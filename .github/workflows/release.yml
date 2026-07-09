@@ -1,0 +1,77 @@
+# Release da app `viabilidade` — repo de app única (app na raiz).
+# Dois jeitos de disparar:
+#   1. workflow_dispatch (Actions → release → Run workflow): a tag
+#      viabilidade-v<versao>_<sha8> é criada automaticamente do commit do ref escolhido.
+#   2. push de tag viabilidade-v<x.y.z>_<sha8> (sem sha ainda é aceito, com warning —
+#      sem sha a plataforma não faz upgrade de build em mesma versão).
+# Em ambos: build → urbi-empacotar → release GitHub com viabilidade-<versao>.urbiapp.tgz
+# + .sha256 (convenção que a plataforma consome para instalar/atualizar a app).
+name: release
+on:
+  push:
+    tags: ['viabilidade-v*']
+  workflow_dispatch: {}
+permissions:
+  contents: write    # gh release create (inclui criar a tag no dispatch)
+  packages: read     # instalar @urbiverso/sdk do GitHub Packages
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Derivar versão e tag de release
+        id: tag
+        run: |
+          appId="viabilidade"
+          buildSha=$(git rev-parse HEAD)
+          sha8=$(git rev-parse --short=8 HEAD)
+          versao=$(node -p "require('./manifesto.json').versao")
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            releaseTag="${appId}-v${versao}_${sha8}"
+            if git ls-remote --exit-code --tags origin "refs/tags/$releaseTag" >/dev/null 2>&1; then
+              echo "::error::tag '$releaseTag' já existe — este commit já tem release"; exit 1
+            fi
+          else
+            if [[ "$GITHUB_REF_NAME" =~ ^viabilidade-v([0-9]+\.[0-9]+\.[0-9]+)(_([0-9a-f]{7,40}))?$ ]]; then
+              versaoTag="${BASH_REMATCH[1]}"
+              shaTag="${BASH_REMATCH[3]}"
+            else
+              echo "::error::tag '$GITHUB_REF_NAME' fora da convenção viabilidade-v<x.y.z>_<sha8>"; exit 1
+            fi
+            [ "$versaoTag" = "$versao" ] || { echo "::error::tag diz $versaoTag mas manifesto.json diz $versao"; exit 1; }
+            releaseTag="$GITHUB_REF_NAME"
+            if [ -n "$shaTag" ]; then
+              [[ "$buildSha" == "$shaTag"* ]] || { echo "::error::sha da tag ($shaTag) não corresponde ao commit ($buildSha)"; exit 1; }
+            else
+              echo "::warning::tag sem sha de build — use viabilidade-v${versao}_${sha8} para permitir upgrade de build em mesma versão"
+            fi
+          fi
+          echo "app_id=$appId" >> "$GITHUB_OUTPUT"
+          echo "versao=$versao" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$releaseTag" >> "$GITHUB_OUTPUT"
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build e testes
+        run: |
+          pnpm build
+          pnpm test
+      - name: Empacotar
+        run: pnpm exec urbi-empacotar viabilidade --dir . --saida ./dist
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.tag.outputs.release_tag }}" \
+            dist/viabilidade-${{ steps.tag.outputs.versao }}.urbiapp.tgz \
+            dist/viabilidade-${{ steps.tag.outputs.versao }}.urbiapp.tgz.sha256 \
+            --target "$(git rev-parse HEAD)" \
+            --title "viabilidade v${{ steps.tag.outputs.versao }} ($(git rev-parse --short=8 HEAD))" \
+            --generate-notes

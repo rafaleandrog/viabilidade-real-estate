@@ -1,0 +1,18 @@
+{
+  "nome": "Estudo de Viabilidade",
+  "versao": "0.1.0",
+  "shell_min": "0.50.3",
+  "descricao": "Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação) — proforma automática, comparação de cenários, sensibilidade e apelo comercial por IA.",
+  "rotas_publicas": [],
+  "roles": {
+    "leitura": {
+      "leitor": "Acompanha estudos e terrenos aos quais foi dado acesso"
+    },
+    "escrita": {
+      "editor": "Cria e edita estudos de viabilidade"
+    },
+    "admin": {
+      "aprovador": "Aprova ou reprova estudos em análise e gerencia benchmarks"
+    }
+  }
+}
