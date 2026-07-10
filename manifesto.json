@@ -4,15 +4,110 @@
   "shell_min": "0.50.3",
   "descricao": "Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação) — proforma automática, comparação de cenários, sensibilidade e apelo comercial por IA.",
   "rotas_publicas": [],
+  "dependencias_nucleo": [],
+  "permissoes_nucleo": {},
+  "instrucoes_agente": "Pode consultar estudos de viabilidade aos quais o usuário tem acesso, gerar a análise de apelo comercial de um estudo a partir dos documentos anexados, e consultar benchmarks por tipo de empreendimento. Não avança status nem edita premissas.",
   "roles": {
     "leitura": {
-      "leitor": "Acompanha estudos e terrenos aos quais foi dado acesso"
+      "leitor": {
+        "descricao": "Visualiza estudos e exporta relatórios (PDF/Excel)"
+      }
     },
     "escrita": {
-      "editor": "Cria e edita estudos de viabilidade"
+      "editor": {
+        "descricao": "Cria, edita e duplica estudos; edita benchmarks; avança Rascunho → Em análise",
+        "sticker": {
+          "icone": "fa-solid fa-pen-ruler",
+          "cor": "#2F6BDB"
+        }
+      }
     },
     "admin": {
-      "aprovador": "Aprova ou reprova estudos em análise e gerencia benchmarks"
+      "aprovador": {
+        "descricao": "Aprova, reprova e devolve estudos; edita qualquer campo (Diretoria)",
+        "sticker": {
+          "icone": "fa-solid fa-stamp",
+          "cor": "#D4860B"
+        }
+      }
+    }
+  },
+  "nav": [
+    {
+      "titulo": "Estudos",
+      "rota": "/",
+      "icone": "fa-solid fa-chart-line"
+    },
+    {
+      "titulo": "Terrenos",
+      "rota": "/terrenos",
+      "icone": "fa-solid fa-map-location-dot"
+    }
+  ],
+  "ia": true,
+  "telas_config": {
+    "benchmarks": {
+      "titulo": "Benchmarks",
+      "descricao": "Valores de referência e faixas de sensibilidade por tipo de empreendimento",
+      "componente": "viabilidade-config-benchmarks"
+    }
+  },
+  "parametros": {
+    "imposto_padrao_pct": {
+      "tipo": "numero",
+      "nullable": false,
+      "inicial": 7,
+      "descricao": "Alíquota padrão de imposto sobre a receita (não-RET), em %"
+    },
+    "aliquota_ret_pct": {
+      "tipo": "numero",
+      "nullable": false,
+      "inicial": 4,
+      "descricao": "Alíquota fixa aplicada quando o estudo está sujeito ao RET, em %"
+    },
+    "corretagem_padrao_pct": {
+      "tipo": "numero",
+      "nullable": false,
+      "inicial": 5,
+      "descricao": "Taxa de corretagem padrão sobre o valor dos contratos, em %"
+    },
+    "marketing_padrao_pct": {
+      "tipo": "numero",
+      "nullable": false,
+      "inicial": 1,
+      "descricao": "Percentual padrão de marketing sobre o VGV, em %"
+    },
+    "gestao_indiretos_padrao_pct": {
+      "tipo": "numero",
+      "nullable": false,
+      "inicial": 1.25,
+      "descricao": "Percentual padrão de gestão e outros custos indiretos sobre o VGV, em %"
+    },
+    "prazo_arquivamento_dias": {
+      "tipo": "numero",
+      "nullable": false,
+      "inicial": 30,
+      "descricao": "Dias sem movimentação (exceto Aprovado) até o estudo ser arquivado automaticamente"
+    }
+  },
+  "eventos": {
+    "estudo_criado": {
+      "campos": ["estudo_id", "nome_estudo", "tipo_empreendimento", "autor"],
+      "conteudo": "Novo estudo criado por {autor}: {nome_estudo} ({tipo_empreendimento})",
+      "api": "estudos/{estudo_id}",
+      "rota": "detalhe/{estudo_id}"
+    },
+    "estudo_status_alterado": {
+      "campos": ["estudo_id", "nome_estudo", "tipo_empreendimento", "status_anterior", "status_novo", "autor"],
+      "conteudo": "{nome_estudo}: status alterado de {status_anterior} para {status_novo} por {autor}",
+      "api": "estudos/{estudo_id}",
+      "rota": "detalhe/{estudo_id}"
+    },
+    "apelo_comercial_concluido": {
+      "campos": ["estudo_id", "nome_estudo", "score_geral"],
+      "conteudo": "Análise de apelo comercial concluída para {nome_estudo} — Score: {score_geral}",
+      "api": "estudos/{estudo_id}",
+      "rota": "detalhe/{estudo_id}"
     }
   }
 }

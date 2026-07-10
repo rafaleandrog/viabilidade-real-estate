@@ -16,7 +16,24 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
-## Estado atual: Etapa 0 — ✅ CONCLUÍDA
+## Estado atual: Etapa 1 — ✅ CONCLUÍDA
+
+### Feito (Etapa 1 — schema.json + manifesto.json reais)
+- **`schema.json` completo** com as 6 tabelas da spec §6.1, todas `acesso_externo: "restrito"`:
+  - `estudos` (`soft_delete: true`) — meta/identidade (`id_legivel` único, `nome_exibicao`, `nome`, `tipo_empreendimento`, `uf`, `sequencia`, `nivel_analise`, `status`, `autor_id`), terreno (`origem_terreno` nucleo/manual + `terreno_manual_nome`/`terreno_manual_area`), produto (preços/m², coeficientes, áreas PVT R/NR aberta/fechada, %s da gleba), custos diretos/indiretos com toggles de modo (`infra_modo`, `projetos_modo`, `licenciamento_modo`, `permuta_fisica_modo`), impostos/RET, permutas e overrides de sensibilidade.
+  - `estudo_imoveis` (junção N:M, `imovel_nucleo_id` inteiro = ref. lógica; `tipo_imovel` gleba/lote; único `[estudo_id, imovel_nucleo_id]`), `estudo_membros` (funcao leitor/editor/aprovador; único `[estudo_id, usuario_id]`), `benchmarks` (único `[tipo_empreendimento, campo]`), `apelo_comercial` (6 scores + `score_geral` + `resultado` json), `apelo_comercial_documentos` (`arquivo` com mimes PDF/DOCX/XLSX).
+- **`manifesto.json` completo**: roles (leitor/editor/aprovador com stickers), `nav` (Estudos, Terrenos), `ia: true`, `telas_config.benchmarks`, `parametros` (§6.5 — impostos/RET/corretagem/marketing/indiretos/prazo arquivamento), `eventos` (§6.9 — `estudo_criado`, `estudo_status_alterado`, `apelo_comercial_concluido`).
+- **Validado (verde):** JSON parse ✓ · `pnpm typecheck` ✓ · `pnpm build` ✓ · `pnpm run empacotar` ✓ → `dist/viabilidade-0.1.0.urbiapp.tgz` (schema+manifesto aceitos pelo empacotador).
+
+### Decisões da Etapa 1 (reconciliação com a realidade)
+- **Núcleo declarado vazio no MVP:** `dependencias_nucleo: []`, `permissoes_nucleo: {}`. Motivo: o módulo `imoveis`/`gleba`/`lote` da spec §6.6 **não existe** na instância real (só há `empreendimentos` e `unidades`); declarar dependência de módulo inexistente arriscaria travar o registro/instalação do app na interface. **Decisão do usuário:** o app aceita terreno do Núcleo **e** manual; no MVP tudo funciona pelo modo `manual` (nome+área digitados) e o schema já está preparado (`origem_terreno`, `estudo_imoveis.imovel_nucleo_id`) para quando houver conexão real — bastará adicionar dependência + rotas-proxy, **sem migração de schema**. Ver `[[nucleo-imoveis-nao-existe-usar-manual]]`.
+- **`permissoes_nucleo` usa string** (`"leitura"`), não array `["ler"]` como na spec — corrigido conforme apps reais (`visualizador`, `fabrica`).
+- **Percentuais de input unificados em `decimal(5,2)`** (não `inteiro` como diz §6.1). Motivo: vários defaults da spec são fracionários (imposto 6,73% arredondado p/ 7, projetos 1,6%, incorporação/registro 0,25%, gestão indiretos 1,25%); `inteiro` zeraria/corromperia esses valores. Monetários e áreas em `decimal(12,2)`, scores do apelo em `decimal(3,1)`, conforme spec.
+- **`nivel_analise` usa `"avancado"` sem acento** (slug seguro para filtros de API), em vez de `"avançado"`.
+
+---
+
+## Estado anterior: Etapa 0 — ✅ CONCLUÍDA
 
 ### Feito
 - **Reconhecimento** das docs do shell: `overview`, `banco-de-dados`, `permissoes`, `ui`, `barramento` (eventos), `agentes` (IA/usuários), `documentacao`. Apps modelo lidas: `okr` (membership `ciclo_membros`, status, rotas modulares, web component Lit) e `recrutamento` (bloco `ia` no manifesto).
@@ -47,8 +64,7 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 ---
 
 ## Próximos passos
-- **Etapa 1 (próxima):** `schema.json` + `manifesto.json` reais — tabelas da spec §6.1 (`estudos`, `estudo_imoveis`, `estudo_membros`, `benchmarks`, `apelo_comercial`, `apelo_comercial_documentos`, todas `acesso_externo:"restrito"`, precisão decimal); manifesto com roles, nav, `ia`, eventos §6.9, `dependencias_nucleo:["imoveis"]` + `permissoes_nucleo:{imoveis:["ler"]}`, params §6.5. Validar com `urbi-empacotar` (via PowerShell no Windows).
-  - ⚠️ Antes: reconciliar `dependencias_nucleo` com a **divergência do Núcleo** (ver abaixo) — pode ser que o supertipo não se chame `imoveis` na instância real.
+- **Etapa 2 (próxima):** permissão por estudo (membership 4ª camada) espelhando `ciclo_membros`/`permissoes-ciclo.ts` do `okr`. Rotas customizadas de `estudos` (listar filtrado por membership, criar com membros, detalhe/patch/delete, duplicar, transição de status com regras) + publicação dos eventos §6.9. Ler `docs/shell/permissoes.md` e o `permissoes-ciclo.ts` do okr antes.
 
 ## Pendências v2 (fora do MVP)
 - Nível "Avançado" do estudo (dimensão temporal). MVP é só "Preliminar".

@@ -1,3 +1,154 @@
 {
-  "tabelas": {}
+  "tabelas": {
+    "estudos": {
+      "acesso_externo": "restrito",
+      "soft_delete": true,
+      "colunas": {
+        "id_legivel":          { "tipo": "texto", "limite": 100, "unico": true, "obrigatorio": true },
+        "nome_exibicao":       { "tipo": "texto", "limite": 200 },
+        "nome":                { "tipo": "texto", "limite": 200, "obrigatorio": true },
+        "tipo_empreendimento": { "tipo": "texto", "limite": 20, "opcoes": ["loteamento", "incorporacao"], "obrigatorio": true },
+        "uf":                  { "tipo": "texto", "limite": 2 },
+        "sequencia":           { "tipo": "inteiro" },
+        "nivel_analise":       { "tipo": "texto", "limite": 20, "opcoes": ["preliminar", "avancado"], "padrao": "preliminar" },
+        "status":              { "tipo": "texto", "limite": 20, "opcoes": ["rascunho", "em_analise", "aprovado", "reprovado", "arquivado"], "padrao": "rascunho" },
+        "autor_id":            { "tipo": "referencia", "tabela_ref": "shell.usuarios", "campos_incluir": ["nome as autor_nome", "avatar_url as autor_avatar_url"] },
+        "notas":               { "tipo": "texto_longo" },
+
+        "origem_terreno":      { "tipo": "texto", "limite": 10, "opcoes": ["nucleo", "manual"], "padrao": "manual" },
+        "terreno_manual_nome": { "tipo": "texto", "limite": 200 },
+        "terreno_manual_area": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+
+        "area_media_lote_m2":            { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "preco_venda_m2":                { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "preco_venda_m2_residencial":    { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "preco_venda_m2_nao_residencial":{ "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "num_unidades":                  { "tipo": "inteiro" },
+
+        "coef_aproveitamento_basico": { "tipo": "decimal", "precisao": 6, "escala": 2 },
+        "coef_aproveitamento_maximo": { "tipo": "decimal", "precisao": 6, "escala": 2, "padrao": 3 },
+        "gabarito_maximo":            { "tipo": "decimal", "precisao": 8, "escala": 2 },
+
+        "app_pct":                         { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "faixas_nao_edificaveis_pct":      { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "sistema_viario_pct":              { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 25 },
+        "elup_pct":                        { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "epc_pct":                         { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "epu_pct":                         { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "areas_privativas_nao_vendaveis_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
+
+        "area_pvt_r_aberta":   { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "area_pvt_r_fechada":  { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "area_pvt_nr_aberta":  { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "area_pvt_nr_fechada": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "area_comum_total":    { "tipo": "decimal", "precisao": 12, "escala": 2 },
+
+        "sujeito_ret":                          { "tipo": "booleano", "padrao": false },
+        "imposto_percentual":                   { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 7 },
+        "corretagem_percentual":                { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 5 },
+        "marketing_percentual":                 { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
+        "permuta_financeira_residencial_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "permuta_financeira_nao_residencial_pct": { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+
+        "considerar_custo_terreno": { "tipo": "booleano", "padrao": true },
+        "custo_terreno_m2":         { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "valor_venal_terreno_m2":   { "tipo": "decimal", "precisao": 12, "escala": 2 },
+
+        "projetos_modo":       { "tipo": "texto", "limite": 12, "opcoes": ["valor_fixo", "pct_vgv"], "padrao": "pct_vgv" },
+        "projetos_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1.6 },
+        "projetos_valor_fixo": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+
+        "licenciamento_modo":       { "tipo": "texto", "limite": 12, "opcoes": ["valor_fixo", "pct_vgv"], "padrao": "valor_fixo" },
+        "licenciamento_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "licenciamento_valor_fixo": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+
+        "infra_modo":       { "tipo": "texto", "limite": 12, "opcoes": ["valor_m2", "pct_vgv"], "padrao": "pct_vgv" },
+        "custo_infra_m2":   { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "infra_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 30 },
+
+        "incorporacao_registro_pct": { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0.25 },
+        "custo_construcao_m2":       { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 4800 },
+        "taxa_gestao_pct":           { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 6 },
+        "custo_decoracao_m2":        { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 150 },
+        "manutencao_pct":            { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
+        "contingencias_pct":         { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "stand_vendas_valor":        { "tipo": "decimal", "precisao": 12, "escala": 2 },
+
+        "marketing_global_pct":  { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
+        "gestao_indiretos_pct":  { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1.25 },
+
+        "permuta_fisica_modo":    { "tipo": "texto", "limite": 16, "opcoes": ["area_m2", "pct_area_venda"], "padrao": "area_m2" },
+        "permuta_fisica_area_m2": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "permuta_fisica_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2 },
+
+        "sensibilidade_variacao_positiva_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "sensibilidade_variacao_negativa_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 }
+      },
+      "indices": [["tipo_empreendimento"], ["status"], ["autor_id"]],
+      "unicos": [["id_legivel"]]
+    },
+
+    "estudo_imoveis": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":       { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "imovel_nucleo_id":{ "tipo": "inteiro", "obrigatorio": true },
+        "tipo_imovel":     { "tipo": "texto", "limite": 10, "opcoes": ["gleba", "lote"] }
+      },
+      "indices": [["estudo_id"]],
+      "unicos": [["estudo_id", "imovel_nucleo_id"]]
+    },
+
+    "estudo_membros": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":  { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "usuario_id": { "tipo": "referencia", "tabela_ref": "shell.usuarios", "obrigatorio": true, "campos_incluir": ["nome as usuario_nome", "avatar_url as usuario_avatar_url"] },
+        "funcao":     { "tipo": "texto", "limite": 20, "opcoes": ["leitor", "editor", "aprovador"], "padrao": "leitor" }
+      },
+      "indices": [["estudo_id"], ["usuario_id"]],
+      "unicos": [["estudo_id", "usuario_id"]]
+    },
+
+    "benchmarks": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "tipo_empreendimento": { "tipo": "texto", "limite": 20, "opcoes": ["loteamento", "incorporacao"], "obrigatorio": true },
+        "campo":               { "tipo": "texto", "limite": 100, "obrigatorio": true },
+        "valor":               { "tipo": "decimal", "precisao": 10, "escala": 2 },
+        "regra_comparacao":    { "tipo": "texto", "limite": 30, "opcoes": ["atingir_ou_superar", "nao_exceder"] },
+        "variacao_positiva_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "variacao_negativa_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 }
+      },
+      "indices": [["tipo_empreendimento"]],
+      "unicos": [["tipo_empreendimento", "campo"]]
+    },
+
+    "apelo_comercial": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":               { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "resultado":               { "tipo": "json" },
+        "score_localizacao":       { "tipo": "decimal", "precisao": 3, "escala": 1 },
+        "score_infraestrutura":    { "tipo": "decimal", "precisao": 3, "escala": 1 },
+        "score_vetor_crescimento": { "tipo": "decimal", "precisao": 3, "escala": 1 },
+        "score_concorrencia":      { "tipo": "decimal", "precisao": 3, "escala": 1 },
+        "score_demanda":           { "tipo": "decimal", "precisao": 3, "escala": 1 },
+        "score_seguranca_juridica":{ "tipo": "decimal", "precisao": 3, "escala": 1 },
+        "score_geral":             { "tipo": "decimal", "precisao": 3, "escala": 1 }
+      },
+      "indices": [["estudo_id"]]
+    },
+
+    "apelo_comercial_documentos": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "apelo_id":        { "tipo": "referencia", "tabela_ref": "apelo_comercial", "obrigatorio": true, "ao_deletar": "cascata" },
+        "documento":       { "tipo": "arquivo", "mimes": ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"], "tamanho_max_mb": 25 },
+        "tipo_dado":       { "tipo": "texto", "limite": 50 },
+        "texto_adicional": { "tipo": "texto_longo" }
+      },
+      "indices": [["apelo_id"]]
+    }
+  }
 }
