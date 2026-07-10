@@ -105,6 +105,12 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Demonstração estática (GitHub Pages)
+- **`index.html`** (raiz) + **`demo/demo.ts`→`demo/demo.js`** (bundle versionado) + **`demo/mock.ts`** (mock de `window.urbiVerso` com backend fake em memória: estudos/membros/imóveis/benchmarks seed, roteamento por hash, toasts). Reusa os componentes reais do frontend.
+- **`.nojekyll`** na raiz; script `pnpm run build:demo` (esbuild bundla lit inline, self-contained).
+- Permite navegar todo o frontend sem shell/backend. Habilitar Pages: Settings → Pages → Deploy from branch → `main` / root.
+- ⚠️ Não substitui teste real: dados fictícios, sem cálculo de Proforma (Etapas 5/6), sem `urbi-*` reais.
+
 ## Próximos passos
 - **Etapa 5 (próxima):** formulário completo de Premissas (§4.4/§4.5 — todos os campos de produto/custos/áreas por tipo, toggles de modo) + engine de Proforma no frontend (§6.2, cálculos em tempo real) + KPI grids (§5.2) + Preço Sugerido/m². Ler o protótipo `apps/analise_viabilidade` (schema `res_*`) como referência de fórmulas.
 

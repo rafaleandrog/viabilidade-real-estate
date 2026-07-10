@@ -6,6 +6,20 @@ Este repositório contém o código-fonte da app. Ele **não é** o monorepo do 
 
 ---
 
+## 🖥️ Demonstração navegável (GitHub Pages)
+
+O app real depende do shell do UrbiVerso (que injeta `window.urbiVerso`, autenticação e backend), então **não roda sozinho**. Para permitir uma prévia visual, o repositório inclui uma **página de demonstração estática** que reusa exatamente os mesmos componentes do frontend, porém com um **mock do `window.urbiVerso`** e dados fictícios em memória.
+
+- **Arquivos:** `index.html` (raiz) + `demo/demo.js` (bundle) + `demo/mock.ts` (backend fake).
+- **O que dá pra ver:** dashboard de estudos, criar/duplicar/remover, detalhe com abas (Premissas/Proforma/Gráficos), transições de status, gestão de membros e a configuração de benchmarks.
+- **Limite honesto:** é estático — os dados são fictícios e se perdem ao recarregar; não há backend real nem cálculo de Proforma (esse chega nas Etapas 5/6).
+
+**Como habilitar o GitHub Pages** (após dar push): repositório → **Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: `main` / `/ (root)` → Save**. Em ~1 min o app fica em `https://<seu-usuario>.github.io/<nome-do-repo>/`.
+
+**Rebuild do demo** (se mexer no frontend): `pnpm run build:demo` (regenera `demo/demo.js`, que é versionado).
+
+---
+
 ## ⚠️ Leia isto primeiro (para o Claude Code)
 
 Este README é o mapa do projeto. **Releia-o no início de cada sessão** antes de escrever qualquer código. As regras abaixo valem para **todas** as etapas.
