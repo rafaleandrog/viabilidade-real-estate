@@ -58,7 +58,8 @@ jobs:
       - name: Instalar dependências
         run: pnpm install --frozen-lockfile
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT com read:packages — o GITHUB_TOKEN automático não lê pacotes de outra org (@urbiverso)
+          NODE_AUTH_TOKEN: ${{ secrets.URBIVERSO_PACKAGES_TOKEN }}
       - name: Build e testes
         run: |
           pnpm build
