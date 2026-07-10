@@ -16,7 +16,19 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
-## Estado atual: Etapa 5 — ✅ CONCLUÍDA
+## Estado atual: Etapa 6 — ✅ CONCLUÍDA
+
+### Feito (Etapa 6 — aba Proforma + cenários + sensibilidade + Gráficos)
+- **`frontend/tela-proforma.ts`** — `<viab-tela-proforma>`: KPI grid do topo (§5.2, área permutada condicional, custo obras/VGV e margem com cor por benchmark); **tabela Proforma linha a linha** (§6.2, colunas R$ e % VGV, subtotais e resultado destacados, linhas exclusivas por tipo e ocultação de zeros); **comparação de cenários** transiente (máx. 2 snapshots + coluna Δ%); **análise de sensibilidade** Bear/Base/Bull por variável estressada (preço, permuta física/financeira, custo infra/obras) com faixas do estudo/benchmark; botões de exportação (placeholder → Etapa 7). Tudo reusa `proforma.ts`.
+- **`frontend/tela-graficos.ts`** — `<viab-tela-graficos>`: pizza de composição de custos em **SVG autocontido** (com flag para excluir terreno) + barras Receita×Custos. Sem dependência de `urbi-grafico-*`.
+- **`frontend/viab-format.ts`** — formatadores compartilhados (R$, número, %).
+- **`tela-estudo`**: abas agora **preservam o DOM** (toggle por `?hidden`, não recriação) — atende §6.4 (estado transiente dos cenários sobrevive à troca de aba). Proforma/Gráficos recebem `.estudo`.
+- **Demo**: seed enriquecido com defaults de premissas para a Proforma exibir números realistas.
+- **Validado (verde):** typecheck ✓ · build ✓ (frontend 60→75KB) · test 15/15 ✓ · build:demo ✓ (81→99KB) · empacotar ✓.
+
+---
+
+## Estado anterior: Etapa 5 — ✅ CONCLUÍDA
 
 ### Feito (Etapa 5 — engine de Proforma + Premissas + KPIs + Preço Sugerido)
 - **`frontend/proforma.ts`** — engine pura `calcularProforma(estudo)` para Loteamento e Incorporação (§6.2): áreas, VGV (áreas fechadas na Inc; área vendável líquida no Lot), deduções (imposto/RET, corretagem, marketing, permutas financeiras), custos diretos (terreno, infra/construção/decoração/gestão, projetos, outorga, registro, manutenção, contingências) e indiretos, resultado + margem, KPIs (eficiência, custo obras/VGV, ROI, margem bruta, nº unidades, preço médio). `precoSugeridoM2()` por bisseção sobre o piso de resultado final (§1).
@@ -123,7 +135,7 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - ⚠️ Não substitui teste real: dados fictícios, sem cálculo de Proforma (Etapas 5/6), sem `urbi-*` reais.
 
 ## Próximos passos
-- **Etapa 6 (próxima):** aba Proforma (tabela linha a linha §6.2 reusando `proforma.ts`, KPI grid topo §5.2, botões de exportação placeholder), comparação de cenários (§5.2, transiente), análise de sensibilidade Bear/Base/Bull (§5.2) + aba Gráficos (pizza custos + barras receita×custo). Depois: exportação PDF/Excel (§6.3), IA Apelo Comercial (§6.7), **arquivamento automático 30 dias (§3)** e filtro Núcleo — Etapa 7.
+- **Etapa 7 (próxima — final):** exportação PDF/Excel (§6.3), IA de Apelo Comercial (§6.7 — `req.ia.extrairConteudo`/`consultar`, tabelas `apelo_comercial*`, evento `apelo_comercial_concluido`, upload de documentos), **arquivamento automático 30 dias (§3)** (ler contrato de agendamento do shell), UI de benchmarks polida, docs do app em `docs/viabilidade/*` (§6.10, seguir `documentacao.md`) e empacotamento final. Filtro Núcleo permanece bloqueado (instância sem glebas/lotes).
 
 ## Pendências de etapas anteriores (rastreadas)
 - **Arquivamento automático 30 dias (§3)** — regra de backend não implementada; exige contrato de agendamento do shell (`req.eventos.agendar`/rotina). Fazer na Etapa 7.

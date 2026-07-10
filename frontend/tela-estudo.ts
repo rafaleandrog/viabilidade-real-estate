@@ -2,6 +2,8 @@ import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estilosBase, STATUS_LABEL, TIPO_LABEL } from './viab-shared.js';
 import './tela-premissas.js';
+import './tela-proforma.js';
+import './tela-graficos.js';
 import {
   urbiVerso, buscarEstudo, transicaoStatus,
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
@@ -93,9 +95,13 @@ export class ViabTelaEstudo extends LitElement {
         `)}
       </div>
 
-      ${this.aba === 'premissas' ? this._renderPremissas(p) : nothing}
-      ${this.aba === 'proforma' ? html`<div class="placeholder">Proforma — cálculos e sensibilidade chegam na Etapa 5/6.</div>` : nothing}
-      ${this.aba === 'graficos' ? html`<div class="placeholder">Gráficos — visualizações chegam na Etapa 6.</div>` : nothing}
+      <div ?hidden=${this.aba !== 'premissas'}>${this._renderPremissas(p)}</div>
+      <div ?hidden=${this.aba !== 'proforma'}>
+        <viab-tela-proforma .estudo=${this.estudo}></viab-tela-proforma>
+      </div>
+      <div ?hidden=${this.aba !== 'graficos'}>
+        <viab-tela-graficos .estudo=${this.estudo}></viab-tela-graficos>
+      </div>
     `;
   }
 
