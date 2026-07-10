@@ -4,12 +4,13 @@ import { estilosBase, STATUS_LABEL, TIPO_LABEL } from './viab-shared.js';
 import './tela-premissas.js';
 import './tela-proforma.js';
 import './tela-graficos.js';
+import './tela-apelo.js';
 import {
   urbiVerso, buscarEstudo, transicaoStatus,
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
-type Aba = 'premissas' | 'proforma' | 'graficos';
+type Aba = 'premissas' | 'proforma' | 'graficos' | 'apelo';
 const FUNCOES = ['leitor', 'editor', 'aprovador'];
 
 @customElement('viab-tela-estudo')
@@ -88,9 +89,9 @@ export class ViabTelaEstudo extends LitElement {
       </div>
 
       <div class="abas">
-        ${(['premissas', 'proforma', 'graficos'] as Aba[]).map((a) => html`
+        ${(['premissas', 'proforma', 'graficos', 'apelo'] as Aba[]).map((a) => html`
           <button class="aba ${this.aba === a ? 'ativa' : ''}" @click=${() => this.aba = a}>
-            ${a === 'premissas' ? 'Premissas' : a === 'proforma' ? 'Proforma' : 'Gráficos'}
+            ${a === 'premissas' ? 'Premissas' : a === 'proforma' ? 'Proforma' : a === 'graficos' ? 'Gráficos' : 'Apelo Comercial'}
           </button>
         `)}
       </div>
@@ -101,6 +102,9 @@ export class ViabTelaEstudo extends LitElement {
       </div>
       <div ?hidden=${this.aba !== 'graficos'}>
         <viab-tela-graficos .estudo=${this.estudo}></viab-tela-graficos>
+      </div>
+      <div ?hidden=${this.aba !== 'apelo'}>
+        <viab-tela-apelo .estudo=${this.estudo} .editavel=${(this.estudo._permissao || {}).podeEditar}></viab-tela-apelo>
       </div>
     `;
   }

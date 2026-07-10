@@ -115,6 +115,28 @@ export function listarLotes(): Promise<any> {
   return urbiVerso.api(`${APP}/nucleo/lotes`);
 }
 
+// ── Apelo Comercial (IA) ──
+export function buscarApelo(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial`);
+}
+export async function uploadDocumentoApelo(file: File): Promise<{ upload_id: number }> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch('/api/dados/viabilidade/apelo_comercial_documentos/__upload?coluna=documento', {
+    method: 'POST', body: fd, credentials: 'same-origin',
+  });
+  return res.json();
+}
+export function anexarDocumentoApelo(estudoId: number, dados: { upload_id?: number; tipo_dado?: string; texto_adicional?: string }): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial/documentos`, { method: 'POST', body: JSON.stringify(dados) });
+}
+export function removerDocumentoApelo(estudoId: number, docId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial/documentos/${docId}`, { method: 'DELETE' });
+}
+export function analisarApelo(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial`, { method: 'POST' });
+}
+
 // ── Usuários (para gestão de membros) ──
 export async function listarUsuarios(): Promise<any[]> {
   const res = await urbiVerso.api('/shell/apps/viabilidade/roles/usuarios');

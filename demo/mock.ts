@@ -26,6 +26,34 @@ const estudos: any[] = [];
 const membros: any[] = []; // { id, estudo_id, usuario_id, usuario_nome, funcao }
 const imoveis: any[] = []; // { id, estudo_id, imovel_nucleo_id, tipo_imovel }
 const benchmarks: any[] = []; // { id, tipo_empreendimento, campo, valor, regra_comparacao, variacao_positiva_pct, variacao_negativa_pct }
+const apeloStore: Record<number, { apelo: any; documentos: any[] }> = {};
+
+const FATORES_DEMO = ['Localização', 'Infraestrutura no Entorno', 'Vetor de Crescimento', 'Concorrência', 'Demanda Estrutural', 'Segurança Jurídica e Regulatória'];
+function apeloDemo(estudoId: number) {
+  const fatores = FATORES_DEMO.map((nome, i) => {
+    const notas = [4, 3, 5, 4].map((x) => Math.max(1, Math.min(5, x - (i % 2))));
+    const media = Math.round(notas.reduce((s, x) => s + x, 0) / notas.length * 10) / 10;
+    return {
+      nome, nota_consolidada: media,
+      justificativa_geral: `Avaliação do fator ${nome.toLowerCase()} com base nas fontes fornecidas (demo).`,
+      perguntas: notas.map((n, j) => ({ pergunta: `Pergunta-guia ${j + 1} de ${nome}`, nota: n, justificativa: 'Justificativa sintética (demo).' })),
+    };
+  });
+  const todas = fatores.flatMap((f) => f.perguntas.map((p: any) => p.nota));
+  const geral = Math.round(todas.reduce((s, x) => s + x, 0) / todas.length * 10) / 10;
+  return {
+    id: ++seqId, estudo_id: estudoId, score_geral: geral,
+    resultado: {
+      fatores,
+      relatorio: {
+        vantagens: ['Boa acessibilidade viária', 'Vetor de crescimento favorável'],
+        desvantagens: ['Concorrência relevante no entorno'],
+        ganhos: ['Potencial de valorização no médio prazo'],
+        riscos: ['Dependência de investimento público em infraestrutura'],
+      },
+    },
+  };
+}
 
 function proximaSeq(tipo: string): number {
   return estudos.filter((e) => e.tipo_empreendimento === tipo).length + 1;
@@ -150,6 +178,22 @@ async function api(url: string, opts?: RequestInit): Promise<any> {
   if (r[0] === 'config') {
     return { parametros: { imposto_padrao_pct: 7, aliquota_ret_pct: 4, corretagem_padrao_pct: 5, marketing_padrao_pct: 1, gestao_indiretos_padrao_pct: 1.25, prazo_arquivamento_dias: 30 } };
   }
+
+  // /viabilidade/estudos/:id/apelo-comercial...
+  if (r[0] === 'estudos' && r[2] === 'apelo-comercial') {
+    const eid = Number(r[1]);
+    apeloStore[eid] = apeloStore[eid] || { apelo: null, documentos: [] };
+    const st = apeloStore[eid];
+    if (r[3] === 'documentos') {
+      if (metodo === 'POST') { const d = { id: ++seqId, tipo_dado: body.tipo_dado, texto_adicional: body.texto_adicional || null, documento: body.upload_id || null }; st.documentos.push(d); return d; }
+      if (metodo === 'DELETE') { st.documentos = st.documentos.filter((d: any) => d.id !== Number(r[4])); return { ok: true }; }
+    }
+    if (metodo === 'GET') return { apelo: st.apelo, documentos: st.documentos, fatores: [] };
+    if (metodo === 'POST') { st.apelo = apeloDemo(eid); return st.apelo; } // dispara "IA" (canned)
+  }
+
+  // /viabilidade/manutencao/...
+  if (r[0] === 'manutencao') return { ok: true, arquivados: 0, prazo_dias: 30 };
 
   // /viabilidade/nucleo/...
   if (r[0] === 'nucleo') {

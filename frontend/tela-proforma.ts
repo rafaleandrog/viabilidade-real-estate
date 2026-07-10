@@ -4,6 +4,7 @@ import { estilosBase } from './viab-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
+import { exportarPDF, exportarExcel } from './exportar.js';
 
 interface Linha { l: string; v: number; cls?: string; soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean; }
 
@@ -247,6 +248,9 @@ export class ViabTelaProforma extends LitElement {
   }
 
   private _exportar(formato: string) {
-    urbiVerso.notificar(`Exportação ${formato.toUpperCase()} chega na Etapa 7.`, 'alerta');
+    const lot = this.estudo.tipo_empreendimento === 'loteamento';
+    const p = calcularProforma(this._entrada());
+    if (formato === 'excel') exportarExcel(this.estudo, p, lot);
+    else if (!exportarPDF(this.estudo, p, lot)) urbiVerso.notificar('Permita pop-ups para exportar em PDF.', 'alerta');
   }
 }
