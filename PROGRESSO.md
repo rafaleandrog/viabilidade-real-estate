@@ -16,7 +16,18 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
-## Estado atual: Etapa 4 — ✅ CONCLUÍDA
+## Estado atual: Etapa 5 — ✅ CONCLUÍDA
+
+### Feito (Etapa 5 — engine de Proforma + Premissas + KPIs + Preço Sugerido)
+- **`frontend/proforma.ts`** — engine pura `calcularProforma(estudo)` para Loteamento e Incorporação (§6.2): áreas, VGV (áreas fechadas na Inc; área vendável líquida no Lot), deduções (imposto/RET, corretagem, marketing, permutas financeiras), custos diretos (terreno, infra/construção/decoração/gestão, projetos, outorga, registro, manutenção, contingências) e indiretos, resultado + margem, KPIs (eficiência, custo obras/VGV, ROI, margem bruta, nº unidades, preço médio). `precoSugeridoM2()` por bisseção sobre o piso de resultado final (§1).
+- **`frontend/proforma.test.ts`** — 7 testes com números conferidos à mão (Lot completo, RET, terreno desconsiderado, Inc VGV, preço sugerido). **Total 15/15 verdes** (script `test` agora varre `frontend/` também).
+- **`frontend/tela-premissas.ts`** — `<viab-tela-premissas>`: formulário completo por tipo (terreno, produto/áreas, custos com toggles infra/projetos, impostos+RET, permuta física com toggle), **KPI grid ao vivo** (§5.2, com cor verde/vermelho por benchmark) e **Preço Sugerido/m²** recalculados a cada digitação; Salvar via PATCH (conversão numérica). Integrado na `tela-estudo` (substitui o mini-form da Etapa 4).
+- **Interpretações documentadas** no topo de `proforma.ts** (onde §4.4/§6.2 se contradizem): custo do terreno × área do terreno; obras = infra (Lot) / construção+decoração+gestão (Inc); projetos/licenciamento % sobre VGV.
+- **Validado (verde):** typecheck ✓ · build ✓ (frontend 47→60KB) · test 15/15 ✓ · build:demo ✓ (66→81KB) · empacotar ✓.
+
+---
+
+## Estado anterior: Etapa 4 — ✅ CONCLUÍDA
 
 ### Feito (Etapa 4 — frontend: dashboard + detalhe + config)
 - **`frontend/viabilidade-api.ts`** — wrapper sobre `window.urbiVerso.api` (APP `/viabilidade`) com todas as chamadas: estudos (CRUD/duplicar/status), membros, imóveis, benchmarks, config, glebas/lotes, `listarUsuarios` (via `/shell/apps/viabilidade/roles/usuarios`).
@@ -112,7 +123,11 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 - ⚠️ Não substitui teste real: dados fictícios, sem cálculo de Proforma (Etapas 5/6), sem `urbi-*` reais.
 
 ## Próximos passos
-- **Etapa 5 (próxima):** formulário completo de Premissas (§4.4/§4.5 — todos os campos de produto/custos/áreas por tipo, toggles de modo) + engine de Proforma no frontend (§6.2, cálculos em tempo real) + KPI grids (§5.2) + Preço Sugerido/m². Ler o protótipo `apps/analise_viabilidade` (schema `res_*`) como referência de fórmulas.
+- **Etapa 6 (próxima):** aba Proforma (tabela linha a linha §6.2 reusando `proforma.ts`, KPI grid topo §5.2, botões de exportação placeholder), comparação de cenários (§5.2, transiente), análise de sensibilidade Bear/Base/Bull (§5.2) + aba Gráficos (pizza custos + barras receita×custo). Depois: exportação PDF/Excel (§6.3), IA Apelo Comercial (§6.7), **arquivamento automático 30 dias (§3)** e filtro Núcleo — Etapa 7.
+
+## Pendências de etapas anteriores (rastreadas)
+- **Arquivamento automático 30 dias (§3)** — regra de backend não implementada; exige contrato de agendamento do shell (`req.eventos.agendar`/rotina). Fazer na Etapa 7.
+- **Filtro Núcleo** (excluir Fazenda Paranoazinho / lotes em parcelamento) — bloqueado (Núcleo desta instância sem glebas/lotes). Ver [[nucleo-imoveis-nao-existe-usar-manual]].
 
 ### Descoberta (Etapa 2) — glebas/lotes existem no Núcleo via `req.nucleo`
 Os tipos do SDK (`node_modules/@urbiverso/sdk/dist/express.d.ts`, `type EntidadeBatch`) listam `glebas`, `lotes`, `parcelamentos`, `unidades` como entidades do Núcleo acessíveis por `req.nucleo` (`batch`, `chamarSubrecurso`, `buscarPorChave`). Ou seja: **glebas/lotes existem** como entidades — só não há supertipo `imoveis` nem rota REST dedicada em `nucleo/backend/src/rotas/`. Isso **refina** (não invalida) a decisão da Etapa 1: MVP segue manual; a integração "Buscar terreno" usará `req.nucleo` e `permissoes_nucleo: { glebas: "leitura", lotes: "leitura" }`. Ver `[[nucleo-imoveis-nao-existe-usar-manual]]`.

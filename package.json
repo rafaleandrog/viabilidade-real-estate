@@ -8,7 +8,7 @@
     "build": "esbuild frontend/index.ts --bundle --external:@urbiverso/ui --format=esm --outfile=frontend/index.js --target=es2022 --minify --tsconfig=tsconfig.json && esbuild backend/rotas.ts --bundle --minify --format=esm --outfile=backend/rotas.js --platform=node --target=node20 --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
     "build:demo": "esbuild demo/demo.ts --bundle --format=esm --outfile=demo/demo.js --target=es2022 --tsconfig=tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx/esm --test backend/**/*.test.ts",
+    "test": "node --import tsx/esm --test backend/**/*.test.ts frontend/**/*.test.ts",
     "empacotar": "urbi-empacotar viabilidade --dir . --saida ./dist"
   },
   "dependencies": {

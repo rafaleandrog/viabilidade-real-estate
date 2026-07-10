@@ -1,7 +1,7 @@
 // demo/mock.ts
 var SIGLAS = { loteamento: "LOT", incorporacao: "INC" };
-function slug(s3) {
-  return s3.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+function slug(s) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 var usuarios = [
   { id: 1, nome: "Voc\xEA (demo)", email: "voce@demo", tipo: "usuario_urbiverso", avatar_url: "" },
@@ -67,9 +67,9 @@ function semearBenchmarks() {
   for (const tipo of ["loteamento", "incorporacao"]) {
     const base = [...comuns];
     if (tipo === "loteamento") base.push({ campo: "eficiencia_aproveitamento", valor: 40, regra_comparacao: "atingir_ou_superar" });
-    for (const b2 of base) {
-      if (benchmarks.some((x) => x.tipo_empreendimento === tipo && x.campo === b2.campo)) continue;
-      benchmarks.push({ id: ++seqId, tipo_empreendimento: tipo, ...b2, variacao_positiva_pct: 10, variacao_negativa_pct: 10 });
+    for (const b of base) {
+      if (benchmarks.some((x2) => x2.tipo_empreendimento === tipo && x2.campo === b.campo)) continue;
+      benchmarks.push({ id: ++seqId, tipo_empreendimento: tipo, ...b, variacao_positiva_pct: 10, variacao_negativa_pct: 10 });
       criados++;
     }
   }
@@ -77,7 +77,7 @@ function semearBenchmarks() {
 }
 semearBenchmarks();
 function permissao(estudo) {
-  const m = membros.find((x) => x.estudo_id === estudo.id && x.usuario_id === USUARIO_ATUAL.id);
+  const m = membros.find((x2) => x2.estudo_id === estudo.id && x2.usuario_id === USUARIO_ATUAL.id);
   return {
     funcao: m?.funcao || "aprovador",
     ehMembro: true,
@@ -113,20 +113,20 @@ async function api(url, opts) {
     if (r[1] === "semear" && metodo === "POST") return { ok: true, criados: semearBenchmarks() };
     if (!r[1] && metodo === "GET") {
       const tipo = q2.get("tipo_empreendimento");
-      return { dados: benchmarks.filter((b2) => !tipo || b2.tipo_empreendimento === tipo), total: benchmarks.length };
+      return { dados: benchmarks.filter((b) => !tipo || b.tipo_empreendimento === tipo), total: benchmarks.length };
     }
     if (!r[1] && metodo === "POST") {
-      const b2 = { id: ++seqId, tipo_empreendimento: body.tipo_empreendimento, campo: body.campo, valor: body.valor ?? null, regra_comparacao: body.regra_comparacao || "atingir_ou_superar", variacao_positiva_pct: null, variacao_negativa_pct: null };
-      benchmarks.push(b2);
-      return b2;
+      const b = { id: ++seqId, tipo_empreendimento: body.tipo_empreendimento, campo: body.campo, valor: body.valor ?? null, regra_comparacao: body.regra_comparacao || "atingir_ou_superar", variacao_positiva_pct: null, variacao_negativa_pct: null };
+      benchmarks.push(b);
+      return b;
     }
     if (r[1] && metodo === "PATCH") {
-      const b2 = benchmarks.find((x) => x.id === Number(r[1]));
-      if (b2) Object.assign(b2, body);
-      return b2 || { erro: true };
+      const b = benchmarks.find((x2) => x2.id === Number(r[1]));
+      if (b) Object.assign(b, body);
+      return b || { erro: true };
     }
     if (r[1] && metodo === "DELETE") {
-      const i = benchmarks.findIndex((x) => x.id === Number(r[1]));
+      const i = benchmarks.findIndex((x2) => x2.id === Number(r[1]));
       if (i >= 0) benchmarks.splice(i, 1);
       return { ok: true };
     }
@@ -137,7 +137,7 @@ async function api(url, opts) {
       if (metodo === "GET") {
         const tipo = q2.get("tipo_empreendimento");
         const status = q2.get("status");
-        const lista = estudos.filter((e) => (!tipo || e.tipo_empreendimento === tipo) && (!status || e.status === status)).map((e) => ({ ...e, _funcao: permissao(e).funcao })).sort((a, b2) => b2.criado_em.localeCompare(a.criado_em));
+        const lista = estudos.filter((e) => (!tipo || e.tipo_empreendimento === tipo) && (!status || e.status === status)).map((e) => ({ ...e, _funcao: permissao(e).funcao })).sort((a, b) => b.criado_em.localeCompare(a.criado_em));
         return { dados: lista, total: lista.length };
       }
       if (metodo === "POST") return novoEstudo(body);
@@ -155,7 +155,7 @@ async function api(url, opts) {
     if (r[2] === "membros") {
       if (!r[3] && metodo === "GET") return { dados: membros.filter((m) => m.estudo_id === id) };
       if (!r[3] && metodo === "POST") {
-        const u = usuarios.find((x) => x.id === Number(body.usuario_id));
+        const u = usuarios.find((x2) => x2.id === Number(body.usuario_id));
         if (!membros.some((m) => m.estudo_id === id && m.usuario_id === Number(body.usuario_id))) {
           membros.push({ id: ++seqId, estudo_id: id, usuario_id: Number(body.usuario_id), usuario_nome: u?.nome || "", funcao: body.funcao || "leitor" });
         }
@@ -168,7 +168,7 @@ async function api(url, opts) {
         return { ok: true };
       }
       if (metodo === "PATCH") {
-        const m = membros.find((x) => x.estudo_id === id && x.usuario_id === uid);
+        const m = membros.find((x2) => x2.estudo_id === id && x2.usuario_id === uid);
         if (m) m.funcao = body.funcao;
         return { ok: true };
       }
@@ -181,7 +181,7 @@ async function api(url, opts) {
         return im;
       }
       if (metodo === "DELETE") {
-        const i = imoveis.findIndex((x) => x.id === Number(r[3]));
+        const i = imoveis.findIndex((x2) => x2.id === Number(r[3]));
         if (i >= 0) imoveis.splice(i, 1);
         return { ok: true };
       }
@@ -234,26 +234,26 @@ var mock = {
 globalThis.urbiVerso = mock;
 
 // frontend/index.js
-var Qt = Object.defineProperty;
-var Xt = Object.getOwnPropertyDescriptor;
-var p = (s3, e, t, r) => {
-  for (var o = r > 1 ? void 0 : r ? Xt(e, t) : e, a = s3.length - 1, i; a >= 0; a--) (i = s3[a]) && (o = (r ? i(e, t, o) : i(o)) || o);
-  return r && o && Qt(e, t, o), o;
+var De = Object.defineProperty;
+var Ge = Object.getOwnPropertyDescriptor;
+var p = (o3, e, t, r) => {
+  for (var a = r > 1 ? void 0 : r ? Ge(e, t) : e, s = o3.length - 1, i; s >= 0; s--) (i = o3[s]) && (a = (r ? i(e, t, a) : i(a)) || a);
+  return r && a && De(e, t, a), a;
 };
-var K = globalThis;
-var Z = K.ShadowRoot && (K.ShadyCSS === void 0 || K.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype;
-var et = Symbol();
-var ht = /* @__PURE__ */ new WeakMap();
-var z = class {
+var rt = globalThis;
+var ot = rt.ShadowRoot && (rt.ShadyCSS === void 0 || rt.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype;
+var $t = Symbol();
+var Vt = /* @__PURE__ */ new WeakMap();
+var D = class {
   constructor(e, t, r) {
-    if (this._$cssResult$ = true, r !== et) throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
+    if (this._$cssResult$ = true, r !== $t) throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
     this.cssText = e, this.t = t;
   }
   get styleSheet() {
     let e = this.o, t = this.t;
-    if (Z && e === void 0) {
+    if (ot && e === void 0) {
       let r = t !== void 0 && t.length === 1;
-      r && (e = ht.get(t)), e === void 0 && ((this.o = e = new CSSStyleSheet()).replaceSync(this.cssText), r && ht.set(t, e));
+      r && (e = Vt.get(t)), e === void 0 && ((this.o = e = new CSSStyleSheet()).replaceSync(this.cssText), r && Vt.set(t, e));
     }
     return e;
   }
@@ -261,112 +261,112 @@ var z = class {
     return this.cssText;
   }
 };
-var ft = (s3) => new z(typeof s3 == "string" ? s3 : s3 + "", void 0, et);
-var y = (s3, ...e) => {
-  let t = s3.length === 1 ? s3[0] : e.reduce((r, o, a) => r + ((i) => {
+var Jt = (o3) => new D(typeof o3 == "string" ? o3 : o3 + "", void 0, $t);
+var x = (o3, ...e) => {
+  let t = o3.length === 1 ? o3[0] : e.reduce((r, a, s) => r + ((i) => {
     if (i._$cssResult$ === true) return i.cssText;
     if (typeof i == "number") return i;
     throw Error("Value passed to 'css' function must be a 'css' function result: " + i + ". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.");
-  })(o) + s3[a + 1], s3[0]);
-  return new z(t, s3, et);
+  })(a) + o3[s + 1], o3[0]);
+  return new D(t, o3, $t);
 };
-var vt = (s3, e) => {
-  if (Z) s3.adoptedStyleSheets = e.map((t) => t instanceof CSSStyleSheet ? t : t.styleSheet);
+var Wt = (o3, e) => {
+  if (ot) o3.adoptedStyleSheets = e.map((t) => t instanceof CSSStyleSheet ? t : t.styleSheet);
   else for (let t of e) {
-    let r = document.createElement("style"), o = K.litNonce;
-    o !== void 0 && r.setAttribute("nonce", o), r.textContent = t.cssText, s3.appendChild(r);
+    let r = document.createElement("style"), a = rt.litNonce;
+    a !== void 0 && r.setAttribute("nonce", a), r.textContent = t.cssText, o3.appendChild(r);
   }
 };
-var rt = Z ? (s3) => s3 : (s3) => s3 instanceof CSSStyleSheet ? ((e) => {
+var xt = ot ? (o3) => o3 : (o3) => o3 instanceof CSSStyleSheet ? ((e) => {
   let t = "";
   for (let r of e.cssRules) t += r.cssText;
-  return ft(t);
-})(s3) : s3;
-var { is: Yt, defineProperty: Vt, getOwnPropertyDescriptor: te, getOwnPropertyNames: ee, getOwnPropertySymbols: re, getPrototypeOf: oe } = Object;
-var Q = globalThis;
-var gt = Q.trustedTypes;
-var se = gt ? gt.emptyScript : "";
-var ae = Q.reactiveElementPolyfillSupport;
-var B = (s3, e) => s3;
-var q = { toAttribute(s3, e) {
+  return Jt(t);
+})(o3) : o3;
+var { is: Ve, defineProperty: Je, getOwnPropertyDescriptor: We, getOwnPropertyNames: Ke, getOwnPropertySymbols: Xe, getPrototypeOf: Ze } = Object;
+var at = globalThis;
+var Kt = at.trustedTypes;
+var Qe = Kt ? Kt.emptyScript : "";
+var Ye = at.reactiveElementPolyfillSupport;
+var G = (o3, e) => o3;
+var V = { toAttribute(o3, e) {
   switch (e) {
     case Boolean:
-      s3 = s3 ? se : null;
+      o3 = o3 ? Qe : null;
       break;
     case Object:
     case Array:
-      s3 = s3 == null ? s3 : JSON.stringify(s3);
+      o3 = o3 == null ? o3 : JSON.stringify(o3);
   }
-  return s3;
-}, fromAttribute(s3, e) {
-  let t = s3;
+  return o3;
+}, fromAttribute(o3, e) {
+  let t = o3;
   switch (e) {
     case Boolean:
-      t = s3 !== null;
+      t = o3 !== null;
       break;
     case Number:
-      t = s3 === null ? null : Number(s3);
+      t = o3 === null ? null : Number(o3);
       break;
     case Object:
     case Array:
       try {
-        t = JSON.parse(s3);
+        t = JSON.parse(o3);
       } catch {
         t = null;
       }
   }
   return t;
 } };
-var X = (s3, e) => !Yt(s3, e);
-var bt = { attribute: true, type: String, converter: q, reflect: false, useDefault: false, hasChanged: X };
-Symbol.metadata ??= Symbol("metadata"), Q.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
-var E = class extends HTMLElement {
+var st = (o3, e) => !Ve(o3, e);
+var Xt = { attribute: true, type: String, converter: V, reflect: false, useDefault: false, hasChanged: st };
+Symbol.metadata ??= Symbol("metadata"), at.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
+var P = class extends HTMLElement {
   static addInitializer(e) {
     this._$Ei(), (this.l ??= []).push(e);
   }
   static get observedAttributes() {
     return this.finalize(), this._$Eh && [...this._$Eh.keys()];
   }
-  static createProperty(e, t = bt) {
+  static createProperty(e, t = Xt) {
     if (t.state && (t.attribute = false), this._$Ei(), this.prototype.hasOwnProperty(e) && ((t = Object.create(t)).wrapped = true), this.elementProperties.set(e, t), !t.noAccessor) {
-      let r = Symbol(), o = this.getPropertyDescriptor(e, r, t);
-      o !== void 0 && Vt(this.prototype, e, o);
+      let r = Symbol(), a = this.getPropertyDescriptor(e, r, t);
+      a !== void 0 && Je(this.prototype, e, a);
     }
   }
   static getPropertyDescriptor(e, t, r) {
-    let { get: o, set: a } = te(this.prototype, e) ?? { get() {
+    let { get: a, set: s } = We(this.prototype, e) ?? { get() {
       return this[t];
     }, set(i) {
       this[t] = i;
     } };
-    return { get: o, set(i) {
-      let u = o?.call(this);
-      a?.call(this, i), this.requestUpdate(e, u, r);
+    return { get: a, set(i) {
+      let l = a?.call(this);
+      s?.call(this, i), this.requestUpdate(e, l, r);
     }, configurable: true, enumerable: true };
   }
   static getPropertyOptions(e) {
-    return this.elementProperties.get(e) ?? bt;
+    return this.elementProperties.get(e) ?? Xt;
   }
   static _$Ei() {
-    if (this.hasOwnProperty(B("elementProperties"))) return;
-    let e = oe(this);
+    if (this.hasOwnProperty(G("elementProperties"))) return;
+    let e = Ze(this);
     e.finalize(), e.l !== void 0 && (this.l = [...e.l]), this.elementProperties = new Map(e.elementProperties);
   }
   static finalize() {
-    if (this.hasOwnProperty(B("finalized"))) return;
-    if (this.finalized = true, this._$Ei(), this.hasOwnProperty(B("properties"))) {
-      let t = this.properties, r = [...ee(t), ...re(t)];
-      for (let o of r) this.createProperty(o, t[o]);
+    if (this.hasOwnProperty(G("finalized"))) return;
+    if (this.finalized = true, this._$Ei(), this.hasOwnProperty(G("properties"))) {
+      let t = this.properties, r = [...Ke(t), ...Xe(t)];
+      for (let a of r) this.createProperty(a, t[a]);
     }
     let e = this[Symbol.metadata];
     if (e !== null) {
       let t = litPropertyMetadata.get(e);
-      if (t !== void 0) for (let [r, o] of t) this.elementProperties.set(r, o);
+      if (t !== void 0) for (let [r, a] of t) this.elementProperties.set(r, a);
     }
     this._$Eh = /* @__PURE__ */ new Map();
     for (let [t, r] of this.elementProperties) {
-      let o = this._$Eu(t, r);
-      o !== void 0 && this._$Eh.set(o, t);
+      let a = this._$Eu(t, r);
+      a !== void 0 && this._$Eh.set(a, t);
     }
     this.elementStyles = this.finalizeStyles(this.styles);
   }
@@ -374,8 +374,8 @@ var E = class extends HTMLElement {
     let t = [];
     if (Array.isArray(e)) {
       let r = new Set(e.flat(1 / 0).reverse());
-      for (let o of r) t.unshift(rt(o));
-    } else e !== void 0 && t.push(rt(e));
+      for (let a of r) t.unshift(xt(a));
+    } else e !== void 0 && t.push(xt(e));
     return t;
   }
   static _$Eu(e, t) {
@@ -401,7 +401,7 @@ var E = class extends HTMLElement {
   }
   createRenderRoot() {
     let e = this.shadowRoot ?? this.attachShadow(this.constructor.shadowRootOptions);
-    return vt(e, this.constructor.elementStyles), e;
+    return Wt(e, this.constructor.elementStyles), e;
   }
   connectedCallback() {
     this.renderRoot ??= this.createRenderRoot(), this.enableUpdating(true), this._$EO?.forEach((e) => e.hostConnected?.());
@@ -415,31 +415,31 @@ var E = class extends HTMLElement {
     this._$AK(e, r);
   }
   _$ET(e, t) {
-    let r = this.constructor.elementProperties.get(e), o = this.constructor._$Eu(e, r);
-    if (o !== void 0 && r.reflect === true) {
-      let a = (r.converter?.toAttribute !== void 0 ? r.converter : q).toAttribute(t, r.type);
-      this._$Em = e, a == null ? this.removeAttribute(o) : this.setAttribute(o, a), this._$Em = null;
+    let r = this.constructor.elementProperties.get(e), a = this.constructor._$Eu(e, r);
+    if (a !== void 0 && r.reflect === true) {
+      let s = (r.converter?.toAttribute !== void 0 ? r.converter : V).toAttribute(t, r.type);
+      this._$Em = e, s == null ? this.removeAttribute(a) : this.setAttribute(a, s), this._$Em = null;
     }
   }
   _$AK(e, t) {
-    let r = this.constructor, o = r._$Eh.get(e);
-    if (o !== void 0 && this._$Em !== o) {
-      let a = r.getPropertyOptions(o), i = typeof a.converter == "function" ? { fromAttribute: a.converter } : a.converter?.fromAttribute !== void 0 ? a.converter : q;
-      this._$Em = o;
-      let u = i.fromAttribute(t, a.type);
-      this[o] = u ?? this._$Ej?.get(o) ?? u, this._$Em = null;
+    let r = this.constructor, a = r._$Eh.get(e);
+    if (a !== void 0 && this._$Em !== a) {
+      let s = r.getPropertyOptions(a), i = typeof s.converter == "function" ? { fromAttribute: s.converter } : s.converter?.fromAttribute !== void 0 ? s.converter : V;
+      this._$Em = a;
+      let l = i.fromAttribute(t, s.type);
+      this[a] = l ?? this._$Ej?.get(a) ?? l, this._$Em = null;
     }
   }
-  requestUpdate(e, t, r, o = false, a) {
+  requestUpdate(e, t, r, a = false, s) {
     if (e !== void 0) {
       let i = this.constructor;
-      if (o === false && (a = this[e]), r ??= i.getPropertyOptions(e), !((r.hasChanged ?? X)(a, t) || r.useDefault && r.reflect && a === this._$Ej?.get(e) && !this.hasAttribute(i._$Eu(e, r)))) return;
+      if (a === false && (s = this[e]), r ??= i.getPropertyOptions(e), !((r.hasChanged ?? st)(s, t) || r.useDefault && r.reflect && s === this._$Ej?.get(e) && !this.hasAttribute(i._$Eu(e, r)))) return;
       this.C(e, t, r);
     }
     this.isUpdatePending === false && (this._$ES = this._$EP());
   }
-  C(e, t, { useDefault: r, reflect: o, wrapped: a }, i) {
-    r && !(this._$Ej ??= /* @__PURE__ */ new Map()).has(e) && (this._$Ej.set(e, i ?? t ?? this[e]), a !== true || i !== void 0) || (this._$AL.has(e) || (this.hasUpdated || r || (t = void 0), this._$AL.set(e, t)), o === true && this._$Em !== e && (this._$Eq ??= /* @__PURE__ */ new Set()).add(e));
+  C(e, t, { useDefault: r, reflect: a, wrapped: s }, i) {
+    r && !(this._$Ej ??= /* @__PURE__ */ new Map()).has(e) && (this._$Ej.set(e, i ?? t ?? this[e]), s !== true || i !== void 0) || (this._$AL.has(e) || (this.hasUpdated || r || (t = void 0), this._$AL.set(e, t)), a === true && this._$Em !== e && (this._$Eq ??= /* @__PURE__ */ new Set()).add(e));
   }
   async _$EP() {
     this.isUpdatePending = true;
@@ -458,13 +458,13 @@ var E = class extends HTMLElement {
     if (!this.isUpdatePending) return;
     if (!this.hasUpdated) {
       if (this.renderRoot ??= this.createRenderRoot(), this._$Ep) {
-        for (let [o, a] of this._$Ep) this[o] = a;
+        for (let [a, s] of this._$Ep) this[a] = s;
         this._$Ep = void 0;
       }
       let r = this.constructor.elementProperties;
-      if (r.size > 0) for (let [o, a] of r) {
-        let { wrapped: i } = a, u = this[o];
-        i !== true || this._$AL.has(o) || u === void 0 || this.C(o, void 0, a, u);
+      if (r.size > 0) for (let [a, s] of r) {
+        let { wrapped: i } = s, l = this[a];
+        i !== true || this._$AL.has(a) || l === void 0 || this.C(a, void 0, s, l);
       }
     }
     let e = false, t = this._$AL;
@@ -500,94 +500,94 @@ var E = class extends HTMLElement {
   firstUpdated(e) {
   }
 };
-E.elementStyles = [], E.shadowRootOptions = { mode: "open" }, E[B("elementProperties")] = /* @__PURE__ */ new Map(), E[B("finalized")] = /* @__PURE__ */ new Map(), ae?.({ ReactiveElement: E }), (Q.reactiveElementVersions ??= []).push("2.1.2");
-var lt = globalThis;
-var $t = (s3) => s3;
-var Y = lt.trustedTypes;
-var _t = Y ? Y.createPolicy("lit-html", { createHTML: (s3) => s3 }) : void 0;
-var wt = "$lit$";
-var S = `lit$${Math.random().toFixed(9).slice(2)}$`;
-var Pt = "?" + S;
-var ie = `<${Pt}>`;
-var M = document;
-var D = () => M.createComment("");
-var F = (s3) => s3 === null || typeof s3 != "object" && typeof s3 != "function";
-var dt = Array.isArray;
-var ne = (s3) => dt(s3) || typeof s3?.[Symbol.iterator] == "function";
-var ot = `[ 	
+P.elementStyles = [], P.shadowRootOptions = { mode: "open" }, P[G("elementProperties")] = /* @__PURE__ */ new Map(), P[G("finalized")] = /* @__PURE__ */ new Map(), Ye?.({ ReactiveElement: P }), (at.reactiveElementVersions ??= []).push("2.1.2");
+var wt = globalThis;
+var Zt = (o3) => o3;
+var it = wt.trustedTypes;
+var Qt = it ? it.createPolicy("lit-html", { createHTML: (o3) => o3 }) : void 0;
+var ae = "$lit$";
+var C = `lit$${Math.random().toFixed(9).slice(2)}$`;
+var se = "?" + C;
+var tr = `<${se}>`;
+var O = document;
+var W = () => O.createComment("");
+var K = (o3) => o3 === null || typeof o3 != "object" && typeof o3 != "function";
+var Ct = Array.isArray;
+var er = (o3) => Ct(o3) || typeof o3?.[Symbol.iterator] == "function";
+var yt = `[ 	
 \f\r]`;
-var j = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g;
-var yt = /-->/g;
-var xt = />/g;
-var C = RegExp(`>|${ot}(?:([^\\s"'>=/]+)(${ot}*=${ot}*(?:[^ 	
+var J = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g;
+var Yt = /-->/g;
+var te = />/g;
+var T = RegExp(`>|${yt}(?:([^\\s"'>=/]+)(${yt}*=${yt}*(?:[^ 	
 \f\r"'\`<>=]|("|')|))|$)`, "g");
-var Et = /'/g;
-var At = /"/g;
-var Ct = /^(?:script|style|textarea|title)$/i;
-var pt = (s3) => (e, ...t) => ({ _$litType$: s3, strings: e, values: t });
-var c = pt(1);
-var be = pt(2);
-var $e = pt(3);
-var R = Symbol.for("lit-noChange");
-var d = Symbol.for("lit-nothing");
-var St = /* @__PURE__ */ new WeakMap();
-var k = M.createTreeWalker(M, 129);
-function kt(s3, e) {
-  if (!dt(s3) || !s3.hasOwnProperty("raw")) throw Error("invalid template strings array");
-  return _t !== void 0 ? _t.createHTML(e) : e;
+var ee = /'/g;
+var re = /"/g;
+var ie = /^(?:script|style|textarea|title)$/i;
+var Rt = (o3) => (e, ...t) => ({ _$litType$: o3, strings: e, values: t });
+var c = Rt(1);
+var pr = Rt(2);
+var hr = Rt(3);
+var I = Symbol.for("lit-noChange");
+var h = Symbol.for("lit-nothing");
+var oe = /* @__PURE__ */ new WeakMap();
+var L = O.createTreeWalker(O, 129);
+function ne(o3, e) {
+  if (!Ct(o3) || !o3.hasOwnProperty("raw")) throw Error("invalid template strings array");
+  return Qt !== void 0 ? Qt.createHTML(e) : e;
 }
-var ce = (s3, e) => {
-  let t = s3.length - 1, r = [], o, a = e === 2 ? "<svg>" : e === 3 ? "<math>" : "", i = j;
-  for (let u = 0; u < t; u++) {
-    let l = s3[u], f, v, m = -1, x = 0;
-    for (; x < l.length && (i.lastIndex = x, v = i.exec(l), v !== null); ) x = i.lastIndex, i === j ? v[1] === "!--" ? i = yt : v[1] !== void 0 ? i = xt : v[2] !== void 0 ? (Ct.test(v[2]) && (o = RegExp("</" + v[2], "g")), i = C) : v[3] !== void 0 && (i = C) : i === C ? v[0] === ">" ? (i = o ?? j, m = -1) : v[1] === void 0 ? m = -2 : (m = i.lastIndex - v[2].length, f = v[1], i = v[3] === void 0 ? C : v[3] === '"' ? At : Et) : i === At || i === Et ? i = C : i === yt || i === xt ? i = j : (i = C, o = void 0);
-    let A = i === C && s3[u + 1].startsWith("/>") ? " " : "";
-    a += i === j ? l + ie : m >= 0 ? (r.push(f), l.slice(0, m) + wt + l.slice(m) + S + A) : l + S + (m === -2 ? u : A);
+var rr = (o3, e) => {
+  let t = o3.length - 1, r = [], a, s = e === 2 ? "<svg>" : e === 3 ? "<math>" : "", i = J;
+  for (let l = 0; l < t; l++) {
+    let u = o3[l], b, v, m = -1, E = 0;
+    for (; E < u.length && (i.lastIndex = E, v = i.exec(u), v !== null); ) E = i.lastIndex, i === J ? v[1] === "!--" ? i = Yt : v[1] !== void 0 ? i = te : v[2] !== void 0 ? (ie.test(v[2]) && (a = RegExp("</" + v[2], "g")), i = T) : v[3] !== void 0 && (i = T) : i === T ? v[0] === ">" ? (i = a ?? J, m = -1) : v[1] === void 0 ? m = -2 : (m = i.lastIndex - v[2].length, b = v[1], i = v[3] === void 0 ? T : v[3] === '"' ? re : ee) : i === re || i === ee ? i = T : i === Yt || i === te ? i = J : (i = T, a = void 0);
+    let A = i === T && o3[l + 1].startsWith("/>") ? " " : "";
+    s += i === J ? u + tr : m >= 0 ? (r.push(b), u.slice(0, m) + ae + u.slice(m) + C + A) : u + C + (m === -2 ? l : A);
   }
-  return [kt(s3, a + (s3[t] || "<?>") + (e === 2 ? "</svg>" : e === 3 ? "</math>" : "")), r];
+  return [ne(o3, s + (o3[t] || "<?>") + (e === 2 ? "</svg>" : e === 3 ? "</math>" : "")), r];
 };
-var J = class s {
+var X = class o {
   constructor({ strings: e, _$litType$: t }, r) {
-    let o;
+    let a;
     this.parts = [];
-    let a = 0, i = 0, u = e.length - 1, l = this.parts, [f, v] = ce(e, t);
-    if (this.el = s.createElement(f, r), k.currentNode = this.el.content, t === 2 || t === 3) {
+    let s = 0, i = 0, l = e.length - 1, u = this.parts, [b, v] = rr(e, t);
+    if (this.el = o.createElement(b, r), L.currentNode = this.el.content, t === 2 || t === 3) {
       let m = this.el.content.firstChild;
       m.replaceWith(...m.childNodes);
     }
-    for (; (o = k.nextNode()) !== null && l.length < u; ) {
-      if (o.nodeType === 1) {
-        if (o.hasAttributes()) for (let m of o.getAttributeNames()) if (m.endsWith(wt)) {
-          let x = v[i++], A = o.getAttribute(m).split(S), G = /([.?@])?(.*)/.exec(x);
-          l.push({ type: 1, index: a, name: G[2], strings: A, ctor: G[1] === "." ? at : G[1] === "?" ? it : G[1] === "@" ? nt : T }), o.removeAttribute(m);
-        } else m.startsWith(S) && (l.push({ type: 6, index: a }), o.removeAttribute(m));
-        if (Ct.test(o.tagName)) {
-          let m = o.textContent.split(S), x = m.length - 1;
-          if (x > 0) {
-            o.textContent = Y ? Y.emptyScript : "";
-            for (let A = 0; A < x; A++) o.append(m[A], D()), k.nextNode(), l.push({ type: 2, index: ++a });
-            o.append(m[x], D());
+    for (; (a = L.nextNode()) !== null && u.length < l; ) {
+      if (a.nodeType === 1) {
+        if (a.hasAttributes()) for (let m of a.getAttributeNames()) if (m.endsWith(ae)) {
+          let E = v[i++], A = a.getAttribute(m).split(C), N = /([.?@])?(.*)/.exec(E);
+          u.push({ type: 1, index: s, name: N[2], strings: A, ctor: N[1] === "." ? At : N[1] === "?" ? kt : N[1] === "@" ? St : q }), a.removeAttribute(m);
+        } else m.startsWith(C) && (u.push({ type: 6, index: s }), a.removeAttribute(m));
+        if (ie.test(a.tagName)) {
+          let m = a.textContent.split(C), E = m.length - 1;
+          if (E > 0) {
+            a.textContent = it ? it.emptyScript : "";
+            for (let A = 0; A < E; A++) a.append(m[A], W()), L.nextNode(), u.push({ type: 2, index: ++s });
+            a.append(m[E], W());
           }
         }
-      } else if (o.nodeType === 8) if (o.data === Pt) l.push({ type: 2, index: a });
+      } else if (a.nodeType === 8) if (a.data === se) u.push({ type: 2, index: s });
       else {
         let m = -1;
-        for (; (m = o.data.indexOf(S, m + 1)) !== -1; ) l.push({ type: 7, index: a }), m += S.length - 1;
+        for (; (m = a.data.indexOf(C, m + 1)) !== -1; ) u.push({ type: 7, index: s }), m += C.length - 1;
       }
-      a++;
+      s++;
     }
   }
   static createElement(e, t) {
-    let r = M.createElement("template");
+    let r = O.createElement("template");
     return r.innerHTML = e, r;
   }
 };
-function O(s3, e, t = s3, r) {
-  if (e === R) return e;
-  let o = r !== void 0 ? t._$Co?.[r] : t._$Cl, a = F(e) ? void 0 : e._$litDirective$;
-  return o?.constructor !== a && (o?._$AO?.(false), a === void 0 ? o = void 0 : (o = new a(s3), o._$AT(s3, t, r)), r !== void 0 ? (t._$Co ??= [])[r] = o : t._$Cl = o), o !== void 0 && (e = O(s3, o._$AS(s3, e.values), o, r)), e;
+function H(o3, e, t = o3, r) {
+  if (e === I) return e;
+  let a = r !== void 0 ? t._$Co?.[r] : t._$Cl, s = K(e) ? void 0 : e._$litDirective$;
+  return a?.constructor !== s && (a?._$AO?.(false), s === void 0 ? a = void 0 : (a = new s(o3), a._$AT(o3, t, r)), r !== void 0 ? (t._$Co ??= [])[r] = a : t._$Cl = a), a !== void 0 && (e = H(o3, a._$AS(o3, e.values), a, r)), e;
 }
-var st = class {
+var Et = class {
   constructor(e, t) {
     this._$AV = [], this._$AN = void 0, this._$AD = e, this._$AM = t;
   }
@@ -598,29 +598,29 @@ var st = class {
     return this._$AM._$AU;
   }
   u(e) {
-    let { el: { content: t }, parts: r } = this._$AD, o = (e?.creationScope ?? M).importNode(t, true);
-    k.currentNode = o;
-    let a = k.nextNode(), i = 0, u = 0, l = r[0];
-    for (; l !== void 0; ) {
-      if (i === l.index) {
-        let f;
-        l.type === 2 ? f = new W(a, a.nextSibling, this, e) : l.type === 1 ? f = new l.ctor(a, l.name, l.strings, this, e) : l.type === 6 && (f = new ct(a, this, e)), this._$AV.push(f), l = r[++u];
+    let { el: { content: t }, parts: r } = this._$AD, a = (e?.creationScope ?? O).importNode(t, true);
+    L.currentNode = a;
+    let s = L.nextNode(), i = 0, l = 0, u = r[0];
+    for (; u !== void 0; ) {
+      if (i === u.index) {
+        let b;
+        u.type === 2 ? b = new Z(s, s.nextSibling, this, e) : u.type === 1 ? b = new u.ctor(s, u.name, u.strings, this, e) : u.type === 6 && (b = new Pt(s, this, e)), this._$AV.push(b), u = r[++l];
       }
-      i !== l?.index && (a = k.nextNode(), i++);
+      i !== u?.index && (s = L.nextNode(), i++);
     }
-    return k.currentNode = M, o;
+    return L.currentNode = O, a;
   }
   p(e) {
     let t = 0;
     for (let r of this._$AV) r !== void 0 && (r.strings !== void 0 ? (r._$AI(e, r, t), t += r.strings.length - 2) : r._$AI(e[t])), t++;
   }
 };
-var W = class s2 {
+var Z = class o2 {
   get _$AU() {
     return this._$AM?._$AU ?? this._$Cv;
   }
-  constructor(e, t, r, o) {
-    this.type = 2, this._$AH = d, this._$AN = void 0, this._$AA = e, this._$AB = t, this._$AM = r, this.options = o, this._$Cv = o?.isConnected ?? true;
+  constructor(e, t, r, a) {
+    this.type = 2, this._$AH = h, this._$AN = void 0, this._$AA = e, this._$AB = t, this._$AM = r, this.options = a, this._$Cv = a?.isConnected ?? true;
   }
   get parentNode() {
     let e = this._$AA.parentNode, t = this._$AM;
@@ -633,7 +633,7 @@ var W = class s2 {
     return this._$AB;
   }
   _$AI(e, t = this) {
-    e = O(this, e, t), F(e) ? e === d || e == null || e === "" ? (this._$AH !== d && this._$AR(), this._$AH = d) : e !== this._$AH && e !== R && this._(e) : e._$litType$ !== void 0 ? this.$(e) : e.nodeType !== void 0 ? this.T(e) : ne(e) ? this.k(e) : this._(e);
+    e = H(this, e, t), K(e) ? e === h || e == null || e === "" ? (this._$AH !== h && this._$AR(), this._$AH = h) : e !== this._$AH && e !== I && this._(e) : e._$litType$ !== void 0 ? this.$(e) : e.nodeType !== void 0 ? this.T(e) : er(e) ? this.k(e) : this._(e);
   }
   O(e) {
     return this._$AA.parentNode.insertBefore(e, this._$AB);
@@ -642,89 +642,89 @@ var W = class s2 {
     this._$AH !== e && (this._$AR(), this._$AH = this.O(e));
   }
   _(e) {
-    this._$AH !== d && F(this._$AH) ? this._$AA.nextSibling.data = e : this.T(M.createTextNode(e)), this._$AH = e;
+    this._$AH !== h && K(this._$AH) ? this._$AA.nextSibling.data = e : this.T(O.createTextNode(e)), this._$AH = e;
   }
   $(e) {
-    let { values: t, _$litType$: r } = e, o = typeof r == "number" ? this._$AC(e) : (r.el === void 0 && (r.el = J.createElement(kt(r.h, r.h[0]), this.options)), r);
-    if (this._$AH?._$AD === o) this._$AH.p(t);
+    let { values: t, _$litType$: r } = e, a = typeof r == "number" ? this._$AC(e) : (r.el === void 0 && (r.el = X.createElement(ne(r.h, r.h[0]), this.options)), r);
+    if (this._$AH?._$AD === a) this._$AH.p(t);
     else {
-      let a = new st(o, this), i = a.u(this.options);
-      a.p(t), this.T(i), this._$AH = a;
+      let s = new Et(a, this), i = s.u(this.options);
+      s.p(t), this.T(i), this._$AH = s;
     }
   }
   _$AC(e) {
-    let t = St.get(e.strings);
-    return t === void 0 && St.set(e.strings, t = new J(e)), t;
+    let t = oe.get(e.strings);
+    return t === void 0 && oe.set(e.strings, t = new X(e)), t;
   }
   k(e) {
-    dt(this._$AH) || (this._$AH = [], this._$AR());
-    let t = this._$AH, r, o = 0;
-    for (let a of e) o === t.length ? t.push(r = new s2(this.O(D()), this.O(D()), this, this.options)) : r = t[o], r._$AI(a), o++;
-    o < t.length && (this._$AR(r && r._$AB.nextSibling, o), t.length = o);
+    Ct(this._$AH) || (this._$AH = [], this._$AR());
+    let t = this._$AH, r, a = 0;
+    for (let s of e) a === t.length ? t.push(r = new o2(this.O(W()), this.O(W()), this, this.options)) : r = t[a], r._$AI(s), a++;
+    a < t.length && (this._$AR(r && r._$AB.nextSibling, a), t.length = a);
   }
   _$AR(e = this._$AA.nextSibling, t) {
     for (this._$AP?.(false, true, t); e !== this._$AB; ) {
-      let r = $t(e).nextSibling;
-      $t(e).remove(), e = r;
+      let r = Zt(e).nextSibling;
+      Zt(e).remove(), e = r;
     }
   }
   setConnected(e) {
     this._$AM === void 0 && (this._$Cv = e, this._$AP?.(e));
   }
 };
-var T = class {
+var q = class {
   get tagName() {
     return this.element.tagName;
   }
   get _$AU() {
     return this._$AM._$AU;
   }
-  constructor(e, t, r, o, a) {
-    this.type = 1, this._$AH = d, this._$AN = void 0, this.element = e, this.name = t, this._$AM = o, this.options = a, r.length > 2 || r[0] !== "" || r[1] !== "" ? (this._$AH = Array(r.length - 1).fill(new String()), this.strings = r) : this._$AH = d;
+  constructor(e, t, r, a, s) {
+    this.type = 1, this._$AH = h, this._$AN = void 0, this.element = e, this.name = t, this._$AM = a, this.options = s, r.length > 2 || r[0] !== "" || r[1] !== "" ? (this._$AH = Array(r.length - 1).fill(new String()), this.strings = r) : this._$AH = h;
   }
-  _$AI(e, t = this, r, o) {
-    let a = this.strings, i = false;
-    if (a === void 0) e = O(this, e, t, 0), i = !F(e) || e !== this._$AH && e !== R, i && (this._$AH = e);
+  _$AI(e, t = this, r, a) {
+    let s = this.strings, i = false;
+    if (s === void 0) e = H(this, e, t, 0), i = !K(e) || e !== this._$AH && e !== I, i && (this._$AH = e);
     else {
-      let u = e, l, f;
-      for (e = a[0], l = 0; l < a.length - 1; l++) f = O(this, u[r + l], t, l), f === R && (f = this._$AH[l]), i ||= !F(f) || f !== this._$AH[l], f === d ? e = d : e !== d && (e += (f ?? "") + a[l + 1]), this._$AH[l] = f;
+      let l = e, u, b;
+      for (e = s[0], u = 0; u < s.length - 1; u++) b = H(this, l[r + u], t, u), b === I && (b = this._$AH[u]), i ||= !K(b) || b !== this._$AH[u], b === h ? e = h : e !== h && (e += (b ?? "") + s[u + 1]), this._$AH[u] = b;
     }
-    i && !o && this.j(e);
+    i && !a && this.j(e);
   }
   j(e) {
-    e === d ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, e ?? "");
+    e === h ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, e ?? "");
   }
 };
-var at = class extends T {
+var At = class extends q {
   constructor() {
     super(...arguments), this.type = 3;
   }
   j(e) {
-    this.element[this.name] = e === d ? void 0 : e;
+    this.element[this.name] = e === h ? void 0 : e;
   }
 };
-var it = class extends T {
+var kt = class extends q {
   constructor() {
     super(...arguments), this.type = 4;
   }
   j(e) {
-    this.element.toggleAttribute(this.name, !!e && e !== d);
+    this.element.toggleAttribute(this.name, !!e && e !== h);
   }
 };
-var nt = class extends T {
-  constructor(e, t, r, o, a) {
-    super(e, t, r, o, a), this.type = 5;
+var St = class extends q {
+  constructor(e, t, r, a, s) {
+    super(e, t, r, a, s), this.type = 5;
   }
   _$AI(e, t = this) {
-    if ((e = O(this, e, t, 0) ?? d) === R) return;
-    let r = this._$AH, o = e === d && r !== d || e.capture !== r.capture || e.once !== r.once || e.passive !== r.passive, a = e !== d && (r === d || o);
-    o && this.element.removeEventListener(this.name, this, r), a && this.element.addEventListener(this.name, this, e), this._$AH = e;
+    if ((e = H(this, e, t, 0) ?? h) === I) return;
+    let r = this._$AH, a = e === h && r !== h || e.capture !== r.capture || e.once !== r.once || e.passive !== r.passive, s = e !== h && (r === h || a);
+    a && this.element.removeEventListener(this.name, this, r), s && this.element.addEventListener(this.name, this, e), this._$AH = e;
   }
   handleEvent(e) {
     typeof this._$AH == "function" ? this._$AH.call(this.options?.host ?? this.element, e) : this._$AH.handleEvent(e);
   }
 };
-var ct = class {
+var Pt = class {
   constructor(e, t, r) {
     this.element = e, this.type = 6, this._$AN = void 0, this._$AM = t, this.options = r;
   }
@@ -732,21 +732,21 @@ var ct = class {
     return this._$AM._$AU;
   }
   _$AI(e) {
-    O(this, e);
+    H(this, e);
   }
 };
-var le = lt.litHtmlPolyfillSupport;
-le?.(J, W), (lt.litHtmlVersions ??= []).push("3.3.3");
-var Mt = (s3, e, t) => {
-  let r = t?.renderBefore ?? e, o = r._$litPart$;
-  if (o === void 0) {
-    let a = t?.renderBefore ?? null;
-    r._$litPart$ = o = new W(e.insertBefore(D(), a), a, void 0, t ?? {});
+var or = wt.litHtmlPolyfillSupport;
+or?.(X, Z), (wt.litHtmlVersions ??= []).push("3.3.3");
+var ce = (o3, e, t) => {
+  let r = t?.renderBefore ?? e, a = r._$litPart$;
+  if (a === void 0) {
+    let s = t?.renderBefore ?? null;
+    r._$litPart$ = a = new Z(e.insertBefore(W(), s), s, void 0, t ?? {});
   }
-  return o._$AI(s3), o;
+  return a._$AI(o3), a;
 };
-var ut = globalThis;
-var b = class extends E {
+var Mt = globalThis;
+var f = class extends P {
   constructor() {
     super(...arguments), this.renderOptions = { host: this }, this._$Do = void 0;
   }
@@ -756,7 +756,7 @@ var b = class extends E {
   }
   update(e) {
     let t = this.render();
-    this.hasUpdated || (this.renderOptions.isConnected = this.isConnected), super.update(e), this._$Do = Mt(t, this.renderRoot, this.renderOptions);
+    this.hasUpdated || (this.renderOptions.isConnected = this.isConnected), super.update(e), this._$Do = ce(t, this.renderRoot, this.renderOptions);
   }
   connectedCallback() {
     super.connectedCallback(), this._$Do?.setConnected(true);
@@ -765,56 +765,56 @@ var b = class extends E {
     super.disconnectedCallback(), this._$Do?.setConnected(false);
   }
   render() {
-    return R;
+    return I;
   }
 };
-b._$litElement$ = true, b.finalized = true, ut.litElementHydrateSupport?.({ LitElement: b });
-var de = ut.litElementPolyfillSupport;
-de?.({ LitElement: b });
-(ut.litElementVersions ??= []).push("4.2.2");
-var w = (s3) => (e, t) => {
+f._$litElement$ = true, f.finalized = true, Mt.litElementHydrateSupport?.({ LitElement: f });
+var ar = Mt.litElementPolyfillSupport;
+ar?.({ LitElement: f });
+(Mt.litElementVersions ??= []).push("4.2.2");
+var S = (o3) => (e, t) => {
   t !== void 0 ? t.addInitializer(() => {
-    customElements.define(s3, e);
-  }) : customElements.define(s3, e);
+    customElements.define(o3, e);
+  }) : customElements.define(o3, e);
 };
-var pe = { attribute: true, type: String, converter: q, reflect: false, hasChanged: X };
-var ue = (s3 = pe, e, t) => {
-  let { kind: r, metadata: o } = t, a = globalThis.litPropertyMetadata.get(o);
-  if (a === void 0 && globalThis.litPropertyMetadata.set(o, a = /* @__PURE__ */ new Map()), r === "setter" && ((s3 = Object.create(s3)).wrapped = true), a.set(t.name, s3), r === "accessor") {
+var sr = { attribute: true, type: String, converter: V, reflect: false, hasChanged: st };
+var ir = (o3 = sr, e, t) => {
+  let { kind: r, metadata: a } = t, s = globalThis.litPropertyMetadata.get(a);
+  if (s === void 0 && globalThis.litPropertyMetadata.set(a, s = /* @__PURE__ */ new Map()), r === "setter" && ((o3 = Object.create(o3)).wrapped = true), s.set(t.name, o3), r === "accessor") {
     let { name: i } = t;
-    return { set(u) {
-      let l = e.get.call(this);
-      e.set.call(this, u), this.requestUpdate(i, l, s3, true, u);
-    }, init(u) {
-      return u !== void 0 && this.C(i, void 0, s3, u), u;
+    return { set(l) {
+      let u = e.get.call(this);
+      e.set.call(this, l), this.requestUpdate(i, u, o3, true, l);
+    }, init(l) {
+      return l !== void 0 && this.C(i, void 0, o3, l), l;
     } };
   }
   if (r === "setter") {
     let { name: i } = t;
-    return function(u) {
-      let l = this[i];
-      e.call(this, u), this.requestUpdate(i, l, s3, true, u);
+    return function(l) {
+      let u = this[i];
+      e.call(this, l), this.requestUpdate(i, u, o3, true, l);
     };
   }
   throw Error("Unsupported decorator location: " + r);
 };
-function N(s3) {
-  return (e, t) => typeof t == "object" ? ue(s3, e, t) : ((r, o, a) => {
-    let i = o.hasOwnProperty(a);
-    return o.constructor.createProperty(a, r), i ? Object.getOwnPropertyDescriptor(o, a) : void 0;
-  })(s3, e, t);
+function w(o3) {
+  return (e, t) => typeof t == "object" ? ir(o3, e, t) : ((r, a, s) => {
+    let i = a.hasOwnProperty(s);
+    return a.constructor.createProperty(s, r), i ? Object.getOwnPropertyDescriptor(a, s) : void 0;
+  })(o3, e, t);
 }
-function h(s3) {
-  return N({ ...s3, state: true, attribute: false });
+function _(o3) {
+  return w({ ...o3, state: true, attribute: false });
 }
-var U = { rascunho: "Rascunho", em_analise: "Em an\xE1lise", aprovado: "Aprovado", reprovado: "Reprovado", arquivado: "Arquivado" };
-var L = { loteamento: "Loteamento", incorporacao: "Incorpora\xE7\xE3o" };
-function Rt(s3) {
-  if (!s3) return "\u2014";
-  let e = new Date(s3);
+var j = { rascunho: "Rascunho", em_analise: "Em an\xE1lise", aprovado: "Aprovado", reprovado: "Reprovado", arquivado: "Arquivado" };
+var F = { loteamento: "Loteamento", incorporacao: "Incorpora\xE7\xE3o" };
+function le(o3) {
+  if (!o3) return "\u2014";
+  let e = new Date(o3);
   return isNaN(e.getTime()) ? "\u2014" : e.toLocaleDateString("pt-BR");
 }
-var I = y`
+var R = x`
   :host {
     display: block;
     color: var(--cor-texto, rgba(255, 255, 255, 0.85));
@@ -891,63 +891,66 @@ var I = y`
 `;
 var n = globalThis.urbiVerso;
 var g = "/viabilidade";
-function Ot(s3 = {}) {
+function ue(o3 = {}) {
   let e = new URLSearchParams();
-  s3.tipo_empreendimento && e.set("tipo_empreendimento", s3.tipo_empreendimento), s3.status && e.set("status", s3.status);
+  o3.tipo_empreendimento && e.set("tipo_empreendimento", o3.tipo_empreendimento), o3.status && e.set("status", o3.status);
   let t = e.toString() ? `?${e}` : "";
   return n.api(`${g}/estudos${t}`);
 }
-function Tt(s3) {
-  return n.api(`${g}/estudos`, { method: "POST", body: JSON.stringify(s3) });
+function de(o3) {
+  return n.api(`${g}/estudos`, { method: "POST", body: JSON.stringify(o3) });
 }
-function Nt(s3) {
-  return n.api(`${g}/estudos/${s3}`);
+function me(o3) {
+  return n.api(`${g}/estudos/${o3}`);
 }
-function Ut(s3, e) {
-  return n.api(`${g}/estudos/${s3}`, { method: "PATCH", body: JSON.stringify(e) });
+function pe(o3, e) {
+  return n.api(`${g}/estudos/${o3}`, { method: "PATCH", body: JSON.stringify(e) });
 }
-function Lt(s3) {
-  return n.api(`${g}/estudos/${s3}`, { method: "DELETE" });
+function he(o3) {
+  return n.api(`${g}/estudos/${o3}`, { method: "DELETE" });
 }
-function It(s3) {
-  return n.api(`${g}/estudos/${s3}/duplicar`, { method: "POST" });
+function _e(o3) {
+  return n.api(`${g}/estudos/${o3}/duplicar`, { method: "POST" });
 }
-function Ht(s3, e) {
-  return n.api(`${g}/estudos/${s3}/status`, { method: "POST", body: JSON.stringify({ status: e }) });
+function be(o3, e) {
+  return n.api(`${g}/estudos/${o3}/status`, { method: "POST", body: JSON.stringify({ status: e }) });
 }
-function tt(s3) {
-  return n.api(`${g}/estudos/${s3}/membros`);
+function ct(o3) {
+  return n.api(`${g}/estudos/${o3}/membros`);
 }
-function zt(s3, e, t) {
-  return n.api(`${g}/estudos/${s3}/membros`, { method: "POST", body: JSON.stringify({ usuario_id: e, funcao: t }) });
+function ve(o3, e, t) {
+  return n.api(`${g}/estudos/${o3}/membros`, { method: "POST", body: JSON.stringify({ usuario_id: e, funcao: t }) });
 }
-function Bt(s3, e, t) {
-  return n.api(`${g}/estudos/${s3}/membros/${e}`, { method: "PATCH", body: JSON.stringify({ funcao: t }) });
+function ge(o3, e, t) {
+  return n.api(`${g}/estudos/${o3}/membros/${e}`, { method: "PATCH", body: JSON.stringify({ funcao: t }) });
 }
-function qt(s3, e) {
-  return n.api(`${g}/estudos/${s3}/membros/${e}/remover`, { method: "PATCH" });
+function fe(o3, e) {
+  return n.api(`${g}/estudos/${o3}/membros/${e}/remover`, { method: "PATCH" });
 }
-function jt(s3) {
-  let e = s3 ? `?tipo_empreendimento=${s3}` : "";
+function lt(o3) {
+  let e = o3 ? `?tipo_empreendimento=${o3}` : "";
   return n.api(`${g}/benchmarks${e}`);
 }
-function Dt(s3) {
-  return n.api(`${g}/benchmarks`, { method: "POST", body: JSON.stringify(s3) });
+function $e(o3) {
+  return n.api(`${g}/benchmarks`, { method: "POST", body: JSON.stringify(o3) });
 }
-function Ft(s3, e) {
-  return n.api(`${g}/benchmarks/${s3}`, { method: "PATCH", body: JSON.stringify(e) });
+function xe(o3, e) {
+  return n.api(`${g}/benchmarks/${o3}`, { method: "PATCH", body: JSON.stringify(e) });
 }
-function Jt(s3) {
-  return n.api(`${g}/benchmarks/${s3}`, { method: "DELETE" });
+function ye(o3) {
+  return n.api(`${g}/benchmarks/${o3}`, { method: "DELETE" });
 }
-function Wt() {
+function Ee() {
   return n.api(`${g}/benchmarks/semear`, { method: "POST" });
 }
-async function Gt() {
-  let s3 = await n.api("/shell/apps/viabilidade/roles/usuarios");
-  return [...Array.isArray(s3) ? s3 : s3?.usuarios || []].sort((t, r) => (t.nome ?? "").localeCompare(r.nome ?? "", "pt-BR", { sensitivity: "base" }));
+function Ae() {
+  return n.api(`${g}/config`);
 }
-var $ = class extends b {
+async function ke() {
+  let o3 = await n.api("/shell/apps/viabilidade/roles/usuarios");
+  return [...Array.isArray(o3) ? o3 : o3?.usuarios || []].sort((t, r) => (t.nome ?? "").localeCompare(r.nome ?? "", "pt-BR", { sensitivity: "base" }));
+}
+var $ = class extends f {
   constructor() {
     super(...arguments);
     this.aba = "estudos";
@@ -969,7 +972,7 @@ var $ = class extends b {
       }
       this.salvando = true, this.formErro = "";
       try {
-        let t = await Tt({ nome: this.form.nome.trim(), tipo_empreendimento: this.form.tipo_empreendimento, nivel_analise: this.form.nivel_analise, origem_terreno: this.form.origem_terreno, uf: this.form.uf || null });
+        let t = await de({ nome: this.form.nome.trim(), tipo_empreendimento: this.form.tipo_empreendimento, nivel_analise: this.form.nivel_analise, origem_terreno: this.form.origem_terreno, uf: this.form.uf || null });
         if (t?.erro) {
           this.formErro = t.mensagem || "Erro ao criar estudo";
           return;
@@ -991,7 +994,7 @@ var $ = class extends b {
   async _carregar() {
     this.carregando = true;
     try {
-      let t = await Ot({ tipo_empreendimento: this.filtroTipo || void 0, status: this.filtroStatus || void 0 });
+      let t = await ue({ tipo_empreendimento: this.filtroTipo || void 0, status: this.filtroStatus || void 0 });
       this.estudos = t?.dados || [];
     } catch (t) {
       console.error("Erro ao listar estudos:", t);
@@ -1002,7 +1005,7 @@ var $ = class extends b {
     return c`
       <div class="topo">
         <h1>Estudos de Viabilidade</h1>
-        ${this.aba === "estudos" ? c`<button class="btn-cta" @click=${this._abrirForm}>+ Criar estudo</button>` : d}
+        ${this.aba === "estudos" ? c`<button class="btn-cta" @click=${this._abrirForm}>+ Criar estudo</button>` : h}
       </div>
 
       <div class="abas">
@@ -1011,7 +1014,7 @@ var $ = class extends b {
       </div>
 
       ${this.aba === "estudos" ? this._renderEstudos() : this._renderTerrenos()}
-      ${this.mostrarForm ? this._renderForm() : d}
+      ${this.mostrarForm ? this._renderForm() : h}
     `;
   }
   _renderEstudos() {
@@ -1028,7 +1031,7 @@ var $ = class extends b {
       this.filtroStatus = t.target.value, this._carregar();
     }}>
           <option value="">Todos os status</option>
-          ${Object.entries(U).map(([t, r]) => c`<option value=${t}>${r}</option>`)}
+          ${Object.entries(j).map(([t, r]) => c`<option value=${t}>${r}</option>`)}
         </select>
       </div>
 
@@ -1044,9 +1047,9 @@ var $ = class extends b {
                   ${this.estudos.map((t) => c`
                     <tr @click=${() => n.navegarSub(`/detalhe/${t.id}`)}>
                       <td>${t.nome_exibicao || t.nome}</td>
-                      <td>${L[t.tipo_empreendimento] || t.tipo_empreendimento}</td>
-                      <td><span class="badge ${t.status}">${U[t.status] || t.status}</span></td>
-                      <td class="sec">${Rt(t.criado_em)}</td>
+                      <td>${F[t.tipo_empreendimento] || t.tipo_empreendimento}</td>
+                      <td><span class="badge ${t.status}">${j[t.status] || t.status}</span></td>
+                      <td class="sec">${le(t.criado_em)}</td>
                       <td>
                         <div class="acoes-linha" @click=${(r) => r.stopPropagation()}>
                           <button class="btn-sec btn-sm" @click=${() => this._duplicar(t.id)}>Duplicar</button>
@@ -1121,7 +1124,7 @@ var $ = class extends b {
               @input=${(t) => this.form = { ...this.form, uf: t.target.value.toUpperCase() }} />
           </div>
 
-          ${this.formErro ? c`<div class="erro">${this.formErro}</div>` : d}
+          ${this.formErro ? c`<div class="erro">${this.formErro}</div>` : h}
 
           <div class="acoes">
             <button class="btn-sec" @click=${() => this.mostrarForm = false}>Cancelar</button>
@@ -1135,7 +1138,7 @@ var $ = class extends b {
   }
   async _duplicar(t) {
     try {
-      let r = await It(t);
+      let r = await _e(t);
       if (r?.erro) {
         n.notificar(r.mensagem || "Erro ao duplicar", "erro");
         return;
@@ -1147,7 +1150,7 @@ var $ = class extends b {
   }
   async _remover(t) {
     if (confirm(`Remover o estudo "${t.nome_exibicao || t.nome}"?`)) try {
-      let r = await Lt(t.id);
+      let r = await he(t.id);
       if (r?.erro) {
         n.notificar(r.mensagem || "Erro ao remover", "erro");
         return;
@@ -1158,7 +1161,7 @@ var $ = class extends b {
     }
   }
 };
-$.styles = [I, y`
+$.styles = [R, x`
     .topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
     .abas { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.08)); }
     .aba {
@@ -1169,41 +1172,239 @@ $.styles = [I, y`
     .filtros { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
     .acoes-linha { display: flex; gap: 6px; }
     :host { padding: 24px; }
-  `], p([N({ type: String })], $.prototype, "aba", 2), p([h()], $.prototype, "estudos", 2), p([h()], $.prototype, "carregando", 2), p([h()], $.prototype, "filtroTipo", 2), p([h()], $.prototype, "filtroStatus", 2), p([h()], $.prototype, "mostrarForm", 2), p([h()], $.prototype, "form", 2), p([h()], $.prototype, "salvando", 2), p([h()], $.prototype, "formErro", 2), $ = p([w("viab-tela-dashboard")], $);
-var Kt = ["leitor", "editor", "aprovador"];
-var mt = [{ campo: "terreno_manual_nome", label: "Nome do terreno (manual)", tipo: "texto" }, { campo: "terreno_manual_area", label: "\xC1rea do terreno (m\xB2)", tipo: "numero" }, { campo: "preco_venda_m2", label: "Pre\xE7o de venda (R$/m\xB2)", tipo: "numero" }, { campo: "custo_construcao_m2", label: "Custo de constru\xE7\xE3o (R$/m\xB2)", tipo: "numero" }, { campo: "notas", label: "Notas", tipo: "area_texto" }];
-var _ = class extends b {
+  `], p([w({ type: String })], $.prototype, "aba", 2), p([_()], $.prototype, "estudos", 2), p([_()], $.prototype, "carregando", 2), p([_()], $.prototype, "filtroTipo", 2), p([_()], $.prototype, "filtroStatus", 2), p([_()], $.prototype, "mostrarForm", 2), p([_()], $.prototype, "form", 2), p([_()], $.prototype, "salvando", 2), p([_()], $.prototype, "formErro", 2), $ = p([S("viab-tela-dashboard")], $);
+var d = (o3) => Number(o3) || 0;
+function Nt(o3) {
+  let e = o3.tipo_empreendimento === "loteamento", t = d(o3.terreno_manual_area), r = 0, a = 0, s = 0, i = 0, l = 0, u = d(o3.preco_venda_m2);
+  if (e) {
+    let z = d(o3.app_pct) + d(o3.faixas_nao_edificaveis_pct) + d(o3.sistema_viario_pct) + d(o3.elup_pct) + d(o3.epc_pct) + d(o3.epu_pct) + d(o3.areas_privativas_nao_vendaveis_pct);
+    r = t * (1 - z / 100), a = r;
+  } else {
+    let z = d(o3.area_pvt_r_fechada), ft = d(o3.area_pvt_nr_fechada), Be = d(o3.area_pvt_r_aberta), ze = d(o3.area_pvt_nr_aberta);
+    a = z + ft + Be + ze, s = a + d(o3.area_comum_total), r = z + ft, i = z * d(o3.preco_venda_m2_residencial), l = ft * d(o3.preco_venda_m2_nao_residencial);
+  }
+  let b = o3.permuta_fisica_modo === "pct_area_venda" ? r * d(o3.permuta_fisica_pct) / 100 : d(o3.permuta_fisica_area_m2), v = r - b;
+  e && (i = v * u);
+  let m = i + l, E = o3.sujeito_ret ? o3.aliquota_ret_pct ?? 4 : d(o3.imposto_percentual), A = m * E / 100, N = m * d(o3.corretagem_percentual) / 100, Lt = m * d(o3.marketing_percentual) / 100, dt = i * d(o3.permuta_financeira_residencial_pct) / 100, mt = l * d(o3.permuta_financeira_nao_residencial_pct) / 100, pt = m - A - N - Lt - dt - mt, Ot = o3.considerar_custo_terreno === false ? 0 : d(o3.custo_terreno_m2) * t, Q = e ? o3.infra_modo === "valor_m2" ? d(o3.custo_infra_m2) * r : m * d(o3.infra_pct) / 100 : 0, Y = e ? 0 : d(o3.custo_construcao_m2) * a, tt = e ? 0 : d(o3.custo_decoracao_m2) * a, Te = e ? Q : Y + tt, ht = e ? 0 : Te * d(o3.taxa_gestao_pct) / 100, It = o3.projetos_modo === "valor_fixo" ? d(o3.projetos_valor_fixo) : m * d(o3.projetos_pct) / 100, Ut = e ? 0 : d(o3.coef_aproveitamento_basico) > 0 ? d(o3.valor_venal_terreno_m2) / d(o3.coef_aproveitamento_basico) * t * (d(o3.coef_aproveitamento_maximo) - d(o3.coef_aproveitamento_basico)) * 0.2 : 0, Ht = e ? 0 : m * d(o3.incorporacao_registro_pct) / 100, qt = m * d(o3.manutencao_pct) / 100, jt = m * d(o3.contingencias_pct) / 100, _t = Ot + It + Q + Ut + Ht + Y + ht + tt + qt + jt, Ft = m * d(o3.marketing_global_pct) / 100 + (e ? d(o3.stand_vendas_valor) : 0), Bt = m * d(o3.gestao_indiretos_pct) / 100, bt = Ft + Bt, et = pt - _t - bt, zt = et + dt + mt, Le = e ? u : r > 0 ? m / r : 0, Dt = b * Le, Oe = zt + Dt, Ie = m > 0 ? et / m * 100 : 0, vt = _t + bt, Gt = e ? Q : Y + tt + ht, Ue = m > 0 ? Gt / m * 100 : 0, He = m > 0 ? pt / m * 100 : 0, qe = vt > 0 ? et / vt * 100 : 0, je = t > 0 ? r / t * 100 : 0, gt = e ? d(o3.area_media_lote_m2) > 0 ? Math.floor(v / d(o3.area_media_lote_m2)) : 0 : d(o3.num_unidades), Fe = e ? d(o3.area_media_lote_m2) * u : gt > 0 ? m / gt : 0;
+  return { areaTerreno: t, areaVendavel: r, areaPermutaFisica: b, areaVendavelLiquida: v, areaPrivativa: a, areaConstruida: s, vgvResidencial: i, vgvNaoResidencial: l, vgv: m, imposto: A, corretagem: N, marketing: Lt, permutaFinResidencial: dt, permutaFinNaoResidencial: mt, receitaLiquida: pt, custoTerreno: Ot, projetos: It, infraestrutura: Q, outorga: Ut, incorporacaoRegistro: Ht, construcao: Y, gestaoConstrucao: ht, decoracao: tt, manutencao: qt, contingencias: jt, custoDiretoTotal: _t, marketingGlobal: Ft, gestaoIndiretos: Bt, custoIndiretoTotal: bt, resultado: et, resultadoComPermutasFin: zt, resultadoComPermutasFisicas: Oe, valorPermutaFisica: Dt, margemLiquidaPct: Ie, investimentoTotal: vt, custoObras: Gt, custoObrasVgvPct: Ue, margemBrutaPct: He, roiPct: qe, eficienciaPct: je, numUnidades: gt, precoMedioUnidade: Fe };
+}
+function Se(o3, e) {
+  let t = o3.tipo_empreendimento === "loteamento", r = (l) => {
+    let u = t ? { ...o3, preco_venda_m2: l } : { ...o3, preco_venda_m2_residencial: l, preco_venda_m2_nao_residencial: l };
+    return Nt(u).margemLiquidaPct;
+  }, a = 1e6;
+  if (r(a) < e) return null;
+  if (r(0.01) >= e) return 0;
+  let s = 0, i = a;
+  for (let l = 0; l < 60; l++) {
+    let u = (s + i) / 2;
+    r(u) >= e ? i = u : s = u;
+  }
+  return i;
+}
+var Pe = [{ k: "custo_terreno_m2", label: "Custo do terreno", t: "num", sufixo: "R$/m\xB2" }, { k: "custo_infra_m2", label: "Infraestrutura (R$/m\xB2)", t: "num", sufixo: "R$/m\xB2", so: "loteamento" }, { k: "infra_pct", label: "Infraestrutura (% VGV)", t: "num", sufixo: "%", so: "loteamento" }, { k: "custo_construcao_m2", label: "Constru\xE7\xE3o", t: "num", sufixo: "R$/m\xB2", so: "incorporacao" }, { k: "custo_decoracao_m2", label: "Decora\xE7\xE3o", t: "num", sufixo: "R$/m\xB2", so: "incorporacao" }, { k: "taxa_gestao_pct", label: "Gest\xE3o da constru\xE7\xE3o", t: "num", sufixo: "%", so: "incorporacao" }, { k: "incorporacao_registro_pct", label: "Incorpora\xE7\xE3o e registro", t: "num", sufixo: "% VGV", so: "incorporacao" }, { k: "valor_venal_terreno_m2", label: "Valor venal do terreno (outorga)", t: "num", sufixo: "R$/m\xB2", so: "incorporacao" }, { k: "projetos_pct", label: "Projetos", t: "num", sufixo: "% VGV" }, { k: "manutencao_pct", label: "Manuten\xE7\xE3o p\xF3s-obra", t: "num", sufixo: "% VGV" }, { k: "contingencias_pct", label: "Conting\xEAncias", t: "num", sufixo: "% VGV" }, { k: "stand_vendas_valor", label: "Stand de vendas", t: "num", sufixo: "R$", so: "loteamento" }, { k: "marketing_global_pct", label: "Marketing global / estrutura", t: "num", sufixo: "% VGV" }, { k: "gestao_indiretos_pct", label: "Gest\xE3o e indiretos", t: "num", sufixo: "% VGV" }];
+var we = [{ k: "imposto_percentual", label: "Imposto (se n\xE3o RET)", t: "num", sufixo: "%" }, { k: "corretagem_percentual", label: "Corretagem", t: "num", sufixo: "%" }, { k: "marketing_percentual", label: "Marketing", t: "num", sufixo: "%" }, { k: "permuta_financeira_residencial_pct", label: "Permuta financeira residencial", t: "num", sufixo: "%" }, { k: "permuta_financeira_nao_residencial_pct", label: "Permuta financeira n\xE3o residencial", t: "num", sufixo: "%" }];
+var Ce = [{ k: "app_pct", label: "APP", t: "num", sufixo: "% gleba" }, { k: "faixas_nao_edificaveis_pct", label: "Faixas n\xE3o edific\xE1veis", t: "num", sufixo: "% gleba" }, { k: "sistema_viario_pct", label: "Sistema vi\xE1rio", t: "num", sufixo: "% gleba" }, { k: "elup_pct", label: "ELUP", t: "num", sufixo: "% gleba" }, { k: "epc_pct", label: "EPC", t: "num", sufixo: "% gleba" }, { k: "epu_pct", label: "EPU", t: "num", sufixo: "% gleba" }, { k: "areas_privativas_nao_vendaveis_pct", label: "Priv. n\xE3o vend\xE1veis", t: "num", sufixo: "% gleba" }, { k: "area_media_lote_m2", label: "\xC1rea m\xE9dia do lote", t: "num", sufixo: "m\xB2" }, { k: "preco_venda_m2", label: "Pre\xE7o de venda", t: "num", sufixo: "R$/m\xB2" }];
+var Re = [{ k: "coef_aproveitamento_basico", label: "Coef. aproveitamento b\xE1sico", t: "num" }, { k: "coef_aproveitamento_maximo", label: "Coef. aproveitamento m\xE1ximo", t: "num" }, { k: "area_pvt_r_fechada", label: "\xC1rea PVT R Fechada", t: "num", sufixo: "m\xB2" }, { k: "area_pvt_nr_fechada", label: "\xC1rea PVT NR Fechada", t: "num", sufixo: "m\xB2" }, { k: "area_pvt_r_aberta", label: "\xC1rea PVT R Aberta", t: "num", sufixo: "m\xB2" }, { k: "area_pvt_nr_aberta", label: "\xC1rea PVT NR Aberta", t: "num", sufixo: "m\xB2" }, { k: "area_comum_total", label: "\xC1rea comum total", t: "num", sufixo: "m\xB2" }, { k: "num_unidades", label: "N\xBA de unidades", t: "num" }, { k: "preco_venda_m2_residencial", label: "Pre\xE7o venda residencial", t: "num", sufixo: "R$/m\xB2" }, { k: "preco_venda_m2_nao_residencial", label: "Pre\xE7o venda n\xE3o residencial", t: "num", sufixo: "R$/m\xB2" }];
+var nr = new Set([...Pe, ...we, ...Ce, ...Re, { k: "permuta_fisica_area_m2" }, { k: "permuta_fisica_pct" }, { k: "terreno_manual_area" }].filter((o3) => o3.t === "num" || ["permuta_fisica_area_m2", "permuta_fisica_pct", "terreno_manual_area"].includes(o3.k)).map((o3) => o3.k));
+var Tt = (o3) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(o3 || 0);
+var U = (o3, e = 0) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: e }).format(o3 || 0);
+var ut = (o3) => `${(o3 || 0).toFixed(1)}%`;
+var k = class extends f {
   constructor() {
     super(...arguments);
-    this.estudoId = 0;
     this.estudo = null;
-    this.carregando = true;
-    this.aba = "premissas";
+    this.editavel = false;
     this.form = {};
     this.salvando = false;
-    this.membros = [];
-    this.usuarios = [];
-    this.mostrarMembros = false;
-    this._salvarPremissas = async () => {
+    this.benchmarks = [];
+    this.aliquotaRet = 4;
+    this._salvar = async () => {
       this.salvando = true;
       try {
         let t = {};
-        for (let { campo: o, tipo: a } of mt) {
-          let i = this.form[o];
-          i === "" ? i = null : a === "numero" && i != null && (i = Number(i)), t[o] = i;
-        }
-        let r = await Ut(this.estudoId, t);
+        for (let [a, s] of Object.entries(this.form)) ["id", "id_legivel", "nome_exibicao", "sequencia", "status", "autor_id", "criado_em", "atualizado_em", "membros", "imoveis", "_permissao", "_funcao", "autor_nome", "autor_avatar_url"].includes(a) || (nr.has(a) ? t[a] = s === "" || s == null ? null : Number(s) : t[a] = s);
+        let r = await pe(this.estudo.id, t);
         if (r?.erro) {
           n.notificar(r.mensagem || "Erro ao salvar", "erro");
           return;
         }
-        n.notificar("Premissas salvas.", "sucesso"), this._carregar();
+        n.notificar("Premissas salvas.", "sucesso");
       } catch (t) {
         n.notificar(t?.message || "Erro ao salvar", "erro");
       } finally {
         this.salvando = false;
       }
     };
+  }
+  connectedCallback() {
+    super.connectedCallback(), this._init();
+  }
+  updated(t) {
+    t.has("estudo") && this._init();
+  }
+  async _init() {
+    if (this.estudo) {
+      this.form = { ...this.estudo };
+      try {
+        let [t, r] = await Promise.all([lt(this.estudo.tipo_empreendimento), Ae()]);
+        this.benchmarks = t?.dados || [], this.aliquotaRet = Number(r?.parametros?.aliquota_ret_pct) || 4;
+      } catch (t) {
+        console.error(t);
+      }
+    }
+  }
+  _entradaProforma() {
+    return { ...this.form, aliquota_ret_pct: this.aliquotaRet };
+  }
+  _set(t, r) {
+    this.form = { ...this.form, [t]: r };
+  }
+  render() {
+    if (!this.estudo) return h;
+    let t = this.estudo.tipo_empreendimento === "loteamento", r = t ? Ce : Re, a = Pe.filter((i) => !i.so || i.so === this.estudo.tipo_empreendimento), s = !this.editavel;
+    return c`
+      <div class="card">
+        <h3 style="margin-top:0">Premissas</h3>
+
+        <div class="secao">
+          <h4>Terreno</h4>
+          ${this.estudo.origem_terreno === "nucleo" ? c`<p class="sec">Origem: Núcleo (área em modo leitura — indisponível nesta instância).</p>` : c`<div class="grid">
+                ${this._input({ k: "terreno_manual_nome", label: "Nome do terreno", t: "txt" }, s)}
+                ${this._input({ k: "terreno_manual_area", label: "\xC1rea do terreno", t: "num", sufixo: "m\xB2" }, s)}
+              </div>`}
+        </div>
+
+        <div class="secao">
+          <h4>Produto e áreas</h4>
+          <div class="grid">${r.map((i) => this._input(i, s))}</div>
+        </div>
+
+        <div class="secao">
+          <h4>Custos</h4>
+          <div class="check">
+            <input type="checkbox" ?disabled=${s} .checked=${this.form.considerar_custo_terreno !== false}
+              @change=${(i) => this._set("considerar_custo_terreno", i.target.checked)} />
+            <label>Considerar custo de aquisição do terreno</label>
+          </div>
+          ${t ? this._toggle("infra_modo", [{ v: "pct_vgv", l: "% VGV" }, { v: "valor_m2", l: "R$/m\xB2" }], "Infraestrutura", s) : h}
+          ${this._toggle("projetos_modo", [{ v: "pct_vgv", l: "% VGV" }, { v: "valor_fixo", l: "R$ fixo" }], "Projetos", s)}
+          <div class="grid">${a.map((i) => this._input(i, s))}</div>
+        </div>
+
+        <div class="secao">
+          <h4>Impostos e deduções</h4>
+          <div class="check">
+            <input type="checkbox" ?disabled=${s} .checked=${!!this.form.sujeito_ret}
+              @change=${(i) => this._set("sujeito_ret", i.target.checked)} />
+            <label>Sujeito a RET (alíquota fixa ${this.aliquotaRet}%)</label>
+          </div>
+          <div class="grid">${we.map((i) => this._input(i, s || i.k === "imposto_percentual" && !!this.form.sujeito_ret))}</div>
+        </div>
+
+        <div class="secao">
+          <h4>Permuta física</h4>
+          ${this._toggle("permuta_fisica_modo", [{ v: "area_m2", l: "m\xB2" }, { v: "pct_area_venda", l: "% \xE1rea venda" }], "Modo", s)}
+          <div class="grid">
+            ${this._input({ k: "permuta_fisica_area_m2", label: "Permuta f\xEDsica (m\xB2)", t: "num", sufixo: "m\xB2" }, s || this.form.permuta_fisica_modo === "pct_area_venda")}
+            ${this._input({ k: "permuta_fisica_pct", label: "Permuta f\xEDsica (% \xE1rea venda)", t: "num", sufixo: "%" }, s || this.form.permuta_fisica_modo !== "pct_area_venda")}
+          </div>
+        </div>
+
+        ${this.editavel ? c`<div class="acoes">
+          <button class="btn-cta" ?disabled=${this.salvando} @click=${this._salvar}>${this.salvando ? "Salvando\u2026" : "Salvar premissas"}</button>
+        </div>` : c`<p class="sec">Somente leitura neste status/função.</p>`}
+      </div>
+
+      ${this._renderResumo(t)}
+    `;
+  }
+  _input(t, r) {
+    return t.t === "txt" ? c`<div class="campo campo-in">
+        <label>${t.label}</label>
+        <input type="text" ?disabled=${r} .value=${String(this.form[t.k] ?? "")}
+          @input=${(a) => this._set(t.k, a.target.value)} />
+      </div>` : c`<div class="campo campo-in">
+      <label>${t.label}</label>
+      <input type="number" ?disabled=${r} .value=${String(this.form[t.k] ?? "")}
+        @input=${(a) => this._set(t.k, a.target.value)} />
+      ${t.sufixo ? c`<span class="suf">${t.sufixo}</span>` : h}
+    </div>`;
+  }
+  _toggle(t, r, a, s) {
+    let i = this.form[t] ?? r[0].v;
+    return c`<div class="campo">
+      <label>${a}</label>
+      <div class="toggle">
+        ${r.map((l) => c`<button class=${i === l.v ? "on" : ""} ?disabled=${s} @click=${() => this._set(t, l.v)}>${l.l}</button>`)}
+      </div>
+    </div>`;
+  }
+  _benchmark(t) {
+    return this.benchmarks.find((r) => r.campo === t);
+  }
+  _renderResumo(t) {
+    let r = Nt(this._entradaProforma()), a = [];
+    if (t) {
+      let l = this._benchmark("eficiencia_aproveitamento");
+      a.push({ rot: "\xC1rea da gleba", val: `${U(r.areaTerreno)} m\xB2` }, { rot: "\xC1rea vend\xE1vel", val: `${U(r.areaVendavel)} m\xB2` }, { rot: "Vend\xE1vel / gleba", val: ut(r.eficienciaPct), bm: l ? { ok: r.eficienciaPct >= Number(l.valor) } : void 0 }, { rot: "VGV", val: Tt(r.vgv) }, { rot: "N\xBA de lotes", val: U(r.numUnidades) }, { rot: "Margem l\xEDquida", val: ut(r.margemLiquidaPct) });
+    } else {
+      let l = this._benchmark("custo_obras_vgv"), u = this._benchmark("margem_liquida");
+      a.push({ rot: "\xC1rea privativa total", val: `${U(r.areaPrivativa)} m\xB2` }, { rot: "\xC1rea constru\xEDda", val: `${U(r.areaConstruida)} m\xB2` }, { rot: "N\xBA de unidades", val: U(r.numUnidades) }, { rot: "Pre\xE7o m\xE9dio/unid.", val: Tt(r.precoMedioUnidade) }, { rot: "Custo obras / VGV", val: ut(r.custoObrasVgvPct), bm: l ? { ok: r.custoObrasVgvPct <= Number(l.valor) } : void 0 }, { rot: "Margem l\xEDquida", val: ut(r.margemLiquidaPct), bm: u ? { ok: r.margemLiquidaPct >= Number(u.valor) } : void 0 });
+    }
+    let s = this._benchmark("resultado_final"), i = null;
+    return s && Number(s.valor) > 0 && (i = Se(this._entradaProforma(), Number(s.valor))), c`
+      <div class="card" style="margin-top:16px">
+        <h3 style="margin-top:0">Resumo</h3>
+        <div class="kpis">
+          ${a.map((l) => c`
+            <div class="kpi ${l.bm ? l.bm.ok ? "ok" : "ruim" : ""}">
+              <div class="rot">${l.rot}</div>
+              <div class="val">${l.val}</div>
+            </div>
+          `)}
+        </div>
+        ${s ? c`
+          <div class="preco-sugerido">
+            Preço sugerido/m² para atingir o piso de resultado final (${U(Number(s.valor))}%):
+            <strong>${i !== null ? Tt(i) + "/m\xB2" : "inating\xEDvel com as premissas atuais"}</strong>
+          </div>
+        ` : c`<p class="sec" style="margin-top:12px">Defina o benchmark “resultado_final” para calcular o preço sugerido/m².</p>`}
+      </div>
+    `;
+  }
+};
+k.styles = [R, x`
+    :host { display: block; }
+    .secao { margin-bottom: 18px; }
+    .secao h4 { margin: 0 0 10px; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .campo-in { position: relative; }
+    .campo-in .suf { position: absolute; right: 10px; top: 30px; font-size: 0.7rem; color: var(--cor-texto-sec, rgba(255,255,255,0.4)); pointer-events: none; }
+    .toggle { display: inline-flex; border: 1px solid var(--cor-borda, rgba(255,255,255,0.14)); border-radius: 6px; overflow: hidden; }
+    .toggle button { border: none; border-radius: 0; background: none; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); padding: 5px 10px; }
+    .toggle button.on { background: var(--cor-primaria-solida, #2AA9E0); color: #06121c; font-weight: 600; }
+    .check { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 6px; }
+    .kpi { background: var(--cor-fundo, #0D1B2A); border: 1px solid var(--cor-borda, rgba(255,255,255,0.1)); border-radius: 8px; padding: 12px; }
+    .kpi .rot { font-size: 0.7rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); text-transform: uppercase; letter-spacing: 0.03em; }
+    .kpi .val { font-size: 1.15rem; font-weight: 700; margin-top: 4px; }
+    .kpi.ok .val { color: var(--cor-sucesso, #13A98D); }
+    .kpi.ruim .val { color: var(--cor-erro, #D45A3A); }
+    .preco-sugerido { margin-top: 12px; padding: 12px 14px; border-radius: 8px; background: rgba(247,161,17,0.10); border: 1px solid rgba(247,161,17,0.3); font-size: 0.9rem; }
+    .preco-sugerido strong { color: var(--cor-cta, #F7A111); }
+  `], p([w({ attribute: false })], k.prototype, "estudo", 2), p([w({ type: Boolean })], k.prototype, "editavel", 2), p([_()], k.prototype, "form", 2), p([_()], k.prototype, "salvando", 2), p([_()], k.prototype, "benchmarks", 2), p([_()], k.prototype, "aliquotaRet", 2), k = p([S("viab-tela-premissas")], k);
+var Me = ["leitor", "editor", "aprovador"];
+var y = class extends f {
+  constructor() {
+    super(...arguments);
+    this.estudoId = 0;
+    this.estudo = null;
+    this.carregando = true;
+    this.aba = "premissas";
+    this.membros = [];
+    this.usuarios = [];
+    this.mostrarMembros = false;
   }
   connectedCallback() {
     super.connectedCallback(), this._carregar();
@@ -1215,12 +1416,8 @@ var _ = class extends b {
     if (this.estudoId) {
       this.carregando = true;
       try {
-        let t = await Nt(this.estudoId);
-        if (t?.erro) n.notificar(t.mensagem || "Sem acesso", "erro"), this.estudo = null;
-        else {
-          this.estudo = t, this.membros = t.membros || [], this.form = {};
-          for (let { campo: r } of mt) this.form[r] = t[r] ?? "";
-        }
+        let t = await me(this.estudoId);
+        t?.erro ? (n.notificar(t.mensagem || "Sem acesso", "erro"), this.estudo = null) : (this.estudo = t, this.membros = t.membros || []);
       } catch (t) {
         console.error("Erro ao carregar estudo:", t);
       }
@@ -1239,58 +1436,38 @@ var _ = class extends b {
         <div>
           <h1>${this.estudo.nome_exibicao || this.estudo.nome}</h1>
           <div class="meta">
-            <span class="badge ${r}">${U[r] || r}</span>
-            <span class="sec">${L[this.estudo.tipo_empreendimento] || this.estudo.tipo_empreendimento}</span>
-            ${t.funcao ? c`<span class="sec">· sua função: ${t.funcao}</span>` : d}
+            <span class="badge ${r}">${j[r] || r}</span>
+            <span class="sec">${F[this.estudo.tipo_empreendimento] || this.estudo.tipo_empreendimento}</span>
+            ${t.funcao ? c`<span class="sec">· sua função: ${t.funcao}</span>` : h}
           </div>
         </div>
         <div class="acoes-status">${this._renderAcoesStatus(t, r)}</div>
       </div>
 
       <div class="abas">
-        ${["premissas", "proforma", "graficos"].map((o) => c`
-          <button class="aba ${this.aba === o ? "ativa" : ""}" @click=${() => this.aba = o}>
-            ${o === "premissas" ? "Premissas" : o === "proforma" ? "Proforma" : "Gr\xE1ficos"}
+        ${["premissas", "proforma", "graficos"].map((a) => c`
+          <button class="aba ${this.aba === a ? "ativa" : ""}" @click=${() => this.aba = a}>
+            ${a === "premissas" ? "Premissas" : a === "proforma" ? "Proforma" : "Gr\xE1ficos"}
           </button>
         `)}
       </div>
 
-      ${this.aba === "premissas" ? this._renderPremissas(t) : d}
-      ${this.aba === "proforma" ? c`<div class="placeholder">Proforma — cálculos e sensibilidade chegam na Etapa 5/6.</div>` : d}
-      ${this.aba === "graficos" ? c`<div class="placeholder">Gráficos — visualizações chegam na Etapa 6.</div>` : d}
+      ${this.aba === "premissas" ? this._renderPremissas(t) : h}
+      ${this.aba === "proforma" ? c`<div class="placeholder">Proforma — cálculos e sensibilidade chegam na Etapa 5/6.</div>` : h}
+      ${this.aba === "graficos" ? c`<div class="placeholder">Gráficos — visualizações chegam na Etapa 6.</div>` : h}
     `;
   }
   _renderAcoesStatus(t, r) {
-    let o = [];
-    return t.podeEditar && r === "rascunho" && o.push(c`<button class="btn-primario btn-sm" @click=${() => this._status("em_analise")}>Submeter para análise</button>`), t.podeAprovar && r === "em_analise" && (o.push(c`<button class="btn-primario btn-sm" @click=${() => this._status("aprovado")}>Aprovar</button>`), o.push(c`<button class="btn-perigo btn-sm" @click=${() => this._status("reprovado")}>Reprovar</button>`), o.push(c`<button class="btn-sec btn-sm" @click=${() => this._status("rascunho")}>Devolver ao rascunho</button>`)), t.podeAprovar && r === "arquivado" && o.push(c`<button class="btn-sec btn-sm" @click=${() => this._status("rascunho")}>Reabrir</button>`), o.push(c`<button class="btn-sec btn-sm" @click=${() => {
+    let a = [];
+    return t.podeEditar && r === "rascunho" && a.push(c`<button class="btn-primario btn-sm" @click=${() => this._status("em_analise")}>Submeter para análise</button>`), t.podeAprovar && r === "em_analise" && (a.push(c`<button class="btn-primario btn-sm" @click=${() => this._status("aprovado")}>Aprovar</button>`), a.push(c`<button class="btn-perigo btn-sm" @click=${() => this._status("reprovado")}>Reprovar</button>`), a.push(c`<button class="btn-sec btn-sm" @click=${() => this._status("rascunho")}>Devolver ao rascunho</button>`)), t.podeAprovar && r === "arquivado" && a.push(c`<button class="btn-sec btn-sm" @click=${() => this._status("rascunho")}>Reabrir</button>`), a.push(c`<button class="btn-sec btn-sm" @click=${() => {
       this.mostrarMembros = !this.mostrarMembros, this.mostrarMembros && this._carregarUsuarios();
-    }}>Membros</button>`), o;
+    }}>Membros</button>`), a;
   }
   _renderPremissas(t) {
     let r = t.podeEditar && this.estudo.status !== "aprovado" && this.estudo.status !== "reprovado";
     return c`
-      ${this.mostrarMembros ? this._renderMembros(t) : d}
-      <div class="card">
-        <h3 style="margin-top:0">Premissas</h3>
-        <div class="grid2">
-          ${mt.map((o) => c`
-            <div class="campo" style=${o.tipo === "area_texto" ? "grid-column: 1 / -1" : ""}>
-              <label>${o.label}</label>
-              ${o.tipo === "area_texto" ? c`<textarea rows="3" ?disabled=${!r}
-                    .value=${this.form[o.campo] ?? ""}
-                    @input=${(a) => this.form = { ...this.form, [o.campo]: a.target.value }}></textarea>` : c`<input type=${o.tipo === "numero" ? "number" : "text"} ?disabled=${!r}
-                    .value=${String(this.form[o.campo] ?? "")}
-                    @input=${(a) => this.form = { ...this.form, [o.campo]: a.target.value }} />`}
-            </div>
-          `)}
-        </div>
-        ${r ? c`
-          <div class="acoes">
-            <button class="btn-cta" ?disabled=${this.salvando} @click=${this._salvarPremissas}>
-              ${this.salvando ? "Salvando\u2026" : "Salvar premissas"}
-            </button>
-          </div>` : c`<p class="sec">Somente leitura neste status/função.</p>`}
-      </div>
+      ${this.mostrarMembros ? this._renderMembros(t) : h}
+      <viab-tela-premissas .estudo=${this.estudo} .editavel=${r}></viab-tela-premissas>
     `;
   }
   _renderMembros(t) {
@@ -1299,17 +1476,17 @@ var _ = class extends b {
       <div class="card" style="margin-bottom:16px">
         <h3 style="margin-top:0">Membros do estudo</h3>
         <div class="membros-lista">
-          ${this.membros.length === 0 ? c`<span class="sec">Nenhum membro.</span>` : d}
-          ${this.membros.map((o) => c`
+          ${this.membros.length === 0 ? c`<span class="sec">Nenhum membro.</span>` : h}
+          ${this.membros.map((a) => c`
             <div class="membro">
-              <span>${o.usuario_nome || `Usu\xE1rio ${o.usuario_id}`}</span>
+              <span>${a.usuario_nome || `Usu\xE1rio ${a.usuario_id}`}</span>
               <div style="display:flex; gap:6px; align-items:center">
                 ${r ? c`
-                  <select .value=${o.funcao} @change=${(a) => this._alterarFuncao(o.usuario_id, a.target.value)}>
-                    ${Kt.map((a) => c`<option value=${a} ?selected=${a === o.funcao}>${a}</option>`)}
+                  <select .value=${a.funcao} @change=${(s) => this._alterarFuncao(a.usuario_id, s.target.value)}>
+                    ${Me.map((s) => c`<option value=${s} ?selected=${s === a.funcao}>${s}</option>`)}
                   </select>
-                  <button class="btn-perigo btn-sm" @click=${() => this._removerMembro(o.usuario_id)}>Remover</button>
-                ` : c`<span class="badge rascunho">${o.funcao}</span>`}
+                  <button class="btn-perigo btn-sm" @click=${() => this._removerMembro(a.usuario_id)}>Remover</button>
+                ` : c`<span class="badge rascunho">${a.funcao}</span>`}
               </div>
             </div>
           `)}
@@ -1318,78 +1495,78 @@ var _ = class extends b {
           <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap">
             <select id="sel-usuario">
               <option value="">Selecionar usuário…</option>
-              ${this.usuarios.map((o) => c`<option value=${o.id}>${o.nome}</option>`)}
+              ${this.usuarios.map((a) => c`<option value=${a.id}>${a.nome}</option>`)}
             </select>
             <select id="sel-funcao">
-              ${Kt.map((o) => c`<option value=${o}>${o}</option>`)}
+              ${Me.map((a) => c`<option value=${a}>${a}</option>`)}
             </select>
             <button class="btn-sec btn-sm" @click=${this._adicionarMembro}>Adicionar</button>
-          </div>` : d}
+          </div>` : h}
       </div>
     `;
   }
   async _carregarUsuarios() {
     if (!(this.usuarios.length > 0)) try {
-      this.usuarios = await Gt();
+      this.usuarios = await ke();
     } catch (t) {
       console.error(t);
     }
   }
   async _status(t) {
     if (!((t === "aprovado" || t === "reprovado") && !confirm(`Confirma ${{ aprovado: "aprovar", reprovado: "reprovar", rascunho: "devolver ao rascunho", em_analise: "submeter" }[t]} este estudo?`))) try {
-      let o = await Ht(this.estudoId, t);
-      if (o?.erro) {
-        n.notificar(o.mensagem || "Transi\xE7\xE3o n\xE3o permitida", "erro");
+      let a = await be(this.estudoId, t);
+      if (a?.erro) {
+        n.notificar(a.mensagem || "Transi\xE7\xE3o n\xE3o permitida", "erro");
         return;
       }
-      n.notificar(`Status alterado para ${U[t] || t}.`, "sucesso"), this._carregar();
-    } catch (o) {
-      n.notificar(o?.message || "Erro na transi\xE7\xE3o", "erro");
+      n.notificar(`Status alterado para ${j[t] || t}.`, "sucesso"), this._carregar();
+    } catch (a) {
+      n.notificar(a?.message || "Erro na transi\xE7\xE3o", "erro");
     }
   }
   async _adicionarMembro() {
-    let t = this.renderRoot.querySelector("#sel-usuario"), r = this.renderRoot.querySelector("#sel-funcao"), o = parseInt(t?.value || ""), a = r?.value || "leitor";
-    if (!o) {
+    let t = this.renderRoot.querySelector("#sel-usuario"), r = this.renderRoot.querySelector("#sel-funcao"), a = parseInt(t?.value || ""), s = r?.value || "leitor";
+    if (!a) {
       n.notificar("Selecione um usu\xE1rio.", "alerta");
       return;
     }
     try {
-      let i = await zt(this.estudoId, o, a);
+      let i = await ve(this.estudoId, a, s);
       if (i?.erro) {
         n.notificar(i.mensagem || "Erro", "erro");
         return;
       }
-      this.membros = (await tt(this.estudoId))?.dados || this.membros, n.notificar("Membro adicionado.", "sucesso");
+      this.membros = (await ct(this.estudoId))?.dados || this.membros, n.notificar("Membro adicionado.", "sucesso");
     } catch (i) {
       n.notificar(i?.message || "Erro", "erro");
     }
   }
   async _alterarFuncao(t, r) {
     try {
-      let o = await Bt(this.estudoId, t, r);
-      if (o?.erro) {
-        n.notificar(o.mensagem || "Erro", "erro");
+      let a = await ge(this.estudoId, t, r);
+      if (a?.erro) {
+        n.notificar(a.mensagem || "Erro", "erro");
         return;
       }
-      this.membros = (await tt(this.estudoId))?.dados || this.membros;
-    } catch (o) {
-      n.notificar(o?.message || "Erro", "erro");
+      this.membros = (await ct(this.estudoId))?.dados || this.membros;
+    } catch (a) {
+      n.notificar(a?.message || "Erro", "erro");
     }
   }
   async _removerMembro(t) {
     try {
-      let r = await qt(this.estudoId, t);
+      let r = await fe(this.estudoId, t);
       if (r?.erro) {
         n.notificar(r.mensagem || "Erro", "erro");
         return;
       }
-      this.membros = (await tt(this.estudoId))?.dados || this.membros;
+      this.membros = (await ct(this.estudoId))?.dados || this.membros;
     } catch (r) {
       n.notificar(r?.message || "Erro", "erro");
     }
   }
 };
-_.styles = [I, y`
+y.styles = [R, x`
     :host { padding: 24px; }
     .voltar { background: none; border: none; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); cursor: pointer; padding: 0; margin-bottom: 12px; }
     .cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -1404,8 +1581,8 @@ _.styles = [I, y`
     .membros-lista { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
     .membro { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
     .placeholder { padding: 40px; text-align: center; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
-  `], p([N({ type: Number })], _.prototype, "estudoId", 2), p([h()], _.prototype, "estudo", 2), p([h()], _.prototype, "carregando", 2), p([h()], _.prototype, "aba", 2), p([h()], _.prototype, "form", 2), p([h()], _.prototype, "salvando", 2), p([h()], _.prototype, "membros", 2), p([h()], _.prototype, "usuarios", 2), p([h()], _.prototype, "mostrarMembros", 2), _ = p([w("viab-tela-estudo")], _);
-var P = class extends b {
+  `], p([w({ type: Number })], y.prototype, "estudoId", 2), p([_()], y.prototype, "estudo", 2), p([_()], y.prototype, "carregando", 2), p([_()], y.prototype, "aba", 2), p([_()], y.prototype, "membros", 2), p([_()], y.prototype, "usuarios", 2), p([_()], y.prototype, "mostrarMembros", 2), y = p([S("viab-tela-estudo")], y);
+var M = class extends f {
   constructor() {
     super(...arguments);
     this.tipo = "loteamento";
@@ -1418,7 +1595,7 @@ var P = class extends b {
   async _carregar() {
     this.carregando = true;
     try {
-      let t = await jt(this.tipo);
+      let t = await lt(this.tipo);
       this.itens = t?.dados || [];
     } catch (t) {
       console.error(t);
@@ -1437,7 +1614,7 @@ var P = class extends b {
         ${["loteamento", "incorporacao"].map((t) => c`
           <button class="aba ${this.tipo === t ? "ativa" : ""}" @click=${() => {
       this.tipo = t, this._carregar();
-    }}>${L[t]}</button>
+    }}>${F[t]}</button>
         `)}
       </div>
 
@@ -1446,7 +1623,7 @@ var P = class extends b {
             <table>
               <thead><tr><th>Indicador</th><th>Valor</th><th>Regra</th><th>Var + (%)</th><th>Var − (%)</th><th></th></tr></thead>
               <tbody>
-                ${this.itens.length === 0 ? c`<tr><td colspan="6" class="sec" style="text-align:center; padding:24px">Nenhum benchmark. Clique em “Criar indicadores padrão”.</td></tr>` : d}
+                ${this.itens.length === 0 ? c`<tr><td colspan="6" class="sec" style="text-align:center; padding:24px">Nenhum benchmark. Clique em “Criar indicadores padrão”.</td></tr>` : h}
                 ${this.itens.map((t) => c`
                   <tr>
                     <td>${t.campo}</td>
@@ -1477,18 +1654,18 @@ var P = class extends b {
   }
   async _patch(t, r) {
     try {
-      let o = await Ft(t, r);
-      if (o?.erro) {
-        n.notificar(o.mensagem || "Erro ao salvar", "erro");
+      let a = await xe(t, r);
+      if (a?.erro) {
+        n.notificar(a.mensagem || "Erro ao salvar", "erro");
         return;
       }
-    } catch (o) {
-      n.notificar(o?.message || "Erro", "erro");
+    } catch (a) {
+      n.notificar(a?.message || "Erro", "erro");
     }
   }
   async _remover(t) {
     if (confirm("Remover este benchmark?")) try {
-      let r = await Jt(t);
+      let r = await ye(t);
       if (r?.erro) {
         n.notificar(r.mensagem || "Erro", "erro");
         return;
@@ -1501,7 +1678,7 @@ var P = class extends b {
   async _novo() {
     let t = prompt("Identificador do indicador (ex: resultado_final):");
     if (t?.trim()) try {
-      let r = await Dt({ tipo_empreendimento: this.tipo, campo: t.trim(), regra_comparacao: "atingir_ou_superar" });
+      let r = await $e({ tipo_empreendimento: this.tipo, campo: t.trim(), regra_comparacao: "atingir_ou_superar" });
       if (r?.erro) {
         n.notificar(r.mensagem || "Erro", "erro");
         return;
@@ -1513,7 +1690,7 @@ var P = class extends b {
   }
   async _semear() {
     try {
-      let t = await Wt();
+      let t = await Ee();
       if (t?.erro) {
         n.notificar(t.mensagem || "Erro", "erro");
         return;
@@ -1524,7 +1701,7 @@ var P = class extends b {
     }
   }
 };
-P.styles = [I, y`
+M.styles = [R, x`
     :host { padding: 16px; }
     .abas { display: flex; gap: 4px; margin-bottom: 16px; }
     .aba { padding: 8px 14px; background: none; border: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
@@ -1533,23 +1710,23 @@ P.styles = [I, y`
     .topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
     td input, td select { width: 100%; box-sizing: border-box; }
     td.num input { max-width: 90px; }
-  `], p([h()], P.prototype, "tipo", 2), p([h()], P.prototype, "itens", 2), p([h()], P.prototype, "carregando", 2), P = p([w("viabilidade-config-benchmarks")], P);
-function Zt(s3) {
-  let e = (s3 || "").replace(/^\//, "").split("/").filter(Boolean);
+  `], p([_()], M.prototype, "tipo", 2), p([_()], M.prototype, "itens", 2), p([_()], M.prototype, "carregando", 2), M = p([S("viabilidade-config-benchmarks")], M);
+function Ne(o3) {
+  let e = (o3 || "").replace(/^\//, "").split("/").filter(Boolean);
   if (e[0] === "detalhe" && e[1]) {
     let t = parseInt(e[1]);
     if (!isNaN(t)) return { tela: "estudo", estudoId: t };
   }
   return e[0] === "terrenos" ? { tela: "dashboard", aba: "terrenos" } : { tela: "dashboard", aba: "estudos" };
 }
-var H = class extends b {
+var B = class extends f {
   constructor() {
     super(...arguments);
     this.rota = { tela: "dashboard", aba: "estudos" };
   }
   connectedCallback() {
-    super.connectedCallback(), this.rota = Zt(n.subRota()), this._cleanupRota = n.escutarRota((t) => {
-      this.rota = Zt(t);
+    super.connectedCallback(), this.rota = Ne(n.subRota()), this._cleanupRota = n.escutarRota((t) => {
+      this.rota = Ne(t);
     });
   }
   disconnectedCallback() {
@@ -1559,14 +1736,14 @@ var H = class extends b {
     return this.rota.tela === "estudo" ? c`<viab-tela-estudo .estudoId=${this.rota.estudoId || 0}></viab-tela-estudo>` : c`<viab-tela-dashboard .aba=${this.rota.aba || "estudos"}></viab-tela-dashboard>`;
   }
 };
-H.styles = y`
+B.styles = x`
     :host {
       display: block;
       min-height: 100%;
       background: var(--cor-fundo, #0D1B2A);
       color: var(--cor-texto, rgba(255, 255, 255, 0.85));
     }
-  `, p([h()], H.prototype, "rota", 2), H = p([w("app-viabilidade")], H);
+  `, p([_()], B.prototype, "rota", 2), B = p([S("app-viabilidade")], B);
 
 // demo/demo.ts
 var root = document.getElementById("root");
@@ -1574,12 +1751,12 @@ function mostrar(view) {
   if (!root) return;
   root.innerHTML = "";
   root.appendChild(document.createElement(view === "config" ? "viabilidade-config-benchmarks" : "app-viabilidade"));
-  document.querySelectorAll("[data-view]").forEach((b2) => {
-    b2.classList.toggle("ativa", b2.dataset.view === view);
+  document.querySelectorAll("[data-view]").forEach((b) => {
+    b.classList.toggle("ativa", b.dataset.view === view);
   });
 }
-document.querySelectorAll("[data-view]").forEach((b2) => {
-  b2.addEventListener("click", () => mostrar(b2.dataset.view || "app"));
+document.querySelectorAll("[data-view]").forEach((b) => {
+  b.addEventListener("click", () => mostrar(b.dataset.view || "app"));
 });
 mostrar("app");
 /*! Bundled license information:

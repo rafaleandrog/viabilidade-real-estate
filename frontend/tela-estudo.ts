@@ -1,23 +1,14 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estilosBase, STATUS_LABEL, TIPO_LABEL } from './viab-shared.js';
+import './tela-premissas.js';
 import {
-  urbiVerso, buscarEstudo, atualizarEstudo, transicaoStatus,
+  urbiVerso, buscarEstudo, transicaoStatus,
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
 type Aba = 'premissas' | 'proforma' | 'graficos';
 const FUNCOES = ['leitor', 'editor', 'aprovador'];
-
-// Campos editáveis expostos na Premissas (MVP — o formulário completo da
-// proforma chega nas Etapas 5/6). Cada um é persistido via PATCH.
-const CAMPOS_PREMISSAS: { campo: string; label: string; tipo: 'texto' | 'numero' | 'area_texto' }[] = [
-  { campo: 'terreno_manual_nome', label: 'Nome do terreno (manual)', tipo: 'texto' },
-  { campo: 'terreno_manual_area', label: 'Área do terreno (m²)', tipo: 'numero' },
-  { campo: 'preco_venda_m2', label: 'Preço de venda (R$/m²)', tipo: 'numero' },
-  { campo: 'custo_construcao_m2', label: 'Custo de construção (R$/m²)', tipo: 'numero' },
-  { campo: 'notas', label: 'Notas', tipo: 'area_texto' },
-];
 
 @customElement('viab-tela-estudo')
 export class ViabTelaEstudo extends LitElement {
@@ -26,8 +17,6 @@ export class ViabTelaEstudo extends LitElement {
   @state() private estudo: any = null;
   @state() private carregando = true;
   @state() private aba: Aba = 'premissas';
-  @state() private form: Record<string, any> = {};
-  @state() private salvando = false;
   @state() private membros: any[] = [];
   @state() private usuarios: any[] = [];
   @state() private mostrarMembros = false;
@@ -67,8 +56,6 @@ export class ViabTelaEstudo extends LitElement {
       else {
         this.estudo = estudo;
         this.membros = estudo.membros || [];
-        this.form = {};
-        for (const { campo } of CAMPOS_PREMISSAS) this.form[campo] = estudo[campo] ?? '';
       }
     } catch (e) {
       console.error('Erro ao carregar estudo:', e);
@@ -133,29 +120,7 @@ export class ViabTelaEstudo extends LitElement {
     const editavel = p.podeEditar && this.estudo.status !== 'aprovado' && this.estudo.status !== 'reprovado';
     return html`
       ${this.mostrarMembros ? this._renderMembros(p) : nothing}
-      <div class="card">
-        <h3 style="margin-top:0">Premissas</h3>
-        <div class="grid2">
-          ${CAMPOS_PREMISSAS.map((c) => html`
-            <div class="campo" style=${c.tipo === 'area_texto' ? 'grid-column: 1 / -1' : ''}>
-              <label>${c.label}</label>
-              ${c.tipo === 'area_texto'
-                ? html`<textarea rows="3" ?disabled=${!editavel}
-                    .value=${this.form[c.campo] ?? ''}
-                    @input=${(e: Event) => this.form = { ...this.form, [c.campo]: (e.target as HTMLTextAreaElement).value }}></textarea>`
-                : html`<input type=${c.tipo === 'numero' ? 'number' : 'text'} ?disabled=${!editavel}
-                    .value=${String(this.form[c.campo] ?? '')}
-                    @input=${(e: Event) => this.form = { ...this.form, [c.campo]: (e.target as HTMLInputElement).value }} />`}
-            </div>
-          `)}
-        </div>
-        ${editavel ? html`
-          <div class="acoes">
-            <button class="btn-cta" ?disabled=${this.salvando} @click=${this._salvarPremissas}>
-              ${this.salvando ? 'Salvando…' : 'Salvar premissas'}
-            </button>
-          </div>` : html`<p class="sec">Somente leitura neste status/função.</p>`}
-      </div>
+      <viab-tela-premissas .estudo=${this.estudo} .editavel=${editavel}></viab-tela-premissas>
     `;
   }
 
@@ -212,27 +177,6 @@ export class ViabTelaEstudo extends LitElement {
       urbiVerso.notificar(e?.message || 'Erro na transição', 'erro');
     }
   }
-
-  private _salvarPremissas = async () => {
-    this.salvando = true;
-    try {
-      const dados: Record<string, any> = {};
-      for (const { campo, tipo } of CAMPOS_PREMISSAS) {
-        let v = this.form[campo];
-        if (v === '') v = null;
-        else if (tipo === 'numero' && v != null) v = Number(v);
-        dados[campo] = v;
-      }
-      const res = await atualizarEstudo(this.estudoId, dados);
-      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
-      urbiVerso.notificar('Premissas salvas.', 'sucesso');
-      this._carregar();
-    } catch (e: any) {
-      urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
-    } finally {
-      this.salvando = false;
-    }
-  };
 
   private async _adicionarMembro() {
     const selU = this.renderRoot.querySelector('#sel-usuario') as HTMLSelectElement | null;
