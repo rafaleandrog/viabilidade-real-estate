@@ -16,7 +16,22 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
-## Estado atual: Etapa 3 — ✅ CONCLUÍDA
+## Estado atual: Etapa 4 — ✅ CONCLUÍDA
+
+### Feito (Etapa 4 — frontend: dashboard + detalhe + config)
+- **`frontend/viabilidade-api.ts`** — wrapper sobre `window.urbiVerso.api` (APP `/viabilidade`) com todas as chamadas: estudos (CRUD/duplicar/status), membros, imóveis, benchmarks, config, glebas/lotes, `listarUsuarios` (via `/shell/apps/viabilidade/roles/usuarios`).
+- **`frontend/viab-shared.ts`** — estilos base (tema escuro por tokens `var(--cor-*)`), labels de status/tipo, badges, botões, tabela, modal, `formatarData`.
+- **`frontend/index.ts`** — `<app-viabilidade>` com roteamento por sub-rota (`/`, `/terrenos`, `/detalhe/{id}`) via `urbiVerso.subRota()`/`escutarRota`.
+- **`frontend/tela-dashboard.ts`** — abas Estudos/Terrenos, tabela filtrável (tipo/status), criar (modal), duplicar, remover. Aba Terrenos avisa que o Núcleo está indisponível → usar modo manual.
+- **`frontend/tela-estudo.ts`** — detalhe com abas Premissas/Proforma/Gráficos; botões de transição de status conforme `_permissao` (submeter/aprovar/reprovar/devolver/reabrir); painel de membros (add/mudar função/remover); formulário de Premissas inicial (subconjunto editável com Salvar via PATCH). Proforma/Gráficos são placeholders (Etapas 5/6).
+- **`frontend/viabilidade-config-benchmarks.ts`** — `<viabilidade-config-benchmarks>` (manifesto `telas_config`): tabela editável por tipo, criar/remover/semear indicadores padrão.
+- **Decisão de robustez:** componentes **autocontidos** (HTML puro + CSS por tokens), sem depender das APIs dos componentes `urbi-*` (não verificáveis offline). Adotar `urbi-tabela`/`urbi-kpi`/`urbi-abas` etc. quando houver instância rodando.
+- **Validado (verde):** typecheck ✓ · build ✓ (frontend 17→47KB) · test 8/8 ✓ · empacotar ✓.
+- ⏳ **Verificação em runtime pendente** — a UI não foi exercitada contra uma instância UrbiVerso real (o "teste na interface"). Offline validei por typecheck+build+empacotamento.
+
+---
+
+## Estado anterior: Etapa 3 — ✅ CONCLUÍDA
 
 ### Feito (Etapa 3 — benchmarks + config + Núcleo stub)
 - **`backend/rotas/benchmarks.ts`** — CRUD admin-only (`nivelApp === 'admin'` = role aprovador): `GET /benchmarks` (leitura liberada a qualquer usuário da app), `POST`/`PATCH /:id`/`DELETE /:id` (admin), `POST /benchmarks/semear` (idempotente, cria os indicadores padrão §4.6 que faltam). Unicidade `[tipo_empreendimento, campo]` tratada (409). Indicadores padrão: `resultado_final`(piso), `margem_bruta`, `margem_liquida`, `roi`, `custo_obras_vgv`(teto); `eficiencia_aproveitamento` só Loteamento.
@@ -91,7 +106,7 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 ---
 
 ## Próximos passos
-- **Etapa 4 (próxima):** frontend — dashboard de estudos (`urbi-tabela`, filtros tipo/status, criar/duplicar/remover) + tela de detalhe com `urbi-abas` (Premissas/Proforma/Gráficos, esqueleto) consumindo as rotas da Etapa 2/3. Config de benchmarks (`viabilidade-config-benchmarks`) via `telas_config`. Ler `docs/shell/ui.md` e o frontend do `okr` antes.
+- **Etapa 5 (próxima):** formulário completo de Premissas (§4.4/§4.5 — todos os campos de produto/custos/áreas por tipo, toggles de modo) + engine de Proforma no frontend (§6.2, cálculos em tempo real) + KPI grids (§5.2) + Preço Sugerido/m². Ler o protótipo `apps/analise_viabilidade` (schema `res_*`) como referência de fórmulas.
 
 ### Descoberta (Etapa 2) — glebas/lotes existem no Núcleo via `req.nucleo`
 Os tipos do SDK (`node_modules/@urbiverso/sdk/dist/express.d.ts`, `type EntidadeBatch`) listam `glebas`, `lotes`, `parcelamentos`, `unidades` como entidades do Núcleo acessíveis por `req.nucleo` (`batch`, `chamarSubrecurso`, `buscarPorChave`). Ou seja: **glebas/lotes existem** como entidades — só não há supertipo `imoveis` nem rota REST dedicada em `nucleo/backend/src/rotas/`. Isso **refina** (não invalida) a decisão da Etapa 1: MVP segue manual; a integração "Buscar terreno" usará `req.nucleo` e `permissoes_nucleo: { glebas: "leitura", lotes: "leitura" }`. Ver `[[nucleo-imoveis-nao-existe-usar-manual]]`.
