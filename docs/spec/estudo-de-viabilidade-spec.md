@@ -2,6 +2,53 @@
 
 > Plataforma para análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação). Substitui planilhas dispersas por uma aplicação centralizada no UrbiVerso com cálculos automáticos, indicadores padronizados, comparação de cenários, análise de sensibilidade e avaliação de apelo comercial assistida por IA.
 
+> **Anotada com o status de implementação do MVP `v0.1.0`** (Etapas 0–7, 2026-07-10). Ver seção **“0. Status de Implementação”** abaixo. Esta spec é a fonte funcional; a seção 0 registra o que foi construído, os ajustes de rota e o que fica para v2.
+
+---
+
+## 0. Status de Implementação (MVP v0.1.0)
+
+**Legenda:** ✅ implementado · ✏️ implementado com ajuste/decisão (ver nota) · ⏳ adiado para v2 · ⛔ bloqueado pelo ambiente atual
+
+### 0.1 Cobertura por seção
+
+| Seção | Status | Observação |
+|---|---|---|
+| §1 Visão geral (tipos, origem terreno, níveis, preço sugerido) | ✅ / ✏️ | Nível "Avançado" bloqueado na UI (só `preliminar` no MVP). Origem Núcleo degrada para manual (⛔ Núcleo). |
+| §2 Roles e permissões | ✅ | leitor/editor/aprovador por estudo (membership). |
+| §3 Ciclo de vida | ✅ / ✏️ | Transições completas. Arquivamento automático: regra pronta em endpoint; **disparo automático** depende do agendador da instância. |
+| §4 Entidades e modelo | ✅ | |
+| §4.4 Custos/receitas · §4.5 Áreas | ✅ / ✏️ | Engine `proforma.ts` (testada). Interpretações documentadas onde a spec se contradiz (ver §0.2). |
+| §4.6 Benchmarks | ✅ / ✏️ | Indicadores do MVP semeáveis. Edição **admin-only** (ver §0.2). ROE/TIR/VPL/Payback → v2. |
+| §5 Telas (dashboard, detalhe, imóveis) | ✅ / ✏️ | 3 abas + 4ª aba "Apelo Comercial". Aba Terrenos avisa Núcleo indisponível. Componentes autocontidos (ver §0.2). |
+| §6.1 Schema · §6.2 Proforma · §6.5 Params · §6.9 Eventos | ✅ | |
+| §6.3 Exportação | ✏️ | Gerada no **frontend** (PDF via impressão do navegador com estilos do app; Excel via CSV). Ver §0.2. |
+| §6.6 Dependências do Núcleo | ⛔ | Instância sem `glebas`/`lotes`; `dependencias_nucleo` vazio, modo manual. Preparado para plugar. |
+| §6.7 IA — Apelo Comercial | ✅ | 6 fatores × 4 perguntas, upload de docs + texto, scores, relatório. Requer framework de IA habilitado na instância. |
+| §6.8 Rotas customizadas | ✅ / ✏️ | Todas implementadas, exceto `GET /exportar/:formato` (substituída por exportação no frontend). |
+| §6.10 Documentação | ✅ | `docs/viabilidade/*` (7 docs). |
+
+### 0.2 Decisões e ajustes de rota (divergências da spec original)
+
+Registrados para rastreabilidade — nas próximas versões, tratar como o comportamento vigente:
+
+1. **Núcleo sem supertipo `imoveis`.** A instância real não expõe um supertipo `imoveis`; `glebas`/`lotes` existem como entidades acessíveis via `req.nucleo` (SDK), mas não nesta instância. → MVP usa **modo manual**; `dependencias_nucleo: []`. `permissoes_nucleo` usa **string** (`"leitura"`), não array `["ler"]` como no §6.6.
+2. **Precisão de percentuais.** Campos de % usam `decimal(5,2)`, não `inteiro` (§6.1), porque vários defaults são fracionários (6,73% / 1,6% / 0,25% / 1,25%).
+3. **Benchmarks admin-only.** §2 diz "editor edita benchmarks", mas §6.8 + `acesso_externo: restrito` dizem admin. Seguimos **admin-only** (aprovador/nível admin).
+4. **Custo do terreno** incide sobre a **área do terreno** (não "área privativa" como no texto literal de §4.4/§6.2).
+5. **"Obras"** = Infraestrutura (Loteamento) · Construção + Decoração + Gestão da construção (Incorporação). A ✓ de "Construção" para Loteamento em §4.4 foi tratada como engano.
+6. **Projetos e Licenciamento** no modo % incidem sobre o **VGV** (§4.4 toggle "% VGV"), não sobre "custo total de construção".
+7. **`nivel_analise`** grava `avancado` (sem acento) como slug seguro para filtros.
+8. **Exportação no frontend.** Como a Proforma é calculada no cliente, a exportação também é — reusando a UI/estilos existentes do UrbiVerso (não há biblioteca PDF/Excel no backend self-contained). O "modelo de referência" citado no §6.3 (imagem não fornecida) foi substituído pela própria formatação do app.
+9. **Componentes autocontidos** (HTML + CSS por tokens) em vez de `urbi-tabela`/`urbi-kpi`/`urbi-abas`/`urbi-grafico-*`, cujas APIs não eram verificáveis sem instância. Adoção dos nativos → v2 (§8).
+10. **Abas preservam o DOM** (`?hidden`, não recriação) para o estado transiente dos cenários sobreviver à troca de aba (§6.4).
+
+### 0.3 Não testado / pendências de ambiente
+
+- **Runtime não exercitado contra um shell real.** Validação offline: typecheck + build + 15 testes de unidade da engine + empacotamento + demo estático (GitHub Pages). Ajustes finos de contrato (upload de arquivo, `req.ia`, slots) são esperados no primeiro deploy.
+- **Filtro do Núcleo** (excluir Fazenda Paranoazinho / lotes em parcelamento) — ⛔ bloqueado até o Núcleo expor glebas/lotes.
+- **IA** requer habilitar o slot do framework de IA para a app na instância.
+
 ---
 
 ## 1. Visão Geral
@@ -927,6 +974,17 @@ Toda documentação deve seguir o framework de documentação do UrbiVerso (`doc
 - Ingestão de índices econômicos (SELIC, IPCA, IGPM) via APIs públicas (BCB, IBGE)
 - Preço sugerido/m² com base em indicadores econômicos (complementar ao cálculo do MVP)
 - Conexão de unidades do estudo com Unidades do Núcleo
+
+### Backlog técnico da implementação (levantado nas Etapas 0–7)
+
+*(Não são features de produto novas, mas evoluções da base construída — priorizar cedo na v2)*
+
+- **Integração real com o Núcleo:** consumir glebas/lotes via `req.nucleo` quando a instância expuser, declarar `permissoes_nucleo: { glebas: "leitura", lotes: "leitura" }` e implementar o filtro excludente (Fazenda Paranoazinho / lotes em parcelamento) — hoje em stub de degradação graciosa.
+- **Adoção dos componentes nativos `urbi-*`** (`urbi-tabela`, `urbi-kpi`, `urbi-abas`, `urbi-grafico-pizza`, `urbi-grafico-colunas`, `urbi-badge`, `urbi-card`) no lugar dos componentes autocontidos, para alinhamento visual pleno com o shell.
+- **Disparo automático do arquivamento** (§3): ligar `POST /manutencao/arquivar-inativos` a uma rotina/agendador do shell (contrato de agendamento de app a confirmar).
+- **Exportação server-side** (opcional): rota `GET /estudos/:id/exportar/:formato` gerando PDF/Excel no backend, se desejado além da exportação no frontend.
+- **Exportação dedicada** de comparação de cenários e de análise de sensibilidade (hoje só na tela).
+- **Benchmarks avançados** (ROE, TIR, TIRM, TMA, VPL, Payback) — dependem do motor financeiro temporal da v2.
 
 ---
 
