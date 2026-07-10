@@ -16,7 +16,22 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
-## Estado atual: Etapa 1 — ✅ CONCLUÍDA
+## Estado atual: Etapa 2 — ✅ CONCLUÍDA
+
+### Feito (Etapa 2 — permissão por estudo + rotas customizadas)
+- **`backend/permissoes-estudo.ts`** — 4ª camada (membership) espelhando `permissoes-ciclo.ts` do OKR. `resolverPermissaoEstudo` lê `estudo_membros`; gates `exigirMembro`/`exigirEditor`/`exigirAprovador` (aprovador ⊇ editor ⊇ leitor; admin de app age como aprovador; estudo sem membros → escrita+ assume editor); `garantirMembro` idempotente.
+- **`backend/eventos-viabilidade.ts`** — `publicarEvento` (best-effort, chave nua; shell prefixa `app.viabilidade.`), `inscreverMembroEstudo`/`desinscreverMembroEstudo` (inscrição **forte** filtrada por `estudo_id`; editores/aprovadores também seguem `apelo_comercial_concluido`), payload builders batendo exatamente com os `campos` do manifesto §6.9.
+- **`backend/identificacao.ts`** — `id_legivel`/`nome_exibicao`/`sequencia` (§6.1). Template `{SIGLA} - {nome} - {UF} - {seq}`; sequência incrementa por `tipo_empreendimento` (conta removidos p/ não reusar); slug sem acentos/espaços.
+- **`backend/rotas/estudos.ts`** — `POST /estudos` (cria + criador vira editor + evento `estudo_criado`), `GET /estudos` (filtrado por membership; admin vê tudo; leitor não vê rascunho/arquivado), `GET /estudos/:id` (detalhe + membros + imóveis + flags `_permissao`), `PATCH /estudos/:id` (editor+; travado em aprovado/reprovado/arquivado → só aprovador; `tipo_empreendimento` só em rascunho), `DELETE` (soft delete via `remover`), `POST /:id/duplicar` (copia campos+imóveis, novo id_legivel, evento), `POST /:id/status` (matriz de transição `gateTransicao` + evento `estudo_status_alterado`).
+- **`backend/rotas/membros-estudo.ts`** — GET/POST/PATCH função/PATCH remover (editor+; reconcilia inscrições).
+- **`backend/rotas/imoveis-estudo.ts`** — GET/POST/DELETE vínculo imóvel↔estudo; **editável só em Rascunho**; consistência tipo (loteamento→1 gleba, incorporação→N lotes).
+- **`backend/rotas/estudos.test.ts`** — 5 testes da matriz de transição de status (todos passam).
+- **Validado (verde):** `pnpm typecheck` ✓ · `pnpm build` ✓ (backend 812→827KB) · `pnpm test` ✓ (5/5) · `pnpm run empacotar` ✓.
+- ⏳ **Verificação em runtime contra o shell fica pendente** — exige o app instalado numa instância UrbiVerso (o teste na interface que o usuário mencionará). Offline validei por typecheck+build+testes+empacotamento.
+
+---
+
+## Estado anterior: Etapa 1 — ✅ CONCLUÍDA
 
 ### Feito (Etapa 1 — schema.json + manifesto.json reais)
 - **`schema.json` completo** com as 6 tabelas da spec §6.1, todas `acesso_externo: "restrito"`:
@@ -64,7 +79,10 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 ---
 
 ## Próximos passos
-- **Etapa 2 (próxima):** permissão por estudo (membership 4ª camada) espelhando `ciclo_membros`/`permissoes-ciclo.ts` do `okr`. Rotas customizadas de `estudos` (listar filtrado por membership, criar com membros, detalhe/patch/delete, duplicar, transição de status com regras) + publicação dos eventos §6.9. Ler `docs/shell/permissoes.md` e o `permissoes-ciclo.ts` do okr antes.
+- **Etapa 3 (próxima):** benchmarks (CRUD admin-only via `telas_config.benchmarks`) + parâmetros da app (§6.5) + rota-proxy do Núcleo para glebas/lotes usando `req.nucleo` (ver descoberta abaixo). Reconciliar `dependencias_nucleo`/`permissoes_nucleo` quando a integração real entrar (`{ glebas: "leitura", lotes: "leitura" }`).
+
+### Descoberta (Etapa 2) — glebas/lotes existem no Núcleo via `req.nucleo`
+Os tipos do SDK (`node_modules/@urbiverso/sdk/dist/express.d.ts`, `type EntidadeBatch`) listam `glebas`, `lotes`, `parcelamentos`, `unidades` como entidades do Núcleo acessíveis por `req.nucleo` (`batch`, `chamarSubrecurso`, `buscarPorChave`). Ou seja: **glebas/lotes existem** como entidades — só não há supertipo `imoveis` nem rota REST dedicada em `nucleo/backend/src/rotas/`. Isso **refina** (não invalida) a decisão da Etapa 1: MVP segue manual; a integração "Buscar terreno" usará `req.nucleo` e `permissoes_nucleo: { glebas: "leitura", lotes: "leitura" }`. Ver `[[nucleo-imoveis-nao-existe-usar-manual]]`.
 
 ## Pendências v2 (fora do MVP)
 - Nível "Avançado" do estudo (dimensão temporal). MVP é só "Preliminar".
