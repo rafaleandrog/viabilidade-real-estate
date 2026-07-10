@@ -3,6 +3,9 @@ import { Router } from 'express';
 import { rotasEstudos } from './rotas/estudos.js';
 import { rotasMembrosEstudo } from './rotas/membros-estudo.js';
 import { rotasImoveisEstudo } from './rotas/imoveis-estudo.js';
+import { rotasBenchmarks } from './rotas/benchmarks.js';
+import { rotasConfig } from './rotas/config.js';
+import { rotasNucleo } from './rotas/nucleo.js';
 
 // Rotas de negócio da app `viabilidade`.
 // O shell prefixa tudo com /api/viabilidade/ — as rotas aqui são sempre relativas.
@@ -13,3 +16,6 @@ export const rotas: ReturnType<typeof Router> = Router();
 rotas.use(rotasEstudos);
 rotas.use(rotasMembrosEstudo);
 rotas.use(rotasImoveisEstudo);
+rotas.use(rotasBenchmarks);
+rotas.use(rotasConfig);
+rotas.use(rotasNucleo);

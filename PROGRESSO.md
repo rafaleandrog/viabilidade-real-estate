@@ -16,7 +16,19 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
-## Estado atual: Etapa 2 — ✅ CONCLUÍDA
+## Estado atual: Etapa 3 — ✅ CONCLUÍDA
+
+### Feito (Etapa 3 — benchmarks + config + Núcleo stub)
+- **`backend/rotas/benchmarks.ts`** — CRUD admin-only (`nivelApp === 'admin'` = role aprovador): `GET /benchmarks` (leitura liberada a qualquer usuário da app), `POST`/`PATCH /:id`/`DELETE /:id` (admin), `POST /benchmarks/semear` (idempotente, cria os indicadores padrão §4.6 que faltam). Unicidade `[tipo_empreendimento, campo]` tratada (409). Indicadores padrão: `resultado_final`(piso), `margem_bruta`, `margem_liquida`, `roi`, `custo_obras_vgv`(teto); `eficiencia_aproveitamento` só Loteamento.
+- **`backend/rotas/config.ts`** — `GET /config` expõe os 6 parâmetros da app (§6.5) via `req.parametros.obter` para o frontend pré-preencher defaults.
+- **`backend/rotas/nucleo.ts`** — proxy `GET /nucleo/glebas|lotes|imoveis/:id` com **degradação graciosa** (`disponivel: false`). Motivo: este Núcleo **não tem** glebas/lotes (nem rota REST nem `req.nucleo.listar` — confirmado por grep em `nucleo/`; SDK v0.50.3 declara essas entidades como futuras). Frontend cai no modo manual. `permissoes_nucleo` segue vazio (install seguro).
+- **Testes:** `benchmarks.test.ts` (3) + `estudos.test.ts` (5) = **8/8 verdes**.
+- **Validado (verde):** typecheck ✓ · build ✓ (827→832KB) · test 8/8 ✓ · empacotar ✓.
+- ⚠️ **Discrepância da spec:** §2 diz "editor edita benchmarks", mas §6.8 + schema `acesso_externo: restrito` dizem admin-only. Segui **admin-only** (aprovador). Revisar com o autor se necessário.
+
+---
+
+## Estado anterior: Etapa 2 — ✅ CONCLUÍDA
 
 ### Feito (Etapa 2 — permissão por estudo + rotas customizadas)
 - **`backend/permissoes-estudo.ts`** — 4ª camada (membership) espelhando `permissoes-ciclo.ts` do OKR. `resolverPermissaoEstudo` lê `estudo_membros`; gates `exigirMembro`/`exigirEditor`/`exigirAprovador` (aprovador ⊇ editor ⊇ leitor; admin de app age como aprovador; estudo sem membros → escrita+ assume editor); `garantirMembro` idempotente.
@@ -79,7 +91,7 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 ---
 
 ## Próximos passos
-- **Etapa 3 (próxima):** benchmarks (CRUD admin-only via `telas_config.benchmarks`) + parâmetros da app (§6.5) + rota-proxy do Núcleo para glebas/lotes usando `req.nucleo` (ver descoberta abaixo). Reconciliar `dependencias_nucleo`/`permissoes_nucleo` quando a integração real entrar (`{ glebas: "leitura", lotes: "leitura" }`).
+- **Etapa 4 (próxima):** frontend — dashboard de estudos (`urbi-tabela`, filtros tipo/status, criar/duplicar/remover) + tela de detalhe com `urbi-abas` (Premissas/Proforma/Gráficos, esqueleto) consumindo as rotas da Etapa 2/3. Config de benchmarks (`viabilidade-config-benchmarks`) via `telas_config`. Ler `docs/shell/ui.md` e o frontend do `okr` antes.
 
 ### Descoberta (Etapa 2) — glebas/lotes existem no Núcleo via `req.nucleo`
 Os tipos do SDK (`node_modules/@urbiverso/sdk/dist/express.d.ts`, `type EntidadeBatch`) listam `glebas`, `lotes`, `parcelamentos`, `unidades` como entidades do Núcleo acessíveis por `req.nucleo` (`batch`, `chamarSubrecurso`, `buscarPorChave`). Ou seja: **glebas/lotes existem** como entidades — só não há supertipo `imoveis` nem rota REST dedicada em `nucleo/backend/src/rotas/`. Isso **refina** (não invalida) a decisão da Etapa 1: MVP segue manual; a integração "Buscar terreno" usará `req.nucleo` e `permissoes_nucleo: { glebas: "leitura", lotes: "leitura" }`. Ver `[[nucleo-imoveis-nao-existe-usar-manual]]`.
