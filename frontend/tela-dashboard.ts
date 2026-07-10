@@ -1,6 +1,8 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, state, property } from 'lit/decorators.js';
 import { estilosBase, STATUS_LABEL, TIPO_LABEL, formatarData } from './viab-shared.js';
+import { fmtR$, fmtPct } from './viab-format.js';
+import { calcularProforma } from './proforma.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo,
 } from './viabilidade-api.js';
@@ -28,6 +30,7 @@ export class ViabTelaDashboard extends LitElement {
     .aba.ativa { color: var(--cor-primaria-solida, #2AA9E0); border-bottom-color: var(--cor-primaria-solida, #2AA9E0); }
     .filtros { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
     .acoes-linha { display: flex; gap: 6px; }
+    th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
     :host { padding: 24px; }
   `];
 
@@ -96,14 +99,19 @@ export class ViabTelaDashboard extends LitElement {
               <table>
                 <thead>
                   <tr>
-                    <th>Estudo</th><th>Tipo</th><th>Status</th><th>Criado em</th><th></th>
+                    <th>Estudo</th><th>Tipo</th><th class="num">VGV</th><th class="num">Resultado</th><th class="num">Margem</th><th>Status</th><th>Criado em</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${this.estudos.map((e) => html`
+                  ${this.estudos.map((e) => {
+                    const p = calcularProforma(e);
+                    return html`
                     <tr @click=${() => urbiVerso.navegarSub(`/detalhe/${e.id}`)}>
                       <td>${e.nome_exibicao || e.nome}</td>
                       <td>${TIPO_LABEL[e.tipo_empreendimento] || e.tipo_empreendimento}</td>
+                      <td class="num">${p.vgv > 0 ? fmtR$(p.vgv) : '—'}</td>
+                      <td class="num">${p.vgv > 0 ? fmtR$(p.resultado) : '—'}</td>
+                      <td class="num">${p.vgv > 0 ? fmtPct(p.margemLiquidaPct) : '—'}</td>
                       <td><span class="badge ${e.status}">${STATUS_LABEL[e.status] || e.status}</span></td>
                       <td class="sec">${formatarData(e.criado_em)}</td>
                       <td>
@@ -113,7 +121,8 @@ export class ViabTelaDashboard extends LitElement {
                         </div>
                       </td>
                     </tr>
-                  `)}
+                  `;
+                  })}
                 </tbody>
               </table>
             </div>

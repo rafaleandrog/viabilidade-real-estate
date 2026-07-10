@@ -158,7 +158,7 @@ async function api(url, opts) {
   const metodo = (opts?.method || "GET").toUpperCase();
   const body = opts?.body ? JSON.parse(opts.body) : {};
   const [caminho, query] = url.split("?");
-  const q = new URLSearchParams(query || "");
+  const q2 = new URLSearchParams(query || "");
   const seg = caminho.replace(/^\//, "").split("/").filter(Boolean);
   if (seg[0] === "shell") return { usuarios };
   const r = seg.slice(1);
@@ -193,7 +193,7 @@ async function api(url, opts) {
   if (r[0] === "benchmarks") {
     if (r[1] === "semear" && metodo === "POST") return { ok: true, criados: semearBenchmarks() };
     if (!r[1] && metodo === "GET") {
-      const tipo = q.get("tipo_empreendimento");
+      const tipo = q2.get("tipo_empreendimento");
       return { dados: benchmarks.filter((b) => !tipo || b.tipo_empreendimento === tipo), total: benchmarks.length };
     }
     if (!r[1] && metodo === "POST") {
@@ -216,8 +216,8 @@ async function api(url, opts) {
     const id = Number(r[1]);
     if (!r[1]) {
       if (metodo === "GET") {
-        const tipo = q.get("tipo_empreendimento");
-        const status = q.get("status");
+        const tipo = q2.get("tipo_empreendimento");
+        const status = q2.get("status");
         const lista = estudos.filter((e) => (!tipo || e.tipo_empreendimento === tipo) && (!status || e.status === status)).map((e) => ({ ...e, _funcao: permissao(e).funcao })).sort((a, b) => b.criado_em.localeCompare(a.criado_em));
         return { dados: lista, total: lista.length };
       }
@@ -343,7 +343,7 @@ var Q = class {
   }
 };
 var re = (o3) => new Q(typeof o3 == "string" ? o3 : o3 + "", void 0, wt);
-var $ = (o3, ...e) => {
+var y = (o3, ...e) => {
   let t = o3.length === 1 ? o3[0] : e.reduce((r, a, s) => r + ((i) => {
     if (i._$cssResult$ === true) return i.cssText;
     if (typeof i == "number") return i;
@@ -582,19 +582,19 @@ var N = class extends HTMLElement {
   }
 };
 N.elementStyles = [], N.shadowRootOptions = { mode: "open" }, N[Y("elementProperties")] = /* @__PURE__ */ new Map(), N[Y("finalized")] = /* @__PURE__ */ new Map(), gr?.({ ReactiveElement: N }), (mt.reactiveElementVersions ??= []).push("2.1.2");
-var Tt = globalThis;
+var Ot = globalThis;
 var ie = (o3) => o3;
-var ht = Tt.trustedTypes;
+var ht = Ot.trustedTypes;
 var ne = ht ? ht.createPolicy("lit-html", { createHTML: (o3) => o3 }) : void 0;
 var pe = "$lit$";
-var O = `lit$${Math.random().toFixed(9).slice(2)}$`;
-var he = "?" + O;
+var q = `lit$${Math.random().toFixed(9).slice(2)}$`;
+var he = "?" + q;
 var br = `<${he}>`;
 var D = document;
 var rt = () => D.createComment("");
 var ot = (o3) => o3 === null || typeof o3 != "object" && typeof o3 != "function";
-var qt = Array.isArray;
-var fr = (o3) => qt(o3) || typeof o3?.[Symbol.iterator] == "function";
+var Tt = Array.isArray;
+var fr = (o3) => Tt(o3) || typeof o3?.[Symbol.iterator] == "function";
 var Rt = `[ 	
 \f\r]`;
 var et = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g;
@@ -608,13 +608,13 @@ var ve = /^(?:script|style|textarea|title)$/i;
 var Ft = (o3) => (e, ...t) => ({ _$litType$: o3, strings: e, values: t });
 var c = Ft(1);
 var Ut = Ft(2);
-var Lr = Ft(3);
+var Ir = Ft(3);
 var j = Symbol.for("lit-noChange");
 var h = Symbol.for("lit-nothing");
 var me = /* @__PURE__ */ new WeakMap();
 var U = D.createTreeWalker(D, 129);
 function ge(o3, e) {
-  if (!qt(o3) || !o3.hasOwnProperty("raw")) throw Error("invalid template strings array");
+  if (!Tt(o3) || !o3.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return ne !== void 0 ? ne.createHTML(e) : e;
 }
 var _r = (o3, e) => {
@@ -622,8 +622,8 @@ var _r = (o3, e) => {
   for (let n = 0; n < t; n++) {
     let d = o3[n], u, b, p = -1, k = 0;
     for (; k < d.length && (i.lastIndex = k, b = i.exec(d), b !== null); ) k = i.lastIndex, i === et ? b[1] === "!--" ? i = ce : b[1] !== void 0 ? i = le : b[2] !== void 0 ? (ve.test(b[2]) && (a = RegExp("</" + b[2], "g")), i = F) : b[3] !== void 0 && (i = F) : i === F ? b[0] === ">" ? (i = a ?? et, p = -1) : b[1] === void 0 ? p = -2 : (p = i.lastIndex - b[2].length, u = b[1], i = b[3] === void 0 ? F : b[3] === '"' ? ue : de) : i === ue || i === de ? i = F : i === ce || i === le ? i = et : (i = F, a = void 0);
-    let R = i === F && o3[n + 1].startsWith("/>") ? " " : "";
-    s += i === et ? d + br : p >= 0 ? (r.push(u), d.slice(0, p) + pe + d.slice(p) + O + R) : d + O + (p === -2 ? n : R);
+    let M = i === F && o3[n + 1].startsWith("/>") ? " " : "";
+    s += i === et ? d + br : p >= 0 ? (r.push(u), d.slice(0, p) + pe + d.slice(p) + q + M) : d + q + (p === -2 ? n : M);
   }
   return [ge(o3, s + (o3[t] || "<?>") + (e === 2 ? "</svg>" : e === 3 ? "</math>" : "")), r];
 };
@@ -639,21 +639,21 @@ var at = class o {
     for (; (a = U.nextNode()) !== null && d.length < n; ) {
       if (a.nodeType === 1) {
         if (a.hasAttributes()) for (let p of a.getAttributeNames()) if (p.endsWith(pe)) {
-          let k = b[i++], R = a.getAttribute(p).split(O), q = /([.?@])?(.*)/.exec(k);
-          d.push({ type: 1, index: s, name: q[2], strings: R, ctor: q[1] === "." ? It : q[1] === "?" ? Lt : q[1] === "@" ? Nt : V }), a.removeAttribute(p);
-        } else p.startsWith(O) && (d.push({ type: 6, index: s }), a.removeAttribute(p));
+          let k = b[i++], M = a.getAttribute(p).split(q), T = /([.?@])?(.*)/.exec(k);
+          d.push({ type: 1, index: s, name: T[2], strings: M, ctor: T[1] === "." ? Lt : T[1] === "?" ? It : T[1] === "@" ? Nt : V }), a.removeAttribute(p);
+        } else p.startsWith(q) && (d.push({ type: 6, index: s }), a.removeAttribute(p));
         if (ve.test(a.tagName)) {
-          let p = a.textContent.split(O), k = p.length - 1;
+          let p = a.textContent.split(q), k = p.length - 1;
           if (k > 0) {
             a.textContent = ht ? ht.emptyScript : "";
-            for (let R = 0; R < k; R++) a.append(p[R], rt()), U.nextNode(), d.push({ type: 2, index: ++s });
+            for (let M = 0; M < k; M++) a.append(p[M], rt()), U.nextNode(), d.push({ type: 2, index: ++s });
             a.append(p[k], rt());
           }
         }
       } else if (a.nodeType === 8) if (a.data === he) d.push({ type: 2, index: s });
       else {
         let p = -1;
-        for (; (p = a.data.indexOf(O, p + 1)) !== -1; ) d.push({ type: 7, index: s }), p += O.length - 1;
+        for (; (p = a.data.indexOf(q, p + 1)) !== -1; ) d.push({ type: 7, index: s }), p += q.length - 1;
       }
       s++;
     }
@@ -685,7 +685,7 @@ var Mt = class {
     for (; d !== void 0; ) {
       if (i === d.index) {
         let u;
-        d.type === 2 ? u = new st(s, s.nextSibling, this, e) : d.type === 1 ? u = new d.ctor(s, d.name, d.strings, this, e) : d.type === 6 && (u = new Ot(s, this, e)), this._$AV.push(u), d = r[++n];
+        d.type === 2 ? u = new st(s, s.nextSibling, this, e) : d.type === 1 ? u = new d.ctor(s, d.name, d.strings, this, e) : d.type === 6 && (u = new qt(s, this, e)), this._$AV.push(u), d = r[++n];
       }
       i !== d?.index && (s = U.nextNode(), i++);
     }
@@ -738,7 +738,7 @@ var st = class o2 {
     return t === void 0 && me.set(e.strings, t = new at(e)), t;
   }
   k(e) {
-    qt(this._$AH) || (this._$AH = [], this._$AR());
+    Tt(this._$AH) || (this._$AH = [], this._$AR());
     let t = this._$AH, r, a = 0;
     for (let s of e) a === t.length ? t.push(r = new o2(this.O(rt()), this.O(rt()), this, this.options)) : r = t[a], r._$AI(s), a++;
     a < t.length && (this._$AR(r && r._$AB.nextSibling, a), t.length = a);
@@ -776,7 +776,7 @@ var V = class {
     e === h ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, e ?? "");
   }
 };
-var It = class extends V {
+var Lt = class extends V {
   constructor() {
     super(...arguments), this.type = 3;
   }
@@ -784,7 +784,7 @@ var It = class extends V {
     this.element[this.name] = e === h ? void 0 : e;
   }
 };
-var Lt = class extends V {
+var It = class extends V {
   constructor() {
     super(...arguments), this.type = 4;
   }
@@ -805,7 +805,7 @@ var Nt = class extends V {
     typeof this._$AH == "function" ? this._$AH.call(this.options?.host ?? this.element, e) : this._$AH.handleEvent(e);
   }
 };
-var Ot = class {
+var qt = class {
   constructor(e, t, r) {
     this.element = e, this.type = 6, this._$AN = void 0, this._$AM = t, this.options = r;
   }
@@ -816,8 +816,8 @@ var Ot = class {
     G(this, e);
   }
 };
-var $r = Tt.litHtmlPolyfillSupport;
-$r?.(at, st), (Tt.litHtmlVersions ??= []).push("3.3.3");
+var $r = Ot.litHtmlPolyfillSupport;
+$r?.(at, st), (Ot.litHtmlVersions ??= []).push("3.3.3");
 var be = (o3, e, t) => {
   let r = t?.renderBefore ?? e, a = r._$litPart$;
   if (a === void 0) {
@@ -895,7 +895,7 @@ function fe(o3) {
   let e = new Date(o3);
   return isNaN(e.getTime()) ? "\u2014" : e.toLocaleDateString("pt-BR");
 }
-var P = $`
+var P = y`
   :host {
     display: block;
     color: var(--cor-texto, rgba(255, 255, 255, 0.85));
@@ -970,80 +970,112 @@ var P = $`
   .modal h3 { margin: 0 0 16px; font-size: 1.05rem; }
   .acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 `;
+var x = (o3) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(o3 || 0);
+var B = (o3, e = 0) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: e }).format(o3 || 0);
+var _ = (o3) => `${(o3 || 0).toFixed(1)}%`;
+var v = (o3) => Number(o3) || 0;
+function w(o3) {
+  let e = o3.tipo_empreendimento === "loteamento", t = v(o3.terreno_manual_area), r = 0, a = 0, s = 0, i = 0, n = 0, d = v(o3.preco_venda_m2);
+  if (e) {
+    let X = v(o3.app_pct) + v(o3.faixas_nao_edificaveis_pct) + v(o3.sistema_viario_pct) + v(o3.elup_pct) + v(o3.epc_pct) + v(o3.epu_pct) + v(o3.areas_privativas_nao_vendaveis_pct);
+    r = t * (1 - X / 100), a = r;
+  } else {
+    let X = v(o3.area_pvt_r_fechada), St = v(o3.area_pvt_nr_fechada), sr = v(o3.area_pvt_r_aberta), ir = v(o3.area_pvt_nr_aberta);
+    a = X + St + sr + ir, s = a + v(o3.area_comum_total), r = X + St, i = X * v(o3.preco_venda_m2_residencial), n = St * v(o3.preco_venda_m2_nao_residencial);
+  }
+  let u = o3.permuta_fisica_modo === "pct_area_venda" ? r * v(o3.permuta_fisica_pct) / 100 : v(o3.permuta_fisica_area_m2), b = r - u;
+  e && (i = b * d);
+  let p = i + n, k = o3.sujeito_ret ? o3.aliquota_ret_pct ?? 4 : v(o3.imposto_percentual), M = p * k / 100, T = p * v(o3.corretagem_percentual) / 100, zt = p * v(o3.marketing_percentual) / 100, _t = i * v(o3.permuta_financeira_residencial_pct) / 100, $t = n * v(o3.permuta_financeira_nao_residencial_pct) / 100, xt = p - M - T - zt - _t - $t, Ht = o3.considerar_custo_terreno === false ? 0 : v(o3.custo_terreno_m2) * t, it = e ? o3.infra_modo === "valor_m2" ? v(o3.custo_infra_m2) * r : p * v(o3.infra_pct) / 100 : 0, nt = e ? 0 : v(o3.custo_construcao_m2) * a, ct = e ? 0 : v(o3.custo_decoracao_m2) * a, Ke = e ? it : nt + ct, yt = e ? 0 : Ke * v(o3.taxa_gestao_pct) / 100, Gt = o3.projetos_modo === "valor_fixo" ? v(o3.projetos_valor_fixo) : p * v(o3.projetos_pct) / 100, Vt = e ? 0 : v(o3.coef_aproveitamento_basico) > 0 ? v(o3.valor_venal_terreno_m2) / v(o3.coef_aproveitamento_basico) * t * (v(o3.coef_aproveitamento_maximo) - v(o3.coef_aproveitamento_basico)) * 0.2 : 0, Jt = e ? 0 : p * v(o3.incorporacao_registro_pct) / 100, Wt = p * v(o3.manutencao_pct) / 100, Zt = p * v(o3.contingencias_pct) / 100, Et = Ht + Gt + it + Vt + Jt + nt + yt + ct + Wt + Zt, Kt = p * v(o3.marketing_global_pct) / 100 + (e ? v(o3.stand_vendas_valor) : 0), Xt = p * v(o3.gestao_indiretos_pct) / 100, At = Kt + Xt, lt = xt - Et - At, Qt = lt + _t + $t, Xe = e ? d : r > 0 ? p / r : 0, Yt = u * Xe, Qe = Qt + Yt, Ye = p > 0 ? lt / p * 100 : 0, kt = Et + At, te = e ? it : nt + ct + yt, tr = p > 0 ? te / p * 100 : 0, er = p > 0 ? xt / p * 100 : 0, rr = kt > 0 ? lt / kt * 100 : 0, or = t > 0 ? r / t * 100 : 0, Pt = e ? v(o3.area_media_lote_m2) > 0 ? Math.floor(b / v(o3.area_media_lote_m2)) : 0 : v(o3.num_unidades), ar = e ? v(o3.area_media_lote_m2) * d : Pt > 0 ? p / Pt : 0;
+  return { areaTerreno: t, areaVendavel: r, areaPermutaFisica: u, areaVendavelLiquida: b, areaPrivativa: a, areaConstruida: s, vgvResidencial: i, vgvNaoResidencial: n, vgv: p, imposto: M, corretagem: T, marketing: zt, permutaFinResidencial: _t, permutaFinNaoResidencial: $t, receitaLiquida: xt, custoTerreno: Ht, projetos: Gt, infraestrutura: it, outorga: Vt, incorporacaoRegistro: Jt, construcao: nt, gestaoConstrucao: yt, decoracao: ct, manutencao: Wt, contingencias: Zt, custoDiretoTotal: Et, marketingGlobal: Kt, gestaoIndiretos: Xt, custoIndiretoTotal: At, resultado: lt, resultadoComPermutasFin: Qt, resultadoComPermutasFisicas: Qe, valorPermutaFisica: Yt, margemLiquidaPct: Ye, investimentoTotal: kt, custoObras: te, custoObrasVgvPct: tr, margemBrutaPct: er, roiPct: rr, eficienciaPct: or, numUnidades: Pt, precoMedioUnidade: ar };
+}
+function _e(o3, e) {
+  let t = o3.tipo_empreendimento === "loteamento", r = (n) => {
+    let d = t ? { ...o3, preco_venda_m2: n } : { ...o3, preco_venda_m2_residencial: n, preco_venda_m2_nao_residencial: n };
+    return w(d).margemLiquidaPct;
+  }, a = 1e6;
+  if (r(a) < e) return null;
+  if (r(0.01) >= e) return 0;
+  let s = 0, i = a;
+  for (let n = 0; n < 60; n++) {
+    let d = (s + i) / 2;
+    r(d) >= e ? i = d : s = d;
+  }
+  return i;
+}
 var l = globalThis.urbiVerso;
-var _ = "/viabilidade";
-function _e(o3 = {}) {
+var $ = "/viabilidade";
+function $e(o3 = {}) {
   let e = new URLSearchParams();
   o3.tipo_empreendimento && e.set("tipo_empreendimento", o3.tipo_empreendimento), o3.status && e.set("status", o3.status);
   let t = e.toString() ? `?${e}` : "";
-  return l.api(`${_}/estudos${t}`);
-}
-function $e(o3) {
-  return l.api(`${_}/estudos`, { method: "POST", body: JSON.stringify(o3) });
+  return l.api(`${$}/estudos${t}`);
 }
 function xe(o3) {
-  return l.api(`${_}/estudos/${o3}`);
+  return l.api(`${$}/estudos`, { method: "POST", body: JSON.stringify(o3) });
 }
-function ye(o3, e) {
-  return l.api(`${_}/estudos/${o3}`, { method: "PATCH", body: JSON.stringify(e) });
+function ye(o3) {
+  return l.api(`${$}/estudos/${o3}`);
 }
-function Ee(o3) {
-  return l.api(`${_}/estudos/${o3}`, { method: "DELETE" });
+function Ee(o3, e) {
+  return l.api(`${$}/estudos/${o3}`, { method: "PATCH", body: JSON.stringify(e) });
 }
 function Ae(o3) {
-  return l.api(`${_}/estudos/${o3}/duplicar`, { method: "POST" });
+  return l.api(`${$}/estudos/${o3}`, { method: "DELETE" });
 }
-function ke(o3, e) {
-  return l.api(`${_}/estudos/${o3}/status`, { method: "POST", body: JSON.stringify({ status: e }) });
+function ke(o3) {
+  return l.api(`${$}/estudos/${o3}/duplicar`, { method: "POST" });
+}
+function Pe(o3, e) {
+  return l.api(`${$}/estudos/${o3}/status`, { method: "POST", body: JSON.stringify({ status: e }) });
 }
 function gt(o3) {
-  return l.api(`${_}/estudos/${o3}/membros`);
-}
-function Pe(o3, e, t) {
-  return l.api(`${_}/estudos/${o3}/membros`, { method: "POST", body: JSON.stringify({ usuario_id: e, funcao: t }) });
+  return l.api(`${$}/estudos/${o3}/membros`);
 }
 function Se(o3, e, t) {
-  return l.api(`${_}/estudos/${o3}/membros/${e}`, { method: "PATCH", body: JSON.stringify({ funcao: t }) });
+  return l.api(`${$}/estudos/${o3}/membros`, { method: "POST", body: JSON.stringify({ usuario_id: e, funcao: t }) });
 }
-function we(o3, e) {
-  return l.api(`${_}/estudos/${o3}/membros/${e}/remover`, { method: "PATCH" });
+function we(o3, e, t) {
+  return l.api(`${$}/estudos/${o3}/membros/${e}`, { method: "PATCH", body: JSON.stringify({ funcao: t }) });
+}
+function Ce(o3, e) {
+  return l.api(`${$}/estudos/${o3}/membros/${e}/remover`, { method: "PATCH" });
 }
 function Z(o3) {
   let e = o3 ? `?tipo_empreendimento=${o3}` : "";
-  return l.api(`${_}/benchmarks${e}`);
+  return l.api(`${$}/benchmarks${e}`);
 }
-function Ce(o3) {
-  return l.api(`${_}/benchmarks`, { method: "POST", body: JSON.stringify(o3) });
+function Re(o3) {
+  return l.api(`${$}/benchmarks`, { method: "POST", body: JSON.stringify(o3) });
 }
-function Re(o3, e) {
-  return l.api(`${_}/benchmarks/${o3}`, { method: "PATCH", body: JSON.stringify(e) });
-}
-function Me(o3) {
-  return l.api(`${_}/benchmarks/${o3}`, { method: "DELETE" });
-}
-function Ie() {
-  return l.api(`${_}/benchmarks/semear`, { method: "POST" });
-}
-function bt() {
-  return l.api(`${_}/config`);
+function Me(o3, e) {
+  return l.api(`${$}/benchmarks/${o3}`, { method: "PATCH", body: JSON.stringify(e) });
 }
 function Le(o3) {
-  return l.api(`${_}/estudos/${o3}/apelo-comercial`);
+  return l.api(`${$}/benchmarks/${o3}`, { method: "DELETE" });
 }
-async function Ne(o3) {
+function Ie() {
+  return l.api(`${$}/benchmarks/semear`, { method: "POST" });
+}
+function bt() {
+  return l.api(`${$}/config`);
+}
+function Ne(o3) {
+  return l.api(`${$}/estudos/${o3}/apelo-comercial`);
+}
+async function qe(o3) {
   let e = new FormData();
   return e.append("file", o3), (await fetch("/api/dados/viabilidade/apelo_comercial_documentos/__upload?coluna=documento", { method: "POST", body: e, credentials: "same-origin" })).json();
 }
 function jt(o3, e) {
-  return l.api(`${_}/estudos/${o3}/apelo-comercial/documentos`, { method: "POST", body: JSON.stringify(e) });
+  return l.api(`${$}/estudos/${o3}/apelo-comercial/documentos`, { method: "POST", body: JSON.stringify(e) });
 }
 function Oe(o3, e) {
-  return l.api(`${_}/estudos/${o3}/apelo-comercial/documentos/${e}`, { method: "DELETE" });
+  return l.api(`${$}/estudos/${o3}/apelo-comercial/documentos/${e}`, { method: "DELETE" });
 }
 function Te(o3) {
-  return l.api(`${_}/estudos/${o3}/apelo-comercial`, { method: "POST" });
+  return l.api(`${$}/estudos/${o3}/apelo-comercial`, { method: "POST" });
 }
-async function qe() {
+async function Fe() {
   let o3 = await l.api("/shell/apps/viabilidade/roles/usuarios");
   return [...Array.isArray(o3) ? o3 : o3?.usuarios || []].sort((t, r) => (t.nome ?? "").localeCompare(r.nome ?? "", "pt-BR", { sensitivity: "base" }));
 }
@@ -1069,7 +1101,7 @@ var S = class extends f {
       }
       this.salvando = true, this.formErro = "";
       try {
-        let t = await $e({ nome: this.form.nome.trim(), tipo_empreendimento: this.form.tipo_empreendimento, nivel_analise: this.form.nivel_analise, origem_terreno: this.form.origem_terreno, uf: this.form.uf || null });
+        let t = await xe({ nome: this.form.nome.trim(), tipo_empreendimento: this.form.tipo_empreendimento, nivel_analise: this.form.nivel_analise, origem_terreno: this.form.origem_terreno, uf: this.form.uf || null });
         if (t?.erro) {
           this.formErro = t.mensagem || "Erro ao criar estudo";
           return;
@@ -1091,7 +1123,7 @@ var S = class extends f {
   async _carregar() {
     this.carregando = true;
     try {
-      let t = await _e({ tipo_empreendimento: this.filtroTipo || void 0, status: this.filtroStatus || void 0 });
+      let t = await $e({ tipo_empreendimento: this.filtroTipo || void 0, status: this.filtroStatus || void 0 });
       this.estudos = t?.dados || [];
     } catch (t) {
       console.error("Erro ao listar estudos:", t);
@@ -1137,24 +1169,30 @@ var S = class extends f {
               <table>
                 <thead>
                   <tr>
-                    <th>Estudo</th><th>Tipo</th><th>Status</th><th>Criado em</th><th></th>
+                    <th>Estudo</th><th>Tipo</th><th class="num">VGV</th><th class="num">Resultado</th><th class="num">Margem</th><th>Status</th><th>Criado em</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${this.estudos.map((t) => c`
+                  ${this.estudos.map((t) => {
+      let r = w(t);
+      return c`
                     <tr @click=${() => l.navegarSub(`/detalhe/${t.id}`)}>
                       <td>${t.nome_exibicao || t.nome}</td>
                       <td>${W[t.tipo_empreendimento] || t.tipo_empreendimento}</td>
+                      <td class="num">${r.vgv > 0 ? x(r.vgv) : "\u2014"}</td>
+                      <td class="num">${r.vgv > 0 ? x(r.resultado) : "\u2014"}</td>
+                      <td class="num">${r.vgv > 0 ? _(r.margemLiquidaPct) : "\u2014"}</td>
                       <td><span class="badge ${t.status}">${J[t.status] || t.status}</span></td>
                       <td class="sec">${fe(t.criado_em)}</td>
                       <td>
-                        <div class="acoes-linha" @click=${(r) => r.stopPropagation()}>
+                        <div class="acoes-linha" @click=${(a) => a.stopPropagation()}>
                           <button class="btn-sec btn-sm" @click=${() => this._duplicar(t.id)}>Duplicar</button>
                           <button class="btn-perigo btn-sm" @click=${() => this._remover(t)}>Remover</button>
                         </div>
                       </td>
                     </tr>
-                  `)}
+                  `;
+    })}
                 </tbody>
               </table>
             </div>
@@ -1235,7 +1273,7 @@ var S = class extends f {
   }
   async _duplicar(t) {
     try {
-      let r = await Ae(t);
+      let r = await ke(t);
       if (r?.erro) {
         l.notificar(r.mensagem || "Erro ao duplicar", "erro");
         return;
@@ -1247,7 +1285,7 @@ var S = class extends f {
   }
   async _remover(t) {
     if (confirm(`Remover o estudo "${t.nome_exibicao || t.nome}"?`)) try {
-      let r = await Ee(t.id);
+      let r = await Ae(t.id);
       if (r?.erro) {
         l.notificar(r.mensagem || "Erro ao remover", "erro");
         return;
@@ -1258,7 +1296,7 @@ var S = class extends f {
     }
   }
 };
-S.styles = [P, $`
+S.styles = [P, y`
     .topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
     .abas { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.08)); }
     .aba {
@@ -1268,46 +1306,18 @@ S.styles = [P, $`
     .aba.ativa { color: var(--cor-primaria-solida, #2AA9E0); border-bottom-color: var(--cor-primaria-solida, #2AA9E0); }
     .filtros { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
     .acoes-linha { display: flex; gap: 6px; }
+    th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
     :host { padding: 24px; }
   `], m([A({ type: String })], S.prototype, "aba", 2), m([g()], S.prototype, "estudos", 2), m([g()], S.prototype, "carregando", 2), m([g()], S.prototype, "filtroTipo", 2), m([g()], S.prototype, "filtroStatus", 2), m([g()], S.prototype, "mostrarForm", 2), m([g()], S.prototype, "form", 2), m([g()], S.prototype, "salvando", 2), m([g()], S.prototype, "formErro", 2), S = m([E("viab-tela-dashboard")], S);
-var v = (o3) => Number(o3) || 0;
-function M(o3) {
-  let e = o3.tipo_empreendimento === "loteamento", t = v(o3.terreno_manual_area), r = 0, a = 0, s = 0, i = 0, n = 0, d = v(o3.preco_venda_m2);
-  if (e) {
-    let X = v(o3.app_pct) + v(o3.faixas_nao_edificaveis_pct) + v(o3.sistema_viario_pct) + v(o3.elup_pct) + v(o3.epc_pct) + v(o3.epu_pct) + v(o3.areas_privativas_nao_vendaveis_pct);
-    r = t * (1 - X / 100), a = r;
-  } else {
-    let X = v(o3.area_pvt_r_fechada), St = v(o3.area_pvt_nr_fechada), sr = v(o3.area_pvt_r_aberta), ir = v(o3.area_pvt_nr_aberta);
-    a = X + St + sr + ir, s = a + v(o3.area_comum_total), r = X + St, i = X * v(o3.preco_venda_m2_residencial), n = St * v(o3.preco_venda_m2_nao_residencial);
-  }
-  let u = o3.permuta_fisica_modo === "pct_area_venda" ? r * v(o3.permuta_fisica_pct) / 100 : v(o3.permuta_fisica_area_m2), b = r - u;
-  e && (i = b * d);
-  let p = i + n, k = o3.sujeito_ret ? o3.aliquota_ret_pct ?? 4 : v(o3.imposto_percentual), R = p * k / 100, q = p * v(o3.corretagem_percentual) / 100, zt = p * v(o3.marketing_percentual) / 100, _t = i * v(o3.permuta_financeira_residencial_pct) / 100, $t = n * v(o3.permuta_financeira_nao_residencial_pct) / 100, xt = p - R - q - zt - _t - $t, Ht = o3.considerar_custo_terreno === false ? 0 : v(o3.custo_terreno_m2) * t, it = e ? o3.infra_modo === "valor_m2" ? v(o3.custo_infra_m2) * r : p * v(o3.infra_pct) / 100 : 0, nt = e ? 0 : v(o3.custo_construcao_m2) * a, ct = e ? 0 : v(o3.custo_decoracao_m2) * a, Ke = e ? it : nt + ct, yt = e ? 0 : Ke * v(o3.taxa_gestao_pct) / 100, Gt = o3.projetos_modo === "valor_fixo" ? v(o3.projetos_valor_fixo) : p * v(o3.projetos_pct) / 100, Vt = e ? 0 : v(o3.coef_aproveitamento_basico) > 0 ? v(o3.valor_venal_terreno_m2) / v(o3.coef_aproveitamento_basico) * t * (v(o3.coef_aproveitamento_maximo) - v(o3.coef_aproveitamento_basico)) * 0.2 : 0, Jt = e ? 0 : p * v(o3.incorporacao_registro_pct) / 100, Wt = p * v(o3.manutencao_pct) / 100, Zt = p * v(o3.contingencias_pct) / 100, Et = Ht + Gt + it + Vt + Jt + nt + yt + ct + Wt + Zt, Kt = p * v(o3.marketing_global_pct) / 100 + (e ? v(o3.stand_vendas_valor) : 0), Xt = p * v(o3.gestao_indiretos_pct) / 100, At = Kt + Xt, lt = xt - Et - At, Qt = lt + _t + $t, Xe = e ? d : r > 0 ? p / r : 0, Yt = u * Xe, Qe = Qt + Yt, Ye = p > 0 ? lt / p * 100 : 0, kt = Et + At, te = e ? it : nt + ct + yt, tr = p > 0 ? te / p * 100 : 0, er = p > 0 ? xt / p * 100 : 0, rr = kt > 0 ? lt / kt * 100 : 0, or = t > 0 ? r / t * 100 : 0, Pt = e ? v(o3.area_media_lote_m2) > 0 ? Math.floor(b / v(o3.area_media_lote_m2)) : 0 : v(o3.num_unidades), ar = e ? v(o3.area_media_lote_m2) * d : Pt > 0 ? p / Pt : 0;
-  return { areaTerreno: t, areaVendavel: r, areaPermutaFisica: u, areaVendavelLiquida: b, areaPrivativa: a, areaConstruida: s, vgvResidencial: i, vgvNaoResidencial: n, vgv: p, imposto: R, corretagem: q, marketing: zt, permutaFinResidencial: _t, permutaFinNaoResidencial: $t, receitaLiquida: xt, custoTerreno: Ht, projetos: Gt, infraestrutura: it, outorga: Vt, incorporacaoRegistro: Jt, construcao: nt, gestaoConstrucao: yt, decoracao: ct, manutencao: Wt, contingencias: Zt, custoDiretoTotal: Et, marketingGlobal: Kt, gestaoIndiretos: Xt, custoIndiretoTotal: At, resultado: lt, resultadoComPermutasFin: Qt, resultadoComPermutasFisicas: Qe, valorPermutaFisica: Yt, margemLiquidaPct: Ye, investimentoTotal: kt, custoObras: te, custoObrasVgvPct: tr, margemBrutaPct: er, roiPct: rr, eficienciaPct: or, numUnidades: Pt, precoMedioUnidade: ar };
-}
-function Fe(o3, e) {
-  let t = o3.tipo_empreendimento === "loteamento", r = (n) => {
-    let d = t ? { ...o3, preco_venda_m2: n } : { ...o3, preco_venda_m2_residencial: n, preco_venda_m2_nao_residencial: n };
-    return M(d).margemLiquidaPct;
-  }, a = 1e6;
-  if (r(a) < e) return null;
-  if (r(0.01) >= e) return 0;
-  let s = 0, i = a;
-  for (let n = 0; n < 60; n++) {
-    let d = (s + i) / 2;
-    r(d) >= e ? i = d : s = d;
-  }
-  return i;
-}
 var Ue = [{ k: "custo_terreno_m2", label: "Custo do terreno", t: "num", sufixo: "R$/m\xB2" }, { k: "custo_infra_m2", label: "Infraestrutura (R$/m\xB2)", t: "num", sufixo: "R$/m\xB2", so: "loteamento" }, { k: "infra_pct", label: "Infraestrutura (% VGV)", t: "num", sufixo: "%", so: "loteamento" }, { k: "custo_construcao_m2", label: "Constru\xE7\xE3o", t: "num", sufixo: "R$/m\xB2", so: "incorporacao" }, { k: "custo_decoracao_m2", label: "Decora\xE7\xE3o", t: "num", sufixo: "R$/m\xB2", so: "incorporacao" }, { k: "taxa_gestao_pct", label: "Gest\xE3o da constru\xE7\xE3o", t: "num", sufixo: "%", so: "incorporacao" }, { k: "incorporacao_registro_pct", label: "Incorpora\xE7\xE3o e registro", t: "num", sufixo: "% VGV", so: "incorporacao" }, { k: "valor_venal_terreno_m2", label: "Valor venal do terreno (outorga)", t: "num", sufixo: "R$/m\xB2", so: "incorporacao" }, { k: "projetos_pct", label: "Projetos", t: "num", sufixo: "% VGV" }, { k: "manutencao_pct", label: "Manuten\xE7\xE3o p\xF3s-obra", t: "num", sufixo: "% VGV" }, { k: "contingencias_pct", label: "Conting\xEAncias", t: "num", sufixo: "% VGV" }, { k: "stand_vendas_valor", label: "Stand de vendas", t: "num", sufixo: "R$", so: "loteamento" }, { k: "marketing_global_pct", label: "Marketing global / estrutura", t: "num", sufixo: "% VGV" }, { k: "gestao_indiretos_pct", label: "Gest\xE3o e indiretos", t: "num", sufixo: "% VGV" }];
 var De = [{ k: "imposto_percentual", label: "Imposto (se n\xE3o RET)", t: "num", sufixo: "%" }, { k: "corretagem_percentual", label: "Corretagem", t: "num", sufixo: "%" }, { k: "marketing_percentual", label: "Marketing", t: "num", sufixo: "%" }, { k: "permuta_financeira_residencial_pct", label: "Permuta financeira residencial", t: "num", sufixo: "%" }, { k: "permuta_financeira_nao_residencial_pct", label: "Permuta financeira n\xE3o residencial", t: "num", sufixo: "%" }];
 var je = [{ k: "app_pct", label: "APP", t: "num", sufixo: "% gleba" }, { k: "faixas_nao_edificaveis_pct", label: "Faixas n\xE3o edific\xE1veis", t: "num", sufixo: "% gleba" }, { k: "sistema_viario_pct", label: "Sistema vi\xE1rio", t: "num", sufixo: "% gleba" }, { k: "elup_pct", label: "ELUP", t: "num", sufixo: "% gleba" }, { k: "epc_pct", label: "EPC", t: "num", sufixo: "% gleba" }, { k: "epu_pct", label: "EPU", t: "num", sufixo: "% gleba" }, { k: "areas_privativas_nao_vendaveis_pct", label: "Priv. n\xE3o vend\xE1veis", t: "num", sufixo: "% gleba" }, { k: "area_media_lote_m2", label: "\xC1rea m\xE9dia do lote", t: "num", sufixo: "m\xB2" }, { k: "preco_venda_m2", label: "Pre\xE7o de venda", t: "num", sufixo: "R$/m\xB2" }];
 var Be = [{ k: "coef_aproveitamento_basico", label: "Coef. aproveitamento b\xE1sico", t: "num" }, { k: "coef_aproveitamento_maximo", label: "Coef. aproveitamento m\xE1ximo", t: "num" }, { k: "area_pvt_r_fechada", label: "\xC1rea PVT R Fechada", t: "num", sufixo: "m\xB2" }, { k: "area_pvt_nr_fechada", label: "\xC1rea PVT NR Fechada", t: "num", sufixo: "m\xB2" }, { k: "area_pvt_r_aberta", label: "\xC1rea PVT R Aberta", t: "num", sufixo: "m\xB2" }, { k: "area_pvt_nr_aberta", label: "\xC1rea PVT NR Aberta", t: "num", sufixo: "m\xB2" }, { k: "area_comum_total", label: "\xC1rea comum total", t: "num", sufixo: "m\xB2" }, { k: "num_unidades", label: "N\xBA de unidades", t: "num" }, { k: "preco_venda_m2_residencial", label: "Pre\xE7o venda residencial", t: "num", sufixo: "R$/m\xB2" }, { k: "preco_venda_m2_nao_residencial", label: "Pre\xE7o venda n\xE3o residencial", t: "num", sufixo: "R$/m\xB2" }];
 var Ar = new Set([...Ue, ...De, ...je, ...Be, { k: "permuta_fisica_area_m2" }, { k: "permuta_fisica_pct" }, { k: "terreno_manual_area" }].filter((o3) => o3.t === "num" || ["permuta_fisica_area_m2", "permuta_fisica_pct", "terreno_manual_area"].includes(o3.k)).map((o3) => o3.k));
 var Bt = (o3) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(o3 || 0);
-var B = (o3, e = 0) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: e }).format(o3 || 0);
+var z = (o3, e = 0) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: e }).format(o3 || 0);
 var ft = (o3) => `${(o3 || 0).toFixed(1)}%`;
-var I = class extends f {
+var L = class extends f {
   constructor() {
     super(...arguments);
     this.estudo = null;
@@ -1321,7 +1331,7 @@ var I = class extends f {
       try {
         let t = {};
         for (let [a, s] of Object.entries(this.form)) ["id", "id_legivel", "nome_exibicao", "sequencia", "status", "autor_id", "criado_em", "atualizado_em", "membros", "imoveis", "_permissao", "_funcao", "autor_nome", "autor_avatar_url"].includes(a) || (Ar.has(a) ? t[a] = s === "" || s == null ? null : Number(s) : t[a] = s);
-        let r = await ye(this.estudo.id, t);
+        let r = await Ee(this.estudo.id, t);
         if (r?.erro) {
           l.notificar(r.mensagem || "Erro ao salvar", "erro");
           return;
@@ -1441,16 +1451,16 @@ var I = class extends f {
     return this.benchmarks.find((r) => r.campo === t);
   }
   _renderResumo(t) {
-    let r = M(this._entradaProforma()), a = [];
+    let r = w(this._entradaProforma()), a = [];
     if (t) {
       let n = this._benchmark("eficiencia_aproveitamento");
-      a.push({ rot: "\xC1rea da gleba", val: `${B(r.areaTerreno)} m\xB2` }, { rot: "\xC1rea vend\xE1vel", val: `${B(r.areaVendavel)} m\xB2` }, { rot: "Vend\xE1vel / gleba", val: ft(r.eficienciaPct), bm: n ? { ok: r.eficienciaPct >= Number(n.valor) } : void 0 }, { rot: "VGV", val: Bt(r.vgv) }, { rot: "N\xBA de lotes", val: B(r.numUnidades) }, { rot: "Margem l\xEDquida", val: ft(r.margemLiquidaPct) });
+      a.push({ rot: "\xC1rea da gleba", val: `${z(r.areaTerreno)} m\xB2` }, { rot: "\xC1rea vend\xE1vel", val: `${z(r.areaVendavel)} m\xB2` }, { rot: "Vend\xE1vel / gleba", val: ft(r.eficienciaPct), bm: n ? { ok: r.eficienciaPct >= Number(n.valor) } : void 0 }, { rot: "VGV", val: Bt(r.vgv) }, { rot: "N\xBA de lotes", val: z(r.numUnidades) }, { rot: "Margem l\xEDquida", val: ft(r.margemLiquidaPct) });
     } else {
       let n = this._benchmark("custo_obras_vgv"), d = this._benchmark("margem_liquida");
-      a.push({ rot: "\xC1rea privativa total", val: `${B(r.areaPrivativa)} m\xB2` }, { rot: "\xC1rea constru\xEDda", val: `${B(r.areaConstruida)} m\xB2` }, { rot: "N\xBA de unidades", val: B(r.numUnidades) }, { rot: "Pre\xE7o m\xE9dio/unid.", val: Bt(r.precoMedioUnidade) }, { rot: "Custo obras / VGV", val: ft(r.custoObrasVgvPct), bm: n ? { ok: r.custoObrasVgvPct <= Number(n.valor) } : void 0 }, { rot: "Margem l\xEDquida", val: ft(r.margemLiquidaPct), bm: d ? { ok: r.margemLiquidaPct >= Number(d.valor) } : void 0 });
+      a.push({ rot: "\xC1rea privativa total", val: `${z(r.areaPrivativa)} m\xB2` }, { rot: "\xC1rea constru\xEDda", val: `${z(r.areaConstruida)} m\xB2` }, { rot: "N\xBA de unidades", val: z(r.numUnidades) }, { rot: "Pre\xE7o m\xE9dio/unid.", val: Bt(r.precoMedioUnidade) }, { rot: "Custo obras / VGV", val: ft(r.custoObrasVgvPct), bm: n ? { ok: r.custoObrasVgvPct <= Number(n.valor) } : void 0 }, { rot: "Margem l\xEDquida", val: ft(r.margemLiquidaPct), bm: d ? { ok: r.margemLiquidaPct >= Number(d.valor) } : void 0 });
     }
     let s = this._benchmark("resultado_final"), i = null;
-    return s && Number(s.valor) > 0 && (i = Fe(this._entradaProforma(), Number(s.valor))), c`
+    return s && Number(s.valor) > 0 && (i = _e(this._entradaProforma(), Number(s.valor))), c`
       <div class="card" style="margin-top:16px">
         <h3 style="margin-top:0">Resumo</h3>
         <div class="kpis">
@@ -1463,7 +1473,7 @@ var I = class extends f {
         </div>
         ${s ? c`
           <div class="preco-sugerido">
-            Preço sugerido/m² para atingir o piso de resultado final (${B(Number(s.valor))}%):
+            Preço sugerido/m² para atingir o piso de resultado final (${z(Number(s.valor))}%):
             <strong>${i !== null ? Bt(i) + "/m\xB2" : "inating\xEDvel com as premissas atuais"}</strong>
           </div>
         ` : c`<p class="sec" style="margin-top:12px">Defina o benchmark “resultado_final” para calcular o preço sugerido/m².</p>`}
@@ -1471,7 +1481,7 @@ var I = class extends f {
     `;
   }
 };
-I.styles = [P, $`
+L.styles = [P, y`
     :host { display: block; }
     .secao { margin-bottom: 18px; }
     .secao h4 { margin: 0 0 10px; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
@@ -1490,10 +1500,7 @@ I.styles = [P, $`
     .kpi.ruim .val { color: var(--cor-erro, #D45A3A); }
     .preco-sugerido { margin-top: 12px; padding: 12px 14px; border-radius: 8px; background: rgba(247,161,17,0.10); border: 1px solid rgba(247,161,17,0.3); font-size: 0.9rem; }
     .preco-sugerido strong { color: var(--cor-cta, #F7A111); }
-  `], m([A({ attribute: false })], I.prototype, "estudo", 2), m([A({ type: Boolean })], I.prototype, "editavel", 2), m([g()], I.prototype, "form", 2), m([g()], I.prototype, "salvando", 2), m([g()], I.prototype, "benchmarks", 2), m([g()], I.prototype, "aliquotaRet", 2), I = m([E("viab-tela-premissas")], I);
-var y = (o3) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(o3 || 0);
-var z = (o3, e = 0) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: e }).format(o3 || 0);
-var x = (o3) => `${(o3 || 0).toFixed(1)}%`;
+  `], m([A({ attribute: false })], L.prototype, "estudo", 2), m([A({ type: Boolean })], L.prototype, "editavel", 2), m([g()], L.prototype, "form", 2), m([g()], L.prototype, "salvando", 2), m([g()], L.prototype, "benchmarks", 2), m([g()], L.prototype, "aliquotaRet", 2), L = m([E("viab-tela-premissas")], L);
 var kr = (o3) => o3.toFixed(2).replace(".", ",");
 function Pr(o3, e, t) {
   let r = new Blob(["\uFEFF" + e], { type: t }), a = URL.createObjectURL(r), s = document.createElement("a");
@@ -1516,9 +1523,9 @@ function He(o3, e, t) {
 }
 function Ge(o3, e, t) {
   let a = ze(e, t).map((d) => {
-    let u = d.l.startsWith("="), b = e.vgv > 0 ? x(Math.abs(d.v) / e.vgv * 100) : "\u2014";
-    return `<tr class="${u ? "sub" : ""}"><td>${d.l}</td><td class="v">${y(d.v)}</td><td class="v">${b}</td></tr>`;
-  }).join(""), s = t ? [["\xC1rea vend\xE1vel", `${z(e.areaVendavel)} m\xB2`], ["VGV", y(e.vgv)], ["Efici\xEAncia", x(e.eficienciaPct)], ["Margem l\xEDquida", x(e.margemLiquidaPct)]] : [["\xC1rea privativa", `${z(e.areaPrivativa)} m\xB2`], ["VGV", y(e.vgv)], ["Custo obras/VGV", x(e.custoObrasVgvPct)], ["Margem l\xEDquida", x(e.margemLiquidaPct)]], i = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${o3.nome_exibicao || o3.nome}</title>
+    let u = d.l.startsWith("="), b = e.vgv > 0 ? _(Math.abs(d.v) / e.vgv * 100) : "\u2014";
+    return `<tr class="${u ? "sub" : ""}"><td>${d.l}</td><td class="v">${x(d.v)}</td><td class="v">${b}</td></tr>`;
+  }).join(""), s = t ? [["\xC1rea vend\xE1vel", `${B(e.areaVendavel)} m\xB2`], ["VGV", x(e.vgv)], ["Efici\xEAncia", _(e.eficienciaPct)], ["Margem l\xEDquida", _(e.margemLiquidaPct)]] : [["\xC1rea privativa", `${B(e.areaPrivativa)} m\xB2`], ["VGV", x(e.vgv)], ["Custo obras/VGV", _(e.custoObrasVgvPct)], ["Margem l\xEDquida", _(e.margemLiquidaPct)]], i = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${o3.nome_exibicao || o3.nome}</title>
   <style>
     body { font-family: 'Inter', system-ui, sans-serif; color: #111; margin: 32px; }
     h1 { font-size: 18px; margin: 0 0 2px; } .sub-h { color: #666; font-size: 12px; margin-bottom: 18px; }
@@ -1534,12 +1541,12 @@ function Ge(o3, e, t) {
     <div class="sub-h">${o3.tipo_empreendimento} \xB7 ${o3.status} \xB7 Estudo de Viabilidade \u2014 UrbiVerso</div>
     <div class="kpis">${s.map(([d, u]) => `<div class="kpi"><div class="r">${d}</div><div class="v">${u}</div></div>`).join("")}</div>
     <table><thead><tr><td>Linha</td><td class="v">R$</td><td class="v">% VGV</td></tr></thead>
-    <tbody>${a}<tr class="sub"><td>Margem l\xEDquida</td><td class="v">${x(e.margemLiquidaPct)}</td><td class="v"></td></tr></tbody></table>
+    <tbody>${a}<tr class="sub"><td>Margem l\xEDquida</td><td class="v">${_(e.margemLiquidaPct)}</td><td class="v"></td></tr></tbody></table>
     <button onclick="window.print()" style="margin-top:16px;padding:8px 16px">Imprimir / Salvar PDF</button>
   </body></html>`, n = window.open("", "_blank");
   return n ? (n.document.write(i), n.document.close(), setTimeout(() => n.print(), 400), true) : false;
 }
-var L = class extends f {
+var I = class extends f {
   constructor() {
     super(...arguments);
     this.estudo = null;
@@ -1571,7 +1578,7 @@ var L = class extends f {
   }
   render() {
     if (!this.estudo) return h;
-    let t = this.estudo.tipo_empreendimento === "loteamento", r = M(this._entrada());
+    let t = this.estudo.tipo_empreendimento === "loteamento", r = w(this._entrada());
     return c`
       ${this._renderKpis(r, t)}
       <div class="card">
@@ -1590,8 +1597,8 @@ var L = class extends f {
     `;
   }
   _renderKpis(t, r) {
-    let a = this._bm("custo_obras_vgv"), s = this._bm("margem_liquida"), i = t.areaPermutaFisica > 0 || t.permutaFinResidencial > 0 || t.permutaFinNaoResidencial > 0, n = [{ rot: "\xC1rea vend\xE1vel", val: `${z(t.areaVendavel)} m\xB2` }, { rot: "Pre\xE7o m\xE9dio/unid.", val: y(t.precoMedioUnidade) }, { rot: "N\xBA de unidades", val: z(t.numUnidades) }];
-    return i && n.push({ rot: "\xC1rea permutada", val: `${z(t.areaPermutaFisica)} m\xB2` }), n.push({ rot: "Custo obras / VGV", val: x(t.custoObrasVgvPct), ok: a ? t.custoObrasVgvPct <= Number(a.valor) : void 0 }), n.push({ rot: "Margem l\xEDquida", val: x(t.margemLiquidaPct), ok: s ? t.margemLiquidaPct >= Number(s.valor) : void 0 }), c`<div class="kpis">
+    let a = this._bm("custo_obras_vgv"), s = this._bm("margem_liquida"), i = t.areaPermutaFisica > 0 || t.permutaFinResidencial > 0 || t.permutaFinNaoResidencial > 0, n = [{ rot: "\xC1rea vend\xE1vel", val: `${B(t.areaVendavel)} m\xB2` }, { rot: "Pre\xE7o m\xE9dio/unid.", val: x(t.precoMedioUnidade) }, { rot: "N\xBA de unidades", val: B(t.numUnidades) }];
+    return i && n.push({ rot: "\xC1rea permutada", val: `${B(t.areaPermutaFisica)} m\xB2` }), n.push({ rot: "Custo obras / VGV", val: _(t.custoObrasVgvPct), ok: a ? t.custoObrasVgvPct <= Number(a.valor) : void 0 }), n.push({ rot: "Margem l\xEDquida", val: _(t.margemLiquidaPct), ok: s ? t.margemLiquidaPct >= Number(s.valor) : void 0 }), c`<div class="kpis">
       ${n.map((d) => c`<div class="kpi ${d.ok === void 0 ? "" : d.ok ? "ok" : "ruim"}">
         <div class="rot">${d.rot}</div><div class="val">${d.val}</div></div>`)}
     </div>`;
@@ -1610,12 +1617,12 @@ var L = class extends f {
       let i = s.cls === "res" && s.v < 0;
       return c`<tr class="${s.cls || ""} ${i ? "neg" : ""}">
                 <td>${s.l}</td>
-                <td class="v">${y(s.v)}</td>
-                <td class="v">${t.vgv > 0 ? x(Math.abs(s.v) / t.vgv * 100) : "\u2014"}</td>
+                <td class="v">${x(s.v)}</td>
+                <td class="v">${t.vgv > 0 ? _(Math.abs(s.v) / t.vgv * 100) : "\u2014"}</td>
               </tr>`;
     })}
             <tr class="res ${t.margemLiquidaPct < 0 ? "neg" : ""}">
-              <td>Margem líquida</td><td class="v">${x(t.margemLiquidaPct)}</td><td class="v"></td>
+              <td>Margem líquida</td><td class="v">${_(t.margemLiquidaPct)}</td><td class="v"></td>
             </tr>
           </tbody>
         </table>
@@ -1637,8 +1644,8 @@ var L = class extends f {
       let i = s.f(t.p), n = s.f(r.p), d = i !== 0 ? (n - i) / Math.abs(i) * 100 : 0;
       return c`<tr>
               <td>${s.l}</td>
-              <td class="v">${s.pct ? x(i) : y(i)}</td>
-              <td class="v">${s.pct ? x(n) : y(n)}</td>
+              <td class="v">${s.pct ? _(i) : x(i)}</td>
+              <td class="v">${s.pct ? _(n) : x(n)}</td>
               <td class="v delta ${d >= 0 ? "pos" : "neg"}">${d >= 0 ? "+" : ""}${d.toFixed(1)}%</td>
             </tr>`;
     })}
@@ -1665,7 +1672,7 @@ var L = class extends f {
     }
   }
   _renderSensibilidade(t) {
-    let r = Number(this.estudo.sensibilidade_variacao_positiva_pct) || 10, a = Number(this.estudo.sensibilidade_variacao_negativa_pct) || 10, s = M(this._aplicarFator(1 - a / 100)), i = M(this._aplicarFator(1)), n = M(this._aplicarFator(1 + r / 100)), d = [{ l: "VGV", f: (u) => u.vgv }, { l: "Receita l\xEDquida", f: (u) => u.receitaLiquida }, { l: "Custo direto total", f: (u) => u.custoDiretoTotal }, { l: "Resultado", f: (u) => u.resultado }, { l: "Margem l\xEDquida", f: (u) => u.margemLiquidaPct, pct: true }];
+    let r = Number(this.estudo.sensibilidade_variacao_positiva_pct) || 10, a = Number(this.estudo.sensibilidade_variacao_negativa_pct) || 10, s = w(this._aplicarFator(1 - a / 100)), i = w(this._aplicarFator(1)), n = w(this._aplicarFator(1 + r / 100)), d = [{ l: "VGV", f: (u) => u.vgv }, { l: "Receita l\xEDquida", f: (u) => u.receitaLiquida }, { l: "Custo direto total", f: (u) => u.custoDiretoTotal }, { l: "Resultado", f: (u) => u.resultado }, { l: "Margem l\xEDquida", f: (u) => u.margemLiquidaPct, pct: true }];
     return c`<div class="card" style="margin-top:16px">
       <h3 style="margin-top:0">Análise de sensibilidade</h3>
       <div class="campo" style="max-width:320px">
@@ -1679,20 +1686,20 @@ var L = class extends f {
         <tbody>
           ${d.map((u) => c`<tr>
             <td>${u.l}</td>
-            <td class="v">${u.pct ? x(u.f(s)) : y(u.f(s))}</td>
-            <td class="v">${u.pct ? x(u.f(i)) : y(u.f(i))}</td>
-            <td class="v">${u.pct ? x(u.f(n)) : y(u.f(n))}</td>
+            <td class="v">${u.pct ? _(u.f(s)) : x(u.f(s))}</td>
+            <td class="v">${u.pct ? _(u.f(i)) : x(u.f(i))}</td>
+            <td class="v">${u.pct ? _(u.f(n)) : x(u.f(n))}</td>
           </tr>`)}
         </tbody>
       </table></div>
     </div>`;
   }
   _exportar(t) {
-    let r = this.estudo.tipo_empreendimento === "loteamento", a = M(this._entrada());
+    let r = this.estudo.tipo_empreendimento === "loteamento", a = w(this._entrada());
     t === "excel" ? He(this.estudo, a, r) : Ge(this.estudo, a, r) || l.notificar("Permita pop-ups para exportar em PDF.", "alerta");
   }
 };
-L.styles = [P, $`
+I.styles = [P, y`
     :host { display: block; }
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
     .kpi { background: var(--cor-fundo, #0D1B2A); border: 1px solid var(--cor-borda, rgba(255,255,255,0.1)); border-radius: 8px; padding: 12px; }
@@ -1710,7 +1717,7 @@ L.styles = [P, $`
     .comp td.delta.pos { color: var(--cor-sucesso, #13A98D); }
     .comp td.delta.neg { color: var(--cor-erro, #D45A3A); }
     .disabled-note { opacity: 0.6; font-size: 0.8rem; }
-  `], m([A({ attribute: false })], L.prototype, "estudo", 2), m([g()], L.prototype, "benchmarks", 2), m([g()], L.prototype, "aliquotaRet", 2), m([g()], L.prototype, "cenarios", 2), m([g()], L.prototype, "mostrarSens", 2), m([g()], L.prototype, "varSens", 2), L = m([E("viab-tela-proforma")], L);
+  `], m([A({ attribute: false })], I.prototype, "estudo", 2), m([g()], I.prototype, "benchmarks", 2), m([g()], I.prototype, "aliquotaRet", 2), m([g()], I.prototype, "cenarios", 2), m([g()], I.prototype, "mostrarSens", 2), m([g()], I.prototype, "varSens", 2), I = m([E("viab-tela-proforma")], I);
 var Ve = ["#2AA9E0", "#F7A111", "#13A98D", "#D45A3A", "#8E7CC3", "#5AA469", "#E0679B", "#C9A227", "#4A90D9", "#6FB3A0"];
 function Je(o3, e, t, r) {
   return { x: o3 + t * Math.cos(r), y: e + t * Math.sin(r) };
@@ -1727,7 +1734,7 @@ var H = class extends f {
   }
   render() {
     if (!this.estudo) return h;
-    let t = M({ ...this.estudo });
+    let t = w({ ...this.estudo });
     return c`
       <div class="graficos">
         <div class="card">
@@ -1757,13 +1764,13 @@ var H = class extends f {
     });
     return c`
       <svg viewBox="0 0 200 200" role="img" aria-label="Composição dos custos">
-        ${i.map((n) => Ut`<path d=${n.path} fill=${n.cor}><title>${n.l}: ${y(n.v)}</title></path>`)}
+        ${i.map((n) => Ut`<path d=${n.path} fill=${n.cor}><title>${n.l}: ${x(n.v)}</title></path>`)}
       </svg>
       <div class="legenda">
         ${i.map((n) => c`<div class="item">
           <span class="cor" style="background:${n.cor}"></span>
           <span>${n.l}</span>
-          <span class="val">${y(n.v)} · ${x(n.frac * 100)}</span>
+          <span class="val">${x(n.v)} · ${_(n.frac * 100)}</span>
         </div>`)}
       </div>`;
   }
@@ -1772,7 +1779,7 @@ var H = class extends f {
       let k = i(u);
       return Ut`
         <rect x=${d} y=${180 - k} width="70" height=${k} rx="4" fill=${b}></rect>
-        <text x=${d + 35} y=${180 - k - 6} text-anchor="middle" font-size="9" fill="currentColor">${y(u)}</text>
+        <text x=${d + 35} y=${180 - k - 6} text-anchor="middle" font-size="9" fill="currentColor">${x(u)}</text>
         <text x=${d + 35} y="196" text-anchor="middle" font-size="10" fill="currentColor">${p}</text>`;
     };
     return c`
@@ -1782,11 +1789,11 @@ var H = class extends f {
         ${n(140, a, "#D45A3A", "Custos")}
       </svg>
       <div class="barras-legenda">
-        <span>Resultado: <strong>${y(r - a)}</strong></span>
+        <span>Resultado: <strong>${x(r - a)}</strong></span>
       </div>`;
   }
 };
-H.styles = [P, $`
+H.styles = [P, y`
     :host { display: block; }
     .graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
     .legenda { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: 0.82rem; }
@@ -1797,7 +1804,7 @@ H.styles = [P, $`
     svg { max-width: 100%; height: auto; }
     .barras-legenda { display: flex; gap: 16px; justify-content: center; margin-top: 8px; font-size: 0.82rem; }
   `], m([A({ attribute: false })], H.prototype, "estudo", 2), m([g()], H.prototype, "excluirTerreno", 2), H = m([E("viab-tela-graficos")], H);
-var w = class extends f {
+var C = class extends f {
   constructor() {
     super(...arguments);
     this.estudo = null;
@@ -1819,7 +1826,7 @@ var w = class extends f {
     if (this.estudo) {
       this.carregando = true;
       try {
-        let t = await Le(this.estudo.id);
+        let t = await Ne(this.estudo.id);
         this.apelo = t?.apelo || null, this.documentos = t?.documentos || [];
       } catch (t) {
         console.error(t);
@@ -1902,7 +1909,7 @@ var w = class extends f {
   async _arquivo(t) {
     let r = t.target.files?.[0];
     if (r) try {
-      let a = await Ne(r);
+      let a = await qe(r);
       if (!a?.upload_id) {
         l.notificar("Falha no upload", "erro");
         return;
@@ -1942,7 +1949,7 @@ var w = class extends f {
     }
   }
 };
-w.styles = [P, $`
+C.styles = [P, y`
     :host { display: block; }
     .doc { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.06)); }
     .scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 10px 0; }
@@ -1957,9 +1964,9 @@ w.styles = [P, $`
     .rel { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
     .rel ul { margin: 4px 0; padding-left: 18px; font-size: 0.84rem; }
     .upload-form { display: grid; gap: 8px; margin-top: 10px; }
-  `], m([A({ attribute: false })], w.prototype, "estudo", 2), m([A({ type: Boolean })], w.prototype, "editavel", 2), m([g()], w.prototype, "apelo", 2), m([g()], w.prototype, "documentos", 2), m([g()], w.prototype, "carregando", 2), m([g()], w.prototype, "analisando", 2), m([g()], w.prototype, "tipoDado", 2), m([g()], w.prototype, "textoAdicional", 2), w = m([E("viab-tela-apelo")], w);
+  `], m([A({ attribute: false })], C.prototype, "estudo", 2), m([A({ type: Boolean })], C.prototype, "editavel", 2), m([g()], C.prototype, "apelo", 2), m([g()], C.prototype, "documentos", 2), m([g()], C.prototype, "carregando", 2), m([g()], C.prototype, "analisando", 2), m([g()], C.prototype, "tipoDado", 2), m([g()], C.prototype, "textoAdicional", 2), C = m([E("viab-tela-apelo")], C);
 var We = ["leitor", "editor", "aprovador"];
-var C = class extends f {
+var R = class extends f {
   constructor() {
     super(...arguments);
     this.estudoId = 0;
@@ -1980,7 +1987,7 @@ var C = class extends f {
     if (this.estudoId) {
       this.carregando = true;
       try {
-        let t = await xe(this.estudoId);
+        let t = await ye(this.estudoId);
         t?.erro ? (l.notificar(t.mensagem || "Sem acesso", "erro"), this.estudo = null) : (this.estudo = t, this.membros = t.membros || []);
       } catch (t) {
         console.error("Erro ao carregar estudo:", t);
@@ -2078,14 +2085,14 @@ var C = class extends f {
   }
   async _carregarUsuarios() {
     if (!(this.usuarios.length > 0)) try {
-      this.usuarios = await qe();
+      this.usuarios = await Fe();
     } catch (t) {
       console.error(t);
     }
   }
   async _status(t) {
     if (!((t === "aprovado" || t === "reprovado") && !confirm(`Confirma ${{ aprovado: "aprovar", reprovado: "reprovar", rascunho: "devolver ao rascunho", em_analise: "submeter" }[t]} este estudo?`))) try {
-      let a = await ke(this.estudoId, t);
+      let a = await Pe(this.estudoId, t);
       if (a?.erro) {
         l.notificar(a.mensagem || "Transi\xE7\xE3o n\xE3o permitida", "erro");
         return;
@@ -2102,7 +2109,7 @@ var C = class extends f {
       return;
     }
     try {
-      let i = await Pe(this.estudoId, a, s);
+      let i = await Se(this.estudoId, a, s);
       if (i?.erro) {
         l.notificar(i.mensagem || "Erro", "erro");
         return;
@@ -2114,7 +2121,7 @@ var C = class extends f {
   }
   async _alterarFuncao(t, r) {
     try {
-      let a = await Se(this.estudoId, t, r);
+      let a = await we(this.estudoId, t, r);
       if (a?.erro) {
         l.notificar(a.mensagem || "Erro", "erro");
         return;
@@ -2126,7 +2133,7 @@ var C = class extends f {
   }
   async _removerMembro(t) {
     try {
-      let r = await we(this.estudoId, t);
+      let r = await Ce(this.estudoId, t);
       if (r?.erro) {
         l.notificar(r.mensagem || "Erro", "erro");
         return;
@@ -2137,7 +2144,7 @@ var C = class extends f {
     }
   }
 };
-C.styles = [P, $`
+R.styles = [P, y`
     :host { padding: 24px; }
     .voltar { background: none; border: none; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); cursor: pointer; padding: 0; margin-bottom: 12px; }
     .cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -2152,8 +2159,8 @@ C.styles = [P, $`
     .membros-lista { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
     .membro { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
     .placeholder { padding: 40px; text-align: center; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
-  `], m([A({ type: Number })], C.prototype, "estudoId", 2), m([g()], C.prototype, "estudo", 2), m([g()], C.prototype, "carregando", 2), m([g()], C.prototype, "aba", 2), m([g()], C.prototype, "membros", 2), m([g()], C.prototype, "usuarios", 2), m([g()], C.prototype, "mostrarMembros", 2), C = m([E("viab-tela-estudo")], C);
-var T = class extends f {
+  `], m([A({ type: Number })], R.prototype, "estudoId", 2), m([g()], R.prototype, "estudo", 2), m([g()], R.prototype, "carregando", 2), m([g()], R.prototype, "aba", 2), m([g()], R.prototype, "membros", 2), m([g()], R.prototype, "usuarios", 2), m([g()], R.prototype, "mostrarMembros", 2), R = m([E("viab-tela-estudo")], R);
+var O = class extends f {
   constructor() {
     super(...arguments);
     this.tipo = "loteamento";
@@ -2225,7 +2232,7 @@ var T = class extends f {
   }
   async _patch(t, r) {
     try {
-      let a = await Re(t, r);
+      let a = await Me(t, r);
       if (a?.erro) {
         l.notificar(a.mensagem || "Erro ao salvar", "erro");
         return;
@@ -2236,7 +2243,7 @@ var T = class extends f {
   }
   async _remover(t) {
     if (confirm("Remover este benchmark?")) try {
-      let r = await Me(t);
+      let r = await Le(t);
       if (r?.erro) {
         l.notificar(r.mensagem || "Erro", "erro");
         return;
@@ -2249,7 +2256,7 @@ var T = class extends f {
   async _novo() {
     let t = prompt("Identificador do indicador (ex: resultado_final):");
     if (t?.trim()) try {
-      let r = await Ce({ tipo_empreendimento: this.tipo, campo: t.trim(), regra_comparacao: "atingir_ou_superar" });
+      let r = await Re({ tipo_empreendimento: this.tipo, campo: t.trim(), regra_comparacao: "atingir_ou_superar" });
       if (r?.erro) {
         l.notificar(r.mensagem || "Erro", "erro");
         return;
@@ -2272,7 +2279,7 @@ var T = class extends f {
     }
   }
 };
-T.styles = [P, $`
+O.styles = [P, y`
     :host { padding: 16px; }
     .abas { display: flex; gap: 4px; margin-bottom: 16px; }
     .aba { padding: 8px 14px; background: none; border: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
@@ -2281,7 +2288,7 @@ T.styles = [P, $`
     .topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
     td input, td select { width: 100%; box-sizing: border-box; }
     td.num input { max-width: 90px; }
-  `], m([g()], T.prototype, "tipo", 2), m([g()], T.prototype, "itens", 2), m([g()], T.prototype, "carregando", 2), T = m([E("viabilidade-config-benchmarks")], T);
+  `], m([g()], O.prototype, "tipo", 2), m([g()], O.prototype, "itens", 2), m([g()], O.prototype, "carregando", 2), O = m([E("viabilidade-config-benchmarks")], O);
 function Ze(o3) {
   let e = (o3 || "").replace(/^\//, "").split("/").filter(Boolean);
   if (e[0] === "detalhe" && e[1]) {
@@ -2307,7 +2314,7 @@ var K = class extends f {
     return this.rota.tela === "estudo" ? c`<viab-tela-estudo .estudoId=${this.rota.estudoId || 0}></viab-tela-estudo>` : c`<viab-tela-dashboard .aba=${this.rota.aba || "estudos"}></viab-tela-dashboard>`;
   }
 };
-K.styles = $`
+K.styles = y`
     :host {
       display: block;
       min-height: 100%;
