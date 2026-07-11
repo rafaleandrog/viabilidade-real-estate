@@ -58,7 +58,11 @@ jobs:
       - name: Instalar dependências
         run: pnpm install --frozen-lockfile
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # @urbiverso/sdk é privado (GitHub Packages, org urbiverso). O GITHUB_TOKEN efêmero
+          # deste repo NÃO tem read:packages cross-org (403), então usamos um PAT com
+          # read:packages guardado no secret URBIVERSO_PACKAGES_TOKEN. Fallback para o
+          # GITHUB_TOKEN caso a org libere o acesso do pacote a este repo no futuro.
+          NODE_AUTH_TOKEN: ${{ secrets.URBIVERSO_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
       - name: Build e testes
         run: |
           pnpm build

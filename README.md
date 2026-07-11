@@ -110,7 +110,9 @@ Tag canônica: **`viabilidade-v<x.y.z>_<sha8>`** (ex.: `viabilidade-v0.1.0_c03c3
 
 O sha vive **só na tag** — o `manifesto.json` nunca o contém (ele não existe antes do commit). O nome do asset não muda: `viabilidade-<x.y.z>.urbiapp.tgz` + sidecar `.sha256`.
 
-**Como publicar:** Actions → **release** → Run workflow (ref `main`). O workflow deriva a versão do `manifesto.json`, cria a tag com o sha8 do commit e publica a release — sem terminal. (Se e só se houve migração de schema, bumpe antes a `versao` no `manifesto.json` — e no `package.json`, por higiene.)
+**Pré-requisito de CI (uma vez):** o workflow instala o `@urbiverso/sdk` (privado) do GitHub Packages. O `GITHUB_TOKEN` efêmero do repo **não** tem acesso cross-org a esse pacote (dá `403`), então crie um secret **`URBIVERSO_PACKAGES_TOKEN`** com um PAT `read:packages` em `Settings → Secrets and variables → Actions`. Sem esse secret, o passo *Instalar dependências* falha e nenhuma release é publicada.
+
+**Como publicar:** Actions → **release** → Run workflow (ref `main`, ou a branch que contenha a correção). O workflow deriva a versão do `manifesto.json`, cria a tag com o sha8 do commit e publica a release — sem terminal. (Se e só se houve migração de schema, bumpe antes a `versao` no `manifesto.json` — e no `package.json`, por higiene.)
 
 Push manual de tag também funciona (`git tag viabilidade-v0.1.0_<sha8> && git push origin <tag>`); o workflow valida que a versão bate com o manifesto e que o sha bate com o commit tagueado. Em ambos os caminhos ele builda, testa, empacota com `urbi-empacotar` e publica a release com tarball + `.sha256`.
 
@@ -119,7 +121,10 @@ Push manual de tag também funciona (`git tag viabilidade-v0.1.0_<sha8> && git p
 ## Acessos e pré-requisitos
 
 - **Leitura do monorepo `UP-Urbita/urbiverso`:** garantida (a conta é contributor).
-- **`@urbiverso/sdk` (GitHub Packages, escopo `@urbiverso`, registry `https://npm.pkg.github.com`):** entra como `devDependency`. Ter leitura no repo do monorepo **não** garante acesso ao pacote — é permissão separada. **Na Etapa 0, testar cedo o `install`.** Se falhar com erro de autenticação de packages, parar e avisar: será preciso um PAT com `read:packages` (local no `~/.npmrc` e como secret do repo para o CI).
+- **`@urbiverso/sdk` (GitHub Packages, escopo `@urbiverso`, registry `https://npm.pkg.github.com`):** entra como `devDependency`. Ter leitura no repo do monorepo **não** garante acesso ao pacote — é permissão separada. Também **não** basta o autor ser membro da org: o `GITHUB_TOKEN` do CI representa o repo, não a pessoa, e não herda esse acesso (dá `403`). São necessários **dois** pontos de auth com um PAT `read:packages`:
+  - **Local:** `//npm.pkg.github.com/:_authToken=<PAT>` no `~/.npmrc`.
+  - **CI:** secret do repo **`URBIVERSO_PACKAGES_TOKEN`** (`Settings → Secrets and variables → Actions`). O `release.yml` usa `NODE_AUTH_TOKEN: ${{ secrets.URBIVERSO_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}` no passo de install.
+  - **Alternativa ao secret:** um admin da org liberar este repo em *Package settings → Manage Actions access* do `@urbiverso/sdk` — aí o fallback `GITHUB_TOKEN` passa a funcionar.
 - **Instância dev de teste:** o app roda numa versão dev do UrbiVerso. O ID da gleba "Fazenda Paranoazinho" (usada no filtro de exclusão) é um **parâmetro configurável** do app; enquanto vazio, o filtro degrada mostrando todas as glebas.
 
 ## Etapas de construção
