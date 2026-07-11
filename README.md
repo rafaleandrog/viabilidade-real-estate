@@ -29,7 +29,7 @@ Este README é o mapa do projeto. **Releia-o no início de cada sessão** antes 
 | Item | Valor |
 |---|---|
 | **appId** | `viabilidade` (snake_case — é o nome da pasta, o schema PostgreSQL e o prefixo de rota) |
-| **Nome da tag / release** | `viabilidade-v<versao>` (ex.: `viabilidade-v0.1.0`) |
+| **Nome da tag / release** | `viabilidade-v<x.y.z>_<sha8>` (ex.: `viabilidade-v0.1.0_c03c34e1`) — ver [Lançar uma release](#lançar-uma-release) |
 | **Web component** | `app-viabilidade` |
 | **Prefixo de rota** | shell prefixa tudo com `/api/viabilidade/` — **nunca** escreva o prefixo você mesmo |
 | **Versão do shell / SDK alvo** | `0.50.3` (é o `shell_min` e a versão do `@urbiverso/sdk`) |
@@ -98,6 +98,23 @@ viabilidade-real-estate/
 ├── README.md
 └── .github/workflows/release.yml
 ```
+
+## Lançar uma release
+
+A app é distribuída como pacote `viabilidade-<versao>.urbiapp.tgz`, publicado como **release do GitHub** por `.github/workflows/release.yml`.
+
+Tag canônica: **`viabilidade-v<x.y.z>_<sha8>`** (ex.: `viabilidade-v0.1.0_c03c34e1`). Dois pedaços de identidade, papéis distintos:
+
+- **`versao` (`x.y.z`)** vem do `manifesto.json` e é o contrato de **schema**: bump de `z` só quando há migração de banco. Mudança só de código **não** bumpa versão. Downgrade é recusado pelo instalador.
+- **`_<sha8>`** é a identidade de **build**: o short sha (8 chars, hexa minúsculo) do commit do qual o tarball é buildado. É ele que permite à plataforma atualizar entre releases de **mesma versão** (compara por ancestralidade git). Tag sem sha instala, mas nunca gera upgrade de build.
+
+O sha vive **só na tag** — o `manifesto.json` nunca o contém (ele não existe antes do commit). O nome do asset não muda: `viabilidade-<x.y.z>.urbiapp.tgz` + sidecar `.sha256`.
+
+**Como publicar:** Actions → **release** → Run workflow (ref `main`). O workflow deriva a versão do `manifesto.json`, cria a tag com o sha8 do commit e publica a release — sem terminal. (Se e só se houve migração de schema, bumpe antes a `versao` no `manifesto.json` — e no `package.json`, por higiene.)
+
+Push manual de tag também funciona (`git tag viabilidade-v0.1.0_<sha8> && git push origin <tag>`); o workflow valida que a versão bate com o manifesto e que o sha bate com o commit tagueado. Em ambos os caminhos ele builda, testa, empacota com `urbi-empacotar` e publica a release com tarball + `.sha256`.
+
+> **Importante:** merge na `main` não vira release sozinho — o auto-update instala *releases*. Mudou código e quer o novo build nas instâncias? Publique release nova com a **mesma** versão e a tag com o sha novo.
 
 ## Acessos e pré-requisitos
 
