@@ -6,7 +6,6 @@
   "rotas_publicas": [],
   "dependencias_nucleo": [],
   "permissoes_nucleo": {},
-  "instrucoes_agente": "Pode consultar estudos de viabilidade aos quais o usuário tem acesso, gerar a análise de apelo comercial de um estudo a partir dos documentos anexados, e consultar benchmarks por tipo de empreendimento. Não avança status nem edita premissas.",
   "roles": {
     "leitura": {
       "leitor": {
