@@ -1,27 +1,29 @@
-import { LitElement, html, css, nothing } from 'lit';
+import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { estilosBase, TIPO_LABEL } from './viab-shared.js';
+import { TIPO_LABEL } from './viab-shared.js';
+import { estiloConteudo } from './estilos.js';
 import {
   urbiVerso, listarBenchmarks, atualizarBenchmark, removerBenchmark, criarBenchmark, semearBenchmarks,
 } from './viabilidade-api.js';
 
 // Tela de configuração de benchmarks (manifesto telas_config.benchmarks).
-// Montada pelo shell na área de config. Escrita é admin-only (backend valida).
+// Injetada pelo shell na área de config (Template C): NÃO renderiza
+// urbi-shell-page; o respiro vem de <urbi-hospedeiro>. Escrita é admin-only.
 @customElement('viabilidade-config-benchmarks')
 export class ViabConfigBenchmarks extends LitElement {
   @state() private tipo: 'loteamento' | 'incorporacao' = 'loteamento';
   @state() private itens: any[] = [];
   @state() private carregando = true;
+  @state() private mostrarNovo = false;
+  @state() private novoCampo = '';
+  @state() private removerId: number | null = null;
 
-  static styles = [estilosBase, css`
-    :host { padding: 16px; }
-    .abas { display: flex; gap: 4px; margin-bottom: 16px; }
-    .aba { padding: 8px 14px; background: none; border: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
-           border-radius: 6px; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 600; cursor: pointer; }
-    .aba.ativa { color: var(--cor-primaria-solida, #2AA9E0); border-color: var(--cor-primaria-solida, #2AA9E0); }
-    .topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-    td input, td select { width: 100%; box-sizing: border-box; }
-    td.num input { max-width: 90px; }
+  static styles = [estiloConteudo, css`
+    .topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+    .topo h2 { margin: 0; }
+    .chips { display: flex; gap: 6px; margin: 12px 0; }
+    .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+    .rodape { margin-top: 12px; }
   `];
 
   connectedCallback() {
@@ -38,55 +40,123 @@ export class ViabConfigBenchmarks extends LitElement {
     this.carregando = false;
   }
 
+  private _num(v: any): number | null {
+    if (v === '' || v == null) return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+  }
+
   render() {
     return html`
-      <div class="topo">
-        <h2 style="margin:0">Benchmarks</h2>
-        <button class="btn-sec btn-sm" @click=${this._semear}>Criar indicadores padrão</button>
-      </div>
-      <p class="sec">Valores de referência e faixas de sensibilidade por tipo de empreendimento. Edição restrita a administradores.</p>
+      <urbi-hospedeiro>
+        <div class="topo">
+          <h2>Benchmarks</h2>
+          <urbi-botao variante="secundario" pequeno icone="fa-solid fa-seedling" @click=${this._semear}>Criar indicadores padrão</urbi-botao>
+        </div>
+        <p class="sec">
+          Valores de referência e faixas de sensibilidade por tipo de empreendimento.
+          Edição restrita a administradores.
+        </p>
 
-      <div class="abas">
-        ${(['loteamento', 'incorporacao'] as const).map((t) => html`
-          <button class="aba ${this.tipo === t ? 'ativa' : ''}" @click=${() => { this.tipo = t; this._carregar(); }}>${TIPO_LABEL[t]}</button>
-        `)}
-      </div>
+        <div class="chips">
+          ${(['loteamento', 'incorporacao'] as const).map((t) => html`
+            <urbi-badge
+              cor="info" interativo ?ativo=${this.tipo === t}
+              role="button" tabindex="0"
+              @click=${() => { this.tipo = t; this._carregar(); }}
+              @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.tipo = t; this._carregar(); } }}
+            >${TIPO_LABEL[t]}</urbi-badge>`)}
+        </div>
 
-      ${this.carregando
-        ? html`<div class="vazio">Carregando…</div>`
-        : html`
-          <div class="card" style="padding:0; overflow-x:auto;">
-            <table>
-              <thead><tr><th>Indicador</th><th>Valor</th><th>Regra</th><th>Var + (%)</th><th>Var − (%)</th><th></th></tr></thead>
-              <tbody>
-                ${this.itens.length === 0 ? html`<tr><td colspan="6" class="sec" style="text-align:center; padding:24px">Nenhum benchmark. Clique em “Criar indicadores padrão”.</td></tr>` : nothing}
-                ${this.itens.map((b) => html`
-                  <tr>
-                    <td>${b.campo}</td>
-                    <td class="num"><input type="number" .value=${String(b.valor ?? '')}
-                      @change=${(e: Event) => this._patch(b.id, { valor: this._num((e.target as HTMLInputElement).value) })} /></td>
-                    <td>
-                      <select @change=${(e: Event) => this._patch(b.id, { regra_comparacao: (e.target as HTMLSelectElement).value })}>
-                        <option value="atingir_ou_superar" ?selected=${b.regra_comparacao === 'atingir_ou_superar'}>atingir ou superar</option>
-                        <option value="nao_exceder" ?selected=${b.regra_comparacao === 'nao_exceder'}>não exceder</option>
-                      </select>
-                    </td>
-                    <td class="num"><input type="number" .value=${String(b.variacao_positiva_pct ?? '')}
-                      @change=${(e: Event) => this._patch(b.id, { variacao_positiva_pct: this._num((e.target as HTMLInputElement).value) })} /></td>
-                    <td class="num"><input type="number" .value=${String(b.variacao_negativa_pct ?? '')}
-                      @change=${(e: Event) => this._patch(b.id, { variacao_negativa_pct: this._num((e.target as HTMLInputElement).value) })} /></td>
-                    <td><button class="btn-perigo btn-sm" @click=${() => this._remover(b.id)}>×</button></td>
-                  </tr>
-                `)}
-              </tbody>
-            </table>
-          </div>
-          <div style="margin-top:12px"><button class="btn-sec btn-sm" @click=${this._novo}>+ Novo indicador</button></div>
-        `}
+        ${this.carregando
+          ? html`<urbi-loading mensagem="Carregando benchmarks..."></urbi-loading>`
+          : html`
+            <urbi-tabela
+              .colunas=${this._colunas()}
+              .linhas=${this.itens}
+              mensagem-vazio="Nenhum benchmark. Clique em “Criar indicadores padrão”."
+            ></urbi-tabela>
+            <div class="rodape">
+              <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus" @click=${() => { this.novoCampo = ''; this.mostrarNovo = true; }}>Novo indicador</urbi-botao>
+            </div>`}
+      </urbi-hospedeiro>
+
+      ${this.mostrarNovo ? this._renderNovo() : nothing}
+      ${this.removerId != null ? this._renderConfirmRemover() : nothing}
     `;
   }
 
-  private _num(v: string): number | null { return v === '' ? null : Number(v); }
+  private _colunas() {
+    return [
+      { id: 'campo', label: 'Indicador', valor: (b: any) => b.campo },
+      {
+        id: 'valor', label: 'Valor', alinhamento: 'direita',
+        render: (b: any) => html`<urbi-input-numero
+          .valor=${this._num(b.valor)}
+          @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { valor: e.detail.valor })}
+        ></urbi-input-numero>`,
+      },
+      {
+        id: 'regra', label: 'Regra',
+        render: (b: any) => html`<urbi-select
+          .valor=${b.regra_comparacao}
+          .opcoes=${[
+            { valor: 'atingir_ou_superar', rotulo: 'atingir ou superar' },
+            { valor: 'nao_exceder', rotulo: 'não exceder' },
+          ]}
+          @urbi:select-change=${(e: CustomEvent) => this._patch(b.id, { regra_comparacao: e.detail.valor })}
+        ></urbi-select>`,
+      },
+      {
+        id: 'varpos', label: 'Var + (%)', alinhamento: 'direita',
+        render: (b: any) => html`<urbi-input-numero
+          .valor=${this._num(b.variacao_positiva_pct)}
+          @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { variacao_positiva_pct: e.detail.valor })}
+        ></urbi-input-numero>`,
+      },
+      {
+        id: 'varneg', label: 'Var − (%)', alinhamento: 'direita',
+        render: (b: any) => html`<urbi-input-numero
+          .valor=${this._num(b.variacao_negativa_pct)}
+          @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { variacao_negativa_pct: e.detail.valor })}
+        ></urbi-input-numero>`,
+      },
+      {
+        id: 'acoes', label: '',
+        render: (b: any) => html`<urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
+          @click=${() => this.removerId = b.id}>Remover</urbi-botao>`,
+      },
+    ];
+  }
+
+  private _renderNovo(): TemplateResult {
+    return html`
+      <urbi-modal title="Novo indicador" maxWidth="420px" @urbi-modal:close=${() => this.mostrarNovo = false}>
+        <urbi-input
+          label="Identificador do indicador"
+          placeholder="ex: resultado_final"
+          .valor=${this.novoCampo}
+          @urbi:input-change=${(e: CustomEvent) => this.novoCampo = e.detail.valor}
+        ></urbi-input>
+        <div class="form-acoes">
+          <urbi-botao variante="fantasma" @click=${() => this.mostrarNovo = false}>Cancelar</urbi-botao>
+          <urbi-botao variante="primario" ?desabilitado=${!this.novoCampo.trim()} @click=${this._novo}>Criar</urbi-botao>
+        </div>
+      </urbi-modal>
+    `;
+  }
+
+  private _renderConfirmRemover(): TemplateResult {
+    return html`
+      <urbi-modal title="Remover benchmark" maxWidth="380px" @urbi-modal:close=${() => this.removerId = null}>
+        <p>Remover este benchmark?</p>
+        <div class="form-acoes">
+          <urbi-botao variante="fantasma" @click=${() => this.removerId = null}>Cancelar</urbi-botao>
+          <urbi-botao variante="perigo" @click=${this._confirmarRemover}>Remover</urbi-botao>
+        </div>
+      </urbi-modal>
+    `;
+  }
 
   private async _patch(id: number, dados: Record<string, any>) {
     try {
@@ -95,20 +165,23 @@ export class ViabConfigBenchmarks extends LitElement {
     } catch (e: any) { urbiVerso.notificar(e?.message || 'Erro', 'erro'); }
   }
 
-  private async _remover(id: number) {
-    if (!confirm('Remover este benchmark?')) return;
+  private _confirmarRemover = async () => {
+    const id = this.removerId;
+    this.removerId = null;
+    if (id == null) return;
     try {
       const res = await removerBenchmark(id);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro', 'erro'); return; }
       this._carregar();
     } catch (e: any) { urbiVerso.notificar(e?.message || 'Erro', 'erro'); }
-  }
+  };
 
   private async _novo() {
-    const campo = prompt('Identificador do indicador (ex: resultado_final):');
-    if (!campo?.trim()) return;
+    const campo = this.novoCampo.trim();
+    if (!campo) return;
+    this.mostrarNovo = false;
     try {
-      const res = await criarBenchmark({ tipo_empreendimento: this.tipo, campo: campo.trim(), regra_comparacao: 'atingir_ou_superar' });
+      const res = await criarBenchmark({ tipo_empreendimento: this.tipo, campo, regra_comparacao: 'atingir_ou_superar' });
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro', 'erro'); return; }
       this._carregar();
     } catch (e: any) { urbiVerso.notificar(e?.message || 'Erro', 'erro'); }

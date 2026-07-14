@@ -6,17 +6,22 @@ Este repositório contém o código-fonte da app. Ele **não é** o monorepo do 
 
 ---
 
-## 🖥️ Demonstração navegável (GitHub Pages)
+## 🖥️ Interface
 
-O app real depende do shell do UrbiVerso (que injeta `window.urbiVerso`, autenticação e backend), então **não roda sozinho**. Para permitir uma prévia visual, o repositório inclui uma **página de demonstração estática** que reusa exatamente os mesmos componentes do frontend, porém com um **mock do `window.urbiVerso`** e dados fictícios em memória.
+A UI segue o **framework de UI do UrbiVerso** (ver `docs/shell/ui.md` no monorepo da
+plataforma): o app estende `LitElement`, replica o contrato de altura em
+`frontend/estilos.ts` (`estiloPagina`/`estiloPrimitivo`) e consome os primitivos
+`urbi-*` **por tag** (registrados globalmente pelo shell; `@urbiverso/ui` só como
+`import type`). Todas as telas usam `urbi-shell-page`, `urbi-abas`, `urbi-tabela`,
+`urbi-card`, `urbi-botao`, `urbi-input(-numero)`, `urbi-select`, `urbi-modal`,
+`urbi-kpi`, `urbi-badge`, `urbi-banner`, `urbi-estado-vazio`, `urbi-loading`,
+`urbi-icone` e `urbi-grafico-*`, com cores/tipografia **só via tokens**
+(`var(--cor-*, <fallback>)`) — herdando o tema claro/escuro do shell.
 
-- **Arquivos:** `index.html` (raiz) + `demo/demo.js` (bundle) + `demo/mock.ts` (backend fake).
-- **O que dá pra ver:** dashboard de estudos, criar/duplicar/remover, detalhe com abas (Premissas/Proforma/Gráficos), transições de status, gestão de membros e a configuração de benchmarks.
-- **Limite honesto:** é estático — os dados são fictícios e se perdem ao recarregar; não há backend real nem cálculo de Proforma (esse chega nas Etapas 5/6).
-
-**Como habilitar o GitHub Pages** (após dar push): repositório → **Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: `main` / `/ (root)` → Save**. Em ~1 min o app fica em `https://<seu-usuario>.github.io/<nome-do-repo>/`.
-
-**Rebuild do demo** (se mexer no frontend): `pnpm run build:demo` (regenera `demo/demo.js`, que é versionado).
+Como o app depende do shell (que injeta `window.urbiVerso`, autenticação e backend)
+e os primitivos `urbi-*` só existem dentro do shell, ele **não roda isolado** — a
+verificação visual é feita instalando a app numa instância UrbiVerso (dev). Não há
+mais página de demonstração estática (GitHub Pages).
 
 ---
 
