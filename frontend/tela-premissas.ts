@@ -1,11 +1,13 @@
-import { LitElement, html, css, nothing } from 'lit';
+import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { estilosBase } from './viab-shared.js';
+import { estiloConteudo } from './estilos.js';
+import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { calcularProforma, precoSugeridoM2, type ProformaInput } from './proforma.js';
 
-type T = 'num' | 'txt' | 'bool';
+type T = 'num' | 'txt';
 interface Campo { k: string; label: string; t: T; sufixo?: string; }
+interface Opcao { valor: string; rotulo: string; }
 
 // Campos por seção. `so` limita a um tipo ('loteamento' | 'incorporacao').
 const CUSTOS: (Campo & { so?: string })[] = [
@@ -60,12 +62,7 @@ const AREAS_INC: Campo[] = [
 
 const TODOS_NUM = new Set<string>([
   ...CUSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC,
-  { k: 'permuta_fisica_area_m2' } as any, { k: 'permuta_fisica_pct' } as any, { k: 'terreno_manual_area' } as any,
-].filter((c: any) => c.t === 'num' || ['permuta_fisica_area_m2', 'permuta_fisica_pct', 'terreno_manual_area'].includes(c.k)).map((c: any) => c.k));
-
-const fmtR$ = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v || 0);
-const fmtNum = (v: number, d = 0) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: d }).format(v || 0);
-const fmtPct = (v: number) => `${(v || 0).toFixed(1)}%`;
+].map((c) => c.k).concat(['permuta_fisica_area_m2', 'permuta_fisica_pct', 'terreno_manual_area']));
 
 @customElement('viab-tela-premissas')
 export class ViabTelaPremissas extends LitElement {
@@ -77,25 +74,19 @@ export class ViabTelaPremissas extends LitElement {
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
 
-  static styles = [estilosBase, css`
-    :host { display: block; }
-    .secao { margin-bottom: 18px; }
-    .secao h4 { margin: 0 0 10px; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+  static styles = [estiloConteudo, css`
+    .secao { margin-bottom: 20px; }
+    .secao h4 {
+      margin: 0 0 12px; font-size: var(--texto-rotulo, 0.75rem);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+    }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-    .campo-in { position: relative; }
-    .campo-in .suf { position: absolute; right: 10px; top: 30px; font-size: 0.7rem; color: var(--cor-texto-sec, rgba(255,255,255,0.4)); pointer-events: none; }
-    .toggle { display: inline-flex; border: 1px solid var(--cor-borda, rgba(255,255,255,0.14)); border-radius: 6px; overflow: hidden; }
-    .toggle button { border: none; border-radius: 0; background: none; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); padding: 5px 10px; }
-    .toggle button.on { background: var(--cor-primaria-solida, #2AA9E0); color: #06121c; font-weight: 600; }
-    .check { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 6px; }
-    .kpi { background: var(--cor-fundo, #0D1B2A); border: 1px solid var(--cor-borda, rgba(255,255,255,0.1)); border-radius: 8px; padding: 12px; }
-    .kpi .rot { font-size: 0.7rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); text-transform: uppercase; letter-spacing: 0.03em; }
-    .kpi .val { font-size: 1.15rem; font-weight: 700; margin-top: 4px; }
-    .kpi.ok .val { color: var(--cor-sucesso, #13A98D); }
-    .kpi.ruim .val { color: var(--cor-erro, #D45A3A); }
-    .preco-sugerido { margin-top: 12px; padding: 12px 14px; border-radius: 8px; background: rgba(247,161,17,0.10); border: 1px solid rgba(247,161,17,0.3); font-size: 0.9rem; }
-    .preco-sugerido strong { color: var(--cor-cta, #F7A111); }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .form-acoes { display: flex; justify-content: flex-end; margin-top: 8px; }
+    urbi-card + urbi-card { margin-top: 16px; }
+    urbi-banner { margin-top: 12px; }
   `];
 
   connectedCallback() {
@@ -122,6 +113,13 @@ export class ViabTelaPremissas extends LitElement {
 
   private _set(k: string, v: any) { this.form = { ...this.form, [k]: v }; }
 
+  private _num(k: string): number | null {
+    const v = this.form[k];
+    if (v === '' || v == null) return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+  }
+
   render() {
     if (!this.estudo) return nothing;
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
@@ -130,9 +128,7 @@ export class ViabTelaPremissas extends LitElement {
     const dis = !this.editavel;
 
     return html`
-      <div class="card">
-        <h3 style="margin-top:0">Premissas</h3>
-
+      <urbi-card titulo="Premissas">
         <div class="secao">
           <h4>Terreno</h4>
           ${this.estudo.origem_terreno === 'nucleo'
@@ -150,122 +146,126 @@ export class ViabTelaPremissas extends LitElement {
 
         <div class="secao">
           <h4>Custos</h4>
-          <div class="check">
-            <input type="checkbox" ?disabled=${dis} .checked=${this.form.considerar_custo_terreno !== false}
-              @change=${(e: Event) => this._set('considerar_custo_terreno', (e.target as HTMLInputElement).checked)} />
-            <label>Considerar custo de aquisição do terreno</label>
+          <div class="checks">
+            <urbi-checkbox
+              label="Considerar custo de aquisição do terreno"
+              ?desabilitado=${dis}
+              ?marcado=${this.form.considerar_custo_terreno !== false}
+              @urbi:checkbox-change=${(e: CustomEvent) => this._set('considerar_custo_terreno', e.detail.marcado)}
+            ></urbi-checkbox>
           </div>
-          ${lot ? this._toggle('infra_modo', [{ v: 'pct_vgv', l: '% VGV' }, { v: 'valor_m2', l: 'R$/m²' }], 'Infraestrutura', dis) : nothing}
-          ${this._toggle('projetos_modo', [{ v: 'pct_vgv', l: '% VGV' }, { v: 'valor_fixo', l: 'R$ fixo' }], 'Projetos', dis)}
-          <div class="grid">${custos.map((c) => this._input(c, dis))}</div>
+          <div class="grid">
+            ${lot ? this._modo('infra_modo', [{ valor: 'pct_vgv', rotulo: '% VGV' }, { valor: 'valor_m2', rotulo: 'R$/m²' }], 'Infraestrutura', dis) : nothing}
+            ${this._modo('projetos_modo', [{ valor: 'pct_vgv', rotulo: '% VGV' }, { valor: 'valor_fixo', rotulo: 'R$ fixo' }], 'Projetos', dis)}
+            ${custos.map((c) => this._input(c, dis))}
+          </div>
         </div>
 
         <div class="secao">
           <h4>Impostos e deduções</h4>
-          <div class="check">
-            <input type="checkbox" ?disabled=${dis} .checked=${!!this.form.sujeito_ret}
-              @change=${(e: Event) => this._set('sujeito_ret', (e.target as HTMLInputElement).checked)} />
-            <label>Sujeito a RET (alíquota fixa ${this.aliquotaRet}%)</label>
+          <div class="checks">
+            <urbi-checkbox
+              label="Sujeito a RET (alíquota fixa ${this.aliquotaRet}%)"
+              ?desabilitado=${dis}
+              ?marcado=${!!this.form.sujeito_ret}
+              @urbi:checkbox-change=${(e: CustomEvent) => this._set('sujeito_ret', e.detail.marcado)}
+            ></urbi-checkbox>
           </div>
           <div class="grid">${DEDUCOES.map((c) => this._input(c, dis || (c.k === 'imposto_percentual' && !!this.form.sujeito_ret)))}</div>
         </div>
 
         <div class="secao">
           <h4>Permuta física</h4>
-          ${this._toggle('permuta_fisica_modo', [{ v: 'area_m2', l: 'm²' }, { v: 'pct_area_venda', l: '% área venda' }], 'Modo', dis)}
           <div class="grid">
+            ${this._modo('permuta_fisica_modo', [{ valor: 'area_m2', rotulo: 'm²' }, { valor: 'pct_area_venda', rotulo: '% área venda' }], 'Modo', dis)}
             ${this._input({ k: 'permuta_fisica_area_m2', label: 'Permuta física (m²)', t: 'num', sufixo: 'm²' }, dis || this.form.permuta_fisica_modo === 'pct_area_venda')}
             ${this._input({ k: 'permuta_fisica_pct', label: 'Permuta física (% área venda)', t: 'num', sufixo: '%' }, dis || this.form.permuta_fisica_modo !== 'pct_area_venda')}
           </div>
         </div>
 
-        ${this.editavel ? html`<div class="acoes">
-          <button class="btn-cta" ?disabled=${this.salvando} @click=${this._salvar}>${this.salvando ? 'Salvando…' : 'Salvar premissas'}</button>
-        </div>` : html`<p class="sec">Somente leitura neste status/função.</p>`}
-      </div>
+        ${this.editavel
+          ? html`<div class="form-acoes">
+              <urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar premissas</urbi-botao>
+            </div>`
+          : html`<p class="sec">Somente leitura neste status/função.</p>`}
+      </urbi-card>
 
       ${this._renderResumo(lot)}
     `;
   }
 
-  private _input(c: Campo, dis: boolean) {
+  private _input(c: Campo, dis: boolean): TemplateResult {
     if (c.t === 'txt') {
-      return html`<div class="campo campo-in">
-        <label>${c.label}</label>
-        <input type="text" ?disabled=${dis} .value=${String(this.form[c.k] ?? '')}
-          @input=${(e: Event) => this._set(c.k, (e.target as HTMLInputElement).value)} />
-      </div>`;
+      return html`<urbi-input
+        label=${c.label} ?desabilitado=${dis}
+        .valor=${String(this.form[c.k] ?? '')}
+        @urbi:input-change=${(e: CustomEvent) => this._set(c.k, e.detail.valor)}
+      ></urbi-input>`;
     }
-    return html`<div class="campo campo-in">
-      <label>${c.label}</label>
-      <input type="number" ?disabled=${dis} .value=${String(this.form[c.k] ?? '')}
-        @input=${(e: Event) => this._set(c.k, (e.target as HTMLInputElement).value)} />
-      ${c.sufixo ? html`<span class="suf">${c.sufixo}</span>` : nothing}
-    </div>`;
+    return html`<urbi-input-numero
+      label=${c.label} sufixo=${c.sufixo ?? ''} ?desabilitado=${dis}
+      .valor=${this._num(c.k)}
+      @urbi:input-numero-change=${(e: CustomEvent) => this._set(c.k, e.detail.valor)}
+    ></urbi-input-numero>`;
   }
 
-  private _toggle(k: string, ops: { v: string; l: string }[], rotulo: string, dis: boolean) {
-    const atual = this.form[k] ?? ops[0].v;
-    return html`<div class="campo">
-      <label>${rotulo}</label>
-      <div class="toggle">
-        ${ops.map((o) => html`<button class=${atual === o.v ? 'on' : ''} ?disabled=${dis} @click=${() => this._set(k, o.v)}>${o.l}</button>`)}
-      </div>
-    </div>`;
+  private _modo(k: string, ops: Opcao[], rotulo: string, dis: boolean): TemplateResult {
+    return html`<urbi-select
+      label=${rotulo} ?desabilitado=${dis}
+      .valor=${this.form[k] ?? ops[0].valor}
+      .opcoes=${ops}
+      @urbi:select-change=${(e: CustomEvent) => this._set(k, e.detail.valor)}
+    ></urbi-select>`;
   }
 
   private _benchmark(campo: string): any { return this.benchmarks.find((b) => b.campo === campo); }
 
-  private _renderResumo(lot: boolean) {
+  private _renderResumo(lot: boolean): TemplateResult {
     const p = calcularProforma(this._entradaProforma());
-    const kpis: { rot: string; val: string; bm?: { ok: boolean } }[] = [];
+    const kpis: { rot: string; val: string; variante: string }[] = [];
+    const variante = (bm: any | undefined, ok: () => boolean) => (bm ? (ok() ? 'sucesso' : 'erro') : '');
 
     if (lot) {
       const ef = this._benchmark('eficiencia_aproveitamento');
       kpis.push(
-        { rot: 'Área da gleba', val: `${fmtNum(p.areaTerreno)} m²` },
-        { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²` },
-        { rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), bm: ef ? { ok: p.eficienciaPct >= Number(ef.valor) } : undefined },
-        { rot: 'VGV', val: fmtR$(p.vgv) },
-        { rot: 'Nº de lotes', val: fmtNum(p.numUnidades) },
-        { rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct) },
+        { rot: 'Área da gleba', val: `${fmtNum(p.areaTerreno)} m²`, variante: '' },
+        { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²`, variante: '' },
+        { rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: variante(ef, () => p.eficienciaPct >= Number(ef.valor)) },
+        { rot: 'VGV', val: fmtR$(p.vgv), variante: '' },
+        { rot: 'Nº de lotes', val: fmtNum(p.numUnidades), variante: '' },
+        { rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: '' },
       );
     } else {
       const co = this._benchmark('custo_obras_vgv');
       const ml = this._benchmark('margem_liquida');
       kpis.push(
-        { rot: 'Área privativa total', val: `${fmtNum(p.areaPrivativa)} m²` },
-        { rot: 'Área construída', val: `${fmtNum(p.areaConstruida)} m²` },
-        { rot: 'Nº de unidades', val: fmtNum(p.numUnidades) },
-        { rot: 'Preço médio/unid.', val: fmtR$(p.precoMedioUnidade) },
-        { rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), bm: co ? { ok: p.custoObrasVgvPct <= Number(co.valor) } : undefined },
-        { rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), bm: ml ? { ok: p.margemLiquidaPct >= Number(ml.valor) } : undefined },
+        { rot: 'Área privativa total', val: `${fmtNum(p.areaPrivativa)} m²`, variante: '' },
+        { rot: 'Área construída', val: `${fmtNum(p.areaConstruida)} m²`, variante: '' },
+        { rot: 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
+        { rot: 'Preço médio/unid.', val: fmtR$(p.precoMedioUnidade), variante: '' },
+        { rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: variante(co, () => p.custoObrasVgvPct <= Number(co.valor)) },
+        { rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: variante(ml, () => p.margemLiquidaPct >= Number(ml.valor)) },
       );
     }
 
-    // Preço sugerido/m² a partir do piso de resultado final
     const piso = this._benchmark('resultado_final');
     let precoSug: number | null = null;
     if (piso && Number(piso.valor) > 0) precoSug = precoSugeridoM2(this._entradaProforma(), Number(piso.valor));
 
     return html`
-      <div class="card" style="margin-top:16px">
-        <h3 style="margin-top:0">Resumo</h3>
+      <urbi-card titulo="Resumo">
         <div class="kpis">
           ${kpis.map((k) => html`
-            <div class="kpi ${k.bm ? (k.bm.ok ? 'ok' : 'ruim') : ''}">
-              <div class="rot">${k.rot}</div>
-              <div class="val">${k.val}</div>
-            </div>
+            <urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>
           `)}
         </div>
-        ${piso ? html`
-          <div class="preco-sugerido">
-            Preço sugerido/m² para atingir o piso de resultado final (${fmtNum(Number(piso.valor))}%):
-            <strong>${precoSug !== null ? fmtR$(precoSug) + '/m²' : 'inatingível com as premissas atuais'}</strong>
-          </div>
-        ` : html`<p class="sec" style="margin-top:12px">Defina o benchmark “resultado_final” para calcular o preço sugerido/m².</p>`}
-      </div>
+        ${piso
+          ? html`<urbi-banner variante="alerta">
+              Preço sugerido/m² para atingir o piso de resultado final (${fmtNum(Number(piso.valor))}%):
+              <strong>${precoSug !== null ? fmtR$(precoSug) + '/m²' : 'inatingível com as premissas atuais'}</strong>
+            </urbi-banner>`
+          : html`<p class="sec">Defina o benchmark “resultado_final” para calcular o preço sugerido/m².</p>`}
+      </urbi-card>
     `;
   }
 

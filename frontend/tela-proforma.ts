@@ -1,12 +1,12 @@
-import { LitElement, html, css, nothing } from 'lit';
+import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { estilosBase } from './viab-shared.js';
+import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
 import { exportarPDF, exportarExcel } from './exportar.js';
 
-interface Linha { l: string; v: number; cls?: string; soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean; }
+interface Linha { l: string; v: number; cls?: 'sub' | 'res'; soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean; isPct?: boolean; }
 
 type VarSens = 'preco' | 'permuta_fisica' | 'permuta_financeira' | 'custo_infra' | 'custo_obras';
 
@@ -20,24 +20,12 @@ export class ViabTelaProforma extends LitElement {
   @state() private mostrarSens = false;
   @state() private varSens: VarSens = 'preco';
 
-  static styles = [estilosBase, css`
-    :host { display: block; }
+  static styles = [estiloConteudo, css`
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
-    .kpi { background: var(--cor-fundo, #0D1B2A); border: 1px solid var(--cor-borda, rgba(255,255,255,0.1)); border-radius: 8px; padding: 12px; }
-    .kpi .rot { font-size: 0.7rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); text-transform: uppercase; }
-    .kpi .val { font-size: 1.1rem; font-weight: 700; margin-top: 4px; }
-    .kpi.ok .val { color: var(--cor-sucesso, #13A98D); }
-    .kpi.ruim .val { color: var(--cor-erro, #D45A3A); }
-    table.pf { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
-    table.pf td { padding: 6px 10px; border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.06)); }
-    table.pf td.v { text-align: right; font-variant-numeric: tabular-nums; }
-    tr.sub td { font-weight: 700; border-top: 1px solid var(--cor-borda, rgba(255,255,255,0.15)); }
-    tr.res td { font-weight: 700; color: var(--cor-primaria-solida, #2AA9E0); border-top: 2px solid var(--cor-primaria-solida, #2AA9E0); }
-    tr.res.neg td { color: var(--cor-erro, #D45A3A); border-top-color: var(--cor-erro, #D45A3A); }
-    .barra-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
-    .comp td.delta.pos { color: var(--cor-sucesso, #13A98D); }
-    .comp td.delta.neg { color: var(--cor-erro, #D45A3A); }
-    .disabled-note { opacity: 0.6; font-size: 0.8rem; }
+    .barra-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .sens-var { max-width: 320px; margin-bottom: 12px; }
+    urbi-card + urbi-card { margin-top: 16px; }
+    strong.total { color: var(--cor-texto-forte, rgba(255,255,255,0.95)); }
   `];
 
   connectedCallback() { super.connectedCallback(); this._init(); }
@@ -62,38 +50,36 @@ export class ViabTelaProforma extends LitElement {
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
     const p = calcularProforma(this._entrada());
     return html`
-      ${this._renderKpis(p, lot)}
-      <div class="card">
-        <h3 style="margin-top:0">Proforma</h3>
+      ${this._renderKpis(p)}
+      <urbi-card titulo="Proforma">
         ${this._renderTabela(p, lot)}
         <div class="barra-acoes">
-          <button class="btn-sec btn-sm" @click=${() => this._salvarCenario(p)}>Salvar cenário</button>
-          ${this.cenarios.length > 0 ? html`<button class="btn-sec btn-sm" @click=${() => this.cenarios = []}>Limpar cenários</button>` : nothing}
-          <button class="btn-sec btn-sm" @click=${() => this.mostrarSens = !this.mostrarSens}>${this.mostrarSens ? 'Ocultar' : 'Mostrar'} sensibilidade</button>
-          <button class="btn-sec btn-sm" @click=${() => this._exportar('excel')}>Exportar Excel</button>
-          <button class="btn-sec btn-sm" @click=${() => this._exportar('pdf')}>Exportar PDF</button>
+          <urbi-botao variante="secundario" pequeno icone="fa-solid fa-floppy-disk" @click=${() => this._salvarCenario(p)}>Salvar cenário</urbi-botao>
+          ${this.cenarios.length > 0 ? html`<urbi-botao variante="fantasma" pequeno @click=${() => this.cenarios = []}>Limpar cenários</urbi-botao>` : nothing}
+          <urbi-botao variante="fantasma" pequeno @click=${() => this.mostrarSens = !this.mostrarSens}>${this.mostrarSens ? 'Ocultar' : 'Mostrar'} sensibilidade</urbi-botao>
+          <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-excel" @click=${() => this._exportar('excel')}>Exportar Excel</urbi-botao>
+          <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-pdf" @click=${() => this._exportar('pdf')}>Exportar PDF</urbi-botao>
         </div>
-      </div>
+      </urbi-card>
       ${this.cenarios.length > 0 ? this._renderComparacao() : nothing}
       ${this.mostrarSens ? this._renderSensibilidade(lot) : nothing}
     `;
   }
 
-  private _renderKpis(p: Proforma, lot: boolean) {
+  private _renderKpis(p: Proforma): TemplateResult {
     const co = this._bm('custo_obras_vgv');
     const ml = this._bm('margem_liquida');
     const temPermuta = p.areaPermutaFisica > 0 || p.permutaFinResidencial > 0 || p.permutaFinNaoResidencial > 0;
-    const kpis: { rot: string; val: string; ok?: boolean }[] = [
-      { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²` },
-      { rot: 'Preço médio/unid.', val: fmtR$(p.precoMedioUnidade) },
-      { rot: 'Nº de unidades', val: fmtNum(p.numUnidades) },
+    const kpis: { rot: string; val: string; variante: string }[] = [
+      { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²`, variante: '' },
+      { rot: 'Preço médio/unid.', val: fmtR$(p.precoMedioUnidade), variante: '' },
+      { rot: 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
     ];
-    if (temPermuta) kpis.push({ rot: 'Área permutada', val: `${fmtNum(p.areaPermutaFisica)} m²` });
-    kpis.push({ rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), ok: co ? p.custoObrasVgvPct <= Number(co.valor) : undefined });
-    kpis.push({ rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), ok: ml ? p.margemLiquidaPct >= Number(ml.valor) : undefined });
+    if (temPermuta) kpis.push({ rot: 'Área permutada', val: `${fmtNum(p.areaPermutaFisica)} m²`, variante: '' });
+    kpis.push({ rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: co ? (p.custoObrasVgvPct <= Number(co.valor) ? 'sucesso' : 'erro') : '' });
+    kpis.push({ rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: ml ? (p.margemLiquidaPct >= Number(ml.valor) ? 'sucesso' : 'erro') : '' });
     return html`<div class="kpis">
-      ${kpis.map((k) => html`<div class="kpi ${k.ok === undefined ? '' : k.ok ? 'ok' : 'ruim'}">
-        <div class="rot">${k.rot}</div><div class="val">${k.val}</div></div>`)}
+      ${kpis.map((k) => html`<urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>`)}
     </div>`;
   }
 
@@ -123,44 +109,45 @@ export class ViabTelaProforma extends LitElement {
       { l: '= Resultado', v: p.resultado, cls: 'res' },
       { l: 'Resultado + permutas financeiras', v: p.resultadoComPermutasFin, ocultarSeZero: true },
       { l: 'Resultado + permutas (com físicas)', v: p.resultadoComPermutasFisicas, ocultarSeZero: true },
+      { l: 'Margem líquida', v: p.margemLiquidaPct, cls: 'res', isPct: true },
     ];
   }
 
-  private _renderTabela(p: Proforma, lot: boolean) {
+  private _renderTabela(p: Proforma, lot: boolean): TemplateResult {
     const linhas = this._linhas(p).filter((r) =>
       !(r.soLot && !lot) && !(r.soInc && lot) && !(r.ocultarSeZero && Math.abs(r.v) < 0.005));
-    return html`
-      <div style="overflow-x:auto">
-        <table class="pf">
-          <thead><tr><td>Linha</td><td class="v">R$</td><td class="v">% VGV</td></tr></thead>
-          <tbody>
-            ${linhas.map((r) => {
-              const neg = r.cls === 'res' && r.v < 0;
-              return html`<tr class="${r.cls || ''} ${neg ? 'neg' : ''}">
-                <td>${r.l}</td>
-                <td class="v">${fmtR$(r.v)}</td>
-                <td class="v">${p.vgv > 0 ? fmtPct(Math.abs(r.v) / p.vgv * 100) : '—'}</td>
-              </tr>`;
-            })}
-            <tr class="res ${p.margemLiquidaPct < 0 ? 'neg' : ''}">
-              <td>Margem líquida</td><td class="v">${fmtPct(p.margemLiquidaPct)}</td><td class="v"></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>`;
+    const colunas = [
+      {
+        id: 'linha', label: 'Linha',
+        render: (r: any) => r.cls ? html`<strong class="total">${r.l}</strong>` : html`${r.l}`,
+      },
+      {
+        id: 'rs', label: 'R$', alinhamento: 'direita',
+        render: (r: any) => {
+          if (r.isPct) return html`<urbi-badge cor=${r.v < 0 ? 'perigo' : 'sucesso'}>${fmtPct(r.v)}</urbi-badge>`;
+          const texto = fmtR$(r.v);
+          if (r.cls === 'res') return html`<urbi-badge cor=${r.v < 0 ? 'perigo' : 'sucesso'}>${texto}</urbi-badge>`;
+          if (r.cls === 'sub') return html`<strong class="total">${texto}</strong>`;
+          return html`${texto}`;
+        },
+      },
+      {
+        id: 'pct', label: '% VGV', alinhamento: 'direita',
+        valor: (r: any) => (r.isPct ? '' : p.vgv > 0 ? fmtPct(Math.abs(r.v) / p.vgv * 100) : '—'),
+      },
+    ];
+    return html`<urbi-tabela .colunas=${colunas} .linhas=${linhas}></urbi-tabela>`;
   }
 
-  // ── Comparação de cenários (transiente, máx. 2) ──
   private _salvarCenario(p: Proforma) {
     const nome = `Cenário ${this.cenarios.length + 1}`;
-    const novo = [...this.cenarios, { nome, p }];
-    this.cenarios = novo.slice(-2); // mantém no máximo os 2 últimos
+    this.cenarios = [...this.cenarios, { nome, p }].slice(-2);
     urbiVerso.notificar(`${nome} salvo (transiente).`, 'sucesso');
   }
 
-  private _renderComparacao() {
+  private _renderComparacao(): TemplateResult {
     if (this.cenarios.length < 2) {
-      return html`<div class="card" style="margin-top:16px"><p class="sec">1 cenário salvo. Ajuste as premissas e salve um segundo para comparar.</p></div>`;
+      return html`<urbi-card titulo="Comparação de cenários"><p class="sec">1 cenário salvo. Ajuste as premissas e salve um segundo para comparar.</p></urbi-card>`;
     }
     const [a, b] = this.cenarios;
     const metricas: { l: string; f: (p: Proforma) => number; pct?: boolean }[] = [
@@ -170,33 +157,31 @@ export class ViabTelaProforma extends LitElement {
       { l: 'Resultado', f: (p) => p.resultado },
       { l: 'Margem líquida', f: (p) => p.margemLiquidaPct, pct: true },
     ];
-    return html`<div class="card comp" style="margin-top:16px">
-      <h3 style="margin-top:0">Comparação de cenários</h3>
-      <div style="overflow-x:auto"><table class="pf">
-        <thead><tr><td>Métrica</td><td class="v">${a.nome}</td><td class="v">${b.nome}</td><td class="v">Δ%</td></tr></thead>
-        <tbody>
-          ${metricas.map((m) => {
-            const va = m.f(a.p), vb = m.f(b.p);
-            const delta = va !== 0 ? (vb - va) / Math.abs(va) * 100 : 0;
-            return html`<tr>
-              <td>${m.l}</td>
-              <td class="v">${m.pct ? fmtPct(va) : fmtR$(va)}</td>
-              <td class="v">${m.pct ? fmtPct(vb) : fmtR$(vb)}</td>
-              <td class="v delta ${delta >= 0 ? 'pos' : 'neg'}">${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%</td>
-            </tr>`;
-          })}
-        </tbody>
-      </table></div>
-    </div>`;
+    const fmt = (m: any, v: number) => (m.pct ? fmtPct(v) : fmtR$(v));
+    const colunas = [
+      { id: 'metrica', label: 'Métrica', valor: (m: any) => m.l },
+      { id: 'a', label: a.nome, alinhamento: 'direita', valor: (m: any) => fmt(m, m.f(a.p)) },
+      { id: 'b', label: b.nome, alinhamento: 'direita', valor: (m: any) => fmt(m, m.f(b.p)) },
+      {
+        id: 'delta', label: 'Δ%', alinhamento: 'direita',
+        render: (m: any) => {
+          const va = m.f(a.p), vb = m.f(b.p);
+          const delta = va !== 0 ? (vb - va) / Math.abs(va) * 100 : 0;
+          return html`<urbi-badge cor=${delta >= 0 ? 'sucesso' : 'perigo'}>${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%</urbi-badge>`;
+        },
+      },
+    ];
+    return html`<urbi-card titulo="Comparação de cenários">
+      <urbi-tabela .colunas=${colunas} .linhas=${metricas}></urbi-tabela>
+    </urbi-card>`;
   }
 
-  // ── Análise de sensibilidade (Bear / Base / Bull) ──
-  private _variaveis(lot: boolean): { v: VarSens; l: string }[] {
+  private _variaveis(lot: boolean): { valor: VarSens; rotulo: string }[] {
     return [
-      { v: 'preco', l: lot ? 'Preço/m² de venda' : 'Preço/m² (res + não res)' },
-      { v: 'permuta_fisica', l: 'Permuta física' },
-      { v: 'permuta_financeira', l: 'Permuta financeira' },
-      lot ? { v: 'custo_infra' as VarSens, l: 'Custo de infraestrutura' } : { v: 'custo_obras' as VarSens, l: 'Custo de obras' },
+      { valor: 'preco', rotulo: lot ? 'Preço/m² de venda' : 'Preço/m² (res + não res)' },
+      { valor: 'permuta_fisica', rotulo: 'Permuta física' },
+      { valor: 'permuta_financeira', rotulo: 'Permuta financeira' },
+      lot ? { valor: 'custo_infra' as VarSens, rotulo: 'Custo de infraestrutura' } : { valor: 'custo_obras' as VarSens, rotulo: 'Custo de obras' },
     ];
   }
 
@@ -212,7 +197,7 @@ export class ViabTelaProforma extends LitElement {
     }
   }
 
-  private _renderSensibilidade(lot: boolean) {
+  private _renderSensibilidade(lot: boolean): TemplateResult {
     const varPos = Number(this.estudo.sensibilidade_variacao_positiva_pct) || 10;
     const varNeg = Number(this.estudo.sensibilidade_variacao_negativa_pct) || 10;
     const bear = calcularProforma(this._aplicarFator(1 - varNeg / 100));
@@ -225,26 +210,24 @@ export class ViabTelaProforma extends LitElement {
       { l: 'Resultado', f: (p) => p.resultado },
       { l: 'Margem líquida', f: (p) => p.margemLiquidaPct, pct: true },
     ];
-    return html`<div class="card" style="margin-top:16px">
-      <h3 style="margin-top:0">Análise de sensibilidade</h3>
-      <div class="campo" style="max-width:320px">
-        <label>Variável estressada (−${varNeg}% / +${varPos}%)</label>
-        <select .value=${this.varSens} @change=${(e: Event) => this.varSens = (e.target as HTMLSelectElement).value as VarSens}>
-          ${this._variaveis(lot).map((o) => html`<option value=${o.v} ?selected=${o.v === this.varSens}>${o.l}</option>`)}
-        </select>
+    const fmt = (m: any, v: number) => (m.pct ? fmtPct(v) : fmtR$(v));
+    const colunas = [
+      { id: 'linha', label: 'Linha', valor: (m: any) => m.l },
+      { id: 'bear', label: 'Bear', alinhamento: 'direita', valor: (m: any) => fmt(m, m.f(bear)) },
+      { id: 'base', label: 'Base', alinhamento: 'direita', valor: (m: any) => fmt(m, m.f(base)) },
+      { id: 'bull', label: 'Bull', alinhamento: 'direita', valor: (m: any) => fmt(m, m.f(bull)) },
+    ];
+    return html`<urbi-card titulo="Análise de sensibilidade">
+      <div class="sens-var">
+        <urbi-select
+          label="Variável estressada (−${varNeg}% / +${varPos}%)"
+          .valor=${this.varSens}
+          .opcoes=${this._variaveis(lot)}
+          @urbi:select-change=${(e: CustomEvent) => this.varSens = e.detail.valor as VarSens}
+        ></urbi-select>
       </div>
-      <div style="overflow-x:auto"><table class="pf">
-        <thead><tr><td>Linha</td><td class="v">Bear</td><td class="v">Base</td><td class="v">Bull</td></tr></thead>
-        <tbody>
-          ${linhas.map((m) => html`<tr>
-            <td>${m.l}</td>
-            <td class="v">${m.pct ? fmtPct(m.f(bear)) : fmtR$(m.f(bear))}</td>
-            <td class="v">${m.pct ? fmtPct(m.f(base)) : fmtR$(m.f(base))}</td>
-            <td class="v">${m.pct ? fmtPct(m.f(bull)) : fmtR$(m.f(bull))}</td>
-          </tr>`)}
-        </tbody>
-      </table></div>
-    </div>`;
+      <urbi-tabela .colunas=${colunas} .linhas=${linhas}></urbi-tabela>
+    </urbi-card>`;
   }
 
   private _exportar(formato: string) {

@@ -1,9 +1,10 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import './tela-dashboard.js';
 import './tela-estudo.js';
 import './viabilidade-config-benchmarks.js';
 import { urbiVerso } from './viabilidade-api.js';
+import { estiloPagina } from './estilos.js';
 
 // Web component raiz da app. O shell monta <app-viabilidade> e injeta window.urbiVerso.
 // Roteamento interno por sub-rota: '/', '/terrenos', '/detalhe/{id}'.
@@ -29,14 +30,9 @@ export class AppViabilidade extends LitElement {
   @state() private rota: Rota = { tela: 'dashboard', aba: 'estudos' };
   private _cleanupRota?: () => void;
 
-  static styles = css`
-    :host {
-      display: block;
-      min-height: 100%;
-      background: var(--cor-fundo, #0D1B2A);
-      color: var(--cor-texto, rgba(255, 255, 255, 0.85));
-    }
-  `;
+  // Contrato de página: o shell provê fundo e cor; a raiz só ancora a
+  // cadeia de altura (height:100%) pras telas filhas herdarem.
+  static styles = [estiloPagina];
 
   connectedCallback() {
     super.connectedCallback();
