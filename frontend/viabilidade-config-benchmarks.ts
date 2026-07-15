@@ -1,16 +1,24 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, state, property } from 'lit/decorators.js';
 import { TIPO_LABEL } from './viab-shared.js';
 import { estiloConteudo } from './estilos.js';
+import { fmtNum } from './viab-format.js';
 import {
   urbiVerso, listarBenchmarks, atualizarBenchmark, removerBenchmark, criarBenchmark, semearBenchmarks,
 } from './viabilidade-api.js';
+import './viab-num.js';
 
 // Tela de configuração de benchmarks (manifesto telas_config.benchmarks).
 // Injetada pelo shell na área de config (Template C): NÃO renderiza
 // urbi-shell-page; o respiro vem de <urbi-hospedeiro>. Escrita é admin-only.
+//
+// Reaproveitada DENTRO do estudo (#12) via `tipoFixo` (trava o tipo e some com
+// os chips) e `somenteLeitura` (não-admin vê os valores, mas não edita).
 @customElement('viabilidade-config-benchmarks')
 export class ViabConfigBenchmarks extends LitElement {
+  @property({ attribute: false }) tipoFixo: 'loteamento' | 'incorporacao' | '' = '';
+  @property({ type: Boolean }) somenteLeitura = false;
+
   @state() private tipo: 'loteamento' | 'incorporacao' = 'loteamento';
   @state() private itens: any[] = [];
   @state() private carregando = true;
@@ -28,6 +36,7 @@ export class ViabConfigBenchmarks extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    if (this.tipoFixo) this.tipo = this.tipoFixo;
     this._carregar();
   }
 
@@ -50,23 +59,26 @@ export class ViabConfigBenchmarks extends LitElement {
     return html`
       <urbi-hospedeiro>
         <div class="topo">
-          <h2>Benchmarks</h2>
-          <urbi-botao variante="secundario" pequeno icone="fa-solid fa-seedling" @click=${this._semear}>Criar indicadores padrão</urbi-botao>
+          <h2>Benchmarks${this.tipoFixo ? html` · ${TIPO_LABEL[this.tipo]}` : nothing}</h2>
+          ${this.somenteLeitura ? nothing : html`
+            <urbi-botao variante="secundario" pequeno icone="fa-solid fa-seedling" @click=${this._semear}>Criar indicadores padrão</urbi-botao>`}
         </div>
         <p class="sec">
           Valores de referência e faixas de sensibilidade por tipo de empreendimento.
-          Edição restrita a administradores.
+          Alimentam os avisos verde/vermelho e a análise de sensibilidade.
+          ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
         </p>
 
-        <div class="chips">
-          ${(['loteamento', 'incorporacao'] as const).map((t) => html`
-            <urbi-badge
-              cor="info" interativo ?ativo=${this.tipo === t}
-              role="button" tabindex="0"
-              @click=${() => { this.tipo = t; this._carregar(); }}
-              @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.tipo = t; this._carregar(); } }}
-            >${TIPO_LABEL[t]}</urbi-badge>`)}
-        </div>
+        ${this.tipoFixo ? nothing : html`
+          <div class="chips">
+            ${(['loteamento', 'incorporacao'] as const).map((t) => html`
+              <urbi-badge
+                cor="info" interativo ?ativo=${this.tipo === t}
+                role="button" tabindex="0"
+                @click=${() => { this.tipo = t; this._carregar(); }}
+                @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.tipo = t; this._carregar(); } }}
+              >${TIPO_LABEL[t]}</urbi-badge>`)}
+          </div>`}
 
         ${this.carregando
           ? html`<urbi-loading mensagem="Carregando benchmarks..."></urbi-loading>`
@@ -74,11 +86,12 @@ export class ViabConfigBenchmarks extends LitElement {
             <urbi-tabela
               .colunas=${this._colunas()}
               .linhas=${this.itens}
-              mensagem-vazio="Nenhum benchmark. Clique em “Criar indicadores padrão”."
+              mensagem-vazio=${this.somenteLeitura ? 'Nenhum benchmark definido para este tipo.' : 'Nenhum benchmark. Clique em “Criar indicadores padrão”.'}
             ></urbi-tabela>
-            <div class="rodape">
-              <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus" @click=${() => { this.novoCampo = ''; this.mostrarNovo = true; }}>Novo indicador</urbi-botao>
-            </div>`}
+            ${this.somenteLeitura ? nothing : html`
+              <div class="rodape">
+                <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus" @click=${() => { this.novoCampo = ''; this.mostrarNovo = true; }}>Novo indicador</urbi-botao>
+              </div>`}`}
       </urbi-hospedeiro>
 
       ${this.mostrarNovo ? this._renderNovo() : nothing}
@@ -87,46 +100,61 @@ export class ViabConfigBenchmarks extends LitElement {
   }
 
   private _colunas() {
-    return [
+    const ro = this.somenteLeitura;
+    const regraLabel: Record<string, string> = {
+      atingir_ou_superar: 'atingir ou superar', nao_exceder: 'não exceder',
+    };
+    const colunas: any[] = [
       { id: 'campo', label: 'Indicador', valor: (b: any) => b.campo },
       {
         id: 'valor', label: 'Valor', alinhamento: 'direita',
-        render: (b: any) => html`<urbi-input-numero
-          .valor=${this._num(b.valor)}
-          @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { valor: e.detail.valor })}
-        ></urbi-input-numero>`,
+        render: (b: any) => ro
+          ? html`${fmtNum(Number(b.valor) || 0, 2)}`
+          : html`<viab-num
+              .valor=${this._num(b.valor)}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { valor: e.detail.valor })}
+            ></viab-num>`,
       },
       {
         id: 'regra', label: 'Regra',
-        render: (b: any) => html`<urbi-select
-          .valor=${b.regra_comparacao}
-          .opcoes=${[
-            { valor: 'atingir_ou_superar', rotulo: 'atingir ou superar' },
-            { valor: 'nao_exceder', rotulo: 'não exceder' },
-          ]}
-          @urbi:select-change=${(e: CustomEvent) => this._patch(b.id, { regra_comparacao: e.detail.valor })}
-        ></urbi-select>`,
+        render: (b: any) => ro
+          ? html`${regraLabel[b.regra_comparacao] || b.regra_comparacao}`
+          : html`<urbi-select
+              .valor=${b.regra_comparacao}
+              .opcoes=${[
+                { valor: 'atingir_ou_superar', rotulo: 'atingir ou superar' },
+                { valor: 'nao_exceder', rotulo: 'não exceder' },
+              ]}
+              @urbi:select-change=${(e: CustomEvent) => this._patch(b.id, { regra_comparacao: e.detail.valor })}
+            ></urbi-select>`,
       },
       {
         id: 'varpos', label: 'Var + (%)', alinhamento: 'direita',
-        render: (b: any) => html`<urbi-input-numero
-          .valor=${this._num(b.variacao_positiva_pct)}
-          @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { variacao_positiva_pct: e.detail.valor })}
-        ></urbi-input-numero>`,
+        render: (b: any) => ro
+          ? html`${fmtNum(Number(b.variacao_positiva_pct) || 0, 2)}`
+          : html`<viab-num
+              .valor=${this._num(b.variacao_positiva_pct)}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { variacao_positiva_pct: e.detail.valor })}
+            ></viab-num>`,
       },
       {
         id: 'varneg', label: 'Var − (%)', alinhamento: 'direita',
-        render: (b: any) => html`<urbi-input-numero
-          .valor=${this._num(b.variacao_negativa_pct)}
-          @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { variacao_negativa_pct: e.detail.valor })}
-        ></urbi-input-numero>`,
+        render: (b: any) => ro
+          ? html`${fmtNum(Number(b.variacao_negativa_pct) || 0, 2)}`
+          : html`<viab-num
+              .valor=${this._num(b.variacao_negativa_pct)}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { variacao_negativa_pct: e.detail.valor })}
+            ></viab-num>`,
       },
-      {
+    ];
+    if (!ro) {
+      colunas.push({
         id: 'acoes', label: '',
         render: (b: any) => html`<urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
           @click=${() => this.removerId = b.id}>Remover</urbi-botao>`,
-      },
-    ];
+      });
+    }
+    return colunas;
   }
 
   private _renderNovo(): TemplateResult {

@@ -44,7 +44,7 @@ rotasApelo.post('/estudos/:id/apelo-comercial/documentos', async (req: Request, 
     if (isNaN(estudoId)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
     if (!(await exigirEditor(req, estudoId))) { erro(res, 403, 'SEM_PERMISSAO', 'Apenas editores podem anexar documentos'); return; }
 
-    const { upload_id, tipo_dado, texto_adicional } = req.body;
+    const { upload_id, tipo_dado, texto_adicional, nome_arquivo } = req.body;
     if (!upload_id && !texto_adicional) {
       erro(res, 400, 'NADA_A_ANEXAR', 'Informe um arquivo (upload_id) ou texto_adicional');
       return;
@@ -53,6 +53,7 @@ rotasApelo.post('/estudos/:id/apelo-comercial/documentos', async (req: Request, 
     const doc = await req.dados!.criar('apelo_comercial_documentos', {
       apelo_id: apelo.id,
       documento: upload_id || null,
+      nome_arquivo: (upload_id && nome_arquivo) ? String(nome_arquivo).slice(0, 255) : null,
       tipo_dado: tipo_dado || null,
       texto_adicional: texto_adicional || null,
     });

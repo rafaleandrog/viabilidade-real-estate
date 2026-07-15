@@ -87,6 +87,55 @@ test('incorporação: VGV usa áreas fechadas res + não-res', () => {
   assert.ok(perto(p.areaConstruida, 1700));
 });
 
+test('incorporação: construção por R$/m² vs valor total (#4)', () => {
+  const base: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+    custo_construcao_m2: 5000, // × 1000 m² = 5.000.000
+  };
+  const porM2 = calcularProforma({ ...base, construcao_modo: 'valor_m2' });
+  assert.ok(perto(porM2.construcao, 5_000_000), `construcao m²=${porM2.construcao}`);
+
+  const total = calcularProforma({ ...base, construcao_modo: 'valor_total', construcao_valor_total: 7_500_000 });
+  assert.ok(perto(total.construcao, 7_500_000), `construcao total=${total.construcao}`);
+});
+
+test('projetos por % VGV vs valor fixo (#3)', () => {
+  const pct = calcularProforma({ ...LOT, projetos_modo: 'pct_vgv', projetos_pct: 2 });
+  assert.ok(perto(pct.projetos, 1_500_000), `projetos %=${pct.projetos}`); // 2% de 75M
+  const fixo = calcularProforma({ ...LOT, projetos_modo: 'valor_fixo', projetos_valor_fixo: 900_000 });
+  assert.ok(perto(fixo.projetos, 900_000), `projetos fixo=${fixo.projetos}`);
+});
+
+test('incorporação: permuta física reduz VGV proporcionalmente e o resultado (#14)', () => {
+  const base: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+  };
+  const sem = calcularProforma(base);
+  const com = calcularProforma({ ...base, permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10 });
+  assert.ok(perto(sem.vgv, 10_000_000));
+  assert.ok(perto(com.vgv, 9_000_000), `vgv com permuta=${com.vgv}`); // −10% da área vendável
+  assert.ok(com.resultado < sem.resultado, 'permuta física reduz o resultado');
+});
+
+test('permuta financeira reduz o resultado final (#14)', () => {
+  const sem = calcularProforma(LOT);
+  const com = calcularProforma({ ...LOT, permuta_financeira_residencial_pct: 10 });
+  // 10% do VGV residencial (75M) = 7,5M deduzidos da receita.
+  assert.ok(perto(sem.resultado - com.resultado, 7_500_000), `dif=${sem.resultado - com.resultado}`);
+});
+
+test('incorporação: nº de unidades soma R + NR (#2)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+    num_unidades_residencial: 8, num_unidades_nao_residencial: 2,
+  });
+  assert.equal(p.numUnidades, 10);
+  assert.ok(perto(p.precoMedioUnidade, 1_000_000), `preçoMedio=${p.precoMedioUnidade}`);
+});
+
 test('preço sugerido: atinge o piso do benchmark', () => {
   const piso = 40; // acima da margem atual (~38,4%)
   const preco = precoSugeridoM2(LOT, piso);

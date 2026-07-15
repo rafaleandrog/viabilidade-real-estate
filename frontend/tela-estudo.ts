@@ -6,12 +6,13 @@ import './tela-premissas.js';
 import './tela-proforma.js';
 import './tela-graficos.js';
 import './tela-apelo.js';
+import './viabilidade-config-benchmarks.js';
 import {
   urbiVerso, buscarEstudo, transicaoStatus,
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
-type Aba = 'premissas' | 'proforma' | 'graficos' | 'apelo';
+type Aba = 'premissas' | 'proforma' | 'graficos' | 'apelo' | 'benchmarks';
 const FUNCOES = [
   { valor: 'leitor', rotulo: 'Leitor' },
   { valor: 'editor', rotulo: 'Editor' },
@@ -21,10 +22,20 @@ const FUNCOES = [
 @customElement('viab-tela-estudo')
 export class ViabTelaEstudo extends LitElement {
   @property({ type: Number }) estudoId = 0;
+  // Guia ativa vem da URL (/detalhe/:id/:aba) — bug #7. Setter normaliza valores
+  // desconhecidos para 'premissas'.
+  @property({ type: String })
+  set aba(v: string) {
+    const val = (['premissas', 'proforma', 'graficos', 'apelo', 'benchmarks'] as const).includes(v as Aba) ? (v as Aba) : 'premissas';
+    const antigo = this._aba;
+    this._aba = val;
+    this.requestUpdate('aba', antigo);
+  }
+  get aba(): Aba { return this._aba; }
+  private _aba: Aba = 'premissas';
 
   @state() private estudo: any = null;
   @state() private carregando = true;
-  @state() private aba: Aba = 'premissas';
   @state() private membros: any[] = [];
   @state() private usuarios: any[] = [];
   @state() private mostrarMembros = false;
@@ -47,7 +58,12 @@ export class ViabTelaEstudo extends LitElement {
     { id: 'proforma', label: 'Proforma', icone: 'fa-solid fa-table-cells' },
     { id: 'graficos', label: 'Gráficos', icone: 'fa-solid fa-chart-pie' },
     { id: 'apelo', label: 'Apelo Comercial', icone: 'fa-solid fa-bullhorn' },
+    { id: 'benchmarks', label: 'Benchmarks', icone: 'fa-solid fa-gauge-high' },
   ];
+
+  private _ehAdmin(): boolean {
+    try { return (urbiVerso.contexto()?.nivel || '') === 'admin'; } catch { return false; }
+  }
 
   connectedCallback() {
     super.connectedCallback();
@@ -91,8 +107,9 @@ export class ViabTelaEstudo extends LitElement {
     const p = this.estudo._permissao || {};
     const st = this.estudo.status;
     return html`
-      <urbi-shell-page .titulo=${this.estudo.nome_exibicao || this.estudo.nome}
-        @viab:terreno-alterado=${() => this._carregar()}>
+      <urbi-shell-page dashboard .titulo=${this.estudo.nome_exibicao || this.estudo.nome}
+        @viab:terreno-alterado=${() => this._carregar()}
+        @viab:premissas-change=${(e: CustomEvent) => { this.estudo = { ...this.estudo, ...e.detail.dados }; }}>
         <urbi-botao-voltar slot="voltar" rotulo="Voltar aos estudos"
           @urbi:voltar=${() => urbiVerso.navegarSub('/')}></urbi-botao-voltar>
         ${this._renderAcoesStatus(p, st)}
@@ -107,7 +124,10 @@ export class ViabTelaEstudo extends LitElement {
           expandir
           .abas=${this._abas}
           .ativa=${this.aba}
-          @urbi:aba-selecionar=${(e: CustomEvent) => { this.aba = (e.detail?.id || 'premissas') as Aba; }}
+          @urbi:aba-selecionar=${(e: CustomEvent) => {
+            const id = (e.detail?.id || 'premissas') as Aba;
+            urbiVerso.navegarSub(`/detalhe/${this.estudoId}/${id}`);
+          }}
         >
           <urbi-hospedeiro slot="premissas">
             <viab-tela-premissas .estudo=${this.estudo}
@@ -121,6 +141,12 @@ export class ViabTelaEstudo extends LitElement {
           </urbi-hospedeiro>
           <urbi-hospedeiro slot="apelo">
             <viab-tela-apelo .estudo=${this.estudo} .editavel=${p.podeEditar}></viab-tela-apelo>
+          </urbi-hospedeiro>
+          <urbi-hospedeiro slot="benchmarks">
+            <viabilidade-config-benchmarks
+              .tipoFixo=${this.estudo.tipo_empreendimento}
+              ?somenteLeitura=${!this._ehAdmin()}
+            ></viabilidade-config-benchmarks>
           </urbi-hospedeiro>
         </urbi-abas>
       </urbi-shell-page>

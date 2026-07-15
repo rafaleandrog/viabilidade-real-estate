@@ -5,6 +5,7 @@ import type { Proforma } from './proforma.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 
 const R$ = (v: number) => v.toFixed(2).replace('.', ',');
+const pct1 = (v: number) => v.toFixed(1).replace('.', ',');
 
 function baixar(nome: string, conteudo: string, mime: string) {
   const blob = new Blob(['﻿' + conteudo], { type: mime });
@@ -40,9 +41,8 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     { l: '(-) Marketing global e estrutura', v: p.marketingGlobal },
     { l: '(-) Gestão e outros indiretos', v: p.gestaoIndiretos },
     { l: '= Custo indireto total', v: p.custoIndiretoTotal },
+    { l: '(memo) Permuta física entregue', v: p.valorPermutaFisica },
     { l: '= Resultado', v: p.resultado },
-    { l: 'Resultado + permutas financeiras', v: p.resultadoComPermutasFin },
-    { l: 'Resultado + permutas (com físicas)', v: p.resultadoComPermutasFisicas },
   ];
   return linhas.filter((r) => !(r.soLot && !lot) && !(r.soInc && lot));
 }
@@ -55,11 +55,11 @@ export function exportarExcel(estudo: any, p: Proforma, lot: boolean) {
   rows.push('');
   rows.push('Linha;R$;% VGV');
   for (const r of linhas) {
-    const pct = p.vgv > 0 ? (Math.abs(r.v) / p.vgv * 100).toFixed(1) : '';
+    const pct = p.vgv > 0 ? pct1(Math.abs(r.v) / p.vgv * 100) : '';
     rows.push(`${r.l};${R$(r.v)};${pct}`);
   }
   rows.push('');
-  rows.push(`Margem líquida (%);${p.margemLiquidaPct.toFixed(1)}`);
+  rows.push(`Margem líquida (%);${pct1(p.margemLiquidaPct)}`);
   const nome = (estudo.id_legivel || 'estudo') + '_proforma.csv';
   baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
 }

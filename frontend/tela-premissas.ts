@@ -1,10 +1,11 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctEntrada } from './viab-format.js';
 import { urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { calcularProforma, precoSugeridoM2, type ProformaInput } from './proforma.js';
 import './tela-terreno-nucleo.js';
+import './viab-num.js';
 
 type T = 'num' | 'txt';
 interface Campo { k: string; label: string; t: T; sufixo?: string; }
@@ -13,19 +14,46 @@ interface Opcao { valor: string; rotulo: string; }
 // Campos por seção. `so` limita a um tipo ('loteamento' | 'incorporacao').
 const CUSTOS: (Campo & { so?: string })[] = [
   { k: 'custo_terreno_m2', label: 'Custo do terreno', t: 'num', sufixo: 'R$/m²' },
-  { k: 'custo_infra_m2', label: 'Infraestrutura (R$/m²)', t: 'num', sufixo: 'R$/m²', so: 'loteamento' },
-  { k: 'infra_pct', label: 'Infraestrutura (% VGV)', t: 'num', sufixo: '%', so: 'loteamento' },
-  { k: 'custo_construcao_m2', label: 'Construção', t: 'num', sufixo: 'R$/m²', so: 'incorporacao' },
   { k: 'custo_decoracao_m2', label: 'Decoração', t: 'num', sufixo: 'R$/m²', so: 'incorporacao' },
   { k: 'taxa_gestao_pct', label: 'Gestão da construção', t: 'num', sufixo: '%', so: 'incorporacao' },
   { k: 'incorporacao_registro_pct', label: 'Incorporação e registro', t: 'num', sufixo: '% VGV', so: 'incorporacao' },
   { k: 'valor_venal_terreno_m2', label: 'Valor venal do terreno (outorga)', t: 'num', sufixo: 'R$/m²', so: 'incorporacao' },
-  { k: 'projetos_pct', label: 'Projetos', t: 'num', sufixo: '% VGV' },
   { k: 'manutencao_pct', label: 'Manutenção pós-obra', t: 'num', sufixo: '% VGV' },
   { k: 'contingencias_pct', label: 'Contingências', t: 'num', sufixo: '% VGV' },
   { k: 'stand_vendas_valor', label: 'Stand de vendas', t: 'num', sufixo: 'R$', so: 'loteamento' },
   { k: 'marketing_global_pct', label: 'Marketing global / estrutura', t: 'num', sufixo: '% VGV' },
   { k: 'gestao_indiretos_pct', label: 'Gestão e indiretos', t: 'num', sufixo: '% VGV' },
+];
+
+// Custos com opção de UNIDADE (#3/#4): um seletor de unidade + um único campo de
+// valor cuja chave/sufixo dependem da unidade escolhida. Só o campo da unidade
+// ativa é exibido (o outro fica oculto — não some do schema).
+interface CustoUnidade {
+  modoKey: string; rotulo: string; so?: string; padrao: string;
+  opcoes: { valor: string; rotulo: string; campo: string; sufixo: string }[];
+}
+const CUSTOS_UNIDADE: CustoUnidade[] = [
+  {
+    modoKey: 'infra_modo', rotulo: 'Infraestrutura', so: 'loteamento', padrao: 'pct_vgv',
+    opcoes: [
+      { valor: 'pct_vgv', rotulo: '% VGV', campo: 'infra_pct', sufixo: '% VGV' },
+      { valor: 'valor_m2', rotulo: 'R$/m²', campo: 'custo_infra_m2', sufixo: 'R$/m²' },
+    ],
+  },
+  {
+    modoKey: 'construcao_modo', rotulo: 'Construção', so: 'incorporacao', padrao: 'valor_m2',
+    opcoes: [
+      { valor: 'valor_m2', rotulo: 'R$/m²', campo: 'custo_construcao_m2', sufixo: 'R$/m²' },
+      { valor: 'valor_total', rotulo: 'R$ (total)', campo: 'construcao_valor_total', sufixo: 'R$' },
+    ],
+  },
+  {
+    modoKey: 'projetos_modo', rotulo: 'Projetos', padrao: 'pct_vgv',
+    opcoes: [
+      { valor: 'pct_vgv', rotulo: '% VGV', campo: 'projetos_pct', sufixo: '% VGV' },
+      { valor: 'valor_fixo', rotulo: 'R$ (fixo)', campo: 'projetos_valor_fixo', sufixo: 'R$' },
+    ],
+  },
 ];
 
 const DEDUCOES: Campo[] = [
@@ -56,14 +84,18 @@ const AREAS_INC: Campo[] = [
   { k: 'area_pvt_r_aberta', label: 'Área PVT R Aberta', t: 'num', sufixo: 'm²' },
   { k: 'area_pvt_nr_aberta', label: 'Área PVT NR Aberta', t: 'num', sufixo: 'm²' },
   { k: 'area_comum_total', label: 'Área comum total', t: 'num', sufixo: 'm²' },
-  { k: 'num_unidades', label: 'Nº de unidades', t: 'num' },
+  { k: 'num_unidades_residencial', label: 'Nº de unidades residenciais', t: 'num' },
+  { k: 'num_unidades_nao_residencial', label: 'Nº de unidades não residenciais', t: 'num' },
   { k: 'preco_venda_m2_residencial', label: 'Preço venda residencial', t: 'num', sufixo: 'R$/m²' },
   { k: 'preco_venda_m2_nao_residencial', label: 'Preço venda não residencial', t: 'num', sufixo: 'R$/m²' },
 ];
 
 const TODOS_NUM = new Set<string>([
   ...CUSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC,
-].map((c) => c.k).concat(['permuta_fisica_area_m2', 'permuta_fisica_pct', 'terreno_manual_area']));
+].map((c) => c.k).concat(
+  ['permuta_fisica_area_m2', 'permuta_fisica_pct', 'terreno_manual_area'],
+  CUSTOS_UNIDADE.flatMap((cu) => cu.opcoes.map((o) => o.campo)),
+));
 
 @customElement('viab-tela-premissas')
 export class ViabTelaPremissas extends LitElement {
@@ -83,23 +115,29 @@ export class ViabTelaPremissas extends LitElement {
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
     }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .kpis urbi-kpi { min-width: 0; }
     .checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
     .form-acoes { display: flex; justify-content: flex-end; margin-top: 8px; }
     urbi-card + urbi-card { margin-top: 16px; }
     urbi-banner { margin-top: 12px; }
   `];
 
+  private _idCarregado: number | null = null;
+
   connectedCallback() {
     super.connectedCallback();
     this._init();
   }
   updated(ch: Map<string, unknown>) {
-    if (ch.has('estudo')) this._init();
+    // Só recarrega (e refaz o fetch de benchmarks/config) quando muda o ESTUDO
+    // de fato — não a cada tecla propagada de volta via viab:premissas-change (#6).
+    if (ch.has('estudo') && this.estudo?.id !== this._idCarregado) this._init();
   }
 
   private async _init() {
     if (!this.estudo) return;
+    this._idCarregado = this.estudo.id ?? null;
     this.form = { ...this.estudo };
     try {
       const [bm, cfg] = await Promise.all([listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig()]);
@@ -112,7 +150,14 @@ export class ViabTelaPremissas extends LitElement {
     return { ...this.form, aliquota_ret_pct: this.aliquotaRet } as ProformaInput;
   }
 
-  private _set(k: string, v: any) { this.form = { ...this.form, [k]: v }; }
+  private _set(k: string, v: any) {
+    this.form = { ...this.form, [k]: v };
+    // Propaga em tempo real para a tela do estudo, que reflete em Proforma e
+    // Gráficos instantaneamente (#6). Não persiste — persistência é no Salvar.
+    this.dispatchEvent(new CustomEvent('viab:premissas-change', {
+      detail: { dados: this.form }, bubbles: true, composed: true,
+    }));
+  }
 
   private _num(k: string): number | null {
     const v = this.form[k];
@@ -159,9 +204,10 @@ export class ViabTelaPremissas extends LitElement {
             ></urbi-checkbox>
           </div>
           <div class="grid">
-            ${lot ? this._modo('infra_modo', [{ valor: 'pct_vgv', rotulo: '% VGV' }, { valor: 'valor_m2', rotulo: 'R$/m²' }], 'Infraestrutura', dis) : nothing}
-            ${this._modo('projetos_modo', [{ valor: 'pct_vgv', rotulo: '% VGV' }, { valor: 'valor_fixo', rotulo: 'R$ fixo' }], 'Projetos', dis)}
-            ${custos.map((c) => this._input(c, dis))}
+            ${CUSTOS_UNIDADE
+              .filter((cu) => !cu.so || cu.so === this.estudo.tipo_empreendimento)
+              .map((cu) => this._custoUnidade(cu, dis))}
+            ${custos.map((c) => this._input(c, dis, c.k === 'custo_terreno_m2' && this.form.considerar_custo_terreno === false))}
           </div>
         </div>
 
@@ -175,15 +221,18 @@ export class ViabTelaPremissas extends LitElement {
               @urbi:checkbox-change=${(e: CustomEvent) => this._set('sujeito_ret', e.detail.marcado)}
             ></urbi-checkbox>
           </div>
-          <div class="grid">${DEDUCOES.map((c) => this._input(c, dis || (c.k === 'imposto_percentual' && !!this.form.sujeito_ret)))}</div>
+          <div class="grid">${DEDUCOES.map((c) => {
+            const bloqImposto = c.k === 'imposto_percentual' && !!this.form.sujeito_ret;
+            return this._input(c, dis || bloqImposto, bloqImposto);
+          })}</div>
         </div>
 
         <div class="secao">
           <h4>Permuta física</h4>
           <div class="grid">
             ${this._modo('permuta_fisica_modo', [{ valor: 'area_m2', rotulo: 'm²' }, { valor: 'pct_area_venda', rotulo: '% área venda' }], 'Modo', dis)}
-            ${this._input({ k: 'permuta_fisica_area_m2', label: 'Permuta física (m²)', t: 'num', sufixo: 'm²' }, dis || this.form.permuta_fisica_modo === 'pct_area_venda')}
-            ${this._input({ k: 'permuta_fisica_pct', label: 'Permuta física (% área venda)', t: 'num', sufixo: '%' }, dis || this.form.permuta_fisica_modo !== 'pct_area_venda')}
+            ${this._input({ k: 'permuta_fisica_area_m2', label: 'Permuta física (m²)', t: 'num', sufixo: 'm²' }, dis || this.form.permuta_fisica_modo === 'pct_area_venda', this.form.permuta_fisica_modo === 'pct_area_venda')}
+            ${this._input({ k: 'permuta_fisica_pct', label: 'Permuta física (% área venda)', t: 'num', sufixo: '%' }, dis || this.form.permuta_fisica_modo !== 'pct_area_venda', this.form.permuta_fisica_modo !== 'pct_area_venda')}
           </div>
         </div>
 
@@ -198,7 +247,9 @@ export class ViabTelaPremissas extends LitElement {
     `;
   }
 
-  private _input(c: Campo, dis: boolean): TemplateResult {
+  // `aten` (bug #15): campo cujo dado não entra no cálculo naquele momento
+  // (ex.: custo do terreno desligado, lado não escolhido da permuta) — fica cinza.
+  private _input(c: Campo, dis: boolean, aten = false): TemplateResult {
     if (c.t === 'txt') {
       return html`<urbi-input
         label=${c.label} ?desabilitado=${dis}
@@ -206,11 +257,31 @@ export class ViabTelaPremissas extends LitElement {
         @urbi:input-change=${(e: CustomEvent) => this._set(c.k, e.detail.valor)}
       ></urbi-input>`;
     }
-    return html`<urbi-input-numero
-      label=${c.label} sufixo=${c.sufixo ?? ''} ?desabilitado=${dis}
+    return html`<viab-num
+      label=${c.label} sufixo=${c.sufixo ?? ''} ?desabilitado=${dis} ?atenuado=${aten}
       .valor=${this._num(c.k)}
       @urbi:input-numero-change=${(e: CustomEvent) => this._set(c.k, e.detail.valor)}
-    ></urbi-input-numero>`;
+    ></viab-num>`;
+  }
+
+  // Custo com opção de unidade (#3/#4): seletor de unidade + campo de valor
+  // da unidade ativa (o outro fica oculto). O label do campo carrega a unidade.
+  private _custoUnidade(cu: CustoUnidade, dis: boolean): TemplateResult {
+    const modo = this.form[cu.modoKey] ?? cu.padrao;
+    const op = cu.opcoes.find((o) => o.valor === modo) ?? cu.opcoes[0];
+    return html`
+      <urbi-select
+        label=${`${cu.rotulo} — unidade`} ?desabilitado=${dis}
+        .valor=${modo}
+        .opcoes=${cu.opcoes.map((o) => ({ valor: o.valor, rotulo: o.rotulo }))}
+        @urbi:select-change=${(e: CustomEvent) => this._set(cu.modoKey, e.detail.valor)}
+      ></urbi-select>
+      <viab-num
+        label=${cu.rotulo} sufixo=${op.sufixo} ?desabilitado=${dis}
+        .valor=${this._num(op.campo)}
+        @urbi:input-numero-change=${(e: CustomEvent) => this._set(op.campo, e.detail.valor)}
+      ></viab-num>
+    `;
   }
 
   private _modo(k: string, ops: Opcao[], rotulo: string, dis: boolean): TemplateResult {
@@ -265,7 +336,7 @@ export class ViabTelaPremissas extends LitElement {
         </div>
         ${piso
           ? html`<urbi-banner variante="alerta">
-              Preço sugerido/m² para atingir o piso de resultado final (${fmtNum(Number(piso.valor))}%):
+              Preço sugerido/m² para atingir o piso de resultado final (${fmtPctEntrada(Number(piso.valor))}):
               <strong>${precoSug !== null ? fmtR$(precoSug) + '/m²' : 'inatingível com as premissas atuais'}</strong>
             </urbi-banner>`
           : html`<p class="sec">Defina o benchmark “resultado_final” para calcular o preço sugerido/m².</p>`}

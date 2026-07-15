@@ -13,13 +13,14 @@ interface Rota {
   tela: 'dashboard' | 'estudo';
   aba?: 'estudos' | 'terrenos';
   estudoId?: number;
+  abaEstudo?: string; // guia dentro do estudo: premissas|proforma|graficos|apelo
 }
 
 function parsearSubRota(sub: string): Rota {
   const partes = (sub || '').replace(/^\//, '').split('/').filter(Boolean);
   if (partes[0] === 'detalhe' && partes[1]) {
     const id = parseInt(partes[1]);
-    if (!isNaN(id)) return { tela: 'estudo', estudoId: id };
+    if (!isNaN(id)) return { tela: 'estudo', estudoId: id, abaEstudo: partes[2] };
   }
   if (partes[0] === 'terrenos') return { tela: 'dashboard', aba: 'terrenos' };
   return { tela: 'dashboard', aba: 'estudos' };
@@ -47,7 +48,10 @@ export class AppViabilidade extends LitElement {
 
   render() {
     if (this.rota.tela === 'estudo') {
-      return html`<viab-tela-estudo .estudoId=${this.rota.estudoId || 0}></viab-tela-estudo>`;
+      return html`<viab-tela-estudo
+        .estudoId=${this.rota.estudoId || 0}
+        .aba=${this.rota.abaEstudo || 'premissas'}
+      ></viab-tela-estudo>`;
     }
     return html`<viab-tela-dashboard .aba=${this.rota.aba || 'estudos'}></viab-tela-dashboard>`;
   }
