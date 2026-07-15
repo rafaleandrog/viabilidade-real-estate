@@ -14,7 +14,9 @@
 export interface ProformaInput {
   tipo_empreendimento: string;
   // terreno
-  terreno_manual_area?: number | string | null;
+  origem_terreno?: string;                          // 'nucleo' | 'manual'
+  terreno_manual_area?: number | string | null;     // usado quando origem = manual
+  area_terreno_nucleo?: number | string | null;     // área somada dos imóveis do Núcleo (origem = nucleo)
   // loteamento — áreas (% da gleba)
   app_pct?: number | string; faixas_nao_edificaveis_pct?: number | string;
   sistema_viario_pct?: number | string; elup_pct?: number | string;
@@ -75,7 +77,11 @@ const n = (v: any): number => Number(v) || 0;
 
 export function calcularProforma(e: ProformaInput): Proforma {
   const lot = e.tipo_empreendimento === 'loteamento';
-  const areaTerreno = n(e.terreno_manual_area);
+  // Área do terreno: do Núcleo (soma das glebas/lotes vinculados) quando a
+  // origem é Núcleo; senão, a área informada manualmente no estudo.
+  const areaTerreno = e.origem_terreno === 'nucleo'
+    ? n(e.area_terreno_nucleo)
+    : n(e.terreno_manual_area);
 
   // ── Áreas + VGV ──
   let areaVendavel = 0, areaPrivativa = 0, areaConstruida = 0;

@@ -18,6 +18,7 @@
         "origem_terreno":      { "tipo": "texto", "limite": 10, "opcoes": ["nucleo", "manual"], "padrao": "manual" },
         "terreno_manual_nome": { "tipo": "texto", "limite": 200 },
         "terreno_manual_area": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "area_terreno_nucleo": { "tipo": "decimal", "precisao": 12, "escala": 2 },
 
         "area_media_lote_m2":            { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "preco_venda_m2":                { "tipo": "decimal", "precisao": 12, "escala": 2 },

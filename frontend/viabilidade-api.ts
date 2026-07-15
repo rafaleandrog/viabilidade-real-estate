@@ -3,6 +3,9 @@
 
 interface UrbiVersoApi {
   api(url: string, opts?: RequestInit): Promise<any>;
+  // Acesso ao Núcleo compartilhado. Monta /api/<appId>/nucleo/... e aplica os
+  // gates do manifesto (permissoes_nucleo) + toggles do admin. Lança em não-2xx.
+  nucleo(url: string, opts?: RequestInit): Promise<any>;
   usuario(): { id: number; nome: string; email: string; tipo: string; avatar_url: string };
   contexto(): { nivel: string | null; roles: string[] };
   navegar(rota: string): void;
@@ -104,15 +107,27 @@ export function semearBenchmarks(): Promise<any> {
   return urbiVerso.api(`${APP}/benchmarks/semear`, { method: 'POST' });
 }
 
-// ── Config e Núcleo ──
+// ── Config ──
 export function buscarConfig(): Promise<any> {
   return urbiVerso.api(`${APP}/config`);
 }
-export function listarGlebas(): Promise<any> {
-  return urbiVerso.api(`${APP}/nucleo/glebas`);
+
+// ── Núcleo (glebas/lotes/imóveis) ──
+// Consumo padrão via urbiVerso.nucleo → /api/viabilidade/nucleo/... (o shell
+// provê essas rotas para apps que declaram dependencias_nucleo no manifesto).
+// Loteamento usa glebas; Incorporação usa lotes. Só leitura (flag "ler").
+export function listarGlebasNucleo(busca = ''): Promise<any> {
+  const qs = new URLSearchParams({ por_pagina: '200' });
+  if (busca) qs.set('busca', busca);
+  return urbiVerso.nucleo(`/glebas?${qs}`);
 }
-export function listarLotes(): Promise<any> {
-  return urbiVerso.api(`${APP}/nucleo/lotes`);
+export function listarLotesNucleo(busca = ''): Promise<any> {
+  const qs = new URLSearchParams({ por_pagina: '200' });
+  if (busca) qs.set('busca', busca);
+  return urbiVerso.nucleo(`/lotes?${qs}`);
+}
+export function buscarImovelNucleo(id: number): Promise<any> {
+  return urbiVerso.nucleo(`/imoveis/${id}`);
 }
 
 // ── Apelo Comercial (IA) ──
