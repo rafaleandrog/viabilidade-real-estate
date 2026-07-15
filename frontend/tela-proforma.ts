@@ -27,11 +27,18 @@ export class ViabTelaProforma extends LitElement {
     strong.total { color: var(--cor-texto-forte, rgba(255,255,255,0.95)); }
   `];
 
+  private _idCarregado: number | null = null;
+
   connectedCallback() { super.connectedCallback(); this._init(); }
-  updated(ch: Map<string, unknown>) { if (ch.has('estudo')) this._init(); }
+  updated(ch: Map<string, unknown>) {
+    // Recarrega benchmarks só quando muda o estudo; edições ao vivo de Premissas
+    // (#6) só atualizam os números, não os benchmarks.
+    if (ch.has('estudo') && this.estudo?.id !== this._idCarregado) this._init();
+  }
 
   private async _init() {
     if (!this.estudo) return;
+    this._idCarregado = this.estudo.id ?? null;
     try {
       const [bm, cfg] = await Promise.all([listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig()]);
       this.benchmarks = bm?.dados || [];
@@ -158,9 +165,16 @@ export class ViabTelaProforma extends LitElement {
   private _renderSensibilidade(lot: boolean): TemplateResult {
     const varPos = Number(this.estudo.sensibilidade_variacao_positiva_pct) || 10;
     const varNeg = Number(this.estudo.sensibilidade_variacao_negativa_pct) || 10;
-    const bear = calcularProforma(this._aplicarFator(1 - varNeg / 100));
+    // Bull = cenário otimista (melhor resultado); Bear = pessimista. Para o
+    // PREÇO, otimista é preço maior. Para variáveis de CUSTO/permuta (que pioram
+    // o resultado quando sobem), o Bull é uma REDUÇÃO — a conta é invertida
+    // em relação ao preço (bug #13).
+    const custoLike = this.varSens !== 'preco';
+    const fatorBull = custoLike ? 1 - varPos / 100 : 1 + varPos / 100;
+    const fatorBear = custoLike ? 1 + varNeg / 100 : 1 - varNeg / 100;
+    const bear = calcularProforma(this._aplicarFator(fatorBear));
     const base = calcularProforma(this._aplicarFator(1));
-    const bull = calcularProforma(this._aplicarFator(1 + varPos / 100));
+    const bull = calcularProforma(this._aplicarFator(fatorBull));
     const linhas: { l: string; f: (p: Proforma) => number; pct?: boolean }[] = [
       { l: 'VGV', f: (p) => p.vgv },
       { l: 'Receita líquida', f: (p) => p.receitaLiquida },

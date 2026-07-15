@@ -39,7 +39,8 @@ export interface ProformaInput {
   projetos_modo?: string; projetos_pct?: number | string; projetos_valor_fixo?: number | string;
   licenciamento_modo?: string; licenciamento_pct?: number | string; licenciamento_valor_fixo?: number | string;
   infra_modo?: string; custo_infra_m2?: number | string; infra_pct?: number | string;
-  incorporacao_registro_pct?: number | string; custo_construcao_m2?: number | string;
+  incorporacao_registro_pct?: number | string;
+  construcao_modo?: string; custo_construcao_m2?: number | string; construcao_valor_total?: number | string;
   taxa_gestao_pct?: number | string; custo_decoracao_m2?: number | string;
   manutencao_pct?: number | string; contingencias_pct?: number | string; stand_vendas_valor?: number | string;
   // custos indiretos
@@ -127,7 +128,9 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const infraestrutura = lot
     ? (e.infra_modo === 'valor_m2' ? n(e.custo_infra_m2) * areaVendavel : vgv * n(e.infra_pct) / 100)
     : 0;
-  const construcao = lot ? 0 : n(e.custo_construcao_m2) * areaPrivativa;
+  // Construção: por área (R$/m² × área privativa) ou valor total em R$ (#4).
+  const construcao = lot ? 0
+    : (e.construcao_modo === 'valor_total' ? n(e.construcao_valor_total) : n(e.custo_construcao_m2) * areaPrivativa);
   const decoracao = lot ? 0 : n(e.custo_decoracao_m2) * areaPrivativa;
   const custoTotalConstrucao = lot ? infraestrutura : (construcao + decoracao);
   const gestaoConstrucao = lot ? 0 : custoTotalConstrucao * n(e.taxa_gestao_pct) / 100;

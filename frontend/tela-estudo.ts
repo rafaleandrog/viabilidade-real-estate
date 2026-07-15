@@ -102,7 +102,8 @@ export class ViabTelaEstudo extends LitElement {
     const st = this.estudo.status;
     return html`
       <urbi-shell-page dashboard .titulo=${this.estudo.nome_exibicao || this.estudo.nome}
-        @viab:terreno-alterado=${() => this._carregar()}>
+        @viab:terreno-alterado=${() => this._carregar()}
+        @viab:premissas-change=${(e: CustomEvent) => { this.estudo = { ...this.estudo, ...e.detail.dados }; }}>
         <urbi-botao-voltar slot="voltar" rotulo="Voltar aos estudos"
           @urbi:voltar=${() => urbiVerso.navegarSub('/')}></urbi-botao-voltar>
         ${this._renderAcoesStatus(p, st)}

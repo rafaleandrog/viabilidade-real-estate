@@ -14,19 +14,46 @@ interface Opcao { valor: string; rotulo: string; }
 // Campos por seção. `so` limita a um tipo ('loteamento' | 'incorporacao').
 const CUSTOS: (Campo & { so?: string })[] = [
   { k: 'custo_terreno_m2', label: 'Custo do terreno', t: 'num', sufixo: 'R$/m²' },
-  { k: 'custo_infra_m2', label: 'Infraestrutura (R$/m²)', t: 'num', sufixo: 'R$/m²', so: 'loteamento' },
-  { k: 'infra_pct', label: 'Infraestrutura (% VGV)', t: 'num', sufixo: '%', so: 'loteamento' },
-  { k: 'custo_construcao_m2', label: 'Construção', t: 'num', sufixo: 'R$/m²', so: 'incorporacao' },
   { k: 'custo_decoracao_m2', label: 'Decoração', t: 'num', sufixo: 'R$/m²', so: 'incorporacao' },
   { k: 'taxa_gestao_pct', label: 'Gestão da construção', t: 'num', sufixo: '%', so: 'incorporacao' },
   { k: 'incorporacao_registro_pct', label: 'Incorporação e registro', t: 'num', sufixo: '% VGV', so: 'incorporacao' },
   { k: 'valor_venal_terreno_m2', label: 'Valor venal do terreno (outorga)', t: 'num', sufixo: 'R$/m²', so: 'incorporacao' },
-  { k: 'projetos_pct', label: 'Projetos', t: 'num', sufixo: '% VGV' },
   { k: 'manutencao_pct', label: 'Manutenção pós-obra', t: 'num', sufixo: '% VGV' },
   { k: 'contingencias_pct', label: 'Contingências', t: 'num', sufixo: '% VGV' },
   { k: 'stand_vendas_valor', label: 'Stand de vendas', t: 'num', sufixo: 'R$', so: 'loteamento' },
   { k: 'marketing_global_pct', label: 'Marketing global / estrutura', t: 'num', sufixo: '% VGV' },
   { k: 'gestao_indiretos_pct', label: 'Gestão e indiretos', t: 'num', sufixo: '% VGV' },
+];
+
+// Custos com opção de UNIDADE (#3/#4): um seletor de unidade + um único campo de
+// valor cuja chave/sufixo dependem da unidade escolhida. Só o campo da unidade
+// ativa é exibido (o outro fica oculto — não some do schema).
+interface CustoUnidade {
+  modoKey: string; rotulo: string; so?: string; padrao: string;
+  opcoes: { valor: string; rotulo: string; campo: string; sufixo: string }[];
+}
+const CUSTOS_UNIDADE: CustoUnidade[] = [
+  {
+    modoKey: 'infra_modo', rotulo: 'Infraestrutura', so: 'loteamento', padrao: 'pct_vgv',
+    opcoes: [
+      { valor: 'pct_vgv', rotulo: '% VGV', campo: 'infra_pct', sufixo: '% VGV' },
+      { valor: 'valor_m2', rotulo: 'R$/m²', campo: 'custo_infra_m2', sufixo: 'R$/m²' },
+    ],
+  },
+  {
+    modoKey: 'construcao_modo', rotulo: 'Construção', so: 'incorporacao', padrao: 'valor_m2',
+    opcoes: [
+      { valor: 'valor_m2', rotulo: 'R$/m²', campo: 'custo_construcao_m2', sufixo: 'R$/m²' },
+      { valor: 'valor_total', rotulo: 'R$ (total)', campo: 'construcao_valor_total', sufixo: 'R$' },
+    ],
+  },
+  {
+    modoKey: 'projetos_modo', rotulo: 'Projetos', padrao: 'pct_vgv',
+    opcoes: [
+      { valor: 'pct_vgv', rotulo: '% VGV', campo: 'projetos_pct', sufixo: '% VGV' },
+      { valor: 'valor_fixo', rotulo: 'R$ (fixo)', campo: 'projetos_valor_fixo', sufixo: 'R$' },
+    ],
+  },
 ];
 
 const DEDUCOES: Campo[] = [
@@ -64,7 +91,10 @@ const AREAS_INC: Campo[] = [
 
 const TODOS_NUM = new Set<string>([
   ...CUSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC,
-].map((c) => c.k).concat(['permuta_fisica_area_m2', 'permuta_fisica_pct', 'terreno_manual_area']));
+].map((c) => c.k).concat(
+  ['permuta_fisica_area_m2', 'permuta_fisica_pct', 'terreno_manual_area'],
+  CUSTOS_UNIDADE.flatMap((cu) => cu.opcoes.map((o) => o.campo)),
+));
 
 @customElement('viab-tela-premissas')
 export class ViabTelaPremissas extends LitElement {
@@ -92,16 +122,21 @@ export class ViabTelaPremissas extends LitElement {
     urbi-banner { margin-top: 12px; }
   `];
 
+  private _idCarregado: number | null = null;
+
   connectedCallback() {
     super.connectedCallback();
     this._init();
   }
   updated(ch: Map<string, unknown>) {
-    if (ch.has('estudo')) this._init();
+    // Só recarrega (e refaz o fetch de benchmarks/config) quando muda o ESTUDO
+    // de fato — não a cada tecla propagada de volta via viab:premissas-change (#6).
+    if (ch.has('estudo') && this.estudo?.id !== this._idCarregado) this._init();
   }
 
   private async _init() {
     if (!this.estudo) return;
+    this._idCarregado = this.estudo.id ?? null;
     this.form = { ...this.estudo };
     try {
       const [bm, cfg] = await Promise.all([listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig()]);
@@ -114,7 +149,14 @@ export class ViabTelaPremissas extends LitElement {
     return { ...this.form, aliquota_ret_pct: this.aliquotaRet } as ProformaInput;
   }
 
-  private _set(k: string, v: any) { this.form = { ...this.form, [k]: v }; }
+  private _set(k: string, v: any) {
+    this.form = { ...this.form, [k]: v };
+    // Propaga em tempo real para a tela do estudo, que reflete em Proforma e
+    // Gráficos instantaneamente (#6). Não persiste — persistência é no Salvar.
+    this.dispatchEvent(new CustomEvent('viab:premissas-change', {
+      detail: { dados: this.form }, bubbles: true, composed: true,
+    }));
+  }
 
   private _num(k: string): number | null {
     const v = this.form[k];
@@ -161,8 +203,9 @@ export class ViabTelaPremissas extends LitElement {
             ></urbi-checkbox>
           </div>
           <div class="grid">
-            ${lot ? this._modo('infra_modo', [{ valor: 'pct_vgv', rotulo: '% VGV' }, { valor: 'valor_m2', rotulo: 'R$/m²' }], 'Infraestrutura', dis) : nothing}
-            ${this._modo('projetos_modo', [{ valor: 'pct_vgv', rotulo: '% VGV' }, { valor: 'valor_fixo', rotulo: 'R$ fixo' }], 'Projetos', dis)}
+            ${CUSTOS_UNIDADE
+              .filter((cu) => !cu.so || cu.so === this.estudo.tipo_empreendimento)
+              .map((cu) => this._custoUnidade(cu, dis))}
             ${custos.map((c) => this._input(c, dis, c.k === 'custo_terreno_m2' && this.form.considerar_custo_terreno === false))}
           </div>
         </div>
@@ -218,6 +261,26 @@ export class ViabTelaPremissas extends LitElement {
       .valor=${this._num(c.k)}
       @urbi:input-numero-change=${(e: CustomEvent) => this._set(c.k, e.detail.valor)}
     ></viab-num>`;
+  }
+
+  // Custo com opção de unidade (#3/#4): seletor de unidade + campo de valor
+  // da unidade ativa (o outro fica oculto). O label do campo carrega a unidade.
+  private _custoUnidade(cu: CustoUnidade, dis: boolean): TemplateResult {
+    const modo = this.form[cu.modoKey] ?? cu.padrao;
+    const op = cu.opcoes.find((o) => o.valor === modo) ?? cu.opcoes[0];
+    return html`
+      <urbi-select
+        label=${`${cu.rotulo} — unidade`} ?desabilitado=${dis}
+        .valor=${modo}
+        .opcoes=${cu.opcoes.map((o) => ({ valor: o.valor, rotulo: o.rotulo }))}
+        @urbi:select-change=${(e: CustomEvent) => this._set(cu.modoKey, e.detail.valor)}
+      ></urbi-select>
+      <viab-num
+        label=${cu.rotulo} sufixo=${op.sufixo} ?desabilitado=${dis}
+        .valor=${this._num(op.campo)}
+        @urbi:input-numero-change=${(e: CustomEvent) => this._set(op.campo, e.detail.valor)}
+      ></viab-num>
+    `;
   }
 
   private _modo(k: string, ops: Opcao[], rotulo: string, dis: boolean): TemplateResult {

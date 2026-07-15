@@ -87,6 +87,26 @@ test('incorporação: VGV usa áreas fechadas res + não-res', () => {
   assert.ok(perto(p.areaConstruida, 1700));
 });
 
+test('incorporação: construção por R$/m² vs valor total (#4)', () => {
+  const base: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+    custo_construcao_m2: 5000, // × 1000 m² = 5.000.000
+  };
+  const porM2 = calcularProforma({ ...base, construcao_modo: 'valor_m2' });
+  assert.ok(perto(porM2.construcao, 5_000_000), `construcao m²=${porM2.construcao}`);
+
+  const total = calcularProforma({ ...base, construcao_modo: 'valor_total', construcao_valor_total: 7_500_000 });
+  assert.ok(perto(total.construcao, 7_500_000), `construcao total=${total.construcao}`);
+});
+
+test('projetos por % VGV vs valor fixo (#3)', () => {
+  const pct = calcularProforma({ ...LOT, projetos_modo: 'pct_vgv', projetos_pct: 2 });
+  assert.ok(perto(pct.projetos, 1_500_000), `projetos %=${pct.projetos}`); // 2% de 75M
+  const fixo = calcularProforma({ ...LOT, projetos_modo: 'valor_fixo', projetos_valor_fixo: 900_000 });
+  assert.ok(perto(fixo.projetos, 900_000), `projetos fixo=${fixo.projetos}`);
+});
+
 test('preço sugerido: atinge o piso do benchmark', () => {
   const piso = 40; // acima da margem atual (~38,4%)
   const preco = precoSugeridoM2(LOT, piso);

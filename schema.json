@@ -68,7 +68,9 @@
         "infra_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 30 },
 
         "incorporacao_registro_pct": { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0.25 },
+        "construcao_modo":           { "tipo": "texto", "limite": 12, "opcoes": ["valor_m2", "valor_total"], "padrao": "valor_m2" },
         "custo_construcao_m2":       { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 4800 },
+        "construcao_valor_total":    { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "taxa_gestao_pct":           { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 6 },
         "custo_decoracao_m2":        { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 150 },
         "manutencao_pct":            { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
