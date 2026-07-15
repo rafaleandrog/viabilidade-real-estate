@@ -37,6 +37,12 @@ Validação: typecheck ✓ · build ✓ · 25 testes ✓ · empacotar ✓ (offli
   no objeto e as abas recalculam na hora. Fetch de benchmarks guardado por id (não reroda por tecla).
 - **Unidades de custo (#3/#4):** seletor de unidade + 1 campo por custo. Projetos %VGV/R$ fixo;
   Infra %VGV/R$/m²; Construção R$/m²/R$ total (novos `construcao_modo`/`construcao_valor_total`).
+- **Campo único com unidade embutida (UI):** o par "seletor de unidade — campo de valor" (que antes
+  eram duas células separadas no grid) virou **um só campo** — rótulo em cima e `[tag de unidade][valor]`
+  lado a lado (`_custoUnidade` em `tela-premissas.ts`), replicando o padrão do orçamento de obra: troca a
+  tag → muda a unidade inserida no mesmo campo. A **permuta física** foi trazida para esse mesmo padrão
+  (`PERMUTA_UNIDADE`: m² / % área de venda), aposentando o `_modo` + dois inputs atenuados. Cada unidade
+  guarda seu próprio valor nas colunas já existentes — **mudança 100% de UI, sem schema/proforma/migração**.
 - **Permutas (#14 — decisão do autor):** permuta física reduz a área vendável e o VGV nos DOIS
   tipos (antes só no Loteamento); permuta financeira segue deduzida da receita. Ambas reduzem o
   **Resultado final** — removidas as linhas "Resultado + permutas" que somavam de volta;
