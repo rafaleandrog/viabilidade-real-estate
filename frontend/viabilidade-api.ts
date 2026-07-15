@@ -142,7 +142,7 @@ export async function uploadDocumentoApelo(file: File): Promise<{ upload_id: num
   });
   return res.json();
 }
-export function anexarDocumentoApelo(estudoId: number, dados: { upload_id?: number; tipo_dado?: string; texto_adicional?: string }): Promise<any> {
+export function anexarDocumentoApelo(estudoId: number, dados: { upload_id?: number; tipo_dado?: string; texto_adicional?: string; nome_arquivo?: string }): Promise<any> {
   return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial/documentos`, { method: 'POST', body: JSON.stringify(dados) });
 }
 export function removerDocumentoApelo(estudoId: number, docId: number): Promise<any> {

@@ -4,6 +4,13 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
 
+// Paleta categórica para segmentar os custos por cor (12 tons distintos —
+// mais que os 6 da paleta padrão do gráfico, para não repetir cor entre custos).
+const PALETA_CUSTOS = [
+  '#2AA9E0', '#13A98D', '#F7A111', '#D45A3A', '#8E7CC3', '#5BAF7A',
+  '#E0699B', '#7FB3D5', '#C0A16B', '#59C3C3', '#B57EDC', '#9AA5B1',
+];
+
 @customElement('viab-tela-graficos')
 export class ViabTelaGraficos extends LitElement {
   @property({ attribute: false }) estudo: any = null;
@@ -34,7 +41,7 @@ export class ViabTelaGraficos extends LitElement {
     `;
   }
 
-  private _custos(p: Proforma) {
+  private _custos(p: Proforma, excluirTerreno = this.excluirTerreno) {
     const itens = [
       { l: 'Terreno', v: p.custoTerreno, terreno: true },
       { l: 'Infraestrutura', v: p.infraestrutura },
@@ -49,7 +56,7 @@ export class ViabTelaGraficos extends LitElement {
       { l: 'Marketing global', v: p.marketingGlobal },
       { l: 'Gestão e indiretos', v: p.gestaoIndiretos },
     ];
-    return itens.filter((i) => i.v > 0.005 && !(i.terreno && this.excluirTerreno));
+    return itens.filter((i) => i.v > 0.005 && !(i.terreno && excluirTerreno));
   }
 
   private _renderPizza(p: Proforma): TemplateResult {
@@ -68,14 +75,24 @@ export class ViabTelaGraficos extends LitElement {
   }
 
   private _renderBarras(p: Proforma): TemplateResult {
-    const receita = p.vgv;
-    const custos = p.custoDiretoTotal + p.custoIndiretoTotal;
-    const resultado = receita - custos;
+    // Coluna "Custos" empilhada e segmentada por cor (um segmento por custo),
+    // ao lado da coluna "Receita". Cada custo é uma série própria com valor só
+    // na categoria "Custos" (0 em "Receita", que o empilhado ignora). A legenda
+    // do gráfico mapeia cor → custo.
+    const itens = this._custos(p, false); // bars: sempre com todos os custos
+    const series = [
+      { rotulo: 'Receita (VGV)', valores: [p.vgv, 0], cor: 'var(--cor-sucesso, #13A98D)' },
+      ...itens.map((c, i) => ({ rotulo: c.l, valores: [0, c.v], cor: PALETA_CUSTOS[i % PALETA_CUSTOS.length] })),
+    ];
+    const custosTotal = itens.reduce((s, c) => s + c.v, 0);
+    const resultado = p.vgv - custosTotal;
     return html`
       <urbi-grafico-colunas
+        empilhado
+        legenda="sempre"
         formato="moeda"
         .categorias=${['Receita', 'Custos']}
-        .series=${[{ rotulo: 'R$', valores: [receita, custos] }]}
+        .series=${series}
       ></urbi-grafico-colunas>
       <div class="resultado">
         <urbi-kpi rotulo="Resultado" .valor=${fmtR$(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>

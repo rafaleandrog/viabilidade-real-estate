@@ -146,6 +146,7 @@
       "colunas": {
         "apelo_id":        { "tipo": "referencia", "tabela_ref": "apelo_comercial", "obrigatorio": true, "ao_deletar": "cascata" },
         "documento":       { "tipo": "arquivo", "mimes": ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"], "tamanho_max_mb": 25 },
+        "nome_arquivo":    { "tipo": "texto", "limite": 255 },
         "tipo_dado":       { "tipo": "texto", "limite": 50 },
         "texto_adicional": { "tipo": "texto_longo" }
       },

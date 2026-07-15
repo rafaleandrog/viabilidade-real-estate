@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctEntrada } from './viab-format.js';
 import { urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { calcularProforma, precoSugeridoM2, type ProformaInput } from './proforma.js';
 import './tela-terreno-nucleo.js';
@@ -83,7 +83,8 @@ export class ViabTelaPremissas extends LitElement {
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
     }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .kpis urbi-kpi { min-width: 0; }
     .checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
     .form-acoes { display: flex; justify-content: flex-end; margin-top: 8px; }
     urbi-card + urbi-card { margin-top: 16px; }
@@ -265,7 +266,7 @@ export class ViabTelaPremissas extends LitElement {
         </div>
         ${piso
           ? html`<urbi-banner variante="alerta">
-              Preço sugerido/m² para atingir o piso de resultado final (${fmtNum(Number(piso.valor))}%):
+              Preço sugerido/m² para atingir o piso de resultado final (${fmtPctEntrada(Number(piso.valor))}):
               <strong>${precoSug !== null ? fmtR$(precoSug) + '/m²' : 'inatingível com as premissas atuais'}</strong>
             </urbi-banner>`
           : html`<p class="sec">Defina o benchmark “resultado_final” para calcular o preço sugerido/m².</p>`}

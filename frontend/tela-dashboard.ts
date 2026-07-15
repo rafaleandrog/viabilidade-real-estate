@@ -22,6 +22,7 @@ export class ViabTelaDashboard extends LitElement {
   @state() private formErro = '';
   @state() private removerAlvo: any = null;
   @state() private terrenos: any[] = [];
+  @state() private filtroTerreno = '';
   @state() private terrenosCarregando = false;
   @state() private terrenosDisponivel = true;
   @state() private terrenosMotivo = '';
@@ -31,6 +32,8 @@ export class ViabTelaDashboard extends LitElement {
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
     .acoes-linha { display: inline-flex; gap: 6px; }
+    .filtros-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .filtros-bar urbi-select { min-width: 200px; }
   `];
 
   private readonly _abas = [
@@ -78,7 +81,7 @@ export class ViabTelaDashboard extends LitElement {
 
   render() {
     return html`
-      <urbi-shell-page titulo="Estudos de Viabilidade">
+      <urbi-shell-page dashboard titulo="Estudos de Viabilidade">
         ${this.aba === 'estudos'
           ? html`
               <urbi-botao
@@ -117,11 +120,6 @@ export class ViabTelaDashboard extends LitElement {
       {
         id: 'tipo', label: 'Tipo',
         valor: (l: any) => TIPO_LABEL[l.tipo_empreendimento] || l.tipo_empreendimento,
-        filtro: { tipo: 'select', opcoes: [
-          { valor: '', rotulo: 'Todos os tipos' },
-          { valor: 'loteamento', rotulo: 'Loteamento' },
-          { valor: 'incorporacao', rotulo: 'Incorporação' },
-        ] },
       },
       { id: 'vgv', label: 'VGV', alinhamento: 'direita', valor: numero((p) => fmtR$(p.vgv)) },
       { id: 'resultado', label: 'Resultado', alinhamento: 'direita', valor: numero((p) => fmtR$(p.resultado)) },
@@ -129,10 +127,6 @@ export class ViabTelaDashboard extends LitElement {
       {
         id: 'status', label: 'Status',
         render: (l: any) => html`<urbi-badge cor=${COR_STATUS[l.status] ?? 'padrao'}>${STATUS_LABEL[l.status] || l.status}</urbi-badge>`,
-        filtro: { tipo: 'select', opcoes: [
-          { valor: '', rotulo: 'Todos os status' },
-          ...Object.entries(STATUS_LABEL).map(([valor, rotulo]) => ({ valor, rotulo })),
-        ] },
       },
       { id: 'criado', label: 'Criado em', valor: (l: any) => formatarData(l.criado_em) },
       {
@@ -158,6 +152,27 @@ export class ViabTelaDashboard extends LitElement {
 
   private _renderEstudos(): TemplateResult {
     return html`
+      <div class="filtros-bar">
+        <urbi-select
+          label="Tipo de estudo"
+          .valor=${this.filtros.tipo ?? ''}
+          .opcoes=${[
+            { valor: '', rotulo: 'Todos os tipos' },
+            { valor: 'loteamento', rotulo: 'Loteamento' },
+            { valor: 'incorporacao', rotulo: 'Incorporação' },
+          ]}
+          @urbi:select-change=${(e: CustomEvent) => { this.filtros = { ...this.filtros, tipo: e.detail.valor }; }}
+        ></urbi-select>
+        <urbi-select
+          label="Status"
+          .valor=${this.filtros.status ?? ''}
+          .opcoes=${[
+            { valor: '', rotulo: 'Todos os status' },
+            ...Object.entries(STATUS_LABEL).map(([valor, rotulo]) => ({ valor, rotulo })),
+          ]}
+          @urbi:select-change=${(e: CustomEvent) => { this.filtros = { ...this.filtros, status: e.detail.valor }; }}
+        ></urbi-select>
+      </div>
       <urbi-tabela
         expandir
         clicavel
@@ -165,7 +180,6 @@ export class ViabTelaDashboard extends LitElement {
         .linhas=${this._linhasFiltradas()}
         ?carregando=${this.carregando}
         mensagem-vazio="Nenhum estudo ainda. Clique em “Criar estudo”."
-        @urbi:tabela-filtro=${(e: CustomEvent) => { this.filtros = e.detail?.filtros ?? {}; }}
         @urbi:tabela-click=${(e: CustomEvent) => {
           const l = e.detail?.linha; if (l?.id) urbiVerso.navegarSub(`/detalhe/${l.id}`);
         }}
@@ -193,11 +207,26 @@ export class ViabTelaDashboard extends LitElement {
       { id: 'nome', label: 'Imóvel', valor: (l: any) => l.id_legivel || `#${l.id}` },
       { id: 'area', label: 'Área', alinhamento: 'direita', valor: (l: any) => `${fmtNum(Number(l.area) || 0)} m²` },
     ];
+    const linhas = this.filtroTerreno
+      ? this.terrenos.filter((t) => t._tipo === this.filtroTerreno)
+      : this.terrenos;
     return html`
+      <div class="filtros-bar">
+        <urbi-select
+          label="Tipo de terreno"
+          .valor=${this.filtroTerreno}
+          .opcoes=${[
+            { valor: '', rotulo: 'Todos os terrenos' },
+            { valor: 'gleba', rotulo: 'Glebas' },
+            { valor: 'lote', rotulo: 'Lotes' },
+          ]}
+          @urbi:select-change=${(e: CustomEvent) => { this.filtroTerreno = e.detail.valor; }}
+        ></urbi-select>
+      </div>
       <urbi-tabela
         expandir
         .colunas=${colunas}
-        .linhas=${this.terrenos}
+        .linhas=${linhas}
         mensagem-vazio="Nenhuma gleba ou lote cadastrado no Núcleo."
       ></urbi-tabela>
     `;

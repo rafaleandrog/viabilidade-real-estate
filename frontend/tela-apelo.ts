@@ -22,7 +22,8 @@ export class ViabTelaApelo extends LitElement {
     .doc { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); }
     .upload-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
     .upload-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
-    .scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 8px 0 16px; }
+    .scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 8px 0 16px; }
+    .scores urbi-kpi { min-width: 0; }
     .fator-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
     .perg { font-size: var(--texto-corpo, 0.8125rem); margin: 8px 0; }
     .perg-nota { margin-right: 6px; }
@@ -62,7 +63,14 @@ export class ViabTelaApelo extends LitElement {
           : html`<div class="docs">
               ${this.documentos.map((d) => html`
                 <div class="doc">
-                  <span>${d.tipo_dado || 'fonte'}${d.texto_adicional ? ' · texto' : ''}${d.documento ? ' · arquivo' : ''}</span>
+                  <span>
+                    ${d.tipo_dado || 'fonte'}${d.texto_adicional ? ' · texto' : ''}
+                    ${d.documento
+                      ? html` · <strong>${d.nome_arquivo || 'arquivo'}</strong>${this._formatoLabel(d.nome_arquivo)
+                          ? html` <urbi-badge cor="padrao">${this._formatoLabel(d.nome_arquivo)}</urbi-badge>`
+                          : nothing}`
+                      : nothing}
+                  </span>
                   ${this.editavel
                     ? html`<urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
                         @click=${() => this._remover(d.id)}>Remover</urbi-botao>`
@@ -148,6 +156,15 @@ export class ViabTelaApelo extends LitElement {
     `;
   }
 
+  // Rótulo amigável do formato a partir da extensão do nome do arquivo.
+  private _formatoLabel(nome?: string | null): string {
+    const ext = (nome || '').split('.').pop()?.toLowerCase() || '';
+    const mapa: Record<string, string> = {
+      pdf: 'PDF', doc: 'Word', docx: 'Word', xls: 'Excel', xlsx: 'Excel',
+    };
+    return mapa[ext] || (ext ? ext.toUpperCase() : '');
+  }
+
   private _lista(titulo: string, itens: string[]): TemplateResult {
     return html`
       <div>
@@ -167,7 +184,7 @@ export class ViabTelaApelo extends LitElement {
     try {
       const up = await uploadDocumentoApelo(file);
       if (!up?.upload_id) { urbiVerso.notificar('Falha no upload', 'erro'); return; }
-      await anexarDocumentoApelo(this.estudo.id, { upload_id: up.upload_id, tipo_dado: this.tipoDado });
+      await anexarDocumentoApelo(this.estudo.id, { upload_id: up.upload_id, tipo_dado: this.tipoDado, nome_arquivo: file.name });
       urbiVerso.notificar('Documento anexado.', 'sucesso');
       this._carregar();
     } catch (err: any) { urbiVerso.notificar(err?.message || 'Erro no upload', 'erro'); }
