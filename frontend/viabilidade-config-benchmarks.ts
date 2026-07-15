@@ -5,6 +5,7 @@ import { estiloConteudo } from './estilos.js';
 import {
   urbiVerso, listarBenchmarks, atualizarBenchmark, removerBenchmark, criarBenchmark, semearBenchmarks,
 } from './viabilidade-api.js';
+import './viab-num.js';
 
 // Tela de configuração de benchmarks (manifesto telas_config.benchmarks).
 // Injetada pelo shell na área de config (Template C): NÃO renderiza
@@ -91,10 +92,10 @@ export class ViabConfigBenchmarks extends LitElement {
       { id: 'campo', label: 'Indicador', valor: (b: any) => b.campo },
       {
         id: 'valor', label: 'Valor', alinhamento: 'direita',
-        render: (b: any) => html`<urbi-input-numero
+        render: (b: any) => html`<viab-num
           .valor=${this._num(b.valor)}
           @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { valor: e.detail.valor })}
-        ></urbi-input-numero>`,
+        ></viab-num>`,
       },
       {
         id: 'regra', label: 'Regra',
@@ -109,17 +110,17 @@ export class ViabConfigBenchmarks extends LitElement {
       },
       {
         id: 'varpos', label: 'Var + (%)', alinhamento: 'direita',
-        render: (b: any) => html`<urbi-input-numero
+        render: (b: any) => html`<viab-num
           .valor=${this._num(b.variacao_positiva_pct)}
           @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { variacao_positiva_pct: e.detail.valor })}
-        ></urbi-input-numero>`,
+        ></viab-num>`,
       },
       {
         id: 'varneg', label: 'Var − (%)', alinhamento: 'direita',
-        render: (b: any) => html`<urbi-input-numero
+        render: (b: any) => html`<viab-num
           .valor=${this._num(b.variacao_negativa_pct)}
           @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { variacao_negativa_pct: e.detail.valor })}
-        ></urbi-input-numero>`,
+        ></viab-num>`,
       },
       {
         id: 'acoes', label: '',

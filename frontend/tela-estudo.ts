@@ -21,10 +21,20 @@ const FUNCOES = [
 @customElement('viab-tela-estudo')
 export class ViabTelaEstudo extends LitElement {
   @property({ type: Number }) estudoId = 0;
+  // Guia ativa vem da URL (/detalhe/:id/:aba) — bug #7. Setter normaliza valores
+  // desconhecidos para 'premissas'.
+  @property({ type: String })
+  set aba(v: string) {
+    const val = (['premissas', 'proforma', 'graficos', 'apelo'] as const).includes(v as Aba) ? (v as Aba) : 'premissas';
+    const antigo = this._aba;
+    this._aba = val;
+    this.requestUpdate('aba', antigo);
+  }
+  get aba(): Aba { return this._aba; }
+  private _aba: Aba = 'premissas';
 
   @state() private estudo: any = null;
   @state() private carregando = true;
-  @state() private aba: Aba = 'premissas';
   @state() private membros: any[] = [];
   @state() private usuarios: any[] = [];
   @state() private mostrarMembros = false;
@@ -107,7 +117,10 @@ export class ViabTelaEstudo extends LitElement {
           expandir
           .abas=${this._abas}
           .ativa=${this.aba}
-          @urbi:aba-selecionar=${(e: CustomEvent) => { this.aba = (e.detail?.id || 'premissas') as Aba; }}
+          @urbi:aba-selecionar=${(e: CustomEvent) => {
+            const id = (e.detail?.id || 'premissas') as Aba;
+            urbiVerso.navegarSub(`/detalhe/${this.estudoId}/${id}`);
+          }}
         >
           <urbi-hospedeiro slot="premissas">
             <viab-tela-premissas .estudo=${this.estudo}

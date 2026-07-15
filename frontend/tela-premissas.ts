@@ -5,6 +5,7 @@ import { fmtR$, fmtNum, fmtPct, fmtPctEntrada } from './viab-format.js';
 import { urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { calcularProforma, precoSugeridoM2, type ProformaInput } from './proforma.js';
 import './tela-terreno-nucleo.js';
+import './viab-num.js';
 
 type T = 'num' | 'txt';
 interface Campo { k: string; label: string; t: T; sufixo?: string; }
@@ -162,7 +163,7 @@ export class ViabTelaPremissas extends LitElement {
           <div class="grid">
             ${lot ? this._modo('infra_modo', [{ valor: 'pct_vgv', rotulo: '% VGV' }, { valor: 'valor_m2', rotulo: 'R$/m²' }], 'Infraestrutura', dis) : nothing}
             ${this._modo('projetos_modo', [{ valor: 'pct_vgv', rotulo: '% VGV' }, { valor: 'valor_fixo', rotulo: 'R$ fixo' }], 'Projetos', dis)}
-            ${custos.map((c) => this._input(c, dis))}
+            ${custos.map((c) => this._input(c, dis, c.k === 'custo_terreno_m2' && this.form.considerar_custo_terreno === false))}
           </div>
         </div>
 
@@ -176,15 +177,18 @@ export class ViabTelaPremissas extends LitElement {
               @urbi:checkbox-change=${(e: CustomEvent) => this._set('sujeito_ret', e.detail.marcado)}
             ></urbi-checkbox>
           </div>
-          <div class="grid">${DEDUCOES.map((c) => this._input(c, dis || (c.k === 'imposto_percentual' && !!this.form.sujeito_ret)))}</div>
+          <div class="grid">${DEDUCOES.map((c) => {
+            const bloqImposto = c.k === 'imposto_percentual' && !!this.form.sujeito_ret;
+            return this._input(c, dis || bloqImposto, bloqImposto);
+          })}</div>
         </div>
 
         <div class="secao">
           <h4>Permuta física</h4>
           <div class="grid">
             ${this._modo('permuta_fisica_modo', [{ valor: 'area_m2', rotulo: 'm²' }, { valor: 'pct_area_venda', rotulo: '% área venda' }], 'Modo', dis)}
-            ${this._input({ k: 'permuta_fisica_area_m2', label: 'Permuta física (m²)', t: 'num', sufixo: 'm²' }, dis || this.form.permuta_fisica_modo === 'pct_area_venda')}
-            ${this._input({ k: 'permuta_fisica_pct', label: 'Permuta física (% área venda)', t: 'num', sufixo: '%' }, dis || this.form.permuta_fisica_modo !== 'pct_area_venda')}
+            ${this._input({ k: 'permuta_fisica_area_m2', label: 'Permuta física (m²)', t: 'num', sufixo: 'm²' }, dis || this.form.permuta_fisica_modo === 'pct_area_venda', this.form.permuta_fisica_modo === 'pct_area_venda')}
+            ${this._input({ k: 'permuta_fisica_pct', label: 'Permuta física (% área venda)', t: 'num', sufixo: '%' }, dis || this.form.permuta_fisica_modo !== 'pct_area_venda', this.form.permuta_fisica_modo !== 'pct_area_venda')}
           </div>
         </div>
 
@@ -199,7 +203,9 @@ export class ViabTelaPremissas extends LitElement {
     `;
   }
 
-  private _input(c: Campo, dis: boolean): TemplateResult {
+  // `aten` (bug #15): campo cujo dado não entra no cálculo naquele momento
+  // (ex.: custo do terreno desligado, lado não escolhido da permuta) — fica cinza.
+  private _input(c: Campo, dis: boolean, aten = false): TemplateResult {
     if (c.t === 'txt') {
       return html`<urbi-input
         label=${c.label} ?desabilitado=${dis}
@@ -207,11 +213,11 @@ export class ViabTelaPremissas extends LitElement {
         @urbi:input-change=${(e: CustomEvent) => this._set(c.k, e.detail.valor)}
       ></urbi-input>`;
     }
-    return html`<urbi-input-numero
-      label=${c.label} sufixo=${c.sufixo ?? ''} ?desabilitado=${dis}
+    return html`<viab-num
+      label=${c.label} sufixo=${c.sufixo ?? ''} ?desabilitado=${dis} ?atenuado=${aten}
       .valor=${this._num(c.k)}
       @urbi:input-numero-change=${(e: CustomEvent) => this._set(c.k, e.detail.valor)}
-    ></urbi-input-numero>`;
+    ></viab-num>`;
   }
 
   private _modo(k: string, ops: Opcao[], rotulo: string, dis: boolean): TemplateResult {
