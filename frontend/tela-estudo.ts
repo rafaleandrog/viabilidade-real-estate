@@ -6,12 +6,13 @@ import './tela-premissas.js';
 import './tela-proforma.js';
 import './tela-graficos.js';
 import './tela-apelo.js';
+import './viabilidade-config-benchmarks.js';
 import {
   urbiVerso, buscarEstudo, transicaoStatus,
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
-type Aba = 'premissas' | 'proforma' | 'graficos' | 'apelo';
+type Aba = 'premissas' | 'proforma' | 'graficos' | 'apelo' | 'benchmarks';
 const FUNCOES = [
   { valor: 'leitor', rotulo: 'Leitor' },
   { valor: 'editor', rotulo: 'Editor' },
@@ -25,7 +26,7 @@ export class ViabTelaEstudo extends LitElement {
   // desconhecidos para 'premissas'.
   @property({ type: String })
   set aba(v: string) {
-    const val = (['premissas', 'proforma', 'graficos', 'apelo'] as const).includes(v as Aba) ? (v as Aba) : 'premissas';
+    const val = (['premissas', 'proforma', 'graficos', 'apelo', 'benchmarks'] as const).includes(v as Aba) ? (v as Aba) : 'premissas';
     const antigo = this._aba;
     this._aba = val;
     this.requestUpdate('aba', antigo);
@@ -57,7 +58,12 @@ export class ViabTelaEstudo extends LitElement {
     { id: 'proforma', label: 'Proforma', icone: 'fa-solid fa-table-cells' },
     { id: 'graficos', label: 'Gráficos', icone: 'fa-solid fa-chart-pie' },
     { id: 'apelo', label: 'Apelo Comercial', icone: 'fa-solid fa-bullhorn' },
+    { id: 'benchmarks', label: 'Benchmarks', icone: 'fa-solid fa-gauge-high' },
   ];
+
+  private _ehAdmin(): boolean {
+    try { return (urbiVerso.contexto()?.nivel || '') === 'admin'; } catch { return false; }
+  }
 
   connectedCallback() {
     super.connectedCallback();
@@ -135,6 +141,12 @@ export class ViabTelaEstudo extends LitElement {
           </urbi-hospedeiro>
           <urbi-hospedeiro slot="apelo">
             <viab-tela-apelo .estudo=${this.estudo} .editavel=${p.podeEditar}></viab-tela-apelo>
+          </urbi-hospedeiro>
+          <urbi-hospedeiro slot="benchmarks">
+            <viabilidade-config-benchmarks
+              .tipoFixo=${this.estudo.tipo_empreendimento}
+              ?somenteLeitura=${!this._ehAdmin()}
+            ></viabilidade-config-benchmarks>
           </urbi-hospedeiro>
         </urbi-abas>
       </urbi-shell-page>

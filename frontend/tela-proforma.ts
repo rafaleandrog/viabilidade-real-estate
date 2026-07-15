@@ -108,9 +108,8 @@ export class ViabTelaProforma extends LitElement {
       { l: '(-) Marketing global e estrutura', v: p.marketingGlobal },
       { l: '(-) Gestão e outros indiretos', v: p.gestaoIndiretos },
       { l: '= Custo indireto total', v: p.custoIndiretoTotal, cls: 'sub' },
+      { l: '(memo) Permuta física entregue', v: p.valorPermutaFisica, ocultarSeZero: true },
       { l: '= Resultado', v: p.resultado, cls: 'res' },
-      { l: 'Resultado + permutas financeiras', v: p.resultadoComPermutasFin, ocultarSeZero: true },
-      { l: 'Resultado + permutas (com físicas)', v: p.resultadoComPermutasFisicas, ocultarSeZero: true },
       { l: 'Margem líquida', v: p.margemLiquidaPct, cls: 'res', isPct: true },
     ];
   }

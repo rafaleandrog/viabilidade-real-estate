@@ -25,6 +25,8 @@
         "preco_venda_m2_residencial":    { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "preco_venda_m2_nao_residencial":{ "tipo": "decimal", "precisao": 12, "escala": 2 },
         "num_unidades":                  { "tipo": "inteiro" },
+        "num_unidades_residencial":      { "tipo": "inteiro" },
+        "num_unidades_nao_residencial":  { "tipo": "inteiro" },
 
         "coef_aproveitamento_basico": { "tipo": "decimal", "precisao": 6, "escala": 2 },
         "coef_aproveitamento_maximo": { "tipo": "decimal", "precisao": 6, "escala": 2, "padrao": 3 },

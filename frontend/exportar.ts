@@ -41,9 +41,8 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     { l: '(-) Marketing global e estrutura', v: p.marketingGlobal },
     { l: '(-) Gestão e outros indiretos', v: p.gestaoIndiretos },
     { l: '= Custo indireto total', v: p.custoIndiretoTotal },
+    { l: '(memo) Permuta física entregue', v: p.valorPermutaFisica },
     { l: '= Resultado', v: p.resultado },
-    { l: 'Resultado + permutas financeiras', v: p.resultadoComPermutasFin },
-    { l: 'Resultado + permutas (com físicas)', v: p.resultadoComPermutasFisicas },
   ];
   return linhas.filter((r) => !(r.soLot && !lot) && !(r.soInc && lot));
 }

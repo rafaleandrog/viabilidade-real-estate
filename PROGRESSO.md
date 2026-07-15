@@ -18,6 +18,51 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada de correções — "lista bugs.xlsx" (2026-07-15)
+
+Round de refinamento sobre o MVP (22 itens da planilha do autor). Branch `fix/lista-bugs`.
+Validação: typecheck ✓ · build ✓ · 25 testes ✓ · empacotar ✓ (offline, sem runtime real).
+
+- **Formatação (#5):** `fmtPct` calculado "xx,x%" (vírgula, 1 casa); `fmtPctEntrada` "xx,xx%".
+  Números já agrupam milhar via Intl pt-BR. Novo `parseNumeroBR` (testado).
+- **Input mascarado (#1):** `viab-num` (app-local) exibe separador de milhar nos campos
+  preenchíveis — o `urbi-input-numero` é `<input type=number>` e não agrupa. Usado em
+  Premissas e na config de Benchmarks. Flag `atenuado` = marcador cinza de dado não usado (#15).
+- **Proforma:** removida a ação "Salvar cenário"/comparação transiente (#8); sensibilidade
+  sempre visível (#10); cores Bear=vermelho/Base=verde/Bull=azul (#11); botões de exportar à
+  direita (#9).
+- **Sensibilidade — sinal do custo (#13):** Bull é otimista de verdade. Preço: otimista = maior;
+  custo/permuta: otimista = menor (conta invertida em `_renderSensibilidade`).
+- **Live Premissas→Proforma (#6):** `_set` emite `viab:premissas-change`; a tela do estudo funde
+  no objeto e as abas recalculam na hora. Fetch de benchmarks guardado por id (não reroda por tecla).
+- **Unidades de custo (#3/#4):** seletor de unidade + 1 campo por custo. Projetos %VGV/R$ fixo;
+  Infra %VGV/R$/m²; Construção R$/m²/R$ total (novos `construcao_modo`/`construcao_valor_total`).
+- **Permutas (#14 — decisão do autor):** permuta física reduz a área vendável e o VGV nos DOIS
+  tipos (antes só no Loteamento); permuta financeira segue deduzida da receita. Ambas reduzem o
+  **Resultado final** — removidas as linhas "Resultado + permutas" que somavam de volta;
+  `valorPermutaFisica` vira memo.
+- **Unidades R/NR (#2 — decisão do autor: só contagem):** dois campos de nº de unidades
+  (Residencial/Não Residencial) na Incorporação; `numUnidades = R + NR` (fallback ao legado
+  `num_unidades`). VGV segue por área × preço.
+- **Benchmarks dentro do estudo (#12 — decisão do autor):** nova aba "Benchmarks" no estudo reusa
+  `viabilidade-config-benchmarks` com `tipoFixo` (trava o tipo) e `somenteLeitura` (não-admin só lê;
+  backend segue admin-only na escrita).
+- **URL por guia (#7):** rota `/detalhe/:id/:aba` (premissas|proforma|graficos|apelo|benchmarks).
+- **Telas/tabelas:** largura total `urbi-shell-page[dashboard]` (#16); gráfico de custos empilhado e
+  colorido por custo com legenda (#17); nome real + formato do arquivo no Apelo, nova coluna
+  `nome_arquivo` (#18); filtros de Estudos em barra acima da tabela (#19); filtro Glebas/Lotes em
+  Terrenos (#20); grids de KPI mais largos p/ reduzir overflow (#21 — fix completo exige ajustar o
+  primitivo `urbi-kpi` na plataforma).
+- **Loteamento (#22):** coberto — física reduz VGV no Lot (já era) e agora no Inc; toggle de infra é
+  do Lot; unidades R/NR são exclusivas do Inc por natureza.
+
+**Colunas novas no schema** (auto-criadas pelo sincronizador, sem migração destrutiva):
+`apelo_comercial_documentos.nome_arquivo`, `estudos.construcao_modo`,
+`estudos.construcao_valor_total`, `estudos.num_unidades_residencial`,
+`estudos.num_unidades_nao_residencial`. Versão mantida em 0.1.0 (só adição de coluna).
+
+---
+
 ## Manutenção pós-MVP — alinhamento ao contrato do framework
 
 - **Soft-delete: campos reservados no PATCH/duplicação.** Com `estudos` marcado `soft_delete: true`, o framework passou a gerir `removido_em`/`removido_por_id` (colunas auto-criadas, ver `docs/shell/banco-de-dados.md` §Soft-delete). Como o GET de estudo agora devolve esses dois campos, o frontend os ecoava de volta ao salvar premissas → `422 DADOS_CAMPO_RESERVADO` ("use PATCH /:tabela/:id/remover ou /restaurar"), quebrando o registro dos dados de um estudo recém-criado. Corrigido em 3 pontos: `tela-premissas.ts` (`_salvar` não reenvia os campos), `estudos.ts` PATCH (`bloqueados` inclui os dois) e `estudos.ts` `CAMPOS_NAO_COPIAVEIS` (nomes obsoletos `removido_por`/`removido` → `removido_por_id`, senão a duplicação recopiaria e falharia).

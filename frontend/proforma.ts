@@ -28,6 +28,7 @@ export interface ProformaInput {
   area_pvt_r_fechada?: number | string; area_pvt_nr_fechada?: number | string;
   area_pvt_r_aberta?: number | string; area_pvt_nr_aberta?: number | string;
   area_comum_total?: number | string; num_unidades?: number | string;
+  num_unidades_residencial?: number | string; num_unidades_nao_residencial?: number | string;
   preco_venda_m2_residencial?: number | string; preco_venda_m2_nao_residencial?: number | string;
   valor_venal_terreno_m2?: number | string;
   // deduções da receita
@@ -65,9 +66,8 @@ export interface Proforma {
   manutencao: number; contingencias: number; custoDiretoTotal: number;
   // custos indiretos
   marketingGlobal: number; gestaoIndiretos: number; custoIndiretoTotal: number;
-  // resultado
-  resultado: number; resultadoComPermutasFin: number; resultadoComPermutasFisicas: number;
-  valorPermutaFisica: number; margemLiquidaPct: number;
+  // resultado (final — permutas financeiras e físicas já o reduzem)
+  resultado: number; valorPermutaFisica: number; margemLiquidaPct: number;
   // KPIs
   investimentoTotal: number; custoObras: number; custoObrasVgvPct: number;
   margemBrutaPct: number; roiPct: number; eficienciaPct: number;
@@ -110,7 +110,16 @@ export function calcularProforma(e: ProformaInput): Proforma {
     : n(e.permuta_fisica_area_m2);
   const areaVendavelLiquida = areaVendavel - areaPermutaFisica;
 
-  if (lot) vgvResidencial = areaVendavelLiquida * precoLot; // loteamento: tudo "residencial"
+  // Permuta física reduz a área vendável e, portanto, o VGV — nos DOIS tipos (#14).
+  // Loteamento: recomputa o VGV sobre a área líquida. Incorporação: reduz R e NR
+  // proporcionalmente à fração de área que sai como permuta.
+  if (lot) {
+    vgvResidencial = areaVendavelLiquida * precoLot; // loteamento: tudo "residencial"
+  } else if (areaPermutaFisica > 0 && areaVendavel > 0) {
+    const fatorLiquido = areaVendavelLiquida / areaVendavel;
+    vgvResidencial *= fatorLiquido;
+    vgvNaoResidencial *= fatorLiquido;
+  }
   const vgv = vgvResidencial + vgvNaoResidencial;
 
   // ── Deduções da receita ──
@@ -153,12 +162,13 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const custoIndiretoTotal = marketingGlobal + gestaoIndiretos;
 
   // ── Resultado ──
+  // Final. Permuta financeira já foi deduzida da receita líquida; permuta física
+  // já reduziu o VGV — ambas, portanto, reduzem o resultado (#14). `valorPermutaFisica`
+  // é memo: o valor de mercado da área entregue em permuta.
   const resultado = receitaLiquida - custoDiretoTotal - custoIndiretoTotal;
-  const resultadoComPermutasFin = resultado + permutaFinResidencial + permutaFinNaoResidencial;
   const precoMedioM2 = lot ? precoLot
-    : (areaVendavel > 0 ? vgv / areaVendavel : 0);
+    : (areaVendavelLiquida > 0 ? vgv / areaVendavelLiquida : 0);
   const valorPermutaFisica = areaPermutaFisica * precoMedioM2;
-  const resultadoComPermutasFisicas = resultadoComPermutasFin + valorPermutaFisica;
   const margemLiquidaPct = vgv > 0 ? resultado / vgv * 100 : 0;
 
   // ── KPIs ──
@@ -168,9 +178,12 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const margemBrutaPct = vgv > 0 ? receitaLiquida / vgv * 100 : 0;
   const roiPct = investimentoTotal > 0 ? resultado / investimentoTotal * 100 : 0;
   const eficienciaPct = areaTerreno > 0 ? areaVendavel / areaTerreno * 100 : 0;
+  // Incorporação: nº de unidades vem dos dois campos R e NR (#2); mantém
+  // compatibilidade com o campo único legado num_unidades quando ambos zerados.
+  const unidadesInc = n(e.num_unidades_residencial) + n(e.num_unidades_nao_residencial);
   const numUnidades = lot
     ? (n(e.area_media_lote_m2) > 0 ? Math.floor(areaVendavelLiquida / n(e.area_media_lote_m2)) : 0)
-    : n(e.num_unidades);
+    : (unidadesInc > 0 ? unidadesInc : n(e.num_unidades));
   const precoMedioUnidade = lot
     ? n(e.area_media_lote_m2) * precoLot
     : (numUnidades > 0 ? vgv / numUnidades : 0);
@@ -182,7 +195,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
     custoTerreno, projetos, infraestrutura, outorga, incorporacaoRegistro, construcao, gestaoConstrucao,
     decoracao, manutencao, contingencias, custoDiretoTotal,
     marketingGlobal, gestaoIndiretos, custoIndiretoTotal,
-    resultado, resultadoComPermutasFin, resultadoComPermutasFisicas, valorPermutaFisica, margemLiquidaPct,
+    resultado, valorPermutaFisica, margemLiquidaPct,
     investimentoTotal, custoObras, custoObrasVgvPct, margemBrutaPct, roiPct, eficienciaPct,
     numUnidades, precoMedioUnidade,
   };

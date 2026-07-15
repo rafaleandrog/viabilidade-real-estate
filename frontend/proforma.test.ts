@@ -107,6 +107,35 @@ test('projetos por % VGV vs valor fixo (#3)', () => {
   assert.ok(perto(fixo.projetos, 900_000), `projetos fixo=${fixo.projetos}`);
 });
 
+test('incorporação: permuta física reduz VGV proporcionalmente e o resultado (#14)', () => {
+  const base: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+  };
+  const sem = calcularProforma(base);
+  const com = calcularProforma({ ...base, permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10 });
+  assert.ok(perto(sem.vgv, 10_000_000));
+  assert.ok(perto(com.vgv, 9_000_000), `vgv com permuta=${com.vgv}`); // −10% da área vendável
+  assert.ok(com.resultado < sem.resultado, 'permuta física reduz o resultado');
+});
+
+test('permuta financeira reduz o resultado final (#14)', () => {
+  const sem = calcularProforma(LOT);
+  const com = calcularProforma({ ...LOT, permuta_financeira_residencial_pct: 10 });
+  // 10% do VGV residencial (75M) = 7,5M deduzidos da receita.
+  assert.ok(perto(sem.resultado - com.resultado, 7_500_000), `dif=${sem.resultado - com.resultado}`);
+});
+
+test('incorporação: nº de unidades soma R + NR (#2)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+    num_unidades_residencial: 8, num_unidades_nao_residencial: 2,
+  });
+  assert.equal(p.numUnidades, 10);
+  assert.ok(perto(p.precoMedioUnidade, 1_000_000), `preçoMedio=${p.precoMedioUnidade}`);
+});
+
 test('preço sugerido: atinge o piso do benchmark', () => {
   const piso = 40; // acima da margem atual (~38,4%)
   const preco = precoSugeridoM2(LOT, piso);

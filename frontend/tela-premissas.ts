@@ -84,7 +84,8 @@ const AREAS_INC: Campo[] = [
   { k: 'area_pvt_r_aberta', label: 'Área PVT R Aberta', t: 'num', sufixo: 'm²' },
   { k: 'area_pvt_nr_aberta', label: 'Área PVT NR Aberta', t: 'num', sufixo: 'm²' },
   { k: 'area_comum_total', label: 'Área comum total', t: 'num', sufixo: 'm²' },
-  { k: 'num_unidades', label: 'Nº de unidades', t: 'num' },
+  { k: 'num_unidades_residencial', label: 'Nº de unidades residenciais', t: 'num' },
+  { k: 'num_unidades_nao_residencial', label: 'Nº de unidades não residenciais', t: 'num' },
   { k: 'preco_venda_m2_residencial', label: 'Preço venda residencial', t: 'num', sufixo: 'R$/m²' },
   { k: 'preco_venda_m2_nao_residencial', label: 'Preço venda não residencial', t: 'num', sufixo: 'R$/m²' },
 ];
