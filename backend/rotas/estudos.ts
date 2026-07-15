@@ -21,7 +21,7 @@ const STATUS = ['rascunho', 'em_analise', 'aprovado', 'reprovado', 'arquivado'];
 
 // Campos que não são copiados na duplicação (gerados ou de junção do shell).
 const CAMPOS_NAO_COPIAVEIS = new Set([
-  'id', 'criado_em', 'atualizado_em', 'removido_em', 'removido_por', 'removido',
+  'id', 'criado_em', 'atualizado_em', 'removido_em', 'removido_por_id',
   'id_legivel', 'nome_exibicao', 'sequencia', 'status',
   'autor_id', 'autor_nome', 'autor_avatar_url',
 ]);
@@ -198,10 +198,12 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    // Nunca via PATCH: identidade/estado/autor gerados. tipo_empreendimento só em rascunho.
+    // Nunca via PATCH: identidade/estado/autor gerados, colunas de soft-delete
+    // geridas pelo framework (removido_em/removido_por_id — DADOS_CAMPO_RESERVADO
+    // se repassadas a req.dados.atualizar). tipo_empreendimento só em rascunho.
     const bloqueados = new Set([
       'id', 'id_legivel', 'nome_exibicao', 'sequencia', 'status', 'autor_id',
-      'criado_em', 'atualizado_em',
+      'criado_em', 'atualizado_em', 'removido_em', 'removido_por_id',
     ]);
     const dados: Record<string, any> = {};
     for (const [k, v] of Object.entries(req.body)) {

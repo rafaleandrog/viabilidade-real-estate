@@ -275,6 +275,7 @@ export class ViabTelaPremissas extends LitElement {
       const dados: Record<string, any> = {};
       for (const [k, v] of Object.entries(this.form)) {
         if (['id', 'id_legivel', 'nome_exibicao', 'sequencia', 'status', 'autor_id', 'criado_em', 'atualizado_em',
+          'removido_em', 'removido_por_id',
           'membros', 'imoveis', '_permissao', '_funcao', 'autor_nome', 'autor_avatar_url'].includes(k)) continue;
         if (TODOS_NUM.has(k)) dados[k] = v === '' || v == null ? null : Number(v);
         else dados[k] = v;

@@ -54,7 +54,7 @@ export class ViabTelaDashboard extends LitElement {
 
   render() {
     return html`
-      <urbi-shell-page titulo="Estudos de Viabilidade" preencher>
+      <urbi-shell-page titulo="Estudos de Viabilidade">
         ${this.aba === 'estudos'
           ? html`
               <urbi-botao

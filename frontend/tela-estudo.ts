@@ -91,7 +91,7 @@ export class ViabTelaEstudo extends LitElement {
     const p = this.estudo._permissao || {};
     const st = this.estudo.status;
     return html`
-      <urbi-shell-page .titulo=${this.estudo.nome_exibicao || this.estudo.nome} preencher>
+      <urbi-shell-page .titulo=${this.estudo.nome_exibicao || this.estudo.nome}>
         <urbi-botao-voltar slot="voltar" rotulo="Voltar aos estudos"
           @urbi:voltar=${() => urbiVerso.navegarSub('/')}></urbi-botao-voltar>
         ${this._renderAcoesStatus(p, st)}
