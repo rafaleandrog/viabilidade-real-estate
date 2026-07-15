@@ -9,7 +9,6 @@ import './viab-num.js';
 
 type T = 'num' | 'txt';
 interface Campo { k: string; label: string; t: T; sufixo?: string; }
-interface Opcao { valor: string; rotulo: string; }
 
 // Campos por seção. `so` limita a um tipo ('loteamento' | 'incorporacao').
 const CUSTOS: (Campo & { so?: string })[] = [
@@ -55,6 +54,16 @@ const CUSTOS_UNIDADE: CustoUnidade[] = [
     ],
   },
 ];
+
+// Permuta física: mesmo padrão de campo único com unidade (a permuta reduz o VGV;
+// entra por área em m² ou por % da área de venda). Renderizada na sua própria seção.
+const PERMUTA_UNIDADE: CustoUnidade = {
+  modoKey: 'permuta_fisica_modo', rotulo: 'Permuta física', padrao: 'area_m2',
+  opcoes: [
+    { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_area_m2', sufixo: 'm²' },
+    { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_pct', sufixo: '%' },
+  ],
+};
 
 const DEDUCOES: Campo[] = [
   { k: 'imposto_percentual', label: 'Imposto (se não RET)', t: 'num', sufixo: '%' },
@@ -121,6 +130,16 @@ export class ViabTelaPremissas extends LitElement {
     .form-acoes { display: flex; justify-content: flex-end; margin-top: 8px; }
     urbi-card + urbi-card { margin-top: 16px; }
     urbi-banner { margin-top: 12px; }
+    /* Campo único com unidade: rótulo em cima; [tag de unidade][valor] embutidos. */
+    .campo-unidade { display: flex; flex-direction: column; gap: 4px; }
+    .cu-rotulo {
+      font-size: 0.75rem; text-transform: uppercase;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      font-weight: 700; letter-spacing: 0.4px;
+    }
+    .cu-linha { display: flex; align-items: flex-end; gap: 6px; }
+    .cu-unidade { flex: 0 0 auto; width: 132px; }
+    .cu-valor { flex: 1 1 auto; min-width: 0; }
   `];
 
   private _idCarregado: number | null = null;
@@ -230,9 +249,7 @@ export class ViabTelaPremissas extends LitElement {
         <div class="secao">
           <h4>Permuta física</h4>
           <div class="grid">
-            ${this._modo('permuta_fisica_modo', [{ valor: 'area_m2', rotulo: 'm²' }, { valor: 'pct_area_venda', rotulo: '% área venda' }], 'Modo', dis)}
-            ${this._input({ k: 'permuta_fisica_area_m2', label: 'Permuta física (m²)', t: 'num', sufixo: 'm²' }, dis || this.form.permuta_fisica_modo === 'pct_area_venda', this.form.permuta_fisica_modo === 'pct_area_venda')}
-            ${this._input({ k: 'permuta_fisica_pct', label: 'Permuta física (% área venda)', t: 'num', sufixo: '%' }, dis || this.form.permuta_fisica_modo !== 'pct_area_venda', this.form.permuta_fisica_modo !== 'pct_area_venda')}
+            ${this._custoUnidade(PERMUTA_UNIDADE, dis)}
           </div>
         </div>
 
@@ -264,33 +281,30 @@ export class ViabTelaPremissas extends LitElement {
     ></viab-num>`;
   }
 
-  // Custo com opção de unidade (#3/#4): seletor de unidade + campo de valor
-  // da unidade ativa (o outro fica oculto). O label do campo carrega a unidade.
+  // Campo ÚNICO com unidade (#3/#4): rótulo em cima; abaixo, o seletor de unidade
+  // (tag) + o valor da unidade ativa lado a lado, como um só campo — o mesmo
+  // padrão do orçamento de obra (troca a tag → muda a unidade inserida). Só o
+  // campo da unidade ativa é escrito; o outro fica intocado no schema (guarda os
+  // possíveis valores diferentes por unidade).
   private _custoUnidade(cu: CustoUnidade, dis: boolean): TemplateResult {
     const modo = this.form[cu.modoKey] ?? cu.padrao;
     const op = cu.opcoes.find((o) => o.valor === modo) ?? cu.opcoes[0];
     return html`
-      <urbi-select
-        label=${`${cu.rotulo} — unidade`} ?desabilitado=${dis}
-        .valor=${modo}
-        .opcoes=${cu.opcoes.map((o) => ({ valor: o.valor, rotulo: o.rotulo }))}
-        @urbi:select-change=${(e: CustomEvent) => this._set(cu.modoKey, e.detail.valor)}
-      ></urbi-select>
-      <viab-num
-        label=${cu.rotulo} sufixo=${op.sufixo} ?desabilitado=${dis}
-        .valor=${this._num(op.campo)}
-        @urbi:input-numero-change=${(e: CustomEvent) => this._set(op.campo, e.detail.valor)}
-      ></viab-num>
+      <div class="campo-unidade">
+        <label class="cu-rotulo">${cu.rotulo}</label>
+        <div class="cu-linha">
+          <urbi-select class="cu-unidade" ?desabilitado=${dis}
+            .valor=${modo}
+            .opcoes=${cu.opcoes.map((o) => ({ valor: o.valor, rotulo: o.rotulo }))}
+            @urbi:select-change=${(e: CustomEvent) => this._set(cu.modoKey, e.detail.valor)}
+          ></urbi-select>
+          <viab-num class="cu-valor" sufixo=${op.sufixo} ?desabilitado=${dis}
+            .valor=${this._num(op.campo)}
+            @urbi:input-numero-change=${(e: CustomEvent) => this._set(op.campo, e.detail.valor)}
+          ></viab-num>
+        </div>
+      </div>
     `;
-  }
-
-  private _modo(k: string, ops: Opcao[], rotulo: string, dis: boolean): TemplateResult {
-    return html`<urbi-select
-      label=${rotulo} ?desabilitado=${dis}
-      .valor=${this.form[k] ?? ops[0].valor}
-      .opcoes=${ops}
-      @urbi:select-change=${(e: CustomEvent) => this._set(k, e.detail.valor)}
-    ></urbi-select>`;
   }
 
   private _benchmark(campo: string): any { return this.benchmarks.find((b) => b.campo === campo); }
