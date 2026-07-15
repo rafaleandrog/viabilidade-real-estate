@@ -65,6 +65,14 @@ test('RET fixa imposto em 4%', () => {
   assert.ok(perto(p.imposto, 3_000_000), `imposto RET=${p.imposto}`); // 4% de 75M
 });
 
+test('origem Núcleo: área vem de area_terreno_nucleo (ignora terreno_manual_area)', () => {
+  const p = calcularProforma({
+    ...LOT, terreno_manual_area: 5, origem_terreno: 'nucleo', area_terreno_nucleo: 100000,
+  });
+  assert.ok(perto(p.areaVendavel, 75000), `areaVendavel=${p.areaVendavel}`);
+  assert.ok(perto(p.vgv, 75_000_000), `vgv=${p.vgv}`);
+});
+
 test('incorporação: VGV usa áreas fechadas res + não-res', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',

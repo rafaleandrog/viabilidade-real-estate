@@ -4,6 +4,7 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { calcularProforma, precoSugeridoM2, type ProformaInput } from './proforma.js';
+import './tela-terreno-nucleo.js';
 
 type T = 'num' | 'txt';
 interface Campo { k: string; label: string; t: T; sufixo?: string; }
@@ -132,7 +133,10 @@ export class ViabTelaPremissas extends LitElement {
         <div class="secao">
           <h4>Terreno</h4>
           ${this.estudo.origem_terreno === 'nucleo'
-            ? html`<p class="sec">Origem: Núcleo (área em modo leitura — indisponível nesta instância).</p>`
+            ? html`<viab-terreno-nucleo
+                .estudo=${this.estudo}
+                .editavel=${this.editavel && this.estudo.status === 'rascunho'}
+              ></viab-terreno-nucleo>`
             : html`<div class="grid">
                 ${this._input({ k: 'terreno_manual_nome', label: 'Nome do terreno', t: 'txt' }, dis)}
                 ${this._input({ k: 'terreno_manual_area', label: 'Área do terreno', t: 'num', sufixo: 'm²' }, dis)}

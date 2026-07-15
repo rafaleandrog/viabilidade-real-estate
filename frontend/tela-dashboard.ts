@@ -2,10 +2,11 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, state, property } from 'lit/decorators.js';
 import { STATUS_LABEL, TIPO_LABEL, COR_STATUS, formatarData } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtPct } from './viab-format.js';
+import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
 import { calcularProforma } from './proforma.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo,
+  listarGlebasNucleo, listarLotesNucleo,
 } from './viabilidade-api.js';
 
 @customElement('viab-tela-dashboard')
@@ -20,6 +21,11 @@ export class ViabTelaDashboard extends LitElement {
   @state() private salvando = false;
   @state() private formErro = '';
   @state() private removerAlvo: any = null;
+  @state() private terrenos: any[] = [];
+  @state() private terrenosCarregando = false;
+  @state() private terrenosDisponivel = true;
+  @state() private terrenosMotivo = '';
+  private terrenosCarregados = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
@@ -39,6 +45,24 @@ export class ViabTelaDashboard extends LitElement {
 
   updated(changed: Map<string, unknown>) {
     if (changed.has('aba') && this.aba === 'estudos') this._carregar();
+    if (changed.has('aba') && this.aba === 'terrenos' && !this.terrenosCarregados) this._carregarTerrenos();
+  }
+
+  private async _carregarTerrenos() {
+    this.terrenosCarregando = true;
+    this.terrenosDisponivel = true;
+    this.terrenosMotivo = '';
+    try {
+      const [glebas, lotes] = await Promise.all([listarGlebasNucleo(), listarLotesNucleo()]);
+      const g = (glebas?.dados ?? []).map((o: any) => ({ ...o, _tipo: 'gleba' }));
+      const l = (lotes?.dados ?? []).map((o: any) => ({ ...o, _tipo: 'lote' }));
+      this.terrenos = [...g, ...l];
+      this.terrenosCarregados = true;
+    } catch (e: any) {
+      this.terrenosDisponivel = false;
+      this.terrenosMotivo = e?.message || 'Indisponível';
+    }
+    this.terrenosCarregando = false;
   }
 
   private async _carregar() {
@@ -150,14 +174,32 @@ export class ViabTelaDashboard extends LitElement {
   }
 
   private _renderTerrenos(): TemplateResult {
+    if (this.terrenosCarregando) {
+      return html`<urbi-loading mensagem="Carregando imóveis do Núcleo..."></urbi-loading>`;
+    }
+    if (!this.terrenosDisponivel) {
+      return html`
+        <urbi-card titulo="Terrenos (via Núcleo)">
+          <urbi-banner variante="alerta">
+            Integração com o Núcleo indisponível ou sem permissão de leitura (${this.terrenosMotivo}).
+            Um administrador pode liberar em <strong>Admin → Apps → viabilidade → Núcleo</strong>.
+            Enquanto isso, cadastre o terreno no estudo pelo modo <strong>“Inserir novo”</strong>.
+          </urbi-banner>
+        </urbi-card>
+      `;
+    }
+    const colunas = [
+      { id: 'tipo', label: 'Tipo', valor: (l: any) => (l._tipo === 'gleba' ? 'Gleba' : 'Lote') },
+      { id: 'nome', label: 'Imóvel', valor: (l: any) => l.id_legivel || `#${l.id}` },
+      { id: 'area', label: 'Área', alinhamento: 'direita', valor: (l: any) => `${fmtNum(Number(l.area) || 0)} m²` },
+    ];
     return html`
-      <urbi-card titulo="Terrenos (via Núcleo)">
-        <p class="sec">
-          A integração com o Núcleo (glebas/lotes) ainda não está disponível nesta
-          instância. Enquanto isso, cadastre o terreno diretamente no estudo pelo modo
-          <strong>“Inserir novo”</strong> na criação.
-        </p>
-      </urbi-card>
+      <urbi-tabela
+        expandir
+        .colunas=${colunas}
+        .linhas=${this.terrenos}
+        mensagem-vazio="Nenhuma gleba ou lote cadastrado no Núcleo."
+      ></urbi-tabela>
     `;
   }
 

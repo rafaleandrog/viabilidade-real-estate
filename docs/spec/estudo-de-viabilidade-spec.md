@@ -14,16 +14,16 @@
 
 | Seção | Status | Observação |
 |---|---|---|
-| §1 Visão geral (tipos, origem terreno, níveis, preço sugerido) | ✅ / ✏️ | Nível "Avançado" bloqueado na UI (só `preliminar` no MVP). Origem Núcleo degrada para manual (⛔ Núcleo). |
+| §1 Visão geral (tipos, origem terreno, níveis, preço sugerido) | ✅ / ✏️ | Nível "Avançado" bloqueado na UI (só `preliminar` no MVP). Origem Núcleo integrada (glebas/lotes); degrada para manual se o admin não liberar a permissão. |
 | §2 Roles e permissões | ✅ | leitor/editor/aprovador por estudo (membership). |
 | §3 Ciclo de vida | ✅ / ✏️ | Transições completas. Arquivamento automático: regra pronta em endpoint; **disparo automático** depende do agendador da instância. |
 | §4 Entidades e modelo | ✅ | |
 | §4.4 Custos/receitas · §4.5 Áreas | ✅ / ✏️ | Engine `proforma.ts` (testada). Interpretações documentadas onde a spec se contradiz (ver §0.2). |
 | §4.6 Benchmarks | ✅ / ✏️ | Indicadores do MVP semeáveis. Edição **admin-only** (ver §0.2). ROE/TIR/VPL/Payback → v2. |
-| §5 Telas (dashboard, detalhe, imóveis) | ✅ / ✏️ | 3 abas + 4ª aba "Apelo Comercial". Aba Terrenos avisa Núcleo indisponível. Componentes autocontidos (ver §0.2). |
+| §5 Telas (dashboard, detalhe, imóveis) | ✅ / ✏️ | 3 abas + 4ª aba "Apelo Comercial". Aba Terrenos lista glebas/lotes do Núcleo (degrada com aviso se sem permissão). Componentes autocontidos (ver §0.2). |
 | §6.1 Schema · §6.2 Proforma · §6.5 Params · §6.9 Eventos | ✅ | |
 | §6.3 Exportação | ✏️ | Gerada no **frontend** (PDF via impressão do navegador com estilos do app; Excel via CSV). Ver §0.2. |
-| §6.6 Dependências do Núcleo | ⛔ | Instância sem `glebas`/`lotes`; `dependencias_nucleo` vazio, modo manual. Preparado para plugar. |
+| §6.6 Dependências do Núcleo | ✅ / ✏️ | `dependencias_nucleo: ["imoveis"]` + `permissoes_nucleo: { "imoveis": ["ler"] }`. Terreno via gleba (Loteamento) / lote(s) (Incorporação); área somada em `area_terreno_nucleo`. Filtro de exclusão ainda pendente (degrada mostrando todos). |
 | §6.7 IA — Apelo Comercial | ✅ | 6 fatores × 4 perguntas, upload de docs + texto, scores, relatório. Requer framework de IA habilitado na instância. |
 | §6.8 Rotas customizadas | ✅ / ✏️ | Todas implementadas, exceto `GET /exportar/:formato` (substituída por exportação no frontend). |
 | §6.10 Documentação | ✅ | `docs/viabilidade/*` (7 docs). |
@@ -32,7 +32,7 @@
 
 Registrados para rastreabilidade — nas próximas versões, tratar como o comportamento vigente:
 
-1. **Núcleo sem supertipo `imoveis`.** A instância real não expõe um supertipo `imoveis`; `glebas`/`lotes` existem como entidades acessíveis via `req.nucleo` (SDK), mas não nesta instância. → MVP usa **modo manual**; `dependencias_nucleo: []`. `permissoes_nucleo` usa **string** (`"leitura"`), não array `["ler"]` como no §6.6.
+1. **Núcleo — integração via supertipo `imoveis`.** O acesso é declarado com `dependencias_nucleo: ["imoveis"]` e `permissoes_nucleo: { "imoveis": ["ler"] }` (array de flags, conforme `docs/shell/nucleo.md`). Consumo padrão: `urbiVerso.nucleo('/glebas' | '/lotes' | '/imoveis/:id')` no frontend, servido pelas rotas `/api/viabilidade/nucleo/*` que o shell provê para apps com `dependencias_nucleo`. Se a instância não expõe glebas/lotes ou o admin não liga o toggle, os endpoints dão 403 e a UI degrada com aviso — o modo **manual** permanece disponível. *(Versão anterior do MVP ficou em modo manual com `dependencias_nucleo: []` porque a instância não expunha essas entidades.)*
 2. **Precisão de percentuais.** Campos de % usam `decimal(5,2)`, não `inteiro` (§6.1), porque vários defaults são fracionários (6,73% / 1,6% / 0,25% / 1,25%).
 3. **Benchmarks admin-only.** §2 diz "editor edita benchmarks", mas §6.8 + `acesso_externo: restrito` dizem admin. Seguimos **admin-only** (aprovador/nível admin).
 4. **Custo do terreno** incide sobre a **área do terreno** (não "área privativa" como no texto literal de §4.4/§6.2).
@@ -46,7 +46,7 @@ Registrados para rastreabilidade — nas próximas versões, tratar como o compo
 ### 0.3 Não testado / pendências de ambiente
 
 - **Runtime não exercitado contra um shell real.** Validação offline: typecheck + build + 15 testes de unidade da engine + empacotamento + demo estático (GitHub Pages). Ajustes finos de contrato (upload de arquivo, `req.ia`, slots) são esperados no primeiro deploy.
-- **Filtro do Núcleo** (excluir Fazenda Paranoazinho / lotes em parcelamento) — ⛔ bloqueado até o Núcleo expor glebas/lotes.
+- **Filtro do Núcleo** (excluir Fazenda Paranoazinho / lotes em parcelamento) — ainda não implementado; o seletor mostra todos os imóveis do subtipo correto (comportamento previsto no §6.6 enquanto o filtro não existe).
 - **IA** requer habilitar o slot do framework de IA para a app na instância.
 
 ---
