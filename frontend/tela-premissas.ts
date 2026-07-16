@@ -85,9 +85,14 @@ const AREAS_LOT: Campo[] = [
   { k: 'preco_venda_m2', label: 'Preço de venda', t: 'num', sufixo: 'R$/m²' },
 ];
 
+// Coeficientes de aproveitamento (mín/máx): característica do terreno/zoneamento
+// (só Incorporação). Renderizados dentro da seção Terreno (#9).
+const TERRENO_COEF: Campo[] = [
+  { k: 'coef_aproveitamento_basico', label: 'Coeficiente mínimo', t: 'num' },
+  { k: 'coef_aproveitamento_maximo', label: 'Coeficiente máximo', t: 'num' },
+];
+
 const AREAS_INC: Campo[] = [
-  { k: 'coef_aproveitamento_basico', label: 'Coef. aproveitamento básico', t: 'num' },
-  { k: 'coef_aproveitamento_maximo', label: 'Coef. aproveitamento máximo', t: 'num' },
   { k: 'area_pvt_r_fechada', label: 'Área PVT R Fechada', t: 'num', sufixo: 'm²' },
   { k: 'area_pvt_nr_fechada', label: 'Área PVT NR Fechada', t: 'num', sufixo: 'm²' },
   { k: 'area_pvt_r_aberta', label: 'Área PVT R Aberta', t: 'num', sufixo: 'm²' },
@@ -100,7 +105,7 @@ const AREAS_INC: Campo[] = [
 ];
 
 const TODOS_NUM = new Set<string>([
-  ...CUSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC,
+  ...CUSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC, ...TERRENO_COEF,
 ].map((c) => c.k).concat(
   ['permuta_fisica_area_m2', 'permuta_fisica_pct', 'terreno_manual_area'],
   CUSTOS_UNIDADE.flatMap((cu) => cu.opcoes.map((o) => o.campo)),
@@ -124,6 +129,7 @@ export class ViabTelaPremissas extends LitElement {
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
     }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .subgrid { margin-top: 12px; }
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
     .kpis urbi-kpi { min-width: 0; }
     .checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -205,11 +211,19 @@ export class ViabTelaPremissas extends LitElement {
                 ${this._input({ k: 'terreno_manual_nome', label: 'Nome do terreno', t: 'txt' }, dis)}
                 ${this._input({ k: 'terreno_manual_area', label: 'Área do terreno', t: 'num', sufixo: 'm²' }, dis)}
               </div>`}
+          ${!lot
+            ? html`<div class="grid subgrid">${TERRENO_COEF.map((c) => this._input(c, dis))}</div>`
+            : nothing}
         </div>
 
         <div class="secao">
-          <h4>Produto e áreas</h4>
-          <div class="grid">${areas.map((c) => this._input(c, dis))}</div>
+          <h4>Áreas</h4>
+          <div class="grid">${areas.filter((c) => c.label.startsWith('Área')).map((c) => this._input(c, dis))}</div>
+        </div>
+
+        <div class="secao">
+          <h4>Produtos</h4>
+          <div class="grid">${areas.filter((c) => !c.label.startsWith('Área')).map((c) => this._input(c, dis))}</div>
         </div>
 
         <div class="secao">
