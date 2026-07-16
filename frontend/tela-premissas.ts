@@ -76,6 +76,7 @@ const DEDUCOES: Campo[] = [
   { k: 'permuta_financeira_nao_residencial_pct', label: 'Permuta financeira não residencial', t: 'num', sufixo: '%' },
 ];
 
+// Loteamento — Áreas = composição da área da gleba (deduções em % da gleba).
 const AREAS_LOT: Campo[] = [
   { k: 'app_pct', label: 'APP', t: 'num', sufixo: '% gleba' },
   { k: 'faixas_nao_edificaveis_pct', label: 'Faixas não edificáveis', t: 'num', sufixo: '% gleba' },
@@ -84,6 +85,9 @@ const AREAS_LOT: Campo[] = [
   { k: 'epc_pct', label: 'EPC', t: 'num', sufixo: '% gleba' },
   { k: 'epu_pct', label: 'EPU', t: 'num', sufixo: '% gleba' },
   { k: 'areas_privativas_nao_vendaveis_pct', label: 'Priv. não vendáveis', t: 'num', sufixo: '% gleba' },
+];
+// Loteamento — Produtos = o lote (tamanho médio) e o preço de venda.
+const PRODUTOS_LOT: Campo[] = [
   { k: 'area_media_lote_m2', label: 'Área média do lote', t: 'num', sufixo: 'm²' },
   { k: 'preco_venda_m2', label: 'Preço de venda', t: 'num', sufixo: 'R$/m²' },
 ];
@@ -95,12 +99,16 @@ const TERRENO_COEF: Campo[] = [
   { k: 'coef_aproveitamento_maximo', label: 'Coeficiente máximo', t: 'num' },
 ];
 
+// Incorporação — Áreas = as áreas privativas/comuns do produto.
 const AREAS_INC: Campo[] = [
   { k: 'area_pvt_r_fechada', label: 'Área PVT R Fechada', t: 'num', sufixo: 'm²' },
   { k: 'area_pvt_nr_fechada', label: 'Área PVT NR Fechada', t: 'num', sufixo: 'm²' },
   { k: 'area_pvt_r_aberta', label: 'Área PVT R Aberta', t: 'num', sufixo: 'm²' },
   { k: 'area_pvt_nr_aberta', label: 'Área PVT NR Aberta', t: 'num', sufixo: 'm²' },
   { k: 'area_comum_total', label: 'Área comum total', t: 'num', sufixo: 'm²' },
+];
+// Incorporação — Produtos = unidades e preços por tipo (Residencial / Não res.).
+const PRODUTOS_INC: Campo[] = [
   { k: 'num_unidades_residencial', label: 'Nº de unidades residenciais', t: 'num' },
   { k: 'num_unidades_nao_residencial', label: 'Nº de unidades não residenciais', t: 'num' },
   { k: 'preco_venda_m2_residencial', label: 'Preço venda residencial', t: 'num', sufixo: 'R$/m²' },
@@ -108,7 +116,8 @@ const AREAS_INC: Campo[] = [
 ];
 
 const TODOS_NUM = new Set<string>([
-  ...CUSTOS, ...IMPOSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC, ...TERRENO_COEF,
+  ...CUSTOS, ...IMPOSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC,
+  ...PRODUTOS_LOT, ...PRODUTOS_INC, ...TERRENO_COEF,
 ].map((c) => c.k).concat(
   ['permuta_fisica_area_m2', 'permuta_fisica_pct', 'terreno_manual_area'],
   CUSTOS_UNIDADE.flatMap((cu) => cu.opcoes.map((o) => o.campo)),
@@ -203,6 +212,7 @@ export class ViabTelaPremissas extends LitElement {
     if (!this.estudo) return nothing;
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
     const areas = lot ? AREAS_LOT : AREAS_INC;
+    const produtos = lot ? PRODUTOS_LOT : PRODUTOS_INC;
     const custos = CUSTOS.filter((c) => !c.so || c.so === this.estudo.tipo_empreendimento);
     const dis = !this.editavel;
 
@@ -226,12 +236,12 @@ export class ViabTelaPremissas extends LitElement {
 
         <div class="secao grupo grupo-b">
           <h4>Áreas</h4>
-          <div class="grid">${areas.filter((c) => c.label.startsWith('Área')).map((c) => this._input(c, dis))}</div>
+          <div class="grid">${areas.map((c) => this._input(c, dis))}</div>
         </div>
 
         <div class="secao grupo grupo-a">
           <h4>Produtos</h4>
-          <div class="grid">${areas.filter((c) => !c.label.startsWith('Área')).map((c) => this._input(c, dis))}</div>
+          <div class="grid">${produtos.map((c) => this._input(c, dis))}</div>
         </div>
 
         <div class="secao grupo grupo-b">
