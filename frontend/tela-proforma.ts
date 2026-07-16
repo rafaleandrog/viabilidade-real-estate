@@ -14,6 +14,7 @@ interface Linha {
   tipo?: 'receita' | 'consolidado' | 'resultado';
   grupo?: 'direto' | 'indireto';
   toggle?: 'direto' | 'indireto';
+  semPermuta?: boolean;   // #8: linha "VGV sem permuta" (itálico, sub-linha de contexto)
   soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean;
 }
 
@@ -67,6 +68,16 @@ export class ViabTelaProforma extends LitElement {
     .pf tr.resultado td.neg { color: var(--cor-erro, #D45A3A); }
     /* Tipo 4 — Itens/sub-linhas (discreto/neutro). */
     .pf tr.item td { color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
+    /* #8 — "VGV sem permuta": itálico (linha de contexto). */
+    .pf tr.italico td { font-style: italic; }
+    /* #11 — unidades e preço médio por tipo. */
+    .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; }
+    .ut-item { display: flex; flex-direction: column; gap: 2px; }
+    .ut-rot {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+    }
+    .ut-val { font-size: 0.95rem; color: var(--cor-texto-forte, rgba(255,255,255,0.95)); font-variant-numeric: tabular-nums; }
   `];
 
   private _idCarregado: number | null = null;
@@ -97,10 +108,13 @@ export class ViabTelaProforma extends LitElement {
     if (!this.estudo) return nothing;
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
     const p = calcularProforma(this._entrada());
+    // #8: VGV bruto = VGV se a área de permuta física NÃO fosse entregue (vendida).
+    const vgvBruto = calcularProforma(this._entrada({ permuta_fisica_area_m2: 0, permuta_fisica_pct: 0 })).vgv;
     return html`
       ${this._renderKpis(p)}
+      ${!lot ? this._renderUnidadesTipo(p) : nothing}
       <urbi-card titulo="Proforma">
-        ${this._renderTabela(p, lot)}
+        ${this._renderTabela(p, lot, vgvBruto)}
         <div class="barra-acoes">
           <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-excel" @click=${() => this._exportar('excel')}>Exportar Excel</urbi-botao>
           <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-pdf" @click=${() => this._exportar('pdf')}>Exportar PDF</urbi-botao>
@@ -160,7 +174,8 @@ export class ViabTelaProforma extends LitElement {
     this.colapso = { ...this.colapso, [g]: !this.colapso[g] };
   }
 
-  // % VGV: no Resultado é a margem (com sinal); nas demais, magnitude sobre o VGV.
+  // % VGV: no Resultado é a margem (com sinal); nas demais (inclusive "VGV sem
+  // permuta" do #8), magnitude sobre o VGV da Receita bruta — nunca sobre si.
   private _pctVgv(r: Linha, p: Proforma): string {
     if (p.vgv <= 0) return '—';
     return r.tipo === 'resultado'
@@ -168,8 +183,17 @@ export class ViabTelaProforma extends LitElement {
       : fmtPct(Math.abs(r.v) / p.vgv * 100);
   }
 
-  private _renderTabela(p: Proforma, lot: boolean): TemplateResult {
-    const linhas = this._linhas(p).filter((r) =>
+  // #4: R$ por m² vendável (valor da linha ÷ área vendável do projeto).
+  private _rsM2(r: Linha, p: Proforma): string {
+    return p.areaVendavel > 0 ? `${fmtR$(r.v / p.areaVendavel)}/m²` : '—';
+  }
+
+  private _renderTabela(p: Proforma, lot: boolean, vgvBruto: number): TemplateResult {
+    // #8: quando há permuta física, prepende a linha do VGV bruto (sem permuta).
+    const comBruto: Linha[] = p.areaPermutaFisica > 0
+      ? [{ l: 'VGV sem permuta física', v: vgvBruto, tipo: 'receita', semPermuta: true }, ...this._linhas(p)]
+      : this._linhas(p);
+    const linhas = comBruto.filter((r) =>
       !(r.soLot && !lot) && !(r.soInc && lot)
       && !(r.ocultarSeZero && Math.abs(r.v) < 0.005)
       && !(r.grupo && this.colapso[r.grupo]));   // #2: esconde sub-linhas do grupo colapsado
@@ -177,11 +201,11 @@ export class ViabTelaProforma extends LitElement {
       <div class="pf-wrap">
         <table class="pf">
           <thead>
-            <tr><th>Linha</th><th class="num">R$</th><th class="num">% VGV</th></tr>
+            <tr><th>Linha</th><th class="num">R$</th><th class="num">R$/m²</th><th class="num">% VGV</th></tr>
           </thead>
           <tbody>
             ${linhas.map((r) => {
-              const cls = r.tipo ?? 'item';
+              const cls = `${r.tipo ?? 'item'}${r.semPermuta ? ' italico' : ''}`;
               const sinal = r.tipo === 'resultado' ? (r.v < 0 ? 'neg' : 'pos') : '';
               return html`<tr class=${cls}>
                 <td>
@@ -192,6 +216,7 @@ export class ViabTelaProforma extends LitElement {
                   ${r.l}
                 </td>
                 <td class="num ${sinal}">${fmtR$(r.v)}</td>
+                <td class="num">${this._rsM2(r, p)}</td>
                 <td class="num">${this._pctVgv(r, p)}</td>
               </tr>`;
             })}
@@ -199,6 +224,21 @@ export class ViabTelaProforma extends LitElement {
         </table>
       </div>
     `;
+  }
+
+  // #11: unidades e preço médio por tipo (Residencial / Não residencial).
+  private _renderUnidadesTipo(p: Proforma): TemplateResult {
+    const qR = Number(this.estudo.num_unidades_residencial) || 0;
+    const qNR = Number(this.estudo.num_unidades_nao_residencial) || 0;
+    if (qR === 0 && qNR === 0) return html``;
+    const pmR = qR > 0 ? `${fmtR$(p.vgvResidencial / qR)}/un` : '—';
+    const pmNR = qNR > 0 ? `${fmtR$(p.vgvNaoResidencial / qNR)}/un` : '—';
+    return html`<urbi-card titulo="Unidades e preço médio por tipo">
+      <div class="unid-tipo">
+        <div class="ut-item"><span class="ut-rot">Residencial</span><span class="ut-val">${fmtNum(qR)} un · ${pmR}</span></div>
+        <div class="ut-item"><span class="ut-rot">Não residencial</span><span class="ut-val">${fmtNum(qNR)} un · ${pmNR}</span></div>
+      </div>
+    </urbi-card>`;
   }
 
   private _variaveis(lot: boolean): { valor: VarSens; rotulo: string }[] {
