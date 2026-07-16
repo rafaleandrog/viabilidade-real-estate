@@ -15,6 +15,7 @@ interface Linha {
   grupo?: 'direto' | 'indireto';
   toggle?: 'direto' | 'indireto';
   semPermuta?: boolean;   // #8: linha "VGV sem permuta" (itálico, sub-linha de contexto)
+  memo?: string;          // #5: anotação da conta que define o custo (ex: "7% do VGV")
   soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean;
 }
 
@@ -70,6 +71,14 @@ export class ViabTelaProforma extends LitElement {
     .pf tr.item td { color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
     /* #8 — "VGV sem permuta": itálico (linha de contexto). */
     .pf tr.italico td { font-style: italic; }
+    /* #5 — anotação da conta que define o custo: menor, itálico, cinza, à frente. */
+    .pf .memo {
+      font-style: italic; font-size: 0.72rem; margin-left: 6px;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+    }
+    @media (max-width: 560px) {
+      .pf .memo { display: block; margin-left: 0; }
+    }
     /* #11 — unidades e preço médio por tipo. */
     .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; }
     .ut-item { display: flex; flex-direction: column; gap: 2px; }
@@ -142,27 +151,40 @@ export class ViabTelaProforma extends LitElement {
   }
 
   private _linhas(p: Proforma): Linha[] {
+    // #5: cada linha de custo/dedução ganha uma anotação (memo) com a conta que
+    // a define, a partir das Premissas (percentual, R$/m², valor fixo…).
+    const e = this.estudo;
+    const lot = e.tipo_empreendimento === 'loteamento';
+    const pct = (v: any) => `${fmtNum(Number(v) || 0, 2)}%`;
+    const rsm2 = (v: any) => `${fmtR$(Number(v) || 0)}/m²`;
+    const impostoMemo = e.sujeito_ret ? `RET ${pct(this.aliquotaRet)}` : `${pct(e.imposto_percentual)} do VGV`;
+    const terrenoMemo = e.considerar_custo_terreno === false
+      ? 'desconsiderado'
+      : `${rsm2(e.custo_terreno_m2)} × ${fmtNum(p.areaTerreno)} m²`;
+    const projetosMemo = e.projetos_modo === 'valor_fixo' ? 'valor fixo' : `${pct(e.projetos_pct)} do VGV`;
+    const infraMemo = e.infra_modo === 'valor_m2' ? `${rsm2(e.custo_infra_m2)} × área vendável` : `${pct(e.infra_pct)} do VGV`;
+    const construcaoMemo = e.construcao_modo === 'valor_total' ? 'valor total' : `${rsm2(e.custo_construcao_m2)} × área privativa`;
     return [
       { l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita' },
-      { l: '(-) Imposto', v: p.imposto },
-      { l: '(-) Corretagem', v: p.corretagem },
-      { l: '(-) Marketing', v: p.marketing },
-      { l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, ocultarSeZero: true },
-      { l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, ocultarSeZero: true },
+      { l: '(-) Imposto', v: p.imposto, memo: impostoMemo },
+      { l: '(-) Corretagem', v: p.corretagem, memo: `${pct(e.corretagem_percentual)} do VGV` },
+      { l: '(-) Marketing', v: p.marketing, memo: `${pct(e.marketing_percentual)} do VGV` },
+      { l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, ocultarSeZero: true, memo: `${pct(e.permuta_financeira_residencial_pct)} do VGV res.` },
+      { l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, ocultarSeZero: true, memo: `${pct(e.permuta_financeira_nao_residencial_pct)} do VGV n/res.` },
       { l: '= Receita líquida', v: p.receitaLiquida, tipo: 'receita' },
-      { l: '(-) Terreno', v: p.custoTerreno, grupo: 'direto' },
-      { l: '(-) Projetos e aprovação', v: p.projetos, grupo: 'direto' },
-      { l: '(-) Infraestrutura', v: p.infraestrutura, soLot: true, grupo: 'direto' },
+      { l: '(-) Terreno', v: p.custoTerreno, grupo: 'direto', memo: terrenoMemo },
+      { l: '(-) Projetos e aprovação', v: p.projetos, grupo: 'direto', memo: projetosMemo },
+      { l: '(-) Infraestrutura', v: p.infraestrutura, soLot: true, grupo: 'direto', memo: infraMemo },
       { l: '(-) Outorga', v: p.outorga, soInc: true, grupo: 'direto' },
-      { l: '(-) Incorporação e registro', v: p.incorporacaoRegistro, soInc: true, grupo: 'direto' },
-      { l: '(-) Construção', v: p.construcao, soInc: true, grupo: 'direto' },
-      { l: '(-) Gestão da construção', v: p.gestaoConstrucao, soInc: true, grupo: 'direto' },
-      { l: '(-) Decoração', v: p.decoracao, soInc: true, grupo: 'direto' },
-      { l: '(-) Manutenção pós-obra', v: p.manutencao, grupo: 'direto' },
-      { l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true, grupo: 'direto' },
+      { l: '(-) Incorporação e registro', v: p.incorporacaoRegistro, soInc: true, grupo: 'direto', memo: `${pct(e.incorporacao_registro_pct)} do VGV` },
+      { l: '(-) Construção', v: p.construcao, soInc: true, grupo: 'direto', memo: construcaoMemo },
+      { l: '(-) Gestão da construção', v: p.gestaoConstrucao, soInc: true, grupo: 'direto', memo: `${pct(e.taxa_gestao_pct)} das obras` },
+      { l: '(-) Decoração', v: p.decoracao, soInc: true, grupo: 'direto', memo: `${rsm2(e.custo_decoracao_m2)} × área privativa` },
+      { l: '(-) Manutenção pós-obra', v: p.manutencao, grupo: 'direto', memo: `${pct(e.manutencao_pct)} do VGV` },
+      { l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true, grupo: 'direto', memo: `${pct(e.contingencias_pct)} do VGV` },
       { l: '= Custo direto total', v: p.custoDiretoTotal, tipo: 'consolidado', toggle: 'direto' },
-      { l: '(-) Marketing global e estrutura', v: p.marketingGlobal, grupo: 'indireto' },
-      { l: '(-) Gestão e outros indiretos', v: p.gestaoIndiretos, grupo: 'indireto' },
+      { l: '(-) Marketing global e estrutura', v: p.marketingGlobal, grupo: 'indireto', memo: `${pct(e.marketing_global_pct)} do VGV${lot ? ' + stand' : ''}` },
+      { l: '(-) Gestão e outros indiretos', v: p.gestaoIndiretos, grupo: 'indireto', memo: `${pct(e.gestao_indiretos_pct)} do VGV` },
       { l: '= Custo indireto total', v: p.custoIndiretoTotal, tipo: 'consolidado', toggle: 'indireto' },
       { l: '(memo) Permuta física entregue', v: p.valorPermutaFisica, ocultarSeZero: true },
       { l: '= Resultado', v: p.resultado, tipo: 'resultado' },
@@ -213,7 +235,7 @@ export class ViabTelaProforma extends LitElement {
                     ? html`<button class="toggle" title="Expandir/recolher"
                         @click=${() => this._toggle(r.toggle!)}>${this.colapso[r.toggle!] ? '▸' : '▾'}</button>`
                     : nothing}
-                  ${r.l}
+                  ${r.l}${r.memo ? html`<span class="memo">(${r.memo})</span>` : nothing}
                 </td>
                 <td class="num ${sinal}">${fmtR$(r.v)}</td>
                 <td class="num">${this._rsM2(r, p)}</td>
