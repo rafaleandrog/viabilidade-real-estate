@@ -65,8 +65,11 @@ const PERMUTA_UNIDADE: CustoUnidade = {
   ],
 };
 
-const DEDUCOES: Campo[] = [
+const IMPOSTOS: Campo[] = [
   { k: 'imposto_percentual', label: 'Imposto (se não RET)', t: 'num', sufixo: '%' },
+];
+
+const DEDUCOES: Campo[] = [
   { k: 'corretagem_percentual', label: 'Corretagem', t: 'num', sufixo: '%' },
   { k: 'marketing_percentual', label: 'Marketing', t: 'num', sufixo: '%' },
   { k: 'permuta_financeira_residencial_pct', label: 'Permuta financeira residencial', t: 'num', sufixo: '%' },
@@ -105,7 +108,7 @@ const AREAS_INC: Campo[] = [
 ];
 
 const TODOS_NUM = new Set<string>([
-  ...CUSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC, ...TERRENO_COEF,
+  ...CUSTOS, ...IMPOSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC, ...TERRENO_COEF,
 ].map((c) => c.k).concat(
   ['permuta_fisica_area_m2', 'permuta_fisica_pct', 'terreno_manual_area'],
   CUSTOS_UNIDADE.flatMap((cu) => cu.opcoes.map((o) => o.campo)),
@@ -130,6 +133,11 @@ export class ViabTelaPremissas extends LitElement {
     }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
     .subgrid { margin-top: 12px; }
+    /* #10: cada grupo é uma faixa delimitada por uma linha horizontal no topo,
+       com duas cores do design system intercaladas (A/B). Tokens theme-aware. */
+    .grupo { margin-bottom: 0; padding: 16px 14px; border-top: 1px solid var(--cor-borda, rgba(255,255,255,0.08)); }
+    .grupo-a { background: var(--cor-superficie-sutil, rgba(255,255,255,0.02)); }
+    .grupo-b { background: var(--cor-superficie, rgba(255,255,255,0.04)); }
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
     .kpis urbi-kpi { min-width: 0; }
     .checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -200,7 +208,7 @@ export class ViabTelaPremissas extends LitElement {
 
     return html`
       <urbi-card titulo="Premissas">
-        <div class="secao">
+        <div class="secao grupo grupo-a">
           <h4>Terreno</h4>
           ${this.estudo.origem_terreno === 'nucleo'
             ? html`<viab-terreno-nucleo
@@ -216,17 +224,17 @@ export class ViabTelaPremissas extends LitElement {
             : nothing}
         </div>
 
-        <div class="secao">
+        <div class="secao grupo grupo-b">
           <h4>Áreas</h4>
           <div class="grid">${areas.filter((c) => c.label.startsWith('Área')).map((c) => this._input(c, dis))}</div>
         </div>
 
-        <div class="secao">
+        <div class="secao grupo grupo-a">
           <h4>Produtos</h4>
           <div class="grid">${areas.filter((c) => !c.label.startsWith('Área')).map((c) => this._input(c, dis))}</div>
         </div>
 
-        <div class="secao">
+        <div class="secao grupo grupo-b">
           <h4>Custos</h4>
           <div class="checks">
             <urbi-checkbox
@@ -244,8 +252,8 @@ export class ViabTelaPremissas extends LitElement {
           </div>
         </div>
 
-        <div class="secao">
-          <h4>Impostos e deduções</h4>
+        <div class="secao grupo grupo-a">
+          <h4>Impostos</h4>
           <div class="checks">
             <urbi-checkbox
               label="Sujeito a RET (alíquota fixa ${this.aliquotaRet}%)"
@@ -254,13 +262,18 @@ export class ViabTelaPremissas extends LitElement {
               @urbi:checkbox-change=${(e: CustomEvent) => this._set('sujeito_ret', e.detail.marcado)}
             ></urbi-checkbox>
           </div>
-          <div class="grid">${DEDUCOES.map((c) => {
-            const bloqImposto = c.k === 'imposto_percentual' && !!this.form.sujeito_ret;
+          <div class="grid">${IMPOSTOS.map((c) => {
+            const bloqImposto = !!this.form.sujeito_ret;
             return this._input(c, dis || bloqImposto, bloqImposto);
           })}</div>
         </div>
 
-        <div class="secao">
+        <div class="secao grupo grupo-b">
+          <h4>Deduções</h4>
+          <div class="grid">${DEDUCOES.map((c) => this._input(c, dis))}</div>
+        </div>
+
+        <div class="secao grupo grupo-a">
           <h4>Permuta física</h4>
           <div class="grid">
             ${this._custoUnidade(PERMUTA_UNIDADE, dis)}
