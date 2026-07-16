@@ -11,7 +11,7 @@ import { estiloPagina } from './estilos.js';
 
 interface Rota {
   tela: 'dashboard' | 'estudo';
-  aba?: 'estudos' | 'terrenos';
+  aba?: 'estudos' | 'terrenos' | 'benchmark';
   estudoId?: number;
   abaEstudo?: string; // guia dentro do estudo: premissas|proforma|graficos|apelo
 }
@@ -23,6 +23,7 @@ function parsearSubRota(sub: string): Rota {
     if (!isNaN(id)) return { tela: 'estudo', estudoId: id, abaEstudo: partes[2] };
   }
   if (partes[0] === 'terrenos') return { tela: 'dashboard', aba: 'terrenos' };
+  if (partes[0] === 'benchmarks') return { tela: 'dashboard', aba: 'benchmark' };
   return { tela: 'dashboard', aba: 'estudos' };
 }
 
