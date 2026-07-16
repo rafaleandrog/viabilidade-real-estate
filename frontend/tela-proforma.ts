@@ -6,7 +6,16 @@ import { urbiVerso, listarBenchmarks, buscarConfig } from './viabilidade-api.js'
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
 import { exportarPDF, exportarExcel } from './exportar.js';
 
-interface Linha { l: string; v: number; cls?: 'sub' | 'res'; soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean; isPct?: boolean; }
+// `tipo` dá a categoria visual (#3): receita | consolidado | resultado;
+// ausente = item comum (sub-linha discreta). `grupo` marca sub-linhas
+// colapsáveis (#2); `toggle` marca a linha-total que colapsa aquele grupo.
+interface Linha {
+  l: string; v: number;
+  tipo?: 'receita' | 'consolidado' | 'resultado';
+  grupo?: 'direto' | 'indireto';
+  toggle?: 'direto' | 'indireto';
+  soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean;
+}
 
 type VarSens = 'preco' | 'permuta_fisica' | 'permuta_financeira' | 'custo_infra' | 'custo_obras';
 
@@ -17,6 +26,8 @@ export class ViabTelaProforma extends LitElement {
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
   @state() private varSens: VarSens = 'preco';
+  // #2: grupos de custo colapsados (default: expandido).
+  @state() private colapso: { direto: boolean; indireto: boolean } = { direto: false, indireto: false };
 
   static styles = [estiloConteudo, css`
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -25,6 +36,37 @@ export class ViabTelaProforma extends LitElement {
     .sens-var { max-width: 320px; margin-bottom: 12px; }
     urbi-card + urbi-card { margin-top: 16px; }
     strong.total { color: var(--cor-texto-forte, rgba(255,255,255,0.95)); }
+
+    /* #3: tabela da Proforma com 4 tipos de linha, só cores do design system. */
+    .pf-wrap { overflow-x: auto; }
+    table.pf { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+    .pf th, .pf td { padding: 8px 10px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); }
+    .pf th {
+      text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+    }
+    .pf td { text-align: left; color: var(--cor-texto, rgba(255,255,255,0.85)); }
+    .pf .num { text-align: right; white-space: nowrap; }
+    .toggle {
+      background: none; border: none; color: inherit; cursor: pointer;
+      font-size: 0.85rem; line-height: 1; padding: 0 8px 0 0; width: 20px;
+    }
+    /* Tipo 1 — Receita (identidade UP: azul primária), simples. */
+    .pf tr.receita td { color: var(--cor-primaria-solida, #2AA9E0); font-weight: 600; }
+    /* Tipo 2 — Consolidado (bold + fundo de destaque). */
+    .pf tr.consolidado td {
+      font-weight: 700; background: var(--cor-superficie-hover, rgba(255,255,255,0.08));
+      color: var(--cor-texto-forte, rgba(255,255,255,0.95));
+    }
+    /* Tipo 3 — Resultado final (bold + grande + highlight forte). */
+    .pf tr.resultado td {
+      font-weight: 800; font-size: 1.05rem; background: var(--cor-primaria-fundo, rgba(42,169,224,0.12));
+      color: var(--cor-texto-forte, rgba(255,255,255,0.95));
+    }
+    .pf tr.resultado td.pos { color: var(--cor-sucesso, #13A98D); }
+    .pf tr.resultado td.neg { color: var(--cor-erro, #D45A3A); }
+    /* Tipo 4 — Itens/sub-linhas (discreto/neutro). */
+    .pf tr.item td { color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
   `];
 
   private _idCarregado: number | null = null;
@@ -87,57 +129,76 @@ export class ViabTelaProforma extends LitElement {
 
   private _linhas(p: Proforma): Linha[] {
     return [
-      { l: 'Receita bruta (VGV)', v: p.vgv, cls: 'sub' },
+      { l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita' },
       { l: '(-) Imposto', v: p.imposto },
       { l: '(-) Corretagem', v: p.corretagem },
       { l: '(-) Marketing', v: p.marketing },
       { l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, ocultarSeZero: true },
       { l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, ocultarSeZero: true },
-      { l: '= Receita líquida', v: p.receitaLiquida, cls: 'sub' },
-      { l: '(-) Terreno', v: p.custoTerreno },
-      { l: '(-) Projetos e aprovação', v: p.projetos },
-      { l: '(-) Infraestrutura', v: p.infraestrutura, soLot: true },
-      { l: '(-) Outorga', v: p.outorga, soInc: true },
-      { l: '(-) Incorporação e registro', v: p.incorporacaoRegistro, soInc: true },
-      { l: '(-) Construção', v: p.construcao, soInc: true },
-      { l: '(-) Gestão da construção', v: p.gestaoConstrucao, soInc: true },
-      { l: '(-) Decoração', v: p.decoracao, soInc: true },
-      { l: '(-) Manutenção pós-obra', v: p.manutencao },
-      { l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true },
-      { l: '= Custo direto total', v: p.custoDiretoTotal, cls: 'sub' },
-      { l: '(-) Marketing global e estrutura', v: p.marketingGlobal },
-      { l: '(-) Gestão e outros indiretos', v: p.gestaoIndiretos },
-      { l: '= Custo indireto total', v: p.custoIndiretoTotal, cls: 'sub' },
+      { l: '= Receita líquida', v: p.receitaLiquida, tipo: 'receita' },
+      { l: '(-) Terreno', v: p.custoTerreno, grupo: 'direto' },
+      { l: '(-) Projetos e aprovação', v: p.projetos, grupo: 'direto' },
+      { l: '(-) Infraestrutura', v: p.infraestrutura, soLot: true, grupo: 'direto' },
+      { l: '(-) Outorga', v: p.outorga, soInc: true, grupo: 'direto' },
+      { l: '(-) Incorporação e registro', v: p.incorporacaoRegistro, soInc: true, grupo: 'direto' },
+      { l: '(-) Construção', v: p.construcao, soInc: true, grupo: 'direto' },
+      { l: '(-) Gestão da construção', v: p.gestaoConstrucao, soInc: true, grupo: 'direto' },
+      { l: '(-) Decoração', v: p.decoracao, soInc: true, grupo: 'direto' },
+      { l: '(-) Manutenção pós-obra', v: p.manutencao, grupo: 'direto' },
+      { l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true, grupo: 'direto' },
+      { l: '= Custo direto total', v: p.custoDiretoTotal, tipo: 'consolidado', toggle: 'direto' },
+      { l: '(-) Marketing global e estrutura', v: p.marketingGlobal, grupo: 'indireto' },
+      { l: '(-) Gestão e outros indiretos', v: p.gestaoIndiretos, grupo: 'indireto' },
+      { l: '= Custo indireto total', v: p.custoIndiretoTotal, tipo: 'consolidado', toggle: 'indireto' },
       { l: '(memo) Permuta física entregue', v: p.valorPermutaFisica, ocultarSeZero: true },
-      { l: '= Resultado', v: p.resultado, cls: 'res' },
-      { l: 'Margem líquida', v: p.margemLiquidaPct, cls: 'res', isPct: true },
+      { l: '= Resultado', v: p.resultado, tipo: 'resultado' },
+      // (#7) Linha "Margem líquida" removida — o valor aparece no % VGV do Resultado.
     ];
+  }
+
+  private _toggle(g: 'direto' | 'indireto') {
+    this.colapso = { ...this.colapso, [g]: !this.colapso[g] };
+  }
+
+  // % VGV: no Resultado é a margem (com sinal); nas demais, magnitude sobre o VGV.
+  private _pctVgv(r: Linha, p: Proforma): string {
+    if (p.vgv <= 0) return '—';
+    return r.tipo === 'resultado'
+      ? fmtPct(r.v / p.vgv * 100)
+      : fmtPct(Math.abs(r.v) / p.vgv * 100);
   }
 
   private _renderTabela(p: Proforma, lot: boolean): TemplateResult {
     const linhas = this._linhas(p).filter((r) =>
-      !(r.soLot && !lot) && !(r.soInc && lot) && !(r.ocultarSeZero && Math.abs(r.v) < 0.005));
-    const colunas = [
-      {
-        id: 'linha', label: 'Linha',
-        render: (r: any) => r.cls ? html`<strong class="total">${r.l}</strong>` : html`${r.l}`,
-      },
-      {
-        id: 'rs', label: 'R$', alinhamento: 'direita',
-        render: (r: any) => {
-          if (r.isPct) return html`<urbi-badge cor=${r.v < 0 ? 'perigo' : 'sucesso'}>${fmtPct(r.v)}</urbi-badge>`;
-          const texto = fmtR$(r.v);
-          if (r.cls === 'res') return html`<urbi-badge cor=${r.v < 0 ? 'perigo' : 'sucesso'}>${texto}</urbi-badge>`;
-          if (r.cls === 'sub') return html`<strong class="total">${texto}</strong>`;
-          return html`${texto}`;
-        },
-      },
-      {
-        id: 'pct', label: '% VGV', alinhamento: 'direita',
-        valor: (r: any) => (r.isPct ? '' : p.vgv > 0 ? fmtPct(Math.abs(r.v) / p.vgv * 100) : '—'),
-      },
-    ];
-    return html`<urbi-tabela .colunas=${colunas} .linhas=${linhas}></urbi-tabela>`;
+      !(r.soLot && !lot) && !(r.soInc && lot)
+      && !(r.ocultarSeZero && Math.abs(r.v) < 0.005)
+      && !(r.grupo && this.colapso[r.grupo]));   // #2: esconde sub-linhas do grupo colapsado
+    return html`
+      <div class="pf-wrap">
+        <table class="pf">
+          <thead>
+            <tr><th>Linha</th><th class="num">R$</th><th class="num">% VGV</th></tr>
+          </thead>
+          <tbody>
+            ${linhas.map((r) => {
+              const cls = r.tipo ?? 'item';
+              const sinal = r.tipo === 'resultado' ? (r.v < 0 ? 'neg' : 'pos') : '';
+              return html`<tr class=${cls}>
+                <td>
+                  ${r.toggle
+                    ? html`<button class="toggle" title="Expandir/recolher"
+                        @click=${() => this._toggle(r.toggle!)}>${this.colapso[r.toggle!] ? '▸' : '▾'}</button>`
+                    : nothing}
+                  ${r.l}
+                </td>
+                <td class="num ${sinal}">${fmtR$(r.v)}</td>
+                <td class="num">${this._pctVgv(r, p)}</td>
+              </tr>`;
+            })}
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
   private _variaveis(lot: boolean): { valor: VarSens; rotulo: string }[] {
@@ -182,12 +243,12 @@ export class ViabTelaProforma extends LitElement {
       { l: 'Margem líquida', f: (p) => p.margemLiquidaPct, pct: true },
     ];
     const fmt = (m: any, v: number) => (m.pct ? fmtPct(v) : fmtR$(v));
-    // Cores por cenário (contrato de UI — tokens do design system): Bear=vermelho,
-    // Base=verde, Bull=azul. Aplicadas no cabeçalho e nos valores da coluna.
+    // #6: emoji + cor por cenário (tokens do design system). Bull=verde (positivo),
+    // Base=neutro, Bear=vermelho (negativo). Aplicados no cabeçalho e nos valores.
     const CORES = {
       bear: 'var(--cor-erro, #D45A3A)',
-      base: 'var(--cor-sucesso, #13A98D)',
-      bull: 'var(--cor-primaria-solida, #2AA9E0)',
+      base: 'var(--cor-texto, rgba(255,255,255,0.85))',
+      bull: 'var(--cor-sucesso, #13A98D)',
     } as const;
     const colCenario = (id: 'bear' | 'base' | 'bull', rot: string, cen: Proforma) => ({
       id, alinhamento: 'direita',
@@ -196,9 +257,9 @@ export class ViabTelaProforma extends LitElement {
     });
     const colunas = [
       { id: 'linha', label: 'Linha', valor: (m: any) => m.l },
-      colCenario('bear', 'Bear', bear),
-      colCenario('base', 'Base', base),
-      colCenario('bull', 'Bull', bull),
+      colCenario('bear', '📉 Bear', bear),
+      colCenario('base', '📊 Base', base),
+      colCenario('bull', '🚀 Bull', bull),
     ];
     return html`<urbi-card titulo="Análise de sensibilidade">
       <div class="sens-var">
