@@ -8,10 +8,11 @@ import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo,
   listarGlebasNucleo, listarLotesNucleo,
 } from './viabilidade-api.js';
+import './viabilidade-config-benchmarks.js';
 
 @customElement('viab-tela-dashboard')
 export class ViabTelaDashboard extends LitElement {
-  @property({ type: String }) aba: 'estudos' | 'terrenos' = 'estudos';
+  @property({ type: String }) aba: 'estudos' | 'terrenos' | 'benchmark' = 'estudos';
 
   @state() private estudos: any[] = [];
   @state() private carregando = true;
@@ -39,6 +40,7 @@ export class ViabTelaDashboard extends LitElement {
   private readonly _abas = [
     { id: 'estudos', label: 'Estudos', icone: 'fa-solid fa-chart-line' },
     { id: 'terrenos', label: 'Terrenos', icone: 'fa-solid fa-map-location-dot' },
+    { id: 'benchmark', label: 'Benchmark', icone: 'fa-solid fa-gauge-high' },
   ];
 
   connectedCallback() {
@@ -99,11 +101,16 @@ export class ViabTelaDashboard extends LitElement {
           .ativa=${this.aba}
           @urbi:aba-selecionar=${(e: CustomEvent) => {
             const id = e.detail?.id;
-            urbiVerso.navegarSub(id === 'terrenos' ? '/terrenos' : '/');
+            urbiVerso.navegarSub(id === 'terrenos' ? '/terrenos' : id === 'benchmark' ? '/benchmarks' : '/');
           }}
         >
           <urbi-hospedeiro slot="estudos">${this._renderEstudos()}</urbi-hospedeiro>
           <urbi-hospedeiro slot="terrenos">${this._renderTerrenos()}</urbi-hospedeiro>
+          <urbi-hospedeiro slot="benchmark">
+            <viabilidade-config-benchmarks
+              .somenteLeitura=${urbiVerso.contexto()?.nivel !== 'admin'}
+            ></viabilidade-config-benchmarks>
+          </urbi-hospedeiro>
         </urbi-abas>
       </urbi-shell-page>
 

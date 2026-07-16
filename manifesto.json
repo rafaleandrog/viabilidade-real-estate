@@ -43,6 +43,11 @@
       "titulo": "Terrenos",
       "rota": "/terrenos",
       "icone": "fa-solid fa-map-location-dot"
+    },
+    {
+      "titulo": "Benchmark",
+      "rota": "/benchmarks",
+      "icone": "fa-solid fa-gauge-high"
     }
   ],
   "ia": true,
