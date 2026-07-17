@@ -21,6 +21,7 @@ export interface BenchmarkPadrao {
   variacao_negativa_pct: number;
 }
 
+// Indicadores de META (comparação verde/vermelho): usam `valor` + `regra_comparacao`.
 const INDICADORES_COMUNS: BenchmarkPadrao[] = [
   { campo: 'resultado_final', valor: 25, regra_comparacao: 'atingir_ou_superar', variacao_positiva_pct: 10, variacao_negativa_pct: 10 },
   { campo: 'margem_bruta', valor: 30, regra_comparacao: 'atingir_ou_superar', variacao_positiva_pct: 10, variacao_negativa_pct: 10 },
@@ -29,11 +30,21 @@ const INDICADORES_COMUNS: BenchmarkPadrao[] = [
   { campo: 'custo_obras_vgv', valor: 35, regra_comparacao: 'nao_exceder', variacao_positiva_pct: 10, variacao_negativa_pct: 10 },
 ];
 
+// Indicadores de SENSIBILIDADE: as 4 variáveis estressadas na Análise de
+// Sensibilidade da Proforma. Só usam `variacao_*_pct` (a faixa +/- que estressa a
+// variável); `valor`/`regra` não se aplicam (0). Os `campo` batem com o mapeamento
+// da Proforma (ver `_campoSensibilidade` em tela-proforma).
+export const CAMPOS_SENSIBILIDADE = ['preco', 'permuta_fisica', 'permuta_financeira', 'custo_obras'] as const;
+const INDICADORES_SENSIBILIDADE: BenchmarkPadrao[] = CAMPOS_SENSIBILIDADE.map((campo) => ({
+  campo, valor: 0, regra_comparacao: 'atingir_ou_superar', variacao_positiva_pct: 10, variacao_negativa_pct: 10,
+}));
+
 export function benchmarksPadrao(tipo: string): BenchmarkPadrao[] {
   const base = [...INDICADORES_COMUNS];
   if (tipo === 'loteamento') {
     base.push({ campo: 'eficiencia_aproveitamento', valor: 40, regra_comparacao: 'atingir_ou_superar', variacao_positiva_pct: 10, variacao_negativa_pct: 10 });
   }
+  base.push(...INDICADORES_SENSIBILIDADE);
   return base;
 }
 

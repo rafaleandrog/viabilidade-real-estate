@@ -320,6 +320,23 @@ acionei workflows).
   `.div-top`).
 - Validado: typecheck ✓ · build ✓ (117.4→118.0kb) · test 49/49 ✓ · empacotar ✓.
 
+## Rodada Benchmark/Sensibilidade + Medidores
+
+### Etapa A — Indicadores de Sensibilidade = as 4 variáveis da Proforma ✅
+- **Problema:** a seção "Indicador de Sensibilidade" mostrava os mesmos campos das metas e não
+  alimentava os cenários (a Proforma usava um par único `estudos.sensibilidade_variacao_*_pct`).
+- **Backend seed:** +4 indicadores de sensibilidade (`preco`, `permuta_fisica`, `permuta_financeira`,
+  `custo_obras`) com var+/var− (10/10); `valor`=0 (metas não se aplicam). Export `CAMPOS_SENSIBILIDADE`.
+- **Config de benchmark:** a seção "Benchmark" lista só as **metas** (`_itensMeta`); a seção
+  "Sensibilidade" lista só os **4 de sensibilidade** (`_itensSensibilidade`) com rótulos amigáveis
+  (Preço R$/m², Permuta física, Permuta financeira, Custo de obras).
+- **Proforma:** a Análise de Sensibilidade passou a ler a variação **por variável** do benchmark
+  (`_campoSensibilidade(VarSens)`→`campo`; `custo_infra`/`custo_obras`→`custo_obras`), fallback 10%.
+  Inversão Bull/Bear mantida na versão econômica (só Preço "subir = melhor"; Custo, Permuta física e
+  Permuta financeira "subir = pior") — confirmada pelo autor.
+- **Schema intacto** (a tabela `benchmarks` já tinha `variacao_*_pct`). `estudos.sensibilidade_*` ficou
+  sem uso no cálculo (mantido no schema). Testes do seed atualizados. **test 50/50 ✓**.
+
 ### Pós-fechamento — nota
 - **KPI R/NR na Proforma (revertido a pedido do autor).** Chegou a existir um commit dividindo o KPI
   do topo em "Nº un. residencial/não residencial/total" + preço médio R/NR (`4bef233`), mas o autor

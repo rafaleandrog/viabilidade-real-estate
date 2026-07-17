@@ -8,6 +8,16 @@ import {
 } from './viabilidade-api.js';
 import './viab-num.js';
 
+// Indicadores de SENSIBILIDADE = as 4 variáveis estressadas na Proforma. Os demais
+// `campo` são metas de benchmark. Rótulos amigáveis na seção de sensibilidade.
+const CAMPOS_SENS = new Set(['preco', 'permuta_fisica', 'permuta_financeira', 'custo_obras']);
+const ROTULO_SENS: Record<string, string> = {
+  preco: 'Preço R$/m²',
+  permuta_fisica: 'Permuta física',
+  permuta_financeira: 'Permuta financeira',
+  custo_obras: 'Custo de obras',
+};
+
 // Tela de configuração de benchmarks (manifesto telas_config.benchmarks).
 // Injetada pelo shell na área de config (Template C): NÃO renderiza
 // urbi-shell-page; o respiro vem de <urbi-hospedeiro>. Escrita é admin-only.
@@ -63,6 +73,9 @@ export class ViabConfigBenchmarks extends LitElement {
     return Number.isNaN(n) ? null : n;
   }
 
+  private _itensMeta() { return this.itens.filter((b) => !CAMPOS_SENS.has(String(b.campo))); }
+  private _itensSensibilidade() { return this.itens.filter((b) => CAMPOS_SENS.has(String(b.campo))); }
+
   render() {
     return html`
       <urbi-hospedeiro>
@@ -72,9 +85,9 @@ export class ViabConfigBenchmarks extends LitElement {
             <urbi-botao variante="secundario" pequeno icone="fa-solid fa-seedling" @click=${this._semear}>Criar indicadores padrão</urbi-botao>`}
         </div>
         <p class="sec">
-          Cada indicador tem dois papéis, separados abaixo: a <strong>meta de benchmark</strong>
-          (comparação verde/vermelho) e a <strong>faixa de sensibilidade</strong> (cenários
-          Bear/Base/Bull). ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
+          Duas seções: os <strong>indicadores de meta</strong> (comparação verde/vermelho) e os
+          <strong>indicadores de sensibilidade</strong> — as variáveis estressadas nos cenários
+          Bear/Base/Bull da Proforma. ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
         </p>
 
         ${this.tipoFixo ? nothing : html`
@@ -96,7 +109,7 @@ export class ViabConfigBenchmarks extends LitElement {
               <p class="sec">A meta a atingir. Alimenta os avisos verde/vermelho e a comparação de resultado.</p>
               <urbi-tabela
                 .colunas=${this._colunasBenchmark()}
-                .linhas=${this.itens}
+                .linhas=${this._itensMeta()}
                 mensagem-vazio=${this.somenteLeitura ? 'Nenhum benchmark definido para este tipo.' : 'Nenhum benchmark. Clique em “Criar indicadores padrão”.'}
               ></urbi-tabela>
               ${this.somenteLeitura ? nothing : html`
@@ -107,10 +120,10 @@ export class ViabConfigBenchmarks extends LitElement {
 
             <section class="secao">
               <h3>Indicador de Sensibilidade</h3>
-              <p class="sec">Faixa de variação que alimenta os cenários Bear / Base / Bull.</p>
+              <p class="sec">Faixa de variação (± %) que estressa cada variável nos cenários Bear / Base / Bull da Proforma.</p>
               <urbi-tabela
                 .colunas=${this._colunasSensibilidade()}
-                .linhas=${this.itens}
+                .linhas=${this._itensSensibilidade()}
                 mensagem-vazio=${this.somenteLeitura ? 'Nenhum indicador definido para este tipo.' : 'Nenhum indicador. Clique em “Criar indicadores padrão”.'}
               ></urbi-tabela>
             </section>`}
@@ -170,7 +183,7 @@ export class ViabConfigBenchmarks extends LitElement {
   // Colunas da seção "Indicador de Sensibilidade": faixa de variação (± %).
   private _colunasSensibilidade() {
     return [
-      { id: 'campo', label: 'Indicador', valor: (b: any) => b.campo },
+      { id: 'campo', label: 'Indicador', valor: (b: any) => ROTULO_SENS[b.campo] ?? b.campo },
       {
         id: 'varpos', label: 'Var + (%)', alinhamento: 'direita',
         render: (b: any) => this._celulaNum(b, 'variacao_positiva_pct'),

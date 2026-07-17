@@ -325,9 +325,22 @@ export class ViabTelaProforma extends LitElement {
     }
   }
 
+  // Variável estressada (VarSens) → `campo` do indicador de sensibilidade no
+  // benchmark. custo_infra (loteamento) e custo_obras (incorporação) compartilham
+  // o mesmo indicador "custo_obras".
+  private _campoSensibilidade(v: VarSens): string {
+    return v === 'preco' ? 'preco'
+      : v === 'permuta_fisica' ? 'permuta_fisica'
+      : v === 'permuta_financeira' ? 'permuta_financeira'
+      : 'custo_obras';
+  }
+
   private _renderSensibilidade(lot: boolean): TemplateResult {
-    const varPos = Number(this.estudo.sensibilidade_variacao_positiva_pct) || 10;
-    const varNeg = Number(this.estudo.sensibilidade_variacao_negativa_pct) || 10;
+    // A variação +/- vem do indicador de sensibilidade do benchmark (por variável),
+    // não mais de um par único do estudo. Sem benchmark → fallback 10%.
+    const bmSens = this.benchmarks.find((b) => b.campo === this._campoSensibilidade(this.varSens));
+    const varPos = Number(bmSens?.variacao_positiva_pct) || 10;
+    const varNeg = Number(bmSens?.variacao_negativa_pct) || 10;
     // Bull = cenário otimista (melhor resultado); Bear = pessimista. Para o
     // PREÇO, otimista é preço maior. Para variáveis de CUSTO/permuta (que pioram
     // o resultado quando sobem), o Bull é uma REDUÇÃO — a conta é invertida
