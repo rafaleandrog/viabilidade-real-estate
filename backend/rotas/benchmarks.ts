@@ -122,7 +122,8 @@ rotasBenchmarks.patch('/benchmarks/:id', async (req: Request, res: Response) => 
     if (isNaN(id)) { erro(res, 400, 'ID_INVALIDO', 'ID deve ser um número'); return; }
 
     const dados: Record<string, any> = {};
-    for (const campo of ['valor', 'regra_comparacao', 'variacao_positiva_pct', 'variacao_negativa_pct']) {
+    for (const campo of ['valor', 'regra_comparacao', 'variacao_positiva_pct', 'variacao_negativa_pct',
+      'medidor_min', 'medidor_max', 'medidor_faixa1_ate', 'medidor_faixa2_ate']) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (dados.regra_comparacao !== undefined && !REGRAS.includes(dados.regra_comparacao)) {

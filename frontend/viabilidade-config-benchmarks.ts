@@ -126,6 +126,20 @@ export class ViabConfigBenchmarks extends LitElement {
                 .linhas=${this._itensSensibilidade()}
                 mensagem-vazio=${this.somenteLeitura ? 'Nenhum indicador definido para este tipo.' : 'Nenhum indicador. Clique em “Criar indicadores padrão”.'}
               ></urbi-tabela>
+            </section>
+
+            <section class="secao">
+              <h3>Faixas do medidor</h3>
+              <p class="sec">
+                Limites e cortes das faixas do velocímetro (aba Gráficos). Cores fixas: vermelho (ruim)
+                / amarelo (atenção) / verde (bom) — invertidas nos indicadores “não exceder”.
+                Em branco = faixas automáticas a partir da meta.
+              </p>
+              <urbi-tabela
+                .colunas=${this._colunasMedidor()}
+                .linhas=${this._itensMeta()}
+                mensagem-vazio=${this.somenteLeitura ? 'Nenhum indicador de meta definido.' : 'Nenhum indicador. Clique em “Criar indicadores padrão”.'}
+              ></urbi-tabela>
             </section>`}
       </urbi-hospedeiro>
 
@@ -178,6 +192,17 @@ export class ViabConfigBenchmarks extends LitElement {
       });
     }
     return colunas;
+  }
+
+  // Colunas da seção "Faixas do medidor": min, 2 cortes e máx do velocímetro.
+  private _colunasMedidor() {
+    return [
+      { id: 'campo', label: 'Indicador', valor: (b: any) => b.campo },
+      { id: 'min', label: 'Mín', alinhamento: 'direita', render: (b: any) => this._celulaNum(b, 'medidor_min') },
+      { id: 'f1', label: 'Faixa 1 até', alinhamento: 'direita', render: (b: any) => this._celulaNum(b, 'medidor_faixa1_ate') },
+      { id: 'f2', label: 'Faixa 2 até', alinhamento: 'direita', render: (b: any) => this._celulaNum(b, 'medidor_faixa2_ate') },
+      { id: 'max', label: 'Máx', alinhamento: 'direita', render: (b: any) => this._celulaNum(b, 'medidor_max') },
+    ];
   }
 
   // Colunas da seção "Indicador de Sensibilidade": faixa de variação (± %).

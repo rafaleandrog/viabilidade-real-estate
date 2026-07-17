@@ -337,6 +337,22 @@ acionei workflows).
 - **Schema intacto** (a tabela `benchmarks` já tinha `variacao_*_pct`). `estudos.sensibilidade_*` ficou
   sem uso no cálculo (mantido no schema). Testes do seed atualizados. **test 50/50 ✓**.
 
+### Etapa B — Medidores configuráveis por indicador (aba Benchmark) ✅
+- **Confirmação de viabilidade:** `urbi-grafico-medidor` aceita `min`/`max`/`faixas` como **props** e
+  `faixas` é um **array** (N bandas) — tudo API pública do primitivo. Customização é **100% no app**,
+  sem tocar no urbiverso.
+- **Schema (aditivo):** `benchmarks` += `medidor_min`, `medidor_max`, `medidor_faixa1_ate`,
+  `medidor_faixa2_ate`. Backend PATCH liberou os 4 campos. Sem migração; `versao` intacta.
+- **Config (aba Benchmark):** nova seção **"Faixas do medidor"** sobre os indicadores de meta —
+  campos editáveis Mín · Faixa 1 até · Faixa 2 até · Máx. (A edição fica **só** aqui, nunca na aba
+  Gráficos.)
+- **Gráficos:** `montarMedidor(b, val)` (módulo puro `medidor-faixas.ts`) monta min/máx + faixas:
+  **configurado** → **3 faixas** cor fixa **vermelho/amarelo/verde** (invertidas p/ `nao_exceder`);
+  **em branco/ inválido** → fallback automático de 2 faixas em torno da meta (comportamento anterior).
+  A tela de Gráficos só consome; não edita.
+- **+5 testes** (`medidor-faixas.test.ts`): 3 faixas, inversão, fallback, config inválida, sem meta.
+- Validado: typecheck ✓ · build ✓ (118.6→120.3kb · backend 841.5kb) · **test 55/55 ✓** · empacotar ✓.
+
 ### Pós-fechamento — nota
 - **KPI R/NR na Proforma (revertido a pedido do autor).** Chegou a existir um commit dividindo o KPI
   do topo em "Nº un. residencial/não residencial/total" + preço médio R/NR (`4bef233`), mas o autor

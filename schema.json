@@ -131,7 +131,11 @@
         "valor":               { "tipo": "decimal", "precisao": 10, "escala": 2 },
         "regra_comparacao":    { "tipo": "texto", "limite": 30, "opcoes": ["atingir_ou_superar", "nao_exceder"] },
         "variacao_positiva_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
-        "variacao_negativa_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 }
+        "variacao_negativa_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "medidor_min":        { "tipo": "decimal", "precisao": 10, "escala": 2 },
+        "medidor_max":        { "tipo": "decimal", "precisao": 10, "escala": 2 },
+        "medidor_faixa1_ate": { "tipo": "decimal", "precisao": 10, "escala": 2 },
+        "medidor_faixa2_ate": { "tipo": "decimal", "precisao": 10, "escala": 2 }
       },
       "indices": [["tipo_empreendimento"]],
       "unicos": [["tipo_empreendimento", "campo"]]

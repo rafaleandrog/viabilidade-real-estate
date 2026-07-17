@@ -4,6 +4,7 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
 import { listarBenchmarks, buscarConfig } from './viabilidade-api.js';
+import { montarMedidor } from './medidor-faixas.js';
 
 const n = (v: any): number => Number(v) || 0;
 
@@ -207,18 +208,15 @@ export class ViabTelaGraficos extends LitElement {
     const medidores = this.benchmarks
       .map((b) => {
         const val = MAPA[b.campo];
-        const meta = Number(b.valor) || 0;
-        if (val === undefined || meta <= 0) return null;
-        const max = Math.max(meta * 2, val * 1.2, meta + 10);
-        const naoExceder = b.regra_comparacao === 'nao_exceder';
-        // Faixa boa (verde) do lado bom da meta; ruim (vermelho) do outro.
-        const faixas = naoExceder
-          ? [{ ate: meta, cor: 'var(--cor-sucesso)' }, { ate: max, cor: 'var(--cor-erro)' }]
-          : [{ ate: meta, cor: 'var(--cor-erro)' }, { ate: max, cor: 'var(--cor-sucesso)' }];
+        if (val === undefined) return null;
+        // Limites e faixas: configurados na aba Benchmark (3 faixas) ou automáticos
+        // (2 faixas em torno da meta). Ver `montarMedidor`.
+        const cfg = montarMedidor(b, val);
+        if (!cfg) return null;
         return html`<urbi-grafico-medidor
           rotulo=${ROTULOS[b.campo] ?? b.campo}
-          .min=${0} .max=${max} .valor=${val}
-          .faixas=${faixas}
+          .min=${cfg.min} .max=${cfg.max} .valor=${val}
+          .faixas=${cfg.faixas}
           formato="porcentagem"
         ></urbi-grafico-medidor>`;
       })
