@@ -79,6 +79,32 @@ Fontes de verdade confirmadas no monorepo `C:\Users\Rafael.gualberto\urbiverso\u
 - **Validado (verde):** typecheck ✓ · build ✓ (frontend 102.7→103.0kb · backend 841.2kb) ·
   test 25/25 ✓ · empacotar ✓ (PowerShell). Sem alteração de schema/migração; `versao` intacta.
 
+### Etapa 2 — ✅ CONCLUÍDA (itens 3, 4, 6 — layout de formulário em Premissas)
+- **Item 3 (botão de Membros com UI errada):** o contrato de `urbi-botao`
+  (`docs/shell/ui-componentes-conteudo.md` §urbi-botao) só admite `variante` =
+  `primario|secundario|perigo|sucesso` — **`fantasma` não existe** no contrato. O botão Membros
+  usava `variante="fantasma"`; trocado para **`secundario`** (padrão das apps-modelo: 56 usos de
+  `secundario` para ações secundárias). ⚠️ **Observação (não corrigida — fora do escopo do item 3):**
+  há outros botões `fantasma` espalhados (tela-estudo "Devolver ao rascunho", tela-dashboard,
+  config-benchmarks). Se forem inválidos em runtime, tratar numa varredura própria.
+- **Item 4 (label de 2 linhas desalinha a fileira):** `viab-num` e o campo composto (`.cu-rotulo`)
+  agora reservam **altura fixa de 2 linhas** no rótulo (`min-height: 2.4em; line-height: 1.2`),
+  ancorado ao rodapé (`align-items: flex-end`) — o espaço de reserva fica acima do texto, mantendo
+  o gap rótulo→campo constante e alinhando todos os campos da fileira, com label de 1 ou 2 linhas.
+  Só afeta `viab-num` **com label** (exclusivo de Premissas); células de tabela/`cu-valor` não têm
+  label. Nota: `urbi-input` (texto) tem label interno do primitivo, fora do nosso alcance — na
+  prática os poucos labels de texto (p3) são de 1 linha, então o alinhamento se mantém.
+- **Item 6 (três larguras de campo):** o `.grid` de Premissas deixou de ser `grid auto-fill 1fr`
+  (largura uniforme) e virou **flex-wrap com 3 larguras fixas** por classe: **p1 (165px)** para
+  `%`/`R$/m²`/coeficientes; **p2 (210px, default)** para área (`m²`)/moeda (`R$`) e numéricos sem
+  sufixo; **p3 (330px)** para texto livre e o campo composto com select. Classe derivada em
+  `larguraClasse(campo)` a partir do sufixo/tipo (coef marcados com `w:'p1'`). `max-width:100%`
+  evita overflow em telas estreitas. `urbi-input`/`urbi-input-numero` não têm prop de largura — o
+  controle é do container (confirmado no contrato).
+- **Validado (verde):** typecheck ✓ · build ✓ (frontend 103.0kb estável · backend 841.2kb) ·
+  test 25/25 ✓ · empacotar ✓ (PowerShell). Frontend puro (CSS/tokens); sem cálculo, schema ou
+  migração; `versao` intacta.
+
 ---
 
 ## Rodada de correções — "lista bugs.xlsx" (2026-07-15)

@@ -8,7 +8,21 @@ import './tela-terreno-nucleo.js';
 import './viab-num.js';
 
 type T = 'num' | 'txt';
-interface Campo { k: string; label: string; t: T; sufixo?: string; }
+type Largura = 'p1' | 'p2' | 'p3';
+interface Campo { k: string; label: string; t: T; sufixo?: string; w?: Largura; }
+
+// #6: três larguras de campo. p2 (média) é o default; a classe define a largura
+// fixa no grid (ver estilos `.grid > .pN`).
+//  · p1 (menor): % (qualquer), R$/m² e coeficientes mín/máx.
+//  · p2 (média): área (m²) e moeda (R$), além de numéricos sem sufixo (contagens).
+//  · p3 (maior): texto livre e selects.
+function larguraClasse(c: Campo): Largura {
+  if (c.w) return c.w;
+  if (c.t === 'txt') return 'p3';
+  const s = c.sufixo ?? '';
+  if (s.includes('%') || s === 'R$/m²') return 'p1';
+  return 'p2';
+}
 
 // Campos por seção. `so` limita a um tipo ('loteamento' | 'incorporacao').
 const CUSTOS: (Campo & { so?: string })[] = [
@@ -95,8 +109,8 @@ const PRODUTOS_LOT: Campo[] = [
 // Coeficientes de aproveitamento (mín/máx): característica do terreno/zoneamento
 // (só Incorporação). Renderizados dentro da seção Terreno (#9).
 const TERRENO_COEF: Campo[] = [
-  { k: 'coef_aproveitamento_basico', label: 'Coeficiente mínimo', t: 'num' },
-  { k: 'coef_aproveitamento_maximo', label: 'Coeficiente máximo', t: 'num' },
+  { k: 'coef_aproveitamento_basico', label: 'Coeficiente mínimo', t: 'num', w: 'p1' },
+  { k: 'coef_aproveitamento_maximo', label: 'Coeficiente máximo', t: 'num', w: 'p1' },
 ];
 
 // Incorporação — Áreas = as áreas privativas/comuns do produto.
@@ -140,7 +154,13 @@ export class ViabTelaPremissas extends LitElement {
       text-transform: uppercase; letter-spacing: 0.05em;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
     }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    /* #6: três larguras fixas de campo. flex-wrap distribui da esquerda pra
+       direita e quebra conforme couber; max-width:100% evita overflow em telas
+       estreitas. p2 é o default; p1 menor, p3 maior. */
+    .grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+    .grid > * { width: 210px; max-width: 100%; box-sizing: border-box; }
+    .grid > .p1 { width: 165px; }
+    .grid > .p3 { width: 330px; }
     .subgrid { margin-top: 12px; }
     /* #10: cada grupo é uma faixa delimitada por uma linha horizontal no topo,
        com duas cores do design system intercaladas (A/B). Tokens theme-aware. */
@@ -155,10 +175,14 @@ export class ViabTelaPremissas extends LitElement {
     urbi-banner { margin-top: 12px; }
     /* Campo único com unidade: rótulo em cima; [tag de unidade][valor] embutidos. */
     .campo-unidade { display: flex; flex-direction: column; gap: 4px; }
+    /* #4: mesmo rótulo de 2 linhas ancorado ao rodapé do viab-num, para o campo
+       composto alinhar com os vizinhos da fileira. */
     .cu-rotulo {
       font-size: 0.75rem; text-transform: uppercase;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
       font-weight: 700; letter-spacing: 0.4px;
+      display: flex; align-items: flex-end;
+      min-height: 2.4em; line-height: 1.2;
     }
     .cu-linha { display: flex; align-items: flex-end; gap: 6px; }
     .cu-unidade { flex: 0 0 auto; width: 132px; }
@@ -304,14 +328,17 @@ export class ViabTelaPremissas extends LitElement {
   // `aten` (bug #15): campo cujo dado não entra no cálculo naquele momento
   // (ex.: custo do terreno desligado, lado não escolhido da permuta) — fica cinza.
   private _input(c: Campo, dis: boolean, aten = false): TemplateResult {
+    const w = larguraClasse(c);
     if (c.t === 'txt') {
       return html`<urbi-input
+        class=${w}
         label=${c.label} ?desabilitado=${dis}
         .valor=${String(this.form[c.k] ?? '')}
         @urbi:input-change=${(e: CustomEvent) => this._set(c.k, e.detail.valor)}
       ></urbi-input>`;
     }
     return html`<viab-num
+      class=${w}
       label=${c.label} sufixo=${c.sufixo ?? ''} ?desabilitado=${dis} ?atenuado=${aten}
       .valor=${this._num(c.k)}
       @urbi:input-numero-change=${(e: CustomEvent) => this._set(c.k, e.detail.valor)}
@@ -327,7 +354,7 @@ export class ViabTelaPremissas extends LitElement {
     const modo = this.form[cu.modoKey] ?? cu.padrao;
     const op = cu.opcoes.find((o) => o.valor === modo) ?? cu.opcoes[0];
     return html`
-      <div class="campo-unidade">
+      <div class="campo-unidade p3">
         <label class="cu-rotulo">${cu.rotulo}</label>
         <div class="cu-linha">
           <urbi-select class="cu-unidade" ?desabilitado=${dis}

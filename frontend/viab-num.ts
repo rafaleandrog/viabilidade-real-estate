@@ -30,10 +30,16 @@ export class ViabNum extends LitElement {
   static styles = css`
     :host { display: block; }
     .campo { display: flex; flex-direction: column; gap: 4px; }
+    /* #4: label com altura fixa de 2 linhas (ancorado ao rodapé) para que o
+       campo alinhe com os vizinhos independentemente de o rótulo ter 1 ou 2
+       linhas. O espaço reservado fica ACIMA do texto, mantendo o gap
+       rótulo→campo constante em toda a fileira. */
     label {
       font-size: 0.75rem; text-transform: uppercase;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
       font-weight: 700; letter-spacing: 0.4px;
+      display: flex; align-items: flex-end;
+      min-height: 2.4em; line-height: 1.2;
     }
     .input-wrap {
       display: flex; align-items: center; gap: 6px;

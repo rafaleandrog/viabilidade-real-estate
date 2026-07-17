@@ -159,7 +159,7 @@ export class ViabTelaEstudo extends LitElement {
         ${p.podeAprovar && st === 'arquivado'
           ? html`<urbi-botao pequeno variante="secundario" @click=${() => this._status('rascunho')}>Reabrir</urbi-botao>`
           : nothing}
-        <urbi-botao pequeno variante="fantasma" icone="fa-solid fa-users"
+        <urbi-botao pequeno variante="secundario" icone="fa-solid fa-users"
           @click=${() => { this.mostrarMembros = true; this._carregarUsuarios(); }}>Membros</urbi-botao>
       </div>
     `;
