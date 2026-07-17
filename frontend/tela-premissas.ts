@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctEntrada } from './viab-format.js';
 import { urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
-import { calcularProforma, precoSugeridoM2, type ProformaInput } from './proforma.js';
+import { calcularProforma, precoSugeridoM2, type ProformaInput, type Proforma } from './proforma.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 
@@ -192,6 +192,14 @@ export class ViabTelaPremissas extends LitElement {
     .grupo-b { background: var(--cor-superficie, rgba(255,255,255,0.04)); }
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
     .kpis urbi-kpi { min-width: 0; }
+    /* #7: nº e preço médio por unidade, Residencial / Não residencial. */
+    .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 14px; }
+    .ut-item { display: flex; flex-direction: column; gap: 2px; }
+    .ut-rot {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+    }
+    .ut-val { font-size: 0.95rem; color: var(--cor-texto-forte, rgba(255,255,255,0.95)); font-variant-numeric: tabular-nums; }
     .checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
     .form-acoes { display: flex; justify-content: flex-end; margin-top: 8px; }
     urbi-card + urbi-card { margin-top: 16px; }
@@ -406,6 +414,19 @@ export class ViabTelaPremissas extends LitElement {
 
   private _benchmark(campo: string): any { return this.benchmarks.find((b) => b.campo === campo); }
 
+  // #7: detalhe de nº e preço médio por unidade, Residencial / Não residencial
+  // (Incorporação). Mesmas métricas do motor exibidas na Proforma.
+  private _unidadesTipo(p: Proforma): TemplateResult {
+    if (p.numUnidadesResidencial === 0 && p.numUnidadesNaoResidencial === 0) return html``;
+    const pmR = p.numUnidadesResidencial > 0 ? `${fmtR$(p.precoMedioUnidadeResidencial)}/un` : '—';
+    const pmNR = p.numUnidadesNaoResidencial > 0 ? `${fmtR$(p.precoMedioUnidadeNaoResidencial)}/un` : '—';
+    return html`
+      <div class="unid-tipo">
+        <div class="ut-item"><span class="ut-rot">Residencial</span><span class="ut-val">${fmtNum(p.numUnidadesResidencial)} un · ${pmR}</span></div>
+        <div class="ut-item"><span class="ut-rot">Não residencial</span><span class="ut-val">${fmtNum(p.numUnidadesNaoResidencial)} un · ${pmNR}</span></div>
+      </div>`;
+  }
+
   private _renderResumo(lot: boolean): TemplateResult {
     const p = calcularProforma(this._entradaProforma());
     const kpis: { rot: string; val: string; variante: string }[] = [];
@@ -445,6 +466,7 @@ export class ViabTelaPremissas extends LitElement {
             <urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>
           `)}
         </div>
+        ${!lot ? this._unidadesTipo(p) : nothing}
         ${piso
           ? html`<urbi-banner variante="alerta">
               Preço sugerido/m² para atingir o piso de resultado final (${fmtPctEntrada(Number(piso.valor))}):

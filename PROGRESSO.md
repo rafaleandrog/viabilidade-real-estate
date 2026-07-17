@@ -136,6 +136,25 @@ Fontes de verdade confirmadas no monorepo `C:\Users\Rafael.gualberto\urbiverso\u
 - **Validado (verde):** typecheck ✓ · build ✓ (frontend 103.0→105.3kb · backend 841.2kb) ·
   **test 28/28 ✓** (+3) · empacotar ✓ (PowerShell).
 
+### Etapa 4 — ✅ CONCLUÍDA (item 7 — separação Residencial / Não Residencial)
+- **Estado de partida:** Premissas **já coletava** os 4 campos R/NR (`num_unidades_{res,nao_res}`,
+  `preco_venda_m2_{res,nao_res}` em `PRODUTOS_INC`) e a Proforma **já exibia** o card "Unidades e
+  preço médio por tipo" (`_renderUnidadesTipo`, herança do #11). A engine já somava R+NR no VGV
+  (`vgv = vgvResidencial + vgvNaoResidencial`). O gap real: a **Premissas** só mostrava totais no
+  resumo, e as métricas por tipo eram calculadas ad-hoc na Proforma (não no motor).
+- **Motor (fonte única):** `proforma.ts` passou a expor `numUnidades{Residencial,NaoResidencial}` e
+  `precoMedioUnidade{Residencial,NaoResidencial}` (preço médio = VGV do tipo, já líquido de permuta
+  física, ÷ nº de unidades do tipo). Loteamento não separa R/NR → ficam 0.
+- **Proforma:** `_renderUnidadesTipo` refatorado para ler as métricas do motor (antes calculava
+  `vgvResidencial/qR` inline). Comportamento idêntico, fonte única.
+- **Premissas:** novo bloco `_unidadesTipo(p)` no resumo (só Incorporação, quando há unidades R/NR)
+  espelhando a Proforma — "Residencial: N un · R$ x/un" / "Não residencial: …". Totais seguem no
+  grid de KPIs.
+- **Testes ampliados:** +2 casos (#7) — detalhe R/NR de nº e preço médio (VGV soma R+NR) e
+  loteamento com métricas por tipo zeradas.
+- **Validado (verde):** typecheck ✓ · build ✓ (frontend 105.3→106.7kb · backend 841.2kb) ·
+  **test 30/30 ✓** (+2) · empacotar ✓ (PowerShell). Sem schema/migração; `versao` intacta.
+
 ---
 
 ## Rodada de correções — "lista bugs.xlsx" (2026-07-15)

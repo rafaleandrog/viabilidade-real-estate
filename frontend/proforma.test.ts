@@ -172,6 +172,32 @@ test('incorporação: nº de unidades soma R + NR (#2)', () => {
   assert.ok(perto(p.precoMedioUnidade, 1_000_000), `preçoMedio=${p.precoMedioUnidade}`);
 });
 
+test('incorporação: nº e preço médio por unidade detalhados R e NR (#7)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,   // VGV res = 10.000.000
+    area_pvt_nr_fechada: 200, preco_venda_m2_nao_residencial: 8000, // VGV nr  = 1.600.000
+    num_unidades_residencial: 10, num_unidades_nao_residencial: 4,
+  });
+  // VGV soma R + NR
+  assert.ok(perto(p.vgvResidencial, 10_000_000));
+  assert.ok(perto(p.vgvNaoResidencial, 1_600_000));
+  assert.ok(perto(p.vgv, 11_600_000), `vgv=${p.vgv}`);
+  // Detalhe por tipo
+  assert.equal(p.numUnidadesResidencial, 10);
+  assert.equal(p.numUnidadesNaoResidencial, 4);
+  assert.ok(perto(p.precoMedioUnidadeResidencial, 1_000_000), `pmR=${p.precoMedioUnidadeResidencial}`);
+  assert.ok(perto(p.precoMedioUnidadeNaoResidencial, 400_000), `pmNR=${p.precoMedioUnidadeNaoResidencial}`);
+});
+
+test('loteamento não separa R/NR (métricas por tipo zeradas) (#7)', () => {
+  const p = calcularProforma(LOT);
+  assert.equal(p.numUnidadesResidencial, 0);
+  assert.equal(p.numUnidadesNaoResidencial, 0);
+  assert.equal(p.precoMedioUnidadeResidencial, 0);
+  assert.equal(p.precoMedioUnidadeNaoResidencial, 0);
+});
+
 test('preço sugerido: atinge o piso do benchmark', () => {
   const piso = 40; // acima da margem atual (~38,4%)
   const preco = precoSugeridoM2(LOT, piso);

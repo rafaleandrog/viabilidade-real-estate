@@ -252,13 +252,14 @@ export class ViabTelaProforma extends LitElement {
     `;
   }
 
-  // #11: unidades e preço médio por tipo (Residencial / Não residencial).
+  // #7/#11: unidades e preço médio por tipo (Residencial / Não residencial),
+  // direto do motor (fonte única, também usada na Premissas).
   private _renderUnidadesTipo(p: Proforma): TemplateResult {
-    const qR = Number(this.estudo.num_unidades_residencial) || 0;
-    const qNR = Number(this.estudo.num_unidades_nao_residencial) || 0;
+    const qR = p.numUnidadesResidencial;
+    const qNR = p.numUnidadesNaoResidencial;
     if (qR === 0 && qNR === 0) return html``;
-    const pmR = qR > 0 ? `${fmtR$(p.vgvResidencial / qR)}/un` : '—';
-    const pmNR = qNR > 0 ? `${fmtR$(p.vgvNaoResidencial / qNR)}/un` : '—';
+    const pmR = qR > 0 ? `${fmtR$(p.precoMedioUnidadeResidencial)}/un` : '—';
+    const pmNR = qNR > 0 ? `${fmtR$(p.precoMedioUnidadeNaoResidencial)}/un` : '—';
     return html`<urbi-card titulo="Unidades e preço médio por tipo">
       <div class="unid-tipo">
         <div class="ut-item"><span class="ut-rot">Residencial</span><span class="ut-val">${fmtNum(qR)} un · ${pmR}</span></div>

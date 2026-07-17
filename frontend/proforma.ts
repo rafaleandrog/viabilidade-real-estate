@@ -74,6 +74,9 @@ export interface Proforma {
   investimentoTotal: number; custoObras: number; custoObrasVgvPct: number;
   margemBrutaPct: number; roiPct: number; eficienciaPct: number;
   numUnidades: number; precoMedioUnidade: number;
+  // Detalhe por tipo (Incorporação — #7). Loteamento não separa R/NR: ficam 0.
+  numUnidadesResidencial: number; numUnidadesNaoResidencial: number;
+  precoMedioUnidadeResidencial: number; precoMedioUnidadeNaoResidencial: number;
 }
 
 const n = (v: any): number => Number(v) || 0;
@@ -198,6 +201,12 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const precoMedioUnidade = lot
     ? n(e.area_media_lote_m2) * precoLot
     : (numUnidades > 0 ? vgv / numUnidades : 0);
+  // Detalhe por tipo (#7): nº e preço médio por unidade, R e NR separados. Preço
+  // médio = VGV do tipo (já líquido de permuta física) ÷ nº de unidades do tipo.
+  const numUnidadesResidencial = lot ? 0 : n(e.num_unidades_residencial);
+  const numUnidadesNaoResidencial = lot ? 0 : n(e.num_unidades_nao_residencial);
+  const precoMedioUnidadeResidencial = numUnidadesResidencial > 0 ? vgvResidencial / numUnidadesResidencial : 0;
+  const precoMedioUnidadeNaoResidencial = numUnidadesNaoResidencial > 0 ? vgvNaoResidencial / numUnidadesNaoResidencial : 0;
 
   return {
     areaTerreno, areaVendavel, areaPermutaFisica, areaVendavelLiquida, areaPrivativa, areaConstruida,
@@ -209,6 +218,8 @@ export function calcularProforma(e: ProformaInput): Proforma {
     resultado, valorPermutaFisica, margemLiquidaPct,
     investimentoTotal, custoObras, custoObrasVgvPct, margemBrutaPct, roiPct, eficienciaPct,
     numUnidades, precoMedioUnidade,
+    numUnidadesResidencial, numUnidadesNaoResidencial,
+    precoMedioUnidadeResidencial, precoMedioUnidadeNaoResidencial,
   };
 }
 
