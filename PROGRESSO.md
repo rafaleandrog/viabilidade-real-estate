@@ -298,6 +298,16 @@ acionei workflows).
 - **Frontend puro; sem schema/engine.** Validado: typecheck ✓ · build ✓ (115.6→117.1kb) ·
   **test 49/49 ✓** · empacotar ✓. `versao` intacta.
 
+## Rodada Proforma (ajustes visuais)
+
+### Etapa 1 — Tabela da Proforma ✅
+- **Notação contábil na coluna R$:** `_fmtContabil(linha)` — sem "R$"; custos/deduções (itens e
+  consolidados) entre parênteses (ex.: `(1.546.210)`); receita plana; resultado pelo sinal real
+  (negativo entre parênteses). Reusa `fmtNum` (pt-BR, 0 casas). Colunas R$/m² e % VGV inalteradas.
+- **Cabeçalhos:** maiores (0.7→0.85rem) e **centralizados** nas colunas de valor; **Descrição à
+  esquerda**; **1ª coluna sem o título "Linha"** (cabeçalho vazio). Valores seguem à direita.
+- Validado: typecheck ✓ · build ✓ (117.1→117.4kb) · test 49/49 ✓ · empacotar ✓.
+
 ### Pós-fechamento — nota
 - **KPI R/NR na Proforma (revertido a pedido do autor).** Chegou a existir um commit dividindo o KPI
   do topo em "Nº un. residencial/não residencial/total" + preço médio R/NR (`4bef233`), mas o autor

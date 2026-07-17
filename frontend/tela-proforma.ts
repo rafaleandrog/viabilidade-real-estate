@@ -44,10 +44,13 @@ export class ViabTelaProforma extends LitElement {
     .pf-wrap { overflow-x: auto; }
     table.pf { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
     .pf th, .pf td { padding: 8px 10px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); }
+    /* Cabeçalhos maiores e centralizados; a coluna Descrição fica à esquerda. */
     .pf th {
-      text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px;
+      text-align: center; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.4px;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
     }
+    .pf th.desc { text-align: left; }
+    .pf th.num { text-align: center; }
     .pf td { text-align: left; color: var(--cor-texto, rgba(255,255,255,0.85)); }
     .pf .num { text-align: right; white-space: nowrap; }
     .toggle {
@@ -230,6 +233,16 @@ export class ViabTelaProforma extends LitElement {
       : fmtPct(Math.abs(r.v) / p.vgv * 100);
   }
 
+  // Coluna R$ em notação contábil: sem "R$"; custos/deduções (itens e consolidados)
+  // entre parênteses; receita plana; resultado pelo sinal real (negativo entre
+  // parênteses).
+  private _fmtContabil(r: Linha): string {
+    const abs = fmtNum(Math.abs(r.v));
+    if (r.tipo === 'receita') return abs;
+    if (r.tipo === 'resultado') return r.v < 0 ? `(${abs})` : abs;
+    return `(${abs})`;
+  }
+
   // #4: R$ por m² vendável (valor da linha ÷ área vendável do projeto).
   private _rsM2(r: Linha, p: Proforma): string {
     return p.areaVendavel > 0 ? `${fmtR$(r.v / p.areaVendavel)}/m²` : '—';
@@ -244,7 +257,7 @@ export class ViabTelaProforma extends LitElement {
       <div class="pf-wrap">
         <table class="pf">
           <thead>
-            <tr><th>Linha</th><th>Descrição</th><th class="num">R$</th><th class="num">R$/m²</th><th class="num">% VGV</th></tr>
+            <tr><th></th><th class="desc">Descrição</th><th class="num">R$</th><th class="num">R$/m²</th><th class="num">% VGV</th></tr>
           </thead>
           <tbody>
             ${linhas.map((r) => {
@@ -259,7 +272,7 @@ export class ViabTelaProforma extends LitElement {
                   ${r.l}
                 </td>
                 <td class="desc">${r.memo ?? ''}</td>
-                <td class="num ${sinal}">${fmtR$(r.v)}</td>
+                <td class="num ${sinal}">${this._fmtContabil(r)}</td>
                 <td class="num">${this._rsM2(r, p)}</td>
                 <td class="num">${this._pctVgv(r, p)}</td>
               </tr>`;
