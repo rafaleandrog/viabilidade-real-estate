@@ -12,8 +12,13 @@ import './viab-num.js';
 // Injetada pelo shell na área de config (Template C): NÃO renderiza
 // urbi-shell-page; o respiro vem de <urbi-hospedeiro>. Escrita é admin-only.
 //
-// Reaproveitada DENTRO do estudo (#12) via `tipoFixo` (trava o tipo e some com
-// os chips) e `somenteLeitura` (não-admin vê os valores, mas não edita).
+// Item 2 (rodada 2026-07): a tela discrimina DOIS papéis do mesmo indicador em
+// seções separadas — Indicador de Benchmark (meta: `valor` + `regra_comparacao`)
+// e Indicador de Sensibilidade (faixa: `variacao_positiva_pct`/`_negativa_pct`).
+// O schema `benchmarks` já carrega os dois papéis na mesma linha (genesis intacto).
+//
+// Props `tipoFixo` (trava o tipo e some com os chips) e `somenteLeitura`
+// (não-admin vê os valores, mas não edita) seguem disponíveis para reuso.
 @customElement('viabilidade-config-benchmarks')
 export class ViabConfigBenchmarks extends LitElement {
   @property({ attribute: false }) tipoFixo: 'loteamento' | 'incorporacao' | '' = '';
@@ -32,6 +37,9 @@ export class ViabConfigBenchmarks extends LitElement {
     .chips { display: flex; gap: 6px; margin: 12px 0; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
     .rodape { margin-top: 12px; }
+    .secao { margin-top: 24px; }
+    .secao h3 { margin: 0 0 2px; }
+    .secao > p.sec { margin: 0 0 10px; }
   `];
 
   connectedCallback() {
@@ -64,9 +72,9 @@ export class ViabConfigBenchmarks extends LitElement {
             <urbi-botao variante="secundario" pequeno icone="fa-solid fa-seedling" @click=${this._semear}>Criar indicadores padrão</urbi-botao>`}
         </div>
         <p class="sec">
-          Valores de referência e faixas de sensibilidade por tipo de empreendimento.
-          Alimentam os avisos verde/vermelho e a análise de sensibilidade.
-          ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
+          Cada indicador tem dois papéis, separados abaixo: a <strong>meta de benchmark</strong>
+          (comparação verde/vermelho) e a <strong>faixa de sensibilidade</strong> (cenários
+          Bear/Base/Bull). ${this.somenteLeitura ? 'Edição restrita a administradores.' : ''}
         </p>
 
         ${this.tipoFixo ? nothing : html`
@@ -83,15 +91,29 @@ export class ViabConfigBenchmarks extends LitElement {
         ${this.carregando
           ? html`<urbi-loading mensagem="Carregando benchmarks..."></urbi-loading>`
           : html`
-            <urbi-tabela
-              .colunas=${this._colunas()}
-              .linhas=${this.itens}
-              mensagem-vazio=${this.somenteLeitura ? 'Nenhum benchmark definido para este tipo.' : 'Nenhum benchmark. Clique em “Criar indicadores padrão”.'}
-            ></urbi-tabela>
-            ${this.somenteLeitura ? nothing : html`
-              <div class="rodape">
-                <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus" @click=${() => { this.novoCampo = ''; this.mostrarNovo = true; }}>Novo indicador</urbi-botao>
-              </div>`}`}
+            <section class="secao">
+              <h3>Indicador de Benchmark</h3>
+              <p class="sec">A meta a atingir. Alimenta os avisos verde/vermelho e a comparação de resultado.</p>
+              <urbi-tabela
+                .colunas=${this._colunasBenchmark()}
+                .linhas=${this.itens}
+                mensagem-vazio=${this.somenteLeitura ? 'Nenhum benchmark definido para este tipo.' : 'Nenhum benchmark. Clique em “Criar indicadores padrão”.'}
+              ></urbi-tabela>
+              ${this.somenteLeitura ? nothing : html`
+                <div class="rodape">
+                  <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus" @click=${() => { this.novoCampo = ''; this.mostrarNovo = true; }}>Novo indicador</urbi-botao>
+                </div>`}
+            </section>
+
+            <section class="secao">
+              <h3>Indicador de Sensibilidade</h3>
+              <p class="sec">Faixa de variação que alimenta os cenários Bear / Base / Bull.</p>
+              <urbi-tabela
+                .colunas=${this._colunasSensibilidade()}
+                .linhas=${this.itens}
+                mensagem-vazio=${this.somenteLeitura ? 'Nenhum indicador definido para este tipo.' : 'Nenhum indicador. Clique em “Criar indicadores padrão”.'}
+              ></urbi-tabela>
+            </section>`}
       </urbi-hospedeiro>
 
       ${this.mostrarNovo ? this._renderNovo() : nothing}
@@ -99,7 +121,18 @@ export class ViabConfigBenchmarks extends LitElement {
     `;
   }
 
-  private _colunas() {
+  // Célula numérica editável (ou só-leitura) para uma coluna decimal.
+  private _celulaNum(b: any, key: string) {
+    return this.somenteLeitura
+      ? html`${fmtNum(Number(b[key]) || 0, 2)}`
+      : html`<viab-num
+          .valor=${this._num(b[key])}
+          @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { [key]: e.detail.valor })}
+        ></viab-num>`;
+  }
+
+  // Colunas da seção "Indicador de Benchmark": meta (valor + regra).
+  private _colunasBenchmark() {
     const ro = this.somenteLeitura;
     const regraLabel: Record<string, string> = {
       atingir_ou_superar: 'atingir ou superar', nao_exceder: 'não exceder',
@@ -108,12 +141,7 @@ export class ViabConfigBenchmarks extends LitElement {
       { id: 'campo', label: 'Indicador', valor: (b: any) => b.campo },
       {
         id: 'valor', label: 'Valor', alinhamento: 'direita',
-        render: (b: any) => ro
-          ? html`${fmtNum(Number(b.valor) || 0, 2)}`
-          : html`<viab-num
-              .valor=${this._num(b.valor)}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { valor: e.detail.valor })}
-            ></viab-num>`,
+        render: (b: any) => this._celulaNum(b, 'valor'),
       },
       {
         id: 'regra', label: 'Regra',
@@ -128,24 +156,6 @@ export class ViabConfigBenchmarks extends LitElement {
               @urbi:select-change=${(e: CustomEvent) => this._patch(b.id, { regra_comparacao: e.detail.valor })}
             ></urbi-select>`,
       },
-      {
-        id: 'varpos', label: 'Var + (%)', alinhamento: 'direita',
-        render: (b: any) => ro
-          ? html`${fmtNum(Number(b.variacao_positiva_pct) || 0, 2)}`
-          : html`<viab-num
-              .valor=${this._num(b.variacao_positiva_pct)}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { variacao_positiva_pct: e.detail.valor })}
-            ></viab-num>`,
-      },
-      {
-        id: 'varneg', label: 'Var − (%)', alinhamento: 'direita',
-        render: (b: any) => ro
-          ? html`${fmtNum(Number(b.variacao_negativa_pct) || 0, 2)}`
-          : html`<viab-num
-              .valor=${this._num(b.variacao_negativa_pct)}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._patch(b.id, { variacao_negativa_pct: e.detail.valor })}
-            ></viab-num>`,
-      },
     ];
     if (!ro) {
       colunas.push({
@@ -155,6 +165,21 @@ export class ViabConfigBenchmarks extends LitElement {
       });
     }
     return colunas;
+  }
+
+  // Colunas da seção "Indicador de Sensibilidade": faixa de variação (± %).
+  private _colunasSensibilidade() {
+    return [
+      { id: 'campo', label: 'Indicador', valor: (b: any) => b.campo },
+      {
+        id: 'varpos', label: 'Var + (%)', alinhamento: 'direita',
+        render: (b: any) => this._celulaNum(b, 'variacao_positiva_pct'),
+      },
+      {
+        id: 'varneg', label: 'Var − (%)', alinhamento: 'direita',
+        render: (b: any) => this._celulaNum(b, 'variacao_negativa_pct'),
+      },
+    ];
   }
 
   private _renderNovo(): TemplateResult {

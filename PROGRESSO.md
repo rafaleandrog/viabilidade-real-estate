@@ -55,6 +55,30 @@ Fontes de verdade confirmadas no monorepo `C:\Users\Rafael.gualberto\urbiverso\u
 (`docs/shell/ui-componentes-conteudo.md`, `ui-componentes-layout.md`, `nucleo.md`, `ia.md`,
 `sdk/src/contrato.ts`) e apps-modelo em `urbiverso-apps-gestao/`. Nenhuma correção feita.
 
+### Etapa 1 — ✅ CONCLUÍDA (itens 1 e 2 — navegação + separação benchmark/sensibilidade)
+- **Item 1 (Benchmark como aba de topo):** a aba de topo `/benchmarks` **já existia e
+  funcionava** no dashboard (`tela-dashboard.ts` aba `benchmark` → `viabilidade-config-benchmarks`),
+  honrando o `nav`/`telas_config.benchmarks` do manifesto. O que sobrava era a **5ª aba
+  "Benchmarks" dentro do Estudo** (introduzida como #12 na rodada 2026-07-15). Removida de
+  `tela-estudo.ts`: tirado o item de `_abas`, o `<urbi-hospedeiro slot="benchmarks">`, o
+  `Aba`='benchmarks', o import e o helper `_ehAdmin` (que só servia àquele slot). Benchmark
+  agora é **exclusivamente** aba de topo, no nível de Estudos/Terrenos.
+- **Item 2 (separar os dois indicadores):** `viabilidade-config-benchmarks.ts` agora exibe **duas
+  seções distintas** sobre as mesmas linhas da tabela `benchmarks` (genesis intacto):
+  1. **Indicador de Benchmark** — colunas Indicador · Valor · Regra (`valor` + `regra_comparacao`);
+     é a meta que alimenta os avisos verde/vermelho e a comparação de resultado.
+  2. **Indicador de Sensibilidade** — colunas Indicador · Var + (%) · Var − (%)
+     (`variacao_positiva_pct`/`_negativa_pct`); é a faixa dos cenários Bear/Base/Bull.
+  Schema confirmado: a tabela `benchmarks` já suporta os dois papéis na mesma linha. Leitura já
+  era separada — comparação de meta lê `valor`; os cenários leem os campos do **estudo**
+  (`estudos.sensibilidade_variacao_*_pct`, fallback 10). **Decisão registrada:** não reconectei o
+  cálculo dos cenários para consumir `benchmarks.variacao_*_pct` (risco de regressão e fora do
+  escopo "UI/leitura" do item 2); as faixas globais servem como referência/padrão por tipo.
+- **Nota de rota:** esta etapa **reverte** a decisão #12 da rodada "lista bugs.xlsx" (benchmark
+  dentro do estudo). Conforme regra do documento, os itens desta rodada vencem.
+- **Validado (verde):** typecheck ✓ · build ✓ (frontend 102.7→103.0kb · backend 841.2kb) ·
+  test 25/25 ✓ · empacotar ✓ (PowerShell). Sem alteração de schema/migração; `versao` intacta.
+
 ---
 
 ## Rodada de correções — "lista bugs.xlsx" (2026-07-15)
