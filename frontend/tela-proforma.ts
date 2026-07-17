@@ -83,6 +83,8 @@ export class ViabTelaProforma extends LitElement {
       font-style: italic; font-size: 0.72rem; max-width: 340px;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
     }
+    /* Sensibilidade: divisória simples entre os grupos (monetárias × indicadores %). */
+    .pf.sens tr.div-top td { border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.15)); }
     /* #11 — unidades e preço médio por tipo. */
     .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; }
     .ut-item { display: flex; flex-direction: column; gap: 2px; }
@@ -336,29 +338,30 @@ export class ViabTelaProforma extends LitElement {
     const bear = calcularProforma(this._aplicarFator(fatorBear));
     const base = calcularProforma(this._aplicarFator(1));
     const bull = calcularProforma(this._aplicarFator(fatorBull));
-    const linhas: { l: string; f: (p: Proforma) => number; pct?: boolean }[] = [
+    // Duas primeiras linhas monetárias (4) e, separados por uma divisória, os dois
+    // indicadores em % — Custo obra/VGV (novo) e Margem líquida.
+    const linhas: { l: string; f: (p: Proforma) => number; pct?: boolean; divisoria?: boolean }[] = [
       { l: 'VGV', f: (p) => p.vgv },
       { l: 'Receita líquida', f: (p) => p.receitaLiquida },
       { l: 'Custo direto total', f: (p) => p.custoDiretoTotal },
       { l: 'Resultado', f: (p) => p.resultado },
+      { l: 'Custo obra / VGV', f: (p) => p.custoObrasVgvPct, pct: true, divisoria: true },
       { l: 'Margem líquida', f: (p) => p.margemLiquidaPct, pct: true },
     ];
-    const fmt = (m: any, v: number) => (m.pct ? fmtPct(v) : fmtR$(v));
-    // #11: título de cada cenário num urbi-badge ESTÁTICO (sem `interativo`), com a
-    // cor convencionada — Bear=perigo (vermelho), Base=sucesso (verde), Bull=info
-    // (azul). O emoji segue na frente; os valores ficam neutros (a identidade da
-    // coluna vem do badge no cabeçalho).
+    const fmt = (m: { pct?: boolean }, v: number) => (m.pct ? fmtPct(v) : fmtR$(v));
+    // #11: título de cada cenário num urbi-badge ESTÁTICO — Bear=perigo (vermelho),
+    // Base=sucesso (verde), Bull=info (azul). Os NÚMEROS agora seguem a mesma cor
+    // do cenário (tokens correspondentes ao badge).
     const COR_BADGE = { bear: 'perigo', base: 'sucesso', bull: 'info' } as const;
-    const colCenario = (id: 'bear' | 'base' | 'bull', rot: string, cen: Proforma) => ({
-      id, alinhamento: 'direita',
-      label: html`<urbi-badge cor=${COR_BADGE[id]}>${rot}</urbi-badge>`,
-      render: (m: any) => html`<span style="font-variant-numeric:tabular-nums">${fmt(m, m.f(cen))}</span>`,
-    });
-    const colunas = [
-      { id: 'linha', label: 'Linha', valor: (m: any) => m.l },
-      colCenario('bear', '📉 Bear', bear),
-      colCenario('base', '📊 Base', base),
-      colCenario('bull', '🚀 Bull', bull),
+    const COR_TXT = {
+      bear: 'var(--cor-erro, #D45A3A)',
+      base: 'var(--cor-sucesso, #13A98D)',
+      bull: 'var(--cor-info, #2AA9E0)',
+    } as const;
+    const cenarios: { id: 'bear' | 'base' | 'bull'; rot: string; p: Proforma }[] = [
+      { id: 'bear', rot: '📉 Bear', p: bear },
+      { id: 'base', rot: '📊 Base', p: base },
+      { id: 'bull', rot: '🚀 Bull', p: bull },
     ];
     return html`<urbi-card titulo="Análise de sensibilidade">
       <div class="sens-var">
@@ -369,7 +372,23 @@ export class ViabTelaProforma extends LitElement {
           @urbi:select-change=${(e: CustomEvent) => this.varSens = e.detail.valor as VarSens}
         ></urbi-select>
       </div>
-      <urbi-tabela .colunas=${colunas} .linhas=${linhas}></urbi-tabela>
+      <div class="pf-wrap">
+        <table class="pf sens">
+          <thead>
+            <tr>
+              <th></th>
+              ${cenarios.map((c) => html`<th class="num"><urbi-badge cor=${COR_BADGE[c.id]}>${c.rot}</urbi-badge></th>`)}
+            </tr>
+          </thead>
+          <tbody>
+            ${linhas.map((m) => html`
+              <tr class=${m.divisoria ? 'div-top' : ''}>
+                <td>${m.l}</td>
+                ${cenarios.map((c) => html`<td class="num" style="color:${COR_TXT[c.id]}">${fmt(m, m.f(c.p))}</td>`)}
+              </tr>`)}
+          </tbody>
+        </table>
+      </div>
     </urbi-card>`;
   }
 

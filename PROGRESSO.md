@@ -308,6 +308,18 @@ acionei workflows).
   esquerda**; **1ª coluna sem o título "Linha"** (cabeçalho vazio). Valores seguem à direita.
 - Validado: typecheck ✓ · build ✓ (117.1→117.4kb) · test 49/49 ✓ · empacotar ✓.
 
+### Etapa 2 — Análise de sensibilidade ✅
+- Convertida de `urbi-tabela` para **tabela HTML própria** (`table.pf.sens`, reusa os estilos da
+  Proforma) para controlar cabeçalho, cores e divisória.
+- **Cabeçalho da 1ª coluna vazio** (sem "Linha"); títulos Bear/Base/Bull seguem em `urbi-badge`.
+- **Números na cor do cenário:** Bear=`--cor-erro` (vermelho), Base=`--cor-sucesso` (verde),
+  Bull=`--cor-info` (azul) — antes eram neutros.
+- **Novo indicador "Custo obra / VGV"** (`custoObrasVgvPct`).
+- **Dois grupos:** 4 monetárias (VGV, Receita líquida, Custo direto total, Resultado) em cima; os 2
+  indicadores em % (Custo obra/VGV, Margem líquida) embaixo, com **`border-top` de divisória** (linha
+  `.div-top`).
+- Validado: typecheck ✓ · build ✓ (117.4→118.0kb) · test 49/49 ✓ · empacotar ✓.
+
 ### Pós-fechamento — nota
 - **KPI R/NR na Proforma (revertido a pedido do autor).** Chegou a existir um commit dividindo o KPI
   do topo em "Nº un. residencial/não residencial/total" + preço médio R/NR (`4bef233`), mas o autor
