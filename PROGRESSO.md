@@ -18,6 +18,45 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada correção 2026-07 — plano (`lista_bugs.csv`)
+
+> Nova rodada de refinamento, guiada pelo documento `prompt-correcao-viabilidade`.
+> **Uma etapa por sessão.** Numeração dos itens é a da `lista_bugs.csv` — **independente**
+> da rodada "lista bugs.xlsx" (2026-07-15) mais abaixo, cujos `#N` são outra lista.
+> 14 itens em escopo; **itens 12 e 16 removidos do escopo pelo autor** — não tocar.
+
+**Baseline Etapa 0 (verde):** typecheck ✓ · build ✓ (frontend 102.7kb · backend 841.2kb) ·
+test 25/25 ✓ · empacotar ✓ (via PowerShell; o `tar` do Git Bash falha em paths `C:` —
+**usar PowerShell para `urbi-empacotar` neste ambiente**).
+
+| Item | Descrição | Etapa | Área |
+|---|---|---|---|
+| 1 | Benchmark vira aba de topo (nível de Estudos/Terrenos), fora do detalhe do Estudo | **1** | manifesto/nav + frontend |
+| 2 | Separar Indicador de **Benchmark** (meta, `regra_comparacao`) de Indicador de **Sensibilidade** (`variacao_*_pct` → cenários) | **1** | schema/frontend |
+| 3 | Botão de Membros com UI errada → seguir contrato `urbi-botao` | **2** | frontend (UI) |
+| 4 | Label de campo em 2 linhas desalinha a fileira → alinhar por grid/altura fixa | **2** | frontend (UI) |
+| 6 | Padronizar `urbi-input*` em **3 larguras** (%/R$m²/coef · área/moeda · texto/select) | **2** | frontend (UI) |
+| 5 | **Troca de unidade por badge interativa** com recálculo correto (CRÍTICA) | **3** | frontend + engine |
+| 7 | Detalhar nº e preço médio por unidade **R e NR** em Premissas e Proforma | **4** | frontend + engine |
+| 8 | Nova **coluna de descrição** na Proforma (2ª col, texto menor itálico) | **5** | frontend (tabela) |
+| 9 | Linhas de consolidação: inverter posições + adicionar **"Deduções sobre VGV"** | **5** | frontend + engine |
+| 10 | **Permuta física detalhada** (m² e % área privativa; R e NR em linhas separadas) | **5** | frontend + engine |
+| 13 | Remover memo "Permuta física entregue" + renomear "Gestão e outros indiretos" → "…custos indiretos" | **5** | frontend + premissas |
+| 11 | Cenários **Bear/Base/Bull** em `urbi-badge` estático colorido | **6** | frontend (UI) |
+| 14 | **Pizza de alocação de áreas** (Loteamento e Incorporação; Inc com subgrupo geral+macro) | **7** | frontend (gráficos) |
+| 15 | **Medidores de indicadores** por benchmark (Custo obra/VGV invertido) | **7** | frontend (gráficos) |
+| ~~12~~ | ~~fora do escopo (decisão do autor)~~ | — | — |
+| ~~16~~ | ~~fora do escopo (decisão do autor)~~ | — | — |
+
+**Etapa 8:** fechamento + empacotamento. Não bumpar `versao` salvo migração de schema.
+
+### Etapa 0 — ✅ CONCLUÍDA (reconhecimento + baseline)
+Fontes de verdade confirmadas no monorepo `C:\Users\Rafael.gualberto\urbiverso\urbiverso\`
+(`docs/shell/ui-componentes-conteudo.md`, `ui-componentes-layout.md`, `nucleo.md`, `ia.md`,
+`sdk/src/contrato.ts`) e apps-modelo em `urbiverso-apps-gestao/`. Nenhuma correção feita.
+
+---
+
 ## Rodada de correções — "lista bugs.xlsx" (2026-07-15)
 
 Round de refinamento sobre o MVP (22 itens da planilha do autor). Branch `fix/lista-bugs`.
