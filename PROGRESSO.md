@@ -186,6 +186,19 @@ Fontes de verdade confirmadas no monorepo `C:\Users\Rafael.gualberto\urbiverso\u
 - **Validado (verde):** typecheck ✓ · build ✓ (frontend 106.7→109.0kb · backend 841.2kb) ·
   **test 32/32 ✓** (+2) · empacotar ✓ (PowerShell).
 
+### Etapa 6 — ✅ CONCLUÍDA (item 11 — cenários Bear/Base/Bull em urbi-badge)
+- Os títulos das colunas da análise de sensibilidade (📉 Bear, 📊 Base, 🚀 Bull) deixaram de ser
+  `<span>` coloridos e viraram **`urbi-badge` estáticos** (sem `interativo` — badge estática aplica a
+  `cor` direto, ver contrato §urbi-badge), cada um com a cor convencionada: **Bear=`perigo`** (vermelho),
+  **Base=`sucesso`** (verde), **Bull=`info`** (azul). O emoji segue na frente, dentro do badge.
+- **Ajuste de convenção:** a cor de `Base`/`Bull` estava divergente (Base=neutro, Bull=verde na versão
+  anterior). O documento vence e fixa Base=verde/sucesso, Bull=azul/info — alinhado.
+- **Valores neutros:** a tinta por cenário saiu das células de valor (antes coloridas). A identidade
+  da coluna vem do badge no cabeçalho; evita interpretar número verde como "bom" (a cor agora é
+  categoria, não semântica de bom/ruim).
+- **Validado (verde):** typecheck ✓ · build ✓ (frontend 109.0→108.9kb · backend 841.2kb) ·
+  test 32/32 ✓ · empacotar ✓ (PowerShell). Frontend puro; sem schema/cálculo; `versao` intacta.
+
 ---
 
 ## Rodada de correções — "lista bugs.xlsx" (2026-07-15)

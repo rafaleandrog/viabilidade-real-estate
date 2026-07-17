@@ -331,17 +331,15 @@ export class ViabTelaProforma extends LitElement {
       { l: 'Margem líquida', f: (p) => p.margemLiquidaPct, pct: true },
     ];
     const fmt = (m: any, v: number) => (m.pct ? fmtPct(v) : fmtR$(v));
-    // #6: emoji + cor por cenário (tokens do design system). Bull=verde (positivo),
-    // Base=neutro, Bear=vermelho (negativo). Aplicados no cabeçalho e nos valores.
-    const CORES = {
-      bear: 'var(--cor-erro, #D45A3A)',
-      base: 'var(--cor-texto, rgba(255,255,255,0.85))',
-      bull: 'var(--cor-sucesso, #13A98D)',
-    } as const;
+    // #11: título de cada cenário num urbi-badge ESTÁTICO (sem `interativo`), com a
+    // cor convencionada — Bear=perigo (vermelho), Base=sucesso (verde), Bull=info
+    // (azul). O emoji segue na frente; os valores ficam neutros (a identidade da
+    // coluna vem do badge no cabeçalho).
+    const COR_BADGE = { bear: 'perigo', base: 'sucesso', bull: 'info' } as const;
     const colCenario = (id: 'bear' | 'base' | 'bull', rot: string, cen: Proforma) => ({
       id, alinhamento: 'direita',
-      label: html`<span style="color:${CORES[id]}">${rot}</span>`,
-      render: (m: any) => html`<span style="color:${CORES[id]};font-variant-numeric:tabular-nums">${fmt(m, m.f(cen))}</span>`,
+      label: html`<urbi-badge cor=${COR_BADGE[id]}>${rot}</urbi-badge>`,
+      render: (m: any) => html`<span style="font-variant-numeric:tabular-nums">${fmt(m, m.f(cen))}</span>`,
     });
     const colunas = [
       { id: 'linha', label: 'Linha', valor: (m: any) => m.l },
