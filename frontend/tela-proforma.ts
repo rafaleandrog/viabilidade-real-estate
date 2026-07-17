@@ -80,14 +80,6 @@ export class ViabTelaProforma extends LitElement {
       font-style: italic; font-size: 0.72rem; max-width: 340px;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
     }
-    /* #11 — unidades e preço médio por tipo. */
-    .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; }
-    .ut-item { display: flex; flex-direction: column; gap: 2px; }
-    .ut-rot {
-      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
-    }
-    .ut-val { font-size: 0.95rem; color: var(--cor-texto-forte, rgba(255,255,255,0.95)); font-variant-numeric: tabular-nums; }
   `];
 
   private _idCarregado: number | null = null;
@@ -124,8 +116,7 @@ export class ViabTelaProforma extends LitElement {
       permuta_fisica_nr_area_m2: 0, permuta_fisica_nr_pct: 0,
     })).vgv;
     return html`
-      ${this._renderKpis(p)}
-      ${!lot ? this._renderUnidadesTipo(p) : nothing}
+      ${this._renderKpis(p, lot)}
       <urbi-card titulo="Proforma">
         ${this._renderTabela(p, lot, vgvBruto)}
         <div class="barra-acoes">
@@ -137,15 +128,31 @@ export class ViabTelaProforma extends LitElement {
     `;
   }
 
-  private _renderKpis(p: Proforma): TemplateResult {
+  private _renderKpis(p: Proforma, lot: boolean): TemplateResult {
     const co = this._bm('custo_obras_vgv');
     const ml = this._bm('margem_liquida');
     const temPermuta = p.areaPermutaFisica > 0 || p.permutaFinResidencial > 0 || p.permutaFinNaoResidencial > 0;
+    // #7: Incorporação com unidades R/NR informadas → nº e preço médio separados
+    // (residencial / não residencial / total) direto nos KPIs do topo. Sem dados
+    // R/NR (loteamento ou estudo legado só com o total) → KPIs únicos.
+    const temRNR = !lot && (p.numUnidadesResidencial > 0 || p.numUnidadesNaoResidencial > 0);
     const kpis: { rot: string; val: string; variante: string }[] = [
       { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²`, variante: '' },
-      { rot: 'Preço médio/unid.', val: fmtR$(p.precoMedioUnidade), variante: '' },
-      { rot: 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
     ];
+    if (temRNR) {
+      kpis.push(
+        { rot: 'Nº un. residencial', val: fmtNum(p.numUnidadesResidencial), variante: '' },
+        { rot: 'Nº un. não residencial', val: fmtNum(p.numUnidadesNaoResidencial), variante: '' },
+        { rot: 'Nº un. total', val: fmtNum(p.numUnidades), variante: '' },
+        { rot: 'Preço médio/un. R', val: fmtR$(p.precoMedioUnidadeResidencial), variante: '' },
+        { rot: 'Preço médio/un. NR', val: fmtR$(p.precoMedioUnidadeNaoResidencial), variante: '' },
+      );
+    } else {
+      kpis.push(
+        { rot: 'Preço médio/unid.', val: fmtR$(p.precoMedioUnidade), variante: '' },
+        { rot: lot ? 'Nº de lotes' : 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
+      );
+    }
     if (temPermuta) kpis.push({ rot: 'Área permutada', val: `${fmtNum(p.areaPermutaFisica)} m²`, variante: '' });
     kpis.push({ rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: co ? (p.custoObrasVgvPct <= Number(co.valor) ? 'sucesso' : 'erro') : '' });
     kpis.push({ rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: ml ? (p.margemLiquidaPct >= Number(ml.valor) ? 'sucesso' : 'erro') : '' });
@@ -268,22 +275,6 @@ export class ViabTelaProforma extends LitElement {
         </table>
       </div>
     `;
-  }
-
-  // #7/#11: unidades e preço médio por tipo (Residencial / Não residencial),
-  // direto do motor (fonte única, também usada na Premissas).
-  private _renderUnidadesTipo(p: Proforma): TemplateResult {
-    const qR = p.numUnidadesResidencial;
-    const qNR = p.numUnidadesNaoResidencial;
-    if (qR === 0 && qNR === 0) return html``;
-    const pmR = qR > 0 ? `${fmtR$(p.precoMedioUnidadeResidencial)}/un` : '—';
-    const pmNR = qNR > 0 ? `${fmtR$(p.precoMedioUnidadeNaoResidencial)}/un` : '—';
-    return html`<urbi-card titulo="Unidades e preço médio por tipo">
-      <div class="unid-tipo">
-        <div class="ut-item"><span class="ut-rot">Residencial</span><span class="ut-val">${fmtNum(qR)} un · ${pmR}</span></div>
-        <div class="ut-item"><span class="ut-rot">Não residencial</span><span class="ut-val">${fmtNum(qNR)} un · ${pmNR}</span></div>
-      </div>
-    </urbi-card>`;
   }
 
   private _variaveis(lot: boolean): { valor: VarSens; rotulo: string }[] {

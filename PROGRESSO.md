@@ -258,6 +258,16 @@ transformar dado de instância): `infra_valor_fixo`, `permuta_financeira_{res,na
 **Fluxo:** code → commit → push. Release/deploy é responsabilidade do autor (não criei release nem
 acionei workflows).
 
+### Pós-fechamento — reforço do item 7 (unidades R/NR na Proforma)
+Autor apontou não ver a separação de nº de unidades R/NR na Proforma. Verificado: **estava na lista
+(item 7) e já implementado** (Etapa 4 + card herdado do #11), mas (a) ainda não deployado e (b) o card
+"Unidades e preço médio por tipo" **se escondia** quando o estudo só tinha o campo legado `num_unidades`.
+Correção (decisão do autor: **dividir o KPI do topo**): os KPIs do topo da Proforma agora mostram, para
+Incorporação com unidades R/NR informadas, **Nº un. residencial · Nº un. não residencial · Nº un. total**
+e **Preço médio/un. R · Preço médio/un. NR** — direto na faixa mais visível. Sem dados R/NR (loteamento
+ou estudo legado) cai nos KPIs únicos. Card redundante "Unidades e preço médio por tipo" removido.
+Validado: typecheck ✓ · build ✓ (111.8kb) · test 32/32 ✓ · empacotar ✓.
+
 ---
 
 ## Rodada de correções — "lista bugs.xlsx" (2026-07-15)
