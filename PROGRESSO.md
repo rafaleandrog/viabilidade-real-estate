@@ -222,6 +222,42 @@ Fontes de verdade confirmadas no monorepo `C:\Users\Rafael.gualberto\urbiverso\u
   test 32/32 ✓ · empacotar ✓ (PowerShell). Sem schema/cálculo novo (só leitura); `versao` intacta.
   ⏳ Render real dos primitivos `urbi-grafico-*` só valida no deploy dev.
 
+### Etapa 8 — ✅ CONCLUÍDA (fechamento e empacotamento)
+**Suíte completa verde:** typecheck ✓ · build ✓ (frontend **112.4kb**, backend **841.2kb**) ·
+**test 32/32 ✓** · empacotar ✓ → `dist/viabilidade-0.1.0.urbiapp.tgz` (342 KB) + `.sha256`.
+
+**Itens fechados (14/14):** 1, 2 (Etapa 1) · 3, 4, 6 (Etapa 2) · 5 (Etapa 3) · 7 (Etapa 4) ·
+8, 9, 10, 13 (Etapa 5) · 11 (Etapa 6) · 14, 15 (Etapa 7).
+**Fora do escopo por decisão do autor — não tocados:** **itens 12 e 16**.
+
+**Versão:** mantida em **0.1.0**. Nenhuma migração criada (`migracoes/` só tem `.gitkeep`) — todas as
+mudanças de schema foram **colunas/opções aditivas no genesis** (auto-criadas pelo sincronizador, sem
+transformar dado de instância): `infra_valor_fixo`, `permuta_financeira_{res,nao_res}_{modo,valor}`,
+`permuta_fisica_nr_{modo,area_m2,pct}`, e a opção `valor_fixo` em `infra_modo`. Backend inalterado
+(PATCH por blocklist valida contra o genesis).
+
+**Decisões de rota registradas (os itens desta rodada vencem a spec/rodadas anteriores):**
+1. Benchmark voltou a ser **aba de topo** — reverte o #12 da rodada "lista bugs.xlsx" (Etapa 1).
+2. Sensibilidade continua lendo `estudos.sensibilidade_variacao_*_pct` (as `variacao_*_pct` do
+   benchmark são referência/padrão por tipo; **não** reconectei o cálculo dos cenários) (Etapa 1).
+3. Botão de Membros: `fantasma`→`secundario`. Outros botões `fantasma` no app **não** foram tocados
+   (fora do escopo do item 3) — varredura própria pendente se `fantasma` for inválido em runtime (Etapa 2).
+4. Permuta física R/NR: par legado `permuta_fisica_*` virou o **Residencial** (e o único do
+   loteamento); só a NR ganhou colunas novas — sem perda de dados (Etapas 3/5).
+5. Permuta financeira NR **oculta no loteamento** (não há produto NR) (Etapa 3).
+6. Cenários Bear/Base/Bull: cor de convenção corrigida para Base=verde/sucesso, Bull=azul/info; valores
+   das células ficaram **neutros** (cor = categoria, não semântica de bom/ruim) (Etapa 6).
+
+**Pendente para o deploy dev (validação visual real — nunca rodou contra shell real):**
+- Render/ajuste fino dos primitivos migrados nesta rodada: `urbi-badge` interativo (troca de unidade),
+  `urbi-badge` estático (cenários), `urbi-grafico-pizza` (alocação de áreas) e `urbi-grafico-medidor`
+  (indicadores + faixas).
+- Alinhamento de labels de 2 linhas e as 3 larguras de campo em Premissas (CSS conferido offline).
+- `urbi-empacotar` neste ambiente **só roda via PowerShell** (o `tar` do Git Bash falha em paths `C:`).
+
+**Fluxo:** code → commit → push. Release/deploy é responsabilidade do autor (não criei release nem
+acionei workflows).
+
 ---
 
 ## Rodada de correções — "lista bugs.xlsx" (2026-07-15)
