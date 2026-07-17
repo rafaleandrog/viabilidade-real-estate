@@ -35,11 +35,13 @@ export interface ProformaInput {
   sujeito_ret?: boolean; imposto_percentual?: number | string;
   corretagem_percentual?: number | string; marketing_percentual?: number | string;
   permuta_financeira_residencial_pct?: number | string; permuta_financeira_nao_residencial_pct?: number | string;
+  permuta_financeira_residencial_modo?: string; permuta_financeira_residencial_valor?: number | string;
+  permuta_financeira_nao_residencial_modo?: string; permuta_financeira_nao_residencial_valor?: number | string;
   // custos diretos
   considerar_custo_terreno?: boolean; custo_terreno_m2?: number | string;
   projetos_modo?: string; projetos_pct?: number | string; projetos_valor_fixo?: number | string;
   licenciamento_modo?: string; licenciamento_pct?: number | string; licenciamento_valor_fixo?: number | string;
-  infra_modo?: string; custo_infra_m2?: number | string; infra_pct?: number | string;
+  infra_modo?: string; custo_infra_m2?: number | string; infra_pct?: number | string; infra_valor_fixo?: number | string;
   incorporacao_registro_pct?: number | string;
   construcao_modo?: string; custo_construcao_m2?: number | string; construcao_valor_total?: number | string;
   taxa_gestao_pct?: number | string; custo_decoracao_m2?: number | string;
@@ -127,15 +129,24 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const imposto = vgv * impostoPct / 100;
   const corretagem = vgv * n(e.corretagem_percentual) / 100;
   const marketing = vgv * n(e.marketing_percentual) / 100;
-  const permutaFinResidencial = vgvResidencial * n(e.permuta_financeira_residencial_pct) / 100;
-  const permutaFinNaoResidencial = vgvNaoResidencial * n(e.permuta_financeira_nao_residencial_pct) / 100;
+  // Permuta financeira (#5): por % do VGV do tipo ou por valor absoluto em R$.
+  const permutaFinResidencial = e.permuta_financeira_residencial_modo === 'valor_fixo'
+    ? n(e.permuta_financeira_residencial_valor)
+    : vgvResidencial * n(e.permuta_financeira_residencial_pct) / 100;
+  const permutaFinNaoResidencial = e.permuta_financeira_nao_residencial_modo === 'valor_fixo'
+    ? n(e.permuta_financeira_nao_residencial_valor)
+    : vgvNaoResidencial * n(e.permuta_financeira_nao_residencial_pct) / 100;
   const receitaLiquida = vgv - imposto - corretagem - marketing - permutaFinResidencial - permutaFinNaoResidencial;
 
   // ── Custos diretos ──
   const custoTerreno = e.considerar_custo_terreno === false ? 0 : n(e.custo_terreno_m2) * areaTerreno;
 
+  // Infraestrutura (loteamento) — 3 modos (#5): % do VGV, valor fixo em R$, ou
+  // R$/m² × área privativa dos lotes (= área vendável bruta).
   const infraestrutura = lot
-    ? (e.infra_modo === 'valor_m2' ? n(e.custo_infra_m2) * areaVendavel : vgv * n(e.infra_pct) / 100)
+    ? (e.infra_modo === 'valor_m2' ? n(e.custo_infra_m2) * areaVendavel
+      : e.infra_modo === 'valor_fixo' ? n(e.infra_valor_fixo)
+      : vgv * n(e.infra_pct) / 100)
     : 0;
   // Construção: por área (R$/m² × área privativa) ou valor total em R$ (#4).
   const construcao = lot ? 0

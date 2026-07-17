@@ -162,15 +162,19 @@ export class ViabTelaProforma extends LitElement {
       ? 'desconsiderado'
       : `${rsm2(e.custo_terreno_m2)} × ${fmtNum(p.areaTerreno)} m²`;
     const projetosMemo = e.projetos_modo === 'valor_fixo' ? 'valor fixo' : `${pct(e.projetos_pct)} do VGV`;
-    const infraMemo = e.infra_modo === 'valor_m2' ? `${rsm2(e.custo_infra_m2)} × área vendável` : `${pct(e.infra_pct)} do VGV`;
+    const infraMemo = e.infra_modo === 'valor_m2' ? `${rsm2(e.custo_infra_m2)} × área vendável`
+      : e.infra_modo === 'valor_fixo' ? 'valor fixo'
+      : `${pct(e.infra_pct)} do VGV`;
     const construcaoMemo = e.construcao_modo === 'valor_total' ? 'valor total' : `${rsm2(e.custo_construcao_m2)} × área privativa`;
     return [
       { l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita' },
       { l: '(-) Imposto', v: p.imposto, memo: impostoMemo },
       { l: '(-) Corretagem', v: p.corretagem, memo: `${pct(e.corretagem_percentual)} do VGV` },
       { l: '(-) Marketing', v: p.marketing, memo: `${pct(e.marketing_percentual)} do VGV` },
-      { l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, ocultarSeZero: true, memo: `${pct(e.permuta_financeira_residencial_pct)} do VGV res.` },
-      { l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, ocultarSeZero: true, memo: `${pct(e.permuta_financeira_nao_residencial_pct)} do VGV n/res.` },
+      { l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, ocultarSeZero: true,
+        memo: e.permuta_financeira_residencial_modo === 'valor_fixo' ? 'valor fixo' : `${pct(e.permuta_financeira_residencial_pct)} do VGV res.` },
+      { l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, ocultarSeZero: true,
+        memo: e.permuta_financeira_nao_residencial_modo === 'valor_fixo' ? 'valor fixo' : `${pct(e.permuta_financeira_nao_residencial_pct)} do VGV n/res.` },
       { l: '= Receita líquida', v: p.receitaLiquida, tipo: 'receita' },
       { l: '(-) Terreno', v: p.custoTerreno, grupo: 'direto', memo: terrenoMemo },
       { l: '(-) Projetos e aprovação', v: p.projetos, grupo: 'direto', memo: projetosMemo },

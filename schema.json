@@ -52,6 +52,10 @@
         "marketing_percentual":                 { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
         "permuta_financeira_residencial_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
         "permuta_financeira_nao_residencial_pct": { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "permuta_financeira_residencial_modo":      { "tipo": "texto", "limite": 12, "opcoes": ["pct_vgv", "valor_fixo"], "padrao": "pct_vgv" },
+        "permuta_financeira_residencial_valor":     { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "permuta_financeira_nao_residencial_modo":  { "tipo": "texto", "limite": 12, "opcoes": ["pct_vgv", "valor_fixo"], "padrao": "pct_vgv" },
+        "permuta_financeira_nao_residencial_valor": { "tipo": "decimal", "precisao": 12, "escala": 2 },
 
         "considerar_custo_terreno": { "tipo": "booleano", "padrao": true },
         "custo_terreno_m2":         { "tipo": "decimal", "precisao": 12, "escala": 2 },
@@ -65,8 +69,9 @@
         "licenciamento_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2 },
         "licenciamento_valor_fixo": { "tipo": "decimal", "precisao": 12, "escala": 2 },
 
-        "infra_modo":       { "tipo": "texto", "limite": 12, "opcoes": ["valor_m2", "pct_vgv"], "padrao": "pct_vgv" },
+        "infra_modo":       { "tipo": "texto", "limite": 12, "opcoes": ["valor_m2", "valor_fixo", "pct_vgv"], "padrao": "pct_vgv" },
         "custo_infra_m2":   { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "infra_valor_fixo": { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "infra_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 30 },
 
         "incorporacao_registro_pct": { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0.25 },

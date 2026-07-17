@@ -105,6 +105,37 @@ Fontes de verdade confirmadas no monorepo `C:\Users\Rafael.gualberto\urbiverso\u
   test 25/25 ✓ · empacotar ✓ (PowerShell). Frontend puro (CSS/tokens); sem cálculo, schema ou
   migração; `versao` intacta.
 
+### Etapa 3 — ✅ CONCLUÍDA (item 5 — troca de unidade por badge interativa) — ETAPA CRÍTICA
+- **Mecanismo de badge (headline):** `_custoUnidade` (tela-premissas) trocou o `urbi-select` de
+  unidade por **`urbi-badge` interativos com seleção mútua** — só uma `?ativo` por vez; clicar troca
+  o `<modoKey>` e recalcula ao vivo. Contrato confirmado (`ui-componentes-conteudo.md` §urbi-badge):
+  `interativo` dá cursor/chip/cinza-quando-inativo e Enter/Espaço já disparam o mesmo `click` (sem
+  `keydown` manual). Aplicado a: infra, construção, projetos e permuta física.
+- **Infra do loteamento com 3 unidades (#5):** era `%VGV`/`R$/m²`; agora `%VGV` / **`R$` (fixo)** /
+  `R$/m²`. Schema: `infra_modo` opcoes += `valor_fixo` e nova coluna `infra_valor_fixo` (aditivo, o
+  sincronizador cria; sem migração). Motor: `infra_modo==='valor_fixo' → infra_valor_fixo`; `valor_m2
+  → custo_infra_m2 × área vendável (= privativa dos lotes)`.
+- **Permuta financeira R e NR como badge (#5):** as duas saíram das Deduções-plain-% e viraram
+  campos com toggle **`% VGV` ↔ `R$`**. Schema aditivo: `permuta_financeira_{residencial,
+  nao_residencial}_{modo,valor}`. Motor: `modo==='valor_fixo' → valor absoluto`, senão `pct × VGV do
+  tipo`. **Correção de borda:** a permuta financeira NR fica oculta no **loteamento** (não há produto
+  NR; no modo % era inócua ×0, mas no modo R$ deduziria valor espúrio).
+- **Cálculo R$/m² travado por teste:** construção `R$/m² × área privativa TOTAL` (R+NR, fechada+aberta);
+  infra `R$/m² × área vendável`. +5 testes (infra 3 modos, permuta financeira R$, construção total).
+- **Memos da Proforma cientes do modo** (tela-proforma): `infra`/permuta financeira mostram
+  "valor fixo" no modo R$ em vez de "% do VGV" enganoso. (Tabela completa é da Etapa 5.)
+- **DECISÃO DE ROTA (reportada):** o **split R/NR da permuta física** (2 campos separados) foi
+  **adiado para a Etapa 5 / item 10**, dona das "linhas separadas R e NR" na Proforma — evita
+  duplicar schema/engine e mantém a etapa crítica isolada. Permuta física segue como campo único
+  com badge (m²/% área venda) por ora.
+- **Schema:** +5 colunas aditivas em `estudos` (`infra_valor_fixo`,
+  `permuta_financeira_{residencial,nao_residencial}_{modo,valor}`) + 1 opção nova em `infra_modo`.
+  Backend PATCH usa **blocklist** (não allowlist) → colunas passam e são validadas contra o genesis;
+  sem alteração no backend. **`versao` mantida em 0.1.0** (só adição de coluna, sem migração — segue
+  o precedente da rodada anterior).
+- **Validado (verde):** typecheck ✓ · build ✓ (frontend 103.0→105.3kb · backend 841.2kb) ·
+  **test 28/28 ✓** (+3) · empacotar ✓ (PowerShell).
+
 ---
 
 ## Rodada de correções — "lista bugs.xlsx" (2026-07-15)

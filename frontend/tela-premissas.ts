@@ -47,9 +47,11 @@ interface CustoUnidade {
 }
 const CUSTOS_UNIDADE: CustoUnidade[] = [
   {
+    // #5: infraestrutura do loteamento tem 3 unidades — % VGV, R$ (fixo) ou R$/m².
     modoKey: 'infra_modo', rotulo: 'Infraestrutura', so: 'loteamento', padrao: 'pct_vgv',
     opcoes: [
       { valor: 'pct_vgv', rotulo: '% VGV', campo: 'infra_pct', sufixo: '% VGV' },
+      { valor: 'valor_fixo', rotulo: 'R$', campo: 'infra_valor_fixo', sufixo: 'R$' },
       { valor: 'valor_m2', rotulo: 'R$/m²', campo: 'custo_infra_m2', sufixo: 'R$/m²' },
     ],
   },
@@ -71,6 +73,7 @@ const CUSTOS_UNIDADE: CustoUnidade[] = [
 
 // Permuta física: mesmo padrão de campo único com unidade (a permuta reduz o VGV;
 // entra por área em m² ou por % da área de venda). Renderizada na sua própria seção.
+// (O detalhamento R/NR em linhas separadas é da Etapa 5 / item 10.)
 const PERMUTA_UNIDADE: CustoUnidade = {
   modoKey: 'permuta_fisica_modo', rotulo: 'Permuta física', padrao: 'area_m2',
   opcoes: [
@@ -79,15 +82,32 @@ const PERMUTA_UNIDADE: CustoUnidade = {
   ],
 };
 
+// Permuta financeira R e NR (#5): cada uma alterna entre % do VGV do tipo e um
+// valor absoluto em R$. Renderizadas na seção Deduções.
+const PERMUTA_FIN_R: CustoUnidade = {
+  modoKey: 'permuta_financeira_residencial_modo', rotulo: 'Permuta financeira residencial', padrao: 'pct_vgv',
+  opcoes: [
+    { valor: 'pct_vgv', rotulo: '% VGV', campo: 'permuta_financeira_residencial_pct', sufixo: '% VGV' },
+    { valor: 'valor_fixo', rotulo: 'R$', campo: 'permuta_financeira_residencial_valor', sufixo: 'R$' },
+  ],
+};
+const PERMUTA_FIN_NR: CustoUnidade = {
+  modoKey: 'permuta_financeira_nao_residencial_modo', rotulo: 'Permuta financeira não residencial', padrao: 'pct_vgv',
+  opcoes: [
+    { valor: 'pct_vgv', rotulo: '% VGV', campo: 'permuta_financeira_nao_residencial_pct', sufixo: '% VGV' },
+    { valor: 'valor_fixo', rotulo: 'R$', campo: 'permuta_financeira_nao_residencial_valor', sufixo: 'R$' },
+  ],
+};
+
 const IMPOSTOS: Campo[] = [
   { k: 'imposto_percentual', label: 'Imposto (se não RET)', t: 'num', sufixo: '%' },
 ];
 
+// Permuta financeira R/NR saiu daqui (#5) para o padrão de campo com badge de
+// unidade (ver PERMUTA_FIN_R/PERMUTA_FIN_NR).
 const DEDUCOES: Campo[] = [
   { k: 'corretagem_percentual', label: 'Corretagem', t: 'num', sufixo: '%' },
   { k: 'marketing_percentual', label: 'Marketing', t: 'num', sufixo: '%' },
-  { k: 'permuta_financeira_residencial_pct', label: 'Permuta financeira residencial', t: 'num', sufixo: '%' },
-  { k: 'permuta_financeira_nao_residencial_pct', label: 'Permuta financeira não residencial', t: 'num', sufixo: '%' },
 ];
 
 // Loteamento — Áreas = composição da área da gleba (deduções em % da gleba).
@@ -129,12 +149,15 @@ const PRODUTOS_INC: Campo[] = [
   { k: 'preco_venda_m2_nao_residencial', label: 'Preço venda não residencial', t: 'num', sufixo: 'R$/m²' },
 ];
 
+// Todas as definições de campo-com-unidade (para coletar seus campos numéricos).
+const CAMPOS_UNIDADE: CustoUnidade[] = [...CUSTOS_UNIDADE, PERMUTA_UNIDADE, PERMUTA_FIN_R, PERMUTA_FIN_NR];
+
 const TODOS_NUM = new Set<string>([
   ...CUSTOS, ...IMPOSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC,
   ...PRODUTOS_LOT, ...PRODUTOS_INC, ...TERRENO_COEF,
 ].map((c) => c.k).concat(
-  ['permuta_fisica_area_m2', 'permuta_fisica_pct', 'terreno_manual_area'],
-  CUSTOS_UNIDADE.flatMap((cu) => cu.opcoes.map((o) => o.campo)),
+  ['terreno_manual_area'],
+  CAMPOS_UNIDADE.flatMap((cu) => cu.opcoes.map((o) => o.campo)),
 ));
 
 @customElement('viab-tela-premissas')
@@ -184,9 +207,12 @@ export class ViabTelaPremissas extends LitElement {
       display: flex; align-items: flex-end;
       min-height: 2.4em; line-height: 1.2;
     }
-    .cu-linha { display: flex; align-items: flex-end; gap: 6px; }
-    .cu-unidade { flex: 0 0 auto; width: 132px; }
-    .cu-valor { flex: 1 1 auto; min-width: 0; }
+    .cu-linha { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    /* #5: badges de unidade (seleção mútua) à esquerda do valor. */
+    .cu-badges { display: flex; gap: 4px; flex: 0 0 auto; }
+    .cu-badges urbi-badge { cursor: pointer; }
+    .cu-badge-dis { pointer-events: none; opacity: 0.5; }
+    .cu-valor { flex: 1 1 120px; min-width: 0; }
   `];
 
   private _idCarregado: number | null = null;
@@ -304,7 +330,11 @@ export class ViabTelaPremissas extends LitElement {
 
         <div class="secao grupo grupo-b">
           <h4>Deduções</h4>
-          <div class="grid">${DEDUCOES.map((c) => this._input(c, dis))}</div>
+          <div class="grid">
+            ${DEDUCOES.map((c) => this._input(c, dis))}
+            ${this._custoUnidade(PERMUTA_FIN_R, dis)}
+            ${lot ? nothing : this._custoUnidade(PERMUTA_FIN_NR, dis)}
+          </div>
         </div>
 
         <div class="secao grupo grupo-a">
@@ -345,11 +375,11 @@ export class ViabTelaPremissas extends LitElement {
     ></viab-num>`;
   }
 
-  // Campo ÚNICO com unidade (#3/#4): rótulo em cima; abaixo, o seletor de unidade
-  // (tag) + o valor da unidade ativa lado a lado, como um só campo — o mesmo
-  // padrão do orçamento de obra (troca a tag → muda a unidade inserida). Só o
-  // campo da unidade ativa é escrito; o outro fica intocado no schema (guarda os
-  // possíveis valores diferentes por unidade).
+  // Campo ÚNICO com unidade (#5): rótulo em cima; abaixo, as BADGES interativas de
+  // unidade (seleção mútua — só uma `?ativo` por vez) + o valor da unidade ativa,
+  // como um só campo. Clicar numa badge troca `<modoKey>` → recalcula (a badge é o
+  // gatilho; a regra unidade→cálculo mora aqui). Só o campo da unidade ativa é
+  // escrito; o outro fica intocado no schema (guarda o valor daquela unidade).
   private _custoUnidade(cu: CustoUnidade, dis: boolean): TemplateResult {
     const modo = this.form[cu.modoKey] ?? cu.padrao;
     const op = cu.opcoes.find((o) => o.valor === modo) ?? cu.opcoes[0];
@@ -357,11 +387,14 @@ export class ViabTelaPremissas extends LitElement {
       <div class="campo-unidade p3">
         <label class="cu-rotulo">${cu.rotulo}</label>
         <div class="cu-linha">
-          <urbi-select class="cu-unidade" ?desabilitado=${dis}
-            .valor=${modo}
-            .opcoes=${cu.opcoes.map((o) => ({ valor: o.valor, rotulo: o.rotulo }))}
-            @urbi:select-change=${(e: CustomEvent) => this._set(cu.modoKey, e.detail.valor)}
-          ></urbi-select>
+          <div class="cu-badges" role="group" aria-label=${`Unidade de ${cu.rotulo}`}>
+            ${cu.opcoes.map((o) => html`
+              <urbi-badge
+                cor="info" interativo ?ativo=${o.valor === modo}
+                class=${dis ? 'cu-badge-dis' : ''}
+                @click=${() => { if (!dis) this._set(cu.modoKey, o.valor); }}
+              >${o.rotulo}</urbi-badge>`)}
+          </div>
           <viab-num class="cu-valor" sufixo=${op.sufixo} ?desabilitado=${dis}
             .valor=${this._num(op.campo)}
             @urbi:input-numero-change=${(e: CustomEvent) => this._set(op.campo, e.detail.valor)}

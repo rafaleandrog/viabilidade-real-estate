@@ -100,6 +100,42 @@ test('incorporação: construção por R$/m² vs valor total (#4)', () => {
   assert.ok(perto(total.construcao, 7_500_000), `construcao total=${total.construcao}`);
 });
 
+test('loteamento: infra 3 modos — % VGV, R$/m² e R$ fixo (#5)', () => {
+  const pct = calcularProforma({ ...LOT, infra_modo: 'pct_vgv', infra_pct: 30 });
+  assert.ok(perto(pct.infraestrutura, 22_500_000), `infra %=${pct.infraestrutura}`); // 30% de 75M
+
+  // R$/m² incide sobre a área privativa dos lotes (= área vendável = 75.000 m²).
+  const m2 = calcularProforma({ ...LOT, infra_modo: 'valor_m2', custo_infra_m2: 100 });
+  assert.ok(perto(m2.infraestrutura, 7_500_000), `infra R$/m²=${m2.infraestrutura}`);
+
+  const fixo = calcularProforma({ ...LOT, infra_modo: 'valor_fixo', infra_valor_fixo: 5_000_000 });
+  assert.ok(perto(fixo.infraestrutura, 5_000_000), `infra R$ fixo=${fixo.infraestrutura}`);
+});
+
+test('permuta financeira: modo valor fixo deduz R$ absoluto (#5)', () => {
+  const sem = calcularProforma(LOT);
+  const com = calcularProforma({
+    ...LOT,
+    permuta_financeira_residencial_modo: 'valor_fixo',
+    permuta_financeira_residencial_valor: 3_000_000,
+    permuta_financeira_residencial_pct: 10, // deve ser ignorado no modo valor_fixo
+  });
+  assert.ok(perto(com.permutaFinResidencial, 3_000_000), `permutaFin=${com.permutaFinResidencial}`);
+  assert.ok(perto(sem.resultado - com.resultado, 3_000_000), `dif=${sem.resultado - com.resultado}`);
+});
+
+test('incorporação: construção R$/m² incide sobre a área privativa TOTAL (#5)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, area_pvt_nr_fechada: 200,
+    area_pvt_r_aberta: 100, area_pvt_nr_aberta: 50,
+    preco_venda_m2_residencial: 10000,
+    construcao_modo: 'valor_m2', custo_construcao_m2: 5000,
+  });
+  assert.ok(perto(p.areaPrivativa, 1350), `areaPriv=${p.areaPrivativa}`);
+  assert.ok(perto(p.construcao, 6_750_000), `construcao=${p.construcao}`); // 5000 × 1350
+});
+
 test('projetos por % VGV vs valor fixo (#3)', () => {
   const pct = calcularProforma({ ...LOT, projetos_modo: 'pct_vgv', projetos_pct: 2 });
   assert.ok(perto(pct.projetos, 1_500_000), `projetos %=${pct.projetos}`); // 2% de 75M
