@@ -22,6 +22,8 @@ export class ViabNum extends LitElement {
   @property() placeholder = '';
   @property({ type: Boolean }) desabilitado = false;
   @property({ type: Boolean, reflect: true }) atenuado = false;
+  @property({ type: Boolean }) obrigatorio = false;
+  @property() erro = '';
   @property({ type: Number, attribute: 'casas-decimais' }) casasDecimais = 2;
 
   @state() private _foco = false;
@@ -64,6 +66,10 @@ export class ViabNum extends LitElement {
     /* #15: dado não utilizado no cálculo → cinza/atenuado. */
     :host([atenuado]) .input-wrap { opacity: 0.45; }
     :host([atenuado]) label { opacity: 0.6; }
+    /* Campo obrigatório: asterisco no label; estado de erro: borda + mensagem. */
+    .req { color: var(--cor-erro, #d45a3a); margin-left: 2px; }
+    .input-wrap.tem-erro { border-color: var(--cor-erro, #d45a3a); }
+    .erro-msg { color: var(--cor-erro, #d45a3a); font-size: 0.72rem; margin-top: 2px; }
   `;
 
   private _fmtAgrupado(v: number | null): string {
@@ -86,20 +92,23 @@ export class ViabNum extends LitElement {
   render() {
     return html`
       <div class="campo">
-        ${this.label ? html`<label>${this.label}</label>` : nothing}
-        <div class="input-wrap">
+        ${this.label ? html`<label>${this.label}${this.obrigatorio ? html`<span class="req" aria-hidden="true">*</span>` : nothing}</label>` : nothing}
+        <div class="input-wrap ${this.erro ? 'tem-erro' : ''}">
           <input
             type="text"
             inputmode="decimal"
             .value=${this._display()}
             placeholder=${this.placeholder}
             ?disabled=${this.desabilitado}
+            aria-required=${this.obrigatorio ? 'true' : 'false'}
+            aria-invalid=${this.erro ? 'true' : 'false'}
             @focus=${this._onFocus}
             @blur=${this._onBlur}
             @input=${this._onInput}
           />
           ${this.sufixo ? html`<span class="afixo">${this.sufixo}</span>` : nothing}
         </div>
+        ${this.erro ? html`<span class="erro-msg">${this.erro}</span>` : nothing}
       </div>
     `;
   }

@@ -258,6 +258,27 @@ transformar dado de instância): `infra_valor_fixo`, `permuta_financeira_{res,na
 **Fluxo:** code → commit → push. Release/deploy é responsabilidade do autor (não criei release nem
 acionei workflows).
 
+## Rodada pós-fechamento — campos obrigatórios + conversão de unidades
+
+### Parte 1 — Campos obrigatórios em Premissas ✅
+- **Contrato de UI:** obrigatório = `obrigatorio` (asterisco `*` no label) + `erro` (mensagem vermelha
+  abaixo). Adicionado suporte a `viab-num` (não tinha), espelhando `urbi-input-numero`.
+- **Regra (por tipo, decisão do autor — sem campo de classificação de uso):**
+  - **Ambos:** Área do terreno (manual; via Núcleo já vem preenchida — valida a área somada) +
+    **obras** (Infraestrutura no Loteamento / Custo de construção na Incorporação — sempre o campo da
+    **unidade ativa**, ex.: `infra_pct` no modo %VGV, `custo_infra_m2` no R$/m²).
+  - **Incorporação, por lado:** cada lado (R/NR) com **Nº de unidades > 0** exige a sua **Área PVT
+    fechada** e o seu **Preço**. Exige **ao menos um lado**. Um estudo só residencial não exige dados
+    de NR (e vice-versa).
+  - "Preenchido" = ≠ vazio **e** ≠ 0.
+- **Comportamento:** ao **Salvar**, se faltar obrigatório, bloqueia o PATCH, marca os campos (borda +
+  "Obrigatório") e mostra `urbi-banner` de erro listando o que falta. Editar um campo limpa o erro
+  dele. Asteriscos aparecem dinamicamente (ex.: preencher Nº un. R faz Área/Preço R ganharem `*`).
+- **Regra pura e testável:** `frontend/premissas-validacao.ts` (`camposObrigatorios` / `validarObrigatorios`
+  / `campoObrasAtivo`), coberta por **10 testes** nos dois tipos (loteamento, incorporação só-R, só-NR,
+  misto, Núcleo, zero-não-conta). Frontend puro; sem schema/engine; `versao` intacta.
+- **Validado:** typecheck ✓ · build ✓ (112.4→115.6kb) · **test 42/42 ✓** · empacotar ✓.
+
 ### Pós-fechamento — nota
 - **KPI R/NR na Proforma (revertido a pedido do autor).** Chegou a existir um commit dividindo o KPI
   do topo em "Nº un. residencial/não residencial/total" + preço médio R/NR (`4bef233`), mas o autor

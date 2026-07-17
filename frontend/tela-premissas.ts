@@ -4,6 +4,7 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctEntrada } from './viab-format.js';
 import { urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { calcularProforma, precoSugeridoM2, type ProformaInput, type Proforma } from './proforma.js';
+import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 
@@ -178,6 +179,11 @@ export class ViabTelaPremissas extends LitElement {
   @state() private salvando = false;
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
+  // Validação de obrigatórios (ao salvar): `erros` por campo + resumo em banner.
+  @state() private erros: Record<string, string> = {};
+  @state() private erroGeral = '';
+  // Set de campos obrigatórios do render atual (recalculado no topo de render()).
+  private _obrigCache = new Set<string>();
 
   static styles = [estiloConteudo, css`
     .secao { margin-bottom: 20px; }
@@ -224,6 +230,7 @@ export class ViabTelaPremissas extends LitElement {
       display: flex; align-items: flex-end;
       min-height: 2.4em; line-height: 1.2;
     }
+    .cu-req { color: var(--cor-erro, #d45a3a); margin-left: 2px; }
     .cu-linha { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     /* #5: badges de unidade (seleção mútua) à esquerda do valor. */
     .cu-badges { display: flex; gap: 4px; flex: 0 0 auto; }
@@ -248,6 +255,8 @@ export class ViabTelaPremissas extends LitElement {
     if (!this.estudo) return;
     this._idCarregado = this.estudo.id ?? null;
     this.form = { ...this.estudo };
+    this.erros = {};
+    this.erroGeral = '';
     try {
       const [bm, cfg] = await Promise.all([listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig()]);
       this.benchmarks = bm?.dados || [];
@@ -261,12 +270,16 @@ export class ViabTelaPremissas extends LitElement {
 
   private _set(k: string, v: any) {
     this.form = { ...this.form, [k]: v };
+    // Ao editar, limpa o erro daquele campo (o resumo em banner persiste até o
+    // próximo Salvar).
+    if (this.erros[k]) { const { [k]: _omit, ...resto } = this.erros; this.erros = resto; }
     // Propaga em tempo real para a tela do estudo, que reflete em Proforma e
     // Gráficos instantaneamente (#6). Não persiste — persistência é no Salvar.
     this.dispatchEvent(new CustomEvent('viab:premissas-change', {
       detail: { dados: this.form }, bubbles: true, composed: true,
     }));
   }
+
 
   private _num(k: string): number | null {
     const v = this.form[k];
@@ -282,6 +295,7 @@ export class ViabTelaPremissas extends LitElement {
     const produtos = lot ? PRODUTOS_LOT : PRODUTOS_INC;
     const custos = CUSTOS.filter((c) => !c.so || c.so === this.estudo.tipo_empreendimento);
     const dis = !this.editavel;
+    this._obrigCache = camposObrigatorios(this.form, this.estudo.tipo_empreendimento);
 
     return html`
       <urbi-card titulo="Premissas">
@@ -363,6 +377,7 @@ export class ViabTelaPremissas extends LitElement {
           </div>
         </div>
 
+        ${this.erroGeral ? html`<urbi-banner variante="erro">${this.erroGeral}</urbi-banner>` : nothing}
         ${this.editavel
           ? html`<div class="form-acoes">
               <urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar premissas</urbi-botao>
@@ -389,6 +404,7 @@ export class ViabTelaPremissas extends LitElement {
     return html`<viab-num
       class=${w}
       label=${c.label} sufixo=${c.sufixo ?? ''} ?desabilitado=${dis} ?atenuado=${aten}
+      ?obrigatorio=${this._obrigCache.has(c.k)} erro=${this.erros[c.k] ?? ''}
       .valor=${this._num(c.k)}
       @urbi:input-numero-change=${(e: CustomEvent) => this._set(c.k, e.detail.valor)}
     ></viab-num>`;
@@ -402,9 +418,12 @@ export class ViabTelaPremissas extends LitElement {
   private _custoUnidade(cu: CustoUnidade, dis: boolean): TemplateResult {
     const modo = this.form[cu.modoKey] ?? cu.padrao;
     const op = cu.opcoes.find((o) => o.valor === modo) ?? cu.opcoes[0];
+    // Obrigatório/erro seguem o campo da unidade ATIVA (ex.: Infraestrutura/Construção).
+    const obrig = this._obrigCache.has(op.campo);
+    const erro = this.erros[op.campo] ?? '';
     return html`
       <div class="campo-unidade p3">
-        <label class="cu-rotulo">${cu.rotulo}</label>
+        <label class="cu-rotulo">${cu.rotulo}${obrig ? html`<span class="cu-req" aria-hidden="true">*</span>` : nothing}</label>
         <div class="cu-linha">
           <div class="cu-badges" role="group" aria-label=${`Unidade de ${cu.rotulo}`}>
             ${cu.opcoes.map((o) => html`
@@ -414,7 +433,7 @@ export class ViabTelaPremissas extends LitElement {
                 @click=${() => { if (!dis) this._set(cu.modoKey, o.valor); }}
               >${o.rotulo}</urbi-badge>`)}
           </div>
-          <viab-num class="cu-valor" sufixo=${op.sufixo} ?desabilitado=${dis}
+          <viab-num class="cu-valor" sufixo=${op.sufixo} ?desabilitado=${dis} erro=${erro}
             .valor=${this._num(op.campo)}
             @urbi:input-numero-change=${(e: CustomEvent) => this._set(op.campo, e.detail.valor)}
           ></viab-num>
@@ -489,6 +508,15 @@ export class ViabTelaPremissas extends LitElement {
   }
 
   private _salvar = async () => {
+    // Bloqueia o salvamento se houver obrigatórios não preenchidos (≠ vazio e ≠ 0).
+    const { erros, faltando } = validarObrigatorios(this.form, this.estudo.tipo_empreendimento);
+    this.erros = erros;
+    if (faltando.length > 0) {
+      this.erroGeral = `Preencha os campos obrigatórios: ${faltando.join(', ')}.`;
+      urbiVerso.notificar('Há campos obrigatórios não preenchidos.', 'erro');
+      return;
+    }
+    this.erroGeral = '';
     this.salvando = true;
     try {
       const dados: Record<string, any> = {};
