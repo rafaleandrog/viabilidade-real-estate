@@ -199,6 +199,29 @@ Fontes de verdade confirmadas no monorepo `C:\Users\Rafael.gualberto\urbiverso\u
 - **Validado (verde):** typecheck ✓ · build ✓ (frontend 109.0→108.9kb · backend 841.2kb) ·
   test 32/32 ✓ · empacotar ✓ (PowerShell). Frontend puro; sem schema/cálculo; `versao` intacta.
 
+### Etapa 7 — ✅ CONCLUÍDA (itens 14 e 15 — gráficos nativos)
+- **Item 14 (pizza de alocação de áreas):** novo bloco em `tela-graficos` com `urbi-grafico-pizza`
+  (formato `numero`, m²). **Loteamento:** uma pizza da composição da gleba (APP, faixas não
+  edificáveis, sistema viário, ELUP, EPC, EPU, priv. não vendáveis + área vendável dos lotes — soma =
+  gleba). **Incorporação:** **dois** subgrupos — "geral" (5 áreas detalhadas: priv. R/NR fechada/aberta
+  + comuns) e "macro" (privativa residencial + privativa não residencial + áreas comuns = 100%).
+  Fatias zeradas são filtradas; sem áreas → `urbi-estado-vazio`.
+- **Item 15 (medidores de indicadores):** novo card "Indicadores vs. benchmark" com
+  `urbi-grafico-medidor` por benchmark do estudo. Mapa benchmark→valor atual do motor
+  (`resultado_final`/`margem_liquida`→margem líquida, `margem_bruta`, `roi`, `custo_obras_vgv`,
+  `eficiencia_aproveitamento`). Faixas de status derivadas da **`regra_comparacao`**:
+  `atingir_ou_superar` → vermelho abaixo da meta / verde acima; **`nao_exceder` (Custo obra/VGV) →
+  verde ABAIXO da meta / vermelho acima** (a inversão pedida). `min=0`, `max=máx(meta×2, valor×1,2,
+  meta+10)` (garante faixas válidas: ascendentes, última `ate`===`max`, e a agulha não estoura),
+  `formato="porcentagem"`, cores por token `var(--cor-sucesso|erro)`. `tela-graficos` passou a buscar
+  benchmarks + config (alíquota RET) por estudo, como a Proforma.
+- **Contratos confirmados no doc** (`ui-componentes-conteudo.md`): pizza usa `categorias`/`series`
+  (1ª série, cor por categoria); medidor tem API própria (`min`/`max`/`valor`/`faixas`/`formato`/
+  `rotulo`), faixas ascendentes cobrindo `[min,max]`.
+- **Validado (verde):** typecheck ✓ · build ✓ (frontend 108.9→112.4kb · backend 841.2kb) ·
+  test 32/32 ✓ · empacotar ✓ (PowerShell). Sem schema/cálculo novo (só leitura); `versao` intacta.
+  ⏳ Render real dos primitivos `urbi-grafico-*` só valida no deploy dev.
+
 ---
 
 ## Rodada de correções — "lista bugs.xlsx" (2026-07-15)
