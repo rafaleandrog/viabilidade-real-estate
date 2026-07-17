@@ -155,6 +155,37 @@ Fontes de verdade confirmadas no monorepo `C:\Users\Rafael.gualberto\urbiverso\u
 - **Validado (verde):** typecheck ✓ · build ✓ (frontend 105.3→106.7kb · backend 841.2kb) ·
   **test 30/30 ✓** (+2) · empacotar ✓ (PowerShell). Sem schema/migração; `versao` intacta.
 
+### Etapa 5 — ✅ CONCLUÍDA (itens 8, 9, 10, 13 — tabela da Proforma)
+- **Item 8 (coluna de descrição):** a tabela da Proforma passou de 4 para **5 colunas** —
+  Linha · **Descrição** · R$ · R$/m² · % VGV. A descrição (antes um `(memo)` inline no título) virou
+  **2ª coluna** própria (`td.desc`: texto menor `0.72rem` + itálico + cinza; respiro pelo padding da
+  célula, não colado no título).
+- **Item 9 (consolidação invertida + "Deduções sobre VGV"):** as linhas-total agora são o **header**
+  do grupo colapsável (antes eram o rodapé): `= Custo direto total` logo abaixo de Receita líquida,
+  `= Custo indireto total` logo abaixo do último custo direto. Nova linha **`= Deduções sobre VGV`**
+  logo abaixo da Receita bruta, consolidando imposto + corretagem + marketing + permuta financeira
+  (R+NR), também colapsável. Estado `colapso` ganhou a chave `deducoes`.
+- **Item 10 (permuta física detalhada R/NR):** quando há permuta física, entre "VGV sem permuta" e
+  "Receita bruta (VGV)" entram linhas **(-) Permuta física residencial** e **(-) …não residencial**
+  (loteamento: uma só "(-) Permuta física"), com descrição **"X m² · Y% da área privativa total"**.
+  Aqui entrou o **split R/NR adiado da Etapa 3**: schema aditivo `permuta_fisica_nr_{modo,area_m2,pct}`
+  (o par legado `permuta_fisica_*` passou a ser o **Residencial** / e o único do loteamento — sem perda
+  de dados). Premissas mostra 2 campos-badge (R e NR) na incorporação; motor reduz `vgvResidencial`
+  por `permuta_fisica_*` e `vgvNaoResidencial` por `permuta_fisica_nr_*` (novas saídas
+  `areaPermuta{R,NR}`, `vgvPermuta{R,NR}`). Loteamento inalterado (usa o campo legado, NR = 0).
+- **Item 13 (remover memo + rename):** removida a linha "(memo) Permuta física entregue"; o Resultado
+  ganhou `border-top` + `padding-top` para manter o espaçamento. "Gestão e outros indiretos" →
+  **"Gestão e outros custos indiretos"** na Proforma **e** na Premissas (label do campo
+  `gestao_indiretos_pct`).
+- **exportar.ts:** `linhasProforma` espelha a nova estrutura (Deduções sobre VGV, permuta física R/NR,
+  rename, sem o memo) — PDF e Excel seguem consistentes com a tela.
+- **Testes ampliados:** +2 casos (#10) — permuta física R/NR separada reduz cada VGV; loteamento usa
+  o campo legado com NR zerado.
+- **Schema:** +3 colunas aditivas (`permuta_fisica_nr_{modo,area_m2,pct}`). Backend PATCH por blocklist
+  → passam e validam no genesis; sem mudança de backend. **`versao` mantida em 0.1.0.**
+- **Validado (verde):** typecheck ✓ · build ✓ (frontend 106.7→109.0kb · backend 841.2kb) ·
+  **test 32/32 ✓** (+2) · empacotar ✓ (PowerShell).
+
 ---
 
 ## Rodada de correções — "lista bugs.xlsx" (2026-07-15)

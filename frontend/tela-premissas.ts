@@ -35,7 +35,7 @@ const CUSTOS: (Campo & { so?: string })[] = [
   { k: 'contingencias_pct', label: 'Contingências', t: 'num', sufixo: '% VGV' },
   { k: 'stand_vendas_valor', label: 'Stand de vendas', t: 'num', sufixo: 'R$', so: 'loteamento' },
   { k: 'marketing_global_pct', label: 'Marketing global / estrutura', t: 'num', sufixo: '% VGV' },
-  { k: 'gestao_indiretos_pct', label: 'Gestão e indiretos', t: 'num', sufixo: '% VGV' },
+  { k: 'gestao_indiretos_pct', label: 'Gestão e outros custos indiretos', t: 'num', sufixo: '% VGV' },
 ];
 
 // Custos com opção de UNIDADE (#3/#4): um seletor de unidade + um único campo de
@@ -71,14 +71,23 @@ const CUSTOS_UNIDADE: CustoUnidade[] = [
   },
 ];
 
-// Permuta física: mesmo padrão de campo único com unidade (a permuta reduz o VGV;
-// entra por área em m² ou por % da área de venda). Renderizada na sua própria seção.
-// (O detalhamento R/NR em linhas separadas é da Etapa 5 / item 10.)
+// Permuta física: campo único com unidade (a permuta reduz o VGV; entra por área
+// em m² ou por % da área de venda). Loteamento usa uma só (produto único).
+// Incorporação separa Residencial (campos legados `permuta_fisica_*`) e Não
+// Residencial (`permuta_fisica_nr_*`) em dois campos (#10).
 const PERMUTA_UNIDADE: CustoUnidade = {
   modoKey: 'permuta_fisica_modo', rotulo: 'Permuta física', padrao: 'area_m2',
   opcoes: [
     { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_area_m2', sufixo: 'm²' },
     { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_pct', sufixo: '%' },
+  ],
+};
+const PERMUTA_FIS_R: CustoUnidade = { ...PERMUTA_UNIDADE, rotulo: 'Permuta física residencial' };
+const PERMUTA_FIS_NR: CustoUnidade = {
+  modoKey: 'permuta_fisica_nr_modo', rotulo: 'Permuta física não residencial', padrao: 'area_m2',
+  opcoes: [
+    { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_nr_area_m2', sufixo: 'm²' },
+    { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_nr_pct', sufixo: '%' },
   ],
 };
 
@@ -150,7 +159,7 @@ const PRODUTOS_INC: Campo[] = [
 ];
 
 // Todas as definições de campo-com-unidade (para coletar seus campos numéricos).
-const CAMPOS_UNIDADE: CustoUnidade[] = [...CUSTOS_UNIDADE, PERMUTA_UNIDADE, PERMUTA_FIN_R, PERMUTA_FIN_NR];
+const CAMPOS_UNIDADE: CustoUnidade[] = [...CUSTOS_UNIDADE, PERMUTA_UNIDADE, PERMUTA_FIS_NR, PERMUTA_FIN_R, PERMUTA_FIN_NR];
 
 const TODOS_NUM = new Set<string>([
   ...CUSTOS, ...IMPOSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC,
@@ -348,7 +357,9 @@ export class ViabTelaPremissas extends LitElement {
         <div class="secao grupo grupo-a">
           <h4>Permuta física</h4>
           <div class="grid">
-            ${this._custoUnidade(PERMUTA_UNIDADE, dis)}
+            ${lot
+              ? this._custoUnidade(PERMUTA_UNIDADE, dis)
+              : html`${this._custoUnidade(PERMUTA_FIS_R, dis)}${this._custoUnidade(PERMUTA_FIS_NR, dis)}`}
           </div>
         </div>
 

@@ -19,14 +19,26 @@ function baixar(nome: string, conteudo: string, mime: string) {
 interface LinhaPf { l: string; v: number; }
 
 export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
-  const linhas: (LinhaPf & { soLot?: boolean; soInc?: boolean })[] = [
+  // Espelha a estrutura da tabela da Proforma (#8/#9/#10/#13): totais consolidados
+  // como header do grupo, "Deduções sobre VGV", permuta física R/NR e sem o memo
+  // "Permuta física entregue".
+  const temPermuta = p.areaPermutaFisica > 0.005;
+  const deducoesVgv = p.imposto + p.corretagem + p.marketing + p.permutaFinResidencial + p.permutaFinNaoResidencial;
+  const linhas: (LinhaPf & { soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean })[] = [
+    ...(temPermuta ? [
+      { l: 'VGV sem permuta física', v: p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial },
+      { l: '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true },
+      { l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true },
+    ] : []),
     { l: 'Receita bruta (VGV)', v: p.vgv },
+    { l: '= Deduções sobre VGV', v: deducoesVgv },
     { l: '(-) Imposto', v: p.imposto },
     { l: '(-) Corretagem', v: p.corretagem },
     { l: '(-) Marketing', v: p.marketing },
-    { l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial },
-    { l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial },
+    { l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, ocultarSeZero: true },
+    { l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, ocultarSeZero: true },
     { l: '= Receita líquida', v: p.receitaLiquida },
+    { l: '= Custo direto total', v: p.custoDiretoTotal },
     { l: '(-) Terreno', v: p.custoTerreno },
     { l: '(-) Projetos e aprovação', v: p.projetos },
     { l: '(-) Infraestrutura', v: p.infraestrutura, soLot: true },
@@ -36,15 +48,14 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     { l: '(-) Gestão da construção', v: p.gestaoConstrucao, soInc: true },
     { l: '(-) Decoração', v: p.decoracao, soInc: true },
     { l: '(-) Manutenção pós-obra', v: p.manutencao },
-    { l: '(-) Contingências', v: p.contingencias },
-    { l: '= Custo direto total', v: p.custoDiretoTotal },
-    { l: '(-) Marketing global e estrutura', v: p.marketingGlobal },
-    { l: '(-) Gestão e outros indiretos', v: p.gestaoIndiretos },
+    { l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true },
     { l: '= Custo indireto total', v: p.custoIndiretoTotal },
-    { l: '(memo) Permuta física entregue', v: p.valorPermutaFisica },
+    { l: '(-) Marketing global e estrutura', v: p.marketingGlobal },
+    { l: '(-) Gestão e outros custos indiretos', v: p.gestaoIndiretos },
     { l: '= Resultado', v: p.resultado },
   ];
-  return linhas.filter((r) => !(r.soLot && !lot) && !(r.soInc && lot));
+  return linhas.filter((r) =>
+    !(r.soLot && !lot) && !(r.soInc && lot) && !(r.ocultarSeZero && Math.abs(r.v) < 0.005));
 }
 
 export function exportarExcel(estudo: any, p: Proforma, lot: boolean) {

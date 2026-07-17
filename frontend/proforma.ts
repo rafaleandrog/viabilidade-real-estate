@@ -48,8 +48,10 @@ export interface ProformaInput {
   manutencao_pct?: number | string; contingencias_pct?: number | string; stand_vendas_valor?: number | string;
   // custos indiretos
   marketing_global_pct?: number | string; gestao_indiretos_pct?: number | string;
-  // permuta física
+  // permuta física — o par legado (`permuta_fisica_*`) é o RESIDENCIAL (e o único
+  // do loteamento); o par `_nr_*` é o não residencial (só incorporação). (#10)
   permuta_fisica_modo?: string; permuta_fisica_area_m2?: number | string; permuta_fisica_pct?: number | string;
+  permuta_fisica_nr_modo?: string; permuta_fisica_nr_area_m2?: number | string; permuta_fisica_nr_pct?: number | string;
   aliquota_ret_pct?: number; // parâmetro da app (default 4)
 }
 
@@ -57,6 +59,9 @@ export interface Proforma {
   // áreas
   areaTerreno: number; areaVendavel: number; areaPermutaFisica: number; areaVendavelLiquida: number;
   areaPrivativa: number; areaConstruida: number;
+  // permuta física por tipo (#10): m² entregue e VGV correspondente, R e NR.
+  areaPermutaResidencial: number; areaPermutaNaoResidencial: number;
+  vgvPermutaResidencial: number; vgvPermutaNaoResidencial: number;
   // receita
   vgvResidencial: number; vgvNaoResidencial: number; vgv: number;
   // deduções
@@ -109,22 +114,32 @@ export function calcularProforma(e: ProformaInput): Proforma {
     vgvNaoResidencial = nrFech * n(e.preco_venda_m2_nao_residencial);
   }
 
-  // Permuta física
-  const areaPermutaFisica = e.permuta_fisica_modo === 'pct_area_venda'
-    ? areaVendavel * n(e.permuta_fisica_pct) / 100
+  // Permuta física (#10) — R e NR separados. Cada uma sai da área vendável do seu
+  // tipo (loteamento é produto único ⇒ tudo "residencial", NR = 0). O par legado
+  // `permuta_fisica_*` é o residencial; `permuta_fisica_nr_*` é o não residencial.
+  const areaVendavelR = lot ? areaVendavel : n(e.area_pvt_r_fechada);
+  const areaVendavelNR = lot ? 0 : n(e.area_pvt_nr_fechada);
+  const precoR = lot ? precoLot : n(e.preco_venda_m2_residencial);
+  const precoNR = lot ? 0 : n(e.preco_venda_m2_nao_residencial);
+
+  const areaPermutaResidencial = e.permuta_fisica_modo === 'pct_area_venda'
+    ? areaVendavelR * n(e.permuta_fisica_pct) / 100
     : n(e.permuta_fisica_area_m2);
+  const areaPermutaNaoResidencial = lot ? 0
+    : (e.permuta_fisica_nr_modo === 'pct_area_venda'
+      ? areaVendavelNR * n(e.permuta_fisica_nr_pct) / 100
+      : n(e.permuta_fisica_nr_area_m2));
+  const areaPermutaFisica = areaPermutaResidencial + areaPermutaNaoResidencial;
   const areaVendavelLiquida = areaVendavel - areaPermutaFisica;
 
-  // Permuta física reduz a área vendável e, portanto, o VGV — nos DOIS tipos (#14).
-  // Loteamento: recomputa o VGV sobre a área líquida. Incorporação: reduz R e NR
-  // proporcionalmente à fração de área que sai como permuta.
-  if (lot) {
-    vgvResidencial = areaVendavelLiquida * precoLot; // loteamento: tudo "residencial"
-  } else if (areaPermutaFisica > 0 && areaVendavel > 0) {
-    const fatorLiquido = areaVendavelLiquida / areaVendavel;
-    vgvResidencial *= fatorLiquido;
-    vgvNaoResidencial *= fatorLiquido;
-  }
+  // A permuta reduz o VGV do tipo (área entregue × preço do tipo) — reduz o
+  // resultado nos dois tipos de empreendimento (#14).
+  const vgvPermutaResidencial = areaPermutaResidencial * precoR;
+  const vgvPermutaNaoResidencial = areaPermutaNaoResidencial * precoNR;
+  vgvResidencial = lot
+    ? (areaVendavel - areaPermutaResidencial) * precoLot
+    : vgvResidencial - vgvPermutaResidencial;
+  vgvNaoResidencial = lot ? 0 : vgvNaoResidencial - vgvPermutaNaoResidencial;
   const vgv = vgvResidencial + vgvNaoResidencial;
 
   // ── Deduções da receita ──
@@ -210,6 +225,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
 
   return {
     areaTerreno, areaVendavel, areaPermutaFisica, areaVendavelLiquida, areaPrivativa, areaConstruida,
+    areaPermutaResidencial, areaPermutaNaoResidencial, vgvPermutaResidencial, vgvPermutaNaoResidencial,
     vgvResidencial, vgvNaoResidencial, vgv,
     imposto, corretagem, marketing, permutaFinResidencial, permutaFinNaoResidencial, receitaLiquida,
     custoTerreno, projetos, infraestrutura, outorga, incorporacaoRegistro, construcao, gestaoConstrucao,

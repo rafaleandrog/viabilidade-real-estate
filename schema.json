@@ -90,6 +90,9 @@
         "permuta_fisica_modo":    { "tipo": "texto", "limite": 16, "opcoes": ["area_m2", "pct_area_venda"], "padrao": "area_m2" },
         "permuta_fisica_area_m2": { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "permuta_fisica_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2 },
+        "permuta_fisica_nr_modo":    { "tipo": "texto", "limite": 16, "opcoes": ["area_m2", "pct_area_venda"], "padrao": "area_m2" },
+        "permuta_fisica_nr_area_m2": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "permuta_fisica_nr_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2 },
 
         "sensibilidade_variacao_positiva_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
         "sensibilidade_variacao_negativa_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 }

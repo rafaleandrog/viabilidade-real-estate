@@ -155,6 +155,33 @@ test('incorporação: permuta física reduz VGV proporcionalmente e o resultado 
   assert.ok(com.resultado < sem.resultado, 'permuta física reduz o resultado');
 });
 
+test('incorporação: permuta física R e NR separadas reduzem cada VGV (#10)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,    // VGV R bruto = 10M
+    area_pvt_nr_fechada: 500, preco_venda_m2_nao_residencial: 8000, // VGV NR bruto = 4M
+    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,     // R: 10% de 1000 = 100 m²
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 50,  // NR: 50 m²
+  });
+  assert.ok(perto(p.areaPermutaResidencial, 100), `areaR=${p.areaPermutaResidencial}`);
+  assert.ok(perto(p.areaPermutaNaoResidencial, 50), `areaNR=${p.areaPermutaNaoResidencial}`);
+  assert.ok(perto(p.areaPermutaFisica, 150));
+  assert.ok(perto(p.vgvPermutaResidencial, 1_000_000), `vgvPermR=${p.vgvPermutaResidencial}`);     // 100 × 10000
+  assert.ok(perto(p.vgvPermutaNaoResidencial, 400_000), `vgvPermNR=${p.vgvPermutaNaoResidencial}`); // 50 × 8000
+  // VGV líquido = (1000−100)×10000 + (500−50)×8000 = 9M + 3,6M = 12,6M
+  assert.ok(perto(p.vgvResidencial, 9_000_000));
+  assert.ok(perto(p.vgvNaoResidencial, 3_600_000));
+  assert.ok(perto(p.vgv, 12_600_000), `vgv=${p.vgv}`);
+});
+
+test('loteamento: permuta física usa o campo legado, NR não se aplica (#10)', () => {
+  const p = calcularProforma({ ...LOT, permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 15000 });
+  assert.ok(perto(p.areaPermutaResidencial, 15000));
+  assert.equal(p.areaPermutaNaoResidencial, 0);
+  assert.ok(perto(p.areaVendavelLiquida, 60000), `liq=${p.areaVendavelLiquida}`);
+  assert.ok(perto(p.vgv, 60_000_000), `vgv=${p.vgv}`); // 60.000 m² × R$ 1.000
+});
+
 test('permuta financeira reduz o resultado final (#14)', () => {
   const sem = calcularProforma(LOT);
   const com = calcularProforma({ ...LOT, permuta_financeira_residencial_pct: 10 });
