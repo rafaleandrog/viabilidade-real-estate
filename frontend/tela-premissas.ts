@@ -5,6 +5,7 @@ import { fmtR$, fmtNum, fmtPct, fmtPctEntrada } from './viab-format.js';
 import { urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { calcularProforma, precoSugeridoM2, type ProformaInput, type Proforma } from './proforma.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
+import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 
@@ -44,30 +45,32 @@ const CUSTOS: (Campo & { so?: string })[] = [
 // ativa é exibido (o outro fica oculto — não some do schema).
 interface CustoUnidade {
   modoKey: string; rotulo: string; so?: string; padrao: string;
-  opcoes: { valor: string; rotulo: string; campo: string; sufixo: string }[];
+  // `conv` (Parte 2): como o valor da unidade converte para a base ao trocar de
+  // unidade (identidade / % de uma grandeza / por m² de uma grandeza).
+  opcoes: { valor: string; rotulo: string; campo: string; sufixo: string; conv: ConvUnidade }[];
 }
 const CUSTOS_UNIDADE: CustoUnidade[] = [
   {
     // #5: infraestrutura do loteamento tem 3 unidades — % VGV, R$ (fixo) ou R$/m².
     modoKey: 'infra_modo', rotulo: 'Infraestrutura', so: 'loteamento', padrao: 'pct_vgv',
     opcoes: [
-      { valor: 'pct_vgv', rotulo: '% VGV', campo: 'infra_pct', sufixo: '% VGV' },
-      { valor: 'valor_fixo', rotulo: 'R$', campo: 'infra_valor_fixo', sufixo: 'R$' },
-      { valor: 'valor_m2', rotulo: 'R$/m²', campo: 'custo_infra_m2', sufixo: 'R$/m²' },
+      { valor: 'pct_vgv', rotulo: '% VGV', campo: 'infra_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgv' } },
+      { valor: 'valor_fixo', rotulo: 'R$', campo: 'infra_valor_fixo', sufixo: 'R$', conv: { tipo: 'identidade' } },
+      { valor: 'valor_m2', rotulo: 'R$/m²', campo: 'custo_infra_m2', sufixo: 'R$/m²', conv: { tipo: 'por_area', link: 'areaVendavel' } },
     ],
   },
   {
     modoKey: 'construcao_modo', rotulo: 'Construção', so: 'incorporacao', padrao: 'valor_m2',
     opcoes: [
-      { valor: 'valor_m2', rotulo: 'R$/m²', campo: 'custo_construcao_m2', sufixo: 'R$/m²' },
-      { valor: 'valor_total', rotulo: 'R$ (total)', campo: 'construcao_valor_total', sufixo: 'R$' },
+      { valor: 'valor_m2', rotulo: 'R$/m²', campo: 'custo_construcao_m2', sufixo: 'R$/m²', conv: { tipo: 'por_area', link: 'areaPrivativa' } },
+      { valor: 'valor_total', rotulo: 'R$ (total)', campo: 'construcao_valor_total', sufixo: 'R$', conv: { tipo: 'identidade' } },
     ],
   },
   {
     modoKey: 'projetos_modo', rotulo: 'Projetos', padrao: 'pct_vgv',
     opcoes: [
-      { valor: 'pct_vgv', rotulo: '% VGV', campo: 'projetos_pct', sufixo: '% VGV' },
-      { valor: 'valor_fixo', rotulo: 'R$ (fixo)', campo: 'projetos_valor_fixo', sufixo: 'R$' },
+      { valor: 'pct_vgv', rotulo: '% VGV', campo: 'projetos_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgv' } },
+      { valor: 'valor_fixo', rotulo: 'R$ (fixo)', campo: 'projetos_valor_fixo', sufixo: 'R$', conv: { tipo: 'identidade' } },
     ],
   },
 ];
@@ -79,16 +82,16 @@ const CUSTOS_UNIDADE: CustoUnidade[] = [
 const PERMUTA_UNIDADE: CustoUnidade = {
   modoKey: 'permuta_fisica_modo', rotulo: 'Permuta física', padrao: 'area_m2',
   opcoes: [
-    { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_area_m2', sufixo: 'm²' },
-    { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_pct', sufixo: '%' },
+    { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_area_m2', sufixo: 'm²', conv: { tipo: 'identidade' } },
+    { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_pct', sufixo: '%', conv: { tipo: 'pct', link: 'areaVendavelR' } },
   ],
 };
 const PERMUTA_FIS_R: CustoUnidade = { ...PERMUTA_UNIDADE, rotulo: 'Permuta física residencial' };
 const PERMUTA_FIS_NR: CustoUnidade = {
   modoKey: 'permuta_fisica_nr_modo', rotulo: 'Permuta física não residencial', padrao: 'area_m2',
   opcoes: [
-    { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_nr_area_m2', sufixo: 'm²' },
-    { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_nr_pct', sufixo: '%' },
+    { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_nr_area_m2', sufixo: 'm²', conv: { tipo: 'identidade' } },
+    { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_nr_pct', sufixo: '%', conv: { tipo: 'pct', link: 'areaVendavelNR' } },
   ],
 };
 
@@ -97,15 +100,15 @@ const PERMUTA_FIS_NR: CustoUnidade = {
 const PERMUTA_FIN_R: CustoUnidade = {
   modoKey: 'permuta_financeira_residencial_modo', rotulo: 'Permuta financeira residencial', padrao: 'pct_vgv',
   opcoes: [
-    { valor: 'pct_vgv', rotulo: '% VGV', campo: 'permuta_financeira_residencial_pct', sufixo: '% VGV' },
-    { valor: 'valor_fixo', rotulo: 'R$', campo: 'permuta_financeira_residencial_valor', sufixo: 'R$' },
+    { valor: 'pct_vgv', rotulo: '% VGV', campo: 'permuta_financeira_residencial_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgvResidencial' } },
+    { valor: 'valor_fixo', rotulo: 'R$', campo: 'permuta_financeira_residencial_valor', sufixo: 'R$', conv: { tipo: 'identidade' } },
   ],
 };
 const PERMUTA_FIN_NR: CustoUnidade = {
   modoKey: 'permuta_financeira_nao_residencial_modo', rotulo: 'Permuta financeira não residencial', padrao: 'pct_vgv',
   opcoes: [
-    { valor: 'pct_vgv', rotulo: '% VGV', campo: 'permuta_financeira_nao_residencial_pct', sufixo: '% VGV' },
-    { valor: 'valor_fixo', rotulo: 'R$', campo: 'permuta_financeira_nao_residencial_valor', sufixo: 'R$' },
+    { valor: 'pct_vgv', rotulo: '% VGV', campo: 'permuta_financeira_nao_residencial_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgvNaoResidencial' } },
+    { valor: 'valor_fixo', rotulo: 'R$', campo: 'permuta_financeira_nao_residencial_valor', sufixo: 'R$', conv: { tipo: 'identidade' } },
   ],
 };
 
@@ -288,6 +291,41 @@ export class ViabTelaPremissas extends LitElement {
     return Number.isNaN(n) ? null : n;
   }
 
+  // Grandezas de ligação para a conversão de unidades (Parte 2), do estado atual.
+  // O VGV e as áreas não dependem dos campos de custo/permuta, então não há
+  // circularidade. areaVendavelR/NR = área de venda de cada tipo (loteamento é
+  // produto único ⇒ R = área vendável, NR = 0).
+  private _ctxConversao(): CtxConversao {
+    const p = calcularProforma(this._entradaProforma());
+    const lot = this.estudo.tipo_empreendimento === 'loteamento';
+    return {
+      vgv: p.vgv,
+      vgvResidencial: p.vgvResidencial,
+      vgvNaoResidencial: p.vgvNaoResidencial,
+      areaVendavel: p.areaVendavel,
+      areaVendavelR: lot ? p.areaVendavel : (Number(this.form.area_pvt_r_fechada) || 0),
+      areaVendavelNR: lot ? 0 : (Number(this.form.area_pvt_nr_fechada) || 0),
+      areaPrivativa: p.areaPrivativa,
+    };
+  }
+
+  // Troca a unidade de um campo (Parte 2): converte o valor atual para a unidade
+  // nova (equivalente), depois muda o modo. Se a base não estiver definida
+  // (grandeza de ligação = 0) ou o valor estiver vazio, não converte — mantém o
+  // valor atual do campo destino.
+  private _trocarUnidade(cu: CustoUnidade, nova: CustoUnidade['opcoes'][number]) {
+    const modoAtual = this.form[cu.modoKey] ?? cu.padrao;
+    if (nova.valor === modoAtual) return;
+    const atual = cu.opcoes.find((o) => o.valor === modoAtual) ?? cu.opcoes[0];
+    const valorAtual = this._num(atual.campo);
+    // Campo de origem vazio → só troca o modo (não sobrescreve o destino com 0).
+    if (valorAtual !== null) {
+      const convertido = converterUnidade(atual.conv, nova.conv, valorAtual, this._ctxConversao());
+      if (convertido !== null) this._set(nova.campo, convertido);
+    }
+    this._set(cu.modoKey, nova.valor);
+  }
+
   render() {
     if (!this.estudo) return nothing;
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
@@ -430,7 +468,7 @@ export class ViabTelaPremissas extends LitElement {
               <urbi-badge
                 cor="info" interativo ?ativo=${o.valor === modo}
                 class=${dis ? 'cu-badge-dis' : ''}
-                @click=${() => { if (!dis) this._set(cu.modoKey, o.valor); }}
+                @click=${() => { if (!dis) this._trocarUnidade(cu, o); }}
               >${o.rotulo}</urbi-badge>`)}
           </div>
           <viab-num class="cu-valor" sufixo=${op.sufixo} ?desabilitado=${dis} erro=${erro}

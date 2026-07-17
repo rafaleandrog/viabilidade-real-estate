@@ -279,6 +279,25 @@ acionei workflows).
   misto, Núcleo, zero-não-conta). Frontend puro; sem schema/engine; `versao` intacta.
 - **Validado:** typecheck ✓ · build ✓ (112.4→115.6kb) · **test 42/42 ✓** · empacotar ✓.
 
+### Parte 2 — Conversão automática de unidades ✅
+- **Comportamento:** ao trocar a unidade de um campo (badge), o valor é convertido para a unidade
+  nova (equivalente) e o modo muda. Ex. (permuta física): 2.000 m² com área de venda 40.000 → clica
+  "% área venda" → **5%**; muda para 10% e volta pra m² → **4.000 m²**.
+- **Regra geral:** cada unidade representa a MESMA quantidade base — R$ (custos/permuta financeira) ou
+  m² (permuta física) — e converte `unidade atual → base → unidade nova` via uma **grandeza de ligação**
+  do motor (VGV, área de venda, área privativa), que **não depende do próprio campo** (sem
+  circularidade). Descritor `conv` por opção: `identidade` / `pct` (link) / `por_area` (link).
+- **Cobertura por campo** (confere com o motor nos dois tipos): permuta física m²↔% (link área de
+  venda R/NR; loteamento usa a vendável total); infra %VGV↔R$↔R$/m² (VGV / área vendável); construção
+  R$/m²↔R$ total (área privativa); projetos %VGV↔R$ (VGV); permuta financeira R/NR %VGV↔R$ (VGV do tipo).
+- **Sem base definida** (grandeza de ligação = 0, ex.: áreas/preços ainda não preenchidos) → **não
+  converte** (mantém o valor do destino); campo de origem vazio → só troca o modo. Arredonda a 2 casas.
+- **Módulo puro e testado:** `frontend/premissas-conversao.ts` (`converterUnidade`/`paraBase`/`daBase`),
+  **7 testes** (exemplo do autor, infra 3-modos, construção, permuta financeira R/NR, base zero, NaN,
+  arredondamento). `_ctxConversao()` monta as grandezas do motor; `_trocarUnidade()` faz a troca.
+- **Frontend puro; sem schema/engine.** Validado: typecheck ✓ · build ✓ (115.6→117.1kb) ·
+  **test 49/49 ✓** · empacotar ✓. `versao` intacta.
+
 ### Pós-fechamento — nota
 - **KPI R/NR na Proforma (revertido a pedido do autor).** Chegou a existir um commit dividindo o KPI
   do topo em "Nº un. residencial/não residencial/total" + preço médio R/NR (`4bef233`), mas o autor
