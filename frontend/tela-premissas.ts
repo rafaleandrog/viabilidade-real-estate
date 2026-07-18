@@ -6,6 +6,7 @@ import { urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig } from './vi
 import { calcularProforma, precoSugeridoM2, type ProformaInput, type Proforma } from './proforma.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
+import { varianteFaixa } from './medidor-faixas.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 
@@ -320,8 +321,21 @@ export class ViabTelaPremissas extends LitElement {
     const valorAtual = this._num(atual.campo);
     // Campo de origem vazio → só troca o modo (não sobrescreve o destino com 0).
     if (valorAtual !== null) {
-      const convertido = converterUnidade(atual.conv, nova.conv, valorAtual, this._ctxConversao());
-      if (convertido !== null) this._set(nova.campo, convertido);
+      const ctx = this._ctxConversao();
+      // Preservação no round-trip: se o campo destino JÁ guarda um valor que,
+      // reconvertido para a unidade atual, bate com o valor atual (na precisão de
+      // exibição, 2 casas), mantém o original em vez de sobrescrever com o
+      // reconvertido — evita o erro de ida-e-volta (2.000 m² → % → 2.000 m², e não
+      // 2.000,41). Só reconverte quando o destino ainda não representa este mesmo
+      // valor (ex.: o usuário editou o número na outra unidade).
+      const destAtual = this._num(nova.campo);
+      const round2 = (x: number) => Math.round(x * 100) / 100;
+      const voltou = destAtual !== null ? converterUnidade(nova.conv, atual.conv, destAtual, ctx) : null;
+      const preserva = voltou !== null && round2(voltou) === round2(valorAtual);
+      if (!preserva) {
+        const convertido = converterUnidade(atual.conv, nova.conv, valorAtual, ctx);
+        if (convertido !== null) this._set(nova.campo, convertido);
+      }
     }
     this._set(cu.modoKey, nova.valor);
   }
@@ -417,9 +431,13 @@ export class ViabTelaPremissas extends LitElement {
 
         ${this.erroGeral ? html`<urbi-banner variante="erro">${this.erroGeral}</urbi-banner>` : nothing}
         ${this.editavel
-          ? html`<div class="form-acoes">
-              <urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar premissas</urbi-botao>
-            </div>`
+          ? html`
+              <urbi-banner variante="alerta">
+                As alterações não são salvas automaticamente — clique em “Salvar premissas” antes de sair desta página.
+              </urbi-banner>
+              <div class="form-acoes">
+                <urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar premissas</urbi-botao>
+              </div>`
           : html`<p class="sec">Somente leitura neste status/função.</p>`}
       </urbi-card>
 
@@ -498,14 +516,15 @@ export class ViabTelaPremissas extends LitElement {
   private _renderResumo(lot: boolean): TemplateResult {
     const p = calcularProforma(this._entradaProforma());
     const kpis: { rot: string; val: string; variante: string }[] = [];
-    const variante = (bm: any | undefined, ok: () => boolean) => (bm ? (ok() ? 'sucesso' : 'erro') : '');
+    // Texto colorido nos 3 níveis do velocímetro do benchmark (sem emoji; a bola
+    // fica só nos badges da análise de sensibilidade, na Proforma).
 
     if (lot) {
       const ef = this._benchmark('eficiencia_aproveitamento');
       kpis.push(
         { rot: 'Área da gleba', val: `${fmtNum(p.areaTerreno)} m²`, variante: '' },
         { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²`, variante: '' },
-        { rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: variante(ef, () => p.eficienciaPct >= Number(ef.valor)) },
+        { rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: varianteFaixa(ef, p.eficienciaPct) },
         { rot: 'VGV', val: fmtR$(p.vgv), variante: '' },
         { rot: 'Nº de lotes', val: fmtNum(p.numUnidades), variante: '' },
         { rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: '' },
@@ -518,8 +537,8 @@ export class ViabTelaPremissas extends LitElement {
         { rot: 'Área construída', val: `${fmtNum(p.areaConstruida)} m²`, variante: '' },
         { rot: 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
         { rot: 'Preço médio/unid.', val: fmtR$(p.precoMedioUnidade), variante: '' },
-        { rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: variante(co, () => p.custoObrasVgvPct <= Number(co.valor)) },
-        { rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: variante(ml, () => p.margemLiquidaPct >= Number(ml.valor)) },
+        { rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: varianteFaixa(co, p.custoObrasVgvPct) },
+        { rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) },
       );
     }
 

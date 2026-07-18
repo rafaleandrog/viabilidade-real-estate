@@ -38,3 +38,37 @@ export function montarMedidor(b: any, val: number): ConfigMedidor | null {
     : [{ ate: meta, cor: COR.erro }, { ate: max, cor: COR.sucesso }];
   return { min: 0, max, faixas };
 }
+
+// Cor da faixa do velocímetro em que o valor cai — a MESMA faixa/cor do medidor
+// (config de 3 faixas ou fallback de 2). null quando não há medidor válido.
+function corFaixa(b: any, val: number): string | null {
+  const cfg = montarMedidor(b, val);
+  if (!cfg) return null;
+  const faixa = cfg.faixas.find((f) => val <= f.ate) ?? cfg.faixas[cfg.faixas.length - 1];
+  return faixa.cor;
+}
+
+// Bola colorida (🟢/🟡/🔴) da faixa — para usar como emoji de status em urbi-badge.
+const BOLA: Record<string, string> = {
+  [COR.erro]: '🔴',
+  [COR.alerta]: '🟡',
+  [COR.sucesso]: '🟢',
+};
+
+// Variante (sucesso/alerta/erro) da faixa — para colorir o texto de urbi-kpi com
+// os 3 níveis do velocímetro (sem emoji). Todas já suportadas pelo urbi-kpi.
+const VARIANTE: Record<string, string> = {
+  [COR.erro]: 'erro',
+  [COR.alerta]: 'alerta',
+  [COR.sucesso]: 'sucesso',
+};
+
+export function bolaFaixa(b: any, val: number): string {
+  const cor = corFaixa(b, val);
+  return cor ? (BOLA[cor] ?? '') : '';
+}
+
+export function varianteFaixa(b: any, val: number): string {
+  const cor = corFaixa(b, val);
+  return cor ? (VARIANTE[cor] ?? '') : '';
+}

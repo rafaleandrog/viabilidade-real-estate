@@ -49,6 +49,7 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     { l: '(-) Decoração', v: p.decoracao, soInc: true },
     { l: '(-) Manutenção pós-obra', v: p.manutencao },
     { l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true },
+    { l: '= Receita operacional', v: p.receitaOperacional },
     { l: '= Custo indireto total', v: p.custoIndiretoTotal },
     { l: '(-) Marketing global e estrutura', v: p.marketingGlobal },
     { l: '(-) Gestão e outros custos indiretos', v: p.gestaoIndiretos },

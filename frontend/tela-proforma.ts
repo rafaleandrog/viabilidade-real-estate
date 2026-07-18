@@ -5,6 +5,7 @@ import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
 import { exportarPDF, exportarExcel } from './exportar.js';
+import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
 
 // `tipo` dá a categoria visual (#3): receita | consolidado | resultado;
 // ausente = item comum (sub-linha discreta). `grupo` marca sub-linhas
@@ -83,8 +84,15 @@ export class ViabTelaProforma extends LitElement {
       font-style: italic; font-size: 0.72rem; max-width: 340px;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
     }
-    /* Sensibilidade: divisória simples entre os grupos (monetárias × indicadores %). */
-    .pf.sens tr.div-top td { border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.15)); }
+    /* Sensibilidade: divisória entre os grupos (monetárias × indicadores %), com
+       respiro extra acima dos indicadores (Custo obra/VGV e Margem líquida). */
+    .pf.sens tr.div-top td {
+      border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.15));
+      padding-top: 20px;
+    }
+    /* Badges dos cenários (cabeçalho) e dos indicadores centralizados na coluna. */
+    .pf.sens .sens-cab { display: flex; justify-content: center; }
+    .pf.sens td .sens-cab { padding: 2px 0; }
     /* #11 — unidades e preço médio por tipo. */
     .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; }
     .ut-item { display: flex; flex-direction: column; gap: 2px; }
@@ -152,8 +160,10 @@ export class ViabTelaProforma extends LitElement {
       { rot: 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
     ];
     if (temPermuta) kpis.push({ rot: 'Área permutada', val: `${fmtNum(p.areaPermutaFisica)} m²`, variante: '' });
-    kpis.push({ rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: co ? (p.custoObrasVgvPct <= Number(co.valor) ? 'sucesso' : 'erro') : '' });
-    kpis.push({ rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: ml ? (p.margemLiquidaPct >= Number(ml.valor) ? 'sucesso' : 'erro') : '' });
+    // Texto colorido nos 3 níveis do velocímetro do benchmark (sem emoji; a bola
+    // fica só nos badges da análise de sensibilidade).
+    kpis.push({ rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: varianteFaixa(co, p.custoObrasVgvPct) });
+    kpis.push({ rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) });
     return html`<div class="kpis">
       ${kpis.map((k) => html`<urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>`)}
     </div>`;
@@ -213,6 +223,8 @@ export class ViabTelaProforma extends LitElement {
     linhas.push({ l: '(-) Decoração', v: p.decoracao, soInc: true, grupo: 'direto', memo: `${rsm2(e.custo_decoracao_m2)} × área privativa` });
     linhas.push({ l: '(-) Manutenção pós-obra', v: p.manutencao, grupo: 'direto', memo: `${pct(e.manutencao_pct)} do VGV` });
     linhas.push({ l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true, grupo: 'direto', memo: `${pct(e.contingencias_pct)} do VGV` });
+    // Receita operacional = receita líquida − custo direto total (antes dos indiretos).
+    linhas.push({ l: '= Receita operacional', v: p.receitaOperacional, tipo: 'receita' });
     linhas.push({ l: '= Custo indireto total', v: p.custoIndiretoTotal, tipo: 'consolidado', toggle: 'indireto' });
     linhas.push({ l: '(-) Marketing global e estrutura', v: p.marketingGlobal, grupo: 'indireto', memo: `${pct(e.marketing_global_pct)} do VGV${lot ? ' + stand' : ''}` });
     // #13: rename "Gestão e outros indiretos" → "…custos indiretos".
@@ -348,18 +360,29 @@ export class ViabTelaProforma extends LitElement {
     const custoLike = this.varSens !== 'preco';
     const fatorBull = custoLike ? 1 - varPos / 100 : 1 + varPos / 100;
     const fatorBear = custoLike ? 1 + varNeg / 100 : 1 - varNeg / 100;
-    const bear = calcularProforma(this._aplicarFator(fatorBear));
-    const base = calcularProforma(this._aplicarFator(1));
-    const bull = calcularProforma(this._aplicarFator(fatorBull));
-    // Duas primeiras linhas monetárias (4) e, separados por uma divisória, os dois
-    // indicadores em % — Custo obra/VGV (novo) e Margem líquida.
-    const linhas: { l: string; f: (p: Proforma) => number; pct?: boolean; divisoria?: boolean }[] = [
-      { l: 'VGV', f: (p) => p.vgv },
-      { l: 'Receita líquida', f: (p) => p.receitaLiquida },
-      { l: 'Custo direto total', f: (p) => p.custoDiretoTotal },
-      { l: 'Resultado', f: (p) => p.resultado },
-      { l: 'Custo obra / VGV', f: (p) => p.custoObrasVgvPct, pct: true, divisoria: true },
-      { l: 'Margem líquida', f: (p) => p.margemLiquidaPct, pct: true },
+    // VGV bruto por cenário = VGV se a permuta física NÃO fosse entregue (vendida).
+    // Difere da Receita bruta (VGV) só quando há permuta física.
+    const semPermutaFisica = {
+      permuta_fisica_area_m2: 0, permuta_fisica_pct: 0,
+      permuta_fisica_nr_area_m2: 0, permuta_fisica_nr_pct: 0,
+    };
+    const proforma = (fator: number) => calcularProforma(this._aplicarFator(fator));
+    const vgvBrutoDe = (fator: number) =>
+      calcularProforma({ ...this._aplicarFator(fator), ...semPermutaFisica }).vgv;
+    // Linhas monetárias (6) e, separados por uma divisória com mais respiro, os dois
+    // indicadores em % (Custo obra/VGV e Margem líquida) exibidos como urbi-badge
+    // com a cor do cenário.
+    type Cen = { p: Proforma; vgvBruto: number };
+    const linhas: { l: string; f: (c: Cen) => number; pct?: boolean; badge?: boolean; bmCampo?: string; divisoria?: boolean }[] = [
+      { l: 'VGV', f: (c) => c.vgvBruto },
+      { l: 'Receita bruta', f: (c) => c.p.vgv },
+      { l: 'Receita líquida', f: (c) => c.p.receitaLiquida },
+      { l: 'Custo direto total', f: (c) => c.p.custoDiretoTotal },
+      { l: 'Receita operacional', f: (c) => c.p.receitaOperacional },
+      { l: 'Custo indireto total', f: (c) => c.p.custoIndiretoTotal },
+      { l: 'Resultado', f: (c) => c.p.resultado },
+      { l: 'Custo obra / VGV', f: (c) => c.p.custoObrasVgvPct, pct: true, badge: true, bmCampo: 'custo_obras_vgv', divisoria: true },
+      { l: 'Margem líquida', f: (c) => c.p.margemLiquidaPct, pct: true, badge: true, bmCampo: 'margem_liquida' },
     ];
     const fmt = (m: { pct?: boolean }, v: number) => (m.pct ? fmtPct(v) : fmtR$(v));
     // #11: título de cada cenário num urbi-badge ESTÁTICO — Bear=perigo (vermelho),
@@ -371,10 +394,10 @@ export class ViabTelaProforma extends LitElement {
       base: 'var(--cor-sucesso, #13A98D)',
       bull: 'var(--cor-info, #2AA9E0)',
     } as const;
-    const cenarios: { id: 'bear' | 'base' | 'bull'; rot: string; p: Proforma }[] = [
-      { id: 'bear', rot: '📉 Bear', p: bear },
-      { id: 'base', rot: '📊 Base', p: base },
-      { id: 'bull', rot: '🚀 Bull', p: bull },
+    const cenarios: { id: 'bear' | 'base' | 'bull'; rot: string; p: Proforma; vgvBruto: number }[] = [
+      { id: 'bear', rot: '📉 Bear', p: proforma(fatorBear), vgvBruto: vgvBrutoDe(fatorBear) },
+      { id: 'base', rot: '📊 Base', p: proforma(1), vgvBruto: vgvBrutoDe(1) },
+      { id: 'bull', rot: '🚀 Bull', p: proforma(fatorBull), vgvBruto: vgvBrutoDe(fatorBull) },
     ];
     return html`<urbi-card titulo="Análise de sensibilidade">
       <div class="sens-var">
@@ -390,14 +413,22 @@ export class ViabTelaProforma extends LitElement {
           <thead>
             <tr>
               <th></th>
-              ${cenarios.map((c) => html`<th class="num"><urbi-badge cor=${COR_BADGE[c.id]}>${c.rot}</urbi-badge></th>`)}
+              ${cenarios.map((c) => html`<th class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${c.rot}</urbi-badge></div></th>`)}
             </tr>
           </thead>
           <tbody>
             ${linhas.map((m) => html`
               <tr class=${m.divisoria ? 'div-top' : ''}>
                 <td>${m.l}</td>
-                ${cenarios.map((c) => html`<td class="num" style="color:${COR_TXT[c.id]}">${fmt(m, m.f(c.p))}</td>`)}
+                ${cenarios.map((c) => {
+                  const valNum = m.f(c);
+                  const txt = fmt(m, valNum);
+                  if (m.badge) {
+                    const bola = m.bmCampo ? bolaFaixa(this._bm(m.bmCampo), valNum) : '';
+                    return html`<td class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${bola ? `${bola} ` : ''}${txt}</urbi-badge></div></td>`;
+                  }
+                  return html`<td class="num" style="color:${COR_TXT[c.id]}">${txt}</td>`;
+                })}
               </tr>`)}
           </tbody>
         </table>

@@ -189,21 +189,15 @@ export class ViabTelaGraficos extends LitElement {
   // acima da meta; `nao_exceder` (menor é melhor, ex.: Custo obra/VGV) → verde ABAIXO
   // da meta (inversão pedida no item 15).
   private _renderMedidores(p: Proforma): TemplateResult {
+    // Mantidos: Custo obra/VGV e Margem líquida. Removidos desta aba: ROI, Resultado
+    // final, Margem bruta e Eficiência de aproveitamento.
     const MAPA: Record<string, number> = {
-      resultado_final: p.margemLiquidaPct,
-      margem_liquida: p.margemLiquidaPct,
-      margem_bruta: p.margemBrutaPct,
-      roi: p.roiPct,
       custo_obras_vgv: p.custoObrasVgvPct,
-      eficiencia_aproveitamento: p.eficienciaPct,
+      margem_liquida: p.margemLiquidaPct,
     };
     const ROTULOS: Record<string, string> = {
-      resultado_final: 'Resultado final',
-      margem_liquida: 'Margem líquida',
-      margem_bruta: 'Margem bruta',
-      roi: 'ROI',
       custo_obras_vgv: 'Custo obra / VGV',
-      eficiencia_aproveitamento: 'Eficiência de aproveitamento',
+      margem_liquida: 'Margem líquida',
     };
     const medidores = this.benchmarks
       .map((b) => {

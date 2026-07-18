@@ -71,6 +71,8 @@ export interface Proforma {
   custoTerreno: number; projetos: number; infraestrutura: number; outorga: number;
   incorporacaoRegistro: number; construcao: number; gestaoConstrucao: number; decoracao: number;
   manutencao: number; contingencias: number; custoDiretoTotal: number;
+  // receita operacional = receita líquida − custo direto total
+  receitaOperacional: number;
   // custos indiretos
   marketingGlobal: number; gestaoIndiretos: number; custoIndiretoTotal: number;
   // resultado (final — permutas financeiras e físicas já o reduzem)
@@ -190,11 +192,14 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const gestaoIndiretos = vgv * n(e.gestao_indiretos_pct) / 100;
   const custoIndiretoTotal = marketingGlobal + gestaoIndiretos;
 
+  // Receita operacional = receita líquida − custo direto total (antes dos indiretos).
+  const receitaOperacional = receitaLiquida - custoDiretoTotal;
+
   // ── Resultado ──
   // Final. Permuta financeira já foi deduzida da receita líquida; permuta física
   // já reduziu o VGV — ambas, portanto, reduzem o resultado (#14). `valorPermutaFisica`
   // é memo: o valor de mercado da área entregue em permuta.
-  const resultado = receitaLiquida - custoDiretoTotal - custoIndiretoTotal;
+  const resultado = receitaOperacional - custoIndiretoTotal;
   const precoMedioM2 = lot ? precoLot
     : (areaVendavelLiquida > 0 ? vgv / areaVendavelLiquida : 0);
   const valorPermutaFisica = areaPermutaFisica * precoMedioM2;
@@ -230,6 +235,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
     imposto, corretagem, marketing, permutaFinResidencial, permutaFinNaoResidencial, receitaLiquida,
     custoTerreno, projetos, infraestrutura, outorga, incorporacaoRegistro, construcao, gestaoConstrucao,
     decoracao, manutencao, contingencias, custoDiretoTotal,
+    receitaOperacional,
     marketingGlobal, gestaoIndiretos, custoIndiretoTotal,
     resultado, valorPermutaFisica, margemLiquidaPct,
     investimentoTotal, custoObras, custoObrasVgvPct, margemBrutaPct, roiPct, eficienciaPct,

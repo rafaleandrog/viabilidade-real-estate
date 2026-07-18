@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { montarMedidor } from './medidor-faixas.js';
+import { montarMedidor, bolaFaixa, varianteFaixa } from './medidor-faixas.js';
 
 test('configurado: 3 faixas vermelho/amarelo/verde (atingir_ou_superar)', () => {
   const c = montarMedidor(
@@ -47,4 +47,30 @@ test('config incompleta/inválida cai no fallback', () => {
 
 test('sem meta e sem config: null (não desenha medidor)', () => {
   assert.equal(montarMedidor({ regra_comparacao: 'atingir_ou_superar', valor: 0 }, 0), null);
+});
+
+test('bolaFaixa: bola da faixa em que o valor cai (config 3 faixas)', () => {
+  const b = { regra_comparacao: 'atingir_ou_superar', medidor_min: 0, medidor_faixa1_ate: 20, medidor_faixa2_ate: 30, medidor_max: 50 };
+  assert.equal(bolaFaixa(b, 10), '🔴');  // ≤20 → faixa baixa (ruim)
+  assert.equal(bolaFaixa(b, 25), '🟡');  // 20–30 → alerta
+  assert.equal(bolaFaixa(b, 40), '🟢');  // 30–50 → boa
+  assert.equal(bolaFaixa(b, 999), '🟢'); // acima do máx → última faixa
+});
+
+test('bolaFaixa: nao_exceder inverte (verde embaixo)', () => {
+  const b = { regra_comparacao: 'nao_exceder', medidor_min: 0, medidor_faixa1_ate: 30, medidor_faixa2_ate: 40, medidor_max: 60 };
+  assert.equal(bolaFaixa(b, 10), '🟢');
+  assert.equal(bolaFaixa(b, 55), '🔴');
+});
+
+test('bolaFaixa: sem medidor válido → vazio', () => {
+  assert.equal(bolaFaixa({ regra_comparacao: 'atingir_ou_superar', valor: 0 }, 0), '');
+});
+
+test('varianteFaixa: variante (sucesso/alerta/erro) da faixa, sem emoji', () => {
+  const b = { regra_comparacao: 'atingir_ou_superar', medidor_min: 0, medidor_faixa1_ate: 20, medidor_faixa2_ate: 30, medidor_max: 50 };
+  assert.equal(varianteFaixa(b, 10), 'erro');
+  assert.equal(varianteFaixa(b, 25), 'alerta');
+  assert.equal(varianteFaixa(b, 40), 'sucesso');
+  assert.equal(varianteFaixa({ regra_comparacao: 'atingir_ou_superar', valor: 0 }, 0), '');
 });
