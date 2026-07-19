@@ -3,6 +3,7 @@ import { customElement, state } from 'lit/decorators.js';
 import './tela-dashboard.js';
 import './tela-estudo.js';
 import './viabilidade-config-benchmarks.js';
+import './viabilidade-config-curvas.js';
 import { urbiVerso } from './viabilidade-api.js';
 import { estiloPagina } from './estilos.js';
 

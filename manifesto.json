@@ -56,6 +56,11 @@
       "titulo": "Benchmarks",
       "descricao": "Valores de referência e faixas de sensibilidade por tipo de empreendimento",
       "componente": "viabilidade-config-benchmarks"
+    },
+    "curvas": {
+      "titulo": "Curvas de distribuição",
+      "descricao": "Curvas reutilizáveis para distribuir custos no tempo (estudo Avançado)",
+      "componente": "viabilidade-config-curvas"
     }
   },
   "parametros": {

@@ -9,6 +9,7 @@ import {
 } from './viabilidade-api.js';
 import './viab-num.js';
 import './tela-fluxo-receitas.js';
+import './tela-fluxo-custos.js';
 
 // Aba "Fluxo de Caixa" — EXCLUSIVA do nível Avançado. Renderizada por
 // tela-estudo somente quando estudo.nivel_analise === 'avancado'; ainda assim
@@ -317,9 +318,7 @@ export class ViabTelaFluxo extends LitElement {
 
   private _renderCustos(): TemplateResult {
     return html`
-      <urbi-card titulo="Custos">
-        <p class="sec placeholder">Custos do terreno, de obra e indiretos, distribuídos no tempo. (em construção)</p>
-      </urbi-card>
+      <viab-fluxo-custos .estudo=${this.estudo} .editavel=${this.editavel}></viab-fluxo-custos>
     `;
   }
 

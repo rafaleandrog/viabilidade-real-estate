@@ -173,3 +173,33 @@ export function absorcaoMensal(
   pcts.fill(porMes);
   return { inicio: periodo.inicio, pcts };
 }
+
+// ─────────────────────────────────────────────────────────────────
+// Custos: resolução de unidade de orçamento (puro — motor reutiliza)
+// ─────────────────────────────────────────────────────────────────
+
+export interface ContextoCusto {
+  areaPrivativaTotal: number; // soma de área × qtd de todas as tipologias
+  areaTerreno: number;        // m² do terreno (Premissas)
+  vgvTotal: number;           // VGV somado das linhas de receita
+  receitaTotal?: number;      // receita líquida (VGL) — para pct_receita
+}
+
+/** Área privativa total (área × quantidade) de todas as tipologias das linhas. */
+export function areaPrivativaTotalLinhas(linhas: any[]): number {
+  return (linhas ?? []).reduce((s, l) =>
+    s + (l.tipologias ?? []).reduce((si: number, t: any) =>
+      si + n(t.area_privativa_m2) * n(t.quantidade), 0), 0);
+}
+
+/** Converte o orçamento de uma linha de custo para R$ absolutos. */
+export function resolverCustoTotal(custo: any, ctx: ContextoCusto): number {
+  const valor = n(custo?.orcamento_valor);
+  switch (custo?.orcamento_unidade) {
+    case 'rs_m2_priv': return valor * n(ctx.areaPrivativaTotal);
+    case 'rs_m2_terreno': return valor * n(ctx.areaTerreno);
+    case 'pct_vgv': return (valor / 100) * n(ctx.vgvTotal);
+    case 'pct_receita': return (valor / 100) * n(ctx.receitaTotal ?? ctx.vgvTotal);
+    default: return valor; // 'rs'
+  }
+}

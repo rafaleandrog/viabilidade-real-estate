@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseMesAno, rotuloMesRelativo, mesRelativoCompleto, rotuloPeriodo,
   vgvTipologia, vgvLinha, vglLinha, periodoAbsorcao, absorcaoMensal,
+  areaPrivativaTotalLinhas, resolverCustoTotal,
   type EventoCrono,
 } from './fluxo-shared.js';
 
@@ -84,6 +85,23 @@ test('absorcaoMensal distribuído aloca blocos nos meses dos eventos', () => {
   assert.ok(perto(r.pcts[18 - 13], 35 / 24));         // 1º mês da obra
   assert.ok(perto(r.pcts[42 - 13], 35 / 12));         // 1º mês da pós-obra
   assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 100));
+});
+
+test('resolverCustoTotal converte cada unidade de orçamento para R$', () => {
+  const ctx = { areaPrivativaTotal: 20_000, areaTerreno: 50_000, vgvTotal: 100_000_000, receitaTotal: 90_000_000 };
+  assert.equal(resolverCustoTotal({ orcamento_valor: 1_000_000, orcamento_unidade: 'rs' }, ctx), 1_000_000);
+  assert.equal(resolverCustoTotal({ orcamento_valor: 4800, orcamento_unidade: 'rs_m2_priv' }, ctx), 96_000_000);
+  assert.equal(resolverCustoTotal({ orcamento_valor: 200, orcamento_unidade: 'rs_m2_terreno' }, ctx), 10_000_000);
+  assert.equal(resolverCustoTotal({ orcamento_valor: 1.25, orcamento_unidade: 'pct_vgv' }, ctx), 1_250_000);
+  assert.equal(resolverCustoTotal({ orcamento_valor: 2, orcamento_unidade: 'pct_receita' }, ctx), 1_800_000);
+});
+
+test('areaPrivativaTotalLinhas soma área × quantidade de todas as tipologias', () => {
+  const linhas = [
+    { tipologias: [{ area_privativa_m2: 70, quantidade: 100 }, { area_privativa_m2: 25, quantidade: 200 }] },
+    { tipologias: [{ area_privativa_m2: 85, quantidade: 60 }] },
+  ];
+  assert.equal(areaPrivativaTotalLinhas(linhas), 7000 + 5000 + 5100);
 });
 
 test('absorcaoMensal personalizado usa os meses relativos informados', () => {
