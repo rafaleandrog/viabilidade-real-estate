@@ -8,6 +8,7 @@ import {
   buscarCronogramaAvancado, atualizarEventoCronograma,
 } from './viabilidade-api.js';
 import './viab-num.js';
+import './tela-fluxo-receitas.js';
 
 // Aba "Fluxo de Caixa" — EXCLUSIVA do nível Avançado. Renderizada por
 // tela-estudo somente quando estudo.nivel_analise === 'avancado'; ainda assim
@@ -310,9 +311,7 @@ export class ViabTelaFluxo extends LitElement {
 
   private _renderReceitas(): TemplateResult {
     return html`
-      <urbi-card titulo="Linhas de receita">
-        <p class="sec placeholder">Tipologias, absorção de vendas e fluxo de pagamento. (em construção)</p>
-      </urbi-card>
+      <viab-fluxo-receitas .estudo=${this.estudo} .editavel=${this.editavel}></viab-fluxo-receitas>
     `;
   }
 

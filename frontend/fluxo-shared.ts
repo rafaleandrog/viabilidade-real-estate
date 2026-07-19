@@ -69,3 +69,107 @@ export const EVENTO_COR: Record<string, string> = {
   obra: 'var(--cor-primaria-solida, #7a5af8)',
   pos_obra: 'var(--cor-texto-sec, #8a8f98)',
 };
+
+// ─────────────────────────────────────────────────────────────────
+// Absorção de vendas e VGV (puros — reutilizados pelo motor do fluxo)
+// ─────────────────────────────────────────────────────────────────
+
+export interface EventoCrono {
+  evento: string;
+  inicio_mes: number;
+  duracao_meses: number;
+}
+
+const n = (v: any): number => Number(v) || 0;
+
+/** VGV de uma tipologia: quantidade × área privativa × preço/m². */
+export function vgvTipologia(t: any): number {
+  return n(t?.quantidade) * n(t?.area_privativa_m2) * n(t?.preco_m2);
+}
+
+/** VGV de uma linha de receita (soma das tipologias). */
+export function vgvLinha(tipologias: any[]): number {
+  return (tipologias ?? []).reduce((s, t) => s + vgvTipologia(t), 0);
+}
+
+/**
+ * VGL (Valor Geral Líquido) da linha: VGV líquido de comissão DESTACADA e de
+ * RET, conforme o fluxo de pagamento. Comissão embutida já está no preço e
+ * não deduz.
+ */
+export function vglLinha(vgv: number, fluxoPagamento: any): number {
+  const fp = fluxoPagamento ?? {};
+  let liquido = vgv;
+  if (fp.comissao?.ativo && fp.comissao?.tipo === 'destacada') liquido -= vgv * (n(fp.comissao.pct) / 100);
+  if (fp.ret?.ativo) liquido -= vgv * (n(fp.ret.pct) / 100);
+  return liquido;
+}
+
+/**
+ * Período de absorção de uma linha: do início do Lançamento até o fim da
+ * Pós-obra (a duração da pós-obra pode ser sobrescrita pelo bloco de absorção).
+ * Retorna null se o cronograma não tiver os eventos necessários.
+ */
+export function periodoAbsorcao(
+  crono: EventoCrono[],
+  posObraMeses?: number,
+): { inicio: number; fim: number } | null {
+  const lanc = crono.find((e) => e.evento === 'lancamento');
+  const pos = crono.find((e) => e.evento === 'pos_obra');
+  if (!lanc || !pos) return null;
+  const durPos = Math.max(1, Math.round(posObraMeses ?? n(pos.duracao_meses)));
+  return { inicio: n(lanc.inicio_mes), fim: n(pos.inicio_mes) + durPos - 1 };
+}
+
+/**
+ * Distribui a absorção (% de vendas) mês a mês, em meses RELATIVOS do projeto.
+ * Retorna { inicio, pcts } onde pcts[i] é o % vendido no mês (inicio + i),
+ * ou null se o cronograma for insuficiente.
+ *
+ * - linear: uniforme por todo o período de absorção
+ * - distribuido: cada bloco (lancamento / obra / pos_obra) espalha seu % pelos
+ *   meses do próprio evento (pós-obra usa duracao_meses do bloco, se houver)
+ * - personalizado: usa absorcao.meses = [{ mes (relativo), pct }]
+ */
+export function absorcaoMensal(
+  absorcao: any,
+  crono: EventoCrono[],
+): { inicio: number; pcts: number[] } | null {
+  const modo = absorcao?.modo ?? 'linear';
+  const blocoPos = Array.isArray(absorcao?.blocos)
+    ? absorcao.blocos.find((b: any) => b?.evento === 'pos_obra')
+    : null;
+  const periodo = periodoAbsorcao(crono, blocoPos?.duracao_meses);
+  if (!periodo) return null;
+  const tamanho = periodo.fim - periodo.inicio + 1;
+  const pcts = new Array<number>(tamanho).fill(0);
+
+  if (modo === 'personalizado' && Array.isArray(absorcao?.meses)) {
+    for (const m of absorcao.meses) {
+      const idx = n(m?.mes) - periodo.inicio;
+      if (idx >= 0 && idx < tamanho) pcts[idx] += n(m?.pct);
+    }
+    return { inicio: periodo.inicio, pcts };
+  }
+
+  if (modo === 'distribuido' && Array.isArray(absorcao?.blocos)) {
+    for (const b of absorcao.blocos) {
+      const ev = crono.find((e) => e.evento === b?.evento);
+      if (!ev) continue;
+      const dur = b.evento === 'pos_obra'
+        ? Math.max(1, Math.round(n(b.duracao_meses) || n(ev.duracao_meses)))
+        : Math.max(1, n(ev.duracao_meses));
+      const porMes = n(b.pct) / dur;
+      for (let i = 0; i < dur; i++) {
+        const idx = n(ev.inicio_mes) + i - periodo.inicio;
+        if (idx >= 0 && idx < tamanho) pcts[idx] += porMes;
+      }
+    }
+    return { inicio: periodo.inicio, pcts };
+  }
+
+  // linear (default)
+  const porMes = 100 / tamanho;
+  pcts.fill(porMes);
+  return { inicio: periodo.inicio, pcts };
+}
