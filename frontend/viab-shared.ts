@@ -15,6 +15,11 @@ export const TIPO_LABEL: Record<string, string> = {
   incorporacao: 'Incorporação',
 };
 
+export const NIVEL_LABEL: Record<string, string> = {
+  preliminar: 'Preliminar',
+  avancado: 'Avançado',
+};
+
 // Cor semântica da badge (variante nativa do <urbi-badge>) por status.
 export type CorBadge = 'padrao' | 'sucesso' | 'perigo' | 'alerta' | 'info';
 export const COR_STATUS: Record<string, CorBadge> = {

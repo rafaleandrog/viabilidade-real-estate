@@ -7,6 +7,7 @@ import { rotasBenchmarks } from './rotas/benchmarks.js';
 import { rotasConfig } from './rotas/config.js';
 import { rotasApelo } from './rotas/apelo-comercial.js';
 import { rotasManutencao } from './rotas/manutencao.js';
+import { rotasAvancado } from './rotas/avancado.js';
 
 // Rotas de negócio da app `viabilidade`.
 // O shell prefixa tudo com /api/viabilidade/ — as rotas aqui são sempre relativas.
@@ -21,3 +22,4 @@ rotas.use(rotasBenchmarks);
 rotas.use(rotasConfig);
 rotas.use(rotasApelo);
 rotas.use(rotasManutencao);
+rotas.use(rotasAvancado);

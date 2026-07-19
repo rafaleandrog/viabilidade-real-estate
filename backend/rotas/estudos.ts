@@ -212,6 +212,15 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
         erro(res, 422, 'TIPO_TRAVADO', 'tipo_empreendimento só pode mudar em Rascunho');
         return;
       }
+      // Nível de análise é imutável após a criação (Preliminar × Avançado
+      // definem estruturas diferentes — trocar corromperia o estudo).
+      if (k === 'nivel_analise') {
+        if (v !== estudo.nivel_analise) {
+          erro(res, 422, 'NIVEL_IMUTAVEL', 'nivel_analise não pode ser alterado após a criação do estudo');
+          return;
+        }
+        continue;
+      }
       dados[k] = v;
     }
     if (Object.keys(dados).length === 0) {

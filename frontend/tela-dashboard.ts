@@ -1,6 +1,6 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, state, property } from 'lit/decorators.js';
-import { STATUS_LABEL, TIPO_LABEL, COR_STATUS, formatarData } from './viab-shared.js';
+import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, formatarData } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
 import { calcularProforma } from './proforma.js';
@@ -35,6 +35,9 @@ export class ViabTelaDashboard extends LitElement {
     .acoes-linha { display: inline-flex; gap: 6px; }
     .filtros-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .filtros-bar urbi-select { min-width: 200px; }
+    .nivel-campo label { display: block; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-bottom: 6px; }
+    .nivel-badges { display: flex; gap: 6px; }
+    .nivel-apoio { margin-top: 6px; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
   `];
 
   private readonly _abas = [
@@ -127,6 +130,10 @@ export class ViabTelaDashboard extends LitElement {
       {
         id: 'tipo', label: 'Tipo',
         valor: (l: any) => TIPO_LABEL[l.tipo_empreendimento] || l.tipo_empreendimento,
+      },
+      {
+        id: 'nivel', label: 'Nível',
+        render: (l: any) => html`<urbi-badge cor=${l.nivel_analise === 'avancado' ? 'info' : 'padrao'}>${NIVEL_LABEL[l.nivel_analise] || 'Preliminar'}</urbi-badge>`,
       },
       { id: 'vgv', label: 'VGV', alinhamento: 'direita', valor: numero((p) => fmtR$(p.vgv)) },
       { id: 'resultado', label: 'Resultado', alinhamento: 'direita', valor: numero((p) => fmtR$(p.resultado)) },
@@ -270,12 +277,22 @@ export class ViabTelaDashboard extends LitElement {
             @urbi:select-change=${(e: CustomEvent) => this.form = { ...this.form, tipo_empreendimento: e.detail.valor }}
           ></urbi-select>
 
-          <urbi-select
-            label="Nível de análise"
-            .valor=${this.form.nivel_analise}
-            .opcoes=${[{ valor: 'preliminar', rotulo: 'Estudo Preliminar' }]}
-            @urbi:select-change=${(e: CustomEvent) => this.form = { ...this.form, nivel_analise: e.detail.valor }}
-          ></urbi-select>
+          <div class="nivel-campo">
+            <label>Nível de análise</label>
+            <div class="nivel-badges" role="group" aria-label="Nível de análise">
+              <urbi-badge cor="info" interativo ?ativo=${this.form.nivel_analise !== 'avancado'}
+                @click=${() => this.form = { ...this.form, nivel_analise: 'preliminar' }}
+              >Preliminar</urbi-badge>
+              <urbi-badge cor="info" interativo ?ativo=${this.form.nivel_analise === 'avancado'}
+                @click=${() => this.form = { ...this.form, nivel_analise: 'avancado' }}
+              >Avançado</urbi-badge>
+            </div>
+            <div class="nivel-apoio">
+              ${this.form.nivel_analise === 'avancado'
+                ? 'Fluxo de caixa mês a mês com TIR, VPL e payback.'
+                : 'Proforma estática, sem dimensão temporal.'}
+            </div>
+          </div>
 
           <urbi-select
             label="Origem do terreno"

@@ -1,17 +1,18 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { STATUS_LABEL, TIPO_LABEL, COR_STATUS } from './viab-shared.js';
+import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import './tela-premissas.js';
 import './tela-proforma.js';
 import './tela-graficos.js';
 import './tela-apelo.js';
+import './tela-fluxo.js';
 import {
   urbiVerso, buscarEstudo, transicaoStatus,
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
-type Aba = 'premissas' | 'proforma' | 'graficos' | 'apelo';
+type Aba = 'premissas' | 'proforma' | 'fluxo' | 'graficos' | 'apelo';
 const FUNCOES = [
   { valor: 'leitor', rotulo: 'Leitor' },
   { valor: 'editor', rotulo: 'Editor' },
@@ -25,7 +26,7 @@ export class ViabTelaEstudo extends LitElement {
   // desconhecidos para 'premissas'.
   @property({ type: String })
   set aba(v: string) {
-    const val = (['premissas', 'proforma', 'graficos', 'apelo'] as const).includes(v as Aba) ? (v as Aba) : 'premissas';
+    const val = (['premissas', 'proforma', 'fluxo', 'graficos', 'apelo'] as const).includes(v as Aba) ? (v as Aba) : 'premissas';
     const antigo = this._aba;
     this._aba = val;
     this.requestUpdate('aba', antigo);
@@ -52,12 +53,19 @@ export class ViabTelaEstudo extends LitElement {
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
   `];
 
-  private readonly _abas = [
-    { id: 'premissas', label: 'Premissas', icone: 'fa-solid fa-sliders' },
-    { id: 'proforma', label: 'Proforma', icone: 'fa-solid fa-table-cells' },
-    { id: 'graficos', label: 'Gráficos', icone: 'fa-solid fa-chart-pie' },
-    { id: 'apelo', label: 'Apelo Comercial', icone: 'fa-solid fa-bullhorn' },
-  ];
+  // Aba "Fluxo de Caixa" só existe no nível Avançado — o Preliminar mantém as
+  // 4 abas de sempre, sem nenhuma mudança.
+  private _abasVisiveis() {
+    return [
+      { id: 'premissas', label: 'Premissas', icone: 'fa-solid fa-sliders' },
+      { id: 'proforma', label: 'Proforma', icone: 'fa-solid fa-table-cells' },
+      ...(this.estudo?.nivel_analise === 'avancado'
+        ? [{ id: 'fluxo', label: 'Fluxo de Caixa', icone: 'fa-solid fa-money-bill-transfer' }]
+        : []),
+      { id: 'graficos', label: 'Gráficos', icone: 'fa-solid fa-chart-pie' },
+      { id: 'apelo', label: 'Apelo Comercial', icone: 'fa-solid fa-bullhorn' },
+    ];
+  }
 
   connectedCallback() {
     super.connectedCallback();
@@ -110,14 +118,17 @@ export class ViabTelaEstudo extends LitElement {
 
         <div class="meta">
           <urbi-badge cor=${COR_STATUS[st] ?? 'padrao'}>${STATUS_LABEL[st] || st}</urbi-badge>
+          <urbi-badge cor=${this.estudo.nivel_analise === 'avancado' ? 'info' : 'padrao'}>
+            ${NIVEL_LABEL[this.estudo.nivel_analise] || 'Preliminar'}
+          </urbi-badge>
           <span class="sec">${TIPO_LABEL[this.estudo.tipo_empreendimento] || this.estudo.tipo_empreendimento}</span>
           ${p.funcao ? html`<span class="sec">· sua função: ${p.funcao}</span>` : nothing}
         </div>
 
         <urbi-abas
           expandir
-          .abas=${this._abas}
-          .ativa=${this.aba}
+          .abas=${this._abasVisiveis()}
+          .ativa=${this.aba === 'fluxo' && this.estudo.nivel_analise !== 'avancado' ? 'premissas' : this.aba}
           @urbi:aba-selecionar=${(e: CustomEvent) => {
             const id = (e.detail?.id || 'premissas') as Aba;
             urbiVerso.navegarSub(`/detalhe/${this.estudoId}/${id}`);
@@ -130,6 +141,11 @@ export class ViabTelaEstudo extends LitElement {
           <urbi-hospedeiro slot="proforma">
             <viab-tela-proforma .estudo=${this.estudo}></viab-tela-proforma>
           </urbi-hospedeiro>
+          ${this.estudo.nivel_analise === 'avancado' ? html`
+            <urbi-hospedeiro slot="fluxo">
+              <viab-tela-fluxo .estudo=${this.estudo}
+                .editavel=${p.podeEditar && st !== 'aprovado' && st !== 'reprovado' && st !== 'arquivado'}></viab-tela-fluxo>
+            </urbi-hospedeiro>` : nothing}
           <urbi-hospedeiro slot="graficos">
             <viab-tela-graficos .estudo=${this.estudo}></viab-tela-graficos>
           </urbi-hospedeiro>

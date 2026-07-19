@@ -112,6 +112,90 @@ export function buscarConfig(): Promise<any> {
   return urbiVerso.api(`${APP}/config`);
 }
 
+// ── Avançado: parâmetros globais e cronograma ──
+export function buscarParametrosAvancado(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/parametros`);
+}
+export function atualizarParametrosAvancado(estudoId: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/parametros`, {
+    method: 'PATCH', body: JSON.stringify(dados),
+  });
+}
+export function buscarCronogramaAvancado(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cronograma`);
+}
+export function atualizarEventoCronograma(estudoId: number, evento: string, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cronograma/${evento}`, {
+    method: 'PATCH', body: JSON.stringify(dados),
+  });
+}
+
+// ── Avançado: curvas de distribuição (globais) ──
+export function listarCurvas(): Promise<any> {
+  return urbiVerso.api(`${APP}/avancado/curvas`);
+}
+export function criarCurva(dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/avancado/curvas`, { method: 'POST', body: JSON.stringify(dados) });
+}
+export function atualizarCurva(id: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/avancado/curvas/${id}`, { method: 'PATCH', body: JSON.stringify(dados) });
+}
+export function removerCurva(id: number): Promise<any> {
+  return urbiVerso.api(`${APP}/avancado/curvas/${id}`, { method: 'DELETE' });
+}
+export function semearCurvas(): Promise<any> {
+  return urbiVerso.api(`${APP}/avancado/curvas/semear`, { method: 'POST' });
+}
+
+// ── Avançado: linhas de receita + tipologias ──
+export function listarReceitasAvancado(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas`);
+}
+export function criarReceitaAvancado(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas`, {
+    method: 'POST', body: JSON.stringify(dados),
+  });
+}
+export function atualizarReceitaAvancado(estudoId: number, rid: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas/${rid}`, {
+    method: 'PATCH', body: JSON.stringify(dados),
+  });
+}
+export function removerReceitaAvancado(estudoId: number, rid: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas/${rid}`, { method: 'DELETE' });
+}
+export function criarTipologia(estudoId: number, rid: number, dados: Record<string, any> = {}): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas/${rid}/tipologias`, {
+    method: 'POST', body: JSON.stringify(dados),
+  });
+}
+export function atualizarTipologia(estudoId: number, rid: number, tid: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas/${rid}/tipologias/${tid}`, {
+    method: 'PATCH', body: JSON.stringify(dados),
+  });
+}
+export function removerTipologia(estudoId: number, rid: number, tid: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas/${rid}/tipologias/${tid}`, { method: 'DELETE' });
+}
+
+// ── Avançado: linhas de custo ──
+export function listarCustosAvancado(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos`);
+}
+export function criarCustoAvancado(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos`, {
+    method: 'POST', body: JSON.stringify(dados),
+  });
+}
+export function atualizarCustoAvancado(estudoId: number, cid: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos/${cid}`, {
+    method: 'PATCH', body: JSON.stringify(dados),
+  });
+}
+export function removerCustoAvancado(estudoId: number, cid: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos/${cid}`, { method: 'DELETE' });
+}
+
 // ── Núcleo (glebas/lotes/imóveis) ──
 // Consumo padrão via urbiVerso.nucleo → /api/viabilidade/nucleo/... (o shell
 // provê essas rotas para apps que declaram dependencias_nucleo no manifesto).

@@ -95,7 +95,10 @@
         "permuta_fisica_nr_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2 },
 
         "sensibilidade_variacao_positiva_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
-        "sensibilidade_variacao_negativa_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 }
+        "sensibilidade_variacao_negativa_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
+
+        "data_inicio_projeto": { "tipo": "texto", "limite": 10 },
+        "taxa_desconto_aa":    { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 12 }
       },
       "indices": [["tipo_empreendimento"], ["status"], ["autor_id"]],
       "unicos": [["id_legivel"]]
@@ -167,6 +170,80 @@
         "texto_adicional": { "tipo": "texto_longo" }
       },
       "indices": [["apelo_id"]]
+    },
+
+    "avancado_cronograma": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":       { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "evento":          { "tipo": "texto", "limite": 20, "opcoes": ["planejamento", "pre_lancamento", "lancamento", "obra", "pos_obra"], "obrigatorio": true },
+        "inicio_mes":      { "tipo": "inteiro", "padrao": 1 },
+        "duracao_meses":   { "tipo": "inteiro", "padrao": 1 },
+        "travado_inicio":  { "tipo": "booleano", "padrao": false },
+        "travado_duracao": { "tipo": "booleano", "padrao": false }
+      },
+      "indices": [["estudo_id"]],
+      "unicos": [["estudo_id", "evento"]]
+    },
+
+    "avancado_curvas": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "nome":       { "tipo": "texto", "limite": 100, "obrigatorio": true },
+        "is_padrao":  { "tipo": "booleano", "padrao": false },
+        "valores":    { "tipo": "json" },
+        "criado_por": { "tipo": "referencia", "tabela_ref": "shell.usuarios", "campos_incluir": ["nome as criado_por_nome"] }
+      },
+      "unicos": [["nome"]]
+    },
+
+    "avancado_linhas_receita": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":       { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "nome":            { "tipo": "texto", "limite": 200 },
+        "fase_label":      { "tipo": "texto", "limite": 50 },
+        "tipo":            { "tipo": "texto", "limite": 20, "opcoes": ["venda"], "padrao": "venda" },
+        "ordem":           { "tipo": "inteiro", "padrao": 0 },
+        "absorcao":        { "tipo": "json" },
+        "fluxo_pagamento": { "tipo": "json" }
+      },
+      "indices": [["estudo_id"]]
+    },
+
+    "avancado_tipologias": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "linha_receita_id":  { "tipo": "referencia", "tabela_ref": "avancado_linhas_receita", "obrigatorio": true, "ao_deletar": "cascata" },
+        "estudo_id":         { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "nome":              { "tipo": "texto", "limite": 100 },
+        "tipo_unidade":      { "tipo": "texto", "limite": 20, "opcoes": ["apartamento", "cobertura", "loja", "lote", "outro"], "padrao": "apartamento" },
+        "area_privativa_m2": { "tipo": "decimal", "precisao": 10, "escala": 2 },
+        "dormitorios":       { "tipo": "inteiro" },
+        "vagas":             { "tipo": "inteiro" },
+        "quantidade":        { "tipo": "inteiro", "padrao": 0 },
+        "preco_m2":          { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "ordem":             { "tipo": "inteiro", "padrao": 0 }
+      },
+      "indices": [["linha_receita_id"], ["estudo_id"]]
+    },
+
+    "avancado_linhas_custo": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":         { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "grupo":             { "tipo": "texto", "limite": 20, "opcoes": ["terreno", "obra", "indireto"], "obrigatorio": true },
+        "categoria":         { "tipo": "texto", "limite": 100 },
+        "subcategoria":      { "tipo": "texto", "limite": 100 },
+        "orcamento_valor":   { "tipo": "decimal", "precisao": 15, "escala": 2 },
+        "orcamento_unidade": { "tipo": "texto", "limite": 20, "opcoes": ["rs", "rs_m2_priv", "rs_m2_terreno", "pct_vgv", "pct_receita"], "padrao": "rs" },
+        "curva_id":          { "tipo": "referencia", "tabela_ref": "avancado_curvas", "ao_deletar": "anular" },
+        "cronograma_evento": { "tipo": "texto", "limite": 20, "opcoes": ["planejamento", "pre_lancamento", "obra", "pos_obra", "customizado"], "padrao": "customizado" },
+        "inicio_mes":        { "tipo": "inteiro", "padrao": 1 },
+        "duracao_meses":     { "tipo": "inteiro", "padrao": 1 },
+        "ordem":             { "tipo": "inteiro", "padrao": 0 }
+      },
+      "indices": [["estudo_id"]]
     }
   }
 }
