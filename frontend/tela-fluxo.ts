@@ -10,6 +10,7 @@ import {
 import './viab-num.js';
 import './tela-fluxo-receitas.js';
 import './tela-fluxo-custos.js';
+import './tela-fluxo-ver.js';
 
 // Aba "Fluxo de Caixa" — EXCLUSIVA do nível Avançado. Renderizada por
 // tela-estudo somente quando estudo.nivel_analise === 'avancado'; ainda assim
@@ -324,9 +325,7 @@ export class ViabTelaFluxo extends LitElement {
 
   private _renderVerFluxo(): TemplateResult {
     return html`
-      <urbi-card titulo="Fluxo de caixa">
-        <p class="sec placeholder">Tabela mensal com TIR, VPL, payback e exposição máxima. (em construção)</p>
-      </urbi-card>
+      <viab-fluxo-ver .estudo=${this.estudo}></viab-fluxo-ver>
     `;
   }
 }
