@@ -156,6 +156,15 @@ const UNIDADES_ORCAMENTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct
 const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'obra', 'pos_obra', 'customizado'];
 const REGEX_MES_ANO = /^(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\/\d{4}$/i;
 
+/** Projeta só os campos listados, ignorando ausentes (para cópia de linhas). */
+export function extrairCampos(obj: any, campos: string[]): Record<string, any> {
+  const saida: Record<string, any> = {};
+  for (const c of campos) {
+    if (obj?.[c] !== undefined) saida[c] = obj[c];
+  }
+  return saida;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Guards e helpers de rota
 // ─────────────────────────────────────────────────────────────────
@@ -813,6 +822,57 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 });
+
+// ─────────────────────────────────────────────────────────────────
+// Duplicação: copia todos os dados do Avançado para um novo estudo
+// (chamada por POST /estudos/:id/duplicar quando o estudo é avançado)
+// ─────────────────────────────────────────────────────────────────
+
+const CAMPOS_CRONOGRAMA = ['evento', 'inicio_mes', 'duracao_meses', 'travado_inicio', 'travado_duracao'];
+const CAMPOS_RECEITA = ['nome', 'fase_label', 'tipo', 'ordem', 'absorcao', 'fluxo_pagamento'];
+
+export async function duplicarDadosAvancado(req: Request, origId: number, novoId: number): Promise<void> {
+  // Cronograma (5 eventos).
+  const crono = await req.dados!.listar('avancado_cronograma', {
+    filtros: { estudo_id: origId }, por_pagina: 10,
+  });
+  for (const linha of crono.dados) {
+    await req.dados!.criar('avancado_cronograma', {
+      estudo_id: novoId, ...extrairCampos(linha, CAMPOS_CRONOGRAMA),
+    });
+  }
+
+  // Linhas de receita + tipologias (mapeando linha antiga → nova).
+  const [receitas, tipologias] = await Promise.all([
+    req.dados!.listar('avancado_linhas_receita', {
+      filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100,
+    }),
+    req.dados!.listar('avancado_tipologias', {
+      filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
+    }),
+  ]);
+  for (const linha of receitas.dados) {
+    const nova = await req.dados!.criar('avancado_linhas_receita', {
+      estudo_id: novoId, ...extrairCampos(linha, CAMPOS_RECEITA),
+    });
+    for (const tip of tipologias.dados) {
+      if (Number(tip.linha_receita_id) !== Number(linha.id)) continue;
+      await req.dados!.criar('avancado_tipologias', {
+        linha_receita_id: nova.id, estudo_id: novoId, ...extrairCampos(tip, CAMPOS_TIPOLOGIA),
+      });
+    }
+  }
+
+  // Linhas de custo (curva_id copia direto — curvas são globais da instância).
+  const custos = await req.dados!.listar('avancado_linhas_custo', {
+    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
+  });
+  for (const custo of custos.dados) {
+    await req.dados!.criar('avancado_linhas_custo', {
+      estudo_id: novoId, ...extrairCampos(custo, CAMPOS_CUSTO),
+    });
+  }
+}
 
 rotasAvancado.delete('/estudos/:id/avancado/custos/:cid', async (req: Request, res: Response) => {
   try {

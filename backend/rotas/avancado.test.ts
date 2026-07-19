@@ -8,6 +8,7 @@ import {
   validarValoresCurva,
   validarAbsorcao,
   validarFluxoPagamento,
+  extrairCampos,
   type LinhaCronograma,
 } from './avancado.js';
 
@@ -104,6 +105,18 @@ test('validarAbsorcao: linear sem campos extras é válida; distribuído exige b
   assert.ok(validarAbsorcao({ modo: 'distribuido', blocos: [{ evento: 'obra', pct: 50 }] }));
   assert.ok(validarAbsorcao({ modo: 'personalizado', meses: [{ mes: 1, pct: 40 }] }));
   assert.ok(validarAbsorcao({ modo: 'xyz' }));
+});
+
+// ── Duplicação: projeção de campos copiáveis ──
+
+test('extrairCampos projeta só os campos pedidos e descarta id/estudo_id/timestamps', () => {
+  const linha = {
+    id: 42, estudo_id: 7, criado_em: '2026-01-01', atualizado_em: '2026-01-02',
+    nome: 'Sales', fase_label: 'Fase 1', ordem: 0, absorcao: { modo: 'linear' },
+  };
+  const copia = extrairCampos(linha, ['nome', 'fase_label', 'tipo', 'ordem', 'absorcao']);
+  assert.deepEqual(copia, { nome: 'Sales', fase_label: 'Fase 1', ordem: 0, absorcao: { modo: 'linear' } });
+  assert.ok(!('id' in copia) && !('estudo_id' in copia) && !('criado_em' in copia));
 });
 
 // ── Fluxo de pagamento (spec §4C) ──

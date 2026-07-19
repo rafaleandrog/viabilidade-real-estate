@@ -13,6 +13,7 @@ import {
   payloadStatusAlterado,
 } from '../eventos-viabilidade.js';
 import { gerarIdentificacao } from '../identificacao.js';
+import { duplicarDadosAvancado } from './avancado.js';
 
 export const rotasEstudos: ReturnType<typeof Router> = Router();
 
@@ -291,6 +292,11 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
         imovel_nucleo_id: im.imovel_nucleo_id,
         tipo_imovel: im.tipo_imovel,
       });
+    }
+
+    // Estudo Avançado: copiar cronograma, receitas + tipologias e custos.
+    if (novo.nivel_analise === 'avancado') {
+      await duplicarDadosAvancado(req, estudoId, Number(novo.id));
     }
 
     const funcao = await garantirMembro(req, novo.id, req.contexto!.usuario.id, 'editor');
