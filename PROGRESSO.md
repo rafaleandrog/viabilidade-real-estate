@@ -4,6 +4,51 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Lotes de bugs 2026-07-20 (sessões por lote — `docs/lotes-bugs-2026-07-20.md`)
+
+### Lote 1 — Trivial Preliminar — ✅ CONCLUÍDO (issues #9, #10, #11, #12, #13)
+Branch `claude/issues-lote-1-76fyc5`. Todas as mudanças **100% frontend** — sem schema,
+sem backend, sem migração; `versao` intacta em 0.1.0.
+
+- **#9 (R$/m² sem notação contábil):** novo `_fmtContabilM2(r, p)` em `tela-proforma.ts`,
+  análogo a `_fmtContabil` mas com sufixo `/m²` e **sem prefixo "R$"** (antes usava `fmtR$`,
+  que injeta "R$"): custos/deduções entre parênteses, receita plana, resultado pelo sinal
+  real; `—` quando área vendável ≤ 0. Aplicado na 3ª coluna da tabela, agora com a mesma
+  classe de sinal (`pos`/`neg`) do resultado. Método antigo `_rsM2` removido.
+- **#10 (Receita Bruta sem destaque):** CSS de `.pf tr.receita td` igualado ao `resultado`
+  em peso/tamanho/destaque (`font-weight: 800; font-size: 1.05rem;` + fundo
+  `var(--cor-primaria-fundo)`), **mantendo a cor azul primária** que distingue Receita de
+  Resultado. Aplica-se a todas as linhas-receita (VGV bruto, Receita bruta, líquida,
+  operacional) — a mais proeminente delas é a Receita Bruta (VGV).
+- **#11 (sensibilidade sem distinção receita×despesa):** cada linha da análise de
+  sensibilidade ganhou `natureza: 'receita' | 'despesa'`; a `<tr>` recebe classe
+  `nat-receita`/`nat-despesa`. CSS **só com tokens** (color-mix preserva o token, zero cor
+  literal): 1ª coluna colorida por `var(--cor-sucesso)` (receita) / `var(--cor-erro)`
+  (despesa) e fundo da linha com `color-mix(... 8%, transparent)`. Classificação: VGV,
+  Receita bruta/líquida/operacional, Resultado e Margem líquida = receita; Custo direto
+  total, Custo indireto total e Custo obra/VGV = despesa.
+- **#12 (badge Preliminar amarelo):** `cor="padrao"` → `cor="alerta"` (token amarelo já
+  usado no app e presente em `CorBadge` de `viab-shared.ts`) nos dois pontos:
+  `tela-dashboard.ts` (coluna Nível) e `tela-estudo.ts` (cabeçalho do estudo). Avançado
+  segue `info` (azul).
+- **#13 (remover botão "Criar indicadores padrão" + auto-seed):** removido o botão do topo
+  e o método `_semear` de `viabilidade-config-benchmarks.ts`. **Auto-seed silencioso** no 1º
+  acesso dentro de `_carregar`: se a lista vier vazia, não for `somenteLeitura` e o seed ainda
+  não tiver sido tentado (flag `_semeadoTentado`), chama `semearBenchmarks()` (idempotente,
+  admin-only no backend) e recarrega. Guarda evita re-semear ao alternar de tipo. Mensagens
+  de tabela vazia que citavam o botão foram neutralizadas.
+- **#24 — permanece BLOQUEADA (aguarda print).** `taxa_desconto_aa` só é renderizado em
+  `tela-fluxo.ts` (exclusivo do Avançado); o bug não se reproduz no código atual. Sem print,
+  não há o que corrigir — issue mantida aberta.
+- **Validação neste ambiente:** o `@urbiverso/sdk` é gated por GitHub Packages (auth
+  indisponível → 401), então backend/typecheck-completo/`urbi-empacotar` não rodam aqui. Como
+  as mudanças são 100% frontend (que **não** importa o SDK, usa o global `window.urbiVerso`),
+  validei o frontend isolado com as deps públicas do store pnpm: **typecheck frontend ✓
+  (exit 0)** · **testes frontend 70/70 ✓** · **build do bundle frontend (esbuild) ✓**.
+  Empacotamento/backend a validar no ambiente do autor (autenticado).
+
+---
+
 ## Mapa de repositórios (na máquina)
 
 | Repo | Caminho | Papel |

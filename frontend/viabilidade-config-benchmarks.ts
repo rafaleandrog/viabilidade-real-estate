@@ -40,6 +40,9 @@ export class ViabConfigBenchmarks extends LitElement {
   @state() private mostrarNovo = false;
   @state() private novoCampo = '';
   @state() private removerId: number | null = null;
+  // #13: garante uma única tentativa de auto-seed por instância (evita re-semear
+  // ao trocar de tipo se um tipo ficar legitimamente vazio após o seed).
+  private _semeadoTentado = false;
 
   static styles = [estiloConteudo, css`
     .topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
@@ -61,8 +64,19 @@ export class ViabConfigBenchmarks extends LitElement {
   private async _carregar() {
     this.carregando = true;
     try {
-      const res = await listarBenchmarks(this.tipo);
-      this.itens = res?.dados || [];
+      let res = await listarBenchmarks(this.tipo);
+      let itens = res?.dados || [];
+      // #13: auto-seed silencioso no 1º acesso (sem botão). Seed é idempotente e
+      // admin-only no backend — só tenta para quem pode escrever (não somenteLeitura).
+      if (itens.length === 0 && !this.somenteLeitura && !this._semeadoTentado) {
+        this._semeadoTentado = true;
+        try {
+          await semearBenchmarks();
+          res = await listarBenchmarks(this.tipo);
+          itens = res?.dados || [];
+        } catch (e) { console.error(e); }
+      }
+      this.itens = itens;
     } catch (e) { console.error(e); }
     this.carregando = false;
   }
@@ -81,8 +95,6 @@ export class ViabConfigBenchmarks extends LitElement {
       <urbi-hospedeiro>
         <div class="topo">
           <h2>Benchmarks${this.tipoFixo ? html` · ${TIPO_LABEL[this.tipo]}` : nothing}</h2>
-          ${this.somenteLeitura ? nothing : html`
-            <urbi-botao variante="secundario" pequeno icone="fa-solid fa-seedling" @click=${this._semear}>Criar indicadores padrão</urbi-botao>`}
         </div>
         <p class="sec">
           Duas seções: os <strong>indicadores de meta</strong> (comparação verde/vermelho) e os
@@ -110,7 +122,7 @@ export class ViabConfigBenchmarks extends LitElement {
               <urbi-tabela
                 .colunas=${this._colunasBenchmark()}
                 .linhas=${this._itensMeta()}
-                mensagem-vazio=${this.somenteLeitura ? 'Nenhum benchmark definido para este tipo.' : 'Nenhum benchmark. Clique em “Criar indicadores padrão”.'}
+                mensagem-vazio="Nenhum benchmark definido para este tipo."
               ></urbi-tabela>
               ${this.somenteLeitura ? nothing : html`
                 <div class="rodape">
@@ -124,7 +136,7 @@ export class ViabConfigBenchmarks extends LitElement {
               <urbi-tabela
                 .colunas=${this._colunasSensibilidade()}
                 .linhas=${this._itensSensibilidade()}
-                mensagem-vazio=${this.somenteLeitura ? 'Nenhum indicador definido para este tipo.' : 'Nenhum indicador. Clique em “Criar indicadores padrão”.'}
+                mensagem-vazio="Nenhum indicador definido para este tipo."
               ></urbi-tabela>
             </section>
 
@@ -138,7 +150,7 @@ export class ViabConfigBenchmarks extends LitElement {
               <urbi-tabela
                 .colunas=${this._colunasMedidor()}
                 .linhas=${this._itensMeta()}
-                mensagem-vazio=${this.somenteLeitura ? 'Nenhum indicador de meta definido.' : 'Nenhum indicador. Clique em “Criar indicadores padrão”.'}
+                mensagem-vazio="Nenhum indicador de meta definido."
               ></urbi-tabela>
             </section>`}
       </urbi-hospedeiro>
@@ -278,12 +290,4 @@ export class ViabConfigBenchmarks extends LitElement {
     } catch (e: any) { urbiVerso.notificar(e?.message || 'Erro', 'erro'); }
   }
 
-  private async _semear() {
-    try {
-      const res = await semearBenchmarks();
-      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro', 'erro'); return; }
-      urbiVerso.notificar(`${res.criados ?? 0} indicador(es) criado(s).`, 'sucesso');
-      this._carregar();
-    } catch (e: any) { urbiVerso.notificar(e?.message || 'Erro', 'erro'); }
-  }
 }

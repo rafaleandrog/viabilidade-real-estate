@@ -133,7 +133,7 @@ export class ViabTelaDashboard extends LitElement {
       },
       {
         id: 'nivel', label: 'Nível',
-        render: (l: any) => html`<urbi-badge cor=${l.nivel_analise === 'avancado' ? 'info' : 'padrao'}>${NIVEL_LABEL[l.nivel_analise] || 'Preliminar'}</urbi-badge>`,
+        render: (l: any) => html`<urbi-badge cor=${l.nivel_analise === 'avancado' ? 'info' : 'alerta'}>${NIVEL_LABEL[l.nivel_analise] || 'Preliminar'}</urbi-badge>`,
       },
       { id: 'vgv', label: 'VGV', alinhamento: 'direita', valor: numero((p) => fmtR$(p.vgv)) },
       { id: 'resultado', label: 'Resultado', alinhamento: 'direita', valor: numero((p) => fmtR$(p.resultado)) },
