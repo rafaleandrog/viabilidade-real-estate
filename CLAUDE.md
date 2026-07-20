@@ -38,13 +38,44 @@ Cada lote tem dependências listadas em `docs/lotes-bugs-2026-07-20.md`. **Não 
 - Manter os contratos inegociáveis de `INSTRUCOES-CODE.md`
 - Usar tokens CSS do design system (`var(--cor-*)`) — nunca cores literais
 - Migrações de schema: sempre forward-only, bumpar versão z
-- Após cada issue: typecheck + build verdes antes de passar para a próxima
+- Após cada issue: validar verde antes de passar para a próxima. No ambiente Claude Code,
+  mudança de frontend → `bash scripts/validar-frontend.sh` (ver seção de validação abaixo);
+  mudança de backend/schema → validação fica para o ambiente autenticado do autor.
 
 ### 4. Encerrar sessão
-1. `pnpm exec urbi-empacotar viabilidade` sem erros
+1. Validação: frontend via `bash scripts/validar-frontend.sh` (verde). `pnpm exec
+   urbi-empacotar viabilidade` e a suíte de backend rodam no ambiente do autor (SDK gated)
 2. Commit com mensagem `fix(lote-X): ...` ou `feat(lote-X): ...`
 3. **Atualizar `PROGRESSO.md`**: marcar issues concluídas, registrar decisões tomadas e pendências
 4. Fechar as issues do GitHub que foram implementadas
+
+---
+
+## Validação no ambiente Claude Code (web/remoto) — NÃO redescobrir isto
+
+⚠️ **Regra de ouro:** neste ambiente o `@urbiverso/sdk` está no GitHub Packages **privado**
+e a auth disponível **não tem acesso** a ele → `pnpm install` sempre falha com **401** e
+aborta o link dos pacotes. **Isso é esperado.** Não perca tempo caçando `GITHUB_TOKEN`,
+configurando `.npmrc` com token, tentando `--offline`, etc. — nada disso destrava o SDK aqui.
+
+**Para mudanças de FRONTEND (a maioria dos lotes de UI):** o frontend **não importa o SDK**
+(usa o global `window.urbiVerso`), então valida-se 100% só com os pacotes públicos. Use o
+script pronto — é o "caminho simples" que sempre funciona:
+
+```
+bash scripts/validar-frontend.sh
+```
+
+Ele roda `pnpm install` (ignorando o 401 do SDK, que ainda assim baixa lit/typescript/tsx/
+esbuild para `.pnpm/`), linka esses pacotes e executa **typecheck do frontend + testes de
+frontend + build do bundle (esbuild)**. Verde = mudança de frontend validada.
+
+**Backend, typecheck do backend, `urbi-empacotar` e a suíte completa** exigem o SDK →
+**só rodam no ambiente autenticado do autor**. Se uma issue tocar backend/schema, implemente
+e registre no `PROGRESSO.md` que a validação de backend/empacotamento fica para o autor
+(não fique tentando instalar o SDK aqui). No PC do autor o fluxo canônico segue valendo:
+`pnpm typecheck`, `pnpm build`, `pnpm test`, `pnpm exec urbi-empacotar viabilidade`
+(no Windows, `urbi-empacotar` roda via **PowerShell**, não Git Bash — ver PROGRESSO).
 
 ---
 
