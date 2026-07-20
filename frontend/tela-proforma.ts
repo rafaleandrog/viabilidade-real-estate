@@ -58,8 +58,13 @@ export class ViabTelaProforma extends LitElement {
       background: none; border: none; color: inherit; cursor: pointer;
       font-size: 0.85rem; line-height: 1; padding: 0 8px 0 0; width: 20px;
     }
-    /* Tipo 1 — Receita (identidade UP: azul primária), simples. */
-    .pf tr.receita td { color: var(--cor-primaria-solida, #2AA9E0); font-weight: 600; }
+    /* Tipo 1 — Receita (identidade UP: azul primária). #10: mesmo peso/tamanho/
+       destaque da linha Resultado (bold, maior, com fundo), mantendo a cor azul
+       que a distingue do Resultado. */
+    .pf tr.receita td {
+      color: var(--cor-primaria-solida, #2AA9E0); font-weight: 800; font-size: 1.05rem;
+      background: var(--cor-primaria-fundo, rgba(42,169,224,0.12));
+    }
     /* Tipo 2 — Consolidado (bold + fundo de destaque). */
     .pf tr.consolidado td {
       font-weight: 700; background: var(--cor-superficie-hover, rgba(255,255,255,0.08));
@@ -90,6 +95,13 @@ export class ViabTelaProforma extends LitElement {
       border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.15));
       padding-top: 20px;
     }
+    /* #11 — distinção receita × despesa: cor do rótulo (1ª coluna) + fundo da
+       linha, exclusivamente por tokens do design system (color-mix mantém o
+       token, sem cor literal). */
+    .pf.sens tr.nat-receita td:first-child { color: var(--cor-sucesso); font-weight: 600; }
+    .pf.sens tr.nat-despesa td:first-child { color: var(--cor-erro); font-weight: 600; }
+    .pf.sens tr.nat-receita { background: color-mix(in srgb, var(--cor-sucesso) 8%, transparent); }
+    .pf.sens tr.nat-despesa { background: color-mix(in srgb, var(--cor-erro) 8%, transparent); }
     /* Badges dos cenários (cabeçalho) e dos indicadores centralizados na coluna. */
     .pf.sens .sens-cab { display: flex; justify-content: center; }
     .pf.sens td .sens-cab { padding: 2px 0; }
@@ -257,9 +269,15 @@ export class ViabTelaProforma extends LitElement {
     return `(${abs})`;
   }
 
-  // #4: R$ por m² vendável (valor da linha ÷ área vendável do projeto).
-  private _rsM2(r: Linha, p: Proforma): string {
-    return p.areaVendavel > 0 ? `${fmtR$(r.v / p.areaVendavel)}/m²` : '—';
+  // #9: R$ por m² vendável em notação contábil — análogo a _fmtContabil, mas com
+  // sufixo "/m²" e sem prefixo "R$": custos/deduções entre parênteses, receita
+  // plana, resultado pelo sinal real. (Antes usava fmtR$, que injeta "R$".)
+  private _fmtContabilM2(r: Linha, p: Proforma): string {
+    if (p.areaVendavel <= 0) return '—';
+    const abs = `${fmtNum(Math.abs(r.v / p.areaVendavel))}/m²`;
+    if (r.tipo === 'receita') return abs;
+    if (r.tipo === 'resultado') return r.v < 0 ? `(${abs})` : abs;
+    return `(${abs})`;
   }
 
   private _renderTabela(p: Proforma, lot: boolean, vgvBruto: number): TemplateResult {
@@ -287,7 +305,7 @@ export class ViabTelaProforma extends LitElement {
                 </td>
                 <td class="desc">${r.memo ?? ''}</td>
                 <td class="num ${sinal}">${this._fmtContabil(r)}</td>
-                <td class="num">${this._rsM2(r, p)}</td>
+                <td class="num ${sinal}">${this._fmtContabilM2(r, p)}</td>
                 <td class="num">${this._pctVgv(r, p)}</td>
               </tr>`;
             })}
@@ -372,17 +390,20 @@ export class ViabTelaProforma extends LitElement {
     // Linhas monetárias (6) e, separados por uma divisória com mais respiro, os dois
     // indicadores em % (Custo obra/VGV e Margem líquida) exibidos como urbi-badge
     // com a cor do cenário.
+    // #11: `natureza` classifica cada linha como receita ou despesa para colorir o
+    // rótulo (1ª coluna) e o fundo da linha (só tokens do design system).
     type Cen = { p: Proforma; vgvBruto: number };
-    const linhas: { l: string; f: (c: Cen) => number; pct?: boolean; badge?: boolean; bmCampo?: string; divisoria?: boolean }[] = [
-      { l: 'VGV', f: (c) => c.vgvBruto },
-      { l: 'Receita bruta', f: (c) => c.p.vgv },
-      { l: 'Receita líquida', f: (c) => c.p.receitaLiquida },
-      { l: 'Custo direto total', f: (c) => c.p.custoDiretoTotal },
-      { l: 'Receita operacional', f: (c) => c.p.receitaOperacional },
-      { l: 'Custo indireto total', f: (c) => c.p.custoIndiretoTotal },
-      { l: 'Resultado', f: (c) => c.p.resultado },
-      { l: 'Custo obra / VGV', f: (c) => c.p.custoObrasVgvPct, pct: true, badge: true, bmCampo: 'custo_obras_vgv', divisoria: true },
-      { l: 'Margem líquida', f: (c) => c.p.margemLiquidaPct, pct: true, badge: true, bmCampo: 'margem_liquida' },
+    type Natureza = 'receita' | 'despesa';
+    const linhas: { l: string; f: (c: Cen) => number; natureza: Natureza; pct?: boolean; badge?: boolean; bmCampo?: string; divisoria?: boolean }[] = [
+      { l: 'VGV', f: (c) => c.vgvBruto, natureza: 'receita' },
+      { l: 'Receita bruta', f: (c) => c.p.vgv, natureza: 'receita' },
+      { l: 'Receita líquida', f: (c) => c.p.receitaLiquida, natureza: 'receita' },
+      { l: 'Custo direto total', f: (c) => c.p.custoDiretoTotal, natureza: 'despesa' },
+      { l: 'Receita operacional', f: (c) => c.p.receitaOperacional, natureza: 'receita' },
+      { l: 'Custo indireto total', f: (c) => c.p.custoIndiretoTotal, natureza: 'despesa' },
+      { l: 'Resultado', f: (c) => c.p.resultado, natureza: 'receita' },
+      { l: 'Custo obra / VGV', f: (c) => c.p.custoObrasVgvPct, natureza: 'despesa', pct: true, badge: true, bmCampo: 'custo_obras_vgv', divisoria: true },
+      { l: 'Margem líquida', f: (c) => c.p.margemLiquidaPct, natureza: 'receita', pct: true, badge: true, bmCampo: 'margem_liquida' },
     ];
     const fmt = (m: { pct?: boolean }, v: number) => (m.pct ? fmtPct(v) : fmtR$(v));
     // #11: título de cada cenário num urbi-badge ESTÁTICO — Bear=perigo (vermelho),
@@ -418,7 +439,7 @@ export class ViabTelaProforma extends LitElement {
           </thead>
           <tbody>
             ${linhas.map((m) => html`
-              <tr class=${m.divisoria ? 'div-top' : ''}>
+              <tr class="nat-${m.natureza}${m.divisoria ? ' div-top' : ''}">
                 <td>${m.l}</td>
                 ${cenarios.map((c) => {
                   const valNum = m.f(c);

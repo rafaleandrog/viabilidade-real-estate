@@ -118,7 +118,7 @@ export class ViabTelaEstudo extends LitElement {
 
         <div class="meta">
           <urbi-badge cor=${COR_STATUS[st] ?? 'padrao'}>${STATUS_LABEL[st] || st}</urbi-badge>
-          <urbi-badge cor=${this.estudo.nivel_analise === 'avancado' ? 'info' : 'padrao'}>
+          <urbi-badge cor=${this.estudo.nivel_analise === 'avancado' ? 'info' : 'alerta'}>
             ${NIVEL_LABEL[this.estudo.nivel_analise] || 'Preliminar'}
           </urbi-badge>
           <span class="sec">${TIPO_LABEL[this.estudo.tipo_empreendimento] || this.estudo.tipo_empreendimento}</span>

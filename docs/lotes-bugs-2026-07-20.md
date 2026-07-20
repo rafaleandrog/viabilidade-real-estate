@@ -179,7 +179,7 @@ Colunas obrigatórias em todas as abas:
 
 | Lote | Status | Observações |
 |------|--------|-------------|
-| 1 | ⏳ Pendente | #24 aguarda print do usuário |
+| 1 | ✅ Concluído | #9 #10 #11 #12 #13 feitos. #24 segue bloqueado (aguarda print do usuário) |
 | 2 | ⏳ Pendente | |
 | 3 | ⏳ Pendente | |
 | 4 | ⏳ Pendente | |
