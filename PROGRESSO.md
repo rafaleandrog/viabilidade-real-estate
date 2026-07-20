@@ -47,6 +47,28 @@ sem backend, sem migração; `versao` intacta em 0.1.0.
   (exit 0)** · **testes frontend 70/70 ✓** · **build do bundle frontend (esbuild) ✓**.
   Empacotamento/backend a validar no ambiente do autor (autenticado).
 
+### Lote 2 — Bug de sobreposição no Fluxo de Caixa — ✅ CONCLUÍDO (issue #14)
+Branch `claude/issues-lote-2-iy51q4`. Mudança **100% frontend** (só CSS), sem schema/backend/
+motor; `versao` intacta.
+
+- **#14 (sobreposição ao rolar a tabela horizontalmente — `tela-fluxo-ver.ts`):** as 5 colunas
+  sticky (`.c1`–`.c5`) tinham `left` fixos (0 · 220 · 292 · 356 · 476) mas larguras **não
+  travadas** — `.c1` com `min-width:180 / max-width:220` e `.c2`–`.c5` só com `min-width`. Duas
+  falhas daí: (a) com nome de linha curto a `.c1` encolhia abaixo do passo de 220px e abria um
+  **vão** por onde as colunas de meses vazavam ao rolar (a "sobreposição" reportada — bleed-through,
+  não overlap de sticky); (b) valores grandes em Total/VPL faziam `.c4`/`.c5` **crescerem além do
+  passo** e invadirem a coluna vizinha (o `left` da seguinte é fixo). **Fix:** travar cada coluna
+  com `width = min-width = max-width` + `box-sizing: border-box` + `overflow: hidden`, nos valores
+  exatos que os passos de `left` já assumiam (220/72/64/120/120 → cumulativo 0·220·292·356·476, fim
+  596). Assim a largura real de cada sticky bate exatamente com o `left` da próxima: sem vão, sem
+  crescimento, sem sobreposição. Ellipsis mantido na `.c1` (nomes longos truncam como antes).
+- **Nota (armadilha do template):** o comentário CSS vive dentro do tagged template ``css`…` `` —
+  um backtick literal no texto fecha o template e quebra o typecheck. Comentário reescrito sem
+  backticks (usa aspas).
+- **Validação neste ambiente:** frontend isolado (deps públicas do store pnpm) — **typecheck ✓ ·
+  testes 70/70 ✓ · build do bundle (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde).
+  Empacotamento/backend não se aplicam (mudança puramente de CSS de frontend).
+
 ---
 
 ## Mapa de repositórios (na máquina)

@@ -72,12 +72,18 @@ export class ViabFluxoVer extends LitElement {
       border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
     }
     table.fx td.num { text-align: right; }
-    /* 5 colunas fixas à esquerda */
-    .c1 { position: sticky; left: 0;    z-index: 2; min-width: 180px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
-    .c2 { position: sticky; left: 220px; z-index: 2; min-width: 56px; text-align: right; }
-    .c3 { position: sticky; left: 292px; z-index: 2; min-width: 48px; text-align: right; }
-    .c4 { position: sticky; left: 356px; z-index: 2; min-width: 104px; text-align: right; }
-    .c5 { position: sticky; left: 476px; z-index: 2; min-width: 104px; text-align: right;
+    /* 5 colunas fixas à esquerda — largura TRAVADA (width = min = max, border-box) para
+       que o "left" de cada sticky bata exatamente com a largura real da coluna anterior.
+       Sem travar: a c1 (só min/max) encolhia abaixo do passo de 220px e abria um vão por
+       onde os meses vazavam ao rolar (a "sobreposição" reportada); e as colunas numéricas
+       (só min-width) cresciam além do passo com valores grandes e invadiam a vizinha.
+       Cumulativo dos passos: 0 · 220 · 292 · 356 · 476 (fim em 596). */
+    .c1, .c2, .c3, .c4, .c5 { box-sizing: border-box; overflow: hidden; }
+    .c1 { position: sticky; left: 0;    z-index: 2; width: 220px; min-width: 220px; max-width: 220px; text-overflow: ellipsis; text-align: left; }
+    .c2 { position: sticky; left: 220px; z-index: 2; width: 72px;  min-width: 72px;  max-width: 72px;  text-align: right; }
+    .c3 { position: sticky; left: 292px; z-index: 2; width: 64px;  min-width: 64px;  max-width: 64px;  text-align: right; }
+    .c4 { position: sticky; left: 356px; z-index: 2; width: 120px; min-width: 120px; max-width: 120px; text-align: right; }
+    .c5 { position: sticky; left: 476px; z-index: 2; width: 120px; min-width: 120px; max-width: 120px; text-align: right;
       border-right: 2px solid var(--cor-borda, rgba(255,255,255,0.12)); }
     table.fx thead .c1, table.fx thead .c2, table.fx thead .c3, table.fx thead .c4, table.fx thead .c5 { z-index: 4; }
     table.fx thead .c1 { text-align: left; }
