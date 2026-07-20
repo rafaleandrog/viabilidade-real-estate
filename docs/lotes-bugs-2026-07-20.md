@@ -180,7 +180,7 @@ Colunas obrigatórias em todas as abas:
 | Lote | Status | Observações |
 |------|--------|-------------|
 | 1 | ✅ Concluído | #9 #10 #11 #12 #13 feitos. #24 segue bloqueado (aguarda print do usuário) |
-| 2 | ⏳ Pendente | |
+| 2 | ✅ Concluído | #14 feito — larguras das 5 colunas sticky travadas em `tela-fluxo-ver.ts` (CSS puro) |
 | 3 | ⏳ Pendente | |
 | 4 | ⏳ Pendente | |
 | 5 | ⏳ Pendente | Mapa de reclassificação de grupos aguarda decisão |
