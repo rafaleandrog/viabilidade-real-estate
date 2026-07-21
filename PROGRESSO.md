@@ -209,6 +209,51 @@ Branch `claude/lote-5-issues-msebmq`. Toca **schema + backend + frontend**. `ver
   `Number(c.inicio_mes) || 1`, que exibe 1 quando o valor é o mês 0 (convenção do Lote 4). Bug latente de
   exibição do default, não do dado salvo; deixado para uma varredura própria.
 
+### Lote 6 — Receitas + Fases + Absorção/Fluxo (spec conjunta) — ✅ IMPLEMENTADO (issues #19, #20, #21)
+Branch `claude/lote-6-issues-b21wlr`. Toca **schema + backend + frontend + motor**. `versao` **0.1.2 → 0.1.3**
+(migração `migracoes/003_receitas_fases_alocacoes.js`). Pré-requisitos #15 e #16: concluídos.
+
+- **Decisões do autor (perguntadas no início — respostas registradas):**
+  1. **Modelo de dados:** **Fase nova + Alocações** — `avancado_fases` (nome, ordem, `absorcao`, `fluxo_pagamento`)
+     e `avancado_alocacoes` (fase_id, tipologia_id→catálogo, unidades, preco_m2). `avancado_tipologias` virou
+     **catálogo do estudo** (desacoplado — `linha_receita_id` removido). `avancado_linhas_receita` **aposentada**
+     (migrada p/ fases+alocações; preservada vestigial no schema para não exigir drop de tabela).
+  2. **Integridade tipologia (#19):** **bloquear exclusão** de tipologia com alocações (422 `TIPOLOGIA_EM_USO`);
+     a alocação guarda só unidades+preço e lê nome/área do catálogo **ao vivo** (edição reflete).
+  3. **Trava de saldo:** **por fase** — saldo = `quantidade` da tipologia − Σ unidades alocadas **naquela fase**
+     (a mesma tipologia pode ser realocada por inteiro noutra fase).
+- **#19 (novo modelo de Receitas):** a aba **Viabilidade → Receitas** virou **1 card por Fase**; dentro, uma tabela
+  de **alocações** (tipologia do catálogo · unidades · preço/m² · área read-only · preço unit/total · saldo). O
+  `urbi-select` de tipologia só oferece as com **saldo > 0 na fase** (trava). Empreendimento → Tipologias virou o
+  **cadastro do catálogo** (`tela-empreendimento-tipologias.ts` reescrita, endpoints estudo-level).
+- **#20 (Absorção + Fluxo):** **Absorção** só **Distribuído** em 3 períodos — P1 = **Pré-lançamento+Lançamento**,
+  P2 = Obra, **P3 = Pós-obra derivado** (`100 − p1 − p2`, período do Cronograma). Removidos `linear`/`personalizado`
+  da UI, o campo **VGL** e a validação de soma=100%. **Fluxo de Pagamento** com **múltiplas linhas** de Entrada e
+  Parcelamento; **Repasse derivado** (`100 − Σentrada − Σparcelas`), sem mensagem de soma.
+- **#21 (Fases estruturadas):** `fase_label` (texto) virou entidade `avancado_fases`, dona da Absorção e do Fluxo;
+  as alocações são organizadas **por fase**.
+- **Motor (compat):** `fluxo-shared.ts` — `absorcaoMensal` distribuído reescrito p/ os 3 períodos (novos
+  `faixasAbsorcao`/`pctPosObraDerivado`; `periodoAbsorcao` agora começa no Pré-lançamento). `fluxo-caixa-motor.ts`
+  — `receitaMensalLinha` aceita Entrada/Parcelas em **lista** com Repasse derivado (`pctRepasseDerivado`,
+  `normalizarLinhasPagamento`); **backward-compat** para o shape objeto legado. `GET /avancado/receitas` devolve as
+  **fases no formato do motor** (fase = "linha de receita"; alocações joinadas ao catálogo = "tipologias"), então
+  `tela-fluxo-ver`/gráficos/`exportar` seguem sem mudança.
+- **Backend (`backend/rotas/avancado.ts`):** novas rotas — catálogo de tipologias (estudo-level, DELETE bloqueia se
+  em uso), Fases (CRUD com `absorcao`/`fluxo_pagamento` validados sem soma), Alocações (CRUD nested por fase, trava de
+  saldo por fase em POST/PATCH). Validadores `validarAbsorcao`/`validarFluxoPagamento` relaxados (sem soma=100).
+  `duplicarDadosAvancado` reescrita (catálogo → mapa id, fases + alocações remapeadas). `montarLinhasReceita` exportada.
+- **Migração 003 (forward-only):** cada `avancado_linhas_receita` → `avancado_fases` (absorção convertida p/ distribuído,
+  fluxo p/ multi-linha); cada `avancado_tipologias` legada → uma `avancado_alocacoes` na fase da sua linha; drop de
+  `avancado_tipologias.linha_receita_id` via `remover_colunas`. Numa instância virgem o runner faz baseline (inócua).
+- **Decisão registrada (área p/ custos `rs_m2_priv`):** a área privativa total do motor passa a somar as **alocações**
+  (unidades × área do catálogo), mantendo VGV e base de custo consistentes entre si. Se o autor quiser a área do
+  **catálogo inteiro** (construído, não só vendido) para custo de obra, ajustar `montarLinhasReceita`/motor num passo próprio.
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 76/76 ✓** (+ absorção 3-períodos,
+  fluxo multi-linha, `montarLinhasReceita`) **· build (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde;
+  bundle ~224kb). ⏳ **Pendente do autor (SDK gated):** typecheck do backend, suíte de backend (inclui os testes
+  novos de `validar*`/`montarLinhasReceita`), `urbi-empacotar` e a **execução da migração 003** contra dados reais.
+  Render real dos modais (Absorção 3 períodos, Fluxo multi-linha) e da trava de saldo só valida no deploy dev.
+
 ---
 
 ## Mapa de repositórios (na máquina)

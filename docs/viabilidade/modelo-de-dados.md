@@ -20,6 +20,25 @@ Todas as tabelas usam `acesso_externo: "restrito"` — a escrita passa pelas rot
 | `benchmarks` | Valores de referência por tipo de empreendimento. Único `[tipo_empreendimento, campo]`. |
 | `apelo_comercial` | Resultado da IA (`resultado` JSON + 6 scores por fator + `score_geral`). |
 | `apelo_comercial_documentos` | Fontes anexadas (`documento` arquivo, `tipo_dado`, `texto_adicional`). |
+| `estudo_documentos` | Anexos do Empreendimento (imagem principal, renders, plantas). |
+
+### Avançado — fluxo de caixa (nível `avancado`)
+
+| Tabela | Papel |
+|---|---|
+| `avancado_cronograma` | 5 eventos por estudo (planejamento, pré-lançamento, lançamento, obra, pós-obra) com `inicio_mes` 0-based e `duracao_meses`. Único `[estudo_id, evento]`. |
+| `avancado_curvas` | Curvas de distribuição globais da instância (Curva S padrão + customizadas). |
+| `avancado_tipologias` | **Catálogo de tipologias do estudo** (Lote 6 · #19) — nome, tipo, área privativa, dormitórios, vagas, `quantidade` (total de unidades), `unidades_permutadas`. Cadastrado em Empreendimento → Tipologias, **desacoplado** da receita. |
+| `avancado_fases` | **Fase** (Lote 6 · #21) — entidade dona da **Absorção** (`absorcao` JSON) e do **Fluxo de Pagamento** (`fluxo_pagamento` JSON). Substitui o antigo `fase_label` de texto. |
+| `avancado_alocacoes` | **Alocação de venda** (Lote 6 · #19) — vende `unidades` de uma `tipologia_id` (catálogo) numa `fase_id`, a um `preco_m2`. Várias alocações por tipologia (preços diferentes). Trava de saldo **por fase**: Σ unidades alocadas da tipologia na fase ≤ `quantidade` do catálogo. |
+| `avancado_linhas_receita` | **Vestigial** — modelo antigo (linha de receita com tipologias filhas). Preservada no schema, mas o app não a lê/escreve após a migração 003 (fases + alocações). |
+| `avancado_linhas_custo` | Linhas de custo em 5 grupos (terreno/obra/diretos/indireto/financeiro) com unidade de orçamento e ancoragem ao cronograma. |
+
+**Absorção (`avancado_fases.absorcao`)** — só o modo **Distribuído** em 3 períodos (Lote 6 · #20): `blocos: [{evento:'lancamento',pct}, {evento:'obra',pct}, {evento:'pos_obra',pct}]`. O período 1 (`lancamento`) cobre **Pré-lançamento + Lançamento**; o Pós-obra é **derivado** (`100 − p1 − p2`) e seu período vem do Cronograma.
+
+**Fluxo de Pagamento (`avancado_fases.fluxo_pagamento`)** — `comissao`, `ret`, **`entrada` e `parcelas` como LISTAS** de linhas (Lote 6 · #20), e `repasse: { apos_entrega_meses }`. O `%` do Repasse é **derivado** (`100 − Σentrada − Σparcelas`), não persistido.
+
+Integridade (Lote 6 · #19): excluir uma tipologia do catálogo com alocações é **bloqueado** (422 `TIPOLOGIA_EM_USO`); editar nome/área reflete ao vivo nas alocações (a alocação guarda só unidades + preço).
 
 ## Regras de precisão
 

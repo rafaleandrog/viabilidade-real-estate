@@ -107,19 +107,55 @@ export function vglLinha(vgv: number, fluxoPagamento: any): number {
 }
 
 /**
- * Período de absorção de uma linha: do início do Lançamento até o fim da
- * Pós-obra (a duração da pós-obra pode ser sobrescrita pelo bloco de absorção).
- * Retorna null se o cronograma não tiver os eventos necessários.
+ * As 3 faixas de tempo da absorção Distribuída (Lote 6 · #20), em meses
+ * RELATIVOS do projeto, derivadas do Cronograma:
+ *  - `prelancamento` (período 1 = Pré-lançamento + Lançamento): do início do
+ *    Pré-lançamento até o fim do Lançamento.
+ *  - `obra` (período 2 = Durante a obra): a duração do evento Obra.
+ *  - `pos_obra` (período 3 = Pós-obra): a duração do evento Pós-obra (pode ser
+ *    sobrescrita por `posObraMeses`).
+ * Retorna null se faltar Lançamento, Obra ou Pós-obra no cronograma.
+ */
+export function faixasAbsorcao(
+  crono: EventoCrono[],
+  posObraMeses?: number,
+): { prelancamento: { inicio: number; fim: number }; obra: { inicio: number; fim: number }; pos_obra: { inicio: number; fim: number } } | null {
+  const pre = crono.find((e) => e.evento === 'pre_lancamento');
+  const lanc = crono.find((e) => e.evento === 'lancamento');
+  const obra = crono.find((e) => e.evento === 'obra');
+  const pos = crono.find((e) => e.evento === 'pos_obra');
+  if (!lanc || !obra || !pos) return null;
+  const durPos = Math.max(1, Math.round(posObraMeses ?? n(pos.duracao_meses)));
+  return {
+    prelancamento: { inicio: pre ? n(pre.inicio_mes) : n(lanc.inicio_mes), fim: n(lanc.inicio_mes) + Math.max(1, n(lanc.duracao_meses)) - 1 },
+    obra: { inicio: n(obra.inicio_mes), fim: n(obra.inicio_mes) + Math.max(1, n(obra.duracao_meses)) - 1 },
+    pos_obra: { inicio: n(pos.inicio_mes), fim: n(pos.inicio_mes) + durPos - 1 },
+  };
+}
+
+/**
+ * Período total de absorção de uma linha/fase: do início do período 1
+ * (Pré-lançamento) até o fim da Pós-obra. Retorna null se o cronograma não
+ * tiver os eventos necessários.
  */
 export function periodoAbsorcao(
   crono: EventoCrono[],
   posObraMeses?: number,
 ): { inicio: number; fim: number } | null {
-  const lanc = crono.find((e) => e.evento === 'lancamento');
-  const pos = crono.find((e) => e.evento === 'pos_obra');
-  if (!lanc || !pos) return null;
-  const durPos = Math.max(1, Math.round(posObraMeses ?? n(pos.duracao_meses)));
-  return { inicio: n(lanc.inicio_mes), fim: n(pos.inicio_mes) + durPos - 1 };
+  const f = faixasAbsorcao(crono, posObraMeses);
+  if (!f) return null;
+  return { inicio: f.prelancamento.inicio, fim: f.pos_obra.fim };
+}
+
+/** Lê o % de um bloco de absorção por chave de evento (0 se ausente). */
+function pctBloco(blocos: any[], evento: string): number {
+  const b = (blocos ?? []).find((x: any) => x?.evento === evento);
+  return b ? n(b.pct) : 0;
+}
+
+/** % da Pós-obra na absorção Distribuída = 100 − Pré+Lançamento − Obra (derivado). */
+export function pctPosObraDerivado(blocos: any[]): number {
+  return Math.max(0, 100 - pctBloco(blocos, 'lancamento') - pctBloco(blocos, 'obra'));
 }
 
 /**
@@ -127,19 +163,21 @@ export function periodoAbsorcao(
  * Retorna { inicio, pcts } onde pcts[i] é o % vendido no mês (inicio + i),
  * ou null se o cronograma for insuficiente.
  *
- * - linear: uniforme por todo o período de absorção
- * - distribuido: cada bloco (lancamento / obra / pos_obra) espalha seu % pelos
- *   meses do próprio evento (pós-obra usa duracao_meses do bloco, se houver)
- * - personalizado: usa absorcao.meses = [{ mes (relativo), pct }]
+ * Modelo vigente (Lote 6 · #20): apenas **Distribuído** em 3 períodos —
+ * Pré-lançamento+Lançamento (bloco `lancamento`), Durante a obra (bloco `obra`)
+ * e Pós-obra (bloco `pos_obra`, derivado = 100 − p1 − p2). Cada bloco espalha
+ * seu % uniformemente pelos meses da sua faixa.
+ *
+ * Compat: `personalizado` (dado legado) usa `absorcao.meses`; qualquer outro
+ * modo cai em `linear` (uniforme por todo o período de absorção).
  */
 export function absorcaoMensal(
   absorcao: any,
   crono: EventoCrono[],
 ): { inicio: number; pcts: number[] } | null {
   const modo = absorcao?.modo ?? 'linear';
-  const blocoPos = Array.isArray(absorcao?.blocos)
-    ? absorcao.blocos.find((b: any) => b?.evento === 'pos_obra')
-    : null;
+  const blocos = Array.isArray(absorcao?.blocos) ? absorcao.blocos : [];
+  const blocoPos = blocos.find((b: any) => b?.evento === 'pos_obra');
   const periodo = periodoAbsorcao(crono, blocoPos?.duracao_meses);
   if (!periodo) return null;
   const tamanho = periodo.fim - periodo.inicio + 1;
@@ -153,23 +191,24 @@ export function absorcaoMensal(
     return { inicio: periodo.inicio, pcts };
   }
 
-  if (modo === 'distribuido' && Array.isArray(absorcao?.blocos)) {
-    for (const b of absorcao.blocos) {
-      const ev = crono.find((e) => e.evento === b?.evento);
-      if (!ev) continue;
-      const dur = b.evento === 'pos_obra'
-        ? Math.max(1, Math.round(n(b.duracao_meses) || n(ev.duracao_meses)))
-        : Math.max(1, n(ev.duracao_meses));
-      const porMes = n(b.pct) / dur;
-      for (let i = 0; i < dur; i++) {
-        const idx = n(ev.inicio_mes) + i - periodo.inicio;
+  if (modo === 'distribuido') {
+    const faixas = faixasAbsorcao(crono, blocoPos?.duracao_meses);
+    if (!faixas) return null;
+    const espalhar = (faixa: { inicio: number; fim: number }, pct: number) => {
+      const dur = Math.max(1, faixa.fim - faixa.inicio + 1);
+      const porMes = pct / dur;
+      for (let m = faixa.inicio; m <= faixa.fim; m++) {
+        const idx = m - periodo.inicio;
         if (idx >= 0 && idx < tamanho) pcts[idx] += porMes;
       }
-    }
+    };
+    espalhar(faixas.prelancamento, pctBloco(blocos, 'lancamento'));
+    espalhar(faixas.obra, pctBloco(blocos, 'obra'));
+    espalhar(faixas.pos_obra, pctPosObraDerivado(blocos));
     return { inicio: periodo.inicio, pcts };
   }
 
-  // linear (default)
+  // linear (fallback)
   const porMes = 100 / tamanho;
   pcts.fill(porMes);
   return { inicio: periodo.inicio, pcts };
