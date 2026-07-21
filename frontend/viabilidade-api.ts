@@ -236,6 +236,25 @@ export function analisarApelo(estudoId: number): Promise<any> {
   return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial`, { method: 'POST' });
 }
 
+// ── Empreendimento → Informações: anexos (imagem principal, renders, plantas) ──
+export function listarDocumentosEmpreendimento(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/empreendimento/documentos`);
+}
+export async function uploadDocumentoEmpreendimento(file: File): Promise<{ upload_id: number }> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch('/api/dados/viabilidade/estudo_documentos/__upload?coluna=documento', {
+    method: 'POST', body: fd, credentials: 'same-origin',
+  });
+  return res.json();
+}
+export function anexarDocumentoEmpreendimento(estudoId: number, dados: { upload_id: number; categoria?: string; nome_arquivo?: string }): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/empreendimento/documentos`, { method: 'POST', body: JSON.stringify(dados) });
+}
+export function removerDocumentoEmpreendimento(estudoId: number, docId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/empreendimento/documentos/${docId}`, { method: 'DELETE' });
+}
+
 // ── Usuários (para gestão de membros) ──
 export async function listarUsuarios(): Promise<any[]> {
   const res = await urbiVerso.api('/shell/apps/viabilidade/roles/usuarios');

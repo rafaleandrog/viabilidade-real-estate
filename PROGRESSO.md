@@ -115,6 +115,55 @@ de abas), sem schema/backend/motor; `versao` intacta.
   Empacotamento/backend não se aplicam (sem schema/backend). ⏳ Render real das abas aninhadas só
   valida no deploy dev.
 
+### Lote 4 — Aba Empreendimento (Informações · Cronograma · Tipologias) — ✅ IMPLEMENTADO (issue #16)
+Branch `claude/issues-lote-4-sx0rel`. Toca **schema + backend + frontend**. `versao` **0.1.0 → 0.1.1**
+(1ª migração real do app — `migracoes/001_mes_zero_cronograma.js`).
+
+- **Decisões de rota (o autor pediu para prosseguir sem responder às perguntas — registrado):**
+  1. **Tipologias: só realocadas, mantidas ACOPLADAS às linhas de receita** (`linha_receita_id`
+     segue obrigatório). O modelo de **catálogo desacoplado** é do **Lote 6 (#19)**, que exige spec
+     conjunta — não pré-emptado aqui. A sub-aba apresenta as tipologias de todas as linhas numa única
+     tabela; adicionar a 1ª cria uma linha de receita padrão ("Vendas") se não houver nenhuma.
+  2. **`taxa_desconto_aa`: editor REMOVIDO da tela de Cronograma** (conforme #16). O valor persiste no
+     schema e o motor usa o padrão 12% a.a. até a realocação (**Financeiro, Lote 7 — bloqueado**).
+  3. **Mês 0 com migração de dados existentes** (forward-only, desloca −1).
+- **(2) Cronograma — convenção mês 1 → 0 (mês 0 = início do projeto):** mudança sistemática no motor
+  puro (`fluxo-shared.ts`, `fluxo-caixa-motor.ts`) — rótulos e índices 0-based (índice do array =
+  número do mês); horizonte derivado com `+1`; `recorte` devolve o índice direto e o gate de exibição
+  passou a ser por **duração** (mês 0 é válido, não pode ser falsy). Consumidores ajustados:
+  `tela-fluxo-ver.ts` (eixos/marcos/payback `M+`), `tela-fluxo-cronograma.ts` (Gantt, banner, guarda
+  `>= 0`), `exportar.ts` (CSV/PDF). Backend: `cronogramaPadrao` 0-based (0·6·12·17·41), validação
+  `inicio_mes >= 0`, default de custo `inicio_mes 0`. Schema: `avancado_cronograma.inicio_mes` e
+  `avancado_linhas_custo.inicio_mes` padrão → 0. **Migração 001** desloca em −1 os `inicio_mes`
+  persistidos (cronograma + custos) e os `absorcao.meses[].mes` (absorção personalizada). NÃO toca
+  `duracao_meses`, `absorcao.blocos` (por evento) nem `fluxo_pagamento` (offsets relativos). Os **18
+  testes de motor/shared** foram reancorados a 0-based (70/70 verde).
+- **(1) Informações:** novos campos `matricula` (texto) e `descricao` (texto_longo) em `estudos`
+  (passam pelo PATCH por blocklist); nova tabela **`estudo_documentos`** (espelha
+  `apelo_comercial_documentos`, FK `estudo_id` cascata, coluna `categoria` =
+  imagem_principal/render/planta, `documento` tipo `arquivo` com mimes imagem+PDF). Backend novo
+  `backend/rotas/empreendimento.ts` (GET/POST/DELETE dos anexos, registrado em `rotas.ts`). Frontend
+  `frontend/tela-empreendimento-info.ts` (`viab-empreendimento-info`): nome/matrícula/descrição
+  editáveis + área do terreno read-only + upload por categoria (mesmo fluxo `__upload` do Apelo).
+- **(3) Tipologias:** nova coluna `unidades_permutadas` (inteiro, padrão 0) em `avancado_tipologias`
+  (+ `CAMPOS_TIPOLOGIA` no backend). Frontend `frontend/tela-empreendimento-tipologias.ts`
+  (`viab-empreendimento-tipologias`): tabela consolidada com colunas **Nome · Tipo · Área privativa ·
+  Dormitórios · Vagas · Unidades · Un. permutadas** (loteamento oculta Tipo/Dorm/Vagas) + **linha de
+  consolidado** (total de unidades, área total = Σ área×un, total de vagas, total permutadas).
+  **Decisão:** `areaPrivativaTotalLinhas` do motor **não** foi alterada (segue Σ área×quantidade, usada
+  no custo `rs_m2_priv` e travada por teste); o efeito de `unidades_permutadas` sobre VGV/área líquida
+  é do **Lote 6** (rework de Receitas) — aqui a coluna é coletada e somada no consolidado.
+- **`tela-avancado.ts`:** os placeholders de Informações e Tipologias foram substituídos pelos novos
+  componentes; `_placeholder` removido (sem uso).
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 70/70 ✓ · build (esbuild)
+  ✓** (`bash scripts/validar-frontend.sh` verde; bundle 209→223kb). ⏳ **Pendente do autor
+  (ambiente autenticado, SDK gated):** typecheck do backend, suíte de backend, `urbi-empacotar` e a
+  **execução da migração 001** contra dados reais. Render real dos primitivos de upload/tabela só
+  valida no deploy dev.
+- **Não copiado no duplicar (nota):** `estudo_documentos` (anexos) não é copiado por
+  `duplicarDadosAvancado` (blobs de arquivo); `matricula`/`descricao` viajam com a cópia do estudo
+  (não estão no blocklist de cópia). Ajustar se o autor quiser duplicar anexos.
+
 ---
 
 ## Mapa de repositórios (na máquina)

@@ -14,6 +14,8 @@
         "status":              { "tipo": "texto", "limite": 20, "opcoes": ["rascunho", "em_analise", "aprovado", "reprovado", "arquivado"], "padrao": "rascunho" },
         "autor_id":            { "tipo": "referencia", "tabela_ref": "shell.usuarios", "campos_incluir": ["nome as autor_nome", "avatar_url as autor_avatar_url"] },
         "notas":               { "tipo": "texto_longo" },
+        "matricula":           { "tipo": "texto", "limite": 100 },
+        "descricao":           { "tipo": "texto_longo" },
 
         "origem_terreno":      { "tipo": "texto", "limite": 10, "opcoes": ["nucleo", "manual"], "padrao": "manual" },
         "terreno_manual_nome": { "tipo": "texto", "limite": 200 },
@@ -172,12 +174,24 @@
       "indices": [["apelo_id"]]
     },
 
+    "estudo_documentos": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":     { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "categoria":     { "tipo": "texto", "limite": 20, "opcoes": ["imagem_principal", "render", "planta"], "padrao": "render" },
+        "documento":     { "tipo": "arquivo", "mimes": ["image/png", "image/jpeg", "image/webp", "application/pdf"], "tamanho_max_mb": 25 },
+        "nome_arquivo":  { "tipo": "texto", "limite": 255 },
+        "ordem":         { "tipo": "inteiro", "padrao": 0 }
+      },
+      "indices": [["estudo_id"]]
+    },
+
     "avancado_cronograma": {
       "acesso_externo": "restrito",
       "colunas": {
         "estudo_id":       { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
         "evento":          { "tipo": "texto", "limite": 20, "opcoes": ["planejamento", "pre_lancamento", "lancamento", "obra", "pos_obra"], "obrigatorio": true },
-        "inicio_mes":      { "tipo": "inteiro", "padrao": 1 },
+        "inicio_mes":      { "tipo": "inteiro", "padrao": 0 },
         "duracao_meses":   { "tipo": "inteiro", "padrao": 1 },
         "travado_inicio":  { "tipo": "booleano", "padrao": false },
         "travado_duracao": { "tipo": "booleano", "padrao": false }
@@ -219,11 +233,12 @@
         "nome":              { "tipo": "texto", "limite": 100 },
         "tipo_unidade":      { "tipo": "texto", "limite": 20, "opcoes": ["apartamento", "cobertura", "loja", "lote", "outro"], "padrao": "apartamento" },
         "area_privativa_m2": { "tipo": "decimal", "precisao": 10, "escala": 2 },
-        "dormitorios":       { "tipo": "inteiro" },
-        "vagas":             { "tipo": "inteiro" },
-        "quantidade":        { "tipo": "inteiro", "padrao": 0 },
-        "preco_m2":          { "tipo": "decimal", "precisao": 12, "escala": 2 },
-        "ordem":             { "tipo": "inteiro", "padrao": 0 }
+        "dormitorios":         { "tipo": "inteiro" },
+        "vagas":               { "tipo": "inteiro" },
+        "quantidade":          { "tipo": "inteiro", "padrao": 0 },
+        "unidades_permutadas": { "tipo": "inteiro", "padrao": 0 },
+        "preco_m2":            { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "ordem":               { "tipo": "inteiro", "padrao": 0 }
       },
       "indices": [["linha_receita_id"], ["estudo_id"]]
     },
@@ -239,7 +254,7 @@
         "orcamento_unidade": { "tipo": "texto", "limite": 20, "opcoes": ["rs", "rs_m2_priv", "rs_m2_terreno", "pct_vgv", "pct_receita"], "padrao": "rs" },
         "curva_id":          { "tipo": "referencia", "tabela_ref": "avancado_curvas", "ao_deletar": "anular" },
         "cronograma_evento": { "tipo": "texto", "limite": 20, "opcoes": ["planejamento", "pre_lancamento", "obra", "pos_obra", "customizado"], "padrao": "customizado" },
-        "inicio_mes":        { "tipo": "inteiro", "padrao": 1 },
+        "inicio_mes":        { "tipo": "inteiro", "padrao": 0 },
         "duracao_meses":     { "tipo": "inteiro", "padrao": 1 },
         "ordem":             { "tipo": "inteiro", "padrao": 0 }
       },

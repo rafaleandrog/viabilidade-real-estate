@@ -182,7 +182,7 @@ Colunas obrigatórias em todas as abas:
 | 1 | ✅ Concluído | #9 #10 #11 #12 #13 feitos. #24 segue bloqueado (aguarda print do usuário) |
 | 2 | ✅ Concluído | #14 feito — larguras das 5 colunas sticky travadas em `tela-fluxo-ver.ts` (CSS puro) |
 | 3 | ✅ Concluído | #15 feito — 7 abas de topo do Avançado (`viab-tela-avancado`), telas existentes preservadas no lugar; Cronograma extraído p/ `viab-fluxo-cronograma`; `tela-fluxo.ts` removido |
-| 4 | ⏳ Pendente | |
+| 4 | ✅ Implementado | #16 feito — Informações (matrícula/descrição/anexos `estudo_documentos`), Cronograma **mês 0** (motor + migração 001 forward-only), Tipologias (`unidades_permutadas` + consolidado). Frontend verde; backend/empacotamento/migração a validar no ambiente do autor |
 | 5 | ⏳ Pendente | Mapa de reclassificação de grupos aguarda decisão |
 | 6 | ⏳ Pendente | Spec conjunta Receitas+Fases obrigatória antes de iniciar |
 | 7 | 🚫 Bloqueado | Aguarda spec dos campos das sub-abas de Financeiro |

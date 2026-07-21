@@ -17,7 +17,10 @@ import './viab-num.js';
 // A lógica (parâmetros do projeto + tabela de eventos + gráfico de Gantt) é a
 // mesma de antes — só mudou de casa.
 //
-// A taxa de desconto segue aqui por ora; o Lote 4 (#16) prevê realocá-la.
+// A taxa de desconto (`taxa_desconto_aa`) foi REMOVIDA desta tela no Lote 4 (#16)
+// — será realocada em outra aba (Financeiro, Lote 7). O valor persiste no schema
+// e o motor usa o padrão (12% a.a.) até a realocação.
+// Convenção de tempo do cronograma: mês 0-based (mês 0 = início do projeto).
 
 @customElement('viab-fluxo-cronograma')
 export class ViabFluxoCronograma extends LitElement {
@@ -101,15 +104,6 @@ export class ViabFluxoCronograma extends LitElement {
               this.paramsForm = { ...this.paramsForm, data_inicio_projeto: String(e.detail.valor || '').toLowerCase() };
             }}
           ></urbi-input>
-          <viab-num
-            label="Taxa de desconto"
-            sufixo="% a.a."
-            ?desabilitado=${dis}
-            .valor=${this.paramsForm.taxa_desconto_aa ?? 12}
-            @urbi:input-numero-change=${(e: CustomEvent) => {
-              this.paramsForm = { ...this.paramsForm, taxa_desconto_aa: e.detail.valor };
-            }}
-          ></viab-num>
           ${!dis ? html`
             <urbi-botao variante="secundario" ?carregando=${this.salvandoParams}
               @click=${this._salvarParametros}>Salvar</urbi-botao>` : nothing}
@@ -117,7 +111,7 @@ export class ViabFluxoCronograma extends LitElement {
         ${dataInicio && !parseMesAno(dataInicio) ? html`
           <urbi-banner variante="erro">Data de início inválida — use o formato mmm/AAAA (ex.: jan/2027).</urbi-banner>` : nothing}
         ${!dataInicio ? html`
-          <urbi-banner variante="alerta">Defina a data de início do projeto — ela ancora o mês 1 de todo o fluxo.</urbi-banner>` : nothing}
+          <urbi-banner variante="alerta">Defina a data de início do projeto — ela ancora o mês 0 de todo o fluxo.</urbi-banner>` : nothing}
 
         <table class="crono">
           <thead>
@@ -198,7 +192,8 @@ export class ViabFluxoCronograma extends LitElement {
 
   private async _salvarEvento(evento: string, dados: Record<string, any>) {
     const valor = Object.values(dados)[0];
-    if (valor === null || valor === undefined || Number(valor) < 1) return;
+    // inicio_mes pode ser 0 (mês 0 = início); duração < 1 é barrada no backend.
+    if (valor === null || valor === undefined || Number(valor) < 0) return;
     try {
       const res = await atualizarEventoCronograma(this.estudo.id, evento, dados);
       if (res?.erro) {
@@ -228,13 +223,14 @@ export class ViabFluxoCronograma extends LitElement {
     const topo = 8;
     const eixoH = 22;
     const H = topo + this.crono.length * rowH + eixoH;
-    const escala = (mes: number) => padL + ((mes - 1) / fim) * (W - padL - padR);
-    const largura = (dur: number) => Math.max((dur / fim) * (W - padL - padR), 3);
+    // Meses 0-based: mês 0 no início do eixo, mês `fim` na borda direita.
+    const escala = (mes: number) => padL + (fim > 0 ? (mes / fim) : 0) * (W - padL - padR);
+    const largura = (dur: number) => Math.max((dur / Math.max(fim, 1)) * (W - padL - padR), 3);
 
-    // Ticks do eixo: ~8 marcas espaçadas em múltiplos de 3 meses.
+    // Ticks do eixo: ~8 marcas espaçadas em múltiplos de 3 meses, a partir do mês 0.
     const passo = Math.max(3, Math.ceil(fim / 8 / 3) * 3);
     const ticks: number[] = [];
-    for (let m = 1; m <= fim; m += passo) ticks.push(m);
+    for (let m = 0; m <= fim; m += passo) ticks.push(m);
 
     const corTexto = 'var(--cor-texto-sec, #8a8f98)';
     const corGrade = 'var(--cor-borda-sutil, rgba(128,128,128,0.25))';

@@ -7,12 +7,13 @@ import {
   type EventoCrono,
 } from './fluxo-shared.js';
 
+// Cronograma 0-based (mês 0 = início do projeto).
 const CRONO: EventoCrono[] = [
-  { evento: 'planejamento', inicio_mes: 1, duracao_meses: 6 },
-  { evento: 'pre_lancamento', inicio_mes: 7, duracao_meses: 6 },
-  { evento: 'lancamento', inicio_mes: 13, duracao_meses: 1 },
-  { evento: 'obra', inicio_mes: 18, duracao_meses: 24 },
-  { evento: 'pos_obra', inicio_mes: 42, duracao_meses: 12 },
+  { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6 },
+  { evento: 'pre_lancamento', inicio_mes: 6, duracao_meses: 6 },
+  { evento: 'lancamento', inicio_mes: 12, duracao_meses: 1 },
+  { evento: 'obra', inicio_mes: 17, duracao_meses: 24 },
+  { evento: 'pos_obra', inicio_mes: 41, duracao_meses: 12 },
 ];
 
 const perto = (a: number, b: number, tol = 0.001) => Math.abs(a - b) <= tol;
@@ -26,23 +27,23 @@ test('parseMesAno aceita mmm/AAAA e rejeita formatos inválidos', () => {
   assert.equal(parseMesAno(null), null);
 });
 
-test('rotuloMesRelativo cruza a virada de ano corretamente', () => {
-  assert.equal(rotuloMesRelativo('jan/2027', 1), 'jan/27');
-  assert.equal(rotuloMesRelativo('jan/2027', 12), 'dez/27');
-  assert.equal(rotuloMesRelativo('jan/2027', 13), 'jan/28');
-  assert.equal(rotuloMesRelativo('nov/2027', 3), 'jan/28');
+test('rotuloMesRelativo cruza a virada de ano corretamente (0-based)', () => {
+  assert.equal(rotuloMesRelativo('jan/2027', 0), 'jan/27'); // mês 0 = início
+  assert.equal(rotuloMesRelativo('jan/2027', 11), 'dez/27');
+  assert.equal(rotuloMesRelativo('jan/2027', 12), 'jan/28');
+  assert.equal(rotuloMesRelativo('nov/2027', 2), 'jan/28');
   assert.equal(rotuloMesRelativo(null, 7), 'M7'); // sem data de início
 });
 
-test('mesRelativoCompleto devolve mmm/AAAA ou null', () => {
-  assert.equal(mesRelativoCompleto('jan/2027', 18), 'jun/2028');
+test('mesRelativoCompleto devolve mmm/AAAA ou null (0-based)', () => {
+  assert.equal(mesRelativoCompleto('jan/2027', 18), 'jul/2028');
   assert.equal(mesRelativoCompleto(undefined, 5), null);
 });
 
-test('rotuloPeriodo formata intervalo com duração', () => {
-  assert.equal(rotuloPeriodo('jan/2027', 1, 12), 'jan/27 → dez/27 (12m)');
-  assert.equal(rotuloPeriodo('jan/2027', 13, 1), 'jan/28 (1m)');
-  assert.equal(rotuloPeriodo(null, 2, 3), 'M2 → M4 (3m)');
+test('rotuloPeriodo formata intervalo com duração (0-based)', () => {
+  assert.equal(rotuloPeriodo('jan/2027', 0, 12), 'jan/27 → dez/27 (12m)');
+  assert.equal(rotuloPeriodo('jan/2027', 12, 1), 'jan/28 (1m)');
+  assert.equal(rotuloPeriodo(null, 0, 3), 'M0 → M2 (3m)');
 });
 
 test('vgv de tipologia, de linha e VGL com comissão destacada + RET', () => {
@@ -57,15 +58,15 @@ test('vgv de tipologia, de linha e VGL com comissão destacada + RET', () => {
 });
 
 test('periodoAbsorcao vai do Lançamento ao fim da Pós-obra', () => {
-  assert.deepEqual(periodoAbsorcao(CRONO), { inicio: 13, fim: 53 });
-  assert.deepEqual(periodoAbsorcao(CRONO, 6), { inicio: 13, fim: 47 }); // pós-obra sobrescrita
-  assert.equal(periodoAbsorcao([{ evento: 'obra', inicio_mes: 1, duracao_meses: 12 }]), null);
+  assert.deepEqual(periodoAbsorcao(CRONO), { inicio: 12, fim: 52 });
+  assert.deepEqual(periodoAbsorcao(CRONO, 6), { inicio: 12, fim: 46 }); // pós-obra sobrescrita
+  assert.equal(periodoAbsorcao([{ evento: 'obra', inicio_mes: 0, duracao_meses: 12 }]), null);
 });
 
 test('absorcaoMensal linear distribui 100% uniformemente pelo período', () => {
   const r = absorcaoMensal({ modo: 'linear' }, CRONO)!;
-  assert.equal(r.inicio, 13);
-  assert.equal(r.pcts.length, 41); // 13..53
+  assert.equal(r.inicio, 12);
+  assert.equal(r.pcts.length, 41); // 12..52
   assert.ok(perto(r.pcts[0], 100 / 41));
   assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 100));
 });
@@ -80,10 +81,10 @@ test('absorcaoMensal distribuído aloca blocos nos meses dos eventos', () => {
     ],
   };
   const r = absorcaoMensal(abs, CRONO)!;
-  assert.ok(perto(r.pcts[0], 30));                    // mês 13 = lançamento inteiro
-  assert.ok(perto(r.pcts[15 - 13], 0));               // hiato entre lançamento e obra (mês 15)
-  assert.ok(perto(r.pcts[18 - 13], 35 / 24));         // 1º mês da obra
-  assert.ok(perto(r.pcts[42 - 13], 35 / 12));         // 1º mês da pós-obra
+  assert.ok(perto(r.pcts[0], 30));                    // mês 12 = lançamento inteiro
+  assert.ok(perto(r.pcts[14 - 12], 0));               // hiato entre lançamento e obra (mês 14)
+  assert.ok(perto(r.pcts[17 - 12], 35 / 24));         // 1º mês da obra
+  assert.ok(perto(r.pcts[41 - 12], 35 / 12));         // 1º mês da pós-obra
   assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 100));
 });
 
@@ -105,7 +106,7 @@ test('areaPrivativaTotalLinhas soma área × quantidade de todas as tipologias',
 });
 
 test('absorcaoMensal personalizado usa os meses relativos informados', () => {
-  const abs = { modo: 'personalizado', meses: [{ mes: 13, pct: 60 }, { mes: 20, pct: 40 }] };
+  const abs = { modo: 'personalizado', meses: [{ mes: 12, pct: 60 }, { mes: 19, pct: 40 }] };
   const r = absorcaoMensal(abs, CRONO)!;
   assert.ok(perto(r.pcts[0], 60));
   assert.ok(perto(r.pcts[7], 40));
