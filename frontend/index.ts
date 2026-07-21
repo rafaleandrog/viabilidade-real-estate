@@ -14,7 +14,8 @@ interface Rota {
   tela: 'dashboard' | 'estudo';
   aba?: 'estudos' | 'terrenos' | 'benchmark';
   estudoId?: number;
-  abaEstudo?: string; // guia dentro do estudo: premissas|proforma|graficos|apelo
+  abaEstudo?: string; // guia dentro do estudo. Preliminar: premissas|proforma|graficos|apelo.
+                      // Avançado: resumo|empreendimento|viabilidade|obra|fluxo|cenarios|mercado.
 }
 
 function parsearSubRota(sub: string): Rota {

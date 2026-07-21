@@ -8,34 +8,22 @@ import {
   buscarCronogramaAvancado, atualizarEventoCronograma,
 } from './viabilidade-api.js';
 import './viab-num.js';
-import './tela-fluxo-receitas.js';
-import './tela-fluxo-custos.js';
-import './tela-fluxo-ver.js';
 
-// Aba "Fluxo de Caixa" — EXCLUSIVA do nível Avançado. Renderizada por
-// tela-estudo somente quando estudo.nivel_analise === 'avancado'; ainda assim
-// o próprio componente reforça o guard e não renderiza nada num Preliminar.
+// Cronograma do empreendimento — EXCLUSIVO do nível Avançado.
 //
-// Sub-navegação interna por urbi-badge (não urbi-abas — é navegação de segundo
-// nível dentro da aba): Cronograma · Receitas · Custos · Ver Fluxo.
+// Extraído da antiga aba única "Fluxo de Caixa" (viab-tela-fluxo) na
+// reestruturação de abas do Lote 3 (#15). Passou a ser um componente
+// standalone para ser hospedado na aba de topo "Empreendimento → Cronograma".
+// A lógica (parâmetros do projeto + tabela de eventos + gráfico de Gantt) é a
+// mesma de antes — só mudou de casa.
+//
+// A taxa de desconto segue aqui por ora; o Lote 4 (#16) prevê realocá-la.
 
-type SubTela = 'cronograma' | 'receitas' | 'custos' | 'ver_fluxo';
-
-const SUBTELAS: { id: SubTela; label: string }[] = [
-  { id: 'cronograma', label: 'Cronograma' },
-  { id: 'receitas', label: 'Receitas' },
-  { id: 'custos', label: 'Custos' },
-  { id: 'ver_fluxo', label: 'Ver Fluxo' },
-];
-
-@customElement('viab-tela-fluxo')
-export class ViabTelaFluxo extends LitElement {
+@customElement('viab-fluxo-cronograma')
+export class ViabFluxoCronograma extends LitElement {
   @property({ type: Object }) estudo: any = null;
   @property({ type: Boolean }) editavel = false;
 
-  @state() private subTela: SubTela = 'cronograma';
-
-  // ── Cronograma ──
   @state() private paramsForm: Record<string, any> = {};
   @state() private salvandoParams = false;
   @state() private crono: any[] = [];
@@ -43,9 +31,6 @@ export class ViabTelaFluxo extends LitElement {
   private cronoCarregado = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
-    .sub-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-    .placeholder { padding: 8px 0; }
-
     .params { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 8px; }
     .params urbi-input { width: 160px; }
     .params viab-num { width: 160px; }
@@ -73,32 +58,6 @@ export class ViabTelaFluxo extends LitElement {
     .gantt-wrap svg { display: block; min-width: 560px; width: 100%; height: auto; }
   `];
 
-  render() {
-    if (this.estudo?.nivel_analise !== 'avancado') return nothing;
-    return html`
-      <div class="sub-nav" role="group" aria-label="Seções do fluxo de caixa">
-        ${SUBTELAS.map((s) => html`
-          <urbi-badge cor="info" interativo ?ativo=${this.subTela === s.id}
-            @click=${() => { this.subTela = s.id; }}
-          >${s.label}</urbi-badge>`)}
-      </div>
-      ${this._renderSubTela()}
-    `;
-  }
-
-  private _renderSubTela(): TemplateResult {
-    switch (this.subTela) {
-      case 'cronograma': return this._renderCronograma();
-      case 'receitas': return this._renderReceitas();
-      case 'custos': return this._renderCustos();
-      case 'ver_fluxo': return this._renderVerFluxo();
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────
-  // Cronograma
-  // ─────────────────────────────────────────────────────────────────
-
   updated() {
     if (this.estudo?.nivel_analise === 'avancado' && !this.cronoCarregado) {
       this.cronoCarregado = true;
@@ -122,7 +81,8 @@ export class ViabTelaFluxo extends LitElement {
     this.cronoCarregando = false;
   }
 
-  private _renderCronograma(): TemplateResult {
+  render(): TemplateResult {
+    if (this.estudo?.nivel_analise !== 'avancado') return html`${nothing}`;
     if (this.cronoCarregando && this.crono.length === 0) {
       return html`<urbi-loading mensagem="Carregando cronograma..."></urbi-loading>`;
     }
@@ -304,28 +264,6 @@ export class ViabTelaFluxo extends LitElement {
           })}
         </svg>
       </div>
-    `;
-  }
-
-  // ─────────────────────────────────────────────────────────────────
-  // Sub-telas das próximas fases
-  // ─────────────────────────────────────────────────────────────────
-
-  private _renderReceitas(): TemplateResult {
-    return html`
-      <viab-fluxo-receitas .estudo=${this.estudo} .editavel=${this.editavel}></viab-fluxo-receitas>
-    `;
-  }
-
-  private _renderCustos(): TemplateResult {
-    return html`
-      <viab-fluxo-custos .estudo=${this.estudo} .editavel=${this.editavel}></viab-fluxo-custos>
-    `;
-  }
-
-  private _renderVerFluxo(): TemplateResult {
-    return html`
-      <viab-fluxo-ver .estudo=${this.estudo}></viab-fluxo-ver>
     `;
   }
 }
