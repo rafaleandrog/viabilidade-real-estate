@@ -29,13 +29,14 @@ export interface LinhaCronograma {
 }
 
 // Defaults de um cronograma novo (48 meses no total, espelhando a referência).
+// Convenção 0-based: mês 0 = início do projeto (Lote 4 · #16).
 export function cronogramaPadrao(): LinhaCronograma[] {
   const base: LinhaCronograma[] = [
-    { evento: 'planejamento', inicio_mes: 1, duracao_meses: 6, travado_inicio: false, travado_duracao: false },
-    { evento: 'pre_lancamento', inicio_mes: 7, duracao_meses: 6, travado_inicio: false, travado_duracao: false },
-    { evento: 'lancamento', inicio_mes: 13, duracao_meses: 1, travado_inicio: true, travado_duracao: true },
-    { evento: 'obra', inicio_mes: 18, duracao_meses: 24, travado_inicio: false, travado_duracao: false },
-    { evento: 'pos_obra', inicio_mes: 42, duracao_meses: 12, travado_inicio: true, travado_duracao: false },
+    { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6, travado_inicio: false, travado_duracao: false },
+    { evento: 'pre_lancamento', inicio_mes: 6, duracao_meses: 6, travado_inicio: false, travado_duracao: false },
+    { evento: 'lancamento', inicio_mes: 12, duracao_meses: 1, travado_inicio: true, travado_duracao: true },
+    { evento: 'obra', inicio_mes: 17, duracao_meses: 24, travado_inicio: false, travado_duracao: false },
+    { evento: 'pos_obra', inicio_mes: 41, duracao_meses: 12, travado_inicio: true, travado_duracao: false },
   ];
   return recalcularTravados(base);
 }
@@ -359,7 +360,7 @@ rotasAvancado.patch('/estudos/:id/avancado/cronograma/:evento', async (req: Requ
     if (req.body.inicio_mes !== undefined) {
       if (alvo.travado_inicio) { erro(res, 422, 'CAMPO_TRAVADO', `O início de ${evento} é calculado automaticamente`); return; }
       const v = Number(req.body.inicio_mes);
-      if (!Number.isInteger(v) || v < 1) { erro(res, 400, 'INICIO_INVALIDO', 'inicio_mes deve ser inteiro ≥ 1'); return; }
+      if (!Number.isInteger(v) || v < 0) { erro(res, 400, 'INICIO_INVALIDO', 'inicio_mes deve ser inteiro ≥ 0 (mês 0 = início do projeto)'); return; }
       alvo.inicio_mes = v;
     }
     if (req.body.duracao_meses !== undefined) {
@@ -756,7 +757,7 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
       grupo: 'indireto',
       orcamento_unidade: lote ? 'rs_m2_terreno' : 'rs',
       cronograma_evento: 'customizado',
-      inicio_mes: 1,
+      inicio_mes: 0,
       duracao_meses: 1,
       ordem: 0,
     };

@@ -197,7 +197,7 @@ export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string |
     const indent = '  '.repeat(l.nivel);
     rows.push([
       indent + l.nome,
-      l.inicio ? rotuloMesRelativo(dataInicio, l.inicio) : '',
+      l.duracao ? rotuloMesRelativo(dataInicio, l.inicio!) : '',
       l.duracao ? `${l.duracao}m` : '',
       R$(l.total),
       l.vpl !== undefined ? R$(l.vpl) : '',
@@ -281,7 +281,7 @@ export function exportarFluxoPDF(estudo: any, c: FluxoCalc, dataInicio: string |
       const cls = l.nivel === 0 ? 'g0' : l.nivel === 1 ? 'g1' : 'g2';
       const tds = l.mensal.slice(ini, fim).map((v) => `<td class="v">${fmtCel(v, l.custo)}</td>`).join('');
       return `<tr class="${cls}"><td class="nome">${'&nbsp;&nbsp;'.repeat(l.nivel)}${l.nome}</td>
-        <td class="v">${l.inicio ? rotuloMesRelativo(dataInicio, l.inicio) : ''}</td>
+        <td class="v">${l.duracao ? rotuloMesRelativo(dataInicio, l.inicio!) : ''}</td>
         <td class="v">${l.duracao ? `${l.duracao}m` : ''}</td>
         <td class="v">${fmtCel(l.total, l.custo)}</td>
         <td class="v">${l.vpl !== undefined ? fmtCel(l.vpl, l.custo) : ''}</td>${tds}</tr>`;

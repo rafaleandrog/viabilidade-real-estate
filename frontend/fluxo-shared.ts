@@ -1,8 +1,9 @@
 // Helpers puros de calendário do Fluxo de Caixa (nível Avançado).
 // Sem DOM, cobertos por testes unitários (fluxo-shared.test.ts).
 //
-// Convenção de tempo: o fluxo é indexado em meses RELATIVOS 1-based — o mês 1
-// é o mês de `data_inicio_projeto` ("mmm/AAAA", ex.: "jan/2027").
+// Convenção de tempo: o fluxo é indexado em meses RELATIVOS 0-based — o mês 0
+// é o mês de `data_inicio_projeto` ("mmm/AAAA", ex.: "jan/2027"). O índice do
+// array mensal coincide com o número do mês (índice i = mês i).
 
 export const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -24,24 +25,24 @@ export function formatarMesAno(v: MesAno): string {
 }
 
 /**
- * Rótulo curto do mês relativo `mesRel` (1-based) a partir de `dataInicio`
- * ("mmm/AAAA"). Ex.: dataInicio "jan/2027", mesRel 13 → "jan/28".
- * Sem data de início válida, degrada para "M13".
+ * Rótulo curto do mês relativo `mesRel` (0-based) a partir de `dataInicio`
+ * ("mmm/AAAA"). Ex.: dataInicio "jan/2027", mesRel 0 → "jan/27", mesRel 12 →
+ * "jan/28". Sem data de início válida, degrada para "M12".
  */
 export function rotuloMesRelativo(dataInicio: string | null | undefined, mesRel: number): string {
   const p = parseMesAno(dataInicio);
   if (!p) return `M${mesRel}`;
-  const total = p.ano * 12 + p.mes + (mesRel - 1);
+  const total = p.ano * 12 + p.mes + mesRel;
   const ano = Math.floor(total / 12);
   const mes = total % 12;
   return `${MESES_ABREV[mes]}/${String(ano).slice(2)}`;
 }
 
-/** Rótulo longo "mmm/AAAA" do mês relativo (ou null sem data de início). */
+/** Rótulo longo "mmm/AAAA" do mês relativo (0-based) (ou null sem data de início). */
 export function mesRelativoCompleto(dataInicio: string | null | undefined, mesRel: number): string | null {
   const p = parseMesAno(dataInicio);
   if (!p) return null;
-  const total = p.ano * 12 + p.mes + (mesRel - 1);
+  const total = p.ano * 12 + p.mes + mesRel;
   return formatarMesAno({ mes: total % 12, ano: Math.floor(total / 12) });
 }
 

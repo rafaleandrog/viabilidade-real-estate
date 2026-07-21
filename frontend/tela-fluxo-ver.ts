@@ -295,7 +295,7 @@ export class ViabFluxoVer extends LitElement {
               <span class="seta">${this.colapso[chaveToggle] ? '▸' : '▾'}</span>${nome}
             </button>` : nome}
         </td>
-        <td class="c2">${linha.inicio ? rotuloMesRelativo(dataInicio, linha.inicio) : ''}</td>
+        <td class="c2">${linha.duracao ? rotuloMesRelativo(dataInicio, linha.inicio!) : ''}</td>
         <td class="c3">${linha.duracao ? `${linha.duracao}m` : ''}</td>
         <td class="c4 num">${celula(linha.total, ehCusto)}</td>
         <td class="c5 num">${linha.vpl !== undefined ? celula(linha.vpl, ehCusto) : ''}</td>
@@ -352,14 +352,14 @@ export class ViabFluxoVer extends LitElement {
           <line x1=${padL} y1=${y(v)} x2=${W - padR} y2=${y(v)} stroke="var(--cor-borda-sutil, rgba(128,128,128,0.15))" />
           <text x=${padL - 6} y=${y(v) + 3} font-size="9" fill=${corTexto} text-anchor="end">${abrevR$(v)}</text>`)}
         ${ticks.map((i) => svg`
-          <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${rotuloMesRelativo(dataInicio, i + 1)}</text>`)}
+          <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${rotuloMesRelativo(dataInicio, i)}</text>`)}
         ${c.fluxoMensal.map((v, i) => svg`
           <rect x=${x(i)} y=${Math.min(y(v), y0)} width=${bw} height=${Math.max(Math.abs(y(v) - y0), 0.5)}
             fill=${v >= 0 ? 'var(--cor-sucesso, #13a98d)' : 'var(--cor-erro, #d45a3a)'} opacity="0.9" />`)}
         ${this._marcos().map((m, idx) => svg`
-          <line x1=${x(m.mes - 1)} y1=${padT - 4} x2=${x(m.mes - 1)} y2=${H - padB}
+          <line x1=${x(m.mes)} y1=${padT - 4} x2=${x(m.mes)} y2=${H - padB}
             stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.7" />
-          <text x=${x(m.mes - 1) + 3} y=${padT + 8 + (idx % 2) * 10} font-size="9" fill=${corTexto}>
+          <text x=${x(m.mes) + 3} y=${padT + 8 + (idx % 2) * 10} font-size="9" fill=${corTexto}>
             ${m.rotulo} · ${rotuloMesRelativo(dataInicio, m.mes)} · M+${m.mes}
           </text>`)}
       </svg>
@@ -389,7 +389,7 @@ export class ViabFluxoVer extends LitElement {
           <clipPath id="abaixo"><rect x="0" y=${y0} width=${W} height=${H - y0} /></clipPath>
         </defs>
         ${ticks.map((i) => svg`
-          <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${rotuloMesRelativo(dataInicio, i + 1)}</text>`)}
+          <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${rotuloMesRelativo(dataInicio, i)}</text>`)}
         ${[min, 0, max].map((v) => svg`
           <text x=${padL - 6} y=${y(v) + 3} font-size="9" fill=${corTexto} text-anchor="end">${abrevR$(v)}</text>`)}
         <path d=${area} fill="var(--cor-sucesso, #13a98d)" opacity="0.15" clip-path="url(#acima)" />
@@ -397,14 +397,14 @@ export class ViabFluxoVer extends LitElement {
         <line x1=${padL} y1=${y0} x2=${W - padR} y2=${y0} stroke=${corTexto} stroke-dasharray="4,3" opacity="0.6" />
         <path d=${linha} fill="none" stroke="var(--cor-texto-forte, #e8e8ea)" stroke-width="2" />
         ${this._marcos().map((m) => svg`
-          <line x1=${x(m.mes - 1)} y1=${padT - 4} x2=${x(m.mes - 1)} y2=${H - padB}
+          <line x1=${x(m.mes)} y1=${padT - 4} x2=${x(m.mes)} y2=${H - padB}
             stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.5" />
-          <text x=${x(m.mes - 1) + 3} y=${padT + 8} font-size="9" fill=${corTexto}>${m.rotulo}</text>`)}
+          <text x=${x(m.mes) + 3} y=${padT + 8} font-size="9" fill=${corTexto}>${m.rotulo}</text>`)}
         ${c.paybackMes !== null ? svg`
           <line x1=${x(c.paybackMes)} y1=${padT} x2=${x(c.paybackMes)} y2=${H - padB}
             stroke="var(--cor-sucesso, #13a98d)" stroke-width="1.5" stroke-dasharray="2,2" />
           <text x=${x(c.paybackMes) + 3} y=${padT + 20} font-size="9" fill="var(--cor-sucesso, #13a98d)">
-            Payback: ${c.paybackData} · M+${c.paybackMes + 1}
+            Payback: ${c.paybackData} · M+${c.paybackMes}
           </text>` : nothing}
         ${iExp >= 0 ? svg`
           <circle cx=${x(iExp)} cy=${y(c.exposicaoMaxima)} r="4" fill="var(--cor-erro, #d45a3a)" />

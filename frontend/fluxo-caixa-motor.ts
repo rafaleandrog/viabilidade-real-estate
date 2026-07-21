@@ -4,8 +4,8 @@
 // estudo.nivel_analise === 'avancado'; o Preliminar não passa por aqui.
 //
 // Convenções:
-// - Tempo em meses RELATIVOS 1-based (mês 1 = data_inicio_projeto).
-// - Arrays mensais são 0-based: indice i = mês (i+1).
+// - Tempo em meses RELATIVOS 0-based (mês 0 = data_inicio_projeto).
+// - Arrays mensais são 0-based e o índice coincide com o número do mês: índice i = mês i.
 // - Receitas positivas; custos positivos nos próprios arrays (o sinal entra na
 //   consolidação: fluxo = receita − custo).
 // - Permuta física NÃO entra no fluxo: o VGV derivado das tipologias já é o
@@ -27,7 +27,7 @@ export type CurvaPersonalizada = { mes: number; pct: number }[];
 
 /**
  * Distribui `total` ao longo de `duracaoMeses` a partir de `inicioMes`
- * (1-based), devolvendo um array de `prazoTotal` posições (zeros fora do
+ * (0-based), devolvendo um array de `prazoTotal` posições (zeros fora do
  * intervalo).
  *
  * - 'linear': total/duracao em cada mês
@@ -43,7 +43,7 @@ export function distribuirLinha(
 ): number[] {
   const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
   const dur = Math.max(1, Math.round(duracaoMeses));
-  const inicio = Math.max(1, Math.round(inicioMes));
+  const inicio = Math.max(0, Math.round(inicioMes));
 
   let pesos: number[];
   if (curva === 'linear' || !Array.isArray(curva) || curva.length === 0) {
@@ -53,7 +53,7 @@ export function distribuirLinha(
   }
 
   for (let i = 0; i < dur; i++) {
-    const idx = inicio - 1 + i;
+    const idx = inicio + i; // mês 0-based coincide com o índice do array
     if (idx >= 0 && idx < saida.length) saida[idx] += total * pesos[i];
   }
   return saida;
@@ -106,8 +106,8 @@ export interface LinhaCalc {
   nome: string;
   grupo: 'receita' | 'terreno' | 'obra' | 'indireto';
   faseLabel?: string;
-  inicio: number;                  // 1º mês com valor (1-based; 0 = sem valores)
-  duracao: number;                 // nº de meses entre o 1º e o último valor
+  inicio: number;                  // 1º mês com valor (0-based; use duracao===0 p/ "sem valores")
+  duracao: number;                 // nº de meses entre o 1º e o último valor (0 = sem valores)
   total: number;
   vpl: number;
   mensal: number[];
@@ -172,7 +172,7 @@ export function receitaMensalLinha(
 
   const deposita = (mes: number, valor: number) => {
     if (valor === 0) return;
-    const idx = Math.max(0, mes - 1); // recebimentos antes do mês 1 caem no mês 1
+    const idx = Math.max(0, mes); // mês 0-based = índice; recebimentos antes do mês 0 caem no mês 0
     if (idx < saida.length) saida[idx] += valor;
     else if (saida.length > 0) saida[saida.length - 1] += valor; // proteção de horizonte
   };
@@ -255,8 +255,9 @@ function recorte(mensal: number[]): { inicio: number; duracao: number } {
   for (let i = 0; i < mensal.length; i++) {
     if (Math.abs(mensal[i]) > 1e-9) { if (primeiro < 0) primeiro = i; ultimo = i; }
   }
+  // mês 0-based coincide com o índice → o 1º mês com valor é o próprio índice.
   if (primeiro < 0) return { inicio: 0, duracao: 0 };
-  return { inicio: primeiro + 1, duracao: ultimo - primeiro + 1 };
+  return { inicio: primeiro, duracao: ultimo - primeiro + 1 };
 }
 
 export function calcularFluxo(config: FluxoConfig): FluxoCalc {
@@ -266,11 +267,13 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const taxa = n(config.taxaDescontoAa) || 12;
 
   // Horizonte: usa prazoMeses se dado; senão deriva do conteúdo (+ folga de
-  // repasse/parcelas, já protegida em receitaMensalLinha).
-  const fimCrono = Math.max(0, ...crono.map((e) => n(e.inicio_mes) + n(e.duracao_meses) - 1));
-  const fimCustos = Math.max(0, ...linhasCusto.map((c) => n(c.inicio_mes) + n(c.duracao_meses) - 1));
+  // repasse/parcelas, já protegida em receitaMensalLinha). Meses 0-based: o
+  // último mês usado é `ultimo*`, então o comprimento do array é `ultimo* + 1`.
+  const ultimoCrono = Math.max(0, ...crono.map((e) => n(e.inicio_mes) + n(e.duracao_meses) - 1));
+  const ultimoCustos = Math.max(0, ...linhasCusto.map((c) => n(c.inicio_mes) + n(c.duracao_meses) - 1));
   const maxRepasse = Math.max(0, ...linhasReceita.map((l) => n(l?.fluxo_pagamento?.repasse?.apos_entrega_meses)));
-  const prazo = Math.max(1, Math.round(n(config.prazoMeses) || Math.max(fimCrono + maxRepasse, fimCustos, 12)));
+  const prazoDerivado = Math.max(ultimoCrono + maxRepasse, ultimoCustos, 11) + 1;
+  const prazo = Math.max(1, Math.round(n(config.prazoMeses) || prazoDerivado));
 
   const ctxCusto: ContextoCusto = {
     areaPrivativaTotal: areaPrivativaTotalLinhas(linhasReceita),
@@ -340,13 +343,13 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
 
   return {
     prazo,
-    meses: Array.from({ length: prazo }, (_, i) => rotuloMesRelativo(config.dataInicio, i + 1)),
+    meses: Array.from({ length: prazo }, (_, i) => rotuloMesRelativo(config.dataInicio, i)),
     receitaMensal, custoMensal, fluxoMensal, fluxoAcumulado,
     vgvTotal: ctxCusto.vgvTotal,
     vpl: vplFluxo(fluxoMensal, taxa),
     tir: tirFluxo(fluxoMensal),
     paybackMes: paybackMes >= 0 ? paybackMes : null,
-    paybackData: paybackMes >= 0 ? mesRelativoCompleto(config.dataInicio, paybackMes + 1) : null,
+    paybackData: paybackMes >= 0 ? mesRelativoCompleto(config.dataInicio, paybackMes) : null,
     exposicaoMaxima,
     linhasReceita: calcReceitas,
     linhasCusto: calcCustos,

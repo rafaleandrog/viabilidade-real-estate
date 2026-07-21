@@ -10,25 +10,26 @@ import type { EventoCrono } from './fluxo-shared.js';
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 const soma = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
 
+// Cronograma 0-based (mês 0 = início do projeto).
 const CRONO: EventoCrono[] = [
-  { evento: 'planejamento', inicio_mes: 1, duracao_meses: 6 },
-  { evento: 'pre_lancamento', inicio_mes: 7, duracao_meses: 6 },
-  { evento: 'lancamento', inicio_mes: 13, duracao_meses: 1 },
-  { evento: 'obra', inicio_mes: 18, duracao_meses: 24 },
-  { evento: 'pos_obra', inicio_mes: 42, duracao_meses: 12 },
+  { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6 },
+  { evento: 'pre_lancamento', inicio_mes: 6, duracao_meses: 6 },
+  { evento: 'lancamento', inicio_mes: 12, duracao_meses: 1 },
+  { evento: 'obra', inicio_mes: 17, duracao_meses: 24 },
+  { evento: 'pos_obra', inicio_mes: 41, duracao_meses: 12 },
 ];
 
 const CURVA_S = [2, 4, 7, 10, 13, 14, 14, 13, 10, 7, 4, 2].map((pct, i) => ({ mes: i + 1, pct }));
 
-// 1. Distribuição linear
+// 1. Distribuição linear (mês 0-based: início 3 = índice 3)
 test('distribuirLinha linear: 12 meses iguais somando o total', () => {
   const r = distribuirLinha(1_200_000, 3, 12, 'linear', 24);
   assert.equal(r.length, 24);
   assert.ok(perto(soma(r), 1_200_000));
   assert.equal(r[0], 0);
-  assert.equal(r[1], 0);
-  for (let i = 2; i < 14; i++) assert.ok(perto(r[i], 100_000));
-  assert.equal(r[14], 0);
+  assert.equal(r[2], 0);
+  for (let i = 3; i < 15; i++) assert.ok(perto(r[i], 100_000));
+  assert.equal(r[15], 0);
 });
 
 // 2. Curva S interpolada para outra duração
@@ -39,7 +40,7 @@ test('curva S de 12 meses reamostrada para 24 mantém soma e formato', () => {
   // formato de S preservado: meio > extremidades
   assert.ok(pesos[11] > pesos[0]);
   assert.ok(pesos[11] > pesos[23]);
-  const r = distribuirLinha(500_000, 1, 24, CURVA_S, 24);
+  const r = distribuirLinha(500_000, 0, 24, CURVA_S, 24);
   assert.ok(perto(soma(r), 500_000));
 });
 
@@ -59,16 +60,16 @@ test('absorção distribuída: vendas caem nos meses dos blocos e somam o VGV', 
   };
   const r = receitaMensalLinha(linha, CRONO, 60);
   assert.ok(perto(soma(r), 50_000_000, 1));
-  assert.ok(perto(r[12], 15_000_000, 1));          // mês 13: 30% no lançamento
-  assert.ok(perto(r[14], 0, 1));                   // hiato (mês 15)
-  assert.ok(perto(r[17], (0.35 * 50_000_000) / 24, 1)); // 1º mês da obra
+  assert.ok(perto(r[12], 15_000_000, 1));          // mês 12: 30% no lançamento
+  assert.ok(perto(r[14], 0, 1));                   // hiato (mês 14)
+  assert.ok(perto(r[17], (0.35 * 50_000_000) / 24, 1)); // 1º mês da obra (mês 17)
 });
 
 // 4. Fluxo de pagamento: entrada + parcelas + repasse = VGV no tempo correto
 test('fluxo de pagamento distribui entrada, parcelas na obra e repasse na entrega', () => {
   const linha = {
     tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
-    absorcao: { modo: 'personalizado', meses: [{ mes: 13, pct: 100 }] },        // tudo vendido no lançamento
+    absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },        // tudo vendido no lançamento
     fluxo_pagamento: {
       comissao: { ativo: true, tipo: 'embutida', pct: 6 },  // embutida: não deduz
       ret: { ativo: false, pct: 0 },
@@ -79,11 +80,11 @@ test('fluxo de pagamento distribui entrada, parcelas na obra e repasse na entreg
   };
   const r = receitaMensalLinha(linha, CRONO, 60);
   assert.ok(perto(soma(r), 10_000_000, 1));                   // nada se perde
-  assert.ok(perto(r[12], 1_500_000, 1));                      // entrada no mês 13
-  // parcelas: mensal do mês 14 até o fim da obra (mês 41) = 28 meses
+  assert.ok(perto(r[12], 1_500_000, 1));                      // entrada no mês 12
+  // parcelas: mensal do mês 13 até o fim da obra (mês 40) = 28 meses
   assert.ok(perto(r[13], 1_500_000 / 28, 1));
   assert.ok(perto(r[40], 1_500_000 / 28, 1));
-  // repasse: fim da obra (41) + 2 = mês 43
+  // repasse: fim da obra (40) + 2 = mês 42
   assert.ok(perto(r[42], 7_000_000, 1));
 });
 
@@ -113,17 +114,17 @@ test('VPL a taxa zero é a soma simples do fluxo', () => {
 test('payback é o primeiro mês com acumulado ≥ 0 após investimento', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12,
-    cronograma: [{ evento: 'lancamento', inicio_mes: 2, duracao_meses: 1 }, { evento: 'obra', inicio_mes: 2, duracao_meses: 2 }, { evento: 'pos_obra', inicio_mes: 4, duracao_meses: 2 }],
+    cronograma: [{ evento: 'lancamento', inicio_mes: 1, duracao_meses: 1 }, { evento: 'obra', inicio_mes: 1, duracao_meses: 2 }, { evento: 'pos_obra', inicio_mes: 3, duracao_meses: 2 }],
     linhasReceita: [{
       id: 1, nome: 'Sales', tipologias: [{ id: 1, quantidade: 1, area_privativa_m2: 100, preco_m2: 3_000 }], // 300k
-      absorcao: { modo: 'personalizado', meses: [{ mes: 2, pct: 100 }] },
-      fluxo_pagamento: null, // à vista no mês 2
+      absorcao: { modo: 'personalizado', meses: [{ mes: 1, pct: 100 }] },
+      fluxo_pagamento: null, // à vista no mês 1
     }],
-    linhasCusto: [{ id: 1, grupo: 'terreno', categoria: 'Preço', orcamento_valor: 200_000, orcamento_unidade: 'rs', inicio_mes: 1, duracao_meses: 1 }],
+    linhasCusto: [{ id: 1, grupo: 'terreno', categoria: 'Preço', orcamento_valor: 200_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 }],
     areaTerreno: 0,
   };
   const r = calcularFluxo(config);
-  // mês 1: -200k; mês 2: +300k → acumulado vira ≥ 0 no índice 1
+  // mês 0: -200k; mês 1: +300k → acumulado vira ≥ 0 no índice 1
   assert.equal(r.paybackMes, 1);
   assert.equal(r.paybackData, 'fev/2027');
 });
@@ -160,9 +161,9 @@ test('fluxo completo: consolidação, acumulado, TIR e exposição coerentes', (
       },
     }],
     linhasCusto: [
-      { id: 1, grupo: 'terreno', categoria: 'Preço', orcamento_valor: 60_000_000, orcamento_unidade: 'rs', inicio_mes: 1, duracao_meses: 1 },
-      { id: 2, grupo: 'obra', categoria: 'Obra', orcamento_valor: 4_800, orcamento_unidade: 'rs_m2_priv', inicio_mes: 18, duracao_meses: 24, curva_id: 9 },
-      { id: 3, grupo: 'indireto', categoria: 'Projetos', orcamento_valor: 1.25, orcamento_unidade: 'pct_vgv', inicio_mes: 1, duracao_meses: 12 },
+      { id: 1, grupo: 'terreno', categoria: 'Preço', orcamento_valor: 60_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+      { id: 2, grupo: 'obra', categoria: 'Obra', orcamento_valor: 4_800, orcamento_unidade: 'rs_m2_priv', inicio_mes: 17, duracao_meses: 24, curva_id: 9 },
+      { id: 3, grupo: 'indireto', categoria: 'Projetos', orcamento_valor: 1.25, orcamento_unidade: 'pct_vgv', inicio_mes: 0, duracao_meses: 12 },
     ],
     curvas: [{ id: 9, nome: 'Curva S', valores: CURVA_S }],
     areaTerreno: 50_000,
