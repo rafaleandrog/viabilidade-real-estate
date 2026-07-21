@@ -3,7 +3,6 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { urbiVerso } from './viabilidade-api.js';
 import './tela-premissas.js';
-import './tela-proforma.js';
 import './tela-graficos.js';
 import './tela-apelo.js';
 import './tela-fluxo-cronograma.js';
@@ -13,6 +12,7 @@ import './tela-fluxo-receitas.js';
 import './tela-fluxo-custos.js';
 import './tela-fluxo-ver.js';
 import './tela-financeiro.js';
+import './tela-resumo.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tela do estudo AVANÇADO — reestruturação de abas (Lote 3 · #15).
@@ -30,7 +30,7 @@ import './tela-financeiro.js';
 //    Fluxo de Caixa já usava; estado interno, não vai para a URL.
 //
 // Mapa de topo → conteúdo (Lote que assume cada aba entre parênteses):
-//   Resumo            → Proforma            (Lote 8 · #23 reconstrói)
+//   Resumo            → Resumo consolidado  (Lote 8 · #23)
 //   Empreendimento    → Informações* · Cronograma · Tipologias*   (Lote 4 · #16)
 //   Viabilidade       → Premissas · Receitas   (Lote 6 · #19–21)
 //   Obra              → Custos                 (Lote 5 · #17–18)
@@ -184,8 +184,9 @@ export class ViabTelaAvancado extends LitElement {
   }
 
   private _renderResumo(): TemplateResult {
-    // A Proforma é o consolidado atual; o Lote 8 (#23) reconstrói o Resumo.
-    return html`<viab-tela-proforma .estudo=${this.estudo}></viab-tela-proforma>`;
+    // Resumo consolidado do Avançado (Lote 8 · #23): KPIs-chave + gráficos que
+    // leem os resultados calculados pelas outras abas. Frontend puro.
+    return html`<viab-tela-resumo .estudo=${this.estudo}></viab-tela-resumo>`;
   }
 
   private _renderFluxo(): TemplateResult {

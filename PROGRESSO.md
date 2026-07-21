@@ -305,6 +305,36 @@ nem exige migração; o sincronizador cria as colunas com seus padrões).
   das colunas aditivas (sincronizador) contra dados reais. Render real dos `urbi-select`/acordeões só valida no
   deploy dev.
 
+### Lote 8 — Aba Resumo consolidada (ÚLTIMO) — ✅ IMPLEMENTADO (issue #23)
+Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/backend/motor/migração;
+`versao` intacta. Pré-requisitos (lotes 1–7): todos concluídos.
+
+- **Seleção de itens (definida com o autor, conforme #23 "definida em conjunto"):**
+  - **8 KPIs:** do Fluxo de Caixa → **VPL · TIR · Payback · Exposição máxima**; do Proforma →
+    **VGV · Resultado · Margem líquida · ROI**.
+  - **4 gráficos-chave:** **Fluxo de Caixa Acumulado** (curva S, com payback + exposição) ·
+    **Fluxo de Caixa Mensal** (barras) · **Composição dos custos** (pizza) · **Indicadores vs.
+    benchmark** (medidores).
+- **Novo `frontend/tela-resumo.ts` (`viab-tela-resumo`):** frontend puro, **sem entrada própria** —
+  consome os resultados das outras abas. Carrega os dados do Avançado (receitas, custos, curvas,
+  cronograma, parâmetros) + benchmarks + config numa única `_carregar`, computa o **motor de fluxo**
+  (`calcularFluxo`) e o **Proforma** (`calcularProforma`, com `aliquota_ret_pct` da config) e renderiza
+  os 8 KPIs + os 4 gráficos. `urbi-estado-vazio` quando ainda não há receitas/custos.
+- **Reuso, não reinvenção (headline):** os SVGs de fluxo (mensal + acumulado) foram **extraídos** de
+  `tela-fluxo-ver.ts` para o novo módulo puro **`frontend/fluxo-graficos.ts`** (`graficoFluxoMensal`/
+  `graficoFluxoAcumulado`, + `abrevR$` e os marcos do cronograma). `tela-fluxo-ver` passou a importar
+  essas funções (removidas as cópias privadas `_graficoMensal`/`_graficoAcumulado`/`_marcos` e o
+  `abrevR$` local; import de `svg` removido). Assim **Resumo e Fluxo de Caixa renderizam gráficos
+  idênticos** a partir da mesma fonte. Os medidores reusam `montarMedidor` (`medidor-faixas.ts`) e a
+  pizza reusa `urbi-grafico-pizza` com a mesma lista de custos do Proforma que a aba Cenários
+  (`tela-graficos`).
+- **`tela-avancado.ts`:** a aba **Resumo** deixou de renderizar `viab-tela-proforma` (placeholder do
+  Lote 3) e passou a renderizar **`viab-tela-resumo`**; import de `tela-proforma` removido daqui (o
+  Preliminar segue registrando-o via `tela-estudo`). Comentário do mapa de abas atualizado.
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 76/76 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~239kb). Sem schema/backend → empacotamento não se
+  aplica. ⏳ Render real dos `urbi-kpi`/`urbi-grafico-*` só valida no deploy dev.
+
 ---
 
 ## Mapa de repositórios (na máquina)
