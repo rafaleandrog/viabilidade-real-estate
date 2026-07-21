@@ -100,7 +100,42 @@
         "sensibilidade_variacao_negativa_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
 
         "data_inicio_projeto": { "tipo": "texto", "limite": 10 },
-        "taxa_desconto_aa":    { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 12 }
+        "taxa_desconto_aa":    { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 12 },
+
+        "estrutura_capital_proprio_pct":  { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "estrutura_financiamento_pct":    { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "estrutura_investidores_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "taxa_juros_valor_futuro_aa":     { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+
+        "tarifas_bancarias_pct":          { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "taxa_adm_carteira_pct":          { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "taxa_estruturacao_divida_pct":   { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "taxa_gerenciamento_obra_pct":    { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+
+        "juros_financeiros_aa":           { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "juros_inicio_cobranca_mes":      { "tipo": "inteiro", "padrao": 0 },
+        "indice_correcao":                { "tipo": "texto", "limite": 12, "opcoes": ["nenhum", "incc", "ipca", "igpm", "cdi", "tr", "inpc"], "padrao": "nenhum" },
+        "indice_correcao_taxa_aa":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+
+        "regime_tributario":              { "tipo": "texto", "limite": 16, "opcoes": ["ret", "lucro_presumido", "lucro_real"], "padrao": "ret" },
+        "aliquota_pis_pct":               { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "aliquota_cofins_pct":            { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "aliquota_csll_pct":              { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "aliquota_irpj_pct":              { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "aliquota_itbi_pct":              { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "imposto_sobre_permuta_fisica":   { "tipo": "booleano", "padrao": false },
+
+        "financiamento_obra_pct":           { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "financiamento_juros_aa":           { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "financiamento_sistema_amortizacao":{ "tipo": "texto", "limite": 8, "opcoes": ["price", "sac"], "padrao": "price" },
+        "financiamento_prazo_meses":        { "tipo": "inteiro", "padrao": 0 },
+        "financiamento_carencia_meses":     { "tipo": "inteiro", "padrao": 0 },
+
+        "investidor_aporte_valor":          { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 0 },
+        "investidor_retorno_tipo":          { "tipo": "texto", "limite": 16, "opcoes": ["remunerado", "pct_receita", "pct_resultado"], "padrao": "remunerado" },
+        "investidor_juros_aa":              { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "investidor_carencia_meses":        { "tipo": "inteiro", "padrao": 0 },
+        "investidor_parcelas":              { "tipo": "inteiro", "padrao": 0 }
       },
       "indices": [["tipo_empreendimento"], ["status"], ["autor_id"]],
       "unicos": [["id_legivel"]]
