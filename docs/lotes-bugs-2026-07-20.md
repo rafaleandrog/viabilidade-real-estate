@@ -185,7 +185,7 @@ Colunas obrigatórias em todas as abas:
 | 4 | ✅ Implementado | #16 feito — Informações (matrícula/descrição/anexos `estudo_documentos`), Cronograma **mês 0** (motor + migração 001 forward-only), Tipologias (`unidades_permutadas` + consolidado). Frontend verde; backend/empacotamento/migração a validar no ambiente do autor |
 | 5 | ✅ Implementado | #17 #18 feitos — 5 grupos (`diretos`/`financeiro` novos), migração 002 (obra+Decoração/Gestão→diretos), seletor de unidade por badge com conversão (portado do Preliminar), 5 sub-abas em Obra. Frontend verde; backend/migração a validar no ambiente do autor |
 | 6 | ✅ Implementado | #19 #20 #21 feitos — Fase vira entidade (`avancado_fases`) dona de Absorção/Fluxo; Tipologias viram catálogo (`avancado_tipologias` desacoplada) + Alocações (`avancado_alocacoes`, trava de saldo por fase); Absorção só Distribuído 3 períodos (pós-obra derivado); Fluxo multi-linha com Repasse derivado. Migração 003. Frontend verde; backend/migração a validar no ambiente do autor |
-| 7 | 🚫 Bloqueado | Aguarda spec dos campos das sub-abas de Financeiro |
+| 7 | ✅ Implementado | #22 feito — spec destravada por prints do autor. `Financeiro` = 3º badge de Viabilidade, 5 seções roláveis (Estrutura · Custos Financeiros · Juros · Taxas e Impostos · Financiamento & Investidores). ~29 colunas aditivas em `estudos` (persist-only, sem motor/migração); `taxa_desconto_aa` realocado. Frontend verde; backend/empacotamento a validar no ambiente do autor |
 | 8 | ⏳ Pendente | |
 
 **Atualizar esta tabela ao concluir cada lote.**

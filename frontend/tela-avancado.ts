@@ -12,6 +12,7 @@ import './tela-empreendimento-tipologias.js';
 import './tela-fluxo-receitas.js';
 import './tela-fluxo-custos.js';
 import './tela-fluxo-ver.js';
+import './tela-financeiro.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tela do estudo AVANÇADO — reestruturação de abas (Lote 3 · #15).
@@ -60,8 +61,9 @@ const SUBABAS: Partial<Record<AbaTopo, { id: string; label: string }[]>> = {
     { id: 'tipologias',  label: 'Tipologias' },
   ],
   viabilidade: [
-    { id: 'premissas', label: 'Premissas' },
-    { id: 'receitas',  label: 'Receitas' },
+    { id: 'premissas',  label: 'Premissas' },
+    { id: 'receitas',   label: 'Receitas' },
+    { id: 'financeiro', label: 'Financeiro' },
   ],
   // Custos em 5 sub-abas (Lote 5 · #17–18). Cada uma exibe o grupo
   // correspondente em viab-fluxo-custos (tabela + consolidado próprio).
@@ -166,6 +168,8 @@ export class ViabTelaAvancado extends LitElement {
       switch (sub) {
         case 'receitas':
           return html`<viab-fluxo-receitas .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-fluxo-receitas>`;
+        case 'financeiro':
+          return html`<viab-tela-financeiro .estudo=${this.estudo} .editavel=${this._editavelPremissas}></viab-tela-financeiro>`;
         case 'premissas':
         default:
           return html`<viab-tela-premissas .estudo=${this.estudo} .editavel=${this._editavelPremissas}></viab-tela-premissas>`;

@@ -254,6 +254,57 @@ Branch `claude/lote-6-issues-b21wlr`. Toca **schema + backend + frontend + motor
   novos de `validar*`/`montarLinhasReceita`), `urbi-empacotar` e a **execução da migração 003** contra dados reais.
   Render real dos modais (Absorção 3 períodos, Fluxo multi-linha) e da trava de saldo só valida no deploy dev.
 
+### Lote 7 — Financeiro (sub-abas de Viabilidade) — ✅ IMPLEMENTADO (issue #22)
+Branch `claude/lote-7-issues-y8gvh9`. Toca **schema + frontend** (sem motor, sem migração). `versao`
+**mantida** — só colunas aditivas em `estudos` (precedente da Etapa 3: adição de coluna não bumpa `versao`
+nem exige migração; o sincronizador cria as colunas com seus padrões).
+
+- **Destravamento do lote:** o issue estava 🚫 bloqueado por falta de spec dos campos. O autor forneceu a
+  spec via **prints de uma ferramenta profissional de incorporação** (abas Juros/Taxas · Impostos ·
+  Financiamento à Produção · Securitização) + 2 ajustes: (a) `taxa_desconto_aa` mora em **Custos Financeiros**;
+  (b) a **Correção** tem 2 fatores — índice + taxa (% a.a.) digitada. Proposta rascunhada por mim e aprovada
+  "com ajustes".
+- **Decisões do autor (registradas):**
+  1. **Motor:** "só persistir + realocar existentes" — os campos novos são **gravados/exibidos mas NÃO entram
+     em nenhuma fórmula** agora. `proforma.ts`/`fluxo-caixa-motor.ts`/`fluxo-shared.ts` **intocados**. Entrada
+     de juros/financiamento no fluxo é passo futuro (spec de motor à parte).
+  2. **Layout:** `Financeiro` como **3º badge de Viabilidade** (`Premissas · Receitas · Financeiro`); as 5
+     seções são **urbi-card empilhados (seções roláveis)**, não um 3º nível de aba — a alternativa que o
+     próprio #22 sugeriu.
+  3. **Overlap com Obra→Financeiro:** a seção Custos Financeiros aqui é **paramétrica**; as linhas manuais de
+     custo financeiro seguem no grupo **Obra → Financeiro** (Lote 5) — papéis distintos, sem duplicar dado.
+- **Avaliação severa dos prints (o que foi CORTADO):** rejeitados por exigirem motor temporal (adiado) ou por
+  obsolescência — **CPMF** (extinto desde 2007), IOF adicional, curvas de liberação/amortização,
+  financiamentos associativos CEF/MCMV, securitização de recebíveis, e as matrizes por-conta "Encargos sobre
+  Incorridos"/"Projeção Inflacionária". Mantidos só os campos-cabeçalho que cabem barato no schema e ficam
+  persist-only.
+- **Schema (`estudos`, ~29 colunas aditivas):** Estrutura (`estrutura_capital_proprio_pct`,
+  `estrutura_financiamento_pct`, `estrutura_investidores_pct`, `taxa_juros_valor_futuro_aa`); Custos Financeiros
+  (`tarifas_bancarias_pct`, `taxa_adm_carteira_pct`, `taxa_estruturacao_divida_pct`, `taxa_gerenciamento_obra_pct`
+  — + `taxa_desconto_aa` já existente, só realocado); Juros (`juros_financeiros_aa`, `juros_inicio_cobranca_mes`,
+  `indice_correcao` [enum], `indice_correcao_taxa_aa`); Taxas e Impostos (`regime_tributario` [enum],
+  `aliquota_pis_pct`, `aliquota_cofins_pct`, `aliquota_csll_pct`, `aliquota_irpj_pct`, `aliquota_itbi_pct`,
+  `imposto_sobre_permuta_fisica` [bool] — reusando `sujeito_ret`/`imposto_percentual`); Financiamento &
+  Investidores (`financiamento_obra_pct`, `financiamento_juros_aa`, `financiamento_sistema_amortizacao` [enum],
+  `financiamento_prazo_meses`, `financiamento_carencia_meses`, `investidor_aporte_valor`,
+  `investidor_retorno_tipo` [enum], `investidor_juros_aa`, `investidor_carencia_meses`, `investidor_parcelas`).
+  Precisão seguindo o precedente local do `estudos`: % → `decimal(5,2)`, R$ → `decimal(12,2)`, meses/parcelas →
+  `inteiro`.
+- **Frontend:** novo `frontend/tela-financeiro.ts` (`viab-tela-financeiro`) — 5 urbi-card, `viab-num` (com
+  `casas-decimais=0` p/ inteiros), `urbi-select` p/ os enums, `urbi-checkbox` p/ RET e permuta física, salvar via
+  `atualizarEstudo` (coerção '' → null nos numéricos). `tela-avancado.ts`: `financeiro` adicionado ao `SUBABAS.viabilidade`
+  e ao `_renderSubConteudo` (editável = guard de premissas). `taxa_desconto_aa` volta a ter editor (sumira no Lote 4).
+- **Realocação sem duplicar dado:** `sujeito_ret`/`imposto_percentual` seguem editáveis também em Premissas
+  (componente `viab-tela-premissas` é compartilhado com o Preliminar — **não** mexido para não afetar o Preliminar);
+  editar em qualquer tela grava a mesma coluna. Registrado como dupla-superfície consciente.
+- **Check de não-regressão (pedido do autor):** confirmado por `git diff` que **nenhum arquivo de motor** foi
+  tocado (proforma/fluxo/conversão) → todas as fórmulas seguem idênticas; **typecheck ✓ · testes 76/76 ✓ · build
+  (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde; bundle ~234kb). Como os campos são inertes ao cálculo,
+  não há fórmula nova para quebrar.
+- ⏳ **Pendente do autor (SDK gated):** typecheck do backend, suíte de backend, `urbi-empacotar` e a criação real
+  das colunas aditivas (sincronizador) contra dados reais. Render real dos `urbi-select`/acordeões só valida no
+  deploy dev.
+
 ---
 
 ## Mapa de repositórios (na máquina)
