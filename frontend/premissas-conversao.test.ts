@@ -65,3 +65,25 @@ test('arredonda a 2 casas', () => {
   // 1000 m² / 30000 × 100 = 3,3333… → 3,33
   assert.equal(converterUnidade(IDENT, areaParaPct, 1000, c), 3.33);
 });
+
+// Grandezas do Avançado (Lote 5 · custos): R$/m² de terreno e % da receita.
+test('custo Avançado: R$/m² de terreno ↔ R$ (link areaTerreno)', () => {
+  const c = ctx({ areaTerreno: 20000 });
+  const porTerreno = { tipo: 'por_area', link: 'areaTerreno' } as const;
+  assert.equal(converterUnidade(porTerreno, IDENT, 150, c), 3_000_000); // 150 × 20000
+  assert.equal(converterUnidade(IDENT, porTerreno, 3_000_000, c), 150);
+});
+
+test('custo Avançado: % da receita ↔ R$ (link receita)', () => {
+  const c = ctx({ receita: 50_000_000 });
+  const pctReceita = { tipo: 'pct', link: 'receita' } as const;
+  assert.equal(converterUnidade(pctReceita, IDENT, 4, c), 2_000_000); // 4% de 50M
+  assert.equal(converterUnidade(IDENT, pctReceita, 2_000_000, c), 4);
+});
+
+test('custo Avançado: chave de ligação ausente no ctx não converte', () => {
+  const c = ctx({}); // sem areaTerreno/receita
+  const porTerreno = { tipo: 'por_area', link: 'areaTerreno' } as const;
+  assert.equal(converterUnidade(porTerreno, IDENT, 150, c), null);
+  assert.equal(converterUnidade(IDENT, porTerreno, 3_000_000, c), null);
+});

@@ -152,7 +152,7 @@ export function fluxoPagamentoPadrao(): Record<string, any> {
   };
 }
 
-const GRUPOS_CUSTO = ['terreno', 'obra', 'indireto'];
+const GRUPOS_CUSTO = ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'];
 const UNIDADES_ORCAMENTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita'];
 const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'obra', 'pos_obra', 'customizado'];
 const REGEX_MES_ANO = /^(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\/\d{4}$/i;

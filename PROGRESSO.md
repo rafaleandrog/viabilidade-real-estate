@@ -164,6 +164,51 @@ Branch `claude/issues-lote-4-sx0rel`. Toca **schema + backend + frontend**. `ver
   `duplicarDadosAvancado` (blobs de arquivo); `matricula`/`descricao` viajam com a cópia do estudo
   (não estão no blocklist de cópia). Ajustar se o autor quiser duplicar anexos.
 
+### Lote 5 — Custos em 5 abas + seletor de unidade unificado — ✅ IMPLEMENTADO (issues #17, #18)
+Branch `claude/lote-5-issues-msebmq`. Toca **schema + backend + frontend**. `versao` **0.1.1 → 0.1.2**
+(migração `migracoes/002_grupos_custo.js`). Pré-requisitos #15 e #16: concluídos.
+
+- **Decisões do autor (perguntadas no início — respostas registradas):**
+  1. **Divisão dos grupos ("Obra = tudo de construção"):** o menu de categorias da aba **Obra**
+     mantém toda a obra física (Obra · Decoração · Gestão da obra · Contingência · Outro); **Diretos**
+     nasce como grupo novo p/ o usuário cadastrar (entrega do produto: Decoração · Gestão da obra ·
+     Stand de vendas · Comissão de vendas · Outro); **Financeiro** novo (Juros de financiamento ·
+     Taxas bancárias · Estruturação de dívida · Investidores · Outro). Terreno e Indiretos: menus
+     intactos.
+  2. **Migração dos dados existentes ("Reclassificar por categoria"):** linhas em `obra` com categoria
+     **Decoração** ou **Gestão da obra** → `diretos`; o resto de `obra` fica em `obra`; `terreno` e
+     `indireto` ficam onde estão. `financeiro` sem dado legado.
+  - **Reconciliação das duas respostas (nota):** a resposta 1 deixa o menu da aba Obra permissivo
+    (oferece Decoração/Gestão) enquanto a 2 migra as linhas *já cadastradas* dessas categorias p/
+    Diretos. Coerente: o menu é a oferta futura; a migração pré-classifica o dado existente. Para as
+    linhas migradas renderizarem certo, o menu de **Diretos** também inclui Decoração/Gestão da obra.
+- **#17 (5 grupos + seletor por badge):**
+  - **Schema:** `avancado_linhas_custo.grupo.opcoes` 3→5 (`terreno`/`obra`/**`diretos`**/`indireto`/
+    **`financeiro`** — mantido o valor legado `indireto` p/ não migrar linhas de indireto). Backend
+    `GRUPOS_CUSTO` idem (valida POST/PATCH). **Migração 002** forward-only (obra+categoria → diretos).
+  - **Seletor de unidade unificado com o Preliminar:** a coluna Orçamento trocou o `urbi-select` por
+    **`urbi-badge` interativos** (5 unidades: R$ · R$/m² priv · R$/m² terreno · % VGV · % Receita) com
+    **conversão automática de valor** ao trocar (mesmo padrão de `_custoUnidade` do Preliminar). Como a
+    linha de custo guarda **um só par** `orcamento_valor`/`orcamento_unidade` (≠ Preliminar, que tem
+    coluna por unidade), a troca converte o valor e persiste unidade+valor num só PATCH. Descritores
+    `CONV_UNIDADE` batem com o motor (`resolverCustoTotal`): identidade / por_area(areaPrivativa) /
+    por_area(areaTerreno) / pct(vgv) / pct(receita←fallback vgv). Reusa `converterUnidade` de
+    `premissas-conversao.ts`, agora com as chaves `areaTerreno`/`receita` no `LinkKey` (e
+    `CtxConversao` virou `Partial` — chave ausente = não converte).
+- **#18 (formato de tabela + 5 abas):** os 5 grupos viraram **5 sub-abas** da aba de topo **Obra**
+  (nível-2 `urbi-badge`, declaradas em `tela-avancado.ts` `SUBABAS.obra`), cada uma renderizando
+  `viab-fluxo-custos` com a prop nova **`grupo`** (filtra p/ 1 grupo; vazio = todos, fallback). Colunas
+  já batem com a spec (Categoria single-select por aba · Orçamento · Distribuição · Cronograma · Início ·
+  Duração) + **subcategoria mantida** (aditiva, útil) + **consolidado por aba** (rodapé já existente).
+  Regra 🔒 do Cronograma (evento trava Início/Duração) preservada.
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 73/73 ✓** (+3 de conversão
+  areaTerreno/receita) **· build (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde; bundle
+  ~225kb). ⏳ **Pendente do autor (SDK gated):** typecheck do backend, suíte de backend, `urbi-empacotar`
+  e a **execução da migração 002** contra dados reais. Render real dos badges/sub-abas só no deploy dev.
+- **Pré-existente não tocado (fora do escopo):** em `tela-fluxo-custos.ts` o campo Início customizado usa
+  `Number(c.inicio_mes) || 1`, que exibe 1 quando o valor é o mês 0 (convenção do Lote 4). Bug latente de
+  exibição do default, não do dado salvo; deixado para uma varredura própria.
+
 ---
 
 ## Mapa de repositórios (na máquina)

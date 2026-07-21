@@ -7,7 +7,10 @@
 
 export type LinkKey =
   | 'vgv' | 'vgvResidencial' | 'vgvNaoResidencial'
-  | 'areaVendavel' | 'areaVendavelR' | 'areaVendavelNR' | 'areaPrivativa';
+  | 'areaVendavel' | 'areaVendavelR' | 'areaVendavelNR' | 'areaPrivativa'
+  // Grandezas adicionais usadas pelos custos do Avançado (tela-fluxo-custos):
+  // R$/m² de terreno e % da receita. As de cima seguem servindo o Preliminar.
+  | 'areaTerreno' | 'receita';
 
 // identidade: o valor já é a base (R$ fixo, R$ total, m²).
 // pct: o valor é % da grandeza de ligação (ex.: % do VGV, % da área de venda).
@@ -17,7 +20,10 @@ export type ConvUnidade =
   | { tipo: 'pct'; link: LinkKey }
   | { tipo: 'por_area'; link: LinkKey };
 
-export type CtxConversao = Record<LinkKey, number>;
+// Parcial: nem todo consumidor supre todas as grandezas (o Preliminar não usa
+// areaTerreno/receita; o Avançado não usa areaVendavel*). Chave ausente = base
+// indefinida → não converte (mesmo efeito de grandeza 0).
+export type CtxConversao = Partial<Record<LinkKey, number>>;
 
 // Valor da unidade → quantidade base. null = não há base definida (grandeza de
 // ligação 0/indefinida) ou valor inválido — nesse caso não se converte.
@@ -25,7 +31,7 @@ export function paraBase(conv: ConvUnidade, valor: number, ctx: CtxConversao): n
   if (!Number.isFinite(valor)) return null;
   if (conv.tipo === 'identidade') return valor;
   const x = ctx[conv.link];
-  if (!(x > 0)) return null;
+  if (x === undefined || !(x > 0)) return null;
   return conv.tipo === 'pct' ? (valor / 100) * x : valor * x;
 }
 
@@ -34,7 +40,7 @@ export function daBase(conv: ConvUnidade, base: number, ctx: CtxConversao): numb
   if (!Number.isFinite(base)) return null;
   if (conv.tipo === 'identidade') return base;
   const x = ctx[conv.link];
-  if (!(x > 0)) return null;
+  if (x === undefined || !(x > 0)) return null;
   return conv.tipo === 'pct' ? (base / x) * 100 : base / x;
 }
 

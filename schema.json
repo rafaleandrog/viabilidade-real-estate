@@ -247,7 +247,7 @@
       "acesso_externo": "restrito",
       "colunas": {
         "estudo_id":         { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
-        "grupo":             { "tipo": "texto", "limite": 20, "opcoes": ["terreno", "obra", "indireto"], "obrigatorio": true },
+        "grupo":             { "tipo": "texto", "limite": 20, "opcoes": ["terreno", "obra", "diretos", "indireto", "financeiro"], "obrigatorio": true },
         "categoria":         { "tipo": "texto", "limite": 100 },
         "subcategoria":      { "tipo": "texto", "limite": 100 },
         "orcamento_valor":   { "tipo": "decimal", "precisao": 15, "escala": 2 },

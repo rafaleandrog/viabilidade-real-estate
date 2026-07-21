@@ -1,6 +1,6 @@
 {
   "nome": "Estudo de Viabilidade",
-  "versao": "0.1.1",
+  "versao": "0.1.2",
   "shell_min": "0.50.3",
   "descricao": "Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação) — proforma automática, comparação de cenários, sensibilidade e apelo comercial por IA.",
   "rotas_publicas": [],
