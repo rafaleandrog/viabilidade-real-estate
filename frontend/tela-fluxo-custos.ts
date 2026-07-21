@@ -11,15 +11,19 @@ import {
   buscarParametrosAvancado, buscarCronogramaAvancado, listarReceitasAvancado,
   listarCurvas, listarCustosAvancado, criarCustoAvancado, atualizarCustoAvancado, removerCustoAvancado,
 } from './viabilidade-api.js';
+import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import './viab-num.js';
 
-// Sub-tela "Custos" do Fluxo de Caixa (nível Avançado): três seções fixas
-// (Terreno / Obra / Indiretos) com linhas de custo editáveis inline —
-// categoria/subcategoria, orçamento (unidade + valor), curva de distribuição e
+// Sub-tela "Custos" do nível Avançado (Viabilidade › Custos): cinco seções
+// fixas (Terreno / Obra / Diretos / Indiretos / Financeiro) com linhas de custo
+// editáveis inline — categoria/subcategoria, orçamento (unidade por badge +
+// valor, com conversão automática igual ao Preliminar), curva de distribuição e
 // ancoragem no cronograma. Nada aqui toca o estudo Preliminar.
 
+type GrupoId = 'terreno' | 'obra' | 'diretos' | 'indireto' | 'financeiro';
+
 interface Grupo {
-  id: 'terreno' | 'obra' | 'indireto';
+  id: GrupoId;
   titulo: string;
   subtitulo: string;
   eventoPadrao: string;
@@ -27,13 +31,18 @@ interface Grupo {
 
 const GRUPOS: Grupo[] = [
   { id: 'terreno', titulo: 'Custos do Terreno', subtitulo: 'Aquisição do terreno, permutas e estruturas de pagamento', eventoPadrao: 'planejamento' },
-  { id: 'obra', titulo: 'Custos de Obra (Custos Diretos)', subtitulo: 'Custos de construção e desenvolvimento físico', eventoPadrao: 'obra' },
+  { id: 'obra', titulo: 'Custos de Obra', subtitulo: 'Custos de construção e desenvolvimento físico', eventoPadrao: 'obra' },
+  { id: 'diretos', titulo: 'Custos Diretos', subtitulo: 'Custos diretamente ligados à entrega do produto', eventoPadrao: 'obra' },
   { id: 'indireto', titulo: 'Custos Indiretos', subtitulo: 'Custos pré-desenvolvimento e administrativos do projeto', eventoPadrao: 'planejamento' },
+  { id: 'financeiro', titulo: 'Financeiro', subtitulo: 'Juros, taxas, estruturação de dívida e investidores', eventoPadrao: 'obra' },
 ];
 
-// Categorias e subcategorias por grupo (spec §5B). Categoria "Outro" libera
-// texto livre na subcategoria.
-const CATEGORIAS: Record<string, { nome: string; subs: string[] }[]> = {
+// Categorias e subcategorias por grupo. Categoria "Outro" libera texto livre na
+// subcategoria. Divisão em 5 abas (Lote 5, #17): "Obra" concentra a obra física
+// (opção do autor "Obra = tudo de construção"); "Diretos" recebe os custos de
+// entrega do produto — inclui Decoração/Gestão da obra para as linhas migradas
+// da migração 002. "Financeiro" nasce sem dados legados.
+const CATEGORIAS: Record<GrupoId, { nome: string; subs: string[] }[]> = {
   terreno: [
     { nome: 'Preço', subs: ['Valor à vista', 'Permuta', 'Parcelado', 'Outro'] },
     { nome: 'Outorga', subs: [] },
@@ -47,6 +56,13 @@ const CATEGORIAS: Record<string, { nome: string; subs: string[] }[]> = {
     { nome: 'Contingência', subs: [] },
     { nome: 'Outro', subs: [] },
   ],
+  diretos: [
+    { nome: 'Decoração', subs: [] },
+    { nome: 'Gestão da obra', subs: [] },
+    { nome: 'Stand de vendas', subs: [] },
+    { nome: 'Comissão de vendas', subs: [] },
+    { nome: 'Outro', subs: [] },
+  ],
   indireto: [
     { nome: 'Projetos', subs: ['Arquitetura', 'Estrutural', 'Instalações', 'Outro'] },
     { nome: 'Licenças', subs: ['Alvarás', 'Aprovações', 'Outro'] },
@@ -54,6 +70,25 @@ const CATEGORIAS: Record<string, { nome: string; subs: string[] }[]> = {
     { nome: 'Administração', subs: ['Administrativo', 'Jurídico', 'Outro'] },
     { nome: 'Outro', subs: [] },
   ],
+  financeiro: [
+    { nome: 'Juros de financiamento', subs: [] },
+    { nome: 'Taxas bancárias', subs: [] },
+    { nome: 'Estruturação de dívida', subs: [] },
+    { nome: 'Investidores', subs: [] },
+    { nome: 'Outro', subs: [] },
+  ],
+};
+
+// Descritor de conversão por unidade de orçamento (mesma base do motor em
+// `resolverCustoTotal`): R$ absoluto, R$/m² × área privativa, R$/m² × terreno,
+// % do VGV, % da receita (o motor usa VGV como fallback de receita — a ligação
+// aqui segue esse fallback). Alimenta a troca de unidade por badge.
+const CONV_UNIDADE: Record<string, ConvUnidade> = {
+  rs: { tipo: 'identidade' },
+  rs_m2_priv: { tipo: 'por_area', link: 'areaPrivativa' },
+  rs_m2_terreno: { tipo: 'por_area', link: 'areaTerreno' },
+  pct_vgv: { tipo: 'pct', link: 'vgv' },
+  pct_receita: { tipo: 'pct', link: 'receita' },
 };
 
 const UNIDADES = [
@@ -76,6 +111,9 @@ const EVENTOS_ANCORA = [
 export class ViabFluxoCustos extends LitElement {
   @property({ type: Object }) estudo: any = null;
   @property({ type: Boolean }) editavel = false;
+  // Grupo único a exibir (uma das 5 sub-abas de Custos). Vazio/ausente → todos
+  // os grupos empilhados (fallback, ex.: uso fora da sub-navegação).
+  @property({ type: String }) grupo: GrupoId | '' = '';
 
   @state() private custos: any[] = [];
   @state() private curvas: any[] = [];
@@ -96,8 +134,10 @@ export class ViabFluxoCustos extends LitElement {
     .rodape-custo .espaco { flex: 1; }
     .total-rotulo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.75rem); margin-right: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
     .total-valor { font-weight: 600; font-variant-numeric: tabular-nums; }
-    .orc { display: inline-flex; gap: 6px; align-items: center; }
-    .orc urbi-select { min-width: 120px; }
+    .orc { display: inline-flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+    .orc-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+    .orc-badges urbi-badge { cursor: pointer; }
+    .orc-badges .cu-badge-dis { cursor: default; opacity: 0.6; }
     .orc viab-num { width: 130px; }
     .mes-calc { white-space: nowrap; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
     .campo-mes { display: inline-flex; align-items: center; gap: 4px; }
@@ -140,9 +180,10 @@ export class ViabFluxoCustos extends LitElement {
 
   render() {
     if (this.carregando) return html`<urbi-loading mensagem="Carregando custos..."></urbi-loading>`;
+    const grupos = this.grupo ? GRUPOS.filter((g) => g.id === this.grupo) : GRUPOS;
     return html`
       <div class="secoes">
-        ${GRUPOS.map((g) => this._renderGrupo(g))}
+        ${grupos.map((g) => this._renderGrupo(g))}
       </div>
       ${this.removerAlvo ? this._renderConfirmRemover() : nothing}
     `;
@@ -214,16 +255,23 @@ export class ViabFluxoCustos extends LitElement {
       },
       {
         id: 'orcamento', label: 'Orçamento',
-        render: (c: any) => html`
-          <span class="orc">
-            <urbi-select .valor=${c.orcamento_unidade || 'rs'} .opcoes=${UNIDADES}
-              @urbi:select-change=${(e: CustomEvent) => this._salvar(c, { orcamento_unidade: e.detail.valor })}
-            ></urbi-select>
-            <viab-num ?desabilitado=${dis}
-              .valor=${c.orcamento_valor !== null && c.orcamento_valor !== undefined ? Number(c.orcamento_valor) : null}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { orcamento_valor: e.detail.valor })}
-            ></viab-num>
-          </span>`,
+        render: (c: any) => {
+          const modo = c.orcamento_unidade || 'rs';
+          return html`
+            <span class="orc">
+              <span class="orc-badges" role="group" aria-label="Unidade do orçamento">
+                ${UNIDADES.map((u) => html`
+                  <urbi-badge cor="info" interativo ?ativo=${u.valor === modo}
+                    class=${dis ? 'cu-badge-dis' : ''}
+                    @click=${() => { if (!dis) this._trocarUnidade(c, u.valor); }}
+                  >${u.rotulo}</urbi-badge>`)}
+              </span>
+              <viab-num ?desabilitado=${dis}
+                .valor=${c.orcamento_valor !== null && c.orcamento_valor !== undefined ? Number(c.orcamento_valor) : null}
+                @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { orcamento_valor: e.detail.valor })}
+              ></viab-num>
+            </span>`;
+        },
       },
       {
         id: 'distribuicao', label: 'Distribuição',
@@ -294,6 +342,33 @@ export class ViabFluxoCustos extends LitElement {
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao criar custo', 'erro');
     }
+  }
+
+  // Grandezas de ligação p/ conversão (do contexto já carregado). O motor usa
+  // VGV como fallback de receita, então `receita` segue o VGV total aqui.
+  private _ctxConversao(): CtxConversao {
+    return {
+      areaPrivativa: this.ctxCusto.areaPrivativaTotal,
+      areaTerreno: this.ctxCusto.areaTerreno,
+      vgv: this.ctxCusto.vgvTotal,
+      receita: this.ctxCusto.vgvTotal,
+    };
+  }
+
+  // Troca a unidade de orçamento por badge (padrão do Preliminar): converte o
+  // valor atual para a unidade nova (equivalente) e persiste unidade+valor num
+  // só PATCH. Base indefinida (grandeza 0) ou valor vazio → só troca a unidade.
+  private _trocarUnidade(c: any, nova: string) {
+    if (!this.editavel) return;
+    const atual = c.orcamento_unidade || 'rs';
+    if (nova === atual) return;
+    const dados: Record<string, any> = { orcamento_unidade: nova };
+    const valorAtual = c.orcamento_valor !== null && c.orcamento_valor !== undefined ? Number(c.orcamento_valor) : null;
+    if (valorAtual !== null && Number.isFinite(valorAtual)) {
+      const convertido = converterUnidade(CONV_UNIDADE[atual], CONV_UNIDADE[nova], valorAtual, this._ctxConversao());
+      if (convertido !== null) dados.orcamento_valor = convertido;
+    }
+    this._salvar(c, dados);
   }
 
   private async _salvar(c: any, dados: Record<string, any>) {

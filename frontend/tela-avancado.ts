@@ -63,6 +63,15 @@ const SUBABAS: Partial<Record<AbaTopo, { id: string; label: string }[]>> = {
     { id: 'premissas', label: 'Premissas' },
     { id: 'receitas',  label: 'Receitas' },
   ],
+  // Custos em 5 sub-abas (Lote 5 · #17–18). Cada uma exibe o grupo
+  // correspondente em viab-fluxo-custos (tabela + consolidado próprio).
+  obra: [
+    { id: 'terreno',    label: 'Terreno' },
+    { id: 'obra',       label: 'Obra' },
+    { id: 'diretos',    label: 'Diretos' },
+    { id: 'indireto',   label: 'Indiretos' },
+    { id: 'financeiro', label: 'Financeiro' },
+  ],
 };
 
 @customElement('viab-tela-avancado')
@@ -89,6 +98,7 @@ export class ViabTelaAvancado extends LitElement {
   @state() private subAtiva: Record<string, string> = {
     empreendimento: 'informacoes',
     viabilidade: 'premissas',
+    obra: 'terreno',
   };
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
@@ -116,7 +126,7 @@ export class ViabTelaAvancado extends LitElement {
         <urbi-hospedeiro slot="resumo">${this._renderResumo()}</urbi-hospedeiro>
         <urbi-hospedeiro slot="empreendimento">${this._renderComSubNav('empreendimento')}</urbi-hospedeiro>
         <urbi-hospedeiro slot="viabilidade">${this._renderComSubNav('viabilidade')}</urbi-hospedeiro>
-        <urbi-hospedeiro slot="obra">${this._renderObra()}</urbi-hospedeiro>
+        <urbi-hospedeiro slot="obra">${this._renderComSubNav('obra')}</urbi-hospedeiro>
         <urbi-hospedeiro slot="fluxo">${this._renderFluxo()}</urbi-hospedeiro>
         <urbi-hospedeiro slot="cenarios">${this._renderCenarios()}</urbi-hospedeiro>
         <urbi-hospedeiro slot="mercado">${this._renderMercado()}</urbi-hospedeiro>
@@ -161,16 +171,17 @@ export class ViabTelaAvancado extends LitElement {
           return html`<viab-tela-premissas .estudo=${this.estudo} .editavel=${this._editavelPremissas}></viab-tela-premissas>`;
       }
     }
+    if (topo === 'obra') {
+      // Uma instância do componente por grupo (sub-aba). Cada uma carrega seus
+      // custos e mostra a tabela + consolidado do seu grupo.
+      return html`<viab-fluxo-custos .estudo=${this.estudo} .editavel=${this._editavelFluxo} .grupo=${sub || 'terreno'}></viab-fluxo-custos>`;
+    }
     return html`${nothing}`;
   }
 
   private _renderResumo(): TemplateResult {
     // A Proforma é o consolidado atual; o Lote 8 (#23) reconstrói o Resumo.
     return html`<viab-tela-proforma .estudo=${this.estudo}></viab-tela-proforma>`;
-  }
-
-  private _renderObra(): TemplateResult {
-    return html`<viab-fluxo-custos .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-fluxo-custos>`;
   }
 
   private _renderFluxo(): TemplateResult {
