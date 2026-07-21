@@ -6,6 +6,7 @@ import { rotasImoveisEstudo } from './rotas/imoveis-estudo.js';
 import { rotasBenchmarks } from './rotas/benchmarks.js';
 import { rotasConfig } from './rotas/config.js';
 import { rotasApelo } from './rotas/apelo-comercial.js';
+import { rotasEmpreendimento } from './rotas/empreendimento.js';
 import { rotasManutencao } from './rotas/manutencao.js';
 import { rotasAvancado } from './rotas/avancado.js';
 
@@ -21,5 +22,6 @@ rotas.use(rotasImoveisEstudo);
 rotas.use(rotasBenchmarks);
 rotas.use(rotasConfig);
 rotas.use(rotasApelo);
+rotas.use(rotasEmpreendimento);
 rotas.use(rotasManutencao);
 rotas.use(rotasAvancado);

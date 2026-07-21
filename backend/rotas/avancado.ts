@@ -618,7 +618,7 @@ rotasAvancado.delete('/estudos/:id/avancado/receitas/:rid', async (req: Request,
 // ── Tipologias ──
 
 const TIPOS_UNIDADE = ['apartamento', 'cobertura', 'loja', 'lote', 'outro'];
-const CAMPOS_TIPOLOGIA = ['nome', 'tipo_unidade', 'area_privativa_m2', 'dormitorios', 'vagas', 'quantidade', 'preco_m2', 'ordem'];
+const CAMPOS_TIPOLOGIA = ['nome', 'tipo_unidade', 'area_privativa_m2', 'dormitorios', 'vagas', 'quantidade', 'unidades_permutadas', 'preco_m2', 'ordem'];
 
 rotasAvancado.post('/estudos/:id/avancado/receitas/:rid/tipologias', async (req: Request, res: Response) => {
   try {

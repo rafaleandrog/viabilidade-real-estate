@@ -7,6 +7,8 @@ import './tela-proforma.js';
 import './tela-graficos.js';
 import './tela-apelo.js';
 import './tela-fluxo-cronograma.js';
+import './tela-empreendimento-info.js';
+import './tela-empreendimento-tipologias.js';
 import './tela-fluxo-receitas.js';
 import './tela-fluxo-custos.js';
 import './tela-fluxo-ver.js';
@@ -144,10 +146,10 @@ export class ViabTelaAvancado extends LitElement {
         case 'cronograma':
           return html`<viab-fluxo-cronograma .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-fluxo-cronograma>`;
         case 'tipologias':
-          return this._placeholder('Tipologias', 'O cadastro de tipologias será construído no Lote 4 (Empreendimento).');
+          return html`<viab-empreendimento-tipologias .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-empreendimento-tipologias>`;
         case 'informacoes':
         default:
-          return this._placeholder('Informações', 'Matrícula, descrição e anexos do empreendimento serão construídos no Lote 4 (Empreendimento).');
+          return html`<viab-empreendimento-info .estudo=${this.estudo} .editavel=${this._editavelPremissas} .podeEditar=${this.podeEditar}></viab-empreendimento-info>`;
       }
     }
     if (topo === 'viabilidade') {
@@ -181,13 +183,5 @@ export class ViabTelaAvancado extends LitElement {
 
   private _renderMercado(): TemplateResult {
     return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this.podeEditar}></viab-tela-apelo>`;
-  }
-
-  private _placeholder(titulo: string, msg: string): TemplateResult {
-    return html`
-      <urbi-card titulo=${titulo}>
-        <urbi-estado-vazio icone="fa-solid fa-hammer" mensagem=${msg}></urbi-estado-vazio>
-      </urbi-card>
-    `;
   }
 }
