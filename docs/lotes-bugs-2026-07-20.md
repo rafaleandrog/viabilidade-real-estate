@@ -184,7 +184,7 @@ Colunas obrigatórias em todas as abas:
 | 3 | ✅ Concluído | #15 feito — 7 abas de topo do Avançado (`viab-tela-avancado`), telas existentes preservadas no lugar; Cronograma extraído p/ `viab-fluxo-cronograma`; `tela-fluxo.ts` removido |
 | 4 | ✅ Implementado | #16 feito — Informações (matrícula/descrição/anexos `estudo_documentos`), Cronograma **mês 0** (motor + migração 001 forward-only), Tipologias (`unidades_permutadas` + consolidado). Frontend verde; backend/empacotamento/migração a validar no ambiente do autor |
 | 5 | ✅ Implementado | #17 #18 feitos — 5 grupos (`diretos`/`financeiro` novos), migração 002 (obra+Decoração/Gestão→diretos), seletor de unidade por badge com conversão (portado do Preliminar), 5 sub-abas em Obra. Frontend verde; backend/migração a validar no ambiente do autor |
-| 6 | ⏳ Pendente | Spec conjunta Receitas+Fases obrigatória antes de iniciar |
+| 6 | ✅ Implementado | #19 #20 #21 feitos — Fase vira entidade (`avancado_fases`) dona de Absorção/Fluxo; Tipologias viram catálogo (`avancado_tipologias` desacoplada) + Alocações (`avancado_alocacoes`, trava de saldo por fase); Absorção só Distribuído 3 períodos (pós-obra derivado); Fluxo multi-linha com Repasse derivado. Migração 003. Frontend verde; backend/migração a validar no ambiente do autor |
 | 7 | 🚫 Bloqueado | Aguarda spec dos campos das sub-abas de Financeiro |
 | 8 | ⏳ Pendente | |
 

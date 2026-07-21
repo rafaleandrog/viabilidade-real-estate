@@ -140,11 +140,30 @@ const INTERVALO_PERIODICIDADE: Record<string, number> = {
 };
 
 /**
- * Recebimentos mensais de uma linha de receita, em meses relativos.
+ * Normaliza um bloco de pagamento (Entrada / Parcelamento) para uma LISTA de
+ * linhas. O modelo vigente (Lote 6 · #20) permite múltiplas linhas em cada
+ * bloco; o legado guardava um único objeto — aqui ele vira uma lista de 1.
+ */
+export function normalizarLinhasPagamento(bloco: any): any[] {
+  if (Array.isArray(bloco)) return bloco.filter(Boolean);
+  if (bloco && typeof bloco === 'object') return [bloco];
+  return [];
+}
+
+/** % do Repasse = 100 − Σ(entrada) − Σ(parcelas), derivado (Lote 6 · #20). */
+export function pctRepasseDerivado(fp: any): number {
+  const somaEntrada = normalizarLinhasPagamento(fp?.entrada).reduce((s, e) => s + n(e?.pct), 0);
+  const somaParcelas = normalizarLinhasPagamento(fp?.parcelas).reduce((s, p) => s + n(p?.pct), 0);
+  return Math.max(0, 100 - somaEntrada - somaParcelas);
+}
+
+/**
+ * Recebimentos mensais de uma linha de receita (fase), em meses relativos.
  * Aplica absorção → vendas/mês e o fluxo de pagamento sobre cada venda:
- * entrada no mês da venda (parcelável), parcelas nos meses seguintes
- * (ao longo da obra ou por periodicidade) e repasse concentrado N meses
- * após o fim da Obra. Comissão destacada e RET deduzem o valor recebível.
+ * cada linha de Entrada (parcelável a partir do mês da venda), cada linha de
+ * Parcelamento (ao longo da obra ou por periodicidade) e o Repasse — cujo %
+ * é derivado (100 − entradas − parcelas) — concentrado N meses após a Obra.
+ * Comissão destacada e RET deduzem o valor recebível.
  */
 export function receitaMensalLinha(
   linha: any,
@@ -159,16 +178,16 @@ export function receitaMensalLinha(
   if (!abs) return saida;
 
   const fator = vgv > 0 ? vglLinha(vgv, linha?.fluxo_pagamento) / vgv : 1;
-  const fp = linha?.fluxo_pagamento ?? {};
-  const pctEntrada = n(fp.entrada?.pct);
-  const parcelasEntrada = Math.max(1, Math.round(n(fp.entrada?.parcelas) || 1));
-  const pctParcelas = n(fp.parcelas?.pct);
-  const pctRepasse = n(fp.repasse?.pct);
-  const semConfig = pctEntrada + pctParcelas + pctRepasse <= 0;
+  const fp = linha?.fluxo_pagamento ?? null;
+  const entradas = normalizarLinhasPagamento(fp?.entrada);
+  const parcelasLinhas = normalizarLinhasPagamento(fp?.parcelas);
+  const pctRepasse = pctRepasseDerivado(fp);
+  // Sem fluxo configurado (null) → recebe à vista no mês da venda.
+  const semConfig = !fp;
 
   const obra = cronograma.find((e) => e.evento === 'obra');
   const fimObra = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : 0;
-  const mesRepasse = fimObra + Math.max(0, Math.round(n(fp.repasse?.apos_entrega_meses)));
+  const mesRepasse = fimObra + Math.max(0, Math.round(n(fp?.repasse?.apos_entrega_meses)));
 
   const deposita = (mes: number, valor: number) => {
     if (valor === 0) return;
@@ -183,27 +202,31 @@ export function receitaMensalLinha(
     if (venda <= 0) continue;
     const recebivel = venda * fator;
 
-    // Sem fluxo de pagamento configurado: recebe à vista no mês da venda.
     if (semConfig) { deposita(mesVenda, recebivel); continue; }
 
-    // Entrada (parcelável a partir do mês da venda).
-    const totalEntrada = recebivel * (pctEntrada / 100);
-    for (let k = 0; k < parcelasEntrada; k++) deposita(mesVenda + k, totalEntrada / parcelasEntrada);
+    // Entrada — cada linha parcelável a partir do mês da venda.
+    for (const e of entradas) {
+      const total = recebivel * (n(e?.pct) / 100);
+      if (total <= 0) continue;
+      const nParc = Math.max(1, Math.round(n(e?.parcelas) || 1));
+      for (let k = 0; k < nParc; k++) deposita(mesVenda + k, total / nParc);
+    }
 
-    // Parcelas.
-    const totalParcelas = recebivel * (pctParcelas / 100);
-    if (totalParcelas > 0) {
-      if (fp.parcelas?.ao_longo_obra && fimObra > mesVenda) {
+    // Parcelamento — cada linha ao longo da obra ou por periodicidade.
+    for (const p of parcelasLinhas) {
+      const total = recebivel * (n(p?.pct) / 100);
+      if (total <= 0) continue;
+      if (p?.ao_longo_obra && fimObra > mesVenda) {
         const meses = fimObra - mesVenda; // mensal, do mês seguinte até o fim da obra
-        for (let k = 1; k <= meses; k++) deposita(mesVenda + k, totalParcelas / meses);
+        for (let k = 1; k <= meses; k++) deposita(mesVenda + k, total / meses);
       } else {
-        const intervalo = INTERVALO_PERIODICIDADE[fp.parcelas?.periodicidade] ?? 1;
-        const nParc = Math.max(1, Math.round(n(fp.parcelas?.parcelas) || 1));
-        for (let k = 1; k <= nParc; k++) deposita(mesVenda + intervalo * k, totalParcelas / nParc);
+        const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
+        const nParc = Math.max(1, Math.round(n(p?.parcelas) || 1));
+        for (let k = 1; k <= nParc; k++) deposita(mesVenda + intervalo * k, total / nParc);
       }
     }
 
-    // Repasse — concentrado na entrega (independe do mês da venda).
+    // Repasse — % derivado, concentrado na entrega (independe do mês da venda).
     deposita(Math.max(mesRepasse, mesVenda), recebivel * (pctRepasse / 100));
   }
   return saida;

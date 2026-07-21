@@ -225,10 +225,21 @@
       "indices": [["estudo_id"]]
     },
 
+    "avancado_fases": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":       { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "nome":            { "tipo": "texto", "limite": 100 },
+        "ordem":           { "tipo": "inteiro", "padrao": 0 },
+        "absorcao":        { "tipo": "json" },
+        "fluxo_pagamento": { "tipo": "json" }
+      },
+      "indices": [["estudo_id"]]
+    },
+
     "avancado_tipologias": {
       "acesso_externo": "restrito",
       "colunas": {
-        "linha_receita_id":  { "tipo": "referencia", "tabela_ref": "avancado_linhas_receita", "obrigatorio": true, "ao_deletar": "cascata" },
         "estudo_id":         { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
         "nome":              { "tipo": "texto", "limite": 100 },
         "tipo_unidade":      { "tipo": "texto", "limite": 20, "opcoes": ["apartamento", "cobertura", "loja", "lote", "outro"], "padrao": "apartamento" },
@@ -240,7 +251,20 @@
         "preco_m2":            { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "ordem":               { "tipo": "inteiro", "padrao": 0 }
       },
-      "indices": [["linha_receita_id"], ["estudo_id"]]
+      "indices": [["estudo_id"]]
+    },
+
+    "avancado_alocacoes": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":    { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "fase_id":      { "tipo": "referencia", "tabela_ref": "avancado_fases", "obrigatorio": true, "ao_deletar": "cascata" },
+        "tipologia_id": { "tipo": "referencia", "tabela_ref": "avancado_tipologias", "obrigatorio": true, "ao_deletar": "cascata" },
+        "unidades":     { "tipo": "inteiro", "padrao": 0 },
+        "preco_m2":     { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "ordem":        { "tipo": "inteiro", "padrao": 0 }
+      },
+      "indices": [["estudo_id"], ["fase_id"], ["tipologia_id"]]
     },
 
     "avancado_linhas_custo": {

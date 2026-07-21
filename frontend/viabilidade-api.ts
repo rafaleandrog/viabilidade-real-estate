@@ -147,35 +147,61 @@ export function semearCurvas(): Promise<any> {
   return urbiVerso.api(`${APP}/avancado/curvas/semear`, { method: 'POST' });
 }
 
-// ── Avançado: linhas de receita + tipologias ──
+// ── Avançado: receitas no formato do motor (fases + alocações joinadas) ──
+// Usado por tela-fluxo-ver / gráficos / exportar (cada fase = uma linha de receita).
 export function listarReceitasAvancado(estudoId: number): Promise<any> {
   return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas`);
 }
-export function criarReceitaAvancado(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas`, {
+
+// ── Avançado: catálogo de Tipologias (nível estudo — Lote 6 · #19) ──
+export function listarTipologiasCatalogo(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/tipologias`);
+}
+export function criarTipologia(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/tipologias`, {
     method: 'POST', body: JSON.stringify(dados),
   });
 }
-export function atualizarReceitaAvancado(estudoId: number, rid: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas/${rid}`, {
+export function atualizarTipologia(estudoId: number, tid: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/tipologias/${tid}`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
-export function removerReceitaAvancado(estudoId: number, rid: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas/${rid}`, { method: 'DELETE' });
+export function removerTipologia(estudoId: number, tid: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/tipologias/${tid}`, { method: 'DELETE' });
 }
-export function criarTipologia(estudoId: number, rid: number, dados: Record<string, any> = {}): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas/${rid}/tipologias`, {
+
+// ── Avançado: Fases (Absorção/Fluxo por fase — Lote 6 · #21) ──
+export function listarFasesAvancado(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases`);
+}
+export function criarFaseAvancado(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases`, {
     method: 'POST', body: JSON.stringify(dados),
   });
 }
-export function atualizarTipologia(estudoId: number, rid: number, tid: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas/${rid}/tipologias/${tid}`, {
+export function atualizarFaseAvancado(estudoId: number, fid: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases/${fid}`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
-export function removerTipologia(estudoId: number, rid: number, tid: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas/${rid}/tipologias/${tid}`, { method: 'DELETE' });
+export function removerFaseAvancado(estudoId: number, fid: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases/${fid}`, { method: 'DELETE' });
+}
+
+// ── Avançado: Alocações de venda (tipologia → fase — Lote 6 · #19) ──
+export function criarAlocacao(estudoId: number, fid: number, dados: Record<string, any> = {}): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases/${fid}/alocacoes`, {
+    method: 'POST', body: JSON.stringify(dados),
+  });
+}
+export function atualizarAlocacao(estudoId: number, fid: number, aid: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases/${fid}/alocacoes/${aid}`, {
+    method: 'PATCH', body: JSON.stringify(dados),
+  });
+}
+export function removerAlocacao(estudoId: number, fid: number, aid: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases/${fid}/alocacoes/${aid}`, { method: 'DELETE' });
 }
 
 // ── Avançado: linhas de custo ──

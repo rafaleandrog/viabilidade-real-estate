@@ -103,52 +103,63 @@ export function validarValoresCurva(valores: any): string | null {
   return null;
 }
 
-/** Valida o JSON de absorção de vendas de uma linha de receita. */
+/**
+ * Valida o JSON de absorção de vendas de uma FASE (Lote 6 · #20).
+ * Modelo vigente: apenas **Distribuído** em 3 períodos — Pré-lançamento+Lançamento
+ * (bloco `lancamento`), Durante a obra (bloco `obra`) e Pós-obra (derivado). NÃO
+ * há mais validação de soma = 100% (o Pós-obra é calculado). Modos legados
+ * (`linear`/`personalizado`) são tolerados na leitura, sem exigência de soma.
+ */
 export function validarAbsorcao(a: any): string | null {
-  if (a === null || a === undefined) return null; // ausente = linear default
+  if (a === null || a === undefined) return null; // ausente = default
   if (typeof a !== 'object') return 'absorcao deve ser um objeto';
   const modo = a.modo;
-  if (!['linear', 'distribuido', 'personalizado'].includes(modo)) {
-    return 'absorcao.modo deve ser linear, distribuido ou personalizado';
+  if (modo !== undefined && !['linear', 'distribuido', 'personalizado'].includes(modo)) {
+    return 'absorcao.modo deve ser distribuido (ou linear/personalizado legado)';
   }
-  if (modo === 'distribuido') {
-    if (!Array.isArray(a.blocos) || a.blocos.length === 0) return 'absorcao.blocos é obrigatório no modo distribuido';
-    const soma = a.blocos.reduce((s: number, b: any) => s + (Number(b?.pct) || 0), 0);
-    if (Math.abs(soma - 100) > 0.01) return `a soma dos blocos de absorção deve ser 100% (atual: ${soma.toFixed(2)}%)`;
-  }
-  if (modo === 'personalizado') {
-    if (!Array.isArray(a.meses) || a.meses.length === 0) return 'absorcao.meses é obrigatório no modo personalizado';
-    const soma = a.meses.reduce((s: number, m: any) => s + (Number(m?.pct) || 0), 0);
-    if (Math.abs(soma - 100) > 0.01) return `a soma da absorção mensal deve ser 100% (atual: ${soma.toFixed(2)}%)`;
+  if (modo === 'distribuido' && a.blocos !== undefined && !Array.isArray(a.blocos)) {
+    return 'absorcao.blocos deve ser uma lista';
   }
   return null;
 }
 
-/** Valida o JSON de fluxo de pagamento: entrada + parcelas + repasse = 100%. */
+/**
+ * Valida o JSON de fluxo de pagamento de uma FASE (Lote 6 · #20).
+ * Entrada e Parcelamento aceitam **múltiplas linhas** (lista) ou objeto único
+ * (legado). O Repasse é **derivado** (100 − Σentrada − Σparcelas), então NÃO há
+ * validação de soma = 100%.
+ */
 export function validarFluxoPagamento(fp: any): string | null {
   if (fp === null || fp === undefined) return null; // ausente = default
   if (typeof fp !== 'object') return 'fluxo_pagamento deve ser um objeto';
-  const entrada = Number(fp.entrada?.pct) || 0;
-  const parcelas = Number(fp.parcelas?.pct) || 0;
-  const repasse = Number(fp.repasse?.pct) || 0;
-  const soma = entrada + parcelas + repasse;
-  if (Math.abs(soma - 100) > 0.01) {
-    return `Entrada + Parcelas + Repasse deve somar 100% (atual: ${soma.toFixed(2)}%)`;
+  for (const chave of ['entrada', 'parcelas']) {
+    const v = fp[chave];
+    if (v !== undefined && v !== null && !Array.isArray(v) && typeof v !== 'object') {
+      return `fluxo_pagamento.${chave} deve ser uma lista de linhas (ou objeto)`;
+    }
   }
   return null;
 }
 
-// Defaults de uma linha de receita nova.
+// Defaults de uma fase nova (absorção Distribuída + fluxo com listas de linhas).
 export function absorcaoPadrao(): Record<string, any> {
-  return { modo: 'linear', correcao_estoque: false };
+  return {
+    modo: 'distribuido',
+    correcao_estoque: false,
+    blocos: [
+      { evento: 'lancamento', pct: 30 }, // Pré-lançamento + Lançamento
+      { evento: 'obra', pct: 40 },        // Durante a obra
+      { evento: 'pos_obra', pct: 0 },     // Pós-obra: derivado = 100 − 30 − 40 = 30
+    ],
+  };
 }
 export function fluxoPagamentoPadrao(): Record<string, any> {
   return {
     comissao: { ativo: true, tipo: 'embutida', pct: 6 },
     ret: { ativo: false, pct: 4 },
-    entrada: { modo: 'entrada', parcelas: 1, pct: 15 },
-    parcelas: { periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 15 },
-    repasse: { pct: 70, apos_entrega_meses: 2 },
+    entrada: [{ pct: 15, parcelas: 1 }],
+    parcelas: [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 15 }],
+    repasse: { apos_entrega_meses: 2 }, // pct derivado = 100 − 15 − 15 = 70
   };
 }
 
@@ -491,151 +502,67 @@ rotasAvancado.delete('/avancado/curvas/:cid', async (req: Request, res: Response
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 });
-
 // ─────────────────────────────────────────────────────────────────
-// Linhas de receita + tipologias
+// Receitas (Lote 6 · #19–21): catálogo de Tipologias (nível estudo) +
+// Fases (Absorção/Fluxo por fase) + Alocações de venda (tipologia → fase).
+//
+// Modelo:
+//  - avancado_tipologias  = catálogo do estudo (cadastrado em Empreendimento).
+//  - avancado_fases       = fase estruturada, dona da Absorção e do Fluxo de
+//                           Pagamento (antes viviam na linha de receita).
+//  - avancado_alocacoes   = venda de N unidades de uma tipologia, a um preço/m²,
+//                           dentro de uma fase (várias linhas por tipologia).
+//
+// GET /receitas devolve as FASES no formato que o motor do fluxo consome
+// (fase = "linha de receita"; alocações joinadas ao catálogo = "tipologias"),
+// mantendo tela-fluxo-ver/gráficos/exportar sem mudança.
 // ─────────────────────────────────────────────────────────────────
-
-rotasAvancado.get('/estudos/:id/avancado/receitas', async (req: Request, res: Response) => {
-  try {
-    const estudo = await estudoAvancado(req, res);
-    if (!estudo) return;
-    if (!(await exigirLeitura(req, res, estudo))) return;
-
-    const [linhas, tipologias] = await Promise.all([
-      req.dados!.listar('avancado_linhas_receita', {
-        filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100,
-      }),
-      req.dados!.listar('avancado_tipologias', {
-        filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
-      }),
-    ]);
-    const porLinha = new Map<number, any[]>();
-    for (const t of tipologias.dados) {
-      const chave = Number(t.linha_receita_id);
-      if (!porLinha.has(chave)) porLinha.set(chave, []);
-      porLinha.get(chave)!.push(t);
-    }
-    res.json({
-      dados: linhas.dados.map((l) => ({ ...l, tipologias: porLinha.get(Number(l.id)) ?? [] })),
-      total: linhas.total,
-    });
-  } catch (e: any) {
-    console.error('Erro em GET /avancado/receitas:', e);
-    erro(res, 500, 'ERRO_INTERNO', e.message);
-  }
-});
-
-rotasAvancado.post('/estudos/:id/avancado/receitas', async (req: Request, res: Response) => {
-  try {
-    const estudo = await estudoAvancado(req, res);
-    if (!estudo) return;
-    if (!(await exigirEscrita(req, res, estudo))) return;
-
-    const existentes = await req.dados!.listar('avancado_linhas_receita', {
-      filtros: { estudo_id: estudo.id }, por_pagina: 100,
-    });
-    const n = existentes.total + 1;
-    const criada = await req.dados!.criar('avancado_linhas_receita', {
-      estudo_id: estudo.id,
-      nome: String(req.body.nome || 'Sales').trim() || 'Sales',
-      fase_label: String(req.body.fase_label || `Fase ${n}`),
-      tipo: 'venda',
-      ordem: existentes.total,
-      absorcao: absorcaoPadrao(),
-      fluxo_pagamento: fluxoPagamentoPadrao(),
-    });
-    res.status(201).json({ ...criada, tipologias: [] });
-  } catch (e: any) {
-    console.error('Erro em POST /avancado/receitas:', e);
-    erro(res, 500, 'ERRO_INTERNO', e.message);
-  }
-});
-
-/** Busca a linha de receita e valida que pertence ao estudo da URL. */
-async function linhaReceitaDoEstudo(req: Request, res: Response, estudoId: number): Promise<any | null> {
-  const rid = parseInt(req.params.rid);
-  if (isNaN(rid)) { erro(res, 400, 'ID_INVALIDO', 'ID da linha de receita inválido'); return null; }
-  const linha = await req.dados!.buscar('avancado_linhas_receita', rid);
-  if (!linha || Number(linha.estudo_id) !== estudoId) {
-    erro(res, 404, 'RECEITA_NAO_ENCONTRADA', 'Linha de receita não encontrada neste estudo');
-    return null;
-  }
-  return linha;
-}
-
-rotasAvancado.patch('/estudos/:id/avancado/receitas/:rid', async (req: Request, res: Response) => {
-  try {
-    const estudo = await estudoAvancado(req, res);
-    if (!estudo) return;
-    if (!(await exigirEscrita(req, res, estudo))) return;
-    const linha = await linhaReceitaDoEstudo(req, res, estudo.id);
-    if (!linha) return;
-
-    const dados: Record<string, any> = {};
-    if (req.body.nome !== undefined) dados.nome = String(req.body.nome).trim();
-    if (req.body.fase_label !== undefined) dados.fase_label = String(req.body.fase_label).trim();
-    if (req.body.tipo !== undefined) {
-      if (req.body.tipo !== 'venda') { erro(res, 400, 'TIPO_INVALIDO', 'tipo deve ser "venda"'); return; }
-      dados.tipo = 'venda';
-    }
-    if (req.body.ordem !== undefined) dados.ordem = Number(req.body.ordem) || 0;
-    if (req.body.absorcao !== undefined) {
-      const invalido = validarAbsorcao(req.body.absorcao);
-      if (invalido) { erro(res, 400, 'ABSORCAO_INVALIDA', invalido); return; }
-      dados.absorcao = req.body.absorcao;
-    }
-    if (req.body.fluxo_pagamento !== undefined) {
-      const invalido = validarFluxoPagamento(req.body.fluxo_pagamento);
-      if (invalido) { erro(res, 400, 'FLUXO_PAGAMENTO_INVALIDO', invalido); return; }
-      dados.fluxo_pagamento = req.body.fluxo_pagamento;
-    }
-    if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
-
-    const atualizada = await req.dados!.atualizar('avancado_linhas_receita', linha.id, dados);
-    res.json(atualizada);
-  } catch (e: any) {
-    console.error('Erro em PATCH /avancado/receitas/:rid:', e);
-    erro(res, 500, 'ERRO_INTERNO', e.message);
-  }
-});
-
-rotasAvancado.delete('/estudos/:id/avancado/receitas/:rid', async (req: Request, res: Response) => {
-  try {
-    const estudo = await estudoAvancado(req, res);
-    if (!estudo) return;
-    if (!(await exigirEscrita(req, res, estudo))) return;
-    const linha = await linhaReceitaDoEstudo(req, res, estudo.id);
-    if (!linha) return;
-    await req.dados!.deletar('avancado_linhas_receita', linha.id); // tipologias caem por cascata
-    res.json({ ok: true });
-  } catch (e: any) {
-    console.error('Erro em DELETE /avancado/receitas/:rid:', e);
-    erro(res, 500, 'ERRO_INTERNO', e.message);
-  }
-});
-
-// ── Tipologias ──
 
 const TIPOS_UNIDADE = ['apartamento', 'cobertura', 'loja', 'lote', 'outro'];
 const CAMPOS_TIPOLOGIA = ['nome', 'tipo_unidade', 'area_privativa_m2', 'dormitorios', 'vagas', 'quantidade', 'unidades_permutadas', 'preco_m2', 'ordem'];
 
-rotasAvancado.post('/estudos/:id/avancado/receitas/:rid/tipologias', async (req: Request, res: Response) => {
+// ── Catálogo de tipologias (nível estudo) ──
+
+async function tipologiaDoEstudo(req: Request, res: Response, estudoId: number): Promise<any | null> {
+  const tid = parseInt(req.params.tid);
+  if (isNaN(tid)) { erro(res, 400, 'ID_INVALIDO', 'ID da tipologia inválido'); return null; }
+  const tip = await req.dados!.buscar('avancado_tipologias', tid);
+  if (!tip || Number(tip.estudo_id) !== estudoId) {
+    erro(res, 404, 'TIPOLOGIA_NAO_ENCONTRADA', 'Tipologia não encontrada neste estudo');
+    return null;
+  }
+  return tip;
+}
+
+rotasAvancado.get('/estudos/:id/avancado/tipologias', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirLeitura(req, res, estudo))) return;
+    const r = await req.dados!.listar('avancado_tipologias', {
+      filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
+    });
+    res.json(r);
+  } catch (e: any) {
+    console.error('Erro em GET /avancado/tipologias:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+rotasAvancado.post('/estudos/:id/avancado/tipologias', async (req: Request, res: Response) => {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
-    const linha = await linhaReceitaDoEstudo(req, res, estudo.id);
-    if (!linha) return;
 
     const lote = estudo.tipo_empreendimento === 'loteamento';
+    const existentes = await req.dados!.listar('avancado_tipologias', { filtros: { estudo_id: estudo.id }, por_pagina: 500 });
     const dados: Record<string, any> = {
-      linha_receita_id: linha.id,
       estudo_id: estudo.id,
       nome: lote ? 'Lote' : '',
       tipo_unidade: lote ? 'lote' : 'apartamento',
       quantidade: 0,
-      ordem: 0,
+      ordem: existentes.total,
     };
     for (const campo of CAMPOS_TIPOLOGIA) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
@@ -652,25 +579,12 @@ rotasAvancado.post('/estudos/:id/avancado/receitas/:rid/tipologias', async (req:
   }
 });
 
-async function tipologiaDaLinha(req: Request, res: Response, linhaId: number): Promise<any | null> {
-  const tid = parseInt(req.params.tid);
-  if (isNaN(tid)) { erro(res, 400, 'ID_INVALIDO', 'ID da tipologia inválido'); return null; }
-  const tip = await req.dados!.buscar('avancado_tipologias', tid);
-  if (!tip || Number(tip.linha_receita_id) !== linhaId) {
-    erro(res, 404, 'TIPOLOGIA_NAO_ENCONTRADA', 'Tipologia não encontrada nesta linha de receita');
-    return null;
-  }
-  return tip;
-}
-
-rotasAvancado.patch('/estudos/:id/avancado/receitas/:rid/tipologias/:tid', async (req: Request, res: Response) => {
+rotasAvancado.patch('/estudos/:id/avancado/tipologias/:tid', async (req: Request, res: Response) => {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
-    const linha = await linhaReceitaDoEstudo(req, res, estudo.id);
-    if (!linha) return;
-    const tip = await tipologiaDaLinha(req, res, Number(linha.id));
+    const tip = await tipologiaDoEstudo(req, res, estudo.id);
     if (!tip) return;
 
     const dados: Record<string, any> = {};
@@ -682,7 +596,6 @@ rotasAvancado.patch('/estudos/:id/avancado/receitas/:rid/tipologias/:tid', async
       return;
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
-
     const atualizada = await req.dados!.atualizar('avancado_tipologias', tip.id, dados);
     res.json(atualizada);
   } catch (e: any) {
@@ -691,19 +604,309 @@ rotasAvancado.patch('/estudos/:id/avancado/receitas/:rid/tipologias/:tid', async
   }
 });
 
-rotasAvancado.delete('/estudos/:id/avancado/receitas/:rid/tipologias/:tid', async (req: Request, res: Response) => {
+rotasAvancado.delete('/estudos/:id/avancado/tipologias/:tid', async (req: Request, res: Response) => {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
-    const linha = await linhaReceitaDoEstudo(req, res, estudo.id);
-    if (!linha) return;
-    const tip = await tipologiaDaLinha(req, res, Number(linha.id));
+    const tip = await tipologiaDoEstudo(req, res, estudo.id);
     if (!tip) return;
+    // Integridade (Lote 6 · #19): excluir uma tipologia com alocações é bloqueado.
+    const usos = await req.dados!.listar('avancado_alocacoes', { filtros: { tipologia_id: tip.id }, por_pagina: 1 });
+    if (usos.total > 0) {
+      erro(res, 422, 'TIPOLOGIA_EM_USO', 'Esta tipologia tem alocações de venda — remova as alocações antes de excluí-la');
+      return;
+    }
     await req.dados!.deletar('avancado_tipologias', tip.id);
     res.json({ ok: true });
   } catch (e: any) {
     console.error('Erro em DELETE /avancado/tipologias/:tid:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+// ── Fases (dona da Absorção e do Fluxo de Pagamento) ──
+
+async function faseDoEstudo(req: Request, res: Response, estudoId: number): Promise<any | null> {
+  const fid = parseInt(req.params.fid);
+  if (isNaN(fid)) { erro(res, 400, 'ID_INVALIDO', 'ID da fase inválido'); return null; }
+  const fase = await req.dados!.buscar('avancado_fases', fid);
+  if (!fase || Number(fase.estudo_id) !== estudoId) {
+    erro(res, 404, 'FASE_NAO_ENCONTRADA', 'Fase não encontrada neste estudo');
+    return null;
+  }
+  return fase;
+}
+
+/** Alocações de uma fase (cru), ordenadas. */
+async function alocacoesDaFase(req: Request, faseId: number): Promise<any[]> {
+  const r = await req.dados!.listar('avancado_alocacoes', {
+    filtros: { fase_id: faseId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
+  });
+  return r.dados;
+}
+
+rotasAvancado.get('/estudos/:id/avancado/fases', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirLeitura(req, res, estudo))) return;
+    const [fases, alocacoes] = await Promise.all([
+      req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
+      req.dados!.listar('avancado_alocacoes', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 1000 }),
+    ]);
+    const porFase = new Map<number, any[]>();
+    for (const a of alocacoes.dados) {
+      const chave = Number(a.fase_id);
+      if (!porFase.has(chave)) porFase.set(chave, []);
+      porFase.get(chave)!.push(a);
+    }
+    res.json({
+      dados: fases.dados.map((f) => ({ ...f, alocacoes: porFase.get(Number(f.id)) ?? [] })),
+      total: fases.total,
+    });
+  } catch (e: any) {
+    console.error('Erro em GET /avancado/fases:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+rotasAvancado.post('/estudos/:id/avancado/fases', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirEscrita(req, res, estudo))) return;
+    const existentes = await req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id }, por_pagina: 100 });
+    const n = existentes.total + 1;
+    const criada = await req.dados!.criar('avancado_fases', {
+      estudo_id: estudo.id,
+      nome: String(req.body.nome || `Fase ${n}`).trim() || `Fase ${n}`,
+      ordem: existentes.total,
+      absorcao: absorcaoPadrao(),
+      fluxo_pagamento: fluxoPagamentoPadrao(),
+    });
+    res.status(201).json({ ...criada, alocacoes: [] });
+  } catch (e: any) {
+    console.error('Erro em POST /avancado/fases:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+rotasAvancado.patch('/estudos/:id/avancado/fases/:fid', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirEscrita(req, res, estudo))) return;
+    const fase = await faseDoEstudo(req, res, estudo.id);
+    if (!fase) return;
+
+    const dados: Record<string, any> = {};
+    if (req.body.nome !== undefined) dados.nome = String(req.body.nome).trim();
+    if (req.body.ordem !== undefined) dados.ordem = Number(req.body.ordem) || 0;
+    if (req.body.absorcao !== undefined) {
+      const invalido = validarAbsorcao(req.body.absorcao);
+      if (invalido) { erro(res, 400, 'ABSORCAO_INVALIDA', invalido); return; }
+      dados.absorcao = req.body.absorcao;
+    }
+    if (req.body.fluxo_pagamento !== undefined) {
+      const invalido = validarFluxoPagamento(req.body.fluxo_pagamento);
+      if (invalido) { erro(res, 400, 'FLUXO_PAGAMENTO_INVALIDO', invalido); return; }
+      dados.fluxo_pagamento = req.body.fluxo_pagamento;
+    }
+    if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
+    const atualizada = await req.dados!.atualizar('avancado_fases', fase.id, dados);
+    res.json(atualizada);
+  } catch (e: any) {
+    console.error('Erro em PATCH /avancado/fases/:fid:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirEscrita(req, res, estudo))) return;
+    const fase = await faseDoEstudo(req, res, estudo.id);
+    if (!fase) return;
+    await req.dados!.deletar('avancado_fases', fase.id); // alocações caem por cascata
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('Erro em DELETE /avancado/fases/:fid:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+// ── Alocações de venda (tipologia → fase) ──
+
+/**
+ * Saldo de unidades de uma tipologia DENTRO de uma fase (Lote 6 · trava por
+ * fase): quantidade do catálogo − Σ unidades já alocadas na fase (ignorando,
+ * opcionalmente, uma alocação em edição).
+ */
+async function saldoTipologiaNaFase(
+  req: Request, faseId: number, tipologia: any, ignorarAlocId?: number,
+): Promise<number> {
+  const alocacoes = await alocacoesDaFase(req, faseId);
+  const usado = alocacoes
+    .filter((a) => Number(a.tipologia_id) === Number(tipologia.id) && Number(a.id) !== Number(ignorarAlocId))
+    .reduce((s, a) => s + (Number(a.unidades) || 0), 0);
+  return (Number(tipologia.quantidade) || 0) - usado;
+}
+
+async function alocacaoDaFase(req: Request, res: Response, faseId: number): Promise<any | null> {
+  const aid = parseInt(req.params.aid);
+  if (isNaN(aid)) { erro(res, 400, 'ID_INVALIDO', 'ID da alocação inválido'); return null; }
+  const aloc = await req.dados!.buscar('avancado_alocacoes', aid);
+  if (!aloc || Number(aloc.fase_id) !== faseId) {
+    erro(res, 404, 'ALOCACAO_NAO_ENCONTRADA', 'Alocação não encontrada nesta fase');
+    return null;
+  }
+  return aloc;
+}
+
+rotasAvancado.post('/estudos/:id/avancado/fases/:fid/alocacoes', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirEscrita(req, res, estudo))) return;
+    const fase = await faseDoEstudo(req, res, estudo.id);
+    if (!fase) return;
+
+    const tipologiaId = parseInt(req.body.tipologia_id);
+    if (isNaN(tipologiaId)) { erro(res, 400, 'TIPOLOGIA_OBRIGATORIA', 'Informe a tipologia da alocação'); return; }
+    const tip = await req.dados!.buscar('avancado_tipologias', tipologiaId);
+    if (!tip || Number(tip.estudo_id) !== estudo.id) {
+      erro(res, 404, 'TIPOLOGIA_NAO_ENCONTRADA', 'Tipologia não encontrada neste estudo'); return;
+    }
+    const unidades = Math.max(0, Math.round(Number(req.body.unidades) || 0));
+    const saldo = await saldoTipologiaNaFase(req, fase.id, tip);
+    if (saldo <= 0) {
+      erro(res, 422, 'SALDO_ESGOTADO', `A tipologia "${tip.nome || 'sem nome'}" não tem unidades disponíveis nesta fase`); return;
+    }
+    if (unidades > saldo) {
+      erro(res, 422, 'SALDO_EXCEDIDO', `Só há ${saldo} unidade(s) disponível(is) desta tipologia nesta fase`); return;
+    }
+    const existentes = await alocacoesDaFase(req, fase.id);
+    const criada = await req.dados!.criar('avancado_alocacoes', {
+      estudo_id: estudo.id,
+      fase_id: fase.id,
+      tipologia_id: tip.id,
+      unidades,
+      preco_m2: req.body.preco_m2 !== undefined ? Number(req.body.preco_m2) || 0 : (Number(tip.preco_m2) || 0),
+      ordem: existentes.length,
+    });
+    res.status(201).json(criada);
+  } catch (e: any) {
+    console.error('Erro em POST /avancado/alocacoes:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+rotasAvancado.patch('/estudos/:id/avancado/fases/:fid/alocacoes/:aid', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirEscrita(req, res, estudo))) return;
+    const fase = await faseDoEstudo(req, res, estudo.id);
+    if (!fase) return;
+    const aloc = await alocacaoDaFase(req, res, Number(fase.id));
+    if (!aloc) return;
+
+    const dados: Record<string, any> = {};
+    if (req.body.tipologia_id !== undefined) {
+      const tid = parseInt(req.body.tipologia_id);
+      const t = await req.dados!.buscar('avancado_tipologias', tid);
+      if (!t || Number(t.estudo_id) !== estudo.id) { erro(res, 404, 'TIPOLOGIA_NAO_ENCONTRADA', 'Tipologia não encontrada neste estudo'); return; }
+      dados.tipologia_id = tid;
+    }
+    if (req.body.preco_m2 !== undefined) dados.preco_m2 = Number(req.body.preco_m2) || 0;
+    if (req.body.ordem !== undefined) dados.ordem = Number(req.body.ordem) || 0;
+    if (req.body.unidades !== undefined) {
+      const unidades = Math.max(0, Math.round(Number(req.body.unidades) || 0));
+      const tipId = dados.tipologia_id ?? Number(aloc.tipologia_id);
+      const tip = await req.dados!.buscar('avancado_tipologias', tipId);
+      const saldo = tip ? await saldoTipologiaNaFase(req, fase.id, tip, Number(aloc.id)) : 0;
+      if (unidades > saldo) {
+        erro(res, 422, 'SALDO_EXCEDIDO', `Só há ${saldo} unidade(s) disponível(is) desta tipologia nesta fase`); return;
+      }
+      dados.unidades = unidades;
+    }
+    if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
+    const atualizada = await req.dados!.atualizar('avancado_alocacoes', aloc.id, dados);
+    res.json(atualizada);
+  } catch (e: any) {
+    console.error('Erro em PATCH /avancado/alocacoes/:aid:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+rotasAvancado.delete('/estudos/:id/avancado/fases/:fid/alocacoes/:aid', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirEscrita(req, res, estudo))) return;
+    const fase = await faseDoEstudo(req, res, estudo.id);
+    if (!fase) return;
+    const aloc = await alocacaoDaFase(req, res, Number(fase.id));
+    if (!aloc) return;
+    await req.dados!.deletar('avancado_alocacoes', aloc.id);
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('Erro em DELETE /avancado/alocacoes/:aid:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+// ── GET /receitas: fases no formato do motor do fluxo (compat) ──
+//
+// Cada fase vira uma "linha de receita"; suas alocações, joinadas ao catálogo,
+// viram as "tipologias" que o motor usa para VGV (unidades × área × preço/m²).
+
+/** Constrói as linhas de receita (formato do motor) a partir de fases+alocações+catálogo. */
+export function montarLinhasReceita(fases: any[], alocacoes: any[], tipologias: any[]): any[] {
+  const catalogo = new Map<number, any>(tipologias.map((t) => [Number(t.id), t]));
+  const porFase = new Map<number, any[]>();
+  for (const a of alocacoes) {
+    const chave = Number(a.fase_id);
+    if (!porFase.has(chave)) porFase.set(chave, []);
+    porFase.get(chave)!.push(a);
+  }
+  return fases.map((f) => ({
+    id: f.id,
+    nome: f.nome || 'Fase',
+    fase_label: f.nome || '',
+    ordem: f.ordem,
+    absorcao: f.absorcao,
+    fluxo_pagamento: f.fluxo_pagamento,
+    tipologias: (porFase.get(Number(f.id)) ?? []).map((a) => {
+      const t = catalogo.get(Number(a.tipologia_id));
+      return {
+        id: a.id,
+        tipologia_id: a.tipologia_id,
+        nome: t?.nome || 'Tipologia',
+        area_privativa_m2: t?.area_privativa_m2 ?? 0,
+        quantidade: a.unidades,
+        preco_m2: a.preco_m2,
+      };
+    }),
+  }));
+}
+
+rotasAvancado.get('/estudos/:id/avancado/receitas', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirLeitura(req, res, estudo))) return;
+    const [fases, alocacoes, tipologias] = await Promise.all([
+      req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
+      req.dados!.listar('avancado_alocacoes', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 1000 }),
+      req.dados!.listar('avancado_tipologias', { filtros: { estudo_id: estudo.id }, por_pagina: 500 }),
+    ]);
+    const linhas = montarLinhasReceita(fases.dados, alocacoes.dados, tipologias.dados);
+    res.json({ dados: linhas, total: fases.total });
+  } catch (e: any) {
+    console.error('Erro em GET /avancado/receitas:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 });
@@ -830,7 +1033,8 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
 // ─────────────────────────────────────────────────────────────────
 
 const CAMPOS_CRONOGRAMA = ['evento', 'inicio_mes', 'duracao_meses', 'travado_inicio', 'travado_duracao'];
-const CAMPOS_RECEITA = ['nome', 'fase_label', 'tipo', 'ordem', 'absorcao', 'fluxo_pagamento'];
+const CAMPOS_FASE_COPIA = ['nome', 'ordem', 'absorcao', 'fluxo_pagamento'];
+const CAMPOS_ALOCACAO_COPIA = ['unidades', 'preco_m2', 'ordem'];
 
 export async function duplicarDadosAvancado(req: Request, origId: number, novoId: number): Promise<void> {
   // Cronograma (5 eventos).
@@ -843,23 +1047,34 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     });
   }
 
-  // Linhas de receita + tipologias (mapeando linha antiga → nova).
-  const [receitas, tipologias] = await Promise.all([
-    req.dados!.listar('avancado_linhas_receita', {
-      filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100,
-    }),
-    req.dados!.listar('avancado_tipologias', {
-      filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
-    }),
-  ]);
-  for (const linha of receitas.dados) {
-    const nova = await req.dados!.criar('avancado_linhas_receita', {
-      estudo_id: novoId, ...extrairCampos(linha, CAMPOS_RECEITA),
+  // Catálogo de tipologias (nível estudo) — mapeando id antigo → novo.
+  const tipologias = await req.dados!.listar('avancado_tipologias', {
+    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
+  });
+  const mapaTipologia = new Map<number, number>();
+  for (const tip of tipologias.dados) {
+    const nova = await req.dados!.criar('avancado_tipologias', {
+      estudo_id: novoId, ...extrairCampos(tip, CAMPOS_TIPOLOGIA),
     });
-    for (const tip of tipologias.dados) {
-      if (Number(tip.linha_receita_id) !== Number(linha.id)) continue;
-      await req.dados!.criar('avancado_tipologias', {
-        linha_receita_id: nova.id, estudo_id: novoId, ...extrairCampos(tip, CAMPOS_TIPOLOGIA),
+    mapaTipologia.set(Number(tip.id), Number(nova.id));
+  }
+
+  // Fases + alocações (mapeando fase antiga → nova e tipologia antiga → nova).
+  const [fases, alocacoes] = await Promise.all([
+    req.dados!.listar('avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
+    req.dados!.listar('avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 1000 }),
+  ]);
+  for (const fase of fases.dados) {
+    const nova = await req.dados!.criar('avancado_fases', {
+      estudo_id: novoId, ...extrairCampos(fase, CAMPOS_FASE_COPIA),
+    });
+    for (const aloc of alocacoes.dados) {
+      if (Number(aloc.fase_id) !== Number(fase.id)) continue;
+      const novaTipologia = mapaTipologia.get(Number(aloc.tipologia_id));
+      if (!novaTipologia) continue; // tipologia órfã (não deveria ocorrer)
+      await req.dados!.criar('avancado_alocacoes', {
+        estudo_id: novoId, fase_id: nova.id, tipologia_id: novaTipologia,
+        ...extrairCampos(aloc, CAMPOS_ALOCACAO_COPIA),
       });
     }
   }

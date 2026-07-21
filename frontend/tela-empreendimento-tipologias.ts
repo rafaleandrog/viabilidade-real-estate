@@ -4,23 +4,20 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtNum } from './viab-format.js';
 import {
   urbiVerso,
-  listarReceitasAvancado, criarReceitaAvancado,
-  criarTipologia, atualizarTipologia, removerTipologia,
+  listarTipologiasCatalogo, criarTipologia, atualizarTipologia, removerTipologia,
 } from './viabilidade-api.js';
 import './viab-num.js';
 
-// Sub-aba "Empreendimento → Tipologias" (nível Avançado · Lote 4 · #16).
+// Sub-aba "Empreendimento → Tipologias" (nível Avançado · Lote 4 · #16, Lote 6 · #19).
 //
-// Catálogo consolidado de tipologias do estudo, transferido do antigo
-// "Fluxo de Caixa → Receitas". As tipologias seguem VINCULADAS às linhas de
-// receita (o modelo de catálogo desacoplado é do Lote 6 · #19, que exige spec
-// conjunta) — aqui elas são apresentadas numa única tabela, com a linha de
-// consolidado ao final. Adicionar a 1ª tipologia cria uma linha de receita
-// padrão quando o estudo ainda não tem nenhuma.
+// Catálogo consolidado de tipologias do estudo. A partir do Lote 6 as tipologias
+// são um CATÁLOGO desacoplado (nível estudo) — a venda vira "alocação" na aba
+// Viabilidade → Receitas, que referencia a tipologia pelo nome. Aqui só se
+// cadastra o catálogo (nome, área, quantidade total, etc.).
 //
 // Colunas: Nome · Tipo · Área privativa · Dormitórios · Vagas · Unidades ·
-// Unidades permutadas. Loteamento oculta Tipo/Dormitórios/Vagas (como na tela
-// de Receitas). Nada aqui é usado pelo estudo Preliminar.
+// Unidades permutadas. Loteamento oculta Tipo/Dormitórios/Vagas. Nada aqui é
+// usado pelo estudo Preliminar.
 
 const TIPOS_UNIDADE_INC = [
   { valor: 'apartamento', rotulo: 'Apartamento' },
@@ -36,9 +33,9 @@ export class ViabEmpreendimentoTipologias extends LitElement {
   @property({ type: Object }) estudo: any = null;
   @property({ type: Boolean }) editavel = false;
 
-  @state() private linhas: any[] = [];
+  @state() private tipologias: any[] = [];
   @state() private carregando = true;
-  @state() private confirmRemover: { linhaId: number; tip: any } | null = null;
+  @state() private confirmRemover: any | null = null;
   private carregado = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
@@ -77,31 +74,25 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     if (this.estudo?.nivel_analise !== 'avancado') { this.carregando = false; return; }
     this.carregando = true;
     try {
-      const receitas = await listarReceitasAvancado(this.estudo.id);
-      if (!receitas?.erro) this.linhas = receitas.dados || [];
+      const r = await listarTipologiasCatalogo(this.estudo.id);
+      if (!r?.erro) this.tipologias = r.dados || [];
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar tipologias', 'erro');
     }
     this.carregando = false;
   }
 
-  /** Todas as tipologias do estudo (achatadas), com a linha de receita de origem. */
-  private get _tipologias(): any[] {
-    return this.linhas.flatMap((l) => (l.tipologias || []).map((t: any) => ({ ...t, _linhaId: l.id })));
-  }
-
   render(): TemplateResult {
     if (this.estudo?.nivel_analise !== 'avancado') return html`${nothing}`;
     if (this.carregando) return html`<urbi-loading mensagem="Carregando tipologias..."></urbi-loading>`;
     const lote = this.estudo?.tipo_empreendimento === 'loteamento';
-    const tips = this._tipologias;
     return html`
       <urbi-card titulo="Tipologias do empreendimento">
-        ${tips.length === 0 ? html`
+        ${this.tipologias.length === 0 ? html`
           <div class="vazio">
             <urbi-estado-vazio icone="fa-solid fa-table-list"
               mensagem="Nenhuma tipologia cadastrada — adicione a primeira."></urbi-estado-vazio>
-          </div>` : this._renderTabela(tips, lote)}
+          </div>` : this._renderTabela(this.tipologias, lote)}
 
         ${this.editavel ? html`
           <div class="acoes-topo">
@@ -178,31 +169,19 @@ export class ViabEmpreendimentoTipologias extends LitElement {
         ${dis ? nothing : html`
           <td class="num">
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
-              @click=${() => { this.confirmRemover = { linhaId: t._linhaId, tip: t }; }}>Remover</urbi-botao>
+              @click=${() => { this.confirmRemover = t; }}>Remover</urbi-botao>
           </td>`}
       </tr>
     `;
   }
 
-  // ── CRUD (tipologias seguem vinculadas a uma linha de receita) ──
-
-  /** Garante uma linha de receita para pendurar tipologias; cria uma padrão se não houver. */
-  private async _linhaAlvo(): Promise<any | null> {
-    if (this.linhas.length > 0) return this.linhas[0];
-    const res = await criarReceitaAvancado(this.estudo.id, { nome: 'Vendas' });
-    if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao criar linha de receita', 'erro'); return null; }
-    this.linhas = [...this.linhas, { ...res, tipologias: res.tipologias || [] }];
-    return this.linhas[0];
-  }
+  // ── CRUD (catálogo — nível estudo) ──
 
   private _adicionar = async () => {
     try {
-      const alvo = await this._linhaAlvo();
-      if (!alvo) return;
-      const res = await criarTipologia(this.estudo.id, alvo.id, { ordem: (alvo.tipologias?.length ?? 0) });
+      const res = await criarTipologia(this.estudo.id, { ordem: this.tipologias.length });
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao criar tipologia', 'erro'); return; }
-      this.linhas = this.linhas.map((l) =>
-        l.id === alvo.id ? { ...l, tipologias: [...(l.tipologias || []), res] } : l);
+      this.tipologias = [...this.tipologias, res];
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao criar tipologia', 'erro');
     }
@@ -210,12 +189,9 @@ export class ViabEmpreendimentoTipologias extends LitElement {
 
   private async _salvar(t: any, dados: Record<string, any>) {
     try {
-      const res = await atualizarTipologia(this.estudo.id, t._linhaId, t.id, dados);
+      const res = await atualizarTipologia(this.estudo.id, t.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
-      this.linhas = this.linhas.map((l) =>
-        l.id === t._linhaId
-          ? { ...l, tipologias: (l.tipologias || []).map((y: any) => (y.id === t.id ? { ...y, ...dados } : y)) }
-          : l);
+      this.tipologias = this.tipologias.map((y) => (y.id === t.id ? { ...y, ...dados } : y));
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
     }
@@ -225,7 +201,8 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     const c = this.confirmRemover!;
     return html`
       <urbi-modal title="Remover tipologia" maxWidth="420px" @urbi-modal:close=${() => this.confirmRemover = null}>
-        <p>Remover a tipologia "${c.tip?.nome || 'sem nome'}"?</p>
+        <p>Remover a tipologia "${c?.nome || 'sem nome'}"?</p>
+        <p class="sec">Não é possível remover uma tipologia com alocações de venda — remova as alocações primeiro.</p>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
           <urbi-botao variante="secundario" @click=${() => this.confirmRemover = null}>Cancelar</urbi-botao>
           <urbi-botao variante="perigo" @click=${this._confirmar}>Remover</urbi-botao>
@@ -238,10 +215,9 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     const c = this.confirmRemover!;
     this.confirmRemover = null;
     try {
-      const res = await removerTipologia(this.estudo.id, c.linhaId, c.tip.id);
+      const res = await removerTipologia(this.estudo.id, c.id);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao remover', 'erro'); return; }
-      this.linhas = this.linhas.map((l) =>
-        l.id === c.linhaId ? { ...l, tipologias: (l.tipologias || []).filter((y: any) => y.id !== c.tip.id) } : l);
+      this.tipologias = this.tipologias.filter((y) => y.id !== c.id);
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao remover', 'erro');
     }

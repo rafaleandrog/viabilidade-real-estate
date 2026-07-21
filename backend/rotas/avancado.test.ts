@@ -9,6 +9,7 @@ import {
   validarAbsorcao,
   validarFluxoPagamento,
   extrairCampos,
+  montarLinhasReceita,
   type LinhaCronograma,
 } from './avancado.js';
 
@@ -90,21 +91,18 @@ test('validarValoresCurva aceita soma 100 e rejeita soma diferente', () => {
   assert.ok(validarValoresCurva([{ mes: 1, pct: -10 }, { mes: 2, pct: 110 }]));
 });
 
-// ── Absorção de vendas (spec §4B) ──
+// ── Absorção de vendas (Lote 6 · #20: distribuído, sem soma = 100%) ──
 
-test('validarAbsorcao: linear sem campos extras é válida; distribuído exige blocos somando 100', () => {
-  assert.equal(validarAbsorcao({ modo: 'linear', correcao_estoque: false }), null);
-  assert.equal(validarAbsorcao({
-    modo: 'distribuido',
-    blocos: [
-      { evento: 'lancamento', pct: 30 },
-      { evento: 'obra', pct: 35 },
-      { evento: 'pos_obra', pct: 35, duracao_meses: 12 },
-    ],
-  }), null);
-  assert.ok(validarAbsorcao({ modo: 'distribuido', blocos: [{ evento: 'obra', pct: 50 }] }));
-  assert.ok(validarAbsorcao({ modo: 'personalizado', meses: [{ mes: 1, pct: 40 }] }));
-  assert.ok(validarAbsorcao({ modo: 'xyz' }));
+test('validarAbsorcao: distribuído sem validação de soma; modo inválido é rejeitado', () => {
+  assert.equal(validarAbsorcao({ modo: 'distribuido', blocos: [
+    { evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 40 }, { evento: 'pos_obra', pct: 0 },
+  ] }), null);
+  // Pós-obra é derivado → soma dos blocos não precisa fechar 100.
+  assert.equal(validarAbsorcao({ modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 20 }, { evento: 'obra', pct: 30 }] }), null);
+  assert.equal(validarAbsorcao(null), null);           // ausente = default
+  assert.equal(validarAbsorcao({ modo: 'linear' }), null); // legado tolerado
+  assert.ok(validarAbsorcao({ modo: 'xyz' }));          // modo inválido
+  assert.ok(validarAbsorcao({ modo: 'distribuido', blocos: 'x' })); // blocos não-lista
 });
 
 // ── Duplicação: projeção de campos copiáveis ──
@@ -119,13 +117,29 @@ test('extrairCampos projeta só os campos pedidos e descarta id/estudo_id/timest
   assert.ok(!('id' in copia) && !('estudo_id' in copia) && !('criado_em' in copia));
 });
 
-// ── Fluxo de pagamento (spec §4C) ──
+// ── Fluxo de pagamento (Lote 6 · #20: multi-linha, repasse derivado) ──
 
-test('validarFluxoPagamento: entrada + parcelas + repasse = 100%', () => {
+test('validarFluxoPagamento: aceita listas de linhas e objeto legado, sem soma = 100%', () => {
   assert.equal(validarFluxoPagamento({
-    entrada: { pct: 15 }, parcelas: { pct: 15 }, repasse: { pct: 70 },
+    entrada: [{ pct: 10 }, { pct: 5 }], parcelas: [{ pct: 15 }], repasse: { apos_entrega_meses: 2 },
   }), null);
-  assert.ok(validarFluxoPagamento({
-    entrada: { pct: 20 }, parcelas: { pct: 20 }, repasse: { pct: 70 },
-  }));
+  assert.equal(validarFluxoPagamento({ entrada: { pct: 15 }, parcelas: { pct: 15 } }), null); // legado (objeto)
+  assert.equal(validarFluxoPagamento(null), null);
+  assert.ok(validarFluxoPagamento({ entrada: 5 }));   // tipo inválido
+});
+
+// ── Montagem das linhas de receita para o motor (fases + alocações + catálogo) ──
+
+test('montarLinhasReceita joina alocações ao catálogo no formato do motor', () => {
+  const fases = [{ id: 1, nome: 'Fase 1', ordem: 0, absorcao: { modo: 'distribuido' }, fluxo_pagamento: {} }];
+  const tipologias = [{ id: 7, nome: 'Studio', area_privativa_m2: 30, preco_m2: 11000 }];
+  const alocacoes = [{ id: 100, fase_id: 1, tipologia_id: 7, unidades: 50, preco_m2: 12000 }];
+  const linhas = montarLinhasReceita(fases, alocacoes, tipologias);
+  assert.equal(linhas.length, 1);
+  assert.equal(linhas[0].fase_label, 'Fase 1');
+  const t = linhas[0].tipologias[0];
+  assert.equal(t.nome, 'Studio');
+  assert.equal(t.area_privativa_m2, 30);
+  assert.equal(t.quantidade, 50);      // unidades da alocação
+  assert.equal(t.preco_m2, 12000);     // preço da alocação (não o do catálogo)
 });

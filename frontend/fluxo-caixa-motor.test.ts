@@ -44,25 +44,26 @@ test('curva S de 12 meses reamostrada para 24 mantém soma e formato', () => {
   assert.ok(perto(soma(r), 500_000));
 });
 
-// 3. Absorção distribuída aplicada às vendas de uma linha
-test('absorção distribuída: vendas caem nos meses dos blocos e somam o VGV', () => {
+// 3. Absorção distribuída (3 períodos) aplicada às vendas de uma linha
+test('absorção distribuída: vendas caem nos 3 períodos e somam o VGV', () => {
   const linha = {
     tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }], // VGV 50M
     absorcao: {
       modo: 'distribuido',
       blocos: [
-        { evento: 'lancamento', pct: 30 },
-        { evento: 'obra', pct: 35 },
-        { evento: 'pos_obra', pct: 35, duracao_meses: 12 },
+        { evento: 'lancamento', pct: 30 },  // período 1 = pré-lançamento + lançamento (meses 6..12)
+        { evento: 'obra', pct: 35 },        // período 2 = obra (meses 17..40)
+        { evento: 'pos_obra', pct: 0 },     // período 3 = derivado = 35% (meses 41..52)
       ],
     },
     fluxo_pagamento: null, // sem config → recebe à vista no mês da venda
   };
   const r = receitaMensalLinha(linha, CRONO, 60);
   assert.ok(perto(soma(r), 50_000_000, 1));
-  assert.ok(perto(r[12], 15_000_000, 1));          // mês 12: 30% no lançamento
-  assert.ok(perto(r[14], 0, 1));                   // hiato (mês 14)
+  assert.ok(perto(r[6], (0.30 * 50_000_000) / 7, 1));   // período 1 espalhado por 7 meses (6..12)
+  assert.ok(perto(r[14], 0, 1));                        // hiato entre período 1 e obra (mês 14)
   assert.ok(perto(r[17], (0.35 * 50_000_000) / 24, 1)); // 1º mês da obra (mês 17)
+  assert.ok(perto(r[41], (0.35 * 50_000_000) / 12, 1)); // 1º mês da pós-obra (derivado)
 });
 
 // 4. Fluxo de pagamento: entrada + parcelas + repasse = VGV no tempo correto
@@ -86,6 +87,26 @@ test('fluxo de pagamento distribui entrada, parcelas na obra e repasse na entreg
   assert.ok(perto(r[40], 1_500_000 / 28, 1));
   // repasse: fim da obra (40) + 2 = mês 42
   assert.ok(perto(r[42], 7_000_000, 1));
+});
+
+// 4b. Fluxo de pagamento com MÚLTIPLAS linhas de entrada e repasse derivado
+test('fluxo de pagamento: múltiplas entradas + repasse derivado (100 − entradas − parcelas)', () => {
+  const linha = {
+    tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
+    absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+    fluxo_pagamento: {
+      comissao: { ativo: true, tipo: 'embutida', pct: 6 },
+      ret: { ativo: false, pct: 0 },
+      entrada: [{ pct: 10, parcelas: 1 }, { pct: 5, parcelas: 1 }], // duas linhas, 15% no total
+      parcelas: [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, pct: 15 }],
+      repasse: { apos_entrega_meses: 2 }, // pct derivado = 100 − 15 − 15 = 70
+    },
+  };
+  const r = receitaMensalLinha(linha, CRONO, 60);
+  assert.ok(perto(soma(r), 10_000_000, 1));       // nada se perde
+  assert.ok(perto(r[12], 1_500_000, 1));          // 10% + 5% de entrada no mês 12
+  assert.ok(perto(r[13], 1_500_000 / 28, 1));     // parcelas ao longo da obra (mês 13..40)
+  assert.ok(perto(r[42], 7_000_000, 1));          // repasse derivado (70%) na entrega (mês 42)
 });
 
 // 5. Resolução de unidade pct_vgv dentro do fluxo completo
