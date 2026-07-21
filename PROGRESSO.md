@@ -69,6 +69,52 @@ motor; `versao` intacta.
   testes 70/70 ✓ · build do bundle (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde).
   Empacotamento/backend não se aplicam (mudança puramente de CSS de frontend).
 
+### Lote 3 — Reestruturação de abas do Avançado (FUNDAÇÃO) — ✅ CONCLUÍDO (issue #15)
+Branch `claude/issues-lote-3-kz6rmc`. Mudança **100% frontend** (novos componentes + roteamento
+de abas), sem schema/backend/motor; `versao` intacta.
+
+- **Decisão de transição (confirmada com o autor):** *preservar tudo no lugar* — as 7 abas de topo
+  novas são criadas e cada tela EXISTENTE do Avançado é roteada para a aba correspondente, mantendo
+  o Avançado 100% funcional durante a transição. Placeholders só nas sub-abas genuinamente novas
+  (Informações, Tipologias), que o Lote 4 (#16) constrói. **O Preliminar fica intocado** (suas 4
+  abas de sempre: Premissas · Proforma · Gráficos · Apelo).
+- **Novo `frontend/tela-avancado.ts` (`viab-tela-avancado`):** as 7 abas de topo (nível 1) em
+  `urbi-abas`, sincronizadas com a URL (`/detalhe/:id/:aba`; emite `viab:aba-topo` → `navegarSub`).
+  Navegação de nível 2 por **`urbi-badge` interativo** (mesmo padrão da antiga aba Fluxo — estado
+  interno, fora da URL). **Mapa topo → conteúdo:**
+  - **Resumo** → `viab-tela-proforma` (o consolidado atual; Lote 8/#23 reconstrói)
+  - **Empreendimento** → sub-nav *Informações\* · Cronograma · Tipologias\** (Lote 4/#16)
+  - **Viabilidade** → sub-nav *Premissas · Receitas* (Lote 6/#19–21)
+  - **Obra** → `viab-fluxo-custos` (Lote 5/#17–18)
+  - **Fluxo de Caixa** → `viab-fluxo-ver`
+  - **Cenários** → `viab-tela-graficos`
+  - **Análise de mercado** → `viab-tela-apelo`
+  - (\* = placeholder `urbi-estado-vazio` apontando o Lote 4)
+- **Cronograma extraído:** o Cronograma (parâmetros + tabela de eventos + Gantt SVG) vivia embutido
+  em `tela-fluxo.ts`. Foi movido **verbatim** para o novo `frontend/tela-fluxo-cronograma.ts`
+  (`viab-fluxo-cronograma`), standalone, para ser hospedado em Empreendimento → Cronograma. Os
+  demais sub-componentes do fluxo (`viab-fluxo-receitas`/`-custos`/`-ver`) já eram standalone.
+- **`tela-fluxo.ts` removido:** era só o wrapper da antiga aba única "Fluxo de Caixa" com sub-nav;
+  totalmente superado por `viab-tela-avancado`. Nenhum teste dependia dele (os testes cobrem
+  motor/shared). Único import era em `tela-estudo`.
+- **`tela-estudo.ts`:** o render passou a ramificar por nível — Avançado renderiza
+  `<viab-tela-avancado>` (recebe `estudo` + `podeEditar` + `status` e computa os guards de edição
+  como antes: premissas sem checar `arquivado`; cronograma/receitas/custos com `arquivado`; apelo
+  só `podeEditar`); Preliminar mantém a `urbi-abas` de 4 abas idêntica. Setter de `aba` agora só
+  guarda o valor cru; cada ramo normaliza para o seu conjunto (Avançado normaliza dentro do
+  componente; URLs antigas do Preliminar caem em `resumo` no Avançado).
+- **Nota de comportamento:** como todos os slots da `urbi-abas` são renderizados (padrão do
+  primitivo, já era assim no Preliminar), Custos (Obra) e Ver Fluxo passam a montar junto ao abrir
+  o estudo — só marginalmente mais fetches iniciais; cada componente guarda seu próprio carregamento.
+  Sem impacto de correção.
+- **Escopo do lote:** só a FUNDAÇÃO (a árvore de abas). O conteúdo definitivo de cada sub-aba é dos
+  lotes 4–8. `matricula`/`descricao`/anexos, mês 0, tipologias, 5 abas de custo, novo modelo de
+  receitas/fases, Financeiro e o Resumo consolidado **não** entram aqui.
+- **Validação neste ambiente:** frontend isolado (deps públicas do store pnpm) — **typecheck ✓ ·
+  testes 70/70 ✓ · build do bundle (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde).
+  Empacotamento/backend não se aplicam (sem schema/backend). ⏳ Render real das abas aninhadas só
+  valida no deploy dev.
+
 ---
 
 ## Mapa de repositórios (na máquina)
