@@ -337,6 +337,33 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ---
 
+## Rodada 2 — Etapas (2026-07-22)
+
+### Etapa 2 — Backend & dados — ✅ IMPLEMENTADA (issues #24, #38)
+Branch `claude/etapa-2-pykm15`. Toca **backend + frontend** (sem schema, sem migração).
+
+- **#24 (campos do Avançado validados ao salvar Preliminar):** a raiz do bug é que ao
+  salvar Premissas de um estudo Preliminar o frontend envia TODOS os campos do objeto
+  estudo (incluindo os da aba Financeiro/Avançado, que chegam como `null`). O shell,
+  ao receber `campo_numerico: null` no payload, dispara "deve ser um número". **Fix
+  backend (`backend/rotas/estudos.ts`):** nova constante `CAMPOS_SOMENTE_AVANCADO` (28
+  campos — `taxa_desconto_aa`, estrutura de capital, juros, impostos, financiamento,
+  investidor etc.); no handler `PATCH /estudos/:id`, quando `nivel_analise ===
+  'preliminar'`, campos dessa lista são ignorados antes de chegar ao validador do shell.
+  Assim, salvar Premissas de um Preliminar nunca mais envia valores `null` para campos
+  exclusivos do Avançado.
+- **#38 (lista do Núcleo incompleta + paginação):** `listarGlebasNucleo` /
+  `listarLotesNucleo` em `viabilidade-api.ts` agora aceitam `pagina` e `porPagina`
+  (padrão 100 itens/página) e repassa esses parâmetros ao shell. O componente
+  `viab-terreno-nucleo` ganha estado `_pagina` e `_totalItens`; exibe indicador
+  "Página X de Y (Z glebas/lotes)" + botões Anterior/Próxima quando há mais de uma
+  página. Reset para página 1 ao trocar de estudo.
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 76/76 ✓ ·
+  build (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde). ⏳ **Pendente do
+  autor (SDK gated):** typecheck do backend, suíte de backend e `urbi-empacotar`.
+
+---
+
 ## Mapa de repositórios (na máquina)
 
 | Repo | Caminho | Papel |

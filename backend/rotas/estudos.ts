@@ -20,6 +20,28 @@ export const rotasEstudos: ReturnType<typeof Router> = Router();
 const TIPOS = ['loteamento', 'incorporacao'];
 const STATUS = ['rascunho', 'em_analise', 'aprovado', 'reprovado', 'arquivado'];
 
+// Campos exclusivos do estudo Avançado (aba Financeiro + estrutura de capital).
+// Num estudo Preliminar esses campos nunca são preenchidos e chegam como null no
+// payload, disparando a validação numérica do shell. Filtrá-los no PATCH elimina
+// o erro "Campo X deve ser um número" ao salvar Premissas de um Preliminar.
+const CAMPOS_SOMENTE_AVANCADO = new Set([
+  'taxa_desconto_aa',
+  'estrutura_capital_proprio_pct', 'estrutura_financiamento_pct',
+  'estrutura_investidores_pct', 'taxa_juros_valor_futuro_aa',
+  'tarifas_bancarias_pct', 'taxa_adm_carteira_pct',
+  'taxa_estruturacao_divida_pct', 'taxa_gerenciamento_obra_pct',
+  'juros_financeiros_aa', 'juros_inicio_cobranca_mes',
+  'indice_correcao', 'indice_correcao_taxa_aa',
+  'regime_tributario', 'aliquota_pis_pct', 'aliquota_cofins_pct',
+  'aliquota_csll_pct', 'aliquota_irpj_pct', 'aliquota_itbi_pct',
+  'imposto_sobre_permuta_fisica',
+  'financiamento_obra_pct', 'financiamento_juros_aa',
+  'financiamento_sistema_amortizacao', 'financiamento_prazo_meses',
+  'financiamento_carencia_meses',
+  'investidor_aporte_valor', 'investidor_retorno_tipo',
+  'investidor_juros_aa', 'investidor_carencia_meses', 'investidor_parcelas',
+]);
+
 // Campos que não são copiados na duplicação (gerados ou de junção do shell).
 const CAMPOS_NAO_COPIAVEIS = new Set([
   'id', 'criado_em', 'atualizado_em', 'removido_em', 'removido_por_id',
@@ -209,6 +231,9 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
     const dados: Record<string, any> = {};
     for (const [k, v] of Object.entries(req.body)) {
       if (bloqueados.has(k)) continue;
+      // Campos exclusivos do Avançado nunca chegam ao validador quando o estudo
+      // é Preliminar (valores null disparariam "deve ser um número" no shell).
+      if (estudo.nivel_analise === 'preliminar' && CAMPOS_SOMENTE_AVANCADO.has(k)) continue;
       if (k === 'tipo_empreendimento' && estudo.status !== 'rascunho') {
         erro(res, 422, 'TIPO_TRAVADO', 'tipo_empreendimento só pode mudar em Rascunho');
         return;
