@@ -126,7 +126,7 @@ autor; ver protocolo).
 | 1 | #33 #34 #35 #36 #37 | ✅ Concluída (parcial) | #34 e #36 implementados nesta sessão; #33/#35/#37 já estavam no código |
 | 2 | #24 #38 | ✅ Concluída | Backend + frontend — validação de backend no ambiente do autor |
 | 3 | #39 #40 | ✅ Concluída | Fundação — urbi-nav lateral + urbi-abas no topo (frontend puro) |
-| 4 | #41 #42 #43 #44 #45 | ⬜ Pendente | Depende de #39 |
+| 4 | #41 #42 #43 #44 #45 | ✅ Concluída | Schema (migração 004) + backend + frontend — validação de backend no ambiente do autor |
 | 5 | #46 #47 | ✅ Concluída | Schema + frontend + motor — validação de backend no ambiente do autor |
 | 6 | #48 #49 #50 #51 #52 | ✅ Concluída | Frontend + backend (saldo global) — validação de backend no ambiente do autor |
 | 7 | #53 #55 #54 | ✅ Concluída | Frontend puro — Terreno → Informações; Premissas mantida (#54 avaliado) |

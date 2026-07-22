@@ -463,6 +463,44 @@ Avançado; sem schema/backend/motor/migração). `versao` intacta. Pré-requisit
   empacotamento não se aplica. ⏳ Render real do `urbi-nav`/`urbi-abas` aninhados só valida no
   deploy dev.
 
+### Etapa 4 — Cronograma + Tipologias — ✅ IMPLEMENTADA (issues #41, #42, #43, #44, #45)
+Branch `claude/etapa-4-cronograma-tipologias-0dhw04` (commit `85a6429` mergeado direto na `main`).
+Toca **schema + backend + frontend** (migração `migracoes/004_fases_gantt.js` — colunas aditivas
+`inicio_mes`/`duracao_meses` em `avancado_fases`). Pré-requisito #39 (Etapa 3): concluído.
+
+- **#41 (5 fases padrão com cores distintas):** `EVENTO_COR` em `fluxo-shared.ts` ganhou 5 tokens
+  semânticos distintos — `planejamento` → `--cor-info`, `pre_lancamento` → `--cor-alerta`,
+  `lancamento` → `--cor-sucesso`, `obra` → `--cor-primaria-solida`, `pos_obra` → `--cor-erro`. A tabela
+  de cronograma exibe `border-left` colorida pelo token de cada fase; o ponto-cor (bolinha) cresceu de
+  8px para 10px. `corFaseExtra(idx)` reusa a mesma paleta de 5 tokens ciclicamente para fases extras.
+
+- **#42 (CRUD de fases comerciais no Cronograma):** colunas `inicio_mes` (int, padrão 0) e
+  `duracao_meses` (int, padrão 12) adicionadas a `avancado_fases` via **migração 004** (forward-only,
+  `ADD COLUMN IF NOT EXISTS`). Backend PATCH atualizado (`CAMPOS_FASE`). Frontend
+  `tela-fluxo-cronograma.ts` — seção "Fases comerciais" abaixo das 5 fixas: edição inline de
+  nome/início/duração e botão Remover por linha; botão "Adicionar fase" no rodapé; fases aparecem
+  como **barras tracejadas** no gantt SVG com paleta de tokens cíclica.
+
+- **#43 (emojis no gantt):** ⭐ posicionado acima da barra do evento `lancamento` (sempre 1 mês —
+  renderizado como círculo); 🔑 ao final (`xFim + 4`) da barra do evento `obra`. Ambos renderizados
+  como `<text>` no SVG, sem dependência externa.
+
+- **#44 (largura/alinhamento das colunas de Tipologias):** `table-layout: fixed` + `<colgroup>` com
+  larguras explícitas (Nome `auto` · Tipo 160px · Área 130px · Dorm/Vagas 90px · Unidades 100px ·
+  Permutadas 200px · Ação 90px). Cabeçalho e células alinhados uniformemente; `overflow: hidden` nas
+  células.
+
+- **#45 (texto calculado de permutadas):** à direita do campo `unidades_permutadas`, um
+  `<div class="perm-calc">` (0.72rem, `--cor-texto-sec`) com **% de unidades permutadas** e **m²
+  permutados**, exibidos só quando `perm > 0`. Rodapé de totais também mostra a área total permutada
+  (`Σ permutadas × área`).
+
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 76/76 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~225kb). ⏳ **Pendente do autor (SDK gated):**
+  typecheck do backend, suíte de backend, `urbi-empacotar` e a **execução da migração 004** contra dados
+  reais (ADD COLUMN IF NOT EXISTS — sem risco para dados existentes). Render real das barras do gantt
+  e do alinhamento das tabelas só valida no deploy dev.
+
 ### Etapa 5 — Custos (unidade por categoria + coluna de resultado) — ✅ IMPLEMENTADA (issues #46, #47)
 Branch `claude/etapa-5-p24nm1`. Toca **schema + frontend + motor** (sem backend, sem migração).
 `versao` intacta — só adição de opção ao `orcamento_unidade` (genesis; sincronizador aplica).
