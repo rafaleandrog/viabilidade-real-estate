@@ -22,6 +22,8 @@ import {
 
 interface ImovelVinculado { vinculoId: number; imovelId: number; rotulo: string; area: number; }
 
+const POR_PAGINA = 50;
+
 @customElement('viab-terreno-nucleo')
 export class ViabTerrenoNucleo extends LitElement {
   @property({ attribute: false }) estudo: any = null;
@@ -33,6 +35,8 @@ export class ViabTerrenoNucleo extends LitElement {
   @state() private opcoes: { valor: string; rotulo: string }[] = [];
   @state() private vinculados: ImovelVinculado[] = [];
   @state() private salvando = false;
+  @state() private _pagina = 1;
+  @state() private _totalItens = 0;
 
   static styles = [estiloConteudo, css`
     .lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -43,6 +47,8 @@ export class ViabTerrenoNucleo extends LitElement {
     .add { display: flex; gap: 8px; align-items: flex-end; margin-top: 12px; }
     .add urbi-select { flex: 1; min-width: 180px; }
     urbi-banner { margin-bottom: 12px; }
+    .pag-info { display: block; margin-top: 8px; font-size: 0.75rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    .pag-btns { display: flex; gap: 8px; margin-top: 8px; }
   `];
 
   connectedCallback() {
@@ -50,7 +56,7 @@ export class ViabTerrenoNucleo extends LitElement {
     this._carregar();
   }
   updated(ch: Map<string, unknown>) {
-    if (ch.has('estudo')) this._carregar();
+    if (ch.has('estudo')) this._carregar(1);
   }
 
   private get _ehLoteamento(): boolean {
@@ -59,14 +65,18 @@ export class ViabTerrenoNucleo extends LitElement {
   private get _subtipo(): string { return this._ehLoteamento ? 'gleba' : 'lote'; }
   private get _vinculos(): any[] { return this.estudo?.imoveis ?? []; }
 
-  private async _carregar() {
+  private async _carregar(pagina = this._pagina) {
     if (!this.estudo) return;
     this.carregando = true;
     this.disponivel = true;
     this.motivo = '';
     try {
-      // Candidatos para o seletor (rótulo apenas).
-      const lista = this._ehLoteamento ? await listarGlebasNucleo() : await listarLotesNucleo();
+      // Candidatos para o seletor (rótulo apenas), paginados.
+      const lista = this._ehLoteamento
+        ? await listarGlebasNucleo('', pagina, POR_PAGINA)
+        : await listarLotesNucleo('', pagina, POR_PAGINA);
+      this._totalItens = lista?.total ?? 0;
+      this._pagina = pagina;
       const usados = new Set(this._vinculos.map((v) => Number(v.imovel_nucleo_id)));
       this.opcoes = (lista?.dados ?? [])
         .filter((o: any) => !usados.has(Number(o.id)))
@@ -78,6 +88,10 @@ export class ViabTerrenoNucleo extends LitElement {
       this.motivo = e?.message || 'Indisponível';
     }
     this.carregando = false;
+  }
+
+  private _totalPaginas(): number {
+    return Math.max(1, Math.ceil(this._totalItens / POR_PAGINA));
   }
 
   private async _resolverVinculados(vinculos: any[]): Promise<ImovelVinculado[]> {
@@ -191,8 +205,24 @@ export class ViabTerrenoNucleo extends LitElement {
     if (this._ehLoteamento && this.vinculados.length >= 1) {
       return html`<p class="sec">Loteamento admite exatamente 1 gleba. Remova a atual para trocar.</p>`;
     }
+    const totalPag = this._totalPaginas();
+    const paginacaoInfo = this._totalItens > 0
+      ? html`<span class="pag-info">Página ${this._pagina} de ${totalPag} (${this._totalItens} ${this._subtipo}s)</span>`
+      : nothing;
+    const paginacaoBotoes = totalPag > 1 ? html`
+      <div class="pag-btns">
+        <urbi-botao variante="secundario" pequeno icone="fa-solid fa-chevron-left"
+          ?desabilitado=${this._pagina <= 1 || this.salvando || this.carregando}
+          @click=${() => this._carregar(this._pagina - 1)}>Anterior</urbi-botao>
+        <urbi-botao variante="secundario" pequeno icone="fa-solid fa-chevron-right"
+          ?desabilitado=${this._pagina >= totalPag || this.salvando || this.carregando}
+          @click=${() => this._carregar(this._pagina + 1)}>Próxima</urbi-botao>
+      </div>` : nothing;
     if (this.opcoes.length === 0) {
-      return html`<p class="sec">Nenhum ${this._subtipo} disponível no Núcleo para vincular.</p>`;
+      return html`
+        <p class="sec">Nenhum ${this._subtipo} disponível nesta página para vincular.</p>
+        ${paginacaoInfo}${paginacaoBotoes}
+      `;
     }
     return html`
       <div class="add">
@@ -206,6 +236,7 @@ export class ViabTerrenoNucleo extends LitElement {
           @urbi:select-change=${(e: CustomEvent) => this._adicionar(parseInt(e.detail?.valor))}
         ></urbi-select>
       </div>
+      ${paginacaoInfo}${paginacaoBotoes}
     `;
   }
 }

@@ -226,13 +226,13 @@ export function removerCustoAvancado(estudoId: number, cid: number): Promise<any
 // Consumo padrão via urbiVerso.nucleo → /api/viabilidade/nucleo/... (o shell
 // provê essas rotas para apps que declaram dependencias_nucleo no manifesto).
 // Loteamento usa glebas; Incorporação usa lotes. Só leitura (flag "ler").
-export function listarGlebasNucleo(busca = ''): Promise<any> {
-  const qs = new URLSearchParams({ por_pagina: '200' });
+export function listarGlebasNucleo(busca = '', pagina = 1, porPagina = 100): Promise<any> {
+  const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
   if (busca) qs.set('busca', busca);
   return urbiVerso.nucleo(`/glebas?${qs}`);
 }
-export function listarLotesNucleo(busca = ''): Promise<any> {
-  const qs = new URLSearchParams({ por_pagina: '200' });
+export function listarLotesNucleo(busca = '', pagina = 1, porPagina = 100): Promise<any> {
+  const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
   if (busca) qs.set('busca', busca);
   return urbiVerso.nucleo(`/lotes?${qs}`);
 }

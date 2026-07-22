@@ -124,7 +124,7 @@ autor; ver protocolo).
 | Etapa | Issues | Status | Observações |
 |------|--------|--------|-------------|
 | 1 | #33 #34 #35 #36 #37 | ⬜ Pendente | Frontend puro |
-| 2 | #24 #38 | ⬜ Pendente | Schema/backend — validar no ambiente do autor |
+| 2 | #24 #38 | ✅ Concluída | Backend + frontend — validação de backend no ambiente do autor |
 | 3 | #39 #40 | ⬜ Pendente | Fundação — antes das Etapas 4–8 |
 | 4 | #41 #42 #43 #44 #45 | ⬜ Pendente | Depende de #39 |
 | 5 | #46 #47 | ⬜ Pendente | Depende de #39, #40 |
