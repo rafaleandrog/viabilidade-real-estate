@@ -5,26 +5,12 @@
 // preço de venda (R$/m²) e custo de obra (R$/m²). O motor reaplica esses deltas
 // (aplicarCenario) ao recalcular o fluxo — não há dado derivado persistido.
 //
-// Forward-only e idempotente (CREATE TABLE IF NOT EXISTS). O sincronizador do
-// SDK também materializa a tabela a partir do schema.json; esta migração é a
-// rede de segurança explícita pedida na issue e não transforma dado existente
-// (tabela nova, sempre vazia numa instância pré-existente).
+// Forward-only. A tabela é materializada pelo sincronizador de schema do SDK
+// (schema.json é a fonte de verdade); tabela nova = sempre vazia em instâncias
+// pré-existentes, não há dado a transformar.
 
-exports.acima = async function (db) {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS viabilidade.avancado_cenarios (
-      id              BIGSERIAL PRIMARY KEY,
-      estudo_id       BIGINT NOT NULL REFERENCES viabilidade.estudos(id) ON DELETE CASCADE,
-      nome            VARCHAR(100),
-      preco_venda_pct NUMERIC(6,2) NOT NULL DEFAULT 0,
-      custo_obra_pct  NUMERIC(6,2) NOT NULL DEFAULT 0,
-      ordem           INT NOT NULL DEFAULT 0,
-      criado_em       TIMESTAMPTZ NOT NULL DEFAULT now(),
-      atualizado_em   TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS avancado_cenarios_estudo_id_idx
-      ON viabilidade.avancado_cenarios (estudo_id)
-  `);
-};
+export default async function ({ dados }) {
+  // Nenhuma transformação de dado necessária — avancado_cenarios é uma tabela
+  // nova, criada pelo schema sync do SDK a partir do schema.json.
+  void dados;
+}
