@@ -110,6 +110,8 @@ test('resolverCustoTotal converte cada unidade de orçamento para R$', () => {
   assert.equal(resolverCustoTotal({ orcamento_valor: 200, orcamento_unidade: 'rs_m2_terreno' }, ctx), 10_000_000);
   assert.equal(resolverCustoTotal({ orcamento_valor: 1.25, orcamento_unidade: 'pct_vgv' }, ctx), 1_250_000);
   assert.equal(resolverCustoTotal({ orcamento_valor: 2, orcamento_unidade: 'pct_receita' }, ctx), 1_800_000);
+  const ctxObra = { ...ctx, totalObra: 5_000_000 };
+  assert.equal(resolverCustoTotal({ orcamento_valor: 10, orcamento_unidade: 'pct_obra' }, ctxObra), 500_000);
 });
 
 test('areaPrivativaTotalLinhas soma área × quantidade de todas as tipologias', () => {

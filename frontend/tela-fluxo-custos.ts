@@ -57,17 +57,16 @@ const CATEGORIAS: Record<GrupoId, { nome: string; subs: string[] }[]> = {
     { nome: 'Outro', subs: [] },
   ],
   diretos: [
-    { nome: 'Decoração', subs: [] },
-    { nome: 'Gestão da obra', subs: [] },
-    { nome: 'Stand de vendas', subs: [] },
+    { nome: 'Marketing & Publicidade', subs: [] },
     { nome: 'Comissão de vendas', subs: [] },
+    { nome: 'Projetos', subs: [] },
+    { nome: 'Licenças e Aprovações', subs: [] },
     { nome: 'Outro', subs: [] },
   ],
   indireto: [
-    { nome: 'Projetos', subs: ['Arquitetura', 'Estrutural', 'Instalações', 'Outro'] },
-    { nome: 'Licenças', subs: ['Alvarás', 'Aprovações', 'Outro'] },
-    { nome: 'Marketing', subs: ['Publicidade', 'Stand de vendas', 'Outro'] },
-    { nome: 'Administração', subs: ['Administrativo', 'Jurídico', 'Outro'] },
+    { nome: 'Marketing global', subs: [] },
+    { nome: 'Stand de vendas', subs: [] },
+    { nome: 'Gestão', subs: [] },
     { nome: 'Outro', subs: [] },
   ],
   financeiro: [
@@ -89,6 +88,7 @@ const CONV_UNIDADE: Record<string, ConvUnidade> = {
   rs_m2_terreno: { tipo: 'por_area', link: 'areaTerreno' },
   pct_vgv: { tipo: 'pct', link: 'vgv' },
   pct_receita: { tipo: 'pct', link: 'receita' },
+  pct_obra: { tipo: 'pct', link: 'vgv' }, // link=vgv usado só na conversão de display; motor usa totalObra
 };
 
 const UNIDADES = [
@@ -97,7 +97,39 @@ const UNIDADES = [
   { valor: 'rs_m2_terreno', rotulo: 'R$/m² terreno' },
   { valor: 'pct_vgv', rotulo: '% VGV' },
   { valor: 'pct_receita', rotulo: '% Receita' },
+  { valor: 'pct_obra', rotulo: '% Obra' },
 ];
+
+// Unidades permitidas por grupo+categoria. Ausência = todas as unidades.
+// Garante coerência entre a opção visível e o que o motor calcula.
+const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
+  terreno: {
+    'Preço':   ['rs', 'rs_m2_terreno'],
+    'Outorga': ['rs', 'pct_vgv'],
+    'Registro':['rs', 'rs_m2_priv'],
+    'Outro':   ['rs', 'pct_vgv'],
+  },
+  obra: {
+    'Obra':          ['rs', 'rs_m2_priv'],
+    'Decoração':     ['rs', 'rs_m2_priv'],
+    'Gestão da obra':['rs', 'pct_obra'],
+    'Contingência':  ['rs', 'pct_vgv'],
+    'Outro':         ['rs', 'pct_vgv'],
+  },
+  diretos: {
+    'Marketing & Publicidade': ['rs', 'pct_vgv'],
+    'Comissão de vendas':      ['pct_vgv'],
+    'Projetos':                ['rs', 'rs_m2_priv'],
+    'Licenças e Aprovações':   ['rs', 'rs_m2_priv'],
+    'Outro':                   ['rs', 'pct_vgv'],
+  },
+  indireto: {
+    'Marketing global': ['rs', 'pct_vgv'],
+    'Stand de vendas':  ['rs', 'pct_vgv'],
+    'Gestão':           ['rs', 'pct_vgv'],
+    'Outro':            ['rs', 'pct_vgv'],
+  },
+};
 
 const EVENTOS_ANCORA = [
   { valor: 'planejamento', rotulo: 'Planejamento' },
@@ -124,6 +156,24 @@ export class ViabFluxoCustos extends LitElement {
   private ctxCusto: ContextoCusto = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0 };
   private carregado = false;
 
+  // Total do grupo Obra excluindo linhas com pct_obra (base para % Obra).
+  private get _totalObra(): number {
+    return this.custos
+      .filter((c) => c.grupo === 'obra' && (c.orcamento_unidade || 'rs') !== 'pct_obra')
+      .reduce((s, c) => s + resolverCustoTotal(c, this.ctxCusto), 0);
+  }
+
+  // Contexto completo incluindo totalObra (usado no render/cálculos).
+  private _ctx(): ContextoCusto {
+    return { ...this.ctxCusto, totalObra: this._totalObra };
+  }
+
+  // Unidades permitidas para o combo grupo+categoria. Sem categoria → todas.
+  private _unidsPerm(grupo: GrupoId, categoria: string | null | undefined): string[] {
+    if (!categoria) return UNIDADES.map((u) => u.valor);
+    return UNIDADES_CAT[grupo]?.[categoria] ?? UNIDADES.map((u) => u.valor);
+  }
+
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .secoes { display: flex; flex-direction: column; gap: 16px; }
     .card-cab { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
@@ -138,10 +188,11 @@ export class ViabFluxoCustos extends LitElement {
     .orc-badges { display: flex; flex-wrap: wrap; gap: 4px; }
     .orc-badges urbi-badge { cursor: pointer; }
     .orc-badges .cu-badge-dis { cursor: default; opacity: 0.6; }
-    .orc viab-num { width: 130px; }
+    .orc viab-num { width: 110px; }
+    .res-calc { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: 0.85rem; }
     .mes-calc { white-space: nowrap; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
     .campo-mes { display: inline-flex; align-items: center; gap: 4px; }
-    .campo-mes viab-num { width: 100px; }
+    .campo-mes viab-num { width: 80px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
   `];
 
@@ -191,7 +242,8 @@ export class ViabFluxoCustos extends LitElement {
 
   private _renderGrupo(g: Grupo): TemplateResult {
     const linhas = this.custos.filter((c) => c.grupo === g.id);
-    const total = linhas.reduce((s, c) => s + resolverCustoTotal(c, this.ctxCusto), 0);
+    const ctx = this._ctx();
+    const total = linhas.reduce((s, c) => s + resolverCustoTotal(c, ctx), 0);
     return html`
       <urbi-card>
         <div class="card-cab">
@@ -231,7 +283,7 @@ export class ViabFluxoCustos extends LitElement {
           <urbi-select placeholder="Selecione…"
             .valor=${c.categoria || ''}
             .opcoes=${cats.map((x) => ({ valor: x.nome, rotulo: x.nome }))}
-            @urbi:select-change=${(e: CustomEvent) => this._salvar(c, { categoria: e.detail.valor, subcategoria: null })}
+            @urbi:select-change=${(e: CustomEvent) => this._salvarCategoria(c, g.id, e.detail.valor)}
           ></urbi-select>`,
       },
       {
@@ -257,10 +309,12 @@ export class ViabFluxoCustos extends LitElement {
         id: 'orcamento', label: 'Orçamento',
         render: (c: any) => {
           const modo = c.orcamento_unidade || 'rs';
+          const perm = this._unidsPerm(g.id, c.categoria);
+          const unidsFilt = UNIDADES.filter((u) => perm.includes(u.valor));
           return html`
             <span class="orc">
               <span class="orc-badges" role="group" aria-label="Unidade do orçamento">
-                ${UNIDADES.map((u) => html`
+                ${unidsFilt.map((u) => html`
                   <urbi-badge cor="info" interativo ?ativo=${u.valor === modo}
                     class=${dis ? 'cu-badge-dis' : ''}
                     @click=${() => { if (!dis) this._trocarUnidade(c, u.valor); }}
@@ -271,6 +325,15 @@ export class ViabFluxoCustos extends LitElement {
                 @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { orcamento_valor: e.detail.valor })}
               ></viab-num>
             </span>`;
+        },
+      },
+      {
+        id: 'resultado', label: 'Resultado',
+        render: (c: any) => {
+          const modo = c.orcamento_unidade || 'rs';
+          if (modo === 'rs') return html`<span class="sec">—</span>`;
+          const ctx = this._ctx();
+          return html`<span class="res-calc">${fmtR$(resolverCustoTotal(c, ctx))}</span>`;
         },
       },
       {
@@ -353,6 +416,15 @@ export class ViabFluxoCustos extends LitElement {
       vgv: this.ctxCusto.vgvTotal,
       receita: this.ctxCusto.vgvTotal,
     };
+  }
+
+  // Salva mudança de categoria e corrige a unidade se necessário.
+  private _salvarCategoria(c: any, grupo: GrupoId, novaCategoria: string) {
+    const dados: Record<string, any> = { categoria: novaCategoria, subcategoria: null };
+    const unidAtual = c.orcamento_unidade || 'rs';
+    const perm = this._unidsPerm(grupo, novaCategoria);
+    if (!perm.includes(unidAtual)) dados.orcamento_unidade = perm[0] ?? 'rs';
+    this._salvar(c, dados);
   }
 
   // Troca a unidade de orçamento por badge (padrão do Preliminar): converte o

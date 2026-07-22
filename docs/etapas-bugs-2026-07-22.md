@@ -127,7 +127,7 @@ autor; ver protocolo).
 | 2 | #24 #38 | ✅ Concluída | Backend + frontend — validação de backend no ambiente do autor |
 | 3 | #39 #40 | ✅ Concluída | Fundação — urbi-nav lateral + urbi-abas no topo (frontend puro) |
 | 4 | #41 #42 #43 #44 #45 | ⬜ Pendente | Depende de #39 |
-| 5 | #46 #47 | ⬜ Pendente | Depende de #39, #40 |
+| 5 | #46 #47 | ✅ Concluída | Schema + frontend + motor — validação de backend no ambiente do autor |
 | 6 | #48 #49 #50 #51 #52 | ⬜ Pendente | Depende de #39 |
 | 7 | #53 #55 #54 | ⬜ Pendente | Depende de #39 + Etapa 4 |
 | 8 | #56 | ⬜ Pendente | Depende de #39 + motor |

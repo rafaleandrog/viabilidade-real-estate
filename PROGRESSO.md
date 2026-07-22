@@ -371,6 +371,47 @@ Avançado; sem schema/backend/motor/migração). `versao` intacta. Pré-requisit
   empacotamento não se aplica. ⏳ Render real do `urbi-nav`/`urbi-abas` aninhados só valida no
   deploy dev.
 
+### Etapa 5 — Custos (unidade por categoria + coluna de resultado) — ✅ IMPLEMENTADA (issues #46, #47)
+Branch `claude/etapa-5-p24nm1`. Toca **schema + frontend + motor** (sem backend, sem migração).
+`versao` intacta — só adição de opção ao `orcamento_unidade` (genesis; sincronizador aplica).
+Pré-requisitos #39 e #40: concluídos (Etapa 3).
+
+- **#46 (unidade dependente da categoria):** o seletor de unidades por badge passou a ser **filtrado
+  por categoria** via o mapa `UNIDADES_CAT` (Partial Record por grupo+categoria). Por aba:
+  - **Terreno:** Preço → `R$`/`R$/m² terreno`; Outorga/Outro → `R$`/`% VGV`; Registro → `R$`/`R$/m² priv`.
+  - **Obras:** Obra/Decoração → `R$`/`R$/m² priv`; Gestão da obra → `R$`/`% Obra` (nova unidade!);
+    Contingência/Outro → `R$`/`% VGV`.
+  - **Diretos** (categorias **atualizadas**): Marketing & Publicidade → `R$`/`% VGV`; Comissão de
+    vendas → somente `% VGV`; Projetos/Licenças e Aprovações → `R$`/`R$/m² priv`; Outro → `R$`/`% VGV`.
+  - **Indiretos** (categorias **atualizadas**): Marketing global/Stand de vendas/Gestão/Outro → `R$`/`% VGV`.
+  - **Financeiro:** sem restrição (todas as unidades).
+  - Quando a **categoria muda**, a unidade atual é verificada: se não estiver na lista permitida,
+    reseta para a primeira da lista (`_salvarCategoria` + `_unidsPerm`). Evita dados incoerentes.
+- **Nova unidade `% Obra`:** aplicada a "Gestão da obra" no grupo Obras. O `%` multiplica o
+  **total do grupo Obra** (soma das linhas com `grupo=obra` excluindo as próprias linhas `pct_obra`).
+  - `schema.json`: `orcamento_unidade.opcoes` += `pct_obra` (genesis aditivo; sem migração).
+  - `fluxo-shared.ts`: `ContextoCusto` += campo opcional `totalObra`; `resolverCustoTotal` trata
+    `case 'pct_obra'`.
+  - `fluxo-caixa-motor.ts`: computa `ctxCusto.totalObra` (2ª passagem sobre linhas de obra
+    excluindo `pct_obra`) antes do loop de custos — sem circularidade.
+  - `tela-fluxo-custos.ts`: getter `_totalObra` reusa o mesmo cálculo; `_ctx()` injeta no contexto.
+  - ⚠️ **Backend**: o validador de `orcamento_unidade` no genesis ainda não inclui `pct_obra`
+    explicitamente — o schema.json foi atualizado mas o backend gated precisa rodar
+    `urbi-empacotar` para aplicar o genesis. **Validação de backend no ambiente do autor**.
+- **#47 (coluna Resultado + ajuste de larguras):**
+  - Nova coluna **Resultado** imediatamente após Orçamento: exibe `fmtR$(resolverCustoTotal(c, ctx))`
+    quando `orcamento_unidade !== 'rs'`; mostra `—` quando a unidade já é R$.
+  - Largura do `viab-num` do Orçamento: 130px → **110px** (coluna mais estreita para caber o Resultado).
+  - Largura do `viab-num` da Duração: 100px → **80px** (campo de no máx. 2 dígitos).
+- **CATEGORIAS atualizadas — nota de migração:** os registros existentes no DB com as categorias
+  antigas de Diretos (Decoração, Gestão da obra, Stand de vendas) e Indiretos (Projetos, Licenças,
+  Marketing, Administração) continuarão exibindo seus valores no campo (o DB guarda string livre),
+  mas a unidade não será filtrada para eles (UNIDADES_CAT não mapeia os nomes antigos → retorna
+  todas as unidades como fallback). Sem perda de dado; só o dropdown de nova entrada muda.
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 76/76 ✓ · build (esbuild)
+  ✓** (`bash scripts/validar-frontend.sh` verde; bundle ~248.2kb). ⏳ **Pendente do autor (SDK
+  gated):** typecheck do backend, suíte de backend (inclui genesis com `pct_obra`) e `urbi-empacotar`.
+
 ### Etapa 2 — Backend & dados — ✅ IMPLEMENTADA (issues #24, #38)
 Branch `claude/etapa-2-pykm15`. Toca **backend + frontend** (sem schema, sem migração).
 

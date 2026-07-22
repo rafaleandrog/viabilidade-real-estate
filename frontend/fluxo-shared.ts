@@ -235,6 +235,7 @@ export interface ContextoCusto {
   areaTerreno: number;        // m² do terreno (Premissas)
   vgvTotal: number;           // VGV somado das linhas de receita
   receitaTotal?: number;      // receita líquida (VGL) — para pct_receita
+  totalObra?: number;         // total do grupo Obra (excl. linhas pct_obra) — para pct_obra
 }
 
 /** Área privativa total (área × quantidade) de todas as tipologias das linhas. */
@@ -252,6 +253,7 @@ export function resolverCustoTotal(custo: any, ctx: ContextoCusto): number {
     case 'rs_m2_terreno': return valor * n(ctx.areaTerreno);
     case 'pct_vgv': return (valor / 100) * n(ctx.vgvTotal);
     case 'pct_receita': return (valor / 100) * n(ctx.receitaTotal ?? ctx.vgvTotal);
+    case 'pct_obra': return (valor / 100) * n(ctx.totalObra);
     default: return valor; // 'rs'
   }
 }
