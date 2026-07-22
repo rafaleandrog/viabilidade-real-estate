@@ -182,6 +182,7 @@ export class ViabTelaPremissas extends LitElement {
   @state() private form: Record<string, any> = {};
   @state() private salvando = false;
   @state() private _dirty = false;
+  private _snapshot: Record<string, any> = {};
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
   // Validação de obrigatórios (ao salvar): `erros` por campo + resumo em banner.
@@ -260,6 +261,7 @@ export class ViabTelaPremissas extends LitElement {
     if (!this.estudo) return;
     this._idCarregado = this.estudo.id ?? null;
     this.form = { ...this.estudo };
+    this._snapshot = { ...this.estudo };
     this._dirty = false;
     this.erros = {};
     this.erroGeral = '';
@@ -276,7 +278,7 @@ export class ViabTelaPremissas extends LitElement {
 
   private _set(k: string, v: any) {
     this.form = { ...this.form, [k]: v };
-    this._dirty = true;
+    this._dirty = this._formDifereSnapshot();
     // Ao editar, limpa o erro daquele campo (o resumo em banner persiste até o
     // próximo Salvar).
     if (this.erros[k]) { const { [k]: _omit, ...resto } = this.erros; this.erros = resto; }
@@ -287,6 +289,17 @@ export class ViabTelaPremissas extends LitElement {
     }));
   }
 
+
+  private _formDifereSnapshot(): boolean {
+    for (const k of Object.keys(this.form)) {
+      const a = this.form[k];
+      const b = this._snapshot[k];
+      const an = (a === '' || a == null) ? null : a;
+      const bn = (b === '' || b == null) ? null : b;
+      if (String(an) !== String(bn)) return true;
+    }
+    return false;
+  }
 
   private _num(k: string): number | null {
     const v = this.form[k];
@@ -592,6 +605,7 @@ export class ViabTelaPremissas extends LitElement {
       }
       const res = await atualizarEstudo(this.estudo.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      this._snapshot = { ...this.form };
       this._dirty = false;
       urbiVerso.notificar('Premissas salvas.', 'sucesso');
     } catch (e: any) {
