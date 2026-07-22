@@ -543,6 +543,35 @@ Pré-requisito #39 (Etapa 3): concluído. Arquivo-alvo único no frontend: `fron
   do backend, suíte de backend e `urbi-empacotar` (a mudança de `saldoTipologiaNoEstudo` toca só lógica de
   validação, sem schema/migração). Render real dos botões coloridos/bolas de status só valida no deploy dev.
 
+### Etapa 1 — Correções rápidas de UI (parcial: #34 e #36) — ✅ IMPLEMENTADA (issues #34, #36)
+Branch `claude/etapa-1-sensibilidade-dirty-check-nm8x70`. Mudança **100% frontend** (sem
+schema/backend/motor/migração). `versao` intacta.
+
+**Nota:** #33, #35 e #37 já estavam implementados no código (commits anteriores da rodada);
+apenas #34 e #36 foram o foco desta sessão.
+
+- **#34 (indicadores da sensibilidade em tabela separada):** o código já separava corretamente
+  as linhas em `linhasMonetarias` e `linhasIndicadores` e renderizava duas `<table class="pf
+  sens">` distintas (a 2ª com `.sens-indicadores { margin-top: 20px }`). Confirmado por
+  inspeção — nenhuma alteração necessária. Issue fechada.
+
+- **#36 (dirty check por snapshot em Premissas):** a implementação anterior usava um booleano
+  `_dirty = true` em qualquer chamada a `_set()`, mas **não desfazia o dirty** se o usuário
+  revertesse o campo ao valor original. Implementado **deep comparison via snapshot**:
+  - `_snapshot: Record<string, any>` (campo privado, não reativo) guarda uma cópia do form
+    no momento do carregamento/save.
+  - `_formDifereSnapshot()`: compara campo a campo (tratando `''`/`null`/`undefined` como
+    equivalentes via `String(null)`) — retorna `true` só quando existe diferença real.
+  - `_set()` agora atribui `this._dirty = this._formDifereSnapshot()` em vez de `= true` —
+    assim reverter um campo ao valor original limpa o dirty automaticamente.
+  - Após save bem-sucedido: `this._snapshot = { ...this.form }` atualiza o snapshot para
+    refletir o estado recém-persistido → banner some.
+  - `_init()` inicializa `_snapshot = { ...this.estudo }` junto com o form.
+
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build
+  (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde). Mudança puramente de frontend
+  → empacotamento/backend não se aplicam.
+
 ### Etapa 2 — Backend & dados — ✅ IMPLEMENTADA (issues #24, #38)
 Branch `claude/etapa-2-pykm15`. Toca **backend + frontend** (sem schema, sem migração).
 
