@@ -265,9 +265,10 @@ export class ViabTelaProforma extends LitElement {
     return `(${abs})`;
   }
 
-  // #9: R$ por m² vendável em notação contábil — análogo a _fmtContabil, mas com
-  // sufixo "/m²" e sem prefixo "R$": custos/deduções entre parênteses, receita
-  // plana, resultado pelo sinal real. (Antes usava fmtR$, que injeta "R$".)
+  // #9/#33: R$ por m² vendável em notação contábil — análogo a _fmtContabil, sem
+  // prefixo "R$" e SEM sufixo "/m²" no valor (a unidade já está no cabeçalho da
+  // coluna "R$/m²"): custos/deduções entre parênteses, receita plana, resultado
+  // pelo sinal real.
   private _fmtContabilM2(r: Linha, p: Proforma): string {
     if (p.areaVendavel <= 0) return '—';
     const abs = fmtNum(Math.abs(r.v / p.areaVendavel));
