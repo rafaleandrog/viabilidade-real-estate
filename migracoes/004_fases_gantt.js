@@ -5,13 +5,12 @@
 // As colunas são aditivas — fase sem posição explícita exibe inicio_mes=0 e
 // duracao_meses=12, cabendo ao usuário ajustar pelo cronograma.
 //
-// Forward-only. Numa instalação virgem a tabela avancado_fases pode estar
-// vazia; as colunas são criadas com DEFAULT e nenhum dado é alterado.
+// Forward-only. As colunas são criadas pelo sincronizador de schema do SDK
+// (schema.json é a fonte de verdade); não há dado existente a transformar.
 
-exports.acima = async function (db) {
-  await db.query(`
-    ALTER TABLE viabilidade.avancado_fases
-      ADD COLUMN IF NOT EXISTS inicio_mes    INT NOT NULL DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS duracao_meses INT NOT NULL DEFAULT 12
-  `);
-};
+export default async function ({ dados }) {
+  // Nenhuma transformação de dado necessária — as novas colunas (inicio_mes,
+  // duracao_meses) têm DEFAULT 0 e 12 respectivamente e são materializadas
+  // pelo schema sync do SDK a partir do schema.json.
+  void dados;
+}
