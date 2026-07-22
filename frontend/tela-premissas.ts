@@ -346,6 +346,8 @@ export class ViabTelaPremissas extends LitElement {
   render() {
     if (!this.estudo) return nothing;
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
+    // No Avançado o Terreno vive em Empreendimento → Informações (#53).
+    const avancado = this.estudo.nivel_analise === 'avancado';
     const areas = lot ? AREAS_LOT : AREAS_INC;
     const produtos = lot ? PRODUTOS_LOT : PRODUTOS_INC;
     const custos = CUSTOS.filter((c) => !c.so || c.so === this.estudo.tipo_empreendimento);
@@ -354,21 +356,22 @@ export class ViabTelaPremissas extends LitElement {
 
     return html`
       <urbi-card titulo="Premissas">
-        <div class="secao grupo grupo-a">
-          <h4>Terreno</h4>
-          ${this.estudo.origem_terreno === 'nucleo'
-            ? html`<viab-terreno-nucleo
-                .estudo=${this.estudo}
-                .editavel=${this.editavel && this.estudo.status === 'rascunho'}
-              ></viab-terreno-nucleo>`
-            : html`<div class="grid">
-                ${this._input({ k: 'terreno_manual_nome', label: 'Nome do terreno', t: 'txt' }, dis)}
-                ${this._input({ k: 'terreno_manual_area', label: 'Área do terreno', t: 'num', sufixo: 'm²' }, dis)}
-              </div>`}
-          ${!lot
-            ? html`<div class="grid subgrid">${TERRENO_COEF.map((c) => this._input(c, dis))}</div>`
-            : nothing}
-        </div>
+        ${!avancado ? html`
+          <div class="secao grupo grupo-a">
+            <h4>Terreno</h4>
+            ${this.estudo.origem_terreno === 'nucleo'
+              ? html`<viab-terreno-nucleo
+                  .estudo=${this.estudo}
+                  .editavel=${this.editavel && this.estudo.status === 'rascunho'}
+                ></viab-terreno-nucleo>`
+              : html`<div class="grid">
+                  ${this._input({ k: 'terreno_manual_nome', label: 'Nome do terreno', t: 'txt' }, dis)}
+                  ${this._input({ k: 'terreno_manual_area', label: 'Área do terreno', t: 'num', sufixo: 'm²' }, dis)}
+                </div>`}
+            ${!lot
+              ? html`<div class="grid subgrid">${TERRENO_COEF.map((c) => this._input(c, dis))}</div>`
+              : nothing}
+          </div>` : nothing}
 
         <div class="secao grupo grupo-b">
           <h4>Áreas</h4>

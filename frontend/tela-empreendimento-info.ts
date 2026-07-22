@@ -1,12 +1,13 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtNum } from './viab-format.js';
 import {
   urbiVerso, atualizarEstudo,
   listarDocumentosEmpreendimento, uploadDocumentoEmpreendimento,
   anexarDocumentoEmpreendimento, removerDocumentoEmpreendimento,
 } from './viabilidade-api.js';
+import './tela-terreno-nucleo.js';
+import './viab-num.js';
 
 // Sub-aba "Empreendimento → Informações" (nível Avançado · Lote 4 · #16).
 //
@@ -27,7 +28,17 @@ export class ViabEmpreendimentoInfo extends LitElement {
   @property({ type: Boolean }) editavel = false;
   @property({ type: Boolean }) podeEditar = false;
 
-  @state() private form: { nome: string; matricula: string; descricao: string } = { nome: '', matricula: '', descricao: '' };
+  @state() private form: {
+    nome: string; matricula: string; descricao: string;
+    terreno_manual_nome: string;
+    terreno_manual_area: number | null;
+    coef_aproveitamento_basico: number | null;
+    coef_aproveitamento_maximo: number | null;
+  } = {
+    nome: '', matricula: '', descricao: '',
+    terreno_manual_nome: '', terreno_manual_area: null,
+    coef_aproveitamento_basico: null, coef_aproveitamento_maximo: null,
+  };
   @state() private documentos: any[] = [];
   @state() private carregando = true;
   @state() private salvando = false;
@@ -53,10 +64,15 @@ export class ViabEmpreendimentoInfo extends LitElement {
   updated() {
     if (this.estudo?.id && !this.carregado) {
       this.carregado = true;
+      const e = this.estudo;
       this.form = {
-        nome: this.estudo.nome || '',
-        matricula: this.estudo.matricula || '',
-        descricao: this.estudo.descricao || '',
+        nome: e.nome || '',
+        matricula: e.matricula || '',
+        descricao: e.descricao || '',
+        terreno_manual_nome: e.terreno_manual_nome || '',
+        terreno_manual_area: e.terreno_manual_area != null ? Number(e.terreno_manual_area) : null,
+        coef_aproveitamento_basico: e.coef_aproveitamento_basico != null ? Number(e.coef_aproveitamento_basico) : null,
+        coef_aproveitamento_maximo: e.coef_aproveitamento_maximo != null ? Number(e.coef_aproveitamento_maximo) : null,
       };
       this._carregarDocumentos();
     }
@@ -71,11 +87,6 @@ export class ViabEmpreendimentoInfo extends LitElement {
       urbiVerso.notificar(e?.message || 'Erro ao carregar anexos', 'erro');
     }
     this.carregando = false;
-  }
-
-  private get _areaTerreno(): number {
-    const e = this.estudo || {};
-    return e.origem_terreno === 'manual' ? Number(e.terreno_manual_area) || 0 : Number(e.area_terreno_nucleo) || 0;
   }
 
   render(): TemplateResult {
@@ -96,10 +107,6 @@ export class ViabEmpreendimentoInfo extends LitElement {
               @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, matricula: e.detail.valor }; }}
             ></urbi-input>
           </div>
-          <div class="campo area">
-            <span class="rotulo">Área do terreno</span>
-            <span class="valor-ro">${this._areaTerreno > 0 ? `${fmtNum(this._areaTerreno)} m²` : '—'}</span>
-          </div>
         </div>
 
         <div class="descricao">
@@ -109,12 +116,14 @@ export class ViabEmpreendimentoInfo extends LitElement {
             @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, descricao: e.detail.valor }; }}
           ></urbi-textarea>
         </div>
-
-        ${!dis ? html`
-          <div class="acoes">
-            <urbi-botao variante="secundario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar</urbi-botao>
-          </div>` : nothing}
       </urbi-card>
+
+      ${this._renderTerreno(dis)}
+
+      ${!dis ? html`
+        <div class="acoes">
+          <urbi-botao variante="secundario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar informações</urbi-botao>
+        </div>` : nothing}
 
       <urbi-card titulo="Anexos">
         ${this.carregando
@@ -150,14 +159,63 @@ export class ViabEmpreendimentoInfo extends LitElement {
     `;
   }
 
+  private _renderTerreno(dis: boolean): TemplateResult {
+    const nucleo = this.estudo.origem_terreno === 'nucleo';
+    const inc = this.estudo.tipo_empreendimento === 'incorporacao';
+    return html`
+      <urbi-card titulo="Dados do terreno">
+        ${nucleo
+          ? html`<viab-terreno-nucleo
+              .estudo=${this.estudo}
+              .editavel=${this.editavel && this.estudo.status === 'rascunho'}
+            ></viab-terreno-nucleo>`
+          : html`
+              <div class="grid">
+                <div class="campo nome">
+                  <span class="rotulo">Nome do terreno</span>
+                  <urbi-input ?desabilitado=${dis} .valor=${this.form.terreno_manual_nome}
+                    @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, terreno_manual_nome: e.detail.valor }; }}
+                  ></urbi-input>
+                </div>
+                <viab-num label="Área do terreno" sufixo="m²" ?desabilitado=${dis}
+                  .valor=${this.form.terreno_manual_area}
+                  @urbi:input-numero-change=${(e: CustomEvent) => { this.form = { ...this.form, terreno_manual_area: e.detail.valor }; }}
+                ></viab-num>
+              </div>`}
+        ${inc ? html`
+          <div class="grid" style="margin-top:12px">
+            <viab-num label="Coeficiente mínimo" ?desabilitado=${dis}
+              .valor=${this.form.coef_aproveitamento_basico}
+              @urbi:input-numero-change=${(e: CustomEvent) => { this.form = { ...this.form, coef_aproveitamento_basico: e.detail.valor }; }}
+            ></viab-num>
+            <viab-num label="Coeficiente máximo" ?desabilitado=${dis}
+              .valor=${this.form.coef_aproveitamento_maximo}
+              @urbi:input-numero-change=${(e: CustomEvent) => { this.form = { ...this.form, coef_aproveitamento_maximo: e.detail.valor }; }}
+            ></viab-num>
+          </div>` : nothing}
+      </urbi-card>
+    `;
+  }
+
   private async _salvar() {
     this.salvando = true;
     try {
-      const res = await atualizarEstudo(this.estudo.id, {
+      const nucleo = this.estudo.origem_terreno === 'nucleo';
+      const inc = this.estudo.tipo_empreendimento === 'incorporacao';
+      const dados: Record<string, any> = {
         nome: this.form.nome.trim() || this.estudo.nome,
         matricula: this.form.matricula.trim() || null,
         descricao: this.form.descricao.trim() || null,
-      });
+      };
+      if (!nucleo) {
+        dados.terreno_manual_nome = this.form.terreno_manual_nome.trim() || null;
+        dados.terreno_manual_area = this.form.terreno_manual_area != null ? Number(this.form.terreno_manual_area) : null;
+      }
+      if (inc) {
+        dados.coef_aproveitamento_basico = this.form.coef_aproveitamento_basico != null ? Number(this.form.coef_aproveitamento_basico) : null;
+        dados.coef_aproveitamento_maximo = this.form.coef_aproveitamento_maximo != null ? Number(this.form.coef_aproveitamento_maximo) : null;
+      }
+      const res = await atualizarEstudo(this.estudo.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
       urbiVerso.notificar('Informações salvas.', 'sucesso');
     } catch (e: any) {
