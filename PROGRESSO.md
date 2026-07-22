@@ -339,6 +339,50 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ## Rodada 2 — Etapas (2026-07-22)
 
+### Etapa 7 — Redistribuição de Premissas — ✅ IMPLEMENTADA (issues #53, #55, #54)
+Branch `claude/etapa-7-pu7kqg`. Mudança **100% frontend** (sem schema, sem backend, sem migração).
+`versao` intacta. Pré-requisitos #39 (Etapa 3) e Etapa 4: ambos concluídos.
+
+- **#53 (Terreno → Empreendimento → Informações, só Avançado):**
+  - `frontend/tela-empreendimento-info.ts`: adicionado **card "Dados do terreno"** abaixo do card
+    de Informações. Para `origem_terreno === 'nucleo'`, exibe `viab-terreno-nucleo` (componente
+    self-contained). Para `manual`, exibe `terreno_manual_nome` (urbi-input) + `terreno_manual_area`
+    (viab-num, m²) editáveis. Para Incorporação (qualquer origem), adiciona `coef_aproveitamento_basico`
+    e `coef_aproveitamento_maximo` no mesmo card. Botão "Salvar informações" (após o card de Terreno,
+    antes dos Anexos) persiste tudo via `atualizarEstudo` incluindo os novos campos de terreno. `form`
+    expandido para incluir `terreno_manual_nome`, `terreno_manual_area`, `coef_aproveitamento_basico` e
+    `coef_aproveitamento_maximo`; `updated()` os inicializa a partir de `this.estudo`. Importados
+    `./tela-terreno-nucleo.js` e `./viab-num.js`. Campo de área lido só (da versão anterior) removido
+    do card de Informações (agora está no card de Terreno).
+  - `frontend/tela-premissas.ts`: seção `Terreno` (grupo-a completo com nome, área, coeficientes e
+    viab-terreno-nucleo) fica **oculta quando `nivel_analise === 'avancado'`** — o Preliminar não é
+    afetado (a seção continua aparecendo normalmente).
+
+- **#55 (Taxa de Desconto na aba Financeiro — double-check):**
+  - `taxa_desconto_aa` **já estava** na aba Financeiro desde o Lote 7 — card "Custos Financeiros",
+    `tela-financeiro.ts` linha 194. Nenhuma alteração de código necessária.
+  - Backend: `CAMPOS_SOMENTE_AVANCADO` em `backend/rotas/estudos.ts` **já inclui** `taxa_desconto_aa`
+    (linha 28) — ao salvar Premissas de um Preliminar, o campo é ignorado antes da validação do shell.
+    Double-check confirmado: o campo não interfere no Preliminar.
+  - Issue fechada por confirmação; nenhuma regressão introduzida.
+
+- **#54 (Avaliar e excluir a aba Premissas — só Avançado):**
+  - **Avaliação realizada.** Após #53, a aba Premissas em Viabilidade ainda contém: Áreas (pvt R/NR
+    fechada/aberta, comum), Produtos (num_unidades, preco_venda_m2), Custos (construção, decoração,
+    etc.), Impostos (sujeito_ret), Deduções (corretagem, marketing) e Permuta física R/NR.
+  - **Decisão: MANTER a aba Premissas** para o Avançado. Motivo: `tela-resumo.ts` chama
+    `calcularProforma({ ...this.estudo, ... })` (linha 105) para os KPIs de VGV, Resultado, Margem
+    líquida e ROI e para a pizza de custos e os medidores de benchmark. Remover a aba eliminaria a
+    superfície de edição desses campos → o Resumo exibiria zeros ou valores obsoletos nesses 4 KPIs e
+    nos gráficos. A remoção completa exigiria refatorar o Resumo para derivar esses números do motor
+    de fluxo (`calcularFluxo`), em vez das premissas estáticas — passo futuro a especificar à parte.
+  - Issue fechada como "avaliada: manter Premissas até refatorar o Resumo".
+
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 76/76 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~252.7kb). Sem schema/backend/migração →
+  empacotamento não se aplica. ⏳ Render real da nova seção Terreno em Informações só valida no
+  deploy dev.
+
 ### Etapa 3 — Fundação de navegação — ✅ IMPLEMENTADA (issues #39, #40)
 Branch `claude/etapa-3-r86dld`. Mudança **100% frontend** (só o chassi de navegação do
 Avançado; sem schema/backend/motor/migração). `versao` intacta. Pré-requisito das Etapas 4–8.
