@@ -89,12 +89,8 @@ export class ViabTelaProforma extends LitElement {
       font-style: italic; font-size: 0.72rem; max-width: 340px;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
     }
-    /* Sensibilidade: divisória entre os grupos (monetárias × indicadores %), com
-       respiro extra acima dos indicadores (Custo obra/VGV e Margem líquida). */
-    .pf.sens tr.div-top td {
-      border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.15));
-      padding-top: 20px;
-    }
+    /* #34: indicadores da sensibilidade numa tabela separada com espaçamento. */
+    .sens-indicadores { margin-top: 20px; }
     /* #11 — distinção receita × despesa: cor do rótulo (1ª coluna) + fundo da
        linha, exclusivamente por tokens do design system (color-mix mantém o
        token, sem cor literal). */
@@ -209,7 +205,7 @@ export class ViabTelaProforma extends LitElement {
     // #10: bloco de permuta física (só quando houver) — entre o VGV bruto (sem
     // permuta) e a Receita bruta (VGV). Residencial e Não Residencial separados.
     if (p.areaPermutaFisica > 0) {
-      linhas.push({ l: 'VGV sem permuta física', v: vgvBruto, tipo: 'receita', semPermuta: true });
+      linhas.push({ l: 'VGV sem permuta física', v: vgvBruto, semPermuta: true });
       linhas.push({ l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true, memo: permMemo(p.areaPermutaResidencial) });
       linhas.push({ l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true, memo: permMemo(p.areaPermutaNaoResidencial) });
     }
@@ -222,7 +218,7 @@ export class ViabTelaProforma extends LitElement {
     linhas.push({ l: '(-) Marketing', v: p.marketing, grupo: 'deducoes', memo: `${pct(e.marketing_percentual)} do VGV` });
     linhas.push({ l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, grupo: 'deducoes', ocultarSeZero: true, memo: permutaFinRMemo });
     linhas.push({ l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, grupo: 'deducoes', ocultarSeZero: true, memo: permutaFinNRMemo });
-    linhas.push({ l: '= Receita líquida', v: p.receitaLiquida, tipo: 'receita' });
+    linhas.push({ l: '= Receita líquida', v: p.receitaLiquida, tipo: 'consolidado' });
     // #9: totais de custo invertidos — o total é o header do grupo colapsável.
     linhas.push({ l: '= Custo direto total', v: p.custoDiretoTotal, tipo: 'consolidado', toggle: 'direto' });
     linhas.push({ l: '(-) Terreno', v: p.custoTerreno, grupo: 'direto', memo: terrenoMemo });
@@ -236,7 +232,7 @@ export class ViabTelaProforma extends LitElement {
     linhas.push({ l: '(-) Manutenção pós-obra', v: p.manutencao, grupo: 'direto', memo: `${pct(e.manutencao_pct)} do VGV` });
     linhas.push({ l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true, grupo: 'direto', memo: `${pct(e.contingencias_pct)} do VGV` });
     // Receita operacional = receita líquida − custo direto total (antes dos indiretos).
-    linhas.push({ l: '= Receita operacional', v: p.receitaOperacional, tipo: 'receita' });
+    linhas.push({ l: '= Receita operacional', v: p.receitaOperacional, tipo: 'consolidado' });
     linhas.push({ l: '= Custo indireto total', v: p.custoIndiretoTotal, tipo: 'consolidado', toggle: 'indireto' });
     linhas.push({ l: '(-) Marketing global e estrutura', v: p.marketingGlobal, grupo: 'indireto', memo: `${pct(e.marketing_global_pct)} do VGV${lot ? ' + stand' : ''}` });
     // #13: rename "Gestão e outros indiretos" → "…custos indiretos".
@@ -274,7 +270,7 @@ export class ViabTelaProforma extends LitElement {
   // plana, resultado pelo sinal real. (Antes usava fmtR$, que injeta "R$".)
   private _fmtContabilM2(r: Linha, p: Proforma): string {
     if (p.areaVendavel <= 0) return '—';
-    const abs = `${fmtNum(Math.abs(r.v / p.areaVendavel))}/m²`;
+    const abs = fmtNum(Math.abs(r.v / p.areaVendavel));
     if (r.tipo === 'receita') return abs;
     if (r.tipo === 'resultado') return r.v < 0 ? `(${abs})` : abs;
     return `(${abs})`;
@@ -420,6 +416,28 @@ export class ViabTelaProforma extends LitElement {
       { id: 'base', rot: '📊 Base', p: proforma(1), vgvBruto: vgvBrutoDe(1) },
       { id: 'bull', rot: '🚀 Bull', p: proforma(fatorBull), vgvBruto: vgvBrutoDe(fatorBull) },
     ];
+    const linhasMonetarias = linhas.filter((m) => !m.divisoria && !m.badge);
+    const linhasIndicadores = linhas.filter((m) => m.divisoria || m.badge);
+    const cabecalho = html`
+      <thead>
+        <tr>
+          <th></th>
+          ${cenarios.map((c) => html`<th class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${c.rot}</urbi-badge></div></th>`)}
+        </tr>
+      </thead>`;
+    const renderLinha = (m: typeof linhas[0]) => html`
+      <tr class="nat-${m.natureza}">
+        <td>${m.l}</td>
+        ${cenarios.map((c) => {
+          const valNum = m.f(c);
+          const txt = fmt(m, valNum);
+          if (m.badge) {
+            const bola = m.bmCampo ? bolaFaixa(this._bm(m.bmCampo), valNum) : '';
+            return html`<td class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${bola ? `${bola} ` : ''}${txt}</urbi-badge></div></td>`;
+          }
+          return html`<td class="num" style="color:${COR_TXT[c.id]}">${txt}</td>`;
+        })}
+      </tr>`;
     return html`<urbi-card titulo="Análise de sensibilidade">
       <div class="sens-var">
         <urbi-select
@@ -431,27 +449,14 @@ export class ViabTelaProforma extends LitElement {
       </div>
       <div class="pf-wrap">
         <table class="pf sens">
-          <thead>
-            <tr>
-              <th></th>
-              ${cenarios.map((c) => html`<th class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${c.rot}</urbi-badge></div></th>`)}
-            </tr>
-          </thead>
-          <tbody>
-            ${linhas.map((m) => html`
-              <tr class="nat-${m.natureza}${m.divisoria ? ' div-top' : ''}">
-                <td>${m.l}</td>
-                ${cenarios.map((c) => {
-                  const valNum = m.f(c);
-                  const txt = fmt(m, valNum);
-                  if (m.badge) {
-                    const bola = m.bmCampo ? bolaFaixa(this._bm(m.bmCampo), valNum) : '';
-                    return html`<td class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${bola ? `${bola} ` : ''}${txt}</urbi-badge></div></td>`;
-                  }
-                  return html`<td class="num" style="color:${COR_TXT[c.id]}">${txt}</td>`;
-                })}
-              </tr>`)}
-          </tbody>
+          ${cabecalho}
+          <tbody>${linhasMonetarias.map(renderLinha)}</tbody>
+        </table>
+      </div>
+      <div class="pf-wrap sens-indicadores">
+        <table class="pf sens">
+          ${cabecalho}
+          <tbody>${linhasIndicadores.map(renderLinha)}</tbody>
         </table>
       </div>
     </urbi-card>`;

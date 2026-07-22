@@ -181,6 +181,7 @@ export class ViabTelaPremissas extends LitElement {
 
   @state() private form: Record<string, any> = {};
   @state() private salvando = false;
+  @state() private _dirty = false;
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
   // Validação de obrigatórios (ao salvar): `erros` por campo + resumo em banner.
@@ -259,6 +260,7 @@ export class ViabTelaPremissas extends LitElement {
     if (!this.estudo) return;
     this._idCarregado = this.estudo.id ?? null;
     this.form = { ...this.estudo };
+    this._dirty = false;
     this.erros = {};
     this.erroGeral = '';
     try {
@@ -274,6 +276,7 @@ export class ViabTelaPremissas extends LitElement {
 
   private _set(k: string, v: any) {
     this.form = { ...this.form, [k]: v };
+    this._dirty = true;
     // Ao editar, limpa o erro daquele campo (o resumo em banner persiste até o
     // próximo Salvar).
     if (this.erros[k]) { const { [k]: _omit, ...resto } = this.erros; this.erros = resto; }
@@ -432,10 +435,10 @@ export class ViabTelaPremissas extends LitElement {
         ${this.erroGeral ? html`<urbi-banner variante="erro">${this.erroGeral}</urbi-banner>` : nothing}
         ${this.editavel
           ? html`
-              <urbi-banner variante="alerta">
+              ${this._dirty ? html`<urbi-banner variante=”alerta”>
                 As alterações não são salvas automaticamente — clique em “Salvar premissas” antes de sair desta página.
-              </urbi-banner>
-              <div class="form-acoes">
+              </urbi-banner>` : nothing}
+              <div class=”form-acoes”>
                 <urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar premissas</urbi-botao>
               </div>`
           : html`<p class="sec">Somente leitura neste status/função.</p>`}
@@ -586,6 +589,7 @@ export class ViabTelaPremissas extends LitElement {
       }
       const res = await atualizarEstudo(this.estudo.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      this._dirty = false;
       urbiVerso.notificar('Premissas salvas.', 'sucesso');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
