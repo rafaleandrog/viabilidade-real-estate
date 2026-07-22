@@ -4,6 +4,34 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 2 — etapas 2026-07-22 (`docs/etapas-bugs-2026-07-22.md`)
+
+### Etapa 1 — Correções rápidas de UI — ✅ CONCLUÍDA (issues #33 #34 #35 #36 #37)
+Branch `claude/etapa-1-hivw5t` → PR #58 → mergeado na `main`.
+Mudanças **100% frontend** — sem schema, backend ou migração; `versao` intacta.
+
+- **#33 (R$/m² ainda com "/m²" — regressão do #9):** removido o sufixo `/m²` de `_fmtContabilM2`
+  em `tela-proforma.ts:277`. O cabeçalho da coluna já exibe "R$/m²".
+- **#34 (separar 2 indicadores da sensibilidade em tabela própria):** `_renderSensibilidade` agora
+  produz **duas tabelas** independentes — a 1ª com as 7 linhas monetárias, a 2ª com os 2
+  indicadores % (Custo obra/VGV e Margem líquida). Separação visual por `margin-top: 20px`
+  (classe `.sens-indicadores`). CSS de divisória `div-top` removido. Classes `nat-*` e tokens
+  de cor preservados.
+- **#35 (linhas-receita ao tamanho padrão — regressão do #10):** `= Receita líquida` e
+  `= Receita operacional` mudaram de `tipo: 'receita'` (grande, azul) para `tipo: 'consolidado'`
+  (bold, tamanho padrão). `VGV sem permuta física` perdeu o `tipo` (ficou como item itálico
+  discreto). Só "Receita bruta (VGV)" e "Resultado" mantêm o estilo destacado grande.
+- **#36 (aviso "não salvo" só com mudança real):** flag `@state() _dirty` em
+  `ViabTelaPremissas`. Zerada em `_init()` e após salvar com sucesso; ativada em `_set()`
+  (qualquer edição do usuário). O `urbi-banner` de alerta condicional a `_dirty`.
+- **#37 (sobreposição no Fluxo persiste — regressão do #14):** `background: var(--cor-superficie)`
+  explícito na regra `.c1, .c2, .c3, .c4, .c5` em `tela-fluxo-ver.ts`. Sem background
+  explícito na classe sticky, o geral `table.fx td` não era suficiente para opacidade no scroll.
+- **Validação:** typecheck ✓ · testes 76/76 ✓ · build (esbuild) ✓
+  (`bash scripts/validar-frontend.sh`). ⏳ Render real só valida no deploy dev.
+
+---
+
 ## Lotes de bugs 2026-07-20 (sessões por lote — `docs/lotes-bugs-2026-07-20.md`)
 
 ### Lote 1 — Trivial Preliminar — ✅ CONCLUÍDO (issues #9, #10, #11, #12, #13)

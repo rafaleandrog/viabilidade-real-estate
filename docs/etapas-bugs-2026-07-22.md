@@ -123,7 +123,7 @@ autor; ver protocolo).
 
 | Etapa | Issues | Status | Observações |
 |------|--------|--------|-------------|
-| 1 | #33 #34 #35 #36 #37 | ⬜ Pendente | Frontend puro |
+| 1 | #33 #34 #35 #36 #37 | ✅ Concluída | PR #58 mergeado na main |
 | 2 | #24 #38 | ⬜ Pendente | Schema/backend — validar no ambiente do autor |
 | 3 | #39 #40 | ⬜ Pendente | Fundação — antes das Etapas 4–8 |
 | 4 | #41 #42 #43 #44 #45 | ⬜ Pendente | Depende de #39 |
