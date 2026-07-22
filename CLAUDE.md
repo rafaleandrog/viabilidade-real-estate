@@ -17,37 +17,59 @@ App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell U
 
 ---
 
-## Protocolo de sessão por lote
+## Protocolo de etapa (rodada 2) — disparo `Siga para a Etapa X`
 
-Quando o usuário disser **"Prossiga para os issues do lote X"**, siga este protocolo:
+Quando o usuário disser **"Siga para a Etapa X"**, isso **sozinho** basta para checar e resolver
+as issues daquela etapa e **fechar o ciclo abrindo o PR e fazendo o merge na `main`**. Siga:
 
 ### 1. Carregar contexto (sempre, no início)
 ```
 Ler nesta ordem:
 1. PROGRESSO.md  → estado atual e o que já foi feito
-2. docs/lotes-bugs-2026-07-20.md  → issues do lote pedido e suas dependências
+2. docs/etapas-bugs-2026-07-22.md  → issues da etapa pedida, arquivos-alvo e dependências
 3. schema.json  → schema atual (para saber o que precisa migrar)
-4. Cada issue do GitHub listado no lote  → descrição completa e requisitos
+4. Cada issue do GitHub listada na etapa  → descrição completa e requisitos
 ```
 
 ### 2. Verificar pré-requisitos
-Cada lote tem dependências listadas em `docs/lotes-bugs-2026-07-20.md`. **Não iniciar um lote se seus pré-requisitos não estiverem concluídos.** Se estiverem pendentes, reportar ao usuário em vez de prosseguir.
+Cada etapa lista dependências em `docs/etapas-bugs-2026-07-22.md`. **Não iniciar uma etapa cujos
+pré-requisitos não estejam concluídos** (ex.: Etapas 4–8 dependem da #39). Reportar em vez de prosseguir.
 
-### 3. Implementar
-- Uma issue por vez, na ordem do lote
-- Manter os contratos inegociáveis de `INSTRUCOES-CODE.md`
-- Usar tokens CSS do design system (`var(--cor-*)`) — nunca cores literais
-- Migrações de schema: sempre forward-only, bumpar versão z
-- Após cada issue: validar verde antes de passar para a próxima. No ambiente Claude Code,
-  mudança de frontend → `bash scripts/validar-frontend.sh` (ver seção de validação abaixo);
-  mudança de backend/schema → validação fica para o ambiente autenticado do autor.
+### 3. Branch (sempre a partir da `main` atualizada)
+```
+git fetch origin main
+git checkout -B claude/etapa-X-<slug> origin/main
+```
+Etapas seguintes já pegam as anteriores porque cada etapa foi mergeada na `main`.
 
-### 4. Encerrar sessão
-1. Validação: frontend via `bash scripts/validar-frontend.sh` (verde). `pnpm exec
-   urbi-empacotar viabilidade` e a suíte de backend rodam no ambiente do autor (SDK gated)
-2. Commit com mensagem `fix(lote-X): ...` ou `feat(lote-X): ...`
-3. **Atualizar `PROGRESSO.md`**: marcar issues concluídas, registrar decisões tomadas e pendências
-4. Fechar as issues do GitHub que foram implementadas
+### 4. Implementar
+- Uma issue por vez, na ordem da etapa.
+- Manter os contratos inegociáveis de `INSTRUCOES-CODE.md`; tokens CSS (`var(--cor-*)`) — nunca cor literal.
+- Migrações de schema: sempre **forward-only**, bumpar versão z.
+- Só primitivos `urbi-*` do `ui.md` do shell (`urbi-nav`/`urbi-abas`/`urbi-badge` etc.).
+
+### 5. Validar
+- `bash scripts/validar-frontend.sh` (verde) + testes runáveis.
+- `pnpm exec urbi-empacotar viabilidade`, typecheck/suíte de backend e execução de migração
+  **só rodam no ambiente autenticado do autor (SDK gated)** — registrar no corpo do PR e no
+  `PROGRESSO.md` **o que não foi validável aqui**.
+
+### 6. Fechar o ciclo — automático (PR + merge)
+1. Commit `fix(etapa-X): …` ou `feat(etapa-X): …` → `git push -u origin claude/etapa-X-<slug>`.
+2. **Abrir o PR** contra `main` (usar template do repo se existir; corpo lista issues fechadas e
+   o que ficou pendente de validação no ambiente do autor).
+3. **Fazer o merge do PR na `main`** — **em TODAS as etapas**, assim que os checks disponíveis
+   passarem (decisão do autor: merge automático inclusive nas etapas de backend/schema não
+   valid��veis aqui; o risco assumido é subir algo pendente de validação no PC do autor).
+4. Fechar as issues da etapa (`Closes #…` no PR já basta) e **atualizar** `PROGRESSO.md` + o
+   checklist de `docs/etapas-bugs-2026-07-22.md` (marcar a etapa concluída).
+
+> **Autorização:** o comando `Siga para a Etapa X` **é** a autorização explícita do autor para
+> abrir PR e mergear na `main` — supera o default de "não criar PR / não commitar em main sem OK".
+> Vale por etapa; não persiste para trabalho fora desse fluxo.
+
+> A rodada 1 (`docs/lotes-bugs-2026-07-20.md`, issues #9–#24, lotes 1–8) está **concluída**. O
+> protocolo antigo "Prossiga para os issues do lote X" foi substituído por este.
 
 ---
 
@@ -92,17 +114,19 @@ e registre no `PROGRESSO.md` que a validação de backend/empacotamento fica par
 
 ---
 
-## Mapa dos lotes (resumo rápido)
+## Mapa das etapas — rodada 2 (ativa) — disparo `Siga para a Etapa X`
 
-| Lote | Issues | Dependências |
+| Etapa | Issues | Dependências |
 |------|--------|--------------|
-| **1** — Trivial Preliminar | #9 #10 #11 #12 #13 (#24 aguarda print) | Nenhuma |
-| **2** — Bug sobreposição | #14 | Nenhuma (fazer antes de mover a tela) |
-| **3** — Estrutura de abas Avançado | #15 | Nenhuma (fundação de tudo) |
-| **4** — Aba Empreendimento | #16 | #15 |
-| **5** — Custos (5 abas + tabela) | #17 #18 | #15, #16 |
-| **6** — Receitas + Fases | #19 #20 #21 | #15, #16 — spec conjunta obrigatória |
-| **7** — Financeiro sub-abas | #22 | #15, #17 — **bloqueado: aguarda spec dos campos** |
-| **8** — Resumo | #23 | Todos os anteriores |
+| **1** — Correções rápidas de UI | #33 #34 #35 #36 #37 | Nenhuma (frontend puro) |
+| **2** — Backend & dados | #24 #38 | Nenhuma (schema/backend) |
+| **3** — Fundação de navegação | #39 #40 | Nenhuma (pré-requisito das Etapas 4–8) |
+| **4** — Empreendimento | #41 #42 #43 #44 #45 | #39 |
+| **5** — Custos | #46 #47 | #39, #40 |
+| **6** — Receitas | #48 #49 #50 #51 #52 | #39 |
+| **7** — Redistribuição de Premissas | #53 #55 #54 | #39 + Etapa 4 |
+| **8** — Cenários | #56 | #39 + motor de fluxo |
 
-Detalhes completos, riscos e checklists em `docs/lotes-bugs-2026-07-20.md`.
+Detalhes, diagnóstico, arquivos-alvo, riscos e checklist em `docs/etapas-bugs-2026-07-22.md`.
+
+> **Rodada 1 (concluída):** lotes 1–8, issues #9–#24, em `docs/lotes-bugs-2026-07-20.md`.
