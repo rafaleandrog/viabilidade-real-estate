@@ -312,7 +312,7 @@
         "categoria":         { "tipo": "texto", "limite": 100 },
         "subcategoria":      { "tipo": "texto", "limite": 100 },
         "orcamento_valor":   { "tipo": "decimal", "precisao": 15, "escala": 2 },
-        "orcamento_unidade": { "tipo": "texto", "limite": 20, "opcoes": ["rs", "rs_m2_priv", "rs_m2_terreno", "pct_vgv", "pct_receita"], "padrao": "rs" },
+        "orcamento_unidade": { "tipo": "texto", "limite": 20, "opcoes": ["rs", "rs_m2_priv", "rs_m2_terreno", "pct_vgv", "pct_receita", "pct_obra"], "padrao": "rs" },
         "curva_id":          { "tipo": "referencia", "tabela_ref": "avancado_curvas", "ao_deletar": "anular" },
         "cronograma_evento": { "tipo": "texto", "limite": 20, "opcoes": ["planejamento", "pre_lancamento", "obra", "pos_obra", "customizado"], "padrao": "customizado" },
         "inicio_mes":        { "tipo": "inteiro", "padrao": 0 },

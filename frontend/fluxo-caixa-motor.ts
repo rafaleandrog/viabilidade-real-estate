@@ -305,6 +305,9 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   };
   ctxCusto.receitaTotal = linhasReceita.reduce(
     (s, l) => s + vglLinha(vgvLinha(l.tipologias), l.fluxo_pagamento), 0);
+  ctxCusto.totalObra = linhasCusto
+    .filter((c) => c.grupo === 'obra' && (c.orcamento_unidade || 'rs') !== 'pct_obra')
+    .reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);
 
   // Receitas por linha (e por tipologia, proporcional ao VGV da tipologia).
   const calcReceitas: LinhaCalc[] = linhasReceita.map((l) => {
