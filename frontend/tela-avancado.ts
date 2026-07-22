@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { urbiVerso } from './viabilidade-api.js';
 import './tela-premissas.js';
-import './tela-graficos.js';
+import './tela-cenarios.js';
 import './tela-apelo.js';
 import './tela-fluxo-cronograma.js';
 import './tela-empreendimento-info.js';
@@ -33,7 +33,7 @@ import './tela-resumo.js';
 //   Viabilidade       → Premissas · Receitas · Financeiro
 //   Custos            → Terreno · Obra · Diretos · Indiretos · Financeiro
 //   Fluxo de Caixa    → Ver Fluxo
-//   Cenários          → Gráficos
+//   Cenários          → Simulação de cenários (sliders + fluxo do cenário)
 //   Análise de mercado→ Apelo Comercial
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -164,7 +164,10 @@ export class ViabTelaAvancado extends LitElement {
       case 'fluxo':
         return html`<viab-fluxo-ver .estudo=${this.estudo}></viab-fluxo-ver>`;
       case 'cenarios':
-        return html`<viab-tela-graficos .estudo=${this.estudo}></viab-tela-graficos>`;
+        // Cenários (Etapa 8 · #56): simulação de deltas (preço/custo) sobre o
+        // fluxo. Componente exclusivo do Avançado; o Preliminar mantém sua aba
+        // Gráficos estática em viab-tela-graficos (via tela-estudo).
+        return html`<viab-tela-cenarios .estudo=${this.estudo}></viab-tela-cenarios>`;
       case 'mercado':
         return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this.podeEditar}></viab-tela-apelo>`;
       case 'resumo':

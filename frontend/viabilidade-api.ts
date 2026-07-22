@@ -222,6 +222,26 @@ export function removerCustoAvancado(estudoId: number, cid: number): Promise<any
   return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos/${cid}`, { method: 'DELETE' });
 }
 
+// ── Avançado: Cenários salvos (Etapa 8 · #56) ──
+// Cada cenário guarda um par de deltas percentuais (preço de venda, custo de
+// obra); o motor reaplica-os (aplicarCenario) ao recalcular o fluxo.
+export function listarCenarios(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cenarios`);
+}
+export function criarCenario(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cenarios`, {
+    method: 'POST', body: JSON.stringify(dados),
+  });
+}
+export function atualizarCenario(estudoId: number, cid: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cenarios/${cid}`, {
+    method: 'PATCH', body: JSON.stringify(dados),
+  });
+}
+export function removerCenario(estudoId: number, cid: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cenarios/${cid}`, { method: 'DELETE' });
+}
+
 // ── Núcleo (glebas/lotes/imóveis) ──
 // Consumo padrão via urbiVerso.nucleo → /api/viabilidade/nucleo/... (o shell
 // provê essas rotas para apps que declaram dependencias_nucleo no manifesto).

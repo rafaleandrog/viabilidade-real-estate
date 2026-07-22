@@ -320,6 +320,18 @@
         "ordem":             { "tipo": "inteiro", "padrao": 0 }
       },
       "indices": [["estudo_id"]]
+    },
+
+    "avancado_cenarios": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":       { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "nome":            { "tipo": "texto", "limite": 100 },
+        "preco_venda_pct": { "tipo": "decimal", "precisao": 6, "escala": 2, "padrao": 0 },
+        "custo_obra_pct":  { "tipo": "decimal", "precisao": 6, "escala": 2, "padrao": 0 },
+        "ordem":           { "tipo": "inteiro", "padrao": 0 }
+      },
+      "indices": [["estudo_id"]]
     }
   }
 }

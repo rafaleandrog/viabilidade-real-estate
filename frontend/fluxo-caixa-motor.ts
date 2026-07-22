@@ -270,6 +270,43 @@ export function tirFluxo(fluxoMensal: number[]): number | null {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Cenários (Etapa 8 · #56) — reparametrização do fluxo
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Parâmetros de um cenário: variações percentuais (deltas) aplicadas sobre a
+ * configuração-base. `0` = cenário-base (sem alteração).
+ *  - `precoVendaPct`: varia o preço/m² de TODAS as tipologias de receita.
+ *  - `custoObraPct`: varia o orçamento das linhas de custo do grupo `obra`.
+ */
+export interface CenarioParams {
+  precoVendaPct: number;
+  custoObraPct: number;
+}
+
+/**
+ * Devolve uma NOVA `FluxoConfig` com o cenário aplicado — função pura, não muta
+ * a entrada. Escala `preco_m2` das tipologias (preço de venda) e `orcamento_valor`
+ * das linhas de obra (custo de obra) pelos fatores derivados dos deltas. As demais
+ * linhas de custo (terreno/indiretos/…) e o restante da config ficam intactos.
+ * `calcularFluxo(aplicarCenario(base, params))` produz o fluxo do cenário.
+ */
+export function aplicarCenario(config: FluxoConfig, params: CenarioParams): FluxoConfig {
+  const fPreco = 1 + n(params?.precoVendaPct) / 100;
+  const fCusto = 1 + n(params?.custoObraPct) / 100;
+  return {
+    ...config,
+    linhasReceita: (config.linhasReceita ?? []).map((l) => ({
+      ...l,
+      tipologias: (l.tipologias ?? []).map((t: any) => ({ ...t, preco_m2: n(t?.preco_m2) * fPreco })),
+    })),
+    linhasCusto: (config.linhasCusto ?? []).map((c) => (
+      c?.grupo === 'obra' ? { ...c, orcamento_valor: n(c?.orcamento_valor) * fCusto } : c
+    )),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────
 // 6D. Fluxo consolidado
 // ─────────────────────────────────────────────────────────────────
 

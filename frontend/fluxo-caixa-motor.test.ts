@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
-  vplFluxo, tirFluxo, calcularFluxo,
+  vplFluxo, tirFluxo, calcularFluxo, aplicarCenario,
   type FluxoConfig,
 } from './fluxo-caixa-motor.js';
 import type { EventoCrono } from './fluxo-shared.js';
@@ -216,4 +216,42 @@ test('fluxo completo: consolidação, acumulado, TIR e exposição coerentes', (
   const linha = r.linhasReceita[0];
   const somaTipologias = linha.itens!.reduce((s, t) => s + t.total, 0);
   assert.ok(perto(somaTipologias, linha.total, 1));
+});
+
+// Cenários (Etapa 8 · #56): aplicarCenario escala preço de venda e custo de obra.
+test('aplicarCenario escala preço/m² das tipologias e orçamento de obra', () => {
+  const base: FluxoConfig = {
+    dataInicio: null, taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }], // VGV 50M
+      absorcao: { modo: 'linear' }, fluxo_pagamento: null,
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'terreno', categoria: 'Preço', orcamento_valor: 5_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+      { id: 2, grupo: 'obra', categoria: 'Obra', orcamento_valor: 20_000_000, orcamento_unidade: 'rs', inicio_mes: 17, duracao_meses: 24 },
+    ],
+    areaTerreno: 10_000,
+  };
+
+  // Base: VGV 50M, custo total 25M.
+  const rBase = calcularFluxo(base);
+  assert.ok(perto(rBase.vgvTotal, 50_000_000, 1));
+
+  // Cenário: +10% preço, +20% custo de obra.
+  const rCen = calcularFluxo(aplicarCenario(base, { precoVendaPct: 10, custoObraPct: 20 }));
+  assert.ok(perto(rCen.vgvTotal, 55_000_000, 1)); // 50M × 1,10
+  // custo total = terreno 5M + obra 20M×1,20 = 5M + 24M = 29M
+  assert.ok(perto(soma(rCen.custoMensal), 29_000_000, 5));
+  // terreno intacto (grupo ≠ obra)
+  assert.ok(perto(base.linhasCusto[0].orcamento_valor, 5_000_000, 0.01));
+
+  // pureza: a config-base não foi mutada
+  assert.equal(base.linhasReceita[0].tipologias[0].preco_m2, 10_000);
+  assert.equal(base.linhasCusto[1].orcamento_valor, 20_000_000);
+
+  // cenário-zero = base
+  const rZero = calcularFluxo(aplicarCenario(base, { precoVendaPct: 0, custoObraPct: 0 }));
+  assert.ok(perto(rZero.vgvTotal, rBase.vgvTotal, 1));
+  assert.ok(perto(soma(rZero.custoMensal), soma(rBase.custoMensal), 1));
 });
