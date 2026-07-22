@@ -339,6 +339,54 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ## Rodada 2 — Etapas (2026-07-22)
 
+### Etapa 8 — Cenários — ✅ IMPLEMENTADA (issue #56)
+Branch `claude/etapa-8-npe1vk`. Toca **schema + backend + frontend + motor**. `versao` **0.1.3 → 0.1.4**
+(migração `migracoes/005_cenarios.js` — tabela nova `avancado_cenarios`). Pré-requisitos #39 (Etapa 3) e
+motor de fluxo: ambos concluídos. Última etapa da rodada 2.
+
+- **Decisão-chave (não repurposar `viab-tela-graficos`):** `viab-tela-graficos` é **dual-use** — é a aba
+  **Gráficos** do **Preliminar** (`tela-estudo.ts`) *e* era a aba **Cenários** do Avançado (`tela-avancado.ts`).
+  Reconstruir a Cenários dentro dela quebraria o Preliminar (que não tem fluxo/receitas/custos do Avançado).
+  Por isso criei um componente **novo** `frontend/tela-cenarios.ts` (`viab-tela-cenarios`) só para o Avançado
+  e reapontei o `case 'cenarios'` de `tela-avancado.ts` para ele. **O Preliminar segue intocado** com
+  `viab-tela-graficos` (pizza/barras/áreas/medidores).
+
+- **#56 (reconstrução da página Cenários):**
+  - **Motor reparametrizado** (`fluxo-caixa-motor.ts`): nova função pura `aplicarCenario(config, {precoVendaPct,
+    custoObraPct})` que devolve uma **nova** `FluxoConfig` escalando o `preco_m2` de **todas** as tipologias
+    (preço de venda) e o `orcamento_valor` das linhas `grupo==='obra'` (custo de obra). `calcularFluxo(aplicarCenario(...))`
+    dá o fluxo do cenário. Função **não muta** a base (testado). `0/0` = base.
+  - **Sliders (esquerda):** `<input type="range">` (não há primitivo `urbi-slider` no shell) com limites vindos
+    dos **benchmarks de sensibilidade** — `campo === 'preco'` e `campo === 'custo_obras'`, faixa `[-variacao_negativa_pct,
+    +variacao_positiva_pct]` (padrão ±15% sem benchmark). Arrastar recalcula o fluxo em tempo real.
+  - **Gráfico de linha (direita):** novo `graficoCenarioAcumulado(base, cenario, …)` em `fluxo-graficos.ts` —
+    fluxo acumulado com **base (linha cheia)** + **cenário (linha tracejada roxa, `--cor-primaria`)** na mesma escala,
+    com legenda e marcos do cronograma.
+  - **Fluxo do cenário (largura inteira):** os **mesmos campos da aba Fluxo de Caixa** — KPIs + tabela mensal sticky.
+    Para não duplicar ~150 linhas, extraí a tabela/KPIs para o módulo puro **`frontend/fluxo-tabela.ts`**
+    (`estiloFluxoTabela`, `kpisFluxo`, `tabelaFluxo`, `chavesColapso`) e **refatorei `tela-fluxo-ver.ts`** para consumi-lo
+    (mesmo padrão do Lote 8, que extraiu `fluxo-graficos.ts`). Fluxo de Caixa e Cenários renderizam tabela idêntica.
+  - **Tabela de cenários salvos (fim):** persistem **permanentemente** no estudo (nova tabela `avancado_cenarios`).
+    Colunas = indicadores (Preço venda · Custo obra · VPL · TIR · Payback · Exposição máx.), **recomputados** por
+    `aplicarCenario` a cada render; cada linha com **botão remover** (modal de confirmação). Salvar + nomear na mesma
+    área dos sliders (botão "Salvar cenário"; nome default derivado dos deltas se vazio).
+
+- **Schema/backend (validação no ambiente do autor — SDK gated):**
+  - `schema.json`: nova tabela **`avancado_cenarios`** (`estudo_id` FK cascata, `nome`, `preco_venda_pct` decimal(6,2),
+    `custo_obra_pct` decimal(6,2), `ordem`).
+  - `migracoes/005_cenarios.js`: forward-only, `CREATE TABLE IF NOT EXISTS` (rede de segurança; o sincronizador do SDK
+    também materializa a tabela do schema). Tabela nova → não transforma dado existente.
+  - `manifesto.json`: `versao` 0.1.3 → **0.1.4**.
+  - `backend/rotas/avancado.ts`: CRUD `GET/POST/PATCH/DELETE /estudos/:id/avancado/cenarios` (mesmo padrão de custos;
+    `CAMPOS_CENARIO`), + cópia no `duplicarDadosAvancado` (cenários viajam com a duplicação do estudo).
+  - `frontend/viabilidade-api.ts`: `listarCenarios`/`criarCenario`/`atualizarCenario`/`removerCenario`.
+
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 77/77 ✓** (+ `aplicarCenario`:
+  escala preço/obra, terreno intacto, pureza, cenário-zero = base) **· build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~263.8kb). ⏳ **Pendente do autor (SDK gated):** typecheck do
+  backend, suíte de backend, `urbi-empacotar` e a **execução da migração 005** contra dados reais. Render real dos
+  sliders/gráfico de cenário só valida no deploy dev.
+
 ### Etapa 7 — Redistribuição de Premissas — ✅ IMPLEMENTADA (issues #53, #55, #54)
 Branch `claude/etapa-7-pu7kqg`. Mudança **100% frontend** (sem schema, sem backend, sem migração).
 `versao` intacta. Pré-requisitos #39 (Etapa 3) e Etapa 4: ambos concluídos.

@@ -130,6 +130,6 @@ autor; ver protocolo).
 | 5 | #46 #47 | ✅ Concluída | Schema + frontend + motor — validação de backend no ambiente do autor |
 | 6 | #48 #49 #50 #51 #52 | ✅ Concluída | Frontend + backend (saldo global) — validação de backend no ambiente do autor |
 | 7 | #53 #55 #54 | ✅ Concluída | Frontend puro — Terreno → Informações; Premissas mantida (#54 avaliado) |
-| 8 | #56 | ⬜ Pendente | Depende de #39 + motor |
+| 8 | #56 | ✅ Concluída | Schema + backend + frontend + motor — novo viab-tela-cenarios; validação de backend/migração no ambiente do autor |
 
 **Atualizar esta tabela ao concluir cada etapa.**

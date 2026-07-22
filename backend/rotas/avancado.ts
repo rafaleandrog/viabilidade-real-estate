@@ -1093,6 +1093,16 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
       estudo_id: novoId, ...extrairCampos(custo, CAMPOS_CUSTO),
     });
   }
+
+  // Cenários salvos (Etapa 8 · #56) — deltas percentuais, sem dado derivado.
+  const cenarios = await req.dados!.listar('avancado_cenarios', {
+    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 200,
+  });
+  for (const cen of cenarios.dados) {
+    await req.dados!.criar('avancado_cenarios', {
+      estudo_id: novoId, ...extrairCampos(cen, CAMPOS_CENARIO),
+    });
+  }
 }
 
 rotasAvancado.delete('/estudos/:id/avancado/custos/:cid', async (req: Request, res: Response) => {
@@ -1111,6 +1121,104 @@ rotasAvancado.delete('/estudos/:id/avancado/custos/:cid', async (req: Request, r
     res.json({ ok: true });
   } catch (e: any) {
     console.error('Erro em DELETE /avancado/custos/:cid:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// Cenários (Etapa 8 · #56)
+//
+// Cada cenário é um par de variações percentuais (deltas) sobre a base —
+// preço de venda (R$/m²) e custo de obra (R$/m²). Persiste permanentemente
+// no estudo; o frontend reaplica os deltas ao motor (aplicarCenario) para
+// recalcular o fluxo. Nenhum indicador derivado é gravado.
+// ─────────────────────────────────────────────────────────────────
+
+const CAMPOS_CENARIO = ['nome', 'preco_venda_pct', 'custo_obra_pct', 'ordem'];
+
+rotasAvancado.get('/estudos/:id/avancado/cenarios', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirLeitura(req, res, estudo))) return;
+    const r = await req.dados!.listar('avancado_cenarios', {
+      filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 200,
+    });
+    res.json(r);
+  } catch (e: any) {
+    console.error('Erro em GET /avancado/cenarios:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+rotasAvancado.post('/estudos/:id/avancado/cenarios', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirEscrita(req, res, estudo))) return;
+
+    const dados: Record<string, any> = {
+      estudo_id: estudo.id,
+      nome: 'Cenário',
+      preco_venda_pct: 0,
+      custo_obra_pct: 0,
+      ordem: 0,
+    };
+    for (const campo of CAMPOS_CENARIO) {
+      if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
+    }
+    const criado = await req.dados!.criar('avancado_cenarios', dados);
+    res.status(201).json(criado);
+  } catch (e: any) {
+    console.error('Erro em POST /avancado/cenarios:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+rotasAvancado.patch('/estudos/:id/avancado/cenarios/:cid', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirEscrita(req, res, estudo))) return;
+
+    const cid = parseInt(req.params.cid);
+    if (isNaN(cid)) { erro(res, 400, 'ID_INVALIDO', 'ID do cenário inválido'); return; }
+    const cen = await req.dados!.buscar('avancado_cenarios', cid);
+    if (!cen || Number(cen.estudo_id) !== estudo.id) {
+      erro(res, 404, 'CENARIO_NAO_ENCONTRADO', 'Cenário não encontrado neste estudo');
+      return;
+    }
+
+    const dados: Record<string, any> = {};
+    for (const campo of CAMPOS_CENARIO) {
+      if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
+    }
+    if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
+
+    const atualizado = await req.dados!.atualizar('avancado_cenarios', cid, dados);
+    res.json(atualizado);
+  } catch (e: any) {
+    console.error('Erro em PATCH /avancado/cenarios/:cid:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
+  }
+});
+
+rotasAvancado.delete('/estudos/:id/avancado/cenarios/:cid', async (req: Request, res: Response) => {
+  try {
+    const estudo = await estudoAvancado(req, res);
+    if (!estudo) return;
+    if (!(await exigirEscrita(req, res, estudo))) return;
+    const cid = parseInt(req.params.cid);
+    if (isNaN(cid)) { erro(res, 400, 'ID_INVALIDO', 'ID do cenário inválido'); return; }
+    const cen = await req.dados!.buscar('avancado_cenarios', cid);
+    if (!cen || Number(cen.estudo_id) !== estudo.id) {
+      erro(res, 404, 'CENARIO_NAO_ENCONTRADO', 'Cenário não encontrado neste estudo');
+      return;
+    }
+    await req.dados!.deletar('avancado_cenarios', cid);
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('Erro em DELETE /avancado/cenarios/:cid:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 });
