@@ -42,12 +42,17 @@ export const estiloFluxoTabela = css`
     position: sticky; top: 0; z-index: 3; font-weight: 600; text-align: right;
     color: var(--cor-texto-sec, rgba(255,255,255,0.5));
     border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+    /* Fundo OPACO: --cor-superficie é translúcida (~4% alpha) e deixava o conteúdo
+       rolado vazar por baixo do cabeçalho fixo. --cor-superficie-elevada é opaca. */
+    background: var(--cor-superficie-elevada, #16243A);
   }
   table.fx td.num { text-align: right; }
   /* 5 colunas fixas à esquerda — largura TRAVADA (width = min = max, border-box) para
      que o "left" de cada sticky bata exatamente com a largura real da coluna anterior.
      Cumulativo dos passos: 0 · 220 · 292 · 356 · 476 (fim em 596). */
-  .c1, .c2, .c3, .c4, .c5 { box-sizing: border-box; overflow: hidden; background: var(--cor-superficie, #17181c); }
+  /* Colunas fixas: fundo OPACO (--cor-superficie-elevada) — com --cor-superficie
+     (~4% alpha) os meses rolados vazavam por baixo (bug #37 / item 27). */
+  .c1, .c2, .c3, .c4, .c5 { box-sizing: border-box; overflow: hidden; background: var(--cor-superficie-elevada, #16243A); }
   .c1 { position: sticky; left: 0;    z-index: 2; width: 220px; min-width: 220px; max-width: 220px; text-overflow: ellipsis; text-align: left; }
   .c2 { position: sticky; left: 220px; z-index: 2; width: 72px;  min-width: 72px;  max-width: 72px;  text-align: right; }
   .c3 { position: sticky; left: 292px; z-index: 2; width: 64px;  min-width: 64px;  max-width: 64px;  text-align: right; }
