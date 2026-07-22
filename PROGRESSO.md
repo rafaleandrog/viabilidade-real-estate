@@ -412,6 +412,45 @@ Pré-requisitos #39 e #40: concluídos (Etapa 3).
   ✓** (`bash scripts/validar-frontend.sh` verde; bundle ~248.2kb). ⏳ **Pendente do autor (SDK
   gated):** typecheck do backend, suíte de backend (inclui genesis com `pct_obra`) e `urbi-empacotar`.
 
+### Etapa 6 — Receitas (layout, status, cores, save, saldo) — ✅ IMPLEMENTADA (issues #48–#52)
+Branch `claude/etapa-6-69jii4`. Toca **frontend + backend** (sem schema, sem migração — a flag
+`aplicado` mora dentro das colunas JSON `absorcao`/`fluxo_pagamento` já existentes). `versao` intacta.
+Pré-requisito #39 (Etapa 3): concluído. Arquivo-alvo único no frontend: `frontend/tela-fluxo-receitas.ts`.
+
+- **#48 (largura/alinhamento das colunas — mesmo bug do #44):** a tabela de alocações passou a usar
+  **`table-layout: fixed` + `<colgroup>`** com larguras por coluna (Tipologia `auto` · Área 120 · Unidades 92 ·
+  Saldo 68 · Preço/m² 110 · Preço unit. 120 · Preço total 120 · ação 92) + `overflow: hidden` em th/td,
+  exatamente o padrão introduzido no #44 (Tipologias). Os campos (`viab-num`/`urbi-select`) passaram a
+  `width: 100%` da célula, então **cabeçalho e campo alinham por coluna** (some o descasamento a partir de
+  Unidades) e Área privativa fica encostada à esquerda com respiro em relação à Tipologia.
+- **#49 (bola de status amarela→verde em Absorção/Fluxo):** cada botão ganhou um `<span class="stat">`
+  (slot do `urbi-botao` herda os estilos deste componente). **Amarelo** (`var(--cor-alerta)`) = pendente,
+  **verde** (`var(--cor-sucesso)`) = aplicado. O estado "aplicado" é persistido **dentro do próprio JSON da
+  seção**: `_aplicarAbsorcao` grava `absorcao.aplicado = true` e `_aplicarPagamento` grava
+  `fluxo_pagamento.aplicado = true`. Numa fase recém-criada os JSONs vêm sem a flag → bola amarela até o
+  1º "Aplicar". Sem coluna nova (a flag é um campo aditivo no JSON, inócuo ao motor).
+- **#50 (cores dos botões — Absorção roxo, Fluxo azul):** `Absorção de Vendas` → `variante="primario"`
+  (roxo, cor primária/brand do UrbiVerso, token `--cor-primaria`); `Fluxo de Pagamento` → `variante="info"`
+  (azul, token `--cor-info`). Só variantes do `urbi-botao` — nenhuma cor literal.
+- **#51 (letras somem ao digitar + botão Salvar):** a raiz era o `nome` da fase persistir a **cada tecla**
+  (`urbi:input-change` → PATCH assíncrono → re-render com `.valor` do servidor sobrescrevendo teclas mais
+  novas). Agora o input escreve num **rascunho local** (`draftNome[faseId]`, estado do componente): digitar
+  só atualiza o rascunho (sem round-trip), e o `.valor` sempre reflete o que foi digitado — nenhuma tecla se
+  perde. Um botão **"Salvar"** (aparece só quando o nome está sujo, padrão dirty do #36) persiste via
+  `_salvarFase` e limpa o rascunho. Demais campos são `viab-num`/`urbi-select` (numéricos/enum, sem o problema
+  de digitação livre) — mantidos no fluxo de save direto.
+- **#52 (saldo deve somar por TODAS as fases):** revê a decisão do Lote 6 ("trava por fase"). `_saldo` no
+  frontend agora **agrega as alocações de todas as fases** por tipologia (quantidade do catálogo − Σ unidades
+  em qualquer fase); `_tipologiasDisponiveis` e as opções do `urbi-select` seguem o mesmo saldo global.
+  **Backend (`backend/rotas/avancado.ts`):** `saldoTipologiaNaFase` → **`saldoTipologiaNoEstudo`** (lista
+  `avancado_alocacoes` por `tipologia_id`, que já é único por estudo, e soma tudo); POST/PATCH de alocação
+  usam a nova trava, com mensagens de erro ajustadas ("somando todas as fases"). Assim não se aloca, no total,
+  mais unidades do que o cadastrado em Tipologias.
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 76/76 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~250.3kb). ⏳ **Pendente do autor (SDK gated):** typecheck
+  do backend, suíte de backend e `urbi-empacotar` (a mudança de `saldoTipologiaNoEstudo` toca só lógica de
+  validação, sem schema/migração). Render real dos botões coloridos/bolas de status só valida no deploy dev.
+
 ### Etapa 2 — Backend & dados — ✅ IMPLEMENTADA (issues #24, #38)
 Branch `claude/etapa-2-pykm15`. Toca **backend + frontend** (sem schema, sem migração).
 

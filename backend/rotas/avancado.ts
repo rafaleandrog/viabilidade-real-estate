@@ -742,17 +742,20 @@ rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', async (req: Request, re
 // ── Alocações de venda (tipologia → fase) ──
 
 /**
- * Saldo de unidades de uma tipologia DENTRO de uma fase (Lote 6 · trava por
- * fase): quantidade do catálogo − Σ unidades já alocadas na fase (ignorando,
- * opcionalmente, uma alocação em edição).
+ * Saldo de unidades de uma tipologia no ESTUDO INTEIRO (#52 · trava agregada por
+ * todas as fases): quantidade do catálogo − Σ unidades já alocadas em qualquer
+ * fase (ignorando, opcionalmente, uma alocação em edição). Como cada tipologia
+ * pertence a um único estudo, filtrar por `tipologia_id` já cobre todo o estudo.
  */
-async function saldoTipologiaNaFase(
-  req: Request, faseId: number, tipologia: any, ignorarAlocId?: number,
+async function saldoTipologiaNoEstudo(
+  req: Request, tipologia: any, ignorarAlocId?: number,
 ): Promise<number> {
-  const alocacoes = await alocacoesDaFase(req, faseId);
-  const usado = alocacoes
-    .filter((a) => Number(a.tipologia_id) === Number(tipologia.id) && Number(a.id) !== Number(ignorarAlocId))
-    .reduce((s, a) => s + (Number(a.unidades) || 0), 0);
+  const r = await req.dados!.listar('avancado_alocacoes', {
+    filtros: { tipologia_id: tipologia.id }, por_pagina: 1000,
+  });
+  const usado = r.dados
+    .filter((a: any) => Number(a.id) !== Number(ignorarAlocId))
+    .reduce((s: number, a: any) => s + (Number(a.unidades) || 0), 0);
   return (Number(tipologia.quantidade) || 0) - usado;
 }
 
@@ -782,12 +785,12 @@ rotasAvancado.post('/estudos/:id/avancado/fases/:fid/alocacoes', async (req: Req
       erro(res, 404, 'TIPOLOGIA_NAO_ENCONTRADA', 'Tipologia não encontrada neste estudo'); return;
     }
     const unidades = Math.max(0, Math.round(Number(req.body.unidades) || 0));
-    const saldo = await saldoTipologiaNaFase(req, fase.id, tip);
+    const saldo = await saldoTipologiaNoEstudo(req, tip);
     if (saldo <= 0) {
-      erro(res, 422, 'SALDO_ESGOTADO', `A tipologia "${tip.nome || 'sem nome'}" não tem unidades disponíveis nesta fase`); return;
+      erro(res, 422, 'SALDO_ESGOTADO', `A tipologia "${tip.nome || 'sem nome'}" não tem unidades disponíveis (todas as fases)`); return;
     }
     if (unidades > saldo) {
-      erro(res, 422, 'SALDO_EXCEDIDO', `Só há ${saldo} unidade(s) disponível(is) desta tipologia nesta fase`); return;
+      erro(res, 422, 'SALDO_EXCEDIDO', `Só há ${saldo} unidade(s) disponível(is) desta tipologia (somando todas as fases)`); return;
     }
     const existentes = await alocacoesDaFase(req, fase.id);
     const criada = await req.dados!.criar('avancado_alocacoes', {
@@ -828,9 +831,9 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid/alocacoes/:aid', async (re
       const unidades = Math.max(0, Math.round(Number(req.body.unidades) || 0));
       const tipId = dados.tipologia_id ?? Number(aloc.tipologia_id);
       const tip = await req.dados!.buscar('avancado_tipologias', tipId);
-      const saldo = tip ? await saldoTipologiaNaFase(req, fase.id, tip, Number(aloc.id)) : 0;
+      const saldo = tip ? await saldoTipologiaNoEstudo(req, tip, Number(aloc.id)) : 0;
       if (unidades > saldo) {
-        erro(res, 422, 'SALDO_EXCEDIDO', `Só há ${saldo} unidade(s) disponível(is) desta tipologia nesta fase`); return;
+        erro(res, 422, 'SALDO_EXCEDIDO', `Só há ${saldo} unidade(s) disponível(is) desta tipologia (somando todas as fases)`); return;
       }
       dados.unidades = unidades;
     }

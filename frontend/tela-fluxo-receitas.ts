@@ -49,6 +49,9 @@ export class ViabFluxoReceitas extends LitElement {
   @state() private pagForm: any = null;
   @state() private modalErro = '';
   @state() private aplicando = false;
+  // #51 — rascunho local do nome da fase (evita que o re-render/round-trip
+  // sobrescreva o input enquanto o usuário digita). Persiste via botão "Salvar".
+  @state() private draftNome: Record<number, string> = {};
 
   private carregado = false;
 
@@ -57,19 +60,44 @@ export class ViabFluxoReceitas extends LitElement {
     .card-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .card-cab urbi-input.nome { width: 200px; }
     .card-cab .espaco { flex: 1; }
-    table.aloc { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+
+    /* #48 — table-layout fixo + colgroup (mesmo padrão do #44/Tipologias): cabeçalho
+       e células alinham por coluna; campos ocupam 100% da célula. */
+    table.aloc {
+      width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums;
+      table-layout: fixed;
+    }
     table.aloc th {
       text-align: left; font-weight: 600; padding: 7px 8px;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.75rem);
       border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+      overflow: hidden;
     }
     table.aloc th.num, table.aloc td.num { text-align: right; }
     table.aloc td {
       padding: 5px 8px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
-      font-size: var(--texto-corpo, 0.8125rem);
+      font-size: var(--texto-corpo, 0.8125rem); overflow: hidden;
     }
-    table.aloc td viab-num { width: 96px; }
-    table.aloc td.tipo urbi-select { min-width: 150px; }
+    /* Larguras por coluna (th e td herdadas do table-layout: fixed) */
+    col.c-tipo   { width: auto; }
+    col.c-area   { width: 120px; }
+    col.c-un     { width: 92px; }
+    col.c-saldo  { width: 68px; }
+    col.c-preco  { width: 110px; }
+    col.c-punit  { width: 120px; }
+    col.c-ptotal { width: 120px; }
+    col.c-acao   { width: 92px; }
+    table.aloc td viab-num { width: 100%; }
+    table.aloc td.tipo urbi-select { width: 100%; }
+
+    /* #49 — bola de status (amarela = pendente → verde = aplicado) nos botões
+       de Absorção e Fluxo de Pagamento. Slot do urbi-botao herda estes estilos. */
+    .stat {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 6px; vertical-align: middle;
+      background: var(--cor-alerta, #d0a215);
+    }
+    .stat.ok { background: var(--cor-sucesso, #2f9e44); }
     .saldo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.7rem); }
     .saldo.zero { color: var(--cor-erro, #d45a3a); }
     .rodape-tip { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-top: 10px; }
@@ -142,13 +170,22 @@ export class ViabFluxoReceitas extends LitElement {
     return this.tipologias.find((t) => Number(t.id) === Number(id));
   }
 
-  /** Saldo de unidades de uma tipologia numa fase = quantidade − Σ alocado (ignorando 1 alocação). */
-  private _saldo(fase: any, tipologiaId: any, ignorarAlocId?: any): number {
+  /**
+   * Saldo de unidades de uma tipologia = quantidade do catálogo − Σ alocado em
+   * TODAS as fases (ignorando, opcionalmente, uma alocação em edição). #52: o
+   * saldo agrega todas as fases para não exceder o total cadastrado em Tipologias.
+   */
+  private _saldo(tipologiaId: any, ignorarAlocId?: any): number {
     const tip = this._tip(tipologiaId);
     if (!tip) return 0;
-    const usado = (fase.alocacoes || [])
-      .filter((a: any) => Number(a.tipologia_id) === Number(tipologiaId) && Number(a.id) !== Number(ignorarAlocId))
-      .reduce((s: number, a: any) => s + n(a.unidades), 0);
+    let usado = 0;
+    for (const fase of this.fases) {
+      for (const a of (fase.alocacoes || [])) {
+        if (Number(a.tipologia_id) === Number(tipologiaId) && Number(a.id) !== Number(ignorarAlocId)) {
+          usado += n(a.unidades);
+        }
+      }
+    }
     return n(tip.quantidade) - usado;
   }
 
@@ -194,13 +231,21 @@ export class ViabFluxoReceitas extends LitElement {
     return html`
       <urbi-card>
         <div class="card-cab">
-          <urbi-input class="nome" ?desabilitado=${dis} .valor=${f.nome || ''}
+          <urbi-input class="nome" ?desabilitado=${dis}
+            .valor=${this.draftNome[f.id] ?? (f.nome || '')}
             placeholder="Nome da fase"
-            @urbi:input-change=${(e: CustomEvent) => this._salvarFase(f, { nome: e.detail.valor })}
+            @urbi:input-change=${(e: CustomEvent) => this._editarNome(f, e.detail.valor)}
           ></urbi-input>
+          ${!dis && this._nomeSujo(f) ? html`
+            <urbi-botao variante="primario" pequeno icone="fa-solid fa-check"
+              @click=${() => this._salvarNome(f)}>Salvar</urbi-botao>` : nothing}
           <span class="espaco"></span>
-          <urbi-botao variante="secundario" pequeno @click=${() => this._abrirAbsorcao(f)}>Absorção de Vendas</urbi-botao>
-          <urbi-botao variante="secundario" pequeno @click=${() => this._abrirPagamento(f)}>Fluxo de Pagamento</urbi-botao>
+          <urbi-botao variante="primario" pequeno @click=${() => this._abrirAbsorcao(f)}>
+            <span class="stat ${this._aplicado(f, 'absorcao') ? 'ok' : ''}"></span>Absorção de Vendas
+          </urbi-botao>
+          <urbi-botao variante="info" pequeno @click=${() => this._abrirPagamento(f)}>
+            <span class="stat ${this._aplicado(f, 'fluxo') ? 'ok' : ''}"></span>Fluxo de Pagamento
+          </urbi-botao>
           ${!dis ? html`
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
               @click=${() => { this.confirmRemover = { tipo: 'fase', fase: f }; }}>Remover</urbi-botao>` : nothing}
@@ -220,9 +265,9 @@ export class ViabFluxoReceitas extends LitElement {
     `;
   }
 
-  /** Tipologias com saldo > 0 na fase (para novas alocações). */
-  private _tipologiasDisponiveis(fase: any): any[] {
-    return this.tipologias.filter((t) => this._saldo(fase, t.id) > 0);
+  /** Tipologias com saldo > 0 (agregado por todas as fases; para novas alocações). */
+  private _tipologiasDisponiveis(_fase: any): any[] {
+    return this.tipologias.filter((t) => this._saldo(t.id) > 0);
   }
 
   private _renderTabelaAlocacoes(f: any, dis: boolean): TemplateResult {
@@ -233,6 +278,16 @@ export class ViabFluxoReceitas extends LitElement {
     const lote = this.estudo?.tipo_empreendimento === 'loteamento';
     return html`
       <table class="aloc">
+        <colgroup>
+          <col class="c-tipo">
+          <col class="c-area">
+          <col class="c-un">
+          <col class="c-saldo">
+          <col class="c-preco">
+          <col class="c-punit">
+          <col class="c-ptotal">
+          ${dis ? nothing : html`<col class="c-acao">`}
+        </colgroup>
         <thead>
           <tr>
             <th>${lote ? 'Lote' : 'Tipologia'}</th>
@@ -257,10 +312,10 @@ export class ViabFluxoReceitas extends LitElement {
     const area = n(tip?.area_privativa_m2);
     const precoUnit = area * n(a.preco_m2);
     const precoTotal = precoUnit * n(a.unidades);
-    const saldo = this._saldo(f, a.tipologia_id, a.id);
-    // Opções: tipologias com saldo (na fase) + a atual (sempre presente).
+    const saldo = this._saldo(a.tipologia_id, a.id);
+    // Opções: tipologias com saldo (todas as fases) + a atual (sempre presente).
     const opcoes = this.tipologias
-      .filter((t) => Number(t.id) === Number(a.tipologia_id) || this._saldo(f, t.id) > 0)
+      .filter((t) => Number(t.id) === Number(a.tipologia_id) || this._saldo(t.id) > 0)
       .map((t) => ({ valor: String(t.id), rotulo: t.nome || 'Sem nome' }));
     return html`
       <tr>
@@ -314,6 +369,32 @@ export class ViabFluxoReceitas extends LitElement {
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
     }
+  }
+
+  // #51 — edição do nome sem persistir a cada tecla (evita sync que apaga letras).
+  private _editarNome(f: any, valor: string) {
+    this.draftNome = { ...this.draftNome, [f.id]: valor };
+  }
+
+  private _nomeSujo(f: any): boolean {
+    const d = this.draftNome[f.id];
+    return d !== undefined && d !== (f.nome || '');
+  }
+
+  private async _salvarNome(f: any) {
+    const valor = this.draftNome[f.id];
+    if (valor === undefined) return;
+    await this._salvarFase(f, { nome: valor });
+    const { [f.id]: _descartado, ...resto } = this.draftNome;
+    this.draftNome = resto;
+    urbiVerso.notificar('Nome da fase salvo.', 'sucesso');
+  }
+
+  // #49 — estado "aplicado" (verde) por fase, guardado no próprio JSON da seção.
+  private _aplicado(f: any, tipo: 'absorcao' | 'fluxo'): boolean {
+    return tipo === 'absorcao'
+      ? Boolean(f.absorcao?.aplicado)
+      : Boolean(f.fluxo_pagamento?.aplicado);
   }
 
   private async _adicionarAlocacao(f: any) {
@@ -501,7 +582,7 @@ export class ViabFluxoReceitas extends LitElement {
     this.aplicando = true;
     this.modalErro = '';
     try {
-      const json = this._absorcaoJson();
+      const json = { ...this._absorcaoJson(), aplicado: true }; // #49 — marca como aplicado (bola verde)
       const res = await atualizarFaseAvancado(this.estudo.id, this.modalAbs.id, { absorcao: json });
       if (res?.erro) { this.modalErro = res.mensagem || 'Erro ao aplicar'; return; }
       this.fases = this.fases.map((x) => (x.id === this.modalAbs.id ? { ...x, absorcao: json } : x));
@@ -666,9 +747,10 @@ export class ViabFluxoReceitas extends LitElement {
     this.aplicando = true;
     this.modalErro = '';
     try {
-      const res = await atualizarFaseAvancado(this.estudo.id, this.modalPag.id, { fluxo_pagamento: this.pagForm });
+      const fluxo = { ...this.pagForm, aplicado: true }; // #49 — marca como aplicado (bola verde)
+      const res = await atualizarFaseAvancado(this.estudo.id, this.modalPag.id, { fluxo_pagamento: fluxo });
       if (res?.erro) { this.modalErro = res.mensagem || 'Erro ao aplicar'; return; }
-      this.fases = this.fases.map((x) => (x.id === this.modalPag.id ? { ...x, fluxo_pagamento: this.pagForm } : x));
+      this.fases = this.fases.map((x) => (x.id === this.modalPag.id ? { ...x, fluxo_pagamento: fluxo } : x));
       this.modalPag = null;
       urbiVerso.notificar('Fluxo de pagamento aplicado.', 'sucesso');
     } catch (e: any) {
