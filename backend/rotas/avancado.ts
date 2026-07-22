@@ -703,6 +703,8 @@ rotasAvancado.patch('/estudos/:id/avancado/fases/:fid', async (req: Request, res
     const dados: Record<string, any> = {};
     if (req.body.nome !== undefined) dados.nome = String(req.body.nome).trim();
     if (req.body.ordem !== undefined) dados.ordem = Number(req.body.ordem) || 0;
+    if (req.body.inicio_mes !== undefined) dados.inicio_mes = Math.max(0, Number(req.body.inicio_mes) || 0);
+    if (req.body.duracao_meses !== undefined) dados.duracao_meses = Math.max(1, Number(req.body.duracao_meses) || 1);
     if (req.body.absorcao !== undefined) {
       const invalido = validarAbsorcao(req.body.absorcao);
       if (invalido) { erro(res, 400, 'ABSORCAO_INVALIDA', invalido); return; }
@@ -1033,7 +1035,7 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
 // ─────────────────────────────────────────────────────────────────
 
 const CAMPOS_CRONOGRAMA = ['evento', 'inicio_mes', 'duracao_meses', 'travado_inicio', 'travado_duracao'];
-const CAMPOS_FASE_COPIA = ['nome', 'ordem', 'absorcao', 'fluxo_pagamento'];
+const CAMPOS_FASE_COPIA = ['nome', 'ordem', 'inicio_mes', 'duracao_meses', 'absorcao', 'fluxo_pagamento'];
 const CAMPOS_ALOCACAO_COPIA = ['unidades', 'preco_m2', 'ordem'];
 
 export async function duplicarDadosAvancado(req: Request, origId: number, novoId: number): Promise<void> {

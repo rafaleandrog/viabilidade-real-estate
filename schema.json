@@ -266,6 +266,8 @@
         "estudo_id":       { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
         "nome":            { "tipo": "texto", "limite": 100 },
         "ordem":           { "tipo": "inteiro", "padrao": 0 },
+        "inicio_mes":      { "tipo": "inteiro", "padrao": 0 },
+        "duracao_meses":   { "tipo": "inteiro", "padrao": 12 },
         "absorcao":        { "tipo": "json" },
         "fluxo_pagamento": { "tipo": "json" }
       },

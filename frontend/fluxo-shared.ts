@@ -68,8 +68,20 @@ export const EVENTO_COR: Record<string, string> = {
   pre_lancamento: 'var(--cor-alerta, #e0a82a)',
   lancamento: 'var(--cor-sucesso, #13a98d)',
   obra: 'var(--cor-primaria-solida, #7a5af8)',
-  pos_obra: 'var(--cor-texto-sec, #8a8f98)',
+  pos_obra: 'var(--cor-erro, #e05757)',
 };
+
+// Paleta de tokens para fases extras (índice cíclico).
+const FASE_PALETA = [
+  'var(--cor-info, #2aa9e0)',
+  'var(--cor-alerta, #e0a82a)',
+  'var(--cor-sucesso, #13a98d)',
+  'var(--cor-primaria-solida, #7a5af8)',
+  'var(--cor-erro, #e05757)',
+];
+export function corFaseExtra(idx: number): string {
+  return FASE_PALETA[idx % FASE_PALETA.length];
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Absorção de vendas e VGV (puros — reutilizados pelo motor do fluxo)
