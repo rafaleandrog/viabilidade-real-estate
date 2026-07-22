@@ -69,7 +69,7 @@ export class ViabFluxoVer extends LitElement {
        onde os meses vazavam ao rolar (a "sobreposição" reportada); e as colunas numéricas
        (só min-width) cresciam além do passo com valores grandes e invadiam a vizinha.
        Cumulativo dos passos: 0 · 220 · 292 · 356 · 476 (fim em 596). */
-    .c1, .c2, .c3, .c4, .c5 { box-sizing: border-box; overflow: hidden; }
+    .c1, .c2, .c3, .c4, .c5 { box-sizing: border-box; overflow: hidden; background: var(--cor-superficie, #17181c); }
     .c1 { position: sticky; left: 0;    z-index: 2; width: 220px; min-width: 220px; max-width: 220px; text-overflow: ellipsis; text-align: left; }
     .c2 { position: sticky; left: 220px; z-index: 2; width: 72px;  min-width: 72px;  max-width: 72px;  text-align: right; }
     .c3 { position: sticky; left: 292px; z-index: 2; width: 64px;  min-width: 64px;  max-width: 64px;  text-align: right; }
