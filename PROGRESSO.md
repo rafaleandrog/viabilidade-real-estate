@@ -371,6 +371,34 @@ Avançado; sem schema/backend/motor/migração). `versao` intacta. Pré-requisit
   empacotamento não se aplica. ⏳ Render real do `urbi-nav`/`urbi-abas` aninhados só valida no
   deploy dev.
 
+### Etapa 4 — Empreendimento (Cronograma + Tipologias) — ✅ IMPLEMENTADA (issues #41 #42 #43 #44 #45)
+Branch `claude/etapa-4-l6d5ed`. Toca **schema + backend + frontend** (migração `migracoes/004_fases_gantt.js`).
+
+- **#41 (cores distintas por fase — tokens):** `EVENTO_COR` em `fluxo-shared.ts` — `pos_obra`
+  trocado de `--cor-texto-sec` (cinza) para `--cor-erro` (vermelho): todos os 5 eventos usam
+  tokens semânticos distintos. Cada linha da tabela de cronograma recebe `border-left: 3px`
+  colorida pelo token da sua fase; `ponto-cor` cresceu de 8px para 10px. Nova função
+  `corFaseExtra(idx)` com paleta cíclica de 5 tokens para fases personalizadas.
+- **#42 (fases extras posicionadas no gantt):** `avancado_fases` ganhou colunas aditivas
+  `inicio_mes INT DEFAULT 0` e `duracao_meses INT DEFAULT 12` (migração 004 — `ADD COLUMN IF
+  NOT EXISTS`). Backend `PATCH /avancado/fases/:fid` passa a aceitar esses campos;
+  `CAMPOS_FASE_COPIA` atualizado. Frontend — cronograma carrega as fases via
+  `listarFasesAvancado` e exibe seção "Fases comerciais" abaixo dos 5 eventos fixos, com CRUD
+  inline (adicionar/renomear/editar início e duração/remover). No gantt, fases extras aparecem
+  como barras tracejadas (opacity 0.55) com cores da paleta cíclica.
+- **#43 (emojis no gantt SVG):** ⭐ posicionada acima do evento Lançamento (1 mês, renderizado
+  como círculo no gantt); 🔑 posicionada à direita do fim da barra do evento Obra.
+- **#44 (largura/alinhamento de Tipologias):** tabela convertida para `table-layout: fixed` com
+  `<colgroup>` explícito — Tipo 160px, Área privativa 130px, Dormitórios/Vagas 90px,
+  Unidades 100px, Un. permutadas 200px, Ações 90px. Padding uniformizado em 8px.
+- **#45 (texto calculado de permutadas):** ao lado do campo `unidades_permutadas`, dois valores
+  calculados (só quando `perm > 0`): % de unidades permutadas e m² permutados.
+  Fonte 0.72rem / `--cor-texto-sec`. Rodapé de totais exibe também área total permutada.
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 76/76 ✓ · build
+  (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde). ⏳ **Pendente do autor (SDK gated):**
+  typecheck de backend, suíte de backend, **execução da migração 004** contra dados reais e
+  `urbi-empacotar`. Render real dos emojis SVG e fases no gantt só valida no deploy dev.
+
 ### Etapa 2 — Backend & dados — ✅ IMPLEMENTADA (issues #24, #38)
 Branch `claude/etapa-2-pykm15`. Toca **backend + frontend** (sem schema, sem migração).
 
