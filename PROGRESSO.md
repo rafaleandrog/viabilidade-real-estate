@@ -339,6 +339,38 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ## Rodada 2 — Etapas (2026-07-22)
 
+### Etapa 3 — Fundação de navegação — ✅ IMPLEMENTADA (issues #39, #40)
+Branch `claude/etapa-3-r86dld`. Mudança **100% frontend** (só o chassi de navegação do
+Avançado; sem schema/backend/motor/migração). `versao` intacta. Pré-requisito das Etapas 4–8.
+
+- **#39 (urbi-nav lateral + urbi-abas no topo):** `frontend/tela-avancado.ts` trocou o chassi
+  de navegação do Avançado. **Nível 1 (páginas)** deixou de ser `urbi-abas` de topo e virou
+  **`urbi-nav` lateral** (lista à esquerda), na ordem pedida: Resumo · Empreendimento ·
+  Viabilidade · **Custos** · Fluxo de Caixa · Cenários · Análise de mercado. **Nível 2 (seções)**
+  deixou de ser `urbi-badge` de sub-nav e virou **`urbi-abas` no topo da página**, com **nome +
+  ícone** (FontAwesome via `icone`) por aba — só nas 3 páginas com múltiplas seções
+  (Empreendimento: Informações/Cronograma/Tipologias; Viabilidade: Premissas/Receitas/Financeiro;
+  Custos: Terreno/Obra/Diretos/Indiretos/Financeiro). **Nenhuma tela de conteúdo foi reescrita** —
+  o roteamento de `_renderSubConteudo` (lotes 4–8) é o mesmo; só o container mudou.
+- **Sync de URL preservado:** a página ativa continua vindo da prop `.aba` (URL
+  `/detalhe/:id/:aba`) e o `urbi:nav-selecionar` re-emite o **mesmo** evento `viab:aba-topo` que
+  `tela-estudo.ts` já escuta → **`tela-estudo.ts` não precisou mudar**. A aba de nível 2 segue
+  como estado interno (`subAtiva`), fora da URL, como antes. Layout: flex-row (nav 210px sticky +
+  conteúdo `flex:1`), que **empilha** (nav vira barra superior) em telas ≤900px.
+- **#40 (renomear "Obra" → "Custos"):** o **rótulo** da página passou a **"Custos"** em `PAGINAS`.
+  **Decisão (baixo risco):** o `id`/slug de rota permanece **`obra`** — muda-lo quebraria URLs
+  salvas, a chave `SUBABAS.obra` e o roteamento `.grupo` de `viab-fluxo-custos`. Só o texto visível
+  mudou, que é o que a issue pede ("renomear a página").
+- **Contrato dos primitivos (confirmado nos docs do shell):** `urbi-nav` (`.secoes`
+  `UrbiNavSecao[]`, `ativo`, evento `urbi:nav-selecionar {id}`) — `docs/shell/ui-componentes-conteudo.md`;
+  `urbi-abas` (`icone` FontAwesome por aba, `urbi:aba-selecionar {id}`) —
+  `docs/shell/ui-componentes-layout.md`. Nenhuma mudança no shell. Nota: `UrbiNavItem` não tem
+  campo de ícone (só label/descricao/indicador) → a lista lateral é textual; o ícone mora nas abas.
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 76/76 ✓ · build (esbuild)
+  ✓** (`bash scripts/validar-frontend.sh` verde; bundle ~240.8kb). Sem schema/backend →
+  empacotamento não se aplica. ⏳ Render real do `urbi-nav`/`urbi-abas` aninhados só valida no
+  deploy dev.
+
 ### Etapa 2 — Backend & dados — ✅ IMPLEMENTADA (issues #24, #38)
 Branch `claude/etapa-2-pykm15`. Toca **backend + frontend** (sem schema, sem migração).
 

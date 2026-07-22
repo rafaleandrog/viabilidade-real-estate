@@ -15,64 +15,65 @@ import './tela-financeiro.js';
 import './tela-resumo.js';
 
 // ─────────────────────────────────────────────────────────────────────────
-// Tela do estudo AVANÇADO — reestruturação de abas (Lote 3 · #15).
+// Tela do estudo AVANÇADO — reestruturação de navegação (Etapa 3 · #39/#40).
 //
-// É a FUNDAÇÃO da árvore Avançado: as 7 abas de topo (nível 1). O conteúdo
-// definitivo de cada sub-aba chega nos lotes seguintes (4–8). Aqui as telas
-// EXISTENTES são preservadas no lugar — cada uma roteada para a aba nova
-// correspondente — para o Avançado seguir 100% funcional durante a transição.
-// Placeholders só nas sub-abas genuinamente novas (Informações, Tipologias),
-// que o Lote 4 (#16) constrói.
+// Nova arquitetura de navegação (item 7):
+//  · Nível 1 (PÁGINAS): urbi-nav lateral (lista à esquerda), sincronizado com
+//    a URL (/detalhe/:id/:aba). Emite viab:aba-topo → tela-estudo navega.
+//  · Nível 2 (ABAS): urbi-abas no topo da página (nome + ícone por aba),
+//    estado interno (não vai para a URL) — só nas páginas com mais de uma seção.
 //
-// Padrão de navegação:
-//  · Nível 1 (topo): urbi-abas, sincronizado com a URL (/detalhe/:id/:aba).
-//  · Nível 2 (sub-aba): urbi-badge interativo — mesmo padrão que a antiga aba
-//    Fluxo de Caixa já usava; estado interno, não vai para a URL.
+// O conteúdo de cada seção é o mesmo já roteado nos lotes 4–8; a Etapa 3 só
+// troca o CHASSI de navegação (urbi-abas de topo → urbi-nav; urbi-badge de
+// sub-nav → urbi-abas). O Preliminar não muda (árvore própria em tela-estudo).
 //
-// Mapa de topo → conteúdo (Lote que assume cada aba entre parênteses):
-//   Resumo            → Resumo consolidado  (Lote 8 · #23)
-//   Empreendimento    → Informações* · Cronograma · Tipologias*   (Lote 4 · #16)
-//   Viabilidade       → Premissas · Receitas   (Lote 6 · #19–21)
-//   Obra              → Custos                 (Lote 5 · #17–18)
+// Mapa de páginas → conteúdo (#40: "Obra" renomeada para "Custos"):
+//   Resumo            → Resumo consolidado
+//   Empreendimento    → Informações · Cronograma · Tipologias
+//   Viabilidade       → Premissas · Receitas · Financeiro
+//   Custos            → Terreno · Obra · Diretos · Indiretos · Financeiro
 //   Fluxo de Caixa    → Ver Fluxo
 //   Cenários          → Gráficos
 //   Análise de mercado→ Apelo Comercial
-//   (* = placeholder até o Lote 4)
 // ─────────────────────────────────────────────────────────────────────────
 
 type AbaTopo = 'resumo' | 'empreendimento' | 'viabilidade' | 'obra' | 'fluxo' | 'cenarios' | 'mercado';
 
-const ABAS_TOPO: { id: AbaTopo; label: string; icone: string }[] = [
-  { id: 'resumo',         label: 'Resumo',             icone: 'fa-solid fa-gauge-high' },
-  { id: 'empreendimento', label: 'Empreendimento',     icone: 'fa-solid fa-building' },
-  { id: 'viabilidade',    label: 'Viabilidade',        icone: 'fa-solid fa-scale-balanced' },
-  { id: 'obra',           label: 'Obra',               icone: 'fa-solid fa-helmet-safety' },
-  { id: 'fluxo',          label: 'Fluxo de Caixa',     icone: 'fa-solid fa-money-bill-transfer' },
-  { id: 'cenarios',       label: 'Cenários',           icone: 'fa-solid fa-chart-line' },
-  { id: 'mercado',        label: 'Análise de mercado', icone: 'fa-solid fa-bullhorn' },
+// Páginas (nível 1) — ordem da lista lateral (urbi-nav). O id 'obra' é
+// preservado como slug de rota; só o rótulo virou "Custos" (#40).
+const PAGINAS: { id: AbaTopo; label: string }[] = [
+  { id: 'resumo',         label: 'Resumo' },
+  { id: 'empreendimento', label: 'Empreendimento' },
+  { id: 'viabilidade',    label: 'Viabilidade' },
+  { id: 'obra',           label: 'Custos' },
+  { id: 'fluxo',          label: 'Fluxo de Caixa' },
+  { id: 'cenarios',       label: 'Cenários' },
+  { id: 'mercado',        label: 'Análise de mercado' },
 ];
-const IDS_TOPO = ABAS_TOPO.map((a) => a.id) as AbaTopo[];
+const IDS_TOPO = PAGINAS.map((a) => a.id) as AbaTopo[];
 
-// Sub-abas (nível 2) por aba de topo — só as abas com mais de uma sub-aba.
-const SUBABAS: Partial<Record<AbaTopo, { id: string; label: string }[]>> = {
+// Abas (nível 2) por página — só as páginas com mais de uma seção. Cada aba
+// leva nome + ícone (urbi-abas suporta `icone` FontAwesome por aba).
+type SubAba = { id: string; label: string; icone: string };
+const SUBABAS: Partial<Record<AbaTopo, SubAba[]>> = {
   empreendimento: [
-    { id: 'informacoes', label: 'Informações' },
-    { id: 'cronograma',  label: 'Cronograma' },
-    { id: 'tipologias',  label: 'Tipologias' },
+    { id: 'informacoes', label: 'Informações', icone: 'fa-solid fa-circle-info' },
+    { id: 'cronograma',  label: 'Cronograma',  icone: 'fa-solid fa-calendar-days' },
+    { id: 'tipologias',  label: 'Tipologias',  icone: 'fa-solid fa-table-list' },
   ],
   viabilidade: [
-    { id: 'premissas',  label: 'Premissas' },
-    { id: 'receitas',   label: 'Receitas' },
-    { id: 'financeiro', label: 'Financeiro' },
+    { id: 'premissas',  label: 'Premissas',  icone: 'fa-solid fa-sliders' },
+    { id: 'receitas',   label: 'Receitas',   icone: 'fa-solid fa-hand-holding-dollar' },
+    { id: 'financeiro', label: 'Financeiro', icone: 'fa-solid fa-percent' },
   ],
-  // Custos em 5 sub-abas (Lote 5 · #17–18). Cada uma exibe o grupo
+  // Custos em 5 abas (#40 renomeou a página). Cada uma exibe o grupo
   // correspondente em viab-fluxo-custos (tabela + consolidado próprio).
   obra: [
-    { id: 'terreno',    label: 'Terreno' },
-    { id: 'obra',       label: 'Obra' },
-    { id: 'diretos',    label: 'Diretos' },
-    { id: 'indireto',   label: 'Indiretos' },
-    { id: 'financeiro', label: 'Financeiro' },
+    { id: 'terreno',    label: 'Terreno',    icone: 'fa-solid fa-mountain-sun' },
+    { id: 'obra',       label: 'Obra',       icone: 'fa-solid fa-helmet-safety' },
+    { id: 'diretos',    label: 'Diretos',    icone: 'fa-solid fa-truck-ramp-box' },
+    { id: 'indireto',   label: 'Indiretos',  icone: 'fa-solid fa-briefcase' },
+    { id: 'financeiro', label: 'Financeiro', icone: 'fa-solid fa-building-columns' },
   ],
 };
 
@@ -84,8 +85,8 @@ export class ViabTelaAvancado extends LitElement {
   @property({ type: Boolean }) podeEditar = false;
   @property({ type: String }) status = '';
 
-  // Aba de topo ativa — vem da URL via tela-estudo. Setter normaliza para uma
-  // das 7 (URLs antigas do Preliminar, ex. 'premissas', caem em 'resumo').
+  // Página ativa — vem da URL via tela-estudo. Setter normaliza para uma das 7
+  // (URLs antigas do Preliminar, ex. 'premissas', caem em 'resumo').
   @property({ type: String })
   set aba(v: string) {
     const val = IDS_TOPO.includes(v as AbaTopo) ? (v as AbaTopo) : 'resumo';
@@ -96,7 +97,7 @@ export class ViabTelaAvancado extends LitElement {
   get aba(): AbaTopo { return this._aba; }
   private _aba: AbaTopo = 'resumo';
 
-  // Sub-aba ativa por aba de topo (default: 1ª sub-aba de cada uma).
+  // Aba ativa por página (default: 1ª aba de cada uma).
   @state() private subAtiva: Record<string, string> = {
     empreendimento: 'informacoes',
     viabilidade: 'premissas',
@@ -104,7 +105,29 @@ export class ViabTelaAvancado extends LitElement {
   };
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
-    .sub-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .layout {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .nav-col {
+      flex: 0 0 210px;
+      max-width: 210px;
+      border: 1px solid var(--cor-borda);
+      border-radius: 8px;
+      background: var(--cor-superficie-sutil, transparent);
+      position: sticky;
+      top: 0;
+    }
+    .conteudo {
+      flex: 1 1 0%;
+      min-width: 0;
+    }
+    /* Empilha em telas estreitas: a lista de páginas vira barra superior. */
+    @media (max-width: 900px) {
+      .layout { flex-direction: column; }
+      .nav-col { flex: 0 0 auto; max-width: none; width: 100%; position: static; }
+    }
   `];
 
   private get _editavelPremissas(): boolean {
@@ -116,39 +139,59 @@ export class ViabTelaAvancado extends LitElement {
 
   render(): TemplateResult {
     return html`
-      <urbi-abas
-        expandir
-        .abas=${ABAS_TOPO}
-        .ativa=${this.aba}
-        @urbi:aba-selecionar=${(e: CustomEvent) => {
-          const id = (e.detail?.id || 'resumo') as AbaTopo;
-          this.dispatchEvent(new CustomEvent('viab:aba-topo', { detail: { id }, bubbles: true, composed: true }));
-        }}
-      >
-        <urbi-hospedeiro slot="resumo">${this._renderResumo()}</urbi-hospedeiro>
-        <urbi-hospedeiro slot="empreendimento">${this._renderComSubNav('empreendimento')}</urbi-hospedeiro>
-        <urbi-hospedeiro slot="viabilidade">${this._renderComSubNav('viabilidade')}</urbi-hospedeiro>
-        <urbi-hospedeiro slot="obra">${this._renderComSubNav('obra')}</urbi-hospedeiro>
-        <urbi-hospedeiro slot="fluxo">${this._renderFluxo()}</urbi-hospedeiro>
-        <urbi-hospedeiro slot="cenarios">${this._renderCenarios()}</urbi-hospedeiro>
-        <urbi-hospedeiro slot="mercado">${this._renderMercado()}</urbi-hospedeiro>
-      </urbi-abas>
+      <div class="layout">
+        <div class="nav-col">
+          <urbi-nav
+            .secoes=${[{ itens: PAGINAS }]}
+            .ativo=${this.aba}
+            @urbi:nav-selecionar=${(e: CustomEvent) => {
+              const id = (e.detail?.id || 'resumo') as AbaTopo;
+              this.dispatchEvent(new CustomEvent('viab:aba-topo', { detail: { id }, bubbles: true, composed: true }));
+            }}
+          ></urbi-nav>
+        </div>
+        <div class="conteudo">${this._renderPagina()}</div>
+      </div>
     `;
   }
 
-  // Barra de sub-navegação (nível 2) por urbi-badge interativo + conteúdo da
-  // sub-aba selecionada.
-  private _renderComSubNav(topo: AbaTopo): TemplateResult {
+  private _renderPagina(): TemplateResult {
+    switch (this.aba) {
+      case 'empreendimento':
+      case 'viabilidade':
+      case 'obra':
+        return this._renderComAbas(this.aba);
+      case 'fluxo':
+        return html`<viab-fluxo-ver .estudo=${this.estudo}></viab-fluxo-ver>`;
+      case 'cenarios':
+        return html`<viab-tela-graficos .estudo=${this.estudo}></viab-tela-graficos>`;
+      case 'mercado':
+        return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this.podeEditar}></viab-tela-apelo>`;
+      case 'resumo':
+      default:
+        // Resumo consolidado do Avançado: KPIs-chave + gráficos que leem os
+        // resultados calculados pelas outras páginas. Frontend puro.
+        return html`<viab-tela-resumo .estudo=${this.estudo}></viab-tela-resumo>`;
+    }
+  }
+
+  // Página com abas de topo (urbi-abas): nome + ícone por aba; a aba ativa é
+  // estado interno. Todas as seções são montadas (slots); urbi-abas exibe a ativa.
+  private _renderComAbas(topo: AbaTopo): TemplateResult {
     const subs = SUBABAS[topo] || [];
     const ativa = this.subAtiva[topo] || subs[0]?.id;
     return html`
-      <div class="sub-nav" role="group" aria-label="Seções de ${topo}">
+      <urbi-abas
+        .abas=${subs.map((s) => ({ id: s.id, label: s.label, icone: s.icone }))}
+        .ativa=${ativa}
+        @urbi:aba-selecionar=${(e: CustomEvent) => {
+          const id = e.detail?.id || subs[0]?.id;
+          this.subAtiva = { ...this.subAtiva, [topo]: id };
+        }}
+      >
         ${subs.map((s) => html`
-          <urbi-badge cor="info" interativo ?ativo=${ativa === s.id}
-            @click=${() => { this.subAtiva = { ...this.subAtiva, [topo]: s.id }; }}
-          >${s.label}</urbi-badge>`)}
-      </div>
-      ${this._renderSubConteudo(topo, ativa)}
+          <urbi-hospedeiro slot=${s.id}>${this._renderSubConteudo(topo, s.id)}</urbi-hospedeiro>`)}
+      </urbi-abas>
     `;
   }
 
@@ -176,28 +219,10 @@ export class ViabTelaAvancado extends LitElement {
       }
     }
     if (topo === 'obra') {
-      // Uma instância do componente por grupo (sub-aba). Cada uma carrega seus
+      // Uma instância do componente por grupo (aba). Cada uma carrega seus
       // custos e mostra a tabela + consolidado do seu grupo.
       return html`<viab-fluxo-custos .estudo=${this.estudo} .editavel=${this._editavelFluxo} .grupo=${sub || 'terreno'}></viab-fluxo-custos>`;
     }
     return html`${nothing}`;
-  }
-
-  private _renderResumo(): TemplateResult {
-    // Resumo consolidado do Avançado (Lote 8 · #23): KPIs-chave + gráficos que
-    // leem os resultados calculados pelas outras abas. Frontend puro.
-    return html`<viab-tela-resumo .estudo=${this.estudo}></viab-tela-resumo>`;
-  }
-
-  private _renderFluxo(): TemplateResult {
-    return html`<viab-fluxo-ver .estudo=${this.estudo}></viab-fluxo-ver>`;
-  }
-
-  private _renderCenarios(): TemplateResult {
-    return html`<viab-tela-graficos .estudo=${this.estudo}></viab-tela-graficos>`;
-  }
-
-  private _renderMercado(): TemplateResult {
-    return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this.podeEditar}></viab-tela-apelo>`;
   }
 }
