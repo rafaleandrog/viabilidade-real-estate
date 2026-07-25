@@ -15,6 +15,9 @@ App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell U
 - `schema.json` — schema de dados atual
 - `docs/shell/*.md` no monorepo `urbiverso/urbiverso` — fonte de verdade da plataforma
 
+**Contexto de negócio (consultivo — NÃO governa comportamento):**
+- `docs/viabilidade/padrao-incorporacao.md` — como o app raciocina sobre viabilidade de **Incorporação** (conceito, premissas, motor, indicadores). Leia-o quando precisar de contexto de negócio para implementar uma mudança ou resolver um issue. ⚠️ É **descritivo e consultivo**: não é contrato nem autoriza alterar a lógica existente. Se divergir do código/`schema.json`/spec, **o código está certo e o documento é que deve ser corrigido** — nunca ajuste o comportamento para casar com ele. Mudança de lógica nasce de issue/spec, não deste doc.
+
 ---
 
 ## Protocolo de etapa (rodada 2) — disparo `Siga para a Etapa X`
