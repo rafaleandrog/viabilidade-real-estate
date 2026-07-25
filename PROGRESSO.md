@@ -337,6 +337,31 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ---
 
+## Rodada 3 — Sessões (2026-07-25) — `docs/sessoes-bugs-2026-07-25.md`
+
+### Sessão S3 — Preliminar Proforma: Bugs de exibição — ✅ IMPLEMENTADA (issues #77, #78)
+Branch `claude/sessao-s3-hcnifg` (PR #136). Mudança **100% frontend** (`frontend/tela-proforma.ts`) —
+sem schema/backend/motor/migração; `versao` intacta. Sem pré-requisitos.
+
+- **#77 (receita com notação contábil negativa):** **Receita líquida** e **Receita operacional** são
+  consolidados de receita (`tipo: 'consolidado'` + `natureza: 'receita'`), mas o fallback de
+  `_fmtContabil`/`_fmtContabilM2` envolvia qualquer não-receita/não-resultado em parênteses, incluindo-os.
+  Agora ambos os formatadores testam também `natureza === 'receita'` → exibem valor **plano (absoluto
+  positivo)** nas colunas R$ e R$/m². `proforma.ts` **não** foi tocado (os valores já vinham corretos; o
+  bug era só de exibição).
+- **#78 (títulos da sensibilidade desalinhados):** os números da tabela monetária herdavam
+  `text-align: right` da regra global `.num`, enquanto o cabeçalho (badge do cenário) é centralizado via
+  `.sens-cab`. Fix: `.pf.sens td.num` agora **centralizado** (casa com o cabeçalho, como já ocorria na
+  tabela de indicadores) + **`colgroup` compartilhado** (rótulo 40% + 3 cenários 20%) e
+  `table-layout: fixed` para as colunas bear/base/bull terem a mesma geometria nas duas tabelas.
+- **Armadilha do template (relembrada):** backtick literal dentro do `` css`…` `` fecha o tagged template
+  e quebra o typecheck — comentário reescrito sem backticks (usa aspas). Ver Lote 2.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~265.8kb). Sem schema/backend → empacotamento não se
+  aplica. ⏳ Render real do alinhamento só valida no deploy dev.
+
+---
+
 ## Rodada 2 — Etapas (2026-07-22)
 
 ### Etapa 8 — Cenários — ✅ IMPLEMENTADA (issue #56)
