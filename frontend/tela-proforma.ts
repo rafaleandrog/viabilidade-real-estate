@@ -107,8 +107,16 @@ export class ViabTelaProforma extends LitElement {
     /* Badges dos cenários (cabeçalho) e dos indicadores centralizados na coluna. */
     .pf.sens .sens-cab { display: flex; justify-content: center; }
     .pf.sens td .sens-cab { padding: 2px 0; }
-    /* #76 — valores da sensibilidade em negrito. */
-    .pf.sens td.num { font-weight: 700; }
+    /* #78 — larguras fixas por colgroup (mesma geometria nas duas tabelas de
+       sensibilidade: monetária e indicadores) para os cenários bear/base/bull
+       alinharem entre si. */
+    .pf.sens { table-layout: fixed; }
+    /* #76 — valores da sensibilidade em negrito. #78 — centralizados (o cabeçalho
+       usa badge centralizado via .sens-cab; os números da tabela monetária herdavam
+       "text-align: right" da regra global .num, o que os desalinhava do título do
+       cenário). Centralizar casa o conteúdo com o cabeçalho, como já ocorre na
+       tabela de indicadores (badge sobre badge). */
+    .pf.sens td.num { font-weight: 700; text-align: center; }
     /* #11 — unidades e preço médio por tipo. */
     .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; }
     .ut-item { display: flex; flex-direction: column; gap: 2px; }
@@ -265,10 +273,12 @@ export class ViabTelaProforma extends LitElement {
 
   // Coluna R$ em notação contábil: sem "R$"; custos/deduções (itens e consolidados)
   // entre parênteses; receita plana; resultado pelo sinal real (negativo entre
-  // parênteses).
+  // parênteses). #77: consolidados de receita (Receita líquida/operacional, marcados
+  // com `natureza: 'receita'`) são valores de receita — exibidos planos (positivo),
+  // NUNCA entre parênteses, mesmo sendo `tipo: 'consolidado'`.
   private _fmtContabil(r: Linha): string {
     const abs = fmtNum(Math.abs(r.v));
-    if (r.tipo === 'receita') return abs;
+    if (r.tipo === 'receita' || r.natureza === 'receita') return abs;
     if (r.tipo === 'resultado') return r.v < 0 ? `(${abs})` : abs;
     return `(${abs})`;
   }
@@ -280,7 +290,8 @@ export class ViabTelaProforma extends LitElement {
   private _fmtContabilM2(r: Linha, p: Proforma): string {
     if (p.areaVendavel <= 0) return '—';
     const abs = fmtNum(Math.abs(r.v / p.areaVendavel));
-    if (r.tipo === 'receita') return abs;
+    // #77: consolidados de receita exibidos planos (positivo), sem parênteses.
+    if (r.tipo === 'receita' || r.natureza === 'receita') return abs;
     if (r.tipo === 'resultado') return r.v < 0 ? `(${abs})` : abs;
     return `(${abs})`;
   }
@@ -427,6 +438,17 @@ export class ViabTelaProforma extends LitElement {
     ];
     const linhasMonetarias = linhas.filter((m) => !m.divisoria && !m.badge);
     const linhasIndicadores = linhas.filter((m) => m.divisoria || m.badge);
+    // #78: colgroup compartilhado — rótulo + 3 cenários de largura igual. Com
+    // `table-layout: fixed`, garante que as colunas bear/base/bull tenham a mesma
+    // largura nas duas tabelas (monetária e indicadores) e que o cabeçalho fique
+    // alinhado com o conteúdo.
+    const colgroup = html`
+      <colgroup>
+        <col style="width: 40%" />
+        <col style="width: 20%" />
+        <col style="width: 20%" />
+        <col style="width: 20%" />
+      </colgroup>`;
     const cabecalho = html`
       <thead>
         <tr>
@@ -458,12 +480,14 @@ export class ViabTelaProforma extends LitElement {
       </div>
       <div class="pf-wrap">
         <table class="pf sens">
+          ${colgroup}
           ${cabecalho}
           <tbody>${linhasMonetarias.map(renderLinha)}</tbody>
         </table>
       </div>
       <div class="pf-wrap sens-indicadores">
         <table class="pf sens">
+          ${colgroup}
           ${cabecalho}
           <tbody>${linhasIndicadores.map(renderLinha)}</tbody>
         </table>
