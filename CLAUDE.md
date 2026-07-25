@@ -57,18 +57,16 @@ Etapas seguintes já pegam as anteriores porque cada etapa foi mergeada na `main
   **só rodam no ambiente autenticado do autor (SDK gated)** — registrar no corpo do PR e no
   `PROGRESSO.md` **o que não foi validável aqui**.
 
-### 6. Fechar o ciclo — automático (PR + merge)
+### 6. Fechar o ciclo — automático (PR sem merge)
 1. Commit `fix(etapa-X): …` ou `feat(etapa-X): …` → `git push -u origin claude/etapa-X-<slug>`.
 2. **Abrir o PR** contra `main` (usar template do repo se existir; corpo lista issues fechadas e
    o que ficou pendente de validação no ambiente do autor).
-3. **Fazer o merge do PR na `main`** — **em TODAS as etapas**, assim que os checks disponíveis
-   passarem (decisão do autor: merge automático inclusive nas etapas de backend/schema não
-   valid��veis aqui; o risco assumido é subir algo pendente de validação no PC do autor).
+3. **Não fazer merge** — o merge fica a cargo do autor após revisão.
 4. Fechar as issues da etapa (`Closes #…` no PR já basta) e **atualizar** `PROGRESSO.md` + o
    checklist de `docs/etapas-bugs-2026-07-22.md` (marcar a etapa concluída).
 
 > **Autorização:** o comando `Siga para a Etapa X` **é** a autorização explícita do autor para
-> abrir PR e mergear na `main` — supera o default de "não criar PR / não commitar em main sem OK".
+> abrir o PR — mas **não** para mergear. O merge é sempre decisão do autor.
 > Vale por etapa; não persiste para trabalho fora desse fluxo.
 
 > A rodada 1 (`docs/lotes-bugs-2026-07-20.md`, issues #9–#24, lotes 1–8) está **concluída**. O
