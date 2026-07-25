@@ -22,26 +22,26 @@ Substitua `X` pelo número da sessão desejada. O Claude vai carregar os issues 
 
 | Sessão | Tema | Issues | Dif. | Pré-requisitos |
 |--------|------|--------|------|----------------|
-| **S1** | Preliminar Premissas: Cores de avisos | #63 #64 | F | — |
-| **S2** | Preliminar Proforma: Cores | #65 #66 #67 #68 | F | — |
-| **S3** | Preliminar Proforma: Bugs de exibição | #69 #70 | M | — |
-| **S4** | Empreendimento: Texto & Layout | #71 #72 #73 #74 #75 | F | — |
-| **S5** | Empreendimento Cronograma: Regras e bug Gantt | #76 #77 #78 | M | — |
-| **S6** | Empreendimento: Bugs difíceis | #79 #80 | D | — |
-| **S7** | Feature: Imagem Principal + Thumbnail | #81 #82 | D | — |
-| **S8** | Receitas: CSS, Layout & Texto | #83 #84 #85 #86 #87 #88 #89 #90 #91 #92 #93 #94 | F | — |
-| **S9** | Receitas: UI & Validação | #95 #96 #97 #98 | M | S5 |
-| **S10** | Receitas: Saldo e Absorção | #99 #100 | D | S5 |
-| **S11** | Custos: Texto, CSS & Layout | #101 #102 #103 #104 #105 #106 | F | — |
-| **S12** | Custos: Regras & Formatação | #107 #108 #109 | M | S11 |
-| **S13** | Custos: Lógica multi-arquivo | #110 #111 #112 | D | S12 |
-| **S14** | Custos Diretos: Motor de Corretagem | #113 | C | S13 + S10 |
-| **S15** | Fluxo de Caixa: Visual & Layout | #114 #115 #116 | M | S13/S14 |
-| **S16** | Fluxo de Caixa: Estrutura & VPL | #117 #118 | D | S15 |
-| **S17** | Fluxo de Caixa: View Mensal/Anual | #119 | C | S16 |
-| **S18** | Cenários: Texto & KPI | #120 #121 | F | S16 |
-| **S19** | Cenários: Tabela de Salvos | #122 | M | S16 |
-| **S20** | Cenários: Gráfico Tracejado & Variação % | #123 #124 | D | S16/S19 |
+| **S1** | Preliminar Premissas: Cores de avisos | #71 #72 | F | — |
+| **S2** | Preliminar Proforma: Cores | #73 #74 #75 #76 | F | — |
+| **S3** | Preliminar Proforma: Bugs de exibição | #77 #78 | M | — |
+| **S4** | Empreendimento: Texto & Layout | #79 #80 #81 #82 #83 | F | — |
+| **S5** | Empreendimento Cronograma: Regras e bug Gantt | #84 #85 #86 | M | — |
+| **S6** | Empreendimento: Bugs difíceis | #87 #88 | D | — |
+| **S7** | Feature: Imagem Principal + Thumbnail | #89 #90 | D | — |
+| **S8** | Receitas: CSS, Layout & Texto | #91 #92 #93 #94 #95 #96 #97 #98 #99 #100 #101 #102 | F | — |
+| **S9** | Receitas: UI & Validação | #103 #104 #105 #106 | M | S5 |
+| **S10** | Receitas: Saldo e Absorção | #107 #108 | D | S5 |
+| **S11** | Custos: Texto, CSS & Layout | #109 #110 #111 #112 #113 #114 | F | — |
+| **S12** | Custos: Regras & Formatação | #115 #116 #117 | M | S11 |
+| **S13** | Custos: Lógica multi-arquivo | #118 #119 #120 | D | S12 |
+| **S14** | Custos Diretos: Motor de Corretagem | #121 | C | S13 + S10 |
+| **S15** | Fluxo de Caixa: Visual & Layout | #122 #123 #124 | M | S13/S14 |
+| **S16** | Fluxo de Caixa: Estrutura & VPL | #125 #126 | D | S15 |
+| **S17** | Fluxo de Caixa: View Mensal/Anual | #127 | C | S16 |
+| **S18** | Cenários: Texto & KPI | #128 #129 | F | S16 |
+| **S19** | Cenários: Tabela de Salvos | #130 | M | S16 |
+| **S20** | Cenários: Gráfico Tracejado & Variação % | #131 #132 | D | S16/S19 |
 
 ---
 
