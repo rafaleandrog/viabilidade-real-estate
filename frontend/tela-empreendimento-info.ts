@@ -46,6 +46,19 @@ export class ViabEmpreendimentoInfo extends LitElement {
   @state() private salvando = false;
   private carregado = false;
 
+  // Proteção contra race de PATCH stale (#87): os campos de texto salvam sozinhos
+  // com debounce, e cada save cancela o anterior ainda pendente via AbortController
+  // — assim a resposta de um PATCH antigo nunca chega depois e apaga o que o
+  // usuário acabou de digitar.
+  private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private _salvarController: AbortController | null = null;
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._debounceTimer) { clearTimeout(this._debounceTimer); this._debounceTimer = null; }
+    this._salvarController?.abort();
+  }
+
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .grid { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
     .campo { display: flex; flex-direction: column; gap: 4px; }
@@ -100,13 +113,13 @@ export class ViabEmpreendimentoInfo extends LitElement {
           <div class="campo nome">
             <span class="rotulo">Nome do empreendimento</span>
             <urbi-input ?desabilitado=${dis} .valor=${this.form.nome}
-              @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, nome: e.detail.valor }; }}
+              @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, nome: e.detail.valor }; this._agendarSalvarTexto(); }}
             ></urbi-input>
           </div>
           <div class="campo matricula">
             <span class="rotulo">Matrícula</span>
             <urbi-input ?desabilitado=${dis} placeholder="Nº da matrícula" .valor=${this.form.matricula}
-              @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, matricula: e.detail.valor }; }}
+              @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, matricula: e.detail.valor }; this._agendarSalvarTexto(); }}
             ></urbi-input>
           </div>
         </div>
@@ -115,7 +128,7 @@ export class ViabEmpreendimentoInfo extends LitElement {
           <urbi-textarea label="Descrição" rows="4" ?desabilitado=${dis}
             placeholder="Descrição do empreendimento"
             .valor=${this.form.descricao}
-            @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, descricao: e.detail.valor }; }}
+            @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, descricao: e.detail.valor }; this._agendarSalvarTexto(); }}
           ></urbi-textarea>
         </div>
       </urbi-card>
@@ -203,16 +216,57 @@ export class ViabEmpreendimentoInfo extends LitElement {
     `;
   }
 
+  // Só os campos de identificação (texto) — os que salvam sozinhos ao digitar.
+  private _dadosTexto(): Record<string, any> {
+    return {
+      nome: this.form.nome.trim() || this.estudo.nome,
+      matricula: this.form.matricula.trim() || null,
+      descricao: this.form.descricao.trim() || null,
+    };
+  }
+
+  // Agenda o auto-save dos campos de texto (#87): debounce evita um PATCH por
+  // tecla; o disparo efetivo passa por _salvarCampos, que cancela o anterior.
+  private _agendarSalvarTexto() {
+    if (!this.editavel) return;
+    if (this._debounceTimer) clearTimeout(this._debounceTimer);
+    this._debounceTimer = setTimeout(() => {
+      this._debounceTimer = null;
+      void this._salvarCampos(this._dadosTexto(), { silencioso: true });
+    }, 500);
+  }
+
+  // Save primitivo com proteção de race (#87): aborta o PATCH pendente anterior e
+  // dispara um novo com AbortSignal próprio. Se este for cancelado por um save
+  // mais recente, a rejeição por aborto é engolida (comportamento esperado) — a
+  // resposta antiga nunca volta para sobrescrever o campo.
+  private async _salvarCampos(dados: Record<string, any>, opts: { silencioso?: boolean } = {}): Promise<boolean> {
+    this._salvarController?.abort();
+    const ctrl = new AbortController();
+    this._salvarController = ctrl;
+    try {
+      const res = await atualizarEstudo(this.estudo.id, dados, ctrl.signal);
+      if (ctrl.signal.aborted) return false;
+      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return false; }
+      if (!opts.silencioso) urbiVerso.notificar('Informações salvas.', 'sucesso');
+      return true;
+    } catch (e: any) {
+      if (e?.name === 'AbortError' || ctrl.signal.aborted) return false; // cancelado por um save mais novo
+      urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
+      return false;
+    } finally {
+      if (this._salvarController === ctrl) this._salvarController = null;
+    }
+  }
+
   private async _salvar() {
+    // Flush do auto-save pendente: o clique salva tudo agora, num único PATCH.
+    if (this._debounceTimer) { clearTimeout(this._debounceTimer); this._debounceTimer = null; }
     this.salvando = true;
     try {
       const nucleo = this.estudo.origem_terreno === 'nucleo';
       const inc = this.estudo.tipo_empreendimento === 'incorporacao';
-      const dados: Record<string, any> = {
-        nome: this.form.nome.trim() || this.estudo.nome,
-        matricula: this.form.matricula.trim() || null,
-        descricao: this.form.descricao.trim() || null,
-      };
+      const dados: Record<string, any> = { ...this._dadosTexto() };
       if (!nucleo) {
         dados.terreno_manual_nome = this.form.terreno_manual_nome.trim() || null;
         dados.terreno_manual_area = this.form.terreno_manual_area != null ? Number(this.form.terreno_manual_area) : null;
@@ -221,11 +275,7 @@ export class ViabEmpreendimentoInfo extends LitElement {
         dados.coef_aproveitamento_basico = this.form.coef_aproveitamento_basico != null ? Number(this.form.coef_aproveitamento_basico) : null;
         dados.coef_aproveitamento_maximo = this.form.coef_aproveitamento_maximo != null ? Number(this.form.coef_aproveitamento_maximo) : null;
       }
-      const res = await atualizarEstudo(this.estudo.id, dados);
-      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
-      urbiVerso.notificar('Informações salvas.', 'sucesso');
-    } catch (e: any) {
-      urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
+      await this._salvarCampos(dados);
     } finally {
       this.salvando = false;
     }

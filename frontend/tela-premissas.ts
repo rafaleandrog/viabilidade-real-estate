@@ -359,6 +359,12 @@ export class ViabTelaPremissas extends LitElement {
 
   render() {
     if (!this.estudo) return nothing;
+    // #88: no Avançado a aba Premissas não tem conteúdo — todo o formulário
+    // estático (áreas/produtos/custos/impostos/deduções) é exclusivo do
+    // Preliminar. O host (tela-avancado) já nem monta este componente para o
+    // Avançado; este guard é a rede de segurança que garante "nenhum conteúdo".
+    // Os campos seguem no schema: proforma.ts ainda os lê para os KPIs do Resumo.
+    if (this.estudo.nivel_analise === 'avancado') return nothing;
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
     // No Avançado o Terreno vive em Empreendimento → Informações (#53).
     const avancado = this.estudo.nivel_analise === 'avancado';

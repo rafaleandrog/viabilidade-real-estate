@@ -42,8 +42,12 @@ export function buscarEstudo(id: number): Promise<any> {
   return urbiVerso.api(`${APP}/estudos/${id}`);
 }
 
-export function atualizarEstudo(id: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${id}`, { method: 'PATCH', body: JSON.stringify(dados) });
+// `signal` (opcional) liga o PATCH a um AbortController — permite cancelar uma
+// requisição pendente quando outra mais nova a substitui, evitando que a resposta
+// antiga chegue depois e sobrescreva o valor atual do campo (#87). Chamadas sem
+// o argumento seguem idênticas (signal = undefined ⇒ fetch sem aborto).
+export function atualizarEstudo(id: number, dados: Record<string, any>, signal?: AbortSignal): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${id}`, { method: 'PATCH', body: JSON.stringify(dados), signal });
 }
 
 export function removerEstudo(id: number): Promise<any> {

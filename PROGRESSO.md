@@ -339,6 +339,7 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ## Rodada 3 — Sessões (2026-07-25) — `docs/sessoes-bugs-2026-07-25.md`
 
+<<<<<<< HEAD
 ### Sessão S5 — Empreendimento Cronograma: Regras e bug Gantt — ✅ IMPLEMENTADA (issues #84, #85, #86)
 Branch `claude/sessao-s5-rx8lrh` (PR #139). Mudança **100% frontend** (`frontend/tela-fluxo-cronograma.ts`) —
 sem schema/backend/migração; `versao` intacta. Sem pré-requisitos.
@@ -377,6 +378,52 @@ sem schema/backend/motor/migração; `versao` intacta. Pré-requisito S5: conclu
 - **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓** (~266.7kb).
   Sem schema/backend → empacotamento não se aplica. ⏳ Render real do modal de Fluxo de Pagamento
   só valida no deploy dev.
+=======
+### Sessão S6 — Empreendimento: Bugs difíceis — ✅ IMPLEMENTADA (issues #87, #88)
+Branch `claude/sessao-s6-votd43`. Mudança **100% frontend** — sem schema/backend/motor/migração;
+`versao` intacta. Sem pré-requisitos.
+
+- **#87 (campos de texto apagam ao digitar rápido — race de PATCH stale):** raiz do bug é uma
+  resposta de PATCH antigo chegando **depois** e sobrescrevendo o valor atual do campo. Fix nos
+  dois arquivos-alvo:
+  - `frontend/viabilidade-api.ts`: `atualizarEstudo(id, dados, signal?)` ganhou 3º parâmetro
+    **`AbortSignal` opcional** (repassado ao `fetch` via `RequestInit.signal`). Chamadas existentes
+    (2 args) seguem idênticas.
+  - `frontend/tela-empreendimento-info.ts`: os campos de texto (Nome · Matrícula · Descrição) agora
+    fazem **auto-save com debounce (500ms) + AbortController**. Cada disparo **aborta o PATCH
+    pendente anterior** antes de iniciar o novo (`_salvarCampos`), então a resposta de um PATCH
+    obsoleto nunca volta para clobberar o campo; o componente também **nunca reescreve** o valor a
+    partir da resposta da API. O botão "Salvar informações" continua (faz *flush* do debounce e
+    grava tudo — texto + terreno/coeficientes — num único PATCH). Auto-save é silencioso; o botão
+    mantém o toast de confirmação. `disconnectedCallback` limpa o timer e aborta o controller;
+    `_agendarSalvarTexto` só dispara quando `editavel`.
+- **#88 (remover todo o conteúdo da aba Premissas no Avançado):** revisita e **supera** a decisão da
+  Etapa 7/#54 (que mantivera Premissas no Avançado). Auditoria dos motores (arquivos-alvo
+  `fluxo-shared.ts`/`proforma.ts` — **sem alteração de código**, só auditados):
+  - **Motor de fluxo do Avançado** (`fluxo-caixa-motor.ts`/`fluxo-shared.ts`): **não lê nenhum campo
+    estático de Premissas** — usa fases/alocações (receitas), linhas de custo, cronograma, curvas e
+    `areaTerreno` (que mora em Empreendimento → Informações desde #53), não a aba Premissas.
+  - **`proforma.ts`**: consome muitos campos de Premissas e é invocado por `tela-resumo.ts` (Resumo
+    do Avançado) para 4 KPIs (VGV · Resultado · Margem líquida · ROI) + pizza de custos + medidores.
+    Esses campos **permanecem no schema** (remover UI não dropa coluna) — o Resumo segue lendo os
+    valores persistidos, conforme o próprio issue pede ("campos que alimentam cálculos continuam no
+    schema/dados mesmo sem UI"). **`tela-resumo.ts` não foi tocado** (refatorá-lo para derivar esses
+    números do motor de fluxo em vez das premissas estáticas segue como passo futuro, como já
+    registrado em #54).
+  - **Remoção (exclusiva do Avançado):** `frontend/tela-avancado.ts` — a sub-aba **Premissas** saiu
+    de `SUBABAS.viabilidade` (sobram Receitas · Financeiro), `subAtiva.viabilidade` default virou
+    `'receitas'`, o `case 'premissas'` de `_renderSubConteudo` foi removido (a página abre em
+    Receitas) e o `import './tela-premissas.js'` (não mais usado aqui) saiu. `frontend/tela-premissas.ts`
+    — **guard defensivo**: `render()` retorna `nothing` quando `nivel_analise === 'avancado'`.
+  - **Preliminar 100% intocado:** `tela-estudo.ts` monta `viab-tela-premissas` só no ramo Preliminar
+    (o custom element segue registrado pelo import de `tela-estudo`); o guard `=== 'avancado'` não
+    afeta o Preliminar. Testes das puras `premissas-conversao`/`premissas-validacao` (ainda usadas
+    pelo Preliminar) seguem verdes.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~266.7kb). Sem schema/backend → empacotamento
+  não se aplica. ⏳ Render real (auto-save silencioso + navegação Viabilidade sem Premissas) só
+  valida no deploy dev.
+>>>>>>> cc093f9 (fix(sessao-s6): corrige race em campos de texto (#87) e remove Premissas do Avançado (#88))
 
 ### Sessão S3 — Preliminar Proforma: Bugs de exibição — ✅ IMPLEMENTADA (issues #77, #78)
 Branch `claude/sessao-s3-hcnifg` (PR #136). Mudança **100% frontend** (`frontend/tela-proforma.ts`) —
