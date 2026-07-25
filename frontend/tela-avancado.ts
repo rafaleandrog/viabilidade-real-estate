@@ -2,7 +2,6 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { urbiVerso } from './viabilidade-api.js';
-import './tela-premissas.js';
 import './tela-cenarios.js';
 import './tela-apelo.js';
 import './tela-fluxo-cronograma.js';
@@ -30,7 +29,7 @@ import './tela-resumo.js';
 // Mapa de páginas → conteúdo (#40: "Obra" renomeada para "Custos"):
 //   Resumo            → Resumo consolidado
 //   Empreendimento    → Informações · Cronograma · Tipologias
-//   Viabilidade       → Premissas · Receitas · Financeiro
+//   Viabilidade       → Receitas · Financeiro (Premissas removida no Avançado · #88)
 //   Custos            → Terreno · Obra · Diretos · Indiretos · Financeiro
 //   Fluxo de Caixa    → Ver Fluxo
 //   Cenários          → Simulação de cenários (sliders + fluxo do cenário)
@@ -61,8 +60,11 @@ const SUBABAS: Partial<Record<AbaTopo, SubAba[]>> = {
     { id: 'cronograma',  label: 'Cronograma',  icone: 'fa-solid fa-calendar-days' },
     { id: 'tipologias',  label: 'Tipologias',  icone: 'fa-solid fa-table-list' },
   ],
+  // Premissas removida no Avançado (#88): todo o seu conteúdo (áreas/produtos/
+  // custos/impostos/deduções estáticos) só faz sentido no Preliminar. Os campos
+  // seguem no schema — proforma.ts ainda os lê para os KPIs do Resumo — mas sem
+  // superfície de edição aqui. Sobram Receitas e Financeiro.
   viabilidade: [
-    { id: 'premissas',  label: 'Premissas',  icone: 'fa-solid fa-sliders' },
     { id: 'receitas',   label: 'Receitas',   icone: 'fa-solid fa-hand-holding-dollar' },
     { id: 'financeiro', label: 'Financeiro', icone: 'fa-solid fa-percent' },
   ],
@@ -100,7 +102,7 @@ export class ViabTelaAvancado extends LitElement {
   // Aba ativa por página (default: 1ª aba de cada uma).
   @state() private subAtiva: Record<string, string> = {
     empreendimento: 'informacoes',
-    viabilidade: 'premissas',
+    viabilidade: 'receitas',
     obra: 'terreno',
   };
 
@@ -212,13 +214,12 @@ export class ViabTelaAvancado extends LitElement {
     }
     if (topo === 'viabilidade') {
       switch (sub) {
-        case 'receitas':
-          return html`<viab-fluxo-receitas .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-fluxo-receitas>`;
         case 'financeiro':
           return html`<viab-tela-financeiro .estudo=${this.estudo} .editavel=${this._editavelPremissas}></viab-tela-financeiro>`;
-        case 'premissas':
+        // Premissas removida no Avançado (#88): a página abre em Receitas.
+        case 'receitas':
         default:
-          return html`<viab-tela-premissas .estudo=${this.estudo} .editavel=${this._editavelPremissas}></viab-tela-premissas>`;
+          return html`<viab-fluxo-receitas .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-fluxo-receitas>`;
       }
     }
     if (topo === 'obra') {

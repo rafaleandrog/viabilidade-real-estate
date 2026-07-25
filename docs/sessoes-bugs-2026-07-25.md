@@ -27,7 +27,7 @@ Substitua `X` pelo número da sessão desejada. O Claude vai carregar os issues 
 | **S3** | Preliminar Proforma: Bugs de exibição | #77 #78 | M | — |
 | **S4** | Empreendimento: Texto & Layout | #79 #80 #81 #82 #83 | F | — |
 | **S5** | Empreendimento Cronograma: Regras e bug Gantt | #84 #85 #86 | M | — |
-| **S6** | Empreendimento: Bugs difíceis | #87 #88 | D | — |
+| **S6** ✅ | Empreendimento: Bugs difíceis | #87 #88 | D | — |
 | **S7** | Feature: Imagem Principal + Thumbnail | #89 #90 | D | — |
 | **S8** | Receitas: CSS, Layout & Texto | #91 #92 #93 #94 #95 #96 #97 #98 #99 #100 #101 #102 | F | — |
 | **S9** | Receitas: UI & Validação | #103 #104 #105 #106 | M | S5 |
