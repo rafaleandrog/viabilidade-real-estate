@@ -14,6 +14,7 @@ type Grupo = 'deducoes' | 'direto' | 'indireto';
 interface Linha {
   l: string; v: number;
   tipo?: 'receita' | 'consolidado' | 'resultado';
+  natureza?: 'receita';   // #74: consolidado de receita (fundo verde)
   grupo?: Grupo;          // #9: sub-linha colapsável do grupo cujo total é o header
   toggle?: Grupo;         // #9: linha-total (header) que colapsa o grupo abaixo dela
   semPermuta?: boolean;   // #10: linha "VGV sem permuta" (itálico, sub-linha de contexto)
@@ -70,6 +71,11 @@ export class ViabTelaProforma extends LitElement {
       font-weight: 700; background: var(--cor-superficie-hover, rgba(255,255,255,0.08));
       color: var(--cor-texto-forte, rgba(255,255,255,0.95));
     }
+    /* #74 — Receita líquida e operacional: fundo verde (consolidado de receita). */
+    .pf tr.consolidado.nat-receita td {
+      background: color-mix(in srgb, var(--cor-sucesso) 14%, transparent);
+      color: var(--cor-sucesso);
+    }
     /* Tipo 3 — Resultado final (bold + grande + highlight forte). #13: espaço extra
        acima, separando o Resultado da última linha de custos (onde saiu o memo). */
     .pf tr.resultado td {
@@ -81,8 +87,8 @@ export class ViabTelaProforma extends LitElement {
     .pf tr.resultado td.neg { color: var(--cor-erro, #D45A3A); }
     /* Tipo 4 — Itens/sub-linhas (discreto/neutro). */
     .pf tr.item td { color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
-    /* #8 — "VGV sem permuta": itálico (linha de contexto). */
-    .pf tr.italico td { font-style: italic; }
+    /* #8/#73 — "VGV sem permuta": itálico + fundo neutro diferenciado. */
+    .pf tr.italico td { font-style: italic; background: var(--cor-superficie, rgba(255,255,255,0.04)); }
     /* #8 — 2ª coluna de descrição da conta: texto menor e itálico, cinza; o
        padding da célula garante o respiro (não cola no título). */
     .pf td.desc {
@@ -101,6 +107,8 @@ export class ViabTelaProforma extends LitElement {
     /* Badges dos cenários (cabeçalho) e dos indicadores centralizados na coluna. */
     .pf.sens .sens-cab { display: flex; justify-content: center; }
     .pf.sens td .sens-cab { padding: 2px 0; }
+    /* #76 — valores da sensibilidade em negrito. */
+    .pf.sens td.num { font-weight: 700; }
     /* #11 — unidades e preço médio por tipo. */
     .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; }
     .ut-item { display: flex; flex-direction: column; gap: 2px; }
@@ -218,7 +226,7 @@ export class ViabTelaProforma extends LitElement {
     linhas.push({ l: '(-) Marketing', v: p.marketing, grupo: 'deducoes', memo: `${pct(e.marketing_percentual)} do VGV` });
     linhas.push({ l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, grupo: 'deducoes', ocultarSeZero: true, memo: permutaFinRMemo });
     linhas.push({ l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, grupo: 'deducoes', ocultarSeZero: true, memo: permutaFinNRMemo });
-    linhas.push({ l: '= Receita líquida', v: p.receitaLiquida, tipo: 'consolidado' });
+    linhas.push({ l: '= Receita líquida', v: p.receitaLiquida, tipo: 'consolidado', natureza: 'receita' });
     // #9: totais de custo invertidos — o total é o header do grupo colapsável.
     linhas.push({ l: '= Custo direto total', v: p.custoDiretoTotal, tipo: 'consolidado', toggle: 'direto' });
     linhas.push({ l: '(-) Terreno', v: p.custoTerreno, grupo: 'direto', memo: terrenoMemo });
@@ -232,7 +240,7 @@ export class ViabTelaProforma extends LitElement {
     linhas.push({ l: '(-) Manutenção pós-obra', v: p.manutencao, grupo: 'direto', memo: `${pct(e.manutencao_pct)} do VGV` });
     linhas.push({ l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true, grupo: 'direto', memo: `${pct(e.contingencias_pct)} do VGV` });
     // Receita operacional = receita líquida − custo direto total (antes dos indiretos).
-    linhas.push({ l: '= Receita operacional', v: p.receitaOperacional, tipo: 'consolidado' });
+    linhas.push({ l: '= Receita operacional', v: p.receitaOperacional, tipo: 'consolidado', natureza: 'receita' });
     linhas.push({ l: '= Custo indireto total', v: p.custoIndiretoTotal, tipo: 'consolidado', toggle: 'indireto' });
     linhas.push({ l: '(-) Marketing global e estrutura', v: p.marketingGlobal, grupo: 'indireto', memo: `${pct(e.marketing_global_pct)} do VGV${lot ? ' + stand' : ''}` });
     // #13: rename "Gestão e outros indiretos" → "…custos indiretos".
@@ -290,7 +298,7 @@ export class ViabTelaProforma extends LitElement {
           </thead>
           <tbody>
             ${linhas.map((r) => {
-              const cls = `${r.tipo ?? 'item'}${r.semPermuta ? ' italico' : ''}`;
+              const cls = `${r.tipo ?? 'item'}${r.semPermuta ? ' italico' : ''}${r.natureza ? ` nat-${r.natureza}` : ''}`;
               const sinal = r.tipo === 'resultado' ? (r.v < 0 ? 'neg' : 'pos') : '';
               return html`<tr class=${cls}>
                 <td>
@@ -303,7 +311,7 @@ export class ViabTelaProforma extends LitElement {
                 <td class="desc">${r.memo ?? ''}</td>
                 <td class="num ${sinal}">${this._fmtContabil(r)}</td>
                 <td class="num ${sinal}">${this._fmtContabilM2(r, p)}</td>
-                <td class="num">${this._pctVgv(r, p)}</td>
+                <td class="num ${sinal}">${this._pctVgv(r, p)}</td>
               </tr>`;
             })}
           </tbody>
