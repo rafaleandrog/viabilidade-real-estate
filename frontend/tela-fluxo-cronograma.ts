@@ -164,8 +164,10 @@ export class ViabFluxoCronograma extends LitElement {
   }
 
   private _linhaEvento(ev: any, dataInicio: string | null, dis: boolean): TemplateResult {
-    const travadoIni = Boolean(ev.travado_inicio);
-    const travadoDur = Boolean(ev.travado_duracao);
+    // #84 — pre_lancamento.inicio é sempre derivado (planejamento.inicio + 1)
+    const travadoIni = ev.evento === 'pre_lancamento' ? true : Boolean(ev.travado_inicio);
+    // #85 — lancamento.duracao agora é editável pelo usuário
+    const travadoDur = ev.evento === 'lancamento' ? false : Boolean(ev.travado_duracao);
     const cor = EVENTO_COR[ev.evento] || 'var(--cor-texto-sec)';
     return html`
       <tr style="border-left: 3px solid ${cor}">
@@ -278,6 +280,12 @@ export class ViabFluxoCronograma extends LitElement {
       if (res.custos_reancorados > 0) {
         urbiVerso.notificar(`${res.custos_reancorados} linha(s) de custo reancorada(s) ao novo cronograma.`, 'info');
       }
+      // #84 — ao mover o início do Planejamento, reancora automaticamente o Pré-lançamento
+      if (evento === 'planejamento' && 'inicio_mes' in dados) {
+        const novoPreLanc = Number(dados.inicio_mes) + 1;
+        const resPreLanc = await atualizarEventoCronograma(this.estudo.id, 'pre_lancamento', { inicio_mes: novoPreLanc });
+        if (!resPreLanc?.erro) this.crono = resPreLanc.dados || this.crono;
+      }
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar o cronograma', 'erro');
       this._carregarCronograma();
@@ -386,7 +394,7 @@ export class ViabFluxoCronograma extends LitElement {
                 ? svg`
                   <circle cx=${x + 4} cy=${y + rowH / 2} r="6" fill=${cor} />
                   ${marcador === '⭐' ? svg`
-                    <text x=${x + 4} y=${y + rowH / 2 - 8} font-size="13" text-anchor="middle"
+                    <text x=${x - 4} y=${y + rowH / 2 + 4} font-size="13" text-anchor="end"
                       dominant-baseline="middle">⭐</text>` : nothing}`
                 : svg`
                   <rect x=${x} y=${y + 6} width=${w} height=${rowH - 12} rx="3" fill=${cor}
@@ -395,7 +403,10 @@ export class ViabFluxoCronograma extends LitElement {
                     stroke-dasharray=${tracejado ? '4 3' : 'none'} />
                   ${marcador === '🔑' ? svg`
                     <text x=${xFim + 4} y=${y + rowH / 2 + 4} font-size="12"
-                      dominant-baseline="middle">🔑</text>` : nothing}`}
+                      dominant-baseline="middle">🔑</text>` : nothing}
+                  ${marcador === '⭐' ? svg`
+                    <text x=${x - 4} y=${y + rowH / 2 + 4} font-size="13" text-anchor="end"
+                      dominant-baseline="middle">⭐</text>` : nothing}`}
             `;
           })}
         </svg>
