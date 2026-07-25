@@ -1206,6 +1206,22 @@ Validação: typecheck ✓ · build ✓ · 25 testes ✓ · empacotar ✓ (offli
 ### Descoberta (Etapa 2) — glebas/lotes existem no Núcleo via `req.nucleo`
 Os tipos do SDK (`node_modules/@urbiverso/sdk/dist/express.d.ts`, `type EntidadeBatch`) listam `glebas`, `lotes`, `parcelamentos`, `unidades` como entidades do Núcleo acessíveis por `req.nucleo` (`batch`, `chamarSubrecurso`, `buscarPorChave`). Ou seja: **glebas/lotes existem** como entidades — só não há supertipo `imoveis` nem rota REST dedicada em `nucleo/backend/src/rotas/`. Isso **refina** (não invalida) a decisão da Etapa 1: MVP segue manual; a integração "Buscar terreno" usará `req.nucleo` e `permissoes_nucleo: { glebas: "leitura", lotes: "leitura" }`. Ver `[[nucleo-imoveis-nao-existe-usar-manual]]`.
 
+---
+
+## Sessão S4 — Empreendimento: Texto & Layout — ✅ CONCLUÍDA
+
+Branch `claude/s4-empreendimento-texto-layout` (PR #137 mergeada). Mudanças **100% frontend** (CSS/texto puro), sem schema/backend/migração. `versao` intacta.
+
+- **#79 (texto Cronograma):** "Fases comerciais" → "Fases customizadas" (linha 148 de `tela-fluxo-cronograma.ts`)
+- **#80 (CSS Tipologias):** aumentar `font-size` em `tr.total td` para 0.9rem
+- **#81 (CSS Tipologias):** reduzir largura de `col.c-nome` de `auto` para 150px
+- **#82 (CSS Tipologias):** igualar `col.c-perm` de 200px para 100px (mesma largura de `col.c-un`)
+- **#83 (texto Tipologias):** "Un. permutadas" → "Unidades permutadas" (cabeçalho da tabela)
+
+**Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde).
+
+---
+
 ## Pendências v2 (fora do MVP)
 - Nível "Avançado" do estudo (dimensão temporal). MVP é só "Preliminar".
 - Layout definitivo dos relatórios PDF/Excel (referência visual do autor ainda não fornecida).
