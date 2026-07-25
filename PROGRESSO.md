@@ -360,6 +360,26 @@ sem schema/backend/motor/migração; `versao` intacta. Sem pré-requisitos.
   (`bash scripts/validar-frontend.sh` verde; bundle ~265.8kb). Sem schema/backend → empacotamento não se
   aplica. ⏳ Render real do alinhamento só valida no deploy dev.
 
+### Sessão S8 — Receitas: CSS, Layout & Texto — ✅ IMPLEMENTADA (issues #91–#102)
+Branch `claude/sessao-s8-cq2y5p` (PR #142). Mudança **100% frontend** (`frontend/tela-fluxo-receitas.ts`) —
+sem schema/backend/motor/migração; `versao` intacta. Sem pré-requisitos.
+
+- **#91 (cor do botão Fluxo de Pagamento):** mudado de `variante="info"` (azul) para `variante="primario"` (roxo).
+- **#92 (cores das bolas de status):** pendente amarela → vermelha (`--cor-erro`); aplicado verde → azul (`--cor-info`).
+- **#93 (reduzir largura Tipologia):** `col.c-tipo` de `auto` → `120px`.
+- **#94 (aumentar largura Preço / m²):** `col.c-preco` de `110px` → `150px` (cabe 5 dígitos).
+- **#95 (remover R$ de Preço unitário/total):** substituído `fmtR$()` por `toLocaleString()` sem prefixo.
+- **#96 (Preço total → VGV):** título da coluna alterado na tabela de alocações.
+- **#97 (Adicionar Alocação → Adicionar tipologia):** texto do botão renomeado.
+- **#98 (texto Absorção → 4 períodos):** descritivo do modal atualizado para explicar os 4 períodos explicitamente.
+- **#99 (remover "(calculado)" Pós-obra):** sufixo removido do label na tabela de Absorção.
+- **#100 (reduzir campos % e parcelas):** labels abreviados ("% do total" → "%", "Nº parcelas" → "Parcelas").
+- **#101 (remover "(calculado)" Repasse + fórmula):** label "Repasse (calculado)" → "Repasse"; removida linha explicativa.
+- **#102 (Comissão → Corretagem):** label do checkbox renomeado no modal Fluxo de Pagamento.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~265.9kb). Sem schema/backend → empacotamento não se
+  aplica. ⏳ Render real dos campos/modais só valida no deploy dev.
+
 ---
 
 ## Rodada 2 — Etapas (2026-07-22)
