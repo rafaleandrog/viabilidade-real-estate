@@ -145,7 +145,7 @@ export class ViabFluxoCronograma extends LitElement {
             <tr><td colspan="5" class="secao-titulo">Fases fixas</td></tr>
             ${this.crono.map((ev) => this._linhaEvento(ev, dataInicio, dis))}
             ${this.fases.length > 0 ? html`
-              <tr><td colspan="5" class="secao-titulo">Fases comerciais</td></tr>
+              <tr><td colspan="5" class="secao-titulo">Fases customizadas</td></tr>
               ${this.fases.map((f, i) => this._linhaFase(f, i, dataInicio, dis))}
             ` : nothing}
           </tbody>
