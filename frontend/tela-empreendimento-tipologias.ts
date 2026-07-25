@@ -59,13 +59,13 @@ export class ViabEmpreendimentoTipologias extends LitElement {
       overflow: hidden;
     }
     /* Larguras por coluna (th e td herdadas do table-layout: fixed) */
-    col.c-nome   { width: auto; }
+    col.c-nome   { width: 150px; }
     col.c-tipo   { width: 160px; }
     col.c-area   { width: 130px; }
     col.c-dorm   { width: 90px; }
     col.c-vagas  { width: 90px; }
     col.c-un     { width: 100px; }
-    col.c-perm   { width: 200px; }
+    col.c-perm   { width: 100px; }
     col.c-acao   { width: 90px; }
 
     table.tip td.nome urbi-input { width: 100%; }
@@ -81,7 +81,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
 
     tr.total td {
       font-weight: 700; border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2));
-      border-bottom: none; padding-top: 10px;
+      border-bottom: none; padding-top: 10px; font-size: 0.9rem;
     }
     .acoes-topo { margin-top: 16px; }
     .vazio { padding: 8px 0; }
@@ -154,7 +154,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
             <th class="num">Área privativa</th>
             ${lote ? nothing : html`<th class="num">Dormitórios</th><th class="num">Vagas</th>`}
             <th class="num">Unidades</th>
-            <th class="num">Un. permutadas</th>
+            <th class="num">Unidades permutadas</th>
             ${dis ? nothing : html`<th></th>`}
           </tr>
         </thead>
