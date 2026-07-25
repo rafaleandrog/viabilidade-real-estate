@@ -339,6 +339,25 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ## Rodada 3 — Sessões (2026-07-25) — `docs/sessoes-bugs-2026-07-25.md`
 
+### Sessão S5 — Empreendimento Cronograma: Regras e bug Gantt — ✅ IMPLEMENTADA (issues #84, #85, #86)
+Branch `claude/sessao-s5-rx8lrh` (PR #139). Mudança **100% frontend** (`frontend/tela-fluxo-cronograma.ts`) —
+sem schema/backend/migração; `versao` intacta. Sem pré-requisitos.
+
+- **#84 (Pré-lançamento derivado de Planejamento):** `pre_lancamento.inicio_mes` agora é sempre
+  travado na UI (flag forçado para `true` no frontend, independente do servidor). Ao salvar
+  `planejamento.inicio_mes`, o componente faz um segundo PATCH automático para `pre_lancamento` com
+  `inicio_mes = planejamento.inicio_mes + 1`. O array `crono` é atualizado com o retorno do segundo PATCH.
+- **#85 (Duração do Lançamento editável):** para o evento `lancamento`, `travadoDur` é forçado para
+  `false` no frontend — o campo passa a ser editável como as demais fases, removendo a trava que vinha
+  do flag do servidor.
+- **#86 (Estrela à esquerda da barra):** a estrela ⭐ era renderizada em `x + 4` (em cima do início
+  da barra). Corrigida para `x - 4` com `text-anchor="end"` — imediatamente à esquerda. Também
+  adicionado suporte à estrela no branch `rect` (duração > 1 mês), já que após #85 o Lançamento pode
+  ter qualquer duração.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde). Sem schema/backend → empacotamento não se aplica.
+  ⏳ Render real do Gantt e do cascade-save só valida no deploy dev.
+
 ### Sessão S3 — Preliminar Proforma: Bugs de exibição — ✅ IMPLEMENTADA (issues #77, #78)
 Branch `claude/sessao-s3-hcnifg` (PR #136). Mudança **100% frontend** (`frontend/tela-proforma.ts`) —
 sem schema/backend/motor/migração; `versao` intacta. Sem pré-requisitos.
