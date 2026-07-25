@@ -337,6 +337,20 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ---
 
+## Rodada 3 — Sessões (2026-07-25) — `docs/sessoes-bugs-2026-07-25.md`
+
+### Sessão S1 — Cores de avisos em Premissas — ✅ IMPLEMENTADA (issues #71, #72)
+Branch `claude/sessao-s1-mlvqrq`. Mudança **100% frontend** (1 linha de template). `versao` intacta.
+
+- **#71 (banner dirty em amarelo):** o código já usava `variante="alerta"` desde a Etapa 1/#36.
+  Confirmado e fechado sem alteração.
+- **#72 (banner preço sugerido em azul):** `variante="alerta"` → `variante="info"` em
+  `tela-premissas.ts` (linha do banner de preço sugerido). Semântica correta: preço sugerido
+  é informação de referência, não alerta de ação pendente.
+- **Validação:** typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓.
+
+---
+
 ## Rodada 2 — Etapas (2026-07-22)
 
 ### Etapa 8 — Cenários — ✅ IMPLEMENTADA (issue #56)

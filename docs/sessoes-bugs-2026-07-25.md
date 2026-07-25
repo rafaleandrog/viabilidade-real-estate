@@ -22,7 +22,7 @@ Substitua `X` pelo número da sessão desejada. O Claude vai carregar os issues 
 
 | Sessão | Tema | Issues | Dif. | Pré-requisitos |
 |--------|------|--------|------|----------------|
-| **S1** | Preliminar Premissas: Cores de avisos | #71 #72 | F | — |
+| **S1** | Preliminar Premissas: Cores de avisos | #71 #72 | F | — | ✅ |
 | **S2** | Preliminar Proforma: Cores | #73 #74 #75 #76 | F | — |
 | **S3** | Preliminar Proforma: Bugs de exibição | #77 #78 | M | — |
 | **S4** | Empreendimento: Texto & Layout | #79 #80 #81 #82 #83 | F | — |
