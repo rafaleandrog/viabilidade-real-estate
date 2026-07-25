@@ -81,12 +81,13 @@ export class ViabFluxoReceitas extends LitElement {
     /* Larguras por coluna (th e td herdadas do table-layout: fixed) */
     col.c-tipo   { width: auto; }
     col.c-area   { width: 120px; }
+    col.c-total  { width: 68px; }
     col.c-un     { width: 92px; }
     col.c-saldo  { width: 68px; }
     col.c-preco  { width: 110px; }
     col.c-punit  { width: 120px; }
     col.c-ptotal { width: 120px; }
-    col.c-acao   { width: 92px; }
+    col.c-acao   { width: 56px; }
     table.aloc td viab-num { width: 100%; }
     table.aloc td.tipo urbi-select { width: 100%; }
 
@@ -281,6 +282,7 @@ export class ViabFluxoReceitas extends LitElement {
         <colgroup>
           <col class="c-tipo">
           <col class="c-area">
+          <col class="c-total">
           <col class="c-un">
           <col class="c-saldo">
           <col class="c-preco">
@@ -292,11 +294,12 @@ export class ViabFluxoReceitas extends LitElement {
           <tr>
             <th>${lote ? 'Lote' : 'Tipologia'}</th>
             <th class="num">Área privativa</th>
+            <th class="num">Total</th>
             <th class="num">Unidades</th>
             <th class="num">Saldo</th>
             <th class="num">Preço / m²</th>
             <th class="num">Preço unitário</th>
-            <th class="num">Preço total</th>
+            <th class="num">VGV</th>
             ${dis ? nothing : html`<th></th>`}
           </tr>
         </thead>
@@ -325,6 +328,7 @@ export class ViabFluxoReceitas extends LitElement {
           ></urbi-select>
         </td>
         <td class="num">${area ? `${area.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²` : '—'}</td>
+        <td class="num">${tip ? n(tip.quantidade) : '—'}</td>
         <td class="num">
           <viab-num casas-decimais="0" ?desabilitado=${dis}
             .valor=${a.unidades !== null && a.unidades !== undefined ? Number(a.unidades) : null}
@@ -626,9 +630,16 @@ export class ViabFluxoReceitas extends LitElement {
 
   private _addLinha(bloco: 'entrada' | 'parcelas') {
     const f = this.pagForm;
-    const nova = bloco === 'entrada'
-      ? { pct: 0, parcelas: 1 }
-      : { periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 0 };
+    if (bloco === 'parcelas' && f.parcelas.length >= 4) return; // #105 — máximo 4
+    let nova: any;
+    if (bloco === 'entrada') {
+      nova = { pct: 0, parcelas: 1 };
+    } else {
+      // #105 — escolhe a primeira periodicidade ainda não usada
+      const usadas = new Set(f.parcelas.map((p: any) => p.periodicidade));
+      const disponivel = PERIODICIDADES.find((per) => !usadas.has(per)) ?? 'mensal';
+      nova = { periodicidade: disponivel, parcelas: 0, ao_longo_obra: true, juros: false, pct: 0 };
+    }
     this.pagForm = { ...f, [bloco]: [...f[bloco], nova] };
   }
 
@@ -685,23 +696,27 @@ export class ViabFluxoReceitas extends LitElement {
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0" ?desabilitado=${dis} .valor=${e.parcelas}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('entrada', i, 'parcelas', ev.detail.valor ?? 1)}></viab-num>
                   ${!dis && f.entrada.length > 1 ? html`
-                    <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-xmark"
+                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
                       @click=${() => this._delLinha('entrada', i)}></urbi-botao>` : nothing}
                 </div>`)}
               ${!dis ? html`
-                <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus"
+                <urbi-botao variante="secundario" pequeno icone="fa-solid fa-plus"
                   @click=${() => this._addLinha('entrada')}>Adicionar entrada</urbi-botao>` : nothing}
             </div>
             <div class="pag-secao">
               <h4>Parcelamento</h4>
-              ${f.parcelas.map((p: any, i: number) => html`
+              ${f.parcelas.map((p: any, i: number) => {
+                // #105 — periodicidades já usadas por OUTRAS linhas (para desabilitar badges)
+                const perUsadas = new Set(f.parcelas.filter((_: any, j: number) => j !== i).map((x: any) => x.periodicidade));
+                return html`
                 <div class="pag-linha">
                   <viab-num label="% do total" sufixo="%" ?desabilitado=${dis} .valor=${p.pct}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'pct', ev.detail.valor ?? 0)}></viab-num>
                   <span class="badges-par">
                     ${PERIODICIDADES.map((per) => html`
                       <urbi-badge cor="info" interativo ?ativo=${p.periodicidade === per}
-                        @click=${() => { if (!dis) this._setLinha('parcelas', i, 'periodicidade', per); }}>${ROTULO_PER[per]}</urbi-badge>`)}
+                        ?desabilitado=${!dis && perUsadas.has(per) && p.periodicidade !== per}
+                        @click=${() => { if (!dis && !perUsadas.has(per)) this._setLinha('parcelas', i, 'periodicidade', per); }}>${ROTULO_PER[per]}</urbi-badge>`)}
                   </span>
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0"
                     ?desabilitado=${dis || p.ao_longo_obra} .valor=${p.parcelas}
@@ -709,11 +724,12 @@ export class ViabFluxoReceitas extends LitElement {
                   <urbi-checkbox label="Ao longo da obra" ?desabilitado=${dis} ?marcado=${p.ao_longo_obra}
                     @urbi:checkbox-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'ao_longo_obra', ev.detail.marcado)}></urbi-checkbox>
                   ${!dis && f.parcelas.length > 1 ? html`
-                    <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-xmark"
+                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
                       @click=${() => this._delLinha('parcelas', i)}></urbi-botao>` : nothing}
-                </div>`)}
-              ${!dis ? html`
-                <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus"
+                </div>`;
+              })}
+              ${!dis && f.parcelas.length < 4 ? html`
+                <urbi-botao variante="secundario" pequeno icone="fa-solid fa-plus"
                   @click=${() => this._addLinha('parcelas')}>Adicionar parcelamento</urbi-botao>` : nothing}
             </div>
             <div class="pag-secao">
