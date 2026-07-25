@@ -1187,6 +1187,29 @@ Validação: typecheck ✓ · build ✓ · 25 testes ✓ · empacotar ✓ (offli
 
 ---
 
+## Sessões de bugs 2026-07-25 (`docs/sessoes-bugs-2026-07-25.md`)
+
+### Sessão S2 — Preliminar Proforma: Cores — ✅ IMPLEMENTADA (issues #73, #74, #75, #76)
+Branch `claude/sessao-s2-336yv0`. Mudança **100% frontend** (CSS + classes em `tela-proforma.ts`).
+`versao` intacta. PR #135 mergeado na `main`.
+
+- **#73 (fundo neutro na linha "VGV sem permuta física"):** `.pf tr.italico td` ganhou
+  `background: var(--cor-superficie)` — fundo discreto que diferencia a linha sem chamar atenção.
+- **#74 (fundo verde em Receita líquida e Receita operacional):** interface `Linha` ganhou
+  campo opcional `natureza?: 'receita'`; as duas linhas foram marcadas; classe `nat-receita`
+  aplicada no `<tr>`; CSS `.pf tr.consolidado.nat-receita td` usa `color-mix(--cor-sucesso 14%)`
+  no fundo e `--cor-sucesso` no texto. Os outros `consolidado` (Deduções, Custo direto/indireto)
+  não são afetados.
+- **#75 (% VGV da linha Resultado em verde):** a célula da coluna `% VGV` recebia `class="num"`
+  sem sinal; corrigido para `class="num ${sinal}"` — fica verde/vermelho consistentemente com
+  as demais colunas da linha.
+- **#76 (valores da sensibilidade em negrito):** `.pf.sens td.num { font-weight: 700 }` — todos
+  os valores numéricos da tabela de análise de sensibilidade em negrito.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde). Empacotamento/backend não se aplicam.
+
+---
+
 ## Demonstração estática (GitHub Pages)
 - **`index.html`** (raiz) + **`demo/demo.ts`→`demo/demo.js`** (bundle versionado) + **`demo/mock.ts`** (mock de `window.urbiVerso` com backend fake em memória: estudos/membros/imóveis/benchmarks seed, roteamento por hash, toasts). Reusa os componentes reais do frontend.
 - **`.nojekyll`** na raiz; script `pnpm run build:demo` (esbuild bundla lit inline, self-contained).
