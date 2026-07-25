@@ -574,7 +574,7 @@ export class ViabTelaPremissas extends LitElement {
         </div>
         ${!lot ? this._unidadesTipo(p) : nothing}
         ${piso
-          ? html`<urbi-banner variante="alerta">
+          ? html`<urbi-banner variante="info">
               Preço sugerido/m² para atingir o piso de resultado final (${fmtPctEntrada(Number(piso.valor))}):
               <strong>${precoSug !== null ? fmtR$(precoSug) + '/m²' : 'inatingível com as premissas atuais'}</strong>
             </urbi-banner>`
