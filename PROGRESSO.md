@@ -339,6 +339,47 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ## Rodada 3 — Sessões (2026-07-25) — `docs/sessoes-bugs-2026-07-25.md`
 
+### Sessão S7 — Imagem Principal + Thumbnail — ✅ IMPLEMENTADA (issues #89, #90)
+Branch `claude/sessao-s7-8hzz7a`. Toca **backend + frontend** (sem schema novo, sem migração —
+a tabela `estudo_documentos` e a categoria `imagem_principal` já existiam do Lote 4). `versao`
+intacta. Sem pré-requisitos.
+
+- **Infra reaproveitada:** `estudo_documentos` (FK `estudo_id`, coluna `categoria` com opção
+  `imagem_principal`, coluna `documento` tipo `arquivo`) e as rotas `GET/POST/DELETE
+  /estudos/:id/empreendimento/documentos` já existiam (Lote 4 · #16). S7 só acrescentou a
+  **UI de capa com prévia**, a **exibição** (URL assinada) e o **thumbnail na lista**.
+- **Servir imagem de tabela `restrito` (chave da sessão):** `estudo_documentos` é
+  `acesso_externo: "restrito"` → o download genérico por sessão responde `403
+  DADOS_ACESSO_RESTRITO`. Por isso a imagem é servida por **URL assinada** gerada no backend via
+  `req.arquivos.url(arquivoId, 3600)` (token `sset_…` libera mesmo em tabela restrita; padrão do
+  `editor_nucleo`). O valor de `estudo_documentos.documento` é o **id do arquivo**.
+- **#89 (anexar imagem principal — Preliminar e Avançado):**
+  - Novo componente reutilizável `frontend/viab-imagem-principal.ts` (`viab-imagem-principal`):
+    carrega os documentos, filtra `imagem_principal`, mostra a **prévia** (`<img src=doc.url>`) +
+    seletor de arquivo (Adicionar/Trocar) + Remover. **Capa é única** — ao anexar uma nova, a
+    anterior é removida. Emite `viab:imagem-principal-change`.
+  - `backend/rotas/empreendimento.ts`: o `GET …/empreendimento/documentos` agora anexa a **URL
+    assinada** (`url`) a cada anexo (via `req.arquivos.url`; arquivo ausente/expirado → `null`).
+  - `frontend/tela-premissas.ts`: novo card **"Imagem principal"** no topo, **só no Preliminar**
+    (`!avancado`) — o Avançado já tem a capa em Empreendimento → Informações.
+  - `frontend/tela-empreendimento-info.ts` (Avançado): `imagem_principal` **saiu** de `CATEGORIAS`
+    (que agora lista só renders/plantas) e ganhou **card próprio com prévia** usando o novo
+    componente.
+- **#90 (thumbnail na lista de estudos):**
+  - `backend/rotas/estudos.ts`: `GET /estudos` agora anexa `imagem_principal_url` (URL assinada da
+    capa) a cada estudo — **uma query** para todas as capas + `req.arquivos.url` por estudo com
+    imagem. Helper `anexarImagemPrincipal`; robusto a helper ausente/arquivo expirado (→ `null`).
+  - `frontend/tela-dashboard.ts`: nova **coluna de miniatura entre "Estudo" e "Tipo"** — `<img>`
+    48×36 com a `imagem_principal_url`, ou placeholder (`urbi-icone fa-image`) quando não há capa.
+  - **Desvio de arquivo-alvo (registrado):** o issue #90 apontava `tela-estudo.ts` +
+    `viabilidade-api.ts`, mas a **lista** de estudos vive em `tela-dashboard.ts` (`tela-estudo.ts`
+    é o **detalhe**). A URL da imagem vem enriquecida no `GET /estudos` (backend), então não foi
+    preciso novo wrapper em `viabilidade-api.ts`. Implementado onde a tabela realmente está.
+- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build
+  (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde; bundle ~269.8kb). ⏳ **Pendente do
+  autor (SDK gated):** typecheck do backend, suíte de backend, `urbi-empacotar` e o teste real do
+  fluxo `req.arquivos.url` (upload → prévia → thumbnail) contra dados reais / deploy dev.
+
 ### Sessão S3 — Preliminar Proforma: Bugs de exibição — ✅ IMPLEMENTADA (issues #77, #78)
 Branch `claude/sessao-s3-hcnifg` (PR #136). Mudança **100% frontend** (`frontend/tela-proforma.ts`) —
 sem schema/backend/motor/migração; `versao` intacta. Sem pré-requisitos.

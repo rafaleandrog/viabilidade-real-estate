@@ -9,6 +9,7 @@ import { converterUnidade, type ConvUnidade, type CtxConversao } from './premiss
 import { varianteFaixa } from './medidor-faixas.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
+import './viab-imagem-principal.js';
 
 type T = 'num' | 'txt';
 type Largura = 'p1' | 'p2' | 'p3';
@@ -368,6 +369,11 @@ export class ViabTelaPremissas extends LitElement {
     this._obrigCache = camposObrigatorios(this.form, this.estudo.tipo_empreendimento);
 
     return html`
+      ${!avancado ? html`
+        <urbi-card titulo="Imagem principal">
+          <viab-imagem-principal .estudo=${this.estudo} .editavel=${this.editavel}></viab-imagem-principal>
+        </urbi-card>` : nothing}
+
       <urbi-card titulo="Premissas">
         ${!avancado ? html`
           <div class="secao grupo grupo-a">
