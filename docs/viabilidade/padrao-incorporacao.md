@@ -10,9 +10,11 @@ ordem: 8
 
 > **App:** Estudo de Viabilidade (UrbiVerso) · **Tipo de empreendimento:** Incorporação (SIGLA `INC`)
 > **Escopo:** um empreendimento de incorporação (residencial e/ou não residencial), analisado como **Estudo Preliminar** (indicadores estáticos) ou **Avançado** (fluxo de caixa temporal). Loteamento tem seu próprio conjunto de premissas e não é coberto aqui.
-> **Uso:** referência canônica de como o app raciocina sobre a viabilidade de uma incorporação e de onde cada conceito vive no código (`schema.json`, `frontend/proforma.ts`, `frontend/fluxo-caixa-motor.ts`).
+> **Uso:** material de **contexto de negócio** para entender *por que* a viabilidade de uma incorporação funciona como funciona e onde cada conceito vive no código (`schema.json`, `frontend/proforma.ts`, `frontend/fluxo-caixa-motor.ts`).
 
-Este documento **não introduz vocabulário novo**: toda linguagem, convenção e fórmula aqui reflete o que já existe no app. Onde houver dúvida, valem as fontes de verdade: [Visão Geral](visao-geral), [Modelo de Dados](modelo-de-dados), [Fórmulas da Proforma](formulas), [Benchmarks e Sensibilidade](benchmarks), [Permissões e Ciclo de Vida](permissoes), `schema.json` e as engines cobertas por teste (`frontend/proforma.ts`, `frontend/fluxo-caixa-motor.ts`).
+> ⚠️ **Status: documento CONSULTIVO, não normativo.** Consulte-o para ganhar contexto de negócio ao implementar uma mudança, atualização ou resolver um issue — **nunca** o use como autoridade para *alterar* a lógica que já existe. Ele **descreve** o app; não o **define**. A verdade sobre comportamento está sempre no código, no `schema.json`, na spec (`docs/spec/estudo-de-viabilidade-spec.md`) e nos docs de referência. **Se este texto divergir do que o código faz, o código está certo e é ESTE documento que deve ser corrigido** — jamais o contrário. Uma mudança de comportamento nasce de uma issue/spec, não de uma frase daqui.
+
+Este documento **não introduz vocabulário novo** nem regra nova: toda linguagem, convenção e fórmula aqui apenas reflete o que já existe no app. Onde houver dúvida, valem as fontes de verdade: [Visão Geral](visao-geral), [Modelo de Dados](modelo-de-dados), [Fórmulas da Proforma](formulas), [Benchmarks e Sensibilidade](benchmarks), [Permissões e Ciclo de Vida](permissoes), `schema.json` e as engines cobertas por teste (`frontend/proforma.ts`, `frontend/fluxo-caixa-motor.ts`).
 
 ---
 
