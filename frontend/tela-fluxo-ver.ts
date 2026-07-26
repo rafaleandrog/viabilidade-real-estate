@@ -1,8 +1,8 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { type EventoCrono } from './fluxo-shared.js';
-import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
+import { periodosAnuais, type EventoCrono, type PeriodoAgregado } from './fluxo-shared.js';
+import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { graficoFluxoMensal, graficoFluxoAcumulado } from './fluxo-graficos.js';
 import { estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso } from './fluxo-tabela.js';
 import { exportarFluxoCSV, exportarFluxoPDF } from './exportar.js';
@@ -26,6 +26,8 @@ export class ViabFluxoVer extends LitElement {
   @state() private calc: FluxoCalc | null = null;
   @state() private colapso: Record<string, boolean> = {};
   @state() private faseFiltro = '';
+  /** View das colunas da tabela e dos gráficos (#127) — sempre uma das duas. */
+  @state() private visao: 'mensal' | 'anual' = 'mensal';
   private dados: {
     receitas: any[]; custos: any[]; curvas: any[];
     crono: EventoCrono[]; dataInicio: string | null; taxa: number;
@@ -92,6 +94,15 @@ export class ViabFluxoVer extends LitElement {
     this.calc = calcularFluxo(config);
   }
 
+  /**
+   * Faixas de meses da view Anual (#127) — `null` na view Mensal, em que cada
+   * coluna já é um mês. Derivadas da data de início e do prazo do cálculo.
+   */
+  private _periodos(): PeriodoAgregado[] | null {
+    if (this.visao !== 'anual' || !this.calc) return null;
+    return periodosAnuais(this.dados?.dataInicio ?? null, this.calc.prazo);
+  }
+
   render() {
     if (this.carregando) return html`<urbi-loading mensagem="Calculando fluxo de caixa..."></urbi-loading>`;
     const c = this.calc;
@@ -100,16 +111,22 @@ export class ViabFluxoVer extends LitElement {
         <urbi-estado-vazio icone="fa-solid fa-money-bill-transfer"
           mensagem="Defina o cronograma, receitas e custos para ver o fluxo de caixa."></urbi-estado-vazio>`;
     }
+    // A view (#127) só troca as COLUNAS: `exib` é o mesmo cálculo mensal com as
+    // colunas reagrupadas por ano. Os KPIs seguem lendo o cálculo mensal — TIR,
+    // VPL, payback e exposição são grandezas do fluxo mês a mês.
+    const periodos = this._periodos();
+    const exib = periodos ? agregarFluxoPorPeriodos(c, periodos) : c;
+    const titulo = this.visao === 'anual' ? 'Anual' : 'Mensal';
     return html`
       ${kpisFluxo(c)}
       ${this._renderControles()}
-      ${tabelaFluxo(c, this.dados?.dataInicio ?? null, this.colapso, (ch) => this._t(ch))}
+      ${tabelaFluxo(exib, this.dados?.dataInicio ?? null, this.colapso, (ch) => this._t(ch))}
       <div class="graficos">
-        <urbi-card titulo="Fluxo de Caixa Mensal">
-          <div class="graf-wrap"><div class="graf">${graficoFluxoMensal(c, this.dados?.dataInicio ?? null, this.dados?.crono ?? [])}</div></div>
+        <urbi-card titulo="Fluxo de Caixa ${titulo}">
+          <div class="graf-wrap"><div class="graf">${graficoFluxoMensal(exib, this.dados?.dataInicio ?? null, this.dados?.crono ?? [], periodos ?? undefined)}</div></div>
         </urbi-card>
         <urbi-card titulo="Fluxo de Caixa Acumulado">
-          <div class="graf-wrap"><div class="graf">${graficoFluxoAcumulado(c, this.dados?.dataInicio ?? null, this.dados?.crono ?? [])}</div></div>
+          <div class="graf-wrap"><div class="graf">${graficoFluxoAcumulado(exib, this.dados?.dataInicio ?? null, this.dados?.crono ?? [], periodos ?? undefined)}</div></div>
         </urbi-card>
       </div>
     `;
@@ -123,6 +140,14 @@ export class ViabFluxoVer extends LitElement {
         <urbi-botao variante="secundario" pequeno @click=${() => this._toggleTudo(!tudoRecolhido)}>
           ${tudoRecolhido ? 'Expandir tudo' : 'Recolher tudo'}
         </urbi-botao>
+        <div role="group" aria-label="Período das colunas">
+          <urbi-badge cor="info" interativo ?ativo=${this.visao === 'mensal'}
+            @click=${() => { this.visao = 'mensal'; }}
+          >Mensal</urbi-badge>
+          <urbi-badge cor="info" interativo ?ativo=${this.visao === 'anual'}
+            @click=${() => { this.visao = 'anual'; }}
+          >Anual</urbi-badge>
+        </div>
         ${fases.length > 1 ? html`
           <urbi-select
             .valor=${this.faseFiltro}
@@ -150,15 +175,26 @@ export class ViabFluxoVer extends LitElement {
 
   // ── Exportação ──
 
+  // CSV e PDF seguem a view selecionada (#127): exportam as mesmas colunas que
+  // estão na tela. As colunas Início/Duração e os KPIs continuam em meses.
+  private _exportavel(): FluxoCalc | null {
+    if (!this.calc) return null;
+    const periodos = this._periodos();
+    return periodos ? agregarFluxoPorPeriodos(this.calc, periodos) : this.calc;
+  }
+
   private _csv = () => {
-    if (!this.calc) return;
-    exportarFluxoCSV(this.estudo, this.calc, this.dados?.dataInicio ?? null);
+    const c = this._exportavel();
+    if (!c) return;
+    exportarFluxoCSV(this.estudo, c, this.dados?.dataInicio ?? null);
     urbiVerso.notificar('CSV do fluxo exportado.', 'sucesso');
   };
 
   private _pdf = () => {
-    if (!this.calc) return;
-    const ok = exportarFluxoPDF(this.estudo, this.calc, this.dados?.dataInicio ?? null);
+    const c = this._exportavel();
+    if (!c) return;
+    const ok = exportarFluxoPDF(this.estudo, c, this.dados?.dataInicio ?? null,
+      this.visao === 'anual' ? 'Anos' : 'Meses');
     if (!ok) urbiVerso.notificar('Permita pop-ups para exportar o PDF.', 'alerta');
   };
 }

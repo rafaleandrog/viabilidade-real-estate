@@ -618,6 +618,53 @@ sem schema/backend/migração; `versao` intacta. Sem pré-requisitos.
   (`bash scripts/validar-frontend.sh` verde; bundle ~277.1kb). Sem schema/backend → empacotamento não
   se aplica. ⏳ Render real das cores de status, larguras e textos só valida no deploy dev.
 
+### Sessão S17 — Fluxo de Caixa: View Mensal/Anual — ✅ IMPLEMENTADA (issue #127)
+Branch `claude/sessao-s17-bus1bk`. Mudança **100% frontend** (`fluxo-shared.ts`, `fluxo-caixa-motor.ts`,
+`fluxo-graficos.ts`, `tela-fluxo-ver.ts`, `exportar.ts`) — sem schema/backend/migração; `versao` intacta.
+Pré-requisito S16: concluído e na `main`.
+
+- **#127 (badges Mensal/Anual para alternar a view do Fluxo):** dois `urbi-badge` **interativos e
+  exclusivos** (`cor="info"`, `?ativo`) ao lado do botão Expandir/Recolher tudo — um deles **sempre**
+  ativo, porque o estado é um enum `visao: 'mensal' | 'anual'` (default `mensal`), não dois booleanos.
+  Mesmo padrão de chip já usado em `tela-dashboard.ts` (nível de análise) e `tela-fluxo-custos.ts`.
+- **Arquitetura — agregação é de EXIBIÇÃO, não recálculo.** O motor continua calculando **mês a mês**;
+  a view Anual só reagrupa as colunas do resultado. Duas funções puras novas, ambas testadas:
+  - `fluxo-shared.ts` · **`periodosAnuais(dataInicio, prazo)`** → faixas de meses por **ano-calendário**
+    (`{ rotulo, inicio, fim }`). O corte segue o calendário real: com início em `abr/2027`, o 1º período é
+    2027 e cobre só abr→dez (9 meses); o último é truncado no fim do horizonte. As faixas são **contíguas
+    e cobrem exatamente todos os meses** — é o que garante que a soma anual bata com a mensal. Sem
+    `data_inicio_projeto` válida degrada para blocos de 12 meses rotulados "Ano 1", "Ano 2"… (mesma
+    degradação de `rotuloMesRelativo`).
+  - `fluxo-caixa-motor.ts` · **`agregarFluxoPorPeriodos(calc, periodos)`** → novo `FluxoCalc` com
+    `prazo`/`meses` por período. **Séries de fluxo** (receita, custo, fluxo, cada linha e cada tipologia):
+    **soma** dos meses da faixa → `Σ colunas = Σ meses` em **toda** linha, e cada linha continua batendo
+    com a sua coluna "Total". **Acumulado**: **último** mês da faixa (somar acumulados contaria o mesmo
+    caixa várias vezes) — é o saldo no fim do ano.
+- **O que NÃO muda com a view (decisão de negócio):** `vpl`, `tir`, `paybackMes`/`paybackData`,
+  `exposicaoMaxima`, `vgvTotal` e o `total`/`vpl` de cada linha. São grandezas do fluxo **mensal** — o VPL
+  desconta mês a mês e a exposição máxima é o pior saldo de um **mês**, não de um fim de ano. Os 4 KPIs do
+  topo seguem lendo o `FluxoCalc` mensal. `inicio`/`duracao` das linhas também continuam em **meses**
+  (é o calendário real da linha); quem desenha as colunas converte para índice de período.
+- **Gráficos:** rótulos do eixo X passaram de `rotuloMesRelativo(dataInicio, i)` para **`c.meses[i]`** —
+  no-op na view mensal (é literalmente o mesmo valor) e correto na anual. Marcos do cronograma e a linha
+  de payback continuam em meses e são posicionados por um mapeador mês→coluna (`colunaDoMes`), com
+  **fração dentro do ano** para não grudarem no início da coluna. O marcador de **exposição máxima** só
+  aparece quando o pior saldo cai no fim de um período (`indexOf` em `fluxoAcumulado`) — assim ele nunca
+  é desenhado em cima de um ponto que não é o mínimo real.
+- **Exportações seguem a view** (CSV e PDF exportam as mesmas colunas da tela). `exportarFluxoPDF` ganhou
+  o parâmetro opcional `rotuloColunas` ("Meses"/"Anos") só para o rodapé de paginação; as colunas
+  Início/Duração e os KPIs do PDF continuam em meses.
+- **Escopo intocado:** a aba **Cenários** (`tela-cenarios.ts`, que reusa `tabelaFluxo`/`kpisFluxo`) e a aba
+  **Resumo** seguem 100% mensais — a issue é da tela Fluxo de Caixa. `fluxo-tabela.ts` **não precisou de
+  mudança**: recebendo o `FluxoCalc` agregado, a tabela já renderiza uma coluna por período.
+- **Doc:** `docs/viabilidade/padrao-incorporacao.md` § 3.2 ganhou o parágrafo das views Mensal/Anual.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 88/88 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~278.9kb). **6 testes novos**: 4 de `periodosAnuais`
+  (anos parciais, ano cheio, degradação sem data, cobertura sem furo/sobreposição) e 2 de
+  `agregarFluxoPorPeriodos` (soma anual = soma mensal em todas as linhas e tipologias; acumulado =
+  saldo do último mês do ano + indicadores inalterados). Sem schema/backend → empacotamento não se
+  aplica. ⏳ Render real dos badges e das colunas anuais só valida no deploy dev.
+
 ---
 
 ## Rodada 2 — Etapas (2026-07-22)

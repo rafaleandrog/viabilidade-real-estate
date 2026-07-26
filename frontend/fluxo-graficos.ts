@@ -1,5 +1,5 @@
 import { html, svg, nothing, type TemplateResult } from 'lit';
-import { rotuloMesRelativo, type EventoCrono } from './fluxo-shared.js';
+import { rotuloMesRelativo, type EventoCrono, type PeriodoAgregado } from './fluxo-shared.js';
 import type { FluxoCalc } from './fluxo-caixa-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -35,11 +35,34 @@ function marcos(crono: EventoCrono[]): { mes: number; rotulo: string }[] {
   return out;
 }
 
+/**
+ * Converte um MÊS relativo na posição (índice de coluna, fracionário) do eixo X.
+ * Na view mensal é a identidade; na view agregada por período (#127) devolve o
+ * índice do período que contém o mês + a fração percorrida dentro dele, para
+ * que marcos e payback caiam no ponto certo do ano e não no início da coluna.
+ */
+function colunaDoMes(periodos?: PeriodoAgregado[]): (mes: number) => number {
+  if (!periodos || periodos.length === 0) return (mes) => mes;
+  return (mes) => {
+    const i = periodos.findIndex((p) => mes >= p.inicio && mes <= p.fim);
+    if (i < 0) return mes <= periodos[0].inicio ? 0 : periodos.length - 1;
+    const p = periodos[i];
+    return i + (mes - p.inicio) / (p.fim - p.inicio + 1);
+  };
+}
+
+/**
+ * Gráfico de barras do fluxo por coluna. `periodos` só é passado na view
+ * agregada (#127) — nela `c` já vem de `agregarFluxoPorPeriodos` e serve para
+ * posicionar no eixo os marcos do cronograma, que continuam em meses.
+ */
 export function graficoFluxoMensal(
   c: FluxoCalc,
   dataInicio: string | null,
   crono: EventoCrono[],
+  periodos?: PeriodoAgregado[],
 ): TemplateResult {
+  const col = colunaDoMes(periodos);
   const W = 900; const H = 260; const padL = 64; const padR = 10; const padT = 26; const padB = 24;
   const gw = W - padL - padR; const gh = H - padT - padB;
   const maxAbs = Math.max(1, ...c.fluxoMensal.map((v) => Math.abs(v)));
@@ -57,25 +80,32 @@ export function graficoFluxoMensal(
         <line x1=${padL} y1=${y(v)} x2=${W - padR} y2=${y(v)} stroke="var(--cor-borda-sutil, rgba(128,128,128,0.15))" />
         <text x=${padL - 6} y=${y(v) + 3} font-size="9" fill=${corTexto} text-anchor="end">${abrevR$(v)}</text>`)}
       ${ticks.map((i) => svg`
-        <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${rotuloMesRelativo(dataInicio, i)}</text>`)}
+        <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${c.meses[i]}</text>`)}
       ${c.fluxoMensal.map((v, i) => svg`
         <rect x=${x(i)} y=${Math.min(y(v), y0)} width=${bw} height=${Math.max(Math.abs(y(v) - y0), 0.5)}
           fill=${v >= 0 ? 'var(--cor-sucesso, #13a98d)' : 'var(--cor-erro, #d45a3a)'} opacity="0.9" />`)}
       ${marcos(crono).map((m, idx) => svg`
-        <line x1=${x(m.mes)} y1=${padT - 4} x2=${x(m.mes)} y2=${H - padB}
+        <line x1=${x(col(m.mes))} y1=${padT - 4} x2=${x(col(m.mes))} y2=${H - padB}
           stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.7" />
-        <text x=${x(m.mes) + 3} y=${padT + 8 + (idx % 2) * 10} font-size="9" fill=${corTexto}>
+        <text x=${x(col(m.mes)) + 3} y=${padT + 8 + (idx % 2) * 10} font-size="9" fill=${corTexto}>
           ${m.rotulo} · ${rotuloMesRelativo(dataInicio, m.mes)} · M+${m.mes}
         </text>`)}
     </svg>
   `;
 }
 
+/**
+ * Curva do acumulado por coluna. `periodos`: ver `graficoFluxoMensal` (#127).
+ * `dataInicio` fica na assinatura por simetria com os demais gráficos — os
+ * rótulos do eixo vêm de `c.meses`, que já traz o rótulo de cada coluna.
+ */
 export function graficoFluxoAcumulado(
   c: FluxoCalc,
   dataInicio: string | null,
   crono: EventoCrono[],
+  periodos?: PeriodoAgregado[],
 ): TemplateResult {
+  const col = colunaDoMes(periodos);
   const W = 900; const H = 280; const padL = 64; const padR = 10; const padT = 26; const padB = 24;
   const gw = W - padL - padR; const gh = H - padT - padB;
   const min = Math.min(0, ...c.fluxoAcumulado);
@@ -86,6 +116,9 @@ export function graficoFluxoAcumulado(
   const linha = c.fluxoAcumulado.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   const area = `${linha} L${x(c.prazo - 1).toFixed(1)},${y0.toFixed(1)} L${x(0).toFixed(1)},${y0.toFixed(1)} Z`;
   const corTexto = 'var(--cor-texto-sec, #8a8f98)';
+  // Exposição máxima é o pior saldo de um MÊS: na view agregada (#127) a curva
+  // só passa pelos fins de período, então o marcador só aparece quando o pior
+  // saldo cai exatamente no fim de um deles — nunca em cima de um ponto errado.
   const iExp = c.fluxoAcumulado.indexOf(c.exposicaoMaxima);
   const passo = Math.max(3, Math.ceil(c.prazo / 10 / 3) * 3);
   const ticks: number[] = [];
@@ -97,7 +130,7 @@ export function graficoFluxoAcumulado(
         <clipPath id="abaixo"><rect x="0" y=${y0} width=${W} height=${H - y0} /></clipPath>
       </defs>
       ${ticks.map((i) => svg`
-        <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${rotuloMesRelativo(dataInicio, i)}</text>`)}
+        <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${c.meses[i]}</text>`)}
       ${[min, 0, max].map((v) => svg`
         <text x=${padL - 6} y=${y(v) + 3} font-size="9" fill=${corTexto} text-anchor="end">${abrevR$(v)}</text>`)}
       <path d=${area} fill="var(--cor-sucesso, #13a98d)" opacity="0.15" clip-path="url(#acima)" />
@@ -105,13 +138,13 @@ export function graficoFluxoAcumulado(
       <line x1=${padL} y1=${y0} x2=${W - padR} y2=${y0} stroke=${corTexto} stroke-dasharray="4,3" opacity="0.6" />
       <path d=${linha} fill="none" stroke="var(--cor-texto-forte, #e8e8ea)" stroke-width="2" />
       ${marcos(crono).map((m) => svg`
-        <line x1=${x(m.mes)} y1=${padT - 4} x2=${x(m.mes)} y2=${H - padB}
+        <line x1=${x(col(m.mes))} y1=${padT - 4} x2=${x(col(m.mes))} y2=${H - padB}
           stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.5" />
-        <text x=${x(m.mes) + 3} y=${padT + 8} font-size="9" fill=${corTexto}>${m.rotulo}</text>`)}
+        <text x=${x(col(m.mes)) + 3} y=${padT + 8} font-size="9" fill=${corTexto}>${m.rotulo}</text>`)}
       ${c.paybackMes !== null ? svg`
-        <line x1=${x(c.paybackMes)} y1=${padT} x2=${x(c.paybackMes)} y2=${H - padB}
+        <line x1=${x(col(c.paybackMes))} y1=${padT} x2=${x(col(c.paybackMes))} y2=${H - padB}
           stroke="var(--cor-sucesso, #13a98d)" stroke-width="1.5" stroke-dasharray="2,2" />
-        <text x=${x(c.paybackMes) + 3} y=${padT + 20} font-size="9" fill="var(--cor-sucesso, #13a98d)">
+        <text x=${x(col(c.paybackMes)) + 3} y=${padT + 20} font-size="9" fill="var(--cor-sucesso, #13a98d)">
           Payback: ${c.paybackData} · M+${c.paybackMes}
         </text>` : nothing}
       ${iExp >= 0 ? svg`

@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
-  vplFluxo, tirFluxo, calcularFluxo, aplicarCenario,
+  vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig,
 } from './fluxo-caixa-motor.js';
-import type { EventoCrono } from './fluxo-shared.js';
+import { periodosAnuais, CATEGORIA_CORRETAGEM, type EventoCrono } from './fluxo-shared.js';
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 const soma = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
@@ -314,4 +314,95 @@ test('aplicarCenario escala preço/m² das tipologias e orçamento de obra', () 
   const rZero = calcularFluxo(aplicarCenario(base, { precoVendaPct: 0, custoObraPct: 0 }));
   assert.ok(perto(rZero.vgvTotal, rBase.vgvTotal, 1));
   assert.ok(perto(soma(rZero.custoMensal), soma(rBase.custoMensal), 1));
+});
+
+// View Anual (S17 · #127): agregação de colunas mensais em anos-calendário.
+test('agregarFluxoPorPeriodos: soma anual bate com a mensal em TODAS as linhas', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'abr/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas', fase_label: 'Fase 1',
+      tipologias: [
+        { id: 1, nome: 'Studio', quantidade: 100, area_privativa_m2: 30, preco_m2: 10_000 },
+        { id: 2, nome: '2 dorms', quantidade: 80, area_privativa_m2: 70, preco_m2: 9_000 },
+      ],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 40 }, { evento: 'obra', pct: 40 }] },
+      fluxo_pagamento: null,
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'terreno', categoria: 'Preço', orcamento_valor: 12_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+      { id: 2, grupo: 'obra', categoria: 'Obra', orcamento_valor: 30_000_000, orcamento_unidade: 'rs', inicio_mes: 17, duracao_meses: 24 },
+      { id: 3, grupo: 'diretos', categoria: CATEGORIA_CORRETAGEM, orcamento_valor: 4, orcamento_unidade: 'pct_vgv' },
+    ],
+    areaTerreno: 20_000,
+  };
+  const mensal = calcularFluxo(config);
+  const periodos = periodosAnuais('abr/2027', mensal.prazo);
+  const anual = agregarFluxoPorPeriodos(mensal, periodos);
+
+  // Colunas viram anos; o 1º ano é parcial (abr→dez).
+  assert.equal(anual.prazo, periodos.length);
+  assert.ok(anual.prazo < mensal.prazo);
+  assert.equal(anual.meses[0], '2027');
+  assert.equal(anual.meses[1], '2028');
+
+  // Toda série de fluxo conserva a soma — inclusive linhas e tipologias.
+  const mesmaSoma = (a: number[], b: number[], nome: string) =>
+    assert.ok(perto(soma(a), soma(b), 0.01), `${nome}: soma anual ≠ soma mensal`);
+  mesmaSoma(anual.receitaMensal, mensal.receitaMensal, 'receita');
+  mesmaSoma(anual.custoMensal, mensal.custoMensal, 'custo');
+  mesmaSoma(anual.fluxoMensal, mensal.fluxoMensal, 'fluxo');
+  for (let i = 0; i < mensal.linhasReceita.length; i++) {
+    const lm = mensal.linhasReceita[i]; const la = anual.linhasReceita[i];
+    mesmaSoma(la.mensal, lm.mensal, `receita ${lm.nome}`);
+    assert.ok(perto(soma(la.mensal), la.total, 0.01), 'linha: colunas somam o Total');
+    for (let j = 0; j < (lm.itens ?? []).length; j++) {
+      mesmaSoma(la.itens![j].mensal, lm.itens![j].mensal, `tipologia ${lm.itens![j].nome}`);
+    }
+  }
+  for (let i = 0; i < mensal.linhasCusto.length; i++) {
+    mesmaSoma(anual.linhasCusto[i].mensal, mensal.linhasCusto[i].mensal, `custo ${mensal.linhasCusto[i].nome}`);
+  }
+  // cada coluna anual = soma dos meses da sua faixa
+  periodos.forEach((p, k) => {
+    assert.ok(perto(anual.fluxoMensal[k], soma(mensal.fluxoMensal.slice(p.inicio, p.fim + 1)), 0.01));
+  });
+});
+
+test('agregarFluxoPorPeriodos: acumulado é o saldo do ÚLTIMO mês do ano, não a soma', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, nome: 'Lote', quantidade: 100, area_privativa_m2: 250, preco_m2: 2_000 }],
+      absorcao: { modo: 'linear' }, fluxo_pagamento: null,
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'terreno', categoria: 'Preço', orcamento_valor: 10_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+    areaTerreno: 25_000,
+  };
+  const mensal = calcularFluxo(config);
+  const periodos = periodosAnuais('jan/2027', mensal.prazo);
+  const anual = agregarFluxoPorPeriodos(mensal, periodos);
+
+  periodos.forEach((p, k) => {
+    assert.ok(perto(anual.fluxoAcumulado[k], mensal.fluxoAcumulado[p.fim], 0.01),
+      `ano ${p.rotulo}: acumulado = saldo no mês ${p.fim}`);
+  });
+  // saldo final é o mesmo nas duas views
+  assert.ok(perto(anual.fluxoAcumulado[anual.prazo - 1], mensal.fluxoAcumulado[mensal.prazo - 1], 0.01));
+  // acumulado anual também é a soma corrida dos fluxos anuais
+  let acc = 0;
+  anual.fluxoMensal.forEach((v, k) => { acc += v; assert.ok(perto(acc, anual.fluxoAcumulado[k], 0.01)); });
+
+  // Indicadores NÃO mudam com a view (são do fluxo mensal) e a entrada não é mutada.
+  assert.equal(anual.vpl, mensal.vpl);
+  assert.equal(anual.tir, mensal.tir);
+  assert.equal(anual.exposicaoMaxima, mensal.exposicaoMaxima);
+  assert.equal(anual.paybackMes, mensal.paybackMes);
+  assert.equal(anual.paybackData, mensal.paybackData);
+  assert.equal(anual.vgvTotal, mensal.vgvTotal);
+  assert.equal(mensal.meses[0], 'jan/27');
+  assert.equal(mensal.fluxoMensal.length, mensal.prazo);
 });

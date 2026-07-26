@@ -238,6 +238,8 @@ Consolidação:
 
 **Saídas do Fluxo** (`FluxoCalc`): `vgvTotal`, `vpl` (à `taxa_desconto_aa`), `tir` (% a.a.), `paybackMes`/`paybackData`, `exposicaoMaxima` (= `min(fluxoAcumulado)`, tipicamente negativo — o capital próprio que o projeto exige), além das séries `receitaMensal`, `custoMensal`, `fluxoMensal`, `fluxoAcumulado` e das linhas de receita/custo detalhadas.
 
+**Views Mensal e Anual (#127):** a tela oferece dois modos de exibição das colunas, exclusivos entre si (um sempre ativo). Em **Mensal** cada coluna é um mês; em **Anual**, `agregarFluxoPorPeriodos` reagrupa as colunas em anos-calendário (recortados por `periodosAnuais` a partir de `data_inicio_projeto` — o primeiro e o último ano podem ser parciais). A agregação é só de **exibição**: as séries de fluxo são somadas dentro do ano (a soma anual bate com a mensal em toda linha), o acumulado é o saldo do **último mês** do ano, e `vpl`, `tir`, `paybackMes`/`paybackData` e `exposicaoMaxima` **não mudam** — são grandezas do fluxo mês a mês. Tabela, gráficos e as exportações CSV/PDF seguem a view selecionada.
+
 > **Permuta física no Avançado:** não entra no fluxo — o VGV derivado das tipologias já é o valor de venda do incorporador (as `unidades_permutadas` saem do total vendável).
 
 ---

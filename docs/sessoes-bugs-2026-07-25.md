@@ -40,7 +40,7 @@ Substitua `X` pelo número da sessão desejada. O Claude vai carregar os issues 
 | **S14** ✅ | Custos Diretos: Motor de Corretagem | #121 | C | S13 + S10 |
 | **S15** | Fluxo de Caixa: Visual & Layout | #122 #123 #124 | M | S13/S14 |
 | **S16** | Fluxo de Caixa: Estrutura & VPL | #125 #126 | D | S15 |
-| **S17** | Fluxo de Caixa: View Mensal/Anual | #127 | C | S16 |
+| **S17** ✅ | Fluxo de Caixa: View Mensal/Anual | #127 | C | S16 |
 | **S18** | Cenários: Texto & KPI | #128 #129 | F | S16 |
 | **S19** | Cenários: Tabela de Salvos | #130 | M | S16 |
 | **S20** | Cenários: Gráfico Tracejado & Variação % | #131 #132 | D | S16/S19 |

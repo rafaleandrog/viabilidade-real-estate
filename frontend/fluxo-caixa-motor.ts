@@ -15,7 +15,7 @@ import {
   absorcaoMensal, vgvLinha, vgvTipologia, vglLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, vgvVendidoMensal,
-  type EventoCrono, type ContextoCusto,
+  type EventoCrono, type ContextoCusto, type PeriodoAgregado,
 } from './fluxo-shared.js';
 
 const n = (v: any): number => Number(v) || 0;
@@ -304,6 +304,57 @@ export function tirFluxo(fluxoMensal: number[]): number | null {
   }
   if (Math.abs(npv(r)) > 1e-3) return null; // não convergiu
   return (Math.pow(1 + r, 12) - 1) * 100;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// View agregada (S17 · #127) — colunas por período em vez de por mês
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Reagrupa um `FluxoCalc` mensal em COLUNAS POR PERÍODO (view "Anual", #127) —
+ * função pura, não muta a entrada. Cada coluna passa a valer uma faixa de meses
+ * (`periodosAnuais` produz as faixas de ano-calendário).
+ *
+ * Como cada tipo de série é agregado:
+ * - **Séries de fluxo** (receita, custo, cada linha e cada tipologia, fluxo do
+ *   período): SOMA dos meses da faixa. Como as faixas são contíguas e cobrem
+ *   todos os meses, `Σ colunas = Σ meses` em toda linha — o total de cada linha
+ *   continua batendo com a coluna "Total".
+ * - **Acumulado**: ÚLTIMO mês da faixa (somar acumulados seria contar o mesmo
+ *   caixa várias vezes); o valor da coluna é o saldo no fim do período.
+ * - **Indicadores** (`vpl`, `tir`, `exposicaoMaxima`, `paybackMes`,
+ *   `paybackData`, `vgvTotal`, e o `total`/`vpl` de cada linha): **inalterados**.
+ *   São grandezas do fluxo mensal e independem de como as colunas são exibidas —
+ *   o VPL desconta mês a mês e a exposição máxima é o pior saldo de um MÊS, não
+ *   de um fim de ano. Agrupar colunas não pode mexer nesses números.
+ * - `paybackMes` e o `inicio`/`duracao` das linhas continuam em MESES relativos
+ *   (é o calendário real da linha); quem desenha as colunas converte para índice
+ *   de período.
+ */
+export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[]): FluxoCalc {
+  const soma = (serie: number[]): number[] => periodos.map((p) => {
+    let acc = 0;
+    for (let i = p.inicio; i <= p.fim; i++) acc += serie[i] ?? 0;
+    return acc;
+  });
+  const ultimo = (serie: number[]): number[] => periodos.map((p) => serie[p.fim] ?? 0);
+  const agregarLinha = (l: LinhaCalc): LinhaCalc => ({
+    ...l,
+    mensal: soma(l.mensal),
+    itens: l.itens ? l.itens.map(agregarLinha) : undefined,
+  });
+
+  return {
+    ...c,
+    prazo: periodos.length,
+    meses: periodos.map((p) => p.rotulo),
+    receitaMensal: soma(c.receitaMensal),
+    custoMensal: soma(c.custoMensal),
+    fluxoMensal: soma(c.fluxoMensal),
+    fluxoAcumulado: ultimo(c.fluxoAcumulado),
+    linhasReceita: c.linhasReceita.map(agregarLinha),
+    linhasCusto: c.linhasCusto.map(agregarLinha),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────
