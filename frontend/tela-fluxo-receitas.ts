@@ -124,6 +124,10 @@ export class ViabFluxoReceitas extends LitElement {
     .modal-rodape { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
     .modal-rodape .espaco { flex: 1; }
     .badges-par { display: inline-flex; gap: 6px; }
+    /* Periodicidade ja usada por outra linha de parcelamento: o clique ja e barrado
+       pelo proprio handler, isto e so o sinal visual. urbi-badge nao tem estado
+       "desabilitado" (so cor/interativo/ativo), entao a indicacao vem daqui. */
+    urbi-badge.indisponivel { opacity: 0.45; cursor: not-allowed; }
 
     /* Modal de pagamento */
     .pag-grid { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
@@ -748,7 +752,7 @@ export class ViabFluxoReceitas extends LitElement {
                   <span class="badges-par">
                     ${PERIODICIDADES.map((per) => html`
                       <urbi-badge cor="info" interativo ?ativo=${p.periodicidade === per}
-                        ?desabilitado=${!dis && perUsadas.has(per) && p.periodicidade !== per}
+                        class=${!dis && perUsadas.has(per) && p.periodicidade !== per ? 'indisponivel' : ''}
                         @click=${() => { if (!dis && !perUsadas.has(per)) this._setLinha('parcelas', i, 'periodicidade', per); }}>${ROTULO_PER[per]}</urbi-badge>`)}
                   </span>
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0"
