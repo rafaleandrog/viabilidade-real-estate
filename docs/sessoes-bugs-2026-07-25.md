@@ -1,7 +1,7 @@
 # Sessões de bugs — lista_bugs.xlsx (62 itens)
 
 **Data:** 2026-07-25  
-**Issues GitHub:** #63–#124  
+**Issues GitHub:** #71–#132 (62 issues em 20 sessões)  
 **Branch padrão de cada sessão:** `claude/sX-<slug>` a partir da `main` atualizada
 
 ---
@@ -14,7 +14,7 @@ Cada sessão é iniciada com o comando:
 Siga para a Sessão SX
 ```
 
-Substitua `X` pelo número da sessão desejada. O Claude vai carregar os issues da sessão, implementar, validar e abrir o PR automaticamente.
+Substitua `X` pelo número da sessão desejada. O Claude vai carregar os issues da sessão, implementar, validar e **abrir o PR contra `main`**. O **merge fica a cargo do autor** após revisão — não é feito automaticamente.
 
 ---
 
