@@ -1,0 +1,89 @@
+# Guards de PR — barram os dois modos de falha que atravessaram TODA a cadeia de
+# validação em verde na rodada 3 (issue #162).
+#
+# Deliberadamente LEVE: não roda `pnpm install`, build nem a suíte completa. O
+# `@urbiverso/sdk` é privado (GitHub Packages, org urbiverso) e o GITHUB_TOKEN efêmero
+# deste repo não tem read:packages cross-org → o install falha com 401 (ver release.yml,
+# que precisa do PAT em secrets.URBIVERSO_PACKAGES_TOKEN). Estes guards são só git + grep,
+# então rodam sem credencial nenhuma e nunca ficam vermelhos por falta de acesso.
+name: pr-guards
+on:
+  pull_request:
+    # `edited` importa: o corpo do PR é metade da entrada do guard de diff vazio,
+    # então editar a descrição precisa re-rodar a checagem.
+    types: [opened, synchronize, reopened, edited]
+permissions:
+  contents: read
+jobs:
+  diff-vazio:
+    name: PR que fecha issue precisa alterar arquivo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # precisa do histórico para o merge-base do diff
+      - name: Verificar diff vs. issues fechadas
+        env:
+          # Corpo e títulos vêm de entrada de usuário — passam por env, NUNCA
+          # interpolados direto no script (script injection).
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITULO: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+
+          # Diff de merge-base (três pontos): só o que o PR realmente introduz,
+          # ignorando o que a base andou para frente.
+          arquivos="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+          n_arquivos="$(printf '%s' "$arquivos" | grep -c . || true)"
+
+          # Mensagens dos commits do PR entram junto: o GitHub fecha issue tanto pelo
+          # corpo do PR quanto por commit message. O #142 trazia os Closes na mensagem.
+          commits="$(git log --format='%B' "$BASE_SHA..$HEAD_SHA" || true)"
+          texto="$PR_TITULO
+          $PR_BODY
+          $commits"
+
+          # Palavras-chave que o GitHub realmente aceita para auto-fechar issue.
+          padrao='(clos(e|es|ed)|fix(|es|ed)|resolv(e|es|ed))[[:space:]]*:?[[:space:]]*#[0-9]+'
+          if printf '%s' "$texto" | grep -qiE "$padrao"; then
+            fecha_issue=1
+            citadas="$(printf '%s' "$texto" | grep -oiE "$padrao" | tr '\n' ' ')"
+          else
+            fecha_issue=0
+            citadas=''
+          fi
+
+          echo "arquivos alterados: $n_arquivos"
+          echo "fecha issue: $fecha_issue $citadas"
+
+          if [ "$n_arquivos" -eq 0 ] && [ "$fecha_issue" -eq 1 ]; then
+            echo "::error title=PR fecha issue sem alterar arquivo::Este PR declara fechar issue ($citadas) mas o diff contra a base está VAZIO — zero arquivos alterados. Foi exatamente assim que o PR #142 fechou 12 issues sem entregar nada (ver #162). Revise antes de mergear."
+            exit 1
+          fi
+
+          if [ "$n_arquivos" -eq 0 ]; then
+            echo "::warning title=PR sem alterações::O diff contra a base está vazio. Não fecha issue, então não é bloqueante — mas confirme que é intencional."
+          fi
+
+          echo "ok: $n_arquivos arquivo(s) alterado(s)."
+
+  aspas-curvas:
+    name: Aspas curvas em posição de atributo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard de aspas curvas
+        run: |
+          set -uo pipefail
+          # Mesmo guard da etapa 1/5 de scripts/validar-frontend.sh, replicado aqui para
+          # pegar quem não rodou o script local. Aspas curvas em posição de ATRIBUTO
+          # deixam o atributo inerte e passam batido por typecheck/testes/build.
+          # Alternância (e não a classe [”“]) porque sem locale UTF-8 o grep compara
+          # byte a byte e ”/“/—/→ dividem o primeiro byte 0xE2 → falso positivo.
+          if grep -rn '=\(”\|“\|‘\|’\)' frontend/; then
+            echo "::error title=Aspas curvas em atributo::As linhas acima usam aspas curvas em posição de atributo. O parser inclui as aspas no valor, o atributo fica INERTE e nada falha no typecheck/teste/build (ver #160). Use aspas retas."
+            exit 1
+          fi
+          echo "ok: nenhuma aspa curva em posição de atributo."
