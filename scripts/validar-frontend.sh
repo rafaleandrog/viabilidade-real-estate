@@ -10,10 +10,12 @@
 #   dá para validar 100% do frontend só com esses pacotes públicos.
 #
 # O que faz (o "caminho simples" — não perca tempo redescobrindo auth/token):
-#   1. roda `pnpm install` (a falha de 401 do SDK é ESPERADA e ignorada);
-#   2. cria os symlinks de topo dos pacotes públicos a partir de `.pnpm/`;
-#   3. typecheck do frontend (tsconfig só-frontend), testes de frontend e build
-#      do bundle via esbuild.
+#   1. guard de aspas curvas em posição de atributo (#162 — bug que nenhuma das
+#      etapas abaixo enxerga, porque mora num template literal do lit);
+#   2. roda `pnpm install` (a falha de 401 do SDK é ESPERADA e ignorada);
+#   3. cria os symlinks de topo dos pacotes públicos a partir de `.pnpm/`;
+#   4. typecheck do frontend (tsconfig só-frontend);
+#   5. testes de frontend e build do bundle via esbuild.
 #
 # Backend / `urbi-empacotar` / typecheck do backend precisam do SDK → só rodam no
 # ambiente autenticado do autor. Para mudanças de frontend, este script basta.
@@ -23,14 +25,34 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 raiz="$(pwd)"
 
-echo "== 1/4 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
+# Aspas curvas em posição de ATRIBUTO deixam o atributo INERTE: o parser lê o valor
+# com as aspas dentro dele (”alerta” em vez de alerta), o valor não casa com nada e o
+# primitivo cai no default — sem erro em lugar nenhum. Como isso mora dentro de um
+# template literal do lit, `tsc --noEmit`, os testes e o esbuild passam todos em verde
+# (foi assim que o #160 sobreviveu a uma sessão inteira que "validou ✓").
+#
+# O padrão casa só com `=` seguido de aspa curva, então NÃO acusa as aspas curvas em
+# conteúdo de texto (clique em “Salvar premissas”), que são tipografia legítima.
+#
+# Por que alternância `\(”\|“\)` e não a classe `[”“]`: sem locale UTF-8 (o caso deste
+# ambiente, LANG vazio) o grep casa a classe BYTE a byte, e como ”/“/—/→ compartilham
+# o primeiro byte 0xE2, `=[”“]` daria falso positivo em `=—` e `=→`. A alternância
+# compara as sequências de 3 bytes inteiras e acerta em qualquer locale.
+echo "== 1/5 guard: aspas curvas em posição de atributo =="
+if grep -rn '=\(”\|“\|‘\|’\)' frontend/; then
+  echo "  FALHOU: aspas curvas em atributo — o atributo fica inerte. Use aspas retas." >&2
+  exit 1
+fi
+echo "  ok: nenhuma aspa curva em atributo"
+
+echo "== 2/5 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
 pnpm install >/dev/null 2>&1 || true
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — o pnpm não conseguiu baixar nem os pacotes públicos (sem rede?)." >&2
   exit 1
 fi
 
-echo "== 2/4 linkando pacotes públicos do store virtual (.pnpm) =="
+echo "== 3/5 linkando pacotes públicos do store virtual (.pnpm) =="
 # link_pkg <glob-do-dir-em-.pnpm> <subcaminho-interno> <alvo-em-node_modules>
 link_pkg() {
   local glob="$1" interno="$2" alvo="$3"
@@ -54,7 +76,7 @@ link_pkg 'esbuild@0.24*'             'esbuild'                'esbuild'
 tsc="node_modules/typescript/bin/tsc"
 esbuild_bin="node_modules/esbuild/bin/esbuild"
 
-echo "== 3/4 typecheck do frontend =="
+echo "== 4/5 typecheck do frontend =="
 cat > tsconfig.frontend.json <<'JSON'
 { "extends": "./tsconfig.json", "include": ["frontend/**/*"] }
 JSON
@@ -63,7 +85,7 @@ tc=$?
 rm -f tsconfig.frontend.json
 [ $tc -eq 0 ] && echo "  typecheck OK" || { echo "  typecheck FALHOU"; exit 1; }
 
-echo "== 4/4 testes de frontend + build do bundle =="
+echo "== 5/5 testes de frontend + build do bundle =="
 node --import tsx/esm --test frontend/*.test.ts
 tst=$?
 [ $tst -eq 0 ] || { echo "  testes FALHARAM"; exit 1; }

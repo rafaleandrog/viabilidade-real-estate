@@ -272,7 +272,7 @@ export class ViabFluxoReceitas extends LitElement {
           <urbi-botao variante="primario" pequeno @click=${() => this._abrirAbsorcao(f)}>
             <span class="stat ${this._aplicado(f, 'absorcao') ? 'ok' : ''}"></span>Absorção de Vendas
           </urbi-botao>
-          <urbi-botao variante="info" pequeno @click=${() => this._abrirPagamento(f)}>
+          <urbi-botao variante="secundario" pequeno @click=${() => this._abrirPagamento(f)}>
             <span class="stat ${this._aplicado(f, 'fluxo') ? 'ok' : ''}"></span>Fluxo de Pagamento
           </urbi-botao>
           ${!dis ? html`

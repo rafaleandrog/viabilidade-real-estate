@@ -463,10 +463,10 @@ export class ViabTelaPremissas extends LitElement {
         ${this.erroGeral ? html`<urbi-banner variante="erro">${this.erroGeral}</urbi-banner>` : nothing}
         ${this.editavel
           ? html`
-              ${this._dirty ? html`<urbi-banner variante=”alerta”>
+              ${this._dirty ? html`<urbi-banner variante="alerta">
                 As alterações não são salvas automaticamente — clique em “Salvar premissas” antes de sair desta página.
               </urbi-banner>` : nothing}
-              <div class=”form-acoes”>
+              <div class="form-acoes">
                 <urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar premissas</urbi-botao>
               </div>`
           : html`<p class="sec">Somente leitura neste status/função.</p>`}

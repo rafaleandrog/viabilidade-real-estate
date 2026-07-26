@@ -4,6 +4,84 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Auditoria da rodada 3 — issues #160, #161, #162 (2026-07-26)
+
+Branch `claude/analyze-unimplemented-prs-79s2to-f0axc2`. Três consertos, **100% frontend/infra**
+— sem backend, sem schema, sem migração. `versao` do `manifesto.json` **intacta** (regra do
+CLAUDE.md: `z` só bumpa quando entra migração nova).
+
+A auditoria das 62 issues da rodada 3 (#71–#132) achou 3 coisas dadas como entregues sem terem
+sido. Um commit por issue, nesta ordem (#160 antes de #162 de propósito: o guard que o #162
+adiciona nasce verde porque as aspas já foram corrigidas).
+
+- **#160 — aspas curvas em posição de atributo (reabre #71).** `tela-premissas.ts:466,469`
+  tinham `variante=”alerta”` e `class=”form-acoes”` com `”` (U+201D). O parser inclui as aspas
+  no valor (`”alerta”`), o valor não casa com nada e o atributo fica **inerte**: o banner de
+  "alterações não salvas" renderizava sem cor e a regra `.form-acoes` não aplicava, desalinhando
+  o botão "Salvar premissas". Trocado por aspas retas. As aspas curvas em **conteúdo de texto**
+  (linha 467, `“Salvar premissas”`) são tipografia legítima e ficaram intactas.
+- **#161 — variante inerte no botão "Fluxo de Pagamento" (reabre #91).**
+  `tela-fluxo-receitas.ts:275` usava `variante="info"`. Conferido na fonte de verdade
+  (`ui/src/urbi-botao.ts` no monorepo): `urbi-botao` declara só
+  `primario | secundario | perigo | sucesso | fantasma`. `info` é de `urbi-banner`, outro
+  primitivo; `texto`, que a spec cita, **também não existe**. O `render()` joga o valor cru em
+  `class`, então saía `class="info"`, sem regra CSS → botão só com o estilo base, sem fundo.
+  Trocado por **`secundario`** — e não `primario` — porque o gradiente de `.primario` começa em
+  `#2AA9E0`, idêntico ao `--cor-info` da bola de status "ok" que o próprio botão contém (a bola
+  sumiria no fundo), e porque o botão irmão "Absorção de Vendas" já é `primario`.
+- **#162 — guards contra reincidência.** Guard de aspas curvas como etapa **1/5** de
+  `scripts/validar-frontend.sh` (etapas renumeradas) + workflow novo `.github/workflows/
+  pr-guards.yml`, que barra PR com **diff vazio** que declara fechar issue, e replica o guard de
+  aspas no CI. O workflow é só `git` + `grep`: **não** roda `pnpm install` nem a suíte completa,
+  porque o `@urbiverso/sdk` é privado e o `GITHUB_TOKEN` deste repo toma 401 (só o `release.yml`
+  tem o PAT). Assim o guard nunca fica vermelho por falta de credencial.
+
+### A lição — o que passou por typecheck/teste/build e mesmo assim estava quebrado
+
+Os dois bugs de UI (#160 e #161) são a **mesma classe de falha**: um valor inválido dentro de um
+template literal do `lit`. Nada nessa cadeia enxerga isso —
+
+- `tsc --noEmit` trata o interior de `` html`...` `` como string, não como HTML;
+- o `variante` de um primitivo é `@property()`, então em runtime aceita **qualquer** string: o
+  tipo TS é só compile-time e o app nem importa o primitivo (usa o global `window.urbiVerso`);
+- os testes cobrem funções puras (motor, conversões), não render;
+- o esbuild empacota, não valida markup.
+
+O sintoma comum é o do CLAUDE.md: **atributo inexistente não dá erro, só não faz nada** — falha
+silenciosa. Foi por isso que uma sessão inteira fechou #71 "validado ✓": leu a string `alerta` no
+código e não viu as aspas ao redor. Daí o guard 1 ser um `grep`, não um linter: é a única coisa
+que olha o *texto* do template.
+
+O terceiro (#162) é de processo: o PR #142 (`e19d691`) foi mergeado com diff **literalmente
+vazio** — zero arquivos — enquanto a mensagem descrevia 12 mudanças item a item e afirmava
+`typecheck ✓ · testes 77/77 ✓ · build ✓`, com `Closes #91…#102`. O GitHub fechou as 12 sozinho.
+Nove foram recuperadas depois; **a #91 ficou perdida** até esta auditoria. Nenhuma validação de
+código pega isso, porque não havia código: o guard tem que ser no PR. Verificado localmente que
+o `pr-guards.yml` bloqueia exatamente esse cenário e deixa passar PR com mudança real.
+
+Corolário para as próximas sessões: **"fechou a issue" não é evidência de entrega — o diff é.**
+
+### Varredura complementar (aproveitando o monorepo conectado)
+
+Conferidos **todos** os atributos usados nos 24 primitivos `urbi-*` deste app contra o que cada
+um declara em `ui/src/`, seguindo herança de classe-base. **Nenhum outro atributo inerte.** Os 10
+candidatos que a varredura levantou são todos legítimos: `categorias`/`series`/`formato`/
+`legenda`/`empilhado` dos gráficos vêm de `UrbiGraficoBase`, e `expandir` (`urbi-abas`,
+`urbi-tabela`) é convenção de atributo lida no `connectedCallback()` de `UrbiPrimitivoDeLayout` e
+usada como `:host([expandir])` em `UrbiPrimitivoDeConteudo` — não é `@property`, mas é suportado.
+Os 3 casos conhecidos (`urbi-badge ?desabilitado`, `urbi-input estilo="compacto"` e este `#161`)
+já estão todos corrigidos.
+
+### Validação
+
+`bash scripts/validar-frontend.sh` verde nos três commits (typecheck + 94/94 testes + build).
+O guard novo foi testado nos **dois** sentidos: passa na árvore limpa e falha com exit 1
+apontando `arquivo:linha` quando a aspa curva é reintroduzida. **Não exercido aqui** (exige o SDK,
+fica para o ambiente autenticado do autor): typecheck de backend, `pnpm test` completo e
+`urbi-empacotar`. Nenhuma das três mudanças toca backend ou schema.
+
+---
+
 ## Lotes de bugs 2026-07-20 (sessões por lote — `docs/lotes-bugs-2026-07-20.md`)
 
 ### Lote 1 — Trivial Preliminar — ✅ CONCLUÍDO (issues #9, #10, #11, #12, #13)
