@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, svg, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$ } from './viab-format.js';
+import { fmtR$, fmtNum } from './viab-format.js';
 import {
   rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosObraDerivado,
   type EventoCrono,
@@ -79,26 +79,27 @@ export class ViabFluxoReceitas extends LitElement {
       font-size: var(--texto-corpo, 0.8125rem); overflow: hidden;
     }
     /* Larguras por coluna (th e td herdadas do table-layout: fixed) */
-    col.c-tipo   { width: auto; }
+    col.c-tipo   { width: 190px; }
     col.c-area   { width: 120px; }
     col.c-total  { width: 68px; }
     col.c-un     { width: 92px; }
     col.c-saldo  { width: 68px; }
-    col.c-preco  { width: 110px; }
+    col.c-preco  { width: 140px; }
     col.c-punit  { width: 120px; }
     col.c-ptotal { width: 120px; }
     col.c-acao   { width: 56px; }
     table.aloc td viab-num { width: 100%; }
     table.aloc td.tipo urbi-select { width: 100%; }
 
-    /* #49 — bola de status (amarela = pendente → verde = aplicado) nos botões
-       de Absorção e Fluxo de Pagamento. Slot do urbi-botao herda estes estilos. */
+    /* #49 — bola de status (pendente → aplicado) nos botões de Absorção e Fluxo
+       de Pagamento. Slot do urbi-botao herda estes estilos.
+       #92 — pendente vermelha (erro), aplicado azul (info). */
     .stat {
       display: inline-block; width: 8px; height: 8px; border-radius: 50%;
       margin-right: 6px; vertical-align: middle;
-      background: var(--cor-alerta, #d0a215);
+      background: var(--cor-erro, #d45a3a);
     }
-    .stat.ok { background: var(--cor-sucesso, #2f9e44); }
+    .stat.ok { background: var(--cor-info, #2aa9e0); }
     .saldo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.7rem); }
     .saldo.zero { color: var(--cor-erro, #d45a3a); }
     .rodape-tip { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-top: 10px; }
@@ -133,7 +134,7 @@ export class ViabFluxoReceitas extends LitElement {
       color: var(--cor-texto-sec, rgba(255,255,255,0.5)); text-transform: uppercase;
     }
     .pag-linha { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 8px; }
-    .pag-linha viab-num { width: 120px; }
+    .pag-linha viab-num { width: 92px; }
     .repasse-box {
       padding: 10px 12px; border: 1px solid var(--cor-borda, rgba(255,255,255,0.12)); border-radius: 8px;
       background: var(--cor-superficie-hover, rgba(255,255,255,0.03));
@@ -281,7 +282,7 @@ export class ViabFluxoReceitas extends LitElement {
           ${!dis ? html`
             <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus"
               ?desabilitado=${this._tipologiasDisponiveis(f).length === 0}
-              @click=${() => this._adicionarAlocacao(f)}>Adicionar Alocação</urbi-botao>` : nothing}
+              @click=${() => this._adicionarAlocacao(f)}>Adicionar tipologia</urbi-botao>` : nothing}
           <span class="espaco"></span>
           <span><span class="total-rotulo">VGV da fase</span><span class="total-valor">${fmtR$(vgv)}</span></span>
         </div>
@@ -366,8 +367,8 @@ export class ViabFluxoReceitas extends LitElement {
             @urbi:input-numero-change=${(e: CustomEvent) => this._salvarAlocacao(f, a, { preco_m2: e.detail.valor ?? 0 })}
           ></viab-num>
         </td>
-        <td class="num">${fmtR$(precoUnit)}</td>
-        <td class="num">${fmtR$(precoTotal)}</td>
+        <td class="num">${fmtNum(precoUnit)}</td>
+        <td class="num">${fmtNum(precoTotal)}</td>
         ${dis ? nothing : html`
           <td class="num">
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
@@ -528,7 +529,7 @@ export class ViabFluxoReceitas extends LitElement {
       fx && fx.fim >= fx.inicio ? rotuloPeriodo(this.dataInicio, fx.inicio, fx.fim - fx.inicio + 1) : '—';
     return html`
       <urbi-modal title="Absorção de vendas" maxWidth="820px" @urbi-modal:close=${() => this.modalAbs = null}>
-        <p class="sec">Distribuído em 4 períodos (o Pós-obra é calculado automaticamente). Os períodos vêm do Cronograma.</p>
+        <p class="sec">Distribuído em 4 períodos — Pré-lançamento, Lançamento, Obra e Pós-obra (calculado automaticamente). Os períodos vêm do Cronograma.</p>
         <div class="abs-grid">
           <div>
             <table class="abs">
@@ -550,7 +551,7 @@ export class ViabFluxoReceitas extends LitElement {
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, obra_pct: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>
                 <tr>
-                  <td>Pós-obra <span class="sec">(calculado)</span><br /><span class="sec">${rot(faixas?.pos_obra)}</span></td>
+                  <td>Pós-obra<br /><span class="sec">${rot(faixas?.pos_obra)}</span></td>
                   <td><span class="derivado">${posDerivado.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</span></td>
                 </tr>
               </tbody>
@@ -691,7 +692,7 @@ export class ViabFluxoReceitas extends LitElement {
             <div class="pag-secao">
               <h4>Definições</h4>
               <div class="pag-linha">
-                <urbi-checkbox label="Comissão" ?desabilitado=${dis} ?marcado=${f.comissao.ativo}
+                <urbi-checkbox label="Corretagem" ?desabilitado=${dis} ?marcado=${f.comissao.ativo}
                   @urbi:checkbox-change=${(e: CustomEvent) => this._setPag('comissao', 'ativo', e.detail.marcado)}></urbi-checkbox>
               </div>
               ${f.comissao.ativo ? html`
@@ -768,13 +769,12 @@ export class ViabFluxoReceitas extends LitElement {
               <h4>Repasse</h4>
               <div class="pag-linha">
                 <div class="repasse-box">
-                  <span class="sec">Repasse (calculado)</span><br />
+                  <span class="sec">Repasse</span><br />
                   <span class="derivado">${repasse.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</span>
                 </div>
                 <viab-num label="Após entrega" sufixo="meses" casas-decimais="0" ?desabilitado=${dis} .valor=${f.repasse.apos_entrega_meses}
                   @urbi:input-numero-change=${(e: CustomEvent) => this._setPag('repasse', 'apos_entrega_meses', e.detail.valor ?? 0)}></viab-num>
               </div>
-              <p class="sec">Repasse = 100% − entradas − parcelas.</p>
             </div>
           </div>
         </div>
