@@ -121,10 +121,14 @@ export function exportarPDF(estudo: any, p: Proforma, lot: boolean) {
 // Exportação do Fluxo de Caixa (nível Avançado)
 // ─────────────────────────────────────────────────────────────────
 
+// Rótulos e ordem espelham as 5 abas de Custos (#125): Terreno · Obra ·
+// Diretos · Indiretos · Financeiro.
 const GRUPO_CUSTO_ROTULO: Record<string, string> = {
   terreno: 'Custos do Terreno',
-  obra: 'Custos Diretos',
+  obra: 'Custos de Obra',
+  diretos: 'Custos Diretos',
   indireto: 'Custos Indiretos',
+  financeiro: 'Custos Financeiros',
 };
 
 interface LinhaFx {
@@ -146,10 +150,12 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
     for (const l of xs) for (let i = 0; i < c.prazo; i++) out[i] += l.mensal[i];
     return out;
   };
+  // VPL é linear no fluxo mensal, então o VPL de um agregado = Σ VPL das suas linhas (#126).
+  const somaVpl = (xs: LinhaCalc[]): number => xs.reduce((s, l) => s + l.vpl, 0);
   const linhas: LinhaFx[] = [];
   linhas.push({
-    nivel: 0, nome: 'Receita', custo: false,
-    total: c.receitaMensal.reduce((s, v) => s + v, 0), mensal: c.receitaMensal,
+    nivel: 0, nome: 'Receita Bruta (VGV)', custo: false,
+    total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita), mensal: c.receitaMensal,
   });
   for (const l of c.linhasReceita) {
     linhas.push({
@@ -162,14 +168,14 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
   }
   linhas.push({
     nivel: 0, nome: 'Custo Total', custo: true, separadorAntes: true,
-    total: c.custoMensal.reduce((s, v) => s + v, 0), mensal: c.custoMensal,
+    total: c.custoMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasCusto), mensal: c.custoMensal,
   });
-  for (const g of ['terreno', 'obra', 'indireto'] as const) {
+  for (const g of ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'] as const) {
     const itens = c.linhasCusto.filter((x) => x.grupo === g);
     if (itens.length === 0) continue;
     linhas.push({
       nivel: 1, nome: GRUPO_CUSTO_ROTULO[g], custo: true,
-      total: itens.reduce((s, x) => s + x.total, 0), mensal: soma(itens),
+      total: itens.reduce((s, x) => s + x.total, 0), vpl: somaVpl(itens), mensal: soma(itens),
     });
     for (const x of itens) {
       linhas.push({ nivel: 2, nome: x.nome, custo: true, inicio: x.inicio, duracao: x.duracao, total: x.total, vpl: x.vpl, mensal: x.mensal });
@@ -177,11 +183,11 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
   }
   linhas.push({
     nivel: 0, nome: 'Fluxo de Caixa Mensal', custo: false, separadorAntes: true,
-    total: c.fluxoMensal.reduce((s, v) => s + v, 0), mensal: c.fluxoMensal,
+    total: c.fluxoMensal.reduce((s, v) => s + v, 0), vpl: c.vpl, mensal: c.fluxoMensal,
   });
   linhas.push({
     nivel: 0, nome: 'Fluxo de Caixa Acumulado', custo: false,
-    total: c.fluxoAcumulado[c.prazo - 1] ?? 0, mensal: c.fluxoAcumulado,
+    total: c.fluxoAcumulado[c.prazo - 1] ?? 0, vpl: c.vpl, mensal: c.fluxoAcumulado,
   });
   return linhas;
 }

@@ -554,6 +554,42 @@ sem schema/backend/migração; `versao` intacta. Pré-requisitos S13/S14: conclu
   empacotamento não se aplica. ⏳ Render real das cores de linha e do scroll sticky só
   valida no deploy dev.
 
+### Sessão S16 — Fluxo de Caixa: Estrutura & VPL — ✅ IMPLEMENTADA (issues #125, #126)
+Branch `claude/sessao-s16-3scr7u`. Mudança **100% frontend** (`fluxo-caixa-motor.ts`,
+`fluxo-tabela.ts`, `exportar.ts`) — sem schema/backend/migração; `versao` intacta.
+Pré-requisito S15: concluído e na `main`.
+
+- **#125 (renomear "Receita" + acrescentar Obras e Financeiro no Proforma do Fluxo):**
+  1. A linha-grupo de receita passou de **"Receita"** para **"Receita Bruta (VGV)"** (mesmo rótulo
+     no export CSV/PDF).
+  2. O Proforma do Fluxo só listava **3 grupos de custo** (`terreno`/`obra`/`indireto`), mas as abas
+     de Custos têm **5** (Terreno · Obra · Diretos · Indiretos · Financeiro, desde o Lote 5). A causa:
+     o motor **colapsava** `diretos`/`financeiro` em `indireto` ao montar `LinhaCalc.grupo`. Fix:
+     - `fluxo-caixa-motor.ts`: `LinhaCalc.grupo` ampliado para os 5 grupos; o `map` de custos agora
+       **preserva o grupo real** (grupo desconhecido/legado ainda cai em `indireto` por segurança).
+     - `fluxo-tabela.ts`: `GRUPO_CUSTO_LABEL` e a lista de `grupos` cobrem os 5, **na ordem das abas
+       de Custos**. Rótulo de `obra` corrigido de "Custos Diretos" (herança do modelo antigo de 3
+       grupos) para **"Custos de Obra"**; `diretos` = "Custos Diretos"; `financeiro` = "Custos
+       Financeiros". `chavesColapso` inclui `custo-diretos`/`custo-financeiro`.
+     - `exportar.ts` (não estava na lista de alvos, mas **consome `LinhaCalc.grupo`**): mesma expansão
+       de rótulos/ordem — senão as linhas de `diretos`/`financeiro` **sumiriam** do CSV/PDF depois que
+       o motor parou de remapeá-las para `indireto`.
+- **#126 (VPL faltando em algumas linhas do Fluxo de Caixa):** o motor **já** calcula `vpl` por linha
+  (receita, tipologia, custo). O que faltava eram as linhas **agregadas/subtotais e de resultado**, que
+  a tabela montava sem `vpl` → coluna VPL vinha vazia em: **Receita Bruta (VGV)** (grupo), **Custo
+  Total** (grupo), cada **subtotal de grupo de custo**, e **Fluxo de Caixa Mensal/Acumulado**
+  (resultado). Fix (VPL é **linear** no fluxo mensal, então VPL do agregado = Σ VPL das linhas):
+  - `fluxo-tabela.ts`: helper `somaVpl(linhas)`; passado `vpl` para a linha de Receita Bruta
+    (Σ receitas), Custo Total (Σ custos) e cada subtotal de grupo (Σ do grupo). `linhaResultado` ganhou
+    parâmetro `vpl` e renderiza o **VPL do projeto** (`c.vpl`) nas duas linhas de resultado (com classe
+    `pos`/`neg`). Consistência garantida: VPL(Fluxo Mensal) = VPL(Receita) − VPL(Custo) = `c.vpl`.
+  - `exportar.ts`: mesmos agregados ganharam `vpl` (a coluna VPL do CSV/PDF já renderizava quando
+    presente), mantendo export e tela idênticos.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 82/82 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~277.1kb). Sem schema/backend →
+  empacotamento não se aplica. ⏳ Render real das novas seções (Diretos/Financeiro) e da coluna VPL
+  preenchida só valida no deploy dev.
+
 ---
 
 ## Rodada 2 — Etapas (2026-07-22)

@@ -13,10 +13,14 @@ import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
 // O estado de colapso vive no componente hospedeiro (tela-fluxo-ver / cenários).
 // ─────────────────────────────────────────────────────────────────────────
 
+// Rótulos e ordem espelham as 5 abas de Custos (#125): Terreno · Obra ·
+// Diretos · Indiretos · Financeiro.
 const GRUPO_CUSTO_LABEL: Record<string, string> = {
   terreno: 'Custos do Terreno',
-  obra: 'Custos Diretos',
+  obra: 'Custos de Obra',
+  diretos: 'Custos Diretos',
   indireto: 'Custos Indiretos',
+  financeiro: 'Custos Financeiros',
 };
 
 /** Notação contábil da célula: vazio para zero; custos entre parênteses. */
@@ -126,14 +130,14 @@ function linhaTabela(
   `;
 }
 
-function linhaResultado(nome: string, valores: number[], c: FluxoCalc): TemplateResult {
+function linhaResultado(nome: string, valores: number[], vpl: number): TemplateResult {
   const total = nome.includes('Acumulado') ? valores[valores.length - 1] : valores.reduce((s, v) => s + v, 0);
   return html`
     <tr class="resultado">
       <td class="c1">${nome}</td>
       <td class="c2"></td><td class="c3"></td>
       <td class="c4 num ${total >= 0 ? 'pos' : 'neg'}">${celula(total, false)}</td>
-      <td class="c5"></td>
+      <td class="c5 num ${vpl >= 0 ? 'pos' : 'neg'}">${celula(vpl, false)}</td>
       ${valores.map((v) => html`<td class="num ${v >= 0 ? 'pos' : 'neg'}">${celula(v, false)}</td>`)}
     </tr>
   `;
@@ -157,7 +161,11 @@ export function tabelaFluxo(
     return out;
   };
   const custosPorGrupo = (g: string) => c.linhasCusto.filter((x) => x.grupo === g);
-  const grupos = (['terreno', 'obra', 'indireto'] as const).filter((g) => custosPorGrupo(g).length > 0);
+  // Ordem das 5 abas de Custos (#125): Terreno · Obra · Diretos · Indiretos · Financeiro.
+  const grupos = (['terreno', 'obra', 'diretos', 'indireto', 'financeiro'] as const)
+    .filter((g) => custosPorGrupo(g).length > 0);
+  // VPL é linear no fluxo mensal, então o VPL de um agregado = Σ VPL das suas linhas (#126).
+  const somaVpl = (linhas: LinhaCalc[]): number => linhas.reduce((s, l) => s + l.vpl, 0);
 
   return html`
     <div class="fx-wrap">
@@ -173,8 +181,8 @@ export function tabelaFluxo(
           </tr>
         </thead>
         <tbody>
-          ${linhaTabela('grupo', 'receita', 'Receita',
-            { mensal: c.receitaMensal, total: c.receitaMensal.reduce((s, v) => s + v, 0) }, dataInicio, colapso, toggle, false)}
+          ${linhaTabela('grupo', 'receita', 'Receita Bruta (VGV)',
+            { mensal: c.receitaMensal, total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita) }, dataInicio, colapso, toggle, false)}
           ${!colapso['receita'] ? c.linhasReceita.map((l) => html`
             ${linhaTabela('subgrupo', `r${l.id}`,
               l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, l, dataInicio, colapso, toggle, false)}
@@ -183,17 +191,17 @@ export function tabelaFluxo(
           `) : nothing}
 
           ${linhaTabela('grupo', '', 'Custo Total',
-            { mensal: c.custoMensal, total: c.custoMensal.reduce((s, v) => s + v, 0) }, dataInicio, colapso, toggle, true, false)}
+            { mensal: c.custoMensal, total: c.custoMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasCusto) }, dataInicio, colapso, toggle, true, false)}
           ${grupos.map((g) => html`
             ${linhaTabela('subgrupo', `custo-${g}`, GRUPO_CUSTO_LABEL[g],
-              { mensal: somaLinhas(custosPorGrupo(g)), total: custosPorGrupo(g).reduce((s, x) => s + x.total, 0) }, dataInicio, colapso, toggle, true)}
+              { mensal: somaLinhas(custosPorGrupo(g)), total: custosPorGrupo(g).reduce((s, x) => s + x.total, 0), vpl: somaVpl(custosPorGrupo(g)) }, dataInicio, colapso, toggle, true)}
             ${!colapso[`custo-${g}`] ? custosPorGrupo(g).map((x) =>
               linhaTabela('item', '', x.nome, x, dataInicio, colapso, toggle, true)) : nothing}
           `)}
 
           <tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${c.meses.map(() => html`<td></td>`)}</tr>
-          ${linhaResultado('Fluxo de Caixa Mensal', c.fluxoMensal, c)}
-          ${linhaResultado('Fluxo de Caixa Acumulado', c.fluxoAcumulado, c)}
+          ${linhaResultado('Fluxo de Caixa Mensal', c.fluxoMensal, c.vpl)}
+          ${linhaResultado('Fluxo de Caixa Acumulado', c.fluxoAcumulado, c.vpl)}
         </tbody>
       </table>
     </div>
@@ -202,6 +210,6 @@ export function tabelaFluxo(
 
 /** Chaves de colapso de todos os grupos expansíveis (para "recolher/expandir tudo"). */
 export function chavesColapso(c: FluxoCalc): string[] {
-  return ['receita', 'custo-terreno', 'custo-obra', 'custo-indireto',
+  return ['receita', 'custo-terreno', 'custo-obra', 'custo-diretos', 'custo-indireto', 'custo-financeiro',
     ...c.linhasReceita.map((l) => `r${l.id}`)];
 }
