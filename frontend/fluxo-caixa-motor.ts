@@ -105,7 +105,7 @@ export interface FluxoConfig {
 export interface LinhaCalc {
   id: any;
   nome: string;
-  grupo: 'receita' | 'terreno' | 'obra' | 'indireto';
+  grupo: 'receita' | 'terreno' | 'obra' | 'diretos' | 'indireto' | 'financeiro';
   faseLabel?: string;
   inicio: number;                  // 1º mês com valor (0-based; use duracao===0 p/ "sem valores")
   duracao: number;                 // nº de meses entre o 1º e o último valor (0 = sem valores)
@@ -415,7 +415,11 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     (config.curvas ?? []).map((k: any) => [Number(k.id), (k.valores ?? []) as CurvaPersonalizada]));
   const calcCustos: LinhaCalc[] = linhasCusto.map((c) => {
     const nome = [c.categoria, c.subcategoria].filter(Boolean).join(' — ') || 'Custo';
-    const grupo = (c.grupo === 'terreno' || c.grupo === 'obra' ? c.grupo : 'indireto') as LinhaCalc['grupo'];
+    // Preserva o grupo real (5 grupos das abas de Custos: Terreno · Obra ·
+    // Diretos · Indiretos · Financeiro, #125) para o Proforma exibir cada seção;
+    // grupo desconhecido/legado cai em 'indireto'.
+    const grupo = (['terreno', 'obra', 'diretos', 'indireto', 'financeiro'].includes(c.grupo)
+      ? c.grupo : 'indireto') as LinhaCalc['grupo'];
 
     // Corretagem: paga no mês da venda, sem cronograma próprio (#121). Início e
     // duração são o RECORTE das vendas, e o total é o que de fato entra no fluxo.
