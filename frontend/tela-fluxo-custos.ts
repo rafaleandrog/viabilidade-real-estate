@@ -50,7 +50,7 @@ const CATEGORIAS: Record<GrupoId, { nome: string; subs: string[] }[]> = {
     { nome: 'Outro', subs: [] },
   ],
   obra: [
-    { nome: 'Obra', subs: [] },
+    { nome: 'Construção', subs: [] },
     { nome: 'Decoração', subs: [] },
     { nome: 'Gestão da obra', subs: [] },
     { nome: 'Contingência', subs: [] },
@@ -110,7 +110,7 @@ const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
     'Outro':   ['rs', 'pct_vgv'],
   },
   obra: {
-    'Obra':          ['rs', 'rs_m2_priv'],
+    'Construção':    ['rs', 'rs_m2_priv'],
     'Decoração':     ['rs', 'rs_m2_priv'],
     'Gestão da obra':['rs', 'pct_obra'],
     'Contingência':  ['rs', 'pct_vgv'],
@@ -138,6 +138,32 @@ const EVENTOS_ANCORA = [
   { valor: 'pos_obra', rotulo: 'Pós-obra' },
   { valor: 'customizado', rotulo: 'Customizado' },
 ];
+
+// Linhas obrigatórias do grupo Obra (em ordem): sempre na 1ª e 2ª posição,
+// categoria travada e não removíveis. A linha inexistente é criada ao abrir.
+const OBRA_OBRIGATORIAS: { categoria: string; posicao: number }[] = [
+  { categoria: 'Construção', posicao: 0 },
+  { categoria: 'Gestão da obra', posicao: 1 },
+];
+
+function eObrigatoria(c: any): boolean {
+  return c.grupo === 'obra' && OBRA_OBRIGATORIAS.some((o) => o.categoria === c.categoria);
+}
+
+// Ordena linhas do grupo obra: obrigatórias primeiro (na ordem declarada),
+// seguidas pelas demais na ordem original.
+function ordenarLinhasObra(linhas: any[]): any[] {
+  const obrig: any[] = [];
+  const resto: any[] = [];
+  for (const cat of OBRA_OBRIGATORIAS) {
+    const linha = linhas.find((c) => c.categoria === cat.categoria);
+    if (linha) obrig.push(linha);
+  }
+  for (const c of linhas) {
+    if (!OBRA_OBRIGATORIAS.some((o) => o.categoria === c.categoria)) resto.push(c);
+  }
+  return [...obrig, ...resto];
+}
 
 @customElement('viab-fluxo-custos')
 export class ViabFluxoCustos extends LitElement {
@@ -214,7 +240,11 @@ export class ViabFluxoCustos extends LitElement {
         buscarParametrosAvancado(this.estudo.id),
         listarReceitasAvancado(this.estudo.id),
       ]);
-      if (!custos?.erro) this.custos = custos.dados || [];
+      if (!custos?.erro) {
+        this.custos = custos.dados || [];
+        // Garante que as linhas obrigatórias do grupo Obra existam no servidor.
+        if (this.editavel) await this._garantirLinhasObra();
+      }
       if (!curvas?.erro) this.curvas = curvas.dados || [];
       if (!crono?.erro) this.crono = crono.dados || [];
       if (!params?.erro) this.dataInicio = params.data_inicio_projeto ?? null;
@@ -242,7 +272,8 @@ export class ViabFluxoCustos extends LitElement {
   }
 
   private _renderGrupo(g: Grupo): TemplateResult {
-    const linhas = this.custos.filter((c) => c.grupo === g.id);
+    const todasLinhas = this.custos.filter((c) => c.grupo === g.id);
+    const linhas = g.id === 'obra' ? ordenarLinhasObra(todasLinhas) : todasLinhas;
     const ctx = this._ctx();
     const total = linhas.reduce((s, c) => s + resolverCustoTotal(c, ctx), 0);
     return html`
@@ -280,12 +311,18 @@ export class ViabFluxoCustos extends LitElement {
     const colunas: any[] = [
       {
         id: 'categoria', label: 'Categoria',
-        render: (c: any) => html`
-          <urbi-select placeholder="Selecione…"
-            .valor=${c.categoria || ''}
-            .opcoes=${cats.map((x) => ({ valor: x.nome, rotulo: x.nome }))}
-            @urbi:select-change=${(e: CustomEvent) => this._salvarCategoria(c, g.id, e.detail.valor)}
-          ></urbi-select>`,
+        render: (c: any) => {
+          if (eObrigatoria(c)) {
+            // Linha obrigatória: categoria travada (texto, não seletor).
+            return html`<strong>${c.categoria}</strong>`;
+          }
+          return html`
+            <urbi-select placeholder="Selecione…"
+              .valor=${c.categoria || ''}
+              .opcoes=${cats.map((x) => ({ valor: x.nome, rotulo: x.nome }))}
+              @urbi:select-change=${(e: CustomEvent) => this._salvarCategoria(c, g.id, e.detail.valor)}
+            ></urbi-select>`;
+        },
       },
       {
         id: 'subcategoria', label: 'Subcategoria',
@@ -324,6 +361,7 @@ export class ViabFluxoCustos extends LitElement {
                 </span>
               ` : nothing}
               <viab-num ?desabilitado=${dis}
+                casas-decimais=${modo.startsWith('pct_') ? '2' : '0'}
                 .valor=${c.orcamento_valor !== null && c.orcamento_valor !== undefined ? Number(c.orcamento_valor) : null}
                 @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { orcamento_valor: e.detail.valor })}
               ></viab-num>
@@ -388,12 +426,28 @@ export class ViabFluxoCustos extends LitElement {
     if (!dis) {
       colunas.push({
         id: 'acoes', label: '',
-        render: (c: any) => html`
+        render: (c: any) => eObrigatoria(c) ? nothing : html`
           <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
             @click=${() => { this.removerAlvo = c; }}>Remover</urbi-botao>`,
       });
     }
     return colunas;
+  }
+
+  // Cria as linhas obrigatórias do grupo Obra que ainda não existem.
+  private async _garantirLinhasObra() {
+    for (const obrig of OBRA_OBRIGATORIAS) {
+      const existe = this.custos.some((c) => c.grupo === 'obra' && c.categoria === obrig.categoria);
+      if (!existe) {
+        const res = await criarCustoAvancado(this.estudo.id, {
+          grupo: 'obra',
+          categoria: obrig.categoria,
+          cronograma_evento: 'obra',
+          ordem: obrig.posicao,
+        });
+        if (!res?.erro) this.custos = [...this.custos, res];
+      }
+    }
   }
 
   private async _adicionar(g: Grupo) {
