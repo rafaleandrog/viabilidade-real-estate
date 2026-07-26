@@ -11,7 +11,8 @@ App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell U
 **Fontes de verdade:**
 - `PROGRESSO.md` — estado atual, o que foi feito, pendências
 - `INSTRUCOES-CODE.md` — master plan e contratos inegociáveis da plataforma
-- `docs/lotes-bugs-2026-07-20.md` — lista completa dos lotes de bugs/melhorias com issues do GitHub
+- `docs/lotes-bugs-2026-07-20.md` — lista completa dos lotes de bugs/melhorias com issues do GitHub (Rodada 1: concluído)
+- **`docs/sessoes-bugs-2026-07-25.md`** — **MAPA ATUAL DE SESSÕES (Rodada bugs.xlsx):** 62 issues (#71–#132) em 20 sessões com temas, dificuldades e pré-requisitos. Consulte SEMPRE este arquivo para saber quais issues pertencem a cada sessão
 - `schema.json` — schema de dados atual
 - `docs/shell/*.md` no monorepo `urbiverso/urbiverso` — fonte de verdade da plataforma
 

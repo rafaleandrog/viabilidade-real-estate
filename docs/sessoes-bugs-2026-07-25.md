@@ -1,5 +1,7 @@
 # Sessões de bugs — lista_bugs.xlsx (62 itens)
 
+⚠️ **DOCUMENTO OFICIAL** — Este é o mapa mestre das 62 issues organizadas em 20 sessões Claude Code. **Todos os chats de sessões devem consultar ESTE ARQUIVO para saber exatamente quais issues pertencem a cada sessão SX.**
+
 **Data:** 2026-07-25  
 **Issues GitHub:** #71–#132 (62 issues em 20 sessões)  
 **Branch padrão de cada sessão:** `claude/sX-<slug>` a partir da `main` atualizada
