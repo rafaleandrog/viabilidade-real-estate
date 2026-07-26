@@ -127,6 +127,64 @@ test('linha de custo em % VGV resolve sobre o VGV das tipologias', () => {
   assert.ok(perto(soma(r.linhasCusto[0].mensal), 1_250_000, 1));
 });
 
+// 5b. Corretagem de vendas: paga no mês da venda, não distribuída (#121)
+test('corretagem de vendas cai no mês da venda, acompanhando a absorção', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
+      absorcao: {
+        modo: 'distribuido',
+        blocos: [
+          { evento: 'lancamento', pct: 40 },  // mês 12 (1m)
+          { evento: 'obra', pct: 60 },        // meses 17..40 (24m)
+          { evento: 'pos_obra', pct: 0 },     // derivado = 0
+        ],
+      },
+      fluxo_pagamento: null,
+    }],
+    linhasCusto: [
+      // Corretagem: 4% do VGV. inicio_mes/duracao_meses são IGNORADOS pelo motor.
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 4, orcamento_unidade: 'pct_vgv', inicio_mes: 0, duracao_meses: 1 },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  const linha = r.linhasCusto[0];
+
+  // Total = 4% do VGV vendido (absorção completa) e o mensal soma o mesmo.
+  assert.ok(perto(linha.total, 4_000_000, 1));
+  assert.ok(perto(soma(linha.mensal), 4_000_000, 1));
+  // Mês do lançamento: 40% do VGV vendido → 4% de 40M = 1,6M.
+  assert.ok(perto(linha.mensal[12], 0.04 * 40_000_000, 1));
+  // Durante a obra: 60% espalhados por 24 meses.
+  assert.ok(perto(linha.mensal[17], (0.04 * 60_000_000) / 24, 1));
+  assert.ok(perto(linha.mensal[40], (0.04 * 60_000_000) / 24, 1));
+  // Nada antes da 1ª venda nem no hiato entre lançamento e obra.
+  assert.ok(perto(linha.mensal[0], 0, 1e-6));
+  assert.ok(perto(linha.mensal[14], 0, 1e-6));
+  // Início/duração vêm do recorte das vendas (mês 12 até o mês 40).
+  assert.equal(linha.inicio, 12);
+  assert.equal(linha.duracao, 40 - 12 + 1);
+});
+
+// 5c. Corretagem sem vendas no horizonte não gera desembolso (#121)
+test('corretagem sem linhas de receita não gera custo', () => {
+  const config: FluxoConfig = {
+    dataInicio: null, taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 4, orcamento_unidade: 'pct_vgv', inicio_mes: 0, duracao_meses: 1 },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  assert.ok(perto(r.linhasCusto[0].total, 0, 1e-9));
+  assert.equal(r.linhasCusto[0].duracao, 0);
+  assert.ok(perto(soma(r.custoMensal), 0, 1e-9));
+});
+
 // 6. VPL com taxa zero = soma do fluxo
 test('VPL a taxa zero é a soma simples do fluxo', () => {
   const fluxo = [-100, 30, 40, 50];

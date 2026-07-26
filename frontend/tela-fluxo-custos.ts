@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import {
-  rotuloMesRelativo, EVENTO_LABEL,
+  rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem,
   vgvLinha, vglLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 import {
@@ -139,15 +139,28 @@ const EVENTOS_ANCORA = [
   { valor: 'customizado', rotulo: 'Customizado' },
 ];
 
-// Linhas obrigatórias do grupo Obra (em ordem): sempre na 1ª e 2ª posição,
-// categoria travada e não removíveis. A linha inexistente é criada ao abrir.
-const OBRA_OBRIGATORIAS: { categoria: string; posicao: number }[] = [
-  { categoria: 'Construção', posicao: 0 },
-  { categoria: 'Gestão da obra', posicao: 1 },
-];
+// Linhas obrigatórias por grupo (na ordem declarada): sempre nas primeiras
+// posições, categoria travada e não removíveis. A linha inexistente é criada ao
+// abrir a tela. `unidade` fixa a unidade de orçamento na criação.
+interface LinhaObrigatoria { categoria: string; posicao: number; unidade?: string }
+
+const LINHAS_OBRIGATORIAS: Partial<Record<GrupoId, LinhaObrigatoria[]>> = {
+  obra: [
+    { categoria: 'Construção', posicao: 0 },
+    { categoria: 'Gestão da obra', posicao: 1 },
+  ],
+  // Corretagem de vendas: 1ª linha de Custos Diretos, sempre em % VGV (#121).
+  diretos: [
+    { categoria: CATEGORIA_CORRETAGEM, posicao: 0, unidade: 'pct_vgv' },
+  ],
+};
+
+function obrigatoriasDoGrupo(grupo: string | null | undefined): LinhaObrigatoria[] {
+  return LINHAS_OBRIGATORIAS[grupo as GrupoId] ?? [];
+}
 
 function eObrigatoria(c: any): boolean {
-  return c.grupo === 'obra' && OBRA_OBRIGATORIAS.some((o) => o.categoria === c.categoria);
+  return obrigatoriasDoGrupo(c.grupo).some((o) => o.categoria === c.categoria);
 }
 
 // Linha "Construção" (obrigatória, 1ª do grupo Obra): além da categoria travada
@@ -157,18 +170,19 @@ function eConstrucao(c: any): boolean {
   return c.grupo === 'obra' && c.categoria === 'Construção';
 }
 
-// Ordena linhas do grupo obra: obrigatórias primeiro (na ordem declarada),
+// Ordena as linhas de um grupo: obrigatórias primeiro (na ordem declarada),
 // seguidas pelas demais na ordem original.
-function ordenarLinhasObra(linhas: any[]): any[] {
+function ordenarLinhas(grupo: GrupoId, linhas: any[]): any[] {
+  const obrigatorias = obrigatoriasDoGrupo(grupo);
+  if (obrigatorias.length === 0) return linhas;
   const obrig: any[] = [];
-  const resto: any[] = [];
-  for (const cat of OBRA_OBRIGATORIAS) {
+  for (const cat of obrigatorias) {
     const linha = linhas.find((c) => c.categoria === cat.categoria);
     if (linha) obrig.push(linha);
   }
-  for (const c of linhas) {
-    if (!OBRA_OBRIGATORIAS.some((o) => o.categoria === c.categoria)) resto.push(c);
-  }
+  // Comparação por identidade: uma 2ª linha com a mesma categoria (dado legado)
+  // continua listada, logo após a obrigatória, em vez de sumir da tabela.
+  const resto = linhas.filter((c) => !obrig.includes(c));
   return [...obrig, ...resto];
 }
 
@@ -255,8 +269,8 @@ export class ViabFluxoCustos extends LitElement {
       ]);
       if (!custos?.erro) {
         this.custos = custos.dados || [];
-        // Garante que as linhas obrigatórias do grupo Obra existam no servidor.
-        if (this.editavel) await this._garantirLinhasObra();
+        // Garante que as linhas obrigatórias existam no servidor.
+        if (this.editavel) await this._garantirLinhasObrigatorias();
       }
       if (!curvas?.erro) this.curvas = curvas.dados || [];
       if (!crono?.erro) this.crono = crono.dados || [];
@@ -295,8 +309,7 @@ export class ViabFluxoCustos extends LitElement {
   }
 
   private _renderGrupo(g: Grupo): TemplateResult {
-    const todasLinhas = this.custos.filter((c) => c.grupo === g.id);
-    const linhas = g.id === 'obra' ? ordenarLinhasObra(todasLinhas) : todasLinhas;
+    const linhas = ordenarLinhas(g.id, this.custos.filter((c) => c.grupo === g.id));
     const ctx = this._ctx();
     const total = linhas.reduce((s, c) => s + resolverCustoTotal(c, ctx), 0);
     return html`
@@ -402,7 +415,9 @@ export class ViabFluxoCustos extends LitElement {
       },
       {
         id: 'distribuicao', label: 'Distribuição',
-        render: (c: any) => html`
+        render: (c: any) => eCorretagem(c) ? html`
+          <span class="mes-calc" title="A corretagem é paga integralmente no mês em que a unidade é vendida">
+            Mês da venda <span>🔒</span></span>` : html`
           <urbi-select
             .valor=${c.curva_id ? String(c.curva_id) : ''}
             .opcoes=${[{ valor: '', rotulo: 'Linear' },
@@ -414,6 +429,8 @@ export class ViabFluxoCustos extends LitElement {
       {
         id: 'cronograma', label: 'Cronograma',
         render: (c: any) => {
+          // Corretagem: sem cronograma próprio — segue as vendas (#121).
+          if (eCorretagem(c)) return html`<span class="sec">—</span>`;
           if (eConstrucao(c)) {
             // Construção: cronograma fixo em "Obra" (sem seletor) — #120.
             return html`<span class="mes-calc"><strong>Obra</strong>
@@ -428,6 +445,7 @@ export class ViabFluxoCustos extends LitElement {
       {
         id: 'inicio', label: 'Início',
         render: (c: any) => {
+          if (eCorretagem(c)) return html`<span class="sec">—</span>`;
           if (eConstrucao(c)) {
             // Início derivado do cronograma (evento Obra), bloqueado — #120.
             const obra = this._eventoObra;
@@ -452,6 +470,7 @@ export class ViabFluxoCustos extends LitElement {
       {
         id: 'duracao', label: 'Duração',
         render: (c: any) => {
+          if (eCorretagem(c)) return html`<span class="sec">—</span>`;
           if (eConstrucao(c)) {
             // Duração derivada do cronograma (evento Obra), bloqueada — #120.
             const obra = this._eventoObra;
@@ -496,17 +515,22 @@ export class ViabFluxoCustos extends LitElement {
     if (Object.keys(patch).length) await this._salvar(c, patch);
   }
 
-  // Cria as linhas obrigatórias do grupo Obra que ainda não existem.
-  private async _garantirLinhasObra() {
-    for (const obrig of OBRA_OBRIGATORIAS) {
-      const existe = this.custos.some((c) => c.grupo === 'obra' && c.categoria === obrig.categoria);
-      if (!existe) {
-        const res = await criarCustoAvancado(this.estudo.id, {
-          grupo: 'obra',
+  // Cria as linhas obrigatórias (de todos os grupos) que ainda não existem.
+  // Corretagem nasce sem âncora de cronograma: quem manda no seu calendário é a
+  // absorção das vendas, resolvida no motor (#121).
+  private async _garantirLinhasObrigatorias() {
+    for (const [grupo, obrigatorias] of Object.entries(LINHAS_OBRIGATORIAS)) {
+      for (const obrig of obrigatorias ?? []) {
+        const existe = this.custos.some((c) => c.grupo === grupo && c.categoria === obrig.categoria);
+        if (existe) continue;
+        const dados: Record<string, any> = {
+          grupo,
           categoria: obrig.categoria,
-          cronograma_evento: 'obra',
+          cronograma_evento: grupo === 'obra' ? 'obra' : 'customizado',
           ordem: obrig.posicao,
-        });
+        };
+        if (obrig.unidade) dados.orcamento_unidade = obrig.unidade;
+        const res = await criarCustoAvancado(this.estudo.id, dados);
         if (!res?.erro) this.custos = [...this.custos, res];
       }
     }
