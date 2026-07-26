@@ -698,6 +698,79 @@ sem schema/backend/migração; `versao` intacta. Pré-requisito S16: concluído 
   (`bash scripts/validar-frontend.sh` verde; bundle ~279.6kb). Sem schema/backend → empacotamento
   não se aplica. ⏳ Render real da linha travada só valida no deploy dev.
 
+### Sessão S20 — Cenários: Gráfico Tracejado & Variação % — ✅ IMPLEMENTADA (issues #131, #132) — **ÚLTIMA DA RODADA 3**
+Branch `claude/sessao-s20-issues-finais-9qwt68`. Mudança **100% frontend** (`frontend/tela-cenarios.ts`,
+`frontend/fluxo-graficos.ts`, `frontend/fluxo-tabela.ts` + novo módulo puro `frontend/cenario-variacao.ts`
+e seu teste) — sem schema/backend/migração; `versao` intacta. Pré-requisitos S16/S19: concluídos e na `main`.
+
+- **#131 (linha tracejada em tempo real ao mover os sliders):** a segunda curva já existia desde a
+  Etapa 8/#56 (`graficoCenarioAcumulado` desenhava base cheia + cenário tracejado) e o redesenho já
+  era automático (os deltas moram em `@state`, então cada `input` do slider re-renderiza o SVG). O que
+  faltava — e é o que S20 entrega — são as **duas falhas que tornavam esse comportamento inútil na
+  prática**:
+  1. **Tracejada fantasma na base.** Com os sliders em zero a curva do cenário era idêntica à da base e
+     desenhada **por cima** dela, escondendo a linha sólida e sugerindo que havia dois cenários quando
+     só havia um. Agora `graficoCenarioAcumulado` aceita `cenario: FluxoCalc | null` e o hospedeiro
+     passa `null` enquanto `precoPct === 0 && custoPct === 0`: **a tracejada nasce ao mover o primeiro
+     slider**, exatamente como o issue descreve. A legenda acompanha (só "Cenário real" na base) e
+     ganhou o **rótulo com os deltas vivos** (`Cenário · preço +5% · obra -3%`) via novo parâmetro
+     `rotuloCenario`; foi movida para o canto superior **esquerdo** para caber rótulo longo.
+  2. **Redesenho não era barato o bastante para ser "tempo real".** Cada quadro do arraste recalculava
+     o motor para a base, para o cenário vivo **e para cada cenário salvo** da tabela — N+2 execuções de
+     `calcularFluxo` por pixel arrastado. Novo `cacheCalc: Map<string, FluxoCalc>` em `tela-cenarios.ts`
+     memoiza por par de deltas (`"preco|custo"`): base e cenários salvos são calculados **uma vez**, e
+     arrastar de volta a um valor já visitado é lookup. Cache limitado a `LIMITE_CACHE = 240` entradas
+     (esvazia ao estourar) e **zerado em `_carregar`**, já que um `baseConfig` novo invalida tudo.
+- **#132 (seta ↑/↓ + variação % nos KPIs e badge na tabela de salvos):** genuinamente novo.
+  - **Novo módulo puro `frontend/cenario-variacao.ts`** — `calcularVariacao(novo, base, maiorMelhor)`
+    → `{ pct, melhor, texto }` ou `null`. A regra que exigia teste é a **direção**: ela não vem do
+    sinal da variação, vem do indicador. Os quatro KPIs afetados são "maior é melhor" — **inclusive a
+    Exposição máxima**, que é `min(fluxoAcumulado)` e portanto negativa: ir de −1.000 para −800 é
+    **melhora** de +20%. Por isso a variação normaliza pelo **módulo** da base (senão o sinal
+    inverteria em indicadores negativos). Devolve `null` — nada é pintado — quando algum valor não é
+    finito, quando a base é zero (sem denominador) ou quando |pct| < 0,05 (arredondaria para 0,0%).
+    **6 testes novos** cobrem cada um desses ramos.
+  - **KPIs:** `kpisFluxo(c, base?)` ganhou 2º parâmetro **opcional**. Com ele, Resultado · TIR · VPL ·
+    Exposição máxima exibem `urbi-icone` de seta + o percentual no canto superior direito do próprio
+    card, verde se melhor / vermelho se pior. **Payback ficou de fora de propósito**: é uma data, não
+    um escalar comparável. Sem o 2º parâmetro o componente renderiza **exatamente como antes** — as
+    abas Fluxo de Caixa (`tela-fluxo-ver`) e Resumo seguem intactas.
+  - **Tabela de salvos:** `urbi-badge` (`sucesso`/`perigo`) à direita do valor em VPL, TIR e Exposição
+    máxima de cada cenário salvo, comparando contra a linha do Cenário real (S19/#130). A própria
+    linha real não recebe badge — ela **é** a referência.
+- **Decisão registrada (por que não mexer no `urbi-kpi` do shell):** `urbi-kpi` só expõe
+  `rotulo`/`valor`/`variante` e **não renderiza slot**, então não há como injetar a seta por dentro do
+  primitivo. O caminho "correto" pelo `ui.md` seria estender o primitivo no monorepo — mas isso
+  obrigaria a **bumpar `shell_min` (0.50.3)**, que é contrato inegociável do app, por um indicador de
+  uma única tela. Os dois issues escopam explicitamente `frontend/tela-cenarios.ts`. Optei por ancorar
+  o indicador na **célula do grid** (`.kpi-cel { position: relative }` + `.kpi-var` absoluto), CSS que
+  vive no `static styles` do próprio app — mesmo padrão de `.fx-kpis`/`.fx-wrap` já usado aqui. **Se
+  o padrão se repetir noutra app, aí sim vale promover `variacao` a prop do `urbi-kpi`.**
+- **Faxina de contrato (varredura final):** o único `<i class="fa-solid fa-lock">` do frontend (linha do
+  Cenário real, introduzido em S19) virou `<urbi-icone classe="...">` — o `ui.md` do shell proíbe
+  `<i class="fa-...">` cru no consumidor. Varredura confirma **zero** ocorrências de `<i class=` e zero
+  emoji unicode de status no frontend. As cores literais restantes em `exportar.ts` **não são
+  violação**: são o CSS de documentos HTML autônomos de impressão/PDF, abertos fora do escopo das
+  variáveis do shell, onde `var(--cor-*)` não resolve.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 94/94 ✓** (88 + 6 de `cenario-variacao`)
+  **· build (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde; bundle ~282.5kb). Sem
+  schema/backend/migração → `urbi-empacotar` e suíte de backend não se aplicam a esta sessão.
+  ⏳ Render real da tracejada, das setas nos KPIs e dos badges só valida no deploy dev.
+
+---
+
+## 🏁 Rodada 3 (bugs.xlsx) — CONCLUÍDA
+
+As **62 issues #71–#132** das **20 sessões** de `docs/sessoes-bugs-2026-07-25.md` estão todas
+implementadas e fechadas. Nenhuma issue aberta resta no repositório ao fim da S20.
+
+**Pendências herdadas que permanecem com o autor (ambiente autenticado, SDK gated) — não são desta
+sessão, mas seguem valendo antes de publicar:**
+- `pnpm typecheck` completo (backend), suíte de backend e `pnpm exec urbi-empacotar viabilidade`.
+- **Execução das migrações 001–005** contra dados reais (`versao` do manifesto está em **0.1.4**).
+- Render real no deploy dev de tudo que só se vê no shell: primitivos `urbi-*`, uploads, Gantt,
+  modais, tabelas sticky e os gráficos SVG.
+
 ---
 
 ## Rodada 2 — Etapas (2026-07-22)
