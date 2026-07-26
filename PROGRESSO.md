@@ -527,6 +527,33 @@ Pré-requisitos S13 e S10 (#108): concluídos e já na `main`.
   empacotamento não se aplica. ⏳ Render real da linha travada em Custos Diretos e a conferência da
   corretagem na tabela do Fluxo de Caixa só validam no deploy dev.
 
+### Sessão S15 — Fluxo de Caixa: Visual & Layout — ✅ IMPLEMENTADA (issues #122, #123, #124)
+Branch `claude/sessao-s15-096661`. Mudança **100% frontend** (`frontend/fluxo-tabela.ts`) —
+sem schema/backend/migração; `versao` intacta. Pré-requisitos S13/S14: concluídos.
+
+- **#122 (sobreposição de colunas fixas ao rolar horizontalmente):** `--cor-superficie` é
+  translúcida no design system (~4% alpha); ao usar `background: var(--cor-superficie)` nas
+  células não-fixas, o conteúdo dos meses aparecia por cima das colunas sticky (cujo fundo
+  era opaco mas ficava "atrás" visualmente). Fix: alterado `table.fx th, table.fx td` para
+  usar `--cor-superficie-elevada` (opaca) em todas as células. As regras de row-color (#123)
+  também usam `color-mix` com base opaca, reforçando a correção.
+- **#123 (cores de fundo por tipo de linha no Proforma do Fluxo):** função `linhaTabela`
+  ganhou classe `receita`/`custo` no `<tr>` (adicionada via template literal). CSS com seis
+  regras `color-mix` de especificidade `[0,2,1]` (supera a regra de sticky `.c1`/`.c4`/`.c5`
+  `[0,1,0]`), então a cor da linha aparece também nas colunas fixas:
+  - Receita grupo (15%) → subgrupo/fase (8%) → subitem/tipologia (4%) em verde sucesso
+  - Custo grupo (15%) → subgrupo/agrupamento (8%) → item (4%) em vermelho erro
+  Linhas `resultado` e `divisoria` mantêm o fundo padrão.
+- **#124 (ocultar colunas Início e Duração):** verificação confirmou que `inicio` e `duracao`
+  são exibidos apenas para referência — o motor não os usa para calcular VPL. Fix via CSS:
+  `.c2 { display: none }` e `.c3 { display: none }`. Ajustados os `left` das colunas
+  subsequentes: `.c4` 356→220 px, `.c5` 476→340 px. Comentário de cumulativo atualizado.
+  Células `.c2`/`.c3` permanecem no DOM (estrutura da tabela preservada; conteúdo oculto).
+- **Validação:** frontend isolado — **typecheck ✓ · testes 82/82 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~276.6kb). Sem schema/backend →
+  empacotamento não se aplica. ⏳ Render real das cores de linha e do scroll sticky só
+  valida no deploy dev.
+
 ---
 
 ## Rodada 2 — Etapas (2026-07-22)
