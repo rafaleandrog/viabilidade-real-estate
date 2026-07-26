@@ -83,6 +83,8 @@ export class ViabTelaCenarios extends LitElement {
     table.cen th:first-child, table.cen td:first-child { text-align: left; }
     table.cen td.pos { color: var(--cor-sucesso, #13a98d); }
     table.cen td.neg { color: var(--cor-erro, #d45a3a); }
+    table.cen tr.linha-real td { font-weight: 700; background: var(--cor-primaria-fundo, rgba(124,92,255,0.12)); }
+    table.cen tr.linha-real td:first-child i { margin-right: 6px; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
     .cen-wrap { overflow-x: auto; }
   `];
 
@@ -162,7 +164,7 @@ export class ViabTelaCenarios extends LitElement {
         ${tabelaFluxo(cenario, this.dataInicio, this.colapso, (ch) => this._t(ch))}
       </section>
 
-      ${this._renderCenariosSalvos()}
+      ${this._renderCenariosSalvos(base)}
     `;
   }
 
@@ -243,35 +245,54 @@ export class ViabTelaCenarios extends LitElement {
     }
   };
 
-  private _renderCenariosSalvos(): TemplateResult {
+  private _renderCenariosSalvos(base: FluxoCalc): TemplateResult {
     return html`
       <section class="secao-cenarios">
         <h3>Cenários salvos</h3>
+        <div class="cen-wrap">
+          <table class="cen">
+            <thead>
+              <tr>
+                <th>Cenário</th>
+                <th>Preço venda</th>
+                <th>Custo obra</th>
+                <th>VPL</th>
+                <th>TIR</th>
+                <th>Payback</th>
+                <th>Exposição máx.</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${this._linhaReal(base)}
+              ${this.cenarios.map((c) => this._linhaCenario(c))}
+            </tbody>
+          </table>
+        </div>
         ${this.cenarios.length === 0
           ? html`<urbi-estado-vazio icone="fa-solid fa-layer-group"
               mensagem="Nenhum cenário salvo. Ajuste os parâmetros acima e clique em “Salvar cenário”."></urbi-estado-vazio>`
-          : html`
-            <div class="cen-wrap">
-              <table class="cen">
-                <thead>
-                  <tr>
-                    <th>Cenário</th>
-                    <th>Preço venda</th>
-                    <th>Custo obra</th>
-                    <th>VPL</th>
-                    <th>TIR</th>
-                    <th>Payback</th>
-                    <th>Exposição máx.</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${this.cenarios.map((c) => this._linhaCenario(c))}
-                </tbody>
-              </table>
-            </div>`}
+          : nothing}
       </section>
       ${this.removerId != null ? this._renderConfirmRemover() : nothing}
+    `;
+  }
+
+  // Linha travada, sempre primeira: o cenário real (sem alterações dos sliders),
+  // referência de comparação para os cenários salvos pelo usuário.
+  private _linhaReal(base: FluxoCalc): TemplateResult {
+    const tir = base.tir === null ? '—' : fmtPct(base.tir);
+    return html`
+      <tr class="linha-real">
+        <td><i class="fa-solid fa-lock"></i>Cenário real</td>
+        <td>—</td>
+        <td>—</td>
+        <td class=${base.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(base.vpl)}</td>
+        <td>${tir}</td>
+        <td>${base.paybackData ?? '—'}</td>
+        <td class="neg">${fmtR$(base.exposicaoMaxima)}</td>
+        <td></td>
+      </tr>
     `;
   }
 
