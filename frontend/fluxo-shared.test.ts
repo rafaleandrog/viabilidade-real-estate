@@ -6,6 +6,7 @@ import {
   faixasAbsorcao, pctPosObraDerivado,
   areaPrivativaTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
+  totalAntesAlocacao,
   type EventoCrono,
 } from './fluxo-shared.js';
 
@@ -210,4 +211,74 @@ test('periodosAnuais cobre exatamente todos os meses, sem furo nem sobreposiçã
     const meses = p.reduce((s, f) => s + (f.fim - f.inicio + 1), 0);
     assert.equal(meses, prazo, `${inicio}/${prazo}: soma das faixas = prazo`);
   }
+});
+
+// ── #170: saldo de tipologias cascateando pelas Fases da Receita ──
+// Fixture idêntica à aba "#7" da planilha da issue (4 tipologias × 3 fases):
+// Total = catálogo − vendido nas linhas acima; Saldo = Total − unidades da linha.
+const TIPOLOGIAS_170 = [
+  { id: 1, nome: 'Studio', area_privativa_m2: 21, quantidade: 100 },
+  { id: 2, nome: '2 Dorms', area_privativa_m2: 55, quantidade: 80 },
+  { id: 3, nome: '3 Dorms', area_privativa_m2: 85, quantidade: 60 },
+  { id: 4, nome: 'Loja', area_privativa_m2: 60, quantidade: 20 },
+];
+
+const FASES_170 = [
+  { id: 1, nome: '1ª Fase', ordem: 0, alocacoes: [
+    { id: 11, tipologia_id: 1, unidades: 10, preco_m2: 12000 },
+    { id: 12, tipologia_id: 2, unidades: 60, preco_m2: 13500 },
+    { id: 13, tipologia_id: 3, unidades: 10, preco_m2: 14000 },
+    { id: 14, tipologia_id: 4, unidades: 2, preco_m2: 11000 },
+  ] },
+  { id: 2, nome: '2ª Fase', ordem: 1, alocacoes: [
+    { id: 21, tipologia_id: 1, unidades: 50, preco_m2: 14000 },
+    { id: 22, tipologia_id: 2, unidades: 15, preco_m2: 15000 },
+    { id: 23, tipologia_id: 3, unidades: 40, preco_m2: 12500 },
+    { id: 24, tipologia_id: 4, unidades: 14, preco_m2: 10500 },
+  ] },
+  { id: 3, nome: '3ª Fase', ordem: 2, alocacoes: [
+    { id: 31, tipologia_id: 1, unidades: 40, preco_m2: 16000 },
+    { id: 32, tipologia_id: 2, unidades: 5, preco_m2: 13000 },
+    { id: 33, tipologia_id: 3, unidades: 10, preco_m2: 14000 },
+    { id: 34, tipologia_id: 4, unidades: 4, preco_m2: 15500 },
+  ] },
+];
+
+test('totalAntesAlocacao reproduz Total e Saldo da planilha (aba #7) linha a linha', () => {
+  // [alocId, tipologiaId, Total esperado, Saldo esperado] — colunas F e H da planilha.
+  const esperado: Array<[number, number, number, number]> = [
+    // 1ª Fase
+    [11, 1, 100, 90], [12, 2, 80, 20], [13, 3, 60, 50], [14, 4, 20, 18],
+    // 2ª Fase
+    [21, 1, 90, 40], [22, 2, 20, 5], [23, 3, 50, 10], [24, 4, 18, 4],
+    // 3ª Fase — tudo vendido, saldo zera
+    [31, 1, 40, 0], [32, 2, 5, 0], [33, 3, 10, 0], [34, 4, 4, 0],
+  ];
+  for (const [alocId, tipId, total, saldo] of esperado) {
+    const t = totalAntesAlocacao(FASES_170, TIPOLOGIAS_170, alocId, tipId);
+    const un = FASES_170.flatMap((f) => f.alocacoes).find((a) => a.id === alocId)!.unidades;
+    assert.equal(t, total, `alocação ${alocId}: Total`);
+    assert.equal(t - un, saldo, `alocação ${alocId}: Saldo`);
+  }
+});
+
+test('totalAntesAlocacao ignora as outras tipologias e a própria linha', () => {
+  // A 1ª linha de cada tipologia sempre vê o total cheio do catálogo.
+  assert.equal(totalAntesAlocacao(FASES_170, TIPOLOGIAS_170, 11, 1), 100);
+  assert.equal(totalAntesAlocacao(FASES_170, TIPOLOGIAS_170, 14, 4), 20);
+  // Alocação inexistente e tipologia fora do catálogo devolvem 0.
+  assert.equal(totalAntesAlocacao(FASES_170, TIPOLOGIAS_170, 99, 1), 0);
+  assert.equal(totalAntesAlocacao(FASES_170, TIPOLOGIAS_170, 11, 9), 0);
+  assert.equal(totalAntesAlocacao([], TIPOLOGIAS_170, 11, 1), 0);
+});
+
+test('totalAntesAlocacao nunca devolve negativo e aceita campos ausentes', () => {
+  const fases = [
+    { id: 1, alocacoes: [{ id: 1, tipologia_id: 1, unidades: 100 }] },
+    { id: 2, alocacoes: [{ id: 2, tipologia_id: 1, unidades: null }] },
+    { id: 3 }, // fase sem alocações
+    { id: 4, alocacoes: [{ id: 3, tipologia_id: 1 }] },
+  ];
+  assert.equal(totalAntesAlocacao(fases, TIPOLOGIAS_170, 2, 1), 0);
+  assert.equal(totalAntesAlocacao(fases, TIPOLOGIAS_170, 3, 1), 0);
 });

@@ -4,6 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum } from './viab-format.js';
 import {
   rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosObraDerivado,
+  totalAntesAlocacao,
   type EventoCrono,
 } from './fluxo-shared.js';
 import { pctRepasseDerivado } from './fluxo-caixa-motor.js';
@@ -21,9 +22,11 @@ import './viab-num.js';
 // Modelo: um card por FASE. Cada fase é dona da Absorção de Vendas e do Fluxo
 // de Pagamento (modais). Dentro da fase, uma tabela de ALOCAÇÕES de venda: cada
 // linha escolhe uma tipologia do catálogo (Empreendimento → Tipologias), define
-// unidades e preço/m². Ao esgotar as unidades da tipologia na fase, ela some das
-// opções de novas linhas (trava de saldo por fase). Nada aqui é usado pelo
-// estudo Preliminar.
+// unidades e preço/m². As unidades da tipologia CASCATEIAM pelas fases (#170):
+// o "Total" de cada linha é o que sobrou das linhas acima e o "Saldo" é esse
+// total menos as unidades da própria linha. Ao esgotar as unidades no estudo
+// inteiro, a tipologia some das opções de novas linhas (trava de saldo agregada
+// por estudo, espelhando a do backend). Nada aqui é usado pelo estudo Preliminar.
 
 const n = (v: any): number => Number(v) || 0;
 
@@ -195,29 +198,6 @@ export class ViabFluxoReceitas extends LitElement {
     return n(tip.quantidade) - usado;
   }
 
-  /**
-   * Saldo disponível ANTES da alocação `alocId`, contando de cima para baixo
-   * todas as alocações anteriores da mesma tipologia em todas as fases. #107:
-   * exibe o saldo como "balanço progressivo" — o usuário vê quantas unidades
-   * estavam livres quando chegou a vez desta linha.
-   */
-  private _saldoAntes(alocId: any, tipologiaId: any): number {
-    const tip = this._tip(tipologiaId);
-    if (!tip) return 0;
-    let usado = 0;
-    for (const fase of this.fases) {
-      for (const a of (fase.alocacoes || [])) {
-        if (Number(a.id) === Number(alocId)) {
-          return Math.max(0, n(tip.quantidade) - usado);
-        }
-        if (Number(a.tipologia_id) === Number(tipologiaId)) {
-          usado += n(a.unidades);
-        }
-      }
-    }
-    return 0;
-  }
-
   private _vgvFase(fase: any): number {
     return (fase.alocacoes || []).reduce((s: number, a: any) => {
       const tip = this._tip(a.tipologia_id);
@@ -343,8 +323,11 @@ export class ViabFluxoReceitas extends LitElement {
     const area = n(tip?.area_privativa_m2);
     const precoUnit = area * n(a.preco_m2);
     const precoTotal = precoUnit * n(a.unidades);
-    // #107: saldo "antes desta linha" (balanço progressivo de cima para baixo).
-    const saldo = this._saldoAntes(a.id, a.tipologia_id);
+    // #170: as unidades da tipologia cascateiam pelas fases. "Total" é o que
+    // ainda estava disponível ao chegar nesta linha (catálogo − vendido acima);
+    // "Saldo" é esse total menos as unidades vendidas na própria linha.
+    const total = totalAntesAlocacao(this.fases, this.tipologias, a.id, a.tipologia_id);
+    const saldo = total - n(a.unidades);
     // Opções: tipologias com saldo global > 0 + a atual (sempre inclusa).
     const opcoes = this.tipologias
       .filter((t) => Number(t.id) === Number(a.tipologia_id) || this._saldo(t.id) > 0)
@@ -357,7 +340,7 @@ export class ViabFluxoReceitas extends LitElement {
           ></urbi-select>
         </td>
         <td class="num">${area ? `${area.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²` : '—'}</td>
-        <td class="num">${tip ? n(tip.quantidade) : '—'}</td>
+        <td class="num">${tip ? total : '—'}</td>
         <td class="num">
           <viab-num casas-decimais="0" ?desabilitado=${dis}
             .valor=${a.unidades !== null && a.unidades !== undefined ? Number(a.unidades) : null}
