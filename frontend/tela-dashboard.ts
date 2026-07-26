@@ -33,15 +33,6 @@ export class ViabTelaDashboard extends LitElement {
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
     .acoes-linha { display: inline-flex; gap: 6px; }
-    /* #90: miniatura da imagem principal na lista de estudos. */
-    .thumb { display: block; width: 48px; height: 36px; object-fit: cover; border-radius: 4px; border: 1px solid var(--cor-borda, rgba(255,255,255,0.08)); }
-    .thumb-vazio {
-      display: flex; align-items: center; justify-content: center;
-      width: 48px; height: 36px; border-radius: 4px;
-      background: var(--cor-superficie-sutil, rgba(255,255,255,0.03));
-      border: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
-      color: var(--cor-texto-sec, rgba(255,255,255,0.4));
-    }
     .filtros-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .filtros-bar urbi-select { min-width: 200px; }
     .nivel-campo label { display: block; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-bottom: 6px; }
@@ -136,14 +127,6 @@ export class ViabTelaDashboard extends LitElement {
       (l) => { const p = calcularProforma(l as any); return p.vgv > 0 ? fn(p) : '—'; };
     return [
       { id: 'nome', label: 'Estudo', valor: (l: any) => l.nome_exibicao || l.nome },
-      {
-        id: 'imagem', label: '',
-        // #90: miniatura da capa (imagem_principal). URL assinada vem do backend
-        // (estudo_documentos é `restrito`). Sem imagem → placeholder com ícone.
-        render: (l: any) => l.imagem_principal_url
-          ? html`<img class="thumb" src=${l.imagem_principal_url} alt="" loading="lazy" />`
-          : html`<span class="thumb-vazio" aria-label="Sem imagem"><urbi-icone classe="fa-solid fa-image"></urbi-icone></span>`,
-      },
       {
         id: 'tipo', label: 'Tipo',
         valor: (l: any) => TIPO_LABEL[l.tipo_empreendimento] || l.tipo_empreendimento,
