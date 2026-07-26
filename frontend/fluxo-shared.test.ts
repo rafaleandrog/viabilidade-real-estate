@@ -5,6 +5,7 @@ import {
   vgvTipologia, vgvLinha, vglLinha, periodoAbsorcao, absorcaoMensal,
   faixasAbsorcao, pctPosObraDerivado,
   areaPrivativaTotalLinhas, resolverCustoTotal,
+  eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM,
   type EventoCrono,
 } from './fluxo-shared.js';
 
@@ -135,6 +136,32 @@ test('areaPrivativaTotalLinhas soma área × quantidade de todas as tipologias',
     { tipologias: [{ area_privativa_m2: 85, quantidade: 60 }] },
   ];
   assert.equal(areaPrivativaTotalLinhas(linhas), 7000 + 5000 + 5100);
+});
+
+test('vgvVendidoMensal reparte o VGV de cada linha pela sua absorção (#121)', () => {
+  const linhas = [
+    { // VGV 50M, tudo vendido no lançamento (mês 12)
+      tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }],
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+    },
+    { // VGV 20M, metade no mês 12 e metade no mês 20
+      tipologias: [{ quantidade: 40, area_privativa_m2: 50, preco_m2: 10_000 }],
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 50 }, { mes: 20, pct: 50 }] },
+    },
+  ];
+  const r = vgvVendidoMensal(linhas, CRONO, 60);
+  assert.equal(r.length, 60);
+  assert.ok(perto(r.reduce((s, x) => s + x, 0), 70_000_000));
+  assert.ok(perto(r[12], 50_000_000 + 10_000_000));
+  assert.ok(perto(r[20], 10_000_000));
+  assert.ok(perto(r[13], 0));
+});
+
+test('eCorretagem só reconhece a linha de Corretagem em Custos Diretos (#121)', () => {
+  assert.equal(eCorretagem({ grupo: 'diretos', categoria: CATEGORIA_CORRETAGEM }), true);
+  assert.equal(eCorretagem({ grupo: 'indireto', categoria: CATEGORIA_CORRETAGEM }), false);
+  assert.equal(eCorretagem({ grupo: 'diretos', categoria: 'Projetos' }), false);
+  assert.equal(eCorretagem(null), false);
 });
 
 test('absorcaoMensal personalizado (legado) usa os meses relativos informados', () => {

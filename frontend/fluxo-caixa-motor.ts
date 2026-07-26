@@ -14,6 +14,7 @@
 import {
   absorcaoMensal, vgvLinha, vgvTipologia, vglLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
+  eCorretagem, vgvVendidoMensal,
   type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 
@@ -233,6 +234,42 @@ export function receitaMensalLinha(
 }
 
 // ─────────────────────────────────────────────────────────────────
+// 6C. Corretagem de vendas (#121)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Distribuição mensal da linha de Corretagem de vendas (Custos Diretos, #121).
+ *
+ * Regra de negócio: a corretagem é paga INTEGRALMENTE no mês em que a unidade é
+ * vendida — não é espalhada por um período como os demais custos. Por isso a
+ * linha não tem Distribuição/Cronograma/Início/Duração: seu calendário é o das
+ * vendas (absorção das linhas de receita).
+ *
+ * Em `pct_vgv` (única unidade oferecida na UI) aplica o % sobre o VGV vendido em
+ * cada mês. Outras unidades (dado legado) caem no mesmo calendário: o total
+ * resolvido é rateado proporcionalmente ao VGV vendido no mês. Sem vendas no
+ * horizonte, não há corretagem a pagar.
+ */
+export function corretagemMensal(
+  custo: any,
+  linhasReceita: any[],
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+  ctx: ContextoCusto,
+): number[] {
+  const vendas = vgvVendidoMensal(linhasReceita, cronograma, prazoTotal);
+  const somaVendas = vendas.reduce((s, v) => s + v, 0);
+  if (somaVendas <= 0) return new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+
+  if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv') {
+    const pct = n(custo?.orcamento_valor) / 100;
+    return vendas.map((v) => v * pct);
+  }
+  const total = resolverCustoTotal(custo, ctx);
+  return vendas.map((v) => (total * v) / somaVendas);
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Indicadores financeiros
 // ─────────────────────────────────────────────────────────────────
 
@@ -377,13 +414,28 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const curvasPorId = new Map<number, CurvaPersonalizada>(
     (config.curvas ?? []).map((k: any) => [Number(k.id), (k.valores ?? []) as CurvaPersonalizada]));
   const calcCustos: LinhaCalc[] = linhasCusto.map((c) => {
+    const nome = [c.categoria, c.subcategoria].filter(Boolean).join(' — ') || 'Custo';
+    const grupo = (c.grupo === 'terreno' || c.grupo === 'obra' ? c.grupo : 'indireto') as LinhaCalc['grupo'];
+
+    // Corretagem: paga no mês da venda, sem cronograma próprio (#121). Início e
+    // duração são o RECORTE das vendas, e o total é o que de fato entra no fluxo.
+    if (eCorretagem(c)) {
+      const mensal = corretagemMensal(c, linhasReceita, crono, prazo, ctxCusto);
+      const r = recorte(mensal);
+      return {
+        id: c.id, nome, grupo,
+        inicio: r.inicio, duracao: r.duracao,
+        total: mensal.reduce((s, v) => s + v, 0),
+        vpl: vplFluxo(mensal, taxa),
+        mensal,
+      };
+    }
+
     const total = resolverCustoTotal(c, ctxCusto);
     const curva = c.curva_id ? (curvasPorId.get(Number(c.curva_id)) ?? 'linear') : 'linear';
     const mensal = distribuirLinha(total, n(c.inicio_mes), n(c.duracao_meses), curva, prazo);
-    const nome = [c.categoria, c.subcategoria].filter(Boolean).join(' — ') || 'Custo';
     return {
-      id: c.id, nome,
-      grupo: (c.grupo === 'terreno' || c.grupo === 'obra' ? c.grupo : 'indireto') as LinhaCalc['grupo'],
+      id: c.id, nome, grupo,
       inicio: n(c.inicio_mes), duracao: n(c.duracao_meses),
       total,
       vpl: vplFluxo(mensal, taxa),

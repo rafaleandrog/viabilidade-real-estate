@@ -492,6 +492,41 @@ sem schema/backend/migração; `versao` intacta. Pré-requisito S12: concluído.
   empacotamento não se aplica. ⏳ Render real das colunas travadas, do sync da Construção e do
   Resultado em `% Receita` só valida no deploy dev.
 
+### Sessão S14 — Custos Diretos: Motor de Corretagem — ✅ IMPLEMENTADA (issue #121)
+Branch `claude/sessao-s14-svgouc`. Mudança **100% frontend** (`fluxo-shared.ts`, `fluxo-caixa-motor.ts`,
+`tela-fluxo-custos.ts` + testes) — sem schema/backend/migração; `versao` intacta.
+Pré-requisitos S13 e S10 (#108): concluídos e já na `main`.
+
+- **Regra de negócio (#121):** a **Corretagem de vendas** não é um custo distribuído no tempo como os
+  demais — ela é paga **integralmente no mês em que a unidade é vendida**. Logo a linha não tem
+  Distribuição, Cronograma, Início nem Duração: quem define o calendário dela é a **absorção das
+  vendas** (o mesmo `absorcaoMensal` das 4 faixas do #108).
+- **Motor (`fluxo-shared.ts`):** dois primitivos puros novos — `vgvVendidoMensal(linhasReceita, crono,
+  prazo)`, que soma o **VGV vendido mês a mês** repartindo o VGV de cada linha de receita pela sua
+  própria curva de absorção; e `eCorretagem(custo)` + `CATEGORIA_CORRETAGEM`, que identificam a linha
+  (grupo `diretos` + categoria "Corretagem de vendas") — um único predicado compartilhado entre motor
+  e UI, sem duplicar a regra.
+- **Motor (`fluxo-caixa-motor.ts`):** `corretagemMensal(custo, linhasReceita, crono, prazo, ctx)`
+  aplica o **% de corretagem sobre o VGV vendido em cada mês** (unidade `pct_vgv`, a única oferecida
+  na UI). Dado legado em outra unidade cai no mesmo calendário: o total resolvido é rateado
+  proporcionalmente ao VGV vendido no mês. Sem vendas no horizonte → nenhum desembolso.
+  Em `calcularFluxo`, a linha de corretagem **desvia de `distribuirLinha`**: `inicio`/`duracao` vêm do
+  **recorte das vendas** (não dos campos persistidos, que passam a ser ignorados) e `total` é a soma do
+  próprio mensal — ou seja, o que de fato entra no fluxo de caixa.
+- **UI (`tela-fluxo-custos.ts`):** a máquina de "linhas obrigatórias" do grupo Obra (S12/S13) foi
+  **generalizada por grupo** (`LINHAS_OBRIGATORIAS`, `obrigatoriasDoGrupo`, `ordenarLinhas`), e o grupo
+  **Diretos** ganhou a Corretagem como **1ª linha obrigatória**, em `pct_vgv`: categoria travada
+  (texto, sem seletor), **sem botão Remover** e com **Distribuição / Cronograma / Início / Duração
+  sem campo** — Distribuição exibe "Mês da venda 🔒" (com tooltip da regra) e as outras três, "—".
+  `_garantirLinhasObrigatorias` (ex-`_garantirLinhasObra`) cria a linha que faltar em qualquer grupo,
+  já com a unidade fixa; a Corretagem nasce com `cronograma_evento: 'customizado'`, pois não se ancora
+  em evento nenhum. `ordenarLinhas` passou a comparar por **identidade**, então uma 2ª linha legada com
+  a mesma categoria continua listada em vez de sumir da tabela.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 82/82 ✓ (4 novos) · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~275.9kb). Sem schema/backend →
+  empacotamento não se aplica. ⏳ Render real da linha travada em Custos Diretos e a conferência da
+  corretagem na tabela do Fluxo de Caixa só validam no deploy dev.
+
 ---
 
 ## Rodada 2 — Etapas (2026-07-22)

@@ -269,3 +269,44 @@ export function resolverCustoTotal(custo: any, ctx: ContextoCusto): number {
     default: return valor; // 'rs'
   }
 }
+
+// ─────────────────────────────────────────────────────────────────
+// Corretagem de vendas (#121) — custo direto pago no mês da venda
+// ─────────────────────────────────────────────────────────────────
+
+/** Categoria da linha obrigatória de Corretagem (1ª linha de Custos Diretos). */
+export const CATEGORIA_CORRETAGEM = 'Corretagem de vendas';
+
+/**
+ * Identifica a linha de Corretagem de vendas. Ela não tem Distribuição,
+ * Cronograma, Início nem Duração: o motor a paga integralmente no mês em que
+ * cada unidade é vendida (#121).
+ */
+export function eCorretagem(custo: any): boolean {
+  return custo?.grupo === 'diretos' && custo?.categoria === CATEGORIA_CORRETAGEM;
+}
+
+/**
+ * VGV VENDIDO mês a mês (meses RELATIVOS 0-based), somando todas as linhas de
+ * receita: o VGV de cada linha é repartido pela sua própria curva de absorção.
+ * Devolve um array de `prazoTotal` posições; vendas fora do horizonte são
+ * ignoradas. Linhas sem VGV ou com cronograma insuficiente não contribuem.
+ */
+export function vgvVendidoMensal(
+  linhasReceita: any[],
+  crono: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+  for (const l of linhasReceita ?? []) {
+    const vgv = vgvLinha(l?.tipologias ?? []);
+    if (vgv <= 0) continue;
+    const abs = absorcaoMensal(l?.absorcao ?? { modo: 'linear' }, crono);
+    if (!abs) continue;
+    for (let i = 0; i < abs.pcts.length; i++) {
+      const idx = abs.inicio + i; // mês 0-based coincide com o índice
+      if (idx >= 0 && idx < saida.length) saida[idx] += (vgv * abs.pcts[i]) / 100;
+    }
+  }
+  return saida;
+}
