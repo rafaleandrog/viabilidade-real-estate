@@ -358,6 +358,26 @@ sem schema/backend/migração; `versao` intacta. Sem pré-requisitos.
   (`bash scripts/validar-frontend.sh` verde). Sem schema/backend → empacotamento não se aplica.
   ⏳ Render real do Gantt e do cascade-save só valida no deploy dev.
 
+### Sessão S9 — Receitas: UI & Validação — ✅ IMPLEMENTADA (issues #103, #104, #105, #106)
+Branch `claude/sessao-s9-rs5ndx` (PR #143). Mudança **100% frontend** (`frontend/tela-fluxo-receitas.ts`) —
+sem schema/backend/motor/migração; `versao` intacta. Pré-requisito S5: concluído.
+
+- **#103 (coluna "Total"):** nova coluna `c-total` (68px) inserida entre Área privativa e Unidades na tabela
+  de alocações — exibe `tip.quantidade`, total de unidades registradas para a tipologia no catálogo
+  (Empreendimento → Tipologias). Header da coluna de VGV corrigido de "Preço total" para "VGV" (alinhado com S8).
+  `col.c-acao` reduzida de 92px para 56px para acomodar a nova coluna.
+- **#104 (botões de adicionar):** "Adicionar entrada" e "Adicionar parcelamento" trocados de
+  `variante="fantasma"` para `variante="secundario"` (botão real do design system UrbiVerso).
+- **#105 (regras de parcelamento):** botão "Adicionar parcelamento" some quando já há 4 linhas
+  (`f.parcelas.length >= 4`); badges de periodicidade ficam desabilitados para as periodicidades
+  já usadas em outra linha (sem duplicata por fase); `_addLinha('parcelas')` escolhe automaticamente
+  a primeira periodicidade livre; mínimo 1 garantido pelo guard pré-existente (`length > 1` para mostrar excluir).
+- **#106 (lixeira):** botão de exclusão de entrada e parcelamento: `fa-solid fa-xmark` / `variante="fantasma"`
+  → `fa-solid fa-trash` / `variante="perigo"`, alinhado ao padrão das lixeiras de fase e alocação.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓** (~266.7kb).
+  Sem schema/backend → empacotamento não se aplica. ⏳ Render real do modal de Fluxo de Pagamento
+  só valida no deploy dev.
+
 ### Sessão S3 — Preliminar Proforma: Bugs de exibição — ✅ IMPLEMENTADA (issues #77, #78)
 Branch `claude/sessao-s3-hcnifg` (PR #136). Mudança **100% frontend** (`frontend/tela-proforma.ts`) —
 sem schema/backend/motor/migração; `versao` intacta. Sem pré-requisitos.
