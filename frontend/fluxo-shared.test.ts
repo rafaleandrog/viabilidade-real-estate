@@ -5,7 +5,7 @@ import {
   vgvTipologia, vgvLinha, vglLinha, periodoAbsorcao, absorcaoMensal,
   faixasAbsorcao, pctPosObraDerivado,
   areaPrivativaTotalLinhas, resolverCustoTotal,
-  eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM,
+  eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
   type EventoCrono,
 } from './fluxo-shared.js';
 
@@ -171,4 +171,43 @@ test('absorcaoMensal personalizado (legado) usa os meses relativos informados', 
   assert.ok(perto(r.pcts[12 - 6], 60));
   assert.ok(perto(r.pcts[19 - 6], 40));
   assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 100));
+});
+
+// ── View Anual (S17 · #127) ──
+
+test('periodosAnuais corta pelo calendário: primeiro e último anos parciais', () => {
+  // Início em abr/2027, 30 meses: 2027 = abr→dez (9m), 2028 cheio, 2029 = jan→set (9m).
+  const p = periodosAnuais('abr/2027', 30);
+  assert.deepEqual(p, [
+    { rotulo: '2027', inicio: 0, fim: 8 },
+    { rotulo: '2028', inicio: 9, fim: 20 },
+    { rotulo: '2029', inicio: 21, fim: 29 },
+  ]);
+});
+
+test('periodosAnuais com início em janeiro dá anos cheios de 12 meses', () => {
+  const p = periodosAnuais('jan/2027', 24);
+  assert.deepEqual(p, [
+    { rotulo: '2027', inicio: 0, fim: 11 },
+    { rotulo: '2028', inicio: 12, fim: 23 },
+  ]);
+});
+
+test('periodosAnuais sem data de início agrupa em blocos de 12 ("Ano N")', () => {
+  assert.deepEqual(periodosAnuais(null, 18), [
+    { rotulo: 'Ano 1', inicio: 0, fim: 11 },
+    { rotulo: 'Ano 2', inicio: 12, fim: 17 },
+  ]);
+  assert.deepEqual(periodosAnuais('', 0), []);
+});
+
+test('periodosAnuais cobre exatamente todos os meses, sem furo nem sobreposição', () => {
+  for (const [inicio, prazo] of [['jan/2027', 1], ['dez/2027', 13], ['jul/2030', 41], [null, 7]] as const) {
+    const p = periodosAnuais(inicio, prazo);
+    assert.equal(p[0].inicio, 0, `${inicio}/${prazo}: começa no mês 0`);
+    assert.equal(p[p.length - 1].fim, prazo - 1, `${inicio}/${prazo}: termina no último mês`);
+    for (let i = 1; i < p.length; i++) assert.equal(p[i].inicio, p[i - 1].fim + 1);
+    const meses = p.reduce((s, f) => s + (f.fim - f.inicio + 1), 0);
+    assert.equal(meses, prazo, `${inicio}/${prazo}: soma das faixas = prazo`);
+  }
 });

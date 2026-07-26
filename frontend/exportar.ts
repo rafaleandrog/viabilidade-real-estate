@@ -258,8 +258,18 @@ function svgFluxoAcumulado(c: FluxoCalc): string {
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${eixo}<path d="${linha}" fill="none" stroke="#111" stroke-width="1.5"/>${payback}</svg>`;
 }
 
-export function exportarFluxoPDF(estudo: any, c: FluxoCalc, dataInicio: string | null): boolean {
-  const POR_PAGINA = 18; // colunas de mês por página (paisagem)
+/**
+ * PDF do fluxo. `rotuloColunas` nomeia a unidade das colunas no rodapé de cada
+ * página — "Meses" na view mensal, "Anos" quando o fluxo vem agregado por ano
+ * (#127). As colunas Início/Duração e os KPIs são sempre em meses.
+ */
+export function exportarFluxoPDF(
+  estudo: any,
+  c: FluxoCalc,
+  dataInicio: string | null,
+  rotuloColunas = 'Meses',
+): boolean {
+  const POR_PAGINA = 18; // colunas por página (paisagem)
   const linhas = linhasFluxo(c);
   const kpis: [string, string][] = [
     ['TIR', c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`],
@@ -295,7 +305,7 @@ export function exportarFluxoPDF(estudo: any, c: FluxoCalc, dataInicio: string |
     paginas.push(`
       <section class="pagina">
         ${cab}
-        <div class="faixa">Meses ${ini + 1}–${fim} de ${c.prazo}</div>
+        <div class="faixa">${rotuloColunas} ${ini + 1}–${fim} de ${c.prazo}</div>
         <table>
           <thead><tr><th class="nome">Linha</th><th>Início</th><th>Duração</th><th>Total</th><th>VPL</th>${ths}</tr></thead>
           <tbody>${trs}</tbody>

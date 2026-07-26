@@ -46,6 +46,45 @@ export function mesRelativoCompleto(dataInicio: string | null | undefined, mesRe
   return formatarMesAno({ mes: total % 12, ano: Math.floor(total / 12) });
 }
 
+/**
+ * Um período agregado da view do fluxo: uma faixa CONTÍGUA de meses relativos
+ * (inclusive nas duas pontas) e o rótulo da coluna correspondente.
+ */
+export interface PeriodoAgregado { rotulo: string; inicio: number; fim: number }
+
+/**
+ * Agrupa os meses relativos `0..prazo-1` em ANOS-CALENDÁRIO (#127), para a view
+ * "Anual" do Fluxo de Caixa.
+ *
+ * O corte segue o calendário real: com `dataInicio` "abr/2027", o primeiro
+ * período é 2027 e cobre só abr→dez (9 meses); os seguintes são anos cheios,
+ * e o último é truncado no fim do horizonte. Os períodos são contíguos e
+ * cobrem exatamente todos os meses — condição para que a soma anual bata com
+ * a soma mensal em qualquer linha.
+ *
+ * Sem data de início válida não há calendário: agrupa em blocos de 12 meses
+ * rotulados "Ano 1", "Ano 2"… (mesma degradação de `rotuloMesRelativo`).
+ */
+export function periodosAnuais(dataInicio: string | null | undefined, prazo: number): PeriodoAgregado[] {
+  const total = Math.max(0, Math.round(Number(prazo) || 0));
+  const out: PeriodoAgregado[] = [];
+  const p = parseMesAno(dataInicio);
+  if (!p) {
+    for (let i = 0; i < total; i += 12) {
+      out.push({ rotulo: `Ano ${i / 12 + 1}`, inicio: i, fim: Math.min(i + 11, total - 1) });
+    }
+    return out;
+  }
+  let i = 0;
+  while (i < total) {
+    const abs = p.ano * 12 + p.mes + i;      // mês absoluto do mês relativo i
+    const fim = Math.min(total - 1, i + (11 - (abs % 12))); // até dezembro daquele ano
+    out.push({ rotulo: String(Math.floor(abs / 12)), inicio: i, fim });
+    i = fim + 1;
+  }
+  return out;
+}
+
 /** Período "jan/27 → dez/27 (12m)" de um evento com início e duração relativos. */
 export function rotuloPeriodo(dataInicio: string | null | undefined, inicioMes: number, duracaoMeses: number): string {
   const ini = rotuloMesRelativo(dataInicio, inicioMes);
