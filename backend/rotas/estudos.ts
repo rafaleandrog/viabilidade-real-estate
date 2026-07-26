@@ -53,6 +53,34 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
   res.status(http).json({ erro: true, codigo, mensagem });
 }
 
+// Anexa `imagem_principal_url` (URL assinada da capa) a cada estudo da lista, para
+// o thumbnail da tabela de estudos (S7 · #90). `estudo_documentos` é `restrito` →
+// o download direto por sessão dá 403; a URL vem de req.arquivos.url (token
+// assinado). Uma query só para todas as capas; mutação in-place. Arquivo
+// ausente/expirado ou helper indisponível → url null (a lista segue funcionando).
+async function anexarImagemPrincipal(req: Request, estudos: any[]): Promise<void> {
+  for (const e of estudos) e.imagem_principal_url = null;
+  if (estudos.length === 0 || !req.arquivos) return;
+  const ids = new Set(estudos.map((e) => Number(e.id)));
+  const docs = await req.dados!.listar('estudo_documentos', {
+    filtros: { categoria: 'imagem_principal' }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
+  });
+  // Primeira imagem principal (menor ordem) de cada estudo da lista.
+  const arquivoPorEstudo = new Map<number, number>();
+  for (const d of docs.dados) {
+    const eid = Number(d.estudo_id);
+    if (ids.has(eid) && !arquivoPorEstudo.has(eid) && d.documento != null) {
+      arquivoPorEstudo.set(eid, Number(d.documento));
+    }
+  }
+  for (const e of estudos) {
+    const arqId = arquivoPorEstudo.get(Number(e.id));
+    if (arqId == null) continue;
+    try { e.imagem_principal_url = await req.arquivos!.url(arqId, 3600); }
+    catch { /* arquivo removido/expirado → sem thumbnail */ }
+  }
+}
+
 // ---------------------------------------------------------------
 // POST /estudos — criar (auto-adiciona o criador como editor)
 // ---------------------------------------------------------------
@@ -147,6 +175,7 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
       estudos.sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)));
     }
 
+    await anexarImagemPrincipal(req, estudos);
     res.json({ dados: estudos, total: estudos.length });
   } catch (e: any) {
     console.error('Erro em GET /estudos:', e);

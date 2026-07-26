@@ -8,6 +8,7 @@ import {
 } from './viabilidade-api.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
+import './viab-imagem-principal.js';
 
 // Sub-aba "Empreendimento → Informações" (nível Avançado · Lote 4 · #16).
 //
@@ -16,8 +17,9 @@ import './viab-num.js';
 // (imagem principal, renders, plantas) vivem em `estudo_documentos` e usam o
 // mesmo fluxo de upload do Apelo Comercial.
 
+// A imagem principal (capa) tem card próprio com prévia (viab-imagem-principal,
+// S7 · #89); aqui ficam só os demais anexos (renders, plantas).
 const CATEGORIAS: { id: string; rotulo: string; accept: string; dica: string }[] = [
-  { id: 'imagem_principal', rotulo: 'Imagem principal', accept: 'image/*', dica: 'Uma imagem de capa do empreendimento.' },
   { id: 'render', rotulo: 'Renders', accept: 'image/*', dica: 'Imagens de perspectiva/render.' },
   { id: 'planta', rotulo: 'Plantas baixas', accept: 'image/*,.pdf', dica: 'Plantas em PDF ou imagem.' },
 ];
@@ -116,6 +118,10 @@ export class ViabEmpreendimentoInfo extends LitElement {
             @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, descricao: e.detail.valor }; }}
           ></urbi-textarea>
         </div>
+      </urbi-card>
+
+      <urbi-card titulo="Imagem principal">
+        <viab-imagem-principal .estudo=${this.estudo} .editavel=${this.editavel}></viab-imagem-principal>
       </urbi-card>
 
       ${this._renderTerreno(dis)}

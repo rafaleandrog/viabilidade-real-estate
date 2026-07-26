@@ -28,7 +28,18 @@ rotasEmpreendimento.get('/estudos/:id/empreendimento/documentos', async (req: Re
     const r = await req.dados!.listar('estudo_documentos', {
       filtros: { estudo_id: estudoId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 200,
     });
-    res.json({ dados: r.dados });
+    // Anexa a URL (assinada) de cada anexo para exibição inline (imagem
+    // principal, renders). `estudo_documentos` é `restrito` → o download direto
+    // por sessão responde 403; a URL vem de req.arquivos.url (token assinado, que
+    // libera mesmo em tabela restrita). Arquivo ausente/expirado → url null. (S7 · #89)
+    const docs = await Promise.all((r.dados as any[]).map(async (d) => {
+      let url: string | null = null;
+      if (d.documento != null && req.arquivos) {
+        try { url = await req.arquivos.url(Number(d.documento), 3600); } catch { url = null; }
+      }
+      return { ...d, url };
+    }));
+    res.json({ dados: docs });
   } catch (e: any) {
     console.error('Erro em GET empreendimento/documentos:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
