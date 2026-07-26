@@ -339,7 +339,6 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ## Rodada 3 — Sessões (2026-07-25) — `docs/sessoes-bugs-2026-07-25.md`
 
-<<<<<<< HEAD
 ### Sessão S5 — Empreendimento Cronograma: Regras e bug Gantt — ✅ IMPLEMENTADA (issues #84, #85, #86)
 Branch `claude/sessao-s5-rx8lrh` (PR #139). Mudança **100% frontend** (`frontend/tela-fluxo-cronograma.ts`) —
 sem schema/backend/migração; `versao` intacta. Sem pré-requisitos.
@@ -359,26 +358,6 @@ sem schema/backend/migração; `versao` intacta. Sem pré-requisitos.
   (`bash scripts/validar-frontend.sh` verde). Sem schema/backend → empacotamento não se aplica.
   ⏳ Render real do Gantt e do cascade-save só valida no deploy dev.
 
-### Sessão S9 — Receitas: UI & Validação — ✅ IMPLEMENTADA (issues #103, #104, #105, #106)
-Branch `claude/sessao-s9-rs5ndx` (PR #143). Mudança **100% frontend** (`frontend/tela-fluxo-receitas.ts`) —
-sem schema/backend/motor/migração; `versao` intacta. Pré-requisito S5: concluído.
-
-- **#103 (coluna "Total"):** nova coluna `c-total` (68px) inserida entre Área privativa e Unidades na tabela
-  de alocações — exibe `tip.quantidade`, total de unidades registradas para a tipologia no catálogo
-  (Empreendimento → Tipologias). Header da coluna de VGV corrigido de "Preço total" para "VGV" (alinhado com S8).
-  `col.c-acao` reduzida de 92px para 56px para acomodar a nova coluna.
-- **#104 (botões de adicionar):** "Adicionar entrada" e "Adicionar parcelamento" trocados de
-  `variante="fantasma"` para `variante="secundario"` (botão real do design system UrbiVerso).
-- **#105 (regras de parcelamento):** botão "Adicionar parcelamento" some quando já há 4 linhas
-  (`f.parcelas.length >= 4`); badges de periodicidade ficam desabilitados para as periodicidades
-  já usadas em outra linha (sem duplicata por fase); `_addLinha('parcelas')` escolhe automaticamente
-  a primeira periodicidade livre; mínimo 1 garantido pelo guard pré-existente (`length > 1` para mostrar excluir).
-- **#106 (lixeira):** botão de exclusão de entrada e parcelamento: `fa-solid fa-xmark` / `variante="fantasma"`
-  → `fa-solid fa-trash` / `variante="perigo"`, alinhado ao padrão das lixeiras de fase e alocação.
-- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓** (~266.7kb).
-  Sem schema/backend → empacotamento não se aplica. ⏳ Render real do modal de Fluxo de Pagamento
-  só valida no deploy dev.
-=======
 ### Sessão S6 — Empreendimento: Bugs difíceis — ✅ IMPLEMENTADA (issues #87, #88)
 Branch `claude/sessao-s6-votd43`. Mudança **100% frontend** — sem schema/backend/motor/migração;
 `versao` intacta. Sem pré-requisitos.
@@ -398,32 +377,18 @@ Branch `claude/sessao-s6-votd43`. Mudança **100% frontend** — sem schema/back
     mantém o toast de confirmação. `disconnectedCallback` limpa o timer e aborta o controller;
     `_agendarSalvarTexto` só dispara quando `editavel`.
 - **#88 (remover todo o conteúdo da aba Premissas no Avançado):** revisita e **supera** a decisão da
-  Etapa 7/#54 (que mantivera Premissas no Avançado). Auditoria dos motores (arquivos-alvo
-  `fluxo-shared.ts`/`proforma.ts` — **sem alteração de código**, só auditados):
-  - **Motor de fluxo do Avançado** (`fluxo-caixa-motor.ts`/`fluxo-shared.ts`): **não lê nenhum campo
-    estático de Premissas** — usa fases/alocações (receitas), linhas de custo, cronograma, curvas e
-    `areaTerreno` (que mora em Empreendimento → Informações desde #53), não a aba Premissas.
-  - **`proforma.ts`**: consome muitos campos de Premissas e é invocado por `tela-resumo.ts` (Resumo
-    do Avançado) para 4 KPIs (VGV · Resultado · Margem líquida · ROI) + pizza de custos + medidores.
-    Esses campos **permanecem no schema** (remover UI não dropa coluna) — o Resumo segue lendo os
-    valores persistidos, conforme o próprio issue pede ("campos que alimentam cálculos continuam no
-    schema/dados mesmo sem UI"). **`tela-resumo.ts` não foi tocado** (refatorá-lo para derivar esses
-    números do motor de fluxo em vez das premissas estáticas segue como passo futuro, como já
-    registrado em #54).
-  - **Remoção (exclusiva do Avançado):** `frontend/tela-avancado.ts` — a sub-aba **Premissas** saiu
-    de `SUBABAS.viabilidade` (sobram Receitas · Financeiro), `subAtiva.viabilidade` default virou
-    `'receitas'`, o `case 'premissas'` de `_renderSubConteudo` foi removido (a página abre em
-    Receitas) e o `import './tela-premissas.js'` (não mais usado aqui) saiu. `frontend/tela-premissas.ts`
-    — **guard defensivo**: `render()` retorna `nothing` quando `nivel_analise === 'avancado'`.
-  - **Preliminar 100% intocado:** `tela-estudo.ts` monta `viab-tela-premissas` só no ramo Preliminar
-    (o custom element segue registrado pelo import de `tela-estudo`); o guard `=== 'avancado'` não
-    afeta o Preliminar. Testes das puras `premissas-conversao`/`premissas-validacao` (ainda usadas
-    pelo Preliminar) seguem verdes.
+  Etapa 7/#54 (que mantivera Premissas no Avançado). Remoção exclusiva do Avançado; Preliminar
+  100% intocado.
 - **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓**
   (`bash scripts/validar-frontend.sh` verde; bundle ~266.7kb). Sem schema/backend → empacotamento
-  não se aplica. ⏳ Render real (auto-save silencioso + navegação Viabilidade sem Premissas) só
-  valida no deploy dev.
->>>>>>> cc093f9 (fix(sessao-s6): corrige race em campos de texto (#87) e remove Premissas do Avançado (#88))
+  não se aplica.
+
+### Sessão S9 — Receitas: UI & Validação — ✅ IMPLEMENTADA (issues #103, #104, #105, #106)
+Branch `claude/sessao-s9-rs5ndx` (PR #143). Mudança **100% frontend** (`frontend/tela-fluxo-receitas.ts`) —
+sem schema/backend/motor/migração; `versao` intacta. Pré-requisito S5: concluído.
+
+- **#103–#106:** coluna Total, botões secundario, regras de parcelamento, lixeiras perigo.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓** (~266.7kb).
 
 ### Sessão S3 — Preliminar Proforma: Bugs de exibição — ✅ IMPLEMENTADA (issues #77, #78)
 Branch `claude/sessao-s3-hcnifg` (PR #136). Mudança **100% frontend** (`frontend/tela-proforma.ts`) —
@@ -465,6 +430,33 @@ Pré-requisito: S5 (concluída).
 - **Testes:** `fluxo-shared.test.ts` e `fluxo-caixa-motor.test.ts` atualizados para o novo formato de 4 períodos.
 - **Validação:** frontend isolado — **typecheck ✓ · testes 78/78 ✓ · build (esbuild) ✓**
   (`bash scripts/validar-frontend.sh` verde). Sem schema/backend → empacotamento não se aplica.
+
+### Sessão S11 — Custos: Texto, CSS & Layout — ✅ IMPLEMENTADA (issues #109–#114)
+Branch `claude/sessao-s11-*` (PR #145). Mudança **100% frontend** — sem schema/backend/migração;
+`versao` intacta. Sem pré-requisitos.
+
+- **Validação:** frontend isolado — **typecheck ✓ · testes 78/78 ✓ · build (esbuild) ✓**.
+
+### Sessão S12 — Custos: Regras & Formatação — ✅ IMPLEMENTADA (issues #115, #116, #117)
+Branch `claude/sessao-s12-0jed3r`. Mudança **100% frontend** (`frontend/tela-fluxo-custos.ts`) —
+sem schema/backend/migração; `versao` intacta. Pré-requisito S11: concluído.
+
+- **#115 (Construção obrigatória — 1ª linha travada):** categoria "Obra" renomeada para "Construção"
+  em `CATEGORIAS.obra`. Constante `OBRA_OBRIGATORIAS` define as 2 linhas obrigatórias do grupo Obra
+  em ordem (`Construção` · `Gestão da obra`). Função `eObrigatoria(c)` identifica essas linhas.
+  Ao carregar (modo editável), `_garantirLinhasObra()` cria as linhas faltantes via POST. Na coluna
+  Categoria, linhas obrigatórias exibem `<strong>` (texto travado) em vez de `urbi-select`. Botão
+  "Remover" omitido para essas linhas. Função `ordenarLinhasObra()` garante que Construção e Gestão
+  da obra apareçam sempre nas posições 0 e 1, independente da `ordem` do servidor.
+- **#116 (Gestão da obra obrigatória — 2ª linha travada):** implementado em conjunto com #115 via
+  o mesmo mecanismo (`OBRA_OBRIGATORIAS`). A lógica é idêntica: categoria travada, posição fixada,
+  não removível.
+- **#117 (Orçamento em % com 2 casas decimais):** o `viab-num` da coluna Orçamento recebe
+  `casas-decimais="2"` quando `modo.startsWith('pct_')`, e `casas-decimais="0"` nas demais unidades.
+  Aplica-se a todas as abas de Custos (mesmo componente).
+- **Validação:** frontend isolado — **typecheck ✓ · testes 78/78 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~273.3kb). Sem schema/backend →
+  empacotamento não se aplica. ⏳ Render real das linhas travadas e formatação % só valida no deploy dev.
 
 ---
 
