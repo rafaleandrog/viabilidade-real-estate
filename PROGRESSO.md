@@ -679,6 +679,25 @@ Pré-requisito S16: concluído e na `main`.
   saldo do último mês do ano + indicadores inalterados). Sem schema/backend → empacotamento não se
   aplica. ⏳ Render real dos badges e das colunas anuais só valida no deploy dev.
 
+### Sessão S19 — Cenários: Tabela de Salvos — ✅ IMPLEMENTADA (issue #130)
+Branch `claude/sessao-s19-merge-prs-7q8wuz`. Mudança **100% frontend** (`frontend/tela-cenarios.ts`) —
+sem schema/backend/migração; `versao` intacta. Pré-requisito S16: concluído e na `main`.
+
+- **#130 (linha do Cenário real travada como primeira linha da tabela de Cenários salvos):** nova
+  `_linhaReal(base)` renderiza uma `<tr class="linha-real">` sempre em primeiro na tabela `table.cen`,
+  usando o `FluxoCalc` **base** (`{ precoVendaPct: 0, custoObraPct: 0 }`) já calculado em `render()` —
+  o mesmo cenário sem alterações que alimenta o gráfico "base × cenário". Colunas Preço venda/Custo
+  obra mostram `—` (não são deltas aplicáveis à base) e a última coluna (ação) fica vazia — **sem**
+  botão Remover, tornando a linha não removível. Ícone `fa-solid fa-lock` + destaque visual
+  (`font-weight: 700` + fundo `var(--cor-primaria-fundo)`, tokens já usados em `tela-proforma.ts`).
+- **Tabela sempre visível:** antes, `cenarios.length === 0` trocava a tabela inteira por
+  `urbi-estado-vazio`; agora a tabela **sempre** renderiza (a linha real é permanente), e o estado
+  vazio vira uma mensagem complementar **abaixo** da tabela só quando não há cenários salvos pelo
+  usuário ainda.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 88/88 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~279.6kb). Sem schema/backend → empacotamento
+  não se aplica. ⏳ Render real da linha travada só valida no deploy dev.
+
 ---
 
 ## Rodada 2 — Etapas (2026-07-22)
