@@ -771,6 +771,61 @@ sessão, mas seguem valendo antes de publicar:**
 - Render real no deploy dev de tudo que só se vê no shell: primitivos `urbi-*`, uploads, Gantt,
   modais, tabelas sticky e os gráficos SVG.
 
+### Verificação final de encerramento (2026-07-26)
+
+Varredura estática do repo inteiro antes do release. **Nada quebrado encontrado**; dois atributos
+inertes corrigidos e uma dívida histórica documentada.
+
+**Integridade estrutural — tudo verde:**
+- **JSON:** `schema.json` (15 tabelas), `manifesto.json`, `package.json`, `tsconfig.json` parseiam.
+- **Componentes:** 22 `@customElement` declarados; **36/36 arquivos de frontend alcançáveis a partir
+  de `index.ts`** (zero órfãos); zero tags `viab-*` usadas sem definição; zero componente definido em
+  arquivo não importado. `telas_config` do manifesto aponta para componentes que existem.
+- **Primitivos:** os **24** `urbi-*` usados pela app existem no `ui/` do shell (conferido um a um).
+- **Eventos:** todo `@urbi:*` / `@viab:*` ouvido pela app é emitido por alguém — zero handler morto.
+- **Rotas:** 40 rotas de backend × 44 chamadas do frontend cruzadas; nenhuma chamada sem rota. As
+  únicas rotas não chamadas pela UI são falsos positivos (`Map.get('obra')` etc.) e a
+  `POST /manutencao/arquivar-inativos`, que é **de agendador/admin por desenho** (ver pendência
+  histórica do arquivamento automático, abaixo).
+- **Contratos:** zero `instanceof` no backend · build sem `--packages=external` · `shell_min`
+  `0.50.3` · nenhuma rota com o prefixo `/api/viabilidade` hardcoded (só em comentário) · nenhum
+  `INSERT`/seed dentro de migração · `.gitignore` cobre `dist/`, `node_modules/`,
+  `frontend/index.js` e `backend/rotas.js`, e nenhum output de build está rastreado — o **gate Git
+  do `urbi-release`** (que aborta com árvore suja) passa.
+
+**Dois atributos inertes corrigidos** (falha silenciosa: prop inexistente num primitivo não dá erro,
+simplesmente não faz nada):
+- `tela-fluxo-receitas.ts` — `<urbi-badge ?desabilitado=…>` nos chips de periodicidade. `urbi-badge`
+  só declara `cor`/`interativo`/`ativo`, então a periodicidade já usada por outra linha **parecia
+  clicável**. O clique já era barrado pelo próprio handler (comportamento estava correto); faltava o
+  sinal visual. Trocado por `class="indisponivel"` + CSS local (`opacity`/`cursor`). **Sem** mexer no
+  primitivo — `urbi-badge` não tem conceito de desabilitado e criá-lo exigiria bump de `shell_min`.
+- `tela-fluxo-cronograma.ts` — `<urbi-input estilo="compacto">`. `urbi-input` não declara `estilo`;
+  atributo removido (era no-op).
+
+**Dívida histórica documentada (não corrigida de propósito):** a migração `004_fases_gantt.js` entrou
+na Etapa 4 (commit `85a6429`) **sem bump de `z`** — viola "toda migração nova acompanha bump de `z`"
+(`docs/shell/distribuicao.md` § Identidade dupla). **Não há dado em risco:** o runner é sequencial
+por número e aplica todas as pendentes, então a 004 subiu junto com a 005 no bump 0.1.3 → 0.1.4 da
+Etapa 8. Corrigir agora (bumpar para 0.1.5 sem migração nova) só criaria um degrau vazio e seria
+*outro* desvio da mesma regra. Fica registrado como precedente a não repetir.
+
+### Prontidão para o release (verificada)
+
+Último release publicado: **`viabilidade-v0.1.4_79cbe46c`** (2026-07-22). **Toda a rodada 3 está
+fora dele** — 40 commits desde então.
+
+- **Versão continua 0.1.4, e isso está certo.** `git diff 79cbe46c..main -- migracoes/ schema.json
+  manifesto.json` é **vazio**: a rodada 3 foi 100% frontend. A regra é `z` só bumpa com migração —
+  não bumpar é o comportamento correto.
+- **O upgrade é elegível assim mesmo.** A plataforma instala por versão maior **ou** por mesma
+  versão com `build_sha` à frente (ancestralidade git). Verificado: `79cbe46c` **é ancestral** da
+  `main` atual → o `compare` do GitHub devolve `ahead` → upgrade do tipo **`build`**.
+- **Como publicar:** Actions → `release` → **Run workflow** (`workflow_dispatch`). O workflow deriva
+  a tag `viabilidade-v0.1.4_<sha8>` sozinho, **com o sha** — indispensável, porque tag sem sha trava
+  o upgrade dentro da mesma versão. Precedente na prática: já houve `0.1.0` e `0.1.4` publicados
+  várias vezes com sha8 diferente, e o canal repo reconheceu cada um.
+
 ---
 
 ## Rodada 2 — Etapas (2026-07-22)

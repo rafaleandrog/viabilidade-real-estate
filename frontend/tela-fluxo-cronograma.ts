@@ -211,7 +211,7 @@ export class ViabFluxoCronograma extends LitElement {
           <span class="evento-label">
             <span class="ponto-cor" style="background:${cor}"></span>
             ${dis ? html`${f.nome || 'Fase'}` : html`
-              <urbi-input .valor=${f.nome || ''} placeholder="Nome da fase" estilo="compacto"
+              <urbi-input .valor=${f.nome || ''} placeholder="Nome da fase"
                 @urbi:input-change=${(e: CustomEvent) => this._salvarFase(f, { nome: e.detail.valor })}
               ></urbi-input>`}
           </span>
