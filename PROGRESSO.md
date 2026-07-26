@@ -339,46 +339,44 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ## Rodada 3 — Sessões (2026-07-25) — `docs/sessoes-bugs-2026-07-25.md`
 
-### Sessão S7 — Imagem Principal + Thumbnail — ✅ IMPLEMENTADA (issues #89, #90)
-Branch `claude/sessao-s7-8hzz7a`. Toca **backend + frontend** (sem schema novo, sem migração —
-a tabela `estudo_documentos` e a categoria `imagem_principal` já existiam do Lote 4). `versao`
-intacta. Sem pré-requisitos.
+### Sessão S5 — Empreendimento Cronograma: Regras e bug Gantt — ✅ IMPLEMENTADA (issues #84, #85, #86)
+Branch `claude/sessao-s5-rx8lrh` (PR #139). Mudança **100% frontend** (`frontend/tela-fluxo-cronograma.ts`) —
+sem schema/backend/migração; `versao` intacta. Sem pré-requisitos.
 
-- **Infra reaproveitada:** `estudo_documentos` (FK `estudo_id`, coluna `categoria` com opção
-  `imagem_principal`, coluna `documento` tipo `arquivo`) e as rotas `GET/POST/DELETE
-  /estudos/:id/empreendimento/documentos` já existiam (Lote 4 · #16). S7 só acrescentou a
-  **UI de capa com prévia**, a **exibição** (URL assinada) e o **thumbnail na lista**.
-- **Servir imagem de tabela `restrito` (chave da sessão):** `estudo_documentos` é
-  `acesso_externo: "restrito"` → o download genérico por sessão responde `403
-  DADOS_ACESSO_RESTRITO`. Por isso a imagem é servida por **URL assinada** gerada no backend via
-  `req.arquivos.url(arquivoId, 3600)` (token `sset_…` libera mesmo em tabela restrita; padrão do
-  `editor_nucleo`). O valor de `estudo_documentos.documento` é o **id do arquivo**.
-- **#89 (anexar imagem principal — Preliminar e Avançado):**
-  - Novo componente reutilizável `frontend/viab-imagem-principal.ts` (`viab-imagem-principal`):
-    carrega os documentos, filtra `imagem_principal`, mostra a **prévia** (`<img src=doc.url>`) +
-    seletor de arquivo (Adicionar/Trocar) + Remover. **Capa é única** — ao anexar uma nova, a
-    anterior é removida. Emite `viab:imagem-principal-change`.
-  - `backend/rotas/empreendimento.ts`: o `GET …/empreendimento/documentos` agora anexa a **URL
-    assinada** (`url`) a cada anexo (via `req.arquivos.url`; arquivo ausente/expirado → `null`).
-  - `frontend/tela-premissas.ts`: novo card **"Imagem principal"** no topo, **só no Preliminar**
-    (`!avancado`) — o Avançado já tem a capa em Empreendimento → Informações.
-  - `frontend/tela-empreendimento-info.ts` (Avançado): `imagem_principal` **saiu** de `CATEGORIAS`
-    (que agora lista só renders/plantas) e ganhou **card próprio com prévia** usando o novo
-    componente.
-- **#90 (thumbnail na lista de estudos):**
-  - `backend/rotas/estudos.ts`: `GET /estudos` agora anexa `imagem_principal_url` (URL assinada da
-    capa) a cada estudo — **uma query** para todas as capas + `req.arquivos.url` por estudo com
-    imagem. Helper `anexarImagemPrincipal`; robusto a helper ausente/arquivo expirado (→ `null`).
-  - `frontend/tela-dashboard.ts`: nova **coluna de miniatura entre "Estudo" e "Tipo"** — `<img>`
-    48×36 com a `imagem_principal_url`, ou placeholder (`urbi-icone fa-image`) quando não há capa.
-  - **Desvio de arquivo-alvo (registrado):** o issue #90 apontava `tela-estudo.ts` +
-    `viabilidade-api.ts`, mas a **lista** de estudos vive em `tela-dashboard.ts` (`tela-estudo.ts`
-    é o **detalhe**). A URL da imagem vem enriquecida no `GET /estudos` (backend), então não foi
-    preciso novo wrapper em `viabilidade-api.ts`. Implementado onde a tabela realmente está.
-- **Validação neste ambiente:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build
-  (esbuild) ✓** (`bash scripts/validar-frontend.sh` verde; bundle ~269.8kb). ⏳ **Pendente do
-  autor (SDK gated):** typecheck do backend, suíte de backend, `urbi-empacotar` e o teste real do
-  fluxo `req.arquivos.url` (upload → prévia → thumbnail) contra dados reais / deploy dev.
+- **#84 (Pré-lançamento derivado de Planejamento):** `pre_lancamento.inicio_mes` agora é sempre
+  travado na UI (flag forçado para `true` no frontend, independente do servidor). Ao salvar
+  `planejamento.inicio_mes`, o componente faz um segundo PATCH automático para `pre_lancamento` com
+  `inicio_mes = planejamento.inicio_mes + 1`. O array `crono` é atualizado com o retorno do segundo PATCH.
+- **#85 (Duração do Lançamento editável):** para o evento `lancamento`, `travadoDur` é forçado para
+  `false` no frontend — o campo passa a ser editável como as demais fases, removendo a trava que vinha
+  do flag do servidor.
+- **#86 (Estrela à esquerda da barra):** a estrela ⭐ era renderizada em `x + 4` (em cima do início
+  da barra). Corrigida para `x - 4` com `text-anchor="end"` — imediatamente à esquerda. Também
+  adicionado suporte à estrela no branch `rect` (duração > 1 mês), já que após #85 o Lançamento pode
+  ter qualquer duração.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde). Sem schema/backend → empacotamento não se aplica.
+  ⏳ Render real do Gantt e do cascade-save só valida no deploy dev.
+
+### Sessão S9 — Receitas: UI & Validação — ✅ IMPLEMENTADA (issues #103, #104, #105, #106)
+Branch `claude/sessao-s9-rs5ndx` (PR #143). Mudança **100% frontend** (`frontend/tela-fluxo-receitas.ts`) —
+sem schema/backend/motor/migração; `versao` intacta. Pré-requisito S5: concluído.
+
+- **#103 (coluna "Total"):** nova coluna `c-total` (68px) inserida entre Área privativa e Unidades na tabela
+  de alocações — exibe `tip.quantidade`, total de unidades registradas para a tipologia no catálogo
+  (Empreendimento → Tipologias). Header da coluna de VGV corrigido de "Preço total" para "VGV" (alinhado com S8).
+  `col.c-acao` reduzida de 92px para 56px para acomodar a nova coluna.
+- **#104 (botões de adicionar):** "Adicionar entrada" e "Adicionar parcelamento" trocados de
+  `variante="fantasma"` para `variante="secundario"` (botão real do design system UrbiVerso).
+- **#105 (regras de parcelamento):** botão "Adicionar parcelamento" some quando já há 4 linhas
+  (`f.parcelas.length >= 4`); badges de periodicidade ficam desabilitados para as periodicidades
+  já usadas em outra linha (sem duplicata por fase); `_addLinha('parcelas')` escolhe automaticamente
+  a primeira periodicidade livre; mínimo 1 garantido pelo guard pré-existente (`length > 1` para mostrar excluir).
+- **#106 (lixeira):** botão de exclusão de entrada e parcelamento: `fa-solid fa-xmark` / `variante="fantasma"`
+  → `fa-solid fa-trash` / `variante="perigo"`, alinhado ao padrão das lixeiras de fase e alocação.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓** (~266.7kb).
+  Sem schema/backend → empacotamento não se aplica. ⏳ Render real do modal de Fluxo de Pagamento
+  só valida no deploy dev.
 
 ### Sessão S3 — Preliminar Proforma: Bugs de exibição — ✅ IMPLEMENTADA (issues #77, #78)
 Branch `claude/sessao-s3-hcnifg` (PR #136). Mudança **100% frontend** (`frontend/tela-proforma.ts`) —
@@ -400,6 +398,26 @@ sem schema/backend/motor/migração; `versao` intacta. Sem pré-requisitos.
 - **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓**
   (`bash scripts/validar-frontend.sh` verde; bundle ~265.8kb). Sem schema/backend → empacotamento não se
   aplica. ⏳ Render real do alinhamento só valida no deploy dev.
+
+### Sessão S10 — Saldo de unidades + Absorção 4 períodos — ✅ IMPLEMENTADA (issues #107, #108)
+Branch `claude/sessao-s10-fbqwwv`. Mudança **100% frontend** (`frontend/fluxo-shared.ts`,
+`frontend/tela-fluxo-receitas.ts`, testes) — sem schema/backend/migração; `versao` intacta.
+Pré-requisito: S5 (concluída).
+
+- **#107 (Saldo de unidades: cálculo de cima para baixo):** introduzido `_saldoAntes(alocId, tipologiaId)`
+  em `tela-fluxo-receitas.ts` — percorre `this.fases` em ordem e acumula unidades até encontrar a alocação
+  alvo, retornando `quantidade - usado_acima`. O `_saldo()` simples (total restante) permanece para o campo
+  readonly final. `_renderAlocacao` agora usa `_saldoAntes(a.id, a.tipologia_id)` para exibir o saldo
+  disponível no momento daquela alocação específica.
+- **#108 (Absorção: separar Pré-lançamento e Lançamento — 4 períodos):** `faixasAbsorcao` em
+  `fluxo-shared.ts` agora retorna 4 faixas separadas (`pre_lancamento`, `lancamento`, `obra`, `pos_obra`).
+  `pctPosObraDerivado` subtrai os 4 inputs. `absorcaoMensal` modo `distribuido` espalha cada período
+  separadamente; faixa vazia (fim < inicio) quando Pré-lançamento ausente do cronograma. Modal de absorção
+  em `tela-fluxo-receitas.ts` atualizado para 4 linhas/entradas. Backward-compat: bloco `pos_obra` com
+  `pct: 0` se torna derivado de `100 − pré − lanc − obra`.
+- **Testes:** `fluxo-shared.test.ts` e `fluxo-caixa-motor.test.ts` atualizados para o novo formato de 4 períodos.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 78/78 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde). Sem schema/backend → empacotamento não se aplica.
 
 ---
 

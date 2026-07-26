@@ -81,12 +81,13 @@ export class ViabFluxoReceitas extends LitElement {
     /* Larguras por coluna (th e td herdadas do table-layout: fixed) */
     col.c-tipo   { width: auto; }
     col.c-area   { width: 120px; }
+    col.c-total  { width: 68px; }
     col.c-un     { width: 92px; }
     col.c-saldo  { width: 68px; }
     col.c-preco  { width: 110px; }
     col.c-punit  { width: 120px; }
     col.c-ptotal { width: 120px; }
-    col.c-acao   { width: 92px; }
+    col.c-acao   { width: 56px; }
     table.aloc td viab-num { width: 100%; }
     table.aloc td.tipo urbi-select { width: 100%; }
 
@@ -171,22 +172,45 @@ export class ViabFluxoReceitas extends LitElement {
   }
 
   /**
-   * Saldo de unidades de uma tipologia = quantidade do catálogo − Σ alocado em
-   * TODAS as fases (ignorando, opcionalmente, uma alocação em edição). #52: o
-   * saldo agrega todas as fases para não exceder o total cadastrado em Tipologias.
+   * Saldo global de unidades: quantidade do catálogo − Σ de todas as alocações
+   * (todas as fases). Usado para checar disponibilidade ao adicionar/trocar tipologia.
+   * #52: saldo agrega todas as fases para não exceder o total do catálogo.
    */
-  private _saldo(tipologiaId: any, ignorarAlocId?: any): number {
+  private _saldo(tipologiaId: any): number {
     const tip = this._tip(tipologiaId);
     if (!tip) return 0;
     let usado = 0;
     for (const fase of this.fases) {
       for (const a of (fase.alocacoes || [])) {
-        if (Number(a.tipologia_id) === Number(tipologiaId) && Number(a.id) !== Number(ignorarAlocId)) {
+        if (Number(a.tipologia_id) === Number(tipologiaId)) {
           usado += n(a.unidades);
         }
       }
     }
     return n(tip.quantidade) - usado;
+  }
+
+  /**
+   * Saldo disponível ANTES da alocação `alocId`, contando de cima para baixo
+   * todas as alocações anteriores da mesma tipologia em todas as fases. #107:
+   * exibe o saldo como "balanço progressivo" — o usuário vê quantas unidades
+   * estavam livres quando chegou a vez desta linha.
+   */
+  private _saldoAntes(alocId: any, tipologiaId: any): number {
+    const tip = this._tip(tipologiaId);
+    if (!tip) return 0;
+    let usado = 0;
+    for (const fase of this.fases) {
+      for (const a of (fase.alocacoes || [])) {
+        if (Number(a.id) === Number(alocId)) {
+          return Math.max(0, n(tip.quantidade) - usado);
+        }
+        if (Number(a.tipologia_id) === Number(tipologiaId)) {
+          usado += n(a.unidades);
+        }
+      }
+    }
+    return 0;
   }
 
   private _vgvFase(fase: any): number {
@@ -281,6 +305,7 @@ export class ViabFluxoReceitas extends LitElement {
         <colgroup>
           <col class="c-tipo">
           <col class="c-area">
+          <col class="c-total">
           <col class="c-un">
           <col class="c-saldo">
           <col class="c-preco">
@@ -292,11 +317,12 @@ export class ViabFluxoReceitas extends LitElement {
           <tr>
             <th>${lote ? 'Lote' : 'Tipologia'}</th>
             <th class="num">Área privativa</th>
+            <th class="num">Total</th>
             <th class="num">Unidades</th>
             <th class="num">Saldo</th>
             <th class="num">Preço / m²</th>
             <th class="num">Preço unitário</th>
-            <th class="num">Preço total</th>
+            <th class="num">VGV</th>
             ${dis ? nothing : html`<th></th>`}
           </tr>
         </thead>
@@ -312,8 +338,9 @@ export class ViabFluxoReceitas extends LitElement {
     const area = n(tip?.area_privativa_m2);
     const precoUnit = area * n(a.preco_m2);
     const precoTotal = precoUnit * n(a.unidades);
-    const saldo = this._saldo(a.tipologia_id, a.id);
-    // Opções: tipologias com saldo (todas as fases) + a atual (sempre presente).
+    // #107: saldo "antes desta linha" (balanço progressivo de cima para baixo).
+    const saldo = this._saldoAntes(a.id, a.tipologia_id);
+    // Opções: tipologias com saldo global > 0 + a atual (sempre inclusa).
     const opcoes = this.tipologias
       .filter((t) => Number(t.id) === Number(a.tipologia_id) || this._saldo(t.id) > 0)
       .map((t) => ({ valor: String(t.id), rotulo: t.nome || 'Sem nome' }));
@@ -325,6 +352,7 @@ export class ViabFluxoReceitas extends LitElement {
           ></urbi-select>
         </td>
         <td class="num">${area ? `${area.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²` : '—'}</td>
+        <td class="num">${tip ? n(tip.quantidade) : '—'}</td>
         <td class="num">
           <viab-num casas-decimais="0" ?desabilitado=${dis}
             .valor=${a.unidades !== null && a.unidades !== undefined ? Number(a.unidades) : null}
@@ -468,6 +496,7 @@ export class ViabFluxoReceitas extends LitElement {
     const pct = (ev: string) => Number((blocos.find((b: any) => b?.evento === ev) || {}).pct) || 0;
     this.absForm = {
       correcao_estoque: Boolean(a.correcao_estoque),
+      pre_lancamento_pct: pct('pre_lancamento'),
       lancamento_pct: pct('lancamento'),
       obra_pct: pct('obra'),
     };
@@ -481,6 +510,7 @@ export class ViabFluxoReceitas extends LitElement {
       modo: 'distribuido',
       correcao_estoque: f.correcao_estoque,
       blocos: [
+        { evento: 'pre_lancamento', pct: n(f.pre_lancamento_pct) },
         { evento: 'lancamento', pct: n(f.lancamento_pct) },
         { evento: 'obra', pct: n(f.obra_pct) },
         { evento: 'pos_obra', pct: 0 }, // derivado no motor
@@ -493,18 +523,24 @@ export class ViabFluxoReceitas extends LitElement {
     const dis = !this.editavel;
     const faixas = faixasAbsorcao(this.crono);
     const posDerivado = pctPosObraDerivado(this._absorcaoJson().blocos);
+    // rot: formata o rótulo de período; retorna '—' para faixas vazias (fim < inicio).
     const rot = (fx?: { inicio: number; fim: number }) =>
-      fx ? rotuloPeriodo(this.dataInicio, fx.inicio, fx.fim - fx.inicio + 1) : '—';
+      fx && fx.fim >= fx.inicio ? rotuloPeriodo(this.dataInicio, fx.inicio, fx.fim - fx.inicio + 1) : '—';
     return html`
       <urbi-modal title="Absorção de vendas" maxWidth="820px" @urbi-modal:close=${() => this.modalAbs = null}>
-        <p class="sec">Distribuído em 3 períodos (o Pós-obra é calculado automaticamente). Os períodos vêm do Cronograma.</p>
+        <p class="sec">Distribuído em 4 períodos (o Pós-obra é calculado automaticamente). Os períodos vêm do Cronograma.</p>
         <div class="abs-grid">
           <div>
             <table class="abs">
               <thead><tr><th>Período</th><th>% Vendido</th></tr></thead>
               <tbody>
                 <tr>
-                  <td>Pré-lançamento + Lançamento<br /><span class="sec">${rot(faixas?.prelancamento)}</span></td>
+                  <td>Pré-lançamento<br /><span class="sec">${rot(faixas?.pre_lancamento)}</span></td>
+                  <td><viab-num sufixo="%" ?desabilitado=${dis} .valor=${f.pre_lancamento_pct}
+                    @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, pre_lancamento_pct: e.detail.valor ?? 0 }}></viab-num></td>
+                </tr>
+                <tr>
+                  <td>Lançamento<br /><span class="sec">${rot(faixas?.lancamento)}</span></td>
                   <td><viab-num sufixo="%" ?desabilitado=${dis} .valor=${f.lancamento_pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, lancamento_pct: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>
@@ -626,9 +662,16 @@ export class ViabFluxoReceitas extends LitElement {
 
   private _addLinha(bloco: 'entrada' | 'parcelas') {
     const f = this.pagForm;
-    const nova = bloco === 'entrada'
-      ? { pct: 0, parcelas: 1 }
-      : { periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 0 };
+    if (bloco === 'parcelas' && f.parcelas.length >= 4) return; // #105 — máximo 4
+    let nova: any;
+    if (bloco === 'entrada') {
+      nova = { pct: 0, parcelas: 1 };
+    } else {
+      // #105 — escolhe a primeira periodicidade ainda não usada
+      const usadas = new Set(f.parcelas.map((p: any) => p.periodicidade));
+      const disponivel = PERIODICIDADES.find((per) => !usadas.has(per)) ?? 'mensal';
+      nova = { periodicidade: disponivel, parcelas: 0, ao_longo_obra: true, juros: false, pct: 0 };
+    }
     this.pagForm = { ...f, [bloco]: [...f[bloco], nova] };
   }
 
@@ -685,23 +728,27 @@ export class ViabFluxoReceitas extends LitElement {
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0" ?desabilitado=${dis} .valor=${e.parcelas}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('entrada', i, 'parcelas', ev.detail.valor ?? 1)}></viab-num>
                   ${!dis && f.entrada.length > 1 ? html`
-                    <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-xmark"
+                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
                       @click=${() => this._delLinha('entrada', i)}></urbi-botao>` : nothing}
                 </div>`)}
               ${!dis ? html`
-                <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus"
+                <urbi-botao variante="secundario" pequeno icone="fa-solid fa-plus"
                   @click=${() => this._addLinha('entrada')}>Adicionar entrada</urbi-botao>` : nothing}
             </div>
             <div class="pag-secao">
               <h4>Parcelamento</h4>
-              ${f.parcelas.map((p: any, i: number) => html`
+              ${f.parcelas.map((p: any, i: number) => {
+                // #105 — periodicidades já usadas por OUTRAS linhas (para desabilitar badges)
+                const perUsadas = new Set(f.parcelas.filter((_: any, j: number) => j !== i).map((x: any) => x.periodicidade));
+                return html`
                 <div class="pag-linha">
                   <viab-num label="% do total" sufixo="%" ?desabilitado=${dis} .valor=${p.pct}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'pct', ev.detail.valor ?? 0)}></viab-num>
                   <span class="badges-par">
                     ${PERIODICIDADES.map((per) => html`
                       <urbi-badge cor="info" interativo ?ativo=${p.periodicidade === per}
-                        @click=${() => { if (!dis) this._setLinha('parcelas', i, 'periodicidade', per); }}>${ROTULO_PER[per]}</urbi-badge>`)}
+                        ?desabilitado=${!dis && perUsadas.has(per) && p.periodicidade !== per}
+                        @click=${() => { if (!dis && !perUsadas.has(per)) this._setLinha('parcelas', i, 'periodicidade', per); }}>${ROTULO_PER[per]}</urbi-badge>`)}
                   </span>
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0"
                     ?desabilitado=${dis || p.ao_longo_obra} .valor=${p.parcelas}
@@ -709,11 +756,12 @@ export class ViabFluxoReceitas extends LitElement {
                   <urbi-checkbox label="Ao longo da obra" ?desabilitado=${dis} ?marcado=${p.ao_longo_obra}
                     @urbi:checkbox-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'ao_longo_obra', ev.detail.marcado)}></urbi-checkbox>
                   ${!dis && f.parcelas.length > 1 ? html`
-                    <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-xmark"
+                    <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
                       @click=${() => this._delLinha('parcelas', i)}></urbi-botao>` : nothing}
-                </div>`)}
-              ${!dis ? html`
-                <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus"
+                </div>`;
+              })}
+              ${!dis && f.parcelas.length < 4 ? html`
+                <urbi-botao variante="secundario" pequeno icone="fa-solid fa-plus"
                   @click=${() => this._addLinha('parcelas')}>Adicionar parcelamento</urbi-botao>` : nothing}
             </div>
             <div class="pag-secao">

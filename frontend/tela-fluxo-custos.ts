@@ -44,7 +44,7 @@ const GRUPOS: Grupo[] = [
 // da migração 002. "Financeiro" nasce sem dados legados.
 const CATEGORIAS: Record<GrupoId, { nome: string; subs: string[] }[]> = {
   terreno: [
-    { nome: 'Preço', subs: ['Valor à vista', 'Permuta', 'Parcelado', 'Outro'] },
+    { nome: 'Compra', subs: ['Valor à vista', 'Permuta', 'Parcelado', 'Outro'] },
     { nome: 'Outorga', subs: [] },
     { nome: 'Registro', subs: [] },
     { nome: 'Outro', subs: [] },
@@ -58,7 +58,7 @@ const CATEGORIAS: Record<GrupoId, { nome: string; subs: string[] }[]> = {
   ],
   diretos: [
     { nome: 'Marketing & Publicidade', subs: [] },
-    { nome: 'Comissão de vendas', subs: [] },
+    { nome: 'Corretagem de vendas', subs: [] },
     { nome: 'Projetos', subs: [] },
     { nome: 'Licenças e Aprovações', subs: [] },
     { nome: 'Outro', subs: [] },
@@ -104,7 +104,7 @@ const UNIDADES = [
 // Garante coerência entre a opção visível e o que o motor calcula.
 const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
   terreno: {
-    'Preço':   ['rs', 'rs_m2_terreno'],
+    'Compra':  ['rs', 'rs_m2_terreno'],
     'Outorga': ['rs', 'pct_vgv'],
     'Registro':['rs', 'rs_m2_priv'],
     'Outro':   ['rs', 'pct_vgv'],
@@ -118,7 +118,7 @@ const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
   },
   diretos: {
     'Marketing & Publicidade': ['rs', 'pct_vgv'],
-    'Comissão de vendas':      ['pct_vgv'],
+    'Corretagem de vendas':    ['pct_vgv'],
     'Projetos':                ['rs', 'rs_m2_priv'],
     'Licenças e Aprovações':   ['rs', 'rs_m2_priv'],
     'Outro':                   ['rs', 'pct_vgv'],
@@ -189,10 +189,11 @@ export class ViabFluxoCustos extends LitElement {
     .orc-badges urbi-badge { cursor: pointer; }
     .orc-badges .cu-badge-dis { cursor: default; opacity: 0.6; }
     .orc viab-num { width: 110px; }
+    .campo-mes { width: 80px; }
     .res-calc { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: 0.85rem; }
     .mes-calc { white-space: nowrap; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
-    .campo-mes { display: inline-flex; align-items: center; gap: 4px; }
-    .campo-mes viab-num { width: 80px; }
+    .campo-mes { display: inline-flex; align-items: center; gap: 4px; width: 80px; }
+    .campo-mes viab-num { width: 100%; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
   `];
 
@@ -313,13 +314,15 @@ export class ViabFluxoCustos extends LitElement {
           const unidsFilt = UNIDADES.filter((u) => perm.includes(u.valor));
           return html`
             <span class="orc">
-              <span class="orc-badges" role="group" aria-label="Unidade do orçamento">
-                ${unidsFilt.map((u) => html`
-                  <urbi-badge cor="info" interativo ?ativo=${u.valor === modo}
-                    class=${dis ? 'cu-badge-dis' : ''}
-                    @click=${() => { if (!dis) this._trocarUnidade(c, u.valor); }}
-                  >${u.rotulo}</urbi-badge>`)}
-              </span>
+              ${c.categoria ? html`
+                <span class="orc-badges" role="group" aria-label="Unidade do orçamento">
+                  ${unidsFilt.map((u) => html`
+                    <urbi-badge cor="info" interativo ?ativo=${u.valor === modo}
+                      class=${dis ? 'cu-badge-dis' : ''}
+                      @click=${() => { if (!dis) this._trocarUnidade(c, u.valor); }}
+                    >${u.rotulo}</urbi-badge>`)}
+                </span>
+              ` : nothing}
               <viab-num ?desabilitado=${dis}
                 .valor=${c.orcamento_valor !== null && c.orcamento_valor !== undefined ? Number(c.orcamento_valor) : null}
                 @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { orcamento_valor: e.detail.valor })}
