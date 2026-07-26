@@ -458,6 +458,40 @@ sem schema/backend/migração; `versao` intacta. Pré-requisito S11: concluído.
   (`bash scripts/validar-frontend.sh` verde; bundle ~273.3kb). Sem schema/backend →
   empacotamento não se aplica. ⏳ Render real das linhas travadas e formatação % só valida no deploy dev.
 
+### Sessão S13 — Custos: Lógica multi-arquivo — ✅ IMPLEMENTADA (issues #118, #119, #120)
+Branch `claude/sessao-s13-sfftnq`. Mudança **100% frontend** (`frontend/tela-fluxo-custos.ts`) —
+sem schema/backend/migração; `versao` intacta. Pré-requisito S12: concluído.
+
+- **#118 (coluna Resultado — multiplicação correta por unidade):** a coluna Resultado já usava
+  `resolverCustoTotal` (motor puro em `fluxo-shared.ts`), mas o `ContextoCusto` montado na UI **não
+  preenchia `receitaTotal`** — então linhas em **`% Receita`** caíam no fallback do motor
+  (`ctx.receitaTotal ?? ctx.vgvTotal` → VGV) e **divergiam** do que o Fluxo de Caixa efetivamente
+  computa (o motor em `fluxo-caixa-motor.ts` usa a receita líquida real). Fix: `_carregar` passou a
+  calcular `receitaTotal` **exatamente como o motor** — Σ `vglLinha(vgvLinha(tipologias), fluxo_pagamento)`
+  (VGL líquido de comissão destacada e RET) — e a incluí-lo no `ctxCusto`. Agora as 5 unidades batem
+  com o motor: R$ direto · R$/m² priv × área privativa · R$/m² terreno × área do terreno · % VGV × VGV
+  · % Receita × VGL · % Obra × total de Obra. `_ctxConversao()` também passou a usar a receita real
+  (VGL) na chave `receita`, deixando a conversão por badge coerente com o cálculo do Resultado.
+- **#119 (arredondamento de unidade igual ao padrão de Premissas):** a troca de badge já convertia o
+  valor via `converterUnidade` (a mesma função das Premissas), mas arredondava só a 2 casas
+  independentemente da unidade de destino — deixando **centavos ocultos** numa unidade inteira (R$,
+  R$/m²) e desestabilizando o round-trip. Fix: `_trocarUnidade` passou a arredondar o valor convertido
+  à **precisão de exibição da unidade de destino** (`_casasUnidade`: % → 2 casas, R$/R$-m² → 0), a
+  mesma precisão do `viab-num` daquela unidade (#117). Assim o valor guardado é idêntico ao exibido/
+  digitado e a ida-e-volta entre unidades não acumula drift.
+- **#120 (Construção: Cronograma fixo em "Obra", Início/Duração derivados e bloqueados):** helper
+  `eConstrucao(c)` (grupo obra + categoria Construção). Na coluna **Cronograma**, a linha Construção
+  exibe **"Obra" travado** (texto + 🔒, sem `urbi-select`). **Início** e **Duração** passam a ser
+  **derivados do evento Obra do cronograma** (getter `_eventoObra` sobre o `crono` já carregado por
+  `buscarCronogramaAvancado`) e renderizados **bloqueados** (📅/🕐 + 🔒). Para o motor distribuir o
+  custo no mesmo intervalo exibido, `_sincronizarConstrucao()` (chamado no `_carregar`, modo editável,
+  idempotente) faz PATCH da linha Construção quando `cronograma_evento`/`inicio_mes`/`duracao_meses`
+  divergem do evento Obra. `buscarCronogramaAvancado` já existia e foi reutilizado (sem mudança na API).
+- **Validação:** frontend isolado — **typecheck ✓ · testes 78/78 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~274.6kb). Sem schema/backend →
+  empacotamento não se aplica. ⏳ Render real das colunas travadas, do sync da Construção e do
+  Resultado em `% Receita` só valida no deploy dev.
+
 ---
 
 ## Rodada 2 — Etapas (2026-07-22)
