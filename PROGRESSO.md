@@ -590,6 +590,20 @@ Pré-requisito S15: concluído e na `main`.
   empacotamento não se aplica. ⏳ Render real das novas seções (Diretos/Financeiro) e da coluna VPL
   preenchida só valida no deploy dev.
 
+### Sessão S18 — Cenários: Texto & KPI — ✅ IMPLEMENTADA (issues #128, #129)
+Branch `claude/sessao-s18-suhtuj` (PR #155). Mudança **100% frontend** (`frontend/tela-cenarios.ts`,
+`frontend/fluxo-tabela.ts`) — sem schema/backend/migração; `versao` intacta. Pré-requisito S16:
+concluído e na `main`.
+
+- **#128 (remover placeholder do campo Nome):** Removido o atributo `placeholder` do `urbi-input`
+  do campo "Nome do cenário" em `tela-cenarios.ts`.
+- **#129 (adicionar KPI Resultado):** Adicionado o KPI "Resultado" como primeiro indicador da função
+  `kpisFluxo` em `fluxo-tabela.ts`. O valor é calculado como o final do fluxo acumulado
+  (`fluxoAcumulado[fluxoAcumulado.length - 1]`), com variante de cor (sucesso se ≥ 0, erro se < 0).
+- **Validação:** frontend isolado — **typecheck ✓ · testes 82/82 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~277.2kb). Sem schema/backend → empacotamento
+  não se aplica.
+
 ### Sessão S8 — Receitas: CSS, Layout & Texto — ✅ IMPLEMENTADA (issues #91–#102)
 Branch `claude/sessao-s16-3scr7u`. Mudança **100% frontend** (`frontend/tela-fluxo-receitas.ts`) —
 sem schema/backend/migração; `versao` intacta. Sem pré-requisitos.

@@ -87,12 +87,14 @@ export const estiloFluxoTabela = css`
   tr.item.custo td      { background: color-mix(in srgb, var(--cor-erro, #d45a3a)  4%, var(--cor-superficie-elevada, #16243A)); }
 `;
 
-/** Os 4 KPIs do fluxo (TIR, VPL, Payback, Exposição máxima). */
+/** Os 5 KPIs do fluxo (Resultado, TIR, VPL, Payback, Exposição máxima). */
 export function kpisFluxo(c: FluxoCalc): TemplateResult {
+  const resultado = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] || 0;
   const tirTxt = c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`;
   const tirVar = c.tir === null ? '' : (c.tir > 0 ? 'sucesso' : 'erro');
   return html`
     <div class="fx-kpis">
+      <urbi-kpi rotulo="Resultado" .valor=${fmtR$(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
       <urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi>
       <urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
       <urbi-kpi rotulo="Payback" .valor=${c.paybackData ?? '—'}></urbi-kpi>

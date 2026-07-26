@@ -181,7 +181,6 @@ export class ViabTelaCenarios extends LitElement {
         <div class="salvar">
           <urbi-input
             label="Nome do cenário"
-            placeholder="ex: Preço −5%, obra +10%"
             .valor=${this.nomeNovo}
             @urbi:input-change=${(e: CustomEvent) => this.nomeNovo = e.detail.valor}
           ></urbi-input>
