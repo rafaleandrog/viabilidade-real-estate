@@ -4,7 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import {
   rotuloMesRelativo, EVENTO_LABEL,
-  vgvLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
+  vgvLinha, vglLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 import {
   urbiVerso,
@@ -80,8 +80,8 @@ const CATEGORIAS: Record<GrupoId, { nome: string; subs: string[] }[]> = {
 
 // Descritor de conversão por unidade de orçamento (mesma base do motor em
 // `resolverCustoTotal`): R$ absoluto, R$/m² × área privativa, R$/m² × terreno,
-// % do VGV, % da receita (o motor usa VGV como fallback de receita — a ligação
-// aqui segue esse fallback). Alimenta a troca de unidade por badge.
+// % do VGV, % da receita (VGL — receita líquida, mesma base do motor; cai no VGV
+// só quando não há receita definida). Alimenta a troca de unidade por badge.
 const CONV_UNIDADE: Record<string, ConvUnidade> = {
   rs: { tipo: 'identidade' },
   rs_m2_priv: { tipo: 'por_area', link: 'areaPrivativa' },
@@ -150,6 +150,13 @@ function eObrigatoria(c: any): boolean {
   return c.grupo === 'obra' && OBRA_OBRIGATORIAS.some((o) => o.categoria === c.categoria);
 }
 
+// Linha "Construção" (obrigatória, 1ª do grupo Obra): além da categoria travada
+// (#115), o Cronograma fica fixo em "Obra" e o Início/Duração são derivados do
+// cronograma do empreendimento e bloqueados (#120).
+function eConstrucao(c: any): boolean {
+  return c.grupo === 'obra' && c.categoria === 'Construção';
+}
+
 // Ordena linhas do grupo obra: obrigatórias primeiro (na ordem declarada),
 // seguidas pelas demais na ordem original.
 function ordenarLinhasObra(linhas: any[]): any[] {
@@ -181,6 +188,12 @@ export class ViabFluxoCustos extends LitElement {
   @state() private removerAlvo: any = null;
   private ctxCusto: ContextoCusto = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0 };
   private carregado = false;
+
+  // Evento "Obra" do cronograma do empreendimento (fonte do Início/Duração
+  // derivados da linha Construção — #120).
+  private get _eventoObra(): EventoCrono | undefined {
+    return this.crono.find((e) => e.evento === 'obra');
+  }
 
   // Total do grupo Obra excluindo linhas com pct_obra (base para % Obra).
   private get _totalObra(): number {
@@ -249,11 +262,21 @@ export class ViabFluxoCustos extends LitElement {
       if (!crono?.erro) this.crono = crono.dados || [];
       if (!params?.erro) this.dataInicio = params.data_inicio_projeto ?? null;
       const linhas = receitas?.erro ? [] : (receitas.dados || []);
+      // Contexto de resolução idêntico ao do motor (fluxo-caixa-motor.ts): além de
+      // área/VGV, calcula a RECEITA total (VGL — líquida de comissão destacada e RET)
+      // para que a coluna Resultado de linhas em `% Receita` bata exatamente com o
+      // que o motor computa (antes, sem `receitaTotal`, o cálculo caía no fallback
+      // VGV e divergia do fluxo de caixa — issue #118).
       this.ctxCusto = {
         areaPrivativaTotal: areaPrivativaTotalLinhas(linhas),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
         vgvTotal: linhas.reduce((s: number, l: any) => s + vgvLinha(l.tipologias), 0),
+        receitaTotal: linhas.reduce(
+          (s: number, l: any) => s + vglLinha(vgvLinha(l.tipologias), l.fluxo_pagamento), 0),
       };
+      // Alinha a linha Construção ao cronograma (evento Obra) — depende de crono +
+      // custos já carregados. Editável apenas (#120).
+      if (this.editavel) await this._sincronizarConstrucao();
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar custos', 'erro');
     }
@@ -390,14 +413,28 @@ export class ViabFluxoCustos extends LitElement {
       },
       {
         id: 'cronograma', label: 'Cronograma',
-        render: (c: any) => html`
-          <urbi-select .valor=${c.cronograma_evento || 'customizado'} .opcoes=${EVENTOS_ANCORA}
-            @urbi:select-change=${(e: CustomEvent) => this._salvar(c, { cronograma_evento: e.detail.valor })}
-          ></urbi-select>`,
+        render: (c: any) => {
+          if (eConstrucao(c)) {
+            // Construção: cronograma fixo em "Obra" (sem seletor) — #120.
+            return html`<span class="mes-calc"><strong>Obra</strong>
+              <span title="Cronograma fixo na Obra">🔒</span></span>`;
+          }
+          return html`
+            <urbi-select .valor=${c.cronograma_evento || 'customizado'} .opcoes=${EVENTOS_ANCORA}
+              @urbi:select-change=${(e: CustomEvent) => this._salvar(c, { cronograma_evento: e.detail.valor })}
+            ></urbi-select>`;
+        },
       },
       {
         id: 'inicio', label: 'Início',
         render: (c: any) => {
+          if (eConstrucao(c)) {
+            // Início derivado do cronograma (evento Obra), bloqueado — #120.
+            const obra = this._eventoObra;
+            const ini = obra ? Number(obra.inicio_mes) : Number(c.inicio_mes) || 0;
+            return html`<span class="mes-calc">📅 ${rotuloMesRelativo(this.dataInicio, ini)}
+              <span title="Derivado do cronograma (Obra)">🔒</span></span>`;
+          }
           const custom = (c.cronograma_evento || 'customizado') === 'customizado';
           if (!custom) {
             return html`<span class="mes-calc">📅 ${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
@@ -414,13 +451,22 @@ export class ViabFluxoCustos extends LitElement {
       },
       {
         id: 'duracao', label: 'Duração',
-        render: (c: any) => html`
-          <span class="campo-mes">🕐
-            <viab-num casas-decimais="0" sufixo="meses" ?desabilitado=${dis}
-              .valor=${Number(c.duracao_meses) || 1}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { duracao_meses: e.detail.valor })}
-            ></viab-num>
-          </span>`,
+        render: (c: any) => {
+          if (eConstrucao(c)) {
+            // Duração derivada do cronograma (evento Obra), bloqueada — #120.
+            const obra = this._eventoObra;
+            const dur = obra ? Number(obra.duracao_meses) : Number(c.duracao_meses) || 1;
+            return html`<span class="mes-calc">🕐 ${dur} ${dur === 1 ? 'mês' : 'meses'}
+              <span title="Derivado do cronograma (Obra)">🔒</span></span>`;
+          }
+          return html`
+            <span class="campo-mes">🕐
+              <viab-num casas-decimais="0" sufixo="meses" ?desabilitado=${dis}
+                .valor=${Number(c.duracao_meses) || 1}
+                @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { duracao_meses: e.detail.valor })}
+              ></viab-num>
+            </span>`;
+        },
       },
     ];
     if (!dis) {
@@ -432,6 +478,22 @@ export class ViabFluxoCustos extends LitElement {
       });
     }
     return colunas;
+  }
+
+  // Alinha a linha Construção ao cronograma do empreendimento: fixa o evento em
+  // "obra" e copia Início/Duração do evento Obra para o dado persistido, de modo
+  // que o motor de fluxo distribua o custo no mesmo intervalo exibido (bloqueado)
+  // na UI — #120. Idempotente: só faz PATCH quando algo diverge.
+  private async _sincronizarConstrucao() {
+    const obra = this._eventoObra;
+    if (!obra) return;
+    const c = this.custos.find((x) => eConstrucao(x));
+    if (!c) return;
+    const patch: Record<string, any> = {};
+    if ((c.cronograma_evento || '') !== 'obra') patch.cronograma_evento = 'obra';
+    if (Number(c.inicio_mes) !== Number(obra.inicio_mes)) patch.inicio_mes = Number(obra.inicio_mes);
+    if (Number(c.duracao_meses) !== Number(obra.duracao_meses)) patch.duracao_meses = Number(obra.duracao_meses);
+    if (Object.keys(patch).length) await this._salvar(c, patch);
   }
 
   // Cria as linhas obrigatórias do grupo Obra que ainda não existem.
@@ -464,14 +526,16 @@ export class ViabFluxoCustos extends LitElement {
     }
   }
 
-  // Grandezas de ligação p/ conversão (do contexto já carregado). O motor usa
-  // VGV como fallback de receita, então `receita` segue o VGV total aqui.
+  // Grandezas de ligação p/ conversão (do contexto já carregado). `receita` usa a
+  // receita líquida real (VGL) — a mesma base que `resolverCustoTotal` aplica para
+  // `pct_receita` —, então a conversão por badge e o Resultado ficam coerentes
+  // entre si (#118). Sem receita definida, cai no VGV (fallback do motor).
   private _ctxConversao(): CtxConversao {
     return {
       areaPrivativa: this.ctxCusto.areaPrivativaTotal,
       areaTerreno: this.ctxCusto.areaTerreno,
       vgv: this.ctxCusto.vgvTotal,
-      receita: this.ctxCusto.vgvTotal,
+      receita: this.ctxCusto.receitaTotal ?? this.ctxCusto.vgvTotal,
     };
   }
 
@@ -484,9 +548,19 @@ export class ViabFluxoCustos extends LitElement {
     this._salvar(c, dados);
   }
 
+  // Casas decimais da unidade (padrão de exibição/entrada do `viab-num`): % com 2
+  // casas (#117), R$ e R$/m² inteiros. Usado para arredondar o valor convertido à
+  // MESMA precisão em que ele será exibido e digitado — evita guardar centavos
+  // ocultos numa unidade inteira e mantém o round-trip estável (#119).
+  private _casasUnidade(unidade: string): number {
+    return unidade.startsWith('pct_') ? 2 : 0;
+  }
+
   // Troca a unidade de orçamento por badge (padrão do Preliminar): converte o
   // valor atual para a unidade nova (equivalente) e persiste unidade+valor num
   // só PATCH. Base indefinida (grandeza 0) ou valor vazio → só troca a unidade.
+  // O valor convertido é arredondado à precisão de exibição da unidade de destino
+  // (mesma regra de arredondamento das Premissas — #119).
   private _trocarUnidade(c: any, nova: string) {
     if (!this.editavel) return;
     const atual = c.orcamento_unidade || 'rs';
@@ -495,7 +569,10 @@ export class ViabFluxoCustos extends LitElement {
     const valorAtual = c.orcamento_valor !== null && c.orcamento_valor !== undefined ? Number(c.orcamento_valor) : null;
     if (valorAtual !== null && Number.isFinite(valorAtual)) {
       const convertido = converterUnidade(CONV_UNIDADE[atual], CONV_UNIDADE[nova], valorAtual, this._ctxConversao());
-      if (convertido !== null) dados.orcamento_valor = convertido;
+      if (convertido !== null) {
+        const f = Math.pow(10, this._casasUnidade(nova));
+        dados.orcamento_valor = Math.round(convertido * f) / f;
+      }
     }
     this._salvar(c, dados);
   }
