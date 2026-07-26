@@ -310,6 +310,44 @@ export function resolverCustoTotal(custo: any, ctx: ContextoCusto): number {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Saldo de tipologias nas Fases da Receita (#170)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Unidades da tipologia ainda DISPONÍVEIS quando se chega na alocação `alocId`
+ * — a coluna "Total" da tabela de alocações. É o balanço cumulativo de cima
+ * para baixo: quantidade do catálogo menos tudo que as alocações ANTERIORES da
+ * mesma tipologia já venderam, em qualquer fase anterior (a linha `alocId` não
+ * entra na conta). O "Saldo" da linha é este total menos as unidades dela.
+ *
+ * A ordem é a que o backend devolve — fases por `ordem`, alocações na ordem da
+ * fase — e é parte do contrato: mudá-la muda o resultado de cada linha.
+ *
+ * Alocação não encontrada devolve 0 (a tela não tem o que exibir).
+ */
+export function totalAntesAlocacao(
+  fases: any[],
+  tipologias: any[],
+  alocId: any,
+  tipologiaId: any,
+): number {
+  const tip = (tipologias ?? []).find((t) => Number(t?.id) === Number(tipologiaId));
+  if (!tip) return 0;
+  let usado = 0;
+  for (const fase of fases ?? []) {
+    for (const a of (fase?.alocacoes ?? [])) {
+      if (Number(a?.id) === Number(alocId)) {
+        return Math.max(0, n(tip.quantidade) - usado);
+      }
+      if (Number(a?.tipologia_id) === Number(tipologiaId)) {
+        usado += n(a?.unidades);
+      }
+    }
+  }
+  return 0;
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Corretagem de vendas (#121) — custo direto pago no mês da venda
 // ─────────────────────────────────────────────────────────────────
 

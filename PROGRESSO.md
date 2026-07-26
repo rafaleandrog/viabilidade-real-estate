@@ -4,6 +4,53 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #170 — saldo de tipologias cascateando pelas Fases da Receita (2026-07-26)
+
+Branch `claude/viabilidade-issues-receita-xbdqy4`. **100% frontend** — sem backend, sem schema,
+sem migração. `versao` do `manifesto.json` **intacta**.
+
+Rodada nova de issues (#165–#170), abertas a partir da planilha `lista_bugs.xlsx` do autor. Esta
+sessão implementou só a **#170** (item 7 da planilha); as outras cinco (#165, #166, #167, #168,
+#169) ficaram abertas com causa raiz já mapeada na descrição.
+
+**O bug.** A tabela de alocações de cada fase (Viabilidade → Receitas) tinha as colunas `Total` e
+`Saldo` deslocadas em relação à spec da planilha (aba `#7`, com as fórmulas):
+
+- `Total` exibia `tip.quantidade` — o total bruto do catálogo, **igual em todas as fases**, sem
+  descontar o que as fases anteriores já venderam;
+- `Saldo` exibia `_saldoAntes(...)`, que calcula o balanço cumulativo **antes** da linha e nunca
+  subtrai as `unidades` da própria linha. Ou seja: a coluna rotulada `Saldo` mostrava, na verdade,
+  o `Total` que a planilha define. A última fase nunca zerava.
+
+O `_saldoAntes` veio da S10/#107 e a cascata dele estava certa — errado era **onde** o valor
+aparecia e o fato de faltar o segundo passo.
+
+**A correção.** A cascata virou função pura em `fluxo-shared.ts` com o nome do que ela calcula:
+`totalAntesAlocacao(fases, tipologias, alocId, tipologiaId)` → coluna `Total`. O `Saldo` passou a
+ser `total − unidades` da própria linha (e é ele que ganha a classe `.zero`, vermelha ao esgotar).
+`_saldoAntes` foi removido de `tela-fluxo-receitas.ts`.
+
+**O que NÃO mudou, de propósito:** `_saldo()` (saldo agregado do estudo, usado só para filtrar o
+dropdown de tipologias disponíveis) é outro conceito e continua correto para o seu propósito. A
+trava do backend (`saldoTipologiaNoEstudo`) já impede que a soma das alocações passe da
+`quantidade` do catálogo, então o novo `Saldo` por linha nunca fica negativo — nenhuma validação
+nova foi necessária.
+
+**Contrato de ordem.** A cascata depende da ordem `fases → fase.alocacoes` que o backend devolve
+(fases por `ordem`). Isso está agora escrito no docblock da função pura: mudar a ordem muda o
+resultado de cada linha.
+
+**Testes.** `fluxo-shared.test.ts` ganhou a fixture da aba `#7` inteira (4 tipologias × 3 fases,
+os mesmos números da planilha) conferida linha a linha, mais os casos de borda (alocação
+inexistente, tipologia fora do catálogo, `unidades` nulo). Suíte de frontend: **97 testes, 97
+passando** via `bash scripts/validar-frontend.sh` (guard de aspas + typecheck + testes + build).
+
+**Doc corrigido junto.** `docs/viabilidade/padrao-incorporacao.md` descrevia a trava de saldo como
+"por fase" em dois pontos, quando `saldoTipologiaNoEstudo` (`backend/rotas/avancado.ts:750`)
+agrega **todas as fases** do estudo. Divergiu do código → quem se corrige é o doc (CLAUDE.md).
+
+---
+
 ## Auditoria da rodada 3 — issues #160, #161, #162 (2026-07-26)
 
 Branch `claude/analyze-unimplemented-prs-79s2to-f0axc2`. Três consertos, **100% frontend/infra**

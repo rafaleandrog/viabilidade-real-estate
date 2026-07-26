@@ -183,7 +183,7 @@ O nível Avançado acrescenta a régua de tempo e a mecânica de recebimento, em
 - **Absorção** (`absorcao` JSON) — modo **Distribuído** em 3 períodos: `lancamento` (cobre Pré-lançamento + Lançamento), `obra`, `pos_obra`. O Pós-obra é **derivado** (`100 − p1 − p2`) e seu período vem do Cronograma.
 - **Fluxo de Pagamento** (`fluxo_pagamento` JSON) — `comissao`, `ret`, **`entrada` e `parcelas` como LISTAS** de linhas, e `repasse: { apos_entrega_meses }`. O `%` do Repasse é **derivado** (`100 − Σ entrada − Σ parcelas`), não persistido.
 
-**Alocações (`avancado_alocacoes`)** — vende `unidades` de uma `tipologia_id` numa `fase_id` a um `preco_m2`. Várias alocações por tipologia (preços diferentes). Trava de saldo por fase: `Σ unidades alocadas da tipologia na fase ≤ quantidade` do catálogo.
+**Alocações (`avancado_alocacoes`)** — vende `unidades` de uma `tipologia_id` numa `fase_id` a um `preco_m2`. Várias alocações por tipologia (preços diferentes). Trava de saldo **agregada por estudo** (`saldoTipologiaNoEstudo`): `Σ unidades alocadas da tipologia em TODAS as fases ≤ quantidade` do catálogo. Na tela, as unidades **cascateiam** de uma fase para a seguinte: o `Total` de cada linha é a `quantidade` do catálogo menos o que as linhas acima já venderam, e o `Saldo` é esse total menos as unidades da própria linha (#170).
 
 **Linhas de custo (`avancado_linhas_custo`)** — 5 grupos (`terreno`\|`obra`\|`diretos`\|`indireto`\|`financeiro`), `orcamento_valor` + `orcamento_unidade` (`rs`\|`rs_m2_priv`\|`rs_m2_terreno`\|`pct_vgv`\|`pct_receita`\|`pct_obra`), ancoradas ao Cronograma (`cronograma_evento`, `inicio_mes`, `duracao_meses`) e a uma curva (`curva_id`).
 
@@ -326,7 +326,7 @@ Rodam no frontend (`frontend/premissas-validacao.ts`). Exemplos coerentes com o 
 | Percentuais de dedução somando > 100% | Loteamento (não se aplica à Incorporação, mas o mesmo guarda-chuva vale) |
 | Absorção por fase excede 100% | `lancamento + obra > 100` (pós-obra é o resíduo) |
 | Fluxo de pagamento excede 100% | `Σ entrada + Σ parcelas > 100` (repasse é o resíduo) |
-| Trava de alocação por fase | `Σ unidades alocadas da tipologia na fase > quantidade` do catálogo |
+| Trava de alocação por estudo | `Σ unidades alocadas da tipologia em todas as fases > quantidade` do catálogo (`422 SALDO_EXCEDIDO`) |
 | Excluir tipologia com alocações | Bloqueado (`422 TIPOLOGIA_EM_USO`) |
 | Carência ≥ prazo | `financiamento_carencia_meses ≥ financiamento_prazo_meses` com financiamento > 0 |
 
