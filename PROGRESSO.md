@@ -590,6 +590,34 @@ Pré-requisito S15: concluído e na `main`.
   empacotamento não se aplica. ⏳ Render real das novas seções (Diretos/Financeiro) e da coluna VPL
   preenchida só valida no deploy dev.
 
+### Sessão S8 — Receitas: CSS, Layout & Texto — ✅ IMPLEMENTADA (issues #91–#102)
+Branch `claude/sessao-s16-3scr7u`. Mudança **100% frontend** (`frontend/tela-fluxo-receitas.ts`) —
+sem schema/backend/migração; `versao` intacta. Sem pré-requisitos.
+
+- **Contexto:** auditoria (a pedido do autor) revelou que a S8 nunca fora rodada como sessão — 11 das
+  suas issues seguiam abertas e sem entrada no PROGRESSO. #91 já estava fechada; #96 (título "VGV") e
+  #98 (texto "4 períodos") já estavam satisfeitas no código por trabalho anterior. As **9 restantes**
+  foram implementadas aqui.
+- **#92 (cores das bolas de status):** `.stat` (pendente) de `var(--cor-alerta)` → **`var(--cor-erro)`**
+  (vermelha) e `.stat.ok` (aplicado) de `var(--cor-sucesso)` → **`var(--cor-info)`** (azul). Só tokens.
+- **#93 (largura da coluna Tipologia):** `col.c-tipo` de `width: auto` → **`190px`**.
+- **#94 (largura de "Preço / m²"):** `col.c-preco` `110px` → **`140px`** (cabe 5 dígitos + 2 casas + sufixo).
+- **#95 (remover prefixo "R$"):** colunas Preço unitário e VGV trocaram `fmtR$` por **`fmtNum`** (mesma
+  formatação de milhar, sem "R$"). `fmtNum` adicionado ao import.
+- **#96 (título "Preço total" → "VGV"):** já estava no código (header "VGV"). Sem mudança.
+- **#97 (botão "Adicionar Alocação" → "Adicionar tipologia"):** label trocado.
+- **#98 (texto da Absorção p/ 4 períodos):** refinado para **nomear** os períodos — "Pré-lançamento,
+  Lançamento, Obra e Pós-obra (calculado automaticamente)".
+- **#99 (remover "(calculado)" do Pós-obra):** removido o `<span>` no label da tabela de Absorção.
+- **#100 (reduzir campos % e nº parcelas no Fluxo de Pagamento):** `.pag-linha viab-num` `120px` → **`92px`**.
+- **#101 (remover "(calculado)" do Repasse + fórmula):** label "Repasse (calculado)" → "Repasse" e
+  removida a linha `<p>Repasse = 100% − entradas − parcelas.</p>`.
+- **#102 ("Comissão" → "Corretagem" no modal):** label do `urbi-checkbox` trocado (a chave interna de
+  dados `comissao` **não** mudou — só o texto visível).
+- **Validação:** frontend isolado — **typecheck ✓ · testes 82/82 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde; bundle ~277.1kb). Sem schema/backend → empacotamento não
+  se aplica. ⏳ Render real das cores de status, larguras e textos só valida no deploy dev.
+
 ---
 
 ## Rodada 2 — Etapas (2026-07-22)
