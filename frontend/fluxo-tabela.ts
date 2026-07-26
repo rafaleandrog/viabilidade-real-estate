@@ -1,6 +1,7 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { fmtR$, fmtPct } from './viab-format.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
+import { calcularVariacao } from './cenario-variacao.js';
 import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -34,6 +35,21 @@ function celula(v: number, negativoEntreParenteses: boolean): string {
 /** Estilos da tabela + KPIs — o componente hospedeiro os adiciona a `static styles`. */
 export const estiloFluxoTabela = css`
   .fx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+
+  /* #132: a variacao vs. cenario real fica no canto superior direito do proprio
+     card de KPI. urbi-kpi nao expoe slot nem prop de variacao (so rotulo/valor/
+     variante), entao a celula do grid e quem ancora o indicador — sem tocar no
+     primitivo e sem exigir bump de shell_min. */
+  .fx-kpis .kpi-cel { position: relative; }
+  .fx-kpis .kpi-cel urbi-kpi { width: 100%; }
+  .kpi-var {
+    position: absolute; top: 12px; right: 14px; z-index: 1;
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .kpi-var.melhor { color: var(--cor-sucesso, #13a98d); }
+  .kpi-var.pior { color: var(--cor-erro, #d45a3a); }
 
   .fx-wrap { overflow: auto; max-height: 72vh; border: 1px solid var(--cor-borda, rgba(255,255,255,0.12)); border-radius: 8px; }
   table.fx { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; width: max-content; min-width: 100%; }
@@ -87,18 +103,64 @@ export const estiloFluxoTabela = css`
   tr.item.custo td      { background: color-mix(in srgb, var(--cor-erro, #d45a3a)  4%, var(--cor-superficie-elevada, #16243A)); }
 `;
 
-/** Os 5 KPIs do fluxo (Resultado, TIR, VPL, Payback, Exposição máxima). */
-export function kpisFluxo(c: FluxoCalc): TemplateResult {
-  const resultado = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] || 0;
+/** Resultado do fluxo = último ponto do acumulado. */
+function resultadoDe(c: FluxoCalc): number {
+  return c.fluxoAcumulado[c.fluxoAcumulado.length - 1] || 0;
+}
+
+/**
+ * Seta ↑/↓ + variação % de um KPI contra o cenário real (#132). Devolve
+ * `nothing` quando não há base (uso normal, fora de Cenários) ou quando a
+ * variação é desprezível — ver `calcularVariacao`.
+ */
+function varKpi(novo: number | null, base: number | null | undefined, maiorMelhor: boolean) {
+  if (base === undefined || base === null) return nothing;
+  const v = calcularVariacao(novo, base, maiorMelhor);
+  if (!v) return nothing;
+  const seta = v.pct > 0 ? 'fa-solid fa-arrow-up' : 'fa-solid fa-arrow-down';
+  return html`
+    <span class="kpi-var ${v.melhor ? 'melhor' : 'pior'}"
+      title=${`${v.melhor ? 'Melhor' : 'Pior'} que o cenário real (${v.texto})`}>
+      <urbi-icone classe=${seta}></urbi-icone>${v.texto}
+    </span>
+  `;
+}
+
+/**
+ * Os 5 KPIs do fluxo (Resultado, TIR, VPL, Payback, Exposição máxima).
+ *
+ * `base` só é passada pela aba Cenários (#132): com ela, Resultado, TIR, VPL e
+ * Exposição máxima ganham seta + variação % contra o cenário real. Payback é
+ * uma data, não um escalar comparável — fica sem indicador. Sem `base` o
+ * componente renderiza exatamente como antes (aba Fluxo de Caixa e Resumo).
+ */
+export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult {
+  const resultado = resultadoDe(c);
   const tirTxt = c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`;
   const tirVar = c.tir === null ? '' : (c.tir > 0 ? 'sucesso' : 'erro');
+  // Exposição máxima é min(fluxoAcumulado), tipicamente negativa: subir (ficar
+  // menos negativa) é MELHOR — daí maiorMelhor = true nos quatro indicadores.
   return html`
     <div class="fx-kpis">
-      <urbi-kpi rotulo="Resultado" .valor=${fmtR$(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-      <urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi>
-      <urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-      <urbi-kpi rotulo="Payback" .valor=${c.paybackData ?? '—'}></urbi-kpi>
-      <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi>
+      <div class="kpi-cel">
+        <urbi-kpi rotulo="Resultado" .valor=${fmtR$(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        ${varKpi(resultado, base ? resultadoDe(base) : undefined, true)}
+      </div>
+      <div class="kpi-cel">
+        <urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi>
+        ${varKpi(c.tir, base ? base.tir : undefined, true)}
+      </div>
+      <div class="kpi-cel">
+        <urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        ${varKpi(c.vpl, base ? base.vpl : undefined, true)}
+      </div>
+      <div class="kpi-cel">
+        <urbi-kpi rotulo="Payback" .valor=${c.paybackData ?? '—'}></urbi-kpi>
+      </div>
+      <div class="kpi-cel">
+        <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi>
+        ${varKpi(c.exposicaoMaxima, base ? base.exposicaoMaxima : undefined, true)}
+      </div>
     </div>
   `;
 }

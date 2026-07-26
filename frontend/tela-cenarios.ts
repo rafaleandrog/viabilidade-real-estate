@@ -9,6 +9,7 @@ import {
 } from './fluxo-caixa-motor.js';
 import { graficoCenarioAcumulado } from './fluxo-graficos.js';
 import { estiloFluxoTabela, kpisFluxo, tabelaFluxo } from './fluxo-tabela.js';
+import { calcularVariacao } from './cenario-variacao.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
@@ -56,6 +57,12 @@ export class ViabTelaCenarios extends LitElement {
   private faixaPreco: Faixa = { min: -15, max: 15 };
   private faixaCusto: Faixa = { min: -15, max: 15 };
   private carregado = false;
+  // Memória dos fluxos já calculados, por par de deltas (#131). Arrastar um
+  // slider dispara um render por pixel e cada render precisa do fluxo da base,
+  // do cenário vivo E de cada cenário salvo — sem cache seriam N+2 execuções do
+  // motor por quadro. Com ele só o par novo é calculado; base, salvos e valores
+  // já visitados (arrastar de volta) saem do mapa.
+  private cacheCalc = new Map<string, FluxoCalc>();
 
   static styles = [estiloPrimitivo, estiloConteudo, estiloFluxoTabela, css`
     .topo { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 16px; align-items: start; }
@@ -84,7 +91,9 @@ export class ViabTelaCenarios extends LitElement {
     table.cen td.pos { color: var(--cor-sucesso, #13a98d); }
     table.cen td.neg { color: var(--cor-erro, #d45a3a); }
     table.cen tr.linha-real td { font-weight: 700; background: var(--cor-primaria-fundo, rgba(124,92,255,0.12)); }
-    table.cen tr.linha-real td:first-child i { margin-right: 6px; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
+    table.cen tr.linha-real td:first-child urbi-icone { margin-right: 6px; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
+    /* #132: variacao vs. cenario real, a direita do valor da propria celula. */
+    table.cen td urbi-badge { margin-left: 6px; vertical-align: middle; }
     .cen-wrap { overflow-x: auto; }
   `];
 
@@ -121,6 +130,7 @@ export class ViabTelaCenarios extends LitElement {
       this.faixaPreco = this._faixa(bm?.dados || [], 'preco');
       this.faixaCusto = this._faixa(bm?.dados || [], 'custo_obras');
       this.cenarios = cens?.erro ? [] : (cens.dados || []);
+      this.cacheCalc.clear();  // baseConfig novo invalida tudo que estava memorizado
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar os cenários', 'erro');
     }
@@ -136,8 +146,28 @@ export class ViabTelaCenarios extends LitElement {
     return { min: -Math.round(neg), max: Math.round(pos) };
   }
 
+  /** Teto do cache: arrastar os dois sliders de ponta a ponta gera no máximo
+   *  algumas centenas de pares; passando disso, esvazia (recalcular é barato). */
+  private static readonly LIMITE_CACHE = 240;
+
   private _calc(params: CenarioParams): FluxoCalc {
-    return calcularFluxo(aplicarCenario(this.baseConfig!, params));
+    const chave = `${n(params.precoVendaPct)}|${n(params.custoObraPct)}`;
+    const memo = this.cacheCalc.get(chave);
+    if (memo) return memo;
+    const calc = calcularFluxo(aplicarCenario(this.baseConfig!, params));
+    if (this.cacheCalc.size >= ViabTelaCenarios.LIMITE_CACHE) this.cacheCalc.clear();
+    this.cacheCalc.set(chave, calc);
+    return calc;
+  }
+
+  /** Sliders fora do zero — há um cenário alternativo a comparar com a base. */
+  private get _alterado(): boolean {
+    return this.precoPct !== 0 || this.custoPct !== 0;
+  }
+
+  private _rotuloCenario(): string {
+    const p = (v: number) => `${v > 0 ? '+' : ''}${v}%`;
+    return `Cenário · preço ${p(this.precoPct)} · obra ${p(this.custoPct)}`;
   }
 
   render() {
@@ -148,19 +178,26 @@ export class ViabTelaCenarios extends LitElement {
         <urbi-estado-vazio icone="fa-solid fa-sliders"
           mensagem="Defina o cronograma, as receitas e os custos nas outras abas para simular cenários."></urbi-estado-vazio>`;
     }
+    // Base = cenário real (deltas zerados). Enquanto os sliders estiverem nele o
+    // cenário É a base: nada de segunda curva nem de setas de variação (#131/#132).
     const base = this._calc({ precoVendaPct: 0, custoObraPct: 0 });
-    const cenario = this._calc({ precoVendaPct: this.precoPct, custoObraPct: this.custoPct });
+    const alterado = this._alterado;
+    const cenario = alterado
+      ? this._calc({ precoVendaPct: this.precoPct, custoObraPct: this.custoPct })
+      : base;
     return html`
       <div class="topo">
         ${this._renderControles()}
-        <urbi-card titulo="Fluxo acumulado — base × cenário">
-          <div class="graf-wrap"><div class="graf">${graficoCenarioAcumulado(base, cenario, this.dataInicio, this.crono)}</div></div>
+        <urbi-card titulo="Fluxo acumulado — cenário real × cenário simulado">
+          <div class="graf-wrap"><div class="graf">
+            ${graficoCenarioAcumulado(base, alterado ? cenario : null, this.dataInicio, this.crono, this._rotuloCenario())}
+          </div></div>
         </urbi-card>
       </div>
 
       <section class="secao-fluxo">
-        <h3>Fluxo de caixa do cenário</h3>
-        ${kpisFluxo(cenario)}
+        <h3>${alterado ? 'Fluxo de caixa do cenário' : 'Fluxo de caixa do cenário real'}</h3>
+        ${kpisFluxo(cenario, alterado ? base : null)}
         ${tabelaFluxo(cenario, this.dataInicio, this.colapso, (ch) => this._t(ch))}
       </section>
 
@@ -169,7 +206,7 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   private _renderControles(): TemplateResult {
-    const alterado = this.precoPct !== 0 || this.custoPct !== 0;
+    const alterado = this._alterado;
     return html`
       <urbi-card titulo="Parâmetros do cenário">
         ${this._slider('Preço de venda (R$/m²)', this.precoPct, this.faixaPreco, (v) => this.precoPct = v)}
@@ -265,7 +302,7 @@ export class ViabTelaCenarios extends LitElement {
             </thead>
             <tbody>
               ${this._linhaReal(base)}
-              ${this.cenarios.map((c) => this._linhaCenario(c))}
+              ${this.cenarios.map((c) => this._linhaCenario(c, base))}
             </tbody>
           </table>
         </div>
@@ -284,7 +321,7 @@ export class ViabTelaCenarios extends LitElement {
     const tir = base.tir === null ? '—' : fmtPct(base.tir);
     return html`
       <tr class="linha-real">
-        <td><i class="fa-solid fa-lock"></i>Cenário real</td>
+        <td><urbi-icone classe="fa-solid fa-lock"></urbi-icone>Cenário real</td>
         <td>—</td>
         <td>—</td>
         <td class=${base.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(base.vpl)}</td>
@@ -296,7 +333,18 @@ export class ViabTelaCenarios extends LitElement {
     `;
   }
 
-  private _linhaCenario(c: any): TemplateResult {
+  /**
+   * Badge de variação do indicador contra o cenário real (#132). Todos os
+   * indicadores da tabela são "maior é melhor" — inclusive a exposição máxima,
+   * que sendo negativa melhora ao subir (ficar menos negativa).
+   */
+  private _badgeVar(novo: number | null, base: number | null) {
+    const v = calcularVariacao(novo, base, true);
+    if (!v) return nothing;
+    return html`<urbi-badge cor=${v.melhor ? 'sucesso' : 'perigo'}>${v.texto}</urbi-badge>`;
+  }
+
+  private _linhaCenario(c: any, base: FluxoCalc): TemplateResult {
     const calc = this._calc({ precoVendaPct: n(c.preco_venda_pct), custoObraPct: n(c.custo_obra_pct) });
     const pctTxt = (v: number) => `${v > 0 ? '+' : ''}${v}%`;
     const tir = calc.tir === null ? '—' : `${fmtPct(calc.tir)}`;
@@ -305,10 +353,10 @@ export class ViabTelaCenarios extends LitElement {
         <td>${c.nome || 'Cenário'}</td>
         <td>${pctTxt(n(c.preco_venda_pct))}</td>
         <td>${pctTxt(n(c.custo_obra_pct))}</td>
-        <td class=${calc.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(calc.vpl)}</td>
-        <td>${tir}</td>
+        <td class=${calc.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(calc.vpl)}${this._badgeVar(calc.vpl, base.vpl)}</td>
+        <td>${tir}${this._badgeVar(calc.tir, base.tir)}</td>
         <td>${calc.paybackData ?? '—'}</td>
-        <td class="neg">${fmtR$(calc.exposicaoMaxima)}</td>
+        <td class="neg">${fmtR$(calc.exposicaoMaxima)}${this._badgeVar(calc.exposicaoMaxima, base.exposicaoMaxima)}</td>
         <td>
           <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
             @click=${() => this.removerId = Number(c.id)}>Remover</urbi-botao>
