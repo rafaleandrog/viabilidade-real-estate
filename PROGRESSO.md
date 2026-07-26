@@ -72,6 +72,23 @@ usada como `:host([expandir])` em `UrbiPrimitivoDeConteudo` — não é `@proper
 Os 3 casos conhecidos (`urbi-badge ?desabilitado`, `urbi-input estilo="compacto"` e este `#161`)
 já estão todos corrigidos.
 
+### Adendo — sessão paralela e o doc que faltou
+
+Uma **segunda sessão** atacou as mesmas três issues em paralelo, na branch
+`claude/viabilidade-app-repo-s6x7mf` (commit `b6ba53a`, ~2 min antes do PR #163). As correções de
+frontend saíram **idênticas** nos dois lados — mesmos dois arquivos, mesmas linhas, e ambas
+escolheram `secundario` para o #161 de forma independente. Boa corroboração da análise.
+
+O resto era redundante: o `guard-pr.yml` dela é equivalente ao `pr-guards.yml` já mergeado (mergear
+os dois daria **dois workflows duplicados** rodando o mesmo check em todo PR), e o grep dela usa a
+classe `'=[”“’‘]'` — justamente a forma que dá falso positivo em `=—`/`=→` sem locale UTF-8.
+
+Mas ela pegou uma coisa que o PR #163 **deixou passar**: o `CLAUDE.md` continuava descrevendo o
+`validar-frontend.sh` como 3 etapas, sem o guard nem o workflow novo. Doc e código andam juntos —
+a regra existe e o PR #163 a violou. Corrigido aqui, com o nome real do arquivo mergeado
+(`pr-guards.yml`). Lição colateral: **duas sessões na mesma tarefa desperdiçam trabalho** — o
+`CLAUDE.md` já manda uma branch por sessão; vale confirmar escopo antes de começar.
+
 ### Validação
 
 `bash scripts/validar-frontend.sh` verde nos três commits (typecheck + 94/94 testes + build).

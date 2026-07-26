@@ -55,9 +55,22 @@ script pronto — é o "caminho simples" que sempre funciona:
 bash scripts/validar-frontend.sh
 ```
 
-Ele roda `pnpm install` (ignorando o 401 do SDK, que ainda assim baixa lit/typescript/tsx/
-esbuild para `.pnpm/`), linka esses pacotes e executa **typecheck do frontend + testes de
-frontend + build do bundle (esbuild)**. Verde = mudança de frontend validada.
+Ele roda, em 5 etapas: o **guard de aspas curvas em posição de atributo**, depois `pnpm install`
+(ignorando o 401 do SDK, que ainda assim baixa lit/typescript/tsx/esbuild para `.pnpm/`), linka
+esses pacotes e executa **typecheck do frontend + testes de frontend + build do bundle
+(esbuild)**. Verde = mudança de frontend validada.
+
+> **Por que o guard de aspas curvas existe:** `variante=”alerta”` (aspa curva, U+201D) deixa o
+> atributo **inerte** — o parser inclui as aspas no valor, ele não casa com nada e o primitivo cai
+> no default, sem erro em lugar nenhum. Como mora dentro de template literal do lit, atravessa
+> typecheck, testes e esbuild **em verde**: foi assim que o #71/#160 sobreviveu a uma rodada
+> inteira que "validou ✓". Aspas curvas em **conteúdo de texto** são tipografia legítima e não são
+> acusadas — o padrão casa só `=` seguido de aspa curva.
+
+O `.github/workflows/pr-guards.yml` é o CI de PR (só `git` + `grep`, sem SDK, então nunca fica
+vermelho por falta de credencial). Barra **PR de diff vazio que declara fechar issue** — o caso do
+PR #142, que fechou 12 issues sem alterar um arquivo — e repete o guard de aspas curvas para pegar
+quem não rodou o script local.
 
 **Backend, typecheck do backend, `urbi-empacotar` e a suíte completa** exigem o SDK →
 **só rodam no ambiente autenticado do autor**. Se uma mudança tocar backend/schema, implemente
