@@ -171,22 +171,45 @@ export class ViabFluxoReceitas extends LitElement {
   }
 
   /**
-   * Saldo de unidades de uma tipologia = quantidade do catálogo − Σ alocado em
-   * TODAS as fases (ignorando, opcionalmente, uma alocação em edição). #52: o
-   * saldo agrega todas as fases para não exceder o total cadastrado em Tipologias.
+   * Saldo global de unidades: quantidade do catálogo − Σ de todas as alocações
+   * (todas as fases). Usado para checar disponibilidade ao adicionar/trocar tipologia.
+   * #52: saldo agrega todas as fases para não exceder o total do catálogo.
    */
-  private _saldo(tipologiaId: any, ignorarAlocId?: any): number {
+  private _saldo(tipologiaId: any): number {
     const tip = this._tip(tipologiaId);
     if (!tip) return 0;
     let usado = 0;
     for (const fase of this.fases) {
       for (const a of (fase.alocacoes || [])) {
-        if (Number(a.tipologia_id) === Number(tipologiaId) && Number(a.id) !== Number(ignorarAlocId)) {
+        if (Number(a.tipologia_id) === Number(tipologiaId)) {
           usado += n(a.unidades);
         }
       }
     }
     return n(tip.quantidade) - usado;
+  }
+
+  /**
+   * Saldo disponível ANTES da alocação `alocId`, contando de cima para baixo
+   * todas as alocações anteriores da mesma tipologia em todas as fases. #107:
+   * exibe o saldo como "balanço progressivo" — o usuário vê quantas unidades
+   * estavam livres quando chegou a vez desta linha.
+   */
+  private _saldoAntes(alocId: any, tipologiaId: any): number {
+    const tip = this._tip(tipologiaId);
+    if (!tip) return 0;
+    let usado = 0;
+    for (const fase of this.fases) {
+      for (const a of (fase.alocacoes || [])) {
+        if (Number(a.id) === Number(alocId)) {
+          return Math.max(0, n(tip.quantidade) - usado);
+        }
+        if (Number(a.tipologia_id) === Number(tipologiaId)) {
+          usado += n(a.unidades);
+        }
+      }
+    }
+    return 0;
   }
 
   private _vgvFase(fase: any): number {
@@ -312,8 +335,9 @@ export class ViabFluxoReceitas extends LitElement {
     const area = n(tip?.area_privativa_m2);
     const precoUnit = area * n(a.preco_m2);
     const precoTotal = precoUnit * n(a.unidades);
-    const saldo = this._saldo(a.tipologia_id, a.id);
-    // Opções: tipologias com saldo (todas as fases) + a atual (sempre presente).
+    // #107: saldo "antes desta linha" (balanço progressivo de cima para baixo).
+    const saldo = this._saldoAntes(a.id, a.tipologia_id);
+    // Opções: tipologias com saldo global > 0 + a atual (sempre inclusa).
     const opcoes = this.tipologias
       .filter((t) => Number(t.id) === Number(a.tipologia_id) || this._saldo(t.id) > 0)
       .map((t) => ({ valor: String(t.id), rotulo: t.nome || 'Sem nome' }));
@@ -468,6 +492,7 @@ export class ViabFluxoReceitas extends LitElement {
     const pct = (ev: string) => Number((blocos.find((b: any) => b?.evento === ev) || {}).pct) || 0;
     this.absForm = {
       correcao_estoque: Boolean(a.correcao_estoque),
+      pre_lancamento_pct: pct('pre_lancamento'),
       lancamento_pct: pct('lancamento'),
       obra_pct: pct('obra'),
     };
@@ -481,6 +506,7 @@ export class ViabFluxoReceitas extends LitElement {
       modo: 'distribuido',
       correcao_estoque: f.correcao_estoque,
       blocos: [
+        { evento: 'pre_lancamento', pct: n(f.pre_lancamento_pct) },
         { evento: 'lancamento', pct: n(f.lancamento_pct) },
         { evento: 'obra', pct: n(f.obra_pct) },
         { evento: 'pos_obra', pct: 0 }, // derivado no motor
@@ -493,18 +519,24 @@ export class ViabFluxoReceitas extends LitElement {
     const dis = !this.editavel;
     const faixas = faixasAbsorcao(this.crono);
     const posDerivado = pctPosObraDerivado(this._absorcaoJson().blocos);
+    // rot: formata o rótulo de período; retorna '—' para faixas vazias (fim < inicio).
     const rot = (fx?: { inicio: number; fim: number }) =>
-      fx ? rotuloPeriodo(this.dataInicio, fx.inicio, fx.fim - fx.inicio + 1) : '—';
+      fx && fx.fim >= fx.inicio ? rotuloPeriodo(this.dataInicio, fx.inicio, fx.fim - fx.inicio + 1) : '—';
     return html`
       <urbi-modal title="Absorção de vendas" maxWidth="820px" @urbi-modal:close=${() => this.modalAbs = null}>
-        <p class="sec">Distribuído em 3 períodos (o Pós-obra é calculado automaticamente). Os períodos vêm do Cronograma.</p>
+        <p class="sec">Distribuído em 4 períodos (o Pós-obra é calculado automaticamente). Os períodos vêm do Cronograma.</p>
         <div class="abs-grid">
           <div>
             <table class="abs">
               <thead><tr><th>Período</th><th>% Vendido</th></tr></thead>
               <tbody>
                 <tr>
-                  <td>Pré-lançamento + Lançamento<br /><span class="sec">${rot(faixas?.prelancamento)}</span></td>
+                  <td>Pré-lançamento<br /><span class="sec">${rot(faixas?.pre_lancamento)}</span></td>
+                  <td><viab-num sufixo="%" ?desabilitado=${dis} .valor=${f.pre_lancamento_pct}
+                    @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, pre_lancamento_pct: e.detail.valor ?? 0 }}></viab-num></td>
+                </tr>
+                <tr>
+                  <td>Lançamento<br /><span class="sec">${rot(faixas?.lancamento)}</span></td>
                   <td><viab-num sufixo="%" ?desabilitado=${dis} .valor=${f.lancamento_pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, lancamento_pct: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>

@@ -64,15 +64,28 @@ test('periodoAbsorcao vai do Pré-lançamento ao fim da Pós-obra', () => {
   assert.equal(periodoAbsorcao([{ evento: 'obra', inicio_mes: 0, duracao_meses: 12 }]), null);
 });
 
-test('faixasAbsorcao: período 1 = pré-lançamento+lançamento, período 2 = obra, período 3 = pós-obra', () => {
+test('faixasAbsorcao: 4 períodos separados (pré-lançamento, lançamento, obra, pós-obra)', () => {
   const f = faixasAbsorcao(CRONO)!;
-  assert.deepEqual(f.prelancamento, { inicio: 6, fim: 12 });  // pré (6) até fim do lançamento (12)
+  assert.deepEqual(f.pre_lancamento, { inicio: 6, fim: 11 });  // pré (6, dur 6) → fim = 11
+  assert.deepEqual(f.lancamento, { inicio: 12, fim: 12 });     // lançamento (12, dur 1)
   assert.deepEqual(f.obra, { inicio: 17, fim: 40 });
   assert.deepEqual(f.pos_obra, { inicio: 41, fim: 52 });
 });
 
-test('pctPosObraDerivado = 100 − pré+lançamento − obra', () => {
-  assert.equal(pctPosObraDerivado([{ evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 35 }]), 35);
+test('faixasAbsorcao sem pré-lançamento: faixa pre_lancamento vazia (fim < inicio)', () => {
+  const cronoSemPre: EventoCrono[] = [
+    { evento: 'lancamento', inicio_mes: 6, duracao_meses: 1 },
+    { evento: 'obra', inicio_mes: 12, duracao_meses: 24 },
+    { evento: 'pos_obra', inicio_mes: 36, duracao_meses: 12 },
+  ];
+  const f = faixasAbsorcao(cronoSemPre)!;
+  assert.ok(f.pre_lancamento.fim < f.pre_lancamento.inicio, 'faixa pré deve ser vazia');
+  assert.deepEqual(f.lancamento, { inicio: 6, fim: 6 });
+});
+
+test('pctPosObraDerivado = 100 − pré-lançamento − lançamento − obra', () => {
+  assert.equal(pctPosObraDerivado([{ evento: 'pre_lancamento', pct: 10 }, { evento: 'lancamento', pct: 20 }, { evento: 'obra', pct: 35 }]), 35);
+  assert.equal(pctPosObraDerivado([{ evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 35 }]), 35); // sem bloco pre (backward compat)
   assert.equal(pctPosObraDerivado([{ evento: 'lancamento', pct: 60 }, { evento: 'obra', pct: 60 }]), 0); // clamp em 0
 });
 
@@ -84,20 +97,22 @@ test('absorcaoMensal linear distribui 100% uniformemente pelo período', () => {
   assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 100));
 });
 
-test('absorcaoMensal distribuído espalha 3 períodos (pós-obra derivado)', () => {
+test('absorcaoMensal distribuído espalha 4 períodos (pós-obra derivado, #108)', () => {
   const abs = {
     modo: 'distribuido',
     blocos: [
-      { evento: 'lancamento', pct: 30 },  // período 1: pré-lançamento + lançamento
-      { evento: 'obra', pct: 35 },        // período 2
-      { evento: 'pos_obra', pct: 0 },     // período 3: derivado = 100 − 30 − 35 = 35
+      { evento: 'pre_lancamento', pct: 15 }, // período 1: pré-lançamento (meses 6..11, 6m)
+      { evento: 'lancamento', pct: 15 },      // período 2: lançamento (mês 12, 1m)
+      { evento: 'obra', pct: 35 },            // período 3
+      { evento: 'pos_obra', pct: 0 },         // período 4: derivado = 100 − 15 − 15 − 35 = 35
     ],
   };
   const r = absorcaoMensal(abs, CRONO)!;
   assert.equal(r.inicio, 6);
-  assert.ok(perto(r.pcts[6 - 6], 30 / 7));            // mês 6: período 1 espalhado por 7 meses (6..12)
-  assert.ok(perto(r.pcts[12 - 6], 30 / 7));           // mês 12 ainda no período 1
-  assert.ok(perto(r.pcts[14 - 6], 0));                // hiato entre período 1 e obra (mês 14)
+  assert.ok(perto(r.pcts[6 - 6], 15 / 6));            // mês 6: pré espalhado por 6 meses
+  assert.ok(perto(r.pcts[11 - 6], 15 / 6));           // mês 11: último mês do pré
+  assert.ok(perto(r.pcts[12 - 6], 15 / 1));           // mês 12: lançamento concentrado em 1 mês
+  assert.ok(perto(r.pcts[14 - 6], 0));                // hiato entre lançamento e obra
   assert.ok(perto(r.pcts[17 - 6], 35 / 24));          // 1º mês da obra
   assert.ok(perto(r.pcts[41 - 6], 35 / 12));          // 1º mês da pós-obra (derivado)
   assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 100));
