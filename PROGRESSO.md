@@ -339,6 +339,45 @@ Branch `claude/lote-8-issues-jp59cw`. Mudança **100% frontend** — sem schema/
 
 ## Rodada 3 — Sessões (2026-07-25) — `docs/sessoes-bugs-2026-07-25.md`
 
+### Sessão S5 — Empreendimento Cronograma: Regras e bug Gantt — ✅ IMPLEMENTADA (issues #84, #85, #86)
+Branch `claude/sessao-s5-rx8lrh` (PR #139). Mudança **100% frontend** (`frontend/tela-fluxo-cronograma.ts`) —
+sem schema/backend/migração; `versao` intacta. Sem pré-requisitos.
+
+- **#84 (Pré-lançamento derivado de Planejamento):** `pre_lancamento.inicio_mes` agora é sempre
+  travado na UI (flag forçado para `true` no frontend, independente do servidor). Ao salvar
+  `planejamento.inicio_mes`, o componente faz um segundo PATCH automático para `pre_lancamento` com
+  `inicio_mes = planejamento.inicio_mes + 1`. O array `crono` é atualizado com o retorno do segundo PATCH.
+- **#85 (Duração do Lançamento editável):** para o evento `lancamento`, `travadoDur` é forçado para
+  `false` no frontend — o campo passa a ser editável como as demais fases, removendo a trava que vinha
+  do flag do servidor.
+- **#86 (Estrela à esquerda da barra):** a estrela ⭐ era renderizada em `x + 4` (em cima do início
+  da barra). Corrigida para `x - 4` com `text-anchor="end"` — imediatamente à esquerda. Também
+  adicionado suporte à estrela no branch `rect` (duração > 1 mês), já que após #85 o Lançamento pode
+  ter qualquer duração.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde). Sem schema/backend → empacotamento não se aplica.
+  ⏳ Render real do Gantt e do cascade-save só valida no deploy dev.
+
+### Sessão S9 — Receitas: UI & Validação — ✅ IMPLEMENTADA (issues #103, #104, #105, #106)
+Branch `claude/sessao-s9-rs5ndx` (PR #143). Mudança **100% frontend** (`frontend/tela-fluxo-receitas.ts`) —
+sem schema/backend/motor/migração; `versao` intacta. Pré-requisito S5: concluído.
+
+- **#103 (coluna "Total"):** nova coluna `c-total` (68px) inserida entre Área privativa e Unidades na tabela
+  de alocações — exibe `tip.quantidade`, total de unidades registradas para a tipologia no catálogo
+  (Empreendimento → Tipologias). Header da coluna de VGV corrigido de "Preço total" para "VGV" (alinhado com S8).
+  `col.c-acao` reduzida de 92px para 56px para acomodar a nova coluna.
+- **#104 (botões de adicionar):** "Adicionar entrada" e "Adicionar parcelamento" trocados de
+  `variante="fantasma"` para `variante="secundario"` (botão real do design system UrbiVerso).
+- **#105 (regras de parcelamento):** botão "Adicionar parcelamento" some quando já há 4 linhas
+  (`f.parcelas.length >= 4`); badges de periodicidade ficam desabilitados para as periodicidades
+  já usadas em outra linha (sem duplicata por fase); `_addLinha('parcelas')` escolhe automaticamente
+  a primeira periodicidade livre; mínimo 1 garantido pelo guard pré-existente (`length > 1` para mostrar excluir).
+- **#106 (lixeira):** botão de exclusão de entrada e parcelamento: `fa-solid fa-xmark` / `variante="fantasma"`
+  → `fa-solid fa-trash` / `variante="perigo"`, alinhado ao padrão das lixeiras de fase e alocação.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓** (~266.7kb).
+  Sem schema/backend → empacotamento não se aplica. ⏳ Render real do modal de Fluxo de Pagamento
+  só valida no deploy dev.
+
 ### Sessão S3 — Preliminar Proforma: Bugs de exibição — ✅ IMPLEMENTADA (issues #77, #78)
 Branch `claude/sessao-s3-hcnifg` (PR #136). Mudança **100% frontend** (`frontend/tela-proforma.ts`) —
 sem schema/backend/motor/migração; `versao` intacta. Sem pré-requisitos.
@@ -360,25 +399,25 @@ sem schema/backend/motor/migração; `versao` intacta. Sem pré-requisitos.
   (`bash scripts/validar-frontend.sh` verde; bundle ~265.8kb). Sem schema/backend → empacotamento não se
   aplica. ⏳ Render real do alinhamento só valida no deploy dev.
 
-### Sessão S8 — Receitas: CSS, Layout & Texto — ✅ IMPLEMENTADA (issues #91–#102)
-Branch `claude/sessao-s8-cq2y5p` (PR #142). Mudança **100% frontend** (`frontend/tela-fluxo-receitas.ts`) —
-sem schema/backend/motor/migração; `versao` intacta. Sem pré-requisitos.
+### Sessão S10 — Saldo de unidades + Absorção 4 períodos — ✅ IMPLEMENTADA (issues #107, #108)
+Branch `claude/sessao-s10-fbqwwv`. Mudança **100% frontend** (`frontend/fluxo-shared.ts`,
+`frontend/tela-fluxo-receitas.ts`, testes) — sem schema/backend/migração; `versao` intacta.
+Pré-requisito: S5 (concluída).
 
-- **#91 (cor do botão Fluxo de Pagamento):** mudado de `variante="info"` (azul) para `variante="primario"` (roxo).
-- **#92 (cores das bolas de status):** pendente amarela → vermelha (`--cor-erro`); aplicado verde → azul (`--cor-info`).
-- **#93 (reduzir largura Tipologia):** `col.c-tipo` de `auto` → `120px`.
-- **#94 (aumentar largura Preço / m²):** `col.c-preco` de `110px` → `150px` (cabe 5 dígitos).
-- **#95 (remover R$ de Preço unitário/total):** substituído `fmtR$()` por `toLocaleString()` sem prefixo.
-- **#96 (Preço total → VGV):** título da coluna alterado na tabela de alocações.
-- **#97 (Adicionar Alocação → Adicionar tipologia):** texto do botão renomeado.
-- **#98 (texto Absorção → 4 períodos):** descritivo do modal atualizado para explicar os 4 períodos explicitamente.
-- **#99 (remover "(calculado)" Pós-obra):** sufixo removido do label na tabela de Absorção.
-- **#100 (reduzir campos % e parcelas):** labels abreviados ("% do total" → "%", "Nº parcelas" → "Parcelas").
-- **#101 (remover "(calculado)" Repasse + fórmula):** label "Repasse (calculado)" → "Repasse"; removida linha explicativa.
-- **#102 (Comissão → Corretagem):** label do checkbox renomeado no modal Fluxo de Pagamento.
-- **Validação:** frontend isolado — **typecheck ✓ · testes 77/77 ✓ · build (esbuild) ✓**
-  (`bash scripts/validar-frontend.sh` verde; bundle ~265.9kb). Sem schema/backend → empacotamento não se
-  aplica. ⏳ Render real dos campos/modais só valida no deploy dev.
+- **#107 (Saldo de unidades: cálculo de cima para baixo):** introduzido `_saldoAntes(alocId, tipologiaId)`
+  em `tela-fluxo-receitas.ts` — percorre `this.fases` em ordem e acumula unidades até encontrar a alocação
+  alvo, retornando `quantidade - usado_acima`. O `_saldo()` simples (total restante) permanece para o campo
+  readonly final. `_renderAlocacao` agora usa `_saldoAntes(a.id, a.tipologia_id)` para exibir o saldo
+  disponível no momento daquela alocação específica.
+- **#108 (Absorção: separar Pré-lançamento e Lançamento — 4 períodos):** `faixasAbsorcao` em
+  `fluxo-shared.ts` agora retorna 4 faixas separadas (`pre_lancamento`, `lancamento`, `obra`, `pos_obra`).
+  `pctPosObraDerivado` subtrai os 4 inputs. `absorcaoMensal` modo `distribuido` espalha cada período
+  separadamente; faixa vazia (fim < inicio) quando Pré-lançamento ausente do cronograma. Modal de absorção
+  em `tela-fluxo-receitas.ts` atualizado para 4 linhas/entradas. Backward-compat: bloco `pos_obra` com
+  `pct: 0` se torna derivado de `100 − pré − lanc − obra`.
+- **Testes:** `fluxo-shared.test.ts` e `fluxo-caixa-motor.test.ts` atualizados para o novo formato de 4 períodos.
+- **Validação:** frontend isolado — **typecheck ✓ · testes 78/78 ✓ · build (esbuild) ✓**
+  (`bash scripts/validar-frontend.sh` verde). Sem schema/backend → empacotamento não se aplica.
 
 ---
 

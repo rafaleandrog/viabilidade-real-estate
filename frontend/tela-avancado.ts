@@ -70,7 +70,7 @@ const SUBABAS: Partial<Record<AbaTopo, SubAba[]>> = {
   // correspondente em viab-fluxo-custos (tabela + consolidado próprio).
   obra: [
     { id: 'terreno',    label: 'Terreno',    icone: 'fa-solid fa-mountain-sun' },
-    { id: 'obra',       label: 'Obra',       icone: 'fa-solid fa-helmet-safety' },
+    { id: 'obra',       label: 'Obras',      icone: 'fa-solid fa-helmet-safety' },
     { id: 'diretos',    label: 'Diretos',    icone: 'fa-solid fa-truck-ramp-box' },
     { id: 'indireto',   label: 'Indiretos',  icone: 'fa-solid fa-briefcase' },
     { id: 'financeiro', label: 'Financeiro', icone: 'fa-solid fa-building-columns' },

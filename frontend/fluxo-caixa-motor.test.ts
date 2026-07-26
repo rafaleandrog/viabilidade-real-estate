@@ -44,24 +44,26 @@ test('curva S de 12 meses reamostrada para 24 mantém soma e formato', () => {
   assert.ok(perto(soma(r), 500_000));
 });
 
-// 3. Absorção distribuída (3 períodos) aplicada às vendas de uma linha
-test('absorção distribuída: vendas caem nos 3 períodos e somam o VGV', () => {
+// 3. Absorção distribuída (4 períodos) aplicada às vendas de uma linha (#108)
+test('absorção distribuída: vendas caem nos 4 períodos e somam o VGV', () => {
   const linha = {
     tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }], // VGV 50M
     absorcao: {
       modo: 'distribuido',
       blocos: [
-        { evento: 'lancamento', pct: 30 },  // período 1 = pré-lançamento + lançamento (meses 6..12)
-        { evento: 'obra', pct: 35 },        // período 2 = obra (meses 17..40)
-        { evento: 'pos_obra', pct: 0 },     // período 3 = derivado = 35% (meses 41..52)
+        { evento: 'pre_lancamento', pct: 20 }, // período 1 = pré-lançamento (meses 6..11, 6m)
+        { evento: 'lancamento', pct: 10 },     // período 2 = lançamento (mês 12, 1m)
+        { evento: 'obra', pct: 35 },           // período 3 = obra (meses 17..40, 24m)
+        { evento: 'pos_obra', pct: 0 },        // período 4 = derivado = 35% (meses 41..52)
       ],
     },
     fluxo_pagamento: null, // sem config → recebe à vista no mês da venda
   };
   const r = receitaMensalLinha(linha, CRONO, 60);
   assert.ok(perto(soma(r), 50_000_000, 1));
-  assert.ok(perto(r[6], (0.30 * 50_000_000) / 7, 1));   // período 1 espalhado por 7 meses (6..12)
-  assert.ok(perto(r[14], 0, 1));                        // hiato entre período 1 e obra (mês 14)
+  assert.ok(perto(r[6], (0.20 * 50_000_000) / 6, 1));   // pré-lançamento: 20% / 6 meses
+  assert.ok(perto(r[12], (0.10 * 50_000_000) / 1, 1));  // lançamento: 10% em 1 mês
+  assert.ok(perto(r[14], 0, 1));                         // hiato entre lançamento e obra
   assert.ok(perto(r[17], (0.35 * 50_000_000) / 24, 1)); // 1º mês da obra (mês 17)
   assert.ok(perto(r[41], (0.35 * 50_000_000) / 12, 1)); // 1º mês da pós-obra (derivado)
 });
