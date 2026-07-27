@@ -19,24 +19,56 @@ App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell U
 
 ---
 
-## Estado do backlog — todas as rodadas concluídas
+## Estado do backlog — Rodada 4 ATIVA
 
-As três rodadas de bugs/melhorias planejadas terminaram. **Não há issue aberta.** Os documentos
-abaixo são **histórico**, não backlog ativo — nenhum deles dispara trabalho:
+🔴 **Backlog ativo: Rodada 4** — `docs/rodada-4-planilha-2026-07-27.md` é o **mapa mestre**.
+**35 issues abertas** (#165–#169 + #172–#201). **Uma issue por sessão** — não há lote, etapa nem
+agrupamento. Disparo:
+
+```
+Resolva a issue #NNN
+```
+
+Antes de escrever código, a sessão **lê a linha da issue no mapa mestre** e confere os
+**pré-requisitos**: issue listada em `Pré-req.` precisa estar **mergeada na `main`**, não só com PR
+aberto. Faltando alguma → parar e avisar, nunca implementar por cima de dependência ausente.
 
 | Rodada | Escopo | Documento | Estado |
 |--------|--------|-----------|--------|
-| 1 — Lotes 1–8 | issues #9–#24 | `docs/lotes-bugs-2026-07-20.md` | ✅ concluída |
-| 2 — Etapas 1–8 | issues #33–#56 | `docs/etapas-bugs-2026-07-22.md` | ✅ concluída |
-| 3 — Sessões S1–S20 | issues #71–#132 | `docs/sessoes-bugs-2026-07-25.md` | ✅ concluída |
+| 1 — Lotes 1–8 | issues #9–#24 | `docs/lotes-bugs-2026-07-20.md` | ✅ concluída (histórico) |
+| 2 — Etapas 1–8 | issues #33–#56 | `docs/etapas-bugs-2026-07-22.md` | ✅ concluída (histórico) |
+| 3 — Sessões S1–S20 | issues #71–#132 | `docs/sessoes-bugs-2026-07-25.md` | ✅ concluída (histórico) |
+| **4 — Sessões R4-S1–S14** | **#165–#169 + #172–#201** | **`docs/rodada-4-planilha-2026-07-27.md`** | 🔴 **ativa** |
 
-Os disparos antigos (`Prossiga para os issues do lote X`, `Siga para a Etapa X`, `Siga para a
-Sessão SX`) **estão aposentados** — não há mais lote, etapa ou sessão a executar. Trabalho novo
-nasce de issue nova ou de pedido direto do autor, na branch própria (`fix/…`, `feat/…`,
-`claude/…`) a partir da `main` atualizada, com PR contra a `main`.
+As rodadas 1–3 são **histórico** e não disparam trabalho; os disparos antigos (`Prossiga para os
+issues do lote X`, `Siga para a Etapa X`, `Siga para a Sessão SX`) **estão aposentados**.
 
-> **Merge é sempre decisão do autor**, salvo autorização explícita naquela conversa — e a
-> autorização vale só para aquele pedido, não persiste.
+> ⚠️ **#165–#169 estavam abertas há uma rodada sem ninguém perceber.** A sessão do PR #171 abriu
+> seis issues a partir da planilha `lista_bugs.xlsx` e implementou **só a #170**; este `CLAUDE.md`
+> continuou dizendo "não há issue aberta" e a informação se perdeu até a auditoria de 2026-07-27.
+> Junto com o PR #142 (diff vazio fechando 12 issues), a lição completa é: **"fechou a issue" não é
+> evidência de entrega — nem "abriu a issue" é evidência de que alguém vai pegá-la. O diff é.**
+> Quem encerrar uma rodada atualiza esta seção **na mesma alteração**.
+
+Trabalho fora da Rodada 4 nasce de issue nova ou de pedido direto do autor, na branch própria
+(`fix/…`, `feat/…`, `claude/…`) a partir da `main` atualizada, com PR contra a `main`.
+
+### Merge
+
+> **Merge é sempre decisão do autor**, salvo autorização explícita — em geral valendo só para
+> aquele pedido, sem persistir.
+
+**Exceção permanente e delimitada — portões da Rodada 4.** O autor autorizou (2026-07-27) que a
+sessão **mergeie sozinha** o PR de issue marcada como **portão** (`Portão? = SIM` no mapa mestre) —
+são 16 das 35, aquelas cujo código outras issues precisam ter na `main` para poderem ser
+implementadas. Um portão parado trava a fila inteira atrás dele, e por isso ele não espera revisão.
+
+Condições, **todas** obrigatórias: `scripts/validar-frontend.sh` verde · pré-requisitos já na
+`main` · o PR fecha **uma** issue e tem diff **não vazio** · migração numerada contra a `main` do
+momento, com a `versao` bumpada. Falhou qualquer uma → não mergeia, avisa o autor e explica.
+
+As outras 19 issues **não são portão**: a sessão abre o PR e para. Fora da Rodada 4, nada muda —
+merge continua sendo do autor.
 
 ---
 

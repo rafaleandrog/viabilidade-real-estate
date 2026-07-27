@@ -4,6 +4,104 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 4 — planejamento e abertura das issues (2026-07-27)
+
+Branch `claude/viability-issues-planning-678j2c`. **Sessão de planejamento — zero código.** Saída:
+`docs/rodada-4-planilha-2026-07-27.md` (mapa mestre), atualização do `CLAUDE.md` e **30 issues
+novas** (#172–#201) a partir da planilha `lista_bugs.xlsx` enviada pelo autor.
+
+### O achado: a premissa de que "os itens até o #7 já estavam implementados" era falsa
+
+O autor pediu, junto com o planejamento, a verificação dos itens 1–7 da planilha. Conferido contra
+o HEAD `7c9d59f`: das seis issues abertas a partir dessa mesma planilha na sessão anterior
+(PR #171), **só a #170 foi implementada**. As outras cinco — #165, #166, #167, #168, #169 —
+seguiam abertas, com diagnóstico pronto e **nenhuma linha de código**.
+
+O caso mais incômodo é a **#166** (item 2, duração do Lançamento): está numa **meia-implementação
+quebrada**. O frontend liberou o campo (`tela-fluxo-cronograma.ts:169-170`), mas
+`recalcularTravados` ainda força `duracao_meses = 1` (`avancado.ts:56-61`) e o PATCH devolve **422
+CAMPO_TRAVADO** (`:377-378`). O usuário digita, toma erro e o valor volta — pior do que se o campo
+estivesse visivelmente travado. Os testes de backend ainda **afirmam a trava**
+(`avancado.test.ts:26-27,41`) e vão falhar quando a issue for corrigida; é o esperado.
+
+O `CLAUDE.md` agravou o problema: continuava afirmando **"Não há issue aberta"** desde o
+encerramento da rodada 3, mesmo com as #165–#169 abertas. Corrigido nesta sessão, com a lição
+registrada lá: *"fechou a issue" não é evidência de entrega — nem "abriu a issue" é evidência de
+que alguém vai pegá-la. O diff é.*
+
+### Escopo que a tabela `bugs` não mostrava
+
+A planilha tem 28 itens na aba `bugs` (`Item` 1–4 e 6–29 — **o 5 não existe**, a numeração pula),
+mas **três abas de referência carregam pedidos sem linha na tabela principal**: `View cronograma`
+(stepper com o mês inline), `Referência para Tabelas` (linha de totais destacada) e
+`Análise de Mercado` (tela nova alimentada por IA). Viraram #197, #198 e #199–#201 — sem issue
+própria eles se perderiam, que foi exatamente como a #91 sumiu na rodada 3.
+
+### Três causas raiz que atravessam a rodada
+
+1. **O Resumo morreu junto com a aba Premissas** (#182, #183, #184). `tela-resumo.ts:105` chama
+   `calcularProforma({ ...this.estudo })`, que só lê colunas estáticas de `estudos`. O commit
+   `301396a` (#88) removeu a aba Premissas do Avançado e deixou o consumidor para trás — o próprio
+   `tela-avancado.ts:63-70` documenta isso. Num estudo Avançado esses campos são `NULL` → VGV,
+   Resultado, Margem, ROI, medidores e as 12 fatias da pizza, tudo zero. Os dados certos
+   (`c.vgvTotal`, `resultadoDe(c)`, `c.linhasCusto`) **já estão carregados no componente e não são
+   usados**.
+2. **A duplicação de linhas de custo tem três causas somadas** (#178, #179): conflito entre a
+   `migracoes/002_grupos_custo.js` (que moveu `Gestão da obra` para `diretos`) e
+   `LINHAS_OBRIGATORIAS.obra` (que continua exigindo a linha em `obra`); ausência de `unicos` no
+   `schema.json` e de guarda no backend, com POST fire-and-forget a cada carga; e `eObrigatoria`
+   casando por categoria em vez de identidade, o que deixa **as duas** cópias travadas e sem botão
+   de remover — a duplicata nasce indeletável.
+3. **VGV tem duas definições no app.** O motor do Avançado **não** desconta permuta física
+   (`fluxo-caixa-motor.ts:10-12`; `unidades_permutadas` nunca chega ao motor), a Proforma do
+   Preliminar desconta (`proforma.ts:119-145`). Por isso a #188 (linhas `VGV Total` /
+   `VGV Permuta Física` / `Receita Bruta`) vem **antes** de #189, #182 e #195 no sequenciamento.
+
+### Decisões do autor registradas
+
+- **#185 (item 16):** migrar o gráfico de Cenários para `urbi-grafico-linha`. ⚠️ Trade-off aceito e
+  escrito na issue: **perde a linha tracejada** (que o texto do item pede) **e os marcos rotulados**
+  da imagem de referência — `SerieGrafico` declara só `{ rotulo, valores, cor }` e nenhum gráfico do
+  `ui/src` tem `dasharray` ou anotação. Alternativa conhecida: estender o primitivo no monorepo.
+- **#190/#191 (itens 23/24):** o **motor muda** — nº de parcelas fixo, ancorado no cronograma da
+  obra. **Estudos existentes mudam de números.**
+- **#192 (item 22):** só a linha `Projetado`; Realizado/Desvio/Forecast fora de escopo (o app não
+  tem nenhum conceito de custo realizado).
+- **#199–#201 (E3):** Análise de Mercado com IA **entra na rodada**, como sessão R4-S14.
+
+### Sequenciamento — **uma issue por sessão**
+
+O autor pediu (na mesma conversa) que o roteiro fosse **individual, não por etapas ou
+agrupamentos**: ele abre uma sessão por issue. O mapa mestre foi reescrito nesse formato —
+disparo `Resolva a issue #NNN`, com um catálogo de uma linha por issue trazendo pré-requisitos,
+portão de merge, arquivo quente e bump de versão.
+
+**A decisão de merge virou regra automática.** Issue cujo código outras precisam ter na `main` para
+poderem ser implementadas é **portão**: a sessão mergeia o PR sozinha depois da validação verde.
+São **16 dos 35**: #165 #166 #168 #173 #174 #175 #178 #180 #182 #188 #190 #193 #194 #198 #199 #200.
+As outras 19 param no PR aberto, e o merge é do autor. Autorização registrada no `CLAUDE.md` como
+exceção **delimitada à Rodada 4** — a regra geral ("merge é decisão do autor") continua valendo
+fora dela.
+
+**Correção do grafo na reverificação:** o planejamento inicial punha as issues de parcelas
+(#190, #191) como dependentes das de Cronograma. **Não dependem** — elas usam a duração do evento
+`obra`, e `recalcularTravados` (`backend/rotas/avancado.ts:50-69`) só deriva `lancamento` de
+`pre_lancamento` e `pos_obra` de `obra`, sem tocar em `obra`. Podem ser feitas a qualquer momento.
+
+O agrupamento por sessão (`R4-S1`…`R4-S14`) foi **descartado** — não sobreviveu ao pedido do autor
+nem à reverificação: ele criava dependências falsas (como a acima) e escondia as reais dentro de
+uma mesma sessão.
+
+### Validação
+
+`bash scripts/validar-frontend.sh` **verde** (a sessão não tocou código — só `docs/`, `CLAUDE.md` e
+este arquivo). As 30 issues conferidas por `list_issues` após a criação. Seis issues receberam
+comentário de correção de referência cruzada (#178, #179, #180, #182, #183, #188), porque citavam
+números que ainda não existiam no momento da abertura e apontavam para issues antigas das rodadas
+1–3. As #165–#170 receberam comentário ligando-as à Rodada 4.
+
+---
+
 ## #170 — saldo de tipologias cascateando pelas Fases da Receita (2026-07-26)
 
 Branch `claude/viabilidade-issues-receita-xbdqy4`. **100% frontend** — sem backend, sem schema,
