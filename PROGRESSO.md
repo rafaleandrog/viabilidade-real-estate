@@ -69,10 +69,28 @@ própria eles se perderiam, que foi exatamente como a #91 sumiu na rodada 3.
   tem nenhum conceito de custo realizado).
 - **#199–#201 (E3):** Análise de Mercado com IA **entra na rodada**, como sessão R4-S14.
 
-### Sequenciamento
+### Sequenciamento — **uma issue por sessão**
 
-14 sessões (`R4-S1`…`R4-S14`), disparo `Siga para a Sessão R4-SX`. Caminho crítico: S7 destrava S8
-e S11; S2 destrava S5, que destrava S6. **Bumpam `versao`**: S3, S5, S6, S11, S14.
+O autor pediu (na mesma conversa) que o roteiro fosse **individual, não por etapas ou
+agrupamentos**: ele abre uma sessão por issue. O mapa mestre foi reescrito nesse formato —
+disparo `Resolva a issue #NNN`, com um catálogo de uma linha por issue trazendo pré-requisitos,
+portão de merge, arquivo quente e bump de versão.
+
+**A decisão de merge virou regra automática.** Issue cujo código outras precisam ter na `main` para
+poderem ser implementadas é **portão**: a sessão mergeia o PR sozinha depois da validação verde.
+São **16 dos 35**: #165 #166 #168 #173 #174 #175 #178 #180 #182 #188 #190 #193 #194 #198 #199 #200.
+As outras 19 param no PR aberto, e o merge é do autor. Autorização registrada no `CLAUDE.md` como
+exceção **delimitada à Rodada 4** — a regra geral ("merge é decisão do autor") continua valendo
+fora dela.
+
+**Correção do grafo na reverificação:** o planejamento inicial punha as issues de parcelas
+(#190, #191) como dependentes das de Cronograma. **Não dependem** — elas usam a duração do evento
+`obra`, e `recalcularTravados` (`backend/rotas/avancado.ts:50-69`) só deriva `lancamento` de
+`pre_lancamento` e `pos_obra` de `obra`, sem tocar em `obra`. Podem ser feitas a qualquer momento.
+
+O agrupamento por sessão (`R4-S1`…`R4-S14`) foi **descartado** — não sobreviveu ao pedido do autor
+nem à reverificação: ele criava dependências falsas (como a acima) e escondia as reais dentro de
+uma mesma sessão.
 
 ### Validação
 

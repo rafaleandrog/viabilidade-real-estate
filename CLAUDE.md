@@ -22,11 +22,16 @@ App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell U
 ## Estado do backlog — Rodada 4 ATIVA
 
 🔴 **Backlog ativo: Rodada 4** — `docs/rodada-4-planilha-2026-07-27.md` é o **mapa mestre**.
-**35 issues abertas** (#165–#169 + #172–#201), organizadas em **14 sessões**. Disparo:
+**35 issues abertas** (#165–#169 + #172–#201). **Uma issue por sessão** — não há lote, etapa nem
+agrupamento. Disparo:
 
 ```
-Siga para a Sessão R4-SX
+Resolva a issue #NNN
 ```
+
+Antes de escrever código, a sessão **lê a linha da issue no mapa mestre** e confere os
+**pré-requisitos**: issue listada em `Pré-req.` precisa estar **mergeada na `main`**, não só com PR
+aberto. Faltando alguma → parar e avisar, nunca implementar por cima de dependência ausente.
 
 | Rodada | Escopo | Documento | Estado |
 |--------|--------|-----------|--------|
@@ -48,8 +53,22 @@ issues do lote X`, `Siga para a Etapa X`, `Siga para a Sessão SX`) **estão apo
 Trabalho fora da Rodada 4 nasce de issue nova ou de pedido direto do autor, na branch própria
 (`fix/…`, `feat/…`, `claude/…`) a partir da `main` atualizada, com PR contra a `main`.
 
-> **Merge é sempre decisão do autor**, salvo autorização explícita naquela conversa — e a
-> autorização vale só para aquele pedido, não persiste.
+### Merge
+
+> **Merge é sempre decisão do autor**, salvo autorização explícita — em geral valendo só para
+> aquele pedido, sem persistir.
+
+**Exceção permanente e delimitada — portões da Rodada 4.** O autor autorizou (2026-07-27) que a
+sessão **mergeie sozinha** o PR de issue marcada como **portão** (`Portão? = SIM` no mapa mestre) —
+são 16 das 35, aquelas cujo código outras issues precisam ter na `main` para poderem ser
+implementadas. Um portão parado trava a fila inteira atrás dele, e por isso ele não espera revisão.
+
+Condições, **todas** obrigatórias: `scripts/validar-frontend.sh` verde · pré-requisitos já na
+`main` · o PR fecha **uma** issue e tem diff **não vazio** · migração numerada contra a `main` do
+momento, com a `versao` bumpada. Falhou qualquer uma → não mergeia, avisa o autor e explica.
+
+As outras 19 issues **não são portão**: a sessão abre o PR e para. Fora da Rodada 4, nada muda —
+merge continua sendo do autor.
 
 ---
 
