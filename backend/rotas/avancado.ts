@@ -33,8 +33,8 @@ export interface LinhaCronograma {
 export function cronogramaPadrao(): LinhaCronograma[] {
   const base: LinhaCronograma[] = [
     { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6, travado_inicio: false, travado_duracao: false },
-    { evento: 'pre_lancamento', inicio_mes: 6, duracao_meses: 6, travado_inicio: false, travado_duracao: false },
-    { evento: 'lancamento', inicio_mes: 12, duracao_meses: 1, travado_inicio: true, travado_duracao: true },
+    { evento: 'pre_lancamento', inicio_mes: 6, duracao_meses: 6, travado_inicio: true, travado_duracao: false },
+    { evento: 'lancamento', inicio_mes: 12, duracao_meses: 1, travado_inicio: true, travado_duracao: false },
     { evento: 'obra', inicio_mes: 17, duracao_meses: 24, travado_inicio: false, travado_duracao: false },
     { evento: 'pos_obra', inicio_mes: 41, duracao_meses: 12, travado_inicio: true, travado_duracao: false },
   ];
@@ -43,24 +43,30 @@ export function cronogramaPadrao(): LinhaCronograma[] {
 
 /**
  * Recalcula os campos travados do cronograma:
- *  - Lançamento: início = fim do Pré-lançamento + 1; duração = 1 (ambos travados)
- *  - Pós-obra:   início = fim da Obra + 1 (travado; duração livre)
+ *  - Pré-lançamento: início = fim do Planejamento (travado — #165)
+ *  - Lançamento:     início = fim do Pré-lançamento (travado); duração LIVRE (#166 —
+ *                     antes fixa em 1 mês, o usuário já podia editá-la na tela e
+ *                     tomava 422 do backend, que ainda forçava o valor)
+ *  - Pós-obra:       início = fim da Obra (travado; duração livre)
  * Retorna um novo array (não muta o de entrada).
  */
 export function recalcularTravados(eventos: LinhaCronograma[]): LinhaCronograma[] {
   const porEvento = new Map(eventos.map((e) => [e.evento, { ...e }]));
+  const plan = porEvento.get('planejamento');
   const pre = porEvento.get('pre_lancamento');
   const lanc = porEvento.get('lancamento');
   const obra = porEvento.get('obra');
   const pos = porEvento.get('pos_obra');
+  if (plan && pre) {
+    pre.inicio_mes = plan.inicio_mes + plan.duracao_meses; // fim do planejamento
+    pre.travado_inicio = true;
+  }
   if (pre && lanc) {
-    lanc.inicio_mes = pre.inicio_mes + pre.duracao_meses; // fim do pré + 1
-    lanc.duracao_meses = 1;
+    lanc.inicio_mes = pre.inicio_mes + pre.duracao_meses; // fim do pré-lançamento
     lanc.travado_inicio = true;
-    lanc.travado_duracao = true;
   }
   if (obra && pos) {
-    pos.inicio_mes = obra.inicio_mes + obra.duracao_meses; // fim da obra + 1
+    pos.inicio_mes = obra.inicio_mes + obra.duracao_meses; // fim da obra
     pos.travado_inicio = true;
   }
   return EVENTOS_CRONOGRAMA
@@ -408,7 +414,7 @@ rotasAvancado.patch('/estudos/:id/avancado/cronograma/:evento', async (req: Requ
       alvo.inicio_mes = v;
     }
     if (req.body.duracao_meses !== undefined) {
-      if (alvo.travado_duracao) { erro(res, 422, 'CAMPO_TRAVADO', `A duração de ${evento} é fixa (1 mês)`); return; }
+      if (alvo.travado_duracao) { erro(res, 422, 'CAMPO_TRAVADO', `A duração de ${evento} é calculada automaticamente`); return; }
       const v = Number(req.body.duracao_meses);
       if (!Number.isInteger(v) || v < 1) { erro(res, 400, 'DURACAO_INVALIDA', 'duracao_meses deve ser inteiro ≥ 1'); return; }
       alvo.duracao_meses = v;

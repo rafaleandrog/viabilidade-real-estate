@@ -18,27 +18,46 @@ import {
 test('cronograma padrão tem os 5 eventos com travados coerentes', () => {
   const c = cronogramaPadrao();
   assert.equal(c.length, 5);
-  const lanc = c.find((e) => e.evento === 'lancamento')!;
+  const plan = c.find((e) => e.evento === 'planejamento')!;
   const pre = c.find((e) => e.evento === 'pre_lancamento')!;
+  const lanc = c.find((e) => e.evento === 'lancamento')!;
   const obra = c.find((e) => e.evento === 'obra')!;
   const pos = c.find((e) => e.evento === 'pos_obra')!;
-  assert.equal(lanc.inicio_mes, pre.inicio_mes + pre.duracao_meses); // fim do pré + 1
-  assert.equal(lanc.duracao_meses, 1);
-  assert.ok(lanc.travado_inicio && lanc.travado_duracao);
-  assert.equal(pos.inicio_mes, obra.inicio_mes + obra.duracao_meses); // fim da obra + 1
+  // #165: início do pré-lançamento é derivado do fim do Planejamento.
+  assert.equal(pre.inicio_mes, plan.inicio_mes + plan.duracao_meses);
+  assert.ok(pre.travado_inicio);
+  assert.equal(lanc.inicio_mes, pre.inicio_mes + pre.duracao_meses); // fim do pré
+  assert.ok(lanc.travado_inicio);
+  // #166: duração do lançamento é livre (antes fixa em 1 mês).
+  assert.ok(!lanc.travado_duracao);
+  assert.equal(pos.inicio_mes, obra.inicio_mes + obra.duracao_meses); // fim da obra
   assert.ok(pos.travado_inicio);
   assert.ok(!pos.travado_duracao); // duração da pós-obra é livre
 });
 
-test('recalcularTravados propaga mudança do pré-lançamento para o lançamento', () => {
+test('recalcularTravados propaga mudança do planejamento para o pré-lançamento e o lançamento (#165)', () => {
+  const c = cronogramaPadrao();
+  const plan = c.find((e) => e.evento === 'planejamento')!;
+  plan.duracao_meses = 9;
+  const rec = recalcularTravados(c);
+  const pre = rec.find((e) => e.evento === 'pre_lancamento')!;
+  const lanc = rec.find((e) => e.evento === 'lancamento')!;
+  assert.equal(pre.inicio_mes, plan.inicio_mes + 9);
+  assert.equal(lanc.inicio_mes, pre.inicio_mes + pre.duracao_meses);
+});
+
+test('recalcularTravados propaga a duração do pré-lançamento para o lançamento e preserva a duração editável dele (#166)', () => {
   const c = cronogramaPadrao();
   const pre = c.find((e) => e.evento === 'pre_lancamento')!;
-  pre.inicio_mes = 10;
-  pre.duracao_meses = 8;
+  const lanc = c.find((e) => e.evento === 'lancamento')!;
+  pre.duracao_meses = 8; // início do pré continua derivado do Planejamento
+  lanc.duracao_meses = 3; // usuário editou a duração do lançamento
   const rec = recalcularTravados(c);
-  const lanc = rec.find((e) => e.evento === 'lancamento')!;
-  assert.equal(lanc.inicio_mes, 18);
-  assert.equal(lanc.duracao_meses, 1);
+  const preRec = rec.find((e) => e.evento === 'pre_lancamento')!;
+  const lancRec = rec.find((e) => e.evento === 'lancamento')!;
+  assert.equal(preRec.inicio_mes, 6); // planejamento (0 + 6) — inalterado
+  assert.equal(lancRec.inicio_mes, preRec.inicio_mes + 8);
+  assert.equal(lancRec.duracao_meses, 3); // preservada, não forçada para 1
 });
 
 test('recalcularTravados propaga mudança da obra para a pós-obra sem tocar na duração', () => {

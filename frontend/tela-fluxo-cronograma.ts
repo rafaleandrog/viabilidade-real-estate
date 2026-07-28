@@ -167,10 +167,14 @@ export class ViabFluxoCronograma extends LitElement {
   }
 
   private _linhaEvento(ev: any, dataInicio: string | null, dis: boolean): TemplateResult {
-    // #84 — pre_lancamento.inicio é sempre derivado (planejamento.inicio + 1)
-    const travadoIni = ev.evento === 'pre_lancamento' ? true : Boolean(ev.travado_inicio);
-    // #85 — lancamento.duracao agora é editável pelo usuário
-    const travadoDur = ev.evento === 'lancamento' ? false : Boolean(ev.travado_duracao);
+    // #165/#166: os overrides por nome de evento que existiam aqui (pre_lancamento
+    // sempre travado, lancamento sempre destravado) tratavam só o SINTOMA — o
+    // backend (recalcularTravados, avancado.ts) é quem decide travado_inicio/
+    // travado_duracao de verdade, e agora já deriva pre_lancamento.inicio_mes do
+    // fim do Planejamento (#165) e não força mais lancamento.duracao_meses = 1
+    // (#166). Confiar direto nas flags evita o desalinho que gerava 422 ao editar.
+    const travadoIni = Boolean(ev.travado_inicio);
+    const travadoDur = Boolean(ev.travado_duracao);
     const cor = EVENTO_COR[ev.evento] || 'var(--cor-texto-sec)';
     return html`
       <tr style="border-left: 3px solid ${cor}">
@@ -283,12 +287,12 @@ export class ViabFluxoCronograma extends LitElement {
       if (res.custos_reancorados > 0) {
         urbiVerso.notificar(`${res.custos_reancorados} linha(s) de custo reancorada(s) ao novo cronograma.`, 'info');
       }
-      // #84 — ao mover o início do Planejamento, reancora automaticamente o Pré-lançamento
-      if (evento === 'planejamento' && 'inicio_mes' in dados) {
-        const novoPreLanc = Number(dados.inicio_mes) + 1;
-        const resPreLanc = await atualizarEventoCronograma(this.estudo.id, 'pre_lancamento', { inicio_mes: novoPreLanc });
-        if (!resPreLanc?.erro) this.crono = resPreLanc.dados || this.crono;
-      }
+      // #165: pre_lancamento.inicio_mes (e, em cadeia, lancamento/pos_obra) já
+      // vem recalculado em `res.dados` — o backend (recalcularTravados) deriva
+      // do fim do Planejamento a cada PATCH. O reancoramento manual que existia
+      // aqui fazia `inicio_mes + 1` (ignorando duracao_meses) e ficou redundante
+      // — travado_inicio de pre_lancamento agora é sempre true, então essa
+      // chamada extra passaria a tomar 422 CAMPO_TRAVADO.
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar o cronograma', 'erro');
       this._carregarCronograma();
