@@ -219,8 +219,8 @@ export class ViabEmpreendimentoTipologias extends LitElement {
         </td>
         ${dis ? nothing : html`
           <td class="num">
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
-              @click=${() => { this.confirmRemover = t; }}>Remover</urbi-botao>
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+              @click=${() => { this.confirmRemover = t; }}></urbi-botao>
           </td>`}
       </tr>
     `;

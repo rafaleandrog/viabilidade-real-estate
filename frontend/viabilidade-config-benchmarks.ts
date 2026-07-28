@@ -199,8 +199,8 @@ export class ViabConfigBenchmarks extends LitElement {
     if (!ro) {
       colunas.push({
         id: 'acoes', label: '',
-        render: (b: any) => html`<urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
-          @click=${() => this.removerId = b.id}>Remover</urbi-botao>`,
+        render: (b: any) => html`<urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+          @click=${() => this.removerId = b.id}></urbi-botao>`,
       });
     }
     return colunas;

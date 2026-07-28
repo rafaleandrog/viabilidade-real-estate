@@ -152,7 +152,7 @@ export class ViabTelaDashboard extends LitElement {
               title="Duplicar">Duplicar</urbi-botao>
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
               @click=${(ev: Event) => { ev.stopPropagation(); this.removerAlvo = l; }}
-              title="Remover">Remover</urbi-botao>
+              title="Remover"></urbi-botao>
           </div>`,
       },
     ];

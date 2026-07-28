@@ -358,8 +358,8 @@ export class ViabTelaCenarios extends LitElement {
         <td>${calc.paybackData ?? '—'}</td>
         <td class="neg">${fmtR$(calc.exposicaoMaxima)}${this._badgeVar(calc.exposicaoMaxima, base.exposicaoMaxima)}</td>
         <td>
-          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
-            @click=${() => this.removerId = Number(c.id)}>Remover</urbi-botao>
+          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+            @click=${() => this.removerId = Number(c.id)}></urbi-botao>
         </td>
       </tr>
     `;

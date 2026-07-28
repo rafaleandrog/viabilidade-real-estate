@@ -40,7 +40,10 @@ export const estiloFluxoTabela = css`
      card de KPI. urbi-kpi nao expoe slot nem prop de variacao (so rotulo/valor/
      variante), entao a celula do grid e quem ancora o indicador — sem tocar no
      primitivo e sem exigir bump de shell_min. */
-  .fx-kpis .kpi-cel { position: relative; }
+  /* #176: min-width:0 no item do grid (default é min-width:auto, que segue o
+     min-content do valor — R$ com muitos dígitos empurra o card por cima do
+     vizinho). width:100% no urbi-kpi interno preenche o espaço liberado. */
+  .fx-kpis .kpi-cel { position: relative; min-width: 0; }
   .fx-kpis .kpi-cel urbi-kpi { width: 100%; }
   .kpi-var {
     position: absolute; top: 12px; right: 14px; z-index: 1;

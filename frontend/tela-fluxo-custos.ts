@@ -279,10 +279,12 @@ export class ViabFluxoCustos extends LitElement {
     .orc-badges urbi-badge { cursor: pointer; }
     .orc-badges .cu-badge-dis { cursor: default; opacity: 0.6; }
     .orc viab-num { width: 110px; }
-    .campo-mes { width: 80px; }
     .res-calc { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: 0.85rem; }
     .mes-calc { white-space: nowrap; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
-    .campo-mes { display: inline-flex; align-items: center; gap: 4px; width: 80px; }
+    /* #174: 80px cortava o número + sufixo ("º mês"/"meses") do viab-num, que
+       fica DENTRO do span junto com o emoji — duas regras conflitantes
+       existiam para .campo-mes (80px nas duas), unificadas aqui. */
+    .campo-mes { display: inline-flex; align-items: center; gap: 4px; width: 140px; }
     .campo-mes viab-num { width: 100%; }
     /* #194: modo de distribuição do Preço do Terreno + curva (só em "Fixo"), empilhados. */
     .dist-preco { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
@@ -447,12 +449,10 @@ export class ViabFluxoCustos extends LitElement {
       },
       {
         id: 'resultado', label: 'Resultado',
-        render: (c: any) => {
-          const modo = c.orcamento_unidade || 'rs';
-          if (modo === 'rs') return html`<span class="sec">—</span>`;
-          const ctx = this._ctx();
-          return html`<span class="res-calc">${fmtR$(resolverCustoTotal(c, ctx))}</span>`;
-        },
+        // #175: sempre mostra o total resolvido em R$ — em `rs` é o próprio
+        // orcamento_valor (sem conversão), mas ainda é o número que entra no
+        // fluxo; escondê-lo ali deixava a coluna vazia na maioria das linhas.
+        render: (c: any) => html`<span class="res-calc">${fmtR$(resolverCustoTotal(c, this._ctx()))}</span>`,
       },
       {
         id: 'distribuicao', label: 'Distribuição',
@@ -587,8 +587,8 @@ export class ViabFluxoCustos extends LitElement {
       colunas.push({
         id: 'acoes', label: '',
         render: (c: any) => eObrigatoria(c) ? nothing : html`
-          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
-            @click=${() => { this.removerAlvo = c; }}>Remover</urbi-botao>`,
+          <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+            @click=${() => { this.removerAlvo = c; }}></urbi-botao>`,
       });
     }
     return colunas;

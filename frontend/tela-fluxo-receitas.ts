@@ -249,15 +249,18 @@ export class ViabFluxoReceitas extends LitElement {
             <urbi-botao variante="primario" pequeno icone="fa-solid fa-check"
               @click=${() => this._salvarNome(f)}>Salvar</urbi-botao>` : nothing}
           <span class="espaco"></span>
-          <urbi-botao variante="primario" pequeno @click=${() => this._abrirAbsorcao(f)}>
+          <!-- #169: "primario" (mesma cor de "Salvar") deixava a Absorção indistinguível
+               da ação de salvar o nome; "secundario" alinha com o botão irmão Fluxo de
+               Pagamento — as duas abrem modal, nenhuma é o CTA principal do card. -->
+          <urbi-botao variante="secundario" pequeno @click=${() => this._abrirAbsorcao(f)}>
             <span class="stat ${this._aplicado(f, 'absorcao') ? 'ok' : ''}"></span>Absorção de Vendas
           </urbi-botao>
           <urbi-botao variante="secundario" pequeno @click=${() => this._abrirPagamento(f)}>
             <span class="stat ${this._aplicado(f, 'fluxo') ? 'ok' : ''}"></span>Fluxo de Pagamento
           </urbi-botao>
           ${!dis ? html`
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
-              @click=${() => { this.confirmRemover = { tipo: 'fase', fase: f }; }}>Remover</urbi-botao>` : nothing}
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+              @click=${() => { this.confirmRemover = { tipo: 'fase', fase: f }; }}></urbi-botao>` : nothing}
         </div>
 
         ${this._renderTabelaAlocacoes(f, dis)}
@@ -358,8 +361,8 @@ export class ViabFluxoReceitas extends LitElement {
         <td class="num">${fmtNum(precoTotal)}</td>
         ${dis ? nothing : html`
           <td class="num">
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
-              @click=${() => { this.confirmRemover = { tipo: 'alocacao', fase: f, aloc: a }; }}>Remover</urbi-botao>
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+              @click=${() => { this.confirmRemover = { tipo: 'alocacao', fase: f, aloc: a }; }}></urbi-botao>
           </td>`}
       </tr>
     `;
