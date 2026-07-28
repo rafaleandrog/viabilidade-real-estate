@@ -4,6 +4,42 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #195 — Permuta física reduz VGV/unidades/Resultado (2026-07-28)
+
+Branch `claude/r4-195-permuta-fisica-reduz-vgv`. Não é portão — pré-requisitos #193 e #188 (ambos já
+mergeados — PR #208 e #204).
+
+⚠️ **Muda números de estudos existentes** (§10.4 do mapa mestre): qualquer estudo com
+`unidades_permutadas > 0` numa tipologia passa a receber MENOS receita em caixa do que antes — o
+resultado final cai. Isso é a correção pretendida, não uma regressão.
+
+**Causa raiz (§9.3):** o motor somava a tipologia inteira (`vgvTipologia = quantidade × área ×
+preço`) na absorção de vendas, ignorando `unidades_permutadas` — a decisão documentada no topo de
+`fluxo-caixa-motor.ts` dizia "permuta física não entra no fluxo" mas a base de cálculo continuava
+contando as unidades permutadas como se fossem vendidas por caixa. O #188 só expôs o valor da fatia
+(`vgvPermutaFisica`/`receitaBrutaVgv`); o #195 faz o fluxo de caixa respeitar essa fatia.
+
+**Fix — escopo restrito à RECEITA EM CAIXA, não ao "VGV" informativo:**
+1. `frontend/fluxo-shared.ts` — `vgvVendavelTipologia`/`vgvVendavelLinha` = `vgvTipologia` menos a
+   fatia de permuta física (`vgvPermutaFisicaTipologia`).
+2. `frontend/fluxo-caixa-motor.ts` — `receitaMensalLinha` passa a repartir a absorção de vendas
+   sobre o VGV VENDÁVEL, não o bruto; o rateio por tipologia (`itens` de cada linha de receita)
+   idem. Uma tipologia 100% permutada não gera receita nem "puxa" fatia do caixa da linha.
+   `ctxCusto.vgvTotal`/`receitaTotal` (base de custos `pct_vgv`/`pct_receita`) e o `vgvTotal`/
+   `vgvPermutaFisica`/`receitaBrutaVgv` do `FluxoCalc` (KPIs informativos, #188) **não mudam** —
+   continuam brutos, fora do escopo desta issue.
+3. Testes atualizados/novos em `fluxo-caixa-motor.test.ts`: o teste do #188 passou a esperar
+   `receitaMensal` líquido de permuta (334M em vez de 340M no fixture); teste novo cobre tipologia
+   100% permutada (receita zero, `vgvTotal` bruto inalterado).
+4. `docs/viabilidade/padrao-incorporacao.md:243` já descrevia esse comportamento (aspiracional) —
+   nenhuma mudança de doc necessária, o código é que alcançou o doc.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 101 testes + build).
+
+**Merge:** não é portão, mas o autor autorizou mergear nesta sessão.
+
+---
+
 ## #194 — Terreno: modos `Unit Delivery` e `Sales Revenue` (2026-07-28)
 
 Branch `claude/r4-194-preco-modos-distribuicao`. Issue portão (§3 do mapa mestre), pré-requisito
