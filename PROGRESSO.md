@@ -4,6 +4,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #193 — Terreno: `Compra` → `Preço` + subcategorias (2026-07-28)
+
+Branch `claude/r4-193-terreno-preco`. Issue portão (§3 do mapa mestre), pré-requisito #180 (já
+mergeado — PR #205). Destrava #194, #195, #196.
+
+**Escopo:** rename puro da categoria "Compra" → "Preço" em `terreno` (alinha com a referência
+visual "View Custos Terreno" da planilha de bugs) — mesma linha obrigatória do #180, mesmas
+subcategorias (`Valor à vista`/`Permuta`/`Parcelado`/`Outro`, já existentes). Os modos `Unit
+Delivery`/`Sales Revenue` citados na mesma referência visual são o #194 (motor+backend, issue
+separada, `Dif. = D`); #193 só prepara o nome/estrutura.
+
+1. `frontend/tela-fluxo-custos.ts` — `CATEGORIAS.terreno`, `UNIDADES_CAT.terreno` e
+   `LINHAS_OBRIGATORIAS.terreno` trocam `'Compra'` por `'Preço'`.
+2. `backend/rotas/avancado.ts` — `LINHAS_OBRIGATORIAS_CUSTO.terreno` acompanha o rename.
+3. `migracoes/008_terreno_preco.js` — renomeia `categoria` das linhas existentes (`grupo='terreno'`,
+   `categoria='Compra'` → `'Preço'`); nenhuma linha é apagada. `versao` `0.1.6` → `0.1.7`.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 98 testes + build). Backend
+(typecheck, execução da migração, `urbi-empacotar`) fica para o ambiente autenticado do autor.
+
+**Merge:** portão (`Portão? = SIM` → #194, #195, #196) — mergeado pela sessão após validação verde.
+
+---
+
 ## #182 — Resumo: KPIs zerados (2026-07-28)
 
 Branch `claude/r4-182-resumo-kpis-zerados`. Issue portão (§3 do mapa mestre), pré-requisito #188

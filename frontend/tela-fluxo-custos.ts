@@ -44,7 +44,10 @@ const GRUPOS: Grupo[] = [
 // da migração 002. "Financeiro" nasce sem dados legados.
 const CATEGORIAS: Record<GrupoId, { nome: string; subs: string[] }[]> = {
   terreno: [
-    { nome: 'Compra', subs: ['Valor à vista', 'Permuta', 'Parcelado', 'Outro'] },
+    // "Compra" → "Preço" (#193): nome alinhado à referência visual da planilha
+    // de bugs ("View Custos Terreno") — mesma linha obrigatória, mesmas
+    // subcategorias.
+    { nome: 'Preço', subs: ['Valor à vista', 'Permuta', 'Parcelado', 'Outro'] },
     { nome: 'Registro', subs: [] },
     { nome: 'Outro', subs: [] },
   ],
@@ -106,7 +109,7 @@ const UNIDADES = [
 // Garante coerência entre a opção visível e o que o motor calcula.
 const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
   terreno: {
-    'Compra':  ['rs', 'rs_m2_terreno'],
+    'Preço':   ['rs', 'rs_m2_terreno'],
     'Registro':['rs', 'rs_m2_priv'],
     'Outro':   ['rs', 'pct_vgv'],
   },
@@ -154,10 +157,10 @@ const EVENTOS_ANCORA = [
 interface LinhaObrigatoria { categoria: string; posicao: number; unidade?: string }
 
 const LINHAS_OBRIGATORIAS: Partial<Record<GrupoId, LinhaObrigatoria[]>> = {
-  // Compra: 1ª linha de Custos do Terreno — todo estudo tem aquisição do
-  // terreno (#180).
+  // Preço: 1ª linha de Custos do Terreno — todo estudo tem aquisição do
+  // terreno (#180; renomeada de "Compra" no #193).
   terreno: [
-    { categoria: 'Compra', posicao: 0 },
+    { categoria: 'Preço', posicao: 0 },
   ],
   obra: [
     { categoria: 'Construção', posicao: 0 },
