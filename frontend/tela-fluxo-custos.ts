@@ -10,6 +10,7 @@ import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado, listarReceitasAvancado,
   listarCurvas, listarCustosAvancado, criarCustoAvancado, atualizarCustoAvancado, removerCustoAvancado,
+  listarFasesAvancado,
 } from './viabilidade-api.js';
 import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import './viab-num.js';
@@ -229,6 +230,9 @@ export class ViabFluxoCustos extends LitElement {
 
   @state() private custos: any[] = [];
   @state() private curvas: any[] = [];
+  // Fases do Cronograma (tipo='cronograma', #168) — âncora alternativa aos 5
+  // eventos fixos para a coluna Distribuição (#167).
+  @state() private fasesCronograma: any[] = [];
   @state() private crono: EventoCrono[] = [];
   @state() private dataInicio: string | null = null;
   @state() private carregando = true;
@@ -295,9 +299,10 @@ export class ViabFluxoCustos extends LitElement {
   private async _carregar() {
     this.carregando = true;
     try {
-      const [custos, curvas, crono, params, receitas] = await Promise.all([
+      const [custos, curvas, fases, crono, params, receitas] = await Promise.all([
         listarCustosAvancado(this.estudo.id),
         listarCurvas(),
+        listarFasesAvancado(this.estudo.id, 'cronograma'),
         buscarCronogramaAvancado(this.estudo.id),
         buscarParametrosAvancado(this.estudo.id),
         listarReceitasAvancado(this.estudo.id),
@@ -308,6 +313,7 @@ export class ViabFluxoCustos extends LitElement {
         if (this.editavel) await this._garantirLinhasObrigatorias();
       }
       if (!curvas?.erro) this.curvas = curvas.dados || [];
+      if (!fases?.erro) this.fasesCronograma = fases.dados || [];
       if (!crono?.erro) this.crono = crono.dados || [];
       if (!params?.erro) this.dataInicio = params.data_inicio_projeto ?? null;
       const linhas = receitas?.erro ? [] : (receitas.dados || []);
@@ -500,9 +506,22 @@ export class ViabFluxoCustos extends LitElement {
             return html`<span class="mes-calc"><strong>Obra</strong>
               <span title="Cronograma fixo na Obra">🔒</span></span>`;
           }
+          // #167: além dos 5 eventos fixos, ancora numa fase do Cronograma
+          // (tipo='cronograma', lista separada da de Receitas desde o #168).
+          const opcoes = [...EVENTOS_ANCORA, ...this.fasesCronograma.map((f) => ({
+            valor: `fase:${f.id}`, rotulo: f.nome || 'Fase',
+          }))];
+          const valorAtual = c.fase_ancora_id ? `fase:${c.fase_ancora_id}` : (c.cronograma_evento || 'customizado');
           return html`
-            <urbi-select .valor=${c.cronograma_evento || 'customizado'} .opcoes=${EVENTOS_ANCORA}
-              @urbi:select-change=${(e: CustomEvent) => this._salvar(c, { cronograma_evento: e.detail.valor })}
+            <urbi-select .valor=${valorAtual} .opcoes=${opcoes}
+              @urbi:select-change=${(e: CustomEvent) => {
+                const v = String(e.detail.valor);
+                if (v.startsWith('fase:')) {
+                  this._salvar(c, { fase_ancora_id: Number(v.slice(5)), cronograma_evento: 'customizado' });
+                } else {
+                  this._salvar(c, { cronograma_evento: v, fase_ancora_id: null });
+                }
+              }}
             ></urbi-select>`;
         },
       },
@@ -519,6 +538,12 @@ export class ViabFluxoCustos extends LitElement {
             const ini = obra ? Number(obra.inicio_mes) : Number(c.inicio_mes) || 0;
             return html`<span class="mes-calc">📅 ${rotuloMesRelativo(this.dataInicio, ini)}
               <span title="Derivado do cronograma (Obra)">🔒</span></span>`;
+          }
+          if (c.fase_ancora_id) {
+            // Início derivado da fase-âncora do Cronograma, bloqueado — #167.
+            const fase = this.fasesCronograma.find((f) => Number(f.id) === Number(c.fase_ancora_id));
+            return html`<span class="mes-calc">📅 ${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
+              <span title=${`Ancorado na fase "${fase?.nome || c.fase_ancora_id}"`}>🔒</span></span>`;
           }
           const custom = (c.cronograma_evento || 'customizado') === 'customizado';
           if (!custom) {

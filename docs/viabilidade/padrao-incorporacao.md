@@ -189,7 +189,7 @@ segue descreve as fases `receita`:
 
 **Alocações (`avancado_alocacoes`)** — vende `unidades` de uma `tipologia_id` numa `fase_id` a um `preco_m2`. Várias alocações por tipologia (preços diferentes). Trava de saldo **agregada por estudo** (`saldoTipologiaNoEstudo`): `Σ unidades alocadas da tipologia em TODAS as fases ≤ quantidade` do catálogo. Na tela, as unidades **cascateiam** de uma fase para a seguinte: o `Total` de cada linha é a `quantidade` do catálogo menos o que as linhas acima já venderam, e o `Saldo` é esse total menos as unidades da própria linha (#170).
 
-**Linhas de custo (`avancado_linhas_custo`)** — 5 grupos (`terreno`\|`obra`\|`diretos`\|`indireto`\|`financeiro`), `orcamento_valor` + `orcamento_unidade` (`rs`\|`rs_m2_priv`\|`rs_m2_terreno`\|`pct_vgv`\|`pct_receita`\|`pct_obra`), ancoradas ao Cronograma (`cronograma_evento`, `inicio_mes`, `duracao_meses`) e a uma curva (`curva_id`).
+**Linhas de custo (`avancado_linhas_custo`)** — 5 grupos (`terreno`\|`obra`\|`diretos`\|`indireto`\|`financeiro`), `orcamento_valor` + `orcamento_unidade` (`rs`\|`rs_m2_priv`\|`rs_m2_terreno`\|`pct_vgv`\|`pct_receita`\|`pct_obra`), ancoradas ao Cronograma (`cronograma_evento`, `inicio_mes`, `duracao_meses`) e a uma curva (`curva_id`). `fase_ancora_id` (#167) é uma âncora alternativa: referencia uma fase do Cronograma (`avancado_fases.tipo='cronograma'`) em vez de um dos 5 eventos fixos — mutuamente exclusiva com `cronograma_evento`.
 
 **Curvas (`avancado_curvas`)** — distribuição de valores no tempo (Curva S padrão + customizadas da instância). A engine reamostra a curva para a duração real e normaliza para somar 100% (`reamostrarCurva`), com fallback `linear`.
 

@@ -316,6 +316,7 @@
         "orcamento_unidade": { "tipo": "texto", "limite": 20, "opcoes": ["rs", "rs_m2_priv", "rs_m2_terreno", "pct_vgv", "pct_receita", "pct_obra"], "padrao": "rs" },
         "curva_id":          { "tipo": "referencia", "tabela_ref": "avancado_curvas", "ao_deletar": "anular" },
         "cronograma_evento": { "tipo": "texto", "limite": 20, "opcoes": ["planejamento", "pre_lancamento", "obra", "pos_obra", "customizado"], "padrao": "customizado" },
+        "fase_ancora_id":    { "tipo": "referencia", "tabela_ref": "avancado_fases", "ao_deletar": "anular" },
         "inicio_mes":        { "tipo": "inteiro", "padrao": 0 },
         "duracao_meses":     { "tipo": "inteiro", "padrao": 1 },
         "ordem":             { "tipo": "inteiro", "padrao": 0 },
