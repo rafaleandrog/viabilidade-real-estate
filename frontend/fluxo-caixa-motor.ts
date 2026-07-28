@@ -8,11 +8,15 @@
 // - Arrays mensais são 0-based e o índice coincide com o número do mês: índice i = mês i.
 // - Receitas positivas; custos positivos nos próprios arrays (o sinal entra na
 //   consolidação: fluxo = receita − custo).
-// - Permuta física NÃO entra no fluxo: o VGV derivado das tipologias já é o
-//   valor de venda do incorporador.
+// - Permuta física NÃO gera receita em caixa (#195): a unidade permutada é
+//   entregue em troca do terreno/serviço, não vendida — a absorção de vendas
+//   e o rateio por tipologia usam o VGV VENDÁVEL (`vgvVendavelLinha`), não o
+//   VGV bruto. `vgvTotal` continua contando a tipologia inteira — é o KPI
+//   informativo do #188 (`vgvTotal`/`vgvPermutaFisica`/`receitaBrutaVgv`).
 
 import {
-  absorcaoMensal, vgvLinha, vgvTipologia, vglLinha, vgvPermutaFisicaLinha,
+  absorcaoMensal, vgvLinha, vglLinha, vgvPermutaFisicaLinha,
+  vgvVendavelTipologia, vgvVendavelLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, vgvVendidoMensal, ePrecoTerreno,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado,
@@ -174,7 +178,9 @@ export function receitaMensalLinha(
   prazoTotal: number,
 ): number[] {
   const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
-  const vgv = vgvLinha(linha?.tipologias ?? []);
+  // VGV VENDÁVEL (#195): a absorção de vendas reparte só o que é efetivamente
+  // vendido por caixa — as unidades permutadas fisicamente saem da base.
+  const vgv = vgvVendavelLinha(linha?.tipologias ?? []);
   if (vgv <= 0) return saida;
 
   const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, cronograma);
@@ -455,13 +461,14 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     .filter((c) => c.grupo === 'obra' && (c.orcamento_unidade || 'rs') !== 'pct_obra')
     .reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);
 
-  // Receitas por linha (e por tipologia, proporcional ao VGV da tipologia).
+  // Receitas por linha (e por tipologia, proporcional ao VGV VENDÁVEL da
+  // tipologia, #195 — uma tipologia 100% permutada não recebe fatia de caixa).
   const calcReceitas: LinhaCalc[] = linhasReceita.map((l) => {
     const mensal = receitaMensalLinha(l, crono, prazo);
-    const vgvL = vgvLinha(l.tipologias);
+    const vgvVendavelL = vgvVendavelLinha(l.tipologias);
     const r = recorte(mensal);
     const itens: LinhaCalc[] = (l.tipologias ?? []).map((t: any) => {
-      const propor = vgvL > 0 ? vgvTipologia(t) / vgvL : 0;
+      const propor = vgvVendavelL > 0 ? vgvVendavelTipologia(t) / vgvVendavelL : 0;
       const mensalTip = mensal.map((v) => v * propor);
       const rt = recorte(mensalTip);
       return {

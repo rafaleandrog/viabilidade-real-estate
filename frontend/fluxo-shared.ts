@@ -147,9 +147,7 @@ export function vgvLinha(tipologias: any[]): number {
 /**
  * VGV atribuído às unidades permutadas (fisicamente) de uma tipologia — #188.
  * `unidades_permutadas` é um SUBCONJUNTO de `quantidade` (não soma além dela);
- * daí o `Math.min`. Puramente informativo aqui: `vgvTipologia`/`vgvLinha`
- * continuam contando a tipologia inteira (decisão documentada em
- * `fluxo-caixa-motor.ts`) — reduzir o fluxo pela permuta física é o #195.
+ * daí o `Math.min`.
  */
 export function vgvPermutaFisicaTipologia(t: any): number {
   const qtd = n(t?.quantidade);
@@ -160,6 +158,22 @@ export function vgvPermutaFisicaTipologia(t: any): number {
 /** VGV de permuta física de uma linha de receita (soma das tipologias). */
 export function vgvPermutaFisicaLinha(tipologias: any[]): number {
   return (tipologias ?? []).reduce((s, t) => s + vgvPermutaFisicaTipologia(t), 0);
+}
+
+/**
+ * VGV VENDÁVEL de uma tipologia — `vgvTipologia` menos a fatia de permuta
+ * física (#195): a unidade permutada é entregue em troca do terreno/serviço,
+ * não vendida por caixa, então não gera receita a distribuir no fluxo. Esta é
+ * a base usada por `receitaMensalLinha` para a absorção de vendas — `vgvTotal`
+ * (KPI informativo, #188) continua contando a tipologia inteira.
+ */
+export function vgvVendavelTipologia(t: any): number {
+  return vgvTipologia(t) - vgvPermutaFisicaTipologia(t);
+}
+
+/** VGV vendável de uma linha de receita (soma das tipologias). */
+export function vgvVendavelLinha(tipologias: any[]): number {
+  return (tipologias ?? []).reduce((s, t) => s + vgvVendavelTipologia(t), 0);
 }
 
 /**

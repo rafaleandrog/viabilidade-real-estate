@@ -368,11 +368,42 @@ test('vgvPermutaFisica e receitaBrutaVgv: permutadas são subconjunto de quantid
   };
   const r = calcularFluxo(config);
 
-  assert.ok(perto(r.vgvTotal, 340_000_000, 1));
-  // Permuta física não altera vgvTotal nem o fluxo — apenas expõe a fatia (#195 é quem muda o motor).
+  assert.ok(perto(r.vgvTotal, 340_000_000, 1)); // KPI informativo (#188): conta a tipologia inteira
   assert.ok(perto(r.vgvPermutaFisica, 6_000_000, 1));
   assert.ok(perto(r.receitaBrutaVgv, 334_000_000, 1));
-  assert.ok(perto(soma(r.receitaMensal), 340_000_000, 5));
+  // #195: a permuta física é entregue em troca do terreno, não vendida por
+  // caixa — o fluxo (receita mensal) reflete o VGV VENDÁVEL, não o bruto.
+  assert.ok(perto(soma(r.receitaMensal), 334_000_000, 5));
+});
+
+// #195: tipologia 100% permutada não gera receita nem "puxa" fatia do caixa
+// da linha (a proporção por tipologia usa VGV VENDÁVEL, não o bruto).
+test('tipologia 100% permutada nao gera receita em caixa (#195)', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [
+        // Vendável: 300 un a 10.000/m² × 60m² = 180M
+        { id: 1, nome: 'Vendável', quantidade: 300, area_privativa_m2: 60, preco_m2: 10_000 },
+        // 100% permutada — VGV bruto 60M, vendável 0
+        { id: 2, nome: 'Permutada', quantidade: 100, unidades_permutadas: 100, area_privativa_m2: 60, preco_m2: 10_000 },
+      ],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+
+  assert.ok(perto(r.vgvTotal, 240_000_000, 1)); // bruto: 180M + 60M
+  assert.ok(perto(r.vgvPermutaFisica, 60_000_000, 1));
+  // Caixa recebido = só o vendável (180M) — a permutada não entra no fluxo.
+  assert.ok(perto(soma(r.receitaMensal), 180_000_000, 5));
+  const [vendavel, permutada] = r.linhasReceita[0].itens!;
+  assert.ok(perto(vendavel.total, 180_000_000, 1));
+  assert.ok(perto(permutada.total, 0, 1e-6));
 });
 
 // Cenários (Etapa 8 · #56): aplicarCenario escala preço de venda e custo de obra.
