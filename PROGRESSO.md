@@ -4,6 +4,39 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #188 — VGV Total / VGV Permuta Física / Receita Bruta (2026-07-28)
+
+Branch `claude/r4-188-vgv-permuta-fisica`. Issue portão (§3 do mapa mestre), sem pré-requisito.
+Destrava #182, #183, #184, #189, #195.
+
+**Causa raiz (§9.3 do mapa mestre):** o motor do Avançado (`vgvTipologia`, `fluxo-shared.ts`) conta
+`quantidade` inteira de cada tipologia no VGV, sem descontar `unidades_permutadas` — o campo existe
+no schema e na tela de Tipologias, mas nunca chegava ao motor. Isso deixa VGV Total, Receita Bruta e
+tudo que depende de VGV (Resumo, coluna %VGV, #195) sem uma definição consistente do que é "VGV
+líquido de permuta".
+
+**Fix — só expõe as grandezas novas, não muda o fluxo de caixa existente** (permuta física continua
+fora do cálculo de caixa, decisão documentada no topo de `fluxo-caixa-motor.ts`; mudar isso é o
+escopo do #195, que tem #188 como pré-requisito):
+1. `frontend/fluxo-shared.ts` — `vgvPermutaFisicaTipologia`/`vgvPermutaFisicaLinha`: VGV atribuído às
+   unidades permutadas (`Math.min(unidades_permutadas, quantidade)` × área × preço — permutadas são
+   subconjunto de quantidade, não somam além dela).
+2. `frontend/fluxo-caixa-motor.ts` — `FluxoCalc` ganha `vgvPermutaFisica` e `receitaBrutaVgv`
+   (`vgvTotal − vgvPermutaFisica`), calculados em `calcularFluxo` e preservados (inalterados) por
+   `agregarFluxoPorPeriodos` (view Anual), igual aos demais indicadores.
+3. `frontend/fluxo-tabela.ts` — 6º KPI "Receita Bruta (VGV)" no card do Fluxo de Caixa, com tooltip
+   nativo (`title`) mostrando o breakdown VGV Total / VGV Permuta Física.
+4. Teste novo em `fluxo-caixa-motor.test.ts` cobrindo a separação Total/Permuta/Bruta.
+
+Sem schema, sem migração, sem bump de `versao` (`Ver. = não` no mapa mestre) — são grandezas
+derivadas, nada persistido.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 98 testes + build).
+
+**Merge:** portão (`Portão? = SIM`) — mergeado pela sessão após validação verde.
+
+---
+
 ## #178 — Obras: obrigatórias + fim da duplicação (2026-07-28)
 
 Branch `claude/r4-178-linhas-obrigatorias`. Issue portão (§3 do

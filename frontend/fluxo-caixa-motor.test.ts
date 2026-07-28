@@ -278,6 +278,33 @@ test('fluxo completo: consolidação, acumulado, TIR e exposição coerentes', (
   assert.ok(perto(somaTipologias, linha.total, 1));
 });
 
+// #188: VGV Total / VGV Permuta Física / Receita Bruta (VGV).
+test('vgvPermutaFisica e receitaBrutaVgv: permutadas são subconjunto de quantidade, informativo', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Sales', fase_label: 'Fase 1',
+      tipologias: [
+        // 200 un a 12.000/m² × 25m² = 60M, das quais 20 permutadas = 6M
+        { id: 1, nome: 'Studio', quantidade: 200, unidades_permutadas: 20, area_privativa_m2: 25, preco_m2: 12_000 },
+        // 400 un a 10.000/m² × 70m² = 280M, sem permuta
+        { id: 2, nome: '2 dorms', quantidade: 400, area_privativa_m2: 70, preco_m2: 10_000 },
+      ],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [],
+    areaTerreno: 50_000,
+  };
+  const r = calcularFluxo(config);
+
+  assert.ok(perto(r.vgvTotal, 340_000_000, 1));
+  // Permuta física não altera vgvTotal nem o fluxo — apenas expõe a fatia (#195 é quem muda o motor).
+  assert.ok(perto(r.vgvPermutaFisica, 6_000_000, 1));
+  assert.ok(perto(r.receitaBrutaVgv, 334_000_000, 1));
+  assert.ok(perto(soma(r.receitaMensal), 340_000_000, 5));
+});
+
 // Cenários (Etapa 8 · #56): aplicarCenario escala preço de venda e custo de obra.
 test('aplicarCenario escala preço/m² das tipologias e orçamento de obra', () => {
   const base: FluxoConfig = {

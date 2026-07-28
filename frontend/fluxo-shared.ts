@@ -145,6 +145,24 @@ export function vgvLinha(tipologias: any[]): number {
 }
 
 /**
+ * VGV atribuído às unidades permutadas (fisicamente) de uma tipologia — #188.
+ * `unidades_permutadas` é um SUBCONJUNTO de `quantidade` (não soma além dela);
+ * daí o `Math.min`. Puramente informativo aqui: `vgvTipologia`/`vgvLinha`
+ * continuam contando a tipologia inteira (decisão documentada em
+ * `fluxo-caixa-motor.ts`) — reduzir o fluxo pela permuta física é o #195.
+ */
+export function vgvPermutaFisicaTipologia(t: any): number {
+  const qtd = n(t?.quantidade);
+  const permutadas = Math.min(n(t?.unidades_permutadas), qtd);
+  return permutadas * n(t?.area_privativa_m2) * n(t?.preco_m2);
+}
+
+/** VGV de permuta física de uma linha de receita (soma das tipologias). */
+export function vgvPermutaFisicaLinha(tipologias: any[]): number {
+  return (tipologias ?? []).reduce((s, t) => s + vgvPermutaFisicaTipologia(t), 0);
+}
+
+/**
  * VGL (Valor Geral Líquido) da linha: VGV líquido de comissão DESTACADA e de
  * RET, conforme o fluxo de pagamento. Comissão embutida já está no preço e
  * não deduz.
