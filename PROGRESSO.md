@@ -4,6 +4,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #180 — Terreno: obrigatórias; Outorga → Obras (2026-07-28)
+
+Branch `claude/r4-180-terreno-obrigatoria-outorga`. Issue portão (§3 do mapa mestre), pré-requisito
+#178 (já mergeado — PR #203). Destrava #193.
+
+Mesmo padrão do #178, aplicado à aba Terreno:
+1. `frontend/tela-fluxo-custos.ts` — "Compra" vira a linha obrigatória de `terreno` (mirror de
+   "Construção" em `obra` e "Corretagem de vendas" em `diretos`, `LINHAS_OBRIGATORIAS`).
+2. "Outorga" sai da lista de categorias de `terreno` e entra em `obra` — é contrapartida pelo
+   potencial construtivo, custo de desenvolvimento da obra, não de aquisição do terreno (a Proforma
+   já trata Outorga separado de Terreno no custo direto). Movida em `CATEGORIAS` e `UNIDADES_CAT`.
+3. `backend/rotas/avancado.ts` — `LINHAS_OBRIGATORIAS_CUSTO` ganha `terreno: ['Compra']` (mesma
+   lógica server-authoritative do #178).
+4. `migracoes/007_terreno_obrigatoria_outorga.js` — move linhas existentes de `terreno`/`Outorga`
+   para `obra`, e faz o backfill de `obrigatoria=true` na linha "Compra" de menor id por estudo.
+   `versao` `0.1.5` → `0.1.6`.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 98 testes + build). Backend
+(typecheck, execução da migração, `urbi-empacotar`) fica para o ambiente autenticado do autor.
+
+**Merge:** portão (`Portão? = SIM` → #193) — mergeado pela sessão após validação verde.
+
+---
+
 ## #188 — VGV Total / VGV Permuta Física / Receita Bruta (2026-07-28)
 
 Branch `claude/r4-188-vgv-permuta-fisica`. Issue portão (§3 do mapa mestre), sem pré-requisito.
