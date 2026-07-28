@@ -318,7 +318,8 @@
         "inicio_mes":        { "tipo": "inteiro", "padrao": 0 },
         "duracao_meses":     { "tipo": "inteiro", "padrao": 1 },
         "ordem":             { "tipo": "inteiro", "padrao": 0 },
-        "obrigatoria":       { "tipo": "logico", "padrao": false }
+        "obrigatoria":       { "tipo": "logico", "padrao": false },
+        "distribuicao_modo": { "tipo": "texto", "limite": 20, "opcoes": ["fixo", "unit_delivery", "sales_revenue"], "padrao": "fixo" }
       },
       "indices": [["estudo_id"]]
     },

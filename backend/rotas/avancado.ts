@@ -166,6 +166,9 @@ export function fluxoPagamentoPadrao(): Record<string, any> {
 const GRUPOS_CUSTO = ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'];
 const UNIDADES_ORCAMENTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita'];
 const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'obra', 'pos_obra', 'customizado'];
+// `unit_delivery`/`sales_revenue` (#194): só a linha de Preço do Terreno usa —
+// o motor (fluxo-caixa-motor.ts) ignora o campo em qualquer outra linha.
+const MODOS_DISTRIBUICAO = ['fixo', 'unit_delivery', 'sales_revenue'];
 
 // Linhas obrigatórias por grupo — espelha `LINHAS_OBRIGATORIAS` do frontend
 // (tela-fluxo-custos.ts). `obrigatoria` é decidida aqui, no servidor: a
@@ -948,7 +951,7 @@ rotasAvancado.get('/estudos/:id/avancado/custos', async (req: Request, res: Resp
   }
 });
 
-const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'inicio_mes', 'duracao_meses', 'ordem'];
+const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo'];
 
 function validarCamposCusto(res: Response, dados: Record<string, any>): boolean {
   if (dados.grupo !== undefined && !GRUPOS_CUSTO.includes(dados.grupo)) {
@@ -961,6 +964,10 @@ function validarCamposCusto(res: Response, dados: Record<string, any>): boolean 
   }
   if (dados.cronograma_evento !== undefined && !EVENTOS_ANCORA.includes(dados.cronograma_evento)) {
     erro(res, 400, 'EVENTO_INVALIDO', `cronograma_evento deve ser um de: ${EVENTOS_ANCORA.join(', ')}`);
+    return false;
+  }
+  if (dados.distribuicao_modo !== undefined && !MODOS_DISTRIBUICAO.includes(dados.distribuicao_modo)) {
+    erro(res, 400, 'MODO_DISTRIBUICAO_INVALIDO', `distribuicao_modo deve ser um de: ${MODOS_DISTRIBUICAO.join(', ')}`);
     return false;
   }
   return true;

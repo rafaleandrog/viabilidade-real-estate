@@ -185,6 +185,76 @@ test('corretagem sem linhas de receita não gera custo', () => {
   assert.ok(perto(soma(r.custoMensal), 0, 1e-9));
 });
 
+// #194: Preço do Terreno em `sales_revenue` segue o VGV vendido — mesmo
+// mecanismo da Corretagem, mas aplicado à linha de Terreno.
+test('Preço do Terreno em sales_revenue acompanha o VGV vendido (#194)', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
+      absorcao: {
+        modo: 'distribuido',
+        blocos: [
+          { evento: 'lancamento', pct: 40 },  // mês 12
+          { evento: 'obra', pct: 60 },        // meses 17..40
+          { evento: 'pos_obra', pct: 0 },
+        ],
+      },
+      fluxo_pagamento: null,
+    }],
+    linhasCusto: [
+      {
+        id: 1, grupo: 'terreno', categoria: 'Preço', orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
+        distribuicao_modo: 'sales_revenue', inicio_mes: 0, duracao_meses: 1,
+      },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  const linha = r.linhasCusto[0];
+
+  assert.ok(perto(linha.total, 10_000_000, 1)); // 10% de 100M
+  assert.ok(perto(linha.mensal[12], 0.10 * 40_000_000, 1)); // 40% vendido no lançamento
+  assert.ok(perto(linha.mensal[17], (0.10 * 60_000_000) / 24, 1)); // obra espalhada
+  assert.ok(perto(linha.mensal[0], 0, 1e-6)); // nada antes da 1ª venda
+});
+
+// #194: Preço do Terreno em `unit_delivery` segue a receita em CAIXA (entrada +
+// parcelas + repasse), não o momento da venda — difere de sales_revenue quando
+// há parcelamento/repasse pós-venda.
+test('Preço do Terreno em unit_delivery acompanha a receita em caixa, nao o VGV vendido (#194)', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] }, // 100% vendido no mês 12
+      fluxo_pagamento: {
+        entrada: { modo: 'entrada', parcelas: 1, pct: 20 },
+        parcelas: { periodicidade: 'mensal', parcelas: 0, ao_longo_obra: false, juros: false, pct: 0 },
+        repasse: { pct: 80, apos_entrega_meses: 0 }, // repasse na entrega (fim da obra, mês 40)
+      },
+    }],
+    linhasCusto: [
+      {
+        id: 1, grupo: 'terreno', categoria: 'Preço', orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
+        distribuicao_modo: 'unit_delivery', inicio_mes: 0, duracao_meses: 1,
+      },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  const linha = r.linhasCusto[0];
+
+  assert.ok(perto(linha.total, 10_000_000, 1)); // 10% de 100M
+  // 100% vendido no mês 12, mas o CAIXA chega em 2 momentos: entrada (mês 12) e
+  // repasse (entrega, ~mês 40) — sales_revenue concentraria tudo no mês 12.
+  assert.ok(perto(linha.mensal[12], 0.10 * 20_000_000, 1)); // 20% de entrada
+  assert.ok(linha.mensal[40] > 0); // repasse na entrega
+  assert.ok(perto(linha.mensal[13], 0, 1e-6)); // nada entre entrada e repasse
+});
+
 // 6. VPL com taxa zero = soma do fluxo
 test('VPL a taxa zero é a soma simples do fluxo', () => {
   const fluxo = [-100, 30, 40, 50];

@@ -4,6 +4,45 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #194 — Terreno: modos `Unit Delivery` e `Sales Revenue` (2026-07-28)
+
+Branch `claude/r4-194-preco-modos-distribuicao`. Issue portão (§3 do mapa mestre), pré-requisito
+#193 (já mergeado — PR #208). Destrava #196.
+
+**O que é:** a linha de Preço do Terreno (`grupo='terreno'`, `categoria='Preço'`) ganha um seletor de
+**modo de distribuição**, substituindo (quando ativo) o cronograma fixo por um rateio proporcional:
+- **`fixo`** (padrão) — comportamento atual, inalterado: cronograma_evento + curva, igual às demais
+  linhas de Terreno.
+- **`sales_revenue`** — rateia proporcionalmente ao **VGV vendido** (mesmo mecanismo já usado pela
+  Corretagem de vendas, #121: `vgvVendidoMensal`).
+- **`unit_delivery`** — rateia proporcionalmente à **receita em caixa** (entrada + parcelas +
+  repasse na entrega das unidades) — difere de `sales_revenue` sempre que há parcelamento/repasse
+  pós-venda: a venda acontece num mês, o caixa entra em outro(s).
+
+1. `frontend/fluxo-shared.ts` — `ePrecoTerreno`/`CATEGORIA_PRECO_TERRENO`, mesmo padrão de
+   `eCorretagem`/`CATEGORIA_CORRETAGEM`.
+2. `frontend/fluxo-caixa-motor.ts` — `distribuirProporcional` (generaliza o rateio já usado por
+   `corretagemMensal`); `receitaMensal` (caixa agregado) passou a ser calculada ANTES do loop de
+   custos, para servir de peso ao modo `unit_delivery`. Branch novo em `calcCustos` para
+   `ePrecoTerreno(c) && distribuicao_modo !== 'fixo'`.
+3. `frontend/tela-fluxo-custos.ts` — coluna Distribuição da linha de Preço ganha o seletor de modo
+   (+ a curva normal, quando `fixo`); colunas Cronograma/Início/Duração ficam travadas (`—`) nos
+   modos especiais, mesmo tratamento dado à Corretagem.
+4. `schema.json` + `backend/rotas/avancado.ts` — nova coluna `distribuicao_modo` (opções
+   `fixo`/`unit_delivery`/`sales_revenue`, padrão `fixo`) em `avancado_linhas_custo`, validada no
+   POST/PATCH (`MODOS_DISTRIBUICAO`).
+5. `migracoes/009_distribuicao_modo.js` — coluna aditiva com DEFAULT, sem transformação de dado
+   (mesmo padrão de `004_fases_gantt.js`). `versao` `0.1.7` → `0.1.8`.
+6. Testes novos em `fluxo-caixa-motor.test.ts` cobrindo os dois modos, com o caso que os distingue
+   (venda concentrada + repasse pós-venda).
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 100 testes + build). Backend
+(typecheck, execução da migração, `urbi-empacotar`) fica para o ambiente autenticado do autor.
+
+**Merge:** portão (`Portão? = SIM` → #196) — mergeado pela sessão após validação verde.
+
+---
+
 ## #193 — Terreno: `Compra` → `Preço` + subcategorias (2026-07-28)
 
 Branch `claude/r4-193-terreno-preco`. Issue portão (§3 do mapa mestre), pré-requisito #180 (já

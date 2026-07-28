@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import {
-  rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem,
+  rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno,
   vgvLinha, vglLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 import {
@@ -144,6 +144,16 @@ const EVENTOS_ANCORA = [
   { valor: 'customizado', rotulo: 'Customizado' },
 ];
 
+// Modos de distribuição do Preço do Terreno (#194): "Fixo" segue o cronograma
+// normal (evento + curva, igual às demais linhas); "Unit Delivery" e "Sales
+// Revenue" não têm cronograma próprio — o motor rateia proporcionalmente à
+// receita em caixa (entrada+parcelas+repasse) ou ao VGV vendido, respectivamente.
+const MODOS_DISTRIBUICAO_PRECO = [
+  { valor: 'fixo', rotulo: 'Fixo (cronograma)' },
+  { valor: 'unit_delivery', rotulo: 'Unit Delivery' },
+  { valor: 'sales_revenue', rotulo: 'Sales Revenue' },
+];
+
 // Linhas obrigatórias por grupo (na ordem declarada): sempre nas primeiras
 // posições, categoria travada e não removíveis. A linha inexistente é criada ao
 // abrir a tela. `unidade` fixa a unidade de orçamento na criação.
@@ -270,6 +280,8 @@ export class ViabFluxoCustos extends LitElement {
     .mes-calc { white-space: nowrap; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
     .campo-mes { display: inline-flex; align-items: center; gap: 4px; width: 80px; }
     .campo-mes viab-num { width: 100%; }
+    /* #194: modo de distribuição do Preço do Terreno + curva (só em "Fixo"), empilhados. */
+    .dist-preco { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
   `];
 
@@ -438,22 +450,51 @@ export class ViabFluxoCustos extends LitElement {
       },
       {
         id: 'distribuicao', label: 'Distribuição',
-        render: (c: any) => eCorretagem(c) ? html`
-          <span class="mes-calc" title="A corretagem é paga integralmente no mês em que a unidade é vendida">
-            Mês da venda <span>🔒</span></span>` : html`
-          <urbi-select
-            .valor=${c.curva_id ? String(c.curva_id) : ''}
-            .opcoes=${[{ valor: '', rotulo: 'Linear' },
-              ...this.curvas.map((k) => ({ valor: String(k.id), rotulo: k.nome }))]}
-            @urbi:select-change=${(e: CustomEvent) =>
-              this._salvar(c, { curva_id: e.detail.valor ? Number(e.detail.valor) : null })}
-          ></urbi-select>`,
+        render: (c: any) => {
+          if (eCorretagem(c)) return html`
+            <span class="mes-calc" title="A corretagem é paga integralmente no mês em que a unidade é vendida">
+              Mês da venda <span>🔒</span></span>`;
+          if (ePrecoTerreno(c)) {
+            const modo = c.distribuicao_modo || 'fixo';
+            return html`
+              <div class="dist-preco">
+                <urbi-select .valor=${modo} .opcoes=${MODOS_DISTRIBUICAO_PRECO}
+                  @urbi:select-change=${(e: CustomEvent) => this._salvar(c, { distribuicao_modo: e.detail.valor })}
+                ></urbi-select>
+                ${modo === 'fixo' ? html`
+                  <urbi-select
+                    .valor=${c.curva_id ? String(c.curva_id) : ''}
+                    .opcoes=${[{ valor: '', rotulo: 'Linear' },
+                      ...this.curvas.map((k) => ({ valor: String(k.id), rotulo: k.nome }))]}
+                    @urbi:select-change=${(e: CustomEvent) =>
+                      this._salvar(c, { curva_id: e.detail.valor ? Number(e.detail.valor) : null })}
+                  ></urbi-select>` : html`
+                  <span class="mes-calc"
+                    title=${modo === 'unit_delivery'
+                      ? 'Rateado proporcionalmente à receita em caixa (entrada + parcelas + repasse na entrega)'
+                      : 'Rateado proporcionalmente ao VGV vendido (mesma absorção da linha de receita)'}>
+                    ${modo === 'unit_delivery' ? 'Receita em caixa' : 'VGV vendido'} <span>🔒</span></span>`}
+              </div>`;
+          }
+          return html`
+            <urbi-select
+              .valor=${c.curva_id ? String(c.curva_id) : ''}
+              .opcoes=${[{ valor: '', rotulo: 'Linear' },
+                ...this.curvas.map((k) => ({ valor: String(k.id), rotulo: k.nome }))]}
+              @urbi:select-change=${(e: CustomEvent) =>
+                this._salvar(c, { curva_id: e.detail.valor ? Number(e.detail.valor) : null })}
+            ></urbi-select>`;
+        },
       },
       {
         id: 'cronograma', label: 'Cronograma',
         render: (c: any) => {
           // Corretagem: sem cronograma próprio — segue as vendas (#121).
           if (eCorretagem(c)) return html`<span class="sec">—</span>`;
+          // Preço do Terreno em Unit Delivery/Sales Revenue: idem (#194).
+          if (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo') {
+            return html`<span class="sec">—</span>`;
+          }
           if (eConstrucao(c)) {
             // Construção: cronograma fixo em "Obra" (sem seletor) — #120.
             return html`<span class="mes-calc"><strong>Obra</strong>
@@ -469,6 +510,9 @@ export class ViabFluxoCustos extends LitElement {
         id: 'inicio', label: 'Início',
         render: (c: any) => {
           if (eCorretagem(c)) return html`<span class="sec">—</span>`;
+          if (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo') {
+            return html`<span class="sec">—</span>`;
+          }
           if (eConstrucao(c)) {
             // Início derivado do cronograma (evento Obra), bloqueado — #120.
             const obra = this._eventoObra;
@@ -494,6 +538,9 @@ export class ViabFluxoCustos extends LitElement {
         id: 'duracao', label: 'Duração',
         render: (c: any) => {
           if (eCorretagem(c)) return html`<span class="sec">—</span>`;
+          if (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo') {
+            return html`<span class="sec">—</span>`;
+          }
           if (eConstrucao(c)) {
             // Duração derivada do cronograma (evento Obra), bloqueada — #120.
             const obra = this._eventoObra;

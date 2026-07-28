@@ -381,6 +381,17 @@ export function eCorretagem(custo: any): boolean {
   return custo?.grupo === 'diretos' && custo?.categoria === CATEGORIA_CORRETAGEM;
 }
 
+/** Categoria da linha obrigatória de Preço do Terreno (renomeada de "Compra" no #193). */
+export const CATEGORIA_PRECO_TERRENO = 'Preço';
+
+/**
+ * Identifica a linha de Preço do Terreno — a única que aceita os modos de
+ * distribuição `unit_delivery`/`sales_revenue` do `distribuicao_modo` (#194).
+ */
+export function ePrecoTerreno(custo: any): boolean {
+  return custo?.grupo === 'terreno' && custo?.categoria === CATEGORIA_PRECO_TERRENO;
+}
+
 /**
  * VGV VENDIDO mês a mês (meses RELATIVOS 0-based), somando todas as linhas de
  * receita: o VGV de cada linha é repartido pela sua própria curva de absorção.
