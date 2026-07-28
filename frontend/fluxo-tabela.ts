@@ -127,7 +127,8 @@ function varKpi(novo: number | null, base: number | null | undefined, maiorMelho
 }
 
 /**
- * Os 5 KPIs do fluxo (Resultado, TIR, VPL, Payback, Exposição máxima).
+ * Os 6 KPIs do fluxo (Resultado, TIR, VPL, Payback, Exposição máxima,
+ * Receita Bruta (VGV) — #188).
  *
  * `base` só é passada pela aba Cenários (#132): com ela, Resultado, TIR, VPL e
  * Exposição máxima ganham seta + variação % contra o cenário real. Payback é
@@ -160,6 +161,11 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
       <div class="kpi-cel">
         <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi>
         ${varKpi(c.exposicaoMaxima, base ? base.exposicaoMaxima : undefined, true)}
+      </div>
+      <div class="kpi-cel"
+        title=${`VGV Total ${fmtR$(c.vgvTotal)} · VGV Permuta Física ${fmtR$(c.vgvPermutaFisica)}`}>
+        <urbi-kpi rotulo="Receita Bruta (VGV)" .valor=${fmtR$(c.receitaBrutaVgv)}></urbi-kpi>
+        ${varKpi(c.receitaBrutaVgv, base ? base.receitaBrutaVgv : undefined, true)}
       </div>
     </div>
   `;

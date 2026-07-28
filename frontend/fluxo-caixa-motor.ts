@@ -12,7 +12,7 @@
 //   valor de venda do incorporador.
 
 import {
-  absorcaoMensal, vgvLinha, vgvTipologia, vglLinha,
+  absorcaoMensal, vgvLinha, vgvTipologia, vglLinha, vgvPermutaFisicaLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, vgvVendidoMensal,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado,
@@ -128,6 +128,8 @@ export interface FluxoCalc {
   paybackMes: number | null;       // índice 0-based no array mensal
   paybackData: string | null;      // "jul/2030"
   exposicaoMaxima: number;         // min(fluxoAcumulado) — tipicamente negativo
+  vgvPermutaFisica: number;        // #188 — VGV atribuído às unidades permutadas (informativo)
+  receitaBrutaVgv: number;         // #188 — vgvTotal − vgvPermutaFisica (informativo; não altera o fluxo)
   linhasReceita: LinhaCalc[];
   linhasCusto: LinhaCalc[];
 }
@@ -323,7 +325,8 @@ export function tirFluxo(fluxoMensal: number[]): number | null {
  * - **Acumulado**: ÚLTIMO mês da faixa (somar acumulados seria contar o mesmo
  *   caixa várias vezes); o valor da coluna é o saldo no fim do período.
  * - **Indicadores** (`vpl`, `tir`, `exposicaoMaxima`, `paybackMes`,
- *   `paybackData`, `vgvTotal`, e o `total`/`vpl` de cada linha): **inalterados**.
+ *   `paybackData`, `vgvTotal`, `vgvPermutaFisica`, `receitaBrutaVgv`, e o
+ *   `total`/`vpl` de cada linha): **inalterados**.
  *   São grandezas do fluxo mensal e independem de como as colunas são exibidas —
  *   o VPL desconta mês a mês e a exposição máxima é o pior saldo de um MÊS, não
  *   de um fim de ano. Agrupar colunas não pode mexer nesses números.
@@ -511,6 +514,15 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const paybackMes = fluxoAcumulado.findIndex((v, i) => v >= 0 && fluxoMensal.slice(0, i + 1).some((x) => x < 0));
   const exposicaoMaxima = fluxoAcumulado.length ? Math.min(...fluxoAcumulado) : 0;
 
+  // #188 — VGV Total / VGV Permuta Física / Receita Bruta (VGV): grandezas
+  // informativas, consumidas pelo Resumo (#182), pela coluna % VGV do Fluxo
+  // de Caixa (#189) e pela permuta física (#195). Não alteram o fluxo em si —
+  // a permuta física continua fora do cálculo de caixa (ver comentário no
+  // topo do arquivo); apenas expõem o quanto do VGV Total é atribuível a
+  // unidades permutadas.
+  const vgvPermutaFisica = linhasReceita.reduce((s, l) => s + vgvPermutaFisicaLinha(l.tipologias), 0);
+  const receitaBrutaVgv = ctxCusto.vgvTotal - vgvPermutaFisica;
+
   return {
     prazo,
     meses: Array.from({ length: prazo }, (_, i) => rotuloMesRelativo(config.dataInicio, i)),
@@ -521,6 +533,8 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     paybackMes: paybackMes >= 0 ? paybackMes : null,
     paybackData: paybackMes >= 0 ? mesRelativoCompleto(config.dataInicio, paybackMes) : null,
     exposicaoMaxima,
+    vgvPermutaFisica,
+    receitaBrutaVgv,
     linhasReceita: calcReceitas,
     linhasCusto: calcCustos,
   };
