@@ -264,6 +264,7 @@
       "acesso_externo": "restrito",
       "colunas": {
         "estudo_id":       { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "tipo":            { "tipo": "texto", "limite": 20, "opcoes": ["cronograma", "receita"], "obrigatorio": true, "padrao": "receita" },
         "nome":            { "tipo": "texto", "limite": 100 },
         "ordem":           { "tipo": "inteiro", "padrao": 0 },
         "inicio_mes":      { "tipo": "inteiro", "padrao": 0 },

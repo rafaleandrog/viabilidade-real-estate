@@ -662,13 +662,24 @@ async function alocacoesDaFase(req: Request, faseId: number): Promise<any[]> {
   return r.dados;
 }
 
+const TIPOS_FASE = ['cronograma', 'receita'];
+
 rotasAvancado.get('/estudos/:id/avancado/fases', async (req: Request, res: Response) => {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
     if (!(await exigirLeitura(req, res, estudo))) return;
+    // `tipo` separa as fases do Cronograma das fases de Receitas (#168) —
+    // sem filtro, devolve as duas (uso legado/relatórios que precisem de tudo).
+    const tipo = typeof req.query.tipo === 'string' ? req.query.tipo : undefined;
+    if (tipo !== undefined && !TIPOS_FASE.includes(tipo)) {
+      erro(res, 400, 'TIPO_INVALIDO', `tipo deve ser um de: ${TIPOS_FASE.join(', ')}`);
+      return;
+    }
+    const filtrosFases: Record<string, any> = { estudo_id: estudo.id };
+    if (tipo) filtrosFases.tipo = tipo;
     const [fases, alocacoes] = await Promise.all([
-      req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
+      req.dados!.listar('avancado_fases', { filtros: filtrosFases, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
       req.dados!.listar('avancado_alocacoes', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 1000 }),
     ]);
     const porFase = new Map<number, any[]>();
@@ -692,15 +703,34 @@ rotasAvancado.post('/estudos/:id/avancado/fases', async (req: Request, res: Resp
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
-    const existentes = await req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id }, por_pagina: 100 });
+
+    // `tipo` (#168): Cronograma cria marcadores do gantt (`cronograma`);
+    // Receitas cria fases estruturadas com Absorção/Fluxo de Pagamento
+    // (`receita`, padrão do schema — mantém o comportamento pré-#168 para
+    // chamadas legadas sem o campo). Numeração/ordem contam só dentro do
+    // próprio tipo, para as duas listas não brigarem por "Fase N".
+    const tipo = req.body.tipo !== undefined ? String(req.body.tipo) : 'receita';
+    if (!TIPOS_FASE.includes(tipo)) {
+      erro(res, 400, 'TIPO_INVALIDO', `tipo deve ser um de: ${TIPOS_FASE.join(', ')}`);
+      return;
+    }
+    const existentes = await req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id, tipo }, por_pagina: 100 });
     const n = existentes.total + 1;
-    const criada = await req.dados!.criar('avancado_fases', {
+    const dados: Record<string, any> = {
       estudo_id: estudo.id,
+      tipo,
       nome: String(req.body.nome || `Fase ${n}`).trim() || `Fase ${n}`,
       ordem: existentes.total,
-      absorcao: absorcaoPadrao(),
-      fluxo_pagamento: fluxoPagamentoPadrao(),
-    });
+    };
+    if (req.body.inicio_mes !== undefined) dados.inicio_mes = Math.max(0, Number(req.body.inicio_mes) || 0);
+    if (req.body.duracao_meses !== undefined) dados.duracao_meses = Math.max(1, Number(req.body.duracao_meses) || 1);
+    // Absorção/Fluxo de Pagamento só fazem sentido para fases de receita — o
+    // Cronograma nunca lê/edita esses campos.
+    if (tipo === 'receita') {
+      dados.absorcao = absorcaoPadrao();
+      dados.fluxo_pagamento = fluxoPagamentoPadrao();
+    }
+    const criada = await req.dados!.criar('avancado_fases', dados);
     res.status(201).json({ ...criada, alocacoes: [] });
   } catch (e: any) {
     console.error('Erro em POST /avancado/fases:', e);
@@ -919,8 +949,10 @@ rotasAvancado.get('/estudos/:id/avancado/receitas', async (req: Request, res: Re
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
     if (!(await exigirLeitura(req, res, estudo))) return;
+    // Só fases de receita (#168) — as fases do Cronograma são marcadores do
+    // gantt, sem alocação, e não devem virar "linhas de receita" vazias no motor.
     const [fases, alocacoes, tipologias] = await Promise.all([
-      req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
+      req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id, tipo: 'receita' }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
       req.dados!.listar('avancado_alocacoes', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 1000 }),
       req.dados!.listar('avancado_tipologias', { filtros: { estudo_id: estudo.id }, por_pagina: 500 }),
     ]);
@@ -1069,7 +1101,7 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
 // ─────────────────────────────────────────────────────────────────
 
 const CAMPOS_CRONOGRAMA = ['evento', 'inicio_mes', 'duracao_meses', 'travado_inicio', 'travado_duracao'];
-const CAMPOS_FASE_COPIA = ['nome', 'ordem', 'inicio_mes', 'duracao_meses', 'absorcao', 'fluxo_pagamento'];
+const CAMPOS_FASE_COPIA = ['tipo', 'nome', 'ordem', 'inicio_mes', 'duracao_meses', 'absorcao', 'fluxo_pagamento'];
 const CAMPOS_ALOCACAO_COPIA = ['unidades', 'preco_m2', 'ordem'];
 
 export async function duplicarDadosAvancado(req: Request, origId: number, novoId: number): Promise<void> {

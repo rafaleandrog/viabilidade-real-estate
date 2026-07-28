@@ -160,7 +160,7 @@ export class ViabFluxoReceitas extends LitElement {
     this.carregando = true;
     try {
       const [fases, tipologias, crono, params] = await Promise.all([
-        listarFasesAvancado(this.estudo.id),
+        listarFasesAvancado(this.estudo.id, 'receita'),
         listarTipologiasCatalogo(this.estudo.id),
         buscarCronogramaAvancado(this.estudo.id),
         buscarParametrosAvancado(this.estudo.id),
@@ -369,7 +369,7 @@ export class ViabFluxoReceitas extends LitElement {
 
   private _adicionarFase = async () => {
     try {
-      const res = await criarFaseAvancado(this.estudo.id);
+      const res = await criarFaseAvancado(this.estudo.id, { tipo: 'receita' });
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao criar fase', 'erro'); return; }
       this.fases = [...this.fases, { ...res, alocacoes: res.alocacoes || [] }];
     } catch (e: any) {
