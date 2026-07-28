@@ -4,6 +4,38 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #182 — Resumo: KPIs zerados (2026-07-28)
+
+Branch `claude/r4-182-resumo-kpis-zerados`. Issue portão (§3 do mapa mestre), pré-requisito #188
+(já mergeado — PR #204). Destrava #183, #184.
+
+**Causa raiz (§9.1 do mapa mestre):** `tela-resumo.ts` chamava `calcularProforma({ ...this.estudo })`
+para os 4 KPIs "de negócio" (VGV, Resultado, Margem líquida, ROI) — mas essa função só lê colunas
+estáticas de `estudos` (Premissas), removidas da UI do Avançado no #88 (`tela-avancado.ts` já
+documentava: "proforma.ts ainda os lê para os KPIs do Resumo — mas sem superfície de edição aqui").
+Num estudo criado direto como Avançado essas colunas são `NULL` → os 4 KPIs saíam zerados mesmo com
+receitas/custos preenchidos nas outras abas. Os 4 KPIs de fluxo (VPL/TIR/Payback/Exposição), no
+mesmo card, sempre estiveram corretos porque vêm do `FluxoCalc` do motor — daí a inconsistência
+visível (uns zerados, outros não).
+
+**Fix:** `_renderKpis` (`tela-resumo.ts`) passa a calcular os 4 KPIs a partir do `FluxoCalc` já
+carregado, mesma fonte dos KPIs de fluxo — sem chamar Proforma para eles:
+- **VGV** = `c.vgvTotal` (motor).
+- **Resultado** = último ponto de `c.fluxoAcumulado` (mesma definição de `resultadoDe` em
+  `fluxo-tabela.ts`).
+- **Margem líquida (%)** = Resultado / VGV × 100.
+- **ROI (%)** = Resultado / custo total das linhas de custo (`c.linhasCusto`).
+
+Escopo é só os 4 KPIs — a pizza de composição de custos e os medidores continuam usando o Proforma
+(zerados/errados) até #184 e #183, que dependem deste PR.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 98 testes + build). Sem tela de
+teste dedicada (componente Lit; padrão do projeto é testar só as funções puras).
+
+**Merge:** portão (`Portão? = SIM` → #183, #184) — mergeado pela sessão após validação verde.
+
+---
+
 ## #180 — Terreno: obrigatórias; Outorga → Obras (2026-07-28)
 
 Branch `claude/r4-180-terreno-obrigatoria-outorga`. Issue portão (§3 do mapa mestre), pré-requisito
