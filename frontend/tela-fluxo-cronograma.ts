@@ -240,8 +240,8 @@ export class ViabFluxoCronograma extends LitElement {
         <td class="periodo">${rotuloPeriodo(dataInicio, Number(f.inicio_mes ?? 0), Number(f.duracao_meses ?? 12))}</td>
         ${!dis ? html`
           <td>
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
-              @click=${() => this._removerFase(f)}>Remover</urbi-botao>
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+              @click=${() => this._removerFase(f)}></urbi-botao>
           </td>` : nothing}
       </tr>
     `;

@@ -47,6 +47,12 @@ export class ViabTelaResumo extends LitElement {
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    /* #176: sem min-width:0 os urbi-kpi (itens diretos do grid) mantêm a
+       largura do próprio conteúdo (default min-width:auto de item de grid) e
+       transbordam por cima do card vizinho quando o valor é longo (R$ com
+       muitos dígitos) — mesmo ajuste que fluxo-tabela.ts já faz para o card
+       de KPI do Fluxo de Caixa. */
+    .kpis urbi-kpi { min-width: 0; width: 100%; }
     .graficos { display: flex; flex-direction: column; gap: 16px; }
     .lado-a-lado { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
     .medidores { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }

@@ -4,6 +4,39 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #174, #175, #169, #172, #176 — lote de correções pequenas de Custos/Receitas/UI (2026-07-28)
+
+Branch `claude/r4-lote-ui-menores`. Nenhuma é portão — PR único aberto e mergeado nesta sessão a
+pedido do autor. Nenhuma toca schema/backend/migração; puramente frontend.
+
+- **#174 — Largura dos campos de Duração/Início:** `.campo-mes` (Custos) tinha duas regras
+  conflitantes (ambas 80px) e esse tamanho cortava o número + sufixo ("º mês"/"meses") do
+  `viab-num`, que fica dentro do mesmo span que o emoji. Unificado numa regra só, 140px.
+- **#175 — Coluna Resultado sempre preenchida:** a coluna Resultado de Custos escondia o total em
+  `rs` (`orcamento_unidade`), mostrando "—" na maioria das linhas — o total resolvido em R$ é útil
+  independente da unidade de entrada. Removida a condição, sempre mostra `resolverCustoTotal`.
+- **#169 — Cor do botão "Absorção de Vendas":** usava `variante="primario"`, a mesma cor do botão
+  "Salvar" do nome da fase — ficava indistinguível dele e inconsistente com o botão irmão "Fluxo de
+  Pagamento" (`variante="secundario"`). Alinhado para `secundario`.
+- **#172 — Botão de remover só com lixeira:** 13 botões de remover/excluir em 11 telas
+  (`tela-apelo`, `tela-cenarios`, `tela-dashboard`, `tela-empreendimento-info`,
+  `tela-empreendimento-tipologias`, `tela-estudo`, `tela-fluxo-cronograma`, `tela-fluxo-custos`,
+  `tela-fluxo-receitas` ×2, `viab-imagem-principal`, `viabilidade-config-benchmarks`,
+  `viabilidade-config-curvas`) tinham texto "Remover"/"Excluir" ao lado do ícone de lixeira,
+  inconsistentes com os botões de remover linha de Entrada/Parcelas (já só ícone). Texto removido
+  de todos, com `title` preenchido para manter o tooltip/nome acessível.
+- **#176 — urbi-kpis sobrepostos:** `.kpis`/`.fx-kpis` (Resumo e Fluxo de Caixa) são grids
+  `auto-fit`, mas os itens (urbi-kpi direto em `tela-resumo.ts`; `.kpi-cel` em `fluxo-tabela.ts`)
+  não tinham `min-width: 0` — o default `min-width: auto` de item de grid segue o min-content do
+  valor (R$ com muitos dígitos), empurrando o card por cima do vizinho. `min-width: 0` +
+  `width: 100%` no urbi-kpi interno corrige nos dois arquivos.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 102 testes + build).
+
+**Merge:** nenhuma é portão, mas o autor autorizou mergear o lote nesta sessão.
+
+---
+
 ## #167 — Fases do Cronograma como âncora de Custos (2026-07-28)
 
 Branch `claude/r4-167-fase-ancora-custos`. Não é portão — pré-requisito #168 (já mergeado — PR

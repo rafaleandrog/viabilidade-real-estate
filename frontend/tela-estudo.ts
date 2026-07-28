@@ -202,8 +202,8 @@ export class ViabTelaEstudo extends LitElement {
                     .opcoes=${FUNCOES}
                     @urbi:select-change=${(e: CustomEvent) => this._alterarFuncao(m.usuario_id, e.detail.valor)}
                   ></urbi-select>
-                  <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
-                    @click=${() => this._removerMembro(m.usuario_id)}>Remover</urbi-botao>
+                  <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+                    @click=${() => this._removerMembro(m.usuario_id)}></urbi-botao>
                 ` : html`<urbi-badge cor="padrao">${m.funcao}</urbi-badge>`}
               </div>
             </div>
