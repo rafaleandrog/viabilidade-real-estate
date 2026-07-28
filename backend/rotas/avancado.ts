@@ -166,6 +166,18 @@ export function fluxoPagamentoPadrao(): Record<string, any> {
 const GRUPOS_CUSTO = ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'];
 const UNIDADES_ORCAMENTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita'];
 const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'obra', 'pos_obra', 'customizado'];
+
+// Linhas obrigatórias por grupo — espelha `LINHAS_OBRIGATORIAS` do frontend
+// (tela-fluxo-custos.ts). `obrigatoria` é decidida aqui, no servidor: a
+// primeira linha do estudo cuja grupo+categoria bate com a lista vira a linha
+// oficial (trava categoria, ganha ancoragem própria); linhas seguintes com a
+// mesma categoria são normais e removíveis (#178 — antes a marca "obrigatória"
+// era por categoria, então uma 2ª linha nascida de reclassificação de grupo
+// ficava indeletável).
+const LINHAS_OBRIGATORIAS_CUSTO: Partial<Record<string, string[]>> = {
+  obra: ['Construção'],
+  diretos: ['Corretagem de vendas'],
+};
 const REGEX_MES_ANO = /^(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\/\d{4}$/i;
 
 /** Projeta só os campos listados, ignorando ausentes (para cópia de linhas). */
@@ -979,6 +991,17 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
     if (ancora) {
       dados.inicio_mes = ancora.inicio_mes;
       if (req.body.duracao_meses === undefined) dados.duracao_meses = ancora.duracao_meses;
+    }
+
+    // `obrigatoria` não é campo de entrada (fora de CAMPOS_CUSTO): o servidor
+    // decide, marcando a primeira linha do estudo que bate grupo+categoria com
+    // LINHAS_OBRIGATORIAS_CUSTO. Evita a duplicação indeletável do #178.
+    const categoriasObrig = LINHAS_OBRIGATORIAS_CUSTO[String(dados.grupo)] ?? [];
+    if (dados.categoria !== undefined && categoriasObrig.includes(String(dados.categoria))) {
+      const existentes = await req.dados!.listar('avancado_linhas_custo', {
+        filtros: { estudo_id: estudo.id, grupo: dados.grupo, categoria: dados.categoria }, por_pagina: 1,
+      });
+      if (existentes.total === 0) dados.obrigatoria = true;
     }
 
     const criada = await req.dados!.criar('avancado_linhas_custo', dados);

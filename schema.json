@@ -317,7 +317,8 @@
         "cronograma_evento": { "tipo": "texto", "limite": 20, "opcoes": ["planejamento", "pre_lancamento", "obra", "pos_obra", "customizado"], "padrao": "customizado" },
         "inicio_mes":        { "tipo": "inteiro", "padrao": 0 },
         "duracao_meses":     { "tipo": "inteiro", "padrao": 1 },
-        "ordem":             { "tipo": "inteiro", "padrao": 0 }
+        "ordem":             { "tipo": "inteiro", "padrao": 0 },
+        "obrigatoria":       { "tipo": "logico", "padrao": false }
       },
       "indices": [["estudo_id"]]
     },
