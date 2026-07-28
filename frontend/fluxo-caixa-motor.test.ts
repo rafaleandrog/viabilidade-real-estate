@@ -255,6 +255,49 @@ test('Preço do Terreno em unit_delivery acompanha a receita em caixa, nao o VGV
   assert.ok(perto(linha.mensal[13], 0, 1e-6)); // nada entre entrada e repasse
 });
 
+// #196: Permuta financeira (subcategoria "Permuta" do Preço do Terreno) é
+// dedução da receita — sai de linhasCusto/custoMensal, entra negativa em
+// linhasReceita/receitaMensal. vgvTotal (KPI informativo) não muda.
+test('Permuta financeira do Preço do Terreno deduz a receita, nao vira custo (#196)', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
+      absorcao: {
+        modo: 'distribuido',
+        blocos: [{ evento: 'lancamento', pct: 40 }, { evento: 'obra', pct: 60 }, { evento: 'pos_obra', pct: 0 }],
+      },
+      fluxo_pagamento: null,
+    }],
+    linhasCusto: [
+      {
+        id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta',
+        orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
+        distribuicao_modo: 'sales_revenue', inicio_mes: 0, duracao_meses: 1,
+      },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+
+  // Some 1 linha em linhasReceita (a dedução) e NENHUMA em linhasCusto.
+  assert.equal(r.linhasCusto.length, 0);
+  assert.equal(r.linhasReceita.length, 2); // a linha de Vendas + a dedução
+  const deducao = r.linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
+  assert.ok(deducao, 'a permuta financeira deve aparecer em linhasReceita');
+  assert.ok(perto(deducao.total, -10_000_000, 1)); // -10% de 100M, negativo
+
+  // vgvTotal (KPI informativo, #188) não é afetado por permuta financeira.
+  assert.ok(perto(r.vgvTotal, 100_000_000, 1));
+  // Receita mensal já vem líquida da dedução (acompanha o VGV vendido, igual sales_revenue).
+  assert.ok(perto(r.receitaMensal[12], 40_000_000 - 0.10 * 40_000_000, 1));
+  // custoMensal fica zerado — a dedução não é custo.
+  assert.ok(perto(soma(r.custoMensal), 0, 1e-6));
+  // Resultado final = 100M vendido - 10M de permuta financeira.
+  assert.ok(perto(r.fluxoAcumulado[r.prazo - 1], 90_000_000, 1));
+});
+
 // 6. VPL com taxa zero = soma do fluxo
 test('VPL a taxa zero é a soma simples do fluxo', () => {
   const fluxo = [-100, 30, 40, 50];
