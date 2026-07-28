@@ -295,6 +295,18 @@ export function distribuirProporcional(custo: any, pesos: number[], ctx: Context
   return pesos.map((v) => (total * v) / somaPesos);
 }
 
+/**
+ * Permuta financeira (#196): a subcategoria "Permuta" da linha de Preço do
+ * Terreno — parte do preço paga em % da receita (ou valor fixo), não em
+ * caixa. Ao contrário da permuta física (#195, que reduz o VGV vendável),
+ * ela é uma DEDUÇÃO DA RECEITA: sai de `linhasCusto`/`custoMensal` e entra em
+ * `linhasReceita`/`receitaMensal` com valor negativo — mesmo tratamento do
+ * Preliminar (`proforma.ts`), onde permuta financeira reduz `receitaLiquida`.
+ */
+function ePermutaFinanceira(custo: any): boolean {
+  return ePrecoTerreno(custo) && String(custo?.subcategoria || '') === 'Permuta';
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Indicadores financeiros
 // ─────────────────────────────────────────────────────────────────
@@ -489,16 +501,23 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     };
   });
 
-  // Receita mensal agregada (caixa efetivo: entrada + parcelas + repasse na
-  // entrega) — calculada aqui, antes dos custos, porque o modo `unit_delivery`
-  // do Preço do Terreno (#194) precisa dela como peso de distribuição.
-  const receitaMensal = new Array<number>(prazo).fill(0);
-  for (const l of calcReceitas) for (let i = 0; i < prazo; i++) receitaMensal[i] += l.mensal[i];
+  // Receita mensal SÓ das vendas (caixa efetivo: entrada + parcelas + repasse
+  // na entrega) — calculada aqui, antes dos custos, porque o modo
+  // `unit_delivery` do Preço do Terreno (#194) e a Permuta financeira (#196)
+  // precisam dela como peso de distribuição. A receita FINAL (com a dedução
+  // da Permuta financeira) é calculada mais abaixo, depois de `calcCustos`.
+  const receitaMensalVendas = new Array<number>(prazo).fill(0);
+  for (const l of calcReceitas) for (let i = 0; i < prazo; i++) receitaMensalVendas[i] += l.mensal[i];
+
+  // Permuta financeira (#196) é dedução da receita, não custo — sai de
+  // `linhasCusto` antes do loop de custos.
+  const linhasCustoSemPermutaFinanceira = linhasCusto.filter((c) => !ePermutaFinanceira(c));
+  const linhasPermutaFinanceira = linhasCusto.filter(ePermutaFinanceira);
 
   // Custos por linha (valores positivos; sinal aplicado na consolidação).
   const curvasPorId = new Map<number, CurvaPersonalizada>(
     (config.curvas ?? []).map((k: any) => [Number(k.id), (k.valores ?? []) as CurvaPersonalizada]));
-  const calcCustos: LinhaCalc[] = linhasCusto.map((c) => {
+  const calcCustos: LinhaCalc[] = linhasCustoSemPermutaFinanceira.map((c) => {
     const nome = [c.categoria, c.subcategoria].filter(Boolean).join(' — ') || 'Custo';
     // Preserva o grupo real (5 grupos das abas de Custos: Terreno · Obra ·
     // Diretos · Indiretos · Financeiro, #125) para o Proforma exibir cada seção;
@@ -529,7 +548,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     if (ePrecoTerreno(c) && (c.distribuicao_modo === 'unit_delivery' || c.distribuicao_modo === 'sales_revenue')) {
       const pesos = c.distribuicao_modo === 'sales_revenue'
         ? vgvVendidoMensal(linhasReceita, crono, prazo)
-        : receitaMensal;
+        : receitaMensalVendas;
       const mensal = distribuirProporcional(c, pesos, ctxCusto);
       const r = recorte(mensal);
       return {
@@ -553,6 +572,37 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     };
   });
 
+  // Permuta financeira (#196): mesmo mecanismo de distribuição do Preço do
+  // Terreno (`fixo`/`unit_delivery`/`sales_revenue`, #194), mas o resultado
+  // entra NEGATIVO em `linhasReceita` — dedução da receita, não custo.
+  const calcDeducoesReceita: LinhaCalc[] = linhasPermutaFinanceira.map((c) => {
+    const nome = [c.categoria, c.subcategoria].filter(Boolean).join(' — ') || 'Custo';
+    let mensalBruto: number[];
+    if (c.distribuicao_modo === 'unit_delivery' || c.distribuicao_modo === 'sales_revenue') {
+      const pesos = c.distribuicao_modo === 'sales_revenue'
+        ? vgvVendidoMensal(linhasReceita, crono, prazo)
+        : receitaMensalVendas;
+      mensalBruto = distribuirProporcional(c, pesos, ctxCusto);
+    } else {
+      const total = resolverCustoTotal(c, ctxCusto);
+      const curva = c.curva_id ? (curvasPorId.get(Number(c.curva_id)) ?? 'linear') : 'linear';
+      mensalBruto = distribuirLinha(total, n(c.inicio_mes), n(c.duracao_meses), curva, prazo);
+    }
+    const mensal = mensalBruto.map((v) => -v);
+    const r = recorte(mensal);
+    return {
+      id: c.id, nome, grupo: 'receita' as const,
+      inicio: r.inicio, duracao: r.duracao,
+      total: mensal.reduce((s, v) => s + v, 0),
+      vpl: vplFluxo(mensal, taxa),
+      mensal,
+    };
+  });
+
+  const linhasReceitaFinal = [...calcReceitas, ...calcDeducoesReceita];
+  const receitaMensal = new Array<number>(prazo).fill(0);
+  for (const l of linhasReceitaFinal) for (let i = 0; i < prazo; i++) receitaMensal[i] += l.mensal[i];
+
   const custoMensal = new Array<number>(prazo).fill(0);
   for (const c of calcCustos) for (let i = 0; i < prazo; i++) custoMensal[i] += c.mensal[i];
 
@@ -566,10 +616,10 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
 
   // #188 — VGV Total / VGV Permuta Física / Receita Bruta (VGV): grandezas
   // informativas, consumidas pelo Resumo (#182), pela coluna % VGV do Fluxo
-  // de Caixa (#189) e pela permuta física (#195). Não alteram o fluxo em si —
-  // a permuta física continua fora do cálculo de caixa (ver comentário no
-  // topo do arquivo); apenas expõem o quanto do VGV Total é atribuível a
-  // unidades permutadas.
+  // de Caixa (#189) e pela permuta física (#195, que reduz a absorção de
+  // vendas ao VGV vendável). `vgvTotal` continua contando a tipologia
+  // inteira — só expõe o quanto do VGV Total é atribuível a unidades
+  // permutadas fisicamente.
   const vgvPermutaFisica = linhasReceita.reduce((s, l) => s + vgvPermutaFisicaLinha(l.tipologias), 0);
   const receitaBrutaVgv = ctxCusto.vgvTotal - vgvPermutaFisica;
 
@@ -585,7 +635,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     exposicaoMaxima,
     vgvPermutaFisica,
     receitaBrutaVgv,
-    linhasReceita: calcReceitas,
+    linhasReceita: linhasReceitaFinal,
     linhasCusto: calcCustos,
   };
 }

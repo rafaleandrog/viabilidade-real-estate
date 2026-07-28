@@ -4,6 +4,42 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #196 — Permuta financeira como dedução da receita (2026-07-28)
+
+Branch `claude/r4-196-permuta-financeira-deducao`. Não é portão — pré-requisitos #193 e #194 (ambos
+já mergeados — PR #208 e #209). Fecha a cadeia da Terreno (#178→#180→#188→#193→#194→#195→#196).
+
+⚠️ **Muda números de estudos existentes** que usam a subcategoria "Permuta" na linha de Preço do
+Terreno: o valor sai de "Custos do Terreno" e passa a reduzir a Receita — mesmo Resultado final,
+mas a composição por seção muda (correção pretendida, conforme o contrato C5 de
+`padrao-incorporacao.md`: "permuta financeira é dedução da receita").
+
+**O que é:** a linha de Preço do Terreno com subcategoria **"Permuta"** (já existente desde o #193)
+deixa de ser tratada como custo e passa a ser uma **dedução da receita** — mesmo tratamento que o
+Preliminar (`proforma.ts`) já dá à permuta financeira, e distinto da permuta física (#195, que reduz
+o VGV vendável, não gera linha separada).
+
+1. `frontend/fluxo-caixa-motor.ts` — `ePermutaFinanceira(custo)` (local, não exportada — grupo
+   `terreno` + categoria `Preço` + subcategoria `Permuta`). `linhasCusto` é dividida em duas antes do
+   loop de custos: as demais linhas seguem o caminho normal (`calcCustos`); as de Permuta financeira
+   viram `calcDeducoesReceita` — mesmo mecanismo de distribuição do #194
+   (`fixo`/`unit_delivery`/`sales_revenue`, via `distribuirProporcional`/`distribuirLinha`), mas com
+   o `mensal` **negado**. O resultado entra em `linhasReceita` (não `linhasCusto`) e é somado em
+   `receitaMensal` (não `custoMensal`).
+2. `vgvTotal`/`vgvPermutaFisica`/`receitaBrutaVgv` (KPIs informativos do #188) não mudam — a permuta
+   financeira não é permuta física, não afeta o VGV vendável.
+3. Comentário desatualizado no topo do arquivo e perto do `return` (dizia "permuta física continua
+   fora do cálculo de caixa", já não era mais verdade desde o #195) corrigido no mesmo PR.
+4. Teste novo em `fluxo-caixa-motor.test.ts`: a linha de Permuta financeira some de `linhasCusto`,
+   aparece negativa em `linhasReceita`, `custoMensal` fica zerado e o Resultado final bate com
+   receita menos a dedução.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 102 testes + build).
+
+**Merge:** não é portão, mas o autor autorizou mergear nesta sessão.
+
+---
+
 ## #195 — Permuta física reduz VGV/unidades/Resultado (2026-07-28)
 
 Branch `claude/r4-195-permuta-fisica-reduz-vgv`. Não é portão — pré-requisitos #193 e #188 (ambos já
