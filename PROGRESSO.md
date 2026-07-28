@@ -4,6 +4,44 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #178 — Obras: obrigatórias + fim da duplicação (2026-07-28)
+
+Branch `claude/r4-178-linhas-obrigatorias`. Issue portão (§3 do
+`docs/rodada-4-planilha-2026-07-27.md`), sem pré-requisito. Destrava #179, #180, #192.
+
+**Causa raiz (§9.2 do mapa mestre):** a migração `002_grupos_custo.js` moveu "Gestão da obra" de
+`obra` para `diretos`, mas `LINHAS_OBRIGATORIAS.obra` (frontend) continuava exigindo essa categoria
+em `obra` — a cada carga da tela, `_garantirLinhasObrigatorias` recriava a linha em `obra` porque a
+checagem de existência (por grupo+categoria) sempre falhava. A duplicata resultante era indeletável
+porque `eObrigatoria()` casava por **categoria**, então as duas cópias (a movida e a recriada)
+perdiam o botão Remover.
+
+**Fix:**
+1. `frontend/tela-fluxo-custos.ts` — removida "Gestão da obra" de `LINHAS_OBRIGATORIAS.obra` (só
+   "Construção" continua obrigatória em Obra; Corretagem de vendas segue obrigatória em Diretos).
+   Fim da causa da recriação.
+2. `schema.json` — nova coluna `obrigatoria` (lógico, padrão `false`) em `avancado_linhas_custo`.
+   `eObrigatoria()` e `ordenarLinhas()` passam a identificar a linha oficial por **essa flag**, não
+   por categoria — uma 2ª linha com o mesmo nome (dado legado ou reclassificação futura de grupo)
+   fica editável/removível.
+3. `backend/rotas/avancado.ts` — `POST /avancado/custos` decide `obrigatoria` no servidor
+   (`LINHAS_OBRIGATORIAS_CUSTO`, espelha o mapa do frontend): marca `true` só na 1ª linha do estudo
+   que bate grupo+categoria com a exigência. Campo não é client-writable (fora de `CAMPOS_CUSTO`).
+4. `migracoes/006_linhas_custo_obrigatoria.js` — backfill: para cada estudo+grupo, a linha de menor
+   `id` cuja categoria bate com a exigência atual (Construção/obra, Corretagem de vendas/diretos)
+   recebe `obrigatoria=true`. Nenhuma linha é apagada — inclusive a "Gestão da obra" órfã criada em
+   `obra` pelo bug some da trava e vira uma linha normal, removível pelo usuário. `manifesto.json`
+   `versao` `0.1.4` → `0.1.5`.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 97 testes + build). Backend
+(typecheck, migração, `urbi-empacotar`) fica para o ambiente autenticado do autor, conforme
+`CLAUDE.md` — o `@urbiverso/sdk` não está disponível aqui.
+
+**Merge:** portão (`Portão? = SIM`) — mergeado pela sessão após validação verde, conforme §3 do
+mapa mestre.
+
+---
+
 ## Rodada 4 — planejamento e abertura das issues (2026-07-27)
 
 Branch `claude/viability-issues-planning-678j2c`. **Sessão de planejamento — zero código.** Saída:

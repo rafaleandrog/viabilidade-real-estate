@@ -142,12 +142,18 @@ const EVENTOS_ANCORA = [
 // Linhas obrigatórias por grupo (na ordem declarada): sempre nas primeiras
 // posições, categoria travada e não removíveis. A linha inexistente é criada ao
 // abrir a tela. `unidade` fixa a unidade de orçamento na criação.
+//
+// A migração 002 moveu "Gestão da obra" de `obra` para `diretos` — este mapa
+// só declara o que hoje é exigido em cada grupo. Não redeclarar "Gestão da
+// obra" aqui: fazia `_garantirLinhasObrigatorias` recriar, em `obra`, uma
+// linha que a migração já tinha movido para `diretos` — a origem da
+// duplicação indeletável do #178 (a categoria existia, só que no grupo
+// errado, então a checagem de existência falhava sempre).
 interface LinhaObrigatoria { categoria: string; posicao: number; unidade?: string }
 
 const LINHAS_OBRIGATORIAS: Partial<Record<GrupoId, LinhaObrigatoria[]>> = {
   obra: [
     { categoria: 'Construção', posicao: 0 },
-    { categoria: 'Gestão da obra', posicao: 1 },
   ],
   // Corretagem de vendas: 1ª linha de Custos Diretos, sempre em % VGV (#121).
   diretos: [
@@ -159,8 +165,12 @@ function obrigatoriasDoGrupo(grupo: string | null | undefined): LinhaObrigatoria
   return LINHAS_OBRIGATORIAS[grupo as GrupoId] ?? [];
 }
 
+// Identidade, não categoria (#178): `obrigatoria` é decidida pelo servidor na
+// criação e marca só a linha oficial. Uma 2ª linha com a mesma categoria (dado
+// legado, ou reclassificação futura de grupo) fica com `obrigatoria=false` e
+// portanto editável/removível — nunca mais trava por coincidência de nome.
 function eObrigatoria(c: any): boolean {
-  return obrigatoriasDoGrupo(c.grupo).some((o) => o.categoria === c.categoria);
+  return c.obrigatoria === true;
 }
 
 // Linha "Construção" (obrigatória, 1ª do grupo Obra): além da categoria travada
@@ -177,7 +187,10 @@ function ordenarLinhas(grupo: GrupoId, linhas: any[]): any[] {
   if (obrigatorias.length === 0) return linhas;
   const obrig: any[] = [];
   for (const cat of obrigatorias) {
-    const linha = linhas.find((c) => c.categoria === cat.categoria);
+    // Prioriza a linha marcada pelo servidor; cai para categoria só em dado
+    // legado ainda não migrado (backfill roda na 006_linhas_custo_obrigatoria).
+    const linha = linhas.find((c) => c.obrigatoria === true && c.categoria === cat.categoria)
+      ?? linhas.find((c) => c.categoria === cat.categoria);
     if (linha) obrig.push(linha);
   }
   // Comparação por identidade: uma 2ª linha com a mesma categoria (dado legado)
