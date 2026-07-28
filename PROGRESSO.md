@@ -4,6 +4,39 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #167 — Fases do Cronograma como âncora de Custos (2026-07-28)
+
+Branch `claude/r4-167-fase-ancora-custos`. Não é portão — pré-requisito #168 (já mergeado — PR
+#212). Só foi seguro implementar depois do #168 separar as fases de Cronograma das de Receitas — a
+lista de fases hoje é limpa (`tipo='cronograma'` vs `'receita'`).
+
+**O que é:** a coluna Distribuição de uma linha de Custos ganha, além dos 5 eventos fixos do
+Cronograma (`EVENTOS_ANCORA`), a opção de ancorar numa **fase do Cronograma** (tipo `cronograma`,
+criada em "Fases comerciais") — início/duração passam a vir dessa fase, do mesmo jeito que já
+funcionava para os eventos fixos.
+
+1. `schema.json` — nova coluna `fase_ancora_id` (referência a `avancado_fases`, `ao_deletar:
+   anular`) em `avancado_linhas_custo`. Mutuamente exclusiva com `cronograma_evento`.
+2. `backend/rotas/avancado.ts` — `ancorarLinhaCustoEmFase` (valida que a fase pertence ao estudo e é
+   `tipo='cronograma'`) espelha `ancorarLinhaCusto`. POST/PATCH de custos: `fase_ancora_id` tem
+   prioridade sobre `cronograma_evento` quando presente; a mesma trava de "início calculado quando
+   ancorado" (`CAMPO_TRAVADO`) se aplica à âncora de fase. Duplicar estudo (`duplicarDadosAvancado`)
+   remapeia `fase_ancora_id` para a fase **nova** via `mapaFase` — copiar o id antigo apontaria para
+   uma fase de outro estudo.
+3. `frontend/tela-fluxo-custos.ts` — carrega `listarFasesAvancado(estudoId, 'cronograma')`; a coluna
+   Cronograma oferece as fases junto dos 5 eventos fixos (`valor: 'fase:<id>'`); a coluna Início
+   trava (🔒) quando `fase_ancora_id` está setado, mostrando o nome da fase.
+4. `migracoes/011_fase_ancora_id.js` — coluna aditiva, sem transformação de dado. `versao` `0.1.9` →
+   `0.1.10`.
+5. `docs/viabilidade/padrao-incorporacao.md` — seção de Linhas de custo atualizada.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 102 testes + build). Backend
+(typecheck, execução da migração, `urbi-empacotar`) fica para o ambiente autenticado do autor.
+
+**Merge:** não é portão, mas o autor autorizou mergear nesta sessão.
+
+---
+
 ## #168 — Separar fases Cronograma × Receitas (2026-07-28)
 
 Branch `claude/r4-168-fases-tipo`. Issue portão (§3 do mapa mestre), sem pré-requisito. Destrava

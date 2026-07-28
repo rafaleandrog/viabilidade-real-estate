@@ -83,6 +83,23 @@ export function ancorarLinhaCusto(
   return { inicio_mes: ev.inicio_mes, duracao_meses: ev.duracao_meses };
 }
 
+/**
+ * Resolve início/duração de uma linha de custo ancorada a uma FASE do
+ * Cronograma (#167 — só depois do #168 separar fases de Cronograma/Receitas
+ * era seguro oferecer isso: antes, a lista de fases misturava as duas telas).
+ * `null` = `fase_ancora_id` inválido (fase inexistente, de outro estudo, ou
+ * do tipo `receita` — só fases `cronograma` servem de âncora).
+ */
+async function ancorarLinhaCustoEmFase(
+  req: Request,
+  estudoId: number,
+  faseAncoraId: number,
+): Promise<{ inicio_mes: number; duracao_meses: number } | null> {
+  const fase = await req.dados!.buscar('avancado_fases', faseAncoraId);
+  if (!fase || Number(fase.estudo_id) !== estudoId || fase.tipo !== 'cronograma') return null;
+  return { inicio_mes: Number(fase.inicio_mes) || 0, duracao_meses: Number(fase.duracao_meses) || 1 };
+}
+
 // Curva S padrão: distribuição em S normalizada para 12 meses (soma = 100).
 // O motor interpola para a duração real de cada linha.
 export function curvaSPadrao(): { mes: number; pct: number }[] {
@@ -983,7 +1000,7 @@ rotasAvancado.get('/estudos/:id/avancado/custos', async (req: Request, res: Resp
   }
 });
 
-const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo'];
+const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo'];
 
 function validarCamposCusto(res: Response, dados: Record<string, any>): boolean {
   if (dados.grupo !== undefined && !GRUPOS_CUSTO.includes(dados.grupo)) {
@@ -1026,11 +1043,24 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
     }
     if (!validarCamposCusto(res, dados)) return;
 
-    // Ancoragem: evento ≠ customizado herda início/duração do cronograma.
-    const ancora = ancorarLinhaCusto(String(dados.cronograma_evento), (await lerCronograma(req, estudo.id)).linhas);
-    if (ancora) {
-      dados.inicio_mes = ancora.inicio_mes;
-      if (req.body.duracao_meses === undefined) dados.duracao_meses = ancora.duracao_meses;
+    // Ancoragem: fase do Cronograma (#167) tem prioridade sobre evento fixo —
+    // as duas são mutuamente exclusivas (o frontend nunca manda as duas).
+    if (dados.fase_ancora_id !== undefined && dados.fase_ancora_id !== null) {
+      const ancoraFase = await ancorarLinhaCustoEmFase(req, estudo.id, Number(dados.fase_ancora_id));
+      if (!ancoraFase) {
+        erro(res, 400, 'FASE_ANCORA_INVALIDA', 'fase_ancora_id deve ser uma fase do Cronograma deste estudo');
+        return;
+      }
+      dados.cronograma_evento = 'customizado';
+      dados.inicio_mes = ancoraFase.inicio_mes;
+      if (req.body.duracao_meses === undefined) dados.duracao_meses = ancoraFase.duracao_meses;
+    } else {
+      // Ancoragem: evento ≠ customizado herda início/duração do cronograma.
+      const ancora = ancorarLinhaCusto(String(dados.cronograma_evento), (await lerCronograma(req, estudo.id)).linhas);
+      if (ancora) {
+        dados.inicio_mes = ancora.inicio_mes;
+        if (req.body.duracao_meses === undefined) dados.duracao_meses = ancora.duracao_meses;
+      }
     }
 
     // `obrigatoria` não é campo de entrada (fora de CAMPOS_CUSTO): o servidor
@@ -1073,18 +1103,40 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
     if (!validarCamposCusto(res, dados)) return;
 
-    // Ao trocar a âncora para um evento do cronograma, herda início/duração dele.
-    const eventoFinal = String(dados.cronograma_evento ?? custo.cronograma_evento);
-    if (dados.cronograma_evento !== undefined && dados.cronograma_evento !== 'customizado') {
-      const ancora = ancorarLinhaCusto(eventoFinal, (await lerCronograma(req, estudo.id)).linhas);
-      if (ancora) {
-        dados.inicio_mes = ancora.inicio_mes;
-        if (req.body.duracao_meses === undefined) dados.duracao_meses = ancora.duracao_meses;
+    // Âncora final (nova, se veio no PATCH; senão a que já estava salva) —
+    // fase do Cronograma (#167) e evento fixo são mutuamente exclusivas.
+    const faseAncoraFinal = dados.fase_ancora_id !== undefined ? dados.fase_ancora_id : custo.fase_ancora_id;
+    if (faseAncoraFinal !== undefined && faseAncoraFinal !== null) {
+      if (dados.fase_ancora_id !== undefined) {
+        // Trocando a âncora agora: valida e deriva início/duração da fase.
+        const ancoraFase = await ancorarLinhaCustoEmFase(req, estudo.id, Number(faseAncoraFinal));
+        if (!ancoraFase) {
+          erro(res, 400, 'FASE_ANCORA_INVALIDA', 'fase_ancora_id deve ser uma fase do Cronograma deste estudo');
+          return;
+        }
+        dados.cronograma_evento = 'customizado';
+        dados.inicio_mes = ancoraFase.inicio_mes;
+        if (req.body.duracao_meses === undefined) dados.duracao_meses = ancoraFase.duracao_meses;
+      } else if (dados.inicio_mes !== undefined) {
+        // Início é calculado quando ancorado a uma fase — só editável trocando
+        // fase_ancora_id para null (mesma trava do evento-âncora, abaixo).
+        erro(res, 422, 'CAMPO_TRAVADO', 'inicio_mes é calculado pela fase-âncora; envie fase_ancora_id = null para editar');
+        return;
       }
-    } else if (eventoFinal !== 'customizado' && dados.inicio_mes !== undefined) {
-      // Início é calculado quando ancorado — só editável em customizado.
-      erro(res, 422, 'CAMPO_TRAVADO', 'inicio_mes é calculado pelo evento-âncora; use cronograma_evento = customizado para editar');
-      return;
+    } else {
+      // Ao trocar a âncora para um evento do cronograma, herda início/duração dele.
+      const eventoFinal = String(dados.cronograma_evento ?? custo.cronograma_evento);
+      if (dados.cronograma_evento !== undefined && dados.cronograma_evento !== 'customizado') {
+        const ancora = ancorarLinhaCusto(eventoFinal, (await lerCronograma(req, estudo.id)).linhas);
+        if (ancora) {
+          dados.inicio_mes = ancora.inicio_mes;
+          if (req.body.duracao_meses === undefined) dados.duracao_meses = ancora.duracao_meses;
+        }
+      } else if (eventoFinal !== 'customizado' && dados.inicio_mes !== undefined) {
+        // Início é calculado quando ancorado — só editável em customizado.
+        erro(res, 422, 'CAMPO_TRAVADO', 'inicio_mes é calculado pelo evento-âncora; use cronograma_evento = customizado para editar');
+        return;
+      }
     }
 
     const atualizada = await req.dados!.atualizar('avancado_linhas_custo', cid, dados);
@@ -1132,10 +1184,12 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     req.dados!.listar('avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
     req.dados!.listar('avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 1000 }),
   ]);
+  const mapaFase = new Map<number, number>();
   for (const fase of fases.dados) {
     const nova = await req.dados!.criar('avancado_fases', {
       estudo_id: novoId, ...extrairCampos(fase, CAMPOS_FASE_COPIA),
     });
+    mapaFase.set(Number(fase.id), Number(nova.id));
     for (const aloc of alocacoes.dados) {
       if (Number(aloc.fase_id) !== Number(fase.id)) continue;
       const novaTipologia = mapaTipologia.get(Number(aloc.tipologia_id));
@@ -1147,14 +1201,18 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     }
   }
 
-  // Linhas de custo (curva_id copia direto — curvas são globais da instância).
+  // Linhas de custo (curva_id copia direto — curvas são globais da instância;
+  // fase_ancora_id remapeia para a fase NOVA, #167 — copiar o id antigo
+  // apontaria para uma fase de outro estudo).
   const custos = await req.dados!.listar('avancado_linhas_custo', {
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
   });
   for (const custo of custos.dados) {
-    await req.dados!.criar('avancado_linhas_custo', {
-      estudo_id: novoId, ...extrairCampos(custo, CAMPOS_CUSTO),
-    });
+    const copia: Record<string, any> = { estudo_id: novoId, ...extrairCampos(custo, CAMPOS_CUSTO) };
+    if (custo.fase_ancora_id !== null && custo.fase_ancora_id !== undefined) {
+      copia.fase_ancora_id = mapaFase.get(Number(custo.fase_ancora_id)) ?? null;
+    }
+    await req.dados!.criar('avancado_linhas_custo', copia);
   }
 
   // Cenários salvos (Etapa 8 · #56) — deltas percentuais, sem dado derivado.
