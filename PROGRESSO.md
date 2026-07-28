@@ -4,6 +4,34 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #173 — Remover coluna Subcategoria (exceto Terreno) (2026-07-28)
+
+Branch `claude/r4-173-subcategoria-so-terreno`. Issue portão (§3 do mapa mestre), sem pré-requisito.
+Destrava (junto com #174 ✅, #175 ✅, #198) o #181.
+
+**O que é:** Terreno é o único grupo com uma lista real de subcategorias (Preço:
+`Valor à vista`/`Permuta`/`Parcelado`/`Outro`); nos demais grupos a coluna só mostrava "—" ou, na
+categoria "Outro", um campo de texto livre sem função clara. A coluna some de Obra/Diretos/
+Indiretos/Financeiro.
+
+1. `frontend/tela-fluxo-custos.ts` — `_colunas(g)` filtra a coluna `subcategoria` fora de
+   `g.id === 'terreno'`.
+2. `frontend/fluxo-caixa-motor.ts` — `nomeLinhaCusto(c)` (nova, local): o nome de exibição só
+   concatena subcategoria quando `grupo === 'terreno'` — dado legado de subcategoria em outro grupo
+   (a categoria "Outro" aceitava texto livre em todo grupo antes desta issue) não aparece mais
+   pendurado no nome da linha, já que não tem mais editor na UI para corrigi-lo.
+3. Teste novo em `fluxo-caixa-motor.test.ts` cobrindo os dois casos (Terreno inclui subcategoria;
+   outro grupo não).
+
+Sem schema/migração — mudança de exibição, nenhum dado é apagado ou reescrito.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 103 testes + build).
+
+**Merge:** portão (`Portão? = SIM`, junto com #174/#175/#198 → #181) — mergeado pela sessão após
+validação verde.
+
+---
+
 ## #165 + #166 — Pré-lançamento derivado do Planejamento; duração do Lançamento livre (2026-07-28)
 
 Branch `claude/r4-165-166-cronograma-travados`. Duas issues portão (§3 do mapa mestre), sem

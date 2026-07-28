@@ -127,6 +127,25 @@ test('linha de custo em % VGV resolve sobre o VGV das tipologias', () => {
   assert.ok(perto(soma(r.linhasCusto[0].mensal), 1_250_000, 1));
 });
 
+// #173: subcategoria só compõe o nome de exibição em Terreno — nos demais
+// grupos a coluna some da tela e o dado legado não deve "vazar" no nome.
+test('nome da linha de custo inclui subcategoria só em Terreno (#173)', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [],
+    linhasCusto: [
+      { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta', orcamento_valor: 1, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+      { id: 2, grupo: 'indireto', categoria: 'Gestão', subcategoria: 'Legado', orcamento_valor: 1, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  const terreno = r.linhasReceita.find((l) => l.nome.includes('Preço'))!; // vira dedução da receita (#196)
+  const indireto = r.linhasCusto.find((l) => l.nome.includes('Gestão'))!;
+  assert.equal(terreno.nome, 'Preço — Permuta');
+  assert.equal(indireto.nome, 'Gestão'); // subcategoria legada não aparece fora de Terreno
+});
+
 // 5b. Corretagem de vendas: paga no mês da venda, não distribuída (#121)
 test('corretagem de vendas cai no mês da venda, acompanhando a absorção', () => {
   const config: FluxoConfig = {

@@ -591,7 +591,10 @@ export class ViabFluxoCustos extends LitElement {
             @click=${() => { this.removerAlvo = c; }}></urbi-botao>`,
       });
     }
-    return colunas;
+    // #173: Subcategoria só existe de fato em Terreno (Preço tem uma lista real
+    // de subs); nos demais grupos a coluna ficava com "—" ou um campo de texto
+    // livre sem função clara. Some para todo grupo que não seja Terreno.
+    return g.id === 'terreno' ? colunas : colunas.filter((col) => col.id !== 'subcategoria');
   }
 
   // Alinha a linha Construção ao cronograma do empreendimento: fixa o evento em

@@ -24,6 +24,18 @@ import {
 
 const n = (v: any): number => Number(v) || 0;
 
+/**
+ * Nome de exibição de uma linha de custo: categoria + subcategoria — mas só
+ * para `terreno`, o único grupo com subcategoria editável na tela (#173).
+ * Dado legado de subcategoria em outro grupo (categoria "Outro" aceitava
+ * texto livre em todos os grupos antes desta issue) fica sem editor na UI e
+ * não deve aparecer pendurado no nome.
+ */
+function nomeLinhaCusto(c: any): string {
+  const partes = c.grupo === 'terreno' ? [c.categoria, c.subcategoria] : [c.categoria];
+  return partes.filter(Boolean).join(' — ') || 'Custo';
+}
+
 export type CurvaPersonalizada = { mes: number; pct: number }[];
 
 // ─────────────────────────────────────────────────────────────────
@@ -518,7 +530,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const curvasPorId = new Map<number, CurvaPersonalizada>(
     (config.curvas ?? []).map((k: any) => [Number(k.id), (k.valores ?? []) as CurvaPersonalizada]));
   const calcCustos: LinhaCalc[] = linhasCustoSemPermutaFinanceira.map((c) => {
-    const nome = [c.categoria, c.subcategoria].filter(Boolean).join(' — ') || 'Custo';
+    const nome = nomeLinhaCusto(c);
     // Preserva o grupo real (5 grupos das abas de Custos: Terreno · Obra ·
     // Diretos · Indiretos · Financeiro, #125) para o Proforma exibir cada seção;
     // grupo desconhecido/legado cai em 'indireto'.
@@ -576,7 +588,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   // Terreno (`fixo`/`unit_delivery`/`sales_revenue`, #194), mas o resultado
   // entra NEGATIVO em `linhasReceita` — dedução da receita, não custo.
   const calcDeducoesReceita: LinhaCalc[] = linhasPermutaFinanceira.map((c) => {
-    const nome = [c.categoria, c.subcategoria].filter(Boolean).join(' — ') || 'Custo';
+    const nome = nomeLinhaCusto(c);
     let mensalBruto: number[];
     if (c.distribuicao_modo === 'unit_delivery' || c.distribuicao_modo === 'sales_revenue') {
       const pesos = c.distribuicao_modo === 'sales_revenue'
