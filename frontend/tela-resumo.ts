@@ -106,7 +106,7 @@ export class ViabTelaResumo extends LitElement {
     const dataInicio = this.dados?.dataInicio ?? null;
     const crono = this.dados?.crono ?? [];
     return html`
-      ${this._renderKpis(c, p)}
+      ${this._renderKpis(c)}
       <div class="graficos">
         <urbi-card titulo="Fluxo de Caixa Acumulado">
           <div class="graf-wrap"><div class="graf">${graficoFluxoAcumulado(c, dataInicio, crono)}</div></div>
@@ -122,19 +122,33 @@ export class ViabTelaResumo extends LitElement {
     `;
   }
 
-  private _renderKpis(c: FluxoCalc, p: Proforma): TemplateResult {
+  // #182: os 4 últimos KPIs vinham do Proforma (`calcularProforma`), que só lê
+  // colunas estáticas de `estudos` (Premissas) — removidas do Avançado no #88.
+  // Num estudo criado direto como Avançado essas colunas são NULL e os 4 KPIs
+  // saíam zerados, mesmo com receitas/custos preenchidos nas outras abas. Os
+  // dados certos já estão no `FluxoCalc` carregado (mesma fonte dos 4 KPIs de
+  // fluxo, que sempre estiveram corretos): VGV = `c.vgvTotal`; Resultado =
+  // último ponto do acumulado (mesma definição de `resultadoDe` em
+  // `fluxo-tabela.ts`); Margem líquida = Resultado/VGV; ROI = Resultado sobre
+  // o custo total das linhas de custo do Avançado.
+  private _renderKpis(c: FluxoCalc): TemplateResult {
     const tirTxt = c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`;
     const tirVar = c.tir === null ? '' : (c.tir > 0 ? 'sucesso' : 'erro');
+    const vgv = c.vgvTotal;
+    const resultado = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] || 0;
+    const custoTotal = c.linhasCusto.reduce((s, l) => s + l.total, 0);
+    const margemLiquidaPct = vgv > 0 ? (resultado / vgv) * 100 : 0;
+    const roiPct = custoTotal > 0 ? (resultado / custoTotal) * 100 : 0;
     return html`
       <div class="kpis">
         <urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
         <urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi>
         <urbi-kpi rotulo="Payback" .valor=${c.paybackData ?? '—'}></urbi-kpi>
         <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi>
-        <urbi-kpi rotulo="VGV" .valor=${fmtR$(p.vgv)}></urbi-kpi>
-        <urbi-kpi rotulo="Resultado" .valor=${fmtR$(p.resultado)} variante=${p.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        <urbi-kpi rotulo="Margem líquida" .valor=${fmtPct(p.margemLiquidaPct)} variante=${p.margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        <urbi-kpi rotulo="ROI" .valor=${fmtPct(p.roiPct)} variante=${p.roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="VGV" .valor=${fmtR$(vgv)}></urbi-kpi>
+        <urbi-kpi rotulo="Resultado" .valor=${fmtR$(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="Margem líquida" .valor=${fmtPct(margemLiquidaPct)} variante=${margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="ROI" .valor=${fmtPct(roiPct)} variante=${roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
       </div>
     `;
   }
