@@ -14,7 +14,7 @@
 import {
   absorcaoMensal, vgvLinha, vgvTipologia, vglLinha, vgvPermutaFisicaLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
-  eCorretagem, vgvVendidoMensal,
+  eCorretagem, vgvVendidoMensal, ePrecoTerreno,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado,
 } from './fluxo-shared.js';
 
@@ -271,6 +271,24 @@ export function corretagemMensal(
   return vendas.map((v) => (total * v) / somaVendas);
 }
 
+/**
+ * Rateia o total resolvido de `custo` proporcionalmente a `pesos` (mesmo
+ * mecanismo de `corretagemMensal`, generalizado para os modos `unit_delivery`/
+ * `sales_revenue` da linha de Preço do Terreno, #194): em `pct_vgv` aplica o %
+ * direto sobre cada peso; nas demais unidades, rateia o total resolvido
+ * proporcionalmente. Sem peso no horizonte (soma ≤ 0), não distribui nada.
+ */
+export function distribuirProporcional(custo: any, pesos: number[], ctx: ContextoCusto): number[] {
+  const somaPesos = pesos.reduce((s, v) => s + v, 0);
+  if (somaPesos <= 0) return pesos.map(() => 0);
+  if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv') {
+    const pct = n(custo?.orcamento_valor) / 100;
+    return pesos.map((v) => v * pct);
+  }
+  const total = resolverCustoTotal(custo, ctx);
+  return pesos.map((v) => (total * v) / somaPesos);
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Indicadores financeiros
 // ─────────────────────────────────────────────────────────────────
@@ -464,6 +482,12 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     };
   });
 
+  // Receita mensal agregada (caixa efetivo: entrada + parcelas + repasse na
+  // entrega) — calculada aqui, antes dos custos, porque o modo `unit_delivery`
+  // do Preço do Terreno (#194) precisa dela como peso de distribuição.
+  const receitaMensal = new Array<number>(prazo).fill(0);
+  for (const l of calcReceitas) for (let i = 0; i < prazo; i++) receitaMensal[i] += l.mensal[i];
+
   // Custos por linha (valores positivos; sinal aplicado na consolidação).
   const curvasPorId = new Map<number, CurvaPersonalizada>(
     (config.curvas ?? []).map((k: any) => [Number(k.id), (k.valores ?? []) as CurvaPersonalizada]));
@@ -489,6 +513,27 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
       };
     }
 
+    // Preço do Terreno em `unit_delivery`/`sales_revenue` (#194): sem
+    // cronograma próprio, distribuído proporcionalmente a um peso mensal —
+    // `sales_revenue` acompanha o VGV VENDIDO (igual à Corretagem, absorção
+    // das vendas); `unit_delivery` acompanha a RECEITA EM CAIXA (entrada +
+    // parcelas + repasse na entrega das unidades). `fixo` (padrão) cai no
+    // caminho normal abaixo, igual às demais linhas de Terreno.
+    if (ePrecoTerreno(c) && (c.distribuicao_modo === 'unit_delivery' || c.distribuicao_modo === 'sales_revenue')) {
+      const pesos = c.distribuicao_modo === 'sales_revenue'
+        ? vgvVendidoMensal(linhasReceita, crono, prazo)
+        : receitaMensal;
+      const mensal = distribuirProporcional(c, pesos, ctxCusto);
+      const r = recorte(mensal);
+      return {
+        id: c.id, nome, grupo,
+        inicio: r.inicio, duracao: r.duracao,
+        total: mensal.reduce((s, v) => s + v, 0),
+        vpl: vplFluxo(mensal, taxa),
+        mensal,
+      };
+    }
+
     const total = resolverCustoTotal(c, ctxCusto);
     const curva = c.curva_id ? (curvasPorId.get(Number(c.curva_id)) ?? 'linear') : 'linear';
     const mensal = distribuirLinha(total, n(c.inicio_mes), n(c.duracao_meses), curva, prazo);
@@ -501,8 +546,6 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     };
   });
 
-  const receitaMensal = new Array<number>(prazo).fill(0);
-  for (const l of calcReceitas) for (let i = 0; i < prazo; i++) receitaMensal[i] += l.mensal[i];
   const custoMensal = new Array<number>(prazo).fill(0);
   for (const c of calcCustos) for (let i = 0; i < prazo; i++) custoMensal[i] += c.mensal[i];
 
