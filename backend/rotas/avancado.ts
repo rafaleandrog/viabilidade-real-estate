@@ -175,6 +175,7 @@ const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'obra', 'pos_obra', 'c
 // era por categoria, então uma 2ª linha nascida de reclassificação de grupo
 // ficava indeletável).
 const LINHAS_OBRIGATORIAS_CUSTO: Partial<Record<string, string[]>> = {
+  terreno: ['Compra'],
   obra: ['Construção'],
   diretos: ['Corretagem de vendas'],
 };

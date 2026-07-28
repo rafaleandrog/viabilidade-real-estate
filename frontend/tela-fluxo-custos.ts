@@ -45,12 +45,14 @@ const GRUPOS: Grupo[] = [
 const CATEGORIAS: Record<GrupoId, { nome: string; subs: string[] }[]> = {
   terreno: [
     { nome: 'Compra', subs: ['Valor à vista', 'Permuta', 'Parcelado', 'Outro'] },
-    { nome: 'Outorga', subs: [] },
     { nome: 'Registro', subs: [] },
     { nome: 'Outro', subs: [] },
   ],
   obra: [
     { nome: 'Construção', subs: [] },
+    // Outorga onerosa é contrapartida do potencial construtivo — custo de
+    // desenvolvimento da obra, não de aquisição do terreno (#180).
+    { nome: 'Outorga', subs: [] },
     { nome: 'Decoração', subs: [] },
     { nome: 'Gestão da obra', subs: [] },
     { nome: 'Contingência', subs: [] },
@@ -105,12 +107,12 @@ const UNIDADES = [
 const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
   terreno: {
     'Compra':  ['rs', 'rs_m2_terreno'],
-    'Outorga': ['rs', 'pct_vgv'],
     'Registro':['rs', 'rs_m2_priv'],
     'Outro':   ['rs', 'pct_vgv'],
   },
   obra: {
     'Construção':    ['rs', 'rs_m2_priv'],
+    'Outorga':       ['rs', 'pct_vgv'],
     'Decoração':     ['rs', 'rs_m2_priv'],
     'Gestão da obra':['rs', 'pct_obra'],
     'Contingência':  ['rs', 'pct_vgv'],
@@ -152,6 +154,11 @@ const EVENTOS_ANCORA = [
 interface LinhaObrigatoria { categoria: string; posicao: number; unidade?: string }
 
 const LINHAS_OBRIGATORIAS: Partial<Record<GrupoId, LinhaObrigatoria[]>> = {
+  // Compra: 1ª linha de Custos do Terreno — todo estudo tem aquisição do
+  // terreno (#180).
+  terreno: [
+    { categoria: 'Compra', posicao: 0 },
+  ],
   obra: [
     { categoria: 'Construção', posicao: 0 },
   ],
