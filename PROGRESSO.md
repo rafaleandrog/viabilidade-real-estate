@@ -4,6 +4,43 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #168 — Separar fases Cronograma × Receitas (2026-07-28)
+
+Branch `claude/r4-168-fases-tipo`. Issue portão (§3 do mapa mestre), sem pré-requisito. Destrava
+#167.
+
+**Causa raiz (§6 do mapa mestre):** Cronograma e Receitas faziam CRUD na MESMA lista de
+`avancado_fases`, pelas mesmas funções (`tela-fluxo-cronograma.ts`/`tela-fluxo-receitas.ts`), sem
+nenhum discriminador no schema. Uma fase criada em qualquer uma das duas telas aparecia — e podia
+ser editada/removida — na outra: uma fase de gantt sem alocações virava uma "linha de receita" vazia
+no motor; uma fase de receita com Absorção/Fluxo de Pagamento aparecia no Cronograma como se fosse
+um marcador simples.
+
+**Fix:**
+1. `schema.json` — nova coluna `tipo` (opções `cronograma`/`receita`, obrigatória, padrão `receita`)
+   em `avancado_fases`.
+2. `backend/rotas/avancado.ts` — `GET /avancado/fases` aceita `?tipo=` (filtra); `POST` aceita `tipo`
+   no corpo (default `receita`, mantém compat com chamadas legadas), numeração/`ordem` de "Fase N"
+   passam a contar só dentro do próprio tipo; Absorção/Fluxo de Pagamento só são inicializados para
+   `tipo='receita'` (o Cronograma nunca os lê). `GET /avancado/receitas` (o endpoint que alimenta o
+   motor) filtra `tipo='receita'` — fases do Cronograma não viram mais linhas de receita vazias.
+   `CAMPOS_FASE_COPIA` (duplicar estudo) ganhou `tipo`, para a cópia preservar a classificação.
+3. `frontend/viabilidade-api.ts` — `listarFasesAvancado(estudoId, tipo?)` repassa o filtro.
+4. `frontend/tela-fluxo-cronograma.ts` e `frontend/tela-fluxo-receitas.ts` — cada tela lista e cria
+   só o seu próprio tipo (`cronograma`/`receita`).
+5. `migracoes/010_fases_tipo.js` — backfill: fase com pelo menos uma `avancado_alocacoes` →
+   `receita` (só Receitas cria alocações); sem nenhuma → `cronograma` (o caso mais comum de "Fase N"
+   criada só para marcar o gantt). Nenhuma linha é apagada. `versao` `0.1.8` → `0.1.9`.
+6. `docs/viabilidade/padrao-incorporacao.md` — seção de Fases atualizada para descrever a separação
+   por `tipo`.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 102 testes + build). Backend
+(typecheck, execução da migração, `urbi-empacotar`) fica para o ambiente autenticado do autor.
+
+**Merge:** portão (`Portão? = SIM` → #167) — mergeado pela sessão após validação verde.
+
+---
+
 ## #196 — Permuta financeira como dedução da receita (2026-07-28)
 
 Branch `claude/r4-196-permuta-financeira-deducao`. Não é portão — pré-requisitos #193 e #194 (ambos

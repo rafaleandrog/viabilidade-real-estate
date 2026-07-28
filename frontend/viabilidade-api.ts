@@ -176,8 +176,12 @@ export function removerTipologia(estudoId: number, tid: number): Promise<any> {
 }
 
 // ── Avançado: Fases (Absorção/Fluxo por fase — Lote 6 · #21) ──
-export function listarFasesAvancado(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases`);
+// `tipo` separa as fases do Cronograma (`cronograma`, marcadores do gantt) das
+// fases de Receitas (`receita`, donas de Absorção/Fluxo de Pagamento/Alocações)
+// — #168: antes as duas telas faziam CRUD na mesma lista sem discriminador.
+export function listarFasesAvancado(estudoId: number, tipo?: 'cronograma' | 'receita'): Promise<any> {
+  const sufixo = tipo ? `?tipo=${tipo}` : '';
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases${sufixo}`);
 }
 export function criarFaseAvancado(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
   return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases`, {

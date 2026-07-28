@@ -18,8 +18,11 @@ import './viab-num.js';
 // Mostra dois blocos:
 //  1. 5 eventos fixos (planejamento … pos_obra) — editáveis pelo usuário (início
 //     e duração; travados são calculados automaticamente).
-//  2. Fases comerciais (avancado_fases) — criadas em Receitas e/ou diretamente
-//     aqui com nome/início/duração livres. Aparecem no gantt junto com os eventos.
+//  2. Fases comerciais (avancado_fases, tipo='cronograma', #168) — criadas
+//     SÓ aqui, com nome/início/duração livres, como marcadores do gantt. São
+//     uma lista separada das fases de Receitas (tipo='receita', donas de
+//     Absorção/Fluxo de Pagamento/Alocações) — antes as duas telas faziam
+//     CRUD na mesma lista sem discriminador.
 //
 // #41 — cada evento padrão exibe sua cor de token distinta na lista e no gantt.
 // #42 — CRUD de fases extras posicionadas no gantt.
@@ -91,7 +94,7 @@ export class ViabFluxoCronograma extends LitElement {
       const [params, crono, fasesRes] = await Promise.all([
         buscarParametrosAvancado(this.estudo.id),
         buscarCronogramaAvancado(this.estudo.id),
-        listarFasesAvancado(this.estudo.id),
+        listarFasesAvancado(this.estudo.id, 'cronograma'),
       ]);
       if (!params?.erro) this.paramsForm = { ...params };
       if (!crono?.erro) this.crono = crono.dados || [];
@@ -295,6 +298,7 @@ export class ViabFluxoCronograma extends LitElement {
   private _adicionarFase = async () => {
     try {
       const res = await criarFaseAvancado(this.estudo.id, {
+        tipo: 'cronograma',
         nome: `Fase ${this.fases.length + 1}`,
         ordem: this.fases.length,
         inicio_mes: 0,

@@ -178,7 +178,11 @@ O nível Avançado acrescenta a régua de tempo e a mecânica de recebimento, em
 
 **Tipologias (`avancado_tipologias`)** — catálogo do estudo: `nome`, `tipo_unidade` (`apartamento`\|`cobertura`\|`loja`\|`lote`\|`outro`), `area_privativa_m2`, `dormitorios`, `vagas`, `quantidade`, `unidades_permutadas`, `preco_m2`. Desacoplado da receita.
 
-**Fases (`avancado_fases`)** — entidade dona da **Absorção** e do **Fluxo de Pagamento**:
+**Fases (`avancado_fases`)** — separadas por `tipo` (#168): `receita` é a entidade dona da
+**Absorção** e do **Fluxo de Pagamento**, gerida na aba Receitas; `cronograma` é um marcador simples
+(nome/início/duração) do gantt do Cronograma, sem Absorção/Fluxo/Alocações. As duas telas faziam CRUD
+na mesma lista antes do `tipo` existir — cada uma só enxerga hoje as fases do seu próprio tipo. O que
+segue descreve as fases `receita`:
 
 - **Absorção** (`absorcao` JSON) — modo **Distribuído** em 3 períodos: `lancamento` (cobre Pré-lançamento + Lançamento), `obra`, `pos_obra`. O Pós-obra é **derivado** (`100 − p1 − p2`) e seu período vem do Cronograma.
 - **Fluxo de Pagamento** (`fluxo_pagamento` JSON) — `comissao`, `ret`, **`entrada` e `parcelas` como LISTAS** de linhas, e `repasse: { apos_entrega_meses }`. O `%` do Repasse é **derivado** (`100 − Σ entrada − Σ parcelas`), não persistido.
