@@ -4,6 +4,31 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #181 — Financeiro alinhado às outras abas (2026-07-28)
+
+Branch `claude/r4-181-financeiro-unidades`. Não é portão — PR aberto, merge fica com o autor.
+Pré-requisitos #173, #174, #175 e #198 (todos já mergeados — PR #216, #214, #214 e #217).
+
+**O que é:** `UNIDADES_CAT` (mapa de unidades de orçamento permitidas por grupo+categoria) tinha
+entrada para `terreno`/`obra`/`diretos`/`indireto`, mas **não para `financeiro`** — sem entrada,
+`_unidsPerm` caía no fallback "todas as unidades" e oferecia badges sem sentido nenhum para custo
+financeiro (`R$/m² terreno`, `% Obra`, `R$/m² priv`) em vez da lista curada que as outras 4 abas já
+tinham.
+
+`frontend/tela-fluxo-custos.ts` — `UNIDADES_CAT.financeiro` adicionado, mesmo padrão de Indiretos
+(cada categoria aceita `rs` ou `pct_vgv`): `Juros de financiamento`, `Taxas bancárias`,
+`Estruturação de dívida`, `Investidores`, `Outro`.
+
+Sem schema/migração — restrição de opções de UI, nenhum dado é alterado (uma linha já persistida
+numa unidade fora dessa lista continua sendo lida e calculada normalmente pelo motor; só a criação
+de novas linhas fica restrita à lista curada).
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 103 testes + build).
+
+**Merge:** não é portão — PR aberto, aguardando o autor.
+
+---
+
 ## #198 — Linha de totais destacada nas tabelas (2026-07-28)
 
 Branch `claude/r4-198-total-destacado`. Issue portão (§3 do mapa mestre), sem pré-requisito. Última
