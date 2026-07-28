@@ -4,6 +4,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #198 — Linha de totais destacada nas tabelas (2026-07-28)
+
+Branch `claude/r4-198-total-destacado`. Issue portão (§3 do mapa mestre), sem pré-requisito. Última
+das quatro pré-condições do #181 (#173/#174/#175 já prontas) — destrava o #181.
+
+**O que é:** referência visual "Referência para Tabelas" da planilha de bugs: "linha de totais ao
+final deve ter uma separação do restante das linhas". A linha "Total <grupo>" de cada seção de
+Custos (`.rodape-custo`) tinha só `margin-top`, sem nenhuma separação visual da tabela acima.
+
+`frontend/tela-fluxo-custos.ts` — `.rodape-custo` ganha `border-top: 2px solid` + fundo levemente
+destacado (`--cor-superficie-hover`) + padding, mesmo tratamento que `fluxo-tabela.ts`/
+`tela-proforma.ts` já dão às linhas de resultado/total (border-top 2px). `.total-valor` fica maior e
+mais peso (700, 1.05rem) para reforçar que é o número final da seção. Só tokens do design system —
+nenhuma cor literal.
+
+Sem schema/migração — mudança puramente visual.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 103 testes + build).
+
+**Merge:** portão (`Portão? = SIM`, junto com #173/#174/#175 → #181) — mergeado pela sessão após
+validação verde.
+
+---
+
 ## #173 — Remover coluna Subcategoria (exceto Terreno) (2026-07-28)
 
 Branch `claude/r4-173-subcategoria-so-terreno`. Issue portão (§3 do mapa mestre), sem pré-requisito.
