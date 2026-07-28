@@ -4,6 +4,47 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #165 + #166 — Pré-lançamento derivado do Planejamento; duração do Lançamento livre (2026-07-28)
+
+Branch `claude/r4-165-166-cronograma-travados`. Duas issues portão (§3 do mapa mestre), sem
+pré-requisito, ambas destravando #197 — resolvidas juntas porque são a mesma correção em
+`recalcularTravados`/`cronogramaPadrao` (backend) e no mesmo componente de tela.
+
+**Causa raiz (§6 do mapa mestre, achado da auditoria 2026-07-27):** `avancado.ts` nunca derivava
+`pre_lancamento.inicio_mes` do fim do Planejamento (só Lançamento← Pré-lançamento e Pós-obra←Obra
+eram recalculados) — `cronogramaPadrao()` nascia com `travado_inicio: false` para Pré-lançamento
+enquanto a TELA já mostrava o campo travado (🔒) com um hack por nome de evento; o valor "acertava"
+por coincidência porque o default (`0+6=6`) batia com o hardcode. Ao mesmo tempo, o backend forçava
+`lancamento.duracao_meses = 1` (com `travado_duracao: true`) enquanto a tela já tinha liberado o
+campo — o usuário digitava, o PATCH devolvia 422 CAMPO_TRAVADO, e o valor voltava.
+
+**Fix:**
+1. `backend/rotas/avancado.ts` — `recalcularTravados` ganha a derivação de `pre_lancamento.inicio_mes`
+   (fim do Planejamento, #165) e `lancamento` perde `travado_duracao` (agora livre, #166) —
+   continua travado só o início (fim do Pré-lançamento). `cronogramaPadrao()` atualizado para
+   `pre_lancamento: travado_inicio: true` / `lancamento: travado_duracao: false`. Mensagem de erro
+   do `CAMPO_TRAVADO` de duração generalizada (não é mais sempre "fixa em 1 mês").
+2. `frontend/tela-fluxo-cronograma.ts` — removidos os dois hacks por nome de evento
+   (`ev.evento === 'pre_lancamento' ? true : ...` / `ev.evento === 'lancamento' ? false : ...`): a
+   tela agora confia direto em `ev.travado_inicio`/`ev.travado_duracao`, que o backend já calcula
+   certo. Removido também o reancoramento manual client-side do Pré-lançamento
+   (`inicio_mes + 1`, ignorava `duracao_meses`) — redundante agora que o backend recalcula em cadeia
+   a cada PATCH, e passaria a tomar 422 (Pré-lançamento sempre travado).
+3. `backend/rotas/avancado.test.ts` — testes atualizados para a nova coerência (`pre_lancamento`
+   derivado do Planejamento; `lancamento.duracao_meses` preservado, não forçado a 1) + teste novo
+   cobrindo a propagação Planejamento → Pré-lançamento → Lançamento.
+4. `docs/viabilidade/padrao-incorporacao.md` — nota sobre o encadeamento de início travado.
+
+Sem schema/migração — `travado_inicio`/`travado_duracao` já existiam; só a lógica de cálculo mudou.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 102 testes + build). Backend
+(typecheck, `pnpm test` do `avancado.test.ts`, `urbi-empacotar`) fica para o ambiente autenticado do
+autor.
+
+**Merge:** ambas portão (`Portão? = SIM` → #197) — mergeadas pela sessão após validação verde.
+
+---
+
 ## #174, #175, #169, #172, #176 — lote de correções pequenas de Custos/Receitas/UI (2026-07-28)
 
 Branch `claude/r4-lote-ui-menores`. Nenhuma é portão — PR único aberto e mergeado nesta sessão a

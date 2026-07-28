@@ -176,6 +176,11 @@ O nível Avançado acrescenta a régua de tempo e a mecânica de recebimento, em
 | `obra` | Execução física; sobrepõe-se às vendas |
 | `pos_obra` | Entrega, repasse e venda de estoque |
 
+Início encadeado (`recalcularTravados`, travado/🔒 na tela): `pre_lancamento` = fim do
+`planejamento` (#165); `lancamento` = fim do `pre_lancamento`; `pos_obra` = fim da `obra`.
+`planejamento` e `obra` têm início livre; toda **duração** é livre, inclusive a do `lancamento`
+(#166 — antes fixa em 1 mês).
+
 **Tipologias (`avancado_tipologias`)** — catálogo do estudo: `nome`, `tipo_unidade` (`apartamento`\|`cobertura`\|`loja`\|`lote`\|`outro`), `area_privativa_m2`, `dormitorios`, `vagas`, `quantidade`, `unidades_permutadas`, `preco_m2`. Desacoplado da receita.
 
 **Fases (`avancado_fases`)** — separadas por `tipo` (#168): `receita` é a entidade dona da
