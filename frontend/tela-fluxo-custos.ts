@@ -270,10 +270,20 @@ export class ViabFluxoCustos extends LitElement {
     .card-cab .titulos { flex: 1; }
     .card-cab h3 { margin: 0; }
     .card-cab p { margin: 2px 0 0; }
-    .rodape-custo { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-top: 10px; }
+    /* #198: a linha de totais ficava só com um margin-top, sem separação visual
+       da tabela acima — border + fundo destacam que ali fecha a soma do grupo,
+       igual ao tratamento que fluxo-tabela.ts/tela-proforma.ts já dão às linhas
+       de resultado/total (border-top 2px + leve destaque de fundo). */
+    .rodape-custo {
+      display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+      margin-top: 10px; padding: 10px 12px 4px;
+      border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2));
+      background: var(--cor-superficie-hover, rgba(255,255,255,0.04));
+      border-radius: 0 0 8px 8px;
+    }
     .rodape-custo .espaco { flex: 1; }
     .total-rotulo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.75rem); margin-right: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
-    .total-valor { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .total-valor { font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
     .orc { display: inline-flex; flex-direction: column; gap: 6px; align-items: flex-start; }
     .orc-badges { display: flex; flex-wrap: wrap; gap: 4px; }
     .orc-badges urbi-badge { cursor: pointer; }
