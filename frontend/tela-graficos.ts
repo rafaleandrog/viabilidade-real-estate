@@ -186,17 +186,19 @@ export class ViabTelaGraficos extends LitElement {
 
   // #15: medidores de indicadores a partir dos benchmarks do estudo. As faixas de
   // status usam a `regra_comparacao`: `atingir_ou_superar` (maior é melhor) → verde
-  // acima da meta; `nao_exceder` (menor é melhor, ex.: Custo obra/VGV) → verde ABAIXO
+  // acima da meta; `nao_exceder` (menor é melhor, ex.: Custo obras/VGV) → verde ABAIXO
   // da meta (inversão pedida no item 15).
   private _renderMedidores(p: Proforma): TemplateResult {
-    // Mantidos: Custo obra/VGV e Margem líquida. Removidos desta aba: ROI, Resultado
+    // Mantidos: Custo obras/VGV e Margem líquida. Removidos desta aba: ROI, Resultado
     // final, Margem bruta e Eficiência de aproveitamento.
     const MAPA: Record<string, number> = {
       custo_obras_vgv: p.custoObrasVgvPct,
       margem_liquida: p.margemLiquidaPct,
     };
     const ROTULOS: Record<string, string> = {
-      custo_obras_vgv: 'Custo obra / VGV',
+      // "Custo obras / VGV" (plural) — mesmo rótulo usado em exportar.ts,
+      // tela-premissas.ts e tela-proforma.ts (#183).
+      custo_obras_vgv: 'Custo obras / VGV',
       margem_liquida: 'Margem líquida',
     };
     const medidores = this.benchmarks

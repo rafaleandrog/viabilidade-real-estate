@@ -4,6 +4,32 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #183 — Resumo: medidores zerados + renome do rótulo (2026-07-28)
+
+Branch `claude/r4-183-resumo-medidores-zerados`. Não é portão — PR aberto, merge fica com o autor.
+Pré-requisito #182 (já mergeado — PR #206).
+
+**Medidores zerados:** mesma causa raiz do #182 (§9.1) — `_renderMedidores` de `tela-resumo.ts`
+lia `p.custoObrasVgvPct`/`p.margemLiquidaPct` do Proforma (`calcularProforma(estudo)`), zerado num
+estudo Avançado puro. Extraí `_kpisAvancado(c)` (a partir do `FluxoCalc`) reunindo os 5 números que
+`_renderKpis` (#182) e `_renderMedidores` precisam — evita duplicar a conta de `margemLiquidaPct`
+entre os dois métodos. `custoObrasVgvPct` novo: soma de `c.linhasCusto` do grupo `obra` sobre
+`c.vgvTotal`.
+
+**tela-graficos.ts e tela-proforma.ts** são telas do **Preliminar** — usam `calcularProforma(estudo)`
+corretamente (os campos existem lá) e não tinham o bug de zerar; entraram no escopo só pelo rename.
+
+**Renome do rótulo:** "Custo obra / VGV" (singular) → "Custo obras / VGV" (plural), alinhando com
+`exportar.ts`, `tela-premissas.ts` e `tela-proforma.ts:189`, que já usavam o plural — havia
+inconsistência dentro do próprio `tela-proforma.ts` (linha 189 plural, linha 421 singular). Corrigido
+em `tela-resumo.ts`, `tela-graficos.ts` e `tela-proforma.ts` (rótulo + comentários).
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 98 testes + build).
+
+**Merge:** não é portão — PR aberto, aguardando o autor.
+
+---
+
 ## #182 — Resumo: KPIs zerados (2026-07-28)
 
 Branch `claude/r4-182-resumo-kpis-zerados`. Issue portão (§3 do mapa mestre), pré-requisito #188

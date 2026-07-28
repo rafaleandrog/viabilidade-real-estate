@@ -404,7 +404,7 @@ export class ViabTelaProforma extends LitElement {
     const vgvBrutoDe = (fator: number) =>
       calcularProforma({ ...this._aplicarFator(fator), ...semPermutaFisica }).vgv;
     // Linhas monetárias (6) e, separados por uma divisória com mais respiro, os dois
-    // indicadores em % (Custo obra/VGV e Margem líquida) exibidos como urbi-badge
+    // indicadores em % (Custo obras/VGV e Margem líquida) exibidos como urbi-badge
     // com a cor do cenário.
     // #11: `natureza` classifica cada linha como receita ou despesa para colorir o
     // rótulo (1ª coluna) e o fundo da linha (só tokens do design system).
@@ -418,7 +418,7 @@ export class ViabTelaProforma extends LitElement {
       { l: 'Receita operacional', f: (c) => c.p.receitaOperacional, natureza: 'receita' },
       { l: 'Custo indireto total', f: (c) => c.p.custoIndiretoTotal, natureza: 'despesa' },
       { l: 'Resultado', f: (c) => c.p.resultado, natureza: 'receita' },
-      { l: 'Custo obra / VGV', f: (c) => c.p.custoObrasVgvPct, natureza: 'despesa', pct: true, badge: true, bmCampo: 'custo_obras_vgv', divisoria: true },
+      { l: 'Custo obras / VGV', f: (c) => c.p.custoObrasVgvPct, natureza: 'despesa', pct: true, badge: true, bmCampo: 'custo_obras_vgv', divisoria: true },
       { l: 'Margem líquida', f: (c) => c.p.margemLiquidaPct, natureza: 'receita', pct: true, badge: true, bmCampo: 'margem_liquida' },
     ];
     const fmt = (m: { pct?: boolean }, v: number) => (m.pct ? fmtPct(v) : fmtR$(v));
