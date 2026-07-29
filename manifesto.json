@@ -112,18 +112,6 @@
       "inicial": 30,
       "descricao": "Dias sem movimentação (exceto Aprovado) até o estudo ser arquivado automaticamente"
     },
-    "mercado_busca_url": {
-      "tipo": "texto",
-      "nullable": true,
-      "inicial": "",
-      "descricao": "Endpoint da API de busca usada na coleta diária de mercado. Recebe ?q=<termos>. Vazio = coleta roda sem fonte externa e não registra itens."
-    },
-    "mercado_busca_chave": {
-      "tipo": "texto",
-      "nullable": true,
-      "inicial": "",
-      "descricao": "Chave da API de busca (enviada no header Authorization). Deixe vazio se o endpoint não exigir."
-    },
     "mercado_busca_max_itens": {
       "tipo": "numero",
       "nullable": false,
