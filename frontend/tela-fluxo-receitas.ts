@@ -527,17 +527,17 @@ export class ViabFluxoReceitas extends LitElement {
               <tbody>
                 <tr>
                   <td>Pré-lançamento<br /><span class="sec">${rot(faixas?.pre_lancamento)}</span></td>
-                  <td><viab-num sufixo="%" ?desabilitado=${dis} .valor=${f.pre_lancamento_pct}
+                  <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.pre_lancamento_pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, pre_lancamento_pct: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>
                 <tr>
                   <td>Lançamento<br /><span class="sec">${rot(faixas?.lancamento)}</span></td>
-                  <td><viab-num sufixo="%" ?desabilitado=${dis} .valor=${f.lancamento_pct}
+                  <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.lancamento_pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, lancamento_pct: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>
                 <tr>
                   <td>Durante a obra<br /><span class="sec">${rot(faixas?.obra)}</span></td>
-                  <td><viab-num sufixo="%" ?desabilitado=${dis} .valor=${f.obra_pct}
+                  <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.obra_pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, obra_pct: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>
                 <tr>
@@ -693,7 +693,7 @@ export class ViabFluxoReceitas extends LitElement {
                     <urbi-badge cor="info" interativo ?ativo=${f.comissao.tipo === 'embutida'}
                       @click=${() => { if (!dis) this._setPag('comissao', 'tipo', 'embutida'); }}>Embutida</urbi-badge>
                   </span>
-                  <viab-num sufixo="%" ?desabilitado=${dis} .valor=${f.comissao.pct}
+                  <viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.comissao.pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this._setPag('comissao', 'pct', e.detail.valor ?? 0)}></viab-num>
                 </div>
                 <p class="sec">${f.comissao.tipo === 'embutida'
@@ -703,7 +703,7 @@ export class ViabFluxoReceitas extends LitElement {
                 <urbi-checkbox label="RET" ?desabilitado=${dis} ?marcado=${f.ret.ativo}
                   @urbi:checkbox-change=${(e: CustomEvent) => this._setPag('ret', 'ativo', e.detail.marcado)}></urbi-checkbox>
                 ${f.ret.ativo ? html`
-                  <viab-num sufixo="%" ?desabilitado=${dis} .valor=${f.ret.pct}
+                  <viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.ret.pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this._setPag('ret', 'pct', e.detail.valor ?? 0)}></viab-num>` : nothing}
               </div>
               ${f.ret.ativo ? html`<p class="sec">Regime Especial de Tributação — patrimônio de afetação.</p>` : nothing}
@@ -714,7 +714,7 @@ export class ViabFluxoReceitas extends LitElement {
               <h4>Condições de entrada</h4>
               ${f.entrada.map((e: any, i: number) => html`
                 <div class="pag-linha">
-                  <viab-num label="% do total" sufixo="%" ?desabilitado=${dis} .valor=${e.pct}
+                  <viab-num label="% do total" sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${e.pct}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('entrada', i, 'pct', ev.detail.valor ?? 0)}></viab-num>
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0" ?desabilitado=${dis} .valor=${e.parcelas}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('entrada', i, 'parcelas', ev.detail.valor ?? 1)}></viab-num>
@@ -733,7 +733,7 @@ export class ViabFluxoReceitas extends LitElement {
                 const perUsadas = new Set(f.parcelas.filter((_: any, j: number) => j !== i).map((x: any) => x.periodicidade));
                 return html`
                 <div class="pag-linha">
-                  <viab-num label="% do total" sufixo="%" ?desabilitado=${dis} .valor=${p.pct}
+                  <viab-num label="% do total" sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${p.pct}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'pct', ev.detail.valor ?? 0)}></viab-num>
                   <span class="badges-par">
                     ${PERIODICIDADES.map((per) => html`

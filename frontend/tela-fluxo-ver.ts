@@ -1,10 +1,10 @@
-import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
+import { LitElement, html, css, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { periodosAnuais, type EventoCrono, type PeriodoAgregado } from './fluxo-shared.js';
 import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { graficoFluxoMensal, graficoFluxoAcumulado } from './fluxo-graficos.js';
-import { estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso } from './fluxo-tabela.js';
+import { estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, controlesFluxo } from './fluxo-tabela.js';
 import { exportarFluxoCSV, exportarFluxoPDF } from './exportar.js';
 import {
   urbiVerso,
@@ -35,10 +35,6 @@ export class ViabFluxoVer extends LitElement {
   private carregado = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, estiloFluxoTabela, css`
-    .controles { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-    .controles .espaco { flex: 1; }
-    .controles urbi-select { min-width: 160px; }
-
     .graficos { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
     .graf svg { display: block; width: 100%; height: auto; min-width: 560px; }
     .graf-wrap { overflow-x: auto; }
@@ -135,31 +131,19 @@ export class ViabFluxoVer extends LitElement {
   private _renderControles(): TemplateResult {
     const fases = [...new Set((this.dados?.receitas ?? []).map((l) => String(l.fase_label || '')).filter(Boolean))];
     const tudoRecolhido = Object.values(this.colapso).some(Boolean);
-    return html`
-      <div class="controles">
-        <urbi-botao variante="secundario" pequeno @click=${() => this._toggleTudo(!tudoRecolhido)}>
-          ${tudoRecolhido ? 'Expandir tudo' : 'Recolher tudo'}
-        </urbi-botao>
-        <div role="group" aria-label="Período das colunas">
-          <urbi-badge cor="info" interativo ?ativo=${this.visao === 'mensal'}
-            @click=${() => { this.visao = 'mensal'; }}
-          >Mensal</urbi-badge>
-          <urbi-badge cor="info" interativo ?ativo=${this.visao === 'anual'}
-            @click=${() => { this.visao = 'anual'; }}
-          >Anual</urbi-badge>
-        </div>
-        ${fases.length > 1 ? html`
-          <urbi-select
-            .valor=${this.faseFiltro}
-            .opcoes=${[{ valor: '', rotulo: 'Global (todas as fases)' },
-              ...fases.map((f) => ({ valor: f, rotulo: f }))]}
-            @urbi:select-change=${(e: CustomEvent) => { this.faseFiltro = e.detail.valor; this._recalcular(); }}
-          ></urbi-select>` : nothing}
-        <span class="espaco"></span>
+    return controlesFluxo({
+      tudoRecolhido,
+      onToggleTudo: () => this._toggleTudo(!tudoRecolhido),
+      visao: this.visao,
+      onVisao: (v) => { this.visao = v; },
+      fases,
+      faseFiltro: this.faseFiltro,
+      onFase: (v) => { this.faseFiltro = v; this._recalcular(); },
+      extra: html`
         <urbi-botao variante="secundario" pequeno icone="fa-solid fa-download" @click=${this._csv}>CSV</urbi-botao>
         <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-pdf" @click=${this._pdf}>PDF</urbi-botao>
-      </div>
-    `;
+      `,
+    });
   }
 
   private _toggleTudo(recolher: boolean) {

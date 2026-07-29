@@ -34,6 +34,12 @@ function celula(v: number, negativoEntreParenteses: boolean): string {
 
 /** Estilos da tabela + KPIs — o componente hospedeiro os adiciona a `static styles`. */
 export const estiloFluxoTabela = css`
+  /* #186: controles (Recolher tudo, Mensal/Anual, filtro de fase) — compartilhados
+     entre Fluxo de Caixa e Cenários via controlesFluxo, um só lugar para o CSS. */
+  .controles { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .controles .espaco { flex: 1; }
+  .controles urbi-select { min-width: 160px; }
+
   .fx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
 
   /* #132: a variacao vs. cenario real fica no canto superior direito do proprio
@@ -74,14 +80,17 @@ export const estiloFluxoTabela = css`
      que o "left" de cada sticky bata exatamente com a largura real da coluna anterior.
      #124: c2 (Inicio) e c3 (Duracao) ocultadas — apenas exibicao, nao afetam calculo.
      Cumulativo com c2/c3 ocultos: 0 · 220 · 340 (fim em 460). */
-  .c1, .c4, .c5 { box-sizing: border-box; overflow: hidden; background: var(--cor-superficie-elevada, #16243A); }
+  .c1, .c4, .c5, .c6 { box-sizing: border-box; overflow: hidden; background: var(--cor-superficie-elevada, #16243A); }
   .c1 { position: sticky; left: 0;    z-index: 2; width: 220px; min-width: 220px; max-width: 220px; text-overflow: ellipsis; text-align: left; }
   .c2 { display: none; }
   .c3 { display: none; }
   .c4 { position: sticky; left: 220px; z-index: 2; width: 120px; min-width: 120px; max-width: 120px; text-align: right; }
-  .c5 { position: sticky; left: 340px; z-index: 2; width: 120px; min-width: 120px; max-width: 120px; text-align: right;
+  .c5 { position: sticky; left: 340px; z-index: 2; width: 120px; min-width: 120px; max-width: 120px; text-align: right; }
+  /* #189: coluna % sobre VGV — última coluna fixa (sticky), a borda que fechava
+     o bloco congelado passa dela para o c5. */
+  .c6 { position: sticky; left: 460px; z-index: 2; width: 76px; min-width: 76px; max-width: 76px; text-align: right;
     border-right: 2px solid var(--cor-borda, rgba(255,255,255,0.12)); }
-  table.fx thead .c1, table.fx thead .c4, table.fx thead .c5 { z-index: 4; }
+  table.fx thead .c1, table.fx thead .c4, table.fx thead .c5, table.fx thead .c6 { z-index: 4; }
   table.fx thead .c1 { text-align: left; }
 
   tr.grupo td { font-weight: 700; }
@@ -174,6 +183,57 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
   `;
 }
 
+/** #189: peso da linha sobre a Receita Bruta (VGV) — vazio sem base ou linha sem sentido. */
+function pctVgv(total: number, vgv: number, ocultar: boolean): string {
+  if (ocultar || vgv <= 0) return '';
+  return fmtPct((total / vgv) * 100);
+}
+
+/**
+ * #186: controles da tabela do Fluxo de Caixa — Recolher/Expandir tudo,
+ * Mensal/Anual e o filtro Global/por fase — extraídos de `tela-fluxo-ver.ts`
+ * para serem reusados pela aba Cenários sem duplicar o markup. `extra` é um
+ * slot livre no fim da barra (ex.: os botões CSV/PDF, que só a aba Fluxo de
+ * Caixa tem).
+ */
+export interface ControlesFluxoProps {
+  tudoRecolhido: boolean;
+  onToggleTudo: () => void;
+  visao: 'mensal' | 'anual';
+  onVisao: (v: 'mensal' | 'anual') => void;
+  fases: string[];
+  faseFiltro: string;
+  onFase: (v: string) => void;
+  extra?: TemplateResult;
+}
+
+export function controlesFluxo(p: ControlesFluxoProps): TemplateResult {
+  return html`
+    <div class="controles">
+      <urbi-botao variante="secundario" pequeno @click=${p.onToggleTudo}>
+        ${p.tudoRecolhido ? 'Expandir tudo' : 'Recolher tudo'}
+      </urbi-botao>
+      <div role="group" aria-label="Período das colunas">
+        <urbi-badge cor="info" interativo ?ativo=${p.visao === 'mensal'}
+          @click=${() => p.onVisao('mensal')}
+        >Mensal</urbi-badge>
+        <urbi-badge cor="info" interativo ?ativo=${p.visao === 'anual'}
+          @click=${() => p.onVisao('anual')}
+        >Anual</urbi-badge>
+      </div>
+      ${p.fases.length > 1 ? html`
+        <urbi-select
+          .valor=${p.faseFiltro}
+          .opcoes=${[{ valor: '', rotulo: 'Global (todas as fases)' },
+            ...p.fases.map((f) => ({ valor: f, rotulo: f }))]}
+          @urbi:select-change=${(e: CustomEvent) => p.onFase(e.detail.valor)}
+        ></urbi-select>` : nothing}
+      <span class="espaco"></span>
+      ${p.extra ?? nothing}
+    </div>
+  `;
+}
+
 function linhaTabela(
   classe: 'grupo' | 'subgrupo' | 'item' | 'subitem',
   chaveToggle: string,
@@ -183,6 +243,8 @@ function linhaTabela(
   colapso: Record<string, boolean>,
   toggle: (chave: string) => void,
   ehCusto: boolean,
+  vgv: number,
+  ocultarPct = false,
   expansivel = true,
 ): TemplateResult {
   const podeToggle = chaveToggle && expansivel;
@@ -198,6 +260,7 @@ function linhaTabela(
       <td class="c3">${linha.duracao ? `${linha.duracao}m` : ''}</td>
       <td class="c4 num">${celula(linha.total, ehCusto)}</td>
       <td class="c5 num">${linha.vpl !== undefined ? celula(linha.vpl, ehCusto) : ''}</td>
+      <td class="c6 num">${pctVgv(linha.total, vgv, ocultarPct)}</td>
       ${linha.mensal.map((v) => html`<td class="num">${celula(v, ehCusto)}</td>`)}
     </tr>
   `;
@@ -211,6 +274,7 @@ function linhaResultado(nome: string, valores: number[], vpl: number): TemplateR
       <td class="c2"></td><td class="c3"></td>
       <td class="c4 num ${total >= 0 ? 'pos' : 'neg'}">${celula(total, false)}</td>
       <td class="c5 num ${vpl >= 0 ? 'pos' : 'neg'}">${celula(vpl, false)}</td>
+      <td class="c6"></td>
       ${valores.map((v) => html`<td class="num ${v >= 0 ? 'pos' : 'neg'}">${celula(v, false)}</td>`)}
     </tr>
   `;
@@ -250,26 +314,27 @@ export function tabelaFluxo(
             <th class="c3">Duração</th>
             <th class="c4">Total</th>
             <th class="c5">VPL</th>
+            <th class="c6">% VGV</th>
             ${c.meses.map((m) => html`<th>${m}</th>`)}
           </tr>
         </thead>
         <tbody>
           ${linhaTabela('grupo', 'receita', 'Receita Bruta (VGV)',
-            { mensal: c.receitaMensal, total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita) }, dataInicio, colapso, toggle, false)}
+            { mensal: c.receitaMensal, total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita) }, dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true)}
           ${!colapso['receita'] ? c.linhasReceita.map((l) => html`
             ${linhaTabela('subgrupo', `r${l.id}`,
-              l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, l, dataInicio, colapso, toggle, false)}
+              l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, l, dataInicio, colapso, toggle, false, c.receitaBrutaVgv)}
             ${!colapso[`r${l.id}`] ? (l.itens ?? []).map((t) =>
-              linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false)) : nothing}
+              linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.receitaBrutaVgv)) : nothing}
           `) : nothing}
 
           ${linhaTabela('grupo', '', 'Custo Total',
-            { mensal: c.custoMensal, total: c.custoMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasCusto) }, dataInicio, colapso, toggle, true, false)}
+            { mensal: c.custoMensal, total: c.custoMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasCusto) }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv, false, false)}
           ${grupos.map((g) => html`
             ${linhaTabela('subgrupo', `custo-${g}`, GRUPO_CUSTO_LABEL[g],
-              { mensal: somaLinhas(custosPorGrupo(g)), total: custosPorGrupo(g).reduce((s, x) => s + x.total, 0), vpl: somaVpl(custosPorGrupo(g)) }, dataInicio, colapso, toggle, true)}
+              { mensal: somaLinhas(custosPorGrupo(g)), total: custosPorGrupo(g).reduce((s, x) => s + x.total, 0), vpl: somaVpl(custosPorGrupo(g)) }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv)}
             ${!colapso[`custo-${g}`] ? custosPorGrupo(g).map((x) =>
-              linhaTabela('item', '', x.nome, x, dataInicio, colapso, toggle, true)) : nothing}
+              linhaTabela('item', '', x.nome, x, dataInicio, colapso, toggle, true, c.receitaBrutaVgv)) : nothing}
           `)}
 
           <tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${c.meses.map(() => html`<td></td>`)}</tr>

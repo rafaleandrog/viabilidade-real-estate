@@ -23,7 +23,7 @@ export function abrevR$(v: number): string {
 }
 
 /** Marcos verticais do cronograma (Lançamento, Início/Fim da Obra). */
-function marcos(crono: EventoCrono[]): { mes: number; rotulo: string }[] {
+export function marcos(crono: EventoCrono[]): { mes: number; rotulo: string }[] {
   const lanc = crono.find((e) => e.evento === 'lancamento');
   const obra = crono.find((e) => e.evento === 'obra');
   const out: { mes: number; rotulo: string }[] = [];
@@ -156,69 +156,3 @@ export function graficoFluxoAcumulado(
   `;
 }
 
-/**
- * Fluxo acumulado do CENÁRIO (Etapa 8 · #56; endurecido em S20 · #131): a
- * curva-base (linha cheia = cenário real) e a curva do cenário em avaliação
- * (linha TRACEJADA), na mesma escala, para comparação direta do efeito dos
- * deltas. As duas curvas compartilham o eixo (min/max sobre ambas) e o
- * comprimento é o maior dos dois prazos.
- *
- * `cenario === null` significa "sliders na base": aí a tracejada seria idêntica
- * à cheia e só a esconderia — então ela não é desenhada e a legenda some. A
- * tracejada nasce, portanto, ao mover o primeiro slider (#131), e o SVG é
- * refeito a cada mudança porque o hospedeiro guarda os deltas em `@state`.
- *
- * `rotuloCenario` nomeia a tracejada na legenda (ex.: "Cenário · preço +5% ·
- * obra -3%"); vazio cai em "Cenário".
- */
-export function graficoCenarioAcumulado(
-  base: FluxoCalc,
-  cenario: FluxoCalc | null,
-  dataInicio: string | null,
-  crono: EventoCrono[],
-  rotuloCenario = '',
-): TemplateResult {
-  const W = 900; const H = 280; const padL = 64; const padR = 10; const padT = 26; const padB = 24;
-  const gw = W - padL - padR; const gh = H - padT - padB;
-  const prazo = Math.max(base.prazo, cenario?.prazo ?? 0);
-  const todos = [...base.fluxoAcumulado, ...(cenario?.fluxoAcumulado ?? [])];
-  const min = Math.min(0, ...todos);
-  const max = Math.max(1, ...todos);
-  const x = (i: number) => padL + (prazo <= 1 ? 0 : (i / (prazo - 1)) * gw);
-  const y = (v: number) => padT + (1 - (v - min) / (max - min || 1)) * gh;
-  const y0 = y(0);
-  const caminho = (vals: number[]) =>
-    vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-  const corTexto = 'var(--cor-texto-sec, #8a8f98)';
-  const passo = Math.max(3, Math.ceil(prazo / 10 / 3) * 3);
-  const ticks: number[] = [];
-  for (let m = 0; m < prazo; m += passo) ticks.push(m);
-  return html`
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Fluxo acumulado — base e cenário">
-      ${ticks.map((i) => svg`
-        <text x=${x(i)} y=${H - 8} font-size="9" fill=${corTexto} text-anchor="middle">${rotuloMesRelativo(dataInicio, i)}</text>`)}
-      ${[min, 0, max].map((v) => svg`
-        <line x1=${padL} y1=${y(v)} x2=${W - padR} y2=${y(v)} stroke="var(--cor-borda-sutil, rgba(128,128,128,0.15))" />
-        <text x=${padL - 6} y=${y(v) + 3} font-size="9" fill=${corTexto} text-anchor="end">${abrevR$(v)}</text>`)}
-      <line x1=${padL} y1=${y0} x2=${W - padR} y2=${y0} stroke=${corTexto} stroke-dasharray="4,3" opacity="0.6" />
-      ${marcos(crono).map((m) => svg`
-        <line x1=${x(m.mes)} y1=${padT - 4} x2=${x(m.mes)} y2=${H - padB}
-          stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.5" />
-        <text x=${x(m.mes) + 3} y=${padT + 8} font-size="9" fill=${corTexto}>${m.rotulo}</text>`)}
-      <path d=${caminho(base.fluxoAcumulado)} fill="none" stroke="var(--cor-texto-forte, #e8e8ea)" stroke-width="2" />
-      ${cenario ? svg`
-        <path d=${caminho(cenario.fluxoAcumulado)} fill="none"
-          stroke="var(--cor-primaria, #7c5cff)" stroke-width="2" stroke-dasharray="6,4" />` : nothing}
-      <g font-size="9">
-        <line x1=${padL} y1=${padT - 12} x2=${padL + 22} y2=${padT - 12} stroke="var(--cor-texto-forte, #e8e8ea)" stroke-width="2" />
-        <text x=${padL + 26} y=${padT - 9} fill=${corTexto}>Cenário real</text>
-        ${cenario ? svg`
-          <line x1=${padL + 110} y1=${padT - 12} x2=${padL + 132} y2=${padT - 12}
-            stroke="var(--cor-primaria, #7c5cff)" stroke-width="2" stroke-dasharray="6,4" />
-          <text x=${padL + 136} y=${padT - 9} fill="var(--cor-primaria, #7c5cff)">
-            ${rotuloCenario || 'Cenário'}
-          </text>` : nothing}
-      </g>
-    </svg>
-  `;
-}

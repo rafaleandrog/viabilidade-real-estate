@@ -415,10 +415,19 @@ export class ViabFluxoCustos extends LitElement {
             // Linha obrigatória: categoria travada (texto, não seletor).
             return html`<strong>${c.categoria}</strong>`;
           }
+          // #179: categorias obrigatórias (Preço/Construção/Corretagem de
+          // vendas) já têm sua linha oficial garantida por
+          // `_garantirLinhasObrigatorias` — oferecê-las aqui também deixava o
+          // usuário criar uma 2ª linha com a mesma categoria, que o motor soma
+          // independentemente (custo duplicado). Escondidas do seletor de
+          // QUALQUER OUTRA linha; a própria categoria da linha continua
+          // selecionável (evita sumir do combo se o dado já estiver assim).
+          const obrigDoGrupo = obrigatoriasDoGrupo(g.id).map((o) => o.categoria);
+          const opcoes = cats.filter((x) => !obrigDoGrupo.includes(x.nome) || x.nome === c.categoria);
           return html`
             <urbi-select placeholder="Selecione…"
               .valor=${c.categoria || ''}
-              .opcoes=${cats.map((x) => ({ valor: x.nome, rotulo: x.nome }))}
+              .opcoes=${opcoes.map((x) => ({ valor: x.nome, rotulo: x.nome }))}
               @urbi:select-change=${(e: CustomEvent) => this._salvarCategoria(c, g.id, e.detail.valor)}
             ></urbi-select>`;
         },
@@ -461,6 +470,7 @@ export class ViabFluxoCustos extends LitElement {
               ` : nothing}
               <viab-num ?desabilitado=${dis}
                 casas-decimais=${modo.startsWith('pct_') ? '2' : '0'}
+                casas-minimas=${modo.startsWith('pct_') ? '2' : '0'}
                 .valor=${c.orcamento_valor !== null && c.orcamento_valor !== undefined ? Number(c.orcamento_valor) : null}
                 @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { orcamento_valor: e.detail.valor })}
               ></viab-num>
