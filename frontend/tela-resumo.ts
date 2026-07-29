@@ -109,10 +109,11 @@ export class ViabTelaResumo extends LitElement {
           mensagem="Defina o cronograma, as receitas e os custos nas outras abas para ver o resumo consolidado."></urbi-estado-vazio>`;
     }
     const p = calcularProforma({ ...this.estudo, aliquota_ret_pct: this.aliquotaRet } as ProformaInput);
+    const k = this._kpisAvancado(c);
     const dataInicio = this.dados?.dataInicio ?? null;
     const crono = this.dados?.crono ?? [];
     return html`
-      ${this._renderKpis(c)}
+      ${this._renderKpis(c, k)}
       <div class="graficos">
         <urbi-card titulo="Fluxo de Caixa Acumulado">
           <div class="graf-wrap"><div class="graf">${graficoFluxoAcumulado(c, dataInicio, crono)}</div></div>
@@ -122,39 +123,46 @@ export class ViabTelaResumo extends LitElement {
         </urbi-card>
         <div class="lado-a-lado">
           <urbi-card titulo="Composição dos custos">${this._renderPizza(p)}</urbi-card>
-          ${this._renderMedidores(p)}
+          ${this._renderMedidores(k)}
         </div>
       </div>
     `;
   }
 
-  // #182: os 4 últimos KPIs vinham do Proforma (`calcularProforma`), que só lê
-  // colunas estáticas de `estudos` (Premissas) — removidas do Avançado no #88.
-  // Num estudo criado direto como Avançado essas colunas são NULL e os 4 KPIs
-  // saíam zerados, mesmo com receitas/custos preenchidos nas outras abas. Os
-  // dados certos já estão no `FluxoCalc` carregado (mesma fonte dos 4 KPIs de
-  // fluxo, que sempre estiveram corretos): VGV = `c.vgvTotal`; Resultado =
-  // último ponto do acumulado (mesma definição de `resultadoDe` em
-  // `fluxo-tabela.ts`); Margem líquida = Resultado/VGV; ROI = Resultado sobre
-  // o custo total das linhas de custo do Avançado.
-  private _renderKpis(c: FluxoCalc): TemplateResult {
-    const tirTxt = c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`;
-    const tirVar = c.tir === null ? '' : (c.tir > 0 ? 'sucesso' : 'erro');
+  // #182/#183: os KPIs "de negócio" (VGV, Resultado, Margem líquida, ROI,
+  // Custo obras/VGV) vinham do Proforma (`calcularProforma`), que só lê
+  // colunas estáticas de `estudos` (Premissas) — removidas do Avançado no
+  // #88. Num estudo criado direto como Avançado essas colunas são NULL e os
+  // KPIs saíam zerados, mesmo com receitas/custos preenchidos nas outras
+  // abas. Os dados certos já estão no `FluxoCalc` carregado (mesma fonte dos
+  // KPIs de fluxo, que sempre estiveram corretos) — calculados uma vez aqui e
+  // reusados pelos KPIs (#182) e pelos medidores vs. benchmark (#183).
+  private _kpisAvancado(c: FluxoCalc) {
     const vgv = c.vgvTotal;
     const resultado = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] || 0;
     const custoTotal = c.linhasCusto.reduce((s, l) => s + l.total, 0);
-    const margemLiquidaPct = vgv > 0 ? (resultado / vgv) * 100 : 0;
-    const roiPct = custoTotal > 0 ? (resultado / custoTotal) * 100 : 0;
+    const custoObras = c.linhasCusto.filter((l) => l.grupo === 'obra').reduce((s, l) => s + l.total, 0);
+    return {
+      vgv, resultado,
+      margemLiquidaPct: vgv > 0 ? (resultado / vgv) * 100 : 0,
+      roiPct: custoTotal > 0 ? (resultado / custoTotal) * 100 : 0,
+      custoObrasVgvPct: vgv > 0 ? (custoObras / vgv) * 100 : 0,
+    };
+  }
+
+  private _renderKpis(c: FluxoCalc, k: ReturnType<ViabTelaResumo['_kpisAvancado']>): TemplateResult {
+    const tirTxt = c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`;
+    const tirVar = c.tir === null ? '' : (c.tir > 0 ? 'sucesso' : 'erro');
     return html`
       <div class="kpis">
         <urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
         <urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi>
         <urbi-kpi rotulo="Payback" .valor=${c.paybackData ?? '—'}></urbi-kpi>
         <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi>
-        <urbi-kpi rotulo="VGV" .valor=${fmtR$(vgv)}></urbi-kpi>
-        <urbi-kpi rotulo="Resultado" .valor=${fmtR$(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        <urbi-kpi rotulo="Margem líquida" .valor=${fmtPct(margemLiquidaPct)} variante=${margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        <urbi-kpi rotulo="ROI" .valor=${fmtPct(roiPct)} variante=${roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="VGV" .valor=${fmtR$(k.vgv)}></urbi-kpi>
+        <urbi-kpi rotulo="Resultado" .valor=${fmtR$(k.resultado)} variante=${k.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="Margem líquida" .valor=${fmtPct(k.margemLiquidaPct)} variante=${k.margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="ROI" .valor=${fmtPct(k.roiPct)} variante=${k.roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
       </div>
     `;
   }
@@ -189,13 +197,17 @@ export class ViabTelaResumo extends LitElement {
   }
 
   // Indicadores vs. benchmark — mesmos medidores da aba Cenários (montarMedidor).
-  private _renderMedidores(p: Proforma): TemplateResult {
+  // #183: vinham do Proforma (zerados no Avançado, mesma causa do #182) — agora
+  // usam os KPIs derivados do FluxoCalc (`_kpisAvancado`).
+  private _renderMedidores(k: ReturnType<ViabTelaResumo['_kpisAvancado']>): TemplateResult {
     const MAPA: Record<string, number> = {
-      custo_obras_vgv: p.custoObrasVgvPct,
-      margem_liquida: p.margemLiquidaPct,
+      custo_obras_vgv: k.custoObrasVgvPct,
+      margem_liquida: k.margemLiquidaPct,
     };
     const ROTULOS: Record<string, string> = {
-      custo_obras_vgv: 'Custo obra / VGV',
+      // "Custo obras / VGV" (plural) — mesmo rótulo usado em exportar.ts,
+      // tela-premissas.ts e tela-proforma.ts (o singular era inconsistência).
+      custo_obras_vgv: 'Custo obras / VGV',
       margem_liquida: 'Margem líquida',
     };
     const medidores = this.benchmarks
