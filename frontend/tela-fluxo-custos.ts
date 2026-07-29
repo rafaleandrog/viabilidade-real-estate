@@ -12,6 +12,7 @@ import {
   listarCurvas, listarCustosAvancado, criarCustoAvancado, atualizarCustoAvancado, removerCustoAvancado,
   listarFasesAvancado,
 } from './viabilidade-api.js';
+import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import './viab-num.js';
 
@@ -175,6 +176,13 @@ const MODOS_DISTRIBUICAO_PRECO = [
 // linha que a migração já tinha movido para `diretos` — a origem da
 // duplicação indeletável do #178 (a categoria existia, só que no grupo
 // errado, então a checagem de existência falhava sempre).
+// Categorias do grupo Obra referenciadas por nome no código (#192): a
+// Construção é a linha obrigatória/ancorada e a Gestão da obra é a série
+// opcional empilhada nos gráficos de avanço. Declaradas ANTES de
+// `LINHAS_OBRIGATORIAS`, que as consome na inicialização do módulo.
+const CATEGORIA_CONSTRUCAO = 'Construção';
+const CATEGORIA_GESTAO_OBRA = 'Gestão da obra';
+
 interface LinhaObrigatoria { categoria: string; posicao: number; unidade?: string }
 
 const LINHAS_OBRIGATORIAS: Partial<Record<GrupoId, LinhaObrigatoria[]>> = {
@@ -184,7 +192,7 @@ const LINHAS_OBRIGATORIAS: Partial<Record<GrupoId, LinhaObrigatoria[]>> = {
     { categoria: 'Preço', posicao: 0 },
   ],
   obra: [
-    { categoria: 'Construção', posicao: 0 },
+    { categoria: CATEGORIA_CONSTRUCAO, posicao: 0 },
   ],
   // Corretagem de vendas: 1ª linha de Custos Diretos, sempre em % VGV (#121).
   diretos: [
@@ -208,7 +216,7 @@ function eObrigatoria(c: any): boolean {
 // (#115), o Cronograma fica fixo em "Obra" e o Início/Duração são derivados do
 // cronograma do empreendimento e bloqueados (#120).
 function eConstrucao(c: any): boolean {
-  return c.grupo === 'obra' && c.categoria === 'Construção';
+  return c.grupo === 'obra' && c.categoria === CATEGORIA_CONSTRUCAO;
 }
 
 // Ordena as linhas de um grupo: obrigatórias primeiro (na ordem declarada),
@@ -247,7 +255,14 @@ export class ViabFluxoCustos extends LitElement {
   @state() private dataInicio: string | null = null;
   @state() private carregando = true;
   @state() private removerAlvo: any = null;
+  // #192: empilha "Gestão da obra" junto da Construção nos gráficos de avanço.
+  @state() private incluirGestaoObra = false;
   private ctxCusto: ContextoCusto = { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0 };
+  // #192: insumos do motor guardados para os gráficos de avanço da obra —
+  // rodar `calcularFluxo` aqui é o que garante que os valores batam com a
+  // linha Construção do Fluxo de Caixa, em vez de redistribuir por conta.
+  private linhasReceita: any[] = [];
+  private taxaDesconto = 12;
   private carregado = false;
 
   // Evento "Obra" do cronograma do empreendimento (fonte do Início/Duração
@@ -309,6 +324,25 @@ export class ViabFluxoCustos extends LitElement {
     /* #194: modo de distribuição do Preço do Terreno + curva (só em "Fixo"), empilhados. */
     .dist-preco { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+    /* #192: gráficos de avanço da obra (barras mensais + área acumulada) + tabela mensal. */
+    .avanco-ctrl { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .graf-bloco { margin-top: 12px; }
+    .graf-bloco h4 {
+      margin: 0 0 6px; font-size: var(--texto-rotulo, 0.75rem); font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+    }
+    .avanco-tabela-wrap { overflow-x: auto; margin-top: 16px; }
+    .avanco-tabela { border-collapse: collapse; font-variant-numeric: tabular-nums; width: max-content; min-width: 100%; }
+    .avanco-tabela th, .avanco-tabela td {
+      padding: 5px 8px; font-size: 0.75rem; white-space: nowrap; text-align: right;
+      border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+    }
+    .avanco-tabela th {
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 600;
+      border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+    }
+    .avanco-tabela th:first-child, .avanco-tabela td:first-child { text-align: left; font-weight: 600; }
   `];
 
   updated() {
@@ -337,8 +371,12 @@ export class ViabFluxoCustos extends LitElement {
       if (!curvas?.erro) this.curvas = curvas.dados || [];
       if (!fases?.erro) this.fasesCronograma = fases.dados || [];
       if (!crono?.erro) this.crono = crono.dados || [];
-      if (!params?.erro) this.dataInicio = params.data_inicio_projeto ?? null;
+      if (!params?.erro) {
+        this.dataInicio = params.data_inicio_projeto ?? null;
+        this.taxaDesconto = Number(params.taxa_desconto_aa ?? 12);
+      }
       const linhas = receitas?.erro ? [] : (receitas.dados || []);
+      this.linhasReceita = linhas;
       // Contexto de resolução idêntico ao do motor (fluxo-caixa-motor.ts): além de
       // área/VGV, calcula a RECEITA total (VGL — líquida de comissão destacada e RET)
       // para que a coluna Resultado de linhas em `% Receita` bata exatamente com o
@@ -399,6 +437,134 @@ export class ViabFluxoCustos extends LitElement {
               @click=${() => this._adicionar(g)}>Adicionar Custo</urbi-botao>` : nothing}
           <span class="espaco"></span>
           <span><span class="total-rotulo">Total ${g.titulo}</span><span class="total-valor">${fmtR$(total)}</span></span>
+        </div>
+      </urbi-card>
+      ${g.id === 'obra' ? this._renderAvancoObra() : nothing}
+    `;
+  }
+
+  // ── #192: gráficos de avanço da obra (só a linha Projetado) ──────────────
+  //
+  // Escopo decidido pelo autor (2026-07-27): a referência visual da planilha
+  // traz Projetado/Realizado/Desvio/Forecast, mas "Realizado" não existe em
+  // schema, backend nem motor — só o Projetado entra, sem migração.
+  //
+  // Requisito duro da issue: os valores têm de bater EXATAMENTE com a linha
+  // Construção do Fluxo de Caixa. Por isso não há distribuição própria aqui —
+  // roda-se o MESMO motor (`calcularFluxo`) com os mesmos insumos já
+  // carregados por `_carregar`, e lê-se `c.linhasCusto`. Qualquer regra de
+  // distribuição (curva, âncora de cronograma, unidade de orçamento) sai de
+  // graça e não pode divergir por construção.
+  private _calcObra(): FluxoCalc | null {
+    if (this.crono.length === 0 && this.custos.length === 0) return null;
+    const config: FluxoConfig = {
+      dataInicio: this.dataInicio,
+      taxaDescontoAa: this.taxaDesconto,
+      cronograma: this.crono,
+      linhasReceita: this.linhasReceita,
+      linhasCusto: this.custos,
+      curvas: this.curvas,
+      areaTerreno: this.ctxCusto.areaTerreno,
+    };
+    return calcularFluxo(config);
+  }
+
+  private _renderAvancoObra(): TemplateResult {
+    const c = this._calcObra();
+    // `linhasCusto` do motor carrega o nome de exibição já montado
+    // (`nomeLinhaCusto`), que para o grupo `obra` é a própria categoria.
+    const doGrupo = (cat: string) => (c?.linhasCusto ?? []).filter(
+      (l) => l.grupo === 'obra' && l.nome === cat);
+    const somar = (linhas: { mensal: number[] }[], prazo: number) => {
+      const out = new Array<number>(prazo).fill(0);
+      for (const l of linhas) for (let i = 0; i < prazo; i++) out[i] += l.mensal[i] ?? 0;
+      return out;
+    };
+    const construcao = doGrupo(CATEGORIA_CONSTRUCAO);
+    if (!c || construcao.length === 0 || this.crono.length === 0) {
+      return html`
+        <urbi-card titulo="Avanço da obra">
+          <urbi-estado-vazio icone="fa-solid fa-chart-column"
+            mensagem="Defina o Cronograma e a linha de custo Construção para ver o avanço da obra."></urbi-estado-vazio>
+        </urbi-card>`;
+    }
+    const gestao = doGrupo(CATEGORIA_GESTAO_OBRA);
+    const temGestao = gestao.length > 0;
+    const incluirGestao = this.incluirGestaoObra && temGestao;
+
+    const mensalConstrucao = somar(construcao, c.prazo);
+    const mensalGestao = incluirGestao ? somar(gestao, c.prazo) : null;
+    // Acumulado do que está no gráfico de barras — soma as séries exibidas.
+    const acumulado: number[] = [];
+    let corrente = 0;
+    for (let i = 0; i < c.prazo; i++) {
+      corrente += mensalConstrucao[i] + (mensalGestao?.[i] ?? 0);
+      acumulado.push(corrente);
+    }
+
+    const series = [
+      { rotulo: CATEGORIA_CONSTRUCAO, valores: mensalConstrucao, cor: 'var(--cor-primaria-solida, #2AA9E0)' },
+      ...(mensalGestao ? [{ rotulo: CATEGORIA_GESTAO_OBRA, valores: mensalGestao, cor: 'var(--cor-alerta, #e0a82a)' }] : []),
+    ];
+    const totalExibido = acumulado[acumulado.length - 1] ?? 0;
+
+    return html`
+      <urbi-card titulo="Avanço da obra">
+        <div class="avanco-ctrl">
+          <urbi-checkbox
+            label="Incluir Gestão da obra"
+            ?marcado=${incluirGestao}
+            ?desabilitado=${!temGestao}
+            @urbi:checkbox-change=${(e: CustomEvent) => { this.incluirGestaoObra = e.detail.marcado; }}
+          ></urbi-checkbox>
+          ${!temGestao ? html`
+            <span class="sec">Sem linha "Gestão da obra" neste estudo.</span>` : nothing}
+        </div>
+
+        <div class="graf-bloco">
+          <h4>Custo mensal da obra</h4>
+          <urbi-grafico-colunas
+            ?empilhado=${incluirGestao}
+            legenda="sempre"
+            formato="moeda"
+            .categorias=${c.meses}
+            .series=${series}
+          ></urbi-grafico-colunas>
+        </div>
+
+        <div class="graf-bloco">
+          <h4>Desembolso acumulado</h4>
+          <urbi-grafico-area
+            formato="moeda"
+            legenda="sempre"
+            .categorias=${c.meses}
+            .series=${[{ rotulo: 'Acumulado', valores: acumulado, cor: 'var(--cor-primaria-solida, #2AA9E0)' }]}
+          ></urbi-grafico-area>
+        </div>
+
+        <div class="avanco-tabela-wrap">
+          <table class="avanco-tabela">
+            <thead>
+              <tr>
+                <th>Linha</th>
+                <th>Total</th>
+                ${c.meses.map((m) => html`<th>${m}</th>`)}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Projetado</td>
+                <td class="num">${fmtR$(totalExibido)}</td>
+                ${mensalConstrucao.map((v, i) => html`
+                  <td class="num">${fmtR$(v + (mensalGestao?.[i] ?? 0))}</td>`)}
+              </tr>
+              <tr>
+                <td>Projetado acumulado</td>
+                <td class="num">${fmtR$(totalExibido)}</td>
+                ${acumulado.map((v) => html`<td class="num">${fmtR$(v)}</td>`)}
+              </tr>
+            </tbody>
+          </table>
         </div>
       </urbi-card>
     `;

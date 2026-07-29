@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
+  parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig,
 } from './fluxo-caixa-motor.js';
@@ -84,11 +85,59 @@ test('fluxo de pagamento distribui entrada, parcelas na obra e repasse na entreg
   const r = receitaMensalLinha(linha, CRONO, 60);
   assert.ok(perto(soma(r), 10_000_000, 1));                   // nada se perde
   assert.ok(perto(r[12], 1_500_000, 1));                      // entrada no mês 12
-  // parcelas: mensal do mês 13 até o fim da obra (mês 40) = 28 meses
-  assert.ok(perto(r[13], 1_500_000 / 28, 1));
-  assert.ok(perto(r[40], 1_500_000 / 28, 1));
+  // #190: parcelas ancoradas nos MESES DA OBRA (17..40 = 24 parcelas), não mais
+  // contadas a partir do mês da venda (que dava 28 parcelas, do mês 13 ao 40).
+  assert.ok(perto(r[13], 0, 1));                              // antes da obra: nada
+  assert.ok(perto(r[17], 1_500_000 / 24, 1));                 // 1º mês da obra
+  assert.ok(perto(r[40], 1_500_000 / 24, 1));                 // último mês da obra
   // repasse: fim da obra (40) + 2 = mês 42
   assert.ok(perto(r[42], 7_000_000, 1));
+});
+
+// 4c. #190 — "Ao longo da obra" + Mensal: nº de parcelas = duração da obra.
+test('#190 ao longo da obra: nº de parcelas fixo pela duração da obra', () => {
+  assert.equal(parcelasAoLongoObra(CRONO), 24);               // obra 17..40
+  // Venda ANTES da obra: todos os 24 meses de obra recebem parcela igual.
+  const v = vencimentosAoLongoObra(CRONO, 12);
+  assert.equal(v.length, 24);
+  assert.equal(v[0], 17);
+  assert.equal(v[23], 40);
+});
+
+test('#190 venda no meio da obra: 1ª parcela no 1º vencimento >= mês da venda', () => {
+  // Venda no mês 25 (obra 17..40): sobram os meses 25..40 = 16 vencimentos.
+  const v = vencimentosAoLongoObra(CRONO, 25);
+  assert.equal(v.length, 16);
+  assert.equal(v[0], 25);                                     // nada retroativo
+  assert.equal(v[15], 40);
+
+  const linha = {
+    tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
+    absorcao: { modo: 'personalizado', meses: [{ mes: 25, pct: 100 }] },        // vendido no mês 25
+    fluxo_pagamento: {
+      comissao: { ativo: false, tipo: 'embutida', pct: 0 },
+      ret: { ativo: false, pct: 0 },
+      entrada: { modo: 'entrada', parcelas: 1, pct: 0 },
+      parcelas: { periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 100 },
+      repasse: { pct: 0, apos_entrega_meses: 0 },
+    },
+  };
+  const r = receitaMensalLinha(linha, CRONO, 60);
+  assert.ok(perto(soma(r), 10_000_000, 1));                   // conservação da receita
+  assert.ok(perto(r[24], 0, 1));                              // antes da venda: nada
+  assert.ok(perto(r[25], 10_000_000 / 16, 1));                // parcela maior, total igual
+  assert.ok(perto(r[40], 10_000_000 / 16, 1));
+});
+
+test('#190 obra sem duração: cai para 1 parcela no mês da venda', () => {
+  const semObra: EventoCrono[] = [
+    { evento: 'lancamento', inicio_mes: 12, duracao_meses: 1 },
+    { evento: 'obra', inicio_mes: 17, duracao_meses: 0 },
+  ];
+  assert.equal(parcelasAoLongoObra(semObra), 1);
+  assert.deepEqual(vencimentosAoLongoObra(semObra, 12), [12]);
+  // Venda depois do FIM da obra também vira parcela única no mês da venda.
+  assert.deepEqual(vencimentosAoLongoObra(CRONO, 50), [50]);
 });
 
 // 4b. Fluxo de pagamento com MÚLTIPLAS linhas de entrada e repasse derivado
@@ -107,7 +156,10 @@ test('fluxo de pagamento: múltiplas entradas + repasse derivado (100 − entrad
   const r = receitaMensalLinha(linha, CRONO, 60);
   assert.ok(perto(soma(r), 10_000_000, 1));       // nada se perde
   assert.ok(perto(r[12], 1_500_000, 1));          // 10% + 5% de entrada no mês 12
-  assert.ok(perto(r[13], 1_500_000 / 28, 1));     // parcelas ao longo da obra (mês 13..40)
+  // #190: parcelas ao longo da obra vencem nos MESES DA OBRA (17..40 = 24), não
+  // a partir do mês seguinte à venda (13..40 = 28).
+  assert.ok(perto(r[13], 0, 1));
+  assert.ok(perto(r[17], 1_500_000 / 24, 1));
   assert.ok(perto(r[42], 7_000_000, 1));          // repasse derivado (70%) na entrega (mês 42)
 });
 

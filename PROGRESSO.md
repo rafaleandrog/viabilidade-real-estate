@@ -4,6 +4,87 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #184, #192, #190 — Resumo, avanço da obra e parcelas ao longo da obra (2026-07-29)
+
+Branch `claude/r4-184-192-190`. **#190 é portão** (`Portão? = SIM` → destrava #191); #184 e #192 não
+são, mas o autor pediu explicitamente o merge do lote nesta sessão. Nenhuma toca schema/migração —
+`versao` do manifesto **não** muda.
+
+### #184 — Resumo: composição de custos vazia + filtro
+
+Fecha a trinca #182/#183/#184: a pizza montava 12 fatias a partir de `calcularProforma`, que só lê
+colunas estáticas de `estudos` (as Premissas, removidas do Avançado no #88) — num estudo criado
+direto como Avançado as 12 eram zero e a pizza saía **sempre vazia**.
+
+1. `frontend/fluxo-tabela.ts` — `GRUPO_CUSTO_LABEL` e `GRUPOS_CUSTO` (ordem das 5 abas) agora
+   **exportados**, para a pizza usar exatamente os mesmos rótulos/ordem da tabela do Fluxo de Caixa.
+   `tabelaFluxo` passou a consumir a constante em vez do array literal repetido.
+2. `frontend/tela-resumo.ts` — a pizza vem de `c.linhasCusto`, o mesmo array que soma em
+   `custoMensal`; a pizza **fecha com o Custo Total do Fluxo de Caixa por construção**, não por
+   coincidência. Novo `urbi-select`: **macro** (uma fatia por grupo, padrão) ou um grupo específico
+   (uma fatia por linha, agregando linhas de mesmo nome). Grupo selecionado que fica sem custo cai
+   de volta no macro sozinho. Estado vazio preservado.
+3. Com isso `tela-resumo.ts` **deixa de importar `proforma.ts`** (e `buscarConfig`/`aliquotaRet`,
+   que só existiam para alimentá-lo). O Proforma segue sendo a fonte do **Preliminar**
+   (`tela-proforma`, `tela-graficos`), onde aquelas colunas existem e são editáveis.
+
+### #192 — Custos → Obras: gráficos de avanço (só Projetado)
+
+Escopo conforme decisão do autor (§8 do mapa mestre): a referência visual traz
+Projetado/Realizado/Desvio/Forecast, mas "Realizado" não existe em schema/backend/motor — **só o
+Projetado**, sem migração.
+
+O requisito duro da issue é que os valores batam **exatamente** com a linha Construção do Fluxo de
+Caixa. Em vez de redistribuir por conta (que divergiria na primeira mudança de regra), o
+`tela-fluxo-custos.ts` roda o **próprio motor** (`calcularFluxo`) com os insumos que já carregava, e
+lê `c.linhasCusto` — curva, âncora de cronograma e unidade de orçamento saem de graça e não podem
+divergir. Foram guardados `linhasReceita` e `taxa_desconto_aa`, que a tela lia e descartava.
+
+Abaixo da tabela de Obra: `urbi-grafico-colunas` (custo mensal, `empilhado` quando a Gestão entra),
+`urbi-grafico-area` (desembolso acumulado), `urbi-checkbox` "Incluir Gestão da obra" (desabilitado
+quando o estudo não tem essa linha) e a tabela mensal Projetado + Projetado acumulado. Estado vazio
+quando falta Cronograma ou a linha Construção. Só tokens do design system.
+
+> Props conferidas no `dist/index.d.ts` do SDK antes de usar (`categorias`, `series`, `formato`,
+> `legenda`, `empilhado`, `altura`, `clicavel`; `SerieGrafico = { rotulo, valores, cor? }`) —
+> `urbi-grafico-area` **existe**. Atributo inexistente não dá erro, só não faz nada (§10.2).
+
+### #190 — Nº de parcelas "Ao longo da obra" + Mensal (PORTÃO → #191)
+
+⚠️ **Muda números de estudos existentes** que usem Parcelamento com "Ao longo da obra" (§10.4 do
+mapa mestre).
+
+**Causa:** o motor distribuía `fimObra − mesVenda` parcelas a partir do mês SEGUINTE à venda — cada
+mês de venda gerava um número diferente de parcelas, então não existia um "nº de parcelas" único
+para preencher o campo (que ficava travado e **vazio**). A periodicidade era ignorada nesse ramo.
+
+1. `frontend/fluxo-caixa-motor.ts` — duas funções novas exportadas:
+   `parcelasAoLongoObra(cronograma)` (= duração da obra, mínimo 1) e
+   `vencimentosAoLongoObra(cronograma, mesVenda)`, que devolve os **meses da obra** como
+   vencimentos. Venda depois do início da obra: parcelas já vencidas não são recuperadas — a 1ª cai
+   no 1º vencimento **≥ mês da venda** e o total se reparte entre os restantes (a parcela sobe, a
+   receita **se conserva**). Obra sem duração/sem evento, ou venda após o fim da obra: 1 parcela no
+   mês da venda. `receitaMensalLinha` usa isso quando `ao_longo_obra` **e** periodicidade Mensal;
+   Trimestral/Semestral/Anual seguem no comportamento herdado — é o escopo do **#191**.
+2. `frontend/tela-fluxo-receitas.ts` — `_parcelasExibidas` mostra o nº derivado do Cronograma no
+   campo travado. **Derivado, não persistido**: gravar o número criaria uma segunda fonte de verdade
+   que envelheceria assim que a duração da obra mudasse — e o motor ignora o `parcelas` salvo nesse
+   ramo. Assim o campo é reativo à duração, como pede o aceite.
+3. `frontend/fluxo-caixa-motor.test.ts` — 3 testes novos (nº fixo pela duração; venda no meio da
+   obra com 1º vencimento ≥ venda + conservação; fallback de obra sem duração). Os testes 4 e 4b
+   afirmavam as 28 parcelas do comportamento antigo e foram **atualizados para as 24 novas** — a
+   mudança numérica é a correção pretendida, não regressão.
+4. `docs/viabilidade/padrao-incorporacao.md` — motor de receita descreve a nova ancoragem.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + **106** testes + build), rodado
+a cada issue e de novo no fim do lote. Nada de backend/schema/migração neste lote — não há pendência
+para o ambiente autenticado do autor.
+
+**Merge:** #190 é portão (mergeia por regra); #184 e #192 mergeadas junto por pedido explícito do
+autor nesta sessão.
+
+---
+
 ## #179, #189, #177, #185, #186, #187 — lote de 6 issues Médio (2026-07-29)
 
 Branch `claude/r4-lote-medio`. Nenhuma é portão — lote implementado e **mergeado nesta sessão a

@@ -16,7 +16,11 @@ import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
 
 // Rótulos e ordem espelham as 5 abas de Custos (#125): Terreno · Obra ·
 // Diretos · Indiretos · Financeiro.
-const GRUPO_CUSTO_LABEL: Record<string, string> = {
+// Exportados (#184) para que a pizza de composição de custos do Resumo use
+// exatamente os mesmos rótulos e a mesma ordem da tabela do Fluxo de Caixa.
+export const GRUPOS_CUSTO = ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'] as const;
+
+export const GRUPO_CUSTO_LABEL: Record<string, string> = {
   terreno: 'Custos do Terreno',
   obra: 'Custos de Obra',
   diretos: 'Custos Diretos',
@@ -299,8 +303,7 @@ export function tabelaFluxo(
   };
   const custosPorGrupo = (g: string) => c.linhasCusto.filter((x) => x.grupo === g);
   // Ordem das 5 abas de Custos (#125): Terreno · Obra · Diretos · Indiretos · Financeiro.
-  const grupos = (['terreno', 'obra', 'diretos', 'indireto', 'financeiro'] as const)
-    .filter((g) => custosPorGrupo(g).length > 0);
+  const grupos = GRUPOS_CUSTO.filter((g) => custosPorGrupo(g).length > 0);
   // VPL é linear no fluxo mensal, então o VPL de um agregado = Σ VPL das suas linhas (#126).
   const somaVpl = (linhas: LinhaCalc[]): number => linhas.reduce((s, l) => s + l.vpl, 0);
 
