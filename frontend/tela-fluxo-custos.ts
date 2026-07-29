@@ -135,6 +135,16 @@ const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
     'Gestão':           ['rs', 'pct_vgv'],
     'Outro':            ['rs', 'pct_vgv'],
   },
+  // #181: Financeiro não tinha entrada aqui — sem restrição, `_unidsPerm` caía
+  // no fallback "todas as unidades" e oferecia badges sem sentido para custo
+  // financeiro (R$/m² terreno, % Obra). Mesmo padrão de Indiretos: R$ ou % VGV.
+  financeiro: {
+    'Juros de financiamento':  ['rs', 'pct_vgv'],
+    'Taxas bancárias':         ['rs', 'pct_vgv'],
+    'Estruturação de dívida':  ['rs', 'pct_vgv'],
+    'Investidores':            ['rs', 'pct_vgv'],
+    'Outro':                   ['rs', 'pct_vgv'],
+  },
 };
 
 const EVENTOS_ANCORA = [
