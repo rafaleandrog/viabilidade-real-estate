@@ -169,6 +169,49 @@ export function normalizarLinhasPagamento(bloco: any): any[] {
   return [];
 }
 
+/**
+ * #190: nº de parcelas do parcelamento "Ao longo da obra" na periodicidade
+ * MENSAL — uma parcela por mês de obra, fixo pela duração do evento `obra` do
+ * Cronograma. É o número que a tela mostra no campo "Nº parcelas" (travado) e
+ * o mesmo que `vencimentosAoLongoObra` distribui, para não haver duas fontes
+ * de verdade. Obra ausente ou com duração 0 → 1 parcela.
+ */
+export function parcelasAoLongoObra(cronograma: EventoCrono[]): number {
+  const obra = cronograma.find((e) => e.evento === 'obra');
+  return Math.max(1, Math.round(n(obra?.duracao_meses)));
+}
+
+/**
+ * #190: meses de vencimento do parcelamento "Ao longo da obra" + Mensal.
+ *
+ * ANTES: as parcelas saíam do mês da venda (`fimObra − mesVenda` parcelas, uma
+ * por mês a partir de `mesVenda + 1`), então CADA mês de venda gerava um número
+ * diferente de parcelas — não existia um "nº de parcelas" único para exibir na
+ * tela, e o campo ficava travado e vazio.
+ *
+ * AGORA os vencimentos são os MESES DA OBRA (um por mês, de `inicio_mes` até o
+ * fim), independentes do mês da venda — o parcelamento acompanha o andamento
+ * da obra, que é o que "ao longo da obra" significa.
+ *
+ * Venda depois do início da obra: parcelas já vencidas não são recuperadas — a
+ * primeira cai no primeiro vencimento **≥ mês da venda** e o total é repartido
+ * entre os vencimentos restantes (o valor da parcela sobe; a receita se
+ * conserva). Venda depois do fim da obra, obra sem duração ou sem evento de
+ * obra: 1 parcela no mês da venda.
+ */
+export function vencimentosAoLongoObra(cronograma: EventoCrono[], mesVenda: number): number[] {
+  const obra = cronograma.find((e) => e.evento === 'obra');
+  const dur = Math.max(0, Math.round(n(obra?.duracao_meses)));
+  if (!obra || dur <= 0) return [mesVenda];
+  const inicio = n(obra.inicio_mes);
+  const meses: number[] = [];
+  for (let k = 0; k < dur; k++) {
+    const mes = inicio + k;
+    if (mes >= mesVenda) meses.push(mes);
+  }
+  return meses.length > 0 ? meses : [mesVenda];
+}
+
 /** % do Repasse = 100 − Σ(entrada) − Σ(parcelas), derivado (Lote 6 · #20). */
 export function pctRepasseDerivado(fp: any): number {
   const somaEntrada = normalizarLinhasPagamento(fp?.entrada).reduce((s, e) => s + n(e?.pct), 0);
@@ -237,11 +280,20 @@ export function receitaMensalLinha(
     for (const p of parcelasLinhas) {
       const total = recebivel * (n(p?.pct) / 100);
       if (total <= 0) continue;
-      if (p?.ao_longo_obra && fimObra > mesVenda) {
-        const meses = fimObra - mesVenda; // mensal, do mês seguinte até o fim da obra
+      const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
+      if (p?.ao_longo_obra && intervalo === 1) {
+        // #190 — "Ao longo da obra" + Mensal: vencimentos ancorados nos meses
+        // da OBRA, não contados a partir do mês da venda (ver
+        // `vencimentosAoLongoObra`). Σ das parcelas = `total` sempre.
+        const vencimentos = vencimentosAoLongoObra(cronograma, mesVenda);
+        for (const mes of vencimentos) deposita(mes, total / vencimentos.length);
+      } else if (p?.ao_longo_obra && fimObra > mesVenda) {
+        // "Ao longo da obra" com periodicidade Trimestral/Semestral/Anual: a
+        // periodicidade segue ignorada aqui (comportamento herdado) — é o
+        // escopo do #191, que ancora essas periodicidades no cronograma.
+        const meses = fimObra - mesVenda;
         for (let k = 1; k <= meses; k++) deposita(mesVenda + k, total / meses);
       } else {
-        const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
         const nParc = Math.max(1, Math.round(n(p?.parcelas) || 1));
         for (let k = 1; k <= nParc; k++) deposita(mesVenda + intervalo * k, total / nParc);
       }

@@ -5,13 +5,13 @@ import { fmtR$, fmtPct } from './viab-format.js';
 import { type EventoCrono } from './fluxo-shared.js';
 import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { graficoFluxoMensal, graficoFluxoAcumulado } from './fluxo-graficos.js';
-import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
+import { GRUPOS_CUSTO, GRUPO_CUSTO_LABEL } from './fluxo-tabela.js';
 import { montarMedidor } from './medidor-faixas.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
-  listarBenchmarks, buscarConfig,
+  listarBenchmarks,
 } from './viabilidade-api.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -19,8 +19,8 @@ import {
 //
 // Frontend puro, sem lógica de entrada própria: consolida os resultados já
 // calculados pelas outras abas em "poucos itens destacados":
-//  · 8 KPIs — 4 do Fluxo de Caixa (VPL, TIR, Payback, Exposição máx.) e 4 do
-//    Proforma (VGV, Resultado, Margem líquida, ROI). Seleção definida com o autor.
+//  · 8 KPIs — 4 do Fluxo de Caixa (VPL, TIR, Payback, Exposição máx.) e 4 "de
+//    negócio" (VGV, Resultado, Margem líquida, ROI). Seleção definida com o autor.
 //  · 4 gráficos-chave — Fluxo Acumulado (curva S) e Fluxo Mensal (reusados de
 //    fluxo-graficos, idênticos à aba Fluxo de Caixa), Composição de custos
 //    (pizza) e Indicadores vs. benchmark (medidores), reusados de Cenários.
@@ -28,6 +28,13 @@ import {
 // Reuso: os gráficos de fluxo vêm de `fluxo-graficos.ts` (mesmas funções puras
 // que a aba Fluxo de Caixa) e os medidores de `medidor-faixas.ts` — nada é
 // recalculado aqui de forma divergente das outras abas.
+//
+// #182/#183/#184: esta tela NÃO consome mais `proforma.ts`. Os KPIs, os
+// medidores e a pizza de custos vinham de `calcularProforma`, que só lê colunas
+// estáticas de `estudos` (as Premissas, removidas do Avançado no #88) — num
+// estudo criado direto como Avançado saíam todos zerados. Tudo agora deriva do
+// `FluxoCalc`; o Proforma segue sendo a fonte do PRELIMINAR (tela-proforma,
+// tela-graficos), onde aquelas colunas existem e são editáveis.
 // ─────────────────────────────────────────────────────────────────────────
 
 const n = (v: any): number => Number(v) || 0;
@@ -39,7 +46,9 @@ export class ViabTelaResumo extends LitElement {
   @state() private carregando = true;
   @state() private calc: FluxoCalc | null = null;
   @state() private benchmarks: any[] = [];
-  @state() private aliquotaRet = 4;
+  // #184: visão da pizza de custos — '' = macro (uma fatia por grupo); um id de
+  // grupo abre em uma fatia por linha daquele grupo.
+  @state() private grupoPizza = '';
   private dados: {
     crono: EventoCrono[]; dataInicio: string | null;
   } | null = null;
@@ -58,6 +67,13 @@ export class ViabTelaResumo extends LitElement {
     .medidores { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
     .graf svg { display: block; width: 100%; height: auto; min-width: 560px; }
     .graf-wrap { overflow-x: auto; }
+    /* #184: seletor macro/por grupo acima da pizza de composição de custos. */
+    .pizza-ctrl { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .pizza-ctrl urbi-select { flex: 1; min-width: 180px; }
+    .pizza-rot {
+      font-size: var(--texto-rotulo, 0.75rem); text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+    }
   `];
 
   updated() {
@@ -70,14 +86,13 @@ export class ViabTelaResumo extends LitElement {
   private async _carregar() {
     this.carregando = true;
     try {
-      const [receitas, custos, curvas, crono, params, bm, cfg] = await Promise.all([
+      const [receitas, custos, curvas, crono, params, bm] = await Promise.all([
         listarReceitasAvancado(this.estudo.id),
         listarCustosAvancado(this.estudo.id),
         listarCurvas(),
         buscarCronogramaAvancado(this.estudo.id),
         buscarParametrosAvancado(this.estudo.id),
         listarBenchmarks(this.estudo.tipo_empreendimento),
-        buscarConfig(),
       ]);
       const cronoDados: EventoCrono[] = crono?.erro ? [] : (crono.dados || []);
       const dataInicio = params?.erro ? null : (params.data_inicio_projeto ?? null);
@@ -93,7 +108,6 @@ export class ViabTelaResumo extends LitElement {
       this.dados = { crono: cronoDados, dataInicio };
       this.calc = calcularFluxo(config);
       this.benchmarks = bm?.dados || [];
-      this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar o resumo', 'erro');
     }
@@ -108,7 +122,6 @@ export class ViabTelaResumo extends LitElement {
         <urbi-estado-vazio icone="fa-solid fa-gauge-high"
           mensagem="Defina o cronograma, as receitas e os custos nas outras abas para ver o resumo consolidado."></urbi-estado-vazio>`;
     }
-    const p = calcularProforma({ ...this.estudo, aliquota_ret_pct: this.aliquotaRet } as ProformaInput);
     const k = this._kpisAvancado(c);
     const dataInicio = this.dados?.dataInicio ?? null;
     const crono = this.dados?.crono ?? [];
@@ -122,7 +135,7 @@ export class ViabTelaResumo extends LitElement {
           <div class="graf-wrap"><div class="graf">${graficoFluxoMensal(c, dataInicio, crono)}</div></div>
         </urbi-card>
         <div class="lado-a-lado">
-          <urbi-card titulo="Composição dos custos">${this._renderPizza(p)}</urbi-card>
+          <urbi-card titulo="Composição dos custos">${this._renderPizza(c)}</urbi-card>
           ${this._renderMedidores(k)}
         </div>
       </div>
@@ -167,32 +180,57 @@ export class ViabTelaResumo extends LitElement {
     `;
   }
 
-  // Composição de custos — espelha `_custos` de tela-graficos (mesma lista de
-  // linhas do Proforma); pizza pelo primitivo urbi-grafico-pizza.
-  private _renderPizza(p: Proforma): TemplateResult {
-    const itens = [
-      { l: 'Terreno', v: p.custoTerreno },
-      { l: 'Infraestrutura', v: p.infraestrutura },
-      { l: 'Construção', v: p.construcao },
-      { l: 'Decoração', v: p.decoracao },
-      { l: 'Gestão da construção', v: p.gestaoConstrucao },
-      { l: 'Projetos', v: p.projetos },
-      { l: 'Outorga', v: p.outorga },
-      { l: 'Incorporação e registro', v: p.incorporacaoRegistro },
-      { l: 'Manutenção', v: p.manutencao },
-      { l: 'Contingências', v: p.contingencias },
-      { l: 'Marketing global', v: p.marketingGlobal },
-      { l: 'Gestão e indiretos', v: p.gestaoIndiretos },
-    ].filter((i) => i.v > 0.005);
-    if (itens.length === 0) {
+  /**
+   * Composição de custos (#184). Antes montava 12 fatias a partir do Proforma
+   * (`calcularProforma`), que só lê colunas estáticas de `estudos` (as
+   * Premissas, removidas do Avançado no #88) — num estudo criado direto como
+   * Avançado todas as 12 eram zero e a pizza saía SEMPRE vazia. Mesma causa
+   * raiz do #182/#183; agora a fonte é `c.linhasCusto`, o mesmo array que
+   * alimenta o Custo Total da tabela do Fluxo de Caixa (`custoMensal` é a soma
+   * dessas linhas), então a pizza fecha com aquele total por construção.
+   *
+   * `grupoPizza` vazio = visão MACRO (uma fatia por grupo de custo); com um
+   * grupo selecionado, abre em uma fatia por linha daquele grupo (agregando
+   * linhas de mesmo nome).
+   */
+  private _renderPizza(c: FluxoCalc): TemplateResult {
+    const doGrupo = (g: string) => c.linhasCusto.filter((l) => l.grupo === g);
+    const comCusto = GRUPOS_CUSTO.filter((g) => doGrupo(g).reduce((s, l) => s + l.total, 0) > 0.005);
+    if (comCusto.length === 0) {
       return html`<urbi-estado-vazio icone="fa-solid fa-chart-pie" mensagem="Sem custos para exibir."></urbi-estado-vazio>`;
     }
+    // Grupo selecionado que ficou sem custo (mudança nas outras abas) volta ao macro.
+    const sel = comCusto.includes(this.grupoPizza as any) ? this.grupoPizza : '';
+    let itens: { l: string; v: number }[];
+    if (sel) {
+      const porNome = new Map<string, number>();
+      for (const l of doGrupo(sel)) porNome.set(l.nome, (porNome.get(l.nome) ?? 0) + l.total);
+      itens = [...porNome].map(([l, v]) => ({ l, v }));
+    } else {
+      itens = comCusto.map((g) => ({
+        l: GRUPO_CUSTO_LABEL[g],
+        v: doGrupo(g).reduce((s, l) => s + l.total, 0),
+      }));
+    }
+    itens = itens.filter((i) => i.v > 0.005);
     return html`
-      <urbi-grafico-pizza
-        formato="moeda"
-        .categorias=${itens.map((i) => i.l)}
-        .series=${[{ rotulo: 'Custos', valores: itens.map((i) => i.v) }]}
-      ></urbi-grafico-pizza>
+      <div class="pizza-ctrl">
+        <span class="pizza-rot">Ver por</span>
+        <urbi-select
+          .valor=${sel}
+          .opcoes=${[{ valor: '', rotulo: 'Custo macro (todos os grupos)' },
+            ...comCusto.map((g) => ({ valor: g, rotulo: GRUPO_CUSTO_LABEL[g] }))]}
+          @urbi:select-change=${(e: CustomEvent) => { this.grupoPizza = e.detail.valor; }}
+        ></urbi-select>
+      </div>
+      ${itens.length === 0
+        ? html`<urbi-estado-vazio icone="fa-solid fa-chart-pie" mensagem="Sem custos para exibir."></urbi-estado-vazio>`
+        : html`
+          <urbi-grafico-pizza
+            formato="moeda"
+            .categorias=${itens.map((i) => i.l)}
+            .series=${[{ rotulo: 'Custos', valores: itens.map((i) => i.v) }]}
+          ></urbi-grafico-pizza>`}
     `;
   }
 

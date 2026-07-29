@@ -233,6 +233,11 @@ Receita da fase(t):
   para cada venda, aplica o Fluxo de Pagamento:
     - Entrada (parcelável a partir do mês da venda)
     - Parcelas (ao longo da obra / por periodicidade)
+        "ao longo da obra" + Mensal: uma parcela por MÊS DE OBRA (nº de parcelas =
+        duração da obra no Cronograma), independente do mês da venda. Venda depois
+        do início da obra: 1ª parcela no 1º vencimento >= mês da venda e o total é
+        repartido entre os vencimentos restantes. Obra sem duração, ou venda após o
+        fim da obra: 1 parcela no mês da venda.
     - Repasse (% derivado) concentrado N meses após a Obra (repasse.apos_entrega_meses)
   Comissão e RET deduzem o valor recebível.
 

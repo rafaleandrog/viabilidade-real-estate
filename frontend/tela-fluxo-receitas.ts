@@ -7,7 +7,7 @@ import {
   totalAntesAlocacao,
   type EventoCrono,
 } from './fluxo-shared.js';
-import { pctRepasseDerivado } from './fluxo-caixa-motor.js';
+import { pctRepasseDerivado, parcelasAoLongoObra } from './fluxo-caixa-motor.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
@@ -651,6 +651,18 @@ export class ViabFluxoReceitas extends LitElement {
     this.pagForm = { ...f, [bloco]: linhas };
   }
 
+  /**
+   * #190: nº de parcelas exibido numa linha de Parcelamento. Em "Ao longo da
+   * obra" + Mensal o número não é digitado nem persistido — é a duração da
+   * obra no Cronograma, a mesma que o motor usa para montar os vencimentos
+   * (`parcelasAoLongoObra`). Nas demais combinações segue o valor salvo.
+   */
+  private _parcelasExibidas(p: any): number {
+    const mensal = (p?.periodicidade ?? 'mensal') === 'mensal';
+    if (p?.ao_longo_obra && mensal) return parcelasAoLongoObra(this.crono);
+    return p?.parcelas ?? 0;
+  }
+
   private _addLinha(bloco: 'entrada' | 'parcelas') {
     const f = this.pagForm;
     if (bloco === 'parcelas' && f.parcelas.length >= 4) return; // #105 — máximo 4
@@ -741,8 +753,16 @@ export class ViabFluxoReceitas extends LitElement {
                         class=${!dis && perUsadas.has(per) && p.periodicidade !== per ? 'indisponivel' : ''}
                         @click=${() => { if (!dis && !perUsadas.has(per)) this._setLinha('parcelas', i, 'periodicidade', per); }}>${ROTULO_PER[per]}</urbi-badge>`)}
                   </span>
+                  ${/* #190: "Ao longo da obra" + Mensal → nº de parcelas é a
+                       duração da obra no Cronograma. O valor é DERIVADO (não
+                       persistido): o motor calcula os vencimentos a partir do
+                       cronograma, então gravar o número aqui criaria uma
+                       segunda fonte de verdade que ficaria velha assim que a
+                       duração da obra mudasse. Exibido travado, como o campo
+                       já era nesse modo — só que agora preenchido. */ ''}
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0"
-                    ?desabilitado=${dis || p.ao_longo_obra} .valor=${p.parcelas}
+                    ?desabilitado=${dis || p.ao_longo_obra}
+                    .valor=${this._parcelasExibidas(p)}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'parcelas', ev.detail.valor ?? 0)}></viab-num>
                   <urbi-checkbox label="Ao longo da obra" ?desabilitado=${dis} ?marcado=${p.ao_longo_obra}
                     @urbi:checkbox-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'ao_longo_obra', ev.detail.marcado)}></urbi-checkbox>
