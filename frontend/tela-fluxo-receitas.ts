@@ -652,14 +652,16 @@ export class ViabFluxoReceitas extends LitElement {
   }
 
   /**
-   * #190: nº de parcelas exibido numa linha de Parcelamento. Em "Ao longo da
-   * obra" + Mensal o número não é digitado nem persistido — é a duração da
-   * obra no Cronograma, a mesma que o motor usa para montar os vencimentos
-   * (`parcelasAoLongoObra`). Nas demais combinações segue o valor salvo.
+   * #190/#191: nº de parcelas exibido numa linha de Parcelamento. Em "Ao longo
+   * da obra" o número não é digitado nem persistido — sai do Cronograma e da
+   * periodicidade da linha (`max(1, floor(duração da obra / intervalo))`), a
+   * mesma conta que o motor usa para montar os vencimentos
+   * (`parcelasAoLongoObra`). Trocar a periodicidade recalcula na hora: Mensal
+   * numa obra de 24 meses mostra 24; Trimestral, 8. Nas demais combinações
+   * (sem "ao longo da obra") segue o valor salvo, digitado pelo usuário.
    */
   private _parcelasExibidas(p: any): number {
-    const mensal = (p?.periodicidade ?? 'mensal') === 'mensal';
-    if (p?.ao_longo_obra && mensal) return parcelasAoLongoObra(this.crono);
+    if (p?.ao_longo_obra) return parcelasAoLongoObra(this.crono, p?.periodicidade);
     return p?.parcelas ?? 0;
   }
 
@@ -753,12 +755,13 @@ export class ViabFluxoReceitas extends LitElement {
                         class=${!dis && perUsadas.has(per) && p.periodicidade !== per ? 'indisponivel' : ''}
                         @click=${() => { if (!dis && !perUsadas.has(per)) this._setLinha('parcelas', i, 'periodicidade', per); }}>${ROTULO_PER[per]}</urbi-badge>`)}
                   </span>
-                  ${/* #190: "Ao longo da obra" + Mensal → nº de parcelas é a
-                       duração da obra no Cronograma. O valor é DERIVADO (não
-                       persistido): o motor calcula os vencimentos a partir do
-                       cronograma, então gravar o número aqui criaria uma
-                       segunda fonte de verdade que ficaria velha assim que a
-                       duração da obra mudasse. Exibido travado, como o campo
+                  ${/* #190/#191: "Ao longo da obra" → nº de parcelas sai da
+                       duração da obra no Cronograma dividida pelo intervalo da
+                       periodicidade. O valor é DERIVADO (não persistido): o
+                       motor calcula os vencimentos a partir do cronograma,
+                       então gravar o número aqui criaria uma segunda fonte de
+                       verdade que ficaria velha assim que a duração da obra ou
+                       a periodicidade mudasse. Exibido travado, como o campo
                        já era nesse modo — só que agora preenchido. */ ''}
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0"
                     ?desabilitado=${dis || p.ao_longo_obra}

@@ -4,6 +4,48 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #191 — Nº de parcelas Trimestral/Semestral/Anual "Ao longo da obra" (2026-07-29)
+
+Branch `claude/r4-191-parcelas-periodicidade`. Não é portão — mergeada nesta sessão a pedido
+explícito do autor. Pré-requisito **#190 já na `main`** (commit `d4a8d33`, merge `b30fe7d`).
+Sem schema/migração; `versao` do manifesto não muda.
+
+⚠️ **Muda números de estudos existentes** que usem Parcelamento com "Ao longo da obra" em
+Trimestral, Semestral ou Anual (§10.4 do mapa mestre) — antes essas linhas pagavam **todo mês**.
+
+**Causa:** o ramo `ao_longo_obra` do motor ignorava a periodicidade por completo — Trimestral,
+Semestral e Anual espalhavam o valor mensalmente. O #190 arrumou só o caso Mensal e deixou o ramo
+herdado no lugar, explicitamente marcado como escopo desta issue.
+
+1. `frontend/fluxo-caixa-motor.ts` — as duas funções criadas no #190 foram **generalizadas** para
+   receber a periodicidade, em vez de ganharem uma segunda implementação ao lado:
+   - `parcelasAoLongoObra(cronograma, periodicidade?)` = `max(1, floor(duração / intervalo))`,
+     intervalo 1/3/6/12. Em Mensal reproduz exatamente o #190 (`floor(dur/1) = dur`).
+   - `vencimentosAoLongoObra(cronograma, mesVenda, periodicidade?)` — 1º vencimento no
+     `inicio_mes` da obra, os demais a cada `intervalo`.
+   O **resto da divisão não vira parcela** (obra de 10 meses em Trimestral = 3 parcelas nos meses
+   0/3/6, sobra 1 mês sem vencimento) — é a regra da issue, não arredondamento acidental. Duração
+   menor que um intervalo cai no piso de 1 parcela. Com isso o ramo herdado (`fimObra > mesVenda`,
+   mensal forçado) **saiu do motor**: "ao longo da obra" tem agora um caminho só.
+2. `frontend/tela-fluxo-receitas.ts` — `_parcelasExibidas` passa a periodicidade da linha. Trocar a
+   periodicidade recalcula o campo na hora (obra de 24 meses: Mensal 24, Trimestral 8, Semestral 4,
+   Anual 2). Continua **derivado, não persistido**, pelo mesmo motivo do #190 — evitar uma segunda
+   fonte de verdade que envelheceria a cada mudança de duração ou de periodicidade.
+3. `frontend/fluxo-caixa-motor.test.ts` — 3 testes novos: contagem/vencimentos nas 4
+   periodicidades, o caso do resto da divisão (10 meses trimestral = 3 parcelas) + piso de 1
+   parcela, e um fluxo Semestral completo verificando conservação da receita e os meses exatos
+   (17/23/29/35, zero nos meses do meio). Nenhum teste existente precisou mudar — os do #190 já
+   passavam a periodicidade Mensal e o caso geral os reproduz.
+4. `docs/viabilidade/padrao-incorporacao.md` — motor de receita descreve a regra geral.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + **109** testes + build). Nada
+de backend/schema/migração — não há pendência para o ambiente autenticado do autor.
+
+**Merge:** não é portão; mergeada por pedido explícito do autor nesta sessão. **Encerra a cadeia
+#190 → #191.**
+
+---
+
 ## #184, #192, #190 — Resumo, avanço da obra e parcelas ao longo da obra (2026-07-29)
 
 Branch `claude/r4-184-192-190`. **#190 é portão** (`Portão? = SIM` → destrava #191); #184 e #192 não

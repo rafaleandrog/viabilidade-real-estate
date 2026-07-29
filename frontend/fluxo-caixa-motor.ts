@@ -170,43 +170,63 @@ export function normalizarLinhasPagamento(bloco: any): any[] {
 }
 
 /**
- * #190: nº de parcelas do parcelamento "Ao longo da obra" na periodicidade
- * MENSAL — uma parcela por mês de obra, fixo pela duração do evento `obra` do
- * Cronograma. É o número que a tela mostra no campo "Nº parcelas" (travado) e
- * o mesmo que `vencimentosAoLongoObra` distribui, para não haver duas fontes
- * de verdade. Obra ausente ou com duração 0 → 1 parcela.
+ * #190/#191: nº de parcelas do parcelamento "Ao longo da obra", fixo pela
+ * duração do evento `obra` do Cronograma e pela PERIODICIDADE da linha:
+ *
+ *     nº de parcelas = max(1, floor(duração da obra / intervalo))
+ *
+ * Mensal (intervalo 1) → uma parcela por mês de obra (regra do #190, que este
+ * caso geral reproduz exatamente). Trimestral/Semestral/Anual (3/6/12) → uma a
+ * cada `intervalo` meses (#191). O RESTO da divisão não vira parcela: obra de
+ * 10 meses em Trimestral dá 3 parcelas (meses 0, 3, 6) e sobra 1 mês sem
+ * vencimento — é a regra pedida na issue, não arredondamento acidental.
+ *
+ * É o número que a tela mostra no campo "Nº parcelas" (travado) e o mesmo que
+ * `vencimentosAoLongoObra` distribui, para não haver duas fontes de verdade.
+ * Obra ausente, sem duração, ou duração menor que um intervalo → 1 parcela.
  */
-export function parcelasAoLongoObra(cronograma: EventoCrono[]): number {
+export function parcelasAoLongoObra(cronograma: EventoCrono[], periodicidade?: string): number {
   const obra = cronograma.find((e) => e.evento === 'obra');
-  return Math.max(1, Math.round(n(obra?.duracao_meses)));
+  const dur = Math.max(0, Math.round(n(obra?.duracao_meses)));
+  const intervalo = INTERVALO_PERIODICIDADE[periodicidade ?? 'mensal'] ?? 1;
+  return Math.max(1, Math.floor(dur / intervalo));
 }
 
 /**
- * #190: meses de vencimento do parcelamento "Ao longo da obra" + Mensal.
+ * #190/#191: meses de vencimento do parcelamento "Ao longo da obra".
  *
  * ANTES: as parcelas saíam do mês da venda (`fimObra − mesVenda` parcelas, uma
  * por mês a partir de `mesVenda + 1`), então CADA mês de venda gerava um número
  * diferente de parcelas — não existia um "nº de parcelas" único para exibir na
- * tela, e o campo ficava travado e vazio.
+ * tela, e o campo ficava travado e vazio. A periodicidade era simplesmente
+ * ignorada neste ramo: Trimestral/Semestral/Anual pagavam todo mês (#191).
  *
- * AGORA os vencimentos são os MESES DA OBRA (um por mês, de `inicio_mes` até o
- * fim), independentes do mês da venda — o parcelamento acompanha o andamento
- * da obra, que é o que "ao longo da obra" significa.
+ * AGORA os vencimentos saem do CRONOGRAMA DA OBRA: o primeiro no `inicio_mes`
+ * e os demais a cada `intervalo` meses (1/3/6/12 conforme a periodicidade),
+ * `parcelasAoLongoObra` vencimentos ao todo — independentes do mês da venda. O
+ * parcelamento acompanha o andamento da obra, que é o que "ao longo da obra"
+ * significa.
  *
  * Venda depois do início da obra: parcelas já vencidas não são recuperadas — a
  * primeira cai no primeiro vencimento **≥ mês da venda** e o total é repartido
  * entre os vencimentos restantes (o valor da parcela sobe; a receita se
- * conserva). Venda depois do fim da obra, obra sem duração ou sem evento de
- * obra: 1 parcela no mês da venda.
+ * conserva). Venda depois do último vencimento, obra sem duração ou sem evento
+ * de obra: 1 parcela no mês da venda.
  */
-export function vencimentosAoLongoObra(cronograma: EventoCrono[], mesVenda: number): number[] {
+export function vencimentosAoLongoObra(
+  cronograma: EventoCrono[],
+  mesVenda: number,
+  periodicidade?: string,
+): number[] {
   const obra = cronograma.find((e) => e.evento === 'obra');
   const dur = Math.max(0, Math.round(n(obra?.duracao_meses)));
   if (!obra || dur <= 0) return [mesVenda];
+  const intervalo = INTERVALO_PERIODICIDADE[periodicidade ?? 'mensal'] ?? 1;
+  const nParc = parcelasAoLongoObra(cronograma, periodicidade);
   const inicio = n(obra.inicio_mes);
   const meses: number[] = [];
-  for (let k = 0; k < dur; k++) {
-    const mes = inicio + k;
+  for (let k = 0; k < nParc; k++) {
+    const mes = inicio + k * intervalo;
     if (mes >= mesVenda) meses.push(mes);
   }
   return meses.length > 0 ? meses : [mesVenda];
@@ -280,20 +300,15 @@ export function receitaMensalLinha(
     for (const p of parcelasLinhas) {
       const total = recebivel * (n(p?.pct) / 100);
       if (total <= 0) continue;
-      const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
-      if (p?.ao_longo_obra && intervalo === 1) {
-        // #190 — "Ao longo da obra" + Mensal: vencimentos ancorados nos meses
-        // da OBRA, não contados a partir do mês da venda (ver
-        // `vencimentosAoLongoObra`). Σ das parcelas = `total` sempre.
-        const vencimentos = vencimentosAoLongoObra(cronograma, mesVenda);
+      if (p?.ao_longo_obra) {
+        // #190/#191 — "Ao longo da obra": vencimentos ancorados no CRONOGRAMA
+        // da obra (a cada `intervalo` meses, conforme a periodicidade), não
+        // contados a partir do mês da venda (ver `vencimentosAoLongoObra`).
+        // Σ das parcelas = `total` sempre.
+        const vencimentos = vencimentosAoLongoObra(cronograma, mesVenda, p?.periodicidade);
         for (const mes of vencimentos) deposita(mes, total / vencimentos.length);
-      } else if (p?.ao_longo_obra && fimObra > mesVenda) {
-        // "Ao longo da obra" com periodicidade Trimestral/Semestral/Anual: a
-        // periodicidade segue ignorada aqui (comportamento herdado) — é o
-        // escopo do #191, que ancora essas periodicidades no cronograma.
-        const meses = fimObra - mesVenda;
-        for (let k = 1; k <= meses; k++) deposita(mesVenda + k, total / meses);
       } else {
+        const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
         const nParc = Math.max(1, Math.round(n(p?.parcelas) || 1));
         for (let k = 1; k <= nParc; k++) deposita(mesVenda + intervalo * k, total / nParc);
       }
