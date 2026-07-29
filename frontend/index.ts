@@ -4,6 +4,7 @@ import './tela-dashboard.js';
 import './tela-estudo.js';
 import './viabilidade-config-benchmarks.js';
 import './viabilidade-config-curvas.js';
+import './viabilidade-config-mercado.js';
 import { urbiVerso } from './viabilidade-api.js';
 import { estiloPagina } from './estilos.js';
 

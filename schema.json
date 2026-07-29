@@ -9,6 +9,7 @@
         "nome":                { "tipo": "texto", "limite": 200, "obrigatorio": true },
         "tipo_empreendimento": { "tipo": "texto", "limite": 20, "opcoes": ["loteamento", "incorporacao"], "obrigatorio": true },
         "uf":                  { "tipo": "texto", "limite": 2 },
+        "regiao_mercado_id":  { "tipo": "referencia", "tabela_ref": "mercado_regioes", "ao_deletar": "anular" },
         "sequencia":           { "tipo": "inteiro" },
         "nivel_analise":       { "tipo": "texto", "limite": 20, "opcoes": ["preliminar", "avancado"], "padrao": "preliminar" },
         "status":              { "tipo": "texto", "limite": 20, "opcoes": ["rascunho", "em_analise", "aprovado", "reprovado", "arquivado"], "padrao": "rascunho" },
@@ -360,9 +361,44 @@
         "resultado":        { "tipo": "json" },
 
         "origem":           { "tipo": "texto", "limite": 200 },
-        "data_referencia":  { "tipo": "texto", "limite": 20 }
+        "data_referencia":  { "tipo": "texto", "limite": 20 },
+        "gerado_em":        { "tipo": "texto", "limite": 30 },
+        "modelo":           { "tipo": "texto", "limite": 80 }
       },
       "indices": [["estudo_id"]]
+    },
+
+    "mercado_regioes": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "nome":                  { "tipo": "texto", "limite": 120, "obrigatorio": true },
+        "uf":                    { "tipo": "texto", "limite": 2, "padrao": "DF" },
+        "palavras_chave":        { "tipo": "texto_longo" },
+        "ativa":                 { "tipo": "logico", "padrao": true },
+        "ordem":                 { "tipo": "inteiro", "padrao": 0 },
+        "ultima_coleta_em":      { "tipo": "texto", "limite": 30 },
+        "ultima_coleta_status":  { "tipo": "texto", "limite": 30, "opcoes": ["ok", "sem_fonte_externa", "sem_ia", "erro"] },
+        "ultima_coleta_itens":   { "tipo": "inteiro", "padrao": 0 },
+        "ultima_coleta_msg":     { "tipo": "texto", "limite": 300 }
+      },
+      "indices": [["ativa"]]
+    },
+
+    "mercado_coletas": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "regiao_id":     { "tipo": "referencia", "tabela_ref": "mercado_regioes", "obrigatorio": true, "ao_deletar": "cascata" },
+        "data_coleta":   { "tipo": "texto", "limite": 10, "obrigatorio": true },
+        "tipo":          { "tipo": "texto", "limite": 20, "opcoes": ["noticia", "anuncio"], "padrao": "noticia" },
+        "titulo":        { "tipo": "texto", "limite": 300 },
+        "resumo":        { "tipo": "texto_longo" },
+        "url":           { "tipo": "texto", "limite": 500 },
+        "fonte":         { "tipo": "texto", "limite": 200 },
+        "publicado_em":  { "tipo": "texto", "limite": 30 },
+        "relevancia":    { "tipo": "inteiro", "padrao": 0 },
+        "bruto":         { "tipo": "json" }
+      },
+      "indices": [["regiao_id"], ["data_coleta"]]
     }
   }
 }

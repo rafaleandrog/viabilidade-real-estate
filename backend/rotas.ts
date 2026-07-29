@@ -27,3 +27,8 @@ rotas.use(rotasEmpreendimento);
 rotas.use(rotasManutencao);
 rotas.use(rotasAvancado);
 rotas.use(rotasAnaliseMercado);
+
+// Rotinas agendadas (framework de agenda do UrbiVerso, #200). Declaradas em
+// `manifesto.json` → `rotinas`; o shell descobre este export no mesmo módulo de
+// entrada do backend e chama o handler na frequência declarada (`diaria`).
+export { rotinas } from './rotinas.js';

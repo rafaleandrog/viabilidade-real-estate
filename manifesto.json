@@ -1,6 +1,6 @@
 {
   "nome": "Estudo de Viabilidade",
-  "versao": "0.1.11",
+  "versao": "0.1.12",
   "shell_min": "0.50.3",
   "descricao": "Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação) — proforma automática, comparação de cenários, sensibilidade e apelo comercial por IA.",
   "rotas_publicas": [],
@@ -61,6 +61,18 @@
       "titulo": "Curvas de distribuição",
       "descricao": "Curvas reutilizáveis para distribuir custos no tempo (estudo Avançado)",
       "componente": "viabilidade-config-curvas"
+    },
+    "mercado_regioes": {
+      "titulo": "Regiões monitoradas",
+      "descricao": "Regiões administrativas/bairros e palavras-chave varridos diariamente pela coleta de mercado",
+      "componente": "viabilidade-config-mercado"
+    }
+  },
+  "rotinas": {
+    "coleta_mercado_diaria": {
+      "titulo": "Coleta diária de mercado",
+      "descricao": "Busca notícias e anúncios de imóveis das regiões monitoradas e resume com a IA barata",
+      "frequencia": "diaria"
     }
   },
   "parametros": {
@@ -99,6 +111,24 @@
       "nullable": false,
       "inicial": 30,
       "descricao": "Dias sem movimentação (exceto Aprovado) até o estudo ser arquivado automaticamente"
+    },
+    "mercado_busca_url": {
+      "tipo": "texto",
+      "nullable": true,
+      "inicial": "",
+      "descricao": "Endpoint da API de busca usada na coleta diária de mercado. Recebe ?q=<termos>. Vazio = coleta roda sem fonte externa e não registra itens."
+    },
+    "mercado_busca_chave": {
+      "tipo": "texto",
+      "nullable": true,
+      "inicial": "",
+      "descricao": "Chave da API de busca (enviada no header Authorization). Deixe vazio se o endpoint não exigir."
+    },
+    "mercado_busca_max_itens": {
+      "tipo": "numero",
+      "nullable": false,
+      "inicial": 10,
+      "descricao": "Máximo de itens guardados por região a cada coleta diária"
     }
   },
   "eventos": {

@@ -4,6 +4,78 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #200 — Rota de IA + coleta diária de mercado (2026-07-29) · PORTÃO
+
+Branch `claude/r4-200-mercado-ia-agenda`. **Portão** (→ #201). Pré-requisito #199 já na `main`.
+Traz migração (`013`) e bumpa a `versao` `0.1.11` → `0.1.12`.
+
+Escopo **ampliado pelo autor** além da issue: além da rota de IA, entram os dois frameworks do
+UrbiVerso — **IA** e **agenda (rotinas)** — para uma coleta diária de notícias e anúncios das
+regiões cadastradas.
+
+### O achado que definiu o desenho
+
+**O framework de IA do UrbiVerso não navega na web.** `ia.consultar()` recebe texto e devolve JSON
+estruturado — não há tool-use, busca nem `fetch` para o modelo (conferido em
+`node_modules/@urbiverso/sdk/dist/index.d.ts`: `IAHelper` tem só `consultar`, `extrairConteudo` e
+as variantes async). Levado ao autor, que escolheu **fonte externa plugável**.
+
+Consequência, e é a decisão mais importante do PR: **sem fonte externa configurada a rotina NÃO
+pergunta à IA "o que você sabe sobre a região"** — registra `sem_fonte_externa` e não grava nada.
+Conteúdo de memória de modelo entraria no app com cara de notícia apurada e alimentaria a
+viabilidade. Há teste garantindo que a IA sequer é chamada nesse caso.
+
+### Frameworks usados (contratos conferidos no `index.d.ts`, não presumidos)
+
+- **IA** — `manifesto.json` já tinha `"ia": true`. `SlotIA` inclui **`'barato'`**, usado na triagem
+  diária (volume, todo dia, toda região); a análise do estudo usa o slot padrão.
+- **Agenda** — `rotinas.coleta_mercado_diaria` com `frequencia: "diaria"` no manifesto;
+  `HandlerRotinaApp = (ctx: ContextoListener) => Promise<ResultadoRotinaApp>` em
+  `backend/rotinas.ts`, reexportado por `backend/rotas.ts` (`export { rotinas }`), que é a única
+  entrada de backend do build.
+
+### O que entrou
+
+1. `schema.json` — `mercado_regioes` (região + palavras-chave + status da última coleta),
+   `mercado_coletas` (itens com procedência), `estudos.regiao_mercado_id` e, em `analise_mercado`,
+   `gerado_em` + `modelo`. Migração `013`, aditiva.
+2. `backend/mercado-ia.ts` (puro) — schemas de structured output, prompts e **a trava
+   anti-invenção**. `EIXOS_RELEVANCIA` reusa os 6 fatores do Apelo Comercial: o app já definiu por
+   quais parâmetros se avalia uma região.
+3. `backend/rotinas.ts` — a rotina diária, com fonte externa plugável, timeout, corte de payload e
+   isolamento por região (uma região quebrada não derruba as outras).
+4. `backend/rotas/analise-mercado.ts` — `POST` da análise (editor + `422 IA_INDISPONIVEL`), PATCH da
+   região do estudo, CRUD de regiões (admin) e GET de coletas.
+5. Frontend — botão "Analisar mercado" (sob demanda), seletor de região, sinais de risco, lista do
+   material coletado; nova tela de config `viabilidade-config-mercado`.
+6. `docs/viabilidade/analise-mercado.md` §7.
+
+### Dois bugs que os testes pegaram (e um risco evitado)
+
+- **`Number(null)` é `0`, e `0` é finito.** A primeira versão de `normalizarIndicador` aceitaria um
+  indicador com `valor: null` como **R$ 0,00/m²** na tela — o número inventado que a camada existe
+  para barrar. Corrigido com guarda de tipo explícita.
+- **`scripts/validar-backend.sh` só varria `backend/rotas/*.test.ts`**, então os 16 testes novos de
+  `backend/mercado-ia.test.ts` passaram batido na primeira rodada. Glob corrigido no script **e** no
+  `package.json`, que tinha o mesmo buraco.
+- **`urbi-textarea` evitado:** o SDK confirma `urbi:input-change` mas não expõe o nome do evento do
+  textarea. Usar o palpite deixaria o campo de palavras-chave mudo sem erro nenhum — o campo de que
+  a coleta inteira depende. Ficou `urbi-input` com separador por vírgula (`termosBusca` já aceita
+  vírgula, `;` e quebra de linha). Trocar por textarea quando o evento for confirmado no monorepo.
+
+**Validação:** `validar-frontend.sh` verde (typecheck + **118** testes + build) e
+`validar-backend.sh` verde (typecheck + **44** testes + 13 migrações + guard "1 migração nova,
+versao coerente").
+
+**Fica para o autor no UrbiVerso:** `urbi-empacotar`; sincronização do `schema.json`; execução da
+migração; **confirmar que o shell descobre `export { rotinas }` no módulo de entrada do backend**
+(o `index.d.ts` documenta `export const rotinas = { nome: fn }` mas não o arquivo); e configurar
+`mercado_busca_url`/`mercado_busca_chave` para a coleta sair do modo `sem_fonte_externa`.
+
+**Merge:** portão (`Portão? = SIM` → #201) — mergeado pela sessão após validação verde.
+
+---
+
 ## #199 — Análise de Mercado: schema e tela (2026-07-29) · PORTÃO
 
 Branch `claude/r4-199-analise-mercado`. **Portão** (`Portão? = SIM` → destrava #200 e #201). Sem

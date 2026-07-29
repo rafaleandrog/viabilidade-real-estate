@@ -106,6 +106,76 @@ sob ação do usuário.
 
 ---
 
+## 7. Coleta diária e IA (#200)
+
+### 7.1 Os dois frameworks do UrbiVerso em uso
+
+| Framework | Onde é declarado | O que faz aqui |
+|---|---|---|
+| **IA** | `manifesto.json` → `"ia": true` | `req.ia.consultar()` na análise sob demanda; `ctx.ia.consultar()` na coleta diária |
+| **Agenda (rotinas)** | `manifesto.json` → `rotinas.coleta_mercado_diaria`, `frequencia: "diaria"` | O shell chama `coletaMercadoDiaria` uma vez por dia. A app **não** agenda nada por conta própria |
+
+O handler é exportado de `backend/rotinas.ts` e reexportado por `backend/rotas.ts`
+(`export { rotinas }`), que é o módulo de entrada do backend.
+
+**Slot de IA.** A triagem diária roda no slot **`barato`** (`slot: 'barato'`) — é trabalho de
+volume, todo dia, para toda região. A análise do estudo roda no slot padrão, porque é pontual e
+precisa raciocinar sobre a comparação.
+
+### 7.2 O que a rotina faz, por região ativa
+
+1. monta os termos de busca: nome + UF + palavras-chave cadastradas (`termosBusca`);
+2. busca na **fonte externa** configurada em `parametros` (`mercado_busca_url`, `mercado_busca_chave`);
+3. manda o bruto para a IA barata, que classifica por um dos 6 eixos, resume e pontua relevância;
+4. grava em `mercado_coletas` e registra o status na própria região.
+
+### 7.3 ⚠️ O limite que define o desenho
+
+**O framework de IA do UrbiVerso não navega na web.** `ia.consultar()` recebe um texto e devolve
+JSON estruturado — não há tool-use, busca nem `fetch` para o modelo. Portanto:
+
+> **Sem fonte externa configurada, a rotina NÃO pergunta à IA "o que você sabe sobre a região".**
+> Ela registra `sem_fonte_externa` e não grava item nenhum.
+
+Isso é deliberado. Conteúdo vindo da memória do modelo entraria no app com aparência de notícia
+apurada e alimentaria a análise de viabilidade — a mesma classe de risco que a #200 chama de
+central. Não existe esse caminho no código, e há teste garantindo que a IA sequer é chamada
+(`backend/rotinas.test.ts`).
+
+A fonte é **agnóstica de provedor**: qualquer endpoint que aceite `?q=<termos>` e devolva texto ou
+JSON serve. A chave vai no header `Authorization` e nunca é lida pelo frontend.
+
+### 7.4 A trava anti-invenção
+
+O prompt pede que a IA não invente número. Isso é **conselho**. O que **vincula** é
+`normalizarIndicador` (`backend/mercado-ia.ts`), que descarta o valor — vira `null` /
+`confianca: 'sem_dado'` — quando ele:
+
+- não é número finito, ou é negativo;
+- vem **sem `origem`** — número sem procedência não chega à tela;
+- vem com `confianca: 'sem_dado'` e valor preenchido (contradição).
+
+> Um bug encontrado por teste durante a implementação mostra por que a trava mora em código:
+> `Number(null)` é `0`, e `0` é finito. A primeira versão aceitaria um indicador com `valor: null`
+> como **R$ 0,00/m²** na tela — exatamente o número inventado que a camada existe para barrar.
+
+### 7.5 Onde o usuário mexe
+
+- **Admin → Apps → viabilidade → Regiões monitoradas** — cadastra regiões administrativas/bairros
+  e palavras-chave; vê o status da última coleta e o material coletado.
+- **Estudo → Análise de mercado** — vincula o estudo a uma região monitorada e roda a análise pelo
+  botão. A análise é **sob demanda**, nunca por carga de tela: ela custa IA.
+
+### 7.6 Eixos de avaliação — reuso deliberado
+
+A relevância da coleta e a classificação dos riscos usam os **mesmos 6 fatores do Apelo Comercial**
+(`backend/apelo-comercial.ts` → `FATORES`, reexportados como `EIXOS_RELEVANCIA`): localização,
+infraestrutura, vetor de crescimento, concorrência, demanda e segurança jurídica. O app já definiu
+por quais parâmetros uma região é avaliada; um segundo vocabulário criaria duas definições
+concorrentes de "região boa".
+
+---
+
 ## Veja também
 
 - `docs/viabilidade/apelo-comercial.md` — o score qualitativo do ativo, que **não** é isto
