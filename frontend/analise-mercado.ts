@@ -123,3 +123,52 @@ export const ROTULO_ABRANGENCIA: Record<string, string> = {
   uf: 'estado (UF)',
   nacional: 'nacional',
 };
+
+export interface ProcedenciaIndicador {
+  valor: number | null;
+  origem: string;
+  confianca: string;
+  /** Insight da IA sobre ESTE indicador (#201) — exibido junto do número, não num rodapé. */
+  observacao: string;
+}
+
+/**
+ * #201: lê a procedência de um indicador do snapshot.
+ *
+ * O `POST` do #200 grava o valor em coluna própria (para consulta) E o bloco
+ * completo em `resultado.indicadores` (origem, confiança, observação). A tela
+ * precisa dos dois: o número vem da coluna, a procedência vem do bloco — e o
+ * critério de aceite é que **nenhum número de mercado apareça sem origem
+ * visível**.
+ *
+ * Devolve `valor: null` quando o snapshot não tem o indicador, quando o valor
+ * não é numérico, ou quando falta origem. Um número sem procedência é tratado
+ * como ausente de propósito: exibi-lo sem dizer de onde veio é o que a #200
+ * proíbe.
+ */
+export function lerIndicador(analise: any, campo: string): ProcedenciaIndicador {
+  const vazio: ProcedenciaIndicador = { valor: null, origem: '', confianca: 'sem_dado', observacao: '' };
+  if (!analise || typeof analise !== 'object') return vazio;
+
+  const bloco = analise?.resultado?.indicadores?.[campo] ?? null;
+  const bruto = analise[campo];
+  const valor = typeof bruto === 'number' && Number.isFinite(bruto)
+    ? bruto
+    : (typeof bruto === 'string' && bruto.trim() !== '' && Number.isFinite(Number(bruto)) ? Number(bruto) : null);
+
+  const origem = String(bloco?.origem ?? '').trim();
+  const confianca = String(bloco?.confianca ?? 'sem_dado').trim() || 'sem_dado';
+  const observacao = String(bloco?.observacao ?? '').trim();
+
+  if (valor === null || !origem || confianca === 'sem_dado') {
+    return { ...vazio, observacao };
+  }
+  return { valor, origem, confianca, observacao };
+}
+
+export const ROTULO_CONFIANCA: Record<string, string> = {
+  alta: 'confiança alta',
+  media: 'confiança média',
+  baixa: 'confiança baixa',
+  sem_dado: 'sem dado',
+};
