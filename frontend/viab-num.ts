@@ -19,6 +19,14 @@ export class ViabNum extends LitElement {
   @property() label = '';
   @property({ type: Number }) valor: number | null = null;
   @property() sufixo = '';
+  // #197: rótulo secundário, inline após o sufixo — mês correspondente ao
+  // valor (ex.: "jan/27"), calculado pelo consumidor (`rotuloMesRelativo`).
+  // Distinto de `sufixo` (unidade, ex.: "meses") porque os dois aparecem
+  // juntos: "6 meses · jan/27".
+  @property({ attribute: 'sufixo-mes' }) sufixoMes = '';
+  // #197: passo do incremento/decremento das setas ⇅. 0 (padrão) esconde as
+  // setas — mantém o campo como antes para quem não usa a feature.
+  @property({ type: Number }) passo = 0;
   @property() placeholder = '';
   @property({ type: Boolean }) desabilitado = false;
   @property({ type: Boolean, reflect: true }) atenuado = false;
@@ -63,6 +71,14 @@ export class ViabNum extends LitElement {
     }
     input::placeholder { color: var(--cor-texto-fraco, rgba(255,255,255,0.4)); }
     input:disabled { opacity: 0.5; }
+    .stepper { display: flex; flex-direction: column; flex-shrink: 0; }
+    .stepper button {
+      all: unset; cursor: pointer; line-height: 1; font-size: 0.55rem;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); padding: 1px 3px;
+    }
+    .stepper button:hover:not(:disabled) { color: var(--cor-texto, rgba(255,255,255,0.85)); }
+    .stepper button:disabled { cursor: default; opacity: 0.35; }
+    .afixo-mes { font-variant-numeric: normal; }
     /* #15: dado não utilizado no cálculo → cinza/atenuado. */
     :host([atenuado]) .input-wrap { opacity: 0.45; }
     :host([atenuado]) label { opacity: 0.6; }
@@ -106,7 +122,13 @@ export class ViabNum extends LitElement {
             @blur=${this._onBlur}
             @input=${this._onInput}
           />
+          ${this.passo > 0 && !this.desabilitado ? html`
+            <span class="stepper">
+              <button type="button" aria-label="Aumentar" @click=${() => this._incrementar(this.passo)}>▲</button>
+              <button type="button" aria-label="Diminuir" @click=${() => this._incrementar(-this.passo)}>▼</button>
+            </span>` : nothing}
           ${this.sufixo ? html`<span class="afixo">${this.sufixo}</span>` : nothing}
+          ${this.sufixoMes ? html`<span class="afixo afixo-mes">${this.sufixoMes}</span>` : nothing}
         </div>
         ${this.erro ? html`<span class="erro-msg">${this.erro}</span>` : nothing}
       </div>
@@ -130,5 +152,22 @@ export class ViabNum extends LitElement {
     this.dispatchEvent(new CustomEvent('urbi:input-numero-change', {
       detail: { valor }, bubbles: true, composed: true,
     }));
+  }
+
+  private _debounceId: ReturnType<typeof setTimeout> | null = null;
+
+  // #197: clique na seta atualiza o valor exibido na hora, mas o evento (que
+  // dispara PATCH no consumidor) sai com debounce — cliques em sequência
+  // rápida colapsam numa chamada só.
+  private _incrementar(delta: number) {
+    const novo = Math.max(0, (this.valor ?? 0) + delta);
+    this.valor = novo;
+    if (this._debounceId) clearTimeout(this._debounceId);
+    this._debounceId = setTimeout(() => {
+      this._debounceId = null;
+      this.dispatchEvent(new CustomEvent('urbi:input-numero-change', {
+        detail: { valor: novo }, bubbles: true, composed: true,
+      }));
+    }, 400);
   }
 }

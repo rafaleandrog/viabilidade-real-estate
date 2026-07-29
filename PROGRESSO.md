@@ -4,6 +4,34 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #197 — Cronograma: stepper com mês inline (2026-07-29)
+
+Branch `claude/r4-197-cronograma-stepper`. Não é portão — PR aberto, merge fica com o autor.
+Pré-requisitos #165, #166 (já mergeados).
+
+**O que é:** referência visual "View cronograma" da planilha de bugs — campos de Início e Duração
+do Cronograma (fases fixas e customizadas) ganham setas ▲▼ de incremento/decremento e o mês
+correspondente inline, no formato "6 meses · jan/27".
+
+1. `frontend/viab-num.ts` — duas props novas, opcionais (comportamento anterior preservado quando
+   ausentes): `passo` (>0 mostra as setas; oculta quando `desabilitado`, cobrindo "campo travado não
+   recebe seta") e `sufixo-mes` (rótulo textual inline, após o `sufixo` existente). Clique na seta
+   atualiza `valor` na hora (feedback visual) mas o evento `urbi:input-numero-change` (que dispara o
+   PATCH no consumidor) sai com debounce de 400ms — cliques em sequência colapsam numa chamada só.
+2. `frontend/tela-fluxo-cronograma.ts` — `passo="1"` e `sufixo-mes` nos 4 campos (Início/Duração ×
+   evento fixo/fase customizada), usando `rotuloMesRelativo` já existente: Início mostra o mês do
+   próprio `inicio_mes`; Duração mostra o mês final (`inicio_mes + duracao_meses - 1`). Sem
+   `data_inicio_projeto`, `sufixo-mes` fica vazio — sem rótulo de mês, mas os campos continuam
+   funcionais (aceite do issue).
+
+Sem schema/migração — mudança de UI/UX, nenhum dado é alterado.
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 103 testes + build).
+
+**Merge:** não é portão — PR aberto, aguardando o autor.
+
+---
+
 ## #181 — Financeiro alinhado às outras abas (2026-07-28)
 
 Branch `claude/r4-181-financeiro-unidades`. Não é portão — PR aberto, merge fica com o autor.
