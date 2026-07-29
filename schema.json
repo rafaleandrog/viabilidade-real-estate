@@ -321,7 +321,7 @@
         "inicio_mes":        { "tipo": "inteiro", "padrao": 0 },
         "duracao_meses":     { "tipo": "inteiro", "padrao": 1 },
         "ordem":             { "tipo": "inteiro", "padrao": 0 },
-        "obrigatoria":       { "tipo": "logico", "padrao": false },
+        "obrigatoria":       { "tipo": "booleano", "padrao": false },
         "distribuicao_modo": { "tipo": "texto", "limite": 20, "opcoes": ["fixo", "unit_delivery", "sales_revenue"], "padrao": "fixo" }
       },
       "indices": [["estudo_id"]]
@@ -374,7 +374,7 @@
         "nome":                  { "tipo": "texto", "limite": 120, "obrigatorio": true },
         "uf":                    { "tipo": "texto", "limite": 2, "padrao": "DF" },
         "palavras_chave":        { "tipo": "texto_longo" },
-        "ativa":                 { "tipo": "logico", "padrao": true },
+        "ativa":                 { "tipo": "booleano", "padrao": true },
         "ordem":                 { "tipo": "inteiro", "padrao": 0 },
         "ultima_coleta_em":      { "tipo": "texto", "limite": 30 },
         "ultima_coleta_status":  { "tipo": "texto", "limite": 30, "opcoes": ["ok", "sem_fonte_externa", "sem_ia", "erro"] },
