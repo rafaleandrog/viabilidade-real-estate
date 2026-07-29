@@ -21,6 +21,7 @@ Todas as tabelas usam `acesso_externo: "restrito"` — a escrita passa pelas rot
 | `apelo_comercial` | Resultado da IA (`resultado` JSON + 6 scores por fator + `score_geral`). |
 | `apelo_comercial_documentos` | Fontes anexadas (`documento` arquivo, `tipo_dado`, `texto_adicional`). |
 | `estudo_documentos` | Anexos do Empreendimento (imagem principal, renders, plantas). |
+| `analise_mercado` | **Snapshot de MERCADO** do estudo (#199) — preço e custo por m², VSO, macros (IPCA/Selic/INCC + Focus), `riscos` JSON, `abrangencia` (município/UF/nacional), `origem` e `data_referencia`. Guarda **só o lado mercado**: o lado "projeto" é derivado do estudo em tempo de render, nunca persistido. Ver [Análise de Mercado](analise-mercado). |
 
 ### Avançado — fluxo de caixa (nível `avancado`)
 

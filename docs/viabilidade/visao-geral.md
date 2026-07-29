@@ -24,6 +24,8 @@ App do UrbiVerso que substitui planilhas dispersas por uma aplicação centraliz
   - **Proforma** — tabela linha a linha, comparação de cenários e análise de sensibilidade; exportação PDF/Excel.
   - **Gráficos** — composição de custos (pizza) e Receita × Custos (barras).
   - **Apelo Comercial** — análise qualitativa por IA (6 fatores) a partir de documentos anexados.
+- **Estudo Avançado** — páginas próprias: Resumo, Empreendimento, Viabilidade, Custos, Fluxo de Caixa, Cenários, **Análise de mercado** e **Apelo Comercial**.
+  - **Análise de mercado** (#199) — compara os números do estudo com os do mercado (preço e custo por m², velocidade de vendas, macros). O lado "projeto" é derivado do próprio estudo, não digitado. Ver [Análise de Mercado](analise-mercado).
 
 ## Origem do terreno
 
@@ -37,4 +39,4 @@ No modo **Núcleo**, o estudo referencia imóveis do Núcleo compartilhado — *
 
 ## Veja também
 
-- [Modelo de dados](modelo-de-dados) · [Fórmulas](formulas) · [Benchmarks](benchmarks) · [Apelo Comercial](apelo-comercial) · [Permissões](permissoes) · [Exportação](exportacao)
+- [Modelo de dados](modelo-de-dados) · [Fórmulas](formulas) · [Benchmarks](benchmarks) · [Apelo Comercial](apelo-comercial) · [Análise de Mercado](analise-mercado) · [Permissões](permissoes) · [Exportação](exportacao)

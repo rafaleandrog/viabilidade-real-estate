@@ -364,6 +364,11 @@ rotasAvancado.patch('/estudos/:id/avancado/parametros', async (req: Request, res
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
 
     const atualizado = await req.dados!.atualizar('estudos', estudo.id, dados);
+    // `atualizar` devolve `null` quando o registro sumiu entre a leitura e a
+    // escrita. Sem esta guarda o acesso às propriedades abaixo estourava e o
+    // catch devolvia 500 ERRO_INTERNO — 404 é a resposta correta, e é o mesmo
+    // tratamento que o PATCH de curvas já dava (`CURVA_NAO_ENCONTRADA`).
+    if (!atualizado) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
     res.json({
       data_inicio_projeto: atualizado.data_inicio_projeto ?? null,
       taxa_desconto_aa: Number(atualizado.taxa_desconto_aa ?? 12),

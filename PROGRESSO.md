@@ -4,6 +4,80 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #199 — Análise de Mercado: schema e tela (2026-07-29) · PORTÃO
+
+Branch `claude/r4-199-analise-mercado`. **Portão** (`Portão? = SIM` → destrava #200 e #201). Sem
+pré-requisito. **Traz migração e bumpa a `versao`** (`0.1.10` → `0.1.11`).
+
+### Antes: validação de backend passou a rodar aqui
+
+A regra "backend só roda no ambiente autenticado do autor" era conservadora demais. Descoberto
+nesta sessão:
+
+- o `@urbiverso/sdk` **já está** em `node_modules/@urbiverso/sdk` com o `dist/index.d.ts`. O que
+  toma 401 é *reinstalar* o pacote; o typecheck só precisa dos tipos, que estão no disco;
+- só `backend/rotas.ts` importa o SDK (augmentação de tipo do Express). O resto do backend depende
+  só do `express`, que é público e está no store do pnpm;
+- os testes de backend importam apenas funções puras das rotas — rodam com `tsx`, sem servidor.
+
+Criados `scripts/validar-backend.sh` (typecheck do backend + testes de rota + migrações + guard de
+`versao`) e `scripts/migracoes-harness.mjs` (banco em memória: contrato, instalação virgem,
+reexecução e cadeia completa). O guard barra os dois erros simétricos: migração nova sem bump e
+bump sem migração — o primeiro já aconteceu de verdade na `004_fases_gantt.js`.
+
+No caminho, os **2 únicos erros de typecheck do backend**, pré-existentes na `main`, foram
+corrigidos para o portão nascer utilizável: o `PATCH /avancado/parametros` não tratava o `null` de
+`atualizar()` e devolvia **500** onde cabia **404** — mesmo tratamento que o PATCH de curvas já
+dava no mesmo arquivo. `CLAUDE.md` atualizado com o fluxo novo.
+
+### A issue
+
+**Decisão de navegação (o item crítico):** a aba "Análise de mercado" renderizava o **Apelo
+Comercial**, que é outra coisa — o Apelo pontua o *ativo* (localização, infraestrutura, vetor de
+crescimento), não compara o projeto com o mercado. Adotada a opção recomendada pela issue: a aba
+virou a análise de verdade e o **Apelo ganhou página própria**, mesmo componente e mesmo backend.
+Nada foi removido.
+
+1. `schema.json` — tabela **`analise_mercado`** (`acesso_externo: restrito`): preço/custo por m²,
+   `vso_pct`, macros (IPCA/Selic/INCC + Focus), `riscos` e `resultado` JSON, `abrangencia`
+   (município/UF/nacional), `localidade`, `origem`, `data_referencia`. Guarda **só o lado
+   mercado**.
+2. `migracoes/012_analise_mercado.js` — aditiva, sem transformação (a entidade nasce aqui); seed
+   fora da migração por contrato. `manifesto.json` `0.1.10` → `0.1.11`.
+3. `frontend/analise-mercado.ts` (novo, puro) — deriva o lado **projeto**, que **não é digitado nem
+   persistido**: preço = VGV ÷ área privativa (ponderado pela área, não média dos `preco_m2`);
+   custo de obra = Σ grupo obra ÷ mesma área, usando as linhas **já resolvidas pelo motor** (mesmo
+   argumento do #192 — a resolução de unidade mora num lugar só); VSO = absorção lida como
+   velocidade, ponderada pelo VGV das fases. Tudo devolve **`null`, nunca `0`**, quando não dá para
+   derivar — zero é valor legítimo e diria outra coisa ao usuário.
+4. `frontend/analise-mercado.test.ts` — **9 testes** das fórmulas, incluindo os dois casos que
+   pegam erro de verdade: ponderação (média aritmética daria 15.000 onde o certo é 14.444) e
+   `null` vs `0`.
+5. `backend/rotas/analise-mercado.ts` + registro em `rotas.ts`; `buscarAnaliseMercado` na API.
+   Só o **GET** — quem preenche é o #200. Ausência de snapshot responde `{ analise: null }`, **não
+   404**: o estudo existe, só nunca rodou a análise.
+6. `frontend/tela-analise-mercado.ts` — cards projeto × mercado, bloco macro, banner de isenção
+   fixo. Três ausências tratadas separadamente: sem snapshot, sem série do município (avisa que a
+   abrangência é mais ampla) e sem dado do projeto (`—` isolado, sem derrubar o resto).
+7. `frontend/tela-avancado.ts` — página `mercado` → nova tela; página `apelo` nova.
+8. `docs/viabilidade/analise-mercado.md` (novo) + `visao-geral.md` e `modelo-de-dados.md`.
+
+> **Props conferidas no `dist/index.d.ts` antes de usar:** `urbi-kpi` declara só
+> `rotulo/valor/variante/formato` — **não** tem slot nem subtítulo, então os cards de comparação
+> são markup próprio com tokens do design system, em vez de passar prop inexistente (que ficaria
+> inerte, sem erro).
+
+**Validação:** `scripts/validar-frontend.sh` verde (typecheck + **118** testes + build) e
+`scripts/validar-backend.sh` verde (typecheck do backend + 22 testes de rota + 12 migrações + guard
+confirmando "1 migração nova, versao coerente").
+
+**Fica para o autor no UrbiVerso:** `urbi-empacotar`, sincronização do `schema.json` (materialização
+da tabela nova) e execução da migração no Postgres.
+
+**Merge:** portão (`Portão? = SIM` → #200, #201) — mergeado pela sessão após validação verde.
+
+---
+
 ## #191 — Nº de parcelas Trimestral/Semestral/Anual "Ao longo da obra" (2026-07-29)
 
 Branch `claude/r4-191-parcelas-periodicidade`. Não é portão — mergeada nesta sessão a pedido
