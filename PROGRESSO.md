@@ -4,6 +4,56 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #201 — Sinais de risco e insights + ENCERRAMENTO DA RODADA 4 (2026-07-29)
+
+Branch `claude/r4-201-riscos-insights`. Não é portão. Pré-requisitos #199 e #200 já na `main`.
+**Só frontend** (+ um ajuste de prompt) — sem schema, sem migração, `versao` **não muda** (o guard
+do `validar-backend.sh` confirma: "0 migrações novas, versao coerente").
+
+### A issue
+
+Reordena e completa a tela conforme a referência visual, e fecha o requisito que o #200 deixou
+gravado mas não exibido: **procedência por indicador**.
+
+1. `frontend/analise-mercado.ts` — `lerIndicador(analise, campo)` (pura, 6 testes novos): o #200
+   grava o valor em coluna própria E o bloco de procedência em `resultado.indicadores`; a tela
+   precisa dos dois. Devolve `valor: null` quando falta origem — **número sem procedência é
+   tratado como ausente**, que é o critério de aceite. Snapshot legado (sem o bloco) não quebra.
+2. `frontend/tela-analise-mercado.ts`:
+   - **cabeçalho** com a localidade da análise + data de referência + data da geração, e o aviso
+     de isenção (obrigatório, não decorativo);
+   - **sinais de risco subiram para o topo**, logo abaixo do cabeçalho — antes ficavam depois dos
+     indicadores, contrariando a referência;
+   - **limitação explícita** como cidadã de primeira classe: "Sem dado no nível da cidade —
+     análise limitada a `<abrangência>`" + o texto de `limitacoes` da IA, em vez de a seção
+     simplesmente sumir;
+   - cada card mostra **origem + badge de confiança**, e o **insight da IA junto do indicador que
+     ele explica** (`observacao`), não num bloco solto no rodapé;
+   - **macro passou pelo mesmo crivo**: indicador sem fonte identificada não aparece; se nenhum
+     tiver, a seção mostra estado vazio explicando, em vez de sumir.
+3. `backend/mercado-ia.ts` — o prompt passa a dizer que `observacao` é o insight **daquele**
+   indicador (o campo já existia no schema e já era normalizado; faltava pedir).
+
+### Encerramento da Rodada 4
+
+Com a #201 mergeada, **as 35 issues (#165–#169 + #172–#201) estão na `main`**. O `CLAUDE.md`
+obriga quem encerra uma rodada a atualizar a seção de backlog **na mesma alteração** — feito:
+
+- § Estado do backlog: Rodada 4 marcada como concluída, sem backlog ativo, com o aviso de que
+  quem abrir/encerrar uma rodada atualiza a seção (foi a falha que originou a própria Rodada 4);
+- § Merge: a autorização de auto-merge de portões **era escopada à Rodada 4 e expirou com ela** —
+  não há autorização permanente hoje. Registrada também a nota de que o `gh` CLI não existe neste
+  ambiente, para a próxima sessão não redescobrir;
+- lista das pendências do autor no UrbiVerso, consolidada.
+
+**Validação:** `validar-frontend.sh` verde (typecheck + **124** testes + build) e
+`validar-backend.sh` verde (typecheck + 44 testes + 13 migrações + guard).
+
+**Merge:** não é portão; mergeada a pedido explícito do autor ("resolva a última issue... pode
+prosseguir e atualizar tudo no main").
+
+---
+
 ## #200 — Rota de IA + coleta diária de mercado (2026-07-29) · PORTÃO
 
 Branch `claude/r4-200-mercado-ia-agenda`. **Portão** (→ #201). Pré-requisito #199 já na `main`.

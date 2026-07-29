@@ -6,7 +6,8 @@ import { type EventoCrono } from './fluxo-shared.js';
 import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import {
   precoMedioM2Projeto, custoObraM2Projeto, vsoProjetoPct, compararProjetoMercado,
-  ROTULO_ABRANGENCIA, type Comparacao,
+  lerIndicador, ROTULO_ABRANGENCIA, ROTULO_CONFIANCA,
+  type Comparacao, type ProcedenciaIndicador,
 } from './analise-mercado.js';
 import {
   urbiVerso,
@@ -122,6 +123,22 @@ export class ViabTelaAnaliseMercado extends LitElement {
     .risco-cab, .coleta-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
     .risco p, .coleta p { margin: 4px 0 0; font-size: 0.85rem; }
     .coleta a { color: var(--cor-primaria, #2aa9e0); }
+
+    /* #201 — cabeçalho com a localidade, procedência por indicador e insight. */
+    .cabecalho { margin-bottom: 10px; }
+    .cab-local { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 1rem; }
+    .cab-local .nota { margin-top: 0; }
+    .comp-proc {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      margin-top: 8px; font-size: 0.74rem;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+    }
+    .comp-insight {
+      display: flex; gap: 6px; align-items: flex-start;
+      margin-top: 8px; padding-top: 8px;
+      border-top: 1px dashed var(--cor-borda-sutil, rgba(255,255,255,0.08));
+      font-size: 0.8rem; color: var(--cor-texto-sec, rgba(255,255,255,0.65));
+    }
   `];
 
   updated() {
@@ -188,20 +205,20 @@ export class ViabTelaAnaliseMercado extends LitElement {
           mensagem="Defina as tipologias, os custos e o cronograma nas outras abas para comparar o projeto com o mercado."></urbi-estado-vazio>`;
     }
 
+    // #201: ordem da referência visual — cabeçalho com a localidade e o aviso,
+    // sinais de risco LOGO ABAIXO (não no rodapé), depois os indicadores.
     return html`
-      <urbi-banner variante="info" icone="fa-solid fa-circle-info">
-        Dados externos, apenas referência — não é recomendação de investimento.
-      </urbi-banner>
-
+      ${this._renderCabecalho()}
       ${this._renderAcoes(precoProjeto, custoProjeto, vsoProjeto)}
-      ${this._renderProcedencia()}
+      ${this._renderLimitacao()}
+      ${this._renderRiscos()}
 
       <div class="secao">
         <h3>Projeto × mercado</h3>
         <div class="cards">
-          ${this._cardComparacao('Preço de venda (R$/m²)', precoProjeto, m ? n(m.preco_medio_m2) : null, fmtR$)}
-          ${this._cardComparacao('Custo de obra (R$/m²)', custoProjeto, m ? n(m.custo_obra_m2) : null, fmtR$)}
-          ${this._cardComparacao('Velocidade de vendas (%/mês)', vsoProjeto, m ? n(m.vso_pct) : null, fmtPct)}
+          ${this._cardComparacao('Preço de venda (R$/m²)', precoProjeto, lerIndicador(m, 'preco_medio_m2'), fmtR$)}
+          ${this._cardComparacao('Custo de obra (R$/m²)', custoProjeto, lerIndicador(m, 'custo_obra_m2'), fmtR$)}
+          ${this._cardComparacao('Velocidade de vendas (%/mês)', vsoProjeto, lerIndicador(m, 'vso_pct'), fmtPct)}
         </div>
         <p class="nota">
           Os números do projeto são derivados deste estudo — preço é o VGV sobre a área privativa,
@@ -210,7 +227,6 @@ export class ViabTelaAnaliseMercado extends LitElement {
         </p>
       </div>
 
-      ${this._renderRiscos()}
       ${this._renderMacro()}
       ${this._renderColetas()}
     `;
@@ -336,8 +352,36 @@ export class ViabTelaAnaliseMercado extends LitElement {
     `;
   }
 
-  /** Procedência do dado de mercado — inclusive quando não existe (#199). */
-  private _renderProcedencia(): TemplateResult {
+  /**
+   * #201 — cabeçalho da análise: a localidade a que os números se referem e o
+   * aviso de isenção, que é obrigatório e não decorativo.
+   */
+  private _renderCabecalho(): TemplateResult {
+    const m = this.analise;
+    const local = String(m?.localidade || '').trim()
+      || (this.regiao ? `${this.regiao.nome}${this.regiao.uf ? `/${this.regiao.uf}` : ''}` : '')
+      || String(this.estudo?.uf || '').trim();
+    const quando = String(m?.gerado_em || '').slice(0, 10);
+    return html`
+      <div class="cabecalho">
+        <div class="cab-local">
+          <urbi-icone classe="fa-solid fa-location-dot"></urbi-icone>
+          <strong>${local || 'Localidade não definida'}</strong>
+          ${m?.data_referencia ? html`<span class="nota">referência ${m.data_referencia}</span>` : nothing}
+          ${quando ? html`<span class="nota">· análise de ${quando}</span>` : nothing}
+        </div>
+      </div>
+      <urbi-banner variante="info" icone="fa-solid fa-circle-info">
+        Dados de mercado externos, apenas para referência — não é recomendação de investimento.
+      </urbi-banner>
+    `;
+  }
+
+  /**
+   * #201 — limitação como cidadã de primeira classe: quando falta dado, a tela
+   * DIZ o que falta e por quê, em vez de simplesmente não mostrar a seção.
+   */
+  private _renderLimitacao(): TemplateResult {
     const m = this.analise;
     if (!m) {
       return html`
@@ -347,24 +391,32 @@ export class ViabTelaAnaliseMercado extends LitElement {
         </urbi-banner>`;
     }
     const abr = String(m.abrangencia || 'municipio');
-    const local = String(m.localidade || '').trim();
+    const limitacoes = String(m?.resultado?.limitacoes || '').trim();
+    if (abr === 'municipio' && !limitacoes) return html`${nothing}`;
     return html`
-      <p class="nota">
-        Referência ${ROTULO_ABRANGENCIA[abr] ?? abr}${local ? html` — ${local}` : nothing}${m.data_referencia ? html` · ${m.data_referencia}` : nothing}${m.origem ? html` · fonte: ${m.origem}` : nothing}.
+      <urbi-banner variante="alerta" icone="fa-solid fa-circle-exclamation">
         ${abr !== 'municipio' ? html`
-          <br />Sem série para o município do empreendimento; a comparação usa a abrangência
-          ${ROTULO_ABRANGENCIA[abr] ?? abr}, que é mais ampla e menos específica.` : nothing}
-      </p>
+          Sem dado no nível da cidade — análise limitada a ${ROTULO_ABRANGENCIA[abr] ?? abr}.
+        ` : nothing}
+        ${limitacoes ? html`<br />${limitacoes}` : nothing}
+      </urbi-banner>
     `;
   }
 
+  /**
+   * #201 — card de comparação com PROCEDÊNCIA. Todo número de mercado exibido
+   * carrega origem e confiança visíveis; sem origem, `lerIndicador` já devolve
+   * `valor: null` e o card mostra "sem dado" em vez do número. O insight da IA
+   * sobre aquele indicador aparece aqui, junto do que ele explica — não num
+   * bloco solto no rodapé.
+   */
   private _cardComparacao(
     rotulo: string,
     projeto: number | null,
-    mercado: number | null,
+    mercado: ProcedenciaIndicador,
     fmt: (v: number) => string,
   ): TemplateResult {
-    const cmp: Comparacao | null = compararProjetoMercado(projeto, mercado);
+    const cmp: Comparacao | null = compararProjetoMercado(projeto, mercado.valor);
     return html`
       <div class="comp">
         <div class="comp-rot">${rotulo}</div>
@@ -374,14 +426,26 @@ export class ViabTelaAnaliseMercado extends LitElement {
         </div>
         <div class="comp-linha">
           <span class="lado">Mercado</span>
-          <span class="val">${mercado === null || mercado === 0 ? html`<span class="sem-dado">sem dado</span>` : fmt(mercado)}</span>
+          <span class="val">${mercado.valor === null ? html`<span class="sem-dado">—</span>` : fmt(mercado.valor)}</span>
         </div>
+        ${mercado.valor === null
+          ? html`<div class="comp-proc sem-dado">Sem dado de mercado para este indicador.</div>`
+          : html`
+            <div class="comp-proc">
+              <urbi-badge cor=${mercado.confianca === 'alta' ? 'sucesso' : mercado.confianca === 'media' ? 'info' : 'alerta'}>
+                ${ROTULO_CONFIANCA[mercado.confianca] ?? mercado.confianca}
+              </urbi-badge>
+              <span>${mercado.origem}</span>
+            </div>`}
         ${cmp ? html`
           <div class="comp-delta ${cmp.posicao}">
             ${cmp.posicao === 'alinhado'
               ? 'Alinhado com o mercado'
               : html`${fmtPct(Math.abs(cmp.deltaPct))} ${cmp.posicao} do mercado (${fmt(Math.abs(cmp.delta))})`}
           </div>` : nothing}
+        ${mercado.observacao
+          ? html`<div class="comp-insight"><urbi-icone classe="fa-solid fa-lightbulb"></urbi-icone>${mercado.observacao}</div>`
+          : nothing}
       </div>
     `;
   }
@@ -389,20 +453,44 @@ export class ViabTelaAnaliseMercado extends LitElement {
   private _renderMacro(): TemplateResult {
     const m = this.analise;
     if (!m) return html`${nothing}`;
-    const macros: { rotulo: string; valor: any }[] = [
-      { rotulo: 'IPCA (12m)', valor: m.ipca_pct },
-      { rotulo: 'Selic', valor: m.selic_pct },
-      { rotulo: 'INCC (12m)', valor: m.incc_pct },
-      { rotulo: 'Focus · IPCA', valor: m.focus_ipca_pct },
-      { rotulo: 'Focus · Selic', valor: m.focus_selic_pct },
-    ].filter((x) => x.valor !== null && x.valor !== undefined);
-    if (macros.length === 0) return html`${nothing}`;
+    // #201: mesmo critério dos cards — macro só aparece COM procedência.
+    const macros = [
+      { rotulo: 'IPCA (12m)', campo: 'ipca_pct' },
+      { rotulo: 'Selic', campo: 'selic_pct' },
+      { rotulo: 'INCC (12m)', campo: 'incc_pct' },
+      { rotulo: 'Focus · IPCA', campo: 'focus_ipca_pct' },
+      { rotulo: 'Focus · Selic', campo: 'focus_selic_pct' },
+    ].map((x) => ({ ...x, ind: lerIndicador(m, x.campo) }));
+    const comDado = macros.filter((x) => x.ind.valor !== null);
+    if (comDado.length === 0) {
+      return html`
+        <div class="secao">
+          <h3>Indicadores macro</h3>
+          <urbi-estado-vazio icone="fa-solid fa-chart-line"
+            mensagem="A análise não trouxe indicadores macro com fonte identificada."></urbi-estado-vazio>
+        </div>`;
+    }
     return html`
       <div class="secao">
         <h3>Indicadores macro</h3>
-        <div class="kpis">
-          ${macros.map((x) => html`
-            <urbi-kpi rotulo=${x.rotulo} .valor=${fmtPct(Number(x.valor))}></urbi-kpi>`)}
+        <div class="cards">
+          ${comDado.map((x) => html`
+            <div class="comp">
+              <div class="comp-rot">${x.rotulo}</div>
+              <div class="comp-linha">
+                <span class="lado">Mercado</span>
+                <span class="val projeto">${fmtPct(x.ind.valor as number)}</span>
+              </div>
+              <div class="comp-proc">
+                <urbi-badge cor=${x.ind.confianca === 'alta' ? 'sucesso' : x.ind.confianca === 'media' ? 'info' : 'alerta'}>
+                  ${ROTULO_CONFIANCA[x.ind.confianca] ?? x.ind.confianca}
+                </urbi-badge>
+                <span>${x.ind.origem}</span>
+              </div>
+              ${x.ind.observacao
+                ? html`<div class="comp-insight"><urbi-icone classe="fa-solid fa-lightbulb"></urbi-icone>${x.ind.observacao}</div>`
+                : nothing}
+            </div>`)}
         </div>
       </div>
     `;

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  precoMedioM2Projeto, custoObraM2Projeto, vsoProjetoPct, compararProjetoMercado,
+  precoMedioM2Projeto, custoObraM2Projeto, vsoProjetoPct, compararProjetoMercado, lerIndicador,
 } from './analise-mercado.js';
 import type { EventoCrono } from './fluxo-shared.js';
 
@@ -114,4 +114,60 @@ test('#199 comparação é null quando falta um dos lados (não vira zero)', () 
   assert.equal(compararProjetoMercado(10_000, undefined), null);
   // Mercado zero tornaria o % infinito — tratado como "sem dado".
   assert.equal(compararProjetoMercado(10_000, 0), null);
+});
+
+// ── #201: procedência por indicador ──
+
+const SNAPSHOT = {
+  preco_medio_m2: 11_500,
+  custo_obra_m2: 4_800,
+  vso_pct: null,
+  resultado: {
+    indicadores: {
+      preco_medio_m2: { valor: 11_500, origem: 'Secovi-DF, jul/2026', confianca: 'alta', observacao: 'Oferta nova puxou o preço' },
+      custo_obra_m2: { valor: 4_800, origem: 'Sinduscon-DF', confianca: 'media' },
+      vso_pct: { valor: null, origem: '', confianca: 'sem_dado' },
+    },
+  },
+};
+
+test('#201 indicador com procedência traz valor, origem, confiança e insight', () => {
+  const r = lerIndicador(SNAPSHOT, 'preco_medio_m2');
+  assert.equal(r.valor, 11_500);
+  assert.equal(r.origem, 'Secovi-DF, jul/2026');
+  assert.equal(r.confianca, 'alta');
+  assert.equal(r.observacao, 'Oferta nova puxou o preço');
+});
+
+test('#201 indicador sem observação vem com insight vazio, não undefined', () => {
+  assert.equal(lerIndicador(SNAPSHOT, 'custo_obra_m2').observacao, '');
+});
+
+test('#201 indicador sem dado devolve valor null', () => {
+  const r = lerIndicador(SNAPSHOT, 'vso_pct');
+  assert.equal(r.valor, null);
+  assert.equal(r.confianca, 'sem_dado');
+});
+
+test('#201 número SEM origem é tratado como ausente — nada aparece sem procedência', () => {
+  const semOrigem = {
+    preco_medio_m2: 9_999,
+    resultado: { indicadores: { preco_medio_m2: { valor: 9_999, origem: '', confianca: 'alta' } } },
+  };
+  assert.equal(lerIndicador(semOrigem, 'preco_medio_m2').valor, null);
+});
+
+test('#201 snapshot legado, sem bloco resultado.indicadores, não quebra', () => {
+  // Snapshot gravado antes do #200 tem a coluna mas não o bloco de procedência.
+  assert.equal(lerIndicador({ preco_medio_m2: 10_000 }, 'preco_medio_m2').valor, null);
+  assert.equal(lerIndicador(null, 'preco_medio_m2').valor, null);
+  assert.equal(lerIndicador(undefined, 'qualquer').valor, null);
+});
+
+test('#201 valor numérico em string (vindo do banco) é aceito', () => {
+  const doBanco = {
+    preco_medio_m2: '11500.50',
+    resultado: { indicadores: { preco_medio_m2: { origem: 'Secovi-DF', confianca: 'alta' } } },
+  };
+  assert.equal(lerIndicador(doBanco, 'preco_medio_m2').valor, 11_500.5);
 });
