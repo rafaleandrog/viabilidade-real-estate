@@ -15,8 +15,9 @@
 #
 # O que este script NÃO cobre — continua sendo do autor, no UrbiVerso:
 #   · `urbi-empacotar` (empacotamento e publicação);
-#   · materialização do `schema.json` pelo sincronizador do SDK — uma migração
-#     pode passar aqui e ainda assim referenciar coluna que o schema não declara;
+#   · a materialização real das tabelas no Postgres — o passo 2 confere o
+#     `schema.json` contra o contrato do SDK (foi o que reprovou o pacote
+#     `0.1.12`: `"tipo": "logico"`, que nunca existiu), mas não executa o DDL;
 #   · execução real das migrações contra o Postgres da instância;
 #   · qualquer coisa que dependa de request/sessão/permissão de verdade.
 #
@@ -25,7 +26,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 raiz="$(pwd)"
 
-echo "== 1/4 dependências públicas (express) =="
+echo "== 1/5 dependências públicas (express) =="
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — rode antes: bash scripts/validar-frontend.sh" >&2
   exit 1
@@ -50,7 +51,11 @@ if [ ! -d node_modules/@urbiverso/sdk ]; then
   exit 1
 fi
 
-echo "== 2/4 typecheck do backend =="
+echo "== 2/5 schema.json vs contrato do SDK =="
+node scripts/validar-schema.mjs
+[ $? -eq 0 ] || { echo "  schema FALHOU — o shell reprovaria o pacote na instalação"; exit 1; }
+
+echo "== 3/5 typecheck do backend =="
 cat > tsconfig.backend.json <<'JSON'
 { "extends": "./tsconfig.json", "include": ["backend/**/*"] }
 JSON
@@ -59,14 +64,14 @@ tc=$?
 rm -f tsconfig.backend.json
 [ $tc -eq 0 ] && echo "  typecheck OK" || { echo "  typecheck FALHOU"; exit 1; }
 
-echo "== 3/4 testes de backend (lógica pura) =="
+echo "== 4/5 testes de backend (lógica pura) =="
 # Dois níveis: módulos de domínio em `backend/` (ex.: mercado-ia) e as rotas em
 # `backend/rotas/`. O glob antigo só pegava o segundo e deixou 16 testes novos
 # passarem batido no #200 — daí os dois padrões explícitos.
 node --import tsx/esm --test backend/*.test.ts backend/rotas/*.test.ts
 [ $? -eq 0 ] || { echo "  testes FALHARAM"; exit 1; }
 
-echo "== 4/4 migrações (contrato, banco vazio, reexecução, cadeia) =="
+echo "== 5/5 migrações (contrato, banco vazio, reexecução, cadeia) =="
 node scripts/migracoes-harness.mjs
 [ $? -eq 0 ] || { echo "  migrações FALHARAM"; exit 1; }
 
@@ -103,6 +108,6 @@ else
 fi
 
 echo
-echo "✅ Backend validado: typecheck + testes de rota + migrações + guard de versao."
+echo "✅ Backend validado: schema + typecheck + testes de rota + migrações + guard de versao."
 echo "   Falta o autor rodar no UrbiVerso: urbi-empacotar, sincronização de schema.json"
 echo "   e execução real das migrações."
