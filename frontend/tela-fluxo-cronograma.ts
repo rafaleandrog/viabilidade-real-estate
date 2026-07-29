@@ -65,7 +65,7 @@ export class ViabFluxoCronograma extends LitElement {
     }
     .evento-label { display: inline-flex; align-items: center; }
     .campo-mes { display: inline-flex; align-items: center; gap: 6px; }
-    .campo-mes viab-num { width: 120px; }
+    .campo-mes viab-num { width: 148px; }
     .cadeado { opacity: 0.7; font-size: 0.75rem; }
     td.periodo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); white-space: nowrap; }
 
@@ -186,7 +186,8 @@ export class ViabFluxoCronograma extends LitElement {
         </td>
         <td>
           <span class="campo-mes">
-            <viab-num casas-decimais="0" sufixo="º mês"
+            <viab-num casas-decimais="0" sufixo="º mês" passo="1"
+              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, Number(ev.inicio_mes)) : ''}
               ?desabilitado=${dis || travadoIni}
               .valor=${Number(ev.inicio_mes)}
               @urbi:input-numero-change=${(e: CustomEvent) => this._salvarEvento(ev.evento, { inicio_mes: e.detail.valor })}
@@ -196,7 +197,8 @@ export class ViabFluxoCronograma extends LitElement {
         </td>
         <td>
           <span class="campo-mes">
-            <viab-num casas-decimais="0" sufixo="meses"
+            <viab-num casas-decimais="0" sufixo="meses" passo="1"
+              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, Number(ev.inicio_mes) + Number(ev.duracao_meses) - 1) : ''}
               ?desabilitado=${dis || travadoDur}
               .valor=${Number(ev.duracao_meses)}
               @urbi:input-numero-change=${(e: CustomEvent) => this._salvarEvento(ev.evento, { duracao_meses: e.detail.valor })}
@@ -225,7 +227,8 @@ export class ViabFluxoCronograma extends LitElement {
         </td>
         <td>
           <span class="campo-mes">
-            <viab-num casas-decimais="0" sufixo="º mês"
+            <viab-num casas-decimais="0" sufixo="º mês" passo="1"
+              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, Number(f.inicio_mes ?? 0)) : ''}
               ?desabilitado=${dis}
               .valor=${Number(f.inicio_mes ?? 0)}
               @urbi:input-numero-change=${(e: CustomEvent) => this._salvarFase(f, { inicio_mes: e.detail.valor })}
@@ -234,7 +237,8 @@ export class ViabFluxoCronograma extends LitElement {
         </td>
         <td>
           <span class="campo-mes">
-            <viab-num casas-decimais="0" sufixo="meses"
+            <viab-num casas-decimais="0" sufixo="meses" passo="1"
+              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, Number(f.inicio_mes ?? 0) + Number(f.duracao_meses ?? 12) - 1) : ''}
               ?desabilitado=${dis}
               .valor=${Number(f.duracao_meses ?? 12)}
               @urbi:input-numero-change=${(e: CustomEvent) => this._salvarFase(f, { duracao_meses: e.detail.valor })}
