@@ -279,6 +279,35 @@ export function buscarApelo(estudoId: number): Promise<any> {
 export function buscarAnaliseMercado(estudoId: number): Promise<any> {
   return urbiVerso.api(`${APP}/estudos/${estudoId}/analise-mercado`);
 }
+// Roda a análise de IA (#200). Sob demanda — nunca por carga de tela. `projeto`
+// leva os números já derivados na tela, que entram só como contexto do prompt.
+export function rodarAnaliseMercado(estudoId: number, projeto: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/analise-mercado`, {
+    method: 'POST', body: JSON.stringify({ projeto }),
+  });
+}
+export function definirRegiaoMercado(estudoId: number, regiaoId: number | null): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/analise-mercado/regiao`, {
+    method: 'PATCH', body: JSON.stringify({ regiao_mercado_id: regiaoId }),
+  });
+}
+
+// ── Regiões monitoradas (#200) — registro global, coletadas diariamente ──
+export function listarRegioesMercado(): Promise<any> {
+  return urbiVerso.api(`${APP}/mercado/regioes`);
+}
+export function criarRegiaoMercado(dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/mercado/regioes`, { method: 'POST', body: JSON.stringify(dados) });
+}
+export function atualizarRegiaoMercado(id: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/mercado/regioes/${id}`, { method: 'PATCH', body: JSON.stringify(dados) });
+}
+export function removerRegiaoMercado(id: number): Promise<any> {
+  return urbiVerso.api(`${APP}/mercado/regioes/${id}`, { method: 'DELETE' });
+}
+export function listarColetasMercado(regiaoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/mercado/regioes/${regiaoId}/coletas`);
+}
 export async function uploadDocumentoApelo(file: File): Promise<{ upload_id: number }> {
   const fd = new FormData();
   fd.append('file', file);

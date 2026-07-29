@@ -59,8 +59,11 @@ tc=$?
 rm -f tsconfig.backend.json
 [ $tc -eq 0 ] && echo "  typecheck OK" || { echo "  typecheck FALHOU"; exit 1; }
 
-echo "== 3/4 testes de backend (lógica pura das rotas) =="
-node --import tsx/esm --test backend/rotas/*.test.ts
+echo "== 3/4 testes de backend (lógica pura) =="
+# Dois níveis: módulos de domínio em `backend/` (ex.: mercado-ia) e as rotas em
+# `backend/rotas/`. O glob antigo só pegava o segundo e deixou 16 testes novos
+# passarem batido no #200 — daí os dois padrões explícitos.
+node --import tsx/esm --test backend/*.test.ts backend/rotas/*.test.ts
 [ $? -eq 0 ] || { echo "  testes FALHARAM"; exit 1; }
 
 echo "== 4/4 migrações (contrato, banco vazio, reexecução, cadeia) =="

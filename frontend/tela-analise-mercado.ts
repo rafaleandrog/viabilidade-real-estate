@@ -12,7 +12,7 @@ import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
-  buscarAnaliseMercado,
+  buscarAnaliseMercado, rodarAnaliseMercado, listarRegioesMercado, definirRegiaoMercado,
 } from './viabilidade-api.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -35,16 +35,36 @@ import {
 
 const n = (v: any): number => Number(v) || 0;
 
+// Eixos de risco — espelham os 6 fatores do Apelo Comercial (`backend/apelo-comercial.ts`),
+// que é o framework já definido no app para avaliar uma região. Duplicado aqui
+// só como RÓTULO de exibição; a lista canônica é a do backend (`EIXOS_RELEVANCIA`),
+// que também restringe o enum do schema da IA.
+const ROTULO_EIXO: Record<string, string> = {
+  localizacao: 'Localização',
+  infraestrutura: 'Infraestrutura',
+  vetor_crescimento: 'Vetor de crescimento',
+  concorrencia: 'Concorrência',
+  demanda: 'Demanda',
+  seguranca_juridica: 'Segurança jurídica',
+};
+
 @customElement('viab-tela-analise-mercado')
 export class ViabTelaAnaliseMercado extends LitElement {
   @property({ type: Object }) estudo: any = null;
+  @property({ type: Boolean }) editavel = false;
 
   @state() private carregando = true;
   @state() private calc: FluxoCalc | null = null;
   @state() private analise: any = null;
+  // #200: região monitorada do estudo, coletas da rotina diária e estado do botão.
+  @state() private regiao: any = null;
+  @state() private coletas: any[] = [];
+  @state() private regioes: any[] = [];
+  @state() private analisando = false;
   private receitas: any[] = [];
   private crono: EventoCrono[] = [];
   private areaPrivativaTotal = 0;
+  private unidades = 0;
   private carregado = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
@@ -81,6 +101,27 @@ export class ViabTelaAnaliseMercado extends LitElement {
     .comp-delta.alinhado { color: var(--cor-sucesso, #13a98d); }
     .sem-dado { color: var(--cor-texto-fraco, rgba(255,255,255,0.4)); font-style: italic; }
     .nota { font-size: 0.78rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-top: 8px; }
+
+    /* #200 — barra de ações, riscos e material coletado. */
+    .acoes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+    .acoes .espaco { flex: 1; }
+    .acoes urbi-select { min-width: 200px; }
+    .acoes-rot {
+      font-size: var(--texto-rotulo, 0.75rem); text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+    }
+    .riscos, .coletas { display: flex; flex-direction: column; gap: 10px; }
+    .risco, .coleta {
+      border: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+      border-left-width: 3px; border-radius: 8px; padding: 10px 12px;
+      background: var(--cor-superficie-elevada, rgba(255,255,255,0.03));
+    }
+    .risco.sev-alta { border-left-color: var(--cor-erro, #d45a3a); }
+    .risco.sev-media { border-left-color: var(--cor-alerta, #e0a82a); }
+    .risco.sev-baixa { border-left-color: var(--cor-info, #2aa9e0); }
+    .risco-cab, .coleta-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+    .risco p, .coleta p { margin: 4px 0 0; font-size: 0.85rem; }
+    .coleta a { color: var(--cor-primaria, #2aa9e0); }
   `];
 
   updated() {
@@ -93,14 +134,16 @@ export class ViabTelaAnaliseMercado extends LitElement {
   private async _carregar() {
     this.carregando = true;
     try {
-      const [receitas, custos, curvas, crono, params, mercado] = await Promise.all([
+      const [receitas, custos, curvas, crono, params, mercado, regioes] = await Promise.all([
         listarReceitasAvancado(this.estudo.id),
         listarCustosAvancado(this.estudo.id),
         listarCurvas(),
         buscarCronogramaAvancado(this.estudo.id),
         buscarParametrosAvancado(this.estudo.id),
         buscarAnaliseMercado(this.estudo.id),
+        listarRegioesMercado(),
       ]);
+      this.regioes = regioes?.erro ? [] : (regioes.dados || []);
       this.receitas = receitas?.erro ? [] : (receitas.dados || []);
       this.crono = crono?.erro ? [] : (crono.dados || []);
       const config: FluxoConfig = {
@@ -118,7 +161,12 @@ export class ViabTelaAnaliseMercado extends LitElement {
       this.areaPrivativaTotal = this.receitas.reduce(
         (s: number, l: any) => s + (l.tipologias ?? []).reduce(
           (si: number, t: any) => si + n(t.area_privativa_m2) * n(t.quantidade), 0), 0);
+      this.unidades = this.receitas.reduce(
+        (s: number, l: any) => s + (l.tipologias ?? []).reduce(
+          (si: number, t: any) => si + n(t.quantidade), 0), 0);
       this.analise = mercado?.erro ? null : (mercado?.analise ?? null);
+      this.regiao = mercado?.erro ? null : (mercado?.regiao ?? null);
+      this.coletas = mercado?.erro ? [] : (mercado?.coletas ?? []);
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar a análise de mercado', 'erro');
     }
@@ -145,6 +193,7 @@ export class ViabTelaAnaliseMercado extends LitElement {
         Dados externos, apenas referência — não é recomendação de investimento.
       </urbi-banner>
 
+      ${this._renderAcoes(precoProjeto, custoProjeto, vsoProjeto)}
       ${this._renderProcedencia()}
 
       <div class="secao">
@@ -161,7 +210,129 @@ export class ViabTelaAnaliseMercado extends LitElement {
         </p>
       </div>
 
+      ${this._renderRiscos()}
       ${this._renderMacro()}
+      ${this._renderColetas()}
+    `;
+  }
+
+  /**
+   * #200 — região monitorada + botão de análise. A análise roda SOB DEMANDA,
+   * nunca por carga de tela: ela custa IA e o usuário decide quando gastar.
+   */
+  private _renderAcoes(preco: number | null, custo: number | null, vso: number | null): TemplateResult {
+    if (!this.editavel) return html`${nothing}`;
+    return html`
+      <div class="acoes">
+        <span class="acoes-rot">Região monitorada</span>
+        <urbi-select
+          .valor=${this.regiao ? String(this.regiao.id) : ''}
+          .opcoes=${[{ valor: '', rotulo: 'Não vinculada' },
+            ...this.regioes.map((r: any) => ({ valor: String(r.id), rotulo: `${r.nome}${r.uf ? `/${r.uf}` : ''}` }))]}
+          @urbi:select-change=${(e: CustomEvent) => this._trocarRegiao(e.detail.valor)}
+        ></urbi-select>
+        <span class="espaco"></span>
+        <urbi-botao variante="primario" icone="fa-solid fa-wand-magic-sparkles"
+          ?carregando=${this.analisando}
+          @click=${() => this._analisar(preco, custo, vso)}>
+          ${this.analise ? 'Refazer análise' : 'Analisar mercado'}
+        </urbi-botao>
+      </div>
+      ${this.regioes.length === 0 ? html`
+        <p class="nota">
+          Nenhuma região monitorada cadastrada. Um administrador pode cadastrá-las em
+          <strong>Admin → Apps → viabilidade → Regiões monitoradas</strong>; a coleta diária passa a
+          varrer notícias e anúncios dessas regiões automaticamente.
+        </p>` : nothing}
+    `;
+  }
+
+  private async _trocarRegiao(valor: string) {
+    const id = valor ? Number(valor) : null;
+    try {
+      const r = await definirRegiaoMercado(this.estudo.id, id);
+      if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Erro ao vincular a região', 'erro'); return; }
+      this.regiao = this.regioes.find((x: any) => Number(x.id) === id) ?? null;
+      // Recarrega para trazer as coletas da região nova.
+      this.carregado = false;
+      this._carregar();
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao vincular a região', 'erro');
+    }
+  }
+
+  private async _analisar(preco: number | null, custo: number | null, vso: number | null) {
+    if (this.analisando) return;
+    this.analisando = true;
+    try {
+      const r = await rodarAnaliseMercado(this.estudo.id, {
+        preco_medio_m2: preco, custo_obra_m2: custo, vso_pct: vso,
+        area_privativa_total: this.areaPrivativaTotal, unidades: this.unidades,
+      });
+      if (r?.erro) {
+        // 422 IA_INDISPONIVEL é o caso previsto no aceite: mensagem clara, sem quebrar.
+        urbiVerso.notificar(r.mensagem || 'Não foi possível rodar a análise', 'erro');
+        return;
+      }
+      this.analise = r?.analise ?? null;
+      this.coletas = r?.coletas ?? this.coletas;
+      urbiVerso.notificar('Análise de mercado atualizada.', 'sucesso');
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Não foi possível rodar a análise', 'erro');
+    } finally {
+      this.analisando = false;
+    }
+  }
+
+  /** Sinais de risco devolvidos pela IA (#200/#201). */
+  private _renderRiscos(): TemplateResult {
+    const riscos = Array.isArray(this.analise?.riscos) ? this.analise.riscos : [];
+    if (riscos.length === 0) return html`${nothing}`;
+    return html`
+      <div class="secao">
+        <h3>Sinais de risco</h3>
+        <div class="riscos">
+          ${riscos.map((r: any) => html`
+            <div class="risco sev-${r.severidade || 'baixa'}">
+              <div class="risco-cab">
+                <urbi-badge cor=${r.severidade === 'alta' ? 'perigo' : r.severidade === 'media' ? 'alerta' : 'info'}>
+                  ${ROTULO_EIXO[r.eixo] ?? r.eixo}
+                </urbi-badge>
+                <strong>${r.titulo}</strong>
+              </div>
+              <p>${r.descricao}</p>
+              ${r.origem ? html`<p class="nota">Fonte: ${r.origem}</p>` : nothing}
+            </div>`)}
+        </div>
+      </div>
+    `;
+  }
+
+  /** Material coletado pela rotina diária para a região do estudo. */
+  private _renderColetas(): TemplateResult {
+    if (this.coletas.length === 0) return html`${nothing}`;
+    return html`
+      <div class="secao">
+        <h3>Coletado sobre a região</h3>
+        <div class="coletas">
+          ${this.coletas.map((c: any) => html`
+            <div class="coleta">
+              <div class="coleta-cab">
+                <urbi-badge cor=${c.tipo === 'anuncio' ? 'sucesso' : 'info'}>
+                  ${c.tipo === 'anuncio' ? 'Anúncio' : 'Notícia'}
+                </urbi-badge>
+                ${c.url
+                  ? html`<a href=${c.url} target="_blank" rel="noopener noreferrer">${c.titulo}</a>`
+                  : html`<strong>${c.titulo}</strong>`}
+              </div>
+              <p>${c.resumo}</p>
+              <p class="nota">
+                ${[c.fonte, c.publicado_em, c.data_coleta ? `coletado em ${c.data_coleta}` : '']
+                  .filter(Boolean).join(' · ')}
+              </p>
+            </div>`)}
+        </div>
+      </div>
     `;
   }
 

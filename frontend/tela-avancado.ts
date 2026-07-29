@@ -183,7 +183,7 @@ export class ViabTelaAvancado extends LitElement {
         // #199: projeto × mercado (preço/custo por m², VSO, macros). O lado
         // "projeto" é derivado do estudo; o lado "mercado" vem do snapshot que
         // a rota de IA (#200) preenche — ausente, a tela explica a limitação.
-        return html`<viab-tela-analise-mercado .estudo=${this.estudo}></viab-tela-analise-mercado>`;
+        return html`<viab-tela-analise-mercado .estudo=${this.estudo} .editavel=${this.podeEditar}></viab-tela-analise-mercado>`;
       case 'apelo':
         return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this.podeEditar}></viab-tela-apelo>`;
       case 'resumo':
