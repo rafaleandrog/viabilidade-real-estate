@@ -25,6 +25,11 @@ export class ViabNum extends LitElement {
   @property({ type: Boolean }) obrigatorio = false;
   @property() erro = '';
   @property({ type: Number, attribute: 'casas-decimais' }) casasDecimais = 2;
+  // #177: piso de casas decimais SEMPRE exibidas (1,2 → "1,20"); 0 (padrão)
+  // mantém o comportamento anterior ("mínimo zero" — 12 continua "12", não
+  // "12,00"). Campos de % passam `casas-minimas="2"`; campos de mês
+  // (casas-decimais="0") não usam esta prop.
+  @property({ type: Number, attribute: 'casas-minimas' }) casasMinimas = 0;
 
   @state() private _foco = false;
   @state() private _rascunho = '';
@@ -75,13 +80,16 @@ export class ViabNum extends LitElement {
   private _fmtAgrupado(v: number | null): string {
     if (v == null) return '';
     return new Intl.NumberFormat('pt-BR', {
-      minimumFractionDigits: 0, maximumFractionDigits: this.casasDecimais,
+      minimumFractionDigits: this.casasMinimas, maximumFractionDigits: this.casasDecimais,
     }).format(v);
   }
 
-  // Valor cru para edição: vírgula decimal, sem separador de milhar.
+  // Valor cru para edição: vírgula decimal, sem separador de milhar. Com piso
+  // de casas (#177), completa com zeros — "1,2" edita como "1,20" — para o
+  // campo não "perder" a formatação ao ganhar foco.
   private _paraEdicao(v: number | null): string {
     if (v == null) return '';
+    if (this.casasMinimas > 0) return v.toFixed(this.casasDecimais).replace('.', ',');
     return String(v).replace('.', ',');
   }
 

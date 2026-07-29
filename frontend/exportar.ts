@@ -141,6 +141,9 @@ interface LinhaFx {
   mensal: number[];
   custo: boolean;
   separadorAntes?: boolean;
+  // #189: peso sobre a Receita Bruta (VGV) — undefined na própria linha de VGV
+  // e no Fluxo de Caixa Mensal/Acumulado (linhas sem sentido para o indicador).
+  pctVgv?: number;
 }
 
 /** Achata o fluxo calculado na hierarquia da tabela (grupos → itens). */
@@ -152,6 +155,8 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
   };
   // VPL é linear no fluxo mensal, então o VPL de um agregado = Σ VPL das suas linhas (#126).
   const somaVpl = (xs: LinhaCalc[]): number => xs.reduce((s, l) => s + l.vpl, 0);
+  const vgv = c.receitaBrutaVgv;
+  const pct = (total: number) => (vgv > 0 ? (total / vgv) * 100 : undefined);
   const linhas: LinhaFx[] = [];
   linhas.push({
     nivel: 0, nome: 'Receita Bruta (VGV)', custo: false,
@@ -160,25 +165,27 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
   for (const l of c.linhasReceita) {
     linhas.push({
       nivel: 1, nome: l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, custo: false,
-      inicio: l.inicio, duracao: l.duracao, total: l.total, vpl: l.vpl, mensal: l.mensal,
+      inicio: l.inicio, duracao: l.duracao, total: l.total, vpl: l.vpl, mensal: l.mensal, pctVgv: pct(l.total),
     });
     for (const t of l.itens ?? []) {
-      linhas.push({ nivel: 2, nome: t.nome, custo: false, inicio: t.inicio, duracao: t.duracao, total: t.total, vpl: t.vpl, mensal: t.mensal });
+      linhas.push({ nivel: 2, nome: t.nome, custo: false, inicio: t.inicio, duracao: t.duracao, total: t.total, vpl: t.vpl, mensal: t.mensal, pctVgv: pct(t.total) });
     }
   }
   linhas.push({
     nivel: 0, nome: 'Custo Total', custo: true, separadorAntes: true,
     total: c.custoMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasCusto), mensal: c.custoMensal,
+    pctVgv: pct(c.custoMensal.reduce((s, v) => s + v, 0)),
   });
   for (const g of ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'] as const) {
     const itens = c.linhasCusto.filter((x) => x.grupo === g);
     if (itens.length === 0) continue;
+    const totalGrupo = itens.reduce((s, x) => s + x.total, 0);
     linhas.push({
       nivel: 1, nome: GRUPO_CUSTO_ROTULO[g], custo: true,
-      total: itens.reduce((s, x) => s + x.total, 0), vpl: somaVpl(itens), mensal: soma(itens),
+      total: totalGrupo, vpl: somaVpl(itens), mensal: soma(itens), pctVgv: pct(totalGrupo),
     });
     for (const x of itens) {
-      linhas.push({ nivel: 2, nome: x.nome, custo: true, inicio: x.inicio, duracao: x.duracao, total: x.total, vpl: x.vpl, mensal: x.mensal });
+      linhas.push({ nivel: 2, nome: x.nome, custo: true, inicio: x.inicio, duracao: x.duracao, total: x.total, vpl: x.vpl, mensal: x.mensal, pctVgv: pct(x.total) });
     }
   }
   linhas.push({
@@ -197,7 +204,7 @@ export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string |
   rows.push('Estudo;' + (estudo.nome_exibicao || estudo.nome));
   rows.push('Nível;Avançado');
   rows.push('');
-  rows.push(['Linha', 'Início', 'Duração', 'Total', 'VPL', ...c.meses].join(';'));
+  rows.push(['Linha', 'Início', 'Duração', 'Total', 'VPL', '% VGV', ...c.meses].join(';'));
   for (const l of linhasFluxo(c)) {
     if (l.separadorAntes) rows.push('');
     const indent = '  '.repeat(l.nivel);
@@ -207,6 +214,7 @@ export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string |
       l.duracao ? `${l.duracao}m` : '',
       R$(l.total),
       l.vpl !== undefined ? R$(l.vpl) : '',
+      l.pctVgv !== undefined ? pct1(l.pctVgv) : '',
       ...l.mensal.map((v) => (Math.abs(v) < 0.005 ? '' : R$(v))),
     ].join(';'));
   }
@@ -300,14 +308,15 @@ export function exportarFluxoPDF(
         <td class="v">${l.duracao ? rotuloMesRelativo(dataInicio, l.inicio!) : ''}</td>
         <td class="v">${l.duracao ? `${l.duracao}m` : ''}</td>
         <td class="v">${fmtCel(l.total, l.custo)}</td>
-        <td class="v">${l.vpl !== undefined ? fmtCel(l.vpl, l.custo) : ''}</td>${tds}</tr>`;
+        <td class="v">${l.vpl !== undefined ? fmtCel(l.vpl, l.custo) : ''}</td>
+        <td class="v">${l.pctVgv !== undefined ? `${pct1(l.pctVgv)}%` : ''}</td>${tds}</tr>`;
     }).join('');
     paginas.push(`
       <section class="pagina">
         ${cab}
         <div class="faixa">${rotuloColunas} ${ini + 1}–${fim} de ${c.prazo}</div>
         <table>
-          <thead><tr><th class="nome">Linha</th><th>Início</th><th>Duração</th><th>Total</th><th>VPL</th>${ths}</tr></thead>
+          <thead><tr><th class="nome">Linha</th><th>Início</th><th>Duração</th><th>Total</th><th>VPL</th><th>% VGV</th>${ths}</tr></thead>
           <tbody>${trs}</tbody>
         </table>
       </section>`);

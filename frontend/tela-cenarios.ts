@@ -2,13 +2,13 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct } from './viab-format.js';
-import { type EventoCrono } from './fluxo-shared.js';
+import { type EventoCrono, type PeriodoAgregado, periodosAnuais, rotuloMesRelativo } from './fluxo-shared.js';
 import {
-  calcularFluxo, aplicarCenario,
+  calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoCalc, type FluxoConfig, type CenarioParams,
 } from './fluxo-caixa-motor.js';
-import { graficoCenarioAcumulado } from './fluxo-graficos.js';
-import { estiloFluxoTabela, kpisFluxo, tabelaFluxo } from './fluxo-tabela.js';
+import { marcos } from './fluxo-graficos.js';
+import { estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, controlesFluxo } from './fluxo-tabela.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import {
   urbiVerso,
@@ -50,8 +50,15 @@ export class ViabTelaCenarios extends LitElement {
   @state() private cenarios: any[] = [];
   @state() private colapso: Record<string, boolean> = {};
   @state() private removerId: number | null = null;
+  // #186: mesmos controles do Fluxo de Caixa (Recolher tudo, Mensal/Anual,
+  // filtro Global/por fase), aplicados ao FluxoCalc do cenário SIMULADO.
+  @state() private faseFiltro = '';
+  @state() private visao: 'mensal' | 'anual' = 'mensal';
 
   private baseConfig: FluxoConfig | null = null;
+  // Último FluxoCalc do cenário em exibição (mensal, não-agregado) — guardado
+  // fora do render() para `_toggleTudo` (chavesColapso) poder lê-lo.
+  private ultimoCalc: FluxoCalc | null = null;
   private crono: EventoCrono[] = [];
   private dataInicio: string | null = null;
   private faixaPreco: Faixa = { min: -15, max: 15 };
@@ -67,8 +74,13 @@ export class ViabTelaCenarios extends LitElement {
   static styles = [estiloPrimitivo, estiloConteudo, estiloFluxoTabela, css`
     .topo { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 16px; align-items: start; }
     @media (max-width: 860px) { .topo { grid-template-columns: 1fr; } }
-    .graf svg { display: block; width: 100%; height: auto; min-width: 480px; }
     .graf-wrap { overflow-x: auto; }
+    /* #185: marcos do cronograma + Payback/Exposição em texto — a migração
+       para urbi-grafico-linha abriu mão da linha tracejada e dos marcadores
+       verticais que o SVG customizado desenhava (decisão aceita: SerieGrafico
+       só declara { rotulo, valores, cor }, sem dasharray/anotação). */
+    .marcos-lista { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 0.78rem; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
+    .marcos-lista strong { color: var(--cor-texto, rgba(255,255,255,0.85)); font-weight: 600; }
 
     .slider { margin: 14px 0; }
     .slider-topo { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
@@ -84,7 +96,7 @@ export class ViabTelaCenarios extends LitElement {
     .secao-fluxo h3, .secao-cenarios h3 { margin: 0 0 10px; }
     .secao-cenarios { margin-top: 24px; }
 
-    table.cen { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    table.cen { width: auto; border-collapse: collapse; font-variant-numeric: tabular-nums; }
     table.cen th, table.cen td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.08)); font-size: 0.82rem; white-space: nowrap; }
     table.cen th { color: var(--cor-texto-sec, rgba(255,255,255,0.55)); font-weight: 600; }
     table.cen th:first-child, table.cen td:first-child { text-align: left; }
@@ -92,8 +104,14 @@ export class ViabTelaCenarios extends LitElement {
     table.cen td.neg { color: var(--cor-erro, #d45a3a); }
     table.cen tr.linha-real td { font-weight: 700; background: var(--cor-primaria-fundo, rgba(124,92,255,0.12)); }
     table.cen tr.linha-real td:first-child urbi-icone { margin-right: 6px; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
-    /* #132: variacao vs. cenario real, a direita do valor da propria celula. */
-    table.cen td urbi-badge { margin-left: 6px; vertical-align: middle; }
+    /* #187: Preço venda/Custo obra estreitas (só "±NN%") — a tabela deixa de
+       esticar para 100% (width:auto acima) e o resto do conteúdo alinha à
+       esquerda em vez de espalhar por colunas largas demais para o dado. */
+    table.cen th.cen-estreita, table.cen td.cen-estreita { width: 84px; }
+    /* #187: coluna própria para a variação (badge) de VPL/TIR/Exposição máx.,
+       separada do valor — cabeçalho vazio (rótulo só em aria-label). */
+    table.cen th.cen-var, table.cen td.cen-var { width: 68px; padding-left: 2px; }
+    table.cen td urbi-badge { vertical-align: middle; }
     .cen-wrap { overflow-x: auto; }
   `];
 
@@ -150,14 +168,30 @@ export class ViabTelaCenarios extends LitElement {
    *  algumas centenas de pares; passando disso, esvazia (recalcular é barato). */
   private static readonly LIMITE_CACHE = 240;
 
+  // #186: filtro por fase incide sobre as linhas de RECEITA do config-base —
+  // mesmo campo (`fase_label`, cru da API) e mesmo critério de tela-fluxo-ver.ts.
+  private _configFiltrado(): FluxoConfig {
+    const cfg = this.baseConfig!;
+    if (!this.faseFiltro) return cfg;
+    return { ...cfg, linhasReceita: cfg.linhasReceita.filter((l: any) => (l.fase_label || '') === this.faseFiltro) };
+  }
+
   private _calc(params: CenarioParams): FluxoCalc {
-    const chave = `${n(params.precoVendaPct)}|${n(params.custoObraPct)}`;
+    // A chave inclui o filtro de fase (#186) — sem isso, trocar o filtro
+    // reaproveitaria do cache um cálculo da fase anterior.
+    const chave = `${this.faseFiltro}|${n(params.precoVendaPct)}|${n(params.custoObraPct)}`;
     const memo = this.cacheCalc.get(chave);
     if (memo) return memo;
-    const calc = calcularFluxo(aplicarCenario(this.baseConfig!, params));
+    const calc = calcularFluxo(aplicarCenario(this._configFiltrado(), params));
     if (this.cacheCalc.size >= ViabTelaCenarios.LIMITE_CACHE) this.cacheCalc.clear();
     this.cacheCalc.set(chave, calc);
     return calc;
+  }
+
+  /** Faixas de meses da view Anual (#186/#127) — `null` na view Mensal. */
+  private _periodos(prazo: number): PeriodoAgregado[] | null {
+    if (this.visao !== 'anual') return null;
+    return periodosAnuais(this.dataInicio, prazo);
   }
 
   /** Sliders fora do zero — há um cenário alternativo a comparar com a base. */
@@ -168,6 +202,22 @@ export class ViabTelaCenarios extends LitElement {
   private _rotuloCenario(): string {
     const p = (v: number) => `${v > 0 ? '+' : ''}${v}%`;
     return `Cenário · preço ${p(this.precoPct)} · obra ${p(this.custoPct)}`;
+  }
+
+  // #185: marcos do cronograma (Lançamento/Início/Fim de Obra) + Payback e
+  // Exposição máxima do cenário exibido — texto fora do gráfico, mitigação
+  // aceita pela remoção dos marcadores verticais e da linha tracejada do SVG.
+  private _renderMarcos(c: FluxoCalc): TemplateResult {
+    const itens = [
+      ...marcos(this.crono).map((m) => ({ rotulo: m.rotulo, valor: rotuloMesRelativo(this.dataInicio, m.mes) })),
+      { rotulo: 'Payback', valor: c.paybackData ?? '—' },
+      { rotulo: 'Exposição máxima', valor: fmtR$(c.exposicaoMaxima) },
+    ];
+    return html`
+      <div class="marcos-lista">
+        ${itens.map((i) => html`<span><strong>${i.rotulo}:</strong> ${i.valor}</span>`)}
+      </div>
+    `;
   }
 
   render() {
@@ -185,24 +235,65 @@ export class ViabTelaCenarios extends LitElement {
     const cenario = alterado
       ? this._calc({ precoVendaPct: this.precoPct, custoObraPct: this.custoPct })
       : base;
+    this.ultimoCalc = cenario;
+    // #186: Mensal/Anual só reagrupa as COLUNAS do gráfico e da tabela — os
+    // KPIs (VPL/TIR/Payback/Exposição) seguem lendo o cálculo mensal, mesma
+    // convenção de tela-fluxo-ver.ts.
+    const periodos = this._periodos(Math.max(base.prazo, cenario.prazo));
+    const exibBase = periodos ? agregarFluxoPorPeriodos(base, periodos) : base;
+    const exibCenario = periodos ? agregarFluxoPorPeriodos(cenario, periodos) : cenario;
     return html`
       <div class="topo">
         ${this._renderControles()}
         <urbi-card titulo="Fluxo acumulado — cenário real × cenário simulado">
           <div class="graf-wrap"><div class="graf">
-            ${graficoCenarioAcumulado(base, alterado ? cenario : null, this.dataInicio, this.crono, this._rotuloCenario())}
+            <urbi-grafico-linha
+              formato="moeda"
+              legenda="sempre"
+              .categorias=${exibBase.meses}
+              .series=${alterado ? [
+                { rotulo: 'Cenário real', valores: exibBase.fluxoAcumulado, cor: 'var(--cor-texto-forte, #e8e8ea)' },
+                { rotulo: this._rotuloCenario(), valores: exibCenario.fluxoAcumulado, cor: 'var(--cor-primaria, #7c5cff)' },
+              ] : [
+                { rotulo: 'Cenário real', valores: exibBase.fluxoAcumulado, cor: 'var(--cor-texto-forte, #e8e8ea)' },
+              ]}
+            ></urbi-grafico-linha>
           </div></div>
+          ${this._renderMarcos(cenario)}
         </urbi-card>
       </div>
 
       <section class="secao-fluxo">
         <h3>${alterado ? 'Fluxo de caixa do cenário' : 'Fluxo de caixa do cenário real'}</h3>
         ${kpisFluxo(cenario, alterado ? base : null)}
-        ${tabelaFluxo(cenario, this.dataInicio, this.colapso, (ch) => this._t(ch))}
+        ${this._renderControlesFluxo()}
+        ${tabelaFluxo(exibCenario, this.dataInicio, this.colapso, (ch) => this._t(ch))}
       </section>
 
       ${this._renderCenariosSalvos(base)}
     `;
+  }
+
+  private _renderControlesFluxo(): TemplateResult {
+    const fases = [...new Set((this.baseConfig?.linhasReceita ?? [])
+      .map((l: any) => String(l.fase_label || '')).filter(Boolean))];
+    const tudoRecolhido = Object.values(this.colapso).some(Boolean);
+    return controlesFluxo({
+      tudoRecolhido,
+      onToggleTudo: () => this._toggleTudo(!tudoRecolhido),
+      visao: this.visao,
+      onVisao: (v) => { this.visao = v; },
+      fases,
+      faseFiltro: this.faseFiltro,
+      onFase: (v) => { this.faseFiltro = v; },
+    });
+  }
+
+  private _toggleTudo(recolher: boolean) {
+    const chaves = this.ultimoCalc ? chavesColapso(this.ultimoCalc) : [];
+    const novo: Record<string, boolean> = {};
+    for (const k of chaves) novo[k] = recolher;
+    this.colapso = novo;
   }
 
   private _renderControles(): TemplateResult {
@@ -291,12 +382,15 @@ export class ViabTelaCenarios extends LitElement {
             <thead>
               <tr>
                 <th>Cenário</th>
-                <th>Preço venda</th>
-                <th>Custo obra</th>
+                <th class="cen-estreita">Preço venda</th>
+                <th class="cen-estreita">Custo obra</th>
                 <th>VPL</th>
+                <th class="cen-var" aria-label="Variação de VPL vs. cenário real" scope="col"></th>
                 <th>TIR</th>
+                <th class="cen-var" aria-label="Variação de TIR vs. cenário real" scope="col"></th>
                 <th>Payback</th>
                 <th>Exposição máx.</th>
+                <th class="cen-var" aria-label="Variação de Exposição máxima vs. cenário real" scope="col"></th>
                 <th></th>
               </tr>
             </thead>
@@ -322,12 +416,15 @@ export class ViabTelaCenarios extends LitElement {
     return html`
       <tr class="linha-real">
         <td><urbi-icone classe="fa-solid fa-lock"></urbi-icone>Cenário real</td>
-        <td>—</td>
-        <td>—</td>
+        <td class="cen-estreita">—</td>
+        <td class="cen-estreita">—</td>
         <td class=${base.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(base.vpl)}</td>
+        <td class="cen-var"></td>
         <td>${tir}</td>
+        <td class="cen-var"></td>
         <td>${base.paybackData ?? '—'}</td>
         <td class="neg">${fmtR$(base.exposicaoMaxima)}</td>
+        <td class="cen-var"></td>
         <td></td>
       </tr>
     `;
@@ -351,12 +448,15 @@ export class ViabTelaCenarios extends LitElement {
     return html`
       <tr>
         <td>${c.nome || 'Cenário'}</td>
-        <td>${pctTxt(n(c.preco_venda_pct))}</td>
-        <td>${pctTxt(n(c.custo_obra_pct))}</td>
-        <td class=${calc.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(calc.vpl)}${this._badgeVar(calc.vpl, base.vpl)}</td>
-        <td>${tir}${this._badgeVar(calc.tir, base.tir)}</td>
+        <td class="cen-estreita">${pctTxt(n(c.preco_venda_pct))}</td>
+        <td class="cen-estreita">${pctTxt(n(c.custo_obra_pct))}</td>
+        <td class=${calc.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(calc.vpl)}</td>
+        <td class="cen-var">${this._badgeVar(calc.vpl, base.vpl)}</td>
+        <td>${tir}</td>
+        <td class="cen-var">${this._badgeVar(calc.tir, base.tir)}</td>
         <td>${calc.paybackData ?? '—'}</td>
-        <td class="neg">${fmtR$(calc.exposicaoMaxima)}${this._badgeVar(calc.exposicaoMaxima, base.exposicaoMaxima)}</td>
+        <td class="neg">${fmtR$(calc.exposicaoMaxima)}</td>
+        <td class="cen-var">${this._badgeVar(calc.exposicaoMaxima, base.exposicaoMaxima)}</td>
         <td>
           <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
             @click=${() => this.removerId = Number(c.id)}></urbi-botao>

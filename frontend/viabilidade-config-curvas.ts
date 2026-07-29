@@ -134,7 +134,7 @@ export class ViabConfigCurvas extends LitElement {
                 <tr>
                   <td>${v.mes}</td>
                   <td>
-                    <viab-num sufixo="%" .valor=${v.pct || null}
+                    <viab-num sufixo="%" casas-minimas="2" .valor=${v.pct || null}
                       @urbi:input-numero-change=${(e: CustomEvent) => {
                         this.formValores = this.formValores.map((x, j) =>
                           j === i ? { ...x, pct: e.detail.valor ?? 0 } : x);

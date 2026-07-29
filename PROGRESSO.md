@@ -4,6 +4,50 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #179, #189, #177, #185, #186, #187 — lote de 6 issues Médio (2026-07-29)
+
+Branch `claude/r4-lote-medio`. Nenhuma é portão — lote implementado e **mergeado nesta sessão a
+pedido explícito do autor** (pedido pontual, não altera a regra geral de merge do `CLAUDE.md`).
+Nenhuma toca schema/migração; puramente frontend.
+
+- **#179 — Diretos: Corretagem obrigatória sem duplicar.** A idempotência do backend/migração já
+  existia desde o #178 (`obrigatoria` decidida no servidor, migração 006 já desatava duplicatas
+  legadas para edição/remoção). O gap real era só o seletor de categoria em
+  `tela-fluxo-custos.ts`, que oferecia "Corretagem de vendas" (e as demais categorias obrigatórias:
+  Preço/Construção) para QUALQUER linha — permitindo criar uma 2ª linha manualmente, somada em
+  dobro pelo motor. Filtrado: categorias obrigatórias somem do seletor de outras linhas.
+- **#189 — Fluxo de Caixa: coluna % sobre VGV.** Nova coluna `c6` (sticky) logo após o VPL em
+  `fluxo-tabela.ts`, `linha.total / c.receitaBrutaVgv × 100` via `fmtPct` (1 casa). Vazia na própria
+  linha "Receita Bruta (VGV)" e nas linhas de Fluxo Mensal/Acumulado; presente em receita e custo
+  (grupo/subgrupo/item), inclusive Custo Total. Refletida em `exportar.ts` (CSV e PDF).
+- **#177 — % sempre com 2 casas decimais.** `viab-num.ts` ganha `casas-minimas` (piso de casas
+  exibidas, inclusive com foco — `1,2` sempre aparece `1,20`). Aplicado a todo campo `sufixo="%"`
+  (`tela-fluxo-receitas.ts`, `viabilidade-config-curvas.ts`) e ao Orçamento de Custos quando a
+  unidade é `pct_*` (`tela-fluxo-custos.ts`). Campos de mês (`casas-decimais="0"`) não usam a prop
+  nova — default `0` preserva o comportamento anterior.
+- **#185 — Cenários: gráfico migrado para `urbi-grafico-linha`.** `graficoCenarioAcumulado` (SVG
+  customizado) removido de `fluxo-graficos.ts`; `tela-cenarios.ts` usa o primitivo com 2 séries
+  (Cenário real + cenário simulado, cores de alto contraste, `legenda="sempre"`). Trade-off aceito
+  (`CLAUDE.md`): sem linha tracejada nem marcadores verticais — mitigado com lista textual de
+  marcos (Lançamento/Início/Fim de Obra + Payback + Exposição máxima) abaixo do gráfico.
+- **#186 — Cenários: controles do Fluxo de Caixa.** `controlesFluxo` (Recolher tudo, Mensal/Anual,
+  filtro Global/por fase) extraído de `tela-fluxo-ver.ts` para `fluxo-tabela.ts` (CSS `.controles`
+  junto) e reusado em `tela-cenarios.ts`, entre os KPIs e a tabela. Opera sobre o `FluxoCalc` do
+  cenário SIMULADO; a chave do cache (`cacheCalc`) passou a incluir o filtro de fase, senão trocar
+  de fase reaproveitaria do cache um cálculo da fase anterior. Mensal/Anual só reagrupa colunas do
+  gráfico/tabela — KPIs continuam no cálculo mensal (mesma convenção de Fluxo de Caixa).
+- **#187 — Cenários: colunas de variação % próprias.** "Preço venda"/"Custo obra" estreitas (84px,
+  tabela deixou de esticar a 100%); os badges de variação de VPL/TIR/Exposição máxima saíram de
+  dentro da célula do valor para 3 colunas próprias (`.cen-var`, cabeçalho vazio + `aria-label`). A
+  linha travada "Cenário real" preenche essas colunas vazias (sem variação contra si mesma).
+
+**Validação:** `bash scripts/validar-frontend.sh` verde (typecheck + 103 testes + build), rodado a
+cada issue e novamente no final do lote.
+
+**Merge:** nenhuma é portão, mas o autor autorizou mergear o lote nesta sessão.
+
+---
+
 ## #181 — Financeiro alinhado às outras abas (2026-07-28)
 
 Branch `claude/r4-181-financeiro-unidades`. Não é portão — PR aberto, merge fica com o autor.
