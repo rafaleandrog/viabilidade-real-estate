@@ -272,6 +272,13 @@ export function buscarImovelNucleo(id: number): Promise<any> {
 export function buscarApelo(estudoId: number): Promise<any> {
   return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial`);
 }
+
+// ── Análise de Mercado (#199) ──
+// Snapshot de MERCADO do estudo. `{ analise: null }` é resposta normal: o
+// estudo existe e nunca rodou a análise. Quem preenche é a rota de IA (#200).
+export function buscarAnaliseMercado(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/analise-mercado`);
+}
 export async function uploadDocumentoApelo(file: File): Promise<{ upload_id: number }> {
   const fd = new FormData();
   fd.append('file', file);

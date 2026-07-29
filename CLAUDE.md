@@ -104,12 +104,39 @@ vermelho por falta de credencial). Barra **PR de diff vazio que declara fechar i
 PR #142, que fechou 12 issues sem alterar um arquivo — e repete o guard de aspas curvas para pegar
 quem não rodou o script local.
 
-**Backend, typecheck do backend, `urbi-empacotar` e a suíte completa** exigem o SDK →
-**só rodam no ambiente autenticado do autor**. Se uma mudança tocar backend/schema, implemente
-e registre no `PROGRESSO.md` que a validação de backend/empacotamento fica para o autor
-(não fique tentando instalar o SDK aqui). No PC do autor o fluxo canônico segue valendo:
-`pnpm typecheck`, `pnpm build`, `pnpm test`, `pnpm exec urbi-empacotar viabilidade`
-(no Windows, `urbi-empacotar` roda via **PowerShell**, não Git Bash — ver PROGRESSO).
+**Para mudanças de BACKEND / SCHEMA / MIGRAÇÃO:** existe o segundo script, criado em 2026-07-29
+depois de descobrir que a regra antiga ("backend só roda no ambiente do autor") era conservadora
+demais:
+
+```
+bash scripts/validar-backend.sh
+```
+
+Ele roda **typecheck do backend + testes de lógica pura das rotas + harness de migrações + guard de
+`versao`**. Funciona aqui porque:
+
+- o `@urbiverso/sdk` **já está** em `node_modules/@urbiverso/sdk` com o `dist/index.d.ts` — o que
+  falha com 401 é *reinstalar* o pacote, e o typecheck só precisa dos tipos, que estão no disco;
+- só `backend/rotas.ts` importa o SDK (`import '@urbiverso/sdk/express'`, augmentação de tipo);
+  todo o resto do backend depende só do `express`, que é **público**;
+- os testes de backend importam apenas as **funções puras** dos módulos de rota — não sobem
+  servidor nem banco.
+
+O harness (`scripts/migracoes-harness.mjs`) exercita cada migração contra um banco em memória:
+contrato do módulo, instalação virgem, **reexecução** e a cadeia completa em ordem. O guard final
+barra os dois erros simétricos de versionamento: migração nova **sem** bump da `versao`, e bump
+**sem** migração nova.
+
+> ⚠️ O `dist/index.d.ts` do SDK é também a **fonte para conferir props de primitivo `urbi-*`**
+> antes de usar (`grep -n "declare class UrbiGraficoArea" -A 30`). Atributo ou elemento inexistente
+> **não dá erro, só não faz nada** — leia antes de presumir.
+
+**Continua sendo do autor, no ambiente autenticado:** `urbi-empacotar`, a sincronização de
+`schema.json` pelo SDK (uma migração pode passar aqui e mesmo assim citar coluna que o schema não
+declara) e a execução real das migrações no Postgres. Registre isso no `PROGRESSO.md`/PR. No PC do
+autor o fluxo canônico segue valendo: `pnpm typecheck`, `pnpm build`, `pnpm test`,
+`pnpm exec urbi-empacotar viabilidade` (no Windows, `urbi-empacotar` roda via **PowerShell**, não
+Git Bash — ver PROGRESSO).
 
 ---
 

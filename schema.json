@@ -336,6 +336,33 @@
         "ordem":           { "tipo": "inteiro", "padrao": 0 }
       },
       "indices": [["estudo_id"]]
+    },
+
+    "analise_mercado": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":        { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+
+        "abrangencia":      { "tipo": "texto", "limite": 20, "opcoes": ["municipio", "uf", "nacional"], "padrao": "municipio" },
+        "localidade":       { "tipo": "texto", "limite": 120 },
+
+        "preco_medio_m2":   { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "custo_obra_m2":    { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "vso_pct":          { "tipo": "decimal", "precisao": 5, "escala": 1 },
+
+        "ipca_pct":         { "tipo": "decimal", "precisao": 5, "escala": 1 },
+        "selic_pct":        { "tipo": "decimal", "precisao": 5, "escala": 1 },
+        "incc_pct":         { "tipo": "decimal", "precisao": 5, "escala": 1 },
+        "focus_ipca_pct":   { "tipo": "decimal", "precisao": 5, "escala": 1 },
+        "focus_selic_pct":  { "tipo": "decimal", "precisao": 5, "escala": 1 },
+
+        "riscos":           { "tipo": "json" },
+        "resultado":        { "tipo": "json" },
+
+        "origem":           { "tipo": "texto", "limite": 200 },
+        "data_referencia":  { "tipo": "texto", "limite": 20 }
+      },
+      "indices": [["estudo_id"]]
     }
   }
 }

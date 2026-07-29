@@ -12,6 +12,7 @@ import './tela-fluxo-custos.js';
 import './tela-fluxo-ver.js';
 import './tela-financeiro.js';
 import './tela-resumo.js';
+import './tela-analise-mercado.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tela do estudo AVANÇADO — reestruturação de navegação (Etapa 3 · #39/#40).
@@ -33,10 +34,17 @@ import './tela-resumo.js';
 //   Custos            → Terreno · Obra · Diretos · Indiretos · Financeiro
 //   Fluxo de Caixa    → Ver Fluxo
 //   Cenários          → Simulação de cenários (sliders + fluxo do cenário)
-//   Análise de mercado→ Apelo Comercial
+//   Análise de mercado→ Projeto × mercado (#199)
+//   Apelo Comercial   → Score qualitativo do ativo por IA
+//
+// #199 — a aba "Análise de mercado" apontava para o Apelo Comercial, que é
+// outra coisa: o Apelo pontua o ATIVO (localização, infraestrutura, vetor de
+// crescimento) e não compara o projeto com o mercado. A aba passou a ser a
+// análise de mercado de verdade e o Apelo ganhou página própria — nada foi
+// removido, só desambiguado. Decisão registrada em docs/viabilidade/analise-mercado.md.
 // ─────────────────────────────────────────────────────────────────────────
 
-type AbaTopo = 'resumo' | 'empreendimento' | 'viabilidade' | 'obra' | 'fluxo' | 'cenarios' | 'mercado';
+type AbaTopo = 'resumo' | 'empreendimento' | 'viabilidade' | 'obra' | 'fluxo' | 'cenarios' | 'mercado' | 'apelo';
 
 // Páginas (nível 1) — ordem da lista lateral (urbi-nav). O id 'obra' é
 // preservado como slug de rota; só o rótulo virou "Custos" (#40).
@@ -48,6 +56,7 @@ const PAGINAS: { id: AbaTopo; label: string }[] = [
   { id: 'fluxo',          label: 'Fluxo de Caixa' },
   { id: 'cenarios',       label: 'Cenários' },
   { id: 'mercado',        label: 'Análise de mercado' },
+  { id: 'apelo',          label: 'Apelo Comercial' },
 ];
 const IDS_TOPO = PAGINAS.map((a) => a.id) as AbaTopo[];
 
@@ -171,6 +180,11 @@ export class ViabTelaAvancado extends LitElement {
         // Gráficos estática em viab-tela-graficos (via tela-estudo).
         return html`<viab-tela-cenarios .estudo=${this.estudo}></viab-tela-cenarios>`;
       case 'mercado':
+        // #199: projeto × mercado (preço/custo por m², VSO, macros). O lado
+        // "projeto" é derivado do estudo; o lado "mercado" vem do snapshot que
+        // a rota de IA (#200) preenche — ausente, a tela explica a limitação.
+        return html`<viab-tela-analise-mercado .estudo=${this.estudo}></viab-tela-analise-mercado>`;
+      case 'apelo':
         return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this.podeEditar}></viab-tela-apelo>`;
       case 'resumo':
       default:

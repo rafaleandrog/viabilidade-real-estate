@@ -75,7 +75,13 @@ echo
 echo "== guard: migração nova ⇄ bump da versao =="
 base="${BASE_REF:-origin/main}"
 if git rev-parse --verify --quiet "$base" >/dev/null; then
-  novas="$(git diff --name-only --diff-filter=A "$base"...HEAD -- migracoes/ | wc -l | tr -d ' ')"
+  # Conta migrações novas COMMITADAS e também as que ainda estão na árvore de
+  # trabalho (untracked ou staged). Sem a segunda parte o guard fica cego
+  # justamente quando é mais útil — antes do commit, que é quando se roda a
+  # validação (foi o que aconteceu na primeira execução dele, no #199).
+  n_commit="$(git diff --name-only --diff-filter=A "$base"...HEAD -- migracoes/ | wc -l | tr -d ' ')"
+  n_wt="$(git status --porcelain -- migracoes/ | grep -Ec '^(\?\?|A |M )' || true)"
+  novas=$(( n_commit + n_wt ))
   ver_base="$(git show "$base:manifesto.json" 2>/dev/null | grep -o '"versao"[^,]*' || echo '')"
   ver_agora="$(grep -o '"versao"[^,]*' manifesto.json || echo '')"
   if [ "$novas" -gt 0 ] && [ "$ver_base" = "$ver_agora" ]; then
