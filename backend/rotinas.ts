@@ -37,6 +37,22 @@ function hoje(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Lê um parâmetro da app. Devolve '' quando o parâmetro não existe ou o helper
+ * não está disponível — nunca lança.
+ *
+ * ⚠️ `mercado_busca_url` e `mercado_busca_chave` foram REMOVIDOS do manifesto
+ * (2026-07-29): o pacote `0.1.12` foi reprovado na validação do shell e o
+ * suspeito nº 1 era o `"tipo": "texto"` em `parametros` — todos os parâmetros
+ * pré-existentes da app são `"numero"`, e o `Manifesto` do SDK sequer declara
+ * `parametros`, então não havia como confirmar o vocabulário aceito.
+ *
+ * Consequência enquanto isso não é resolvido: `buscarExterno` nunca recebe URL,
+ * a coleta diária roda em `sem_fonte_externa` e **não grava nada** — que é o
+ * modo já testado e seguro (nada é inventado). As chamadas abaixo continuam
+ * aqui de propósito: no dia em que o tipo certo for confirmado, basta redeclarar
+ * os dois parâmetros no manifesto e a coleta volta a buscar, sem tocar em código.
+ */
 async function param(ctx: ContextoListener, slug: string): Promise<string> {
   try {
     const v = await ctx.parametros?.obter(slug);
