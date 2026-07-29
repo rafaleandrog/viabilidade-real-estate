@@ -129,6 +129,49 @@ test('#190 venda no meio da obra: 1ª parcela no 1º vencimento >= mês da venda
   assert.ok(perto(r[40], 10_000_000 / 16, 1));
 });
 
+// 4d. #191 — periodicidade respeitada no "Ao longo da obra".
+test('#191 trimestral/semestral/anual: nº de parcelas = floor(duração / intervalo)', () => {
+  // Obra de 24 meses (17..40).
+  assert.equal(parcelasAoLongoObra(CRONO, 'mensal'), 24);
+  assert.equal(parcelasAoLongoObra(CRONO, 'trimestral'), 8);
+  assert.equal(parcelasAoLongoObra(CRONO, 'semestral'), 4);
+  assert.equal(parcelasAoLongoObra(CRONO, 'anual'), 2);
+  // Vencimentos a cada intervalo, a partir do início da obra.
+  assert.deepEqual(vencimentosAoLongoObra(CRONO, 12, 'trimestral'), [17, 20, 23, 26, 29, 32, 35, 38]);
+  assert.deepEqual(vencimentosAoLongoObra(CRONO, 12, 'semestral'), [17, 23, 29, 35]);
+  assert.deepEqual(vencimentosAoLongoObra(CRONO, 12, 'anual'), [17, 29]);
+});
+
+test('#191 resto da divisão não vira parcela (10 meses trimestral = 3 parcelas)', () => {
+  const obra10: EventoCrono[] = [{ evento: 'obra', inicio_mes: 5, duracao_meses: 10 }];
+  assert.equal(parcelasAoLongoObra(obra10, 'trimestral'), 3);       // 10/3 = 3, sobra 1 mês
+  assert.deepEqual(vencimentosAoLongoObra(obra10, 0, 'trimestral'), [5, 8, 11]);
+  // Duração menor que um intervalo ainda gera 1 parcela (piso).
+  const obra2: EventoCrono[] = [{ evento: 'obra', inicio_mes: 5, duracao_meses: 2 }];
+  assert.equal(parcelasAoLongoObra(obra2, 'anual'), 1);
+  assert.deepEqual(vencimentosAoLongoObra(obra2, 0, 'anual'), [5]);
+});
+
+test('#191 semestral: receita se conserva e vence no intervalo certo', () => {
+  const linha = {
+    tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
+    absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+    fluxo_pagamento: {
+      comissao: { ativo: false, tipo: 'embutida', pct: 0 },
+      ret: { ativo: false, pct: 0 },
+      entrada: { modo: 'entrada', parcelas: 1, pct: 0 },
+      parcelas: { periodicidade: 'semestral', parcelas: 0, ao_longo_obra: true, juros: false, pct: 100 },
+      repasse: { pct: 0, apos_entrega_meses: 0 },
+    },
+  };
+  const r = receitaMensalLinha(linha, CRONO, 60);
+  assert.ok(perto(soma(r), 10_000_000, 1));            // conservação da receita
+  // 4 parcelas iguais nos meses 17, 23, 29 e 35 — e nada nos meses do meio.
+  for (const mes of [17, 23, 29, 35]) assert.ok(perto(r[mes], 10_000_000 / 4, 1));
+  assert.ok(perto(r[18], 0, 1));
+  assert.ok(perto(r[40], 0, 1));
+});
+
 test('#190 obra sem duração: cai para 1 parcela no mês da venda', () => {
   const semObra: EventoCrono[] = [
     { evento: 'lancamento', inicio_mes: 12, duracao_meses: 1 },
