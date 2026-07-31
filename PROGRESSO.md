@@ -4,6 +4,91 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Alinhamento documental EVI + backlog preparado (2026-07-31)
+
+Branch `claude/viabilidade-incorporacao-padroes-vksjs7`, a partir de `8ff6679`. Sessão
+**documental e diagnóstica**, conforme instrução de sessão recebida do autor.
+**Diff só em `.md`** — `git diff --stat 8ff6679 -- ':!*.md'` volta vazio. Sem schema, sem migração,
+`versao` **não muda**; `validar-backend.sh` não se aplica.
+
+### O que entrou
+
+O commit `8ff6679` tinha largado dois documentos grandes **na raiz do repo**, fora do framework de
+documentação. Esta sessão os colocou no lugar:
+
+1. **Documento 1** → `docs/viabilidade/inteligencia-evi-incorporacao.md`. Regra de **mínima
+   intervenção**: só frontmatter, comentário do framework, aviso de status consultivo e
+   `Veja também`. **Nenhuma linha do conteúdo econômico foi alterada** — nenhum erro inequívoco foi
+   encontrado para corrigir.
+2. **Documento 2** → **integrado** em `docs/viabilidade/padrao-incorporacao.md`, que agora tem a
+   espinha de 27 seções do padrão funcional. O material específico do app foi **preservado nos
+   anexos A–E** (convenções de cálculo, dicionário de campos reais, modelo de dados, armadilhas
+   conhecidas, API), não descartado. Cada divergência entre documento e código está rotulada como
+   **Comportamento vigente** / **Modelo funcional de referência** / **Evolução dependente de
+   issue** — 21 blocos ao todo. O texto usa **Grupo** e **Após-chaves**; a nomenclatura legada da
+   tela está registrada, e **nada foi renomeado no código**.
+3. `docs/rodada-5-evi-2026-07-31.md` — matriz de aderência, com status e classe de impacto
+   (D0/U1/M2/P3/I4) por conceito e evidência em `arquivo:linha`.
+4. `docs/issues-evi-propostas-2026-07-31.md` — **21 corpos de issue prontos**.
+
+### ⚠️ As issues NÃO foram abertas
+
+A instrução exige aprovação explícita do autor antes da abertura, e receber o documento não
+equivale a aprovar. **Nenhuma issue existe no GitHub** — a consulta confirmou 0 abertas. O
+`CLAUDE.md` foi atualizado na mesma alteração para registrar que existe lista preparada aguardando
+decisão, justamente para não repetir o caso #165–#169.
+
+### Achados que mudaram a lista original
+
+- **EVI-005 encolheu**: a #165 já ancorou o Pré-lançamento ao fim do Planejamento. Sobra a **Obra**,
+  cujo `inicio_mes` continua livre em `recalcularTravados`.
+- **`receitaBrutaVgv` mede outra coisa**: `vgvTotal − vgvPermutaFisica` é o VGV vendável, não a soma
+  dos recebimentos que o nome promete (#188). Vira EVI-009 + EVI-017.
+- **Corretagem sobre base errada**: `ctxCusto.receitaTotal` parte de `vgvLinha` (VGV bruto), então
+  comissão e RET incidem sobre unidade permutada fisicamente, que nunca gera caixa — enquanto a
+  receita usa `vgvVendavelLinha`. Vira EVI-008.
+- **Horizonte empilha sobra**: `saida[saida.length - 1] += valor` deposita no último mês tudo que
+  não cabe, e o prazo derivado ignora parcelas. Vira EVI-011, **portão** para EVI-012/013.
+- **Financiamento à produção é feature invisível**: os 5 campos `financiamento_*` existem no
+  `schema.json` e têm controle em `tela-financeiro.ts`, mas o motor **nunca os lê**. Viola "UI e API
+  andam sempre juntas" — EVI-019 tem de **decidir** entre integrar ou remover as duas pontas.
+- **Não há fixture dourada** em nenhum dos 11 arquivos de teste → EVI-001 confirmada como portão.
+
+### Validação
+
+`bash scripts/validar-frontend.sh` verde (guard de aspas curvas + typecheck + **124 testes** +
+build). `git diff --check` limpo. Links relativos de `docs/viabilidade/` todos resolvem; nenhum
+`.md` sobrando em link de slug; `ordem:` removido dos dois docs tocados (o campo foi retirado do
+framework).
+
+### Limpeza dos mapas mestres antigos
+
+A pedido do autor, os quatro mapas de backlog fechado foram **apagados**:
+`docs/lotes-bugs-2026-07-20.md`, `docs/etapas-bugs-2026-07-22.md`,
+`docs/sessoes-bugs-2026-07-25.md` e `docs/rodada-4-planilha-2026-07-27.md`.
+
+Auditoria feita antes de apagar: **nenhum código, workflow, `manifesto.json`, script ou teste os
+referencia** — o acoplamento era só documental (`CLAUDE.md` e entradas datadas deste arquivo). Todas
+as issues das quatro rodadas estão mergeadas, então os mapas não disparavam mais trabalho.
+
+O que **ainda valia** foi migrado antes: as decisões do autor que não se relitigam (#185 sobre a
+limitação de `SerieGrafico`, #190/#191 sobre as parcelas ancoradas no cronograma da Obra, #192 sobre
+a linha `Projetado`) viraram o **Anexo F** de `docs/viabilidade/padrao-incorporacao.md`, e o
+detalhamento das parcelas "ao longo da obra" virou a §11.6.1. As causas raiz que a Rodada 4
+descrevia já haviam sido corrigidas pelas próprias issues.
+
+> ⚠️ **As entradas antigas deste arquivo continuam citando os quatro caminhos apagados.** Isso é
+> proposital: elas são registro datado do que existia à época e não foram reescritas. Quem
+> encontrar um `docs/<rodada>.md` numa entrada anterior a 2026-07-31 deve procurar no `git log`, não
+> no working tree.
+
+### Pendente do autor
+
+Aprovar, ajustar ou rejeitar a lista de 21 issues e a ordem de execução. As pendências antigas
+(#199, #200) seguem inalteradas.
+
+---
+
 ## #201 — Sinais de risco e insights + ENCERRAMENTO DA RODADA 4 (2026-07-29)
 
 Branch `claude/r4-201-riscos-insights`. Não é portão. Pré-requisitos #199 e #200 já na `main`.
