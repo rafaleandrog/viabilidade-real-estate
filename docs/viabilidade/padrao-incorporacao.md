@@ -1302,10 +1302,21 @@ Receita Bruta — VGV
 >
 > **Divergência:** o nome exibido hoje ao usuário promete o conceito do padrão e entrega outro.
 >
-> **Evolução dependente de issue.** EVI-009 separa a taxonomia (VGV potencial · VGV vendável ·
-> vendas contratadas · juros recebidos · Receita Bruta) preservando os consumidores atuais;
-> EVI-017 passa a formar a Receita Bruta pelos recebimentos. A ordem importa: renomear antes de
-> existirem juros produziria um KPI vazio.
+> **Segunda divergência, mais funda: a série de receita do fluxo também não é bruta.**
+> `receitaMensalLinha` calcula `fator = vglLinha(vgv, fluxo_pagamento) / vgv` e aplica-o a cada
+> recebimento. Como `vglLinha` subtrai **comissão destacada** e **RET**, `receitaMensal` já é
+> **líquida** — não é o que o cliente pagou. O Doc 1 §4.6 define Receita Bruta como a soma do que o
+> **comprador** paga; a corretagem é desembolso do incorporador, não desconto na nota dele.
+>
+> Consequência prática: hoje, num estudo com taxa zero e comissão destacada, a "Receita Bruta" seria
+> `contratação × (1 − comissão − RET)`, e o invariante da §14.2 **não fecha**.
+>
+> **Evolução dependente de issue.** **EVI-022** desagrega comissão e RET do recebível e cria as
+> séries mensais de corretagem e imposto — é **portão**, porque sem ela "bruto" e "líquido" são o
+> mesmo número. Depois, EVI-009 separa a taxonomia (VGV potencial · VGV vendável · vendas
+> contratadas · juros recebidos · Receita Bruta) preservando os consumidores atuais, e EVI-017 passa
+> a formar a Receita Bruta pelos recebimentos. A ordem importa: renomear antes de existirem juros e
+> antes da desagregação produziria um KPI vazio e um invariante que não fecha.
 
 ### 14.3 O que não integra a Receita Bruta
 
@@ -1397,9 +1408,16 @@ base líquida
 > fluxo. As duas séries paralelas (bruta e líquida de imposto e corretagem) não são calculadas nem
 > expostas para auditoria.
 >
-> **Evolução dependente de issue.** EVI-018 — calcular as duas visões no regime de caixa e declarar
-> explicitamente qual delas alimenta o fluxo. O redesenho do **cadastro** da permuta física
-> permanece fora do backlog por decisão do autor.
+> ⚠️ **As duas séries que a fórmula da visão líquida consome não existem.** Não há série mensal de
+> imposto (o único tributo do Avançado é o RET por Grupo, embutido no fator do recebível, e o bloco
+> `regime_tributario`/`aliquota_*` é ignorado pelo motor) nem de corretagem. E o app aplica os
+> descontos de forma **multiplicativa**, que é justamente o que o padrão pede para evitar quando o
+> contrato determina subtração direta.
+>
+> **Evolução dependente de issue.** **EVI-022** precisa vir antes, produzindo `imposto_t` e
+> `corretagem_t` como séries próprias. Só então EVI-018 calcula as duas visões no regime de caixa e
+> declara qual delas alimenta o fluxo. O redesenho do **cadastro** da permuta física permanece fora
+> do backlog por decisão do autor.
 
 ```text
 permuta financeira líquida
@@ -1556,20 +1574,27 @@ O estudo completo deve conseguir representar:
 - saldo devedor;
 - quitação.
 
-> **Comportamento vigente — feature invisível.** Os parâmetros **já existem** em dois lugares:
-> `schema.json` declara `financiamento_obra_pct`, `financiamento_juros_aa`,
-> `financiamento_sistema_amortizacao`, `financiamento_prazo_meses` e
-> `financiamento_carencia_meses`, e `frontend/tela-financeiro.ts` renderiza os controles
-> correspondentes. **O motor nunca lê nenhum deles**: não há uma única referência a
-> `financiamento_*` em `frontend/fluxo-caixa-motor.ts`. O usuário preenche campos que não produzem
-> efeito algum sobre o fluxo, sem qualquer aviso.
+> **Comportamento vigente — a aba Financeiro inteira é inerte.** Não são só os campos de
+> financiamento: é o **Bloco G completo**. `schema.json` declara e `frontend/tela-financeiro.ts`
+> renderiza controles para financiamento à produção (`financiamento_*`), estrutura de capital
+> (`estrutura_*_pct`), investidor (`investidor_*`), regime tributário
+> (`regime_tributario`, `aliquota_*_pct`, `imposto_sobre_permuta_fisica`) e correção
+> (`indice_correcao`, `juros_financeiros_aa`, …). **O motor não lê nenhum deles** —
+> `backend/rotas/estudos.ts` os trata apenas como colunas persistíveis. O usuário preenche uma aba
+> inteira que não altera número nenhum, sem qualquer aviso.
 >
 > Isso viola a convenção do monorepo de que **UI e API andam sempre juntas**: capacidade que existe
 > na tela tem que existir no cálculo, e vice-versa.
 >
-> **Evolução dependente de issue.** EVI-019 — a issue precisa **decidir entre as duas saídas
-> legítimas**: integrar o financiamento ao fluxo mensal, ou remover as duas pontas. Manter como
-> está não é opção.
+> **Há ainda duas entradas fiscais concorrentes.** O único imposto que o Avançado aplica é o **RET
+> por Grupo**, marcado no modal de Fluxo de Pagamento e **desligado por default** — enquanto o bloco
+> de regime tributário desta aba fica sem uso. A Proforma (Preliminar) usa uma terceira regra,
+> `sujeito_ret`/`imposto_percentual`.
+>
+> **Evolução dependente de issue.** **EVI-022** resolve o eixo fiscal (escolhe a entrada oficial e
+> cria a série mensal de imposto). **EVI-019** decide, campo a campo, o destino do funding —
+> **integrar ou remover as duas pontas**. Manter como está não é opção, e todo campo que não for
+> implementado sai da tela.
 
 ### 17.3 Repasse não é financiamento à produção
 
@@ -2145,7 +2170,7 @@ O relatório é uma visão horizontal de uma série temporal; o modelo interno d
 Esta seção é diagnóstica. Ela não substitui o documento de issues e não autoriza mudanças diretas.
 
 > A auditoria verificada contra o código — conceito a conceito, com evidência em `arquivo:linha`,
-> status e classe de impacto — está em `docs/rodada-5-evi-2026-07-31.md`. Os corpos das 21 issues
+> status e classe de impacto — está em `docs/rodada-5-evi-2026-07-31.md`. Os corpos das 22 issues
 > propostas estão em `docs/issues-evi-propostas-2026-07-31.md`, **ainda não abertas**.
 
 ### 24.1 Estruturas já alinhadas
@@ -2425,8 +2450,9 @@ são **digitados como número inteiro/decimal** (ex.: `7` = 7%), não como fraç
 
 **Funding (Avançado):** `estrutura_capital_proprio_pct`, `estrutura_financiamento_pct`, `estrutura_investidores_pct`, `financiamento_obra_pct`, `financiamento_juros_aa`, `financiamento_sistema_amortizacao`, `financiamento_prazo_meses`, `financiamento_carencia_meses`, `investidor_aporte_valor`, `investidor_retorno_tipo`, `investidor_juros_aa`, `investidor_carencia_meses`, `investidor_parcelas`, `regime_tributario`, `aliquota_*_pct`, `indice_correcao`/`_taxa_aa`, `juros_financeiros_aa`, `juros_inicio_cobranca_mes`.
 
-> ⚠️ Os cinco campos `financiamento_*` estão declarados e têm controle na tela, mas **o motor não os
-> lê** — ver §17.2 e EVI-019.
+> ⚠️ **Todo o Bloco G acima é inerte no Avançado**: financiamento, estrutura de capital, investidor,
+> regime tributário e correção estão declarados e têm controle na tela, mas o motor **não lê nenhum
+> deles**. Ver §17.2, EVI-019 (funding) e EVI-022 (regime tributário).
 
 Para os campos das tabelas `avancado_*`, ver [Modelo de Dados](modelo-de-dados).
 

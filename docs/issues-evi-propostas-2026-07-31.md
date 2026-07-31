@@ -1,19 +1,40 @@
 # Issues EVI propostas — 2026-07-31
 
-> ⚠️ **NENHUMA destas issues foi aberta no GitHub.** Os identificadores `EVI-0NN` são **locais e
-> provisórios**; o GitHub atribuirá os números reais quando (e se) o autor aprovar a abertura.
-> Enquanto isso, elas não existem como issue: não têm número, não aparecem em busca e não podem ser
-> referenciadas por PR.
->
-> **Decisão pendente do autor:** aprovar, ajustar ou rejeitar esta lista e a ordem de execução.
+> ✅ **As 22 issues foram ABERTAS em 2026-07-31**, com autorização explícita do autor, após a 2ª
+> auditoria que conferiu cada corpo contra o código. Correspondência abaixo. Este arquivo continua
+> sendo a fonte dos corpos completos — a issue no GitHub traz o mesmo conteúdo.
+
+| ID local | Issue | Título | Onda |
+|---|---|---|:--:|
+| EVI-001 | #220 | cenário dourado reconciliado mês a mês | 0 |
+| EVI-002 | #221 | inventariar dados legados e compatibilidade | 0 |
+| EVI-003 | #222 | Fase → Grupo na linguagem do usuário | 1 |
+| EVI-004 | #223 | Pós-obra → Após-chaves na linguagem do usuário | 1 |
+| EVI-005 | #224 | ancorar o início da Obra ao fim do Planejamento | 1 |
+| EVI-006 | #225 | "Durante a obra" derivado após o Lançamento | 1 |
+| EVI-007 | #226 | Após-chaves em 12 meses, desacoplada do cronograma | 1 |
+| EVI-008 | #227 | série canônica de vendas contratadas | 2 |
+| EVI-022 | #228 | desagregar deduções do recebível e derivar impostos | 2 |
+| EVI-009 | #229 | taxonomia de VGV, contratação e receita | 2 |
+| EVI-010 | #230 | contrato canônico de pagamento por Grupo | 2 |
+| EVI-011 | #231 | horizonte derivado; remover o fallback | 2 |
+| EVI-012 | #232 | tabela curta por safra | 3 |
+| EVI-013 | #233 | componente Obra da tabela longa por safra | 3 |
+| EVI-014 | #234 | saldo a repassar e liquidação integral | 3 |
+| EVI-015 | #235 | vendas Após-chaves à vista | 3 |
+| EVI-016 | #236 | carteira econômica real de clientes | 3 |
+| EVI-017 | #237 | Receita Bruta formada pelos recebimentos | 3 |
+| EVI-018 | #238 | permuta financeira bruta e líquida | 4 |
+| EVI-019 | #239 | destino do Bloco G (aba Financeiro) | 4 |
+| EVI-020 | #240 | invariantes e relatório de reconciliação | 5 |
+| EVI-021 | #241 | fluxo, KPIs e exportações | 5 |
 
 **Base de evidência:** `docs/rodada-5-evi-2026-07-31.md` (matriz de aderência).
 **Labels:** só as existentes no repo — `bug` (comportamento errado hoje) e `enhancement`
 (capacidade nova). Nenhuma taxonomia nova.
-**Verificação de duplicidade:** 0 issues abertas; 141 fechadas varridas. As adjacentes (#165, #166,
-#168, #170, #188, #195, #196) entram citadas como histórico, não como duplicata.
-
----
+**Verificação de duplicidade:** 0 issues abertas antes desta rodada; 141 fechadas varridas. As
+adjacentes (#165, #166, #168, #170, #188, #195, #196) entram citadas como histórico, não como
+duplicata.
 
 ## Índice e ordem de abertura
 
@@ -25,9 +46,10 @@
 | EVI-004 | `fix(cronograma): adotar Após-chaves na nomenclatura exibida` | enhancement | P1 | U1 | 1 | — |
 | EVI-005 | `fix(cronograma): ancorar o início da Obra ao fim do Planejamento` | bug | P1 | M2 | 1 | 001, 002 |
 | EVI-006 | `fix(absorcao): derivar "Durante a obra" após o Lançamento, sem sobrepor períodos` | bug | P1 | M2 | 1 | 005 |
-| EVI-007 | `fix(absorcao): fixar a janela Após-chaves em 12 meses` | bug | P1 | M2/P3 | 1 | 001, 002, 005 |
+| EVI-007 | `fix(absorcao): fixar a janela Após-chaves em 12 meses, desacoplada do evento de cronograma` | bug | P1 | M2/P3 | 1 | 001, 002, 005, 006 |
 | EVI-008 | `feat(receitas): série canônica de vendas contratadas, separada do recebimento` | bug | P1 | M2 | 2 | 001 |
-| EVI-009 | `refactor(receitas): explicitar VGV potencial, vendável, contratado e Receita Bruta` | enhancement | P1 | M2/U1 | 2 | 008 |
+| **EVI-022** | `fix(fluxo): desagregar deduções do recebível e derivar impostos mensais` | bug | P1 | M2 | 2 | 001, 008 |
+| EVI-009 | `refactor(receitas): explicitar VGV potencial, vendável, contratado e Receita Bruta` | enhancement | P1 | M2/U1 | 2 | 008, 022 |
 | EVI-010 | `refactor(receitas): contrato canônico de pagamento por Grupo, sem quebrar o JSON legado` | enhancement | P1 | P3/M2 | 2 | 001, 002 |
 | EVI-011 | `fix(fluxo): derivar o horizonte de todos os eventos financeiros e remover o fallback` | bug | P1 | M2 | 2 | 001, 010 |
 | EVI-012 | `feat(receitas): tabela curta com sinal, 36 parcelas e juros por safra` | enhancement | P2 | M2 | 3 | 008, 010, 011 |
@@ -35,20 +57,43 @@
 | EVI-014 | `feat(receitas): saldo a repassar capitalizado e liquidação integral` | enhancement | P2 | M2 | 3 | 013 |
 | EVI-015 | `fix(receitas): novas vendas Após-chaves recebidas à vista no mês da contratação` | bug | P2 | M2 | 3 | 007, 008, 010 |
 | EVI-016 | `feat(fluxo): carteira econômica real de clientes por componente` | enhancement | P2 | M2 | 3 | 012, 013, 014 |
-| EVI-017 | `feat(receitas): Receita Bruta — VGV formada pelos recebimentos, com juros` | enhancement | P2 | M2/U1 | 3 | 008, 012–016 |
-| EVI-018 | `feat(terreno): permuta financeira bruta e líquida no regime de caixa` | enhancement | P2 | M2 | 4 | 008, 017 |
-| EVI-019 | `feat(funding): integrar (ou remover) o financiamento à produção` | bug | P3 | M2/P3 | 4 | 001, 011, 017 |
+| EVI-017 | `feat(receitas): Receita Bruta — VGV formada pelos recebimentos, com juros` | enhancement | P2 | M2/U1 | 3 | 008, 022, 012–016 |
+| EVI-018 | `feat(terreno): permuta financeira bruta e líquida no regime de caixa` | enhancement | P2 | M2 | 4 | 008, 022, 017 |
+| EVI-019 | `fix(financeiro): a aba Financeiro do Avançado não alimenta o motor — decidir o destino do Bloco G` | bug | P3 | M2/P3 | 4 | 001, 011, 017, 022 |
 | EVI-020 | `feat(fluxo): invariantes e relatório de reconciliação` | enhancement | P2 | M2/testes | 5 | 012–019 |
 | EVI-021 | `feat(fluxo): exibir contratação, juros, carteiras, repasse e funding` | enhancement | P3 | U1/M2 | 5 | 017, 019, 020 |
 
-**Ajustes da auditoria sobre a lista original da instrução:**
+> **A ordem de execução não é a ordem numérica.** `EVI-022` foi criada depois, na segunda
+> auditoria, mas executa na **Onda 2** — os IDs são ordem de criação, a coluna Onda é ordem de
+> trabalho.
+
+**Ajustes da 1ª auditoria sobre a lista original da instrução:**
 
 - **EVI-005 encolheu** — o Pré-lançamento já foi ancorado pela #165; sobra só a Obra;
 - **EVI-001 confirmada necessária** — nenhum dos 11 arquivos de teste do repo é cenário dourado;
 - **EVI-008** ganhou o achado da corretagem incidindo sobre VGV bruto;
 - **EVI-009/EVI-017** ganharam o caso concreto de `receitaBrutaVgv` já significar VGV vendável;
-- **EVI-018** registra que #195 e #196 já entregaram parte do escopo;
-- **EVI-019** deixou de ser "implementar funding" e virou **decisão**: integrar ou remover.
+- **EVI-018** registra que #195 e #196 já entregaram parte do escopo.
+
+**Ajustes da 2ª auditoria — conferência de cada corpo contra o código:**
+
+Quatro issues tinham **premissa factualmente errada** e foram reescritas; cinco tinham lacuna de
+dependência. A raiz de três delas é a mesma e virou issue própria.
+
+- **EVI-022 é nova.** O recebível do Avançado **já é líquido** de comissão destacada e RET, dobrados
+  num fator multiplicativo (`fator = vglLinha(vgv, fp) / vgv`). Isso quebrava a premissa de EVI-017,
+  EVI-018 e EVI-019 ao mesmo tempo.
+- **EVI-007 reescrita** — travar `pos_obra.duracao_meses` também travaria a duração de toda linha de
+  custo ancorada nesse evento, porque `ancorarLinhaCusto` copia **início e duração**. A solução
+  passa a ser desacoplar a janela comercial do evento de cronograma.
+- **EVI-017 reescrita** — o critério "taxa zero fecha Receita Bruta = vendas contratadas" estava
+  errado: hoje daria `contratação × (1 − comissão − RET)`.
+- **EVI-018 reescrita** — consumia `imposto_dedutivel_t` e `corretagem_dedutivel_t`, que não existem
+  como série mensal, e proibia o desconto multiplicativo que o app faz.
+- **EVI-019 reescrita e ampliada** — não são 5 campos mortos, é **o Bloco G inteiro**.
+- **EVI-008** ganhou a contagem dupla de corretagem; **EVI-005**, a `cronogramaPadrao()`;
+  **EVI-006**, o caso do Lançamento terminando depois da Obra; **EVI-011**, um critério marcado
+  como condicional; **EVI-007**, dependência de EVI-006.
 
 ---
 
@@ -257,6 +302,12 @@ derivado e protegido contra combinação incoerente, com o campo travado na tela
 reancoragem de custos apenas conforme as regras já existentes; comportamento definido para estudos
 legados.
 
+> ⚠️ **`cronogramaPadrao()` também tem de mudar.** O default do próprio app viola a regra:
+> `planejamento` 0–5, `pre_lancamento` começa em 6, mas **`obra` começa em 17**. Sem corrigir essa
+> função em `backend/rotas/avancado.ts`, todo estudo novo nasce fora da regra e a issue não fecha.
+> Corrigir o default também desloca as âncoras de custo dos estudos novos — o que é o
+> comportamento desejado, mas precisa estar nos testes.
+
 **Fora de escopo.** Alterar a duração da Obra. A janela comercial "Durante a obra" (EVI-006). Fixar
 Após-chaves (EVI-007). Datas próprias de Grupo.
 
@@ -313,6 +364,13 @@ off-by-one.
 **Escopo.** Helper de faixas de absorção; gráfico e rótulos; cálculo distribuído; caso em que o
 Lançamento termina no mesmo mês da entrega; impedir duração negativa.
 
+> ⚠️ **O caso não coberto: Lançamento terminando DEPOIS do fim da Obra.** Nada hoje impede um
+> Lançamento longo o bastante para ultrapassar a entrega. Nesse cenário "Durante a obra" fica vazia
+> **e** o Após-chaves (ancorado em fim-da-Obra + 1 por EVI-007) **se sobrepõe ao Lançamento** — ou
+> seja, reintroduz exatamente a sobreposição que esta issue existe para eliminar. A issue tem de
+> decidir e testar uma das saídas: barrar a combinação na validação, ou truncar o Lançamento na
+> entrega. Deixar implícito recria o defeito por outro caminho.
+
 **Fora de escopo.** Mudar o início físico da Obra (EVI-005). Fixar Após-chaves (EVI-007). Calendário
 por Grupo.
 
@@ -336,9 +394,9 @@ curta; janela vazia; 0% em um ou mais períodos; reconciliação da fixture dour
 
 ---
 
-## EVI-007 — Fixar Após-chaves em 12 meses
+## EVI-007 — Fixar Após-chaves em 12 meses, desacoplada do evento de cronograma
 
-**Título:** `fix(absorcao): fixar a janela Após-chaves em 12 meses`
+**Título:** `fix(absorcao): fixar a janela Após-chaves em 12 meses, desacoplada do evento de cronograma`
 **Label:** `bug` · **Prioridade:** P1 · **Classe:** M2/P3 · **Risco:** alto para estudos existentes
 
 **Contexto.** A regra aprovada define janela comercial fixa de 12 meses após a entrega.
@@ -347,13 +405,46 @@ curta; janela vazia; 0% em um ou mais períodos; reconciliação da fixture dour
 travado em `recalcularTravados`). A **duração é livre e editável**: `faixasAbsorcao`, em
 `frontend/fluxo-shared.ts`, calcula
 `durPos = Math.max(1, Math.round(posObraMeses ?? pos.duracao_meses))`. Há estudos gravados com
-duração diferente de 12.
+duração diferente de 12. O default de `cronogramaPadrao()` já é 12.
 
-**Comportamento esperado.** `duracao_apos_chaves = 12`, com o percentual continuando a ser o resíduo
-da absorção do Grupo.
+> ⚠️ **O evento `pos_obra` tem DOIS papéis, e a issue original travava os dois.**
+>
+> Além de definir a janela comercial, `pos_obra` é **âncora válida de linha de custo**
+> (`EVENTOS_ANCORA` em `backend/rotas/avancado.ts`), e `ancorarLinhaCusto` copia do evento **o
+> início E a duração**:
+>
+> ```
+> return { inicio_mes: ev.inicio_mes, duracao_meses: ev.duracao_meses };
+> ```
+>
+> Travar `pos_obra.duracao_meses = 12` forçaria toda linha de custo ancorada nesse evento —
+> tipicamente **manutenção e assistência técnica** — a exatamente 12 meses. O Doc 2 §8.2 separa
+> justamente **Após-chaves** (12 meses de venda) de **Posterior** (parcelas, manutenção, dívida); o
+> app usa um evento só para ambos.
 
-**Escopo.** Fixar a duração no motor e na UI; remover ou travar a edição; atualizar defaults e
-validações; definir a estratégia para dados existentes; atualizar gráfico e rótulo.
+**Comportamento esperado — desacoplar, não travar.** A janela comercial **Após-chaves** passa a ser
+um conceito **derivado**, calculado pelo motor de absorção:
+
+```text
+inicio_apos_chaves  = fim da Obra + 1
+duracao_apos_chaves = 12    (constante do padrão, não campo)
+```
+
+O evento `pos_obra` do cronograma **continua existindo com duração livre**, servindo de âncora de
+custos pós-entrega. Os dois deixam de ser a mesma coisa.
+
+Essa escolha resolve o conflito **sem migração de dados**: nenhum estudo precisa ter
+`pos_obra.duracao_meses` reescrito, e as linhas de custo ancoradas continuam com a duração que
+sempre tiveram. O que muda é só de onde a **absorção** tira sua janela.
+
+**Escopo.** Derivar a janela Após-chaves no helper de absorção a partir do fim da Obra, ignorando
+`pos_obra.duracao_meses`; remover o parâmetro de override `posObraMeses`; manter o evento
+`pos_obra` editável no Cronograma, com rótulo que deixe claro que ali é **período de custos
+pós-entrega**, não a janela de vendas; atualizar gráfico, validações e defaults.
+
+**Alternativa considerada e descartada.** Travar `pos_obra.duracao_meses = 12` e criar um evento
+novo para manutenção: exigiria migração, quebraria âncoras de custo existentes e criaria um sexto
+evento no gantt sem ganho analítico.
 
 **Fora de escopo.** Condição à vista para novas vendas (EVI-015). Repasse (EVI-014). Renomear rótulo
 (EVI-004).
@@ -361,25 +452,30 @@ validações; definir a estratégia para dados existentes; atualizar gráfico e 
 **Arquivos prováveis.** `frontend/fluxo-shared.ts`, tela de Cronograma, modal de absorção,
 `backend/rotas/avancado.ts`, possível migração.
 
-**Impacto em estudos existentes.** **O maior desta rodada.** **Migração:** provável.
+**Impacto em estudos existentes.** Alto no resultado — a janela de vendas muda em todo estudo cujo
+`pos_obra.duracao_meses` ≠ 12. **Mas nenhuma linha de custo é afetada**, que era o risco escondido.
+**Migração:** **não** — nenhum dado é reescrito.
 
 **Compatibilidade obrigatória — a issue não pode ser implementada antes de responder:**
-quantos estudos têm duração diferente; se estudos aprovados serão preservados; se a regra vale só
-para estudos novos; se haverá migração ou aviso de recálculo; como ficam os cenários salvos.
+quantos estudos têm duração diferente de 12 (é o levantamento da EVI-002); se estudos **aprovados**
+serão preservados ou recalculados; como ficam os cenários salvos.
 
 **Critérios de aceite.**
-- [ ] Novos estudos usam 12 meses.
-- [ ] O primeiro mês é imediatamente posterior à Obra.
-- [ ] O usuário não cria duração diferente no modelo novo.
-- [ ] A absorção residual fecha em 100%.
-- [ ] O tratamento legado é explícito e testado.
-- [ ] **Nenhum recebimento é truncado pelo horizonte** (ver EVI-011).
+- [ ] A janela de absorção Após-chaves tem 12 meses, começando no mês seguinte ao fim da Obra.
+- [ ] A duração é **constante do motor**, não campo editável, e não há override.
+- [ ] **Alterar `pos_obra.duracao_meses` no Cronograma não muda mais a absorção** — só as âncoras de custo.
+- [ ] **Linha de custo ancorada em `pos_obra` mantém a duração que tinha**, testado explicitamente.
+- [ ] A absorção residual fecha em 100% sobre os **quatro** períodos de EVI-006.
+- [ ] Nenhum recebimento é truncado pelo horizonte (ver EVI-011).
 
-**Testes mínimos.** Estudo novo; estudo legado com 24 meses; 100% vendido antes da entrega; 100%
-vendido Após-chaves; combinação de percentuais; exportação e gráfico.
+**Testes mínimos.** Estudo novo; estudo legado com `pos_obra` de 24 meses (absorção passa a 12, custo
+de manutenção segue 24); 100% vendido antes da entrega; 100% vendido Após-chaves; combinação de
+percentuais; exportação e gráfico.
 
-**Dependências.** EVI-001, EVI-002 e EVI-005. **Documentação afetada.** `padrao-incorporacao.md`
-§8.5, §10.4.
+**Dependências.** EVI-001, EVI-002, EVI-005 e **EVI-006** — o critério do resíduo de 100% só faz
+sentido depois que a absorção tiver quatro períodos.
+
+**Documentação afetada.** `padrao-incorporacao.md` §8.5, §10.4, §16.2.
 
 ---
 
@@ -398,7 +494,19 @@ conta a tipologia inteira). `receitaMensalLinha`, em `frontend/fluxo-caixa-motor
 
 **Consequência confirmada:** `ctxCusto.receitaTotal` é montado com `vglLinha(vgvLinha(...))`, de
 modo que **comissão e RET incidem também sobre a unidade permutada fisicamente**, que nunca gera
-caixa. Custos com base `pct_receita` herdam essa base.
+caixa. Custos com base `pct_receita` herdam essa base (`fluxo-shared.ts` →
+`case 'pct_receita': (valor / 100) * (ctx.receitaTotal ?? ctx.vgvTotal)`).
+
+**Segundo achado — corretagem pode ser contada duas vezes.** Ela existe em **dois lugares**:
+
+1. `fluxo_pagamento.comissao` por Grupo — deduz o recebível **quando `tipo === 'destacada'`**;
+2. a linha de custo **obrigatória** "Corretagem de vendas" em `diretos`, sempre `pct_vgv` (#121),
+   criada automaticamente em todo estudo.
+
+O default é `tipo: 'embutida'`, que **não** deduz — nesse caminho a conta fecha, porque só a linha
+de custo conta. Mas ao marcar **Destacada** na tela, a corretagem passa a reduzir a receita **e**
+continuar como custo: **contada duas vezes**. Esta issue tem de declarar onde a corretagem vive de
+verdade e garantir uma fonte só; a mecânica de desagregação está em **EVI-022**.
 
 **Comportamento esperado.** Por mês, Grupo e tipologia:
 
@@ -426,7 +534,7 @@ RET deixam de incidir sobre unidade permutada. Tem que ser comunicado. **Migraç
 - [ ] Existe série mensal explícita de contratação.
 - [ ] A soma mensal fecha com o valor contratado acumulado.
 - [ ] A abertura por Grupo e tipologia fecha com o total.
-- [ ] A corretagem usa a mesma série, com base declarada.
+- [ ] A corretagem usa a mesma série, com base declarada, e **existe em um só lugar** — marcar "Destacada" não pode dobrar o valor.
 - [ ] Juros não entram na contratação.
 - [ ] Permuta física não gera contratação de caixa.
 - [ ] A visão anual soma os meses sem recalcular a lógica.
@@ -436,6 +544,107 @@ diferentes; vários Grupos com absorções diferentes; arredondamento de área e
 e sem permuta física; estoque final.
 
 **Dependências.** EVI-001. **Documentação afetada.** `padrao-incorporacao.md` §12, §16.3.
+
+---
+
+## EVI-022 — Desagregar deduções do recebível e derivar impostos mensais
+
+**Título:** `fix(fluxo): desagregar deduções do recebível e derivar impostos mensais`
+**Label:** `bug` · **Prioridade:** P1 · **Classe:** M2 · **Risco:** alto
+**Onda: 2** (o número é maior porque nasceu na segunda auditoria, não porque executa depois)
+
+**Contexto.** Um app de viabilidade precisa responder "quanto o cliente pagou" e "quanto disso
+sobrou" como **duas grandezas separadas**. Hoje o Avançado só sabe a segunda: as deduções estão
+dobradas dentro do recebível, e não existem como série.
+
+**Comportamento atual confirmado.** Em `frontend/fluxo-caixa-motor.ts`:
+
+```
+fator     = vglLinha(vgv, linha.fluxo_pagamento) / vgv
+recebivel = venda * fator
+```
+
+e `vglLinha`, em `frontend/fluxo-shared.ts`, subtrai do VGV a **comissão destacada** e o **RET**:
+
+```
+if (fp.comissao?.ativo && fp.comissao?.tipo === 'destacada') liquido -= vgv * (fp.comissao.pct / 100);
+if (fp.ret?.ativo)                                            liquido -= vgv * (fp.ret.pct  / 100);
+```
+
+Consequências, todas verificadas:
+
+1. **`receitaMensal` não é "recebimento do cliente"** — é recebimento já líquido de corretagem e
+   RET. O Doc 1 §4.6 define Receita Bruta como a soma do que **o cliente paga**; a corretagem é
+   desembolso do incorporador, não desconto na nota do comprador.
+2. **Não existe série mensal de imposto nem de corretagem.** Elas nunca aparecem no fluxo como
+   linha — só encolhem a receita por dentro.
+3. **O desconto é multiplicativo**, aplicado sobre o VGV da linha, e não subtração explícita mês a
+   mês sobre o caixa recebido.
+4. **O regime tributário detalhado não participa.** O motor não lê `regime_tributario` nem
+   `aliquota_pis/cofins/csll/irpj/itbi_pct`. O único imposto que existe no Avançado é o **RET por
+   Grupo**, marcado no modal de Fluxo de Pagamento e **desligado por default**
+   (`ret: { ativo: false }`). Ou seja: há **duas entradas fiscais concorrentes** no app — uma viva
+   (o checkbox RET do Grupo) e uma morta (o bloco de regime da aba Financeiro).
+5. Na Proforma (Preliminar) o imposto **é** calculado, de outra forma:
+   `imposto = vgv × (sujeito_ret ? aliquota_ret_pct : imposto_percentual) / 100`. Preliminar e
+   Avançado usam modelos fiscais diferentes para o mesmo empreendimento.
+
+**Comportamento esperado.** O motor passa a produzir, por mês:
+
+```text
+recebimento_bruto_t     — o que o cliente pagou, sem nenhuma dedução
+corretagem_t            — despesa comercial sobre a contratação do mês
+imposto_t               — tributo sobre a receita do mês, conforme o regime
+recebimento_liquido_t   = recebimento_bruto_t − corretagem_t − imposto_t
+```
+
+com `recebimento_bruto_t` alimentando a Receita Bruta (EVI-017) e `corretagem_t`/`imposto_t`
+disponíveis como séries próprias para o fluxo, para a permuta financeira (EVI-018) e para os
+relatórios (EVI-021).
+
+**Escopo.**
+
+- Remover o `fator` multiplicativo de `receitaMensalLinha`, mantendo o valor cheio no recebimento.
+- Criar a série mensal de **corretagem**, resolvendo a duplicidade apontada em EVI-008: uma fonte
+  só, com a outra desativada ou convertida.
+- Criar a série mensal de **imposto**, decidindo explicitamente qual das duas entradas fiscais
+  concorrentes é a oficial — o RET por Grupo ou o regime da aba Financeiro. **As duas não podem
+  coexistir.**
+- Reconciliar Preliminar e Avançado: ou compartilham a regra de imposto, ou a diferença fica
+  documentada e justificada.
+- Recalcular a base de `pct_receita` sobre a grandeza correta e declarar qual é.
+
+**Fora de escopo.** Juros ao cliente e carteiras (EVI-012 a EVI-016). Financiamento à produção
+(EVI-019). Alterar alíquotas ou criar regime novo — esta issue **liga** o que já existe, não
+inventa tributo.
+
+**Arquivos prováveis.** `frontend/fluxo-caixa-motor.ts` (`receitaMensalLinha`, `fator`),
+`frontend/fluxo-shared.ts` (`vglLinha`, `resolverBase`), `frontend/tela-fluxo-receitas.ts` (modal de
+pagamento), `frontend/tela-fluxo-custos.ts` (linha obrigatória de corretagem).
+
+**Impacto em estudos existentes.** **Alto e visível.** A receita exibida sobe (passa a ser bruta) e
+aparecem duas linhas de dedução novas. O **Resultado final não deve mudar** — se mudar, é sinal de
+que havia contagem dupla ou ausente, e o caso tem de ser investigado, não acomodado.
+**Migração:** não; é reinterpretação de cálculo, não de dado.
+
+**Critérios de aceite.**
+- [ ] `recebimento_bruto` de um Grupo sem juros é igual às suas vendas contratadas.
+- [ ] Corretagem e imposto aparecem como séries mensais próprias, somando ao total do empreendimento.
+- [ ] **Nenhuma dedução é aplicada em dois lugares** — marcar "Destacada" não muda o Resultado.
+- [ ] Existe uma única entrada fiscal oficial no Avançado, e a outra foi removida ou migrada.
+- [ ] O Resultado final de um estudo existente é **idêntico** antes e depois, ou a diferença está
+      explicada como correção de defeito.
+- [ ] A base de `pct_receita` está declarada e testada.
+- [ ] Preliminar e Avançado usam a mesma definição de imposto, ou a divergência está documentada.
+
+**Testes mínimos.** Comissão embutida; comissão destacada; RET ligado e desligado; os quatro
+cruzamentos; estudo com permuta física (para pegar a base errada da EVI-008); custo em
+`pct_receita`; comparação de Resultado antes/depois num estudo real; fixture dourada.
+
+**Dependências.** EVI-001 e EVI-008. **É portão para EVI-017, EVI-018 e EVI-019.**
+
+**Documentação afetada.** `docs/viabilidade/padrao-incorporacao.md` §11, §14, §15.2, §16.3,
+Anexo A (C6).
 
 ---
 
@@ -459,7 +668,13 @@ promete. O próprio código o marca como "informativo; não altera o fluxo".
 | VGV vendável | potencial menos permuta física |
 | Vendas contratadas | valor fechado, sem juros futuros |
 | Juros recebidos | remuneração financeira dos clientes |
-| Receita Bruta — VGV | soma dos recebimentos dos clientes |
+| Receita Bruta — VGV | soma dos recebimentos **brutos** dos clientes |
+| Receita líquida | Receita Bruta menos corretagem e impostos |
+
+> **A distinção bruto × líquido é o ponto sensível.** Hoje a única série de receita do Avançado já
+> é líquida de comissão destacada e RET, dobradas num fator (ver EVI-022). Enquanto isso não for
+> desagregado, "Receita Bruta" e "Receita líquida" não têm como ser nomes diferentes — são o mesmo
+> número.
 
 **Escopo.** Inventariar usos de `vgvTotal`, `receitaBrutaVgv`, `receitaTotal` e equivalentes; propor
 campos novos e aliases de compatibilidade; atualizar nomenclatura funcional; definir depreciação
@@ -484,7 +699,10 @@ base estava errada (EVI-008). **Migração:** não.
 **Testes mínimos.** Compatibilidade dos objetos de cálculo; KPIs; CSV/PDF; cenários; análise de
 mercado que consome preço/VGV; comparação antes/depois em estudo sem juros.
 
-**Dependências.** EVI-008. **Documentação afetada.** `padrao-incorporacao.md` §14, §19.1.
+**Dependências.** EVI-008 e **EVI-022** — a taxonomia só é implementável depois que bruto e líquido
+forem grandezas distintas no motor.
+
+**Documentação afetada.** `padrao-incorporacao.md` §14, §19.1.
 
 ---
 
@@ -572,9 +790,14 @@ cálculo; erro visível quando um evento ficar fora do horizonte.
 - [ ] Nenhum recebimento é deslocado para o último mês por falta de espaço.
 - [ ] A última parcela da tabela curta aparece no mês correto.
 - [ ] A carteira termina em zero.
-- [ ] Dívidas terminam em zero.
 - [ ] A visão anual cobre todos os meses.
 - [ ] O horizonte reage a mudanças de cronograma e de pagamento.
+- [ ] *(condicional — só verificável após EVI-019)* Dívidas terminam em zero.
+
+> **Sobre o critério condicional.** A função de derivação deve **já prever** a quitação do
+> financiamento à produção entre suas entradas, mas o critério só pode ser exercido quando existir
+> dívida a quitar. Deixe o ponto de extensão pronto e o teste marcado como pendente — não remova a
+> entrada da fórmula, senão EVI-019 terá de reabrir esta issue.
 
 **Testes mínimos.** Tabela curta originada no último mês pré-entrega; manutenção maior que
 Após-chaves; financiamento com prazo longo; repasse após a Obra; cenário sem recebíveis longos;
@@ -835,9 +1058,18 @@ venda Após-chaves; horizonte completo; fixture dourada.
 **Contexto.** No padrão aprovado, `Receita Bruta — VGV = soma de todos os recebimentos dos clientes`,
 juros incluídos — e pode superar as vendas contratadas.
 
-**Comportamento atual confirmado.** `receitaBrutaVgv = vgvTotal − vgvPermutaFisica` (#188), que é o
-**VGV vendável**: uma grandeza de contratação, sem juros, marcada no código como "informativo; não
-altera o fluxo". O nome exibido promete o conceito do padrão e entrega outro.
+**Comportamento atual confirmado — dois problemas, não um.**
+
+1. `receitaBrutaVgv = vgvTotal − vgvPermutaFisica` (#188) é o **VGV vendável**: grandeza de
+   contratação, sem juros, marcada no código como "informativo; não altera o fluxo". O nome promete
+   o conceito do padrão e entrega outro.
+2. **A série de receita do fluxo também não serve de base.** `receitaMensal` já é **líquida** de
+   comissão destacada e RET, dobradas no `fator` de `receitaMensalLinha`. Não é "recebimento do
+   cliente" — o cliente paga o valor cheio, e a corretagem é desembolso do incorporador.
+
+> ⚠️ **Por isso esta issue não é "somar juros na série existente".** Sem a desagregação da EVI-022,
+> o invariante não fecha **nem com taxa zero**: daria
+> `contratação × (1 − comissão − RET)`, não `contratação`.
 
 **Comportamento esperado.** Composição: recebimentos à vista, sinais, parcelas de tabela curta,
 parcelas do componente Obra da tabela longa, repasse, novas vendas Após-chaves à vista e os juros
@@ -863,18 +1095,21 @@ transição**; definir a base dos percentuais de custo sem mudança silenciosa.
 **Impacto em estudos existentes.** **Alto** — o KPI muda de valor. Comunicar. **Migração:** não.
 
 **Critérios de aceite.**
-- [ ] O total é a soma das séries mensais de clientes; funding não entra.
+- [ ] O total é a soma das séries mensais de recebimento **bruto**; funding não entra.
 - [ ] Juros aparecem separadamente.
-- [ ] Estudo com taxa zero fecha `Receita Bruta = vendas contratadas`.
-- [ ] Estudo com juros apresenta Receita Bruta superior.
+- [ ] Estudo com taxa zero fecha `Receita Bruta = vendas contratadas` — **exatamente**, sem o desconto de comissão/RET que existe hoje.
+- [ ] Estudo com juros apresenta Receita Bruta superior às vendas contratadas.
+- [ ] Corretagem e imposto aparecem como dedução **explícita**, não embutida na receita.
 - [ ] Grupo e tipologia fecham com o total.
 - [ ] KPI, tabela, cenários e exportação usam a mesma fonte.
 
-**Testes mínimos.** Só à vista; só curta; só longa; combinação; taxa zero; Após-chaves; repasse;
-reconciliação total; fixture dourada.
+**Testes mínimos.** Só à vista; só curta; só longa; combinação; taxa zero **com comissão destacada
+ligada** (o caso que hoje quebraria o invariante); Após-chaves; repasse; reconciliação total;
+fixture dourada.
 
-**Dependências.** EVI-008 e EVI-012 a EVI-016. **Documentação afetada.** `padrao-incorporacao.md`
-§14.
+**Dependências.** EVI-008, **EVI-022** e EVI-012 a EVI-016.
+
+**Documentação afetada.** `padrao-incorporacao.md` §14.
 
 ---
 
@@ -886,10 +1121,15 @@ reconciliação total; fixture dourada.
 **Contexto.** A permuta financeira sai do caixa no mesmo mês em que a incorporadora recebe a receita
 correspondente, e o estudo precisa das duas visões: sem e com descontos de imposto e corretagem.
 
-**Comportamento atual confirmado — parte já entregue.** A #195 fez a permuta física reduzir unidades
-vendidas, VGV e Resultado no Avançado; a #196 fez a permuta financeira do Terreno ser deduzida da
-receita. O que existe é **uma visão só** — a dedução aplicada ao fluxo. As duas séries paralelas não
-são calculadas nem expostas.
+**Comportamento atual confirmado — parte já entregue, mas a fórmula-alvo não tem insumo.** A #195
+fez a permuta física reduzir unidades vendidas, VGV e Resultado no Avançado; a #196 fez a permuta
+financeira do Terreno ser deduzida da receita. O que existe é **uma visão só**.
+
+> ⚠️ **As duas séries que a fórmula consome não existem hoje.** `imposto_dedutivel_t` e
+> `corretagem_dedutivel_t` não são produzidos pelo motor: corretagem e RET vivem dobrados no
+> `fator` do recebível, e o regime tributário da aba Financeiro é ignorado. Além disso, o app faz
+> **exatamente o desconto multiplicativo** que esta issue proíbe. Sem EVI-022 não há o que
+> subtrair.
 
 **Comportamento esperado.**
 
@@ -926,32 +1166,45 @@ regime tributário geral. Valor presente da permuta.
 **Testes mínimos.** Sem deduções; só imposto; só corretagem; ambas; receita com juros; repasse;
 venda Após-chaves; segmentos residencial e não residencial.
 
-**Dependências.** EVI-008 e EVI-017. **Documentação afetada.** `padrao-incorporacao.md` §15.2.
+**Dependências.** EVI-008, **EVI-022** (fornece `imposto_t` e `corretagem_t` como séries) e EVI-017.
+
+**Documentação afetada.** `padrao-incorporacao.md` §15.2.
 
 ---
 
-## EVI-019 — Integrar (ou remover) o financiamento à produção
+## EVI-019 — A aba Financeiro do Avançado não alimenta o motor: decidir o destino do Bloco G
 
-**Título:** `feat(funding): integrar (ou remover) o financiamento à produção`
+**Título:** `fix(financeiro): a aba Financeiro do Avançado não alimenta o motor — decidir o destino do Bloco G`
 **Label:** `bug` · **Prioridade:** P3 · **Classe:** M2/P3 · **Risco:** muito alto
 
 **Contexto.** Financiamento à produção é dívida da incorporadora para financiar custos elegíveis, e
-deve permanecer totalmente separado do repasse.
+deve permanecer totalmente separado do repasse. Mas o problema é maior do que o financiamento.
 
-**Comportamento atual confirmado — feature invisível.** Os cinco parâmetros **existem em duas
-pontas** e não têm efeito nenhum:
+**Comportamento atual confirmado — a aba Financeiro inteira é inerte.** Não são cinco campos: é o
+**Bloco G completo**. `backend/rotas/estudos.ts` os lista apenas como colunas persistíveis, e
+`frontend/fluxo-caixa-motor.ts` **não referencia nenhum deles**:
 
-- `schema.json` declara `financiamento_obra_pct`, `financiamento_juros_aa`,
-  `financiamento_sistema_amortizacao`, `financiamento_prazo_meses`, `financiamento_carencia_meses`;
-- `frontend/tela-financeiro.ts` renderiza os controles correspondentes;
-- **`frontend/fluxo-caixa-motor.ts` não contém nenhuma referência a `financiamento_*`.**
+| Grupo | Campos mortos |
+|---|---|
+| Financiamento à produção | `financiamento_obra_pct`, `_juros_aa`, `_sistema_amortizacao`, `_prazo_meses`, `_carencia_meses` |
+| Estrutura de capital | `estrutura_capital_proprio_pct`, `_financiamento_pct`, `_investidores_pct` |
+| Investidor | `investidor_aporte_valor`, `_retorno_tipo`, `_juros_aa`, `_carencia_meses`, `_parcelas` |
+| Regime tributário | `regime_tributario`, `aliquota_pis/cofins/csll/irpj/itbi_pct`, `imposto_sobre_permuta_fisica` |
+| Correção e juros | `indice_correcao`, `_taxa_aa`, `juros_financeiros_aa`, `juros_inicio_cobranca_mes` |
 
-O usuário preenche campos que não alteram o fluxo, sem aviso. Isso viola a convenção do monorepo de
-que **UI e API andam sempre juntas**.
+`frontend/tela-financeiro.ts` renderiza controles para todos. O usuário preenche uma aba inteira que
+não altera número nenhum, sem aviso — violação frontal da convenção de que **UI e API andam sempre
+juntas**.
 
-> **Esta issue é, antes de tudo, uma decisão.** Há duas saídas legítimas — integrar ao fluxo mensal,
-> ou remover as duas pontas. Manter como está não é opção. O escopo abaixo cobre o caminho
-> "integrar"; se o autor escolher remover, a issue vira U1/P3 e encolhe drasticamente.
+> **Esta issue é, antes de tudo, uma decisão — e ela se divide.** O bloco **regime tributário** sai
+> daqui: ele é insumo de EVI-022, que precisa escolher entre o regime da aba Financeiro e o RET por
+> Grupo como entrada fiscal oficial. O que sobra para esta issue é **funding**: financiamento à
+> produção, estrutura de capital, investidor e correção monetária.
+>
+> Para cada um dos quatro, a issue tem de escolher **integrar** ou **remover as duas pontas**.
+> Manter como está não é opção. O escopo abaixo cobre o caminho "integrar" do financiamento à
+> produção, que é o mais definido pelo Doc 1 §4.12; estrutura de capital, investidor e correção
+> podem legitimamente ser removidos se não houver modelo aprovado para eles.
 
 **Comportamento esperado (caminho integrar).**
 
@@ -968,12 +1221,14 @@ saldo_t     = saldo_anterior + liberacao_t + juros_t − amortizacao_t
 com liberação condicionada a exposição mínima, período elegível, percentual financiado e limite da
 linha.
 
-**Escopo.** Auditar os parâmetros existentes; definir custos elegíveis; implementar gatilho e
-liberações; calcular juros; política de amortização; expor saldo e endividamento máximo; separar
-fluxo livre de fluxo após funding; garantir quitação final.
+**Escopo.** Auditar os parâmetros existentes; **decidir, campo a campo, entre integrar e remover**;
+definir custos elegíveis; implementar gatilho e liberações; calcular juros; política de amortização;
+expor saldo e endividamento máximo; separar fluxo livre de fluxo após funding; garantir quitação
+final. Todo campo que ficar sem implementação nesta issue **sai da tela**.
 
-**Fora de escopo.** Confundir repasse com liberação bancária. Inventar contrato bancário não
-informado. Antecipação de repasse. Tratar funding como Receita Bruta.
+**Fora de escopo.** O bloco de **regime tributário** — ele pertence a EVI-022. Confundir repasse com
+liberação bancária. Inventar contrato bancário não informado. Antecipação de repasse. Tratar funding
+como Receita Bruta.
 
 **Arquivos prováveis.** `frontend/fluxo-caixa-motor.ts`, `frontend/tela-financeiro.ts`, `schema.json`
 e migração se os campos não bastarem.
@@ -988,13 +1243,16 @@ fluxo diferente. **Migração:** possível; se houver, **bumpar a `versao`**.
 - [ ] O repasse pode gerar caixa para amortização sem ser classificado como funding.
 - [ ] O saldo final da dívida é zero e o endividamento máximo é calculado.
 - [ ] Fluxo livre e fluxo final reconciliam.
+- [ ] **Nenhum campo do Bloco G continua na tela sem efeito no motor** — cada um foi implementado ou removido.
+- [ ] O critério condicional de EVI-011 ("dívidas terminam em zero") passa a ser exercível e é exercido.
 
 **Testes mínimos.** Sem financiamento; exposição mínima não atingida; primeira liberação; várias
 liberações; amortização antecipada se suportada; quitação no repasse; taxa zero; limite de
 financiamento; horizonte final.
 
-**Dependências.** EVI-001, EVI-011 e EVI-017. **Documentação afetada.** `padrao-incorporacao.md`
-§17, Anexo B.
+**Dependências.** EVI-001, EVI-011, EVI-017 e **EVI-022** (que resolve o regime tributário antes).
+
+**Documentação afetada.** `padrao-incorporacao.md` §17, Anexo B.
 
 ---
 

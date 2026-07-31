@@ -28,21 +28,37 @@ está em `docs/rodada-5-evi-2026-07-31.md`.
 
 ---
 
-## Estado do backlog — NENHUMA rodada ativa · 21 issues EVI aguardando aprovação
+## Estado do backlog — 🔴 RODADA 5 ABERTA · 22 issues EVI (#220–#241)
 
-🟡 **Não há rodada aberta, mas há uma lista preparada.** A sessão documental de **2026-07-31**
-auditou o app contra os documentos EVI e deixou **21 issues prontas e NÃO abertas** em
-`docs/issues-evi-propostas-2026-07-31.md` (identificadores locais `EVI-001`…`EVI-021`), com a matriz
-de evidência em `docs/rodada-5-evi-2026-07-31.md`.
+**A Rodada 5 foi aberta em 2026-07-31.** As **22 issues #220–#241** nasceram da auditoria do app
+contra os documentos EVI e estão **todas abertas e nenhuma implementada**.
 
-> ⚠️ **Elas dependem de aprovação explícita do autor para serem abertas** — a instrução da sessão
-> exige isso, e receber o documento não equivale a aprovar a abertura. Enquanto não forem abertas,
-> **não existem no GitHub**: nenhum número, nenhuma issue. Quem abrir atualiza esta seção **na mesma
-> alteração**, transformando este bloco na Rodada 5.
+- **Mapa mestre:** `docs/issues-evi-propostas-2026-07-31.md` — corpo completo de cada uma, com a
+  correspondência `EVI-0NN → #NNN`;
+- **Evidência:** `docs/rodada-5-evi-2026-07-31.md` — matriz conceito → `arquivo:linha` → issue, com
+  status e classe de impacto (D0/U1/M2/P3/I4).
 
-A Rodada 4 foi **concluída em 2026-07-29**: as 35 issues (#165–#169 + #172–#201) estão mergeadas na
-`main`. Trabalho novo nasce de **issue nova ou de pedido direto do autor**, na branch própria
-(`fix/…`, `feat/…`, `claude/…`) a partir da `main` atualizada, com PR contra a `main`.
+**Ordem de execução é por onda, não por número.** `EVI-022` (#228) nasceu na 2ª auditoria e executa
+na Onda 2 — os IDs são ordem de criação.
+
+| Onda | Issues | Tema |
+|---|---|---|
+| **0** | #220, #221 | Portões: fixture dourada e inventário de dados legados |
+| **1** | #222 … #226 | Nomenclatura (U1) e cronograma (M2) |
+| **2** | #227, **#228**, #229 … #231 | Fundação comercial, fiscal e temporal |
+| **3** | #232 … #237 | Recebíveis, carteiras e Receita Bruta |
+| **4** | #238, #239 | Terreno e funding |
+| **5** | #240, #241 | Invariantes, UI e relatórios |
+
+**Três ordens não negociáveis:** #220/#221 antes de qualquer issue M2 · #231 antes de #232/#233 ·
+**#228 antes de #237, #238 e #239**. Cada issue traz suas dependências no corpo — leia antes de
+pegar.
+
+> ⚠️ **Quem encerrar a rodada atualiza esta seção na mesma alteração.** A Rodada 4 nasceu porque
+> #165–#169 ficaram abertas uma rodada inteira sem ninguém perceber, com este arquivo dizendo "não
+> há issue aberta".
+
+Rodadas anteriores, todas mergeadas na `main`:
 
 | Rodada | Escopo | Estado |
 |--------|--------|--------|
@@ -50,6 +66,7 @@ A Rodada 4 foi **concluída em 2026-07-29**: as 35 issues (#165–#169 + #172–
 | 2 — Etapas 1–8 | issues #33–#56 | ✅ concluída |
 | 3 — Sessões S1–S20 | issues #71–#132 | ✅ concluída |
 | 4 — planilha `lista_bugs.xlsx` | #165–#169 + #172–#201 | ✅ concluída |
+| **5 — EVI** | **#220–#241** | 🔴 **aberta, 0 implementadas** |
 
 **Os quatro mapas mestres foram apagados em 2026-07-31**, com todas as issues mergeadas: eram
 backlog fechado e não disparavam mais trabalho. Os disparos antigos (`Prossiga para os issues do
