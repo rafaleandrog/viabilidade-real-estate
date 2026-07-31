@@ -15,16 +15,34 @@ App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell U
 - `docs/shell/*.md` no monorepo `urbiverso/urbiverso` — fonte de verdade da plataforma
 
 **Contexto de negócio (consultivo — NÃO governa comportamento):**
-- `docs/viabilidade/padrao-incorporacao.md` — como o app raciocina sobre viabilidade de **Incorporação** (conceito, premissas, motor, indicadores). Leia-o quando precisar de contexto de negócio para implementar uma mudança ou resolver um issue. ⚠️ É **descritivo e consultivo**: não é contrato nem autoriza alterar a lógica existente. Se divergir do código/`schema.json`/spec, **o código está certo e o documento é que deve ser corrigido** — nunca ajuste o comportamento para casar com ele. Mudança de lógica nasce de issue/spec, não deste doc.
+São **dois documentos com papéis distintos**. ⚠️ A mesma ressalva vale para os dois: são
+**consultivos**, não são contrato e **não autorizam alterar a lógica existente**. Se divergirem do
+código/`schema.json`/spec, **o código está certo** — a divergência vira **issue**, nunca um ajuste
+automático de comportamento.
+
+- `docs/viabilidade/inteligencia-evi-incorporacao.md` — **significado econômico**: como a empresa raciocina sobre viabilidade de Incorporação (premissas, motor de vendas e recebíveis, carteira, repasse, indicadores de decisão). É conhecimento de negócio, **não descreve o app** e **não governa o runtime**. Também não deve ser rebaixado para casar com uma limitação atual do app.
+- `docs/viabilidade/padrao-incorporacao.md` — **dinâmica funcional**: como o app representa esse conhecimento. Leia-o quando precisar de contexto para implementar uma mudança ou resolver um issue. Ele rotula explicitamente cada trecho como **Comportamento vigente** (o que o código faz hoje), **Modelo funcional de referência** (a regra aprovada) ou **Evolução dependente de issue** — não presuma que uma regra descrita ali já está implementada. Os **anexos A–E** guardam o material do app instalado: convenções de cálculo, dicionário de campos reais, modelo de dados, armadilhas conhecidas e API.
+
+A conciliação entre os dois e o código — conceito a conceito, com evidência em `arquivo:linha` —
+está em `docs/rodada-5-evi-2026-07-31.md`.
 
 ---
 
-## Estado do backlog — NENHUMA rodada ativa
+## Estado do backlog — NENHUMA rodada ativa · 21 issues EVI aguardando aprovação
 
-🟢 **Não há backlog ativo.** A Rodada 4 foi **concluída em 2026-07-29**: as 35 issues
-(#165–#169 + #172–#201) estão mergeadas na `main`. Trabalho novo nasce de **issue nova ou de
-pedido direto do autor**, na branch própria (`fix/…`, `feat/…`, `claude/…`) a partir da `main`
-atualizada, com PR contra a `main`.
+🟡 **Não há rodada aberta, mas há uma lista preparada.** A sessão documental de **2026-07-31**
+auditou o app contra os documentos EVI e deixou **21 issues prontas e NÃO abertas** em
+`docs/issues-evi-propostas-2026-07-31.md` (identificadores locais `EVI-001`…`EVI-021`), com a matriz
+de evidência em `docs/rodada-5-evi-2026-07-31.md`.
+
+> ⚠️ **Elas dependem de aprovação explícita do autor para serem abertas** — a instrução da sessão
+> exige isso, e receber o documento não equivale a aprovar a abertura. Enquanto não forem abertas,
+> **não existem no GitHub**: nenhum número, nenhuma issue. Quem abrir atualiza esta seção **na mesma
+> alteração**, transformando este bloco na Rodada 5.
+
+A Rodada 4 foi **concluída em 2026-07-29**: as 35 issues (#165–#169 + #172–#201) estão mergeadas na
+`main`. Trabalho novo nasce de **issue nova ou de pedido direto do autor**, na branch própria
+(`fix/…`, `feat/…`, `claude/…`) a partir da `main` atualizada, com PR contra a `main`.
 
 | Rodada | Escopo | Documento | Estado |
 |--------|--------|-----------|--------|

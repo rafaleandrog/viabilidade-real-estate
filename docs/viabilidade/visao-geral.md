@@ -40,3 +40,4 @@ No modo **Núcleo**, o estudo referencia imóveis do Núcleo compartilhado — *
 ## Veja também
 
 - [Modelo de dados](modelo-de-dados) · [Fórmulas](formulas) · [Benchmarks](benchmarks) · [Apelo Comercial](apelo-comercial) · [Análise de Mercado](analise-mercado) · [Permissões](permissoes) · [Exportação](exportacao)
+- Incorporação: [Padrão de Viabilidade](padrao-incorporacao) (dinâmica funcional do app) · [Inteligência EVI](inteligencia-evi-incorporacao) (significado econômico de negócio)
