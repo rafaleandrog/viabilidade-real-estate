@@ -14,7 +14,7 @@ ordem: 1
 
 App do UrbiVerso que substitui planilhas dispersas por uma aplicação centralizada: cria estudos de viabilidade, calcula automaticamente uma **Proforma** com indicadores financeiros, compara cenários, roda análise de sensibilidade e avalia o **apelo comercial** do imóvel com IA.
 
-**Tipos de empreendimento:** Loteamento e Incorporação. **Nível de análise (MVP):** Estudo Preliminar (indicadores estáticos, sem dimensão temporal). Projeto Avançado (fluxo de caixa, TIR, VPL) é v2.
+**Tipos de empreendimento:** Loteamento e Incorporação. **Níveis de análise:** **Preliminar** (indicadores estáticos, sem dimensão temporal) e **Avançado** (fluxo de caixa mensal, TIR, VPL, payback e exposição), este último com páginas próprias descritas abaixo.
 
 ## Para usuários
 
@@ -41,3 +41,4 @@ No modo **Núcleo**, o estudo referencia imóveis do Núcleo compartilhado — *
 
 - [Modelo de dados](modelo-de-dados) · [Fórmulas](formulas) · [Benchmarks](benchmarks) · [Apelo Comercial](apelo-comercial) · [Análise de Mercado](analise-mercado) · [Permissões](permissoes) · [Exportação](exportacao)
 - Incorporação: [Padrão de Viabilidade](padrao-incorporacao) (dinâmica funcional do app) · [Inteligência EVI](inteligencia-evi-incorporacao) (significado econômico de negócio)
+  - Os dois são **consultivos**. O modelo de recebíveis por **safras** que eles descrevem — safra, componentes de pagamento, primeiro vencimento em `s + 1`, PMT, carteira e repasse — é **modelo funcional de referência, ainda não implementado**; depende das issues da Rodada 5. Ver `docs/revisao-recebiveis-calliandra-2026-07-31.md`.

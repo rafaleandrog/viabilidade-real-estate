@@ -35,6 +35,29 @@ Marketing global/estrutura (+ stand de vendas no Loteamento) e gestão/indiretos
 
 Menor preço de venda por m² para a margem atingir o **piso do benchmark `resultado_final`**. Resolvido por bisseção sobre o preço (valor único, mesmo na Incorporação). Ver [Benchmarks](benchmarks).
 
+## Fluxo avançado por safras — onde as fórmulas vivem
+
+> ⚠️ **Nada desta seção descreve runtime.** As fórmulas acima são a **Proforma** (Preliminar), que
+> roda hoje em `frontend/proforma.ts`.
+
+As fórmulas do **fluxo de caixa avançado por safras** — contratação bruta/desconto/líquido,
+componentes de pagamento (imediato, prazo fixo, até marco, concentrado), PMT, primeiro vencimento
+em `s + 1`, carteira por safra e repasse — estão nos dois documentos EVI:
+
+- [Inteligência EVI — Incorporação](inteligencia-evi-incorporacao) — significado econômico;
+- [Padrão de Viabilidade — Incorporação](padrao-incorporacao) §11 a §14 — dinâmica funcional, com
+  os cenários dourados no Anexo G.
+
+Elas são **modelo funcional de referência**, não comportamento instalado: o motor atual
+(`frontend/fluxo-caixa-motor.ts`) rateia valor nominal e não tem safra, juros do cliente nem
+carteira. A implementação depende das issues #230–#237 da Rodada 5, cujos corpos ainda precisam de
+emenda — ver `docs/revisao-recebiveis-calliandra-2026-07-31.md`.
+
+> 🚫 **Não copiar fórmula de carteira do arquivo Urbitá.** As fórmulas de carteira daquele arquivo
+> admitem saldo negativo e saldo que volta a crescer depois da última parcela. A recorrência correta
+> é por safra: `saldo_s,s = principal_s`, depois
+> `saldo_s,t = saldo_s,t-1 + juros_s,t − pagamento_s,t`.
+
 ## Interpretações
 
 Onde a spec era ambígua/contraditória, seguimos o app-protótipo e o bom senso: custo do terreno incide sobre a **área do terreno**; “obras” = infraestrutura (Loteamento) / construção+decoração+gestão (Incorporação); projetos e licenciamento no modo % incidem sobre o **VGV**. Detalhes no cabeçalho de `frontend/proforma.ts`.

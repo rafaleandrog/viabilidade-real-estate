@@ -1,6 +1,6 @@
 ---
 titulo: Inteligência EVI — Incorporação
-descricao: Base de conhecimento de negócio sobre viabilidade econômico-financeira de incorporação — premissas, motor de vendas e recebíveis, sequência mensal de cálculo e indicadores de decisão.
+descricao: Base de conhecimento de negócio sobre viabilidade econômico-financeira de incorporação — premissas, contratação por safras, recebíveis, carteiras, repasse, sequência mensal de cálculo e indicadores de decisão.
 tipo: app
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
@@ -29,6 +29,13 @@ O documento foi escrito para ser compreendido sem uma planilha, sistema ou códi
 
 As regras aqui são o padrão adotado pela empresa. Quando uma prática contratual específica diferir do padrão, a diferença deve ser explicitada como premissa do estudo, sem alterar silenciosamente o significado dos indicadores.
 
+A mecânica temporal deste padrão foi reconciliada contra dois modelos reais de referência do projeto Calliandra:
+
+- **financiamento de prazo fixo por safra**, com sinal na contratação e primeira parcela no mês seguinte;
+- **pagamento até um marco comum**, com entrada, parcelas até o fim da Obra e repasse concentrado depois da entrega.
+
+Os dois modelos comprovam a mesma regra estrutural: **cada mês de venda cria uma safra própria de recebimentos**. O caixa de um mês é a soma dos pagamentos imediatos das vendas atuais com as parcelas e liquidações de todas as safras anteriores ainda ativas.
+
 ---
 
 ## Índice
@@ -43,6 +50,7 @@ As regras aqui são o padrão adotado pela empresa. Quando uma prática contratu
 8. [Validações e invariantes](#8-validações-e-invariantes)
 9. [Armadilhas conhecidas](#9-armadilhas-conhecidas)
 10. [Glossário](#10-glossário)
+11. [Cenários de referência para validação](#11-cenários-de-referência-para-validação)
 
 ---
 
@@ -143,8 +151,8 @@ Estas convenções resolvem ambiguidades que, se deixadas em aberto, produzem es
 | **C5** | **Obra física e período comercial “Durante a obra” não são a mesma janela.** | A Obra começa com o Pré-lançamento; as vendas “Durante a obra” começam somente depois do fim do Lançamento. |
 | **C6** | **Não existe período independente de vendas “nas chaves”.** | A entrega é um marco. O estoque remanescente é vendido no período Após-chaves. |
 | **C7** | **Após-chaves dura 12 meses.** | É uma constante do padrão e começa no primeiro mês imediatamente posterior ao fim da Obra. |
-| **C8** | **Tabela curta dura 36 meses.** | É uma constante do padrão. O sinal ocorre na contratação e a primeira parcela no mês seguinte. |
-| **C9** | **Vendas contratadas e Receita Bruta (VGV) são grandezas distintas.** | Contratação mede o valor comercial fechado; Receita Bruta mede o caixa recebido dos clientes, inclusive juros. |
+| **C8** | **A modalidade curta usa 36 parcelas.** | Quando utilizada, possui sinal configurável no mês da contratação e primeira parcela no mês seguinte. |
+| **C9** | **Vendas contratadas e Receita Bruta (VGV) são grandezas distintas.** | Contratação mede o valor comercial líquido fechado; Receita Bruta mede o caixa recebido dos clientes, inclusive juros. |
 | **C10** | **Quando o termo VGV aparece sem qualificador, significa Receita Bruta (VGV).** | Valores sem juros devem ser chamados de VGV potencial, VGV vendável ou vendas contratadas, conforme o caso. |
 | **C11** | **As condições de financiamento direto aplicam-se somente às vendas anteriores à entrega.** | Novas vendas Após-chaves entram integralmente no caixa no mês da venda. |
 | **C12** | **O repasse ocorre integralmente no primeiro mês Após-chaves.** | Não há antecipação, repasse parcial ou novo saldo de repasse criado por vendas posteriores à entrega. |
@@ -154,6 +162,11 @@ Estas convenções resolvem ambiguidades que, se deixadas em aberto, produzem es
 | **C16** | **Existe uma única carteira econômica real.** | Seus componentes podem ser exibidos separadamente, mas nenhum saldo pode ser negativo e todos precisam fechar em zero. |
 | **C17** | **Receitas são positivas e despesas são negativas no fluxo.** | A consolidação é feita por soma algébrica, sem inversões de sinal na apresentação final. |
 | **C18** | **Taxas anuais são convertidas para taxas mensais equivalentes.** | Não se misturam juros simples e compostos no mesmo fluxo. |
+| **C19** | **Cada mês de contratação cria uma safra própria.** | O recebimento do mês é a soma das safras atuais e anteriores ainda ativas; não se aplica uma única curva de caixa ao VGV total. |
+| **C20** | **A primeira parcela recorrente ocorre, por padrão, no mês seguinte à venda.** | Pagamento no próprio mês precisa ser componente imediato explícito — à vista, entrada, sinal ou parcela no ato. |
+| **C21** | **O plano de pagamento é composto por regras econômicas, não apenas por rótulos.** | O motor precisa suportar pagamento imediato, parcelamento de prazo fixo, parcelamento até um marco e pagamento concentrado em marco. |
+| **C22** | **Desconto comercial reduz a base contratual antes da geração dos recebíveis.** | `valor contratado líquido = valor bruto de tabela − descontos`; ao final, `Receita Bruta = valor contratado líquido + juros recebidos`. |
+| **C23** | **A incidência de juros no mês da contratação deve ser explícita.** | O padrão é não contar o mês da venda como período financeiro completo; exceção contratual precisa ser configurada e testada. |
 
 A conversão de taxa anual para mensal é:
 
@@ -161,7 +174,14 @@ A conversão de taxa anual para mensal é:
 taxa mensal = (1 + taxa anual)^(1/12) − 1
 ```
 
----
+A regra de caixa por safra é:
+
+```text
+receita do mês t
+= pagamentos imediatos das vendas do mês t
++ soma das parcelas das safras anteriores e atuais com vencimento em t
++ pagamentos concentrados ou repasses com vencimento em t
+```
 
 ## 3. Os seis blocos de premissas
 
@@ -341,28 +361,31 @@ O estudo deve permitir a leitura do grau de inferência. Um produto majoritariam
 
 ---
 
-### Bloco B — Preços, contratação e Receita Bruta
+### Bloco B — Preços, contratação, descontos e Receita Bruta
 
 #### B.1 Preço por alocação
 
 O preço comercial pertence à alocação da tipologia dentro do Grupo. Isso permite que a mesma tipologia seja comercializada por preços diferentes em Grupos diferentes.
 
 ```text
-valor contratado potencial do Grupo
+valor bruto potencial do Grupo
 = soma de (área alocada × preço por m²)
 ```
 
 Uma venda não residencial em bloco, a investidor ou parceiro, com preço diferenciado, deve ser tratada como um Grupo próprio quando possuir preço, absorção ou condição de pagamento diferentes.
 
-#### B.2 As cinco grandezas de valor
+#### B.2 As oito grandezas de valor
 
 | Grandeza | Definição | Uso |
 |---|---|---|
 | **VGV potencial bruto do produto** | Valor de toda a área privativa, antes da permuta física | Medida econômica do produto completo |
 | **Valor econômico da permuta física** | Valor informativo da área transferida | Comparação de aquisição do terreno; não é receita |
-| **VGV potencial vendável** | Potencial bruto menos a parcela da permuta física | Valor nominal máximo capaz de ser contratado |
-| **Vendas contratadas** | Soma dos valores efetivamente fechados no mês, sem juros futuros | Estoque, corretagem, safras e aderência comercial |
-| **Receita Bruta (VGV)** | Soma de todos os recebimentos dos clientes em todos os meses, inclusive juros | Resultado, margem e fluxo final de receita |
+| **VGV potencial vendável** | Potencial bruto menos a parcela da permuta física | Valor máximo de tabela capaz de ser comercializado |
+| **Valor bruto contratado** | Área contratada × preço por m², antes de descontos comerciais | Referência de tabela e medição do desconto |
+| **Descontos comerciais** | Reduções concedidas na contratação, como desconto à vista | Ponte entre preço de tabela e obrigação do cliente |
+| **Valor contratado líquido** | Valor bruto contratado menos descontos | Base que será decomposta no plano de pagamento |
+| **Juros recebidos** | Remuneração financeira gerada pelos componentes parcelados | Diferença entre recebimento final e principal contratado |
+| **Receita Bruta (VGV)** | Soma de todos os recebimentos dos clientes, inclusive juros | Resultado, margem e fluxo final de receita |
 
 A identidade estrutural do potencial é:
 
@@ -372,12 +395,26 @@ VGV potencial bruto do produto
 + valor econômico da permuta física
 ```
 
+A identidade da contratação é:
+
+```text
+valor contratado líquido
+= valor bruto contratado
+− descontos comerciais
+```
+
 A identidade do fluxo, depois que todo o recebível foi liquidado, é:
 
 ```text
 Receita Bruta (VGV)
-= vendas contratadas acumuladas
+= valor contratado líquido acumulado
 + juros recebidos dos clientes
+```
+
+Se não houver desconto comercial:
+
+```text
+valor bruto contratado = valor contratado líquido
 ```
 
 A Receita Bruta (VGV) não inclui:
@@ -390,22 +427,40 @@ A Receita Bruta (VGV) não inclui:
 
 #### B.3 Formação mensal das vendas contratadas
 
+Para cada alocação e mês:
+
 ```text
-vendas contratadas no mês
-= soma, em todos os Grupos e alocações,
-  de (área contratada no mês × preço por m²)
+valor bruto contratado no mês
+= área contratada no mês × preço por m²
 ```
 
-A contratação ocorre quando a área sai do estoque comercial. O recebimento pode ocorrer no mesmo mês ou ao longo de meses futuros.
+```text
+desconto comercial do mês
+= valor bruto contratado no mês × percentual de desconto aplicável
+```
+
+```text
+valor contratado líquido no mês
+= valor bruto contratado no mês − desconto comercial do mês
+```
+
+O valor contratado líquido é a base de:
+
+- formação das safras;
+- principal das modalidades de pagamento;
+- reconciliação com a Receita Bruta;
+- análise dos juros recebidos.
+
+A corretagem segue a regra contratual definida pela empresa. Como padrão, incide sobre a contratação e deve declarar se sua base é o valor bruto de tabela ou o valor contratado líquido. A base não pode ficar implícita.
 
 #### B.4 Formação da Receita Bruta (VGV)
 
 ```text
 Receita Bruta do mês
-= recebimentos à vista
-+ sinais e entradas
-+ parcelas de tabela curta
-+ parcelas do componente obra da tabela longa
+= pagamentos imediatos
++ parcelas de prazo fixo
++ parcelas até marcos
++ pagamentos concentrados
 + repasse
 + recebimentos de novas vendas Após-chaves
 ```
@@ -415,9 +470,18 @@ Receita Bruta (VGV)
 = soma da Receita Bruta de todos os meses
 ```
 
-Os juros fazem parte das parcelas e do saldo liquidado no repasse. Por isso a Receita Bruta (VGV) pode superar as vendas contratadas.
+Os juros fazem parte das parcelas e dos saldos liquidados. Por isso a Receita Bruta (VGV) pode superar o valor contratado líquido.
 
----
+Quando existir desconto comercial, a reconciliação correta é:
+
+```text
+Receita Bruta (VGV)
+= valor bruto contratado acumulado
+− descontos comerciais acumulados
++ juros recebidos acumulados
+```
+
+Não se deve reconciliar a Receita Bruta contra o valor bruto de tabela sem descontar os abatimentos concedidos.
 
 ### Bloco C — Cronograma global
 
@@ -509,7 +573,7 @@ Somente a tabela curta e a janela Após-chaves são prazos fixos deste padrão. 
 Cada Grupo possui duas configurações independentes:
 
 1. **Absorção de vendas** — quando a área alocada será contratada.
-2. **Fluxo de pagamento** — como o valor contratado antes da entrega será recebido.
+2. **Plano de pagamento** — como o valor contratado será convertido em recebimentos.
 
 As duas configurações aplicam-se a todas as alocações do Grupo.
 
@@ -533,35 +597,99 @@ percentual Após-chaves do Grupo
 
 Cada percentual é distribuído uniformemente na respectiva janela global.
 
-#### D.2 Condições de pagamento antes da entrega
+#### D.2 O plano de pagamento é composto por componentes
 
-Cada Grupo informa:
-
-- percentual à vista;
-- percentual de tabela curta;
-- percentual da tabela longa, calculado como resíduo.
+O valor contratado líquido de cada safra é dividido entre componentes de pagamento. A soma das participações deve fechar exatamente 100%.
 
 ```text
-percentual da tabela longa
-= 100%
-− percentual à vista
-− percentual da tabela curta
+soma das participações dos componentes
+= 100% do valor contratado líquido
 ```
 
-A tabela curta possui sinal e 36 parcelas. A tabela longa divide-se em componente pago durante a Obra e componente destinado ao repasse.
+Cada componente precisa declarar:
 
-#### D.3 Regra após a entrega
+- participação no contrato;
+- regra temporal;
+- eventual sinal ou entrada;
+- mês do primeiro vencimento;
+- prazo fixo ou marco de encerramento;
+- periodicidade;
+- taxa de juros;
+- regra de capitalização;
+- regra de pagamento final.
+
+As quatro regras econômicas suportadas são:
+
+| Regra | Comportamento |
+|---|---|
+| **Imediato** | Recebido integralmente no mês da contratação |
+| **Prazo fixo** | Número fixo de parcelas contado a partir de cada safra |
+| **Até um marco** | Parcelas da safra terminam em um marco comum, como o fim da Obra |
+| **Concentrado em marco** | Principal e juros são liquidados em um único mês, como o repasse |
+
+#### D.3 Modelos comerciais usuais
+
+O padrão deve conseguir representar, no mínimo, estes modelos.
+
+**À vista**
+
+```text
+100% ou participação configurada
+→ recebimento no mês da contratação
+```
+
+**Tabela curta**
+
+```text
+sinal no mês da contratação
++ 36 parcelas
++ primeira parcela no mês seguinte
+```
+
+**Tabela de prazo fixo longo**
+
+```text
+sinal ou entrada configurável
++ N parcelas fixas
++ primeira parcela no mês seguinte
+```
+
+O prazo pode ser, por exemplo, 120 meses. Essa modalidade é financiamento direto de longo prazo e não deve ser confundida com repasse bancário.
+
+**Pagamento durante a Obra + repasse**
+
+```text
+entrada ou sinal no mês da contratação
++ parcelas do mês seguinte até o fim da Obra
++ saldo concentrado no primeiro mês Após-chaves
+```
+
+A participação, a taxa e a existência de juros em cada componente são premissas do Grupo.
+
+#### D.4 Primeiro vencimento
+
+A convenção padrão é:
+
+```text
+mês da contratação
+→ somente pagamentos imediatos
+
+mês seguinte
+→ primeira parcela recorrente
+```
+
+Caso um contrato preveja parcela no ato, ela deve ser cadastrada como componente imediato ou com defasagem zero explicitamente configurada. O motor não deve criar uma parcela no próprio mês de forma implícita.
+
+#### D.5 Regra após a entrega
 
 As configurações de financiamento direto do Grupo não se aplicam a novas vendas Após-chaves.
 
 ```text
 recebimento de nova venda Após-chaves
-= 100% do valor contratado no próprio mês
+= 100% do valor contratado líquido no próprio mês
 ```
 
 O mesmo mês pode também receber parcelas e repasses de vendas contratadas antes da entrega.
-
----
 
 ### Bloco E — Custos e despesas
 
@@ -824,214 +952,336 @@ O estoque nunca pode ser negativo e precisa terminar em zero ao final do Após-c
 
 ### 4.5 Safras de vendas
 
-Uma **safra** é o conjunto de contratos originados no mesmo mês, dentro do mesmo Grupo, alocação e modalidade de pagamento.
+Uma **safra** é o conjunto de contratos originados no mesmo mês, dentro do mesmo Grupo, alocação e componente de pagamento.
 
-Safras são necessárias porque:
+Uma safra conserva, no mínimo:
 
-- contratos feitos em meses diferentes possuem prazos diferentes até a entrega;
-- a tabela curta começa a pagar no mês seguinte;
-- a tabela longa começa a pagar no mesmo mês;
-- o saldo para repasse acumula juros por tempos diferentes.
+- mês da contratação;
+- Grupo;
+- tipologia e alocação;
+- valor bruto contratado;
+- desconto comercial;
+- valor contratado líquido;
+- participação do componente;
+- principal financiado;
+- sinal ou entrada;
+- taxa;
+- regra temporal;
+- primeiro vencimento;
+- quantidade de parcelas ou marco final;
+- parcela;
+- saldo.
 
-O fluxo mensal é a soma dos recebimentos de todas as safras ativas.
-
-### 4.6 Decomposição das vendas anteriores à entrega
-
-Para vendas contratadas no Pré-lançamento, Lançamento e Durante a obra:
+O fluxo mensal é a soma dos pagamentos de todas as safras com vencimento naquele mês.
 
 ```text
-valor à vista
-= vendas contratadas × percentual à vista
+receita_t
+= pagamentos imediatos das safras criadas em t
++ Σ pagamentos_s,t de todas as safras s ainda ativas
+```
+
+Essa estrutura reproduz a realidade comercial:
+
+```text
+mês 1
+= entrada/sinal das vendas do mês 1
+
+mês 2
+= entrada/sinal das vendas do mês 2
++ primeira parcela das vendas do mês 1
+
+mês 3
+= entrada/sinal das vendas do mês 3
++ segunda parcela das vendas do mês 1
++ primeira parcela das vendas do mês 2
+```
+
+Contar apenas quantas safras estão ativas pode ser usado como atalho em uma planilha homogênea, mas o motor da aplicação deve calcular cada safra individualmente. Preços, descontos, taxas, prazos e valores podem variar entre meses.
+
+### 4.6 Base contratual e decomposição em componentes
+
+Para cada safra:
+
+```text
+valor bruto contratado_s
+= área contratada_s × preço por m²
 ```
 
 ```text
-valor em tabela curta
-= vendas contratadas × percentual de tabela curta
+desconto comercial_s
+= valor bruto contratado_s × percentual de desconto_s
 ```
 
 ```text
-valor em tabela longa
-= vendas contratadas × percentual de tabela longa
+valor contratado líquido_s
+= valor bruto contratado_s − desconto comercial_s
+```
+
+Cada componente `c` recebe uma participação do valor líquido:
+
+```text
+valor do componente_s,c
+= valor contratado líquido_s × participação_c
+```
+
+A soma dos componentes deve fechar:
+
+```text
+Σ valor do componente_s,c
+= valor contratado líquido_s
+```
+
+Quando um componente possui sinal ou entrada:
+
+```text
+pagamento imediato_s,c
+= valor do componente_s,c × percentual de sinal_c
 ```
 
 ```text
-percentual de tabela longa
-= 100% − percentual à vista − percentual de tabela curta
+principal financiado_s,c
+= valor do componente_s,c − pagamento imediato_s,c
 ```
 
-Os três componentes precisam somar exatamente 100%.
+### 4.7 Componentes de pagamento imediato
 
-### 4.7 Modalidade à vista
+Um componente imediato entra integralmente no mês da contratação.
+
+Pode representar:
+
+- pagamento à vista;
+- entrada;
+- sinal;
+- parcela no ato expressamente prevista.
 
 ```text
-receita à vista do mês
-= valor contratado à vista no mês
+recebimento imediato_s
+= valor do componente_s
 ```
 
-Não gera juros, carteira ou saldo de repasse.
+Não gera saldo, juros ou carteira futura.
 
-### 4.8 Tabela curta
+Se houver desconto à vista, o desconto reduz o valor contratado líquido antes da decomposição do plano.
 
-A tabela curta é financiamento direto com sinal e prazo fixo de 36 meses.
+### 4.8 Parcelamento de prazo fixo
 
-#### 4.8.1 Contratação
+No parcelamento de prazo fixo, cada safra possui o mesmo número `N` de parcelas, contado a partir de sua própria contratação.
+
+Exemplos:
+
+- tabela curta: 36 parcelas;
+- financiamento direto longo: 120 parcelas;
+- outro prazo contratualmente definido.
+
+A convenção padrão é:
 
 ```text
-sinal da safra
-= valor contratado em tabela curta × percentual de sinal
+primeiro vencimento = mês da contratação + 1
+último vencimento = mês da contratação + N
 ```
 
+O principal é:
+
 ```text
-principal parcelado da safra
-= valor contratado em tabela curta × (1 − percentual de sinal)
+principal_s
+= valor do componente_s − sinal_s
 ```
 
-O sinal entra no caixa no mês da contratação.
-
-#### 4.8.2 Parcelas
-
-A primeira parcela ocorre no mês seguinte à contratação.
+Com taxa mensal `r`:
 
 ```text
-parcela mensal da safra
-= PMT(taxa mensal do cliente; 36; principal parcelado)
+parcela_s
+= principal_s × r × (1+r)^N
+  ÷ ((1+r)^N − 1)
 ```
 
-Cada safra paga exatamente 36 parcelas. O total recebido no mês é a soma das parcelas de todas as safras ativas.
-
-#### 4.8.3 Carteira da tabela curta
-
-A ordem econômica mensal é:
-
-1. a carteira que veio do mês anterior capitaliza juros;
-2. as parcelas do mês são recebidas;
-3. o principal dos novos contratos do mês é adicionado à carteira.
+Se `r = 0`:
 
 ```text
-juros da carteira curta no mês
-= carteira curta inicial × taxa mensal
+parcela_s = principal_s ÷ N
 ```
 
+A receita do componente no mês `t` é:
+
 ```text
-carteira curta final
-= carteira curta inicial
-+ juros
-− parcelas recebidas
-+ novo principal parcelado
+receita_prazo_fixo_t
+= Σ parcela_s
+  para todas as safras em que:
+  s + 1 ≤ t ≤ s + N
 ```
 
-O novo principal não recebe juros no mês da contratação, pois sua primeira parcela ocorre somente no mês seguinte.
+Uma venda do mês atual não gera parcela recorrente no mesmo mês. O que é recebido no ato deve estar em sinal, entrada ou componente imediato.
 
-A carteira da tabela curta precisa terminar exatamente em zero depois da última parcela da última safra.
+### 4.9 Parcelamento até um marco
 
-### 4.9 Tabela longa
+Nesse modelo, todas as safras encerram suas parcelas no mesmo marco, como o último mês da Obra.
 
-A tabela longa não possui sinal. O valor contratado é separado em dois componentes:
+Definições:
+
+- `s` = mês da contratação;
+- `M` = último mês em que uma parcela pode ser recebida;
+- primeiro vencimento = `s + 1`.
+
+O número de parcelas é:
 
 ```text
-componente pago durante a Obra
-= valor contratado em tabela longa
-× percentual pago durante a Obra
+N_s = M − s
 ```
 
+Uma venda mais tardia possui menos parcelas e, portanto, parcela maior.
+
+Sem juros:
+
 ```text
-componente destinado ao repasse
-= valor contratado em tabela longa
-× (1 − percentual pago durante a Obra)
+parcela_s
+= principal_s ÷ N_s
 ```
 
-#### 4.9.1 Componente pago durante a Obra
-
-A primeira parcela ocorre no mesmo mês da contratação.
-
-O número de parcelas da safra é a quantidade de meses entre o mês da venda e o último mês da Obra, incluindo as duas extremidades:
+Com juros:
 
 ```text
-prazo da safra
-= último mês da Obra − mês da contratação + 1
+parcela_s
+= PMT(taxa mensal; N_s; principal_s)
 ```
 
-Uma venda no último mês da Obra possui uma única parcela. Uma venda no Pré-lançamento possui o maior prazo.
+A janela é:
 
 ```text
-parcela mensal da safra
-= PMT(taxa mensal do cliente;
-      prazo da safra;
-      componente pago durante a Obra)
+s + 1 ≤ t ≤ M
 ```
 
-A parcela total do mês é a soma das parcelas de todas as safras ativas.
+Se `N_s ≤ 0`, a condição comercial é incompatível com o marco. O motor deve bloquear a configuração ou exigir que o valor seja classificado como pagamento imediato ou concentrado; não deve criar prazo negativo nem empilhar o valor no último mês.
 
-#### 4.9.2 Carteira do componente obra
+### 4.10 Pagamento concentrado em marco e repasse
 
-Como a primeira parcela ocorre no próprio mês da contratação, o novo principal capitaliza no mês e depois é abatido pela parcela:
+Um componente concentrado acumula principal e, quando aplicável, juros até um mês definido.
+
+No caso do repasse:
 
 ```text
-saldo antes da parcela
-= carteira inicial do componente obra
-+ novo principal do mês
+mês do repasse
+= primeiro mês Após-chaves
 ```
 
+Para cada safra:
+
 ```text
-juros do mês
-= saldo antes da parcela × taxa mensal
+principal para repasse_s
+= valor contratado líquido_s × participação do repasse
 ```
 
+A incidência de juros precisa ser explícita.
+
+**Convenção padrão — juros começam depois da contratação:**
+
 ```text
-carteira final do componente obra
-= saldo antes da parcela
-+ juros
-− parcelas recebidas
+saldo_s,s = principal para repasse_s
 ```
 
-A carteira do componente obra precisa chegar a zero no último mês da Obra. Saldo negativo não representa carteira real e é erro de cálculo.
-
-### 4.10 Saldo para repasse
-
-O componente de repasse acumula novas contratações e juros até o primeiro mês Após-chaves.
+Nos meses seguintes:
 
 ```text
-saldo antes dos juros
-= saldo para repasse inicial
-+ novo componente de repasse contratado no mês
-```
-
-```text
-juros do mês
-= saldo antes dos juros × taxa mensal
-```
-
-Antes do mês do repasse:
-
-```text
-saldo para repasse final
-= saldo antes dos juros + juros
-```
-
-No primeiro mês Após-chaves:
-
-```text
-valor repassado
-= saldo antes dos juros + juros
+juros_s,t
+= saldo_s,t-1 × taxa mensal
 ```
 
 ```text
-saldo para repasse final
-= zero
+saldo_s,t
+= saldo_s,t-1 + juros_s,t
 ```
 
-Características obrigatórias:
+No mês do repasse `R`:
 
-- o repasse é integral;
-- ocorre no primeiro mês Após-chaves;
-- não pode ser antecipado;
-- não é distribuído por vários meses;
-- zera o saldo;
-- não recebe novas contratações depois da entrega;
-- integra a Receita Bruta (VGV), pois é recebimento de cliente;
-- pode gerar caixa para amortizar o financiamento à produção, mas não é a mesma operação.
+```text
+repasse_s,R
+= saldo_s,R-1 + juros_s,R
+```
 
-### 4.11 Vendas Após-chaves
+```text
+saldo_s,R = 0
+```
+
+Quando a taxa é zero:
+
+```text
+repasse_R
+= soma dos principais destinados ao repasse
+```
+
+O padrão não admite:
+
+- antecipação;
+- repasse parcial;
+- fracionamento do saldo em vários meses;
+- novos saldos de repasse gerados por vendas Após-chaves.
+
+O repasse é recebimento de cliente. Não é liberação de financiamento à produção.
+
+### 4.11 Carteira por safra
+
+A carteira real deve ser calculada a partir do saldo de cada safra e componente.
+
+Para componente cuja primeira parcela ocorre no mês seguinte:
+
+#### Mês da contratação
+
+```text
+saldo_s,s = principal_s
+```
+
+#### Meses seguintes
+
+```text
+juros_s,t
+= saldo_s,t-1 × taxa mensal
+```
+
+```text
+saldo_s,t
+= saldo_s,t-1
++ juros_s,t
+− pagamento_s,t
+```
+
+No último vencimento:
+
+```text
+saldo_s,t = 0
+```
+
+O último pagamento pode absorver uma diferença de arredondamento dentro da tolerância definida. A correção não pode alterar o principal econômico nem esconder diferença material.
+
+Se o contrato contar o mês da contratação como período de juros, essa exceção deve ser indicada por uma premissa específica e testada separadamente. Não pode ser inferida apenas porque a venda e a parcela aparecem no mesmo mês.
+
+### 4.12 Carteira agregada
+
+A carteira agregada do mês é:
+
+```text
+carteira_t
+= Σ saldo_s,c,t
+  de todas as safras e componentes
+```
+
+As aberturas mínimas são:
+
+- carteira de prazo fixo curto;
+- carteira de prazo fixo longo, quando houver;
+- carteira de componentes até marco;
+- saldo concentrado para repasse;
+- carteira total.
+
+A carteira total é um indicador de risco de crédito, não de caixa.
+
+Regras obrigatórias:
+
+- nenhum saldo pode ser negativo;
+- cada safra termina em zero;
+- o saldo não pode voltar a crescer depois do último pagamento;
+- a carteira total termina em zero no fim do horizonte;
+- a soma dos saldos por safra precisa fechar com a visão consolidada.
+
+### 4.13 Vendas Após-chaves
 
 O percentual Após-chaves é o resíduo da absorção de cada Grupo e é distribuído por 12 meses.
 
@@ -1052,53 +1302,30 @@ Toda nova venda Após-chaves é recebida integralmente no mesmo mês:
 
 ```text
 receita de nova venda Após-chaves
-= venda contratada Após-chaves
+= valor contratado líquido Após-chaves
 ```
 
-O banco pode financiar uma parte da aquisição e o comprador pagar outra parte diretamente, mas ambas chegam à incorporadora no mesmo mês. Para o fluxo da incorporadora, é uma única entrada à vista.
+O banco pode financiar uma parte da aquisição e o comprador pagar outra diretamente, mas ambas chegam à incorporadora no mesmo mês.
 
 A regra não elimina recebimentos antigos. Um mês Após-chaves pode conter simultaneamente:
 
-- receita de novas vendas à vista;
-- parcelas remanescentes de tabela curta;
-- repasse das vendas anteriores à entrega;
-- outros recebimentos já contratados antes da entrega.
+- novas vendas à vista;
+- parcelas de safras de prazo fixo contratadas antes da entrega;
+- repasse;
+- outros recebimentos já contratados.
 
-### 4.12 Carteira de clientes
-
-A carteira total é o saldo econômico que os compradores ainda devem à incorporadora:
-
-```text
-carteira total de clientes
-= carteira da tabela curta
-+ carteira do componente obra da tabela longa
-+ saldo para repasse
-```
-
-A carteira é um indicador de risco de crédito, não de caixa.
-
-Regras obrigatórias:
-
-- nenhuma carteira pode ser negativa;
-- o componente obra da tabela longa zera no fim da Obra;
-- o saldo para repasse zera no mês do repasse;
-- a tabela curta zera após a última parcela;
-- a carteira total zera no encerramento do fluxo.
-
-Existe uma única carteira econômica real. Os componentes são aberturas analíticas dessa carteira, não versões alternativas do mesmo indicador.
-
-### 4.13 Receita mensal e Receita Bruta (VGV)
+### 4.14 Receita mensal e Receita Bruta (VGV)
 
 Por Grupo e alocação:
 
 ```text
 receita mensal
-= receita à vista
-+ sinal da tabela curta
-+ parcelas da tabela curta
-+ parcelas do componente obra da tabela longa
+= pagamentos imediatos
++ parcelas de prazo fixo
++ parcelas até marco
++ pagamentos concentrados
 + repasse
-+ recebimentos de novas vendas Após-chaves
++ novas vendas Após-chaves
 ```
 
 Para o empreendimento:
@@ -1116,31 +1343,47 @@ Receita Bruta (VGV)
 Depois do fechamento completo:
 
 ```text
-juros recebidos dos clientes
+juros recebidos
 = Receita Bruta (VGV)
-− vendas contratadas acumuladas
+− valor contratado líquido acumulado
 ```
 
-### 4.14 Segmentos e produtos diferenciados
+Ou, partindo do valor bruto de tabela:
+
+```text
+Receita Bruta (VGV)
+= valor bruto contratado acumulado
+− descontos comerciais acumulados
++ juros recebidos acumulados
+```
+
+### 4.15 Segmentos e produtos diferenciados
 
 O motor deve manter a rastreabilidade por Grupo e tipologia. Residencial e não residencial podem ser consolidados separadamente, mas não precisam possuir motores diferentes.
 
 Quando uma parte do produto tiver:
 
 - preço diferenciado;
+- desconto próprio;
 - venda em bloco;
 - absorção própria;
 - condição de pagamento própria;
 
 ela deve ser representada por um Grupo específico. Isso permite incluir lojas, lajes, coberturas ou vendas institucionais sem alterar o núcleo do cálculo.
 
-### 4.15 Horizonte do fluxo
+### 4.16 Horizonte do fluxo
 
-O horizonte não termina na entrega nem ao fim dos 12 meses Após-chaves. Ele precisa alcançar o último evento financeiro.
+O horizonte não termina na entrega nem ao fim dos 12 meses Após-chaves. Ele precisa alcançar o último evento financeiro de todas as safras.
 
 ```text
-fim da tabela curta
-= mês da última contratação em tabela curta + 36 meses
+fim de componente de prazo fixo
+= mês da última contratação nesse componente
++ prazo em parcelas
+```
+
+```text
+fim de componente até marco
+= marco final configurado
 ```
 
 ```text
@@ -1166,12 +1409,27 @@ fim do fluxo
 O fluxo só pode ser encerrado quando:
 
 - não há estoque;
+- não há safra ativa;
 - não há carteira;
 - não há saldo para repasse;
 - não há dívida;
 - não há despesa futura prevista.
 
----
+Nenhum valor pode ser deslocado para o último mês apenas porque o horizonte foi dimensionado de forma insuficiente.
+
+### 4.17 Precisão e fechamento das safras
+
+Os cálculos internos devem preservar precisão superior à apresentação.
+
+O motor precisa:
+
+- calcular PMT com precisão financeira;
+- arredondar apenas na apresentação ou no momento contratualmente definido;
+- ajustar a última parcela para zerar resíduo imaterial;
+- registrar tolerância de fechamento;
+- identificar o primeiro mês e a primeira safra divergente quando um invariante falhar.
+
+Atalhos agregados só são aceitáveis quando produzirem exatamente o mesmo resultado da matriz de safras.
 
 ## 5. Sequência mensal de cálculo
 
@@ -1191,9 +1449,9 @@ Identificar:
 - manutenção;
 - período posterior.
 
-Calcular quantos meses restam até o fim da Obra.
+Calcular os marcos e os meses restantes até cada um deles.
 
-### Passo 2 — Definir estoque vendável inicial
+### Passo 2 — Definir o estoque vendável inicial
 
 Deduzir a permuta física da área total antes de qualquer venda.
 
@@ -1209,58 +1467,85 @@ Converter a absorção do Grupo em área contratada de cada tipologia alocada.
 
 Subtrair a área contratada e impedir saldo negativo.
 
-### Passo 6 — Calcular vendas contratadas
+### Passo 6 — Calcular o valor bruto contratado
 
 Multiplicar a área contratada pelo preço por m² de cada alocação.
 
-### Passo 7 — Calcular corretagem
+### Passo 7 — Calcular descontos e valor contratado líquido
 
-Aplicar a corretagem sobre as vendas contratadas do mês.
+Aplicar os descontos comerciais válidos para a safra.
 
-### Passo 8 — Separar as modalidades pré-entrega
+```text
+valor contratado líquido
+= valor bruto contratado − descontos
+```
 
-Nas vendas anteriores à entrega, decompor o valor em:
+### Passo 8 — Calcular corretagem
 
-- à vista;
-- tabela curta;
-- tabela longa.
+Aplicar a corretagem sobre a base contratual declarada, sem duplicar a despesa em outra linha.
 
-Nas vendas Após-chaves, classificar 100% como recebimento do próprio mês.
+### Passo 9 — Determinar o tratamento pré ou pós-entrega
 
-### Passo 9 — Processar a tabela curta
+- Vendas anteriores à entrega seguem o plano de pagamento do Grupo.
+- Novas vendas Após-chaves entram integralmente no próprio mês.
 
-Calcular:
+### Passo 10 — Decompor a safra em componentes
 
-- sinal;
-- novo principal parcelado;
-- parcelas das safras ativas;
-- juros;
-- carteira final.
+Distribuir o valor contratado líquido entre os componentes do plano, garantindo soma de 100%.
 
-### Passo 10 — Processar o componente obra da tabela longa
+### Passo 11 — Registrar pagamentos imediatos
 
-Calcular:
+Lançar à vista, entrada, sinal e parcela no ato no mês da contratação.
 
-- novo principal;
-- prazo por safra;
-- parcela por safra;
-- soma das parcelas ativas;
-- juros;
-- carteira final.
+### Passo 12 — Criar componentes de prazo fixo
 
-### Passo 11 — Processar o saldo para repasse
+Para cada componente:
 
-Adicionar novas contratações, capitalizar juros e, no primeiro mês Após-chaves, liquidar integralmente o saldo.
+- calcular principal;
+- definir primeiro vencimento;
+- calcular parcela;
+- gerar o calendário da safra;
+- registrar o saldo inicial.
 
-### Passo 12 — Consolidar receita e carteira
+### Passo 13 — Criar componentes até um marco
 
-Somar todos os recebimentos dos clientes e compor a carteira total.
+Calcular o prazo remanescente entre o mês seguinte à contratação e o marco final. Bloquear prazo incompatível.
 
-### Passo 13 — Calcular impostos
+### Passo 14 — Criar componentes concentrados
 
-Aplicar os impostos sobre a receita recebida no mês.
+Registrar principal, taxa, marco de liquidação e convenção de incidência de juros.
 
-### Passo 14 — Calcular permuta financeira
+### Passo 15 — Processar todas as safras ativas
+
+No mês corrente:
+
+- capitalizar os saldos que completaram um período;
+- receber parcelas com vencimento;
+- liquidar pagamentos concentrados;
+- ajustar apenas resíduos imateriais na última parcela;
+- atualizar o saldo de cada safra.
+
+### Passo 16 — Consolidar as carteiras
+
+Somar os saldos por componente, Grupo, tipologia e empreendimento.
+
+### Passo 17 — Consolidar a Receita Bruta
+
+Somar:
+
+- pagamentos imediatos;
+- parcelas;
+- repasse;
+- outras liquidações de clientes;
+- novas vendas Após-chaves.
+
+Separar principal recebido e juros recebidos.
+
+### Passo 18 — Calcular impostos
+
+Aplicar os impostos sobre a receita tributável recebida no mês.
+
+### Passo 19 — Calcular permuta financeira
 
 Calcular as duas visões:
 
@@ -1269,11 +1554,11 @@ Calcular as duas visões:
 
 Lançar no fluxo a visão contratualmente aplicável.
 
-### Passo 15 — Calcular as demais despesas
+### Passo 20 — Calcular as demais despesas
 
 Aplicar cada custo conforme sua base e curva temporal.
 
-### Passo 16 — Formar o fluxo de caixa livre
+### Passo 21 — Formar o fluxo de caixa livre
 
 ```text
 fluxo de caixa livre do mês
@@ -1284,7 +1569,7 @@ Como despesas são negativas, a consolidação é uma soma.
 
 Esse fluxo é desalavancado: ainda não inclui liberação e amortização dos instrumentos de funding.
 
-### Passo 17 — Processar o financiamento à produção
+### Passo 22 — Processar o financiamento à produção
 
 Calcular:
 
@@ -1296,20 +1581,19 @@ Calcular:
 - saldo devedor;
 - fluxo líquido do instrumento.
 
-### Passo 18 — Processar o capital de giro
+### Passo 23 — Processar o capital de giro e outros instrumentos
 
 Calcular liberação, juros, carência, amortização e saldo.
 
-### Passo 19 — Formar o fluxo final
+### Passo 24 — Formar o fluxo final
 
 ```text
 fluxo final do mês
 = fluxo de caixa livre
-+ fluxo líquido do financiamento à produção
-+ fluxo líquido do capital de giro
++ fluxos líquidos dos instrumentos de funding
 ```
 
-### Passo 20 — Atualizar acumulados e indicadores
+### Passo 25 — Atualizar acumulados e indicadores
 
 Calcular:
 
@@ -1317,25 +1601,35 @@ Calcular:
 - caixa livre acumulado;
 - fluxo descontado;
 - exposição máxima;
+- descontos acumulados;
+- juros recebidos;
 - carteira total;
 - endividamento total;
 - payback;
 - TIR;
 - VPL.
 
-### Passo 21 — Executar validações de fechamento
+### Passo 26 — Executar validações de fechamento
 
-O mês final só é aceito quando estoque, carteira, repasse e dívida estão zerados e todas as identidades do modelo fecham.
+O mês final só é aceito quando:
 
----
+- estoque está zerado;
+- não há safra ativa;
+- todas as carteiras estão zeradas;
+- repasse está liquidado;
+- dívidas estão quitadas;
+- a Receita Bruta reconcilia com valor contratado líquido e juros;
+- todas as identidades do modelo fecham.
 
 ## 6. Indicadores de decisão
 
 | Indicador | Definição | Leitura |
 |---|---|---|
 | **Receita Bruta (VGV)** | Soma de todos os recebimentos de clientes, inclusive juros | Tamanho financeiro realizado do empreendimento |
-| **Vendas contratadas** | Soma dos valores comerciais fechados, sem juros futuros | Tamanho comercial nominal |
-| **Juros recebidos** | Receita Bruta menos vendas contratadas | Remuneração do financiamento direto ao cliente |
+| **Valor bruto contratado** | Soma de área contratada × preço por m², antes dos descontos | Tamanho comercial de tabela |
+| **Descontos comerciais** | Diferença entre valor bruto e valor contratado líquido | Custo comercial concedido ao comprador |
+| **Valor contratado líquido** | Obrigação principal assumida pelos clientes, sem juros futuros | Base econômica das safras |
+| **Juros recebidos** | Receita Bruta menos valor contratado líquido | Remuneração do financiamento direto ao cliente |
 | **Resultado** | Receita Bruta mais todas as despesas operacionais | Lucro econômico do projeto antes da tributação da holding |
 | **Margem** | Resultado ÷ Receita Bruta (VGV) | Rentabilidade sobre a receita total |
 | **Resultado por m² vendável** | Resultado ÷ área privativa vendável | Comparação entre produtos e tipologias |
@@ -1349,8 +1643,6 @@ O mês final só é aceito quando estoque, carteira, repasse e dívida estão ze
 | **Mês do pico de exposição** | Mês em que ocorre o menor caixa acumulado | Janela crítica de execução |
 
 Margem, TIR, VPL e exposição devem ser lidos juntos. A carteira e o endividamento explicam de onde vem o risco financeiro que não aparece na margem.
-
----
 
 ## 7. Dicionário de campos de negócio
 
@@ -1418,8 +1710,12 @@ Margem, TIR, VPL e exposição devem ser lidos juntos. A carteira e o endividame
 | VGV potencial bruto do produto | R$ | DER |
 | valor econômico da permuta física | R$ | DER |
 | VGV potencial vendável | R$ | DER |
-| vendas contratadas do mês | R$ | DER |
-| vendas contratadas acumuladas | R$ | DER |
+| valor bruto contratado do mês | R$ | DER |
+| desconto comercial do mês | R$ | DER |
+| percentual de desconto comercial | % | IN |
+| valor contratado líquido do mês | R$ | DER |
+| valor contratado líquido acumulado | R$ | DER |
+| principal recebido | R$ | DER |
 | juros recebidos dos clientes | R$ | DER |
 | Receita Bruta do mês | R$ | DER |
 | Receita Bruta (VGV) | R$ | DER |
@@ -1452,36 +1748,46 @@ Margem, TIR, VPL e exposição devem ser lidos juntos. A carteira e o endividame
 | área contratada por período e alocação | m² | DER |
 | área contratada por mês e alocação | m² | DER |
 
-### 7.6 Fluxo de pagamento por Grupo
+### 7.6 Plano de pagamento por Grupo
 
 | Campo | Unidade | Origem |
 |---|---:|---|
-| percentual à vista | % | IN |
-| percentual em tabela curta | % | IN |
-| percentual em tabela longa | % | DER |
-| percentual de sinal da tabela curta | % | IN |
-| duração da tabela curta | meses | CFG: 36 |
-| percentual da tabela longa pago durante a Obra | % | IN |
-| percentual da tabela longa destinado ao repasse | % | DER |
+| participação do componente | % | IN |
+| tipo do componente | enum: imediato, prazo fixo, até marco, concentrado em marco | IN |
+| percentual de sinal ou entrada do componente | % | IN |
+| principal financiado do componente | R$ | DER |
+| prazo fixo | meses/parcelas | IN ou CFG |
+| prazo da modalidade curta | parcelas | CFG: 36 |
+| marco final | evento ou mês relativo | IN/DER |
+| defasagem do primeiro vencimento | meses | IN; padrão 1 |
+| periodicidade | mensal, trimestral, semestral ou anual | IN |
 | taxa anual de juros do cliente | % a.a. | IN |
 | taxa mensal equivalente do cliente | % a.m. | DER |
-| mês da primeira parcela curta | mês relativo | DER |
-| prazo da safra longa | meses | DER |
-| parcela curta por safra | R$ | DER |
-| parcela longa por safra | R$ | DER |
-| mês do repasse | mês relativo | DER |
+| juros no mês da contratação | booleano | IN; padrão falso |
+| quantidade de parcelas da safra | inteiro | DER |
+| parcela por safra | R$ | DER |
+| mês do pagamento concentrado | mês relativo | DER |
+| participação destinada ao repasse | % | DER |
+| soma das participações | % | DER: 100% |
 
-### 7.7 Carteira
+### 7.7 Safras e carteira
 
 | Campo | Unidade | Origem |
 |---|---:|---|
-| novo principal da tabela curta | R$ | DER |
-| carteira da tabela curta | R$ | DER |
-| novo principal do componente obra | R$ | DER |
-| carteira do componente obra | R$ | DER |
-| novo componente de repasse | R$ | DER |
+| identificador econômico da safra | Grupo × alocação × mês × componente | DER |
+| mês da contratação | mês relativo | DER |
+| valor bruto da safra | R$ | DER |
+| desconto da safra | R$ | DER |
+| valor líquido da safra | R$ | DER |
+| pagamento imediato da safra | R$ | DER |
+| principal financiado da safra | R$ | DER |
+| juros da safra no mês | R$ | DER |
+| pagamento da safra no mês | R$ | DER |
+| saldo da safra | R$ | DER |
+| carteira de prazo fixo curto | R$ | DER |
+| carteira de prazo fixo longo | R$ | DER |
+| carteira de componentes até marco | R$ | DER |
 | saldo para repasse | R$ | DER |
-| juros do saldo para repasse | R$ | DER |
 | valor repassado | R$ | DER |
 | carteira total de clientes | R$ | DER |
 
@@ -1557,14 +1863,17 @@ Margem, TIR, VPL e exposição devem ser lidos juntos. A carteira e o endividame
 | Permuta física válida | Quantidade ou área permutada não pode exceder a tipologia ou o produto |
 | Alocação válida | Soma das quantidades alocadas em todos os Grupos não pode exceder o estoque vendável |
 | Preço válido | Preço por m² de alocação deve ser positivo |
+| Desconto válido | Desconto não pode ser negativo nem superar o valor bruto contratado |
 | Absorção válida | Pré-lançamento + Lançamento + Durante a obra não pode exceder 100% |
 | Após-chaves derivado | Percentual Após-chaves deve ser o resíduo e não pode ser negativo |
 | Janela Durante a obra | Pré-lançamento e Lançamento precisam caber dentro do prazo da Obra |
-| Condição de pagamento válida | À vista + tabela curta não pode exceder 100% |
-| Tabela longa derivada | Percentual da tabela longa deve ser o resíduo e não pode ser negativo |
-| Sinal válido | Percentual de sinal deve estar entre 0% e 100% |
-| Componente obra válido | Percentual pago durante a Obra deve estar entre 0% e 100% |
-| Prazos válidos | Todo prazo editável precisa ser inteiro e coerente com seu evento |
+| Plano de pagamento válido | Soma das participações dos componentes deve ser exatamente 100% |
+| Sinal válido | Percentual de sinal ou entrada deve estar entre 0% e 100% do componente |
+| Prazo fixo válido | Número de parcelas deve ser inteiro positivo |
+| Marco válido | Marco final precisa ocorrer depois do primeiro vencimento da safra |
+| Primeiro vencimento válido | Defasagem não pode ser negativa; valor zero precisa ser explícito |
+| Taxa válida | Taxa e convenção de capitalização precisam estar definidas |
+| Sem parcela implícita no ato | Pagamento no mês da venda deve estar classificado como imediato ou defasagem zero explícita |
 | Repasse único | Mês do repasse deve ser o primeiro mês Após-chaves |
 | Sem antecipação | Nenhum recebimento de repasse pode ocorrer antes do mês definido |
 | Vendas Após-chaves | Novas vendas depois da entrega precisam ser 100% recebidas no mês da contratação |
@@ -1579,16 +1888,20 @@ Falha em um invariante indica erro do motor, não uma simples premissa desfavor�
 | **Fechamento de estoque** | Estoque nunca é negativo e termina em zero |
 | **Conservação da alocação** | Área alocada não supera a área vendável da tipologia |
 | **Aderência da absorção** | Cada Grupo contrata exatamente 100% da área alocada |
-| **Conservação da contratação** | Vendas contratadas acumuladas igualam a soma de área contratada × preço por m² |
+| **Conservação do valor bruto** | Valor bruto contratado iguala a soma de área contratada × preço por m² |
+| **Conservação dos descontos** | Valor bruto contratado menos descontos iguala o valor contratado líquido |
+| **Conservação dos componentes** | Soma dos componentes de cada safra iguala seu valor contratado líquido |
+| **Pagamento imediato único** | Componente imediato é recebido uma única vez no mês correto |
+| **Fechamento por safra** | Sinal + amortização do principal igualam o principal contratado |
+| **Identidade das parcelas** | Soma das parcelas da safra iguala principal + juros |
 | **Conservação da receita** | Soma da receita mensal iguala a Receita Bruta (VGV) |
-| **Identidade dos juros** | Receita Bruta (VGV) menos vendas contratadas iguala os juros recebidos |
+| **Identidade dos juros** | Receita Bruta menos valor contratado líquido iguala os juros recebidos |
 | **Permuta física fora do caixa** | Permuta física não gera receita nem despesa de caixa |
 | **Permuta financeira no mês correto** | Saída acompanha o recebimento correspondente |
-| **Carteira curta não negativa** | Saldo nunca é negativo e zera após a última parcela |
-| **Carteira longa não negativa** | Saldo nunca é negativo e zera no fim da Obra |
+| **Carteira não negativa** | Nenhum saldo de safra ou componente pode ser negativo |
+| **Fechamento das carteiras** | Cada safra e componente zera no último vencimento |
 | **Fechamento do repasse** | Saldo para repasse zera no primeiro mês Após-chaves e permanece zerado |
-| **Carteira total real** | Soma dos três componentes; nunca negativa; zera no encerramento |
-| **Nenhum novo financiamento pós-entrega** | Venda Após-chaves não cria tabela curta, longa ou saldo para repasse |
+| **Nenhum novo financiamento pós-entrega** | Venda Após-chaves não cria componente parcelado ou saldo para repasse |
 | **Cobertura do horizonte** | O fluxo alcança a última parcela, despesa e amortização |
 | **Funding fora da receita** | Liberações de dívida não integram a Receita Bruta (VGV) |
 | **Repasse separado do funding** | Repasse integra receita de cliente, não liberação do financiamento à produção |
@@ -1604,13 +1917,14 @@ Falha em um invariante indica erro do motor, não uma simples premissa desfavor�
 | Eficiência atípica | Razão privativa/construída fora da faixa esperada |
 | Velocidade agressiva | Concentração elevada no Pré-lançamento ou Lançamento |
 | Estoque tardio elevado | Percentual Após-chaves materialmente alto |
+| Desconto comercial elevado | Diferença material entre valor bruto e valor líquido contratado |
+| Concentração no repasse | Parcela relevante da Receita Bruta depende de um único marco |
+| Prazo de carteira longo | Parte material do recebível se estende muito além da entrega |
 | Contingência zerada | Ausência de reserva para imprevistos |
 | Terreno sem custo aparente | Não há caixa nem permuta identificada |
 | Estudo majoritariamente inferido | Produto e custos dependem predominantemente de benchmark |
 | Carteira excessiva | Pico de recebíveis incompatível com a capacidade de gestão de crédito |
 | Exposição incompatível | Pico de caixa negativo supera a capacidade financeira da empresa |
-
----
 
 ## 9. Armadilhas conhecidas
 
@@ -1622,83 +1936,105 @@ Grupo é um agrupamento comercial de tipologias, quantidades, preços, absorçã
 
 A quantidade controla estoque, mas o cálculo econômico é feito por m². Forçar vendas mensais em números inteiros de unidades distorce a absorção e cria degraus artificiais.
 
-### 3 — Confundir vendas contratadas com Receita Bruta (VGV)
+### 3 — Aplicar uma única curva de recebimento ao VGV total
 
-Vendas contratadas não incluem juros futuros. Receita Bruta (VGV) é a soma do caixa recebido. Usar uma coluna no lugar da outra distorce corretagem, margem, carteira e reconciliação.
+A absorção gera contratações mensais. Cada contratação cria sua própria safra. Distribuir o VGV total diretamente por percentuais mensais elimina a sobreposição real de entradas e parcelas.
 
-### 4 — Somar permuta física à receita
+### 4 — Confundir valor bruto, valor líquido e Receita Bruta
+
+O valor bruto de tabela pode sofrer desconto. O valor líquido é o principal contratado. A Receita Bruta inclui o valor líquido e os juros. Usar uma grandeza no lugar da outra quebra a reconciliação.
+
+### 5 — Somar permuta física à receita
 
 Permuta física reduz a área vendável. Seu valor pode ser exibido para análise do terreno, mas não é recebimento do incorporador.
 
-### 5 — Aplicar permuta financeira em mês diferente do recebimento
+### 6 — Aplicar permuta financeira em mês diferente do recebimento
 
 Permuta financeira acompanha o caixa. Distribuí-la pela contratação ou por uma curva independente altera a exposição real.
 
-### 6 — Aplicar deduções da permuta financeira de forma multiplicativa sem base contratual
+### 7 — Aplicar deduções da permuta financeira de forma multiplicativa sem base contratual
 
 Subtrair imposto e corretagem em valores monetários evita efeito cruzado. A fórmula multiplicativa só é válida quando o contrato a estabelece.
 
-### 7 — Criar uma etapa de vendas nas chaves
+### 8 — Criar uma etapa de vendas nas chaves
 
 A entrega é um marco. O estoque remanescente começa a ser vendido no primeiro mês Após-chaves e é distribuído em 12 meses.
 
-### 8 — Financiar novas vendas Após-chaves pela incorporadora
+### 9 — Financiar novas vendas Após-chaves pela incorporadora
 
 Depois da entrega, novas vendas entram integralmente no caixa no mês da contratação. Parcelas posteriores só podem vir de contratos celebrados antes da entrega.
 
-### 9 — Confundir repasse com financiamento à produção
+### 10 — Confundir repasse com financiamento à produção
 
 Repasse é recebimento do cliente. Financiamento à produção é dívida da incorporadora. O fato de o repasse normalmente ajudar a amortizar a dívida não torna as operações equivalentes.
 
-### 10 — Antecipar ou parcelar o repasse
+### 11 — Antecipar ou parcelar o repasse
 
 Neste padrão, o repasse ocorre integralmente no primeiro mês Após-chaves. Antecipação e fracionamento não fazem parte do modelo.
 
-### 11 — Calcular tabela curta com início no mês errado
+### 12 — Colocar a primeira parcela recorrente no mês da venda sem regra explícita
 
-O sinal entra no mês da contratação. A primeira das 36 parcelas entra no mês seguinte. Capitalizar o novo principal já no mês da venda superestima a carteira.
+A convenção padrão é sinal ou entrada no ato e primeira parcela no mês seguinte. Pagamento no mesmo mês precisa ser componente imediato ou defasagem zero declarada.
 
-### 12 — Usar prazo fixo para o componente obra da tabela longa
+### 13 — Contar o mês da contratação como período cheio de juros
 
-O prazo depende do mês da contratação e do tempo restante até o fim da Obra. Uma venda tardia possui menos parcelas e parcelas maiores.
+O novo principal não deve receber juros antes de completar um período, salvo regra contratual explícita. Esse erro superestima carteira, repasse e Receita Bruta.
 
-### 13 — Dividir linearmente o componente obra da tabela longa
+### 14 — Confundir financiamento de prazo fixo longo com componente até a Obra e repasse
 
-A parcela precisa incorporar juros e ser calculada por safra. Divisão simples do principal subestima ou desloca os recebimentos.
+Uma tabela de 120 meses termina 120 meses depois de cada venda. Um componente até a Obra termina num marco comum e pode deixar saldo para repasse. São modelos diferentes.
 
-### 14 — Aceitar carteira negativa
+### 15 — Usar prazo fixo para todas as safras de um componente até marco
 
-Carteira é saldo devido por clientes e não pode ser negativa. Resíduo negativo significa erro de recorrência, de juros, de prazo ou de ordem dos eventos.
+Quando todas as safras terminam na entrega, uma venda tardia tem menos parcelas e parcela maior. Fixar o mesmo prazo desloca caixa para depois do marco.
 
-### 15 — Encerrar o fluxo no fim da Obra ou do Após-chaves
+### 16 — Dividir principal por número de meses quando há juros
 
-A tabela curta pode continuar além desses períodos. O horizonte precisa alcançar a última parcela, a última despesa e a quitação de todas as dívidas.
+Com taxa positiva, a parcela deve ser calculada por PMT ou fórmula financeira equivalente. Divisão simples subestima os recebimentos.
 
-### 16 — Tratar corretagem como percentual do recebimento
+### 17 — Usar contador de safras como motor principal
+
+Contadores funcionam em planilhas homogêneas. No app, cada safra pode ter preço, desconto, taxa e prazo diferentes; o cálculo precisa ser individual.
+
+### 18 — Aceitar carteira negativa
+
+Carteira é saldo devido por clientes e não pode ser negativa. Resíduo negativo significa erro de recorrência, juros, prazo ou ordem dos eventos.
+
+### 19 — Deixar a carteira crescer depois do último pagamento
+
+Depois que a última parcela foi recebida, a safra precisa estar zerada. Capitalizar um resíduo indefinidamente é erro de fechamento.
+
+### 20 — Encerrar o fluxo no fim da Obra ou do Após-chaves
+
+Componentes de prazo fixo podem continuar além desses períodos. O horizonte precisa alcançar a última parcela, a última despesa e a quitação de todas as dívidas.
+
+### 21 — Empilhar valores excedentes no último mês
+
+Se um recebimento ultrapassar o array, o horizonte está errado. Mover o valor para o último mês altera TIR, VPL e exposição e mascara o defeito.
+
+### 22 — Tratar corretagem como percentual do recebimento
 
 Corretagem acompanha contratação. Imposto acompanha caixa. Confundir as bases esconde a pressão financeira do início do empreendimento.
 
-### 17 — Incluir funding na Receita Bruta (VGV)
+### 23 — Incluir funding na Receita Bruta (VGV)
 
 Liberação de financiamento e capital de giro aumentam caixa, mas também criam dívida. Não são receita de venda.
 
-### 18 — Confundir base de custo
+### 24 — Confundir base de custo
 
 Custo por m² construído, equivalente, de terreno e privativo não são intercambiáveis. Toda premissa precisa declarar sua base e, quando necessário, ser convertida para a base comparável do estudo.
 
-### 19 — Dupla contagem da gestão de construção
+### 25 — Dupla contagem da gestão de construção
 
 Se a taxa de gestão já está incluída no custo por m², não pode ser lançada novamente como linha separada.
 
-### 20 — Deixar resíduos numéricos abertos
+### 26 — Deixar resíduos numéricos abertos
 
-Pequenas frações por arredondamento podem gerar juros indefinidos. Saldos imateriais precisam ser zerados dentro de uma tolerância declarada, sem mascarar diferenças econômicas reais.
+Pequenas frações por arredondamento podem gerar juros indefinidos. Saldos imateriais precisam ser zerados na última parcela dentro de tolerância declarada, sem mascarar diferença econômica real.
 
-### 21 — Deixar um único indicador decidir
+### 27 — Deixar um único indicador decidir
 
 Margem não substitui exposição, TIR não substitui VPL e VPL não substitui capacidade de execução. A decisão exige leitura conjunta.
-
----
 
 ## 10. Glossário
 
@@ -1712,37 +2048,231 @@ Margem não substitui exposição, TIR não substitui VPL e VPL não substitui c
 | **Área equivalente** | Área ponderada por custo relativo de construção |
 | **Área privativa** | Área de propriedade exclusiva das unidades |
 | **Área privativa vendável** | Área privativa capaz de gerar contratação depois da permuta física |
-| **Carteira de clientes** | Saldo total ainda devido pelos compradores à incorporadora |
-| **Carteira da tabela curta** | Saldo dos principais parcelados em 36 meses, acrescido de juros e líquido das parcelas recebidas |
-| **Carteira do componente obra** | Saldo das parcelas da tabela longa que devem ser pagas até o fim da Obra |
-| **Chaves ou entrega** | Marco de conclusão da Obra que separa vendas pré e pós-entrega |
-| **Coeficiente de aproveitamento** | Multiplicador da área do terreno que limita a área computável |
+| **Carteira de clientes** | Soma dos saldos econômicos ainda devidos pelos compradores |
+| **Componente até marco** | Parcela do contrato paga de forma recorrente até um mês comum, como o fim da Obra |
+| **Componente concentrado** | Parcela do contrato liquidada em um único marco, como o repasse |
+| **Componente de prazo fixo** | Parcela do contrato paga em número fixo de prestações contado a partir de cada safra |
+| **Contrato bruto** | Área contratada × preço por m², antes de descontos comerciais |
+| **Contrato líquido** | Contrato bruto menos descontos; principal econômico que será recebido |
+| **Desconto comercial** | Redução concedida sobre o valor bruto de tabela antes da formação dos recebíveis |
 | **Durante a obra** | Período comercial iniciado após o Lançamento e encerrado no último mês da Obra física |
 | **Exposição máxima** | Maior saldo negativo de caixa ao longo do empreendimento |
 | **Financiamento à produção** | Dívida da incorporadora destinada a financiar custos do empreendimento |
 | **Grupo** | Agrupamento comercial de tipologias, quantidades, preços, absorção e fluxo de pagamento; não é período temporal |
-| **Juros recebidos** | Diferença entre Receita Bruta (VGV) e vendas contratadas depois do fechamento do fluxo |
+| **Juros no mês da contratação** | Convenção que define se o mês da venda conta como período financeiro; padrão falso |
+| **Juros recebidos** | Diferença entre Receita Bruta (VGV) e valor contratado líquido depois do fechamento do fluxo |
 | **Lançamento** | Período comercial iniciado imediatamente depois do Pré-lançamento |
 | **Obra física** | Período de execução da construção, iniciado junto com o Pré-lançamento |
-| **Outorga onerosa** | Contrapartida pelo potencial construtivo acima do coeficiente básico |
+| **Pagamento imediato** | Valor recebido no mês da contratação: à vista, entrada, sinal ou parcela no ato |
 | **Payback** | Mês em que o caixa acumulado recupera de forma definitiva a exposição anterior |
 | **Permuta financeira** | Pagamento atrelado à receita recebida pela incorporadora |
 | **Permuta física** | Pagamento por meio de unidades ou área do próprio empreendimento |
 | **Planejamento** | Período anterior ao mês zero, que precede e determina o início do Pré-lançamento e da Obra |
+| **PMT** | Parcela periódica calculada a partir de principal, taxa e prazo |
 | **Pré-lançamento** | Primeiro período comercial, iniciado junto com a Obra após o Planejamento |
+| **Primeiro vencimento** | Primeiro mês em que a prestação recorrente é devida; padrão mês seguinte à contratação |
 | **Receita Bruta (VGV)** | Soma de todos os recebimentos dos clientes, inclusive juros e repasse |
 | **Repasse** | Liquidação bancária do saldo do comprador junto à incorporadora no primeiro mês Após-chaves |
-| **Safra de vendas** | Conjunto de contratos originados no mesmo mês, Grupo, alocação e modalidade |
-| **Saldo para repasse** | Componente da tabela longa que acumula juros até ser liquidado pelo repasse |
-| **Sinal** | Entrada paga no mês da contratação da tabela curta |
-| **Tabela curta** | Financiamento direto com sinal e 36 parcelas iniciadas no mês seguinte |
-| **Tabela longa** | Financiamento direto sem sinal, com componente pago durante a Obra e saldo liquidado no repasse |
+| **Safra de vendas** | Conjunto de contratos originados no mesmo mês, Grupo, alocação e componente de pagamento |
+| **Saldo para repasse** | Componente que acumula principal e, quando aplicável, juros até a liquidação bancária |
+| **Sinal** | Pagamento imediato vinculado a um componente financiado |
+| **Tabela curta** | Modelo de prazo fixo com sinal e 36 parcelas iniciadas no mês seguinte |
+| **Tabela longa de prazo fixo** | Financiamento direto com prazo longo contado a partir de cada safra, como 120 meses |
+| **Tabela longa com repasse** | Modelo que combina pagamento durante a Obra e saldo concentrado no repasse |
 | **Tipologia** | Conjunto homogêneo de unidades com mesma área e características de produto |
-| **Valor contratado** | Área contratada multiplicada pelo preço por m², sem juros futuros |
-| **Vendas contratadas** | Soma dos valores contratados no mês |
+| **Valor contratado líquido** | Obrigação principal do cliente depois de descontos, sem juros futuros |
+| **Vendas contratadas** | Série mensal do valor contratado líquido; pode ser acompanhada também pelo valor bruto e pelos descontos |
 | **VGV potencial bruto** | Valor econômico de toda a área privativa antes da permuta física |
 | **VGV potencial vendável** | Valor nominal da área capaz de ser comercializada por caixa |
 | **VPL** | Valor presente dos fluxos descontados ao custo de capital |
+
+## 11. Cenários de referência para validação
+
+Os cenários abaixo não substituem as premissas de cada empreendimento. Eles existem como referências de fechamento para comprovar que o motor respeita safras, vencimentos, juros, carteiras e marcos.
+
+> **Origem da referência.** Os dois cenários vêm de EVIs do projeto **Calliandra**, que é um
+> **loteamento**. O que se aproveita deles é a **mecânica econômica dos recebíveis** — safra, sinal,
+> primeiro vencimento, PMT, marco comum e liquidação concentrada —, que independe do tipo de
+> empreendimento. Produto, tipologia, custo e estrutura de obra **não** são importados.
+
+### 11.1 Calliandra — prazo fixo por safra
+
+O EVI detalhado de Calliandra utiliza:
+
+| Premissa | Valor de referência |
+|---|---:|
+| Participação à vista | 20,0% |
+| Desconto à vista | 5,0% |
+| Participação em prazo curto | 13,3% |
+| Prazo curto | 36 parcelas |
+| Participação em prazo longo | aproximadamente 64,81% |
+| Prazo longo | 120 parcelas |
+| Venda de casa em linha separada | aproximadamente 1,8868% |
+| Sinal nos componentes parcelados | 15,0% |
+| Taxa do cliente | 15,0% a.a. |
+| Primeiro vencimento | mês seguinte à contratação |
+
+A taxa mensal equivalente é:
+
+```text
+r = (1 + 15%)^(1/12) − 1
+r ≈ 1,1714917% a.m.
+```
+
+A base contratada e sua distribuição no tempo fazem parte do cenário — sem elas os valores
+esperados não são reproduzíveis:
+
+```text
+base contratada total = R$ 28.601.115,20
+
+meses 1 a 4   → R$ 2.860.111,52 por mês   (10,0% da base por mês)
+meses 5 a 12  → R$ 2.145.083,64 por mês   ( 7,5% da base por mês)
+meses 13+     → sem contratação
+```
+
+A linha de `Vendas Contratadas` do primeiro mês é, portanto, R$ 2.860.111,52 — e ela **inclui** a
+parcela denominada **Venda Casas**, que corresponde a **1 de 53 lotes** (1 ÷ 53 = 1,8868%) e possui
+regra própria: **240 parcelas com 30% de sinal**. Essa regra existe nas premissas do estudo, mas
+**não foi levada para as colunas de receita do fluxo**, que abrem somente à vista, tabela curta e
+tabela longa.
+
+Por isso, o cenário dourado deve:
+
+- isolar a base de recebíveis de lotes representada nas três modalidades — que somam **98,1132%**,
+  não 100%; ou
+- incluir uma regra de pagamento própria para a casa antes de exigir fechamento de 100%.
+
+Os valores mensais abaixo validam as três modalidades efetivamente representadas no fluxo:
+
+| Mês | Receita esperada |
+|---:|---:|
+| 1 | R$ 878.539,92 |
+| 2 | R$ 914.119,61 |
+| 3 | R$ 949.699,31 |
+| 4 | R$ 985.279,01 |
+
+O crescimento ocorre porque cada novo mês adiciona:
+
+- pagamentos imediatos da nova safra;
+- parcelas das safras anteriores.
+
+Depois do fim das vendas, as parcelas continuam. À medida que cada safra conclui suas 36 ou 120 prestações, a receita cai em degraus, não de uma só vez.
+
+Valores de controle adicionais:
+
+| Mês | Receita esperada |
+|---:|---:|
+| 13 | R$ 355.796,98 |
+| 38 | R$ 344.737,04 |
+| 49 | R$ 245.197,58 |
+| 122 | R$ 220.677,83 |
+| 132 | R$ 18.389,82 |
+| 133 | R$ 0,00 |
+
+Esse cenário valida a mecânica temporal das modalidades representadas, mas não deve ser usado
+para afirmar que a linha agregada `Vendas Contratadas` fecha com a receita sem antes tratar a
+`Venda Casas`.
+
+Ele valida:
+
+- sinal no mês da venda;
+- primeira parcela no mês seguinte;
+- safras sobrepostas;
+- prazos fixos diferentes;
+- juros por PMT;
+- encerramento gradual;
+- horizonte até a última parcela.
+
+### 11.2 Calliandra — parcelas até a Obra e repasse
+
+O fluxo sintético de Calliandra é reproduzido por:
+
+| Componente | Participação |
+|---|---:|
+| Entrada no mês da venda | 15% |
+| Parcelas do mês seguinte até o fim da Obra | 15% |
+| Repasse no primeiro mês posterior | 70% |
+
+No cenário:
+
+- vendas distribuídas **uniformemente** por 12 meses — curva diferente da do cenário anterior;
+- último mês de parcelas durante a Obra: mês 24;
+- repasse: mês 25;
+- taxa dos componentes: zero.
+
+```text
+base contratada total = R$ 28.547.740,29
+
+meses 1 a 12  → R$ 2.378.978,36 por mês   (1/12 da base por mês)
+meses 13+     → sem contratação
+```
+
+Para uma safra vendida no mês `s`:
+
+```text
+quantidade de parcelas
+= 24 − s
+```
+
+```text
+parcela da safra
+= principal durante a Obra ÷ (24 − s)
+```
+
+As três conferências que fecham o cenário:
+
+```text
+mês 1        = 15% × 2.378.978,36                        = R$    356.846,75
+meses 13–24  = 15% × 2.378.978,36 × Σ_{s=1..12} 1/(24−s) = R$    254.936,38
+mês 25       = 70% × 28.547.740,29                       = R$ 19.983.418,20
+```
+
+Valores de controle:
+
+| Mês | Receita esperada |
+|---:|---:|
+| 1 | R$ 356.846,75 |
+| 2 | R$ 372.361,83 |
+| 3 | R$ 388.582,14 |
+| 12 | R$ 582.045,90 |
+| 13 a 24 | R$ 254.936,38 por mês |
+| 25 | R$ 19.983.418,20 |
+
+Esse cenário valida:
+
+- entrada no mês da contratação;
+- primeira parcela no mês seguinte;
+- prazo decrescente por safra;
+- parcelas maiores para vendas tardias;
+- marco comum de encerramento;
+- repasse concentrado;
+- fechamento de 100% do valor contratado.
+
+### 11.3 Urbitá — uso limitado como referência
+
+O fluxo de recebimentos de Urbitá também acumula parcelas de safras anteriores. Portanto, a sua linha de caixa não deve ser descartada integralmente.
+
+Entretanto, as fórmulas de carteira analisadas não representam saldo econômico real:
+
+- a carteira longa pode ficar negativa;
+- a carteira curta pode manter resíduo e voltar a crescer depois da última parcela;
+- a carteira total pode ser contaminada por esses saldos.
+
+Consequência:
+
+> Urbitá pode ser usado para conferir a sobreposição de recebimentos, mas não deve ser usado como referência para recorrência de carteira, juros do saldo ou fechamento final.
+
+### 11.4 Critério de equivalência
+
+Uma implementação é aderente quando reproduz os valores mensais dos cenários dentro da tolerância monetária definida e, simultaneamente:
+
+- fecha valor contratado, descontos e principal;
+- separa principal e juros;
+- zera cada safra;
+- zera a carteira total;
+- não desloca vencimentos;
+- não empilha excedentes no último mês;
+- identifica a primeira divergência por linha e mês.
 
 ---
 

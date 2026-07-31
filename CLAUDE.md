@@ -21,10 +21,12 @@ código/`schema.json`/spec, **o código está certo** — a divergência vira **
 automático de comportamento.
 
 - `docs/viabilidade/inteligencia-evi-incorporacao.md` — **significado econômico**: como a empresa raciocina sobre viabilidade de Incorporação (premissas, motor de vendas e recebíveis, carteira, repasse, indicadores de decisão). É conhecimento de negócio, **não descreve o app** e **não governa o runtime**. Também não deve ser rebaixado para casar com uma limitação atual do app.
-- `docs/viabilidade/padrao-incorporacao.md` — **dinâmica funcional**: como o app representa esse conhecimento. Leia-o quando precisar de contexto para implementar uma mudança ou resolver um issue. Ele rotula explicitamente cada trecho como **Comportamento vigente** (o que o código faz hoje), **Modelo funcional de referência** (a regra aprovada) ou **Evolução dependente de issue** — não presuma que uma regra descrita ali já está implementada. Os **anexos A–E** guardam o material do app instalado: convenções de cálculo, dicionário de campos reais, modelo de dados, armadilhas conhecidas e API.
+- `docs/viabilidade/padrao-incorporacao.md` — **dinâmica funcional**: como o app representa esse conhecimento. Leia-o quando precisar de contexto para implementar uma mudança ou resolver um issue. Ele rotula explicitamente cada trecho como **Comportamento vigente** (o que o código faz hoje), **Modelo funcional de referência** (a regra aprovada) ou **Evolução dependente de issue** — não presuma que uma regra descrita ali já está implementada. Os **anexos A–G** guardam o material do app instalado: convenções de cálculo, dicionário de campos reais, modelo de dados, armadilhas conhecidas, API, decisões históricas e os **cenários dourados de recebíveis**.
 
 A conciliação entre os dois e o código — conceito a conceito, com evidência em `arquivo:linha` —
-está em `docs/rodada-5-evi-2026-07-31.md`.
+está em `docs/rodada-5-evi-2026-07-31.md`. A revisão de recebíveis por safras, que reconciliou os
+dois documentos contra EVIs reais do projeto Calliandra, está em
+`docs/revisao-recebiveis-calliandra-2026-07-31.md`.
 
 ---
 
@@ -53,6 +55,20 @@ na Onda 2 — os IDs são ordem de criação.
 **Três ordens não negociáveis:** #220/#221 antes de qualquer issue M2 · #231 antes de #232/#233 ·
 **#228 antes de #237, #238 e #239**. Cada issue traz suas dependências no corpo — leia antes de
 pegar.
+
+> 🔴 **12 corpos de issue precisam de emenda antes de serem implementados.** A **revisão de
+> recebíveis Calliandra** (2026-07-31) reconciliou os dois documentos EVI contra EVIs reais e
+> derrubou premissas de **#220, #227, #229, #230, #231, #232, #233, #234, #236, #237, #240 e
+> #241**. As emendas estão na seção *Emendas pendentes de aprovação* de
+> `docs/issues-evi-propostas-2026-07-31.md`; a reconciliação, em
+> `docs/revisao-recebiveis-calliandra-2026-07-31.md`.
+>
+> **Nenhuma dessas issues deve ser implementada com o corpo antigo.** A pior é a **#233**, cujo
+> critério de aceite ainda diz *"a 1ª parcela ocorre no mês da venda"* — o oposto da regra
+> aprovada, que é `s + 1` com `N_s = M − s`. As issues **não foram editadas no GitHub**: aplicar as
+> emendas é decisão do autor.
+>
+> A ordem dos portões **não muda** e o total continua **22 issues, todas abertas, 0 implementadas**.
 
 > ⚠️ **Quem encerrar a rodada atualiza esta seção na mesma alteração.** A Rodada 4 nasceu porque
 > #165–#169 ficaram abertas uma rodada inteira sem ninguém perceber, com este arquivo dizendo "não
@@ -111,10 +127,15 @@ padrão de qualidade: `scripts/validar-frontend.sh` verde · `scripts/validar-ba
 tocou backend/schema/migração · pré-requisitos já na `main` · diff **não vazio** · migração
 numerada contra a `main` do momento, com a `versao` bumpada.
 
-> **Nota de ambiente:** o `gh` CLI **não existe** neste ambiente — só `git`. Não dá para abrir PR
-> pelo terminal; o fluxo que funciona é branch → push → (merge na `main`, se autorizado) → push.
-> Ao terminar, diga ao autor que o PR formal não foi aberto e deixe o link
-> `https://github.com/<owner>/<repo>/pull/new/<branch>`. Não gaste tempo procurando o `gh`.
+> **Nota de ambiente:** o `gh` CLI **não existe** neste ambiente — só `git`. Não gaste tempo
+> procurando o `gh`.
+>
+> Isso **não** significa que o PR não possa ser aberto: quando a sessão tiver as ferramentas MCP do
+> GitHub (`mcp__github__create_pull_request`, `merge_pull_request`, …), o fluxo completo
+> branch → push → PR → merge funciona por elas. Confirmado em 2026-07-31, na sessão da revisão
+> Calliandra. Só quando essas ferramentas **não** estiverem disponíveis é que se faz
+> branch → push e se deixa ao autor o link
+> `https://github.com/<owner>/<repo>/pull/new/<branch>`.
 
 ---
 
