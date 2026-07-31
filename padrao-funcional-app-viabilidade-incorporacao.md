@@ -1,0 +1,2046 @@
+---
+titulo: Padrão Funcional do App de Viabilidade — Incorporação
+descricao: Referência funcional de como o app do UrbiVerso representa, organiza, calcula e apresenta um estudo avançado de viabilidade de incorporação.
+tipo: app
+ordem: 8
+---
+<!-- Ao inserir este documento no repositório, preservar o framework de documentação do UrbiVerso. -->
+
+# Padrão Funcional do App de Viabilidade — Incorporação
+
+> **App:** Estudo de Viabilidade · **Ambiente:** UrbiVerso · **Tipo de empreendimento:** Incorporação
+>
+> **Escopo principal:** dinâmica funcional do estudo avançado — produto, cronograma, Grupos comerciais, absorção, fluxo de pagamento, custos, funding, fluxo de caixa e resultados.
+
+Este documento descreve **como o aplicativo deve representar funcionalmente** o conhecimento econômico definido no documento [Padrão EVI — Inteligência de Mercado e Viabilidade Econômico-Financeira de Incorporação](padrao-evi-inteligencia-mercado-viabilidade-incorporacao.md).
+
+Ele traduz conceitos de negócio em:
+
+- entidades percebidas pelo usuário;
+- telas e jornadas;
+- relações entre informações;
+- regras de cálculo e apresentação;
+- validações funcionais;
+- resultados e relatórios esperados.
+
+Este documento **não é uma especificação de código**. Ele não determina linguagem, biblioteca, endpoint, nome de tabela, migração ou estratégia de implementação.
+
+> ⚠️ **Status: documento funcional consultivo.**
+>
+> O código, o schema, as migrações, a especificação já aprovada e os contratos do UrbiVerso continuam sendo a fonte de verdade do comportamento que está em produção. Uma divergência entre este documento e o app deve gerar análise de impacto e, quando aprovada, uma issue específica. A divergência não autoriza uma alteração automática ou uma refatoração ampla.
+
+A introdução deste padrão deve preservar o que já funciona. O objetivo é tornar explícita a dinâmica funcional de referência e permitir uma evolução controlada do aplicativo.
+
+---
+
+## Índice
+
+1. [Papel do aplicativo](#1-papel-do-aplicativo)
+2. [Autoridade dos documentos e princípio de compatibilidade](#2-autoridade-dos-documentos-e-princípio-de-compatibilidade)
+3. [Vocabulário funcional oficial](#3-vocabulário-funcional-oficial)
+4. [Níveis de análise e navegação](#4-níveis-de-análise-e-navegação)
+5. [Ciclo de vida, membros e permissões](#5-ciclo-de-vida-membros-e-permissões)
+6. [Criação do estudo e origem do terreno](#6-criação-do-estudo-e-origem-do-terreno)
+7. [Empreendimento e catálogo de tipologias](#7-empreendimento-e-catálogo-de-tipologias)
+8. [Cronograma global](#8-cronograma-global)
+9. [Grupos comerciais e alocações](#9-grupos-comerciais-e-alocações)
+10. [Absorção de vendas](#10-absorção-de-vendas)
+11. [Fluxo de pagamento](#11-fluxo-de-pagamento)
+12. [Vendas contratadas e controle de estoque](#12-vendas-contratadas-e-controle-de-estoque)
+13. [Recebimentos, safras, carteiras e repasse](#13-recebimentos-safras-carteiras-e-repasse)
+14. [Receita Bruta — VGV](#14-receita-bruta--vgv)
+15. [Permutas](#15-permutas)
+16. [Custos, obra e despesas](#16-custos-obra-e-despesas)
+17. [Funding e estrutura de capital](#17-funding-e-estrutura-de-capital)
+18. [Motor mensal e horizonte do estudo](#18-motor-mensal-e-horizonte-do-estudo)
+19. [Resultados, indicadores e visualizações](#19-resultados-indicadores-e-visualizações)
+20. [Cenários, mercado e apoio à decisão](#20-cenários-mercado-e-apoio-à-decisão)
+21. [Validações funcionais e invariantes](#21-validações-funcionais-e-invariantes)
+22. [Exportação, auditabilidade e reprodutibilidade](#22-exportação-auditabilidade-e-reprodutibilidade)
+23. [Jornadas principais do usuário](#23-jornadas-principais-do-usuário)
+24. [Aderência geral do app atual ao padrão](#24-aderência-geral-do-app-atual-ao-padrão)
+25. [Limites deste documento e governança de mudanças](#25-limites-deste-documento-e-governança-de-mudanças)
+26. [Critérios funcionais de aceite](#26-critérios-funcionais-de-aceite)
+27. [Glossário funcional](#27-glossário-funcional)
+
+---
+
+## 1. Papel do aplicativo
+
+O app de Viabilidade existe para transformar premissas dispersas em um estudo único, comparável e auditável.
+
+No caso de Incorporação, ele precisa conectar:
+
+```text
+TERRENO E POTENCIAL CONSTRUTIVO
+        ↓
+PRODUTO E TIPOLOGIAS
+        ↓
+GRUPOS COMERCIAIS, PREÇOS E ABSORÇÃO
+        ↓
+CONTRATAÇÃO, RECEBÍVEIS E REPASSE
+        ↓
+CUSTOS, OBRA E FUNDING
+        ↓
+FLUXO DE CAIXA E INDICADORES
+```
+
+O aplicativo deve permitir que o usuário responda, com rastreabilidade:
+
+- o que será construído;
+- quanto estará disponível para venda;
+- como o estoque será agrupado comercialmente;
+- por qual preço cada parcela do produto será comercializada;
+- em quais períodos ocorrerão as vendas;
+- como os compradores pagarão;
+- quanto ficará em carteira;
+- quando ocorrerá o repasse;
+- quando cada custo será pago;
+- quanto capital próprio e dívida serão exigidos;
+- qual resultado, retorno e exposição o projeto produzirá.
+
+O aplicativo não deve ser apenas uma reprodução visual de uma planilha. Ele deve preservar as identidades econômicas do estudo e impedir combinações de premissas que produzam resultados internamente incoerentes.
+
+### 1.1 Determinismo
+
+Dado o mesmo conjunto de premissas, a aplicação deve produzir o mesmo resultado.
+
+```text
+mesmas premissas
++ mesmas regras
++ mesma precisão
+= mesmo fluxo e mesmos indicadores
+```
+
+A interface pode apresentar visões diferentes — mensal, anual, por Grupo ou consolidada — sem modificar o cálculo-base.
+
+### 1.2 Separação entre entrada e resultado
+
+O app deve distinguir claramente:
+
+- **premissas informadas**;
+- **parâmetros organizacionais**;
+- **valores derivados**;
+- **resultados do fluxo**;
+- **alertas e validações**.
+
+Campos calculados não devem se comportar como inputs livres. Campos editáveis não devem parecer resultados definitivos.
+
+---
+
+## 2. Autoridade dos documentos e princípio de compatibilidade
+
+Quatro camadas convivem no projeto:
+
+| Camada | Papel |
+|---|---|
+| **Inteligência de negócio** | Define o significado econômico dos conceitos e fórmulas |
+| **Padrão funcional do app** | Define como esses conceitos devem aparecer e se relacionar na experiência do usuário |
+| **Especificação técnica e contratos do UrbiVerso** | Define como a solução pode ser implementada dentro da plataforma |
+| **Código, schema, migrações e testes** | Definem o comportamento efetivamente executado na versão instalada |
+
+### 2.1 Regra de prudência
+
+Quando o padrão funcional divergir do código atual:
+
+1. a divergência deve ser confirmada;
+2. o impacto sobre estudos existentes deve ser medido;
+3. a mudança deve ser dividida em uma issue específica;
+4. migração e compatibilidade devem ser avaliadas;
+5. testes devem ser definidos antes da alteração;
+6. a alteração só deve ocorrer depois de aprovação.
+
+### 2.2 O documento não ordena renomeações internas
+
+O termo funcional oficial passa a ser **Grupo**. A interface atual pode ainda exibir “Fase” e a persistência interna pode conter identificadores legados associados a esse nome.
+
+Este documento exige a evolução da **nomenclatura percebida pelo usuário**, mas não exige, por si só:
+
+- renomear tabelas;
+- renomear colunas;
+- alterar contratos de API;
+- migrar identificadores internos;
+- quebrar compatibilidade com estudos existentes.
+
+A eventual alteração interna deve ser tratada em uma issue técnica independente, apenas se trouxer benefício suficiente para justificar o risco.
+
+---
+
+## 3. Vocabulário funcional oficial
+
+A aplicação deve evitar usar o mesmo termo para conceitos diferentes.
+
+| Termo oficial | Significado funcional | Termo legado ou ambíguo a evitar |
+|---|---|---|
+| **Estudo** | Registro completo de uma análise de viabilidade | Projeto, simulação, arquivo |
+| **Cronograma global** | Régua temporal do empreendimento | Fase comercial |
+| **Evento do cronograma** | Planejamento, Pré-lançamento, Lançamento, Obra e Após-chaves | Grupo |
+| **Período de absorção** | Janela na qual uma parcela das vendas é contratada | Fase |
+| **Grupo** | Agrupamento comercial de estoque, preços, absorção e pagamento | Fase |
+| **Tipologia** | Produto homogêneo, com área e características próprias | Unidade individual |
+| **Alocação** | Quantidade de uma tipologia destinada a um Grupo, com preço por m² | Tipologia do Grupo |
+| **Safra** | Contratos originados no mesmo mês sob as mesmas condições | Parcela |
+| **Vendas contratadas** | Valor comercial fechado no mês, sem juros futuros | Receita mensal |
+| **Receita Bruta — VGV** | Soma de todos os recebimentos dos clientes, incluindo juros | Funding ou valor apenas contratado |
+| **Carteira de clientes** | Saldo econômico ainda devido pelos compradores | Caixa futuro sem reconciliação |
+| **Repasse** | Liquidação bancária do saldo do comprador após a entrega | Financiamento à produção |
+| **Financiamento à produção** | Dívida da incorporadora para financiar custos do empreendimento | Repasse |
+| **Após-chaves** | Período de 12 meses após a entrega | Vendas nas chaves ou Pós-obra indefinido |
+
+### 3.1 Grupo substitui Fase na linguagem do usuário
+
+A interface deverá evoluir, por issue própria, de:
+
+```text
+1ª Fase
+2ª Fase
+Adicionar Fase
+```
+
+para:
+
+```text
+1º Grupo
+2º Grupo
+Adicionar Grupo
+```
+
+A mudança deve alcançar textos de interface, documentação, relatórios e mensagens. Identificadores internos podem permanecer como estão para evitar uma migração desnecessária.
+
+### 3.2 Grupo não é período
+
+Um Grupo não possui início, duração ou fim próprios.
+
+Ele representa:
+
+```text
+seleção de estoque
++ preço por m²
++ absorção
++ fluxo de pagamento
+```
+
+Dois Grupos podem vender nos mesmos meses. A ordem “1º”, “2º” ou “3º” organiza a apresentação e a estratégia comercial, mas não cria uma sequência temporal automática.
+
+---
+
+## 4. Níveis de análise e navegação
+
+O aplicativo pode oferecer dois níveis de estudo.
+
+### 4.1 Estudo Preliminar
+
+O Preliminar é uma validação estática. Ele responde principalmente:
+
+- qual é o potencial do produto;
+- qual é o VGV potencial;
+- qual é a estrutura de custos;
+- qual é o resultado e a margem;
+- qual preço por m² seria necessário para atingir determinado benchmark.
+
+Ele não precisa reproduzir toda a dinâmica mensal de recebíveis, carteira e funding.
+
+A navegação típica inclui:
+
+- Premissas;
+- Proforma;
+- Gráficos;
+- Apelo Comercial;
+- Análise de Mercado, quando aplicável.
+
+### 4.2 Estudo Avançado
+
+O Avançado acrescenta a dimensão temporal e deve suportar:
+
+- cronograma;
+- catálogo de tipologias;
+- Grupos e alocações;
+- absorção de vendas;
+- fluxo de pagamento;
+- custos com curvas temporais;
+- carteiras;
+- repasse;
+- funding;
+- fluxo mensal;
+- TIR, VPL, payback e exposição máxima;
+- cenários e comparação com mercado.
+
+A organização funcional pode conter módulos como:
+
+- **Resumo**;
+- **Empreendimento**;
+  - Informações;
+  - Cronograma;
+  - Tipologias;
+- **Viabilidade**;
+  - Receitas;
+  - Financeiro ou Custos;
+- **Obra**;
+- **Fluxo de Caixa**;
+- **Cenários**;
+- **Análise de Mercado**;
+- **Apelo Comercial**.
+
+A nomenclatura exata das abas pode evoluir, desde que a relação entre as informações permaneça clara.
+
+### 4.3 O Avançado não deve duplicar o Preliminar sem necessidade
+
+Premissas comuns devem ser reutilizadas ou reconciliadas. O usuário não deve informar duas vezes o mesmo dado sem saber qual versão prevalece.
+
+Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve mostrar a relação entre ambos.
+
+---
+
+## 5. Ciclo de vida, membros e permissões
+
+O acesso é controlado por estudo, além das permissões gerais do app no UrbiVerso.
+
+### 5.1 Funções
+
+| Função | Comportamento esperado |
+|---|---|
+| **Leitor** | Visualiza estudos permitidos e exporta relatórios |
+| **Editor** | Cria, edita, duplica e submete o estudo para análise |
+| **Aprovador** | Aprova, reprova, devolve ao rascunho e reabre estudos arquivados |
+| **Administrador do app** | Possui capacidade ampliada conforme as regras do UrbiVerso |
+
+### 5.2 Estados
+
+```text
+Rascunho
+   ↓ editor submete
+Em análise
+   ├── aprovado
+   ├── reprovado
+   └── devolvido ao Rascunho
+```
+
+Estudos inativos podem ser arquivados conforme a política da instância.
+
+### 5.3 Restrições funcionais
+
+- A origem e os imóveis vinculados ao terreno devem ficar protegidos depois da submissão, conforme a regra vigente.
+- Resultados precisam refletir imediatamente qualquer alteração permitida nas premissas.
+- Alterações feitas por um aprovador em estudo já submetido devem permanecer auditáveis.
+- O app não implementa autenticação própria: utiliza identidade, papéis e contexto fornecidos pelo UrbiVerso.
+
+---
+
+## 6. Criação do estudo e origem do terreno
+
+Na criação, o usuário define:
+
+- nome;
+- tipo de empreendimento;
+- UF ou localidade;
+- nível de análise;
+- origem do terreno;
+- membros iniciais, quando aplicável.
+
+### 6.1 Origem pelo Núcleo
+
+Para Incorporação, o estudo pode referenciar um ou mais lotes existentes no Núcleo.
+
+O app deve:
+
+- consumir os dados autorizados pela instância;
+- apresentar claramente quais imóveis estão vinculados;
+- somar a área dos lotes para formar a área do terreno;
+- degradar de forma segura quando a permissão do Núcleo não estiver disponível;
+- nunca substituir silenciosamente um vínculo por um valor manual.
+
+### 6.2 Origem manual
+
+O usuário informa:
+
+- nome ou identificação do terreno;
+- área;
+- matrícula e descrição, quando aplicável.
+
+A origem escolhida deve permanecer explícita no estudo e nos relatórios.
+
+### 6.3 Integração com o UrbiVerso
+
+O app foi concebido para funcionar **somente dentro de uma instância do UrbiVerso**. Ele não deve ser tratado como aplicação autônoma nem validado como se autenticação, persistência, componentes de interface e serviços da plataforma fossem dependências opcionais. A validação funcional completa ocorre no ambiente do shell.
+
+A experiência deve respeitar:
+
+- autenticação do shell;
+- permissões concedidas à app;
+- contratos de acesso ao Núcleo;
+- componentes e tokens do design system;
+- padrões de documentação, eventos e empacotamento da plataforma.
+
+Nenhuma funcionalidade deste documento autoriza contornar as regras do UrbiVerso.
+
+---
+
+## 7. Empreendimento e catálogo de tipologias
+
+### 7.1 Função do catálogo
+
+O catálogo descreve o produto que poderá ser alocado nos Grupos.
+
+Cada tipologia deve conter, conforme o tipo de produto:
+
+- nome;
+- tipo de unidade;
+- área privativa unitária;
+- dormitórios;
+- vagas;
+- quantidade total;
+- quantidade ou área destinada à permuta física, quando a nova dinâmica estiver definida;
+- ordem de apresentação.
+
+### 7.2 Unidade física e unidade econômica
+
+O app usa unidades para controlar o produto, mas calcula a receita por m².
+
+```text
+área total da tipologia
+= área privativa unitária × quantidade total
+```
+
+```text
+área alocada no Grupo
+= área privativa unitária × quantidade alocada
+```
+
+```text
+valor potencial da alocação
+= área alocada × preço por m²
+```
+
+Isso permite que o fluxo mensal seja proporcional mesmo quando a absorção produza uma quantidade econômica fracionária de unidades em determinado mês.
+
+### 7.3 Não cadastrar cada unidade individual
+
+O estudo não precisa manter uma linha para cada apartamento ou loja. Ele trabalha com conjuntos homogêneos.
+
+Unidades devem ser separadas em tipologias distintas quando houver diferença relevante de:
+
+- área;
+- uso;
+- produto;
+- padrão construtivo;
+- comportamento comercial necessário.
+
+### 7.4 Totais do catálogo
+
+A tela deve consolidar, no mínimo:
+
+- área privativa total;
+- quantidade total de unidades;
+- vagas;
+- quantidade e área de permuta física, quando aplicável;
+- estoque potencialmente alocável.
+
+Os totais precisam reconciliar com as alocações dos Grupos.
+
+### 7.5 Edição e integridade
+
+- Alterar nome ou área de uma tipologia deve refletir nas alocações que a referenciam.
+- Excluir tipologia em uso deve ser bloqueado.
+- Reduzir a quantidade total abaixo do que já foi alocado deve ser bloqueado ou exigir regularização prévia.
+- A quantidade disponível deve considerar todas as alocações do estudo, e não apenas o Grupo aberto na tela.
+
+### 7.6 Permuta física
+
+A futura forma de entrada das unidades permutadas ainda será tratada separadamente.
+
+Este documento fixa apenas a consequência funcional:
+
+- estoque permutado não pode gerar receita;
+- estoque permutado não pode ser vendido novamente;
+- a evolução da interface não deve ser feita de forma improvisada enquanto a dinâmica de entrada não estiver aprovada.
+
+---
+
+## 8. Cronograma global
+
+O cronograma é único para o estudo. Grupos não possuem cronogramas próprios.
+
+### 8.1 Relação econômica entre os eventos
+
+```text
+PLANEJAMENTO
+    ↓
+começam simultaneamente PRÉ-LANÇAMENTO e OBRA FÍSICA
+    ↓
+LANÇAMENTO
+    ↓
+período comercial DURANTE A OBRA
+    ↓
+ENTREGA DAS CHAVES
+    ↓
+APÓS-CHAVES — 12 meses
+    ↓
+CAUDA FINANCEIRA, se houver
+```
+
+### 8.2 Eventos e períodos
+
+| Elemento | Função |
+|---|---|
+| **Planejamento** | Produto, projetos, aprovações e preparação anterior à comercialização |
+| **Pré-lançamento** | Primeiro período comercial |
+| **Lançamento** | Abertura formal e concentração de esforço comercial |
+| **Obra física** | Execução construtiva, iniciada junto ao Pré-lançamento |
+| **Durante a obra** | Período comercial depois do Lançamento até o fim da Obra |
+| **Entrega das chaves** | Marco que separa vendas pré e pós-entrega |
+| **Após-chaves** | 12 meses de venda do estoque remanescente |
+| **Posterior** | Parcelas, manutenção, dívida e outros eventos que ultrapassam o Após-chaves |
+
+### 8.3 Obra física não é a faixa comercial inteira “Durante a obra”
+
+A Obra física começa com o Pré-lançamento. A faixa de absorção chamada “Durante a obra” começa somente depois do Lançamento.
+
+```text
+início de Durante a obra
+= primeiro mês depois do fim do Lançamento
+```
+
+```text
+fim de Durante a obra
+= último mês da Obra física
+```
+
+A interface deve evitar mostrar a mesma janela integral da Obra em três linhas de absorção simultâneas.
+
+### 8.4 Entrega é marco, não período de venda
+
+Não existe uma faixa independente “Vendas nas chaves”.
+
+A entrega:
+
+- encerra a Obra física;
+- encerra a contratação financiada diretamente pela incorporadora;
+- dispara o repasse no primeiro mês seguinte;
+- inicia o Após-chaves.
+
+### 8.5 Após-chaves
+
+```text
+duração do Após-chaves = 12 meses
+```
+
+O período começa no primeiro mês posterior ao fim da Obra.
+
+### 8.6 Representação temporal no app
+
+O app atual pode usar meses relativos 0-based a partir da data de início do projeto, incluindo o Planejamento nos primeiros índices.
+
+O padrão de negócio pode tratar o mês zero comercial como o início simultâneo do Pré-lançamento e da Obra. As duas representações são compatíveis desde que:
+
+- as datas reais coincidam;
+- os vínculos entre eventos sejam preservados;
+- a interface deixe claro o marco utilizado;
+- nenhum recebimento ou custo seja deslocado por erro de índice.
+
+Não é necessário introduzir meses negativos no código apenas para reproduzir a nomenclatura analítica.
+
+---
+
+## 9. Grupos comerciais e alocações
+
+### 9.1 Função do Grupo
+
+Cada Grupo é um card ou bloco comercial que reúne:
+
+- nome;
+- alocações de tipologias;
+- preços por m²;
+- perfil de absorção;
+- perfil de fluxo de pagamento;
+- VGV potencial do Grupo.
+
+### 9.2 Estrutura da alocação
+
+Uma alocação conecta uma tipologia a um Grupo e contém:
+
+- tipologia escolhida;
+- quantidade alocada;
+- preço por m²;
+- ordem de apresentação.
+
+Valores derivados:
+
+```text
+área alocada
+= quantidade alocada × área privativa unitária
+```
+
+```text
+preço unitário
+= área privativa unitária × preço por m²
+```
+
+```text
+VGV potencial da alocação
+= quantidade alocada × preço unitário
+```
+
+```text
+VGV potencial do Grupo
+= soma dos VGVs potenciais das alocações
+```
+
+### 9.3 A mesma tipologia em vários Grupos
+
+A mesma tipologia pode aparecer em vários Grupos com:
+
+- quantidades diferentes;
+- preços diferentes;
+- absorções diferentes;
+- fluxos de pagamento diferentes.
+
+Exemplo:
+
+```text
+Studio de 21 m²
+├── 10 unidades no 1º Grupo a R$ 12.000/m²
+└── 90 unidades no 2º Grupo a R$ 14.000/m²
+```
+
+### 9.4 Um Grupo pode ter várias tipologias
+
+O Grupo não deve ser limitado a uma única tipologia. Studio, 2 dormitórios, 3 dormitórios e loja podem compartilhar a mesma absorção e o mesmo fluxo de pagamento quando essa for a estratégia comercial.
+
+### 9.5 Saldo de unidades
+
+A interface deve mostrar, em cada linha:
+
+- total disponível antes da alocação;
+- quantidade alocada;
+- saldo depois da alocação.
+
+O saldo é global por tipologia:
+
+```text
+saldo disponível
+= quantidade vendável da tipologia
+− soma das alocações anteriores em todos os Grupos
+```
+
+A ordem de exibição pode determinar a leitura em cascata, mas a validação final deve considerar o estudo inteiro.
+
+### 9.6 Quando criar outro Grupo
+
+Um novo Grupo é apropriado quando parte do estoque possuir:
+
+- preço diferente;
+- estratégia de absorção diferente;
+- fluxo de pagamento diferente;
+- venda em bloco;
+- condição comercial institucional;
+- tratamento distinto de produto.
+
+Não se deve criar outro Grupo apenas para reproduzir um período do cronograma.
+
+### 9.7 Nome e ordem
+
+O nome pode ser “1º Grupo”, “2º Grupo”, “Investidor”, “Varejo”, “Lojas” ou outra descrição útil.
+
+A ordem organiza a tela, o relatório e a leitura do saldo. Ela não cria, por si só, precedência temporal.
+
+### 9.8 Extensibilidade
+
+Adicionar uma tipologia, um Grupo ou uma alocação deve significar adicionar informação ao estudo, e não alterar sua estrutura fixa. A experiência não deve impor um número predeterminado de Grupos ou criar uma nova coluna estrutural para cada produto.
+
+---
+
+## 10. Absorção de vendas
+
+### 10.1 Propriedade do Grupo
+
+Cada Grupo possui um perfil único de absorção, aplicado a todas as suas alocações.
+
+A configuração informa quanto do estoque do Grupo será vendido em cada período global.
+
+### 10.2 Quatro períodos
+
+| Período | Percentual |
+|---|---|
+| **Pré-lançamento** | Informado |
+| **Lançamento** | Informado |
+| **Durante a obra** | Informado |
+| **Após-chaves** | Derivado como resíduo |
+
+```text
+% Após-chaves
+= 100%
+− % Pré-lançamento
+− % Lançamento
+− % Durante a obra
+```
+
+A soma dos três percentuais informados não pode ultrapassar 100%.
+
+### 10.3 Distribuição mensal
+
+Dentro de cada período, a distribuição padrão é uniforme.
+
+```text
+% mensal do período
+= % do período ÷ quantidade de meses do período
+```
+
+Para cada alocação:
+
+```text
+área contratada no mês
+= área alocada × % mensal
+```
+
+A mesma curva percentual é aplicada a todas as tipologias do Grupo.
+
+### 10.4 Após-chaves fixo
+
+O percentual residual é distribuído por 12 meses.
+
+```text
+% mensal Após-chaves
+= % Após-chaves ÷ 12
+```
+
+A duração não deve ser editável no padrão funcional de Incorporação.
+
+### 10.5 Gráfico de absorção
+
+O modal ou painel deve mostrar:
+
+- percentuais por período;
+- datas ou meses de cada período;
+- curva acumulada;
+- total final de 100%;
+- mensagens de erro antes de aplicar uma configuração inválida.
+
+A visualização acumulada deve terminar em 100%.
+
+### 10.6 Correção de estoque
+
+Quando existir uma opção de correção de estoque, seu comportamento deve ser explícito e testável.
+
+Ela não pode:
+
+- criar um quinto período;
+- alterar o VGV total;
+- esconder percentuais que não fecham;
+- produzir estoque negativo;
+- modificar silenciosamente preços ou condições de pagamento.
+
+### 10.7 Absorção não define o recebimento
+
+A absorção determina a contratação. O caixa é determinado pelo fluxo de pagamento.
+
+```text
+absorção → vendas contratadas
+fluxo de pagamento → recebimentos
+```
+
+Misturar os dois conceitos impede a correta apuração de corretagem, carteira e exposição.
+
+---
+
+## 11. Fluxo de pagamento
+
+### 11.1 Propriedade do Grupo
+
+Cada Grupo possui um perfil de pagamento aplicável a todas as suas alocações.
+
+O app pode apresentar o editor por linhas flexíveis, mas cada componente precisa ter significado econômico reconhecível.
+
+### 11.2 Vendas anteriores à entrega
+
+As vendas contratadas no Pré-lançamento, Lançamento e Durante a obra são separadas em:
+
+- à vista;
+- tabela curta;
+- tabela longa.
+
+```text
+% tabela longa
+= 100% − % à vista − % tabela curta
+```
+
+### 11.3 À vista
+
+O valor entra integralmente no mês da contratação.
+
+Não gera:
+
+- carteira;
+- juros;
+- repasse.
+
+### 11.4 Tabela curta
+
+A tabela curta possui:
+
+- sinal no mês da contratação;
+- prazo fixo de 36 meses;
+- primeira parcela no mês seguinte;
+- juros à taxa do cliente;
+- carteira própria.
+
+O percentual de sinal pertence à configuração do Grupo.
+
+### 11.5 Tabela longa
+
+A tabela longa:
+
+- não possui sinal;
+- possui componente pago durante a Obra;
+- possui componente destinado ao repasse;
+- começa a receber o componente obra no mês da contratação;
+- usa prazo por safra, até o fim da Obra;
+- acumula juros no saldo de repasse.
+
+### 11.6 Componentes flexíveis da interface
+
+Caso o app mantenha linhas genéricas de “Entrada” e “Parcelamento”, elas precisam ser classificadas de modo que o motor consiga reconciliar:
+
+- principal contratado;
+- sinal;
+- parcelas;
+- juros;
+- componente obra;
+- saldo para repasse;
+- carteira final.
+
+Uma distribuição apenas nominal, que soma o valor contratado sem calcular juros e saldos, não representa integralmente o estudo avançado de referência.
+
+### 11.7 Repasse residual
+
+O percentual destinado ao repasse é derivado:
+
+```text
+% repasse
+= 100%
+− soma dos componentes recebidos antes da entrega
+```
+
+O percentual não deve ser informado como uma grandeza independente capaz de fazer a soma ultrapassar ou ficar abaixo de 100%.
+
+### 11.8 Regra para novas vendas Após-chaves
+
+O fluxo configurado no Grupo não se aplica a novas vendas depois da entrega.
+
+```text
+recebimento da nova venda Após-chaves
+= 100% do valor contratado no mesmo mês
+```
+
+O comprador pode pagar parte diretamente e financiar parte com o banco, mas ambas chegam à incorporadora no mesmo mês.
+
+### 11.9 Recebimentos antigos continuam
+
+O fato de uma nova venda Após-chaves ser recebida à vista não elimina:
+
+- parcelas da tabela curta de vendas anteriores;
+- repasse das vendas anteriores;
+- outros valores já contratados antes da entrega.
+
+---
+
+## 12. Vendas contratadas e controle de estoque
+
+### 12.1 Série obrigatória
+
+O fluxo deve possuir uma série mensal de **Vendas contratadas**, separada da Receita Bruta.
+
+```text
+vendas contratadas da alocação no mês
+= área contratada no mês × preço por m²
+```
+
+```text
+vendas contratadas do Grupo
+= soma das alocações do Grupo
+```
+
+```text
+vendas contratadas do empreendimento
+= soma de todos os Grupos
+```
+
+### 12.2 Usos da contratação
+
+As vendas contratadas são a base de:
+
+- baixa de estoque;
+- corretagem;
+- formação de safras;
+- aderência da curva de absorção;
+- comparação entre Grupos;
+- apuração de juros recebidos;
+- reconciliação entre produto e receita.
+
+### 12.3 Contratação não contém juros futuros
+
+O valor contratado é o preço comercial da área vendida. Juros futuros surgem no fluxo de recebimento.
+
+```text
+vendas contratadas acumuladas
+≠ Receita Bruta final, quando houver juros
+```
+
+### 12.4 Controle em unidades e em m²
+
+A aplicação deve manter duas leituras coerentes:
+
+- quantidade de unidades para saldo comercial;
+- área em m² para cálculo econômico.
+
+O motor mensal pode contratar frações econômicas de área sem identificar a unidade física exata.
+
+### 12.5 Fechamento do estoque
+
+```text
+estoque final
+= estoque inicial vendável − área contratada acumulada
+```
+
+Ao fim da absorção:
+
+- o estoque vendável deve ser zero;
+- o estoque nunca pode ser negativo;
+- a soma das alocações não pode ultrapassar o catálogo.
+
+---
+
+## 13. Recebimentos, safras, carteiras e repasse
+
+### 13.1 Safras
+
+Cada mês de contratação cria safras próprias por:
+
+- Grupo;
+- alocação;
+- modalidade de pagamento.
+
+A safra conserva:
+
+- mês da venda;
+- valor contratado;
+- prazo;
+- taxa;
+- parcela;
+- saldo.
+
+Essa granularidade é necessária porque contratos feitos em meses diferentes possuem prazos diferentes até a entrega.
+
+### 13.2 Receita à vista
+
+```text
+receita à vista do mês
+= valor contratado à vista no mês
+```
+
+### 13.3 Tabela curta
+
+#### Contratação
+
+```text
+sinal
+= valor da tabela curta × % de sinal
+```
+
+```text
+principal parcelado
+= valor da tabela curta − sinal
+```
+
+#### Parcela
+
+```text
+parcela mensal
+= PMT(taxa mensal; 36; principal parcelado)
+```
+
+A primeira parcela ocorre no mês seguinte.
+
+#### Carteira
+
+```text
+carteira curta final
+= carteira curta inicial
++ juros sobre a carteira inicial
+− parcelas recebidas
++ novo principal parcelado
+```
+
+O novo principal não capitaliza juros no próprio mês da contratação.
+
+### 13.4 Tabela longa — componente obra
+
+```text
+componente obra
+= valor da tabela longa × % pago durante a Obra
+```
+
+O prazo depende do mês da venda:
+
+```text
+prazo da safra
+= último mês da Obra − mês da venda + 1
+```
+
+```text
+parcela da safra
+= PMT(taxa mensal; prazo da safra; componente obra)
+```
+
+A primeira parcela ocorre no mesmo mês da contratação.
+
+### 13.5 Carteira do componente obra
+
+```text
+saldo antes da parcela
+= carteira inicial + novo principal
+```
+
+```text
+carteira final
+= saldo antes da parcela
++ juros do mês
+− parcelas recebidas
+```
+
+A carteira deve chegar a zero no último mês da Obra.
+
+### 13.6 Saldo para repasse
+
+```text
+componente de repasse
+= valor da tabela longa − componente obra
+```
+
+Antes da entrega:
+
+```text
+saldo final para repasse
+= saldo inicial
++ novas contratações destinadas ao repasse
++ juros
+```
+
+No primeiro mês Após-chaves:
+
+```text
+repasse
+= saldo total atualizado
+```
+
+```text
+saldo para repasse final = zero
+```
+
+### 13.7 Repasse como evento único
+
+O repasse:
+
+- ocorre no primeiro mês Após-chaves;
+- é integral;
+- não é antecipado;
+- não é parcelado;
+- zera o saldo;
+- não recebe novas contratações depois da entrega.
+
+### 13.8 Carteira total
+
+```text
+carteira total
+= carteira da tabela curta
++ carteira do componente obra da tabela longa
++ saldo para repasse
+```
+
+A interface deve permitir visualizar:
+
+- carteira total;
+- abertura por componente;
+- pico da carteira;
+- mês do pico;
+- queda provocada pelo repasse;
+- encerramento final.
+
+### 13.9 Uma única carteira econômica real
+
+Não deve existir uma carteira “legado” paralela à carteira econômica.
+
+Regras:
+
+- nenhum componente pode ser negativo;
+- saldos devem fechar em zero;
+- resíduos de arredondamento devem ser controlados sem alterar o caixa;
+- o total deve reconciliar com principal, juros e recebimentos.
+
+---
+
+## 14. Receita Bruta — VGV
+
+### 14.1 Definição funcional
+
+No padrão adotado pela empresa:
+
+```text
+Receita Bruta do mês
+= à vista
++ sinais e entradas
++ parcelas de tabela curta
++ parcelas da tabela longa durante a Obra
++ repasse
++ novas vendas Após-chaves
+```
+
+```text
+Receita Bruta — VGV
+= soma da Receita Bruta de todos os meses
+```
+
+### 14.2 Relação com vendas contratadas
+
+Depois do encerramento de todos os recebíveis:
+
+```text
+Receita Bruta — VGV
+= vendas contratadas acumuladas
++ juros recebidos dos clientes
+```
+
+### 14.3 O que não integra a Receita Bruta
+
+Não entram:
+
+- permuta física;
+- financiamento à produção;
+- capital de giro;
+- aporte de sócio;
+- aporte de investidor;
+- qualquer liberação de dívida.
+
+### 14.4 Linhas obrigatórias de resultado
+
+O fluxo e os relatórios devem apresentar separadamente:
+
+- vendas contratadas;
+- receita de caixa;
+- juros recebidos dos clientes;
+- Receita Bruta — VGV acumulada.
+
+O usuário não deve precisar deduzir uma dessas grandezas a partir de uma linha com nome ambíguo.
+
+### 14.5 Hierarquia de apresentação
+
+A receita deve poder ser aberta por:
+
+```text
+Receita Bruta — VGV
+├── 1º Grupo
+│   ├── Tipologia A
+│   ├── Tipologia B
+│   └── Tipologia C
+├── 2º Grupo
+│   ├── Tipologia A
+│   └── Tipologia D
+└── demais Grupos
+```
+
+A mesma hierarquia deve existir para as vendas contratadas.
+
+---
+
+## 15. Permutas
+
+### 15.1 Permuta física
+
+A permuta física:
+
+- reduz estoque vendável;
+- não gera contratação;
+- não gera recebimento;
+- não gera saída de caixa no momento da transferência;
+- pode ter valor econômico informativo.
+
+A futura forma de cadastro e identificação das unidades permutadas será especificada separadamente.
+
+Até essa definição:
+
+- o app não deve receber uma refatoração ampla improvisada;
+- a documentação deve preservar o princípio econômico;
+- qualquer inconsistência atual deve ser tratada em issue própria e conservadora.
+
+### 15.2 Permuta financeira
+
+A permuta financeira é uma saída vinculada à receita efetivamente recebida.
+
+O aplicativo deve calcular duas visões.
+
+#### Visão sem deduções
+
+```text
+permuta financeira bruta
+= receita de caixa × % de permuta
+```
+
+#### Visão com deduções
+
+```text
+base líquida
+= receita de caixa
+− imposto dedutível
+− corretagem dedutível
+```
+
+```text
+permuta financeira líquida
+= base líquida × % de permuta
+```
+
+### 15.3 Série utilizada no fluxo
+
+O fluxo visível deve usar a visão que representa o contrato e a realidade de caixa do incorporador.
+
+As duas visões devem permanecer disponíveis para auditoria.
+
+### 15.4 Momento
+
+A saída ocorre no mesmo mês em que a receita-base entra.
+
+Não deve ser distribuída por uma curva independente quando o contrato for proporcional ao recebimento.
+
+---
+
+## 16. Custos, obra e despesas
+
+### 16.1 Estrutura funcional das linhas de custo
+
+Cada linha deve possuir:
+
+- grupo de custo;
+- categoria;
+- valor ou percentual;
+- unidade de orçamento;
+- base de cálculo;
+- modo de distribuição;
+- evento ou período de ancoragem;
+- início e duração, quando livres;
+- curva temporal.
+
+### 16.2 Grupos de custo
+
+A organização funcional pode utilizar:
+
+- Terreno;
+- Obra;
+- Custos Diretos;
+- Custos Indiretos;
+- Financeiro.
+
+### 16.3 Bases possíveis
+
+Uma linha pode ser expressa como:
+
+- valor fixo em reais;
+- R$/m² privativo;
+- R$/m² de terreno;
+- percentual do VGV;
+- percentual da receita;
+- percentual do custo da Obra.
+
+A tela deve sempre mostrar a unidade e o total resolvido.
+
+### 16.4 Distribuição temporal
+
+O custo pode ser:
+
+- pontual;
+- linear;
+- distribuído por curva;
+- proporcional à contratação;
+- proporcional ao recebimento;
+- proporcional à entrega de unidades;
+- ancorado a um evento do cronograma.
+
+### 16.5 Corretagem
+
+A corretagem segue a contratação, não o recebimento.
+
+```text
+corretagem do mês
+= vendas contratadas do mês × % de corretagem
+```
+
+### 16.6 Impostos
+
+Impostos sobre receita seguem o caixa recebido, conforme o regime configurado.
+
+```text
+imposto do mês
+= receita tributável recebida no mês × alíquota
+```
+
+### 16.7 Construção e gestão
+
+Construção e gestão da construção devem permanecer linhas distintas.
+
+O custo da gestão não pode ser embutido no custo por m² e lançado novamente como percentual.
+
+### 16.8 Obra e curvas
+
+A tela de Obra deve permitir visualizar:
+
+- custo mensal projetado;
+- custo acumulado;
+- avanço físico ou financeiro;
+- gestão da Obra, quando destacada;
+- aderência entre cronograma e fluxo de custos.
+
+Curvas personalizadas devem conservar 100% do valor distribuído.
+
+### 16.9 Custos obrigatórios
+
+Linhas consideradas obrigatórias pelo produto devem existir uma única vez ou possuir uma regra clara de oficialização.
+
+A interface deve impedir duplicação acidental de categorias obrigatórias sem bloquear linhas adicionais legítimas com outra finalidade.
+
+---
+
+## 17. Funding e estrutura de capital
+
+### 17.1 Separação entre projeto e capital
+
+O app deve permitir duas leituras:
+
+- **fluxo de caixa livre do projeto**, antes de funding;
+- **fluxo final**, depois dos instrumentos financeiros.
+
+### 17.2 Financiamento à produção
+
+É uma dívida da incorporadora destinada a financiar custos do empreendimento.
+
+O estudo completo deve conseguir representar:
+
+- base de custos financiáveis;
+- exposição mínima;
+- percentual financiado;
+- limite;
+- liberação mensal;
+- juros;
+- amortização;
+- saldo devedor;
+- quitação.
+
+### 17.3 Repasse não é financiamento à produção
+
+| Operação | Devedor econômico | Função |
+|---|---|---|
+| **Financiamento à produção** | Incorporadora ou SPE | Financiar a construção e custos elegíveis |
+| **Repasse** | Comprador, financiado pelo banco | Liquidar o saldo do cliente junto à incorporadora |
+
+O repasse pode gerar caixa utilizado para amortizar o financiamento à produção, mas as duas linhas devem permanecer separadas.
+
+### 17.4 Capital de giro e investidores
+
+Quando utilizados, precisam ter:
+
+- mês de entrada;
+- valor;
+- taxa;
+- prazo;
+- carência;
+- regra de remuneração;
+- pagamentos;
+- saldo final.
+
+### 17.5 Funding não integra VGV
+
+Liberações de funding entram no caixa financeiro, não na Receita Bruta — VGV.
+
+### 17.6 Situação funcional
+
+O app pode possuir campos de funding ainda não integrados integralmente ao motor. O padrão funcional registra a estrutura esperada, mas a incorporação de cada instrumento ao cálculo deve ocorrer por issues pequenas e testadas.
+
+---
+
+## 18. Motor mensal e horizonte do estudo
+
+### 18.1 Linha do tempo
+
+O motor calcula mês a mês. A sequência funcional é:
+
+1. classificar o mês no cronograma;
+2. identificar janelas de absorção;
+3. calcular área contratada por Grupo e alocação;
+4. baixar estoque;
+5. calcular vendas contratadas;
+6. calcular corretagem;
+7. separar modalidades de pagamento pré-entrega;
+8. processar safras de tabela curta;
+9. processar o componente obra da tabela longa;
+10. atualizar saldo para repasse;
+11. receber novas vendas Após-chaves à vista;
+12. consolidar receita e carteira;
+13. calcular impostos;
+14. calcular permuta financeira;
+15. distribuir os demais custos;
+16. formar o fluxo de caixa livre;
+17. processar financiamento à produção;
+18. processar outros instrumentos;
+19. formar o fluxo final;
+20. atualizar acumulados e indicadores;
+21. executar validações de fechamento.
+
+### 18.2 Horizonte derivado
+
+O horizonte precisa alcançar o último evento relevante.
+
+```text
+fim do fluxo
+= máximo entre:
+  fim das vendas Após-chaves,
+  última parcela da tabela curta,
+  manutenção pós-obra,
+  quitação de funding,
+  demais obrigações
+```
+
+### 18.3 Constantes
+
+- Tabela curta: 36 meses.
+- Após-chaves: 12 meses.
+
+Esses são os prazos fixados neste padrão. Os demais prazos permanecem como premissas editáveis ou valores derivados das relações do cronograma. Essas constantes não tornam o horizonte total fixo.
+
+### 18.4 Proteção contra truncamento
+
+O app não deve deslocar recebimentos excedentes para o último mês apenas para caber em um array pré-definido.
+
+Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
+
+### 18.5 Precisão e arredondamento
+
+- Cálculos internos devem usar precisão suficiente.
+- Arredondamento de exibição não pode alterar somas econômicas.
+- Resíduos devem ser tratados no encerramento da própria safra ou saldo.
+- O fechamento precisa respeitar uma tolerância documentada.
+
+### 18.6 Visão anual
+
+A visão anual é uma agregação da visão mensal.
+
+- receitas e custos: soma dos meses;
+- acumulado: saldo do último mês do período;
+- VPL, TIR, payback e exposição: permanecem calculados sobre o fluxo mensal.
+
+Mudar a visualização não pode recalcular o empreendimento em periodicidade anual.
+
+---
+
+## 19. Resultados, indicadores e visualizações
+
+### 19.1 KPIs principais
+
+O Resumo e o Fluxo devem exibir, conforme o nível do estudo:
+
+- Receita Bruta — VGV;
+- vendas contratadas;
+- juros recebidos;
+- custo total;
+- resultado;
+- margem;
+- TIR;
+- VPL;
+- payback;
+- exposição máxima;
+- carteira máxima;
+- endividamento máximo.
+
+### 19.2 Exposição máxima
+
+```text
+exposição máxima
+= menor valor do caixa acumulado
+```
+
+A tela deve apresentar:
+
+- valor;
+- mês ou data;
+- curva que conduz ao pico negativo.
+
+### 19.3 Tabela mensal
+
+A tabela deve permitir expansão hierárquica.
+
+#### Receitas
+
+```text
+Vendas contratadas
+├── Grupo
+│   └── Tipologias
+
+Receita Bruta — VGV
+├── Grupo
+│   └── Tipologias
+```
+
+#### Custos
+
+```text
+Custo Total
+├── Terreno
+├── Obra
+├── Diretos
+├── Indiretos
+└── Financeiro
+```
+
+#### Consolidação
+
+```text
+Fluxo de Caixa Livre
+Funding
+Fluxo Final
+Caixa Acumulado
+Carteira
+Endividamento
+```
+
+### 19.4 Colunas fixas
+
+Antes das colunas mensais, a tabela deve apresentar, quando aplicável:
+
+- Total;
+- VPL;
+- percentual do VGV;
+- unidade ou base;
+- outros atributos necessários à leitura.
+
+### 19.5 Filtros
+
+A visualização pode permitir:
+
+- global;
+- por Grupo;
+- mensal;
+- anual;
+- expandir ou recolher hierarquia.
+
+O filtro não altera o cálculo, apenas a apresentação.
+
+### 19.6 Gráficos
+
+Gráficos úteis incluem:
+
+- receita e custo mensal;
+- fluxo mensal;
+- caixa acumulado;
+- avanço da Obra;
+- composição de custos;
+- absorção acumulada;
+- carteira;
+- endividamento;
+- comparação de cenários.
+
+Marcos do cronograma devem aparecer na mesma régua temporal dos dados.
+
+---
+
+## 20. Cenários, mercado e apoio à decisão
+
+### 20.1 Cenários
+
+O app pode aplicar variações sobre o estudo-base, como:
+
+- preço de venda;
+- custo da Obra;
+- outras premissas aprovadas futuramente.
+
+Cada cenário deve:
+
+- manter as demais premissas constantes;
+- recalcular todo o fluxo;
+- mostrar a diferença para o base;
+- preservar o estudo-base sem mutação.
+
+### 20.2 Análise de sensibilidade
+
+A sensibilidade mostra o efeito de uma premissa variada dentro de limites definidos.
+
+Ela não substitui um cenário completo e não deve alterar permanentemente as premissas.
+
+### 20.3 Análise de Mercado
+
+O módulo deve separar:
+
+- **lado do projeto**, derivado do próprio estudo;
+- **lado do mercado**, obtido de fontes externas ou snapshot validado.
+
+A procedência dos dados de mercado deve ficar visível.
+
+### 20.4 Apelo Comercial
+
+A análise qualitativa por IA é apoio à decisão, não substituto do EVI.
+
+Ela deve utilizar documentos e informações fornecidos, manter a rastreabilidade das fontes e não modificar premissas financeiras automaticamente.
+
+---
+
+## 21. Validações funcionais e invariantes
+
+### 21.1 Validações de entrada
+
+Devem bloquear o cálculo ou a aplicação da configuração:
+
+| Regra | Condição |
+|---|---|
+| Tipologia inválida | Área, quantidade ou preço incompatíveis com a operação |
+| Saldo excedido | Soma das alocações ultrapassa o estoque disponível |
+| Absorção inválida | Pré-lançamento + Lançamento + Durante a obra > 100% |
+| Pagamento inválido | À vista + tabela curta > 100% ou componentes totais incompatíveis |
+| Cronograma inválido | Lançamento ou período comercial fora da Obra |
+| Prazo inválido | Prazo, carência ou duração incompatíveis |
+| Preço inválido | Preço por m² não positivo em alocação comercial |
+| Funding inválido | Percentual, limite ou prazo incoerente |
+
+### 21.2 Invariantes de produto
+
+```text
+soma das alocações por tipologia
+≤ estoque vendável da tipologia
+```
+
+```text
+estoque final ≥ 0 em todos os meses
+```
+
+```text
+estoque final = 0 ao fim da absorção de 100%
+```
+
+### 21.3 Invariantes de contratação
+
+```text
+vendas contratadas acumuladas
+= soma das áreas contratadas × respectivos preços
+```
+
+A contratação por período deve reproduzir os percentuais de absorção do Grupo.
+
+### 21.4 Invariantes de recebimento
+
+```text
+Receita Bruta — VGV
+= soma dos recebimentos mensais dos clientes
+```
+
+```text
+Receita Bruta — VGV
+= vendas contratadas acumuladas + juros recebidos
+```
+
+### 21.5 Invariantes de carteira
+
+- carteira curta termina em zero;
+- carteira do componente obra termina em zero no fim da Obra;
+- saldo para repasse termina em zero no mês do repasse;
+- carteira total nunca é negativa;
+- carteira total termina em zero.
+
+### 21.6 Invariantes do repasse
+
+- ocorre em um único mês;
+- ocorre no primeiro mês Após-chaves;
+- liquida todo o saldo;
+- não é funding;
+- não recebe contratos novos depois da entrega.
+
+### 21.7 Invariantes de funding
+
+- cada dívida termina em zero;
+- liberações não integram Receita Bruta;
+- amortizações não reduzem custos operacionais;
+- juros financeiros permanecem identificáveis;
+- o fluxo final reconcilia com o fluxo livre e o funding.
+
+### 21.8 Alertas não bloqueantes
+
+O app deve alertar, sem necessariamente impedir:
+
+- custo fora de benchmark;
+- eficiência atípica;
+- absorção agressiva;
+- concentração de recebimento no repasse;
+- ausência de contingência;
+- carteira elevada;
+- estudo com premissas majoritariamente inferidas;
+- falta de cenário adverso;
+- exposição acima da capacidade de capital configurada.
+
+### 21.9 Mensagens
+
+A mensagem de validação deve informar:
+
+- o que está errado;
+- onde está o campo;
+- qual regra foi violada;
+- qual valor foi encontrado;
+- o que precisa ser corrigido.
+
+Mensagens genéricas como “dados inválidos” não são suficientes para um estudo financeiro complexo.
+
+---
+
+## 22. Exportação, auditabilidade e reprodutibilidade
+
+### 22.1 Formatos
+
+O app pode exportar:
+
+- PDF;
+- CSV compatível com Excel;
+- outros formatos aprovados futuramente.
+
+### 22.2 Fidelidade
+
+O relatório deve refletir exatamente:
+
+- as premissas vigentes;
+- os valores calculados na tela;
+- a visão mensal ou anual selecionada;
+- a hierarquia de Grupos e tipologias;
+- os indicadores do mesmo cálculo-base.
+
+### 22.3 Conteúdo mínimo do estudo avançado
+
+- identificação do estudo;
+- versão ou data da extração;
+- cronograma;
+- tipologias;
+- Grupos e alocações;
+- absorção;
+- fluxo de pagamento;
+- vendas contratadas;
+- Receita Bruta — VGV;
+- custos;
+- funding;
+- fluxo mensal;
+- carteira;
+- indicadores;
+- alertas relevantes.
+
+### 22.4 Reprodutibilidade
+
+Uma exportação deve conter informação suficiente para que o estudo seja conferido sem depender apenas da tela.
+
+Quando um resultado for derivado, o relatório deve identificar a premissa ou base que o originou.
+
+### 22.5 CSV não é modelo de dados
+
+Meses podem aparecer como colunas no relatório. Isso não significa que a persistência interna deva criar uma coluna para cada mês.
+
+O relatório é uma visão horizontal de uma série temporal; o modelo interno deve continuar extensível.
+
+---
+
+## 23. Jornadas principais do usuário
+
+### Jornada 1 — Criar o estudo
+
+1. Criar novo estudo.
+2. Escolher Incorporação.
+3. Escolher Preliminar ou Avançado.
+4. Selecionar origem do terreno.
+5. Vincular lotes ou informar terreno manual.
+6. Definir membros.
+7. Salvar como Rascunho.
+
+### Jornada 2 — Definir o produto
+
+1. Preencher informações do empreendimento.
+2. Configurar cronograma.
+3. Cadastrar tipologias.
+4. Conferir área, unidades e vagas.
+5. Validar coerência com potencial construtivo.
+
+### Jornada 3 — Montar a estratégia comercial
+
+1. Criar o 1º Grupo.
+2. Alocar tipologias e quantidades.
+3. Informar preço por m² de cada alocação.
+4. Conferir preço unitário, VGV e saldo.
+5. Configurar absorção.
+6. Configurar fluxo de pagamento.
+7. Criar novos Grupos quando houver preço ou condição diferente.
+8. Conferir que todo o estoque vendável foi alocado.
+
+### Jornada 4 — Montar custos e Obra
+
+1. Revisar linhas obrigatórias.
+2. Informar valores e bases.
+3. Escolher curvas e ancoragens.
+4. Conferir custo total resolvido.
+5. Revisar cronograma e avanço da Obra.
+
+### Jornada 5 — Configurar funding
+
+1. Informar financiamento à produção.
+2. Informar capital de giro ou investidor, quando houver.
+3. Conferir liberações e amortizações.
+4. Verificar quitação final.
+
+### Jornada 6 — Analisar o fluxo
+
+1. Abrir a visão mensal.
+2. Conferir vendas contratadas.
+3. Conferir receita e repasse.
+4. Conferir carteiras.
+5. Conferir custos e funding.
+6. Ver exposição, VPL, TIR e payback.
+7. Alternar para visão anual sem alterar KPIs.
+8. Expandir Grupos e tipologias quando necessário.
+
+### Jornada 7 — Decidir e reportar
+
+1. Rodar cenários.
+2. Consultar análise de mercado.
+3. Revisar alertas.
+4. Exportar relatório.
+5. Submeter para análise.
+6. Aprovar, reprovar ou devolver ao Rascunho.
+
+---
+
+## 24. Aderência geral do app atual ao padrão
+
+Esta seção é diagnóstica. Ela não substitui o documento de issues e não autoriza mudanças diretas.
+
+### 24.1 Estruturas já alinhadas
+
+O desenho atual já possui fundamentos adequados:
+
+- catálogo de tipologias;
+- agrupadores comerciais com várias tipologias;
+- alocações de quantidade e preço por m²;
+- possibilidade de repetir tipologia em agrupadores diferentes;
+- absorção e fluxo de pagamento pertencentes ao agrupador;
+- cálculo mensal;
+- visão anual como agregação;
+- hierarquia por agrupador e tipologia;
+- controle de permissões por estudo;
+- ciclo de vida;
+- cenários;
+- exportação;
+- integração com o UrbiVerso.
+
+Esses fundamentos devem ser preservados.
+
+### 24.2 Pontos de nomenclatura
+
+- A interface ainda utiliza **Fase** para o conceito que passa a se chamar **Grupo**.
+- O termo **Pós-obra** pode aparecer onde o padrão usa **Após-chaves**.
+- Linhas de VGV e receita podem não distinguir contratação, recebimento e juros com clareza suficiente.
+
+### 24.3 Pontos temporais
+
+- A duração de Pós-obra pode estar configurável, enquanto o padrão determina 12 meses.
+- A faixa de absorção “Obra” pode coincidir com toda a Obra física, embora o período comercial “Durante a obra” deva começar depois do Lançamento.
+- O cronograma interno 0-based pode começar no Planejamento; isso é aceitável desde que as relações econômicas estejam corretas.
+
+### 24.4 Pontos do motor de recebíveis
+
+- O fluxo atual pode distribuir o valor nominal sem calcular toda a capitalização de juros por safra.
+- Vendas contratadas e Receita Bruta podem aparecer como uma única grandeza.
+- Carteiras econômicas completas podem não estar presentes.
+- O repasse pode ser tratado apenas como vencimento residual, sem saldo reconciliado.
+- Novas vendas Após-chaves precisam seguir a regra à vista da planilha de referência.
+
+### 24.5 Pontos de funding
+
+- Campos financeiros podem existir sem integração completa ao fluxo mensal.
+- Financiamento à produção precisa permanecer separado de repasse.
+
+### 24.6 Permuta física
+
+A dinâmica futura de entrada das unidades permutadas ainda não está definida. Nenhuma reestruturação ampla deve ocorrer antes dessa decisão.
+
+### 24.7 Conversão em mudanças
+
+As diferenças desta seção devem ser convertidas em issues independentes no documento de instrução ao Claude Code, com:
+
+- prioridade;
+- dependências;
+- impacto em dados existentes;
+- critérios de aceite;
+- testes;
+- necessidade ou não de migração.
+
+---
+
+## 25. Limites deste documento e governança de mudanças
+
+### 25.1 O que este documento define
+
+- terminologia funcional;
+- relações entre as informações;
+- comportamento econômico esperado;
+- jornadas;
+- validações;
+- saídas e resultados.
+
+### 25.2 O que este documento não define
+
+- nomes de tabelas;
+- formato de schema;
+- rotas;
+- contratos HTTP;
+- componentes Lit;
+- arquivos de código;
+- migrações;
+- ordem de commits;
+- estratégia de release.
+
+### 25.3 Proteção ao app existente
+
+A evolução deve:
+
+- preservar estudos já criados;
+- manter compatibilidade de leitura;
+- evitar renomeações internas desnecessárias;
+- respeitar o shell e o SDK do UrbiVerso;
+- validar schema e migrações;
+- manter testes existentes verdes;
+- adicionar testes para cada nova regra;
+- dividir mudanças em escopo pequeno.
+
+### 25.4 Documentação não é autorização de implementação
+
+A existência de uma regra neste arquivo não é autorização suficiente para alterar o código.
+
+A implementação ocorrerá somente quando:
+
+1. a diferença estiver listada como issue;
+2. o escopo estiver aprovado;
+3. os contratos do UrbiVerso tiverem sido lidos;
+4. o impacto estiver compreendido;
+5. os testes estiverem definidos.
+
+---
+
+## 26. Critérios funcionais de aceite
+
+O aplicativo estará funcionalmente aderente ao padrão quando conseguir demonstrar, em um estudo controlado, todos os pontos abaixo.
+
+### 26.1 Produto e Grupos
+
+- Tipologias são cadastradas uma vez.
+- Uma tipologia pode ser alocada em vários Grupos.
+- Um Grupo pode conter várias tipologias.
+- Preço por m² pertence à alocação.
+- Saldo global não pode ser excedido.
+- Grupo não possui calendário próprio.
+
+### 26.2 Absorção
+
+- Existem Pré-lançamento, Lançamento, Durante a obra e Após-chaves.
+- Após-chaves é residual e dura 12 meses.
+- A soma final é 100%.
+- A curva é aplicada a todas as alocações do Grupo.
+- A Obra física e a faixa comercial Durante a obra não são confundidas.
+
+### 26.3 Contratação
+
+- Existe série mensal de vendas contratadas.
+- Contratação baixa estoque e calcula corretagem.
+- Contratação não inclui juros futuros.
+- A soma por Grupo e tipologia fecha com o total.
+
+### 26.4 Pagamentos
+
+- Vendas pré-entrega podem ser à vista, tabela curta ou tabela longa.
+- Tabela curta tem sinal, 36 parcelas e início no mês seguinte.
+- Tabela longa tem componente obra e repasse.
+- O prazo da tabela longa varia por safra.
+- Novas vendas Após-chaves entram integralmente no mês.
+
+### 26.5 Carteira e repasse
+
+- Existe carteira curta.
+- Existe carteira do componente obra.
+- Existe saldo para repasse.
+- A carteira total é a soma dos componentes.
+- Nenhum saldo fica negativo.
+- O repasse integral ocorre no primeiro mês Após-chaves.
+- O repasse zera o saldo.
+- A carteira final é zero.
+
+### 26.6 Receita Bruta — VGV
+
+- É a soma de todos os recebimentos dos clientes.
+- Inclui juros.
+- Não inclui funding.
+- Reconcilia com vendas contratadas mais juros.
+- Pode ser aberta por Grupo e tipologia.
+
+### 26.7 Custos e funding
+
+- Corretagem acompanha contratação.
+- Imposto acompanha recebimento.
+- Custos respeitam suas curvas.
+- Financiamento à produção possui fluxo separado.
+- Dívidas terminam zeradas.
+
+### 26.8 Resultados
+
+- Fluxo mensal fecha.
+- Visão anual não altera KPIs.
+- TIR, VPL, payback e exposição são derivados do fluxo mensal.
+- Exportação reproduz os números da tela.
+- O mesmo estudo produz o mesmo resultado em nova execução.
+
+---
+
+## 27. Glossário funcional
+
+| Termo | Definição |
+|---|---|
+| **Absorção** | Distribuição percentual das vendas contratadas pelos períodos globais |
+| **Alocação** | Quantidade de uma tipologia destinada a um Grupo, com preço por m² |
+| **Após-chaves** | Período fixo de 12 meses após a entrega para vender o estoque remanescente |
+| **Carteira** | Saldo econômico ainda devido pelos clientes |
+| **Contrato ou venda contratada** | Valor fechado no mês, antes dos juros futuros |
+| **Durante a obra** | Período comercial entre o fim do Lançamento e o fim da Obra física |
+| **Estudo Avançado** | Estudo com dimensão temporal, recebíveis, funding e indicadores de retorno |
+| **Estudo Preliminar** | Estudo estático de produto, preço, custo e resultado |
+| **Evento do cronograma** | Marco ou janela temporal global do empreendimento |
+| **Financiamento à produção** | Dívida da incorporadora para financiar custos elegíveis |
+| **Fluxo de pagamento** | Regras que transformam contratação em recebimentos |
+| **Grupo** | Agrupamento comercial de estoque, preço, absorção e pagamento |
+| **Juros do cliente** | Remuneração pelo financiamento direto concedido pela incorporadora |
+| **Obra física** | Execução construtiva do empreendimento |
+| **Permuta financeira** | Pagamento proporcional ao recebimento, com visão bruta e líquida |
+| **Permuta física** | Transferência de área ou unidades do produto, sem receita de caixa |
+| **Repasse** | Liquidação bancária do saldo do comprador no primeiro mês Após-chaves |
+| **Safra** | Conjunto de contratos originados no mesmo mês e sob as mesmas condições |
+| **Tabela curta** | Financiamento com sinal e 36 parcelas iniciadas no mês seguinte |
+| **Tabela longa** | Financiamento sem sinal, com componente obra e saldo para repasse |
+| **Tipologia** | Conjunto homogêneo de unidades com área e características próprias |
+| **Vendas contratadas** | Soma dos valores comerciais fechados, sem juros futuros |
+| **Receita Bruta — VGV** | Soma de todos os recebimentos dos clientes, inclusive juros |
+
+---
+
+## Veja também
+
+- [Padrão EVI — Inteligência de Mercado e Viabilidade Econômico-Financeira de Incorporação](padrao-evi-inteligencia-mercado-viabilidade-incorporacao.md)
+- [Estudo de Viabilidade — Visão Geral](visao-geral)
+- [Modelo de Dados](modelo-de-dados)
+- [Fórmulas da Proforma](formulas)
+- [Permissões e Ciclo de Vida](permissoes)
+- [Exportação](exportacao)
+
+---
+
+*Padrão Funcional do App de Viabilidade — Incorporação · Documento consultivo · UrbiVerso*
