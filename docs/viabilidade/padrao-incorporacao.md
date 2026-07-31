@@ -98,6 +98,7 @@ dicionário de campos reais, modelo de dados, convenções de cálculo, armadilh
 - C. [Modelo de dados](#anexo-c--modelo-de-dados)
 - D. [Armadilhas conhecidas](#anexo-d--armadilhas-conhecidas)
 - E. [API](#anexo-e--api)
+- F. [Decisões do autor ainda vigentes](#anexo-f--decisões-do-autor-ainda-vigentes)
 
 ---
 
@@ -951,6 +952,22 @@ Uma distribuição apenas nominal, que soma o valor contratado sem calcular juro
 > **Evolução dependente de issue.** EVI-010 define o contrato canônico (à vista / curta / longa,
 > com normalizador do shape atual); EVI-012 a EVI-016 implementam a mecânica financeira. Nenhuma
 > delas pode entrar antes do portão de fixture dourada (EVI-001) e do inventário legado (EVI-002).
+
+### 11.6.1 Como as parcelas "ao longo da obra" funcionam hoje
+
+**Comportamento vigente**, decidido nas #190/#191 e ainda em vigor. Os vencimentos são ancorados no
+**cronograma da Obra**, não no mês da venda:
+
+- número de parcelas = `max(1, floor(duração da obra / intervalo))`, com intervalo 1/3/6/12 conforme
+  a periodicidade (Mensal, Trimestral, Semestral, Anual);
+- a 1ª vence no `inicio_mes` da Obra e as demais a cada intervalo;
+- **o resto da divisão não vira parcela** — obra de 10 meses em Trimestral dá 3 parcelas;
+- venda depois do início da Obra: a 1ª parcela cai no primeiro vencimento `>=` mês da venda, e o
+  total é repartido entre os vencimentos restantes;
+- obra sem duração, ou venda após o último vencimento: 1 parcela no mês da venda.
+
+Essa mecânica é **incompatível** com o modelo por safra da §13.4, em que o prazo depende do mês da
+contratação. EVI-013 substitui uma pela outra — e muda os números de estudos existentes.
 
 ### 11.7 Repasse residual
 
@@ -2461,6 +2478,22 @@ do frontend (a API **não** tem endpoint de "simular").
 Endpoints principais: `/estudos` (CRUD + duplicar + ciclo de status), `/benchmarks` (leitura livre;
 `POST`/`PATCH`/`DELETE` e `POST /benchmarks/semear` para admin), rotas de
 Empreendimento/Tipologias/Fases/Custos do Avançado, `/apelo-comercial` e exportação.
+
+## Anexo F — Decisões do autor ainda vigentes
+
+Preservadas dos mapas das rodadas 1–4, apagados em 2026-07-31 depois que todas as issues foram
+mergeadas. O restante daqueles documentos era backlog fechado; o que segue **continua valendo** e
+não deve ser relitigado.
+
+| Origem | Decisão | Consequência aceita |
+|---|---|---|
+| **#185** | Gráfico de fluxo acumulado usa `urbi-grafico-linha` com 2 séries, diferenciadas **por cor** | Abre mão da **linha tracejada** e dos **marcos rotulados** (Payback, Exposição, Obra): `SerieGrafico` declara só `{ rotulo, valores, cor }` e nenhum gráfico do `ui/src` tem `dasharray` ou anotação. Mitigação adotada: cores de alto contraste, `legenda="sempre"`, marcos como texto **fora** do gráfico. Estender `SerieGrafico` exigiria mudança no monorepo `urbiverso`. |
+| **#190**, **#191** | O número de parcelas "ao longo da obra" é **fixo e ancorado no cronograma da Obra** | Detalhado na §11.6.1. Mudou os números de estudos existentes quando entrou. |
+| **#192** | Gráficos de avanço de obra exibem **só a linha `Projetado`** | `Realizado`, `Desvio` e `Forecast` ficam fora de escopo e **não têm issue**. |
+
+> **Regra geral que essas decisões ilustram:** atributo ou prop inexistente num primitivo `urbi-*`
+> **não dá erro — simplesmente não faz nada**. Leia o `dist/index.d.ts` do SDK, ou
+> `ui/src/urbi-<nome>.ts` no monorepo, antes de presumir que uma prop existe.
 
 ---
 

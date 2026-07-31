@@ -61,10 +61,31 @@ build). `git diff --check` limpo. Links relativos de `docs/viabilidade/` todos r
 `.md` sobrando em link de slug; `ordem:` removido dos dois docs tocados (o campo foi retirado do
 framework).
 
+### Limpeza dos mapas mestres antigos
+
+A pedido do autor, os quatro mapas de backlog fechado foram **apagados**:
+`docs/lotes-bugs-2026-07-20.md`, `docs/etapas-bugs-2026-07-22.md`,
+`docs/sessoes-bugs-2026-07-25.md` e `docs/rodada-4-planilha-2026-07-27.md`.
+
+Auditoria feita antes de apagar: **nenhum código, workflow, `manifesto.json`, script ou teste os
+referencia** — o acoplamento era só documental (`CLAUDE.md` e entradas datadas deste arquivo). Todas
+as issues das quatro rodadas estão mergeadas, então os mapas não disparavam mais trabalho.
+
+O que **ainda valia** foi migrado antes: as decisões do autor que não se relitigam (#185 sobre a
+limitação de `SerieGrafico`, #190/#191 sobre as parcelas ancoradas no cronograma da Obra, #192 sobre
+a linha `Projetado`) viraram o **Anexo F** de `docs/viabilidade/padrao-incorporacao.md`, e o
+detalhamento das parcelas "ao longo da obra" virou a §11.6.1. As causas raiz que a Rodada 4
+descrevia já haviam sido corrigidas pelas próprias issues.
+
+> ⚠️ **As entradas antigas deste arquivo continuam citando os quatro caminhos apagados.** Isso é
+> proposital: elas são registro datado do que existia à época e não foram reescritas. Quem
+> encontrar um `docs/<rodada>.md` numa entrada anterior a 2026-07-31 deve procurar no `git log`, não
+> no working tree.
+
 ### Pendente do autor
 
-Aprovar, ajustar ou rejeitar a lista de 21 issues e a ordem de execução. Sem merge, sem PR aberto.
-As pendências antigas (#199, #200) seguem inalteradas.
+Aprovar, ajustar ou rejeitar a lista de 21 issues e a ordem de execução. As pendências antigas
+(#199, #200) seguem inalteradas.
 
 ---
 

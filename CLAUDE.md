@@ -44,17 +44,24 @@ A Rodada 4 foi **concluída em 2026-07-29**: as 35 issues (#165–#169 + #172–
 `main`. Trabalho novo nasce de **issue nova ou de pedido direto do autor**, na branch própria
 (`fix/…`, `feat/…`, `claude/…`) a partir da `main` atualizada, com PR contra a `main`.
 
-| Rodada | Escopo | Documento | Estado |
-|--------|--------|-----------|--------|
-| 1 — Lotes 1–8 | issues #9–#24 | `docs/lotes-bugs-2026-07-20.md` | ✅ concluída (histórico) |
-| 2 — Etapas 1–8 | issues #33–#56 | `docs/etapas-bugs-2026-07-22.md` | ✅ concluída (histórico) |
-| 3 — Sessões S1–S20 | issues #71–#132 | `docs/sessoes-bugs-2026-07-25.md` | ✅ concluída (histórico) |
-| 4 — planilha `lista_bugs.xlsx` | #165–#169 + #172–#201 | `docs/rodada-4-planilha-2026-07-27.md` | ✅ **concluída (histórico)** |
+| Rodada | Escopo | Estado |
+|--------|--------|--------|
+| 1 — Lotes 1–8 | issues #9–#24 | ✅ concluída |
+| 2 — Etapas 1–8 | issues #33–#56 | ✅ concluída |
+| 3 — Sessões S1–S20 | issues #71–#132 | ✅ concluída |
+| 4 — planilha `lista_bugs.xlsx` | #165–#169 + #172–#201 | ✅ concluída |
 
-Todas as rodadas são **histórico** e não disparam trabalho; os disparos antigos (`Prossiga para os
-issues do lote X`, `Siga para a Etapa X`, `Siga para a Sessão SX`, `Resolva a issue #NNN` do mapa
-mestre) **estão aposentados**. O mapa mestre da Rodada 4 continua útil como **referência de
-decisões** (§8 traz as decisões do autor; §9, as causas raiz compartilhadas).
+**Os quatro mapas mestres foram apagados em 2026-07-31**, com todas as issues mergeadas: eram
+backlog fechado e não disparavam mais trabalho. Os disparos antigos (`Prossiga para os issues do
+lote X`, `Siga para a Etapa X`, `Siga para a Sessão SX`, `Resolva a issue #NNN`) **não existem
+mais** — não procure por eles. O histórico completo continua no `git log` e no `PROGRESSO.md`, que
+guarda a narrativa de cada sessão.
+
+O que ainda valia daqueles documentos foi **migrado antes da exclusão**: as decisões do autor que
+não devem ser relitigadas (#185 sobre `SerieGrafico`, #190/#191 sobre as parcelas ancoradas na
+Obra, #192 sobre a linha `Projetado`) estão no **Anexo F** de
+`docs/viabilidade/padrao-incorporacao.md`. As causas raiz que aqueles mapas descreviam já foram
+corrigidas pelas próprias issues.
 
 > ⚠️ **Se abrir uma rodada nova, atualize esta seção junto** — e quem a encerrar faz o mesmo, na
 > mesma alteração. A Rodada 4 nasceu porque #165–#169 ficaram abertas uma rodada inteira sem
