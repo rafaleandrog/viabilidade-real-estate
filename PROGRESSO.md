@@ -82,10 +82,33 @@ descrevia já haviam sido corrigidas pelas próprias issues.
 > encontrar um `docs/<rodada>.md` numa entrada anterior a 2026-07-31 deve procurar no `git log`, não
 > no working tree.
 
-### Pendente do autor
+### 2ª auditoria: conferir cada corpo contra o código
 
-Aprovar, ajustar ou rejeitar a lista de 21 issues e a ordem de execução. As pendências antigas
-(#199, #200) seguem inalteradas.
+O autor pediu a verificação dos 21 corpos contra o app real. **Quatro tinham premissa factualmente
+errada** e foram reescritos; cinco tinham lacuna de dependência. Achados:
+
+- **O recebível do Avançado já é líquido.** `receitaMensalLinha` aplica
+  `fator = vglLinha(vgv, fp) / vgv`, e `vglLinha` subtrai comissão destacada e RET. Logo
+  `receitaMensal` **não é** "recebimento do cliente", e o invariante da Receita Bruta não fecharia
+  nem com taxa zero. Quebrava EVI-017, EVI-018 e EVI-019 de uma vez → virou **EVI-022**, a issue
+  raiz da Onda 2.
+- **`pos_obra` tem dois papéis.** É janela comercial **e** âncora de linha de custo, e
+  `ancorarLinhaCusto` copia início **e duração**. Travar a duração em 12 travaria a manutenção
+  junto. EVI-007 foi reescrita para **desacoplar** a janela do evento, o que resolve sem migração.
+- **A aba Financeiro inteira é inerte** — não são 5 campos, é o Bloco G (financiamento, estrutura de
+  capital, investidor, regime tributário, correção). EVI-019 foi ampliada e o eixo fiscal migrou
+  para EVI-022.
+- **Corretagem pode dobrar:** existe em `fluxo_pagamento.comissao` e como linha de custo obrigatória
+  `pct_vgv` (#121). Com "Destacada" é contada duas vezes.
+- **`cronogramaPadrao()` viola a regra da EVI-005** — cria `obra` no mês 17.
+- **Lançamento pode terminar depois da Obra**, e nenhuma issue tratava o caso.
+
+### Rodada 5 aberta — #220 a #241
+
+Com autorização do autor, as **22 issues foram abertas**. Correspondência `EVI-0NN → #NNN` no mapa
+mestre; o `CLAUDE.md` foi atualizado **na mesma alteração**, como a regra exige.
+
+As pendências antigas (#199, #200) seguem inalteradas.
 
 ---
 
