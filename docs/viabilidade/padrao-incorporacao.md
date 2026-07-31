@@ -1,6 +1,6 @@
 ---
 titulo: Padrão de Viabilidade — Incorporação
-descricao: Documento funcional de como o app representa, organiza, calcula e apresenta um estudo de viabilidade de Incorporação — com o contraste explícito entre o comportamento vigente e o modelo funcional de referência.
+descricao: Documento funcional de como o app representa, organiza, calcula e apresenta um estudo de viabilidade de Incorporação — com contratação por safras, componentes de pagamento, carteiras e contraste explícito entre o comportamento vigente e o modelo funcional de referência.
 tipo: app
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
@@ -30,6 +30,8 @@ Este documento **não é uma especificação de código**. Ele não determina li
 
 A introdução deste padrão deve preservar o que já funciona. O objetivo é tornar explícita a dinâmica funcional de referência e permitir uma evolução controlada do aplicativo.
 
+A versão atual incorpora a reconciliação de dois modelos de fluxo do projeto Calliandra. Eles demonstram que o motor-alvo não pode distribuir diretamente o VGV total: **cada mês de contratação cria uma safra própria**, e cada safra gera pagamentos imediatos, parcelas e liquidações segundo sua regra temporal.
+
 ## Como ler este documento
 
 Ele mistura, de propósito, duas camadas — e elas estão sempre rotuladas:
@@ -42,10 +44,16 @@ Ele mistura, de propósito, duas camadas — e elas estão sempre rotuladas:
 
 Uma seção **sem** esses rótulos descreve comportamento vigente e modelo de referência que **coincidem**.
 
-Os identificadores `EVI-0NN` citados ao longo do texto são **locais e provisórios**: eles vêm da
-lista preparada em `docs/issues-evi-propostas-2026-07-31.md` e **ainda não foram abertos** no
-GitHub. A matriz de aderência completa — conceito, evidência em `arquivo:linha`, status e classe de
-impacto — está em `docs/rodada-5-evi-2026-07-31.md`.
+Os identificadores `EVI-0NN` citados ao longo do texto correspondem às issues **#220–#241**, abertas
+na Rodada 5. A matriz de aderência completa — conceito, evidência em `arquivo:linha`, status e classe
+de impacto — está em `docs/rodada-5-evi-2026-07-31.md`.
+
+> **Revisão de recebíveis.** A validação posterior contra os dois arquivos de Calliandra corrige
+> premissas das issues EVI-001, EVI-008, EVI-009, EVI-010, EVI-012, EVI-013, EVI-014,
+> EVI-016, EVI-017, EVI-020 e EVI-021. Antes de implementar qualquer uma delas, seus corpos e os
+> mapas documentais precisam ser reconciliados com esta versão. Em especial, a primeira parcela
+> recorrente passa a ocorrer, por padrão, no mês seguinte à contratação, e o motor passa a suportar
+> componentes de prazo fixo e componentes até marco como regras distintas.
 
 **Regra de ouro do app:** a Proforma **roda no frontend em tempo real** e é determinística — dado o
 mesmo conjunto de premissas, o resultado é sempre o mesmo. O backend **persiste apenas os inputs**;
@@ -56,7 +64,7 @@ nenhum indicador é gravado.
 > usa `avancado_fases`, `fase_id` e `pos_obra` internamente. Isso está registrado seção a seção e é
 > tratado pelas issues EVI-003 e EVI-004; **nada foi renomeado no código**.
 
-Os anexos A a E, ao final, preservam o material específico do app que este padrão não cobre:
+Os anexos A a G, ao final, preservam o material específico do app que este padrão não cobre:
 dicionário de campos reais, modelo de dados, convenções de cálculo, armadilhas conhecidas e API.
 
 ---
@@ -74,7 +82,7 @@ dicionário de campos reais, modelo de dados, convenções de cálculo, armadilh
 9. [Grupos comerciais e alocações](#9-grupos-comerciais-e-alocações)
 10. [Absorção de vendas](#10-absorção-de-vendas)
 11. [Fluxo de pagamento](#11-fluxo-de-pagamento)
-12. [Vendas contratadas e controle de estoque](#12-vendas-contratadas-e-controle-de-estoque)
+12. [Vendas contratadas, descontos e controle de estoque](#12-vendas-contratadas-descontos-e-controle-de-estoque)
 13. [Recebimentos, safras, carteiras e repasse](#13-recebimentos-safras-carteiras-e-repasse)
 14. [Receita Bruta — VGV](#14-receita-bruta--vgv)
 15. [Permutas](#15-permutas)
@@ -98,7 +106,8 @@ dicionário de campos reais, modelo de dados, convenções de cálculo, armadilh
 - C. [Modelo de dados](#anexo-c--modelo-de-dados)
 - D. [Armadilhas conhecidas](#anexo-d--armadilhas-conhecidas)
 - E. [API](#anexo-e--api)
-- F. [Decisões do autor ainda vigentes](#anexo-f--decisões-do-autor-ainda-vigentes)
+- F. [Decisões históricas e vigência](#anexo-f--decisões-históricas-e-vigência)
+- G. [Cenários dourados de recebíveis](#anexo-g--cenários-dourados-de-recebíveis)
 
 ---
 
@@ -216,8 +225,14 @@ A aplicação deve evitar usar o mesmo termo para conceitos diferentes.
 | **Grupo** | Agrupamento comercial de estoque, preços, absorção e pagamento | Fase |
 | **Tipologia** | Produto homogêneo, com área e características próprias | Unidade individual |
 | **Alocação** | Quantidade de uma tipologia destinada a um Grupo, com preço por m² | Tipologia do Grupo |
-| **Safra** | Contratos originados no mesmo mês sob as mesmas condições | Parcela |
-| **Vendas contratadas** | Valor comercial fechado no mês, sem juros futuros | Receita mensal |
+| **Safra** | Contratos originados no mesmo mês, Grupo, alocação e componente | Parcela |
+| **Valor bruto contratado** | Área contratada × preço por m², antes de descontos | Receita mensal |
+| **Valor contratado líquido** | Valor bruto menos descontos, sem juros futuros | Receita Bruta |
+| **Componente de pagamento** | Regra que transforma parte do contrato em recebimentos | Coluna genérica sem semântica |
+| **Pagamento imediato** | À vista, entrada, sinal ou parcela no ato | Parcela futura |
+| **Prazo fixo** | Número fixo de parcelas contado a partir da safra | Parcelamento até a Obra |
+| **Até um marco** | Parcelas encerradas num marco comum, como fim da Obra | Prazo fixo |
+| **Pagamento concentrado** | Liquidação em um único mês, como repasse | Funding |
 | **Receita Bruta — VGV** | Soma de todos os recebimentos dos clientes, incluindo juros | Funding ou valor apenas contratado |
 | **Carteira de clientes** | Saldo econômico ainda devido pelos compradores | Caixa futuro sem reconciliação |
 | **Repasse** | Liquidação bancária do saldo do comprador após a entrega | Financiamento à produção |
@@ -263,12 +278,10 @@ Ele representa:
 seleção de estoque
 + preço por m²
 + absorção
-+ fluxo de pagamento
++ plano de pagamento
 ```
 
 Dois Grupos podem vender nos mesmos meses. A ordem “1º”, “2º” ou “3º” organiza a apresentação e a estratégia comercial, mas não cria uma sequência temporal automática.
-
----
 
 ## 4. Níveis de análise e navegação
 
@@ -878,183 +891,258 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 
 ### 11.1 Propriedade do Grupo
 
-Cada Grupo possui um perfil de pagamento aplicável a todas as suas alocações.
+Cada Grupo possui um plano de pagamento aplicável a todas as suas alocações.
 
-O app pode apresentar o editor por linhas flexíveis, mas cada componente precisa ter significado econômico reconhecível.
+O plano não é uma curva pronta de caixa. Ele é um conjunto de regras que, aplicado a cada mês de contratação, cria uma ou mais safras de recebimentos.
 
-### 11.2 Vendas anteriores à entrega
+### 11.2 Base financeira do plano
 
-As vendas contratadas no Pré-lançamento, Lançamento e Durante a obra são separadas em:
-
-- à vista;
-- tabela curta;
-- tabela longa.
+Para cada alocação e mês:
 
 ```text
-% tabela longa
-= 100% − % à vista − % tabela curta
+valor bruto contratado
+= área contratada × preço por m²
 ```
 
-### 11.3 À vista
+```text
+valor contratado líquido
+= valor bruto contratado − descontos comerciais
+```
 
-O valor entra integralmente no mês da contratação.
+Os componentes de pagamento são aplicados sobre o valor contratado líquido.
 
-Não gera:
+A soma das participações precisa fechar:
 
-- carteira;
-- juros;
-- repasse.
+```text
+Σ participação dos componentes = 100%
+```
 
-### 11.4 Tabela curta
+### 11.3 Regras econômicas de componente
 
-A tabela curta possui:
+O contrato funcional deve conseguir representar quatro regras.
 
-- sinal no mês da contratação;
-- prazo fixo de 36 meses;
-- primeira parcela no mês seguinte;
-- juros à taxa do cliente;
-- carteira própria.
+| Regra | Parâmetros mínimos | Comportamento |
+|---|---|---|
+| **Imediato** | participação | Recebimento no mês da contratação |
+| **Prazo fixo** | participação, sinal, prazo, primeiro vencimento, taxa | Número fixo de parcelas contado a partir de cada safra |
+| **Até um marco** | participação, sinal, marco final, primeiro vencimento, taxa | Quantidade de parcelas depende do mês da venda |
+| **Concentrado em marco** | participação, marco, taxa e convenção de juros | Liquidação única, como repasse |
 
-O percentual de sinal pertence à configuração do Grupo.
+Cada componente precisa informar ou derivar:
 
-### 11.5 Tabela longa
+- participação;
+- percentual de sinal ou entrada;
+- principal financiado;
+- periodicidade;
+- defasagem do primeiro vencimento;
+- prazo fixo ou marco final;
+- taxa;
+- incidência ou não de juros no mês da contratação;
+- regra de fechamento da última parcela.
 
-A tabela longa:
+### 11.4 Modelos comerciais que o app precisa suportar
 
-- não possui sinal;
-- possui componente pago durante a Obra;
-- possui componente destinado ao repasse;
-- começa a receber o componente obra no mês da contratação;
-- usa prazo por safra, até o fim da Obra;
-- acumula juros no saldo de repasse.
+#### À vista
 
-### 11.6 Componentes flexíveis da interface
+```text
+participação à vista
+→ recebimento no mês da contratação
+```
 
-Caso o app mantenha linhas genéricas de “Entrada” e “Parcelamento”, elas precisam ser classificadas de modo que o motor consiga reconciliar:
+#### Curta de 36 parcelas
 
-- principal contratado;
-- sinal;
-- parcelas;
-- juros;
-- componente obra;
-- saldo para repasse;
-- carteira final.
+```text
+sinal no mês da contratação
++ 36 parcelas
++ primeira parcela no mês seguinte
+```
 
-Uma distribuição apenas nominal, que soma o valor contratado sem calcular juros e saldos, não representa integralmente o estudo avançado de referência.
+#### Longa de prazo fixo
 
-> **Comportamento vigente.** É exatamente o caso descrito acima: o JSON `fluxo_pagamento` guarda
-> `comissao`, `ret`, **`entrada` e `parcelas` como listas** de linhas percentuais, e
-> `repasse: { apos_entrega_meses }`. `receitaMensalLinha`, em `frontend/fluxo-caixa-motor.ts`,
-> **rateia o valor nominal** por esses percentuais: não existe sinal, prazo de 36 meses, safra,
-> taxa de juros ao cliente, componente obra nem saldo capitalizado. O repasse é um vencimento
-> residual em `fimObra + apos_entrega_meses`, sobre valor nominal.
->
-> **Evolução dependente de issue.** EVI-010 define o contrato canônico (à vista / curta / longa,
-> com normalizador do shape atual); EVI-012 a EVI-016 implementam a mecânica financeira. Nenhuma
-> delas pode entrar antes do portão de fixture dourada (EVI-001) e do inventário legado (EVI-002).
+```text
+sinal ou entrada configurável
++ N parcelas
++ primeira parcela no mês seguinte
+```
 
-### 11.6.1 Como as parcelas "ao longo da obra" funcionam hoje
+O cenário de referência possui 120 parcelas. Essa modalidade é financiamento direto de longo prazo; não é repasse.
 
-**Comportamento vigente**, decidido nas #190/#191 e ainda em vigor. Os vencimentos são ancorados no
-**cronograma da Obra**, não no mês da venda:
+#### Durante a Obra + repasse
 
-- número de parcelas = `max(1, floor(duração da obra / intervalo))`, com intervalo 1/3/6/12 conforme
-  a periodicidade (Mensal, Trimestral, Semestral, Anual);
+```text
+entrada ou sinal no mês da contratação
++ parcelas do mês seguinte até o fim da Obra
++ saldo concentrado no primeiro mês Após-chaves
+```
+
+Uma venda tardia possui menos parcelas até a Obra e, portanto, parcela maior.
+
+### 11.5 Primeiro vencimento
+
+A convenção funcional é:
+
+```text
+mês da venda
+→ à vista, entrada, sinal ou parcela no ato explicitamente configurada
+
+mês seguinte
+→ primeira parcela recorrente
+```
+
+O motor não deve criar uma parcela no próprio mês apenas porque o componente é chamado de “ao longo da Obra”.
+
+A incidência de juros no mês da contratação precisa ser um parâmetro explícito. O padrão é **não** contar o mês da venda como período financeiro completo.
+
+### 11.6 Comportamento vigente
+
+O JSON `fluxo_pagamento` guarda:
+
+- `comissao`;
+- `ret`;
+- listas de `entrada`;
+- listas de `parcelas`;
+- `repasse.apos_entrega_meses`.
+
+`receitaMensalLinha`, em `frontend/fluxo-caixa-motor.ts`, rateia nominalmente o valor. Não existem:
+
+- desconto comercial como série própria;
+- safra;
+- PMT;
+- taxa de juros do cliente aplicada ao saldo;
+- saldo por componente;
+- distinção entre prazo fixo e até marco;
+- primeiro vencimento configurado de forma econômica;
+- carteira reconciliada.
+
+### 11.6.1 Parcelas “ao longo da Obra” no app instalado
+
+O comportamento atual, originado nas #190/#191, é ancorado no calendário físico da Obra, **não no
+mês da venda**. A mecânica exata, em `vencimentosAoLongoObra` (`frontend/fluxo-caixa-motor.ts`), é:
+
+- número de parcelas = `max(1, floor(duração da obra / intervalo))`, com intervalo 1/3/6/12
+  conforme a periodicidade (Mensal, Trimestral, Semestral, Anual);
 - a 1ª vence no `inicio_mes` da Obra e as demais a cada intervalo;
 - **o resto da divisão não vira parcela** — obra de 10 meses em Trimestral dá 3 parcelas;
 - venda depois do início da Obra: a 1ª parcela cai no primeiro vencimento `>=` mês da venda, e o
-  total é repartido entre os vencimentos restantes;
-- obra sem duração, ou venda após o último vencimento: 1 parcela no mês da venda.
+  valor nominal é repartido entre os vencimentos restantes;
+- obra sem duração, ou venda após o último vencimento: 1 parcela no mês da venda;
+- não existe primeira parcela definida como `mês da venda + 1`;
+- não existe saldo financeiro por safra.
 
-Essa mecânica é **incompatível** com o modelo por safra da §13.4, em que o prazo depende do mês da
-contratação. EVI-013 substitui uma pela outra — e muda os números de estudos existentes.
+Esse comportamento permanece como descrição do runtime atual, mas **não é o modelo funcional de
+referência** depois da reconciliação com Calliandra: no modelo por safra o prazo depende do mês da
+contratação, e a primeira parcela vence em `s + 1`. EVI-013 / #233 substitui uma mecânica pela
+outra — e **muda os números de estudos existentes**.
 
-### 11.7 Repasse residual
+### 11.7 Evolução dependente de issues
 
-O percentual destinado ao repasse é derivado:
+As issues já abertas precisam ser revisadas antes de implementação:
 
-```text
-% repasse
-= 100%
-− soma dos componentes recebidos antes da entrega
-```
+- **EVI-010 / #230** — contrato canônico deve ser baseado nas quatro regras de componente, não apenas em à vista/curta/longa rígidas;
+- **EVI-012 / #232** — deve implementar componente de prazo fixo por safra, incluindo curta de 36 e longa de 120 meses;
+- **EVI-013 / #233** — deve implementar componente até marco, com primeira parcela no mês seguinte, substituindo a premissa anterior de parcela no mês da contratação;
+- **EVI-014 / #234** — deve implementar pagamento concentrado e repasse, com convenção explícita de juros;
+- **EVI-016 / #236** — deve consolidar saldos reais por safra e componente;
+- **EVI-017 / #237** — deve reconciliar Receita Bruta com valor contratado líquido e juros.
 
-O percentual não deve ser informado como uma grandeza independente capaz de fazer a soma ultrapassar ou ficar abaixo de 100%.
+A documentação e os corpos das issues precisam ser atualizados antes de qualquer alteração no motor.
 
 ### 11.8 Regra para novas vendas Após-chaves
 
-O fluxo configurado no Grupo não se aplica a novas vendas depois da entrega.
+O plano financiado do Grupo não se aplica a novas vendas depois da entrega.
 
 ```text
 recebimento da nova venda Após-chaves
-= 100% do valor contratado no mesmo mês
+= 100% do valor contratado líquido no mesmo mês
 ```
 
 O comprador pode pagar parte diretamente e financiar parte com o banco, mas ambas chegam à incorporadora no mesmo mês.
+
+> **Comportamento vigente.** O motor **não distingue** venda anterior de venda posterior à entrega:
+> o mesmo `fluxo_pagamento` do Grupo é aplicado a todas as safras, inclusive às contratadas no
+> Após-chaves — que assim geram parcelas e repasse como se fossem vendas pré-entrega
+> (`frontend/fluxo-caixa-motor.ts` → `receitaMensalLinha`).
+>
+> **Evolução dependente de issue.** EVI-015 / #235.
 
 ### 11.9 Recebimentos antigos continuam
 
 O fato de uma nova venda Após-chaves ser recebida à vista não elimina:
 
-- parcelas da tabela curta de vendas anteriores;
-- repasse das vendas anteriores;
+- parcelas de prazo fixo de vendas anteriores;
+- parcelas até marco que ainda vencerem no mês permitido;
+- repasse;
 - outros valores já contratados antes da entrega.
 
----
+## 12. Vendas contratadas, descontos e controle de estoque
 
-## 12. Vendas contratadas e controle de estoque
+### 12.1 Séries obrigatórias
 
-### 12.1 Série obrigatória
-
-O fluxo deve possuir uma série mensal de **Vendas contratadas**, separada da Receita Bruta.
+O fluxo deve possuir três séries comerciais separadas do recebimento:
 
 ```text
-vendas contratadas da alocação no mês
-= área contratada no mês × preço por m²
+valor bruto contratado
+= área contratada × preço por m²
 ```
 
 ```text
-vendas contratadas do Grupo
-= soma das alocações do Grupo
+desconto comercial
+= valor bruto contratado × percentual de desconto aplicável
 ```
 
 ```text
-vendas contratadas do empreendimento
-= soma de todos os Grupos
+valor contratado líquido
+= valor bruto contratado − desconto comercial
 ```
+
+As três precisam ser abertas por mês, Grupo e tipologia.
 
 ### 12.2 Usos da contratação
 
-As vendas contratadas são a base de:
+O valor contratado líquido é a base de:
+
+- formação das safras;
+- decomposição dos componentes de pagamento;
+- principal financiado;
+- reconciliação da Receita Bruta.
+
+A área contratada é a base de:
 
 - baixa de estoque;
-- corretagem;
-- formação de safras;
-- aderência da curva de absorção;
-- comparação entre Grupos;
-- apuração de juros recebidos;
-- reconciliação entre produto e receita.
+- aderência da absorção.
 
-> **Comportamento vigente.** Existe `vgvVendidoMensal`, em `frontend/fluxo-shared.ts`, mas ela **não
-> é canônica**: reparte o **VGV bruto** da linha (`vgvLinha`, que conta a tipologia inteira),
-> enquanto `receitaMensalLinha`, em `frontend/fluxo-caixa-motor.ts`, reparte o **VGV vendável**
-> (`vgvVendavelLinha`, que exclui as unidades permutadas fisicamente — #195). As duas séries partem
-> de bases diferentes.
+A corretagem acompanha a contratação e precisa declarar se sua base é o valor bruto ou líquido. A mesma despesa não pode existir simultaneamente como dedução embutida e linha de custo.
+
+> **Comportamento vigente.** Existe `vgvVendidoMensal`, em `frontend/fluxo-shared.ts`, mas ela não
+> é canônica: reparte o **VGV bruto** da linha (`vgvLinha`, que conta a tipologia inteira), enquanto
+> `receitaMensalLinha`, em `frontend/fluxo-caixa-motor.ts`, reparte o **VGV vendável**
+> (`vgvVendavelLinha`, que exclui as unidades permutadas fisicamente). As bases divergem.
 >
-> **Consequência confirmada:** `ctxCusto.receitaTotal` é montado com `vglLinha(vgvLinha(...))`, de
-> modo que **corretagem e RET incidem também sobre a unidade permutada fisicamente**, que nunca
-> gera caixa.
->
-> **Evolução dependente de issue.** EVI-008 — uma única função canônica de contratação mensal,
-> usada por baixa de estoque, corretagem e safras, com a base explicitada.
+> **Evolução dependente de issue.** EVI-008 / #227 deve criar uma função canônica e agora também
+> separar valor bruto, desconto e valor líquido. EVI-009 / #229 deve atualizar a taxonomia.
 
 ### 12.3 Contratação não contém juros futuros
 
-O valor contratado é o preço comercial da área vendida. Juros futuros surgem no fluxo de recebimento.
+O valor contratado líquido é o principal comercial assumido pelo comprador. Juros surgem ao longo do recebimento.
 
 ```text
-vendas contratadas acumuladas
+valor contratado líquido acumulado
 ≠ Receita Bruta final, quando houver juros
+```
+
+Quando não existem juros:
+
+```text
+Receita Bruta final = valor contratado líquido acumulado
+```
+
+Quando existem descontos:
+
+```text
+Receita Bruta final
+= valor bruto contratado
+− descontos
++ juros
 ```
 
 ### 12.4 Controle em unidades e em m²
@@ -1079,189 +1167,226 @@ Ao fim da absorção:
 - o estoque nunca pode ser negativo;
 - a soma das alocações não pode ultrapassar o catálogo.
 
----
-
 ## 13. Recebimentos, safras, carteiras e repasse
 
-> ⚠️ **Esta seção inteira descreve o modelo funcional de referência, não o app instalado.**
+> ⚠️ **Esta seção descreve o modelo funcional de referência, não o app instalado.**
 >
-> **Comportamento vigente.** Nada da mecânica desta seção existe hoje. `frontend/fluxo-caixa-motor.ts`
-> reparte o valor nominal de cada venda pelos percentuais de entrada, parcelas e repasse; **não há**
-> safra, PMT, taxa de juros ao cliente, carteira, saldo capitalizado nem componente obra. O repasse é
-> um vencimento residual em `fimObra + apos_entrega_meses`, não a liquidação de um saldo acumulado.
-> As parcelas "ao longo da obra" são ancoradas no cronograma da Obra, independentes do mês da venda.
+> **Comportamento vigente.** `frontend/fluxo-caixa-motor.ts` distribui valores nominais por linhas de
+> entrada, parcelas e repasse. Não há safra, PMT, taxa aplicada ao saldo, carteira ou reconciliação
+> por componente.
 >
-> **Evolução dependente de issue.** EVI-012 (tabela curta por safra), EVI-013 (componente obra da
-> tabela longa), EVI-014 (saldo a repassar e liquidação integral), EVI-015 (vendas Após-chaves à
-> vista) e EVI-016 (carteira consolidada) — todas dependentes de EVI-010 e EVI-011, e todas atrás
-> dos portões EVI-001 e EVI-002.
+> **Revisão obrigatória.** Os corpos atuais de EVI-012, EVI-013 e EVI-014 foram escritos antes da
+> validação completa dos dois fluxos de Calliandra. Antes de implementar, devem ser corrigidos para
+> refletir as regras abaixo.
 
 ### 13.1 Safras
 
-Cada mês de contratação cria safras próprias por:
+Cada mês de contratação cria safras por:
 
 - Grupo;
 - alocação;
-- modalidade de pagamento.
+- mês;
+- componente de pagamento.
 
 A safra conserva:
 
-- mês da venda;
-- valor contratado;
-- prazo;
+- valor bruto;
+- desconto;
+- valor líquido;
+- sinal ou entrada;
+- principal;
 - taxa;
+- primeiro vencimento;
+- prazo ou marco;
 - parcela;
 - saldo.
 
-Essa granularidade é necessária porque contratos feitos em meses diferentes possuem prazos diferentes até a entrega.
-
-### 13.2 Receita à vista
+O fluxo do mês é:
 
 ```text
-receita à vista do mês
-= valor contratado à vista no mês
+receita_t
+= pagamentos imediatos das vendas de t
++ Σ pagamentos das safras anteriores e atuais com vencimento em t
 ```
 
-### 13.3 Tabela curta
+### 13.2 Pagamentos imediatos
 
-#### Contratação
+Entram no mês da contratação:
 
-```text
-sinal
-= valor da tabela curta × % de sinal
-```
+- à vista;
+- entrada;
+- sinal;
+- parcela no ato expressamente configurada.
 
-```text
-principal parcelado
-= valor da tabela curta − sinal
-```
+Não geram carteira futura.
 
-#### Parcela
+### 13.3 Componente de prazo fixo
 
-```text
-parcela mensal
-= PMT(taxa mensal; 36; principal parcelado)
-```
-
-A primeira parcela ocorre no mês seguinte.
-
-#### Carteira
+Para uma safra `s`:
 
 ```text
-carteira curta final
-= carteira curta inicial
-+ juros sobre a carteira inicial
-− parcelas recebidas
-+ novo principal parcelado
-```
-
-O novo principal não capitaliza juros no próprio mês da contratação.
-
-### 13.4 Tabela longa — componente obra
-
-```text
-componente obra
-= valor da tabela longa × % pago durante a Obra
-```
-
-O prazo depende do mês da venda:
-
-```text
-prazo da safra
-= último mês da Obra − mês da venda + 1
+principal_s
+= valor do componente_s − sinal_s
 ```
 
 ```text
-parcela da safra
-= PMT(taxa mensal; prazo da safra; componente obra)
+primeiro vencimento = s + 1
+último vencimento = s + N
 ```
 
-A primeira parcela ocorre no mesmo mês da contratação.
-
-### 13.5 Carteira do componente obra
+Com juros:
 
 ```text
-saldo antes da parcela
-= carteira inicial + novo principal
+parcela_s
+= PMT(taxa mensal; N; principal_s)
+```
+
+Sem juros:
+
+```text
+parcela_s = principal_s ÷ N
+```
+
+A receita mensal é a soma de todas as safras ativas.
+
+Esse componente suporta:
+
+- curta de 36 parcelas;
+- longa de 120 parcelas;
+- outros prazos fixos aprovados.
+
+### 13.4 Componente até um marco
+
+Para:
+
+- `s` = mês da contratação;
+- `M` = último mês permitido para parcela;
+
+a primeira parcela ocorre em `s + 1` e a quantidade é:
+
+```text
+N_s = M − s
+```
+
+Com juros:
+
+```text
+parcela_s = PMT(taxa mensal; N_s; principal_s)
+```
+
+Sem juros:
+
+```text
+parcela_s = principal_s ÷ N_s
+```
+
+Uma venda tardia possui menos parcelas e parcela maior.
+
+Se `N_s ≤ 0`, a configuração deve ser bloqueada ou transformada explicitamente em pagamento imediato/concentrado. O motor não pode criar prazo negativo.
+
+### 13.5 Pagamento concentrado e repasse
+
+O componente concentrado mantém um saldo até um marco.
+
+No padrão:
+
+```text
+mês do repasse = primeiro mês Após-chaves
+```
+
+A incidência de juros precisa ser explícita.
+
+Convenção padrão:
+
+```text
+saldo no mês da contratação = principal
 ```
 
 ```text
-carteira final
-= saldo antes da parcela
-+ juros do mês
-− parcelas recebidas
+juros começam no mês seguinte
 ```
 
-A carteira deve chegar a zero no último mês da Obra.
-
-### 13.6 Saldo para repasse
+No repasse:
 
 ```text
-componente de repasse
-= valor da tabela longa − componente obra
+repasse = principal acumulado + juros acumulados
+saldo final = 0
 ```
 
-Antes da entrega:
+Com taxa zero, o repasse é apenas a soma dos principais.
+
+### 13.6 Carteira por safra
+
+Para componente com primeira parcela no mês seguinte:
 
 ```text
-saldo final para repasse
-= saldo inicial
-+ novas contratações destinadas ao repasse
-+ juros
+saldo_s,s = principal_s
 ```
 
-No primeiro mês Após-chaves:
+Nos meses posteriores:
 
 ```text
-repasse
-= saldo total atualizado
+juros_s,t = saldo_s,t-1 × taxa
+saldo_s,t = saldo_s,t-1 + juros_s,t − pagamento_s,t
 ```
+
+No último vencimento:
 
 ```text
-saldo para repasse final = zero
+saldo_s,t = 0
 ```
 
-### 13.7 Repasse como evento único
+A última parcela pode absorver resíduo imaterial dentro da tolerância.
 
-O repasse:
-
-- ocorre no primeiro mês Após-chaves;
-- é integral;
-- não é antecipado;
-- não é parcelado;
-- zera o saldo;
-- não recebe novas contratações depois da entrega.
-
-### 13.8 Carteira total
+### 13.7 Carteira total
 
 ```text
-carteira total
-= carteira da tabela curta
-+ carteira do componente obra da tabela longa
-+ saldo para repasse
+carteira total_t
+= Σ saldo de todas as safras e componentes em t
 ```
 
-A interface deve permitir visualizar:
+A interface deve abrir, no mínimo:
 
-- carteira total;
-- abertura por componente;
-- pico da carteira;
-- mês do pico;
-- queda provocada pelo repasse;
-- encerramento final.
-
-### 13.9 Uma única carteira econômica real
-
-Não deve existir uma carteira “legado” paralela à carteira econômica.
+- prazo fixo curto;
+- prazo fixo longo;
+- componentes até marco;
+- saldo para repasse;
+- total.
 
 Regras:
 
-- nenhum componente pode ser negativo;
-- saldos devem fechar em zero;
-- resíduos de arredondamento devem ser controlados sem alterar o caixa;
-- o total deve reconciliar com principal, juros e recebimentos.
+- nenhum saldo negativo;
+- nenhum saldo crescendo depois do último pagamento;
+- cada safra fecha;
+- a carteira total termina em zero.
 
----
+### 13.8 Vendas Após-chaves
+
+Novas vendas Após-chaves entram integralmente no mês.
+
+Elas não criam:
+
+- nova safra parcelada;
+- nova carteira;
+- novo saldo para repasse.
+
+No mesmo mês podem continuar parcelas e repasses de contratos antigos.
+
+> **Evolução dependente de issue.** EVI-015 / #235 — ver §11.8 para o comportamento vigente.
+
+### 13.9 O que muda nas issues da Rodada 5
+
+| Issue | Correção necessária |
+|---|---|
+| **EVI-001 / #220** | Dois cenários dourados: Calliandra prazo fixo e Calliandra até Obra + repasse |
+| **EVI-010 / #230** | Contrato baseado em componentes e regras temporais |
+| **EVI-012 / #232** | Generalizar para prazo fixo por safra; curta de 36 e longa de 120 |
+| **EVI-013 / #233** | Primeira parcela no mês seguinte; componente até marco, não parcela no ato |
+| **EVI-014 / #234** | Repasse como pagamento concentrado, taxa zero ou positiva e juros explicitamente convencionados |
+| **EVI-016 / #236** | Carteira derivada de saldos por safra, não de recorrência agregada defeituosa |
+| **EVI-017 / #237** | Receita Bruta = valor contratado líquido + juros |
+| **EVI-020 / #240** | Invariantes por safra e identificação do primeiro mês divergente |
+| **EVI-021 / #241** | Exibir bruto, desconto, líquido, principal, juros, parcelas, repasse e carteira |
 
 ## 14. Receita Bruta — VGV
 
@@ -1271,10 +1396,10 @@ No padrão adotado pela empresa:
 
 ```text
 Receita Bruta do mês
-= à vista
-+ sinais e entradas
-+ parcelas de tabela curta
-+ parcelas da tabela longa durante a Obra
+= pagamentos imediatos
++ parcelas de prazo fixo
++ parcelas até marco
++ pagamentos concentrados
 + repasse
 + novas vendas Após-chaves
 ```
@@ -1284,39 +1409,38 @@ Receita Bruta — VGV
 = soma da Receita Bruta de todos os meses
 ```
 
-### 14.2 Relação com vendas contratadas
+### 14.2 Relação com contratação e descontos
+
+```text
+valor contratado líquido
+= valor bruto contratado − descontos comerciais
+```
 
 Depois do encerramento de todos os recebíveis:
 
 ```text
 Receita Bruta — VGV
-= vendas contratadas acumuladas
-+ juros recebidos dos clientes
+= valor contratado líquido acumulado
++ juros recebidos acumulados
 ```
 
-> **Comportamento vigente.** O campo `receitaBrutaVgv` **já existe** no motor (#188), mas com outro
-> significado: `frontend/fluxo-caixa-motor.ts` calcula `receitaBrutaVgv = vgvTotal −
-> vgvPermutaFisica`. Isso é o **VGV vendável** — uma grandeza de contratação, não a soma dos
-> recebimentos, e por construção não contém juros. O próprio código o marca como "informativo; não
-> altera o fluxo".
+Equivalentemente:
+
+```text
+Receita Bruta — VGV
+= valor bruto contratado acumulado
+− descontos comerciais acumulados
++ juros recebidos acumulados
+```
+
+Essa é a identidade que o motor deve validar.
+
+> **Comportamento vigente.** `receitaBrutaVgv = vgvTotal − vgvPermutaFisica` representa VGV
+> vendável, não recebimento. A série de receita também é líquida de comissão destacada e RET.
 >
-> **Divergência:** o nome exibido hoje ao usuário promete o conceito do padrão e entrega outro.
->
-> **Segunda divergência, mais funda: a série de receita do fluxo também não é bruta.**
-> `receitaMensalLinha` calcula `fator = vglLinha(vgv, fluxo_pagamento) / vgv` e aplica-o a cada
-> recebimento. Como `vglLinha` subtrai **comissão destacada** e **RET**, `receitaMensal` já é
-> **líquida** — não é o que o cliente pagou. O Doc 1 §4.6 define Receita Bruta como a soma do que o
-> **comprador** paga; a corretagem é desembolso do incorporador, não desconto na nota dele.
->
-> Consequência prática: hoje, num estudo com taxa zero e comissão destacada, a "Receita Bruta" seria
-> `contratação × (1 − comissão − RET)`, e o invariante da §14.2 **não fecha**.
->
-> **Evolução dependente de issue.** **EVI-022** desagrega comissão e RET do recebível e cria as
-> séries mensais de corretagem e imposto — é **portão**, porque sem ela "bruto" e "líquido" são o
-> mesmo número. Depois, EVI-009 separa a taxonomia (VGV potencial · VGV vendável · vendas
-> contratadas · juros recebidos · Receita Bruta) preservando os consumidores atuais, e EVI-017 passa
-> a formar a Receita Bruta pelos recebimentos. A ordem importa: renomear antes de existirem juros e
-> antes da desagregação produziria um KPI vazio e um invariante que não fecha.
+> **Evolução dependente de issue.** EVI-022 / #228 desagrega as deduções; EVI-008 / #227 cria
+> contratação canônica; EVI-009 / #229 corrige a taxonomia; EVI-017 / #237 forma a Receita Bruta
+> pelas séries de recebimento.
 
 ### 14.3 O que não integra a Receita Bruta
 
@@ -1333,32 +1457,33 @@ Não entram:
 
 O fluxo e os relatórios devem apresentar separadamente:
 
-- vendas contratadas;
-- receita de caixa;
-- juros recebidos dos clientes;
+- valor bruto contratado;
+- descontos comerciais;
+- valor contratado líquido;
+- principal recebido;
+- juros recebidos;
 - Receita Bruta — VGV acumulada.
 
-O usuário não deve precisar deduzir uma dessas grandezas a partir de uma linha com nome ambíguo.
+O usuário não deve precisar deduzir uma dessas grandezas a partir de uma linha ambígua.
 
 ### 14.5 Hierarquia de apresentação
 
-A receita deve poder ser aberta por:
-
 ```text
+Valor contratado
+├── Bruto
+├── Descontos
+└── Líquido
+    └── Grupo → Tipologia
+
 Receita Bruta — VGV
-├── 1º Grupo
-│   ├── Tipologia A
-│   ├── Tipologia B
-│   └── Tipologia C
-├── 2º Grupo
-│   ├── Tipologia A
-│   └── Tipologia D
-└── demais Grupos
+├── Pagamentos imediatos
+├── Prazo fixo
+├── Até marco
+├── Repasse
+├── Novas vendas Após-chaves
+└── Juros
+    └── Grupo → Tipologia
 ```
-
-A mesma hierarquia deve existir para as vendas contratadas.
-
----
 
 ## 15. Permutas
 
@@ -1511,8 +1636,10 @@ A corretagem segue a contratação, não o recebimento.
 
 ```text
 corretagem do mês
-= vendas contratadas do mês × % de corretagem
+= base contratual declarada do mês × % de corretagem
 ```
+
+A base — valor bruto ou líquido contratado — precisa ser explícita e única. A despesa não pode ser simultaneamente dedução embutida no recebível e linha de custo.
 
 ### 16.6 Impostos
 
@@ -1630,109 +1757,112 @@ O app pode possuir campos de funding ainda não integrados integralmente ao moto
 
 ## 18. Motor mensal e horizonte do estudo
 
-### 18.1 Linha do tempo
+### 18.1 Linha do tempo do cálculo
 
-O motor calcula mês a mês. A sequência funcional é:
+O motor calcula mês a mês, mas a unidade financeira elementar é a safra.
+
+A sequência funcional é:
 
 1. classificar o mês no cronograma;
 2. identificar janelas de absorção;
 3. calcular área contratada por Grupo e alocação;
 4. baixar estoque;
-5. calcular vendas contratadas;
-6. calcular corretagem;
-7. separar modalidades de pagamento pré-entrega;
-8. processar safras de tabela curta;
-9. processar o componente obra da tabela longa;
-10. atualizar saldo para repasse;
-11. receber novas vendas Após-chaves à vista;
-12. consolidar receita e carteira;
-13. calcular impostos;
-14. calcular permuta financeira;
-15. distribuir os demais custos;
-16. formar o fluxo de caixa livre;
-17. processar financiamento à produção;
-18. processar outros instrumentos;
-19. formar o fluxo final;
-20. atualizar acumulados e indicadores;
-21. executar validações de fechamento.
+5. calcular valor bruto contratado;
+6. calcular descontos e valor contratado líquido;
+7. calcular corretagem;
+8. identificar vendas pré ou pós-entrega;
+9. decompor contratos pré-entrega em componentes;
+10. registrar pagamentos imediatos;
+11. criar safras de prazo fixo;
+12. criar safras até marco;
+13. criar saldos concentrados;
+14. processar pagamentos e juros de todas as safras ativas;
+15. liquidar repasse no primeiro mês Após-chaves;
+16. consolidar carteiras;
+17. consolidar principal, juros e Receita Bruta;
+18. calcular impostos;
+19. calcular permuta financeira;
+20. distribuir os demais custos;
+21. formar o fluxo de caixa livre;
+22. processar financiamento à produção;
+23. processar outros instrumentos;
+24. formar o fluxo final;
+25. atualizar acumulados e indicadores;
+26. executar validações de fechamento.
 
 ### 18.2 Horizonte derivado
 
-O horizonte precisa alcançar o último evento relevante.
+O horizonte precisa alcançar o último evento relevante de todas as safras.
 
 ```text
 fim do fluxo
 = máximo entre:
   fim das vendas Após-chaves,
-  última parcela da tabela curta,
+  última parcela de cada componente de prazo fixo,
+  marco final de cada componente até marco,
+  pagamento concentrado ou repasse,
   manutenção pós-obra,
+  último custo,
   quitação de funding,
   demais obrigações
 ```
 
-### 18.3 Constantes
+### 18.3 Constantes e parâmetros
 
-- Tabela curta: 36 meses.
+- Modalidade curta: 36 parcelas.
 - Após-chaves: 12 meses.
+- Primeiro vencimento recorrente: defasagem padrão de 1 mês.
+- Juros no mês da contratação: padrão falso.
 
-Esses são os prazos fixados neste padrão. Os demais prazos permanecem como premissas editáveis ou valores derivados das relações do cronograma. Essas constantes não tornam o horizonte total fixo.
+Prazos longos, marcos e taxas são premissas do plano de pagamento.
 
 ### 18.4 Proteção contra truncamento
 
-O app não deve deslocar recebimentos excedentes para o último mês apenas para caber em um array pré-definido.
+O app não deve deslocar recebimentos excedentes para o último mês apenas para caber em um array predefinido.
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> **Comportamento vigente.** `frontend/fluxo-caixa-motor.ts` faz as duas coisas que esta seção
-> proíbe. O prazo derivado é
-> `max(ultimoCrono + maxRepasse, ultimoCustos, 11) + 1` — ele considera o cronograma, os custos e a
-> folga de repasse, mas **não** as parcelas —, e o depósito tem um fallback explícito:
-> `else if (saida.length > 0) saida[saida.length - 1] += valor; // proteção de horizonte`.
-> Todo recebimento que não cabe é **empilhado no último mês**, o que altera economicamente o fluxo
-> e mascara o erro de dimensionamento em vez de denunciá-lo.
+> **Comportamento vigente.** `frontend/fluxo-caixa-motor.ts` deriva o prazo sem considerar todas as
+> parcelas e possui fallback que empilha excedentes no último mês.
 >
-> **Evolução dependente de issue.** EVI-011 — função pura de derivação do horizonte, cobrindo todos
-> os eventos financeiros, e remoção do fallback silencioso. É **portão** para EVI-012 e EVI-013:
-> implementar tabela curta ou longa sobre um horizonte que empilha sobra produz indicador errado
-> com aparência de certo.
+> **Evolução dependente de issue.** EVI-011 / #231 deve dimensionar o horizonte a partir dos
+> componentes normalizados e remover o fallback silencioso.
 
 ### 18.4.1 Visão Mensal e Anual da tela
 
-**Comportamento vigente, alinhado ao padrão** (#127): a tela oferece dois modos exclusivos de
-exibição das colunas. Em **Mensal** cada coluna é um mês; em **Anual**, `agregarFluxoPorPeriodos`
-reagrupa as colunas em anos-calendário recortados por `periodosAnuais` a partir de
-`data_inicio_projeto` — o primeiro e o último ano podem ser parciais. A agregação é só de
-**exibição**: a soma anual bate com a mensal em toda linha, o acumulado é o saldo do último mês do
-ano, e `vpl`, `tir`, `paybackMes`/`paybackData` e `exposicaoMaxima` **não mudam**. Tabela, gráficos
-e exportações CSV/PDF seguem a view selecionada.
+A tela oferece dois modos de exibição.
+
+- **Mensal:** uma coluna por mês.
+- **Anual:** soma das séries mensais em anos-calendário.
+
+A agregação anual é somente visual. VPL, TIR, payback, exposição e carteiras são calculados sobre o fluxo mensal.
 
 ### 18.5 Precisão e arredondamento
 
-- Cálculos internos devem usar precisão suficiente.
-- Arredondamento de exibição não pode alterar somas econômicas.
-- Resíduos devem ser tratados no encerramento da própria safra ou saldo.
-- O fechamento precisa respeitar uma tolerância documentada.
+- Cálculos internos usam precisão financeira suficiente.
+- Arredondamento de exibição não altera somas econômicas.
+- A última parcela de cada safra pode absorver resíduo imaterial.
+- A tolerância precisa ser documentada.
+- Uma divergência deve indicar primeira linha, safra e mês afetados.
 
 ### 18.6 Visão anual
 
-A visão anual é uma agregação da visão mensal.
+Na visão anual:
 
-- receitas e custos: soma dos meses;
-- acumulado: saldo do último mês do período;
-- VPL, TIR, payback e exposição: permanecem calculados sobre o fluxo mensal.
-
-Mudar a visualização não pode recalcular o empreendimento em periodicidade anual.
-
----
+- receitas, descontos, juros e custos são somados;
+- carteira e acumulados usam o saldo do último mês do período;
+- indicadores permanecem os mesmos da visão mensal.
 
 ## 19. Resultados, indicadores e visualizações
 
 ### 19.1 KPIs principais
 
-O Resumo e o Fluxo devem exibir, conforme o nível do estudo:
+O Resumo e o Fluxo devem exibir:
 
 - Receita Bruta — VGV;
-- vendas contratadas;
+- valor bruto contratado;
+- descontos comerciais;
+- valor contratado líquido;
 - juros recebidos;
 - custo total;
 - resultado;
@@ -1744,38 +1874,11 @@ O Resumo e o Fluxo devem exibir, conforme o nível do estudo:
 - carteira máxima;
 - endividamento máximo.
 
-> **Comportamento vigente.** O app calcula e exibe hoje:
+> **Comportamento vigente.** O app já calcula Resultado, margens, ROI, VPL, TIR, Payback e
+> Exposição máxima. Os KPIs de contratação líquida, descontos, juros, carteira máxima e
+> endividamento máximo dependem da evolução do motor.
 >
-> | Indicador | Origem no código | Nível |
-> |---|---|---|
-> | **Resultado final** | `Receita líquida − custos (+ permutas)` | Preliminar |
-> | **Margem bruta / Margem líquida** | `margemBrutaPct`, `margemLiquidaPct` | Preliminar |
-> | **ROI** | `roiPct` | Preliminar |
-> | **Custo de obras / VGV** | `custoObrasVgvPct` | Preliminar |
-> | **VPL** | à `taxa_desconto_aa` | Avançado |
-> | **TIR** | `tir` (% a.a.) | Avançado |
-> | **Payback** | `paybackMes` / `paybackData` | Avançado |
-> | **Exposição máxima** | `min(fluxoAcumulado)` | Avançado |
-> | **VGV total · VGV permuta física · Receita Bruta (VGV)** | #188 — informativos, não alteram o fluxo | Avançado |
->
-> **Faltam:** *vendas contratadas* como série própria (EVI-008), *juros recebidos* (EVI-012 a
-> EVI-015), *carteira máxima* (EVI-016) e *endividamento máximo* (EVI-019) — os quatro dependem de
-> mecânica financeira que ainda não existe. E, como registrado na §14, o KPI hoje rotulado
-> "Receita Bruta (VGV)" mede o VGV vendável, não os recebimentos.
->
-> **Benchmarks.** Registro geral do app (não do Núcleo), definido pelo **administrador** por
-> `tipo_empreendimento`. Cada benchmark tem `campo`, `valor` e `regra_comparacao`
-> (`atingir_ou_superar` | `nao_exceder`), com faixas de medidor
-> (`medidor_min`/`_max`/`_faixa1_ate`/`_faixa2_ate`). O botão **"Criar indicadores padrão"** semeia
-> o conjunto do MVP: `resultado_final`, `margem_bruta`, `margem_liquida`, `roi`, `custo_obras_vgv`.
-> Cada KPI aparece verde/vermelho contra seu benchmark. Ver [Benchmarks e Sensibilidade](benchmarks).
->
-> **Preço Sugerido/m².** Menor preço de venda por m² para a margem atingir o **piso do benchmark
-> `resultado_final`**, resolvido por **bisseção** sobre o preço (valor único, mesmo na Incorporação).
-> Ver [Fórmulas](formulas).
->
-> **Um único indicador não decide.** Margem alta com exposição de caixa incompatível é projeto
-> inviável; exibir os indicadores estruturais juntos, contra benchmark, é requisito de produto.
+> O KPI atual chamado “Receita Bruta (VGV)” mede VGV vendável, não a soma dos recebimentos.
 
 ### 19.2 Exposição máxima
 
@@ -1794,16 +1897,38 @@ A tela deve apresentar:
 
 A tabela deve permitir expansão hierárquica.
 
-#### Receitas
+#### Contratação
 
 ```text
-Vendas contratadas
-├── Grupo
-│   └── Tipologias
+Valor contratado
+├── Bruto
+├── Descontos
+└── Líquido
+    └── Grupo → Tipologia
+```
 
+#### Recebimentos
+
+```text
 Receita Bruta — VGV
-├── Grupo
-│   └── Tipologias
+├── Pagamentos imediatos
+├── Prazo fixo
+├── Até marco
+├── Repasse
+├── Após-chaves
+├── Principal
+└── Juros
+    └── Grupo → Tipologia
+```
+
+#### Carteira
+
+```text
+Carteira de clientes
+├── Prazo fixo curto
+├── Prazo fixo longo
+├── Até marco
+└── Saldo para repasse
 ```
 
 #### Custos
@@ -1834,8 +1959,10 @@ Antes das colunas mensais, a tabela deve apresentar, quando aplicável:
 
 - Total;
 - VPL;
-- percentual do VGV;
-- unidade ou base;
+- percentual da base;
+- unidade;
+- regra de pagamento;
+- prazo ou marco;
 - outros atributos necessários à leitura.
 
 ### 19.5 Filtros
@@ -1844,29 +1971,31 @@ A visualização pode permitir:
 
 - global;
 - por Grupo;
+- por tipologia;
+- por componente;
 - mensal;
 - anual;
 - expandir ou recolher hierarquia.
 
-O filtro não altera o cálculo, apenas a apresentação.
+O filtro não altera o cálculo.
 
 ### 19.6 Gráficos
 
 Gráficos úteis incluem:
 
+- contratação bruta e líquida;
 - receita e custo mensal;
+- principal e juros;
 - fluxo mensal;
 - caixa acumulado;
 - avanço da Obra;
 - composição de custos;
 - absorção acumulada;
-- carteira;
+- carteira por componente;
 - endividamento;
 - comparação de cenários.
 
 Marcos do cronograma devem aparecer na mesma régua temporal dos dados.
-
----
 
 ## 20. Cenários, mercado e apoio à decisão
 
@@ -1922,40 +2051,22 @@ Ela deve utilizar documentos e informações fornecidos, manter a rastreabilidad
 
 ### 21.1 Validações de entrada
 
-Devem bloquear o cálculo ou a aplicação da configuração:
-
 | Regra | Condição |
 |---|---|
 | Tipologia inválida | Área, quantidade ou preço incompatíveis com a operação |
 | Saldo excedido | Soma das alocações ultrapassa o estoque disponível |
 | Absorção inválida | Pré-lançamento + Lançamento + Durante a obra > 100% |
-| Pagamento inválido | À vista + tabela curta > 100% ou componentes totais incompatíveis |
+| Desconto inválido | Desconto negativo ou superior ao valor bruto |
+| Plano inválido | Participações dos componentes não fecham 100% |
+| Sinal inválido | Sinal fora do intervalo de 0% a 100% do componente |
+| Prazo inválido | Prazo fixo não positivo |
+| Primeiro vencimento inválido | Defasagem negativa ou parcela no ato não explicitada |
+| Marco inválido | Marco anterior ao primeiro vencimento |
 | Cronograma inválido | Lançamento ou período comercial fora da Obra |
-| Prazo inválido | Prazo, carência ou duração incompatíveis |
-| Preço inválido | Preço por m² não positivo em alocação comercial |
 | Funding inválido | Percentual, limite ou prazo incoerente |
 
-> **Comportamento vigente.** As validações rodam no frontend (`frontend/premissas-validacao.ts`) e
-> no backend. Hoje existem:
->
-> | Regra | Implementação |
-> |---|---|
-> | Absorção por Grupo excede 100% | `lancamento + obra > 100` (Após-chaves é o resíduo) — em **3** períodos, não 4 |
-> | Fluxo de pagamento excede 100% | `Σ entrada + Σ parcelas > 100` (repasse é o resíduo) |
-> | Trava de alocação por estudo | `Σ unidades alocadas da tipologia em todos os Grupos > quantidade` do catálogo → `422 SALDO_EXCEDIDO` |
-> | Excluir tipologia com alocações | Bloqueado → `422 TIPOLOGIA_EM_USO` |
-> | Carência ≥ prazo | `financiamento_carencia_meses ≥ financiamento_prazo_meses` com financiamento > 0 |
->
-> **Faltam:** validação de cronograma ("período comercial fora da Obra"), de pagamento por
-> modalidade (à vista + curta) e de funding além da carência — as três dependem de conceitos que
-> ainda não existem (EVI-006, EVI-010, EVI-019).
->
-> **Invariantes de fechamento já verificados** sobre a saída do motor: conservação da Proforma
-> (`Resultado = Σ linhas`), fechamento de estoque (vendidas = alocadas, nunca negativo),
-> conservação de receita (`Σ receitaMensal = VGV recebível`, líquido de comissão/RET), repasse
-> derivado (`% repasse = 100 − Σ entrada − Σ parcelas`) e zeramento de saldos residuais de centavo
-> na apresentação. **Não existe** hoje relatório de reconciliação nem fixture que compare séries
-> mensais contra referência — é o objeto de EVI-001 e EVI-020.
+> **Comportamento vigente.** Existem validações de absorção, fluxo nominal, alocação e carência.
+> As validações por componente, safra e marco ainda não existem.
 
 ### 21.2 Invariantes de produto
 
@@ -1975,37 +2086,66 @@ estoque final = 0 ao fim da absorção de 100%
 ### 21.3 Invariantes de contratação
 
 ```text
-vendas contratadas acumuladas
-= soma das áreas contratadas × respectivos preços
+valor bruto contratado
+= Σ área contratada × preço por m²
 ```
 
-A contratação por período deve reproduzir os percentuais de absorção do Grupo.
+```text
+valor contratado líquido
+= valor bruto contratado − descontos
+```
+
+```text
+Σ componentes da safra
+= valor contratado líquido da safra
+```
 
 ### 21.4 Invariantes de recebimento
 
+Por safra:
+
+```text
+sinal + principal financiado
+= valor do componente
+```
+
+```text
+Σ amortizações = principal
+```
+
+```text
+Σ pagamentos = principal + juros
+```
+
+No empreendimento:
+
 ```text
 Receita Bruta — VGV
-= soma dos recebimentos mensais dos clientes
+= Σ recebimentos mensais
 ```
 
 ```text
 Receita Bruta — VGV
-= vendas contratadas acumuladas + juros recebidos
+= valor contratado líquido acumulado + juros recebidos
 ```
 
 ### 21.5 Invariantes de carteira
 
-- carteira curta termina em zero;
-- carteira do componente obra termina em zero no fim da Obra;
-- saldo para repasse termina em zero no mês do repasse;
-- carteira total nunca é negativa;
+- cada safra começa com o principal correto;
+- juros incidem no período correto;
+- nenhum saldo é negativo;
+- cada safra zera no último vencimento;
+- nenhum saldo volta a crescer depois do encerramento;
+- carteira total é a soma dos componentes;
 - carteira total termina em zero.
 
 ### 21.6 Invariantes do repasse
 
 - ocorre em um único mês;
 - ocorre no primeiro mês Após-chaves;
-- liquida todo o saldo;
+- liquida o saldo integral;
+- a taxa pode ser zero ou positiva;
+- a convenção de juros é explícita;
 - não é funding;
 - não recebe contratos novos depois da entrega.
 
@@ -2015,23 +2155,54 @@ Receita Bruta — VGV
 - liberações não integram Receita Bruta;
 - amortizações não reduzem custos operacionais;
 - juros financeiros permanecem identificáveis;
-- o fluxo final reconcilia com o fluxo livre e o funding.
+- fluxo final reconcilia com fluxo livre e funding.
 
-### 21.8 Alertas não bloqueantes
+### 21.8 Cenários dourados
 
-O app deve alertar, sem necessariamente impedir:
+A suíte de referência deve incluir dois casos Calliandra.
+
+#### Prazo fixo
+
+Valores mínimos de conferência:
+
+| Mês | Receita esperada |
+|---:|---:|
+| 1 | R$ 878.539,92 |
+| 2 | R$ 914.119,61 |
+| 3 | R$ 949.699,31 |
+| 4 | R$ 985.279,01 |
+| 13 | R$ 355.796,98 |
+| 38 | R$ 344.737,04 |
+| 132 | R$ 18.389,82 |
+| 133 | R$ 0,00 |
+
+#### Até Obra + repasse
+
+| Mês | Receita esperada |
+|---:|---:|
+| 1 | R$ 356.846,75 |
+| 2 | R$ 372.361,83 |
+| 3 | R$ 388.582,14 |
+| 12 | R$ 582.045,90 |
+| 13 a 24 | R$ 254.936,38 por mês |
+| 25 | R$ 19.983.418,20 |
+
+O teste deve identificar a primeira linha, safra e mês divergente.
+
+### 21.9 Alertas não bloqueantes
+
+O app deve alertar sobre:
 
 - custo fora de benchmark;
 - eficiência atípica;
 - absorção agressiva;
-- concentração de recebimento no repasse;
+- desconto elevado;
+- concentração no repasse;
+- prazo longo de carteira;
 - ausência de contingência;
-- carteira elevada;
-- estudo com premissas majoritariamente inferidas;
-- falta de cenário adverso;
-- exposição acima da capacidade de capital configurada.
+- exposição acima da capacidade de capital.
 
-### 21.9 Mensagens
+### 21.10 Mensagens
 
 A mensagem de validação deve informar:
 
@@ -2039,11 +2210,8 @@ A mensagem de validação deve informar:
 - onde está o campo;
 - qual regra foi violada;
 - qual valor foi encontrado;
+- qual safra ou mês foi afetado;
 - o que precisa ser corrigido.
-
-Mensagens genéricas como “dados inválidos” não são suficientes para um estudo financeiro complexo.
-
----
 
 ## 22. Exportação, auditabilidade e reprodutibilidade
 
@@ -2059,43 +2227,63 @@ O app pode exportar:
 
 O relatório deve refletir exatamente:
 
-- as premissas vigentes;
-- os valores calculados na tela;
-- a visão mensal ou anual selecionada;
-- a hierarquia de Grupos e tipologias;
-- os indicadores do mesmo cálculo-base.
+- premissas vigentes;
+- valores calculados na tela;
+- visão mensal ou anual selecionada;
+- hierarquia de Grupos e tipologias;
+- componentes de pagamento;
+- indicadores do mesmo cálculo-base.
 
 ### 22.3 Conteúdo mínimo do estudo avançado
 
-- identificação do estudo;
-- versão ou data da extração;
+- identificação e versão do estudo;
 - cronograma;
 - tipologias;
 - Grupos e alocações;
 - absorção;
-- fluxo de pagamento;
-- vendas contratadas;
+- plano de pagamento;
+- valor bruto contratado;
+- descontos;
+- valor contratado líquido;
 - Receita Bruta — VGV;
+- principal e juros;
+- carteiras;
+- repasse;
 - custos;
 - funding;
 - fluxo mensal;
-- carteira;
 - indicadores;
 - alertas relevantes.
 
-### 22.4 Reprodutibilidade
+### 22.4 Visão de auditoria por safra
+
+O relatório de diagnóstico deve permitir rastrear, ao menos em formato técnico:
+
+- Grupo;
+- tipologia;
+- mês da contratação;
+- componente;
+- principal;
+- sinal;
+- primeiro vencimento;
+- prazo ou marco;
+- parcela;
+- juros;
+- saldo final.
+
+A apresentação executiva pode permanecer consolidada. A visão por safra é necessária para explicar divergências.
+
+### 22.5 Reprodutibilidade
 
 Uma exportação deve conter informação suficiente para que o estudo seja conferido sem depender apenas da tela.
 
 Quando um resultado for derivado, o relatório deve identificar a premissa ou base que o originou.
 
-### 22.5 CSV não é modelo de dados
+### 22.6 CSV não é modelo de dados
 
 Meses podem aparecer como colunas no relatório. Isso não significa que a persistência interna deva criar uma coluna para cada mês.
 
-O relatório é uma visão horizontal de uma série temporal; o modelo interno deve continuar extensível.
-
----
+O relatório é uma visão horizontal de séries temporais; o modelo interno deve continuar extensível.
 
 ## 23. Jornadas principais do usuário
 
@@ -2146,13 +2334,14 @@ O relatório é uma visão horizontal de uma série temporal; o modelo interno d
 ### Jornada 6 — Analisar o fluxo
 
 1. Abrir a visão mensal.
-2. Conferir vendas contratadas.
-3. Conferir receita e repasse.
-4. Conferir carteiras.
-5. Conferir custos e funding.
-6. Ver exposição, VPL, TIR e payback.
-7. Alternar para visão anual sem alterar KPIs.
-8. Expandir Grupos e tipologias quando necessário.
+2. Conferir valor bruto contratado, descontos e valor líquido.
+3. Conferir pagamentos imediatos e parcelas das safras.
+4. Conferir receita, juros e repasse.
+5. Conferir carteiras.
+6. Conferir custos e funding.
+7. Ver exposição, VPL, TIR e payback.
+8. Alternar para visão anual sem alterar KPIs.
+9. Expandir Grupos, tipologias e componentes quando necessário.
 
 ### Jornada 7 — Decidir e reportar
 
@@ -2169,71 +2358,89 @@ O relatório é uma visão horizontal de uma série temporal; o modelo interno d
 
 Esta seção é diagnóstica. Ela não substitui o documento de issues e não autoriza mudanças diretas.
 
-> A auditoria verificada contra o código — conceito a conceito, com evidência em `arquivo:linha`,
-> status e classe de impacto — está em `docs/rodada-5-evi-2026-07-31.md`. Os corpos das 22 issues
-> propostas estão em `docs/issues-evi-propostas-2026-07-31.md`, **ainda não abertas**.
+A auditoria original está em `docs/rodada-5-evi-2026-07-31.md`. A validação posterior dos recebíveis acrescenta uma segunda conclusão: o motor-alvo precisa ser **por safras e componentes**, e algumas premissas dos corpos já abertos devem ser corrigidas antes da implementação.
 
 ### 24.1 Estruturas já alinhadas
 
-O desenho atual já possui fundamentos adequados:
+O desenho atual possui fundamentos adequados:
 
 - catálogo de tipologias;
-- agrupadores comerciais com várias tipologias;
+- Grupos com várias tipologias;
 - alocações de quantidade e preço por m²;
-- possibilidade de repetir tipologia em agrupadores diferentes;
-- absorção e fluxo de pagamento pertencentes ao agrupador;
+- tipologia repetida em Grupos diferentes;
+- absorção e plano de pagamento pertencentes ao Grupo;
 - cálculo mensal;
 - visão anual como agregação;
-- hierarquia por agrupador e tipologia;
-- controle de permissões por estudo;
-- ciclo de vida;
-- cenários;
-- exportação;
+- hierarquia por Grupo e tipologia;
+- permissões, ciclo de vida, cenários e exportação;
 - integração com o UrbiVerso.
 
 Esses fundamentos devem ser preservados.
 
-### 24.2 Pontos de nomenclatura
+### 24.2 Lacunas do motor de recebíveis
 
-- A interface ainda utiliza **Fase** para o conceito que passa a se chamar **Grupo**.
-- O termo **Pós-obra** pode aparecer onde o padrão usa **Após-chaves**.
-- Linhas de VGV e receita podem não distinguir contratação, recebimento e juros com clareza suficiente.
+O runtime atual:
 
-### 24.3 Pontos temporais
+- distribui valor nominal por linhas genéricas;
+- não cria safras;
+- não calcula PMT;
+- não separa prazo fixo de prazo até marco;
+- não controla primeiro vencimento de forma econômica;
+- não possui descontos como série;
+- não possui principal e juros separados;
+- não possui carteira real;
+- trata repasse como vencimento residual;
+- pode truncar valores no último mês.
 
-- A duração de Pós-obra pode estar configurável, enquanto o padrão determina 12 meses.
-- A faixa de absorção “Obra” pode coincidir com toda a Obra física, embora o período comercial “Durante a obra” deva começar depois do Lançamento.
-- O cronograma interno 0-based pode começar no Planejamento; isso é aceitável desde que as relações econômicas estejam corretas.
+### 24.3 Correção de premissas anteriores
 
-### 24.4 Pontos do motor de recebíveis
+A reconciliação com Calliandra corrige os seguintes pontos:
 
-- O fluxo atual pode distribuir o valor nominal sem calcular toda a capitalização de juros por safra.
-- Vendas contratadas e Receita Bruta podem aparecer como uma única grandeza.
-- Carteiras econômicas completas podem não estar presentes.
-- O repasse pode ser tratado apenas como vencimento residual, sem saldo reconciliado.
-- Novas vendas Após-chaves precisam seguir a regra à vista da planilha de referência.
+- a primeira parcela recorrente ocorre no mês seguinte à venda;
+- pagamento no próprio mês deve ser imediato e explícito;
+- uma tabela longa pode ser prazo fixo, como 120 meses;
+- um fluxo até a Obra + repasse é outro modelo;
+- desconto comercial reduz a base antes dos juros;
+- a carteira deve ser derivada por safra;
+- Urbitá serve como referência de sobreposição de recebimentos, mas não de carteira.
 
-### 24.5 Pontos de funding
+### 24.4 Issues que precisam de revisão documental
 
-- Campos financeiros podem existir sem integração completa ao fluxo mensal.
-- Financiamento à produção precisa permanecer separado de repasse.
+Antes de implementação, revisar:
 
-### 24.6 Permuta física
+- #220;
+- #227;
+- #229;
+- #230;
+- #231;
+- #232;
+- #233;
+- #234;
+- #236;
+- #237;
+- #240;
+- #241.
 
-A dinâmica futura de entrada das unidades permutadas ainda não está definida. Nenhuma reestruturação ampla deve ocorrer antes dessa decisão.
+A revisão pode ser feita por atualização dos corpos ou comentários de escopo aprovados. Nenhuma mudança de runtime deve começar com uma premissa desatualizada.
 
-### 24.7 Conversão em mudanças
+### 24.5 Funding e permutas
 
-As diferenças desta seção devem ser convertidas em issues independentes no documento de instrução ao Claude Code, com:
+As conclusões anteriores permanecem:
 
-- prioridade;
-- dependências;
-- impacto em dados existentes;
-- critérios de aceite;
-- testes;
-- necessidade ou não de migração.
+- financiamento à produção é separado do repasse;
+- permuta física não gera caixa;
+- permuta financeira acompanha recebimentos;
+- o Bloco Financeiro ainda precisa de decisão de integração ou remoção.
 
----
+### 24.6 Conversão em mudanças
+
+Cada evolução deve preservar:
+
+- leitura de dados existentes;
+- compatibilidade com o UrbiVerso;
+- testes atuais;
+- rastreabilidade entre documento, issue, código e resultado;
+- comparação contra os dois cenários dourados.
 
 ## 25. Limites deste documento e governança de mudanças
 
@@ -2287,7 +2494,7 @@ A implementação ocorrerá somente quando:
 
 ## 26. Critérios funcionais de aceite
 
-O aplicativo estará funcionalmente aderente ao padrão quando conseguir demonstrar, em um estudo controlado, todos os pontos abaixo.
+O aplicativo estará funcionalmente aderente quando demonstrar os pontos abaixo em estudos controlados.
 
 ### 26.1 Produto e Grupos
 
@@ -2308,55 +2515,65 @@ O aplicativo estará funcionalmente aderente ao padrão quando conseguir demonst
 
 ### 26.3 Contratação
 
-- Existe série mensal de vendas contratadas.
+- Existem valor bruto, desconto e valor líquido.
+- A contratação é mensal e aberta por Grupo e tipologia.
 - Contratação baixa estoque e calcula corretagem.
 - Contratação não inclui juros futuros.
-- A soma por Grupo e tipologia fecha com o total.
+- A soma fecha com área × preço − descontos.
 
-### 26.4 Pagamentos
+### 26.4 Plano de pagamento
 
-- Vendas pré-entrega podem ser à vista, tabela curta ou tabela longa.
-- Tabela curta tem sinal, 36 parcelas e início no mês seguinte.
-- Tabela longa tem componente obra e repasse.
-- O prazo da tabela longa varia por safra.
+- Componentes fecham 100% do valor líquido.
+- O app suporta imediato, prazo fixo, até marco e concentrado.
+- Curta possui 36 parcelas.
+- Longa de prazo fixo pode possuir outro prazo, como 120.
+- Primeiro vencimento recorrente é no mês seguinte, salvo exceção explícita.
+- Juros no mês da contratação são configuração explícita.
 - Novas vendas Após-chaves entram integralmente no mês.
 
-### 26.5 Carteira e repasse
+### 26.5 Safras e carteira
 
-- Existe carteira curta.
-- Existe carteira do componente obra.
-- Existe saldo para repasse.
-- A carteira total é a soma dos componentes.
-- Nenhum saldo fica negativo.
-- O repasse integral ocorre no primeiro mês Após-chaves.
+- Cada mês de venda cria safras.
+- As parcelas de safras diferentes se sobrepõem corretamente.
+- Cada safra possui principal, juros, pagamento e saldo.
+- Nenhum saldo é negativo.
+- Cada safra zera no último vencimento.
+- Carteira total fecha com a soma dos componentes.
+- Carteira final é zero.
+
+### 26.6 Repasse
+
+- O repasse é pagamento concentrado no primeiro mês Após-chaves.
+- Taxa zero e taxa positiva funcionam.
+- A convenção de juros é explícita.
 - O repasse zera o saldo.
-- A carteira final é zero.
+- Não é financiamento à produção.
 
-### 26.6 Receita Bruta — VGV
+### 26.7 Receita Bruta — VGV
 
 - É a soma de todos os recebimentos dos clientes.
 - Inclui juros.
 - Não inclui funding.
-- Reconcilia com vendas contratadas mais juros.
-- Pode ser aberta por Grupo e tipologia.
+- Reconcilia com valor líquido contratado mais juros.
+- Reconcilia com valor bruto menos descontos mais juros.
+- Pode ser aberta por Grupo, tipologia e componente.
 
-### 26.7 Custos e funding
+### 26.8 Custos e funding
 
 - Corretagem acompanha contratação.
 - Imposto acompanha recebimento.
-- Custos respeitam suas curvas.
+- Custos respeitam curvas.
 - Financiamento à produção possui fluxo separado.
 - Dívidas terminam zeradas.
 
-### 26.8 Resultados
+### 26.9 Resultados e referência
 
 - Fluxo mensal fecha.
 - Visão anual não altera KPIs.
-- TIR, VPL, payback e exposição são derivados do fluxo mensal.
-- Exportação reproduz os números da tela.
-- O mesmo estudo produz o mesmo resultado em nova execução.
-
----
+- TIR, VPL, payback e exposição derivam do fluxo mensal.
+- Exportação reproduz a tela.
+- Os dois cenários Calliandra são reproduzidos dentro da tolerância.
+- A primeira divergência é identificável por linha, safra e mês.
 
 ## 27. Glossário funcional
 
@@ -2364,53 +2581,52 @@ O aplicativo estará funcionalmente aderente ao padrão quando conseguir demonst
 |---|---|
 | **Absorção** | Distribuição percentual das vendas contratadas pelos períodos globais |
 | **Alocação** | Quantidade de uma tipologia destinada a um Grupo, com preço por m² |
-| **Após-chaves** | Período fixo de 12 meses após a entrega para vender o estoque remanescente |
-| **Carteira** | Saldo econômico ainda devido pelos clientes |
-| **Contrato ou venda contratada** | Valor fechado no mês, antes dos juros futuros |
-| **Durante a obra** | Período comercial entre o fim do Lançamento e o fim da Obra física |
-| **Estudo Avançado** | Estudo com dimensão temporal, recebíveis, funding e indicadores de retorno |
+| **Após-chaves** | Período fixo de 12 meses após a entrega |
+| **Carteira** | Soma dos saldos econômicos ainda devidos pelos clientes |
+| **Componente até marco** | Parte do contrato paga em parcelas que terminam num marco comum |
+| **Componente concentrado** | Parte do contrato liquidada num único mês |
+| **Componente de prazo fixo** | Parte do contrato paga em quantidade fixa de parcelas por safra |
+| **Desconto comercial** | Redução do preço de tabela antes da formação do recebível |
+| **Durante a obra** | Período comercial entre o fim do Lançamento e o fim da Obra |
+| **Estudo Avançado** | Estudo com dimensão temporal, recebíveis, funding e retorno |
 | **Estudo Preliminar** | Estudo estático de produto, preço, custo e resultado |
-| **Evento do cronograma** | Marco ou janela temporal global do empreendimento |
+| **Evento do cronograma** | Marco ou janela temporal global |
 | **Financiamento à produção** | Dívida da incorporadora para financiar custos elegíveis |
-| **Fluxo de pagamento** | Regras que transformam contratação em recebimentos |
 | **Grupo** | Agrupamento comercial de estoque, preço, absorção e pagamento |
 | **Juros do cliente** | Remuneração pelo financiamento direto concedido pela incorporadora |
 | **Obra física** | Execução construtiva do empreendimento |
+| **Pagamento imediato** | À vista, entrada, sinal ou parcela no ato |
 | **Permuta financeira** | Pagamento proporcional ao recebimento, com visão bruta e líquida |
-| **Permuta física** | Transferência de área ou unidades do produto, sem receita de caixa |
-| **Repasse** | Liquidação bancária do saldo do comprador no primeiro mês Após-chaves |
-| **Safra** | Conjunto de contratos originados no mesmo mês e sob as mesmas condições |
-| **Tabela curta** | Financiamento com sinal e 36 parcelas iniciadas no mês seguinte |
-| **Tabela longa** | Financiamento sem sinal, com componente obra e saldo para repasse |
-| **Tipologia** | Conjunto homogêneo de unidades com área e características próprias |
-| **Vendas contratadas** | Soma dos valores comerciais fechados, sem juros futuros |
+| **Permuta física** | Transferência de área ou unidades, sem receita de caixa |
+| **PMT** | Parcela periódica calculada por principal, taxa e prazo |
+| **Primeiro vencimento** | Primeiro mês de parcela recorrente; padrão mês seguinte à venda |
 | **Receita Bruta — VGV** | Soma de todos os recebimentos dos clientes, inclusive juros |
+| **Repasse** | Liquidação bancária concentrada no primeiro mês Após-chaves |
+| **Safra** | Contratos originados no mesmo mês, Grupo, alocação e componente |
+| **Tabela curta** | Componente de prazo fixo com 36 parcelas |
+| **Tabela longa de prazo fixo** | Financiamento direto longo, como 120 parcelas |
+| **Tabela longa com repasse** | Pagamento durante a Obra combinado com saldo concentrado |
+| **Tipologia** | Conjunto homogêneo de unidades com área e características próprias |
+| **Valor bruto contratado** | Área contratada × preço por m², antes de descontos |
+| **Valor contratado líquido** | Valor bruto menos descontos, sem juros futuros |
 
 ### 27.1 Termos do app não cobertos acima
 
-Preservados do vocabulário vigente, porque continuam corretos e em uso:
+Preservados do vocabulário vigente:
 
 | Termo | Definição |
 |---|---|
-| **Área privativa** | Área de propriedade exclusiva da unidade; base do produto (`area_pvt_*`) |
+| **Área privativa** | Área de propriedade exclusiva da unidade |
 | **Área vendável líquida** | Área/VGV disponível após a permuta física |
-| **Apelo Comercial** | Análise qualitativa por IA (6 fatores) do imóvel |
-| **Benchmark** | Indicador de referência por tipo de empreendimento, definido pelo administrador |
-| **Exposição máxima** | Maior saldo negativo do fluxo acumulado; o capital próprio exigido |
-| **Nível de análise** | `preliminar` (estático) ou `avancado` (fluxo de caixa) |
-| **Outorga onerosa** | Contrapartida pelo potencial construtivo acima do coeficiente básico |
-| **Preço Sugerido/m²** | Menor preço para atingir o piso do benchmark `resultado_final` |
-| **RET** | Regime Especial de Tributação (imposto de 4% quando `sujeito_ret`) |
-| **VGV** | Valor Geral de Vendas — área privativa fechada × preço. Medida de tamanho |
-| **Fase** | ⚠️ Termo **legado** da interface para o que este padrão chama **Grupo**. Em `avancado_fases`, ainda designa tanto o Grupo comercial (`tipo='receita'`) quanto o marcador do gantt (`tipo='cronograma'`) |
-
----
-
-# Anexos — material específico do app
-
-Os anexos abaixo foram **preservados** da versão anterior deste documento. Eles descrevem o app
-instalado com um nível de detalhe que o padrão funcional não cobre, e são a ponte entre conceito e
-código.
+| **Apelo Comercial** | Análise qualitativa por IA do imóvel |
+| **Benchmark** | Indicador de referência por tipo de empreendimento |
+| **Exposição máxima** | Maior saldo negativo do fluxo acumulado |
+| **Nível de análise** | `preliminar` ou `avancado` |
+| **Outorga onerosa** | Contrapartida pelo potencial acima do coeficiente básico |
+| **Preço Sugerido/m²** | Menor preço para atingir o piso do benchmark |
+| **RET** | Regime Especial de Tributação |
+| **VGV potencial** | Área privativa fechada × preço, antes dos recebimentos |
+| **Fase** | Termo legado da interface para Grupo comercial ou marcador de cronograma, conforme o contexto |
 
 ## Anexo A — Convenções de cálculo do app
 
@@ -2505,23 +2721,165 @@ Endpoints principais: `/estudos` (CRUD + duplicar + ciclo de status), `/benchmar
 `POST`/`PATCH`/`DELETE` e `POST /benchmarks/semear` para admin), rotas de
 Empreendimento/Tipologias/Fases/Custos do Avançado, `/apelo-comercial` e exportação.
 
-## Anexo F — Decisões do autor ainda vigentes
+## Anexo F — Decisões históricas e vigência
 
-Preservadas dos mapas das rodadas 1–4, apagados em 2026-07-31 depois que todas as issues foram
-mergeadas. O restante daqueles documentos era backlog fechado; o que segue **continua valendo** e
-não deve ser relitigado.
+Preservadas dos mapas anteriores para impedir perda de contexto.
 
-| Origem | Decisão | Consequência aceita |
+| Origem | Decisão histórica | Situação atual |
 |---|---|---|
-| **#185** | Gráfico de fluxo acumulado usa `urbi-grafico-linha` com 2 séries, diferenciadas **por cor** | Abre mão da **linha tracejada** e dos **marcos rotulados** (Payback, Exposição, Obra): `SerieGrafico` declara só `{ rotulo, valores, cor }` e nenhum gráfico do `ui/src` tem `dasharray` ou anotação. Mitigação adotada: cores de alto contraste, `legenda="sempre"`, marcos como texto **fora** do gráfico. Estender `SerieGrafico` exigiria mudança no monorepo `urbiverso`. |
-| **#190**, **#191** | O número de parcelas "ao longo da obra" é **fixo e ancorado no cronograma da Obra** | Detalhado na §11.6.1. Mudou os números de estudos existentes quando entrou. |
-| **#192** | Gráficos de avanço de obra exibem **só a linha `Projetado`** | `Realizado`, `Desvio` e `Forecast` ficam fora de escopo e **não têm issue**. |
+| **#185** | Gráfico de fluxo acumulado usa `urbi-grafico-linha` com 2 séries diferenciadas por cor | **Continua vigente.** O primitivo não oferece tracejado nem anotações. Marcos ficam como texto fora do gráfico. |
+| **#190**, **#191** | Parcelas “ao longo da Obra” são fixas e ancoradas no cronograma físico | **Vigente apenas como comportamento do runtime atual.** Foi superado como modelo-alvo pela validação Calliandra. Deve permanecer até a implementação aprovada de EVI-013, sem refatoração antecipada. |
+| **#192** | Gráficos de avanço de Obra exibem somente `Projetado` | **Continua vigente.** Realizado, Desvio e Forecast permanecem fora de escopo. |
 
-> **Regra geral que essas decisões ilustram:** atributo ou prop inexistente num primitivo `urbi-*`
-> **não dá erro — simplesmente não faz nada**. Leia o `dist/index.d.ts` do SDK, ou
-> `ui/src/urbi-<nome>.ts` no monorepo, antes de presumir que uma prop existe.
+A mudança de entendimento sobre #190/#191 não autoriza alteração direta. Ela exige:
+
+1. atualização da documentação e do corpo da issue;
+2. fixture dourada;
+3. inventário de impacto em estudos existentes;
+4. implementação isolada;
+5. comparação de resultados antes e depois.
+
+> **Regra geral:** atributo ou prop inexistente num primitivo `urbi-*` não dá erro — simplesmente não
+> faz nada. Leia o `dist/index.d.ts` do SDK ou o componente no monorepo antes de presumir uma prop.
 
 ---
+
+## Anexo G — Cenários dourados de recebíveis
+
+> **Origem da referência.** Os dois cenários vêm de EVIs do projeto **Calliandra**, que é um
+> **loteamento**. O que se importa deles é a **mecânica de recebíveis** — safra, sinal, primeiro
+> vencimento, PMT, marco e repasse —, que é idêntica na Incorporação. Não se importa produto,
+> tipologia, custo nem estrutura de obra. Uma fixture de Incorporação reproduz a mecânica com
+> tipologias e Grupos próprios.
+
+### G.1 Cenário Calliandra — prazo fixo
+
+Premissas de referência:
+
+- 20% à vista;
+- 5% de desconto à vista;
+- 13,3% em 36 parcelas;
+- aproximadamente 64,81% em 120 parcelas;
+- aproximadamente 1,8868% em uma linha separada de `Venda Casas`;
+- 15% de sinal nos componentes parcelados;
+- 15% a.a.;
+- primeira parcela no mês seguinte.
+
+#### Inputs mínimos da fixture
+
+Os valores esperados abaixo só são reproduzíveis com a base contratada e a curva de absorção. Elas
+são parte da fixture, não detalhe do arquivo de origem:
+
+```text
+base contratada total = R$ 28.601.115,20
+
+meses 1 a 4   → R$ 2.860.111,52 por mês   (10,0% da base por mês)
+meses 5 a 12  → R$ 2.145.083,64 por mês   ( 7,5% da base por mês)
+meses 13+     → sem contratação
+```
+
+```text
+taxa mensal equivalente
+= 1,15^(1/12) − 1
+= 1,1714917% a.m.
+```
+
+Conferências que a fixture deve reproduzir por construção, não por cópia:
+
+```text
+à vista do mês 1   = 20% × (1 − 5%) × 2.860.111,52 = R$ 543.421,19
+sinal curta mês 1  = 13,3% × 15% × 2.860.111,52    = R$  57.059,22
+parcela curta de uma safra de pré-lançamento
+                   = PMT(1,1714917%; 36; 13,3% × 85% × 2.860.111,52)
+                   = R$  11.059,94
+```
+
+#### A quarta modalidade
+
+A `Venda Casas` corresponde a **1 de 53 lotes** (1 ÷ 53 = 1,8868%) e possui regra própria: **240
+parcelas** com **30% de sinal**. Essa regra existe nas premissas do estudo, mas **não foi levada
+para as colunas de receita do fluxo** — o fluxo abre somente à vista, tabela curta e tabela longa.
+
+Consequência para a fixture: a linha agregada de `Vendas Contratadas` **inclui** a `Venda Casas`,
+de modo que as três modalidades representadas somam **98,1132%**, não 100%. A fixture precisa
+isolar a base das três modalidades ou modelar a quarta regra. **Não force um fechamento
+artificial.**
+
+Valores mínimos das modalidades à vista, curta e longa:
+
+| Mês | Receita |
+|---:|---:|
+| 1 | R$ 878.539,92 |
+| 2 | R$ 914.119,61 |
+| 3 | R$ 949.699,31 |
+| 4 | R$ 985.279,01 |
+| 13 | R$ 355.796,98 |
+| 38 | R$ 344.737,04 |
+| 49 | R$ 245.197,58 |
+| 122 | R$ 220.677,83 |
+| 132 | R$ 18.389,82 |
+| 133 | R$ 0,00 |
+
+### G.2 Cenário Calliandra — até Obra + repasse
+
+Premissas inferidas e reconciliadas:
+
+- 15% de entrada;
+- 15% em parcelas do mês seguinte até o mês 24;
+- 70% de repasse no mês 25;
+- taxa zero.
+
+#### Inputs mínimos da fixture
+
+A curva de absorção deste cenário é **diferente** da do G.1 — é uniforme:
+
+```text
+base contratada total = R$ 28.547.740,29
+
+meses 1 a 12  → R$ 2.378.978,36 por mês   (1/12 da base por mês)
+meses 13+     → sem contratação
+```
+
+Para uma safra do mês `s`:
+
+```text
+N_s            = 24 − s
+parcela_s      = 15% × 2.378.978,36 ÷ N_s
+primeiro venc. = s + 1
+último venc.   = 24
+repasse        = 70% × 28.547.740,29 no mês 25
+```
+
+Conferências que fecham com os valores esperados:
+
+```text
+mês 1        = 15% × 2.378.978,36                        = R$    356.846,75
+meses 13–24  = 15% × 2.378.978,36 × Σ_{s=1..12} 1/(24−s) = R$    254.936,38
+mês 25       = 70% × 28.547.740,29                       = R$ 19.983.418,20
+```
+
+Valores mínimos:
+
+| Mês | Receita |
+|---:|---:|
+| 1 | R$ 356.846,75 |
+| 2 | R$ 372.361,83 |
+| 3 | R$ 388.582,14 |
+| 12 | R$ 582.045,90 |
+| 13 a 24 | R$ 254.936,38 por mês |
+| 25 | R$ 19.983.418,20 |
+
+### G.3 Uso nos testes
+
+A fixture deve:
+
+- manter inputs e valores esperados versionados;
+- conferir cada mês;
+- separar contratação, descontos, principal, juros e saldo;
+- identificar primeira divergência;
+- verificar horizonte;
+- fechar cada safra e a carteira total;
+- funcionar sem depender dos arquivos Excel em runtime.
 
 ## Veja também
 

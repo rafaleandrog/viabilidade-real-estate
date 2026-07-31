@@ -4,6 +4,87 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Revisão de recebíveis por safras — referência Calliandra (2026-07-31)
+
+Branch `claude/cashflow-formulas-rules-km5538`, a partir de `519bfbf`. Sessão **documental e
+diagnóstica**, conforme instrução de sessão recebida do autor. **Diff só em `.md`** —
+`git diff --stat 519bfbf -- ':!*.md'` volta vazio. Sem schema, sem migração, sem backend, sem
+frontend; `versao` **não muda**; `validar-frontend.sh`/`validar-backend.sh` não se aplicam.
+
+### A conclusão
+
+> **Cada mês de contratação cria uma safra própria.** O caixa mensal é a soma dos pagamentos
+> imediatos das vendas do mês com as parcelas e liquidações de todas as safras anteriores ainda
+> ativas — e a **primeira parcela recorrente vence em `s + 1`**, não no mês da venda.
+
+Isso **derruba uma premissa que estava escrita no repo**: o padrão anterior dizia
+`prazo da safra = último mês da Obra − mês da venda + 1`, com a primeira parcela no mesmo mês. O
+modelo correto é `N_s = M − s` com primeira parcela em `s + 1`. A premissa errada já tinha sido
+copiada para o corpo da issue **#233 / EVI-013**, inclusive no critério de aceite.
+
+Também ficou claro que **a "tabela longa" não é um modelo único**: prazo fixo (120 parcelas) e até
+marco (parcelas até o fim da Obra + repasse concentrado) são regras temporais distintas.
+
+### O que foi conferido, não presumido
+
+O cenário de **prazo fixo** foi reconciliado contra `20250820_EV_Calliandra_rg_1.xlsx` (aba `Fluxo`,
+coluna `Receita Total (VGV)`) e bate **exatamente** nos 10 meses de controle. A mecânica foi
+reproduzida por construção: taxa mensal `1,15^(1/12) − 1 = 1,1714917%`, à vista
+`20% × 0,95 × contratado`, PMT com primeira parcela em `s + 1`, N = 36 e N = 120. O mês 13 fecha em
+`4 × 11.059,94 + 8 × 8.294,95 = 110.599,40` na curta.
+
+O cenário **até Obra + repasse** vem de outro arquivo, não fornecido. Os inputs que faltavam foram
+reconstruídos por engenharia reversa e fecham nos três pontos de controle: base
+R$ 28.547.740,29 uniforme em 12 meses (R$ 2.378.978,36/mês), 15% / 15% / 70%, taxa zero.
+
+**Achado crítico:** nenhum dos dois cenários trazia base contratada nem curva de absorção — sem
+elas a fixture dourada de **#220**, que é o portão da Rodada 5 inteira, não era construível. Os
+inputs verificados entraram no Anexo G do padrão funcional e na §11 da inteligência EVI.
+
+**Sobre a `Venda Casas`:** ela é **1 de 53 lotes** (1,8868%) e tem regra própria — 240 parcelas com
+30% de sinal — que **não aparece nas colunas de receita do fluxo**. As três modalidades
+representadas somam **98,1132%**, não 100%. A fixture precisa isolar a base ou modelar a quarta
+regra; não force fechamento artificial. Calliandra, note-se, é um **loteamento**: o que se importa
+dele é a mecânica de recebíveis, não produto nem custo.
+
+### Arquivos alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `docs/viabilidade/inteligencia-evi-incorporacao.md` | Substituído pela versão revisada + inputs dos cenários, origem da referência e detalhe da `Venda Casas` |
+| `docs/viabilidade/padrao-incorporacao.md` | Substituído pela versão revisada + as mesmas correções, âncora do Anexo F, ponteiro EVI-015/#235 e restauração do detalhe do comportamento vigente em §11.6.1 |
+| `docs/revisao-recebiveis-calliandra-2026-07-31.md` | **Novo.** Nota de revisão com a reconciliação completa e as emendas que a spec precisaria receber |
+| `docs/rodada-5-evi-2026-07-31.md` | Auditoria original **preservada**; nova §2.1 com 8 linhas de divergência e correção dos ponteiros de seção que a renumeração do Doc 2 invalidou |
+| `docs/issues-evi-propostas-2026-07-31.md` | Corpos originais **intactos** + nova seção *Emendas pendentes de aprovação* |
+| `docs/viabilidade/modelo-de-dados.md` | Seção consultiva *Evolução de domínio prevista para recebíveis* |
+| `docs/viabilidade/formulas.md` | Aviso de onde vivem as fórmulas do fluxo por safras + proibição de copiar carteira do Urbitá |
+| `docs/viabilidade/exportacao.md` | Linhas previstas como evolução dependente de #241 |
+| `docs/viabilidade/visao-geral.md` | Nível Avançado deixou de ser descrito como "v2"; ponteiro para o modelo de referência |
+| `CLAUDE.md` | Nota das 12 issues que exigem emenda; anexos A–G; nota de ambiente sobre PR via MCP |
+
+### ⚠️ Doze issues precisam de emenda antes de serem implementadas
+
+**#220, #227, #229, #230, #231, #232, #233, #234, #236, #237, #240 e #241.** Os corpos publicados
+no GitHub **não foram tocados** — a instrução da sessão proíbe abrir, fechar, editar ou comentar
+issue, e o autor confirmou essa escolha. As emendas propostas estão em
+`docs/issues-evi-propostas-2026-07-31.md`, seção *Emendas pendentes de aprovação*, **pendentes de
+aprovação do autor**.
+
+A pior é a **#233**: seu critério de aceite afirma *"a 1ª parcela ocorre no mês da venda"*.
+Implementá-la pelo corpo atual produz a regra errada **com aparência de aderência ao documento**.
+
+A Rodada 5 continua com **22 issues, todas abertas, 0 implementadas**. A ordem dos portões não
+mudou.
+
+### Nada de runtime mudou
+
+Nenhuma linha de `frontend/`, `backend/`, `schema.json`, `migracoes/` ou `manifesto.json`. O modelo
+por safras **não está implementado** e nenhum documento afirma que esteja. A decisão do autor
+sobre #190/#191 (Anexo F) continua vigente como comportamento do runtime: a mudança de
+entendimento **não autoriza refatoração antecipada**.
+
+---
+
 ## Alinhamento documental EVI + backlog preparado (2026-07-31)
 
 Branch `claude/viabilidade-incorporacao-padroes-vksjs7`, a partir de `8ff6679`. Sessão

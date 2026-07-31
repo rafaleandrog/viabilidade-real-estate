@@ -4,6 +4,14 @@
 > auditoria que conferiu cada corpo contra o código. Correspondência abaixo. Este arquivo continua
 > sendo a fonte dos corpos completos — a issue no GitHub traz o mesmo conteúdo.
 
+> ⚠️ **12 corpos exigem emenda antes de serem implementados.** A revisão de recebíveis Calliandra
+> (2026-07-31) derrubou premissas de #220, #227, #229, #230, #231, #232, **#233**, #234, #236,
+> #237, #240 e #241. Os corpos abaixo continuam **como foram abertos**; as correções estão na seção
+> [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação), ao final. **Não pegue nenhuma
+> dessas issues pelo corpo antigo** — em especial a **#233**, cujo critério de aceite afirma o
+> oposto da regra hoje aprovada. Nenhuma issue foi editada no GitHub: aplicar as emendas é decisão
+> do autor.
+
 | ID local | Issue | Título | Onda |
 |---|---|---|:--:|
 | EVI-001 | #220 | cenário dourado reconciliado mês a mês | 0 |
@@ -98,6 +106,8 @@ dependência. A raiz de três delas é a mesma e virou issue própria.
 ---
 
 ## EVI-001 — Cenário dourado de Incorporação reconciliado mês a mês
+
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#220 / EVI-001`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
 
 **Título:** `test(fluxo): cenário dourado de Incorporação reconciliado mês a mês`
 **Label:** `enhancement` · **Prioridade:** P0 · **Classe:** M2/testes · **Risco:** baixo no runtime, alto valor como portão
@@ -481,6 +491,8 @@ sentido depois que a absorção tiver quatro períodos.
 
 ## EVI-008 — Série canônica de vendas contratadas
 
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#227 / EVI-008`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
+
 **Título:** `feat(receitas): série canônica de vendas contratadas, separada do recebimento`
 **Label:** `bug` · **Prioridade:** P1 · **Classe:** M2 · **Risco:** médio
 
@@ -650,6 +662,8 @@ Anexo A (C6).
 
 ## EVI-009 — Taxonomia de VGV, contratação, recebimento e juros
 
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#229 / EVI-009`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
+
 **Título:** `refactor(receitas): explicitar VGV potencial, vendável, contratado e Receita Bruta`
 **Label:** `enhancement` · **Prioridade:** P1 · **Classe:** M2/U1 · **Risco:** médio a alto — os nomes atuais são consumidos por telas e exportações
 
@@ -708,6 +722,8 @@ forem grandezas distintas no motor.
 
 ## EVI-010 — Contrato canônico de pagamento por Grupo
 
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#230 / EVI-010`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
+
 **Título:** `refactor(receitas): contrato canônico de pagamento por Grupo, sem quebrar o JSON legado`
 **Label:** `enhancement` · **Prioridade:** P1 · **Classe:** P3/M2 · **Risco:** alto
 
@@ -756,6 +772,8 @@ persistência nova.
 ---
 
 ## EVI-011 — Horizonte derivado de todos os eventos financeiros
+
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#231 / EVI-011`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
 
 **Título:** `fix(fluxo): derivar o horizonte de todos os eventos financeiros e remover o fallback`
 **Label:** `bug` · **Prioridade:** P1 · **Classe:** M2 · **Risco:** médio
@@ -811,6 +829,8 @@ prazo explícito insuficiente.
 
 ## EVI-012 — Tabela curta com sinal, 36 parcelas e juros por safra
 
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#232 / EVI-012`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
+
 **Título:** `feat(receitas): tabela curta com sinal, 36 parcelas e juros por safra`
 **Label:** `enhancement` · **Prioridade:** P2 · **Classe:** M2 · **Risco:** alto
 
@@ -860,6 +880,8 @@ arredondamento definidos.
 
 ## EVI-013 — Componente Obra da tabela longa por safra
 
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. **A premissa de primeiro vencimento deste corpo está errada** — ver a emenda. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#233 / EVI-013`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
+
 **Título:** `feat(receitas): componente Obra da tabela longa por safra`
 **Label:** `enhancement` · **Prioridade:** P2 · **Classe:** M2 · **Risco:** alto
 
@@ -907,6 +929,8 @@ pré-entrega; múltiplas safras; taxa zero; reconciliação principal/juros; fix
 ---
 
 ## EVI-014 — Saldo a repassar capitalizado e liquidação integral
+
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#234 / EVI-014`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
 
 **Título:** `feat(receitas): saldo a repassar capitalizado e liquidação integral`
 **Label:** `enhancement` · **Prioridade:** P2 · **Classe:** M2 · **Risco:** alto
@@ -1007,6 +1031,8 @@ financiado pré-entrega.
 
 ## EVI-016 — Carteira econômica real de clientes
 
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#236 / EVI-016`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
+
 **Título:** `feat(fluxo): carteira econômica real de clientes por componente`
 **Label:** `enhancement` · **Prioridade:** P2 · **Classe:** M2 · **Risco:** alto
 
@@ -1051,6 +1077,8 @@ venda Após-chaves; horizonte completo; fixture dourada.
 ---
 
 ## EVI-017 — Receita Bruta — VGV formada pelos recebimentos
+
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#237 / EVI-017`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
 
 **Título:** `feat(receitas): Receita Bruta — VGV formada pelos recebimentos, com juros`
 **Label:** `enhancement` · **Prioridade:** P2 · **Classe:** M2/U1 · **Risco:** alto — altera números e nomenclatura
@@ -1258,6 +1286,8 @@ financiamento; horizonte final.
 
 ## EVI-020 — Invariantes e relatório de reconciliação
 
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#240 / EVI-020`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
+
 **Título:** `feat(fluxo): invariantes e relatório de reconciliação`
 **Label:** `enhancement` · **Prioridade:** P2 · **Classe:** M2/testes · **Risco:** baixo no cálculo, alto valor operacional
 
@@ -1298,6 +1328,8 @@ dívida aberta; diferença de centavos dentro e fora da tolerância; cenário to
 ---
 
 ## EVI-021 — Fluxo de Caixa, KPIs e exportações
+
+> ⚠️ **Corpo publicado, com premissa superada.** A revisão de recebíveis Calliandra (2026-07-31) exige emenda antes da implementação desta issue. Texto proposto em [Emendas pendentes de aprovação](#emendas-pendentes-de-aprovação) → `#241 / EVI-021`. O corpo abaixo é preservado como registro do que foi aberto no GitHub.
 
 **Título:** `feat(fluxo): exibir contratação, juros, carteiras, repasse e funding`
 **Label:** `enhancement` · **Prioridade:** P3 · **Classe:** U1/M2 · **Risco:** médio
@@ -1352,3 +1384,199 @@ e PDF; valores zero e negativos; números longos sem quebrar layout; guard de as
 
 **Dependências.** EVI-017, EVI-019 e EVI-020. **Documentação afetada.** `padrao-incorporacao.md`
 §19, §22, `exportacao.md`.
+
+---
+
+# Emendas pendentes de aprovação
+
+**Origem:** revisão de recebíveis por safras contra os dois EVIs de Calliandra, 2026-07-31.
+Reconciliação completa em `docs/revisao-recebiveis-calliandra-2026-07-31.md`.
+
+**Estado:** nenhuma issue foi aberta, fechada, editada ou comentada no GitHub. Os corpos acima
+continuam sendo o que está publicado. Esta seção registra **o que precisa mudar em cada um** para
+que a implementação não parta de premissa superada. Aplicar as emendas é decisão do autor.
+
+**O total continua 22 issues, todas abertas, nenhuma implementada.** As ordens não negociáveis
+permanecem: #220/#221 antes de qualquer M2 · #231 antes de #232/#233 · #228 antes de #237, #238 e
+#239.
+
+---
+
+## #220 / EVI-001 — cenário dourado
+
+**Emenda.** O escopo passa a exigir **dois** fixtures, não um:
+
+1. **Calliandra prazo fixo** — 20% à vista com 5% de desconto, 13,3% em 36 parcelas, ~64,81% em
+   120 parcelas, 15% de sinal nos parcelados, 15% a.a., primeira parcela em `s + 1`.
+2. **Calliandra até Obra + repasse** — 15% de entrada, 15% em parcelas de `s + 1` até o mês 24,
+   70% de repasse no mês 25, taxa zero.
+
+**Inputs obrigatórios** (sem eles os valores esperados são números sem premissa):
+
+```text
+Cenário 1 — base R$ 28.601.115,20
+  meses 1 a 4   → R$ 2.860.111,52 por mês
+  meses 5 a 12  → R$ 2.145.083,64 por mês
+  taxa mensal   = 1,15^(1/12) − 1 = 1,1714917% a.m.
+
+Cenário 2 — base R$ 28.547.740,29
+  meses 1 a 12  → R$ 2.378.978,36 por mês (uniforme)
+  taxa          = zero
+```
+
+**Advertência que precisa entrar no corpo.** No cenário 1 as participações à vista, curta e longa
+somam **98,1132%**. O restante — **1,8868%, exatamente 1 de 53 lotes** — é `Venda Casas`, com regra
+própria (240 parcelas, 30% de sinal) que **não aparece nas colunas de receita do fluxo**. A fixture
+precisa isolar a base das três modalidades ou modelar a quarta regra. **Não force um fechamento
+artificial contra a linha agregada de `Vendas Contratadas`.**
+
+**Valores mínimos de conferência.**
+
+| Cenário 1 — mês | Receita | | Cenário 2 — mês | Receita |
+|---:|---:|---|---:|---:|
+| 1 | R$ 878.539,92 | | 1 | R$ 356.846,75 |
+| 2 | R$ 914.119,61 | | 2 | R$ 372.361,83 |
+| 3 | R$ 949.699,31 | | 3 | R$ 388.582,14 |
+| 4 | R$ 985.279,01 | | 12 | R$ 582.045,90 |
+| 13 | R$ 355.796,98 | | 13 a 24 | R$ 254.936,38 por mês |
+| 38 | R$ 344.737,04 | | 25 | R$ 19.983.418,20 |
+| 49 | R$ 245.197,58 | | | |
+| 122 | R$ 220.677,83 | | | |
+| 132 | R$ 18.389,82 | | | |
+| 133 | R$ 0,00 | | | |
+
+**Critério de aceite novo.** O teste identifica a primeira divergência por **linha, safra e mês**.
+
+## #227 / EVI-008 — série canônica de contratação
+
+**Emenda.** O escopo deixa de ser "uma série canônica" e passa a ser **três**:
+
+- valor bruto contratado (`área contratada × preço/m²`);
+- desconto comercial (série própria, não fator embutido);
+- valor contratado líquido (`bruto − desconto`).
+
+Acrescentar: **base única de corretagem**, declarada explicitamente como bruto **ou** líquido. A
+mesma despesa não pode existir como dedução embutida no recebível **e** como linha de custo.
+
+## #229 / EVI-009 — taxonomia
+
+**Emenda.** A taxonomia passa a ter oito grandezas, não quatro:
+
+VGV potencial · VGV vendável · valor bruto contratado · descontos · valor contratado líquido ·
+principal recebido · juros · Receita Bruta.
+
+## #230 / EVI-010 — contrato canônico de pagamento
+
+**Emenda.** Substituir o contrato rígido (à vista / curta / longa) por **contrato de componentes**,
+com quatro regras econômicas: **imediato**, **prazo fixo**, **até marco** e **concentrado em
+marco**.
+
+Campos mínimos de cada componente: participação · sinal · prazo ou marco · defasagem do primeiro
+vencimento · periodicidade · taxa · **juros no mês da contratação** (default falso) · regra de
+fechamento da última parcela.
+
+O adapter do JSON legado continua obrigatório.
+
+## #231 / EVI-011 — horizonte
+
+**Emenda.** O horizonte passa a ser derivado de **todos os componentes e todas as safras** — não
+apenas do cronograma e do repasse:
+
+```text
+fim do fluxo = máximo entre
+  fim das vendas Após-chaves,
+  última parcela de cada componente de prazo fixo,
+  marco final de cada componente até marco,
+  pagamento concentrado ou repasse,
+  manutenção pós-obra, último custo, quitação de funding
+```
+
+O fallback que empilha excedente no último mês continua removido.
+
+## #232 / EVI-012 — prazo fixo por safra
+
+**Título proposto:** `feat(receitas): componentes de prazo fixo por safra, com sinal, juros e primeiro vencimento`
+
+**Emenda.** Deixa de ser "tabela curta de 36" e passa a ser o **componente de prazo fixo
+generalizado**. Escopo: curta de 36 · longa de 120 · primeiro vencimento em `s + 1` · PMT · taxa
+zero · saldo por safra.
+
+```text
+principal_s     = valor do componente_s − sinal_s
+primeiro venc.  = s + 1
+último venc.    = s + N
+parcela_s       = PMT(taxa mensal; N; principal_s)      — com juros
+parcela_s       = principal_s ÷ N                        — sem juros
+```
+
+## #233 / EVI-013 — até marco por safra
+
+**Título proposto:** `feat(receitas): componentes até marco por safra`
+
+> 🔴 **Esta é a emenda crítica da rodada.** O corpo publicado afirma, no contexto e no primeiro
+> critério de aceite, que *"a 1ª parcela ocorre no mês da venda"*. **A premissa está errada** e foi
+> desmentida numericamente contra a planilha de Calliandra. Implementar a issue pelo corpo atual
+> produz a regra errada com aparência de aderência ao documento.
+
+**Correções obrigatórias:**
+
+- remover a primeira parcela no mês da venda → **primeira parcela em `s + 1`**;
+- remover `prazo da safra = último mês da Obra − mês da venda + 1` → **`N_s = M − s`**;
+- venda tardia tem **menos** parcelas e parcela **maior**;
+- suportar taxa zero (divisão simples) e PMT;
+- **erro explícito quando `N_s ≤ 0`** — bloquear a configuração ou convertê-la, com decisão do
+  usuário, em pagamento imediato ou concentrado. O motor não pode criar prazo negativo.
+
+**Critério de aceite corrigido:**
+
+- ~~[ ] O prazo varia conforme o mês da venda; a 1ª parcela ocorre no mês da venda.~~
+- [ ] O prazo varia conforme o mês da venda (`N_s = M − s`); a **1ª parcela ocorre no mês seguinte**.
+
+## #234 / EVI-014 — concentrado e repasse
+
+**Título proposto:** `feat(receitas): pagamentos concentrados e repasse com saldo reconciliado`
+
+**Emenda.** Acrescentar: taxa **zero ou positiva** · convenção de juros **explícita** · juros
+começam, por padrão, **depois** da contratação (`saldo_s,s = principal_s`) · repasse no primeiro mês
+Após-chaves · liquidação integral (`saldo final = 0`).
+
+Com taxa zero, o repasse é apenas a soma dos principais.
+
+## #236 / EVI-016 — carteira
+
+**Emenda.** Exigir **saldos por safra e componente**. Proibir recorrência agregada sobre um saldo
+único — é ela que produz carteira negativa e carteira que volta a crescer depois do último
+pagamento (o defeito observado no arquivo Urbitá, que **não** deve ser copiado).
+
+## #237 / EVI-017 — Receita Bruta
+
+**Emenda.** Corrigir o invariante para as duas formas equivalentes:
+
+```text
+Receita Bruta = valor contratado líquido + juros
+Receita Bruta = valor bruto − descontos + juros
+```
+
+A segunda forma é a que falha quando o desconto comercial não existe como série — por isso #227
+antecede.
+
+## #240 / EVI-020 — invariantes
+
+**Emenda.** Acrescentar quatro invariantes:
+
+- soma dos componentes da safra = valor contratado líquido da safra;
+- saldo de cada safra = zero no último vencimento;
+- nenhuma carteira volta a crescer depois do último pagamento;
+- a divergência é reportada com **primeira linha, safra e mês**.
+
+## #241 / EVI-021 — apresentação
+
+**Emenda.** Acrescentar as linhas de apresentação: bruto · desconto · líquido · imediato · prazo
+fixo · até marco · concentrado · principal · juros · carteira.
+
+---
+
+## Issues sem emenda
+
+**#221, #222, #223, #224, #225, #226, #228, #235, #238, #239** seguem válidas com os corpos
+publicados. A revisão não alterou nenhuma premissa delas.

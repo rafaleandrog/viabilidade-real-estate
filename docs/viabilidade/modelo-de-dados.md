@@ -41,6 +41,30 @@ Todas as tabelas usam `acesso_externo: "restrito"` — a escrita passa pelas rot
 
 Integridade (Lote 6 · #19): excluir uma tipologia do catálogo com alocações é **bloqueado** (422 `TIPOLOGIA_EM_USO`); editar nome/área reflete ao vivo nas alocações (a alocação guarda só unidades + preço).
 
+## Evolução de domínio prevista para recebíveis
+
+> ⚠️ **Seção consultiva.** Nada aqui existe no `schema.json`, em migração ou em runtime. Ela
+> registra os conceitos que o modelo de dados precisará representar quando as issues de recebíveis
+> da Rodada 5 forem aprovadas e implementadas. **Nenhuma tabela ou coluna deve ser criada a partir
+> deste texto** — só a partir de issue aprovada.
+
+A revisão de recebíveis Calliandra (`docs/revisao-recebiveis-calliandra-2026-07-31.md`) concluiu que
+a unidade financeira elementar do fluxo avançado **não é o mês**, e sim a **safra**.
+
+| Conceito | O que precisa ser representado |
+|---|---|
+| **Safra** | Contratos originados no mesmo `mês × Grupo × alocação × componente`. É a chave econômica mínima; hoje não existe entidade equivalente |
+| **Componente de pagamento** | Regra que converte parte do contrato em recebimentos. Quatro tipos: **imediato**, **prazo fixo**, **até marco**, **concentrado em marco**. Hoje o `fluxo_pagamento` guarda `entrada` e `parcelas` como listas sem semântica temporal |
+| **Bruto / desconto / líquido** | Três séries mensais separadas por Grupo e tipologia. Hoje existe uma única série derivada do VGV, e o desconto comercial não existe |
+| **Primeiro vencimento** | Defasagem configurável, com padrão `s + 1`. Hoje não há campo — as parcelas partem do mês da venda ou do cronograma da Obra |
+| **Prazo fixo** | `N` fixo por componente, contado a partir de cada safra (36, 120, outros) |
+| **Marco** | Mês comum de encerramento; o prazo da safra passa a ser `N_s = M − s` |
+| **Saldo** | Saldo por safra e componente, com `saldo_s,s = principal_s` e `saldo_s,t = saldo_s,t-1 + juros_s,t − pagamento_s,t`. A carteira total é a soma desses saldos, nunca uma recorrência agregada |
+
+Duas restrições que a evolução precisa respeitar: **compatibilidade de leitura** dos estudos já
+gravados (via adapter do JSON legado, EVI-010 / #230) e o inventário de dados legados
+(EVI-002 / #221), que é portão da rodada.
+
 ## Regras de precisão
 
 - Monetários (R$) e áreas (m²): `decimal(12,2)`.
