@@ -26,6 +26,21 @@ App do UrbiVerso que substitui planilhas dispersas por uma aplicação centraliz
   - **Apelo Comercial** — análise qualitativa por IA (6 fatores) a partir de documentos anexados.
 - **Estudo Avançado** — páginas próprias: Resumo, Empreendimento, Viabilidade, Custos, Fluxo de Caixa, Cenários, **Análise de mercado** e **Apelo Comercial**.
   - **Análise de mercado** (#199) — compara os números do estudo com os do mercado (preço e custo por m², velocidade de vendas, macros). O lado "projeto" é derivado do próprio estudo, não digitado. Ver [Análise de Mercado](analise-mercado).
+  - **Viabilidade → Financeiro** — hoje a aba do **Bloco G**, cujos ~25 campos são persistidos e renderizados mas **não alimentam o motor**. A epic **#239** a transforma no módulo **Capital Stack** (funding, dívida, equity e waterfall); ver [Funding, Capital Stack e Retorno do Capital](funding-capital-stack). `Custos → Financeiro` é outra coisa: permanece grupo de **custos** operacionais.
+
+## Endereços das telas
+
+**Comportamento vigente:** a URL é `/detalhe/:id/:pagina` (`frontend/index.ts` → `parsearSubRota`).
+As **subabas** — Cronograma, Tipologias, Receitas, Terreno, Obras e as demais — vivem apenas no
+estado do componente e **não participam do histórico do navegador**: abrir um link direto ou dar
+refresh volta à subaba padrão. O slug da página de Custos ainda é o legado `/obra` (a #40 renomeou o
+rótulo e preservou o id).
+
+**Evolução dependente de issue:** a gramática passa a `/detalhe/:id/:pagina/:subaba` — por exemplo
+`/detalhe/11/empreendimento/cronograma` —, com deep link, refresh e back/forward preservando a
+subaba, e as URLs antigas continuando válidas como alias da subaba padrão (**#251**). No mesmo
+movimento, `/custos` vira o slug público e `/obra` permanece como alias legado (**#250**). Nenhuma
+das duas altera identificador interno de domínio nem o `manifesto.json`.
 
 ## Origem do terreno
 

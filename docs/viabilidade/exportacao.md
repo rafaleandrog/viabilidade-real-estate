@@ -42,3 +42,31 @@ abrir:
 
 A visão executiva permanece consolidada; a abertura por safra existe para explicar divergências.
 Ver [Padrão de Viabilidade — Incorporação](padrao-incorporacao) §22.4.
+
+## Evolução prevista — funding, permuta física e valor canônico
+
+> ⚠️ **Acrescentado em 2026-08-01.** Como a seção acima, registra o **alvo**, não o estado. A
+> exportação atual não possui nenhuma destas linhas.
+
+**Dependente de #278 (FIN-09).** Quando o Capital Stack for implementado, a exportação abre o bloco
+de funding com a mesma árvore da tabela de fluxo:
+
+- liberações de financiamento à produção e de capital de giro;
+- aportes de equity preferencial e de Sponsor Equity;
+- juros e taxas de dívida, amortização de principal;
+- devolução de Preferred Equity, retorno preferencial, participações sobre receita/residual e
+  distribuições ao sponsor;
+- saldos por instrumento, capital não devolvido, retorno preferencial acumulado e **lacuna de
+  funding**.
+
+Regra de ouro: **CSV, PDF e Cenários consomem exatamente os mesmos arrays do motor** — nada é
+recalculado na camada de apresentação. Ver
+[Funding, Capital Stack e Retorno do Capital](funding-capital-stack) §10.
+
+**Dependente de #269 (`BUGLIST-015-D`).** A exportação passa a abrir a permuta física por
+tipologia: quantidade e área permutada, VGV potencial × VGV vendável, e a reconciliação
+`alocado + permutado ≤ quantidade do catálogo`.
+
+**Dependente de #260 (`BUGLIST-018`).** As exportações deixam de reler campos de exibição e passam a
+consumir o **valor canônico resolvido**, como o resto dos consumidores — hoje não há contrato que
+garanta isso, e uma premissa digitada em `% VGV` pode chegar diferente à exportação e à tela.

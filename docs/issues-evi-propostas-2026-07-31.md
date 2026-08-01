@@ -1400,6 +1400,24 @@ que a implementação não parta de premissa superada. Aplicar as emendas é dec
 permanecem: #220/#221 antes de qualquer M2 · #231 antes de #232/#233 · #228 antes de #237, #238 e
 #239.
 
+> 🔗 **Atualização de 2026-08-01 — rastreio das emendas.** A sessão de planejamento da lista de bugs
+> abriu a epic **#254** (`BUGLIST-011`), que existe justamente para **rastrear a aplicação destas
+> emendas** e a execução das issues executoras. Ela não implementa nada e não substitui nenhuma das
+> #220–#241; ela apenas impede que as emendas se percam de novo — o mesmo risco que produziu o caso
+> #165–#169. Enquanto qualquer emenda desta seção continuar pendente, a #254 permanece aberta.
+>
+> **Nesta sessão foram editadas apenas duas issues no GitHub**, dentro da autorização recebida:
+>
+> - **#238** — emenda **aditiva** com o contrato de interface do item 16 da planilha (Orçamento em
+>   `% VGV`/`R$`, Distribuição "Receita das vendas" bloqueada, Cronograma/Início/Duração vazios).
+>   Nada do corpo publicado foi removido. Ver a entrada da #238 em *Issues sem emenda*, abaixo.
+> - **#239** — convertida em **epic** do programa financeiro, com dez sub-issues **#270–#279**
+>   (FIN-01…FIN-10) e especificação em `docs/viabilidade/funding-capital-stack.md`. O diagnóstico
+>   original do Bloco G foi preservado integralmente.
+>
+> **As 12 emendas abaixo continuam pendentes e não foram aplicadas ao GitHub.** Mapa completo em
+> `docs/lista-bugs-planejamento-2026-07-31.md`.
+
 ---
 
 ## #220 / EVI-001 — cenário dourado
@@ -1580,3 +1598,16 @@ fixo · até marco · concentrado · principal · juros · carteira.
 
 **#221, #222, #223, #224, #225, #226, #228, #235, #238, #239** seguem válidas com os corpos
 publicados. A revisão não alterou nenhuma premissa delas.
+
+> 🔄 **Atualização de 2026-08-01.** A revisão Calliandra continua sem emendar #238 e #239 — nenhuma
+> premissa de recebíveis delas mudou. O que aconteceu em 2026-08-01 é **outra coisa**: a sessão de
+> planejamento da lista de bugs **editou as duas no GitHub** para absorver os itens 16 e 24 da
+> planilha.
+>
+> | Issue | O que mudou | Origem |
+> |---|---|---|
+> | **#238** | Bloco **aditivo** com o contrato de interface: Orçamento aceita `% VGV` ou `R$`; Distribuição preenchida com **"Receita das vendas"** e bloqueada; Cronograma, Início e Duração **vazios**; a regra passa a depender da **subcategoria**, não de `distribuicao_modo`. Dependências acrescentadas: #256, #257, #258, #259, #260. Nada foi removido | `lista_bugs.xlsx` item 16 · `BUGLIST-016` |
+> | **#239** | Convertida em **epic** (`epic(financeiro): Capital Stack — funding, dívida e retorno do equity`), com dez sub-issues **#270–#279**. O diagnóstico do Bloco G inerte foi preservado integralmente; o que mudou é que a decisão "integrar ou remover" foi **respondida: integrar por instrumentos** | `lista_bugs.xlsx` item 24 · `BUGLIST-024` |
+>
+> Detalhe em `docs/lista-bugs-planejamento-2026-07-31.md` e, para o item 24, em
+> `docs/viabilidade/funding-capital-stack.md`.

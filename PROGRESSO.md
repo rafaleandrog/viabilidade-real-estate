@@ -4,6 +4,143 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Planejamento da lista de bugs — 24 itens, Rodada 6 aberta (2026-08-01)
+
+Branch `claude/viabilidade-buglist-matrix-t2yjz3`, a partir de `c0586ef`. Sessão **documental e de
+backlog**, conforme autorização explícita do autor. **Diff só em `.md`** —
+`git diff --stat c0586ef -- ':!*.md'` volta vazio. Sem schema, sem migração, sem backend, sem
+frontend, sem `manifesto.json`; `versao` **não muda**.
+
+### O que foi feito
+
+A planilha `lista_bugs_revisada_para_issues_todos_itens.xlsx` trouxe **24 itens**. Cada um foi
+conferido **contra a `main`**, com evidência em `arquivo:linha`, e recebeu um destino GitHub
+individual. **Zero itens sem destino; zero implementações duplicadas.**
+
+| | |
+|---|---:|
+| Novas issues, epics e trackers | **22** (#244–#265) |
+| Sub-issues da epic de permuta física | **4** (#266–#269) |
+| Issue existente emendada (item 16) | **#238** |
+| Issue existente convertida em epic (item 24) | **#239** |
+| Sub-issues do programa financeiro | **10** (#270–#279) |
+| Issues implementadas | **0** |
+
+Mapa mestre em `docs/lista-bugs-planejamento-2026-07-31.md`; especificação do item 24 em
+`docs/viabilidade/funding-capital-stack.md`.
+
+### Cinco correções ao diagnóstico recebido
+
+O backlog anexado à planilha divergia do código em cinco pontos. **Todas as issues foram abertas já
+com a versão corrigida** — e a razão de cada divergência ficou registrada, para não se reintroduzir:
+
+1. **#249 (item 6) — a assimetria Início × Duração é de backend também.** O diagnóstico dizia que
+   "a tela não aplica a regra". A rota **aceita deliberadamente** sobrescrever a duração derivada
+   (`backend/rotas/avancado.ts:1130,1144` — `if (req.body.duracao_meses === undefined)`) enquanto
+   trava o início com 422 (`:1134,1148`). Corrigir só a UI deixaria a API divergente. Pior: quando
+   o Cronograma muda, `reancorarCustos` reescreve as duas grandezas e apaga sem aviso a duração
+   editada.
+
+2. **#257 (item 14) — a regra de migração proposta era insustentável.** O backlog mandava migrar
+   por `distribuicao_modo` (`unit_delivery`→física, `sales_revenue`→financeira). Mas
+   `fluxo-caixa-motor.ts:385` trata **toda** linha `Preço/Permuta` como permuta *financeira*, e
+   `distribuicao_modo` é curva de rateio (`tela-fluxo-custos.ts:163-167`: receita em caixa × VGV
+   vendido). A permuta física vem de `unidades_permutadas` nas Tipologias. A regra proposta
+   removeria a dedução de caixa de linhas financeiras e contaria a permuta física em dobro.
+   **Regra aprovada pelo autor: toda `Permuta` legada → `Permuta financeira`.**
+
+3. **#259 (item 17) — "o Preliminar já está correto" precisava de ressalva.** São **duas
+   arquiteturas**: Premissas guarda um campo por unidade e tem a heurística de round-trip da #119
+   (`tela-premissas.ts:334-358`), que falha quando o campo companheiro está dessincronizado; Custos
+   guarda **um único** `orcamento_valor` + `orcamento_unidade` e arredonda à precisão de exibição a
+   cada clique (`tela-fluxo-custos.ts:873-875,882-896`), sem preservação nenhuma. Não dá para
+   "copiar a regra do Preliminar" — o contrato canônico tem de cobrir as duas.
+
+4. **#262 (item 20) — escopo reduzido.** A parte de "empurrar cards vizinhos" **já foi corrigida
+   pela #176** (`min-width:0`, `fluxo-tabela.ts:53-57`). O que sobra é `.kpi-var` em
+   `position:absolute` (`:58-63`) sobrepondo o valor dentro do card.
+
+5. **#265 (item 23) — é reversão de decisão, não correção de descuido.** `table.cen{width:auto}` foi
+   introduzido de propósito pela #187 (ver a entrada dela mais abaixo neste arquivo: "tabela deixou
+   de esticar a 100%"). A issue registra isso e pede a reversão consciente.
+
+### Diferença de release — descartada como causa, com prova
+
+O último release publicado é **`viabilidade-v0.1.12_6655ac74`** (2026-07-29 15:18).
+`git log 6655ac74..origin/main` devolve **somente commits de documentação**.
+
+> **Não há código na `main` além do que já foi publicado.** Se o autor ainda vê o sintoma dos itens
+> 2, 20, 22 e 23 no app instalado, a instância está rodando **build anterior** (v0.1.4 ou mais
+> velho) — não é a `main` que está atrás.
+
+Isso muda o item 22 de "bug" para "verificação + decisão": a `main` **já mostra as duas séries**
+quando qualquer slider sai do zero (`tela-cenarios.ts:250-260`); o estado 0% é decisão explícita das
+#131/#132. O trabalho real da #264 é confirmar a versão instalada e registrar/testar a decisão do 0%.
+
+### Decisões do autor nesta sessão
+
+1. **Alvo do item 24 = `Viabilidade → Financeiro`** (`tela-financeiro.ts`, o Bloco G), conforme a
+   especificação §1 e a #239. A planilha registrava "Seção: Custos · Aba: Financeiro", mas o
+   conteúdo do pedido é o do Bloco G. `Custos → Financeiro` permanece grupo de custos operacionais —
+   a FIN-10 (#279) declara isso ao encerrar o programa.
+2. **Taxonomia GitHub = prefixo no título** (`[BUGLIST-0NN]`, `[FIN-0N]`), labels só
+   `bug`/`enhancement`. Nenhum label novo — mesmo padrão de `[EVI-0NN]`, preservando o que a
+   auditoria da Rodada 5 registrou.
+3. **Migração da `Permuta` legada = toda para `Permuta financeira`** (ver correção 2 acima).
+
+### Contrato de precisão monetária — a decisão que fechou a #259
+
+Ao rever a dúvida da #259, o autor fixou o princípio geral:
+
+> **Todo valor monetário que é resultado de fórmula tem 2 casas decimais** — na apresentação, na
+> entrada e no motor. Representações derivadas **não monetárias** (`% do VGV`, `R$/m²`) carregam
+> **precisão plena** internamente e arredondam **só para exibir**.
+
+Isso responde a pergunta arquitetural: **o canônico é o valor monetário, a 2 casas**; percentual e
+R$/m² são derivados dele. Reproduzir o caso relatado deixa de ser pré-requisito e vira caso de teste.
+
+Registrado como convenção **C7** (`padrao-incorporacao.md`, Anexo A) e replicado no `CLAUDE.md`, no
+`INSTRUCOES-CODE.md`, em `modelo-de-dados.md` (§ Regras de precisão, agora separando **precisão de
+persistência** de **precisão de resultado**) e em `formulas.md`.
+
+**Ao verificar o alcance do princípio no código, apareceu uma violação que não estava em issue
+nenhuma:**
+
+| Ponto | Casas hoje | |
+|---|---|---|
+| `frontend/viab-format.ts:8` — `fmtR$`, **53 usos em 11 telas** | **0** | ❌ |
+| `frontend/tela-fluxo-custos.ts:638,873-875` — Orçamento em `rs` | **0** | ❌ |
+| `frontend/exportar.ts:9` — `toFixed(2)` | 2 | ✅ |
+| `frontend/fluxo-caixa-motor.ts` — resultados monetários (`Math.round` só em meses) | float | ❌ |
+
+**A tela e a exportação mostram números diferentes para o mesmo estudo hoje** — a persistência nunca
+foi o problema (`decimal(12,2)` desde sempre). Como `fmtR$` é definido num ponto só, a correção é
+pequena, mas muda **toda** a apresentação monetária do app de uma vez; por isso ganhou destino
+próprio — **#281** (`BUGLIST-017-A`), sub-issue da #259 — em vez de virar ajuste pontual. A
+quantização dos resultados do motor entrou no escopo da **#260**.
+
+Emendas aplicadas: **#259** (contrato + dúvida resolvida + sub-issue) e **#260** (quantização no
+motor + fechamento de soma). Total de destinos da Rodada 6 passa de 36 para **37**.
+
+### Pendências deixadas em aberto
+
+- **#256 e #258** — dependem do inventário de produção (**#221**): quantos estudos têm linha `Preço`
+  sem `obrigatoria=true`, e quantos têm `unidades_permutadas > 0`. Não é verificável neste ambiente.
+- **#266** — base de valoração quando a mesma tipologia tem `preco_m2` diferente por Grupo.
+  **Não usar média implícita**; ADR antes de código.
+- **As 12 emendas EVI continuam pendentes.** A autorização desta sessão cobria editar apenas #238 e
+  #239. As demais ficam como estão no GitHub, agora rastreadas pela epic **#254** — que existe
+  justamente para impedir o padrão #165–#169 (backlog preparado que ninguém pega).
+
+### Declaração
+
+Nenhuma linha de runtime foi alterada. `frontend/`, `backend/`, `schema.json`, `migracoes/`,
+`manifesto.json` e `scripts/` estão intactos. Nenhuma issue foi fechada. As #220–#241 continuam
+**todas abertas, nenhuma implementada**. PR **draft**, sem merge, sem keyword de fechamento — este
+PR não fecha issue nenhuma, ele as cria.
+
+---
+
 ## Revisão de recebíveis por safras — referência Calliandra (2026-07-31)
 
 Branch `claude/cashflow-formulas-rules-km5538`, a partir de `519bfbf`. Sessão **documental e

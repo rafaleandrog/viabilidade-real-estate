@@ -30,7 +30,68 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — 🔴 RODADA 5 ABERTA · 22 issues EVI (#220–#241)
+## Estado do backlog — 🔴 DUAS RODADAS ABERTAS
+
+| Rodada | Escopo | Issues | Estado |
+|---|---|---|---|
+| **5 — EVI** | Auditoria do app contra os documentos EVI | **#220–#241** (22) | 🔴 **aberta, 0 implementadas** · 12 corpos com emenda pendente |
+| **6 — lista de bugs** | `lista_bugs.xlsx`, 24 itens `BUGLIST-001`…`BUGLIST-024` | **#238, #239, #244–#281** (37 destinos) | 🔴 **aberta, 0 implementadas** |
+
+As duas convivem e se cruzam em quatro pontos (itens 5, 11, 16 e 24 da lista de bugs). **A regra é
+não duplicar implementação:** onde a Rodada 5 já tem issue executora, o item da planilha vira UX
+própria, tracker, issue de teste ou emenda da issue existente.
+
+---
+
+## Rodada 6 — lista de bugs (`BUGLIST-001` a `BUGLIST-024`)
+
+**Aberta em 2026-08-01.** Os 24 itens da planilha foram conferidos **item a item contra a `main`** e
+cada um recebeu um destino GitHub individual. **Nenhum item ficou sem destino, nenhum foi absorvido
+sem registro.**
+
+- **Mapa mestre:** `docs/lista-bugs-planejamento-2026-07-31.md` — matriz dos 24, diagnóstico com
+  evidência em `arquivo:linha`, sobreposições, ondas e precedências;
+- **Item 24:** `docs/viabilidade/funding-capital-stack.md` — especificação funcional do Capital
+  Stack, vinculante para a epic #239.
+
+| Onda | Issues | Tema |
+|---|---|---|
+| **A — bloqueantes** | #244, #246 | Duplicação de estudo e cronograma legado |
+| **B — UX e navegação** | #245, #247, #250+#251, #262, #263, #264, #265 | Zero matemática alterada |
+| **C — cronograma e custos** | #249 (+#261), #252, #255 | Ancoragem, salvamento atômico e validação matricial |
+| **D — terreno e valor canônico** | #259 (+#281) → #260 → #256 → #257 → #258 (#266–#269) → #253 | Preço, permutas e fonte canônica de valor |
+| **Rodada 5 (paralela)** | #248 (UX), #254 (epic de rastreio) | Ligadas à cadeia EVI, sem substituí-la |
+| **Programa Financeiro** | #239 + #270–#279 (FIN-01…FIN-10) | Capital Stack, dívida, equity e waterfall |
+
+**Precedências não negociáveis desta rodada:** #244/#246 antes de usar duplicação como fixture ·
+#249 antes de #255 e #261 · #251 junto/antes de #250 · #267 antes de #253 · #256 → #257 → #258 nesta
+ordem · #259 antes de #260 · #262 antes de #263 · #220/#221/#228/#231/#237 estáveis antes de #271.
+
+> 🔎 **Cinco correções ao diagnóstico recebido**, todas com evidência — leia o §4 do mapa mestre
+> antes de pegar qualquer uma dessas issues:
+>
+> 1. **#249** — a assimetria Início × Duração é de **backend também**: a rota aceita sobrescrever a
+>    duração derivada (`avancado.ts:1130,1144`) enquanto trava o início com 422 (`:1134,1148`).
+> 2. **#257** — `distribuicao_modo` **não classifica permuta**; toda linha `Preço/Permuta` já é
+>    financeira no motor (`fluxo-caixa-motor.ts:385`). Regra aprovada: toda `Permuta` legada →
+>    `Permuta financeira`.
+> 3. **#259** — o Preliminar **não** é uniformemente correto; são duas arquiteturas de persistência
+>    diferentes, e o contrato canônico precisa cobrir as duas. **Resolvida em 2026-08-01** pelo
+>    contrato de precisão monetária (2 casas): o canônico é o **monetário**, e `%`/`R$/m²` são
+>    derivados com precisão plena. A violação de apresentação que isso expôs virou a **#281**.
+> 4. **#262** — a parte de "empurrar cards vizinhos" já foi corrigida pela #176; sobra `.kpi-var`
+>    absoluto sobre o valor.
+> 5. **#265** — é **reversão consciente** da decisão da #187 (`width:auto`), não correção de
+>    descuido.
+
+> ⚠️ **Diferença de release descartada como causa.** O último release é
+> `viabilidade-v0.1.12_6655ac74` (2026-07-29); tudo na `main` depois dele é documentação. Se o
+> sintoma dos itens 2, 20, 22 e 23 persiste no app, a **instância está rodando build anterior** — é
+> critério de aceite da #264, não hipótese solta.
+
+---
+
+## Rodada 5 — EVI (#220–#241)
 
 **A Rodada 5 foi aberta em 2026-07-31.** As **22 issues #220–#241** nasceram da auditoria do app
 contra os documentos EVI e estão **todas abertas e nenhuma implementada**.
@@ -81,8 +142,9 @@ Rodadas anteriores, todas mergeadas na `main`:
 | 1 — Lotes 1–8 | issues #9–#24 | ✅ concluída |
 | 2 — Etapas 1–8 | issues #33–#56 | ✅ concluída |
 | 3 — Sessões S1–S20 | issues #71–#132 | ✅ concluída |
-| 4 — planilha `lista_bugs.xlsx` | #165–#169 + #172–#201 | ✅ concluída |
+| 4 — planilha `lista_bugs.xlsx` (1ª leva) | #165–#169 + #172–#201 | ✅ concluída |
 | **5 — EVI** | **#220–#241** | 🔴 **aberta, 0 implementadas** |
+| **6 — lista de bugs (24 itens)** | **#238, #239, #244–#279** | 🔴 **aberta, 0 implementadas** |
 
 **Os quatro mapas mestres foram apagados em 2026-07-31**, com todas as issues mergeadas: eram
 backlog fechado e não disparavam mais trabalho. Os disparos antigos (`Prossiga para os issues do
@@ -214,6 +276,15 @@ Git Bash — ver PROGRESSO).
 - Seed fora de migração; migração só transforma dados existentes
 - `shell_min = "0.50.3"`
 - Precisão: R$ e m² → `decimal(12,2)`; % digitado → inteiro; % calculado → `decimal(5,1)`
+- **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e
+  no motor. Representações derivadas **não monetárias** (% e R$/m²) carregam **precisão plena**
+  internamente e arredondam **só para exibir**; nunca são persistidas arredondadas. Decisão do autor
+  em 2026-08-01; é o contrato que fecha a #259 e dá regra às #260 e #281.
+  > ⚠️ Hoje o app **viola** isso: `fmtR$` usa `maximumFractionDigits: 0`
+  > (`frontend/viab-format.ts:8`, 53 usos em 11 telas) e o Orçamento de Custos em `rs` aceita só
+  > inteiro (`frontend/tela-fluxo-custos.ts:638,873-875`) — enquanto `frontend/exportar.ts:9` já usa
+  > `toFixed(2)`. **Tela e exportação mostram números diferentes.** Corrigir é a #281, não faça
+  > pontualmente.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa
