@@ -4,6 +4,7 @@ import {
   cronogramaPadrao,
   recalcularTravados,
   ancorarLinhaCusto,
+  resolverTravamentoCusto,
   curvaSPadrao,
   validarValoresCurva,
   validarAbsorcao,
@@ -90,6 +91,42 @@ test('ancorarLinhaCusto herda início/duração do evento-âncora', () => {
 
 test('ancorarLinhaCusto retorna null para customizado (campos livres)', () => {
   assert.equal(ancorarLinhaCusto('customizado', cronogramaPadrao()), null);
+});
+
+// ── Travamento simétrico de início/duração quando ancorada (#249) ──
+
+test('resolverTravamentoCusto: sem âncora (customizado) — nada a derivar, sem erro', () => {
+  const r = resolverTravamentoCusto(false, null, true, true, 'travado');
+  assert.deepEqual(r.campos, {});
+  assert.equal(r.erroCampoTravado, undefined);
+});
+
+test('resolverTravamentoCusto: trocando a âncora agora — deriva os dois incondicionalmente', () => {
+  const ancora = { inicio_mes: 17, duracao_meses: 24 };
+  // Mesmo enviando início/duração no mesmo PATCH, o valor derivado prevalece.
+  const r = resolverTravamentoCusto(true, ancora, true, true, 'travado');
+  assert.deepEqual(r.campos, { inicio_mes: 17, duracao_meses: 24 });
+  assert.equal(r.erroCampoTravado, undefined);
+});
+
+test('resolverTravamentoCusto: permanecendo ancorada, nenhum campo enviado — sem erro, nada a aplicar', () => {
+  const ancora = { inicio_mes: 17, duracao_meses: 24 };
+  const r = resolverTravamentoCusto(false, ancora, false, false, 'travado');
+  assert.deepEqual(r.campos, {});
+  assert.equal(r.erroCampoTravado, undefined);
+});
+
+test('resolverTravamentoCusto: permanecendo ancorada, enviar SÓ duração é travado (a assimetria corrigida)', () => {
+  const ancora = { inicio_mes: 17, duracao_meses: 24 };
+  const r = resolverTravamentoCusto(false, ancora, false, true, 'início e duração são calculados pelo evento-âncora');
+  assert.equal(r.erroCampoTravado, 'início e duração são calculados pelo evento-âncora');
+  assert.deepEqual(r.campos, {});
+});
+
+test('resolverTravamentoCusto: permanecendo ancorada, enviar SÓ início continua travado', () => {
+  const ancora = { inicio_mes: 17, duracao_meses: 24 };
+  const r = resolverTravamentoCusto(false, ancora, true, false, 'travado');
+  assert.equal(r.erroCampoTravado, 'travado');
 });
 
 // ── Curva S (seed) ──

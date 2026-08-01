@@ -316,6 +316,14 @@ export class ViabFluxoCustos extends LitElement {
     .orc viab-num { width: 110px; }
     .res-calc { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: 0.85rem; }
     .mes-calc { white-space: nowrap; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
+    /* #261: só nas colunas Início/Duração, mesma largura reservada de
+       .campo-mes — sem isso, a coluna "pulava" de largura entre linhas
+       travadas (.mes-calc, sem largura própria) e editáveis (.campo-mes,
+       140px), quebrando o alinhamento vertical quando linhas ancoradas e
+       customizadas aparecem juntas no mesmo grupo. Escopado com uma classe
+       própria (em vez de alargar .mes-calc genérico) porque a mesma classe
+       também é reusada na coluna Distribuição, onde 140px cortaria o texto. */
+    .mes-calc.mes-crono { display: inline-flex; align-items: center; gap: 4px; width: 140px; }
     /* #174: 80px cortava o número + sufixo ("º mês"/"meses") do viab-num, que
        fica DENTRO do span junto com o emoji — duas regras conflitantes
        existiam para .campo-mes (80px nas duas), unificadas aqui. */
@@ -732,18 +740,18 @@ export class ViabFluxoCustos extends LitElement {
             // Início derivado do cronograma (evento Obra), bloqueado — #120.
             const obra = this._eventoObra;
             const ini = obra ? Number(obra.inicio_mes) : Number(c.inicio_mes) || 0;
-            return html`<span class="mes-calc">📅 ${rotuloMesRelativo(this.dataInicio, ini)}
+            return html`<span class="mes-calc mes-crono">📅 ${rotuloMesRelativo(this.dataInicio, ini)}
               <span title="Derivado do cronograma (Obra)">🔒</span></span>`;
           }
           if (c.fase_ancora_id) {
             // Início derivado da fase-âncora do Cronograma, bloqueado — #167.
             const fase = this.fasesCronograma.find((f) => Number(f.id) === Number(c.fase_ancora_id));
-            return html`<span class="mes-calc">📅 ${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
+            return html`<span class="mes-calc mes-crono">📅 ${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
               <span title=${`Ancorado na fase "${fase?.nome || c.fase_ancora_id}"`}>🔒</span></span>`;
           }
           const custom = (c.cronograma_evento || 'customizado') === 'customizado';
           if (!custom) {
-            return html`<span class="mes-calc">📅 ${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
+            return html`<span class="mes-calc mes-crono">📅 ${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
               <span title=${`Ancorado em ${EVENTO_LABEL[c.cronograma_evento] || c.cronograma_evento}`}>🔒</span></span>`;
           }
           return html`
@@ -766,8 +774,25 @@ export class ViabFluxoCustos extends LitElement {
             // Duração derivada do cronograma (evento Obra), bloqueada — #120.
             const obra = this._eventoObra;
             const dur = obra ? Number(obra.duracao_meses) : Number(c.duracao_meses) || 1;
-            return html`<span class="mes-calc">🕐 ${dur} ${dur === 1 ? 'mês' : 'meses'}
+            return html`<span class="mes-calc mes-crono">🕐 ${dur} ${dur === 1 ? 'mês' : 'meses'}
               <span title="Derivado do cronograma (Obra)">🔒</span></span>`;
+          }
+          // #249: simétrico ao Início — duração também trava quando ancorada a
+          // uma fase ou a um evento fixo (antes só Construção bloqueava aqui;
+          // fase-âncora e demais eventos deixavam o campo editável mesmo com o
+          // backend agora recusando a alteração, o que produzia 422 silencioso
+          // na tela ao salvar).
+          if (c.fase_ancora_id) {
+            const fase = this.fasesCronograma.find((f) => Number(f.id) === Number(c.fase_ancora_id));
+            const dur = Number(c.duracao_meses) || 1;
+            return html`<span class="mes-calc mes-crono">🕐 ${dur} ${dur === 1 ? 'mês' : 'meses'}
+              <span title=${`Ancorado na fase "${fase?.nome || c.fase_ancora_id}"`}>🔒</span></span>`;
+          }
+          const custom = (c.cronograma_evento || 'customizado') === 'customizado';
+          if (!custom) {
+            const dur = Number(c.duracao_meses) || 1;
+            return html`<span class="mes-calc mes-crono">🕐 ${dur} ${dur === 1 ? 'mês' : 'meses'}
+              <span title=${`Ancorado em ${EVENTO_LABEL[c.cronograma_evento] || c.cronograma_evento}`}>🔒</span></span>`;
           }
           return html`
             <span class="campo-mes">🕐
