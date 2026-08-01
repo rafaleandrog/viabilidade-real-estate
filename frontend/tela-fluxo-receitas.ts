@@ -19,7 +19,12 @@ import './viab-num.js';
 
 // Sub-aba "Viabilidade → Receitas" (nível Avançado · Lote 6 · #19 #20 #21).
 //
-// Modelo: um card por FASE. Cada fase é dona da Absorção de Vendas e do Fluxo
+// #222: na linguagem do usuário este agrupador comercial chama-se GRUPO (antes
+// "Fase"). Os identificadores internos seguem sendo `avancado_fases`/`fase_id`/
+// `fase_label` (não são renomeados) — só o rótulo mudou. "Fase" continua válido
+// no Cronograma, onde representa tempo.
+//
+// Modelo: um card por GRUPO. Cada grupo é dono da Absorção de Vendas e do Fluxo
 // de Pagamento (modais). Dentro da fase, uma tabela de ALOCAÇÕES de venda: cada
 // linha escolhe uma tipologia do catálogo (Empreendimento → Tipologias), define
 // unidades e preço/m². As unidades da tipologia CASCATEIAM pelas fases (#170):
@@ -219,14 +224,14 @@ export class ViabFluxoReceitas extends LitElement {
           </urbi-banner>
         </div>` : nothing}
       ${this.fases.length === 0 ? html`
-        <urbi-estado-vazio icone="fa-solid fa-layer-group" mensagem="Nenhuma fase definida"></urbi-estado-vazio>` : nothing}
+        <urbi-estado-vazio icone="fa-solid fa-layer-group" mensagem="Nenhum grupo definido"></urbi-estado-vazio>` : nothing}
       <div class="cards">
         ${this.fases.map((f) => this._renderFase(f))}
       </div>
       ${this.editavel ? html`
         <div class="add-linha">
           <urbi-botao variante="secundario" icone="fa-solid fa-plus" @click=${this._adicionarFase}>
-            Adicionar Fase
+            Adicionar Grupo
           </urbi-botao>
         </div>` : nothing}
       ${this.modalAbs ? this._renderModalAbsorcao() : nothing}
@@ -245,7 +250,7 @@ export class ViabFluxoReceitas extends LitElement {
         <div class="card-cab">
           <urbi-input class="nome" ?desabilitado=${dis}
             .valor=${this.draftNome[f.id] ?? (f.nome || '')}
-            placeholder="Nome da fase"
+            placeholder="Nome do grupo"
             @urbi:input-change=${(e: CustomEvent) => this._editarNome(f, e.detail.valor)}
           ></urbi-input>
           ${!dis && this._nomeSujo(f) ? html`
@@ -274,7 +279,7 @@ export class ViabFluxoReceitas extends LitElement {
               ?desabilitado=${this._tipologiasDisponiveis(f).length === 0}
               @click=${() => this._adicionarAlocacao(f)}>Adicionar tipologia</urbi-botao>` : nothing}
           <span class="espaco"></span>
-          <span><span class="total-rotulo">VGV da fase</span><span class="total-valor">${fmtR$(vgv)}</span></span>
+          <span><span class="total-rotulo">VGV do grupo</span><span class="total-valor">${fmtR$(vgv)}</span></span>
         </div>
       </urbi-card>
     `;
@@ -376,10 +381,10 @@ export class ViabFluxoReceitas extends LitElement {
   private _adicionarFase = async () => {
     try {
       const res = await criarFaseAvancado(this.estudo.id, { tipo: 'receita' });
-      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao criar fase', 'erro'); return; }
+      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao criar grupo', 'erro'); return; }
       this.fases = [...this.fases, { ...res, alocacoes: res.alocacoes || [] }];
     } catch (e: any) {
-      urbiVerso.notificar(e?.message || 'Erro ao criar fase', 'erro');
+      urbiVerso.notificar(e?.message || 'Erro ao criar grupo', 'erro');
     }
   };
 
@@ -409,7 +414,7 @@ export class ViabFluxoReceitas extends LitElement {
     await this._salvarFase(f, { nome: valor });
     const { [f.id]: _descartado, ...resto } = this.draftNome;
     this.draftNome = resto;
-    urbiVerso.notificar('Nome da fase salvo.', 'sucesso');
+    urbiVerso.notificar('Nome do grupo salvo.', 'sucesso');
   }
 
   // #49 — estado "aplicado" (verde) por fase, guardado no próprio JSON da seção.
@@ -421,7 +426,7 @@ export class ViabFluxoReceitas extends LitElement {
 
   private async _adicionarAlocacao(f: any) {
     const disponiveis = this._tipologiasDisponiveis(f);
-    if (disponiveis.length === 0) { urbiVerso.notificar('Sem tipologias com saldo nesta fase.', 'alerta'); return; }
+    if (disponiveis.length === 0) { urbiVerso.notificar('Sem tipologias com saldo neste grupo.', 'alerta'); return; }
     try {
       const res = await criarAlocacao(this.estudo.id, f.id, { tipologia_id: disponiveis[0].id, unidades: 0 });
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao criar alocação', 'erro'); return; }
@@ -448,7 +453,7 @@ export class ViabFluxoReceitas extends LitElement {
   private _renderConfirmRemover(): TemplateResult {
     const c = this.confirmRemover!;
     const rotulo = c.tipo === 'fase'
-      ? `a fase "${c.fase.nome || 'sem nome'}" e todas as suas alocações`
+      ? `o grupo "${c.fase.nome || 'sem nome'}" e todas as suas alocações`
       : `a alocação de "${this._tip(c.aloc?.tipologia_id)?.nome || 'tipologia'}"`;
     return html`
       <urbi-modal title="Remover" maxWidth="420px" @urbi-modal:close=${() => this.confirmRemover = null}>
