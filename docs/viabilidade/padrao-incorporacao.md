@@ -889,6 +889,19 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 
 ## 11. Fluxo de pagamento
 
+> 🔄 **Nota de UX acrescentada em 2026-08-01.** Esta seção descreve o **contrato econômico**. A
+> **experiência de configuração** do editor tem issue própria: **#248** (`BUGLIST-005`).
+>
+> **Comportamento vigente:** o editor expõe a estrutura de persistência, não o modelo econômico —
+> listas genéricas `entrada[]` e `parcelas[]` com quatro periodicidades (`mensal`, `trimestral`,
+> `semestral`, `anual`), no máximo 4 linhas, uma periodicidade por linha, mais um checkbox `juros`
+> que **não alimenta cálculo nenhum** (`frontend/tela-fluxo-receitas.ts:33-34,633-637,668-681,745-780`).
+>
+> **Modelo funcional de referência:** o editor apresenta pagamento no ato, quantidade de parcelas
+> **mensais**, taxa quando aplicável e evento de liquidação/repasse — sem periodicidades fora do
+> padrão aprovado. A #248 depende do contrato canônico da **#230** e não implementa motor: ela
+> **não substitui** a cadeia #232–#237.
+
 ### 11.1 Propriedade do Grupo
 
 Cada Grupo possui um plano de pagamento aplicável a todas as suas alocações.
@@ -1499,6 +1512,25 @@ A permuta física:
 
 A futura forma de cadastro e identificação das unidades permutadas será especificada separadamente.
 
+> 🔄 **Evolução dependente de issue — acrescentado em 2026-08-01.** Essa "futura forma de cadastro"
+> ganhou escopo: é a epic **#258** (`BUGLIST-015`), com quatro sub-issues (**#266** modelo e UI,
+> **#267** fonte de verdade e migração, **#268** motor, **#269** relatórios e invariantes).
+>
+> **Comportamento vigente:** a quantidade permutada é informada no **catálogo de Tipologias**
+> (`frontend/tela-empreendimento-tipologias.ts:212`, `schema.json:289`) e consumida pelo motor via
+> `vgvPermutaFisicaLinha` (`frontend/fluxo-shared.ts:149-154`, #195). Não existe vínculo
+> tipologia ↔ quantidade na linha de custo do Terreno.
+>
+> **Modelo funcional de referência:** ao selecionar `Permuta física`, a célula **Orçamento** passa a
+> conter um single-select de tipologia e um campo de quantidade; **Distribuição** exibe "Entrega de
+> unidades", bloqueada; **Cronograma, Início e Duração ficam vazios**. Uma linha representa uma
+> tipologia. Depois disso — e só depois —, a coluna do catálogo é desligada pela **#253**
+> (`BUGLIST-010`), que nasce bloqueada até a #267 fechar.
+>
+> **Decisão pendente antes do motor (#268):** a base de valoração quando a mesma tipologia tem
+> `preco_m2` diferente em Grupos diferentes (`avancado_alocacoes`). **Não usar média implícita** —
+> ADR na #266.
+
 Até essa definição:
 
 - o app não deve receber uma refatoração ampla improvisada;
@@ -1543,6 +1575,21 @@ base líquida
 > `corretagem_t` como séries próprias. Só então EVI-018 calcula as duas visões no regime de caixa e
 > declara qual delas alimenta o fluxo. O redesenho do **cadastro** da permuta física permanece fora
 > do backlog por decisão do autor.
+>
+> 🔄 **Contrato de interface acrescentado em 2026-08-01** (item 16 da lista de bugs,
+> `BUGLIST-016`), como emenda **aditiva** da **#238**. Além das duas séries, a linha de
+> `Permuta financeira` passa a ter comportamento de tela definido:
+>
+> - **Orçamento** aceita `% VGV` **ou** `R$`, com o valor canônico da **#259**;
+> - **Distribuição** é preenchida com **"Receita das vendas"** e fica **bloqueada** — mesmo padrão
+>   da Corretagem;
+> - **Cronograma, Início e Duração ficam vazios** (`—`): nada ali influencia a velocidade com que a
+>   despesa entra no fluxo, porque ela sai **conforme a receita entra**.
+>
+> **Comportamento vigente a corrigir:** hoje esses campos só somem quando
+> `distribuicao_modo !== 'fixo'` (`frontend/tela-fluxo-custos.ts:697-699,728-730,762-764`) — a regra
+> depende da **curva de rateio**, não da subcategoria. Quem classifica a permuta como financeira é
+> a subcategoria (`frontend/fluxo-caixa-motor.ts:385-387`). Ver a armadilha **A10** no Anexo D.
 
 ```text
 permuta financeira líquida
@@ -1677,6 +1724,22 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 ---
 
 ## 17. Funding e estrutura de capital
+
+> 🔄 **Atualizado em 2026-08-01.** O modelo funcional completo de funding — Capital Stack por
+> instrumentos, waterfall de pagamentos, retorno por provedor de capital e reconciliação mensal —
+> passou a viver em documento próprio: **[Funding, Capital Stack e Retorno do Capital](funding-capital-stack)**.
+> Esta seção continua sendo a visão funcional resumida dentro do padrão; o documento novo é a
+> especificação vinculante da epic **#239** e das dez sub-issues **#270–#279** (FIN-01…FIN-10).
+>
+> **Comportamento vigente, inalterado:** a aba `Viabilidade → Financeiro` é **inerte**. O Bloco G
+> inteiro — ~25 colunas de financiamento, estrutura de capital, investidor e correção — é
+> persistido e renderizado, mas o motor **não referencia nenhuma delas** (grep = 0 em
+> `frontend/fluxo-caixa-motor.ts`, `frontend/proforma.ts` e `frontend/fluxo-shared.ts`). Nada
+> descrito abaixo, nem no documento novo, está implementado.
+>
+> **Decisão registrada (2026-08-01):** o alvo do Capital Stack é a aba **`Viabilidade → Financeiro`**
+> (`frontend/tela-financeiro.ts`). O grupo de custos `Custos → Financeiro` permanece sendo despesa
+> financeira operacional e **não** é absorvido pelo Capital Stack.
 
 ### 17.1 Separação entre projeto e capital
 
@@ -2710,6 +2773,42 @@ Erros que o app já resolve por construção — documentados no cabeçalho de `
 
 **A8 — Um único indicador decide.** Margem alta com exposição de caixa incompatível é projeto inviável. Exibir os indicadores estruturais juntos, contra benchmark, é requisito de produto.
 
+### Armadilhas mapeadas pela lista de bugs (2026-08-01)
+
+> Diferente das A1–A8 acima, **estas ainda NÃO estão resolvidas** — cada uma tem issue aberta. Elas
+> ficam aqui porque são o tipo de erro que se reintroduz sozinho.
+
+**A9 — Início e Duração não são campos simétricos em Custos.** A UI trava o Início em três casos
+(Construção, fase-âncora, evento fixo) e a Duração **só** em Construção
+(`frontend/tela-fluxo-custos.ts:724-757` vs `:758-780`). O backend faz o mesmo: devolve 422 para
+`inicio_mes` em linha ancorada (`backend/rotas/avancado.ts:1134,1148`), mas **aceita** sobrescrever
+`duracao_meses` (`:1130,1144`). Corrigir só a tela deixa a API divergente — e a próxima mudança de
+Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescreve as duas grandezas.
+→ **#249**, validada por **#255**.
+
+**A10 — `distribuicao_modo` não classifica permuta.** `unit_delivery` e `sales_revenue` são
+**curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
+(`frontend/tela-fluxo-custos.ts:163-167`). Quem classifica é a **subcategoria**: toda linha
+`Preço/Permuta` é tratada como permuta **financeira** pelo motor
+(`frontend/fluxo-caixa-motor.ts:385-387`). A permuta **física** vem de outra entidade,
+`unidades_permutadas` no catálogo de Tipologias. Usar `distribuicao_modo` como critério de migração
+reclassifica linhas financeiras como físicas, remove a dedução de caixa e conta a permuta física em
+dobro. → **#257**, **#258**.
+
+**A11 — O valor exibido é o valor persistido.** Nos campos multiunidade, trocar o badge grava a
+conversão arredondada — a troca de representação altera a premissa. São **duas arquiteturas**: as
+Premissas guardam um campo por unidade e têm uma heurística de round-trip (#119,
+`frontend/tela-premissas.ts:334-358`) que falha quando o campo companheiro está dessincronizado;
+Custos guarda **um** `orcamento_valor` + `orcamento_unidade` e arredonda à precisão de exibição a
+cada clique (`frontend/tela-fluxo-custos.ts:873-875,882-896`), sem preservação nenhuma. Um contrato
+canônico precisa cobrir as duas. → **#259**, consumido por **#260**.
+
+**A12 — `travado_*` legado não é normalizado em leitura.** `recalcularTravados` corrige
+`travado_inicio` de três eventos e **nunca toca `travado_duracao`**
+(`backend/rotas/avancado.ts:53-75`). Corrigir o default em `cronogramaPadrao()` não alcança os
+registros já gravados: a leitura devolve a flag antiga (`:278,299`) e o PATCH toma 422 (`:422`).
+Toda correção de flag precisa valer **na leitura**, não só na criação. → **#246**.
+
 ## Anexo E — API
 
 Rotas **relativas**; o shell prefixa tudo com `/api/viabilidade/`. O frontend chama via
@@ -2730,6 +2829,10 @@ Preservadas dos mapas anteriores para impedir perda de contexto.
 | **#185** | Gráfico de fluxo acumulado usa `urbi-grafico-linha` com 2 séries diferenciadas por cor | **Continua vigente.** O primitivo não oferece tracejado nem anotações. Marcos ficam como texto fora do gráfico. |
 | **#190**, **#191** | Parcelas “ao longo da Obra” são fixas e ancoradas no cronograma físico | **Vigente apenas como comportamento do runtime atual.** Foi superado como modelo-alvo pela validação Calliandra. Deve permanecer até a implementação aprovada de EVI-013, sem refatoração antecipada. |
 | **#192** | Gráficos de avanço de Obra exibem somente `Projetado` | **Continua vigente.** Realizado, Desvio e Forecast permanecem fora de escopo. |
+| **#187** | Tabela de Cenários salvos **deixou de esticar a 100%** (`width:auto`), com colunas de 84px/68px | **Em revisão por decisão do autor.** A **#265** (`BUGLIST-023`) pede o oposto: que a tabela ocupe a largura do card. A reversão é consciente; a invariante que permanece é manter cada coluna de variação **adjacente** ao seu indicador. |
+| **#131**, **#132** | No estado 0% os sliders **não** geram segunda curva nem setas de variação — "o cenário É a base" | **Vigente, mas sob decisão explícita.** A **#264** (`BUGLIST-022`) exige registrar e testar essa escolha, em vez de deixá-la implícita no comentário do código. A `main` já mostra as duas séries quando qualquer slider sai do zero. |
+| **#92** | Indicador de Absorção/Fluxo aplicado usa `var(--cor-info)` — azul | **Revisto pela #247** (`BUGLIST-004`): "aplicado" é conclusão bem-sucedida e passa ao token de sucesso. Pendente/erro continua vermelho. |
+| **#40** | Página renomeada para "Custos" **preservando** o id de rota `obra` | **Em revisão pela #250** (`BUGLIST-007`): `/custos` vira o slug público e `/obra` permanece alias legado. O id **interno** de domínio e `avancado_linhas_custo.grupo` não mudam. |
 
 A mudança de entendimento sobre #190/#191 não autoriza alteração direta. Ela exige:
 

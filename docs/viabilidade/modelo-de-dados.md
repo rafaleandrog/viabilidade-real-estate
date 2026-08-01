@@ -65,6 +65,27 @@ Duas restrições que a evolução precisa respeitar: **compatibilidade de leitu
 gravados (via adapter do JSON legado, EVI-010 / #230) e o inventário de dados legados
 (EVI-002 / #221), que é portão da rodada.
 
+## Evolução de domínio prevista para Terreno, valores e funding
+
+> ⚠️ **Seção consultiva, acrescentada em 2026-08-01.** Como a de cima: **nada aqui existe** no
+> `schema.json`, em migração ou em runtime. Ela registra o que o modelo de dados precisará
+> representar quando as issues da lista de bugs forem aprovadas e implementadas. **Nenhuma tabela
+> ou coluna deve ser criada a partir deste texto.**
+
+| Conceito | O que precisa ser representado | Issue |
+|---|---|---|
+| **Linha Preço canônica** | Identidade `obrigatoria` garantida em **todo** estudo, inclusive nos que o backfill da `007` não alcançou — a migração cobre só `terreno/Compra` de menor id por estudo | #256 |
+| **Subcategoria de Preço** | Quatro valores exatos: `Valor à vista`, `Parcelado`, `Permuta física`, `Permuta financeira`. Hoje há uma única `Permuta`, que o motor trata como **financeira** (`frontend/fluxo-caixa-motor.ts:385`). Migração aprovada: toda `Permuta` legada → `Permuta financeira`, preservando o resultado de todo estudo | #257 |
+| **Permuta física por tipologia** | Referência de tipologia + quantidade **na linha de custo do Terreno**, substituindo `avancado_tipologias.unidades_permutadas` como fonte de verdade. Exige base de valoração declarada quando a tipologia tem `preco_m2` diferente por Grupo | #258 · #266–#269 |
+| **Valor canônico multiunidade** | Quantidade econômica com precisão suficiente, independente da unidade exibida. Hoje o valor **exibido é o persistido**, em duas arquiteturas distintas: um campo por unidade nas Premissas, um único `orcamento_valor` + `orcamento_unidade` em Custos | #259 · #260 |
+| **Instrumento de capital** | Entidade de camada do Capital Stack: tipo, compromisso, prioridade de utilização, prioridade de pagamento, calendário de aporte/liberação, status (`rascunho` · `ativo` · `encerrado` · `revisão necessária`). Substitui `financiamento_*`, `investidor_*` e `estrutura_*_pct` como entrada; estes viram metadado legado | #239 · #271 |
+
+Duas restrições valem para todas: nenhum estudo **aprovado, reprovado ou arquivado** pode mudar de
+resultado por migração, e toda migração nova exige **bump da `versao`** do manifesto.
+
+Detalhe completo em `docs/lista-bugs-planejamento-2026-07-31.md` e, para o Capital Stack, em
+[Funding, Capital Stack e Retorno do Capital](funding-capital-stack).
+
 ## Regras de precisão
 
 - Monetários (R$) e áreas (m²): `decimal(12,2)`.

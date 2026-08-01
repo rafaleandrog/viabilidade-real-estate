@@ -1644,6 +1644,49 @@ O mês final só é aceito quando:
 
 Margem, TIR, VPL e exposição devem ser lidos juntos. A carteira e o endividamento explicam de onde vem o risco financeiro que não aparece na margem.
 
+### 6.1 Estrutura de capital e retorno do provedor
+
+> 🔄 **Acrescentado em 2026-08-01.** Conhecimento econômico, como o resto deste documento —
+> **não governa o runtime** e não descreve o app. A representação funcional está em
+> [Funding, Capital Stack e Retorno do Capital](funding-capital-stack); a implementação depende da
+> epic #239.
+
+Os indicadores acima medem o **projeto**. Eles não respondem quem financiou o projeto nem quanto
+cada provedor de capital ganhou — e essas são perguntas diferentes.
+
+**Princípio econômico:** funding resolve **liquidez** e altera **custo de capital** e **retorno do
+equity**. Funding **não transforma um projeto economicamente ruim em receita adicional**. Por isso a
+TIR e o VPL do projeto permanecem **desalavancados**: é o que mantém dois empreendimentos
+comparáveis quando têm estruturas de capital diferentes.
+
+Três separações que a empresa não pode confundir:
+
+1. **Movimento de capital × movimento de resultado.** Devolução de principal e aporte são movimento
+   de **capital** — não alteram o resultado econômico. Juros e taxas são **custo financeiro** — o
+   resultado após custo financeiro é menor que o desalavancado, e a diferença é exatamente esse
+   custo.
+2. **Receita do cliente × entrada de funding.** Liberação de dívida, tomada de capital de giro e
+   aporte de equity **nunca** integram a Receita Bruta — VGV. O **repasse** é o caso que mais se
+   confunde: ele liquida o saldo do comprador e **é receita**, mesmo quando o caixa que ele gera é
+   usado para amortizar a dívida de produção.
+3. **Retorno do projeto × retorno do investidor.** MOIC, ROI e TIR de um provedor de capital usam o
+   **fluxo dele** — aportes como saída, distribuições como entrada —, nunca o fluxo do projeto.
+
+| Indicador | Definição | Leitura |
+|---|---|---|
+| **Resultado após custo financeiro** | Resultado desalavancado − juros e taxas de funding | Quanto a estrutura de capital custou ao projeto |
+| **Necessidade máxima de funding** | Maior déficit mensal contra a reserva mínima de caixa | Quanto de capital precisa estar contratado |
+| **Lacuna de funding** | Necessidade não coberta pelos instrumentos configurados | Risco de execução: o projeto não fecha com o capital que tem |
+| **Capital comprometido × utilizado** | Teto contratado × valor efetivamente liberado/aportado | A estrutura de capital é **resultado**, não premissa solta |
+| **MOIC** | Distribuições totais ÷ aportes totais | Múltiplo do capital do provedor |
+| **TIR do investidor** | TIR do fluxo do próprio instrumento, anualizada | Retorno do provedor, distinto do retorno do projeto |
+| **Saldo terminal de dívida** | Saldo devedor no último mês econômico | Deve ser zero; diferente de zero é erro, não arredondamento |
+
+**Base das participações sobre receita.** Quando um investidor é remunerado por percentual da
+receita líquida, a base é **caixa recebido**, líquido de imposto, corretagem e permuta financeira —
+**nunca** valor contratado. Vendas contratadas e caixa recebido divergem por meses inteiros num
+empreendimento com tabela longa; usar a base errada antecipa remuneração que ainda não existe.
+
 ## 7. Dicionário de campos de negócio
 
 **Convenções:**
