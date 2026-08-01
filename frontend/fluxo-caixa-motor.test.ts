@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
+  componentesDoLegado,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig, type FluxoCalc,
@@ -856,4 +857,88 @@ test('agregarFluxoPorPeriodos: acumulado é o saldo do ÚLTIMO mês do ano, não
   assert.equal(anual.vgvTotal, mensal.vgvTotal);
   assert.equal(mensal.meses[0], 'jan/27');
   assert.equal(mensal.fluxoMensal.length, mensal.prazo);
+});
+
+// ─────────────────────────────────────────────────────────────────
+// #230 — Adapter do legado para o contrato de componentes de pagamento
+// ─────────────────────────────────────────────────────────────────
+
+test('componentesDoLegado: sem fluxo_pagamento — um único imediato de 100%', () => {
+  const r = componentesDoLegado(null, CRONO);
+  assert.deepEqual(r, [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }]);
+});
+
+test('componentesDoLegado: entrada com 1 parcela → imediato, com desconto (#227)', () => {
+  // 20% na entrada; o resto (80%) vira repasse derivado → concentrado.
+  const fp = { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] };
+  const r = componentesDoLegado(fp, CRONO);
+  assert.equal(r.length, 2); // imediato (entrada) + concentrado (repasse)
+  assert.deepEqual(r[0], { tipo: 'imediato', participacaoPct: 20, descontoPct: 5 });
+  assert.equal(r[1].tipo, 'concentrado');
+});
+
+test('componentesDoLegado: entrada com várias parcelas → prazo_fixo com defasagem 0 (1ª no mês da venda, como hoje)', () => {
+  // 30% na entrada; o resto (70%) vira repasse derivado → concentrado.
+  const fp = { entrada: [{ pct: 30, parcelas: 4 }] };
+  const r = componentesDoLegado(fp, CRONO);
+  assert.equal(r.length, 2); // prazo_fixo (entrada) + concentrado (repasse)
+  assert.equal(r[0].tipo, 'prazo_fixo');
+  const c = r[0] as any;
+  assert.equal(c.participacaoPct, 30);
+  assert.equal(c.prazoMeses, 4);
+  assert.equal(c.defasagemMeses, 0);
+  assert.equal(c.taxaMensal, 0);
+});
+
+test('componentesDoLegado: parcelamento "ao longo da obra" → ate_marco no fim da Obra do cronograma', () => {
+  // 40% ao longo da obra; o resto (60%) vira repasse derivado → concentrado.
+  const fp = { parcelas: [{ pct: 40, ao_longo_obra: true, periodicidade: 'mensal' }] };
+  const r = componentesDoLegado(fp, CRONO);
+  assert.equal(r.length, 2); // ate_marco (parcelas) + concentrado (repasse)
+  assert.equal(r[0].tipo, 'ate_marco');
+  const c = r[0] as any;
+  assert.equal(c.participacaoPct, 40);
+  const obra = CRONO.find((e) => e.evento === 'obra')!;
+  assert.equal(c.marcoMes, obra.inicio_mes + obra.duracao_meses - 1);
+  assert.equal(c.defasagemMeses, 1);
+});
+
+test('componentesDoLegado: parcelamento sem "ao longo da obra" → prazo_fixo com defasagem = periodicidade', () => {
+  // 25% em parcelamento; o resto (75%) vira repasse derivado → concentrado.
+  const fp = { parcelas: [{ pct: 25, ao_longo_obra: false, periodicidade: 'trimestral', parcelas: 6 }] };
+  const r = componentesDoLegado(fp, CRONO);
+  assert.equal(r.length, 2); // prazo_fixo (parcelas) + concentrado (repasse)
+  assert.equal(r[0].tipo, 'prazo_fixo');
+  const c = r[0] as any;
+  assert.equal(c.prazoMeses, 6);
+  assert.equal(c.defasagemMeses, 3); // trimestral = intervalo 3
+});
+
+test('componentesDoLegado: repasse deriva concentrado no mês fixo (fim da Obra + carência)', () => {
+  const fp = { entrada: [{ pct: 15, parcelas: 1 }], repasse: { apos_entrega_meses: 2 } };
+  const r = componentesDoLegado(fp, CRONO);
+  const concentrado = r.find((c) => c.tipo === 'concentrado') as any;
+  assert.ok(concentrado);
+  assert.ok(perto(concentrado.participacaoPct, 85, 1e-6)); // 100 − 15 (derivado)
+  const obra = CRONO.find((e) => e.evento === 'obra')!;
+  assert.equal(concentrado.mesPagamento, obra.inicio_mes + obra.duracao_meses - 1 + 2);
+});
+
+test('componentesDoLegado: participação total sempre fecha 100% (entrada+parcelas+repasse derivado)', () => {
+  const fp = {
+    entrada: [{ pct: 10, parcelas: 1 }, { pct: 5, parcelas: 3 }],
+    parcelas: [{ pct: 15, ao_longo_obra: true }, { pct: 10, ao_longo_obra: false, periodicidade: 'semestral', parcelas: 2 }],
+    repasse: { apos_entrega_meses: 1 },
+  };
+  const r = componentesDoLegado(fp, CRONO);
+  const total = r.reduce((s, c: any) => s + c.participacaoPct, 0);
+  assert.ok(perto(total, 100, 1e-6));
+  assert.equal(r.length, 5); // 2 entradas + 2 parcelas + 1 repasse
+});
+
+test('componentesDoLegado: sem repasse (100% já coberto por entrada+parcelas) não cria concentrado', () => {
+  const fp = { entrada: [{ pct: 100, parcelas: 1 }] };
+  const r = componentesDoLegado(fp, CRONO);
+  assert.equal(r.length, 1);
+  assert.ok(!r.some((c) => c.tipo === 'concentrado'));
 });
