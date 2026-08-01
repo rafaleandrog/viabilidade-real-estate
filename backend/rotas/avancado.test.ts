@@ -30,6 +30,10 @@ test('cronograma padrão tem os 5 eventos com travados coerentes', () => {
   assert.ok(lanc.travado_inicio);
   // #166: duração do lançamento é livre (antes fixa em 1 mês).
   assert.ok(!lanc.travado_duracao);
+  // #224: Obra começa junto com o Pré-lançamento, no fim do Planejamento.
+  assert.equal(obra.inicio_mes, plan.inicio_mes + plan.duracao_meses);
+  assert.equal(obra.inicio_mes, pre.inicio_mes);
+  assert.ok(obra.travado_inicio);
   assert.equal(pos.inicio_mes, obra.inicio_mes + obra.duracao_meses); // fim da obra
   assert.ok(pos.travado_inicio);
   assert.ok(!pos.travado_duracao); // duração da pós-obra é livre
@@ -60,15 +64,23 @@ test('recalcularTravados propaga a duração do pré-lançamento para o lançame
   assert.equal(lancRec.duracao_meses, 3); // preservada, não forçada para 1
 });
 
-test('recalcularTravados propaga mudança da obra para a pós-obra sem tocar na duração', () => {
+test('recalcularTravados: Obra ancora no fim do Planejamento e arrasta a Pós-obra (#224)', () => {
   const c = cronogramaPadrao();
+  const plan = c.find((e) => e.evento === 'planejamento')!;
   const obra = c.find((e) => e.evento === 'obra')!;
   const posAntes = c.find((e) => e.evento === 'pos_obra')!;
-  obra.inicio_mes = 20;
+  plan.duracao_meses = 10;  // deslocar o Planejamento move o início da Obra…
   obra.duracao_meses = 30;
+  // Mesmo que um dado legado traga a Obra fora da âncora, o recálculo reimpõe.
+  obra.inicio_mes = 20;
   const rec = recalcularTravados(c);
+  const obraRec = rec.find((e) => e.evento === 'obra')!;
+  const preRec = rec.find((e) => e.evento === 'pre_lancamento')!;
   const pos = rec.find((e) => e.evento === 'pos_obra')!;
-  assert.equal(pos.inicio_mes, 50);
+  assert.equal(obraRec.inicio_mes, 10);               // fim do planejamento (0 + 10)
+  assert.equal(obraRec.inicio_mes, preRec.inicio_mes); // junto com o pré-lançamento
+  assert.ok(obraRec.travado_inicio);
+  assert.equal(pos.inicio_mes, 40);                    // fim da obra (10 + 30)
   assert.equal(pos.duracao_meses, posAntes.duracao_meses); // livre, preservada
 });
 

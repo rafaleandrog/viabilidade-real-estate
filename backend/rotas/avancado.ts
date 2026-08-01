@@ -35,8 +35,11 @@ export function cronogramaPadrao(): LinhaCronograma[] {
     { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6, travado_inicio: false, travado_duracao: false },
     { evento: 'pre_lancamento', inicio_mes: 6, duracao_meses: 6, travado_inicio: true, travado_duracao: false },
     { evento: 'lancamento', inicio_mes: 12, duracao_meses: 1, travado_inicio: true, travado_duracao: false },
-    { evento: 'obra', inicio_mes: 17, duracao_meses: 24, travado_inicio: false, travado_duracao: false },
-    { evento: 'pos_obra', inicio_mes: 41, duracao_meses: 12, travado_inicio: true, travado_duracao: false },
+    // #224: Obra começa no fim do Planejamento, junto com o Pré-lançamento —
+    // início derivado e travado (recalcularTravados reimpõe). Antes nascia no
+    // mês 17, fora da regra.
+    { evento: 'obra', inicio_mes: 6, duracao_meses: 24, travado_inicio: true, travado_duracao: false },
+    { evento: 'pos_obra', inicio_mes: 30, duracao_meses: 12, travado_inicio: true, travado_duracao: false },
   ];
   return recalcularTravados(base);
 }
@@ -44,6 +47,9 @@ export function cronogramaPadrao(): LinhaCronograma[] {
 /**
  * Recalcula os campos travados do cronograma:
  *  - Pré-lançamento: início = fim do Planejamento (travado — #165)
+ *  - Obra:           início = fim do Planejamento (travado — #224): a obra física
+ *                     começa SIMULTÂNEA ao Pré-lançamento. Antes o início era livre,
+ *                     permitindo lacuna entre Planejamento e Obra.
  *  - Lançamento:     início = fim do Pré-lançamento (travado); duração LIVRE (#166 —
  *                     antes fixa em 1 mês, o usuário já podia editá-la na tela e
  *                     tomava 422 do backend, que ainda forçava o valor)
@@ -60,6 +66,10 @@ export function recalcularTravados(eventos: LinhaCronograma[]): LinhaCronograma[
   if (plan && pre) {
     pre.inicio_mes = plan.inicio_mes + plan.duracao_meses; // fim do planejamento
     pre.travado_inicio = true;
+  }
+  if (plan && obra) {
+    obra.inicio_mes = plan.inicio_mes + plan.duracao_meses; // #224: junto com o Pré-lançamento
+    obra.travado_inicio = true;
   }
   if (pre && lanc) {
     lanc.inicio_mes = pre.inicio_mes + pre.duracao_meses; // fim do pré-lançamento
