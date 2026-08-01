@@ -15,7 +15,7 @@
 //   informativo do #188 (`vgvTotal`/`vgvPermutaFisica`/`receitaBrutaVgv`).
 
 import {
-  absorcaoMensal, vgvLinha, vglLinha, vgvPermutaFisicaLinha,
+  absorcaoMensal, vgvLinha, receitaLiquidaLinha, vgvPermutaFisicaLinha,
   vgvVendavelTipologia, vgvVendavelLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, vgvVendidoMensal, ePrecoTerreno,
@@ -311,14 +311,20 @@ export function pctRepasseDerivado(fp: any): number {
 }
 
 /**
- * Recebimentos mensais de uma linha de receita (fase), em meses relativos.
- * Aplica absorção → vendas/mês e o fluxo de pagamento sobre cada venda:
- * cada linha de Entrada (parcelável a partir do mês da venda), cada linha de
- * Parcelamento (ao longo da obra ou por periodicidade) e o Repasse — cujo %
- * é derivado (100 − entradas − parcelas) — concentrado N meses após a Obra.
- * Comissão destacada e RET deduzem o valor recebível.
+ * #228: recebimento BRUTO mensal de uma linha — o que o cliente efetivamente
+ * paga, em meses relativos, SEM nenhuma dedução fiscal ou de corretagem (essas
+ * são séries próprias — ver `impostoMensal` e a linha de custo obrigatória de
+ * Corretagem, #227). O desconto comercial de #227 JÁ está aqui: é uma redução
+ * real do valor devido pelo cliente, não um imposto — reduz o bruto, não o
+ * líquido.
+ *
+ * Aplica a venda BRUTA contratada do mês (#227) ao fluxo de pagamento: cada
+ * linha de Entrada (parcelável a partir do mês da venda, com desconto sobre
+ * sua própria fração), cada linha de Parcelamento (ao longo da obra ou por
+ * periodicidade) e o Repasse — % derivado (100 − entradas − parcelas) —
+ * concentrado N meses após a Obra.
  */
-export function receitaMensalLinha(
+export function recebimentoBrutoMensal(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
@@ -328,7 +334,6 @@ export function receitaMensalLinha(
   const vgv = vgvVendavelLinha(linha?.tipologias ?? []);
   if (vgv <= 0) return saida;
 
-  const fator = vgv > 0 ? vglLinha(vgv, linha?.fluxo_pagamento) / vgv : 1;
   const fp = linha?.fluxo_pagamento ?? null;
   const entradas = normalizarLinhasPagamento(fp?.entrada);
   const parcelasLinhas = normalizarLinhasPagamento(fp?.parcelas);
@@ -351,16 +356,15 @@ export function receitaMensalLinha(
     const mesVenda = i;
     const venda = bruto[i]; // #227: venda BRUTA contratada do mês — série canônica
     if (venda <= 0) continue;
-    const recebivel = venda * fator;
 
-    if (semConfig) { deposita(mesVenda, recebivel); continue; }
+    if (semConfig) { deposita(mesVenda, venda); continue; }
 
     // Entrada — cada linha parcelável a partir do mês da venda. #227: o
     // desconto comercial (ex.: 5% no pagamento à vista) reduz o valor ANTES
     // da formação do recebível — a base é a venda bruta contratada, e a
     // dedução se aplica só à fração desta entrada, nunca ao total da linha.
     for (const e of entradas) {
-      const totalBruto = recebivel * (n(e?.pct) / 100);
+      const totalBruto = venda * (n(e?.pct) / 100);
       if (totalBruto <= 0) continue;
       const total = totalBruto * (1 - n(e?.descontoPct) / 100);
       const nParc = Math.max(1, Math.round(n(e?.parcelas) || 1));
@@ -369,7 +373,7 @@ export function receitaMensalLinha(
 
     // Parcelamento — cada linha ao longo da obra ou por periodicidade.
     for (const p of parcelasLinhas) {
-      const total = recebivel * (n(p?.pct) / 100);
+      const total = venda * (n(p?.pct) / 100);
       if (total <= 0) continue;
       if (p?.ao_longo_obra) {
         // #190/#191 — "Ao longo da obra": vencimentos ancorados no CRONOGRAMA
@@ -386,9 +390,62 @@ export function receitaMensalLinha(
     }
 
     // Repasse — % derivado, concentrado na entrega (independe do mês da venda).
-    deposita(Math.max(mesRepasse, mesVenda), recebivel * (pctRepasse / 100));
+    deposita(Math.max(mesRepasse, mesVenda), venda * (pctRepasse / 100));
   }
   return saida;
+}
+
+/**
+ * #228: imposto mensal — RET por Grupo, a ÚNICA entrada fiscal oficial do
+ * Avançado (decisão do autor 2026-08-01; o regime da aba Financeiro é
+ * exclusivo do Preliminar, `receitaLiquidaLinha` em fluxo-shared.ts). Zero
+ * sem RET ativo — o default de todo estudo — o que preserva o Resultado de
+ * quem nunca usou RET. Proporcional ao recebimento bruto do mesmo mês: como
+ * o % de RET é constante, aplicá-lo por mês (linear) é matematicamente
+ * idêntico a aplicá-lo por venda antes de distribuir no tempo — só muda ONDE
+ * a dedução é contabilizada, nunca o Resultado final de quem usa RET.
+ */
+export function impostoMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal);
+  const ret = linha?.fluxo_pagamento?.ret;
+  if (!ret?.ativo) return bruto.map(() => 0);
+  const pct = n(ret.pct) / 100;
+  return bruto.map((v) => v * pct);
+}
+
+/**
+ * #228: recebimento LÍQUIDO = bruto − imposto. É o valor que entra no fluxo
+ * consolidado (`receitaMensal`, via `receitaMensalLinha`) — a corretagem NÃO
+ * participa desta conta: já é uma linha de custo separada em `linhasCusto`
+ * (#227), somada uma única vez no consolidado. Somar aqui TAMBÉM a
+ * duplicaria — exatamente o defeito que esta issue corrige (marcar a
+ * comissão como "Destacada" não muda mais o Resultado).
+ */
+export function recebimentoLiquidoMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal);
+  const imposto = impostoMensal(linha, cronograma, prazoTotal);
+  return bruto.map((v, i) => v - imposto[i]);
+}
+
+/**
+ * Recebimentos mensais de uma linha de receita (fase), em meses relativos —
+ * a série que alimenta o fluxo consolidado. Alias de `recebimentoLiquidoMensal`
+ * (#228); o nome é mantido por compatibilidade com os chamadores existentes.
+ */
+export function receitaMensalLinha(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  return recebimentoLiquidoMensal(linha, cronograma, prazoTotal);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -408,13 +465,12 @@ export function receitaMensalLinha(
  * resolvido é rateado proporcionalmente ao VGV vendido no mês. Sem vendas no
  * horizonte, não há corretagem a pagar.
  *
- * #227 — base única de corretagem (decisão do autor, 2026-08-01): **bruto/VGV**,
- * exatamente esta linha de custo obrigatória em `pct_vgv`. A dedução embutida em
- * `vglLinha` (comissão `destacada`, que reduz o recebível) é a OUTRA fonte
- * concorrente apontada no diagnóstico do EVI-008 — contaria a corretagem duas
- * vezes se as duas ficassem ativas ao mesmo tempo. Removê-la é escopo da #228
- * (que também cria a série `corretagem_t` explícita); esta linha de custo já é,
- * e continua sendo, a fonte oficial.
+ * #227/#228 — base única de corretagem (decisão do autor, 2026-08-01):
+ * **bruto/VGV**, exatamente esta linha de custo obrigatória em `pct_vgv`. A
+ * dedução concorrente que existia em `vglLinha` (comissão `destacada`, que
+ * reduzia o recebível) foi REMOVIDA pela #228 — contaria a corretagem duas
+ * vezes se as duas ficassem ativas ao mesmo tempo (o defeito do EVI-008).
+ * Esta linha de custo é a única fonte oficial.
  */
 export function corretagemMensal(
   custo: any,
@@ -626,7 +682,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     vgvTotal: linhasReceita.reduce((s, l) => s + vgvLinha(l.tipologias), 0),
   };
   ctxCusto.receitaTotal = linhasReceita.reduce(
-    (s, l) => s + vglLinha(vgvLinha(l.tipologias), l.fluxo_pagamento), 0);
+    (s, l) => s + receitaLiquidaLinha(vgvLinha(l.tipologias), l.fluxo_pagamento), 0);
   ctxCusto.totalObra = linhasCusto
     .filter((c) => c.grupo === 'obra' && (c.orcamento_unidade || 'rs') !== 'pct_obra')
     .reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);

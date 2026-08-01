@@ -4,7 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import {
   rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno,
-  vgvLinha, vglLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
+  vgvLinha, receitaLiquidaLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 import {
   urbiVerso,
@@ -378,16 +378,17 @@ export class ViabFluxoCustos extends LitElement {
       const linhas = receitas?.erro ? [] : (receitas.dados || []);
       this.linhasReceita = linhas;
       // Contexto de resolução idêntico ao do motor (fluxo-caixa-motor.ts): além de
-      // área/VGV, calcula a RECEITA total (VGL — líquida de comissão destacada e RET)
-      // para que a coluna Resultado de linhas em `% Receita` bata exatamente com o
-      // que o motor computa (antes, sem `receitaTotal`, o cálculo caía no fallback
-      // VGV e divergia do fluxo de caixa — issue #118).
+      // área/VGV, calcula a RECEITA total (líquida do único imposto oficial do
+      // Avançado — RET por Grupo, #228) para que a coluna Resultado de linhas em
+      // `% Receita` bata exatamente com o que o motor computa (antes, sem
+      // `receitaTotal`, o cálculo caía no fallback VGV e divergia do fluxo de
+      // caixa — issue #118).
       this.ctxCusto = {
         areaPrivativaTotal: areaPrivativaTotalLinhas(linhas),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
         vgvTotal: linhas.reduce((s: number, l: any) => s + vgvLinha(l.tipologias), 0),
         receitaTotal: linhas.reduce(
-          (s: number, l: any) => s + vglLinha(vgvLinha(l.tipologias), l.fluxo_pagamento), 0),
+          (s: number, l: any) => s + receitaLiquidaLinha(vgvLinha(l.tipologias), l.fluxo_pagamento), 0),
       };
       // Alinha a linha Construção ao cronograma (evento Obra) — depende de crono +
       // custos já carregados. Editável apenas (#120).

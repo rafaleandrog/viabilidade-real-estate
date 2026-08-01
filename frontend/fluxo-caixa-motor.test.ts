@@ -5,7 +5,7 @@ import {
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
-  type FluxoConfig,
+  type FluxoConfig, type FluxoCalc,
 } from './fluxo-caixa-motor.js';
 import { periodosAnuais, CATEGORIA_CORRETAGEM, type EventoCrono } from './fluxo-shared.js';
 
@@ -291,6 +291,52 @@ test('fluxo de pagamento: múltiplas entradas + repasse derivado (100 − entrad
   assert.ok(perto(r[13], 0, 1));
   assert.ok(perto(r[17], 1_500_000 / 24, 1));
   assert.ok(perto(r[42], 7_000_000, 1));          // repasse derivado (70%) na entrega (mês 42)
+});
+
+// #228: "Destacada" não deduz mais do recebível — a corretagem é sempre a
+// linha de custo obrigatória (base bruto/VGV, #227). Antes, marcar "Destacada"
+// dobrava a dedução (uma vez na receita via vglLinha, outra vez como custo);
+// agora o Resultado é IDÊNTICO entre "Destacada" e "Embutida" com o mesmo %.
+test('#228: marcar comissão "Destacada" não muda mais o Resultado (fim da dupla dedução)', () => {
+  const base = (tipo: 'embutida' | 'destacada'): FluxoConfig => ({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+      fluxo_pagamento: { comissao: { ativo: true, tipo, pct: 6 }, ret: { ativo: false, pct: 0 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: CATEGORIA_CORRETAGEM, orcamento_valor: 6, orcamento_unidade: 'pct_vgv', inicio_mes: 0, duracao_meses: 1 },
+    ],
+    areaTerreno: 0,
+  });
+  const rEmbutida = calcularFluxo(base('embutida'));
+  const rDestacada = calcularFluxo(base('destacada'));
+  const resultado = (c: FluxoCalc) => c.fluxoAcumulado[c.fluxoAcumulado.length - 1];
+  assert.ok(perto(resultado(rEmbutida), resultado(rDestacada), 1));
+  // A receita bruta (antes da corretagem, que é custo) também é idêntica.
+  assert.ok(perto(soma(rEmbutida.receitaMensal), soma(rDestacada.receitaMensal), 1));
+  // E igual à venda contratada (10M) — sem RET, sem juros ainda (#232+).
+  assert.ok(perto(soma(rEmbutida.receitaMensal), 10_000_000, 1));
+});
+
+test('#228: RET reduz o Resultado uma única vez (imposto), sem dobrar com a comissão', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+      fluxo_pagamento: { comissao: { ativo: true, tipo: 'destacada', pct: 6 }, ret: { ativo: true, pct: 4 } },
+    }],
+    linhasCusto: [],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  // Receita líquida = 10M − 4% de RET = 9,6M — a comissão "destacada" não soma
+  // outra dedução (não há linha de custo de corretagem nesta config).
+  assert.ok(perto(soma(r.receitaMensal), 9_600_000, 1));
 });
 
 // 5. Resolução de unidade pct_vgv dentro do fluxo completo

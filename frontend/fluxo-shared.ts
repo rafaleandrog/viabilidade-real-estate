@@ -177,16 +177,19 @@ export function vgvVendavelLinha(tipologias: any[]): number {
 }
 
 /**
- * VGL (Valor Geral Líquido) da linha: VGV líquido de comissão DESTACADA e de
- * RET, conforme o fluxo de pagamento. Comissão embutida já está no preço e
- * não deduz.
+ * Receita líquida de uma linha, para fins de BASE DE CUSTO (`pct_receita`) —
+ * VGV menos o único imposto oficial do Avançado: RET por Grupo (#228, decisão
+ * do autor 2026-08-01 — o regime da aba Financeiro, `regime_tributario`/
+ * `aliquota_*`, é exclusivo do Preliminar e não é lido pelo motor do
+ * Avançado). Substitui `vglLinha` (removida): a comissão NUNCA deduz aqui —
+ * ela já é a linha de custo obrigatória "Corretagem de vendas" (#227);
+ * deduzi-la também da receita duplicava o efeito quando o comissionamento
+ * era "Destacada", o bug que a #228 corrige.
  */
-export function vglLinha(vgv: number, fluxoPagamento: any): number {
-  const fp = fluxoPagamento ?? {};
-  let liquido = vgv;
-  if (fp.comissao?.ativo && fp.comissao?.tipo === 'destacada') liquido -= vgv * (n(fp.comissao.pct) / 100);
-  if (fp.ret?.ativo) liquido -= vgv * (n(fp.ret.pct) / 100);
-  return liquido;
+export function receitaLiquidaLinha(vgv: number, fluxoPagamento: any): number {
+  const ret = fluxoPagamento?.ret;
+  if (!ret?.ativo) return vgv;
+  return vgv * (1 - n(ret.pct) / 100);
 }
 
 /**
