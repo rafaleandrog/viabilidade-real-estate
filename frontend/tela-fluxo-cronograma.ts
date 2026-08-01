@@ -43,7 +43,12 @@ export class ViabFluxoCronograma extends LitElement {
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .params { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 8px; }
     .params urbi-input { width: 160px; }
-    .params viab-num { width: 160px; }
+    /* #245: o viab-num agrega número + setas + sufixo ("meses") + sufixo-mes
+       ("jun/29") na mesma linha; com largura estreita o input (flex:1) encolhia
+       e o NÚMERO era truncado. Largura folgada para o pior caso (mês de 2-3
+       dígitos + rótulo de mês) — os afixos vivem no shadow DOM do primitivo e
+       não alcançam esta folha, então a folga aqui é o ajuste correto. */
+    .params viab-num { width: 184px; }
 
     table.crono { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
     table.crono th {
@@ -65,7 +70,9 @@ export class ViabFluxoCronograma extends LitElement {
     }
     .evento-label { display: inline-flex; align-items: center; }
     .campo-mes { display: inline-flex; align-items: center; gap: 6px; }
-    .campo-mes viab-num { width: 148px; }
+    /* #245: ver nota em .params viab-num — 148px truncava o número quando o
+       sufixo-mes estava presente. 184px acomoda "132º mês · dez/29" sem cortar. */
+    .campo-mes viab-num { width: 184px; }
     .cadeado { opacity: 0.7; font-size: 0.75rem; }
     td.periodo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); white-space: nowrap; }
 
