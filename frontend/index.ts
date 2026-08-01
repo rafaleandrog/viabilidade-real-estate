@@ -9,21 +9,26 @@ import { urbiVerso } from './viabilidade-api.js';
 import { estiloPagina } from './estilos.js';
 
 // Web component raiz da app. O shell monta <app-viabilidade> e injeta window.urbiVerso.
-// Roteamento interno por sub-rota: '/', '/terrenos', '/detalhe/{id}'.
+// Roteamento interno por sub-rota: '/', '/terrenos', '/detalhe/{id}',
+// '/detalhe/{id}/{aba}' e '/detalhe/{id}/{aba}/{subaba}' (#251: a subaba passa a
+// viver na URL, habilitando deep link e histórico do navegador). O vocabulário
+// de aba/subaba é do estudo (Avançado normaliza em tela-avancado) — este parser
+// só carrega os segmentos crus, sem conhecê-los.
 
 interface Rota {
   tela: 'dashboard' | 'estudo';
   aba?: 'estudos' | 'terrenos' | 'benchmark';
   estudoId?: number;
-  abaEstudo?: string; // guia dentro do estudo. Preliminar: premissas|proforma|graficos|apelo.
-                      // Avançado: resumo|empreendimento|viabilidade|obra|fluxo|cenarios|mercado.
+  abaEstudo?: string;    // guia dentro do estudo. Preliminar: premissas|proforma|graficos|apelo.
+                         // Avançado: resumo|empreendimento|viabilidade|custos|fluxo|cenarios|mercado.
+  subAbaEstudo?: string; // #251: 2º nível dentro da guia (ex. viabilidade → receitas).
 }
 
 function parsearSubRota(sub: string): Rota {
   const partes = (sub || '').replace(/^\//, '').split('/').filter(Boolean);
   if (partes[0] === 'detalhe' && partes[1]) {
     const id = parseInt(partes[1]);
-    if (!isNaN(id)) return { tela: 'estudo', estudoId: id, abaEstudo: partes[2] };
+    if (!isNaN(id)) return { tela: 'estudo', estudoId: id, abaEstudo: partes[2], subAbaEstudo: partes[3] };
   }
   if (partes[0] === 'terrenos') return { tela: 'dashboard', aba: 'terrenos' };
   if (partes[0] === 'benchmarks') return { tela: 'dashboard', aba: 'benchmark' };
@@ -55,6 +60,7 @@ export class AppViabilidade extends LitElement {
       return html`<viab-tela-estudo
         .estudoId=${this.rota.estudoId || 0}
         .aba=${this.rota.abaEstudo || 'premissas'}
+        .subAba=${this.rota.subAbaEstudo || ''}
       ></viab-tela-estudo>`;
     }
     return html`<viab-tela-dashboard .aba=${this.rota.aba || 'estudos'}></viab-tela-dashboard>`;

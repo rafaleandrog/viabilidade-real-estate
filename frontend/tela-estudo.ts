@@ -37,6 +37,10 @@ export class ViabTelaEstudo extends LitElement {
   get aba(): string { return this._aba; }
   private _aba = 'premissas';
 
+  // #251: subaba (2º nível) vinda da URL /detalhe/:id/:aba/:subaba. Só o Avançado
+  // usa; o Preliminar não tem subaba. Valor cru — tela-avancado normaliza.
+  @property({ type: String }) subAba = '';
+
   @state() private estudo: any = null;
   @state() private carregando = true;
   @state() private membros: any[] = [];
@@ -132,7 +136,9 @@ export class ViabTelaEstudo extends LitElement {
               .podeEditar=${!!p.podeEditar}
               .status=${st}
               .aba=${this.aba}
+              .subAba=${this.subAba}
               @viab:aba-topo=${(e: CustomEvent) => urbiVerso.navegarSub(`/detalhe/${this.estudoId}/${e.detail.id}`)}
+              @viab:subaba-topo=${(e: CustomEvent) => urbiVerso.navegarSub(`/detalhe/${this.estudoId}/${e.detail.aba}/${e.detail.sub}`)}
             ></viab-tela-avancado>`
           : html`
             <urbi-abas
