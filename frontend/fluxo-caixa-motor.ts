@@ -15,7 +15,7 @@
 //   informativo do #188 (`vgvTotal`/`vgvPermutaFisica`/`receitaBrutaVgv`).
 
 import {
-  absorcaoMensal, vgvLinha, receitaLiquidaLinha, vgvPermutaFisicaLinha,
+  absorcaoMensal, periodoAbsorcao, vgvLinha, receitaLiquidaLinha, vgvPermutaFisicaLinha,
   vgvVendavelTipologia, vgvVendavelLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, vgvVendidoMensal, ePrecoTerreno,
@@ -475,6 +475,70 @@ export function componentesDoLegado(
   return componentes;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// #231 — Horizonte derivado de todos os componentes e todas as safras
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * #231: último mês com recebimento possível de UMA linha — considera TODOS
+ * os componentes do fluxo de pagamento (entrada, parcelamento — ao longo da
+ * obra ou por periodicidade — e repasse), não só o cronograma e o repasse
+ * como antes (`ultimoCrono + maxRepasse`, que ignorava entrada/parcelamento
+ * longos). Usado por `calcularFluxo` para derivar o horizonte sem truncar
+ * nenhum recebimento.
+ *
+ * Cobre o "pior caso" por SAFRA sem iterar mês a mês: como entrada e
+ * parcelamento (fora de "ao longo da obra") têm deslocamento CONSTANTE a
+ * partir do mês da venda, o pior caso é sempre a ÚLTIMA safra (`periodo.fim`
+ * — o fim do Após-chaves). "Ao longo da obra" já é absoluto (ancorado no
+ * Cronograma da Obra, não no mês da venda — #190/#191), então seu horizonte
+ * não depende da safra.
+ */
+export function ultimoMesRecebivelLinha(linha: any, cronograma: EventoCrono[]): number {
+  const periodo = periodoAbsorcao(cronograma);
+  if (!periodo) return 0;
+  const ultimoMesVenda = periodo.fim;
+  const fp = linha?.fluxo_pagamento ?? null;
+  if (!fp) return ultimoMesVenda; // sem config → à vista no mês da venda (#190/#191 não se aplicam)
+
+  let ultimo = ultimoMesVenda;
+
+  // Entrada: nParc parcelas consecutivas a partir do mês da venda.
+  for (const e of normalizarLinhasPagamento(fp.entrada)) {
+    const nParc = Math.max(1, Math.round(n(e?.parcelas) || 1));
+    ultimo = Math.max(ultimo, ultimoMesVenda + nParc - 1);
+  }
+
+  const obra = cronograma.find((ev) => ev.evento === 'obra');
+  const fimObra = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : 0;
+
+  // Parcelamento.
+  for (const p of normalizarLinhasPagamento(fp.parcelas)) {
+    if (p?.ao_longo_obra) {
+      // Vencimentos ancorados no Cronograma da Obra (absoluto) — o último
+      // possível é o fim da própria janela de vencimentos.
+      const nParcObra = parcelasAoLongoObra(cronograma, p?.periodicidade);
+      const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade ?? 'mensal'] ?? 1;
+      const inicioObra = obra ? n(obra.inicio_mes) : 0;
+      ultimo = Math.max(ultimo, inicioObra + (nParcObra - 1) * intervalo);
+    } else {
+      // nParc parcelas espaçadas por `intervalo`, a partir de mesVenda+intervalo.
+      const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
+      const nParc = Math.max(1, Math.round(n(p?.parcelas) || 1));
+      ultimo = Math.max(ultimo, ultimoMesVenda + intervalo * nParc);
+    }
+  }
+
+  // Repasse: mês fixo (fim da Obra + carência), independente da safra.
+  const pctRepasse = pctRepasseDerivado(fp);
+  if (pctRepasse > 0) {
+    const mesRepasse = fimObra + Math.max(0, Math.round(n(fp?.repasse?.apos_entrega_meses)));
+    ultimo = Math.max(ultimo, mesRepasse);
+  }
+
+  return ultimo;
+}
+
 /**
  * #228: recebimento BRUTO mensal de uma linha — o que o cliente efetivamente
  * paga, em meses relativos, SEM nenhuma dedução fiscal ou de corretagem (essas
@@ -510,11 +574,22 @@ export function recebimentoBrutoMensal(
   const fimObra = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : 0;
   const mesRepasse = fimObra + Math.max(0, Math.round(n(fp?.repasse?.apos_entrega_meses)));
 
+  // #231: o fallback SILENCIOSO que empilhava excedente no último mês foi
+  // removido — `ultimoMesRecebivelLinha` agora deriva o horizonte para caber
+  // todo recebimento desta linha, então este ramo não deveria disparar nunca
+  // em uso normal. Se disparar (ex.: `config.prazoMeses` explícito mais curto
+  // que o necessário), o aviso é visível — nunca mais um número errado sem
+  // rastro. Também não estoura fora do array: em vez de deslocar o valor,
+  // funciona como um limite (o total da linha deixa de bater com a soma dos
+  // meses, e o aviso aponta a causa).
   const deposita = (mes: number, valor: number) => {
     if (valor === 0) return;
     const idx = Math.max(0, mes); // mês 0-based = índice; recebimentos antes do mês 0 caem no mês 0
-    if (idx < saida.length) saida[idx] += valor;
-    else if (saida.length > 0) saida[saida.length - 1] += valor; // proteção de horizonte
+    if (idx < saida.length) { saida[idx] += valor; return; }
+    console.warn(
+      `fluxo-caixa-motor: recebimento de ${valor.toFixed(2)} no mês ${mes} cai fora do horizonte ` +
+      `(${saida.length} meses) — prazoMeses explícito menor que o necessário? Valor NÃO computado.`,
+    );
   };
 
   for (let i = 0; i < bruto.length; i++) {
@@ -834,13 +909,20 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const linhasCusto = config.linhasCusto ?? [];
   const taxa = n(config.taxaDescontoAa) || 12;
 
-  // Horizonte: usa prazoMeses se dado; senão deriva do conteúdo (+ folga de
-  // repasse/parcelas, já protegida em receitaMensalLinha). Meses 0-based: o
-  // último mês usado é `ultimo*`, então o comprimento do array é `ultimo* + 1`.
+  // Horizonte: usa prazoMeses se dado; senão deriva do conteúdo. Meses
+  // 0-based: o último mês usado é `ultimo*`, então o comprimento do array é
+  // `ultimo* + 1`.
+  //
+  // #231: `ultimoRecebivel` considera TODOS os componentes de pagamento de
+  // cada linha (entrada, parcelamento — ao longo da obra ou por
+  // periodicidade —, repasse), não só o repasse como antes
+  // (`ultimoCrono + maxRepasse` ignorava entrada/parcelamento longos — ex.:
+  // uma tabela de 36 parcelas mensais iniciada no Pré-lançamento facilmente
+  // extrapola o fim da Obra, e o horizonte antigo não via isso).
   const ultimoCrono = Math.max(0, ...crono.map((e) => n(e.inicio_mes) + n(e.duracao_meses) - 1));
   const ultimoCustos = Math.max(0, ...linhasCusto.map((c) => n(c.inicio_mes) + n(c.duracao_meses) - 1));
-  const maxRepasse = Math.max(0, ...linhasReceita.map((l) => n(l?.fluxo_pagamento?.repasse?.apos_entrega_meses)));
-  const prazoDerivado = Math.max(ultimoCrono + maxRepasse, ultimoCustos, 11) + 1;
+  const ultimoRecebivel = Math.max(0, ...linhasReceita.map((l) => ultimoMesRecebivelLinha(l, crono)));
+  const prazoDerivado = Math.max(ultimoCrono, ultimoRecebivel, ultimoCustos, 11) + 1;
   const prazo = Math.max(1, Math.round(n(config.prazoMeses) || prazoDerivado));
 
   const ctxCusto: ContextoCusto = {
