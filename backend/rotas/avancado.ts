@@ -54,10 +54,19 @@ export function cronogramaPadrao(): LinhaCronograma[] {
  *                     antes fixa em 1 mês, o usuário já podia editá-la na tela e
  *                     tomava 422 do backend, que ainda forçava o valor)
  *  - Pós-obra:       início = fim da Obra (travado; duração livre)
+ *
+ * #246: `travado_duracao` é sempre `false` para os 5 eventos — nenhum dos
+ * defaults (cronogramaPadrao) trava duração, e nenhuma rota escreve `true`.
+ * O único jeito de existir `true` é dado LEGADO de antes da #166 (quando o
+ * Lançamento tinha duração fixa em 1 mês) — o valor sobrevivia para sempre no
+ * banco porque só `travado_inicio` era recalculado aqui, nunca `travado_duracao`.
+ * A normalização roda em TODO recálculo (leitura e PATCH via lerCronograma),
+ * corrigindo o legado sem migração.
+ *
  * Retorna um novo array (não muta o de entrada).
  */
 export function recalcularTravados(eventos: LinhaCronograma[]): LinhaCronograma[] {
-  const porEvento = new Map(eventos.map((e) => [e.evento, { ...e }]));
+  const porEvento = new Map(eventos.map((e) => [e.evento, { ...e, travado_duracao: false }]));
   const plan = porEvento.get('planejamento');
   const pre = porEvento.get('pre_lancamento');
   const lanc = porEvento.get('lancamento');
