@@ -96,17 +96,23 @@ export class ViabTelaCenarios extends LitElement {
     .secao-fluxo h3, .secao-cenarios h3 { margin: 0 0 10px; }
     .secao-cenarios { margin-top: 24px; }
 
-    table.cen { width: auto; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    /* #265: reversão consciente da #187 (PROGRESSO §547-551). A #187 pôs
+       width:auto para a tabela não esticar e as colunas não ficarem largas
+       demais para o dado; o efeito colateral foi a tabela encolher e "flutuar"
+       à esquerda do card. Volta a ocupar 100% da largura, mas a folga é
+       absorvida SÓ pela coluna do nome (width:100% na 1ª coluna abaixo) — as
+       numéricas seguem no seu min-content e as estreitas/var no tamanho fixo,
+       então nada se espalha. */
+    table.cen { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
     table.cen th, table.cen td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.08)); font-size: 0.82rem; white-space: nowrap; }
     table.cen th { color: var(--cor-texto-sec, rgba(255,255,255,0.55)); font-weight: 600; }
-    table.cen th:first-child, table.cen td:first-child { text-align: left; }
+    /* Coluna do nome do cenário absorve a folga da largura total. */
+    table.cen th:first-child, table.cen td:first-child { text-align: left; width: 100%; }
     table.cen td.pos { color: var(--cor-sucesso, #13a98d); }
     table.cen td.neg { color: var(--cor-erro, #d45a3a); }
     table.cen tr.linha-real td { font-weight: 700; background: var(--cor-primaria-fundo, rgba(124,92,255,0.12)); }
     table.cen tr.linha-real td:first-child urbi-icone { margin-right: 6px; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
-    /* #187: Preço venda/Custo obra estreitas (só "±NN%") — a tabela deixa de
-       esticar para 100% (width:auto acima) e o resto do conteúdo alinha à
-       esquerda em vez de espalhar por colunas largas demais para o dado. */
+    /* #187/#265: Preço venda/Custo obra estreitas (só "±NN%") — largura fixa. */
     table.cen th.cen-estreita, table.cen td.cen-estreita { width: 84px; }
     /* #187: coluna própria para a variação (badge) de VPL/TIR/Exposição máx.,
        separada do valor — cabeçalho vazio (rótulo só em aria-label). */
