@@ -96,13 +96,16 @@ export class ViabFluxoReceitas extends LitElement {
 
     /* #49 — bola de status (pendente → aplicado) nos botões de Absorção e Fluxo
        de Pagamento. Slot do urbi-botao herda estes estilos.
-       #92 — pendente vermelha (erro), aplicado azul (info). */
+       #92 — pendente vermelha (erro).
+       #247 — aplicado usa o token de SUCESSO (verde), não info (azul): o azul
+       comunica informação, não conclusão; verde é "aplicado/concluído", o
+       mesmo token de sucesso usado no resto do app. */
     .stat {
       display: inline-block; width: 8px; height: 8px; border-radius: 50%;
       margin-right: 6px; vertical-align: middle;
       background: var(--cor-erro, #d45a3a);
     }
-    .stat.ok { background: var(--cor-info, #2aa9e0); }
+    .stat.ok { background: var(--cor-sucesso, #13a98d); }
     .saldo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.7rem); }
     .saldo.zero { color: var(--cor-erro, #d45a3a); }
     .rodape-tip { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-top: 10px; }
