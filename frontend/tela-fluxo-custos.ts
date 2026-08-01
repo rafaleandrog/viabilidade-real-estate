@@ -152,7 +152,7 @@ const EVENTOS_ANCORA = [
   { valor: 'planejamento', rotulo: 'Planejamento' },
   { valor: 'pre_lancamento', rotulo: 'Pré-lançamento' },
   { valor: 'obra', rotulo: 'Obra' },
-  { valor: 'pos_obra', rotulo: 'Pós-obra' },
+  { valor: 'pos_obra', rotulo: 'Após-chaves' },
   { valor: 'customizado', rotulo: 'Customizado' },
 ];
 
