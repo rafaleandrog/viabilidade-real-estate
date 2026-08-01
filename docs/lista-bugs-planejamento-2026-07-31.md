@@ -21,11 +21,14 @@ Sobreposição vira dependência, tracker, issue de UX, issue de teste ou emenda
 | Itens de origem com registro obrigatório | **24** |
 | Novas issues, epics e trackers | **22** |
 | Sub-issues da epic de permuta física | **4** |
+| Sub-issue da epic de valor canônico | **1** |
 | Issue existente atualizada (item 16) | **#238** |
 | Issue existente convertida em epic (item 24) | **#239** |
 | Sub-issues do programa financeiro | **10** (FIN-01…FIN-10) |
 | **Itens sem destino GitHub** | **0** |
 | Issues implementadas nesta sessão | **0** |
+
+> **Total de destinos: 37** — 22 + 4 (permuta física) + 1 (precisão monetária) + #238 + #239 + 10 FIN.
 
 ---
 
@@ -54,6 +57,7 @@ Sobreposição vira dependência, tracker, issue de UX, issue de teste ou emenda
 | ↳ 015-D | 15 | **#269** | relatórios, invariantes e reconciliação | Sub-issue | D | #268 | Não |
 | BUGLIST-016 | 16 | **#238** | `feat(terreno)` permuta financeira bruta e líquida | **Emenda de issue existente** | R5 · 4 | #228, #237, #256, #257, #259, #260 | Conforme #238 |
 | BUGLIST-017 | 17 | **#259** | `epic(valores)` valor canônico e conversão reversível | **Epic de fundação** | D | #220, #221, #229 | Possível + bump |
+| ↳ 017-A | 17 | **#281** | apresentação e entrada monetária com 2 casas decimais | Sub-issue | D | — (antes/junto de #260) | Não |
 | BUGLIST-018 | 18 | **#260** | `fix(calculos)` fonte única de valor resolvido | Nova issue | D | **#259**, #220, #227–#229, #237 | Herdada |
 | BUGLIST-019 | 19 | **#261** | `fix(custos)` largura e leitura do campo Duração | Issue visual | C | **#249** | Não |
 | BUGLIST-020 | 20 | **#262** | `fix(ui)` sobreposição do indicador de variação nos KPIs | Follow-up de #176 | B | — | Não |
@@ -243,16 +247,38 @@ normatizado ali. As emendas que ela precisaria receber, quando o autor aprovar:
    `bug`/`enhancement`. Nenhum label novo, mesmo padrão de `[EVI-0NN]`.
 3. Migração da `Permuta` legada = **toda para `Permuta financeira`**.
 
+4. **Precisão monetária (2026-08-01) — a decisão que fecha a #259.**
+
+   > **Todo valor monetário que é resultado de fórmula tem 2 casas decimais** — na apresentação, na
+   > entrada e no motor. Representações derivadas **não monetárias** (`% do VGV`, `R$/m²`) carregam
+   > **precisão plena** internamente e arredondam **só para exibir**.
+
+   O **valor canônico é o monetário, a 2 casas**. Isso encerra a pergunta arquitetural que bloqueava
+   a epic: reproduzir o caso relatado deixa de ser pré-requisito e vira **caso de teste**.
+
+   Registrado como convenção **C7** em `docs/viabilidade/padrao-incorporacao.md` (Anexo A), no
+   `CLAUDE.md`, no `INSTRUCOES-CODE.md`, em `docs/viabilidade/modelo-de-dados.md` (§ Regras de
+   precisão) e em `docs/viabilidade/formulas.md`.
+
+   **Violação encontrada ao verificar o alcance do princípio — não estava em issue nenhuma:**
+
+   | Ponto | Casas hoje | Destino |
+   |---|---|---|
+   | `frontend/viab-format.ts:8` — `fmtR$`, **53 usos em 11 telas** | **0** | **#281** |
+   | `frontend/tela-fluxo-custos.ts:638,873-875` — Orçamento em `rs` | **0** | **#281** |
+   | `frontend/exportar.ts:9` — `toFixed(2)` | 2 | ✅ conforme |
+   | `frontend/fluxo-caixa-motor.ts` — resultados monetários | float, sem quantização | **#260** |
+
+   **A tela e a exportação mostram números diferentes para o mesmo estudo hoje.** Como `fmtR$` é
+   definido num ponto só, a correção é pequena — mas muda toda a apresentação monetária de uma vez.
+   Por isso ganhou destino próprio (**#281**, sub-issue de #259) em vez de virar ajuste pontual.
+
 **Abertas — bloqueiam implementação, não o backlog**
 
-1. **#259 — qual é a tela do caso relatado?** A aritmética não fecha: em Custos, `rs` é arredondado
-   a **0 casas** (`tela-fluxo-custos.ts:873-875`), então R$ 9.999.998,**76** não pode sair de lá; nas
-   Premissas, a heurística #119 deveria ter evitado o erro no round-trip simples. Reproduzir o caso
-   é o **primeiro entregável** da epic.
-2. **#256 e #258 — inventário de produção.** Quantos estudos têm linha `Preço` sem
+1. **#256 e #258 — inventário de produção.** Quantos estudos têm linha `Preço` sem
    `obrigatoria=true`, ou mais de uma? Quantos têm `unidades_permutadas > 0`? Não é verificável no
    ambiente Claude Code — é o objeto de **#221**.
-3. **#266 — valoração de tipologia com preços diferentes por Grupo.** `avancado_alocacoes` guarda
+2. **#266 — valoração de tipologia com preços diferentes por Grupo.** `avancado_alocacoes` guarda
    `preco_m2` por alocação. Preço médio ponderado, preço do Grupo de origem, ou preço informado na
    linha de permuta? **Não usar média implícita** — decisão explícita em ADR antes de código.
 

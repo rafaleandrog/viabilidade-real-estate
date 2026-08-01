@@ -35,7 +35,7 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
 | **5 — EVI** | Auditoria do app contra os documentos EVI | **#220–#241** (22) | 🔴 **aberta, 0 implementadas** · 12 corpos com emenda pendente |
-| **6 — lista de bugs** | `lista_bugs.xlsx`, 24 itens `BUGLIST-001`…`BUGLIST-024` | **#238, #239, #244–#279** (36 destinos) | 🔴 **aberta, 0 implementadas** |
+| **6 — lista de bugs** | `lista_bugs.xlsx`, 24 itens `BUGLIST-001`…`BUGLIST-024` | **#238, #239, #244–#281** (37 destinos) | 🔴 **aberta, 0 implementadas** |
 
 As duas convivem e se cruzam em quatro pontos (itens 5, 11, 16 e 24 da lista de bugs). **A regra é
 não duplicar implementação:** onde a Rodada 5 já tem issue executora, o item da planilha vira UX
@@ -59,7 +59,7 @@ sem registro.**
 | **A — bloqueantes** | #244, #246 | Duplicação de estudo e cronograma legado |
 | **B — UX e navegação** | #245, #247, #250+#251, #262, #263, #264, #265 | Zero matemática alterada |
 | **C — cronograma e custos** | #249 (+#261), #252, #255 | Ancoragem, salvamento atômico e validação matricial |
-| **D — terreno e valor canônico** | #259 → #260 → #256 → #257 → #258 (#266–#269) → #253 | Preço, permutas e fonte canônica de valor |
+| **D — terreno e valor canônico** | #259 (+#281) → #260 → #256 → #257 → #258 (#266–#269) → #253 | Preço, permutas e fonte canônica de valor |
 | **Rodada 5 (paralela)** | #248 (UX), #254 (epic de rastreio) | Ligadas à cadeia EVI, sem substituí-la |
 | **Programa Financeiro** | #239 + #270–#279 (FIN-01…FIN-10) | Capital Stack, dívida, equity e waterfall |
 
@@ -76,7 +76,9 @@ ordem · #259 antes de #260 · #262 antes de #263 · #220/#221/#228/#231/#237 es
 >    financeira no motor (`fluxo-caixa-motor.ts:385`). Regra aprovada: toda `Permuta` legada →
 >    `Permuta financeira`.
 > 3. **#259** — o Preliminar **não** é uniformemente correto; são duas arquiteturas de persistência
->    diferentes, e o contrato canônico precisa cobrir as duas.
+>    diferentes, e o contrato canônico precisa cobrir as duas. **Resolvida em 2026-08-01** pelo
+>    contrato de precisão monetária (2 casas): o canônico é o **monetário**, e `%`/`R$/m²` são
+>    derivados com precisão plena. A violação de apresentação que isso expôs virou a **#281**.
 > 4. **#262** — a parte de "empurrar cards vizinhos" já foi corrigida pela #176; sobra `.kpi-var`
 >    absoluto sobre o valor.
 > 5. **#265** — é **reversão consciente** da decisão da #187 (`width:auto`), não correção de
@@ -274,6 +276,15 @@ Git Bash — ver PROGRESSO).
 - Seed fora de migração; migração só transforma dados existentes
 - `shell_min = "0.50.3"`
 - Precisão: R$ e m² → `decimal(12,2)`; % digitado → inteiro; % calculado → `decimal(5,1)`
+- **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e
+  no motor. Representações derivadas **não monetárias** (% e R$/m²) carregam **precisão plena**
+  internamente e arredondam **só para exibir**; nunca são persistidas arredondadas. Decisão do autor
+  em 2026-08-01; é o contrato que fecha a #259 e dá regra às #260 e #281.
+  > ⚠️ Hoje o app **viola** isso: `fmtR$` usa `maximumFractionDigits: 0`
+  > (`frontend/viab-format.ts:8`, 53 usos em 11 telas) e o Orçamento de Custos em `rs` aceita só
+  > inteiro (`frontend/tela-fluxo-custos.ts:638,873-875`) — enquanto `frontend/exportar.ts:9` já usa
+  > `toFixed(2)`. **Tela e exportação mostram números diferentes.** Corrigir é a #281, não faça
+  > pontualmente.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa

@@ -2704,6 +2704,7 @@ com os do estudo.
 | **C4** | **No Avançado, o tempo é em meses relativos 0-based**: mês 0 = `data_inicio_projeto`; o índice do array mensal coincide com o número do mês. **Não há meses negativos.** | `fluxo-caixa-motor.ts` |
 | **C5** | **Permuta física não entra no fluxo** — reduz a área/VGV vendável do incorporador. **Permuta financeira é dedução da receita**, % do VGV residencial/não residencial (ou valor fixo). | `proforma.ts`, `formulas.md` |
 | **C6** | **Imposto segue o regime tributário**: `4%` quando `sujeito_ret`, senão `imposto_percentual`. Corretagem, marketing e permutas financeiras são deduções da receita antes dos custos. | `formulas.md`, schema |
+| **C7** | **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e no motor. O **valor canônico** de uma premissa multiunidade é o monetário; `% do VGV` e `R$/m²` são representações **derivadas**, que carregam precisão plena internamente e arredondam só para exibir. Contrato do autor, 2026-08-01. **Ainda não implementado:** a tela usa 0 casas (`viab-format.ts:8`) e a exportação usa 2 (`exportar.ts:9`) — ver #259, #260 e #281. | `formulas.md`, `viab-format.ts`, `premissas-conversao.ts` |
 
 ## Anexo B — Dicionário de premissas (campos reais)
 
@@ -2802,6 +2803,19 @@ Premissas guardam um campo por unidade e têm uma heurística de round-trip (#11
 Custos guarda **um** `orcamento_valor` + `orcamento_unidade` e arredonda à precisão de exibição a
 cada clique (`frontend/tela-fluxo-custos.ts:873-875,882-896`), sem preservação nenhuma. Um contrato
 canônico precisa cobrir as duas. → **#259**, consumido por **#260**.
+
+> ✅ **A regra que fecha esta armadilha existe desde 2026-08-01** (convenção **C7**, Anexo A): o
+> canônico é o **valor monetário a 2 casas**; `%` e `R$/m²` são derivados, com precisão plena
+> internamente. `converterUnidade` arredondar **tudo** a 2 casas
+> (`frontend/premissas-conversao.ts:50-58`), inclusive o percentual, é o que quebra o round-trip —
+> o percentual não é monetário e não deveria ser quantizado.
+
+**A13 — A tela e a exportação formatam dinheiro diferente.** `fmtR$` usa
+`maximumFractionDigits: 0` (`frontend/viab-format.ts:8`) e serve **53 chamadas em 11 telas**;
+`exportar.ts:9` define o seu próprio `R$ = (v) => v.toFixed(2)`. O mesmo estudo mostra valores
+diferentes no CSV e na tela, e a diferença cresce com o número de linhas somadas. Como `fmtR$` é
+definido num ponto só, a correção é pequena — mas ela muda **toda** a apresentação monetária do app
+de uma vez, então não é ajuste pontual. → **#281**.
 
 **A12 — `travado_*` legado não é normalizado em leitura.** `recalcularTravados` corrige
 `travado_inicio` de três eventos e **nunca toca `travado_duracao`**

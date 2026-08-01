@@ -70,6 +70,12 @@ Gráficos) · **Imóveis** (imóveis do Núcleo e em quais estudos são usados).
 - **`shell_min` = `0.50.3`** (formato `x.y.z`), SDK alvo `0.50.3`.
 - **Precisão decimal:** R$ e m² → `decimal(12,2)`; % digitado/default → `inteiro`; % calculado →
   `decimal(5,1)`.
+- **Precisão de resultado (2026-08-01):** **todo valor monetário que é resultado de fórmula é
+  quantizado a 2 casas decimais** — na apresentação, na entrada e no motor. Isso é distinto da
+  precisão de *persistência* acima: `decimal(12,2)` diz o que a coluna guarda, esta regra diz o que
+  o cálculo produz. Representações derivadas **não monetárias** (% do VGV, R$/m²) carregam
+  **precisão plena** internamente e arredondam somente na exibição — arredondá-las e persistir o
+  resultado é o defeito que a #259 corrige.
 - **Rotas relativas**, shell prefixa `/api/viabilidade/`; app nunca faz auth (`req.contexto` já vem);
   persistência via `req.dados`; tabelas de negócio com `acesso_externo:"restrito"`.
 - **Frontend:** Lit com decorators; `urbiVerso.api('/viabilidade/...')`; primitivos `urbi-*` por tag

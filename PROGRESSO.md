@@ -88,11 +88,42 @@ quando qualquer slider sai do zero (`tela-cenarios.ts:250-260`); o estado 0% é 
    auditoria da Rodada 5 registrou.
 3. **Migração da `Permuta` legada = toda para `Permuta financeira`** (ver correção 2 acima).
 
+### Contrato de precisão monetária — a decisão que fechou a #259
+
+Ao rever a dúvida da #259, o autor fixou o princípio geral:
+
+> **Todo valor monetário que é resultado de fórmula tem 2 casas decimais** — na apresentação, na
+> entrada e no motor. Representações derivadas **não monetárias** (`% do VGV`, `R$/m²`) carregam
+> **precisão plena** internamente e arredondam **só para exibir**.
+
+Isso responde a pergunta arquitetural: **o canônico é o valor monetário, a 2 casas**; percentual e
+R$/m² são derivados dele. Reproduzir o caso relatado deixa de ser pré-requisito e vira caso de teste.
+
+Registrado como convenção **C7** (`padrao-incorporacao.md`, Anexo A) e replicado no `CLAUDE.md`, no
+`INSTRUCOES-CODE.md`, em `modelo-de-dados.md` (§ Regras de precisão, agora separando **precisão de
+persistência** de **precisão de resultado**) e em `formulas.md`.
+
+**Ao verificar o alcance do princípio no código, apareceu uma violação que não estava em issue
+nenhuma:**
+
+| Ponto | Casas hoje | |
+|---|---|---|
+| `frontend/viab-format.ts:8` — `fmtR$`, **53 usos em 11 telas** | **0** | ❌ |
+| `frontend/tela-fluxo-custos.ts:638,873-875` — Orçamento em `rs` | **0** | ❌ |
+| `frontend/exportar.ts:9` — `toFixed(2)` | 2 | ✅ |
+| `frontend/fluxo-caixa-motor.ts` — resultados monetários (`Math.round` só em meses) | float | ❌ |
+
+**A tela e a exportação mostram números diferentes para o mesmo estudo hoje** — a persistência nunca
+foi o problema (`decimal(12,2)` desde sempre). Como `fmtR$` é definido num ponto só, a correção é
+pequena, mas muda **toda** a apresentação monetária do app de uma vez; por isso ganhou destino
+próprio — **#281** (`BUGLIST-017-A`), sub-issue da #259 — em vez de virar ajuste pontual. A
+quantização dos resultados do motor entrou no escopo da **#260**.
+
+Emendas aplicadas: **#259** (contrato + dúvida resolvida + sub-issue) e **#260** (quantização no
+motor + fechamento de soma). Total de destinos da Rodada 6 passa de 36 para **37**.
+
 ### Pendências deixadas em aberto
 
-- **#259** — reproduzir o caso exato (R$ 10.000.000 → 12,09% → R$ 9.999.998,76) e registrar **em
-  qual tela**. A aritmética de Custos (`rs` com 0 casas) não produz centavos, e a heurística #119
-  deveria cobrir o round-trip simples nas Premissas. É o primeiro entregável da epic.
 - **#256 e #258** — dependem do inventário de produção (**#221**): quantos estudos têm linha `Preço`
   sem `obrigatoria=true`, e quantos têm `unidades_permutadas > 0`. Não é verificável neste ambiente.
 - **#266** — base de valoração quando a mesma tipologia tem `preco_m2` diferente por Grupo.

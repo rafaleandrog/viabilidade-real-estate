@@ -88,9 +88,30 @@ Detalhe completo em `docs/lista-bugs-planejamento-2026-07-31.md` e, para o Capit
 
 ## Regras de precisão
 
+**Precisão de persistência** — o que a coluna guarda:
+
 - Monetários (R$) e áreas (m²): `decimal(12,2)`.
 - Percentuais de entrada: `decimal(5,2)` (comporta defaults fracionários como 6,73% / 1,6% / 0,25%).
 - Scores do apelo: `decimal(3,1)`.
+
+**Precisão de resultado** — o que o cálculo produz (contrato de 2026-08-01):
+
+> **Todo valor monetário que é resultado de fórmula tem 2 casas decimais**, na apresentação, na
+> entrada e no motor.
+
+São duas regras diferentes e é fácil confundi-las. `decimal(12,2)` já permite centavos desde o
+início; o que faltava era dizer que **o cálculo também é quantizado a 2 casas**. Consequências:
+
+- o **valor canônico** de uma premissa multiunidade é o **monetário**, a 2 casas;
+- `% do VGV` e `R$/m²` são **representações derivadas**: carregam precisão plena internamente e
+  arredondam **só para exibir**. Persistir a representação arredondada é o defeito que a #259
+  corrige — foi assim que R$ 10.000.000 virou R$ 9.999.998,76 ao passar por 12,09%;
+- áreas (m²) seguem `decimal(12,2)` na persistência; a regra de resultado acima é declarada para
+  **valor monetário**.
+
+> ⚠️ **Divergência viva hoje:** a tela formata R$ com **zero** casas (`frontend/viab-format.ts:8`,
+> `maximumFractionDigits: 0`) e a exportação com **duas** (`frontend/exportar.ts:9`, `toFixed(2)`) —
+> o mesmo estudo mostra números diferentes em CSV e em tela. Correção rastreada pela **#281**.
 
 ## id_legivel
 
