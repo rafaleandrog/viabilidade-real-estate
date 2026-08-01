@@ -60,6 +60,16 @@ const PAGINAS: { id: AbaTopo; label: string }[] = [
 ];
 const IDS_TOPO = PAGINAS.map((a) => a.id) as AbaTopo[];
 
+// #250: a página de Custos tem id interno 'obra' (preservado pela #40 para não
+// migrar rota nem estado), mas o slug PÚBLICO na URL passa a ser 'custos' — o
+// rótulo que o usuário vê. 'obra' continua aceito como alias de compatibilidade
+// (deep links e favoritos antigos). Só esta página difere; as demais têm slug =
+// id. O mapa vive aqui porque o vocabulário de páginas é desta tela.
+const SLUG_POR_ID: Partial<Record<AbaTopo, string>> = { obra: 'custos' };
+const ID_POR_SLUG: Record<string, AbaTopo> = { custos: 'obra' };
+const idDaSlug = (s: string): string => ID_POR_SLUG[s] ?? s;
+const slugDoId = (id: string): string => SLUG_POR_ID[id as AbaTopo] ?? id;
+
 // Abas (nível 2) por página — só as páginas com mais de uma seção. Cada aba
 // leva nome + ícone (urbi-abas suporta `icone` FontAwesome por aba).
 type SubAba = { id: string; label: string; icone: string };
@@ -96,11 +106,13 @@ export class ViabTelaAvancado extends LitElement {
   @property({ type: Boolean }) podeEditar = false;
   @property({ type: String }) status = '';
 
-  // Página ativa — vem da URL via tela-estudo. Setter normaliza para uma das 7
-  // (URLs antigas do Preliminar, ex. 'premissas', caem em 'resumo').
+  // Página ativa — vem da URL via tela-estudo. Setter normaliza para uma das 8
+  // (URLs antigas do Preliminar, ex. 'premissas', caem em 'resumo'). #250: o
+  // slug 'custos' (e o alias 'obra') resolve para o id interno 'obra'.
   @property({ type: String })
   set aba(v: string) {
-    const val = IDS_TOPO.includes(v as AbaTopo) ? (v as AbaTopo) : 'resumo';
+    const id = idDaSlug(v);
+    const val = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
     const antigo = this._aba;
     this._aba = val;
     this.requestUpdate('aba', antigo);
@@ -108,12 +120,29 @@ export class ViabTelaAvancado extends LitElement {
   get aba(): AbaTopo { return this._aba; }
   private _aba: AbaTopo = 'resumo';
 
+  // #251: subaba (2º nível) vinda da URL. Aplica-se à página ativa; sincronizada
+  // com subAtiva em updated() para que deep link e voltar/avançar funcionem.
+  @property({ type: String }) subAba = '';
+
   // Aba ativa por página (default: 1ª aba de cada uma).
   @state() private subAtiva: Record<string, string> = {
     empreendimento: 'informacoes',
     viabilidade: 'receitas',
     obra: 'terreno',
   };
+
+  // #251: quando a URL traz uma subaba válida para a página ativa, ela vira a
+  // aba corrente daquela página. Feito em updated (não no setter) porque `aba` e
+  // `subAba` chegam como propriedades sem ordem garantida — aqui os dois já
+  // estão resolvidos. O guard de igualdade evita laço de atualização.
+  updated(changed: Map<string, unknown>) {
+    if ((changed.has('aba') || changed.has('subAba')) && this.subAba) {
+      const subs = SUBABAS[this._aba];
+      if (subs?.some((s) => s.id === this.subAba) && this.subAtiva[this._aba] !== this.subAba) {
+        this.subAtiva = { ...this.subAtiva, [this._aba]: this.subAba };
+      }
+    }
+  }
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .layout {
@@ -157,7 +186,8 @@ export class ViabTelaAvancado extends LitElement {
             .ativo=${this.aba}
             @urbi:nav-selecionar=${(e: CustomEvent) => {
               const id = (e.detail?.id || 'resumo') as AbaTopo;
-              this.dispatchEvent(new CustomEvent('viab:aba-topo', { detail: { id }, bubbles: true, composed: true }));
+              // #250: a URL usa o slug público ('custos' p/ a página de Custos).
+              this.dispatchEvent(new CustomEvent('viab:aba-topo', { detail: { id: slugDoId(id) }, bubbles: true, composed: true }));
             }}
           ></urbi-nav>
         </div>
@@ -206,6 +236,11 @@ export class ViabTelaAvancado extends LitElement {
         @urbi:aba-selecionar=${(e: CustomEvent) => {
           const id = e.detail?.id || subs[0]?.id;
           this.subAtiva = { ...this.subAtiva, [topo]: id };
+          // #251: leva a subaba para a URL (slug da página + id da subaba) →
+          // deep link e histórico. tela-estudo faz o navegarSub com o estudoId.
+          this.dispatchEvent(new CustomEvent('viab:subaba-topo', {
+            detail: { aba: slugDoId(topo), sub: id }, bubbles: true, composed: true,
+          }));
         }}
       >
         ${subs.map((s) => html`
