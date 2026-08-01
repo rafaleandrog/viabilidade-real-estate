@@ -46,17 +46,23 @@ export const estiloFluxoTabela = css`
 
   .fx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
 
-  /* #132: a variacao vs. cenario real fica no canto superior direito do proprio
-     card de KPI. urbi-kpi nao expoe slot nem prop de variacao (so rotulo/valor/
-     variante), entao a celula do grid e quem ancora o indicador — sem tocar no
-     primitivo e sem exigir bump de shell_min. */
+  /* #132: a variacao vs. cenario real acompanha o card de KPI. urbi-kpi nao
+     expoe slot nem prop de variacao (so rotulo/valor/variante), entao a celula
+     do grid e quem ancora o indicador — sem tocar no primitivo e sem exigir
+     bump de shell_min. */
   /* #176: min-width:0 no item do grid (default é min-width:auto, que segue o
      min-content do valor — R$ com muitos dígitos empurra o card por cima do
      vizinho). width:100% no urbi-kpi interno preenche o espaço liberado. */
-  .fx-kpis .kpi-cel { position: relative; min-width: 0; }
+  /* #262: o indicador vinha em position:absolute; top/right sobre o card e
+     SOBREPUNHA o valor do urbi-kpi (que ocupa o topo da célula). Como o layout
+     interno do primitivo é shadow DOM inacessível a esta folha, a correção
+     determinística é tirá-lo do overlay: a célula vira coluna e o indicador
+     entra em fluxo normal, alinhado à direita logo abaixo do KPI. Sem
+     sobreposição, mantendo a associação visual com o card. */
+  .fx-kpis .kpi-cel { display: flex; flex-direction: column; min-width: 0; }
   .fx-kpis .kpi-cel urbi-kpi { width: 100%; }
   .kpi-var {
-    position: absolute; top: 12px; right: 14px; z-index: 1;
+    align-self: flex-end; margin-top: 4px;
     display: inline-flex; align-items: center; gap: 4px;
     font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums;
     pointer-events: none;
