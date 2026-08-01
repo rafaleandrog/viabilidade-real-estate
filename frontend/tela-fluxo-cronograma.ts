@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import {
   EVENTO_LABEL, EVENTO_COR, corFaseExtra,
-  rotuloPeriodo, rotuloMesRelativo, parseMesAno,
+  rotuloPeriodo, rotuloMesRelativo, parseMesAno, problemaJanelaDuranteObra,
 } from './fluxo-shared.js';
 import {
   urbiVerso,
@@ -119,6 +119,8 @@ export class ViabFluxoCronograma extends LitElement {
     }
     const dataInicio = this.paramsForm.data_inicio_projeto ?? null;
     const dis = !this.editavel;
+    // #225: Lançamento que alcança o fim da Obra deixa "Durante a obra" vazia.
+    const probObra = this.crono.length > 0 ? problemaJanelaDuranteObra(this.crono) : null;
     return html`
       <urbi-card titulo="Cronograma do empreendimento">
         <div class="params">
@@ -140,6 +142,8 @@ export class ViabFluxoCronograma extends LitElement {
           <urbi-banner variante="erro">Data de início inválida — use o formato mmm/AAAA (ex.: jan/2027).</urbi-banner>` : nothing}
         ${!dataInicio ? html`
           <urbi-banner variante="alerta">Defina a data de início do projeto — ela ancora o mês 0 de todo o fluxo.</urbi-banner>` : nothing}
+        ${probObra ? html`
+          <urbi-banner variante="alerta">${probObra}</urbi-banner>` : nothing}
 
         <table class="crono">
           <thead>

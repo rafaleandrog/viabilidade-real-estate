@@ -54,7 +54,7 @@ test('absorção distribuída: vendas caem nos 4 períodos e somam o VGV', () =>
       blocos: [
         { evento: 'pre_lancamento', pct: 20 }, // período 1 = pré-lançamento (meses 6..11, 6m)
         { evento: 'lancamento', pct: 10 },     // período 2 = lançamento (mês 12, 1m)
-        { evento: 'obra', pct: 35 },           // período 3 = obra (meses 17..40, 24m)
+        { evento: 'obra', pct: 35 },           // período 3 = "Durante a obra" (meses 13..40, 28m — #225)
         { evento: 'pos_obra', pct: 0 },        // período 4 = derivado = 35% (meses 41..52)
       ],
     },
@@ -64,8 +64,10 @@ test('absorção distribuída: vendas caem nos 4 períodos e somam o VGV', () =>
   assert.ok(perto(soma(r), 50_000_000, 1));
   assert.ok(perto(r[6], (0.20 * 50_000_000) / 6, 1));   // pré-lançamento: 20% / 6 meses
   assert.ok(perto(r[12], (0.10 * 50_000_000) / 1, 1));  // lançamento: 10% em 1 mês
-  assert.ok(perto(r[14], 0, 1));                         // hiato entre lançamento e obra
-  assert.ok(perto(r[17], (0.35 * 50_000_000) / 24, 1)); // 1º mês da obra (mês 17)
+  // #225: "Durante a obra" cobre do mês seguinte ao lançamento (13) ao fim da
+  // obra (40) = 28 meses; não há mais hiato entre lançamento e obra.
+  assert.ok(perto(r[13], (0.35 * 50_000_000) / 28, 1)); // 1º mês de "Durante a obra"
+  assert.ok(perto(r[14], (0.35 * 50_000_000) / 28, 1)); // antes era hiato = 0
   assert.ok(perto(r[41], (0.35 * 50_000_000) / 12, 1)); // 1º mês da pós-obra (derivado)
 });
 
@@ -252,7 +254,7 @@ test('corretagem de vendas cai no mês da venda, acompanhando a absorção', () 
         modo: 'distribuido',
         blocos: [
           { evento: 'lancamento', pct: 40 },  // mês 12 (1m)
-          { evento: 'obra', pct: 60 },        // meses 17..40 (24m)
+          { evento: 'obra', pct: 60 },        // "Durante a obra": meses 13..40 (28m — #225)
           { evento: 'pos_obra', pct: 0 },     // derivado = 0
         ],
       },
@@ -272,12 +274,12 @@ test('corretagem de vendas cai no mês da venda, acompanhando a absorção', () 
   assert.ok(perto(soma(linha.mensal), 4_000_000, 1));
   // Mês do lançamento: 40% do VGV vendido → 4% de 40M = 1,6M.
   assert.ok(perto(linha.mensal[12], 0.04 * 40_000_000, 1));
-  // Durante a obra: 60% espalhados por 24 meses.
-  assert.ok(perto(linha.mensal[17], (0.04 * 60_000_000) / 24, 1));
-  assert.ok(perto(linha.mensal[40], (0.04 * 60_000_000) / 24, 1));
-  // Nada antes da 1ª venda nem no hiato entre lançamento e obra.
+  // #225: "Durante a obra" espalha 60% por 28 meses (13..40), sem hiato.
+  assert.ok(perto(linha.mensal[13], (0.04 * 60_000_000) / 28, 1));
+  assert.ok(perto(linha.mensal[40], (0.04 * 60_000_000) / 28, 1));
+  // Nada antes da 1ª venda; o mês 14 agora faz parte de "Durante a obra".
   assert.ok(perto(linha.mensal[0], 0, 1e-6));
-  assert.ok(perto(linha.mensal[14], 0, 1e-6));
+  assert.ok(perto(linha.mensal[14], (0.04 * 60_000_000) / 28, 1));
   // Início/duração vêm do recorte das vendas (mês 12 até o mês 40).
   assert.equal(linha.inicio, 12);
   assert.equal(linha.duracao, 40 - 12 + 1);
@@ -311,7 +313,7 @@ test('Preço do Terreno em sales_revenue acompanha o VGV vendido (#194)', () => 
         modo: 'distribuido',
         blocos: [
           { evento: 'lancamento', pct: 40 },  // mês 12
-          { evento: 'obra', pct: 60 },        // meses 17..40
+          { evento: 'obra', pct: 60 },        // "Durante a obra": meses 13..40 (28m — #225)
           { evento: 'pos_obra', pct: 0 },
         ],
       },
@@ -330,7 +332,7 @@ test('Preço do Terreno em sales_revenue acompanha o VGV vendido (#194)', () => 
 
   assert.ok(perto(linha.total, 10_000_000, 1)); // 10% de 100M
   assert.ok(perto(linha.mensal[12], 0.10 * 40_000_000, 1)); // 40% vendido no lançamento
-  assert.ok(perto(linha.mensal[17], (0.10 * 60_000_000) / 24, 1)); // obra espalhada
+  assert.ok(perto(linha.mensal[17], (0.10 * 60_000_000) / 28, 1)); // "Durante a obra" espalhada em 28m
   assert.ok(perto(linha.mensal[0], 0, 1e-6)); // nada antes da 1ª venda
 });
 
