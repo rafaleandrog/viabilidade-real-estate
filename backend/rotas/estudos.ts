@@ -49,6 +49,23 @@ const CAMPOS_NAO_COPIAVEIS = new Set([
   'autor_id', 'autor_nome', 'autor_avatar_url',
 ]);
 
+// Monta o payload de campos copiáveis de um estudo para a duplicação.
+// Além dos gerados/de junção (CAMPOS_NAO_COPIAVEIS), **omite valores nulos**: um
+// Preliminar deixa os numéricos exclusivos do Avançado em `null`, e reenviá-los
+// dispara "Campo X deve ser um número" no validador do shell (mesmo motivo do
+// filtro CAMPOS_SOMENTE_AVANCADO no PATCH). Campo ausente na criação cai no
+// default da coluna — idêntico ao POST /estudos, que só seta o que veio no body.
+// `status`, `autor_id` e a identificação são atribuídos pelo chamador depois.
+export function montarCopiaEstudo(orig: Record<string, any>): Record<string, any> {
+  const copia: Record<string, any> = {};
+  for (const [k, v] of Object.entries(orig)) {
+    if (CAMPOS_NAO_COPIAVEIS.has(k)) continue;
+    if (v === null || v === undefined) continue;
+    copia[k] = v;
+  }
+  return copia;
+}
+
 function erro(res: Response, http: number, codigo: string, mensagem: string) {
   res.status(http).json({ erro: true, codigo, mensagem });
 }
@@ -325,10 +342,7 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
     const orig = await req.dados!.buscar('estudos', estudoId);
     if (!orig) { erro(res, 404, 'ESTUDO_NAO_ENCONTRADO', 'Estudo não encontrado'); return; }
 
-    const copia: Record<string, any> = {};
-    for (const [k, v] of Object.entries(orig)) {
-      if (!CAMPOS_NAO_COPIAVEIS.has(k)) copia[k] = v;
-    }
+    const copia = montarCopiaEstudo(orig);
     const ident = await gerarIdentificacao(req, {
       nome: orig.nome, tipo_empreendimento: orig.tipo_empreendimento, uf: orig.uf,
     });
@@ -338,23 +352,32 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
 
     const novo = await req.dados!.criar('estudos', copia);
 
-    // Copiar imóveis vinculados.
-    const imoveis = await req.dados!.listar('estudo_imoveis', { filtros: { estudo_id: estudoId }, por_pagina: 100 });
-    for (const im of imoveis.dados) {
-      await req.dados!.criar('estudo_imoveis', {
-        estudo_id: novo.id,
-        imovel_nucleo_id: im.imovel_nucleo_id,
-        tipo_imovel: im.tipo_imovel,
-      });
-    }
+    // Sem transação no req.dados: se qualquer estrutura filha falhar, o clone
+    // ficaria parcial (estudo sem imóveis/Avançado, ou sem o criador como
+    // editor — inacessível). Compensa-se removendo o estudo recém-criado.
+    try {
+      // Copiar imóveis vinculados.
+      const imoveis = await req.dados!.listar('estudo_imoveis', { filtros: { estudo_id: estudoId }, por_pagina: 100 });
+      for (const im of imoveis.dados) {
+        await req.dados!.criar('estudo_imoveis', {
+          estudo_id: novo.id,
+          imovel_nucleo_id: im.imovel_nucleo_id,
+          tipo_imovel: im.tipo_imovel,
+        });
+      }
 
-    // Estudo Avançado: copiar cronograma, receitas + tipologias e custos.
-    if (novo.nivel_analise === 'avancado') {
-      await duplicarDadosAvancado(req, estudoId, Number(novo.id));
-    }
+      // Estudo Avançado: copiar cronograma, receitas + tipologias e custos.
+      if (novo.nivel_analise === 'avancado') {
+        await duplicarDadosAvancado(req, estudoId, Number(novo.id));
+      }
 
-    const funcao = await garantirMembro(req, novo.id, req.contexto!.usuario.id, 'editor');
-    if (funcao) await inscreverMembroEstudo(req, novo.id, req.contexto!.usuario.id, funcao);
+      const funcao = await garantirMembro(req, novo.id, req.contexto!.usuario.id, 'editor');
+      if (funcao) await inscreverMembroEstudo(req, novo.id, req.contexto!.usuario.id, funcao);
+    } catch (falha) {
+      try { await req.dados!.remover('estudos', Number(novo.id), req.contexto!.usuario.id); }
+      catch { /* best-effort: não mascarar o erro original com o da limpeza */ }
+      throw falha;
+    }
 
     await publicarEvento(req, 'estudo_criado', payloadEstudoCriado(novo, req.contexto!.usuario.nome));
     res.status(201).json(novo);
