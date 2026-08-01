@@ -141,8 +141,9 @@ interface LinhaFx {
   mensal: number[];
   custo: boolean;
   separadorAntes?: boolean;
-  // #189: peso sobre a Receita Bruta (VGV) — undefined na própria linha de VGV
-  // e no Fluxo de Caixa Mensal/Acumulado (linhas sem sentido para o indicador).
+  // #189/#229: peso sobre o VGV Vendável (`receitaBrutaVgv`/`vgvVendavel`) —
+  // undefined na própria linha de Receita e no Fluxo de Caixa Mensal/Acumulado
+  // (linhas sem sentido para o indicador).
   pctVgv?: number;
 }
 
@@ -158,8 +159,12 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
   const vgv = c.receitaBrutaVgv;
   const pct = (total: number) => (vgv > 0 ? (total / vgv) * 100 : undefined);
   const linhas: LinhaFx[] = [];
+  // #229: rótulo corrigido — `c.receitaMensal` é o RECEBIMENTO LÍQUIDO que
+  // entra no fluxo (pós-imposto, #228), não "Receita Bruta"; "VGV" também
+  // confundia, já que o denominador do % é `vgv` (VGV vendável), não este
+  // valor. Detalhamento completo de bruto/desconto/líquido/imposto é #241.
   linhas.push({
-    nivel: 0, nome: 'Receita Bruta (VGV)', custo: false,
+    nivel: 0, nome: 'Receita', custo: false,
     total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita), mensal: c.receitaMensal,
   });
   for (const l of c.linhasReceita) {

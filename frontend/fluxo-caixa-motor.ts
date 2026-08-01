@@ -131,6 +131,33 @@ export interface LinhaCalc {
   itens?: LinhaCalc[];             // tipologias (receita) — sub-linhas
 }
 
+// ─────────────────────────────────────────────────────────────────
+// #229 — Taxonomia de grandezas (EVI-009 + emenda Calliandra 2026-08-01)
+// ─────────────────────────────────────────────────────────────────
+//
+// Oito grandezas, sem nome ambíguo entre si. As seis primeiras já têm valor
+// nesta fase; as duas últimas (safra/juros, #232+) ainda não existem no motor
+// — citadas aqui só para fixar o vocabulário, sem campo `FluxoCalc` correspondente
+// ainda (evita expor placeholder sempre-zero antes de haver cálculo real).
+//
+//  1. VGV potencial          = `vgvTotal`          — produto inteiro, antes da permuta física
+//  2. VGV vendável           = `vgvVendavel`        — potencial − permuta física (#195)
+//     (nome correto de `receitaBrutaVgv`, preservado por compat — ver nota abaixo)
+//  3. Valor bruto contratado = `vendaBrutaContratada` — Σ `vendaBrutaContratadaMensal` (#227)
+//  4. Descontos              = `descontoComercial`    — Σ `descontoComercialMensal` (#227)
+//  5. Valor contratado líquido = `vendaLiquidaContratada` — bruto − descontos (#227)
+//  6. Receita Bruta          = `receitaBruta`        — Σ `recebimentoBrutoMensal` (#228);
+//     "sem juros, Receita Bruta = vendas contratadas" (critério de aceite da #228) —
+//     verificado em fluxo-caixa-motor.test.ts
+//  7. Principal recebido     — ainda não existe; populado quando as safras (#232+)
+//     separarem principal de juros na carteira
+//  8. Juros                  — idem, #232+
+//
+// `receitaMensal`/`fluxoMensal` (o que efetivamente entra no fluxo) usam o
+// RECEBIMENTO LÍQUIDO (`recebimentoLiquidoMensal`, #228) — Receita Bruta menos
+// o imposto (RET). Nenhuma dessas oito grandezas é o mesmo número que outra;
+// consumidor que precisar de mais de uma tem de nomear qual está lendo.
+
 export interface FluxoCalc {
   prazo: number;
   meses: string[];                 // rótulos "jan/27" (ou "M1" sem data)
@@ -138,14 +165,23 @@ export interface FluxoCalc {
   custoMensal: number[];
   fluxoMensal: number[];
   fluxoAcumulado: number[];
-  vgvTotal: number;
+  vgvTotal: number;                // #229 — grandeza 1: VGV potencial
   vpl: number;
   tir: number | null;              // % a.a.
   paybackMes: number | null;       // índice 0-based no array mensal
   paybackData: string | null;      // "jul/2030"
   exposicaoMaxima: number;         // min(fluxoAcumulado) — tipicamente negativo
   vgvPermutaFisica: number;        // #188 — VGV atribuído às unidades permutadas (informativo)
-  receitaBrutaVgv: number;         // #188 — vgvTotal − vgvPermutaFisica (informativo; não altera o fluxo)
+  // #188/#229: nome histórico, MANTIDO por compatibilidade (8+ consumidores em
+  // fluxo-tabela.ts/exportar.ts) — mas o valor NÃO é "Receita Bruta" no sentido
+  // do EVI (recebimento em caixa); é VGV VENDÁVEL. Use `vgvVendavel` (idêntico,
+  // nome correto) em código novo. O rótulo de UI já foi corrigido (fluxo-tabela.ts).
+  receitaBrutaVgv: number;
+  vgvVendavel: number;              // #229 — grandeza 2, alias correto de receitaBrutaVgv
+  vendaBrutaContratada: number;     // #229 — grandeza 3: Σ vendaBrutaContratadaMensal
+  descontoComercial: number;        // #229 — grandeza 4: Σ descontoComercialMensal
+  vendaLiquidaContratada: number;   // #229 — grandeza 5: bruto − descontos
+  receitaBruta: number;             // #229 — grandeza 6: Σ recebimentoBrutoMensal (#228)
   linhasReceita: LinhaCalc[];
   linhasCusto: LinhaCalc[];
 }
@@ -575,7 +611,9 @@ export function tirFluxo(fluxoMensal: number[]): number | null {
  * - **Acumulado**: ÚLTIMO mês da faixa (somar acumulados seria contar o mesmo
  *   caixa várias vezes); o valor da coluna é o saldo no fim do período.
  * - **Indicadores** (`vpl`, `tir`, `exposicaoMaxima`, `paybackMes`,
- *   `paybackData`, `vgvTotal`, `vgvPermutaFisica`, `receitaBrutaVgv`, e o
+ *   `paybackData`, `vgvTotal`, `vgvPermutaFisica`, `receitaBrutaVgv`,
+ *   `vgvVendavel`, `vendaBrutaContratada`, `descontoComercial`,
+ *   `vendaLiquidaContratada`, `receitaBruta` (#229), e o
  *   `total`/`vpl` de cada linha): **inalterados**.
  *   São grandezas do fluxo mensal e independem de como as colunas são exibidas —
  *   o VPL desconta mês a mês e a exposição máxima é o pior saldo de um MÊS, não
@@ -837,6 +875,17 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const vgvPermutaFisica = linhasReceita.reduce((s, l) => s + vgvPermutaFisicaLinha(l.tipologias), 0);
   const receitaBrutaVgv = ctxCusto.vgvTotal - vgvPermutaFisica;
 
+  // #229 — grandezas 3–6 da taxonomia: contratação (bruto/desconto/líquido,
+  // #227) e Receita Bruta (recebimento em caixa, #228). Somadas por linha de
+  // receita ORIGINAL (`linhasReceita`, não `linhasReceitaFinal`) — a Permuta
+  // Financeira (`calcDeducoesReceita`) é dedução de receita, não contratação.
+  const somaMensal = (fn: (l: any, c: EventoCrono[], p: number) => number[]): number =>
+    linhasReceita.reduce((s, l) => s + fn(l, crono, prazo).reduce((s2, v) => s2 + v, 0), 0);
+  const vendaBrutaContratada = somaMensal(vendaBrutaContratadaMensal);
+  const descontoComercial = somaMensal(descontoComercialMensal);
+  const vendaLiquidaContratada = vendaBrutaContratada - descontoComercial;
+  const receitaBruta = somaMensal(recebimentoBrutoMensal);
+
   return {
     prazo,
     meses: Array.from({ length: prazo }, (_, i) => rotuloMesRelativo(config.dataInicio, i)),
@@ -849,6 +898,11 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     exposicaoMaxima,
     vgvPermutaFisica,
     receitaBrutaVgv,
+    vgvVendavel: receitaBrutaVgv,
+    vendaBrutaContratada,
+    descontoComercial,
+    vendaLiquidaContratada,
+    receitaBruta,
     linhasReceita: linhasReceitaFinal,
     linhasCusto: calcCustos,
   };

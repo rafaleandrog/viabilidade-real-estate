@@ -664,6 +664,39 @@ test('vgvPermutaFisica e receitaBrutaVgv: permutadas são subconjunto de quantid
   // #195: a permuta física é entregue em troca do terreno, não vendida por
   // caixa — o fluxo (receita mensal) reflete o VGV VENDÁVEL, não o bruto.
   assert.ok(perto(soma(r.receitaMensal), 334_000_000, 5));
+  // #229: vgvVendavel é o alias correto — mesmo valor, nome sem ambiguidade
+  // com "Receita Bruta" (grandeza distinta, #228).
+  assert.ok(perto(r.vgvVendavel, r.receitaBrutaVgv, 1e-6));
+});
+
+// #229 — as seis grandezas com valor nesta fase, e as relações entre elas.
+test('#229: taxonomia — bruto, desconto, líquido e Receita Bruta não colidem', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+      fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] }, // resto vai a repasse
+    }],
+    linhasCusto: [],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  // Grandeza 3: bruto contratado = VGV vendável (sem permuta física nesta linha).
+  assert.ok(perto(r.vendaBrutaContratada, 10_000_000, 1));
+  // Grandeza 4: desconto = 5% de 20% da venda — só a fração da entrada.
+  assert.ok(perto(r.descontoComercial, 10_000_000 * 0.20 * 0.05, 1));
+  // Grandeza 5: líquido = bruto − desconto (identidade, não coincidência).
+  assert.ok(perto(r.vendaLiquidaContratada, r.vendaBrutaContratada - r.descontoComercial, 1e-6));
+  // Grandeza 6: Receita Bruta (recebimento em caixa) — sem juros (ainda não
+  // implementados, #232+) e sem RET, é igual à venda contratada líquida
+  // (critério de aceite da #228: "recebimento_bruto de um Grupo sem juros é
+  // igual às suas vendas contratadas").
+  assert.ok(perto(r.receitaBruta, r.vendaLiquidaContratada, 1));
+  // Nenhuma das quatro é a mesma que vgvVendavel (grandeza 2) — são conceitos
+  // distintos mesmo quando os NÚMEROS coincidem neste cenário sem permuta física.
+  assert.ok(perto(r.vgvVendavel, 10_000_000, 1));
 });
 
 // #195: tipologia 100% permutada não gera receita nem "puxa" fatia do caixa
