@@ -108,6 +108,48 @@ export function ancorarLinhaCusto(
   return { inicio_mes: ev.inicio_mes, duracao_meses: ev.duracao_meses };
 }
 
+export interface ResultadoTravamentoCusto {
+  /** Campos a aplicar em `dados` — vazio quando a linha não está ancorada. */
+  campos: Partial<{ inicio_mes: number; duracao_meses: number }>;
+  /** Presente quando o PATCH violou o travamento — a rota deve responder 422. */
+  erroCampoTravado?: string;
+}
+
+/**
+ * Decide o que fazer com início/duração de uma linha de custo dada a âncora
+ * final (#249) — usada pelos dois ramos do PATCH (fase e evento), que têm a
+ * mesma regra: início E duração são simétricos, os dois SEMPRE derivados
+ * quando ancorada.
+ *
+ * - `trocandoAncora`: a própria âncora está sendo alterada nesta chamada
+ *   (fase_ancora_id ou cronograma_evento vieram no corpo). Nesse caso início e
+ *   duração são derivados incondicionalmente — um valor enviado junto é
+ *   ignorado, pois a linha está migrando de âncora, sem "override" coerente a
+ *   preservar.
+ * - Permanecendo na mesma âncora (`trocandoAncora=false`): início e duração
+ *   continuam calculados; enviar QUALQUER um dos dois é erro — o cliente
+ *   precisa trocar a âncora para `customizado` para editar. Antes só início
+ *   travava (duração podia ser sobrescrita em silêncio enquanto a linha
+ *   continuava ancorada — a assimetria que esta issue corrige).
+ * - `ancora === null`: linha não ancorada (customizado) — nada a derivar/travar.
+ */
+export function resolverTravamentoCusto(
+  trocandoAncora: boolean,
+  ancora: { inicio_mes: number; duracao_meses: number } | null,
+  enviouInicio: boolean,
+  enviouDuracao: boolean,
+  mensagemErro: string,
+): ResultadoTravamentoCusto {
+  if (!ancora) return { campos: {} };
+  if (trocandoAncora) {
+    return { campos: { inicio_mes: ancora.inicio_mes, duracao_meses: ancora.duracao_meses } };
+  }
+  if (enviouInicio || enviouDuracao) {
+    return { campos: {}, erroCampoTravado: mensagemErro };
+  }
+  return { campos: {} };
+}
+
 /**
  * Resolve início/duração de uma linha de custo ancorada a uma FASE do
  * Cronograma (#167 — só depois do #168 separar fases de Cronograma/Receitas
@@ -1075,6 +1117,9 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
 
     // Ancoragem: fase do Cronograma (#167) tem prioridade sobre evento fixo —
     // as duas são mutuamente exclusivas (o frontend nunca manda as duas).
+    // #249: início E duração são sempre DERIVADOS da âncora — símetrico nos
+    // dois campos; um `duracao_meses` enviado junto é ignorado (a linha nasce
+    // ancorada, não há "override inicial" a preservar).
     if (dados.fase_ancora_id !== undefined && dados.fase_ancora_id !== null) {
       const ancoraFase = await ancorarLinhaCustoEmFase(req, estudo.id, Number(dados.fase_ancora_id));
       if (!ancoraFase) {
@@ -1083,13 +1128,13 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
       }
       dados.cronograma_evento = 'customizado';
       dados.inicio_mes = ancoraFase.inicio_mes;
-      if (req.body.duracao_meses === undefined) dados.duracao_meses = ancoraFase.duracao_meses;
+      dados.duracao_meses = ancoraFase.duracao_meses;
     } else {
       // Ancoragem: evento ≠ customizado herda início/duração do cronograma.
       const ancora = ancorarLinhaCusto(String(dados.cronograma_evento), (await lerCronograma(req, estudo.id)).linhas);
       if (ancora) {
         dados.inicio_mes = ancora.inicio_mes;
-        if (req.body.duracao_meses === undefined) dados.duracao_meses = ancora.duracao_meses;
+        dados.duracao_meses = ancora.duracao_meses;
       }
     }
 
@@ -1135,38 +1180,39 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
 
     // Âncora final (nova, se veio no PATCH; senão a que já estava salva) —
     // fase do Cronograma (#167) e evento fixo são mutuamente exclusivas.
+    // #249: início E duração são simétricos — os dois são DERIVADOS quando
+    // ancorada (resolverTravamentoCusto). Antes só início travava com 422;
+    // duração podia ser sobrescrita em silêncio enquanto a linha continuava
+    // ancorada — a assimetria que esta issue corrige.
+    const enviouInicio = dados.inicio_mes !== undefined;
+    const enviouDuracao = dados.duracao_meses !== undefined;
     const faseAncoraFinal = dados.fase_ancora_id !== undefined ? dados.fase_ancora_id : custo.fase_ancora_id;
     if (faseAncoraFinal !== undefined && faseAncoraFinal !== null) {
-      if (dados.fase_ancora_id !== undefined) {
-        // Trocando a âncora agora: valida e deriva início/duração da fase.
-        const ancoraFase = await ancorarLinhaCustoEmFase(req, estudo.id, Number(faseAncoraFinal));
+      const trocandoAncora = dados.fase_ancora_id !== undefined;
+      let ancoraFase: { inicio_mes: number; duracao_meses: number } | null = null;
+      if (trocandoAncora) {
+        ancoraFase = await ancorarLinhaCustoEmFase(req, estudo.id, Number(faseAncoraFinal));
         if (!ancoraFase) {
           erro(res, 400, 'FASE_ANCORA_INVALIDA', 'fase_ancora_id deve ser uma fase do Cronograma deste estudo');
           return;
         }
         dados.cronograma_evento = 'customizado';
-        dados.inicio_mes = ancoraFase.inicio_mes;
-        if (req.body.duracao_meses === undefined) dados.duracao_meses = ancoraFase.duracao_meses;
-      } else if (dados.inicio_mes !== undefined) {
-        // Início é calculado quando ancorado a uma fase — só editável trocando
-        // fase_ancora_id para null (mesma trava do evento-âncora, abaixo).
-        erro(res, 422, 'CAMPO_TRAVADO', 'inicio_mes é calculado pela fase-âncora; envie fase_ancora_id = null para editar');
-        return;
       }
+      const r = resolverTravamentoCusto(trocandoAncora, ancoraFase, enviouInicio, enviouDuracao,
+        'início e duração são calculados pela fase-âncora; envie fase_ancora_id = null para editar');
+      if (r.erroCampoTravado) { erro(res, 422, 'CAMPO_TRAVADO', r.erroCampoTravado); return; }
+      Object.assign(dados, r.campos);
     } else {
       // Ao trocar a âncora para um evento do cronograma, herda início/duração dele.
       const eventoFinal = String(dados.cronograma_evento ?? custo.cronograma_evento);
-      if (dados.cronograma_evento !== undefined && dados.cronograma_evento !== 'customizado') {
-        const ancora = ancorarLinhaCusto(eventoFinal, (await lerCronograma(req, estudo.id)).linhas);
-        if (ancora) {
-          dados.inicio_mes = ancora.inicio_mes;
-          if (req.body.duracao_meses === undefined) dados.duracao_meses = ancora.duracao_meses;
-        }
-      } else if (eventoFinal !== 'customizado' && dados.inicio_mes !== undefined) {
-        // Início é calculado quando ancorado — só editável em customizado.
-        erro(res, 422, 'CAMPO_TRAVADO', 'inicio_mes é calculado pelo evento-âncora; use cronograma_evento = customizado para editar');
-        return;
-      }
+      const trocandoAncora = dados.cronograma_evento !== undefined && dados.cronograma_evento !== 'customizado';
+      const ancoraEvento = eventoFinal !== 'customizado'
+        ? ancorarLinhaCusto(eventoFinal, (await lerCronograma(req, estudo.id)).linhas)
+        : null;
+      const r = resolverTravamentoCusto(trocandoAncora, ancoraEvento, enviouInicio, enviouDuracao,
+        'início e duração são calculados pelo evento-âncora; use cronograma_evento = customizado para editar');
+      if (r.erroCampoTravado) { erro(res, 422, 'CAMPO_TRAVADO', r.erroCampoTravado); return; }
+      Object.assign(dados, r.campos);
     }
 
     const atualizada = await req.dados!.atualizar('avancado_linhas_custo', cid, dados);
