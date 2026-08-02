@@ -624,6 +624,28 @@ Ao final do programa: nenhum campo antigo permanece editável sem efeito · o qu
 da interface · os dados legados permanecem preservados pelo período necessário · a **remoção física
 de colunas**, se desejada, é issue posterior e específica.
 
+> ✅ **FIN-10 (#279) — fechado em 2026-08-02.** `frontend/tela-financeiro.ts` perdeu o cartão
+> "Financiamento & Investidores" (`financiamento_*`/`investidor_*`) e a seção "Estrutura de capital"
+> (`estrutura_*_pct`) — substituídos pela aba Capital Stack (FIN-08/#277), que já cobre os mesmos
+> conceitos de forma derivada (§2.6). Um `urbi-banner` aponta para a aba nova no lugar onde o cartão
+> antigo estava. Nenhuma coluna foi removida do schema (nenhum campo é `obrigatorio`, nenhum motor
+> de cálculo os lê — confirmado antes da mudança); a "remoção física de colunas" continua sendo
+> issue posterior, como o texto acima já previa. Sem migração nesta issue.
+>
+> **"Ativação definitiva" (§13.3) não ganhou fluxo dedicado** — a decisão foi reaproveitar o editor
+> genérico de status que a FIN-08 já entrega (qualquer camada, migrada ou nova, muda de status via
+> o mesmo seletor + "Salvar camada"). Isso já satisfaz "sem efeito no motor até confirmação do
+> usuário" (mudar o status é a confirmação); um fluxo de ativação com aviso dedicado, se algum dia
+> fizer falta, é decisão de produto futura, não um requisito não atendido desta issue.
+>
+> **Programa Financeiro (epic #239) encerrado nesta sessão** — FIN-01 a FIN-10 (#270–#279)
+> implementadas em 4 grupos (ver `docs/lista-bugs-planejamento-2026-07-31.md` §15 e o histórico da
+> Fase 9 na trilha). O motor (`frontend/capital-stack-motor.ts`) cobre os 4 instrumentos do §4, a
+> prioridade de funding (§5) e o waterfall (§6); a interface (`viab-capital-stack`) consome o motor
+> de verdade. Fora de escopo, registrado explicitamente em cada grupo: gráficos SVG, prévia de
+> recálculo por tecla, integração com `fluxo-tabela.ts`/exportações CSV/PDF, reação a Cenários
+> (§11), e a base de receita líquida do §6.2 sem subtrair corretagem.
+
 ---
 
 ## 14. Casos de teste de referência

@@ -41,35 +41,28 @@ const OPT_REGIME: Op[] = [
   { valor: 'lucro_presumido', rotulo: 'Lucro Presumido' },
   { valor: 'lucro_real', rotulo: 'Lucro Real' },
 ];
-const OPT_AMORT: Op[] = [
-  { valor: 'price', rotulo: 'PRICE (Tabela Price)' },
-  { valor: 'sac', rotulo: 'SAC' },
-];
-const OPT_RETORNO: Op[] = [
-  { valor: 'remunerado', rotulo: 'Remunerado (juros)' },
-  { valor: 'pct_receita', rotulo: '% da Receita' },
-  { valor: 'pct_resultado', rotulo: '% do Resultado' },
-];
-
 // Todos os campos numéricos (decimais + inteiros) — para coerção '' → null e
 // Number(...) no salvar.
+//
+// #239/FIN-10 (#279): `financiamento_*`, `investidor_*` e `estrutura_*_pct`
+// SAÍRAM daqui (§13.4 — "o que foi substituído sai da interface"). O
+// Capital Stack (`viab-capital-stack`, FIN-08/#277) cobre financiamento à
+// produção e Preferred Equity com o mesmo dado, de forma derivada (§2.6),
+// não mais como input solto. As colunas continuam existindo no schema —
+// dado histórico preservado — só o formulário saiu; nenhum motor de
+// cálculo as lia (confirmado antes desta issue: zero ocorrências em
+// fluxo-caixa-motor.ts, fluxo-shared.ts, proforma.ts).
 const CAMPOS_NUM: string[] = [
   'taxa_desconto_aa',
-  'estrutura_capital_proprio_pct', 'estrutura_financiamento_pct', 'estrutura_investidores_pct',
   'taxa_juros_valor_futuro_aa',
   'tarifas_bancarias_pct', 'taxa_adm_carteira_pct', 'taxa_estruturacao_divida_pct', 'taxa_gerenciamento_obra_pct',
   'juros_financeiros_aa', 'juros_inicio_cobranca_mes', 'indice_correcao_taxa_aa',
   'aliquota_pis_pct', 'aliquota_cofins_pct', 'aliquota_csll_pct', 'aliquota_irpj_pct', 'aliquota_itbi_pct',
   'imposto_percentual',
-  'financiamento_obra_pct', 'financiamento_juros_aa', 'financiamento_prazo_meses', 'financiamento_carencia_meses',
-  'investidor_aporte_valor', 'investidor_juros_aa', 'investidor_carencia_meses', 'investidor_parcelas',
 ];
 const NUM = new Set(CAMPOS_NUM);
 // Inteiros (meses/parcelas) — viab-num com 0 casas decimais.
-const INTEIROS = new Set([
-  'juros_inicio_cobranca_mes', 'financiamento_prazo_meses', 'financiamento_carencia_meses',
-  'investidor_carencia_meses', 'investidor_parcelas',
-]);
+const INTEIROS = new Set(['juros_inicio_cobranca_mes']);
 
 @customElement('viab-tela-financeiro')
 export class ViabTelaFinanceiro extends LitElement {
@@ -163,24 +156,15 @@ export class ViabTelaFinanceiro extends LitElement {
   render(): TemplateResult {
     if (this.estudo?.nivel_analise !== 'avancado') return html`${nothing}`;
     const dis = !this.editavel;
-    const somaEstrutura =
-      (this._num('estrutura_capital_proprio_pct') || 0) +
-      (this._num('estrutura_financiamento_pct') || 0) +
-      (this._num('estrutura_investidores_pct') || 0);
 
     return html`
+      <urbi-banner variante="info">
+        Estrutura de capital, financiamento à produção e investidores agora vivem na aba
+        <strong>Capital Stack</strong> — camadas com aporte, liberação e retorno mês a mês, em vez de
+        percentuais informativos soltos.
+      </urbi-banner>
       <urbi-card titulo="Estrutura">
         <div class="secao">
-          <h4>Estrutura de capital</h4>
-          <p class="dica">Como o projeto é financiado. Informativo — os percentuais não precisam somar 100%.</p>
-          <div class="grid">
-            ${this._n('estrutura_capital_proprio_pct', 'Capital próprio', '%', dis)}
-            ${this._n('estrutura_financiamento_pct', 'Financiamento', '%', dis)}
-            ${this._n('estrutura_investidores_pct', 'Investidores', '%', dis)}
-          </div>
-          <p class="soma">Soma das fontes: <strong>${somaEstrutura.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</strong></p>
-        </div>
-        <div class="secao" style="margin-top:16px">
           <h4>Parâmetro base</h4>
           <div class="grid">
             ${this._n('taxa_juros_valor_futuro_aa', 'Taxa de juros p/ valor futuro', '% a.a.', dis)}
@@ -243,29 +227,6 @@ export class ViabTelaFinanceiro extends LitElement {
         </div>
       </urbi-card>
 
-      <urbi-card titulo="Financiamento & Investidores">
-        <div class="secao">
-          <h4>Financiamento à produção</h4>
-          <div class="grid">
-            ${this._n('financiamento_obra_pct', 'Obra financiada', '%', dis)}
-            ${this._n('financiamento_juros_aa', 'Juros', '% a.a.', dis)}
-            ${this._s('financiamento_sistema_amortizacao', 'Sistema de amortização', OPT_AMORT, 'price', dis)}
-            ${this._n('financiamento_prazo_meses', 'Prazo', 'meses', dis)}
-            ${this._n('financiamento_carencia_meses', 'Carência', 'meses', dis)}
-          </div>
-        </div>
-        <div class="secao" style="margin-top:16px">
-          <h4>Investidores</h4>
-          <div class="grid">
-            ${this._n('investidor_aporte_valor', 'Aporte', 'R$', dis, 'p2')}
-            ${this._s('investidor_retorno_tipo', 'Tipo de retorno', OPT_RETORNO, 'remunerado', dis)}
-            ${this._n('investidor_juros_aa', 'Juros do investidor', '% a.a.', dis)}
-            ${this._n('investidor_carencia_meses', 'Carência', 'meses', dis)}
-            ${this._n('investidor_parcelas', 'Parcelas', 'x', dis)}
-          </div>
-        </div>
-      </urbi-card>
-
       ${this.editavel
         ? html`
             <urbi-banner variante="alerta">
@@ -284,7 +245,7 @@ export class ViabTelaFinanceiro extends LitElement {
       const dados: Record<string, any> = {};
       for (const k of [
         ...CAMPOS_NUM,
-        'indice_correcao', 'regime_tributario', 'financiamento_sistema_amortizacao', 'investidor_retorno_tipo',
+        'indice_correcao', 'regime_tributario',
         'sujeito_ret', 'imposto_sobre_permuta_fisica',
       ]) {
         if (!(k in this.form)) continue;
