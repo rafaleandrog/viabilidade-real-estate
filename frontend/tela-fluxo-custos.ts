@@ -49,7 +49,13 @@ const CATEGORIAS: Record<GrupoId, { nome: string; subs: string[] }[]> = {
     // "Compra" → "Preço" (#193): nome alinhado à referência visual da planilha
     // de bugs ("View Custos Terreno") — mesma linha obrigatória, mesmas
     // subcategorias.
-    { nome: 'Preço', subs: ['Valor à vista', 'Permuta', 'Parcelado', 'Outro'] },
+    // #257: quatro subcategorias canônicas — "Permuta" genérica saiu (o motor
+    // sempre tratava como financeira; a legada foi migrada para o rótulo
+    // correto) e "Permuta física" entrou como preparação da fonte nova de
+    // permuta física por tipologia (#258, ainda não implementada — a UI
+    // oferece a opção, mas o motor não a trata de forma diferente da
+    // financeira até o #268 existir).
+    { nome: 'Preço', subs: ['Valor à vista', 'Parcelado', 'Permuta física', 'Permuta financeira'] },
     { nome: 'Registro', subs: [] },
     { nome: 'Outro', subs: [] },
   ],
