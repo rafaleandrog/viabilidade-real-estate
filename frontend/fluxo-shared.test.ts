@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseMesAno, rotuloMesRelativo, mesRelativoCompleto, rotuloPeriodo,
   vgvTipologia, vgvLinha, receitaLiquidaLinha, periodoAbsorcao, absorcaoMensal,
-  faixasAbsorcao, pctPosObraDerivado, problemaJanelaDuranteObra,
+  faixasAbsorcao, pctPosObraDerivado, problemaJanelaDuranteObra, APOS_CHAVES_MESES,
   areaPrivativaTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
   totalAntesAlocacao,
@@ -67,10 +67,27 @@ test('receitaLiquidaLinha: só RET deduz; comissão (destacada ou embutida) nunc
   assert.equal(receitaLiquidaLinha(1_000_000, null), 1_000_000);
 });
 
-test('periodoAbsorcao vai do Pré-lançamento ao fim da Pós-obra', () => {
+test('periodoAbsorcao vai do Pré-lançamento ao fim do Após-chaves (12m fixos — #226)', () => {
   assert.deepEqual(periodoAbsorcao(CRONO), { inicio: 6, fim: 52 });     // começa no pré-lançamento
-  assert.deepEqual(periodoAbsorcao(CRONO, 6), { inicio: 6, fim: 46 });  // pós-obra sobrescrita
   assert.equal(periodoAbsorcao([{ evento: 'obra', inicio_mes: 0, duracao_meses: 12 }]), null);
+});
+
+test('#226: a janela Após-chaves ignora pos_obra.duracao_meses — é constante', () => {
+  const cronoPosLongo: EventoCrono[] = [
+    { evento: 'lancamento', inicio_mes: 6, duracao_meses: 1 },
+    { evento: 'obra', inicio_mes: 7, duracao_meses: 24 },
+    { evento: 'pos_obra', inicio_mes: 31, duracao_meses: 24 }, // manutenção de 24m — âncora de custo
+  ];
+  const f = faixasAbsorcao(cronoPosLongo)!;
+  assert.equal(APOS_CHAVES_MESES, 12);
+  // A absorção usa 12 meses fixos, não os 24 do evento pos_obra.
+  assert.deepEqual(f.pos_obra, { inicio: 31, fim: 31 + APOS_CHAVES_MESES - 1 });
+  // Alterar pos_obra.duracao_meses não muda mais o período total de absorção.
+  const cronoPosCurto: EventoCrono[] = [
+    ...cronoPosLongo.slice(0, 2),
+    { evento: 'pos_obra', inicio_mes: 31, duracao_meses: 3 },
+  ];
+  assert.deepEqual(periodoAbsorcao(cronoPosLongo), periodoAbsorcao(cronoPosCurto));
 });
 
 test('faixasAbsorcao: 4 períodos contíguos sem sobreposição (#225)', () => {

@@ -192,6 +192,14 @@ export function receitaLiquidaLinha(vgv: number, fluxoPagamento: any): number {
   return vgv * (1 - n(ret.pct) / 100);
 }
 
+// #226: janela comercial "Após-chaves" — CONSTANTE do motor, não campo editável.
+// Antes a duração vinha de `pos_obra.duracao_meses` (evento do Cronograma) ou de
+// um bloco de absorção com `duracao_meses` — acoplando a janela de VENDAS à
+// duração de um evento que também serve de ÂNCORA de custo (ex.: manutenção
+// pós-entrega). Editar essa duração no Cronograma não muda mais a absorção — só
+// as âncoras de custo continuam livres, com a duração que já tinham.
+export const APOS_CHAVES_MESES = 12;
+
 /**
  * As 4 faixas de tempo da absorção Distribuída (#108), em meses RELATIVOS do
  * projeto, derivadas do Cronograma:
@@ -203,15 +211,15 @@ export function receitaLiquidaLinha(vgv: number, fluxoPagamento: any): number {
  *    Pré-lançamento e Lançamento; a janela comercial "Durante a obra" começa só
  *    depois do Lançamento. Fica vazia (fim < início) se o Lançamento terminar
  *    em ou depois do fim da Obra — ver `problemaJanelaDuranteObra`.
- *  - `pos_obra`       (período 4): duração do evento Pós-obra (pode ser
- *    sobrescrita por `posObraMeses`).
+ *  - `pos_obra`       (período 4, "Após-chaves"): início no fim da Obra + 1
+ *    (herdado do evento `pos_obra` do Cronograma), duração FIXA de
+ *    `APOS_CHAVES_MESES` — #226, ignora `pos_obra.duracao_meses`.
  * Retorna null se faltar Lançamento, Obra ou Pós-obra no cronograma.
  * Quando não há Pré-lançamento, `pre_lancamento` tem fim < inicio (faixa vazia,
  * sem absorção nesse período).
  */
 export function faixasAbsorcao(
   crono: EventoCrono[],
-  posObraMeses?: number,
 ): {
   pre_lancamento: { inicio: number; fim: number };
   lancamento: { inicio: number; fim: number };
@@ -223,7 +231,6 @@ export function faixasAbsorcao(
   const obra = crono.find((e) => e.evento === 'obra');
   const pos = crono.find((e) => e.evento === 'pos_obra');
   if (!lanc || !obra || !pos) return null;
-  const durPos = Math.max(1, Math.round(posObraMeses ?? n(pos.duracao_meses)));
   // Pré-lançamento: faixa vazia (fim < inicio) quando o evento não existe no cronograma.
   const preInicio = pre ? n(pre.inicio_mes) : n(lanc.inicio_mes);
   const preFim = pre ? n(pre.inicio_mes) + Math.max(1, n(pre.duracao_meses)) - 1 : n(lanc.inicio_mes) - 1;
@@ -233,7 +240,9 @@ export function faixasAbsorcao(
     // #225: "Durante a obra" começa no mês seguinte ao fim do Lançamento, não no
     // início físico da Obra — evita sobrepor Pré-lançamento e Lançamento.
     obra: { inicio: n(lanc.inicio_mes) + Math.max(1, n(lanc.duracao_meses)), fim: n(obra.inicio_mes) + Math.max(1, n(obra.duracao_meses)) - 1 },
-    pos_obra: { inicio: n(pos.inicio_mes), fim: n(pos.inicio_mes) + durPos - 1 },
+    // #226: início herdado do Cronograma (fim da Obra + 1, travado por
+    // recalcularTravados); duração é a CONSTANTE, não `pos.duracao_meses`.
+    pos_obra: { inicio: n(pos.inicio_mes), fim: n(pos.inicio_mes) + APOS_CHAVES_MESES - 1 },
   };
 }
 
@@ -258,13 +267,13 @@ export function problemaJanelaDuranteObra(crono: EventoCrono[]): string | null {
 
 /**
  * Período total de absorção de uma linha/fase: do início do Pré-lançamento até
- * o fim da Pós-obra. Retorna null se o cronograma não tiver os eventos necessários.
+ * o fim do Após-chaves (12 meses fixos — #226). Retorna null se o cronograma
+ * não tiver os eventos necessários.
  */
 export function periodoAbsorcao(
   crono: EventoCrono[],
-  posObraMeses?: number,
 ): { inicio: number; fim: number } | null {
-  const f = faixasAbsorcao(crono, posObraMeses);
+  const f = faixasAbsorcao(crono);
   if (!f) return null;
   return { inicio: f.pre_lancamento.inicio, fim: f.pos_obra.fim };
 }
@@ -299,8 +308,9 @@ export function absorcaoMensal(
 ): { inicio: number; pcts: number[] } | null {
   const modo = absorcao?.modo ?? 'linear';
   const blocos = Array.isArray(absorcao?.blocos) ? absorcao.blocos : [];
-  const blocoPos = blocos.find((b: any) => b?.evento === 'pos_obra');
-  const periodo = periodoAbsorcao(crono, blocoPos?.duracao_meses);
+  // #226: a duração do Após-chaves não é mais lida do bloco de absorção nem do
+  // evento pos_obra — periodoAbsorcao/faixasAbsorcao usam a constante fixa.
+  const periodo = periodoAbsorcao(crono);
   if (!periodo) return null;
   const tamanho = periodo.fim - periodo.inicio + 1;
   const pcts = new Array<number>(tamanho).fill(0);
@@ -314,7 +324,7 @@ export function absorcaoMensal(
   }
 
   if (modo === 'distribuido') {
-    const faixas = faixasAbsorcao(crono, blocoPos?.duracao_meses);
+    const faixas = faixasAbsorcao(crono);
     if (!faixas) return null;
     const espalhar = (faixa: { inicio: number; fim: number }, pct: number) => {
       if (faixa.fim < faixa.inicio) return; // faixa vazia (ex.: sem Pré-lançamento)
