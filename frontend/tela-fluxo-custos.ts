@@ -3,14 +3,14 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import {
-  rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno,
+  rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno, ePermutaFisica,
   vgvLinha, receitaLiquidaLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado, listarReceitasAvancado,
   listarCurvas, listarCustosAvancado, criarCustoAvancado, atualizarCustoAvancado, removerCustoAvancado,
-  listarFasesAvancado,
+  listarFasesAvancado, listarTipologiasCatalogo,
 } from './viabilidade-api.js';
 import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
@@ -254,6 +254,7 @@ export class ViabFluxoCustos extends LitElement {
 
   @state() private custos: any[] = [];
   @state() private curvas: any[] = [];
+  @state() private tipologiasCatalogo: any[] = []; // #266: opções do single-select de permuta física
   // Fases do Cronograma (tipo='cronograma', #168) — âncora alternativa aos 5
   // eventos fixos para a coluna Distribuição (#167).
   @state() private fasesCronograma: any[] = [];
@@ -369,13 +370,14 @@ export class ViabFluxoCustos extends LitElement {
   private async _carregar() {
     this.carregando = true;
     try {
-      const [custos, curvas, fases, crono, params, receitas] = await Promise.all([
+      const [custos, curvas, fases, crono, params, receitas, tipologiasCatalogo] = await Promise.all([
         listarCustosAvancado(this.estudo.id),
         listarCurvas(),
         listarFasesAvancado(this.estudo.id, 'cronograma'),
         buscarCronogramaAvancado(this.estudo.id),
         buscarParametrosAvancado(this.estudo.id),
         listarReceitasAvancado(this.estudo.id),
+        listarTipologiasCatalogo(this.estudo.id),
       ]);
       if (!custos?.erro) {
         this.custos = custos.dados || [];
@@ -384,6 +386,7 @@ export class ViabFluxoCustos extends LitElement {
       }
       if (!curvas?.erro) this.curvas = curvas.dados || [];
       if (!fases?.erro) this.fasesCronograma = fases.dados || [];
+      if (!tipologiasCatalogo?.erro) this.tipologiasCatalogo = tipologiasCatalogo.dados || [];
       if (!crono?.erro) this.crono = crono.dados || [];
       if (!params?.erro) {
         this.dataInicio = params.data_inicio_projeto ?? null;
@@ -640,6 +643,20 @@ export class ViabFluxoCustos extends LitElement {
           const unidsFilt = UNIDADES.filter((u) => perm.includes(u.valor));
           return html`
             <span class="orc">
+              ${ePermutaFisica(c) ? html`
+                <span class="orc-permuta-fisica">
+                  <urbi-select placeholder="Tipologia…"
+                    .valor=${c.permuta_tipologia_id ? String(c.permuta_tipologia_id) : ''}
+                    .opcoes=${this.tipologiasCatalogo.map((t) => ({ valor: String(t.id), rotulo: t.nome || `Tipologia ${t.id}` }))}
+                    @urbi:select-change=${(e: CustomEvent) =>
+                      this._salvar(c, { permuta_tipologia_id: e.detail.valor ? Number(e.detail.valor) : null })}
+                  ></urbi-select>
+                  <viab-num ?desabilitado=${dis} casas-decimais="0" sufixo="un."
+                    .valor=${c.permuta_quantidade !== null && c.permuta_quantidade !== undefined ? Number(c.permuta_quantidade) : null}
+                    @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { permuta_quantidade: e.detail.valor })}
+                  ></viab-num>
+                </span>
+              ` : nothing}
               ${c.categoria ? html`
                 <span class="orc-badges" role="group" aria-label="Unidade do orçamento">
                   ${unidsFilt.map((u) => html`
@@ -671,6 +688,9 @@ export class ViabFluxoCustos extends LitElement {
           if (eCorretagem(c)) return html`
             <span class="mes-calc" title="A corretagem é paga integralmente no mês em que a unidade é vendida">
               Mês da venda <span>🔒</span></span>`;
+          if (ePermutaFisica(c)) return html`
+            <span class="mes-calc" title="A entrega da unidade não segue curva de distribuição — é a transferência da tipologia selecionada">
+              Entrega de unidades <span>🔒</span></span>`;
           if (ePrecoTerreno(c)) {
             const modo = c.distribuicao_modo || 'fixo';
             return html`
@@ -709,7 +729,7 @@ export class ViabFluxoCustos extends LitElement {
           // Corretagem: sem cronograma próprio — segue as vendas (#121).
           if (eCorretagem(c)) return html`<span class="sec">—</span>`;
           // Preço do Terreno em Unit Delivery/Sales Revenue: idem (#194).
-          if (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo') {
+          if (ePermutaFisica(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
             return html`<span class="sec">—</span>`;
           }
           if (eConstrucao(c)) {
@@ -740,7 +760,7 @@ export class ViabFluxoCustos extends LitElement {
         id: 'inicio', label: 'Início',
         render: (c: any) => {
           if (eCorretagem(c)) return html`<span class="sec">—</span>`;
-          if (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo') {
+          if (ePermutaFisica(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
             return html`<span class="sec">—</span>`;
           }
           if (eConstrucao(c)) {
@@ -774,7 +794,7 @@ export class ViabFluxoCustos extends LitElement {
         id: 'duracao', label: 'Duração',
         render: (c: any) => {
           if (eCorretagem(c)) return html`<span class="sec">—</span>`;
-          if (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo') {
+          if (ePermutaFisica(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
             return html`<span class="sec">—</span>`;
           }
           if (eConstrucao(c)) {
