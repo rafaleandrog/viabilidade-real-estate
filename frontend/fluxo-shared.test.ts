@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseMesAno, rotuloMesRelativo, mesRelativoCompleto, rotuloPeriodo,
   vgvTipologia, vgvLinha, receitaLiquidaLinha, periodoAbsorcao, absorcaoMensal,
-  faixasAbsorcao, pctPosObraDerivado,
+  faixasAbsorcao, pctPosObraDerivado, problemaJanelaDuranteObra,
   areaPrivativaTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
   totalAntesAlocacao,
@@ -73,12 +73,28 @@ test('periodoAbsorcao vai do Pré-lançamento ao fim da Pós-obra', () => {
   assert.equal(periodoAbsorcao([{ evento: 'obra', inicio_mes: 0, duracao_meses: 12 }]), null);
 });
 
-test('faixasAbsorcao: 4 períodos separados (pré-lançamento, lançamento, obra, pós-obra)', () => {
+test('faixasAbsorcao: 4 períodos contíguos sem sobreposição (#225)', () => {
   const f = faixasAbsorcao(CRONO)!;
   assert.deepEqual(f.pre_lancamento, { inicio: 6, fim: 11 });  // pré (6, dur 6) → fim = 11
   assert.deepEqual(f.lancamento, { inicio: 12, fim: 12 });     // lançamento (12, dur 1)
-  assert.deepEqual(f.obra, { inicio: 17, fim: 40 });
+  // #225: "Durante a obra" começa no mês seguinte ao fim do Lançamento (13),
+  // não no início físico da Obra (17) — sem sobrepor pré/lançamento.
+  assert.deepEqual(f.obra, { inicio: 13, fim: 40 });
   assert.deepEqual(f.pos_obra, { inicio: 41, fim: 52 });
+  // Contíguo: cada faixa começa no mês seguinte ao fim da anterior.
+  assert.equal(f.lancamento.inicio, f.pre_lancamento.fim + 1);
+  assert.equal(f.obra.inicio, f.lancamento.fim + 1);
+  assert.equal(f.pos_obra.inicio, f.obra.fim + 1);
+});
+
+test('problemaJanelaDuranteObra: Lançamento que alcança o fim da Obra é reportado (#225)', () => {
+  assert.equal(problemaJanelaDuranteObra(CRONO), null); // calendário coerente
+  const lancLongo: EventoCrono[] = [
+    { evento: 'lancamento', inicio_mes: 6, duracao_meses: 30 }, // fim = 35
+    { evento: 'obra', inicio_mes: 6, duracao_meses: 24 },        // fim = 29 < 35
+    { evento: 'pos_obra', inicio_mes: 36, duracao_meses: 12 },
+  ];
+  assert.ok(problemaJanelaDuranteObra(lancLongo)); // durante-obra vazia → explica
 });
 
 test('faixasAbsorcao sem pré-lançamento: faixa pre_lancamento vazia (fim < inicio)', () => {
@@ -121,8 +137,11 @@ test('absorcaoMensal distribuído espalha 4 períodos (pós-obra derivado, #108)
   assert.ok(perto(r.pcts[6 - 6], 15 / 6));            // mês 6: pré espalhado por 6 meses
   assert.ok(perto(r.pcts[11 - 6], 15 / 6));           // mês 11: último mês do pré
   assert.ok(perto(r.pcts[12 - 6], 15 / 1));           // mês 12: lançamento concentrado em 1 mês
-  assert.ok(perto(r.pcts[14 - 6], 0));                // hiato entre lançamento e obra
-  assert.ok(perto(r.pcts[17 - 6], 35 / 24));          // 1º mês da obra
+  // #225: "Durante a obra" cobre 13..40 (28 meses) — não há mais hiato entre
+  // lançamento e obra; o % espalha por toda a janela comercial.
+  assert.ok(perto(r.pcts[13 - 6], 35 / 28));          // 1º mês de "Durante a obra"
+  assert.ok(perto(r.pcts[14 - 6], 35 / 28));          // (antes era hiato = 0)
+  assert.ok(perto(r.pcts[40 - 6], 35 / 28));          // último mês da obra física
   assert.ok(perto(r.pcts[41 - 6], 35 / 12));          // 1º mês da pós-obra (derivado)
   assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 100));
 });

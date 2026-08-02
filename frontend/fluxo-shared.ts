@@ -197,7 +197,12 @@ export function receitaLiquidaLinha(vgv: number, fluxoPagamento: any): number {
  * projeto, derivadas do Cronograma:
  *  - `pre_lancamento` (período 1): duração do evento Pré-lançamento.
  *  - `lancamento`     (período 2): duração do evento Lançamento.
- *  - `obra`           (período 3): duração do evento Obra.
+ *  - `obra`           (período 3, "Durante a obra"): do mês SEGUINTE ao fim do
+ *    Lançamento até o fim físico da Obra (#225). Como a Obra física começa junto
+ *    com o Pré-lançamento (#224), usar o evento Obra inteiro sobreporia
+ *    Pré-lançamento e Lançamento; a janela comercial "Durante a obra" começa só
+ *    depois do Lançamento. Fica vazia (fim < início) se o Lançamento terminar
+ *    em ou depois do fim da Obra — ver `problemaJanelaDuranteObra`.
  *  - `pos_obra`       (período 4): duração do evento Pós-obra (pode ser
  *    sobrescrita por `posObraMeses`).
  * Retorna null se faltar Lançamento, Obra ou Pós-obra no cronograma.
@@ -225,9 +230,30 @@ export function faixasAbsorcao(
   return {
     pre_lancamento: { inicio: preInicio, fim: preFim },
     lancamento: { inicio: n(lanc.inicio_mes), fim: n(lanc.inicio_mes) + Math.max(1, n(lanc.duracao_meses)) - 1 },
-    obra: { inicio: n(obra.inicio_mes), fim: n(obra.inicio_mes) + Math.max(1, n(obra.duracao_meses)) - 1 },
+    // #225: "Durante a obra" começa no mês seguinte ao fim do Lançamento, não no
+    // início físico da Obra — evita sobrepor Pré-lançamento e Lançamento.
+    obra: { inicio: n(lanc.inicio_mes) + Math.max(1, n(lanc.duracao_meses)), fim: n(obra.inicio_mes) + Math.max(1, n(obra.duracao_meses)) - 1 },
     pos_obra: { inicio: n(pos.inicio_mes), fim: n(pos.inicio_mes) + durPos - 1 },
   };
+}
+
+/**
+ * Problema estrutural do calendário comercial (#225): o Lançamento termina em ou
+ * depois do fim da Obra, deixando "Durante a obra" vazia — e, como o Após-chaves
+ * é ancorado no fim da Obra + 1, ele passaria a sobrepor o Lançamento, reintroduzindo
+ * a sobreposição que a derivação existe para eliminar. Retorna a explicação para a
+ * UI, ou null quando o calendário é coerente.
+ */
+export function problemaJanelaDuranteObra(crono: EventoCrono[]): string | null {
+  const lanc = crono.find((e) => e.evento === 'lancamento');
+  const obra = crono.find((e) => e.evento === 'obra');
+  if (!lanc || !obra) return null;
+  const lancFim = n(lanc.inicio_mes) + Math.max(1, n(lanc.duracao_meses)) - 1;
+  const obraFim = n(obra.inicio_mes) + Math.max(1, n(obra.duracao_meses)) - 1;
+  if (lancFim >= obraFim) {
+    return 'O Lançamento termina no fim da Obra ou depois, sem janela "Durante a obra". Encurte o Lançamento ou estenda a Obra.';
+  }
+  return null;
 }
 
 /**
