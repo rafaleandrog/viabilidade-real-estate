@@ -4,9 +4,10 @@ import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   componentesDoLegado, ultimoMesRecebivelLinha,
+  pmt, pagamentosPrazoFixo,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
-  type FluxoConfig, type FluxoCalc,
+  type FluxoConfig, type FluxoCalc, type ComponentePagamento,
 } from './fluxo-caixa-motor.js';
 import { periodosAnuais, CATEGORIA_CORRETAGEM, type EventoCrono } from './fluxo-shared.js';
 
@@ -1014,4 +1015,68 @@ test('#231: calcularFluxo não trunca nem empilha uma entrada de 60 parcelas no 
   // A última parcela cai no mês CORRETO — não empilhada no horizonte antigo.
   assert.ok(perto(r.receitaMensal[ultimaParcelaReal], 10_000_000 / 60, 1));
   assert.ok(perto(r.receitaMensal[ultimoMesAntigo], 10_000_000 / 60, 1)); // só a parcela normal deste mês, sem excedente empilhado
+});
+
+// ─────────────────────────────────────────────────────────────────
+// #232 — Motor de safras: PMT e componente prazo_fixo
+// ─────────────────────────────────────────────────────────────────
+
+test('pmt: taxa zero é divisão simples; n<=0 é 0', () => {
+  assert.equal(pmt(0, 12, 1200), 100);
+  assert.equal(pmt(0, 0, 1000), 0);
+  assert.equal(pmt(0.01, 0, 1000), 0);
+});
+
+test('pmt: taxa positiva reproduz a parcela da tabela curta do Anexo G.1 (Calliandra)', () => {
+  // taxa mensal = 1,15^(1/12) - 1 = 1,1714917% a.m.; principal = 13,3% × 85% × 2.860.111,52
+  const taxaMensal = Math.pow(1.15, 1 / 12) - 1;
+  const principal = 0.133 * 0.85 * 2_860_111.52;
+  assert.ok(Math.abs(pmt(taxaMensal, 36, principal) - 11_059.94) < 0.01);
+});
+
+test('pagamentosPrazoFixo: sinal no mês da safra, parcelas de safra+1 até safra+prazo (padrão novo)', () => {
+  const taxaMensal = Math.pow(1.15, 1 / 12) - 1;
+  const c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }> = {
+    tipo: 'prazo_fixo', participacaoPct: 13.3, sinalPct: 15, prazoMeses: 36,
+    defasagemMeses: 1, taxaMensal, jurosNoMesDaContratacao: false,
+  };
+  const pagamentos = pagamentosPrazoFixo(c, 1, 2_860_111.52);
+  const sinal = pagamentos.find((p) => p.tipo === 'sinal')!;
+  assert.ok(perto(sinal.valor, 0.133 * 0.15 * 2_860_111.52, 1)); // R$ 57.059,22 (Anexo G.1)
+  const parcelas = pagamentos.filter((p) => p.tipo === 'parcela');
+  assert.equal(parcelas.length, 36);
+  assert.equal(Math.min(...parcelas.map((p) => p.mes)), 2); // safra 1 + defasagem 1 = mês 2
+  assert.equal(Math.max(...parcelas.map((p) => p.mes)), 37); // última parcela = 1 + 1 + 36 - 1
+  for (const p of parcelas) assert.ok(perto(p.valor, 11_059.94, 0.01));
+});
+
+test('pagamentosPrazoFixo: sem sinal e taxa zero, VP das parcelas = valor contratado (fecha 100%)', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }> = {
+    tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 12,
+    defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false,
+  };
+  const pagamentos = pagamentosPrazoFixo(c, 5, 1_200_000);
+  assert.equal(pagamentos.length, 12); // sem sinal
+  assert.ok(pagamentos.every((p) => p.tipo === 'parcela'));
+  assert.ok(perto(soma(pagamentos.map((p) => p.valor)), 1_200_000, 1e-6));
+  assert.equal(Math.min(...pagamentos.map((p) => p.mes)), 6); // 5+1
+  assert.equal(Math.max(...pagamentos.map((p) => p.mes)), 17); // 5+1+12-1
+});
+
+test('pagamentosPrazoFixo: valorContratado <= 0 não gera pagamento', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }> = {
+    tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 12,
+    defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false,
+  };
+  assert.deepEqual(pagamentosPrazoFixo(c, 5, 0), []);
+});
+
+test('pagamentosPrazoFixo: defasagemMeses=0 (adapter legado) tem 1ª parcela NO mês da safra', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }> = {
+    tipo: 'prazo_fixo', participacaoPct: 30, sinalPct: 0, prazoMeses: 4,
+    defasagemMeses: 0, taxaMensal: 0, jurosNoMesDaContratacao: false,
+  };
+  const pagamentos = pagamentosPrazoFixo(c, 12, 1_000_000);
+  assert.equal(Math.min(...pagamentos.map((p) => p.mes)), 12); // mesmo mês da venda, como hoje
+  assert.equal(Math.max(...pagamentos.map((p) => p.mes)), 15); // 12+0+4-1
 });

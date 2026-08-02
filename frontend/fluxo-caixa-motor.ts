@@ -491,6 +491,68 @@ export function componentesDoLegado(
 }
 
 // ─────────────────────────────────────────────────────────────────
+// #232/#233/#234 — Motor de safras: PMT, prazo fixo, até marco, concentrado
+// ─────────────────────────────────────────────────────────────────
+//
+// Cada mês de contratação (venda líquida contratada, #227) forma uma SAFRA.
+// Estas funções calculam os pagamentos de UMA safra para UM componente —
+// reconciliadas mês a mês contra o oráculo dourado Calliandra
+// (`frontend/fixtures/calliandra-golden.ts`, #220). São o motor de cálculo
+// que o corpo de #230 previa para #232+; NÃO estão ligadas a
+// `receitaMensalLinha`/`calcularFluxo` nesta fase — nenhum estudo existente
+// muda de resultado. A integração ao fluxo consolidado (para uma linha que
+// opte pelo contrato de componentes) é trabalho de issue futura, quando a UI
+// oferecer o novo modelo; até lá, o motor legado (`entrada`/`parcelas`/
+// `repasse`) continua sendo o único caminho de cálculo real.
+
+/** PMT — parcela fixa que amortiza `principal` em `n` períodos à `taxaMensal`.
+ * Taxa zero → divisão simples (sem juros). `n` ≤ 0 → 0 (guarda defensiva). */
+export function pmt(taxaMensal: number, n: number, principal: number): number {
+  if (n <= 0) return 0;
+  if (taxaMensal === 0) return principal / n;
+  return (principal * taxaMensal) / (1 - Math.pow(1 + taxaMensal, -n));
+}
+
+/** Um pagamento de uma safra: sinal (no mês da contratação), parcela (prazo
+ * fixo ou até marco) ou concentrado (repasse/liquidação). */
+export interface PagamentoSafra {
+  safra: number;    // mês da contratação (0-based)
+  mes: number;       // mês do pagamento
+  tipo: 'sinal' | 'parcela' | 'concentrado';
+  valor: number;
+}
+
+/**
+ * #232: pagamentos de um componente `prazo_fixo` para a safra iniciada em
+ * `safra`, sobre `valorContratado` do mês (líquido de desconto, #227).
+ *
+ * Sinal (se `sinalPct > 0`) no próprio mês da safra. As `prazoMeses` parcelas
+ * (PMT) começam em `safra + defasagemMeses` — por padrão do modelo novo,
+ * `defasagemMeses = 1` (1º vencimento no mês SEGUINTE à contratação, nunca no
+ * próprio mês — a convenção reconciliada contra o Anexo G.1); o adapter do
+ * legado (`componentesDoLegado`) usa `defasagemMeses = 0` só para reproduzir
+ * o comportamento atual de uma entrada parcelada (1ª parcela no mês da
+ * venda), que é INTENCIONALMENTE diferente deste modelo novo.
+ */
+export function pagamentosPrazoFixo(
+  c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }>,
+  safra: number,
+  valorContratado: number,
+): PagamentoSafra[] {
+  const valor = valorContratado * (c.participacaoPct / 100);
+  if (valor <= 0) return [];
+  const sinal = valor * (c.sinalPct / 100);
+  const principal = valor - sinal;
+  const out: PagamentoSafra[] = [];
+  if (sinal > 0) out.push({ safra, mes: safra, tipo: 'sinal', valor: sinal });
+  const parcela = pmt(c.taxaMensal, c.prazoMeses, principal);
+  for (let k = 1; k <= c.prazoMeses; k++) {
+    out.push({ safra, mes: safra + c.defasagemMeses + (k - 1), tipo: 'parcela', valor: parcela });
+  }
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────
 // #231 — Horizonte derivado de todos os componentes e todas as safras
 // ─────────────────────────────────────────────────────────────────
 
