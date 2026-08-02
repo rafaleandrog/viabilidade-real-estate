@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import {
   fluxoAposFundingMensal, caixaAcumuladoMensal, necessidadeFundingMensal,
   caixaDistribuivelMensal, reconciliarCapitalStack,
+  custoElegivelMensalDeLinhas, instrumentoDeRegistro, simularCapitalStackDoEstudo,
 } from './capital-stack-motor.js';
+
+const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 
 // Reconciliados contra os Casos 1 e 16 do oráculo (frontend/fixtures/
 // capital-stack-golden.ts, #270) — mesmos números, mesma leitura.
@@ -56,4 +59,73 @@ test('reconciliarCapitalStack: Caso 16 do oráculo — sem instrumentos, fluxo l
   assert.deepEqual(r.caixaProjetoMensal, [0, 300, -200, 0]);
   assert.deepEqual(r.necessidadeFundingMensal, [0, 0, 200, 0]);
   assert.equal(r.lacunaFundingMaxima, 200);
+});
+
+// ── Adaptador de camadas reais (FIN-04+05+06+07, #273-276) ────────────────
+
+test('custoElegivelMensalDeLinhas: soma só as linhas selecionadas, 1-based', () => {
+  const linhasCusto = [{ id: 1, mensal: [100, 100, 100] }, { id: 2, mensal: [50, 50, 50] }];
+  assert.deepEqual(custoElegivelMensalDeLinhas(linhasCusto, [1], 3), [0, 100, 100, 100]);
+  assert.deepEqual(custoElegivelMensalDeLinhas(linhasCusto, [1, 2], 3), [0, 150, 150, 150]);
+  assert.deepEqual(custoElegivelMensalDeLinhas(linhasCusto, undefined, 3), [0, 0, 0, 0]);
+  assert.deepEqual(custoElegivelMensalDeLinhas(linhasCusto, [], 3), [0, 0, 0, 0]);
+});
+
+test('instrumentoDeRegistro: financiamento_producao carrega compromisso/prioridade da coluna e taxa/política do config', () => {
+  const registro = {
+    tipo: 'financiamento_producao', nome: 'Financiamento', compromisso: 1000, prioridade_funding: 1,
+    config: { taxaAnual: 0.12, politicaAmortizacao: 'cash_sweep', percentualFinanciavel: 0.8 },
+  };
+  const inst = instrumentoDeRegistro(registro, [0, 500]);
+  assert.equal(inst?.tipo, 'divida');
+  if (inst?.tipo !== 'divida') throw new Error('esperava divida');
+  assert.equal(inst.nome, 'Financiamento');
+  assert.equal(inst.limiteComprometido, 1000);
+  assert.equal(inst.prioridadeFunding, 1);
+  assert.equal(inst.percentualFinanciavel, 0.8);
+  assert.deepEqual(inst.custoElegivelMensal, [0, 500]);
+  assert.ok(Math.abs(inst.taxaMensal - (Math.pow(1.12, 1 / 12) - 1)) < 1e-9);
+});
+
+test('instrumentoDeRegistro: capital_giro nunca recebe custoElegivelMensal, mesmo se passado', () => {
+  const registro = { tipo: 'capital_giro', nome: 'Giro', compromisso: 500, prioridade_funding: 2, config: { taxaAnual: 0 } };
+  const inst = instrumentoDeRegistro(registro, [0, 999]);
+  assert.equal(inst?.tipo, 'divida');
+  if (inst?.tipo !== 'divida') throw new Error('esperava divida');
+  assert.equal(inst.custoElegivelMensal, undefined);
+});
+
+test('instrumentoDeRegistro: preferred_equity usa defaults (modo A, capitalização simples) sem config completo', () => {
+  const inst = instrumentoDeRegistro({ tipo: 'preferred_equity', nome: 'PE', config: {} });
+  assert.equal(inst?.tipo, 'preferred_equity');
+  if (inst?.tipo !== 'preferred_equity') throw new Error('esperava preferred_equity');
+  assert.equal(inst.modo, 'A');
+  assert.equal(inst.capitalizacao, 'simples');
+  assert.deepEqual(inst.aportes, []);
+});
+
+test('instrumentoDeRegistro: sponsor_equity coage cobreLacunaAutomatica para booleano', () => {
+  const inst = instrumentoDeRegistro({ tipo: 'sponsor_equity', nome: 'Sponsor', config: { cobreLacunaAutomatica: true } });
+  assert.equal(inst?.tipo, 'sponsor_equity');
+  assert.equal((inst as any).cobreLacunaAutomatica, true);
+  const inst2 = instrumentoDeRegistro({ tipo: 'sponsor_equity', nome: 'Sponsor', config: {} });
+  assert.equal((inst2 as any).cobreLacunaAutomatica, false);
+});
+
+test('instrumentoDeRegistro: tipo desconhecido devolve null (defensivo)', () => {
+  assert.equal(instrumentoDeRegistro({ tipo: 'nao_existe' }), null);
+  assert.equal(instrumentoDeRegistro(null), null);
+});
+
+test('simularCapitalStackDoEstudo: só camadas ATIVAS participam — rascunho/revisão fica sem efeito (§13.3)', () => {
+  const registros = [
+    { tipo: 'capital_giro', nome: 'Giro', status: 'ativo', compromisso: 1000, prioridade_funding: 1, config: { taxaAnual: 0, politicaAmortizacao: 'cash_sweep' } },
+    // Sponsor cobriria a lacuna se estivesse ativo — está em rascunho, deve ser ignorado por completo.
+    { tipo: 'sponsor_equity', nome: 'SponsorRascunho', status: 'rascunho', config: { cobreLacunaAutomatica: true } },
+  ];
+  const r = simularCapitalStackDoEstudo([0, -500, 600], [0, 0, 0], registros, [], 0);
+  assert.deepEqual(r.liberacaoPorInstrumento['Giro'], [0, 500, 0]);
+  assert.deepEqual(r.aporteSponsorMensal, [0, 0, 0]);
+  assert.deepEqual(r.lacunaFundingMensal, [0, 0, 0]);
+  assert.ok(perto(r.caixaProjetoMensal[2], 100));
 });
