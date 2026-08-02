@@ -1072,7 +1072,11 @@ rotasAvancado.get('/estudos/:id/avancado/custos', async (req: Request, res: Resp
   }
 });
 
-const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo'];
+// #266: permuta_tipologia_id/permuta_quantidade — referência de tipologia +
+// quantidade entregue na linha de Preço/Permuta física (modelo/UI). O valor
+// declarado que valora a permuta continua em orcamento_valor/orcamento_unidade
+// (ADR: nunca derivado — ver docs/viabilidade/padrao-incorporacao.md §15.1).
+const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo', 'permuta_tipologia_id', 'permuta_quantidade'];
 
 function validarCamposCusto(res: Response, dados: Record<string, any>): boolean {
   if (dados.grupo !== undefined && !GRUPOS_CUSTO.includes(dados.grupo)) {
@@ -1089,6 +1093,24 @@ function validarCamposCusto(res: Response, dados: Record<string, any>): boolean 
   }
   if (dados.distribuicao_modo !== undefined && !MODOS_DISTRIBUICAO.includes(dados.distribuicao_modo)) {
     erro(res, 400, 'MODO_DISTRIBUICAO_INVALIDO', `distribuicao_modo deve ser um de: ${MODOS_DISTRIBUICAO.join(', ')}`);
+    return false;
+  }
+  if (dados.permuta_quantidade !== undefined && dados.permuta_quantidade !== null
+    && (!Number.isInteger(Number(dados.permuta_quantidade)) || Number(dados.permuta_quantidade) < 0)) {
+    erro(res, 400, 'PERMUTA_QUANTIDADE_INVALIDA', 'permuta_quantidade deve ser um inteiro ≥ 0');
+    return false;
+  }
+  return true;
+}
+
+/** #266: `permuta_tipologia_id` precisa referenciar uma tipologia do MESMO estudo. */
+async function validarPermutaTipologia(
+  req: Request, res: Response, estudoId: number, permutaTipologiaId: any,
+): Promise<boolean> {
+  if (permutaTipologiaId === undefined || permutaTipologiaId === null) return true;
+  const tip = await req.dados!.buscar('avancado_tipologias', permutaTipologiaId);
+  if (!tip || Number(tip.estudo_id) !== estudoId) {
+    erro(res, 400, 'PERMUTA_TIPOLOGIA_INVALIDA', 'permuta_tipologia_id deve ser uma tipologia deste estudo');
     return false;
   }
   return true;
@@ -1114,6 +1136,7 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (!validarCamposCusto(res, dados)) return;
+    if (!(await validarPermutaTipologia(req, res, estudo.id, dados.permuta_tipologia_id))) return;
 
     // Ancoragem: fase do Cronograma (#167) tem prioridade sobre evento fixo —
     // as duas são mutuamente exclusivas (o frontend nunca manda as duas).
@@ -1177,6 +1200,7 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
     if (!validarCamposCusto(res, dados)) return;
+    if (!(await validarPermutaTipologia(req, res, estudo.id, dados.permuta_tipologia_id))) return;
 
     // Âncora final (nova, se veio no PATCH; senão a que já estava salva) —
     // fase do Cronograma (#167) e evento fixo são mutuamente exclusivas.

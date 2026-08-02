@@ -445,6 +445,22 @@ export function ePrecoTerreno(custo: any): boolean {
   return custo?.grupo === 'terreno' && custo?.categoria === CATEGORIA_PRECO_TERRENO;
 }
 
+/** Subcategoria canônica de permuta física da linha de Preço do Terreno (#257). */
+export const SUBCATEGORIA_PERMUTA_FISICA = 'Permuta física';
+
+/**
+ * #266 (modelo/UI): identifica a linha de Preço do Terreno configurada como
+ * permuta física — referencia uma tipologia + quantidade entregue, em vez de
+ * um valor em caixa. Cronograma/Início/Duração ficam vazios (a entrega não
+ * tem calendário próprio) e a Distribuição é fixa ("Entrega de unidades").
+ * O MOTOR que consome `permuta_tipologia_id`/`permuta_quantidade` para
+ * valorar a permuta (a base declarada pelo ADR da #266) é o #268 — esta
+ * função só identifica a linha para a UI, ainda não afeta `calcularFluxo`.
+ */
+export function ePermutaFisica(custo: any): boolean {
+  return ePrecoTerreno(custo) && custo?.subcategoria === SUBCATEGORIA_PERMUTA_FISICA;
+}
+
 /**
  * VGV VENDIDO mês a mês (meses RELATIVOS 0-based), somando todas as linhas de
  * receita: o VGV de cada linha é repartido pela sua própria curva de absorção.

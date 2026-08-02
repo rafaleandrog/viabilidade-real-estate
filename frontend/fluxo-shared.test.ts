@@ -6,7 +6,7 @@ import {
   faixasAbsorcao, pctPosObraDerivado, problemaJanelaDuranteObra, APOS_CHAVES_MESES,
   areaPrivativaTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
-  totalAntesAlocacao,
+  totalAntesAlocacao, ePermutaFisica,
   type EventoCrono,
 } from './fluxo-shared.js';
 
@@ -324,4 +324,14 @@ test('totalAntesAlocacao nunca devolve negativo e aceita campos ausentes', () =>
   ];
   assert.equal(totalAntesAlocacao(fases, TIPOLOGIAS_170, 2, 1), 0);
   assert.equal(totalAntesAlocacao(fases, TIPOLOGIAS_170, 3, 1), 0);
+});
+
+// #266: modelo/UI da permuta física — identifica a linha de Preço do Terreno
+// com a subcategoria canônica (#257), sem afetar nenhuma outra combinação.
+test('ePermutaFisica: só a linha Preço/terreno com subcategoria "Permuta física"', () => {
+  assert.equal(ePermutaFisica({ grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física' }), true);
+  assert.equal(ePermutaFisica({ grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira' }), false);
+  assert.equal(ePermutaFisica({ grupo: 'terreno', categoria: 'Outro', subcategoria: 'Permuta física' }), false);
+  assert.equal(ePermutaFisica({ grupo: 'obra', categoria: 'Preço', subcategoria: 'Permuta física' }), false);
+  assert.equal(ePermutaFisica({}), false);
 });

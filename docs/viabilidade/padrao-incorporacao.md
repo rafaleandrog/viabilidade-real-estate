@@ -1527,9 +1527,12 @@ A futura forma de cadastro e identificação das unidades permutadas será espec
 > tipologia. Depois disso — e só depois —, a coluna do catálogo é desligada pela **#253**
 > (`BUGLIST-010`), que nasce bloqueada até a #267 fechar.
 >
-> **Decisão pendente antes do motor (#268):** a base de valoração quando a mesma tipologia tem
-> `preco_m2` diferente em Grupos diferentes (`avancado_alocacoes`). **Não usar média implícita** —
-> ADR na #266.
+> **ADR da #266 — decidido pelo autor em 2026-08-02.** Quando a mesma tipologia tem `preco_m2`
+> diferente em Grupos diferentes (`avancado_alocacoes`), a base de valoração da permuta física NÃO é
+> derivada (nem média ponderada, nem "preço do Grupo de origem" — que só reintroduziria a mesma
+> ambiguidade sob outro nome). É **declarada explicitamente** pelo usuário na própria linha de
+> permuta, no momento de configurá-la: um valor auditável, escrito, não calculado. Funciona igual
+> com 1 ou N alocações de preços diferentes para a mesma tipologia.
 
 Até essa definição:
 
