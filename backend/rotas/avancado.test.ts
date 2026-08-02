@@ -91,6 +91,20 @@ test('recalcularTravados não muta o array de entrada', () => {
   assert.deepEqual(c, congelado);
 });
 
+test('recalcularTravados normaliza travado_duracao=false em TODOS os eventos (#246)', () => {
+  // Cenário legado: estudo criado antes da #166, quando o Lançamento tinha
+  // duração fixa em 1 mês e travado_duracao=true era persistido. Nada no
+  // código atual escreve esse valor — cronogramaPadrao() já nasce com os 5
+  // eventos em false — mas o dado antigo sobrevivia no banco porque só
+  // travado_inicio era recalculado aqui. Editar a duração do Lançamento desse
+  // estudo tomava 422 (avancado.ts:432) mesmo a regra de 1 mês já não existindo.
+  const legado = cronogramaPadrao().map((e) =>
+    e.evento === 'lancamento' ? { ...e, travado_duracao: true } : e,
+  );
+  const rec = recalcularTravados(legado);
+  for (const e of rec) assert.equal(e.travado_duracao, false, `${e.evento} deveria ter travado_duracao=false`);
+});
+
 // ── Ancoragem de linhas de custo (spec §5C) ──
 
 test('ancorarLinhaCusto herda início/duração do evento-âncora', () => {
