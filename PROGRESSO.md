@@ -4,6 +4,69 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Fase 10 — Fechamento da trilha: Rodadas 5 (EVI) e 6 (lista de bugs) ENCERRADAS (2026-08-02)
+
+Em 2026-08-01 o autor aprovou uma **trilha única de 10 fases** unificando a Rodada 5 (EVI,
+#220–#241) e a Rodada 6 (lista de bugs, #238/#239/#244–#281 — 37 destinos), plano em
+`~/.claude/plans/me-ajude-a-criar-crystalline-wombat.md` (fora do repo). Esta entrada fecha a
+trilha; o detalhe de cada fase individual não foi registrado neste arquivo fase a fase — só nesta
+entrada de fechamento — porque as sessões da trilha inteira ocorreram em sequência contínua.
+
+### O que foi entregue, por fase
+
+- **Fase 0** — aprovação das 12 emendas da revisão Calliandra (issues #220,#227,#229,#230,#231,
+  #232,#233,#234,#236,#237,#240,#241), com 4 decisões de autor resolvidas (`N_s≤0` bloqueia,
+  corretagem sobre bruto/VGV, modelo de 4 componentes, juros no mês da contratação default falso).
+- **Fase 1** — ganhos rápidos de UX/navegação, zero matemática: #244, #245, #247, #250+#251, #262,
+  #263, #264 (sem diff — ver nota abaixo), #265.
+- **Fase 2** — portões #220 (fixtures dourados Calliandra) e #221 (inventário de dados legados).
+- **Fase 3** — nomenclatura (#222, #223) + cronograma (#224→#225→#226) + custos (#249+#261, #255,
+  #252, #246).
+- **Fase 4** — fundação comercial/fiscal/temporal EVI: #227→#228→#229, #230, #231.
+- **Fase 5** — recebíveis por safra, o núcleo matemático: #232, #233 (corrige a premissa publicada
+  errada — 1ª parcela é `s+1`, não no mês da venda), #234, #236, #237, #235.
+- **Fase 6** — valor canônico + terreno: #259→#281→#260→#256→#257→#258(#266→#267→#268)→#253. 4
+  migrações novas, `versao` 0.1.12→0.1.16.
+- **Fase 7** — #238, permuta financeira bruta/líquida do terreno. 1 migração, `versao`→0.1.17.
+- **Fase 8** — #240 (invariantes), #269 (reconciliação permuta física), #241 (apresentação/KPIs),
+  #248 (editor de pagamento por componentes).
+- **Fase 9** — epic #239 (Programa Financeiro / Capital Stack) + FIN-01…FIN-10 (#270–#279), em 4
+  grupos. 1 migração (019), `versao`→0.1.18. Motor dos 4 instrumentos (§4), prioridade de funding
+  (§5) e waterfall (§6) — promovido do oráculo de 16 golden cases do #270 em vez de reimplementado,
+  por não existir planilha real de Capital Stack para comparar.
+- **Fase 9 (segunda verificação, pedida pelo autor após o merge)** — releitura linha a linha de
+  tudo contra `docs/viabilidade/funding-capital-stack.md`. **3 defeitos reais corrigidos:** ordem
+  principal×remuneração invertida no §6.1 (Preferred Equity modo A pagava a remuneração antes do
+  principal); migração 019 gravava `preferred_equity` com um shape que o motor nunca lê
+  (`aporteValor`/`retornoTipoLegado` em vez de `aportes`/`modo`) — todo instrumento migrado do
+  Bloco G ficaria permanentemente inerte mesmo após ativação; `prioridade_pagamento` (coluna real,
+  campo do §9) nunca era lida pelo motor nem editável na UI. Nenhum dos 16 golden cases exercia os
+  3 cenários (exigem caixa insuficiente concorrente ou 2+ instrumentos do mesmo tipo). **2 lacunas
+  documentadas, não corrigidas** (decisão de produto pendente): só um Sponsor Equity é simulado por
+  vez; ambiguidade de leitura §3.1×§7 sobre a ordem de aportes vs. cálculo de necessidade.
+- **Fase 10 (esta entrada)** — fechamento: confirmado que as 59 issues distintas das duas rodadas
+  estão mergeadas na `main`, exceto #254 (fecha por rastreio, sem diff próprio) e #264 (ver nota).
+  Suíte completa (313 testes), harness de migrações e build (esbuild) verdes na `main` pós-merge.
+  `CLAUDE.md` atualizado declarando as duas rodadas encerradas.
+
+### Nota sobre #264
+
+O último release publicado antes da trilha era `viabilidade-v0.1.12_6655ac74` (2026-07-29). A `main`
+já mostra as duas séries de Cenários quando qualquer slider sai do zero, e o estado 0% é decisão
+explícita das #131/#132 — não sobrou bug de código. O critério de aceite restante da #264 é o autor
+confirmar, no ambiente autenticado, que a instância publicada roda uma versão que inclui todo o
+trabalho desta trilha (senão o sintoma reaparece por build desatualizado, não por regressão).
+
+### Pendências do autor no ambiente autenticado (consolidado)
+
+`urbi-empacotar`; sincronização do `schema.json` pelo SDK (`analise_mercado`/`mercado_regioes`/
+`mercado_coletas` + a tabela nova `avancado_capital_instrumentos`); execução real da cadeia
+completa de migrações `001`–`019` no Postgres (nunca rodada em produção); confirmação de que o
+shell descobre `export { rotinas }` em `backend/rotas.ts`; configuração de
+`mercado_busca_url`/`mercado_busca_chave`; e a confirmação de versão publicada da #264.
+
+---
+
 ## Planejamento da lista de bugs — 24 itens, Rodada 6 aberta (2026-08-01)
 
 Branch `claude/viabilidade-buglist-matrix-t2yjz3`, a partir de `c0586ef`. Sessão **documental e de
