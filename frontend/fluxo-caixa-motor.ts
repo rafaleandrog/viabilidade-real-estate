@@ -623,6 +623,73 @@ export function pagamentosConcentrado(
   return [{ safra, mes: c.mesPagamento, tipo: 'concentrado', valor }];
 }
 
+/** Saldo devedor de UMA safra em UM mês (#236). */
+export interface SaldoSafra {
+  safra: number;
+  mes: number;
+  saldo: number;
+}
+
+/**
+ * #236: carteira — saldo devedor por SAFRA e COMPONENTE, mês a mês. Nunca
+ * agrega safras num saldo único: essa é exatamente a recorrência que produz
+ * o defeito do Urbitá (saldo agregado que pode ficar negativo e depois
+ * "ressurgir" quando uma safra nova aporta enquanto outra ainda amortiza).
+ * Cada safra decai isolada, com sua própria taxa e seu próprio principal —
+ * quem quiser a carteira total do estudo SOMA as séries desta função, nunca
+ * substitui por um único acumulador recorrente.
+ *
+ * `saldo_{s,s} = principal_s` (após o sinal, se houver — mesma convenção da
+ * #234: sem juros no mês da contratação); `saldo_{s,t} = saldo_{s,t-1} ×
+ * (1+taxa) − pagamentos_s(t)`, nunca negativo — o último mês da safra é
+ * grampeado em zero (liquidação exata; resíduo de ponto flutuante não é
+ * saldo real). `imediato` não tem saldo (paga e encerra no mesmo mês).
+ */
+export function carteiraSaldoSafra(
+  c: ComponentePagamento,
+  safra: number,
+  valorContratado: number,
+): SaldoSafra[] {
+  if (c.tipo === 'imediato') return [];
+
+  if (c.tipo === 'concentrado') {
+    const pagamentos = pagamentosConcentrado(c, safra, valorContratado);
+    if (pagamentos.length === 0) return [];
+    const principal = valorContratado * (c.participacaoPct / 100);
+    const out: SaldoSafra[] = [{ safra, mes: safra, saldo: principal }];
+    let saldo = principal;
+    for (let mes = safra + 1; mes <= c.mesPagamento; mes++) {
+      saldo = mes === c.mesPagamento ? 0 : saldo * (1 + c.taxaMensal);
+      out.push({ safra, mes, saldo: Math.max(0, saldo) });
+    }
+    return out;
+  }
+
+  const pagamentos = c.tipo === 'prazo_fixo'
+    ? pagamentosPrazoFixo(c, safra, valorContratado)
+    : pagamentosAteMarco(c, safra, valorContratado);
+  if (pagamentos.length === 0) return [];
+
+  const valor = valorContratado * (c.participacaoPct / 100);
+  const principal = valor - valor * (c.sinalPct / 100);
+  const porMes = new Map<number, number>();
+  let ultimoMes = safra;
+  for (const p of pagamentos) {
+    if (p.tipo === 'sinal') continue;
+    porMes.set(p.mes, (porMes.get(p.mes) ?? 0) + p.valor);
+    ultimoMes = Math.max(ultimoMes, p.mes);
+  }
+
+  const out: SaldoSafra[] = [{ safra, mes: safra, saldo: principal }];
+  let saldo = principal;
+  for (let mes = safra + 1; mes <= ultimoMes; mes++) {
+    saldo = saldo * (1 + c.taxaMensal) - (porMes.get(mes) ?? 0);
+    if (mes === ultimoMes) saldo = 0;
+    out.push({ safra, mes, saldo: Math.max(0, saldo) });
+  }
+  return out;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // #231 — Horizonte derivado de todos os componentes e todas as safras
 // ─────────────────────────────────────────────────────────────────

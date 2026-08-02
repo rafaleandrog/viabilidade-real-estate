@@ -5,6 +5,7 @@ import {
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   componentesDoLegado, ultimoMesRecebivelLinha,
   pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
+  carteiraSaldoSafra,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
@@ -1193,4 +1194,70 @@ test('pagamentosConcentrado: liquidação integral — um único pagamento no m�
   assert.equal(r.length, 1);
   assert.equal(r[0].mes, 40);
   assert.equal(r[0].tipo, 'concentrado');
+});
+
+// ─────────────────────────────────────────────────────────────────
+// #236 — Carteira: saldo por safra e componente, nunca agregado
+// ─────────────────────────────────────────────────────────────────
+
+test('carteiraSaldoSafra: imediato não tem saldo (paga e encerra no próprio mês)', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'imediato' }> = {
+    tipo: 'imediato', participacaoPct: 20, descontoPct: 5,
+  };
+  assert.deepEqual(carteiraSaldoSafra(c, 1, 1_000_000), []);
+});
+
+test('carteiraSaldoSafra: prazo_fixo taxa zero — saldo decai linearmente e zera na última parcela', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }> = {
+    tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 4,
+    defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false,
+  };
+  const saldos = carteiraSaldoSafra(c, 10, 400);
+  // safra 10: saldo=400; parcela=100/mês a partir de 11.
+  assert.deepEqual(saldos.map((s) => [s.mes, s.saldo]), [
+    [10, 400], [11, 300], [12, 200], [13, 100], [14, 0],
+  ]);
+});
+
+test('carteiraSaldoSafra: até marco com juros — nunca negativo e zera exatamente no marco', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'ate_marco' }> = {
+    tipo: 'ate_marco', participacaoPct: 15, sinalPct: 0, marcoMes: 24,
+    defasagemMeses: 1, taxaMensal: 0.01, jurosNoMesDaContratacao: false,
+  };
+  const saldos = carteiraSaldoSafra(c, 3, 2_378_978.36);
+  assert.equal(saldos[0].mes, 3);
+  assert.equal(saldos.at(-1)!.mes, 24);
+  assert.equal(saldos.at(-1)!.saldo, 0);
+  for (const s of saldos) assert.ok(s.saldo >= 0, `saldo negativo em mes=${s.mes}`);
+  // Saldo estritamente decrescente (sem ressurgimento) até zerar.
+  for (let i = 1; i < saldos.length; i++) assert.ok(saldos[i].saldo <= saldos[i - 1].saldo + 1e-6);
+});
+
+test('carteiraSaldoSafra: concentrado acumula juros até o pagamento e zera nele', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'concentrado' }> = {
+    tipo: 'concentrado', participacaoPct: 100, mesPagamento: 13, taxaMensal: 0.01,
+  };
+  const saldos = carteiraSaldoSafra(c, 1, 1_000_000);
+  assert.equal(saldos[0].saldo, 1_000_000); // saldo_{s,s} = principal_s (#234)
+  assert.ok(perto(saldos.find((s) => s.mes === 12)!.saldo, 1_000_000 * Math.pow(1.01, 11), 0.01));
+  assert.equal(saldos.at(-1)!.mes, 13);
+  assert.equal(saldos.at(-1)!.saldo, 0);
+});
+
+test('carteiraSaldoSafra: duas safras do mesmo componente NUNCA se somam num saldo único', () => {
+  // O defeito do Urbitá é justamente agregar safras num acumulador recorrente
+  // — cada chamada aqui é isolada por construção (a assinatura só recebe UMA
+  // safra), então safras vizinhas não podem interferir uma na outra.
+  const c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }> = {
+    tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0, prazoMeses: 3,
+    defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false,
+  };
+  const safra1 = carteiraSaldoSafra(c, 1, 300);
+  const safra2 = carteiraSaldoSafra(c, 2, 300);
+  assert.deepEqual(safra1.map((s) => s.mes), [1, 2, 3, 4]);
+  assert.deepEqual(safra2.map((s) => s.mes), [2, 3, 4, 5]);
+  // No mês 2, a safra 1 já amortizou uma parcela (saldo 200) enquanto a
+  // safra 2 nasce intacta (saldo 300) — nada foi somado nem confundido.
+  assert.equal(safra1.find((s) => s.mes === 2)!.saldo, 200);
+  assert.equal(safra2.find((s) => s.mes === 2)!.saldo, 300);
 });
