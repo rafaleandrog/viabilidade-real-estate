@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
-  componentesDoLegado,
+  componentesDoLegado, ultimoMesRecebivelLinha,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig, type FluxoCalc,
@@ -126,7 +126,10 @@ test('#227: desconto de entrada reproduz o à vista do mês 1 do cenário G.1 (C
     },
     fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] },
   };
-  const r = receitaMensalLinha(linha, cronoG1, 20);
+  // prazoTotal folgado (140) para não estourar o horizonte do repasse derivado
+  // (80% da venda, no fim da Obra do cenário = mês 132) — este teste só confere
+  // o mês 1, mas #231 agora avisa (console.warn) se algo cair fora do array.
+  const r = receitaMensalLinha(linha, cronoG1, 140);
   // Mês 1: só a fração de entrada cai no mês da venda (as demais modalidades —
   // curta/longa, #232+ — ainda não existem nesta fase); confere isoladamente o
   // valor da entrada com desconto.
@@ -941,4 +944,72 @@ test('componentesDoLegado: sem repasse (100% já coberto por entrada+parcelas) n
   const r = componentesDoLegado(fp, CRONO);
   assert.equal(r.length, 1);
   assert.ok(!r.some((c) => c.tipo === 'concentrado'));
+});
+
+// ─────────────────────────────────────────────────────────────────
+// #231 — Horizonte derivado de todos os componentes e todas as safras
+// ─────────────────────────────────────────────────────────────────
+
+test('ultimoMesRecebivelLinha: sem fluxo_pagamento é o fim do Após-chaves (à vista no mês da venda)', () => {
+  const linha = { fluxo_pagamento: null };
+  const r = ultimoMesRecebivelLinha(linha, CRONO);
+  const pos = CRONO.find((e) => e.evento === 'pos_obra')!;
+  assert.equal(r, pos.inicio_mes + pos.duracao_meses - 1);
+});
+
+test('ultimoMesRecebivelLinha: entrada com muitas parcelas estende além do fim do Após-chaves', () => {
+  const linha = { fluxo_pagamento: { entrada: [{ pct: 100, parcelas: 60 }] } };
+  const r = ultimoMesRecebivelLinha(linha, CRONO);
+  const pos = CRONO.find((e) => e.evento === 'pos_obra')!;
+  const fimAposChaves = pos.inicio_mes + pos.duracao_meses - 1;
+  assert.equal(r, fimAposChaves + 59); // última safra + 59 parcelas restantes
+  assert.ok(r > fimAposChaves); // maior que o cronograma isoladamente
+});
+
+test('ultimoMesRecebivelLinha: parcelamento por periodicidade (sem "ao longo da obra") considera intervalo × parcelas', () => {
+  const linha = { fluxo_pagamento: { parcelas: [{ pct: 100, ao_longo_obra: false, periodicidade: 'semestral', parcelas: 8 }] } };
+  const r = ultimoMesRecebivelLinha(linha, CRONO);
+  const pos = CRONO.find((e) => e.evento === 'pos_obra')!;
+  const fimAposChaves = pos.inicio_mes + pos.duracao_meses - 1;
+  assert.equal(r, fimAposChaves + 6 * 8); // semestral = intervalo 6
+});
+
+test('ultimoMesRecebivelLinha: repasse distante da Obra estende o horizonte', () => {
+  const linha = { fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1 }], repasse: { apos_entrega_meses: 36 } } };
+  const r = ultimoMesRecebivelLinha(linha, CRONO);
+  const obra = CRONO.find((e) => e.evento === 'obra')!;
+  const fimObra = obra.inicio_mes + obra.duracao_meses - 1;
+  assert.equal(r, fimObra + 36);
+});
+
+// Regressão de ponta a ponta: ANTES da #231, o horizonte derivava só de
+// `ultimoCrono + maxRepasse` — uma entrada de 60 parcelas SEM repasse (e sem
+// eventos de custo longos) ficava de fora, e a 60ª parcela era empilhada no
+// último mês em silêncio. Agora o horizonte cobre a linha inteira.
+test('#231: calcularFluxo não trunca nem empilha uma entrada de 60 parcelas no último mês', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+      fluxo_pagamento: { entrada: [{ pct: 100, parcelas: 60 }] }, // sem repasse (100% já coberto)
+    }],
+    linhasCusto: [],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  const mesVenda = 12;
+  const ultimaParcelaReal = mesVenda + 59; // 71: 60 parcelas a partir do mês 12
+  // Horizonte ANTIGO (ultimoCrono + maxRepasse, sem repasse configurado) era
+  // só o fim do cronograma (pos_obra, mês 52) — bem menor que a 60ª parcela.
+  const horizonteAntigo = CRONO.find((e) => e.evento === 'pos_obra')!;
+  const ultimoMesAntigo = horizonteAntigo.inicio_mes + horizonteAntigo.duracao_meses - 1;
+  assert.ok(ultimaParcelaReal > ultimoMesAntigo, 'pré-condição: a 60ª parcela excede o horizonte antigo');
+  assert.ok(r.prazo > ultimaParcelaReal, `prazo (${r.prazo}) deveria cobrir até ${ultimaParcelaReal}`);
+  // Nada se perde: a soma bate com o VGV (cada parcela igual a 10M/60).
+  assert.ok(perto(soma(r.receitaMensal), 10_000_000, 1));
+  // A última parcela cai no mês CORRETO — não empilhada no horizonte antigo.
+  assert.ok(perto(r.receitaMensal[ultimaParcelaReal], 10_000_000 / 60, 1));
+  assert.ok(perto(r.receitaMensal[ultimoMesAntigo], 10_000_000 / 60, 1)); // só a parcela normal deste mês, sem excedente empilhado
 });

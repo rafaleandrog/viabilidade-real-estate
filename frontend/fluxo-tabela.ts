@@ -150,7 +150,7 @@ function varKpi(novo: number | null, base: number | null | undefined, maiorMelho
 
 /**
  * Os 6 KPIs do fluxo (Resultado, TIR, VPL, Payback, Exposição máxima,
- * Receita Bruta (VGV) — #188).
+ * VGV Vendável — #188/#229).
  *
  * `base` só é passada pela aba Cenários (#132): com ela, Resultado, TIR, VPL e
  * Exposição máxima ganham seta + variação % contra o cenário real. Payback é
@@ -196,7 +196,7 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
   `;
 }
 
-/** #189: peso da linha sobre a Receita Bruta (VGV) — vazio sem base ou linha sem sentido. */
+/** #189/#229: peso da linha sobre o VGV Vendável — vazio sem base ou linha sem sentido. */
 function pctVgv(total: number, vgv: number, ocultar: boolean): string {
   if (ocultar || vgv <= 0) return '';
   return fmtPct((total / vgv) * 100);
@@ -331,7 +331,14 @@ export function tabelaFluxo(
           </tr>
         </thead>
         <tbody>
-          ${linhaTabela('grupo', 'receita', 'Receita Bruta (VGV)',
+          <!-- #229 (fechamento pendente identificado na verificação da Fase 4):
+               esta linha soma c.receitaMensal, que é o RECEBIMENTO LÍQUIDO
+               (pós-imposto, #228) — não "Receita Bruta" nem "VGV". O KPI
+               (acima) e a exportação (exportar.ts) já usam "VGV Vendável" e
+               "Receita" respectivamente; esta linha da tabela havia ficado
+               de fora e ainda carregava o rótulo antigo, reintroduzindo a
+               ambiguidade que a #229 existia para eliminar. -->
+          ${linhaTabela('grupo', 'receita', 'Receita',
             { mensal: c.receitaMensal, total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita) }, dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true)}
           ${!colapso['receita'] ? c.linhasReceita.map((l) => html`
             ${linhaTabela('subgrupo', `r${l.id}`,
