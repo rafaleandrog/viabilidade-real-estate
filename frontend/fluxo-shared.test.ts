@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseMesAno, rotuloMesRelativo, mesRelativoCompleto, rotuloPeriodo,
-  vgvTipologia, vgvLinha, vglLinha, periodoAbsorcao, absorcaoMensal,
+  vgvTipologia, vgvLinha, receitaLiquidaLinha, periodoAbsorcao, absorcaoMensal,
   faixasAbsorcao, pctPosObraDerivado,
   areaPrivativaTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
@@ -49,15 +49,22 @@ test('rotuloPeriodo formata intervalo com duração (0-based)', () => {
   assert.equal(rotuloPeriodo(null, 0, 3), 'M0 → M2 (3m)');
 });
 
-test('vgv de tipologia, de linha e VGL com comissão destacada + RET', () => {
+test('vgv de tipologia e de linha', () => {
   const t1 = { quantidade: 10, area_privativa_m2: 70, preco_m2: 10000 }; // 7.000.000
   const t2 = { quantidade: 2, area_privativa_m2: 280, preco_m2: 12000 }; // 6.720.000
   assert.equal(vgvTipologia(t1), 7_000_000);
   assert.equal(vgvLinha([t1, t2]), 13_720_000);
+});
+
+// #228: receitaLiquidaLinha substitui vglLinha — RET é o único imposto oficial
+// do Avançado; comissão NUNCA deduz (já é a linha de custo obrigatória de
+// Corretagem, #227 — deduzir aqui também dobrava o efeito quando "Destacada").
+test('receitaLiquidaLinha: só RET deduz; comissão (destacada ou embutida) nunca deduz', () => {
   const fpDestacada = { comissao: { ativo: true, tipo: 'destacada', pct: 5 }, ret: { ativo: true, pct: 4 } };
-  assert.equal(vglLinha(1_000_000, fpDestacada), 1_000_000 - 50_000 - 40_000);
+  assert.equal(receitaLiquidaLinha(1_000_000, fpDestacada), 1_000_000 - 40_000); // só o RET
   const fpEmbutida = { comissao: { ativo: true, tipo: 'embutida', pct: 5 }, ret: { ativo: false, pct: 4 } };
-  assert.equal(vglLinha(1_000_000, fpEmbutida), 1_000_000); // embutida não deduz
+  assert.equal(receitaLiquidaLinha(1_000_000, fpEmbutida), 1_000_000); // sem RET, sem dedução
+  assert.equal(receitaLiquidaLinha(1_000_000, null), 1_000_000);
 });
 
 test('periodoAbsorcao vai do Pré-lançamento ao fim da Pós-obra', () => {

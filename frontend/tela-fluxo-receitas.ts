@@ -713,9 +713,14 @@ export class ViabFluxoReceitas extends LitElement {
                   <viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.comissao.pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this._setPag('comissao', 'pct', e.detail.valor ?? 0)}></viab-num>
                 </div>
+                <!-- #228: nem "Destacada" nem "Embutida" deduzem mais do VGV — a
+                     corretagem é sempre a linha de custo obrigatória "Corretagem
+                     de vendas" (base bruto/VGV, #227); deduzir aqui também
+                     contava a corretagem duas vezes quando "Destacada" estava
+                     marcada. O toggle fica como classificação informativa. -->
                 <p class="sec">${f.comissao.tipo === 'embutida'
-                  ? 'Embutida: já está no preço de venda (não deduz do VGV).'
-                  : 'Destacada: custo adicional (deduz do VGV).'}</p>` : nothing}
+                  ? 'Embutida: já está no preço de venda.'
+                  : 'Destacada: cobrada em separado do preço de venda.'} A corretagem em si é sempre a linha de custo "Corretagem de vendas" (Custos Diretos).</p>` : nothing}
               <div class="pag-linha">
                 <urbi-checkbox label="RET" ?desabilitado=${dis} ?marcado=${f.ret.ativo}
                   @urbi:checkbox-change=${(e: CustomEvent) => this._setPag('ret', 'ativo', e.detail.marcado)}></urbi-checkbox>
