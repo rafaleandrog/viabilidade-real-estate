@@ -24,6 +24,9 @@ import {
 
 const n = (v: any): number => Number(v) || 0;
 
+/** #260: quantiza a 2 casas — contrato C7, valor monetário resultado de fórmula. */
+const round2 = (v: number): number => Math.round(v * 100) / 100;
+
 /**
  * Nome de exibição de uma linha de custo: categoria + subcategoria — mas só
  * para `terreno`, o único grupo com subcategoria editável na tela (#173).
@@ -158,13 +161,13 @@ export interface LinhaCalc {
 // o imposto (RET). Nenhuma dessas oito grandezas é o mesmo número que outra;
 // consumidor que precisar de mais de uma tem de nomear qual está lendo.
 //
-// ⚠️ Dívida técnica registrada na verificação da Fase 4: estas séries (e as
-// de #227/#228: `vendaBrutaContratadaMensal`, `descontoComercialMensal`,
-// `recebimentoBrutoMensal`, `impostoMensal`) ainda somam float SEM
-// quantização a 2 casas (contrato C7, CLAUDE.md). A apresentação (`fmtR$`)
-// já é tratada pela #281; o motor em si — bruto/desconto/líquido/imposto —
-// ainda não. Não é regressão (o motor já não quantizava antes desta fase),
-// mas fica sinalizado para não presumir que C7 já vale aqui.
+// ✅ #260 (2026-08-02): as séries de #227/#228 (`vendaBrutaContratadaMensal`,
+// `descontoComercialMensal`, `vendaLiquidaContratadaMensal`,
+// `recebimentoBrutoMensal`, `impostoMensal`, `recebimentoLiquidoMensal`) e os
+// quatro totais agregados de `calcularFluxo` (`vendaBrutaContratada`,
+// `descontoComercial`, `vendaLiquidaContratada`, `receitaBruta`) agora
+// quantizam a 2 casas (`round2`, contrato C7) — a dívida técnica registrada
+// na verificação da Fase 4 foi fechada aqui.
 //
 // Também identificado na verificação: a corretagem (`corretagemMensal`,
 // via `vgvVendidoMensal`) segue usando VGV BRUTO (`vgvLinha`) como base,
@@ -314,7 +317,7 @@ export function vendaBrutaContratadaMensal(
     const idx = abs.inicio + i; // mês 0-based coincide com o índice
     if (idx >= 0 && idx < saida.length) saida[idx] += (vgv * abs.pcts[i]) / 100;
   }
-  return saida;
+  return saida.map(round2); // #260 — C7
 }
 
 /**
@@ -340,7 +343,7 @@ export function descontoComercialMensal(
       if (parcela > 0 && n(e?.descontoPct) > 0) saida[i] += parcela * (n(e.descontoPct) / 100);
     }
   }
-  return saida;
+  return saida.map(round2); // #260 — C7
 }
 
 /** #227: venda LÍQUIDA contratada = bruta − desconto comercial. */
@@ -351,7 +354,7 @@ export function vendaLiquidaContratadaMensal(
 ): number[] {
   const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
   const desconto = descontoComercialMensal(linha, cronograma, prazoTotal);
-  return bruto.map((v, i) => v - desconto[i]);
+  return bruto.map((v, i) => round2(v - desconto[i])); // #260 — C7
 }
 
 /** % do Repasse = 100 − Σ(entrada) − Σ(parcelas), derivado (Lote 6 · #20). */
@@ -934,7 +937,7 @@ export function recebimentoBrutoMensal(
     // Repasse — % derivado, concentrado na entrega (independe do mês da venda).
     deposita(Math.max(mesRepasse, mesVenda), venda * (pctRepasse / 100));
   }
-  return saida;
+  return saida.map(round2); // #260 — C7
 }
 
 /**
@@ -956,7 +959,7 @@ export function impostoMensal(
   const ret = linha?.fluxo_pagamento?.ret;
   if (!ret?.ativo) return bruto.map(() => 0);
   const pct = n(ret.pct) / 100;
-  return bruto.map((v) => v * pct);
+  return bruto.map((v) => round2(v * pct)); // #260 — C7
 }
 
 /**
@@ -974,7 +977,7 @@ export function recebimentoLiquidoMensal(
 ): number[] {
   const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal);
   const imposto = impostoMensal(linha, cronograma, prazoTotal);
-  return bruto.map((v, i) => v - imposto[i]);
+  return bruto.map((v, i) => round2(v - imposto[i])); // #260 — C7
 }
 
 /**
@@ -1394,10 +1397,10 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   // Financeira (`calcDeducoesReceita`) é dedução de receita, não contratação.
   const somaMensal = (fn: (l: any, c: EventoCrono[], p: number) => number[]): number =>
     linhasReceita.reduce((s, l) => s + fn(l, crono, prazo).reduce((s2, v) => s2 + v, 0), 0);
-  const vendaBrutaContratada = somaMensal(vendaBrutaContratadaMensal);
-  const descontoComercial = somaMensal(descontoComercialMensal);
-  const vendaLiquidaContratada = vendaBrutaContratada - descontoComercial;
-  const receitaBruta = somaMensal(recebimentoBrutoMensal);
+  const vendaBrutaContratada = round2(somaMensal(vendaBrutaContratadaMensal)); // #260 — C7
+  const descontoComercial = round2(somaMensal(descontoComercialMensal));
+  const vendaLiquidaContratada = round2(vendaBrutaContratada - descontoComercial);
+  const receitaBruta = round2(somaMensal(recebimentoBrutoMensal));
 
   return {
     prazo,
