@@ -237,7 +237,7 @@ export function controlesFluxo(p: ControlesFluxoProps): TemplateResult {
       ${p.fases.length > 1 ? html`
         <urbi-select
           .valor=${p.faseFiltro}
-          .opcoes=${[{ valor: '', rotulo: 'Global (todas as fases)' },
+          .opcoes=${[{ valor: '', rotulo: 'Global (todos os grupos)' },
             ...p.fases.map((f) => ({ valor: f, rotulo: f }))]}
           @urbi:select-change=${(e: CustomEvent) => p.onFase(e.detail.valor)}
         ></urbi-select>` : nothing}
