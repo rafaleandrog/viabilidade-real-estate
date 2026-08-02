@@ -15,9 +15,15 @@
 //     consumido pela tela — a emenda da #240 pede exatamente as quatro
 //     checagens abaixo, e o corpo original autoriza "começar
 //     incrementalmente antes de todas [as dependências] fecharem".
+//  3. Reconciliação da permuta física por tipologia (#269, sub-issue final
+//     do epic #258): a quantidade permutada declarada nas linhas de custo
+//     `Preço/Permuta física` (#266/#267) nunca pode exceder a quantidade
+//     total da tipologia no catálogo — sem essa checagem, um estudo pode
+//     "entregar" mais unidades do que produziu sem nenhum aviso.
 
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
 import { carteiraSaldoSafra } from './fluxo-caixa-motor.js';
+import { ePermutaFisica } from './fluxo-shared.js';
 
 export type Severidade = 'erro' | 'alerta';
 
@@ -131,5 +137,47 @@ export function validarComponentesSafra(
     }
   }
 
+  return out;
+}
+
+/**
+ * #269: reconciliação da permuta física — soma, por tipologia do catálogo,
+ * a `permuta_quantidade` declarada em todas as linhas de custo
+ * `Preço/Permuta física` (#266/#267) do estudo e compara com a `quantidade`
+ * total daquela tipologia. Exceder o estoque é ERRO (não premissa agressiva):
+ * não existe unidade física para entregar além do que o catálogo produz.
+ *
+ * `linhasCusto`/`tipologiasCatalogo` são os arrays crus do estudo (mesmo
+ * shape de `avancado_linhas_custo`/`avancado_tipologias`), não o `FluxoCalc`
+ * — a permuta física não passa pelo fluxo consolidado (#268: é dedução de
+ * estoque, não de caixa).
+ */
+export function validarPermutaFisica(
+  linhasCusto: any[],
+  tipologiasCatalogo: any[],
+  tol: number = TOLERANCIA_PADRAO,
+): Divergencia[] {
+  const permutadaPorTipologia = new Map<number, number>();
+  for (const c of linhasCusto) {
+    if (!ePermutaFisica(c) || c.permuta_tipologia_id === null || c.permuta_tipologia_id === undefined) continue;
+    const id = Number(c.permuta_tipologia_id);
+    permutadaPorTipologia.set(id, (permutadaPorTipologia.get(id) ?? 0) + Number(c.permuta_quantidade ?? 0));
+  }
+
+  const out: Divergencia[] = [];
+  for (const [id, quantidadePermutada] of permutadaPorTipologia) {
+    const tip = tipologiasCatalogo.find((t) => Number(t.id) === id);
+    const quantidadeTotal = Number(tip?.quantidade ?? 0);
+    if (quantidadePermutada - quantidadeTotal > tol) {
+      const nome = tip?.nome || `tipologia ${id}`;
+      out.push({
+        codigo: 'PERMUTA_FISICA_EXCEDE_ESTOQUE', severidade: 'erro', linha: nome,
+        esperado: quantidadeTotal, encontrado: quantidadePermutada,
+        diferenca: quantidadePermutada - quantidadeTotal,
+        mensagem: `${nome}: ${quantidadePermutada} unidades permutadas excedem as ` +
+          `${quantidadeTotal} do catálogo — não existe estoque para entregar.`,
+      });
+    }
+  }
   return out;
 }
