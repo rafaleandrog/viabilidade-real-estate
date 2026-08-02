@@ -157,6 +157,21 @@ export interface LinhaCalc {
 // RECEBIMENTO LÍQUIDO (`recebimentoLiquidoMensal`, #228) — Receita Bruta menos
 // o imposto (RET). Nenhuma dessas oito grandezas é o mesmo número que outra;
 // consumidor que precisar de mais de uma tem de nomear qual está lendo.
+//
+// ⚠️ Dívida técnica registrada na verificação da Fase 4: estas séries (e as
+// de #227/#228: `vendaBrutaContratadaMensal`, `descontoComercialMensal`,
+// `recebimentoBrutoMensal`, `impostoMensal`) ainda somam float SEM
+// quantização a 2 casas (contrato C7, CLAUDE.md). A apresentação (`fmtR$`)
+// já é tratada pela #281; o motor em si — bruto/desconto/líquido/imposto —
+// ainda não. Não é regressão (o motor já não quantizava antes desta fase),
+// mas fica sinalizado para não presumir que C7 já vale aqui.
+//
+// Também identificado na verificação: a corretagem (`corretagemMensal`,
+// via `vgvVendidoMensal`) segue usando VGV BRUTO (`vgvLinha`) como base,
+// enquanto a série canônica de contratação (`vendaBrutaContratadaMensal`)
+// usa VGV VENDÁVEL. O corpo da #227 pedia uma função única para as duas — a
+// unificação ficou incompleta (decisão do autor mantida — corretagem
+// bruto/VGV — mas via caminho de código separado, não a mesma série).
 
 export interface FluxoCalc {
   prazo: number;
