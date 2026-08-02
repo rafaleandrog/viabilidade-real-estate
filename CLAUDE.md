@@ -30,110 +30,43 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — 🔴 DUAS RODADAS ABERTAS
+## Estado do backlog — 🟢 SEM RODADA ABERTA
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
-| **5 — EVI** | Auditoria do app contra os documentos EVI | **#220–#241** (22) | 🔴 **aberta, 0 implementadas** · 12 corpos com emenda pendente |
-| **6 — lista de bugs** | `lista_bugs.xlsx`, 24 itens `BUGLIST-001`…`BUGLIST-024` | **#238, #239, #244–#281** (37 destinos) | 🔴 **aberta, 0 implementadas** |
+| **5 — EVI** | Auditoria do app contra os documentos EVI | **#220–#241** (22) | ✅ **concluída em 2026-08-02** |
+| **6 — lista de bugs** | `lista_bugs.xlsx`, 24 itens `BUGLIST-001`…`BUGLIST-024` | **#238, #239, #244–#281** (37 destinos) | ✅ **concluída em 2026-08-02** |
 
-As duas convivem e se cruzam em quatro pontos (itens 5, 11, 16 e 24 da lista de bugs). **A regra é
-não duplicar implementação:** onde a Rodada 5 já tem issue executora, o item da planilha vira UX
-própria, tracker, issue de teste ou emenda da issue existente.
+**As duas foram executadas juntas por uma trilha única de 10 fases** (plano aprovado pelo autor em
+2026-08-01), com portão de merge ao fim de cada fase. Os quatro cruzamentos entre rodadas (itens 5,
+11, 16 e 24 da lista de bugs) foram resolvidos sem duplicar implementação: item 5 (#248) é UX sobre a
+cadeia EVI #230/#232–#237; item 11 (#254) é epic de rastreio, fechada quando as executoras EVI
+fecharam com diff; item 16 (#238) e item 24 (#239) já eram issues compartilhadas desde a abertura.
 
----
+**Todas as 59 issues distintas das duas rodadas estão mergeadas na `main`**, exceto duas cujo
+critério de aceite não é código:
 
-## Rodada 6 — lista de bugs (`BUGLIST-001` a `BUGLIST-024`)
+- **#254** (epic de rastreio) — fecha porque #220, #221, #227–#237, #240 e #241 (suas executoras)
+  já fecharam com diff; não tem diff próprio.
+- **#264** (`fix(cenarios)` confirmar as duas séries e decidir o estado 0%) — o código já mostra as
+  duas séries quando o slider sai do zero e o estado 0% já era decisão explícita das #131/#132;
+  o critério de aceite restante é o autor confirmar a **versão publicada na instância** (fora do
+  ambiente Claude Code), não uma mudança de código.
 
-**Aberta em 2026-08-01.** Os 24 itens da planilha foram conferidos **item a item contra a `main`** e
-cada um recebeu um destino GitHub individual. **Nenhum item ficou sem destino, nenhum foi absorvido
-sem registro.**
+A **segunda verificação da Fase 9** (Capital Stack, epic #239), pedida explicitamente pelo autor
+depois do merge, achou e corrigiu 3 defeitos reais que os 16 golden cases não exerciam (ordem
+principal×remuneração do §6.1, shape de migração da `preferred_equity`, `prioridade_pagamento`
+nunca lida/editável) — detalhe em `docs/viabilidade/funding-capital-stack.md` §13.4 e no
+`PROGRESSO.md`.
 
-- **Mapa mestre:** `docs/lista-bugs-planejamento-2026-07-31.md` — matriz dos 24, diagnóstico com
-  evidência em `arquivo:linha`, sobreposições, ondas e precedências;
-- **Item 24:** `docs/viabilidade/funding-capital-stack.md` — especificação funcional do Capital
-  Stack, vinculante para a epic #239.
-
-| Onda | Issues | Tema |
-|---|---|---|
-| **A — bloqueantes** | #244, #246 | Duplicação de estudo e cronograma legado |
-| **B — UX e navegação** | #245, #247, #250+#251, #262, #263, #264, #265 | Zero matemática alterada |
-| **C — cronograma e custos** | #249 (+#261), #252, #255 | Ancoragem, salvamento atômico e validação matricial |
-| **D — terreno e valor canônico** | #259 (+#281) → #260 → #256 → #257 → #258 (#266–#269) → #253 | Preço, permutas e fonte canônica de valor |
-| **Rodada 5 (paralela)** | #248 (UX), #254 (epic de rastreio) | Ligadas à cadeia EVI, sem substituí-la |
-| **Programa Financeiro** | #239 + #270–#279 (FIN-01…FIN-10) | Capital Stack, dívida, equity e waterfall |
-
-**Precedências não negociáveis desta rodada:** #244/#246 antes de usar duplicação como fixture ·
-#249 antes de #255 e #261 · #251 junto/antes de #250 · #267 antes de #253 · #256 → #257 → #258 nesta
-ordem · #259 antes de #260 · #262 antes de #263 · #220/#221/#228/#231/#237 estáveis antes de #271.
-
-> 🔎 **Cinco correções ao diagnóstico recebido**, todas com evidência — leia o §4 do mapa mestre
-> antes de pegar qualquer uma dessas issues:
->
-> 1. **#249** — a assimetria Início × Duração é de **backend também**: a rota aceita sobrescrever a
->    duração derivada (`avancado.ts:1130,1144`) enquanto trava o início com 422 (`:1134,1148`).
-> 2. **#257** — `distribuicao_modo` **não classifica permuta**; toda linha `Preço/Permuta` já é
->    financeira no motor (`fluxo-caixa-motor.ts:385`). Regra aprovada: toda `Permuta` legada →
->    `Permuta financeira`.
-> 3. **#259** — o Preliminar **não** é uniformemente correto; são duas arquiteturas de persistência
->    diferentes, e o contrato canônico precisa cobrir as duas. **Resolvida em 2026-08-01** pelo
->    contrato de precisão monetária (2 casas): o canônico é o **monetário**, e `%`/`R$/m²` são
->    derivados com precisão plena. A violação de apresentação que isso expôs virou a **#281**.
-> 4. **#262** — a parte de "empurrar cards vizinhos" já foi corrigida pela #176; sobra `.kpi-var`
->    absoluto sobre o valor.
-> 5. **#265** — é **reversão consciente** da decisão da #187 (`width:auto`), não correção de
->    descuido.
-
-> ⚠️ **Diferença de release descartada como causa.** O último release é
-> `viabilidade-v0.1.12_6655ac74` (2026-07-29); tudo na `main` depois dele é documentação. Se o
-> sintoma dos itens 2, 20, 22 e 23 persiste no app, a **instância está rodando build anterior** — é
-> critério de aceite da #264, não hipótese solta.
-
----
-
-## Rodada 5 — EVI (#220–#241)
-
-**A Rodada 5 foi aberta em 2026-07-31.** As **22 issues #220–#241** nasceram da auditoria do app
-contra os documentos EVI e estão **todas abertas e nenhuma implementada**.
-
-- **Mapa mestre:** `docs/issues-evi-propostas-2026-07-31.md` — corpo completo de cada uma, com a
-  correspondência `EVI-0NN → #NNN`;
-- **Evidência:** `docs/rodada-5-evi-2026-07-31.md` — matriz conceito → `arquivo:linha` → issue, com
-  status e classe de impacto (D0/U1/M2/P3/I4).
-
-**Ordem de execução é por onda, não por número.** `EVI-022` (#228) nasceu na 2ª auditoria e executa
-na Onda 2 — os IDs são ordem de criação.
-
-| Onda | Issues | Tema |
-|---|---|---|
-| **0** | #220, #221 | Portões: fixture dourada e inventário de dados legados |
-| **1** | #222 … #226 | Nomenclatura (U1) e cronograma (M2) |
-| **2** | #227, **#228**, #229 … #231 | Fundação comercial, fiscal e temporal |
-| **3** | #232 … #237 | Recebíveis, carteiras e Receita Bruta |
-| **4** | #238, #239 | Terreno e funding |
-| **5** | #240, #241 | Invariantes, UI e relatórios |
-
-**Três ordens não negociáveis:** #220/#221 antes de qualquer issue M2 · #231 antes de #232/#233 ·
-**#228 antes de #237, #238 e #239**. Cada issue traz suas dependências no corpo — leia antes de
-pegar.
-
-> 🔴 **12 corpos de issue precisam de emenda antes de serem implementados.** A **revisão de
-> recebíveis Calliandra** (2026-07-31) reconciliou os dois documentos EVI contra EVIs reais e
-> derrubou premissas de **#220, #227, #229, #230, #231, #232, #233, #234, #236, #237, #240 e
-> #241**. As emendas estão na seção *Emendas pendentes de aprovação* de
-> `docs/issues-evi-propostas-2026-07-31.md`; a reconciliação, em
-> `docs/revisao-recebiveis-calliandra-2026-07-31.md`.
->
-> **Nenhuma dessas issues deve ser implementada com o corpo antigo.** A pior é a **#233**, cujo
-> critério de aceite ainda diz *"a 1ª parcela ocorre no mês da venda"* — o oposto da regra
-> aprovada, que é `s + 1` com `N_s = M − s`. As issues **não foram editadas no GitHub**: aplicar as
-> emendas é decisão do autor.
->
-> A ordem dos portões **não muda** e o total continua **22 issues, todas abertas, 0 implementadas**.
-
-> ⚠️ **Quem encerrar a rodada atualiza esta seção na mesma alteração.** A Rodada 4 nasceu porque
-> #165–#169 ficaram abertas uma rodada inteira sem ninguém perceber, com este arquivo dizendo "não
-> há issue aberta".
+**Pendências do autor no ambiente autenticado** (o ambiente Claude Code não cobre — lista
+consolidada de todas as rodadas): `urbi-empacotar`; sincronização do `schema.json` pelo SDK
+(inclui as tabelas `analise_mercado`/`mercado_regioes`/`mercado_coletas` e a tabela nova
+`avancado_capital_instrumentos`); execução real de **todas** as migrações no Postgres (`001` a
+`019`, cadeia completa nunca rodada em produção); confirmação de que o shell descobre
+`export { rotinas }` em `backend/rotas.ts`; configuração de `mercado_busca_url`/`mercado_busca_chave`
+para a coleta diária de mercado sair do modo `sem_fonte_externa`; e a confirmação de versão
+publicada que fecha a #264. Detalhe histórico no `PROGRESSO.md` (#199, #200).
 
 Rodadas anteriores, todas mergeadas na `main`:
 
@@ -143,37 +76,23 @@ Rodadas anteriores, todas mergeadas na `main`:
 | 2 — Etapas 1–8 | issues #33–#56 | ✅ concluída |
 | 3 — Sessões S1–S20 | issues #71–#132 | ✅ concluída |
 | 4 — planilha `lista_bugs.xlsx` (1ª leva) | #165–#169 + #172–#201 | ✅ concluída |
-| **5 — EVI** | **#220–#241** | 🔴 **aberta, 0 implementadas** |
-| **6 — lista de bugs (24 itens)** | **#238, #239, #244–#279** | 🔴 **aberta, 0 implementadas** |
+| 5 — EVI | #220–#241 | ✅ concluída (2026-08-02) |
+| 6 — lista de bugs (24 itens) | #238, #239, #244–#281 | ✅ concluída (2026-08-02) |
 
-**Os quatro mapas mestres foram apagados em 2026-07-31**, com todas as issues mergeadas: eram
-backlog fechado e não disparavam mais trabalho. Os disparos antigos (`Prossiga para os issues do
-lote X`, `Siga para a Etapa X`, `Siga para a Sessão SX`, `Resolva a issue #NNN`) **não existem
-mais** — não procure por eles. O histórico completo continua no `git log` e no `PROGRESSO.md`, que
-guarda a narrativa de cada sessão.
+Os mapas mestres das Rodadas 1–4 foram apagados quando fecharam — eram backlog puro, sem valor de
+evidência duradoura. **Os das Rodadas 5/6 foram mantidos** (`docs/issues-evi-propostas-2026-07-31.md`,
+`docs/rodada-5-evi-2026-07-31.md`, `docs/revisao-recebiveis-calliandra-2026-07-31.md`,
+`docs/lista-bugs-planejamento-2026-07-31.md`, `docs/viabilidade/funding-capital-stack.md`) — guardam
+evidência `arquivo:linha` e o ADR de decisões (emendas Calliandra, waterfall do Capital Stack) que
+vale a pena não perder. Nenhum deles dispara mais trabalho: os disparos antigos (`Siga para a Fase
+N`, `Siga para o Grupo N`, `Resolva a issue #NNN`) **não existem mais** — não procure por eles. O
+histórico completo está no `git log` e no `PROGRESSO.md`.
 
-O que ainda valia daqueles documentos foi **migrado antes da exclusão**: as decisões do autor que
-não devem ser relitigadas (#185 sobre `SerieGrafico`, #190/#191 sobre as parcelas ancoradas na
-Obra, #192 sobre a linha `Projetado`) estão no **Anexo F** de
-`docs/viabilidade/padrao-incorporacao.md`. As causas raiz que aqueles mapas descreviam já foram
-corrigidas pelas próprias issues.
-
-> ⚠️ **Se abrir uma rodada nova, atualize esta seção junto** — e quem a encerrar faz o mesmo, na
-> mesma alteração. A Rodada 4 nasceu porque #165–#169 ficaram abertas uma rodada inteira sem
-> ninguém perceber, com este arquivo dizendo "não há issue aberta".
-
-**Pendências do autor no UrbiVerso** (o ambiente Claude Code não cobre): `urbi-empacotar`,
-sincronização do `schema.json` (tabelas `analise_mercado`, `mercado_regioes`, `mercado_coletas`),
-execução das migrações `012`/`013`, confirmação de que o shell descobre `export { rotinas }` em
-`backend/rotas.ts` e configuração de `mercado_busca_url`/`mercado_busca_chave` para a coleta
-diária sair do modo `sem_fonte_externa`. Detalhe no `PROGRESSO.md` (#199, #200).
-
-> ⚠️ **#165–#169 estavam abertas há uma rodada sem ninguém perceber.** A sessão do PR #171 abriu
-> seis issues a partir da planilha `lista_bugs.xlsx` e implementou **só a #170**; este `CLAUDE.md`
-> continuou dizendo "não há issue aberta" e a informação se perdeu até a auditoria de 2026-07-27.
-> Junto com o PR #142 (diff vazio fechando 12 issues), a lição completa é: **"fechou a issue" não é
-> evidência de entrega — nem "abriu a issue" é evidência de que alguém vai pegá-la. O diff é.**
-> Quem encerrar uma rodada atualiza esta seção **na mesma alteração**.
+> ⚠️ **Lição das rodadas anteriores, ainda válida:** "fechou a issue" não é evidência de entrega —
+> nem "abriu a issue" é evidência de que alguém vai pegá-la. **O diff é.** Se abrir uma rodada nova,
+> atualize esta seção junto — e quem a encerrar faz o mesmo, na mesma alteração. A Rodada 4 nasceu
+> porque #165–#169 ficaram abertas uma rodada inteira sem ninguém perceber, com este arquivo dizendo
+> "não há issue aberta".
 
 ### Merge
 
