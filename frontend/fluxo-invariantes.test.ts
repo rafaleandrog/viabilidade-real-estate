@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validarFluxoCalc, validarComponentesSafra, TOLERANCIA_PADRAO } from './fluxo-invariantes.js';
+import { validarFluxoCalc, validarComponentesSafra, validarPermutaFisica, TOLERANCIA_PADRAO } from './fluxo-invariantes.js';
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
 
 // FluxoCalc mínimo para exercitar validarFluxoCalc — só os campos que a
@@ -98,4 +98,55 @@ test('validarComponentesSafra: tolerância de 1 centavo não gera falso positivo
 test('validarComponentesSafra: imediato não entra na checagem de carteira (paga e encerra no mesmo mês)', () => {
   const r = validarComponentesSafra([{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }], 5, 100_000);
   assert.deepEqual(r, []);
+});
+
+// ── validarPermutaFisica (#269) ──────────────────────────────────────────
+
+const TIPOLOGIAS = [{ id: 1, nome: 'Studio', quantidade: 20 }, { id: 2, nome: '2 dorms', quantidade: 10 }];
+
+test('validarPermutaFisica: dentro do estoque não diverge', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 15 },
+  ];
+  assert.deepEqual(validarPermutaFisica(linhasCusto, TIPOLOGIAS), []);
+});
+
+test('validarPermutaFisica: excede o estoque da tipologia — ERRO com esperado/encontrado/diferença', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 25 },
+  ];
+  const r = validarPermutaFisica(linhasCusto, TIPOLOGIAS);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].codigo, 'PERMUTA_FISICA_EXCEDE_ESTOQUE');
+  assert.equal(r[0].severidade, 'erro');
+  assert.equal(r[0].linha, 'Studio');
+  assert.equal(r[0].esperado, 20);
+  assert.equal(r[0].encontrado, 25);
+  assert.equal(r[0].diferenca, 5);
+});
+
+test('validarPermutaFisica: soma DUAS linhas para a mesma tipologia antes de comparar com o estoque', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 12 },
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 9 },
+  ];
+  // 12 + 9 = 21 > 20 do catálogo, mesmo que nenhuma linha isolada exceda.
+  const r = validarPermutaFisica(linhasCusto, TIPOLOGIAS);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].encontrado, 21);
+});
+
+test('validarPermutaFisica: ignora linhas que não são Permuta física e sem tipologia referenciada', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Valor à vista', orcamento_valor: 1_000_000 },
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: null, permuta_quantidade: 5 },
+  ];
+  assert.deepEqual(validarPermutaFisica(linhasCusto, TIPOLOGIAS), []);
+});
+
+test('validarPermutaFisica: tolerância de 1 centavo/unidade não gera falso positivo', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 20.005 },
+  ];
+  assert.deepEqual(validarPermutaFisica(linhasCusto, TIPOLOGIAS, TOLERANCIA_PADRAO), []);
 });
