@@ -65,19 +65,11 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     col.c-dorm   { width: 90px; }
     col.c-vagas  { width: 90px; }
     col.c-un     { width: 100px; }
-    col.c-perm   { width: 100px; }
     col.c-acao   { width: 90px; }
 
     table.tip td.nome urbi-input { width: 100%; }
     table.tip td.tipo urbi-select { width: 148px; }
     table.tip td viab-num { width: 100%; }
-
-    /* #45 — texto calculado de permutadas */
-    .perm-wrap { display: flex; align-items: center; gap: 8px; }
-    .perm-calc {
-      font-size: 0.72rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5));
-      white-space: nowrap; line-height: 1.3;
-    }
 
     tr.total td {
       font-weight: 700; border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2));
@@ -132,10 +124,8 @@ export class ViabEmpreendimentoTipologias extends LitElement {
   private _renderTabela(tips: any[], lote: boolean): TemplateResult {
     const dis = !this.editavel;
     const totalUnidades = tips.reduce((s, t) => s + n(t.quantidade), 0);
-    const totalPermutadas = tips.reduce((s, t) => s + n(t.unidades_permutadas), 0);
     const areaTotal = tips.reduce((s, t) => s + n(t.area_privativa_m2) * n(t.quantidade), 0);
     const totalVagas = tips.reduce((s, t) => s + n(t.vagas) * n(t.quantidade), 0);
-    const areaPermutadaTotal = tips.reduce((s, t) => s + n(t.unidades_permutadas) * n(t.area_privativa_m2), 0);
     return html`
       <table class="tip">
         <colgroup>
@@ -144,7 +134,6 @@ export class ViabEmpreendimentoTipologias extends LitElement {
           <col class="c-area">
           ${lote ? nothing : html`<col class="c-dorm"><col class="c-vagas">`}
           <col class="c-un">
-          <col class="c-perm">
           ${dis ? nothing : html`<col class="c-acao">`}
         </colgroup>
         <thead>
@@ -154,7 +143,6 @@ export class ViabEmpreendimentoTipologias extends LitElement {
             <th class="num">Área privativa</th>
             ${lote ? nothing : html`<th class="num">Dormitórios</th><th class="num">Vagas</th>`}
             <th class="num">Unidades</th>
-            <th class="num">Unidades permutadas</th>
             ${dis ? nothing : html`<th></th>`}
           </tr>
         </thead>
@@ -166,7 +154,6 @@ export class ViabEmpreendimentoTipologias extends LitElement {
             <td class="num">${fmtNum(areaTotal)} m²</td>
             ${lote ? nothing : html`<td></td><td class="num">${fmtNum(totalVagas)}</td>`}
             <td class="num">${fmtNum(totalUnidades)}</td>
-            <td class="num">${fmtNum(totalPermutadas)} un · ${fmtNum(areaPermutadaTotal)} m²</td>
             ${dis ? nothing : html`<td></td>`}
           </tr>
         </tbody>
@@ -180,13 +167,6 @@ export class ViabEmpreendimentoTipologias extends LitElement {
         .valor=${t[campo] !== null && t[campo] !== undefined ? Number(t[campo]) : null}
         @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(t, { [campo]: e.detail.valor })}
       ></viab-num>`;
-
-    // #45 — texto calculado de permutadas (% e m²) ao lado do campo
-    const qtd = n(t.quantidade);
-    const perm = n(t.unidades_permutadas);
-    const area = n(t.area_privativa_m2);
-    const pctPerm = qtd > 0 ? ((perm / qtd) * 100).toFixed(1) : null;
-    const m2Perm = area > 0 ? perm * area : null;
 
     return html`
       <tr>
@@ -207,16 +187,6 @@ export class ViabEmpreendimentoTipologias extends LitElement {
           <td class="num">${num('dormitorios', '', 0)}</td>
           <td class="num">${num('vagas', '', 0)}</td>`}
         <td class="num">${num('quantidade', '', 0)}</td>
-        <td class="num">
-          <div class="perm-wrap">
-            ${num('unidades_permutadas', '', 0)}
-            ${perm > 0 ? html`
-              <div class="perm-calc">
-                ${pctPerm !== null ? html`${pctPerm}%` : nothing}
-                ${m2Perm !== null ? html`<br>${fmtNum(m2Perm)} m²` : nothing}
-              </div>` : nothing}
-          </div>
-        </td>
         ${dis ? nothing : html`
           <td class="num">
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"

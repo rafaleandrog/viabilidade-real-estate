@@ -624,7 +624,12 @@ rotasAvancado.delete('/avancado/curvas/:cid', async (req: Request, res: Response
 // ─────────────────────────────────────────────────────────────────
 
 const TIPOS_UNIDADE = ['apartamento', 'cobertura', 'loja', 'lote', 'outro'];
-const CAMPOS_TIPOLOGIA = ['nome', 'tipo_unidade', 'area_privativa_m2', 'dormitorios', 'vagas', 'quantidade', 'unidades_permutadas', 'preco_m2', 'ordem'];
+// #253: `unidades_permutadas` retirada da entrada — a fonte de verdade da
+// permuta física do Avançado agora é a linha de custo Preço/Permuta física
+// (#266/#267/#268: permuta_tipologia_id + permuta_quantidade + valor
+// declarado). A coluna em si permanece no schema (dado histórico
+// preservado); só o CRUD deixa de ler/escrever nela.
+const CAMPOS_TIPOLOGIA = ['nome', 'tipo_unidade', 'area_privativa_m2', 'dormitorios', 'vagas', 'quantidade', 'preco_m2', 'ordem'];
 
 // ── Catálogo de tipologias (nível estudo) ──
 
