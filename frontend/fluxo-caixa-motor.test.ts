@@ -566,9 +566,10 @@ test('Permuta financeira do Preço do Terreno deduz a receita, nao vira custo (#
     }],
     linhasCusto: [
       {
+        // #238: sem `distribuicao_modo` — a permuta financeira sempre sai da
+        // Receita das vendas, não é mais escolha da linha (armadilha A10).
         id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
-        orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
-        distribuicao_modo: 'sales_revenue', inicio_mes: 0, duracao_meses: 1,
+        orcamento_valor: 10, orcamento_unidade: 'pct_vgv', inicio_mes: 0, duracao_meses: 1,
       },
     ],
     areaTerreno: 0,
@@ -584,12 +585,79 @@ test('Permuta financeira do Preço do Terreno deduz a receita, nao vira custo (#
 
   // vgvTotal (KPI informativo, #188) não é afetado por permuta financeira.
   assert.ok(perto(r.vgvTotal, 100_000_000, 1));
-  // Receita mensal já vem líquida da dedução (acompanha o VGV vendido, igual sales_revenue).
+  // Receita mensal já vem líquida da dedução (acompanha a receita de caixa).
   assert.ok(perto(r.receitaMensal[12], 40_000_000 - 0.10 * 40_000_000, 1));
   // custoMensal fica zerado — a dedução não é custo.
   assert.ok(perto(soma(r.custoMensal), 0, 1e-6));
   // Resultado final = 100M vendido - 10M de permuta financeira.
   assert.ok(perto(r.fluxoAcumulado[r.prazo - 1], 90_000_000, 1));
+});
+
+// #238 (padrao-incorporacao.md §15.2): duas visões no regime de caixa.
+test('#238: permuta financeira bruta (default) não deduz imposto/corretagem da base', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 }, ret: { ativo: true, pct: 4 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
+      { id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira', orcamento_valor: 10, orcamento_unidade: 'pct_vgv' },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  const deducao = r.linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
+  // Default `bruta`: 10% da receita de caixa (100M), sem deduzir RET (4%) nem corretagem (5%).
+  assert.ok(perto(deducao.total, -10_000_000, 1));
+});
+
+test('#238: permuta financeira líquida deduz imposto e corretagem da base antes do %', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 }, ret: { ativo: true, pct: 4 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
+        orcamento_valor: 10, orcamento_unidade: 'pct_vgv', permuta_financeira_base: 'liquida',
+      },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  const deducao = r.linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
+  // Base líquida = 100M − 4% RET (4M) − 5% corretagem (5M) = 91M; 10% disso = 9,1M.
+  assert.ok(perto(deducao.total, -9_100_000, 1));
+});
+
+test('#238: permuta financeira em valor fixo (rs) não distingue bruta/líquida', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira', orcamento_valor: 3_000_000, orcamento_unidade: 'rs' },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  const deducao = r.linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
+  // Valor fixo integral (única safra, único mês de receita) — mesma dedução
+  // independente de `permuta_financeira_base` (não setado aqui).
+  assert.ok(perto(deducao.total, -3_000_000, 1));
 });
 
 // #257: a subcategoria genérica "Permuta" foi migrada para o rótulo canônico

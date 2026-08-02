@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import {
-  rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno, ePermutaFisica,
+  rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   vgvLinha, receitaLiquidaLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 import {
@@ -639,7 +639,10 @@ export class ViabFluxoCustos extends LitElement {
         id: 'orcamento', label: 'Orçamento',
         render: (c: any) => {
           const modo = c.orcamento_unidade || 'rs';
-          const perm = this._unidsPerm(g.id, c.categoria);
+          // #238: Permuta financeira aceita % VGV OU R$ — não R$/m² terreno
+          // (as demais subcategorias de Preço), porque o valor é uma DEDUÇÃO
+          // proporcional à receita, não um preço de aquisição por área.
+          const perm = ePermutaFinanceira(c) ? ['rs', 'pct_vgv'] : this._unidsPerm(g.id, c.categoria);
           const unidsFilt = UNIDADES.filter((u) => perm.includes(u.valor));
           return html`
             <span class="orc">
@@ -691,6 +694,9 @@ export class ViabFluxoCustos extends LitElement {
           if (ePermutaFisica(c)) return html`
             <span class="mes-calc" title="A entrega da unidade não segue curva de distribuição — é a transferência da tipologia selecionada">
               Entrega de unidades <span>🔒</span></span>`;
+          if (ePermutaFinanceira(c)) return html`
+            <span class="mes-calc" title="A permuta financeira sai proporcionalmente à receita de caixa do mês — não segue curva nem evento próprio (#238)">
+              Receita das vendas <span>🔒</span></span>`;
           if (ePrecoTerreno(c)) {
             const modo = c.distribuicao_modo || 'fixo';
             return html`
@@ -729,7 +735,7 @@ export class ViabFluxoCustos extends LitElement {
           // Corretagem: sem cronograma próprio — segue as vendas (#121).
           if (eCorretagem(c)) return html`<span class="sec">—</span>`;
           // Preço do Terreno em Unit Delivery/Sales Revenue: idem (#194).
-          if (ePermutaFisica(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
+          if (ePermutaFisica(c) || ePermutaFinanceira(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
             return html`<span class="sec">—</span>`;
           }
           if (eConstrucao(c)) {
@@ -760,7 +766,7 @@ export class ViabFluxoCustos extends LitElement {
         id: 'inicio', label: 'Início',
         render: (c: any) => {
           if (eCorretagem(c)) return html`<span class="sec">—</span>`;
-          if (ePermutaFisica(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
+          if (ePermutaFisica(c) || ePermutaFinanceira(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
             return html`<span class="sec">—</span>`;
           }
           if (eConstrucao(c)) {
@@ -794,7 +800,7 @@ export class ViabFluxoCustos extends LitElement {
         id: 'duracao', label: 'Duração',
         render: (c: any) => {
           if (eCorretagem(c)) return html`<span class="sec">—</span>`;
-          if (ePermutaFisica(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
+          if (ePermutaFisica(c) || ePermutaFinanceira(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
             return html`<span class="sec">—</span>`;
           }
           if (eConstrucao(c)) {
