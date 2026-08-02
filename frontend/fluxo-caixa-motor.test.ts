@@ -5,7 +5,7 @@ import {
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   componentesDoLegado, ultimoMesRecebivelLinha,
   pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
-  carteiraSaldoSafra,
+  carteiraSaldoSafra, jurosSafra, receitaBrutaSafra,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
@@ -1260,4 +1260,52 @@ test('carteiraSaldoSafra: duas safras do mesmo componente NUNCA se somam num sal
   // safra 2 nasce intacta (saldo 300) — nada foi somado nem confundido.
   assert.equal(safra1.find((s) => s.mes === 2)!.saldo, 200);
   assert.equal(safra2.find((s) => s.mes === 2)!.saldo, 300);
+});
+
+// ─────────────────────────────────────────────────────────────────
+// #237 — Receita Bruta = líquido + juros = bruto − descontos + juros
+// ─────────────────────────────────────────────────────────────────
+//
+// `valorContratado` aqui é o BRUTO da safra (#227): a única fonte de desconto
+// é o `descontoPct` do componente `imediato` (exatamente como
+// `vendaBrutaContratadaMensal`/`descontoComercialMensal` já modelam — a
+// entrada à vista é o único lugar com abatimento comercial). Os demais
+// componentes usam o bruto direto, então a soma dos principais fecha o bruto
+// por construção (as `participacaoPct` somam 100%).
+
+test('jurosSafra: imediato nunca gera juros (paga no próprio mês)', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'imediato' }> = {
+    tipo: 'imediato', participacaoPct: 20, descontoPct: 5,
+  };
+  assert.equal(jurosSafra(c, 1, 1_000_000), 0);
+});
+
+test('receitaBrutaSafra: sem desconto e sem juros, Receita Bruta = bruto contratado (Anexo G.2, taxa 0)', () => {
+  const componentes: ComponentePagamento[] = [
+    { tipo: 'imediato', participacaoPct: 15, descontoPct: 0 },
+    { tipo: 'ate_marco', participacaoPct: 15, sinalPct: 0, marcoMes: 24, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false },
+    { tipo: 'concentrado', participacaoPct: 70, mesPagamento: 25, taxaMensal: 0 },
+  ];
+  const valorContratado = 2_378_978.36;
+  const receitaBruta = receitaBrutaSafra(componentes, 1, valorContratado);
+  const jurosTotal = componentes.reduce((s, c) => s + jurosSafra(c, 1, valorContratado), 0);
+  assert.equal(jurosTotal, 0);
+  assert.ok(perto(receitaBruta, valorContratado, 1e-6));
+});
+
+test('receitaBrutaSafra + jurosSafra fecham a identidade: Receita Bruta = (bruto − desconto) + juros', () => {
+  const componentes: ComponentePagamento[] = [
+    { tipo: 'imediato', participacaoPct: 20, descontoPct: 5 },
+    { tipo: 'prazo_fixo', participacaoPct: 30, sinalPct: 10, prazoMeses: 12, defasagemMeses: 1, taxaMensal: 0.01, jurosNoMesDaContratacao: false },
+    { tipo: 'ate_marco', participacaoPct: 20, sinalPct: 0, marcoMes: 20, defasagemMeses: 1, taxaMensal: 0.008, jurosNoMesDaContratacao: false },
+    { tipo: 'concentrado', participacaoPct: 30, mesPagamento: 25, taxaMensal: 0.005 },
+  ];
+  const safra = 3;
+  const bruto = 1_000_000;
+  const descontoImediato = bruto * 0.20 * 0.05;
+  const liquido = bruto - descontoImediato;
+  const jurosTotal = componentes.reduce((s, c) => s + jurosSafra(c, safra, bruto), 0);
+  assert.ok(jurosTotal > 0); // as taxas positivas garantem juros > 0 neste mix
+  const receitaBruta = receitaBrutaSafra(componentes, safra, bruto);
+  assert.ok(perto(receitaBruta, liquido + jurosTotal, 1e-6));
 });
