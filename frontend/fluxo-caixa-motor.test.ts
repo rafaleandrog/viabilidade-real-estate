@@ -409,7 +409,7 @@ test('nome da linha de custo inclui subcategoria só em Terreno (#173)', () => {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     linhasReceita: [],
     linhasCusto: [
-      { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta', orcamento_valor: 1, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+      { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira', orcamento_valor: 1, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
       { id: 2, grupo: 'indireto', categoria: 'Gestão', subcategoria: 'Legado', orcamento_valor: 1, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
     ],
     areaTerreno: 0,
@@ -417,7 +417,7 @@ test('nome da linha de custo inclui subcategoria só em Terreno (#173)', () => {
   const r = calcularFluxo(config);
   const terreno = r.linhasReceita.find((l) => l.nome.includes('Preço'))!; // vira dedução da receita (#196)
   const indireto = r.linhasCusto.find((l) => l.nome.includes('Gestão'))!;
-  assert.equal(terreno.nome, 'Preço — Permuta');
+  assert.equal(terreno.nome, 'Preço — Permuta financeira');
   assert.equal(indireto.nome, 'Gestão'); // subcategoria legada não aparece fora de Terreno
 });
 
@@ -566,7 +566,7 @@ test('Permuta financeira do Preço do Terreno deduz a receita, nao vira custo (#
     }],
     linhasCusto: [
       {
-        id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta',
+        id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
         orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
         distribuicao_modo: 'sales_revenue', inicio_mes: 0, duracao_meses: 1,
       },
@@ -590,6 +590,25 @@ test('Permuta financeira do Preço do Terreno deduz a receita, nao vira custo (#
   assert.ok(perto(soma(r.custoMensal), 0, 1e-6));
   // Resultado final = 100M vendido - 10M de permuta financeira.
   assert.ok(perto(r.fluxoAcumulado[r.prazo - 1], 90_000_000, 1));
+});
+
+// #257: a subcategoria genérica "Permuta" foi migrada para o rótulo canônico
+// (migracoes/015). Depois da migração, nenhuma linha real tem mais o valor
+// antigo — este teste prova que, SE alguma linha ainda tivesse (dado que
+// escapou da migração), ela vira custo normal em caixa, não dedução da
+// receita. Documenta a mudança de comportamento, não a esconde.
+test('#257: subcategoria "Permuta" (legada, pré-migração) NÃO é mais reconhecida como financeira', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [],
+    linhasCusto: [
+      { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta', orcamento_valor: 5_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  assert.equal(r.linhasCusto.length, 1); // continua custo, não migrou para receita
+  assert.ok(perto(soma(r.custoMensal), 5_000_000, 1));
 });
 
 // 6. VPL com taxa zero = soma do fluxo

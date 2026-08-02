@@ -1055,15 +1055,23 @@ export function distribuirProporcional(custo: any, pesos: number[], ctx: Context
 }
 
 /**
- * Permuta financeira (#196): a subcategoria "Permuta" da linha de Preço do
- * Terreno — parte do preço paga em % da receita (ou valor fixo), não em
- * caixa. Ao contrário da permuta física (#195, que reduz o VGV vendável),
- * ela é uma DEDUÇÃO DA RECEITA: sai de `linhasCusto`/`custoMensal` e entra em
- * `linhasReceita`/`receitaMensal` com valor negativo — mesmo tratamento do
- * Preliminar (`proforma.ts`), onde permuta financeira reduz `receitaLiquida`.
+ * Permuta financeira (#196): a subcategoria "Permuta financeira" da linha de
+ * Preço do Terreno — parte do preço paga em % da receita (ou valor fixo),
+ * não em caixa. Ao contrário da permuta física (#195, que reduz o VGV
+ * vendável), ela é uma DEDUÇÃO DA RECEITA: sai de `linhasCusto`/`custoMensal`
+ * e entra em `linhasReceita`/`receitaMensal` com valor negativo — mesmo
+ * tratamento do Preliminar (`proforma.ts`), onde permuta financeira reduz
+ * `receitaLiquida`.
+ *
+ * #257: a subcategoria genérica "Permuta" (o único valor que existia antes,
+ * já tratado como financeira) foi migrada para o rótulo canônico — a
+ * migração 015 reescreve todo dado legado, então nenhum estudo existente
+ * muda de resultado. Só "Permuta financeira" entra aqui; "Permuta física"
+ * (nova opção, preparação do #258) ainda não tem motor próprio — continua
+ * como custo em caixa até o #268 existir.
  */
 function ePermutaFinanceira(custo: any): boolean {
-  return ePrecoTerreno(custo) && String(custo?.subcategoria || '') === 'Permuta';
+  return ePrecoTerreno(custo) && String(custo?.subcategoria || '') === 'Permuta financeira';
 }
 
 // ─────────────────────────────────────────────────────────────────
