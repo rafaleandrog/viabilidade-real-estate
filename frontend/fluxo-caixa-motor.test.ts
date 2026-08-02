@@ -4,7 +4,7 @@ import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   componentesDoLegado, ultimoMesRecebivelLinha,
-  pmt, pagamentosPrazoFixo, pagamentosAteMarco,
+  pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
@@ -1146,4 +1146,51 @@ test('#233: soma de todas as safras reproduz os meses 1, 13-24 do Anexo G.2', ()
   assert.ok(perto(porMes.get(13) ?? 0, 254_936.38, 1)); // todas as 12 safras ativas
   assert.ok(perto(porMes.get(24) ?? 0, 254_936.38, 1)); // último mês, ainda todas ativas
   assert.equal(porMes.has(25), false); // nada além do marco
+});
+
+// ─────────────────────────────────────────────────────────────────
+// #234 — Componente concentrado: juros depois da contratação, liquidação
+// ─────────────────────────────────────────────────────────────────
+
+test('pagamentosConcentrado: taxa zero paga exatamente o principal (repasse legado, Anexo G.2)', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'concentrado' }> = {
+    tipo: 'concentrado', participacaoPct: 70, mesPagamento: 25, taxaMensal: 0,
+  };
+  // Soma de todas as 12 safras (base uniforme 2.378.978,36/mês) → 70% da base total.
+  const baseTotal = 12 * 2_378_978.36;
+  let soma25 = 0;
+  for (let s = 1; s <= 12; s++) soma25 += pagamentosConcentrado(c, s, 2_378_978.36)[0].valor;
+  assert.ok(perto(soma25, baseTotal * 0.70, 1)); // R$ 19.983.418,20 (Anexo G.2)
+  assert.ok(perto(soma25, 19_983_418.20, 1));
+});
+
+test('pagamentosConcentrado: juros começam DEPOIS da contratação (saldo_s,s = principal_s)', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'concentrado' }> = {
+    tipo: 'concentrado', participacaoPct: 100, mesPagamento: 13, taxaMensal: 0.01, // 1% a.m.
+  };
+  const r = pagamentosConcentrado(c, 1, 1_000_000);
+  // 12 meses de juros (do mês 2 ao 13 — a contratação em si, mês 1, não capitaliza).
+  assert.ok(perto(r[0].valor, 1_000_000 * Math.pow(1.01, 12), 0.01));
+  // Pagamento na PRÓPRIA safra (sem meses de capitalização) = só o principal.
+  const semJuros = pagamentosConcentrado(c, 13, 1_000_000);
+  assert.ok(perto(semJuros[0].valor, 1_000_000, 1e-6));
+});
+
+test('pagamentosConcentrado: participacaoPct ou valorContratado <= 0 não gera pagamento', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'concentrado' }> = {
+    tipo: 'concentrado', participacaoPct: 0, mesPagamento: 25, taxaMensal: 0,
+  };
+  assert.deepEqual(pagamentosConcentrado(c, 1, 1_000_000), []);
+  const c2 = { ...c, participacaoPct: 70 };
+  assert.deepEqual(pagamentosConcentrado(c2, 1, 0), []);
+});
+
+test('pagamentosConcentrado: liquidação integral — um único pagamento no mês do marco', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'concentrado' }> = {
+    tipo: 'concentrado', participacaoPct: 50, mesPagamento: 40, taxaMensal: 0.005,
+  };
+  const r = pagamentosConcentrado(c, 10, 2_000_000);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].mes, 40);
+  assert.equal(r[0].tipo, 'concentrado');
 });

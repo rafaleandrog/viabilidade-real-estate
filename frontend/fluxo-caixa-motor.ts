@@ -416,6 +416,7 @@ export type ComponentePagamento =
       tipo: 'concentrado';
       participacaoPct: number;
       mesPagamento: number;
+      taxaMensal: number;           // #234: juros entre a safra e o pagamento (0 = repasse legado)
       rotulo?: string;
     };
 
@@ -484,7 +485,7 @@ export function componentesDoLegado(
   const pctRepasse = pctRepasseDerivado(fp);
   if (pctRepasse > 0) {
     const mesRepasse = fimObra + Math.max(0, Math.round(n(fp?.repasse?.apos_entrega_meses)));
-    componentes.push({ tipo: 'concentrado', participacaoPct: pctRepasse, mesPagamento: mesRepasse, rotulo: 'repasse (legado)' });
+    componentes.push({ tipo: 'concentrado', participacaoPct: pctRepasse, mesPagamento: mesRepasse, taxaMensal: 0, rotulo: 'repasse (legado)' });
   }
 
   return componentes;
@@ -590,6 +591,36 @@ export function pagamentosAteMarco(
     out.push({ safra, mes: safra + c.defasagemMeses + (k - 1), tipo: 'parcela', valor: parcela });
   }
   return out;
+}
+
+/**
+ * #234: pagamento único (concentrado) de uma safra — repasse ou liquidação
+ * final, num mês fixo (`mesPagamento`, independente da safra — quem chama já
+ * aplica `Math.max(mesPagamento, safra)` se precisar garantir não pagar antes
+ * da venda). Convenção de juros explícita: **juros começam DEPOIS da
+ * contratação** — `saldo_s,s = principal_s` (a própria emenda da #234) — ou
+ * seja, o principal só passa a capitalizar a partir do mês SEGUINTE à safra,
+ * não no mês da venda. Com `taxaMensal = 0` (o repasse legado, #230), o
+ * valor pago é exatamente o principal — "o repasse é apenas a soma dos
+ * principais", como o Anexo G.2 reconcilia.
+ *
+ * Liquidação integral: por construção, um único pagamento no mês do marco
+ * fecha o saldo daquela safra em zero (não sobra resíduo) — a carteira (#236)
+ * confirma isso agregando por safra.
+ */
+export function pagamentosConcentrado(
+  c: Extract<ComponentePagamento, { tipo: 'concentrado' }>,
+  safra: number,
+  valorContratado: number,
+): PagamentoSafra[] {
+  const principal = valorContratado * (c.participacaoPct / 100);
+  if (principal <= 0) return [];
+  // #234: saldo_s,s = principal (0 períodos decorridos no próprio mês da
+  // safra); em mesPagamento já decorreram (mesPagamento − safra) períodos —
+  // nunca negativo, pagamento na própria safra ou antes não acumula juros.
+  const mesesDeJuros = Math.max(0, c.mesPagamento - safra);
+  const valor = principal * Math.pow(1 + c.taxaMensal, mesesDeJuros);
+  return [{ safra, mes: c.mesPagamento, tipo: 'concentrado', valor }];
 }
 
 // ─────────────────────────────────────────────────────────────────
