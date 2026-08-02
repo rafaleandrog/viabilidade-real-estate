@@ -39,7 +39,7 @@ test('Caso 3: financiamento por custo elegível libera mês a mês e o excedente
   const fin: InstrumentoDivida = {
     tipo: 'divida', nome: 'Financiamento', limiteComprometido: 10_000, taxaMensal: 0.01,
     politicaAmortizacao: 'cash_sweep', custoElegivelMensal: [0, 1000, 1000, 1000], percentualFinanciavel: 0.8,
-    prioridadeFunding: 1,
+    prioridadeFunding: 1, prioridadePagamento: 1,
   };
   const cen: CenarioCapitalStack = { nome: '3', meses: 3, fluxoLivreMensal: [0, -800, -800, 2000], reservaMinima: 0, instrumentos: [fin] };
   const r = simularCapitalStack(cen);
@@ -55,7 +55,7 @@ test('Caso 4: taxa zero não produz juros — saldo só reflete liberação e am
   const fin: InstrumentoDivida = {
     tipo: 'divida', nome: 'Financiamento', limiteComprometido: 5000, taxaMensal: 0,
     politicaAmortizacao: 'cash_sweep', custoElegivelMensal: [0, 1000, 1000], percentualFinanciavel: 1,
-    prioridadeFunding: 1,
+    prioridadeFunding: 1, prioridadePagamento: 1,
   };
   const cen: CenarioCapitalStack = { nome: '4', meses: 2, fluxoLivreMensal: [0, -1000, 1500], reservaMinima: 0, instrumentos: [fin] };
   const r = simularCapitalStack(cen);
@@ -70,7 +70,7 @@ test('Caso 5: financiamento atinge o limite comprometido e o restante vira lacun
   const fin: InstrumentoDivida = {
     tipo: 'divida', nome: 'Financiamento', limiteComprometido: 1500, taxaMensal: 0,
     politicaAmortizacao: 'cash_sweep', custoElegivelMensal: [0, 1000, 1000, 1000], percentualFinanciavel: 1,
-    prioridadeFunding: 1,
+    prioridadeFunding: 1, prioridadePagamento: 1,
   };
   const cen: CenarioCapitalStack = { nome: '5', meses: 3, fluxoLivreMensal: [0, -1000, -1000, -1000], reservaMinima: 0, instrumentos: [fin] };
   const r = simularCapitalStack(cen);
@@ -87,7 +87,7 @@ test('Caso 5: financiamento atinge o limite comprometido e o restante vira lacun
 test('Caso 6: capital de giro cobre descasamento sem depender de custo elegível', () => {
   const giro: InstrumentoDivida = {
     tipo: 'divida', nome: 'Giro', limiteComprometido: 2000, taxaMensal: 0.02,
-    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1,
+    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1, prioridadePagamento: 1,
   };
   const cen: CenarioCapitalStack = { nome: '6', meses: 3, fluxoLivreMensal: [0, -500, -500, 2000], reservaMinima: 0, instrumentos: [giro] };
   const r = simularCapitalStack(cen);
@@ -101,7 +101,7 @@ test('Caso 6: capital de giro cobre descasamento sem depender de custo elegível
 test('Caso 7: bullet capitaliza juros até o vencimento e quita o saldo inteiro de uma vez', () => {
   const bullet: InstrumentoDivida = {
     tipo: 'divida', nome: 'Bullet', limiteComprometido: 1000, taxaMensal: 0.01,
-    politicaAmortizacao: 'bullet', vencimentoMes: 3, prioridadeFunding: 1,
+    politicaAmortizacao: 'bullet', vencimentoMes: 3, prioridadeFunding: 1, prioridadePagamento: 1,
     liberacaoProgramada: [{ mes: 1, valor: 1000 }],
   };
   const cen: CenarioCapitalStack = { nome: '7', meses: 3, fluxoLivreMensal: [0, 0, 0, 2000], reservaMinima: 0, instrumentos: [bullet] };
@@ -112,20 +112,26 @@ test('Caso 7: bullet capitaliza juros até o vencimento e quita o saldo inteiro 
   assert.ok(perto(r.caixaProjetoMensal[3], 1979.9));
 });
 
-// 8 — Preferred Equity com aporte único, retorno preferencial e devolução de principal
-test('Caso 8: Preferred Equity modo A (simples) — remuneração sobre capital não devolvido, depois principal', () => {
+// 8 — Preferred Equity com aporte único, retorno preferencial e devolução de principal.
+// §6.1 "Ordem padrão obrigatória": devolução de PRINCIPAL (item 4) antes da
+// REMUNERAÇÃO preferencial acumulada (item 5) — por isso o principal consome
+// o caixa distribuível primeiro; a remuneração não paga fica acumulada para
+// o mês seguinte, quando houver caixa de novo.
+test('Caso 8: Preferred Equity modo A (simples) — principal antes da remuneração (§6.1)', () => {
   const pe: InstrumentoPreferredEquity = {
     tipo: 'preferred_equity', nome: 'PE', aportes: [{ mes: 1, valor: 1000 }],
-    modo: 'A', taxaMensal: 0.02, capitalizacao: 'simples',
+    modo: 'A', taxaMensal: 0.02, capitalizacao: 'simples', prioridadePagamento: 1,
   };
   const cen: CenarioCapitalStack = { nome: '8', meses: 3, fluxoLivreMensal: [0, -1000, 600, 600], reservaMinima: 0, instrumentos: [pe] };
   const r = simularCapitalStack(cen);
-  assert.deepEqual(r.remuneracaoPagaPE['PE'], [0, 0, 40, 8.8]);
-  assert.deepEqual(r.devolucaoPrincipalPE['PE'], [0, 0, 560, 440]);
+  // Mês 2: caixa distribuível 600 — todo consumido pelo principal (item 4);
+  // a remuneração acumulada do mês (20) não é paga, fica pendente.
+  assert.deepEqual(r.devolucaoPrincipalPE['PE'], [0, 0, 600, 400]);
+  assert.deepEqual(r.remuneracaoPagaPE['PE'], [0, 0, 0, 48]);
   assert.equal(r.capitalNaoDevolvidoFinalPE['PE'], 0);
   assert.equal(r.remuneracaoAcumuladaFinalPE['PE'], 0);
-  const totalDistribuido = 40 + 560 + 8.8 + 440;
-  assert.ok(perto(moic(1000, totalDistribuido), 1.0488));
+  const totalDistribuido = 600 + 400 + 0 + 48;
+  assert.ok(perto(moic(1000, totalDistribuido), 1.048));
   assert.ok(roi(1000, totalDistribuido) > 0);
 });
 
@@ -133,7 +139,7 @@ test('Caso 8: Preferred Equity modo A (simples) — remuneração sobre capital 
 test('Caso 9: Preferred Equity modo B — devolução de principal + 20% do residual, só no evento', () => {
   const pe: InstrumentoPreferredEquity = {
     tipo: 'preferred_equity', nome: 'PE', aportes: [{ mes: 1, valor: 1000 }],
-    modo: 'B', mesEvento: 3, percentualResidualEvento: 0.20,
+    modo: 'B', mesEvento: 3, percentualResidualEvento: 0.20, prioridadePagamento: 1,
   };
   const sponsor: InstrumentoSponsorEquity = { tipo: 'sponsor_equity', nome: 'Sponsor', cobreLacunaAutomatica: false };
   const cen: CenarioCapitalStack = { nome: '9', meses: 3, fluxoLivreMensal: [0, -1000, 0, 2000], reservaMinima: 0, instrumentos: [pe, sponsor] };
@@ -151,7 +157,7 @@ test('Caso 9: Preferred Equity modo B — devolução de principal + 20% do resi
 test('Caso 10: Preferred Equity modo C — % da receita líquida recebida, sem devolução de principal', () => {
   const pe: InstrumentoPreferredEquity = {
     tipo: 'preferred_equity', nome: 'PE', aportes: [{ mes: 1, valor: 500 }],
-    modo: 'C', percentualReceitaLiquida: 0.10,
+    modo: 'C', percentualReceitaLiquida: 0.10, prioridadePagamento: 1,
   };
   const sponsor: InstrumentoSponsorEquity = { tipo: 'sponsor_equity', nome: 'Sponsor', cobreLacunaAutomatica: false };
   const cen: CenarioCapitalStack = {
@@ -187,11 +193,11 @@ test('Caso 12: múltiplos instrumentos — a prioridade de funding decide quem c
   const fin: InstrumentoDivida = {
     tipo: 'divida', nome: 'Financiamento', limiteComprometido: 600, taxaMensal: 0,
     politicaAmortizacao: 'cash_sweep', custoElegivelMensal: [0, 500, 0], percentualFinanciavel: 1,
-    prioridadeFunding: 1,
+    prioridadeFunding: 1, prioridadePagamento: 1,
   };
   const giro: InstrumentoDivida = {
     tipo: 'divida', nome: 'Giro', limiteComprometido: 1000, taxaMensal: 0,
-    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 2,
+    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 2, prioridadePagamento: 2,
   };
   const sponsor: InstrumentoSponsorEquity = { tipo: 'sponsor_equity', nome: 'Sponsor', cobreLacunaAutomatica: true };
   const cen: CenarioCapitalStack = { nome: '12', meses: 2, fluxoLivreMensal: [0, -800, 0], reservaMinima: 0, instrumentos: [fin, giro, sponsor] };
@@ -208,7 +214,7 @@ test('Caso 12: múltiplos instrumentos — a prioridade de funding decide quem c
 test('Caso 13: compromisso insuficiente e sem sponsor — lacuna de funding não coberta', () => {
   const giro: InstrumentoDivida = {
     tipo: 'divida', nome: 'Giro', limiteComprometido: 300, taxaMensal: 0,
-    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1,
+    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1, prioridadePagamento: 1,
   };
   const cen: CenarioCapitalStack = { nome: '13', meses: 1, fluxoLivreMensal: [0, -1000], reservaMinima: 0, instrumentos: [giro] };
   const r = simularCapitalStack(cen);
@@ -222,7 +228,7 @@ test('Caso 13: compromisso insuficiente e sem sponsor — lacuna de funding não
 test('Caso 14: bullet sem caixa suficiente no vencimento — dívida termina o horizonte sem zerar (erro bloqueante, §12.2)', () => {
   const bullet: InstrumentoDivida = {
     tipo: 'divida', nome: 'Bullet', limiteComprometido: 1000, taxaMensal: 0,
-    politicaAmortizacao: 'bullet', vencimentoMes: 2, prioridadeFunding: 1,
+    politicaAmortizacao: 'bullet', vencimentoMes: 2, prioridadeFunding: 1, prioridadePagamento: 1,
     liberacaoProgramada: [{ mes: 1, valor: 1000 }],
   };
   const cen: CenarioCapitalStack = { nome: '14', meses: 2, fluxoLivreMensal: [0, -1000, 50], reservaMinima: 0, instrumentos: [bullet] };
@@ -240,7 +246,7 @@ test('Caso 15: cenário adverso aumenta a lacuna máxima de funding frente ao ca
     nome: 'sensibilidade', meses: 3, fluxoLivreMensal, reservaMinima: 0,
     instrumentos: [{
       tipo: 'divida', nome: 'Giro', limiteComprometido: 1200, taxaMensal: 0,
-      politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1,
+      politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1, prioridadePagamento: 1,
     }],
   });
   const base = simularCapitalStack(cenarioComLimite([0, -500, -500, 2000]));

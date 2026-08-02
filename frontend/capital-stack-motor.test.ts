@@ -4,6 +4,7 @@ import {
   fluxoAposFundingMensal, caixaAcumuladoMensal, necessidadeFundingMensal,
   caixaDistribuivelMensal, reconciliarCapitalStack,
   custoElegivelMensalDeLinhas, instrumentoDeRegistro, simularCapitalStackDoEstudo,
+  simularCapitalStack, type InstrumentoPreferredEquity, type InstrumentoDivida,
 } from './capital-stack-motor.js';
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
@@ -128,4 +129,57 @@ test('simularCapitalStackDoEstudo: só camadas ATIVAS participam — rascunho/re
   assert.deepEqual(r.aporteSponsorMensal, [0, 0, 0]);
   assert.deepEqual(r.lacunaFundingMensal, [0, 0, 0]);
   assert.ok(perto(r.caixaProjetoMensal[2], 100));
+});
+
+// Achado da segunda verificação (2026-08-02): o código pagava a remuneração
+// ANTES do principal — invertido em relação ao §6.1 do doc ("Ordem padrão
+// obrigatória": item 4 = devolução de principal, item 5 = remuneração
+// preferencial). Os 16 golden cases não pegaram porque nenhum tinha caixa
+// insuficiente para os dois no mesmo mês — corrigido, e este teste isola
+// exatamente esse cenário para não regredir.
+test('#6.1: Preferred Equity modo A paga PRINCIPAL antes da remuneração quando o caixa não cobre os dois', () => {
+  const pe: InstrumentoPreferredEquity = {
+    tipo: 'preferred_equity', nome: 'PE', aportes: [{ mes: 1, valor: 1000 }],
+    modo: 'A', taxaMensal: 0.10, capitalizacao: 'simples', prioridadePagamento: 1,
+  };
+  const r = simularCapitalStack({
+    nome: 'ordem-waterfall', meses: 1, fluxoLivreMensal: [0, 50], reservaMinima: 0, instrumentos: [pe],
+  });
+  // Caixa distribuível = 1050; principal (1000) + remuneração (100) = 1100 > 1050.
+  assert.equal(r.devolucaoPrincipalPE['PE'][1], 1000);
+  assert.equal(r.remuneracaoPagaPE['PE'][1], 50); // só o que sobrou do caixa
+  assert.equal(r.capitalNaoDevolvidoFinalPE['PE'], 0);
+  assert.equal(r.remuneracaoAcumuladaFinalPE['PE'], 50); // 100 devido − 50 pago, fica pendente
+});
+
+// Achado da segunda verificação (2026-08-02): `prioridade_pagamento` é coluna
+// real do schema (avancado_capital_instrumentos) e campo listado no §9 do
+// doc como distinto de `prioridade_funding`, mas até aqui o motor reusava a
+// MESMA ordem (por prioridadeFunding) tanto para captar quanto para pagar —
+// e as Preferred Equity nem tinham ordem alguma entre si. Nenhum dos 16
+// golden cases (#270) tem 2+ instrumentos do mesmo tipo, então isso nunca
+// foi exercido. Este teste isola 2 dívidas com prioridade de FUNDING
+// invertida da de PAGAMENTO — se o motor confundisse as duas ordens, a
+// dívida "B" (funding=2, pagamento=1) seria amortizada depois da "A".
+test('§9: prioridade de pagamento entre dívidas é independente da prioridade de funding', () => {
+  const a: InstrumentoDivida = {
+    tipo: 'divida', nome: 'A', limiteComprometido: 1000, taxaMensal: 0,
+    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1, prioridadePagamento: 2,
+  };
+  const b: InstrumentoDivida = {
+    tipo: 'divida', nome: 'B', limiteComprometido: 1000, taxaMensal: 0,
+    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 2, prioridadePagamento: 1,
+  };
+  const r = simularCapitalStack({
+    nome: 'ordem-pagamento', meses: 2, fluxoLivreMensal: [0, -1500, 1200], reservaMinima: 0, instrumentos: [a, b],
+  });
+  // Mês 1: necessidade de 1500 coberta por funding em ordem de FUNDING (A primeiro, então B).
+  assert.deepEqual(r.liberacaoPorInstrumento['A'][1], 1000);
+  assert.deepEqual(r.liberacaoPorInstrumento['B'][1], 500);
+  // Mês 2: 1200 de caixa sweep em ordem de PAGAMENTO (B primeiro, então A) — B (saldo 500) zera
+  // e sobra 700 para A (saldo 1000), não o inverso.
+  assert.equal(r.amortizacaoPorInstrumento['B'][2], 500);
+  assert.equal(r.amortizacaoPorInstrumento['A'][2], 700);
+  assert.equal(r.saldoDividaPorInstrumento['B'][2], 0);
+  assert.equal(r.saldoDividaPorInstrumento['A'][2], 300);
 });

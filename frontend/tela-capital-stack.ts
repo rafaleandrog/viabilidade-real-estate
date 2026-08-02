@@ -476,6 +476,8 @@ export class ViabCapitalStack extends LitElement {
               @urbi:input-numero-change=${(e: CustomEvent) => this._setCampo(c, 'compromisso', e.detail.valor ?? 0)}></viab-num>
             <viab-num label="Prioridade de funding" sufixo="" casas-decimais="0" ?desabilitado=${dis} .valor=${n(d.prioridade_funding)}
               @urbi:input-numero-change=${(e: CustomEvent) => this._setCampo(c, 'prioridade_funding', e.detail.valor ?? 0)}></viab-num>
+            <viab-num label="Prioridade de pagamento" sufixo="" casas-decimais="0" ?desabilitado=${dis} .valor=${n(d.prioridade_pagamento)}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._setCampo(c, 'prioridade_pagamento', e.detail.valor ?? 0)}></viab-num>
           </div>
         </div>
         ${c.tipo === 'financiamento_producao' || c.tipo === 'capital_giro' ? this._renderCamposDivida(c, d, dis) : nothing}

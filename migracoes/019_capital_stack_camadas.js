@@ -23,16 +23,22 @@
 // Idempotente: se o estudo já tem uma camada com o mesmo `origem_legado`,
 // não cria outra — cobre reexecução do harness e de produção.
 //
+// ⚠️ Achado na segunda verificação (2026-08-02), corrigido antes de rodar em
+// produção (confirmado pendente no ambiente autenticado do autor — ver
+// CLAUDE.md): a config de `preferred_equity` gravava `aporteValor` (escalar)
+// e só uma pista `retornoTipoLegado`, mas `instrumentoDeRegistro`
+// (frontend/capital-stack-motor.ts, FIN-04..06/#273-276) lê `aportes`
+// (array `{mes,valor}`) e `modo` diretamente — um instrumento migrado com o
+// shape antigo ficaria PERMANENTEMENTE inerte mesmo depois de o usuário
+// confirmar `status: 'ativo'`, o oposto do que a #271 promete. Corrigido
+// para já nascer no shape que o motor consome; `retornoTipoLegado` continua
+// gravado como registro de onde `modo` veio (mapeamento §4.2: remunerado→A,
+// pct_receita→C, pct_resultado→B). Como o legado só tinha `investidor_juros_aa`
+// como único "percentual", ele é reaproveitado como taxa/percentual
+// aproximado nos modos B/C — por isso o status nasce `revisao_necessaria`,
+// nunca `ativo`: a aproximação PRECISA de revisão humana antes de valer.
+//
 // Forward-only. Tabela nova, sem linhas — inócua em banco vazio.
-
-const CAMPOS_FINANCIAMENTO = [
-  'financiamento_obra_pct', 'financiamento_juros_aa', 'financiamento_sistema_amortizacao',
-  'financiamento_prazo_meses', 'financiamento_carencia_meses',
-];
-const CAMPOS_INVESTIDOR = [
-  'investidor_aporte_valor', 'investidor_retorno_tipo', 'investidor_juros_aa',
-  'investidor_carencia_meses', 'investidor_parcelas',
-];
 
 export default async function ({ dados }) {
   const { dados: estudos } = await dados.listar('estudos', { por_pagina: 100000 });
@@ -71,6 +77,28 @@ export default async function ({ dados }) {
     if (Number(e.investidor_aporte_valor) > 0) {
       const jaMigrado = existentes.some((c) => Number(c.estudo_id) === Number(e.id) && c.origem_legado === 'investidor_bloco_g');
       if (!jaMigrado) {
+        // §4.2: remunerado→A (retorno preferencial), pct_receita→C
+        // (participação na receita líquida), pct_resultado→B (participação
+        // no residual em evento). O legado só tinha `investidor_juros_aa`
+        // como único "percentual" — reaproveitado como taxa/percentual
+        // aproximado nos três modos; PRECISA de revisão humana (daí o
+        // status nascer `revisao_necessaria`, nunca `ativo`).
+        const retornoTipoLegado = e.investidor_retorno_tipo || 'remunerado';
+        const modo = retornoTipoLegado === 'pct_receita' ? 'C' : retornoTipoLegado === 'pct_resultado' ? 'B' : 'A';
+        const taxaOuPct = Number(e.investidor_juros_aa) / 100;
+        const config = {
+          modo,
+          // Aporte único no mês 1 — o legado não tinha calendário de aportes,
+          // só um valor total; o usuário ajusta o mês pela UI se precisar.
+          aportes: [{ mes: 1, valor: Number(e.investidor_aporte_valor) }],
+          retornoTipoLegado,
+          carenciaMesesLegado: Number(e.investidor_carencia_meses) || 0,
+          parcelasLegado: Number(e.investidor_parcelas) || 0,
+        };
+        if (modo === 'A') { config.taxaAnual = taxaOuPct; config.capitalizacao = 'simples'; }
+        if (modo === 'B') { config.percentualResidualEvento = taxaOuPct; config.mesEvento = Number(e.investidor_carencia_meses) || undefined; }
+        if (modo === 'C') { config.percentualReceitaLiquida = taxaOuPct; }
+
         const nova = await dados.criar('avancado_capital_instrumentos', {
           estudo_id: e.id,
           tipo: 'preferred_equity',
@@ -79,16 +107,7 @@ export default async function ({ dados }) {
           prioridade_funding: 0,
           prioridade_pagamento: 0,
           compromisso: Number(e.investidor_aporte_valor),
-          config: {
-            aporteValor: Number(e.investidor_aporte_valor),
-            // #4.2: `investidor_retorno_tipo` mapeia em pista, exigindo revisão
-            // do usuário quando a associação for ambígua (schema.json:136) —
-            // remunerado→A, pct_receita→C, pct_resultado→B (docs §4.2).
-            retornoTipoLegado: e.investidor_retorno_tipo || 'remunerado',
-            taxaAnual: Number(e.investidor_juros_aa) / 100,
-            carenciaMeses: Number(e.investidor_carencia_meses) || 0,
-            parcelas: Number(e.investidor_parcelas) || 0,
-          },
+          config,
           origem_legado: 'investidor_bloco_g',
           ordem: 0,
         });

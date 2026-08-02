@@ -646,6 +646,41 @@ de colunas**, se desejada, é issue posterior e específica.
 > recálculo por tecla, integração com `fluxo-tabela.ts`/exportações CSV/PDF, reação a Cenários
 > (§11), e a base de receita líquida do §6.2 sem subtrair corretagem.
 
+> 🔎 **Segunda verificação (2026-08-02)** — releitura linha a linha de todo o entregue na Fase 9
+> contra este doc, achou e corrigiu 3 defeitos reais; 2 lacunas ficaram documentadas (não corrigidas
+> agora, por exigirem decisão de produto):
+>
+> 1. **Corrigido — ordem principal×remuneração invertida (§6.1).** `simularCapitalStack` (modo A)
+>    pagava a remuneração preferencial ANTES do principal; o item 4 do §6.1 exige o oposto. Os 16
+>    golden cases não pegaram porque nenhum tinha caixa insuficiente para os dois no mesmo mês.
+>    Corrigido em `frontend/capital-stack-motor.ts`; caso 8 do §14 recalculado à mão; regressão
+>    isolada em `capital-stack-motor.test.ts`.
+> 2. **Corrigido — migração 019 gerava Preferred Equity permanentemente inerte.** A config gravada
+>    para instrumentos migrados do Bloco G usava `aporteValor`/`retornoTipoLegado`, mas
+>    `instrumentoDeRegistro` lê `aportes`/`modo` — mesmo depois do usuário confirmar `status: ativo`,
+>    o instrumento nunca teria efeito. Corrigido em `migracoes/019_capital_stack_camadas.js`
+>    (mapeamento remunerado→A / pct_receita→C / pct_resultado→B, §4.2); verificado com script
+>    standalone + `scripts/migracoes-harness.mjs`.
+> 3. **Corrigido — `prioridade_pagamento` nunca lido pelo motor nem editável na UI.** É coluna real
+>    do schema e campo do §9 ("prioridade de pagamento", distinto de "prioridade de utilização"),
+>    mas `simularCapitalStack` reusava a ordem de FUNDING para as amortizações e as Preferred
+>    Equity não tinham ordem alguma entre si — só importa com 2+ instrumentos do mesmo tipo, por
+>    isso nenhum dos 16 casos exercia o bug. Adicionado `prioridadePagamento` aos dois tipos de
+>    instrumento, ordenação própria para as fases de pagamento (steps 5/6), e o campo editável em
+>    `tela-capital-stack.ts` (o `_salvar` já enviava o campo — só faltava o input). Regressão
+>    isolada com 2 dívidas de prioridades invertidas.
+> 4. **Lacuna documentada, não corrigida — um único Sponsor Equity é simulado.** `simularCapitalStack`
+>    usa `cen.instrumentos.find(...)` para achar o sponsor — se o usuário criar 2+ camadas
+>    `sponsor_equity` (a UI permite), só a primeira participa; as demais ficam silenciosamente sem
+>    efeito mesmo com `status: ativo`. Não corrigido agora porque generalizar exige uma decisão de
+>    negócio ainda não escrita no §4.1/§6.1 (como dividir a cobertura de lacuna ou o resíduo entre
+>    múltiplos sponsors). Registrar como issue futura se o caso de uso aparecer.
+> 5. **Ambiguidade de leitura, não um bug de código.** §3.1 (fórmula da necessidade de funding) e §7
+>    (lista numerada da ordem mensal) podem ser lidos como discordantes sobre se "aportes
+>    programados" entra antes ou depois do cálculo de necessidade; o código segue §3.1 (aportes
+>    primeiro, depois necessidade sobre o caixa já com aporte) — comportamento inalterado nesta
+>    verificação, só registrado para quem revisar o doc depois.
+
 ---
 
 ## 14. Casos de teste de referência

@@ -141,8 +141,10 @@ export interface InstrumentoDivida {
    */
   custoElegivelMensal?: number[];
   percentualFinanciavel?: number; // 0–1
-  /** Ordem de utilização (§5) — menor primeiro. */
+  /** Ordem de utilização/funding (§5) — menor primeiro. */
   prioridadeFunding: number;
+  /** Ordem de pagamento/amortização entre dívidas (§9 "prioridade de pagamento") — menor primeiro. */
+  prioridadePagamento: number;
 }
 
 /** Preferred Equity (§4.2) — três modos de remuneração. */
@@ -159,6 +161,8 @@ export interface InstrumentoPreferredEquity {
   mesEvento?: number;
   // Modo C — participação na receita líquida recebida.
   percentualReceitaLiquida?: number;
+  /** Ordem de pagamento entre Preferred Equities (§9 "prioridade de pagamento") — menor primeiro. */
+  prioridadePagamento: number;
 }
 
 /**
@@ -220,7 +224,13 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
   const N = cen.meses;
   const dividas = cen.instrumentos.filter((i): i is InstrumentoDivida => i.tipo === 'divida')
     .sort((a, b) => a.prioridadeFunding - b.prioridadeFunding);
-  const preferenciais = cen.instrumentos.filter((i): i is InstrumentoPreferredEquity => i.tipo === 'preferred_equity');
+  // §9 "prioridade de pagamento" é uma ordem DISTINTA da de funding (§5) —
+  // só importa quando há 2+ dívidas ou 2+ Preferred Equity; nenhum dos 16
+  // golden cases (#270) tem mais de um instrumento do mesmo tipo, então esta
+  // ordem nunca é exercida por eles (sort estável = não regride nada).
+  const dividasPorPagamento = [...dividas].sort((a, b) => a.prioridadePagamento - b.prioridadePagamento);
+  const preferenciais = cen.instrumentos.filter((i): i is InstrumentoPreferredEquity => i.tipo === 'preferred_equity')
+    .sort((a, b) => a.prioridadePagamento - b.prioridadePagamento);
   const sponsor = cen.instrumentos.find((i): i is InstrumentoSponsorEquity => i.tipo === 'sponsor_equity');
 
   const saldoDivida = new Map(dividas.map((d) => [d.nome, 0]));
@@ -311,7 +321,7 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
 
     // 5) amortização — cash sweep (§4.3, política recomendada) e bullet no vencimento
     let disponivelSweep = Math.max(0, caixaProjeto - cen.reservaMinima);
-    for (const d of dividas) {
+    for (const d of dividasPorPagamento) {
       if (d.politicaAmortizacao !== 'cash_sweep' || disponivelSweep <= 0) continue;
       const saldo = saldoDivida.get(d.nome)!;
       const pag = round2(Math.min(disponivelSweep, saldo));
@@ -320,7 +330,7 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
       caixaProjeto = round2(caixaProjeto - pag); disponivelSweep = round2(disponivelSweep - pag);
       r.amortizacaoPorInstrumento[d.nome][t] = pag;
     }
-    for (const d of dividas) {
+    for (const d of dividasPorPagamento) {
       if (d.politicaAmortizacao !== 'bullet' || d.vencimentoMes !== t) continue;
       const saldo = saldoDivida.get(d.nome)!;
       const disponivel = Math.max(0, caixaProjeto - cen.reservaMinima);
@@ -335,22 +345,28 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
     let caixaDistribuivel = Math.max(0, caixaProjeto - cen.reservaMinima);
     for (const p of preferenciais) {
       if (p.modo === 'A') {
-        const capNaoDev = capitalNaoDevolvido.get(p.nome)!;
+        // §6.1 "Ordem padrão obrigatória": item 4 (devolução de principal) vem
+        // ANTES do item 5 (pagamento da remuneração preferencial acumulada).
+        // O acúmulo da remuneração deste mês usa o saldo de ABERTURA
+        // (`capNaoDevAbertura`, antes de qualquer pagamento do mês — mesma
+        // convenção de `juros_t = saldo_abertura_t × taxa`, §4.3); só a ORDEM
+        // de PAGAMENTO é principal-primeiro, quando o caixa não cobre os dois.
+        const capNaoDevAbertura = capitalNaoDevolvido.get(p.nome)!;
         const remunAcumAntes = remuneracaoAcumulada.get(p.nome)!;
-        const base = p.capitalizacao === 'composta' ? capNaoDev + remunAcumAntes : capNaoDev;
+        const base = p.capitalizacao === 'composta' ? capNaoDevAbertura + remunAcumAntes : capNaoDevAbertura;
         const remunMes = round2(base * (p.taxaMensal ?? 0));
         remuneracaoAcumulada.set(p.nome, round2(remunAcumAntes + remunMes));
+
+        const pagPrincipal = round2(Math.min(capNaoDevAbertura, caixaDistribuivel));
+        capitalNaoDevolvido.set(p.nome, round2(capNaoDevAbertura - pagPrincipal));
+        caixaDistribuivel = round2(caixaDistribuivel - pagPrincipal); caixaProjeto = round2(caixaProjeto - pagPrincipal);
+        r.devolucaoPrincipalPE[p.nome][t] = pagPrincipal;
 
         const remunDevida = remuneracaoAcumulada.get(p.nome)!;
         const pagRemun = round2(Math.min(remunDevida, caixaDistribuivel));
         remuneracaoAcumulada.set(p.nome, round2(remunDevida - pagRemun));
         caixaDistribuivel = round2(caixaDistribuivel - pagRemun); caixaProjeto = round2(caixaProjeto - pagRemun);
         r.remuneracaoPagaPE[p.nome][t] = pagRemun;
-
-        const pagPrincipal = round2(Math.min(capNaoDev, caixaDistribuivel));
-        capitalNaoDevolvido.set(p.nome, round2(capNaoDev - pagPrincipal));
-        caixaDistribuivel = round2(caixaDistribuivel - pagPrincipal); caixaProjeto = round2(caixaProjeto - pagPrincipal);
-        r.devolucaoPrincipalPE[p.nome][t] = pagPrincipal;
       } else if (p.modo === 'C') {
         const receitaLiq = Math.max(0, n(cen.receitaLiquidaMensal?.[t]));
         const desejado = round2(receitaLiq * (p.percentualReceitaLiquida ?? 0));
@@ -447,6 +463,7 @@ export function instrumentoDeRegistro(registro: any, custoElegivelMensal?: numbe
       custoElegivelMensal: registro.tipo === 'financiamento_producao' ? custoElegivelMensal : undefined,
       percentualFinanciavel: cfg.percentualFinanciavel !== undefined ? Number(cfg.percentualFinanciavel) : undefined,
       prioridadeFunding: n(registro.prioridade_funding),
+      prioridadePagamento: n(registro.prioridade_pagamento),
     };
   }
   if (registro?.tipo === 'preferred_equity') {
@@ -460,6 +477,7 @@ export function instrumentoDeRegistro(registro: any, custoElegivelMensal?: numbe
       percentualResidualEvento: cfg.percentualResidualEvento !== undefined ? Number(cfg.percentualResidualEvento) : undefined,
       mesEvento: cfg.mesEvento !== undefined ? Number(cfg.mesEvento) : undefined,
       percentualReceitaLiquida: cfg.percentualReceitaLiquida !== undefined ? Number(cfg.percentualReceitaLiquida) : undefined,
+      prioridadePagamento: n(registro.prioridade_pagamento),
     };
   }
   if (registro?.tipo === 'sponsor_equity') {
