@@ -15,10 +15,10 @@
 //   informativo do #188 (`vgvTotal`/`vgvPermutaFisica`/`receitaBrutaVgv`).
 
 import {
-  absorcaoMensal, periodoAbsorcao, vgvLinha, receitaLiquidaLinha, vgvPermutaFisicaLinha,
+  absorcaoMensal, periodoAbsorcao, vgvLinha, receitaLiquidaLinha,
   vgvVendavelTipologia, vgvVendavelLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
-  eCorretagem, vgvVendidoMensal, ePrecoTerreno,
+  eCorretagem, vgvVendidoMensal, ePrecoTerreno, ePermutaFisica,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado,
 } from './fluxo-shared.js';
 
@@ -1286,14 +1286,18 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   for (const l of calcReceitas) for (let i = 0; i < prazo; i++) receitaMensalVendas[i] += l.mensal[i];
 
   // Permuta financeira (#196) é dedução da receita, não custo — sai de
-  // `linhasCusto` antes do loop de custos.
-  const linhasCustoSemPermutaFinanceira = linhasCusto.filter((c) => !ePermutaFinanceira(c));
+  // `linhasCusto` antes do loop de custos. Permuta física (#268) não é custo
+  // NEM receita — não há caixa envolvido (a unidade é entregue, não vendida
+  // nem paga); o valor declarado (#266) só alimenta o KPI informativo
+  // `vgvPermutaFisica` mais abaixo.
+  const linhasCustoSemPermutas = linhasCusto.filter((c) => !ePermutaFinanceira(c) && !ePermutaFisica(c));
   const linhasPermutaFinanceira = linhasCusto.filter(ePermutaFinanceira);
+  const linhasPermutaFisica = linhasCusto.filter(ePermutaFisica);
 
   // Custos por linha (valores positivos; sinal aplicado na consolidação).
   const curvasPorId = new Map<number, CurvaPersonalizada>(
     (config.curvas ?? []).map((k: any) => [Number(k.id), (k.valores ?? []) as CurvaPersonalizada]));
-  const calcCustos: LinhaCalc[] = linhasCustoSemPermutaFinanceira.map((c) => {
+  const calcCustos: LinhaCalc[] = linhasCustoSemPermutas.map((c) => {
     const nome = nomeLinhaCusto(c);
     // Preserva o grupo real (5 grupos das abas de Custos: Terreno · Obra ·
     // Diretos · Indiretos · Financeiro, #125) para o Proforma exibir cada seção;
@@ -1390,13 +1394,22 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const paybackMes = fluxoAcumulado.findIndex((v, i) => v >= 0 && fluxoMensal.slice(0, i + 1).some((x) => x < 0));
   const exposicaoMaxima = fluxoAcumulado.length ? Math.min(...fluxoAcumulado) : 0;
 
-  // #188 — VGV Total / VGV Permuta Física / Receita Bruta (VGV): grandezas
-  // informativas, consumidas pelo Resumo (#182), pela coluna % VGV do Fluxo
-  // de Caixa (#189) e pela permuta física (#195, que reduz a absorção de
-  // vendas ao VGV vendável). `vgvTotal` continua contando a tipologia
-  // inteira — só expõe o quanto do VGV Total é atribuível a unidades
-  // permutadas fisicamente.
-  const vgvPermutaFisica = linhasReceita.reduce((s, l) => s + vgvPermutaFisicaLinha(l.tipologias), 0);
+  // #188/#268 — VGV Total / VGV Permuta Física (sem caixa) / Receita Bruta
+  // (VGV): grandezas informativas, consumidas pelo Resumo (#182) e pela
+  // coluna % VGV do Fluxo de Caixa (#189). `vgvTotal` continua contando a
+  // tipologia inteira — só expõe o quanto é atribuível a unidades entregues
+  // por permuta física.
+  //
+  // Fonte: o VALOR DECLARADO nas linhas de custo `Permuta física` (#266/#267),
+  // nunca derivado (ADR da #266 — ver docs/viabilidade/padrao-incorporacao.md
+  // §15.1). NÃO é `vgvPermutaFisicaLinha(l.tipologias)` (a derivação antiga
+  // por `unidades_permutadas`): essa função é código morto no Avançado real —
+  // o join que monta `linhasReceita.tipologias` (`montarLinhasReceita`,
+  // backend/rotas/avancado.ts) nunca copia `unidades_permutadas` do catálogo,
+  // então ela sempre calculava zero aqui. Não há comportamento vigente a
+  // preservar; por isso não há fallback para o cálculo antigo (decisão do
+  // autor, 2026-08-02).
+  const vgvPermutaFisica = linhasPermutaFisica.reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);
   const receitaBrutaVgv = ctxCusto.vgvTotal - vgvPermutaFisica;
 
   // #229 — grandezas 3–6 da taxonomia: contratação (bruto/desconto/líquido,

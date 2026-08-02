@@ -704,22 +704,27 @@ test('fluxo completo: consolidação, acumulado, TIR e exposição coerentes', (
   assert.ok(perto(somaTipologias, linha.total, 1));
 });
 
-// #188: VGV Total / VGV Permuta Física / Receita Bruta (VGV).
-test('vgvPermutaFisica e receitaBrutaVgv: permutadas são subconjunto de quantidade, informativo', () => {
+// #188/#268: VGV Total / VGV Permuta Física (valor declarado) / Receita Bruta (VGV).
+test('vgvPermutaFisica e receitaBrutaVgv: valor declarado na linha de custo, informativo', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     linhasReceita: [{
       id: 1, nome: 'Sales', fase_label: 'Fase 1',
       tipologias: [
-        // 200 un a 12.000/m² × 25m² = 60M, das quais 20 permutadas = 6M
-        { id: 1, nome: 'Studio', quantidade: 200, unidades_permutadas: 20, area_privativa_m2: 25, preco_m2: 12_000 },
+        // 200 un a 12.000/m² × 25m² = 60M — a permuta física (20 delas) não
+        // reduz este VGV Total (#188: conta a tipologia inteira); quem
+        // declara o valor da permuta é a linha de custo (#266/#267), abaixo.
+        { id: 1, nome: 'Studio', quantidade: 200, area_privativa_m2: 25, preco_m2: 12_000 },
         // 400 un a 10.000/m² × 70m² = 280M, sem permuta
         { id: 2, nome: '2 dorms', quantidade: 400, area_privativa_m2: 70, preco_m2: 10_000 },
       ],
       absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
       fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
     }],
-    linhasCusto: [],
+    linhasCusto: [
+      // Valor declarado (#266) para as 20 unidades de Studio entregues por permuta física.
+      { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 20, orcamento_valor: 6_000_000, orcamento_unidade: 'rs' },
+    ],
     areaTerreno: 50_000,
   };
   const r = calcularFluxo(config);
@@ -727,9 +732,13 @@ test('vgvPermutaFisica e receitaBrutaVgv: permutadas são subconjunto de quantid
   assert.ok(perto(r.vgvTotal, 340_000_000, 1)); // KPI informativo (#188): conta a tipologia inteira
   assert.ok(perto(r.vgvPermutaFisica, 6_000_000, 1));
   assert.ok(perto(r.receitaBrutaVgv, 334_000_000, 1));
-  // #195: a permuta física é entregue em troca do terreno, não vendida por
-  // caixa — o fluxo (receita mensal) reflete o VGV VENDÁVEL, não o bruto.
-  assert.ok(perto(soma(r.receitaMensal), 334_000_000, 5));
+  // #268: a linha de custo Permuta física NÃO reduz a absorção de vendas em
+  // caixa (isso é "estoque/contratação", fora do escopo desta issue — só a
+  // reserva antiga por `unidades_permutadas` faria isso, e ela é código
+  // morto no Avançado real, ver comentário em `vgvPermutaFisica` acima).
+  // O fluxo aqui reflete o VGV Total inteiro: nada foi vendido por caixa a
+  // menos, só o KPI informativo mudou.
+  assert.ok(perto(soma(r.receitaMensal), 340_000_000, 5));
   // #229: vgvVendavel é o alias correto — mesmo valor, nome sem ambiguidade
   // com "Receita Bruta" (grandeza distinta, #228).
   assert.ok(perto(r.vgvVendavel, r.receitaBrutaVgv, 1e-6));
@@ -787,12 +796,48 @@ test('tipologia 100% permutada nao gera receita em caixa (#195)', () => {
   const r = calcularFluxo(config);
 
   assert.ok(perto(r.vgvTotal, 240_000_000, 1)); // bruto: 180M + 60M
-  assert.ok(perto(r.vgvPermutaFisica, 60_000_000, 1));
+  // #268: vgvPermutaFisica não vem mais de `unidades_permutadas` (código
+  // morto no Avançado real — nenhuma linha de custo declara a permuta aqui,
+  // então é 0; ver teste dedicado abaixo para a fonte nova).
+  assert.ok(perto(r.vgvPermutaFisica, 0, 1e-6));
   // Caixa recebido = só o vendável (180M) — a permutada não entra no fluxo.
   assert.ok(perto(soma(r.receitaMensal), 180_000_000, 5));
   const [vendavel, permutada] = r.linhasReceita[0].itens!;
   assert.ok(perto(vendavel.total, 180_000_000, 1));
   assert.ok(perto(permutada.total, 0, 1e-6));
+});
+
+// #268: VGV de permuta física (sem caixa) vem do VALOR DECLARADO nas linhas
+// de custo `Preço/Permuta física` (#266/#267) — nunca derivado de
+// `unidades_permutadas` (ADR da #266).
+test('#268: vgvPermutaFisica soma o valor declarado nas linhas de custo Permuta física', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [],
+    linhasCusto: [
+      { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5, orcamento_valor: 2_000_000, orcamento_unidade: 'rs' },
+      { id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 2, permuta_quantidade: 3, orcamento_valor: 500_000, orcamento_unidade: 'rs' },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  assert.ok(perto(r.vgvPermutaFisica, 2_500_000, 1));
+  // Não é custo em caixa — não aparece em linhasCusto nem em custoMensal.
+  assert.equal(r.linhasCusto.length, 0);
+  assert.ok(perto(soma(r.custoMensal), 0, 1e-6));
+});
+
+test('#268: linha Permuta física com valor declarado em branco (migração #267) conta como 0, sem quebrar', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [],
+    linhasCusto: [
+      { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5, orcamento_valor: null, orcamento_unidade: 'rs' },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  assert.equal(r.vgvPermutaFisica, 0);
 });
 
 // Cenários (Etapa 8 · #56): aplicarCenario escala preço de venda e custo de obra.
