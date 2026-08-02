@@ -186,8 +186,11 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
       </div>
       <div class="kpi-cel"
         title=${`VGV Total ${fmtR$(c.vgvTotal)} · VGV Permuta Física ${fmtR$(c.vgvPermutaFisica)}`}>
-        <urbi-kpi rotulo="Receita Bruta (VGV)" .valor=${fmtR$(c.receitaBrutaVgv)}></urbi-kpi>
-        ${varKpi(c.receitaBrutaVgv, base ? base.receitaBrutaVgv : undefined, true)}
+        <!-- #229: rótulo corrigido — este valor é VGV VENDÁVEL (potencial menos
+             permuta física), não "Receita Bruta" no sentido de recebimento em
+             caixa (#228); "Receita Bruta (VGV)" confundia as duas grandezas. -->
+        <urbi-kpi rotulo="VGV Vendável" .valor=${fmtR$(c.vgvVendavel)}></urbi-kpi>
+        ${varKpi(c.vgvVendavel, base ? base.vgvVendavel : undefined, true)}
       </div>
     </div>
   `;
