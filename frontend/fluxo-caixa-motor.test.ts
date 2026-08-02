@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
+  recebimentoBrutoMensal, impostoMensal, recebimentoLiquidoMensal,
   componentesDoLegado, ultimoMesRecebivelLinha,
   pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
   carteiraSaldoSafra, jurosSafra, receitaBrutaSafra, componentesEfetivosSafra,
@@ -103,6 +104,44 @@ test('vendaLiquidaContratadaMensal = bruta − desconto, mês a mês', () => {
   const desconto = descontoComercialMensal(linha, CRONO, 60);
   const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60);
   for (let i = 0; i < liquido.length; i++) assert.ok(perto(liquido[i], bruto[i] - desconto[i], 1e-6));
+});
+
+// #260 — contrato C7: toda série monetária resultado de fórmula tem 2 casas
+// decimais no motor, não só na apresentação (#281). Absorção linear em 47
+// meses de uma venda que não divide exato é o caso clássico de resíduo de
+// ponto flutuante (dízima), que sem quantização vazaria mais de 2 casas.
+test('#260: vendaBrutaContratadaMensal/descontoComercialMensal/vendaLiquidaContratadaMensal têm 2 casas', () => {
+  const linha = {
+    tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }], // VGV 50M
+    absorcao: { modo: 'linear' },
+    fluxo_pagamento: { entrada: [{ pct: 33, parcelas: 1, descontoPct: 7 }] },
+  };
+  const casas2 = (v: number) => Math.round(v * 100) / 100 === v;
+  const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60);
+  const desconto = descontoComercialMensal(linha, CRONO, 60);
+  const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60);
+  assert.ok(bruto.every(casas2), 'venda bruta com resíduo além de 2 casas');
+  assert.ok(desconto.every(casas2), 'desconto comercial com resíduo além de 2 casas');
+  assert.ok(liquido.every(casas2), 'venda líquida com resíduo além de 2 casas');
+});
+
+test('#260: recebimentoBrutoMensal/impostoMensal/recebimentoLiquidoMensal têm 2 casas', () => {
+  const linha = {
+    tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }],
+    absorcao: { modo: 'linear' },
+    fluxo_pagamento: {
+      entrada: [{ pct: 20, parcelas: 3, descontoPct: 0 }],
+      parcelas: [{ pct: 80, parcelas: 7, periodicidade: 'mensal' }],
+      ret: { ativo: true, pct: 4 },
+    },
+  };
+  const casas2 = (v: number) => Math.round(v * 100) / 100 === v;
+  const bruto = recebimentoBrutoMensal(linha, CRONO, 60);
+  const imposto = impostoMensal(linha, CRONO, 60);
+  const liquido = recebimentoLiquidoMensal(linha, CRONO, 60);
+  assert.ok(bruto.every(casas2), 'recebimento bruto com resíduo além de 2 casas');
+  assert.ok(imposto.every(casas2), 'imposto com resíduo além de 2 casas');
+  assert.ok(liquido.every(casas2), 'recebimento líquido com resíduo além de 2 casas');
 });
 
 // #227 reconciliado contra o Anexo G.1 (Calliandra prazo fixo): à vista do mês 1
