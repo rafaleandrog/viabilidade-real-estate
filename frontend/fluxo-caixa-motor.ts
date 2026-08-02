@@ -756,6 +756,27 @@ export function receitaBrutaSafra(
   return total;
 }
 
+/**
+ * #235: vendas contratadas DEPOIS da entrega (safra posterior ao fim da
+ * Obra — janela "Após-chaves", #226) são recebidas 100% à vista no mês da
+ * contratação, independentemente do fluxo de pagamento configurado no
+ * Grupo: depois da entrega a incorporadora não concede o financiamento
+ * direto do padrão (tabela curta/longa, até marco). O comprador pode
+ * combinar entrada própria com financiamento bancário, mas ambos chegam no
+ * mesmo mês para a incorporadora — sem sinal futuro, parcela nem repasse
+ * para essa venda. Vendas anteriores ou NO próprio mês da entrega continuam
+ * pelos componentes normais; contratos antigos (de safras anteriores) não
+ * são afetados — cada safra é tratada isoladamente, como em todo este motor.
+ */
+export function componentesEfetivosSafra(
+  componentes: ComponentePagamento[],
+  safra: number,
+  mesEntrega: number,
+): ComponentePagamento[] {
+  if (safra <= mesEntrega) return componentes;
+  return [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }];
+}
+
 // ─────────────────────────────────────────────────────────────────
 // #231 — Horizonte derivado de todos os componentes e todas as safras
 // ─────────────────────────────────────────────────────────────────
