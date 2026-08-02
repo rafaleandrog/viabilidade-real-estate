@@ -4,7 +4,7 @@ import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   componentesDoLegado, ultimoMesRecebivelLinha,
-  pmt, pagamentosPrazoFixo,
+  pmt, pagamentosPrazoFixo, pagamentosAteMarco,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
@@ -1079,4 +1079,71 @@ test('pagamentosPrazoFixo: defasagemMeses=0 (adapter legado) tem 1ª parcela NO 
   const pagamentos = pagamentosPrazoFixo(c, 12, 1_000_000);
   assert.equal(Math.min(...pagamentos.map((p) => p.mes)), 12); // mesmo mês da venda, como hoje
   assert.equal(Math.max(...pagamentos.map((p) => p.mes)), 15); // 12+0+4-1
+});
+
+// ─────────────────────────────────────────────────────────────────
+// #233 — Componente até marco: N_s = M − s, erro se N_s ≤ 0
+// ─────────────────────────────────────────────────────────────────
+
+test('pagamentosAteMarco: N_s = marco − safra (varia por safra), 1ª parcela em s+1, última no marco', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'ate_marco' }> = {
+    tipo: 'ate_marco', participacaoPct: 15, sinalPct: 0, marcoMes: 24,
+    defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false,
+  };
+  // Safra 1 (venda cedo): N_1 = 24-1 = 23 parcelas.
+  const p1 = pagamentosAteMarco(c, 1, 2_378_978.36);
+  assert.equal(p1.length, 23);
+  assert.equal(Math.min(...p1.map((p) => p.mes)), 2);  // s+1
+  assert.equal(Math.max(...p1.map((p) => p.mes)), 24); // marco
+  // Safra 12 (venda tardia): N_12 = 24-12 = 12 parcelas — MENOS que a safra 1.
+  const p12 = pagamentosAteMarco(c, 12, 2_378_978.36);
+  assert.equal(p12.length, 12);
+  assert.equal(Math.max(...p12.map((p) => p.mes)), 24); // sempre termina no marco
+  // Mesmo principal, menos parcelas → parcela MAIOR (venda tardia paga mais por mês).
+  assert.ok(p12[0].valor > p1[0].valor);
+});
+
+test('pagamentosAteMarco: N_s ≤ 0 (venda no marco ou depois) lança erro, nunca prazo negativo', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'ate_marco' }> = {
+    tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 24,
+    defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false,
+  };
+  assert.throws(() => pagamentosAteMarco(c, 24, 1_000_000), /N_s.*≤ 0|prazo negativo/);
+  assert.throws(() => pagamentosAteMarco(c, 25, 1_000_000), /N_s.*≤ 0|prazo negativo/);
+  // Safra no mês imediatamente anterior ao marco: N_s = 1, ainda válido.
+  const r = pagamentosAteMarco(c, 23, 1_000_000);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].mes, 24);
+});
+
+test('pagamentosAteMarco: valorContratado <= 0 não gera pagamento nem avalia N_s', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'ate_marco' }> = {
+    tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 5, // marco já passado
+    defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false,
+  };
+  assert.deepEqual(pagamentosAteMarco(c, 10, 0), []); // não lança, mesmo com N_s negativo
+});
+
+// Reconciliação de ponta a ponta contra o Anexo G.2 (Calliandra até Obra +
+// repasse): base uniforme 2.378.978,36/mês nos meses 1-12; componente
+// até-marco de 15%, marco=24, taxa zero.
+test('#233: soma de todas as safras reproduz os meses 1, 13-24 do Anexo G.2', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'ate_marco' }> = {
+    tipo: 'ate_marco', participacaoPct: 15, sinalPct: 0, marcoMes: 24,
+    defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false,
+  };
+  const basePorSafra = 2_378_978.36;
+  const porMes = new Map<number, number>();
+  for (let s = 1; s <= 12; s++) {
+    for (const p of pagamentosAteMarco(c, s, basePorSafra)) {
+      porMes.set(p.mes, (porMes.get(p.mes) ?? 0) + p.valor);
+    }
+  }
+  // Mês 2: só a safra 1 já venceu (1ª parcela em s+1); a safra 2 só paga a
+  // partir do mês 3. Testamos SÓ o componente até-marco isoladamente — o
+  // documento G.2 soma isso à entrada (15%, imediata) para o "mês 1" dele.
+  assert.ok(perto(porMes.get(2) ?? 0, (basePorSafra * 0.15) / 23, 1)); // só a safra 1, N_1=23
+  assert.ok(perto(porMes.get(13) ?? 0, 254_936.38, 1)); // todas as 12 safras ativas
+  assert.ok(perto(porMes.get(24) ?? 0, 254_936.38, 1)); // último mês, ainda todas ativas
+  assert.equal(porMes.has(25), false); // nada além do marco
 });
