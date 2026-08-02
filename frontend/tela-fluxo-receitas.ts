@@ -635,7 +635,7 @@ export class ViabFluxoReceitas extends LitElement {
     this.pagForm = {
       comissao: { ativo: fp.comissao?.ativo ?? true, tipo: fp.comissao?.tipo ?? 'embutida', pct: n(fp.comissao?.pct) },
       ret: { ativo: fp.ret?.ativo ?? false, pct: n(fp.ret?.pct) },
-      entrada: arr(fp.entrada).length ? arr(fp.entrada) : [{ pct: 15, parcelas: 1 }],
+      entrada: arr(fp.entrada).length ? arr(fp.entrada) : [{ pct: 15, parcelas: 1, descontoPct: 0 }],
       parcelas: arr(fp.parcelas).length ? arr(fp.parcelas) : [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 15 }],
       repasse: { apos_entrega_meses: n(fp.repasse?.apos_entrega_meses) },
     };
@@ -673,7 +673,7 @@ export class ViabFluxoReceitas extends LitElement {
     if (bloco === 'parcelas' && f.parcelas.length >= 4) return; // #105 — máximo 4
     let nova: any;
     if (bloco === 'entrada') {
-      nova = { pct: 0, parcelas: 1 };
+      nova = { pct: 0, parcelas: 1, descontoPct: 0 };
     } else {
       // #105 — escolhe a primeira periodicidade ainda não usada
       const usadas = new Set(f.parcelas.map((p: any) => p.periodicidade));
@@ -735,6 +735,12 @@ export class ViabFluxoReceitas extends LitElement {
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('entrada', i, 'pct', ev.detail.valor ?? 0)}></viab-num>
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0" ?desabilitado=${dis} .valor=${e.parcelas}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('entrada', i, 'parcelas', ev.detail.valor ?? 1)}></viab-num>
+                  <!-- #227: desconto comercial — abate esta fração ANTES da formação do
+                       recebível (ex.: 5% no pagamento à vista). Série própria no motor
+                       (descontoComercialMensal), nunca embutida no VGV. 0 = sem desconto,
+                       comportamento idêntico ao de antes desta issue. -->
+                  <viab-num label="Desconto" sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${n(e.descontoPct)}
+                    @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('entrada', i, 'descontoPct', ev.detail.valor ?? 0)}></viab-num>
                   ${!dis && f.entrada.length > 1 ? html`
                     <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
                       @click=${() => this._delLinha('entrada', i)}></urbi-botao>` : nothing}

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
+  vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig,
@@ -43,6 +44,92 @@ test('curva S de 12 meses reamostrada para 24 mantém soma e formato', () => {
   assert.ok(pesos[11] > pesos[23]);
   const r = distribuirLinha(500_000, 0, 24, CURVA_S, 24);
   assert.ok(perto(soma(r), 500_000));
+});
+
+// ── Série canônica de contratação — bruto / desconto / líquido (#227) ──
+
+test('vendaBrutaContratadaMensal: soma o VGV vendável, distribuído pela absorção linear', () => {
+  const linha = {
+    tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }], // VGV 50M
+    absorcao: { modo: 'linear' },
+  };
+  const r = vendaBrutaContratadaMensal(linha, CRONO, 60);
+  assert.ok(perto(soma(r), 50_000_000, 1));
+  assert.equal(r.slice(0, 6).every((v) => v === 0), true); // nada antes do Pré-lançamento
+});
+
+test('vendaBrutaContratadaMensal exclui a permuta física (usa VGV vendável, #195)', () => {
+  const linha = {
+    tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000, unidades_permutadas: 20 }],
+    absorcao: { modo: 'linear' },
+  };
+  const r = vendaBrutaContratadaMensal(linha, CRONO, 60);
+  assert.ok(perto(soma(r), 40_000_000, 1)); // 80/100 unidades vendáveis
+});
+
+test('descontoComercialMensal: zero sem entrada configurada — nenhum estudo existente muda', () => {
+  const linha = {
+    tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }],
+    absorcao: { modo: 'linear' },
+    fluxo_pagamento: null,
+  };
+  const r = descontoComercialMensal(linha, CRONO, 60);
+  assert.ok(r.every((v) => v === 0));
+});
+
+test('descontoComercialMensal: aplica só sobre a fração da entrada, não sobre o total da venda', () => {
+  const linha = {
+    tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }], // VGV 50M
+    absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] }, // tudo no mês 12
+    fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] },
+  };
+  const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60);
+  const desconto = descontoComercialMensal(linha, CRONO, 60);
+  // desconto = 5% de (20% da venda bruta do mês), não 5% da venda inteira.
+  assert.ok(perto(desconto[12], bruto[12] * 0.20 * 0.05, 1));
+  assert.ok(desconto[12] < bruto[12] * 0.05); // bem menor que 5% do total
+});
+
+test('vendaLiquidaContratadaMensal = bruta − desconto, mês a mês', () => {
+  const linha = {
+    tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }],
+    absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+    fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] },
+  };
+  const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60);
+  const desconto = descontoComercialMensal(linha, CRONO, 60);
+  const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60);
+  for (let i = 0; i < liquido.length; i++) assert.ok(perto(liquido[i], bruto[i] - desconto[i], 1e-6));
+});
+
+// #227 reconciliado contra o Anexo G.1 (Calliandra prazo fixo): à vista do mês 1
+// = 20% × (1 − 5%) × 2.860.111,52 = R$ 543.421,19 (docs/viabilidade/padrao-
+// incorporacao.md, Anexo G.1). Reproduz por construção, com a linha real do
+// motor (receitaMensalLinha), não com o oráculo isolado de calliandra-golden.
+test('#227: desconto de entrada reproduz o à vista do mês 1 do cenário G.1 (Calliandra)', () => {
+  const cronoG1: EventoCrono[] = [
+    { evento: 'planejamento', inicio_mes: 0, duracao_meses: 1 },
+    { evento: 'pre_lancamento', inicio_mes: 1, duracao_meses: 0 },
+    { evento: 'lancamento', inicio_mes: 1, duracao_meses: 1 },
+    { evento: 'obra', inicio_mes: 1, duracao_meses: 132 },
+    { evento: 'pos_obra', inicio_mes: 133, duracao_meses: 1 },
+  ];
+  const basePorMes = [0, 2_860_111.52, 2_860_111.52, 2_860_111.52, 2_860_111.52,
+    2_145_083.64, 2_145_083.64, 2_145_083.64, 2_145_083.64, 2_145_083.64, 2_145_083.64, 2_145_083.64, 2_145_083.64];
+  const vgvTotal = basePorMes.reduce((s, v) => s + v, 0);
+  const linha = {
+    tipologias: [{ quantidade: 1, area_privativa_m2: vgvTotal, preco_m2: 1 }], // VGV = base exata
+    absorcao: {
+      modo: 'personalizado',
+      meses: basePorMes.map((v, mes) => ({ mes, pct: (v / vgvTotal) * 100 })),
+    },
+    fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] },
+  };
+  const r = receitaMensalLinha(linha, cronoG1, 20);
+  // Mês 1: só a fração de entrada cai no mês da venda (as demais modalidades —
+  // curta/longa, #232+ — ainda não existem nesta fase); confere isoladamente o
+  // valor da entrada com desconto.
+  assert.ok(perto(r[1], 0.20 * (1 - 0.05) * 2_860_111.52, 0.5));
 });
 
 // 3. Absorção distribuída (4 períodos) aplicada às vendas de uma linha (#108)

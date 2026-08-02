@@ -232,6 +232,77 @@ export function vencimentosAoLongoObra(
   return meses.length > 0 ? meses : [mesVenda];
 }
 
+// ─────────────────────────────────────────────────────────────────
+// 6B.1 Série canônica de contratação — bruto / desconto / líquido (#227)
+// ─────────────────────────────────────────────────────────────────
+//
+// Três grandezas distintas, todas em meses relativos, SEM juros futuros:
+//  - venda BRUTA contratada = área vendável × %absorção do mês × preço/m²;
+//  - desconto comercial = abatimento sobre a parcela de ENTRADA (à vista),
+//    quando configurado (`entrada[].descontoPct`) — série própria, nunca
+//    embutida multiplicativamente no recebível;
+//  - venda LÍQUIDA contratada = bruto − desconto.
+// É a fonte única reusada pela baixa de estoque, pela corretagem (base = bruto,
+// decisão do autor 2026-08-01) e pelas safras (#232+). `receitaMensalLinha`
+// usa `vendaBrutaContratadaMensal` como a "venda" de cada mês e aplica o
+// desconto na formação do recebível — ver ali.
+
+/** #227: venda BRUTA contratada de uma linha/fase, por mês — SEM desconto e SEM
+ * juros futuros. Usa o VGV VENDÁVEL (#195): permuta física não contrata caixa. */
+export function vendaBrutaContratadaMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+  const vgv = vgvVendavelLinha(linha?.tipologias ?? []);
+  if (vgv <= 0) return saida;
+  const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, cronograma);
+  if (!abs) return saida;
+  for (let i = 0; i < abs.pcts.length; i++) {
+    const idx = abs.inicio + i; // mês 0-based coincide com o índice
+    if (idx >= 0 && idx < saida.length) saida[idx] += (vgv * abs.pcts[i]) / 100;
+  }
+  return saida;
+}
+
+/**
+ * #227: desconto comercial mensal de uma linha — soma, mês a mês, o abatimento
+ * configurado em cada linha de Entrada (`entrada[].descontoPct`, ex.: 5% no
+ * pagamento à vista) sobre a fração da venda bruta que cabe a essa entrada.
+ * Sem `entrada[]` configurada (fluxo_pagamento ausente/legado sem desconto),
+ * a série é zero — nenhum estudo existente muda de valor.
+ */
+export function descontoComercialMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
+  const saida = new Array<number>(bruto.length).fill(0);
+  const entradas = normalizarLinhasPagamento(linha?.fluxo_pagamento?.entrada);
+  if (entradas.length === 0) return saida;
+  for (let i = 0; i < bruto.length; i++) {
+    if (bruto[i] <= 0) continue;
+    for (const e of entradas) {
+      const parcela = bruto[i] * (n(e?.pct) / 100);
+      if (parcela > 0 && n(e?.descontoPct) > 0) saida[i] += parcela * (n(e.descontoPct) / 100);
+    }
+  }
+  return saida;
+}
+
+/** #227: venda LÍQUIDA contratada = bruta − desconto comercial. */
+export function vendaLiquidaContratadaMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
+  const desconto = descontoComercialMensal(linha, cronograma, prazoTotal);
+  return bruto.map((v, i) => v - desconto[i]);
+}
+
 /** % do Repasse = 100 − Σ(entrada) − Σ(parcelas), derivado (Lote 6 · #20). */
 export function pctRepasseDerivado(fp: any): number {
   const somaEntrada = normalizarLinhasPagamento(fp?.entrada).reduce((s, e) => s + n(e?.pct), 0);
@@ -253,13 +324,9 @@ export function receitaMensalLinha(
   prazoTotal: number,
 ): number[] {
   const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
-  // VGV VENDÁVEL (#195): a absorção de vendas reparte só o que é efetivamente
-  // vendido por caixa — as unidades permutadas fisicamente saem da base.
+  const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
   const vgv = vgvVendavelLinha(linha?.tipologias ?? []);
   if (vgv <= 0) return saida;
-
-  const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, cronograma);
-  if (!abs) return saida;
 
   const fator = vgv > 0 ? vglLinha(vgv, linha?.fluxo_pagamento) / vgv : 1;
   const fp = linha?.fluxo_pagamento ?? null;
@@ -280,18 +347,22 @@ export function receitaMensalLinha(
     else if (saida.length > 0) saida[saida.length - 1] += valor; // proteção de horizonte
   };
 
-  for (let i = 0; i < abs.pcts.length; i++) {
-    const mesVenda = abs.inicio + i;
-    const venda = (vgv * abs.pcts[i]) / 100;
+  for (let i = 0; i < bruto.length; i++) {
+    const mesVenda = i;
+    const venda = bruto[i]; // #227: venda BRUTA contratada do mês — série canônica
     if (venda <= 0) continue;
     const recebivel = venda * fator;
 
     if (semConfig) { deposita(mesVenda, recebivel); continue; }
 
-    // Entrada — cada linha parcelável a partir do mês da venda.
+    // Entrada — cada linha parcelável a partir do mês da venda. #227: o
+    // desconto comercial (ex.: 5% no pagamento à vista) reduz o valor ANTES
+    // da formação do recebível — a base é a venda bruta contratada, e a
+    // dedução se aplica só à fração desta entrada, nunca ao total da linha.
     for (const e of entradas) {
-      const total = recebivel * (n(e?.pct) / 100);
-      if (total <= 0) continue;
+      const totalBruto = recebivel * (n(e?.pct) / 100);
+      if (totalBruto <= 0) continue;
+      const total = totalBruto * (1 - n(e?.descontoPct) / 100);
       const nParc = Math.max(1, Math.round(n(e?.parcelas) || 1));
       for (let k = 0; k < nParc; k++) deposita(mesVenda + k, total / nParc);
     }
@@ -336,6 +407,14 @@ export function receitaMensalLinha(
  * cada mês. Outras unidades (dado legado) caem no mesmo calendário: o total
  * resolvido é rateado proporcionalmente ao VGV vendido no mês. Sem vendas no
  * horizonte, não há corretagem a pagar.
+ *
+ * #227 — base única de corretagem (decisão do autor, 2026-08-01): **bruto/VGV**,
+ * exatamente esta linha de custo obrigatória em `pct_vgv`. A dedução embutida em
+ * `vglLinha` (comissão `destacada`, que reduz o recebível) é a OUTRA fonte
+ * concorrente apontada no diagnóstico do EVI-008 — contaria a corretagem duas
+ * vezes se as duas ficassem ativas ao mesmo tempo. Removê-la é escopo da #228
+ * (que também cria a série `corretagem_t` explícita); esta linha de custo já é,
+ * e continua sendo, a fonte oficial.
  */
 export function corretagemMensal(
   custo: any,
