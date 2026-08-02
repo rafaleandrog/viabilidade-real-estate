@@ -40,6 +40,14 @@ export class ViabFluxoCronograma extends LitElement {
   @state() private cronoCarregando = false;
   private cronoCarregado = false;
 
+  // #252: rascunho local por evento — Início/Duração deixam de disparar PATCH a
+  // cada tecla (cada urbi:input-numero-change acionava uma chamada, reancorava
+  // custos e emitia um toast por CAMPO). Os dois campos do evento acumulam aqui
+  // até o clique em "Salvar", que os envia numa ÚNICA chamada — atômico para o
+  // par início/duração do mesmo evento, um só toast de reancoragem.
+  @state() private draftCrono: Record<string, { inicio_mes?: number; duracao_meses?: number }> = {};
+  @state() private salvandoEvento: Record<string, boolean> = {};
+
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .params { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 8px; }
     .params urbi-input { width: 160px; }
@@ -183,6 +191,14 @@ export class ViabFluxoCronograma extends LitElement {
     const travadoIni = Boolean(ev.travado_inicio);
     const travadoDur = Boolean(ev.travado_duracao);
     const cor = EVENTO_COR[ev.evento] || 'var(--cor-texto-sec)';
+    // #252: enquanto houver rascunho, a tela exibe o valor DIGITADO (não o
+    // persistido) — inclusive no Período, para o usuário ver o efeito antes de
+    // salvar. Nada é enviado ao backend até o clique em "Salvar".
+    const draft = this.draftCrono[ev.evento];
+    const inicioExibido = draft?.inicio_mes ?? Number(ev.inicio_mes);
+    const duracaoExibida = draft?.duracao_meses ?? Number(ev.duracao_meses);
+    const temRascunho = draft !== undefined;
+    const salvando = Boolean(this.salvandoEvento[ev.evento]);
     return html`
       <tr style="border-left: 3px solid ${cor}">
         <td class="evento">
@@ -194,10 +210,10 @@ export class ViabFluxoCronograma extends LitElement {
         <td>
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="º mês" passo="1"
-              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, Number(ev.inicio_mes)) : ''}
+              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido) : ''}
               ?desabilitado=${dis || travadoIni}
-              .valor=${Number(ev.inicio_mes)}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._salvarEvento(ev.evento, { inicio_mes: e.detail.valor })}
+              .valor=${inicioExibido}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._rascunharEvento(ev.evento, { inicio_mes: e.detail.valor })}
             ></viab-num>
             ${travadoIni ? html`<span class="cadeado" title="Calculado automaticamente">🔒</span>` : nothing}
           </span>
@@ -205,18 +221,66 @@ export class ViabFluxoCronograma extends LitElement {
         <td>
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="meses" passo="1"
-              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, Number(ev.inicio_mes) + Number(ev.duracao_meses) - 1) : ''}
+              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido + duracaoExibida - 1) : ''}
               ?desabilitado=${dis || travadoDur}
-              .valor=${Number(ev.duracao_meses)}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._salvarEvento(ev.evento, { duracao_meses: e.detail.valor })}
+              .valor=${duracaoExibida}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._rascunharEvento(ev.evento, { duracao_meses: e.detail.valor })}
             ></viab-num>
             ${travadoDur ? html`<span class="cadeado" title="Duração fixa">🔒</span>` : nothing}
           </span>
         </td>
-        <td class="periodo">${rotuloPeriodo(dataInicio, Number(ev.inicio_mes), Number(ev.duracao_meses))}</td>
-        ${!dis ? html`<td></td>` : nothing}
+        <td class="periodo">${rotuloPeriodo(dataInicio, inicioExibido, duracaoExibida)}</td>
+        ${!dis ? html`
+          <td>
+            ${temRascunho ? html`
+              <urbi-botao variante="primario" pequeno ?carregando=${salvando}
+                @click=${() => this._salvarLinhaEvento(ev.evento)}>Salvar</urbi-botao>
+              <urbi-botao variante="fantasma" pequeno ?desabilitado=${salvando}
+                @click=${() => this._descartarRascunhoEvento(ev.evento)}>Descartar</urbi-botao>
+            ` : nothing}
+          </td>` : nothing}
       </tr>
     `;
+  }
+
+  // #252: acumula a edição no rascunho local — nenhuma chamada de rede aqui.
+  private _rascunharEvento(evento: string, campo: Record<string, any>) {
+    const valor = Object.values(campo)[0];
+    if (valor === null || valor === undefined || Number(valor) < 0) return;
+    this.draftCrono = { ...this.draftCrono, [evento]: { ...this.draftCrono[evento], ...campo } };
+  }
+
+  private _descartarRascunhoEvento(evento: string) {
+    const { [evento]: _descartado, ...resto } = this.draftCrono;
+    this.draftCrono = resto;
+  }
+
+  // #252: envia início E duração (o que estiver no rascunho) numa ÚNICA
+  // chamada — atômico para o par do mesmo evento, uma só reancoragem, um só
+  // toast. Antes cada campo disparava seu próprio PATCH a cada tecla.
+  private async _salvarLinhaEvento(evento: string) {
+    const dados = this.draftCrono[evento];
+    if (!dados) return;
+    this.salvandoEvento = { ...this.salvandoEvento, [evento]: true };
+    try {
+      const res = await atualizarEventoCronograma(this.estudo.id, evento, dados);
+      if (res?.erro) {
+        urbiVerso.notificar(res.mensagem || 'Erro ao salvar o cronograma', 'erro');
+        return;
+      }
+      this.crono = res.dados || this.crono;
+      this._descartarRascunhoEvento(evento);
+      if (res.custos_reancorados > 0) {
+        urbiVerso.notificar(`${res.custos_reancorados} linha(s) de custo reancorada(s) ao novo cronograma.`, 'info');
+      } else {
+        urbiVerso.notificar('Cronograma salvo.', 'sucesso');
+      }
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao salvar o cronograma', 'erro');
+    } finally {
+      const { [evento]: _s, ...resto } = this.salvandoEvento;
+      this.salvandoEvento = resto;
+    }
   }
 
   private _linhaFase(f: any, idx: number, dataInicio: string | null, dis: boolean): TemplateResult {
@@ -281,32 +345,6 @@ export class ViabFluxoCronograma extends LitElement {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
     } finally {
       this.salvandoParams = false;
-    }
-  }
-
-  private async _salvarEvento(evento: string, dados: Record<string, any>) {
-    const valor = Object.values(dados)[0];
-    if (valor === null || valor === undefined || Number(valor) < 0) return;
-    try {
-      const res = await atualizarEventoCronograma(this.estudo.id, evento, dados);
-      if (res?.erro) {
-        urbiVerso.notificar(res.mensagem || 'Erro ao salvar o cronograma', 'erro');
-        this._carregarCronograma();
-        return;
-      }
-      this.crono = res.dados || this.crono;
-      if (res.custos_reancorados > 0) {
-        urbiVerso.notificar(`${res.custos_reancorados} linha(s) de custo reancorada(s) ao novo cronograma.`, 'info');
-      }
-      // #165: pre_lancamento.inicio_mes (e, em cadeia, lancamento/pos_obra) já
-      // vem recalculado em `res.dados` — o backend (recalcularTravados) deriva
-      // do fim do Planejamento a cada PATCH. O reancoramento manual que existia
-      // aqui fazia `inicio_mes + 1` (ignorando duracao_meses) e ficou redundante
-      // — travado_inicio de pre_lancamento agora é sempre true, então essa
-      // chamada extra passaria a tomar 422 CAMPO_TRAVADO.
-    } catch (e: any) {
-      urbiVerso.notificar(e?.message || 'Erro ao salvar o cronograma', 'erro');
-      this._carregarCronograma();
     }
   }
 
