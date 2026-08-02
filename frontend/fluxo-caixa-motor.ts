@@ -346,6 +346,135 @@ export function pctRepasseDerivado(fp: any): number {
   return Math.max(0, 100 - somaEntrada - somaParcelas);
 }
 
+// ─────────────────────────────────────────────────────────────────
+// #230 — Contrato de componentes de pagamento (EVI-010 + emenda Calliandra)
+// ─────────────────────────────────────────────────────────────────
+//
+// Substitui o modelo rígido por rótulo comercial (à vista / tabela curta /
+// tabela longa) por QUATRO REGRAS ECONÔMICAS, a mesma taxonomia do oráculo
+// dourado (`frontend/fixtures/calliandra-golden.ts`, #220):
+//
+//  - `imediato`     — pago no mês da contratação, com desconto comercial (#227).
+//  - `prazo_fixo`   — N parcelas iguais para toda safra; 1º vencimento em
+//                     `s + defasagemMeses` (default 1, salvo legado de entrada
+//                     parcelada, que usa 0 — 1ª parcela no próprio mês).
+//  - `ate_marco`    — parcelas de `s + defasagemMeses` até um MARCO fixo M;
+//                     N_s = M − s varia com a safra (implementado em #232+).
+//  - `concentrado`  — pagamento único num mês fixo (repasse/liquidação).
+//
+// ESTRATÉGIA CONSERVADORA (corpo da #230): definir o shape canônico → criar o
+// normalizador do dado ATUAL → preservar a leitura legada → só migrar
+// persistência se o ganho justificar. Este PR entrega o TIPO e o ADAPTER
+// (`componentesDoLegado`); a matemática de safra/PMT que os CONSOME é #232+ —
+// `receitaMensalLinha` continua lendo o `fluxo_pagamento` legado diretamente,
+// sem mudança de comportamento nesta issue.
+
+/** Componente de pagamento — 4 regras econômicas, campos mínimos da #230. */
+export type ComponentePagamento =
+  | {
+      tipo: 'imediato';
+      participacaoPct: number;
+      descontoPct: number;
+      rotulo?: string;
+    }
+  | {
+      tipo: 'prazo_fixo';
+      participacaoPct: number;
+      sinalPct: number;
+      prazoMeses: number;
+      defasagemMeses: number;      // 1º vencimento = s + defasagemMeses (default 1)
+      taxaMensal: number;
+      jurosNoMesDaContratacao: boolean; // default false (#234)
+      rotulo?: string;
+    }
+  | {
+      tipo: 'ate_marco';
+      participacaoPct: number;
+      sinalPct: number;
+      marcoMes: number;            // N_s = marcoMes − s (#233)
+      defasagemMeses: number;
+      taxaMensal: number;
+      jurosNoMesDaContratacao: boolean;
+      rotulo?: string;
+    }
+  | {
+      tipo: 'concentrado';
+      participacaoPct: number;
+      mesPagamento: number;
+      rotulo?: string;
+    };
+
+/**
+ * Adapter do JSON legado (`fluxo_pagamento`: `entrada[]`/`parcelas[]`/
+ * `repasse`) para o contrato de componentes (#230). Leitura pura, sem
+ * persistência — não substitui `normalizarLinhasPagamento` nem
+ * `pctRepasseDerivado`, que continuam sendo o que o motor usa até #232+
+ * migrar o cálculo para os componentes.
+ *
+ * Mapeamento (preserva 100% da semântica atual):
+ *  - cada linha de `entrada` com `parcelas ≤ 1` → `imediato` (paga no mês da
+ *    venda, com o desconto de #227); com `parcelas > 1` → `prazo_fixo` com
+ *    `defasagemMeses = 0` (1ª parcela NO mês da venda, como hoje — distinto
+ *    do padrão `1` de uma tabela curta/longa nova, #232+);
+ *  - cada linha de `parcelas` com `ao_longo_obra` → `ate_marco`, com
+ *    `marcoMes` = fim do evento Obra do cronograma (o "marco" de hoje);
+ *    sem `ao_longo_obra` → `prazo_fixo` com `defasagemMeses` = a periodicidade
+ *    (1/3/6/12, conforme hoje) e 1ª parcela em `s + intervalo`;
+ *  - `repasse` (% derivado) → `concentrado`, no mês fixo (fim da Obra +
+ *    `apos_entrega_meses`).
+ * Sem `fluxo_pagamento` (null/legado sem config) → um único `imediato` de
+ * 100%, sem desconto — o "recebe à vista no mês da venda" de hoje.
+ */
+export function componentesDoLegado(
+  fluxoPagamento: any,
+  cronograma: EventoCrono[],
+): ComponentePagamento[] {
+  const fp = fluxoPagamento ?? null;
+  if (!fp) return [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }];
+
+  const componentes: ComponentePagamento[] = [];
+
+  for (const e of normalizarLinhasPagamento(fp.entrada)) {
+    const nParc = Math.max(1, Math.round(n(e?.parcelas) || 1));
+    if (nParc <= 1) {
+      componentes.push({ tipo: 'imediato', participacaoPct: n(e?.pct), descontoPct: n(e?.descontoPct) });
+    } else {
+      componentes.push({
+        tipo: 'prazo_fixo', participacaoPct: n(e?.pct), sinalPct: 0, prazoMeses: nParc,
+        defasagemMeses: 0, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'entrada (legado)',
+      });
+    }
+  }
+
+  const obra = cronograma.find((ev) => ev.evento === 'obra');
+  const fimObra = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : 0;
+
+  for (const p of normalizarLinhasPagamento(fp.parcelas)) {
+    if (p?.ao_longo_obra) {
+      componentes.push({
+        tipo: 'ate_marco', participacaoPct: n(p?.pct), sinalPct: 0, marcoMes: fimObra,
+        defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'ao longo da obra (legado)',
+      });
+    } else {
+      const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
+      componentes.push({
+        tipo: 'prazo_fixo', participacaoPct: n(p?.pct), sinalPct: 0,
+        prazoMeses: Math.max(1, Math.round(n(p?.parcelas) || 1)),
+        defasagemMeses: intervalo, taxaMensal: 0, jurosNoMesDaContratacao: false,
+        rotulo: `parcelamento ${p?.periodicidade ?? 'mensal'} (legado)`,
+      });
+    }
+  }
+
+  const pctRepasse = pctRepasseDerivado(fp);
+  if (pctRepasse > 0) {
+    const mesRepasse = fimObra + Math.max(0, Math.round(n(fp?.repasse?.apos_entrega_meses)));
+    componentes.push({ tipo: 'concentrado', participacaoPct: pctRepasse, mesPagamento: mesRepasse, rotulo: 'repasse (legado)' });
+  }
+
+  return componentes;
+}
+
 /**
  * #228: recebimento BRUTO mensal de uma linha — o que o cliente efetivamente
  * paga, em meses relativos, SEM nenhuma dedução fiscal ou de corretagem (essas
