@@ -99,7 +99,7 @@ export const EVENTO_LABEL: Record<string, string> = {
   pre_lancamento: 'Pré-lançamento',
   lancamento: 'Lançamento',
   obra: 'Obra',
-  pos_obra: 'Pós-obra',
+  pos_obra: 'Após-chaves', // #223: rótulo comercial do período após a entrega (id interno pos_obra intacto)
 };
 
 export const EVENTO_COR: Record<string, string> = {
