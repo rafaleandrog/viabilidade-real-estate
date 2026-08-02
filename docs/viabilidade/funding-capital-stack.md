@@ -20,6 +20,39 @@ ordem: 8
 > comportamento-alvo, não o instalado. **Nenhuma tabela, coluna, rota ou regra deve ser criada a
 > partir deste texto** — só a partir de issue aprovada.
 
+> ✅ **FIN-01 (#270) — portão fechado em 2026-08-02.** Três entregas:
+>
+> 1. **ADR — dependências revisadas.** As duas notas de "dependência dura" deste documento (§6.2 e
+>    §6.4) estavam corretas quando escritas, mas **as issues que travavam já fecharam**: `impostoMensal`
+>    e `corretagemMensal` existem como séries próprias desde a Fase 4 (#228) e já alimentam a
+>    identidade bruta/líquida da permuta financeira (#238, Fase 7); o horizonte derivado (#231) e o
+>    relatório de reconciliação (#240) também já estão na `main`. **Nenhuma das duas notas bloqueia
+>    mais FIN-02 em diante** — mantidas no texto original abaixo só como registro histórico do que
+>    trancava a epic quando ela foi escrita.
+> 2. **Glossário e timing mensal — já formalizados** nas §3 (Conceitos canônicos) e §7 (Ordem mensal
+>    completa do motor) deste documento; FIN-01 os declara **travados** — mudar o vocabulário ou a
+>    ordem dos 17 passos exige revisar esta seção, não só o código.
+> 3. **16 golden cases — `frontend/fixtures/capital-stack-golden.ts`** (+ `.test.ts`), mesmo papel
+>    que `calliandra-golden.ts` teve para #232–#237: um oráculo de referência (`simularCapitalStack`)
+>    e os 16 cenários do §14, cada um executável e reconciliado. **Diferença de método:** não existe
+>    planilha real de Capital Stack para reproduzir — os cenários usam números redondos e são
+>    verificados por invariante fechada (saldo final, total de juros, MOIC/ROI), não por comparação
+>    linha a linha contra uma terceira fonte.
+>
+> **Simplificações do oráculo, registradas como `Evolução dependente de issue` para FIN-02+:**
+> juros na carência sempre capitalizam (o modo "pago" do §4.3 não está no oráculo); amortização
+> contratual SAC/Price não está modelada (só `cash_sweep` e `bullet`, os dois usados pelos 16 casos);
+> Preferred Equity automático por lacuna não está modelado (todos os 16 casos usam aporte
+> programado); o "saldo de distribuição pendente" do §6.2 (quando o caixa do mês não cobre a
+> participação desejada) não é carregado para o mês seguinte — a diferença é simplesmente perdida
+> nesta referência, e o Caso 10 documenta esse comportamento explicitamente. Quem implementar
+> FIN-04/FIN-06/FIN-07 decide se alguma dessas simplificações vira regra definitiva ou é corrigida.
+>
+> **Adição ao §4.1** (não estava explícito no texto original): o Sponsor Equity no modo
+> "participação na receita líquida" é **mutuamente exclusivo** com o resíduo do waterfall nesta
+> referência — uma camada de sponsor está num modo ou no outro, nunca nos dois ao mesmo tempo. Ver
+> Caso 11.
+
 **Rótulos de status usados aqui**, no mesmo padrão de
 [Padrão de Viabilidade — Incorporação](padrao-incorporacao):
 
