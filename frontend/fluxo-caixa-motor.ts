@@ -690,6 +690,72 @@ export function carteiraSaldoSafra(
   return out;
 }
 
+/**
+ * #237: juros pagos por UM componente de UMA safra — a diferença entre o
+ * total efetivamente recebido (parcelas/liquidação, exclui o sinal, que não
+ * carrega juros) e o principal daquele componente. Para `prazo_fixo`/
+ * `ate_marco` a PMT já embute juros e amortização; para `concentrado` é a
+ * capitalização entre a safra e `mesPagamento` (#234). `imediato` não gera
+ * juros (paga no próprio mês). Taxa zero → sempre 0, por construção.
+ */
+export function jurosSafra(
+  c: ComponentePagamento,
+  safra: number,
+  valorContratado: number,
+): number {
+  if (c.tipo === 'imediato') return 0;
+
+  if (c.tipo === 'concentrado') {
+    const pagamentos = pagamentosConcentrado(c, safra, valorContratado);
+    if (pagamentos.length === 0) return 0;
+    const principal = valorContratado * (c.participacaoPct / 100);
+    return pagamentos[0].valor - principal;
+  }
+
+  const pagamentos = c.tipo === 'prazo_fixo'
+    ? pagamentosPrazoFixo(c, safra, valorContratado)
+    : pagamentosAteMarco(c, safra, valorContratado);
+  if (pagamentos.length === 0) return 0;
+
+  const valor = valorContratado * (c.participacaoPct / 100);
+  const principal = valor - valor * (c.sinalPct / 100);
+  const totalParcelas = pagamentos
+    .filter((p) => p.tipo === 'parcela')
+    .reduce((soma, p) => soma + p.valor, 0);
+  return totalParcelas - principal;
+}
+
+/**
+ * #237: invariante da emenda — Receita Bruta = líquido + juros = bruto −
+ * descontos + juros. Verificada aqui por SAFRA, na granularidade em que o
+ * motor de componentes (#232–#236) já opera: soma de TODOS os pagamentos de
+ * TODOS os componentes daquela safra (`receitaBrutaSafra`) contra o valor
+ * líquido contratado da safra mais a soma dos juros de cada componente
+ * (`jurosSafra`). Sem juros (taxa 0 em todo componente), a identidade se
+ * reduz a "Receita Bruta = líquido" — o comportamento hoje em produção,
+ * onde o motor de safras ainda não está ligado a `calcularFluxo` (#230).
+ */
+export function receitaBrutaSafra(
+  componentes: ComponentePagamento[],
+  safra: number,
+  valorContratado: number,
+): number {
+  let total = 0;
+  for (const c of componentes) {
+    if (c.tipo === 'imediato') {
+      total += valorContratado * (c.participacaoPct / 100) * (1 - c.descontoPct / 100);
+    } else if (c.tipo === 'concentrado') {
+      total += pagamentosConcentrado(c, safra, valorContratado).reduce((s, p) => s + p.valor, 0);
+    } else {
+      const pagamentos = c.tipo === 'prazo_fixo'
+        ? pagamentosPrazoFixo(c, safra, valorContratado)
+        : pagamentosAteMarco(c, safra, valorContratado);
+      total += pagamentos.reduce((s, p) => s + p.valor, 0);
+    }
+  }
+  return total;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // #231 — Horizonte derivado de todos os componentes e todas as safras
 // ─────────────────────────────────────────────────────────────────
