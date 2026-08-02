@@ -5,7 +5,7 @@ import {
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   componentesDoLegado, ultimoMesRecebivelLinha,
   pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
-  carteiraSaldoSafra, jurosSafra, receitaBrutaSafra,
+  carteiraSaldoSafra, jurosSafra, receitaBrutaSafra, componentesEfetivosSafra,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
@@ -1308,4 +1308,55 @@ test('receitaBrutaSafra + jurosSafra fecham a identidade: Receita Bruta = (bruto
   assert.ok(jurosTotal > 0); // as taxas positivas garantem juros > 0 neste mix
   const receitaBruta = receitaBrutaSafra(componentes, safra, bruto);
   assert.ok(perto(receitaBruta, liquido + jurosTotal, 1e-6));
+});
+
+// ─────────────────────────────────────────────────────────────────
+// #235 — Vendas Após-chaves recebidas à vista no mês da contratação
+// ─────────────────────────────────────────────────────────────────
+
+const COMPONENTES_GRUPO_PADRAO: ComponentePagamento[] = [
+  { tipo: 'imediato', participacaoPct: 20, descontoPct: 5 },
+  { tipo: 'prazo_fixo', participacaoPct: 30, sinalPct: 15, prazoMeses: 36, defasagemMeses: 1, taxaMensal: 0.01, jurosNoMesDaContratacao: false },
+  { tipo: 'ate_marco', participacaoPct: 20, sinalPct: 0, marcoMes: 24, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false },
+  { tipo: 'concentrado', participacaoPct: 30, mesPagamento: 25, taxaMensal: 0 },
+];
+
+test('componentesEfetivosSafra: venda no último mês antes da entrega mantém os componentes normais', () => {
+  const mesEntrega = 24;
+  const r = componentesEfetivosSafra(COMPONENTES_GRUPO_PADRAO, 24, mesEntrega);
+  assert.equal(r, COMPONENTES_GRUPO_PADRAO); // mesma referência — nenhuma venda pós-entrega
+});
+
+test('componentesEfetivosSafra: venda no primeiro mês Após-chaves vira 100% à vista, sem sinal/parcela/repasse', () => {
+  const mesEntrega = 24;
+  const r = componentesEfetivosSafra(COMPONENTES_GRUPO_PADRAO, 25, mesEntrega);
+  assert.deepEqual(r, [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }]);
+  const pagamentos = receitaBrutaSafra(r, 25, 1_000_000);
+  assert.equal(pagamentos, 1_000_000); // integral, no próprio mês, sem desconto
+});
+
+test('componentesEfetivosSafra: venda no último dos 12 meses Após-chaves também vira à vista', () => {
+  const mesEntrega = 24;
+  const ultimoMesJanela = mesEntrega + 12; // #226: janela fixa de 12 meses
+  const r = componentesEfetivosSafra(COMPONENTES_GRUPO_PADRAO, ultimoMesJanela, mesEntrega);
+  assert.deepEqual(r, [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }]);
+});
+
+test('componentesEfetivosSafra: coexistência — repasse de safra antiga e venda nova à vista no mesmo mês', () => {
+  const mesEntrega = 24;
+  const mesRepasse = 25;
+  // Safra antiga (contratada mês 12, antes da entrega): componentes normais,
+  // o repasse dela cai em 25 via `pagamentosConcentrado`.
+  const componentesAntiga = componentesEfetivosSafra(COMPONENTES_GRUPO_PADRAO, 12, mesEntrega);
+  assert.equal(componentesAntiga, COMPONENTES_GRUPO_PADRAO);
+  const repasseAntigo = pagamentosConcentrado(
+    componentesAntiga[3] as Extract<ComponentePagamento, { tipo: 'concentrado' }>,
+    12, 1_000_000,
+  );
+  assert.equal(repasseAntigo[0].mes, mesRepasse);
+  // Safra nova (contratada NO mês do repasse, já Após-chaves): 100% à vista,
+  // no mesmo mês — os dois recebimentos coexistem sem se misturar.
+  const componentesNova = componentesEfetivosSafra(COMPONENTES_GRUPO_PADRAO, mesRepasse, mesEntrega);
+  const vendaNovaAVista = receitaBrutaSafra(componentesNova, mesRepasse, 500_000);
+  assert.equal(vendaNovaAVista, 500_000);
 });
