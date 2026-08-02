@@ -59,11 +59,34 @@ test('valor inválido/vazio (NaN) não converte', () => {
   assert.equal(converterUnidade(IDENT, areaParaPct, NaN, c), null);
 });
 
-test('arredonda a 2 casas', () => {
+test('convertido PARA identidade (monetário/área canônica) arredonda a 2 casas', () => {
+  const c = ctx({ areaVendavelR: 30000 });
+  const pctParaArea = { tipo: 'pct', link: 'areaVendavelR' } as const;
+  // 33,3333…% de 30000 = 9.999,999… → arredonda a 2 casas: 10.000 (canônico, decimal(12,2)).
+  assert.equal(converterUnidade(pctParaArea, IDENT, 100 / 3, c), 10000);
+});
+
+test('#259: representação derivada (%, R$/m²) NÃO arredonda — carrega precisão plena', () => {
   const c = ctx({ areaVendavelR: 30000 });
   const areaParaPct = { tipo: 'pct', link: 'areaVendavelR' } as const;
-  // 1000 m² / 30000 × 100 = 3,3333… → 3,33
-  assert.equal(converterUnidade(IDENT, areaParaPct, 1000, c), 3.33);
+  // 1000 m² / 30000 × 100 = 3,3333…, sem arredondar aqui — só ao EXIBIR (fmtPct).
+  const resultado = converterUnidade(IDENT, areaParaPct, 1000, c)!;
+  assert.ok(Math.abs(resultado - (1000 / 30000) * 100) < 1e-12);
+  assert.notEqual(resultado, 3.33);
+});
+
+test('#259: round-trip R$ → % → R$ preserva o valor exato (o defeito que esta issue corrige)', () => {
+  // Antes: a representação derivada (%) era arredondada a 2 casas ANTES de
+  // voltar para R$ — R$ 10.000.000 que passava por um % com dízima virava
+  // R$ 9.999.998,76 no retorno. Sem arredondar a derivada internamente, o
+  // round-trip fecha exato, porque a base usada na volta é a mesma da ida.
+  const c = ctx({ vgv: 82_713_401.37 }); // base que gera % com dízima, não redondo
+  const pctVgv = { tipo: 'pct', link: 'vgv' } as const;
+  const valorOriginal = 10_000_000;
+  const pct = converterUnidade(IDENT, pctVgv, valorOriginal, c)!;
+  assert.notEqual(pct, Math.round(pct * 100) / 100); // prova que não é um % "redondo"
+  const voltou = converterUnidade(pctVgv, IDENT, pct, c);
+  assert.equal(voltou, valorOriginal);
 });
 
 // Grandezas do Avançado (Lote 5 · custos): R$/m² de terreno e % da receita.

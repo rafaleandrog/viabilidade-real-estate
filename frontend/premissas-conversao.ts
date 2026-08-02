@@ -44,9 +44,18 @@ export function daBase(conv: ConvUnidade, base: number, ctx: CtxConversao): numb
   return conv.tipo === 'pct' ? (base / x) * 100 : base / x;
 }
 
-// Converte o valor da unidade atual para a unidade nova. Arredonda a 2 casas.
-// Retorna null quando não deve converter (base indefinida) — a UI mantém o valor
-// atual do campo destino nesse caso.
+// Converte o valor da unidade atual para a unidade nova. Retorna null quando não
+// deve converter (base indefinida) — a UI mantém o valor atual do campo destino
+// nesse caso.
+//
+// #259 (contrato C7 — decisão do autor, 2026-08-01): o valor canônico de uma
+// premissa multiunidade é o MONETÁRIO (R$ ou m², `decimal(12,2)` na
+// persistência) — só ele arredonda aqui, a 2 casas. `%` e `R$/m²` são
+// representações DERIVADAS: carregam precisão plena e arredondam só para
+// EXIBIR (`fmtPct`/`fmtR$`, na camada de UI, nunca aqui). Arredondar a
+// derivada antes de devolver é o defeito que esta issue corrige — persistida,
+// ela faz o valor canônico perder o round-trip (R$ 10.000.000 que passa por
+// 12,09% arredondado volta como R$ 9.999.998,76).
 export function converterUnidade(
   convAtual: ConvUnidade, convNova: ConvUnidade, valorAtual: number, ctx: CtxConversao,
 ): number | null {
@@ -54,5 +63,5 @@ export function converterUnidade(
   if (base === null) return null;
   const novo = daBase(convNova, base, ctx);
   if (novo === null) return null;
-  return Math.round(novo * 100) / 100;
+  return convNova.tipo === 'identidade' ? Math.round(novo * 100) / 100 : novo;
 }
