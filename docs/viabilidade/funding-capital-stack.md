@@ -642,9 +642,11 @@ de colunas**, se desejada, é issue posterior e específica.
 > implementadas em 4 grupos (ver `docs/lista-bugs-planejamento-2026-07-31.md` §15 e o histórico da
 > Fase 9 na trilha). O motor (`frontend/capital-stack-motor.ts`) cobre os 4 instrumentos do §4, a
 > prioridade de funding (§5) e o waterfall (§6); a interface (`viab-capital-stack`) consome o motor
-> de verdade. Fora de escopo, registrado explicitamente em cada grupo: gráficos SVG, prévia de
-> recálculo por tecla, integração com `fluxo-tabela.ts`/exportações CSV/PDF, reação a Cenários
-> (§11), e a base de receita líquida do §6.2 sem subtrair corretagem.
+> de verdade. Fora de escopo nesta entrega original, registrado explicitamente em cada grupo:
+> gráficos SVG, prévia de recálculo por tecla, integração com `fluxo-tabela.ts`/exportações CSV/PDF,
+> reação a Cenários (§11), e a base de receita líquida do §6.2 sem subtrair corretagem. **Os 3
+> primeiros foram fechados na terceira rodada (2026-08-02) — ver bloco abaixo; só reação a Cenários
+> continua de fora.**
 
 > 🔎 **Segunda verificação (2026-08-02)** — releitura linha a linha de todo o entregue na Fase 9
 > contra este doc, achou e corrigiu 3 defeitos reais; 2 lacunas ficaram documentadas (não corrigidas
@@ -680,6 +682,36 @@ de colunas**, se desejada, é issue posterior e específica.
 >    programados" entra antes ou depois do cálculo de necessidade; o código segue §3.1 (aportes
 >    primeiro, depois necessidade sobre o caixa já com aporte) — comportamento inalterado nesta
 >    verificação, só registrado para quem revisar o doc depois.
+
+> ✅ **Terceira rodada (2026-08-02) — 3 dos 4 itens fora de escopo fechados a pedido do autor.**
+> Continuam de fora só **reação a Cenários (§11)** e a **generalização de múltiplos Sponsor Equity**
+> (achado 4 acima) — os dois exigem decisão de negócio que o doc ainda não escreve, não é código
+> pendente. Fechados nesta rodada:
+>
+> 1. **Prévia por tecla + gráficos SVG (§9 "Visualizações").** `tela-capital-stack.ts` recalcula a
+>    simulação a cada alteração no editor (`_recalcular`, sobrepõe o draft em memória sobre as
+>    camadas persistidas — nada é enviado à API antes de "Salvar camada", a garantia central do §9
+>    continua intacta) e ganhou dois gráficos SVG puros (sem lib externa): comprometido × utilizado
+>    por camada, e o mensal de entradas × saídas de funding.
+> 2. **Integração com `fluxo-tabela.ts`/exportações CSV/PDF (§10).** Nova função pura
+>    `fundingEntradasSaidasMensal` em `capital-stack-motor.ts` é a ÚNICA fonte da agregação
+>    Entradas/Saídas — consumida pelo gráfico mensal (item 1), pela tabela nova `tabelaCapitalStack`
+>    (`fluxo-tabela.ts`, renderizada em `tela-fluxo-ver.ts` logo abaixo da tabela principal) e pela
+>    exportação (`linhasCapitalStack` em `exportar.ts`), exatamente a árvore do §10: Funding
+>    Entradas/Saídas (4+6 sub-linhas fixas por tipo, não por camada) → Fluxo Líquido de Funding →
+>    Fluxo após Funding → Caixa Final → Saldos (dívida e os dois saldos de PE agora têm série
+>    MENSAL, não só o valor final — novos campos `capitalNaoDevolvidoPorInstrumentoPE`/
+>    `remuneracaoAcumuladaPorInstrumentoPE`). Escopo consciente: só a view **Mensal** (a view Anual
+>    não tem uma agregação do resultado do Capital Stack por período — mesma restrição que já vale
+>    para os KPIs, que também nunca reagregam por ano).
+> 3. **Corretagem na receita líquida (§6.2).** Nova função pura
+>    `receitaLiquidaComCorretagemMensal` (única fonte, usada por `tela-capital-stack.ts` e
+>    `tela-fluxo-ver.ts`) lê a linha de custo "Corretagem de vendas" já calculada em
+>    `calc.linhasCusto` (a mesma fonte oficial única do #227/#228) em vez de duplicar
+>    `corretagemMensal`. `receitaLiquidaMensal` agora bate exatamente com a fórmula do §6.2.
+>
+> Validação: 315 testes (4 novos — `fundingEntradasSaidasMensal`, as séries mensais de saldo PE, e
+> a prioridade de pagamento entre dívidas), typecheck e build limpos, harness de migrações verde.
 
 ---
 

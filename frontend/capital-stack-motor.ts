@@ -14,8 +14,29 @@
 // agora importa este módulo em vez de duplicá-lo — os 16 casos continuam
 // sendo a suíte de reconciliação, só que contra o motor real.
 
+import { eCorretagem } from './fluxo-shared.js';
+
 const round2 = (v: number): number => Math.round(v * 100) / 100;
 const n = (v: any): number => Number(v) || 0;
+
+/**
+ * §6.2: receita_liquida_base = receita_bruta_recebida − impostos − corretagem
+ * − permuta_financeira. `receitaMensal` (de `calcularFluxo`) já é líquida de
+ * RET e permuta financeira (#228) — falta só a corretagem, que é uma linha
+ * de custo comum (fonte oficial única, #227/#228) já calculada dentro de
+ * `linhasCusto` com seu próprio `.mensal`. Única fonte para não duplicar
+ * `corretagemMensal` (fluxo-caixa-motor.ts) nem divergir entre telas —
+ * `tela-capital-stack.ts` e `tela-fluxo-ver.ts` consomem daqui.
+ */
+export function receitaLiquidaComCorretagemMensal(
+  receitaMensal: number[],
+  linhasCusto: { id: any; mensal: number[] }[],
+  custosRaw: any[],
+): number[] {
+  const linhaCorretagem = custosRaw.find(eCorretagem);
+  const corretagem = linhaCorretagem ? linhasCusto.find((l) => l.id === linhaCorretagem.id)?.mensal ?? [] : [];
+  return receitaMensal.map((v, i) => v - (corretagem[i] ?? 0));
+}
 
 /** Taxa mensal equivalente a uma taxa anual composta: (1+a)^(1/12) − 1 — mesma fórmula usada em toda a app (VPL, Calliandra). */
 export function taxaMensalEquivalente(taxaAnual: number): number {
@@ -205,6 +226,9 @@ export interface ResultadoCapitalStack {
   remuneracaoPagaPE: Record<string, number[]>;
   remuneracaoAcumuladaFinalPE: Record<string, number>;
   capitalNaoDevolvidoFinalPE: Record<string, number>;
+  /** Séries mensais dos dois saldos acima (§10 "Saldos") — os campos `*FinalPE` continuam sendo só o último mês, por conveniência. */
+  remuneracaoAcumuladaPorInstrumentoPE: Record<string, number[]>;
+  capitalNaoDevolvidoPorInstrumentoPE: Record<string, number[]>;
   participacaoReceitaPE: Record<string, number[]>;
   participacaoResidualPE: Record<string, number[]>;
   aporteSponsorMensal: number[];
@@ -249,6 +273,8 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
     devolucaoPrincipalPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     remuneracaoPagaPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     remuneracaoAcumuladaFinalPE: {}, capitalNaoDevolvidoFinalPE: {},
+    remuneracaoAcumuladaPorInstrumentoPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
+    capitalNaoDevolvidoPorInstrumentoPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     participacaoReceitaPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     participacaoResidualPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     aporteSponsorMensal: arr(N), distribuicaoSponsorMensal: arr(N),
@@ -384,6 +410,10 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
         caixaDistribuivel = round2(caixaDistribuivel - residual); caixaProjeto = round2(caixaProjeto - residual);
         r.participacaoResidualPE[p.nome][t] = residual;
       }
+      // §10 "Saldos" — série mensal (não só o valor final) dos dois saldos de
+      // Preferred Equity, para a tabela/exportação mostrarem a evolução.
+      r.capitalNaoDevolvidoPorInstrumentoPE[p.nome][t] = capitalNaoDevolvido.get(p.nome)!;
+      r.remuneracaoAcumuladaPorInstrumentoPE[p.nome][t] = remuneracaoAcumulada.get(p.nome)!;
     }
 
     // 7) Sponsor Equity: participação na receita líquida (se configurada) OU
@@ -417,6 +447,41 @@ export function moic(aportes: number, distribuicoes: number): number {
 }
 export function roi(aportes: number, distribuicoes: number): number {
   return aportes > 0 ? (distribuicoes - aportes) / aportes : 0;
+}
+
+/** Soma elemento a elemento todas as séries de um Record — 1-based, mesmo comprimento de `tam`. */
+function somaRecord(rec: Record<string, number[]>, tam: number): number[] {
+  const out = new Array<number>(tam).fill(0);
+  for (const serie of Object.values(rec)) {
+    for (let t = 1; t < tam; t++) out[t] = round2(out[t] + (serie[t] ?? 0));
+  }
+  return out;
+}
+
+/**
+ * §10 "Fluxo de Caixa e relatórios" — Funding Entradas/Saídas agregado, mês a
+ * mês, EXATAMENTE como a árvore do doc define (as mesmas linhas somadas, na
+ * mesma composição). Função pura e única fonte: a tela (gráfico/tabela) e a
+ * exportação CSV/PDF devem consumir daqui, nunca recalcular por conta própria
+ * (§10: "Exportação CSV/PDF e cenários devem usar exatamente os mesmos
+ * arrays do motor").
+ */
+export function fundingEntradasSaidasMensal(r: ResultadoCapitalStack): { entradas: number[]; saidas: number[] } {
+  const tam = r.caixaProjetoMensal.length;
+  const entradas = somaRecord(r.liberacaoPorInstrumento, tam);
+  const entradasPE = somaRecord(r.aportePorInstrumentoPE, tam);
+  const saidas = somaRecord(r.jurosPorInstrumento, tam);
+  const amortizacao = somaRecord(r.amortizacaoPorInstrumento, tam);
+  const devolucaoPE = somaRecord(r.devolucaoPrincipalPE, tam);
+  const remuneracaoPE = somaRecord(r.remuneracaoPagaPE, tam);
+  const participacaoReceita = somaRecord(r.participacaoReceitaPE, tam);
+  const participacaoResidual = somaRecord(r.participacaoResidualPE, tam);
+  for (let t = 1; t < tam; t++) {
+    entradas[t] = round2(entradas[t] + entradasPE[t] + (r.aporteSponsorMensal[t] ?? 0));
+    saidas[t] = round2(saidas[t] + amortizacao[t] + devolucaoPE[t] + remuneracaoPE[t]
+      + participacaoReceita[t] + participacaoResidual[t] + (r.distribuicaoSponsorMensal[t] ?? 0));
+  }
+  return { entradas, saidas };
 }
 
 // ── Adaptador: camadas reais (avancado_capital_instrumentos, #271) → Instrumento ──

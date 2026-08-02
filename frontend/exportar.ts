@@ -5,6 +5,7 @@ import type { Proforma } from './proforma.js';
 import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
+import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
 
 const R$ = (v: number) => v.toFixed(2).replace('.', ',');
 const pct1 = (v: number) => v.toFixed(1).replace('.', ',');
@@ -204,13 +205,68 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
   return linhas;
 }
 
-export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string | null) {
+/** Item 2 (docs/viabilidade/funding-capital-stack.md §10): mesmas linhas que `tabelaCapitalStack` (fluxo-tabela.ts) — nenhuma soma refeita, `fundingEntradasSaidasMensal` é a única fonte. */
+function linhasCapitalStack(r: ResultadoCapitalStack, camadas: { nome: string; tipo: string }[], fluxoLivreMensal: number[]): LinhaFx[] {
+  const prazo = fluxoLivreMensal.length;
+  const a0 = (serie: number[]): number[] => serie.slice(1, prazo + 1);
+  const nomesPorTipo = (tipo: string) => camadas.filter((x) => x.tipo === tipo).map((x) => x.nome);
+  const somaPorNomes = (nomes: string[], rec: Record<string, number[]>): number[] => {
+    const out = new Array<number>(prazo).fill(0);
+    for (const nome of nomes) { const s = rec[nome]; if (!s) continue; for (let i = 0; i < prazo; i++) out[i] += s[i + 1] ?? 0; }
+    return out;
+  };
+  const somaDuas = (a: number[], b: number[]): number[] => a.map((v, i) => v + b[i]);
+  const total = (mensal: number[]) => mensal.reduce((s, v) => s + v, 0);
+  const nomesDivida = [...nomesPorTipo('financiamento_producao'), ...nomesPorTipo('capital_giro')];
+  const nomesPE = nomesPorTipo('preferred_equity');
+
+  const { entradas, saidas } = fundingEntradasSaidasMensal(r);
+  const entradas0 = a0(entradas);
+  const saidas0 = a0(saidas);
+  const fluxoLiquidoFunding = entradas0.map((v, i) => v - saidas0[i]);
+  const fluxoAposFunding = fluxoLivreMensal.map((v, i) => v + fluxoLiquidoFunding[i]);
+  const caixaFinal = a0(r.caixaProjetoMensal);
+
+  const linhas: LinhaFx[] = [
+    { nivel: 0, nome: 'Funding — Entradas', custo: false, separadorAntes: true, total: total(entradas0), mensal: entradas0 },
+    { nivel: 1, nome: 'Financiamento à produção — liberações', custo: false, total: total(somaPorNomes(nomesPorTipo('financiamento_producao'), r.liberacaoPorInstrumento)), mensal: somaPorNomes(nomesPorTipo('financiamento_producao'), r.liberacaoPorInstrumento) },
+    { nivel: 1, nome: 'Capital de giro — liberações', custo: false, total: total(somaPorNomes(nomesPorTipo('capital_giro'), r.liberacaoPorInstrumento)), mensal: somaPorNomes(nomesPorTipo('capital_giro'), r.liberacaoPorInstrumento) },
+    { nivel: 1, nome: 'Equity preferencial — aportes', custo: false, total: total(somaPorNomes(nomesPE, r.aportePorInstrumentoPE)), mensal: somaPorNomes(nomesPE, r.aportePorInstrumentoPE) },
+    { nivel: 1, nome: 'Sponsor Equity — aportes', custo: false, total: total(a0(r.aporteSponsorMensal)), mensal: a0(r.aporteSponsorMensal) },
+    { nivel: 0, nome: 'Funding — Saídas', custo: true, separadorAntes: true, total: total(saidas0), mensal: saidas0 },
+    { nivel: 1, nome: 'Juros e taxas de dívida', custo: true, total: total(somaPorNomes(nomesDivida, r.jurosPorInstrumento)), mensal: somaPorNomes(nomesDivida, r.jurosPorInstrumento) },
+    { nivel: 1, nome: 'Amortização de principal', custo: true, total: total(somaPorNomes(nomesDivida, r.amortizacaoPorInstrumento)), mensal: somaPorNomes(nomesDivida, r.amortizacaoPorInstrumento) },
+    { nivel: 1, nome: 'Devolução de Preferred Equity', custo: true, total: total(somaPorNomes(nomesPE, r.devolucaoPrincipalPE)), mensal: somaPorNomes(nomesPE, r.devolucaoPrincipalPE) },
+    { nivel: 1, nome: 'Retorno preferencial', custo: true, total: total(somaPorNomes(nomesPE, r.remuneracaoPagaPE)), mensal: somaPorNomes(nomesPE, r.remuneracaoPagaPE) },
+    { nivel: 1, nome: 'Participações sobre receita/residual', custo: true, total: total(somaDuas(somaPorNomes(nomesPE, r.participacaoReceitaPE), somaPorNomes(nomesPE, r.participacaoResidualPE))), mensal: somaDuas(somaPorNomes(nomesPE, r.participacaoReceitaPE), somaPorNomes(nomesPE, r.participacaoResidualPE)) },
+    { nivel: 1, nome: 'Distribuições ao sponsor', custo: true, total: total(a0(r.distribuicaoSponsorMensal)), mensal: a0(r.distribuicaoSponsorMensal) },
+    { nivel: 0, nome: 'Fluxo Líquido de Funding', custo: false, separadorAntes: true, total: total(fluxoLiquidoFunding), mensal: fluxoLiquidoFunding },
+    { nivel: 0, nome: 'Fluxo após Funding', custo: false, total: total(fluxoAposFunding), mensal: fluxoAposFunding },
+    { nivel: 0, nome: 'Caixa Final', custo: false, total: caixaFinal[caixaFinal.length - 1] ?? 0, mensal: caixaFinal },
+    { nivel: 0, nome: 'Saldos', custo: false, separadorAntes: true, total: 0, mensal: new Array<number>(prazo).fill(0) },
+    ...nomesDivida.map((nome): LinhaFx => ({ nivel: 1, nome: `Dívida — ${nome}`, custo: false, total: total(somaPorNomes([nome], r.saldoDividaPorInstrumento)), mensal: somaPorNomes([nome], r.saldoDividaPorInstrumento) })),
+    ...nomesPE.map((nome): LinhaFx => ({ nivel: 1, nome: `Capital preferencial não devolvido — ${nome}`, custo: false, total: total(somaPorNomes([nome], r.capitalNaoDevolvidoPorInstrumentoPE)), mensal: somaPorNomes([nome], r.capitalNaoDevolvidoPorInstrumentoPE) })),
+    ...nomesPE.map((nome): LinhaFx => ({ nivel: 1, nome: `Retorno preferencial acumulado — ${nome}`, custo: false, total: total(somaPorNomes([nome], r.remuneracaoAcumuladaPorInstrumentoPE)), mensal: somaPorNomes([nome], r.remuneracaoAcumuladaPorInstrumentoPE) })),
+    { nivel: 1, nome: 'Lacuna de funding', custo: false, total: total(a0(r.lacunaFundingMensal)), mensal: a0(r.lacunaFundingMensal) },
+  ];
+  return linhas;
+}
+
+export interface CapitalStackExport {
+  resultado: ResultadoCapitalStack;
+  camadas: { nome: string; tipo: string }[];
+}
+
+export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string | null, capitalStack?: CapitalStackExport) {
   const rows: string[] = [];
   rows.push('Estudo;' + (estudo.nome_exibicao || estudo.nome));
   rows.push('Nível;Avançado');
   rows.push('');
   rows.push(['Linha', 'Início', 'Duração', 'Total', 'VPL', '% VGV', ...c.meses].join(';'));
-  for (const l of linhasFluxo(c)) {
+  const linhas = capitalStack
+    ? [...linhasFluxo(c), ...linhasCapitalStack(capitalStack.resultado, capitalStack.camadas, c.fluxoMensal)]
+    : linhasFluxo(c);
+  for (const l of linhas) {
     if (l.separadorAntes) rows.push('');
     const indent = '  '.repeat(l.nivel);
     rows.push([
@@ -287,9 +343,12 @@ export function exportarFluxoPDF(
   c: FluxoCalc,
   dataInicio: string | null,
   rotuloColunas = 'Meses',
+  capitalStack?: CapitalStackExport,
 ): boolean {
   const POR_PAGINA = 18; // colunas por página (paisagem)
-  const linhas = linhasFluxo(c);
+  const linhas = capitalStack
+    ? [...linhasFluxo(c), ...linhasCapitalStack(capitalStack.resultado, capitalStack.camadas, c.fluxoMensal)]
+    : linhasFluxo(c);
   const kpis: [string, string][] = [
     ['TIR', c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`],
     ['VPL', fmtR$(c.vpl)],

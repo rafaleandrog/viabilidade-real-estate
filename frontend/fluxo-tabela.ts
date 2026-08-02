@@ -3,6 +3,7 @@ import { fmtR$, fmtPct } from './viab-format.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
+import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tabela + KPIs do Fluxo de Caixa (funções puras).
@@ -377,4 +378,103 @@ export function tabelaFluxo(
 export function chavesColapso(c: FluxoCalc): string[] {
   return ['receita', 'custo-terreno', 'custo-obra', 'custo-diretos', 'custo-indireto', 'custo-financeiro',
     ...c.linhasReceita.map((l) => `r${l.id}`)];
+}
+
+/** Chaves de colapso da tabela de Capital Stack (item 2 — funding-capital-stack.md §10). */
+export const CHAVES_COLAPSO_CAPITAL_STACK = ['fin-entradas', 'fin-saidas', 'fin-saldos'];
+
+/**
+ * §10 "Fluxo de Caixa e relatórios" — Funding Entradas/Saídas, Fluxo Líquido
+ * de Funding, Fluxo após Funding, Caixa Final e Saldos, na MESMA estrutura
+ * de grupo/subgrupo da tabela principal. `camadas` só precisa de `nome`/
+ * `tipo` (para rotular e agrupar as linhas de Saldos por instrumento);
+ * `fluxoLivreMensal` é o `c.fluxoMensal` (0-based) da tabela principal —
+ * "Fluxo após Funding" soma os dois. Renderiza `nothing` sem `resultado`
+ * (nenhuma camada ativa) ou sem camadas — zero efeito em estudo sem Capital
+ * Stack, a mesma regra de blast radius que abriu a aba nova em vez de mexer
+ * aqui direto.
+ */
+export function tabelaCapitalStack(
+  resultado: ResultadoCapitalStack | null,
+  camadas: { nome: string; tipo: string }[],
+  fluxoLivreMensal: number[],
+  meses: string[],
+  colapso: Record<string, boolean>,
+  toggle: (chave: string) => void,
+): TemplateResult {
+  if (!resultado || camadas.length === 0) return html`${nothing}`;
+  const r = resultado;
+  const prazo = fluxoLivreMensal.length;
+  // Séries do motor são 1-based (índice 0 ignorado); a tabela principal é 0-based.
+  const a0 = (serie: number[]): number[] => serie.slice(1, prazo + 1);
+  const nomesPorTipo = (tipo: string) => camadas.filter((c) => c.tipo === tipo).map((c) => c.nome);
+  const somaPorNomes = (nomes: string[], rec: Record<string, number[]>): number[] => {
+    const out = new Array<number>(prazo).fill(0);
+    for (const nome of nomes) {
+      const s = rec[nome];
+      if (!s) continue;
+      for (let i = 0; i < prazo; i++) out[i] += s[i + 1] ?? 0;
+    }
+    return out;
+  };
+  const somaDuas = (a: number[], b: number[]): number[] => a.map((v, i) => v + b[i]);
+  const total = (mensal: number[]) => mensal.reduce((s, v) => s + v, 0);
+  const linha = (mensal: number[]) => ({ mensal, total: total(mensal) });
+
+  const nomesDivida = [...nomesPorTipo('financiamento_producao'), ...nomesPorTipo('capital_giro')];
+  const nomesPE = nomesPorTipo('preferred_equity');
+
+  const { entradas, saidas } = fundingEntradasSaidasMensal(r);
+  const entradas0 = a0(entradas);
+  const saidas0 = a0(saidas);
+  const fluxoLiquidoFunding = entradas0.map((v, i) => v - saidas0[i]);
+  const fluxoAposFunding = somaDuas(fluxoLivreMensal, fluxoLiquidoFunding);
+  const caixaFinal = a0(r.caixaProjetoMensal);
+
+  return html`
+    <div class="fx-wrap">
+      <table class="fx">
+        <thead>
+          <tr>
+            <th class="c1">Programa Financeiro (Capital Stack)</th><th class="c2"></th><th class="c3"></th>
+            <th class="c4">Total</th><th class="c5"></th><th class="c6"></th>
+            ${meses.map((m) => html`<th>${m}</th>`)}
+          </tr>
+        </thead>
+        <tbody>
+          ${linhaTabela('grupo', 'fin-entradas', 'Funding — Entradas', linha(entradas0), null, colapso, toggle, false, 0, true)}
+          ${!colapso['fin-entradas'] ? html`
+            ${linhaTabela('item', '', 'Financiamento à produção — liberações', linha(somaPorNomes(nomesPorTipo('financiamento_producao'), r.liberacaoPorInstrumento)), null, colapso, toggle, false, 0, true, false)}
+            ${linhaTabela('item', '', 'Capital de giro — liberações', linha(somaPorNomes(nomesPorTipo('capital_giro'), r.liberacaoPorInstrumento)), null, colapso, toggle, false, 0, true, false)}
+            ${linhaTabela('item', '', 'Equity preferencial — aportes', linha(somaPorNomes(nomesPE, r.aportePorInstrumentoPE)), null, colapso, toggle, false, 0, true, false)}
+            ${linhaTabela('item', '', 'Sponsor Equity — aportes', linha(a0(r.aporteSponsorMensal)), null, colapso, toggle, false, 0, true, false)}
+          ` : nothing}
+
+          ${linhaTabela('grupo', 'fin-saidas', 'Funding — Saídas', linha(saidas0), null, colapso, toggle, true, 0, true)}
+          ${!colapso['fin-saidas'] ? html`
+            ${linhaTabela('item', '', 'Juros e taxas de dívida', linha(somaPorNomes(nomesDivida, r.jurosPorInstrumento)), null, colapso, toggle, true, 0, true, false)}
+            ${linhaTabela('item', '', 'Amortização de principal', linha(somaPorNomes(nomesDivida, r.amortizacaoPorInstrumento)), null, colapso, toggle, true, 0, true, false)}
+            ${linhaTabela('item', '', 'Devolução de Preferred Equity', linha(somaPorNomes(nomesPE, r.devolucaoPrincipalPE)), null, colapso, toggle, true, 0, true, false)}
+            ${linhaTabela('item', '', 'Retorno preferencial', linha(somaPorNomes(nomesPE, r.remuneracaoPagaPE)), null, colapso, toggle, true, 0, true, false)}
+            ${linhaTabela('item', '', 'Participações sobre receita/residual', linha(somaDuas(somaPorNomes(nomesPE, r.participacaoReceitaPE), somaPorNomes(nomesPE, r.participacaoResidualPE))), null, colapso, toggle, true, 0, true, false)}
+            ${linhaTabela('item', '', 'Distribuições ao sponsor', linha(a0(r.distribuicaoSponsorMensal)), null, colapso, toggle, true, 0, true, false)}
+          ` : nothing}
+
+          <tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${meses.map(() => html`<td></td>`)}</tr>
+          ${linhaResultado('Fluxo Líquido de Funding', fluxoLiquidoFunding, 0)}
+          ${linhaResultado('Fluxo após Funding', fluxoAposFunding, 0)}
+          ${linhaResultado('Caixa Final', caixaFinal, 0)}
+
+          <tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${meses.map(() => html`<td></td>`)}</tr>
+          ${linhaTabela('grupo', 'fin-saldos', 'Saldos', linha(new Array<number>(prazo).fill(0)), null, colapso, toggle, false, 0, true)}
+          ${!colapso['fin-saldos'] ? html`
+            ${nomesDivida.map((nome) => linhaTabela('item', '', `Dívida — ${nome}`, linha(somaPorNomes([nome], r.saldoDividaPorInstrumento)), null, colapso, toggle, true, 0, true, false))}
+            ${nomesPE.map((nome) => linhaTabela('item', '', `Capital preferencial não devolvido — ${nome}`, linha(somaPorNomes([nome], r.capitalNaoDevolvidoPorInstrumentoPE)), null, colapso, toggle, true, 0, true, false))}
+            ${nomesPE.map((nome) => linhaTabela('item', '', `Retorno preferencial acumulado — ${nome}`, linha(somaPorNomes([nome], r.remuneracaoAcumuladaPorInstrumentoPE)), null, colapso, toggle, true, 0, true, false))}
+            ${linhaTabela('item', '', 'Lacuna de funding', linha(a0(r.lacunaFundingMensal)), null, colapso, toggle, true, 0, true, false)}
+          ` : nothing}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
