@@ -366,7 +366,10 @@ export class ViabCapitalStack extends LitElement {
       return (r.aportePorInstrumentoPE[c.nome] ?? []).reduce((a, b) => a + b, 0);
     }
     if (c.tipo === 'sponsor_equity') {
-      return r.aporteSponsorMensal.reduce((a, b) => a + b, 0);
+      // Por instrumento — com 2+ Sponsor Equity ativos, `aporteSponsorMensal`
+      // é o AGREGADO de todos; usar direto aqui contaria o mesmo valor em
+      // cada camada.
+      return (r.aportePorInstrumentoSponsor[c.nome] ?? []).reduce((a, b) => a + b, 0);
     }
     return 0;
   }

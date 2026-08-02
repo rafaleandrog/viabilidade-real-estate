@@ -4,7 +4,7 @@ import {
   fluxoAposFundingMensal, caixaAcumuladoMensal, necessidadeFundingMensal,
   caixaDistribuivelMensal, reconciliarCapitalStack,
   custoElegivelMensalDeLinhas, instrumentoDeRegistro, simularCapitalStackDoEstudo,
-  simularCapitalStack, type InstrumentoPreferredEquity, type InstrumentoDivida,
+  simularCapitalStack, type InstrumentoPreferredEquity, type InstrumentoDivida, type InstrumentoSponsorEquity,
   fundingEntradasSaidasMensal,
 } from './capital-stack-motor.js';
 
@@ -220,4 +220,38 @@ test('capitalNaoDevolvidoPorInstrumentoPE/remuneracaoAcumuladaPorInstrumentoPE: 
   assert.deepEqual(r.remuneracaoAcumuladaPorInstrumentoPE['PE'], [0, 100, 200]);
   assert.equal(r.capitalNaoDevolvidoPorInstrumentoPE['PE'][2], r.capitalNaoDevolvidoFinalPE['PE']);
   assert.equal(r.remuneracaoAcumuladaPorInstrumentoPE['PE'][2], r.remuneracaoAcumuladaFinalPE['PE']);
+});
+
+// Achado da segunda verificação (2026-08-02), decisão do autor: com 2+
+// Sponsor Equity ativos, o motor usava `.find()` — só o primeiro participava,
+// o segundo ficava silenciosamente sem efeito mesmo com `cobreLacunaAutomatica:
+// true`. Corrigido para ratear pro-rata pelo aporte acumulado; sem nenhum
+// aporte ainda (caso deste teste), divide igualmente entre os ativos.
+test('múltiplos Sponsor Equity: lacuna e resíduo se dividem igualmente sem aporte prévio, depois pro-rata pelo acumulado', () => {
+  const a: InstrumentoSponsorEquity = { tipo: 'sponsor_equity', nome: 'A', cobreLacunaAutomatica: true };
+  const b: InstrumentoSponsorEquity = { tipo: 'sponsor_equity', nome: 'B', cobreLacunaAutomatica: true };
+  const r = simularCapitalStack({
+    nome: 'multi-sponsor', meses: 2, fluxoLivreMensal: [0, -300, 100], reservaMinima: 0, instrumentos: [a, b],
+  });
+  // Mês 1: nenhum aportou ainda — lacuna de 300 dividida 50/50.
+  assert.equal(r.aportePorInstrumentoSponsor['A'][1], 150);
+  assert.equal(r.aportePorInstrumentoSponsor['B'][1], 150);
+  assert.equal(r.aporteSponsorMensal[1], 300);
+  // Mês 2: sem % de receita própria, o resíduo (100) é pool compartilhado —
+  // agora pro-rata pelo que cada um já aportou (150 cada, ainda 50/50).
+  assert.equal(r.distribuicaoPorInstrumentoSponsor['A'][2], 50);
+  assert.equal(r.distribuicaoPorInstrumentoSponsor['B'][2], 50);
+  assert.equal(r.distribuicaoSponsorMensal[2], 100);
+});
+
+test('múltiplos Sponsor Equity: % de receita líquida é contratual e independente — não é rateado', () => {
+  const a: InstrumentoSponsorEquity = { tipo: 'sponsor_equity', nome: 'A', cobreLacunaAutomatica: false, percentualReceitaLiquida: 0.10 };
+  const b: InstrumentoSponsorEquity = { tipo: 'sponsor_equity', nome: 'B', cobreLacunaAutomatica: false, percentualReceitaLiquida: 0.05 };
+  const r = simularCapitalStack({
+    nome: 'multi-sponsor-pct', meses: 1, fluxoLivreMensal: [0, 1000], receitaLiquidaMensal: [0, 1000],
+    reservaMinima: 0, instrumentos: [a, b],
+  });
+  assert.equal(r.distribuicaoPorInstrumentoSponsor['A'][1], 100);
+  assert.equal(r.distribuicaoPorInstrumentoSponsor['B'][1], 50);
+  assert.equal(r.distribuicaoSponsorMensal[1], 150);
 });
