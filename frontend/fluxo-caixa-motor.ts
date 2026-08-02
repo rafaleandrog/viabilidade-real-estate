@@ -552,6 +552,46 @@ export function pagamentosPrazoFixo(
   return out;
 }
 
+/**
+ * #233: pagamentos de um componente `ate_marco` para a safra iniciada em
+ * `safra` — a regra que corrige a premissa errada do corpo publicado no
+ * GitHub ("1ª parcela no mês da venda"). A correta, reconciliada contra o
+ * Anexo G.2 (Calliandra até Obra + repasse):
+ *
+ *   N_s = marcoMes − safra    (varia por safra — venda tardia tem MENOS
+ *                              parcelas e cada parcela é MAIOR, mesmo principal)
+ *   1ª parcela em safra + defasagemMeses (default 1 — nunca no mês da venda)
+ *   última parcela em marcoMes
+ *
+ * `N_s ≤ 0` (venda no mês do marco ou depois) é ERRO — o motor não cria
+ * prazo negativo nem concentra tudo de qualquer jeito; quem chama decide se
+ * bloqueia a configuração ou converte para `imediato`/`concentrado`.
+ */
+export function pagamentosAteMarco(
+  c: Extract<ComponentePagamento, { tipo: 'ate_marco' }>,
+  safra: number,
+  valorContratado: number,
+): PagamentoSafra[] {
+  const valor = valorContratado * (c.participacaoPct / 100);
+  if (valor <= 0) return [];
+  const sinal = valor * (c.sinalPct / 100);
+  const principal = valor - sinal;
+  const nParcelas = c.marcoMes - safra - (c.defasagemMeses - 1);
+  if (nParcelas <= 0) {
+    throw new Error(
+      `pagamentosAteMarco: N_s = ${nParcelas} ≤ 0 na safra ${safra} (marco ${c.marcoMes}). ` +
+      'O motor não cria prazo negativo — converta o componente para imediato ou concentrado (#233).',
+    );
+  }
+  const out: PagamentoSafra[] = [];
+  if (sinal > 0) out.push({ safra, mes: safra, tipo: 'sinal', valor: sinal });
+  const parcela = pmt(c.taxaMensal, nParcelas, principal);
+  for (let k = 1; k <= nParcelas; k++) {
+    out.push({ safra, mes: safra + c.defasagemMeses + (k - 1), tipo: 'parcela', valor: parcela });
+  }
+  return out;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // #231 — Horizonte derivado de todos os componentes e todas as safras
 // ─────────────────────────────────────────────────────────────────
