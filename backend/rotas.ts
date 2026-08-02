@@ -10,6 +10,7 @@ import { rotasEmpreendimento } from './rotas/empreendimento.js';
 import { rotasManutencao } from './rotas/manutencao.js';
 import { rotasAvancado } from './rotas/avancado.js';
 import { rotasAnaliseMercado } from './rotas/analise-mercado.js';
+import { rotasCapitalStack } from './rotas/capital-stack.js';
 
 // Rotas de negócio da app `viabilidade`.
 // O shell prefixa tudo com /api/viabilidade/ — as rotas aqui são sempre relativas.
@@ -27,6 +28,7 @@ rotas.use(rotasEmpreendimento);
 rotas.use(rotasManutencao);
 rotas.use(rotasAvancado);
 rotas.use(rotasAnaliseMercado);
+rotas.use(rotasCapitalStack);
 
 // Rotinas agendadas (framework de agenda do UrbiVerso, #200). Declaradas em
 // `manifesto.json` → `rotinas`; o shell descobre este export no mesmo módulo de

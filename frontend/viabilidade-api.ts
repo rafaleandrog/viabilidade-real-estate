@@ -230,6 +230,25 @@ export function removerCustoAvancado(estudoId: number, cid: number): Promise<any
   return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos/${cid}`, { method: 'DELETE' });
 }
 
+// ── Avançado: Capital Stack — camadas (epic #239, FIN-02/#271) ──
+// Nenhuma tela consome estas funções ainda — a interface é a FIN-08 (#277).
+export function listarCapitalInstrumentos(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/capital-instrumentos`);
+}
+export function criarCapitalInstrumento(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/capital-instrumentos`, {
+    method: 'POST', body: JSON.stringify(dados),
+  });
+}
+export function atualizarCapitalInstrumento(estudoId: number, cid: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/capital-instrumentos/${cid}`, {
+    method: 'PATCH', body: JSON.stringify(dados),
+  });
+}
+export function removerCapitalInstrumento(estudoId: number, cid: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/capital-instrumentos/${cid}`, { method: 'DELETE' });
+}
+
 // ── Avançado: Cenários salvos (Etapa 8 · #56) ──
 // Cada cenário guarda um par de deltas percentuais (preço de venda, custo de
 // obra); o motor reaplica-os (aplicarCenario) ao recalcular o fluxo.

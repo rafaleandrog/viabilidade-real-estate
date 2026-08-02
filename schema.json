@@ -330,6 +330,23 @@
       "indices": [["estudo_id"]]
     },
 
+    "avancado_capital_instrumentos": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":            { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "tipo":                 { "tipo": "texto", "limite": 30, "opcoes": ["financiamento_producao", "capital_giro", "preferred_equity", "sponsor_equity"], "obrigatorio": true },
+        "nome":                 { "tipo": "texto", "limite": 100, "obrigatorio": true },
+        "status":               { "tipo": "texto", "limite": 20, "opcoes": ["rascunho", "ativo", "encerrado", "revisao_necessaria"], "padrao": "rascunho" },
+        "prioridade_funding":   { "tipo": "inteiro", "padrao": 0 },
+        "prioridade_pagamento": { "tipo": "inteiro", "padrao": 0 },
+        "compromisso":          { "tipo": "decimal", "precisao": 15, "escala": 2 },
+        "config":               { "tipo": "json" },
+        "origem_legado":        { "tipo": "texto", "limite": 30 },
+        "ordem":                { "tipo": "inteiro", "padrao": 0 }
+      },
+      "indices": [["estudo_id"]]
+    },
+
     "avancado_cenarios": {
       "acesso_externo": "restrito",
       "colunas": {
