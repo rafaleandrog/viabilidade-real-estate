@@ -9,26 +9,29 @@ import {
   listarCapitalInstrumentos, criarCapitalInstrumento, atualizarCapitalInstrumento, removerCapitalInstrumento,
 } from './viabilidade-api.js';
 import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { simularCapitalStackDoEstudo, moic, type ResultadoCapitalStack } from './capital-stack-motor.js';
+import {
+  simularCapitalStackDoEstudo, moic, fundingEntradasSaidasMensal,
+  receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack,
+} from './capital-stack-motor.js';
 import './viab-num.js';
 
 // Sub-aba "Viabilidade → Capital Stack" (epic #239, FIN-08/#277 + FIN-09/#278).
 //
-// Escopo desta entrega, mais modesto que o §9/§10 completo de
-// docs/viabilidade/funding-capital-stack.md — decisão de manter o risco
-// baixo num ambiente sem navegador para validar layout/interação:
+// Escopo desta entrega:
 //  - Resumo superior: KPIs agregados (§9), calculados de verdade via
 //    `simularCapitalStackDoEstudo` sobre o fluxo livre real do estudo.
 //  - Lista de camadas com edição inline por tipo (§9 "Capital Stack" +
 //    "Editor de camada", os 5 blocos como seções dentro do MESMO card, em
 //    vez de um modal/wizard separado).
-//  - SEM gráficos SVG (§9 "Visualizações") e SEM prévia de recálculo a cada
-//    tecla — a mudança só é aplicada em "Salvar camada" (ainda assim, nunca
-//    salva sem confirmação explícita, que é a garantia central do §9).
-//  - `receitaLiquidaMensal` usa `receitaMensal` do motor (já líquida de RET
-//    e permuta financeira, #228) SEM subtrair corretagem — o §6.2 pede as
-//    duas; falta o mesmo `ContextoCusto` que `tela-fluxo-custos.ts` monta.
-//    Registrado aqui em vez de fingir precisão que não existe.
+//  - Prévia de recálculo a cada tecla no editor (§9) — todo campo de `config`
+//    recalcula a simulação sobre o DRAFT em memória, sem tocar a API; só
+//    "Salvar camada" persiste (a garantia central do §9 continua intacta).
+//  - Gráficos SVG (§9 "Visualizações") — comprometido×utilizado por camada e
+//    aportes/liberações×pagamentos/distribuições mês a mês, sem lib externa
+//    (mesmo padrão zero-dependência do resto do app).
+//  - `receitaLiquidaMensal` já subtrai a corretagem (§6.2): lê a linha de
+//    custo "Corretagem de vendas" (fonte oficial única, #227/#228) dentro de
+//    `calc.linhasCusto` em vez de duplicar `corretagemMensal`.
 //
 // Nada aqui é usado pelo Preliminar. Camadas `rascunho`/`revisao_necessaria`/
 // `encerrado` aparecem na lista mas NÃO entram no cálculo do resumo — só
@@ -73,6 +76,10 @@ export class ViabCapitalStack extends LitElement {
   @state() private criando = false;
 
   private carregado = false;
+  // Cache do que `_carregar` já buscou/calculou, para a prévia por tecla
+  // recalcular sem refazer chamadas de API a cada dígito digitado.
+  private fluxoLivre1based: number[] = [];
+  private receitaLiquida1based: number[] = [];
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
@@ -98,6 +105,18 @@ export class ViabCapitalStack extends LitElement {
     table.resultados th, table.resultados td { padding: 6px 8px; font-size: 0.8125rem; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); text-align: left; }
     table.resultados th { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 600; text-align: left; }
     table.resultados td.num, table.resultados th.num { text-align: right; }
+    .graficos { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
+    .grafico-card { flex: 1; min-width: 280px; }
+    svg.grafico { width: 100%; height: auto; overflow: visible; font-variant-numeric: tabular-nums; }
+    .barra-comprometido { fill: var(--cor-texto-sec, rgba(255,255,255,0.25)); }
+    .barra-utilizado { fill: var(--cor-info, #4a90d9); }
+    .rotulo-barra { fill: var(--cor-texto, #fff); font-size: 10px; }
+    .rotulo-camada { fill: var(--cor-texto-sec, rgba(255,255,255,0.7)); font-size: 10px; }
+    .linha-entradas { stroke: var(--cor-sucesso, #13a98d); fill: none; stroke-width: 2; }
+    .linha-saidas { stroke: var(--cor-erro, #d45a3a); fill: none; stroke-width: 2; }
+    .eixo-mes { fill: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: 9px; }
+    .grafico-legenda { display: flex; gap: 14px; font-size: 0.72rem; margin-top: 6px; color: var(--cor-texto-sec, rgba(255,255,255,0.7)); }
+    .grafico-legenda .ponto { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
   `];
 
   updated() {
@@ -130,16 +149,31 @@ export class ViabCapitalStack extends LitElement {
       const calc = calcularFluxo(config);
       this.resultadoDesalavancado = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] || 0;
 
+      const receitaLiquidaComCorretagem = receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, this.custos);
+
       // Motor é 1-based (índice 0 ignorado); calcularFluxo é 0-based.
-      const fluxoLivre1based = [0, ...calc.fluxoMensal];
-      const receitaLiquida1based = [0, ...calc.receitaMensal];
-      this.resultado = simularCapitalStackDoEstudo(
-        fluxoLivre1based, receitaLiquida1based, this.camadas, calc.linhasCusto, 0,
-      );
+      this.fluxoLivre1based = [0, ...calc.fluxoMensal];
+      this.receitaLiquida1based = [0, ...receitaLiquidaComCorretagem];
+      this.linhasCustoCalc = calc.linhasCusto;
+      this._recalcular();
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar o Capital Stack', 'erro');
     }
     this.carregando = false;
+  }
+
+  private linhasCustoCalc: { id: any; mensal: number[] }[] = [];
+
+  /**
+   * §9: toda alteração no editor recalcula a PRÉVIA sem salvar. Sobrepõe o
+   * draft de cada camada em edição por cima do dado persistido (`this.camadas`)
+   * antes de simular — nada é enviado à API aqui, só `_salvar` persiste.
+   */
+  private _recalcular() {
+    const camadasComDraft = this.camadas.map((c) => (c.id in this.draft ? this.draft[c.id] : c));
+    this.resultado = simularCapitalStackDoEstudo(
+      this.fluxoLivre1based, this.receitaLiquida1based, camadasComDraft, this.linhasCustoCalc, 0,
+    );
   }
 
   private _draftDe(c: any): any {
@@ -150,11 +184,13 @@ export class ViabCapitalStack extends LitElement {
   private _setCampo(c: any, campo: string, valor: any) {
     const d = this._draftDe(c);
     this.draft = { ...this.draft, [c.id]: { ...d, [campo]: valor } };
+    this._recalcular();
   }
 
   private _setConfig(c: any, campo: string, valor: any) {
     const d = this._draftDe(c);
     this.draft = { ...this.draft, [c.id]: { ...d, config: { ...d.config, [campo]: valor } } };
+    this._recalcular();
   }
 
   private _toggleCustoElegivel(c: any, custoId: number, marcado: boolean) {
@@ -316,6 +352,101 @@ export class ViabCapitalStack extends LitElement {
           })}
         </tbody>
       </table>
+    `;
+  }
+
+  /** Liberado/aportado por camada — mesma leitura de `_renderResultadosPorCamada`, + sponsor (só usado pelo gráfico). */
+  private _liberadoOuAportado(c: any): number {
+    const r = this.resultado;
+    if (!r || c.status !== 'ativo') return 0;
+    if (c.tipo === 'financiamento_producao' || c.tipo === 'capital_giro') {
+      return (r.liberacaoPorInstrumento[c.nome] ?? []).reduce((a, b) => a + b, 0);
+    }
+    if (c.tipo === 'preferred_equity') {
+      return (r.aportePorInstrumentoPE[c.nome] ?? []).reduce((a, b) => a + b, 0);
+    }
+    if (c.tipo === 'sponsor_equity') {
+      return r.aporteSponsorMensal.reduce((a, b) => a + b, 0);
+    }
+    return 0;
+  }
+
+  /** Lê `compromisso` do draft em edição, sem criar entrada nova (`_draftDe` criaria e afetaria "Salvar camada"). */
+  private _compromissoAtual(c: any): number {
+    const d = this.draft[c.id];
+    return n(d ? d.compromisso : c.compromisso);
+  }
+
+  /**
+   * §9 "Visualizações" — gráfico de Capital Stack comprometido × utilizado,
+   * uma barra dupla por camada. SVG puro (sem lib externa, mesmo padrão do
+   * resto do app) — recalcula a cada tecla porque lê `this.resultado`
+   * (já a prévia via `_recalcular`) e `_compromissoAtual` (o draft em edição).
+   */
+  private _renderGraficoComprometidoUtilizado(): TemplateResult {
+    if (this.camadas.length === 0) return html`${nothing}`;
+    const linhas = this.camadas.map((c) => ({
+      nome: c.nome, comprometido: this._compromissoAtual(c), utilizado: this._liberadoOuAportado(c),
+    }));
+    const max = Math.max(1, ...linhas.flatMap((l) => [l.comprometido, l.utilizado]));
+    const altLinha = 34;
+    const alturaTotal = linhas.length * altLinha;
+    const larguraBarraMax = 260; // eixo X fixo em unidades de viewBox; escala visual via viewBox + width:100%
+    return html`
+      <div class="grafico-card">
+        <h4>Capital comprometido × utilizado, por camada</h4>
+        <svg class="grafico" viewBox="0 0 400 ${alturaTotal}" preserveAspectRatio="xMinYMin meet">
+          ${linhas.map((l, i) => {
+            const y = i * altLinha;
+            const wComprometido = (l.comprometido / max) * larguraBarraMax;
+            const wUtilizado = (l.utilizado / max) * larguraBarraMax;
+            return html`
+              <text x="0" y=${y + 10} class="rotulo-camada">${l.nome}</text>
+              <rect x="0" y=${y + 14} width=${wComprometido} height="7" class="barra-comprometido"></rect>
+              <rect x="0" y=${y + 22} width=${wUtilizado} height="7" class="barra-utilizado"></rect>
+              <text x=${wComprometido + 4} y=${y + 20} class="rotulo-barra">${fmtR$(l.comprometido)}</text>
+              <text x=${wUtilizado + 4} y=${y + 28} class="rotulo-barra">${fmtR$(l.utilizado)}</text>
+            `;
+          })}
+        </svg>
+        <div class="grafico-legenda">
+          <span><i class="ponto" style="background:var(--cor-texto-sec, rgba(255,255,255,0.25))"></i>Comprometido</span>
+          <span><i class="ponto" style="background:var(--cor-info, #4a90d9)"></i>Utilizado (liberado/aportado)</span>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * §9 "Visualizações" — gráfico mensal de aportes/liberações (entradas de
+   * funding) × pagamentos/distribuições (saídas de funding), via a mesma
+   * agregação `fundingEntradasSaidasMensal` que a tabela/exportação (item 2)
+   * vai consumir — nunca soma as linhas de novo aqui.
+   */
+  private _renderGraficoMensal(): TemplateResult {
+    const r = this.resultado;
+    if (!r || r.caixaProjetoMensal.length <= 1) return html`${nothing}`;
+    const { entradas, saidas } = fundingEntradasSaidasMensal(r);
+    const meses = entradas.length - 1;
+    const max = Math.max(1, ...entradas.slice(1), ...saidas.slice(1));
+    const largura = 400, altura = 140, margemBaixo = 16;
+    const x = (t: number) => (meses <= 1 ? 0 : ((t - 1) / (meses - 1)) * largura);
+    const y = (v: number) => altura - margemBaixo - (v / max) * (altura - margemBaixo);
+    const pontos = (serie: number[]) => serie.slice(1).map((v, i) => `${x(i + 1)},${y(v)}`).join(' ');
+    return html`
+      <div class="grafico-card">
+        <h4>Funding mensal — entradas × saídas</h4>
+        <svg class="grafico" viewBox="0 0 ${largura} ${altura}" preserveAspectRatio="xMinYMin meet">
+          <polyline points=${pontos(entradas)} class="linha-entradas"></polyline>
+          <polyline points=${pontos(saidas)} class="linha-saidas"></polyline>
+          <text x="0" y=${altura} class="eixo-mes">mês 1</text>
+          <text x=${largura} y=${altura} text-anchor="end" class="eixo-mes">mês ${meses}</text>
+        </svg>
+        <div class="grafico-legenda">
+          <span><i class="ponto" style="background:var(--cor-sucesso, #13a98d)"></i>Entradas (liberações/aportes)</span>
+          <span><i class="ponto" style="background:var(--cor-erro, #d45a3a)"></i>Saídas (juros/amortização/retorno)</span>
+        </div>
+      </div>
     `;
   }
 
@@ -498,6 +629,10 @@ export class ViabCapitalStack extends LitElement {
     return html`
       ${this._renderResumo()}
       ${this._renderResultadosPorCamada()}
+      <div class="graficos">
+        ${this._renderGraficoComprometidoUtilizado()}
+        ${this._renderGraficoMensal()}
+      </div>
       <div class="camadas">
         ${this.camadas.map((c) => this._renderCamada(c))}
       </div>

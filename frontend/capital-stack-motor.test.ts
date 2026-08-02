@@ -5,6 +5,7 @@ import {
   caixaDistribuivelMensal, reconciliarCapitalStack,
   custoElegivelMensalDeLinhas, instrumentoDeRegistro, simularCapitalStackDoEstudo,
   simularCapitalStack, type InstrumentoPreferredEquity, type InstrumentoDivida,
+  fundingEntradasSaidasMensal,
 } from './capital-stack-motor.js';
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
@@ -182,4 +183,41 @@ test('§9: prioridade de pagamento entre dívidas é independente da prioridade 
   assert.equal(r.amortizacaoPorInstrumento['A'][2], 700);
   assert.equal(r.saldoDividaPorInstrumento['B'][2], 0);
   assert.equal(r.saldoDividaPorInstrumento['A'][2], 300);
+});
+
+// §10: fonte única de agregação Funding Entradas/Saídas, consumida pelo
+// gráfico mensal (tela-capital-stack.ts) e pela tabela/exportação
+// (fluxo-tabela.ts/exportar.ts) — precisa somar exatamente as mesmas linhas
+// que a árvore do doc lista, nem mais nem menos.
+test('fundingEntradasSaidasMensal: soma liberação de dívida como entrada, juros+amortização como saída', () => {
+  const fin: InstrumentoDivida = {
+    tipo: 'divida', nome: 'Fin', limiteComprometido: 1000, taxaMensal: 0.01,
+    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1, prioridadePagamento: 1,
+  };
+  const r = simularCapitalStack({
+    nome: 'entradas-saidas', meses: 2, fluxoLivreMensal: [0, -500, 800], reservaMinima: 0, instrumentos: [fin],
+  });
+  const { entradas, saidas } = fundingEntradasSaidasMensal(r);
+  assert.deepEqual(entradas, [0, 500, 0]);
+  assert.deepEqual(saidas, [0, 0, 510]);
+});
+
+// §10 "Saldos": a série mensal precisa existir (não só o valor final) para a
+// tabela mostrar a evolução mês a mês — o último ponto da série tem que
+// bater com o `*FinalPE` que já era exposto.
+test('capitalNaoDevolvidoPorInstrumentoPE/remuneracaoAcumuladaPorInstrumentoPE: série mensal bate com o valor final', () => {
+  const pe: InstrumentoPreferredEquity = {
+    tipo: 'preferred_equity', nome: 'PE', aportes: [{ mes: 1, valor: 1000 }],
+    modo: 'A', taxaMensal: 0.10, capitalizacao: 'simples', prioridadePagamento: 1,
+  };
+  const r = simularCapitalStack({
+    // fluxoLivre[1] = -1000 absorve o próprio aporte no mês 1 — sem isso, o
+    // aporte entraria em caixa e pagaria a si mesmo de volta no mesmo mês.
+    nome: 'saldos-mensais', meses: 2, fluxoLivreMensal: [0, -1000, 0], reservaMinima: 0, instrumentos: [pe],
+  });
+  // Sem caixa distribuível nos 2 meses, nada é pago: saldo cresce só por juros acumulados.
+  assert.deepEqual(r.capitalNaoDevolvidoPorInstrumentoPE['PE'], [0, 1000, 1000]);
+  assert.deepEqual(r.remuneracaoAcumuladaPorInstrumentoPE['PE'], [0, 100, 200]);
+  assert.equal(r.capitalNaoDevolvidoPorInstrumentoPE['PE'][2], r.capitalNaoDevolvidoFinalPE['PE']);
+  assert.equal(r.remuneracaoAcumuladaPorInstrumentoPE['PE'][2], r.remuneracaoAcumuladaFinalPE['PE']);
 });

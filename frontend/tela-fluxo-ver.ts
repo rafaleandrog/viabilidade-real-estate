@@ -1,15 +1,20 @@
-import { LitElement, html, css, type TemplateResult } from 'lit';
+import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { periodosAnuais, type EventoCrono, type PeriodoAgregado } from './fluxo-shared.js';
 import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { graficoFluxoMensal, graficoFluxoAcumulado } from './fluxo-graficos.js';
-import { estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, controlesFluxo } from './fluxo-tabela.js';
-import { exportarFluxoCSV, exportarFluxoPDF } from './exportar.js';
+import {
+  estiloFluxoTabela, kpisFluxo, tabelaFluxo, tabelaCapitalStack,
+  chavesColapso, CHAVES_COLAPSO_CAPITAL_STACK, controlesFluxo,
+} from './fluxo-tabela.js';
+import { exportarFluxoCSV, exportarFluxoPDF, type CapitalStackExport } from './exportar.js';
+import { simularCapitalStackDoEstudo, receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
+  listarCapitalInstrumentos,
 } from './viabilidade-api.js';
 
 // Sub-tela "Ver Fluxo" (nível Avançado): KPIs, tabela mensal com colunas fixas
@@ -28,6 +33,12 @@ export class ViabFluxoVer extends LitElement {
   @state() private faseFiltro = '';
   /** View das colunas da tabela e dos gráficos (#127) — sempre uma das duas. */
   @state() private visao: 'mensal' | 'anual' = 'mensal';
+  // item 2 (docs/viabilidade/funding-capital-stack.md §10): resultado do
+  // Capital Stack, calculado sobre o fluxo mensal — a tabela/exportação só
+  // aparece na view Mensal (mesma restrição que já vale para os KPIs, que
+  // também nunca reagregam por ano; ver comentário em `render`).
+  @state() private camadas: any[] = [];
+  @state() private resultadoCapitalStack: ResultadoCapitalStack | null = null;
   private dados: {
     receitas: any[]; custos: any[]; curvas: any[];
     crono: EventoCrono[]; dataInicio: string | null; taxa: number;
@@ -50,13 +61,15 @@ export class ViabFluxoVer extends LitElement {
   private async _carregar() {
     this.carregando = true;
     try {
-      const [receitas, custos, curvas, crono, params] = await Promise.all([
+      const [receitas, custos, curvas, crono, params, camadas] = await Promise.all([
         listarReceitasAvancado(this.estudo.id),
         listarCustosAvancado(this.estudo.id),
         listarCurvas(),
         buscarCronogramaAvancado(this.estudo.id),
         buscarParametrosAvancado(this.estudo.id),
+        listarCapitalInstrumentos(this.estudo.id),
       ]);
+      this.camadas = camadas?.erro ? [] : (camadas.dados || []);
       this.dados = {
         receitas: receitas?.erro ? [] : (receitas.dados || []),
         custos: custos?.erro ? [] : (custos.dados || []),
@@ -88,6 +101,18 @@ export class ViabFluxoVer extends LitElement {
       areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
     };
     this.calc = calcularFluxo(config);
+
+    // §13.3: só camadas ATIVAS têm efeito — sem nenhuma, `simularCapitalStackDoEstudo`
+    // devolve entradas/saídas zero e a tabela nem renderiza (`tabelaCapitalStack`
+    // checa `camadas.length === 0`, não o resultado).
+    if (this.camadas.length > 0) {
+      const receitaLiquida = receitaLiquidaComCorretagemMensal(this.calc.receitaMensal, this.calc.linhasCusto, d.custos);
+      const fluxoLivre1based = [0, ...this.calc.fluxoMensal];
+      const receitaLiquida1based = [0, ...receitaLiquida];
+      this.resultadoCapitalStack = simularCapitalStackDoEstudo(
+        fluxoLivre1based, receitaLiquida1based, this.camadas, this.calc.linhasCusto, 0,
+      );
+    }
   }
 
   /**
@@ -117,6 +142,7 @@ export class ViabFluxoVer extends LitElement {
       ${kpisFluxo(c)}
       ${this._renderControles()}
       ${tabelaFluxo(exib, this.dados?.dataInicio ?? null, this.colapso, (ch) => this._t(ch))}
+      ${!periodos ? tabelaCapitalStack(this.resultadoCapitalStack, this.camadas, c.fluxoMensal, c.meses, this.colapso, (ch) => this._t(ch)) : nothing}
       <div class="graficos">
         <urbi-card titulo="Fluxo de Caixa ${titulo}">
           <div class="graf-wrap"><div class="graf">${graficoFluxoMensal(exib, this.dados?.dataInicio ?? null, this.dados?.crono ?? [], periodos ?? undefined)}</div></div>
@@ -147,7 +173,7 @@ export class ViabFluxoVer extends LitElement {
   }
 
   private _toggleTudo(recolher: boolean) {
-    const chaves = this.calc ? chavesColapso(this.calc) : [];
+    const chaves = this.calc ? [...chavesColapso(this.calc), ...CHAVES_COLAPSO_CAPITAL_STACK] : [];
     const novo: Record<string, boolean> = {};
     for (const k of chaves) novo[k] = recolher;
     this.colapso = novo;
@@ -167,10 +193,17 @@ export class ViabFluxoVer extends LitElement {
     return periodos ? agregarFluxoPorPeriodos(this.calc, periodos) : this.calc;
   }
 
+  // item 2: a seção de Capital Stack só entra na exportação na view Mensal —
+  // não existe agregação anual do resultado do motor (mesma restrição da tela).
+  private _capitalStackExport(): CapitalStackExport | undefined {
+    if (this.visao !== 'mensal' || !this.resultadoCapitalStack || this.camadas.length === 0) return undefined;
+    return { resultado: this.resultadoCapitalStack, camadas: this.camadas };
+  }
+
   private _csv = () => {
     const c = this._exportavel();
     if (!c) return;
-    exportarFluxoCSV(this.estudo, c, this.dados?.dataInicio ?? null);
+    exportarFluxoCSV(this.estudo, c, this.dados?.dataInicio ?? null, this._capitalStackExport());
     urbiVerso.notificar('CSV do fluxo exportado.', 'sucesso');
   };
 
@@ -178,7 +211,7 @@ export class ViabFluxoVer extends LitElement {
     const c = this._exportavel();
     if (!c) return;
     const ok = exportarFluxoPDF(this.estudo, c, this.dados?.dataInicio ?? null,
-      this.visao === 'anual' ? 'Anos' : 'Meses');
+      this.visao === 'anual' ? 'Anos' : 'Meses', this._capitalStackExport());
     if (!ok) urbiVerso.notificar('Permita pop-ups para exportar o PDF.', 'alerta');
   };
 }
