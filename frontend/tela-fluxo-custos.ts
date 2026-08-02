@@ -644,8 +644,8 @@ export class ViabFluxoCustos extends LitElement {
                 </span>
               ` : nothing}
               <viab-num ?desabilitado=${dis}
-                casas-decimais=${modo.startsWith('pct_') ? '2' : '0'}
-                casas-minimas=${modo.startsWith('pct_') ? '2' : '0'}
+                casas-decimais=${modo.startsWith('rs_m2') ? '0' : '2'}
+                casas-minimas=${modo.startsWith('rs_m2') ? '0' : '2'}
                 .valor=${c.orcamento_valor !== null && c.orcamento_valor !== undefined ? Number(c.orcamento_valor) : null}
                 @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { orcamento_valor: e.detail.valor })}
               ></viab-num>
@@ -893,11 +893,13 @@ export class ViabFluxoCustos extends LitElement {
   }
 
   // Casas decimais da unidade (padrão de exibição/entrada do `viab-num`): % com 2
-  // casas (#117), R$ e R$/m² inteiros. Usado para arredondar o valor convertido à
-  // MESMA precisão em que ele será exibido e digitado — evita guardar centavos
-  // ocultos numa unidade inteira e mantém o round-trip estável (#119).
+  // casas (#117); R$ (`rs`, valor canônico monetário, #281/C7) também com 2;
+  // R$/m² permanece inteiro (representação derivada, sem o contrato de
+  // precisão de resultado). Usado para arredondar o valor convertido à MESMA
+  // precisão em que ele será exibido e digitado — evita guardar dígitos
+  // ocultos numa unidade mais grosseira e mantém o round-trip estável (#119).
   private _casasUnidade(unidade: string): number {
-    return unidade.startsWith('pct_') ? 2 : 0;
+    return unidade.startsWith('rs_m2') ? 0 : 2;
   }
 
   // Troca a unidade de orçamento por badge (padrão do Preliminar): converte o
