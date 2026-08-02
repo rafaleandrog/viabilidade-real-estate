@@ -8,13 +8,20 @@ import {
   type FluxoCalc, type FluxoConfig, type CenarioParams,
 } from './fluxo-caixa-motor.js';
 import { marcos } from './fluxo-graficos.js';
-import { estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, controlesFluxo } from './fluxo-tabela.js';
+import {
+  estiloFluxoTabela, kpisFluxo, tabelaFluxo, tabelaCapitalStack,
+  chavesColapso, CHAVES_COLAPSO_CAPITAL_STACK, controlesFluxo,
+} from './fluxo-tabela.js';
 import { calcularVariacao } from './cenario-variacao.js';
+import {
+  simularCapitalStackDoEstudo, receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack,
+} from './capital-stack-motor.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   listarBenchmarks, listarCenarios, criarCenario, removerCenario,
+  listarCapitalInstrumentos,
 } from './viabilidade-api.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -54,6 +61,13 @@ export class ViabTelaCenarios extends LitElement {
   // filtro Global/por fase), aplicados ao FluxoCalc do cenário SIMULADO.
   @state() private faseFiltro = '';
   @state() private visao: 'mensal' | 'anual' = 'mensal';
+  // Item 5 (Cenários × Capital Stack, decisão do autor 2026-08-02): camadas
+  // ativas reagem ao cenário simulado — mesmo `simularCapitalStackDoEstudo`
+  // já usado em tela-fluxo-ver.ts, sobre o `FluxoCalc` do cenário em vez do
+  // real. Só existe agregação MENSAL do resultado do Capital Stack (mesma
+  // restrição já documentada em tela-fluxo-ver.ts) — a tabela nova e a coluna
+  // extra na tabela de cenários salvos só aparecem na view Mensal.
+  @state() private camadas: any[] = [];
 
   private baseConfig: FluxoConfig | null = null;
   // Último FluxoCalc do cenário em exibição (mensal, não-agregado) — guardado
@@ -131,7 +145,7 @@ export class ViabTelaCenarios extends LitElement {
   private async _carregar() {
     this.carregando = true;
     try {
-      const [receitas, custos, curvas, crono, params, bm, cens] = await Promise.all([
+      const [receitas, custos, curvas, crono, params, bm, cens, camadas] = await Promise.all([
         listarReceitasAvancado(this.estudo.id),
         listarCustosAvancado(this.estudo.id),
         listarCurvas(),
@@ -139,7 +153,9 @@ export class ViabTelaCenarios extends LitElement {
         buscarParametrosAvancado(this.estudo.id),
         listarBenchmarks(this.estudo.tipo_empreendimento),
         listarCenarios(this.estudo.id),
+        listarCapitalInstrumentos(this.estudo.id),
       ]);
+      this.camadas = camadas?.erro ? [] : (camadas.dados || []);
       this.crono = crono?.erro ? [] : (crono.dados || []);
       this.dataInicio = params?.erro ? null : (params.data_inicio_projeto ?? null);
       this.baseConfig = {
@@ -198,6 +214,24 @@ export class ViabTelaCenarios extends LitElement {
   private _periodos(prazo: number): PeriodoAgregado[] | null {
     if (this.visao !== 'anual') return null;
     return periodosAnuais(this.dataInicio, prazo);
+  }
+
+  /** §13.3/item 5: simula o Capital Stack sobre o `FluxoCalc` de UM cenário (base ou simulado). `null` sem camadas. */
+  private _capitalStackDe(calc: FluxoCalc): ResultadoCapitalStack | null {
+    if (this.camadas.length === 0) return null;
+    const receitaLiquida = receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, this.baseConfig!.linhasCusto);
+    const fluxoLivre1based = [0, ...calc.fluxoMensal];
+    const receitaLiquida1based = [0, ...receitaLiquida];
+    return simularCapitalStackDoEstudo(fluxoLivre1based, receitaLiquida1based, this.camadas, calc.linhasCusto, 0);
+  }
+
+  /** Resultado desalavancado − custo financeiro total (juros + retorno preferencial) do cenário. */
+  private _resultadoAposCustoFinanceiro(calc: FluxoCalc, r: ResultadoCapitalStack | null): number | null {
+    if (!r) return null;
+    const custoFinanceiro = Object.values(r.jurosPorInstrumento).flatMap((s) => s).reduce((a, b) => a + b, 0)
+      + Object.values(r.remuneracaoPagaPE).flatMap((s) => s).reduce((a, b) => a + b, 0);
+    const resultadoDesalavancado = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] || 0;
+    return resultadoDesalavancado - custoFinanceiro;
   }
 
   /** Sliders fora do zero — há um cenário alternativo a comparar com a base. */
@@ -272,11 +306,34 @@ export class ViabTelaCenarios extends LitElement {
       <section class="secao-fluxo">
         <h3>${alterado ? 'Fluxo de caixa do cenário' : 'Fluxo de caixa do cenário real'}</h3>
         ${kpisFluxo(cenario, alterado ? base : null)}
+        ${this._renderResultadoAposFunding(cenario)}
         ${this._renderControlesFluxo()}
         ${tabelaFluxo(exibCenario, this.dataInicio, this.colapso, (ch) => this._t(ch))}
+        ${!periodos ? tabelaCapitalStack(this._capitalStackDe(cenario), this.camadas, cenario.fluxoMensal, cenario.meses, this.colapso, (ch) => this._t(ch)) : nothing}
       </section>
 
       ${this._renderCenariosSalvos(base)}
+    `;
+  }
+
+  /**
+   * Item 5: KPI adicional só quando há camadas de Capital Stack — "Resultado
+   * após custo financeiro" do cenário em exibição. NÃO altera TIR/VPL (§8.1:
+   * "permanecem desalavancados, para manter comparabilidade entre estruturas
+   * de capital") — só soma a informação que faltava, ao lado.
+   */
+  private _renderResultadoAposFunding(calc: FluxoCalc): TemplateResult {
+    const r = this._capitalStackDe(calc);
+    if (!r) return html`${nothing}`;
+    const resultado = this._resultadoAposCustoFinanceiro(calc, r);
+    if (resultado === null) return html`${nothing}`;
+    return html`
+      <div class="fx-kpis">
+        <div class="kpi-cel">
+          <urbi-kpi rotulo="Resultado após custo financeiro" .valor=${fmtR$(resultado)}
+            variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        </div>
+      </div>
     `;
   }
 
@@ -296,7 +353,7 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   private _toggleTudo(recolher: boolean) {
-    const chaves = this.ultimoCalc ? chavesColapso(this.ultimoCalc) : [];
+    const chaves = this.ultimoCalc ? [...chavesColapso(this.ultimoCalc), ...CHAVES_COLAPSO_CAPITAL_STACK] : [];
     const novo: Record<string, boolean> = {};
     for (const k of chaves) novo[k] = recolher;
     this.colapso = novo;
@@ -380,6 +437,9 @@ export class ViabTelaCenarios extends LitElement {
   };
 
   private _renderCenariosSalvos(base: FluxoCalc): TemplateResult {
+    // Item 5: coluna extra só quando há camadas de Capital Stack — sem
+    // nenhuma, a tabela fica idêntica à de antes desta rodada.
+    const comCapitalStack = this.camadas.length > 0;
     return html`
       <section class="secao-cenarios">
         <h3>Cenários salvos</h3>
@@ -397,12 +457,13 @@ export class ViabTelaCenarios extends LitElement {
                 <th>Payback</th>
                 <th>Exposição máx.</th>
                 <th class="cen-var" aria-label="Variação de Exposição máxima vs. cenário real" scope="col"></th>
+                ${comCapitalStack ? html`<th>Resultado após custo financ.</th>` : nothing}
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              ${this._linhaReal(base)}
-              ${this.cenarios.map((c) => this._linhaCenario(c, base))}
+              ${this._linhaReal(base, comCapitalStack)}
+              ${this.cenarios.map((c) => this._linhaCenario(c, base, comCapitalStack))}
             </tbody>
           </table>
         </div>
@@ -417,8 +478,9 @@ export class ViabTelaCenarios extends LitElement {
 
   // Linha travada, sempre primeira: o cenário real (sem alterações dos sliders),
   // referência de comparação para os cenários salvos pelo usuário.
-  private _linhaReal(base: FluxoCalc): TemplateResult {
+  private _linhaReal(base: FluxoCalc, comCapitalStack: boolean): TemplateResult {
     const tir = base.tir === null ? '—' : fmtPct(base.tir);
+    const resultado = comCapitalStack ? this._resultadoAposCustoFinanceiro(base, this._capitalStackDe(base)) : null;
     return html`
       <tr class="linha-real">
         <td><urbi-icone classe="fa-solid fa-lock"></urbi-icone>Cenário real</td>
@@ -431,6 +493,7 @@ export class ViabTelaCenarios extends LitElement {
         <td>${base.paybackData ?? '—'}</td>
         <td class="neg">${fmtR$(base.exposicaoMaxima)}</td>
         <td class="cen-var"></td>
+        ${comCapitalStack ? html`<td class=${resultado !== null && resultado >= 0 ? 'pos' : 'neg'}>${resultado === null ? '—' : fmtR$(resultado)}</td>` : nothing}
         <td></td>
       </tr>
     `;
@@ -447,10 +510,11 @@ export class ViabTelaCenarios extends LitElement {
     return html`<urbi-badge cor=${v.melhor ? 'sucesso' : 'perigo'}>${v.texto}</urbi-badge>`;
   }
 
-  private _linhaCenario(c: any, base: FluxoCalc): TemplateResult {
+  private _linhaCenario(c: any, base: FluxoCalc, comCapitalStack: boolean): TemplateResult {
     const calc = this._calc({ precoVendaPct: n(c.preco_venda_pct), custoObraPct: n(c.custo_obra_pct) });
     const pctTxt = (v: number) => `${v > 0 ? '+' : ''}${v}%`;
     const tir = calc.tir === null ? '—' : `${fmtPct(calc.tir)}`;
+    const resultado = comCapitalStack ? this._resultadoAposCustoFinanceiro(calc, this._capitalStackDe(calc)) : null;
     return html`
       <tr>
         <td>${c.nome || 'Cenário'}</td>
@@ -463,6 +527,7 @@ export class ViabTelaCenarios extends LitElement {
         <td>${calc.paybackData ?? '—'}</td>
         <td class="neg">${fmtR$(calc.exposicaoMaxima)}</td>
         <td class="cen-var">${this._badgeVar(calc.exposicaoMaxima, base.exposicaoMaxima)}</td>
+        ${comCapitalStack ? html`<td class=${resultado !== null && resultado >= 0 ? 'pos' : 'neg'}>${resultado === null ? '—' : fmtR$(resultado)}</td>` : nothing}
         <td>
           <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
             @click=${() => this.removerId = Number(c.id)}></urbi-botao>

@@ -644,9 +644,8 @@ de colunas**, se desejada, é issue posterior e específica.
 > prioridade de funding (§5) e o waterfall (§6); a interface (`viab-capital-stack`) consome o motor
 > de verdade. Fora de escopo nesta entrega original, registrado explicitamente em cada grupo:
 > gráficos SVG, prévia de recálculo por tecla, integração com `fluxo-tabela.ts`/exportações CSV/PDF,
-> reação a Cenários (§11), e a base de receita líquida do §6.2 sem subtrair corretagem. **Os 3
-> primeiros foram fechados na terceira rodada (2026-08-02) — ver bloco abaixo; só reação a Cenários
-> continua de fora.**
+> reação a Cenários (§11), e a base de receita líquida do §6.2 sem subtrair corretagem. **Todos
+> fechados nas rodadas de 2026-08-02 — ver blocos abaixo.**
 
 > 🔎 **Segunda verificação (2026-08-02)** — releitura linha a linha de todo o entregue na Fase 9
 > contra este doc, achou e corrigiu 3 defeitos reais; 2 lacunas ficaram documentadas (não corrigidas
@@ -683,10 +682,7 @@ de colunas**, se desejada, é issue posterior e específica.
 >    primeiro, depois necessidade sobre o caixa já com aporte) — comportamento inalterado nesta
 >    verificação, só registrado para quem revisar o doc depois.
 
-> ✅ **Terceira rodada (2026-08-02) — 3 dos 4 itens fora de escopo fechados a pedido do autor.**
-> Continuam de fora só **reação a Cenários (§11)** e a **generalização de múltiplos Sponsor Equity**
-> (achado 4 acima) — os dois exigem decisão de negócio que o doc ainda não escreve, não é código
-> pendente. Fechados nesta rodada:
+> ✅ **Terceira rodada (2026-08-02) — os 4 itens fora de escopo fechados a pedido do autor.**
 >
 > 1. **Prévia por tecla + gráficos SVG (§9 "Visualizações").** `tela-capital-stack.ts` recalcula a
 >    simulação a cada alteração no editor (`_recalcular`, sobrepõe o draft em memória sobre as
@@ -712,6 +708,36 @@ de colunas**, se desejada, é issue posterior e específica.
 >
 > Validação: 315 testes (4 novos — `fundingEntradasSaidasMensal`, as séries mensais de saldo PE, e
 > a prioridade de pagamento entre dívidas), typecheck e build limpos, harness de migrações verde.
+>
+> **Quarta rodada, mesmo dia — as 3 decisões pendentes (achados 4/5 + §11), resolvidas pelo autor:**
+>
+> 4. **Múltiplos Sponsor Equity — rateio pro-rata pelo aporte acumulado.** `simularCapitalStack`
+>    trocou `.find()` (só o primeiro) por `.filter()` — todos os `sponsor_equity` ativos
+>    participam. Regra: `% da receita líquida` continua contratual e INDEPENDENTE por sponsor (não
+>    é pool — se A tem 10% e B tem 5%, cada recebe o seu, sem afetar o outro); cobertura automática
+>    de lacuna e o resíduo do waterfall SÃO pools compartilhados entre os sponsors sem % próprio,
+>    rateados pelo peso `aporte_acumulado_do_sponsor / Σ aporte_acumulado_de_todos` — sem nenhum
+>    aporte ainda, divide igualmente. Novos campos `aportePorInstrumentoSponsor`/
+>    `distribuicaoPorInstrumentoSponsor` (por instrumento; os agregados `aporteSponsorMensal`/
+>    `distribuicaoSponsorMensal` continuam existindo, agora como a SOMA de todos). Com 1 só sponsor
+>    (todos os 16 golden cases), o peso é sempre 1 — comportamento idêntico a antes.
+> 5. **Ordem §3.1×§7 — mantida a leitura atual, ambiguidade do texto registrada, não do código.**
+>    O autor confirmou: aportes programados ENTRAM no caixa antes do cálculo de necessidade de
+>    funding (§3.1) — mais eficiente em capital, evita puxar dívida automática que um aporte já
+>    programado no mesmo mês tornaria innecessária. §7 continua com a ordem numerada imprecisa
+>    nesse detalhe; não foi reescrito porque o comportamento correto (o do código) já está
+>    documentado aqui, e a lista do §7 é descritiva, não normativa quando conflita com §3.1.
+> 6. **Cenários (§11) — reação mecânica confirmada + tabela completa por cenário, decisão do
+>    autor: os dois.** Não era uma lacuna de regra de negócio (correção de leitura própria): bastou
+>    reusar `simularCapitalStackDoEstudo` sobre o `FluxoCalc` de cada cenário (`aplicarCenario` já
+>    gera um `fluxoMensal` próprio por cenário). `tela-cenarios.ts` ganhou (a) um KPI "Resultado
+>    após custo financeiro" para o cenário em exibição — sem tocar TIR/VPL, que §8.1 explicitamente
+>    mantém desalavancados —, (b) a mesma `tabelaCapitalStack` do item 2 abaixo da tabela do fluxo
+>    (só view Mensal), e (c) uma coluna "Resultado após custo financ." na tabela de Cenários salvos,
+>    condicional a `camadas.length > 0` — sem nenhuma camada, a tabela e a tela ficam idênticas a
+>    antes desta rodada.
+>
+> Validação: 317 testes, typecheck, build e harness de migrações verdes.
 
 ---
 

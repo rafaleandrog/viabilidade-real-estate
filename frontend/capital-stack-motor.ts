@@ -233,9 +233,22 @@ export interface ResultadoCapitalStack {
   participacaoResidualPE: Record<string, number[]>;
   aporteSponsorMensal: number[];
   distribuicaoSponsorMensal: number[];
+  /** Por instrumento — só relevante com 2+ Sponsor Equity ativos (rateio pro-rata pelo aporte, §4.1). Com 1 só, é igual ao array agregado acima. */
+  aportePorInstrumentoSponsor: Record<string, number[]>;
+  distribuicaoPorInstrumentoSponsor: Record<string, number[]>;
 }
 
 const arr = (tam: number): number[] => new Array(tam + 1).fill(0);
+
+/** Peso pro-rata (0..1) pelo aporte acumulado de cada instrumento; igual entre todos se a soma for zero. */
+function pesarPorAporte(instrumentos: { nome: string }[], aporteAcumulado: Map<string, number>): Map<string, number> {
+  const total = instrumentos.reduce((s, i) => s + (aporteAcumulado.get(i.nome) ?? 0), 0);
+  const pesos = new Map<string, number>();
+  for (const i of instrumentos) {
+    pesos.set(i.nome, total > 0 ? (aporteAcumulado.get(i.nome) ?? 0) / total : 1 / instrumentos.length);
+  }
+  return pesos;
+}
 
 /**
  * Simulação dos 4 instrumentos do §4, prioridade de funding (§5) e waterfall
@@ -255,13 +268,19 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
   const dividasPorPagamento = [...dividas].sort((a, b) => a.prioridadePagamento - b.prioridadePagamento);
   const preferenciais = cen.instrumentos.filter((i): i is InstrumentoPreferredEquity => i.tipo === 'preferred_equity')
     .sort((a, b) => a.prioridadePagamento - b.prioridadePagamento);
-  const sponsor = cen.instrumentos.find((i): i is InstrumentoSponsorEquity => i.tipo === 'sponsor_equity');
+  // Rateio pro-rata pelo aporte acumulado — decisão do autor (2026-08-02):
+  // com 2+ Sponsor Equity ativos, cada um recebe fatia proporcional ao que já
+  // aportou; sem nenhum aporte ainda, divide igualmente (nenhum critério para
+  // preferir um sobre o outro). Com 1 só sponsor, o peso é sempre 1 — nenhum
+  // dos 16 golden cases (#270) tem mais de um, então não regride nada.
+  const sponsors = cen.instrumentos.filter((i): i is InstrumentoSponsorEquity => i.tipo === 'sponsor_equity');
 
   const saldoDivida = new Map(dividas.map((d) => [d.nome, 0]));
   const liberadoAcumulado = new Map(dividas.map((d) => [d.nome, 0]));
   const custoElegivelAcumulado = new Map(dividas.map((d) => [d.nome, 0]));
   const capitalNaoDevolvido = new Map(preferenciais.map((p) => [p.nome, 0]));
   const remuneracaoAcumulada = new Map(preferenciais.map((p) => [p.nome, 0]));
+  const aporteAcumuladoSponsor = new Map(sponsors.map((s) => [s.nome, 0]));
 
   const r: ResultadoCapitalStack = {
     lacunaFundingMensal: arr(N), lacunaFundingMaxima: 0, caixaProjetoMensal: arr(N),
@@ -278,6 +297,8 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
     participacaoReceitaPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     participacaoResidualPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     aporteSponsorMensal: arr(N), distribuicaoSponsorMensal: arr(N),
+    aportePorInstrumentoSponsor: Object.fromEntries(sponsors.map((s) => [s.nome, arr(N)])),
+    distribuicaoPorInstrumentoSponsor: Object.fromEntries(sponsors.map((s) => [s.nome, arr(N)])),
   };
 
   let caixaProjeto = 0;
@@ -313,8 +334,14 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
       caixaProvisorio += prog.valor;
       r.aportePorInstrumentoPE[p.nome][t] = prog.valor;
     }
-    const aporteSponsorProg = sponsor?.aportesProgramados?.find((a) => a.mes === t);
-    if (aporteSponsorProg) { caixaProvisorio += aporteSponsorProg.valor; r.aporteSponsorMensal[t] = aporteSponsorProg.valor; }
+    for (const s of sponsors) {
+      const prog = s.aportesProgramados?.find((a) => a.mes === t);
+      if (!prog) continue;
+      aporteAcumuladoSponsor.set(s.nome, round2(aporteAcumuladoSponsor.get(s.nome)! + prog.valor));
+      caixaProvisorio += prog.valor;
+      r.aporteSponsorMensal[t] = round2((r.aporteSponsorMensal[t] ?? 0) + prog.valor);
+      r.aportePorInstrumentoSponsor[s.nome][t] = round2((r.aportePorInstrumentoSponsor[s.nome][t] ?? 0) + prog.valor);
+    }
 
     // 4) necessidade de funding (§3.1) e liberações AUTOMÁTICAS por prioridade (§5)
     let necessidade = Math.max(0, cen.reservaMinima - caixaProvisorio);
@@ -335,9 +362,16 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
       caixaProvisorio += real; necessidade -= real;
       r.liberacaoPorInstrumento[d.nome][t] = round2((r.liberacaoPorInstrumento[d.nome][t] ?? 0) + real);
     }
-    if (necessidade > 0 && sponsor?.cobreLacunaAutomatica) {
-      caixaProvisorio += necessidade;
-      r.aporteSponsorMensal[t] = round2((r.aporteSponsorMensal[t] ?? 0) + necessidade);
+    const sponsorsCobrem = sponsors.filter((s) => s.cobreLacunaAutomatica);
+    if (necessidade > 0 && sponsorsCobrem.length > 0) {
+      const pesos = pesarPorAporte(sponsorsCobrem, aporteAcumuladoSponsor);
+      for (const s of sponsorsCobrem) {
+        const parte = round2(necessidade * pesos.get(s.nome)!);
+        caixaProvisorio += parte;
+        r.aporteSponsorMensal[t] = round2((r.aporteSponsorMensal[t] ?? 0) + parte);
+        r.aportePorInstrumentoSponsor[s.nome][t] = round2((r.aportePorInstrumentoSponsor[s.nome][t] ?? 0) + parte);
+        aporteAcumuladoSponsor.set(s.nome, round2(aporteAcumuladoSponsor.get(s.nome)! + parte));
+      }
       necessidade = 0;
     }
     r.lacunaFundingMensal[t] = round2(necessidade);
@@ -416,18 +450,29 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
       r.remuneracaoAcumuladaPorInstrumentoPE[p.nome][t] = remuneracaoAcumulada.get(p.nome)!;
     }
 
-    // 7) Sponsor Equity: participação na receita líquida (se configurada) OU
-    // resíduo do waterfall (§6.1 item 7 / §4.1).
-    if (sponsor?.percentualReceitaLiquida !== undefined) {
+    // 7) Sponsor Equity: participação na receita líquida (se configurada,
+    // INDEPENDENTE por sponsor — é % contratual fixo, não pool compartilhado)
+    // OU resíduo do waterfall (§6.1 item 7 / §4.1) — esse sim é pool
+    // compartilhado entre os sponsors sem % próprio, rateado pro-rata pelo
+    // aporte acumulado (decisão do autor, 2026-08-02).
+    for (const s of sponsors) {
+      if (s.percentualReceitaLiquida === undefined) continue;
       const receitaLiq = Math.max(0, n(cen.receitaLiquidaMensal?.[t]));
-      const desejado = round2(receitaLiq * sponsor.percentualReceitaLiquida);
+      const desejado = round2(receitaLiq * s.percentualReceitaLiquida);
       const dist = round2(Math.min(desejado, caixaDistribuivel));
-      caixaProjeto = round2(caixaProjeto - dist);
-      r.distribuicaoSponsorMensal[t] = dist;
-    } else if (sponsor) {
-      const dist = caixaDistribuivel;
-      caixaProjeto = round2(caixaProjeto - dist);
-      r.distribuicaoSponsorMensal[t] = dist;
+      caixaDistribuivel = round2(caixaDistribuivel - dist); caixaProjeto = round2(caixaProjeto - dist);
+      r.distribuicaoSponsorMensal[t] = round2((r.distribuicaoSponsorMensal[t] ?? 0) + dist);
+      r.distribuicaoPorInstrumentoSponsor[s.nome][t] = dist;
+    }
+    const sponsorsResidual = sponsors.filter((s) => s.percentualReceitaLiquida === undefined);
+    if (sponsorsResidual.length > 0 && caixaDistribuivel > 0) {
+      const pesos = pesarPorAporte(sponsorsResidual, aporteAcumuladoSponsor);
+      for (const s of sponsorsResidual) {
+        const parte = round2(caixaDistribuivel * pesos.get(s.nome)!);
+        caixaProjeto = round2(caixaProjeto - parte);
+        r.distribuicaoSponsorMensal[t] = round2((r.distribuicaoSponsorMensal[t] ?? 0) + parte);
+        r.distribuicaoPorInstrumentoSponsor[s.nome][t] = parte;
+      }
     }
 
     r.caixaProjetoMensal[t] = caixaProjeto;
