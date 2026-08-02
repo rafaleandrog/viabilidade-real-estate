@@ -445,6 +445,22 @@ export function ePrecoTerreno(custo: any): boolean {
   return custo?.grupo === 'terreno' && custo?.categoria === CATEGORIA_PRECO_TERRENO;
 }
 
+/** Subcategoria canônica de permuta financeira da linha de Preço do Terreno (#257). */
+export const SUBCATEGORIA_PERMUTA_FINANCEIRA = 'Permuta financeira';
+
+/**
+ * Permuta financeira (#196/#238): a subcategoria "Permuta financeira" da
+ * linha de Preço do Terreno — parte do preço paga em % da receita (ou valor
+ * fixo), não em caixa; é DEDUÇÃO DA RECEITA, não custo. Movida para aqui
+ * (#238) para ser a MESMA checagem usada pelo motor
+ * (`frontend/fluxo-caixa-motor.ts`) e pela UI (`tela-fluxo-custos.ts`) — a
+ * armadilha A10 (Anexo D) era exatamente a UI classificar por
+ * `distribuicao_modo` enquanto o motor classifica por subcategoria.
+ */
+export function ePermutaFinanceira(custo: any): boolean {
+  return ePrecoTerreno(custo) && String(custo?.subcategoria || '') === SUBCATEGORIA_PERMUTA_FINANCEIRA;
+}
+
 /** Subcategoria canônica de permuta física da linha de Preço do Terreno (#257). */
 export const SUBCATEGORIA_PERMUTA_FISICA = 'Permuta física';
 

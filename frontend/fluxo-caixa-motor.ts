@@ -18,7 +18,7 @@ import {
   absorcaoMensal, periodoAbsorcao, vgvLinha, receitaLiquidaLinha,
   vgvVendavelTipologia, vgvVendavelLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
-  eCorretagem, vgvVendidoMensal, ePrecoTerreno, ePermutaFisica,
+  eCorretagem, vgvVendidoMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado,
 } from './fluxo-shared.js';
 
@@ -1055,24 +1055,38 @@ export function distribuirProporcional(custo: any, pesos: number[], ctx: Context
 }
 
 /**
- * Permuta financeira (#196): a subcategoria "Permuta financeira" da linha de
- * Preço do Terreno — parte do preço paga em % da receita (ou valor fixo),
- * não em caixa. Ao contrário da permuta física (#195, que reduz o VGV
- * vendável), ela é uma DEDUÇÃO DA RECEITA: sai de `linhasCusto`/`custoMensal`
- * e entra em `linhasReceita`/`receitaMensal` com valor negativo — mesmo
- * tratamento do Preliminar (`proforma.ts`), onde permuta financeira reduz
- * `receitaLiquida`.
+ * #238 (padrao-incorporacao.md §15.2): duas visões da permuta financeira, no
+ * regime de caixa — só quando o orçamento é `% VGV`; em valor fixo (`rs`)
+ * não há distinção bruta/líquida (um total fixo distribuído proporcionalmente
+ * à receita de caixa é o mesmo valor nas duas visões).
  *
- * #257: a subcategoria genérica "Permuta" (o único valor que existia antes,
- * já tratado como financeira) foi migrada para o rótulo canônico — a
- * migração 015 reescreve todo dado legado, então nenhum estudo existente
- * muda de resultado. Só "Permuta financeira" entra aqui; "Permuta física"
- * (nova opção, preparação do #258) ainda não tem motor próprio — continua
- * como custo em caixa até o #268 existir.
+ *   bruta   = receita de caixa × % de permuta
+ *   líquida = (receita de caixa − imposto − corretagem) × % de permuta
+ *
+ * Ambas ficam disponíveis para auditoria (§15.3); qual alimenta o fluxo é
+ * escolha do estudo (`permuta_financeira_base`, default `bruta` — preserva o
+ * resultado de todo estudo existente, que hoje não deduz imposto/corretagem
+ * da base). A base líquida nunca fica negativa (clamp em 0): imposto e
+ * corretagem que excedam a receita do mês não geram permuta negativa.
  */
-function ePermutaFinanceira(custo: any): boolean {
-  return ePrecoTerreno(custo) && String(custo?.subcategoria || '') === 'Permuta financeira';
+export function permutaFinanceiraBrutaMensal(receitaCaixaMensal: number[], pctPermuta: number): number[] {
+  const f = pctPermuta / 100;
+  return receitaCaixaMensal.map((v) => round2(v * f));
 }
+
+export function permutaFinanceiraLiquidaMensal(
+  receitaCaixaMensal: number[],
+  impostoMensalTotal: number[],
+  corretagemMensalSerie: number[],
+  pctPermuta: number,
+): number[] {
+  const f = pctPermuta / 100;
+  return receitaCaixaMensal.map((v, i) => {
+    const base = Math.max(0, v - (impostoMensalTotal[i] ?? 0) - (corretagemMensalSerie[i] ?? 0));
+    return round2(base * f);
+  });
+}
+
 
 // ─────────────────────────────────────────────────────────────────
 // Indicadores financeiros
@@ -1352,21 +1366,42 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     };
   });
 
-  // Permuta financeira (#196): mesmo mecanismo de distribuição do Preço do
-  // Terreno (`fixo`/`unit_delivery`/`sales_revenue`, #194), mas o resultado
-  // entra NEGATIVO em `linhasReceita` — dedução da receita, não custo.
+  // Permuta financeira (#196/#238): sai da RECEITA DAS VENDAS (em caixa),
+  // sempre — não é mais escolha de `distribuicao_modo` (armadilha A10, Anexo
+  // D: quem classifica é a subcategoria; a UI antes lia `distribuicao_modo`,
+  // que é curva de rateio do Preço do Terreno, não critério de permuta). O
+  // resultado entra NEGATIVO em `linhasReceita` — dedução da receita, não
+  // custo. Em `% VGV`, calcula as duas visões (bruta/líquida, §15.2) sobre a
+  // receita de caixa BRUTA (`recebimentoBrutoMensal`, ANTES do RET — nunca
+  // `receitaMensalVendas`, que já é líquida de RET/#228: usá-la subtrairia o
+  // imposto duas vezes na visão líquida) para auditoria, e usa a escolhida
+  // (`permuta_financeira_base`, default bruta) no fluxo; em valor fixo
+  // (`rs`), distribui proporcionalmente à receita de caixa (sem distinção
+  // bruta/líquida — um total fixo não tem base a que aplicar deduções).
+  const receitaCaixaBrutaMensal = new Array<number>(prazo).fill(0);
+  const impostoTotalMensal = new Array<number>(prazo).fill(0);
+  for (const l of linhasReceita) {
+    const bruto = recebimentoBrutoMensal(l, crono, prazo);
+    const imp = impostoMensal(l, crono, prazo);
+    for (let i = 0; i < prazo; i++) {
+      receitaCaixaBrutaMensal[i] += bruto[i] ?? 0;
+      impostoTotalMensal[i] += imp[i] ?? 0;
+    }
+  }
+  const linhaCorretagem = linhasCusto.find(eCorretagem);
+  const corretagemSerie = linhaCorretagem
+    ? corretagemMensal(linhaCorretagem, linhasReceita, crono, prazo, ctxCusto)
+    : new Array<number>(prazo).fill(0);
+
   const calcDeducoesReceita: LinhaCalc[] = linhasPermutaFinanceira.map((c) => {
     const nome = nomeLinhaCusto(c);
     let mensalBruto: number[];
-    if (c.distribuicao_modo === 'unit_delivery' || c.distribuicao_modo === 'sales_revenue') {
-      const pesos = c.distribuicao_modo === 'sales_revenue'
-        ? vgvVendidoMensal(linhasReceita, crono, prazo)
-        : receitaMensalVendas;
-      mensalBruto = distribuirProporcional(c, pesos, ctxCusto);
+    if ((c.orcamento_unidade || 'rs') === 'pct_vgv') {
+      const bruta = permutaFinanceiraBrutaMensal(receitaCaixaBrutaMensal, n(c.orcamento_valor));
+      const liquida = permutaFinanceiraLiquidaMensal(receitaCaixaBrutaMensal, impostoTotalMensal, corretagemSerie, n(c.orcamento_valor));
+      mensalBruto = c.permuta_financeira_base === 'liquida' ? liquida : bruta;
     } else {
-      const total = resolverCustoTotal(c, ctxCusto);
-      const curva = c.curva_id ? (curvasPorId.get(Number(c.curva_id)) ?? 'linear') : 'linear';
-      mensalBruto = distribuirLinha(total, n(c.inicio_mes), n(c.duracao_meses), curva, prazo);
+      mensalBruto = distribuirProporcional(c, receitaMensalVendas, ctxCusto);
     }
     const mensal = mensalBruto.map((v) => -v);
     const r = recorte(mensal);

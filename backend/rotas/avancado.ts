@@ -1081,7 +1081,10 @@ rotasAvancado.get('/estudos/:id/avancado/custos', async (req: Request, res: Resp
 // quantidade entregue na linha de Preço/Permuta física (modelo/UI). O valor
 // declarado que valora a permuta continua em orcamento_valor/orcamento_unidade
 // (ADR: nunca derivado — ver docs/viabilidade/padrao-incorporacao.md §15.1).
-const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo', 'permuta_tipologia_id', 'permuta_quantidade'];
+// #238: permuta_financeira_base escolhe qual visão (bruta/líquida, §15.2)
+// alimenta o fluxo para a linha de Preço/Permuta financeira.
+const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo', 'permuta_tipologia_id', 'permuta_quantidade', 'permuta_financeira_base'];
+const BASES_PERMUTA_FINANCEIRA = ['bruta', 'liquida'];
 
 function validarCamposCusto(res: Response, dados: Record<string, any>): boolean {
   if (dados.grupo !== undefined && !GRUPOS_CUSTO.includes(dados.grupo)) {
@@ -1103,6 +1106,10 @@ function validarCamposCusto(res: Response, dados: Record<string, any>): boolean 
   if (dados.permuta_quantidade !== undefined && dados.permuta_quantidade !== null
     && (!Number.isInteger(Number(dados.permuta_quantidade)) || Number(dados.permuta_quantidade) < 0)) {
     erro(res, 400, 'PERMUTA_QUANTIDADE_INVALIDA', 'permuta_quantidade deve ser um inteiro ≥ 0');
+    return false;
+  }
+  if (dados.permuta_financeira_base !== undefined && !BASES_PERMUTA_FINANCEIRA.includes(dados.permuta_financeira_base)) {
+    erro(res, 400, 'PERMUTA_FINANCEIRA_BASE_INVALIDA', `permuta_financeira_base deve ser um de: ${BASES_PERMUTA_FINANCEIRA.join(', ')}`);
     return false;
   }
   return true;
