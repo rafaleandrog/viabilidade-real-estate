@@ -185,7 +185,15 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
         ${varKpi(c.exposicaoMaxima, base ? base.exposicaoMaxima : undefined, true)}
       </div>
       <div class="kpi-cel"
-        title=${`VGV Total ${fmtR$(c.vgvTotal)} · VGV Permuta Física ${fmtR$(c.vgvPermutaFisica)}`}>
+        title=${`VGV Total ${fmtR$(c.vgvTotal)} · VGV Permuta Física ${fmtR$(c.vgvPermutaFisica)} · ` +
+          // #241: as três grandezas de contratação (#227/#229) — bruto, desconto
+          // comercial e líquido — não tinham lugar na tela nem na exportação.
+          // Ficam aqui, junto das outras informativas, em vez de virarem 3 KPIs
+          // novos (mudaria o grid de 6 para 9 cards sem poder validar em
+          // navegador neste ambiente).
+          `Venda Bruta Contratada ${fmtR$(c.vendaBrutaContratada)} · ` +
+          `Desconto Comercial ${fmtR$(c.descontoComercial)} · ` +
+          `Venda Líquida Contratada ${fmtR$(c.vendaLiquidaContratada)}`}>
         <!-- #229: rótulo corrigido — este valor é VGV VENDÁVEL (potencial menos
              permuta física), não "Receita Bruta" no sentido de recebimento em
              caixa (#228); "Receita Bruta (VGV)" confundia as duas grandezas. -->

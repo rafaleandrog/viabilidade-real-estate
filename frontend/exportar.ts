@@ -228,6 +228,12 @@ export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string |
   rows.push(`VPL;${R$(c.vpl)}`);
   rows.push(`Payback;${c.paybackData ?? ''}`);
   rows.push(`Exposição Máxima;${R$(c.exposicaoMaxima)}`);
+  // #241: as três grandezas de contratação (#227/#229) — mesmo cálculo-base
+  // da tela (tooltip do KPI "VGV Vendável", fluxo-tabela.ts), nunca antes
+  // exportadas.
+  rows.push(`Venda Bruta Contratada;${R$(c.vendaBrutaContratada)}`);
+  rows.push(`Desconto Comercial;${R$(c.descontoComercial)}`);
+  rows.push(`Venda Líquida Contratada;${R$(c.vendaLiquidaContratada)}`);
   const nome = (estudo.id_legivel || 'estudo') + '_fluxo-caixa.csv';
   baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
 }
@@ -289,6 +295,10 @@ export function exportarFluxoPDF(
     ['VPL', fmtR$(c.vpl)],
     ['Payback', c.paybackData ?? '—'],
     ['Exposição Máx.', fmtR$(c.exposicaoMaxima)],
+    // #241: mesmo cálculo-base da tela (tooltip do KPI "VGV Vendável").
+    ['Venda Bruta Contratada', fmtR$(c.vendaBrutaContratada)],
+    ['Desconto Comercial', fmtR$(c.descontoComercial)],
+    ['Venda Líquida Contratada', fmtR$(c.vendaLiquidaContratada)],
   ];
   const cab = `
     <h1>${estudo.nome_exibicao || estudo.nome}</h1>
