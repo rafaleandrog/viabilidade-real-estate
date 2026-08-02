@@ -35,7 +35,14 @@ import './viab-num.js';
 
 const n = (v: any): number => Number(v) || 0;
 
-const PERIODICIDADES = ['mensal', 'trimestral', 'semestral', 'anual'];
+// #248: só "Mensal" é oferecido para linhas NOVAS/editadas — periodicidades
+// fora do padrão aprovado (padrao-incorporacao.md §11, "Modelo funcional de
+// referência": "quantidade de parcelas mensais... sem periodicidades fora do
+// padrão aprovado"). Dado legado com outra periodicidade continua sendo lido
+// e calculado normalmente pelo motor (`INTERVALO_PERIODICIDADE`, fluxo-caixa-
+// motor.ts) — só não é mais oferecido como opção nova; a badge da própria
+// linha aparece à parte (ver `_opcoesPeriodicidade`) para não escondê-la.
+const PERIODICIDADES = ['mensal'];
 const ROTULO_PER: Record<string, string> = { mensal: 'Mensal', trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual' };
 
 @customElement('viab-fluxo-receitas')
@@ -641,7 +648,9 @@ export class ViabFluxoReceitas extends LitElement {
       comissao: { ativo: fp.comissao?.ativo ?? true, tipo: fp.comissao?.tipo ?? 'embutida', pct: n(fp.comissao?.pct) },
       ret: { ativo: fp.ret?.ativo ?? false, pct: n(fp.ret?.pct) },
       entrada: arr(fp.entrada).length ? arr(fp.entrada) : [{ pct: 15, parcelas: 1, descontoPct: 0 }],
-      parcelas: arr(fp.parcelas).length ? arr(fp.parcelas) : [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 15 }],
+      // #248: `juros` saiu do default — campo vestigial, nunca teve controle
+      // na UI (nenhum checkbox o lia/escrevia) e não alimenta cálculo nenhum.
+      parcelas: arr(fp.parcelas).length ? arr(fp.parcelas) : [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, pct: 15 }],
       repasse: { apos_entrega_meses: n(fp.repasse?.apos_entrega_meses) },
     };
     this.modalErro = '';
@@ -683,7 +692,7 @@ export class ViabFluxoReceitas extends LitElement {
       // #105 — escolhe a primeira periodicidade ainda não usada
       const usadas = new Set(f.parcelas.map((p: any) => p.periodicidade));
       const disponivel = PERIODICIDADES.find((per) => !usadas.has(per)) ?? 'mensal';
-      nova = { periodicidade: disponivel, parcelas: 0, ao_longo_obra: true, juros: false, pct: 0 };
+      nova = { periodicidade: disponivel, parcelas: 0, ao_longo_obra: true, pct: 0 };
     }
     this.pagForm = { ...f, [bloco]: [...f[bloco], nova] };
   }
@@ -739,6 +748,8 @@ export class ViabFluxoReceitas extends LitElement {
           <div>
             <div class="pag-secao">
               <h4>Condições de entrada</h4>
+              <p class="sec">Pagamento no ato — 1 parcela paga no mês da contratação; mais de uma
+                parcela aqui é o pagamento inicial dividido, ainda começando naquele mês.</p>
               ${f.entrada.map((e: any, i: number) => html`
                 <div class="pag-linha">
                   <viab-num label="% do total" sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${e.pct}
@@ -761,18 +772,24 @@ export class ViabFluxoReceitas extends LitElement {
             </div>
             <div class="pag-secao">
               <h4>Parcelamento</h4>
+              <p class="sec">Quantidade de parcelas mensais — "Ao longo da obra" liquida no evento
+                do Cronograma (a quantidade vem de lá); sem marcar, é um prazo fixo de N parcelas.</p>
               ${f.parcelas.map((p: any, i: number) => {
                 // #105 — periodicidades já usadas por OUTRAS linhas (para desabilitar badges)
                 const perUsadas = new Set(f.parcelas.filter((_: any, j: number) => j !== i).map((x: any) => x.periodicidade));
+                // #248: se a linha já tem uma periodicidade legada fora do
+                // padrão (trimestral/semestral/anual), a badge dela continua
+                // aparecendo — só não é mais oferecida para linhas novas.
+                const opcoes = PERIODICIDADES.includes(p.periodicidade) ? PERIODICIDADES : [p.periodicidade, ...PERIODICIDADES];
                 return html`
                 <div class="pag-linha">
                   <viab-num label="% do total" sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${p.pct}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'pct', ev.detail.valor ?? 0)}></viab-num>
                   <span class="badges-par">
-                    ${PERIODICIDADES.map((per) => html`
+                    ${opcoes.map((per) => html`
                       <urbi-badge cor="info" interativo ?ativo=${p.periodicidade === per}
                         class=${!dis && perUsadas.has(per) && p.periodicidade !== per ? 'indisponivel' : ''}
-                        @click=${() => { if (!dis && !perUsadas.has(per)) this._setLinha('parcelas', i, 'periodicidade', per); }}>${ROTULO_PER[per]}</urbi-badge>`)}
+                        @click=${() => { if (!dis && !perUsadas.has(per)) this._setLinha('parcelas', i, 'periodicidade', per); }}>${ROTULO_PER[per] ?? per}</urbi-badge>`)}
                   </span>
                   ${/* #190/#191: "Ao longo da obra" → nº de parcelas sai da
                        duração da obra no Cronograma dividida pelo intervalo da
@@ -799,6 +816,8 @@ export class ViabFluxoReceitas extends LitElement {
             </div>
             <div class="pag-secao">
               <h4>Repasse</h4>
+              <p class="sec">Evento de liquidação concentrada — o saldo que restar após entrada e
+                parcelamento é pago de uma vez, no mês informado após a entrega.</p>
               <div class="pag-linha">
                 <div class="repasse-box">
                   <span class="sec">Repasse</span><br />
