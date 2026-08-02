@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fmtPct, fmtPctEntrada, parseNumeroBR } from './viab-format.js';
+import { fmtR$, fmtPct, fmtPctEntrada, parseNumeroBR } from './viab-format.js';
+
+test('#281: fmtR$ usa 2 casas decimais — bate com o toFixed(2) de exportar.ts', () => {
+  assert.equal(fmtR$(10_000_000), 'R$ 10.000.000,00');
+  assert.equal(fmtR$(1234.5), 'R$ 1.234,50');
+  assert.equal(fmtR$(0), 'R$ 0,00');
+  assert.equal(fmtR$(-2_500.789), '-R$ 2.500,79');
+});
 
 test('fmtPct: valor calculado usa 1 casa decimal com vírgula', () => {
   assert.equal(fmtPct(12.34), '12,3%');
