@@ -1215,6 +1215,23 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
       Object.assign(dados, r.campos);
     }
 
+    // #256: mesmo cuidado do POST (linha 1141) — uma linha reclassificada via
+    // PATCH (ex.: categoria "Outro" → "Preço") passava batido por essa
+    // checagem, porque só existia na criação. Sem isso, um estudo cuja linha
+    // Preço nasceu sem categoria e foi categorizada depois nunca ganhava
+    // `obrigatoria=true` — ficava sem identidade oficial no grupo `terreno`.
+    const grupoFinal = dados.grupo !== undefined ? dados.grupo : custo.grupo;
+    const categoriaFinal = dados.categoria !== undefined ? dados.categoria : custo.categoria;
+    if (dados.categoria !== undefined || dados.grupo !== undefined) {
+      const categoriasObrigPatch = LINHAS_OBRIGATORIAS_CUSTO[String(grupoFinal)] ?? [];
+      if (categoriasObrigPatch.includes(String(categoriaFinal))) {
+        const existentes = await req.dados!.listar('avancado_linhas_custo', {
+          filtros: { estudo_id: estudo.id, grupo: grupoFinal, categoria: categoriaFinal }, por_pagina: 1,
+        });
+        if (existentes.total === 0) dados.obrigatoria = true;
+      }
+    }
+
     const atualizada = await req.dados!.atualizar('avancado_linhas_custo', cid, dados);
     res.json(atualizada);
   } catch (e: any) {
