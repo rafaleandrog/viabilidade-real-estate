@@ -87,3 +87,20 @@ jobs:
             exit 1
           fi
           echo "ok: nenhuma aspa curva em posição de atributo."
+
+  json-estrito:
+    name: schema.json e manifesto.json são JSON estrito
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard de JSON estrito
+        run: |
+          set -uo pipefail
+          # Só `node` (já vem no runner) — sem pnpm install, sem SDK, sem credencial.
+          # Comentário `//` no schema.json passa por typecheck, testes, build e pelo
+          # harness de migrações em VERDE, e só falha na instalação, com "Pacote
+          # reprovado na validacao" (foi a v0.1.19). Ver scripts/guard-json.mjs.
+          if ! node scripts/guard-json.mjs; then
+            echo "::error title=JSON inválido::schema.json ou manifesto.json não é JSON estrito. O shell reprova o pacote na instalação com 'Pacote reprovado na validacao' antes de olhar qualquer tabela. Comentário // não existe em JSON."
+            exit 1
+          fi

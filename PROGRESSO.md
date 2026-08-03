@@ -4,6 +4,64 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Release v0.1.19 reprovada na instalação — comentário `//` no `schema.json` (2026-08-03)
+
+**Sintoma:** o modal "Atualizar Estudo de Viabilidade" mostrava `v0.1.19_b57117c` (rótulos
+`schema · roda migração`, `homologada`, `recomendada`) e recusava com **"Pacote reprovado na
+validacao"**.
+
+**Causa raiz (confirmada rodando o validador do shell, não por hipótese):** a fase 4 da cascata de
+áreas (commit `4041d1f`) inseriu um bloco de **8 linhas de comentário `//`** no `schema.json`
+(linhas 46–53, descrevendo a tabela de áreas em cascata). **JSON não tem comentário.** O shell faz:
+
+```
+shell/backend/src/validacao/schema.ts
+  try { raw = JSON.parse(conteudo); }
+  catch (e) { return [{ check: 'schema', detalhes: `JSON invalido: ${e.message}` }] }
+→ validacao.ok = false
+→ instalacao-apps.ts:463  falhar('validacao', 422, 'Pacote reprovado na validacao')
+```
+
+O pacote era reprovado **antes de o shell olhar uma única tabela** — nada a ver com a migração 020,
+com o bump `0.1.18→0.1.19` (que está correto) nem com conflito de dado no banco (esse teria a
+mensagem diferente, "Pacote reprovado no dry-run de schema"). Era a primeira vez em toda a história
+do repo que o `schema.json` continha comentário: o commit anterior (`9e577df`) tinha zero.
+
+**Por que atravessou tudo em verde** — é a mesma família do #160/#162 (falha silenciosa que nenhuma
+etapa enxerga): `tsc`, os 334 testes, o `esbuild` e o harness de migrações **não leem o
+`schema.json`**. Quem lia era o `scripts/validar-schema.mjs` (que faz `JSON.parse` estrito, criado
+depois do pacote `0.1.12` reprovado por `"tipo": "logico"`) — mas ele é a **etapa 2/5** do
+`validar-backend.sh`, e a **etapa 1/5 aborta com `exit 1` quando `node_modules/@urbiverso/sdk` não
+existe**, que é a regra do ambiente Claude Code (SDK privado, 401). Ou seja: o único parse estrito
+do repo nunca chegava a rodar aqui.
+
+**Correção:**
+- `schema.json` — as 8 linhas de comentário removidas. Diff de **8 deleções e nada mais**: nenhuma
+  tabela, coluna, tipo ou índice mudou. O conhecimento que o comentário carregava já vive nos
+  lugares certos — a semântica `_modo`/`_valor` no cabeçalho de `frontend/areas-cascata.ts`, e a
+  soma de `faixas_nao_edificaveis_pct`/`areas_privativas_nao_vendaveis_pct` no cabeçalho da
+  `migracoes/020_areas_cascata_loteamento.js`.
+- `scripts/guard-json.mjs` (novo) — guard de JSON estrito para `schema.json` e `manifesto.json`.
+  **Não depende de SDK, rede nem `node_modules`**, que é exatamente o que fazia o check existente
+  ser pulado. Quando reprova, aponta a linha e lista as linhas de comentário.
+- Ligado em **três** pontos, para não depender de ninguém lembrar: etapa 1/5 do
+  `validar-frontend.sh` (o script que sempre funciona neste ambiente), etapa **0/5** do
+  `validar-backend.sh` (**antes** do portão do SDK que abortava cedo) e job `json-estrito` no
+  `.github/workflows/pr-guards.yml` (só `node`, sem credencial — pega quem não rodou nada local).
+
+**Verificado nesta sessão:** o `validador-schema.ts` real do shell rodado contra o `schema.json`
+corrigido (via `node --experimental-strip-types`, os dois arquivos são TS só de anotação) →
+**19 tabelas, zero erros**; harness de migrações verde (contrato, banco vazio, reexecução e cadeia
+001→020); guard reprovando o estado anterior e passando no corrigido (contraprova com `git stash`).
+
+**`versao` continua `0.1.19`** — e tem que continuar: a `versao` descreve o **schema**, e o schema
+não mudou (só saiu comentário). Como não há degrau de versão, a plataforma só instala este build
+pelo caminho **mesma versão com `build_sha` à frente**, o que exige a tag carregando o sha:
+`viabilidade-v0.1.19_<sha8>`. Disparar o `release.yml` por **workflow_dispatch** (Actions → release
+→ Run workflow), que gera a tag com sha sozinho. Tag sem sha trava o upgrade dentro da mesma versão.
+
+---
+
 ## Fase 10 — Fechamento da trilha: Rodadas 5 (EVI) e 6 (lista de bugs) ENCERRADAS (2026-08-02)
 
 Em 2026-08-01 o autor aprovou uma **trilha única de 10 fases** unificando a Rodada 5 (EVI,

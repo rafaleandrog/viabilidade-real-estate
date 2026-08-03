@@ -43,14 +43,6 @@
         "epu_pct":                         { "tipo": "decimal", "precisao": 5, "escala": 2 },
         "areas_privativas_nao_vendaveis_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
 
-        // Tabela de áreas em cascata do Loteamento (2026-08-03,
-        // docs/viabilidade/... referência `padrao_areas.png`) — substitui a
-        // lista plana de % acima na UI (que fica no schema, sem leitura/
-        // escrita — #migração 020 já soma `faixas_nao_edificaveis_pct` em
-        // `area_app_valor` e `areas_privativas_nao_vendaveis_pct` em
-        // `area_viario_privado_valor`, preservando o resultado calculado de
-        // todo estudo existente). Cada linha editável = `_modo` (qual das 3
-        // unidades é a mestre) + `_valor` (m² se `modo=m2`, senão 0–100).
         "area_app_modo":              { "tipo": "texto", "limite": 20, "opcoes": ["m2", "pct_poligonal"], "padrao": "m2" },
         "area_app_valor":             { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "area_elup_epu_modo":         { "tipo": "texto", "limite": 20, "opcoes": ["m2", "pct_poligonal", "pct_parcelavel"], "padrao": "m2" },

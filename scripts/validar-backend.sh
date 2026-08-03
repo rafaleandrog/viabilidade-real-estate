@@ -26,6 +26,13 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 raiz="$(pwd)"
 
+# JSON estrito ANTES de qualquer coisa: este guard não depende de SDK, de rede nem de
+# node_modules. Ficava implícito na etapa 2/5 (validar-schema.mjs faz JSON.parse), mas
+# a etapa 1/5 aborta quando o SDK não está no disco — então no ambiente Claude Code o
+# parse nunca rodava, e um `//` no schema.json chegou intacto ao release (v0.1.19).
+echo "== 0/5 guard: JSON estrito (schema.json, manifesto.json) =="
+node scripts/guard-json.mjs || exit 1
+
 echo "== 1/5 dependências públicas (express) =="
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — rode antes: bash scripts/validar-frontend.sh" >&2
