@@ -179,6 +179,15 @@ const TODOS_NUM = new Set<string>([
 export class ViabTelaPremissas extends LitElement {
   @property({ attribute: false }) estudo: any = null;
   @property({ type: Boolean }) editavel = false;
+  // Sub-aba (2026-08-03, reestruturação do Preliminar): qual grupo de seções
+  // mostrar. Uma única instância deste componente atende as 3 sub-abas — o
+  // pai (tela-preliminar.ts) reatribui o `slot` dinamicamente em vez de
+  // instanciar 3 componentes (evitaria 3 fetches redundantes e 3 cópias
+  // independentes de `form`/`_dirty` fora de sincronia entre si). O
+  // formulário, o "dirty" e o Salvar continuam ÚNICOS e globais — salvar em
+  // qualquer sub-aba salva as premissas inteiras, como já era antes da
+  // divisão visual.
+  @property({ type: String }) secao: 'terreno' | 'produtos' | 'permutas' = 'terreno';
 
   @state() private form: Record<string, any> = {};
   @state() private salvando = false;
@@ -375,104 +384,132 @@ export class ViabTelaPremissas extends LitElement {
     this._obrigCache = camposObrigatorios(this.form, this.estudo.tipo_empreendimento);
 
     return html`
-      ${!avancado ? html`
-        <urbi-card titulo="Imagem principal">
-          <viab-imagem-principal .estudo=${this.estudo} .editavel=${this.editavel}></viab-imagem-principal>
-        </urbi-card>` : nothing}
-
-      <urbi-card titulo="Premissas">
+      ${this.secao === 'terreno' ? html`
         ${!avancado ? html`
+          <urbi-card titulo="Imagem principal">
+            <viab-imagem-principal .estudo=${this.estudo} .editavel=${this.editavel}></viab-imagem-principal>
+          </urbi-card>` : nothing}
+
+        <urbi-card titulo="Terreno & Áreas">
+          ${!avancado ? html`
+            <div class="secao grupo grupo-a">
+              <h4>Terreno</h4>
+              ${this.estudo.origem_terreno === 'nucleo'
+                ? html`<viab-terreno-nucleo
+                    .estudo=${this.estudo}
+                    .editavel=${this.editavel && this.estudo.status === 'rascunho'}
+                  ></viab-terreno-nucleo>`
+                : html`<div class="grid">
+                    ${this._input({ k: 'terreno_manual_nome', label: 'Nome do terreno', t: 'txt' }, dis)}
+                    ${this._input({ k: 'terreno_manual_area', label: 'Área do terreno', t: 'num', sufixo: 'm²' }, dis)}
+                  </div>`}
+              ${!lot
+                ? html`<div class="grid subgrid">${TERRENO_COEF.map((c) => this._input(c, dis))}</div>`
+                : nothing}
+            </div>` : nothing}
+
+          <div class="secao grupo grupo-b">
+            <h4>Áreas</h4>
+            <div class="grid">${areas.map((c) => this._input(c, dis))}</div>
+          </div>
+
+          ${this._renderRodapeForm()}
+        </urbi-card>
+
+        ${this._renderResumo(lot)}
+      ` : nothing}
+
+      ${this.secao === 'produtos' ? html`
+        <urbi-card titulo="Produtos & Custos">
           <div class="secao grupo grupo-a">
-            <h4>Terreno</h4>
-            ${this.estudo.origem_terreno === 'nucleo'
-              ? html`<viab-terreno-nucleo
-                  .estudo=${this.estudo}
-                  .editavel=${this.editavel && this.estudo.status === 'rascunho'}
-                ></viab-terreno-nucleo>`
-              : html`<div class="grid">
-                  ${this._input({ k: 'terreno_manual_nome', label: 'Nome do terreno', t: 'txt' }, dis)}
-                  ${this._input({ k: 'terreno_manual_area', label: 'Área do terreno', t: 'num', sufixo: 'm²' }, dis)}
-                </div>`}
-            ${!lot
-              ? html`<div class="grid subgrid">${TERRENO_COEF.map((c) => this._input(c, dis))}</div>`
-              : nothing}
-          </div>` : nothing}
-
-        <div class="secao grupo grupo-b">
-          <h4>Áreas</h4>
-          <div class="grid">${areas.map((c) => this._input(c, dis))}</div>
-        </div>
-
-        <div class="secao grupo grupo-a">
-          <h4>Produtos</h4>
-          <div class="grid">${produtos.map((c) => this._input(c, dis))}</div>
-        </div>
-
-        <div class="secao grupo grupo-b">
-          <h4>Custos</h4>
-          <div class="checks">
-            <urbi-checkbox
-              label="Considerar custo de aquisição do terreno"
-              ?desabilitado=${dis}
-              ?marcado=${this.form.considerar_custo_terreno !== false}
-              @urbi:checkbox-change=${(e: CustomEvent) => this._set('considerar_custo_terreno', e.detail.marcado)}
-            ></urbi-checkbox>
+            <h4>Produtos</h4>
+            <div class="grid">${produtos.map((c) => this._input(c, dis))}</div>
           </div>
-          <div class="grid">
-            ${CUSTOS_UNIDADE
-              .filter((cu) => !cu.so || cu.so === this.estudo.tipo_empreendimento)
-              .map((cu) => this._custoUnidade(cu, dis))}
-            ${custos.map((c) => this._input(c, dis, c.k === 'custo_terreno_m2' && this.form.considerar_custo_terreno === false))}
+
+          <div class="secao grupo grupo-b">
+            <h4>Custos</h4>
+            <div class="checks">
+              <urbi-checkbox
+                label="Considerar custo de aquisição do terreno"
+                ?desabilitado=${dis}
+                ?marcado=${this.form.considerar_custo_terreno !== false}
+                @urbi:checkbox-change=${(e: CustomEvent) => this._set('considerar_custo_terreno', e.detail.marcado)}
+              ></urbi-checkbox>
+            </div>
+            <div class="grid">
+              ${CUSTOS_UNIDADE
+                .filter((cu) => !cu.so || cu.so === this.estudo.tipo_empreendimento)
+                .map((cu) => this._custoUnidade(cu, dis))}
+              ${custos.map((c) => this._input(c, dis, c.k === 'custo_terreno_m2' && this.form.considerar_custo_terreno === false))}
+            </div>
           </div>
-        </div>
 
-        <div class="secao grupo grupo-a">
-          <h4>Impostos</h4>
-          <div class="checks">
-            <urbi-checkbox
-              label="Sujeito a RET (alíquota fixa ${this.aliquotaRet}%)"
-              ?desabilitado=${dis}
-              ?marcado=${!!this.form.sujeito_ret}
-              @urbi:checkbox-change=${(e: CustomEvent) => this._set('sujeito_ret', e.detail.marcado)}
-            ></urbi-checkbox>
+          <div class="secao grupo grupo-a">
+            <h4>Impostos</h4>
+            <div class="checks">
+              <urbi-checkbox
+                label="Sujeito a RET (alíquota fixa ${this.aliquotaRet}%)"
+                ?desabilitado=${dis}
+                ?marcado=${!!this.form.sujeito_ret}
+                @urbi:checkbox-change=${(e: CustomEvent) => this._set('sujeito_ret', e.detail.marcado)}
+              ></urbi-checkbox>
+            </div>
+            <div class="grid">${IMPOSTOS.map((c) => {
+              const bloqImposto = !!this.form.sujeito_ret;
+              return this._input(c, dis || bloqImposto, bloqImposto);
+            })}</div>
           </div>
-          <div class="grid">${IMPOSTOS.map((c) => {
-            const bloqImposto = !!this.form.sujeito_ret;
-            return this._input(c, dis || bloqImposto, bloqImposto);
-          })}</div>
-        </div>
 
-        <div class="secao grupo grupo-b">
-          <h4>Deduções</h4>
-          <div class="grid">
-            ${DEDUCOES.map((c) => this._input(c, dis))}
-            ${this._custoUnidade(PERMUTA_FIN_R, dis)}
-            ${lot ? nothing : this._custoUnidade(PERMUTA_FIN_NR, dis)}
+          <div class="secao grupo grupo-b">
+            <h4>Deduções</h4>
+            <div class="grid">${DEDUCOES.map((c) => this._input(c, dis))}</div>
           </div>
-        </div>
 
-        <div class="secao grupo grupo-a">
-          <h4>Permuta física</h4>
-          <div class="grid">
-            ${lot
-              ? this._custoUnidade(PERMUTA_UNIDADE, dis)
-              : html`${this._custoUnidade(PERMUTA_FIS_R, dis)}${this._custoUnidade(PERMUTA_FIS_NR, dis)}`}
+          ${this._renderRodapeForm()}
+        </urbi-card>
+      ` : nothing}
+
+      ${this.secao === 'permutas' ? html`
+        <urbi-card titulo="Permutas">
+          <div class="secao grupo grupo-a">
+            <h4>Permuta física</h4>
+            <div class="grid">
+              ${lot
+                ? this._custoUnidade(PERMUTA_UNIDADE, dis)
+                : html`${this._custoUnidade(PERMUTA_FIS_R, dis)}${this._custoUnidade(PERMUTA_FIS_NR, dis)}`}
+            </div>
           </div>
-        </div>
 
-        ${this.erroGeral ? html`<urbi-banner variante="erro">${this.erroGeral}</urbi-banner>` : nothing}
-        ${this.editavel
-          ? html`
-              ${this._dirty ? html`<urbi-banner variante="alerta">
-                As alterações não são salvas automaticamente — clique em “Salvar premissas” antes de sair desta página.
-              </urbi-banner>` : nothing}
-              <div class="form-acoes">
-                <urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar premissas</urbi-botao>
-              </div>`
-          : html`<p class="sec">Somente leitura neste status/função.</p>`}
-      </urbi-card>
+          <div class="secao grupo grupo-b">
+            <h4>Permuta financeira</h4>
+            <div class="grid">
+              ${this._custoUnidade(PERMUTA_FIN_R, dis)}
+              ${lot ? nothing : this._custoUnidade(PERMUTA_FIN_NR, dis)}
+            </div>
+          </div>
 
-      ${this._renderResumo(lot)}
+          ${this._renderRodapeForm()}
+        </urbi-card>
+      ` : nothing}
+    `;
+  }
+
+  // Rodapé de formulário (erro geral + banner de "não salvo" + botão Salvar)
+  // — repetido em cada sub-aba porque o formulário/dirty/save são ÚNICOS e
+  // globais (ver comentário na prop `secao`); salvar de qualquer sub-aba
+  // salva as premissas inteiras.
+  private _renderRodapeForm(): TemplateResult {
+    return html`
+      ${this.erroGeral ? html`<urbi-banner variante="erro">${this.erroGeral}</urbi-banner>` : nothing}
+      ${this.editavel
+        ? html`
+            ${this._dirty ? html`<urbi-banner variante="alerta">
+              As alterações não são salvas automaticamente — clique em “Salvar premissas” antes de sair desta página.
+            </urbi-banner>` : nothing}
+            <div class="form-acoes">
+              <urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar premissas</urbi-botao>
+            </div>`
+        : html`<p class="sec">Somente leitura neste status/função.</p>`}
     `;
   }
 

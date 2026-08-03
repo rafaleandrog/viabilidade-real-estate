@@ -2,19 +2,13 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import './tela-premissas.js';
-import './tela-proforma.js';
-import './tela-graficos.js';
-import './tela-apelo.js';
+import './tela-preliminar.js';
 import './tela-avancado.js';
 import {
   urbiVerso, buscarEstudo, transicaoStatus,
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
-// Abas do Preliminar (as 4 de sempre — o Avançado usa sua própria árvore em
-// viab-tela-avancado, montada no Lote 3 / #15).
-const ABAS_PRELIMINAR = ['premissas', 'proforma', 'graficos', 'apelo'];
 const FUNCOES = [
   { valor: 'leitor', rotulo: 'Leitor' },
   { valor: 'editor', rotulo: 'Editor' },
@@ -25,9 +19,8 @@ const FUNCOES = [
 export class ViabTelaEstudo extends LitElement {
   @property({ type: Number }) estudoId = 0;
   // Guia ativa vem da URL (/detalhe/:id/:aba). O conjunto válido depende do
-  // nível: Preliminar usa ABAS_PRELIMINAR; o Avançado tem suas 7 abas de topo
-  // (normalizadas dentro de viab-tela-avancado). Aqui só guardamos o valor cru
-  // e cada ramo do render normaliza para o seu conjunto.
+  // nível — cada um normaliza dentro do seu próprio componente
+  // (viab-tela-preliminar / viab-tela-avancado). Aqui só guardamos o valor cru.
   @property({ type: String })
   set aba(v: string) {
     const antigo = this._aba;
@@ -37,8 +30,9 @@ export class ViabTelaEstudo extends LitElement {
   get aba(): string { return this._aba; }
   private _aba = 'premissas';
 
-  // #251: subaba (2º nível) vinda da URL /detalhe/:id/:aba/:subaba. Só o Avançado
-  // usa; o Preliminar não tem subaba. Valor cru — tela-avancado normaliza.
+  // #251: subaba (2º nível) vinda da URL /detalhe/:id/:aba/:subaba — Avançado e
+  // Preliminar (desde a reestruturação de 2026-08-03) usam. Valor cru; cada
+  // ramo do render normaliza (viab-tela-avancado / viab-tela-preliminar).
   @property({ type: String }) subAba = '';
 
   @state() private estudo: any = null;
@@ -59,17 +53,6 @@ export class ViabTelaEstudo extends LitElement {
     .add-membro urbi-select { min-width: 180px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
   `];
-
-  // Abas do Preliminar (as 4 de sempre). O Avançado não passa por aqui — tem
-  // sua própria árvore de 7 abas de topo em viab-tela-avancado.
-  private _abasPreliminar() {
-    return [
-      { id: 'premissas', label: 'Premissas', icone: 'fa-solid fa-sliders' },
-      { id: 'proforma', label: 'Proforma', icone: 'fa-solid fa-table-cells' },
-      { id: 'graficos', label: 'Gráficos', icone: 'fa-solid fa-chart-pie' },
-      { id: 'apelo', label: 'Apelo Comercial', icone: 'fa-solid fa-bullhorn' },
-    ];
-  }
 
   connectedCallback() {
     super.connectedCallback();
@@ -141,29 +124,15 @@ export class ViabTelaEstudo extends LitElement {
               @viab:subaba-topo=${(e: CustomEvent) => urbiVerso.navegarSub(`/detalhe/${this.estudoId}/${e.detail.aba}/${e.detail.sub}`)}
             ></viab-tela-avancado>`
           : html`
-            <urbi-abas
-              expandir
-              .abas=${this._abasPreliminar()}
-              .ativa=${ABAS_PRELIMINAR.includes(this.aba) ? this.aba : 'premissas'}
-              @urbi:aba-selecionar=${(e: CustomEvent) => {
-                const id = e.detail?.id || 'premissas';
-                urbiVerso.navegarSub(`/detalhe/${this.estudoId}/${id}`);
-              }}
-            >
-              <urbi-hospedeiro slot="premissas">
-                <viab-tela-premissas .estudo=${this.estudo}
-                  .editavel=${p.podeEditar && st !== 'aprovado' && st !== 'reprovado'}></viab-tela-premissas>
-              </urbi-hospedeiro>
-              <urbi-hospedeiro slot="proforma">
-                <viab-tela-proforma .estudo=${this.estudo}></viab-tela-proforma>
-              </urbi-hospedeiro>
-              <urbi-hospedeiro slot="graficos">
-                <viab-tela-graficos .estudo=${this.estudo}></viab-tela-graficos>
-              </urbi-hospedeiro>
-              <urbi-hospedeiro slot="apelo">
-                <viab-tela-apelo .estudo=${this.estudo} .editavel=${p.podeEditar}></viab-tela-apelo>
-              </urbi-hospedeiro>
-            </urbi-abas>`}
+            <viab-tela-preliminar
+              .estudo=${this.estudo}
+              .podeEditar=${!!p.podeEditar}
+              .status=${st}
+              .aba=${this.aba}
+              .subAba=${this.subAba}
+              @viab:aba-topo=${(e: CustomEvent) => urbiVerso.navegarSub(`/detalhe/${this.estudoId}/${e.detail.id}`)}
+              @viab:subaba-topo=${(e: CustomEvent) => urbiVerso.navegarSub(`/detalhe/${this.estudoId}/${e.detail.aba}/${e.detail.sub}`)}
+            ></viab-tela-preliminar>`}
       </urbi-shell-page>
 
       ${this.mostrarMembros ? this._renderMembros(p) : nothing}
