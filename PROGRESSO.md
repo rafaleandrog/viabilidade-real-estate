@@ -4,6 +4,65 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## 53 issues implementadas continuavam abertas — faltou a keyword de fechamento (2026-08-03)
+
+**Sintoma:** o autor tinha **53 issues abertas** no GitHub descrevendo trabalho já feito, mergeado e
+declarado concluído neste arquivo e no `CLAUDE.md` — as Rodadas 5 (EVI, #220–#241) e 6 (lista de
+bugs, #244–#281) inteiras.
+
+**Causa raiz (confirmada por contagem em `origin/main`):** os commits citam a issue como **menção**,
+nunca como keyword de fechamento:
+
+```
+fix(terreno): garantir uma única linha Preço obrigatória, também em legados (#256)
+feat(financeiro): motor dos 4 instrumentos + waterfall (FIN-04+05+06+07, #273-276)
+feat(financeiro): aba Capital Stack — editor de camadas (FIN-08+09, #277+278)
+```
+
+| keyword na `main` | ocorrências | issues fechadas |
+|---|---|---|
+| `Closes #NNN` | 6 | **6** (#239, #250, #251, #254, #262, #263) |
+| `Fixes` / `Resolves` | 0 | 0 |
+| menção `(#NNN)` sem keyword | ~82 | **0** |
+
+As 6 que usaram `Closes` são exatamente as 6 que fecharam. **A falha é silenciosa** — não há erro, o
+PR mergeia, e a lista de pendências passa a mentir sobre o estado do projeto.
+
+Duas armadilhas específicas, que uma regra genérica não pega: **intervalo/composto** (`#273-276`,
+`#277+278`) não fecha nem com keyword — o GitHub exige a keyword repetida por issue; e
+`Closes #1, #2` fecha só a **#1**.
+
+**Por que a regra não pegou:** ela existe, escrita em detalhe — mas no `CLAUDE.md` do monorepo
+`urbiverso/urbiverso`. O `CLAUDE.md` **deste** repo, o único que uma sessão trabalhando no app lê,
+não dizia nada sobre fechamento de issue.
+
+**Prevenção implementada:**
+- `scripts/guard-issue-fechamento.mjs` (novo) — barra PR que cita issue sem declarar o que faz com
+  ela. Detecta menção sem keyword, intervalo/composto e keyword seguida de lista. Escape consciente
+  para citação legítima: `Sem-fechamento: #NNN <motivo>`. Não obriga a fechar — obriga a **decidir**.
+  Node puro, sem dependência, mesmo padrão do `guard-json.mjs`.
+- Job `issue-fechamento` no `.github/workflows/pr-guards.yml`, lendo corpo do PR **e** mensagens dos
+  commits (o GitHub fecha pelos dois; foi na mensagem de commit que as 53 foram citadas).
+- `CLAUDE.md` — seção nova **§ Fechamento de issue** com a tabela das formas que falham caladas, e
+  correção da § Estado do backlog, que declarava as rodadas concluídas sem dizer que as issues
+  seguiam abertas.
+
+**Verificado:** 9 casos de fixture nos dois sentidos (entrega com `Closes`, menção nua, intervalo,
+lista, `Sem-fechamento:`, `Fecha` em português, auto-referência da própria PR, PR sem issue,
+multi-keyword) · **contraprova histórica**: o guard reprova os 4 commits reais que causaram o
+problema (`4f920a6`, `bbf87eb`, `1b6eea9`, `e7d11f4`), apontando `#273-276` pelo nome.
+
+**PENDENTE — não feito nesta sessão, por decisão do autor (custo de tokens):** conferir os critérios
+de aceite das **53 issues** uma a uma contra o diff e **fechar as cumpridas**. O levantamento já
+está pronto: **todas as 53 têm commit de implementação mergeado na `main`** (mapeamento
+issue→commit feito nesta sessão), e uma amostra foi validada em profundidade (#244 →
+`montarCopiaEstudo` em `backend/rotas/estudos.ts`, com 3 testes dedicados, critérios atendidos).
+**Mas "tem commit" ≠ "critério de aceite cumprido"** — a conferência real continua devendo. Duas
+exceções já conhecidas: a **#254** (epic de rastreio, sem diff próprio) já fechou, e a **#264** tem
+critério de aceite que não é código (confirmação da versão publicada na instância).
+
+---
+
 ## Release v0.1.19 reprovada na instalação — comentário `//` no `schema.json` (2026-08-03)
 
 **Sintoma:** o modal "Atualizar Estudo de Viabilidade" mostrava `v0.1.19_b57117c` (rótulos

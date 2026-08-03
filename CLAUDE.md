@@ -46,6 +46,13 @@ fecharam com diff; item 16 (#238) e item 24 (#239) já eram issues compartilhada
 **Todas as 59 issues distintas das duas rodadas estão mergeadas na `main`**, exceto duas cujo
 critério de aceite não é código:
 
+> 🔴 **Mas 53 dessas issues continuam ABERTAS no GitHub** (descoberto em 2026-08-03). O código está
+> na `main`; o que faltou foi a keyword de fechamento — os commits citaram `(#256)`, `(#273-276)`,
+> nunca `Closes #NNN`. **Código mergeado e issue fechada são coisas diferentes, e esta seção já
+> confundiu as duas.** Pendente: conferir os critérios de aceite das 53 uma a uma e fechar as
+> cumpridas (o mapeamento issue→commit já está levantado — ver `PROGRESSO.md`, 2026-08-03).
+> A prevenção já está no lugar: § Fechamento de issue + guard no CI.
+
 - **#254** (epic de rastreio) — fecha porque #220, #221, #227–#237, #240 e #241 (suas executoras)
   já fecharam com diff; não tem diff próprio.
 - **#264** (`fix(cenarios)` confirmar as duas séries e decidir o estado 0%) — o código já mostra as
@@ -93,6 +100,35 @@ histórico completo está no `git log` e no `PROGRESSO.md`.
 > atualize esta seção junto — e quem a encerrar faz o mesmo, na mesma alteração. A Rodada 4 nasceu
 > porque #165–#169 ficaram abertas uma rodada inteira sem ninguém perceber, com este arquivo dizendo
 > "não há issue aberta".
+
+### Fechamento de issue — `Closes #123`, sempre em inglês
+
+> ⚠️ **Só keyword em inglês fecha issue.** O GitHub vincula PR→issue exclusivamente por
+> `close`/`closes`/`closed`, `fix`/`fixes`/`fixed`, `resolve`/`resolves`/`resolved` (maiúsculas
+> indiferentes), e **só no corpo do PR ou na mensagem do commit — nunca no título**.
+
+Quatro formas que falham **caladas** — sem erro, o PR mergeia, a issue fica aberta:
+
+| Escrito | Fecha? |
+|---|---|
+| `Closes #244` no corpo do PR | ✅ |
+| `(#244)` no assunto do commit — **só menção** | ❌ |
+| `Fecha #244` (português) | ❌ |
+| `Closes #273-276` / `#277+278` (intervalo/composto) | ❌ |
+| `Closes #1, #2` — fecha só a **#1** | ⚠️ parcial |
+
+Repita a keyword por issue: `closes #273, closes #274, closes #275`. **Depois de mergear, confira
+que a issue fechou** em vez de assumir.
+
+> **Por que esta seção existe:** em 2026-08-03 o autor tinha **53 issues abertas** descrevendo
+> trabalho já implementado e mergeado — as Rodadas 5 e 6 inteiras. Os commits citavam a issue como
+> `(#256)` ou `(FIN-04+05+06+07, #273-276)`. Na `main`, 6 commits usaram `Closes` e são exatamente
+> as 6 issues que fecharam; as outras ~82 menções fecharam zero. A regra existia — mas no
+> `CLAUDE.md` do monorepo `urbiverso/urbiverso`, que sessão deste repo não lê. Ver `PROGRESSO.md`.
+
+O guard `scripts/guard-issue-fechamento.mjs` (job `issue-fechamento` no `pr-guards.yml`) barra PR
+que cita issue sem declarar o que faz com ela. Para citar sem fechar (epic, contexto, "ver #260"),
+declare no corpo: `Sem-fechamento: #NNN <motivo>` — o guard não obriga a fechar, obriga a **decidir**.
 
 ### Merge
 

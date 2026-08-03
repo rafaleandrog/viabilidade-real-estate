@@ -88,6 +88,31 @@ jobs:
           fi
           echo "ok: nenhuma aspa curva em posição de atributo."
 
+  issue-fechamento:
+    name: PR que cita issue declara se fecha
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # precisa do histórico para ler as mensagens dos commits do PR
+      - name: Guard de fechamento de issue
+        env:
+          # Corpo do PR é entrada de usuário — via env, NUNCA interpolado no script.
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMERO: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          # As mensagens dos commits do PR entram junto com o corpo: o GitHub fecha
+          # issue pelos dois. Foi na mensagem de commit que as 53 issues das Rodadas
+          # 5 e 6 foram citadas — sempre como menção `(#NNN)`, nunca com keyword.
+          PR_COMMITS="$(git log --format='%B' "$BASE_SHA..$HEAD_SHA" || true)" \
+            node scripts/guard-issue-fechamento.mjs || {
+              echo "::error title=Issue citada sem declarar fechamento::O PR cita issue(s) sem keyword de fechamento e sem declarar 'Sem-fechamento:'. Só closes/fixes/resolves fecham, no corpo do PR ou no commit — nunca no título, nunca em intervalo (#273-276). Foi assim que 53 issues implementadas ficaram abertas."
+              exit 1
+            }
+
   json-estrito:
     name: schema.json e manifesto.json são JSON estrito
     runs-on: ubuntu-latest
