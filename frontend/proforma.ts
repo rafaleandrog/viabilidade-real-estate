@@ -11,17 +11,26 @@
 //   - Projetos e Licenciamento no modo % incidem sobre o VGV (§4.4 toggle "% VGV").
 //   - Contingências e Manutenção incidem sobre o VGV (§6.2).
 
+import { calcularCascata, CASCATA_LOTEAMENTO, type EstadoLinha, type UnidadeMestre } from './areas-cascata.js';
+
 export interface ProformaInput {
   tipo_empreendimento: string;
   // terreno
   origem_terreno?: string;                          // 'nucleo' | 'manual'
   terreno_manual_area?: number | string | null;     // usado quando origem = manual
   area_terreno_nucleo?: number | string | null;     // área somada dos imóveis do Núcleo (origem = nucleo)
-  // loteamento — áreas (% da gleba)
-  app_pct?: number | string; faixas_nao_edificaveis_pct?: number | string;
-  sistema_viario_pct?: number | string; elup_pct?: number | string;
-  epc_pct?: number | string; epu_pct?: number | string;
-  areas_privativas_nao_vendaveis_pct?: number | string;
+  // loteamento — áreas: campos antigos (% da gleba) ainda existem no schema
+  // mas não são mais lidos aqui (migração 020) — a tabela em cascata abaixo
+  // é a única fonte, e já incorpora os dois campos sem linha própria na
+  // imagem de referência (faixas_nao_edificaveis somado a area_app_valor,
+  // areas_privativas_nao_vendaveis somado a area_viario_privado_valor).
+  area_app_modo?: string; area_app_valor?: number | string;
+  area_elup_epu_modo?: string; area_elup_epu_valor?: number | string;
+  area_epc_modo?: string; area_epc_valor?: number | string;
+  area_viario_publico_modo?: string; area_viario_publico_valor?: number | string;
+  area_viario_privado_modo?: string; area_viario_privado_valor?: number | string;
+  area_comuns_privadas_modo?: string; area_comuns_privadas_valor?: number | string;
+  area_verdes_modo?: string; area_verdes_valor?: number | string;
   area_media_lote_m2?: number | string; preco_venda_m2?: number | string;
   // incorporação — áreas e coeficientes
   coef_aproveitamento_basico?: number | string; coef_aproveitamento_maximo?: number | string;
@@ -88,6 +97,29 @@ export interface Proforma {
 
 const n = (v: any): number => Number(v) || 0;
 
+// O schema/UI usa os nomes de domínio da cascata do Loteamento
+// ('pct_poligonal'/'pct_parcelavel' — ver schema.json); o motor genérico
+// (`areas-cascata.ts`) usa 'pct_ancora1'/'pct_ancora2', reutilizável por
+// qualquer cascata (a de Incorporação usará 'pct_terreno'/'pct_construida').
+function modoOuM2(v: any): UnidadeMestre {
+  if (v === 'pct_poligonal') return 'pct_ancora1';
+  if (v === 'pct_parcelavel') return 'pct_ancora2';
+  return 'm2';
+}
+
+/** Estados das 7 linhas editáveis da cascata de áreas do Loteamento, a partir do `ProformaInput`. */
+function estadosCascataLoteamento(e: ProformaInput): Record<string, EstadoLinha> {
+  return {
+    app: { modo: modoOuM2(e.area_app_modo), valor: n(e.area_app_valor) },
+    elup_epu: { modo: modoOuM2(e.area_elup_epu_modo), valor: n(e.area_elup_epu_valor) },
+    epc: { modo: modoOuM2(e.area_epc_modo), valor: n(e.area_epc_valor) },
+    viario_publico: { modo: modoOuM2(e.area_viario_publico_modo), valor: n(e.area_viario_publico_valor) },
+    viario_privado: { modo: modoOuM2(e.area_viario_privado_modo), valor: n(e.area_viario_privado_valor) },
+    comuns_privadas: { modo: modoOuM2(e.area_comuns_privadas_modo), valor: n(e.area_comuns_privadas_valor) },
+    verdes: { modo: modoOuM2(e.area_verdes_modo), valor: n(e.area_verdes_valor) },
+  };
+}
+
 export function calcularProforma(e: ProformaInput): Proforma {
   const lot = e.tipo_empreendimento === 'loteamento';
   // Área do terreno: do Núcleo (soma das glebas/lotes vinculados) quando a
@@ -102,9 +134,10 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const precoLot = n(e.preco_venda_m2);
 
   if (lot) {
-    const somaDeducoes = n(e.app_pct) + n(e.faixas_nao_edificaveis_pct) + n(e.sistema_viario_pct)
-      + n(e.elup_pct) + n(e.epc_pct) + n(e.epu_pct) + n(e.areas_privativas_nao_vendaveis_pct);
-    areaVendavel = areaTerreno * (1 - somaDeducoes / 100);
+    // Tabela em cascata (2026-08-03, `frontend/areas-cascata.ts`) — a Área
+    // Líquida de Venda (ALV) da cascata É a área vendável do Loteamento.
+    const cascata = calcularCascata(CASCATA_LOTEAMENTO, estadosCascataLoteamento(e), areaTerreno);
+    areaVendavel = cascata.find((l) => l.id === 'alv')!.m2;
     areaPrivativa = areaVendavel; // lotes vendáveis
   } else {
     const rFech = n(e.area_pvt_r_fechada), nrFech = n(e.area_pvt_nr_fechada);
