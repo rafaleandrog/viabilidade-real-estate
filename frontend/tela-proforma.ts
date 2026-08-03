@@ -27,6 +27,10 @@ type VarSens = 'preco' | 'permuta_fisica' | 'permuta_financeira' | 'custo_infra'
 @customElement('viab-tela-proforma')
 export class ViabTelaProforma extends LitElement {
   @property({ attribute: false }) estudo: any = null;
+  // Sub-aba (2026-08-03, reestruturação do Preliminar → "Resultado"): qual
+  // seção mostrar. Mesmo padrão de tela-premissas.ts — uma instância só,
+  // `slot` reatribuído dinamicamente pelo pai.
+  @property({ type: String }) secao: 'proforma' | 'cenarios' = 'proforma';
 
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
@@ -161,16 +165,18 @@ export class ViabTelaProforma extends LitElement {
       permuta_fisica_nr_area_m2: 0, permuta_fisica_nr_pct: 0,
     })).vgv;
     return html`
-      ${this._renderKpis(p)}
-      ${!lot ? this._renderUnidadesTipo(p) : nothing}
-      <urbi-card titulo="Proforma">
-        ${this._renderTabela(p, lot, vgvBruto)}
-        <div class="barra-acoes">
-          <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-excel" @click=${() => this._exportar('excel')}>Exportar Excel</urbi-botao>
-          <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-pdf" @click=${() => this._exportar('pdf')}>Exportar PDF</urbi-botao>
-        </div>
-      </urbi-card>
-      ${this._renderSensibilidade(lot)}
+      ${this.secao === 'proforma' ? html`
+        ${this._renderKpis(p)}
+        ${!lot ? this._renderUnidadesTipo(p) : nothing}
+        <urbi-card titulo="Proforma">
+          ${this._renderTabela(p, lot, vgvBruto)}
+          <div class="barra-acoes">
+            <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-excel" @click=${() => this._exportar('excel')}>Exportar Excel</urbi-botao>
+            <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-pdf" @click=${() => this._exportar('pdf')}>Exportar PDF</urbi-botao>
+          </div>
+        </urbi-card>
+      ` : nothing}
+      ${this.secao === 'cenarios' ? this._renderSensibilidade(lot) : nothing}
     `;
   }
 
