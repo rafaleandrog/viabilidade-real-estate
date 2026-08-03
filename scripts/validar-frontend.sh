@@ -10,8 +10,10 @@
 #   dá para validar 100% do frontend só com esses pacotes públicos.
 #
 # O que faz (o "caminho simples" — não perca tempo redescobrindo auth/token):
-#   1. guard de aspas curvas em posição de atributo (#162 — bug que nenhuma das
-#      etapas abaixo enxerga, porque mora num template literal do lit);
+#   1. guards estáticos: aspas curvas em posição de atributo (#162 — bug que nenhuma
+#      das etapas abaixo enxerga, porque mora num template literal do lit) e JSON
+#      estrito em schema.json/manifesto.json (comentário `//` neles reprova o pacote
+#      na instalação — foi o que derrubou a v0.1.19);
 #   2. roda `pnpm install` (a falha de 401 do SDK é ESPERADA e ignorada);
 #   3. cria os symlinks de topo dos pacotes públicos a partir de `.pnpm/`;
 #   4. typecheck do frontend (tsconfig só-frontend);
@@ -38,11 +40,18 @@ raiz="$(pwd)"
 # ambiente, LANG vazio) o grep casa a classe BYTE a byte, e como ”/“/—/→ compartilham
 # o primeiro byte 0xE2, `=[”“]` daria falso positivo em `=—` e `=→`. A alternância
 # compara as sequências de 3 bytes inteiras e acerta em qualquer locale.
-echo "== 1/5 guard: aspas curvas em posição de atributo =="
+echo "== 1/5 guards estáticos (aspas curvas + JSON estrito) =="
 if grep -rn '=\(”\|“\|‘\|’\)' frontend/; then
   echo "  FALHOU: aspas curvas em atributo — o atributo fica inerte. Use aspas retas." >&2
   exit 1
 fi
+
+# `schema.json`/`manifesto.json` têm que ser JSON estrito — comentário `//` neles
+# reprova o pacote na instalação ("Pacote reprovado na validacao") e não aparece em
+# nenhuma outra etapa daqui. Mora neste script, e não só no validar-backend.sh, porque
+# aquele aborta antes do parse quando o SDK não está em node_modules (o caso deste
+# ambiente). Ver o cabeçalho de scripts/guard-json.mjs.
+node scripts/guard-json.mjs || exit 1
 echo "  ok: nenhuma aspa curva em atributo"
 
 echo "== 2/5 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="

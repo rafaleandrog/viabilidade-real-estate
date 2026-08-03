@@ -135,7 +135,8 @@ script pronto — é o "caminho simples" que sempre funciona:
 bash scripts/validar-frontend.sh
 ```
 
-Ele roda, em 5 etapas: o **guard de aspas curvas em posição de atributo**, depois `pnpm install`
+Ele roda, em 5 etapas: os **guards estáticos** (aspas curvas em posição de atributo + **JSON
+estrito** em `schema.json`/`manifesto.json`), depois `pnpm install`
 (ignorando o 401 do SDK, que ainda assim baixa lit/typescript/tsx/esbuild para `.pnpm/`), linka
 esses pacotes e executa **typecheck do frontend + testes de frontend + build do bundle
 (esbuild)**. Verde = mudança de frontend validada.
@@ -147,10 +148,19 @@ esses pacotes e executa **typecheck do frontend + testes de frontend + build do 
 > inteira que "validou ✓". Aspas curvas em **conteúdo de texto** são tipografia legítima e não são
 > acusadas — o padrão casa só `=` seguido de aspa curva.
 
-O `.github/workflows/pr-guards.yml` é o CI de PR (só `git` + `grep`, sem SDK, então nunca fica
-vermelho por falta de credencial). Barra **PR de diff vazio que declara fechar issue** — o caso do
-PR #142, que fechou 12 issues sem alterar um arquivo — e repete o guard de aspas curvas para pegar
-quem não rodou o script local.
+O `.github/workflows/pr-guards.yml` é o CI de PR (só `git` + `grep` + `node`, sem SDK, então nunca
+fica vermelho por falta de credencial). Barra **PR de diff vazio que declara fechar issue** — o caso
+do PR #142, que fechou 12 issues sem alterar um arquivo — e repete os guards de **aspas curvas** e
+de **JSON estrito** para pegar quem não rodou o script local.
+
+> **Por que o guard de JSON estrito existe:** um bloco de comentários `//` no `schema.json` derrubou
+> a release **v0.1.19** com "Pacote reprovado na validacao". JSON não tem comentário — o
+> `JSON.parse` do shell estoura e o pacote é reprovado **antes de olhar qualquer tabela**. Nem
+> `tsc`, nem os testes, nem o `esbuild`, nem o harness de migrações leem o `schema.json`; o único
+> parse estrito do repo (`scripts/validar-schema.mjs`) é a etapa 2/5 do `validar-backend.sh`, e a
+> etapa 1/5 **aborta quando o SDK não está em `node_modules`** — o caso deste ambiente. Por isso o
+> `scripts/guard-json.mjs` não depende de SDK e roda nos **três** lugares. Ver `PROGRESSO.md`
+> (2026-08-03).
 
 **Para mudanças de BACKEND / SCHEMA / MIGRAÇÃO:** existe o segundo script, criado em 2026-07-29
 depois de descobrir que a regra antiga ("backend só roda no ambiente do autor") era conservadora
@@ -160,8 +170,8 @@ demais:
 bash scripts/validar-backend.sh
 ```
 
-Ele roda **typecheck do backend + testes de lógica pura das rotas + harness de migrações + guard de
-`versao`**. Funciona aqui porque:
+Ele roda **guard de JSON estrito (etapa 0/5, antes do portão do SDK) + typecheck do backend +
+testes de lógica pura das rotas + harness de migrações + guard de `versao`**. Funciona aqui porque:
 
 - o `@urbiverso/sdk` **já está** em `node_modules/@urbiverso/sdk` com o `dist/index.d.ts` — o que
   falha com 401 é *reinstalar* o pacote, e o typecheck só precisa dos tipos, que estão no disco;
