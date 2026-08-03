@@ -10,7 +10,7 @@ import {
 } from './viabilidade-api.js';
 import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
 import {
-  simularCapitalStackDoEstudo, moic, fundingEntradasSaidasMensal,
+  simularCapitalStackDoEstudo, moic, tirAnual, fundingEntradasSaidasMensal,
   receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack,
 } from './capital-stack-motor.js';
 import './viab-num.js';
@@ -52,11 +52,13 @@ const STATUS: { valor: string; rotulo: string }[] = [
 const POLITICAS: { valor: string; rotulo: string }[] = [
   { valor: 'cash_sweep', rotulo: 'Cash sweep' },
   { valor: 'bullet', rotulo: 'Bullet (no vencimento)' },
+  { valor: 'price', rotulo: 'Parcelas (Price, com carência)' },
 ];
 const MODOS_PE: { valor: string; rotulo: string }[] = [
   { valor: 'A', rotulo: 'A — Retorno preferencial fixo' },
   { valor: 'B', rotulo: 'B — % do residual no encerramento' },
-  { valor: 'C', rotulo: 'C — % da receita líquida' },
+  { valor: 'C', rotulo: 'C — % da receita líquida, pró-rata' },
+  { valor: 'D', rotulo: 'D — % do lucro final, parcelado na entrega' },
 ];
 
 const n = (v: any): number => Number(v) || 0;
@@ -312,7 +314,7 @@ export class ViabCapitalStack extends LitElement {
           <tr>
             <th>Nome</th><th>Tipo</th><th>Status</th>
             <th class="num">Compromisso</th><th class="num">Liberado/aportado</th>
-            <th class="num">Saldo final</th><th class="num">MOIC</th>
+            <th class="num">Saldo final</th><th class="num">MOIC</th><th class="num">TIR (a.a.)</th>
           </tr>
         </thead>
         <tbody>
@@ -320,25 +322,30 @@ export class ViabCapitalStack extends LitElement {
             const ativa = c.status === 'ativo';
             const ehDivida = c.tipo === 'financiamento_producao' || c.tipo === 'capital_giro';
             const ehPE = c.tipo === 'preferred_equity';
+            const ehSponsor = c.tipo === 'sponsor_equity';
             const liberado = ativa && r && ehDivida
               ? (r.liberacaoPorInstrumento[c.nome] ?? []).reduce((a, b) => a + b, 0)
               : ativa && r && ehPE
                 ? (r.aportePorInstrumentoPE[c.nome] ?? []).reduce((a, b) => a + b, 0)
-                : null;
+                : ativa && r && ehSponsor
+                  ? (r.aportePorInstrumentoSponsor[c.nome] ?? []).reduce((a, b) => a + b, 0)
+                  : null;
             const saldoFinal = ativa && r && ehDivida
               ? (r.saldoDividaPorInstrumento[c.nome] ?? [])[(r.saldoDividaPorInstrumento[c.nome] ?? []).length - 1]
               : ativa && r && ehPE
                 ? r.capitalNaoDevolvidoFinalPE[c.nome]
                 : null;
+            const distribuicoesPE = ativa && r && ehPE
+              ? (r.devolucaoPrincipalPE[c.nome] ?? []).reduce((a, b) => a + b, 0)
+                + (r.remuneracaoPagaPE[c.nome] ?? []).reduce((a, b) => a + b, 0)
+                + (r.participacaoResidualPE[c.nome] ?? []).reduce((a, b) => a + b, 0)
+                + (r.participacaoReceitaPE[c.nome] ?? []).reduce((a, b) => a + b, 0)
+                + (r.participacaoLucroPE[c.nome] ?? []).reduce((a, b) => a + b, 0)
+              : 0;
             const moicPE = ativa && r && ehPE
-              ? moic(
-                  (r.aportePorInstrumentoPE[c.nome] ?? []).reduce((a, b) => a + b, 0),
-                  (r.devolucaoPrincipalPE[c.nome] ?? []).reduce((a, b) => a + b, 0)
-                    + (r.remuneracaoPagaPE[c.nome] ?? []).reduce((a, b) => a + b, 0)
-                    + (r.participacaoResidualPE[c.nome] ?? []).reduce((a, b) => a + b, 0)
-                    + (r.participacaoReceitaPE[c.nome] ?? []).reduce((a, b) => a + b, 0),
-                )
+              ? moic((r.aportePorInstrumentoPE[c.nome] ?? []).reduce((a, b) => a + b, 0), distribuicoesPE)
               : null;
+            const tir = ativa && r ? tirAnual(this._fluxoInvestidor(c, r)) : null;
             return html`
               <tr>
                 <td>${c.nome}</td>
@@ -348,11 +355,43 @@ export class ViabCapitalStack extends LitElement {
                 <td class="num">${liberado === null ? '—' : fmtR$(liberado)}</td>
                 <td class="num">${saldoFinal === null || saldoFinal === undefined ? '—' : fmtR$(saldoFinal)}</td>
                 <td class="num">${moicPE === null ? '—' : moicPE.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + 'x'}</td>
+                <td class="num">${tir === null ? '—' : (tir * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%'}</td>
               </tr>`;
           })}
         </tbody>
       </table>
     `;
+  }
+
+  /**
+   * §8.3: fluxo de caixa do investidor/credor DESSA camada, mês a mês —
+   * aporte/liberação negativo (sai do bolso dele), recebimento positivo. É
+   * o insumo do `tirAnual` — cada tipo lê os campos que já existem no
+   * resultado, sem recalcular nada que o motor não tenha feito.
+   */
+  private _fluxoInvestidor(c: any, r: ResultadoCapitalStack): number[] {
+    const tam = r.caixaProjetoMensal.length;
+    const fluxo = new Array<number>(tam).fill(0);
+    if (c.tipo === 'financiamento_producao' || c.tipo === 'capital_giro') {
+      const liberado = r.liberacaoPorInstrumento[c.nome] ?? [];
+      const pago = r.amortizacaoPorInstrumento[c.nome] ?? [];
+      for (let t = 0; t < tam; t++) fluxo[t] = (pago[t] ?? 0) - (liberado[t] ?? 0);
+    } else if (c.tipo === 'preferred_equity') {
+      const aportado = r.aportePorInstrumentoPE[c.nome] ?? [];
+      const devolvido = r.devolucaoPrincipalPE[c.nome] ?? [];
+      const remun = r.remuneracaoPagaPE[c.nome] ?? [];
+      const receita = r.participacaoReceitaPE[c.nome] ?? [];
+      const residual = r.participacaoResidualPE[c.nome] ?? [];
+      const lucro = r.participacaoLucroPE[c.nome] ?? [];
+      for (let t = 0; t < tam; t++) {
+        fluxo[t] = (devolvido[t] ?? 0) + (remun[t] ?? 0) + (receita[t] ?? 0) + (residual[t] ?? 0) + (lucro[t] ?? 0) - (aportado[t] ?? 0);
+      }
+    } else if (c.tipo === 'sponsor_equity') {
+      const aportado = r.aportePorInstrumentoSponsor[c.nome] ?? [];
+      const distribuido = r.distribuicaoPorInstrumentoSponsor[c.nome] ?? [];
+      for (let t = 0; t < tam; t++) fluxo[t] = (distribuido[t] ?? 0) - (aportado[t] ?? 0);
+    }
+    return fluxo;
   }
 
   /** Liberado/aportado por camada — mesma leitura de `_renderResultadosPorCamada`, + sponsor (só usado pelo gráfico). */
@@ -468,6 +507,10 @@ export class ViabCapitalStack extends LitElement {
           ${d.config?.politicaAmortizacao === 'bullet'
             ? this._numConfig(c, d, 'vencimentoMes', 'Vencimento', 'mês', dis)
             : nothing}
+          ${d.config?.politicaAmortizacao === 'price' ? html`
+            ${this._numConfig(c, d, 'carenciaMeses', 'Carência', 'mês', dis)}
+            ${this._numConfig(c, d, 'prazoMeses', 'Prazo total (inclui carência)', 'mês', dis)}
+          ` : nothing}
           ${ehFinanciamento ? this._numConfig(c, d, 'percentualFinanciavel', '% financiável do custo elegível', '%', dis) : nothing}
         </div>
       </div>
@@ -524,6 +567,11 @@ export class ViabCapitalStack extends LitElement {
             ${this._numConfig(c, d, 'percentualResidualEvento', '% do residual', '%', dis)}
             ${this._numConfig(c, d, 'mesEvento', 'Mês do evento', 'mês', dis)}` : nothing}
           ${modo === 'C' ? this._numConfig(c, d, 'percentualReceitaLiquida', '% da receita líquida', '%', dis) : nothing}
+          ${modo === 'D' ? html`
+            ${this._numConfig(c, d, 'percentualLucro', '% do lucro final do projeto', '%', dis)}
+            ${this._numConfig(c, d, 'mesEntregaLucro', 'Mês de entrega (1º pagamento no mês seguinte)', 'mês', dis)}
+            ${this._numConfig(c, d, 'parcelasLucro', 'Nº de parcelas (mensais, iguais)', 'mês', dis)}
+          ` : nothing}
         </div>
       </div>
       <div class="secao">

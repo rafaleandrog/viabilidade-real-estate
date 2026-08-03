@@ -43,6 +43,19 @@ export function taxaMensalEquivalente(taxaAnual: number): number {
   return Math.pow(1 + taxaAnual, 1 / 12) - 1;
 }
 
+/**
+ * Parcela fixa do sistema Price/francês que amortiza `principal` em `nper`
+ * meses a `taxaMensal` — magnitude POSITIVA (convenção deste módulo: valores
+ * de pagamento são positivos, o sinal é aplicado explicitamente por quem
+ * chama). Equivalente ao `PMT` do Excel com o sinal invertido.
+ */
+export function pmtPrice(taxaMensal: number, nper: number, principal: number): number {
+  if (nper <= 0) return principal;
+  if (taxaMensal === 0) return principal / nper;
+  const fator = Math.pow(1 + taxaMensal, nper);
+  return principal * taxaMensal * fator / (fator - 1);
+}
+
 // ── Reconciliação de caixa (FIN-03, #272) ──────────────────────────────
 
 /**
@@ -141,9 +154,16 @@ export function reconciliarCapitalStack(
 // ── Instrumentos (§4), prioridade de funding (§5) e waterfall (§6) —
 // FIN-04+05+06+07 (#273-276), promovido do oráculo #270 ──────────────────
 
-export type PoliticaAmortizacao = 'cash_sweep' | 'bullet';
+export type PoliticaAmortizacao = 'cash_sweep' | 'bullet' | 'price';
 
-/** Financiamento à produção (§4.3) ou Capital de giro/dívida ponte (§4.4) — mesmo motor. */
+/**
+ * Financiamento à produção (§4.3), Capital de giro/dívida ponte (§4.4) ou
+ * qualquer outra dívida — mesmo motor, independente do `tipo` da camada
+ * (`financiamento_producao`/`capital_giro`). O modelo de carência + Price
+ * (decodificado de `Incorp Individual!CK:CQ` da planilha de referência,
+ * 2026-08-03) é genérico: aplica a QUALQUER dívida com essa política, não é
+ * um produto à parte.
+ */
 export interface InstrumentoDivida {
   tipo: 'divida';
   nome: string;
@@ -152,6 +172,20 @@ export interface InstrumentoDivida {
   politicaAmortizacao: PoliticaAmortizacao;
   /** Só para `bullet`: mês em que o saldo remanescente é quitado. */
   vencimentoMes?: number;
+  /**
+   * Só para `price`: meses de carência (juros pagos em caixa, principal
+   * intocado) contados a partir do mês da PRIMEIRA liberação real (não um
+   * mês fixo digitado — segue a liberação de fato, programada ou
+   * automática). `undefined`/`0` = sem carência, amortização Price começa
+   * no mês seguinte à primeira liberação.
+   */
+  carenciaMeses?: number;
+  /**
+   * Só para `price`: prazo TOTAL do contrato em meses, incluindo a
+   * carência — mesma convenção da planilha ("Prazo total (inclui
+   * carência)"). Os meses de amortização Price = `prazoMeses − carenciaMeses`.
+   */
+  prazoMeses?: number;
   /** Liberações manuais (mês → valor), aplicadas antes das automáticas. */
   liberacaoProgramada?: { mes: number; valor: number }[];
   /**
@@ -168,20 +202,32 @@ export interface InstrumentoDivida {
   prioridadePagamento: number;
 }
 
-/** Preferred Equity (§4.2) — três modos de remuneração. */
+/** Preferred Equity (§4.2) — quatro modos de remuneração. */
 export interface InstrumentoPreferredEquity {
   tipo: 'preferred_equity';
   nome: string;
   aportes: { mes: number; valor: number }[];
-  modo: 'A' | 'B' | 'C';
+  modo: 'A' | 'B' | 'C' | 'D';
   // Modo A — retorno preferencial fixo.
   taxaMensal?: number;
   capitalizacao?: 'simples' | 'composta';
   // Modo B — participação no residual em evento único.
   percentualResidualEvento?: number;
   mesEvento?: number;
-  // Modo C — participação na receita líquida recebida.
+  // Modo C — participação na receita líquida recebida, pró-rata mensal.
   percentualReceitaLiquida?: number;
+  /**
+   * Modo D (2026-08-03) — % do LUCRO FINAL do projeto (não do residual de um
+   * mês específico como o modo B), pago a partir do mês seguinte à entrega/
+   * fim de obras, em `parcelasLucro` meses IGUAIS. A base é o resultado
+   * desalavancado do projeto inteiro (`Σ fluxoLivreMensal`) — só é
+   * COMPUTÁVEL porque o motor já recebe o horizonte inteiro de uma vez (não
+   * é streaming mês a mês); nenhuma fórmula existente muda, o valor é lido
+   * uma vez antes do loop mensal começar.
+   */
+  percentualLucro?: number;
+  mesEntregaLucro?: number;
+  parcelasLucro?: number;
   /** Ordem de pagamento entre Preferred Equities (§9 "prioridade de pagamento") — menor primeiro. */
   prioridadePagamento: number;
 }
@@ -231,6 +277,8 @@ export interface ResultadoCapitalStack {
   capitalNaoDevolvidoPorInstrumentoPE: Record<string, number[]>;
   participacaoReceitaPE: Record<string, number[]>;
   participacaoResidualPE: Record<string, number[]>;
+  /** Modo D — parcelas de "% do lucro final", pagas a partir do mês seguinte à entrega. */
+  participacaoLucroPE: Record<string, number[]>;
   aporteSponsorMensal: number[];
   distribuicaoSponsorMensal: number[];
   /** Por instrumento — só relevante com 2+ Sponsor Equity ativos (rateio pro-rata pelo aporte, §4.1). Com 1 só, é igual ao array agregado acima. */
@@ -253,9 +301,10 @@ function pesarPorAporte(instrumentos: { nome: string }[], aporteAcumulado: Map<s
 /**
  * Simulação dos 4 instrumentos do §4, prioridade de funding (§5) e waterfall
  * (§6) — ordem mensal do §7, reduzida ao que os instrumentos suportados
- * exigem. Não modela dívida `sac`/`price` nem Preferred Equity automático
- * por lacuna (nenhum dos 16 casos de referência do #270 precisa) — ficam
- * para quando um caso real exigir.
+ * exigem. Não modela dívida `sac` nem Preferred Equity automático por lacuna
+ * (nenhum dos 16 casos de referência do #270 precisa) — ficam para quando um
+ * caso real exigir. `price` (2026-08-03) foi adicionada a partir da
+ * planilha de referência (Capital de Giro, `Incorp Individual!CK:CQ`).
  */
 export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalStack {
   const N = cen.meses;
@@ -281,6 +330,20 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
   const capitalNaoDevolvido = new Map(preferenciais.map((p) => [p.nome, 0]));
   const remuneracaoAcumulada = new Map(preferenciais.map((p) => [p.nome, 0]));
   const aporteAcumuladoSponsor = new Map(sponsors.map((s) => [s.nome, 0]));
+  // `price`: mês da primeira liberação real (não um mês fixo digitado — segue
+  // a liberação de fato) e a parcela fixa, calculada uma única vez ao entrar
+  // na fase de amortização (mesma convenção da planilha: PMT sobre o saldo
+  // no início da fase, não recalculado todo mês).
+  const primeiraLiberacaoMes = new Map<string, number | null>(dividas.map((d) => [d.nome, null]));
+  const parcelaPrice = new Map<string, number | null>(dividas.map((d) => [d.nome, null]));
+  // Modo D: base = resultado desalavancado do projeto INTEIRO — só é
+  // computável de antemão porque `cen.fluxoLivreMensal` já chega com o
+  // horizonte inteiro (o motor não é streaming mês a mês); nenhuma fórmula
+  // existente muda, é só uma leitura antecipada de um array já conhecido.
+  const resultadoFinalProjeto = cen.fluxoLivreMensal.reduce((s, v) => s + n(v), 0);
+  // Saldo pendente por falta de caixa num mês — mesma convenção do modo A
+  // (`remuneracaoAcumulada`): nunca força caixa negativo, acumula e tenta de novo.
+  const saldoDevidoLucro = new Map(preferenciais.map((p) => [p.nome, 0]));
 
   const r: ResultadoCapitalStack = {
     lacunaFundingMensal: arr(N), lacunaFundingMaxima: 0, caixaProjetoMensal: arr(N),
@@ -296,6 +359,7 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
     capitalNaoDevolvidoPorInstrumentoPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     participacaoReceitaPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     participacaoResidualPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
+    participacaoLucroPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     aporteSponsorMensal: arr(N), distribuicaoSponsorMensal: arr(N),
     aportePorInstrumentoSponsor: Object.fromEntries(sponsors.map((s) => [s.nome, arr(N)])),
     distribuicaoPorInstrumentoSponsor: Object.fromEntries(sponsors.map((s) => [s.nome, arr(N)])),
@@ -379,24 +443,63 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
 
     caixaProjeto = caixaProvisorio;
 
-    // 5) amortização — cash sweep (§4.3, política recomendada) e bullet no vencimento
-    let disponivelSweep = Math.max(0, caixaProjeto - cen.reservaMinima);
+    // Marca a primeira liberação real (programada ou automática) — só depois
+    // dela é que carência/amortização Price fazem sentido.
+    for (const d of dividas) {
+      if (primeiraLiberacaoMes.get(d.nome) == null && (r.liberacaoPorInstrumento[d.nome][t] ?? 0) > 0) {
+        primeiraLiberacaoMes.set(d.nome, t);
+      }
+    }
+
+    // 5) amortização — as 3 políticas dividem UMA fila de prioridade de
+    // pagamento (§9), em vez de duas filas separadas (cash_sweep sempre
+    // antes de bullet, independente da prioridade) — corrige uma
+    // inconsistência que só aparecia com 2+ dívidas de políticas diferentes
+    // competindo pelo mesmo caixa no mesmo mês.
+    let disponivelAmort = Math.max(0, caixaProjeto - cen.reservaMinima);
     for (const d of dividasPorPagamento) {
-      if (d.politicaAmortizacao !== 'cash_sweep' || disponivelSweep <= 0) continue;
+      if (disponivelAmort <= 0) break;
       const saldo = saldoDivida.get(d.nome)!;
-      const pag = round2(Math.min(disponivelSweep, saldo));
+      if (saldo <= 0) continue;
+      let pag = 0;
+      if (d.politicaAmortizacao === 'cash_sweep') {
+        pag = round2(Math.min(disponivelAmort, saldo));
+      } else if (d.politicaAmortizacao === 'bullet') {
+        if (d.vencimentoMes === t) pag = round2(Math.min(disponivelAmort, saldo));
+      } else if (d.politicaAmortizacao === 'price') {
+        const primeiraLib = primeiraLiberacaoMes.get(d.nome);
+        if (primeiraLib != null) {
+          const carencia = d.carenciaMeses ?? 0;
+          const emCarencia = t > primeiraLib && t <= primeiraLib + carencia;
+          // `saldo` (lido acima) JÁ inclui os juros deste mês (passo 1 soma
+          // antes de chegar aqui) — não somar `juros` de novo.
+          const juros = r.jurosPorInstrumento[d.nome][t] ?? 0;
+          if (emCarencia) {
+            // §4.3/4.4 do doc — "juros pagos na carência" (não capitalizados):
+            // o saldo não muda (juros somados no passo 1 e devolvidos aqui).
+            // Diferente da planilha (que sempre paga o juros da carência,
+            // sem checar caixa): aqui é capado pelo caixa disponível, como
+            // toda amortização deste motor (§12.2/12.3) — não força negativo.
+            pag = round2(Math.min(disponivelAmort, juros));
+          } else if (t === primeiraLib + carencia + 1) {
+            // 1º mês fora da carência: calcula a parcela fixa UMA VEZ, sobre
+            // o total LIBERADO (não `saldo`, que aqui já embute o juros deste
+            // mês) — equivale ao principal original quando a carência só
+            // pagou juros (o caso comum), e generaliza corretamente se houve
+            // liberação adicional durante a carência.
+            const nAmort = Math.max(1, (d.prazoMeses ?? 0) - carencia);
+            const parcela = round2(pmtPrice(d.taxaMensal, nAmort, liberadoAcumulado.get(d.nome)!));
+            parcelaPrice.set(d.nome, parcela);
+            pag = round2(Math.min(disponivelAmort, Math.min(parcela, saldo)));
+          } else {
+            const parcela = parcelaPrice.get(d.nome) ?? 0;
+            pag = round2(Math.min(disponivelAmort, Math.min(parcela, saldo)));
+          }
+        }
+      }
       if (pag <= 0) continue;
       saldoDivida.set(d.nome, round2(saldo - pag));
-      caixaProjeto = round2(caixaProjeto - pag); disponivelSweep = round2(disponivelSweep - pag);
-      r.amortizacaoPorInstrumento[d.nome][t] = pag;
-    }
-    for (const d of dividasPorPagamento) {
-      if (d.politicaAmortizacao !== 'bullet' || d.vencimentoMes !== t) continue;
-      const saldo = saldoDivida.get(d.nome)!;
-      const disponivel = Math.max(0, caixaProjeto - cen.reservaMinima);
-      const pag = round2(Math.min(saldo, disponivel));
-      saldoDivida.set(d.nome, round2(saldo - pag));
-      caixaProjeto = round2(caixaProjeto - pag);
+      caixaProjeto = round2(caixaProjeto - pag); disponivelAmort = round2(disponivelAmort - pag);
       r.amortizacaoPorInstrumento[d.nome][t] = round2((r.amortizacaoPorInstrumento[d.nome][t] ?? 0) + pag);
     }
     for (const d of dividas) r.saldoDividaPorInstrumento[d.nome][t] = saldoDivida.get(d.nome)!;
@@ -443,6 +546,21 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
         const residual = round2(caixaDistribuivel * (p.percentualResidualEvento ?? 0));
         caixaDistribuivel = round2(caixaDistribuivel - residual); caixaProjeto = round2(caixaProjeto - residual);
         r.participacaoResidualPE[p.nome][t] = residual;
+      } else if (p.modo === 'D' && p.mesEntregaLucro !== undefined && p.parcelasLucro) {
+        // % do LUCRO FINAL do projeto (não do resíduo de um mês, como o modo
+        // B) — total fixo desde o mês 1, parcelado em `parcelasLucro` meses
+        // iguais a partir do mês seguinte à entrega. Lucro negativo não gera
+        // pagamento (participação sobre prejuízo não faz sentido econômico).
+        const totalLucro = Math.max(0, round2((p.percentualLucro ?? 0) * resultadoFinalProjeto));
+        const parcelaFixa = round2(totalLucro / p.parcelasLucro);
+        if (t > p.mesEntregaLucro && t <= p.mesEntregaLucro + p.parcelasLucro) {
+          saldoDevidoLucro.set(p.nome, round2(saldoDevidoLucro.get(p.nome)! + parcelaFixa));
+        }
+        const devido = saldoDevidoLucro.get(p.nome)!;
+        const pag = round2(Math.min(devido, caixaDistribuivel));
+        saldoDevidoLucro.set(p.nome, round2(devido - pag));
+        caixaDistribuivel = round2(caixaDistribuivel - pag); caixaProjeto = round2(caixaProjeto - pag);
+        r.participacaoLucroPE[p.nome][t] = pag;
       }
       // §10 "Saldos" — série mensal (não só o valor final) dos dois saldos de
       // Preferred Equity, para a tabela/exportação mostrarem a evolução.
@@ -486,12 +604,46 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
   return r;
 }
 
-/** MOIC/ROI/TIR do fluxo de UM investidor (§8.3) — aportes como saída, recebimentos como entrada. */
+/** MOIC/ROI do fluxo de UM investidor (§8.3) — aportes como saída, recebimentos como entrada. */
 export function moic(aportes: number, distribuicoes: number): number {
   return aportes > 0 ? distribuicoes / aportes : 0;
 }
 export function roi(aportes: number, distribuicoes: number): number {
   return aportes > 0 ? (distribuicoes - aportes) / aportes : 0;
+}
+
+/**
+ * TIR mensal do fluxo de caixa de UM investidor/credor — `fluxo[t]` negativo
+ * nos meses de aporte/liberação, positivo nos meses de recebimento (§8.3).
+ * Bisseção (robusta, sem risco de não-convergência do Newton-Raphson) sobre
+ * a taxa que zera o VPL do fluxo. `null` quando não há troca de sinal (só
+ * saídas, só entradas, ou fluxo todo zero) — não existe TIR nesse caso.
+ */
+export function tirMensal(fluxo: number[]): number | null {
+  const temNegativo = fluxo.some((v) => v < 0);
+  const temPositivo = fluxo.some((v) => v > 0);
+  if (!temNegativo || !temPositivo) return null;
+
+  const vpl = (taxa: number): number => fluxo.reduce((s, v, t) => s + v / Math.pow(1 + taxa, t), 0);
+
+  // Busca um intervalo [lo, hi] com troca de sinal de VPL antes de bissectar.
+  let lo = -0.99, hi = 10;
+  const vplLo = vpl(lo), vplHi = vpl(hi);
+  if (Math.sign(vplLo) === Math.sign(vplHi)) return null;
+
+  for (let i = 0; i < 100; i++) {
+    const meio = (lo + hi) / 2;
+    const vplMeio = vpl(meio);
+    if (Math.abs(vplMeio) < 0.01) return meio;
+    if (Math.sign(vplMeio) === Math.sign(vpl(lo))) lo = meio; else hi = meio;
+  }
+  return (lo + hi) / 2;
+}
+
+/** TIR anualizada — `(1 + TIR mensal)^12 − 1` (§8.3). `null` se não há TIR mensal. */
+export function tirAnual(fluxo: number[]): number | null {
+  const m = tirMensal(fluxo);
+  return m === null ? null : Math.pow(1 + m, 12) - 1;
 }
 
 /** Soma elemento a elemento todas as séries de um Record — 1-based, mesmo comprimento de `tam`. */
@@ -521,10 +673,11 @@ export function fundingEntradasSaidasMensal(r: ResultadoCapitalStack): { entrada
   const remuneracaoPE = somaRecord(r.remuneracaoPagaPE, tam);
   const participacaoReceita = somaRecord(r.participacaoReceitaPE, tam);
   const participacaoResidual = somaRecord(r.participacaoResidualPE, tam);
+  const participacaoLucro = somaRecord(r.participacaoLucroPE, tam);
   for (let t = 1; t < tam; t++) {
     entradas[t] = round2(entradas[t] + entradasPE[t] + (r.aporteSponsorMensal[t] ?? 0));
     saidas[t] = round2(saidas[t] + amortizacao[t] + devolucaoPE[t] + remuneracaoPE[t]
-      + participacaoReceita[t] + participacaoResidual[t] + (r.distribuicaoSponsorMensal[t] ?? 0));
+      + participacaoReceita[t] + participacaoResidual[t] + participacaoLucro[t] + (r.distribuicaoSponsorMensal[t] ?? 0));
   }
   return { entradas, saidas };
 }
@@ -567,8 +720,10 @@ export function instrumentoDeRegistro(registro: any, custoElegivelMensal?: numbe
       nome: registro.nome,
       limiteComprometido: n(registro.compromisso),
       taxaMensal: taxaMensalEquivalente(n(cfg.taxaAnual)),
-      politicaAmortizacao: cfg.politicaAmortizacao === 'bullet' ? 'bullet' : 'cash_sweep',
+      politicaAmortizacao: cfg.politicaAmortizacao === 'bullet' ? 'bullet' : cfg.politicaAmortizacao === 'price' ? 'price' : 'cash_sweep',
       vencimentoMes: cfg.vencimentoMes !== undefined ? Number(cfg.vencimentoMes) : undefined,
+      carenciaMeses: cfg.carenciaMeses !== undefined ? Number(cfg.carenciaMeses) : undefined,
+      prazoMeses: cfg.prazoMeses !== undefined ? Number(cfg.prazoMeses) : undefined,
       liberacaoProgramada: cfg.liberacaoProgramada,
       custoElegivelMensal: registro.tipo === 'financiamento_producao' ? custoElegivelMensal : undefined,
       percentualFinanciavel: cfg.percentualFinanciavel !== undefined ? Number(cfg.percentualFinanciavel) : undefined,
@@ -581,12 +736,15 @@ export function instrumentoDeRegistro(registro: any, custoElegivelMensal?: numbe
       tipo: 'preferred_equity',
       nome: registro.nome,
       aportes: cfg.aportes ?? [],
-      modo: cfg.modo === 'B' || cfg.modo === 'C' ? cfg.modo : 'A',
+      modo: cfg.modo === 'B' || cfg.modo === 'C' || cfg.modo === 'D' ? cfg.modo : 'A',
       taxaMensal: cfg.taxaAnual !== undefined ? taxaMensalEquivalente(n(cfg.taxaAnual)) : undefined,
       capitalizacao: cfg.capitalizacao === 'composta' ? 'composta' : 'simples',
       percentualResidualEvento: cfg.percentualResidualEvento !== undefined ? Number(cfg.percentualResidualEvento) : undefined,
       mesEvento: cfg.mesEvento !== undefined ? Number(cfg.mesEvento) : undefined,
       percentualReceitaLiquida: cfg.percentualReceitaLiquida !== undefined ? Number(cfg.percentualReceitaLiquida) : undefined,
+      percentualLucro: cfg.percentualLucro !== undefined ? Number(cfg.percentualLucro) : undefined,
+      mesEntregaLucro: cfg.mesEntregaLucro !== undefined ? Number(cfg.mesEntregaLucro) : undefined,
+      parcelasLucro: cfg.parcelasLucro !== undefined ? Number(cfg.parcelasLucro) : undefined,
       prioridadePagamento: n(registro.prioridade_pagamento),
     };
   }
