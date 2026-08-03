@@ -7,6 +7,7 @@ import { calcularProforma, precoSugeridoM2, type ProformaInput, type Proforma } 
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
+import { calcularCascata, CASCATA_LOTEAMENTO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 import './viab-imagem-principal.js';
@@ -164,6 +165,20 @@ const PRODUTOS_INC: Campo[] = [
   { k: 'preco_venda_m2_nao_residencial', label: 'Preço venda não residencial', t: 'num', sufixo: 'R$/m²' },
 ];
 
+// Tabela de áreas em cascata do Loteamento (2026-08-03) — mapa id da linha
+// (motor genérico, `areas-cascata.ts`) → prefixo do campo no schema. `poligonal`
+// não entra aqui: é a linha "Terreno" já renderizada acima (origem Núcleo/manual).
+const CAMPO_POR_LINHA_LOT: Record<string, string> = {
+  app: 'area_app', elup_epu: 'area_elup_epu', epc: 'area_epc',
+  viario_publico: 'area_viario_publico', viario_privado: 'area_viario_privado',
+  comuns_privadas: 'area_comuns_privadas', verdes: 'area_verdes',
+};
+// O motor usa nomes genéricos de âncora ('pct_ancora1'/'pct_ancora2'); o
+// schema/UI usa os nomes de domínio do Loteamento ('pct_poligonal'/
+// 'pct_parcelavel' — mesma tradução que proforma.ts faz para calcular).
+const MODO_SCHEMA_PARA_MOTOR: Record<string, UnidadeMestre> = { m2: 'm2', pct_poligonal: 'pct_ancora1', pct_parcelavel: 'pct_ancora2' };
+const MODO_MOTOR_PARA_SCHEMA: Record<UnidadeMestre, string> = { m2: 'm2', pct_ancora1: 'pct_poligonal', pct_ancora2: 'pct_parcelavel' };
+
 // Todas as definições de campo-com-unidade (para coletar seus campos numéricos).
 const CAMPOS_UNIDADE: CustoUnidade[] = [...CUSTOS_UNIDADE, PERMUTA_UNIDADE, PERMUTA_FIS_NR, PERMUTA_FIN_R, PERMUTA_FIN_NR];
 
@@ -173,6 +188,7 @@ const TODOS_NUM = new Set<string>([
 ].map((c) => c.k).concat(
   ['terreno_manual_area'],
   CAMPOS_UNIDADE.flatMap((cu) => cu.opcoes.map((o) => o.campo)),
+  Object.values(CAMPO_POR_LINHA_LOT).map((campo) => `${campo}_valor`),
 ));
 
 @customElement('viab-tela-premissas')
@@ -253,6 +269,19 @@ export class ViabTelaPremissas extends LitElement {
     .cu-badges urbi-badge { cursor: pointer; }
     .cu-badge-dis { pointer-events: none; opacity: 0.5; }
     .cu-valor { flex: 1 1 120px; min-width: 0; }
+
+    /* Tabela de áreas em cascata (2026-08-03) — mesma convenção de linha
+       negrito/fundo claro para as linhas COMPUTADAS (âncoras/subtotais),
+       espelhando a imagem de referência padrao_areas.png. */
+    .areas-wrap { overflow-x: auto; }
+    table.areas { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+    table.areas th, table.areas td { padding: 6px 10px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); text-align: left; }
+    table.areas th { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+    table.areas td.num, table.areas th.num { text-align: right; }
+    table.areas tr.computada td { font-weight: 700; background: var(--cor-superficie-sutil, rgba(255,255,255,0.03)); }
+    .area-seletor { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
+    .area-seletor urbi-badge { cursor: pointer; flex: 0 0 auto; }
+    .area-valor { width: 130px; }
   `];
 
   private _idCarregado: number | null = null;
@@ -377,7 +406,10 @@ export class ViabTelaPremissas extends LitElement {
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
     // No Avançado o Terreno vive em Empreendimento → Informações (#53).
     const avancado = this.estudo.nivel_analise === 'avancado';
-    const areas = lot ? AREAS_LOT : AREAS_INC;
+    // Loteamento usa a tabela em cascata (2026-08-03) — AREAS_LOT só sobrevive
+    // em TODOS_NUM, pra não perder o tipo numérico dos 7 campos antigos que
+    // ainda existem no schema (dado histórico, sem leitura/escrita na tela).
+    const areas = AREAS_INC;
     const produtos = lot ? PRODUTOS_LOT : PRODUTOS_INC;
     const custos = CUSTOS.filter((c) => !c.so || c.so === this.estudo.tipo_empreendimento);
     const dis = !this.editavel;
@@ -410,7 +442,7 @@ export class ViabTelaPremissas extends LitElement {
 
           <div class="secao grupo grupo-b">
             <h4>Áreas</h4>
-            <div class="grid">${areas.map((c) => this._input(c, dis))}</div>
+            ${lot ? this._renderTabelaAreasLoteamento(dis) : html`<div class="grid">${areas.map((c) => this._input(c, dis))}</div>`}
           </div>
 
           ${this._renderRodapeForm()}
@@ -562,6 +594,102 @@ export class ViabTelaPremissas extends LitElement {
             @urbi:input-numero-change=${(e: CustomEvent) => this._set(op.campo, e.detail.valor)}
           ></viab-num>
         </div>
+      </div>
+    `;
+  }
+
+  // Área do terreno (mesma regra de proforma.ts/premissas-conversao.ts): do
+  // Núcleo (soma das glebas) quando a origem é Núcleo, senão a manual.
+  private _areaTerreno(): number {
+    return this.form.origem_terreno === 'nucleo'
+      ? (this._num('area_terreno_nucleo') ?? 0)
+      : (this._num('terreno_manual_area') ?? 0);
+  }
+
+  private _estadosCascataAreasLot(): Record<string, EstadoLinha> {
+    const estados: Record<string, EstadoLinha> = {};
+    for (const [linhaId, campo] of Object.entries(CAMPO_POR_LINHA_LOT)) {
+      const modoSchema = this.form[`${campo}_modo`] ?? 'm2';
+      estados[linhaId] = {
+        modo: MODO_SCHEMA_PARA_MOTOR[modoSchema] ?? 'm2',
+        valor: this._num(`${campo}_valor`) ?? 0,
+      };
+    }
+    return estados;
+  }
+
+  // Troca o campo mestre de uma linha da cascata (2026-08-03): o m² já
+  // resolvido da linha (`linha.m2`, correto seja qual for o modo atual) é a
+  // fonte da conversão — não há "campo destino" separado para preservar
+  // (diferente de `_trocarUnidade`/`CustoUnidade`), é a MESMA coluna
+  // reinterpretada, então não existe drift de ida-e-volta a evitar.
+  private _trocarModoArea(campo: string, novoModoSchema: string, linha: LinhaResolvida, ancora1: number, ancora2: number | null) {
+    const modoAtual = this.form[`${campo}_modo`] ?? 'm2';
+    if (novoModoSchema === modoAtual) return;
+    let novoValor: number;
+    if (novoModoSchema === 'm2') novoValor = linha.m2;
+    else if (novoModoSchema === 'pct_poligonal') novoValor = ancora1 > 0 ? (linha.m2 / ancora1) * 100 : 0;
+    else novoValor = ancora2 != null && ancora2 > 0 ? (linha.m2 / ancora2) * 100 : 0;
+    this._set(`${campo}_valor`, novoValor);
+    this._set(`${campo}_modo`, novoModoSchema);
+  }
+
+  /**
+   * §Tabela de áreas em cascata (2026-08-03, `padrao_areas.png`) — colunas
+   * Descrição · (seletor sem título) · Área (m²) · ha · % Poligonal · %
+   * Parcelável. A âncora 1 (Poligonal) é só exibida aqui — a edição dela é
+   * a seção "Terreno" acima (origem Núcleo/manual, já existente).
+   */
+  private _renderTabelaAreasLoteamento(dis: boolean): TemplateResult {
+    const ancora1 = this._areaTerreno();
+    const linhas = calcularCascata(CASCATA_LOTEAMENTO, this._estadosCascataAreasLot(), ancora1);
+    const ancora2 = linhas.find((l) => l.papel.tipo === 'computada' && l.papel.ehAncora2)?.m2 ?? null;
+    return html`
+      <div class="areas-wrap">
+        <table class="areas">
+          <thead>
+            <tr>
+              <th>Descrição</th><th></th>
+              <th class="num">Área (m²)</th><th class="num">ha</th>
+              <th class="num">% Poligonal</th><th class="num">% Parcelável</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linhas.map((l) => html`
+              <tr class=${l.papel.tipo !== 'editavel' ? 'computada' : ''}>
+                <td>${l.label}</td>
+                <td>${this._renderSeletorArea(l, dis, ancora1, ancora2)}</td>
+                <td class="num">${fmtNum(l.m2, 2)}</td>
+                <td class="num">${fmtNum(l.ha, 4)}</td>
+                <td class="num">${fmtPct(l.pctAncora1)}</td>
+                <td class="num">${l.pctAncora2 === null ? '' : fmtPct(l.pctAncora2)}</td>
+              </tr>`)}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  private _renderSeletorArea(l: LinhaResolvida, dis: boolean, ancora1: number, ancora2: number | null): TemplateResult {
+    if (l.papel.tipo !== 'editavel') return html`${nothing}`;
+    const campo = CAMPO_POR_LINHA_LOT[l.id];
+    const modoAtual: string = this.form[`${campo}_modo`] ?? 'm2';
+    const opcoes: { valor: string; rotulo: string }[] = [
+      { valor: 'm2', rotulo: 'm²' },
+      { valor: 'pct_poligonal', rotulo: '% Pol.' },
+      ...(l.papel.permiteAncora2 ? [{ valor: 'pct_parcelavel', rotulo: '% Parc.' }] : []),
+    ];
+    const sufixo = modoAtual === 'm2' ? 'm²' : '%';
+    return html`
+      <div class="area-seletor" role="group" aria-label=${`Unidade de ${l.label}`}>
+        ${opcoes.map((o) => html`
+          <urbi-badge cor="info" interativo ?ativo=${o.valor === modoAtual} class=${dis ? 'cu-badge-dis' : ''}
+            @click=${() => { if (!dis) this._trocarModoArea(campo, o.valor, l, ancora1, ancora2); }}
+          >${o.rotulo}</urbi-badge>`)}
+        <viab-num class="area-valor" sufixo=${sufixo} casas-decimais="2" ?desabilitado=${dis}
+          .valor=${this._num(`${campo}_valor`)}
+          @urbi:input-numero-change=${(e: CustomEvent) => this._set(`${campo}_valor`, e.detail.valor ?? 0)}
+        ></viab-num>
       </div>
     `;
   }

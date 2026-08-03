@@ -8,7 +8,8 @@ const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 const LOT: ProformaInput = {
   tipo_empreendimento: 'loteamento',
   terreno_manual_area: 100000,
-  sistema_viario_pct: 25,
+  area_viario_publico_modo: 'pct_poligonal',
+  area_viario_publico_valor: 25,
   area_media_lote_m2: 300,
   preco_venda_m2: 1000,
   imposto_percentual: 7,
@@ -32,6 +33,25 @@ test('loteamento: áreas e VGV', () => {
   assert.ok(perto(p.areaVendavelLiquida, 75000));
   assert.ok(perto(p.vgv, 75_000_000), `vgv=${p.vgv}`);
   assert.ok(perto(p.eficienciaPct, 75), `eficiencia=${p.eficienciaPct}`);
+});
+
+// Migração 020: faixas_nao_edificaveis_pct e areas_privativas_nao_vendaveis_pct
+// (sem linha própria na tabela nova) são somados dentro de area_app_valor e
+// area_viario_privado_valor — a soma total de deduções, e portanto a área
+// vendável, tem que ficar IDÊNTICA à fórmula antiga (soma plana dos 7 campos).
+test('loteamento: soma "dobrada" dos campos órfãos reproduz a fórmula antiga (migração 020)', () => {
+  // Fórmula antiga: 100.000 × (1 − (9.5+2+25+6+4+1+3)/100) = 100.000 × 0.495 = 49.500.
+  const comCamposAntigos: ProformaInput = {
+    tipo_empreendimento: 'loteamento',
+    terreno_manual_area: 100000,
+    area_app_modo: 'pct_poligonal', area_app_valor: 9.5 + 2, // app_pct + faixas_nao_edificaveis_pct
+    area_elup_epu_modo: 'pct_poligonal', area_elup_epu_valor: 6 + 1, // elup_pct + epu_pct
+    area_epc_modo: 'pct_poligonal', area_epc_valor: 4,
+    area_viario_publico_modo: 'pct_poligonal', area_viario_publico_valor: 25,
+    area_viario_privado_modo: 'pct_poligonal', area_viario_privado_valor: 3, // areas_privativas_nao_vendaveis_pct
+  };
+  const p = calcularProforma(comCamposAntigos);
+  assert.ok(perto(p.areaVendavel, 49500), `areaVendavel=${p.areaVendavel}`);
 });
 
 test('loteamento: deduções e receita líquida', () => {
