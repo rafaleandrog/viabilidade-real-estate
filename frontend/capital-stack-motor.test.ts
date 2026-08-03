@@ -5,7 +5,7 @@ import {
   caixaDistribuivelMensal, reconciliarCapitalStack,
   custoElegivelMensalDeLinhas, instrumentoDeRegistro, simularCapitalStackDoEstudo,
   simularCapitalStack, type InstrumentoPreferredEquity, type InstrumentoDivida, type InstrumentoSponsorEquity,
-  fundingEntradasSaidasMensal,
+  fundingEntradasSaidasMensal, pmtPrice, tirMensal, tirAnual,
 } from './capital-stack-motor.js';
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
@@ -104,6 +104,33 @@ test('instrumentoDeRegistro: preferred_equity usa defaults (modo A, capitalizaç
   assert.equal(inst.modo, 'A');
   assert.equal(inst.capitalizacao, 'simples');
   assert.deepEqual(inst.aportes, []);
+});
+
+test('instrumentoDeRegistro: divida com politicaAmortizacao=price carrega carência e prazo', () => {
+  const registro = {
+    tipo: 'capital_giro', nome: 'CapGiro', compromisso: 1_000_000, prioridade_funding: 1,
+    config: { taxaAnual: 0.12, politicaAmortizacao: 'price', carenciaMeses: 3, prazoMeses: 15 },
+  };
+  const inst = instrumentoDeRegistro(registro);
+  assert.equal(inst?.tipo, 'divida');
+  if (inst?.tipo !== 'divida') throw new Error('esperava divida');
+  assert.equal(inst.politicaAmortizacao, 'price');
+  assert.equal(inst.carenciaMeses, 3);
+  assert.equal(inst.prazoMeses, 15);
+});
+
+test('instrumentoDeRegistro: preferred_equity modo D carrega percentualLucro/mesEntregaLucro/parcelasLucro', () => {
+  const registro = {
+    tipo: 'preferred_equity', nome: 'PE',
+    config: { modo: 'D', percentualLucro: 0.10, mesEntregaLucro: 12, parcelasLucro: 4 },
+  };
+  const inst = instrumentoDeRegistro(registro);
+  assert.equal(inst?.tipo, 'preferred_equity');
+  if (inst?.tipo !== 'preferred_equity') throw new Error('esperava preferred_equity');
+  assert.equal(inst.modo, 'D');
+  assert.equal(inst.percentualLucro, 0.10);
+  assert.equal(inst.mesEntregaLucro, 12);
+  assert.equal(inst.parcelasLucro, 4);
 });
 
 test('instrumentoDeRegistro: sponsor_equity coage cobreLacunaAutomatica para booleano', () => {
@@ -244,6 +271,60 @@ test('múltiplos Sponsor Equity: lacuna e resíduo se dividem igualmente sem apo
   assert.equal(r.distribuicaoSponsorMensal[2], 100);
 });
 
+// Achado da 3ª rodada (2026-08-03) — o autor apontou a planilha real
+// `20260730_EVI_Urbita_corrigido.xlsx`, aba "Incorp Individual", colunas
+// CK:CQ (Capital de Giro) como referência: liberação única, carência (juros
+// pagos em caixa, principal intocado) e amortização Price (parcela fixa,
+// calculada uma vez sobre o saldo ao entrar na fase). Este teste reproduz o
+// oráculo EXATO das fórmulas do Excel: Volume=1.000.000, MesTomada=1,
+// JurosAA=12%, Carência=3, Prazo total=15 (amortização=12 meses). O oráculo
+// (réplica das fórmulas CK:CQ, verificado à mão) zera em t=16.
+test('price: carência (juros pagos, principal intocado) + amortização Price — reproduz o oráculo da planilha', () => {
+  const taxaMensal = Math.pow(1.12, 1 / 12) - 1;
+  const divida: InstrumentoDivida = {
+    tipo: 'divida', nome: 'CapGiro', limiteComprometido: 1_000_000, taxaMensal,
+    politicaAmortizacao: 'price', carenciaMeses: 3, prazoMeses: 15,
+    liberacaoProgramada: [{ mes: 1, valor: 1_000_000 }],
+    prioridadeFunding: 1, prioridadePagamento: 1,
+  };
+  // Caixa abundante — fluxoLivreMensal irrelevante aqui, só a dívida move o caixa do projeto.
+  const fluxoLivreMensal = new Array(19).fill(0);
+  const r = simularCapitalStack({
+    nome: 'price-carencia', meses: 18, fluxoLivreMensal, reservaMinima: -10_000_000, instrumentos: [divida],
+  });
+  assert.equal(r.liberacaoPorInstrumento['CapGiro'][1], 1_000_000);
+  // Carência: meses 2,3,4 pagam só juros — saldo fica achatado em 1.000.000.
+  for (const t of [2, 3, 4]) {
+    assert.equal(r.saldoDividaPorInstrumento['CapGiro'][t], 1_000_000);
+    assert.ok(r.amortizacaoPorInstrumento['CapGiro'][t] > 0);
+  }
+  // Parcela fixa: PMT(taxaMensal, 12, 1_000_000) — mesmo valor todo mês da fase de amortização.
+  const parcelaEsperada = pmtPrice(taxaMensal, 12, 1_000_000);
+  for (const t of [5, 6, 10, 15]) {
+    assert.ok(Math.abs(r.amortizacaoPorInstrumento['CapGiro'][t] - parcelaEsperada) < 0.01);
+  }
+  // Zera exatamente no mês 16 (12ª parcela: meses 5..16).
+  assert.equal(r.saldoDividaPorInstrumento['CapGiro'][16], 0);
+  assert.equal(r.saldoDividaPorInstrumento['CapGiro'][17], 0);
+});
+
+test('price: caixa insuficiente na carência não força saldo negativo (§12.2) — divergência deliberada da planilha', () => {
+  const divida: InstrumentoDivida = {
+    tipo: 'divida', nome: 'CapGiro', limiteComprometido: 1_000_000, taxaMensal: 0.01,
+    politicaAmortizacao: 'price', carenciaMeses: 2, prazoMeses: 10,
+    liberacaoProgramada: [{ mes: 1, valor: 1_000_000 }],
+    prioridadeFunding: 1, prioridadePagamento: 1,
+  };
+  // O próprio mês da liberação gasta tudo (obra consome o 1M no ato) — não
+  // sobra caixa nenhum para pagar os juros da carência no mês seguinte.
+  const r = simularCapitalStack({
+    nome: 'price-sem-caixa', meses: 3, fluxoLivreMensal: [0, -1_000_000, 0, 0], reservaMinima: 0, instrumentos: [divida],
+  });
+  assert.equal(r.amortizacaoPorInstrumento['CapGiro'][2], 0);
+  // Saldo cresce (juros não pagos) em vez de ficar negativo ou forçar pagamento sem caixa.
+  assert.ok(r.saldoDividaPorInstrumento['CapGiro'][2] > 1_000_000);
+});
+
 test('múltiplos Sponsor Equity: % de receita líquida é contratual e independente — não é rateado', () => {
   const a: InstrumentoSponsorEquity = { tipo: 'sponsor_equity', nome: 'A', cobreLacunaAutomatica: false, percentualReceitaLiquida: 0.10 };
   const b: InstrumentoSponsorEquity = { tipo: 'sponsor_equity', nome: 'B', cobreLacunaAutomatica: false, percentualReceitaLiquida: 0.05 };
@@ -254,4 +335,55 @@ test('múltiplos Sponsor Equity: % de receita líquida é contratual e independe
   assert.equal(r.distribuicaoPorInstrumentoSponsor['A'][1], 100);
   assert.equal(r.distribuicaoPorInstrumentoSponsor['B'][1], 50);
   assert.equal(r.distribuicaoSponsorMensal[1], 150);
+});
+
+// §8.3: TIR por instrumento (aportes negativos, recebimentos positivos) —
+// achado da 3ª rodada (2026-08-03): o comentário do código já citava
+// "MOIC/ROI/TIR" desde a Fase 9, mas só MOIC e ROI tinham sido implementados.
+test('tirMensal/tirAnual: caso analítico simples — 1000 hoje vira 1200 em 12 meses', () => {
+  const fluxo = new Array(13).fill(0);
+  fluxo[0] = -1000; fluxo[12] = 1200;
+  const anual = tirAnual(fluxo);
+  assert.ok(anual !== null);
+  assert.ok(Math.abs(anual! - 0.20) < 0.001);
+});
+
+test('tirMensal: sem troca de sinal (só saída ou só entrada) não tem TIR — devolve null', () => {
+  assert.equal(tirMensal([0, -100, -100]), null);
+  assert.equal(tirMensal([0, 100, 100]), null);
+  assert.equal(tirMensal([0, 0, 0]), null);
+});
+
+// Modo D (2026-08-03) — % do lucro FINAL do projeto (não de um mês
+// específico), parcelado a partir do mês seguinte à entrega/fim de obras.
+// Achado no pedido do autor: a base tem que ser o resultado do projeto
+// inteiro, só conhecido no fim do horizonte — computável porque o motor já
+// recebe `fluxoLivreMensal` inteiro de uma vez, não em streaming.
+test('modo D: % do lucro final parcelado igualmente a partir do mês seguinte à entrega', () => {
+  const pe: InstrumentoPreferredEquity = {
+    tipo: 'preferred_equity', nome: 'PE', aportes: [{ mes: 1, valor: 1_000_000 }],
+    modo: 'D', percentualLucro: 0.10, mesEntregaLucro: 12, parcelasLucro: 4, prioridadePagamento: 1,
+  };
+  // Fluxo livre soma 5.000.000 ao longo do horizonte (lucro final do projeto) —
+  // 10% disso = 500.000, dividido em 4 parcelas de 125.000 cada.
+  const fluxoLivreMensal = new Array(17).fill(0);
+  fluxoLivreMensal[16] = 5_000_000; // todo o "lucro" chega no fim, caixa abundante lá
+  const r = simularCapitalStack({
+    nome: 'modo-d', meses: 16, fluxoLivreMensal, reservaMinima: -10_000_000, instrumentos: [pe],
+  });
+  assert.deepEqual([13, 14, 15, 16].map((t) => r.participacaoLucroPE['PE'][t]), [125000, 125000, 125000, 125000]);
+  assert.equal(r.participacaoLucroPE['PE'][12], 0); // mês da entrega em si — ainda não paga
+  assert.equal(r.participacaoLucroPE['PE'][17] ?? 0, 0); // depois das 4 parcelas, não paga mais
+});
+
+test('modo D: lucro negativo não gera pagamento (participação sobre prejuízo não existe)', () => {
+  const pe: InstrumentoPreferredEquity = {
+    tipo: 'preferred_equity', nome: 'PE', aportes: [{ mes: 1, valor: 1_000_000 }],
+    modo: 'D', percentualLucro: 0.10, mesEntregaLucro: 2, parcelasLucro: 2, prioridadePagamento: 1,
+  };
+  const r = simularCapitalStack({
+    nome: 'modo-d-prejuizo', meses: 5, fluxoLivreMensal: [0, -1_000_000, 0, 0, 0, 0],
+    reservaMinima: -10_000_000, instrumentos: [pe],
+  });
+  assert.deepEqual([3, 4, 5].map((t) => r.participacaoLucroPE['PE'][t]), [0, 0, 0]);
 });

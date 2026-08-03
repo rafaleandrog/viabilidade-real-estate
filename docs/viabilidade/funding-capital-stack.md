@@ -255,6 +255,21 @@ mensal compõe todo o retorno do instrumento.
 > nessa ordem. O campo é **inerte** hoje; a migração da `FIN-02` (#271) o usa como pista, exigindo
 > revisão do usuário quando a associação for ambígua.
 
+**D. Participação no lucro final, parcelada na entrega** (adicionada 2026-08-03, a pedido do
+autor) — percentual sobre o **resultado desalavancado do projeto inteiro** (`Σ fluxoLivreMensal`,
+a MESMA grandeza que já é o KPI "Resultado desalavancado" em §8.1 — não é o "lucro contábil
+indefinido" que a ressalva do modo B evita; é uma base canônica e já existente). O total
+(`percentual × resultado`, zerado se o resultado for negativo — participação sobre prejuízo não
+existe) é dividido em **N parcelas mensais iguais**, pagas a partir do mês **seguinte** ao mês de
+entrega/fim de obras. Sem devolução de principal separada (mesma convenção do modo C — a
+participação é o retorno inteiro). Insuficiência de caixa num mês vira saldo pendente, cobrado nos
+meses seguintes (nunca força caixa negativo, §12.3).
+
+> **Viabilidade confirmada:** o total distribuível só é computável de antemão porque o motor recebe
+> `fluxoLivreMensal` com o horizonte **inteiro** de uma vez — não é cálculo em streaming mês a mês.
+> A leitura acontece uma única vez, antes do loop mensal começar; nenhuma fórmula existente do §7
+> foi alterada para viabilizar isso.
+
 ### 4.3 Financiamento à produção
 
 **Função:** financiar custos elegíveis do empreendimento, liberando recursos conforme
@@ -314,6 +329,24 @@ Para financiamento à produção, o padrão recomendado é **cash sweep com venc
 e demais recebimentos podem alimentar o cash sweep, mas **continuam classificados como receita do
 cliente**.
 
+> ✅ **Price + carência implementados em 2026-08-03**, decodificados de `Incorp Individual!CK:CQ`
+> da planilha de referência (Capital de Giro): liberação → **carência** (juros pagos em caixa,
+> principal intocado — não capitalizado) → **parcela Price fixa** (`PMT`, calculada uma única vez
+> sobre o total liberado, ao entrar na fase de amortização) até quitar. A política é **genérica**
+> para qualquer `InstrumentoDivida`, independente do `tipo` da camada (`financiamento_producao` ou
+> `capital_giro`) — decisão do autor: Capital de Giro na planilha é só a REFERÊNCIA do modelo, não
+> um produto à parte no app. As 3 políticas (`cash_sweep`/`bullet`/`price`) dividem uma ÚNICA fila
+> de prioridade de pagamento (§9), corrigindo uma inconsistência que existia antes (cash sweep
+> sempre processado antes de bullet, independente da prioridade configurada).
+>
+> **Uma divergência deliberada da planilha:** o Excel sempre paga o juros da carência, sem checar
+> caixa disponível. Este motor capa pelo caixa disponível, como toda amortização (§12.2/12.3) — não
+> força caixa negativo. Numa carência bem financiada isso não muda nada; só diverge quando o
+> projeto genuinamente não tem caixa para os juros daquele mês.
+>
+> **SAC continua não implementado** — nenhum caso real pediu ainda; a planilha de referência só usa
+> Price.
+
 ### 4.4 Capital de giro / dívida ponte
 
 **Função:** cobrir descasamentos de caixa não atendidos pelo financiamento à produção; financiar
@@ -324,7 +357,10 @@ despesas não elegíveis ou períodos intermediários. **Não depende** de medi�
 **Premissas:** limite · mês disponível · prazo · carência · taxa e indexador · taxas · juros pagos
 ou capitalizados · amortização cash sweep, bullet, SAC ou Price.
 
-Uma **dívida ponte** usa o mesmo motor, mudando nome, prazo e regra de pagamento.
+Uma **dívida ponte** usa o mesmo motor, mudando nome, prazo e regra de pagamento. **Não** herda as
+nuances específicas de "Financiamento à produção" achadas na planilha (exposição mínima antes da
+1ª liberação; cash sweep condicional a flag ou fase de Chaves) — decisão do autor, 2026-08-03: ficam
+de fora desta rodada; a planilha serviu só de referência para o modelo de carência+Price.
 
 ---
 
@@ -738,6 +774,24 @@ de colunas**, se desejada, é issue posterior e específica.
 >    antes desta rodada.
 >
 > Validação: 317 testes, typecheck, build e harness de migrações verdes.
+
+> ✅ **Quinta rodada (2026-08-03) — planilha `20260730_EVI_Urbita_corrigido.xlsx` (`Incorp
+> Individual!CK:CQ`, Capital de Giro) usada como referência para generalizar a política de dívida
+> e criar o modo D de equity.** Achados e decisões do autor:
+>
+> 1. **Dívida: Price + carência**, decodificados linha a linha da planilha (§4.3/4.4 acima) —
+>    genérico para qualquer `InstrumentoDivida`; Capital de Giro é só a referência do modelo, não
+>    vira um tipo de instrumento à parte. SAC continua fora (nenhum caso real pede ainda).
+> 2. **Equity: modo D**, "% do lucro final parcelado na entrega" (§4.2 acima) — base = resultado
+>    desalavancado do projeto INTEIRO (não de um mês, como o modo B), confirmada como computável
+>    sem alterar nenhuma fórmula existente do §7.
+> 3. **TIR por instrumento** (§8.3) — o comentário do código já citava "MOIC/ROI/TIR" desde a Fase
+>    9, mas só MOIC/ROI tinham sido implementados; `tirMensal`/`tirAnual` (bisseção sobre o fluxo
+>    de caixa do investidor/credor) fecham o que faltava. Exibido na tabela de resultados por
+>    camada (`tela-capital-stack.ts`), ao lado do MOIC.
+>
+> Validação: 325 testes (14 novos — Price+carência reproduzindo o oráculo exato da planilha, modo
+> D, TIR, adapter), typecheck e build limpos.
 
 ---
 
