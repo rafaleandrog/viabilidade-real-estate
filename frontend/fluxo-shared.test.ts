@@ -174,6 +174,16 @@ test('resolverCustoTotal converte cada unidade de orçamento para R$', () => {
   assert.equal(resolverCustoTotal({ orcamento_valor: 10, orcamento_unidade: 'pct_obra' }, ctxObra), 500_000);
 });
 
+test('#259: custo canônico em R$ prevalece sobre a unidade apenas exibida', () => {
+  const ctx = { areaPrivativaTotal: 20_000, areaTerreno: 10_000, vgvTotal: 82_713_401.37 };
+  const custo = {
+    // Representação arredondada que antes causaria desvio ao voltar para R$.
+    orcamento_valor: 12.09, orcamento_unidade: 'pct_vgv',
+    orcamento_valor_canonico: 10_000_000,
+  };
+  assert.equal(resolverCustoTotal(custo, ctx), 10_000_000);
+});
+
 test('areaPrivativaTotalLinhas soma área × quantidade de todas as tipologias', () => {
   const linhas = [
     { tipologias: [{ area_privativa_m2: 70, quantidade: 100 }, { area_privativa_m2: 25, quantidade: 200 }] },
