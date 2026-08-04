@@ -134,6 +134,36 @@ export interface LinhaCalc {
   itens?: LinhaCalc[];             // tipologias (receita) — sub-linhas
 }
 
+/**
+ * Quantiza uma série monetária sem deixar centavos "sumirem" no total: todos
+ * os meses recebem duas casas e o resíduo fica no último mês não nulo. Assim,
+ * a soma da linha é exatamente o total informado, inclusive em rateios.
+ */
+function quantizarSerieMonetaria(valores: number[], total?: number): number[] {
+  const alvo = round2(total ?? valores.reduce((s, v) => s + v, 0));
+  const ultimo = valores.reduce((idx, v, i) => Math.abs(v) > 1e-9 ? i : idx, -1);
+  if (ultimo < 0) return valores.map(() => 0);
+  let acumulado = 0;
+  return valores.map((v, i) => {
+    if (i === ultimo) return round2(alvo - acumulado);
+    const q = round2(v);
+    acumulado += q;
+    return q;
+  });
+}
+
+function quantizarLinhaMonetaria(linha: LinhaCalc, taxaAa: number): LinhaCalc {
+  if (linha.itens?.length) {
+    const itens = linha.itens.map((item) => quantizarLinhaMonetaria(item, taxaAa));
+    const mensal = linha.mensal.map((_, i) => round2(itens.reduce((s, item) => s + (item.mensal[i] ?? 0), 0)));
+    const total = round2(mensal.reduce((s, v) => s + v, 0));
+    return { ...linha, itens, mensal, total, vpl: round2(vplFluxo(mensal, taxaAa)) };
+  }
+  const mensal = quantizarSerieMonetaria(linha.mensal, linha.total);
+  const total = round2(mensal.reduce((s, v) => s + v, 0));
+  return { ...linha, mensal, total, vpl: round2(vplFluxo(mensal, taxaAa)) };
+}
+
 // ─────────────────────────────────────────────────────────────────
 // #229 — Taxonomia de grandezas (EVI-009 + emenda Calliandra 2026-08-01)
 // ─────────────────────────────────────────────────────────────────
@@ -492,6 +522,18 @@ export function componentesDoLegado(
   }
 
   return componentes;
+}
+
+/**
+ * Resolve o único contrato de domínio da #230. Novos estudos podem persistir
+ * `fluxo_pagamento.componentes`; estudos existentes seguem pelo adaptador
+ * legado, sem alteração de resultado. O motor real passa a consumi-lo na #283.
+ */
+export function componentesPagamento(fluxoPagamento: any, cronograma: EventoCrono[]): ComponentePagamento[] {
+  if (Array.isArray(fluxoPagamento?.componentes)) {
+    return fluxoPagamento.componentes.map((c: any) => ({ ...c })) as ComponentePagamento[];
+  }
+  return componentesDoLegado(fluxoPagamento, cronograma);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1028,7 +1070,8 @@ export function corretagemMensal(
   const somaVendas = vendas.reduce((s, v) => s + v, 0);
   if (somaVendas <= 0) return new Array<number>(Math.max(prazoTotal, 0)).fill(0);
 
-  if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv') {
+  if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv'
+    && (custo?.orcamento_valor_canonico === null || custo?.orcamento_valor_canonico === undefined)) {
     const pct = n(custo?.orcamento_valor) / 100;
     return vendas.map((v) => v * pct);
   }
@@ -1046,7 +1089,8 @@ export function corretagemMensal(
 export function distribuirProporcional(custo: any, pesos: number[], ctx: ContextoCusto): number[] {
   const somaPesos = pesos.reduce((s, v) => s + v, 0);
   if (somaPesos <= 0) return pesos.map(() => 0);
-  if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv') {
+  if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv'
+    && (custo?.orcamento_valor_canonico === null || custo?.orcamento_valor_canonico === undefined)) {
     const pct = n(custo?.orcamento_valor) / 100;
     return pesos.map((v) => v * pct);
   }
@@ -1211,7 +1255,12 @@ export function aplicarCenario(config: FluxoConfig, params: CenarioParams): Flux
       tipologias: (l.tipologias ?? []).map((t: any) => ({ ...t, preco_m2: n(t?.preco_m2) * fPreco })),
     })),
     linhasCusto: (config.linhasCusto ?? []).map((c) => (
-      c?.grupo === 'obra' ? { ...c, orcamento_valor: n(c?.orcamento_valor) * fCusto } : c
+      c?.grupo === 'obra' ? {
+        ...c,
+        orcamento_valor: n(c?.orcamento_valor) * fCusto,
+        ...(c?.orcamento_valor_canonico !== null && c?.orcamento_valor_canonico !== undefined
+          ? { orcamento_valor_canonico: round2(n(c.orcamento_valor_canonico) * fCusto) } : {}),
+      } : c
     )),
   };
 }
@@ -1265,7 +1314,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
 
   // Receitas por linha (e por tipologia, proporcional ao VGV VENDÁVEL da
   // tipologia, #195 — uma tipologia 100% permutada não recebe fatia de caixa).
-  const calcReceitas: LinhaCalc[] = linhasReceita.map((l) => {
+  let calcReceitas: LinhaCalc[] = linhasReceita.map((l) => {
     const mensal = receitaMensalLinha(l, crono, prazo);
     const vgvVendavelL = vgvVendavelLinha(l.tipologias);
     const r = recorte(mensal);
@@ -1290,6 +1339,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
       mensal, itens,
     };
   });
+  calcReceitas = calcReceitas.map((linha) => quantizarLinhaMonetaria(linha, taxa));
 
   // Receita mensal SÓ das vendas (caixa efetivo: entrada + parcelas + repasse
   // na entrega) — calculada aqui, antes dos custos, porque o modo
@@ -1311,7 +1361,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   // Custos por linha (valores positivos; sinal aplicado na consolidação).
   const curvasPorId = new Map<number, CurvaPersonalizada>(
     (config.curvas ?? []).map((k: any) => [Number(k.id), (k.valores ?? []) as CurvaPersonalizada]));
-  const calcCustos: LinhaCalc[] = linhasCustoSemPermutas.map((c) => {
+  let calcCustos: LinhaCalc[] = linhasCustoSemPermutas.map((c) => {
     const nome = nomeLinhaCusto(c);
     // Preserva o grupo real (5 grupos das abas de Custos: Terreno · Obra ·
     // Diretos · Indiretos · Financeiro, #125) para o Proforma exibir cada seção;
@@ -1365,6 +1415,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
       mensal,
     };
   });
+  calcCustos = calcCustos.map((linha) => quantizarLinhaMonetaria(linha, taxa));
 
   // Permuta financeira (#196/#238): sai da RECEITA DAS VENDAS (em caixa),
   // sempre — não é mais escolha de `distribuicao_modo` (armadilha A10, Anexo
@@ -1393,12 +1444,16 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     ? corretagemMensal(linhaCorretagem, linhasReceita, crono, prazo, ctxCusto)
     : new Array<number>(prazo).fill(0);
 
-  const calcDeducoesReceita: LinhaCalc[] = linhasPermutaFinanceira.map((c) => {
+  let calcDeducoesReceita: LinhaCalc[] = linhasPermutaFinanceira.map((c) => {
     const nome = nomeLinhaCusto(c);
     let mensalBruto: number[];
     if ((c.orcamento_unidade || 'rs') === 'pct_vgv') {
-      const bruta = permutaFinanceiraBrutaMensal(receitaCaixaBrutaMensal, n(c.orcamento_valor));
-      const liquida = permutaFinanceiraLiquidaMensal(receitaCaixaBrutaMensal, impostoTotalMensal, corretagemSerie, n(c.orcamento_valor));
+      // Quando existe canônico, o percentual é somente a representação dele.
+      const pct = c.orcamento_valor_canonico !== null && c.orcamento_valor_canonico !== undefined
+        ? (ctxCusto.vgvTotal > 0 ? resolverCustoTotal(c, ctxCusto) / ctxCusto.vgvTotal * 100 : 0)
+        : n(c.orcamento_valor);
+      const bruta = permutaFinanceiraBrutaMensal(receitaCaixaBrutaMensal, pct);
+      const liquida = permutaFinanceiraLiquidaMensal(receitaCaixaBrutaMensal, impostoTotalMensal, corretagemSerie, pct);
       mensalBruto = c.permuta_financeira_base === 'liquida' ? liquida : bruta;
     } else {
       mensalBruto = distribuirProporcional(c, receitaMensalVendas, ctxCusto);
@@ -1413,18 +1468,19 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
       mensal,
     };
   });
+  calcDeducoesReceita = calcDeducoesReceita.map((linha) => quantizarLinhaMonetaria(linha, taxa));
 
   const linhasReceitaFinal = [...calcReceitas, ...calcDeducoesReceita];
   const receitaMensal = new Array<number>(prazo).fill(0);
-  for (const l of linhasReceitaFinal) for (let i = 0; i < prazo; i++) receitaMensal[i] += l.mensal[i];
+  for (const l of linhasReceitaFinal) for (let i = 0; i < prazo; i++) receitaMensal[i] = round2(receitaMensal[i] + l.mensal[i]);
 
   const custoMensal = new Array<number>(prazo).fill(0);
-  for (const c of calcCustos) for (let i = 0; i < prazo; i++) custoMensal[i] += c.mensal[i];
+  for (const c of calcCustos) for (let i = 0; i < prazo; i++) custoMensal[i] = round2(custoMensal[i] + c.mensal[i]);
 
-  const fluxoMensal = receitaMensal.map((r, i) => r - custoMensal[i]);
+  const fluxoMensal = receitaMensal.map((r, i) => round2(r - custoMensal[i]));
   const fluxoAcumulado: number[] = [];
   let acc = 0;
-  for (const v of fluxoMensal) { acc += v; fluxoAcumulado.push(acc); }
+  for (const v of fluxoMensal) { acc = round2(acc + v); fluxoAcumulado.push(acc); }
 
   const paybackMes = fluxoAcumulado.findIndex((v, i) => v >= 0 && fluxoMensal.slice(0, i + 1).some((x) => x < 0));
   const exposicaoMaxima = fluxoAcumulado.length ? Math.min(...fluxoAcumulado) : 0;
