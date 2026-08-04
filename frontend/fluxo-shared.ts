@@ -477,6 +477,59 @@ export function ePermutaFisica(custo: any): boolean {
   return ePrecoTerreno(custo) && custo?.subcategoria === SUBCATEGORIA_PERMUTA_FISICA;
 }
 
+/** Categoria da linha obrigatória do grupo Obra (#115/#120). */
+export const CATEGORIA_CONSTRUCAO = 'Construção';
+
+/**
+ * Linha "Construção" (obrigatória, 1ª do grupo Obra): além da categoria travada
+ * (#115), o Cronograma fica fixo em "Obra" e Início/Duração são derivados do
+ * cronograma do empreendimento e bloqueados (#120).
+ */
+export function eConstrucao(custo: any): boolean {
+  return custo?.grupo === 'obra' && custo?.categoria === CATEGORIA_CONSTRUCAO;
+}
+
+/**
+ * Regime de cronograma de uma linha de custo (#255).
+ *
+ * Por que existe: esta classificação estava INLINE no render de
+ * `tela-fluxo-custos.ts`, repetida IDÊNTICA nas três colunas (Cronograma,
+ * Início e Duração). Essa repetição é o mecanismo exato das duas correções
+ * parciais que a #255 cita — a #120 tratou só a linha Construção, a #167 tratou
+ * só o Início. Quem corrige uma coluna e esquece as outras reproduz o histórico.
+ *
+ * É também a única parte da matriz de ancoragem SENSÍVEL AO GRUPO: as funções
+ * do backend (`ancorarLinhaCusto`, `resolverTravamentoCusto`) não recebem
+ * `grupo`, e por isso a matriz por aba é redundante lá — mas não aqui.
+ *
+ * A ordem das condições é a do código original, e é significativa: Corretagem
+ * antes de Permuta, Permuta antes de Construção, Construção antes de
+ * fase-âncora. Alterá-la muda comportamento.
+ *
+ *  · `sem_cronograma` — não tem calendário próprio. Corretagem segue as vendas
+ *    (#121); permuta física/financeira e Preço do Terreno distribuído por
+ *    `unit_delivery`/`sales_revenue` seguem a curva que os define (#194).
+ *  · `fixo_obra`      — Construção: presa ao evento Obra, sem seletor (#120).
+ *  · `fase_ancora`    — ancorada numa fase do Cronograma (#167).
+ *  · `evento_fixo`    — ancorada num dos eventos fixos.
+ *  · `customizado`    — início e duração livres.
+ */
+export type RegimeCronograma =
+  | 'sem_cronograma' | 'fixo_obra' | 'fase_ancora' | 'evento_fixo' | 'customizado';
+
+export function regimeCronogramaLinha(custo: any): RegimeCronograma {
+  if (eCorretagem(custo)) return 'sem_cronograma';
+  if (ePermutaFisica(custo) || ePermutaFinanceira(custo)
+    || (ePrecoTerreno(custo) && custo?.distribuicao_modo && custo.distribuicao_modo !== 'fixo')) {
+    return 'sem_cronograma';
+  }
+  if (eConstrucao(custo)) return 'fixo_obra';
+  if (custo?.fase_ancora_id) return 'fase_ancora';
+  // Legado sem o campo cai em `customizado`, que é o default histórico.
+  if ((custo?.cronograma_evento || 'customizado') !== 'customizado') return 'evento_fixo';
+  return 'customizado';
+}
+
 /**
  * VGV VENDIDO mês a mês (meses RELATIVOS 0-based), somando todas as linhas de
  * receita: o VGV de cada linha é repartido pela sua própria curva de absorção.

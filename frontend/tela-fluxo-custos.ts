@@ -4,6 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import {
   rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
+  CATEGORIA_CONSTRUCAO, eConstrucao, regimeCronogramaLinha,
   vgvLinha, receitaLiquidaLinha, areaPrivativaTotalLinhas, resolverCustoTotal, type EventoCrono, type ContextoCusto,
 } from './fluxo-shared.js';
 import {
@@ -186,7 +187,6 @@ const MODOS_DISTRIBUICAO_PRECO = [
 // Construção é a linha obrigatória/ancorada e a Gestão da obra é a série
 // opcional empilhada nos gráficos de avanço. Declaradas ANTES de
 // `LINHAS_OBRIGATORIAS`, que as consome na inicialização do módulo.
-const CATEGORIA_CONSTRUCAO = 'Construção';
 const CATEGORIA_GESTAO_OBRA = 'Gestão da obra';
 
 interface LinhaObrigatoria { categoria: string; posicao: number; unidade?: string }
@@ -216,13 +216,6 @@ function obrigatoriasDoGrupo(grupo: string | null | undefined): LinhaObrigatoria
 // portanto editável/removível — nunca mais trava por coincidência de nome.
 function eObrigatoria(c: any): boolean {
   return c.obrigatoria === true;
-}
-
-// Linha "Construção" (obrigatória, 1ª do grupo Obra): além da categoria travada
-// (#115), o Cronograma fica fixo em "Obra" e o Início/Duração são derivados do
-// cronograma do empreendimento e bloqueados (#120).
-function eConstrucao(c: any): boolean {
-  return c.grupo === 'obra' && c.categoria === CATEGORIA_CONSTRUCAO;
 }
 
 // Ordena as linhas de um grupo: obrigatórias primeiro (na ordem declarada),
@@ -732,13 +725,12 @@ export class ViabFluxoCustos extends LitElement {
       {
         id: 'cronograma', label: 'Cronograma',
         render: (c: any) => {
-          // Corretagem: sem cronograma próprio — segue as vendas (#121).
-          if (eCorretagem(c)) return html`<span class="sec">—</span>`;
-          // Preço do Terreno em Unit Delivery/Sales Revenue: idem (#194).
-          if (ePermutaFisica(c) || ePermutaFinanceira(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
-            return html`<span class="sec">—</span>`;
-          }
-          if (eConstrucao(c)) {
+          // #255: a classificação vive em regimeCronogramaLinha (fluxo-shared),
+          // fonte única para as três colunas. Corretagem segue as vendas (#121);
+          // permuta e Preço distribuído seguem sua curva (#194).
+          const regime = regimeCronogramaLinha(c);
+          if (regime === 'sem_cronograma') return html`<span class="sec">—</span>`;
+          if (regime === 'fixo_obra') {
             // Construção: cronograma fixo em "Obra" (sem seletor) — #120.
             return html`<span class="mes-calc"><strong>Obra</strong>
               <span title="Cronograma fixo na Obra">🔒</span></span>`;
@@ -765,25 +757,22 @@ export class ViabFluxoCustos extends LitElement {
       {
         id: 'inicio', label: 'Início',
         render: (c: any) => {
-          if (eCorretagem(c)) return html`<span class="sec">—</span>`;
-          if (ePermutaFisica(c) || ePermutaFinanceira(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
-            return html`<span class="sec">—</span>`;
-          }
-          if (eConstrucao(c)) {
+          const regime = regimeCronogramaLinha(c);   // #255: fonte única
+          if (regime === 'sem_cronograma') return html`<span class="sec">—</span>`;
+          if (regime === 'fixo_obra') {
             // Início derivado do cronograma (evento Obra), bloqueado — #120.
             const obra = this._eventoObra;
             const ini = obra ? Number(obra.inicio_mes) : Number(c.inicio_mes) || 0;
             return html`<span class="mes-calc mes-crono">📅 ${rotuloMesRelativo(this.dataInicio, ini)}
               <span title="Derivado do cronograma (Obra)">🔒</span></span>`;
           }
-          if (c.fase_ancora_id) {
+          if (regime === 'fase_ancora') {
             // Início derivado da fase-âncora do Cronograma, bloqueado — #167.
             const fase = this.fasesCronograma.find((f) => Number(f.id) === Number(c.fase_ancora_id));
             return html`<span class="mes-calc mes-crono">📅 ${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
               <span title=${`Ancorado na fase "${fase?.nome || c.fase_ancora_id}"`}>🔒</span></span>`;
           }
-          const custom = (c.cronograma_evento || 'customizado') === 'customizado';
-          if (!custom) {
+          if (regime === 'evento_fixo') {
             return html`<span class="mes-calc mes-crono">📅 ${rotuloMesRelativo(this.dataInicio, Number(c.inicio_mes))}
               <span title=${`Ancorado em ${EVENTO_LABEL[c.cronograma_evento] || c.cronograma_evento}`}>🔒</span></span>`;
           }
@@ -799,11 +788,9 @@ export class ViabFluxoCustos extends LitElement {
       {
         id: 'duracao', label: 'Duração',
         render: (c: any) => {
-          if (eCorretagem(c)) return html`<span class="sec">—</span>`;
-          if (ePermutaFisica(c) || ePermutaFinanceira(c) || (ePrecoTerreno(c) && c.distribuicao_modo && c.distribuicao_modo !== 'fixo')) {
-            return html`<span class="sec">—</span>`;
-          }
-          if (eConstrucao(c)) {
+          const regime = regimeCronogramaLinha(c);   // #255: fonte única
+          if (regime === 'sem_cronograma') return html`<span class="sec">—</span>`;
+          if (regime === 'fixo_obra') {
             // Duração derivada do cronograma (evento Obra), bloqueada — #120.
             const obra = this._eventoObra;
             const dur = obra ? Number(obra.duracao_meses) : Number(c.duracao_meses) || 1;
@@ -815,14 +802,13 @@ export class ViabFluxoCustos extends LitElement {
           // fase-âncora e demais eventos deixavam o campo editável mesmo com o
           // backend agora recusando a alteração, o que produzia 422 silencioso
           // na tela ao salvar).
-          if (c.fase_ancora_id) {
+          if (regime === 'fase_ancora') {
             const fase = this.fasesCronograma.find((f) => Number(f.id) === Number(c.fase_ancora_id));
             const dur = Number(c.duracao_meses) || 1;
             return html`<span class="mes-calc mes-crono">🕐 ${dur} ${dur === 1 ? 'mês' : 'meses'}
               <span title=${`Ancorado na fase "${fase?.nome || c.fase_ancora_id}"`}>🔒</span></span>`;
           }
-          const custom = (c.cronograma_evento || 'customizado') === 'customizado';
-          if (!custom) {
+          if (regime === 'evento_fixo') {
             const dur = Number(c.duracao_meses) || 1;
             return html`<span class="mes-calc mes-crono">🕐 ${dur} ${dur === 1 ? 'mês' : 'meses'}
               <span title=${`Ancorado em ${EVENTO_LABEL[c.cronograma_evento] || c.cronograma_evento}`}>🔒</span></span>`;
