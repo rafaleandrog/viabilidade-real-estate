@@ -48,6 +48,10 @@ const CUSTOS: (Campo & { so?: string })[] = [
 // ativa é exibido (o outro fica oculto — não some do schema).
 interface CustoUnidade {
   modoKey: string; rotulo: string; so?: string; padrao: string;
+  // Fonte de verdade da quantidade econômica. Para custos é R$; para a
+  // permuta física é m². Os campos históricos por unidade permanecem apenas
+  // como compatibilidade até que todos os consumidores passem ao resolver (#260).
+  campoCanonico: string;
   // `conv` (Parte 2): como o valor da unidade converte para a base ao trocar de
   // unidade (identidade / % de uma grandeza / por m² de uma grandeza).
   opcoes: { valor: string; rotulo: string; campo: string; sufixo: string; conv: ConvUnidade }[];
@@ -55,7 +59,7 @@ interface CustoUnidade {
 const CUSTOS_UNIDADE: CustoUnidade[] = [
   {
     // #5: infraestrutura do loteamento tem 3 unidades — % VGV, R$ (fixo) ou R$/m².
-    modoKey: 'infra_modo', rotulo: 'Infraestrutura', so: 'loteamento', padrao: 'pct_vgv',
+    modoKey: 'infra_modo', rotulo: 'Infraestrutura', so: 'loteamento', padrao: 'pct_vgv', campoCanonico: 'infra_valor_canonico',
     opcoes: [
       { valor: 'pct_vgv', rotulo: '% VGV', campo: 'infra_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgv' } },
       { valor: 'valor_fixo', rotulo: 'R$', campo: 'infra_valor_fixo', sufixo: 'R$', conv: { tipo: 'identidade' } },
@@ -63,14 +67,14 @@ const CUSTOS_UNIDADE: CustoUnidade[] = [
     ],
   },
   {
-    modoKey: 'construcao_modo', rotulo: 'Construção', so: 'incorporacao', padrao: 'valor_m2',
+    modoKey: 'construcao_modo', rotulo: 'Construção', so: 'incorporacao', padrao: 'valor_m2', campoCanonico: 'construcao_valor_canonico',
     opcoes: [
       { valor: 'valor_m2', rotulo: 'R$/m²', campo: 'custo_construcao_m2', sufixo: 'R$/m²', conv: { tipo: 'por_area', link: 'areaPrivativa' } },
       { valor: 'valor_total', rotulo: 'R$ (total)', campo: 'construcao_valor_total', sufixo: 'R$', conv: { tipo: 'identidade' } },
     ],
   },
   {
-    modoKey: 'projetos_modo', rotulo: 'Projetos', padrao: 'pct_vgv',
+    modoKey: 'projetos_modo', rotulo: 'Projetos', padrao: 'pct_vgv', campoCanonico: 'projetos_valor_canonico',
     opcoes: [
       { valor: 'pct_vgv', rotulo: '% VGV', campo: 'projetos_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgv' } },
       { valor: 'valor_fixo', rotulo: 'R$ (fixo)', campo: 'projetos_valor_fixo', sufixo: 'R$', conv: { tipo: 'identidade' } },
@@ -83,7 +87,7 @@ const CUSTOS_UNIDADE: CustoUnidade[] = [
 // Incorporação separa Residencial (campos legados `permuta_fisica_*`) e Não
 // Residencial (`permuta_fisica_nr_*`) em dois campos (#10).
 const PERMUTA_UNIDADE: CustoUnidade = {
-  modoKey: 'permuta_fisica_modo', rotulo: 'Permuta física', padrao: 'area_m2',
+  modoKey: 'permuta_fisica_modo', rotulo: 'Permuta física', padrao: 'area_m2', campoCanonico: 'permuta_fisica_area_canonica',
   opcoes: [
     { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_area_m2', sufixo: 'm²', conv: { tipo: 'identidade' } },
     { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_pct', sufixo: '%', conv: { tipo: 'pct', link: 'areaVendavelR' } },
@@ -91,7 +95,7 @@ const PERMUTA_UNIDADE: CustoUnidade = {
 };
 const PERMUTA_FIS_R: CustoUnidade = { ...PERMUTA_UNIDADE, rotulo: 'Permuta física residencial' };
 const PERMUTA_FIS_NR: CustoUnidade = {
-  modoKey: 'permuta_fisica_nr_modo', rotulo: 'Permuta física não residencial', padrao: 'area_m2',
+  modoKey: 'permuta_fisica_nr_modo', rotulo: 'Permuta física não residencial', padrao: 'area_m2', campoCanonico: 'permuta_fisica_nr_area_canonica',
   opcoes: [
     { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_nr_area_m2', sufixo: 'm²', conv: { tipo: 'identidade' } },
     { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_nr_pct', sufixo: '%', conv: { tipo: 'pct', link: 'areaVendavelNR' } },
@@ -101,14 +105,14 @@ const PERMUTA_FIS_NR: CustoUnidade = {
 // Permuta financeira R e NR (#5): cada uma alterna entre % do VGV do tipo e um
 // valor absoluto em R$. Renderizadas na seção Deduções.
 const PERMUTA_FIN_R: CustoUnidade = {
-  modoKey: 'permuta_financeira_residencial_modo', rotulo: 'Permuta financeira residencial', padrao: 'pct_vgv',
+  modoKey: 'permuta_financeira_residencial_modo', rotulo: 'Permuta financeira residencial', padrao: 'pct_vgv', campoCanonico: 'permuta_financeira_residencial_valor_canonico',
   opcoes: [
     { valor: 'pct_vgv', rotulo: '% VGV', campo: 'permuta_financeira_residencial_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgvResidencial' } },
     { valor: 'valor_fixo', rotulo: 'R$', campo: 'permuta_financeira_residencial_valor', sufixo: 'R$', conv: { tipo: 'identidade' } },
   ],
 };
 const PERMUTA_FIN_NR: CustoUnidade = {
-  modoKey: 'permuta_financeira_nao_residencial_modo', rotulo: 'Permuta financeira não residencial', padrao: 'pct_vgv',
+  modoKey: 'permuta_financeira_nao_residencial_modo', rotulo: 'Permuta financeira não residencial', padrao: 'pct_vgv', campoCanonico: 'permuta_financeira_nao_residencial_valor_canonico',
   opcoes: [
     { valor: 'pct_vgv', rotulo: '% VGV', campo: 'permuta_financeira_nao_residencial_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgvNaoResidencial' } },
     { valor: 'valor_fixo', rotulo: 'R$', campo: 'permuta_financeira_nao_residencial_valor', sufixo: 'R$', conv: { tipo: 'identidade' } },
@@ -373,26 +377,28 @@ export class ViabTelaPremissas extends LitElement {
     const modoAtual = this.form[cu.modoKey] ?? cu.padrao;
     if (nova.valor === modoAtual) return;
     const atual = cu.opcoes.find((o) => o.valor === modoAtual) ?? cu.opcoes[0];
-    const valorAtual = this._num(atual.campo);
-    // Campo de origem vazio → só troca o modo (não sobrescreve o destino com 0).
-    if (valorAtual !== null) {
-      const ctx = this._ctxConversao();
-      // Preservação no round-trip: se o campo destino JÁ guarda um valor que,
-      // reconvertido para a unidade atual, bate com o valor atual (na precisão de
-      // exibição, 2 casas), mantém o original em vez de sobrescrever com o
-      // reconvertido — evita o erro de ida-e-volta (2.000 m² → % → 2.000 m², e não
-      // 2.000,41). Só reconverte quando o destino ainda não representa este mesmo
-      // valor (ex.: o usuário editou o número na outra unidade).
-      const destAtual = this._num(nova.campo);
-      const round2 = (x: number) => Math.round(x * 100) / 100;
-      const voltou = destAtual !== null ? converterUnidade(nova.conv, atual.conv, destAtual, ctx) : null;
-      const preserva = voltou !== null && round2(voltou) === round2(valorAtual);
-      if (!preserva) {
-        const convertido = converterUnidade(atual.conv, nova.conv, valorAtual, ctx);
-        if (convertido !== null) this._set(nova.campo, convertido);
-      }
+    // Estudos legados ainda não têm o canônico. Ao primeiro clique, derivamo-lo
+    // do campo ativo; depois disso a badge só muda apresentação, nunca valor.
+    if (this._num(cu.campoCanonico) === null) {
+      const valorAtual = this._num(atual.campo);
+      const canonico = valorAtual === null ? null
+        : converterUnidade(atual.conv, { tipo: 'identidade' }, valorAtual, this._ctxConversao());
+      if (canonico !== null) this._set(cu.campoCanonico, canonico);
     }
     this._set(cu.modoKey, nova.valor);
+  }
+
+  private _valorUnidade(cu: CustoUnidade, op: CustoUnidade['opcoes'][number]): number | null {
+    const canonico = this._num(cu.campoCanonico);
+    if (canonico === null) return this._num(op.campo); // estudo legado, sem mutação implícita
+    return converterUnidade({ tipo: 'identidade' }, op.conv, canonico, this._ctxConversao()) ?? this._num(op.campo);
+  }
+
+  private _editarCustoUnidade(cu: CustoUnidade, op: CustoUnidade['opcoes'][number], valor: number | null) {
+    this._set(op.campo, valor);
+    if (valor === null) { this._set(cu.campoCanonico, null); return; }
+    const canonico = converterUnidade(op.conv, { tipo: 'identidade' }, valor, this._ctxConversao());
+    if (canonico !== null) this._set(cu.campoCanonico, canonico);
   }
 
   render() {
@@ -569,8 +575,9 @@ export class ViabTelaPremissas extends LitElement {
   // Campo ÚNICO com unidade (#5): rótulo em cima; abaixo, as BADGES interativas de
   // unidade (seleção mútua — só uma `?ativo` por vez) + o valor da unidade ativa,
   // como um só campo. Clicar numa badge troca `<modoKey>` → recalcula (a badge é o
-  // gatilho; a regra unidade→cálculo mora aqui). Só o campo da unidade ativa é
-  // escrito; o outro fica intocado no schema (guarda o valor daquela unidade).
+  // gatilho; a regra unidade→cálculo mora aqui). O campo canônico é a fonte de
+  // verdade; os campos históricos por unidade só dão compatibilidade a estudos
+  // sem canônico e aos consumidores que a #260 ainda migrará.
   private _custoUnidade(cu: CustoUnidade, dis: boolean): TemplateResult {
     const modo = this.form[cu.modoKey] ?? cu.padrao;
     const op = cu.opcoes.find((o) => o.valor === modo) ?? cu.opcoes[0];
@@ -590,8 +597,8 @@ export class ViabTelaPremissas extends LitElement {
               >${o.rotulo}</urbi-badge>`)}
           </div>
           <viab-num class="cu-valor" sufixo=${op.sufixo} ?desabilitado=${dis} erro=${erro}
-            .valor=${this._num(op.campo)}
-            @urbi:input-numero-change=${(e: CustomEvent) => this._set(op.campo, e.detail.valor)}
+            .valor=${this._valorUnidade(cu, op)}
+            @urbi:input-numero-change=${(e: CustomEvent) => this._editarCustoUnidade(cu, op, e.detail.valor)}
           ></viab-num>
         </div>
       </div>
