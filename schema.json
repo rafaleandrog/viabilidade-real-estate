@@ -72,8 +72,10 @@
         "permuta_financeira_nao_residencial_pct": { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
         "permuta_financeira_residencial_modo":      { "tipo": "texto", "limite": 12, "opcoes": ["pct_vgv", "valor_fixo"], "padrao": "pct_vgv" },
         "permuta_financeira_residencial_valor":     { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "permuta_financeira_residencial_valor_canonico": { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "permuta_financeira_nao_residencial_modo":  { "tipo": "texto", "limite": 12, "opcoes": ["pct_vgv", "valor_fixo"], "padrao": "pct_vgv" },
         "permuta_financeira_nao_residencial_valor": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "permuta_financeira_nao_residencial_valor_canonico": { "tipo": "decimal", "precisao": 12, "escala": 2 },
 
         "considerar_custo_terreno": { "tipo": "booleano", "padrao": true },
         "custo_terreno_m2":         { "tipo": "decimal", "precisao": 12, "escala": 2 },
@@ -82,6 +84,7 @@
         "projetos_modo":       { "tipo": "texto", "limite": 12, "opcoes": ["valor_fixo", "pct_vgv"], "padrao": "pct_vgv" },
         "projetos_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1.6 },
         "projetos_valor_fixo": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "projetos_valor_canonico": { "tipo": "decimal", "precisao": 12, "escala": 2 },
 
         "licenciamento_modo":       { "tipo": "texto", "limite": 12, "opcoes": ["valor_fixo", "pct_vgv"], "padrao": "valor_fixo" },
         "licenciamento_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2 },
@@ -90,12 +93,14 @@
         "infra_modo":       { "tipo": "texto", "limite": 12, "opcoes": ["valor_m2", "valor_fixo", "pct_vgv"], "padrao": "pct_vgv" },
         "custo_infra_m2":   { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "infra_valor_fixo": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "infra_valor_canonico": { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "infra_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 30 },
 
         "incorporacao_registro_pct": { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0.25 },
         "construcao_modo":           { "tipo": "texto", "limite": 12, "opcoes": ["valor_m2", "valor_total"], "padrao": "valor_m2" },
         "custo_construcao_m2":       { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 4800 },
         "construcao_valor_total":    { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "construcao_valor_canonico": { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "taxa_gestao_pct":           { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 6 },
         "custo_decoracao_m2":        { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 150 },
         "manutencao_pct":            { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
@@ -107,9 +112,11 @@
 
         "permuta_fisica_modo":    { "tipo": "texto", "limite": 16, "opcoes": ["area_m2", "pct_area_venda"], "padrao": "area_m2" },
         "permuta_fisica_area_m2": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "permuta_fisica_area_canonica": { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "permuta_fisica_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2 },
         "permuta_fisica_nr_modo":    { "tipo": "texto", "limite": 16, "opcoes": ["area_m2", "pct_area_venda"], "padrao": "area_m2" },
         "permuta_fisica_nr_area_m2": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "permuta_fisica_nr_area_canonica": { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "permuta_fisica_nr_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2 },
 
         "sensibilidade_variacao_positiva_pct": { "tipo": "decimal", "precisao": 5, "escala": 2 },
@@ -329,6 +336,7 @@
         "categoria":         { "tipo": "texto", "limite": 100 },
         "subcategoria":      { "tipo": "texto", "limite": 100 },
         "orcamento_valor":   { "tipo": "decimal", "precisao": 15, "escala": 2 },
+        "orcamento_valor_canonico": { "tipo": "decimal", "precisao": 15, "escala": 2 },
         "orcamento_unidade": { "tipo": "texto", "limite": 20, "opcoes": ["rs", "rs_m2_priv", "rs_m2_terreno", "pct_vgv", "pct_receita", "pct_obra"], "padrao": "rs" },
         "curva_id":          { "tipo": "referencia", "tabela_ref": "avancado_curvas", "ao_deletar": "anular" },
         "cronograma_evento": { "tipo": "texto", "limite": 20, "opcoes": ["planejamento", "pre_lancamento", "obra", "pos_obra", "customizado"], "padrao": "customizado" },
