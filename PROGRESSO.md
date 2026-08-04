@@ -4,6 +4,105 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Triagem executada: 23 fechadas, 30 seguem abertas com o que falta (2026-08-03)
+
+Conferência das 53 issues **contra o código da `main`**, critério de aceite a critério de aceite.
+Relatório com evidência `arquivo:linha` por issue: `docs/triagem-issues-2026-08-03.md`.
+
+| Veredito | Qtd | Issues |
+|---|---:|---|
+| ✅ CONFIRMADA — fechada com comentário de evidência | **23** | #220–#229, #231, #244, #246, #247, #249, #253, #258, #261, #265, #267, #270, #271, #278 |
+| 🟡 PARCIAL — segue aberta, com comentário do que falta | **29** | #230, #232–#238, #240, #241, #245, #248, #252, #255–#257, #259, #260, #266, #268, #269, #272–#277, #279, #281 |
+| ⚪ NÃO É CÓDIGO — depende do autor | **1** | #264 |
+
+**Menos da metade se sustenta no código.** Fechar as 53 em bloco teria enterrado 29 pendências
+reais. Confirmado no GitHub após a execução: **31 issues abertas** (30 + a #283 nova), exatamente o
+previsto.
+
+**Achado estrutural — a #283 nasceu daqui.** Nove issues da cadeia EVI de recebíveis (#230,
+#232–#237, #240, #241) têm a matemática construída e testada, mas **não ligada ao cálculo real**.
+Não é inferência: `frontend/fluxo-caixa-motor.ts:505-511` declara que as funções "NÃO estão ligadas
+a `receitaMensalLinha`/`calcularFluxo`" e que "o motor legado continua sendo o único caminho de
+cálculo real". `pmt`, `pagamentosPrazoFixo`, `pagamentosAteMarco`, `pagamentosConcentrado`,
+`receitaBrutaSafra`, `jurosSafra`, `componentesEfetivosSafra` existem, têm teste, e **nenhum estudo
+real passa por elas**.
+
+A **#283** (`[EVI-023] ligar o motor de componentes/safras ao calcularFluxo`) foi aberta com o
+escopo, o raio de impacto (10 módulos consumidores, fixtures Calliandra a revalidar) e a
+**precondição de UI**: `frontend/tela-fluxo-receitas.ts:748+` ainda edita o modelo legado
+(`entrada`/`pct`/`parcelas`), e `ComponentePagamento` não aparece em tela nenhuma. Não implementada
+de propósito — ligar o motor muda o resultado de todo estudo existente e exige decisão de
+compatibilidade do autor.
+
+**Correção de doc pega pela triagem:** o `CLAUDE.md` afirmava que `fmtR$` usava
+`maximumFractionDigits: 0`. Falso desde `e72c111` — `viab-format.ts:14` usa 2 casas. A nota foi
+corrigida; o que resta da #281 é `exportar.ts:10` ainda ter o seu próprio formatador.
+
+**Confiabilidade da triagem:** 6 verificadores em paralelo, um por família de issues, cada um
+conferindo contra o código. **11 vereditos ✅ foram re-conferidos manualmente** antes de qualquer
+fechamento — todos bateram. Regra anti-carimbo aplicada: ✅ sem `arquivo:linha` vira 🟡.
+
+---
+
+## 53 issues implementadas continuavam abertas — faltou a keyword de fechamento (2026-08-03)
+
+**Sintoma:** o autor tinha **53 issues abertas** no GitHub descrevendo trabalho já feito, mergeado e
+declarado concluído neste arquivo e no `CLAUDE.md` — as Rodadas 5 (EVI, #220–#241) e 6 (lista de
+bugs, #244–#281) inteiras.
+
+**Causa raiz (confirmada por contagem em `origin/main`):** os commits citam a issue como **menção**,
+nunca como keyword de fechamento:
+
+```
+fix(terreno): garantir uma única linha Preço obrigatória, também em legados (#256)
+feat(financeiro): motor dos 4 instrumentos + waterfall (FIN-04+05+06+07, #273-276)
+feat(financeiro): aba Capital Stack — editor de camadas (FIN-08+09, #277+278)
+```
+
+| keyword na `main` | ocorrências | issues fechadas |
+|---|---|---|
+| `Closes #NNN` | 6 | **6** (#239, #250, #251, #254, #262, #263) |
+| `Fixes` / `Resolves` | 0 | 0 |
+| menção `(#NNN)` sem keyword | ~82 | **0** |
+
+As 6 que usaram `Closes` são exatamente as 6 que fecharam. **A falha é silenciosa** — não há erro, o
+PR mergeia, e a lista de pendências passa a mentir sobre o estado do projeto.
+
+Duas armadilhas específicas, que uma regra genérica não pega: **intervalo/composto** (`#273-276`,
+`#277+278`) não fecha nem com keyword — o GitHub exige a keyword repetida por issue; e
+`Closes #1, #2` fecha só a **#1**.
+
+**Por que a regra não pegou:** ela existe, escrita em detalhe — mas no `CLAUDE.md` do monorepo
+`urbiverso/urbiverso`. O `CLAUDE.md` **deste** repo, o único que uma sessão trabalhando no app lê,
+não dizia nada sobre fechamento de issue.
+
+**Prevenção implementada:**
+- `scripts/guard-issue-fechamento.mjs` (novo) — barra PR que cita issue sem declarar o que faz com
+  ela. Detecta menção sem keyword, intervalo/composto e keyword seguida de lista. Escape consciente
+  para citação legítima: `Sem-fechamento: #NNN <motivo>`. Não obriga a fechar — obriga a **decidir**.
+  Node puro, sem dependência, mesmo padrão do `guard-json.mjs`.
+- Job `issue-fechamento` no `.github/workflows/pr-guards.yml`, lendo corpo do PR **e** mensagens dos
+  commits (o GitHub fecha pelos dois; foi na mensagem de commit que as 53 foram citadas).
+- `CLAUDE.md` — seção nova **§ Fechamento de issue** com a tabela das formas que falham caladas, e
+  correção da § Estado do backlog, que declarava as rodadas concluídas sem dizer que as issues
+  seguiam abertas.
+
+**Verificado:** 9 casos de fixture nos dois sentidos (entrega com `Closes`, menção nua, intervalo,
+lista, `Sem-fechamento:`, `Fecha` em português, auto-referência da própria PR, PR sem issue,
+multi-keyword) · **contraprova histórica**: o guard reprova os 4 commits reais que causaram o
+problema (`4f920a6`, `bbf87eb`, `1b6eea9`, `e7d11f4`), apontando `#273-276` pelo nome.
+
+**PENDENTE — não feito nesta sessão, por decisão do autor (custo de tokens):** conferir os critérios
+de aceite das **53 issues** uma a uma contra o diff e **fechar as cumpridas**. O levantamento já
+está pronto: **todas as 53 têm commit de implementação mergeado na `main`** (mapeamento
+issue→commit feito nesta sessão), e uma amostra foi validada em profundidade (#244 →
+`montarCopiaEstudo` em `backend/rotas/estudos.ts`, com 3 testes dedicados, critérios atendidos).
+**Mas "tem commit" ≠ "critério de aceite cumprido"** — a conferência real continua devendo. Duas
+exceções já conhecidas: a **#254** (epic de rastreio, sem diff próprio) já fechou, e a **#264** tem
+critério de aceite que não é código (confirmação da versão publicada na instância).
+
+---
+
 ## Release v0.1.19 reprovada na instalação — comentário `//` no `schema.json` (2026-08-03)
 
 **Sintoma:** o modal "Atualizar Estudo de Viabilidade" mostrava `v0.1.19_b57117c` (rótulos

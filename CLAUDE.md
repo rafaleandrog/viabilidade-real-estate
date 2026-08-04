@@ -46,6 +46,26 @@ fecharam com diff; item 16 (#238) e item 24 (#239) já eram issues compartilhada
 **Todas as 59 issues distintas das duas rodadas estão mergeadas na `main`**, exceto duas cujo
 critério de aceite não é código:
 
+> 🔴 **Esta afirmação era enganosa e foi corrigida pela triagem de 2026-08-03.** 53 issues estavam
+> abertas no GitHub porque os commits citaram `(#256)`, `(#273-276)` em vez de `Closes #NNN`
+> (prevenção agora no lugar: § Fechamento de issue + guard no CI). Mas a conferência dos critérios
+> de aceite contra o **código** revelou algo pior que a keyword faltando:
+>
+> | Veredito | Qtd |
+> |---|---:|
+> | ✅ confirmada e **fechada** | 23 |
+> | 🟡 **parcial — segue aberta** | 29 |
+> | ⚪ depende do autor (#264) | 1 |
+>
+> **Menos da metade das duas rodadas se sustenta no código.** "Mergeado" nunca significou
+> "entregue". Cada issue aberta tem comentário dizendo o que falta; a tabela completa, com evidência
+> `arquivo:linha`, está em **`docs/triagem-issues-2026-08-03.md`**.
+>
+> O maior buraco: nove issues da cadeia EVI de recebíveis (#230, #232–#237, #240, #241) têm a
+> matemática pronta e testada, mas **não ligada a `calcularFluxo`** — o próprio motor declara isso
+> em `frontend/fluxo-caixa-motor.ts:505-511`. A integração virou a **#283**, e ela é precondição
+> das nove.
+
 - **#254** (epic de rastreio) — fecha porque #220, #221, #227–#237, #240 e #241 (suas executoras)
   já fecharam com diff; não tem diff próprio.
 - **#264** (`fix(cenarios)` confirmar as duas séries e decidir o estado 0%) — o código já mostra as
@@ -93,6 +113,35 @@ histórico completo está no `git log` e no `PROGRESSO.md`.
 > atualize esta seção junto — e quem a encerrar faz o mesmo, na mesma alteração. A Rodada 4 nasceu
 > porque #165–#169 ficaram abertas uma rodada inteira sem ninguém perceber, com este arquivo dizendo
 > "não há issue aberta".
+
+### Fechamento de issue — `Closes #123`, sempre em inglês
+
+> ⚠️ **Só keyword em inglês fecha issue.** O GitHub vincula PR→issue exclusivamente por
+> `close`/`closes`/`closed`, `fix`/`fixes`/`fixed`, `resolve`/`resolves`/`resolved` (maiúsculas
+> indiferentes), e **só no corpo do PR ou na mensagem do commit — nunca no título**.
+
+Quatro formas que falham **caladas** — sem erro, o PR mergeia, a issue fica aberta:
+
+| Escrito | Fecha? |
+|---|---|
+| `Closes #244` no corpo do PR | ✅ |
+| `(#244)` no assunto do commit — **só menção** | ❌ |
+| `Fecha #244` (português) | ❌ |
+| `Closes #273-276` / `#277+278` (intervalo/composto) | ❌ |
+| `Closes #1, #2` — fecha só a **#1** | ⚠️ parcial |
+
+Repita a keyword por issue: `closes #273, closes #274, closes #275`. **Depois de mergear, confira
+que a issue fechou** em vez de assumir.
+
+> **Por que esta seção existe:** em 2026-08-03 o autor tinha **53 issues abertas** descrevendo
+> trabalho já implementado e mergeado — as Rodadas 5 e 6 inteiras. Os commits citavam a issue como
+> `(#256)` ou `(FIN-04+05+06+07, #273-276)`. Na `main`, 6 commits usaram `Closes` e são exatamente
+> as 6 issues que fecharam; as outras ~82 menções fecharam zero. A regra existia — mas no
+> `CLAUDE.md` do monorepo `urbiverso/urbiverso`, que sessão deste repo não lê. Ver `PROGRESSO.md`.
+
+O guard `scripts/guard-issue-fechamento.mjs` (job `issue-fechamento` no `pr-guards.yml`) barra PR
+que cita issue sem declarar o que faz com ela. Para citar sem fechar (epic, contexto, "ver #260"),
+declare no corpo: `Sem-fechamento: #NNN <motivo>` — o guard não obriga a fechar, obriga a **decidir**.
 
 ### Merge
 
@@ -209,11 +258,13 @@ Git Bash — ver PROGRESSO).
   no motor. Representações derivadas **não monetárias** (% e R$/m²) carregam **precisão plena**
   internamente e arredondam **só para exibir**; nunca são persistidas arredondadas. Decisão do autor
   em 2026-08-01; é o contrato que fecha a #259 e dá regra às #260 e #281.
-  > ⚠️ Hoje o app **viola** isso: `fmtR$` usa `maximumFractionDigits: 0`
-  > (`frontend/viab-format.ts:8`, 53 usos em 11 telas) e o Orçamento de Custos em `rs` aceita só
-  > inteiro (`frontend/tela-fluxo-custos.ts:638,873-875`) — enquanto `frontend/exportar.ts:9` já usa
-  > `toFixed(2)`. **Tela e exportação mostram números diferentes.** Corrigir é a #281, não faça
-  > pontualmente.
+  > ⚠️ **Parcialmente resolvido — o texto anterior desta nota estava vencido** (dizia que `fmtR$`
+  > usava `maximumFractionDigits: 0`, o que deixou de ser verdade e ninguém atualizou; foi pego na
+  > triagem de 2026-08-03). Hoje `frontend/viab-format.ts:14` já usa 2 casas, e o Orçamento de
+  > Custos em `rs` também (`frontend/tela-fluxo-custos.ts:673,933`). **O que ainda falta** é
+  > `frontend/exportar.ts:10` deixar de definir o seu próprio `const R$ = v.toFixed(2)`: enquanto
+  > houver duas fontes de formatação, tela e exportação podem divergir de novo. Continua sendo a
+  > #281 — não corrija pontualmente.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa
