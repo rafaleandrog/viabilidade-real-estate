@@ -37,7 +37,7 @@ Todas as tabelas usam `acesso_externo: "restrito"` — a escrita passa pelas rot
 
 **Absorção (`avancado_fases.absorcao`)** — só o modo **Distribuído** em 3 períodos (Lote 6 · #20): `blocos: [{evento:'lancamento',pct}, {evento:'obra',pct}, {evento:'pos_obra',pct}]`. O período 1 (`lancamento`) cobre **Pré-lançamento + Lançamento**; o Pós-obra é **derivado** (`100 − p1 − p2`) e seu período vem do Cronograma.
 
-**Fluxo de Pagamento (`avancado_fases.fluxo_pagamento`)** — `comissao`, `ret`, **`entrada` e `parcelas` como LISTAS** de linhas (Lote 6 · #20), e `repasse: { apos_entrega_meses }`. O `%` do Repasse é **derivado** (`100 − Σentrada − Σparcelas`), não persistido.
+**Fluxo de Pagamento (`avancado_fases.fluxo_pagamento`)** — o JSON legado mantém `comissao`, `ret`, **`entrada` e `parcelas` como LISTAS** de linhas (Lote 6 · #20), e `repasse: { apos_entrega_meses }`; nele, o `%` do Repasse é **derivado** (`100 − Σentrada − Σparcelas`), não persistido. Desde a #230, o mesmo campo também aceita o contrato canônico opt-in `componentes`: lista não vazia dos tipos `imediato`, `prazo_fixo`, `ate_marco` ou `concentrado`, cujas `participacaoPct` fecham 100%. A leitura legada segue preservada por adaptador até o motor por safras passar a consumir os componentes (#283).
 
 Integridade (Lote 6 · #19): excluir uma tipologia do catálogo com alocações é **bloqueado** (422 `TIPOLOGIA_EM_USO`); editar nome/área reflete ao vivo nas alocações (a alocação guarda só unidades + preço).
 
@@ -54,7 +54,7 @@ a unidade financeira elementar do fluxo avançado **não é o mês**, e sim a **
 | Conceito | O que precisa ser representado |
 |---|---|
 | **Safra** | Contratos originados no mesmo `mês × Grupo × alocação × componente`. É a chave econômica mínima; hoje não existe entidade equivalente |
-| **Componente de pagamento** | Regra que converte parte do contrato em recebimentos. Quatro tipos: **imediato**, **prazo fixo**, **até marco**, **concentrado em marco**. Hoje o `fluxo_pagamento` guarda `entrada` e `parcelas` como listas sem semântica temporal |
+| **Componente de pagamento** | Regra que converte parte do contrato em recebimentos. Quatro tipos: **imediato**, **prazo fixo**, **até marco**, **concentrado em marco**. O contrato já pode ser persistido em `fluxo_pagamento.componentes`; o motor por safras ainda será conectado na #283 |
 | **Bruto / desconto / líquido** | Três séries mensais separadas por Grupo e tipologia. Hoje existe uma única série derivada do VGV, e o desconto comercial não existe |
 | **Primeiro vencimento** | Defasagem configurável, com padrão `s + 1`. Hoje não há campo — as parcelas partem do mês da venda ou do cronograma da Obra |
 | **Prazo fixo** | `N` fixo por componente, contado a partir de cada safra (36, 120, outros) |

@@ -7,7 +7,6 @@ import { rotuloMesRelativo } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
 
-const R$ = (v: number) => v.toFixed(2).replace('.', ',');
 const pct1 = (v: number) => v.toFixed(1).replace('.', ',');
 
 function baixar(nome: string, conteudo: string, mime: string) {
@@ -71,7 +70,7 @@ export function exportarExcel(estudo: any, p: Proforma, lot: boolean) {
   rows.push('Linha;R$;% VGV');
   for (const r of linhas) {
     const pct = p.vgv > 0 ? pct1(Math.abs(r.v) / p.vgv * 100) : '';
-    rows.push(`${r.l};${R$(r.v)};${pct}`);
+    rows.push(`${r.l};${fmtR$(r.v, false)};${pct}`);
   }
   rows.push('');
   rows.push(`Margem líquida (%);${pct1(p.margemLiquidaPct)}`);
@@ -273,23 +272,23 @@ export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string |
       indent + l.nome,
       l.duracao ? rotuloMesRelativo(dataInicio, l.inicio!) : '',
       l.duracao ? `${l.duracao}m` : '',
-      R$(l.total),
-      l.vpl !== undefined ? R$(l.vpl) : '',
+      fmtR$(l.total, false),
+      l.vpl !== undefined ? fmtR$(l.vpl, false) : '',
       l.pctVgv !== undefined ? pct1(l.pctVgv) : '',
-      ...l.mensal.map((v) => (Math.abs(v) < 0.005 ? '' : R$(v))),
+      ...l.mensal.map((v) => (Math.abs(v) < 0.005 ? '' : fmtR$(v, false))),
     ].join(';'));
   }
   rows.push('');
   rows.push(`TIR (% a.a.);${c.tir === null ? '' : pct1(c.tir)}`);
-  rows.push(`VPL;${R$(c.vpl)}`);
+  rows.push(`VPL;${fmtR$(c.vpl, false)}`);
   rows.push(`Payback;${c.paybackData ?? ''}`);
-  rows.push(`Exposição Máxima;${R$(c.exposicaoMaxima)}`);
+  rows.push(`Exposição Máxima;${fmtR$(c.exposicaoMaxima, false)}`);
   // #241: as três grandezas de contratação (#227/#229) — mesmo cálculo-base
   // da tela (tooltip do KPI "VGV Vendável", fluxo-tabela.ts), nunca antes
   // exportadas.
-  rows.push(`Venda Bruta Contratada;${R$(c.vendaBrutaContratada)}`);
-  rows.push(`Desconto Comercial;${R$(c.descontoComercial)}`);
-  rows.push(`Venda Líquida Contratada;${R$(c.vendaLiquidaContratada)}`);
+  rows.push(`Venda Bruta Contratada;${fmtR$(c.vendaBrutaContratada, false)}`);
+  rows.push(`Desconto Comercial;${fmtR$(c.descontoComercial, false)}`);
+  rows.push(`Venda Líquida Contratada;${fmtR$(c.vendaLiquidaContratada, false)}`);
   const nome = (estudo.id_legivel || 'estudo') + '_fluxo-caixa.csv';
   baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
 }
@@ -365,8 +364,8 @@ export function exportarFluxoPDF(
     <div class="kpis">${kpis.map(([r, v]) => `<div class="kpi"><div class="r">${r}</div><div class="v">${v}</div></div>`).join('')}</div>`;
 
   const fmtCel = (v: number, custo: boolean) => {
-    if (!v || Math.abs(v) < 0.5) return '';
-    const abs = Math.round(Math.abs(v)).toLocaleString('pt-BR');
+    if (!v || Math.abs(v) < 0.005) return '';
+    const abs = fmtR$(Math.abs(v), false);
     return custo || v < 0 ? `(${abs})` : abs;
   };
 

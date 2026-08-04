@@ -5,13 +5,22 @@
 //   - fmtPct       → valor CALCULADO: uma casa decimal ("xx,x%").
 //   - fmtPctEntrada→ valor de ENTRADA/config: duas casas decimais ("xx,xx%").
 //
-// #281: R$ sempre com 2 casas decimais — contrato C7 (decisão do autor,
-// 2026-08-01: "todo valor monetário resultado de fórmula tem 2 casas
-// decimais... na apresentação"). Antes eram 0 casas aqui e 2 em
-// `exportar.ts:9` — o mesmo estudo mostrava números diferentes em tela e em
-// CSV/PDF.
-export const fmtR$ = (v: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
+// #281: todo valor monetário tem 2 casas decimais — contrato C7. A mesma
+// função atende tela/PDF (com símbolo) e CSV (sem símbolo, pois o cabeçalho
+// já informa R$), evitando uma segunda regra de arredondamento na exportação.
+export const CASAS_DECIMAIS_MONETARIAS = 2;
+
+export function fmtR$(v: number, comSimbolo = true): string {
+  const opcoes: Intl.NumberFormatOptions = {
+    minimumFractionDigits: CASAS_DECIMAIS_MONETARIAS,
+    maximumFractionDigits: CASAS_DECIMAIS_MONETARIAS,
+  };
+  if (comSimbolo) {
+    opcoes.style = 'currency';
+    opcoes.currency = 'BRL';
+  }
+  return new Intl.NumberFormat('pt-BR', opcoes).format(v || 0);
+}
 export const fmtNum = (v: number, d = 0) =>
   new Intl.NumberFormat('pt-BR', { maximumFractionDigits: d }).format(v || 0);
 

@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$ } from './viab-format.js';
+import { CASAS_DECIMAIS_MONETARIAS, fmtR$ } from './viab-format.js';
 import {
   rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   CATEGORIA_CONSTRUCAO, eConstrucao, regimeCronogramaLinha,
@@ -663,10 +663,10 @@ export class ViabFluxoCustos extends LitElement {
                 </span>
               ` : nothing}
               <viab-num ?desabilitado=${dis}
-                casas-decimais=${modo.startsWith('rs_m2') ? '0' : '2'}
-                casas-minimas=${modo.startsWith('rs_m2') ? '0' : '2'}
-                .valor=${c.orcamento_valor !== null && c.orcamento_valor !== undefined ? Number(c.orcamento_valor) : null}
-                @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { orcamento_valor: e.detail.valor })}
+                casas-decimais=${String(CASAS_DECIMAIS_MONETARIAS)}
+                casas-minimas=${String(CASAS_DECIMAIS_MONETARIAS)}
+                .valor=${this._valorExibido(c)}
+                @urbi:input-numero-change=${(e: CustomEvent) => this._editarOrcamento(c, e.detail.valor)}
               ></viab-num>
             </span>`;
         },
@@ -910,33 +910,38 @@ export class ViabFluxoCustos extends LitElement {
     this._salvar(c, dados);
   }
 
-  // Casas decimais da unidade (padrão de exibição/entrada do `viab-num`): % com 2
-  // casas (#117); R$ (`rs`, valor canônico monetário, #281/C7) também com 2;
-  // R$/m² permanece inteiro (representação derivada, sem o contrato de
-  // precisão de resultado). Usado para arredondar o valor convertido à MESMA
-  // precisão em que ele será exibido e digitado — evita guardar dígitos
-  // ocultos numa unidade mais grosseira e mantém o round-trip estável (#119).
-  private _casasUnidade(unidade: string): number {
-    return unidade.startsWith('rs_m2') ? 0 : 2;
+  private _valorCanonico(c: any): number | null {
+    const salvo = c.orcamento_valor_canonico;
+    if (salvo !== null && salvo !== undefined && Number.isFinite(Number(salvo))) return Number(salvo);
+    const valor = c.orcamento_valor;
+    if (valor === null || valor === undefined || !Number.isFinite(Number(valor))) return null;
+    return converterUnidade(CONV_UNIDADE[c.orcamento_unidade || 'rs'], CONV_UNIDADE.rs, Number(valor), this._ctxConversao());
   }
 
-  // Troca a unidade de orçamento por badge (padrão do Preliminar): converte o
-  // valor atual para a unidade nova (equivalente) e persiste unidade+valor num
-  // só PATCH. Base indefinida (grandeza 0) ou valor vazio → só troca a unidade.
-  // O valor convertido é arredondado à precisão de exibição da unidade de destino
-  // (mesma regra de arredondamento das Premissas — #119).
+  private _valorExibido(c: any): number | null {
+    const canonico = this._valorCanonico(c);
+    if (canonico === null) return null;
+    return converterUnidade(CONV_UNIDADE.rs, CONV_UNIDADE[c.orcamento_unidade || 'rs'], canonico, this._ctxConversao());
+  }
+
+  private _editarOrcamento(c: any, valor: number | null) {
+    const unidade = c.orcamento_unidade || 'rs';
+    const canonico = valor === null ? null
+      : converterUnidade(CONV_UNIDADE[unidade], CONV_UNIDADE.rs, Number(valor), this._ctxConversao());
+    // O campo antigo acompanha somente uma edição consciente; a badge não o toca.
+    this._salvar(c, { orcamento_valor: valor, orcamento_valor_canonico: canonico });
+  }
+
+  // A badge só troca a unidade de apresentação. Para linhas legadas, inicializa
+  // o canônico uma vez a partir do valor ativo, sem alterar o orçamento legado.
   private _trocarUnidade(c: any, nova: string) {
     if (!this.editavel) return;
     const atual = c.orcamento_unidade || 'rs';
     if (nova === atual) return;
     const dados: Record<string, any> = { orcamento_unidade: nova };
-    const valorAtual = c.orcamento_valor !== null && c.orcamento_valor !== undefined ? Number(c.orcamento_valor) : null;
-    if (valorAtual !== null && Number.isFinite(valorAtual)) {
-      const convertido = converterUnidade(CONV_UNIDADE[atual], CONV_UNIDADE[nova], valorAtual, this._ctxConversao());
-      if (convertido !== null) {
-        const f = Math.pow(10, this._casasUnidade(nova));
-        dados.orcamento_valor = Math.round(convertido * f) / f;
-      }
+    if (c.orcamento_valor_canonico === null || c.orcamento_valor_canonico === undefined) {
+      const canonico = this._valorCanonico(c);
+      if (canonico !== null) dados.orcamento_valor_canonico = canonico;
     }
     this._salvar(c, dados);
   }

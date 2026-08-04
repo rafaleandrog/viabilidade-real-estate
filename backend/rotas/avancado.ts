@@ -216,6 +216,34 @@ export function validarAbsorcao(a: any): string | null {
 export function validarFluxoPagamento(fp: any): string | null {
   if (fp === null || fp === undefined) return null; // ausente = default
   if (typeof fp !== 'object') return 'fluxo_pagamento deve ser um objeto';
+  // #230: o contrato novo é opt-in (`componentes`). O JSON legado continua
+  // aceito sem reinterpretação; a soma de 100% só é obrigatória no shape novo.
+  if (fp.componentes !== undefined) {
+    if (!Array.isArray(fp.componentes) || fp.componentes.length === 0) {
+      return 'fluxo_pagamento.componentes deve ser uma lista não vazia';
+    }
+    const tipos = ['imediato', 'prazo_fixo', 'ate_marco', 'concentrado'];
+    let soma = 0;
+    for (const c of fp.componentes) {
+      if (!c || typeof c !== 'object' || !tipos.includes(c.tipo)) return 'componente de pagamento tem tipo inválido';
+      const pct = Number(c.participacaoPct);
+      if (!Number.isFinite(pct) || pct < 0 || pct > 100) return 'participacaoPct deve ser um percentual entre 0 e 100';
+      soma += pct;
+      if (c.tipo === 'prazo_fixo'
+        && (!Number.isInteger(Number(c.prazoMeses)) || Number(c.prazoMeses) < 1)) {
+        return 'prazo_fixo requer prazoMeses inteiro maior que zero';
+      }
+      if (c.tipo === 'ate_marco'
+        && (!Number.isInteger(Number(c.marcoMes)) || Number(c.marcoMes) < 0)) {
+        return 'ate_marco requer marcoMes inteiro não negativo';
+      }
+      if (c.tipo === 'concentrado' && (!Number.isInteger(Number(c.mesPagamento)) || Number(c.mesPagamento) < 0)) {
+        return 'concentrado requer mesPagamento inteiro não negativo';
+      }
+    }
+    if (Math.abs(soma - 100) > 0.01) return `a soma dos componentes deve ser 100% (atual: ${soma.toFixed(2)}%)`;
+    return null;
+  }
   for (const chave of ['entrada', 'parcelas']) {
     const v = fp[chave];
     if (v !== undefined && v !== null && !Array.isArray(v) && typeof v !== 'object') {
@@ -1116,7 +1144,7 @@ rotasAvancado.get('/estudos/:id/avancado/custos', async (req: Request, res: Resp
 // (ADR: nunca derivado — ver docs/viabilidade/padrao-incorporacao.md §15.1).
 // #238: permuta_financeira_base escolhe qual visão (bruta/líquida, §15.2)
 // alimenta o fluxo para a linha de Preço/Permuta financeira.
-const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo', 'permuta_tipologia_id', 'permuta_quantidade', 'permuta_financeira_base'];
+const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_valor_canonico', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo', 'permuta_tipologia_id', 'permuta_quantidade', 'permuta_financeira_base'];
 const BASES_PERMUTA_FINANCEIRA = ['bruta', 'liquida'];
 
 // #257: as quatro subcategorias CANÔNICAS da linha `terreno`/`Preço`. Mesma

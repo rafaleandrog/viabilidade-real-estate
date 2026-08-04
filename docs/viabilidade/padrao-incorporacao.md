@@ -1010,11 +1010,14 @@ A incidência de juros no mês da contratação precisa ser um parâmetro explí
 
 O JSON `fluxo_pagamento` guarda:
 
+- opcionalmente, `componentes`: plano canônico de pagamento com participações que fecham 100%;
 - `comissao`;
 - `ret`;
 - listas de `entrada`;
 - listas de `parcelas`;
 - `repasse.apos_entrega_meses`.
+
+Quando `componentes` está ausente, o app preserva a leitura do formato legado por adaptador. Nesta etapa, o cálculo instalado ainda lê o formato legado; a adoção do contrato canônico pelo motor por safras é responsabilidade da #283.
 
 `receitaMensalLinha`, em `frontend/fluxo-caixa-motor.ts`, rateia nominalmente o valor. Não existem:
 
@@ -2799,13 +2802,10 @@ Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescre
 reclassifica linhas financeiras como físicas, remove a dedução de caixa e conta a permuta física em
 dobro. → **#257**, **#258**.
 
-**A11 — O valor exibido é o valor persistido.** Nos campos multiunidade, trocar o badge grava a
-conversão arredondada — a troca de representação altera a premissa. São **duas arquiteturas**: as
-Premissas guardam um campo por unidade e têm uma heurística de round-trip (#119,
-`frontend/tela-premissas.ts:334-358`) que falha quando o campo companheiro está dessincronizado;
-Custos guarda **um** `orcamento_valor` + `orcamento_unidade` e arredonda à precisão de exibição a
-cada clique (`frontend/tela-fluxo-custos.ts:873-875,882-896`), sem preservação nenhuma. Um contrato
-canônico precisa cobrir as duas. → **#259**, consumido por **#260**.
+**A11 — valor canônico multiunidade (#259).** Premissas persistem `*_canonico` e Custos do
+Avançado persistem `orcamento_valor_canonico`. A badge altera apenas a unidade exibida; editar o
+valor visível recalcula o canônico uma vez. Registros antigos mantêm seu valor econômico até a
+primeira edição. A #260 migra todos os demais consumidores para o resolver canônico.
 
 > ✅ **A regra que fecha esta armadilha existe desde 2026-08-01** (convenção **C7**, Anexo A): o
 > canônico é o **valor monetário a 2 casas**; `%` e `R$/m²` são derivados, com precisão plena

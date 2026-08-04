@@ -16,6 +16,16 @@ import {
   type LinhaCronograma,
 } from './avancado.js';
 
+test('#230: contrato canônico exige componentes válidos fechando 100%', () => {
+  assert.equal(validarFluxoPagamento({ componentes: [
+    { tipo: 'imediato', participacaoPct: 20 },
+    { tipo: 'prazo_fixo', participacaoPct: 80, prazoMeses: 36 },
+  ] }), null);
+  assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'imediato', participacaoPct: 90 }] })!, /100%/);
+  assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'desconhecido', participacaoPct: 100 }] })!, /tipo inválido/);
+  assert.match(validarFluxoPagamento({ componentes: [{ tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 0 }] })!, /prazoMeses/);
+});
+
 // ── Cronograma: travamento (spec Etapa 1/3) ──
 
 test('cronograma padrão tem os 5 eventos com travados coerentes', () => {

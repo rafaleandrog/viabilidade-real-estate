@@ -369,6 +369,9 @@ export function areaPrivativaTotalLinhas(linhas: any[]): number {
 
 /** Converte o orçamento de uma linha de custo para R$ absolutos. */
 export function resolverCustoTotal(custo: any, ctx: ContextoCusto): number {
+  // #259: para linhas já convertidas, R$ canônico independe da unidade exibida.
+  if (custo?.orcamento_valor_canonico !== null && custo?.orcamento_valor_canonico !== undefined
+    && Number.isFinite(Number(custo.orcamento_valor_canonico))) return n(custo.orcamento_valor_canonico);
   const valor = n(custo?.orcamento_valor);
   switch (custo?.orcamento_unidade) {
     case 'rs_m2_priv': return valor * n(ctx.areaPrivativaTotal);

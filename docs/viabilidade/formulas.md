@@ -87,15 +87,14 @@ cliente, ainda que o caixa alimente cash sweep.
 
 ## Valor canônico dos campos multiunidade
 
-> ⚠️ **Comportamento vigente defeituoso, com issue aberta.** Nos campos com badge de unidade, o
-> **valor exibido é o valor persistido**: trocar o badge grava a conversão arredondada, e a troca de
-> representação altera a premissa.
+**ADR #259 — valor canônico (implementado).** Todo campo multiunidade guarda uma quantidade
+canônica: R$ a duas casas para custos e permutas financeiras; m² a duas casas para permuta física.
+A unidade exibida é apresentação. Alternar a badge não regrava uma conversão. Estudos antigos
+permanecem legíveis: seu valor ativo é adotado como canônico apenas na primeira interação deliberada.
 
-`converterUnidade` arredonda a 2 casas (`frontend/premissas-conversao.ts:50-58`). As Premissas
-mitigam isso com uma heurística de round-trip (#119, `frontend/tela-premissas.ts:334-358`) que
-depende de haver **um campo persistido por unidade**; Custos do Avançado guarda **um único**
-`orcamento_valor` + `orcamento_unidade` e arredonda à precisão de exibição a cada clique
-(`frontend/tela-fluxo-custos.ts:873-875,882-896`), sem preservação.
+No Preliminar, os novos campos `*_canonico` coexistem com os campos legados por unidade. No
+Avançado, `orcamento_valor_canonico` coexiste com `orcamento_valor` + `orcamento_unidade`; o
+resolver já prefere o canônico. A migração dos demais consumidores é a #260.
 
 **Modelo funcional de referência:** cada premissa multiunidade tem uma quantidade econômica
 **canônica**; a unidade exibida é apresentação. Toda fórmula — Proforma, Fluxo, Resumo, benchmarks,
@@ -117,11 +116,9 @@ canônico (R$, 2 casas)  ──derivação exata──▶  % do VGV, R$/m²   (e
         └──────── só muda por edição deliberada ───────┘
 ```
 
-Consequência prática, e a razão de o defeito existir: hoje `converterUnidade` arredonda **tudo** a 2
-casas (`frontend/premissas-conversao.ts:50-58`), **inclusive o percentual**, e o resultado é
-persistido. Foi assim que R$ 10.000.000 voltou como R$ 9.999.998,76 depois de passar por 12,09% — o
-percentual perdeu precisão e virou fonte. Sob C7, o percentual não é monetário e **não** deve ser
-quantizado; quem se quantiza é o R$.
+`converterUnidade` quantiza somente o destino de identidade (R$ ou m²). Percentuais e R$/m² seguem
+com precisão plena até a apresentação. Assim, R$ 10.000.000 pode atravessar uma porcentagem com
+dízima e retornar exatamente ao mesmo canônico.
 
 **Estado de conformidade, conferido:**
 
