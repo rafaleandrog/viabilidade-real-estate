@@ -6,16 +6,27 @@ import './viab-num.js';
 
 // Sub-aba "Viabilidade → Financeiro" (nível Avançado · Lote 7 · #22).
 //
-// Parâmetros financeiros do estudo, organizados em 5 seções roláveis
-// (urbi-card empilhados — a alternativa que o próprio issue sugeriu ao 3º nível
-// de aba): Estrutura · Custos Financeiros · Juros · Taxas e Impostos ·
-// Financiamento & Investidores.
+// Parâmetros financeiros do estudo: Custos Financeiros · Taxas e Impostos.
 //
-// ⚠️ ESCOPO (decisão do autor, Lote 7): "só persistir + realocar existentes".
-// Estes campos são gravados/exibidos mas NÃO entram em nenhuma fórmula agora —
-// o motor (proforma/fluxo) segue lendo exatamente os mesmos campos de antes.
-// Isso é o que garante que nada de cálculo muda. A entrada dos juros/
-// financiamento no fluxo de caixa é um passo futuro (spec de motor à parte).
+// #279 — CONTRATO ATUAL: todo controle desta tela tem efeito. O escopo original
+// (Lote 7) era "só persistir + realocar", e a tela acumulou campos que nenhum
+// motor lia; a #239 (Capital Stack) substituiu o modelo, e esta issue fecha o
+// critério mais duro dela — "nenhum campo da aba Financeiro permanece inerte".
+//
+// Saíram da interface 9 controles sem consumidor: `taxa_juros_valor_futuro_aa`
+// (esvaziou o card "Estrutura"); `tarifas_bancarias_pct`,
+// `taxa_adm_carteira_pct`, `taxa_estruturacao_divida_pct` e
+// `taxa_gerenciamento_obra_pct` (Custos Financeiros); `juros_financeiros_aa`,
+// `juros_inicio_cobranca_mes`, `indice_correcao` e `indice_correcao_taxa_aa`
+// (esvaziaram o card "Juros"). Estrutura de capital, financiamento e juros de
+// dívida agora vivem no Capital Stack, com aporte e liberação mês a mês.
+//
+// ⚠️ As COLUNAS permanecem no schema e o dado histórico está intacto — a
+// remoção física é issue própria, e esta tela simplesmente deixou de escrevê-las
+// (saíram de CAMPOS_NUM e da lista de `_salvar`). Nada foi apagado.
+//
+// Os `aliquota_*` continuam na tela mesmo sem consumidor: são campos de regime
+// tributário, escopo declarado da #228, e fora do escopo desta issue.
 //
 // Campos REALOCADOS de outras telas (mesma coluna do schema, sem duplicar dado):
 //  · `taxa_desconto_aa`  → editor mora aqui (removido do Cronograma no Lote 4;
@@ -27,15 +38,6 @@ import './viab-num.js';
 
 type Op = { valor: string; rotulo: string };
 
-const OPT_INDICE: Op[] = [
-  { valor: 'nenhum', rotulo: 'Nenhum' },
-  { valor: 'incc', rotulo: 'INCC' },
-  { valor: 'ipca', rotulo: 'IPCA' },
-  { valor: 'igpm', rotulo: 'IGP-M' },
-  { valor: 'cdi', rotulo: 'CDI' },
-  { valor: 'tr', rotulo: 'TR' },
-  { valor: 'inpc', rotulo: 'INPC' },
-];
 const OPT_REGIME: Op[] = [
   { valor: 'ret', rotulo: 'RET (patrimônio de afetação)' },
   { valor: 'lucro_presumido', rotulo: 'Lucro Presumido' },
@@ -54,15 +56,10 @@ const OPT_REGIME: Op[] = [
 // fluxo-caixa-motor.ts, fluxo-shared.ts, proforma.ts).
 const CAMPOS_NUM: string[] = [
   'taxa_desconto_aa',
-  'taxa_juros_valor_futuro_aa',
-  'tarifas_bancarias_pct', 'taxa_adm_carteira_pct', 'taxa_estruturacao_divida_pct', 'taxa_gerenciamento_obra_pct',
-  'juros_financeiros_aa', 'juros_inicio_cobranca_mes', 'indice_correcao_taxa_aa',
   'aliquota_pis_pct', 'aliquota_cofins_pct', 'aliquota_csll_pct', 'aliquota_irpj_pct', 'aliquota_itbi_pct',
   'imposto_percentual',
 ];
 const NUM = new Set(CAMPOS_NUM);
-// Inteiros (meses/parcelas) — viab-num com 0 casas decimais.
-const INTEIROS = new Set(['juros_inicio_cobranca_mes']);
 
 @customElement('viab-tela-financeiro')
 export class ViabTelaFinanceiro extends LitElement {
@@ -133,7 +130,7 @@ export class ViabTelaFinanceiro extends LitElement {
     return html`<viab-num
       class=${w}
       label=${label} sufixo=${sufixo} ?desabilitado=${dis}
-      casas-decimais=${INTEIROS.has(k) ? 0 : 2}
+      casas-decimais="2"
       .valor=${this._num(k)}
       @urbi:input-numero-change=${(e: CustomEvent) => this._set(k, e.detail.valor)}
     ></viab-num>`;
@@ -163,41 +160,10 @@ export class ViabTelaFinanceiro extends LitElement {
         <strong>Capital Stack</strong> — camadas com aporte, liberação e retorno mês a mês, em vez de
         percentuais informativos soltos.
       </urbi-banner>
-      <urbi-card titulo="Estrutura">
-        <div class="secao">
-          <h4>Parâmetro base</h4>
-          <div class="grid">
-            ${this._n('taxa_juros_valor_futuro_aa', 'Taxa de juros p/ valor futuro', '% a.a.', dis)}
-          </div>
-        </div>
-      </urbi-card>
-
       <urbi-card titulo="Custos Financeiros">
         <p class="dica">Valor presente e despesas financeiras paramétricas. Linhas manuais de custo financeiro seguem em Obra → Financeiro.</p>
         <div class="grid">
           ${this._n('taxa_desconto_aa', 'Taxa de desconto p/ VP', '% a.a.', dis)}
-          ${this._n('tarifas_bancarias_pct', 'Tarifas bancárias', '% / receita', dis)}
-          ${this._n('taxa_adm_carteira_pct', 'Taxa de adm. da carteira', '% / receita', dis)}
-          ${this._n('taxa_estruturacao_divida_pct', 'Estruturação da dívida', '% financ.', dis)}
-          ${this._n('taxa_gerenciamento_obra_pct', 'Taxa de gerenciamento', '% / obra', dis)}
-        </div>
-      </urbi-card>
-
-      <urbi-card titulo="Juros">
-        <div class="secao">
-          <h4>Juros financeiros</h4>
-          <div class="grid">
-            ${this._n('juros_financeiros_aa', 'Taxa de juros', '% a.a.', dis)}
-            ${this._n('juros_inicio_cobranca_mes', 'Início da cobrança', 'mês', dis)}
-          </div>
-        </div>
-        <div class="secao" style="margin-top:16px">
-          <h4>Correção / Indexação</h4>
-          <p class="dica">Dois fatores: o índice de correção e uma taxa (% a.a.) informada pelo usuário.</p>
-          <div class="grid">
-            ${this._s('indice_correcao', 'Índice de correção', OPT_INDICE, 'nenhum', dis)}
-            ${this._n('indice_correcao_taxa_aa', 'Taxa de correção', '% a.a.', dis)}
-          </div>
         </div>
       </urbi-card>
 
@@ -245,7 +211,7 @@ export class ViabTelaFinanceiro extends LitElement {
       const dados: Record<string, any> = {};
       for (const k of [
         ...CAMPOS_NUM,
-        'indice_correcao', 'regime_tributario',
+        'regime_tributario',
         'sujeito_ret', 'imposto_sobre_permuta_fisica',
       ]) {
         if (!(k in this.form)) continue;
