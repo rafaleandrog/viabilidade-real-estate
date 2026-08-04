@@ -4,7 +4,7 @@ import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   recebimentoBrutoMensal, impostoMensal, recebimentoLiquidoMensal,
-  componentesDoLegado, ultimoMesRecebivelLinha,
+  componentesDoLegado, componentesPagamento, ultimoMesRecebivelLinha,
   pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
   carteiraSaldoSafra, jurosSafra, receitaBrutaSafra, componentesEfetivosSafra,
   parcelasAoLongoObra, vencimentosAoLongoObra,
@@ -26,6 +26,13 @@ const CRONO: EventoCrono[] = [
 ];
 
 const CURVA_S = [2, 4, 7, 10, 13, 14, 14, 13, 10, 7, 4, 2].map((pct, i) => ({ mes: i + 1, pct }));
+
+test('#230: contrato canônico é preferido sem alterar a leitura legada', () => {
+  const fluxo = { componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }] };
+  assert.deepEqual(componentesPagamento(fluxo, CRONO), fluxo.componentes);
+  const legado = { entrada: [{ pct: 15, parcelas: 1 }], parcelas: [], repasse: { apos_entrega_meses: 0 } };
+  assert.deepEqual(componentesPagamento(legado, CRONO), componentesDoLegado(legado, CRONO));
+});
 
 // 1. Distribuição linear (mês 0-based: início 3 = índice 3)
 test('distribuirLinha linear: 12 meses iguais somando o total', () => {
@@ -123,6 +130,25 @@ test('#260: vendaBrutaContratadaMensal/descontoComercialMensal/vendaLiquidaContr
   assert.ok(bruto.every(casas2), 'venda bruta com resíduo além de 2 casas');
   assert.ok(desconto.every(casas2), 'desconto comercial com resíduo além de 2 casas');
   assert.ok(liquido.every(casas2), 'venda líquida com resíduo além de 2 casas');
+});
+
+test('#260: rateio monetário fecha exatamente com o total da linha', () => {
+  const r = calcularFluxo({
+    prazoMeses: 3, taxaDescontoAa: 12, areaTerreno: 0, cronograma: [], linhasReceita: [],
+    linhasCusto: [{ id: 1, grupo: 'indireto', categoria: 'Projetos', orcamento_valor: 100, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 3 }],
+  });
+  const linha = r.linhasCusto[0];
+  assert.deepEqual(linha.mensal, [33.33, 33.33, 33.34]);
+  assert.equal(linha.total, 100);
+  assert.equal(r.custoMensal.reduce((s, v) => s + v, 0), 100);
+});
+
+test('#260: custo canônico mantém o mesmo fluxo após troca de unidade', () => {
+  const r = calcularFluxo({
+    prazoMeses: 1, taxaDescontoAa: 12, areaTerreno: 0, cronograma: [], linhasReceita: [],
+    linhasCusto: [{ id: 1, grupo: 'indireto', categoria: 'Projetos', orcamento_valor: 12.09, orcamento_unidade: 'pct_vgv', orcamento_valor_canonico: 10_000_000, inicio_mes: 0, duracao_meses: 1 }],
+  });
+  assert.equal(r.linhasCusto[0].total, 10_000_000);
 });
 
 test('#260: recebimentoBrutoMensal/impostoMensal/recebimentoLiquidoMensal têm 2 casas', () => {
