@@ -132,6 +132,11 @@ export interface LinhaCalc {
   vpl: number;
   mensal: number[];
   itens?: LinhaCalc[];             // tipologias (receita) — sub-linhas
+  // #238: só em linha de Permuta financeira em % VGV. O motor calcula as DUAS
+  // bases (bruta e líquida) e usa a escolhida em `permuta_financeira_base`;
+  // esta é a NÃO escolhida, exposta para auditoria — o critério da issue pede
+  // que a outra visão fique disponível, não que seja descartada em silêncio.
+  permutaAlternativa?: { base: 'bruta' | 'liquida'; total: number };
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1396,10 +1401,18 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const calcDeducoesReceita: LinhaCalc[] = linhasPermutaFinanceira.map((c) => {
     const nome = nomeLinhaCusto(c);
     let mensalBruto: number[];
+    // #238: a base NÃO escolhida vira auditoria em vez de ser descartada.
+    let alternativa: { base: 'bruta' | 'liquida'; total: number } | undefined;
     if ((c.orcamento_unidade || 'rs') === 'pct_vgv') {
       const bruta = permutaFinanceiraBrutaMensal(receitaCaixaBrutaMensal, n(c.orcamento_valor));
       const liquida = permutaFinanceiraLiquidaMensal(receitaCaixaBrutaMensal, impostoTotalMensal, corretagemSerie, n(c.orcamento_valor));
-      mensalBruto = c.permuta_financeira_base === 'liquida' ? liquida : bruta;
+      const eLiquida = c.permuta_financeira_base === 'liquida';
+      mensalBruto = eLiquida ? liquida : bruta;
+      const outra = eLiquida ? bruta : liquida;
+      alternativa = {
+        base: eLiquida ? 'bruta' : 'liquida',
+        total: round2(outra.reduce((t, v) => t + v, 0)),
+      };
     } else {
       mensalBruto = distribuirProporcional(c, receitaMensalVendas, ctxCusto);
     }
@@ -1410,6 +1423,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
       inicio: r.inicio, duracao: r.duracao,
       total: mensal.reduce((s, v) => s + v, 0),
       vpl: vplFluxo(mensal, taxa),
+      ...(alternativa ? { permutaAlternativa: alternativa } : {}),
       mensal,
     };
   });

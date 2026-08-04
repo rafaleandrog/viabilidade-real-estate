@@ -167,6 +167,15 @@ const EVENTOS_ANCORA = [
 // normal (evento + curva, igual às demais linhas); "Unit Delivery" e "Sales
 // Revenue" não têm cronograma próprio — o motor rateia proporcionalmente à
 // receita em caixa (entrada+parcelas+repasse) ou ao VGV vendido, respectivamente.
+// #238: base econômica da permuta financeira. `bruta` é o default e preserva o
+// resultado de todo estudo existente — a base líquida deduz imposto e
+// corretagem da receita antes de aplicar o percentual, e só passa a valer se o
+// usuário escolher explicitamente.
+const BASES_PERMUTA_FINANCEIRA = [
+  { valor: 'bruta', rotulo: 'Receita bruta' },
+  { valor: 'liquida', rotulo: 'Receita líquida (− imposto e corretagem)' },
+];
+
 const MODOS_DISTRIBUICAO_PRECO = [
   { valor: 'fixo', rotulo: 'Fixo (cronograma)' },
   { valor: 'unit_delivery', rotulo: 'Unit Delivery' },
@@ -466,6 +475,22 @@ export class ViabFluxoCustos extends LitElement {
   // carregados por `_carregar`, e lê-se `c.linhasCusto`. Qualquer regra de
   // distribuição (curva, âncora de cronograma, unidade de orçamento) sai de
   // graça e não pode divergir por construção.
+  // #238: total da linha na base econômica NÃO escolhida, para auditoria.
+  // Vem do MESMO `calcularFluxo` que produz o número do fluxo (`_calcObra`),
+  // então não há risco de a tela mostrar uma conta paralela que diverge do
+  // motor. `null` quando a linha não é permuta em % VGV, ou quando ainda não
+  // há insumo suficiente para rodar o fluxo.
+  private _permutaAlternativa(c: any): number | null {
+    if (!ePermutaFinanceira(c) || (c.orcamento_unidade || 'rs') !== 'pct_vgv') return null;
+    const calc = this._calcObra();
+    if (!calc) return null;
+    // A permuta financeira é DEDUÇÃO DE RECEITA no motor, não linha de custo:
+    // `calcDeducoesReceita` entra em `linhasReceita` (motor:1431).
+    const linha: any = calc.linhasReceita?.find((l: any) => l.id === c.id);
+    const alt = linha?.permutaAlternativa;
+    return alt ? alt.total : null;
+  }
+
   private _calcObra(): FluxoCalc | null {
     if (this.crono.length === 0 && this.custos.length === 0) return null;
     const config: FluxoConfig = {
@@ -687,9 +712,30 @@ export class ViabFluxoCustos extends LitElement {
           if (ePermutaFisica(c)) return html`
             <span class="mes-calc" title="A entrega da unidade não segue curva de distribuição — é a transferência da tipologia selecionada">
               Entrega de unidades <span>🔒</span></span>`;
-          if (ePermutaFinanceira(c)) return html`
-            <span class="mes-calc" title="A permuta financeira sai proporcionalmente à receita de caixa do mês — não segue curva nem evento próprio (#238)">
-              Receita das vendas <span>🔒</span></span>`;
+          if (ePermutaFinanceira(c)) {
+            // #238: a distribuição é travada (sai conforme a receita entra), mas
+            // a BASE é escolha do estudo — o motor já lia
+            // `permuta_financeira_base` e o backend já a validava; faltava o
+            // controle, que é o que tornava a capacidade invisível.
+            // Só faz sentido em % VGV: em R$ o total é fixo e as duas bases dão
+            // o mesmo valor (ver nota de permutaFinanceiraBrutaMensal).
+            const ePct = (c.orcamento_unidade || 'rs') === 'pct_vgv';
+            const alt = this._permutaAlternativa(c);
+            return html`
+              <div class="dist-preco">
+                <span class="mes-calc" title="A permuta financeira sai proporcionalmente à receita de caixa do mês — não segue curva nem evento próprio (#238)">
+                  Receita das vendas <span>🔒</span></span>
+                ${ePct ? html`
+                  <urbi-select .valor=${c.permuta_financeira_base || 'bruta'} .opcoes=${BASES_PERMUTA_FINANCEIRA}
+                    ?desabilitado=${dis}
+                    @urbi:select-change=${(e: CustomEvent) => this._salvar(c, { permuta_financeira_base: e.detail.valor })}
+                  ></urbi-select>
+                  ${alt !== null ? html`
+                    <span class="sec" title="Valor que esta linha teria na outra base econômica — disponível para auditoria (#238)">
+                      base ${c.permuta_financeira_base === 'liquida' ? 'bruta' : 'líquida'}: ${fmtR$(alt)}</span>` : nothing}
+                ` : nothing}
+              </div>`;
+          }
           if (ePrecoTerreno(c)) {
             const modo = c.distribuicao_modo || 'fixo';
             return html`
