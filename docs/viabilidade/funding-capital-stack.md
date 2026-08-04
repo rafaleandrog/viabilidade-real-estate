@@ -8,17 +8,33 @@ ordem: 8
 
 # Funding, Capital Stack e Retorno do Capital
 
-> 🚫 **NADA NESTE DOCUMENTO DESCREVE O RUNTIME ATUAL.**
+> ✅ **Este documento descreve COMPORTAMENTO VIGENTE** desde o fechamento da FIN-10 (#279).
 >
-> A aba `Viabilidade → Financeiro` é hoje **inteiramente inerte**: `frontend/tela-financeiro.ts`
-> renderiza ~25 controles, `backend/rotas/estudos.ts` os persiste, e
-> `frontend/fluxo-caixa-motor.ts` **não referencia nenhum deles** (grep confirmado: zero
-> ocorrências, também em `proforma.ts` e `fluxo-shared.ts`).
+> O aviso anterior — *"nada neste documento descreve o runtime atual"* — valia quando a aba
+> `Viabilidade → Financeiro` era inteiramente inerte, com ~25 controles que nenhum motor lia. A epic
+> **#239** (`BUGLIST-024`) e suas dez sub-issues **FIN-01 a FIN-10** (#270–#279) substituíram aquele
+> modelo pelo Capital Stack: camadas de capital com aporte, liberação e retorno mês a mês
+> (`frontend/capital-stack-motor.ts`, `backend/rotas/capital-stack.ts`, tabela
+> `avancado_capital_instrumentos`, migração `019`).
 >
-> Este documento é o **modelo funcional de referência** aprovado para a epic **#239**
-> (`BUGLIST-024`) e suas dez sub-issues **FIN-01 a FIN-10** (#270–#279). Cada seção descreve o
-> comportamento-alvo, não o instalado. **Nenhuma tabela, coluna, rota ou regra deve ser criada a
-> partir deste texto** — só a partir de issue aprovada.
+> **Onde o texto ainda descreve alvo e não instalado, isso está dito na própria seção** — as
+> lacunas conhecidas seguem registradas nas issues #272–#277, abertas com o que falta em cada uma.
+> Continua valendo: nenhuma tabela, coluna, rota ou regra nasce deste texto, só de issue aprovada.
+>
+> **Papel de `Custos → Financeiro` (critério da #279):** aquele grupo de custos **não foi absorvido
+> pelo Capital Stack** e continua sendo o que sempre foi — **custos operacionais** de natureza
+> financeira lançados como linha de orçamento (tarifas, taxas de administração, gerenciamento),
+> com curva e ancoragem próprias, como qualquer outro grupo de custo. O Capital Stack trata de
+> **estrutura de capital**: quem financia, quanto aporta, quando libera e como é remunerado. São
+> eixos distintos e nenhum dos dois substitui o outro.
+>
+> **Campos que saíram da aba Financeiro na #279** (9 controles sem consumidor):
+> `taxa_juros_valor_futuro_aa`, `tarifas_bancarias_pct`, `taxa_adm_carteira_pct`,
+> `taxa_estruturacao_divida_pct`, `taxa_gerenciamento_obra_pct`, `juros_financeiros_aa`,
+> `juros_inicio_cobranca_mes`, `indice_correcao` e `indice_correcao_taxa_aa`. As **colunas
+> permanecem no schema** e o dado histórico está intacto — a tela apenas deixou de escrevê-las. A
+> remoção física é issue própria e deliberadamente posterior. Os `aliquota_*` seguem na tela por
+> serem regime tributário, escopo da #228.
 
 > ✅ **FIN-01 (#270) — portão fechado em 2026-08-02.** Três entregas:
 >
