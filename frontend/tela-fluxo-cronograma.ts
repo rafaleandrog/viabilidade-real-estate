@@ -52,11 +52,15 @@ export class ViabFluxoCronograma extends LitElement {
     .params { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 8px; }
     .params urbi-input { width: 160px; }
     /* #245: o viab-num agrega número + setas + sufixo ("meses") + sufixo-mes
-       ("jun/29") na mesma linha; com largura estreita o input (flex:1) encolhia
-       e o NÚMERO era truncado. Largura folgada para o pior caso (mês de 2-3
-       dígitos + rótulo de mês) — os afixos vivem no shadow DOM do primitivo e
-       não alcançam esta folha, então a folga aqui é o ajuste correto. */
-    .params viab-num { width: 184px; }
+       ("jun/29") na mesma linha. A correção do truncamento é no primitivo
+       ("viab-num.ts": o input ganhou "min-width: 4ch", o afixo foi para corpo
+       secundário) — aqui a largura deixa de ser um px fixo e passa a um
+       intervalo em "ch", que acompanha a fonte em vez de assumir uma.
+       "max-width" (~184px) preserva o tamanho confortável de antes; "min-width"
+       deixa o campo CEDER em tela estreita, o que antes era impossível — medido
+       no Chromium, o primitivo corrigido só trunca abaixo de 90px, contra 175px
+       da versão anterior, então encolher aqui é seguro e evita overflow. */
+    .params viab-num { width: auto; min-width: 10ch; max-width: 18ch; }
 
     table.crono { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
     table.crono th {
@@ -78,9 +82,11 @@ export class ViabFluxoCronograma extends LitElement {
     }
     .evento-label { display: inline-flex; align-items: center; }
     .campo-mes { display: inline-flex; align-items: center; gap: 6px; }
-    /* #245: ver nota em .params viab-num — 148px truncava o número quando o
-       sufixo-mes estava presente. 184px acomoda "132º mês · dez/29" sem cortar. */
-    .campo-mes viab-num { width: 184px; }
+    /* #245: mesma regra de .params viab-num — Início e Duração compartilham o
+       intervalo, que é o que garante a MESMA largura para os dois campos
+       (critério de aceite), inclusive entre eventos fixos e fases customizadas,
+       que usam este mesmo seletor. */
+    .campo-mes viab-num { width: auto; min-width: 10ch; max-width: 18ch; }
     .cadeado { opacity: 0.7; font-size: 0.75rem; }
     td.periodo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); white-space: nowrap; }
 
@@ -90,6 +96,14 @@ export class ViabFluxoCronograma extends LitElement {
       padding: 14px 10px 6px; border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
     }
     .acoes-fase { margin-top: 12px; }
+
+    /* #245: em telas estreitas a soma das colunas (evento + Início + Duração +
+       período) excede a viewport e a PÁGINA ganhava rolagem horizontal. Rolar
+       a tabela, e não o documento, é o mesmo padrão que .gantt-wrap já usa
+       logo abaixo. min-width impede as células de se espremerem a ponto de
+       reintroduzir o truncamento que esta issue corrige. */
+    .tabela-wrap { overflow-x: auto; }
+    .tabela-wrap table.crono { min-width: 520px; }
 
     .gantt-wrap { margin-top: 16px; overflow-x: auto; }
     .gantt-wrap svg { display: block; min-width: 560px; width: 100%; height: auto; }
@@ -153,6 +167,7 @@ export class ViabFluxoCronograma extends LitElement {
         ${probObra ? html`
           <urbi-banner variante="alerta">${probObra}</urbi-banner>` : nothing}
 
+        <div class="tabela-wrap">
         <table class="crono">
           <thead>
             <tr>
@@ -172,6 +187,7 @@ export class ViabFluxoCronograma extends LitElement {
             ` : nothing}
           </tbody>
         </table>
+        </div>
 
         ${!dis ? html`
           <div class="acoes-fase">

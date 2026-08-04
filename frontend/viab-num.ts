@@ -63,13 +63,23 @@ export class ViabNum extends LitElement {
       border-radius: 8px; padding: 0 10px; transition: border-color 0.15s, opacity 0.15s;
     }
     .input-wrap:focus-within { border-color: var(--cor-primaria-solida, #2AA9E0); }
+    /* #245: o afixo é INFORMAÇÃO SECUNDÁRIA — a unidade ("meses") e o mês
+       correspondente ("dez/30") acompanham o número, não competem com ele.
+       Antes dividia o mesmo 0.875rem do input e disputava o olho em pé de
+       igualdade. Menor corpo também devolve espaço horizontal ao número, que
+       é a causa raiz do truncamento. */
     .afixo {
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
-      font-size: 0.875rem; font-variant-numeric: tabular-nums;
+      font-size: 0.78rem; font-variant-numeric: tabular-nums;
       flex-shrink: 0; user-select: none;
     }
+    /* #245: "min-width: 0" deixava o input encolher até truncar o número —
+       os afixos têm "flex-shrink: 0", então TODO o aperto do container caía
+       aqui. "4ch" reserva os dígitos do pior caso (999 + cursor) em unidade
+       relativa à fonte, e não em px: o número nunca é cortado, e quem cede
+       espaço passa a ser o container, não o dado. */
     input {
-      flex: 1; min-width: 0; background: none; border: none; outline: none;
+      flex: 1; min-width: 4ch; background: none; border: none; outline: none;
       color: var(--cor-texto, rgba(255,255,255,0.85));
       font-family: inherit; font-size: 0.875rem; padding: 8px 0;
       font-variant-numeric: tabular-nums;
