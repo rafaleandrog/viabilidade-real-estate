@@ -120,6 +120,17 @@ test('incorporação: construção por R$/m² vs valor total (#4)', () => {
   assert.ok(perto(total.construcao, 7_500_000), `construcao total=${total.construcao}`);
 });
 
+test('#259: Proforma prefere o valor canônico após trocar a unidade exibida', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10_000,
+    construcao_modo: 'valor_m2', custo_construcao_m2: 4800,
+    // A unidade ativa ainda pode carregar um legado diferente; o canônico é a fonte.
+    construcao_valor_canonico: 5_000_000,
+  });
+  assert.equal(p.construcao, 5_000_000);
+});
+
 test('loteamento: infra 3 modos — % VGV, R$/m² e R$ fixo (#5)', () => {
   const pct = calcularProforma({ ...LOT, infra_modo: 'pct_vgv', infra_pct: 30 });
   assert.ok(perto(pct.infraestrutura, 22_500_000), `infra %=${pct.infraestrutura}`); // 30% de 75M
