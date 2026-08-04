@@ -44,23 +44,23 @@ export interface ProformaInput {
   sujeito_ret?: boolean; imposto_percentual?: number | string;
   corretagem_percentual?: number | string; marketing_percentual?: number | string;
   permuta_financeira_residencial_pct?: number | string; permuta_financeira_nao_residencial_pct?: number | string;
-  permuta_financeira_residencial_modo?: string; permuta_financeira_residencial_valor?: number | string;
-  permuta_financeira_nao_residencial_modo?: string; permuta_financeira_nao_residencial_valor?: number | string;
+  permuta_financeira_residencial_modo?: string; permuta_financeira_residencial_valor?: number | string; permuta_financeira_residencial_valor_canonico?: number | string;
+  permuta_financeira_nao_residencial_modo?: string; permuta_financeira_nao_residencial_valor?: number | string; permuta_financeira_nao_residencial_valor_canonico?: number | string;
   // custos diretos
   considerar_custo_terreno?: boolean; custo_terreno_m2?: number | string;
-  projetos_modo?: string; projetos_pct?: number | string; projetos_valor_fixo?: number | string;
+  projetos_modo?: string; projetos_pct?: number | string; projetos_valor_fixo?: number | string; projetos_valor_canonico?: number | string;
   licenciamento_modo?: string; licenciamento_pct?: number | string; licenciamento_valor_fixo?: number | string;
-  infra_modo?: string; custo_infra_m2?: number | string; infra_pct?: number | string; infra_valor_fixo?: number | string;
+  infra_modo?: string; custo_infra_m2?: number | string; infra_pct?: number | string; infra_valor_fixo?: number | string; infra_valor_canonico?: number | string;
   incorporacao_registro_pct?: number | string;
-  construcao_modo?: string; custo_construcao_m2?: number | string; construcao_valor_total?: number | string;
+  construcao_modo?: string; custo_construcao_m2?: number | string; construcao_valor_total?: number | string; construcao_valor_canonico?: number | string;
   taxa_gestao_pct?: number | string; custo_decoracao_m2?: number | string;
   manutencao_pct?: number | string; contingencias_pct?: number | string; stand_vendas_valor?: number | string;
   // custos indiretos
   marketing_global_pct?: number | string; gestao_indiretos_pct?: number | string;
   // permuta física — o par legado (`permuta_fisica_*`) é o RESIDENCIAL (e o único
   // do loteamento); o par `_nr_*` é o não residencial (só incorporação). (#10)
-  permuta_fisica_modo?: string; permuta_fisica_area_m2?: number | string; permuta_fisica_pct?: number | string;
-  permuta_fisica_nr_modo?: string; permuta_fisica_nr_area_m2?: number | string; permuta_fisica_nr_pct?: number | string;
+  permuta_fisica_modo?: string; permuta_fisica_area_m2?: number | string; permuta_fisica_pct?: number | string; permuta_fisica_area_canonica?: number | string;
+  permuta_fisica_nr_modo?: string; permuta_fisica_nr_area_m2?: number | string; permuta_fisica_nr_pct?: number | string; permuta_fisica_nr_area_canonica?: number | string;
   aliquota_ret_pct?: number; // parâmetro da app (default 4)
 }
 
@@ -96,6 +96,8 @@ export interface Proforma {
 }
 
 const n = (v: any): number => Number(v) || 0;
+const moeda = (v: number): number => Math.round(v * 100) / 100;
+const canonico = (v: any, legado: number): number => v === null || v === undefined ? legado : n(v);
 
 // O schema/UI usa os nomes de domínio da cascata do Loteamento
 // ('pct_poligonal'/'pct_parcelavel' — ver schema.json); o motor genérico
@@ -157,13 +159,15 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const precoR = lot ? precoLot : n(e.preco_venda_m2_residencial);
   const precoNR = lot ? 0 : n(e.preco_venda_m2_nao_residencial);
 
-  const areaPermutaResidencial = e.permuta_fisica_modo === 'pct_area_venda'
+  const areaPermutaResidencialLegada = e.permuta_fisica_modo === 'pct_area_venda'
     ? areaVendavelR * n(e.permuta_fisica_pct) / 100
     : n(e.permuta_fisica_area_m2);
-  const areaPermutaNaoResidencial = lot ? 0
+  const areaPermutaResidencial = canonico(e.permuta_fisica_area_canonica, areaPermutaResidencialLegada);
+  const areaPermutaNaoResidencialLegada = lot ? 0
     : (e.permuta_fisica_nr_modo === 'pct_area_venda'
       ? areaVendavelNR * n(e.permuta_fisica_nr_pct) / 100
       : n(e.permuta_fisica_nr_area_m2));
+  const areaPermutaNaoResidencial = canonico(e.permuta_fisica_nr_area_canonica, areaPermutaNaoResidencialLegada);
   const areaPermutaFisica = areaPermutaResidencial + areaPermutaNaoResidencial;
   const areaVendavelLiquida = areaVendavel - areaPermutaFisica;
 
@@ -183,12 +187,14 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const corretagem = vgv * n(e.corretagem_percentual) / 100;
   const marketing = vgv * n(e.marketing_percentual) / 100;
   // Permuta financeira (#5): por % do VGV do tipo ou por valor absoluto em R$.
-  const permutaFinResidencial = e.permuta_financeira_residencial_modo === 'valor_fixo'
+  const permutaFinResidencialLegada = e.permuta_financeira_residencial_modo === 'valor_fixo'
     ? n(e.permuta_financeira_residencial_valor)
     : vgvResidencial * n(e.permuta_financeira_residencial_pct) / 100;
-  const permutaFinNaoResidencial = e.permuta_financeira_nao_residencial_modo === 'valor_fixo'
+  const permutaFinResidencial = canonico(e.permuta_financeira_residencial_valor_canonico, permutaFinResidencialLegada);
+  const permutaFinNaoResidencialLegada = e.permuta_financeira_nao_residencial_modo === 'valor_fixo'
     ? n(e.permuta_financeira_nao_residencial_valor)
     : vgvNaoResidencial * n(e.permuta_financeira_nao_residencial_pct) / 100;
+  const permutaFinNaoResidencial = canonico(e.permuta_financeira_nao_residencial_valor_canonico, permutaFinNaoResidencialLegada);
   const receitaLiquida = vgv - imposto - corretagem - marketing - permutaFinResidencial - permutaFinNaoResidencial;
 
   // ── Custos diretos ──
@@ -196,19 +202,22 @@ export function calcularProforma(e: ProformaInput): Proforma {
 
   // Infraestrutura (loteamento) — 3 modos (#5): % do VGV, valor fixo em R$, ou
   // R$/m² × área privativa dos lotes (= área vendável bruta).
-  const infraestrutura = lot
+  const infraestruturaLegada = lot
     ? (e.infra_modo === 'valor_m2' ? n(e.custo_infra_m2) * areaVendavel
       : e.infra_modo === 'valor_fixo' ? n(e.infra_valor_fixo)
       : vgv * n(e.infra_pct) / 100)
     : 0;
+  const infraestrutura = canonico(e.infra_valor_canonico, infraestruturaLegada);
   // Construção: por área (R$/m² × área privativa) ou valor total em R$ (#4).
-  const construcao = lot ? 0
+  const construcaoLegada = lot ? 0
     : (e.construcao_modo === 'valor_total' ? n(e.construcao_valor_total) : n(e.custo_construcao_m2) * areaPrivativa);
+  const construcao = canonico(e.construcao_valor_canonico, construcaoLegada);
   const decoracao = lot ? 0 : n(e.custo_decoracao_m2) * areaPrivativa;
   const custoTotalConstrucao = lot ? infraestrutura : (construcao + decoracao);
   const gestaoConstrucao = lot ? 0 : custoTotalConstrucao * n(e.taxa_gestao_pct) / 100;
 
-  const projetos = e.projetos_modo === 'valor_fixo' ? n(e.projetos_valor_fixo) : vgv * n(e.projetos_pct) / 100;
+  const projetosLegado = e.projetos_modo === 'valor_fixo' ? n(e.projetos_valor_fixo) : vgv * n(e.projetos_pct) / 100;
+  const projetos = canonico(e.projetos_valor_canonico, projetosLegado);
   const outorga = lot ? 0 : (n(e.coef_aproveitamento_basico) > 0
     ? (n(e.valor_venal_terreno_m2) / n(e.coef_aproveitamento_basico)) * areaTerreno
       * (n(e.coef_aproveitamento_maximo) - n(e.coef_aproveitamento_basico)) * 0.20
@@ -261,7 +270,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const precoMedioUnidadeResidencial = numUnidadesResidencial > 0 ? vgvResidencial / numUnidadesResidencial : 0;
   const precoMedioUnidadeNaoResidencial = numUnidadesNaoResidencial > 0 ? vgvNaoResidencial / numUnidadesNaoResidencial : 0;
 
-  return {
+  const resultadoProforma: Proforma = {
     areaTerreno, areaVendavel, areaPermutaFisica, areaVendavelLiquida, areaPrivativa, areaConstruida,
     areaPermutaResidencial, areaPermutaNaoResidencial, vgvPermutaResidencial, vgvPermutaNaoResidencial,
     vgvResidencial, vgvNaoResidencial, vgv,
@@ -276,6 +285,18 @@ export function calcularProforma(e: ProformaInput): Proforma {
     numUnidadesResidencial, numUnidadesNaoResidencial,
     precoMedioUnidadeResidencial, precoMedioUnidadeNaoResidencial,
   };
+  // #260/C7: toda saída monetária da Proforma é canônica a duas casas. As
+  // métricas de área, quantidade e percentuais preservam sua própria precisão.
+  const monetarios: (keyof Proforma)[] = [
+    'vgvPermutaResidencial', 'vgvPermutaNaoResidencial', 'vgvResidencial', 'vgvNaoResidencial', 'vgv',
+    'imposto', 'corretagem', 'marketing', 'permutaFinResidencial', 'permutaFinNaoResidencial', 'receitaLiquida',
+    'custoTerreno', 'projetos', 'infraestrutura', 'outorga', 'incorporacaoRegistro', 'construcao', 'gestaoConstrucao',
+    'decoracao', 'manutencao', 'contingencias', 'custoDiretoTotal', 'receitaOperacional',
+    'marketingGlobal', 'gestaoIndiretos', 'custoIndiretoTotal', 'resultado', 'valorPermutaFisica',
+    'investimentoTotal', 'custoObras', 'precoMedioUnidade', 'precoMedioUnidadeResidencial', 'precoMedioUnidadeNaoResidencial',
+  ];
+  for (const campo of monetarios) resultadoProforma[campo] = moeda(resultadoProforma[campo] as number) as never;
+  return resultadoProforma;
 }
 
 /**
