@@ -1,12 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fmtR$, fmtPct, fmtPctEntrada, parseNumeroBR } from './viab-format.js';
+import { CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtPct, fmtPctEntrada, parseNumeroBR } from './viab-format.js';
 
-test('#281: fmtR$ usa 2 casas decimais — bate com o toFixed(2) de exportar.ts', () => {
+test('#281: fmtR$ é a fonte única de valores monetários com 2 casas', () => {
+  assert.equal(CASAS_DECIMAIS_MONETARIAS, 2);
   assert.equal(fmtR$(10_000_000), 'R$ 10.000.000,00');
   assert.equal(fmtR$(1234.5), 'R$ 1.234,50');
   assert.equal(fmtR$(0), 'R$ 0,00');
   assert.equal(fmtR$(-2_500.789), '-R$ 2.500,79');
+  assert.equal(fmtR$(1234.5, false), '1.234,50');
+  assert.equal(fmtR$(-2_500.789, false), '-2.500,79');
 });
 
 test('fmtPct: valor calculado usa 1 casa decimal com vírgula', () => {
