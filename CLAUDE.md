@@ -46,12 +46,25 @@ fecharam com diff; item 16 (#238) e item 24 (#239) já eram issues compartilhada
 **Todas as 59 issues distintas das duas rodadas estão mergeadas na `main`**, exceto duas cujo
 critério de aceite não é código:
 
-> 🔴 **Mas 53 dessas issues continuam ABERTAS no GitHub** (descoberto em 2026-08-03). O código está
-> na `main`; o que faltou foi a keyword de fechamento — os commits citaram `(#256)`, `(#273-276)`,
-> nunca `Closes #NNN`. **Código mergeado e issue fechada são coisas diferentes, e esta seção já
-> confundiu as duas.** Pendente: conferir os critérios de aceite das 53 uma a uma e fechar as
-> cumpridas (o mapeamento issue→commit já está levantado — ver `PROGRESSO.md`, 2026-08-03).
-> A prevenção já está no lugar: § Fechamento de issue + guard no CI.
+> 🔴 **Esta afirmação era enganosa e foi corrigida pela triagem de 2026-08-03.** 53 issues estavam
+> abertas no GitHub porque os commits citaram `(#256)`, `(#273-276)` em vez de `Closes #NNN`
+> (prevenção agora no lugar: § Fechamento de issue + guard no CI). Mas a conferência dos critérios
+> de aceite contra o **código** revelou algo pior que a keyword faltando:
+>
+> | Veredito | Qtd |
+> |---|---:|
+> | ✅ confirmada e **fechada** | 23 |
+> | 🟡 **parcial — segue aberta** | 29 |
+> | ⚪ depende do autor (#264) | 1 |
+>
+> **Menos da metade das duas rodadas se sustenta no código.** "Mergeado" nunca significou
+> "entregue". Cada issue aberta tem comentário dizendo o que falta; a tabela completa, com evidência
+> `arquivo:linha`, está em **`docs/triagem-issues-2026-08-03.md`**.
+>
+> O maior buraco: nove issues da cadeia EVI de recebíveis (#230, #232–#237, #240, #241) têm a
+> matemática pronta e testada, mas **não ligada a `calcularFluxo`** — o próprio motor declara isso
+> em `frontend/fluxo-caixa-motor.ts:505-511`. A integração virou a **#283**, e ela é precondição
+> das nove.
 
 - **#254** (epic de rastreio) — fecha porque #220, #221, #227–#237, #240 e #241 (suas executoras)
   já fecharam com diff; não tem diff próprio.
@@ -245,11 +258,13 @@ Git Bash — ver PROGRESSO).
   no motor. Representações derivadas **não monetárias** (% e R$/m²) carregam **precisão plena**
   internamente e arredondam **só para exibir**; nunca são persistidas arredondadas. Decisão do autor
   em 2026-08-01; é o contrato que fecha a #259 e dá regra às #260 e #281.
-  > ⚠️ Hoje o app **viola** isso: `fmtR$` usa `maximumFractionDigits: 0`
-  > (`frontend/viab-format.ts:8`, 53 usos em 11 telas) e o Orçamento de Custos em `rs` aceita só
-  > inteiro (`frontend/tela-fluxo-custos.ts:638,873-875`) — enquanto `frontend/exportar.ts:9` já usa
-  > `toFixed(2)`. **Tela e exportação mostram números diferentes.** Corrigir é a #281, não faça
-  > pontualmente.
+  > ⚠️ **Parcialmente resolvido — o texto anterior desta nota estava vencido** (dizia que `fmtR$`
+  > usava `maximumFractionDigits: 0`, o que deixou de ser verdade e ninguém atualizou; foi pego na
+  > triagem de 2026-08-03). Hoje `frontend/viab-format.ts:14` já usa 2 casas, e o Orçamento de
+  > Custos em `rs` também (`frontend/tela-fluxo-custos.ts:673,933`). **O que ainda falta** é
+  > `frontend/exportar.ts:10` deixar de definir o seu próprio `const R$ = v.toFixed(2)`: enquanto
+  > houver duas fontes de formatação, tela e exportação podem divergir de novo. Continua sendo a
+  > #281 — não corrija pontualmente.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa

@@ -4,6 +4,46 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Triagem executada: 23 fechadas, 30 seguem abertas com o que falta (2026-08-03)
+
+Conferência das 53 issues **contra o código da `main`**, critério de aceite a critério de aceite.
+Relatório com evidência `arquivo:linha` por issue: `docs/triagem-issues-2026-08-03.md`.
+
+| Veredito | Qtd | Issues |
+|---|---:|---|
+| ✅ CONFIRMADA — fechada com comentário de evidência | **23** | #220–#229, #231, #244, #246, #247, #249, #253, #258, #261, #265, #267, #270, #271, #278 |
+| 🟡 PARCIAL — segue aberta, com comentário do que falta | **29** | #230, #232–#238, #240, #241, #245, #248, #252, #255–#257, #259, #260, #266, #268, #269, #272–#277, #279, #281 |
+| ⚪ NÃO É CÓDIGO — depende do autor | **1** | #264 |
+
+**Menos da metade se sustenta no código.** Fechar as 53 em bloco teria enterrado 29 pendências
+reais. Confirmado no GitHub após a execução: **31 issues abertas** (30 + a #283 nova), exatamente o
+previsto.
+
+**Achado estrutural — a #283 nasceu daqui.** Nove issues da cadeia EVI de recebíveis (#230,
+#232–#237, #240, #241) têm a matemática construída e testada, mas **não ligada ao cálculo real**.
+Não é inferência: `frontend/fluxo-caixa-motor.ts:505-511` declara que as funções "NÃO estão ligadas
+a `receitaMensalLinha`/`calcularFluxo`" e que "o motor legado continua sendo o único caminho de
+cálculo real". `pmt`, `pagamentosPrazoFixo`, `pagamentosAteMarco`, `pagamentosConcentrado`,
+`receitaBrutaSafra`, `jurosSafra`, `componentesEfetivosSafra` existem, têm teste, e **nenhum estudo
+real passa por elas**.
+
+A **#283** (`[EVI-023] ligar o motor de componentes/safras ao calcularFluxo`) foi aberta com o
+escopo, o raio de impacto (10 módulos consumidores, fixtures Calliandra a revalidar) e a
+**precondição de UI**: `frontend/tela-fluxo-receitas.ts:748+` ainda edita o modelo legado
+(`entrada`/`pct`/`parcelas`), e `ComponentePagamento` não aparece em tela nenhuma. Não implementada
+de propósito — ligar o motor muda o resultado de todo estudo existente e exige decisão de
+compatibilidade do autor.
+
+**Correção de doc pega pela triagem:** o `CLAUDE.md` afirmava que `fmtR$` usava
+`maximumFractionDigits: 0`. Falso desde `e72c111` — `viab-format.ts:14` usa 2 casas. A nota foi
+corrigida; o que resta da #281 é `exportar.ts:10` ainda ter o seu próprio formatador.
+
+**Confiabilidade da triagem:** 6 verificadores em paralelo, um por família de issues, cada um
+conferindo contra o código. **11 vereditos ✅ foram re-conferidos manualmente** antes de qualquer
+fechamento — todos bateram. Regra anti-carimbo aplicada: ✅ sem `arquivo:linha` vira 🟡.
+
+---
+
 ## 53 issues implementadas continuavam abertas — faltou a keyword de fechamento (2026-08-03)
 
 **Sintoma:** o autor tinha **53 issues abertas** no GitHub descrevendo trabalho já feito, mergeado e
