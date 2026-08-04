@@ -4,6 +4,41 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #255 — matriz de ancoragem de custos executada e documentada (2026-08-04)
+
+A #255 exige a matriz **5 abas × 3 tipos de âncora × (novo | legado)**. Ela existe porque a
+correção parcial já aconteceu **duas vezes**: a #120 tratou só a linha Construção, a #167 tratou só
+o Início.
+
+**Decisão sobre a dimensão "aba", para não se rediscutir:**
+
+| Camada | A aba importa? | Por quê |
+|---|---|---|
+| **Backend** | ❌ não | `ancorarLinhaCusto` e `resolverTravamentoCusto` **não recebem `grupo`** — iterar 5 grupos rodaria o mesmo código 5 vezes. Argumento já registrado em `backend/rotas/avancado-ancoragem.test.ts:18-24`, e mantido. |
+| **Frontend** | ✅ sim | O regime é decidido por **grupo + categoria**. É aqui que a aba muda o resultado — e era exatamente aqui que não havia teste nenhum. |
+
+**Causa estrutural encontrada:** a classificação estava **inline no `render()` de
+`tela-fluxo-custos.ts`, repetida idêntica nas três colunas** (Cronograma, Início, Duração). Essa
+repetição É o mecanismo das duas correções parciais — corrigir uma coluna e esquecer as outras.
+
+Extraída para `regimeCronogramaLinha` em `frontend/fluxo-shared.ts`, com 5 regimes:
+`sem_cronograma` (Corretagem #121; permuta e Preço distribuído #194) · `fixo_obra` (Construção
+#120) · `fase_ancora` (#167) · `evento_fixo` · `customizado`. `eConstrucao` e
+`CATEGORIA_CONSTRUCAO` migraram junto, para o lado dos predicados irmãos.
+
+**A matriz, em `frontend/custos-ancoragem.test.ts` (13 testes):** 5 abas × 4 formas de ancorar
+(evento fixo, fase do Cronograma, customizado e **legado sem o campo gravado** — o caso que a issue
+relatava descoberto); as exceções legítimas com seus números de origem; a precedência entre elas; e
+robustez a entrada nula/parcial.
+
+**Garantia da extração:** um teste reproduz literalmente o `if`-chain original e exige concordância
+em **960 combinações** (5 abas × 4 categorias × 3 subcategorias × 4 modos de distribuição × 4
+âncoras). Reordenar as condições em `regimeCronogramaLinha` quebra esse teste — que é o ponto.
+
+266 testes de frontend verdes. Sem migração, sem schema: `versao` segue `0.1.19`.
+
+---
+
 ## Triagem executada: 23 fechadas, 30 seguem abertas com o que falta (2026-08-03)
 
 Conferência das 53 issues **contra o código da `main`**, critério de aceite a critério de aceite.
