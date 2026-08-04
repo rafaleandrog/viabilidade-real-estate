@@ -11,6 +11,8 @@ import {
   validarFluxoPagamento,
   extrairCampos,
   montarLinhasReceita,
+  subcategoriaPrecoValida,
+  SUBCATEGORIAS_PRECO_TERRENO,
   type LinhaCronograma,
 } from './avancado.js';
 
@@ -224,4 +226,40 @@ test('montarLinhasReceita joina alocações ao catálogo no formato do motor', (
   assert.equal(t.area_privativa_m2, 30);
   assert.equal(t.quantidade, 50);      // unidades da alocação
   assert.equal(t.preco_m2, 12000);     // preço da alocação (não o do catálogo)
+});
+
+// ── #257: subcategoria canônica de Preço (terreno) ──────────────────────────
+//
+// A regra é CONTEXTUAL de propósito: `subcategoria` só é enum na linha
+// `terreno`/`Preço`. Na categoria `Outro` (que existe nos 5 grupos) o mesmo
+// campo é TEXTO LIVRE para o usuário descrever o custo — validar a coluna
+// globalmente contra a lista canônica apagaria essa capacidade da tela.
+
+test('#257 aceita as quatro subcategorias canônicas de Preço', () => {
+  assert.equal(SUBCATEGORIAS_PRECO_TERRENO.length, 4);
+  for (const s of SUBCATEGORIAS_PRECO_TERRENO) {
+    assert.ok(subcategoriaPrecoValida('terreno', 'Preço', s), `deveria aceitar ${s}`);
+  }
+});
+
+test('#257 rejeita subcategoria fora da lista em Preço/terreno', () => {
+  assert.equal(subcategoriaPrecoValida('terreno', 'Preço', 'Permuta'), false);   // legada, migrada pela 015
+  assert.equal(subcategoriaPrecoValida('terreno', 'Preço', 'Outro'), false);     // legada, preservada no banco
+  assert.equal(subcategoriaPrecoValida('terreno', 'Preço', 'qualquer coisa'), false);
+});
+
+test('#257 NÃO toca subcategoria fora de Preço/terreno — é texto livre', () => {
+  // Categoria `Outro` usa subcategoria como descrição livre, nos 5 grupos.
+  assert.ok(subcategoriaPrecoValida('obra', 'Outro', 'Fundação especial'));
+  assert.ok(subcategoriaPrecoValida('financeiro', 'Outro', 'CRI série 2'));
+  assert.ok(subcategoriaPrecoValida('terreno', 'Outro', 'ITBI complementar'));
+  // Outra categoria do próprio grupo terreno também é livre.
+  assert.ok(subcategoriaPrecoValida('terreno', 'Registro', 'Cartório 3º ofício'));
+});
+
+test('#257 vazio, nulo e indefinido sempre passam (é como se limpa o campo)', () => {
+  assert.ok(subcategoriaPrecoValida('terreno', 'Preço', ''));
+  assert.ok(subcategoriaPrecoValida('terreno', 'Preço', '   '));
+  assert.ok(subcategoriaPrecoValida('terreno', 'Preço', null));
+  assert.ok(subcategoriaPrecoValida('terreno', 'Preço', undefined));
 });

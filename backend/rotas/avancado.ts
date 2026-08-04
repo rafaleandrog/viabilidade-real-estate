@@ -1086,7 +1086,47 @@ rotasAvancado.get('/estudos/:id/avancado/custos', async (req: Request, res: Resp
 const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo', 'permuta_tipologia_id', 'permuta_quantidade', 'permuta_financeira_base'];
 const BASES_PERMUTA_FINANCEIRA = ['bruta', 'liquida'];
 
-function validarCamposCusto(res: Response, dados: Record<string, any>): boolean {
+// #257: as quatro subcategorias CANÔNICAS da linha `terreno`/`Preço`. Mesma
+// lista que a UI oferece (`frontend/tela-fluxo-custos.ts:58`) — aqui ela vira
+// contrato, porque `<select>` não é validação: qualquer cliente da API podia
+// gravar subcategoria fora da lista.
+export const SUBCATEGORIAS_PRECO_TERRENO = [
+  'Valor à vista', 'Parcelado', 'Permuta física', 'Permuta financeira',
+];
+
+/**
+ * #257: `subcategoria` só é enum na linha `terreno`/`Preço`. Em todo o resto
+ * ela é TEXTO LIVRE — a categoria `Outro` (presente nos 5 grupos) usa esse
+ * campo para o usuário descrever o custo (`tela-fluxo-custos.ts:625`). Validar
+ * a coluna globalmente contra a lista canônica destruiria esse campo, então a
+ * regra é obrigatoriamente CONTEXTUAL.
+ *
+ * Vazio/nulo sempre passa: é como se limpa a subcategoria.
+ *
+ * O `Outro` LEGADO de `Preço` (a lista antiga era `Valor à vista`/`Permuta`/
+ * `Parcelado`/`Outro`) não é convertido — a migração `015` o preservou de
+ * propósito, por não existir regra de remapeamento. Ele continua no banco e
+ * segue legível; o que esta função barra é **escrita nova** com ele, que é
+ * exatamente o critério de aceite da issue. Como a tela só envia os campos
+ * ALTERADOS no PATCH, editar outro campo de uma linha legada não passa por
+ * aqui — nada quebra.
+ */
+export function subcategoriaPrecoValida(
+  grupo: any, categoria: any, subcategoria: any,
+): boolean {
+  if (String(grupo) !== 'terreno' || String(categoria) !== 'Preço') return true;
+  if (subcategoria === null || subcategoria === undefined || String(subcategoria).trim() === '') return true;
+  return SUBCATEGORIAS_PRECO_TERRENO.includes(String(subcategoria));
+}
+
+/**
+ * `atual` é a linha já gravada, e só o PATCH a tem. Ela existe porque o PATCH
+ * manda apenas os campos alterados: num `{ subcategoria: 'X' }` isolado, o
+ * grupo e a categoria que definem o contexto vêm da linha, não do payload.
+ */
+function validarCamposCusto(
+  res: Response, dados: Record<string, any>, atual?: Record<string, any> | null,
+): boolean {
   if (dados.grupo !== undefined && !GRUPOS_CUSTO.includes(dados.grupo)) {
     erro(res, 400, 'GRUPO_INVALIDO', `grupo deve ser um de: ${GRUPOS_CUSTO.join(', ')}`);
     return false;
@@ -1111,6 +1151,17 @@ function validarCamposCusto(res: Response, dados: Record<string, any>): boolean 
   if (dados.permuta_financeira_base !== undefined && !BASES_PERMUTA_FINANCEIRA.includes(dados.permuta_financeira_base)) {
     erro(res, 400, 'PERMUTA_FINANCEIRA_BASE_INVALIDA', `permuta_financeira_base deve ser um de: ${BASES_PERMUTA_FINANCEIRA.join(', ')}`);
     return false;
+  }
+  // #257: grupo/categoria efetivos = o que o payload manda, senão o que a linha
+  // já tem — sem isso um PATCH de `subcategoria` sozinho não teria contexto.
+  if (dados.subcategoria !== undefined) {
+    const grupo = dados.grupo !== undefined ? dados.grupo : atual?.grupo;
+    const categoria = dados.categoria !== undefined ? dados.categoria : atual?.categoria;
+    if (!subcategoriaPrecoValida(grupo, categoria, dados.subcategoria)) {
+      erro(res, 400, 'SUBCATEGORIA_INVALIDA',
+        `subcategoria de Preço (terreno) deve ser uma de: ${SUBCATEGORIAS_PRECO_TERRENO.join(', ')}`);
+      return false;
+    }
   }
   return true;
 }
@@ -1211,7 +1262,9 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
-    if (!validarCamposCusto(res, dados)) return;
+    // `custo` entra como contexto (#257): num PATCH de `subcategoria` sozinho,
+    // o grupo e a categoria que decidem a regra vêm da linha já gravada.
+    if (!validarCamposCusto(res, dados, custo)) return;
     if (!(await validarPermutaTipologia(req, res, estudo.id, dados.permuta_tipologia_id))) return;
 
     // Âncora final (nova, se veio no PATCH; senão a que já estava salva) —
