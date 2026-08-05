@@ -788,3 +788,46 @@ export function simularCapitalStackDoEstudo(
   }
   return simularCapitalStack({ nome: 'estudo', meses, fluxoLivreMensal, receitaLiquidaMensal, reservaMinima, instrumentos });
 }
+
+/**
+ * #277: reordenação da pilha de camadas — parte PURA, para ter teste.
+ *
+ * Move a camada `id` uma posição na direção dada e devolve a lista já com
+ * `ordem` reescrita a partir do índice. A normalização é deliberada: camadas
+ * criadas pela migração `019` nascem todas com a mesma `ordem`, e listas
+ * legadas podem ter buracos — reescrever tudo pelo índice conserta as duas
+ * situações sem precisar de migração.
+ *
+ * Não toca `prioridade_funding` nem `prioridade_pagamento`: são eixos
+ * independentes (§5 e §6.1) e é por eles que o motor decide, não pela ordem de
+ * exibição. Reordenar é organização visual da pilha.
+ *
+ * Movimento impossível (topo para cima, fim para baixo, id inexistente)
+ * devolve a lista original, sem alteração — o chamador não precisa checar.
+ */
+export function reordenarCamadas<T extends { id: any }>(
+  camadas: T[], id: any, direcao: -1 | 1,
+): (T & { ordem: number })[] {
+  const lista = [...camadas];
+  const i = lista.findIndex((c) => c.id === id);
+  const j = i + direcao;
+  if (i < 0 || j < 0 || j >= lista.length) {
+    return camadas.map((c, k) => ({ ...c, ordem: k }));
+  }
+  [lista[i], lista[j]] = [lista[j], lista[i]];
+  return lista.map((c, k) => ({ ...c, ordem: k }));
+}
+
+/**
+ * #277: devolve todas as camadas cuja ordem precisa ser persistida.
+ *
+ * Não basta salvar as duas camadas trocadas: ao normalizar dados legados com
+ * ordens repetidas ou esparsas, outras posições também mudam. Persistir só a
+ * vizinhança faz a ordenação voltar a ficar ambígua depois do reload.
+ */
+export function camadasComOrdemAlterada<T extends { id: any; ordem?: number }>(
+  antes: T[], depois: (T & { ordem: number })[],
+): (T & { ordem: number })[] {
+  const ordemAnterior = new Map(antes.map((c) => [c.id, Number(c.ordem)]));
+  return depois.filter((c) => ordemAnterior.get(c.id) !== c.ordem);
+}
