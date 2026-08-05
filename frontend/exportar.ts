@@ -6,6 +6,7 @@ import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
+import type { Divergencia } from './fluxo-invariantes.js';
 
 const pct1 = (v: number) => v.toFixed(1).replace('.', ',');
 
@@ -274,7 +275,13 @@ export interface CapitalStackExport {
   camadas: { nome: string; tipo: string }[];
 }
 
-export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string | null, capitalStack?: CapitalStackExport) {
+export function exportarFluxoCSV(
+  estudo: any,
+  c: FluxoCalc,
+  dataInicio: string | null,
+  capitalStack?: CapitalStackExport,
+  divergencias: Divergencia[] = [],
+) {
   const rows: string[] = [];
   rows.push('Estudo;' + (estudo.nome_exibicao || estudo.nome));
   rows.push('Nível;Avançado');
@@ -311,6 +318,15 @@ export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string |
   rows.push(`Juros de Clientes;${fmtR$(c.jurosClientes, false)}`);
   rows.push(`Carteira Máxima;${fmtR$(c.carteiraClientesMaxima, false)}`);
   rows.push(`Mês da Carteira Máxima;${c.mesCarteiraClientesMaxima === null ? '' : c.meses[c.mesCarteiraClientesMaxima] ?? `M${c.mesCarteiraClientesMaxima + 1}`}`);
+  rows.push('');
+  rows.push('Relatório de Reconciliação');
+  rows.push('Código;Severidade;Linha;Safra;Mês;Esperado;Encontrado;Diferença;Mensagem');
+  if (divergencias.length === 0) rows.push('OK;sucesso;;;;0;0;0;Todas as invariantes reconciliadas');
+  for (const d of divergencias) rows.push([
+    d.codigo, d.severidade, d.linha ?? '', d.safra ?? '',
+    d.mes === undefined ? '' : d.mes + 1, d.esperado, d.encontrado, d.diferenca,
+    d.mensagem.replaceAll(';', ','),
+  ].join(';'));
   const nome = (estudo.id_legivel || 'estudo') + '_fluxo-caixa.csv';
   baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
 }
@@ -365,6 +381,7 @@ export function exportarFluxoPDF(
   dataInicio: string | null,
   rotuloColunas = 'Meses',
   capitalStack?: CapitalStackExport,
+  divergencias: Divergencia[] = [],
 ): boolean {
   const POR_PAGINA = 18; // colunas por página (paisagem)
   const linhas = capitalStack
@@ -425,6 +442,21 @@ export function exportarFluxoPDF(
       <h2>Fluxo de Caixa Mensal</h2>${svgFluxoMensal(c)}
       <h2>Fluxo de Caixa Acumulado</h2>${svgFluxoAcumulado(c)}
     </section>`);
+  const linhasReconciliacao = divergencias.length
+    ? divergencias.map((d) => `<tr class="${d.severidade === 'erro' ? 'div-erro' : 'div-alerta'}">
+        <td class="nome">${d.codigo}</td><td>${d.severidade}</td><td>${d.linha ?? ''}</td>
+        <td>${d.mes === undefined ? '' : d.mes + 1}</td><td>${d.esperado}</td>
+        <td>${d.encontrado}</td><td>${d.diferenca}</td><td class="nome">${d.mensagem}</td></tr>`).join('')
+    : '<tr><td class="nome" colspan="8">Todas as invariantes reconciliadas.</td></tr>';
+  paginas.push(`
+    <section class="pagina">
+      ${cab}
+      <h2>Relatório de Reconciliação</h2>
+      <p>Erros indicam quebra de cálculo; alertas indicam premissas de risco.</p>
+      <table><thead><tr><th class="nome">Código</th><th>Severidade</th><th>Linha</th><th>Mês</th>
+        <th>Esperado</th><th>Encontrado</th><th>Diferença</th><th class="nome">Mensagem</th></tr></thead>
+        <tbody>${linhasReconciliacao}</tbody></table>
+    </section>`);
 
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome} — Fluxo de Caixa</title>
   <style>
@@ -443,6 +475,8 @@ export function exportarFluxoPDF(
     tr.g0 td { font-weight: 700; border-top: 1px solid #bbb; }
     tr.g1 td { font-weight: 600; }
     tr.g2 td { color: #444; }
+    tr.div-erro td { color: #a8321d; }
+    tr.div-alerta td { color: #8a6200; }
     td.v { font-variant-numeric: tabular-nums; }
     section.pagina { page-break-after: always; }
     section.pagina:last-child { page-break-after: auto; }
