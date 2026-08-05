@@ -970,6 +970,12 @@ sinal no mês da contratação
 + primeira parcela no mês seguinte
 ```
 
+Cada parcela é monetária, com duas casas decimais. Se o arredondamento das 35 primeiras deixar resíduo, ele é aplicado exclusivamente na 36ª parcela; não se cria uma parcela adicional nem se deixa saldo residual.
+
+A mesma regra se aplica ao componente pago até um marco: o resíduo das parcelas anteriores fica na última parcela do marco, que encerra a safra sem ultrapassar a entrega.
+
+O componente concentrado é liquidado uma única vez no marco configurado, já capitalizado e quantizado em centavos. Um marco anterior à contratação é inválido: o motor não antecipa repasse para uma data em que a venda ainda não existia.
+
 #### Longa de prazo fixo
 
 ```text
@@ -1071,6 +1077,8 @@ O plano financiado do Grupo não se aplica a novas vendas depois da entrega.
 recebimento da nova venda Após-chaves
 = 100% do valor contratado líquido no mesmo mês
 ```
+
+A fronteira é explícita: vendas até o mês da entrega preservam o plano do Grupo; somente safras posteriores à entrega são convertidas em recebimento integral no mês da contratação.
 
 O comprador pode pagar parte diretamente e financiar parte com o banco, mas ambas chegam à incorporadora no mesmo mês.
 
@@ -1375,6 +1383,8 @@ Regras:
 - nenhum saldo crescendo depois do último pagamento;
 - cada safra fecha;
 - a carteira total termina em zero.
+
+O motor consolida uma série mensal aberta em `prazoFixo`, `ateMarco` e `concentrado`, além do total. A carteira máxima e seu mês são obtidos dessa série real; vendas Após-chaves recebidas à vista não aumentam nenhum dos saldos.
 
 ### 13.8 Vendas Após-chaves
 
