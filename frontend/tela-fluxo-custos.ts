@@ -677,23 +677,23 @@ export class ViabFluxoCustos extends LitElement {
                     @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(c, { permuta_quantidade: e.detail.valor })}
                   ></viab-num>
                 </span>
-              ` : nothing}
-              ${c.categoria ? html`
-                <span class="orc-badges" role="group" aria-label="Unidade do orçamento">
-                  ${unidsFilt.map((u) => html`
-                    <urbi-badge cor="info" interativo ?ativo=${u.valor === modo}
-                      class=${dis ? 'cu-badge-dis' : ''}
-                      @click=${() => { if (!dis) this._trocarUnidade(c, u.valor); }}
-                    >${u.rotulo}</urbi-badge>`)}
-                </span>
-              ` : nothing}
-              <viab-num ?desabilitado=${dis}
-                casas-decimais=${String(CASAS_DECIMAIS_MONETARIAS)}
-                casas-minimas=${String(CASAS_DECIMAIS_MONETARIAS)}
-                .valor=${this._valorExibido(c)}
-                @urbi:input-numero-change=${(e: CustomEvent) => this._editarOrcamento(c, e.detail.valor)}
-              ></viab-num>
-            </span>`;
+              ` : html`
+                ${c.categoria ? html`
+                  <span class="orc-badges" role="group" aria-label="Unidade do orçamento">
+                    ${unidsFilt.map((u) => html`
+                      <urbi-badge cor="info" interativo ?ativo=${u.valor === modo}
+                        class=${dis ? 'cu-badge-dis' : ''}
+                        @click=${() => { if (!dis) this._trocarUnidade(c, u.valor); }}
+                      >${u.rotulo}</urbi-badge>`)}
+                  </span>
+                ` : nothing}
+                <viab-num ?desabilitado=${dis}
+                  casas-decimais=${String(CASAS_DECIMAIS_MONETARIAS)}
+                  casas-minimas=${String(CASAS_DECIMAIS_MONETARIAS)}
+                  .valor=${this._valorExibido(c)}
+                  @urbi:input-numero-change=${(e: CustomEvent) => this._editarOrcamento(c, e.detail.valor)}
+                ></viab-num>
+              `
         },
       },
       {
@@ -701,7 +701,9 @@ export class ViabFluxoCustos extends LitElement {
         // #175: sempre mostra o total resolvido em R$ — em `rs` é o próprio
         // orcamento_valor (sem conversão), mas ainda é o número que entra no
         // fluxo; escondê-lo ali deixava a coluna vazia na maioria das linhas.
-        render: (c: any) => html`<span class="res-calc">${fmtR$(resolverCustoTotal(c, this._ctx()))}</span>`,
+        render: (c: any) => ePermutaFisica(c)
+          ? html`<span class="res-calc sec">Sem valor monetário</span>`
+          : html`<span class="res-calc">${fmtR$(resolverCustoTotal(c, this._ctx()))}</span>`,
       },
       {
         id: 'distribuicao', label: 'Distribuição',
