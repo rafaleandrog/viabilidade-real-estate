@@ -2140,8 +2140,9 @@ Ela deve utilizar documentos e informações fornecidos, manter a rastreabilidad
 | Cronograma inválido | Lançamento ou período comercial fora da Obra |
 | Funding inválido | Percentual, limite ou prazo incoerente |
 
-> **Comportamento vigente.** Existem validações de absorção, fluxo nominal, alocação e carência.
-> As validações por componente, safra e marco ainda não existem.
+> **Comportamento vigente (#240).** As validações de entrada continuam junto
+> aos editores. A saída do motor também passa por um validador puro de
+> reconciliação, com tolerância monetária de R$ 0,01 e diagnóstico estruturado.
 
 ### 21.2 Invariantes de produto
 
@@ -2287,6 +2288,21 @@ A mensagem de validação deve informar:
 - qual valor foi encontrado;
 - qual safra ou mês foi afetado;
 - o que precisa ser corrigido.
+
+### 21.11 Relatório de reconciliação implementado
+
+Cada divergência contém `codigo`, `severidade`, `esperado`, `encontrado`,
+`diferenca` e, quando aplicável, `linha`, `safra` e `mes`. A tela de Fluxo de
+Caixa executa o relatório a cada recálculo e o inclui nas exportações CSV e
+PDF. A ausência de divergências é registrada explicitamente como estudo
+reconciliado.
+
+`erro` identifica quebra de uma identidade matemática ou estado impossível
+(estoque/carteira/dívida negativos, saldo terminal indevido ou fluxo que não
+fecha). `alerta` identifica uma premissa economicamente possível, porém
+agressiva — por exemplo, lacuna de funding — e não é confundido com defeito de
+implementação. Juros de dívida capitalizados permanecem no saldo e não são
+contados uma segunda vez como saída de caixa.
 
 ## 22. Exportação, auditabilidade e reprodutibilidade
 

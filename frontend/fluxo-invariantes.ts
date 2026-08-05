@@ -19,8 +19,12 @@
 //     "entregar" mais unidades do que produziu sem nenhum aviso.
 
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
-import { carteiraSaldoSafra } from './fluxo-caixa-motor.js';
-import { ePermutaFisica } from './fluxo-shared.js';
+import {
+  carteiraSaldoSafra, componentesEfetivosSafra, componentesPagamento,
+  vendaLiquidaContratadaMensal,
+} from './fluxo-caixa-motor.js';
+import { absorcaoMensal, ePermutaFisica, type EventoCrono } from './fluxo-shared.js';
+import type { ResultadoCapitalStack } from './capital-stack-motor.js';
 
 export type Severidade = 'erro' | 'alerta';
 
@@ -50,6 +54,15 @@ export const TOLERANCIA_PADRAO = 0.01;
  */
 export function validarFluxoCalc(r: FluxoCalc, tol: number = TOLERANCIA_PADRAO): Divergencia[] {
   const out: Divergencia[] = [];
+  const liquidoEsperado = r.vendaBrutaContratada - r.descontoComercial;
+  if (Math.abs(liquidoEsperado - r.vendaLiquidaContratada) > tol) {
+    out.push({
+      codigo: 'CONTRATACAO_NAO_RECONCILIA', severidade: 'erro',
+      esperado: liquidoEsperado, encontrado: r.vendaLiquidaContratada,
+      diferenca: r.vendaLiquidaContratada - liquidoEsperado,
+      mensagem: 'Contratação líquida não bate com contratação bruta menos descontos.',
+    });
+  }
   const esperado = r.vendaLiquidaContratada + (r.jurosClientes ?? 0);
   const encontrado = r.receitaBruta;
   if (Math.abs(esperado - encontrado) > tol) {
@@ -62,6 +75,14 @@ export function validarFluxoCalc(r: FluxoCalc, tol: number = TOLERANCIA_PADRAO):
   }
 
   const bruto = r.receitaBrutaMensal ?? [];
+  const totalMensal = bruto.reduce((s, v) => s + Number(v ?? 0), 0);
+  if (Math.abs(totalMensal - r.receitaBruta) > tol) {
+    out.push({
+      codigo: 'RECEITA_TOTAL_NAO_RECONCILIA', severidade: 'erro',
+      esperado: r.receitaBruta, encontrado: totalMensal, diferenca: totalMensal - r.receitaBruta,
+      mensagem: 'Receita Bruta total não bate com a soma dos recebimentos mensais.',
+    });
+  }
   const principal = r.principalRecebidoMensal ?? [];
   const juros = r.jurosClientesMensal ?? [];
   for (let mes = 0; mes < bruto.length; mes++) {
@@ -76,6 +97,15 @@ export function validarFluxoCalc(r: FluxoCalc, tol: number = TOLERANCIA_PADRAO):
   }
 
   const carteira = r.carteiraClientesMensal ?? [];
+  for (let mes = 0; mes < carteira.length; mes++) {
+    if ((carteira[mes] ?? 0) >= -tol) continue;
+    out.push({
+      codigo: 'CARTEIRA_NEGATIVA', severidade: 'erro', mes,
+      esperado: 0, encontrado: carteira[mes], diferenca: carteira[mes],
+      mensagem: `Mês ${mes + 1}: carteira de clientes ficou negativa.`,
+    });
+    break;
+  }
   const saldoFinal = carteira[carteira.length - 1] ?? 0;
   if (Math.abs(saldoFinal) > tol) {
     out.push({
@@ -86,6 +116,14 @@ export function validarFluxoCalc(r: FluxoCalc, tol: number = TOLERANCIA_PADRAO):
   }
 
   const repasse = r.repasseMensal ?? [];
+  const mesesComRepasse = repasse.map((v, mes) => ({ v, mes })).filter(({ v }) => v > tol);
+  if (mesesComRepasse.length > 1) {
+    out.push({
+      codigo: 'REPASSE_EM_MULTIPLOS_MESES', severidade: 'erro', mes: mesesComRepasse[1].mes,
+      esperado: 1, encontrado: mesesComRepasse.length, diferenca: mesesComRepasse.length - 1,
+      mensagem: `Repasse ocorreu em ${mesesComRepasse.length} meses; deve liquidar a carteira uma única vez.`,
+    });
+  }
   for (let mes = 0; mes < repasse.length; mes++) {
     if ((repasse[mes] ?? 0) <= (bruto[mes] ?? 0) + tol) continue;
     out.push({
@@ -94,6 +132,199 @@ export function validarFluxoCalc(r: FluxoCalc, tol: number = TOLERANCIA_PADRAO):
       mensagem: `Mês ${mes + 1}: repasse supera a Receita Bruta recebida no mês.`,
     });
     break;
+  }
+  return out;
+}
+
+/** Contratação bruta independente do total calculado: Σ quantidade × área ×
+ * preço/m² × absorção efetiva de cada fase. */
+export function validarContratacao(
+  linhasReceita: any[],
+  cronograma: EventoCrono[],
+  prazo: number,
+  vendaBrutaEncontrada: number,
+  tol: number = TOLERANCIA_PADRAO,
+): Divergencia[] {
+  let esperado = 0;
+  for (const linha of linhasReceita) {
+    const vgv = (linha.tipologias ?? []).reduce((s: number, t: any) => s
+      + Number(t.quantidade ?? 0) * Number(t.area_privativa_m2 ?? 0) * Number(t.preco_m2 ?? 0), 0);
+    const abs = absorcaoMensal(linha.absorcao ?? { modo: 'linear' }, cronograma);
+    if (!abs) continue;
+    const pctNoHorizonte = abs.pcts.reduce((s, pct, i) => {
+      const mes = abs.inicio + i;
+      return s + (mes >= 0 && mes < prazo ? Number(pct ?? 0) : 0);
+    }, 0);
+    esperado += vgv * pctNoHorizonte / 100;
+  }
+  esperado = Math.round((esperado + Number.EPSILON) * 100) / 100;
+  if (Math.abs(esperado - vendaBrutaEncontrada) <= tol) return [];
+  return [{
+    codigo: 'VENDA_BRUTA_NAO_RECONCILIA', severidade: 'erro',
+    esperado, encontrado: vendaBrutaEncontrada, diferenca: vendaBrutaEncontrada - esperado,
+    mensagem: 'Venda Bruta Contratada não bate com quantidade × área privativa × preço/m² × absorção.',
+  }];
+}
+
+/** Executa as invariantes de componentes nas safras efetivamente contratadas
+ * de cada linha real do estudo e preserva linha/safra/mês no diagnóstico. */
+export function validarSafrasReceita(
+  linhasReceita: any[],
+  cronograma: EventoCrono[],
+  prazo: number,
+  tol: number = TOLERANCIA_PADRAO,
+): Divergencia[] {
+  const out: Divergencia[] = [];
+  const obra = cronograma.find((e) => e.evento === 'obra');
+  const mesEntrega = obra ? Number(obra.inicio_mes) + Number(obra.duracao_meses) - 1 : 0;
+  for (const linha of linhasReceita) {
+    const componentes = componentesPagamento(linha.fluxo_pagamento, cronograma);
+    const contratacoes = vendaLiquidaContratadaMensal(linha, cronograma, prazo);
+    for (let safra = 0; safra < contratacoes.length; safra++) {
+      if ((contratacoes[safra] ?? 0) <= tol) continue;
+      const efetivos = componentesEfetivosSafra(componentes, safra, mesEntrega);
+      const divergencias = validarComponentesSafra(efetivos, safra, contratacoes[safra], tol);
+      for (const d of divergencias) out.push({
+        ...d,
+        linha: `${linha.nome || 'Receita'}${d.linha ? ` / ${d.linha}` : ''}`,
+      });
+      if (divergencias.length > 0) break;
+    }
+  }
+  return out;
+}
+
+function quantidadesPermutadas(linhasCusto: any[]): Map<number, number> {
+  const porTipologia = new Map<number, number>();
+  for (const c of linhasCusto) {
+    if (!ePermutaFisica(c) || c.permuta_tipologia_id == null) continue;
+    const id = Number(c.permuta_tipologia_id);
+    porTipologia.set(id, (porTipologia.get(id) ?? 0) + Number(c.permuta_quantidade ?? 0));
+  }
+  return porTipologia;
+}
+
+/** Produto/estoque: alocação + permuta nunca excede o catálogo e a baixa
+ * mensal pela absorção não produz estoque negativo. Premissas abaixo de 100%
+ * podem deixar saldo e não são erro; quando todo o estoque está comprometido
+ * e a absorção fecha 100%, o saldo terminal obrigatoriamente zera. */
+export function validarProduto(
+  linhasReceita: any[],
+  linhasCusto: any[],
+  tipologiasCatalogo: any[],
+  cronograma: EventoCrono[],
+  prazo: number,
+  tol: number = TOLERANCIA_PADRAO,
+): Divergencia[] {
+  const out: Divergencia[] = [];
+  const permutas = quantidadesPermutadas(linhasCusto);
+
+  for (const tip of tipologiasCatalogo) {
+    const id = Number(tip.id);
+    const nome = String(tip.nome || `tipologia ${id}`);
+    const total = Number(tip.quantidade ?? 0);
+    const alocacoes = linhasReceita.flatMap((linha) =>
+      (linha.tipologias ?? [])
+        .filter((a: any) => Number(a.tipologia_id) === id)
+        .map((a: any) => ({ linha, quantidade: Number(a.quantidade ?? 0) })));
+    const alocado = alocacoes.reduce((s, a) => s + a.quantidade, 0);
+    const permutado = permutas.get(id) ?? 0;
+    const comprometido = alocado + permutado;
+    if (comprometido > total + tol) {
+      out.push({
+        codigo: 'PRODUTO_EXCEDE_ESTOQUE', severidade: 'erro', linha: nome,
+        esperado: total, encontrado: comprometido, diferenca: comprometido - total,
+        mensagem: `${nome}: alocações (${alocado}) + permuta física (${permutado}) excedem o estoque (${total}).`,
+      });
+    }
+
+    const vendas = new Array<number>(Math.max(0, prazo)).fill(0);
+    let absorcaoCompleta = alocacoes.length > 0;
+    for (const a of alocacoes) {
+      const abs = absorcaoMensal(a.linha.absorcao ?? { modo: 'linear' }, cronograma);
+      if (!abs) { absorcaoCompleta = false; continue; }
+      const somaPct = abs.pcts.reduce((s, pct) => s + Number(pct || 0), 0);
+      if (Math.abs(somaPct - 100) > tol) absorcaoCompleta = false;
+      for (let i = 0; i < abs.pcts.length; i++) {
+        const mes = abs.inicio + i;
+        if (mes >= 0 && mes < vendas.length) vendas[mes] += a.quantidade * abs.pcts[i] / 100;
+      }
+    }
+    let estoque = total - permutado;
+    for (let mes = 0; mes < vendas.length; mes++) {
+      estoque -= vendas[mes];
+      if (estoque >= -tol) continue;
+      out.push({
+        codigo: 'ESTOQUE_MENSAL_NEGATIVO', severidade: 'erro', linha: nome, mes,
+        esperado: 0, encontrado: estoque, diferenca: estoque,
+        mensagem: `${nome}, mês ${mes + 1}: estoque ficou negativo (${estoque}).`,
+      });
+      break;
+    }
+    if (absorcaoCompleta && Math.abs(comprometido - total) <= tol && Math.abs(estoque) > tol) {
+      out.push({
+        codigo: 'ESTOQUE_FINAL_NAO_ZERA', severidade: 'erro', linha: nome, mes: Math.max(0, prazo - 1),
+        esperado: 0, encontrado: estoque, diferenca: estoque,
+        mensagem: `${nome}: absorção de 100% não zerou o estoque ao fim do horizonte.`,
+      });
+    }
+  }
+  return out;
+}
+
+function somaSeries(rec: Record<string, number[]>, mes: number): number {
+  return Object.values(rec).reduce((s, serie) => s + Number(serie[mes] ?? 0), 0);
+}
+
+/** Funding: dívida não pode ficar negativa nem sobreviver ao horizonte; o
+ * caixa fecha com fluxo livre + entradas − saídas efetivamente pagas. Juros
+ * capitalizados permanecem identificáveis no saldo e não são saída duplicada. */
+export function validarCapitalStack(
+  r: ResultadoCapitalStack,
+  fluxoLivreMensal: number[],
+  tol: number = TOLERANCIA_PADRAO,
+): Divergencia[] {
+  const out: Divergencia[] = [];
+  for (const [nome, serie] of Object.entries(r.saldoDividaPorInstrumento)) {
+    const negativo = serie.findIndex((v, mes) => mes > 0 && v < -tol);
+    if (negativo >= 0) out.push({
+      codigo: 'DIVIDA_NEGATIVA', severidade: 'erro', linha: nome, mes: negativo - 1,
+      esperado: 0, encontrado: serie[negativo], diferenca: serie[negativo],
+      mensagem: `${nome}, mês ${negativo}: saldo da dívida ficou negativo.`,
+    });
+    const final = serie[serie.length - 1] ?? 0;
+    if (Math.abs(final) > tol) out.push({
+      codigo: 'DIVIDA_FINAL_NAO_ZERA', severidade: 'erro', linha: nome, mes: Math.max(0, serie.length - 2),
+      esperado: 0, encontrado: final, diferenca: final,
+      mensagem: `${nome}: dívida termina o horizonte com saldo ${final}.`,
+    });
+  }
+
+  for (let t = 1; t < r.caixaProjetoMensal.length; t++) {
+    const entradas = somaSeries(r.liberacaoPorInstrumento, t)
+      + somaSeries(r.aportePorInstrumentoPE, t) + Number(r.aporteSponsorMensal[t] ?? 0);
+    const saidas = somaSeries(r.amortizacaoPorInstrumento, t)
+      + somaSeries(r.devolucaoPrincipalPE, t) + somaSeries(r.remuneracaoPagaPE, t)
+      + somaSeries(r.participacaoReceitaPE, t) + somaSeries(r.participacaoResidualPE, t)
+      + somaSeries(r.participacaoLucroPE, t) + Number(r.distribuicaoSponsorMensal[t] ?? 0);
+    const esperado = Number(r.caixaProjetoMensal[t - 1] ?? 0)
+      + Number(fluxoLivreMensal[t - 1] ?? 0) + entradas - saidas;
+    const encontrado = Number(r.caixaProjetoMensal[t] ?? 0);
+    if (Math.abs(esperado - encontrado) <= tol) continue;
+    out.push({
+      codigo: 'FLUXO_FUNDING_NAO_RECONCILIA', severidade: 'erro', mes: t - 1,
+      esperado, encontrado, diferenca: encontrado - esperado,
+      mensagem: `Mês ${t}: caixa final não reconcilia com fluxo livre e funding.`,
+    });
+    break;
+  }
+  if (r.lacunaFundingMaxima > tol) {
+    const mes = r.lacunaFundingMensal.findIndex((v) => v > tol);
+    out.push({
+      codigo: 'LACUNA_FUNDING', severidade: 'alerta', mes: Math.max(0, mes - 1),
+      esperado: 0, encontrado: r.lacunaFundingMaxima, diferenca: r.lacunaFundingMaxima,
+      mensagem: `Premissa de capital insuficiente: lacuna máxima de funding ${r.lacunaFundingMaxima}.`,
+    });
   }
   return out;
 }
@@ -188,12 +419,7 @@ export function validarPermutaFisica(
   tipologiasCatalogo: any[],
   tol: number = TOLERANCIA_PADRAO,
 ): Divergencia[] {
-  const permutadaPorTipologia = new Map<number, number>();
-  for (const c of linhasCusto) {
-    if (!ePermutaFisica(c) || c.permuta_tipologia_id === null || c.permuta_tipologia_id === undefined) continue;
-    const id = Number(c.permuta_tipologia_id);
-    permutadaPorTipologia.set(id, (permutadaPorTipologia.get(id) ?? 0) + Number(c.permuta_quantidade ?? 0));
-  }
+  const permutadaPorTipologia = quantidadesPermutadas(linhasCusto);
 
   const out: Divergencia[] = [];
   for (const [id, quantidadePermutada] of permutadaPorTipologia) {

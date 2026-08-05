@@ -1,7 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validarFluxoCalc, validarComponentesSafra, validarPermutaFisica, TOLERANCIA_PADRAO } from './fluxo-invariantes.js';
+import {
+  validarFluxoCalc, validarComponentesSafra, validarPermutaFisica,
+  validarProduto, validarContratacao, validarSafrasReceita, validarCapitalStack, TOLERANCIA_PADRAO,
+} from './fluxo-invariantes.js';
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
+import type { ResultadoCapitalStack } from './capital-stack-motor.js';
 
 // FluxoCalc mínimo para exercitar validarFluxoCalc — só os campos que a
 // invariante lê precisam existir de fato.
@@ -9,7 +13,10 @@ const fluxoBase = (vendaLiquidaContratada: number, receitaBruta: number, jurosCl
   prazo: 1, meses: ['jan/27'], receitaMensal: [], custoMensal: [], fluxoMensal: [], fluxoAcumulado: [],
   vgvTotal: 0, vpl: 0, tir: null, paybackMes: null, paybackData: null, exposicaoMaxima: 0,
   vgvPermutaFisica: 0, receitaBrutaVgv: 0, vgvVendavel: 0,
-  vendaBrutaContratada: 0, descontoComercial: 0, vendaLiquidaContratada, receitaBruta, jurosClientes,
+  vendaBrutaContratada: vendaLiquidaContratada, descontoComercial: 0,
+  vendaLiquidaContratada, receitaBruta, jurosClientes,
+  receitaBrutaMensal: [receitaBruta], principalRecebidoMensal: [receitaBruta - jurosClientes],
+  jurosClientesMensal: [jurosClientes], carteiraClientesMensal: [0], repasseMensal: [0],
   linhasReceita: [], linhasCusto: [],
 } as unknown as FluxoCalc);
 
@@ -71,6 +78,26 @@ test('#283 validarFluxoCalc impede classificar como repasse valor maior que o re
   };
   const divergencia = validarFluxoCalc(fluxo).find((d) => d.codigo === 'REPASSE_SUPERA_RECEITA');
   assert.equal(divergencia?.mes, 0);
+});
+
+test('validarFluxoCalc reconcilia contratação líquida = bruta − descontos', () => {
+  const valido = { ...fluxoBase(90, 90), vendaBrutaContratada: 100, descontoComercial: 10 };
+  assert.equal(validarFluxoCalc(valido).some((d) => d.codigo === 'CONTRATACAO_NAO_RECONCILIA'), false);
+  const invalido = { ...valido, vendaLiquidaContratada: 91, receitaBruta: 91 };
+  const div = validarFluxoCalc(invalido).find((d) => d.codigo === 'CONTRATACAO_NAO_RECONCILIA');
+  assert.equal(div?.esperado, 90);
+  assert.equal(div?.encontrado, 91);
+});
+
+test('validarFluxoCalc diferencia carteira negativa e repasse repetido', () => {
+  const fluxo = {
+    ...fluxoBase(100, 100), vendaBrutaContratada: 100,
+    receitaBrutaMensal: [50, 50], principalRecebidoMensal: [50, 50], jurosClientesMensal: [0, 0],
+    carteiraClientesMensal: [20, -1], repasseMensal: [25, 25],
+  };
+  const codigos = validarFluxoCalc(fluxo).map((d) => d.codigo);
+  assert.ok(codigos.includes('CARTEIRA_NEGATIVA'));
+  assert.ok(codigos.includes('REPASSE_EM_MULTIPLOS_MESES'));
 });
 
 // ── validarComponentesSafra ──────────────────────────────────────────────
@@ -185,4 +212,91 @@ test('validarPermutaFisica: tolerância de 1 centavo/unidade não gera falso pos
     { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 20.005 },
   ];
   assert.deepEqual(validarPermutaFisica(linhasCusto, TIPOLOGIAS, TOLERANCIA_PADRAO), []);
+});
+
+// ── produto/estoque + funding (#240) ────────────────────────────────────
+
+const CRONO_PRODUTO = [
+  { evento: 'pre_lancamento', inicio_mes: 0, duracao_meses: 1 },
+  { evento: 'lancamento', inicio_mes: 1, duracao_meses: 1 },
+  { evento: 'obra', inicio_mes: 1, duracao_meses: 2 },
+  { evento: 'pos_obra', inicio_mes: 3, duracao_meses: 12 },
+];
+const RECEITA_PRODUTO = [{
+  nome: 'Fase 1',
+  absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+  tipologias: [{ tipologia_id: 1, quantidade: 20 }],
+}];
+
+test('validarProduto: estoque totalmente alocado e absorvido fecha em zero', () => {
+  assert.deepEqual(validarProduto(RECEITA_PRODUTO, [], TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4), []);
+});
+
+test('validarContratacao: bruto fecha por quantidade × área × preço × absorção', () => {
+  const linhas = [{
+    ...RECEITA_PRODUTO[0],
+    tipologias: [{ tipologia_id: 1, quantidade: 20, area_privativa_m2: 50, preco_m2: 10_000 }],
+  }];
+  assert.deepEqual(validarContratacao(linhas, CRONO_PRODUTO, 20, 10_000_000), []);
+  const div = validarContratacao(linhas, CRONO_PRODUTO, 20, 9_000_000)[0];
+  assert.equal(div.codigo, 'VENDA_BRUTA_NAO_RECONCILIA');
+  assert.equal(div.diferenca, -1_000_000);
+});
+
+test('validarSafrasReceita: identifica linha e safra com componentes que não fecham 100%', () => {
+  const linhas = [{
+    nome: 'Torre A',
+    absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+    tipologias: [{ quantidade: 1, area_privativa_m2: 50, preco_m2: 10_000 }],
+    fluxo_pagamento: { componentes: [{ tipo: 'imediato', participacaoPct: 90, descontoPct: 0 }] },
+  }];
+  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20)[0];
+  assert.equal(div.codigo, 'SOMA_COMPONENTES_DIVERGE');
+  assert.equal(div.linha, 'Torre A');
+  assert.equal(div.safra, 1);
+});
+
+test('validarProduto: alocação + permuta acima do catálogo identifica tipologia e mês negativo', () => {
+  const custos = [{
+    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+    permuta_tipologia_id: 1, permuta_quantidade: 2,
+  }];
+  const r = validarProduto(RECEITA_PRODUTO, custos, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
+  assert.equal(r.find((d) => d.codigo === 'PRODUTO_EXCEDE_ESTOQUE')?.linha, 'Studio');
+  assert.equal(r.find((d) => d.codigo === 'ESTOQUE_MENSAL_NEGATIVO')?.mes, 1);
+});
+
+function capitalBase(): ResultadoCapitalStack {
+  return {
+    lacunaFundingMensal: [0, 0], lacunaFundingMaxima: 0, caixaProjetoMensal: [0, 100],
+    liberacaoPorInstrumento: {}, jurosPorInstrumento: {}, amortizacaoPorInstrumento: {},
+    saldoDividaPorInstrumento: {}, aportePorInstrumentoPE: {}, devolucaoPrincipalPE: {},
+    remuneracaoPagaPE: {}, remuneracaoAcumuladaFinalPE: {}, capitalNaoDevolvidoFinalPE: {},
+    remuneracaoAcumuladaPorInstrumentoPE: {}, capitalNaoDevolvidoPorInstrumentoPE: {},
+    participacaoReceitaPE: {}, participacaoResidualPE: {}, participacaoLucroPE: {},
+    aporteSponsorMensal: [0, 0], distribuicaoSponsorMensal: [0, 0],
+    aportePorInstrumentoSponsor: {}, distribuicaoPorInstrumentoSponsor: {},
+  };
+}
+
+test('validarCapitalStack: caixa reconciliado e dívida zerada não divergem', () => {
+  const r = capitalBase();
+  r.saldoDividaPorInstrumento = { Banco: [0, 0] };
+  assert.deepEqual(validarCapitalStack(r, [100]), []);
+});
+
+test('validarCapitalStack: acusa dívida terminal e primeira quebra da reconciliação', () => {
+  const r = capitalBase();
+  r.caixaProjetoMensal[1] = 90;
+  r.saldoDividaPorInstrumento = { Banco: [0, 25] };
+  const divs = validarCapitalStack(r, [100]);
+  assert.equal(divs.find((d) => d.codigo === 'DIVIDA_FINAL_NAO_ZERA')?.linha, 'Banco');
+  assert.equal(divs.find((d) => d.codigo === 'FLUXO_FUNDING_NAO_RECONCILIA')?.mes, 0);
+});
+
+test('validarCapitalStack: lacuna é alerta de premissa, não erro de implementação', () => {
+  const r = capitalBase();
+  r.lacunaFundingMensal = [0, 30]; r.lacunaFundingMaxima = 30;
+  const div = validarCapitalStack(r, [100]).find((d) => d.codigo === 'LACUNA_FUNDING');
+  assert.equal(div?.severidade, 'alerta');
 });

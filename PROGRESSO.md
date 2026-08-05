@@ -4,6 +4,24 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #240 — invariantes e relatório de reconciliação concluídos (2026-08-05)
+
+O módulo puro de validação passou a cobrir e distinguir: estoque/alocação e
+permuta por tipologia; baixa mensal e estoque terminal; contratação
+bruta/desconto/líquida; Receita Bruta, principal e juros; carteira negativa ou
+terminal; repasse repetido ou superior ao recebido; dívida negativa/terminal;
+e reconciliação mensal do caixa com fluxo livre e funding. A tolerância
+monetária explícita permanece em R$ 0,01.
+
+O relatório deixou de ser código isolado: a tela **Fluxo de Caixa** carrega o
+catálogo, executa as invariantes a cada recálculo e mostra o diagnóstico com
+código, severidade, linha/mês, esperado, encontrado e diferença. Erros são
+quebras de cálculo; lacuna de funding é alerta de premissa agressiva. O mesmo
+relatório acompanha CSV e PDF, inclusive com o estado “Tudo reconciliado”.
+
+Os testes dedicados cobrem sucesso e falha de produto, contratação, carteira,
+repasse, dívida, caixa e a classificação não bloqueante da lacuna de capital.
+
 ## #237 — Receita Bruta canônica concluída; #241 avançada (2026-08-05)
 
 A integração por safras da #283 já produzia `receitaBrutaMensal`, principal,

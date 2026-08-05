@@ -4,6 +4,7 @@ import { rotuloMesRelativo } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
 import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
+import type { Divergencia } from './fluxo-invariantes.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tabela + KPIs do Fluxo de Caixa (funções puras).
@@ -44,6 +45,12 @@ export const estiloFluxoTabela = css`
   .controles { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
   .controles .espaco { flex: 1; }
   .controles urbi-select { min-width: 160px; }
+  .reconciliacao { margin-top: 16px; }
+  .reconciliacao-resumo { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .reconciliacao-lista { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+  .reconciliacao-lista li { color: var(--cor-texto-sec, rgba(255,255,255,0.68)); }
+  .reconciliacao-lista li.erro { color: var(--cor-erro, #d45a3a); }
+  .reconciliacao-lista strong { color: inherit; }
 
   .fx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
 
@@ -125,6 +132,32 @@ export const estiloFluxoTabela = css`
   tr.subgrupo.custo td  { background: color-mix(in srgb, var(--cor-erro, #d45a3a)  8%, var(--cor-superficie-elevada, #16243A)); }
   tr.item.custo td      { background: color-mix(in srgb, var(--cor-erro, #d45a3a)  4%, var(--cor-superficie-elevada, #16243A)); }
 `;
+
+/** Relatório visível da #240. Divergência vazia também é informação: mostra
+ * que o estudo passou pelas invariantes, em vez de deixar a validação oculta. */
+export function relatorioReconciliacao(divergencias: Divergencia[]): TemplateResult {
+  const erros = divergencias.filter((d) => d.severidade === 'erro');
+  const alertas = divergencias.filter((d) => d.severidade === 'alerta');
+  return html`
+    <urbi-card titulo="Reconciliação do estudo" class="reconciliacao">
+      <div class="reconciliacao-resumo">
+        <urbi-badge cor=${erros.length ? 'erro' : alertas.length ? 'alerta' : 'sucesso'}>
+          ${erros.length ? `${erros.length} erro(s)` : alertas.length ? `${alertas.length} alerta(s)` : 'Tudo reconciliado'}
+        </urbi-badge>
+        <span>Erros indicam quebra de cálculo; alertas indicam premissas de risco.</span>
+      </div>
+      ${divergencias.length ? html`
+        <ol class="reconciliacao-lista">
+          ${divergencias.map((d) => html`
+            <li class=${d.severidade}>
+              <strong>${d.codigo}</strong> — ${d.mensagem}
+              ${d.linha ? html` Linha: ${d.linha}.` : nothing}
+              ${d.mes !== undefined ? html` Mês: ${d.mes + 1}.` : nothing}
+              Esperado: ${d.esperado}; encontrado: ${d.encontrado}; diferença: ${d.diferenca}.
+            </li>`)}
+        </ol>` : html`<span>Nenhuma divergência encontrada nas invariantes de produto, contratação, recebíveis e funding.</span>`}
+    </urbi-card>`;
+}
 
 /** Resultado do fluxo = último ponto do acumulado. */
 function resultadoDe(c: FluxoCalc): number {
