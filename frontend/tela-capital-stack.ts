@@ -11,7 +11,8 @@ import {
 import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
 import {
   simularCapitalStackDoEstudo, moic, tirAnual, fundingEntradasSaidasMensal,
-  receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack,
+  receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack, reordenarCamadas,
+  camadasComOrdemAlterada,
 } from './capital-stack-motor.js';
 import './viab-num.js';
 
@@ -75,6 +76,7 @@ export class ViabCapitalStack extends LitElement {
   @state() private carregando = true;
   @state() private draft: Record<number, any> = {};
   @state() private salvandoId: number | null = null;
+  @state() private movendoId: number | null = null;   // #277: camada em reordenação
   @state() private criando = false;
 
   private carregado = false;
@@ -267,6 +269,60 @@ export class ViabCapitalStack extends LitElement {
     }
   }
 
+  /**
+   * #277: reordenar camadas. `ordem` já era campo aceito pelo backend
+   * (`CAMPOS_INSTRUMENTO`) e é a coluna pela qual a listagem ordena
+   * (`capital-stack.ts:76`) — mas só era escrita na CRIAÇÃO, então a ordem da
+   * pilha ficava congelada no momento em que cada camada nasceu. Capacidade de
+   * API sem controle na tela.
+   *
+   * Troca a camada com a vizinha e persiste TODAS as ordens alteradas pela
+   * normalização. Isso inclui posições além das duas vizinhas quando a lista
+   * legada tem `ordem` repetida ou buracos — comum nas camadas criadas pela
+   * migração 019, todas inicialmente com o mesmo valor.
+   *
+   * Não mexe em `prioridade_funding` nem em `prioridade_pagamento`: são eixos
+   * independentes (§5 e §6.1), e o motor decide por eles, não pela ordem de
+   * exibição. Reordenar é organização visual da pilha.
+   */
+  private async _mover(c: any, direcao: -1 | 1) {
+    const i = this.camadas.findIndex((x) => x.id === c.id);
+    const j = i + direcao;
+    if (i < 0 || j < 0 || j >= this.camadas.length) return;
+    const lista = reordenarCamadas(this.camadas, c.id, direcao);
+    const alteradas = camadasComOrdemAlterada(this.camadas, lista);
+    const ordensAnteriores = new Map(this.camadas.map((camada) => [camada.id, Number(camada.ordem)]));
+    const persistidas: any[] = [];
+    this.movendoId = c.id;
+    try {
+      for (const alvo of alteradas) {
+        const res = await atualizarCapitalInstrumento(this.estudo.id, alvo.id, { ordem: alvo.ordem });
+        if (res?.erro) throw new Error(res.mensagem || 'Erro ao reordenar');
+        persistidas.push(alvo);
+      }
+      this.camadas = lista;
+    } catch (e: any) {
+      // A API atual não oferece atualização em lote. Compensa as gravações já
+      // feitas para não deixar uma reordenação parcial quando uma PATCH falha.
+      let compensacaoFalhou = false;
+      for (const alvo of [...persistidas].reverse()) {
+        try {
+          const res = await atualizarCapitalInstrumento(this.estudo.id, alvo.id, {
+            ordem: ordensAnteriores.get(alvo.id),
+          });
+          if (res?.erro) compensacaoFalhou = true;
+        } catch {
+          compensacaoFalhou = true;
+        }
+      }
+      const sufixo = compensacaoFalhou ? ' A ordem será recarregada; confira antes de tentar novamente.' : '';
+      urbiVerso.notificar((e?.message || 'Erro ao reordenar') + sufixo, 'erro');
+    } finally {
+      this.movendoId = null;
+      this._carregar();
+    }
+  }
+
   private _renderResumo(): TemplateResult {
     const r = this.resultado;
     const compromissoTotal = this.camadas.reduce((s, c) => s + n(c.compromisso), 0);
@@ -296,6 +352,18 @@ export class ViabCapitalStack extends LitElement {
           Lacuna de funding de ${fmtR$(r!.lacunaFundingMaxima)} em algum mês — nenhuma camada ativa cobre
           toda a necessidade de caixa do projeto.
         </urbi-banner>` : nothing}
+      <!-- #277 / §17: o app simula CONTRATOS PRIVADOS e não valida a legalidade
+           da captação. Aviso permanente e não fechável: captação oferecida ao
+           público ou com característica de contrato de investimento coletivo
+           pode ter obrigações regulatórias, e a estrutura simulada precisa de
+           revisão jurídica antes de virar oferta real. -->
+      <urbi-banner variante="info">
+        Esta é uma <strong>simulação de contratos privados</strong>. O app não valida a legalidade da
+        captação nem substitui assessoria jurídica, tributária ou regulatória — e uma captação
+        oferecida ao público, ou com característica de contrato de investimento coletivo, pode ter
+        obrigações regulatórias próprias. Antes de usar esta estrutura numa oferta real, submeta-a
+        aos responsáveis jurídicos e financeiros.
+      </urbi-banner>
     `;
   }
 
@@ -643,7 +711,16 @@ export class ViabCapitalStack extends LitElement {
             @urbi:input-change=${(e: CustomEvent) => this._setCampo(c, 'nome', e.detail.valor)}></urbi-input>
           <urbi-badge cor=${foraDeUso ? 'alerta' : 'sucesso'}>${STATUS.find((s) => s.valor === c.status)?.rotulo || c.status}</urbi-badge>
           <span class="espaco"></span>
-          ${!dis ? html`<urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" @click=${() => this._remover(c)}></urbi-botao>` : nothing}
+          ${!dis ? html`
+            <urbi-botao variante="secundario" pequeno icone="fa-solid fa-arrow-up"
+              title="Mover para cima"
+              ?desabilitado=${this.camadas[0]?.id === c.id || this.movendoId !== null}
+              @click=${() => this._mover(c, -1)}></urbi-botao>
+            <urbi-botao variante="secundario" pequeno icone="fa-solid fa-arrow-down"
+              title="Mover para baixo"
+              ?desabilitado=${this.camadas[this.camadas.length - 1]?.id === c.id || this.movendoId !== null}
+              @click=${() => this._mover(c, 1)}></urbi-botao>
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" @click=${() => this._remover(c)}></urbi-botao>` : nothing}
         </div>
         <div class="secao">
           <h4>Detalhes gerais</h4>

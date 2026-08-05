@@ -5,7 +5,8 @@ import {
   caixaDistribuivelMensal, reconciliarCapitalStack,
   custoElegivelMensalDeLinhas, instrumentoDeRegistro, simularCapitalStackDoEstudo,
   simularCapitalStack, type InstrumentoPreferredEquity, type InstrumentoDivida, type InstrumentoSponsorEquity,
-  fundingEntradasSaidasMensal, pmtPrice, tirMensal, tirAnual,
+  fundingEntradasSaidasMensal, pmtPrice, tirMensal, tirAnual, reordenarCamadas,
+  camadasComOrdemAlterada,
 } from './capital-stack-motor.js';
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
@@ -386,4 +387,80 @@ test('modo D: lucro negativo não gera pagamento (participação sobre prejuízo
     reservaMinima: -10_000_000, instrumentos: [pe],
   });
   assert.deepEqual([3, 4, 5].map((t) => r.participacaoLucroPE['PE'][t]), [0, 0, 0]);
+});
+
+// ── #277: reordenação da pilha de camadas ───────────────────────────────────
+//
+// `ordem` já era campo aceito pelo backend e a coluna pela qual a listagem
+// ordena, mas só era escrita na CRIAÇÃO — a pilha ficava congelada. Estes
+// testes cobrem a parte pura do controle que faltava na tela.
+
+const cam = (id: number, ordem = 0) => ({ id, nome: `C${id}`, ordem });
+
+test('#277 mover para baixo troca com a vizinha e renumera', () => {
+  const r = reordenarCamadas([cam(1), cam(2), cam(3)], 1, 1);
+  assert.deepEqual(r.map((c) => c.id), [2, 1, 3]);
+  assert.deepEqual(r.map((c) => c.ordem), [0, 1, 2]);
+});
+
+test('#277 mover para cima é o inverso exato', () => {
+  const r = reordenarCamadas([cam(1), cam(2), cam(3)], 3, -1);
+  assert.deepEqual(r.map((c) => c.id), [1, 3, 2]);
+  assert.deepEqual(r.map((c) => c.ordem), [0, 1, 2]);
+});
+
+test('#277 movimento impossível devolve a lista intacta', () => {
+  const lista = [cam(1), cam(2)];
+  assert.deepEqual(reordenarCamadas(lista, 1, -1).map((c) => c.id), [1, 2]); // topo p/ cima
+  assert.deepEqual(reordenarCamadas(lista, 2, 1).map((c) => c.id), [1, 2]);  // fim p/ baixo
+  assert.deepEqual(reordenarCamadas(lista, 99, 1).map((c) => c.id), [1, 2]); // id inexistente
+});
+
+test('#277 normaliza ordem repetida — o caso das camadas da migração 019', () => {
+  // A migração cria todas as camadas legadas com a mesma `ordem`; sem
+  // normalizar, reordenar não teria efeito estável na listagem.
+  const legadas = [cam(1, 0), cam(2, 0), cam(3, 0)];
+  const r = reordenarCamadas(legadas, 3, -1);
+  assert.deepEqual(r.map((c) => c.ordem), [0, 1, 2]);
+  assert.deepEqual(r.map((c) => c.id), [1, 3, 2]);
+});
+
+test('#277 persiste todas as ordens alteradas ao normalizar quatro camadas legadas', () => {
+  const legadas = [cam(1, 0), cam(2, 0), cam(3, 0), cam(4, 0)];
+  const reordenadas = reordenarCamadas(legadas, 2, 1);
+  const alteradas = camadasComOrdemAlterada(legadas, reordenadas);
+
+  assert.deepEqual(reordenadas.map((c) => c.id), [1, 3, 2, 4]);
+  assert.deepEqual(alteradas.map((c) => [c.id, c.ordem]), [[3, 1], [2, 2], [4, 3]]);
+});
+
+test('#277 não grava camadas cuja ordem já coincide com a posição final', () => {
+  const antes = [cam(1, 0), cam(2, 1), cam(3, 2)];
+  const depois = reordenarCamadas(antes, 2, 1);
+  assert.deepEqual(camadasComOrdemAlterada(antes, depois).map((c) => c.id), [3, 2]);
+});
+
+test('#277 normaliza buracos na sequência', () => {
+  const r = reordenarCamadas([cam(1, 5), cam(2, 40), cam(3, 41)], 1, 1);
+  assert.deepEqual(r.map((c) => c.ordem), [0, 1, 2]);
+});
+
+test('#277 não altera prioridade de funding nem de pagamento', () => {
+  // Eixos independentes (§5 e §6.1): o motor decide por eles, não pela ordem
+  // de exibição. Reordenar a pilha não pode mudar quem paga primeiro.
+  const lista = [
+    { id: 1, ordem: 0, prioridade_funding: 3, prioridade_pagamento: 9 },
+    { id: 2, ordem: 1, prioridade_funding: 1, prioridade_pagamento: 2 },
+  ];
+  const r = reordenarCamadas(lista, 1, 1);
+  const a = r.find((c) => c.id === 1)!;
+  assert.equal(a.prioridade_funding, 3);
+  assert.equal(a.prioridade_pagamento, 9);
+});
+
+test('#277 não muta a lista de entrada', () => {
+  const lista = [cam(1), cam(2)];
+  const congelado = JSON.parse(JSON.stringify(lista));
+  reordenarCamadas(lista, 1, 1);
+  assert.deepEqual(lista, congelado);
 });
