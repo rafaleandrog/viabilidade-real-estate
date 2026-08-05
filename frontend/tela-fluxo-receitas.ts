@@ -9,6 +9,9 @@ import {
 } from './fluxo-shared.js';
 import { pctRepasseDerivado, parcelasAoLongoObra } from './fluxo-caixa-motor.js';
 import {
+  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento,
+} from './fluxo-pagamento-editor.js';
+import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
   listarFasesAvancado, criarFaseAvancado, atualizarFaseAvancado, removerFaseAvancado,
@@ -642,17 +645,7 @@ export class ViabFluxoReceitas extends LitElement {
   // ─────────────────────────────────────────────────────────────────
 
   private _abrirPagamento(f: any) {
-    const fp = f.fluxo_pagamento || {};
-    const arr = (v: any) => Array.isArray(v) ? v.map((x) => ({ ...x })) : (v ? [{ ...v }] : []);
-    this.pagForm = {
-      comissao: { ativo: fp.comissao?.ativo ?? true, tipo: fp.comissao?.tipo ?? 'embutida', pct: n(fp.comissao?.pct) },
-      ret: { ativo: fp.ret?.ativo ?? false, pct: n(fp.ret?.pct) },
-      entrada: arr(fp.entrada).length ? arr(fp.entrada) : [{ pct: 15, parcelas: 1, descontoPct: 0 }],
-      // #248: `juros` saiu do default — campo vestigial, nunca teve controle
-      // na UI (nenhum checkbox o lia/escrevia) e não alimenta cálculo nenhum.
-      parcelas: arr(fp.parcelas).length ? arr(fp.parcelas) : [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, pct: 15 }],
-      repasse: { apos_entrega_meses: n(fp.repasse?.apos_entrega_meses) },
-    };
+    this.pagForm = formularioPagamento(f.fluxo_pagamento);
     this.modalErro = '';
     this.modalPag = f;
   }
@@ -706,6 +699,9 @@ export class ViabFluxoReceitas extends LitElement {
     const f = this.pagForm;
     const dis = !this.editavel;
     const repasse = pctRepasseDerivado(f);
+    const somaInformada = [...f.entrada, ...f.parcelas].reduce((s: number, item: any) => s + n(item.pct), 0);
+    const totalComponentes = somaInformada + Math.max(0, repasse);
+    const erroPagamento = erroFormularioPagamento(f, this.crono);
     return html`
       <urbi-modal title="Fluxo de pagamento" maxWidth="860px" @urbi-modal:close=${() => this.modalPag = null}>
         <div class="pag-grid">
@@ -826,27 +822,34 @@ export class ViabFluxoReceitas extends LitElement {
                 <viab-num label="Após entrega" sufixo="meses" casas-decimais="0" ?desabilitado=${dis} .valor=${f.repasse.apos_entrega_meses}
                   @urbi:input-numero-change=${(e: CustomEvent) => this._setPag('repasse', 'apos_entrega_meses', e.detail.valor ?? 0)}></viab-num>
               </div>
+              <p class="sec">Total dos componentes: ${totalComponentes.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%.</p>
             </div>
           </div>
         </div>
 
-        ${this.modalErro ? html`<urbi-banner variante="erro">${this.modalErro}</urbi-banner>` : nothing}
+        ${erroPagamento ? html`<urbi-banner variante="erro">${erroPagamento}</urbi-banner>` : nothing}
+        ${this.modalErro && this.modalErro !== erroPagamento ? html`<urbi-banner variante="erro">${this.modalErro}</urbi-banner>` : nothing}
 
         <div class="modal-rodape">
           <span class="espaco"></span>
           <urbi-botao variante="secundario" @click=${() => this.modalPag = null}>Cancelar</urbi-botao>
           ${!dis ? html`
-            <urbi-botao variante="primario" ?carregando=${this.aplicando} @click=${this._aplicarPagamento}>Aplicar</urbi-botao>` : nothing}
+            <urbi-botao variante="primario" ?desabilitado=${Boolean(erroPagamento)}
+              ?carregando=${this.aplicando} @click=${this._aplicarPagamento}>Aplicar</urbi-botao>` : nothing}
         </div>
       </urbi-modal>
     `;
   }
 
   private _aplicarPagamento = async () => {
-    this.aplicando = true;
     this.modalErro = '';
+    const invalido = erroFormularioPagamento(this.pagForm, this.crono);
+    if (invalido) { this.modalErro = invalido; return; }
+    this.aplicando = true;
     try {
-      const fluxo = { ...this.pagForm, aplicado: true }; // #49 — marca como aplicado (bola verde)
+      // #248: `componentes` é o contrato canônico opt-in. O espelho legado
+      // preserva o cálculo até a integração do motor na #283.
+      const fluxo = fluxoPagamentoParaSalvar(this.pagForm, this.crono);
       const res = await atualizarFaseAvancado(this.estudo.id, this.modalPag.id, { fluxo_pagamento: fluxo });
       if (res?.erro) { this.modalErro = res.mensagem || 'Erro ao aplicar'; return; }
       this.fases = this.fases.map((x) => (x.id === this.modalPag.id ? { ...x, fluxo_pagamento: fluxo } : x));
