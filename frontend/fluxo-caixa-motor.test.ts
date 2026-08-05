@@ -1013,6 +1013,7 @@ test('agregarFluxoPorPeriodos: soma anual bate com a mensal em TODAS as linhas',
   const mesmaSoma = (a: number[], b: number[], nome: string) =>
     assert.ok(perto(soma(a), soma(b), 0.01), `${nome}: soma anual ≠ soma mensal`);
   mesmaSoma(anual.receitaMensal, mensal.receitaMensal, 'receita');
+  mesmaSoma(anual.receitaBrutaMensal, mensal.receitaBrutaMensal, 'receita bruta');
   mesmaSoma(anual.custoMensal, mensal.custoMensal, 'custo');
   mesmaSoma(anual.fluxoMensal, mensal.fluxoMensal, 'fluxo');
   for (let i = 0; i < mensal.linhasReceita.length; i++) {
@@ -1021,6 +1022,14 @@ test('agregarFluxoPorPeriodos: soma anual bate com a mensal em TODAS as linhas',
     assert.ok(perto(soma(la.mensal), la.total, 0.01), 'linha: colunas somam o Total');
     for (let j = 0; j < (lm.itens ?? []).length; j++) {
       mesmaSoma(la.itens![j].mensal, lm.itens![j].mensal, `tipologia ${lm.itens![j].nome}`);
+    }
+  }
+  for (let i = 0; i < mensal.linhasReceitaBruta.length; i++) {
+    const lm = mensal.linhasReceitaBruta[i]; const la = anual.linhasReceitaBruta[i];
+    mesmaSoma(la.mensal, lm.mensal, `receita bruta ${lm.nome}`);
+    assert.ok(perto(soma(la.mensal), la.total, 0.01), 'linha bruta: colunas somam o Total');
+    for (let j = 0; j < (lm.itens ?? []).length; j++) {
+      mesmaSoma(la.itens![j].mensal, lm.itens![j].mensal, `tipologia bruta ${lm.itens![j].nome}`);
     }
   }
   for (let i = 0; i < mensal.linhasCusto.length; i++) {
@@ -1727,6 +1736,42 @@ test('#283 linha opt-in alimenta juros, principal e carteira no FluxoCalc', () =
   assert.ok(perto(r.receitaBruta, r.vendaLiquidaContratada + r.jurosClientes, 0.01));
   assert.ok(perto(soma(r.receitaBrutaMensal), soma(r.principalRecebidoMensal) + soma(r.jurosClientesMensal), 0.01));
   assert.equal(soma(r.repasseMensal), 0);
+});
+
+test('#237 Receita Bruta fecha por linha e tipologia sem deduzir RET ou corretagem destacada', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 7, nome: 'Grupo Residencial', fase_label: 'Fase 1',
+      tipologias: [
+        { id: 71, nome: 'Dois quartos', quantidade: 6, area_privativa_m2: 100, preco_m2: 10_000 },
+        { id: 72, nome: 'Três quartos', quantidade: 4, area_privativa_m2: 100, preco_m2: 10_000 },
+      ],
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+      fluxo_pagamento: {
+        componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }],
+        comissao: { ativo: true, tipo: 'destacada', pct: 6 },
+        ret: { ativo: true, pct: 4 },
+      },
+    }],
+    linhasCusto: [{
+      id: 8, grupo: 'diretos', categoria: CATEGORIA_CORRETAGEM,
+      orcamento_valor: 6, orcamento_unidade: 'pct_vgv', inicio_mes: 0, duracao_meses: 1,
+    }],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  const linha = r.linhasReceitaBruta[0];
+  assert.equal(r.receitaBruta, 10_000_000);
+  assert.equal(soma(r.receitaBrutaMensal), 10_000_000);
+  assert.equal(linha.total, r.receitaBruta);
+  assert.equal(soma(linha.itens?.map((item) => item.total) ?? []), linha.total);
+  assert.equal(linha.itens?.[0].total, 6_000_000);
+  assert.equal(linha.itens?.[1].total, 4_000_000);
+  assert.equal(r.jurosClientes, 0);
+  // RET e corretagem são deduções explícitas; nenhuma reduz a Receita Bruta.
+  assert.equal(soma(r.receitaMensal), 9_600_000);
+  assert.equal(soma(r.custoMensal), 600_000);
 });
 
 test('#283 estudo legado sem componentes mantém exatamente o caminho vigente', () => {

@@ -244,6 +244,10 @@ export interface FluxoCalc {
   jurosClientes: number;
   carteiraClientesMaxima: number;
   mesCarteiraClientesMaxima: number | null;
+  // #237/#241: mesma Receita Bruta canônica, aberta por linha de receita e
+  // tipologia. `linhasReceita` permanece sendo o recebimento líquido que
+  // alimenta o fluxo (incluindo deduções de permuta financeira).
+  linhasReceitaBruta: LinhaCalc[];
   linhasReceita: LinhaCalc[];
   linhasCusto: LinhaCalc[];
 }
@@ -1529,6 +1533,7 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
     custoMensal: soma(c.custoMensal),
     fluxoMensal: soma(c.fluxoMensal),
     fluxoAcumulado: ultimo(c.fluxoAcumulado),
+    linhasReceitaBruta: c.linhasReceitaBruta.map(agregarLinha),
     linhasReceita: c.linhasReceita.map(agregarLinha),
     linhasCusto: c.linhasCusto.map(agregarLinha),
   };
@@ -1625,8 +1630,12 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
 
   // Receitas por linha (e por tipologia, proporcional ao VGV VENDÁVEL da
   // tipologia, #195 — uma tipologia 100% permutada não recebe fatia de caixa).
-  let calcReceitas: LinhaCalc[] = linhasReceita.map((l) => {
-    const mensal = receitaMensalLinha(l, crono, prazo);
+  // #237/#241: construímos as visões bruta e líquida pela mesma rotina para
+  // que Grupo/tipologia reconciliem exatamente com seus respectivos totais.
+  const montarLinhasReceita = (
+    serie: (linha: any, cronograma: EventoCrono[], prazoTotal: number) => number[],
+  ): LinhaCalc[] => linhasReceita.map((l) => {
+    const mensal = serie(l, crono, prazo);
     const vgvVendavelL = vgvVendavelLinha(l.tipologias);
     const r = recorte(mensal);
     const itens: LinhaCalc[] = (l.tipologias ?? []).map((t: any) => {
@@ -1649,8 +1658,9 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
       vpl: vplFluxo(mensal, taxa),
       mensal, itens,
     };
-  });
-  calcReceitas = calcReceitas.map((linha) => quantizarLinhaMonetaria(linha, taxa));
+  }).map((linha) => quantizarLinhaMonetaria(linha, taxa));
+  const calcReceitasBrutas = montarLinhasReceita(recebimentoBrutoMensal);
+  const calcReceitas = montarLinhasReceita(receitaMensalLinha);
 
   // Receita mensal SÓ das vendas (caixa efetivo: entrada + parcelas + repasse
   // na entrega) — calculada aqui, antes dos custos, porque o modo
@@ -1884,6 +1894,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     jurosClientes,
     carteiraClientesMaxima,
     mesCarteiraClientesMaxima,
+    linhasReceitaBruta: calcReceitasBrutas,
     linhasReceita: linhasReceitaFinal,
     linhasCusto: calcCustos,
   };

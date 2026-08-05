@@ -150,8 +150,7 @@ function varKpi(novo: number | null, base: number | null | undefined, maiorMelho
 }
 
 /**
- * Os 6 KPIs do fluxo (Resultado, TIR, VPL, Payback, Exposição máxima,
- * VGV Vendável — #188/#229).
+ * Os KPIs do fluxo, incluindo a Receita Bruta canônica (#237).
  *
  * `base` só é passada pela aba Cenários (#132): com ela, Resultado, TIR, VPL e
  * Exposição máxima ganham seta + variação % contra o cenário real. Payback é
@@ -184,6 +183,10 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
       <div class="kpi-cel">
         <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi>
         ${varKpi(c.exposicaoMaxima, base ? base.exposicaoMaxima : undefined, true)}
+      </div>
+      <div class="kpi-cel">
+        <urbi-kpi rotulo="Receita Bruta — VGV" .valor=${fmtR$(c.receitaBruta)}></urbi-kpi>
+        ${varKpi(c.receitaBruta, base ? base.receitaBruta : undefined, true)}
       </div>
       <div class="kpi-cel"
         title=${`VGV Total ${fmtR$(c.vgvTotal)} · VGV Permuta Física ${fmtR$(c.vgvPermutaFisica)} · ` +
@@ -340,38 +343,41 @@ export function tabelaFluxo(
           </tr>
         </thead>
         <tbody>
-          <!-- #229 (fechamento pendente identificado na verificação da Fase 4):
-               esta linha soma c.receitaMensal, que é o RECEBIMENTO LÍQUIDO
-               (pós-imposto, #228) — não "Receita Bruta" nem "VGV". O KPI
-               (acima) e a exportação (exportar.ts) já usam "VGV Vendável" e
-               "Receita" respectivamente; esta linha da tabela havia ficado
-               de fora e ainda carregava o rótulo antigo, reintroduzindo a
-               ambiguidade que a #229 existia para eliminar. -->
-          ${linhaTabela('grupo', 'receita', 'Receita',
-            { mensal: c.receitaMensal, total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita) }, dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true)}
-          ${!colapso['receita'] ? html`
-            <!-- #283: decomposição econômica dos recebíveis canônicos. São
-                 linhas de auditoria; o detalhamento completo da hierarquia
-                 comercial continua pertencendo à #241. -->
+          ${linhaTabela('grupo', 'receita-bruta', 'Receita Bruta — VGV',
+            { mensal: c.receitaBrutaMensal, total: c.receitaBruta, vpl: somaVpl(c.linhasReceitaBruta) },
+            dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
+          ${!colapso['receita-bruta'] ? html`
+            <!-- #237/#241: visões de auditoria não aditivas da mesma Receita
+                 Bruta: composição financeira e abertura por Grupo/tipologia. -->
             ${linhaTabela('subgrupo', '', 'Principal recebido',
               { mensal: c.principalRecebidoMensal, total: c.principalRecebidoMensal.reduce((s, v) => s + v, 0) },
-              dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true, false)}
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
             ${linhaTabela('subgrupo', '', 'Juros de clientes',
               { mensal: c.jurosClientesMensal, total: c.jurosClientes },
-              dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true, false)}
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
             ${linhaTabela('subgrupo', '', 'Repasse',
               { mensal: c.repasseMensal, total: c.repasseMensal.reduce((s, v) => s + v, 0) },
-              dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true, false)}
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
             ${linhaTabela('subgrupo', '', 'Carteira de clientes (Total = pico)',
               { mensal: c.carteiraClientesMensal, total: c.carteiraClientesMaxima },
-              dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true, false)}
-            ${c.linhasReceita.map((l) => html`
-              ${linhaTabela('subgrupo', `r${l.id}`,
-                l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, l, dataInicio, colapso, toggle, false, c.receitaBrutaVgv)}
-              ${!colapso[`r${l.id}`] ? (l.itens ?? []).map((t) =>
-                linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.receitaBrutaVgv)) : nothing}
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
+            ${c.linhasReceitaBruta.map((l) => html`
+              ${linhaTabela('subgrupo', `rb${l.id}`,
+                l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, l, dataInicio, colapso, toggle, false, c.vgvVendavel)}
+              ${!colapso[`rb${l.id}`] ? (l.itens ?? []).map((t) =>
+                linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.vgvVendavel)) : nothing}
             `)}
           ` : nothing}
+
+          ${linhaTabela('grupo', 'receita-liquida', 'Receita Líquida do Projeto',
+            { mensal: c.receitaMensal, total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita) },
+            dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
+          ${!colapso['receita-liquida'] ? c.linhasReceita.map((l) => html`
+            ${linhaTabela('subgrupo', `rl${l.id}`,
+              l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, l, dataInicio, colapso, toggle, false, c.vgvVendavel)}
+            ${!colapso[`rl${l.id}`] ? (l.itens ?? []).map((t) =>
+              linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.vgvVendavel)) : nothing}
+          `) : nothing}
 
           ${linhaTabela('grupo', '', 'Custo Total',
             { mensal: c.custoMensal, total: c.custoMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasCusto) }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv, false, false)}
@@ -393,8 +399,9 @@ export function tabelaFluxo(
 
 /** Chaves de colapso de todos os grupos expansíveis (para "recolher/expandir tudo"). */
 export function chavesColapso(c: FluxoCalc): string[] {
-  return ['receita', 'custo-terreno', 'custo-obra', 'custo-diretos', 'custo-indireto', 'custo-financeiro',
-    ...c.linhasReceita.map((l) => `r${l.id}`)];
+  return ['receita-bruta', 'receita-liquida', 'custo-terreno', 'custo-obra', 'custo-diretos', 'custo-indireto', 'custo-financeiro',
+    ...c.linhasReceitaBruta.map((l) => `rb${l.id}`),
+    ...c.linhasReceita.map((l) => `rl${l.id}`)];
 }
 
 /** Chaves de colapso da tabela de Capital Stack (item 2 — funding-capital-stack.md §10). */
