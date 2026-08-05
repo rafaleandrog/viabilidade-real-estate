@@ -19,7 +19,7 @@ jobs:
     name: PR que fecha issue precisa alterar arquivo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # precisa do histórico para o merge-base do diff
       - name: Verificar diff vs. issues fechadas
@@ -73,7 +73,7 @@ jobs:
     name: Aspas curvas em posição de atributo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Guard de aspas curvas
         run: |
           set -uo pipefail
@@ -92,7 +92,7 @@ jobs:
     name: PR que cita issue declara se fecha
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # precisa do histórico para ler as mensagens dos commits do PR
       - name: Guard de fechamento de issue
@@ -117,7 +117,7 @@ jobs:
     name: schema.json e manifesto.json são JSON estrito
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Guard de JSON estrito
         run: |
           set -uo pipefail
