@@ -209,9 +209,9 @@ export function validarAbsorcao(a: any): string | null {
 
 /**
  * Valida o JSON de fluxo de pagamento de uma FASE (Lote 6 · #20).
- * Entrada e Parcelamento aceitam **múltiplas linhas** (lista) ou objeto único
- * (legado). O Repasse é **derivado** (100 − Σentrada − Σparcelas), então NÃO há
- * validação de soma = 100%.
+ * O contrato canônico (`componentes`) exige soma de 100%. Entrada e
+ * Parcelamento ainda aceitam múltiplas linhas (lista) ou objeto único legado;
+ * nesse shape o Repasse é derivado (100 − Σentrada − Σparcelas).
  */
 export function validarFluxoPagamento(fp: any): string | null {
   if (fp === null || fp === undefined) return null; // ausente = default
