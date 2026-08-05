@@ -6,7 +6,8 @@ import {
   recebimentoBrutoMensal, impostoMensal, recebimentoLiquidoMensal,
   componentesDoLegado, componentesPagamento, ultimoMesRecebivelLinha,
   pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
-  carteiraSaldoSafra, jurosSafra, receitaBrutaSafra, componentesEfetivosSafra,
+  carteiraSaldoSafra, consolidarCarteiraClientes,
+  jurosSafra, receitaBrutaSafra, componentesEfetivosSafra, ehVendaAposChaves,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
@@ -1245,7 +1246,8 @@ test('pagamentosPrazoFixo: sinal no mês da safra, parcelas de safra+1 até safr
   assert.equal(parcelas.length, 36);
   assert.equal(Math.min(...parcelas.map((p) => p.mes)), 2); // safra 1 + defasagem 1 = mês 2
   assert.equal(Math.max(...parcelas.map((p) => p.mes)), 37); // última parcela = 1 + 1 + 36 - 1
-  for (const p of parcelas) assert.ok(perto(p.valor, 11_059.94, 0.01));
+  for (const p of parcelas.slice(0, -1)) assert.equal(p.valor, 11_059.94);
+  assert.equal(parcelas[35].valor, 11_059.93); // resíduo de centavos da 36ª
 });
 
 test('pagamentosPrazoFixo: sem sinal e taxa zero, VP das parcelas = valor contratado (fecha 100%)', () => {
@@ -1259,6 +1261,20 @@ test('pagamentosPrazoFixo: sem sinal e taxa zero, VP das parcelas = valor contra
   assert.ok(perto(soma(pagamentos.map((p) => p.valor)), 1_200_000, 1e-6));
   assert.equal(Math.min(...pagamentos.map((p) => p.mes)), 6); // 5+1
   assert.equal(Math.max(...pagamentos.map((p) => p.mes)), 17); // 5+1+12-1
+});
+
+test('pagamentosPrazoFixo: 36ª parcela absorve o resíduo de centavos, sem criar 37ª', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }> = {
+    tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 15, prazoMeses: 36,
+    defasagemMeses: 1, taxaMensal: Math.pow(1.15, 1 / 12) - 1, jurosNoMesDaContratacao: false,
+  };
+  const pagamentos = pagamentosPrazoFixo(c, 0, 2_860_111.52);
+  const parcelas = pagamentos.filter((p) => p.tipo === 'parcela');
+  const principal = 2_860_111.52 - pagamentos.find((p) => p.tipo === 'sinal')!.valor;
+  const totalEsperado = Math.round(pmt(c.taxaMensal, 36, principal) * 36 * 100) / 100;
+  assert.equal(parcelas.length, 36);
+  assert.equal(Math.round(soma(parcelas.map((p) => p.valor)) * 100) / 100, totalEsperado);
+  assert.notEqual(parcelas[35].valor, parcelas[0].valor); // somente a última recebe o resíduo
 });
 
 test('pagamentosPrazoFixo: valorContratado <= 0 não gera pagamento', () => {
@@ -1320,6 +1336,19 @@ test('pagamentosAteMarco: valorContratado <= 0 não gera pagamento nem avalia N_
     defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false,
   };
   assert.deepEqual(pagamentosAteMarco(c, 10, 0), []); // não lança, mesmo com N_s negativo
+});
+
+test('#233: última parcela até marco absorve os centavos e encerra exatamente no marco', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'ate_marco' }> = {
+    tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 7,
+    defasagemMeses: 1, taxaMensal: 0.01, jurosNoMesDaContratacao: false,
+  };
+  const pagamentos = pagamentosAteMarco(c, 1, 1_000_000);
+  const totalEsperado = Math.round(pmt(0.01, 6, 1_000_000) * 6 * 100) / 100;
+  assert.equal(pagamentos.length, 6);
+  assert.equal(pagamentos.at(-1)!.mes, 7);
+  assert.ok(pagamentos.every((p) => Number.isInteger(p.valor * 100)));
+  assert.equal(Math.round(soma(pagamentos.map((p) => p.valor)) * 100) / 100, totalEsperado);
 });
 
 // Reconciliação de ponta a ponta contra o Anexo G.2 (Calliandra até Obra +
@@ -1393,6 +1422,16 @@ test('pagamentosConcentrado: liquidação integral — um único pagamento no m�
   assert.equal(r[0].tipo, 'concentrado');
 });
 
+test('#234: repasse é monetário, nunca antecede a contratação e liquida múltiplas safras no marco', () => {
+  const c: Extract<ComponentePagamento, { tipo: 'concentrado' }> = {
+    tipo: 'concentrado', participacaoPct: 70, mesPagamento: 25, taxaMensal: 0.01,
+  };
+  const pagamentos = [1, 2, 12].flatMap((safra) => pagamentosConcentrado(c, safra, 1_000_000));
+  assert.equal(pagamentos.length, 3);
+  assert.ok(pagamentos.every((p) => p.mes === 25 && p.valor === Number(p.valor.toFixed(2))));
+  assert.throws(() => pagamentosConcentrado(c, 26, 1_000_000), /anterior à safra|não pode ser antecipado/);
+});
+
 // ─────────────────────────────────────────────────────────────────
 // #236 — Carteira: saldo por safra e componente, nunca agregado
 // ─────────────────────────────────────────────────────────────────
@@ -1459,6 +1498,42 @@ test('carteiraSaldoSafra: duas safras do mesmo componente NUNCA se somam num sal
   assert.equal(safra2.find((s) => s.mes === 2)!.saldo, 300);
 });
 
+test('#236: carteira consolidada soma componentes, calcula a máxima e termina em zero', () => {
+  const componentes: ComponentePagamento[] = [
+    { tipo: 'prazo_fixo', participacaoPct: 30, sinalPct: 0, prazoMeses: 4, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false },
+    { tipo: 'ate_marco', participacaoPct: 20, sinalPct: 0, marcoMes: 6, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false },
+    { tipo: 'concentrado', participacaoPct: 50, mesPagamento: 7, taxaMensal: 0 },
+  ];
+  const base = consolidarCarteiraClientes(componentes, [
+    { safra: 1, valorContratado: 1_000 },
+    { safra: 2, valorContratado: 1_000 },
+  ], 6);
+  const comVendaAposChaves = consolidarCarteiraClientes(componentes, [
+    { safra: 1, valorContratado: 1_000 },
+    { safra: 2, valorContratado: 1_000 },
+    { safra: 8, valorContratado: 5_000 }, // à vista: não cria carteira
+  ], 6);
+
+  assert.deepEqual(comVendaAposChaves, base);
+  assert.ok(base.carteiraMaxima > 0);
+  assert.ok(base.mesCarteiraMaxima !== null);
+  assert.equal(base.mensal.at(-1)!.mes, 7);
+  assert.equal(base.mensal.at(-1)!.total, 0);
+  for (const ponto of base.mensal) {
+    assert.equal(ponto.total, Math.round((ponto.prazoFixo + ponto.ateMarco + ponto.concentrado) * 100) / 100);
+    assert.ok(ponto.prazoFixo >= 0 && ponto.ateMarco >= 0 && ponto.concentrado >= 0);
+  }
+});
+
+test('#236: carteira vazia tem máxima zero e nenhum mês de ocorrência', () => {
+  const r = consolidarCarteiraClientes([], [], 24);
+  assert.deepEqual(r, {
+    mensal: [{ mes: 0, prazoFixo: 0, ateMarco: 0, concentrado: 0, total: 0 }],
+    carteiraMaxima: 0,
+    mesCarteiraMaxima: null,
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────
 // #237 — Receita Bruta = líquido + juros = bruto − descontos + juros
 // ─────────────────────────────────────────────────────────────────
@@ -1517,6 +1592,12 @@ const COMPONENTES_GRUPO_PADRAO: ComponentePagamento[] = [
   { tipo: 'ate_marco', participacaoPct: 20, sinalPct: 0, marcoMes: 24, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false },
   { tipo: 'concentrado', participacaoPct: 30, mesPagamento: 25, taxaMensal: 0 },
 ];
+
+test('#235: fronteira temporal classifica somente meses posteriores à entrega como Após-chaves', () => {
+  assert.equal(ehVendaAposChaves(23, 24), false);
+  assert.equal(ehVendaAposChaves(24, 24), false);
+  assert.equal(ehVendaAposChaves(25, 24), true);
+});
 
 test('componentesEfetivosSafra: venda no último mês antes da entrega mantém os componentes normais', () => {
   const mesEntrega = 24;

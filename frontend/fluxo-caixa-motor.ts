@@ -587,13 +587,23 @@ export function pagamentosPrazoFixo(
 ): PagamentoSafra[] {
   const valor = valorContratado * (c.participacaoPct / 100);
   if (valor <= 0) return [];
-  const sinal = valor * (c.sinalPct / 100);
-  const principal = valor - sinal;
+  // O plano de uma safra também é monetário (C7): sinal e principal já
+  // nascem em centavos. As 36 PMTs podem deixar um resíduo de arredondamento;
+  // ele vai exclusivamente para a última parcela, sem criar uma 37ª.
+  const sinal = round2(valor * (c.sinalPct / 100));
+  const principal = round2(valor - sinal);
   const out: PagamentoSafra[] = [];
   if (sinal > 0) out.push({ safra, mes: safra, tipo: 'sinal', valor: sinal });
-  const parcela = pmt(c.taxaMensal, c.prazoMeses, principal);
+  const parcelaBruta = pmt(c.taxaMensal, c.prazoMeses, principal);
+  const totalParcelas = round2(parcelaBruta * c.prazoMeses);
+  const parcela = round2(parcelaBruta);
+  let parcelasAnteriores = 0;
   for (let k = 1; k <= c.prazoMeses; k++) {
-    out.push({ safra, mes: safra + c.defasagemMeses + (k - 1), tipo: 'parcela', valor: parcela });
+    const valorParcela = k === c.prazoMeses
+      ? round2(totalParcelas - parcelasAnteriores)
+      : parcela;
+    out.push({ safra, mes: safra + c.defasagemMeses + (k - 1), tipo: 'parcela', valor: valorParcela });
+    parcelasAnteriores = round2(parcelasAnteriores + valorParcela);
   }
   return out;
 }
@@ -620,8 +630,8 @@ export function pagamentosAteMarco(
 ): PagamentoSafra[] {
   const valor = valorContratado * (c.participacaoPct / 100);
   if (valor <= 0) return [];
-  const sinal = valor * (c.sinalPct / 100);
-  const principal = valor - sinal;
+  const sinal = round2(valor * (c.sinalPct / 100));
+  const principal = round2(valor - sinal);
   const nParcelas = c.marcoMes - safra - (c.defasagemMeses - 1);
   if (nParcelas <= 0) {
     throw new Error(
@@ -631,9 +641,16 @@ export function pagamentosAteMarco(
   }
   const out: PagamentoSafra[] = [];
   if (sinal > 0) out.push({ safra, mes: safra, tipo: 'sinal', valor: sinal });
-  const parcela = pmt(c.taxaMensal, nParcelas, principal);
+  const parcelaBruta = pmt(c.taxaMensal, nParcelas, principal);
+  const totalParcelas = round2(parcelaBruta * nParcelas);
+  const parcela = round2(parcelaBruta);
+  let parcelasAnteriores = 0;
   for (let k = 1; k <= nParcelas; k++) {
-    out.push({ safra, mes: safra + c.defasagemMeses + (k - 1), tipo: 'parcela', valor: parcela });
+    const valorParcela = k === nParcelas
+      ? round2(totalParcelas - parcelasAnteriores)
+      : parcela;
+    out.push({ safra, mes: safra + c.defasagemMeses + (k - 1), tipo: 'parcela', valor: valorParcela });
+    parcelasAnteriores = round2(parcelasAnteriores + valorParcela);
   }
   return out;
 }
@@ -658,13 +675,19 @@ export function pagamentosConcentrado(
   safra: number,
   valorContratado: number,
 ): PagamentoSafra[] {
-  const principal = valorContratado * (c.participacaoPct / 100);
+  const principal = round2(valorContratado * (c.participacaoPct / 100));
   if (principal <= 0) return [];
+  if (c.mesPagamento < safra) {
+    throw new Error(
+      `pagamentosConcentrado: mês de pagamento ${c.mesPagamento} anterior à safra ${safra}. ` +
+      'O repasse não pode ser antecipado para antes da contratação (#234).',
+    );
+  }
   // #234: saldo_s,s = principal (0 períodos decorridos no próprio mês da
   // safra); em mesPagamento já decorreram (mesPagamento − safra) períodos —
   // nunca negativo, pagamento na própria safra ou antes não acumula juros.
   const mesesDeJuros = Math.max(0, c.mesPagamento - safra);
-  const valor = principal * Math.pow(1 + c.taxaMensal, mesesDeJuros);
+  const valor = round2(principal * Math.pow(1 + c.taxaMensal, mesesDeJuros));
   return [{ safra, mes: c.mesPagamento, tipo: 'concentrado', valor }];
 }
 
@@ -700,11 +723,11 @@ export function carteiraSaldoSafra(
   if (c.tipo === 'concentrado') {
     const pagamentos = pagamentosConcentrado(c, safra, valorContratado);
     if (pagamentos.length === 0) return [];
-    const principal = valorContratado * (c.participacaoPct / 100);
+    const principal = round2(valorContratado * (c.participacaoPct / 100));
     const out: SaldoSafra[] = [{ safra, mes: safra, saldo: principal }];
     let saldo = principal;
     for (let mes = safra + 1; mes <= c.mesPagamento; mes++) {
-      saldo = mes === c.mesPagamento ? 0 : saldo * (1 + c.taxaMensal);
+      saldo = mes === c.mesPagamento ? 0 : round2(saldo * (1 + c.taxaMensal));
       out.push({ safra, mes, saldo: Math.max(0, saldo) });
     }
     return out;
@@ -716,7 +739,8 @@ export function carteiraSaldoSafra(
   if (pagamentos.length === 0) return [];
 
   const valor = valorContratado * (c.participacaoPct / 100);
-  const principal = valor - valor * (c.sinalPct / 100);
+  const sinal = round2(valor * (c.sinalPct / 100));
+  const principal = round2(valor - sinal);
   const porMes = new Map<number, number>();
   let ultimoMes = safra;
   for (const p of pagamentos) {
@@ -728,7 +752,7 @@ export function carteiraSaldoSafra(
   const out: SaldoSafra[] = [{ safra, mes: safra, saldo: principal }];
   let saldo = principal;
   for (let mes = safra + 1; mes <= ultimoMes; mes++) {
-    saldo = saldo * (1 + c.taxaMensal) - (porMes.get(mes) ?? 0);
+    saldo = round2(saldo * (1 + c.taxaMensal) - (porMes.get(mes) ?? 0));
     if (mes === ultimoMes) saldo = 0;
     out.push({ safra, mes, saldo: Math.max(0, saldo) });
   }
@@ -749,12 +773,13 @@ export function jurosSafra(
   valorContratado: number,
 ): number {
   if (c.tipo === 'imediato') return 0;
+  if (c.taxaMensal === 0) return 0;
 
   if (c.tipo === 'concentrado') {
     const pagamentos = pagamentosConcentrado(c, safra, valorContratado);
     if (pagamentos.length === 0) return 0;
-    const principal = valorContratado * (c.participacaoPct / 100);
-    return pagamentos[0].valor - principal;
+    const principal = round2(valorContratado * (c.participacaoPct / 100));
+    return round2(pagamentos[0].valor - principal);
   }
 
   const pagamentos = c.tipo === 'prazo_fixo'
@@ -763,11 +788,12 @@ export function jurosSafra(
   if (pagamentos.length === 0) return 0;
 
   const valor = valorContratado * (c.participacaoPct / 100);
-  const principal = valor - valor * (c.sinalPct / 100);
-  const totalParcelas = pagamentos
+  const sinal = round2(valor * (c.sinalPct / 100));
+  const principal = round2(valor - sinal);
+  const totalParcelas = round2(pagamentos
     .filter((p) => p.tipo === 'parcela')
-    .reduce((soma, p) => soma + p.valor, 0);
-  return totalParcelas - principal;
+    .reduce((soma, p) => soma + p.valor, 0));
+  return round2(totalParcelas - principal);
 }
 
 /**
@@ -785,6 +811,12 @@ export function receitaBrutaSafra(
   safra: number,
   valorContratado: number,
 ): number {
+  if (componentes.every((c) => c.tipo === 'imediato' || c.taxaMensal === 0)) {
+    const descontos = componentes
+      .filter((c): c is Extract<ComponentePagamento, { tipo: 'imediato' }> => c.tipo === 'imediato')
+      .reduce((total, c) => total + valorContratado * (c.participacaoPct / 100) * (c.descontoPct / 100), 0);
+    return round2(valorContratado - descontos);
+  }
   let total = 0;
   for (const c of componentes) {
     if (c.tipo === 'imediato') {
@@ -798,7 +830,7 @@ export function receitaBrutaSafra(
       total += pagamentos.reduce((s, p) => s + p.valor, 0);
     }
   }
-  return total;
+  return round2(total);
 }
 
 /**
@@ -813,13 +845,90 @@ export function receitaBrutaSafra(
  * pelos componentes normais; contratos antigos (de safras anteriores) não
  * são afetados — cada safra é tratada isoladamente, como em todo este motor.
  */
+export function ehVendaAposChaves(safra: number, mesEntrega: number): boolean {
+  return safra > mesEntrega;
+}
+
 export function componentesEfetivosSafra(
   componentes: ComponentePagamento[],
   safra: number,
   mesEntrega: number,
 ): ComponentePagamento[] {
-  if (safra <= mesEntrega) return componentes;
+  if (!ehVendaAposChaves(safra, mesEntrega)) return componentes;
   return [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }];
+}
+
+/** Uma contratação mensal usada para consolidar a carteira econômica (#236). */
+export interface ContratacaoSafra {
+  safra: number;
+  valorContratado: number;
+}
+
+/** Saldos mensais abertos pelas três famílias financiadas do contrato. */
+export interface CarteiraClientesMensal {
+  mes: number;
+  prazoFixo: number;
+  ateMarco: number;
+  concentrado: number;
+  total: number;
+}
+
+export interface CarteiraClientesConsolidada {
+  mensal: CarteiraClientesMensal[];
+  carteiraMaxima: number;
+  mesCarteiraMaxima: number | null;
+}
+
+/**
+ * #236: soma as carteiras por safra sem criar uma recorrência agregada.
+ * Vendas Após-chaves passam antes por `componentesEfetivosSafra` e, portanto,
+ * entram à vista sem criar saldo. A série começa no mês zero e termina somente
+ * quando todos os componentes financiados zeram.
+ */
+export function consolidarCarteiraClientes(
+  componentes: ComponentePagamento[],
+  contratacoes: ContratacaoSafra[],
+  mesEntrega: number,
+): CarteiraClientesConsolidada {
+  type Parcial = Omit<CarteiraClientesMensal, 'mes' | 'total'>;
+  const porMes = new Map<number, Parcial>();
+  let ultimoMes = 0;
+
+  for (const contratacao of contratacoes) {
+    const efetivos = componentesEfetivosSafra(componentes, contratacao.safra, mesEntrega);
+    for (const componente of efetivos) {
+      if (componente.tipo === 'imediato') continue;
+      const campo: keyof Parcial = componente.tipo === 'prazo_fixo'
+        ? 'prazoFixo'
+        : componente.tipo === 'ate_marco' ? 'ateMarco' : 'concentrado';
+      for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)) {
+        const atual = porMes.get(ponto.mes) ?? { prazoFixo: 0, ateMarco: 0, concentrado: 0 };
+        atual[campo] = round2(atual[campo] + ponto.saldo);
+        porMes.set(ponto.mes, atual);
+        ultimoMes = Math.max(ultimoMes, ponto.mes);
+      }
+    }
+  }
+
+  const mensal: CarteiraClientesMensal[] = [];
+  for (let mes = 0; mes <= ultimoMes; mes++) {
+    const parcial = porMes.get(mes) ?? { prazoFixo: 0, ateMarco: 0, concentrado: 0 };
+    mensal.push({
+      mes,
+      ...parcial,
+      total: round2(parcial.prazoFixo + parcial.ateMarco + parcial.concentrado),
+    });
+  }
+
+  let carteiraMaxima = 0;
+  let mesCarteiraMaxima: number | null = null;
+  for (const ponto of mensal) {
+    if (ponto.total > carteiraMaxima) {
+      carteiraMaxima = ponto.total;
+      mesCarteiraMaxima = ponto.mes;
+    }
+  }
+  return { mensal, carteiraMaxima, mesCarteiraMaxima };
 }
 
 // ─────────────────────────────────────────────────────────────────
