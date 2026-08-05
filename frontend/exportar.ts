@@ -167,6 +167,14 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
     nivel: 0, nome: 'Receita', custo: false,
     total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita), mensal: c.receitaMensal,
   });
+  // #283: séries econômicas do contrato canônico. Carteira é estoque, por
+  // isso a coluna Total mostra o pico, enquanto as demais linhas são fluxos.
+  linhas.push(
+    { nivel: 1, nome: 'Principal recebido', custo: false, total: c.principalRecebidoMensal.reduce((s, v) => s + v, 0), mensal: c.principalRecebidoMensal },
+    { nivel: 1, nome: 'Juros de clientes', custo: false, total: c.jurosClientes, mensal: c.jurosClientesMensal },
+    { nivel: 1, nome: 'Repasse', custo: false, total: c.repasseMensal.reduce((s, v) => s + v, 0), mensal: c.repasseMensal },
+    { nivel: 1, nome: 'Carteira de clientes (pico)', custo: false, total: c.carteiraClientesMaxima, mensal: c.carteiraClientesMensal },
+  );
   for (const l of c.linhasReceita) {
     linhas.push({
       nivel: 1, nome: l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, custo: false,
@@ -289,6 +297,9 @@ export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string |
   rows.push(`Venda Bruta Contratada;${fmtR$(c.vendaBrutaContratada, false)}`);
   rows.push(`Desconto Comercial;${fmtR$(c.descontoComercial, false)}`);
   rows.push(`Venda Líquida Contratada;${fmtR$(c.vendaLiquidaContratada, false)}`);
+  rows.push(`Juros de Clientes;${fmtR$(c.jurosClientes, false)}`);
+  rows.push(`Carteira Máxima;${fmtR$(c.carteiraClientesMaxima, false)}`);
+  rows.push(`Mês da Carteira Máxima;${c.mesCarteiraClientesMaxima === null ? '' : c.meses[c.mesCarteiraClientesMaxima] ?? `M${c.mesCarteiraClientesMaxima + 1}`}`);
   const nome = (estudo.id_legivel || 'estudo') + '_fluxo-caixa.csv';
   baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
 }
@@ -357,6 +368,8 @@ export function exportarFluxoPDF(
     ['Venda Bruta Contratada', fmtR$(c.vendaBrutaContratada)],
     ['Desconto Comercial', fmtR$(c.descontoComercial)],
     ['Venda Líquida Contratada', fmtR$(c.vendaLiquidaContratada)],
+    ['Juros de Clientes', fmtR$(c.jurosClientes)],
+    ['Carteira Máxima', fmtR$(c.carteiraClientesMaxima)],
   ];
   const cab = `
     <h1>${estudo.nome_exibicao || estudo.nome}</h1>

@@ -5,16 +5,20 @@ import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
 
 // FluxoCalc mínimo para exercitar validarFluxoCalc — só os campos que a
 // invariante lê precisam existir de fato.
-const fluxoBase = (vendaLiquidaContratada: number, receitaBruta: number): FluxoCalc => ({
+const fluxoBase = (vendaLiquidaContratada: number, receitaBruta: number, jurosClientes = 0): FluxoCalc => ({
   prazo: 1, meses: ['jan/27'], receitaMensal: [], custoMensal: [], fluxoMensal: [], fluxoAcumulado: [],
   vgvTotal: 0, vpl: 0, tir: null, paybackMes: null, paybackData: null, exposicaoMaxima: 0,
   vgvPermutaFisica: 0, receitaBrutaVgv: 0, vgvVendavel: 0,
-  vendaBrutaContratada: 0, descontoComercial: 0, vendaLiquidaContratada, receitaBruta,
+  vendaBrutaContratada: 0, descontoComercial: 0, vendaLiquidaContratada, receitaBruta, jurosClientes,
   linhasReceita: [], linhasCusto: [],
 } as unknown as FluxoCalc);
 
 test('validarFluxoCalc: cenário válido (Receita Bruta = venda líquida contratada) não gera divergência', () => {
   assert.deepEqual(validarFluxoCalc(fluxoBase(1_000_000, 1_000_000)), []);
+});
+
+test('#283 validarFluxoCalc inclui juros de clientes na reconciliação', () => {
+  assert.deepEqual(validarFluxoCalc(fluxoBase(1_000_000, 1_120_000, 120_000)), []);
 });
 
 test('validarFluxoCalc: diferença de centavos DENTRO da tolerância não diverge', () => {
@@ -35,6 +39,38 @@ test('validarFluxoCalc: receita não conservada (menor que o contratado)', () =>
   const r = validarFluxoCalc(fluxoBase(1_000_000, 900_000));
   assert.equal(r.length, 1);
   assert.equal(r[0].diferenca, -100_000);
+});
+
+test('#283 validarFluxoCalc reconcilia Receita Bruta mensal = principal + juros', () => {
+  const fluxo = {
+    ...fluxoBase(100, 110, 10),
+    receitaBrutaMensal: [110], principalRecebidoMensal: [100], jurosClientesMensal: [10],
+    carteiraClientesMensal: [0], repasseMensal: [40],
+  };
+  assert.deepEqual(validarFluxoCalc(fluxo), []);
+
+  const divergencias = validarFluxoCalc({ ...fluxo, principalRecebidoMensal: [90] });
+  assert.equal(divergencias.find((d) => d.codigo === 'RECEITA_MENSAL_NAO_RECONCILIA')?.mes, 0);
+});
+
+test('#283 validarFluxoCalc exige carteira zerada no fim do horizonte', () => {
+  const fluxo = {
+    ...fluxoBase(100, 100),
+    receitaBrutaMensal: [100], principalRecebidoMensal: [100], jurosClientesMensal: [0],
+    carteiraClientesMensal: [25], repasseMensal: [0],
+  };
+  const divergencia = validarFluxoCalc(fluxo).find((d) => d.codigo === 'CARTEIRA_FINAL_NAO_ZERA');
+  assert.equal(divergencia?.encontrado, 25);
+});
+
+test('#283 validarFluxoCalc impede classificar como repasse valor maior que o recebido', () => {
+  const fluxo = {
+    ...fluxoBase(100, 100),
+    receitaBrutaMensal: [100], principalRecebidoMensal: [100], jurosClientesMensal: [0],
+    carteiraClientesMensal: [0], repasseMensal: [100.02],
+  };
+  const divergencia = validarFluxoCalc(fluxo).find((d) => d.codigo === 'REPASSE_SUPERA_RECEITA');
+  assert.equal(divergencia?.mes, 0);
 });
 
 // ── validarComponentesSafra ──────────────────────────────────────────────

@@ -8,8 +8,8 @@ import {
 
 // Fixture dourada de recebíveis por safra (#220 / EVI-001). Estes testes validam
 // o ORÁCULO de referência contra os valores documentados no Anexo G — reproduzidos
-// por construção, não por cópia. Conforme #232–#237 implementarem safras no motor
-// de produção, o motor passa a ser comparado contra este mesmo oráculo.
+// por construção, não por cópia. Desde a #283, o motor de produção é comparado
+// contra este mesmo oráculo em fluxo-caixa-motor.test.ts.
 
 // Tolerância monetária EXPLÍCITA. O resíduo (< R$ 0,05 observado) vem de dois
 // arredondamentos legítimos: a participação da tabela longa é "≈ 64,81%" no

@@ -349,12 +349,29 @@ export function tabelaFluxo(
                ambiguidade que a #229 existia para eliminar. -->
           ${linhaTabela('grupo', 'receita', 'Receita',
             { mensal: c.receitaMensal, total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita) }, dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true)}
-          ${!colapso['receita'] ? c.linhasReceita.map((l) => html`
-            ${linhaTabela('subgrupo', `r${l.id}`,
-              l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, l, dataInicio, colapso, toggle, false, c.receitaBrutaVgv)}
-            ${!colapso[`r${l.id}`] ? (l.itens ?? []).map((t) =>
-              linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.receitaBrutaVgv)) : nothing}
-          `) : nothing}
+          ${!colapso['receita'] ? html`
+            <!-- #283: decomposição econômica dos recebíveis canônicos. São
+                 linhas de auditoria; o detalhamento completo da hierarquia
+                 comercial continua pertencendo à #241. -->
+            ${linhaTabela('subgrupo', '', 'Principal recebido',
+              { mensal: c.principalRecebidoMensal, total: c.principalRecebidoMensal.reduce((s, v) => s + v, 0) },
+              dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true, false)}
+            ${linhaTabela('subgrupo', '', 'Juros de clientes',
+              { mensal: c.jurosClientesMensal, total: c.jurosClientes },
+              dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true, false)}
+            ${linhaTabela('subgrupo', '', 'Repasse',
+              { mensal: c.repasseMensal, total: c.repasseMensal.reduce((s, v) => s + v, 0) },
+              dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true, false)}
+            ${linhaTabela('subgrupo', '', 'Carteira de clientes (Total = pico)',
+              { mensal: c.carteiraClientesMensal, total: c.carteiraClientesMaxima },
+              dataInicio, colapso, toggle, false, c.receitaBrutaVgv, true, false)}
+            ${c.linhasReceita.map((l) => html`
+              ${linhaTabela('subgrupo', `r${l.id}`,
+                l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, l, dataInicio, colapso, toggle, false, c.receitaBrutaVgv)}
+              ${!colapso[`r${l.id}`] ? (l.itens ?? []).map((t) =>
+                linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.receitaBrutaVgv)) : nothing}
+            `)}
+          ` : nothing}
 
           ${linhaTabela('grupo', '', 'Custo Total',
             { mensal: c.custoMensal, total: c.custoMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasCusto) }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv, false, false)}

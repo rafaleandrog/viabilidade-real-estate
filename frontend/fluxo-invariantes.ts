@@ -4,12 +4,9 @@
 // Sem DOM, coberto por testes unitários (fluxo-invariantes.test.ts).
 //
 // Duas camadas:
-//  1. Invariantes do fluxo consolidado (`FluxoCalc`) já em produção. Hoje a
-//     identidade de receita se reduz a um caso trivial porque o motor de
-//     safras (#232-#237) ainda não está ligado a `calcularFluxo` (decisão
-//     registrada para a Fase 9, #270) — sem juros wireados, `receitaBruta`
-//     deve ser EXATAMENTE `vendaLiquidaContratada` (#237). A checagem fica
-//     pronta para quando os juros entrarem no fluxo consolidado.
+//  1. Invariantes do fluxo consolidado (`FluxoCalc`) em produção. A #283 liga
+//     safras e juros ao cálculo real: `receitaBruta` deve ser exatamente a
+//     venda líquida contratada mais os juros recebidos (#237).
 //  2. Invariantes do motor de safras/componentes (#232-#237): já existe como
 //     funções puras testadas (`fluxo-caixa-motor.ts`) mas ainda não é
 //     consumido pela tela — a emenda da #240 pede exatamente as quatro
@@ -49,22 +46,56 @@ export const TOLERANCIA_PADRAO = 0.01;
 
 /**
  * Invariante de receita do fluxo consolidado: Receita Bruta = venda líquida
- * contratada + juros (#237). O motor de safras ainda não alimenta juros
- * aqui, então a identidade vigente é `receitaBruta === vendaLiquidaContratada`
- * — qualquer divergência é ERRO de implementação (bug), não premissa
- * agressiva, porque nada no fluxo consolidado gera juros hoje.
+ * contratada + juros (#237/#283). Qualquer divergência é erro de implementação.
  */
 export function validarFluxoCalc(r: FluxoCalc, tol: number = TOLERANCIA_PADRAO): Divergencia[] {
-  const esperado = r.vendaLiquidaContratada;
+  const out: Divergencia[] = [];
+  const esperado = r.vendaLiquidaContratada + (r.jurosClientes ?? 0);
   const encontrado = r.receitaBruta;
-  if (Math.abs(esperado - encontrado) <= tol) return [];
-  return [{
-    codigo: 'RECEITA_BRUTA_NAO_CONSERVA',
-    severidade: 'erro',
-    esperado, encontrado, diferenca: encontrado - esperado,
-    mensagem: `Receita Bruta (${encontrado}) não bate com a venda líquida contratada (${esperado}) — ` +
-      'sem juros ligados ao motor consolidado, as duas devem ser iguais.',
-  }];
+  if (Math.abs(esperado - encontrado) > tol) {
+    out.push({
+      codigo: 'RECEITA_BRUTA_NAO_CONSERVA',
+      severidade: 'erro',
+      esperado, encontrado, diferenca: encontrado - esperado,
+      mensagem: `Receita Bruta (${encontrado}) não bate com contratação líquida + juros (${esperado}).`,
+    });
+  }
+
+  const bruto = r.receitaBrutaMensal ?? [];
+  const principal = r.principalRecebidoMensal ?? [];
+  const juros = r.jurosClientesMensal ?? [];
+  for (let mes = 0; mes < bruto.length; mes++) {
+    const esperadoMes = (principal[mes] ?? 0) + (juros[mes] ?? 0);
+    if (Math.abs(esperadoMes - bruto[mes]) <= tol) continue;
+    out.push({
+      codigo: 'RECEITA_MENSAL_NAO_RECONCILIA', severidade: 'erro', mes,
+      esperado: esperadoMes, encontrado: bruto[mes], diferenca: bruto[mes] - esperadoMes,
+      mensagem: `Mês ${mes + 1}: Receita Bruta não bate com principal recebido + juros de clientes.`,
+    });
+    break;
+  }
+
+  const carteira = r.carteiraClientesMensal ?? [];
+  const saldoFinal = carteira[carteira.length - 1] ?? 0;
+  if (Math.abs(saldoFinal) > tol) {
+    out.push({
+      codigo: 'CARTEIRA_FINAL_NAO_ZERA', severidade: 'erro', mes: Math.max(0, carteira.length - 1),
+      esperado: 0, encontrado: saldoFinal, diferenca: saldoFinal,
+      mensagem: `Carteira de clientes não zera no fim do horizonte — saldo ${saldoFinal}.`,
+    });
+  }
+
+  const repasse = r.repasseMensal ?? [];
+  for (let mes = 0; mes < repasse.length; mes++) {
+    if ((repasse[mes] ?? 0) <= (bruto[mes] ?? 0) + tol) continue;
+    out.push({
+      codigo: 'REPASSE_SUPERA_RECEITA', severidade: 'erro', mes,
+      esperado: bruto[mes] ?? 0, encontrado: repasse[mes], diferenca: repasse[mes] - (bruto[mes] ?? 0),
+      mensagem: `Mês ${mes + 1}: repasse supera a Receita Bruta recebida no mês.`,
+    });
+    break;
+  }
+  return out;
 }
 
 /**

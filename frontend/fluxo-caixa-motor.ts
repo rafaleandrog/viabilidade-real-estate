@@ -173,10 +173,9 @@ function quantizarLinhaMonetaria(linha: LinhaCalc, taxaAa: number): LinhaCalc {
 // #229 — Taxonomia de grandezas (EVI-009 + emenda Calliandra 2026-08-01)
 // ─────────────────────────────────────────────────────────────────
 //
-// Oito grandezas, sem nome ambíguo entre si. As seis primeiras já têm valor
-// nesta fase; as duas últimas (safra/juros, #232+) ainda não existem no motor
-// — citadas aqui só para fixar o vocabulário, sem campo `FluxoCalc` correspondente
-// ainda (evita expor placeholder sempre-zero antes de haver cálculo real).
+// Oito grandezas, sem nome ambíguo entre si. Desde a #283, todas têm valor no
+// motor para linhas que optam pelo contrato canônico de componentes; linhas
+// legadas preservam o cálculo anterior e expõem juros/carteira/repasse zerados.
 //
 //  1. VGV potencial          = `vgvTotal`          — produto inteiro, antes da permuta física
 //  2. VGV vendável           = `vgvVendavel`        — potencial − permuta física (#195)
@@ -187,9 +186,8 @@ function quantizarLinhaMonetaria(linha: LinhaCalc, taxaAa: number): LinhaCalc {
 //  6. Receita Bruta          = `receitaBruta`        — Σ `recebimentoBrutoMensal` (#228);
 //     "sem juros, Receita Bruta = vendas contratadas" (critério de aceite da #228) —
 //     verificado em fluxo-caixa-motor.test.ts
-//  7. Principal recebido     — ainda não existe; populado quando as safras (#232+)
-//     separarem principal de juros na carteira
-//  8. Juros                  — idem, #232+
+//  7. Principal recebido     = `principalRecebidoMensal` — caixa sem juros
+//  8. Juros                  = `jurosClientesMensal` / `jurosClientes`
 //
 // `receitaMensal`/`fluxoMensal` (o que efetivamente entra no fluxo) usam o
 // RECEBIMENTO LÍQUIDO (`recebimentoLiquidoMensal`, #228) — Receita Bruta menos
@@ -235,6 +233,17 @@ export interface FluxoCalc {
   descontoComercial: number;        // #229 — grandeza 4: Σ descontoComercialMensal
   vendaLiquidaContratada: number;   // #229 — grandeza 5: bruto − descontos
   receitaBruta: number;             // #229 — grandeza 6: Σ recebimentoBrutoMensal (#228)
+  // #283: séries econômicas do contrato canônico por componentes. Em estudos
+  // legados, `receitaBrutaMensal`/`principalRecebidoMensal` reproduzem o caixa
+  // vigente e as séries novas ficam zeradas — nenhum resultado retroativo.
+  receitaBrutaMensal: number[];
+  principalRecebidoMensal: number[];
+  jurosClientesMensal: number[];
+  carteiraClientesMensal: number[];
+  repasseMensal: number[];
+  jurosClientes: number;
+  carteiraClientesMaxima: number;
+  mesCarteiraClientesMaxima: number | null;
   linhasReceita: LinhaCalc[];
   linhasCusto: LinhaCalc[];
 }
@@ -369,6 +378,20 @@ export function descontoComercialMensal(
 ): number[] {
   const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
   const saida = new Array<number>(bruto.length).fill(0);
+  if (Array.isArray(linha?.fluxo_pagamento?.componentes)) {
+    const obra = cronograma.find((e) => e.evento === 'obra');
+    const mesEntrega = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : 0;
+    const componentes = componentesPagamento(linha.fluxo_pagamento, cronograma);
+    for (let safra = 0; safra < bruto.length; safra++) {
+      if (bruto[safra] <= 0) continue;
+      for (const c of componentesIntegradosSafra(componentes, safra, mesEntrega)) {
+        if (c.tipo === 'imediato' && c.descontoPct > 0) {
+          saida[safra] += bruto[safra] * (c.participacaoPct / 100) * (c.descontoPct / 100);
+        }
+      }
+    }
+    return saida.map(round2);
+  }
   const entradas = normalizarLinhasPagamento(linha?.fluxo_pagamento?.entrada);
   if (entradas.length === 0) return saida;
   for (let i = 0; i < bruto.length; i++) {
@@ -532,7 +555,8 @@ export function componentesDoLegado(
 /**
  * Resolve o único contrato de domínio da #230. Novos estudos podem persistir
  * `fluxo_pagamento.componentes`; estudos existentes seguem pelo adaptador
- * legado, sem alteração de resultado. O motor real passa a consumi-lo na #283.
+ * legado, sem alteração de resultado. Desde a #283, o motor real consome o
+ * contrato canônico quando ele está explicitamente persistido na linha.
  */
 export function componentesPagamento(fluxoPagamento: any, cronograma: EventoCrono[]): ComponentePagamento[] {
   if (Array.isArray(fluxoPagamento?.componentes)) {
@@ -808,8 +832,8 @@ export function jurosSafra(
  * TODOS os componentes daquela safra (`receitaBrutaSafra`) contra o valor
  * líquido contratado da safra mais a soma dos juros de cada componente
  * (`jurosSafra`). Sem juros (taxa 0 em todo componente), a identidade se
- * reduz a "Receita Bruta = líquido" — o comportamento hoje em produção,
- * onde o motor de safras ainda não está ligado a `calcularFluxo` (#230).
+ * reduz a "Receita Bruta = líquido" — o comportamento preservado para linhas
+ * legadas; a #283 liga este motor a `calcularFluxo` somente por opt-in.
  */
 export function receitaBrutaSafra(
   componentes: ComponentePagamento[],
@@ -882,6 +906,152 @@ export interface CarteiraClientesConsolidada {
   mensal: CarteiraClientesMensal[];
   carteiraMaxima: number;
   mesCarteiraMaxima: number | null;
+}
+
+/** Séries que a integração da #283 entrega ao fluxo consolidado. */
+export interface RecebiveisComponentesCalc {
+  recebimentoBrutoMensal: number[];
+  principalRecebidoMensal: number[];
+  jurosMensal: number[];
+  carteiraMensal: number[];
+  repasseMensal: number[];
+  carteiraMaxima: number;
+  mesCarteiraMaxima: number | null;
+}
+
+function componentesIntegradosSafra(
+  componentes: ComponentePagamento[],
+  safra: number,
+  mesEntrega: number,
+): ComponentePagamento[] {
+  const efetivos = componentesEfetivosSafra(componentes, safra, mesEntrega);
+  // #233 delega ao chamador a decisão para N_s <= 0. Na integração real, a
+  // fração "até o marco" contratada no próprio marco vence imediatamente;
+  // não se cria prazo negativo nem se invalida toda a safra.
+  return efetivos.map((c) => c.tipo === 'ate_marco'
+    && c.marcoMes - safra - (c.defasagemMeses - 1) <= 0
+    ? { tipo: 'imediato' as const, participacaoPct: c.participacaoPct, descontoPct: 0, rotulo: c.rotulo }
+    : c);
+}
+
+function pagamentosComponenteSafra(
+  componente: ComponentePagamento,
+  safra: number,
+  valorContratado: number,
+): PagamentoSafra[] {
+  if (componente.tipo === 'imediato') {
+    const valor = round2(valorContratado * (componente.participacaoPct / 100)
+      * (1 - componente.descontoPct / 100));
+    return valor > 0 ? [{ safra, mes: safra, tipo: 'parcela', valor }] : [];
+  }
+  if (componente.tipo === 'prazo_fixo') return pagamentosPrazoFixo(componente, safra, valorContratado);
+  if (componente.tipo === 'ate_marco') return pagamentosAteMarco(componente, safra, valorContratado);
+  return pagamentosConcentrado(componente, safra, valorContratado);
+}
+
+/**
+ * #283: consolida pagamentos, principal, juros, carteira e repasse de todas as
+ * safras de uma linha que optou por `fluxo_pagamento.componentes`.
+ */
+export function calcularRecebiveisComponentes(
+  componentes: ComponentePagamento[],
+  contratacoes: ContratacaoSafra[],
+  mesEntrega: number,
+  prazoTotal: number,
+): RecebiveisComponentesCalc {
+  const tamanho = Math.max(0, prazoTotal);
+  const bruto = new Array<number>(tamanho).fill(0);
+  const principal = new Array<number>(tamanho).fill(0);
+  const juros = new Array<number>(tamanho).fill(0);
+  const carteira = new Array<number>(tamanho).fill(0);
+  const repasse = new Array<number>(tamanho).fill(0);
+
+  const deposita = (serie: number[], mes: number, valor: number) => {
+    if (valor === 0) return;
+    if (mes >= 0 && mes < serie.length) serie[mes] = round2(serie[mes] + valor);
+    else console.warn(
+      `fluxo-caixa-motor: recebível canônico de ${valor.toFixed(2)} no mês ${mes} ` +
+      `cai fora do horizonte (${serie.length} meses) e não foi computado.`,
+    );
+  };
+
+  for (const contratacao of contratacoes) {
+    if (contratacao.valorContratado <= 0) continue;
+    const efetivos = componentesIntegradosSafra(componentes, contratacao.safra, mesEntrega);
+    for (const componente of efetivos) {
+      const pagamentos = pagamentosComponenteSafra(componente, contratacao.safra, contratacao.valorContratado);
+      const jurosTotal = jurosSafra(componente, contratacao.safra, contratacao.valorContratado);
+      const pagamentosComJuros = pagamentos.filter((p) => p.tipo !== 'sinal');
+      const saldos = componente.tipo === 'imediato'
+        ? new Map<number, number>()
+        : new Map(carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)
+          .map((p) => [p.mes, p.saldo]));
+      let jurosAlocados = 0;
+
+      for (const pagamento of pagamentos) {
+        let jurosPagamento = 0;
+        if (componente.tipo !== 'imediato' && pagamento.tipo !== 'sinal' && jurosTotal > 0) {
+          const ultimo = pagamento === pagamentosComJuros[pagamentosComJuros.length - 1];
+          if (ultimo) {
+            jurosPagamento = round2(jurosTotal - jurosAlocados);
+          } else {
+            const saldoAnterior = saldos.get(pagamento.mes - 1) ?? 0;
+            jurosPagamento = round2(Math.min(pagamento.valor, saldoAnterior * componente.taxaMensal));
+            jurosAlocados = round2(jurosAlocados + jurosPagamento);
+          }
+        }
+        const principalPagamento = round2(pagamento.valor - jurosPagamento);
+        deposita(bruto, pagamento.mes, pagamento.valor);
+        deposita(principal, pagamento.mes, principalPagamento);
+        deposita(juros, pagamento.mes, jurosPagamento);
+        if (componente.tipo === 'concentrado') deposita(repasse, pagamento.mes, pagamento.valor);
+      }
+
+      if (componente.tipo !== 'imediato') {
+        for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)) {
+          deposita(carteira, ponto.mes, ponto.saldo);
+        }
+      }
+    }
+  }
+
+  let carteiraMaxima = 0;
+  let mesCarteiraMaxima: number | null = null;
+  for (let mes = 0; mes < carteira.length; mes++) {
+    if (carteira[mes] > carteiraMaxima) {
+      carteiraMaxima = carteira[mes];
+      mesCarteiraMaxima = mes;
+    }
+  }
+  return {
+    recebimentoBrutoMensal: bruto,
+    principalRecebidoMensal: principal,
+    jurosMensal: juros,
+    carteiraMensal: carteira,
+    repasseMensal: repasse,
+    carteiraMaxima,
+    mesCarteiraMaxima,
+  };
+}
+
+function recebiveisComponentesLinha(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): RecebiveisComponentesCalc | null {
+  if (!Array.isArray(linha?.fluxo_pagamento?.componentes)) return null;
+  const contratada = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
+  const contratacoes = contratada
+    .map((valorContratado, safra) => ({ safra, valorContratado }))
+    .filter((c) => c.valorContratado > 0);
+  const obra = cronograma.find((e) => e.evento === 'obra');
+  const mesEntrega = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : 0;
+  return calcularRecebiveisComponentes(
+    componentesPagamento(linha.fluxo_pagamento, cronograma),
+    contratacoes,
+    mesEntrega,
+    prazoTotal,
+  );
 }
 
 /**
@@ -962,6 +1132,26 @@ export function ultimoMesRecebivelLinha(linha: any, cronograma: EventoCrono[]): 
   const fp = linha?.fluxo_pagamento ?? null;
   if (!fp) return ultimoMesVenda; // sem config → à vista no mês da venda (#190/#191 não se aplicam)
 
+  // #283: o contrato canônico é opt-in. Vendas posteriores à entrega são à
+  // vista; por isso só a última safra até a entrega pode estender o horizonte.
+  if (Array.isArray(fp.componentes)) {
+    const obra = cronograma.find((ev) => ev.evento === 'obra');
+    const mesEntrega = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : 0;
+    const ultimaSafraFinanciada = Math.min(ultimoMesVenda, mesEntrega);
+    let ultimo = ultimoMesVenda;
+    for (const c of componentesPagamento(fp, cronograma)) {
+      if (c.tipo === 'imediato') continue;
+      if (c.tipo === 'prazo_fixo') {
+        ultimo = Math.max(ultimo, ultimaSafraFinanciada + c.defasagemMeses + c.prazoMeses - 1);
+      } else if (c.tipo === 'ate_marco') {
+        ultimo = Math.max(ultimo, c.marcoMes);
+      } else {
+        ultimo = Math.max(ultimo, c.mesPagamento);
+      }
+    }
+    return ultimo;
+  }
+
   let ultimo = ultimoMesVenda;
 
   // Entrada: nParc parcelas consecutivas a partir do mês da venda.
@@ -1019,6 +1209,8 @@ export function recebimentoBrutoMensal(
   cronograma: EventoCrono[],
   prazoTotal: number,
 ): number[] {
+  const canonico = recebiveisComponentesLinha(linha, cronograma, prazoTotal);
+  if (canonico) return canonico.recebimentoBrutoMensal;
   const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
   const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
   const vgv = vgvVendavelLinha(linha?.tipologias ?? []);
@@ -1329,6 +1521,11 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
     prazo: periodos.length,
     meses: periodos.map((p) => p.rotulo),
     receitaMensal: soma(c.receitaMensal),
+    receitaBrutaMensal: soma(c.receitaBrutaMensal),
+    principalRecebidoMensal: soma(c.principalRecebidoMensal),
+    jurosClientesMensal: soma(c.jurosClientesMensal),
+    carteiraClientesMensal: ultimo(c.carteiraClientesMensal),
+    repasseMensal: soma(c.repasseMensal),
     custoMensal: soma(c.custoMensal),
     fluxoMensal: soma(c.fluxoMensal),
     fluxoAcumulado: ultimo(c.fluxoAcumulado),
@@ -1626,6 +1823,31 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const vgvPermutaFisica = linhasPermutaFisica.reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);
   const receitaBrutaVgv = ctxCusto.vgvTotal - vgvPermutaFisica;
 
+  // #283: séries econômicas agregadas. Apenas linhas com `componentes`
+  // produzem juros/carteira/repasse novos; as legadas continuam com principal
+  // igual ao recebimento bruto e zeros nas séries opt-in.
+  const receitaBrutaMensal = new Array<number>(prazo).fill(0);
+  const principalRecebidoMensal = new Array<number>(prazo).fill(0);
+  const jurosClientesMensal = new Array<number>(prazo).fill(0);
+  const carteiraClientesMensal = new Array<number>(prazo).fill(0);
+  const repasseMensal = new Array<number>(prazo).fill(0);
+  for (const linha of linhasReceita) {
+    const brutoLinha = recebimentoBrutoMensal(linha, crono, prazo);
+    const detalhe = recebiveisComponentesLinha(linha, crono, prazo);
+    for (let mes = 0; mes < prazo; mes++) {
+      receitaBrutaMensal[mes] = round2(receitaBrutaMensal[mes] + (brutoLinha[mes] ?? 0));
+      principalRecebidoMensal[mes] = round2(principalRecebidoMensal[mes]
+        + (detalhe?.principalRecebidoMensal[mes] ?? brutoLinha[mes] ?? 0));
+      jurosClientesMensal[mes] = round2(jurosClientesMensal[mes] + (detalhe?.jurosMensal[mes] ?? 0));
+      carteiraClientesMensal[mes] = round2(carteiraClientesMensal[mes] + (detalhe?.carteiraMensal[mes] ?? 0));
+      repasseMensal[mes] = round2(repasseMensal[mes] + (detalhe?.repasseMensal[mes] ?? 0));
+    }
+  }
+  const jurosClientes = round2(jurosClientesMensal.reduce((s, v) => s + v, 0));
+  const carteiraClientesMaxima = Math.max(0, ...carteiraClientesMensal);
+  const mesCarteiraClientesMaxima = carteiraClientesMaxima > 0
+    ? carteiraClientesMensal.indexOf(carteiraClientesMaxima) : null;
+
   // #229 — grandezas 3–6 da taxonomia: contratação (bruto/desconto/líquido,
   // #227) e Receita Bruta (recebimento em caixa, #228). Somadas por linha de
   // receita ORIGINAL (`linhasReceita`, não `linhasReceitaFinal`) — a Permuta
@@ -1635,7 +1857,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const vendaBrutaContratada = round2(somaMensal(vendaBrutaContratadaMensal)); // #260 — C7
   const descontoComercial = round2(somaMensal(descontoComercialMensal));
   const vendaLiquidaContratada = round2(vendaBrutaContratada - descontoComercial);
-  const receitaBruta = round2(somaMensal(recebimentoBrutoMensal));
+  const receitaBruta = round2(receitaBrutaMensal.reduce((s, v) => s + v, 0));
 
   return {
     prazo,
@@ -1654,6 +1876,14 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     descontoComercial,
     vendaLiquidaContratada,
     receitaBruta,
+    receitaBrutaMensal,
+    principalRecebidoMensal,
+    jurosClientesMensal,
+    carteiraClientesMensal,
+    repasseMensal,
+    jurosClientes,
+    carteiraClientesMaxima,
+    mesCarteiraClientesMaxima,
     linhasReceita: linhasReceitaFinal,
     linhasCusto: calcCustos,
   };

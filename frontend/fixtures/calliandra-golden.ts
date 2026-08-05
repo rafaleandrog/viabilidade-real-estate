@@ -3,9 +3,8 @@
 //
 // Este módulo é a FIXTURE DOURADA e o ORÁCULO de recebíveis por safra. Ele NÃO
 // é importado pelo runtime (não entra no bundle de index.ts) — serve só aos
-// testes. O motor de produção (fluxo-caixa-motor.ts) ainda NÃO calcula safras,
-// PMT, juros nem repasse; conforme #232–#237 forem implementadas, o motor passa
-// a ser comparado contra este oráculo.
+// testes. Desde a #283, o motor de produção (fluxo-caixa-motor.ts) calcula
+// safras, PMT, juros, carteira e repasse e é comparado contra este oráculo.
 //
 // Origem: dois EVIs do projeto Calliandra (um loteamento). Importa-se apenas a
 // MECÂNICA de recebíveis — safra, sinal, primeiro vencimento (s+1), PMT, marco
