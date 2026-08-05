@@ -135,7 +135,7 @@ test('#260: vendaBrutaContratadaMensal/descontoComercialMensal/vendaLiquidaContr
 
 test('#260: rateio monetário fecha exatamente com o total da linha', () => {
   const r = calcularFluxo({
-    prazoMeses: 3, taxaDescontoAa: 12, areaTerreno: 0, cronograma: [], linhasReceita: [],
+    dataInicio: 'jan/2027', prazoMeses: 3, taxaDescontoAa: 12, areaTerreno: 0, cronograma: [], linhasReceita: [],
     linhasCusto: [{ id: 1, grupo: 'indireto', categoria: 'Projetos', orcamento_valor: 100, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 3 }],
   });
   const linha = r.linhasCusto[0];
@@ -146,7 +146,7 @@ test('#260: rateio monetário fecha exatamente com o total da linha', () => {
 
 test('#260: custo canônico mantém o mesmo fluxo após troca de unidade', () => {
   const r = calcularFluxo({
-    prazoMeses: 1, taxaDescontoAa: 12, areaTerreno: 0, cronograma: [], linhasReceita: [],
+    dataInicio: 'jan/2027', prazoMeses: 1, taxaDescontoAa: 12, areaTerreno: 0, cronograma: [], linhasReceita: [],
     linhasCusto: [{ id: 1, grupo: 'indireto', categoria: 'Projetos', orcamento_valor: 12.09, orcamento_unidade: 'pct_vgv', orcamento_valor_canonico: 10_000_000, inicio_mes: 0, duracao_meses: 1 }],
   });
   assert.equal(r.linhasCusto[0].total, 10_000_000);
