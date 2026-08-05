@@ -232,6 +232,9 @@ export interface FluxoCalc {
   vendaBrutaContratada: number;     // #229 — grandeza 3: Σ vendaBrutaContratadaMensal
   descontoComercial: number;        // #229 — grandeza 4: Σ descontoComercialMensal
   vendaLiquidaContratada: number;   // #229 — grandeza 5: bruto − descontos
+  vendaBrutaContratadaMensal: number[];
+  descontoComercialMensal: number[];
+  vendaLiquidaContratadaMensal: number[];
   receitaBruta: number;             // #229 — grandeza 6: Σ recebimentoBrutoMensal (#228)
   // #283: séries econômicas do contrato canônico por componentes. Em estudos
   // legados, `receitaBrutaMensal`/`principalRecebidoMensal` reproduzem o caixa
@@ -241,6 +244,8 @@ export interface FluxoCalc {
   jurosClientesMensal: number[];
   carteiraClientesMensal: number[];
   repasseMensal: number[];
+  receitaPorComponenteMensal: SeriesComponentesReceita;
+  carteiraPorComponenteMensal: SeriesComponentesCarteira;
   jurosClientes: number;
   carteiraClientesMaxima: number;
   mesCarteiraClientesMaxima: number | null;
@@ -248,6 +253,7 @@ export interface FluxoCalc {
   // tipologia. `linhasReceita` permanece sendo o recebimento líquido que
   // alimenta o fluxo (incluindo deduções de permuta financeira).
   linhasReceitaBruta: LinhaCalc[];
+  linhasVendasContratadas: LinhaCalc[];
   linhasReceita: LinhaCalc[];
   linhasCusto: LinhaCalc[];
 }
@@ -919,9 +925,43 @@ export interface RecebiveisComponentesCalc {
   jurosMensal: number[];
   carteiraMensal: number[];
   repasseMensal: number[];
+  receitaPorComponenteMensal: SeriesComponentesReceita;
+  carteiraPorComponenteMensal: SeriesComponentesCarteira;
   carteiraMaxima: number;
   mesCarteiraMaxima: number | null;
 }
+
+/** #241: categorias econômicas estáveis compartilhadas por motor, tela e
+ * exportações. `outros` preserva estudos legados sem reclassificá-los. */
+export interface SeriesComponentesReceita {
+  aVista: number[];
+  tabelaCurta: number[];
+  tabelaLongaObra: number[];
+  repasse: number[];
+  aposChaves: number[];
+  outros: number[];
+}
+
+export interface SeriesComponentesCarteira {
+  tabelaCurta: number[];
+  tabelaLongaObra: number[];
+  saldoARepassar: number[];
+}
+
+export const ROTULOS_COMPONENTES_RECEITA: Record<keyof SeriesComponentesReceita, string> = {
+  aVista: 'À vista',
+  tabelaCurta: 'Tabela curta',
+  tabelaLongaObra: 'Tabela longa — Obra',
+  repasse: 'Repasse',
+  aposChaves: 'Após-chaves',
+  outros: 'Legado / não classificado',
+};
+
+export const ROTULOS_COMPONENTES_CARTEIRA: Record<keyof SeriesComponentesCarteira, string> = {
+  tabelaCurta: 'Curta',
+  tabelaLongaObra: 'Longa — Obra',
+  saldoARepassar: 'Saldo a repassar',
+};
 
 function componentesIntegradosSafra(
   componentes: ComponentePagamento[],
@@ -969,6 +1009,14 @@ export function calcularRecebiveisComponentes(
   const juros = new Array<number>(tamanho).fill(0);
   const carteira = new Array<number>(tamanho).fill(0);
   const repasse = new Array<number>(tamanho).fill(0);
+  const vazia = () => new Array<number>(tamanho).fill(0);
+  const receitaPorComponenteMensal: SeriesComponentesReceita = {
+    aVista: vazia(), tabelaCurta: vazia(), tabelaLongaObra: vazia(),
+    repasse: vazia(), aposChaves: vazia(), outros: vazia(),
+  };
+  const carteiraPorComponenteMensal: SeriesComponentesCarteira = {
+    tabelaCurta: vazia(), tabelaLongaObra: vazia(), saldoARepassar: vazia(),
+  };
 
   const deposita = (serie: number[], mes: number, valor: number) => {
     if (valor === 0) return;
@@ -982,7 +1030,15 @@ export function calcularRecebiveisComponentes(
   for (const contratacao of contratacoes) {
     if (contratacao.valorContratado <= 0) continue;
     const efetivos = componentesIntegradosSafra(componentes, contratacao.safra, mesEntrega);
+    const aposChaves = ehVendaAposChaves(contratacao.safra, mesEntrega);
     for (const componente of efetivos) {
+      const chaveReceita: keyof SeriesComponentesReceita = aposChaves ? 'aposChaves'
+        : componente.tipo === 'imediato' ? 'aVista'
+          : componente.tipo === 'prazo_fixo' ? 'tabelaCurta'
+            : componente.tipo === 'ate_marco' ? 'tabelaLongaObra' : 'repasse';
+      const chaveCarteira: keyof SeriesComponentesCarteira | null = componente.tipo === 'prazo_fixo'
+        ? 'tabelaCurta' : componente.tipo === 'ate_marco'
+          ? 'tabelaLongaObra' : componente.tipo === 'concentrado' ? 'saldoARepassar' : null;
       const pagamentos = pagamentosComponenteSafra(componente, contratacao.safra, contratacao.valorContratado);
       const jurosTotal = jurosSafra(componente, contratacao.safra, contratacao.valorContratado);
       const pagamentosComJuros = pagamentos.filter((p) => p.tipo !== 'sinal');
@@ -1006,6 +1062,7 @@ export function calcularRecebiveisComponentes(
         }
         const principalPagamento = round2(pagamento.valor - jurosPagamento);
         deposita(bruto, pagamento.mes, pagamento.valor);
+        deposita(receitaPorComponenteMensal[chaveReceita], pagamento.mes, pagamento.valor);
         deposita(principal, pagamento.mes, principalPagamento);
         deposita(juros, pagamento.mes, jurosPagamento);
         if (componente.tipo === 'concentrado') deposita(repasse, pagamento.mes, pagamento.valor);
@@ -1014,6 +1071,7 @@ export function calcularRecebiveisComponentes(
       if (componente.tipo !== 'imediato') {
         for (const ponto of carteiraSaldoSafra(componente, contratacao.safra, contratacao.valorContratado)) {
           deposita(carteira, ponto.mes, ponto.saldo);
+          if (chaveCarteira) deposita(carteiraPorComponenteMensal[chaveCarteira], ponto.mes, ponto.saldo);
         }
       }
     }
@@ -1033,6 +1091,8 @@ export function calcularRecebiveisComponentes(
     jurosMensal: juros,
     carteiraMensal: carteira,
     repasseMensal: repasse,
+    receitaPorComponenteMensal,
+    carteiraPorComponenteMensal,
     carteiraMaxima,
     mesCarteiraMaxima,
   };
@@ -1525,15 +1585,32 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
     prazo: periodos.length,
     meses: periodos.map((p) => p.rotulo),
     receitaMensal: soma(c.receitaMensal),
+    vendaBrutaContratadaMensal: soma(c.vendaBrutaContratadaMensal),
+    descontoComercialMensal: soma(c.descontoComercialMensal),
+    vendaLiquidaContratadaMensal: soma(c.vendaLiquidaContratadaMensal),
     receitaBrutaMensal: soma(c.receitaBrutaMensal),
     principalRecebidoMensal: soma(c.principalRecebidoMensal),
     jurosClientesMensal: soma(c.jurosClientesMensal),
     carteiraClientesMensal: ultimo(c.carteiraClientesMensal),
     repasseMensal: soma(c.repasseMensal),
+    receitaPorComponenteMensal: {
+      aVista: soma(c.receitaPorComponenteMensal.aVista),
+      tabelaCurta: soma(c.receitaPorComponenteMensal.tabelaCurta),
+      tabelaLongaObra: soma(c.receitaPorComponenteMensal.tabelaLongaObra),
+      repasse: soma(c.receitaPorComponenteMensal.repasse),
+      aposChaves: soma(c.receitaPorComponenteMensal.aposChaves),
+      outros: soma(c.receitaPorComponenteMensal.outros),
+    },
+    carteiraPorComponenteMensal: {
+      tabelaCurta: ultimo(c.carteiraPorComponenteMensal.tabelaCurta),
+      tabelaLongaObra: ultimo(c.carteiraPorComponenteMensal.tabelaLongaObra),
+      saldoARepassar: ultimo(c.carteiraPorComponenteMensal.saldoARepassar),
+    },
     custoMensal: soma(c.custoMensal),
     fluxoMensal: soma(c.fluxoMensal),
     fluxoAcumulado: ultimo(c.fluxoAcumulado),
     linhasReceitaBruta: c.linhasReceitaBruta.map(agregarLinha),
+    linhasVendasContratadas: c.linhasVendasContratadas.map(agregarLinha),
     linhasReceita: c.linhasReceita.map(agregarLinha),
     linhasCusto: c.linhasCusto.map(agregarLinha),
   };
@@ -1660,6 +1737,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     };
   }).map((linha) => quantizarLinhaMonetaria(linha, taxa));
   const calcReceitasBrutas = montarLinhasReceita(recebimentoBrutoMensal);
+  const calcVendasContratadas = montarLinhasReceita(vendaBrutaContratadaMensal);
   const calcReceitas = montarLinhasReceita(receitaMensalLinha);
 
   // Receita mensal SÓ das vendas (caixa efetivo: entrada + parcelas + repasse
@@ -1841,6 +1919,14 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const jurosClientesMensal = new Array<number>(prazo).fill(0);
   const carteiraClientesMensal = new Array<number>(prazo).fill(0);
   const repasseMensal = new Array<number>(prazo).fill(0);
+  const vazia = () => new Array<number>(prazo).fill(0);
+  const receitaPorComponenteMensal: SeriesComponentesReceita = {
+    aVista: vazia(), tabelaCurta: vazia(), tabelaLongaObra: vazia(),
+    repasse: vazia(), aposChaves: vazia(), outros: vazia(),
+  };
+  const carteiraPorComponenteMensal: SeriesComponentesCarteira = {
+    tabelaCurta: vazia(), tabelaLongaObra: vazia(), saldoARepassar: vazia(),
+  };
   for (const linha of linhasReceita) {
     const brutoLinha = recebimentoBrutoMensal(linha, crono, prazo);
     const detalhe = recebiveisComponentesLinha(linha, crono, prazo);
@@ -1851,6 +1937,19 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
       jurosClientesMensal[mes] = round2(jurosClientesMensal[mes] + (detalhe?.jurosMensal[mes] ?? 0));
       carteiraClientesMensal[mes] = round2(carteiraClientesMensal[mes] + (detalhe?.carteiraMensal[mes] ?? 0));
       repasseMensal[mes] = round2(repasseMensal[mes] + (detalhe?.repasseMensal[mes] ?? 0));
+      if (detalhe) {
+        for (const chave of Object.keys(receitaPorComponenteMensal) as (keyof SeriesComponentesReceita)[]) {
+          receitaPorComponenteMensal[chave][mes] = round2(receitaPorComponenteMensal[chave][mes]
+            + (detalhe.receitaPorComponenteMensal[chave][mes] ?? 0));
+        }
+        for (const chave of Object.keys(carteiraPorComponenteMensal) as (keyof SeriesComponentesCarteira)[]) {
+          carteiraPorComponenteMensal[chave][mes] = round2(carteiraPorComponenteMensal[chave][mes]
+            + (detalhe.carteiraPorComponenteMensal[chave][mes] ?? 0));
+        }
+      } else {
+        receitaPorComponenteMensal.outros[mes] = round2(
+          receitaPorComponenteMensal.outros[mes] + (brutoLinha[mes] ?? 0));
+      }
     }
   }
   const jurosClientes = round2(jurosClientesMensal.reduce((s, v) => s + v, 0));
@@ -1864,6 +1963,18 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   // Financeira (`calcDeducoesReceita`) é dedução de receita, não contratação.
   const somaMensal = (fn: (l: any, c: EventoCrono[], p: number) => number[]): number =>
     linhasReceita.reduce((s, l) => s + fn(l, crono, prazo).reduce((s2, v) => s2 + v, 0), 0);
+  const agregarSerie = (fn: (l: any, c: EventoCrono[], p: number) => number[]): number[] => {
+    const out = new Array<number>(prazo).fill(0);
+    for (const linha of linhasReceita) {
+      const serie = fn(linha, crono, prazo);
+      for (let mes = 0; mes < prazo; mes++) out[mes] = round2(out[mes] + (serie[mes] ?? 0));
+    }
+    return out;
+  };
+  const vendaBrutaContratadaSerie = agregarSerie(vendaBrutaContratadaMensal);
+  const descontoComercialSerie = agregarSerie(descontoComercialMensal);
+  const vendaLiquidaContratadaSerie = vendaBrutaContratadaSerie.map((v, mes) =>
+    round2(v - (descontoComercialSerie[mes] ?? 0)));
   const vendaBrutaContratada = round2(somaMensal(vendaBrutaContratadaMensal)); // #260 — C7
   const descontoComercial = round2(somaMensal(descontoComercialMensal));
   const vendaLiquidaContratada = round2(vendaBrutaContratada - descontoComercial);
@@ -1885,16 +1996,22 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     vendaBrutaContratada,
     descontoComercial,
     vendaLiquidaContratada,
+    vendaBrutaContratadaMensal: vendaBrutaContratadaSerie,
+    descontoComercialMensal: descontoComercialSerie,
+    vendaLiquidaContratadaMensal: vendaLiquidaContratadaSerie,
     receitaBruta,
     receitaBrutaMensal,
     principalRecebidoMensal,
     jurosClientesMensal,
     carteiraClientesMensal,
     repasseMensal,
+    receitaPorComponenteMensal,
+    carteiraPorComponenteMensal,
     jurosClientes,
     carteiraClientesMaxima,
     mesCarteiraClientesMaxima,
     linhasReceitaBruta: calcReceitasBrutas,
+    linhasVendasContratadas: calcVendasContratadas,
     linhasReceita: linhasReceitaFinal,
     linhasCusto: calcCustos,
   };

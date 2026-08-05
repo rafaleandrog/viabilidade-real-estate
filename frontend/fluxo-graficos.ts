@@ -3,6 +3,27 @@ import { rotuloMesRelativo, type EventoCrono, type PeriodoAgregado } from './flu
 import type { FluxoCalc } from './fluxo-caixa-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
+
+export interface SerieEconomicaFluxo {
+  rotulo: string;
+  valores: number[];
+  cor: string;
+}
+
+/** #241: séries comerciais exibidas no gráfico e derivadas diretamente do
+ * mesmo FluxoCalc usado pela tabela/CSV/PDF. */
+export function seriesEconomicasFluxo(c: FluxoCalc): SerieEconomicaFluxo[] {
+  return [
+    { rotulo: 'Venda líquida contratada', valores: c.vendaLiquidaContratadaMensal,
+      cor: 'var(--cor-primaria, #7c5cff)' },
+    { rotulo: 'Receita Bruta — VGV', valores: c.receitaBrutaMensal,
+      cor: 'var(--cor-sucesso, #13a98d)' },
+    { rotulo: 'Carteira de clientes', valores: c.carteiraClientesMensal,
+      cor: 'var(--cor-info, #3b82f6)' },
+    { rotulo: 'Repasse', valores: c.repasseMensal,
+      cor: 'var(--cor-alerta, #d59b2d)' },
+  ];
+}
 // Gráficos SVG autocontidos do Fluxo de Caixa (mensal + acumulado).
 //
 // Extraídos de tela-fluxo-ver.ts (Lote 8 · #23) para serem reusados pela aba
@@ -155,4 +176,3 @@ export function graficoFluxoAcumulado(
     </svg>
   `;
 }
-

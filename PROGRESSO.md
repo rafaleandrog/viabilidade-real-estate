@@ -4,6 +4,23 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #241 — hierarquia econômica completa no fluxo e exportações (2026-08-05)
+
+O `FluxoCalc` agora expõe séries mensais canônicas de contratação bruta,
+desconto e contratação líquida; contratação por Grupo/tipologia; Receita Bruta
+por componente comercial (**À vista, Tabela curta, Tabela longa — Obra,
+Repasse e Após-chaves**); e Carteira por componente (**Curta, Longa — Obra e
+Saldo a repassar**). Estudos legados permanecem matematicamente inalterados e
+entram numa categoria explícita, sem reclassificação retroativa.
+
+A tabela mensal/anual ganhou blocos próprios para **Vendas contratadas** e
+**Carteira de clientes**, mantendo Receita Bruta, Receita Líquida, custos e
+Funding separados. CSV e PDF usam a mesma função de hierarquia; o novo gráfico
+econômico compara contratação líquida, Receita Bruta, Carteira e Repasse a
+partir dos mesmos arrays. Testes provam o fechamento por Grupo/tipologia e por
+componente, agregação anual, grupos colapsáveis, zeros, desconto negativo e
+números longos.
+
 ## #240 — invariantes e relatório de reconciliação concluídos (2026-08-05)
 
 O módulo puro de validação passou a cobrir e distinguir: estoque/alocação e

@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { periodosAnuais, type EventoCrono, type PeriodoAgregado } from './fluxo-shared.js';
 import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { graficoFluxoMensal, graficoFluxoAcumulado } from './fluxo-graficos.js';
+import { graficoFluxoMensal, graficoFluxoAcumulado, seriesEconomicasFluxo } from './fluxo-graficos.js';
 import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo, tabelaCapitalStack,
   chavesColapso, CHAVES_COLAPSO_CAPITAL_STACK, controlesFluxo, relatorioReconciliacao,
@@ -161,6 +161,16 @@ export class ViabFluxoVer extends LitElement {
       ${!periodos ? tabelaCapitalStack(this.resultadoCapitalStack, this.camadas, c.fluxoMensal, c.meses, this.colapso, (ch) => this._t(ch)) : nothing}
       ${relatorioReconciliacao(this.divergencias)}
       <div class="graficos">
+        <urbi-card titulo="Contratação, Receita Bruta, Carteira e Repasse — ${titulo}">
+          <div class="graf-wrap"><div class="graf">
+            <urbi-grafico-linha
+              formato="moeda"
+              legenda="sempre"
+              .categorias=${exib.meses}
+              .series=${seriesEconomicasFluxo(exib)}
+            ></urbi-grafico-linha>
+          </div></div>
+        </urbi-card>
         <urbi-card titulo="Fluxo de Caixa ${titulo}">
           <div class="graf-wrap"><div class="graf">${graficoFluxoMensal(exib, this.dados?.dataInicio ?? null, this.dados?.crono ?? [], periodos ?? undefined)}</div></div>
         </urbi-card>

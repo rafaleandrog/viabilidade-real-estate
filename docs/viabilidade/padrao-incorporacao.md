@@ -1949,11 +1949,11 @@ O Resumo e o Fluxo devem exibir:
 - carteira máxima;
 - endividamento máximo.
 
-> **Comportamento vigente.** O app calcula Resultado, margens, ROI, VPL, TIR,
-> Payback, Exposição máxima e Receita Bruta — VGV. VGV Vendável permanece um
-> KPI separado. Contratação bruta, descontos, contratação líquida, juros e
-> carteira são expostos na tabela/exportações; a evolução completa da
-> hierarquia comercial e de funding continua rastreada pela #241.
+> **Comportamento vigente (#241).** O app calcula Resultado, margens, ROI,
+> VPL, TIR, Payback, Exposição máxima e Receita Bruta — VGV. VGV Vendável
+> permanece um KPI separado. Contratação, recebimentos, carteira e funding são
+> blocos distintos na tabela e nas exportações mensal/anual. As séries
+> comerciais também alimentam um gráfico próprio, sem recálculo na UI.
 
 ### 19.2 Exposição máxima
 
@@ -1978,17 +1978,17 @@ A tabela deve permitir expansão hierárquica.
 Valor contratado
 ├── Bruto
 ├── Descontos
-└── Líquido
-    └── Grupo → Tipologia
+├── Líquido
+└── Grupo → Tipologia
 ```
 
 #### Recebimentos
 
 ```text
 Receita Bruta — VGV
-├── Pagamentos imediatos
-├── Prazo fixo
-├── Até marco
+├── À vista
+├── Tabela curta
+├── Tabela longa — Obra
 ├── Repasse
 ├── Após-chaves
 ├── Principal
@@ -2000,10 +2000,9 @@ Receita Bruta — VGV
 
 ```text
 Carteira de clientes
-├── Prazo fixo curto
-├── Prazo fixo longo
-├── Até marco
-└── Saldo para repasse
+├── Curta
+├── Longa — Obra
+└── Saldo a repassar
 ```
 
 #### Custos
@@ -2071,6 +2070,11 @@ Gráficos úteis incluem:
 - comparação de cenários.
 
 Marcos do cronograma devem aparecer na mesma régua temporal dos dados.
+
+> **Implementação #241.** O gráfico econômico confronta Venda líquida
+> contratada, Receita Bruta — VGV, Carteira de clientes e Repasse. Na visão
+> anual, fluxos são somados e saldos de carteira usam o fechamento do período;
+> os KPIs continuam derivados do cálculo mensal.
 
 ## 20. Cenários, mercado e apoio à decisão
 

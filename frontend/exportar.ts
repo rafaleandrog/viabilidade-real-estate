@@ -2,7 +2,10 @@
 // PDF: abre uma janela com HTML formatado (mesmos tokens/estilos) e chama print
 // (o usuário salva como PDF). Excel: gera CSV (pt-BR, separador ';').
 import type { Proforma } from './proforma.js';
-import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
+import {
+  ROTULOS_COMPONENTES_CARTEIRA, ROTULOS_COMPONENTES_RECEITA,
+  type FluxoCalc, type LinhaCalc, type SeriesComponentesCarteira, type SeriesComponentesReceita,
+} from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
@@ -132,7 +135,7 @@ const GRUPO_CUSTO_ROTULO: Record<string, string> = {
   financeiro: 'Custos Financeiros',
 };
 
-interface LinhaFx {
+export interface LinhaFx {
   nivel: 0 | 1 | 2;
   nome: string;
   inicio?: number;
@@ -149,7 +152,7 @@ interface LinhaFx {
 }
 
 /** Achata o fluxo calculado na hierarquia da tabela (grupos → itens). */
-function linhasFluxo(c: FluxoCalc): LinhaFx[] {
+export function linhasFluxo(c: FluxoCalc): LinhaFx[] {
   const soma = (xs: LinhaCalc[]): number[] => {
     const out = new Array<number>(c.prazo).fill(0);
     for (const l of xs) for (let i = 0; i < c.prazo; i++) out[i] += l.mensal[i];
@@ -159,28 +162,64 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
   const somaVpl = (xs: LinhaCalc[]): number => xs.reduce((s, l) => s + l.vpl, 0);
   const vgv = c.receitaBrutaVgv;
   const pct = (total: number) => (vgv > 0 ? (total / vgv) * 100 : undefined);
+  const totalSerie = (serie: number[]) => serie.reduce((s, v) => s + v, 0);
+  const picoSerie = (serie: number[]) => Math.max(0, ...serie);
   const linhas: LinhaFx[] = [];
+  linhas.push({
+    nivel: 0, nome: 'Vendas contratadas', custo: false,
+    total: c.vendaBrutaContratada, vpl: somaVpl(c.linhasVendasContratadas),
+    mensal: c.vendaBrutaContratadaMensal,
+  });
+  linhas.push(
+    { nivel: 1, nome: '(-) Desconto comercial', custo: false,
+      total: -c.descontoComercial, mensal: c.descontoComercialMensal.map((v) => -v) },
+    { nivel: 1, nome: '= Venda líquida contratada', custo: false,
+      total: c.vendaLiquidaContratada, mensal: c.vendaLiquidaContratadaMensal },
+  );
+  for (const l of c.linhasVendasContratadas) {
+    linhas.push({
+      nivel: 1, nome: `Grupo · ${l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome}`, custo: false,
+      inicio: l.inicio, duracao: l.duracao, total: l.total, vpl: l.vpl, mensal: l.mensal, pctVgv: pct(l.total),
+    });
+    for (const t of l.itens ?? []) linhas.push({
+      nivel: 2, nome: t.nome, custo: false, inicio: t.inicio, duracao: t.duracao,
+      total: t.total, vpl: t.vpl, mensal: t.mensal, pctVgv: pct(t.total),
+    });
+  }
+
   // #237/#241: a exportação reproduz a mesma separação econômica da tela.
   linhas.push({
-    nivel: 0, nome: 'Receita Bruta — VGV', custo: false,
+    nivel: 0, nome: 'Receita Bruta — VGV', custo: false, separadorAntes: true,
     total: c.receitaBruta, vpl: somaVpl(c.linhasReceitaBruta), mensal: c.receitaBrutaMensal,
   });
-  // #283: séries econômicas do contrato canônico. Carteira é estoque, por
-  // isso a coluna Total mostra o pico, enquanto as demais linhas são fluxos.
+  for (const chave of Object.keys(ROTULOS_COMPONENTES_RECEITA) as (keyof SeriesComponentesReceita)[]) {
+    const serie = c.receitaPorComponenteMensal[chave];
+    if (chave === 'outros' && !serie.some((v) => Math.abs(v) > 0.005)) continue;
+    linhas.push({ nivel: 1, nome: `Componente · ${ROTULOS_COMPONENTES_RECEITA[chave]}`, custo: false,
+      total: totalSerie(serie), mensal: serie });
+  }
+  // Principal e juros são visões não aditivas para auditoria da Receita Bruta.
   linhas.push(
-    { nivel: 1, nome: 'Principal recebido', custo: false, total: c.principalRecebidoMensal.reduce((s, v) => s + v, 0), mensal: c.principalRecebidoMensal },
-    { nivel: 1, nome: 'Juros de clientes', custo: false, total: c.jurosClientes, mensal: c.jurosClientesMensal },
-    { nivel: 1, nome: 'Repasse', custo: false, total: c.repasseMensal.reduce((s, v) => s + v, 0), mensal: c.repasseMensal },
-    { nivel: 1, nome: 'Carteira de clientes (pico)', custo: false, total: c.carteiraClientesMaxima, mensal: c.carteiraClientesMensal },
+    { nivel: 1, nome: 'Auditoria · Principal recebido', custo: false, total: c.principalRecebidoMensal.reduce((s, v) => s + v, 0), mensal: c.principalRecebidoMensal },
+    { nivel: 1, nome: 'Auditoria · Juros de clientes', custo: false, total: c.jurosClientes, mensal: c.jurosClientesMensal },
   );
   for (const l of c.linhasReceitaBruta) {
     linhas.push({
-      nivel: 1, nome: l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, custo: false,
+      nivel: 1, nome: `Grupo · ${l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome}`, custo: false,
       inicio: l.inicio, duracao: l.duracao, total: l.total, vpl: l.vpl, mensal: l.mensal, pctVgv: pct(l.total),
     });
     for (const t of l.itens ?? []) {
       linhas.push({ nivel: 2, nome: t.nome, custo: false, inicio: t.inicio, duracao: t.duracao, total: t.total, vpl: t.vpl, mensal: t.mensal, pctVgv: pct(t.total) });
     }
+  }
+  linhas.push({
+    nivel: 0, nome: 'Carteira de clientes (pico)', custo: false, separadorAntes: true,
+    total: c.carteiraClientesMaxima, mensal: c.carteiraClientesMensal,
+  });
+  for (const chave of Object.keys(ROTULOS_COMPONENTES_CARTEIRA) as (keyof SeriesComponentesCarteira)[]) {
+    const serie = c.carteiraPorComponenteMensal[chave];
+    linhas.push({ nivel: 1, nome: `Componente · ${ROTULOS_COMPONENTES_CARTEIRA[chave]}`, custo: false,
+      total: picoSerie(serie), mensal: serie });
   }
   linhas.push({
     nivel: 0, nome: 'Receita Líquida do Projeto', custo: false, separadorAntes: true,
