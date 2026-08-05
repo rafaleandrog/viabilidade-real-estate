@@ -4,6 +4,24 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #237 — Receita Bruta canônica concluída; #241 avançada (2026-08-05)
+
+A integração por safras da #283 já produzia `receitaBrutaMensal`, principal,
+juros, carteira e repasse, mas a apresentação principal ainda chamava de
+“Receita” a série líquida pós-RET e não reconciliava o bruto por linha e
+tipologia.
+
+Esta entrega cria `linhasReceitaBruta`, derivada da mesma fonte canônica do
+total, com fechamento por Grupo/tipologia; adiciona o KPI **Receita Bruta —
+VGV**; separa na tabela e nas exportações **Receita Bruta — VGV** de **Receita
+Líquida do Projeto**; e mantém principal, juros, repasse e carteira visíveis.
+O teste dedicado prova que RET e corretagem destacada não reduzem a Receita
+Bruta e que as tipologias fecham exatamente com o total.
+
+A #241 avança na hierarquia comercial e no compartilhamento das fontes entre
+tela, Cenários, CSV e PDF, mas permanece aberta para o redesenho integral de
+contratação e funding previsto em seu próprio escopo.
+
 ## #255 — matriz de ancoragem de custos executada e documentada (2026-08-04)
 
 A #255 exige a matriz **5 abas × 3 tipos de âncora × (novo | legado)**. Ela existe porque a

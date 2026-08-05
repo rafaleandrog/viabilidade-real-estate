@@ -159,13 +159,10 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
   const vgv = c.receitaBrutaVgv;
   const pct = (total: number) => (vgv > 0 ? (total / vgv) * 100 : undefined);
   const linhas: LinhaFx[] = [];
-  // #229: rótulo corrigido — `c.receitaMensal` é o RECEBIMENTO LÍQUIDO que
-  // entra no fluxo (pós-imposto, #228), não "Receita Bruta"; "VGV" também
-  // confundia, já que o denominador do % é `vgv` (VGV vendável), não este
-  // valor. Detalhamento completo de bruto/desconto/líquido/imposto é #241.
+  // #237/#241: a exportação reproduz a mesma separação econômica da tela.
   linhas.push({
-    nivel: 0, nome: 'Receita', custo: false,
-    total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita), mensal: c.receitaMensal,
+    nivel: 0, nome: 'Receita Bruta — VGV', custo: false,
+    total: c.receitaBruta, vpl: somaVpl(c.linhasReceitaBruta), mensal: c.receitaBrutaMensal,
   });
   // #283: séries econômicas do contrato canônico. Carteira é estoque, por
   // isso a coluna Total mostra o pico, enquanto as demais linhas são fluxos.
@@ -175,6 +172,19 @@ function linhasFluxo(c: FluxoCalc): LinhaFx[] {
     { nivel: 1, nome: 'Repasse', custo: false, total: c.repasseMensal.reduce((s, v) => s + v, 0), mensal: c.repasseMensal },
     { nivel: 1, nome: 'Carteira de clientes (pico)', custo: false, total: c.carteiraClientesMaxima, mensal: c.carteiraClientesMensal },
   );
+  for (const l of c.linhasReceitaBruta) {
+    linhas.push({
+      nivel: 1, nome: l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, custo: false,
+      inicio: l.inicio, duracao: l.duracao, total: l.total, vpl: l.vpl, mensal: l.mensal, pctVgv: pct(l.total),
+    });
+    for (const t of l.itens ?? []) {
+      linhas.push({ nivel: 2, nome: t.nome, custo: false, inicio: t.inicio, duracao: t.duracao, total: t.total, vpl: t.vpl, mensal: t.mensal, pctVgv: pct(t.total) });
+    }
+  }
+  linhas.push({
+    nivel: 0, nome: 'Receita Líquida do Projeto', custo: false, separadorAntes: true,
+    total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita), mensal: c.receitaMensal,
+  });
   for (const l of c.linhasReceita) {
     linhas.push({
       nivel: 1, nome: l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, custo: false,
@@ -297,6 +307,7 @@ export function exportarFluxoCSV(estudo: any, c: FluxoCalc, dataInicio: string |
   rows.push(`Venda Bruta Contratada;${fmtR$(c.vendaBrutaContratada, false)}`);
   rows.push(`Desconto Comercial;${fmtR$(c.descontoComercial, false)}`);
   rows.push(`Venda Líquida Contratada;${fmtR$(c.vendaLiquidaContratada, false)}`);
+  rows.push(`Receita Bruta — VGV;${fmtR$(c.receitaBruta, false)}`);
   rows.push(`Juros de Clientes;${fmtR$(c.jurosClientes, false)}`);
   rows.push(`Carteira Máxima;${fmtR$(c.carteiraClientesMaxima, false)}`);
   rows.push(`Mês da Carteira Máxima;${c.mesCarteiraClientesMaxima === null ? '' : c.meses[c.mesCarteiraClientesMaxima] ?? `M${c.mesCarteiraClientesMaxima + 1}`}`);
@@ -368,6 +379,7 @@ export function exportarFluxoPDF(
     ['Venda Bruta Contratada', fmtR$(c.vendaBrutaContratada)],
     ['Desconto Comercial', fmtR$(c.descontoComercial)],
     ['Venda Líquida Contratada', fmtR$(c.vendaLiquidaContratada)],
+    ['Receita Bruta — VGV', fmtR$(c.receitaBruta)],
     ['Juros de Clientes', fmtR$(c.jurosClientes)],
     ['Carteira Máxima', fmtR$(c.carteiraClientesMaxima)],
   ];

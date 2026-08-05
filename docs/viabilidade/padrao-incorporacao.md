@@ -1457,12 +1457,12 @@ Receita Bruta — VGV
 
 Essa é a identidade que o motor deve validar.
 
-> **Comportamento vigente.** `receitaBrutaVgv = vgvTotal − vgvPermutaFisica` representa VGV
-> vendável, não recebimento. A série de receita também é líquida de comissão destacada e RET.
->
-> **Evolução dependente de issue.** EVI-022 / #228 desagrega as deduções; EVI-008 / #227 cria
-> contratação canônica; EVI-009 / #229 corrige a taxonomia; EVI-017 / #237 forma a Receita Bruta
-> pelas séries de recebimento.
+> **Comportamento vigente desde #237/#283.** `receitaBruta` e
+> `receitaBrutaMensal` são formadas pelos recebimentos dos clientes, com juros,
+> sem funding e antes de RET, corretagem e permuta financeira. A aplicação
+> preserva `receitaBrutaVgv` apenas como alias histórico do **VGV vendável**;
+> código novo usa `vgvVendavel`. A Receita Bruta é aberta por linha e tipologia
+> na tela e nas exportações e reconciliada com principal recebido + juros.
 
 ### 14.3 O que não integra a Receita Bruta
 
@@ -1949,11 +1949,11 @@ O Resumo e o Fluxo devem exibir:
 - carteira máxima;
 - endividamento máximo.
 
-> **Comportamento vigente.** O app já calcula Resultado, margens, ROI, VPL, TIR, Payback e
-> Exposição máxima. Os KPIs de contratação líquida, descontos, juros, carteira máxima e
-> endividamento máximo dependem da evolução do motor.
->
-> O KPI atual chamado “Receita Bruta (VGV)” mede VGV vendável, não a soma dos recebimentos.
+> **Comportamento vigente.** O app calcula Resultado, margens, ROI, VPL, TIR,
+> Payback, Exposição máxima e Receita Bruta — VGV. VGV Vendável permanece um
+> KPI separado. Contratação bruta, descontos, contratação líquida, juros e
+> carteira são expostos na tabela/exportações; a evolução completa da
+> hierarquia comercial e de funding continua rastreada pela #241.
 
 ### 19.2 Exposição máxima
 
