@@ -7,6 +7,7 @@ import {
   componentesDoLegado, componentesPagamento, ultimoMesRecebivelLinha,
   pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
   carteiraSaldoSafra, consolidarCarteiraClientes,
+  calcularRecebiveisComponentes,
   jurosSafra, receitaBrutaSafra, componentesEfetivosSafra, ehVendaAposChaves,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
@@ -14,6 +15,10 @@ import {
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
 } from './fluxo-caixa-motor.js';
 import { periodosAnuais, CATEGORIA_CORRETAGEM, type EventoCrono } from './fluxo-shared.js';
+import {
+  CALLIANDRA_G1, CALLIANDRA_G2, G1_ESPERADO, G2_ESPERADO,
+  type CenarioRecebiveis,
+} from './fixtures/calliandra-golden.js';
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 const soma = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
@@ -1638,6 +1643,118 @@ test('componentesEfetivosSafra: coexistência — repasse de safra antiga e vend
   const componentesNova = componentesEfetivosSafra(COMPONENTES_GRUPO_PADRAO, mesRepasse, mesEntrega);
   const vendaNovaAVista = receitaBrutaSafra(componentesNova, mesRepasse, 500_000);
   assert.equal(vendaNovaAVista, 500_000);
+});
+
+// ── #283: integração do motor de safras ao cálculo real ────────────────────
+
+function componentesDaFixture(cenario: CenarioRecebiveis): ComponentePagamento[] {
+  return cenario.componentes.map((c): ComponentePagamento => {
+    if (c.tipo === 'imediato') return {
+      tipo: 'imediato', participacaoPct: c.participacao * 100,
+      descontoPct: (c.desconto ?? 0) * 100, rotulo: c.rotulo,
+    };
+    if (c.tipo === 'prazo_fixo') return {
+      tipo: 'prazo_fixo', participacaoPct: c.participacao * 100,
+      sinalPct: (c.sinalPct ?? 0) * 100, prazoMeses: c.prazoN,
+      defasagemMeses: 1, taxaMensal: c.taxaMensal,
+      jurosNoMesDaContratacao: false, rotulo: c.rotulo,
+    };
+    if (c.tipo === 'ate_marco') return {
+      tipo: 'ate_marco', participacaoPct: c.participacao * 100,
+      sinalPct: (c.sinalPct ?? 0) * 100, marcoMes: c.marcoM,
+      defasagemMeses: 1, taxaMensal: c.taxaMensal,
+      jurosNoMesDaContratacao: false, rotulo: c.rotulo,
+    };
+    return {
+      tipo: 'concentrado', participacaoPct: c.participacao * 100,
+      mesPagamento: c.mesPagamento, taxaMensal: 0, rotulo: c.rotulo,
+    };
+  });
+}
+
+test('#283 motor de produção reproduz os checkpoints Calliandra G.1', () => {
+  const contratacoes = CALLIANDRA_G1.contratacaoPorMes
+    .map((valorContratado, safra) => ({ safra, valorContratado }))
+    .filter((c) => c.valorContratado > 0);
+  const r = calcularRecebiveisComponentes(
+    componentesDaFixture(CALLIANDRA_G1), contratacoes, 999, 134,
+  );
+  for (const [mes, esperado] of G1_ESPERADO) {
+    // O oráculo mantém precisão integral; produção quantiza cada parcela em
+    // centavos (C7). Centenas de parcelas/safras acumulam até R$ 0,52.
+    assert.ok(perto(r.recebimentoBrutoMensal[mes] ?? 0, esperado, 1),
+      `G.1 mês ${mes}: esperado ${esperado}, obtido ${r.recebimentoBrutoMensal[mes]}`);
+  }
+  assert.ok(soma(r.jurosMensal) > 0);
+  assert.ok(perto(soma(r.recebimentoBrutoMensal), soma(r.principalRecebidoMensal) + soma(r.jurosMensal), 0.01));
+});
+
+test('#283 motor de produção reproduz Calliandra G.2 e separa o repasse', () => {
+  const contratacoes = CALLIANDRA_G2.contratacaoPorMes
+    .map((valorContratado, safra) => ({ safra, valorContratado }))
+    .filter((c) => c.valorContratado > 0);
+  const r = calcularRecebiveisComponentes(
+    componentesDaFixture(CALLIANDRA_G2), contratacoes, 999, 27,
+  );
+  for (const [mes, esperado] of G2_ESPERADO) {
+    assert.ok(perto(r.recebimentoBrutoMensal[mes] ?? 0, esperado, 1),
+      `G.2 mês ${mes}: esperado ${esperado}, obtido ${r.recebimentoBrutoMensal[mes]}`);
+  }
+  assert.ok(perto(r.repasseMensal[25], 0.70 * CALLIANDRA_G2.baseContratada, 0.10));
+  assert.equal(soma(r.jurosMensal), 0);
+  assert.equal(r.carteiraMensal[25], 0);
+});
+
+test('#283 linha opt-in alimenta juros, principal e carteira no FluxoCalc', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Venda financiada',
+      tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+      fluxo_pagamento: { componentes: [{
+        tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0,
+        prazoMeses: 12, defasagemMeses: 1, taxaMensal: 0.01,
+        jurosNoMesDaContratacao: false,
+      }] },
+    }],
+    linhasCusto: [], areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  assert.ok(r.jurosClientes > 0);
+  assert.ok(r.carteiraClientesMaxima > 0);
+  assert.equal(r.carteiraClientesMensal[r.carteiraClientesMensal.length - 1], 0);
+  assert.ok(perto(r.receitaBruta, r.vendaLiquidaContratada + r.jurosClientes, 0.01));
+  assert.ok(perto(soma(r.receitaBrutaMensal), soma(r.principalRecebidoMensal) + soma(r.jurosClientesMensal), 0.01));
+  assert.equal(soma(r.repasseMensal), 0);
+});
+
+test('#283 estudo legado sem componentes mantém exatamente o caminho vigente', () => {
+  const linha = {
+    id: 1, nome: 'Venda legada',
+    tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
+    absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+    fluxo_pagamento: {
+      entrada: [{ pct: 15, parcelas: 1 }],
+      parcelas: [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, pct: 15 }],
+      repasse: { apos_entrega_meses: 2 },
+    },
+  };
+  const vigente = receitaMensalLinha(linha, CRONO, 60);
+  assert.ok(perto(vigente[12], 1_500_000, 0.01));
+  assert.ok(perto(vigente[17], 1_500_000 / 24, 0.01));
+  assert.ok(perto(vigente[42], 7_000_000, 0.01));
+  assert.equal(soma(vigente), 10_000_000);
+
+  const consolidado = calcularFluxo({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [linha], linhasCusto: [], areaTerreno: 0,
+  });
+  assert.deepEqual(consolidado.receitaBrutaMensal, recebimentoBrutoMensal(linha, CRONO, consolidado.prazo));
+  assert.deepEqual(consolidado.principalRecebidoMensal, consolidado.receitaBrutaMensal);
+  assert.equal(consolidado.jurosClientes, 0);
+  assert.equal(consolidado.carteiraClientesMaxima, 0);
+  assert.equal(soma(consolidado.repasseMensal), 0);
 });
 
 // ── #238: permuta financeira — bases bruta e líquida ────────────────────────

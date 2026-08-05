@@ -1012,7 +1012,7 @@ O motor não deve criar uma parcela no próprio mês apenas porque o componente 
 
 A incidência de juros no mês da contratação precisa ser um parâmetro explícito. O padrão é **não** contar o mês da venda como período financeiro completo.
 
-### 11.6 Comportamento vigente
+### 11.6 Estratégia de compatibilidade do motor (#283)
 
 O JSON `fluxo_pagamento` guarda:
 
@@ -1023,20 +1023,16 @@ O JSON `fluxo_pagamento` guarda:
 - listas de `parcelas`;
 - `repasse.apos_entrega_meses`.
 
-Quando `componentes` está ausente, o app preserva a leitura do formato legado por adaptador. Nesta etapa, o cálculo instalado ainda lê o formato legado; a adoção do contrato canônico pelo motor por safras é responsabilidade da #283.
+Desde a #283, a compatibilidade é decidida **por linha de receita e por opt-in**:
 
-`receitaMensalLinha`, em `frontend/fluxo-caixa-motor.ts`, rateia nominalmente o valor. Não existem:
+- quando `fluxo_pagamento.componentes` está explicitamente persistido, `calcularFluxo` usa o motor por safras e expõe principal, juros de clientes, carteira e repasse;
+- quando `componentes` está ausente, o app mantém integralmente o caminho legado (`entrada`, `parcelas` e `repasse`), sem reinterpretar nem migrar o estudo durante a leitura;
+- estudos aprovados ou arquivados não mudam retroativamente: só passam ao motor canônico se a linha for deliberadamente salva no novo contrato;
+- a tela de Cenários reutiliza o mesmo `FluxoCalc`, portanto recebe as mesmas séries e regras sem um cálculo paralelo.
 
-- desconto comercial como série própria;
-- safra;
-- PMT;
-- taxa de juros do cliente aplicada ao saldo;
-- saldo por componente;
-- distinção entre prazo fixo e até marco;
-- primeiro vencimento configurado de forma econômica;
-- carteira reconciliada.
+Essa escolha evita uma migração global silenciosa e permite auditar a adoção linha a linha. O caminho canônico calcula safra, PMT, juros sobre saldo, prazo fixo, vencimento até marco, carteira reconciliada e liquidação concentrada. O caminho legado permanece documentado abaixo apenas como regra de compatibilidade.
 
-### 11.6.1 Parcelas “ao longo da Obra” no app instalado
+### 11.6.1 Parcelas legadas “ao longo da Obra”
 
 O comportamento atual, originado nas #190/#191, é ancorado no calendário físico da Obra, **não no
 mês da venda**. A mecânica exata, em `vencimentosAoLongoObra` (`frontend/fluxo-caixa-motor.ts`), é:
