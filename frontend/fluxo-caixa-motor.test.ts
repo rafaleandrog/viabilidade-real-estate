@@ -10,6 +10,7 @@ import {
   jurosSafra, receitaBrutaSafra, componentesEfetivosSafra, ehVendaAposChaves,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
+  permutaFinanceiraBrutaMensal, permutaFinanceiraLiquidaMensal,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
 } from './fluxo-caixa-motor.js';
 import { periodosAnuais, CATEGORIA_CORRETAGEM, type EventoCrono } from './fluxo-shared.js';
@@ -1637,4 +1638,133 @@ test('componentesEfetivosSafra: coexistência — repasse de safra antiga e vend
   const componentesNova = componentesEfetivosSafra(COMPONENTES_GRUPO_PADRAO, mesRepasse, mesEntrega);
   const vendaNovaAVista = receitaBrutaSafra(componentesNova, mesRepasse, 500_000);
   assert.equal(vendaNovaAVista, 500_000);
+});
+
+// ── #238: permuta financeira — bases bruta e líquida ────────────────────────
+//
+// As duas funções existiam desde a Fase 7 sem NENHUM teste. A issue lista como
+// testes mínimos: sem deduções, só imposto, só corretagem, ambas, e taxa zero.
+
+test('#238 base bruta: percentual direto sobre a receita de caixa', () => {
+  const r = permutaFinanceiraBrutaMensal([1000, 2000, 0], 10);
+  assert.deepEqual(r, [100, 200, 0]);
+});
+
+test('#238 sem deduções, líquida == bruta', () => {
+  const receita = [1000, 2000];
+  const bruta = permutaFinanceiraBrutaMensal(receita, 10);
+  const liquida = permutaFinanceiraLiquidaMensal(receita, [0, 0], [0, 0], 10);
+  assert.deepEqual(liquida, bruta);
+});
+
+test('#238 só imposto deduz da base', () => {
+  // (1000 − 200) × 10% = 80
+  assert.deepEqual(permutaFinanceiraLiquidaMensal([1000], [200], [0], 10), [80]);
+});
+
+test('#238 só corretagem deduz da base', () => {
+  // (1000 − 50) × 10% = 95
+  assert.deepEqual(permutaFinanceiraLiquidaMensal([1000], [0], [50], 10), [95]);
+});
+
+test('#238 imposto e corretagem juntos: SUBTRAÇÃO, não desconto multiplicativo', () => {
+  // A issue proíbe explicitamente o desconto multiplicativo.
+  // Correto:   (1000 − 200 − 50) × 10% = 75
+  // Errado:    1000 × 0,8 × 0,95 × 10% = 76
+  assert.deepEqual(permutaFinanceiraLiquidaMensal([1000], [200], [50], 10), [75]);
+});
+
+test('#238 base líquida nunca fica negativa (clamp em 0)', () => {
+  // Deduções acima da receita do mês não geram permuta negativa.
+  assert.deepEqual(permutaFinanceiraLiquidaMensal([100], [200], [50], 10), [0]);
+});
+
+test('#238 taxa zero de permuta gera série zero nas duas bases', () => {
+  assert.deepEqual(permutaFinanceiraBrutaMensal([1000, 2000], 0), [0, 0]);
+  assert.deepEqual(permutaFinanceiraLiquidaMensal([1000, 2000], [100, 100], [10, 10], 0), [0, 0]);
+});
+
+test('#238 meses sem receita não geram permuta', () => {
+  assert.deepEqual(permutaFinanceiraBrutaMensal([0, 0, 500], 20), [0, 0, 100]);
+});
+
+test('#238 série ausente de imposto/corretagem é tratada como zero', () => {
+  // O motor passa séries de comprimentos possivelmente distintos.
+  assert.deepEqual(permutaFinanceiraLiquidaMensal([1000, 1000], [100], [], 10), [90, 100]);
+});
+
+test('#238 permutaAlternativa expõe a base NÃO escolhida, para auditoria', () => {
+  // Mesma fixture do teste da base líquida: VGV 100M, RET 4%, corretagem 5%,
+  // permuta 10%. Escolhida = líquida (9,1M); alternativa = bruta (10M).
+  const linhaPermuta = (base: 'bruta' | 'liquida') => ({
+    id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
+    orcamento_valor: 10, orcamento_unidade: 'pct_vgv', permuta_financeira_base: base,
+  });
+  const montar = (base: 'bruta' | 'liquida'): FluxoConfig => ({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 }, ret: { ativo: true, pct: 4 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
+      linhaPermuta(base),
+    ],
+    areaTerreno: 0,
+  });
+  const achar = (c: FluxoConfig) =>
+    calcularFluxo(c).linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
+
+  const comLiquida = achar(montar('liquida'));
+  assert.equal(comLiquida.permutaAlternativa?.base, 'bruta');
+  assert.ok(perto(comLiquida.permutaAlternativa!.total, 10_000_000, 1));
+
+  // Escolhendo bruta, a alternativa é a líquida — simétrico.
+  const comBruta = achar(montar('bruta'));
+  assert.equal(comBruta.permutaAlternativa?.base, 'liquida');
+  assert.ok(perto(comBruta.permutaAlternativa!.total, 9_100_000, 1));
+  // E a escolhida continua sendo a que alimenta o fluxo.
+  assert.ok(perto(comBruta.total, -10_000_000, 1));
+});
+
+test('#238 permuta em R$ não tem alternativa — as duas bases dão o mesmo valor', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [{
+      id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
+      orcamento_valor: 1_000_000, orcamento_unidade: 'rs',
+    }],
+    areaTerreno: 0,
+  };
+  const d = calcularFluxo(config).linhasReceita.find((l) => l.nome.includes('Permuta'))!;
+  assert.equal(d.permutaAlternativa, undefined);
+});
+
+test('#238 auditoria preserva o valor canônico quando o percentual visível está desatualizado', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [{
+      id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
+      orcamento_valor: 50, orcamento_unidade: 'pct_vgv',
+      orcamento_valor_canonico: 10_000_000, permuta_financeira_base: 'bruta',
+    }],
+    areaTerreno: 0,
+  };
+  const d = calcularFluxo(config).linhasReceita.find((l) => l.nome.includes('Permuta'))!;
+  assert.equal(d.total, -10_000_000); // canônico equivale a 10%, não aos 50% visíveis
+  assert.equal(d.permutaAlternativa?.total, 10_000_000);
 });
