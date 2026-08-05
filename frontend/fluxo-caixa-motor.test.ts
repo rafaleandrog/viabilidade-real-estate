@@ -1013,6 +1013,9 @@ test('agregarFluxoPorPeriodos: soma anual bate com a mensal em TODAS as linhas',
   const mesmaSoma = (a: number[], b: number[], nome: string) =>
     assert.ok(perto(soma(a), soma(b), 0.01), `${nome}: soma anual ≠ soma mensal`);
   mesmaSoma(anual.receitaMensal, mensal.receitaMensal, 'receita');
+  mesmaSoma(anual.vendaBrutaContratadaMensal, mensal.vendaBrutaContratadaMensal, 'venda bruta contratada');
+  mesmaSoma(anual.descontoComercialMensal, mensal.descontoComercialMensal, 'desconto comercial');
+  mesmaSoma(anual.vendaLiquidaContratadaMensal, mensal.vendaLiquidaContratadaMensal, 'venda líquida contratada');
   mesmaSoma(anual.receitaBrutaMensal, mensal.receitaBrutaMensal, 'receita bruta');
   mesmaSoma(anual.custoMensal, mensal.custoMensal, 'custo');
   mesmaSoma(anual.fluxoMensal, mensal.fluxoMensal, 'fluxo');
@@ -1031,6 +1034,20 @@ test('agregarFluxoPorPeriodos: soma anual bate com a mensal em TODAS as linhas',
     for (let j = 0; j < (lm.itens ?? []).length; j++) {
       mesmaSoma(la.itens![j].mensal, lm.itens![j].mensal, `tipologia bruta ${lm.itens![j].nome}`);
     }
+  }
+  for (let i = 0; i < mensal.linhasVendasContratadas.length; i++) {
+    const lm = mensal.linhasVendasContratadas[i]; const la = anual.linhasVendasContratadas[i];
+    mesmaSoma(la.mensal, lm.mensal, `vendas contratadas ${lm.nome}`);
+    for (let j = 0; j < (lm.itens ?? []).length; j++) {
+      mesmaSoma(la.itens![j].mensal, lm.itens![j].mensal, `venda tipologia ${lm.itens![j].nome}`);
+    }
+  }
+  for (const chave of ['aVista', 'tabelaCurta', 'tabelaLongaObra', 'repasse', 'aposChaves', 'outros'] as const) {
+    mesmaSoma(anual.receitaPorComponenteMensal[chave], mensal.receitaPorComponenteMensal[chave], `componente ${chave}`);
+  }
+  for (const chave of ['tabelaCurta', 'tabelaLongaObra', 'saldoARepassar'] as const) {
+    periodos.forEach((p, k) => assert.equal(
+      anual.carteiraPorComponenteMensal[chave][k], mensal.carteiraPorComponenteMensal[chave][p.fim] ?? 0));
   }
   for (let i = 0; i < mensal.linhasCusto.length; i++) {
     mesmaSoma(anual.linhasCusto[i].mensal, mensal.linhasCusto[i].mensal, `custo ${mensal.linhasCusto[i].nome}`);
@@ -1710,6 +1727,8 @@ test('#283 motor de produção reproduz Calliandra G.2 e separa o repasse', () =
       `G.2 mês ${mes}: esperado ${esperado}, obtido ${r.recebimentoBrutoMensal[mes]}`);
   }
   assert.ok(perto(r.repasseMensal[25], 0.70 * CALLIANDRA_G2.baseContratada, 0.10));
+  assert.equal(r.receitaPorComponenteMensal.repasse[25], r.repasseMensal[25]);
+  assert.equal(r.carteiraPorComponenteMensal.saldoARepassar[25], 0);
   assert.equal(soma(r.jurosMensal), 0);
   assert.equal(r.carteiraMensal[25], 0);
 });
@@ -1736,6 +1755,9 @@ test('#283 linha opt-in alimenta juros, principal e carteira no FluxoCalc', () =
   assert.ok(perto(r.receitaBruta, r.vendaLiquidaContratada + r.jurosClientes, 0.01));
   assert.ok(perto(soma(r.receitaBrutaMensal), soma(r.principalRecebidoMensal) + soma(r.jurosClientesMensal), 0.01));
   assert.equal(soma(r.repasseMensal), 0);
+  assert.ok(soma(r.receitaPorComponenteMensal.tabelaCurta) > 0);
+  assert.deepEqual(r.carteiraPorComponenteMensal.tabelaCurta, r.carteiraClientesMensal);
+  assert.equal(soma(r.receitaPorComponenteMensal.aVista), 0);
 });
 
 test('#237 Receita Bruta fecha por linha e tipologia sem deduzir RET ou corretagem destacada', () => {
@@ -1768,6 +1790,9 @@ test('#237 Receita Bruta fecha por linha e tipologia sem deduzir RET ou corretag
   assert.equal(soma(linha.itens?.map((item) => item.total) ?? []), linha.total);
   assert.equal(linha.itens?.[0].total, 6_000_000);
   assert.equal(linha.itens?.[1].total, 4_000_000);
+  assert.equal(r.linhasVendasContratadas[0].total, r.vendaBrutaContratada);
+  assert.equal(soma(r.linhasVendasContratadas[0].itens?.map((item) => item.total) ?? []), r.vendaBrutaContratada);
+  assert.deepEqual(r.vendaBrutaContratadaMensal, r.receitaBrutaMensal);
   assert.equal(r.jurosClientes, 0);
   // RET e corretagem são deduções explícitas; nenhuma reduz a Receita Bruta.
   assert.equal(soma(r.receitaMensal), 9_600_000);
@@ -1800,6 +1825,7 @@ test('#283 estudo legado sem componentes mantém exatamente o caminho vigente', 
   assert.equal(consolidado.jurosClientes, 0);
   assert.equal(consolidado.carteiraClientesMaxima, 0);
   assert.equal(soma(consolidado.repasseMensal), 0);
+  assert.deepEqual(consolidado.receitaPorComponenteMensal.outros, consolidado.receitaBrutaMensal);
 });
 
 // ── #238: permuta financeira — bases bruta e líquida ────────────────────────

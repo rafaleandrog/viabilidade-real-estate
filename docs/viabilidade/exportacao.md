@@ -23,33 +23,30 @@ A Proforma é calculada no **frontend** (ver [Fórmulas](formulas)); por isso a 
 
 MVP exporta o **estudo completo** (Premissas + Proforma). Comparação de cenários e análise de sensibilidade são visualizadas na tela; a exportação dedicada desses blocos e o layout gráfico avançado ficam para v2.
 
-## Evolução prevista — dependente de #241
+## Fluxo de Caixa Avançado — #241
 
-> ⚠️ **A exportação atual não possui nenhuma das linhas abaixo.** Ela reproduz a Proforma e as
-> séries que o motor calcula hoje. Esta seção registra o alvo, não o estado.
-
-Quando **EVI-021 / #241** for implementada — depois de #237, #239 e #240 —, a exportação passa a
-abrir:
+CSV e PDF reproduzem a mesma hierarquia achatada da tabela do Fluxo de Caixa,
+na visão mensal ou anual selecionada. A exportação abre:
 
 - valor bruto contratado;
 - descontos comerciais;
 - valor contratado líquido;
 - principal recebido;
 - juros recebidos;
-- carteiras por componente (prazo fixo curto, prazo fixo longo, até marco, saldo para repasse);
-- **visão diagnóstica por safra** — Grupo, tipologia, mês da contratação, componente, principal,
-  sinal, primeiro vencimento, prazo ou marco, parcela, juros e saldo final.
+- contratação por Grupo e tipologia;
+- recebimentos por componente (À vista, Tabela curta, Tabela longa — Obra,
+  Repasse e Após-chaves);
+- carteiras por componente (Curta, Longa — Obra e Saldo a repassar);
+- Receita Líquida, custos, Funding e relatório de reconciliação.
 
-A visão executiva permanece consolidada; a abertura por safra existe para explicar divergências.
-Ver [Padrão de Viabilidade — Incorporação](padrao-incorporacao) §22.4.
+A visão diagnóstica por safra permanece técnica e aparece quando uma
+divergência fornece safra/linha/mês. Ver
+[Padrão de Viabilidade — Incorporação](padrao-incorporacao) §22.4.
 
 ## Evolução prevista — funding, permuta física e valor canônico
 
-> ⚠️ **Acrescentado em 2026-08-01.** Como a seção acima, registra o **alvo**, não o estado. A
-> exportação atual não possui nenhuma destas linhas.
-
-**Dependente de #278 (FIN-09).** Quando o Capital Stack for implementado, a exportação abre o bloco
-de funding com a mesma árvore da tabela de fluxo:
+O Capital Stack implementado abre o bloco de funding com a mesma árvore da
+tabela de fluxo:
 
 - liberações de financiamento à produção e de capital de giro;
 - aportes de equity preferencial e de Sponsor Equity;

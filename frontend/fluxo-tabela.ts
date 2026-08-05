@@ -2,7 +2,10 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { fmtR$, fmtPct } from './viab-format.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
-import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
+import {
+  ROTULOS_COMPONENTES_CARTEIRA, ROTULOS_COMPONENTES_RECEITA,
+  type FluxoCalc, type LinhaCalc, type SeriesComponentesCarteira, type SeriesComponentesReceita,
+} from './fluxo-caixa-motor.js';
 import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
 import type { Divergencia } from './fluxo-invariantes.js';
 
@@ -360,6 +363,11 @@ export function tabelaFluxo(
   const grupos = GRUPOS_CUSTO.filter((g) => custosPorGrupo(g).length > 0);
   // VPL é linear no fluxo mensal, então o VPL de um agregado = Σ VPL das suas linhas (#126).
   const somaVpl = (linhas: LinhaCalc[]): number => linhas.reduce((s, l) => s + l.vpl, 0);
+  const totalSerie = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
+  const picoSerie = (serie: number[]): number => Math.max(0, ...serie);
+  const componentesReceita = (Object.keys(ROTULOS_COMPONENTES_RECEITA) as (keyof SeriesComponentesReceita)[])
+    .filter((chave) => chave !== 'outros' || c.receitaPorComponenteMensal.outros.some((v) => Math.abs(v) > 0.005));
+  const componentesCarteira = Object.keys(ROTULOS_COMPONENTES_CARTEIRA) as (keyof SeriesComponentesCarteira)[];
 
   return html`
     <div class="fx-wrap">
@@ -376,31 +384,60 @@ export function tabelaFluxo(
           </tr>
         </thead>
         <tbody>
+          ${linhaTabela('grupo', 'vendas-contratadas', 'Vendas contratadas',
+            { mensal: c.vendaBrutaContratadaMensal, total: c.vendaBrutaContratada,
+              vpl: somaVpl(c.linhasVendasContratadas) },
+            dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
+          ${!colapso['vendas-contratadas'] ? html`
+            ${linhaTabela('subgrupo', '', '(-) Desconto comercial',
+              { mensal: c.descontoComercialMensal.map((v) => -v), total: -c.descontoComercial },
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
+            ${linhaTabela('subgrupo', '', '= Venda líquida contratada',
+              { mensal: c.vendaLiquidaContratadaMensal, total: c.vendaLiquidaContratada },
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
+            ${c.linhasVendasContratadas.map((l) => html`
+              ${linhaTabela('subgrupo', `vc${l.id}`,
+                `Grupo · ${l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome}`, l,
+                dataInicio, colapso, toggle, false, c.vgvVendavel)}
+              ${!colapso[`vc${l.id}`] ? (l.itens ?? []).map((t) =>
+                linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.vgvVendavel)) : nothing}
+            `)}
+          ` : nothing}
+
           ${linhaTabela('grupo', 'receita-bruta', 'Receita Bruta — VGV',
             { mensal: c.receitaBrutaMensal, total: c.receitaBruta, vpl: somaVpl(c.linhasReceitaBruta) },
             dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
           ${!colapso['receita-bruta'] ? html`
-            <!-- #237/#241: visões de auditoria não aditivas da mesma Receita
-                 Bruta: composição financeira e abertura por Grupo/tipologia. -->
-            ${linhaTabela('subgrupo', '', 'Principal recebido',
+            ${componentesReceita.map((chave) => linhaTabela('subgrupo', '',
+              `Componente · ${ROTULOS_COMPONENTES_RECEITA[chave]}`,
+              { mensal: c.receitaPorComponenteMensal[chave],
+                total: totalSerie(c.receitaPorComponenteMensal[chave]) },
+              dataInicio, colapso, toggle, false, c.vgvVendavel, false, false))}
+            <!-- Principal e juros são visões de auditoria da mesma Receita
+                 Bruta; não se somam novamente às categorias comerciais. -->
+            ${linhaTabela('subgrupo', '', 'Auditoria · Principal recebido',
               { mensal: c.principalRecebidoMensal, total: c.principalRecebidoMensal.reduce((s, v) => s + v, 0) },
               dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
-            ${linhaTabela('subgrupo', '', 'Juros de clientes',
+            ${linhaTabela('subgrupo', '', 'Auditoria · Juros de clientes',
               { mensal: c.jurosClientesMensal, total: c.jurosClientes },
-              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
-            ${linhaTabela('subgrupo', '', 'Repasse',
-              { mensal: c.repasseMensal, total: c.repasseMensal.reduce((s, v) => s + v, 0) },
-              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
-            ${linhaTabela('subgrupo', '', 'Carteira de clientes (Total = pico)',
-              { mensal: c.carteiraClientesMensal, total: c.carteiraClientesMaxima },
               dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
             ${c.linhasReceitaBruta.map((l) => html`
               ${linhaTabela('subgrupo', `rb${l.id}`,
-                l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, l, dataInicio, colapso, toggle, false, c.vgvVendavel)}
+                `Grupo · ${l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome}`,
+                l, dataInicio, colapso, toggle, false, c.vgvVendavel)}
               ${!colapso[`rb${l.id}`] ? (l.itens ?? []).map((t) =>
                 linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.vgvVendavel)) : nothing}
             `)}
           ` : nothing}
+
+          ${linhaTabela('grupo', 'carteira-clientes', 'Carteira de clientes (Total = pico)',
+            { mensal: c.carteiraClientesMensal, total: c.carteiraClientesMaxima },
+            dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
+          ${!colapso['carteira-clientes'] ? componentesCarteira.map((chave) =>
+            linhaTabela('subgrupo', '', `Componente · ${ROTULOS_COMPONENTES_CARTEIRA[chave]}`,
+              { mensal: c.carteiraPorComponenteMensal[chave],
+                total: picoSerie(c.carteiraPorComponenteMensal[chave]) },
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)) : nothing}
 
           ${linhaTabela('grupo', 'receita-liquida', 'Receita Líquida do Projeto',
             { mensal: c.receitaMensal, total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita) },
@@ -432,7 +469,9 @@ export function tabelaFluxo(
 
 /** Chaves de colapso de todos os grupos expansíveis (para "recolher/expandir tudo"). */
 export function chavesColapso(c: FluxoCalc): string[] {
-  return ['receita-bruta', 'receita-liquida', 'custo-terreno', 'custo-obra', 'custo-diretos', 'custo-indireto', 'custo-financeiro',
+  return ['vendas-contratadas', 'receita-bruta', 'carteira-clientes', 'receita-liquida',
+    'custo-terreno', 'custo-obra', 'custo-diretos', 'custo-indireto', 'custo-financeiro',
+    ...c.linhasVendasContratadas.map((l) => `vc${l.id}`),
     ...c.linhasReceitaBruta.map((l) => `rb${l.id}`),
     ...c.linhasReceita.map((l) => `rl${l.id}`)];
 }
