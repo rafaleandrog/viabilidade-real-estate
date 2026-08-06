@@ -149,9 +149,12 @@ export function vgvLinha(tipologias: any[]): number {
  * `unidades_permutadas` é um SUBCONJUNTO de `quantidade` (não soma além dela);
  * daí o `Math.min`.
  */
-export function vgvPermutaFisicaTipologia(t: any): number {
+export function vgvPermutaFisicaTipologia(t: any, unidadesPermutadas?: number): number {
   const qtd = n(t?.quantidade);
-  const permutadas = Math.min(n(t?.unidades_permutadas), qtd);
+  // A fonte nova é a reserva da linha de Custos (#266/#268). O campo legado
+  // permanece como fallback apenas para consumidores antigos desta função.
+  const solicitadas = unidadesPermutadas === undefined ? n(t?.unidades_permutadas) : n(unidadesPermutadas);
+  const permutadas = Math.min(Math.max(0, solicitadas), qtd);
   return permutadas * n(t?.area_privativa_m2) * n(t?.preco_m2);
 }
 
@@ -167,8 +170,8 @@ export function vgvPermutaFisicaLinha(tipologias: any[]): number {
  * a base usada por `receitaMensalLinha` para a absorção de vendas — `vgvTotal`
  * (KPI informativo, #188) continua contando a tipologia inteira.
  */
-export function vgvVendavelTipologia(t: any): number {
-  return vgvTipologia(t) - vgvPermutaFisicaTipologia(t);
+export function vgvVendavelTipologia(t: any, unidadesPermutadas?: number): number {
+  return vgvTipologia(t) - vgvPermutaFisicaTipologia(t, unidadesPermutadas);
 }
 
 /** VGV vendável de uma linha de receita (soma das tipologias). */
