@@ -17,6 +17,7 @@ import {
   listarFasesAvancado, criarFaseAvancado, atualizarFaseAvancado, removerFaseAvancado,
   listarTipologiasCatalogo,
   criarAlocacao, atualizarAlocacao, removerAlocacao,
+  listarCustosAvancado,
 } from './viabilidade-api.js';
 import './viab-num.js';
 
@@ -55,6 +56,7 @@ export class ViabFluxoReceitas extends LitElement {
 
   @state() private fases: any[] = [];
   @state() private tipologias: any[] = [];      // catálogo do estudo
+  @state() private custosPermuta: any[] = [];    // reservas físicas feitas em Custos (#266)
   @state() private carregando = true;
   @state() private crono: EventoCrono[] = [];
   @state() private dataInicio: string | null = null;
@@ -177,16 +179,18 @@ export class ViabFluxoReceitas extends LitElement {
   private async _carregar() {
     this.carregando = true;
     try {
-      const [fases, tipologias, crono, params] = await Promise.all([
+      const [fases, tipologias, crono, params, custos] = await Promise.all([
         listarFasesAvancado(this.estudo.id, 'receita'),
         listarTipologiasCatalogo(this.estudo.id),
         buscarCronogramaAvancado(this.estudo.id),
         buscarParametrosAvancado(this.estudo.id),
+        listarCustosAvancado(this.estudo.id),
       ]);
       if (!fases?.erro) this.fases = fases.dados || [];
       if (!tipologias?.erro) this.tipologias = tipologias.dados || [];
       if (!crono?.erro) this.crono = crono.dados || [];
       if (!params?.erro) this.dataInicio = params.data_inicio_projeto ?? null;
+      if (!custos?.erro) this.custosPermuta = custos.dados || [];
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar receitas', 'erro');
     }
@@ -213,7 +217,12 @@ export class ViabFluxoReceitas extends LitElement {
         }
       }
     }
-    return n(tip.quantidade) - usado;
+    const permutado = this.custosPermuta
+      .filter((c) => c.grupo === 'terreno' && c.categoria === 'Preço'
+        && c.subcategoria === 'Permuta física'
+        && Number(c.permuta_tipologia_id) === Number(tipologiaId))
+      .reduce((s, c) => s + Math.max(0, Math.round(n(c.permuta_quantidade))), 0);
+    return n(tip.quantidade) - usado - permutado;
   }
 
   private _vgvFase(fase: any): number {

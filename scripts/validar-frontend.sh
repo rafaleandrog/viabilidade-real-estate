@@ -99,7 +99,7 @@ node --import tsx/esm --test frontend/*.test.ts
 tst=$?
 [ $tst -eq 0 ] || { echo "  testes FALHARAM"; exit 1; }
 
-node "$esbuild_bin" frontend/index.ts --bundle --external:@urbiverso/ui \
+"$esbuild_bin" frontend/index.ts --bundle --external:@urbiverso/ui \
   --format=esm --outfile=/dev/null --target=es2022 --minify --tsconfig=tsconfig.json
 bd=$?
 [ $bd -eq 0 ] || { echo "  build FALHOU"; exit 1; }

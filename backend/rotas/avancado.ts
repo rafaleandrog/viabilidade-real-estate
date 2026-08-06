@@ -948,16 +948,32 @@ rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', async (req: Request, re
  * fase (ignorando, opcionalmente, uma alocação em edição). Como cada tipologia
  * pertence a um único estudo, filtrar por `tipologia_id` já cobre todo o estudo.
  */
+async function unidadesPermutadasNoEstudo(
+  req: Request, estudoId: number, tipologiaId: number, ignorarCustoId?: number,
+): Promise<number> {
+  const r = await req.dados!.listar('avancado_linhas_custo', {
+    filtros: { estudo_id: estudoId }, por_pagina: 1000,
+  });
+  return r.dados
+    .filter((c: any) => Number(c.id) !== Number(ignorarCustoId)
+      && c.grupo === 'terreno' && c.categoria === 'Preço' && c.subcategoria === 'Permuta física'
+      && Number(c.permuta_tipologia_id) === Number(tipologiaId))
+    .reduce((s: number, c: any) => s + Math.max(0, Number(c.permuta_quantidade) || 0), 0);
+}
+
 async function saldoTipologiaNoEstudo(
   req: Request, tipologia: any, ignorarAlocId?: number,
 ): Promise<number> {
   const r = await req.dados!.listar('avancado_alocacoes', {
     filtros: { tipologia_id: tipologia.id }, por_pagina: 1000,
   });
-  const usado = r.dados
+  const [permutadas] = await Promise.all([
+    unidadesPermutadasNoEstudo(req, Number(tipologia.estudo_id), Number(tipologia.id)),
+  ]);
+  const vendido = r.dados
     .filter((a: any) => Number(a.id) !== Number(ignorarAlocId))
     .reduce((s: number, a: any) => s + (Number(a.unidades) || 0), 0);
-  return (Number(tipologia.quantidade) || 0) - usado;
+  return (Number(tipologia.quantidade) || 0) - vendido - permutadas;
 }
 
 async function alocacaoDaFase(req: Request, res: Response, faseId: number): Promise<any | null> {
@@ -1228,6 +1244,41 @@ function validarCamposCusto(
 }
 
 /** #266: `permuta_tipologia_id` precisa referenciar uma tipologia do MESMO estudo. */
+async function validarPermutaFisica(
+  req: Request, res: Response, estudoId: number, dados: Record<string, any>, atual?: Record<string, any> | null,
+): Promise<boolean> {
+  const grupo = dados.grupo !== undefined ? dados.grupo : atual?.grupo;
+  const categoria = dados.categoria !== undefined ? dados.categoria : atual?.categoria;
+  const subcategoria = dados.subcategoria !== undefined ? dados.subcategoria : atual?.subcategoria;
+  if (grupo !== 'terreno' || categoria !== 'Preço' || subcategoria !== 'Permuta física') return true;
+  const tipologiaId = dados.permuta_tipologia_id !== undefined ? dados.permuta_tipologia_id : atual?.permuta_tipologia_id;
+  const quantidade = dados.permuta_quantidade !== undefined ? dados.permuta_quantidade : atual?.permuta_quantidade;
+  if (tipologiaId === null || tipologiaId === undefined || tipologiaId === '') {
+    erro(res, 400, 'PERMUTA_TIPOLOGIA_OBRIGATORIA', 'Permuta física exige uma tipologia');
+    return false;
+  }
+  if (!Number.isInteger(Number(quantidade)) || Number(quantidade) < 1) {
+    erro(res, 400, 'PERMUTA_QUANTIDADE_OBRIGATORIA', 'Permuta física exige pelo menos uma unidade');
+    return false;
+  }
+  const tip = await req.dados!.buscar('avancado_tipologias', tipologiaId);
+  if (!tip || Number(tip.estudo_id) !== estudoId) return false;
+  const vendida = await req.dados!.listar('avancado_alocacoes', { filtros: { tipologia_id: tipologiaId }, por_pagina: 1000 });
+  const custos = await req.dados!.listar('avancado_linhas_custo', { filtros: { estudo_id: estudoId }, por_pagina: 1000 });
+  const usada = vendida.dados.reduce((sum: number, a: any) => sum + (Number(a.unidades) || 0), 0);
+  const reservada = custos.dados
+    .filter((c: any) => Number(c.id) !== Number(atual?.id)
+      && c.grupo === 'terreno' && c.categoria === 'Preço' && c.subcategoria === 'Permuta física'
+      && Number(c.permuta_tipologia_id) === Number(tipologiaId))
+    .reduce((sum: number, c: any) => sum + Math.max(0, Number(c.permuta_quantidade) || 0), 0);
+  const disponivel = (Number(tip.quantidade) || 0) - usada - reservada;
+  if (Number(quantidade) > disponivel) {
+    erro(res, 422, 'PERMUTA_SALDO_EXCEDIDO', `Só há ${disponivel} unidade(s) disponível(is) para permuta desta tipologia`);
+    return false;
+  }
+  return true;
+}
+
 async function validarPermutaTipologia(
   req: Request, res: Response, estudoId: number, permutaTipologiaId: any,
 ): Promise<boolean> {
@@ -1261,6 +1312,12 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
     }
     if (!validarCamposCusto(res, dados)) return;
     if (!(await validarPermutaTipologia(req, res, estudo.id, dados.permuta_tipologia_id))) return;
+    if (!(await validarPermutaFisica(req, res, estudo.id, dados))) return;
+    if (dados.grupo === 'terreno' && dados.categoria === 'Preço' && dados.subcategoria === 'Permuta física') {
+      dados.orcamento_valor = null;
+      dados.orcamento_valor_canonico = null;
+      dados.orcamento_unidade = 'rs';
+    }
 
     // Ancoragem: fase do Cronograma (#167) tem prioridade sobre evento fixo —
     // as duas são mutuamente exclusivas (o frontend nunca manda as duas).
@@ -1333,6 +1390,15 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
     // o grupo e a categoria que decidem a regra vêm da linha já gravada.
     if (!validarCamposCusto(res, dados, custo)) return;
     if (!(await validarPermutaTipologia(req, res, estudo.id, dados.permuta_tipologia_id))) return;
+    if (!(await validarPermutaFisica(req, res, estudo.id, dados, custo))) return;
+    const grupoEfetivo = dados.grupo !== undefined ? dados.grupo : custo.grupo;
+    const categoriaEfetiva = dados.categoria !== undefined ? dados.categoria : custo.categoria;
+    const subcategoriaEfetiva = dados.subcategoria !== undefined ? dados.subcategoria : custo.subcategoria;
+    if (grupoEfetivo === 'terreno' && categoriaEfetiva === 'Preço' && subcategoriaEfetiva === 'Permuta física') {
+      dados.orcamento_valor = null;
+      dados.orcamento_valor_canonico = null;
+      dados.orcamento_unidade = 'rs';
+    }
 
     // Âncora final (nova, se veio no PATCH; senão a que já estava salva) —
     // fase do Cronograma (#167) e evento fixo são mutuamente exclusivas.
