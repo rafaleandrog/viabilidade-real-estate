@@ -7,12 +7,14 @@ import { graficoFluxoMensal, graficoFluxoAcumulado, seriesEconomicasFluxo } from
 import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo, tabelaCapitalStack,
   chavesColapso, CHAVES_COLAPSO_CAPITAL_STACK, controlesFluxo, relatorioReconciliacao,
+  tabelaPermutaFisica,
 } from './fluxo-tabela.js';
 import { exportarFluxoCSV, exportarFluxoPDF, type CapitalStackExport } from './exportar.js';
 import { simularCapitalStackDoEstudo, receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
 import {
   validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita,
-  validarCapitalStack, type Divergencia,
+  validarCapitalStack, validarPermutaFisica, permutaFisicaPorTipologia,
+  type Divergencia, type PermutaFisicaTipologia,
 } from './fluxo-invariantes.js';
 import {
   urbiVerso,
@@ -44,6 +46,7 @@ export class ViabFluxoVer extends LitElement {
   @state() private camadas: any[] = [];
   @state() private resultadoCapitalStack: ResultadoCapitalStack | null = null;
   @state() private divergencias: Divergencia[] = [];
+  @state() private permutaFisica: PermutaFisicaTipologia[] = [];
   private dados: {
     receitas: any[]; custos: any[]; curvas: any[];
     tipologias: any[]; crono: EventoCrono[]; dataInicio: string | null; taxa: number;
@@ -123,12 +126,19 @@ export class ViabFluxoVer extends LitElement {
     }
     this.divergencias = [
       ...validarProduto(d.receitas, d.custos, d.tipologias, d.crono, this.calc.prazo),
+      // #269: validarProduto já cobre alocado+permutado > estoque para tipologias do
+      // catálogo; esta é a única que pega permuta_tipologia_id "solto" (referência sem
+      // tipologia correspondente no catálogo) — validarProduto nunca visita esse caso
+      // porque itera o catálogo, não as linhas de custo.
+      ...validarPermutaFisica(d.custos, d.tipologias),
       ...validarContratacao(receitas, d.crono, this.calc.prazo, this.calc.vendaBrutaContratada),
       ...validarSafrasReceita(receitas, d.crono, this.calc.prazo),
       ...validarFluxoCalc(this.calc),
       ...(this.resultadoCapitalStack
         ? validarCapitalStack(this.resultadoCapitalStack, this.calc.fluxoMensal) : []),
     ];
+    // #269: mesma fonte para tela e exportação — computado uma vez aqui.
+    this.permutaFisica = permutaFisicaPorTipologia(d.custos, d.tipologias);
   }
 
   /**
@@ -160,6 +170,7 @@ export class ViabFluxoVer extends LitElement {
       ${tabelaFluxo(exib, this.dados?.dataInicio ?? null, this.colapso, (ch) => this._t(ch))}
       ${!periodos ? tabelaCapitalStack(this.resultadoCapitalStack, this.camadas, c.fluxoMensal, c.meses, this.colapso, (ch) => this._t(ch)) : nothing}
       ${relatorioReconciliacao(this.divergencias)}
+      ${tabelaPermutaFisica(this.permutaFisica)}
       <div class="graficos">
         <urbi-card titulo="Contratação, Receita Bruta, Carteira e Repasse — ${titulo}">
           <div class="graf-wrap"><div class="graf">
@@ -230,7 +241,7 @@ export class ViabFluxoVer extends LitElement {
   private _csv = () => {
     const c = this._exportavel();
     if (!c) return;
-    exportarFluxoCSV(this.estudo, c, this.dados?.dataInicio ?? null, this._capitalStackExport(), this.divergencias);
+    exportarFluxoCSV(this.estudo, c, this.dados?.dataInicio ?? null, this._capitalStackExport(), this.divergencias, this.permutaFisica);
     urbiVerso.notificar('CSV do fluxo exportado.', 'sucesso');
   };
 
@@ -238,7 +249,7 @@ export class ViabFluxoVer extends LitElement {
     const c = this._exportavel();
     if (!c) return;
     const ok = exportarFluxoPDF(this.estudo, c, this.dados?.dataInicio ?? null,
-      this.visao === 'anual' ? 'Anos' : 'Meses', this._capitalStackExport(), this.divergencias);
+      this.visao === 'anual' ? 'Anos' : 'Meses', this._capitalStackExport(), this.divergencias, this.permutaFisica);
     if (!ok) urbiVerso.notificar('Permita pop-ups para exportar o PDF.', 'alerta');
   };
 }

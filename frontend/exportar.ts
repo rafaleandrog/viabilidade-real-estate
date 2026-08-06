@@ -9,7 +9,7 @@ import {
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
-import type { Divergencia } from './fluxo-invariantes.js';
+import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
 const pct1 = (v: number) => v.toFixed(1).replace('.', ',');
 
@@ -320,6 +320,7 @@ export function exportarFluxoCSV(
   dataInicio: string | null,
   capitalStack?: CapitalStackExport,
   divergencias: Divergencia[] = [],
+  permutaFisica: PermutaFisicaTipologia[] = [],
 ) {
   const rows: string[] = [];
   rows.push('Estudo;' + (estudo.nome_exibicao || estudo.nome));
@@ -366,6 +367,16 @@ export function exportarFluxoCSV(
     d.mes === undefined ? '' : d.mes + 1, d.esperado, d.encontrado, d.diferenca,
     d.mensagem.replaceAll(';', ','),
   ].join(';'));
+  // #269: área e quantidade permutada por tipologia — mesma fonte da tela
+  // (`permutaFisicaPorTipologia`), sem cálculo próprio da exportação.
+  if (permutaFisica.length > 0) {
+    rows.push('');
+    rows.push('Permuta Física — Área e Quantidade por Tipologia');
+    rows.push('Tipologia;Permutada;Catálogo;Área Permutada (m²)');
+    for (const p of permutaFisica) rows.push([
+      p.nome, p.quantidadePermutada, p.quantidadeTotal, fmtNum(p.areaPermutada),
+    ].join(';'));
+  }
   const nome = (estudo.id_legivel || 'estudo') + '_fluxo-caixa.csv';
   baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
 }
@@ -421,6 +432,7 @@ export function exportarFluxoPDF(
   rotuloColunas = 'Meses',
   capitalStack?: CapitalStackExport,
   divergencias: Divergencia[] = [],
+  permutaFisica: PermutaFisicaTipologia[] = [],
 ): boolean {
   const POR_PAGINA = 18; // colunas por página (paisagem)
   const linhas = capitalStack
@@ -496,6 +508,20 @@ export function exportarFluxoPDF(
         <th>Esperado</th><th>Encontrado</th><th>Diferença</th><th class="nome">Mensagem</th></tr></thead>
         <tbody>${linhasReconciliacao}</tbody></table>
     </section>`);
+
+  // #269: mesma fonte da tela — sem cálculo próprio da exportação.
+  if (permutaFisica.length > 0) {
+    const linhasPermuta = permutaFisica.map((p) => `<tr>
+        <td class="nome">${p.nome}</td><td>${fmtNum(p.quantidadePermutada)}</td>
+        <td>${fmtNum(p.quantidadeTotal)}</td><td>${fmtNum(p.areaPermutada)} m²</td></tr>`).join('');
+    paginas.push(`
+    <section class="pagina">
+      ${cab}
+      <h2>Permuta Física — Área e Quantidade por Tipologia</h2>
+      <table><thead><tr><th class="nome">Tipologia</th><th>Permutada</th><th>Catálogo</th><th>Área Permutada</th></tr></thead>
+        <tbody>${linhasPermuta}</tbody></table>
+    </section>`);
+  }
 
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome} — Fluxo de Caixa</title>
   <style>

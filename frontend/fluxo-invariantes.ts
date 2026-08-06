@@ -438,3 +438,38 @@ export function validarPermutaFisica(
   }
   return out;
 }
+
+/** Uma linha de reconciliação de permuta física, por tipologia. */
+export interface PermutaFisicaTipologia {
+  tipologiaId: number;
+  nome: string;
+  quantidadeTotal: number;
+  quantidadePermutada: number;
+  areaPermutada: number;
+}
+
+/**
+ * #269: área e quantidade permutada por tipologia — a mesma leitura de
+ * `linhasCusto` que `validarPermutaFisica` usa, só que para exibição em vez
+ * de validação. Única fonte para tela e exportação (CSV/PDF); nenhum dos
+ * dois calcula isso de novo. Tipologias sem permuta física não aparecem.
+ */
+export function permutaFisicaPorTipologia(
+  linhasCusto: any[],
+  tipologiasCatalogo: any[],
+): PermutaFisicaTipologia[] {
+  const permutadaPorTipologia = quantidadesPermutadas(linhasCusto);
+  const out: PermutaFisicaTipologia[] = [];
+  for (const [id, quantidadePermutada] of permutadaPorTipologia) {
+    if (quantidadePermutada <= 0) continue;
+    const tip = tipologiasCatalogo.find((t) => Number(t.id) === id);
+    out.push({
+      tipologiaId: id,
+      nome: tip?.nome || `tipologia ${id}`,
+      quantidadeTotal: Number(tip?.quantidade ?? 0),
+      quantidadePermutada,
+      areaPermutada: quantidadePermutada * Number(tip?.area_privativa_m2 ?? 0),
+    });
+  }
+  return out;
+}

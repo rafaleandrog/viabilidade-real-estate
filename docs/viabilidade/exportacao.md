@@ -60,9 +60,20 @@ Regra de ouro: **CSV, PDF e Cenários consomem exatamente os mesmos arrays do mo
 recalculado na camada de apresentação. Ver
 [Funding, Capital Stack e Retorno do Capital](funding-capital-stack) §10.
 
-**Dependente de #269 (`BUGLIST-015-D`).** A exportação passa a abrir a permuta física por
-tipologia: quantidade e área permutada, VGV potencial × VGV vendável, e a reconciliação
-`alocado + permutado ≤ quantidade do catálogo`.
+## Permuta física por tipologia — #269
+
+Quando o estudo tem ao menos uma linha de custo `Preço/Permuta física` (#266/#267), tela, CSV e PDF
+abrem, por tipologia: quantidade permutada, quantidade total do catálogo e área permutada (m²) —
+mesma fonte nos três lugares (`permutaFisicaPorTipologia`, `frontend/fluxo-invariantes.ts`); nenhum
+recalcula por conta própria. Sem permuta física declarada, a seção não aparece.
+
+VGV potencial (catálogo inteiro) × VGV vendável (sem a fatia permutada) aparecem como KPIs na aba
+Resumo (`vgvTotal`/`vgvVendavel` do `FluxoCalc`, já existentes desde a #268) — só quando há permuta.
+
+A reconciliação `alocado + permutado ≤ quantidade do catálogo` já existia em duas camadas
+(`validarProduto`, geral; `validarPermutaFisica`, específica por tipologia — inclusive referências a
+tipologia inexistente no catálogo, caso que `validarProduto` não cobre). A #269 conectou a segunda ao
+relatório que a tela e as exportações já mostravam — nenhuma lógica nova de validação.
 
 **Dependente de #260 (`BUGLIST-018`).** As exportações deixam de reler campos de exibição e passam a
 consumir o **valor canônico resolvido**, como o resto dos consumidores — hoje não há contrato que
