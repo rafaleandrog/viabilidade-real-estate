@@ -805,44 +805,57 @@ test('fluxo completo: consolidação, acumulado, TIR e exposição coerentes', (
   assert.ok(perto(somaTipologias, linha.total, 1));
 });
 
-// #188/#268: VGV Total / VGV Permuta Física (valor declarado) / Receita Bruta (VGV).
-test('vgvPermutaFisica e receitaBrutaVgv: valor declarado na linha de custo, informativo', () => {
+// #188/#268: VGV Total / VGV Permuta Física (reservas de unidades em Custos).
+test('permuta física usa tipologia/quantidade de Custos e reduz VGV vendável sem caixa', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     linhasReceita: [{
       id: 1, nome: 'Sales', fase_label: 'Fase 1',
       tipologias: [
-        // 200 un a 12.000/m² × 25m² = 60M — a permuta física (20 delas) não
-        // reduz este VGV Total (#188: conta a tipologia inteira); quem
-        // declara o valor da permuta é a linha de custo (#266/#267), abaixo.
-        { id: 1, nome: 'Studio', quantidade: 200, area_privativa_m2: 25, preco_m2: 12_000 },
-        // 400 un a 10.000/m² × 70m² = 280M, sem permuta
-        { id: 2, nome: '2 dorms', quantidade: 400, area_privativa_m2: 70, preco_m2: 10_000 },
+        // 200 un a 12.000/m² × 25m² = 60M — 20 são reservadas na permuta.
+        { id: 1, tipologia_id: 1, nome: 'Studio', quantidade: 200, area_privativa_m2: 25, preco_m2: 12_000 },
+        // 400 un a 10.000/m² × 70m² = 280M, sem permuta.
+        { id: 2, tipologia_id: 2, nome: '2 dorms', quantidade: 400, area_privativa_m2: 70, preco_m2: 10_000 },
       ],
       absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
       fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
     }],
     linhasCusto: [
-      // Valor declarado (#266) para as 20 unidades de Studio entregues por permuta física.
-      { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 20, orcamento_valor: 6_000_000, orcamento_unidade: 'rs' },
+      // A linha não tem orçamento: só reserva tipologia + quantidade (#266).
+      { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 20, orcamento_valor: null },
     ],
     areaTerreno: 50_000,
   };
   const r = calcularFluxo(config);
 
-  assert.ok(perto(r.vgvTotal, 340_000_000, 1)); // KPI informativo (#188): conta a tipologia inteira
-  assert.ok(perto(r.vgvPermutaFisica, 6_000_000, 1));
+  assert.ok(perto(r.vgvTotal, 340_000_000, 1));
+  assert.ok(perto(r.vgvPermutaFisica, 6_000_000, 1)); // 20 × 25 × 12.000
   assert.ok(perto(r.receitaBrutaVgv, 334_000_000, 1));
-  // #268: a linha de custo Permuta física NÃO reduz a absorção de vendas em
-  // caixa (isso é "estoque/contratação", fora do escopo desta issue — só a
-  // reserva antiga por `unidades_permutadas` faria isso, e ela é código
-  // morto no Avançado real, ver comentário em `vgvPermutaFisica` acima).
-  // O fluxo aqui reflete o VGV Total inteiro: nada foi vendido por caixa a
-  // menos, só o KPI informativo mudou.
-  assert.ok(perto(soma(r.receitaMensal), 340_000_000, 5));
-  // #229: vgvVendavel é o alias correto — mesmo valor, nome sem ambiguidade
-  // com "Receita Bruta" (grandeza distinta, #228).
-  assert.ok(perto(r.vgvVendavel, r.receitaBrutaVgv, 1e-6));
+  assert.ok(perto(r.vgvVendavel, 334_000_000, 1));
+  // As unidades permutadas não geram venda, entrada, parcela ou repasse.
+  assert.ok(perto(soma(r.receitaMensal), 334_000_000, 5));
+  assert.ok(perto(soma(r.custoMensal), 0, 1e-6));
+  assert.ok(perto(soma(r.fluxoMensal), 334_000_000, 5));
+});
+
+// #268: a mesma tipologia pode aparecer em dois Grupos de Receitas; a reserva
+// é consumida uma única vez, sem dupla alocação.
+test('#268: permuta física não duplica unidades quando a tipologia aparece em vários Grupos', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [
+      { id: 1, tipologias: [{ id: 10, tipologia_id: 7, quantidade: 30, area_privativa_m2: 50, preco_m2: 10_000 }], absorcao: { modo: 'linear' }, fluxo_pagamento: null },
+      { id: 2, tipologias: [{ id: 20, tipologia_id: 7, quantidade: 20, area_privativa_m2: 50, preco_m2: 11_000 }], absorcao: { modo: 'linear' }, fluxo_pagamento: null },
+    ],
+    linhasCusto: [{ id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 7, permuta_quantidade: 40 }],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  // Primeiro Grupo consome 30 unidades; segundo consome 10 — nunca 40 em ambos.
+  assert.ok(perto(r.vgvPermutaFisica, 30 * 50 * 10_000 + 10 * 50 * 11_000, 1));
+  assert.ok(perto(r.receitaBrutaVgv, 30 * 50 * 10_000 + 10 * 50 * 11_000, 1) === false);
+  assert.ok(perto(r.receitaBrutaVgv, 50 * 50 * 10_000 + 20 * 50 * 11_000 - r.vgvPermutaFisica, 1));
+  assert.ok(perto(soma(r.custoMensal), 0, 1e-6));
 });
 
 // #229 — as seis grandezas com valor nesta fase, e as relações entre elas.
