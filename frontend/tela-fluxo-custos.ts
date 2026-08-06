@@ -693,7 +693,8 @@ export class ViabFluxoCustos extends LitElement {
                   .valor=${this._valorExibido(c)}
                   @urbi:input-numero-change=${(e: CustomEvent) => this._editarOrcamento(c, e.detail.valor)}
                 ></viab-num>
-              </span>`
+              `}
+            </span>`;
         },
       },
       {
