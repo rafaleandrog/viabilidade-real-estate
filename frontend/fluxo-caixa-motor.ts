@@ -39,6 +39,57 @@ function nomeLinhaCusto(c: any): string {
   return partes.filter(Boolean).join(' — ') || 'Custo';
 }
 
+type ReservaPermutaFisica = {
+  porTipologia: Map<string, number>;
+  vgv: number;
+  usaFonteNova: boolean;
+};
+
+function chaveTipologiaLinha(linha: any, linhaIndex: number, tipologia: any, tipologiaIndex: number): string {
+  return `${linha?.id ?? linhaIndex}:${tipologia?.id ?? tipologiaIndex}`;
+}
+
+/**
+ * Aloca as unidades reservadas em Custos às alocações de Receitas da mesma
+ * tipologia. A quantidade é consumida uma única vez, mesmo quando a tipologia
+ * aparece em vários Grupos; o preço/m² da alocação correspondente é usado só
+ * para medir o VGV informativo. Nenhuma parcela desta reserva entra no caixa.
+ */
+function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]): ReservaPermutaFisica {
+  const custos = (linhasCusto ?? []).filter(ePermutaFisica);
+  const usaFonteNova = custos.length > 0;
+  const reservas = new Map<number, number>();
+  for (const c of custos) {
+    const tipologiaId = Number(c.permuta_tipologia_id);
+    const quantidade = Math.max(0, Math.round(n(c.permuta_quantidade)));
+    if (Number.isFinite(tipologiaId) && quantidade > 0) {
+      reservas.set(tipologiaId, (reservas.get(tipologiaId) ?? 0) + quantidade);
+    }
+  }
+
+  const porTipologia = new Map<string, number>();
+  let vgv = 0;
+  for (const [tipologiaId, reservadaInicial] of reservas) {
+    let restante = reservadaInicial;
+    for (let li = 0; li < (linhasReceita ?? []).length && restante > 0; li++) {
+      const linha = linhasReceita[li];
+      for (let ti = 0; ti < (linha.tipologias ?? []).length && restante > 0; ti++) {
+        const t = linha.tipologias[ti];
+        const id = Number(t?.tipologia_id ?? t?.id);
+        if (id !== tipologiaId) continue;
+        const chave = chaveTipologiaLinha(linha, li, t, ti);
+        const disponivel = Math.max(0, n(t.quantidade) - (porTipologia.get(chave) ?? 0));
+        const usada = Math.min(restante, disponivel);
+        if (usada <= 0) continue;
+        porTipologia.set(chave, usada);
+        vgv += usada * n(t.area_privativa_m2) * n(t.preco_m2);
+        restante -= usada;
+      }
+    }
+  }
+  return { porTipologia, vgv, usaFonteNova };
+}
+
 export type CurvaPersonalizada = { mes: number; pct: number }[];
 
 // ─────────────────────────────────────────────────────────────────
@@ -1674,7 +1725,7 @@ function recorte(mensal: number[]): { inicio: number; duracao: number } {
 
 export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const crono = config.cronograma ?? [];
-  const linhasReceita = config.linhasReceita ?? [];
+  const linhasReceitaOriginal = config.linhasReceita ?? [];
   const linhasCusto = config.linhasCusto ?? [];
   const taxa = n(config.taxaDescontoAa) || 12;
 
@@ -1690,9 +1741,37 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   // extrapola o fim da Obra, e o horizonte antigo não via isso).
   const ultimoCrono = Math.max(0, ...crono.map((e) => n(e.inicio_mes) + n(e.duracao_meses) - 1));
   const ultimoCustos = Math.max(0, ...linhasCusto.map((c) => n(c.inicio_mes) + n(c.duracao_meses) - 1));
-  const ultimoRecebivel = Math.max(0, ...linhasReceita.map((l) => ultimoMesRecebivelLinha(l, crono)));
+  const ultimoRecebivel = Math.max(0, ...linhasReceitaOriginal.map((l) => ultimoMesRecebivelLinha(l, crono)));
   const prazoDerivado = Math.max(ultimoCrono, ultimoRecebivel, ultimoCustos, 11) + 1;
   const prazo = Math.max(1, Math.round(n(config.prazoMeses) || prazoDerivado));
+
+  const reservasPermuta = reservarPermutasFisicas(linhasReceitaOriginal, linhasCusto);
+  const usaFonteNovaPermuta = reservasPermuta.usaFonteNova;
+
+  // #268 (correção pós-CI): as séries mensais de caixa (`vendaBrutaContratadaMensal`,
+  // `recebimentoBrutoMensal` e tudo que deriva delas) leem `t.unidades_permutadas`
+  // diretamente da tipologia — não passam pelo `vgvVendavelLinhaMotor` abaixo, que só
+  // alimenta os KPIs informativos e a proporção por tipologia. Sem este ajuste, a
+  // reserva feita em Custos (#266) nunca chegava ao caixa: os testes confirmaram (ver
+  // `receitaMensal`/`fluxoMensal` de `#268: permuta física...`) que o valor mensal
+  // continuava contando a unidade permutada como vendida, mesmo com os KPIs corretos.
+  // Escrever `unidades_permutadas` aqui, uma única vez, torna toda função antiga que já
+  // sabe ler esse campo automaticamente correta — sem replicar a reserva função a função.
+  const linhasReceita = usaFonteNovaPermuta
+    ? linhasReceitaOriginal.map((l: any, li: number) => ({
+      ...l,
+      tipologias: (l.tipologias ?? []).map((t: any, ti: number) => ({
+        ...t,
+        unidades_permutadas: reservasPermuta.porTipologia.get(chaveTipologiaLinha(l, li, t, ti)) ?? 0,
+      })),
+    }))
+    : linhasReceitaOriginal;
+  const vgvVendavelLinhaMotor = (linha: any, linhaIndex: number): number =>
+    (linha.tipologias ?? []).reduce((total: number, t: any, tipologiaIndex: number) => {
+      const chave = chaveTipologiaLinha(linha, linhaIndex, t, tipologiaIndex);
+      const unidades = usaFonteNovaPermuta ? (reservasPermuta.porTipologia.get(chave) ?? 0) : undefined;
+      return total + vgvVendavelTipologia(t, unidades);
+    }, 0);
 
   const ctxCusto: ContextoCusto = {
     areaPrivativaTotal: areaPrivativaTotalLinhas(linhasReceita),
@@ -1700,7 +1779,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     vgvTotal: linhasReceita.reduce((s, l) => s + vgvLinha(l.tipologias), 0),
   };
   ctxCusto.receitaTotal = linhasReceita.reduce(
-    (s, l) => s + receitaLiquidaLinha(vgvLinha(l.tipologias), l.fluxo_pagamento), 0);
+    (s, l, i) => s + receitaLiquidaLinha(vgvVendavelLinhaMotor(l, i), l.fluxo_pagamento), 0);
   ctxCusto.totalObra = linhasCusto
     .filter((c) => c.grupo === 'obra' && (c.orcamento_unidade || 'rs') !== 'pct_obra')
     .reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);
@@ -1713,10 +1792,12 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     serie: (linha: any, cronograma: EventoCrono[], prazoTotal: number) => number[],
   ): LinhaCalc[] => linhasReceita.map((l) => {
     const mensal = serie(l, crono, prazo);
-    const vgvVendavelL = vgvVendavelLinha(l.tipologias);
+    const vgvVendavelL = vgvVendavelLinhaMotor(l, linhasReceita.indexOf(l));
     const r = recorte(mensal);
-    const itens: LinhaCalc[] = (l.tipologias ?? []).map((t: any) => {
-      const propor = vgvVendavelL > 0 ? vgvVendavelTipologia(t) / vgvVendavelL : 0;
+    const itens: LinhaCalc[] = (l.tipologias ?? []).map((t: any, tipologiaIndex: number) => {
+      const chave = chaveTipologiaLinha(l, linhasReceita.indexOf(l), t, tipologiaIndex);
+      const unidades = usaFonteNovaPermuta ? (reservasPermuta.porTipologia.get(chave) ?? 0) : undefined;
+      const propor = vgvVendavelL > 0 ? vgvVendavelTipologia(t, unidades) / vgvVendavelL : 0;
       const mensalTip = mensal.map((v) => v * propor);
       const rt = recorte(mensalTip);
       return {
@@ -1894,21 +1975,13 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const exposicaoMaxima = fluxoAcumulado.length ? Math.min(...fluxoAcumulado) : 0;
 
   // #188/#268 — VGV Total / VGV Permuta Física (sem caixa) / Receita Bruta
-  // (VGV): grandezas informativas, consumidas pelo Resumo (#182) e pela
-  // coluna % VGV do Fluxo de Caixa (#189). `vgvTotal` continua contando a
-  // tipologia inteira — só expõe o quanto é atribuível a unidades entregues
-  // por permuta física.
-  //
-  // Fonte: o VALOR DECLARADO nas linhas de custo `Permuta física` (#266/#267),
-  // nunca derivado (ADR da #266 — ver docs/viabilidade/padrao-incorporacao.md
-  // §15.1). NÃO é `vgvPermutaFisicaLinha(l.tipologias)` (a derivação antiga
-  // por `unidades_permutadas`): essa função é código morto no Avançado real —
-  // o join que monta `linhasReceita.tipologias` (`montarLinhasReceita`,
-  // backend/rotas/avancado.ts) nunca copia `unidades_permutadas` do catálogo,
-  // então ela sempre calculava zero aqui. Não há comportamento vigente a
-  // preservar; por isso não há fallback para o cálculo antigo (decisão do
-  // autor, 2026-08-02).
-  const vgvPermutaFisica = linhasPermutaFisica.reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);
+  // (VGV): grandezas informativas. A permuta física agora é medida pelas
+  // unidades reservadas em Custos e pelas alocações/preços correspondentes em
+  // Receitas; nunca é orçamento e nunca entra em calcCustos ou no caixa.
+  // Sem linha de custo `Permuta física`, não há fallback para o campo legado
+  // `unidades_permutadas` — decisão do autor (2026-08-02, ver #267): o campo é
+  // código morto no Avançado real. O KPI é 0, não uma derivação da tipologia.
+  const vgvPermutaFisica = usaFonteNovaPermuta ? reservasPermuta.vgv : 0;
   const receitaBrutaVgv = ctxCusto.vgvTotal - vgvPermutaFisica;
 
   // #283: séries econômicas agregadas. Apenas linhas com `componentes`
