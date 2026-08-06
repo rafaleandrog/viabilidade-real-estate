@@ -4,6 +4,67 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Por que os problemas se repetem: 4 causas-raiz (2026-08-06)
+
+O autor perguntou por que erros, imprevistos e "issues não implementadas de verdade" continuam
+acontecendo, apesar das rodadas anteriores terem sido dadas como concluídas. Investigação do
+histórico (git log, `docs/triagem-issues-2026-08-03.md`, o próprio `fluxo-caixa-motor.ts`) cruzada
+com o estado atual das issues no GitHub. **O pior já tinha sido corrigido**: das 53 issues
+"fantasma" de 2026-08-03, restavam nesta data só **4 abertas** (#252, #264, #268, #269) — o sistema
+já tinha reagido ao próprio incêndio. O que faltava era parar de reagir issue a issue e prevenir a
+*próxima* rodada do mesmo padrão.
+
+**As 4 causas-raiz, com evidência:**
+
+1. **"Mergeado" virou proxy falso de "entregue"** — sem checagem final linha-a-linha antes de
+   fechar. As Rodadas 5–6 foram dadas como concluídas, mas a triagem de 2026-08-03 achou que só
+   23/53 issues se sustentavam em `arquivo:linha`; 29 eram "parcial". Ex.: #256 foi dada como
+   pronta, mas o `DELETE .../custos/:cid` não recusava a linha oficial de Preço — critério de
+   aceite não cumprido, só o commit existia.
+2. **Motor construído e testado, mas não ligado ao caminho de cálculo real** ("código morto"
+   recorrente). Nove issues (#230, #232–#237, #240, #241) tinham matemática pronta e testada que o
+   próprio motor declarava, em `frontend/fluxo-caixa-motor.ts:505-511`, não alimentar
+   `calcularFluxo`. **Já corrigido** pela integração da #283 (`f1de233`/`2bf3969`); a varredura por
+   marcadores residuais não achou mais nenhuma ocorrência fora de um caso já documentado e
+   intencional (`:1905`, decisão de arquitetura sobre a fonte legada de permuta física, não bug).
+3. **Falha silenciosa por natureza da plataforma** — cada guard nasceu reativo, depois do
+   incidente. Aspas curvas em atributo Lit (#160) e comentário `//` em `schema.json` (derrubou a
+   v0.1.19) sobreviveram a rodadas inteiras "validadas ✓" porque nenhuma etapa do pipeline lia
+   aquele artefato. `guard-json.mjs` e o grep de aspas curvas só nasceram depois do estrago.
+4. **Convenção de processo presumida, nunca imposta mecanicamente até quebrar.** As 53 issues
+   fantasma existiam porque a regra "só `Closes #NNN` fecha issue" morava no `CLAUDE.md` do repo
+   errado. De ~88 menções a issue em commit, só 6 usaram `Closes` — exatamente as 6 que fecharam.
+   Mesmo padrão, de novo, em 2026-08-06: `validation.yml` sem `timeout-minutes` deixou a PR #304
+   pendurada até o default de 6h do GitHub (ver seção de CI travado nesta mesma sessão).
+
+**Padrão comum:** o processo tratava "parece pronto" (compila, testa, PR aberto, commit menciona a
+issue) como equivalente a "está pronto", e só descobria a diferença via auditoria manual posterior —
+nunca por um gate que existisse *antes* do incidente. As causas #2 e #4 já tinham correção mecânica.
+
+**Tentativa e reversão do dia:** a primeira versão desta investigação (branch
+`claude/blindar-fechamento-issue`) tentou endereçar #1 e #3 com dois guards novos — uma segunda
+exigência de `Evidência: #NNN arquivo:linha` em cima do `guard-issue-fechamento.mjs`, e um guard
+inteiramente novo (`guard-divida-conhecida.mjs`) varrendo o diff atrás de frases como "código
+morto". **O autor pediu para reverter os dois** no mesmo dia: a ferramenta simples que ele queria já
+existia desde 2026-08-03 (o próprio `guard-issue-fechamento.mjs`, que levou o total de issues abertas
+de 53 para 4 em três dias) — as duas adições eram complexidade não pedida em cima de algo que já
+funcionava, e um guard de texto não confirma critério de aceite mesmo assim (só confere se a linha foi
+escrita). **Revertido**: os dois arquivos voltaram ao estado de antes desta sessão. Se a causa #1
+precisar de correção mecânica no futuro, vale desenhar de novo — mas simples, e só se o autor pedir.
+
+Causa #3 (falha silenciosa por design da plataforma) permanece sem correção estrutural — é inerente
+ao UrbiVerso (prop/atributo inexistente "simplesmente não faz nada") e cada novo caso ainda vai
+exigir um guard reativo específico. Registrado aqui para a próxima sessão não redescobrir o padrão do
+zero.
+
+**Sobre o `validation.yml`, separadamente:** o autor perguntou se esse workflow (CI de
+typecheck/teste/build) era a causa dos problemas recorrentes. Não é — ele só existe desde
+2026-08-06 (entrou "de carona" num commit da PR #303, que era sobre a issue #266, não sobre CI),
+três dias **depois** das 53 issues fantasma. O único incidente que ele causou (a PR #304 pendurada
+por falta de `timeout-minutes`) já foi corrigido no PR #305, mergeado. Ele roda os mesmos dois
+scripts (`validar-frontend.sh`/`validar-backend.sh`) que já existiam desde antes de 2026-08-03 como
+gate manual — só automatizou o que já era prática documentada. Recomendação: manter.
+
 ## CI travado na PR #304 — diagnóstico e blindagem dos workflows (2026-08-06)
 
 **Sintoma.** A PR #304 (`agent/268-permuta-fisica-motor`, `Closes #268`) ficou sem veredito: os
