@@ -27,6 +27,27 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 raiz="$(pwd)"
 
+# Teste que NÃO TERMINA é o pior modo de falha do CI: em 2026-08-06 o job da PR #304
+# ficou `in_progress` no passo `Testes` por horas, sem log nenhum para ler (a API do
+# GitHub só serve log de job concluído). São duas defesas, porque cobrem casos
+# diferentes e nenhuma cobre as duas:
+#   - `--test-timeout` (usado na etapa 5/5) mata teste ASSÍNCRONO pendurado e diz o
+#     NOME do teste. Não pega laço síncrono: `while(true){}` bloqueia o event loop e o
+#     próprio timer do runner nunca dispara.
+#   - `com_limite` mata o PROCESSO inteiro — é esta que pega o laço síncrono.
+# O `command -v` existe porque o Git Bash do Windows nem sempre traz o `timeout`;
+# sem ele o comando roda igual, só sem a rede de segurança.
+com_limite() {
+  local seg="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$seg" "$@"
+    local rc=$?
+    [ $rc -eq 124 ] && echo "  ABORTADO: passou de ${seg}s sem terminar — provável laço infinito." >&2
+    return $rc
+  fi
+  "$@"
+}
+
 # Aspas curvas em posição de ATRIBUTO deixam o atributo INERTE: o parser lê o valor
 # com as aspas dentro dele (”alerta” em vez de alerta), o valor não casa com nada e o
 # primitivo cai no default — sem erro em lugar nenhum. Como isso mora dentro de um
@@ -95,7 +116,7 @@ rm -f tsconfig.frontend.json
 [ $tc -eq 0 ] && echo "  typecheck OK" || { echo "  typecheck FALHOU"; exit 1; }
 
 echo "== 5/5 testes de frontend + build do bundle =="
-node --import tsx/esm --test frontend/*.test.ts
+com_limite 300 node --import tsx/esm --test --test-timeout=60000 frontend/*.test.ts
 tst=$?
 [ $tst -eq 0 ] || { echo "  testes FALHARAM"; exit 1; }
 

@@ -4,6 +4,117 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Por que os problemas se repetem: 4 causas-raiz (2026-08-06)
+
+O autor perguntou por que erros, imprevistos e "issues não implementadas de verdade" continuam
+acontecendo, apesar das rodadas anteriores terem sido dadas como concluídas. Investigação do
+histórico (git log, `docs/triagem-issues-2026-08-03.md`, o próprio `fluxo-caixa-motor.ts`) cruzada
+com o estado atual das issues no GitHub. **O pior já tinha sido corrigido**: das 53 issues
+"fantasma" de 2026-08-03, restavam nesta data só **4 abertas** (#252, #264, #268, #269) — o sistema
+já tinha reagido ao próprio incêndio. O que faltava era parar de reagir issue a issue e prevenir a
+*próxima* rodada do mesmo padrão.
+
+**As 4 causas-raiz, com evidência:**
+
+1. **"Mergeado" virou proxy falso de "entregue"** — sem checagem final linha-a-linha antes de
+   fechar. As Rodadas 5–6 foram dadas como concluídas, mas a triagem de 2026-08-03 achou que só
+   23/53 issues se sustentavam em `arquivo:linha`; 29 eram "parcial". Ex.: #256 foi dada como
+   pronta, mas o `DELETE .../custos/:cid` não recusava a linha oficial de Preço — critério de
+   aceite não cumprido, só o commit existia.
+2. **Motor construído e testado, mas não ligado ao caminho de cálculo real** ("código morto"
+   recorrente). Nove issues (#230, #232–#237, #240, #241) tinham matemática pronta e testada que o
+   próprio motor declarava, em `frontend/fluxo-caixa-motor.ts:505-511`, não alimentar
+   `calcularFluxo`. **Já corrigido** pela integração da #283 (`f1de233`/`2bf3969`); a varredura por
+   marcadores residuais não achou mais nenhuma ocorrência fora de um caso já documentado e
+   intencional (`:1905`, decisão de arquitetura sobre a fonte legada de permuta física, não bug).
+3. **Falha silenciosa por natureza da plataforma** — cada guard nasceu reativo, depois do
+   incidente. Aspas curvas em atributo Lit (#160) e comentário `//` em `schema.json` (derrubou a
+   v0.1.19) sobreviveram a rodadas inteiras "validadas ✓" porque nenhuma etapa do pipeline lia
+   aquele artefato. `guard-json.mjs` e o grep de aspas curvas só nasceram depois do estrago.
+4. **Convenção de processo presumida, nunca imposta mecanicamente até quebrar.** As 53 issues
+   fantasma existiam porque a regra "só `Closes #NNN` fecha issue" morava no `CLAUDE.md` do repo
+   errado. De ~88 menções a issue em commit, só 6 usaram `Closes` — exatamente as 6 que fecharam.
+   Mesmo padrão, de novo, em 2026-08-06: `validation.yml` sem `timeout-minutes` deixou a PR #304
+   pendurada até o default de 6h do GitHub (ver seção de CI travado nesta mesma sessão).
+
+**Padrão comum:** o processo tratava "parece pronto" (compila, testa, PR aberto, commit menciona a
+issue) como equivalente a "está pronto", e só descobria a diferença via auditoria manual posterior —
+nunca por um gate que existisse *antes* do incidente. As causas #2 e #4 já tinham correção mecânica.
+
+**Tentativa e reversão do dia:** a primeira versão desta investigação (branch
+`claude/blindar-fechamento-issue`) tentou endereçar #1 e #3 com dois guards novos — uma segunda
+exigência de `Evidência: #NNN arquivo:linha` em cima do `guard-issue-fechamento.mjs`, e um guard
+inteiramente novo (`guard-divida-conhecida.mjs`) varrendo o diff atrás de frases como "código
+morto". **O autor pediu para reverter os dois** no mesmo dia: a ferramenta simples que ele queria já
+existia desde 2026-08-03 (o próprio `guard-issue-fechamento.mjs`, que levou o total de issues abertas
+de 53 para 4 em três dias) — as duas adições eram complexidade não pedida em cima de algo que já
+funcionava, e um guard de texto não confirma critério de aceite mesmo assim (só confere se a linha foi
+escrita). **Revertido**: os dois arquivos voltaram ao estado de antes desta sessão. Se a causa #1
+precisar de correção mecânica no futuro, vale desenhar de novo — mas simples, e só se o autor pedir.
+
+Causa #3 (falha silenciosa por design da plataforma) permanece sem correção estrutural — é inerente
+ao UrbiVerso (prop/atributo inexistente "simplesmente não faz nada") e cada novo caso ainda vai
+exigir um guard reativo específico. Registrado aqui para a próxima sessão não redescobrir o padrão do
+zero.
+
+**Sobre o `validation.yml`, separadamente:** o autor perguntou se esse workflow (CI de
+typecheck/teste/build) era a causa dos problemas recorrentes. Não é — ele só existe desde
+2026-08-06 (entrou "de carona" num commit da PR #303, que era sobre a issue #266, não sobre CI),
+três dias **depois** das 53 issues fantasma. O único incidente que ele causou (a PR #304 pendurada
+por falta de `timeout-minutes`) já foi corrigido no PR #305, mergeado. Ele roda os mesmos dois
+scripts (`validar-frontend.sh`/`validar-backend.sh`) que já existiam desde antes de 2026-08-03 como
+gate manual — só automatizou o que já era prática documentada. Recomendação: manter.
+
+## CI travado na PR #304 — diagnóstico e blindagem dos workflows (2026-08-06)
+
+**Sintoma.** A PR #304 (`agent/268-permuta-fisica-motor`, `Closes #268`) ficou sem veredito: os
+quatro jobs do `pr-guards` fecharam verdes em ~10s, mas o job `validation / Testes, typecheck,
+build e validadores` (run `31106430684`) entrou em `in_progress` às 13:33:05 e **nunca concluiu**,
+preso no passo `Testes` (`started_at 13:33:17`, sem `completed_at`). Como a API do GitHub só serve
+log de job **concluído**, não havia nada para ler — "travado e sem logs".
+
+**Baseline que prova o travamento.** O mesmo job, no run verde imediatamente anterior
+(`31105953077`, PR #303): **33 segundos no total**, passo `Testes` em **4s**, suíte inteira com
+**325 testes em 2,2s**. Não é lentidão, é não-terminação.
+
+**Causa-raiz ainda em aberto entre duas hipóteses** (o desempate é cancelar e re-rodar o job):
+*infra* — corrobora o `pages build and deployment` da `main` (run `31106037967`) ter travado em
+`deployment_queued` na mesma janela de 10 min, até `Timeout reached, aborting!`; *código* — o diff
+da #304 são 3 arquivos e a função nova `reservarPermutasFisicas` tem laços de limite fixo; o único
+`while` do motor é `periodosAnuais` (`frontend/fluxo-shared.ts:79`), que só diverge com `prazo`
+infinito, e o prazo destes testes vem do `CRONO` (≈53 meses). Nenhum candidato estático convincente.
+
+**O que foi corrigido aqui** — o defeito de processo, que é independente de qual das duas hipóteses
+vencer: *um job podia pendurar por 6 horas sem produzir sinal nenhum*.
+
+- `validation.yml`: `timeout-minutes: 10` (baseline 33s); `concurrency` com `cancel-in-progress`;
+  `edited` removido dos `types` (editar a descrição do PR re-disparava a suíte pesada inteira);
+  passos soltos `Testes` e `Typecheck` removidos por serem **subconjunto estrito** dos dois
+  validadores — `pnpm build` fica, porque é o único passo que gera de fato `backend/rotas.js`.
+- `pr-guards.yml`: `timeout-minutes: 5` nos quatro jobs (baseline 6–13 **segundos**).
+- `--test-timeout=60000` em todo `node --test` (`package.json`, os dois validadores) **e** um
+  `com_limite` (wrapper de `timeout`, com fallback quando o binário não existe) nos dois scripts.
+  As duas defesas são necessárias e nenhuma cobre a outra: o `--test-timeout` mata teste
+  **assíncrono** pendurado e diz o nome dele, mas **não pega laço síncrono** — `while(true){}`
+  bloqueia o event loop e o timer do próprio runner nunca dispara; quem pega esse é o `timeout`,
+  que mata o processo inteiro.
+- `actions/setup-node@v4 → v7` e `pnpm/action-setup@v4 → v6`, encerrando o aviso de depreciação do
+  Node 20 que aparecia em todo run ("forced to run on Node.js 24").
+
+**Regra nova, sem exceção: todo job de CI deste repo declara `timeout-minutes`, e todo
+`node --test` declara `--test-timeout`.**
+
+**Pendências do autor** (fora do ambiente Claude Code): cancelar e re-rodar o run `31106430684` para
+desempatar infra × código; decidir o **GitHub Pages** em Settings → Pages (desligar, se o site não é
+usado — hoje ele deixa um ✗ fixo na `main`; não há workflow de Pages no repo, o deploy é o nativo
+por branch); e tirar a #304 de **draft** antes de qualquer merge.
+
+**Já corrigido antes deste diagnóstico, registrado para não reabrir investigação:** o run
+`31105745581` falhou com `frontend/tela-fluxo-custos.ts(1033,1): error TS1128` (erro de sintaxe
+real, corrigido no commit seguinte) e o run `31105863591` falhou com o binário nativo do esbuild
+sendo lido como JS (`SyntaxError: Invalid or unexpected token` sobre o cabeçalho `ELF`) —
+resolvido em `f04cd84`, que passou a invocar `"$esbuild_bin"` direto.
+
 ## #241 — hierarquia econômica completa no fluxo e exportações (2026-08-05)
 
 O `FluxoCalc` agora expõe séries mensais canônicas de contratação bruta,

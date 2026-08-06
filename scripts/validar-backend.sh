@@ -26,6 +26,19 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 raiz="$(pwd)"
 
+# Mata processo de teste que não termina (laço síncrono não é pego pelo
+# `--test-timeout` do node — ver o comentário longo em scripts/validar-frontend.sh).
+com_limite() {
+  local seg="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$seg" "$@"
+    local rc=$?
+    [ $rc -eq 124 ] && echo "  ABORTADO: passou de ${seg}s sem terminar — provável laço infinito." >&2
+    return $rc
+  fi
+  "$@"
+}
+
 # JSON estrito ANTES de qualquer coisa: este guard não depende de SDK, de rede nem de
 # node_modules. Ficava implícito na etapa 2/5 (validar-schema.mjs faz JSON.parse), mas
 # a etapa 1/5 aborta quando o SDK não está no disco — então no ambiente Claude Code o
@@ -75,7 +88,7 @@ echo "== 4/5 testes de backend (lógica pura) =="
 # Dois níveis: módulos de domínio em `backend/` (ex.: mercado-ia) e as rotas em
 # `backend/rotas/`. O glob antigo só pegava o segundo e deixou 16 testes novos
 # passarem batido no #200 — daí os dois padrões explícitos.
-node --import tsx/esm --test backend/*.test.ts backend/rotas/*.test.ts
+com_limite 300 node --import tsx/esm --test --test-timeout=60000 backend/*.test.ts backend/rotas/*.test.ts
 [ $? -eq 0 ] || { echo "  testes FALHARAM"; exit 1; }
 
 echo "== 5/5 migrações (contrato, banco vazio, reexecução, cadeia) =="

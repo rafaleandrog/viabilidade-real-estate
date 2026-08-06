@@ -1,8 +1,27 @@
+# CI pesado do PR: typecheck + testes + build + os dois validadores do repo.
+#
+# Este workflow precisa do `@urbiverso/sdk` (GitHub Packages privado, org urbiverso),
+# então depende de `secrets.URBIVERSO_PACKAGES_TOKEN`. É o oposto do `pr-guards.yml`,
+# que é deliberadamente leve e roda sem credencial nenhuma.
+#
+# ⚠️ TODO job daqui tem `timeout-minutes`. Sem ele o default do GitHub é 6 HORAS:
+# em 2026-08-06 o job da PR #304 pendurou no passo `Testes` e ficou `in_progress`
+# indefinidamente — o check nunca concluía, a API não serve log de job em andamento
+# e o PR ficou sem veredito, sem nada para ler. O baseline verde do mesmo job é 33s.
 name: validation
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    # SEM `edited`: o corpo do PR não muda o código, e re-rodar a suíte pesada a cada
+    # edição de descrição só empilha run. Quem precisa de `edited` é o `pr-guards.yml`,
+    # onde o corpo do PR é entrada do guard.
+    types: [opened, synchronize, reopened]
+
+# Push novo cancela o run anterior da mesma ref — sem isso, runs velhos (inclusive
+# travados) continuam rodando e disputam o veredito do PR.
+concurrency:
+  group: validation-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -12,12 +31,13 @@ jobs:
   frontend-backend:
     name: Testes, typecheck, build e validadores
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           registry-url: https://npm.pkg.github.com
@@ -26,10 +46,16 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           NODE_AUTH_TOKEN: ${{ secrets.URBIVERSO_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
-      - name: Testes
-        run: pnpm test
-      - name: Typecheck
-        run: pnpm typecheck
+      # `pnpm test` e `pnpm typecheck` NÃO aparecem aqui: são subconjunto estrito dos
+      # dois validadores abaixo (juntos eles cobrem backend/*.test.ts,
+      # backend/rotas/*.test.ts, frontend/*.test.ts e os dois typechecks). Rodar os
+      # dois caminhos duplicava trabalho e diluía a atribuição da falha — medido:
+      # 19s de passos de trabalho antes, 12s depois. O tempo TOTAL do job não muda
+      # (33s → 32s): ele é dominado pelo setup, não pelos testes. Quem tira o job de
+      # 6 horas é o `timeout-minutes`, não esta poda.
+      # `pnpm build` FICA: é o único passo que gera os dois bundles de verdade —
+      # inclusive `backend/rotas.js`, o contrato "backend self-contained" — enquanto o
+      # `validar-frontend.sh` só constrói o bundle do frontend para /dev/null.
       - name: Build
         run: pnpm build
       - name: Validar frontend

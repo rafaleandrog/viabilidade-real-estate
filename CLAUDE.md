@@ -202,6 +202,33 @@ fica vermelho por falta de credencial). Barra **PR de diff vazio que declara fec
 do PR #142, que fechou 12 issues sem alterar um arquivo — e repete os guards de **aspas curvas** e
 de **JSON estrito** para pegar quem não rodou o script local.
 
+O `.github/workflows/validation.yml` é o CI **pesado** (build + os dois validadores; precisa do
+`secrets.URBIVERSO_PACKAGES_TOKEN` para o SDK). Ele **não** roda `pnpm test`/`pnpm typecheck`
+soltos: são subconjunto estrito de `validar-frontend.sh` + `validar-backend.sh`, e rodar os dois
+caminhos duplicava trabalho sem cobrir nada a mais. O `pnpm build` fica, porque é o único passo que
+gera de verdade `backend/rotas.js`.
+
+> **Não espere ganho de tempo disso** — medido nos dois runs: 19s de passos de trabalho antes, 12s
+> depois, com o **total do job praticamente igual** (33s → 32s), porque o job é dominado pelo setup
+> (checkout + pnpm + node + install). O motivo da poda é atribuição de falha, não velocidade.
+
+### Duas regras de CI, sem exceção — `timeout-minutes` e `--test-timeout`
+
+> ⚠️ **Todo job de CI declara `timeout-minutes`; todo `node --test` declara `--test-timeout`.**
+> Sem `timeout-minutes` o default do GitHub é **6 horas**: em 2026-08-06 o job da PR #304 pendurou
+> no passo `Testes` e ficou `in_progress` indefinidamente — e como a API do GitHub **só serve log de
+> job concluído**, não havia absolutamente nada para ler. O baseline verde do mesmo job é **33s**
+> (suíte inteira: 325 testes em 2,2s), então qualquer coisa acima de minutos já é travamento.
+
+As duas defesas contra teste que não termina são **complementares** — não escolha uma:
+
+| Defesa | Pega | Não pega |
+|---|---|---|
+| `--test-timeout=60000` | teste **assíncrono** pendurado, dizendo o **nome** dele | laço **síncrono**: `while(true){}` bloqueia o event loop e o timer do runner nunca dispara |
+| `com_limite` (wrapper de `timeout`, nos dois scripts) | laço síncrono — mata o **processo** | não sabe qual teste travou |
+
+Se o CI ficar pendente em vez de vermelho, o problema não é o teste: é um job sem timeout.
+
 > **Por que o guard de JSON estrito existe:** um bloco de comentários `//` no `schema.json` derrubou
 > a release **v0.1.19** com "Pacote reprovado na validacao". JSON não tem comentário — o
 > `JSON.parse` do shell estoura e o pacote é reprovado **antes de olhar qualquer tabela**. Nem
