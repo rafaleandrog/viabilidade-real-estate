@@ -8,7 +8,7 @@ import {
 import {
   urbiVerso,
   buscarParametrosAvancado, atualizarParametrosAvancado,
-  buscarCronogramaAvancado, atualizarEventoCronograma,
+  buscarCronogramaAvancado, atualizarCronogramaLote,
   listarFasesAvancado, criarFaseAvancado, atualizarFaseAvancado, removerFaseAvancado,
 } from './viabilidade-api.js';
 import './viab-num.js';
@@ -40,13 +40,17 @@ export class ViabFluxoCronograma extends LitElement {
   @state() private cronoCarregando = false;
   private cronoCarregado = false;
 
-  // #252: rascunho local por evento — Início/Duração deixam de disparar PATCH a
-  // cada tecla (cada urbi:input-numero-change acionava uma chamada, reancorava
-  // custos e emitia um toast por CAMPO). Os dois campos do evento acumulam aqui
-  // até o clique em "Salvar", que os envia numa ÚNICA chamada — atômico para o
-  // par início/duração do mesmo evento, um só toast de reancoragem.
+  // #252: rascunho local, tela inteira — nenhum campo (eventos fixos OU fases
+  // customizadas) dispara PATCH nem toast por tecla. Tudo acumula aqui até o
+  // clique em "Salvar cronograma": os eventos vão numa ÚNICA chamada em lote
+  // (endpoint novo, backend/rotas/avancado.ts) — validação de todo o lote
+  // antes de qualquer escrita, uma reancoragem só, um só toast. As fases são
+  // uma entidade separada sem endpoint em lote (não há transação disponível
+  // neste stack para uni-las de verdade às duas tabelas numa só chamada) —
+  // continuam salvando uma PATCH por fase, mas só no clique, nunca por tecla.
   @state() private draftCrono: Record<string, { inicio_mes?: number; duracao_meses?: number }> = {};
-  @state() private salvandoEvento: Record<string, boolean> = {};
+  @state() private draftFases: Record<number, { nome?: string; inicio_mes?: number; duracao_meses?: number }> = {};
+  @state() private salvandoCronograma = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .params { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 8px; }
@@ -96,6 +100,7 @@ export class ViabFluxoCronograma extends LitElement {
       padding: 14px 10px 6px; border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
     }
     .acoes-fase { margin-top: 12px; }
+    .acoes-cronograma { display: flex; gap: 8px; margin-bottom: 8px; }
 
     /* #245: em telas estreitas a soma das colunas (evento + Início + Duração +
        período) excede a viewport e a PÁGINA ganhava rolagem horizontal. Rolar
@@ -166,6 +171,18 @@ export class ViabFluxoCronograma extends LitElement {
           <urbi-banner variante="alerta">Defina a data de início do projeto — ela ancora o mês 0 de todo o fluxo.</urbi-banner>` : nothing}
         ${probObra ? html`
           <urbi-banner variante="alerta">${probObra}</urbi-banner>` : nothing}
+        ${!dis && this._sujo ? html`
+          <urbi-banner variante="alerta">
+            Alterações não salvas — clique em "Salvar cronograma" antes de sair desta página.
+          </urbi-banner>` : nothing}
+
+        ${!dis ? html`
+          <div class="acoes-cronograma">
+            <urbi-botao variante="primario" ?carregando=${this.salvandoCronograma}
+              ?desabilitado=${!this._sujo} @click=${this._salvarCronograma}>Salvar cronograma</urbi-botao>
+            <urbi-botao variante="fantasma" ?desabilitado=${!this._sujo || this.salvandoCronograma}
+              @click=${this._cancelarCronograma}>Cancelar</urbi-botao>
+          </div>` : nothing}
 
         <div class="tabela-wrap">
         <table class="crono">
@@ -218,7 +235,7 @@ export class ViabFluxoCronograma extends LitElement {
     const inicioExibido = draft?.inicio_mes ?? Number(ev.inicio_mes);
     const duracaoExibida = draft?.duracao_meses ?? Number(ev.duracao_meses);
     const temRascunho = draft !== undefined;
-    const salvando = Boolean(this.salvandoEvento[ev.evento]);
+    const bloqueado = dis || this.salvandoCronograma;
     return html`
       <tr style="border-left: 3px solid ${cor}">
         <td class="evento">
@@ -231,7 +248,7 @@ export class ViabFluxoCronograma extends LitElement {
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="º mês" passo="1"
               sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido) : ''}
-              ?desabilitado=${dis || travadoIni}
+              ?desabilitado=${bloqueado || travadoIni}
               .valor=${inicioExibido}
               @urbi:input-numero-change=${(e: CustomEvent) => this._rascunharEvento(ev.evento, { inicio_mes: e.detail.valor })}
             ></viab-num>
@@ -242,7 +259,7 @@ export class ViabFluxoCronograma extends LitElement {
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="meses" passo="1"
               sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido + duracaoExibida - 1) : ''}
-              ?desabilitado=${dis || travadoDur}
+              ?desabilitado=${bloqueado || travadoDur}
               .valor=${duracaoExibida}
               @urbi:input-numero-change=${(e: CustomEvent) => this._rascunharEvento(ev.evento, { duracao_meses: e.detail.valor })}
             ></viab-num>
@@ -253,9 +270,7 @@ export class ViabFluxoCronograma extends LitElement {
         ${!dis ? html`
           <td>
             ${temRascunho ? html`
-              <urbi-botao variante="primario" pequeno ?carregando=${salvando}
-                @click=${() => this._salvarLinhaEvento(ev.evento)}>Salvar</urbi-botao>
-              <urbi-botao variante="fantasma" pequeno ?desabilitado=${salvando}
+              <urbi-botao variante="fantasma" pequeno ?desabilitado=${this.salvandoCronograma}
                 @click=${() => this._descartarRascunhoEvento(ev.evento)}>Descartar</urbi-botao>
             ` : nothing}
           </td>` : nothing}
@@ -275,71 +290,120 @@ export class ViabFluxoCronograma extends LitElement {
     this.draftCrono = resto;
   }
 
-  // #252: envia início E duração (o que estiver no rascunho) numa ÚNICA
-  // chamada — atômico para o par do mesmo evento, uma só reancoragem, um só
-  // toast. Antes cada campo disparava seu próprio PATCH a cada tecla.
-  private async _salvarLinhaEvento(evento: string) {
-    const dados = this.draftCrono[evento];
-    if (!dados) return;
-    this.salvandoEvento = { ...this.salvandoEvento, [evento]: true };
+  private _rascunharFase(f: any, campo: Record<string, any>) {
+    const valor = Object.values(campo)[0];
+    // `nome` pode ser string vazia legitimamente enquanto o usuário digita —
+    // só início/duração negativos são recusados, como nos eventos fixos.
+    if (typeof valor === 'number' && valor < 0) return;
+    this.draftFases = { ...this.draftFases, [f.id]: { ...this.draftFases[f.id], ...campo } };
+  }
+
+  private _descartarRascunhoFase(id: number) {
+    const { [id]: _descartado, ...resto } = this.draftFases;
+    this.draftFases = resto;
+  }
+
+  private get _sujo(): boolean {
+    return Object.keys(this.draftCrono).length > 0 || Object.keys(this.draftFases).length > 0;
+  }
+
+  private _cancelarCronograma() {
+    this.draftCrono = {};
+    this.draftFases = {};
+  }
+
+  // #252: um clique salva TUDO. Eventos fixos vão numa única chamada em lote
+  // (endpoint novo) — o backend valida o lote inteiro antes de escrever
+  // qualquer coisa, então uma falha aqui não persiste nada e preserva o
+  // rascunho. Fases são uma tabela separada sem endpoint em lote (não há
+  // transação disponível neste stack para unir as duas numa só chamada
+  // atômica) — continuam uma PATCH por fase, mas só agora, não mais por
+  // tecla; uma falha de fase não desfaz os eventos já salvos com sucesso.
+  private async _salvarCronograma() {
+    if (!this._sujo || this.salvandoCronograma) return;
+    this.salvandoCronograma = true;
     try {
-      const res = await atualizarEventoCronograma(this.estudo.id, evento, dados);
-      if (res?.erro) {
-        urbiVerso.notificar(res.mensagem || 'Erro ao salvar o cronograma', 'erro');
-        return;
+      if (Object.keys(this.draftCrono).length > 0) {
+        const res = await atualizarCronogramaLote(this.estudo.id, this.draftCrono);
+        if (res?.erro) {
+          urbiVerso.notificar(res.mensagem || 'Erro ao salvar o cronograma — nada foi alterado.', 'erro');
+          return;
+        }
+        this.crono = res.dados || this.crono;
+        this.draftCrono = {};
       }
-      this.crono = res.dados || this.crono;
-      this._descartarRascunhoEvento(evento);
-      if (res.custos_reancorados > 0) {
-        urbiVerso.notificar(`${res.custos_reancorados} linha(s) de custo reancorada(s) ao novo cronograma.`, 'info');
+
+      let falhaFase = false;
+      for (const [idStr, dados] of Object.entries(this.draftFases)) {
+        const id = Number(idStr);
+        const res = await atualizarFaseAvancado(this.estudo.id, id, dados);
+        if (res?.erro) { falhaFase = true; continue; }
+        this.fases = this.fases.map((x) => (x.id === id ? { ...x, ...dados } : x));
+        this._descartarRascunhoFase(id);
+      }
+
+      if (falhaFase) {
+        urbiVerso.notificar('O cronograma foi salvo, mas alguma fase falhou — o rascunho dela continua pendente.', 'erro');
       } else {
         urbiVerso.notificar('Cronograma salvo.', 'sucesso');
       }
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar o cronograma', 'erro');
     } finally {
-      const { [evento]: _s, ...resto } = this.salvandoEvento;
-      this.salvandoEvento = resto;
+      this.salvandoCronograma = false;
     }
   }
 
   private _linhaFase(f: any, idx: number, dataInicio: string | null, dis: boolean): TemplateResult {
     const cor = corFaseExtra(idx);
+    // #252: mesmo padrão dos eventos fixos — enquanto houver rascunho, exibe
+    // o valor digitado; nada vai ao backend até "Salvar cronograma".
+    const draft = this.draftFases[f.id];
+    const nomeExibido = draft?.nome ?? (f.nome || '');
+    const inicioExibido = draft?.inicio_mes ?? Number(f.inicio_mes ?? 0);
+    const duracaoExibida = draft?.duracao_meses ?? Number(f.duracao_meses ?? 12);
+    const temRascunho = draft !== undefined;
+    const bloqueado = dis || this.salvandoCronograma;
     return html`
       <tr style="border-left: 3px solid ${cor}">
         <td class="evento">
           <span class="evento-label">
             <span class="ponto-cor" style="background:${cor}"></span>
             ${dis ? html`${f.nome || 'Fase'}` : html`
-              <urbi-input .valor=${f.nome || ''} placeholder="Nome da fase"
-                @urbi:input-change=${(e: CustomEvent) => this._salvarFase(f, { nome: e.detail.valor })}
+              <urbi-input .valor=${nomeExibido} placeholder="Nome da fase" ?desabilitado=${bloqueado}
+                @urbi:input-change=${(e: CustomEvent) => this._rascunharFase(f, { nome: e.detail.valor })}
               ></urbi-input>`}
           </span>
         </td>
         <td>
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="º mês" passo="1"
-              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, Number(f.inicio_mes ?? 0)) : ''}
-              ?desabilitado=${dis}
-              .valor=${Number(f.inicio_mes ?? 0)}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._salvarFase(f, { inicio_mes: e.detail.valor })}
+              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido) : ''}
+              ?desabilitado=${bloqueado}
+              .valor=${inicioExibido}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._rascunharFase(f, { inicio_mes: e.detail.valor })}
             ></viab-num>
           </span>
         </td>
         <td>
           <span class="campo-mes">
             <viab-num casas-decimais="0" sufixo="meses" passo="1"
-              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, Number(f.inicio_mes ?? 0) + Number(f.duracao_meses ?? 12) - 1) : ''}
-              ?desabilitado=${dis}
-              .valor=${Number(f.duracao_meses ?? 12)}
-              @urbi:input-numero-change=${(e: CustomEvent) => this._salvarFase(f, { duracao_meses: e.detail.valor })}
+              sufixo-mes=${dataInicio ? rotuloMesRelativo(dataInicio, inicioExibido + duracaoExibida - 1) : ''}
+              ?desabilitado=${bloqueado}
+              .valor=${duracaoExibida}
+              @urbi:input-numero-change=${(e: CustomEvent) => this._rascunharFase(f, { duracao_meses: e.detail.valor })}
             ></viab-num>
           </span>
         </td>
-        <td class="periodo">${rotuloPeriodo(dataInicio, Number(f.inicio_mes ?? 0), Number(f.duracao_meses ?? 12))}</td>
+        <td class="periodo">${rotuloPeriodo(dataInicio, inicioExibido, duracaoExibida)}</td>
         ${!dis ? html`
           <td>
+            ${temRascunho ? html`
+              <urbi-botao variante="fantasma" pequeno ?desabilitado=${this.salvandoCronograma}
+                @click=${() => this._descartarRascunhoFase(f.id)}>Descartar</urbi-botao>
+            ` : nothing}
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+              ?desabilitado=${this.salvandoCronograma}
               @click=${() => this._removerFase(f)}></urbi-botao>
           </td>` : nothing}
       </tr>
@@ -384,21 +448,12 @@ export class ViabFluxoCronograma extends LitElement {
     }
   };
 
-  private async _salvarFase(f: any, dados: Record<string, any>) {
-    try {
-      const res = await atualizarFaseAvancado(this.estudo.id, f.id, dados);
-      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar fase', 'erro'); return; }
-      this.fases = this.fases.map((x) => (x.id === f.id ? { ...x, ...dados } : x));
-    } catch (e: any) {
-      urbiVerso.notificar(e?.message || 'Erro ao salvar fase', 'erro');
-    }
-  }
-
   private async _removerFase(f: any) {
     try {
       const res = await removerFaseAvancado(this.estudo.id, f.id);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao remover fase', 'erro'); return; }
       this.fases = this.fases.filter((x) => x.id !== f.id);
+      this._descartarRascunhoFase(f.id); // #252: remoção esvazia o rascunho pendente dela.
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao remover fase', 'erro');
     }

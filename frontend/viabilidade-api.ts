@@ -128,9 +128,15 @@ export function atualizarParametrosAvancado(estudoId: number, dados: Record<stri
 export function buscarCronogramaAvancado(estudoId: number): Promise<any> {
   return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cronograma`);
 }
-export function atualizarEventoCronograma(estudoId: number, evento: string, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cronograma/${evento}`, {
-    method: 'PATCH', body: JSON.stringify(dados),
+/**
+ * #252: salva vários eventos numa única chamada — uma reancoragem só. O
+ * endpoint de UM evento (`PATCH .../cronograma/:evento`) foi removido junto
+ * com esta função: a UI passou a usar só o lote (mesmo com 1 evento só), e
+ * "UI e API andam sempre juntas" — endpoint sem tela que o chame é dívida.
+ */
+export function atualizarCronogramaLote(estudoId: number, eventos: Record<string, Record<string, any>>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cronograma`, {
+    method: 'PATCH', body: JSON.stringify({ eventos }),
   });
 }
 

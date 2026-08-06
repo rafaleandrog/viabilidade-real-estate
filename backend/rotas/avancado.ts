@@ -519,40 +519,83 @@ rotasAvancado.get('/estudos/:id/avancado/cronograma', async (req: Request, res: 
   }
 });
 
-rotasAvancado.patch('/estudos/:id/avancado/cronograma/:evento', async (req: Request, res: Response) => {
+/**
+ * Aplica um delta `{inicio_mes?, duracao_meses?}` a UM evento (mutação local,
+ * não persistida) — extraída para que o endpoint em lote (#252) valide cada
+ * evento do lote exatamente como o antigo PATCH de evento único validava.
+ * Retorna a falha (código + mensagem HTTP) ou `null` se aplicou.
+ */
+export function aplicarDeltaEvento(
+  alvo: LinhaCronograma,
+  delta: { inicio_mes?: unknown; duracao_meses?: unknown },
+): { codigo: string; mensagem: string } | null {
+  if (delta.inicio_mes !== undefined) {
+    if (alvo.travado_inicio) return { codigo: 'CAMPO_TRAVADO', mensagem: `O início de ${alvo.evento} é calculado automaticamente` };
+    const v = Number(delta.inicio_mes);
+    if (!Number.isInteger(v) || v < 0) return { codigo: 'INICIO_INVALIDO', mensagem: 'inicio_mes deve ser inteiro ≥ 0 (mês 0 = início do projeto)' };
+    alvo.inicio_mes = v;
+  }
+  if (delta.duracao_meses !== undefined) {
+    if (alvo.travado_duracao) return { codigo: 'CAMPO_TRAVADO', mensagem: `A duração de ${alvo.evento} é calculada automaticamente` };
+    const v = Number(delta.duracao_meses);
+    if (!Number.isInteger(v) || v < 1) return { codigo: 'DURACAO_INVALIDA', mensagem: 'duracao_meses deve ser inteiro ≥ 1' };
+    alvo.duracao_meses = v;
+  }
+  return null;
+}
+
+/**
+ * #252: salvamento em lote do cronograma — substitui o antigo
+ * `PATCH .../cronograma/:evento` (um evento por chamada, removido: "UI e API
+ * andam sempre juntas" — a tela passou a usar só o lote, mesmo para 1 evento
+ * só). Um clique em "Salvar cronograma" na tela envia todos os eventos
+ * alterados numa ÚNICA chamada, em vez de um PATCH por evento (que reancorava
+ * custos e emitia um toast a cada um).
+ *
+ * Atomicidade de VALIDAÇÃO, não de banco (não há transação disponível aqui —
+ * ver CLAUDE.md do monorepo, apps segregadas por conta só usam `req.dados`):
+ * todo delta do lote é validado contra o cronograma lido UMA vez, antes de
+ * qualquer escrita — se um evento falhar, nada é persistido, nenhum é. Só
+ * depois de todos passarem é que `recalcularTravados`/`salvarCronograma`/
+ * `reancorarCustos` rodam, cada um exatamente UMA vez para o lote inteiro.
+ */
+rotasAvancado.patch('/estudos/:id/avancado/cronograma', async (req: Request, res: Response) => {
   try {
     const estudo = await estudoAvancado(req, res);
     if (!estudo) return;
     if (!(await exigirEscrita(req, res, estudo))) return;
 
-    const evento = String(req.params.evento) as EventoCronograma;
-    if (!EVENTOS_CRONOGRAMA.includes(evento)) {
-      erro(res, 400, 'EVENTO_INVALIDO', `evento deve ser um de: ${EVENTOS_CRONOGRAMA.join(', ')}`);
+    const eventos = req.body.eventos;
+    if (!eventos || typeof eventos !== 'object' || Array.isArray(eventos) || Object.keys(eventos).length === 0) {
+      erro(res, 400, 'NENHUM_CAMPO', 'eventos deve ser um objeto { evento: { inicio_mes?, duracao_meses? } } com ao menos uma entrada');
       return;
+    }
+    for (const evento of Object.keys(eventos)) {
+      if (!EVENTOS_CRONOGRAMA.includes(evento as EventoCronograma)) {
+        erro(res, 400, 'EVENTO_INVALIDO', `evento "${evento}" deve ser um de: ${EVENTOS_CRONOGRAMA.join(', ')}`);
+        return;
+      }
     }
 
     const { linhas, ids } = await lerCronograma(req, estudo.id);
-    const alvo = linhas.find((l) => l.evento === evento)!;
 
-    if (req.body.inicio_mes !== undefined) {
-      if (alvo.travado_inicio) { erro(res, 422, 'CAMPO_TRAVADO', `O início de ${evento} é calculado automaticamente`); return; }
-      const v = Number(req.body.inicio_mes);
-      if (!Number.isInteger(v) || v < 0) { erro(res, 400, 'INICIO_INVALIDO', 'inicio_mes deve ser inteiro ≥ 0 (mês 0 = início do projeto)'); return; }
-      alvo.inicio_mes = v;
-    }
-    if (req.body.duracao_meses !== undefined) {
-      if (alvo.travado_duracao) { erro(res, 422, 'CAMPO_TRAVADO', `A duração de ${evento} é calculada automaticamente`); return; }
-      const v = Number(req.body.duracao_meses);
-      if (!Number.isInteger(v) || v < 1) { erro(res, 400, 'DURACAO_INVALIDA', 'duracao_meses deve ser inteiro ≥ 1'); return; }
-      alvo.duracao_meses = v;
+    // Fase 1: valida TODOS os deltas contra o cronograma lido, sem escrever
+    // nada — se qualquer um falhar, a resposta é 422/400 e o rascunho do
+    // cliente permanece intacto (nada foi persistido).
+    for (const [evento, delta] of Object.entries(eventos)) {
+      const alvo = linhas.find((l) => l.evento === evento)!;
+      const falha = aplicarDeltaEvento(alvo, delta as Record<string, unknown>);
+      if (falha) { erro(res, falha.codigo === 'CAMPO_TRAVADO' ? 422 : 400, falha.codigo, falha.mensagem); return; }
     }
 
+    // Fase 2: todos os deltas validaram — recalcula, persiste e reancora
+    // UMA VEZ para o cronograma inteiro (não uma vez por evento do lote).
     const recalculado = recalcularTravados(linhas);
     await salvarCronograma(req, estudo.id, recalculado, ids);
     const custosReancorados = await reancorarCustos(req, estudo.id, recalculado);
     res.json({ dados: recalculado, custos_reancorados: custosReancorados });
   } catch (e: any) {
-    console.error('Erro em PATCH /avancado/cronograma/:evento:', e);
+    console.error('Erro em PATCH /avancado/cronograma:', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 });

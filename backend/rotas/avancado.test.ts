@@ -5,6 +5,7 @@ import {
   recalcularTravados,
   ancorarLinhaCusto,
   resolverTravamentoCusto,
+  aplicarDeltaEvento,
   curvaSPadrao,
   validarValoresCurva,
   validarAbsorcao,
@@ -116,6 +117,56 @@ test('recalcularTravados normaliza travado_duracao=false em TODOS os eventos (#2
   );
   const rec = recalcularTravados(legado);
   for (const e of rec) assert.equal(e.travado_duracao, false, `${e.evento} deveria ter travado_duracao=false`);
+});
+
+// ── aplicarDeltaEvento (#252 — validação usada pelo endpoint em lote) ──
+
+test('aplicarDeltaEvento: aplica início e duração válidos, sem erro', () => {
+  const alvo: LinhaCronograma = { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6, travado_inicio: false, travado_duracao: false };
+  const falha = aplicarDeltaEvento(alvo, { inicio_mes: 2, duracao_meses: 8 });
+  assert.equal(falha, null);
+  assert.equal(alvo.inicio_mes, 2);
+  assert.equal(alvo.duracao_meses, 8);
+});
+
+test('aplicarDeltaEvento: início travado — CAMPO_TRAVADO, nada é aplicado', () => {
+  const alvo: LinhaCronograma = { evento: 'pre_lancamento', inicio_mes: 6, duracao_meses: 6, travado_inicio: true, travado_duracao: false };
+  const falha = aplicarDeltaEvento(alvo, { inicio_mes: 3 });
+  assert.equal(falha?.codigo, 'CAMPO_TRAVADO');
+  assert.equal(alvo.inicio_mes, 6); // não mudou
+});
+
+test('aplicarDeltaEvento: duração inválida (< 1) — DURACAO_INVALIDA', () => {
+  const alvo: LinhaCronograma = { evento: 'obra', inicio_mes: 6, duracao_meses: 24, travado_inicio: true, travado_duracao: false };
+  const falha = aplicarDeltaEvento(alvo, { duracao_meses: 0 });
+  assert.equal(falha?.codigo, 'DURACAO_INVALIDA');
+});
+
+test('aplicarDeltaEvento: delta vazio — sem erro, nada muda', () => {
+  const alvo: LinhaCronograma = { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6, travado_inicio: false, travado_duracao: false };
+  assert.equal(aplicarDeltaEvento(alvo, {}), null);
+  assert.equal(alvo.inicio_mes, 0);
+  assert.equal(alvo.duracao_meses, 6);
+});
+
+test('aplicarDeltaEvento: lote com um evento inválido barra ANTES de mutar os válidos — mesma lógica do endpoint em lote', () => {
+  // Simula a fase 1 (só validação) do endpoint em lote: aplica cada delta a uma
+  // CÓPIA e só confirma nos originais se todos passarem — nenhum evento válido
+  // fica "meio aplicado" quando outro do mesmo lote falha.
+  const linhas: LinhaCronograma[] = cronogramaPadrao();
+  const copia: LinhaCronograma[] = JSON.parse(JSON.stringify(linhas));
+  const deltas: Record<string, any> = {
+    planejamento: { duracao_meses: 8 }, // válido
+    pre_lancamento: { inicio_mes: 3 },  // travado — deve falhar
+  };
+  let falhou = false;
+  for (const [evento, delta] of Object.entries(deltas)) {
+    const alvo = copia.find((l) => l.evento === evento)!;
+    if (aplicarDeltaEvento(alvo, delta)) { falhou = true; break; }
+  }
+  assert.equal(falhou, true);
+  // linhas (as "persistidas") continuam intactas — nada foi escrito.
+  assert.deepEqual(linhas, cronogramaPadrao());
 });
 
 // ── Ancoragem de linhas de custo (spec §5C) ──
