@@ -4,6 +4,56 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## CI travado na PR #304 — diagnóstico e blindagem dos workflows (2026-08-06)
+
+**Sintoma.** A PR #304 (`agent/268-permuta-fisica-motor`, `Closes #268`) ficou sem veredito: os
+quatro jobs do `pr-guards` fecharam verdes em ~10s, mas o job `validation / Testes, typecheck,
+build e validadores` (run `31106430684`) entrou em `in_progress` às 13:33:05 e **nunca concluiu**,
+preso no passo `Testes` (`started_at 13:33:17`, sem `completed_at`). Como a API do GitHub só serve
+log de job **concluído**, não havia nada para ler — "travado e sem logs".
+
+**Baseline que prova o travamento.** O mesmo job, no run verde imediatamente anterior
+(`31105953077`, PR #303): **33 segundos no total**, passo `Testes` em **4s**, suíte inteira com
+**325 testes em 2,2s**. Não é lentidão, é não-terminação.
+
+**Causa-raiz ainda em aberto entre duas hipóteses** (o desempate é cancelar e re-rodar o job):
+*infra* — corrobora o `pages build and deployment` da `main` (run `31106037967`) ter travado em
+`deployment_queued` na mesma janela de 10 min, até `Timeout reached, aborting!`; *código* — o diff
+da #304 são 3 arquivos e a função nova `reservarPermutasFisicas` tem laços de limite fixo; o único
+`while` do motor é `periodosAnuais` (`frontend/fluxo-shared.ts:79`), que só diverge com `prazo`
+infinito, e o prazo destes testes vem do `CRONO` (≈53 meses). Nenhum candidato estático convincente.
+
+**O que foi corrigido aqui** — o defeito de processo, que é independente de qual das duas hipóteses
+vencer: *um job podia pendurar por 6 horas sem produzir sinal nenhum*.
+
+- `validation.yml`: `timeout-minutes: 10` (baseline 33s); `concurrency` com `cancel-in-progress`;
+  `edited` removido dos `types` (editar a descrição do PR re-disparava a suíte pesada inteira);
+  passos soltos `Testes` e `Typecheck` removidos por serem **subconjunto estrito** dos dois
+  validadores — `pnpm build` fica, porque é o único passo que gera de fato `backend/rotas.js`.
+- `pr-guards.yml`: `timeout-minutes: 5` nos quatro jobs (baseline 6–13 **segundos**).
+- `--test-timeout=60000` em todo `node --test` (`package.json`, os dois validadores) **e** um
+  `com_limite` (wrapper de `timeout`, com fallback quando o binário não existe) nos dois scripts.
+  As duas defesas são necessárias e nenhuma cobre a outra: o `--test-timeout` mata teste
+  **assíncrono** pendurado e diz o nome dele, mas **não pega laço síncrono** — `while(true){}`
+  bloqueia o event loop e o timer do próprio runner nunca dispara; quem pega esse é o `timeout`,
+  que mata o processo inteiro.
+- `actions/setup-node@v4 → v7` e `pnpm/action-setup@v4 → v6`, encerrando o aviso de depreciação do
+  Node 20 que aparecia em todo run ("forced to run on Node.js 24").
+
+**Regra nova, sem exceção: todo job de CI deste repo declara `timeout-minutes`, e todo
+`node --test` declara `--test-timeout`.**
+
+**Pendências do autor** (fora do ambiente Claude Code): cancelar e re-rodar o run `31106430684` para
+desempatar infra × código; decidir o **GitHub Pages** em Settings → Pages (desligar, se o site não é
+usado — hoje ele deixa um ✗ fixo na `main`; não há workflow de Pages no repo, o deploy é o nativo
+por branch); e tirar a #304 de **draft** antes de qualquer merge.
+
+**Já corrigido antes deste diagnóstico, registrado para não reabrir investigação:** o run
+`31105745581` falhou com `frontend/tela-fluxo-custos.ts(1033,1): error TS1128` (erro de sintaxe
+real, corrigido no commit seguinte) e o run `31105863591` falhou com o binário nativo do esbuild
+sendo lido como JS (`SyntaxError: Invalid or unexpected token` sobre o cabeçalho `ELF`) —
+resolvido em `f04cd84`, que passou a invocar `"$esbuild_bin"` direto.
+
 ## #241 — hierarquia econômica completa no fluxo e exportações (2026-08-05)
 
 O `FluxoCalc` agora expõe séries mensais canônicas de contratação bruta,
