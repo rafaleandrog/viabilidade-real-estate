@@ -205,8 +205,12 @@ de **JSON estrito** para pegar quem não rodou o script local.
 O `.github/workflows/validation.yml` é o CI **pesado** (build + os dois validadores; precisa do
 `secrets.URBIVERSO_PACKAGES_TOKEN` para o SDK). Ele **não** roda `pnpm test`/`pnpm typecheck`
 soltos: são subconjunto estrito de `validar-frontend.sh` + `validar-backend.sh`, e rodar os dois
-caminhos dobrava o tempo. O `pnpm build` fica, porque é o único passo que gera de verdade
-`backend/rotas.js`.
+caminhos duplicava trabalho sem cobrir nada a mais. O `pnpm build` fica, porque é o único passo que
+gera de verdade `backend/rotas.js`.
+
+> **Não espere ganho de tempo disso** — medido nos dois runs: 19s de passos de trabalho antes, 12s
+> depois, com o **total do job praticamente igual** (33s → 32s), porque o job é dominado pelo setup
+> (checkout + pnpm + node + install). O motivo da poda é atribuição de falha, não velocidade.
 
 ### Duas regras de CI, sem exceção — `timeout-minutes` e `--test-timeout`
 

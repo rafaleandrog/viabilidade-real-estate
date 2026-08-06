@@ -49,7 +49,10 @@ jobs:
       # `pnpm test` e `pnpm typecheck` NÃO aparecem aqui: são subconjunto estrito dos
       # dois validadores abaixo (juntos eles cobrem backend/*.test.ts,
       # backend/rotas/*.test.ts, frontend/*.test.ts e os dois typechecks). Rodar os
-      # dois caminhos dobrava o tempo do job e diluía a atribuição da falha.
+      # dois caminhos duplicava trabalho e diluía a atribuição da falha — medido:
+      # 19s de passos de trabalho antes, 12s depois. O tempo TOTAL do job não muda
+      # (33s → 32s): ele é dominado pelo setup, não pelos testes. Quem tira o job de
+      # 6 horas é o `timeout-minutes`, não esta poda.
       # `pnpm build` FICA: é o único passo que gera os dois bundles de verdade —
       # inclusive `backend/rotas.js`, o contrato "backend self-contained" — enquanto o
       # `validar-frontend.sh` só constrói o bundle do frontend para /dev/null.
