@@ -1725,7 +1725,7 @@ function recorte(mensal: number[]): { inicio: number; duracao: number } {
 
 export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const crono = config.cronograma ?? [];
-  const linhasReceita = config.linhasReceita ?? [];
+  const linhasReceitaOriginal = config.linhasReceita ?? [];
   const linhasCusto = config.linhasCusto ?? [];
   const taxa = n(config.taxaDescontoAa) || 12;
 
@@ -1741,12 +1741,31 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   // extrapola o fim da Obra, e o horizonte antigo não via isso).
   const ultimoCrono = Math.max(0, ...crono.map((e) => n(e.inicio_mes) + n(e.duracao_meses) - 1));
   const ultimoCustos = Math.max(0, ...linhasCusto.map((c) => n(c.inicio_mes) + n(c.duracao_meses) - 1));
-  const ultimoRecebivel = Math.max(0, ...linhasReceita.map((l) => ultimoMesRecebivelLinha(l, crono)));
+  const ultimoRecebivel = Math.max(0, ...linhasReceitaOriginal.map((l) => ultimoMesRecebivelLinha(l, crono)));
   const prazoDerivado = Math.max(ultimoCrono, ultimoRecebivel, ultimoCustos, 11) + 1;
   const prazo = Math.max(1, Math.round(n(config.prazoMeses) || prazoDerivado));
 
-  const reservasPermuta = reservarPermutasFisicas(linhasReceita, linhasCusto);
+  const reservasPermuta = reservarPermutasFisicas(linhasReceitaOriginal, linhasCusto);
   const usaFonteNovaPermuta = reservasPermuta.usaFonteNova;
+
+  // #268 (correção pós-CI): as séries mensais de caixa (`vendaBrutaContratadaMensal`,
+  // `recebimentoBrutoMensal` e tudo que deriva delas) leem `t.unidades_permutadas`
+  // diretamente da tipologia — não passam pelo `vgvVendavelLinhaMotor` abaixo, que só
+  // alimenta os KPIs informativos e a proporção por tipologia. Sem este ajuste, a
+  // reserva feita em Custos (#266) nunca chegava ao caixa: os testes confirmaram (ver
+  // `receitaMensal`/`fluxoMensal` de `#268: permuta física...`) que o valor mensal
+  // continuava contando a unidade permutada como vendida, mesmo com os KPIs corretos.
+  // Escrever `unidades_permutadas` aqui, uma única vez, torna toda função antiga que já
+  // sabe ler esse campo automaticamente correta — sem replicar a reserva função a função.
+  const linhasReceita = usaFonteNovaPermuta
+    ? linhasReceitaOriginal.map((l: any, li: number) => ({
+      ...l,
+      tipologias: (l.tipologias ?? []).map((t: any, ti: number) => ({
+        ...t,
+        unidades_permutadas: reservasPermuta.porTipologia.get(chaveTipologiaLinha(l, li, t, ti)) ?? 0,
+      })),
+    }))
+    : linhasReceitaOriginal;
   const vgvVendavelLinhaMotor = (linha: any, linhaIndex: number): number =>
     (linha.tipologias ?? []).reduce((total: number, t: any, tipologiaIndex: number) => {
       const chave = chaveTipologiaLinha(linha, linhaIndex, t, tipologiaIndex);
@@ -1959,10 +1978,10 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   // (VGV): grandezas informativas. A permuta física agora é medida pelas
   // unidades reservadas em Custos e pelas alocações/preços correspondentes em
   // Receitas; nunca é orçamento e nunca entra em calcCustos ou no caixa.
-  const vgvPermutaFisica = usaFonteNovaPermuta
-    ? reservasPermuta.vgv
-    : linhasReceita.reduce((total, l) => total + (l.tipologias ?? []).reduce(
-      (s: number, t: any) => s + vgvVendavelTipologia(t) - vgvVendavelTipologia(t, 0), 0), 0);
+  // Sem linha de custo `Permuta física`, não há fallback para o campo legado
+  // `unidades_permutadas` — decisão do autor (2026-08-02, ver #267): o campo é
+  // código morto no Avançado real. O KPI é 0, não uma derivação da tipologia.
+  const vgvPermutaFisica = usaFonteNovaPermuta ? reservasPermuta.vgv : 0;
   const receitaBrutaVgv = ctxCusto.vgvTotal - vgvPermutaFisica;
 
   // #283: séries econômicas agregadas. Apenas linhas com `componentes`

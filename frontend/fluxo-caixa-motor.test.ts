@@ -854,7 +854,7 @@ test('#268: permuta física não duplica unidades quando a tipologia aparece em 
   // Primeiro Grupo consome 30 unidades; segundo consome 10 — nunca 40 em ambos.
   assert.ok(perto(r.vgvPermutaFisica, 30 * 50 * 10_000 + 10 * 50 * 11_000, 1));
   assert.ok(perto(r.receitaBrutaVgv, 30 * 50 * 10_000 + 10 * 50 * 11_000, 1) === false);
-  assert.ok(perto(r.receitaBrutaVgv, 50 * 50 * 10_000 + 20 * 50 * 11_000 - r.vgvPermutaFisica, 1));
+  assert.ok(perto(r.receitaBrutaVgv, 30 * 50 * 10_000 + 20 * 50 * 11_000 - r.vgvPermutaFisica, 1));
   assert.ok(perto(soma(r.custoMensal), 0, 1e-6));
 });
 
@@ -921,10 +921,13 @@ test('tipologia 100% permutada nao gera receita em caixa (#195)', () => {
   assert.ok(perto(permutada.total, 0, 1e-6));
 });
 
-// #268: VGV de permuta física (sem caixa) vem do VALOR DECLARADO nas linhas
-// de custo `Preço/Permuta física` (#266/#267) — nunca derivado de
-// `unidades_permutadas` (ADR da #266).
-test('#268: vgvPermutaFisica soma o valor declarado nas linhas de custo Permuta física', () => {
+// #268 (substitui o ADR da #266 citado aqui antes): o VALOR DECLARADO na
+// linha de custo deixou de existir como fonte — a #268 passou a derivar o
+// VGV de permuta física do preço/m² e área da tipologia CORRESPONDENTE em
+// Receitas (ver "permuta física usa tipologia/quantidade de Custos..." acima).
+// Sem tipologia correspondente em nenhum Grupo de Receitas, a reserva não tem
+// o que precificar — o KPI é 0, não a soma de `orcamento_valor`.
+test('#268: reserva sem tipologia correspondente em Receitas não pode ser precificada', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     linhasReceita: [],
@@ -935,7 +938,7 @@ test('#268: vgvPermutaFisica soma o valor declarado nas linhas de custo Permuta 
     areaTerreno: 0,
   };
   const r = calcularFluxo(config);
-  assert.ok(perto(r.vgvPermutaFisica, 2_500_000, 1));
+  assert.ok(perto(r.vgvPermutaFisica, 0, 1e-6));
   // Não é custo em caixa — não aparece em linhasCusto nem em custoMensal.
   assert.equal(r.linhasCusto.length, 0);
   assert.ok(perto(soma(r.custoMensal), 0, 1e-6));
