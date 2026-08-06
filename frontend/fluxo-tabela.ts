@@ -1,5 +1,5 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
-import { fmtR$, fmtPct } from './viab-format.js';
+import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import {
@@ -7,7 +7,7 @@ import {
   type FluxoCalc, type LinhaCalc, type SeriesComponentesCarteira, type SeriesComponentesReceita,
 } from './fluxo-caixa-motor.js';
 import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
-import type { Divergencia } from './fluxo-invariantes.js';
+import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tabela + KPIs do Fluxo de Caixa (funções puras).
@@ -114,6 +114,15 @@ export const estiloFluxoTabela = css`
   table.fx thead .c1, table.fx thead .c4, table.fx thead .c5, table.fx thead .c6 { z-index: 4; }
   table.fx thead .c1 { text-align: left; }
 
+  /* #269: tabela pequena e simples (sem sticky/scroll) — poucas linhas, uma
+     por tipologia com permuta física declarada. */
+  table.tabela-permuta { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  table.tabela-permuta th, table.tabela-permuta td {
+    padding: 6px 10px; font-size: 0.8rem; text-align: left;
+    border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+  }
+  table.tabela-permuta th.num, table.tabela-permuta td.num { text-align: right; }
+
   tr.grupo td { font-weight: 700; }
   tr.subgrupo td { font-weight: 600; }
   tr.item td.c1 { padding-left: 28px; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
@@ -159,6 +168,33 @@ export function relatorioReconciliacao(divergencias: Divergencia[]): TemplateRes
               Esperado: ${d.esperado}; encontrado: ${d.encontrado}; diferença: ${d.diferenca}.
             </li>`)}
         </ol>` : html`<span>Nenhuma divergência encontrada nas invariantes de produto, contratação, recebíveis e funding.</span>`}
+    </urbi-card>`;
+}
+
+/**
+ * #269: área e quantidade permutada por tipologia — mesma fonte
+ * (`permutaFisicaPorTipologia`) usada pela exportação CSV/PDF, para tela e
+ * arquivo nunca divergirem. Some da tela quando o estudo não tem permuta
+ * física declarada.
+ */
+export function tabelaPermutaFisica(linhas: PermutaFisicaTipologia[]): TemplateResult | typeof nothing {
+  if (linhas.length === 0) return nothing;
+  return html`
+    <urbi-card titulo="Permuta física — área e quantidade por tipologia" class="reconciliacao">
+      <table class="tabela-permuta">
+        <thead>
+          <tr><th>Tipologia</th><th class="num">Permutada</th><th class="num">Catálogo</th><th class="num">Área permutada</th></tr>
+        </thead>
+        <tbody>
+          ${linhas.map((l) => html`
+            <tr>
+              <td>${l.nome}</td>
+              <td class="num">${fmtNum(l.quantidadePermutada)}</td>
+              <td class="num">${fmtNum(l.quantidadeTotal)}</td>
+              <td class="num">${fmtNum(l.areaPermutada)} m²</td>
+            </tr>`)}
+        </tbody>
+      </table>
     </urbi-card>`;
 }
 

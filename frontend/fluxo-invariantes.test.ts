@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  validarFluxoCalc, validarComponentesSafra, validarPermutaFisica,
+  validarFluxoCalc, validarComponentesSafra, validarPermutaFisica, permutaFisicaPorTipologia,
   validarProduto, validarContratacao, validarSafrasReceita, validarCapitalStack, TOLERANCIA_PADRAO,
 } from './fluxo-invariantes.js';
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
@@ -212,6 +212,53 @@ test('validarPermutaFisica: tolerância de 1 centavo/unidade não gera falso pos
     { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 20.005 },
   ];
   assert.deepEqual(validarPermutaFisica(linhasCusto, TIPOLOGIAS, TOLERANCIA_PADRAO), []);
+});
+
+// ── permutaFisicaPorTipologia (#269) — mesma fonte que tela e exportação ──
+
+const TIPOLOGIAS_COM_AREA = [
+  { id: 1, nome: 'Studio', quantidade: 20, area_privativa_m2: 25 },
+  { id: 2, nome: '2 dorms', quantidade: 10, area_privativa_m2: 60 },
+];
+
+test('permutaFisicaPorTipologia: uma tipologia com permuta — quantidade e área corretas', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5 },
+  ];
+  const r = permutaFisicaPorTipologia(linhasCusto, TIPOLOGIAS_COM_AREA);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].tipologiaId, 1);
+  assert.equal(r[0].nome, 'Studio');
+  assert.equal(r[0].quantidadeTotal, 20);
+  assert.equal(r[0].quantidadePermutada, 5);
+  assert.equal(r[0].areaPermutada, 125); // 5 × 25m²
+});
+
+test('permutaFisicaPorTipologia: várias tipologias, cada uma com sua linha', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 4 },
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 2, permuta_quantidade: 3 },
+  ];
+  const r = permutaFisicaPorTipologia(linhasCusto, TIPOLOGIAS_COM_AREA);
+  assert.equal(r.length, 2);
+  assert.deepEqual(r.map((l) => l.areaPermutada), [100, 180]); // 4×25, 3×60
+});
+
+test('permutaFisicaPorTipologia: estudo sem permuta física — array vazio', () => {
+  assert.deepEqual(permutaFisicaPorTipologia([], TIPOLOGIAS_COM_AREA), []);
+  const linhasCusto = [{ grupo: 'terreno', categoria: 'Preço', subcategoria: 'Valor à vista', orcamento_valor: 1_000_000 }];
+  assert.deepEqual(permutaFisicaPorTipologia(linhasCusto, TIPOLOGIAS_COM_AREA), []);
+});
+
+test('permutaFisicaPorTipologia: tipologia_id sem correspondente no catálogo — quantidadeTotal 0, área 0 (não precificável)', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 999, permuta_quantidade: 3 },
+  ];
+  const r = permutaFisicaPorTipologia(linhasCusto, TIPOLOGIAS_COM_AREA);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].nome, 'tipologia 999');
+  assert.equal(r[0].quantidadeTotal, 0);
+  assert.equal(r[0].areaPermutada, 0);
 });
 
 // ── produto/estoque + funding (#240) ────────────────────────────────────
