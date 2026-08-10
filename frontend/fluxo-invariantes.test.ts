@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   validarFluxoCalc, validarComponentesSafra, validarPermutaFisica, permutaFisicaPorTipologia,
-  validarProduto, validarContratacao, validarSafrasReceita, validarCapitalStack, TOLERANCIA_PADRAO,
+  validarProduto, validarContratacao, validarSafrasReceita, validarCapitalStack, validarCustosDuplicados,
+  TOLERANCIA_PADRAO,
 } from './fluxo-invariantes.js';
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
 import type { ResultadoCapitalStack } from './capital-stack-motor.js';
@@ -277,6 +278,58 @@ const RECEITA_PRODUTO = [{
 
 test('validarProduto: estoque totalmente alocado e absorvido fecha em zero', () => {
   assert.deepEqual(validarProduto(RECEITA_PRODUTO, [], TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4), []);
+});
+
+test('#335 validarCustosDuplicados: sem duplicata, sem divergência', () => {
+  const custos = [
+    { grupo: 'terreno', categoria: 'Preço' },
+    { grupo: 'obra', categoria: 'Construção' },
+    { grupo: 'diretos', categoria: 'Corretagem de vendas' },
+  ];
+  assert.deepEqual(validarCustosDuplicados(custos), []);
+});
+
+test('#335 validarCustosDuplicados: 2ª linha com a mesma categoria no mesmo grupo é ALERTA, não erro', () => {
+  const custos = [
+    { grupo: 'terreno', categoria: 'Preço' },
+    { grupo: 'terreno', categoria: 'Preço' },
+  ];
+  const r = validarCustosDuplicados(custos);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].codigo, 'CATEGORIA_CUSTO_DUPLICADA');
+  assert.equal(r[0].severidade, 'alerta');
+  assert.equal(r[0].linha, 'Preço');
+  assert.equal(r[0].encontrado, 2);
+  assert.equal(r[0].diferenca, 1);
+});
+
+test('#335 validarCustosDuplicados: mesma categoria em GRUPOS diferentes não é duplicata', () => {
+  const custos = [
+    { grupo: 'terreno', categoria: 'Outro' },
+    { grupo: 'obra', categoria: 'Outro' },
+  ];
+  assert.deepEqual(validarCustosDuplicados(custos), []);
+});
+
+test('#335 validarCustosDuplicados: "Outro" nunca dispara — é a categoria de texto livre', () => {
+  const custos = [
+    { grupo: 'terreno', categoria: 'Outro' },
+    { grupo: 'terreno', categoria: 'Outro' },
+    { grupo: 'terreno', categoria: 'Outro' },
+  ];
+  assert.deepEqual(validarCustosDuplicados(custos), []);
+});
+
+test('#335 validarCustosDuplicados: 3 linhas na mesma categoria conta certo (encontrado=3, diferenca=2)', () => {
+  const custos = [
+    { grupo: 'obra', categoria: 'Construção' },
+    { grupo: 'obra', categoria: 'Construção' },
+    { grupo: 'obra', categoria: 'Construção' },
+  ];
+  const r = validarCustosDuplicados(custos);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].encontrado, 3);
+  assert.equal(r[0].diferenca, 2);
 });
 
 test('validarContratacao: bruto fecha por quantidade × área × preço × absorção', () => {

@@ -219,14 +219,6 @@ function obrigatoriasDoGrupo(grupo: string | null | undefined): LinhaObrigatoria
   return LINHAS_OBRIGATORIAS[grupo as GrupoId] ?? [];
 }
 
-// Identidade, não categoria (#178): `obrigatoria` é decidida pelo servidor na
-// criação e marca só a linha oficial. Uma 2ª linha com a mesma categoria (dado
-// legado, ou reclassificação futura de grupo) fica com `obrigatoria=false` e
-// portanto editável/removível — nunca mais trava por coincidência de nome.
-function eObrigatoria(c: any): boolean {
-  return c.obrigatoria === true;
-}
-
 // Ordena as linhas de um grupo: obrigatórias primeiro (na ordem declarada),
 // seguidas pelas demais na ordem original.
 function ordenarLinhas(grupo: GrupoId, linhas: any[]): any[] {
@@ -612,27 +604,16 @@ export class ViabFluxoCustos extends LitElement {
     const colunas: any[] = [
       {
         id: 'categoria', label: 'Categoria',
-        render: (c: any) => {
-          if (eObrigatoria(c)) {
-            // Linha obrigatória: categoria travada (texto, não seletor).
-            return html`<strong>${c.categoria}</strong>`;
-          }
-          // #179: categorias obrigatórias (Preço/Construção/Corretagem de
-          // vendas) já têm sua linha oficial garantida por
-          // `_garantirLinhasObrigatorias` — oferecê-las aqui também deixava o
-          // usuário criar uma 2ª linha com a mesma categoria, que o motor soma
-          // independentemente (custo duplicado). Escondidas do seletor de
-          // QUALQUER OUTRA linha; a própria categoria da linha continua
-          // selecionável (evita sumir do combo se o dado já estiver assim).
-          const obrigDoGrupo = obrigatoriasDoGrupo(g.id).map((o) => o.categoria);
-          const opcoes = cats.filter((x) => !obrigDoGrupo.includes(x.nome) || x.nome === c.categoria);
-          return html`
-            <urbi-select placeholder="Selecione…"
-              .valor=${c.categoria || ''}
-              .opcoes=${opcoes.map((x) => ({ valor: x.nome, rotulo: x.nome }))}
-              @urbi:select-change=${(e: CustomEvent) => this._salvarCategoria(c, g.id, e.detail.valor)}
-            ></urbi-select>`;
-        },
+        // #335 (reverte #179): todas as linhas ficam iguais — categoria
+        // sempre editável por seletor, com a lista completa da aba. Uma
+        // categoria repetida no mesmo grupo vira alerta na Reconciliação
+        // (validarCustosDuplicados, fluxo-invariantes.ts), não bloqueio.
+        render: (c: any) => html`
+          <urbi-select placeholder="Selecione…"
+            .valor=${c.categoria || ''}
+            .opcoes=${cats.map((x) => ({ valor: x.nome, rotulo: x.nome }))}
+            @urbi:select-change=${(e: CustomEvent) => this._salvarCategoria(c, g.id, e.detail.valor)}
+          ></urbi-select>`,
       },
       {
         id: 'subcategoria', label: 'Subcategoria',
@@ -882,7 +863,7 @@ export class ViabFluxoCustos extends LitElement {
     if (!dis) {
       colunas.push({
         id: 'acoes', label: '',
-        render: (c: any) => eObrigatoria(c) ? nothing : html`
+        render: (c: any) => html`
           <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
             @click=${() => { this.removerAlvo = c; }}></urbi-botao>`,
       });

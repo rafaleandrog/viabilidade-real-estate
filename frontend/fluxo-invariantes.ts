@@ -204,6 +204,40 @@ function quantidadesPermutadas(linhasCusto: any[]): Map<number, number> {
   return porTipologia;
 }
 
+/**
+ * #335: reverte a #179/#256 — a categoria de uma linha de Custos não trava
+ * mais renomeação/remoção nem some do combo das outras linhas. Sem essa
+ * trava, nada impede o usuário de criar uma 2ª linha com a mesma categoria
+ * num grupo, e o motor de fluxo processa cada linha de custo
+ * independentemente (`fluxo-caixa-motor.ts`), somando as duas — correto se
+ * são custos genuinamente distintos, mas silenciosamente dobra o efeito se a
+ * duplicata foi sem querer. Alerta (não erro): a duplicata pode ser
+ * intencional. "Outro" fica de fora — é a categoria livre, feita para ter
+ * várias linhas.
+ */
+export function validarCustosDuplicados(linhasCusto: any[]): Divergencia[] {
+  const out: Divergencia[] = [];
+  const contagem = new Map<string, { grupo: string; categoria: string; count: number }>();
+  for (const c of linhasCusto) {
+    const categoria = String(c?.categoria || '');
+    if (!categoria || categoria === 'Outro') continue;
+    const grupo = String(c?.grupo || '');
+    const chave = `${grupo}::${categoria}`;
+    const atual = contagem.get(chave);
+    if (atual) atual.count++;
+    else contagem.set(chave, { grupo, categoria, count: 1 });
+  }
+  for (const { grupo, categoria, count } of contagem.values()) {
+    if (count <= 1) continue;
+    out.push({
+      codigo: 'CATEGORIA_CUSTO_DUPLICADA', severidade: 'alerta', linha: categoria,
+      esperado: 1, encontrado: count, diferenca: count - 1,
+      mensagem: `${categoria} (${grupo}): ${count} linhas com a mesma categoria no grupo — confirme se é intencional.`,
+    });
+  }
+  return out;
+}
+
 /** Produto/estoque: alocação + permuta nunca excede o catálogo e a baixa
  * mensal pela absorção não produz estoque negativo. Premissas abaixo de 100%
  * podem deixar saldo e não são erro; quando todo o estoque está comprometido
