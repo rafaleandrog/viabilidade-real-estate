@@ -553,7 +553,7 @@ export class ViabFluxoReceitas extends LitElement {
       fx && fx.fim >= fx.inicio ? rotuloPeriodo(this.dataInicio, fx.inicio, fx.fim - fx.inicio + 1) : '—';
     return html`
       <urbi-modal title="Absorção de vendas" maxWidth="820px" @urbi-modal:close=${() => this.modalAbs = null}>
-        <p class="sec">Distribuído em ${temPre ? '4' : '3'} períodos — ${temPre ? 'Pré-lançamento, ' : ''}Lançamento, Obra e Após-chaves (calculado automaticamente). Os períodos vêm do Cronograma.</p>
+        <p class="sec">Distribuído em ${temPre ? '4' : '3'} períodos — ${temPre ? 'Pré-lançamento, ' : ''}Lançamento, Obra e Pós-chaves (calculado automaticamente). Os períodos vêm do Cronograma.</p>
         <div class="abs-grid">
           <div>
             <table class="abs">
@@ -576,7 +576,12 @@ export class ViabFluxoReceitas extends LitElement {
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, obra_pct: e.detail.valor ?? 0 }}></viab-num></td>
                 </tr>
                 <tr>
-                  <td>Após-chaves<br /><span class="sec">${rot(faixas?.pos_obra)}</span></td>
+                  <!-- #348: "Pós-chaves" — janela COMERCIAL fixa em 12 meses
+                       (APOS_CHAVES_MESES, fluxo-shared.ts), sem relação com a
+                       duração da fase "Pós-obras" do Cronograma (#328), que é
+                       livre e serve de âncora de CUSTO. Nomes parecidos, dois
+                       conceitos diferentes — não confundir. -->
+                  <td>Pós-chaves<br /><span class="sec">${rot(faixas?.pos_obra)}</span></td>
                   <td><span class="derivado">${posDerivado.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</span></td>
                 </tr>
               </tbody>
