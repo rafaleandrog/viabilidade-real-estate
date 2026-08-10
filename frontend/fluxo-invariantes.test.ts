@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   validarFluxoCalc, validarComponentesSafra, validarPermutaFisica, permutaFisicaPorTipologia,
   validarProduto, validarContratacao, validarSafrasReceita, validarCapitalStack, validarCustosDuplicados,
-  TOLERANCIA_PADRAO,
+  unidadesNaoAlocadasPorTipologia, TOLERANCIA_PADRAO,
 } from './fluxo-invariantes.js';
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
 import type { ResultadoCapitalStack } from './capital-stack-motor.js';
@@ -364,6 +364,50 @@ test('validarProduto: alocação + permuta acima do catálogo identifica tipolog
   const r = validarProduto(RECEITA_PRODUTO, custos, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
   assert.equal(r.find((d) => d.codigo === 'PRODUTO_EXCEDE_ESTOQUE')?.linha, 'Studio');
   assert.equal(r.find((d) => d.codigo === 'ESTOQUE_MENSAL_NEGATIVO')?.mes, 1);
+});
+
+test('#340 validarProduto: sub-alocação vira PRODUTO_SUBALOCADO, alerta não erro', () => {
+  const receitaParcial = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 15 }] }];
+  const r = validarProduto(receitaParcial, [], TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
+  const div = r.find((d) => d.codigo === 'PRODUTO_SUBALOCADO');
+  assert.ok(div);
+  assert.equal(div!.severidade, 'alerta');
+  assert.equal(div!.linha, 'Studio');
+  assert.equal(div!.diferenca, 5);
+});
+
+test('#340 validarProduto: sub-alocação descontando permuta física não dispara se cobre o resto', () => {
+  const receitaParcial = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 15 }] }];
+  const custosPermuta = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5 },
+  ];
+  const r = validarProduto(receitaParcial, custosPermuta, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
+  assert.equal(r.find((d) => d.codigo === 'PRODUTO_SUBALOCADO'), undefined);
+});
+
+test('#340 unidadesNaoAlocadasPorTipologia: desconta alocação e permuta física corretamente', () => {
+  const receitaParcial = [{ ...RECEITA_PRODUTO[0], tipologias: [{ tipologia_id: 1, quantidade: 12 }] }];
+  const custosPermuta = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 3 },
+  ];
+  const r = unidadesNaoAlocadasPorTipologia(receitaParcial, custosPermuta, TIPOLOGIAS.slice(0, 1));
+  assert.equal(r.length, 1);
+  assert.equal(r[0].nome, 'Studio');
+  assert.equal(r[0].quantidadeTotal, 20);
+  assert.equal(r[0].naoAlocado, 5); // 20 - 12 - 3
+});
+
+test('#340 unidadesNaoAlocadasPorTipologia: totalmente alocada não aparece', () => {
+  const r = unidadesNaoAlocadasPorTipologia(RECEITA_PRODUTO, [], TIPOLOGIAS.slice(0, 1));
+  assert.deepEqual(r, []);
+});
+
+test('#340 unidadesNaoAlocadasPorTipologia: sobre-alocada (excede estoque) também não aparece — diferença negativa', () => {
+  const custosPermuta = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5 },
+  ];
+  const r = unidadesNaoAlocadasPorTipologia(RECEITA_PRODUTO, custosPermuta, TIPOLOGIAS.slice(0, 1));
+  assert.deepEqual(r, []);
 });
 
 function capitalBase(): ResultadoCapitalStack {

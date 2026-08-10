@@ -5,7 +5,9 @@ import { fmtNum } from './viab-format.js';
 import {
   urbiVerso,
   listarTipologiasCatalogo, criarTipologia, atualizarTipologia, removerTipologia,
+  listarReceitasAvancado, listarCustosAvancado,
 } from './viabilidade-api.js';
+import { unidadesNaoAlocadasPorTipologia } from './fluxo-invariantes.js';
 import './viab-num.js';
 
 // Sub-aba "Empreendimento → Tipologias" (nível Avançado · Lote 4 · #16, Lote 6 · #19).
@@ -41,6 +43,10 @@ export class ViabEmpreendimentoTipologias extends LitElement {
   // no meio da digitação; persiste só no clique em "Salvar". Os demais campos
   // (viab-num) não precisam disso: já mascaram o mesmo bug com `_rascunho` local.
   @state() private draftNome: Record<number, string> = {};
+  // #340: só para calcular o aviso de unidades não alocadas — a tela não
+  // edita nem exibe estes dados de outra forma.
+  @state() private receitas: any[] = [];
+  @state() private custosPermuta: any[] = [];
   private carregado = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
@@ -88,6 +94,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     }
     .acoes-topo { margin-top: 16px; }
     .vazio { padding: 8px 0; }
+    .aviso-lista { margin: 4px 0 0; padding-left: 20px; }
   `];
 
   updated() {
@@ -101,12 +108,25 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     if (this.estudo?.nivel_analise !== 'avancado') { this.carregando = false; return; }
     this.carregando = true;
     try {
-      const r = await listarTipologiasCatalogo(this.estudo.id);
+      const [r, receitas, custos] = await Promise.all([
+        listarTipologiasCatalogo(this.estudo.id),
+        listarReceitasAvancado(this.estudo.id),
+        listarCustosAvancado(this.estudo.id),
+      ]);
       if (!r?.erro) this.tipologias = r.dados || [];
+      if (!receitas?.erro) this.receitas = receitas.dados || [];
+      if (!custos?.erro) this.custosPermuta = custos.dados || [];
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar tipologias', 'erro');
     }
     this.carregando = false;
+  }
+
+  // #340: unidades do catálogo ainda não alocadas em Receitas nem
+  // reservadas para permuta física — mesma conta do alerta PRODUTO_SUBALOCADO
+  // da Reconciliação (fluxo-invariantes.ts), aqui como aviso local.
+  private get _naoAlocadas() {
+    return unidadesNaoAlocadasPorTipologia(this.receitas, this.custosPermuta, this.tipologias);
   }
 
   render(): TemplateResult {
@@ -128,7 +148,24 @@ export class ViabEmpreendimentoTipologias extends LitElement {
             </urbi-botao>
           </div>` : nothing}
       </urbi-card>
+      ${this._renderAvisoNaoAlocadas()}
       ${this.confirmRemover ? this._renderConfirm() : nothing}
+    `;
+  }
+
+  // #340: aviso, por tipologia, de quantas unidades ainda faltam ser
+  // alocadas em grupos de Receitas — já descontando a permuta física.
+  private _renderAvisoNaoAlocadas(): TemplateResult {
+    const naoAlocadas = this._naoAlocadas;
+    if (naoAlocadas.length === 0) return html`${nothing}`;
+    return html`
+      <urbi-banner variante="alerta">
+        <strong>Unidades ainda não alocadas em Receitas:</strong>
+        <ul class="aviso-lista">
+          ${naoAlocadas.map((t) => html`
+            <li>${t.nome}: ${fmtNum(t.naoAlocado)} de ${fmtNum(t.quantidadeTotal)}</li>`)}
+        </ul>
+      </urbi-banner>
     `;
   }
 
