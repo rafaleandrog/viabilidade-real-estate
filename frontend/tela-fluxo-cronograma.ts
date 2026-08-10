@@ -165,6 +165,16 @@ export class ViabFluxoCronograma extends LitElement {
               this.paramsForm = { ...this.paramsForm, data_inicio_projeto: isoParaMesAno(e.detail.valor) };
             }}
           ></urbi-input-data>
+          <urbi-checkbox
+            label="Este empreendimento tem Pré-lançamento"
+            ?desabilitado=${dis}
+            ?marcado=${this.paramsForm.tem_pre_lancamento !== false}
+            @urbi:checkbox-change=${(e: CustomEvent) => {
+              // #330: quando o autor desmarca, o Lançamento passa a ancorar
+              // direto no fim do Planejamento (recalcularTravados, backend).
+              this.paramsForm = { ...this.paramsForm, tem_pre_lancamento: e.detail.marcado };
+            }}
+          ></urbi-checkbox>
           ${!dis ? html`
             <urbi-botao variante="secundario" ?carregando=${this.salvandoParams}
               @click=${this._salvarParametros}>Salvar</urbi-botao>` : nothing}
@@ -425,9 +435,16 @@ export class ViabFluxoCronograma extends LitElement {
       const res = await atualizarParametrosAvancado(this.estudo.id, {
         data_inicio_projeto: data || null,
         taxa_desconto_aa: this.paramsForm.taxa_desconto_aa ?? 12,
+        tem_pre_lancamento: this.paramsForm.tem_pre_lancamento !== false,
       });
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
       this.paramsForm = { ...res };
+      // #330: ligar/desligar o Pré-lançamento muda quais eventos existem no
+      // cronograma (lerCronograma, backend) — recarrega para refletir na hora,
+      // sem exigir navegação.
+      this.draftCrono = {};
+      const crono = await buscarCronogramaAvancado(this.estudo.id);
+      if (!crono?.erro) this.crono = crono.dados || [];
       urbiVerso.notificar('Parâmetros do fluxo salvos.', 'sucesso');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');

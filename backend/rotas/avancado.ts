@@ -52,7 +52,9 @@ export function cronogramaPadrao(): LinhaCronograma[] {
  *                     permitindo lacuna entre Planejamento e Obra.
  *  - Lançamento:     início = fim do Pré-lançamento (travado); duração LIVRE (#166 —
  *                     antes fixa em 1 mês, o usuário já podia editá-la na tela e
- *                     tomava 422 do backend, que ainda forçava o valor)
+ *                     tomava 422 do backend, que ainda forçava o valor). Sem
+ *                     Pré-lançamento no cronograma (#330), ancora no fim do
+ *                     Planejamento em vez disso.
  *  - Pós-obra:       início = fim da Obra (travado; duração livre)
  *
  * #246: `travado_duracao` é sempre `false` para os 5 eventos — nenhum dos
@@ -82,6 +84,10 @@ export function recalcularTravados(eventos: LinhaCronograma[]): LinhaCronograma[
   }
   if (pre && lanc) {
     lanc.inicio_mes = pre.inicio_mes + pre.duracao_meses; // fim do pré-lançamento
+    lanc.travado_inicio = true;
+  } else if (plan && lanc) {
+    // #330: sem Pré-lançamento, o Lançamento ancora direto no fim do Planejamento.
+    lanc.inicio_mes = plan.inicio_mes + plan.duracao_meses;
     lanc.travado_inicio = true;
   }
   if (obra && pos) {
@@ -385,9 +391,14 @@ function exigirAdminApp(req: Request, res: Response): boolean {
   return true;
 }
 
-/** Lê o cronograma persistido do estudo; completa com defaults os eventos ausentes. */
-async function lerCronograma(req: Request, estudoId: number): Promise<{ linhas: LinhaCronograma[]; ids: Map<string, number> }> {
-  const r = await req.dados!.listar('avancado_cronograma', { filtros: { estudo_id: estudoId }, por_pagina: 10 });
+/**
+ * Lê o cronograma persistido do estudo; completa com defaults os eventos
+ * ausentes. #330: quando `estudo.tem_pre_lancamento === false`, o evento
+ * `pre_lancamento` é excluído do resultado — `recalcularTravados` ancora o
+ * Lançamento direto no fim do Planejamento nesse caso.
+ */
+async function lerCronograma(req: Request, estudo: { id: number; tem_pre_lancamento?: unknown }): Promise<{ linhas: LinhaCronograma[]; ids: Map<string, number> }> {
+  const r = await req.dados!.listar('avancado_cronograma', { filtros: { estudo_id: estudo.id }, por_pagina: 10 });
   const ids = new Map<string, number>();
   const salvos = new Map<string, LinhaCronograma>();
   for (const linha of r.dados) {
@@ -400,7 +411,8 @@ async function lerCronograma(req: Request, estudoId: number): Promise<{ linhas: 
       travado_duracao: Boolean(linha.travado_duracao),
     });
   }
-  const padrao = cronogramaPadrao();
+  const temPreLancamento = estudo.tem_pre_lancamento !== false;
+  const padrao = cronogramaPadrao().filter((p) => temPreLancamento || p.evento !== 'pre_lancamento');
   const linhas = recalcularTravados(padrao.map((p) => salvos.get(p.evento) ?? p));
   return { linhas, ids };
 }
@@ -453,6 +465,7 @@ rotasAvancado.get('/estudos/:id/avancado/parametros', async (req: Request, res: 
       data_inicio_projeto: estudo.data_inicio_projeto ?? null,
       taxa_desconto_aa: estudo.taxa_desconto_aa !== null && estudo.taxa_desconto_aa !== undefined
         ? Number(estudo.taxa_desconto_aa) : 12,
+      tem_pre_lancamento: estudo.tem_pre_lancamento !== false,
     });
   } catch (e: any) {
     console.error('Erro em GET /avancado/parametros:', e);
@@ -483,6 +496,9 @@ rotasAvancado.patch('/estudos/:id/avancado/parametros', async (req: Request, res
       }
       dados.taxa_desconto_aa = t;
     }
+    if (req.body.tem_pre_lancamento !== undefined) {
+      dados.tem_pre_lancamento = Boolean(req.body.tem_pre_lancamento);
+    }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
 
     const atualizado = await req.dados!.atualizar('estudos', estudo.id, dados);
@@ -494,6 +510,7 @@ rotasAvancado.patch('/estudos/:id/avancado/parametros', async (req: Request, res
     res.json({
       data_inicio_projeto: atualizado.data_inicio_projeto ?? null,
       taxa_desconto_aa: Number(atualizado.taxa_desconto_aa ?? 12),
+      tem_pre_lancamento: atualizado.tem_pre_lancamento !== false,
     });
   } catch (e: any) {
     console.error('Erro em PATCH /avancado/parametros:', e);
@@ -511,7 +528,7 @@ rotasAvancado.get('/estudos/:id/avancado/cronograma', async (req: Request, res: 
     if (!estudo) return;
     if (!(await exigirLeitura(req, res, estudo))) return;
     // Sem escrita no GET: eventos ainda não salvos vêm com defaults calculados.
-    const { linhas } = await lerCronograma(req, estudo.id);
+    const { linhas } = await lerCronograma(req, estudo);
     res.json({ dados: linhas });
   } catch (e: any) {
     console.error('Erro em GET /avancado/cronograma:', e);
@@ -577,13 +594,16 @@ rotasAvancado.patch('/estudos/:id/avancado/cronograma', async (req: Request, res
       }
     }
 
-    const { linhas, ids } = await lerCronograma(req, estudo.id);
+    const { linhas, ids } = await lerCronograma(req, estudo);
 
     // Fase 1: valida TODOS os deltas contra o cronograma lido, sem escrever
     // nada — se qualquer um falhar, a resposta é 422/400 e o rascunho do
     // cliente permanece intacto (nada foi persistido).
     for (const [evento, delta] of Object.entries(eventos)) {
-      const alvo = linhas.find((l) => l.evento === evento)!;
+      const alvo = linhas.find((l) => l.evento === evento);
+      // #330: pre_lancamento some de `linhas` quando o estudo tem a fase
+      // desabilitada — sem esta guarda o `!` original estourava (TypeError).
+      if (!alvo) { erro(res, 422, 'EVENTO_DESABILITADO', `${evento} não existe no cronograma deste estudo`); return; }
       const falha = aplicarDeltaEvento(alvo, delta as Record<string, unknown>);
       if (falha) { erro(res, falha.codigo === 'CAMPO_TRAVADO' ? 422 : 400, falha.codigo, falha.mensagem); return; }
     }
@@ -1378,7 +1398,7 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
       dados.duracao_meses = ancoraFase.duracao_meses;
     } else {
       // Ancoragem: evento ≠ customizado herda início/duração do cronograma.
-      const ancora = ancorarLinhaCusto(String(dados.cronograma_evento), (await lerCronograma(req, estudo.id)).linhas);
+      const ancora = ancorarLinhaCusto(String(dados.cronograma_evento), (await lerCronograma(req, estudo)).linhas);
       if (ancora) {
         dados.inicio_mes = ancora.inicio_mes;
         dados.duracao_meses = ancora.duracao_meses;
@@ -1472,7 +1492,7 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
       const eventoFinal = String(dados.cronograma_evento ?? custo.cronograma_evento);
       const trocandoAncora = dados.cronograma_evento !== undefined && dados.cronograma_evento !== 'customizado';
       const ancoraEvento = eventoFinal !== 'customizado'
-        ? ancorarLinhaCusto(eventoFinal, (await lerCronograma(req, estudo.id)).linhas)
+        ? ancorarLinhaCusto(eventoFinal, (await lerCronograma(req, estudo)).linhas)
         : null;
       const r = resolverTravamentoCusto(trocandoAncora, ancoraEvento, enviouInicio, enviouDuracao,
         'início e duração são calculados pelo evento-âncora; use cronograma_evento = customizado para editar');

@@ -131,6 +131,7 @@
 
         "data_inicio_projeto": { "tipo": "texto", "limite": 10 },
         "taxa_desconto_aa":    { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 12 },
+        "tem_pre_lancamento":  { "tipo": "booleano", "padrao": true },
 
         "estrutura_capital_proprio_pct":  { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
         "estrutura_financiamento_pct":    { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },

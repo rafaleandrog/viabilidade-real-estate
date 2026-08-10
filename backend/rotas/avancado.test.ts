@@ -119,6 +119,30 @@ test('recalcularTravados normaliza travado_duracao=false em TODOS os eventos (#2
   for (const e of rec) assert.equal(e.travado_duracao, false, `${e.evento} deveria ter travado_duracao=false`);
 });
 
+test('recalcularTravados sem Pré-lançamento: Lançamento ancora direto no fim do Planejamento (#330)', () => {
+  const c = cronogramaPadrao().filter((e) => e.evento !== 'pre_lancamento');
+  assert.equal(c.length, 4);
+  const rec = recalcularTravados(c);
+  assert.equal(rec.length, 4);
+  assert.ok(!rec.some((e) => e.evento === 'pre_lancamento'));
+  const plan = rec.find((e) => e.evento === 'planejamento')!;
+  const lanc = rec.find((e) => e.evento === 'lancamento')!;
+  const obra = rec.find((e) => e.evento === 'obra')!;
+  assert.equal(lanc.inicio_mes, plan.inicio_mes + plan.duracao_meses);
+  assert.ok(lanc.travado_inicio);
+  // Obra continua ancorada no fim do Planejamento, como com Pré-lançamento (#224).
+  assert.equal(obra.inicio_mes, plan.inicio_mes + plan.duracao_meses);
+});
+
+test('recalcularTravados sem Pré-lançamento propaga mudança do Planejamento para o Lançamento', () => {
+  const c = cronogramaPadrao().filter((e) => e.evento !== 'pre_lancamento');
+  const plan = c.find((e) => e.evento === 'planejamento')!;
+  plan.duracao_meses = 9;
+  const rec = recalcularTravados(c);
+  const lanc = rec.find((e) => e.evento === 'lancamento')!;
+  assert.equal(lanc.inicio_mes, plan.inicio_mes + 9);
+});
+
 // ── aplicarDeltaEvento (#252 — validação usada pelo endpoint em lote) ──
 
 test('aplicarDeltaEvento: aplica início e duração válidos, sem erro', () => {
