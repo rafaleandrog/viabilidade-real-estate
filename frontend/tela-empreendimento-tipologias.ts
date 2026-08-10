@@ -160,10 +160,10 @@ export class ViabEmpreendimentoTipologias extends LitElement {
           <tr class="total">
             <td>Total</td>
             ${lote ? nothing : html`<td></td>`}
-            <td class="num">${fmtNum(areaTotal)} m²</td>
+            <td class="num"></td>
             ${lote ? nothing : html`<td></td><td class="num">${fmtNum(totalVagas)}</td>`}
             <td class="num">${fmtNum(totalUnidades)}</td>
-            <td class="num"></td>
+            <td class="num">${fmtNum(areaTotal)} m²</td>
             ${dis ? nothing : html`<td></td>`}
           </tr>
         </tbody>
