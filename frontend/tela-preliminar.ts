@@ -43,10 +43,13 @@ const IDS_TOPO = PAGINAS.map((a) => a.id) as AbaTopo[];
 // Sub-abas (nível 2) — só Premissas e Resultado têm mais de uma seção.
 type SubAba = { id: string; label: string; icone: string };
 const SUBABAS: Partial<Record<AbaTopo, SubAba[]>> = {
+  // #309: "Produtos & Custos" virou duas abas — Custos (à direita de Terreno &
+  // Áreas) e Produtos (por último, antes de Permutas).
   premissas: [
-    { id: 'terreno',  label: 'Terreno & Áreas',   icone: 'fa-solid fa-mountain-sun' },
-    { id: 'produtos', label: 'Produtos & Custos', icone: 'fa-solid fa-boxes-stacked' },
-    { id: 'permutas', label: 'Permutas',          icone: 'fa-solid fa-right-left' },
+    { id: 'terreno',  label: 'Terreno & Áreas', icone: 'fa-solid fa-mountain-sun' },
+    { id: 'custos',   label: 'Custos',          icone: 'fa-solid fa-sack-dollar' },
+    { id: 'produtos', label: 'Produtos',        icone: 'fa-solid fa-boxes-stacked' },
+    { id: 'permutas', label: 'Permutas',        icone: 'fa-solid fa-right-left' },
   ],
   proforma: [
     { id: 'proforma', label: 'Proforma', icone: 'fa-solid fa-table-cells' },

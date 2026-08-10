@@ -207,7 +207,7 @@ export class ViabTelaPremissas extends LitElement {
   // formulário, o "dirty" e o Salvar continuam ÚNICOS e globais — salvar em
   // qualquer sub-aba salva as premissas inteiras, como já era antes da
   // divisão visual.
-  @property({ type: String }) secao: 'terreno' | 'produtos' | 'permutas' = 'terreno';
+  @property({ type: String }) secao: 'terreno' | 'custos' | 'produtos' | 'permutas' = 'terreno';
 
   @state() private form: Record<string, any> = {};
   @state() private salvando = false;
@@ -457,14 +457,9 @@ export class ViabTelaPremissas extends LitElement {
         ${this._renderResumo(lot)}
       ` : nothing}
 
-      ${this.secao === 'produtos' ? html`
-        <urbi-card titulo="Produtos & Custos">
+      ${this.secao === 'custos' ? html`
+        <urbi-card titulo="Custos">
           <div class="secao grupo grupo-a">
-            <h4>Produtos</h4>
-            <div class="grid">${produtos.map((c) => this._input(c, dis))}</div>
-          </div>
-
-          <div class="secao grupo grupo-b">
             <h4>Custos</h4>
             <div class="checks">
               <urbi-checkbox
@@ -482,7 +477,7 @@ export class ViabTelaPremissas extends LitElement {
             </div>
           </div>
 
-          <div class="secao grupo grupo-a">
+          <div class="secao grupo grupo-b">
             <h4>Impostos</h4>
             <div class="checks">
               <urbi-checkbox
@@ -498,9 +493,20 @@ export class ViabTelaPremissas extends LitElement {
             })}</div>
           </div>
 
-          <div class="secao grupo grupo-b">
+          <div class="secao grupo grupo-a">
             <h4>Deduções</h4>
             <div class="grid">${DEDUCOES.map((c) => this._input(c, dis))}</div>
+          </div>
+
+          ${this._renderRodapeForm()}
+        </urbi-card>
+      ` : nothing}
+
+      ${this.secao === 'produtos' ? html`
+        <urbi-card titulo="Produtos">
+          <div class="secao grupo grupo-a">
+            <h4>Produtos</h4>
+            <div class="grid">${produtos.map((c) => this._input(c, dis))}</div>
           </div>
 
           ${this._renderRodapeForm()}
