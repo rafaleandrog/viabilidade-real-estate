@@ -24,6 +24,27 @@ export function formatarMesAno(v: MesAno): string {
   return `${MESES_ABREV[v.mes]}/${v.ano}`;
 }
 
+// BUG7-19: conversão entre o formato persistido ("mmm/AAAA", contrato do
+// motor — mês 0 relativo) e o ISO ("YYYY-MM-DD") que `urbi-input-data`
+// exige. Dia é sempre 1º nos dois sentidos — o motor nunca leu dia, só
+// mês/ano, então descartá-lo na conversão não perde nem inventa informação.
+
+/** "mmm/AAAA" → ISO "YYYY-MM-01" para alimentar `urbi-input-data`. '' se vazio/inválido. */
+export function mesAnoParaISO(texto: string | null | undefined): string {
+  const p = parseMesAno(texto);
+  if (!p) return '';
+  return `${p.ano}-${String(p.mes + 1).padStart(2, '0')}-01`;
+}
+
+/** ISO "YYYY-MM-DD" (de `urbi-input-data`) → "mmm/AAAA", descartando o dia. '' se vazio/inválido. */
+export function isoParaMesAno(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-\d{2}$/.exec(String(iso ?? '').trim());
+  if (!m) return '';
+  const mes = Number(m[2]) - 1;
+  if (mes < 0 || mes > 11) return '';
+  return formatarMesAno({ mes, ano: Number(m[1]) });
+}
+
 /**
  * Rótulo curto do mês relativo `mesRel` (0-based) a partir de `dataInicio`
  * ("mmm/AAAA"). Ex.: dataInicio "jan/2027", mesRel 0 → "jan/27", mesRel 12 →
