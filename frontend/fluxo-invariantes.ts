@@ -271,6 +271,16 @@ export function validarProduto(
         mensagem: `${nome}: alocações (${alocado}) + permuta física (${permutado}) excedem o estoque (${total}).`,
       });
     }
+    // #340: o inverso de PRODUTO_EXCEDE_ESTOQUE — sobra estoque nem alocado
+    // nem permutado. Alerta (não erro): pode ser produto ainda em
+    // planejamento de vendas, não uma inconsistência de dado.
+    if (total - comprometido > tol) {
+      out.push({
+        codigo: 'PRODUTO_SUBALOCADO', severidade: 'alerta', linha: nome,
+        esperado: total, encontrado: comprometido, diferenca: total - comprometido,
+        mensagem: `${nome}: ${total - comprometido} unidade(s) ainda não alocadas em grupos de Receitas nem permutadas.`,
+      });
+    }
 
     const vendas = new Array<number>(Math.max(0, prazo)).fill(0);
     let absorcaoCompleta = alocacoes.length > 0;
@@ -504,6 +514,45 @@ export function permutaFisicaPorTipologia(
       quantidadePermutada,
       areaPermutada: quantidadePermutada * Number(tip?.area_privativa_m2 ?? 0),
     });
+  }
+  return out;
+}
+
+/** Uma linha de "unidades não alocadas", por tipologia. */
+export interface UnidadeNaoAlocada {
+  tipologiaId: number;
+  nome: string;
+  quantidadeTotal: number;
+  naoAlocado: number;
+}
+
+/**
+ * #340: unidades do catálogo ainda não alocadas em nenhum grupo de Receitas
+ * nem reservadas para permuta física — o banner de aviso em Tipologias
+ * (`tela-empreendimento-tipologias.ts`) e o alerta `PRODUTO_SUBALOCADO` de
+ * `validarProduto` usam a mesma conta: `total − alocado − permutado`.
+ * Tipologias totalmente alocadas/permutadas não aparecem.
+ */
+export function unidadesNaoAlocadasPorTipologia(
+  linhasReceita: any[],
+  linhasCusto: any[],
+  tipologiasCatalogo: any[],
+  tol: number = TOLERANCIA_PADRAO,
+): UnidadeNaoAlocada[] {
+  const permutas = quantidadesPermutadas(linhasCusto);
+  const out: UnidadeNaoAlocada[] = [];
+  for (const tip of tipologiasCatalogo) {
+    const id = Number(tip.id);
+    const total = Number(tip.quantidade ?? 0);
+    const alocado = linhasReceita.reduce((s, linha) =>
+      s + (linha.tipologias ?? [])
+        .filter((a: any) => Number(a.tipologia_id) === id)
+        .reduce((s2: number, a: any) => s2 + Number(a.quantidade ?? 0), 0), 0);
+    const permutado = permutas.get(id) ?? 0;
+    const naoAlocado = total - alocado - permutado;
+    if (naoAlocado > tol) {
+      out.push({ tipologiaId: id, nome: tip?.nome || `tipologia ${id}`, quantidadeTotal: total, naoAlocado });
+    }
   }
   return out;
 }
