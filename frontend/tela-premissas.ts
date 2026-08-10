@@ -58,6 +58,13 @@ interface CustoUnidade {
   // `conv` (Parte 2): como o valor da unidade converte para a base ao trocar de
   // unidade (identidade / % de uma grandeza / por m² de uma grandeza).
   opcoes: { valor: string; rotulo: string; campo: string; sufixo: string; conv: ConvUnidade }[];
+  // #317: unidade "produto" (nº de produtos do catálogo) — não cabe no modelo
+  // genérico de `opcoes` (precisa de DOIS campos: produto selecionado +
+  // quantidade, não um só). Presente só nas CustoUnidade de permuta física;
+  // a opção correspondente em `opcoes` usa `campo: ''` (sentinela, nunca lido
+  // — o render e os handlers desviam para `_campoProdutoQuantidade`/
+  // `_editarPermutaProduto` quando `modo === 'unidade'`).
+  produto?: { campoProdutoId: string; campoQuantidade: string };
 }
 const CUSTOS_UNIDADE: CustoUnidade[] = [
   {
@@ -92,17 +99,22 @@ const CUSTOS_UNIDADE: CustoUnidade[] = [
 const PERMUTA_UNIDADE: CustoUnidade = {
   modoKey: 'permuta_fisica_modo', rotulo: 'Permuta física', padrao: 'area_m2', campoCanonico: 'permuta_fisica_area_canonica',
   opcoes: [
+    // #317: "unidade" primeiro na lista, como a planilha pede.
+    { valor: 'unidade', rotulo: 'Unidade', campo: '', sufixo: 'un.', conv: { tipo: 'identidade' } },
     { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_area_m2', sufixo: 'm²', conv: { tipo: 'identidade' } },
     { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_pct', sufixo: '%', conv: { tipo: 'pct', link: 'areaVendavelR' } },
   ],
+  produto: { campoProdutoId: 'permuta_fisica_produto_id', campoQuantidade: 'permuta_fisica_quantidade' },
 };
 const PERMUTA_FIS_R: CustoUnidade = { ...PERMUTA_UNIDADE, rotulo: 'Permuta física residencial' };
 const PERMUTA_FIS_NR: CustoUnidade = {
   modoKey: 'permuta_fisica_nr_modo', rotulo: 'Permuta física não residencial', padrao: 'area_m2', campoCanonico: 'permuta_fisica_nr_area_canonica',
   opcoes: [
+    { valor: 'unidade', rotulo: 'Unidade', campo: '', sufixo: 'un.', conv: { tipo: 'identidade' } },
     { valor: 'area_m2', rotulo: 'm²', campo: 'permuta_fisica_nr_area_m2', sufixo: 'm²', conv: { tipo: 'identidade' } },
     { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_nr_pct', sufixo: '%', conv: { tipo: 'pct', link: 'areaVendavelNR' } },
   ],
+  produto: { campoProdutoId: 'permuta_fisica_nr_produto_id', campoQuantidade: 'permuta_fisica_nr_quantidade' },
 };
 
 // Permuta financeira R e NR (#5): cada uma alterna entre % do VGV do tipo e um
@@ -194,7 +206,11 @@ const TODOS_NUM = new Set<string>([
   ...PRODUTOS_LOT, ...PRODUTOS_INC, ...TERRENO_COEF,
 ].map((c) => c.k).concat(
   ['terreno_manual_area'],
-  CAMPOS_UNIDADE.flatMap((cu) => cu.opcoes.map((o) => o.campo)),
+  CAMPOS_UNIDADE.flatMap((cu) => cu.opcoes.map((o) => o.campo).filter(Boolean)),
+  // #317: PERMUTA_FIS_R fica de fora de CAMPOS_UNIDADE (só a lista base
+  // PERMUTA_UNIDADE entra) — os campos de produto/quantidade são os mesmos.
+  [PERMUTA_UNIDADE, PERMUTA_FIS_NR].flatMap((cu) => cu.produto
+    ? [cu.produto.campoProdutoId, cu.produto.campoQuantidade] : []),
   Object.values(CAMPO_POR_LINHA_LOT).map((campo) => `${campo}_valor`),
 ));
 
@@ -281,6 +297,10 @@ export class ViabTelaPremissas extends LitElement {
     .cu-badges urbi-badge { cursor: pointer; }
     .cu-badge-dis { pointer-events: none; opacity: 0.5; }
     .cu-valor { flex: 1 1 120px; min-width: 0; }
+    /* #317: unidade "produto" — select + quantidade lado a lado. */
+    .cu-produto { display: flex; gap: 6px; flex: 1 1 220px; min-width: 0; }
+    .cu-produto urbi-select { flex: 1 1 140px; min-width: 0; }
+    .cu-produto viab-num { flex: 0 0 90px; }
 
     /* Tabela de áreas em cascata (2026-08-03) — mesma convenção de linha
        negrito/fundo claro para as linhas COMPUTADAS (âncoras/subtotais),
@@ -634,13 +654,51 @@ export class ViabTelaPremissas extends LitElement {
                 @click=${() => { if (!dis) this._trocarUnidade(cu, o); }}
               >${o.rotulo}</urbi-badge>`)}
           </div>
-          <viab-num class="cu-valor" sufixo=${op.sufixo} ?desabilitado=${dis} erro=${erro}
-            .valor=${this._valorUnidade(cu, op)}
-            @urbi:input-numero-change=${(e: CustomEvent) => this._editarCustoUnidade(cu, op, e.detail.valor)}
-          ></viab-num>
+          ${modo === 'unidade' && cu.produto
+            ? this._campoProdutoQuantidade(cu.produto, dis)
+            : html`<viab-num class="cu-valor" sufixo=${op.sufixo} ?desabilitado=${dis} erro=${erro}
+                .valor=${this._valorUnidade(cu, op)}
+                @urbi:input-numero-change=${(e: CustomEvent) => this._editarCustoUnidade(cu, op, e.detail.valor)}
+              ></viab-num>`}
         </div>
       </div>
     `;
+  }
+
+  // #317: unidade "produto" da Permuta física — select do produto cadastrado
+  // (catálogo de Produtos) + quantidade, em vez do viab-num único das outras
+  // duas unidades. O canônico (sempre em m²) é recalculado a cada edição —
+  // área média do produto × quantidade — igual ao padrão de `_editarCustoUnidade`.
+  private _campoProdutoQuantidade(p: { campoProdutoId: string; campoQuantidade: string }, dis: boolean): TemplateResult {
+    const produtoIdAtual = this.form[p.campoProdutoId];
+    const quantidade = this._num(p.campoQuantidade);
+    return html`
+      <span class="cu-produto">
+        <urbi-select placeholder="Produto…" ?desabilitado=${dis}
+          .valor=${produtoIdAtual ? String(produtoIdAtual) : ''}
+          .opcoes=${this.produtos.map((prod) => ({ valor: String(prod.id), rotulo: prod.nome || `Produto ${prod.id}` }))}
+          @urbi:select-change=${(e: CustomEvent) => this._editarPermutaProduto(p, Number(e.detail.valor) || null, quantidade)}
+        ></urbi-select>
+        <viab-num sufixo="un." casas-decimais="0" ?desabilitado=${dis}
+          .valor=${quantidade}
+          @urbi:input-numero-change=${(e: CustomEvent) =>
+            this._editarPermutaProduto(p, produtoIdAtual ? Number(produtoIdAtual) : null, e.detail.valor)}
+        ></viab-num>
+      </span>
+    `;
+  }
+
+  private _editarPermutaProduto(p: { campoProdutoId: string; campoQuantidade: string }, produtoId: number | null, quantidade: number | null) {
+    this._set(p.campoProdutoId, produtoId);
+    this._set(p.campoQuantidade, quantidade);
+    const produto = this.produtos.find((prod) => prod.id === produtoId);
+    const areaMedia = produto ? Number(produto.area_media_m2) || 0 : 0;
+    // O campoCanonico correspondente é achado pelo prefixo do campo de
+    // quantidade (permuta_fisica_/permuta_fisica_nr_) — os dois pares
+    // (R e NR) usam o mesmo padrão de nome.
+    const campoCanonico = p.campoQuantidade.startsWith('permuta_fisica_nr_')
+      ? 'permuta_fisica_nr_area_canonica' : 'permuta_fisica_area_canonica';
+    this._set(campoCanonico, areaMedia * (quantidade ?? 0));
   }
 
   // ── Catálogo de Produtos (#315) — tabela add/remove, CRUD à parte do form ──
