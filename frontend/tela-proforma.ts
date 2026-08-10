@@ -2,15 +2,17 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
-import { urbiVerso, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
-import { calcularProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
+import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
+import { calcularProforma, vgvProduto, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 import { exportarPDF, exportarExcel } from './exportar.js';
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
 
 // `tipo` dá a categoria visual (#3): receita | consolidado | resultado;
 // ausente = item comum (sub-linha discreta). `grupo` marca sub-linhas
 // colapsáveis (#2); `toggle` marca a linha-total que colapsa aquele grupo.
-type Grupo = 'deducoes' | 'direto' | 'indireto';
+// BUG7-10: 'receita' colapsa a Receita bruta (VGV) por tipo de unidade
+// cadastrada no catálogo de Produtos, mesmo padrão dos grupos de custo.
+type Grupo = 'receita' | 'deducoes' | 'direto' | 'indireto';
 interface Linha {
   l: string; v: number;
   tipo?: 'receita' | 'consolidado' | 'resultado';
@@ -38,7 +40,9 @@ export class ViabTelaProforma extends LitElement {
   @state() private aliquotaRet = 4;
   @state() private varSens: VarSens = 'preco';
   // #9: grupos consolidados colapsados (default: expandido). O total é o header.
-  @state() private colapso: Record<Grupo, boolean> = { deducoes: false, direto: false, indireto: false };
+  @state() private colapso: Record<Grupo, boolean> = { receita: false, deducoes: false, direto: false, indireto: false };
+  // BUG7-10: catálogo de Produtos, para as sub-linhas de Receita bruta (VGV).
+  @state() private produtos: any[] = [];
 
   static styles = [estiloConteudo, css`
     /* BUG7-09: com o KPI de Preço médio/unid. removido, sobram 3-5 cards —
@@ -150,14 +154,18 @@ export class ViabTelaProforma extends LitElement {
     if (!this.estudo) return;
     this._idCarregado = this.estudo.id ?? null;
     try {
-      const [bm, cfg] = await Promise.all([listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig()]);
+      const [bm, cfg, prod] = await Promise.all([
+        listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
+        listarProdutosPreliminar(this.estudo.id),
+      ]);
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
+      this.produtos = prod?.dados || [];
     } catch (e) { console.error(e); }
   }
 
   private _entrada(over: Partial<ProformaInput> = {}): ProformaInput {
-    return { ...this.estudo, aliquota_ret_pct: this.aliquotaRet, ...over } as ProformaInput;
+    return { ...this.estudo, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos, ...over } as ProformaInput;
   }
   private _bm(campo: string) { return this.benchmarks.find((b) => b.campo === campo); }
 
@@ -232,14 +240,25 @@ export class ViabTelaProforma extends LitElement {
     const deducoesVgv = p.imposto + p.corretagem + p.marketing + p.permutaFinResidencial + p.permutaFinNaoResidencial;
 
     const linhas: Linha[] = [];
-    // #10: bloco de permuta física (só quando houver) — entre o VGV bruto (sem
-    // permuta) e a Receita bruta (VGV). Residencial e Não Residencial separados.
+    // BUG7-10: Receita bruta (VGV) primeiro — header colapsável, com uma
+    // sub-linha por produto do catálogo (mesmo padrão dos grupos de custo).
+    // O bloco de permuta física (context) vem DEPOIS do header, não antes —
+    // o colapso pressupõe sub-linhas depois; permuta continua fora do grupo
+    // 'receita' (é dedução do bruto, não parte da composição por unidade).
+    linhas.push({ l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita', toggle: 'receita' });
+    for (const produto of this.produtos) {
+      linhas.push({
+        l: produto.nome || `Produto ${produto.id}`, v: vgvProduto(produto),
+        grupo: 'receita', natureza: 'receita', ocultarSeZero: true,
+      });
+    }
+    // #10: bloco de permuta física (só quando houver) — entre a Receita bruta
+    // e as Deduções sobre VGV. Residencial e Não Residencial separados.
     if (p.areaPermutaFisica > 0) {
       linhas.push({ l: 'VGV sem permuta física', v: vgvBruto, semPermuta: true });
       linhas.push({ l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true, memo: permMemo(p.areaPermutaResidencial) });
       linhas.push({ l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true, memo: permMemo(p.areaPermutaNaoResidencial) });
     }
-    linhas.push({ l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita' });
     // #9: "Deduções sobre VGV" consolida imposto+corretagem+marketing+permuta fin.,
     // como header colapsável logo abaixo da Receita bruta.
     linhas.push({ l: '= Deduções sobre VGV', v: deducoesVgv, tipo: 'consolidado', toggle: 'deducoes' });
