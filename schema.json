@@ -104,10 +104,13 @@
         "taxa_gestao_pct":           { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 6 },
         "custo_decoracao_m2":        { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 150 },
         "manutencao_pct":            { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
+        "considerar_contingencias":  { "tipo": "booleano", "padrao": true },
         "contingencias_pct":         { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
         "stand_vendas_valor":        { "tipo": "decimal", "precisao": 12, "escala": 2 },
 
+        "considerar_marketing_global": { "tipo": "booleano", "padrao": true },
         "marketing_global_pct":  { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
+        "considerar_gestao_indiretos": { "tipo": "booleano", "padrao": true },
         "gestao_indiretos_pct":  { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1.25 },
 
         "permuta_fisica_modo":    { "tipo": "texto", "limite": 16, "opcoes": ["unidade", "area_m2", "pct_area_venda"], "padrao": "area_m2" },

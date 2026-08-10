@@ -46,6 +46,22 @@ const CUSTOS: (Campo & { so?: string })[] = [
   { k: 'gestao_indiretos_pct', label: 'Gestão e outros custos indiretos', t: 'num', sufixo: '% VGV' },
 ];
 
+// item 5: checkbox por custo — desmarcado, atenua o campo e zera o efeito no
+// motor (mesmo padrão de `considerar_custo_terreno`, já existente).
+const CHECKS_CUSTO: { k: string; label: string }[] = [
+  { k: 'considerar_custo_terreno', label: 'Considerar custo de aquisição do terreno' },
+  { k: 'considerar_marketing_global', label: 'Considerar Marketing global / estrutura' },
+  { k: 'considerar_gestao_indiretos', label: 'Considerar Gestão e outros custos indiretos' },
+  { k: 'considerar_contingencias', label: 'Considerar Contingências' },
+];
+// Campo de CUSTOS → checkbox que o atenua (usado por `_input(c, dis, aten)`).
+const CAMPO_PARA_CONSIDERAR: Record<string, string> = {
+  custo_terreno_m2: 'considerar_custo_terreno',
+  marketing_global_pct: 'considerar_marketing_global',
+  gestao_indiretos_pct: 'considerar_gestao_indiretos',
+  contingencias_pct: 'considerar_contingencias',
+};
+
 // Custos com opção de UNIDADE (#3/#4): um seletor de unidade + um único campo de
 // valor cuja chave/sufixo dependem da unidade escolhida. Só o campo da unidade
 // ativa é exibido (o outro fica oculto — não some do schema).
@@ -511,18 +527,19 @@ export class ViabTelaPremissas extends LitElement {
           <div class="secao grupo grupo-a">
             <h4>Custos</h4>
             <div class="checks">
-              <urbi-checkbox
-                label="Considerar custo de aquisição do terreno"
-                ?desabilitado=${dis}
-                ?marcado=${this.form.considerar_custo_terreno !== false}
-                @urbi:checkbox-change=${(e: CustomEvent) => this._set('considerar_custo_terreno', e.detail.marcado)}
-              ></urbi-checkbox>
+              ${CHECKS_CUSTO.map((chk) => html`
+                <urbi-checkbox
+                  label=${chk.label}
+                  ?desabilitado=${dis}
+                  ?marcado=${this.form[chk.k] !== false}
+                  @urbi:checkbox-change=${(e: CustomEvent) => this._set(chk.k, e.detail.marcado)}
+                ></urbi-checkbox>`)}
             </div>
             <div class="grid">
               ${CUSTOS_UNIDADE
                 .filter((cu) => !cu.so || cu.so === this.estudo.tipo_empreendimento)
                 .map((cu) => this._custoUnidade(cu, dis))}
-              ${custos.map((c) => this._input(c, dis, c.k === 'custo_terreno_m2' && this.form.considerar_custo_terreno === false))}
+              ${custos.map((c) => this._input(c, dis, this.form[CAMPO_PARA_CONSIDERAR[c.k]] === false))}
             </div>
           </div>
 
