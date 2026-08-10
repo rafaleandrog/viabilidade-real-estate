@@ -120,7 +120,11 @@ export const EVENTO_LABEL: Record<string, string> = {
   pre_lancamento: 'Pré-lançamento',
   lancamento: 'Lançamento',
   obra: 'Obra',
-  pos_obra: 'Após-chaves', // #223: rótulo comercial do período após a entrega (id interno pos_obra intacto)
+  // BUG7-20: rótulo do evento do Cronograma (fase de custos) — id interno
+  // pos_obra intacto. Não confundir com "Após-chaves"/APOS_CHAVES_MESES em
+  // fluxo-shared.ts:225, a janela comercial fixa de 12 meses da Absorção
+  // (item 30/BUG7-40, conceito separado, fora do escopo desta issue).
+  pos_obra: 'Pós-obras',
 };
 
 export const EVENTO_COR: Record<string, string> = {
