@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseMesAno, rotuloMesRelativo, mesRelativoCompleto, rotuloPeriodo,
   vgvTipologia, vgvLinha, receitaLiquidaLinha, periodoAbsorcao, absorcaoMensal,
-  faixasAbsorcao, pctPosObraDerivado, problemaJanelaDuranteObra, APOS_CHAVES_MESES,
+  faixasAbsorcao, pctPosObraDerivado, erroFormularioAbsorcao, problemaJanelaDuranteObra, APOS_CHAVES_MESES,
   areaPrivativaTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
   totalAntesAlocacao, ePermutaFisica,
@@ -154,6 +154,20 @@ test('pctPosObraDerivado = 100 − pré-lançamento − lançamento − obra', (
   assert.equal(pctPosObraDerivado([{ evento: 'pre_lancamento', pct: 10 }, { evento: 'lancamento', pct: 20 }, { evento: 'obra', pct: 35 }]), 35);
   assert.equal(pctPosObraDerivado([{ evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 35 }]), 35); // sem bloco pre (backward compat)
   assert.equal(pctPosObraDerivado([{ evento: 'lancamento', pct: 60 }, { evento: 'obra', pct: 60 }]), 0); // clamp em 0
+});
+
+// #347: antes desta issue, uma soma > 100% clampava em silêncio no Pós-obra
+// (pctPosObraDerivado usa Math.max(0, ...)) e a absorção real fechava abaixo
+// de 100% — erroFormularioAbsorcao existe para bloquear isso ANTES de salvar.
+test('erroFormularioAbsorcao: soma > 100% é rejeitada; soma ≤ 100% passa', () => {
+  assert.equal(erroFormularioAbsorcao({ pre_lancamento_pct: 20, lancamento_pct: 30, obra_pct: 40 }), null); // 90
+  assert.equal(erroFormularioAbsorcao({ pre_lancamento_pct: 0, lancamento_pct: 30, obra_pct: 70 }), null); // 100 exato
+  assert.ok(erroFormularioAbsorcao({ pre_lancamento_pct: 30, lancamento_pct: 40, obra_pct: 40 })); // 110
+});
+
+test('erroFormularioAbsorcao: pre_lancamento_pct zerado (sem a fase no Cronograma) não é somado a mais que o resto', () => {
+  assert.equal(erroFormularioAbsorcao({ pre_lancamento_pct: 0, lancamento_pct: 60, obra_pct: 40 }), null); // 100
+  assert.ok(erroFormularioAbsorcao({ pre_lancamento_pct: 0, lancamento_pct: 60, obra_pct: 41 })); // 101
 });
 
 test('absorcaoMensal linear distribui 100% uniformemente pelo período', () => {

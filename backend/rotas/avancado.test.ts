@@ -261,18 +261,27 @@ test('validarValoresCurva aceita soma 100 e rejeita soma diferente', () => {
   assert.ok(validarValoresCurva([{ mes: 1, pct: -10 }, { mes: 2, pct: 110 }]));
 });
 
-// ── Absorção de vendas (Lote 6 · #20: distribuído, sem soma = 100%) ──
+// ── Absorção de vendas (Lote 6 · #20 distribuído; #347 soma ≤ 100%) ──
 
-test('validarAbsorcao: distribuído sem validação de soma; modo inválido é rejeitado', () => {
+test('validarAbsorcao: aceita soma ≤ 100% (Pós-obra derivado não entra na soma); modo inválido é rejeitado', () => {
   assert.equal(validarAbsorcao({ modo: 'distribuido', blocos: [
     { evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 40 }, { evento: 'pos_obra', pct: 0 },
   ] }), null);
-  // Pós-obra é derivado → soma dos blocos não precisa fechar 100.
   assert.equal(validarAbsorcao({ modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 20 }, { evento: 'obra', pct: 30 }] }), null);
   assert.equal(validarAbsorcao(null), null);           // ausente = default
   assert.equal(validarAbsorcao({ modo: 'linear' }), null); // legado tolerado
   assert.ok(validarAbsorcao({ modo: 'xyz' }));          // modo inválido
   assert.ok(validarAbsorcao({ modo: 'distribuido', blocos: 'x' })); // blocos não-lista
+});
+
+test('#347 validarAbsorcao: soma dos períodos informados > 100% é rejeitada', () => {
+  assert.ok(validarAbsorcao({ modo: 'distribuido', blocos: [
+    { evento: 'pre_lancamento', pct: 40 }, { evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 40 },
+  ] })); // 40 + 30 + 40 = 110 > 100
+  // Um pos_obra com pct residual (dado legado) não conta na soma — é sempre derivado.
+  assert.equal(validarAbsorcao({ modo: 'distribuido', blocos: [
+    { evento: 'lancamento', pct: 50 }, { evento: 'obra', pct: 50 }, { evento: 'pos_obra', pct: 999 },
+  ] }), null);
 });
 
 // ── Duplicação: projeção de campos copiáveis ──
