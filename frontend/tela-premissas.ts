@@ -2,8 +2,11 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctEntrada } from './viab-format.js';
-import { urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
-import { calcularProforma, precoSugeridoM2, type ProformaInput, type Proforma } from './proforma.js';
+import {
+  urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig,
+  listarProdutosPreliminar, criarProdutoPreliminar, atualizarProdutoPreliminar, removerProdutoPreliminar,
+} from './viabilidade-api.js';
+import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, type ProformaInput, type Proforma } from './proforma.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
@@ -215,6 +218,11 @@ export class ViabTelaPremissas extends LitElement {
   private _snapshot: Record<string, any> = {};
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
+  // #315: catálogo de Produtos — CRUD à parte do form (uma linha = uma
+  // persistência otimista, como `tela-empreendimento-tipologias.ts`), não faz
+  // parte do "Salvar premissas" único.
+  @state() private produtos: any[] = [];
+  @state() private confirmRemoverProduto: any | null = null;
   // Validação de obrigatórios (ao salvar): `erros` por campo + resumo em banner.
   @state() private erros: Record<string, string> = {};
   @state() private erroGeral = '';
@@ -286,6 +294,26 @@ export class ViabTelaPremissas extends LitElement {
     .area-seletor { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
     .area-seletor urbi-badge { cursor: pointer; flex: 0 0 auto; }
     .area-valor { width: 130px; }
+
+    /* Catálogo de Produtos (#315) — mesmo padrão de tabela dinâmica de
+       tela-empreendimento-tipologias.ts: colgroup de larguras fixas, edição
+       inline por célula, linha de total, VGV calculado (não editável). */
+    table.prod { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; table-layout: fixed; }
+    table.prod th {
+      text-align: left; font-weight: 600; padding: 8px; font-size: var(--texto-rotulo, 0.75rem);
+      color: var(--cor-texto-sec, rgba(255,255,255,0.5));
+      border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
+    }
+    table.prod th.num, table.prod td.num { text-align: right; }
+    table.prod td { padding: 6px 8px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); font-size: var(--texto-corpo, 0.8125rem); }
+    col.p-nome { width: 26%; } col.p-area { width: 20%; } col.p-preco { width: 20%; }
+    col.p-un { width: 12%; } col.p-vgv { width: 16%; } col.p-acao { width: 60px; }
+    table.prod td.nome urbi-input { width: 100%; }
+    table.prod td viab-num { width: 100%; }
+    table.prod td.vgv-calc { font-weight: 600; color: var(--cor-texto-forte, rgba(255,255,255,0.95)); }
+    table.prod tr.total td { font-weight: 700; border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2)); border-bottom: none; padding-top: 10px; }
+    .prod-vazio { padding: 8px 0; }
+    .acoes-topo { margin-top: 16px; }
   `];
 
   private _idCarregado: number | null = null;
@@ -309,14 +337,18 @@ export class ViabTelaPremissas extends LitElement {
     this.erros = {};
     this.erroGeral = '';
     try {
-      const [bm, cfg] = await Promise.all([listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig()]);
+      const [bm, cfg, prod] = await Promise.all([
+        listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
+        listarProdutosPreliminar(this.estudo.id),
+      ]);
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
+      this.produtos = prod?.dados || [];
     } catch (e) { console.error(e); }
   }
 
   private _entradaProforma(): ProformaInput {
-    return { ...this.form, aliquota_ret_pct: this.aliquotaRet } as ProformaInput;
+    return { ...this.form, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput;
   }
 
   private _set(k: string, v: any) {
@@ -416,7 +448,6 @@ export class ViabTelaPremissas extends LitElement {
     // em TODOS_NUM, pra não perder o tipo numérico dos 7 campos antigos que
     // ainda existem no schema (dado histórico, sem leitura/escrita na tela).
     const areas = AREAS_INC;
-    const produtos = lot ? PRODUTOS_LOT : PRODUTOS_INC;
     const custos = CUSTOS.filter((c) => !c.so || c.so === this.estudo.tipo_empreendimento);
     const dis = !this.editavel;
     this._obrigCache = camposObrigatorios(this.form, this.estudo.tipo_empreendimento);
@@ -506,11 +537,12 @@ export class ViabTelaPremissas extends LitElement {
         <urbi-card titulo="Produtos">
           <div class="secao grupo grupo-a">
             <h4>Produtos</h4>
-            <div class="grid">${produtos.map((c) => this._input(c, dis))}</div>
+            ${this._renderTabelaProdutos(dis)}
           </div>
 
           ${this._renderRodapeForm()}
         </urbi-card>
+        ${this.confirmRemoverProduto ? this._renderConfirmRemoverProduto() : nothing}
       ` : nothing}
 
       ${this.secao === 'permutas' ? html`
@@ -610,6 +642,137 @@ export class ViabTelaPremissas extends LitElement {
       </div>
     `;
   }
+
+  // ── Catálogo de Produtos (#315) — tabela add/remove, CRUD à parte do form ──
+
+  private _renderTabelaProdutos(dis: boolean): TemplateResult {
+    if (this.produtos.length === 0) {
+      return html`
+        <div class="prod-vazio">
+          <urbi-estado-vazio icone="fa-solid fa-boxes-stacked"
+            mensagem="Nenhum produto cadastrado — adicione o primeiro."></urbi-estado-vazio>
+        </div>
+        ${!dis ? html`
+          <div class="acoes-topo">
+            <urbi-botao variante="secundario" icone="fa-solid fa-plus" @click=${this._adicionarProduto}>
+              Adicionar Produto
+            </urbi-botao>
+          </div>` : nothing}
+      `;
+    }
+    const { vgv, unidades } = totalProdutos(this.produtos);
+    return html`
+      <table class="prod">
+        <colgroup>
+          <col class="p-nome"><col class="p-area"><col class="p-preco"><col class="p-un"><col class="p-vgv">
+          ${dis ? nothing : html`<col class="p-acao">`}
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Nome</th><th class="num">Área média do lote</th><th class="num">Preço de venda</th>
+            <th class="num">Unidades</th><th class="num">VGV</th>
+            ${dis ? nothing : html`<th></th>`}
+          </tr>
+        </thead>
+        <tbody>
+          ${this.produtos.map((p) => this._linhaProduto(p, dis))}
+          <tr class="total">
+            <td>Total</td><td></td><td></td>
+            <td class="num">${fmtNum(unidades, 0)}</td>
+            <td class="num">${fmtR$(vgv)}</td>
+            ${dis ? nothing : html`<td></td>`}
+          </tr>
+        </tbody>
+      </table>
+      ${!dis ? html`
+        <div class="acoes-topo">
+          <urbi-botao variante="secundario" icone="fa-solid fa-plus" @click=${this._adicionarProduto}>
+            Adicionar Produto
+          </urbi-botao>
+        </div>` : nothing}
+    `;
+  }
+
+  private _linhaProduto(p: any, dis: boolean): TemplateResult {
+    return html`
+      <tr>
+        <td class="nome">
+          <urbi-input ?desabilitado=${dis} .valor=${p.nome || ''} placeholder="Ex.: Lote"
+            @urbi:input-change=${(e: CustomEvent) => this._salvarProduto(p, { nome: e.detail.valor })}
+          ></urbi-input>
+        </td>
+        <td class="num">
+          <viab-num sufixo="m²" ?desabilitado=${dis}
+            .valor=${p.area_media_m2 !== null && p.area_media_m2 !== undefined ? Number(p.area_media_m2) : null}
+            @urbi:input-numero-change=${(e: CustomEvent) => this._salvarProduto(p, { area_media_m2: e.detail.valor })}
+          ></viab-num>
+        </td>
+        <td class="num">
+          <viab-num sufixo="R$/m²" ?desabilitado=${dis}
+            .valor=${p.preco_venda_m2 !== null && p.preco_venda_m2 !== undefined ? Number(p.preco_venda_m2) : null}
+            @urbi:input-numero-change=${(e: CustomEvent) => this._salvarProduto(p, { preco_venda_m2: e.detail.valor })}
+          ></viab-num>
+        </td>
+        <td class="num">
+          <viab-num casas-decimais="0" ?desabilitado=${dis}
+            .valor=${p.unidades !== null && p.unidades !== undefined ? Number(p.unidades) : null}
+            @urbi:input-numero-change=${(e: CustomEvent) => this._salvarProduto(p, { unidades: e.detail.valor })}
+          ></viab-num>
+        </td>
+        <td class="num vgv-calc">${fmtR$(vgvProduto(p))}</td>
+        ${dis ? nothing : html`
+          <td class="num">
+            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+              @click=${() => { this.confirmRemoverProduto = p; }}></urbi-botao>
+          </td>`}
+      </tr>
+    `;
+  }
+
+  private _adicionarProduto = async () => {
+    try {
+      const res = await criarProdutoPreliminar(this.estudo.id, { ordem: this.produtos.length });
+      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao criar produto', 'erro'); return; }
+      this.produtos = [...this.produtos, res];
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao criar produto', 'erro');
+    }
+  };
+
+  private async _salvarProduto(p: any, dados: Record<string, any>) {
+    try {
+      const res = await atualizarProdutoPreliminar(this.estudo.id, p.id, dados);
+      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar produto', 'erro'); return; }
+      this.produtos = this.produtos.map((y) => (y.id === p.id ? { ...y, ...dados } : y));
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao salvar produto', 'erro');
+    }
+  }
+
+  private _renderConfirmRemoverProduto(): TemplateResult {
+    const c = this.confirmRemoverProduto!;
+    return html`
+      <urbi-modal title="Remover produto" maxWidth="420px" @urbi-modal:close=${() => this.confirmRemoverProduto = null}>
+        <p>Remover o produto "${c?.nome || 'sem nome'}"?</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+          <urbi-botao variante="secundario" @click=${() => this.confirmRemoverProduto = null}>Cancelar</urbi-botao>
+          <urbi-botao variante="perigo" @click=${this._confirmarRemoverProduto}>Remover</urbi-botao>
+        </div>
+      </urbi-modal>
+    `;
+  }
+
+  private _confirmarRemoverProduto = async () => {
+    const c = this.confirmRemoverProduto!;
+    this.confirmRemoverProduto = null;
+    try {
+      const res = await removerProdutoPreliminar(this.estudo.id, c.id);
+      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao remover produto', 'erro'); return; }
+      this.produtos = this.produtos.filter((y) => y.id !== c.id);
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao remover produto', 'erro');
+    }
+  };
 
   // Área do terreno (mesma regra de proforma.ts/premissas-conversao.ts): do
   // Núcleo (soma das glebas) quando a origem é Núcleo, senão a manual.
@@ -775,7 +938,7 @@ export class ViabTelaPremissas extends LitElement {
 
   private _salvar = async () => {
     // Bloqueia o salvamento se houver obrigatórios não preenchidos (≠ vazio e ≠ 0).
-    const { erros, faltando } = validarObrigatorios(this.form, this.estudo.tipo_empreendimento);
+    const { erros, faltando } = validarObrigatorios(this.form, this.estudo.tipo_empreendimento, this.produtos);
     this.erros = erros;
     if (faltando.length > 0) {
       this.erroGeral = `Preencha os campos obrigatórios: ${faltando.join(', ')}.`;

@@ -163,6 +163,24 @@ export function listarReceitasAvancado(estudoId: number): Promise<any> {
   return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas`);
 }
 
+// ── Preliminar: catálogo de Produtos (#315) ──
+export function listarProdutosPreliminar(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/preliminar/produtos`);
+}
+export function criarProdutoPreliminar(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/preliminar/produtos`, {
+    method: 'POST', body: JSON.stringify(dados),
+  });
+}
+export function atualizarProdutoPreliminar(estudoId: number, pid: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/preliminar/produtos/${pid}`, {
+    method: 'PATCH', body: JSON.stringify(dados),
+  });
+}
+export function removerProdutoPreliminar(estudoId: number, pid: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/preliminar/produtos/${pid}`, { method: 'DELETE' });
+}
+
 // ── Avançado: catálogo de Tipologias (nível estudo — Lote 6 · #19) ──
 export function listarTipologiasCatalogo(estudoId: number): Promise<any> {
   return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/tipologias`);
