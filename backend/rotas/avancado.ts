@@ -877,6 +877,24 @@ rotasAvancado.get('/estudos/:id/avancado/fases', async (req: Request, res: Respo
   }
 });
 
+// #341: nome padrão da próxima fase — "1º Grupo"/"2º Grupo"… para Receitas
+// (`tipo='receita'`, #222 renomeou o termo na tela), "Fase N" para Cronograma
+// (onde "Fase" continua correto — representa tempo, não agrupamento
+// comercial). Usa o MAIOR sufixo numérico já usado no nome padrão, não a
+// contagem de linhas — `existentes.total + 1` repetia nome depois de apagar
+// um grupo (ex.: 3 grupos, apaga o "3º Grupo", cria outro → "3º Grupo" de
+// novo, colidindo se o nome ainda não tivesse sido trocado). Nomes
+// renomeados pelo usuário (fora do padrão) não contam para o maior sufixo.
+export function proximoNumeroFase(nomesExistentes: string[], tipo: string): number {
+  const padrao = tipo === 'receita' ? /^(\d+)º Grupo$/ : /^Fase (\d+)$/;
+  let maior = 0;
+  for (const nome of nomesExistentes) {
+    const m = padrao.exec(String(nome || '').trim());
+    if (m) maior = Math.max(maior, Number(m[1]));
+  }
+  return maior + 1;
+}
+
 rotasAvancado.post('/estudos/:id/avancado/fases', async (req: Request, res: Response) => {
   try {
     const estudo = await estudoAvancado(req, res);
@@ -894,11 +912,12 @@ rotasAvancado.post('/estudos/:id/avancado/fases', async (req: Request, res: Resp
       return;
     }
     const existentes = await req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id, tipo }, por_pagina: 100 });
-    const n = existentes.total + 1;
+    const n = proximoNumeroFase(existentes.dados.map((f: any) => f.nome), tipo);
+    const nomePadrao = tipo === 'receita' ? `${n}º Grupo` : `Fase ${n}`;
     const dados: Record<string, any> = {
       estudo_id: estudo.id,
       tipo,
-      nome: String(req.body.nome || `Fase ${n}`).trim() || `Fase ${n}`,
+      nome: String(req.body.nome || nomePadrao).trim() || nomePadrao,
       ordem: existentes.total,
     };
     if (req.body.inicio_mes !== undefined) dados.inicio_mes = Math.max(0, Number(req.body.inicio_mes) || 0);
@@ -1120,7 +1139,10 @@ export function montarLinhasReceita(fases: any[], alocacoes: any[], tipologias: 
   }
   return fases.map((f) => ({
     id: f.id,
-    nome: f.nome || 'Fase',
+    // #341: fallback de exibição — GET /receitas só lê fases tipo='receita'
+    // (#222 renomeou o termo na tela); "Fase" continua correto só no
+    // Cronograma, que não passa por aqui.
+    nome: f.nome || 'Grupo',
     fase_label: f.nome || '',
     ordem: f.ordem,
     absorcao: f.absorcao,

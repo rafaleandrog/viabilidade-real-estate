@@ -14,6 +14,7 @@ import {
   montarLinhasReceita,
   subcategoriaPrecoValida,
   SUBCATEGORIAS_PRECO_TERRENO,
+  proximoNumeroFase,
   type LinhaCronograma,
 } from './avancado.js';
 
@@ -311,6 +312,38 @@ test('montarLinhasReceita joina alocações ao catálogo no formato do motor', (
   assert.equal(t.area_privativa_m2, 30);
   assert.equal(t.quantidade, 50);      // unidades da alocação
   assert.equal(t.preco_m2, 12000);     // preço da alocação (não o do catálogo)
+});
+
+// ── #341: numeração do nome padrão de fase — maior sufixo, não contagem ──
+
+test('#341 proximoNumeroFase: estudo vazio começa em 1', () => {
+  assert.equal(proximoNumeroFase([], 'receita'), 1);
+  assert.equal(proximoNumeroFase([], 'cronograma'), 1);
+});
+
+test('#341 proximoNumeroFase: receita usa "Nº Grupo", cronograma usa "Fase N"', () => {
+  assert.equal(proximoNumeroFase(['1º Grupo', '2º Grupo'], 'receita'), 3);
+  assert.equal(proximoNumeroFase(['Fase 1', 'Fase 2'], 'cronograma'), 3);
+});
+
+test('#341 proximoNumeroFase: nomes fora do padrão (renomeados pelo usuário) não contam', () => {
+  assert.equal(proximoNumeroFase(['1º Grupo', 'Lançamento Torre A'], 'receita'), 2);
+  assert.equal(proximoNumeroFase(['Torre A', 'Torre B'], 'receita'), 1);
+});
+
+test('#341 proximoNumeroFase: apagar o maior e criar outro não repete número', () => {
+  // 3 grupos existiam ("1º Grupo".."3º Grupo"); o "3º Grupo" foi apagado —
+  // restam só "1º Grupo" e "2º Grupo". O próximo continua sendo 3, não
+  // repete (n = total + 1 == 3 também acertaria aqui por coincidência —
+  // o caso que realmente expõe o bug antigo é o de baixo).
+  assert.equal(proximoNumeroFase(['1º Grupo', '2º Grupo'], 'receita'), 3);
+});
+
+test('#341 proximoNumeroFase: apagar do MEIO e criar outro não colide com o restante', () => {
+  // 3 grupos existiam; o "2º Grupo" (do meio) foi apagado — restam "1º
+  // Grupo" e "3º Grupo" (2 linhas). `existentes.total + 1` daria 3, que
+  // JÁ EXISTE — colisão. O maior sufixo (3) + 1 = 4 é o correto.
+  assert.equal(proximoNumeroFase(['1º Grupo', '3º Grupo'], 'receita'), 4);
 });
 
 // ── #257: subcategoria canônica de Preço (terreno) ──────────────────────────
