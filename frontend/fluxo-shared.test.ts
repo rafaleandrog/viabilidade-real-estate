@@ -7,6 +7,7 @@ import {
   areaPrivativaTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
   totalAntesAlocacao, ePermutaFisica,
+  mesAnoParaISO, isoParaMesAno,
   type EventoCrono,
 } from './fluxo-shared.js';
 
@@ -28,6 +29,29 @@ test('parseMesAno aceita mmm/AAAA e rejeita formatos inválidos', () => {
   assert.equal(parseMesAno('13/2027'), null);
   assert.equal(parseMesAno(''), null);
   assert.equal(parseMesAno(null), null);
+});
+
+test('BUG7-19 mesAnoParaISO: converte "mmm/AAAA" para ISO com dia sempre 1º', () => {
+  assert.equal(mesAnoParaISO('jan/2027'), '2027-01-01');
+  assert.equal(mesAnoParaISO('DEZ/2030'), '2030-12-01');
+  assert.equal(mesAnoParaISO(''), '');
+  assert.equal(mesAnoParaISO(null), '');
+  assert.equal(mesAnoParaISO('inválido'), '');
+});
+
+test('BUG7-19 isoParaMesAno: converte ISO do urbi-input-data para "mmm/AAAA", descartando o dia', () => {
+  assert.equal(isoParaMesAno('2027-01-01'), 'jan/2027');
+  assert.equal(isoParaMesAno('2027-01-17'), 'jan/2027'); // dia diferente de 1 — descartado
+  assert.equal(isoParaMesAno('2030-12-31'), 'dez/2030');
+  assert.equal(isoParaMesAno(''), '');
+  assert.equal(isoParaMesAno(null), '');
+  assert.equal(isoParaMesAno('não é data'), '');
+});
+
+test('BUG7-19: ida e volta mesAnoParaISO/isoParaMesAno preserva mmm/AAAA', () => {
+  for (const v of ['jan/2027', 'dez/2030', 'jul/1999']) {
+    assert.equal(isoParaMesAno(mesAnoParaISO(v)), v);
+  }
 });
 
 test('rotuloMesRelativo cruza a virada de ano corretamente (0-based)', () => {

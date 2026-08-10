@@ -4,6 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import {
   EVENTO_LABEL, EVENTO_COR, corFaseExtra,
   rotuloPeriodo, rotuloMesRelativo, parseMesAno, problemaJanelaDuranteObra,
+  mesAnoParaISO, isoParaMesAno,
 } from './fluxo-shared.js';
 import {
   urbiVerso,
@@ -54,7 +55,7 @@ export class ViabFluxoCronograma extends LitElement {
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .params { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 8px; }
-    .params urbi-input { width: 160px; }
+    .params urbi-input-data { width: 190px; }
     /* #245: o viab-num agrega número + setas + sufixo ("meses") + sufixo-mes
        ("jun/29") na mesma linha. A correção do truncamento é no primitivo
        ("viab-num.ts": o input ganhou "min-width: 4ch", o afixo foi para corpo
@@ -151,16 +152,19 @@ export class ViabFluxoCronograma extends LitElement {
     return html`
       <urbi-card titulo="Cronograma do empreendimento">
         <div class="params">
-          <urbi-input
+          <urbi-input-data
             label="Data de início do projeto"
-            placeholder="jan/2027"
             obrigatorio
             ?desabilitado=${dis}
-            .valor=${this.paramsForm.data_inicio_projeto || ''}
-            @urbi:input-change=${(e: CustomEvent) => {
-              this.paramsForm = { ...this.paramsForm, data_inicio_projeto: String(e.detail.valor || '').toLowerCase() };
+            .valor=${mesAnoParaISO(this.paramsForm.data_inicio_projeto)}
+            @urbi:input-data-change=${(e: CustomEvent) => {
+              // BUG7-19: urbi-input-data não tem modo mês/ano — o seletor nativo
+              // sempre mostra um dia, mas ele é descartado aqui: o formato
+              // persistido continua "mmm/AAAA" (contrato do motor, mês 0
+              // relativo), como se o dia fosse sempre 1º.
+              this.paramsForm = { ...this.paramsForm, data_inicio_projeto: isoParaMesAno(e.detail.valor) };
             }}
-          ></urbi-input>
+          ></urbi-input-data>
           ${!dis ? html`
             <urbi-botao variante="secundario" ?carregando=${this.salvandoParams}
               @click=${this._salvarParametros}>Salvar</urbi-botao>` : nothing}
