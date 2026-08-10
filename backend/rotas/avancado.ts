@@ -283,7 +283,7 @@ export function fluxoPagamentoPadrao(): Record<string, any> {
 
 const GRUPOS_CUSTO = ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'];
 const UNIDADES_ORCAMENTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita'];
-const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'obra', 'pos_obra', 'customizado'];
+const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado']; // #339
 // `unit_delivery`/`sales_revenue` (#194): só a linha de Preço do Terreno usa —
 // o motor (fluxo-caixa-motor.ts) ignora o campo em qualquer outra linha.
 const MODOS_DISTRIBUICAO = ['fixo', 'unit_delivery', 'sales_revenue'];
