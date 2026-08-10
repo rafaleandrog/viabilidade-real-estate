@@ -159,6 +159,7 @@ const UNIDADES_CAT: Partial<Record<GrupoId, Record<string, string[]>>> = {
 const EVENTOS_ANCORA = [
   { valor: 'planejamento', rotulo: 'Planejamento' },
   { valor: 'pre_lancamento', rotulo: 'Pré-lançamento' },
+  { valor: 'lancamento', rotulo: 'Lançamento' }, // BUG7-31
   { valor: 'obra', rotulo: 'Obra' },
   { valor: 'pos_obra', rotulo: 'Pós-obras' }, // BUG7-20
   { valor: 'customizado', rotulo: 'Customizado' },

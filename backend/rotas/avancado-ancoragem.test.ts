@@ -29,7 +29,6 @@ const CRONO = cronogramaPadrao();
 test('matriz: para cada evento-âncora fixo, trocando a âncora deriva os dois campos incondicionalmente', () => {
   for (const evento of EVENTOS_CRONOGRAMA) {
     const ancora = ancorarLinhaCusto(evento, CRONO);
-    if (evento === 'lancamento') continue; // não é EVENTOS_ANCORA (não oferecido como âncora de custo)
     assert.ok(ancora, `evento ${evento} deveria resolver âncora`);
     for (const enviouInicio of [true, false]) {
       for (const enviouDuracao of [true, false]) {
@@ -43,7 +42,6 @@ test('matriz: para cada evento-âncora fixo, trocando a âncora deriva os dois c
 
 test('matriz: para cada evento-âncora fixo, permanecendo ancorada só erra se ALGUM campo foi enviado', () => {
   for (const evento of EVENTOS_CRONOGRAMA) {
-    if (evento === 'lancamento') continue;
     const ancora = ancorarLinhaCusto(evento, CRONO)!;
     const casos: Array<[boolean, boolean, boolean]> = [
       [false, false, false], // nenhum campo enviado → sem erro
@@ -124,8 +122,8 @@ test('legado: linha com duracao_meses divergente da âncora (drift de antes da #
 
 // ── 5. cronogramaPadrao(): todos os 4 eventos-âncora oferecidos resolvem ──
 
-test('cronogramaPadrao oferece âncora válida para todos os EVENTOS_ANCORA (exceto lançamento e customizado)', () => {
-  for (const evento of ['planejamento', 'pre_lancamento', 'obra', 'pos_obra']) {
+test('#339 cronogramaPadrao oferece âncora válida para todos os EVENTOS_ANCORA (exceto customizado)', () => {
+  for (const evento of ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra']) {
     assert.ok(ancorarLinhaCusto(evento, CRONO), `${evento} deveria ter âncora no cronograma padrão`);
   }
   assert.equal(ancorarLinhaCusto('customizado', CRONO), null);
