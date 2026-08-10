@@ -160,10 +160,6 @@ export class ViabTelaResumo extends LitElement {
       margemLiquidaPct: vgv > 0 ? (resultado / vgv) * 100 : 0,
       roiPct: custoTotal > 0 ? (resultado / custoTotal) * 100 : 0,
       custoObrasVgvPct: vgv > 0 ? (custoObras / vgv) * 100 : 0,
-      // #269: VGV potencial (catálogo inteiro) × vendável (sem a fatia permutada) —
-      // só relevante quando o estudo tem permuta física declarada.
-      vgvPermutaFisica: c.vgvPermutaFisica,
-      vgvVendavel: c.vgvVendavel,
     };
   }
 
@@ -174,16 +170,11 @@ export class ViabTelaResumo extends LitElement {
       <div class="kpis">
         <urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
         <urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi>
-        <urbi-kpi rotulo="Payback" .valor=${c.paybackData ?? '—'}></urbi-kpi>
         <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi>
         <urbi-kpi rotulo="VGV" .valor=${fmtR$(k.vgv)}></urbi-kpi>
         <urbi-kpi rotulo="Resultado" .valor=${fmtR$(k.resultado)} variante=${k.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
         <urbi-kpi rotulo="Margem líquida" .valor=${fmtPct(k.margemLiquidaPct)} variante=${k.margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
         <urbi-kpi rotulo="ROI" .valor=${fmtPct(k.roiPct)} variante=${k.roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        ${k.vgvPermutaFisica > 0 ? html`
-          <urbi-kpi rotulo="VGV vendável" .valor=${fmtR$(k.vgvVendavel)}></urbi-kpi>
-          <urbi-kpi rotulo="VGV em permuta física" .valor=${fmtR$(k.vgvPermutaFisica)}></urbi-kpi>
-        ` : nothing}
       </div>
     `;
   }
