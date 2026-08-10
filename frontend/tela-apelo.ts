@@ -9,6 +9,9 @@ import {
 export class ViabTelaApelo extends LitElement {
   @property({ attribute: false }) estudo: any = null;
   @property({ type: Boolean }) editavel = false;
+  // BUG7-13: componente compartilhado entre Preliminar e Avançado — o rótulo
+  // renomeado (D2) é só do Preliminar, então vem por prop em vez de fixo.
+  @property({ type: String }) titulo = 'Apelo Comercial do Imóvel (IA)';
 
   @state() private apelo: any = null;
   @state() private documentos: any[] = [];
@@ -51,7 +54,7 @@ export class ViabTelaApelo extends LitElement {
     if (this.carregando) return html`<urbi-loading mensagem="Carregando análise..."></urbi-loading>`;
     const r = this.apelo?.resultado;
     return html`
-      <urbi-card titulo="Apelo Comercial do Imóvel (IA)">
+      <urbi-card titulo=${this.titulo}>
         <p class="sec">
           Avaliação qualitativa em 6 fatores a partir de documentos e dados de mercado.
           Anexe arquivos (PDF/Word/Excel) e/ou texto e dispare a análise.

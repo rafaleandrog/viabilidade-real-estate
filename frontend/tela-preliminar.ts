@@ -36,7 +36,7 @@ const PAGINAS: { id: AbaTopo; label: string }[] = [
   { id: 'premissas', label: 'Premissas' },
   { id: 'proforma',  label: 'Resultado' },
   { id: 'graficos',  label: 'Gráficos' },
-  { id: 'apelo',     label: 'Apelo Comercial' },
+  { id: 'apelo',     label: 'Análise de Mercado' },
 ];
 const IDS_TOPO = PAGINAS.map((a) => a.id) as AbaTopo[];
 
@@ -134,7 +134,10 @@ export class ViabTelaPreliminar extends LitElement {
       case 'graficos':
         return html`<viab-tela-graficos .estudo=${this.estudo}></viab-tela-graficos>`;
       case 'apelo':
-        return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this.podeEditar}></viab-tela-apelo>`;
+        // BUG7-13: só o rótulo do Preliminar virou "Análise de Mercado" (D2) — o
+        // Avançado já tem uma aba homônima (mercado_regioes) e ficaria ambíguo.
+        // Slug 'apelo', elemento, evento e tabelas apelo_comercial* ficam intactos.
+        return html`<viab-tela-apelo .estudo=${this.estudo} .editavel=${this.podeEditar} titulo="Análise de Mercado do Imóvel (IA)"></viab-tela-apelo>`;
       default:
         return html`${nothing}`;
     }

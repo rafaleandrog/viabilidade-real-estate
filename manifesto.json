@@ -2,7 +2,7 @@
   "nome": "Estudo de Viabilidade",
   "versao": "0.1.22",
   "shell_min": "0.50.3",
-  "descricao": "Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação) — proforma automática, comparação de cenários, sensibilidade e apelo comercial por IA.",
+  "descricao": "Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação) — proforma automática, comparação de cenários, sensibilidade e análise de mercado do imóvel por IA.",
   "rotas_publicas": [],
   "dependencias_nucleo": ["imoveis"],
   "permissoes_nucleo": {
@@ -134,7 +134,7 @@
     },
     "apelo_comercial_concluido": {
       "campos": ["estudo_id", "nome_estudo", "score_geral"],
-      "conteudo": "Análise de apelo comercial concluída para {nome_estudo} — Score: {score_geral}",
+      "conteudo": "Análise de mercado do imóvel concluída para {nome_estudo} — Score: {score_geral}",
       "api": "estudos/{estudo_id}",
       "rota": "detalhe/{estudo_id}"
     }
