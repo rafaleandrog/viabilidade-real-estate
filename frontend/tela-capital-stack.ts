@@ -87,7 +87,11 @@ export class ViabCapitalStack extends LitElement {
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
-    .resumo urbi-kpi { width: 100%; }
+    /* BUG7-18: width:100% direto no item do grid (sem min-width:0 nem wrapper)
+       estourava a track quando o valor era longo — mesmo padrão comprovado de
+       fluxo-tabela.ts:73-74, agora aplicado aqui. */
+    .resumo .kpi-cel { display: flex; flex-direction: column; min-width: 0; }
+    .resumo .kpi-cel urbi-kpi { width: 100%; }
     .camadas { display: flex; flex-direction: column; gap: 14px; }
     .camada-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .camada-cab .espaco { flex: 1; }
@@ -338,14 +342,18 @@ export class ViabCapitalStack extends LitElement {
     const resultadoAposCustoFinanceiro = this.resultadoDesalavancado - custoFinanceiro;
     return html`
       <div class="resumo">
-        <urbi-kpi rotulo="Capital comprometido" .valor=${fmtR$(compromissoTotal)}></urbi-kpi>
-        <urbi-kpi rotulo="Dívida máxima" .valor=${fmtR$(dividaMaxima)}></urbi-kpi>
-        <urbi-kpi rotulo="Equity aportado" .valor=${fmtR$(equityAportado)}></urbi-kpi>
-        <urbi-kpi rotulo="Lacuna de funding (máx.)" .valor=${fmtR$(r?.lacunaFundingMaxima ?? 0)}
-          variante=${(r?.lacunaFundingMaxima ?? 0) > 0 ? 'erro' : 'sucesso'}></urbi-kpi>
-        <urbi-kpi rotulo="Resultado desalavancado" .valor=${fmtR$(this.resultadoDesalavancado)}></urbi-kpi>
-        <urbi-kpi rotulo="Resultado após custo financeiro" .valor=${fmtR$(resultadoAposCustoFinanceiro)}
-          variante=${resultadoAposCustoFinanceiro >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <div class="kpi-cel"><urbi-kpi rotulo="Capital comprometido" .valor=${fmtR$(compromissoTotal)}></urbi-kpi></div>
+        <div class="kpi-cel"><urbi-kpi rotulo="Dívida máxima" .valor=${fmtR$(dividaMaxima)}></urbi-kpi></div>
+        <div class="kpi-cel"><urbi-kpi rotulo="Equity aportado" .valor=${fmtR$(equityAportado)}></urbi-kpi></div>
+        <div class="kpi-cel">
+          <urbi-kpi rotulo="Lacuna de funding (máx.)" .valor=${fmtR$(r?.lacunaFundingMaxima ?? 0)}
+            variante=${(r?.lacunaFundingMaxima ?? 0) > 0 ? 'erro' : 'sucesso'}></urbi-kpi>
+        </div>
+        <div class="kpi-cel"><urbi-kpi rotulo="Resultado desalavancado" .valor=${fmtR$(this.resultadoDesalavancado)}></urbi-kpi></div>
+        <div class="kpi-cel">
+          <urbi-kpi rotulo="Resultado após custo financeiro" .valor=${fmtR$(resultadoAposCustoFinanceiro)}
+            variante=${resultadoAposCustoFinanceiro >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        </div>
       </div>
       ${(r?.lacunaFundingMaxima ?? 0) > 0 ? html`
         <urbi-banner variante="alerta">

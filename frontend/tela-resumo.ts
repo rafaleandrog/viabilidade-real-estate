@@ -56,12 +56,14 @@ export class ViabTelaResumo extends LitElement {
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
-    /* #176: sem min-width:0 os urbi-kpi (itens diretos do grid) mantêm a
-       largura do próprio conteúdo (default min-width:auto de item de grid) e
-       transbordam por cima do card vizinho quando o valor é longo (R$ com
-       muitos dígitos) — mesmo ajuste que fluxo-tabela.ts já faz para o card
-       de KPI do Fluxo de Caixa. */
-    .kpis urbi-kpi { min-width: 0; width: 100%; }
+    /* BUG7-18: width:100% direto no urbi-kpi (item do grid) resolve contra a
+       largura da CÉLULA — se o :host do primitivo tiver padding/border em
+       content-box (shadow DOM inacessível a esta folha), o card estoura a
+       track e pinta sobre o vizinho. O wrapper .kpi-cel isola o width:100%
+       num flex item próprio, no padrão já comprovado de
+       fluxo-tabela.ts:73-74. */
+    .kpis .kpi-cel { display: flex; flex-direction: column; min-width: 0; }
+    .kpis .kpi-cel urbi-kpi { width: 100%; }
     .graficos { display: flex; flex-direction: column; gap: 16px; }
     .lado-a-lado { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
     .medidores { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
@@ -168,13 +170,13 @@ export class ViabTelaResumo extends LitElement {
     const tirVar = c.tir === null ? '' : (c.tir > 0 ? 'sucesso' : 'erro');
     return html`
       <div class="kpis">
-        <urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        <urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi>
-        <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi>
-        <urbi-kpi rotulo="VGV" .valor=${fmtR$(k.vgv)}></urbi-kpi>
-        <urbi-kpi rotulo="Resultado" .valor=${fmtR$(k.resultado)} variante=${k.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        <urbi-kpi rotulo="Margem líquida" .valor=${fmtPct(k.margemLiquidaPct)} variante=${k.margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        <urbi-kpi rotulo="ROI" .valor=${fmtPct(k.roiPct)} variante=${k.roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <div class="kpi-cel"><urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi></div>
+        <div class="kpi-cel"><urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi></div>
+        <div class="kpi-cel"><urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi></div>
+        <div class="kpi-cel"><urbi-kpi rotulo="VGV" .valor=${fmtR$(k.vgv)}></urbi-kpi></div>
+        <div class="kpi-cel"><urbi-kpi rotulo="Resultado" .valor=${fmtR$(k.resultado)} variante=${k.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi></div>
+        <div class="kpi-cel"><urbi-kpi rotulo="Margem líquida" .valor=${fmtPct(k.margemLiquidaPct)} variante=${k.margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi></div>
+        <div class="kpi-cel"><urbi-kpi rotulo="ROI" .valor=${fmtPct(k.roiPct)} variante=${k.roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi></div>
       </div>
     `;
   }
