@@ -255,37 +255,37 @@ export class ViabTelaProforma extends LitElement {
     // #10: bloco de permuta física (só quando houver) — entre a Receita bruta
     // e as Deduções sobre VGV. Residencial e Não Residencial separados.
     if (p.areaPermutaFisica > 0) {
-      linhas.push({ l: 'VGV sem permuta física', v: vgvBruto, semPermuta: true });
+      linhas.push({ l: 'VGV sem permuta física', v: vgvBruto, semPermuta: true, ocultarSeZero: true });
       linhas.push({ l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true, memo: permMemo(p.areaPermutaResidencial) });
       linhas.push({ l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true, memo: permMemo(p.areaPermutaNaoResidencial) });
     }
     // #9: "Deduções sobre VGV" consolida imposto+corretagem+marketing+permuta fin.,
     // como header colapsável logo abaixo da Receita bruta.
     linhas.push({ l: '= Deduções sobre VGV', v: deducoesVgv, tipo: 'consolidado', toggle: 'deducoes' });
-    linhas.push({ l: '(-) Imposto', v: p.imposto, grupo: 'deducoes', memo: impostoMemo });
-    linhas.push({ l: '(-) Corretagem', v: p.corretagem, grupo: 'deducoes', memo: `${pct(e.corretagem_percentual)} do VGV` });
-    linhas.push({ l: '(-) Marketing', v: p.marketing, grupo: 'deducoes', memo: `${pct(e.marketing_percentual)} do VGV` });
+    linhas.push({ l: '(-) Imposto', v: p.imposto, grupo: 'deducoes', ocultarSeZero: true, memo: impostoMemo });
+    linhas.push({ l: '(-) Corretagem', v: p.corretagem, grupo: 'deducoes', ocultarSeZero: true, memo: `${pct(e.corretagem_percentual)} do VGV` });
+    linhas.push({ l: '(-) Marketing', v: p.marketing, grupo: 'deducoes', ocultarSeZero: true, memo: `${pct(e.marketing_percentual)} do VGV` });
     linhas.push({ l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, grupo: 'deducoes', ocultarSeZero: true, memo: permutaFinRMemo });
     linhas.push({ l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, grupo: 'deducoes', ocultarSeZero: true, memo: permutaFinNRMemo });
     linhas.push({ l: '= Receita líquida', v: p.receitaLiquida, tipo: 'consolidado', natureza: 'receita' });
     // #9: totais de custo invertidos — o total é o header do grupo colapsável.
     linhas.push({ l: '= Custo direto total', v: p.custoDiretoTotal, tipo: 'consolidado', toggle: 'direto' });
-    linhas.push({ l: '(-) Terreno', v: p.custoTerreno, grupo: 'direto', memo: terrenoMemo });
-    linhas.push({ l: '(-) Projetos e aprovação', v: p.projetos, grupo: 'direto', memo: projetosMemo });
-    linhas.push({ l: '(-) Infraestrutura', v: p.infraestrutura, soLot: true, grupo: 'direto', memo: infraMemo });
-    linhas.push({ l: '(-) Outorga', v: p.outorga, soInc: true, grupo: 'direto' });
-    linhas.push({ l: '(-) Incorporação e registro', v: p.incorporacaoRegistro, soInc: true, grupo: 'direto', memo: `${pct(e.incorporacao_registro_pct)} do VGV` });
-    linhas.push({ l: '(-) Construção', v: p.construcao, soInc: true, grupo: 'direto', memo: construcaoMemo });
-    linhas.push({ l: '(-) Gestão da construção', v: p.gestaoConstrucao, soInc: true, grupo: 'direto', memo: `${pct(e.taxa_gestao_pct)} das obras` });
-    linhas.push({ l: '(-) Decoração', v: p.decoracao, soInc: true, grupo: 'direto', memo: `${rsm2(e.custo_decoracao_m2)} × área privativa` });
-    linhas.push({ l: '(-) Manutenção pós-obra', v: p.manutencao, grupo: 'direto', memo: `${pct(e.manutencao_pct)} do VGV` });
+    linhas.push({ l: '(-) Terreno', v: p.custoTerreno, grupo: 'direto', ocultarSeZero: true, memo: terrenoMemo });
+    linhas.push({ l: '(-) Projetos e aprovação', v: p.projetos, grupo: 'direto', ocultarSeZero: true, memo: projetosMemo });
+    linhas.push({ l: '(-) Infraestrutura', v: p.infraestrutura, soLot: true, grupo: 'direto', ocultarSeZero: true, memo: infraMemo });
+    linhas.push({ l: '(-) Outorga', v: p.outorga, soInc: true, grupo: 'direto', ocultarSeZero: true });
+    linhas.push({ l: '(-) Incorporação e registro', v: p.incorporacaoRegistro, soInc: true, grupo: 'direto', ocultarSeZero: true, memo: `${pct(e.incorporacao_registro_pct)} do VGV` });
+    linhas.push({ l: '(-) Construção', v: p.construcao, soInc: true, grupo: 'direto', ocultarSeZero: true, memo: construcaoMemo });
+    linhas.push({ l: '(-) Gestão da construção', v: p.gestaoConstrucao, soInc: true, grupo: 'direto', ocultarSeZero: true, memo: `${pct(e.taxa_gestao_pct)} das obras` });
+    linhas.push({ l: '(-) Decoração', v: p.decoracao, soInc: true, grupo: 'direto', ocultarSeZero: true, memo: `${rsm2(e.custo_decoracao_m2)} × área privativa` });
+    linhas.push({ l: '(-) Manutenção pós-obra', v: p.manutencao, grupo: 'direto', ocultarSeZero: true, memo: `${pct(e.manutencao_pct)} do VGV` });
     linhas.push({ l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true, grupo: 'direto', memo: `${pct(e.contingencias_pct)} do VGV` });
     // Receita operacional = receita líquida − custo direto total (antes dos indiretos).
     linhas.push({ l: '= Receita operacional', v: p.receitaOperacional, tipo: 'consolidado', natureza: 'receita' });
     linhas.push({ l: '= Custo indireto total', v: p.custoIndiretoTotal, tipo: 'consolidado', toggle: 'indireto' });
-    linhas.push({ l: '(-) Marketing global e estrutura', v: p.marketingGlobal, grupo: 'indireto', memo: `${pct(e.marketing_global_pct)} do VGV${lot ? ' + stand' : ''}` });
+    linhas.push({ l: '(-) Marketing global e estrutura', v: p.marketingGlobal, grupo: 'indireto', ocultarSeZero: true, memo: `${pct(e.marketing_global_pct)} do VGV${lot ? ' + stand' : ''}` });
     // #13: rename "Gestão e outros indiretos" → "…custos indiretos".
-    linhas.push({ l: '(-) Gestão e outros custos indiretos', v: p.gestaoIndiretos, grupo: 'indireto', memo: `${pct(e.gestao_indiretos_pct)} do VGV` });
+    linhas.push({ l: '(-) Gestão e outros custos indiretos', v: p.gestaoIndiretos, grupo: 'indireto', ocultarSeZero: true, memo: `${pct(e.gestao_indiretos_pct)} do VGV` });
     // #13: removida a linha "(memo) Permuta física entregue".
     linhas.push({ l: '= Resultado', v: p.resultado, tipo: 'resultado' });
     return linhas;
