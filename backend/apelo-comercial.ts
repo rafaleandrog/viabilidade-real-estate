@@ -127,6 +127,93 @@ export function instrucoesSistema(tipoEmpreendimento: string): string {
   ].join('\n');
 }
 
+// BUG7-15: os 6 fatores avaliados são todos GEOGRÁFICOS (Localização,
+// Infraestrutura, Vetor de Crescimento, Concorrência, Demanda, Segurança
+// Jurídica) — sem saber ONDE fica o imóvel, o modelo não tem o que avaliar e
+// devolve nota null em tudo. Este bloco monta o contexto do empreendimento
+// (localidade em 1º lugar — a causa dominante do diagnóstico) que entra ANTES
+// das fontes anexadas pelo editor. Área/produto/preço são contexto descritivo
+// best-effort (não é cálculo de viabilidade — só ajuda o modelo a dimensionar
+// o empreendimento), lidos de campos já existentes no estudo, sem depender do
+// motor de proforma (backend não importa código do frontend).
+export function montarContextoApelo(entrada: {
+  localidade: string;
+  tipoEmpreendimento: string;
+  areaMediaM2: number | null;
+  unidades: number | null;
+  precoVendaM2: number | null;
+  partes: string[];
+}): string {
+  const l: string[] = [];
+  l.push('EMPREENDIMENTO EM ANÁLISE');
+  l.push(`- Localidade: ${entrada.localidade || 'não informada'}`);
+  l.push(`- Tipo: ${entrada.tipoEmpreendimento || 'não informado'}`);
+  if (entrada.unidades) l.push(`- Unidades: ${entrada.unidades}`);
+  if (entrada.areaMediaM2) l.push(`- Área média por unidade: ${entrada.areaMediaM2.toFixed(2)} m²`);
+  if (entrada.precoVendaM2) l.push(`- Preço de venda praticado: R$ ${entrada.precoVendaM2.toFixed(2)}/m²`);
+  l.push('');
+  l.push('FONTES ANEXADAS PELO EDITOR:');
+  if (entrada.partes.length === 0) l.push('Nenhuma.');
+  else l.push(...entrada.partes);
+  return l.join('\n');
+}
+
+// Nota fora de 1–5 (ou não numérica) vira null — mesma trava anti-invenção de
+// `mercado-ia.ts:normalizarIndicador`, adaptada para escala 1–5 em vez de
+// valor/origem/confiança.
+const notaValida = (v: any): number | null => {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+  const n = Math.round(v * 10) / 10;
+  return n >= 1 && n <= 5 ? n : null;
+};
+
+export interface RespostaApeloNormalizada {
+  fatores: {
+    chave: string; nome: string;
+    perguntas: { pergunta: string; nota: number | null; justificativa: string }[];
+    nota_consolidada: number | null; justificativa_geral: string;
+  }[];
+  relatorio: { vantagens: string[]; desvantagens: string[]; ganhos: string[]; riscos: string[] };
+}
+
+// BUG7-15: normalização pós-resposta, no molde de `mercado-ia.ts` — nunca
+// existiu para o Apelo antes desta issue. Reconstrói os 6 fatores × 4
+// perguntas na ordem CANÔNICA de `FATORES` (o schema pede ao modelo para
+// manter a ordem, mas nada garante isso — sem isto, `calcularScores` associa
+// nota a fator errado se a IA reordenar ou omitir um). `nota_consolidada`
+// recalcula como média das notas válidas quando a IA não mandar uma válida.
+export function normalizarRespostaApelo(bruto: any): RespostaApeloNormalizada {
+  const porChave = new Map(
+    (Array.isArray(bruto?.fatores) ? bruto.fatores : []).map((f: any) => [String(f?.chave ?? ''), f]),
+  );
+  const fatores = FATORES.map((def) => {
+    const f: any = porChave.get(def.chave) ?? {};
+    const perguntasBrutas = Array.isArray(f.perguntas) ? f.perguntas : [];
+    const perguntas = def.perguntas.map((pergunta, i) => {
+      const p = perguntasBrutas[i] ?? {};
+      return { pergunta, nota: notaValida(p?.nota), justificativa: String(p?.justificativa ?? '').trim() };
+    });
+    const notasValidas = perguntas.map((p) => p.nota).filter((n): n is number => n !== null);
+    const consolidada = notaValida(f.nota_consolidada) ?? (notasValidas.length
+      ? Math.round((notasValidas.reduce((s, n) => s + n, 0) / notasValidas.length) * 10) / 10
+      : null);
+    return {
+      chave: def.chave, nome: def.nome, perguntas,
+      nota_consolidada: consolidada, justificativa_geral: String(f.justificativa_geral ?? '').trim(),
+    };
+  });
+  const listaTexto = (v: any): string[] =>
+    Array.isArray(v) ? v.map((x) => String(x ?? '').trim()).filter(Boolean) : [];
+  const rel = bruto?.relatorio ?? {};
+  return {
+    fatores,
+    relatorio: {
+      vantagens: listaTexto(rel.vantagens), desvantagens: listaTexto(rel.desvantagens),
+      ganhos: listaTexto(rel.ganhos), riscos: listaTexto(rel.riscos),
+    },
+  };
+}
+
 // Calcula scores por fator e score geral a partir da resposta da IA.
 export function calcularScores(fatores: any[]): { porFator: Record<string, number | null>; geral: number | null } {
   const porFator: Record<string, number | null> = {};
