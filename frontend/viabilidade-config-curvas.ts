@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
-import { customElement, state, property } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import {
   urbiVerso, listarCurvas, criarCurva, atualizarCurva, removerCurva, semearCurvas,
@@ -14,7 +14,13 @@ import './viab-num.js';
 
 @customElement('viabilidade-config-curvas')
 export class ViabConfigCurvas extends LitElement {
-  @property({ type: Boolean }) somenteLeitura = false;
+  // BUG7-14: era `@property`, mas o shell instancia esta tela em Admin → Apps
+  // via `document.createElement` e nunca passa props (só `expandir`) — o campo
+  // ficava sempre `false` e um não-admin via os botões de escrita, que tomam
+  // 403 no backend. Derivado direto de `urbiVerso`, funciona em qualquer host.
+  private get somenteLeitura(): boolean {
+    return urbiVerso.contexto()?.nivel !== 'admin';
+  }
 
   @state() private curvas: any[] = [];
   @state() private carregando = true;
