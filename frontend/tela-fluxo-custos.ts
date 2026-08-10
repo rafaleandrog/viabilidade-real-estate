@@ -1,7 +1,8 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { CASAS_DECIMAIS_MONETARIAS, fmtR$ } from './viab-format.js';
+import { CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtNum } from './viab-format.js';
+import { permutaFisicaPorTipologia } from './fluxo-invariantes.js';
 import {
   rotuloMesRelativo, EVENTO_LABEL, CATEGORIA_CORRETAGEM, eCorretagem, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   CATEGORIA_CONSTRUCAO, eConstrucao, regimeCronogramaLinha,
@@ -430,6 +431,13 @@ export class ViabFluxoCustos extends LitElement {
     const linhas = ordenarLinhas(g.id, this.custos.filter((c) => c.grupo === g.id));
     const ctx = this._ctx();
     const total = linhas.reduce((s, c) => s + resolverCustoTotal(c, ctx), 0);
+    // #338: Permuta física não entra no total monetário ("Sem valor
+    // monetário") — mostra a área permutada total como segundo par
+    // rótulo/valor no rodapé de Terreno, a fonte já usada na aba Fluxo.
+    const areaPermutada = g.id === 'terreno'
+      ? permutaFisicaPorTipologia(this.custos, this.tipologiasCatalogo)
+        .reduce((s, p) => s + p.areaPermutada, 0)
+      : 0;
     return html`
       <urbi-card>
         <div class="card-cab">
@@ -453,6 +461,9 @@ export class ViabFluxoCustos extends LitElement {
             <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-plus"
               @click=${() => this._adicionar(g)}>Adicionar Custo</urbi-botao>` : nothing}
           <span class="espaco"></span>
+          ${areaPermutada > 0 ? html`
+            <span><span class="total-rotulo">Área permutada</span><span class="total-valor">${fmtNum(areaPermutada)} m²</span></span>
+          ` : nothing}
           <span><span class="total-rotulo">Total ${g.titulo}</span><span class="total-valor">${fmtR$(total)}</span></span>
         </div>
       </urbi-card>
