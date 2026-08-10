@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calcularProforma, precoSugeridoM2, type ProformaInput } from './proforma.js';
+import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, type ProformaInput } from './proforma.js';
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 
@@ -254,6 +254,77 @@ test('loteamento não separa R/NR (métricas por tipo zeradas) (#7)', () => {
   assert.equal(p.numUnidadesNaoResidencial, 0);
   assert.equal(p.precoMedioUnidadeResidencial, 0);
   assert.equal(p.precoMedioUnidadeNaoResidencial, 0);
+});
+
+// #315 — catálogo de Produtos
+test('vgvProduto: multiplica área média × preço × unidades', () => {
+  assert.ok(perto(vgvProduto({ area_media_m2: 300, preco_venda_m2: 1000, unidades: 250 }), 75_000_000));
+  assert.equal(vgvProduto({ area_media_m2: null, preco_venda_m2: 1000, unidades: 10 }), 0);
+});
+
+test('totalProdutos: soma VGV e unidades de várias linhas', () => {
+  const t = totalProdutos([
+    { area_media_m2: 300, preco_venda_m2: 1000, unidades: 200 },
+    { area_media_m2: 500, preco_venda_m2: 1200, unidades: 50 },
+  ]);
+  assert.ok(perto(t.vgv, 60_000_000 + 30_000_000));
+  assert.equal(t.unidades, 250);
+});
+
+test('#315: catálogo de Produtos substitui os campos fixos como fonte de VGV (loteamento)', () => {
+  const semProdutos = calcularProforma(LOT);
+  const comProdutos = calcularProforma({
+    ...LOT,
+    // Campos legados propositalmente diferentes — não devem influenciar o
+    // resultado quando `produtos` está presente.
+    area_media_lote_m2: 999, preco_venda_m2: 1,
+    produtos: [{ area_media_m2: 300, preco_venda_m2: 1000, unidades: 250 }],
+  });
+  assert.ok(perto(comProdutos.vgv, 75_000_000), `vgv=${comProdutos.vgv}`);
+  assert.equal(comProdutos.numUnidades, 250);
+  assert.ok(perto(comProdutos.precoMedioUnidade, 300_000));
+  // Sem produtos, os campos legados (área média × preço, unidades derivadas
+  // da área vendável) continuam mandando — comportamento 100% anterior ao #315.
+  assert.ok(perto(semProdutos.vgv, 75_000_000));
+});
+
+test('#315: produtos vazio/ausente preserva o comportamento legado (incorporação)', () => {
+  const base: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+    num_unidades_residencial: 10,
+  };
+  const semProdutos = calcularProforma(base);
+  const comProdutosVazio = calcularProforma({ ...base, produtos: [] });
+  assert.ok(perto(semProdutos.vgv, comProdutosVazio.vgv));
+  assert.equal(semProdutos.numUnidades, comProdutosVazio.numUnidades);
+});
+
+test('#315: catálogo com múltiplos produtos (incorporação) — VGV combinado em bucket único', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    produtos: [
+      { area_media_m2: 100, preco_venda_m2: 10000, unidades: 10 }, // VGV 10.000.000
+      { area_media_m2: 50, preco_venda_m2: 8000, unidades: 4 },    // VGV 1.600.000
+    ],
+  });
+  assert.ok(perto(p.vgv, 11_600_000), `vgv=${p.vgv}`);
+  assert.equal(p.numUnidades, 14);
+  // #315: interim — bucket único (residencial); NR zerado até #317/#320.
+  assert.equal(p.numUnidadesResidencial, 14);
+  assert.equal(p.numUnidadesNaoResidencial, 0);
+  assert.ok(perto(p.vgvNaoResidencial, 0));
+});
+
+test('#315: permuta física continua deduzindo o VGV quando produtos está presente (preço vem do campo legado — interim até #317)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'loteamento',
+    terreno_manual_area: 100000,
+    preco_venda_m2: 1000, // interim: permuta física ainda lê o preço legado, não o catálogo
+    produtos: [{ area_media_m2: 300, preco_venda_m2: 1000, unidades: 250 }], // VGV bruto 75.000.000
+    permuta_fisica_area_m2: 3000, // 3.000 m² × 1000 R$/m² = 3.000.000
+  });
+  assert.ok(perto(p.vgv, 75_000_000 - 3_000_000), `vgv=${p.vgv}`);
 });
 
 test('preço sugerido: atinge o piso do benchmark', () => {

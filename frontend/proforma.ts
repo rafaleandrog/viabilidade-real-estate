@@ -62,6 +62,32 @@ export interface ProformaInput {
   permuta_fisica_modo?: string; permuta_fisica_area_m2?: number | string; permuta_fisica_pct?: number | string; permuta_fisica_area_canonica?: number | string;
   permuta_fisica_nr_modo?: string; permuta_fisica_nr_area_m2?: number | string; permuta_fisica_nr_pct?: number | string; permuta_fisica_nr_area_canonica?: number | string;
   aliquota_ret_pct?: number; // parâmetro da app (default 4)
+  // #315: catálogo de Produtos (tabela `preliminar_produtos`). Quando presente
+  // e não-vazio, substitui os campos fixos legados (area_media_lote_m2/
+  // preco_venda_m2 no Loteamento; area_pvt_*_fechada/preco_venda_m2_*/
+  // num_unidades_* na Incorporação) como fonte de VGV e nº de unidades — ver
+  // `totalProdutos()`. Ausente/vazio: comportamento idêntico a antes do #315.
+  produtos?: ProdutoPreliminar[];
+}
+
+export interface ProdutoPreliminar {
+  area_media_m2?: number | string | null;
+  preco_venda_m2?: number | string | null;
+  unidades?: number | string | null;
+}
+
+/** VGV de uma linha do catálogo: área média × preço × unidades (#315). */
+export function vgvProduto(p: ProdutoPreliminar): number {
+  return (Number(p.area_media_m2) || 0) * (Number(p.preco_venda_m2) || 0) * (Number(p.unidades) || 0);
+}
+
+/** Totais do catálogo — VGV bruto (soma das linhas) e nº de unidades. */
+export function totalProdutos(produtos: ProdutoPreliminar[] | undefined): { vgv: number; unidades: number } {
+  const lista = produtos ?? [];
+  return {
+    vgv: lista.reduce((s, p) => s + vgvProduto(p), 0),
+    unidades: lista.reduce((s, p) => s + (Number(p.unidades) || 0), 0),
+  };
 }
 
 export interface Proforma {
@@ -175,10 +201,21 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // resultado nos dois tipos de empreendimento (#14).
   const vgvPermutaResidencial = areaPermutaResidencial * precoR;
   const vgvPermutaNaoResidencial = areaPermutaNaoResidencial * precoNR;
-  vgvResidencial = lot
-    ? (areaVendavel - areaPermutaResidencial) * precoLot
-    : vgvResidencial - vgvPermutaResidencial;
-  vgvNaoResidencial = lot ? 0 : vgvNaoResidencial - vgvPermutaNaoResidencial;
+  // #315: quando o catálogo de Produtos está populado, ele substitui o VGV
+  // bruto (área×preço legados) como fonte — um bucket único (a tabela não
+  // distingue R/NR). Interim documentado: a divisão fina residencial/não
+  // residencial de permuta física/financeira e a sensibilidade continuam
+  // lendo os campos legados até as issues #317/#320 integrarem o catálogo.
+  const produtosTotal = e.produtos && e.produtos.length > 0 ? totalProdutos(e.produtos) : null;
+  if (produtosTotal) {
+    vgvResidencial = produtosTotal.vgv - (vgvPermutaResidencial + vgvPermutaNaoResidencial);
+    vgvNaoResidencial = 0;
+  } else {
+    vgvResidencial = lot
+      ? (areaVendavel - areaPermutaResidencial) * precoLot
+      : vgvResidencial - vgvPermutaResidencial;
+    vgvNaoResidencial = lot ? 0 : vgvNaoResidencial - vgvPermutaNaoResidencial;
+  }
   const vgv = vgvResidencial + vgvNaoResidencial;
 
   // ── Deduções da receita ──
@@ -257,16 +294,19 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // Incorporação: nº de unidades vem dos dois campos R e NR (#2); mantém
   // compatibilidade com o campo único legado num_unidades quando ambos zerados.
   const unidadesInc = n(e.num_unidades_residencial) + n(e.num_unidades_nao_residencial);
-  const numUnidades = lot
-    ? (n(e.area_media_lote_m2) > 0 ? Math.floor(areaVendavelLiquida / n(e.area_media_lote_m2)) : 0)
-    : (unidadesInc > 0 ? unidadesInc : n(e.num_unidades));
-  const precoMedioUnidade = lot
-    ? n(e.area_media_lote_m2) * precoLot
-    : (numUnidades > 0 ? vgv / numUnidades : 0);
+  const numUnidades = produtosTotal
+    ? produtosTotal.unidades
+    : (lot
+      ? (n(e.area_media_lote_m2) > 0 ? Math.floor(areaVendavelLiquida / n(e.area_media_lote_m2)) : 0)
+      : (unidadesInc > 0 ? unidadesInc : n(e.num_unidades)));
+  const precoMedioUnidade = produtosTotal
+    ? (numUnidades > 0 ? vgv / numUnidades : 0)
+    : (lot ? n(e.area_media_lote_m2) * precoLot : (numUnidades > 0 ? vgv / numUnidades : 0));
   // Detalhe por tipo (#7): nº e preço médio por unidade, R e NR separados. Preço
   // médio = VGV do tipo (já líquido de permuta física) ÷ nº de unidades do tipo.
-  const numUnidadesResidencial = lot ? 0 : n(e.num_unidades_residencial);
-  const numUnidadesNaoResidencial = lot ? 0 : n(e.num_unidades_nao_residencial);
+  // #315: catálogo de Produtos não distingue R/NR — bucket único em Residencial.
+  const numUnidadesResidencial = produtosTotal ? produtosTotal.unidades : (lot ? 0 : n(e.num_unidades_residencial));
+  const numUnidadesNaoResidencial = produtosTotal ? 0 : (lot ? 0 : n(e.num_unidades_nao_residencial));
   const precoMedioUnidadeResidencial = numUnidadesResidencial > 0 ? vgvResidencial / numUnidadesResidencial : 0;
   const precoMedioUnidadeNaoResidencial = numUnidadesNaoResidencial > 0 ? vgvNaoResidencial / numUnidadesNaoResidencial : 0;
 

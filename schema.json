@@ -244,6 +244,19 @@
       "indices": [["estudo_id"]]
     },
 
+    "preliminar_produtos": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":      { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "nome":           { "tipo": "texto", "limite": 100 },
+        "area_media_m2":  { "tipo": "decimal", "precisao": 10, "escala": 2 },
+        "preco_venda_m2": { "tipo": "decimal", "precisao": 12, "escala": 2 },
+        "unidades":       { "tipo": "inteiro", "padrao": 0 },
+        "ordem":          { "tipo": "inteiro", "padrao": 0 }
+      },
+      "indices": [["estudo_id"]]
+    },
+
     "avancado_cronograma": {
       "acesso_externo": "restrito",
       "colunas": {
