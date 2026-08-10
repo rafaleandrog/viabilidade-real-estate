@@ -786,18 +786,20 @@ export class ViabFluxoReceitas extends LitElement {
                        diferente (trimestral/semestral/anual) mantém o valor
                        gravado, só sem controle visual para trocá-lo — o motor
                        lê e calcula normalmente, como sempre leu. */ ''}
-                  ${/* #190/#191: "Ao longo da obra" → nº de parcelas sai da
-                       duração da obra no Cronograma dividida pelo intervalo da
-                       periodicidade. O valor é DERIVADO (não persistido): o
+                  ${/* #190/#191/#344: "Ao longo da obra" → nº de parcelas sai
+                       da duração da obra no Cronograma dividida pelo intervalo
+                       da periodicidade. O valor é DERIVADO (não persistido): o
                        motor calcula os vencimentos a partir do cronograma,
                        então gravar o número aqui criaria uma segunda fonte de
                        verdade que ficaria velha assim que a duração da obra ou
-                       a periodicidade mudasse. Exibido travado, como o campo
-                       já era nesse modo — só que agora preenchido. */ ''}
+                       a periodicidade mudasse. Por isso o campo fica oculto
+                       (não só desabilitado) nesse modo — não há nada editável
+                       para mostrar. */ ''}
+                  ${!p.ao_longo_obra ? html`
                   <viab-num label="Nº parcelas" sufixo="x" casas-decimais="0"
-                    ?desabilitado=${dis || p.ao_longo_obra}
+                    ?desabilitado=${dis}
                     .valor=${this._parcelasExibidas(p)}
-                    @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'parcelas', ev.detail.valor ?? 0)}></viab-num>
+                    @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'parcelas', ev.detail.valor ?? 0)}></viab-num>` : nothing}
                   <urbi-checkbox label="Ao longo da obra" ?desabilitado=${dis} ?marcado=${p.ao_longo_obra}
                     @urbi:checkbox-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'ao_longo_obra', ev.detail.marcado)}></urbi-checkbox>
                   ${!dis && f.parcelas.length > 1 ? html`
