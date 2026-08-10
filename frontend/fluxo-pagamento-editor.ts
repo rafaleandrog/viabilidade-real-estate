@@ -11,6 +11,10 @@ export interface FormularioPagamento {
   ret: { ativo: boolean; pct: number };
   entrada: any[];
   parcelas: any[];
+  // #345: apos_entrega_meses deixou de ser lido pelo motor (repasse travado
+  // em 1 mês após o fim da obra, sempre). O campo sobrevive só como
+  // passagem para não descartar o valor persistido de estudo legado — sem
+  // migração, sem efeito no cálculo, sem controle editável na UI.
   repasse: { apos_entrega_meses: number };
 }
 
@@ -58,10 +62,6 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
       return 'O prazo fixo deve ter ao menos uma parcela mensal.';
     }
   }
-  if (!Number.isInteger(Number(form.repasse.apos_entrega_meses)) || Number(form.repasse.apos_entrega_meses) < 0) {
-    return 'O prazo do repasse deve ser um número inteiro não negativo.';
-  }
-
   const somaInformada = [...form.entrada, ...form.parcelas].reduce((s, item) => s + n(item.pct), 0);
   if (somaInformada > 100.01) {
     return `Entrada e parcelamento somam ${somaInformada.toFixed(2)}%; o total não pode superar 100%.`;

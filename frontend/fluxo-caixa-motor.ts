@@ -317,6 +317,11 @@ const INTERVALO_PERIODICIDADE: Record<string, number> = {
   mensal: 1, trimestral: 3, semestral: 6, anual: 12,
 };
 
+// #345: o Repasse é travado no 1º mês após o fim da Obra, em qualquer
+// estudo (novo ou legado) — `fluxo_pagamento.repasse.apos_entrega_meses`
+// persistido (se houver, de estudo legado) deixou de ser lido pelo motor.
+const REPASSE_MESES_APOS_ENTREGA = 1;
+
 /**
  * Normaliza um bloco de pagamento (Entrada / Parcelamento) para uma LISTA de
  * linhas. O modelo vigente (Lote 6 · #20) permite múltiplas linhas em cada
@@ -559,7 +564,7 @@ export type ComponentePagamento =
  *    sem `ao_longo_obra` → `prazo_fixo` com `defasagemMeses` = a periodicidade
  *    (1/3/6/12, conforme hoje) e 1ª parcela em `s + intervalo`;
  *  - `repasse` (% derivado) → `concentrado`, no mês fixo (fim da Obra +
- *    `apos_entrega_meses`).
+ *    `REPASSE_MESES_APOS_ENTREGA`, travado em 1 — #345).
  * Sem `fluxo_pagamento` (null/legado sem config) → um único `imediato` de
  * 100%, sem desconto — o "recebe à vista no mês da venda" de hoje.
  */
@@ -606,7 +611,7 @@ export function componentesDoLegado(
 
   const pctRepasse = pctRepasseDerivado(fp);
   if (pctRepasse > 0) {
-    const mesRepasse = fimObra + Math.max(0, Math.round(n(fp?.repasse?.apos_entrega_meses)));
+    const mesRepasse = fimObra + REPASSE_MESES_APOS_ENTREGA;
     componentes.push({ tipo: 'concentrado', participacaoPct: pctRepasse, mesPagamento: mesRepasse, taxaMensal: 0, rotulo: 'repasse (legado)' });
   }
 
@@ -1298,7 +1303,7 @@ export function ultimoMesRecebivelLinha(linha: any, cronograma: EventoCrono[]): 
   // Repasse: mês fixo (fim da Obra + carência), independente da safra.
   const pctRepasse = pctRepasseDerivado(fp);
   if (pctRepasse > 0) {
-    const mesRepasse = fimObra + Math.max(0, Math.round(n(fp?.repasse?.apos_entrega_meses)));
+    const mesRepasse = fimObra + REPASSE_MESES_APOS_ENTREGA;
     ultimo = Math.max(ultimo, mesRepasse);
   }
 
@@ -1340,7 +1345,7 @@ export function recebimentoBrutoMensal(
 
   const obra = cronograma.find((e) => e.evento === 'obra');
   const fimObra = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : 0;
-  const mesRepasse = fimObra + Math.max(0, Math.round(n(fp?.repasse?.apos_entrega_meses)));
+  const mesRepasse = fimObra + REPASSE_MESES_APOS_ENTREGA;
 
   // #231: o fallback SILENCIOSO que empilhava excedente no último mês foi
   // removido — `ultimoMesRecebivelLinha` agora deriva o horizonte para caber
