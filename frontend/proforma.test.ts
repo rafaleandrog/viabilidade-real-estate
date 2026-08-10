@@ -368,6 +368,105 @@ test('#315: permuta física continua deduzindo o VGV quando produtos está prese
   assert.ok(perto(p.vgv, 75_000_000 - 3_000_000), `vgv=${p.vgv}`);
 });
 
+// BUG7-08: sensibilidade — `sensibilidade` escala o valor JÁ RESOLVIDO
+// (canônico OU legado, qualquer modo), então o stress funciona
+// independentemente de qual unidade/modo está selecionada na UI. Cobertura
+// exigida pelo critério de aceite: cada variável × cada modo.
+test('BUG7-08 preco: escala precoLot (loteamento) e precoR/precoNR (incorporação)', () => {
+  const lot = calcularProforma({ ...LOT, sensibilidade: { variavel: 'preco', fator: 1.1 } });
+  assert.ok(perto(lot.vgv, 75_000_000 * 1.1), `lot.vgv=${lot.vgv}`);
+
+  const inc = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+    area_pvt_nr_fechada: 500, preco_venda_m2_nao_residencial: 8000,
+    sensibilidade: { variavel: 'preco', fator: 0.9 },
+  });
+  assert.ok(perto(inc.vgvResidencial, 1000 * 10000 * 0.9));
+  assert.ok(perto(inc.vgvNaoResidencial, 500 * 8000 * 0.9));
+});
+
+test('BUG7-08 permuta_fisica: escala o modo legado (m²/% área venda) e o canônico', () => {
+  const base: ProformaInput = { ...LOT, permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 3000 };
+  const semFator = calcularProforma(base);
+  const comFator = calcularProforma({ ...base, sensibilidade: { variavel: 'permuta_fisica', fator: 2 } });
+  assert.ok(perto(comFator.areaPermutaResidencial, semFator.areaPermutaResidencial * 2), `legado=${comFator.areaPermutaResidencial}`);
+
+  // Modo % área venda também escala (mesmo "valor resolvido", modo diferente).
+  const basePct = { ...LOT, permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10 } as ProformaInput;
+  const comFatorPct = calcularProforma({ ...basePct, sensibilidade: { variavel: 'permuta_fisica', fator: 1.5 } });
+  const semFatorPct = calcularProforma(basePct);
+  assert.ok(perto(comFatorPct.areaPermutaResidencial, semFatorPct.areaPermutaResidencial * 1.5));
+
+  // Canônico: sem fator, o legado (que o motor ignoraria) não importa — o que
+  // conta é escalar o canônico, que é o que estava quebrado antes do BUG7-08.
+  const baseCanon = { ...LOT, permuta_fisica_area_canonica: 5000, permuta_fisica_area_m2: 999999 } as ProformaInput;
+  const comFatorCanon = calcularProforma({ ...baseCanon, sensibilidade: { variavel: 'permuta_fisica', fator: 2 } });
+  assert.ok(perto(comFatorCanon.areaPermutaResidencial, 10000), `canonico=${comFatorCanon.areaPermutaResidencial}`);
+});
+
+test('BUG7-08 permuta_financeira: escala o modo % VGV, o modo valor fixo e o canônico', () => {
+  const basePct: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+    permuta_financeira_residencial_pct: 5,
+  };
+  const semFator = calcularProforma(basePct);
+  const comFator = calcularProforma({ ...basePct, sensibilidade: { variavel: 'permuta_financeira', fator: 2 } });
+  assert.ok(perto(comFator.permutaFinResidencial, semFator.permutaFinResidencial * 2));
+
+  const baseFixo: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+    permuta_financeira_residencial_modo: 'valor_fixo', permuta_financeira_residencial_valor: 200_000,
+  };
+  const comFatorFixo = calcularProforma({ ...baseFixo, sensibilidade: { variavel: 'permuta_financeira', fator: 1.5 } });
+  assert.ok(perto(comFatorFixo.permutaFinResidencial, 300_000), `fixo=${comFatorFixo.permutaFinResidencial}`);
+
+  const baseCanon: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+    permuta_financeira_residencial_valor_canonico: 100_000,
+  };
+  const comFatorCanon = calcularProforma({ ...baseCanon, sensibilidade: { variavel: 'permuta_financeira', fator: 2 } });
+  assert.ok(perto(comFatorCanon.permutaFinResidencial, 200_000), `canonico=${comFatorCanon.permutaFinResidencial}`);
+});
+
+test('BUG7-08 custo_infra: escala os 3 modos (% VGV, R$/m², R$ fixo) e o canônico', () => {
+  const pct = calcularProforma({ ...LOT, infra_modo: 'pct_vgv', infra_pct: 30, sensibilidade: { variavel: 'custo_infra', fator: 2 } });
+  const pctSem = calcularProforma({ ...LOT, infra_modo: 'pct_vgv', infra_pct: 30 });
+  assert.ok(perto(pct.infraestrutura, pctSem.infraestrutura * 2), `pct=${pct.infraestrutura}`);
+
+  const m2 = calcularProforma({ ...LOT, infra_modo: 'valor_m2', custo_infra_m2: 100, sensibilidade: { variavel: 'custo_infra', fator: 3 } });
+  assert.ok(perto(m2.infraestrutura, 75_000 * 100 * 3), `m2=${m2.infraestrutura}`); // antes do BUG7-08 já funcionava (sem canônico)
+
+  // R$ fixo: NÃO era coberto antes do BUG7-08 (só custo_infra_m2/infra_pct estavam na lista).
+  const fixo = calcularProforma({ ...LOT, infra_modo: 'valor_fixo', infra_valor_fixo: 1_000_000, sensibilidade: { variavel: 'custo_infra', fator: 1.2 } });
+  assert.ok(perto(fixo.infraestrutura, 1_200_000), `fixo=${fixo.infraestrutura}`);
+
+  const canon = calcularProforma({ ...LOT, infra_valor_canonico: 500_000, sensibilidade: { variavel: 'custo_infra', fator: 2 } });
+  assert.ok(perto(canon.infraestrutura, 1_000_000), `canonico=${canon.infraestrutura}`);
+});
+
+test('BUG7-08 custo_obras: escala os 2 modos (R$/m², valor total) e o canônico', () => {
+  const base: ProformaInput = { tipo_empreendimento: 'incorporacao', area_pvt_r_fechada: 1000 };
+  const m2 = calcularProforma({ ...base, construcao_modo: 'valor_m2', custo_construcao_m2: 5000, sensibilidade: { variavel: 'custo_obras', fator: 2 } });
+  assert.ok(perto(m2.construcao, 1000 * 5000 * 2), `m2=${m2.construcao}`); // já funcionava antes
+
+  // valor_total: NÃO era coberto antes do BUG7-08 (só custo_construcao_m2 estava na lista).
+  const total = calcularProforma({ ...base, construcao_modo: 'valor_total', construcao_valor_total: 7_500_000, sensibilidade: { variavel: 'custo_obras', fator: 1.5 } });
+  assert.ok(perto(total.construcao, 11_250_000), `total=${total.construcao}`);
+
+  const canon = calcularProforma({ ...base, construcao_valor_canonico: 4_000_000, sensibilidade: { variavel: 'custo_obras', fator: 1.5 } });
+  assert.ok(perto(canon.construcao, 6_000_000), `canonico=${canon.construcao}`);
+});
+
+test('BUG7-08: sensibilidade ausente/fator neutro preserva o comportamento anterior', () => {
+  const semSens = calcularProforma(LOT);
+  const comFator1 = calcularProforma({ ...LOT, sensibilidade: { variavel: 'preco', fator: 1 } });
+  assert.ok(perto(semSens.vgv, comFator1.vgv));
+});
+
 test('preço sugerido: atinge o piso do benchmark', () => {
   const piso = 40; // acima da margem atual (~38,4%)
   const preco = precoSugeridoM2(LOT, piso);

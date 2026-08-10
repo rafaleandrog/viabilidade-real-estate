@@ -70,7 +70,17 @@ export interface ProformaInput {
   // num_unidades_* na Incorporação) como fonte de VGV e nº de unidades — ver
   // `totalProdutos()`. Ausente/vazio: comportamento idêntico a antes do #315.
   produtos?: ProdutoPreliminar[];
+  // BUG7-08: fator de stress da análise de sensibilidade (Bear/Base/Bull).
+  // Escala o valor JÁ RESOLVIDO (canônico se houver, senão o legado) de uma
+  // das 5 variáveis estressáveis — em vez de a UI escalar campos legados
+  // individualmente (que o motor ignora quando há canônico, tornando o
+  // stress um no-op), o fator é aplicado aqui, no único lugar que sabe qual
+  // valor (canônico ou legado) está realmente em uso.
+  sensibilidade?: FatorSensibilidade;
 }
+
+export type VariavelSensibilidade = 'preco' | 'permuta_fisica' | 'permuta_financeira' | 'custo_infra' | 'custo_obras';
+export interface FatorSensibilidade { variavel: VariavelSensibilidade; fator: number; }
 
 export interface ProdutoPreliminar {
   area_media_m2?: number | string | null;
@@ -158,10 +168,17 @@ export function calcularProforma(e: ProformaInput): Proforma {
     ? n(e.area_terreno_nucleo)
     : n(e.terreno_manual_area);
 
+  // BUG7-08: fator de sensibilidade — 1 quando a variável estressada não é a
+  // que este cálculo está resolvendo, senão o fator do estudo (Bear/Bull).
+  const fatorSens = (variavel: VariavelSensibilidade): number =>
+    e.sensibilidade?.variavel === variavel ? e.sensibilidade.fator : 1;
+
   // ── Áreas + VGV ──
   let areaVendavel = 0, areaPrivativa = 0, areaConstruida = 0;
   let vgvResidencial = 0, vgvNaoResidencial = 0;
-  const precoLot = n(e.preco_venda_m2);
+  const precoLot = n(e.preco_venda_m2) * fatorSens('preco');
+  const precoR = lot ? precoLot : n(e.preco_venda_m2_residencial) * fatorSens('preco');
+  const precoNR = lot ? 0 : n(e.preco_venda_m2_nao_residencial) * fatorSens('preco');
 
   if (lot) {
     // Tabela em cascata (2026-08-03, `frontend/areas-cascata.ts`) — a Área
@@ -175,8 +192,8 @@ export function calcularProforma(e: ProformaInput): Proforma {
     areaPrivativa = rFech + nrFech + rAb + nrAb;
     areaConstruida = areaPrivativa + n(e.area_comum_total);
     areaVendavel = rFech + nrFech; // área privativa vendável (áreas fechadas)
-    vgvResidencial = rFech * n(e.preco_venda_m2_residencial);
-    vgvNaoResidencial = nrFech * n(e.preco_venda_m2_nao_residencial);
+    vgvResidencial = rFech * precoR;
+    vgvNaoResidencial = nrFech * precoNR;
   }
 
   // Permuta física (#10) — R e NR separados. Cada uma sai da área vendável do seu
@@ -184,18 +201,19 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // `permuta_fisica_*` é o residencial; `permuta_fisica_nr_*` é o não residencial.
   const areaVendavelR = lot ? areaVendavel : n(e.area_pvt_r_fechada);
   const areaVendavelNR = lot ? 0 : n(e.area_pvt_nr_fechada);
-  const precoR = lot ? precoLot : n(e.preco_venda_m2_residencial);
-  const precoNR = lot ? 0 : n(e.preco_venda_m2_nao_residencial);
 
   const areaPermutaResidencialLegada = e.permuta_fisica_modo === 'pct_area_venda'
     ? areaVendavelR * n(e.permuta_fisica_pct) / 100
     : n(e.permuta_fisica_area_m2);
-  const areaPermutaResidencial = canonico(e.permuta_fisica_area_canonica, areaPermutaResidencialLegada);
+  // BUG7-08: o fator escala o valor JÁ RESOLVIDO (canônico se houver, senão o
+  // legado acima) — cobre os dois em vez de exigir que a UI escale campos
+  // individualmente.
+  const areaPermutaResidencial = canonico(e.permuta_fisica_area_canonica, areaPermutaResidencialLegada) * fatorSens('permuta_fisica');
   const areaPermutaNaoResidencialLegada = lot ? 0
     : (e.permuta_fisica_nr_modo === 'pct_area_venda'
       ? areaVendavelNR * n(e.permuta_fisica_nr_pct) / 100
       : n(e.permuta_fisica_nr_area_m2));
-  const areaPermutaNaoResidencial = canonico(e.permuta_fisica_nr_area_canonica, areaPermutaNaoResidencialLegada);
+  const areaPermutaNaoResidencial = canonico(e.permuta_fisica_nr_area_canonica, areaPermutaNaoResidencialLegada) * fatorSens('permuta_fisica');
   const areaPermutaFisica = areaPermutaResidencial + areaPermutaNaoResidencial;
   const areaVendavelLiquida = areaVendavel - areaPermutaFisica;
 
@@ -229,11 +247,11 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const permutaFinResidencialLegada = e.permuta_financeira_residencial_modo === 'valor_fixo'
     ? n(e.permuta_financeira_residencial_valor)
     : vgvResidencial * n(e.permuta_financeira_residencial_pct) / 100;
-  const permutaFinResidencial = canonico(e.permuta_financeira_residencial_valor_canonico, permutaFinResidencialLegada);
+  const permutaFinResidencial = canonico(e.permuta_financeira_residencial_valor_canonico, permutaFinResidencialLegada) * fatorSens('permuta_financeira');
   const permutaFinNaoResidencialLegada = e.permuta_financeira_nao_residencial_modo === 'valor_fixo'
     ? n(e.permuta_financeira_nao_residencial_valor)
     : vgvNaoResidencial * n(e.permuta_financeira_nao_residencial_pct) / 100;
-  const permutaFinNaoResidencial = canonico(e.permuta_financeira_nao_residencial_valor_canonico, permutaFinNaoResidencialLegada);
+  const permutaFinNaoResidencial = canonico(e.permuta_financeira_nao_residencial_valor_canonico, permutaFinNaoResidencialLegada) * fatorSens('permuta_financeira');
   const receitaLiquida = vgv - imposto - corretagem - marketing - permutaFinResidencial - permutaFinNaoResidencial;
 
   // ── Custos diretos ──
@@ -246,11 +264,11 @@ export function calcularProforma(e: ProformaInput): Proforma {
       : e.infra_modo === 'valor_fixo' ? n(e.infra_valor_fixo)
       : vgv * n(e.infra_pct) / 100)
     : 0;
-  const infraestrutura = canonico(e.infra_valor_canonico, infraestruturaLegada);
+  const infraestrutura = canonico(e.infra_valor_canonico, infraestruturaLegada) * fatorSens('custo_infra');
   // Construção: por área (R$/m² × área privativa) ou valor total em R$ (#4).
   const construcaoLegada = lot ? 0
     : (e.construcao_modo === 'valor_total' ? n(e.construcao_valor_total) : n(e.custo_construcao_m2) * areaPrivativa);
-  const construcao = canonico(e.construcao_valor_canonico, construcaoLegada);
+  const construcao = canonico(e.construcao_valor_canonico, construcaoLegada) * fatorSens('custo_obras');
   const decoracao = lot ? 0 : n(e.custo_decoracao_m2) * areaPrivativa;
   const custoTotalConstrucao = lot ? infraestrutura : (construcao + decoracao);
   const gestaoConstrucao = lot ? 0 : custoTotalConstrucao * n(e.taxa_gestao_pct) / 100;

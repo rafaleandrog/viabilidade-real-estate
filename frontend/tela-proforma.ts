@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig } from './viabilidade-api.js';
-import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
+import { calcularProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 import { exportarPDF, exportarExcel } from './exportar.js';
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
 
@@ -22,7 +22,9 @@ interface Linha {
   soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean;
 }
 
-type VarSens = 'preco' | 'permuta_fisica' | 'permuta_financeira' | 'custo_infra' | 'custo_obras';
+// BUG7-08: mesmo conjunto de variáveis estressáveis que o motor resolve —
+// reexportado como alias em vez de duplicar a união (proforma.ts é a fonte).
+type VarSens = VariavelSensibilidade;
 
 @customElement('viab-tela-proforma')
 export class ViabTelaProforma extends LitElement {
@@ -365,19 +367,14 @@ export class ViabTelaProforma extends LitElement {
     ];
   }
 
+  // BUG7-08: antes escalava campos legados por variável/modo (frágil — o
+  // motor prioriza o canônico quando existe, então escalar só o legado virava
+  // no-op, e alguns modos sequer eram cobertos: custo_obras nunca escalava
+  // construcao_valor_total; custo_infra não cobria infra_valor_fixo). Agora o
+  // fator é parâmetro de calcularProforma, que escala o valor JÁ RESOLVIDO
+  // (canônico ou legado, qualquer modo) num lugar só — ver proforma.ts.
   private _aplicarFator(fator: number): ProformaInput {
-    const e = this.estudo;
-    const mul = (x: any) => (Number(x) || 0) * fator;
-    switch (this.varSens) {
-      case 'preco': return this._entrada({ preco_venda_m2: mul(e.preco_venda_m2), preco_venda_m2_residencial: mul(e.preco_venda_m2_residencial), preco_venda_m2_nao_residencial: mul(e.preco_venda_m2_nao_residencial) });
-      case 'permuta_fisica': return this._entrada({
-        permuta_fisica_area_m2: mul(e.permuta_fisica_area_m2), permuta_fisica_pct: mul(e.permuta_fisica_pct),
-        permuta_fisica_nr_area_m2: mul(e.permuta_fisica_nr_area_m2), permuta_fisica_nr_pct: mul(e.permuta_fisica_nr_pct),
-      });
-      case 'permuta_financeira': return this._entrada({ permuta_financeira_residencial_pct: mul(e.permuta_financeira_residencial_pct), permuta_financeira_nao_residencial_pct: mul(e.permuta_financeira_nao_residencial_pct) });
-      case 'custo_infra': return this._entrada({ custo_infra_m2: mul(e.custo_infra_m2), infra_pct: mul(e.infra_pct) });
-      case 'custo_obras': return this._entrada({ custo_construcao_m2: mul(e.custo_construcao_m2) });
-    }
+    return this._entrada({ sensibilidade: { variavel: this.varSens, fator } });
   }
 
   // Variável estressada (VarSens) → `campo` do indicador de sensibilidade no
