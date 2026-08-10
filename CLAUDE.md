@@ -30,12 +30,30 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — 🟢 SEM RODADA ABERTA
+## Estado do backlog — 🔵 RODADA 7 ABERTA
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
+| **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | 🔵 **aberta em 2026-08-10** |
 | **5 — EVI** | Auditoria do app contra os documentos EVI | **#220–#241** (22) | ✅ **concluída em 2026-08-02** |
 | **6 — lista de bugs** | `lista_bugs.xlsx`, 24 itens `BUGLIST-001`…`BUGLIST-024` | **#238, #239, #244–#281** (37 destinos) | ✅ **concluída em 2026-08-02** |
+
+### Rodada 7 — planejamento
+
+Diagnóstico completo, ordem de execução (E01→E47, 11 fases com portão de merge entre elas) e o
+detalhamento arquivo:linha de cada item estão no plano de sessão gerado em 2026-08-10 (mesmo texto
+usado para redigir as 47 issues). Cada issue leva no título `[BUG7-NN]`, onde `NN` é a ordem de
+execução — **não** o número do item da planilha, que está citado no corpo. Seis decisões (D1–D7)
+ficam registradas em cada issue afetada, com o padrão seguido na ausência de resposta do autor; a
+mais bloqueante é **D6**: a issue #355 (item 48, Funding/Capital Stack) está formalmente **bloqueada**
+até o autor anexar o documento `fluxo_investidor_FORMULAS`, que não está no repositório.
+
+Dependências entre issues desta rodada usam `Sem-fechamento: #NNN pré-requisito` no corpo — não
+fecham a issue citada, só declaram a ordem. **Fase 11 (issue #355) é isolada por exigência
+explícita do autor**: nunca trabalhar nela junto de outra issue na mesma sessão.
+
+Quem fechar a Rodada 7 atualiza esta seção na mesma alteração — regra de baixo, § *Lição das rodadas
+anteriores*.
 
 **As duas foram executadas juntas por uma trilha única de 10 fases** (plano aprovado pelo autor em
 2026-08-01), com portão de merge ao fim de cada fase. Os quatro cruzamentos entre rodadas (itens 5,

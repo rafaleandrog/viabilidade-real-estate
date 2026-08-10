@@ -4,6 +4,42 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 7 — planejamento e abertura das 47 issues (2026-08-10)
+
+O autor entregou `lista_bugs_20260807.xlsx` (47 itens, numerados 1–41 e 43–48 — **o item 42 não
+existe na planilha**; 4 abas extras `#38`/`#39`/`#43`/`#45` continham só imagens de referência,
+extraídas e anexadas às issues correspondentes). Esta sessão fez o diagnóstico completo de cada
+item (3 agentes de exploração em paralelo cobrindo Preliminar, Cronograma/Tipologias/Receitas e
+Custos/Fluxo/Cenários/Funding), montou uma ordem de execução em **11 fases com portão de merge**
+entre elas (E01→E47, respeitando pré-requisitos), e criou as **47 issues** (`#309`–`#355`) no
+GitHub, uma por item, com o diagnóstico `arquivo:linha`, o que fazer e o critério de aceite.
+
+**Ponto de partida:** zero issues abertas antes desta sessão (a Rodada 6 estava de fato encerrada),
+`main` em `54d7df0`. A cadeia EVI de recebíveis (bloqueio de rodadas anteriores) já estava integrada
+pela #283 — não afeta esta rodada.
+
+**Achados transversais registrados nas issues:**
+- Vários itens (15, 20, 47) podem já estar corrigidos na `main` e o autor estar reportando contra a
+  **versão publicada**, que segue atrás por causa das pendências crônicas do autor (`urbi-empacotar`,
+  sync do `schema.json` pelo SDK, migrações reais no Postgres). As issues correspondentes (#313,
+  #329, #354) pedem confirmação contra a instância antes de qualquer mudança de código.
+- Causa-raiz comum aos itens 9 e 12 (#310, #320): o campo `*_canonico` sempre ganha do campo por
+  unidade (`proforma.ts:100`), mas duas rotinas da tela (VGV sem permuta e a sensibilidade) escalam
+  só os campos legados — o resultado é a mesma linha repetida e Bear=Base=Bull.
+- `urbi-kpi` (monorepo) não tem slot nem prop de variação — é a causa de #326 (sobreposição) e #352
+  (variação fora da caixa); a correção fica inteira no app (wrapper CSS / card próprio), sem exigir
+  mudança no SDK nem bump de `shell_min`.
+- Seis decisões (D1–D7) ficaram documentadas issue a issue, com o padrão seguido na ausência de
+  resposta do autor. A mais bloqueante é **D6**: a #355 (item 48, reescrita do Funding/Capital
+  Stack) está formalmente bloqueada até o autor anexar o documento `fluxo_investidor_FORMULAS`
+  (não está no repositório) — é a última da fila de qualquer forma, e o próprio autor pediu que
+  fosse trabalhada isolada de qualquer outra issue.
+
+**Próximo passo:** implementar E01 em diante, fase por fase, com portão de merge ao final de cada
+uma. `CLAUDE.md` § *Estado do backlog* foi atualizado no mesmo commit deste registro.
+
+---
+
 ## Por que os problemas se repetem: 4 causas-raiz (2026-08-06)
 
 O autor perguntou por que erros, imprevistos e "issues não implementadas de verdade" continuam
