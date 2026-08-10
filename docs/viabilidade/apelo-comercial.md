@@ -1,18 +1,25 @@
 ---
-titulo: Apelo Comercial (IA)
+titulo: Análise de Mercado do Imóvel (IA)
 descricao: Análise qualitativa do imóvel por IA — 6 fatores, scoring e relatório.
 tipo: app
 ordem: 5
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
-# Apelo Comercial do Imóvel (IA)
+# Análise de Mercado do Imóvel (IA)
+
+> BUG7-13: rótulo renomeado só no **Preliminar** (D2) — o Avançado mantém a aba
+> "Apelo Comercial", pois já tem uma aba homônima "Análise de mercado" (coleta
+> regional, `mercado_regioes`), e as duas juntas ficariam ambíguas. É a mesma
+> funcionalidade nos dois níveis: slug `apelo`, elemento `viab-tela-apelo`,
+> evento `apelo_comercial_concluido` e as tabelas `apelo_comercial*` continuam
+> intactos — só o texto do card muda por nível.
 
 Usa o framework de IA do UrbiVerso (`req.ia`) para avaliar fatores qualitativos que as fórmulas financeiras não capturam.
 
 ## Como funciona
 
-1. Na aba **Apelo Comercial**, o editor anexa **documentos** (PDF, Word, Excel) e/ou **texto** (ex.: população do município/bairro), marcando o `tipo_dado` (anúncios, população, mercado…).
+1. Na aba **Análise de Mercado** (Preliminar) ou **Apelo Comercial** (Avançado), o editor anexa **documentos** (PDF, Word, Excel) e/ou **texto** (ex.: população do município/bairro), marcando o `tipo_dado` (anúncios, população, mercado…).
 2. Clica em **“Analisar com IA”**. O backend extrai o conteúdo dos arquivos (`req.ia.extrairConteudo`) e consulta o modelo (`req.ia.consultar`) com um schema JSON estruturado.
 3. O resultado é salvo em `apelo_comercial` e o evento `apelo_comercial_concluido` é publicado (editores e aprovadores são inscritos).
 
