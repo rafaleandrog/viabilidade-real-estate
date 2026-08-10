@@ -246,7 +246,7 @@ test('fluxo de pagamento distribui entrada, parcelas na obra e repasse na entreg
       ret: { ativo: false, pct: 0 },
       entrada: { modo: 'entrada', parcelas: 1, pct: 15 },
       parcelas: { periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 15 },
-      repasse: { pct: 70, apos_entrega_meses: 2 },
+      repasse: { pct: 70, apos_entrega_meses: 2 }, // #345: ignorado — offset travado em 1
     },
   };
   const r = receitaMensalLinha(linha, CRONO, 60);
@@ -257,8 +257,9 @@ test('fluxo de pagamento distribui entrada, parcelas na obra e repasse na entreg
   assert.ok(perto(r[13], 0, 1));                              // antes da obra: nada
   assert.ok(perto(r[17], 1_500_000 / 24, 1));                 // 1º mês da obra
   assert.ok(perto(r[40], 1_500_000 / 24, 1));                 // último mês da obra
-  // repasse: fim da obra (40) + 2 = mês 42
-  assert.ok(perto(r[42], 7_000_000, 1));
+  // #345: repasse: fim da obra (40) + 1 (travado) = mês 41 — `apos_entrega_meses:
+  // 2` acima é ignorado, prova de que o valor persistido não influencia mais.
+  assert.ok(perto(r[41], 7_000_000, 1));
 });
 
 // 4c. #190 — "Ao longo da obra" + Mensal: nº de parcelas = duração da obra.
@@ -360,7 +361,7 @@ test('fluxo de pagamento: múltiplas entradas + repasse derivado (100 − entrad
       ret: { ativo: false, pct: 0 },
       entrada: [{ pct: 10, parcelas: 1 }, { pct: 5, parcelas: 1 }], // duas linhas, 15% no total
       parcelas: [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, pct: 15 }],
-      repasse: { apos_entrega_meses: 2 }, // pct derivado = 100 − 15 − 15 = 70
+      repasse: { apos_entrega_meses: 2 }, // #345: ignorado — pct derivado = 100 − 15 − 15 = 70
     },
   };
   const r = receitaMensalLinha(linha, CRONO, 60);
@@ -370,7 +371,7 @@ test('fluxo de pagamento: múltiplas entradas + repasse derivado (100 − entrad
   // a partir do mês seguinte à venda (13..40 = 28).
   assert.ok(perto(r[13], 0, 1));
   assert.ok(perto(r[17], 1_500_000 / 24, 1));
-  assert.ok(perto(r[42], 7_000_000, 1));          // repasse derivado (70%) na entrega (mês 42)
+  assert.ok(perto(r[41], 7_000_000, 1));          // repasse derivado (70%) na entrega (fim obra + 1, #345)
 });
 
 // #228: "Destacada" não deduz mais do recebível — a corretagem é sempre a
@@ -560,7 +561,7 @@ test('Preço do Terreno em unit_delivery acompanha a receita em caixa, nao o VGV
       fluxo_pagamento: {
         entrada: { modo: 'entrada', parcelas: 1, pct: 20 },
         parcelas: { periodicidade: 'mensal', parcelas: 0, ao_longo_obra: false, juros: false, pct: 0 },
-        repasse: { pct: 80, apos_entrega_meses: 0 }, // repasse na entrega (fim da obra, mês 40)
+        repasse: { pct: 80, apos_entrega_meses: 0 }, // #345: ignorado — repasse trava em fim da obra + 1 (mês 41)
       },
     }],
     linhasCusto: [
@@ -576,9 +577,9 @@ test('Preço do Terreno em unit_delivery acompanha a receita em caixa, nao o VGV
 
   assert.ok(perto(linha.total, 10_000_000, 1)); // 10% de 100M
   // 100% vendido no mês 12, mas o CAIXA chega em 2 momentos: entrada (mês 12) e
-  // repasse (entrega, ~mês 40) — sales_revenue concentraria tudo no mês 12.
+  // repasse (entrega, mês 41) — sales_revenue concentraria tudo no mês 12.
   assert.ok(perto(linha.mensal[12], 0.10 * 20_000_000, 1)); // 20% de entrada
-  assert.ok(linha.mensal[40] > 0); // repasse na entrega
+  assert.ok(linha.mensal[41] > 0); // repasse na entrega
   assert.ok(perto(linha.mensal[13], 0, 1e-6)); // nada entre entrada e repasse
 });
 
@@ -1167,14 +1168,16 @@ test('componentesDoLegado: parcelamento sem "ao longo da obra" → prazo_fixo co
   assert.equal(c.defasagemMeses, 3); // trimestral = intervalo 3
 });
 
-test('componentesDoLegado: repasse deriva concentrado no mês fixo (fim da Obra + carência)', () => {
+test('#345 componentesDoLegado: repasse deriva concentrado no mês fixo (fim da Obra + 1, travado)', () => {
+  // `apos_entrega_meses: 2` é persistido mas IGNORADO — o offset é sempre 1,
+  // inclusive para estudo legado com outro valor gravado.
   const fp = { entrada: [{ pct: 15, parcelas: 1 }], repasse: { apos_entrega_meses: 2 } };
   const r = componentesDoLegado(fp, CRONO);
   const concentrado = r.find((c) => c.tipo === 'concentrado') as any;
   assert.ok(concentrado);
   assert.ok(perto(concentrado.participacaoPct, 85, 1e-6)); // 100 − 15 (derivado)
   const obra = CRONO.find((e) => e.evento === 'obra')!;
-  assert.equal(concentrado.mesPagamento, obra.inicio_mes + obra.duracao_meses - 1 + 2);
+  assert.equal(concentrado.mesPagamento, obra.inicio_mes + obra.duracao_meses - 1 + 1);
 });
 
 test('componentesDoLegado: participação total sempre fecha 100% (entrada+parcelas+repasse derivado)', () => {
@@ -1224,12 +1227,16 @@ test('ultimoMesRecebivelLinha: parcelamento por periodicidade (sem "ao longo da 
   assert.equal(r, fimAposChaves + 6 * 8); // semestral = intervalo 6
 });
 
-test('ultimoMesRecebivelLinha: repasse distante da Obra estende o horizonte', () => {
+test('#345 ultimoMesRecebivelLinha: repasse legado com offset distante NÃO estende mais o horizonte (travado em 1)', () => {
   const linha = { fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1 }], repasse: { apos_entrega_meses: 36 } } };
   const r = ultimoMesRecebivelLinha(linha, CRONO);
-  const obra = CRONO.find((e) => e.evento === 'obra')!;
-  const fimObra = obra.inicio_mes + obra.duracao_meses - 1;
-  assert.equal(r, fimObra + 36);
+  const pos = CRONO.find((e) => e.evento === 'pos_obra')!;
+  const fimAposChaves = pos.inicio_mes + pos.duracao_meses - 1;
+  // Antes da #345, um `apos_entrega_meses` legado grande (36) estendia o
+  // horizonte além do fim do Após-chaves (fimObra + 36 = 76 > 52). Agora o
+  // offset é travado em 1 (mês 41) — bem dentro do baseline — então o
+  // repasse deixa de ser o termo dominante e o horizonte fica no baseline.
+  assert.equal(r, fimAposChaves);
 });
 
 // Regressão de ponta a ponta: ANTES da #231, o horizonte derivava só de
@@ -1823,13 +1830,13 @@ test('#283 estudo legado sem componentes mantém exatamente o caminho vigente', 
     fluxo_pagamento: {
       entrada: [{ pct: 15, parcelas: 1 }],
       parcelas: [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, pct: 15 }],
-      repasse: { apos_entrega_meses: 2 },
+      repasse: { apos_entrega_meses: 2 }, // #345: ignorado — offset travado em 1
     },
   };
   const vigente = receitaMensalLinha(linha, CRONO, 60);
   assert.ok(perto(vigente[12], 1_500_000, 0.01));
   assert.ok(perto(vigente[17], 1_500_000 / 24, 0.01));
-  assert.ok(perto(vigente[42], 7_000_000, 0.01));
+  assert.ok(perto(vigente[41], 7_000_000, 0.01));
   assert.equal(soma(vigente), 10_000_000);
 
   const consolidado = calcularFluxo({

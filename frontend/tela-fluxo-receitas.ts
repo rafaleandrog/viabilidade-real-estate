@@ -814,14 +814,12 @@ export class ViabFluxoReceitas extends LitElement {
             <div class="pag-secao">
               <h4>Repasse</h4>
               <p class="sec">Evento de liquidação concentrada — o saldo que restar após entrada e
-                parcelamento é pago de uma vez, no mês informado após a entrega.</p>
+                parcelamento é pago de uma vez, sempre no 1º mês após o fim da obra (#345).</p>
               <div class="pag-linha">
                 <div class="repasse-box">
                   <span class="sec">Repasse</span><br />
                   <span class="derivado">${repasse.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</span>
                 </div>
-                <viab-num label="Após entrega" sufixo="meses" casas-decimais="0" ?desabilitado=${dis} .valor=${f.repasse.apos_entrega_meses}
-                  @urbi:input-numero-change=${(e: CustomEvent) => this._setPag('repasse', 'apos_entrega_meses', e.detail.valor ?? 0)}></viab-num>
               </div>
             </div>
           </div>

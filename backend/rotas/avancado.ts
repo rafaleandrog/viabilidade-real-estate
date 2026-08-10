@@ -277,7 +277,7 @@ export function fluxoPagamentoPadrao(): Record<string, any> {
     ret: { ativo: false, pct: 4 },
     entrada: [{ pct: 15, parcelas: 1 }],
     parcelas: [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 15 }],
-    repasse: { apos_entrega_meses: 2 }, // pct derivado = 100 − 15 − 15 = 70
+    repasse: { apos_entrega_meses: 1 }, // #345: repasse travado em 1 mês após a obra; pct derivado = 100 − 15 − 15 = 70
   };
 }
 

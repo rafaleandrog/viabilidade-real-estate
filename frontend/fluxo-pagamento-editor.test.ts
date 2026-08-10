@@ -51,11 +51,14 @@ test('#248 rejeita prazo fixo vazio e aceita parcelas mensais válidas', () => {
   assert.equal(erroFormularioPagamento(form, CRONO), null);
 });
 
-test('#248 percentuais negativos e prazo de repasse fracionário são inválidos', () => {
+test('#248 percentuais negativos são inválidos', () => {
   const form = formularioPagamento(null);
   form.entrada[0].pct = -1;
   assert.match(erroFormularioPagamento(form, CRONO)!, /entre 0% e 100%/);
-  form.entrada[0].pct = 15;
-  form.repasse.apos_entrega_meses = 1.5;
-  assert.match(erroFormularioPagamento(form, CRONO)!, /inteiro não negativo/);
+});
+
+test('#345 repasse.apos_entrega_meses não é mais validado (campo inerte, sem controle na UI)', () => {
+  const form = formularioPagamento(null);
+  form.repasse.apos_entrega_meses = 1.5; // valor fracionário, antes rejeitado
+  assert.equal(erroFormularioPagamento(form, CRONO), null);
 });
