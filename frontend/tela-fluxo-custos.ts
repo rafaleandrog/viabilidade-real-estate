@@ -176,15 +176,11 @@ const BASES_PERMUTA_FINANCEIRA = [
   { valor: 'liquida', rotulo: 'Receita líquida (− imposto e corretagem)' },
 ];
 
-const MODOS_DISTRIBUICAO_PRECO = [
-  { valor: 'fixo', rotulo: 'Fixo (cronograma)' },
-  { valor: 'unit_delivery', rotulo: 'Unit Delivery' },
-  { valor: 'sales_revenue', rotulo: 'Sales Revenue' },
-];
-
 // Linhas obrigatórias por grupo (na ordem declarada): sempre nas primeiras
-// posições, categoria travada e não removíveis. A linha inexistente é criada ao
-// abrir a tela. `unidade` fixa a unidade de orçamento na criação.
+// posições ao abrir a tela pela primeira vez — a linha inexistente é criada
+// automaticamente (`_garantirLinhasObrigatorias`), com `unidade` fixando a
+// unidade de orçamento na criação. #335: não travam mais categoria/remoção
+// depois de criadas — são só a semeadura inicial.
 //
 // A migração 002 moveu "Gestão da obra" de `obra` para `diretos` — este mapa
 // só declara o que hoje é exigido em cada grupo. Não redeclarar "Gestão da
@@ -721,26 +717,32 @@ export class ViabFluxoCustos extends LitElement {
               </div>`;
           }
           if (ePrecoTerreno(c)) {
+            // #337: um único select achata `distribuicao_modo` + `curva_id` — os
+            // dois campos não são duplicata (modo × curva-quando-fixo), mas o
+            // autor pediu um seletor só. Codifica os dois no valor da opção;
+            // o motor continua lendo os dois campos como estão
+            // (fluxo-shared.ts), só o render muda.
             const modo = c.distribuicao_modo || 'fixo';
+            const valorAtual = modo === 'fixo' ? (c.curva_id ? `curva:${c.curva_id}` : 'fixo') : modo;
+            const opcoes = [
+              { valor: 'fixo', rotulo: 'Linear' },
+              ...this.curvas.map((k) => ({ valor: `curva:${k.id}`, rotulo: k.nome })),
+              { valor: 'unit_delivery', rotulo: 'Unit Delivery' },
+              { valor: 'sales_revenue', rotulo: 'Sales Revenue' },
+            ];
             return html`
-              <div class="dist-preco">
-                <urbi-select .valor=${modo} .opcoes=${MODOS_DISTRIBUICAO_PRECO}
-                  @urbi:select-change=${(e: CustomEvent) => this._salvar(c, { distribuicao_modo: e.detail.valor })}
-                ></urbi-select>
-                ${modo === 'fixo' ? html`
-                  <urbi-select
-                    .valor=${c.curva_id ? String(c.curva_id) : ''}
-                    .opcoes=${[{ valor: '', rotulo: 'Linear' },
-                      ...this.curvas.map((k) => ({ valor: String(k.id), rotulo: k.nome }))]}
-                    @urbi:select-change=${(e: CustomEvent) =>
-                      this._salvar(c, { curva_id: e.detail.valor ? Number(e.detail.valor) : null })}
-                  ></urbi-select>` : html`
-                  <span class="mes-calc"
-                    title=${modo === 'unit_delivery'
-                      ? 'Rateado proporcionalmente à receita em caixa (entrada + parcelas + repasse na entrega)'
-                      : 'Rateado proporcionalmente ao VGV vendido (mesma absorção da linha de receita)'}>
-                    ${modo === 'unit_delivery' ? 'Receita em caixa' : 'VGV vendido'} <span>🔒</span></span>`}
-              </div>`;
+              <urbi-select .valor=${valorAtual} .opcoes=${opcoes}
+                @urbi:select-change=${(e: CustomEvent) => {
+                  const v = String(e.detail.valor);
+                  if (v.startsWith('curva:')) {
+                    this._salvar(c, { distribuicao_modo: 'fixo', curva_id: Number(v.slice(6)) });
+                  } else if (v === 'fixo') {
+                    this._salvar(c, { distribuicao_modo: 'fixo', curva_id: null });
+                  } else {
+                    this._salvar(c, { distribuicao_modo: v, curva_id: null });
+                  }
+                }}
+              ></urbi-select>`;
           }
           return html`
             <urbi-select
