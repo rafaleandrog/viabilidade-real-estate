@@ -92,12 +92,15 @@ test('receitaLiquidaLinha: só RET deduz, quando ativo', () => {
   assert.equal(receitaLiquidaLinha(1_000_000, undefined), 1_000_000);
 });
 
-test('periodoAbsorcao vai do Pré-lançamento ao fim do Após-chaves (12m fixos — #226)', () => {
+test('periodoAbsorcao vai do Pré-lançamento ao fim do Pós-chaves (12m fixos — #226)', () => {
   assert.deepEqual(periodoAbsorcao(CRONO), { inicio: 6, fim: 52 });     // começa no pré-lançamento
   assert.equal(periodoAbsorcao([{ evento: 'obra', inicio_mes: 0, duracao_meses: 12 }]), null);
 });
 
-test('#226: a janela Após-chaves ignora pos_obra.duracao_meses — é constante', () => {
+// #348: renomeado de "Após-chaves" para "Pós-chaves" na UI — o teste já
+// travava exatamente o invariante que a issue pede (APOS_CHAVES_MESES fixo,
+// ignorando pos_obra.duracao_meses do Cronograma); só o título mudou.
+test('#226/#348: a janela Pós-chaves ignora pos_obra.duracao_meses — é constante', () => {
   const cronoPosLongo: EventoCrono[] = [
     { evento: 'lancamento', inicio_mes: 6, duracao_meses: 1 },
     { evento: 'obra', inicio_mes: 7, duracao_meses: 24 },

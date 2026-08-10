@@ -121,9 +121,10 @@ export const EVENTO_LABEL: Record<string, string> = {
   lancamento: 'Lançamento',
   obra: 'Obra',
   // BUG7-20: rótulo do evento do Cronograma (fase de custos) — id interno
-  // pos_obra intacto. Não confundir com "Após-chaves"/APOS_CHAVES_MESES em
-  // fluxo-shared.ts:225, a janela comercial fixa de 12 meses da Absorção
-  // (item 30/BUG7-40, conceito separado, fora do escopo desta issue).
+  // pos_obra intacto. Não confundir com "Pós-chaves"/APOS_CHAVES_MESES logo
+  // abaixo, a janela comercial fixa de 12 meses da Absorção (#348) — nomes
+  // parecidos, conceitos diferentes (fase de custo livre × janela de vendas
+  // travada em 12 meses).
   pos_obra: 'Pós-obras',
 };
 
@@ -224,12 +225,15 @@ export function receitaLiquidaLinha(vgv: number, ret: { ativo: boolean; pct: num
   return vgv * (1 - n(ret.pct) / 100);
 }
 
-// #226: janela comercial "Após-chaves" — CONSTANTE do motor, não campo editável.
-// Antes a duração vinha de `pos_obra.duracao_meses` (evento do Cronograma) ou de
-// um bloco de absorção com `duracao_meses` — acoplando a janela de VENDAS à
-// duração de um evento que também serve de ÂNCORA de custo (ex.: manutenção
-// pós-entrega). Editar essa duração no Cronograma não muda mais a absorção — só
-// as âncoras de custo continuam livres, com a duração que já tinham.
+// #226: janela comercial "Pós-chaves" (rótulo renomeado de "Após-chaves" pela
+// #348 — o nome do identificador/constante não mudou) — CONSTANTE do motor,
+// não campo editável. Antes a duração vinha de `pos_obra.duracao_meses`
+// (evento do Cronograma) ou de um bloco de absorção com `duracao_meses` —
+// acoplando a janela de VENDAS à duração de um evento que também serve de
+// ÂNCORA de custo (ex.: manutenção pós-entrega). Editar essa duração no
+// Cronograma não muda mais a absorção — só as âncoras de custo continuam
+// livres, com a duração que já tinham. Não confundir com "Pós-obras" (#328),
+// a fase de CUSTO do Cronograma — nomes parecidos, conceitos diferentes.
 export const APOS_CHAVES_MESES = 12;
 
 /**
@@ -243,7 +247,7 @@ export const APOS_CHAVES_MESES = 12;
  *    Pré-lançamento e Lançamento; a janela comercial "Durante a obra" começa só
  *    depois do Lançamento. Fica vazia (fim < início) se o Lançamento terminar
  *    em ou depois do fim da Obra — ver `problemaJanelaDuranteObra`.
- *  - `pos_obra`       (período 4, "Após-chaves"): início no fim da Obra + 1
+ *  - `pos_obra`       (período 4, "Pós-chaves"): início no fim da Obra + 1
  *    (herdado do evento `pos_obra` do Cronograma), duração FIXA de
  *    `APOS_CHAVES_MESES` — #226, ignora `pos_obra.duracao_meses`.
  * Retorna null se faltar Lançamento, Obra ou Pós-obra no cronograma.
@@ -280,7 +284,7 @@ export function faixasAbsorcao(
 
 /**
  * Problema estrutural do calendário comercial (#225): o Lançamento termina em ou
- * depois do fim da Obra, deixando "Durante a obra" vazia — e, como o Após-chaves
+ * depois do fim da Obra, deixando "Durante a obra" vazia — e, como o Pós-chaves
  * é ancorado no fim da Obra + 1, ele passaria a sobrepor o Lançamento, reintroduzindo
  * a sobreposição que a derivação existe para eliminar. Retorna a explicação para a
  * UI, ou null quando o calendário é coerente.
@@ -299,7 +303,7 @@ export function problemaJanelaDuranteObra(crono: EventoCrono[]): string | null {
 
 /**
  * Período total de absorção de uma linha/fase: do início do Pré-lançamento até
- * o fim do Após-chaves (12 meses fixos — #226). Retorna null se o cronograma
+ * o fim do Pós-chaves (12 meses fixos — #226). Retorna null se o cronograma
  * não tiver os eventos necessários.
  */
 export function periodoAbsorcao(
@@ -359,7 +363,7 @@ export function absorcaoMensal(
 ): { inicio: number; pcts: number[] } | null {
   const modo = absorcao?.modo ?? 'linear';
   const blocos = Array.isArray(absorcao?.blocos) ? absorcao.blocos : [];
-  // #226: a duração do Após-chaves não é mais lida do bloco de absorção nem do
+  // #226: a duração do Pós-chaves não é mais lida do bloco de absorção nem do
   // evento pos_obra — periodoAbsorcao/faixasAbsorcao usam a constante fixa.
   const periodo = periodoAbsorcao(crono);
   if (!periodo) return null;
