@@ -311,6 +311,15 @@ export class ViabFluxoCustos extends LitElement {
     .orc-badges urbi-badge { cursor: pointer; }
     .orc-badges .cu-badge-dis { cursor: default; opacity: 0.6; }
     .orc viab-num { width: 110px; }
+    /* #336: campos de tipologia + quantidade lado a lado (não empilhados) na
+       linha de Permuta física — antes o select de tipologia não tinha
+       largura própria e esticava até o min-content do nome mais longo,
+       fazendo a coluna Orçamento crescer. Largura própria em cada campo
+       evita o esticamento e mantém o total comparável ao das outras
+       linhas do grupo (badges + viab-num de 110px), sem alargar a coluna. */
+    .orc-permuta-fisica { display: flex; align-items: center; gap: 6px; }
+    .orc-permuta-fisica urbi-select { width: 130px; }
+    .orc-permuta-fisica viab-num { width: 90px; }
     .res-calc { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: 0.85rem; }
     .mes-calc { white-space: nowrap; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
     /* #261: só nas colunas Início/Duração, mesma largura reservada de
