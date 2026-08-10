@@ -484,8 +484,6 @@ export class ViabTelaPremissas extends LitElement {
 
           ${this._renderRodapeForm()}
         </urbi-card>
-
-        ${this._renderResumo(lot)}
       ` : nothing}
 
       ${this.secao === 'custos' ? html`
@@ -543,6 +541,8 @@ export class ViabTelaPremissas extends LitElement {
           ${this._renderRodapeForm()}
         </urbi-card>
         ${this.confirmRemoverProduto ? this._renderConfirmRemoverProduto() : nothing}
+
+        ${this._renderResumo(lot)}
       ` : nothing}
 
       ${this.secao === 'permutas' ? html`
