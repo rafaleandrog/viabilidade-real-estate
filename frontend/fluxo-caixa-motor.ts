@@ -170,6 +170,8 @@ export interface FluxoConfig {
   linhasCusto: any[];              // { id, grupo, categoria, subcategoria, orcamento_*, curva_id, inicio_mes, duracao_meses }
   curvas?: any[];                  // avancado_curvas (lookup de curva_id → valores)
   areaTerreno: number;             // m² (Premissas)
+  // #346: RET é global do estudo (era por Grupo, `linhasReceita[i].fluxo_pagamento.ret`).
+  ret?: { ativo: boolean; pct: number };
 }
 
 export interface LinhaCalc {
@@ -1409,22 +1411,27 @@ export function recebimentoBrutoMensal(
 }
 
 /**
- * #228: imposto mensal — RET por Grupo, a ÚNICA entrada fiscal oficial do
- * Avançado (decisão do autor 2026-08-01; o regime da aba Financeiro é
- * exclusivo do Preliminar, `receitaLiquidaLinha` em fluxo-shared.ts). Zero
- * sem RET ativo — o default de todo estudo — o que preserva o Resultado de
- * quem nunca usou RET. Proporcional ao recebimento bruto do mesmo mês: como
- * o % de RET é constante, aplicá-lo por mês (linear) é matematicamente
- * idêntico a aplicá-lo por venda antes de distribuir no tempo — só muda ONDE
- * a dedução é contabilizada, nunca o Resultado final de quem usa RET.
+ * #228: imposto mensal — RET, a ÚNICA entrada fiscal oficial do Avançado
+ * (decisão do autor 2026-08-01; o regime da aba Financeiro é exclusivo do
+ * Preliminar, `receitaLiquidaLinha` em fluxo-shared.ts). Zero sem RET ativo
+ * — o default de todo estudo — o que preserva o Resultado de quem nunca
+ * usou RET. Proporcional ao recebimento bruto do mesmo mês: como o % de RET
+ * é constante, aplicá-lo por mês (linear) é matematicamente idêntico a
+ * aplicá-lo por venda antes de distribuir no tempo — só muda ONDE a dedução
+ * é contabilizada, nunca o Resultado final de quem usa RET.
+ *
+ * #346: RET é GLOBAL do estudo (era por Grupo, `linha.fluxo_pagamento.ret`)
+ * — o único parâmetro que decide é `ret`, passado explicitamente por quem
+ * chama (`calcularFluxo` usa `config.ret`); a função não lê mais o
+ * `fluxo_pagamento` da linha para isso.
  */
 export function impostoMensal(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
+  ret?: { ativo: boolean; pct: number } | null,
 ): number[] {
   const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal);
-  const ret = linha?.fluxo_pagamento?.ret;
   if (!ret?.ativo) return bruto.map(() => 0);
   const pct = n(ret.pct) / 100;
   return bruto.map((v) => round2(v * pct)); // #260 — C7
@@ -1442,9 +1449,10 @@ export function recebimentoLiquidoMensal(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
+  ret?: { ativo: boolean; pct: number } | null,
 ): number[] {
   const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal);
-  const imposto = impostoMensal(linha, cronograma, prazoTotal);
+  const imposto = impostoMensal(linha, cronograma, prazoTotal, ret);
   return bruto.map((v, i) => round2(v - imposto[i])); // #260 — C7
 }
 
@@ -1457,8 +1465,9 @@ export function receitaMensalLinha(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
+  ret?: { ativo: boolean; pct: number } | null,
 ): number[] {
-  return recebimentoLiquidoMensal(linha, cronograma, prazoTotal);
+  return recebimentoLiquidoMensal(linha, cronograma, prazoTotal, ret);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1784,7 +1793,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     vgvTotal: linhasReceita.reduce((s, l) => s + vgvLinha(l.tipologias), 0),
   };
   ctxCusto.receitaTotal = linhasReceita.reduce(
-    (s, l, i) => s + receitaLiquidaLinha(vgvVendavelLinhaMotor(l, i), l.fluxo_pagamento), 0);
+    (s, l, i) => s + receitaLiquidaLinha(vgvVendavelLinhaMotor(l, i), config.ret), 0);
   ctxCusto.totalObra = linhasCusto
     .filter((c) => c.grupo === 'obra' && (c.orcamento_unidade || 'rs') !== 'pct_obra')
     .reduce((s, c) => s + resolverCustoTotal(c, ctxCusto), 0);
@@ -1824,7 +1833,9 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   }).map((linha) => quantizarLinhaMonetaria(linha, taxa));
   const calcReceitasBrutas = montarLinhasReceita(recebimentoBrutoMensal);
   const calcVendasContratadas = montarLinhasReceita(vendaBrutaContratadaMensal);
-  const calcReceitas = montarLinhasReceita(receitaMensalLinha);
+  // #346: RET é global (config.ret) — a série líquida de cada linha usa o
+  // mesmo valor para todas, em vez de ler `linha.fluxo_pagamento.ret`.
+  const calcReceitas = montarLinhasReceita((l, c, p) => receitaMensalLinha(l, c, p, config.ret));
 
   // Receita mensal SÓ das vendas (caixa efetivo: entrada + parcelas + repasse
   // na entrega) — calculada aqui, antes dos custos, porque o modo
@@ -1918,7 +1929,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const impostoTotalMensal = new Array<number>(prazo).fill(0);
   for (const l of linhasReceita) {
     const bruto = recebimentoBrutoMensal(l, crono, prazo);
-    const imp = impostoMensal(l, crono, prazo);
+    const imp = impostoMensal(l, crono, prazo, config.ret);
     for (let i = 0; i < prazo; i++) {
       receitaCaixaBrutaMensal[i] += bruto[i] ?? 0;
       impostoTotalMensal[i] += imp[i] ?? 0;

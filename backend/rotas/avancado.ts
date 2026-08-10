@@ -273,6 +273,10 @@ export function absorcaoPadrao(): Record<string, any> {
 }
 export function fluxoPagamentoPadrao(): Record<string, any> {
   return {
+    // #346: comissao/ret sobrevivem como campos inertes (pass-through) — a
+    // corretagem já era só informativa (#228) e o RET virou controle GLOBAL
+    // do estudo (estudos.considerar_ret/ret_pct); nenhum dos dois é mais
+    // lido pelo motor nem editável nesta tela.
     comissao: { ativo: true, tipo: 'embutida', pct: 6 },
     ret: { ativo: false, pct: 4 },
     entrada: [{ pct: 15, parcelas: 1 }],
@@ -427,6 +431,10 @@ rotasAvancado.get('/estudos/:id/avancado/parametros', async (req: Request, res: 
       taxa_desconto_aa: estudo.taxa_desconto_aa !== null && estudo.taxa_desconto_aa !== undefined
         ? Number(estudo.taxa_desconto_aa) : 12,
       tem_pre_lancamento: estudo.tem_pre_lancamento !== false,
+      // #346: RET era controle por Grupo (avancado_fases.fluxo_pagamento.ret) —
+      // agora é global, mesma leitura em qualquer tela que precise dele.
+      considerar_ret: estudo.considerar_ret === true,
+      ret_pct: estudo.ret_pct !== null && estudo.ret_pct !== undefined ? Number(estudo.ret_pct) : 4,
     });
   } catch (e: any) {
     console.error('Erro em GET /avancado/parametros:', e);
@@ -460,6 +468,17 @@ rotasAvancado.patch('/estudos/:id/avancado/parametros', async (req: Request, res
     if (req.body.tem_pre_lancamento !== undefined) {
       dados.tem_pre_lancamento = Boolean(req.body.tem_pre_lancamento);
     }
+    if (req.body.considerar_ret !== undefined) {
+      dados.considerar_ret = Boolean(req.body.considerar_ret);
+    }
+    if (req.body.ret_pct !== undefined) {
+      const t = Number(req.body.ret_pct);
+      if (!Number.isFinite(t) || t < 0 || t > 100) {
+        erro(res, 400, 'RET_PCT_INVALIDO', 'ret_pct deve ser um percentual entre 0 e 100');
+        return;
+      }
+      dados.ret_pct = t;
+    }
     if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
 
     const atualizado = await req.dados!.atualizar('estudos', estudo.id, dados);
@@ -472,6 +491,8 @@ rotasAvancado.patch('/estudos/:id/avancado/parametros', async (req: Request, res
       data_inicio_projeto: atualizado.data_inicio_projeto ?? null,
       taxa_desconto_aa: Number(atualizado.taxa_desconto_aa ?? 12),
       tem_pre_lancamento: atualizado.tem_pre_lancamento !== false,
+      considerar_ret: atualizado.considerar_ret === true,
+      ret_pct: Number(atualizado.ret_pct ?? 4),
     });
   } catch (e: any) {
     console.error('Erro em PATCH /avancado/parametros:', e);

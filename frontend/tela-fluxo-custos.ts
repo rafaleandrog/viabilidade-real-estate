@@ -10,7 +10,7 @@ import {
 } from './fluxo-shared.js';
 import {
   urbiVerso,
-  buscarParametrosAvancado, buscarCronogramaAvancado, listarReceitasAvancado,
+  buscarParametrosAvancado, atualizarParametrosAvancado, buscarCronogramaAvancado, listarReceitasAvancado,
   listarCurvas, listarCustosAvancado, criarCustoAvancado, atualizarCustoAvancado, removerCustoAvancado,
   listarFasesAvancado, listarTipologiasCatalogo,
 } from './viabilidade-api.js';
@@ -252,6 +252,12 @@ export class ViabFluxoCustos extends LitElement {
   @state() private fasesCronograma: any[] = [];
   @state() private crono: EventoCrono[] = [];
   @state() private dataInicio: string | null = null;
+  // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret). `ret`
+  // alimenta o cálculo (ctxCusto/FluxoConfig); `retForm` é o rascunho editável
+  // do controle em Custos → Financeiro (padrão rascunho + Salvar — #51/#252).
+  private ret: { ativo: boolean; pct: number } = { ativo: false, pct: 4 };
+  @state() private retForm: { ativo: boolean; pct: number } = { ativo: false, pct: 4 };
+  @state() private salvandoRet = false;
   @state() private carregando = true;
   @state() private removerAlvo: any = null;
   // #192: empilha "Gestão da obra" junto da Construção nos gráficos de avanço.
@@ -306,6 +312,8 @@ export class ViabFluxoCustos extends LitElement {
       border-radius: 0 0 8px 8px;
     }
     .rodape-custo .espaco { flex: 1; }
+    /* #346: RET, único controle global exibido dentro do grupo Financeiro. */
+    .ret-box { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .total-rotulo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.75rem); margin-right: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
     .total-valor { font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
     .orc { display: inline-flex; flex-direction: column; gap: 6px; align-items: flex-start; }
@@ -392,21 +400,23 @@ export class ViabFluxoCustos extends LitElement {
       if (!params?.erro) {
         this.dataInicio = params.data_inicio_projeto ?? null;
         this.taxaDesconto = Number(params.taxa_desconto_aa ?? 12);
+        this.ret = { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) };
+        this.retForm = { ...this.ret };
       }
       const linhas = receitas?.erro ? [] : (receitas.dados || []);
       this.linhasReceita = linhas;
       // Contexto de resolução idêntico ao do motor (fluxo-caixa-motor.ts): além de
       // área/VGV, calcula a RECEITA total (líquida do único imposto oficial do
-      // Avançado — RET por Grupo, #228) para que a coluna Resultado de linhas em
-      // `% Receita` bata exatamente com o que o motor computa (antes, sem
-      // `receitaTotal`, o cálculo caía no fallback VGV e divergia do fluxo de
-      // caixa — issue #118).
+      // Avançado — RET, global desde a #346, antes por Grupo, #228) para que a
+      // coluna Resultado de linhas em `% Receita` bata exatamente com o que o
+      // motor computa (antes, sem `receitaTotal`, o cálculo caía no fallback
+      // VGV e divergia do fluxo de caixa — issue #118).
       this.ctxCusto = {
         areaPrivativaTotal: areaPrivativaTotalLinhas(linhas),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
         vgvTotal: linhas.reduce((s: number, l: any) => s + vgvLinha(l.tipologias), 0),
         receitaTotal: linhas.reduce(
-          (s: number, l: any) => s + receitaLiquidaLinha(vgvLinha(l.tipologias), l.fluxo_pagamento), 0),
+          (s: number, l: any) => s + receitaLiquidaLinha(vgvLinha(l.tipologias), this.ret), 0),
       };
       // Alinha a linha Construção ao cronograma (evento Obra) — depende de crono +
       // custos já carregados. Editável apenas (#120).
@@ -450,6 +460,8 @@ export class ViabFluxoCustos extends LitElement {
             title="Em breve">Importar Planilha</urbi-botao>
         </div>
 
+        ${g.id === 'financeiro' ? this._renderRet() : nothing}
+
         <urbi-tabela
           expandir
           .colunas=${this._colunas(g)}
@@ -469,6 +481,32 @@ export class ViabFluxoCustos extends LitElement {
         </div>
       </urbi-card>
       ${g.id === 'obra' ? this._renderAvancoObra() : nothing}
+    `;
+  }
+
+  // #346: RET (Regime Especial de Tributação) — controle global do estudo,
+  // movido de Receitas → Fluxo de pagamento → Definições para cá (a única
+  // entrada fiscal com efeito real no motor, `fluxo-shared.ts`). Rascunho +
+  // Salvar (A4/#51/#252): `viab-num` não tem estado próprio de "sujo", então
+  // sem rascunho o valor voltaria ao salvo a cada re-render.
+  private _renderRet(): TemplateResult {
+    const dis = !this.editavel;
+    return html`
+      <div class="ret-box">
+        <urbi-checkbox
+          label="RET (Regime Especial de Tributação — patrimônio de afetação)"
+          ?desabilitado=${dis}
+          ?marcado=${this.retForm.ativo}
+          @urbi:checkbox-change=${(e: CustomEvent) => { this.retForm = { ...this.retForm, ativo: e.detail.marcado }; }}
+        ></urbi-checkbox>
+        ${this.retForm.ativo ? html`
+          <viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${this.retForm.pct}
+            @urbi:input-numero-change=${(e: CustomEvent) => { this.retForm = { ...this.retForm, pct: e.detail.valor ?? 0 }; }}
+          ></viab-num>` : nothing}
+        ${!dis ? html`
+          <urbi-botao variante="secundario" pequeno ?carregando=${this.salvandoRet}
+            @click=${this._salvarRet}>Salvar</urbi-botao>` : nothing}
+      </div>
     `;
   }
 
@@ -510,6 +548,7 @@ export class ViabFluxoCustos extends LitElement {
       linhasCusto: this.custos,
       curvas: this.curvas,
       areaTerreno: this.ctxCusto.areaTerreno,
+      ret: this.ret,
     };
     return calcularFluxo(config);
   }
@@ -911,6 +950,28 @@ export class ViabFluxoCustos extends LitElement {
     if (Number(c.inicio_mes) !== Number(obra.inicio_mes)) patch.inicio_mes = Number(obra.inicio_mes);
     if (Number(c.duracao_meses) !== Number(obra.duracao_meses)) patch.duracao_meses = Number(obra.duracao_meses);
     if (Object.keys(patch).length) await this._salvar(c, patch);
+  }
+
+  // #346: RET é controle global do estudo (estudos.considerar_ret/ret_pct) —
+  // salva via /avancado/parametros, o mesmo endpoint de data_inicio_projeto/
+  // taxa_desconto_aa. Recarrega tudo depois, como `_salvarParametros` faz em
+  // tela-fluxo-cronograma.ts, para `ctxCusto.receitaTotal` e o Fluxo de Avanço
+  // da Obra (`_calcObra`) refletirem o novo valor na hora.
+  private async _salvarRet() {
+    this.salvandoRet = true;
+    try {
+      const res = await atualizarParametrosAvancado(this.estudo.id, {
+        considerar_ret: this.retForm.ativo,
+        ret_pct: this.retForm.pct,
+      });
+      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      await this._carregar();
+      urbiVerso.notificar('RET salvo.', 'sucesso');
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao salvar RET', 'erro');
+    } finally {
+      this.salvandoRet = false;
+    }
   }
 
   // Cria as linhas obrigatórias (de todos os grupos) que ainda não existem.

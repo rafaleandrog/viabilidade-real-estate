@@ -80,15 +80,16 @@ test('vgv de tipologia e de linha', () => {
   assert.equal(vgvLinha([t1, t2]), 13_720_000);
 });
 
-// #228: receitaLiquidaLinha substitui vglLinha — RET é o único imposto oficial
-// do Avançado; comissão NUNCA deduz (já é a linha de custo obrigatória de
-// Corretagem, #227 — deduzir aqui também dobrava o efeito quando "Destacada").
-test('receitaLiquidaLinha: só RET deduz; comissão (destacada ou embutida) nunca deduz', () => {
-  const fpDestacada = { comissao: { ativo: true, tipo: 'destacada', pct: 5 }, ret: { ativo: true, pct: 4 } };
-  assert.equal(receitaLiquidaLinha(1_000_000, fpDestacada), 1_000_000 - 40_000); // só o RET
-  const fpEmbutida = { comissao: { ativo: true, tipo: 'embutida', pct: 5 }, ret: { ativo: false, pct: 4 } };
-  assert.equal(receitaLiquidaLinha(1_000_000, fpEmbutida), 1_000_000); // sem RET, sem dedução
+// #228/#346: receitaLiquidaLinha substitui vglLinha — RET é o único imposto
+// oficial do Avançado (agora global, #346 — o parâmetro é o RET já resolvido,
+// não mais o fluxo_pagamento de onde extraí-lo); comissão NUNCA deduz aqui (já
+// é a linha de custo obrigatória de Corretagem, #227 — deduzir aqui também
+// dobrava o efeito quando "Destacada").
+test('receitaLiquidaLinha: só RET deduz, quando ativo', () => {
+  assert.equal(receitaLiquidaLinha(1_000_000, { ativo: true, pct: 4 }), 1_000_000 - 40_000); // só o RET
+  assert.equal(receitaLiquidaLinha(1_000_000, { ativo: false, pct: 4 }), 1_000_000); // sem RET, sem dedução
   assert.equal(receitaLiquidaLinha(1_000_000, null), 1_000_000);
+  assert.equal(receitaLiquidaLinha(1_000_000, undefined), 1_000_000);
 });
 
 test('periodoAbsorcao vai do Pré-lançamento ao fim do Após-chaves (12m fixos — #226)', () => {

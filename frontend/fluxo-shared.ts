@@ -206,16 +206,20 @@ export function vgvVendavelLinha(tipologias: any[]): number {
 
 /**
  * Receita líquida de uma linha, para fins de BASE DE CUSTO (`pct_receita`) —
- * VGV menos o único imposto oficial do Avançado: RET por Grupo (#228, decisão
- * do autor 2026-08-01 — o regime da aba Financeiro, `regime_tributario`/
- * `aliquota_*`, é exclusivo do Preliminar e não é lido pelo motor do
- * Avançado). Substitui `vglLinha` (removida): a comissão NUNCA deduz aqui —
- * ela já é a linha de custo obrigatória "Corretagem de vendas" (#227);
- * deduzi-la também da receita duplicava o efeito quando o comissionamento
- * era "Destacada", o bug que a #228 corrige.
+ * VGV menos o único imposto oficial do Avançado: RET (#228, decisão do autor
+ * 2026-08-01 — o regime da aba Financeiro, `regime_tributario`/`aliquota_*`,
+ * é exclusivo do Preliminar e não é lido pelo motor do Avançado). Substitui
+ * `vglLinha` (removida): a comissão NUNCA deduz aqui — ela já é a linha de
+ * custo obrigatória "Corretagem de vendas" (#227); deduzi-la também da
+ * receita duplicava o efeito quando o comissionamento era "Destacada", o
+ * bug que a #228 corrige.
+ *
+ * #346: RET era controle POR GRUPO (`fluxo_pagamento.ret`, JSON por fase) —
+ * agora é GLOBAL do estudo (`estudos.considerar_ret`/`ret_pct`), o mesmo
+ * valor para toda linha de receita. O parâmetro passou a ser o RET já
+ * resolvido, não mais o `fluxo_pagamento` de onde extraí-lo.
  */
-export function receitaLiquidaLinha(vgv: number, fluxoPagamento: any): number {
-  const ret = fluxoPagamento?.ret;
+export function receitaLiquidaLinha(vgv: number, ret: { ativo: boolean; pct: number } | null | undefined): number {
   if (!ret?.ativo) return vgv;
   return vgv * (1 - n(ret.pct) / 100);
 }

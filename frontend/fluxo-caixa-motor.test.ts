@@ -402,17 +402,18 @@ test('#228: marcar comissão "Destacada" não muda mais o Resultado (fim da dupl
   assert.ok(perto(soma(rEmbutida.receitaMensal), 10_000_000, 1));
 });
 
-test('#228: RET reduz o Resultado uma única vez (imposto), sem dobrar com a comissão', () => {
+test('#228/#346: RET reduz o Resultado uma única vez (imposto), sem dobrar com a comissão', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
       absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
-      fluxo_pagamento: { comissao: { ativo: true, tipo: 'destacada', pct: 6 }, ret: { ativo: true, pct: 4 } },
+      fluxo_pagamento: { comissao: { ativo: true, tipo: 'destacada', pct: 6 } },
     }],
     linhasCusto: [],
     areaTerreno: 0,
+    ret: { ativo: true, pct: 4 }, // #346: RET é global, não mais lido de fluxo_pagamento
   };
   const r = calcularFluxo(config);
   // Receita líquida = 10M − 4% de RET = 9,6M — a comissão "destacada" não soma
@@ -635,13 +636,14 @@ test('#238: permuta financeira bruta (default) não deduz imposto/corretagem da 
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
       absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
-      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 }, ret: { ativo: true, pct: 4 } },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
     }],
     linhasCusto: [
       { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
       { id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira', orcamento_valor: 10, orcamento_unidade: 'pct_vgv' },
     ],
     areaTerreno: 0,
+    ret: { ativo: true, pct: 4 }, // #346: RET global ativo — mesmo assim, a base bruta não deduz
   };
   const r = calcularFluxo(config);
   const deducao = r.linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
@@ -656,7 +658,7 @@ test('#238: permuta financeira líquida deduz imposto e corretagem da base antes
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
       absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
-      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 }, ret: { ativo: true, pct: 4 } },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
     }],
     linhasCusto: [
       { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
@@ -666,6 +668,7 @@ test('#238: permuta financeira líquida deduz imposto e corretagem da base antes
       },
     ],
     areaTerreno: 0,
+    ret: { ativo: true, pct: 4 }, // #346: RET é global, não mais lido de fluxo_pagamento
   };
   const r = calcularFluxo(config);
   const deducao = r.linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
@@ -1796,7 +1799,6 @@ test('#237 Receita Bruta fecha por linha e tipologia sem deduzir RET ou corretag
       fluxo_pagamento: {
         componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }],
         comissao: { ativo: true, tipo: 'destacada', pct: 6 },
-        ret: { ativo: true, pct: 4 },
       },
     }],
     linhasCusto: [{
@@ -1804,6 +1806,7 @@ test('#237 Receita Bruta fecha por linha e tipologia sem deduzir RET ou corretag
       orcamento_valor: 6, orcamento_unidade: 'pct_vgv', inicio_mes: 0, duracao_meses: 1,
     }],
     areaTerreno: 0,
+    ret: { ativo: true, pct: 4 }, // #346: RET é global, não mais lido de fluxo_pagamento
   };
   const r = calcularFluxo(config);
   const linha = r.linhasReceitaBruta[0];
@@ -1917,13 +1920,14 @@ test('#238 permutaAlternativa expõe a base NÃO escolhida, para auditoria', () 
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
       absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
-      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 }, ret: { ativo: true, pct: 4 } },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
     }],
     linhasCusto: [
       { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
       linhaPermuta(base),
     ],
     areaTerreno: 0,
+    ret: { ativo: true, pct: 4 }, // #346: RET é global, não mais lido de fluxo_pagamento
   });
   const achar = (c: FluxoConfig) =>
     calcularFluxo(c).linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
