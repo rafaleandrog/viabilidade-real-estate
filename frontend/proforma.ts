@@ -55,8 +55,10 @@ export interface ProformaInput {
   construcao_modo?: string; custo_construcao_m2?: number | string; construcao_valor_total?: number | string; construcao_valor_canonico?: number | string;
   taxa_gestao_pct?: number | string; custo_decoracao_m2?: number | string;
   manutencao_pct?: number | string; contingencias_pct?: number | string; stand_vendas_valor?: number | string;
+  considerar_contingencias?: boolean;
   // custos indiretos
   marketing_global_pct?: number | string; gestao_indiretos_pct?: number | string;
+  considerar_marketing_global?: boolean; considerar_gestao_indiretos?: boolean;
   // permuta física — o par legado (`permuta_fisica_*`) é o RESIDENCIAL (e o único
   // do loteamento); o par `_nr_*` é o não residencial (só incorporação). (#10)
   permuta_fisica_modo?: string; permuta_fisica_area_m2?: number | string; permuta_fisica_pct?: number | string; permuta_fisica_area_canonica?: number | string;
@@ -261,14 +263,15 @@ export function calcularProforma(e: ProformaInput): Proforma {
     : 0);
   const incorporacaoRegistro = lot ? 0 : vgv * n(e.incorporacao_registro_pct) / 100;
   const manutencao = vgv * n(e.manutencao_pct) / 100;
-  const contingencias = vgv * n(e.contingencias_pct) / 100;
+  const contingencias = e.considerar_contingencias === false ? 0 : vgv * n(e.contingencias_pct) / 100;
 
   const custoDiretoTotal = custoTerreno + projetos + infraestrutura + outorga + incorporacaoRegistro
     + construcao + gestaoConstrucao + decoracao + manutencao + contingencias;
 
   // ── Custos indiretos ──
-  const marketingGlobal = vgv * n(e.marketing_global_pct) / 100 + (lot ? n(e.stand_vendas_valor) : 0);
-  const gestaoIndiretos = vgv * n(e.gestao_indiretos_pct) / 100;
+  const marketingGlobal = (e.considerar_marketing_global === false ? 0 : vgv * n(e.marketing_global_pct) / 100)
+    + (lot ? n(e.stand_vendas_valor) : 0);
+  const gestaoIndiretos = e.considerar_gestao_indiretos === false ? 0 : vgv * n(e.gestao_indiretos_pct) / 100;
   const custoIndiretoTotal = marketingGlobal + gestaoIndiretos;
 
   // Receita operacional = receita líquida − custo direto total (antes dos indiretos).

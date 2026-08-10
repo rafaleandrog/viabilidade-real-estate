@@ -80,6 +80,25 @@ test('custo do terreno desconsiderado zera a linha', () => {
   assert.equal(p.custoTerreno, 0);
 });
 
+// item 5 — checkbox por custo: Marketing global/estrutura, Gestão indiretos,
+// Contingências, mesmo padrão de considerar_custo_terreno.
+test('contingências desconsideradas zera a linha (custo direto)', () => {
+  const p = calcularProforma({ ...LOT, considerar_contingencias: false, contingencias_pct: 5 });
+  assert.equal(p.contingencias, 0);
+  const comContingencia = calcularProforma({ ...LOT, contingencias_pct: 5 });
+  assert.ok(comContingencia.contingencias > 0);
+});
+
+test('marketing global desconsiderado zera só a parte percentual (custo indireto) — stand de vendas continua', () => {
+  const p = calcularProforma({ ...LOT, considerar_marketing_global: false, stand_vendas_valor: 50_000 });
+  assert.ok(perto(p.marketingGlobal, 50_000), `marketingGlobal=${p.marketingGlobal}`);
+});
+
+test('gestão indiretos desconsiderada zera a linha (custo indireto)', () => {
+  const p = calcularProforma({ ...LOT, considerar_gestao_indiretos: false });
+  assert.equal(p.gestaoIndiretos, 0);
+});
+
 test('RET fixa imposto em 4%', () => {
   const p = calcularProforma({ ...LOT, sujeito_ret: true });
   assert.ok(perto(p.imposto, 3_000_000), `imposto RET=${p.imposto}`); // 4% de 75M
