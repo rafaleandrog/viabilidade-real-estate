@@ -36,6 +36,11 @@ export class ViabEmpreendimentoTipologias extends LitElement {
   @state() private tipologias: any[] = [];
   @state() private carregando = true;
   @state() private confirmRemover: any | null = null;
+  // #331: rascunho local do Nome (padrão #51/#252) — digitar rápido não perde
+  // caractere porque o round-trip do PATCH não reescreve `this.tipologias`
+  // no meio da digitação; persiste só no clique em "Salvar". Os demais campos
+  // (viab-num) não precisam disso: já mascaram o mesmo bug com `_rascunho` local.
+  @state() private draftNome: Record<number, string> = {};
   private carregado = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
@@ -70,6 +75,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     table.tip td.nome urbi-input { width: 100%; }
     table.tip td.tipo urbi-select { width: 148px; }
     table.tip td viab-num { width: 100%; }
+    table.tip td.acoes .acoes-grupo { display: flex; gap: 4px; justify-content: flex-end; align-items: center; }
 
     tr.total td {
       font-weight: 700; border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2));
@@ -168,12 +174,13 @@ export class ViabEmpreendimentoTipologias extends LitElement {
         @urbi:input-numero-change=${(e: CustomEvent) => this._salvar(t, { [campo]: e.detail.valor })}
       ></viab-num>`;
 
+    const nomeSujo = this._nomeSujo(t);
     return html`
       <tr>
         <td class="nome">
-          <urbi-input ?desabilitado=${dis} .valor=${t.nome || ''}
+          <urbi-input ?desabilitado=${dis} .valor=${this.draftNome[t.id] ?? (t.nome || '')}
             placeholder=${lote ? 'Lote' : 'Ex.: Studio'}
-            @urbi:input-change=${(e: CustomEvent) => this._salvar(t, { nome: e.detail.valor })}
+            @urbi:input-change=${(e: CustomEvent) => this._editarNome(t, e.detail.valor)}
           ></urbi-input>
         </td>
         ${lote ? nothing : html`
@@ -188,9 +195,14 @@ export class ViabEmpreendimentoTipologias extends LitElement {
           <td class="num">${num('vagas', '', 0)}</td>`}
         <td class="num">${num('quantidade', '', 0)}</td>
         ${dis ? nothing : html`
-          <td class="num">
-            <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
-              @click=${() => { this.confirmRemover = t; }}></urbi-botao>
+          <td class="num acoes">
+            <div class="acoes-grupo">
+              ${nomeSujo ? html`
+                <urbi-botao variante="primario" pequeno icone="fa-solid fa-check" title="Salvar nome"
+                  @click=${() => this._salvarNome(t)}></urbi-botao>` : nothing}
+              <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
+                @click=${() => { this.confirmRemover = t; }}></urbi-botao>
+            </div>
           </td>`}
       </tr>
     `;
@@ -216,6 +228,24 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');
     }
+  }
+
+  // #331: edição do Nome fica só no rascunho local — nenhum PATCH por tecla.
+  private _editarNome(t: any, valor: string) {
+    this.draftNome = { ...this.draftNome, [t.id]: valor };
+  }
+
+  private _nomeSujo(t: any): boolean {
+    const d = this.draftNome[t.id];
+    return d !== undefined && d !== (t.nome || '');
+  }
+
+  private async _salvarNome(t: any) {
+    const valor = this.draftNome[t.id];
+    if (valor === undefined) return;
+    await this._salvar(t, { nome: valor });
+    const { [t.id]: _descartado, ...resto } = this.draftNome;
+    this.draftNome = resto;
   }
 
   private _renderConfirm(): TemplateResult {
