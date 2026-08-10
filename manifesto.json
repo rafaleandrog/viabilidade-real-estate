@@ -48,6 +48,11 @@
       "titulo": "Benchmark",
       "rota": "/benchmarks",
       "icone": "fa-solid fa-gauge-high"
+    },
+    {
+      "titulo": "Curvas",
+      "rota": "/curvas",
+      "icone": "fa-solid fa-wave-square"
     }
   ],
   "ia": true,

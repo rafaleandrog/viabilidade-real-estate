@@ -17,7 +17,7 @@ import { estiloPagina } from './estilos.js';
 
 interface Rota {
   tela: 'dashboard' | 'estudo';
-  aba?: 'estudos' | 'terrenos' | 'benchmark';
+  aba?: 'estudos' | 'terrenos' | 'benchmark' | 'curvas';
   estudoId?: number;
   abaEstudo?: string;    // guia dentro do estudo. Preliminar: premissas|proforma|graficos|apelo.
                          // Avançado: resumo|empreendimento|viabilidade|custos|fluxo|cenarios|mercado.
@@ -32,6 +32,9 @@ function parsearSubRota(sub: string): Rota {
   }
   if (partes[0] === 'terrenos') return { tela: 'dashboard', aba: 'terrenos' };
   if (partes[0] === 'benchmarks') return { tela: 'dashboard', aba: 'benchmark' };
+  // BUG7-16: Curvas como aba geral — a tela já existia só em telas_config.curvas
+  // (Admin → Apps); esta rota nova é a 2ª exposição, mesmo padrão do Benchmark.
+  if (partes[0] === 'curvas') return { tela: 'dashboard', aba: 'curvas' };
   return { tela: 'dashboard', aba: 'estudos' };
 }
 
