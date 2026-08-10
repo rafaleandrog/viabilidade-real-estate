@@ -786,10 +786,17 @@ export class ViabFluxoCustos extends LitElement {
           }
           // #167: além dos 5 eventos fixos, ancora numa fase do Cronograma
           // (tipo='cronograma', lista separada da de Receitas desde o #168).
-          const opcoes = [...EVENTOS_ANCORA, ...this.fasesCronograma.map((f) => ({
+          const valorAtual = c.fase_ancora_id ? `fase:${c.fase_ancora_id}` : (c.cronograma_evento || 'customizado');
+          // #330: some do combo quando o estudo não tem Pré-lançamento — a
+          // menos que esta linha já esteja ancorada nele (legado), caso em
+          // que fica visível para não quebrar o select num valor sem opção.
+          const temPreLancamento = this.crono.some((ev) => ev.evento === 'pre_lancamento');
+          const eventosAncora = temPreLancamento || valorAtual === 'pre_lancamento'
+            ? EVENTOS_ANCORA
+            : EVENTOS_ANCORA.filter((ev) => ev.valor !== 'pre_lancamento');
+          const opcoes = [...eventosAncora, ...this.fasesCronograma.map((f) => ({
             valor: `fase:${f.id}`, rotulo: f.nome || 'Fase',
           }))];
-          const valorAtual = c.fase_ancora_id ? `fase:${c.fase_ancora_id}` : (c.cronograma_evento || 'customizado');
           return html`
             <urbi-select .valor=${valorAtual} .opcoes=${opcoes}
               @urbi:select-change=${(e: CustomEvent) => {
