@@ -9,10 +9,13 @@ import {
   listarGlebasNucleo, listarLotesNucleo,
 } from './viabilidade-api.js';
 import './viabilidade-config-benchmarks.js';
+import './viabilidade-config-curvas.js';
 
 @customElement('viab-tela-dashboard')
 export class ViabTelaDashboard extends LitElement {
-  @property({ type: String }) aba: 'estudos' | 'terrenos' | 'benchmark' = 'estudos';
+  // BUG7-16: 'curvas' — dupla exposição igual ao Benchmark (aba de topo aqui +
+  // telas_config.curvas em Admin → Apps, inalterado).
+  @property({ type: String }) aba: 'estudos' | 'terrenos' | 'benchmark' | 'curvas' = 'estudos';
 
   @state() private estudos: any[] = [];
   @state() private carregando = true;
@@ -44,6 +47,7 @@ export class ViabTelaDashboard extends LitElement {
     { id: 'estudos', label: 'Estudos', icone: 'fa-solid fa-chart-line' },
     { id: 'terrenos', label: 'Terrenos', icone: 'fa-solid fa-map-location-dot' },
     { id: 'benchmark', label: 'Benchmark', icone: 'fa-solid fa-gauge-high' },
+    { id: 'curvas', label: 'Curvas', icone: 'fa-solid fa-wave-square' },
   ];
 
   connectedCallback() {
@@ -104,7 +108,11 @@ export class ViabTelaDashboard extends LitElement {
           .ativa=${this.aba}
           @urbi:aba-selecionar=${(e: CustomEvent) => {
             const id = e.detail?.id;
-            urbiVerso.navegarSub(id === 'terrenos' ? '/terrenos' : id === 'benchmark' ? '/benchmarks' : '/');
+            urbiVerso.navegarSub(
+              id === 'terrenos' ? '/terrenos'
+                : id === 'benchmark' ? '/benchmarks'
+                : id === 'curvas' ? '/curvas'
+                : '/');
           }}
         >
           <urbi-hospedeiro slot="estudos">${this._renderEstudos()}</urbi-hospedeiro>
@@ -113,6 +121,9 @@ export class ViabTelaDashboard extends LitElement {
             <viabilidade-config-benchmarks
               .somenteLeitura=${urbiVerso.contexto()?.nivel !== 'admin'}
             ></viabilidade-config-benchmarks>
+          </urbi-hospedeiro>
+          <urbi-hospedeiro slot="curvas">
+            <viabilidade-config-curvas></viabilidade-config-curvas>
           </urbi-hospedeiro>
         </urbi-abas>
       </urbi-shell-page>
