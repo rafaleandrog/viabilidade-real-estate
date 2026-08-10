@@ -4,6 +4,37 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 7 — Fases 1–8 concluídas (E01–E40, issues #309–#348), portão antes da Fase 9 (2026-08-10)
+
+Sessão contínua, uma issue de cada vez, cada uma com seu próprio branch → PR → CI verde → merge →
+confirmação de fechamento (nunca assumido). Sem desvio do plano de execução E01→E47.
+
+- **Fases 1–6** (E01–E26, Preliminar/Mercado-IA/Resumo-KPI/Cronograma/Tipologias): mergeadas em
+  segmentos anteriores desta mesma sessão.
+- **Fase 7 — Avançado: Custos** (E27–E32, #335–#340): reverteu categorias obrigatórias (D5, com
+  alerta de duplicata em vez de bloqueio), achatou a distribuição do Preço num único select, alinhou
+  os campos de permuta física lado a lado, somou a área permutada no rodapé de Terreno, acrescentou
+  `lancamento` às âncoras de Cronograma (migração `026`, `versao`→`0.1.25`) e o aviso de unidades não
+  alocadas em Tipologias.
+- **Fase 8 — Avançado: Receitas** (E33–E40, #341–#348): nome padrão "Nº Grupo" por maior sufixo
+  (não contagem — corrige colisão pós-exclusão), removida a badge de periodicidade e o texto redundante
+  de "100%", campo Nº Parcelas oculto (não só desabilitado) em "Ao longo da obra", repasse travado em
+  1 mês após a obra nos três pontos do motor, RET promovido a controle GLOBAL do estudo (migração
+  `027`, `versao`→`0.1.26`, saiu do bloco Definições em Receitas para Custos → Financeiro), Absorção
+  de vendas passou a acompanhar o Pré-lançamento do Cronograma com soma travada em 100% (frontend e
+  backend) e a janela comercial renomeada para "Pós-chaves".
+
+**Todas as 40 issues de E01 a E40 estão fechadas** (confirmado via `issue_read` após cada merge, não
+assumido pela existência do PR). Nenhum portão de fase pulado.
+
+**Próximo passo — Fase 9 (E41–E43, #349–#351)**: reconstrução da tabela de fluxo (absorve o Capital
+Stack legado nas categorias de receita/custo, cruza a fronteira arquitetural que hoje separa
+`fluxoLivreMensal` do funding) e a divisão em três abas (Fluxo de Caixa/Proforma/Análise Financeira).
+São os dois itens 🔴 muito alta risco do plano inteiro, fora **E47**/#355. Sessão parou aqui para
+confirmar com o autor antes de entrar nessa fase — não é decisão unilateral de continuar.
+
+---
+
 ## Rodada 7 — planejamento e abertura das 47 issues (2026-08-10)
 
 O autor entregou `lista_bugs_20260807.xlsx` (47 itens, numerados 1–41 e 43–48 — **o item 42 não
