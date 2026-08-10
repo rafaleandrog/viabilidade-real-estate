@@ -1,7 +1,10 @@
 import { Router, type Request, type Response } from 'express';
 import { exigirMembro, exigirEditor } from '../permissoes-estudo.js';
 import { publicarEvento, payloadApeloConcluido } from '../eventos-viabilidade.js';
-import { FATORES, SCHEMA_RESPOSTA, instrucoesSistema, calcularScores } from '../apelo-comercial.js';
+import {
+  FATORES, SCHEMA_RESPOSTA, instrucoesSistema, calcularScores,
+  montarContextoApelo, normalizarRespostaApelo,
+} from '../apelo-comercial.js';
 
 export const rotasApelo: ReturnType<typeof Router> = Router();
 
@@ -98,8 +101,21 @@ rotasApelo.post('/estudos/:id/apelo-comercial', async (req: Request, res: Respon
       return;
     }
 
-    // Extrair conteúdo dos arquivos + reunir textos adicionais.
+    // BUG7-15: localidade é a causa dominante do diagnóstico — os 6 fatores são
+    // todos geográficos, e sem ela o modelo não tem o que avaliar (nota null em
+    // tudo). Região monitorada > UF do estudo, mesma prioridade de analise-mercado.ts.
+    const regiaoId = estudo.regiao_mercado_id ?? null;
+    const regiao = regiaoId ? await req.dados!.buscar('mercado_regioes', Number(regiaoId)) : null;
+    const localidade = regiao
+      ? `${regiao.nome}${regiao.uf ? `/${regiao.uf}` : ''}`
+      : String(estudo.uf ?? '').trim();
+
+    // Extrair conteúdo dos arquivos + reunir textos adicionais. Falha de
+    // extração não é mais engolida em silêncio (só console.warn) — vira `falha`
+    // reportada na resposta, para o usuário saber que aquele documento não
+    // contribuiu nada.
     const partes: string[] = [];
+    const falhas: { doc_id: number; nome_arquivo: string | null; erro: string }[] = [];
     for (const doc of documentos) {
       if (doc.texto_adicional) partes.push(`[${doc.tipo_dado || 'texto'}] ${doc.texto_adicional}`);
       if (doc.documento) {
@@ -108,26 +124,41 @@ rotasApelo.post('/estudos/:id/apelo-comercial', async (req: Request, res: Respon
             { instrucao: 'Extraia o texto e as tabelas relevantes deste documento imobiliário.' });
           const conteudo = typeof ext.conteudo === 'string' ? ext.conteudo : JSON.stringify(ext.conteudo);
           partes.push(`[${doc.tipo_dado || 'documento'}] ${conteudo}`);
-        } catch (err) {
+        } catch (err: any) {
           console.warn('Falha ao extrair documento', doc.id, err);
+          falhas.push({ doc_id: doc.id, nome_arquivo: doc.nome_arquivo ?? null, erro: err?.message || 'Falha na extração' });
         }
       }
     }
+    // Gate movido para DEPOIS da extração (era só documentos.length > 0, antes):
+    // com todo documento falhando e nenhum texto_adicional, `partes` fica vazio
+    // e mandar a IA avaliar sem NENHUM conteúdo real é o mesmo problema de raiz
+    // — o modelo devolve nota null porque não tem o que avaliar, só que agora
+    // por falta de conteúdo em vez de falta de localidade.
+    if (partes.length === 0) {
+      erro(res, 422, 'CONTEUDO_INSUFICIENTE',
+        'Nenhuma fonte anexada teve conteúdo extraível. Anexe um documento legível ou um texto.');
+      return;
+    }
 
-    const contexto = [
-      `Tipo de empreendimento: ${estudo.tipo_empreendimento}.`,
-      `Estudo: ${estudo.nome_exibicao || estudo.nome}.`,
-      'Fontes fornecidas:',
-      ...partes,
-    ].join('\n\n');
+    const contexto = montarContextoApelo({
+      localidade,
+      tipoEmpreendimento: String(estudo.tipo_empreendimento ?? ''),
+      areaMediaM2: Number(estudo.area_media_lote_m2) || null,
+      unidades: Number(estudo.num_unidades) || Number(estudo.num_unidades_residencial) || null,
+      precoVendaM2: Number(estudo.preco_venda_m2) || Number(estudo.preco_venda_m2_residencial) || null,
+      partes,
+    });
 
     const resposta = await req.ia.consultar({
       contexto,
       schema: SCHEMA_RESPOSTA,
       instrucoes_sistema: instrucoesSistema(estudo.tipo_empreendimento),
     });
-    const dados = resposta.dados as any;
-    const { porFator, geral } = calcularScores(dados.fatores || []);
+    // A normalização é a trava real (mesmo padrão de mercado-ia.ts): reconstrói
+    // os 6 fatores × 4 perguntas na ordem canônica e descarta nota fora de 1–5.
+    const dados = normalizarRespostaApelo(resposta.dados);
+    const { porFator, geral } = calcularScores(dados.fatores);
 
     const atualizado = await req.dados!.atualizar('apelo_comercial', apelo.id, {
       resultado: dados,
@@ -136,7 +167,7 @@ rotasApelo.post('/estudos/:id/apelo-comercial', async (req: Request, res: Respon
     });
 
     await publicarEvento(req, 'apelo_comercial_concluido', payloadApeloConcluido(estudo, geral ?? 0));
-    res.json(atualizado);
+    res.json({ ...atualizado, falhas });
   } catch (e: any) {
     console.error('Erro em POST apelo-comercial (IA):', e);
     erro(res, 500, 'ERRO_INTERNO', e.message);

@@ -213,7 +213,15 @@ export class ViabTelaApelo extends LitElement {
       const res = await analisarApelo(this.estudo.id);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro na análise', 'erro'); return; }
       this.apelo = res;
-      urbiVerso.notificar('Análise concluída.', 'sucesso');
+      // BUG7-15: falha de extração não é mais engolida em silêncio — o backend
+      // reporta quais fontes não contribuíram nada para a análise.
+      const falhas: { nome_arquivo: string | null }[] = res?.falhas || [];
+      if (falhas.length > 0) {
+        const nomes = falhas.map((f) => f.nome_arquivo || 'arquivo sem nome').join(', ');
+        urbiVerso.notificar(`Análise concluída, mas não foi possível ler: ${nomes}.`, 'alerta');
+      } else {
+        urbiVerso.notificar('Análise concluída.', 'sucesso');
+      }
     } catch (err: any) { urbiVerso.notificar(err?.message || 'Erro na análise', 'erro'); }
     finally { this.analisando = false; }
   }
