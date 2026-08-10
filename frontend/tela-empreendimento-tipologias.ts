@@ -63,14 +63,18 @@ export class ViabEmpreendimentoTipologias extends LitElement {
       font-size: var(--texto-corpo, 0.8125rem);
       overflow: hidden;
     }
-    /* Larguras por coluna (th e td herdadas do table-layout: fixed) */
+    /* Larguras por coluna (th e td herdadas do table-layout: fixed).
+       #334: dimensionadas em "ch" (1ch = largura do dígito "0" na fonte) para
+       casar direto com o pedido do autor — cabe exatamente o número de
+       dígitos citado, sem sobra. Overhead fixo do viab-num (padding do
+       input-wrap + borda ≈ 3ch) soma-se aos dígitos de cada coluna. */
     col.c-nome   { width: 150px; }
     col.c-tipo   { width: 160px; }
-    col.c-area   { width: 130px; }
-    col.c-dorm   { width: 90px; }
-    col.c-vagas  { width: 90px; }
-    col.c-un     { width: 100px; }
-    col.c-areatot { width: 130px; }
+    col.c-area   { width: 16ch; }    /* 6 dígitos + milhar + decimais + sufixo "m²" */
+    col.c-dorm   { width: 7ch; }     /* 2 dígitos */
+    col.c-vagas  { width: 7ch; }     /* 2 dígitos */
+    col.c-un     { width: 8ch; }     /* 4 dígitos (5 com separador de milhar em ≥1000) */
+    col.c-areatot { width: 17ch; }   /* área privativa × unidades — tende a ser maior */
     col.c-acao   { width: 90px; }
 
     table.tip td.nome urbi-input { width: 100%; }
