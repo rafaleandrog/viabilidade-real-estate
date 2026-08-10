@@ -703,8 +703,6 @@ export class ViabFluxoReceitas extends LitElement {
     const f = this.pagForm;
     const dis = !this.editavel;
     const repasse = pctRepasseDerivado(f);
-    const somaInformada = [...f.entrada, ...f.parcelas].reduce((s: number, item: any) => s + n(item.pct), 0);
-    const totalComponentes = somaInformada + Math.max(0, repasse);
     const erroPagamento = erroFormularioPagamento(f, this.crono);
     return html`
       <urbi-modal title="Fluxo de pagamento" maxWidth="860px" @urbi-modal:close=${() => this.modalPag = null}>
@@ -823,7 +821,6 @@ export class ViabFluxoReceitas extends LitElement {
                 <viab-num label="Após entrega" sufixo="meses" casas-decimais="0" ?desabilitado=${dis} .valor=${f.repasse.apos_entrega_meses}
                   @urbi:input-numero-change=${(e: CustomEvent) => this._setPag('repasse', 'apos_entrega_meses', e.detail.valor ?? 0)}></viab-num>
               </div>
-              <p class="sec">Total dos componentes: ${totalComponentes.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%.</p>
             </div>
           </div>
         </div>
