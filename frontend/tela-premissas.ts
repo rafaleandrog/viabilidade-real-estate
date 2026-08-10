@@ -275,6 +275,17 @@ export class ViabTelaPremissas extends LitElement {
     .grid > * { width: 210px; max-width: 100%; box-sizing: border-box; }
     .grid > .p1 { width: 165px; }
     .grid > .p3 { width: 330px; }
+    /* item 6: no máximo 3 campos por linha na faixa de Custos — grid
+       explícito de 3 colunas evita que o flex-wrap de .grid empacote mais
+       que 3 quando os campos são estreitos (p1, 165px). justify-items:start
+       impede que o grid estique os campos pra preencher a coluna — cada um
+       mantém a própria largura (.p1/.p2/.p3 acima, intocados), só muda o
+       agrupamento por linha. Não mexe em '.grid > *' (compartilhada com
+       Terreno & Áreas/Produtos/Permutas). Abaixo de 700px volta ao
+       empacotamento livre de .grid (flex-wrap), pra não estourar a tela. */
+    @media (min-width: 700px) {
+      .grid.grid-3col { display: grid; grid-template-columns: repeat(3, auto); justify-items: start; }
+    }
     .subgrid { margin-top: 12px; }
     /* #10: cada grupo é uma faixa delimitada por uma linha horizontal no topo,
        com duas cores do design system intercaladas (A/B). Tokens theme-aware. */
@@ -535,7 +546,7 @@ export class ViabTelaPremissas extends LitElement {
                   @urbi:checkbox-change=${(e: CustomEvent) => this._set(chk.k, e.detail.marcado)}
                 ></urbi-checkbox>`)}
             </div>
-            <div class="grid">
+            <div class="grid grid-3col">
               ${CUSTOS_UNIDADE
                 .filter((cu) => !cu.so || cu.so === this.estudo.tipo_empreendimento)
                 .map((cu) => this._custoUnidade(cu, dis))}
