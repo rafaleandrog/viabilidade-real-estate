@@ -322,6 +322,25 @@ export function pctPosObraDerivado(blocos: any[]): number {
 }
 
 /**
+ * #347: valida a soma dos três períodos INFORMADOS do formulário de Absorção
+ * (Pré-lançamento + Lançamento + Obra) — sem isso, um total acima de 100%
+ * clampava silenciosamente no Pós-obra (`pctPosObraDerivado` usa
+ * `Math.max(0, ...)`) e a soma real da absorção fechava abaixo de 100%,
+ * perdendo % de vendas sem aviso nenhum. `pre_lancamento_pct` já chega aqui
+ * zerado quando o Cronograma não tem a fase (a tela nem mostra o campo nesse
+ * caso), então a soma não precisa saber disso por conta própria.
+ */
+export function erroFormularioAbsorcao(f: {
+  pre_lancamento_pct: number; lancamento_pct: number; obra_pct: number;
+}): string | null {
+  const soma = n(f.pre_lancamento_pct) + n(f.lancamento_pct) + n(f.obra_pct);
+  if (soma > 100.01) {
+    return `Pré-lançamento + Lançamento + Obra somam ${soma.toFixed(2)}%; o total não pode superar 100%.`;
+  }
+  return null;
+}
+
+/**
  * Distribui a absorção (% de vendas) mês a mês, em meses RELATIVOS do projeto.
  * Retorna { inicio, pcts } onde pcts[i] é o % vendido no mês (inicio + i),
  * ou null se o cronograma for insuficiente.

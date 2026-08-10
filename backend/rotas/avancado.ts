@@ -195,10 +195,14 @@ export function validarValoresCurva(valores: any): string | null {
 
 /**
  * Valida o JSON de absorção de vendas de uma FASE (Lote 6 · #20).
- * Modelo vigente: apenas **Distribuído** em 3 períodos — Pré-lançamento+Lançamento
- * (bloco `lancamento`), Durante a obra (bloco `obra`) e Pós-obra (derivado). NÃO
- * há mais validação de soma = 100% (o Pós-obra é calculado). Modos legados
+ * Modelo vigente: **Distribuído** em até 4 períodos — Pré-lançamento (bloco
+ * `pre_lancamento`, opcional — #330), Lançamento (`lancamento`), Durante a
+ * obra (`obra`) e Pós-obra (derivado, nunca informado). Modos legados
  * (`linear`/`personalizado`) são tolerados na leitura, sem exigência de soma.
+ *
+ * #347: a soma dos períodos INFORMADOS (tudo exceto `pos_obra`, que é
+ * `100 − soma`) não pode superar 100% — sem isso o Pós-obra clampava em 0 e
+ * o total real da absorção fechava abaixo de 100%, em silêncio.
  */
 export function validarAbsorcao(a: any): string | null {
   if (a === null || a === undefined) return null; // ausente = default
@@ -207,8 +211,12 @@ export function validarAbsorcao(a: any): string | null {
   if (modo !== undefined && !['linear', 'distribuido', 'personalizado'].includes(modo)) {
     return 'absorcao.modo deve ser distribuido (ou linear/personalizado legado)';
   }
-  if (modo === 'distribuido' && a.blocos !== undefined && !Array.isArray(a.blocos)) {
-    return 'absorcao.blocos deve ser uma lista';
+  if (modo === 'distribuido' && a.blocos !== undefined) {
+    if (!Array.isArray(a.blocos)) return 'absorcao.blocos deve ser uma lista';
+    const soma = a.blocos
+      .filter((b: any) => b?.evento !== 'pos_obra')
+      .reduce((s: number, b: any) => s + (Number(b?.pct) || 0), 0);
+    if (soma > 100.01) return `a soma dos períodos informados não pode superar 100% (atual: ${soma.toFixed(2)}%)`;
   }
   return null;
 }
@@ -260,16 +268,19 @@ export function validarFluxoPagamento(fp: any): string | null {
 }
 
 // Defaults de uma fase nova (absorção Distribuída + fluxo com listas de linhas).
-export function absorcaoPadrao(): Record<string, any> {
-  return {
-    modo: 'distribuido',
-    correcao_estoque: false,
-    blocos: [
-      { evento: 'lancamento', pct: 30 }, // Pré-lançamento + Lançamento
-      { evento: 'obra', pct: 40 },        // Durante a obra
-      { evento: 'pos_obra', pct: 0 },     // Pós-obra: derivado = 100 − 30 − 40 = 30
-    ],
-  };
+// #347: o bloco `pre_lancamento` só entra quando o estudo TEM a fase no
+// Cronograma (#330) — nasce em 0%, editável; sem ela, nem aparece no JSON
+// (a tela também não mostra a linha). lancamento/obra/pos_obra preservam
+// exatamente o default de antes da #347.
+export function absorcaoPadrao(temPreLancamento: boolean): Record<string, any> {
+  const blocos: any[] = [];
+  if (temPreLancamento) blocos.push({ evento: 'pre_lancamento', pct: 0 });
+  blocos.push(
+    { evento: 'lancamento', pct: 30 },
+    { evento: 'obra', pct: 40 },
+    { evento: 'pos_obra', pct: 0 }, // Pós-obra: derivado = 100 − 30 − 40 = 30
+  );
+  return { modo: 'distribuido', correcao_estoque: false, blocos };
 }
 export function fluxoPagamentoPadrao(): Record<string, any> {
   return {
@@ -946,7 +957,7 @@ rotasAvancado.post('/estudos/:id/avancado/fases', async (req: Request, res: Resp
     // Absorção/Fluxo de Pagamento só fazem sentido para fases de receita — o
     // Cronograma nunca lê/edita esses campos.
     if (tipo === 'receita') {
-      dados.absorcao = absorcaoPadrao();
+      dados.absorcao = absorcaoPadrao(estudo.tem_pre_lancamento !== false);
       dados.fluxo_pagamento = fluxoPagamentoPadrao();
     }
     const criada = await req.dados!.criar('avancado_fases', dados);

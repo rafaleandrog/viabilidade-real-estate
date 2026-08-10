@@ -4,7 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum } from './viab-format.js';
 import {
   rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosObraDerivado,
-  totalAntesAlocacao,
+  erroFormularioAbsorcao, totalAntesAlocacao,
   type EventoCrono,
 } from './fluxo-shared.js';
 import { pctRepasseDerivado, parcelasAoLongoObra } from './fluxo-caixa-motor.js';
@@ -500,8 +500,18 @@ export class ViabFluxoReceitas extends LitElement {
   };
 
   // ─────────────────────────────────────────────────────────────────
-  // Modal "Absorção de Vendas" (Distribuído — 3 períodos; pós-obra derivado)
+  // Modal "Absorção de Vendas" (Distribuído — 3 ou 4 períodos conforme o
+  // Cronograma tem Pré-lançamento ou não, #330/#347; pós-obra derivado)
   // ─────────────────────────────────────────────────────────────────
+
+  // #347: a fase Pré-lançamento é opcional (#330) — sem ela no Cronograma,
+  // `faixasAbsorcao` devolve uma faixa vazia (fim < início) e `absorcaoMensal`
+  // simplesmente não espalha esse % em lugar nenhum. Um `pre_lancamento_pct`
+  // legado > 0 nesse cenário é % de venda que desaparece em silêncio — por
+  // isso a linha some da tela (não só desabilita) e o valor é zerado ao abrir.
+  private _temPreLancamento(): boolean {
+    return this.crono.some((e) => e.evento === 'pre_lancamento');
+  }
 
   private _abrirAbsorcao(f: any) {
     const a = f.absorcao || {};
@@ -509,7 +519,7 @@ export class ViabFluxoReceitas extends LitElement {
     const pct = (ev: string) => Number((blocos.find((b: any) => b?.evento === ev) || {}).pct) || 0;
     this.absForm = {
       correcao_estoque: Boolean(a.correcao_estoque),
-      pre_lancamento_pct: pct('pre_lancamento'),
+      pre_lancamento_pct: this._temPreLancamento() ? pct('pre_lancamento') : 0,
       lancamento_pct: pct('lancamento'),
       obra_pct: pct('obra'),
     };
@@ -534,24 +544,27 @@ export class ViabFluxoReceitas extends LitElement {
   private _renderModalAbsorcao(): TemplateResult {
     const f = this.absForm;
     const dis = !this.editavel;
+    const temPre = this._temPreLancamento();
     const faixas = faixasAbsorcao(this.crono);
     const posDerivado = pctPosObraDerivado(this._absorcaoJson().blocos);
+    const erroAbs = erroFormularioAbsorcao(f);
     // rot: formata o rótulo de período; retorna '—' para faixas vazias (fim < inicio).
     const rot = (fx?: { inicio: number; fim: number }) =>
       fx && fx.fim >= fx.inicio ? rotuloPeriodo(this.dataInicio, fx.inicio, fx.fim - fx.inicio + 1) : '—';
     return html`
       <urbi-modal title="Absorção de vendas" maxWidth="820px" @urbi-modal:close=${() => this.modalAbs = null}>
-        <p class="sec">Distribuído em 4 períodos — Pré-lançamento, Lançamento, Obra e Após-chaves (calculado automaticamente). Os períodos vêm do Cronograma.</p>
+        <p class="sec">Distribuído em ${temPre ? '4' : '3'} períodos — ${temPre ? 'Pré-lançamento, ' : ''}Lançamento, Obra e Após-chaves (calculado automaticamente). Os períodos vêm do Cronograma.</p>
         <div class="abs-grid">
           <div>
             <table class="abs">
               <thead><tr><th>Período</th><th>% Vendido</th></tr></thead>
               <tbody>
+                ${temPre ? html`
                 <tr>
                   <td>Pré-lançamento<br /><span class="sec">${rot(faixas?.pre_lancamento)}</span></td>
                   <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.pre_lancamento_pct}
                     @urbi:input-numero-change=${(e: CustomEvent) => this.absForm = { ...f, pre_lancamento_pct: e.detail.valor ?? 0 }}></viab-num></td>
-                </tr>
+                </tr>` : nothing}
                 <tr>
                   <td>Lançamento<br /><span class="sec">${rot(faixas?.lancamento)}</span></td>
                   <td><viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.lancamento_pct}
@@ -572,7 +585,8 @@ export class ViabFluxoReceitas extends LitElement {
           <div class="abs-grafico">${this._graficoAbsorcao()}</div>
         </div>
 
-        ${this.modalErro ? html`<urbi-banner variante="erro">${this.modalErro}</urbi-banner>` : nothing}
+        ${erroAbs ? html`<urbi-banner variante="erro">${erroAbs}</urbi-banner>` : nothing}
+        ${this.modalErro && this.modalErro !== erroAbs ? html`<urbi-banner variante="erro">${this.modalErro}</urbi-banner>` : nothing}
 
         <div class="modal-rodape">
           <span class="sec">Correção de estoque</span>
@@ -585,7 +599,8 @@ export class ViabFluxoReceitas extends LitElement {
           <span class="espaco"></span>
           <urbi-botao variante="secundario" @click=${() => this.modalAbs = null}>Cancelar</urbi-botao>
           ${!dis ? html`
-            <urbi-botao variante="primario" ?carregando=${this.aplicando} @click=${this._aplicarAbsorcao}>Aplicar</urbi-botao>` : nothing}
+            <urbi-botao variante="primario" ?desabilitado=${Boolean(erroAbs)}
+              ?carregando=${this.aplicando} @click=${this._aplicarAbsorcao}>Aplicar</urbi-botao>` : nothing}
         </div>
       </urbi-modal>
     `;
@@ -628,8 +643,10 @@ export class ViabFluxoReceitas extends LitElement {
   }
 
   private _aplicarAbsorcao = async () => {
-    this.aplicando = true;
     this.modalErro = '';
+    const invalido = erroFormularioAbsorcao(this.absForm);
+    if (invalido) { this.modalErro = invalido; return; }
+    this.aplicando = true;
     try {
       const json = { ...this._absorcaoJson(), aplicado: true }; // #49 — marca como aplicado (bola verde)
       const res = await atualizarFaseAvancado(this.estudo.id, this.modalAbs.id, { absorcao: json });
