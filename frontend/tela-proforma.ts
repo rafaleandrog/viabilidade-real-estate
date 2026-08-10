@@ -118,19 +118,20 @@ export class ViabTelaProforma extends LitElement {
     .pf.sens tr.nat-despesa td:first-child { color: var(--cor-erro); font-weight: 600; }
     .pf.sens tr.nat-receita { background: color-mix(in srgb, var(--cor-sucesso) 8%, transparent); }
     .pf.sens tr.nat-despesa { background: color-mix(in srgb, var(--cor-erro) 8%, transparent); }
-    /* Badges dos cenários (cabeçalho) e dos indicadores centralizados na coluna. */
-    .pf.sens .sens-cab { display: flex; justify-content: center; }
+    /* Badges dos cenários (cabeçalho) e dos indicadores, alinhados à direita na
+       coluna (BUG7-12 — antes centralizados). */
+    .pf.sens .sens-cab { display: flex; justify-content: flex-end; }
     .pf.sens td .sens-cab { padding: 2px 0; }
     /* #78 — larguras fixas por colgroup (mesma geometria nas duas tabelas de
        sensibilidade: monetária e indicadores) para os cenários bear/base/bull
        alinharem entre si. */
     .pf.sens { table-layout: fixed; }
-    /* #76 — valores da sensibilidade em negrito. #78 — centralizados (o cabeçalho
-       usa badge centralizado via .sens-cab; os números da tabela monetária herdavam
-       "text-align: right" da regra global .num, o que os desalinhava do título do
-       cenário). Centralizar casa o conteúdo com o cabeçalho, como já ocorre na
-       tabela de indicadores (badge sobre badge). */
-    .pf.sens td.num { font-weight: 700; text-align: center; }
+    /* BUG7-12 — cabeçalho (badge via .sens-cab, acima) e valores alinhados à
+       direita, como o resto do app; sobrepõe o '.pf th.num { text-align: center }'
+       genérico (usado pela tabela principal do Proforma) só dentro de '.pf.sens'. */
+    .pf.sens th.num { text-align: right; }
+    /* #76 — valores da sensibilidade em negrito. */
+    .pf.sens td.num { font-weight: 700; text-align: right; }
     /* #11 — unidades e preço médio por tipo. */
     .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; }
     .ut-item { display: flex; flex-direction: column; gap: 2px; }
@@ -448,7 +449,8 @@ export class ViabTelaProforma extends LitElement {
       { l: 'Custo obras / VGV', f: (c) => c.p.custoObrasVgvPct, natureza: 'despesa', pct: true, badge: true, bmCampo: 'custo_obras_vgv', divisoria: true },
       { l: 'Margem líquida', f: (c) => c.p.margemLiquidaPct, natureza: 'receita', pct: true, badge: true, bmCampo: 'margem_liquida' },
     ];
-    const fmt = (m: { pct?: boolean }, v: number) => (m.pct ? fmtPct(v) : fmtR$(v));
+    // BUG7-12: sem símbolo "R$" — número puro com 2 casas decimais.
+    const fmt = (m: { pct?: boolean }, v: number) => (m.pct ? fmtPct(v) : fmtNum(v, 2));
     // #11: título de cada cenário num urbi-badge ESTÁTICO — Bear=perigo (vermelho),
     // Base=sucesso (verde), Bull=info (azul). Os NÚMEROS agora seguem a mesma cor
     // do cenário (tokens correspondentes ao badge).
