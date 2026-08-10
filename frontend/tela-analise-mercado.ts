@@ -76,8 +76,6 @@ export class ViabTelaAnaliseMercado extends LitElement {
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
     }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-    .kpis urbi-kpi { min-width: 0; width: 100%; }
 
     /* Card de comparação: urbi-kpi declara só rotulo/valor/variante/formato —
        sem slot para o par projeto×mercado — então o card é markup próprio,
