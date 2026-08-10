@@ -13,7 +13,7 @@ import { exportarFluxoCSV, exportarFluxoPDF, type CapitalStackExport } from './e
 import { simularCapitalStackDoEstudo, receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
 import {
   validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita,
-  validarCapitalStack, validarPermutaFisica, permutaFisicaPorTipologia,
+  validarCapitalStack, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia,
   type Divergencia, type PermutaFisicaTipologia,
 } from './fluxo-invariantes.js';
 import {
@@ -131,6 +131,9 @@ export class ViabFluxoVer extends LitElement {
       // tipologia correspondente no catálogo) — validarProduto nunca visita esse caso
       // porque itera o catálogo, não as linhas de custo.
       ...validarPermutaFisica(d.custos, d.tipologias),
+      // #335: categoria de custo repetida no mesmo grupo — reversão da #179
+      // deixou de bloquear, agora é alerta visível na Reconciliação.
+      ...validarCustosDuplicados(d.custos),
       ...validarContratacao(receitas, d.crono, this.calc.prazo, this.calc.vendaBrutaContratada),
       ...validarSafrasReceita(receitas, d.crono, this.calc.prazo),
       ...validarFluxoCalc(this.calc),

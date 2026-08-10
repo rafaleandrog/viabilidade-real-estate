@@ -288,51 +288,12 @@ const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'obra', 'pos_obra', 'c
 // o motor (fluxo-caixa-motor.ts) ignora o campo em qualquer outra linha.
 const MODOS_DISTRIBUICAO = ['fixo', 'unit_delivery', 'sales_revenue'];
 
-// Linhas obrigatórias por grupo — espelha `LINHAS_OBRIGATORIAS` do frontend
-// (tela-fluxo-custos.ts). `obrigatoria` é decidida aqui, no servidor: a
-// primeira linha do estudo cuja grupo+categoria bate com a lista vira a linha
-// oficial (trava categoria, ganha ancoragem própria); linhas seguintes com a
-// mesma categoria são normais e removíveis (#178 — antes a marca "obrigatória"
-// era por categoria, então uma 2ª linha nascida de reclassificação de grupo
-// ficava indeletável).
-const LINHAS_OBRIGATORIAS_CUSTO: Partial<Record<string, string[]>> = {
-  terreno: ['Preço'], // renomeada de "Compra" no #193
-  obra: ['Construção'],
-  diretos: ['Corretagem de vendas'],
-};
-
-/**
- * #256: a linha oficial não pode ser RENOMEADA nem REMOVIDA pela API.
- *
- * Até aqui a trava existia só na tela — categoria vira texto e o botão de
- * remover some quando `obrigatoria === true` (`tela-fluxo-custos.ts:598,843`).
- * Esconder controle não é regra: qualquer `PATCH`/`DELETE` direto na API
- * passava, e o estudo ficava sem identidade oficial no grupo.
- *
- * O bloqueio é DELIBERADAMENTE estreito. Recusar o PATCH inteiro travaria
- * editar o orçamento da própria linha de Preço, que é o uso principal dela —
- * o escopo da issue diz "bloquear renomeação e remoção", não congelar a linha.
- * Então só `categoria` e `grupo` são barrados, que são os dois campos capazes
- * de dissolver a identidade. Reenviar o MESMO valor passa (a tela reenvia
- * campo sem alterá-lo em alguns fluxos, e isso não é renomear).
- *
- * @param dados payload do PATCH; `undefined`/`null` significa DELETE.
- * @returns mensagem de erro, ou `null` quando a operação é permitida.
- */
-export function bloqueioLinhaObrigatoria(
-  custo: Record<string, any>, dados?: Record<string, any> | null,
-): string | null {
-  if (custo?.obrigatoria !== true) return null;
-  if (dados === undefined || dados === null) {
-    return 'A linha obrigatória do grupo não pode ser removida';
-  }
-  const renomeia = dados.categoria !== undefined && String(dados.categoria) !== String(custo.categoria);
-  const mudaGrupo = dados.grupo !== undefined && String(dados.grupo) !== String(custo.grupo);
-  if (renomeia || mudaGrupo) {
-    return 'A categoria e o grupo da linha obrigatória não podem ser alterados';
-  }
-  return null;
-}
+// #335: reverte a #179/#256 — categoria de custo não trava mais renomeação,
+// remoção nem some do combo. `avancado_linhas_custo.obrigatoria` continua no
+// schema (migração 025 zera o dado existente), mas nada volta a escrevê-la
+// nem a lê-la para bloquear operação; uma categoria repetida no mesmo grupo
+// vira alerta na Reconciliação (`validarCustosDuplicados`, fluxo-invariantes.ts),
+// não bloqueio.
 const REGEX_MES_ANO = /^(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\/\d{4}$/i;
 
 /** Projeta só os campos listados, ignorando ausentes (para cópia de linhas). */
@@ -1405,17 +1366,6 @@ rotasAvancado.post('/estudos/:id/avancado/custos', async (req: Request, res: Res
       }
     }
 
-    // `obrigatoria` não é campo de entrada (fora de CAMPOS_CUSTO): o servidor
-    // decide, marcando a primeira linha do estudo que bate grupo+categoria com
-    // LINHAS_OBRIGATORIAS_CUSTO. Evita a duplicação indeletável do #178.
-    const categoriasObrig = LINHAS_OBRIGATORIAS_CUSTO[String(dados.grupo)] ?? [];
-    if (dados.categoria !== undefined && categoriasObrig.includes(String(dados.categoria))) {
-      const existentes = await req.dados!.listar('avancado_linhas_custo', {
-        filtros: { estudo_id: estudo.id, grupo: dados.grupo, categoria: dados.categoria }, por_pagina: 1,
-      });
-      if (existentes.total === 0) dados.obrigatoria = true;
-    }
-
     const criada = await req.dados!.criar('avancado_linhas_custo', dados);
     res.status(201).json(criada);
   } catch (e: any) {
@@ -1437,13 +1387,6 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
       erro(res, 404, 'CUSTO_NAO_ENCONTRADO', 'Linha de custo não encontrada neste estudo');
       return;
     }
-    // #256: renomear/mover a linha oficial dissolve a identidade do grupo.
-    // Rejeitado cedo, antes de montar o payload. Editar orçamento, curva e
-    // ancoragem dela continua liberado — `categoria` e `grupo` são os únicos
-    // campos barrados (ver bloqueioLinhaObrigatoria).
-    const bloqueioObrig = bloqueioLinhaObrigatoria(custo, req.body ?? {});
-    if (bloqueioObrig) { erro(res, 422, 'LINHA_OBRIGATORIA', bloqueioObrig); return; }
-
     const dados: Record<string, any> = {};
     for (const campo of CAMPOS_CUSTO) {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
@@ -1498,23 +1441,6 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
         'início e duração são calculados pelo evento-âncora; use cronograma_evento = customizado para editar');
       if (r.erroCampoTravado) { erro(res, 422, 'CAMPO_TRAVADO', r.erroCampoTravado); return; }
       Object.assign(dados, r.campos);
-    }
-
-    // #256: mesmo cuidado do POST (linha 1141) — uma linha reclassificada via
-    // PATCH (ex.: categoria "Outro" → "Preço") passava batido por essa
-    // checagem, porque só existia na criação. Sem isso, um estudo cuja linha
-    // Preço nasceu sem categoria e foi categorizada depois nunca ganhava
-    // `obrigatoria=true` — ficava sem identidade oficial no grupo `terreno`.
-    const grupoFinal = dados.grupo !== undefined ? dados.grupo : custo.grupo;
-    const categoriaFinal = dados.categoria !== undefined ? dados.categoria : custo.categoria;
-    if (dados.categoria !== undefined || dados.grupo !== undefined) {
-      const categoriasObrigPatch = LINHAS_OBRIGATORIAS_CUSTO[String(grupoFinal)] ?? [];
-      if (categoriasObrigPatch.includes(String(categoriaFinal))) {
-        const existentes = await req.dados!.listar('avancado_linhas_custo', {
-          filtros: { estudo_id: estudo.id, grupo: grupoFinal, categoria: categoriaFinal }, por_pagina: 1,
-        });
-        if (existentes.total === 0) dados.obrigatoria = true;
-      }
     }
 
     const atualizada = await req.dados!.atualizar('avancado_linhas_custo', cid, dados);
@@ -1587,14 +1513,6 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   });
   for (const custo of custos.dados) {
     const copia: Record<string, any> = { estudo_id: novoId, ...extrairCampos(custo, CAMPOS_CUSTO) };
-    // #256: `obrigatoria` fica FORA de CAMPOS_CUSTO de propósito — não é campo
-    // de entrada, o servidor a decide. Mas a duplicação grava direto via
-    // `criar`, sem passar pelo POST que faz essa eleição, então a cópia nascia
-    // com a flag perdida: a linha oficial do clone virava uma linha comum,
-    // renomeável e removível. Copiada explicitamente aqui. Não há risco de
-    // duas oficiais — a origem já tem no máximo uma por grupo+categoria
-    // (POST/PATCH garantem, migração 014 fez o backfill).
-    if (custo.obrigatoria === true) copia.obrigatoria = true;
     if (custo.fase_ancora_id !== null && custo.fase_ancora_id !== undefined) {
       copia.fase_ancora_id = mapaFase.get(Number(custo.fase_ancora_id)) ?? null;
     }
@@ -1624,9 +1542,6 @@ rotasAvancado.delete('/estudos/:id/avancado/custos/:cid', async (req: Request, r
       erro(res, 404, 'CUSTO_NAO_ENCONTRADO', 'Linha de custo não encontrada neste estudo');
       return;
     }
-    // #256: a linha oficial do grupo não é removível pela API, não só pela tela.
-    const bloqueio = bloqueioLinhaObrigatoria(custo);
-    if (bloqueio) { erro(res, 422, 'LINHA_OBRIGATORIA', bloqueio); return; }
     await req.dados!.deletar('avancado_linhas_custo', cid);
     res.json({ ok: true });
   } catch (e: any) {
