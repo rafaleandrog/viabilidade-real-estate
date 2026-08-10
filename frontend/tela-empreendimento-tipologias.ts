@@ -70,6 +70,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     col.c-dorm   { width: 90px; }
     col.c-vagas  { width: 90px; }
     col.c-un     { width: 100px; }
+    col.c-areatot { width: 130px; }
     col.c-acao   { width: 90px; }
 
     table.tip td.nome urbi-input { width: 100%; }
@@ -140,6 +141,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
           <col class="c-area">
           ${lote ? nothing : html`<col class="c-dorm"><col class="c-vagas">`}
           <col class="c-un">
+          <col class="c-areatot">
           ${dis ? nothing : html`<col class="c-acao">`}
         </colgroup>
         <thead>
@@ -149,6 +151,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
             <th class="num">Área privativa</th>
             ${lote ? nothing : html`<th class="num">Dormitórios</th><th class="num">Vagas</th>`}
             <th class="num">Unidades</th>
+            <th class="num">Área total</th>
             ${dis ? nothing : html`<th></th>`}
           </tr>
         </thead>
@@ -160,6 +163,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
             <td class="num">${fmtNum(areaTotal)} m²</td>
             ${lote ? nothing : html`<td></td><td class="num">${fmtNum(totalVagas)}</td>`}
             <td class="num">${fmtNum(totalUnidades)}</td>
+            <td class="num"></td>
             ${dis ? nothing : html`<td></td>`}
           </tr>
         </tbody>
@@ -194,6 +198,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
           <td class="num">${num('dormitorios', '', 0)}</td>
           <td class="num">${num('vagas', '', 0)}</td>`}
         <td class="num">${num('quantidade', '', 0)}</td>
+        <td class="num">${fmtNum(n(t.area_privativa_m2) * n(t.quantidade))} m²</td>
         ${dis ? nothing : html`
           <td class="num acoes">
             <div class="acoes-grupo">
