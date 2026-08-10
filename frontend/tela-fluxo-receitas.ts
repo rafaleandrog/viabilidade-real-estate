@@ -39,15 +39,14 @@ import './viab-num.js';
 
 const n = (v: any): number => Number(v) || 0;
 
-// #248: só "Mensal" é oferecido para linhas NOVAS/editadas — periodicidades
+// #248/#342: só "Mensal" é oferecido para linhas NOVAS/editadas — periodicidades
 // fora do padrão aprovado (padrao-incorporacao.md §11, "Modelo funcional de
 // referência": "quantidade de parcelas mensais... sem periodicidades fora do
 // padrão aprovado"). Dado legado com outra periodicidade continua sendo lido
 // e calculado normalmente pelo motor (`INTERVALO_PERIODICIDADE`, fluxo-caixa-
-// motor.ts) — só não é mais oferecido como opção nova; a badge da própria
-// linha aparece à parte (ver `_opcoesPeriodicidade`) para não escondê-la.
+// motor.ts) — só não é mais exposto na UI (a #342 removeu a badge seletora,
+// que só tinha uma opção sempre ativa desde a #248).
 const PERIODICIDADES = ['mensal'];
-const ROTULO_PER: Record<string, string> = { mensal: 'Mensal', trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual' };
 
 @customElement('viab-fluxo-receitas')
 export class ViabFluxoReceitas extends LitElement {
@@ -147,10 +146,6 @@ export class ViabFluxoReceitas extends LitElement {
     .modal-rodape { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
     .modal-rodape .espaco { flex: 1; }
     .badges-par { display: inline-flex; gap: 6px; }
-    /* Periodicidade ja usada por outra linha de parcelamento: o clique ja e barrado
-       pelo proprio handler, isto e so o sinal visual. urbi-badge nao tem estado
-       "desabilitado" (so cor/interativo/ativo), entao a indicacao vem daqui. */
-    urbi-badge.indisponivel { opacity: 0.45; cursor: not-allowed; }
 
     /* Modal de pagamento */
     .pag-grid { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
@@ -780,22 +775,19 @@ export class ViabFluxoReceitas extends LitElement {
               <p class="sec">Quantidade de parcelas mensais — "Ao longo da obra" liquida no evento
                 do Cronograma (a quantidade vem de lá); sem marcar, é um prazo fixo de N parcelas.</p>
               ${f.parcelas.map((p: any, i: number) => {
-                // #105 — periodicidades já usadas por OUTRAS linhas (para desabilitar badges)
-                const perUsadas = new Set(f.parcelas.filter((_: any, j: number) => j !== i).map((x: any) => x.periodicidade));
-                // #248: se a linha já tem uma periodicidade legada fora do
-                // padrão (trimestral/semestral/anual), a badge dela continua
-                // aparecendo — só não é mais oferecida para linhas novas.
-                const opcoes = PERIODICIDADES.includes(p.periodicidade) ? PERIODICIDADES : [p.periodicidade, ...PERIODICIDADES];
                 return html`
                 <div class="pag-linha">
                   <viab-num label="% do total" sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${p.pct}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'pct', ev.detail.valor ?? 0)}></viab-num>
-                  <span class="badges-par">
-                    ${opcoes.map((per) => html`
-                      <urbi-badge cor="info" interativo ?ativo=${p.periodicidade === per}
-                        class=${!dis && perUsadas.has(per) && p.periodicidade !== per ? 'indisponivel' : ''}
-                        @click=${() => { if (!dis && !perUsadas.has(per)) this._setLinha('parcelas', i, 'periodicidade', per); }}>${ROTULO_PER[per] ?? per}</urbi-badge>`)}
-                  </span>
+                  ${/* #342: a badge de periodicidade foi removida — só "Mensal"
+                       existe desde a #248, então marcar/clicar não tinha mais
+                       função (era sempre a única opção, sempre ativa). A
+                       periodicidade continua persistida ('mensal' em toda
+                       linha nova) porque o motor depende dela
+                       (fluxo-caixa-motor.ts). Linha legada com periodicidade
+                       diferente (trimestral/semestral/anual) mantém o valor
+                       gravado, só sem controle visual para trocá-lo — o motor
+                       lê e calcula normalmente, como sempre leu. */ ''}
                   ${/* #190/#191: "Ao longo da obra" → nº de parcelas sai da
                        duração da obra no Cronograma dividida pelo intervalo da
                        periodicidade. O valor é DERIVADO (não persistido): o
