@@ -41,7 +41,11 @@ export class ViabTelaProforma extends LitElement {
   @state() private colapso: Record<Grupo, boolean> = { deducoes: false, direto: false, indireto: false };
 
   static styles = [estiloConteudo, css`
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    /* BUG7-09: com o KPI de Preço médio/unid. removido, sobram 3-5 cards —
+       minmax(180px, 1fr) os esticava até preencher a linha toda numa tela
+       larga. Teto em 220px: cada card fica compacto e o espaço sobrando
+       após o último vira respiro em vez de alargar os existentes. */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 220px)); gap: 12px; margin-bottom: 16px; }
     .kpis urbi-kpi { min-width: 0; }
     .barra-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; justify-content: flex-end; }
     .sens-var { max-width: 320px; margin-bottom: 12px; }
@@ -191,7 +195,6 @@ export class ViabTelaProforma extends LitElement {
     const temPermuta = p.areaPermutaFisica > 0 || p.permutaFinResidencial > 0 || p.permutaFinNaoResidencial > 0;
     const kpis: { rot: string; val: string; variante: string }[] = [
       { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²`, variante: '' },
-      { rot: 'Preço médio/unid.', val: fmtR$(p.precoMedioUnidade), variante: '' },
       { rot: 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
     ];
     if (temPermuta) kpis.push({ rot: 'Área permutada', val: `${fmtNum(p.areaPermutaFisica)} m²`, variante: '' });
