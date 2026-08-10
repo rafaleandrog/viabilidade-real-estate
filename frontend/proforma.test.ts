@@ -224,6 +224,28 @@ test('incorporação: permuta física R e NR separadas reduzem cada VGV (#10)', 
   assert.ok(perto(p.vgv, 12_600_000), `vgv=${p.vgv}`);
 });
 
+// BUG7-07: "VGV sem permuta física" repetia a Receita bruta porque o override
+// zerava só os campos LEGADOS, e o motor prioriza o canônico. Este teste
+// prova a identidade que a tela agora usa (vgv + vgvPermutaResidencial +
+// vgvPermutaNaoResidencial reconstrói o VGV bruto) com o canônico preenchido
+// diretamente — nenhum teste existente cobria esse campo.
+test('BUG7-07: identidade "vgv + permutas" reconstrói o VGV bruto com o canônico preenchido', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,     // VGV R bruto = 10M
+    area_pvt_nr_fechada: 500, preco_venda_m2_nao_residencial: 8000,  // VGV NR bruto = 4M
+    // Canônico preenchido diretamente (como _editarCustoUnidade grava a cada
+    // digitação) — SEM os campos legados equivalentes, para provar que o
+    // motor lê o canônico e não o legado.
+    permuta_fisica_area_canonica: 100,     // R: 100 m² de permuta
+    permuta_fisica_nr_area_canonica: 50,   // NR: 50 m²
+  });
+  const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
+  assert.ok(perto(vgvBruto, 14_000_000), `vgvBruto=${vgvBruto}`); // 10M + 4M
+  assert.ok(p.vgv < vgvBruto, 'VGV líquido de permuta tem que ser menor que o bruto');
+  assert.ok(perto(p.vgv, 12_600_000), `vgv líquido=${p.vgv}`); // 9M + 3,6M, mesma conta do teste R/NR acima
+});
+
 test('loteamento: permuta física usa o campo legado, NR não se aplica (#10)', () => {
   const p = calcularProforma({ ...LOT, permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 15000 });
   assert.ok(perto(p.areaPermutaResidencial, 15000));

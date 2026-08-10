@@ -159,11 +159,14 @@ export class ViabTelaProforma extends LitElement {
     if (!this.estudo) return nothing;
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
     const p = calcularProforma(this._entrada());
-    // #10: VGV bruto = VGV se a permuta física (R e NR) NÃO fosse entregue (vendida).
-    const vgvBruto = calcularProforma(this._entrada({
-      permuta_fisica_area_m2: 0, permuta_fisica_pct: 0,
-      permuta_fisica_nr_area_m2: 0, permuta_fisica_nr_pct: 0,
-    })).vgv;
+    // #10/BUG7-07: VGV bruto = VGV se a permuta física (R e NR) NÃO fosse
+    // entregue (vendida). Antes rodava o motor de novo zerando só os campos
+    // LEGADOS de permuta — mas o motor prioriza o canônico
+    // (permuta_fisica_area_canonica/_nr_area_canonica, proforma.ts:100), que
+    // ficava fora do override e o tornava um no-op (vgvBruto === p.vgv em
+    // qualquer estudo editado depois da introdução do canônico). Mesma
+    // identidade que exportar.ts:35 já usa (fonte única, sem 2ª execução).
+    const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
     return html`
       ${this.secao === 'proforma' ? html`
         ${this._renderKpis(p)}
@@ -401,14 +404,13 @@ export class ViabTelaProforma extends LitElement {
     const fatorBull = custoLike ? 1 - varPos / 100 : 1 + varPos / 100;
     const fatorBear = custoLike ? 1 + varNeg / 100 : 1 - varNeg / 100;
     // VGV bruto por cenário = VGV se a permuta física NÃO fosse entregue (vendida).
-    // Difere da Receita bruta (VGV) só quando há permuta física.
-    const semPermutaFisica = {
-      permuta_fisica_area_m2: 0, permuta_fisica_pct: 0,
-      permuta_fisica_nr_area_m2: 0, permuta_fisica_nr_pct: 0,
-    };
+    // Difere da Receita bruta (VGV) só quando há permuta física. BUG7-07: mesma
+    // omissão do canônico corrigida acima em vgvBruto — aqui, em vez de rodar o
+    // motor de novo com os campos legados zerados (no-op quando há canônico),
+    // deriva-se do próprio Proforma já calculado do cenário (mesma identidade
+    // de exportar.ts:35), sem 2ª execução.
     const proforma = (fator: number) => calcularProforma(this._aplicarFator(fator));
-    const vgvBrutoDe = (fator: number) =>
-      calcularProforma({ ...this._aplicarFator(fator), ...semPermutaFisica }).vgv;
+    const vgvBrutoDe = (cen: Proforma) => cen.vgv + cen.vgvPermutaResidencial + cen.vgvPermutaNaoResidencial;
     // Linhas monetárias (6) e, separados por uma divisória com mais respiro, os dois
     // indicadores em % (Custo obras/VGV e Margem líquida) exibidos como urbi-badge
     // com a cor do cenário.
@@ -437,10 +439,11 @@ export class ViabTelaProforma extends LitElement {
       base: 'var(--cor-sucesso, #13A98D)',
       bull: 'var(--cor-info, #2AA9E0)',
     } as const;
+    const pBear = proforma(fatorBear), pBase = proforma(1), pBull = proforma(fatorBull);
     const cenarios: { id: 'bear' | 'base' | 'bull'; rot: string; p: Proforma; vgvBruto: number }[] = [
-      { id: 'bear', rot: '📉 Bear', p: proforma(fatorBear), vgvBruto: vgvBrutoDe(fatorBear) },
-      { id: 'base', rot: '📊 Base', p: proforma(1), vgvBruto: vgvBrutoDe(1) },
-      { id: 'bull', rot: '🚀 Bull', p: proforma(fatorBull), vgvBruto: vgvBrutoDe(fatorBull) },
+      { id: 'bear', rot: '📉 Bear', p: pBear, vgvBruto: vgvBrutoDe(pBear) },
+      { id: 'base', rot: '📊 Base', p: pBase, vgvBruto: vgvBrutoDe(pBase) },
+      { id: 'bull', rot: '🚀 Bull', p: pBull, vgvBruto: vgvBrutoDe(pBull) },
     ];
     const linhasMonetarias = linhas.filter((m) => !m.divisoria && !m.badge);
     const linhasIndicadores = linhas.filter((m) => m.divisoria || m.badge);
