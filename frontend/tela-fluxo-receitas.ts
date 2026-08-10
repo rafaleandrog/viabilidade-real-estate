@@ -654,11 +654,6 @@ export class ViabFluxoReceitas extends LitElement {
     this.modalPag = f;
   }
 
-  private _setPag(caminho: string, campo: string, valor: any) {
-    const f = this.pagForm;
-    this.pagForm = { ...f, [caminho]: { ...f[caminho], [campo]: valor } };
-  }
-
   private _setLinha(bloco: 'entrada' | 'parcelas', i: number, campo: string, valor: any) {
     const f = this.pagForm;
     const linhas = f[bloco].map((x: any, j: number) => (j === i ? { ...x, [campo]: valor } : x));
@@ -710,37 +705,13 @@ export class ViabFluxoReceitas extends LitElement {
           <div>
             <div class="pag-secao">
               <h4>Definições</h4>
-              <div class="pag-linha">
-                <urbi-checkbox label="Corretagem" ?desabilitado=${dis} ?marcado=${f.comissao.ativo}
-                  @urbi:checkbox-change=${(e: CustomEvent) => this._setPag('comissao', 'ativo', e.detail.marcado)}></urbi-checkbox>
-              </div>
-              ${f.comissao.ativo ? html`
-                <div class="pag-linha">
-                  <span class="badges-par">
-                    <urbi-badge cor="info" interativo ?ativo=${f.comissao.tipo === 'destacada'}
-                      @click=${() => { if (!dis) this._setPag('comissao', 'tipo', 'destacada'); }}>Destacada</urbi-badge>
-                    <urbi-badge cor="info" interativo ?ativo=${f.comissao.tipo === 'embutida'}
-                      @click=${() => { if (!dis) this._setPag('comissao', 'tipo', 'embutida'); }}>Embutida</urbi-badge>
-                  </span>
-                  <viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.comissao.pct}
-                    @urbi:input-numero-change=${(e: CustomEvent) => this._setPag('comissao', 'pct', e.detail.valor ?? 0)}></viab-num>
-                </div>
-                <!-- #228: nem "Destacada" nem "Embutida" deduzem mais do VGV — a
-                     corretagem é sempre a linha de custo obrigatória "Corretagem
-                     de vendas" (base bruto/VGV, #227); deduzir aqui também
-                     contava a corretagem duas vezes quando "Destacada" estava
-                     marcada. O toggle fica como classificação informativa. -->
-                <p class="sec">${f.comissao.tipo === 'embutida'
-                  ? 'Embutida: já está no preço de venda.'
-                  : 'Destacada: cobrada em separado do preço de venda.'} A corretagem em si é sempre a linha de custo "Corretagem de vendas" (Custos Diretos).</p>` : nothing}
-              <div class="pag-linha">
-                <urbi-checkbox label="RET" ?desabilitado=${dis} ?marcado=${f.ret.ativo}
-                  @urbi:checkbox-change=${(e: CustomEvent) => this._setPag('ret', 'ativo', e.detail.marcado)}></urbi-checkbox>
-                ${f.ret.ativo ? html`
-                  <viab-num sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${f.ret.pct}
-                    @urbi:input-numero-change=${(e: CustomEvent) => this._setPag('ret', 'pct', e.detail.valor ?? 0)}></viab-num>` : nothing}
-              </div>
-              ${f.ret.ativo ? html`<p class="sec">Regime Especial de Tributação — patrimônio de afetação.</p>` : nothing}
+              <!-- #346: corretagem e RET saíram deste bloco — corretagem porque
+                   já era só informativa (#228, sem efeito no motor: a linha
+                   real é "Corretagem de vendas" em Custos → Diretos), RET
+                   porque virou controle GLOBAL do estudo (era por Grupo). -->
+              <p class="sec">Corretagem: configurada na linha de custo obrigatória "Corretagem de
+                vendas" (Custos → Diretos).</p>
+              <p class="sec">RET: controle global do estudo, em Custos → Financeiro.</p>
             </div>
           </div>
           <div>

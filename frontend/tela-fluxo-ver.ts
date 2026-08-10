@@ -50,6 +50,7 @@ export class ViabFluxoVer extends LitElement {
   private dados: {
     receitas: any[]; custos: any[]; curvas: any[];
     tipologias: any[]; crono: EventoCrono[]; dataInicio: string | null; taxa: number;
+    ret: { ativo: boolean; pct: number };
   } | null = null;
   private carregado = false;
 
@@ -87,6 +88,8 @@ export class ViabFluxoVer extends LitElement {
         crono: crono?.erro ? [] : (crono.dados || []),
         dataInicio: params?.erro ? null : (params.data_inicio_projeto ?? null),
         taxa: params?.erro ? 12 : Number(params.taxa_desconto_aa ?? 12),
+        // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret).
+        ret: params?.erro ? { ativo: false, pct: 4 } : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
       };
       this._recalcular();
     } catch (e: any) {
@@ -109,6 +112,7 @@ export class ViabFluxoVer extends LitElement {
       linhasCusto: d.custos,
       curvas: d.curvas,
       areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
+      ret: d.ret,
     };
     this.calc = calcularFluxo(config);
     this.resultadoCapitalStack = null;

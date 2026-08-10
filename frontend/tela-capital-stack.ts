@@ -153,6 +153,8 @@ export class ViabCapitalStack extends LitElement {
         linhasCusto: this.custos,
         curvas: curvas?.erro ? [] : (curvas.dados || []),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
+        // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret).
+        ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
       };
       const calc = calcularFluxo(config);
       this.resultadoDesalavancado = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] || 0;
