@@ -174,7 +174,9 @@ export class ViabTelaResumo extends LitElement {
       <div class="kpis">
         <div class="kpi-cel"><urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi></div>
         <div class="kpi-cel"><urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi></div>
-        <div class="kpi-cel"><urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi></div>
+        <!-- #353: exibida como magnitude (módulo) — sem cenário base para
+             comparar aqui, a variante fica fixa em "erro" (é sempre risco). -->
+        <div class="kpi-cel"><urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(Math.abs(c.exposicaoMaxima))} variante="erro"></urbi-kpi></div>
         <div class="kpi-cel"><urbi-kpi rotulo="VGV" .valor=${fmtR$(k.vgv)}></urbi-kpi></div>
         <div class="kpi-cel"><urbi-kpi rotulo="Resultado" .valor=${fmtR$(k.resultado)} variante=${k.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi></div>
         <div class="kpi-cel"><urbi-kpi rotulo="Margem líquida" .valor=${fmtPct(k.margemLiquidaPct)} variante=${k.margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi></div>

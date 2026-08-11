@@ -36,6 +36,22 @@ test('base negativa: normaliza pelo módulo — exposição máxima menos negati
   assert.equal(w?.texto, '-30,0%');
 });
 
+test('#353: exposição máxima por MAGNITUDE — maior é pior, menor é melhor', () => {
+  // fluxo-tabela.ts (kpisFluxo) passa Math.abs() dos dois lados com
+  // maiorMelhor=false: o autor quer a leitura por módulo (dinheiro em
+  // risco), não pelo sinal — de -1.000 para -1.300 a exposição CRESCEU
+  // (mais risco) e deve marcar como PIOR, seta para cima.
+  const cresceu = calcularVariacao(Math.abs(-1300), Math.abs(-1000), false);
+  assert.equal(cresceu?.melhor, false);
+  assert.equal(cresceu?.texto, '+30,0%');
+
+  // De -1.000 para -800 a exposição DIMINUIU (menos risco) — MELHOR, seta
+  // para baixo.
+  const diminuiu = calcularVariacao(Math.abs(-800), Math.abs(-1000), false);
+  assert.equal(diminuiu?.melhor, true);
+  assert.equal(diminuiu?.texto, '-20,0%');
+});
+
 test('sem variação relevante devolve null (não pinta seta nem badge)', () => {
   assert.equal(calcularVariacao(100, 100, true), null);
   assert.equal(calcularVariacao(100.02, 100, true), null);
