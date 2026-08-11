@@ -1,7 +1,11 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { periodosAnuais, type EventoCrono, type PeriodoAgregado } from './fluxo-shared.js';
+import {
+  periodosAnuais, areaPrivativaTotalLinhas, type EventoCrono, type PeriodoAgregado,
+} from './fluxo-shared.js';
+import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
+import { proformaAvancado } from './proforma-avancado.js';
 import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { graficoFluxoMensal, graficoFluxoAcumulado, seriesEconomicasFluxo } from './fluxo-graficos.js';
 import {
@@ -43,6 +47,12 @@ export class ViabFluxoVer extends LitElement {
   @state() private faseFiltro = '';
   /** View das colunas da tabela e dos gráficos (#127) — sempre uma das duas. */
   @state() private visao: 'mensal' | 'anual' = 'mensal';
+  /**
+   * #351: qual das 3 sub-abas de Resultados renderizar. As três compartilham
+   * um único carregamento e um único `calcularFluxo` — por isso são uma prop
+   * deste componente, e não três telas independentes.
+   */
+  @property({ type: String }) vista: 'fluxo-caixa' | 'proforma' | 'analise' = 'fluxo-caixa';
   // item 2 (docs/viabilidade/funding-capital-stack.md §10): resultado do
   // Capital Stack, calculado sobre o fluxo mensal.
   // #349: a restrição "só na view Mensal" acabou — o funding entrou na tabela
@@ -66,6 +76,19 @@ export class ViabFluxoVer extends LitElement {
     .graficos { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
     .graf svg { display: block; width: 100%; height: auto; min-width: 560px; }
     .graf-wrap { overflow-x: auto; }
+
+    /* #351: tabela da Proforma e do quadro Livre × real — poucas linhas, sem
+       sticky nem scroll horizontal (não é a tabela mensal do fluxo). */
+    table.proforma { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    table.proforma th, table.proforma td {
+      padding: 6px 10px; font-size: 0.82rem; text-align: left;
+      border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06));
+    }
+    table.proforma th.num, table.proforma td.num { text-align: right; }
+    table.proforma th { color: var(--cor-texto-sec, rgba(255,255,255,0.55)); font-weight: 600; }
+    table.proforma tr.n1 td:first-child { padding-left: 26px; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
+    table.proforma tr.n0 td { font-weight: 700; border-top: 1px solid var(--cor-borda, rgba(255,255,255,0.14)); }
+    table.proforma tr.resultado td { border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2)); }
   `];
 
   updated() {
@@ -184,13 +207,95 @@ export class ViabFluxoVer extends LitElement {
     // acompanhar a view Anual — a tabela separada só existia na Mensal e
     // sumia ao trocar de view, escondendo o funding sem avisar.
     const fundingExib = this.funding && periodos ? agregarFundingPorPeriodos(this.funding, periodos) : this.funding;
-    const titulo = this.visao === 'anual' ? 'Anual' : 'Mensal';
+    // #351: as 3 sub-abas de Resultados são 3 leituras do MESMO cálculo — o
+    // componente carrega e roda `calcularFluxo` uma vez e a `vista` escolhe o
+    // que renderizar, em vez de três telas repetindo fetch e motor.
+    if (this.vista === 'proforma') return this._renderProforma(c);
+    if (this.vista === 'analise') return this._renderAnaliseFinanceira(c, exib, periodos);
     return html`
       ${kpisFluxo(c)}
       ${this._renderControles()}
       ${tabelaFluxo(exib, this.dados?.dataInicio ?? null, this.colapso, (ch) => this._t(ch), fundingExib)}
       ${relatorioReconciliacao(this.divergencias)}
       ${tabelaPermutaFisica(this.permutaFisica)}
+    `;
+  }
+
+  /**
+   * #351 · aba Proforma — leitura econômica do mesmo `FluxoCalc`, na
+   * segmentação da imagem de referência da planilha (aba `#43`): três colunas
+   * (R$ · R$/m² da área privativa · % VGV). Entradas de funding ficam de fora
+   * de propósito; ver a nota do topo de `proforma-avancado.ts`.
+   */
+  private _renderProforma(c: FluxoCalc): TemplateResult {
+    const area = areaPrivativaTotalLinhas(this.dados?.receitas ?? []);
+    const p = proformaAvancado(c, area, this.funding);
+    const porM2 = (v: number) => (p.areaPrivativa > 0 ? v / p.areaPrivativa : 0);
+    const pctVgv = (v: number) => (p.vgv > 0 ? (v / p.vgv) * 100 : 0);
+    return html`
+      <urbi-card titulo="Proforma">
+        <table class="proforma">
+          <thead>
+            <tr><th>Linha</th><th class="num">R$</th><th class="num">R$/m²</th><th class="num">% VGV</th></tr>
+          </thead>
+          <tbody>
+            ${p.linhas.map((l) => html`
+              <tr class=${`n${l.nivel} ${l.tipo}`}>
+                <td>${l.nome}</td>
+                <td class="num">${fmtR$(l.valor)}</td>
+                <td class="num">${fmtNum(porM2(l.valor))}</td>
+                <td class="num">${fmtPct(pctVgv(l.valor))}</td>
+              </tr>`)}
+          </tbody>
+        </table>
+        <p class="sec">Área privativa: ${fmtNum(p.areaPrivativa)} m² · Margem sobre VGV: ${fmtPct(p.margemPct)}.
+          Aportes e liberações de funding não entram aqui — proforma é resultado econômico, não caixa;
+          o custo do funding aparece em Custos Financeiros.</p>
+      </urbi-card>
+    `;
+  }
+
+  /**
+   * #351 · aba Análise Financeira — indicadores principais, a diferença
+   * explícita entre Fluxo de Caixa Livre (desalavancado, base de TIR/VPL por
+   * §8.1) e o Fluxo de Caixa real (pós-funding), e os gráficos que antes
+   * ficavam empilhados embaixo da tabela.
+   */
+  private _renderAnaliseFinanceira(
+    c: FluxoCalc, exib: FluxoCalc, periodos: PeriodoAgregado[] | null,
+  ): TemplateResult {
+    const titulo = this.visao === 'anual' ? 'Anual' : 'Mensal';
+    const livre = c.fluxoMensal.reduce((s, v) => s + v, 0);
+    const real = this.funding ? this.funding.fluxoMensal.reduce((s, v) => s + v, 0) : livre;
+    const custoFunding = this.funding
+      ? this.funding.linhasSaida.reduce((s, l) => s + l.total, 0) - this.funding.entradas.reduce((s, v) => s + v, 0)
+      : 0;
+    return html`
+      ${kpisFluxo(c)}
+      <urbi-card titulo="Fluxo de Caixa Livre × Fluxo de Caixa real">
+        <table class="proforma">
+          <tbody>
+            <tr class="n0 receita">
+              <td>Fluxo de Caixa Livre (sem despesas financeiras)</td>
+              <td class="num">${fmtR$(livre)}</td>
+            </tr>
+            <tr class="n1 custo">
+              <td>(-) Efeito líquido do funding (saídas − entradas)</td>
+              <td class="num">${fmtR$(-custoFunding)}</td>
+            </tr>
+            <tr class="n0 resultado">
+              <td>= Fluxo de Caixa (resultado real)</td>
+              <td class="num">${fmtR$(real)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="sec">${this.funding
+          ? html`TIR, VPL e Payback continuam <strong>desalavancados</strong> — leem o Fluxo de Caixa Livre
+              (funding-capital-stack.md §8.1, para manter comparabilidade entre estruturas de capital).`
+          : html`Este estudo não tem camadas de Capital Stack: sem funding, o Fluxo de Caixa real é
+              igual ao Livre.`}</p>
+      </urbi-card>
+      ${this._renderControles()}
       <div class="graficos">
         <urbi-card titulo="Contratação, Receita Bruta, Carteira e Repasse — ${titulo}">
           <div class="graf-wrap"><div class="graf">

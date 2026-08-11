@@ -95,6 +95,15 @@ const SUBABAS: Partial<Record<AbaTopo, SubAba[]>> = {
     // existindo até a FIN-10 (#279) decidir o que sai da interface (§13.4).
     { id: 'capital-stack', label: 'Capital Stack', icone: 'fa-solid fa-building-columns' },
   ],
+  // #351: Resultados (id interno 'fluxo') em 3 abas. As três leem o MESMO
+  // `viab-fluxo-ver`, com a prop `vista` — um único componente carrega e roda
+  // `calcularFluxo` uma vez por aba ativa, em vez de três telas repetindo
+  // fetch e motor e podendo divergir entre si.
+  fluxo: [
+    { id: 'fluxo-caixa',        label: 'Fluxo de Caixa',      icone: 'fa-solid fa-money-bill-transfer' },
+    { id: 'proforma',           label: 'Proforma',            icone: 'fa-solid fa-table-list' },
+    { id: 'analise-financeira', label: 'Análise Financeira',  icone: 'fa-solid fa-chart-line' },
+  ],
   // Custos em 5 abas (#40 renomeou a página). Cada uma exibe o grupo
   // correspondente em viab-fluxo-custos (tabela + consolidado próprio).
   obra: [
@@ -137,6 +146,7 @@ export class ViabTelaAvancado extends LitElement {
     empreendimento: 'informacoes',
     viabilidade: 'receitas',
     obra: 'terreno',
+    fluxo: 'fluxo-caixa', // #351: Resultados abre no Fluxo de Caixa, como antes das sub-abas
   };
 
   // #251: quando a URL traz uma subaba válida para a página ativa, ela vira a
@@ -209,9 +219,10 @@ export class ViabTelaAvancado extends LitElement {
       case 'empreendimento':
       case 'viabilidade':
       case 'obra':
-        return this._renderComAbas(this.aba);
+      // #351: 'fluxo' (Resultados) ganhou sub-abas e passou a usar o mesmo
+      // chassi das outras páginas com mais de uma seção.
       case 'fluxo':
-        return html`<viab-fluxo-ver .estudo=${this.estudo}></viab-fluxo-ver>`;
+        return this._renderComAbas(this.aba);
       case 'cenarios':
         // Cenários (Etapa 8 · #56): simulação de deltas (preço/custo) sobre o
         // fluxo. Componente exclusivo do Avançado; o Preliminar mantém sua aba
@@ -280,6 +291,14 @@ export class ViabTelaAvancado extends LitElement {
         default:
           return html`<viab-fluxo-receitas .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-fluxo-receitas>`;
       }
+    }
+    if (topo === 'fluxo') {
+      // A vista escolhe o que `viab-fluxo-ver` renderiza do MESMO cálculo:
+      // tabela+KPIs, a proforma econômica ou os indicadores e gráficos.
+      const vista = sub === 'proforma' ? 'proforma'
+        : sub === 'analise-financeira' ? 'analise'
+          : 'fluxo-caixa';
+      return html`<viab-fluxo-ver .estudo=${this.estudo} .vista=${vista}></viab-fluxo-ver>`;
     }
     if (topo === 'obra') {
       // Uma instância do componente por grupo (aba). Cada uma carrega seus
