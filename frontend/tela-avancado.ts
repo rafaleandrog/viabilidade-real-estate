@@ -33,7 +33,7 @@ import './tela-analise-mercado.js';
 //   Empreendimento    → Informações · Cronograma · Tipologias
 //   Viabilidade       → Receitas · Financeiro (Premissas removida no Avançado · #88)
 //   Custos            → Terreno · Obra · Diretos · Indiretos · Financeiro
-//   Fluxo de Caixa    → Ver Fluxo
+//   Resultados        → Ver Fluxo (#350: era "Fluxo de Caixa")
 //   Cenários          → Simulação de cenários (sliders + fluxo do cenário)
 //   Análise de mercado→ Projeto × mercado (#199)
 //   Apelo Comercial   → Score qualitativo do ativo por IA
@@ -54,7 +54,7 @@ const PAGINAS: { id: AbaTopo; label: string }[] = [
   { id: 'empreendimento', label: 'Empreendimento' },
   { id: 'viabilidade',    label: 'Viabilidade' },
   { id: 'obra',           label: 'Custos' },
-  { id: 'fluxo',          label: 'Fluxo de Caixa' },
+  { id: 'fluxo',          label: 'Resultados' },
   { id: 'cenarios',       label: 'Cenários' },
   { id: 'mercado',        label: 'Análise de mercado' },
   { id: 'apelo',          label: 'Apelo Comercial' },
@@ -64,10 +64,14 @@ const IDS_TOPO = PAGINAS.map((a) => a.id) as AbaTopo[];
 // #250: a página de Custos tem id interno 'obra' (preservado pela #40 para não
 // migrar rota nem estado), mas o slug PÚBLICO na URL passa a ser 'custos' — o
 // rótulo que o usuário vê. 'obra' continua aceito como alias de compatibilidade
-// (deep links e favoritos antigos). Só esta página difere; as demais têm slug =
-// id. O mapa vive aqui porque o vocabulário de páginas é desta tela.
-const SLUG_POR_ID: Partial<Record<AbaTopo, string>> = { obra: 'custos' };
-const ID_POR_SLUG: Record<string, AbaTopo> = { custos: 'obra' };
+// (deep links e favoritos antigos). O mapa vive aqui porque o vocabulário de
+// páginas é desta tela.
+// #350: mesmo padrão para a página renomeada de "Fluxo de Caixa" para
+// "Resultados" — id interno 'fluxo' preservado (rota, estado e SUBABAS da
+// #351 dependem dele), slug público 'resultados', e 'fluxo' segue aceito como
+// alias. As demais páginas têm slug = id.
+const SLUG_POR_ID: Partial<Record<AbaTopo, string>> = { obra: 'custos', fluxo: 'resultados' };
+const ID_POR_SLUG: Record<string, AbaTopo> = { custos: 'obra', resultados: 'fluxo' };
 const idDaSlug = (s: string): string => ID_POR_SLUG[s] ?? s;
 const slugDoId = (id: string): string => SLUG_POR_ID[id as AbaTopo] ?? id;
 
