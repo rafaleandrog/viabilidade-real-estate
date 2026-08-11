@@ -4,6 +4,38 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 7 — Fases 9–10 concluídas (E41–E46, issues #349–#354), portão antes da Fase 11 (2026-08-11)
+
+Sessão contínua a partir do checkpoint anterior, uma issue de cada vez, mesma disciplina de
+branch → PR → CI verde → merge → confirmação de fechamento via `issue_read`.
+
+- **Fase 9 — Avançado: Resultados** (E41–E43, #349–#351): reconstruiu a tabela de fluxo reduzindo-a
+  aos blocos pedidos (Receita Bruta + grupos de Receitas, 5 tipos de Custos, Fluxo), absorveu o
+  funding do Capital Stack nas categorias de receita/custo via `fundingNoFluxo()` (nova função pura
+  em `capital-stack-motor.ts`, fonte única para tabela e exportação), preservando as KPIs
+  desalavancadas (§8.1) com uma nova linha "Fluxo de Caixa Livre (antes do funding)"; renomeou a
+  seção para "Resultados"; e dividiu em três sub-abas (Fluxo de Caixa · Proforma · Análise
+  Financeira), com `proforma-avancado.ts` novo derivando a leitura econômica do mesmo `FluxoCalc` do
+  Fluxo de Caixa (não do `proforma.ts` do Preliminar, que precisa de campos fixos que o Avançado não
+  tem).
+- **Fase 10 — Avançado: Cenários** (E44–E46, #352–#354): variação % dos 6 KPIs de `kpisFluxo()`
+  passou a viver DENTRO da caixa do card (D7 — abandonou `urbi-kpi` nesses cards por markup + tokens
+  próprios, já que o primitivo não tem slot); Exposição Máxima passou a comparar por MAGNITUDE
+  (`Math.abs`, `maiorMelhor=false`) em vez do valor assinado — exposição maior agora é seta pra cima
+  + vermelho, menor é seta pra baixo + verde; e o gráfico de Cenários passou a mostrar SEMPRE as duas
+  séries (Cenário real × simulado, com `marcadores`), mesmo com os sliders em 0% — fechando o ponto
+  que a #264 tinha deixado pendente de confirmação.
+
+**Todas as 6 issues de E41 a E46 estão fechadas** (confirmado via `issue_read` após cada merge).
+Nenhum portão de fase pulado.
+
+**Próximo passo — Fase 11 (E47/#355), isolada por exigência explícita do autor**: reescrita do
+Funding/Capital Stack. Continua **bloqueada pela D6** — falta o autor anexar o documento
+`fluxo_investidor_FORMULAS`, que não está no repositório. Sessão parou aqui; não avança
+unilateralmente para a última fase sem esse documento nem sem confirmação do autor.
+
+---
+
 ## Rodada 7 — Fases 1–8 concluídas (E01–E40, issues #309–#348), portão antes da Fase 9 (2026-08-10)
 
 Sessão contínua, uma issue de cada vez, cada uma com seu próprio branch → PR → CI verde → merge →
