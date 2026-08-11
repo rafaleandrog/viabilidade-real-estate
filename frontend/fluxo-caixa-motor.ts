@@ -1006,6 +1006,12 @@ export interface SeriesComponentesCarteira {
   saldoARepassar: number[];
 }
 
+// #349: estes dois mapas ficaram SEM CONSUMIDOR quando a tabela e a exportação
+// deixaram de listar os blocos "Componente · …" e Carteira de clientes. Não são
+// código morto por descuido: as séries que eles rotulam
+// (`receitaPorComponenteMensal`/`carteiraPorComponenteMensal`) continuam sendo
+// calculadas, conservadas e testadas, e a aba "Análise Financeira" da #351 é o
+// destino natural delas. Se a #351 fechar sem usá-los, aí sim vira remoção.
 export const ROTULOS_COMPONENTES_RECEITA: Record<keyof SeriesComponentesReceita, string> = {
   aVista: 'À vista',
   tabelaCurta: 'Tabela curta',

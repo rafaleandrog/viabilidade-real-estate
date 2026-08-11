@@ -5,12 +5,16 @@ import { periodosAnuais, type EventoCrono, type PeriodoAgregado } from './fluxo-
 import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { graficoFluxoMensal, graficoFluxoAcumulado, seriesEconomicasFluxo } from './fluxo-graficos.js';
 import {
-  estiloFluxoTabela, kpisFluxo, tabelaFluxo, tabelaCapitalStack,
-  chavesColapso, CHAVES_COLAPSO_CAPITAL_STACK, controlesFluxo, relatorioReconciliacao,
+  estiloFluxoTabela, kpisFluxo, tabelaFluxo,
+  chavesColapso, controlesFluxo, relatorioReconciliacao,
   tabelaPermutaFisica,
 } from './fluxo-tabela.js';
-import { exportarFluxoCSV, exportarFluxoPDF, type CapitalStackExport } from './exportar.js';
-import { simularCapitalStackDoEstudo, receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
+import { exportarFluxoCSV, exportarFluxoPDF } from './exportar.js';
+import {
+  simularCapitalStackDoEstudo, receitaLiquidaComCorretagemMensal,
+  fundingNoFluxo, agregarFundingPorPeriodos,
+  type ResultadoCapitalStack, type FundingNoFluxo,
+} from './capital-stack-motor.js';
 import {
   validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita,
   validarCapitalStack, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia,
@@ -40,11 +44,15 @@ export class ViabFluxoVer extends LitElement {
   /** View das colunas da tabela e dos gráficos (#127) — sempre uma das duas. */
   @state() private visao: 'mensal' | 'anual' = 'mensal';
   // item 2 (docs/viabilidade/funding-capital-stack.md §10): resultado do
-  // Capital Stack, calculado sobre o fluxo mensal — a tabela/exportação só
-  // aparece na view Mensal (mesma restrição que já vale para os KPIs, que
-  // também nunca reagregam por ano; ver comentário em `render`).
+  // Capital Stack, calculado sobre o fluxo mensal.
+  // #349: a restrição "só na view Mensal" acabou — o funding entrou na tabela
+  // principal e `agregarFundingPorPeriodos` o reagrupa junto com ela na view
+  // Anual. Os KPIs seguem lendo só o cálculo mensal, como sempre.
   @state() private camadas: any[] = [];
   @state() private resultadoCapitalStack: ResultadoCapitalStack | null = null;
+  // #349: o funding projetado nas categorias da tabela principal — substitui a
+  // tabela separada "Programa Financeiro (Capital Stack)", removida.
+  @state() private funding: FundingNoFluxo | null = null;
   @state() private divergencias: Divergencia[] = [];
   @state() private permutaFisica: PermutaFisicaTipologia[] = [];
   private dados: {
@@ -116,10 +124,11 @@ export class ViabFluxoVer extends LitElement {
     };
     this.calc = calcularFluxo(config);
     this.resultadoCapitalStack = null;
+    this.funding = null;
 
     // §13.3: só camadas ATIVAS têm efeito — sem nenhuma, `simularCapitalStackDoEstudo`
-    // devolve entradas/saídas zero e a tabela nem renderiza (`tabelaCapitalStack`
-    // checa `camadas.length === 0`, não o resultado).
+    // devolve entradas/saídas zero e `fundingNoFluxo` devolve `null`, de modo que a
+    // tabela não ganha nenhuma linha nova (blast radius zero sem Capital Stack).
     if (this.camadas.length > 0) {
       const receitaLiquida = receitaLiquidaComCorretagemMensal(this.calc.receitaMensal, this.calc.linhasCusto, d.custos);
       const fluxoLivre1based = [0, ...this.calc.fluxoMensal];
@@ -127,6 +136,7 @@ export class ViabFluxoVer extends LitElement {
       this.resultadoCapitalStack = simularCapitalStackDoEstudo(
         fluxoLivre1based, receitaLiquida1based, this.camadas, this.calc.linhasCusto, 0,
       );
+      this.funding = fundingNoFluxo(this.resultadoCapitalStack, this.camadas, this.calc.fluxoMensal, d.taxa);
     }
     this.divergencias = [
       ...validarProduto(d.receitas, d.custos, d.tipologias, d.crono, this.calc.prazo),
@@ -170,12 +180,15 @@ export class ViabFluxoVer extends LitElement {
     // VPL, payback e exposição são grandezas do fluxo mês a mês.
     const periodos = this._periodos();
     const exib = periodos ? agregarFluxoPorPeriodos(c, periodos) : c;
+    // #349: o funding agora vive DENTRO da tabela principal, então precisa
+    // acompanhar a view Anual — a tabela separada só existia na Mensal e
+    // sumia ao trocar de view, escondendo o funding sem avisar.
+    const fundingExib = this.funding && periodos ? agregarFundingPorPeriodos(this.funding, periodos) : this.funding;
     const titulo = this.visao === 'anual' ? 'Anual' : 'Mensal';
     return html`
       ${kpisFluxo(c)}
       ${this._renderControles()}
-      ${tabelaFluxo(exib, this.dados?.dataInicio ?? null, this.colapso, (ch) => this._t(ch))}
-      ${!periodos ? tabelaCapitalStack(this.resultadoCapitalStack, this.camadas, c.fluxoMensal, c.meses, this.colapso, (ch) => this._t(ch)) : nothing}
+      ${tabelaFluxo(exib, this.dados?.dataInicio ?? null, this.colapso, (ch) => this._t(ch), fundingExib)}
       ${relatorioReconciliacao(this.divergencias)}
       ${tabelaPermutaFisica(this.permutaFisica)}
       <div class="graficos">
@@ -218,7 +231,7 @@ export class ViabFluxoVer extends LitElement {
   }
 
   private _toggleTudo(recolher: boolean) {
-    const chaves = this.calc ? [...chavesColapso(this.calc), ...CHAVES_COLAPSO_CAPITAL_STACK] : [];
+    const chaves = this.calc ? chavesColapso(this.calc) : [];
     const novo: Record<string, boolean> = {};
     for (const k of chaves) novo[k] = recolher;
     this.colapso = novo;
@@ -238,17 +251,20 @@ export class ViabFluxoVer extends LitElement {
     return periodos ? agregarFluxoPorPeriodos(this.calc, periodos) : this.calc;
   }
 
-  // item 2: a seção de Capital Stack só entra na exportação na view Mensal —
-  // não existe agregação anual do resultado do motor (mesma restrição da tela).
-  private _capitalStackExport(): CapitalStackExport | undefined {
-    if (this.visao !== 'mensal' || !this.resultadoCapitalStack || this.camadas.length === 0) return undefined;
-    return { resultado: this.resultadoCapitalStack, camadas: this.camadas };
+  // #349: o funding exportado segue a MESMA view da tela. Antes ele só saía na
+  // view Mensal (não havia agregação anual do resultado do motor); com
+  // `agregarFundingPorPeriodos` a restrição deixou de existir, e tela e arquivo
+  // voltam a mostrar exatamente as mesmas linhas em qualquer view.
+  private _fundingExportavel(): FundingNoFluxo | null {
+    if (!this.funding) return null;
+    const periodos = this._periodos();
+    return periodos ? agregarFundingPorPeriodos(this.funding, periodos) : this.funding;
   }
 
   private _csv = () => {
     const c = this._exportavel();
     if (!c) return;
-    exportarFluxoCSV(this.estudo, c, this.dados?.dataInicio ?? null, this._capitalStackExport(), this.divergencias, this.permutaFisica);
+    exportarFluxoCSV(this.estudo, c, this.dados?.dataInicio ?? null, this._fundingExportavel(), this.divergencias, this.permutaFisica);
     urbiVerso.notificar('CSV do fluxo exportado.', 'sucesso');
   };
 
@@ -256,7 +272,7 @@ export class ViabFluxoVer extends LitElement {
     const c = this._exportavel();
     if (!c) return;
     const ok = exportarFluxoPDF(this.estudo, c, this.dados?.dataInicio ?? null,
-      this.visao === 'anual' ? 'Anos' : 'Meses', this._capitalStackExport(), this.divergencias, this.permutaFisica);
+      this.visao === 'anual' ? 'Anos' : 'Meses', this._fundingExportavel(), this.divergencias, this.permutaFisica);
     if (!ok) urbiVerso.notificar('Permita pop-ups para exportar o PDF.', 'alerta');
   };
 }
