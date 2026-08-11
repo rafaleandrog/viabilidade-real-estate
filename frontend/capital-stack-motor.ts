@@ -15,6 +15,7 @@
 // sendo a suíte de reconciliação, só que contra o motor real.
 
 import { eCorretagem } from './fluxo-shared.js';
+import { vplFluxo } from './fluxo-caixa-motor.js';
 
 const round2 = (v: number): number => Math.round(v * 100) / 100;
 const n = (v: any): number => Number(v) || 0;
@@ -680,6 +681,167 @@ export function fundingEntradasSaidasMensal(r: ResultadoCapitalStack): { entrada
       + participacaoReceita[t] + participacaoResidual[t] + participacaoLucro[t] + (r.distribuicaoSponsorMensal[t] ?? 0));
   }
   return { entradas, saidas };
+}
+
+/** Uma linha de funding já projetada na tabela principal do fluxo — 0-based, do tamanho do prazo. */
+export interface LinhaFunding {
+  nome: string;
+  mensal: number[];
+  total: number;
+  vpl: number;
+}
+
+/**
+ * O funding lido DENTRO das categorias da tabela principal (#349) — entradas
+ * como bloco de receita, saídas dentro de "Custos Financeiros" (uma das 5
+ * categorias de custo que já existiam). Todas as séries são 0-based e do
+ * tamanho de `fluxoLivreMensal`, prontas para a tabela; as do motor são
+ * 1-based e são convertidas aqui, num lugar só.
+ */
+export interface FundingNoFluxo {
+  entradas: number[];
+  saidas: number[];
+  linhasEntrada: LinhaFunding[];
+  linhasSaida: LinhaFunding[];
+  /** Fluxo ALAVANCADO: livre + entradas − saídas. É o que a tabela mostra no rodapé. */
+  fluxoMensal: number[];
+  fluxoAcumulado: number[];
+  /**
+   * VPL do funding isolado (Σ VPL das entradas − Σ VPL das saídas). Somado ao
+   * VPL desalavancado do motor dá o VPL do fluxo alavancado — sem isso a
+   * coluna VPL do rodapé mostraria o número desalavancado ao lado de um fluxo
+   * alavancado, que é o tipo de inconsistência silenciosa que esta tabela
+   * existe para não ter.
+   */
+  vplLiquido: number;
+}
+
+/**
+ * #349: projeta o resultado do Capital Stack nas categorias da tabela
+ * principal, no lugar da tabela separada "Programa Financeiro (Capital
+ * Stack)" que o autor pediu para apagar.
+ *
+ * Esta é a **fonte única** dessa composição. Antes da #349 as mesmas ~15
+ * linhas eram montadas DUAS vezes — `tabelaCapitalStack` (fluxo-tabela.ts) e
+ * `linhasCapitalStack` (exportar.ts) —, cada uma com sua própria cópia de
+ * `a0`/`somaPorNomes`/`nomesPorTipo`. Duas cópias da mesma árvore é
+ * exatamente o caminho pelo qual tela e CSV divergem sem ninguém perceber;
+ * as duas foram removidas em favor desta.
+ *
+ * ⚠️ **KPIs continuam DESALAVANCADOS.** `fluxoMensal` aqui é o fluxo depois
+ * do funding, mas TIR/VPL/Payback/Exposição seguem lendo `calcularFluxo`
+ * (livre) — decisão de spec, não omissão: `docs/viabilidade/funding-capital-
+ * stack.md` §8.1, "A TIR e o VPL do projeto permanecem desalavancados, para
+ * manter comparabilidade entre estruturas de capital". Por isso a tabela
+ * mostra as duas linhas ("Fluxo de Caixa Livre" e "Fluxo de Caixa Mensal")
+ * quando há funding: o número que alimenta os KPIs continua visível e
+ * reconciliável na própria tabela.
+ *
+ * Devolve `null` sem resultado ou sem camadas — nesse caso a tabela não ganha
+ * nenhuma linha nova e o rodapé segue sendo o fluxo do motor, idêntico ao de
+ * antes desta issue (blast radius zero em estudo sem Capital Stack).
+ */
+export function fundingNoFluxo(
+  resultado: ResultadoCapitalStack | null,
+  camadas: { nome: string; tipo: string }[],
+  fluxoLivreMensal: number[],
+  taxaDescontoAa: number,
+): FundingNoFluxo | null {
+  if (!resultado || camadas.length === 0) return null;
+  const r = resultado;
+  const prazo = fluxoLivreMensal.length;
+  // Séries do motor são 1-based (índice 0 ignorado); a tabela principal é 0-based.
+  const a0 = (serie: number[]): number[] => {
+    const out = new Array<number>(prazo).fill(0);
+    for (let i = 0; i < prazo; i++) out[i] = serie[i + 1] ?? 0;
+    return out;
+  };
+  const nomesPorTipo = (tipo: string) => camadas.filter((c) => c.tipo === tipo).map((c) => c.nome);
+  const somaPorNomes = (nomes: string[], rec: Record<string, number[]>): number[] => {
+    const out = new Array<number>(prazo).fill(0);
+    for (const nome of nomes) {
+      const s = rec[nome];
+      if (!s) continue;
+      for (let i = 0; i < prazo; i++) out[i] += s[i + 1] ?? 0;
+    }
+    return out;
+  };
+  const linha = (nome: string, mensal: number[]): LinhaFunding => ({
+    nome, mensal,
+    total: mensal.reduce((s, v) => s + v, 0),
+    vpl: vplFluxo(mensal, taxaDescontoAa),
+  });
+
+  const nomesDivida = [...nomesPorTipo('financiamento_producao'), ...nomesPorTipo('capital_giro')];
+  const nomesPE = nomesPorTipo('preferred_equity');
+
+  const linhasEntrada = [
+    linha('Financiamento à produção — liberações', somaPorNomes(nomesPorTipo('financiamento_producao'), r.liberacaoPorInstrumento)),
+    linha('Capital de giro — liberações', somaPorNomes(nomesPorTipo('capital_giro'), r.liberacaoPorInstrumento)),
+    linha('Equity preferencial — aportes', somaPorNomes(nomesPE, r.aportePorInstrumentoPE)),
+    linha('Sponsor Equity — aportes', a0(r.aporteSponsorMensal)),
+  ];
+  // Participações sobre receita/residual/lucro andam juntas numa linha só, como
+  // na tabela removida — são a mesma natureza econômica (participação do
+  // investidor), e `fundingEntradasSaidasMensal` soma as três em `saidas`.
+  const partReceita = somaPorNomes(nomesPE, r.participacaoReceitaPE);
+  const partResidual = somaPorNomes(nomesPE, r.participacaoResidualPE);
+  const partLucro = somaPorNomes(nomesPE, r.participacaoLucroPE);
+  const participacoes = partReceita.map((v, i) => v + partResidual[i] + partLucro[i]);
+  const linhasSaida = [
+    linha('Funding · Juros e taxas de dívida', somaPorNomes(nomesDivida, r.jurosPorInstrumento)),
+    linha('Funding · Amortização de principal', somaPorNomes(nomesDivida, r.amortizacaoPorInstrumento)),
+    linha('Funding · Devolução de Preferred Equity', somaPorNomes(nomesPE, r.devolucaoPrincipalPE)),
+    linha('Funding · Retorno preferencial', somaPorNomes(nomesPE, r.remuneracaoPagaPE)),
+    linha('Funding · Participações sobre receita/residual', participacoes),
+    linha('Funding · Distribuições ao sponsor', a0(r.distribuicaoSponsorMensal)),
+  ];
+
+  // `fundingEntradasSaidasMensal` continua sendo a fonte dos AGREGADOS — as
+  // linhas acima são a abertura dele. Somar as linhas por conta própria criaria
+  // uma segunda definição de "entradas"/"saídas" que poderia divergir da do §10.
+  const { entradas, saidas } = fundingEntradasSaidasMensal(r);
+  const entradas0 = a0(entradas);
+  const saidas0 = a0(saidas);
+  const fluxoMensal = fluxoLivreMensal.map((v, i) => round2(v + entradas0[i] - saidas0[i]));
+  const fluxoAcumulado: number[] = [];
+  let acc = 0;
+  for (const v of fluxoMensal) { acc = round2(acc + v); fluxoAcumulado.push(acc); }
+
+  const vplLiquido = linhasEntrada.reduce((s, l) => s + l.vpl, 0) - linhasSaida.reduce((s, l) => s + l.vpl, 0);
+
+  return { entradas: entradas0, saidas: saidas0, linhasEntrada, linhasSaida, fluxoMensal, fluxoAcumulado, vplLiquido };
+}
+
+/**
+ * Reagrupa as séries de funding nas mesmas faixas da view Anual (#127) — sem
+ * isso o funding sumiria da tabela ao trocar para Anual, que é o que a tabela
+ * separada fazia (só renderizava na view Mensal). Soma dentro de cada faixa;
+ * o acumulado pega o ÚLTIMO ponto da faixa, mesma convenção de
+ * `agregarFluxoPorPeriodos`.
+ */
+export function agregarFundingPorPeriodos(
+  f: FundingNoFluxo,
+  periodos: { inicio: number; fim: number }[],
+): FundingNoFluxo {
+  const soma = (serie: number[]): number[] => periodos.map((p) => {
+    let acc = 0;
+    for (let i = p.inicio; i <= p.fim; i++) acc += serie[i] ?? 0;
+    return acc;
+  });
+  const ultimo = (serie: number[]): number[] => periodos.map((p) => serie[p.fim] ?? 0);
+  // `vpl` (da linha e o líquido) NÃO é reagregado: é escalar, calculado sobre a
+  // série MENSAL, e desconto sobre balde anual daria outro número.
+  const agregarLinha = (l: LinhaFunding): LinhaFunding => ({ ...l, mensal: soma(l.mensal) });
+  return {
+    entradas: soma(f.entradas),
+    saidas: soma(f.saidas),
+    linhasEntrada: f.linhasEntrada.map(agregarLinha),
+    linhasSaida: f.linhasSaida.map(agregarLinha),
+    fluxoMensal: soma(f.fluxoMensal),
+    fluxoAcumulado: ultimo(f.fluxoAcumulado),
+    vplLiquido: f.vplLiquido,
+  };
 }
 
 // ── Adaptador: camadas reais (avancado_capital_instrumentos, #271) → Instrumento ──

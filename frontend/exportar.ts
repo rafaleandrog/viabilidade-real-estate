@@ -2,13 +2,13 @@
 // PDF: abre uma janela com HTML formatado (mesmos tokens/estilos) e chama print
 // (o usuário salva como PDF). Excel: gera CSV (pt-BR, separador ';').
 import type { Proforma } from './proforma.js';
-import {
-  ROTULOS_COMPONENTES_CARTEIRA, ROTULOS_COMPONENTES_RECEITA,
-  type FluxoCalc, type LinhaCalc, type SeriesComponentesCarteira, type SeriesComponentesReceita,
-} from './fluxo-caixa-motor.js';
+// #349: `ROTULOS_COMPONENTES_*` saíram daqui junto com os blocos "Componente ·
+// …" e Carteira, que a exportação deixou de listar para espelhar a tabela.
+// Continuam exportados pelo motor e usados por quem ainda os precisa.
+import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
-import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
+import { type FundingNoFluxo } from './capital-stack-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
 const pct1 = (v: number) => v.toFixed(1).replace('.', ',');
@@ -151,8 +151,19 @@ export interface LinhaFx {
   pctVgv?: number;
 }
 
-/** Achata o fluxo calculado na hierarquia da tabela (grupos → itens). */
-export function linhasFluxo(c: FluxoCalc): LinhaFx[] {
+/**
+ * Achata o fluxo calculado na hierarquia da tabela (grupos → itens).
+ *
+ * #349: espelha exatamente `tabelaFluxo` (fluxo-tabela.ts) — Receita Bruta
+ * (VGV) com as divisões por grupo de Receitas · a ponte de deduções até a
+ * Receita Líquida · os 5 tipos de Custos (com as saídas de funding dentro de
+ * Custos Financeiros) · o Fluxo. Saíram daqui, junto com a tela, os blocos
+ * Vendas contratadas, "Componente · …", "Auditoria · …" e Carteira de
+ * clientes: o contrato desta app é que tela e arquivo mostrem as MESMAS
+ * linhas, então reduzir só um dos dois seria reintroduzir a divergência que
+ * a #241 tinha fechado.
+ */
+export function linhasFluxo(c: FluxoCalc, funding: FundingNoFluxo | null = null): LinhaFx[] {
   const soma = (xs: LinhaCalc[]): number[] => {
     const out = new Array<number>(c.prazo).fill(0);
     for (const l of xs) for (let i = 0; i < c.prazo; i++) out[i] += l.mensal[i];
@@ -163,46 +174,12 @@ export function linhasFluxo(c: FluxoCalc): LinhaFx[] {
   const vgv = c.receitaBrutaVgv;
   const pct = (total: number) => (vgv > 0 ? (total / vgv) * 100 : undefined);
   const totalSerie = (serie: number[]) => serie.reduce((s, v) => s + v, 0);
-  const picoSerie = (serie: number[]) => Math.max(0, ...serie);
   const linhas: LinhaFx[] = [];
-  linhas.push({
-    nivel: 0, nome: 'Vendas contratadas', custo: false,
-    total: c.vendaBrutaContratada, vpl: somaVpl(c.linhasVendasContratadas),
-    mensal: c.vendaBrutaContratadaMensal,
-  });
-  linhas.push(
-    { nivel: 1, nome: '(-) Desconto comercial', custo: false,
-      total: -c.descontoComercial, mensal: c.descontoComercialMensal.map((v) => -v) },
-    { nivel: 1, nome: '= Venda líquida contratada', custo: false,
-      total: c.vendaLiquidaContratada, mensal: c.vendaLiquidaContratadaMensal },
-  );
-  for (const l of c.linhasVendasContratadas) {
-    linhas.push({
-      nivel: 1, nome: `Grupo · ${l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome}`, custo: false,
-      inicio: l.inicio, duracao: l.duracao, total: l.total, vpl: l.vpl, mensal: l.mensal, pctVgv: pct(l.total),
-    });
-    for (const t of l.itens ?? []) linhas.push({
-      nivel: 2, nome: t.nome, custo: false, inicio: t.inicio, duracao: t.duracao,
-      total: t.total, vpl: t.vpl, mensal: t.mensal, pctVgv: pct(t.total),
-    });
-  }
 
-  // #237/#241: a exportação reproduz a mesma separação econômica da tela.
   linhas.push({
-    nivel: 0, nome: 'Receita Bruta — VGV', custo: false, separadorAntes: true,
+    nivel: 0, nome: 'Receita Bruta — VGV', custo: false,
     total: c.receitaBruta, vpl: somaVpl(c.linhasReceitaBruta), mensal: c.receitaBrutaMensal,
   });
-  for (const chave of Object.keys(ROTULOS_COMPONENTES_RECEITA) as (keyof SeriesComponentesReceita)[]) {
-    const serie = c.receitaPorComponenteMensal[chave];
-    if (chave === 'outros' && !serie.some((v) => Math.abs(v) > 0.005)) continue;
-    linhas.push({ nivel: 1, nome: `Componente · ${ROTULOS_COMPONENTES_RECEITA[chave]}`, custo: false,
-      total: totalSerie(serie), mensal: serie });
-  }
-  // Principal e juros são visões não aditivas para auditoria da Receita Bruta.
-  linhas.push(
-    { nivel: 1, nome: 'Auditoria · Principal recebido', custo: false, total: c.principalRecebidoMensal.reduce((s, v) => s + v, 0), mensal: c.principalRecebidoMensal },
-    { nivel: 1, nome: 'Auditoria · Juros de clientes', custo: false, total: c.jurosClientes, mensal: c.jurosClientesMensal },
-  );
   for (const l of c.linhasReceitaBruta) {
     linhas.push({
       nivel: 1, nome: `Grupo · ${l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome}`, custo: false,
@@ -212,113 +189,91 @@ export function linhasFluxo(c: FluxoCalc): LinhaFx[] {
       linhas.push({ nivel: 2, nome: t.nome, custo: false, inicio: t.inicio, duracao: t.duracao, total: t.total, vpl: t.vpl, mensal: t.mensal, pctVgv: pct(t.total) });
     }
   }
-  linhas.push({
-    nivel: 0, nome: 'Carteira de clientes (pico)', custo: false, separadorAntes: true,
-    total: c.carteiraClientesMaxima, mensal: c.carteiraClientesMensal,
-  });
-  for (const chave of Object.keys(ROTULOS_COMPONENTES_CARTEIRA) as (keyof SeriesComponentesCarteira)[]) {
-    const serie = c.carteiraPorComponenteMensal[chave];
-    linhas.push({ nivel: 1, nome: `Componente · ${ROTULOS_COMPONENTES_CARTEIRA[chave]}`, custo: false,
-      total: picoSerie(serie), mensal: serie });
+
+  // Ponte bruta → líquida: quem alimenta o Fluxo é a líquida. Só entra quando
+  // há dedução (RET/permuta financeira); sem elas as duas são a mesma coisa.
+  const deducoesMensal = c.receitaMensal.map((v, i) => v - (c.receitaBrutaMensal[i] ?? 0));
+  const totalDeducoes = totalSerie(deducoesMensal);
+  if (Math.abs(totalDeducoes) > 0.005) {
+    linhas.push(
+      { nivel: 1, nome: '(-) Impostos e deduções sobre a receita', custo: false, total: totalDeducoes, mensal: deducoesMensal },
+      { nivel: 1, nome: '= Receita Líquida do Projeto', custo: false, total: totalSerie(c.receitaMensal), vpl: somaVpl(c.linhasReceita), mensal: c.receitaMensal },
+    );
   }
-  linhas.push({
-    nivel: 0, nome: 'Receita Líquida do Projeto', custo: false, separadorAntes: true,
-    total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita), mensal: c.receitaMensal,
-  });
-  for (const l of c.linhasReceita) {
+
+  if (funding) {
     linhas.push({
-      nivel: 1, nome: l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, custo: false,
-      inicio: l.inicio, duracao: l.duracao, total: l.total, vpl: l.vpl, mensal: l.mensal, pctVgv: pct(l.total),
+      nivel: 0, nome: 'Funding — Capital (entradas)', custo: false, separadorAntes: true,
+      total: totalSerie(funding.entradas), vpl: funding.linhasEntrada.reduce((s, l) => s + l.vpl, 0),
+      mensal: funding.entradas,
     });
-    for (const t of l.itens ?? []) {
-      linhas.push({ nivel: 2, nome: t.nome, custo: false, inicio: t.inicio, duracao: t.duracao, total: t.total, vpl: t.vpl, mensal: t.mensal, pctVgv: pct(t.total) });
+    for (const l of funding.linhasEntrada) {
+      linhas.push({ nivel: 1, nome: l.nome, custo: false, total: l.total, vpl: l.vpl, mensal: l.mensal });
     }
   }
+
+  const saidasFunding = funding?.linhasSaida ?? [];
+  const saidasMensal = funding?.saidas ?? new Array<number>(c.prazo).fill(0);
+  const totalSaidasFunding = saidasFunding.reduce((s, l) => s + l.total, 0);
+  const vplSaidasFunding = saidasFunding.reduce((s, l) => s + l.vpl, 0);
+  const custoMensalComFunding = c.custoMensal.map((v, i) => v + (saidasMensal[i] ?? 0));
   linhas.push({
     nivel: 0, nome: 'Custo Total', custo: true, separadorAntes: true,
-    total: c.custoMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasCusto), mensal: c.custoMensal,
-    pctVgv: pct(c.custoMensal.reduce((s, v) => s + v, 0)),
+    total: totalSerie(custoMensalComFunding), vpl: somaVpl(c.linhasCusto) + vplSaidasFunding,
+    mensal: custoMensalComFunding, pctVgv: pct(totalSerie(custoMensalComFunding)),
   });
   for (const g of ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'] as const) {
     const itens = c.linhasCusto.filter((x) => x.grupo === g);
-    if (itens.length === 0) continue;
-    const totalGrupo = itens.reduce((s, x) => s + x.total, 0);
+    // #349: as saídas de funding entram em Custos Financeiros — o grupo aparece
+    // mesmo sem linha própria do usuário, e o subtotal soma as duas origens.
+    const ehFinanceiroComFunding = g === 'financeiro' && saidasFunding.length > 0;
+    if (itens.length === 0 && !ehFinanceiroComFunding) continue;
+    const totalGrupo = itens.reduce((s, x) => s + x.total, 0) + (ehFinanceiroComFunding ? totalSaidasFunding : 0);
+    const mensalGrupo = ehFinanceiroComFunding
+      ? soma(itens).map((v, i) => v + (saidasMensal[i] ?? 0))
+      : soma(itens);
     linhas.push({
       nivel: 1, nome: GRUPO_CUSTO_ROTULO[g], custo: true,
-      total: totalGrupo, vpl: somaVpl(itens), mensal: soma(itens), pctVgv: pct(totalGrupo),
+      total: totalGrupo, vpl: somaVpl(itens) + (ehFinanceiroComFunding ? vplSaidasFunding : 0),
+      mensal: mensalGrupo, pctVgv: pct(totalGrupo),
     });
     for (const x of itens) {
       linhas.push({ nivel: 2, nome: x.nome, custo: true, inicio: x.inicio, duracao: x.duracao, total: x.total, vpl: x.vpl, mensal: x.mensal, pctVgv: pct(x.total) });
     }
+    if (ehFinanceiroComFunding) {
+      for (const l of saidasFunding) {
+        linhas.push({ nivel: 2, nome: l.nome, custo: true, total: l.total, vpl: l.vpl, mensal: l.mensal, pctVgv: pct(l.total) });
+      }
+    }
+  }
+
+  // Com funding, o Fluxo do rodapé é o ALAVANCADO; o livre — base de TIR/VPL,
+  // que §8.1 mantém desalavancados — fica explícito na linha de cima.
+  const fluxoMensal = funding?.fluxoMensal ?? c.fluxoMensal;
+  const fluxoAcumulado = funding?.fluxoAcumulado ?? c.fluxoAcumulado;
+  const vplFluxoExib = c.vpl + (funding?.vplLiquido ?? 0);
+  if (funding) {
+    linhas.push({
+      nivel: 0, nome: 'Fluxo de Caixa Livre (antes do funding)', custo: false, separadorAntes: true,
+      total: totalSerie(c.fluxoMensal), vpl: c.vpl, mensal: c.fluxoMensal,
+    });
   }
   linhas.push({
-    nivel: 0, nome: 'Fluxo de Caixa Mensal', custo: false, separadorAntes: true,
-    total: c.fluxoMensal.reduce((s, v) => s + v, 0), vpl: c.vpl, mensal: c.fluxoMensal,
+    nivel: 0, nome: 'Fluxo de Caixa Mensal', custo: false, separadorAntes: !funding,
+    total: totalSerie(fluxoMensal), vpl: vplFluxoExib, mensal: fluxoMensal,
   });
   linhas.push({
     nivel: 0, nome: 'Fluxo de Caixa Acumulado', custo: false,
-    total: c.fluxoAcumulado[c.prazo - 1] ?? 0, vpl: c.vpl, mensal: c.fluxoAcumulado,
+    total: fluxoAcumulado[fluxoAcumulado.length - 1] ?? 0, vpl: vplFluxoExib, mensal: fluxoAcumulado,
   });
   return linhas;
-}
-
-/** Item 2 (docs/viabilidade/funding-capital-stack.md §10): mesmas linhas que `tabelaCapitalStack` (fluxo-tabela.ts) — nenhuma soma refeita, `fundingEntradasSaidasMensal` é a única fonte. */
-function linhasCapitalStack(r: ResultadoCapitalStack, camadas: { nome: string; tipo: string }[], fluxoLivreMensal: number[]): LinhaFx[] {
-  const prazo = fluxoLivreMensal.length;
-  const a0 = (serie: number[]): number[] => serie.slice(1, prazo + 1);
-  const nomesPorTipo = (tipo: string) => camadas.filter((x) => x.tipo === tipo).map((x) => x.nome);
-  const somaPorNomes = (nomes: string[], rec: Record<string, number[]>): number[] => {
-    const out = new Array<number>(prazo).fill(0);
-    for (const nome of nomes) { const s = rec[nome]; if (!s) continue; for (let i = 0; i < prazo; i++) out[i] += s[i + 1] ?? 0; }
-    return out;
-  };
-  const somaDuas = (a: number[], b: number[]): number[] => a.map((v, i) => v + b[i]);
-  const total = (mensal: number[]) => mensal.reduce((s, v) => s + v, 0);
-  const nomesDivida = [...nomesPorTipo('financiamento_producao'), ...nomesPorTipo('capital_giro')];
-  const nomesPE = nomesPorTipo('preferred_equity');
-
-  const { entradas, saidas } = fundingEntradasSaidasMensal(r);
-  const entradas0 = a0(entradas);
-  const saidas0 = a0(saidas);
-  const fluxoLiquidoFunding = entradas0.map((v, i) => v - saidas0[i]);
-  const fluxoAposFunding = fluxoLivreMensal.map((v, i) => v + fluxoLiquidoFunding[i]);
-  const caixaFinal = a0(r.caixaProjetoMensal);
-
-  const linhas: LinhaFx[] = [
-    { nivel: 0, nome: 'Funding — Entradas', custo: false, separadorAntes: true, total: total(entradas0), mensal: entradas0 },
-    { nivel: 1, nome: 'Financiamento à produção — liberações', custo: false, total: total(somaPorNomes(nomesPorTipo('financiamento_producao'), r.liberacaoPorInstrumento)), mensal: somaPorNomes(nomesPorTipo('financiamento_producao'), r.liberacaoPorInstrumento) },
-    { nivel: 1, nome: 'Capital de giro — liberações', custo: false, total: total(somaPorNomes(nomesPorTipo('capital_giro'), r.liberacaoPorInstrumento)), mensal: somaPorNomes(nomesPorTipo('capital_giro'), r.liberacaoPorInstrumento) },
-    { nivel: 1, nome: 'Equity preferencial — aportes', custo: false, total: total(somaPorNomes(nomesPE, r.aportePorInstrumentoPE)), mensal: somaPorNomes(nomesPE, r.aportePorInstrumentoPE) },
-    { nivel: 1, nome: 'Sponsor Equity — aportes', custo: false, total: total(a0(r.aporteSponsorMensal)), mensal: a0(r.aporteSponsorMensal) },
-    { nivel: 0, nome: 'Funding — Saídas', custo: true, separadorAntes: true, total: total(saidas0), mensal: saidas0 },
-    { nivel: 1, nome: 'Juros e taxas de dívida', custo: true, total: total(somaPorNomes(nomesDivida, r.jurosPorInstrumento)), mensal: somaPorNomes(nomesDivida, r.jurosPorInstrumento) },
-    { nivel: 1, nome: 'Amortização de principal', custo: true, total: total(somaPorNomes(nomesDivida, r.amortizacaoPorInstrumento)), mensal: somaPorNomes(nomesDivida, r.amortizacaoPorInstrumento) },
-    { nivel: 1, nome: 'Devolução de Preferred Equity', custo: true, total: total(somaPorNomes(nomesPE, r.devolucaoPrincipalPE)), mensal: somaPorNomes(nomesPE, r.devolucaoPrincipalPE) },
-    { nivel: 1, nome: 'Retorno preferencial', custo: true, total: total(somaPorNomes(nomesPE, r.remuneracaoPagaPE)), mensal: somaPorNomes(nomesPE, r.remuneracaoPagaPE) },
-    { nivel: 1, nome: 'Participações sobre receita/residual', custo: true, total: total(somaDuas(somaPorNomes(nomesPE, r.participacaoReceitaPE), somaPorNomes(nomesPE, r.participacaoResidualPE))), mensal: somaDuas(somaPorNomes(nomesPE, r.participacaoReceitaPE), somaPorNomes(nomesPE, r.participacaoResidualPE)) },
-    { nivel: 1, nome: 'Distribuições ao sponsor', custo: true, total: total(a0(r.distribuicaoSponsorMensal)), mensal: a0(r.distribuicaoSponsorMensal) },
-    { nivel: 0, nome: 'Fluxo Líquido de Funding', custo: false, separadorAntes: true, total: total(fluxoLiquidoFunding), mensal: fluxoLiquidoFunding },
-    { nivel: 0, nome: 'Fluxo após Funding', custo: false, total: total(fluxoAposFunding), mensal: fluxoAposFunding },
-    { nivel: 0, nome: 'Caixa Final', custo: false, total: caixaFinal[caixaFinal.length - 1] ?? 0, mensal: caixaFinal },
-    { nivel: 0, nome: 'Saldos', custo: false, separadorAntes: true, total: 0, mensal: new Array<number>(prazo).fill(0) },
-    ...nomesDivida.map((nome): LinhaFx => ({ nivel: 1, nome: `Dívida — ${nome}`, custo: false, total: total(somaPorNomes([nome], r.saldoDividaPorInstrumento)), mensal: somaPorNomes([nome], r.saldoDividaPorInstrumento) })),
-    ...nomesPE.map((nome): LinhaFx => ({ nivel: 1, nome: `Capital preferencial não devolvido — ${nome}`, custo: false, total: total(somaPorNomes([nome], r.capitalNaoDevolvidoPorInstrumentoPE)), mensal: somaPorNomes([nome], r.capitalNaoDevolvidoPorInstrumentoPE) })),
-    ...nomesPE.map((nome): LinhaFx => ({ nivel: 1, nome: `Retorno preferencial acumulado — ${nome}`, custo: false, total: total(somaPorNomes([nome], r.remuneracaoAcumuladaPorInstrumentoPE)), mensal: somaPorNomes([nome], r.remuneracaoAcumuladaPorInstrumentoPE) })),
-    { nivel: 1, nome: 'Lacuna de funding', custo: false, total: total(a0(r.lacunaFundingMensal)), mensal: a0(r.lacunaFundingMensal) },
-  ];
-  return linhas;
-}
-
-export interface CapitalStackExport {
-  resultado: ResultadoCapitalStack;
-  camadas: { nome: string; tipo: string }[];
 }
 
 export function exportarFluxoCSV(
   estudo: any,
   c: FluxoCalc,
   dataInicio: string | null,
-  capitalStack?: CapitalStackExport,
+  funding: FundingNoFluxo | null = null,
   divergencias: Divergencia[] = [],
   permutaFisica: PermutaFisicaTipologia[] = [],
 ) {
@@ -327,9 +282,7 @@ export function exportarFluxoCSV(
   rows.push('Nível;Avançado');
   rows.push('');
   rows.push(['Linha', 'Início', 'Duração', 'Total', 'VPL', '% VGV', ...c.meses].join(';'));
-  const linhas = capitalStack
-    ? [...linhasFluxo(c), ...linhasCapitalStack(capitalStack.resultado, capitalStack.camadas, c.fluxoMensal)]
-    : linhasFluxo(c);
+  const linhas = linhasFluxo(c, funding);
   for (const l of linhas) {
     if (l.separadorAntes) rows.push('');
     const indent = '  '.repeat(l.nivel);
@@ -430,14 +383,12 @@ export function exportarFluxoPDF(
   c: FluxoCalc,
   dataInicio: string | null,
   rotuloColunas = 'Meses',
-  capitalStack?: CapitalStackExport,
+  funding: FundingNoFluxo | null = null,
   divergencias: Divergencia[] = [],
   permutaFisica: PermutaFisicaTipologia[] = [],
 ): boolean {
   const POR_PAGINA = 18; // colunas por página (paisagem)
-  const linhas = capitalStack
-    ? [...linhasFluxo(c), ...linhasCapitalStack(capitalStack.resultado, capitalStack.camadas, c.fluxoMensal)]
-    : linhasFluxo(c);
+  const linhas = linhasFluxo(c, funding);
   const kpis: [string, string][] = [
     ['TIR', c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`],
     ['VPL', fmtR$(c.vpl)],

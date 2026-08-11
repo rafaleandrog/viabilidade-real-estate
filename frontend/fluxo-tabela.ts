@@ -2,11 +2,8 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
-import {
-  ROTULOS_COMPONENTES_CARTEIRA, ROTULOS_COMPONENTES_RECEITA,
-  type FluxoCalc, type LinhaCalc, type SeriesComponentesCarteira, type SeriesComponentesReceita,
-} from './fluxo-caixa-motor.js';
-import { fundingEntradasSaidasMensal, type ResultadoCapitalStack } from './capital-stack-motor.js';
+import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
+import { type FundingNoFluxo } from './capital-stack-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -378,16 +375,35 @@ function linhaResultado(nome: string, valores: number[], vpl: number): TemplateR
 }
 
 /**
- * Tabela mensal completa do fluxo (mesmos campos da página Fluxo de Caixa):
- * Receita (por fase → tipologia), Custo Total (por grupo → linha) e as duas
- * linhas de resultado (Mensal, Acumulado), com colunas fixas Início/Duração/
- * Total/VPL + uma coluna por mês. `colapso`/`toggle` controlam a expansão.
+ * Tabela mensal do fluxo — reconstruída pela #349 para conter só o que o autor
+ * pediu: **Receita Bruta (VGV) com as divisões por grupo de Receitas · os 5
+ * tipos de Custos · o Fluxo ao final**.
+ *
+ * Saíram daqui (eram "as várias linhas desnecessárias" da issue): o bloco
+ * Vendas contratadas (com desconto comercial e venda líquida), os 6
+ * "Componente · …" de receita, as duas linhas "Auditoria · …" e o bloco
+ * Carteira de clientes com seus 3 componentes. Continuam existindo no motor
+ * (`FluxoCalc`) e nos testes — o que mudou é que não são mais despejados
+ * nesta tabela.
+ *
+ * As duas linhas que **ficaram** entre a Receita Bruta e o Custo Total
+ * ("(-) Impostos e deduções sobre a receita" e "= Receita Líquida do
+ * Projeto") não são decoração: sem elas a tabela não fecha, porque quem
+ * alimenta o Fluxo é a receita LÍQUIDA (`receitaMensal`), não a bruta. Só
+ * aparecem quando existe alguma dedução — sem RET e sem permuta financeira as
+ * duas grandezas são a mesma e as linhas seriam ruído.
+ *
+ * `funding` (#349) substitui a tabela separada "Programa Financeiro (Capital
+ * Stack)", removida: entradas viram um bloco de receita e saídas entram
+ * dentro de "Custos Financeiros", que já era uma das 5 categorias. Com
+ * `null` (estudo sem camadas) a tabela renderiza exatamente como sem funding.
  */
 export function tabelaFluxo(
   c: FluxoCalc,
   dataInicio: string | null,
   colapso: Record<string, boolean>,
   toggle: (chave: string) => void,
+  funding: FundingNoFluxo | null = null,
 ): TemplateResult {
   const somaLinhas = (linhas: LinhaCalc[]): number[] => {
     const out = new Array<number>(c.prazo).fill(0);
@@ -396,14 +412,37 @@ export function tabelaFluxo(
   };
   const custosPorGrupo = (g: string) => c.linhasCusto.filter((x) => x.grupo === g);
   // Ordem das 5 abas de Custos (#125): Terreno · Obra · Diretos · Indiretos · Financeiro.
-  const grupos = GRUPOS_CUSTO.filter((g) => custosPorGrupo(g).length > 0);
+  // #349: `financeiro` também aparece quando o estudo não tem linha de custo
+  // financeiro própria mas TEM funding — é lá que as saídas de funding moram.
+  const grupos = GRUPOS_CUSTO.filter((g) =>
+    custosPorGrupo(g).length > 0 || (g === 'financeiro' && funding !== null));
   // VPL é linear no fluxo mensal, então o VPL de um agregado = Σ VPL das suas linhas (#126).
   const somaVpl = (linhas: LinhaCalc[]): number => linhas.reduce((s, l) => s + l.vpl, 0);
   const totalSerie = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
-  const picoSerie = (serie: number[]): number => Math.max(0, ...serie);
-  const componentesReceita = (Object.keys(ROTULOS_COMPONENTES_RECEITA) as (keyof SeriesComponentesReceita)[])
-    .filter((chave) => chave !== 'outros' || c.receitaPorComponenteMensal.outros.some((v) => Math.abs(v) > 0.005));
-  const componentesCarteira = Object.keys(ROTULOS_COMPONENTES_CARTEIRA) as (keyof SeriesComponentesCarteira)[];
+
+  // #349: linhas de funding que entram no grupo `financeiro`, e o quanto elas
+  // acrescentam ao total daquele grupo e ao Custo Total — sem isso os
+  // subtotais não bateriam com as linhas listadas abaixo deles.
+  const saidasFunding = funding?.linhasSaida ?? [];
+  const saidasFundingMensal = funding?.saidas ?? new Array<number>(c.prazo).fill(0);
+  const custoMensalComFunding = c.custoMensal.map((v, i) => v + (saidasFundingMensal[i] ?? 0));
+  const vplSaidasFunding = saidasFunding.reduce((s, l) => s + l.vpl, 0);
+  const totalSaidasFunding = saidasFunding.reduce((s, l) => s + l.total, 0);
+
+  // A receita que alimenta o Fluxo é a LÍQUIDA; a bruta é o VGV recebido. A
+  // diferença (RET + permuta financeira) vira uma linha-ponte, e só existe
+  // quando é diferente de zero.
+  const receitaLiquidaMensal = c.receitaMensal;
+  const deducoesMensal = receitaLiquidaMensal.map((v, i) => v - (c.receitaBrutaMensal[i] ?? 0));
+  const totalDeducoes = totalSerie(deducoesMensal);
+  const temDeducoes = Math.abs(totalDeducoes) > 0.005;
+
+  // Rodapé: com funding, o Fluxo passa a ser o ALAVANCADO (o que o autor pediu
+  // ao mandar refletir o funding na tabela principal) e o livre — que é o que
+  // TIR/VPL/Payback continuam usando, §8.1 — fica visível na linha de cima.
+  const fluxoMensalExib = funding?.fluxoMensal ?? c.fluxoMensal;
+  const fluxoAcumuladoExib = funding?.fluxoAcumulado ?? c.fluxoAcumulado;
+  const vplExib = c.vpl + (funding?.vplLiquido ?? 0);
 
   return html`
     <div class="fx-wrap">
@@ -420,83 +459,61 @@ export function tabelaFluxo(
           </tr>
         </thead>
         <tbody>
-          ${linhaTabela('grupo', 'vendas-contratadas', 'Vendas contratadas',
-            { mensal: c.vendaBrutaContratadaMensal, total: c.vendaBrutaContratada,
-              vpl: somaVpl(c.linhasVendasContratadas) },
-            dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
-          ${!colapso['vendas-contratadas'] ? html`
-            ${linhaTabela('subgrupo', '', '(-) Desconto comercial',
-              { mensal: c.descontoComercialMensal.map((v) => -v), total: -c.descontoComercial },
-              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
-            ${linhaTabela('subgrupo', '', '= Venda líquida contratada',
-              { mensal: c.vendaLiquidaContratadaMensal, total: c.vendaLiquidaContratada },
-              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
-            ${c.linhasVendasContratadas.map((l) => html`
-              ${linhaTabela('subgrupo', `vc${l.id}`,
-                `Grupo · ${l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome}`, l,
-                dataInicio, colapso, toggle, false, c.vgvVendavel)}
-              ${!colapso[`vc${l.id}`] ? (l.itens ?? []).map((t) =>
-                linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.vgvVendavel)) : nothing}
-            `)}
-          ` : nothing}
-
           ${linhaTabela('grupo', 'receita-bruta', 'Receita Bruta — VGV',
             { mensal: c.receitaBrutaMensal, total: c.receitaBruta, vpl: somaVpl(c.linhasReceitaBruta) },
             dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
-          ${!colapso['receita-bruta'] ? html`
-            ${componentesReceita.map((chave) => linhaTabela('subgrupo', '',
-              `Componente · ${ROTULOS_COMPONENTES_RECEITA[chave]}`,
-              { mensal: c.receitaPorComponenteMensal[chave],
-                total: totalSerie(c.receitaPorComponenteMensal[chave]) },
-              dataInicio, colapso, toggle, false, c.vgvVendavel, false, false))}
-            <!-- Principal e juros são visões de auditoria da mesma Receita
-                 Bruta; não se somam novamente às categorias comerciais. -->
-            ${linhaTabela('subgrupo', '', 'Auditoria · Principal recebido',
-              { mensal: c.principalRecebidoMensal, total: c.principalRecebidoMensal.reduce((s, v) => s + v, 0) },
-              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
-            ${linhaTabela('subgrupo', '', 'Auditoria · Juros de clientes',
-              { mensal: c.jurosClientesMensal, total: c.jurosClientes },
-              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
-            ${c.linhasReceitaBruta.map((l) => html`
-              ${linhaTabela('subgrupo', `rb${l.id}`,
-                `Grupo · ${l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome}`,
-                l, dataInicio, colapso, toggle, false, c.vgvVendavel)}
-              ${!colapso[`rb${l.id}`] ? (l.itens ?? []).map((t) =>
-                linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.vgvVendavel)) : nothing}
-            `)}
-          ` : nothing}
-
-          ${linhaTabela('grupo', 'carteira-clientes', 'Carteira de clientes (Total = pico)',
-            { mensal: c.carteiraClientesMensal, total: c.carteiraClientesMaxima },
-            dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
-          ${!colapso['carteira-clientes'] ? componentesCarteira.map((chave) =>
-            linhaTabela('subgrupo', '', `Componente · ${ROTULOS_COMPONENTES_CARTEIRA[chave]}`,
-              { mensal: c.carteiraPorComponenteMensal[chave],
-                total: picoSerie(c.carteiraPorComponenteMensal[chave]) },
-              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)) : nothing}
-
-          ${linhaTabela('grupo', 'receita-liquida', 'Receita Líquida do Projeto',
-            { mensal: c.receitaMensal, total: c.receitaMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasReceita) },
-            dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
-          ${!colapso['receita-liquida'] ? c.linhasReceita.map((l) => html`
-            ${linhaTabela('subgrupo', `rl${l.id}`,
-              l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome, l, dataInicio, colapso, toggle, false, c.vgvVendavel)}
-            ${!colapso[`rl${l.id}`] ? (l.itens ?? []).map((t) =>
+          ${!colapso['receita-bruta'] ? c.linhasReceitaBruta.map((l) => html`
+            ${linhaTabela('subgrupo', `rb${l.id}`,
+              `Grupo · ${l.faseLabel ? `${l.nome} (${l.faseLabel})` : l.nome}`,
+              l, dataInicio, colapso, toggle, false, c.vgvVendavel)}
+            ${!colapso[`rb${l.id}`] ? (l.itens ?? []).map((t) =>
               linhaTabela('subitem', '', t.nome, t, dataInicio, colapso, toggle, false, c.vgvVendavel)) : nothing}
           `) : nothing}
 
+          ${temDeducoes ? html`
+            ${linhaTabela('subgrupo', '', '(-) Impostos e deduções sobre a receita',
+              { mensal: deducoesMensal, total: totalDeducoes },
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
+            ${linhaTabela('subgrupo', '', '= Receita Líquida do Projeto',
+              { mensal: receitaLiquidaMensal, total: totalSerie(receitaLiquidaMensal), vpl: somaVpl(c.linhasReceita) },
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
+          ` : nothing}
+
+          ${funding ? html`
+            ${linhaTabela('grupo', 'funding-capital', 'Funding — Capital (entradas)',
+              { mensal: funding.entradas, total: totalSerie(funding.entradas),
+                vpl: funding.linhasEntrada.reduce((s, l) => s + l.vpl, 0) },
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
+            ${!colapso['funding-capital'] ? funding.linhasEntrada.map((l) =>
+              linhaTabela('subgrupo', '', l.nome, l, dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)) : nothing}
+          ` : nothing}
+
           ${linhaTabela('grupo', '', 'Custo Total',
-            { mensal: c.custoMensal, total: c.custoMensal.reduce((s, v) => s + v, 0), vpl: somaVpl(c.linhasCusto) }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv, false, false)}
-          ${grupos.map((g) => html`
+            { mensal: custoMensalComFunding, total: totalSerie(custoMensalComFunding), vpl: somaVpl(c.linhasCusto) + vplSaidasFunding }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv, false, false)}
+          ${grupos.map((g) => {
+            const doGrupo = custosPorGrupo(g);
+            // #349: as saídas de funding pertencem a "Custos Financeiros" — o
+            // subtotal do grupo tem que somá-las, senão não bate com as linhas.
+            const ehFinanceiroComFunding = g === 'financeiro' && saidasFunding.length > 0;
+            const mensalGrupo = ehFinanceiroComFunding
+              ? somaLinhas(doGrupo).map((v, i) => v + (saidasFundingMensal[i] ?? 0))
+              : somaLinhas(doGrupo);
+            const totalGrupo = doGrupo.reduce((s, x) => s + x.total, 0) + (ehFinanceiroComFunding ? totalSaidasFunding : 0);
+            const vplGrupo = somaVpl(doGrupo) + (ehFinanceiroComFunding ? vplSaidasFunding : 0);
+            return html`
             ${linhaTabela('subgrupo', `custo-${g}`, GRUPO_CUSTO_LABEL[g],
-              { mensal: somaLinhas(custosPorGrupo(g)), total: custosPorGrupo(g).reduce((s, x) => s + x.total, 0), vpl: somaVpl(custosPorGrupo(g)) }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv)}
-            ${!colapso[`custo-${g}`] ? custosPorGrupo(g).map((x) =>
-              linhaTabela('item', '', x.nome, x, dataInicio, colapso, toggle, true, c.receitaBrutaVgv)) : nothing}
-          `)}
+              { mensal: mensalGrupo, total: totalGrupo, vpl: vplGrupo }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv)}
+            ${!colapso[`custo-${g}`] ? html`
+              ${doGrupo.map((x) => linhaTabela('item', '', x.nome, x, dataInicio, colapso, toggle, true, c.receitaBrutaVgv))}
+              ${ehFinanceiroComFunding ? saidasFunding.map((l) =>
+                linhaTabela('item', '', l.nome, l, dataInicio, colapso, toggle, true, c.receitaBrutaVgv)) : nothing}
+            ` : nothing}
+          `;})}
 
           <tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${c.meses.map(() => html`<td></td>`)}</tr>
-          ${linhaResultado('Fluxo de Caixa Mensal', c.fluxoMensal, c.vpl)}
-          ${linhaResultado('Fluxo de Caixa Acumulado', c.fluxoAcumulado, c.vpl)}
+          ${funding ? linhaResultado('Fluxo de Caixa Livre (antes do funding)', c.fluxoMensal, c.vpl) : nothing}
+          ${linhaResultado('Fluxo de Caixa Mensal', fluxoMensalExib, vplExib)}
+          ${linhaResultado('Fluxo de Caixa Acumulado', fluxoAcumuladoExib, vplExib)}
         </tbody>
       </table>
     </div>
@@ -505,108 +522,11 @@ export function tabelaFluxo(
 
 /** Chaves de colapso de todos os grupos expansíveis (para "recolher/expandir tudo"). */
 export function chavesColapso(c: FluxoCalc): string[] {
-  return ['vendas-contratadas', 'receita-bruta', 'carteira-clientes', 'receita-liquida',
+  // #349: sumiram `vendas-contratadas`, `carteira-clientes`, `receita-liquida`
+  // e os `vc*` junto com os blocos que a tabela deixou de ter; entrou
+  // `funding-capital`, que substitui as 3 chaves da tabela separada de
+  // Capital Stack (`CHAVES_COLAPSO_CAPITAL_STACK`, removida com ela).
+  return ['receita-bruta', 'funding-capital',
     'custo-terreno', 'custo-obra', 'custo-diretos', 'custo-indireto', 'custo-financeiro',
-    ...c.linhasVendasContratadas.map((l) => `vc${l.id}`),
-    ...c.linhasReceitaBruta.map((l) => `rb${l.id}`),
-    ...c.linhasReceita.map((l) => `rl${l.id}`)];
-}
-
-/** Chaves de colapso da tabela de Capital Stack (item 2 — funding-capital-stack.md §10). */
-export const CHAVES_COLAPSO_CAPITAL_STACK = ['fin-entradas', 'fin-saidas', 'fin-saldos'];
-
-/**
- * §10 "Fluxo de Caixa e relatórios" — Funding Entradas/Saídas, Fluxo Líquido
- * de Funding, Fluxo após Funding, Caixa Final e Saldos, na MESMA estrutura
- * de grupo/subgrupo da tabela principal. `camadas` só precisa de `nome`/
- * `tipo` (para rotular e agrupar as linhas de Saldos por instrumento);
- * `fluxoLivreMensal` é o `c.fluxoMensal` (0-based) da tabela principal —
- * "Fluxo após Funding" soma os dois. Renderiza `nothing` sem `resultado`
- * (nenhuma camada ativa) ou sem camadas — zero efeito em estudo sem Capital
- * Stack, a mesma regra de blast radius que abriu a aba nova em vez de mexer
- * aqui direto.
- */
-export function tabelaCapitalStack(
-  resultado: ResultadoCapitalStack | null,
-  camadas: { nome: string; tipo: string }[],
-  fluxoLivreMensal: number[],
-  meses: string[],
-  colapso: Record<string, boolean>,
-  toggle: (chave: string) => void,
-): TemplateResult {
-  if (!resultado || camadas.length === 0) return html`${nothing}`;
-  const r = resultado;
-  const prazo = fluxoLivreMensal.length;
-  // Séries do motor são 1-based (índice 0 ignorado); a tabela principal é 0-based.
-  const a0 = (serie: number[]): number[] => serie.slice(1, prazo + 1);
-  const nomesPorTipo = (tipo: string) => camadas.filter((c) => c.tipo === tipo).map((c) => c.nome);
-  const somaPorNomes = (nomes: string[], rec: Record<string, number[]>): number[] => {
-    const out = new Array<number>(prazo).fill(0);
-    for (const nome of nomes) {
-      const s = rec[nome];
-      if (!s) continue;
-      for (let i = 0; i < prazo; i++) out[i] += s[i + 1] ?? 0;
-    }
-    return out;
-  };
-  const somaDuas = (a: number[], b: number[]): number[] => a.map((v, i) => v + b[i]);
-  const total = (mensal: number[]) => mensal.reduce((s, v) => s + v, 0);
-  const linha = (mensal: number[]) => ({ mensal, total: total(mensal) });
-
-  const nomesDivida = [...nomesPorTipo('financiamento_producao'), ...nomesPorTipo('capital_giro')];
-  const nomesPE = nomesPorTipo('preferred_equity');
-
-  const { entradas, saidas } = fundingEntradasSaidasMensal(r);
-  const entradas0 = a0(entradas);
-  const saidas0 = a0(saidas);
-  const fluxoLiquidoFunding = entradas0.map((v, i) => v - saidas0[i]);
-  const fluxoAposFunding = somaDuas(fluxoLivreMensal, fluxoLiquidoFunding);
-  const caixaFinal = a0(r.caixaProjetoMensal);
-
-  return html`
-    <div class="fx-wrap">
-      <table class="fx">
-        <thead>
-          <tr>
-            <th class="c1">Programa Financeiro (Capital Stack)</th><th class="c2"></th><th class="c3"></th>
-            <th class="c4">Total</th><th class="c5"></th><th class="c6"></th>
-            ${meses.map((m) => html`<th>${m}</th>`)}
-          </tr>
-        </thead>
-        <tbody>
-          ${linhaTabela('grupo', 'fin-entradas', 'Funding — Entradas', linha(entradas0), null, colapso, toggle, false, 0, true)}
-          ${!colapso['fin-entradas'] ? html`
-            ${linhaTabela('item', '', 'Financiamento à produção — liberações', linha(somaPorNomes(nomesPorTipo('financiamento_producao'), r.liberacaoPorInstrumento)), null, colapso, toggle, false, 0, true, false)}
-            ${linhaTabela('item', '', 'Capital de giro — liberações', linha(somaPorNomes(nomesPorTipo('capital_giro'), r.liberacaoPorInstrumento)), null, colapso, toggle, false, 0, true, false)}
-            ${linhaTabela('item', '', 'Equity preferencial — aportes', linha(somaPorNomes(nomesPE, r.aportePorInstrumentoPE)), null, colapso, toggle, false, 0, true, false)}
-            ${linhaTabela('item', '', 'Sponsor Equity — aportes', linha(a0(r.aporteSponsorMensal)), null, colapso, toggle, false, 0, true, false)}
-          ` : nothing}
-
-          ${linhaTabela('grupo', 'fin-saidas', 'Funding — Saídas', linha(saidas0), null, colapso, toggle, true, 0, true)}
-          ${!colapso['fin-saidas'] ? html`
-            ${linhaTabela('item', '', 'Juros e taxas de dívida', linha(somaPorNomes(nomesDivida, r.jurosPorInstrumento)), null, colapso, toggle, true, 0, true, false)}
-            ${linhaTabela('item', '', 'Amortização de principal', linha(somaPorNomes(nomesDivida, r.amortizacaoPorInstrumento)), null, colapso, toggle, true, 0, true, false)}
-            ${linhaTabela('item', '', 'Devolução de Preferred Equity', linha(somaPorNomes(nomesPE, r.devolucaoPrincipalPE)), null, colapso, toggle, true, 0, true, false)}
-            ${linhaTabela('item', '', 'Retorno preferencial', linha(somaPorNomes(nomesPE, r.remuneracaoPagaPE)), null, colapso, toggle, true, 0, true, false)}
-            ${linhaTabela('item', '', 'Participações sobre receita/residual', linha(somaDuas(somaPorNomes(nomesPE, r.participacaoReceitaPE), somaPorNomes(nomesPE, r.participacaoResidualPE))), null, colapso, toggle, true, 0, true, false)}
-            ${linhaTabela('item', '', 'Distribuições ao sponsor', linha(a0(r.distribuicaoSponsorMensal)), null, colapso, toggle, true, 0, true, false)}
-          ` : nothing}
-
-          <tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${meses.map(() => html`<td></td>`)}</tr>
-          ${linhaResultado('Fluxo Líquido de Funding', fluxoLiquidoFunding, 0)}
-          ${linhaResultado('Fluxo após Funding', fluxoAposFunding, 0)}
-          ${linhaResultado('Caixa Final', caixaFinal, 0)}
-
-          <tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${meses.map(() => html`<td></td>`)}</tr>
-          ${linhaTabela('grupo', 'fin-saldos', 'Saldos', linha(new Array<number>(prazo).fill(0)), null, colapso, toggle, false, 0, true)}
-          ${!colapso['fin-saldos'] ? html`
-            ${nomesDivida.map((nome) => linhaTabela('item', '', `Dívida — ${nome}`, linha(somaPorNomes([nome], r.saldoDividaPorInstrumento)), null, colapso, toggle, true, 0, true, false))}
-            ${nomesPE.map((nome) => linhaTabela('item', '', `Capital preferencial não devolvido — ${nome}`, linha(somaPorNomes([nome], r.capitalNaoDevolvidoPorInstrumentoPE)), null, colapso, toggle, true, 0, true, false))}
-            ${nomesPE.map((nome) => linhaTabela('item', '', `Retorno preferencial acumulado — ${nome}`, linha(somaPorNomes([nome], r.remuneracaoAcumuladaPorInstrumentoPE)), null, colapso, toggle, true, 0, true, false))}
-            ${linhaTabela('item', '', 'Lacuna de funding', linha(a0(r.lacunaFundingMensal)), null, colapso, toggle, true, 0, true, false)}
-          ` : nothing}
-        </tbody>
-      </table>
-    </div>
-  `;
+    ...c.linhasReceitaBruta.map((l) => `rb${l.id}`)];
 }

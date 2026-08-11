@@ -6,7 +6,7 @@ import {
   custoElegivelMensalDeLinhas, instrumentoDeRegistro, simularCapitalStackDoEstudo,
   simularCapitalStack, type InstrumentoPreferredEquity, type InstrumentoDivida, type InstrumentoSponsorEquity,
   fundingEntradasSaidasMensal, pmtPrice, tirMensal, tirAnual, reordenarCamadas,
-  camadasComOrdemAlterada,
+  camadasComOrdemAlterada, fundingNoFluxo, agregarFundingPorPeriodos,
 } from './capital-stack-motor.js';
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
@@ -463,4 +463,73 @@ test('#277 não muta a lista de entrada', () => {
   const congelado = JSON.parse(JSON.stringify(lista));
   reordenarCamadas(lista, 1, 1);
   assert.deepEqual(lista, congelado);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #349 — funding projetado nas categorias da tabela principal.
+//
+// Substitui a tabela separada "Programa Financeiro (Capital Stack)". Estes
+// testes travam as duas propriedades de que a tabela reconstruída depende:
+// (a) as linhas listadas somam os agregados de §10, e (b) o rodapé é
+// exatamente livre + entradas − saídas.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#349 fundingNoFluxo: sem camadas devolve null — tabela idêntica à de antes da issue', () => {
+  const r = simularCapitalStack({
+    nome: 'sem-camadas', meses: 2, fluxoLivreMensal: [0, -500, 800], reservaMinima: 0, instrumentos: [],
+  });
+  assert.equal(fundingNoFluxo(r, [], [-500, 800], 12), null);
+  assert.equal(fundingNoFluxo(null, [{ nome: 'X', tipo: 'divida' }], [-500, 800], 12), null);
+});
+
+test('#349 fundingNoFluxo: fluxo alavancado = livre + entradas − saídas, mês a mês', () => {
+  const fin: InstrumentoDivida = {
+    tipo: 'divida', nome: 'Fin', limiteComprometido: 1000, taxaMensal: 0.01,
+    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1, prioridadePagamento: 1,
+  };
+  const fluxoLivre = [-500, 800];
+  const r = simularCapitalStack({
+    nome: 'alavancado', meses: 2, fluxoLivreMensal: [0, ...fluxoLivre], reservaMinima: 0, instrumentos: [fin],
+  });
+  const f = fundingNoFluxo(r, [{ nome: 'Fin', tipo: 'financiamento_producao' }], fluxoLivre, 12)!;
+  assert.ok(f, 'com camada ativa tem que projetar');
+
+  // §10 continua sendo a fonte dos agregados — convertidos para 0-based aqui.
+  assert.deepEqual(f.entradas, [500, 0]);
+  assert.deepEqual(f.saidas, [0, 510]);
+  for (let m = 0; m < fluxoLivre.length; m++) {
+    assert.ok(perto(f.fluxoMensal[m], fluxoLivre[m] + f.entradas[m] - f.saidas[m]), `fluxo mês ${m}`);
+  }
+  assert.deepEqual(f.fluxoAcumulado, [0, 290]); // (-500+500) e (0 + 800−510)
+
+  // As linhas abertas somam os agregados — se divergirem, a tabela mostra
+  // subtotal que não bate com as linhas abaixo dele.
+  const somaLinhas = (ls: { mensal: number[] }[], m: number) => ls.reduce((s, l) => s + l.mensal[m], 0);
+  for (let m = 0; m < fluxoLivre.length; m++) {
+    assert.ok(perto(somaLinhas(f.linhasEntrada, m), f.entradas[m]), `entradas mês ${m}`);
+    assert.ok(perto(somaLinhas(f.linhasSaida, m), f.saidas[m]), `saídas mês ${m}`);
+  }
+});
+
+test('#349 agregarFundingPorPeriodos: soma dentro da faixa e conserva o total (view Anual)', () => {
+  const fin: InstrumentoDivida = {
+    tipo: 'divida', nome: 'Fin', limiteComprometido: 1000, taxaMensal: 0,
+    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1, prioridadePagamento: 1,
+  };
+  const fluxoLivre = [-500, 200, 200, 200];
+  const r = simularCapitalStack({
+    nome: 'anual', meses: 4, fluxoLivreMensal: [0, ...fluxoLivre], reservaMinima: 0, instrumentos: [fin],
+  });
+  const f = fundingNoFluxo(r, [{ nome: 'Fin', tipo: 'financiamento_producao' }], fluxoLivre, 12)!;
+  const periodos = [{ inicio: 0, fim: 1 }, { inicio: 2, fim: 3 }];
+  const a = agregarFundingPorPeriodos(f, periodos);
+
+  const soma = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
+  assert.equal(a.entradas.length, 2);
+  assert.ok(perto(soma(a.entradas), soma(f.entradas)), 'entradas conservam no anual');
+  assert.ok(perto(soma(a.saidas), soma(f.saidas)), 'saídas conservam no anual');
+  assert.ok(perto(soma(a.fluxoMensal), soma(f.fluxoMensal)), 'fluxo conserva no anual');
+  // Acumulado pega o ÚLTIMO ponto da faixa, não a soma (mesma convenção de
+  // agregarFluxoPorPeriodos) — somá-lo daria um número sem significado.
+  assert.deepEqual(a.fluxoAcumulado, [f.fluxoAcumulado[1], f.fluxoAcumulado[3]]);
 });

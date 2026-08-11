@@ -9,12 +9,12 @@ import {
 } from './fluxo-caixa-motor.js';
 import { marcos } from './fluxo-graficos.js';
 import {
-  estiloFluxoTabela, kpisFluxo, tabelaFluxo, tabelaCapitalStack,
-  chavesColapso, CHAVES_COLAPSO_CAPITAL_STACK, controlesFluxo,
+  estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, controlesFluxo,
 } from './fluxo-tabela.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import {
-  simularCapitalStackDoEstudo, receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack,
+  simularCapitalStackDoEstudo, receitaLiquidaComCorretagemMensal,
+  fundingNoFluxo, agregarFundingPorPeriodos, type ResultadoCapitalStack,
 } from './capital-stack-motor.js';
 import {
   urbiVerso,
@@ -64,9 +64,12 @@ export class ViabTelaCenarios extends LitElement {
   // Item 5 (Cenários × Capital Stack, decisão do autor 2026-08-02): camadas
   // ativas reagem ao cenário simulado — mesmo `simularCapitalStackDoEstudo`
   // já usado em tela-fluxo-ver.ts, sobre o `FluxoCalc` do cenário em vez do
-  // real. Só existe agregação MENSAL do resultado do Capital Stack (mesma
-  // restrição já documentada em tela-fluxo-ver.ts) — a tabela nova e a coluna
-  // extra na tabela de cenários salvos só aparecem na view Mensal.
+  // real.
+  // #349: o funding passou a ser lido dentro da tabela principal (a separada
+  // foi apagada) e acompanha as duas views — a antiga restrição "só na
+  // Mensal" caiu com `agregarFundingPorPeriodos`. A coluna "Resultado após
+  // custo financ." da tabela de cenários salvos nunca dependeu da view: ela
+  // aparece sempre que há camada ativa.
   @state() private camadas: any[] = [];
 
   private baseConfig: FluxoConfig | null = null;
@@ -227,6 +230,20 @@ export class ViabTelaCenarios extends LitElement {
     return simularCapitalStackDoEstudo(fluxoLivre1based, receitaLiquida1based, this.camadas, calc.linhasCusto, 0);
   }
 
+  /**
+   * #349: o funding do cenário projetado nas categorias da tabela principal —
+   * as mesmas funções puras da aba Fluxo de Caixa, que é o que faz a correção
+   * valer para as duas telas de uma vez (o autor reportou o mesmo defeito
+   * aqui). Já reagrupado pela view Anual quando ela está ativa: a tabela
+   * separada só existia na Mensal e o funding sumia ao trocar de view.
+   */
+  private _fundingDe(calc: FluxoCalc, periodos: PeriodoAgregado[] | null) {
+    const f = fundingNoFluxo(this._capitalStackDe(calc), this.camadas, calc.fluxoMensal,
+      this.baseConfig?.taxaDescontoAa ?? 12);
+    if (!f) return null;
+    return periodos ? agregarFundingPorPeriodos(f, periodos) : f;
+  }
+
   /** Resultado desalavancado − custo financeiro total (juros + retorno preferencial) do cenário. */
   private _resultadoAposCustoFinanceiro(calc: FluxoCalc, r: ResultadoCapitalStack | null): number | null {
     if (!r) return null;
@@ -310,8 +327,7 @@ export class ViabTelaCenarios extends LitElement {
         ${kpisFluxo(cenario, alterado ? base : null)}
         ${this._renderResultadoAposFunding(cenario)}
         ${this._renderControlesFluxo()}
-        ${tabelaFluxo(exibCenario, this.dataInicio, this.colapso, (ch) => this._t(ch))}
-        ${!periodos ? tabelaCapitalStack(this._capitalStackDe(cenario), this.camadas, cenario.fluxoMensal, cenario.meses, this.colapso, (ch) => this._t(ch)) : nothing}
+        ${tabelaFluxo(exibCenario, this.dataInicio, this.colapso, (ch) => this._t(ch), this._fundingDe(cenario, periodos))}
       </section>
 
       ${this._renderCenariosSalvos(base)}
@@ -355,7 +371,7 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   private _toggleTudo(recolher: boolean) {
-    const chaves = this.ultimoCalc ? [...chavesColapso(this.ultimoCalc), ...CHAVES_COLAPSO_CAPITAL_STACK] : [];
+    const chaves = this.ultimoCalc ? chavesColapso(this.ultimoCalc) : [];
     const novo: Record<string, boolean> = {};
     for (const k of chaves) novo[k] = recolher;
     this.colapso = novo;
