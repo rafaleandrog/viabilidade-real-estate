@@ -5,9 +5,7 @@ import { periodosAnuais } from './fluxo-shared.js';
 import { linhasFluxo } from './exportar.js';
 import { chavesColapso } from './fluxo-tabela.js';
 import { seriesEconomicasFluxo } from './fluxo-graficos.js';
-import {
-  fundingNoFluxo, simularCapitalStack, type InstrumentoDivida,
-} from './capital-stack-motor.js';
+import { fundingDoEstudo, type OperacaoFunding } from './funding-motor.js';
 import { proformaAvancado } from './proforma-avancado.js';
 
 const CRONO = [
@@ -187,20 +185,25 @@ test('#349 os 5 grupos de custo somam o Custo Total', () => {
   }
 });
 
+/**
+ * #355: a fixture do funding passou a ser uma OPERAÇÃO do modelo novo (3 tipos,
+ * campos como colunas) em vez de um `InstrumentoDivida` com waterfall.
+ * Financiamento à produção de 5M liberado no mês 0, 12% a.a., carência 6 e
+ * amortização 24 — gera liberação (entrada) e serviço de dívida (saída), que
+ * é tudo que estes testes de APRESENTAÇÃO precisam exercitar.
+ */
+const FIN_PRODUCAO: OperacaoFunding = {
+  tipo: 'financiamento_producao', nome: 'Fin produção', valor: 5_000_000, inicio_mes: 0,
+  taxa_anual: 12, periodo_amortizacao_meses: 24, periodo_carencia_meses: 6,
+};
+
 test('#349 com funding: entradas viram receita, saídas entram em Custos Financeiros e o rodapé alavanca', () => {
   const c = calcularFluxo(CONFIG_COMPLETA);
   // Financiamento à produção elegível sobre a linha de Obra, cobrindo a
   // necessidade de caixa — gera liberação (entrada) e juros/amortização (saída).
-  const fin: InstrumentoDivida = {
-    tipo: 'divida', nome: 'Fin produção', limiteComprometido: 5_000_000, taxaMensal: 0.01,
-    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1, prioridadePagamento: 1,
-  };
-  const r = simularCapitalStack({
-    nome: 'e41', meses: c.prazo, fluxoLivreMensal: [0, ...c.fluxoMensal],
-    reservaMinima: 0, instrumentos: [fin],
-  });
-  const funding = fundingNoFluxo(r, [{ nome: 'Fin produção', tipo: 'financiamento_producao' }],
-    c.fluxoMensal, CONFIG_COMPLETA.taxaDescontoAa)!;
+  const funding = fundingDoEstudo(
+    [FIN_PRODUCAO], c.fluxoMensal, c.receitaMensal, 0, 12, CONFIG_COMPLETA.taxaDescontoAa,
+  )!.noFluxo;
   assert.ok(soma(funding.entradas) > 0, 'a fixture precisa gerar liberação, senão o teste não prova nada');
   assert.ok(soma(funding.saidas) > 0, 'a fixture precisa gerar serviço de dívida');
 
@@ -210,14 +213,16 @@ test('#349 com funding: entradas viram receita, saídas entram em Custos Finance
   // Entradas: bloco de receita próprio, aberto nas 4 origens de capital.
   const capital = nome('Funding — Capital (entradas)');
   assert.ok(capital, 'entradas de funding têm que virar bloco de receita');
-  assert.ok(nome('Financiamento à produção — liberações'));
+  assert.ok(nome('Fin produção — liberações'));
   assert.equal(capital.custo, false);
 
   // Saídas: dentro de "Custos Financeiros", que já era uma das 5 categorias —
   // e o subtotal do grupo tem que somá-las junto com a linha do usuário.
   const financeiro = nome('Custos Financeiros');
-  const jurosFunding = nome('Funding · Juros e taxas de dívida');
-  assert.ok(jurosFunding, 'saídas de funding têm que entrar em Custos Financeiros');
+  // #355: a abertura passou a ser POR OPERAÇÃO (era por categoria de waterfall
+  // — juros, amortização, devolução de PE…). Cada operação vira uma linha.
+  const servicoDivida = nome('Funding · Fin produção — parcelas');
+  assert.ok(servicoDivida, 'saídas de funding têm que entrar em Custos Financeiros');
   const linhaUsuario = nome('Taxas bancárias');
   for (let m = 0; m < c.prazo; m++) {
     const somaFilhas = linhaUsuario.mensal[m]
@@ -272,16 +277,9 @@ test('#351 proforma: Resultado reconcilia com o fluxo do motor (sem funding)', (
 
 test('#351 proforma: custo do funding entra em Custos Financeiros; aporte NÃO vira receita', () => {
   const c = calcularFluxo(CONFIG_COMPLETA);
-  const fin: InstrumentoDivida = {
-    tipo: 'divida', nome: 'Fin produção', limiteComprometido: 5_000_000, taxaMensal: 0.01,
-    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1, prioridadePagamento: 1,
-  };
-  const r = simularCapitalStack({
-    nome: 'e43', meses: c.prazo, fluxoLivreMensal: [0, ...c.fluxoMensal],
-    reservaMinima: 0, instrumentos: [fin],
-  });
-  const funding = fundingNoFluxo(r, [{ nome: 'Fin produção', tipo: 'financiamento_producao' }],
-    c.fluxoMensal, CONFIG_COMPLETA.taxaDescontoAa)!;
+  const funding = fundingDoEstudo(
+    [FIN_PRODUCAO], c.fluxoMensal, c.receitaMensal, 0, 12, CONFIG_COMPLETA.taxaDescontoAa,
+  )!.noFluxo;
   const semFunding = proformaAvancado(c, 1000);
   const comFunding = proformaAvancado(c, 1000, funding);
 

@@ -237,6 +237,23 @@ export function receitaLiquidaLinha(vgv: number, ret: { ativo: boolean; pct: num
 export const APOS_CHAVES_MESES = 12;
 
 /**
+ * Mês RELATIVO 0-based do Repasse (entrega das chaves) = 1º mês após o fim
+ * físico da Obra. O offset é travado em 1 desde a #345 — deixou de ser campo
+ * editável (`apos_entrega_meses`) e virou regra do motor.
+ *
+ * Exportado pela #355: o Funding precisa dele para o Equity em modo
+ * "resultado final", que paga de uma vez no repasse. Sem uma fonte única, a
+ * aba de Funding e o motor de receita poderiam discordar sobre qual é o mês do
+ * repasse — exatamente o tipo de divergência silenciosa que a #349/#351
+ * eliminaram na tabela.
+ */
+export function mesRepasse(crono: EventoCrono[]): number {
+  const obra = (crono ?? []).find((e) => e.evento === 'obra');
+  if (!obra) return 0;
+  return n(obra.inicio_mes) + n(obra.duracao_meses) - 1 + 1;
+}
+
+/**
  * As 4 faixas de tempo da absorção Distribuída (#108), em meses RELATIVOS do
  * projeto, derivadas do Cronograma:
  *  - `pre_lancamento` (período 1): duração do evento Pré-lançamento.

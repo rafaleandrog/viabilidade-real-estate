@@ -2,11 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   validarFluxoCalc, validarComponentesSafra, validarPermutaFisica, permutaFisicaPorTipologia,
-  validarProduto, validarContratacao, validarSafrasReceita, validarCapitalStack, validarCustosDuplicados,
+  validarProduto, validarContratacao, validarSafrasReceita, validarFunding, validarCustosDuplicados,
   unidadesNaoAlocadasPorTipologia, TOLERANCIA_PADRAO,
 } from './fluxo-invariantes.js';
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
-import type { ResultadoCapitalStack } from './capital-stack-motor.js';
 
 // FluxoCalc mínimo para exercitar validarFluxoCalc — só os campos que a
 // invariante lê precisam existir de fato.
@@ -410,37 +409,49 @@ test('#340 unidadesNaoAlocadasPorTipologia: sobre-alocada (excede estoque) tamb�
   assert.deepEqual(r, []);
 });
 
-function capitalBase(): ResultadoCapitalStack {
+/** Um FundingCalc mínimo: só o que `validarFunding` lê. */
+function fundingBase(over: any = {}): any {
   return {
-    lacunaFundingMensal: [0, 0], lacunaFundingMaxima: 0, caixaProjetoMensal: [0, 100],
-    liberacaoPorInstrumento: {}, jurosPorInstrumento: {}, amortizacaoPorInstrumento: {},
-    saldoDividaPorInstrumento: {}, aportePorInstrumentoPE: {}, devolucaoPrincipalPE: {},
-    remuneracaoPagaPE: {}, remuneracaoAcumuladaFinalPE: {}, capitalNaoDevolvidoFinalPE: {},
-    remuneracaoAcumuladaPorInstrumentoPE: {}, capitalNaoDevolvidoPorInstrumentoPE: {},
-    participacaoReceitaPE: {}, participacaoResidualPE: {}, participacaoLucroPE: {},
-    aporteSponsorMensal: [0, 0], distribuicaoSponsorMensal: [0, 0],
-    aportePorInstrumentoSponsor: {}, distribuicaoPorInstrumentoSponsor: {},
+    operacoes: [{
+      operacao: { tipo: 'divida', nome: 'Banco', valor: 100, inicio_mes: 0 },
+      entradas: [100, 0], saidas: [0, 100], fluxoInvestidor: [-100, 100],
+      juros: [0, 0], saldo: [100, 0],
+      ...(over.operacao ?? {}),
+    }],
+    noFluxo: {
+      entradas: [100, 0], saidas: [0, 100],
+      linhasEntrada: [], linhasSaida: [],
+      fluxoMensal: [200, 0], fluxoAcumulado: [200, 200], vplLiquido: 0,
+      ...(over.noFluxo ?? {}),
+    },
   };
 }
 
-test('validarCapitalStack: caixa reconciliado e dívida zerada não divergem', () => {
-  const r = capitalBase();
-  r.saldoDividaPorInstrumento = { Banco: [0, 0] };
-  assert.deepEqual(validarCapitalStack(r, [100]), []);
+test('#355 validarFunding: fluxo reconciliado e dívida zerada não divergem', () => {
+  // livre [100, 100] + entradas [100, 0] − saídas [0, 100] = [200, 0] ✓
+  assert.deepEqual(validarFunding(fundingBase(), [100, 100]), []);
 });
 
-test('validarCapitalStack: acusa dívida terminal e primeira quebra da reconciliação', () => {
-  const r = capitalBase();
-  r.caixaProjetoMensal[1] = 90;
-  r.saldoDividaPorInstrumento = { Banco: [0, 25] };
-  const divs = validarCapitalStack(r, [100]);
+test('#355 validarFunding: acusa dívida terminal e a primeira quebra da reconciliação', () => {
+  const f = fundingBase({
+    operacao: { saldo: [100, 25] },
+    noFluxo: { fluxoMensal: [190, 0] },
+  });
+  const divs = validarFunding(f, [100, 100]);
   assert.equal(divs.find((d) => d.codigo === 'DIVIDA_FINAL_NAO_ZERA')?.linha, 'Banco');
   assert.equal(divs.find((d) => d.codigo === 'FLUXO_FUNDING_NAO_RECONCILIA')?.mes, 0);
 });
 
-test('validarCapitalStack: lacuna é alerta de premissa, não erro de implementação', () => {
-  const r = capitalBase();
-  r.lacunaFundingMensal = [0, 30]; r.lacunaFundingMaxima = 30;
-  const div = validarCapitalStack(r, [100]).find((d) => d.codigo === 'LACUNA_FUNDING');
+test('#355 (D14) validarFunding: caixa negativo após funding é ALERTA, não erro', () => {
+  // Sem waterfall, o funding pode furar o caixa — o modelo antigo travava
+  // pagando só até o caixa disponível; a planilha do autor não trava.
+  const f = fundingBase({ noFluxo: { fluxoMensal: [-50, 0], fluxoAcumulado: [-50, -50] } });
+  const div = validarFunding(f, [-150, 100]).find((d) => d.codigo === 'CAIXA_NEGATIVO_APOS_FUNDING');
   assert.equal(div?.severidade, 'alerta');
+  assert.equal(div?.mes, 0);
+});
+
+test('#355 validarFunding: caixa sempre positivo não gera o alerta de D14', () => {
+  const divs = validarFunding(fundingBase(), [100, 100]);
+  assert.equal(divs.find((d) => d.codigo === 'CAIXA_NEGATIVO_APOS_FUNDING'), undefined);
 });

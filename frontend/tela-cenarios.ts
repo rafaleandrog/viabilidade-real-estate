@@ -2,7 +2,9 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct } from './viab-format.js';
-import { type EventoCrono, type PeriodoAgregado, periodosAnuais, rotuloMesRelativo } from './fluxo-shared.js';
+import {
+  type EventoCrono, type PeriodoAgregado, periodosAnuais, rotuloMesRelativo, mesRepasse,
+} from './fluxo-shared.js';
 import {
   calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoCalc, type FluxoConfig, type CenarioParams,
@@ -13,15 +15,15 @@ import {
 } from './fluxo-tabela.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import {
-  simularCapitalStackDoEstudo, receitaLiquidaComCorretagemMensal,
-  fundingNoFluxo, agregarFundingPorPeriodos, type ResultadoCapitalStack,
-} from './capital-stack-motor.js';
+  receitaLiquidaComCorretagemMensal, fundingDoEstudo, agregarFundingPorPeriodos,
+  type FundingCalc, type OperacaoFunding,
+} from './funding-motor.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   listarBenchmarks, listarCenarios, criarCenario, removerCenario,
-  listarCapitalInstrumentos,
+  listarFunding,
 } from './viabilidade-api.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -61,16 +63,15 @@ export class ViabTelaCenarios extends LitElement {
   // filtro Global/por fase), aplicados ao FluxoCalc do cenário SIMULADO.
   @state() private faseFiltro = '';
   @state() private visao: 'mensal' | 'anual' = 'mensal';
-  // Item 5 (Cenários × Capital Stack, decisão do autor 2026-08-02): camadas
-  // ativas reagem ao cenário simulado — mesmo `simularCapitalStackDoEstudo`
-  // já usado em tela-fluxo-ver.ts, sobre o `FluxoCalc` do cenário em vez do
-  // real.
+  // Item 5 (Cenários × Funding, decisão do autor 2026-08-02): as operações
+  // reagem ao cenário simulado — mesmo `fundingDoEstudo` já usado em
+  // tela-fluxo-ver.ts, sobre o `FluxoCalc` do cenário em vez do real.
   // #349: o funding passou a ser lido dentro da tabela principal (a separada
   // foi apagada) e acompanha as duas views — a antiga restrição "só na
   // Mensal" caiu com `agregarFundingPorPeriodos`. A coluna "Resultado após
   // custo financ." da tabela de cenários salvos nunca dependeu da view: ela
-  // aparece sempre que há camada ativa.
-  @state() private camadas: any[] = [];
+  // aparece sempre que há operação de funding.
+  @state() private operacoes: OperacaoFunding[] = [];
 
   private baseConfig: FluxoConfig | null = null;
   // Último FluxoCalc do cenário em exibição (mensal, não-agregado) — guardado
@@ -148,7 +149,7 @@ export class ViabTelaCenarios extends LitElement {
   private async _carregar() {
     this.carregando = true;
     try {
-      const [receitas, custos, curvas, crono, params, bm, cens, camadas] = await Promise.all([
+      const [receitas, custos, curvas, crono, params, bm, cens, operacoes] = await Promise.all([
         listarReceitasAvancado(this.estudo.id),
         listarCustosAvancado(this.estudo.id),
         listarCurvas(),
@@ -156,9 +157,9 @@ export class ViabTelaCenarios extends LitElement {
         buscarParametrosAvancado(this.estudo.id),
         listarBenchmarks(this.estudo.tipo_empreendimento),
         listarCenarios(this.estudo.id),
-        listarCapitalInstrumentos(this.estudo.id),
+        listarFunding(this.estudo.id),
       ]);
-      this.camadas = camadas?.erro ? [] : (camadas.dados || []);
+      this.operacoes = operacoes?.erro ? [] : (operacoes.dados || []);
       this.crono = crono?.erro ? [] : (crono.dados || []);
       this.dataInicio = params?.erro ? null : (params.data_inicio_projeto ?? null);
       this.baseConfig = {
@@ -221,13 +222,15 @@ export class ViabTelaCenarios extends LitElement {
     return periodosAnuais(this.dataInicio, prazo);
   }
 
-  /** §13.3/item 5: simula o Capital Stack sobre o `FluxoCalc` de UM cenário (base ou simulado). `null` sem camadas. */
-  private _capitalStackDe(calc: FluxoCalc): ResultadoCapitalStack | null {
-    if (this.camadas.length === 0) return null;
+  /** Item 5: simula o Funding sobre o `FluxoCalc` de UM cenário (base ou simulado). `null` sem operações. */
+  private _fundingCalcDe(calc: FluxoCalc): FundingCalc | null {
+    if (this.operacoes.length === 0) return null;
     const receitaLiquida = receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, this.baseConfig!.linhasCusto);
-    const fluxoLivre1based = [0, ...calc.fluxoMensal];
-    const receitaLiquida1based = [0, ...receitaLiquida];
-    return simularCapitalStackDoEstudo(fluxoLivre1based, receitaLiquida1based, this.camadas, calc.linhasCusto, 0);
+    const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
+    return fundingDoEstudo(
+      this.operacoes, calc.fluxoMensal, receitaLiquida,
+      resultadoFinal, mesRepasse(this.crono), this.baseConfig?.taxaDescontoAa ?? 12,
+    );
   }
 
   /**
@@ -238,17 +241,24 @@ export class ViabTelaCenarios extends LitElement {
    * separada só existia na Mensal e o funding sumia ao trocar de view.
    */
   private _fundingDe(calc: FluxoCalc, periodos: PeriodoAgregado[] | null) {
-    const f = fundingNoFluxo(this._capitalStackDe(calc), this.camadas, calc.fluxoMensal,
-      this.baseConfig?.taxaDescontoAa ?? 12);
+    const f = this._fundingCalcDe(calc)?.noFluxo;
     if (!f) return null;
     return periodos ? agregarFundingPorPeriodos(f, periodos) : f;
   }
 
-  /** Resultado desalavancado − custo financeiro total (juros + retorno preferencial) do cenário. */
-  private _resultadoAposCustoFinanceiro(calc: FluxoCalc, r: ResultadoCapitalStack | null): number | null {
-    if (!r) return null;
-    const custoFinanceiro = Object.values(r.jurosPorInstrumento).flatMap((s) => s).reduce((a, b) => a + b, 0)
-      + Object.values(r.remuneracaoPagaPE).flatMap((s) => s).reduce((a, b) => a + b, 0);
+  /**
+   * Resultado desalavancado − custo financeiro total do cenário.
+   *
+   * O custo de CADA operação é `Σ saídas − Σ entradas`, que é exatamente
+   * `Σ fluxoInvestidor`: na dívida dá os juros (o principal entra e volta, se
+   * anula); no equity dá o lucro do investidor (o aporte entra e a
+   * remuneração sai). Uma definição só para os dois tipos, em vez de somar
+   * campos específicos de cada um.
+   */
+  private _resultadoAposCustoFinanceiro(calc: FluxoCalc, f: FundingCalc | null): number | null {
+    if (!f) return null;
+    const custoFinanceiro = f.operacoes
+      .reduce((s, op) => s + op.fluxoInvestidor.reduce((a, b) => a + b, 0), 0);
     const resultadoDesalavancado = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] || 0;
     return resultadoDesalavancado - custoFinanceiro;
   }
@@ -337,15 +347,15 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   /**
-   * Item 5: KPI adicional só quando há camadas de Capital Stack — "Resultado
+   * Item 5: KPI adicional só quando há operações de Funding — "Resultado
    * após custo financeiro" do cenário em exibição. NÃO altera TIR/VPL (§8.1:
    * "permanecem desalavancados, para manter comparabilidade entre estruturas
    * de capital") — só soma a informação que faltava, ao lado.
    */
   private _renderResultadoAposFunding(calc: FluxoCalc): TemplateResult {
-    const r = this._capitalStackDe(calc);
-    if (!r) return html`${nothing}`;
-    const resultado = this._resultadoAposCustoFinanceiro(calc, r);
+    const f = this._fundingCalcDe(calc);
+    if (!f) return html`${nothing}`;
+    const resultado = this._resultadoAposCustoFinanceiro(calc, f);
     if (resultado === null) return html`${nothing}`;
     return html`
       <div class="fx-kpis">
@@ -457,9 +467,9 @@ export class ViabTelaCenarios extends LitElement {
   };
 
   private _renderCenariosSalvos(base: FluxoCalc): TemplateResult {
-    // Item 5: coluna extra só quando há camadas de Capital Stack — sem
+    // Item 5: coluna extra só quando há operações de Funding — sem
     // nenhuma, a tabela fica idêntica à de antes desta rodada.
-    const comCapitalStack = this.camadas.length > 0;
+    const comFunding = this.operacoes.length > 0;
     return html`
       <section class="secao-cenarios">
         <h3>Cenários salvos</h3>
@@ -477,13 +487,13 @@ export class ViabTelaCenarios extends LitElement {
                 <th>Payback</th>
                 <th>Exposição máx.</th>
                 <th class="cen-var" aria-label="Variação de Exposição máxima vs. cenário real" scope="col"></th>
-                ${comCapitalStack ? html`<th>Resultado após custo financ.</th>` : nothing}
+                ${comFunding ? html`<th>Resultado após custo financ.</th>` : nothing}
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              ${this._linhaReal(base, comCapitalStack)}
-              ${this.cenarios.map((c) => this._linhaCenario(c, base, comCapitalStack))}
+              ${this._linhaReal(base, comFunding)}
+              ${this.cenarios.map((c) => this._linhaCenario(c, base, comFunding))}
             </tbody>
           </table>
         </div>
@@ -498,9 +508,9 @@ export class ViabTelaCenarios extends LitElement {
 
   // Linha travada, sempre primeira: o cenário real (sem alterações dos sliders),
   // referência de comparação para os cenários salvos pelo usuário.
-  private _linhaReal(base: FluxoCalc, comCapitalStack: boolean): TemplateResult {
+  private _linhaReal(base: FluxoCalc, comFunding: boolean): TemplateResult {
     const tir = base.tir === null ? '—' : fmtPct(base.tir);
-    const resultado = comCapitalStack ? this._resultadoAposCustoFinanceiro(base, this._capitalStackDe(base)) : null;
+    const resultado = comFunding ? this._resultadoAposCustoFinanceiro(base, this._fundingCalcDe(base)) : null;
     return html`
       <tr class="linha-real">
         <td><urbi-icone classe="fa-solid fa-lock"></urbi-icone>Cenário real</td>
@@ -513,7 +523,7 @@ export class ViabTelaCenarios extends LitElement {
         <td>${base.paybackData ?? '—'}</td>
         <td class="neg">${fmtR$(base.exposicaoMaxima)}</td>
         <td class="cen-var"></td>
-        ${comCapitalStack ? html`<td class=${resultado !== null && resultado >= 0 ? 'pos' : 'neg'}>${resultado === null ? '—' : fmtR$(resultado)}</td>` : nothing}
+        ${comFunding ? html`<td class=${resultado !== null && resultado >= 0 ? 'pos' : 'neg'}>${resultado === null ? '—' : fmtR$(resultado)}</td>` : nothing}
         <td></td>
       </tr>
     `;
@@ -530,11 +540,11 @@ export class ViabTelaCenarios extends LitElement {
     return html`<urbi-badge cor=${v.melhor ? 'sucesso' : 'perigo'}>${v.texto}</urbi-badge>`;
   }
 
-  private _linhaCenario(c: any, base: FluxoCalc, comCapitalStack: boolean): TemplateResult {
+  private _linhaCenario(c: any, base: FluxoCalc, comFunding: boolean): TemplateResult {
     const calc = this._calc({ precoVendaPct: n(c.preco_venda_pct), custoObraPct: n(c.custo_obra_pct) });
     const pctTxt = (v: number) => `${v > 0 ? '+' : ''}${v}%`;
     const tir = calc.tir === null ? '—' : `${fmtPct(calc.tir)}`;
-    const resultado = comCapitalStack ? this._resultadoAposCustoFinanceiro(calc, this._capitalStackDe(calc)) : null;
+    const resultado = comFunding ? this._resultadoAposCustoFinanceiro(calc, this._fundingCalcDe(calc)) : null;
     return html`
       <tr>
         <td>${c.nome || 'Cenário'}</td>
@@ -547,7 +557,7 @@ export class ViabTelaCenarios extends LitElement {
         <td>${calc.paybackData ?? '—'}</td>
         <td class="neg">${fmtR$(calc.exposicaoMaxima)}</td>
         <td class="cen-var">${this._badgeVar(calc.exposicaoMaxima, base.exposicaoMaxima)}</td>
-        ${comCapitalStack ? html`<td class=${resultado !== null && resultado >= 0 ? 'pos' : 'neg'}>${resultado === null ? '—' : fmtR$(resultado)}</td>` : nothing}
+        ${comFunding ? html`<td class=${resultado !== null && resultado >= 0 ? 'pos' : 'neg'}>${resultado === null ? '—' : fmtR$(resultado)}</td>` : nothing}
         <td>
           <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
             @click=${() => this.removerId = Number(c.id)}></urbi-botao>

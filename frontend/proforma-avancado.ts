@@ -1,6 +1,6 @@
 import { GRUPOS_CUSTO, GRUPO_CUSTO_LABEL } from './fluxo-tabela.js';
 import type { FluxoCalc } from './fluxo-caixa-motor.js';
-import type { FundingNoFluxo } from './capital-stack-motor.js';
+import type { FundingNoFluxo } from './funding-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #351: Proforma do nível AVANÇADO — a segunda sub-aba de Resultados.

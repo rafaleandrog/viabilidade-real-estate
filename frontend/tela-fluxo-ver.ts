@@ -2,7 +2,8 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import {
-  periodosAnuais, areaPrivativaTotalLinhas, type EventoCrono, type PeriodoAgregado,
+  periodosAnuais, areaPrivativaTotalLinhas, mesRepasse,
+  type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { proformaAvancado } from './proforma-avancado.js';
@@ -15,20 +16,19 @@ import {
 } from './fluxo-tabela.js';
 import { exportarFluxoCSV, exportarFluxoPDF } from './exportar.js';
 import {
-  simularCapitalStackDoEstudo, receitaLiquidaComCorretagemMensal,
-  fundingNoFluxo, agregarFundingPorPeriodos,
-  type ResultadoCapitalStack, type FundingNoFluxo,
-} from './capital-stack-motor.js';
+  receitaLiquidaComCorretagemMensal, fundingDoEstudo, agregarFundingPorPeriodos,
+  type FundingCalc, type FundingNoFluxo, type OperacaoFunding,
+} from './funding-motor.js';
 import {
   validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita,
-  validarCapitalStack, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia,
+  validarFunding, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia,
   type Divergencia, type PermutaFisicaTipologia,
 } from './fluxo-invariantes.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
-  listarCapitalInstrumentos, listarTipologiasCatalogo,
+  listarFunding, listarTipologiasCatalogo,
 } from './viabilidade-api.js';
 
 // Sub-tela "Ver Fluxo" (nível Avançado): KPIs, tabela mensal com colunas fixas
@@ -58,8 +58,8 @@ export class ViabFluxoVer extends LitElement {
   // #349: a restrição "só na view Mensal" acabou — o funding entrou na tabela
   // principal e `agregarFundingPorPeriodos` o reagrupa junto com ela na view
   // Anual. Os KPIs seguem lendo só o cálculo mensal, como sempre.
-  @state() private camadas: any[] = [];
-  @state() private resultadoCapitalStack: ResultadoCapitalStack | null = null;
+  @state() private operacoes: OperacaoFunding[] = [];
+  @state() private fundingCalc: FundingCalc | null = null;
   // #349: o funding projetado nas categorias da tabela principal — substitui a
   // tabela separada "Programa Financeiro (Capital Stack)", removida.
   @state() private funding: FundingNoFluxo | null = null;
@@ -101,16 +101,16 @@ export class ViabFluxoVer extends LitElement {
   private async _carregar() {
     this.carregando = true;
     try {
-      const [receitas, custos, curvas, crono, params, camadas, tipologias] = await Promise.all([
+      const [receitas, custos, curvas, crono, params, operacoes, tipologias] = await Promise.all([
         listarReceitasAvancado(this.estudo.id),
         listarCustosAvancado(this.estudo.id),
         listarCurvas(),
         buscarCronogramaAvancado(this.estudo.id),
         buscarParametrosAvancado(this.estudo.id),
-        listarCapitalInstrumentos(this.estudo.id),
+        listarFunding(this.estudo.id),
         listarTipologiasCatalogo(this.estudo.id),
       ]);
-      this.camadas = camadas?.erro ? [] : (camadas.dados || []);
+      this.operacoes = operacoes?.erro ? [] : (operacoes.dados || []);
       this.dados = {
         receitas: receitas?.erro ? [] : (receitas.dados || []),
         custos: custos?.erro ? [] : (custos.dados || []),
@@ -146,20 +146,22 @@ export class ViabFluxoVer extends LitElement {
       ret: d.ret,
     };
     this.calc = calcularFluxo(config);
-    this.resultadoCapitalStack = null;
+    this.fundingCalc = null;
     this.funding = null;
 
-    // §13.3: só camadas ATIVAS têm efeito — sem nenhuma, `simularCapitalStackDoEstudo`
-    // devolve entradas/saídas zero e `fundingNoFluxo` devolve `null`, de modo que a
-    // tabela não ganha nenhuma linha nova (blast radius zero sem Capital Stack).
-    if (this.camadas.length > 0) {
+    // Sem operações de Funding, `fundingDoEstudo` devolve null e a tabela não
+    // ganha nenhuma linha nova — blast radius zero em estudo sem captação.
+    if (this.operacoes.length > 0) {
       const receitaLiquida = receitaLiquidaComCorretagemMensal(this.calc.receitaMensal, this.calc.linhasCusto, d.custos);
-      const fluxoLivre1based = [0, ...this.calc.fluxoMensal];
-      const receitaLiquida1based = [0, ...receitaLiquida];
-      this.resultadoCapitalStack = simularCapitalStackDoEstudo(
-        fluxoLivre1based, receitaLiquida1based, this.camadas, this.calc.linhasCusto, 0,
+      const resultadoFinal = this.calc.fluxoAcumulado[this.calc.fluxoAcumulado.length - 1] ?? 0;
+      // D8: receita líquida, resultado final e mês do repasse vêm do ESTUDO,
+      // não de campos redigitados na aba de Funding — é o que impede a aba de
+      // contar uma história diferente da tabela de Resultados.
+      this.fundingCalc = fundingDoEstudo(
+        this.operacoes, this.calc.fluxoMensal, receitaLiquida,
+        resultadoFinal, mesRepasse(d.crono), d.taxa,
       );
-      this.funding = fundingNoFluxo(this.resultadoCapitalStack, this.camadas, this.calc.fluxoMensal, d.taxa);
+      this.funding = this.fundingCalc?.noFluxo ?? null;
     }
     this.divergencias = [
       ...validarProduto(d.receitas, d.custos, d.tipologias, d.crono, this.calc.prazo),
@@ -174,8 +176,7 @@ export class ViabFluxoVer extends LitElement {
       ...validarContratacao(receitas, d.crono, this.calc.prazo, this.calc.vendaBrutaContratada),
       ...validarSafrasReceita(receitas, d.crono, this.calc.prazo),
       ...validarFluxoCalc(this.calc),
-      ...(this.resultadoCapitalStack
-        ? validarCapitalStack(this.resultadoCapitalStack, this.calc.fluxoMensal) : []),
+      ...(this.fundingCalc ? validarFunding(this.fundingCalc, this.calc.fluxoMensal) : []),
     ];
     // #269: mesma fonte para tela e exportação — computado uma vez aqui.
     this.permutaFisica = permutaFisicaPorTipologia(d.custos, d.tipologias);
@@ -292,7 +293,7 @@ export class ViabFluxoVer extends LitElement {
         <p class="sec">${this.funding
           ? html`TIR, VPL e Payback continuam <strong>desalavancados</strong> — leem o Fluxo de Caixa Livre
               (funding-capital-stack.md §8.1, para manter comparabilidade entre estruturas de capital).`
-          : html`Este estudo não tem camadas de Capital Stack: sem funding, o Fluxo de Caixa real é
+          : html`Este estudo não tem operações de Funding: sem captação, o Fluxo de Caixa real é
               igual ao Livre.`}</p>
       </urbi-card>
       ${this._renderControles()}

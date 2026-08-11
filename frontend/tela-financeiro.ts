@@ -48,8 +48,8 @@ const OPT_REGIME: Op[] = [
 //
 // #239/FIN-10 (#279): `financiamento_*`, `investidor_*` e `estrutura_*_pct`
 // SAÍRAM daqui (§13.4 — "o que foi substituído sai da interface"). O
-// Capital Stack (`viab-capital-stack`, FIN-08/#277) cobre financiamento à
-// produção e Preferred Equity com o mesmo dado, de forma derivada (§2.6),
+// aba Funding (`viab-funding`, #355 — antes `viab-capital-stack`) cobre
+// financiamento à produção, dívida e equity com o mesmo dado, de forma derivada (§2.6),
 // não mais como input solto. As colunas continuam existindo no schema —
 // dado histórico preservado — só o formulário saiu; nenhum motor de
 // cálculo as lia (confirmado antes desta issue: zero ocorrências em
