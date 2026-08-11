@@ -119,11 +119,11 @@ export function validarCamposOperacao(dados: Record<string, any>): string | null
  * Devolve a operação conflitante, ou `null` quando pode criar/alterar.
  * `ignorarId` existe para o PATCH não conflitar consigo mesmo.
  */
-export function conflitoFinanciamentoUnico(
-  tipo: string | undefined,
-  existentes: { id: any; tipo: string }[],
+export function conflitoFinanciamentoUnico<T extends Record<string, any>>(
+  tipo: unknown,
+  existentes: T[],
   ignorarId?: number,
-): { id: any; tipo: string } | undefined {
+): T | undefined {
   if (tipo !== 'financiamento_producao') return undefined;
   return existentes.find((o) => o.tipo === 'financiamento_producao'
     && (ignorarId === undefined || Number(o.id) !== ignorarId));
