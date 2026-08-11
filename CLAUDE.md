@@ -30,30 +30,35 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — 🔵 RODADA 7 ABERTA
+## Estado do backlog — ✅ NENHUMA RODADA ABERTA
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
-| **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | 🔵 **aberta em 2026-08-10** |
+| **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | ✅ **concluída em 2026-08-11** |
 | **5 — EVI** | Auditoria do app contra os documentos EVI | **#220–#241** (22) | ✅ **concluída em 2026-08-02** |
 | **6 — lista de bugs** | `lista_bugs.xlsx`, 24 itens `BUGLIST-001`…`BUGLIST-024` | **#238, #239, #244–#281** (37 destinos) | ✅ **concluída em 2026-08-02** |
 
-### Rodada 7 — planejamento
+### Rodada 7 — encerrada em 2026-08-11
 
-Diagnóstico completo, ordem de execução (E01→E47, 11 fases com portão de merge entre elas) e o
-detalhamento arquivo:linha de cada item estão no plano de sessão gerado em 2026-08-10 (mesmo texto
-usado para redigir as 47 issues). Cada issue leva no título `[BUG7-NN]`, onde `NN` é a ordem de
-execução — **não** o número do item da planilha, que está citado no corpo. Seis decisões (D1–D7)
-ficam registradas em cada issue afetada, com o padrão seguido na ausência de resposta do autor; a
-mais bloqueante é **D6**: a issue #355 (item 48, Funding/Capital Stack) está formalmente **bloqueada**
-até o autor anexar o documento `fluxo_investidor_FORMULAS`, que não está no repositório.
+As 47 issues (#309–#355) foram executadas em 11 fases, uma issue por vez, cada uma com branch → PR →
+CI verde → merge → **confirmação de fechamento via `issue_read`** (nunca assumida pelo merge do PR).
+Cada issue levou no título `[BUG7-NN]`, onde `NN` é a ordem de execução — **não** o número do item da
+planilha, que está citado no corpo.
 
-Dependências entre issues desta rodada usam `Sem-fechamento: #NNN pré-requisito` no corpo — não
-fecham a issue citada, só declaram a ordem. **Fase 11 (issue #355) é isolada por exigência
-explícita do autor**: nunca trabalhar nela junto de outra issue na mesma sessão.
+Catorze decisões ficaram registradas nas issues afetadas (D1–D7 na abertura, D8–D14 na Fase 11), com
+o padrão seguido na ausência de resposta do autor. **D6 era a mais bloqueante** e caiu no último dia:
+o autor anexou `fluxo_investidor_FORMULAS.xlsx`, que a #355 exigia e que não estava no repositório.
+A planilha está agora transcrita em `docs/viabilidade/fluxo-investidor-formulas.md` — a spec parou de
+morar só na máquina dele.
 
-Quem fechar a Rodada 7 atualiza esta seção na mesma alteração — regra de baixo, § *Lição das rodadas
-anteriores*.
+> ⚠️ **Uma decisão continua aberta: D12** (issue #355). A planilha tem um só modelo de dívida, então
+> Financiamento à produção e Dívida compartilham a matemática e diferem só na cardinalidade. Se o
+> Financiamento à produção devia liberar **conforme a curva da obra**, isso não está na planilha e
+> precisa de confirmação — seria mudança de motor. Nada mais da rodada depende disso.
+
+A reescrita da Fase 11 só foi viável porque a **`FundingNoFluxo` da #349 virou costura**: o shape e
+os 5 consumidores ficaram intactos enquanto o motor inteiro era trocado por baixo. Vale como padrão
+para a próxima reescrita estrutural — achar a fronteira testável antes de começar.
 
 **As duas foram executadas juntas por uma trilha única de 10 fases** (plano aprovado pelo autor em
 2026-08-01), com portão de merge ao fim de cada fase. Os quatro cruzamentos entre rodadas (itens 5,
@@ -100,11 +105,16 @@ nunca lida/editável) — detalhe em `docs/viabilidade/funding-capital-stack.md`
 **Pendências do autor no ambiente autenticado** (o ambiente Claude Code não cobre — lista
 consolidada de todas as rodadas): `urbi-empacotar`; sincronização do `schema.json` pelo SDK
 (inclui as tabelas `analise_mercado`/`mercado_regioes`/`mercado_coletas` e a tabela nova
-`avancado_capital_instrumentos`); execução real de **todas** as migrações no Postgres (`001` a
-`019`, cadeia completa nunca rodada em produção); confirmação de que o shell descobre
+`avancado_funding_operacoes`, da #355); execução real de **todas** as migrações no Postgres (`001` a
+`028`, cadeia completa nunca rodada em produção); confirmação de que o shell descobre
 `export { rotinas }` em `backend/rotas.ts`; configuração de `mercado_busca_url`/`mercado_busca_chave`
 para a coleta diária de mercado sair do modo `sem_fonte_externa`; e a confirmação de versão
 publicada que fecha a #264. Detalhe histórico no `PROGRESSO.md` (#199, #200).
+
+> A tabela `avancado_capital_instrumentos` (migração `019`) continua declarada no `schema.json` mas
+> **nenhum código a lê** depois da #355 — só a migração `028`, que converte o que houver. Como a
+> `019` nunca rodou em Postgres, na prática ela está vazia em toda instalação. Remoção física é
+> issue própria, pelo mesmo critério do §13.4 que manteve as colunas do Bloco G.
 
 Rodadas anteriores, todas mergeadas na `main`:
 

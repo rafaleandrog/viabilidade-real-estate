@@ -4,6 +4,48 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 7 — ✅ CONCLUÍDA: Fase 11 (E47, issue #355) fecha a rodada (2026-08-11)
+
+O bloqueio **D6** caiu: o autor anexou `fluxo_investidor_FORMULAS.xlsx`, que faltava desde a
+abertura da rodada. A planilha foi lida por completo (abas `divida` e `equity`, todas as fórmulas
+e o exemplo numérico) e **transcrita para o repositório** em
+`docs/viabilidade/fluxo-investidor-formulas.md` — era a ausência dela que travava a issue, e a spec
+não pode voltar a morar só na máquina do autor.
+
+**O que definiu a arquitetura:** a `FundingNoFluxo` da #349 virou a **costura** da reescrita. Tudo
+acima dela (tipos, config JSON, waterfall, motor, UI, schema, rotas) foi descartado e refeito; o
+shape e os 5 consumidores (`fluxo-tabela`, `exportar`, `proforma-avancado`, `tela-fluxo-ver`,
+`tela-cenarios`) ficaram de pé. Foi isso que permitiu trocar um motor de 995 linhas sem desfazer a
+Fase 9. A segunda descoberta: **a matemática da planilha já existia no repo** —
+`taxaMensalEquivalente`, `pmtPrice`, `tirMensal`/`tirAnual` são exatamente as fórmulas dela. O que
+se jogou fora foi o waterfall, não a aritmética.
+
+Entregas: tabela `avancado_funding_operacoes` + migração `028` + `versao` `0.1.27`;
+`backend/rotas/funding.ts` (campos como colunas, validados um a um, com a unicidade do
+Financiamento à produção); `frontend/funding-motor.ts`; `frontend/tela-funding.ts` com o painel
+"visão do investidor" por operação (TIR/VPL/payback), que a tela antiga não tinha.
+
+**Os golden cases reproduzem a planilha célula a célula** — taxa mensal a 1e-15, PMT ao centavo,
+saldo zerando no mês da quitação, TIR anual de 20,000000111%, e os indicadores do equity.
+
+Decisões **D8–D14** registradas na issue, com o padrão seguido na ausência de resposta. Duas
+merecem destaque: **D8** (as premissas do projeto são derivadas do estudo, não redigitadas — senão
+a aba de Funding contaria história diferente da de Resultados) e **D14** (sem waterfall nada capa
+os pagamentos pelo caixa, então caixa negativo após funding virou **alerta** na Reconciliação em
+vez de acontecer calado). Dois defeitos da própria planilha foram identificados e **não**
+replicados: o payback deslocado em 27 meses e o VPL que aplica 10% ao mês em vez de ao ano.
+
+> ⚠️ **D12 segue aberta e é a única que pode mudar o motor.** A planilha tem **um só** modelo de
+> dívida, então Financiamento à produção e Dívida compartilham a matemática e diferem só na
+> cardinalidade. Se o Financiamento à produção devia liberar **conforme a curva da obra** — como o
+> modelo antigo fazia — isso não está na planilha e precisa de confirmação do autor. Nada mais da
+> rodada depende disso.
+
+Saldo da suíte: **346 testes de frontend** (65 do modelo antigo saíram junto com ele) e **95 de
+backend**, todos verdes; bundle 440,4 → 418,0 kB.
+
+---
+
 ## Rodada 7 — Fases 9–10 concluídas (E41–E46, issues #349–#354), portão antes da Fase 11 (2026-08-11)
 
 Sessão contínua a partir do checkpoint anterior, uma issue de cada vez, mesma disciplina de
