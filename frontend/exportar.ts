@@ -8,7 +8,7 @@ import type { Proforma } from './proforma.js';
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
-import { type FundingNoFluxo } from './capital-stack-motor.js';
+import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './capital-stack-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
 const pct1 = (v: number) => v.toFixed(1).replace('.', ',');
@@ -149,6 +149,28 @@ export interface LinhaFx {
   // undefined na própria linha de Receita e no Fluxo de Caixa Mensal/Acumulado
   // (linhas sem sentido para o indicador).
   pctVgv?: number;
+  /**
+   * §38: nem toda linha do detalhamento de financiamento à produção é
+   * dinheiro — `% incorrido` é fração e `liberação habilitada` é sinal.
+   * Ausente = `moeda`, o caso de todas as outras linhas do relatório.
+   */
+  formato?: FormatoLinhaFinanciamento;
+  /** `true` nas linhas cuja coluna Total não teria significado (estoques, %, sinais). */
+  ocultarTotal?: boolean;
+}
+
+/**
+ * Célula do relatório, respeitando o formato da linha. Fonte ÚNICA para CSV e
+ * PDF: as duas exportações têm de mostrar o mesmo texto, e antes desta função
+ * cada uma tinha a sua própria expressão de formatação.
+ */
+function celulaFx(v: number, l: Pick<LinhaFx, 'custo' | 'formato'>, comParenteses: boolean): string {
+  if (l.formato === 'percentual') return v ? `${pct1(v * 100)}%` : '';
+  if (l.formato === 'sinal') return v ? 'sim' : '';
+  if (!v || Math.abs(v) < 0.005) return '';
+  const abs = fmtR$(Math.abs(v), false);
+  if (!comParenteses) return v < 0 ? `-${abs}` : abs;
+  return l.custo || v < 0 ? `(${abs})` : abs;
 }
 
 /**
@@ -247,6 +269,24 @@ export function linhasFluxo(c: FluxoCalc, funding: FundingNoFluxo | null = null)
     }
   }
 
+  // §38: detalhamento de auditoria do financiamento à produção. Espelha o
+  // bloco da tela (`tabelaFluxo`), inclusive em ser display-only — as
+  // liberações, juros e amortizações daqui já entraram no relatório pelas
+  // linhas de funding, e nenhuma linha deste bloco alimenta o Fluxo abaixo.
+  for (const bloco of funding?.financiamentoProducao ?? []) {
+    linhas.push({
+      nivel: 0, nome: `Financiamento à produção — ${bloco.nome} (detalhamento)`, custo: false,
+      separadorAntes: true, total: 0, ocultarTotal: true, mensal: new Array<number>(c.prazo).fill(0),
+    });
+    for (const l of bloco.linhas) {
+      linhas.push({
+        nivel: 1, nome: l.nome, custo: false, formato: l.formato,
+        total: l.mostrarTotal ? totalSerie(l.mensal) : 0, ocultarTotal: !l.mostrarTotal,
+        mensal: l.mensal,
+      });
+    }
+  }
+
   // Com funding, o Fluxo do rodapé é o ALAVANCADO; o livre — base de TIR/VPL,
   // que §8.1 mantém desalavancados — fica explícito na linha de cima.
   const fluxoMensal = funding?.fluxoMensal ?? c.fluxoMensal;
@@ -290,10 +330,10 @@ export function exportarFluxoCSV(
       indent + l.nome,
       l.duracao ? rotuloMesRelativo(dataInicio, l.inicio!) : '',
       l.duracao ? `${l.duracao}m` : '',
-      fmtR$(l.total, false),
+      l.ocultarTotal ? '' : fmtR$(l.total, false),
       l.vpl !== undefined ? fmtR$(l.vpl, false) : '',
       l.pctVgv !== undefined ? pct1(l.pctVgv) : '',
-      ...l.mensal.map((v) => (Math.abs(v) < 0.005 ? '' : fmtR$(v, false))),
+      ...l.mensal.map((v) => celulaFx(v, l, false)),
     ].join(';'));
   }
   rows.push('');
@@ -407,11 +447,7 @@ export function exportarFluxoPDF(
     <div class="sub-h">Fluxo de Caixa (Avançado) · ${estudo.tipo_empreendimento} · Estudo de Viabilidade — UrbiVerso</div>
     <div class="kpis">${kpis.map(([r, v]) => `<div class="kpi"><div class="r">${r}</div><div class="v">${v}</div></div>`).join('')}</div>`;
 
-  const fmtCel = (v: number, custo: boolean) => {
-    if (!v || Math.abs(v) < 0.005) return '';
-    const abs = fmtR$(Math.abs(v), false);
-    return custo || v < 0 ? `(${abs})` : abs;
-  };
+  const fmtCel = (v: number, custo: boolean) => celulaFx(v, { custo }, true);
 
   const paginas: string[] = [];
   for (let p = 0; p * POR_PAGINA < c.prazo; p++) {
@@ -420,11 +456,11 @@ export function exportarFluxoPDF(
     const ths = c.meses.slice(ini, fim).map((m) => `<th>${m}</th>`).join('');
     const trs = linhas.map((l) => {
       const cls = l.nivel === 0 ? 'g0' : l.nivel === 1 ? 'g1' : 'g2';
-      const tds = l.mensal.slice(ini, fim).map((v) => `<td class="v">${fmtCel(v, l.custo)}</td>`).join('');
+      const tds = l.mensal.slice(ini, fim).map((v) => `<td class="v">${celulaFx(v, l, true)}</td>`).join('');
       return `<tr class="${cls}"><td class="nome">${'&nbsp;&nbsp;'.repeat(l.nivel)}${l.nome}</td>
         <td class="v">${l.duracao ? rotuloMesRelativo(dataInicio, l.inicio!) : ''}</td>
         <td class="v">${l.duracao ? `${l.duracao}m` : ''}</td>
-        <td class="v">${fmtCel(l.total, l.custo)}</td>
+        <td class="v">${l.ocultarTotal ? '' : fmtCel(l.total, l.custo)}</td>
         <td class="v">${l.vpl !== undefined ? fmtCel(l.vpl, l.custo) : ''}</td>
         <td class="v">${l.pctVgv !== undefined ? `${pct1(l.pctVgv)}%` : ''}</td>${tds}</tr>`;
     }).join('');

@@ -101,7 +101,7 @@ nunca lida/editável) — detalhe em `docs/viabilidade/funding-capital-stack.md`
 consolidada de todas as rodadas): `urbi-empacotar`; sincronização do `schema.json` pelo SDK
 (inclui as tabelas `analise_mercado`/`mercado_regioes`/`mercado_coletas` e a tabela nova
 `avancado_capital_instrumentos`); execução real de **todas** as migrações no Postgres (`001` a
-`019`, cadeia completa nunca rodada em produção); confirmação de que o shell descobre
+`028`, cadeia completa nunca rodada em produção); confirmação de que o shell descobre
 `export { rotinas }` em `backend/rotas.ts`; configuração de `mercado_busca_url`/`mercado_busca_chave`
 para a coleta diária de mercado sair do modo `sem_fonte_externa`; e a confirmação de versão
 publicada que fecha a #264. Detalhe histórico no `PROGRESSO.md` (#199, #200).
@@ -214,6 +214,13 @@ esses pacotes e executa **typecheck do frontend + testes de frontend + build do 
 > typecheck, testes e esbuild **em verde**: foi assim que o #71/#160 sobreviveu a uma rodada
 > inteira que "validou ✓". Aspas curvas em **conteúdo de texto** são tipografia legítima e não são
 > acusadas — o padrão casa só `=` seguido de aspa curva.
+
+> ⚠️ **O glob de teste precisa dos dois padrões: `frontend/*.test.ts frontend/fixtures/*.test.ts`.**
+> `frontend/*.test.ts` sozinho **não alcança subdiretório** — foi assim que os 16 golden cases do
+> Capital Stack (`frontend/fixtures/capital-stack-golden.test.ts`) ficaram desde a Rodada 6
+> escritos, commitados e **nunca executados**, nem aqui nem em `pnpm test`. Corrigido em
+> 2026-08-11 nos dois lugares (`package.json` e este script). Teste que não roda é pior que teste
+> que não existe: ele dá a impressão de cobertura.
 
 O `.github/workflows/pr-guards.yml` é o CI de PR (só `git` + `grep` + `node`, sem SDK, então nunca
 fica vermelho por falta de credencial). Barra **PR de diff vazio que declara fechar issue** — o caso

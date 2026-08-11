@@ -10,7 +10,7 @@ import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoCalc, type FluxoConfi
 import { graficoFluxoMensal, graficoFluxoAcumulado, seriesEconomicasFluxo } from './fluxo-graficos.js';
 import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo,
-  chavesColapso, controlesFluxo, relatorioReconciliacao,
+  chavesColapso, alternarColapso, controlesFluxo, relatorioReconciliacao,
   tabelaPermutaFisica,
 } from './fluxo-tabela.js';
 import { exportarFluxoCSV, exportarFluxoPDF } from './exportar.js';
@@ -158,6 +158,7 @@ export class ViabFluxoVer extends LitElement {
       const receitaLiquida1based = [0, ...receitaLiquida];
       this.resultadoCapitalStack = simularCapitalStackDoEstudo(
         fluxoLivre1based, receitaLiquida1based, this.camadas, this.calc.linhasCusto, 0,
+        { custosRaw: d.custos, cronograma: d.crono },
       );
       this.funding = fundingNoFluxo(this.resultadoCapitalStack, this.camadas, this.calc.fluxoMensal, d.taxa);
     }
@@ -336,14 +337,14 @@ export class ViabFluxoVer extends LitElement {
   }
 
   private _toggleTudo(recolher: boolean) {
-    const chaves = this.calc ? chavesColapso(this.calc) : [];
+    const chaves = this.calc ? chavesColapso(this.calc, this.funding) : [];
     const novo: Record<string, boolean> = {};
     for (const k of chaves) novo[k] = recolher;
     this.colapso = novo;
   }
 
   private _t(chave: string) {
-    this.colapso = { ...this.colapso, [chave]: !this.colapso[chave] };
+    this.colapso = alternarColapso(this.colapso, chave);
   }
 
   // ── Exportação ──

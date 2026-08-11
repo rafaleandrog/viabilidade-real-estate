@@ -288,37 +288,82 @@ meses seguintes (nunca força caixa negativo, §12.3).
 
 ### 4.3 Financiamento à produção
 
+**Comportamento vigente desde 2026-08-11.** A fonte de verdade desta seção é a aba
+`Incorp Individual` da planilha de referência (`20260730_EVI_Urbita`), colunas **BW:CH**, decodificada
+fórmula a fórmula. O oráculo de regressão é `frontend/financiamento-producao-golden.test.ts`, que
+reproduz os 80 períodos do cenário real com tolerância de R$ 0,15.
+
 **Função:** financiar custos elegíveis do empreendimento, liberando recursos conforme
 medição/evolução acumulada, com juros, taxas, amortização e saldo devedor próprios.
 
-**Premissas mínimas:** limite comprometido · percentual financiável dos custos elegíveis · seleção
-das linhas de custo elegíveis · mês inicial e final de elegibilidade · exigência de equity/obra
-executada antes da primeira liberação, quando aplicável · taxa de juros efetiva anual · indexador
-e taxa projetada · taxas de contratação · regra de juros na carência (pagos ou capitalizados) ·
-política de amortização · reserva mínima de caixa · vencimento final.
+**Premissas do app:** taxa de juros efetiva anual · **exposição mínima para liberação** ·
+percentual financiável dos custos elegíveis · seleção das linhas de custo elegíveis ·
+**caixa disponível amortiza antes das chaves (sim/não)** · limite comprometido (opcional).
+A **janela de liberação** e o **mês das chaves** NÃO são digitados: saem do Cronograma do estudo
+(`marcosObra`, `frontend/fluxo-shared.ts`).
 
-#### Liberação mensal
+Continuam **fora**, sem caso real que as exija: indexador e taxa projetada · taxas de contratação ·
+mês inicial/final de elegibilidade digitado · reserva mínima de caixa por camada.
+
+#### Base financiável padrão
+
+Quatro grupos, e só eles (`eFinanciavelPadrao`, `frontend/fluxo-shared.ts`):
+
+1. pagamento **cash** do terreno — a linha de Preço, exceto as subcategorias de permuta;
+2. custo de construção;
+3. outorga;
+4. projetos e aprovações (categorias `Projetos` e `Licenças e Aprovações`).
+
+Ficam de fora, deliberadamente: impostos, corretagem, marketing, permuta física e financeira,
+incorporação e registro, manutenção pós-obra, mobiliário, contingências, gestão e demais indiretos.
+Todos continuam pesando no fluxo de caixa — só não aumentam a base sobre a qual o banco libera.
+
+A camada pode escolher outras linhas em `config.custoLinhaIds`; sem seleção própria, a base padrão é
+resolvida **em runtime**, não persistida — congelar a lista a faria envelhecer assim que o usuário
+adicionasse uma linha de custo.
+
+#### Liberação mensal — catch-up retroativo
 
 Os custos elegíveis são reconhecidos quando **incorridos** no fluxo. A liberação ocorre ao final do
 mês, depois da medição econômica daquele mês.
 
 ```text
-custo_elegivel_acumulado_t     = Σ custos elegíveis incorridos até t
+percentual_incorrido_t         = custo_elegivel_acumulado_t / custo_elegivel_TOTAL
+
+liberacao_habilitada_t         = percentual_incorrido_t ≥ exposicao_minima
+                                 E (obra ativa em t OU t é o mês das chaves)
 
 liberacao_desejada_acumulada_t = mínimo(
-                                   limite_comprometido,
+                                   limite_efetivo,
                                    percentual_financiavel × custo_elegivel_acumulado_t
                                  )
 
-liberacao_disponivel_t         = máximo(0, liberacao_desejada_acumulada_t
-                                           − liberações_acumuladas_anteriores)
-
-liberacao_real_t               = mínimo(liberacao_disponivel_t,
-                                        necessidade a ser coberta pelo instrumento)
+liberacao_t                    = liberacao_habilitada_t
+                                 ? máximo(0, liberacao_desejada_acumulada_t
+                                             − liberações_acumuladas_anteriores)
+                                 : 0
 ```
 
-> O app **não** deve liberar mais dívida apenas porque o limite existe quando o projeto não
-> necessita do caixa — salvo modo contratual de liberação programada explicitamente selecionado.
+Duas consequências que **não** são código especial — caem da fórmula, e é por elas que o modelo se
+distingue de um financiamento genérico:
+
+- **A primeira liberação é um catch-up.** No mês em que o gatilho abre, `liberacao_desejada_acumulada`
+  já cobre TODO o custo incorrido desde o mês 1. No cenário de referência isso são
+  R$ 17.108.298,25 de uma vez (80% de R$ 21,385 MM acumulados), contra R$ 2,79 MM se fosse só o custo
+  daquele mês.
+- **A exposição mínima é um GATILHO, não uma franquia.** Os primeiros 20% não ficam permanentemente
+  por conta do equity: o banco os reconhece retroativamente. Modelar como "equity first" — a
+  incorporadora banca os primeiros 20% e o banco financia só o que vem depois — é um produto
+  **diferente**, e não está implementado.
+
+`limite_efetivo` é o `compromisso` da camada quando ele existe; com `compromisso = 0` (o caso da
+planilha, que não tem teto contratual) é `percentual_financiavel × custo_elegivel_total` — o
+principal para sozinho ali: R$ 83.236.939,35 no cenário de referência.
+
+> **A regra "não liberar dívida sem necessidade de caixa" vale para o Capital de giro (§4.4), não
+> para este produto.** Financiamento à produção é liberação **contratual** por medição: o banco
+> libera o que a medição autoriza, tenha o projeto caixa sobrando ou não. Era esta a exceção que o
+> parágrafo antigo previa como "modo contratual explicitamente selecionado".
 
 #### Juros e saldo
 
@@ -326,7 +371,9 @@ Por convenção mensal do app, medição e liberação ocorrem no **fim do mês*
 começa a gerar juros **no mês seguinte**.
 
 ```text
-juros_t = saldo_abertura_t × taxa_mensal
+taxa_mensal = (1 + taxa_anual)^(1/12) − 1      # efetiva composta, NUNCA taxa_anual/12
+
+juros_t = saldo_abertura_t × taxa_mensal        # o saldo de ABERTURA, sem a liberação de t
 
 saldo_fechamento_t = saldo_abertura_t
                    + liberacao_real_t
@@ -335,25 +382,81 @@ saldo_fechamento_t = saldo_abertura_t
                    − amortizacao_principal_t
 ```
 
-#### Amortização
+Duas armadilhas que o oráculo cobre explicitamente, porque erram sem dar erro:
+
+- **juros sobre `saldo_abertura + liberacao_do_mes`** produziriam R$ 196,3 mil no mês 6 do cenário de
+  referência, contra os R$ 168,7 mil corretos;
+- **`taxa_anual / 12`** em vez da efetiva composta erra ~5 pontos-base ao mês, e o desvio capitaliza
+  por 30 meses de obra.
+
+Os juros são **capitalizados**, não pagos em caixa: por isso o saldo devedor supera o principal
+liberado. No cenário de referência, R$ 83,2 MM de principal viram R$ 95,9 MM de saldo no pico.
+Eles são **custo financeiro**, não custo do projeto — não entram na base financiável e não alteram o
+custo de obra.
+
+#### Amortização — cash sweep
+
+**Financiamento à produção não tem prestação contratual.** Não é SAC nem Price: não há parcela fixa,
+prazo de parcelas nem principal dividido. A dívida é liquidada por **cash sweep** — existe caixa
+disponível, existe dívida amortizável, o caixa reduz a dívida — e o prazo é emergente. Por isso o
+editor da camada não oferece política de amortização, carência, prazo nem vencimento; quem precisa
+disso usa **Capital de giro** (§4.4), que mantém as três políticas.
+
+```text
+caixa_disponivel_t  = caixa_fechamento_{t−1} + fluxo_livre_t     # SEM a liberação de t
+
+divida_amortizavel_t = saldo_abertura_t + juros_t                # SEM a liberação de t
+
+amortizacao_permitida_t = amortizar_com_caixa_disponivel OU chaves_já_ocorreram_t
+
+amortizacao_t = amortizacao_permitida_t
+                ? máximo(0, mínimo(divida_amortizavel_t, caixa_disponivel_t − reserva))
+                : 0
+```
+
+**Por que `caixa_disponivel` exclui a liberação do próprio mês.** Se não excluísse, a liberação do
+banco pagaria a si mesma no mês em que entrou — o mesmo real gasto duas vezes. No motor isso é um
+snapshot: o caixa é congelado logo depois do fluxo livre do mês entrar e antes de qualquer liberação
+ou aporte (`caixaAntesFunding`, `frontend/capital-stack-motor.ts`). Instrumentos nesta modalidade
+sacam dessa piscina congelada; os demais, do caixa corrente. Todo pagamento abate as duas.
+
+**O toggle e as chaves.** Com `amortizar_com_caixa_disponivel = false`, nada é pago antes da entrega
+— mesmo com caixa sobrando. Depois da entrega a amortização passa a ser **obrigatória**, marcado ou
+não. No cenário de referência o toggle está ligado e ainda assim não há amortização durante a obra:
+o caixa disponível é negativo o tempo todo. **A amortização começar nas chaves é consequência do
+fluxo econômico daquele cenário, não de proibição matemática.**
+
+**O gatilho de liberação não governa a amortização.** Do mês 31 em diante a janela de liberação está
+fechada (a obra acabou) e o cash sweep continua rodando até zerar, no mês 36.
+
+Repasse e demais recebimentos alimentam o cash sweep, mas **continuam classificados como receita do
+cliente** (§17.3 de `padrao-incorporacao.md`).
+
+Com a dívida começando e terminando em zero, vale a identidade que serve de teste de consistência:
+
+```text
+Σ amortizado = Σ liberado + Σ juros
+```
+
+No cenário de referência: R$ 98.277.107,77 = R$ 83.236.939,35 + R$ 15.040.168,42.
+
+##### As outras políticas (Capital de giro)
 
 **Cash sweep** (aplica o caixa disponível acima da reserva à dívida, respeitando vencimento e
 outras prioridades) · **bullet** (principal no vencimento) · **SAC** (amortização constante após
 carência) · **Price** (parcela constante após carência).
 
-Para financiamento à produção, o padrão recomendado é **cash sweep com vencimento final**. Repasse
-e demais recebimentos podem alimentar o cash sweep, mas **continuam classificados como receita do
-cliente**.
-
 > ✅ **Price + carência implementados em 2026-08-03**, decodificados de `Incorp Individual!CK:CQ`
 > da planilha de referência (Capital de Giro): liberação → **carência** (juros pagos em caixa,
 > principal intocado — não capitalizado) → **parcela Price fixa** (`PMT`, calculada uma única vez
-> sobre o total liberado, ao entrar na fase de amortização) até quitar. A política é **genérica**
-> para qualquer `InstrumentoDivida`, independente do `tipo` da camada (`financiamento_producao` ou
-> `capital_giro`) — decisão do autor: Capital de Giro na planilha é só a REFERÊNCIA do modelo, não
-> um produto à parte no app. As 3 políticas (`cash_sweep`/`bullet`/`price`) dividem uma ÚNICA fila
-> de prioridade de pagamento (§9), corrigindo uma inconsistência que existia antes (cash sweep
-> sempre processado antes de bullet, independente da prioridade configurada).
+> sobre o total liberado, ao entrar na fase de amortização) até quitar. As 3 políticas
+> (`cash_sweep`/`bullet`/`price`) dividem uma ÚNICA fila de prioridade de pagamento (§9),
+> corrigindo uma inconsistência que existia antes (cash sweep sempre processado antes de bullet,
+> independente da prioridade configurada).
+>
+> ⚠️ **Correção de 2026-08-11:** este bloco dizia que a política era genérica para qualquer
+> `InstrumentoDivida`, "independente do `tipo` da camada". Deixou de ser: `financiamento_producao`
+> é sempre cash sweep (acima). Price e bullet valem só para `capital_giro`.
 >
 > **Uma divergência deliberada da planilha:** o Excel sempre paga o juros da carência, sem checar
 > caixa disponível. Este motor capa pelo caixa disponível, como toda amortização (§12.2/12.3) — não
@@ -374,9 +477,12 @@ despesas não elegíveis ou períodos intermediários. **Não depende** de medi�
 ou capitalizados · amortização cash sweep, bullet, SAC ou Price.
 
 Uma **dívida ponte** usa o mesmo motor, mudando nome, prazo e regra de pagamento. **Não** herda as
-nuances específicas de "Financiamento à produção" achadas na planilha (exposição mínima antes da
-1ª liberação; cash sweep condicional a flag ou fase de Chaves) — decisão do autor, 2026-08-03: ficam
-de fora desta rodada; a planilha serviu só de referência para o modelo de carência+Price.
+nuances de "Financiamento à produção" (exposição mínima, catch-up retroativo, janela de obra, caixa
+disponível defasado, gate de chaves): capital de giro libera **por necessidade de caixa**, não por
+medição de custo, e essa continua sendo a regra dele.
+
+> As nuances acima ficaram fora da Rodada 6 por decisão do autor (2026-08-03) e foram
+> **implementadas em 2026-08-11**, a partir da planilha anexada pelo autor — ver §4.3.
 
 ---
 

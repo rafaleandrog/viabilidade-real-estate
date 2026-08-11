@@ -414,7 +414,12 @@ function capitalBase(): ResultadoCapitalStack {
   return {
     lacunaFundingMensal: [0, 0], lacunaFundingMaxima: 0, caixaProjetoMensal: [0, 100],
     liberacaoPorInstrumento: {}, jurosPorInstrumento: {}, amortizacaoPorInstrumento: {},
-    saldoDividaPorInstrumento: {}, aportePorInstrumentoPE: {}, devolucaoPrincipalPE: {},
+    saldoDividaPorInstrumento: {},
+    custoElegivelPorInstrumento: {}, custoElegivelAcumuladoPorInstrumento: {},
+    percentualIncorridoPorInstrumento: {}, liberacaoHabilitadaPorInstrumento: {},
+    alvoAcumuladoPorInstrumento: {}, liberacaoAcumuladaPorInstrumento: {},
+    caixaDisponivelAmortizacaoPorInstrumento: {},
+    aportePorInstrumentoPE: {}, devolucaoPrincipalPE: {},
     remuneracaoPagaPE: {}, remuneracaoAcumuladaFinalPE: {}, capitalNaoDevolvidoFinalPE: {},
     remuneracaoAcumuladaPorInstrumentoPE: {}, capitalNaoDevolvidoPorInstrumentoPE: {},
     participacaoReceitaPE: {}, participacaoResidualPE: {}, participacaoLucroPE: {},

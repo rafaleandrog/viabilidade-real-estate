@@ -9,7 +9,7 @@ import {
 } from './fluxo-caixa-motor.js';
 import { marcos } from './fluxo-graficos.js';
 import {
-  estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, controlesFluxo,
+  estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, alternarColapso, controlesFluxo,
 } from './fluxo-tabela.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import {
@@ -373,7 +373,7 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   private _toggleTudo(recolher: boolean) {
-    const chaves = this.ultimoCalc ? chavesColapso(this.ultimoCalc) : [];
+    const chaves = this.ultimoCalc ? chavesColapso(this.ultimoCalc, this._fundingDe(this.ultimoCalc, null)) : [];
     const novo: Record<string, boolean> = {};
     for (const k of chaves) novo[k] = recolher;
     this.colapso = novo;
@@ -420,7 +420,7 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   private _t(chave: string) {
-    this.colapso = { ...this.colapso, [chave]: !this.colapso[chave] };
+    this.colapso = alternarColapso(this.colapso, chave);
   }
 
   private _salvar = async () => {

@@ -14,7 +14,7 @@
 // agora importa este módulo em vez de duplicá-lo — os 16 casos continuam
 // sendo a suíte de reconciliação, só que contra o motor real.
 
-import { eCorretagem } from './fluxo-shared.js';
+import { eCorretagem, eFinanciavelPadrao, marcosObra, type EventoCrono } from './fluxo-shared.js';
 import { vplFluxo } from './fluxo-caixa-motor.js';
 
 const round2 = (v: number): number => Math.round(v * 100) / 100;
@@ -43,6 +43,16 @@ export function receitaLiquidaComCorretagemMensal(
 export function taxaMensalEquivalente(taxaAnual: number): number {
   return Math.pow(1 + taxaAnual, 1 / 12) - 1;
 }
+
+// Defaults do Financiamento à produção — os valores da planilha de
+// referência (`Premissas e Resultados!D25:D28`). Aplicam-se quando a camada
+// não declara o campo; um `0` GRAVADO continua valendo 0 (é escolha, não
+// ausência). A migração `028` persiste estes mesmos números nas camadas
+// antigas, para que o valor apareça editável na tela em vez de ficar
+// implícito no código.
+export const PADRAO_EXPOSICAO_MINIMA = 0.20;
+export const PADRAO_PERCENTUAL_FINANCIAVEL = 0.80;
+export const PADRAO_AMORTIZAR_COM_CAIXA = true;
 
 /**
  * Parcela fixa do sistema Price/francês que amortiza `principal` em `nper`
@@ -158,6 +168,29 @@ export function reconciliarCapitalStack(
 export type PoliticaAmortizacao = 'cash_sweep' | 'bullet' | 'price';
 
 /**
+ * Como a liberação AUTOMÁTICA da dívida é dimensionada:
+ *
+ *  - `por_necessidade` — libera só o que falta de caixa no mês
+ *    (`min(disponível, necessidade)`), respeitando o §4.3 "o app não deve
+ *    liberar mais dívida apenas porque o limite existe". É o modelo do
+ *    Capital de giro/dívida ponte (§4.4).
+ *  - `retroativo` — libera INCONDICIONALMENTE o que a medição de custo
+ *    autoriza, tenha o projeto necessidade de caixa ou não, e a primeira
+ *    liberação reconhece retroativamente todo o custo elegível já incorrido
+ *    (catch-up). É o modelo contratual de Financiamento à produção da
+ *    planilha de referência (`Incorp Individual!BW:CH`) — o "modo contratual
+ *    de liberação explicitamente selecionado" que o próprio §4.3 abre como
+ *    exceção à regra acima.
+ *
+ * `equity_first` (incorporadora banca permanentemente os primeiros N% e o
+ * banco só financia os custos seguintes) é uma terceira modalidade
+ * concebível, deliberadamente NÃO implementada: nenhum contrato real pediu, e
+ * confundi-la com `retroativo` é o erro clássico deste produto (a exposição
+ * mínima é um GATILHO, não uma franquia permanente).
+ */
+export type ModalidadeLiberacao = 'por_necessidade' | 'retroativo';
+
+/**
  * Financiamento à produção (§4.3), Capital de giro/dívida ponte (§4.4) ou
  * qualquer outra dívida — mesmo motor, independente do `tipo` da camada
  * (`financiamento_producao`/`capital_giro`). O modelo de carência + Price
@@ -168,9 +201,17 @@ export type PoliticaAmortizacao = 'cash_sweep' | 'bullet' | 'price';
 export interface InstrumentoDivida {
   tipo: 'divida';
   nome: string;
+  /**
+   * Teto contratual de principal. `0` = SEM teto — o caso da planilha de
+   * referência, onde o principal para naturalmente em
+   * `percentualFinanciavel × custoElegivelTotal`. Na modalidade `retroativo`
+   * esse produto vira o limite efetivo quando este campo é zero.
+   */
   limiteComprometido: number;
   taxaMensal: number;
   politicaAmortizacao: PoliticaAmortizacao;
+  /** Default `por_necessidade` — preserva o comportamento de toda dívida que não declara nada. */
+  modalidadeLiberacao?: ModalidadeLiberacao;
   /** Só para `bullet`: mês em que o saldo remanescente é quitado. */
   vencimentoMes?: number;
   /**
@@ -197,6 +238,39 @@ export interface InstrumentoDivida {
    */
   custoElegivelMensal?: number[];
   percentualFinanciavel?: number; // 0–1
+  /**
+   * Denominador do "% de custo financiável incorrido" que dispara
+   * `exposicaoMinima`. Default: `Σ custoElegivelMensal` — o custo elegível do
+   * projeto INTEIRO, não o do horizonte já percorrido. É deliberado que o
+   * gatilho seja medido contra o total planejado: é assim que o banco afere
+   * "20% da obra executada", e é o que a planilha faz
+   * (`BX = SUM(BW até t) / Totals(BW)`).
+   */
+  custoElegivelTotal?: number;
+  /**
+   * Só na modalidade `retroativo` (§4.3 "exigência de equity/obra executada
+   * antes da primeira liberação"): fração (0–1) do custo elegível TOTAL que
+   * precisa já ter sido incorrida para o banco começar a liberar. Enquanto
+   * não é atingida, `liberacao = 0`; quando é, a primeira liberação cobre
+   * retroativamente todo o acumulado. `undefined`/`0` = sem gatilho.
+   */
+  exposicaoMinima?: number;
+  /**
+   * Só na modalidade `retroativo`: 1-based, `true` nos meses em que o
+   * contrato admite liberação (obra ativa ou evento de entrega). Fora da
+   * janela não há desembolso mesmo com custo elegível incorrido.
+   * `undefined` = sem restrição de janela.
+   */
+  janelaLiberacao?: boolean[];
+  /**
+   * Só na modalidade `retroativo`: quando `false`, nenhuma amortização
+   * acontece ANTES da entrega das chaves, mesmo com caixa sobrando. Depois de
+   * `mesChaves` a amortização é sempre permitida, independente deste campo.
+   * Default `true`.
+   */
+  amortizarComCaixaDisponivel?: boolean;
+  /** Só na modalidade `retroativo`: a partir dele o cash sweep é obrigatório. */
+  mesChaves?: number;
   /** Ordem de utilização/funding (§5) — menor primeiro. */
   prioridadeFunding: number;
   /** Ordem de pagamento/amortização entre dívidas (§9 "prioridade de pagamento") — menor primeiro. */
@@ -268,6 +342,25 @@ export interface ResultadoCapitalStack {
   jurosPorInstrumento: Record<string, number[]>;
   amortizacaoPorInstrumento: Record<string, number[]>;
   saldoDividaPorInstrumento: Record<string, number[]>;
+  // ── Diagnóstico da medição de custo elegível (§4.3) ──────────────────
+  // Preenchidas para TODA dívida com `custoElegivelMensal`; zeradas nas
+  // demais. Existem para auditoria linha a linha contra a planilha: sem elas
+  // só dá para conferir o resultado, não o caminho até ele.
+  custoElegivelPorInstrumento: Record<string, number[]>;
+  custoElegivelAcumuladoPorInstrumento: Record<string, number[]>;
+  /** Fração 0–1 do custo elegível total já incorrido — precisão plena, arredonda só para exibir. */
+  percentualIncorridoPorInstrumento: Record<string, number[]>;
+  /** 0/1 — o gatilho de exposição mínima + janela autorizou liberação neste mês. */
+  liberacaoHabilitadaPorInstrumento: Record<string, number[]>;
+  /** `min(limite, percentualFinanciavel × custoElegivelAcumulado)` — quanto DEVERIA estar liberado. */
+  alvoAcumuladoPorInstrumento: Record<string, number[]>;
+  liberacaoAcumuladaPorInstrumento: Record<string, number[]>;
+  /**
+   * Caixa que o mês oferece ao cash sweep. Na modalidade `retroativo` é o
+   * caixa de FECHAMENTO de `t−1` mais o fluxo livre de `t` — sem a liberação
+   * do próprio mês, que só entra no caixa disponível do mês seguinte.
+   */
+  caixaDisponivelAmortizacaoPorInstrumento: Record<string, number[]>;
   aportePorInstrumentoPE: Record<string, number[]>;
   devolucaoPrincipalPE: Record<string, number[]>;
   remuneracaoPagaPE: Record<string, number[]>;
@@ -328,6 +421,23 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
   const saldoDivida = new Map(dividas.map((d) => [d.nome, 0]));
   const liberadoAcumulado = new Map(dividas.map((d) => [d.nome, 0]));
   const custoElegivelAcumulado = new Map(dividas.map((d) => [d.nome, 0]));
+  // Denominador do gatilho de exposição mínima: o custo elegível do projeto
+  // INTEIRO. Só é computável de antemão porque `custoElegivelMensal` chega com
+  // o horizonte todo (mesma premissa que o modo D do Preferred Equity já usa).
+  const custoElegivelTotal = new Map(dividas.map((d) => [
+    d.nome,
+    d.custoElegivelTotal ?? (d.custoElegivelMensal ?? []).reduce((s, v) => s + n(v), 0),
+  ]));
+  // Teto efetivo de principal: o contratado, ou — quando não há teto
+  // contratado (`0`, o caso da planilha) — o que a medição de custo autoriza.
+  const limiteEfetivo = new Map(dividas.map((d) => [
+    d.nome,
+    d.limiteComprometido > 0
+      ? d.limiteComprometido
+      : (d.percentualFinanciavel ?? 1) * custoElegivelTotal.get(d.nome)!,
+  ]));
+  const chavesJaOcorreram = new Map(dividas.map((d) => [d.nome, false]));
+  const retroativa = (d: InstrumentoDivida): boolean => d.modalidadeLiberacao === 'retroativo';
   const capitalNaoDevolvido = new Map(preferenciais.map((p) => [p.nome, 0]));
   const remuneracaoAcumulada = new Map(preferenciais.map((p) => [p.nome, 0]));
   const aporteAcumuladoSponsor = new Map(sponsors.map((s) => [s.nome, 0]));
@@ -352,6 +462,13 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
     jurosPorInstrumento: Object.fromEntries(dividas.map((d) => [d.nome, arr(N)])),
     amortizacaoPorInstrumento: Object.fromEntries(dividas.map((d) => [d.nome, arr(N)])),
     saldoDividaPorInstrumento: Object.fromEntries(dividas.map((d) => [d.nome, arr(N)])),
+    custoElegivelPorInstrumento: Object.fromEntries(dividas.map((d) => [d.nome, arr(N)])),
+    custoElegivelAcumuladoPorInstrumento: Object.fromEntries(dividas.map((d) => [d.nome, arr(N)])),
+    percentualIncorridoPorInstrumento: Object.fromEntries(dividas.map((d) => [d.nome, arr(N)])),
+    liberacaoHabilitadaPorInstrumento: Object.fromEntries(dividas.map((d) => [d.nome, arr(N)])),
+    alvoAcumuladoPorInstrumento: Object.fromEntries(dividas.map((d) => [d.nome, arr(N)])),
+    liberacaoAcumuladaPorInstrumento: Object.fromEntries(dividas.map((d) => [d.nome, arr(N)])),
+    caixaDisponivelAmortizacaoPorInstrumento: Object.fromEntries(dividas.map((d) => [d.nome, arr(N)])),
     aportePorInstrumentoPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     devolucaoPrincipalPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
     remuneracaoPagaPE: Object.fromEntries(preferenciais.map((p) => [p.nome, arr(N)])),
@@ -371,15 +488,28 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
   for (let t = 1; t <= N; t++) {
     // 1) juros sobre saldo de ABERTURA (§4.3 "Juros e saldo") — sempre capitalizados
     // (nenhum dos 16 casos usa juros pagos na carência; fica para issue futura).
+    //
+    // `dividaAmortizavel` congela `saldo_abertura + juros_do_mês` AQUI, antes
+    // de qualquer liberação: é o teto de amortização da modalidade
+    // `retroativo` (a liberação do próprio mês não pode ser quitada no mês em
+    // que entrou). Nas demais modalidades o teto continua sendo o saldo vivo.
+    const dividaAmortizavel = new Map<string, number>();
     for (const d of dividas) {
       const abertura = saldoDivida.get(d.nome)!;
       const juros = round2(abertura * d.taxaMensal);
       saldoDivida.set(d.nome, round2(abertura + juros));
       r.jurosPorInstrumento[d.nome][t] = juros;
+      dividaAmortizavel.set(d.nome, round2(abertura + juros));
     }
 
     // 2) fluxo livre do mês entra no caixa provisório
     let caixaProvisorio = caixaProjeto + n(cen.fluxoLivreMensal[t]);
+    // Caixa que a modalidade `retroativo` oferece ao cash sweep: fechamento de
+    // `t−1` + fluxo livre de `t`, congelado ANTES de qualquer liberação/aporte
+    // do mês. É a coluna `Caixa disponível Fin Prod` da planilha, e a razão de
+    // ela existir: sem esse congelamento a liberação do mês pagaria a si
+    // mesma, gastando o mesmo real duas vezes.
+    const caixaAntesFunding = caixaProvisorio;
 
     // 3) aportes/liberações PROGRAMADOS
     for (const d of dividas) {
@@ -408,9 +538,53 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
       r.aportePorInstrumentoSponsor[s.nome][t] = round2((r.aportePorInstrumentoSponsor[s.nome][t] ?? 0) + prog.valor);
     }
 
+    // 3.5) liberação CONTRATUAL da modalidade `retroativo` (§4.3) — acontece
+    // ANTES da medição de necessidade porque não depende dela: o banco libera
+    // o que a medição de custo autoriza, tenha o projeto caixa ou não.
+    //
+    // A primeira liberação é naturalmente um catch-up: `alvo` é calculado
+    // sobre o custo elegível ACUMULADO desde o mês 1, então no mês em que o
+    // gatilho abre o banco reconhece de uma vez todo o custo já incorrido —
+    // não só o do mês. Isso não é código especial, é a fórmula funcionando.
+    for (const d of dividas) {
+      if (!retroativa(d)) continue;
+      if (d.mesChaves != null && t >= d.mesChaves) chavesJaOcorreram.set(d.nome, true);
+
+      const acum = round2(custoElegivelAcumulado.get(d.nome)! + n(d.custoElegivelMensal?.[t]));
+      custoElegivelAcumulado.set(d.nome, acum);
+      const total = custoElegivelTotal.get(d.nome)!;
+      // Custo elegível total zero ⇒ exposição zero e nenhuma liberação: sem
+      // base de medição não há o que o banco financiar (§42).
+      const pctIncorrido = total > 0 ? acum / total : 0;
+      const dentroDaJanela = d.janelaLiberacao ? Boolean(d.janelaLiberacao[t]) : true;
+      const habilitada = pctIncorrido >= (d.exposicaoMinima ?? 0) && dentroDaJanela;
+      const alvo = round2(Math.min(limiteEfetivo.get(d.nome)!, (d.percentualFinanciavel ?? 1) * acum));
+
+      r.custoElegivelPorInstrumento[d.nome][t] = round2(n(d.custoElegivelMensal?.[t]));
+      r.custoElegivelAcumuladoPorInstrumento[d.nome][t] = acum;
+      r.percentualIncorridoPorInstrumento[d.nome][t] = pctIncorrido;
+      r.liberacaoHabilitadaPorInstrumento[d.nome][t] = habilitada ? 1 : 0;
+      r.alvoAcumuladoPorInstrumento[d.nome][t] = alvo;
+
+      // `max(0, …)` é defensivo (§42): a diferença só ficaria negativa se o
+      // custo elegível encolhesse entre meses, o que o fluxo não produz.
+      const liberar = habilitada ? round2(Math.max(0, alvo - liberadoAcumulado.get(d.nome)!)) : 0;
+      if (liberar > 0) {
+        saldoDivida.set(d.nome, round2(saldoDivida.get(d.nome)! + liberar));
+        liberadoAcumulado.set(d.nome, round2(liberadoAcumulado.get(d.nome)! + liberar));
+        caixaProvisorio += liberar;
+        r.liberacaoPorInstrumento[d.nome][t] = round2((r.liberacaoPorInstrumento[d.nome][t] ?? 0) + liberar);
+      }
+      r.liberacaoAcumuladaPorInstrumento[d.nome][t] = liberadoAcumulado.get(d.nome)!;
+      r.caixaDisponivelAmortizacaoPorInstrumento[d.nome][t] = round2(caixaAntesFunding);
+    }
+
     // 4) necessidade de funding (§3.1) e liberações AUTOMÁTICAS por prioridade (§5)
     let necessidade = Math.max(0, cen.reservaMinima - caixaProvisorio);
     for (const d of dividas) {
+      // Dívida `retroativo` já desembolsou no passo 3.5 e não responde a
+      // necessidade de caixa — deixá-la aqui desembolsaria duas vezes.
+      if (retroativa(d)) continue;
       if (necessidade <= 0) break;
       let disponivel: number;
       if (d.custoElegivelMensal) {
@@ -457,16 +631,33 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
     // antes de bullet, independente da prioridade) — corrige uma
     // inconsistência que só aparecia com 2+ dívidas de políticas diferentes
     // competindo pelo mesmo caixa no mesmo mês.
+    //
+    // Duas piscinas de caixa, uma fila só: a modalidade `retroativo` saca do
+    // caixa CONGELADO antes das liberações do mês (`caixaAntesFunding`), as
+    // demais do caixa corrente. Todo pagamento abate as DUAS — é o mesmo
+    // dinheiro, e nenhuma piscina pode gastá-lo de novo. Sem nenhum
+    // instrumento `retroativo` no cenário a piscina defasada nunca é tocada e
+    // o comportamento é idêntico ao anterior.
     let disponivelAmort = Math.max(0, caixaProjeto - cen.reservaMinima);
+    let disponivelAmortDefasado = Math.max(0, caixaAntesFunding - cen.reservaMinima);
     for (const d of dividasPorPagamento) {
-      if (disponivelAmort <= 0) break;
+      const usaDefasado = retroativa(d);
+      const disponivel = usaDefasado ? disponivelAmortDefasado : disponivelAmort;
+      if (disponivel <= 0) continue;
       const saldo = saldoDivida.get(d.nome)!;
       if (saldo <= 0) continue;
       let pag = 0;
-      if (d.politicaAmortizacao === 'cash_sweep') {
-        pag = round2(Math.min(disponivelAmort, saldo));
+      if (usaDefasado) {
+        // A modalidade implica cash sweep — não há prestação contratual aqui
+        // (§43): a dívida é liquidada conforme o caixa do projeto. O teto é
+        // `dividaAmortizavel` (saldo de abertura + juros do mês), NÃO o saldo
+        // vivo, que já embute a liberação deste mês.
+        const permitida = (d.amortizarComCaixaDisponivel ?? true) || chavesJaOcorreram.get(d.nome)!;
+        if (permitida) pag = round2(Math.max(0, Math.min(dividaAmortizavel.get(d.nome)!, disponivel)));
+      } else if (d.politicaAmortizacao === 'cash_sweep') {
+        pag = round2(Math.min(disponivel, saldo));
       } else if (d.politicaAmortizacao === 'bullet') {
-        if (d.vencimentoMes === t) pag = round2(Math.min(disponivelAmort, saldo));
+        if (d.vencimentoMes === t) pag = round2(Math.min(disponivel, saldo));
       } else if (d.politicaAmortizacao === 'price') {
         const primeiraLib = primeiraLiberacaoMes.get(d.nome);
         if (primeiraLib != null) {
@@ -481,7 +672,7 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
             // Diferente da planilha (que sempre paga o juros da carência,
             // sem checar caixa): aqui é capado pelo caixa disponível, como
             // toda amortização deste motor (§12.2/12.3) — não força negativo.
-            pag = round2(Math.min(disponivelAmort, juros));
+            pag = round2(Math.min(disponivel, juros));
           } else if (t === primeiraLib + carencia + 1) {
             // 1º mês fora da carência: calcula a parcela fixa UMA VEZ, sobre
             // o total LIBERADO (não `saldo`, que aqui já embute o juros deste
@@ -491,16 +682,18 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
             const nAmort = Math.max(1, (d.prazoMeses ?? 0) - carencia);
             const parcela = round2(pmtPrice(d.taxaMensal, nAmort, liberadoAcumulado.get(d.nome)!));
             parcelaPrice.set(d.nome, parcela);
-            pag = round2(Math.min(disponivelAmort, Math.min(parcela, saldo)));
+            pag = round2(Math.min(disponivel, Math.min(parcela, saldo)));
           } else {
             const parcela = parcelaPrice.get(d.nome) ?? 0;
-            pag = round2(Math.min(disponivelAmort, Math.min(parcela, saldo)));
+            pag = round2(Math.min(disponivel, Math.min(parcela, saldo)));
           }
         }
       }
       if (pag <= 0) continue;
       saldoDivida.set(d.nome, round2(saldo - pag));
-      caixaProjeto = round2(caixaProjeto - pag); disponivelAmort = round2(disponivelAmort - pag);
+      caixaProjeto = round2(caixaProjeto - pag);
+      disponivelAmort = round2(Math.max(0, disponivelAmort - pag));
+      disponivelAmortDefasado = round2(Math.max(0, disponivelAmortDefasado - pag));
       r.amortizacaoPorInstrumento[d.nome][t] = round2((r.amortizacaoPorInstrumento[d.nome][t] ?? 0) + pag);
     }
     for (const d of dividas) r.saldoDividaPorInstrumento[d.nome][t] = saldoDivida.get(d.nome)!;
@@ -698,11 +891,41 @@ export interface LinhaFunding {
  * tamanho de `fluxoLivreMensal`, prontas para a tabela; as do motor são
  * 1-based e são convertidas aqui, num lugar só.
  */
+/**
+ * Como a célula é lida e como a linha se agrega na visão Anual. Nem toda
+ * linha do detalhamento é dinheiro que soma: `% incorrido` e `saldo devedor`
+ * são ESTOQUES (o valor do último mês da faixa é o correto; somar doze
+ * saldos devedores não significa nada) e `liberação habilitada` é um sinal.
+ */
+export type FormatoLinhaFinanciamento = 'moeda' | 'percentual' | 'sinal';
+
+export interface LinhaFinanciamentoProducao {
+  nome: string;
+  mensal: number[];
+  formato: FormatoLinhaFinanciamento;
+  agregacao: 'soma' | 'ultimo';
+  /** `false` nas linhas em que a coluna "Total" não teria significado. */
+  mostrarTotal: boolean;
+}
+
+/** Detalhamento mensal de UMA camada de financiamento à produção (§38). */
+export interface BlocoFinanciamentoProducao {
+  nome: string;
+  linhas: LinhaFinanciamentoProducao[];
+}
+
 export interface FundingNoFluxo {
   entradas: number[];
   saidas: number[];
   linhasEntrada: LinhaFunding[];
   linhasSaida: LinhaFunding[];
+  /**
+   * §38 — bloco de auditoria por camada de financiamento à produção. É
+   * DISPLAY-ONLY: as liberações, juros e amortizações destas linhas já entram
+   * no fluxo pelas linhas de funding acima, e repeti-las em `entradas`/
+   * `saidas` seria contagem dupla. Vazio quando não há camada com liberação.
+   */
+  financiamentoProducao: BlocoFinanciamentoProducao[];
   /** Fluxo ALAVANCADO: livre + entradas − saídas. É o que a tabela mostra no rodapé. */
   fluxoMensal: number[];
   fluxoAcumulado: number[];
@@ -810,7 +1033,32 @@ export function fundingNoFluxo(
 
   const vplLiquido = linhasEntrada.reduce((s, l) => s + l.vpl, 0) - linhasSaida.reduce((s, l) => s + l.vpl, 0);
 
-  return { entradas: entradas0, saidas: saidas0, linhasEntrada, linhasSaida, fluxoMensal, fluxoAcumulado, vplLiquido };
+  // §38: detalhamento por camada de financiamento à produção. Só entra quem
+  // efetivamente liberou — uma camada cujo gatilho de exposição nunca abriu
+  // renderizaria oito linhas de zero, sem informação nenhuma.
+  const financiamentoProducao: BlocoFinanciamentoProducao[] = [];
+  for (const camada of camadas.filter((c) => c.tipo === 'financiamento_producao')) {
+    const lib = r.liberacaoPorInstrumento[camada.nome];
+    if (!lib || lib.every((v) => v === 0)) continue;
+    financiamentoProducao.push({
+      nome: camada.nome,
+      linhas: [
+        { nome: 'Despesas financiáveis', mensal: a0(r.custoElegivelPorInstrumento[camada.nome] ?? []), formato: 'moeda', agregacao: 'soma', mostrarTotal: true },
+        { nome: '% custos financiáveis incorridos', mensal: a0(r.percentualIncorridoPorInstrumento[camada.nome] ?? []), formato: 'percentual', agregacao: 'ultimo', mostrarTotal: false },
+        { nome: 'Liberação habilitada', mensal: a0(r.liberacaoHabilitadaPorInstrumento[camada.nome] ?? []), formato: 'sinal', agregacao: 'ultimo', mostrarTotal: false },
+        { nome: 'Liberação do financiamento', mensal: a0(lib), formato: 'moeda', agregacao: 'soma', mostrarTotal: true },
+        { nome: 'Juros do financiamento', mensal: a0(r.jurosPorInstrumento[camada.nome] ?? []), formato: 'moeda', agregacao: 'soma', mostrarTotal: true },
+        { nome: 'Caixa disponível para amortização', mensal: a0(r.caixaDisponivelAmortizacaoPorInstrumento[camada.nome] ?? []), formato: 'moeda', agregacao: 'ultimo', mostrarTotal: false },
+        { nome: 'Amortização', mensal: a0(r.amortizacaoPorInstrumento[camada.nome] ?? []), formato: 'moeda', agregacao: 'soma', mostrarTotal: true },
+        { nome: 'Saldo devedor', mensal: a0(r.saldoDividaPorInstrumento[camada.nome] ?? []), formato: 'moeda', agregacao: 'ultimo', mostrarTotal: false },
+      ],
+    });
+  }
+
+  return {
+    entradas: entradas0, saidas: saidas0, linhasEntrada, linhasSaida,
+    financiamentoProducao, fluxoMensal, fluxoAcumulado, vplLiquido,
+  };
 }
 
 /**
@@ -838,6 +1086,13 @@ export function agregarFundingPorPeriodos(
     saidas: soma(f.saidas),
     linhasEntrada: f.linhasEntrada.map(agregarLinha),
     linhasSaida: f.linhasSaida.map(agregarLinha),
+    // Cada linha do detalhamento declara a sua agregação: fluxos somam dentro
+    // da faixa, estoques (saldo devedor, % incorrido) pegam o último ponto —
+    // mesma convenção de `fluxoAcumulado`.
+    financiamentoProducao: f.financiamentoProducao.map((b) => ({
+      ...b,
+      linhas: b.linhas.map((l) => ({ ...l, mensal: l.agregacao === 'soma' ? soma(l.mensal) : ultimo(l.mensal) })),
+    })),
     fluxoMensal: soma(f.fluxoMensal),
     fluxoAcumulado: ultimo(f.fluxoAcumulado),
     vplLiquido: f.vplLiquido,
@@ -869,14 +1124,74 @@ export function custoElegivelMensalDeLinhas(
 }
 
 /**
+ * IDs das linhas de custo que compõem a base financiável PADRÃO (§5/§6 do
+ * pedido, `eFinanciavelPadrao` em `fluxo-shared.ts`). Usada em dois lugares:
+ * como seleção inicial no editor da camada e como fallback quando
+ * `config.custoLinhaIds` nunca foi definido — camadas criadas pela migração
+ * `019` são exatamente esse caso, e sem o fallback ficariam sem base de
+ * medição e portanto sem nenhuma liberação.
+ *
+ * Uma seleção EXPLICITAMENTE vazia (`[]`) não é sobrescrita: quem
+ * desmarcou tudo quis desmarcar tudo.
+ */
+export function linhasFinanciaveisPadrao(custosRaw: any[]): number[] {
+  return (custosRaw ?? []).filter(eFinanciavelPadrao).map((c) => Number(c.id));
+}
+
+/**
+ * Janela 1-based em que o contrato admite liberação: os meses de obra mais o
+ * mês da entrega. Cronograma é 0-based, o motor é 1-based — daí o `+1`.
+ */
+export function janelaLiberacaoDeMarcos(
+  marcos: { inicioObra: number; fimObra: number; mesEntrega: number },
+  meses: number,
+): boolean[] {
+  const j = new Array<boolean>(meses + 1).fill(false);
+  for (let t = 1; t <= meses; t++) {
+    const mesRelativo = t - 1;
+    j[t] = mesRelativo >= marcos.inicioObra && mesRelativo <= marcos.mesEntrega;
+  }
+  return j;
+}
+
+/**
  * Converte um registro de `avancado_capital_instrumentos` (coluna `config`
  * json, shape por `tipo` — ver docs/viabilidade/funding-capital-stack.md
  * §4) no `Instrumento` que `simularCapitalStack` consome. `null` para um
  * `tipo` desconhecido (defensivo — o schema já restringe as 4 opções).
  */
-export function instrumentoDeRegistro(registro: any, custoElegivelMensal?: number[]): Instrumento | null {
+export function instrumentoDeRegistro(
+  registro: any,
+  custoElegivelMensal?: number[],
+  marcos?: { janelaLiberacao?: boolean[]; mesChaves?: number },
+): Instrumento | null {
   const cfg = registro?.config ?? {};
-  if (registro?.tipo === 'financiamento_producao' || registro?.tipo === 'capital_giro') {
+  if (registro?.tipo === 'financiamento_producao') {
+    // Financiamento à produção é SEMPRE o modelo contratual da planilha:
+    // liberação por medição com catch-up retroativo e cash sweep (§4.3). Não
+    // há seletor de modalidade nem de política de amortização — §43 é
+    // explícito em que este produto não tem prestação contratual (SAC/Price),
+    // e o §4.3 é explícito em que a liberação segue a medição, não a
+    // necessidade de caixa. Capital de giro (abaixo) é que tem essas escolhas.
+    return {
+      tipo: 'divida',
+      nome: registro.nome,
+      limiteComprometido: n(registro.compromisso),
+      taxaMensal: taxaMensalEquivalente(n(cfg.taxaAnual)),
+      politicaAmortizacao: 'cash_sweep',
+      modalidadeLiberacao: 'retroativo',
+      custoElegivelMensal,
+      percentualFinanciavel: cfg.percentualFinanciavel !== undefined ? Number(cfg.percentualFinanciavel) : PADRAO_PERCENTUAL_FINANCIAVEL,
+      exposicaoMinima: cfg.exposicaoMinima !== undefined ? Number(cfg.exposicaoMinima) : PADRAO_EXPOSICAO_MINIMA,
+      amortizarComCaixaDisponivel: cfg.amortizarComCaixaDisponivel !== undefined
+        ? Boolean(cfg.amortizarComCaixaDisponivel) : PADRAO_AMORTIZAR_COM_CAIXA,
+      janelaLiberacao: marcos?.janelaLiberacao,
+      mesChaves: marcos?.mesChaves,
+      prioridadeFunding: n(registro.prioridade_funding),
+      prioridadePagamento: n(registro.prioridade_pagamento),
+    };
+  }
+  if (registro?.tipo === 'capital_giro') {
     return {
       tipo: 'divida',
       nome: registro.nome,
@@ -887,7 +1202,6 @@ export function instrumentoDeRegistro(registro: any, custoElegivelMensal?: numbe
       carenciaMeses: cfg.carenciaMeses !== undefined ? Number(cfg.carenciaMeses) : undefined,
       prazoMeses: cfg.prazoMeses !== undefined ? Number(cfg.prazoMeses) : undefined,
       liberacaoProgramada: cfg.liberacaoProgramada,
-      custoElegivelMensal: registro.tipo === 'financiamento_producao' ? custoElegivelMensal : undefined,
       percentualFinanciavel: cfg.percentualFinanciavel !== undefined ? Number(cfg.percentualFinanciavel) : undefined,
       prioridadeFunding: n(registro.prioridade_funding),
       prioridadePagamento: n(registro.prioridade_pagamento),
@@ -937,18 +1251,102 @@ export function simularCapitalStackDoEstudo(
   registros: any[],
   linhasCusto: { id: any; mensal: number[] }[],
   reservaMinima: number,
+  contexto?: { custosRaw?: any[]; cronograma?: EventoCrono[] },
 ): ResultadoCapitalStack {
   const meses = Math.max(0, fluxoLivreMensal.length - 1);
+  // Janela e mês das chaves vêm do Cronograma do estudo — não são premissas
+  // digitadas na camada. Sem cronograma (chamadas de teste), o financiamento
+  // roda sem restrição de janela e sem gate de chaves.
+  const marcos = contexto?.cronograma ? marcosObra(contexto.cronograma) : null;
+  const marcosDoInstrumento = marcos
+    ? { janelaLiberacao: janelaLiberacaoDeMarcos(marcos, meses), mesChaves: marcos.mesEntrega + 1 }
+    : undefined;
   const instrumentos: Instrumento[] = [];
   for (const registro of registros) {
     if (registro?.status !== 'ativo') continue;
-    const custoElegivel = registro.tipo === 'financiamento_producao'
-      ? custoElegivelMensalDeLinhas(linhasCusto, registro.config?.custoLinhaIds, meses)
-      : undefined;
-    const inst = instrumentoDeRegistro(registro, custoElegivel);
+    let custoElegivel: number[] | undefined;
+    if (registro.tipo === 'financiamento_producao') {
+      const ids: number[] | undefined = registro.config?.custoLinhaIds
+        ?? (contexto?.custosRaw ? linhasFinanciaveisPadrao(contexto.custosRaw) : undefined);
+      custoElegivel = custoElegivelMensalDeLinhas(linhasCusto, ids, meses);
+    }
+    const inst = instrumentoDeRegistro(registro, custoElegivel, marcosDoInstrumento);
     if (inst) instrumentos.push(inst);
   }
   return simularCapitalStack({ nome: 'estudo', meses, fluxoLivreMensal, receitaLiquidaMensal, reservaMinima, instrumentos });
+}
+
+export interface IndicadoresFinanciamentoProducao {
+  custoFinanciavelTotal: number;
+  percentualFinanciado: number;
+  /** `percentualFinanciado × custoFinanciavelTotal` — o principal que a medição autoriza no limite. */
+  principalMaximoPrevisto: number;
+  /** 1-based; `null` quando o gatilho nunca abriu. */
+  primeiroMesLiberacao: number | null;
+  /** O catch-up inicial — costuma ser muito maior que as liberações seguintes. */
+  primeiraLiberacao: number;
+  totalLiberado: number;
+  totalJuros: number;
+  picoSaldoDevedor: number;
+  mesPicoSaldoDevedor: number | null;
+  primeiroMesAmortizacao: number | null;
+  /** Último mês com saldo > 0 — o mês seguinte é o da quitação. `null` se nunca houve dívida. */
+  ultimoMesComDivida: number | null;
+  totalAmortizado: number;
+}
+
+/**
+ * Indicadores de resumo de uma camada de financiamento à produção (§37 do
+ * pedido). Função pura sobre o resultado da simulação — nenhuma regra nova,
+ * só leitura das séries que o motor já produziu.
+ *
+ * `totalAmortizado` é a soma do cash sweep, que paga principal E juros
+ * capitalizados juntos: com a dívida começando e terminando em zero, ele tem
+ * de bater com `totalLiberado + totalJuros`. Essa igualdade é o teste de
+ * consistência do §35.
+ */
+export function indicadoresFinanciamentoProducao(
+  r: ResultadoCapitalStack,
+  nome: string,
+): IndicadoresFinanciamentoProducao | null {
+  const liberacao = r.liberacaoPorInstrumento[nome];
+  if (!liberacao) return null;
+  const juros = r.jurosPorInstrumento[nome] ?? [];
+  const amortizacao = r.amortizacaoPorInstrumento[nome] ?? [];
+  const saldo = r.saldoDividaPorInstrumento[nome] ?? [];
+  const acumulado = r.custoElegivelAcumuladoPorInstrumento[nome] ?? [];
+  const alvo = r.alvoAcumuladoPorInstrumento[nome] ?? [];
+
+  const soma = (s: number[]) => round2(s.reduce((acc, v) => acc + v, 0));
+  const primeiroMes = (s: number[]) => {
+    const i = s.findIndex((v, idx) => idx > 0 && v > 0);
+    return i === -1 ? null : i;
+  };
+  const custoFinanciavelTotal = acumulado.length ? acumulado[acumulado.length - 1] : 0;
+  const totalLiberado = soma(liberacao);
+  // Lido do alvo em vez de recalculado: assim o indicador respeita o teto
+  // contratual quando ele existe, sem duplicar a regra do `limiteEfetivo`.
+  const principalMaximoPrevisto = alvo.length ? Math.max(...alvo) : 0;
+  const percentualFinanciado = custoFinanciavelTotal > 0 ? principalMaximoPrevisto / custoFinanciavelTotal : 0;
+  const pico = saldo.length ? Math.max(...saldo) : 0;
+  const mesPico = pico > 0 ? saldo.indexOf(pico) : null;
+  const ultimoComDivida = saldo.reduce((idx, v, i) => (i > 0 && v > 0 ? i : idx), -1);
+  const primeiroLib = primeiroMes(liberacao);
+
+  return {
+    custoFinanciavelTotal,
+    percentualFinanciado,
+    principalMaximoPrevisto,
+    primeiroMesLiberacao: primeiroLib,
+    primeiraLiberacao: primeiroLib == null ? 0 : liberacao[primeiroLib],
+    totalLiberado,
+    totalJuros: soma(juros),
+    picoSaldoDevedor: pico,
+    mesPicoSaldoDevedor: mesPico,
+    primeiroMesAmortizacao: primeiroMes(amortizacao),
+    ultimoMesComDivida: ultimoComDivida === -1 ? null : ultimoComDivida,
+    totalAmortizado: soma(amortizacao),
+  };
 }
 
 /**

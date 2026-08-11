@@ -547,6 +547,72 @@ export function eConstrucao(custo: any): boolean {
   return custo?.grupo === 'obra' && custo?.categoria === CATEGORIA_CONSTRUCAO;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Base financiável do Financiamento à produção (§4.3 de
+// docs/viabilidade/funding-capital-stack.md)
+// ─────────────────────────────────────────────────────────────────
+
+/** Outorga onerosa — contrapartida do potencial construtivo, grupo Obra (#180). */
+export const CATEGORIA_OUTORGA = 'Outorga';
+/** Projetos (arquitetura, complementares) — grupo Custos Diretos. */
+export const CATEGORIA_PROJETOS = 'Projetos';
+/** Licenças e Aprovações — grupo Custos Diretos; junto com Projetos forma o "Projetos e aprovações" da planilha. */
+export const CATEGORIA_LICENCAS = 'Licenças e Aprovações';
+
+/**
+ * Uma linha de custo pertence à base financiável PADRÃO do Financiamento à
+ * produção? São os quatro grupos que a planilha de referência soma em
+ * `Aux Despesas Financiáveis` (`Incorp Individual!BW`):
+ *
+ *   1. pagamento CASH do terreno — a linha de Preço, exceto as subcategorias
+ *      de permuta (física não gera caixa; financeira é dedução de receita,
+ *      não desembolso — nenhuma das duas é despesa que o banco financia);
+ *   2. custo de construção;
+ *   3. outorga;
+ *   4. projetos e aprovações.
+ *
+ * Ficam DE FORA, deliberadamente: impostos, corretagem, marketing, permutas,
+ * incorporação e registro, manutenção pós-obra, mobiliário, contingências,
+ * gestão e demais indiretos. Todos continuam pesando no fluxo de caixa — só
+ * não aumentam a base sobre a qual o banco libera.
+ *
+ * É só o PADRÃO: a camada pode selecionar outras linhas em
+ * `config.custoLinhaIds`, e é essa seleção que prevalece quando existe.
+ */
+export function eFinanciavelPadrao(custo: any): boolean {
+  if (ePrecoTerreno(custo)) return !ePermutaFisica(custo) && !ePermutaFinanceira(custo);
+  if (eConstrucao(custo)) return true;
+  if (custo?.grupo === 'obra' && custo?.categoria === CATEGORIA_OUTORGA) return true;
+  if (custo?.grupo === 'diretos'
+    && (custo?.categoria === CATEGORIA_PROJETOS || custo?.categoria === CATEGORIA_LICENCAS)) return true;
+  return false;
+}
+
+/**
+ * Marcos da Obra em meses relativos 0-based, derivados do Cronograma.
+ *
+ * `mesEntrega` é o ÚLTIMO mês de obra — a mesma definição que o motor de
+ * recebíveis já usa (`ehVendaAposChaves`, `pagamentosAteMarco`,
+ * `REPASSE_MESES_APOS_ENTREGA`), repetida hoje em seis pontos de
+ * `fluxo-caixa-motor.ts`. Este helper é a fonte única para código novo; os
+ * seis pontos existentes seguem como estão até uma issue de refatoração.
+ *
+ * ⚠️ A planilha de referência marca `Chaves` no mês SEGUINTE ao último mês de
+ * obra (`Mês = PrazoObra`, com `Obra` valendo `0 ≤ Mês < PrazoObra`). O app
+ * adota o último mês de obra, para não ter duas definições de entrega
+ * convivendo. A diferença é de um mês e não altera o cenário de referência
+ * (o mês das chaves não tem custo financiável nem liberação).
+ *
+ * Retorna `null` quando não há evento `obra` no cronograma.
+ */
+export function marcosObra(crono: EventoCrono[]): { inicioObra: number; fimObra: number; mesEntrega: number } | null {
+  const obra = crono.find((e) => e.evento === 'obra');
+  if (!obra) return null;
+  const inicioObra = n(obra.inicio_mes);
+  const fimObra = inicioObra + Math.max(1, n(obra.duracao_meses)) - 1;
+  return { inicioObra, fimObra, mesEntrega: fimObra };
+}
+
 /**
  * Regime de cronograma de uma linha de custo (#255).
  *
