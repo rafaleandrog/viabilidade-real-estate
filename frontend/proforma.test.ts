@@ -474,3 +474,36 @@ test('preço sugerido: atinge o piso do benchmark', () => {
   const margem = calcularProforma({ ...LOT, preco_venda_m2: preco! }).margemLiquidaPct;
   assert.ok(perto(margem, piso, 0.05), `margem no preço sugerido=${margem}`);
 });
+
+// ── #407: o caso que a listagem quebrava ────────────────────────────────
+//
+// Os testes do #315 acima sempre preenchem TAMBÉM os campos legados, então
+// nenhum deles pegava o estudo que existe na prática: catálogo de Produtos
+// preenchido e campos legados vazios. Sem `produtos` no payload, esse estudo
+// dá `vgv = 0` — e a listagem (frontend/tela-dashboard.ts, guard
+// `p.vgv > 0 ? … : '—'`) mostrava "—" em VGV, Resultado e Margem.
+
+const SO_CATALOGO: ProformaInput = {
+  tipo_empreendimento: 'incorporacao',
+  terreno_manual_area: 5000,
+  imposto_percentual: 7,
+  corretagem_percentual: 5,
+  custo_construcao_m2: 4000,
+  // Nenhum campo legado de área/preço: area_pvt_r_fechada,
+  // preco_venda_m2_residencial e num_unidades_residencial ausentes.
+  produtos: [{ area_media_m2: 100, preco_venda_m2: 12000, unidades: 40 }],
+};
+
+test('#407: estudo com VGV só do catálogo tem vgv > 0 — a listagem não pode mostrar "—"', () => {
+  const p = calcularProforma(SO_CATALOGO);
+  assert.ok(perto(p.vgv, 48_000_000), `vgv=${p.vgv}`);
+  assert.ok(p.vgv > 0, 'o guard da listagem depende exatamente disto');
+  assert.equal(p.numUnidades, 40);
+});
+
+test('#407: o MESMO estudo sem `produtos` no payload cai em vgv 0 — a causa do "—"', () => {
+  const { produtos, ...semProdutos } = SO_CATALOGO;
+  const p = calcularProforma(semProdutos as ProformaInput);
+  assert.equal(p.vgv, 0);
+  assert.equal(p.margemLiquidaPct, 0);
+});
