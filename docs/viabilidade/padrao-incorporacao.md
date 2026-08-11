@@ -1776,6 +1776,16 @@ O estudo completo deve conseguir representar:
 - saldo devedor;
 - quitação.
 
+> ✅ **Comportamento vigente desde 2026-08-11 — os nove itens acima estão implementados**, no
+> Capital Stack (camada `financiamento_producao`), não no Bloco G. O modelo é o da planilha de
+> referência: gatilho de exposição mínima, **catch-up retroativo** na primeira liberação, juros
+> capitalizados sobre o saldo anterior e cash sweep até zerar. A especificação completa está em
+> `docs/viabilidade/funding-capital-stack.md` §4.3; o oráculo de regressão contra a planilha, em
+> `frontend/financiamento-producao-golden.test.ts`.
+>
+> Continua valendo o aviso abaixo para o **resto** do Bloco G — estrutura de capital, investidor,
+> regime tributário e correção seguem inertes.
+
 > **Comportamento vigente — a aba Financeiro inteira é inerte.** Não são só os campos de
 > financiamento: é o **Bloco G completo**. `schema.json` declara e `frontend/tela-financeiro.ts`
 > renderiza controles para financiamento à produção (`financiamento_*`), estrutura de capital

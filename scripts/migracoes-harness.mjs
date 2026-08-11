@@ -48,6 +48,17 @@ const SEED = {
   avancado_alocacoes: [
     { id: 1, fase_id: 1, tipologia_id: 1, quantidade: 10 },
   ],
+  // Camada com o shape que a migração `019` produzia (config de Price vinda do
+  // Bloco G legado) — é o caminho de transformação da `028`. Sem esta linha a
+  // `028` só exercitaria o early-return de tabela vazia.
+  avancado_capital_instrumentos: [
+    {
+      id: 1, estudo_id: 1, tipo: 'financiamento_producao', nome: 'Financiamento à produção (migrado)',
+      status: 'revisao_necessaria', prioridade_funding: 0, prioridade_pagamento: 0, compromisso: 0,
+      config: { percentualFinanciavel: 0.7, taxaAnual: 0.12, sistemaAmortizacao: 'price', prazoMeses: 36, carenciaMeses: 12 },
+      origem_legado: 'financiamento_bloco_g', ordem: 0,
+    },
+  ],
 };
 
 /** Banco em memória com a mesma superfície que as migrações usam. */

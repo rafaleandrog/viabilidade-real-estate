@@ -4,6 +4,60 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Financiamento à Produção — modelo da planilha implementado (2026-08-11)
+
+Trabalho **fora da Rodada 7**, a partir de um pedido do autor com a planilha `20260730_EVI_Urbita`
+anexada. Fecha a dívida que o `funding-capital-stack.md` declarava explicitamente em aberto: as
+nuances de financiamento à produção achadas na planilha (exposição mínima antes da 1ª liberação,
+cash sweep condicional a flag/fase de Chaves) tinham ficado **fora da Rodada 6 por decisão do autor
+em 2026-08-03**. Não é a #355 — aquela é a reescrita do Funding/Capital Stack, segue bloqueada pela
+D6 (falta o `fluxo_investidor_FORMULAS`) e isolada por exigência do autor.
+
+**O diagnóstico.** O app já tinha a camada `financiamento_producao`, mas ela liberava dívida
+**por necessidade de caixa** (`min(disponível, necessidade)`). A planilha faz o oposto: libera
+**incondicionalmente** contra medição de custo. Os dois modelos produzem números diferentes para o
+mesmo estudo. Oito divergências decodificadas fórmula a fórmula de `Incorp Individual!BW:CH`:
+liberação incondicional · gatilho de exposição mínima · janela de obra/chaves · catch-up retroativo
+na 1ª liberação · caixa disponível sem a liberação do próprio mês · teto de amortização sem a
+liberação do próprio mês · toggle de amortização antecipada + gate de chaves · ausência de teto de
+crédito.
+
+**Decisão do autor (respondendo à D2 do plano):** a regra vale para **todos** os estudos já salvos,
+com autorização explícita para apagar campos que deixam de existir. Por isso
+`financiamento_producao` passou a ser **sempre** o modelo da planilha — sem seletor de modalidade —
+e a migração `028` limpa `sistemaAmortizacao`/`politicaAmortizacao`/`prazoMeses`/`carenciaMeses`/
+`vencimentoMes`/`liberacaoProgramada` dessas camadas (são parâmetros de Price/bullet, que §43 do
+pedido diz que este produto não tem) e grava os defaults da planilha (exposição 20%, financiado 80%,
+amortizar com caixa = sim). `versao` 0.1.26 → **0.1.27**.
+
+**Regressão:** `frontend/financiamento-producao-golden.test.ts` reproduz os 80 períodos do cenário
+real da planilha — 1ª liberação R$ 17.108.298,25 no mês 5, juros R$ 168.749,08 no mês 6, pico
+R$ 95.884.494,59 no mês 29, quitação no mês 36, totais R$ 83.236.939,35 liberados +
+R$ 15.040.168,42 de juros = R$ 98.277.107,77 amortizados. Desvio máximo **R$ 0,12**, todo de
+`round2` (contrato C7); tolerância do teste é R$ 0,15. Mais os 7 casos extremos do §42 e a
+não-regressão do caminho `por_necessidade`.
+
+> ⚠️ **Achado lateral, corrigido junto:** o glob de teste era `frontend/*.test.ts`, que **não
+> alcança subdiretório** — os 16 golden cases do Capital Stack
+> (`frontend/fixtures/capital-stack-golden.test.ts`, 269 linhas) **nunca rodaram**, nem em
+> `pnpm test` nem em `scripts/validar-frontend.sh`. Estavam escritos, commitados e mortos desde a
+> Rodada 6. O glob agora inclui `frontend/fixtures/*.test.ts` nos dois lugares; a suíte foi de 325
+> para **424 testes**, todos verdes.
+
+**Pendências do autor:** rodar a migração `028` no Postgres (junto com a cadeia `001`–`027`, que
+segue nunca executada em produção) e o `urbi-empacotar`. Nada aqui toca `schema.json` — as premissas
+novas moram na coluna `config` (json) da camada, que não exige DDL.
+
+**Nota de ambiente:** `scripts/validar-backend.sh` **não rodou completo nesta sessão** — aborta na
+etapa 1/5 porque `node_modules/@urbiverso/sdk` não existe neste clone remoto (o `CLAUDE.md` afirma
+que está em disco; nesta máquina não estava). Rodei as duas etapas que não dependem do SDK:
+`scripts/migracoes-harness.mjs` verde (contrato, banco vazio, reexecução e cadeia completa, com uma
+camada semeada no harness para exercitar a transformação) e o guard de `versao` conferido à mão
+(1 migração nova, versão bumpada). O typecheck do backend não foi exercido — mas esta entrega **não
+altera nenhum arquivo em `backend/`**.
+
+---
+
 ## Rodada 7 — Fases 9–10 concluídas (E41–E46, issues #349–#354), portão antes da Fase 11 (2026-08-11)
 
 Sessão contínua a partir do checkpoint anterior, uma issue de cada vez, mesma disciplina de

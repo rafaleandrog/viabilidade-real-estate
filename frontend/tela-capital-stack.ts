@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$ } from './viab-format.js';
+import { fmtR$, fmtPct } from './viab-format.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
@@ -9,10 +9,12 @@ import {
   listarCapitalInstrumentos, criarCapitalInstrumento, atualizarCapitalInstrumento, removerCapitalInstrumento,
 } from './viabilidade-api.js';
 import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
+import { type EventoCrono } from './fluxo-shared.js';
 import {
   simularCapitalStackDoEstudo, moic, tirAnual, fundingEntradasSaidasMensal,
   receitaLiquidaComCorretagemMensal, type ResultadoCapitalStack, reordenarCamadas,
-  camadasComOrdemAlterada,
+  camadasComOrdemAlterada, linhasFinanciaveisPadrao, indicadoresFinanciamentoProducao,
+  PADRAO_AMORTIZAR_COM_CAIXA, PADRAO_PERCENTUAL_FINANCIAVEL,
 } from './capital-stack-motor.js';
 import './viab-num.js';
 
@@ -122,7 +124,12 @@ export class ViabCapitalStack extends LitElement {
     .rotulo-camada { fill: var(--cor-texto-sec, rgba(255,255,255,0.7)); font-size: 10px; }
     .linha-entradas { stroke: var(--cor-sucesso, #13a98d); fill: none; stroke-width: 2; }
     .linha-saidas { stroke: var(--cor-erro, #d45a3a); fill: none; stroke-width: 2; }
+    /* §39: custo elegível é a referência de fundo (tracejado, sem peso visual);
+       o saldo devedor é a curva que o leitor procura, então fica destacada. */
+    .linha-custo-elegivel { stroke: var(--cor-texto-sec, rgba(255,255,255,0.45)); fill: none; stroke-width: 1.5; stroke-dasharray: 4 3; }
+    .linha-saldo-devedor { stroke: var(--cor-alerta, #e0a33e); fill: none; stroke-width: 2.5; }
     .eixo-mes { fill: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: 9px; }
+    .nota { font-size: 0.75rem; margin: 6px 0 10px; line-height: 1.45; }
     .grafico-legenda { display: flex; gap: 14px; font-size: 0.72rem; margin-top: 6px; color: var(--cor-texto-sec, rgba(255,255,255,0.7)); }
     .grafico-legenda .ponto { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
   `];
@@ -165,6 +172,7 @@ export class ViabCapitalStack extends LitElement {
       this.fluxoLivre1based = [0, ...calc.fluxoMensal];
       this.receitaLiquida1based = [0, ...receitaLiquidaComCorretagem];
       this.linhasCustoCalc = calc.linhasCusto;
+      this.cronograma = config.cronograma;
       this._recalcular();
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao carregar o Capital Stack', 'erro');
@@ -173,6 +181,9 @@ export class ViabCapitalStack extends LitElement {
   }
 
   private linhasCustoCalc: { id: any; mensal: number[] }[] = [];
+  // Cronograma do estudo: é dele que saem a janela de liberação e o mês das
+  // chaves do financiamento à produção — não são premissas da camada.
+  private cronograma: EventoCrono[] = [];
 
   /**
    * §9: toda alteração no editor recalcula a PRÉVIA sem salvar. Sobrepõe o
@@ -183,6 +194,7 @@ export class ViabCapitalStack extends LitElement {
     const camadasComDraft = this.camadas.map((c) => (c.id in this.draft ? this.draft[c.id] : c));
     this.resultado = simularCapitalStackDoEstudo(
       this.fluxoLivre1based, this.receitaLiquida1based, camadasComDraft, this.linhasCustoCalc, 0,
+      { custosRaw: this.custos, cronograma: this.cronograma },
     );
   }
 
@@ -203,9 +215,15 @@ export class ViabCapitalStack extends LitElement {
     this._recalcular();
   }
 
-  private _toggleCustoElegivel(c: any, custoId: number, marcado: boolean) {
+  /**
+   * `base` é a seleção EFETIVA mostrada na tela — que, quando a camada nunca
+   * teve seleção própria, é a base padrão resolvida em runtime. Sem ela,
+   * desmarcar uma linha do padrão gravaria uma lista quase vazia (só a linha
+   * desmarcada removida de `[]`), zerando a base sem o usuário pedir.
+   */
+  private _toggleCustoElegivel(c: any, custoId: number, marcado: boolean, base?: number[]) {
     const d = this._draftDe(c);
-    const atuais: number[] = Array.isArray(d.config?.custoLinhaIds) ? d.config.custoLinhaIds : [];
+    const atuais: number[] = Array.isArray(d.config?.custoLinhaIds) ? d.config.custoLinhaIds : (base ?? []);
     const novos = marcado ? [...new Set([...atuais, custoId])] : atuais.filter((id) => id !== custoId);
     this._setConfig(c, 'custoLinhaIds', novos);
   }
@@ -570,8 +588,161 @@ export class ViabCapitalStack extends LitElement {
     `;
   }
 
+  /**
+   * Financiamento à produção — o contrato é único (§4.3): liberação por
+   * medição do custo elegível com catch-up retroativo e cash sweep. Por isso
+   * NÃO há aqui seletor de política de amortização, carência, prazo,
+   * vencimento nem liberação programada: são parâmetros de Price/bullet, que
+   * este produto não tem (§43). Quem precisa deles usa Capital de giro.
+   */
+  /**
+   * §37 — indicadores de resumo por camada de financiamento à produção. Lidos
+   * de `indicadoresFinanciamentoProducao`, que só consulta as séries que o
+   * motor já produziu: nenhuma regra de negócio vive aqui.
+   */
+  private _renderIndicadoresFinanciamento(): TemplateResult {
+    const r = this.resultado;
+    // Lê o DRAFT, não o persistido: `_recalcular` simula sobre o draft, então
+    // as chaves de `r` são os nomes em edição. Renomear uma camada no editor
+    // não pode fazer o bloco de indicadores sumir.
+    const camadas = this.camadas
+      .map((c) => (c.id in this.draft ? this.draft[c.id] : c))
+      .filter((c) => c.tipo === 'financiamento_producao' && c.status === 'ativo');
+    if (!r || camadas.length === 0) return html`${nothing}`;
+    const mes = (m: number | null) => (m == null ? '—' : `mês ${m}`);
+    return html`
+      ${camadas.map((c) => {
+        const ind = indicadoresFinanciamentoProducao(r, c.nome);
+        if (!ind) return html`${nothing}`;
+        return html`
+          <urbi-card>
+            <h4>Financiamento à produção — ${c.nome}</h4>
+            <table class="resultados">
+              <tbody>
+                <tr><td>Custo financiável total</td><td class="num">${fmtR$(ind.custoFinanciavelTotal)}</td>
+                    <td>Percentual financiado</td><td class="num">${fmtPct(ind.percentualFinanciado * 100)}</td></tr>
+                <tr><td>Principal máximo previsto</td><td class="num">${fmtR$(ind.principalMaximoPrevisto)}</td>
+                    <td>Total liberado</td><td class="num">${fmtR$(ind.totalLiberado)}</td></tr>
+                <tr><td>1º mês de liberação</td><td class="num">${mes(ind.primeiroMesLiberacao)}</td>
+                    <td>1ª liberação (catch-up)</td><td class="num">${fmtR$(ind.primeiraLiberacao)}</td></tr>
+                <tr><td>Total de juros</td><td class="num">${fmtR$(ind.totalJuros)}</td>
+                    <td>Pico do saldo devedor</td><td class="num">${fmtR$(ind.picoSaldoDevedor)} (${mes(ind.mesPicoSaldoDevedor)})</td></tr>
+                <tr><td>1º mês de amortização</td><td class="num">${mes(ind.primeiroMesAmortizacao)}</td>
+                    <td>Último mês com dívida</td><td class="num">${mes(ind.ultimoMesComDivida)}</td></tr>
+                <tr><td>Total amortizado</td><td class="num">${fmtR$(ind.totalAmortizado)}</td>
+                    <td></td><td class="num"></td></tr>
+              </tbody>
+            </table>
+            ${this._renderGraficoFinanciamento(c.nome)}
+          </urbi-card>
+        `;
+      })}
+    `;
+  }
+
+  /**
+   * §39 — as quatro curvas que contam a história do financiamento: quando o
+   * banco entra (custo elegível × principal liberado), até onde a alavancagem
+   * vai (saldo devedor) e quando ela se desfaz (amortizações). SVG inline,
+   * sem lib externa, mesmo padrão dos outros dois gráficos deste arquivo.
+   */
+  private _renderGraficoFinanciamento(nome: string): TemplateResult {
+    const r = this.resultado;
+    const custoAcum = r?.custoElegivelAcumuladoPorInstrumento?.[nome];
+    if (!r || !custoAcum || custoAcum.length <= 1) return html`${nothing}`;
+    const saldo = r.saldoDividaPorInstrumento[nome] ?? [];
+    const amort = r.amortizacaoPorInstrumento[nome] ?? [];
+    const liberacao = r.liberacaoPorInstrumento[nome] ?? [];
+    const liberadoAcum = r.liberacaoAcumuladaPorInstrumento?.[nome] ?? [];
+    if (liberacao.every((v) => v === 0)) return html`${nothing}`;
+
+    const meses = custoAcum.length - 1;
+    const max = Math.max(1, ...custoAcum.slice(1), ...saldo.slice(1), ...liberadoAcum.slice(1), ...amort.slice(1));
+    const largura = 400, altura = 160, margemBaixo = 16;
+    const x = (t: number) => (meses <= 1 ? 0 : ((t - 1) / (meses - 1)) * largura);
+    const y = (v: number) => altura - margemBaixo - (v / max) * (altura - margemBaixo);
+    const pontos = (serie: number[]) => serie.slice(1).map((v, i) => `${x(i + 1)},${y(v ?? 0)}`).join(' ');
+    return html`
+      <div class="grafico-card">
+        <h4>Alavancagem mês a mês</h4>
+        <svg class="grafico" viewBox="0 0 ${largura} ${altura}" preserveAspectRatio="xMinYMin meet">
+          <polyline points=${pontos(custoAcum)} class="linha-custo-elegivel"></polyline>
+          <polyline points=${pontos(liberadoAcum)} class="linha-entradas"></polyline>
+          <polyline points=${pontos(saldo)} class="linha-saldo-devedor"></polyline>
+          <polyline points=${pontos(amort)} class="linha-saidas"></polyline>
+          <text x="0" y=${altura} class="eixo-mes">mês 1</text>
+          <text x=${largura} y=${altura} text-anchor="end" class="eixo-mes">mês ${meses}</text>
+        </svg>
+        <div class="grafico-legenda">
+          <span><i class="ponto" style="background:var(--cor-texto-sec, rgba(255,255,255,0.45))"></i>Custo financiável acumulado</span>
+          <span><i class="ponto" style="background:var(--cor-sucesso, #13a98d)"></i>Principal liberado acumulado</span>
+          <span><i class="ponto" style="background:var(--cor-alerta, #e0a33e)"></i>Saldo devedor</span>
+          <span><i class="ponto" style="background:var(--cor-erro, #d45a3a)"></i>Amortizações</span>
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderCamposFinanciamentoProducao(c: any, d: any, dis: boolean): TemplateResult {
+    const cfg = d.config ?? {};
+    const selecao: number[] | undefined = cfg.custoLinhaIds;
+    const padrao = linhasFinanciaveisPadrao(this.custos);
+    const usandoPadrao = !Array.isArray(selecao);
+    const efetiva = usandoPadrao ? padrao : selecao;
+    const amortizaAntes = cfg.amortizarComCaixaDisponivel !== undefined
+      ? Boolean(cfg.amortizarComCaixaDisponivel) : PADRAO_AMORTIZAR_COM_CAIXA;
+    return html`
+      <div class="secao">
+        <h4>Contrato</h4>
+        <div class="grid">
+          ${this._numConfig(c, d, 'taxaAnual', 'Taxa', '% a.a.', dis)}
+          ${this._numConfig(c, d, 'exposicaoMinima', 'Exposição mín. p/ liberação', '%', dis)}
+          ${this._numConfig(c, d, 'percentualFinanciavel', '% do custo financiado', '%', dis)}
+        </div>
+        <p class="sec nota">
+          O banco só começa a liberar quando o custo financiável incorrido atinge a exposição
+          mínima; nesse mês a liberação cobre retroativamente todo o custo já incorrido. A janela de
+          liberação e o mês das chaves vêm do Cronograma do estudo, não daqui.
+          Deixe o Compromisso em zero para não ter teto de crédito — o principal para sozinho em
+          ${fmtPct(cfg.percentualFinanciavel !== undefined ? Number(cfg.percentualFinanciavel) * 100 : PADRAO_PERCENTUAL_FINANCIAVEL * 100)}
+          da base financiável.
+        </p>
+        <urbi-checkbox
+          label="Caixa disponível amortiza antes das chaves"
+          ?desabilitado=${dis}
+          ?marcado=${amortizaAntes}
+          @urbi:checkbox-change=${(e: CustomEvent) => this._setConfig(c, 'amortizarComCaixaDisponivel', e.detail.marcado)}
+        ></urbi-checkbox>
+        <p class="sec nota">
+          Depois da entrega das chaves a amortização passa a ser obrigatória, marcado ou não.
+        </p>
+      </div>
+      <div class="secao">
+        <div class="camada-cab">
+          <h4>Base financiável (linhas de custo do estudo)</h4>
+          <span class="espaco"></span>
+          ${!dis ? html`<urbi-botao variante="secundario" pequeno
+            @click=${() => this._setConfig(c, 'custoLinhaIds', padrao)}>Usar base padrão</urbi-botao>` : nothing}
+        </div>
+        ${usandoPadrao ? html`<p class="sec nota">
+          Sem seleção própria — usando a base padrão: pagamento à vista do terreno, construção,
+          outorga, projetos e aprovações.
+        </p>` : nothing}
+        <div class="custo-lista">
+          ${this.custos.map((custo) => html`
+            <urbi-checkbox
+              label=${`${custo.categoria || 'Custo'} — ${fmtR$(n(custo.orcamento_valor))}`}
+              ?desabilitado=${dis}
+              ?marcado=${efetiva.includes(custo.id)}
+              @urbi:checkbox-change=${(e: CustomEvent) => this._toggleCustoElegivel(c, custo.id, e.detail.marcado, efetiva)}
+            ></urbi-checkbox>`)}
+        </div>
+      </div>
+    `;
+  }
+
   private _renderCamposDivida(c: any, d: any, dis: boolean): TemplateResult {
-    const ehFinanciamento = c.tipo === 'financiamento_producao';
+    if (c.tipo === 'financiamento_producao') return this._renderCamposFinanciamentoProducao(c, d, dis);
     return html`
       <div class="secao">
         <h4>Remuneração e amortização</h4>
@@ -589,22 +760,8 @@ export class ViabCapitalStack extends LitElement {
             ${this._numConfig(c, d, 'carenciaMeses', 'Carência', 'mês', dis)}
             ${this._numConfig(c, d, 'prazoMeses', 'Prazo total (inclui carência)', 'mês', dis)}
           ` : nothing}
-          ${ehFinanciamento ? this._numConfig(c, d, 'percentualFinanciavel', '% financiável do custo elegível', '%', dis) : nothing}
         </div>
       </div>
-      ${ehFinanciamento ? html`
-        <div class="secao">
-          <h4>Custos elegíveis (linhas de custo do estudo)</h4>
-          <div class="custo-lista">
-            ${this.custos.map((custo) => html`
-              <urbi-checkbox
-                label=${`${custo.categoria || 'Custo'} — ${fmtR$(n(custo.orcamento_valor))}`}
-                ?desabilitado=${dis}
-                ?marcado=${(d.config?.custoLinhaIds ?? []).includes(custo.id)}
-                @urbi:checkbox-change=${(e: CustomEvent) => this._toggleCustoElegivel(c, custo.id, e.detail.marcado)}
-              ></urbi-checkbox>`)}
-          </div>
-        </div>` : nothing}
       <div class="secao">
         <h4>Liberação programada (mês, valor)</h4>
         ${(d.config?.liberacaoProgramada ?? []).map((l: any, i: number) => html`
@@ -767,6 +924,7 @@ export class ViabCapitalStack extends LitElement {
     return html`
       ${this._renderResumo()}
       ${this._renderResultadosPorCamada()}
+      ${this._renderIndicadoresFinanciamento()}
       <div class="graficos">
         ${this._renderGraficoComprometidoUtilizado()}
         ${this._renderGraficoMensal()}
