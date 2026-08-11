@@ -243,8 +243,15 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
   const resultado = resultadoDe(c);
   const tirTxt = c.tir === null ? '—' : `${fmtPct(c.tir)} a.a.`;
   const tirVar = c.tir === null ? '' : (c.tir > 0 ? 'sucesso' : 'erro');
-  // Exposição máxima é min(fluxoAcumulado), tipicamente negativa: subir (ficar
-  // menos negativa) é MELHOR — daí maiorMelhor = true nos quatro indicadores.
+  // #353 (BUG7-45): exposição máxima é min(fluxoAcumulado), tipicamente
+  // negativa — mas o autor quer a leitura por MAGNITUDE (módulo): exposição
+  // maior (mais dinheiro em risco) é PIOR, mesmo que numericamente mais
+  // negativa. Por isso aqui, ao contrário dos outros KPIs, comparamos
+  // Math.abs() e usamos maiorMelhor = false (magnitude subir é pior).
+  const expMag = Math.abs(c.exposicaoMaxima);
+  const expBaseMag = base ? Math.abs(base.exposicaoMaxima) : undefined;
+  const expVariacao = expBaseMag !== undefined ? calcularVariacao(expMag, expBaseMag, false) : null;
+  const expVariante = expVariacao ? (expVariacao.melhor ? 'sucesso' : 'erro') : 'erro';
   return html`
     <div class="fx-kpis">
       <div class="kpi-card ${resultado >= 0 ? 'sucesso' : 'erro'}">
@@ -266,10 +273,10 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
         <div class="rotulo">Payback</div>
         <div class="valor">${c.paybackData ?? '—'}</div>
       </div>
-      <div class="kpi-card erro">
+      <div class="kpi-card ${expVariante}">
         <div class="rotulo">Exposição máxima</div>
-        <div class="valor">${fmtR$(c.exposicaoMaxima)}</div>
-        ${varKpi(c.exposicaoMaxima, base ? base.exposicaoMaxima : undefined, true)}
+        <div class="valor">${fmtR$(expMag)}</div>
+        ${varKpi(expMag, expBaseMag, false)}
       </div>
       <div class="kpi-card">
         <div class="rotulo">Receita Bruta — VGV</div>
