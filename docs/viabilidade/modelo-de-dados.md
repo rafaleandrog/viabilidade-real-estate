@@ -78,13 +78,13 @@ gravados (via adapter do JSON legado, EVI-010 / #230) e o inventário de dados l
 | **Subcategoria de Preço** | Quatro valores exatos: `Valor à vista`, `Parcelado`, `Permuta física`, `Permuta financeira`. Hoje há uma única `Permuta`, que o motor trata como **financeira** (`frontend/fluxo-caixa-motor.ts:385`). Migração aprovada: toda `Permuta` legada → `Permuta financeira`, preservando o resultado de todo estudo | #257 |
 | **Permuta física por tipologia** | Referência de tipologia + quantidade **na linha de custo do Terreno**, substituindo `avancado_tipologias.unidades_permutadas` como fonte de verdade. Exige base de valoração declarada quando a tipologia tem `preco_m2` diferente por Grupo | #258 · #266–#269 |
 | **Valor canônico multiunidade** | Quantidade econômica com precisão suficiente, independente da unidade exibida. Hoje o valor **exibido é o persistido**, em duas arquiteturas distintas: um campo por unidade nas Premissas, um único `orcamento_valor` + `orcamento_unidade` em Custos | #259 · #260 |
-| **Instrumento de capital** | Entidade de camada do Capital Stack: tipo, compromisso, prioridade de utilização, prioridade de pagamento, calendário de aporte/liberação, status (`rascunho` · `ativo` · `encerrado` · `revisão necessária`). Substitui `financiamento_*`, `investidor_*` e `estrutura_*_pct` como entrada; estes viram metadado legado | #239 · #271 |
+| **Operação de funding** | Uma captação do estudo (`avancado_funding_operacoes`, #355): tipo (`financiamento_producao` — única por estudo — · `divida` · `equity`), nome, valor, âncora do aporte, e os parâmetros do tipo (taxa/carência/amortização na dívida; modo e % de retorno no equity). Substitui o **Instrumento de capital** do modelo de 4 instrumentos com waterfall (`avancado_capital_instrumentos`, #239/#271), descartado. Os campos `financiamento_*`, `investidor_*` e `estrutura_*_pct` do Bloco G seguem como metadado legado | #355 |
 
 Duas restrições valem para todas: nenhum estudo **aprovado, reprovado ou arquivado** pode mudar de
 resultado por migração, e toda migração nova exige **bump da `versao`** do manifesto.
 
-Detalhe completo em `docs/lista-bugs-planejamento-2026-07-31.md` e, para o Capital Stack, em
-[Funding, Capital Stack e Retorno do Capital](funding-capital-stack).
+Detalhe completo em `docs/lista-bugs-planejamento-2026-07-31.md` e, para o Funding, em
+[Fluxo do Investidor — fórmulas das operações de Funding](fluxo-investidor-formulas).
 
 ## Regras de precisão
 

@@ -26,7 +26,7 @@ App do UrbiVerso que substitui planilhas dispersas por uma aplicação centraliz
   - **Apelo Comercial** — análise qualitativa por IA (6 fatores) a partir de documentos anexados.
 - **Estudo Avançado** — páginas próprias: Resumo, Empreendimento, Viabilidade, Custos, Fluxo de Caixa, Cenários, **Análise de mercado** e **Apelo Comercial**.
   - **Análise de mercado** (#199) — compara os números do estudo com os do mercado (preço e custo por m², velocidade de vendas, macros). O lado "projeto" é derivado do próprio estudo, não digitado. Ver [Análise de Mercado](analise-mercado).
-  - **Viabilidade → Financeiro** — hoje a aba do **Bloco G**, cujos ~25 campos são persistidos e renderizados mas **não alimentam o motor**. A epic **#239** a transforma no módulo **Capital Stack** (funding, dívida, equity e waterfall); ver [Funding, Capital Stack e Retorno do Capital](funding-capital-stack). `Custos → Financeiro` é outra coisa: permanece grupo de **custos** operacionais.
+  - **Viabilidade → Funding** — operações de captação do estudo: **Financiamento à produção** (única por estudo), **Dívida** e **Equity**, com os indicadores do investidor (TIR, VPL, payback) por operação. Fórmulas em [Fluxo do Investidor — fórmulas das operações de Funding](fluxo-investidor-formulas); o histórico do modelo anterior (4 instrumentos com waterfall, substituído pela #355) está em [Funding, Capital Stack e Retorno do Capital](funding-capital-stack). `Custos → Financeiro` é outra coisa: permanece grupo de **custos** operacionais.
 
 ## Endereços das telas
 

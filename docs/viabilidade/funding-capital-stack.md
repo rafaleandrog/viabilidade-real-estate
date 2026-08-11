@@ -1,6 +1,6 @@
 ---
-titulo: Funding, Capital Stack e Retorno do Capital
-descricao: Modelo funcional de referência para financiamento à produção, capital de giro, equity preferencial e capital do incorporador no estudo Avançado — necessidade de funding, waterfall de pagamentos, retorno por instrumento e reconciliação mensal.
+titulo: Funding, Capital Stack e Retorno do Capital (histórico do modelo de 4 instrumentos)
+descricao: ADR do modelo de Capital Stack com waterfall (4 instrumentos), SUBSTITUÍDO pela reescrita da #355. Os princípios de separação projeto × capital e a regra de KPIs desalavancados continuam vigentes; o motor, a tela, o schema e o waterfall descritos aqui não existem mais.
 tipo: app
 ordem: 8
 ---
@@ -8,7 +8,38 @@ ordem: 8
 
 # Funding, Capital Stack e Retorno do Capital
 
-> ✅ **Este documento descreve COMPORTAMENTO VIGENTE** desde o fechamento da FIN-10 (#279).
+> 🔴 **MODELO SUBSTITUÍDO — leia primeiro `fluxo-investidor-formulas.md`.**
+>
+> A issue **#355** (Rodada 7, item 48) descartou o modelo descrito neste documento e reescreveu a
+> aba do zero, a pedido do autor, segundo a planilha `fluxo_investidor_FORMULAS`. O que mudou:
+>
+> | Aqui (histórico) | Vigente desde a #355 |
+> |---|---|
+> | 4 instrumentos (`financiamento_producao`, `capital_giro`, `preferred_equity`, `sponsor_equity`) | **3 operações**: Financiamento à produção (única por estudo), Dívida, Equity |
+> | Waterfall obrigatório de 8 passos (§6.1) | **Nenhum** — as operações são independentes |
+> | `prioridade_funding` / `prioridade_pagamento` | não existem |
+> | Liberação automática por lacuna de caixa | liberação por calendário |
+> | 4 modos de Preferred Equity (A/B/C/D) | 2 modos de Equity: `permuta_financeira`, `resultado_final` |
+> | `cash_sweep` / `bullet` / `price` | só **Price com carência** |
+> | `frontend/capital-stack-motor.ts` · `tela-capital-stack.ts` · `backend/rotas/capital-stack.ts` · `avancado_capital_instrumentos` | `funding-motor.ts` · `tela-funding.ts` · `backend/rotas/funding.ts` · `avancado_funding_operacoes` (migração `028`) |
+>
+> **O que deste documento CONTINUA VIGENTE e governa o código de hoje:**
+> - **§2.1** projeto e capital são camadas diferentes;
+> - **§2.2** funding nunca integra a Receita Bruta — VGV;
+> - **§2.3** o repasse permanece recebimento de cliente;
+> - **§8.1** — *"A TIR e o VPL do projeto permanecem desalavancados, para manter comparabilidade
+>   entre estruturas de capital"*. É a regra que a #349 implementou na tabela de Resultados e que a
+>   #355 preservou intacta.
+>
+> **O que está OBSOLETO:** §4 (instrumentos), §5 (prioridade), §6 (waterfall), §7 (ordem mensal do
+> motor), §9 (interface), §12.2/§12.3 (invariantes de dívida e equity do modelo antigo), §13
+> (migração do Bloco G — a `019` nunca chegou a rodar em Postgres) e §14 (os 16 casos de referência,
+> cujos testes foram removidos junto com o motor). O texto fica como **ADR**: registra por que cada
+> decisão foi tomada e o que a segunda verificação de 2026-08-02 encontrou. Não é especificação de
+> nada que exista hoje.
+
+> ✅ **Contexto histórico — este documento descrevia COMPORTAMENTO VIGENTE** entre o fechamento da
+> FIN-10 (#279) e a reescrita da #355.
 >
 > O aviso anterior — *"nada neste documento descreve o runtime atual"* — valia quando a aba
 > `Viabilidade → Financeiro` era inteiramente inerte, com ~25 controles que nenhum motor lia. A epic
@@ -224,6 +255,8 @@ Distribuições de equity só podem utilizar caixa distribuível.
 
 ## 4. Instrumentos suportados
 
+> 🔴 **Obsoleto desde a #355.** Os 4 instrumentos desta seção não existem mais — viraram 3 operações. Ver `fluxo-investidor-formulas.md`.
+
 **Modelo funcional de referência.** Quatro tipos na primeira versão completa. Novos tipos só devem
 ser criados quando não puderem ser representados por estes motores.
 
@@ -382,6 +415,8 @@ de fora desta rodada; a planilha serviu só de referência para o modelo de car�
 
 ## 5. Prioridade de funding
 
+> 🔴 **Obsoleto desde a #355.** Não há mais prioridade: as operações são independentes e liberam por calendário.
+
 **Modelo funcional de referência.**
 
 Cada instrumento recebe uma **ordem de utilização**. No mês, o motor deve:
@@ -401,6 +436,8 @@ alertar quando a configuração gerar circularidade ou uso impossível.
 ---
 
 ## 6. Waterfall de pagamentos e distribuições
+
+> 🔴 **Obsoleto desde a #355.** O waterfall foi removido inteiro. Só o §6.2 (receita líquida = bruta − impostos − corretagem − permuta financeira) sobrevive, em `receitaLiquidaComCorretagemMensal`.
 
 **Modelo funcional de referência.**
 
@@ -467,6 +504,8 @@ contratual, **sem empurrar valores para um mês artificial**.
 
 ## 7. Ordem mensal completa do motor
 
+> 🔴 **Obsoleto desde a #355.** O laço mensal descrito aqui foi substituído por `simularDivida`/`simularEquity`, que não competem por caixa.
+
 **Modelo funcional de referência.**
 
 1. calcular vendas, recebimentos, repasse, impostos, permuta financeira e custos;
@@ -524,6 +563,8 @@ remuneração acumulada · retorno total · payback · mês do último recebimen
 ---
 
 ## 9. Interface da aba Financeiro
+
+> 🔴 **Obsoleto desde a #355.** A tela foi reescrita (`tela-funding.ts`): lista de operações + campos por tipo + painel do investidor.
 
 **Modelo funcional de referência.** Entrega em `FIN-08` (#277).
 
@@ -646,6 +687,8 @@ Todas as diferenças devem ser **zero** dentro da tolerância definida pelo moto
 ---
 
 ## 13. Compatibilidade e migração
+
+> 🔴 **Obsoleto desde a #355.** A migração `019` nunca rodou em Postgres. A `028` a substitui, convertendo dívida sem perda e carregando equity inerte (ver o cabeçalho dela).
 
 **Modelo funcional de referência.** Entrega em `FIN-02` (#271) e `FIN-10` (#279).
 
@@ -812,6 +855,8 @@ de colunas**, se desejada, é issue posterior e específica.
 ---
 
 ## 14. Casos de teste de referência
+
+> 🔴 **Obsoleto desde a #355.** Os 16 casos e seus testes foram removidos com o motor antigo. Os golden cases vigentes são os da planilha, em `funding-motor.test.ts`.
 
 **Modelo funcional de referência.** `FIN-01` (#270) transforma cada caso em fixture conferida à
 mão, com inputs e valores esperados mês a mês.
