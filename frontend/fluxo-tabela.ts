@@ -54,23 +54,36 @@ export const estiloFluxoTabela = css`
 
   .fx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
 
-  /* #132: a variacao vs. cenario real acompanha o card de KPI. urbi-kpi nao
-     expoe slot nem prop de variacao (so rotulo/valor/variante), entao a celula
-     do grid e quem ancora o indicador — sem tocar no primitivo e sem exigir
-     bump de shell_min. */
-  /* #176: min-width:0 no item do grid (default é min-width:auto, que segue o
-     min-content do valor — R$ com muitos dígitos empurra o card por cima do
-     vizinho). width:100% no urbi-kpi interno preenche o espaço liberado. */
-  /* #262: o indicador vinha em position:absolute; top/right sobre o card e
-     SOBREPUNHA o valor do urbi-kpi (que ocupa o topo da célula). Como o layout
-     interno do primitivo é shadow DOM inacessível a esta folha, a correção
-     determinística é tirá-lo do overlay: a célula vira coluna e o indicador
-     entra em fluxo normal, alinhado à direita logo abaixo do KPI. Sem
-     sobreposição, mantendo a associação visual com o card. */
-  .fx-kpis .kpi-cel { display: flex; flex-direction: column; min-width: 0; }
-  .fx-kpis .kpi-cel urbi-kpi { width: 100%; }
+  /* #352 (BUG7-44): a variação % (#132) precisa ficar DENTRO da mesma moldura
+     do KPI, mas urbi-kpi (ui/src/urbi-kpi.ts, no monorepo) só declara 4 props
+     (rotulo/valor/variante/formato) e o render() não tem slot — nada de
+     markup filho sobrevive. Overlay por cima também não serve: o layout
+     interno é shadow DOM inacessível a esta folha e sobrepunha o valor
+     (#262). A saída determinística (D7) é abandonar urbi-kpi nesses 6 cards e
+     desenhar com markup + tokens próprios do app — mesmo padrão do .comp de
+     tela-analise-mercado.ts — para rótulo, valor e variação conviverem na
+     mesma caixa, sem depender de slot inexistente. */
+  .kpi-card {
+    background: var(--cor-superficie, rgba(255,255,255,0.04));
+    border: 1px solid var(--cor-borda, rgba(255,255,255,0.08));
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-width: 0;
+  }
+  .kpi-card .rotulo {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
+  }
+  .kpi-card .valor {
+    font-size: 1.4rem; font-weight: 700;
+    color: var(--cor-texto-forte, rgba(255,255,255,0.95));
+    margin-top: 4px;
+  }
+  .kpi-card.erro .valor { color: var(--cor-erro, #D45A3A); }
+  .kpi-card.alerta .valor { color: var(--cor-alerta, #F7A111); }
+  .kpi-card.sucesso .valor { color: var(--cor-sucesso, #13A98D); }
   .kpi-var {
-    align-self: flex-end; margin-top: 4px;
+    margin-top: 6px;
     display: inline-flex; align-items: center; gap: 4px;
     font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums;
     pointer-events: none;
@@ -234,30 +247,36 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
   // menos negativa) é MELHOR — daí maiorMelhor = true nos quatro indicadores.
   return html`
     <div class="fx-kpis">
-      <div class="kpi-cel">
-        <urbi-kpi rotulo="Resultado" .valor=${fmtR$(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+      <div class="kpi-card ${resultado >= 0 ? 'sucesso' : 'erro'}">
+        <div class="rotulo">Resultado</div>
+        <div class="valor">${fmtR$(resultado)}</div>
         ${varKpi(resultado, base ? resultadoDe(base) : undefined, true)}
       </div>
-      <div class="kpi-cel">
-        <urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi>
+      <div class="kpi-card ${tirVar}">
+        <div class="rotulo">TIR</div>
+        <div class="valor">${tirTxt}</div>
         ${varKpi(c.tir, base ? base.tir : undefined, true)}
       </div>
-      <div class="kpi-cel">
-        <urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+      <div class="kpi-card ${c.vpl >= 0 ? 'sucesso' : 'erro'}">
+        <div class="rotulo">VPL</div>
+        <div class="valor">${fmtR$(c.vpl)}</div>
         ${varKpi(c.vpl, base ? base.vpl : undefined, true)}
       </div>
-      <div class="kpi-cel">
-        <urbi-kpi rotulo="Payback" .valor=${c.paybackData ?? '—'}></urbi-kpi>
+      <div class="kpi-card">
+        <div class="rotulo">Payback</div>
+        <div class="valor">${c.paybackData ?? '—'}</div>
       </div>
-      <div class="kpi-cel">
-        <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(c.exposicaoMaxima)} variante="erro"></urbi-kpi>
+      <div class="kpi-card erro">
+        <div class="rotulo">Exposição máxima</div>
+        <div class="valor">${fmtR$(c.exposicaoMaxima)}</div>
         ${varKpi(c.exposicaoMaxima, base ? base.exposicaoMaxima : undefined, true)}
       </div>
-      <div class="kpi-cel">
-        <urbi-kpi rotulo="Receita Bruta — VGV" .valor=${fmtR$(c.receitaBruta)}></urbi-kpi>
+      <div class="kpi-card">
+        <div class="rotulo">Receita Bruta — VGV</div>
+        <div class="valor">${fmtR$(c.receitaBruta)}</div>
         ${varKpi(c.receitaBruta, base ? base.receitaBruta : undefined, true)}
       </div>
-      <div class="kpi-cel"
+      <div class="kpi-card"
         title=${`VGV Total ${fmtR$(c.vgvTotal)} · VGV Permuta Física ${fmtR$(c.vgvPermutaFisica)} · ` +
           // #241: as três grandezas de contratação (#227/#229) — bruto, desconto
           // comercial e líquido — não tinham lugar na tela nem na exportação.
@@ -270,7 +289,8 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
         <!-- #229: rótulo corrigido — este valor é VGV VENDÁVEL (potencial menos
              permuta física), não "Receita Bruta" no sentido de recebimento em
              caixa (#228); "Receita Bruta (VGV)" confundia as duas grandezas. -->
-        <urbi-kpi rotulo="VGV Vendável" .valor=${fmtR$(c.vgvVendavel)}></urbi-kpi>
+        <div class="rotulo">VGV Vendável</div>
+        <div class="valor">${fmtR$(c.vgvVendavel)}</div>
         ${varKpi(c.vgvVendavel, base ? base.vgvVendavel : undefined, true)}
       </div>
     </div>
