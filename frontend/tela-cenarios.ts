@@ -287,8 +287,11 @@ export class ViabTelaCenarios extends LitElement {
         <urbi-estado-vazio icone="fa-solid fa-sliders"
           mensagem="Defina o cronograma, as receitas e os custos nas outras abas para simular cenários."></urbi-estado-vazio>`;
     }
-    // Base = cenário real (deltas zerados). Enquanto os sliders estiverem nele o
-    // cenário É a base: nada de segunda curva nem de setas de variação (#131/#132).
+    // Base = cenário real (deltas zerados). Enquanto os sliders estiverem nele
+    // o cenário É a base — nada de setas de variação nos KPIs (#131/#132), mas
+    // o GRÁFICO continua mostrando as duas séries mesmo coincidindo (#354): o
+    // autor quer as duas linhas sempre visíveis, para não sumir a série
+    // simulada quando o slider volta a 0%.
     const base = this._calc({ precoVendaPct: 0, custoObraPct: 0 });
     const alterado = this._alterado;
     const cenario = alterado
@@ -309,12 +312,11 @@ export class ViabTelaCenarios extends LitElement {
             <urbi-grafico-linha
               formato="moeda"
               legenda="sempre"
+              marcadores
               .categorias=${exibBase.meses}
-              .series=${alterado ? [
+              .series=${[
                 { rotulo: 'Cenário real', valores: exibBase.fluxoAcumulado, cor: 'var(--cor-texto-forte, #e8e8ea)' },
-                { rotulo: this._rotuloCenario(), valores: exibCenario.fluxoAcumulado, cor: 'var(--cor-primaria, #7c5cff)' },
-              ] : [
-                { rotulo: 'Cenário real', valores: exibBase.fluxoAcumulado, cor: 'var(--cor-texto-forte, #e8e8ea)' },
+                { rotulo: alterado ? this._rotuloCenario() : 'Cenário simulado', valores: exibCenario.fluxoAcumulado, cor: 'var(--cor-primaria, #7c5cff)' },
               ]}
             ></urbi-grafico-linha>
           </div></div>
