@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gateTransicao, montarCopiaEstudo } from './estudos.js';
+import { gateTransicao, montarCopiaEstudo, agruparProdutosPorEstudo } from './estudos.js';
 
 // Ciclo de vida do estudo (spec §3):
 //   rascunho → em_analise (editor)
@@ -88,4 +88,35 @@ test('montarCopiaEstudo preserva numéricos preenchidos de um Avançado', () => 
   assert.equal(copia.taxa_desconto_aa, 12.5);
   assert.equal(copia.financiamento_prazo_meses, 36);
   assert.equal(copia.investidor_aporte_valor, 0); // zero é valor válido, não nulo
+});
+
+// ── agruparProdutosPorEstudo (#407) ─────────────────────────────────────
+//
+// `GET /estudos` não devolvia `produtos`, e `calcularProforma` escolhe a
+// fonte do VGV pela PRESENÇA deles: sem a lista, um estudo Preliminar cujo
+// VGV vem só do catálogo caía no ramo legado (área × preço, vazio) e a
+// listagem mostrava "—" em VGV, Resultado e Margem.
+
+test('#407 agrupa produtos por estudo e ignora os de estudos fora da página', () => {
+  const produtos = [
+    { id: 1, estudo_id: 10, nome: 'Tipo A' },
+    { id: 2, estudo_id: 10, nome: 'Tipo B' },
+    { id: 3, estudo_id: 11, nome: 'Tipo C' },
+    { id: 4, estudo_id: 99, nome: 'de outro estudo' },
+  ];
+  const r = agruparProdutosPorEstudo(produtos, new Set([10, 11]));
+  assert.deepEqual(r.get(10)?.map((p) => p.id), [1, 2]);
+  assert.deepEqual(r.get(11)?.map((p) => p.id), [3]);
+  assert.equal(r.has(99), false, 'produto de estudo fora da página não pode entrar');
+});
+
+test('#407 estudo_id vem como string do banco e ainda assim casa', () => {
+  const r = agruparProdutosPorEstudo([{ id: 1, estudo_id: '10' }], new Set([10]));
+  assert.equal(r.get(10)?.length, 1);
+});
+
+test('#407 lista vazia, nula ou sem correspondência não quebra', () => {
+  assert.equal(agruparProdutosPorEstudo([], new Set([1])).size, 0);
+  assert.equal(agruparProdutosPorEstudo(undefined as any, new Set([1])).size, 0);
+  assert.equal(agruparProdutosPorEstudo([{ id: 1, estudo_id: 7 }], new Set([1])).size, 0);
 });

@@ -15,6 +15,7 @@ Todas as tabelas usam `acesso_externo: "restrito"` — a escrita passa pelas rot
 | Tabela | Papel |
 |---|---|
 | `estudos` | Registro central (`soft_delete`). Identidade (`id_legivel`, `nome_exibicao`, `sequencia` por tipo), status, origem do terreno, área do terreno (`terreno_manual_area` quando manual; `area_terreno_nucleo` = soma das áreas dos imóveis do Núcleo), e todos os campos de premissas (produto, áreas, custos, impostos, permutas). |
+| `preliminar_produtos` | Catálogo de Produtos do Preliminar (#315) — quando preenchido, é a **fonte do VGV**, no lugar dos campos legados de área × preço da linha `estudos`. `GET /estudos` devolve a lista em `produtos` de cada estudo, porque `calcularProforma` escolhe a fonte do VGV pela **presença** dela: sem os produtos no payload, um estudo cujo VGV vem só do catálogo calcularia `vgv = 0` (#407). |
 | `estudo_imoveis` | Junção N:M com imóveis do Núcleo (`imovel_nucleo_id` como referência lógica; `tipo_imovel` gleba/lote). Único `[estudo_id, imovel_nucleo_id]`. |
 | `estudo_membros` | Permissão por estudo (`funcao` leitor/editor/aprovador). Único `[estudo_id, usuario_id]`. |
 | `benchmarks` | Valores de referência por tipo de empreendimento. Único `[tipo_empreendimento, campo]`. |

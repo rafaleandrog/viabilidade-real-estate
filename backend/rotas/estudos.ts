@@ -98,6 +98,55 @@ async function anexarImagemPrincipal(req: Request, estudos: any[]): Promise<void
   }
 }
 
+/**
+ * Agrupa produtos do catálogo Preliminar (`preliminar_produtos`) por
+ * `estudo_id`, mantendo só os estudos pedidos. Parte PURA de
+ * `anexarProdutos`, separada para ter teste — o resto é I/O.
+ */
+export function agruparProdutosPorEstudo(
+  produtos: any[],
+  estudoIds: Set<number>,
+): Map<number, any[]> {
+  const porEstudo = new Map<number, any[]>();
+  for (const p of produtos ?? []) {
+    const eid = Number(p?.estudo_id);
+    if (!estudoIds.has(eid)) continue;
+    if (!porEstudo.has(eid)) porEstudo.set(eid, []);
+    porEstudo.get(eid)!.push(p);
+  }
+  return porEstudo;
+}
+
+/**
+ * Anexa `produtos` (catálogo do Preliminar, #315) a cada estudo da lista.
+ *
+ * Por que existe: `calcularProforma` (frontend/proforma.ts:229) escolhe a
+ * fonte do VGV pela PRESENÇA de `e.produtos` — sem eles cai no ramo legado
+ * (área × preço), e um estudo cujo VGV vem SÓ do catálogo fica com `vgv = 0`.
+ * Na listagem isso virava "—" em VGV, Resultado e Margem, enquanto a aba
+ * Premissas — que passa `produtos` explicitamente (frontend/tela-premissas.ts)
+ * — mostrava os valores certos.
+ *
+ * São INPUTS persistidos, não valores derivados: devolver isto não move
+ * cálculo para o backend (docs/viabilidade/formulas.md continua valendo).
+ *
+ * Uma query só para toda a página, mutação in-place — mesmo padrão de
+ * `anexarImagemPrincipal`. Estudo sem produto fica com lista vazia, que é o
+ * que o motor espera para cair no ramo legado.
+ */
+async function anexarProdutos(req: Request, estudos: any[]): Promise<void> {
+  for (const e of estudos) e.produtos = [];
+  if (estudos.length === 0) return;
+  const ids = new Set(estudos.map((e) => Number(e.id)));
+  // `por_pagina` alto de propósito: a lista de estudos vai a 200 e cada um
+  // pode ter dezenas de produtos, então o teto de 500 do helper de imagem
+  // truncaria silenciosamente — e um truncamento aqui volta a produzir
+  // exatamente o "—" que este helper existe para eliminar.
+  const r = await req.dados!.listar('preliminar_produtos', { por_pagina: 100000 });
+  const porEstudo = agruparProdutosPorEstudo(r.dados, ids);
+  for (const e of estudos) e.produtos = porEstudo.get(Number(e.id)) ?? [];
+}
+
 // ---------------------------------------------------------------
 // POST /estudos — criar (auto-adiciona o criador como editor)
 // ---------------------------------------------------------------
@@ -193,6 +242,7 @@ rotasEstudos.get('/estudos', async (req: Request, res: Response) => {
     }
 
     await anexarImagemPrincipal(req, estudos);
+    await anexarProdutos(req, estudos);
     res.json({ dados: estudos, total: estudos.length });
   } catch (e: any) {
     console.error('Erro em GET /estudos:', e);
