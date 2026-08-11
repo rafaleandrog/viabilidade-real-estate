@@ -8,6 +8,7 @@ import { seriesEconomicasFluxo } from './fluxo-graficos.js';
 import {
   fundingNoFluxo, simularCapitalStack, type InstrumentoDivida,
 } from './capital-stack-motor.js';
+import { proformaAvancado } from './proforma-avancado.js';
 
 const CRONO = [
   { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6 },
@@ -240,4 +241,73 @@ test('#349 com funding: entradas viram receita, saídas entram em Custos Finance
     const esperado = liquida.mensal[m] + capital.mensal[m] - custo.mensal[m];
     assert.ok(Math.abs(esperado - fluxo.mensal[m]) <= 0.01, `conservação mês ${m}`);
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #351 — Proforma do Avançado (2ª sub-aba de Resultados).
+//
+// A razão de existir da proforma derivada do motor (em vez de reusar
+// `calcularProforma` do Preliminar) é não contar história diferente da aba
+// Fluxo de Caixa. Estes testes travam exatamente isso.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#351 proforma: Resultado reconcilia com o fluxo do motor (sem funding)', () => {
+  const c = calcularFluxo(CONFIG_COMPLETA);
+  const p = proformaAvancado(c, 1000);
+  // Sem funding, o Resultado econômico é o mesmo do fluxo: receita líquida
+  // menos todos os custos. Se divergir, as duas sub-abas mentem uma sobre a
+  // outra — que é o defeito que esta implementação existe para evitar.
+  assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01);
+
+  const nome = (n: string) => p.linhas.find((l) => l.nome === n)!;
+  assert.equal(nome('Receita bruta (VGV)').valor, c.receitaBruta);
+  assert.ok(Math.abs(nome('= Receita líquida').valor - soma(c.receitaMensal)) <= 0.01);
+  // A ponte de deduções é a mesma da tabela do fluxo (RET + permuta financeira).
+  assert.ok(nome('(-) Impostos e deduções sobre a receita').valor < 0);
+  // Custo direto + indireto somam o Custo Total do motor.
+  const direto = -nome('= Custo direto total').valor;
+  const indireto = -nome('= Custo indireto total').valor;
+  assert.ok(Math.abs((direto + indireto) - soma(c.custoMensal)) <= 0.01);
+});
+
+test('#351 proforma: custo do funding entra em Custos Financeiros; aporte NÃO vira receita', () => {
+  const c = calcularFluxo(CONFIG_COMPLETA);
+  const fin: InstrumentoDivida = {
+    tipo: 'divida', nome: 'Fin produção', limiteComprometido: 5_000_000, taxaMensal: 0.01,
+    politicaAmortizacao: 'cash_sweep', prioridadeFunding: 1, prioridadePagamento: 1,
+  };
+  const r = simularCapitalStack({
+    nome: 'e43', meses: c.prazo, fluxoLivreMensal: [0, ...c.fluxoMensal],
+    reservaMinima: 0, instrumentos: [fin],
+  });
+  const funding = fundingNoFluxo(r, [{ nome: 'Fin produção', tipo: 'financiamento_producao' }],
+    c.fluxoMensal, CONFIG_COMPLETA.taxaDescontoAa)!;
+  const semFunding = proformaAvancado(c, 1000);
+  const comFunding = proformaAvancado(c, 1000, funding);
+
+  const financeiro = (p: typeof comFunding) => -p.linhas.find((l) => l.nome === '(-) Custos Financeiros')!.valor;
+  const saidas = funding.linhasSaida.reduce((s, l) => s + l.total, 0);
+  assert.ok(saidas > 0, 'a fixture precisa gerar serviço de dívida');
+  assert.ok(Math.abs((financeiro(comFunding) - financeiro(semFunding)) - saidas) <= 0.01,
+    'o custo do funding tem que entrar em Custos Financeiros');
+
+  // Receita bruta e líquida NÃO mudam: liberação de dívida é caixa, não receita.
+  assert.equal(comFunding.vgv, semFunding.vgv);
+  const liquida = (p: typeof comFunding) => p.linhas.find((l) => l.nome === '= Receita líquida')!.valor;
+  assert.equal(liquida(comFunding), liquida(semFunding));
+  // E o Resultado cai exatamente o custo do funding.
+  assert.ok(Math.abs((semFunding.resultado - comFunding.resultado) - saidas) <= 0.01);
+});
+
+test('#351 proforma: R$/m² e % VGV têm base declarada e sobrevivem a área/VGV zero', () => {
+  const c = calcularFluxo(CONFIG_COMPLETA);
+  const p = proformaAvancado(c, 2000);
+  assert.equal(p.areaPrivativa, 2000);
+  assert.equal(p.vgv, c.receitaBruta);
+  assert.ok(Math.abs(p.margemPct - (p.resultado / p.vgv) * 100) <= 1e-9);
+  // Estudo vazio: sem divisão por zero e sem NaN vazando para a tela.
+  const vazio = calcularFluxo({ ...CONFIG, linhasReceita: [], linhasCusto: [] });
+  const pv = proformaAvancado(vazio, 0);
+  assert.equal(pv.margemPct, 0);
+  assert.ok(pv.linhas.every((l) => Number.isFinite(l.valor)));
 });
