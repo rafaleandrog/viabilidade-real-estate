@@ -4,12 +4,57 @@ import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, formatarData } from 
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
 import { calcularProforma } from './proforma.js';
+import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
+import { areaPrivativaTotalLinhas } from './fluxo-shared.js';
+import { proformaAvancado } from './proforma-avancado.js';
+import {
+  receitaLiquidaComCorretagemMensal, simularCapitalStackDoEstudo, fundingNoFluxo,
+  type FundingNoFluxo,
+} from './capital-stack-motor.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo,
   listarGlebasNucleo, listarLotesNucleo,
+  listarReceitasAvancado, listarCustosAvancado, listarCurvas,
+  buscarCronogramaAvancado, buscarParametrosAvancado, listarCapitalInstrumentos,
 } from './viabilidade-api.js';
 import './viabilidade-config-benchmarks.js';
 import './viabilidade-config-curvas.js';
+
+/** VGV / Resultado / Margem prontos para a listagem — a mesma grandeza que a sub-aba Proforma mostra. */
+export interface ResumoListagem { vgv: number; resultado: number; margemPct: number }
+
+/**
+ * #406: um estudo Avançado não tem os campos fixos que `calcularProforma`
+ * (motor do Preliminar) lê — por isso a listagem mostrava "—" em VGV,
+ * Resultado e Margem para todo estudo Avançado, mesmo com os números prontos
+ * na sub-aba Proforma. `calculosAvancado` é preenchido de forma assíncrona
+ * (`_calcularUmAvancado`, cálculo pesado — várias chamadas de API + motor),
+ * então esta função tem TRÊS desfechos possíveis para um estudo Avançado,
+ * não dois:
+ *
+ *   - a chave está ausente do mapa → ainda não terminou de calcular;
+ *   - a chave é `'indisponivel'` → calculou e deu erro, ou não há receita
+ *     modelada (`vgv <= 0`, mesmo guard do Preliminar);
+ *   - a chave tem o resultado → pronto para exibir.
+ *
+ * Pura e exportada para ter teste sem precisar montar o componente Lit —
+ * mesmo padrão de `linhasFinanciaveisPadrao`/`instrumentoDeRegistro` em
+ * `capital-stack-motor.ts`: a lógica de decisão fica testável, a tela só
+ * consome o resultado.
+ */
+export function resumoListagem(
+  linha: any,
+  calculosAvancado: Record<number, ResumoListagem | 'indisponivel'>,
+): ResumoListagem | null | 'carregando' {
+  if (linha.nivel_analise === 'avancado') {
+    const calc = calculosAvancado[linha.id];
+    if (calc === undefined) return 'carregando';
+    if (calc === 'indisponivel') return null;
+    return calc.vgv > 0 ? calc : null;
+  }
+  const p = calcularProforma(linha);
+  return p.vgv > 0 ? { vgv: p.vgv, resultado: p.resultado, margemPct: p.margemLiquidaPct } : null;
+}
 
 @customElement('viab-tela-dashboard')
 export class ViabTelaDashboard extends LitElement {
@@ -18,6 +63,10 @@ export class ViabTelaDashboard extends LitElement {
   @property({ type: String }) aba: 'estudos' | 'terrenos' | 'benchmark' | 'curvas' = 'estudos';
 
   @state() private estudos: any[] = [];
+  // #406: VGV/Resultado/Margem dos estudos Avançados, preenchidos sob demanda
+  // (não bloqueia o primeiro render da tabela — as linhas Preliminar aparecem
+  // na hora, as Avançadas mostram "…" até a própria linha resolver).
+  @state() private calculosAvancado: Record<number, ResumoListagem | 'indisponivel'> = {};
   @state() private carregando = true;
   @state() private filtros: Record<string, string> = {};
   @state() private mostrarForm = false;
@@ -79,6 +128,7 @@ export class ViabTelaDashboard extends LitElement {
 
   private async _carregar() {
     this.carregando = true;
+    this.calculosAvancado = {};
     try {
       const res = await listarEstudos({});
       this.estudos = res?.dados || [];
@@ -86,6 +136,81 @@ export class ViabTelaDashboard extends LitElement {
       console.error('Erro ao listar estudos:', e);
     }
     this.carregando = false;
+    this._calcularAvancados();
+  }
+
+  /**
+   * #406: dispara o cálculo de VGV/Resultado/Margem de todo estudo Avançado
+   * da página — em paralelo, sem bloquear `_carregar()`. `listarCurvas()` é
+   * GLOBAL (não por estudo), então é buscada UMA vez aqui e compartilhada
+   * entre todas as linhas, em vez de N vezes dentro de cada uma.
+   */
+  private async _calcularAvancados() {
+    const avancados = this.estudos.filter((e) => e.nivel_analise === 'avancado');
+    if (avancados.length === 0) return;
+    const curvasRes = await listarCurvas().catch(() => null);
+    const curvas = curvasRes?.erro ? [] : (curvasRes?.dados || []);
+    await Promise.all(avancados.map((e) => this._calcularUmAvancado(e, curvas)));
+  }
+
+  /**
+   * Reproduz exatamente o caminho da sub-aba Proforma (`tela-fluxo-ver.ts`
+   * `_carregar`/`_recalcular`, com `funding` incluído quando há Capital
+   * Stack ativo) — para que o número da listagem nunca divirja do que o
+   * usuário vê ao abrir o estudo. Cada linha resolve de forma independente:
+   * uma falha não derruba as demais.
+   */
+  private async _calcularUmAvancado(estudo: any, curvas: any[]) {
+    try {
+      const [receitas, custos, crono, params, camadas] = await Promise.all([
+        listarReceitasAvancado(estudo.id),
+        listarCustosAvancado(estudo.id),
+        buscarCronogramaAvancado(estudo.id),
+        buscarParametrosAvancado(estudo.id),
+        listarCapitalInstrumentos(estudo.id),
+      ]);
+      const linhasReceita = receitas?.erro ? [] : (receitas.dados || []);
+      const linhasCusto = custos?.erro ? [] : (custos.dados || []);
+      const cronograma = crono?.erro ? [] : (crono.dados || []);
+      const camadasAtivas = camadas?.erro ? [] : (camadas.dados || []);
+      const taxaDescontoAa = params?.erro ? 12 : Number(params.taxa_desconto_aa ?? 12);
+      const config: FluxoConfig = {
+        dataInicio: params?.erro ? null : (params.data_inicio_projeto ?? null),
+        taxaDescontoAa,
+        cronograma,
+        linhasReceita,
+        linhasCusto,
+        curvas,
+        areaTerreno: Number(estudo?.terreno_manual_area) || Number(estudo?.area_terreno_nucleo) || 0,
+        ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+      };
+      const c = calcularFluxo(config);
+
+      // §13.3: só camadas ATIVAS têm efeito — sem nenhuma, `funding` fica
+      // `null` e `proformaAvancado` calcula desalavancado (mesma regra da
+      // tela de Resultados, blast radius zero sem Capital Stack).
+      let funding: FundingNoFluxo | null = null;
+      if (camadasAtivas.length > 0) {
+        const receitaLiquida = receitaLiquidaComCorretagemMensal(c.receitaMensal, c.linhasCusto, linhasCusto);
+        const fluxoLivre1based = [0, ...c.fluxoMensal];
+        const receitaLiquida1based = [0, ...receitaLiquida];
+        const resultadoCapitalStack = simularCapitalStackDoEstudo(
+          fluxoLivre1based, receitaLiquida1based, camadasAtivas, c.linhasCusto, 0,
+          { custosRaw: linhasCusto, cronograma },
+        );
+        funding = fundingNoFluxo(resultadoCapitalStack, camadasAtivas, c.fluxoMensal, taxaDescontoAa);
+      }
+
+      const area = areaPrivativaTotalLinhas(linhasReceita);
+      const p = proformaAvancado(c, area, funding);
+      this.calculosAvancado = {
+        ...this.calculosAvancado,
+        [estudo.id]: { vgv: p.vgv, resultado: p.resultado, margemPct: p.margemPct },
+      };
+    } catch (e) {
+      console.error(`Erro ao calcular VGV/Resultado/Margem do estudo ${estudo.id}:`, e);
+      this.calculosAvancado = { ...this.calculosAvancado, [estudo.id]: 'indisponivel' };
+    }
   }
 
   render() {
@@ -134,8 +259,16 @@ export class ViabTelaDashboard extends LitElement {
   }
 
   private _colunas() {
-    const numero = (fn: (p: any) => string): (l: unknown) => string =>
-      (l) => { const p = calcularProforma(l as any); return p.vgv > 0 ? fn(p) : '—'; };
+    // #406: "…" enquanto a linha Avançada ainda está calculando (assíncrono,
+    // não bloqueia o resto da tabela); "—" quando terminou e não há dado
+    // suficiente — mesmo guard de sempre (`vgv > 0`), agora também para o
+    // Avançado. Preliminar não muda: mesma chamada síncrona de antes.
+    const numero = (fn: (p: ResumoListagem) => string): (l: unknown) => string =>
+      (l) => {
+        const r = resumoListagem(l, this.calculosAvancado);
+        if (r === 'carregando') return '…';
+        return r ? fn(r) : '—';
+      };
     return [
       { id: 'nome', label: 'Estudo', valor: (l: any) => l.nome_exibicao || l.nome },
       {
@@ -148,7 +281,7 @@ export class ViabTelaDashboard extends LitElement {
       },
       { id: 'vgv', label: 'VGV', alinhamento: 'direita', valor: numero((p) => fmtR$(p.vgv)) },
       { id: 'resultado', label: 'Resultado', alinhamento: 'direita', valor: numero((p) => fmtR$(p.resultado)) },
-      { id: 'margem', label: 'Margem', alinhamento: 'direita', valor: numero((p) => fmtPct(p.margemLiquidaPct)) },
+      { id: 'margem', label: 'Margem', alinhamento: 'direita', valor: numero((p) => fmtPct(p.margemPct)) },
       {
         id: 'status', label: 'Status',
         render: (l: any) => html`<urbi-badge cor=${COR_STATUS[l.status] ?? 'padrao'}>${STATUS_LABEL[l.status] || l.status}</urbi-badge>`,
