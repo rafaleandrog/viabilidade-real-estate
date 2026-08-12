@@ -163,7 +163,7 @@ export function resolverTravamentoCusto(
  * `null` = `fase_ancora_id` inválido (fase inexistente, de outro estudo, ou
  * do tipo `receita` — só fases `cronograma` servem de âncora).
  */
-async function ancorarLinhaCustoEmFase(
+export async function ancorarLinhaCustoEmFase(
   req: Request,
   estudoId: number,
   faseAncoraId: number,
@@ -373,7 +373,7 @@ function exigirAdminApp(req: Request, res: Response): boolean {
  * `pre_lancamento` é excluído do resultado — `recalcularTravados` ancora o
  * Lançamento direto no fim do Planejamento nesse caso.
  */
-async function lerCronograma(req: Request, estudo: { id: number; tem_pre_lancamento?: unknown }): Promise<{ linhas: LinhaCronograma[]; ids: Map<string, number> }> {
+export async function lerCronograma(req: Request, estudo: { id: number; tem_pre_lancamento?: unknown }): Promise<{ linhas: LinhaCronograma[]; ids: Map<string, number> }> {
   const r = await req.dados!.listar('avancado_cronograma', { filtros: { estudo_id: estudo.id }, por_pagina: 10 });
   const ids = new Map<string, number>();
   const salvos = new Map<string, LinhaCronograma>();

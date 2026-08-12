@@ -254,23 +254,22 @@ export function removerCustoAvancado(estudoId: number, cid: number): Promise<any
   return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos/${cid}`, { method: 'DELETE' });
 }
 
-// ── Avançado: Capital Stack — camadas (epic #239, FIN-02/#271) ──
-// Nenhuma tela consome estas funções ainda — a interface é a FIN-08 (#277).
-export function listarCapitalInstrumentos(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/capital-instrumentos`);
+// ── Avançado: Funding — operações (#355, substitui o Capital Stack) ──
+export function listarFundingOperacoes(estudoId: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/funding`);
 }
-export function criarCapitalInstrumento(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/capital-instrumentos`, {
+export function criarFundingOperacao(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/funding`, {
     method: 'POST', body: JSON.stringify(dados),
   });
 }
-export function atualizarCapitalInstrumento(estudoId: number, cid: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/capital-instrumentos/${cid}`, {
+export function atualizarFundingOperacao(estudoId: number, oid: number, dados: Record<string, any>): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/funding/${oid}`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
-export function removerCapitalInstrumento(estudoId: number, cid: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/capital-instrumentos/${cid}`, { method: 'DELETE' });
+export function removerFundingOperacao(estudoId: number, oid: number): Promise<any> {
+  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/funding/${oid}`, { method: 'DELETE' });
 }
 
 // ── Avançado: Cenários salvos (Etapa 8 · #56) ──

@@ -47,12 +47,13 @@ const OPT_REGIME: Op[] = [
 // Number(...) no salvar.
 //
 // #239/FIN-10 (#279): `financiamento_*`, `investidor_*` e `estrutura_*_pct`
-// SAÍRAM daqui (§13.4 — "o que foi substituído sai da interface"). O
-// Capital Stack (`viab-capital-stack`, FIN-08/#277) cobre financiamento à
-// produção e Preferred Equity com o mesmo dado, de forma derivada (§2.6),
-// não mais como input solto. As colunas continuam existindo no schema —
-// dado histórico preservado — só o formulário saiu; nenhum motor de
-// cálculo as lia (confirmado antes desta issue: zero ocorrências em
+// SAÍRAM daqui (§13.4 — "o que foi substituído sai da interface"). O Capital
+// Stack (`viab-capital-stack`, FIN-08/#277) cobriu financiamento à produção e
+// Preferred Equity com o mesmo dado, de forma derivada (§2.6), não mais como
+// input solto — e a #355 substituiu esse componente por `viab-funding`
+// (aba "Funding"), preservando a mesma regra. As colunas continuam existindo
+// no schema — dado histórico preservado — só o formulário saiu; nenhum motor
+// de cálculo as lia (confirmado antes da #279: zero ocorrências em
 // fluxo-caixa-motor.ts, fluxo-shared.ts, proforma.ts).
 const CAMPOS_NUM: string[] = [
   'taxa_desconto_aa',
@@ -157,7 +158,7 @@ export class ViabTelaFinanceiro extends LitElement {
     return html`
       <urbi-banner variante="info">
         Estrutura de capital, financiamento à produção e investidores agora vivem na aba
-        <strong>Capital Stack</strong> — camadas com aporte, liberação e retorno mês a mês, em vez de
+        <strong>Funding</strong> — operações com aporte, liberação e retorno mês a mês, em vez de
         percentuais informativos soltos.
       </urbi-banner>
       <urbi-card titulo="Custos Financeiros">

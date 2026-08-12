@@ -2,11 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   validarFluxoCalc, validarComponentesSafra, validarPermutaFisica, permutaFisicaPorTipologia,
-  validarProduto, validarContratacao, validarSafrasReceita, validarCapitalStack, validarCustosDuplicados,
+  validarProduto, validarContratacao, validarSafrasReceita, validarFunding, validarCustosDuplicados,
   unidadesNaoAlocadasPorTipologia, TOLERANCIA_PADRAO,
 } from './fluxo-invariantes.js';
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
-import type { ResultadoCapitalStack } from './capital-stack-motor.js';
+import type { FundingCalc, OperacaoFunding } from './funding-motor.js';
 
 // FluxoCalc mínimo para exercitar validarFluxoCalc — só os campos que a
 // invariante lê precisam existir de fato.
@@ -410,42 +410,53 @@ test('#340 unidadesNaoAlocadasPorTipologia: sobre-alocada (excede estoque) tamb�
   assert.deepEqual(r, []);
 });
 
-function capitalBase(): ResultadoCapitalStack {
+const OP_BANCO: OperacaoFunding = { tipo: 'divida', nome: 'Banco', valor: 0, inicio_mes: 0 };
+
+function fundingBase(saldoBanco: number[], entradas: number[], saidas: number[]): FundingCalc {
+  const fluxoMensal = saldoBanco.map((_, t) => 0 + (entradas[t] ?? 0) - (saidas[t] ?? 0));
   return {
-    lacunaFundingMensal: [0, 0], lacunaFundingMaxima: 0, caixaProjetoMensal: [0, 100],
-    liberacaoPorInstrumento: {}, jurosPorInstrumento: {}, amortizacaoPorInstrumento: {},
-    saldoDividaPorInstrumento: {},
-    custoElegivelPorInstrumento: {}, custoElegivelAcumuladoPorInstrumento: {},
-    percentualIncorridoPorInstrumento: {}, liberacaoHabilitadaPorInstrumento: {},
-    alvoAcumuladoPorInstrumento: {}, liberacaoAcumuladaPorInstrumento: {},
-    caixaDisponivelAmortizacaoPorInstrumento: {},
-    aportePorInstrumentoPE: {}, devolucaoPrincipalPE: {},
-    remuneracaoPagaPE: {}, remuneracaoAcumuladaFinalPE: {}, capitalNaoDevolvidoFinalPE: {},
-    remuneracaoAcumuladaPorInstrumentoPE: {}, capitalNaoDevolvidoPorInstrumentoPE: {},
-    participacaoReceitaPE: {}, participacaoResidualPE: {}, participacaoLucroPE: {},
-    aporteSponsorMensal: [0, 0], distribuicaoSponsorMensal: [0, 0],
-    aportePorInstrumentoSponsor: {}, distribuicaoPorInstrumentoSponsor: {},
+    operacoes: [{
+      operacao: OP_BANCO, entradas, saidas,
+      fluxoInvestidor: saidas.map((v, t) => v - entradas[t]),
+      juros: saldoBanco.map(() => 0), saldo: saldoBanco,
+    }],
+    noFluxo: {
+      entradas, saidas, linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal, fluxoAcumulado: [], vplLiquido: 0,
+    },
   };
 }
 
-test('validarCapitalStack: caixa reconciliado e dívida zerada não divergem', () => {
-  const r = capitalBase();
-  r.saldoDividaPorInstrumento = { Banco: [0, 0] };
-  assert.deepEqual(validarCapitalStack(r, [100]), []);
+test('validarFunding: dívida zerada e fluxo reconciliado não divergem', () => {
+  const calc = fundingBase([0, 0], [0, 0], [0, 0]);
+  assert.deepEqual(validarFunding(calc, [0, 0]), []);
 });
 
-test('validarCapitalStack: acusa dívida terminal e primeira quebra da reconciliação', () => {
-  const r = capitalBase();
-  r.caixaProjetoMensal[1] = 90;
-  r.saldoDividaPorInstrumento = { Banco: [0, 25] };
-  const divs = validarCapitalStack(r, [100]);
+test('validarFunding: acusa dívida terminal e quebra da reconciliação do fluxo alavancado', () => {
+  const calc = fundingBase([0, 25], [0, 0], [0, 0]);
+  calc.noFluxo.fluxoMensal = [0, 999]; // não bate com fluxoLivre + entradas − saídas
+  const divs = validarFunding(calc, [0, 100]);
   assert.equal(divs.find((d) => d.codigo === 'DIVIDA_FINAL_NAO_ZERA')?.linha, 'Banco');
-  assert.equal(divs.find((d) => d.codigo === 'FLUXO_FUNDING_NAO_RECONCILIA')?.mes, 0);
+  assert.equal(divs.find((d) => d.codigo === 'FLUXO_FUNDING_NAO_RECONCILIA')?.mes, 1);
 });
 
-test('validarCapitalStack: lacuna é alerta de premissa, não erro de implementação', () => {
-  const r = capitalBase();
-  r.lacunaFundingMensal = [0, 30]; r.lacunaFundingMaxima = 30;
-  const div = validarCapitalStack(r, [100]).find((d) => d.codigo === 'LACUNA_FUNDING');
-  assert.equal(div?.severidade, 'alerta');
+test('validarFunding: acusa saldo devedor negativo', () => {
+  const calc = fundingBase([0, -10], [0, 0], [0, 0]);
+  const divs = validarFunding(calc, [0, 0]);
+  assert.equal(divs.find((d) => d.codigo === 'DIVIDA_NEGATIVA')?.mes, 1);
+});
+
+test('validarFunding: equity (sem saldo) não é checado pela invariante de dívida', () => {
+  const equity: FundingCalc = {
+    operacoes: [{
+      operacao: { tipo: 'equity', nome: 'Investidor', valor: 0, inicio_mes: 0 },
+      entradas: [100, 0], saidas: [0, 50], fluxoInvestidor: [-100, 50],
+      juros: [0, 0], saldo: [0, 0],
+    }],
+    noFluxo: {
+      entradas: [100, 0], saidas: [0, 50], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [100, -50], fluxoAcumulado: [100, 50], vplLiquido: 0,
+    },
+  };
+  assert.deepEqual(validarFunding(equity, [0, 0]), []);
 });

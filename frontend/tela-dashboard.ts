@@ -5,17 +5,17 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
 import { calcularProforma } from './proforma.js';
 import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { areaPrivativaTotalLinhas } from './fluxo-shared.js';
+import { areaPrivativaTotalLinhas, mesRepasse } from './fluxo-shared.js';
 import { proformaAvancado } from './proforma-avancado.js';
 import {
-  receitaLiquidaComCorretagemMensal, simularCapitalStackDoEstudo, fundingNoFluxo,
+  receitaLiquidaComCorretagemMensal, fundingDoEstudo,
   type FundingNoFluxo,
-} from './capital-stack-motor.js';
+} from './funding-motor.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo,
   listarGlebasNucleo, listarLotesNucleo,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
-  buscarCronogramaAvancado, buscarParametrosAvancado, listarCapitalInstrumentos,
+  buscarCronogramaAvancado, buscarParametrosAvancado, listarFundingOperacoes,
 } from './viabilidade-api.js';
 import './viabilidade-config-benchmarks.js';
 import './viabilidade-config-curvas.js';
@@ -162,17 +162,17 @@ export class ViabTelaDashboard extends LitElement {
    */
   private async _calcularUmAvancado(estudo: any, curvas: any[]) {
     try {
-      const [receitas, custos, crono, params, camadas] = await Promise.all([
+      const [receitas, custos, crono, params, operacoes] = await Promise.all([
         listarReceitasAvancado(estudo.id),
         listarCustosAvancado(estudo.id),
         buscarCronogramaAvancado(estudo.id),
         buscarParametrosAvancado(estudo.id),
-        listarCapitalInstrumentos(estudo.id),
+        listarFundingOperacoes(estudo.id),
       ]);
       const linhasReceita = receitas?.erro ? [] : (receitas.dados || []);
       const linhasCusto = custos?.erro ? [] : (custos.dados || []);
       const cronograma = crono?.erro ? [] : (crono.dados || []);
-      const camadasAtivas = camadas?.erro ? [] : (camadas.dados || []);
+      const operacoesFunding = operacoes?.erro ? [] : (operacoes.dados || []);
       const taxaDescontoAa = params?.erro ? 12 : Number(params.taxa_desconto_aa ?? 12);
       const config: FluxoConfig = {
         dataInicio: params?.erro ? null : (params.data_inicio_projeto ?? null),
@@ -186,19 +186,19 @@ export class ViabTelaDashboard extends LitElement {
       };
       const c = calcularFluxo(config);
 
-      // §13.3: só camadas ATIVAS têm efeito — sem nenhuma, `funding` fica
-      // `null` e `proformaAvancado` calcula desalavancado (mesma regra da
-      // tela de Resultados, blast radius zero sem Capital Stack).
+      // Sem operações de Funding, `fundingDoEstudo` devolve `null` e
+      // `proformaAvancado` calcula desalavancado (mesma regra da tela de
+      // Resultados, blast radius zero em estudo sem captação).
       let funding: FundingNoFluxo | null = null;
-      if (camadasAtivas.length > 0) {
+      if (operacoesFunding.length > 0) {
         const receitaLiquida = receitaLiquidaComCorretagemMensal(c.receitaMensal, c.linhasCusto, linhasCusto);
-        const fluxoLivre1based = [0, ...c.fluxoMensal];
-        const receitaLiquida1based = [0, ...receitaLiquida];
-        const resultadoCapitalStack = simularCapitalStackDoEstudo(
-          fluxoLivre1based, receitaLiquida1based, camadasAtivas, c.linhasCusto, 0,
-          { custosRaw: linhasCusto, cronograma },
+        const resultadoFinal = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] ?? 0;
+        const fundingCalc = fundingDoEstudo(
+          operacoesFunding, c.fluxoMensal, receitaLiquida, resultadoFinal,
+          mesRepasse(cronograma), taxaDescontoAa,
+          { custosRaw: linhasCusto, linhasCusto: c.linhasCusto, cronograma },
         );
-        funding = fundingNoFluxo(resultadoCapitalStack, camadasAtivas, c.fluxoMensal, taxaDescontoAa);
+        funding = fundingCalc?.noFluxo ?? null;
       }
 
       const area = areaPrivativaTotalLinhas(linhasReceita);

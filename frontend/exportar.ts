@@ -8,7 +8,7 @@ import type { Proforma } from './proforma.js';
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
-import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './capital-stack-motor.js';
+import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
 const pct1 = (v: number) => v.toFixed(1).replace('.', ',');

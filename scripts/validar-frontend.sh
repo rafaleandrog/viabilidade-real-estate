@@ -117,8 +117,10 @@ rm -f tsconfig.frontend.json
 
 echo "== 5/5 testes de frontend + build do bundle =="
 # `frontend/*.test.ts` NÃO alcança subdiretório: até 2026-08-11 os 16 golden
-# cases do Capital Stack (frontend/fixtures/capital-stack-golden.test.ts)
-# nunca rodaram, nem aqui nem no `pnpm test`. O segundo glob conserta isso.
+# cases do Capital Stack (frontend/fixtures/capital-stack-golden.test.ts, hoje
+# apagado — a #355 substituiu o modelo) nunca rodaram, nem aqui nem no
+# `pnpm test`. O segundo glob conserta isso, e continua necessário pelos
+# golden cases de recebíveis (frontend/fixtures/calliandra-golden.test.ts).
 com_limite 300 node --import tsx/esm --test --test-timeout=60000 frontend/*.test.ts frontend/fixtures/*.test.ts
 tst=$?
 [ $tst -eq 0 ] || { echo "  testes FALHARAM"; exit 1; }

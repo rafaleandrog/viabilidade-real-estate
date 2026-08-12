@@ -3,7 +3,7 @@ import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
-import { type FundingNoFluxo, type LinhaFinanciamentoProducao } from './capital-stack-motor.js';
+import { type FundingNoFluxo, type LinhaFinanciamentoProducao } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
 // ─────────────────────────────────────────────────────────────────────────

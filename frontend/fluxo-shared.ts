@@ -614,6 +614,19 @@ export function marcosObra(crono: EventoCrono[]): { inicioObra: number; fimObra:
 }
 
 /**
+ * Mês do repasse/entrega das chaves (0-based) — o mês SEGUINTE ao último mês
+ * de obra (`marcosObra(crono).mesEntrega + 1`). É o marco que o Equity em
+ * modo `resultado_final` usa para pagar de uma vez (`funding-motor.ts`), e o
+ * mesmo que `REPASSE_MESES_APOS_ENTREGA` usa em `fluxo-caixa-motor.ts` para
+ * os recebíveis do cliente — uma fonte só para "quando o repasse acontece".
+ * `0` quando o cronograma não tem evento `obra`.
+ */
+export function mesRepasse(crono: EventoCrono[]): number {
+  const marcos = marcosObra(crono ?? []);
+  return marcos ? marcos.mesEntrega + 1 : 0;
+}
+
+/**
  * Regime de cronograma de uma linha de custo (#255).
  *
  * Por que existe: esta classificação estava INLINE no render de

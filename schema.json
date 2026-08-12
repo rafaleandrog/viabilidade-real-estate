@@ -394,6 +394,32 @@
       "indices": [["estudo_id"]]
     },
 
+    "avancado_funding_operacoes": {
+      "acesso_externo": "restrito",
+      "colunas": {
+        "estudo_id":                     { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
+        "tipo":                          { "tipo": "texto", "limite": 30, "opcoes": ["financiamento_producao", "divida", "equity"], "obrigatorio": true },
+        "nome":                          { "tipo": "texto", "limite": 100, "obrigatorio": true },
+        "ordem":                         { "tipo": "inteiro", "padrao": 0 },
+        "valor":                         { "tipo": "decimal", "precisao": 15, "escala": 2, "padrao": 0 },
+        "cronograma_evento":             { "tipo": "texto", "limite": 20, "opcoes": ["planejamento", "pre_lancamento", "lancamento", "obra", "pos_obra", "customizado"], "padrao": "customizado" },
+        "fase_ancora_id":                { "tipo": "referencia", "tabela_ref": "avancado_fases", "ao_deletar": "anular" },
+        "inicio_mes":                    { "tipo": "inteiro", "padrao": 0 },
+        "distribuir_aporte":             { "tipo": "booleano", "padrao": false },
+        "aporte_meses":                  { "tipo": "inteiro", "padrao": 1 },
+        "taxa_anual":                    { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "periodo_amortizacao_meses":     { "tipo": "inteiro", "padrao": 0 },
+        "periodo_carencia_meses":        { "tipo": "inteiro", "padrao": 0 },
+        "modo_retorno":                  { "tipo": "texto", "limite": 20, "opcoes": ["permuta_financeira", "resultado_final"], "padrao": "permuta_financeira" },
+        "pct_retorno":                   { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "exposicao_minima":              { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 20 },
+        "percentual_financiavel":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 80 },
+        "amortizar_com_caixa_disponivel":{ "tipo": "booleano", "padrao": true },
+        "custo_linha_ids":               { "tipo": "json" }
+      },
+      "indices": [["estudo_id"]]
+    },
+
     "avancado_cenarios": {
       "acesso_externo": "restrito",
       "colunas": {
