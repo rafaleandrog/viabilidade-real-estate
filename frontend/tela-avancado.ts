@@ -11,7 +11,7 @@ import './tela-fluxo-receitas.js';
 import './tela-fluxo-custos.js';
 import './tela-fluxo-ver.js';
 import './tela-financeiro.js';
-import './tela-capital-stack.js';
+import './tela-funding.js';
 import './tela-resumo.js';
 import './tela-analise-mercado.js';
 
@@ -91,9 +91,10 @@ const SUBABAS: Partial<Record<AbaTopo, SubAba[]>> = {
   viabilidade: [
     { id: 'receitas',   label: 'Receitas',   icone: 'fa-solid fa-hand-holding-dollar' },
     { id: 'financeiro', label: 'Financeiro', icone: 'fa-solid fa-percent' },
-    // #239/FIN-08: aditiva — o Bloco G (aba "Financeiro" acima) continua
-    // existindo até a FIN-10 (#279) decidir o que sai da interface (§13.4).
-    { id: 'capital-stack', label: 'Capital Stack', icone: 'fa-solid fa-building-columns' },
+    // #355: substitui a aba Capital Stack (#239/FIN-08). O Bloco G (aba
+    // "Financeiro" acima) continua existindo até a FIN-10 (#279) decidir o
+    // que sai da interface (§13.4).
+    { id: 'funding', label: 'Funding', icone: 'fa-solid fa-building-columns' },
   ],
   // #351: Resultados (id interno 'fluxo') em 3 abas. As três leem o MESMO
   // `viab-fluxo-ver`, com a prop `vista` — um único componente carrega e roda
@@ -284,8 +285,8 @@ export class ViabTelaAvancado extends LitElement {
       switch (sub) {
         case 'financeiro':
           return html`<viab-tela-financeiro .estudo=${this.estudo} .editavel=${this._editavelPremissas}></viab-tela-financeiro>`;
-        case 'capital-stack':
-          return html`<viab-capital-stack .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-capital-stack>`;
+        case 'funding':
+          return html`<viab-funding .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-funding>`;
         // Premissas removida no Avançado (#88): a página abre em Receitas.
         case 'receitas':
         default:

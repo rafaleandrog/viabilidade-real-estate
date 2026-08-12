@@ -58,6 +58,35 @@ const SEED = {
       config: { percentualFinanciavel: 0.7, taxaAnual: 0.12, sistemaAmortizacao: 'price', prazoMeses: 36, carenciaMeses: 12 },
       origem_legado: 'financiamento_bloco_g', ordem: 0,
     },
+    // Exercita o caminho `capital_giro` → `divida` da 029 (liberação
+    // distribuída, política ≠ price → `[revisar]`), sem o qual só o
+    // early-return de tabela vazia seria testado.
+    {
+      id: 2, estudo_id: 1, tipo: 'capital_giro', nome: 'Capital de giro',
+      status: 'ativo', prioridade_funding: 1, prioridade_pagamento: 1, compromisso: 5_000_000,
+      config: {
+        taxaAnual: 0.14, politicaAmortizacao: 'cash_sweep', carenciaMeses: 6, prazoMeses: 24,
+        liberacaoProgramada: [{ mes: 1, valor: 2_500_000 }, { mes: 2, valor: 2_500_000 }],
+      },
+      ordem: 1,
+    },
+    // Exercita `preferred_equity` modo C → `equity` permuta_financeira (o
+    // único modo que converte com remuneração real, sem `[revisar]`... na
+    // verdade sempre leva `[revisar]` por decisão da 029, mas com
+    // pct_retorno preenchido em vez de zerado).
+    {
+      id: 3, estudo_id: 1, tipo: 'preferred_equity', nome: 'Investidor C',
+      status: 'ativo', prioridade_funding: 0, prioridade_pagamento: 0, compromisso: 1_000_000,
+      config: { modo: 'C', percentualReceitaLiquida: 0.05, aportes: [{ mes: 1, valor: 1_000_000 }] },
+      ordem: 2,
+    },
+    // Exercita `sponsor_equity` → `equity` inerte (sem modo equivalente).
+    {
+      id: 4, estudo_id: 1, tipo: 'sponsor_equity', nome: 'Sponsor',
+      status: 'ativo', prioridade_funding: 0, prioridade_pagamento: 0, compromisso: 0,
+      config: { aportesProgramados: [{ mes: 1, valor: 2_000_000 }] },
+      ordem: 3,
+    },
   ],
 };
 

@@ -1,6 +1,6 @@
 ---
 titulo: Funding, Capital Stack e Retorno do Capital
-descricao: Modelo funcional de referência para financiamento à produção, capital de giro, equity preferencial e capital do incorporador no estudo Avançado — necessidade de funding, waterfall de pagamentos, retorno por instrumento e reconciliação mensal.
+descricao: ADR do modelo de Capital Stack (4 instrumentos com waterfall), supersedido pela #355 — preserva vigente só a §4.3 (Financiamento à produção, catch-up retroativo); Dívida e Equity mudaram para fluxo-investidor-formulas.md.
 tipo: app
 ordem: 8
 ---
@@ -8,7 +8,34 @@ ordem: 8
 
 # Funding, Capital Stack e Retorno do Capital
 
-> ✅ **Este documento descreve COMPORTAMENTO VIGENTE** desde o fechamento da FIN-10 (#279).
+> 🔴 **Reescrita pela #355 em 2026-08-12 — este documento é agora majoritariamente ADR/histórico.**
+> O modelo de **4 instrumentos com waterfall** que o resto deste arquivo descreve (Sponsor Equity
+> §4.1, Preferred Equity §4.2, Capital de giro/dívida ponte §4.4, prioridade de funding §5,
+> waterfall de pagamentos §6, ordem mensal do motor §7, KPIs §8, interface §9, relatórios §10,
+> validações §12, migração §13) foi **substituído** por 3 operações independentes — sem waterfall,
+> sem prioridades, sem competição por caixa — especificadas em
+> **[Fluxo do Investidor — fórmulas das operações de Funding](fluxo-investidor-formulas)**:
+> `financiamento_producao` (única por estudo), `divida` (livre) e `equity` (2 modos). Tabela nova:
+> `avancado_funding_operacoes` (migração `029`); motor novo: `frontend/funding-motor.ts`; tela nova:
+> `frontend/tela-funding.ts` (`viab-funding`, aba "Funding"). O modelo antigo (tabela
+> `avancado_capital_instrumentos`, migração `019`, `frontend/capital-stack-motor.ts`,
+> `viab-capital-stack`) foi apagado do código — **as seções abaixo que o descrevem ficam só como
+> registro de decisão (ADR)**, não como comportamento vigente.
+>
+> **Exceção: a §4.3 (Financiamento à produção) continua vigente**, palavra por palavra — é o único
+> pedaço do modelo antigo que a #355 preservou de propósito (decisão do autor, 2026-08-12): a
+> planilha nova (`fluxo_investidor_FORMULAS`) modelaria `financiamento_producao` como dívida de
+> calendário, o que reverteria o catch-up retroativo aprovado nesta seção. A matemática da §4.3 foi
+> só **realocada** para `simularFinanciamentoProducao` em `frontend/funding-motor.ts` — onde este
+> texto cita `frontend/capital-stack-motor.ts`, leia `frontend/funding-motor.ts`.
+>
+> Por que o texto não foi todo reescrito: as seções supersedidas continuam sendo a referência de
+> **por que** os 4 instrumentos, o waterfall e as prioridades existiam e o que cada decisão resolvia
+> — útil para quem perguntar "por que não voltamos ao waterfall". O comportamento **atual**, porém,
+> é só o que `fluxo-investidor-formulas.md` e a §4.3 abaixo descrevem.
+
+> ✅ **Este documento descrevia COMPORTAMENTO VIGENTE** desde o fechamento da FIN-10 (#279) — texto
+> original preservado abaixo como histórico da epic #239, que a #355 substituiu.
 >
 > O aviso anterior — *"nada neste documento descreve o runtime atual"* — valia quando a aba
 > `Viabilidade → Financeiro` era inteiramente inerte, com ~25 controles que nenhum motor lia. A epic
@@ -229,6 +256,8 @@ ser criados quando não puderem ser representados por estes motores.
 
 ### 4.1 Sponsor Equity — capital do incorporador
 
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
+
 **Função:** cobrir capital próprio exigido · cobrir a necessidade residual não atendida pelas
 demais fontes · receber o residual econômico depois das prioridades contratadas.
 
@@ -242,6 +271,8 @@ líquida (percentual mensal, sem devolução separada de principal).
 > residual, os percentuais residuais devem somar **100%**.
 
 ### 4.2 Preferred Equity — equity preferencial
+
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
 
 **Função:** aportar capital com prioridade econômica sobre o sponsor; receber principal e
 remuneração conforme a waterfall contratada; opcionalmente participar do residual ou da receita
@@ -417,8 +448,9 @@ amortizacao_t = amortizacao_permitida_t
 **Por que `caixa_disponivel` exclui a liberação do próprio mês.** Se não excluísse, a liberação do
 banco pagaria a si mesma no mês em que entrou — o mesmo real gasto duas vezes. No motor isso é um
 snapshot: o caixa é congelado logo depois do fluxo livre do mês entrar e antes de qualquer liberação
-ou aporte (`caixaAntesFunding`, `frontend/capital-stack-motor.ts`). Instrumentos nesta modalidade
-sacam dessa piscina congelada; os demais, do caixa corrente. Todo pagamento abate as duas.
+(`caixaAntesFunding`, `frontend/funding-motor.ts` → `simularFinanciamentoProducao`). Esta é a ÚNICA
+operação de Funding cujo desembolso/amortização depende do caixa do projeto — `divida` e `equity`
+seguem a matemática de calendário de `fluxo-investidor-formulas.md`, sem checar caixa algum.
 
 **O toggle e as chaves.** Com `amortizar_com_caixa_disponivel = false`, nada é pago antes da entrega
 — mesmo com caixa sobrando. Depois da entrega a amortização passa a ser **obrigatória**, marcado ou
@@ -468,6 +500,8 @@ carência) · **Price** (parcela constante após carência).
 
 ### 4.4 Capital de giro / dívida ponte
 
+> 🔴 **Supersedida pela #355 (2026-08-12).** `capital_giro` virou `divida` no modelo novo (calendário + Price com carência, sem cash sweep automático nem gate de chaves) — ADR/histórico. Ver o banner do topo do documento.
+
 **Função:** cobrir descasamentos de caixa não atendidos pelo financiamento à produção; financiar
 despesas não elegíveis ou períodos intermediários. **Não depende** de medição de custos elegíveis.
 
@@ -488,6 +522,8 @@ medição de custo, e essa continua sendo a regra dele.
 
 ## 5. Prioridade de funding
 
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
+
 **Modelo funcional de referência.**
 
 Cada instrumento recebe uma **ordem de utilização**. No mês, o motor deve:
@@ -507,6 +543,8 @@ alertar quando a configuração gerar circularidade ou uso impossível.
 ---
 
 ## 6. Waterfall de pagamentos e distribuições
+
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
 
 **Modelo funcional de referência.**
 
@@ -573,6 +611,8 @@ contratual, **sem empurrar valores para um mês artificial**.
 
 ## 7. Ordem mensal completa do motor
 
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
+
 **Modelo funcional de referência.**
 
 1. calcular vendas, recebimentos, repasse, impostos, permuta financeira e custos;
@@ -596,6 +636,8 @@ contratual, **sem empurrar valores para um mês artificial**.
 ---
 
 ## 8. KPIs
+
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
 
 **Modelo funcional de referência.**
 
@@ -631,6 +673,8 @@ remuneração acumulada · retorno total · payback · mês do último recebimen
 
 ## 9. Interface da aba Financeiro
 
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
+
 **Modelo funcional de referência.** Entrega em `FIN-08` (#277).
 
 **Resumo superior:** exposição máxima sem funding · capital comprometido total · capital utilizado
@@ -658,6 +702,8 @@ lacuna, dívida terminal, retorno não pago e configuração incompatível.
 ---
 
 ## 10. Fluxo de Caixa e relatórios
+
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
 
 **Modelo funcional de referência.** Entrega em `FIN-09` (#278).
 
@@ -696,6 +742,8 @@ Exportação CSV/PDF e cenários devem usar **exatamente os mesmos arrays** do m
 
 ## 11. Cenários
 
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
+
 **Modelo funcional de referência.**
 
 Toda mudança de preço, custo, absorção ou recebimento deve recalcular automaticamente: necessidade
@@ -711,6 +759,8 @@ percentual financiável, limite de dívida, retorno preferencial e participaçã
 ---
 
 ## 12. Validações e invariantes
+
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
 
 **Modelo funcional de referência.**
 
@@ -752,6 +802,8 @@ Todas as diferenças devem ser **zero** dentro da tolerância definida pelo moto
 ---
 
 ## 13. Compatibilidade e migração
+
+> 🔴 **Supersedida pela #355 (2026-08-12).** Descreve o modelo de 4 instrumentos com waterfall — ADR/histórico, não comportamento vigente. Ver o banner do topo do documento.
 
 **Modelo funcional de referência.** Entrega em `FIN-02` (#271) e `FIN-10` (#279).
 

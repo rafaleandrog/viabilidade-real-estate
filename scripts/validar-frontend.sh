@@ -117,9 +117,21 @@ rm -f tsconfig.frontend.json
 
 echo "== 5/5 testes de frontend + build do bundle =="
 # `frontend/*.test.ts` NÃO alcança subdiretório: até 2026-08-11 os 16 golden
-# cases do Capital Stack (frontend/fixtures/capital-stack-golden.test.ts)
-# nunca rodaram, nem aqui nem no `pnpm test`. O segundo glob conserta isso.
-com_limite 300 node --import tsx/esm --test --test-timeout=60000 frontend/*.test.ts frontend/fixtures/*.test.ts
+# cases do Capital Stack (frontend/fixtures/capital-stack-golden.test.ts, hoje
+# apagado — a #355 substituiu o modelo) nunca rodaram, nem aqui nem no
+# `pnpm test`. O segundo glob conserta isso — mas só quando ele CASA com pelo
+# menos um arquivo: com `frontend/fixtures/` sem nenhum `.test.ts` (caso desde
+# a #355, calliandra-golden.test.ts mora em `frontend/`, não em `fixtures/`),
+# o glob fica literal (nullglob é off por padrão) e o `node --test` de algumas
+# versões do Node trata isso como "arquivo não encontrado" e ABORTA A SUÍTE
+# INTEIRA — silenciosamente correto localmente (Node 22), vermelho no runner
+# do CI. Só inclui o segundo glob quando `compgen` confirma que ele casa com
+# algo.
+test_globs=(frontend/*.test.ts)
+if compgen -G "frontend/fixtures/*.test.ts" > /dev/null; then
+  test_globs+=(frontend/fixtures/*.test.ts)
+fi
+com_limite 300 node --import tsx/esm --test --test-timeout=60000 "${test_globs[@]}"
 tst=$?
 [ $tst -eq 0 ] || { echo "  testes FALHARAM"; exit 1; }
 

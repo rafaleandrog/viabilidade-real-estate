@@ -24,7 +24,7 @@ import {
   vendaLiquidaContratadaMensal,
 } from './fluxo-caixa-motor.js';
 import { absorcaoMensal, ePermutaFisica, type EventoCrono } from './fluxo-shared.js';
-import type { ResultadoCapitalStack } from './capital-stack-motor.js';
+import type { FundingCalc } from './funding-motor.js';
 
 export type Severidade = 'erro' | 'alerta';
 
@@ -316,59 +316,53 @@ export function validarProduto(
   return out;
 }
 
-function somaSeries(rec: Record<string, number[]>, mes: number): number {
-  return Object.values(rec).reduce((s, serie) => s + Number(serie[mes] ?? 0), 0);
-}
-
-/** Funding: dívida não pode ficar negativa nem sobreviver ao horizonte; o
- * caixa fecha com fluxo livre + entradas − saídas efetivamente pagas. Juros
- * capitalizados permanecem identificáveis no saldo e não são saída duplicada. */
-export function validarCapitalStack(
-  r: ResultadoCapitalStack,
+/**
+ * Funding (#355): dívida (`divida`/`financiamento_producao`) não pode ficar
+ * negativa nem sobreviver ao horizonte; o fluxo alavancado fecha com fluxo
+ * livre + entradas − saídas de TODAS as operações. Equity não tem saldo (é
+ * aporte + retorno, sem dívida) — suas séries `saldo` são zeradas por
+ * construção e por isso ficam de fora da 1ª checagem.
+ *
+ * Substitui `validarCapitalStack` (#239, modelo de 4 instrumentos com
+ * waterfall): sem waterfall nem prioridades no modelo novo, não há mais
+ * "lacuna de funding" a reportar — cada operação roda independente, sem
+ * competir por caixa nem checar se ele é suficiente (equity/dívida) ou com
+ * gate próprio de caixa (financiamento_producao, dentro do motor).
+ */
+export function validarFunding(
+  calc: FundingCalc,
   fluxoLivreMensal: number[],
   tol: number = TOLERANCIA_PADRAO,
 ): Divergencia[] {
   const out: Divergencia[] = [];
-  for (const [nome, serie] of Object.entries(r.saldoDividaPorInstrumento)) {
-    const negativo = serie.findIndex((v, mes) => mes > 0 && v < -tol);
+  for (const s of calc.operacoes) {
+    if (s.saldo.every((v) => v === 0)) continue; // equity: sem dívida, nada a checar
+    const nome = s.operacao.nome || s.operacao.tipo;
+    const negativo = s.saldo.findIndex((v) => v < -tol);
     if (negativo >= 0) out.push({
-      codigo: 'DIVIDA_NEGATIVA', severidade: 'erro', linha: nome, mes: negativo - 1,
-      esperado: 0, encontrado: serie[negativo], diferenca: serie[negativo],
-      mensagem: `${nome}, mês ${negativo}: saldo da dívida ficou negativo.`,
+      codigo: 'DIVIDA_NEGATIVA', severidade: 'erro', linha: nome, mes: negativo,
+      esperado: 0, encontrado: s.saldo[negativo], diferenca: s.saldo[negativo],
+      mensagem: `${nome}, mês ${negativo + 1}: saldo da dívida ficou negativo.`,
     });
-    const final = serie[serie.length - 1] ?? 0;
+    const final = s.saldo[s.saldo.length - 1] ?? 0;
     if (Math.abs(final) > tol) out.push({
-      codigo: 'DIVIDA_FINAL_NAO_ZERA', severidade: 'erro', linha: nome, mes: Math.max(0, serie.length - 2),
+      codigo: 'DIVIDA_FINAL_NAO_ZERA', severidade: 'erro', linha: nome, mes: Math.max(0, s.saldo.length - 1),
       esperado: 0, encontrado: final, diferenca: final,
       mensagem: `${nome}: dívida termina o horizonte com saldo ${final}.`,
     });
   }
 
-  for (let t = 1; t < r.caixaProjetoMensal.length; t++) {
-    const entradas = somaSeries(r.liberacaoPorInstrumento, t)
-      + somaSeries(r.aportePorInstrumentoPE, t) + Number(r.aporteSponsorMensal[t] ?? 0);
-    const saidas = somaSeries(r.amortizacaoPorInstrumento, t)
-      + somaSeries(r.devolucaoPrincipalPE, t) + somaSeries(r.remuneracaoPagaPE, t)
-      + somaSeries(r.participacaoReceitaPE, t) + somaSeries(r.participacaoResidualPE, t)
-      + somaSeries(r.participacaoLucroPE, t) + Number(r.distribuicaoSponsorMensal[t] ?? 0);
-    const esperado = Number(r.caixaProjetoMensal[t - 1] ?? 0)
-      + Number(fluxoLivreMensal[t - 1] ?? 0) + entradas - saidas;
-    const encontrado = Number(r.caixaProjetoMensal[t] ?? 0);
+  const nf = calc.noFluxo;
+  for (let t = 0; t < nf.fluxoMensal.length; t++) {
+    const esperado = Number(fluxoLivreMensal[t] ?? 0) + Number(nf.entradas[t] ?? 0) - Number(nf.saidas[t] ?? 0);
+    const encontrado = Number(nf.fluxoMensal[t] ?? 0);
     if (Math.abs(esperado - encontrado) <= tol) continue;
     out.push({
-      codigo: 'FLUXO_FUNDING_NAO_RECONCILIA', severidade: 'erro', mes: t - 1,
+      codigo: 'FLUXO_FUNDING_NAO_RECONCILIA', severidade: 'erro', mes: t,
       esperado, encontrado, diferenca: encontrado - esperado,
-      mensagem: `Mês ${t}: caixa final não reconcilia com fluxo livre e funding.`,
+      mensagem: `Mês ${t + 1}: fluxo alavancado não reconcilia com fluxo livre e funding.`,
     });
     break;
-  }
-  if (r.lacunaFundingMaxima > tol) {
-    const mes = r.lacunaFundingMensal.findIndex((v) => v > tol);
-    out.push({
-      codigo: 'LACUNA_FUNDING', severidade: 'alerta', mes: Math.max(0, mes - 1),
-      esperado: 0, encontrado: r.lacunaFundingMaxima, diferenca: r.lacunaFundingMaxima,
-      mensagem: `Premissa de capital insuficiente: lacuna máxima de funding ${r.lacunaFundingMaxima}.`,
-    });
   }
   return out;
 }
