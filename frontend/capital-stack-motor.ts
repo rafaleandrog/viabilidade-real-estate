@@ -580,6 +580,19 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
     }
 
     // 4) necessidade de funding (§3.1) e liberações AUTOMÁTICAS por prioridade (§5)
+    //
+    // #408: a medição do custo elegível é um FATO do mês — acontece
+    // independente de o banco ter sido acionado. Por isso é um laço
+    // SEPARADO, sem `break`, que roda ANTES do laço de liberação: se ficasse
+    // dentro dele, um mês em que `necessidade` já chegasse a zero antes de
+    // alcançar esta dívida (ou já começasse em zero) fazia o `break` saltar a
+    // acumulação — o custo daquele mês era perdido para sempre, e toda
+    // liberação futura ficava subdimensionada sobre uma base incompleta.
+    for (const d of dividas) {
+      if (retroativa(d) || !d.custoElegivelMensal) continue;
+      custoElegivelAcumulado.set(d.nome, round2(custoElegivelAcumulado.get(d.nome)! + n(d.custoElegivelMensal[t])));
+    }
+
     let necessidade = Math.max(0, cen.reservaMinima - caixaProvisorio);
     for (const d of dividas) {
       // Dívida `retroativo` já desembolsou no passo 3.5 e não responde a
@@ -588,7 +601,6 @@ export function simularCapitalStack(cen: CenarioCapitalStack): ResultadoCapitalS
       if (necessidade <= 0) break;
       let disponivel: number;
       if (d.custoElegivelMensal) {
-        custoElegivelAcumulado.set(d.nome, round2(custoElegivelAcumulado.get(d.nome)! + n(d.custoElegivelMensal[t])));
         const desejadoAcum = Math.min(d.limiteComprometido, (d.percentualFinanciavel ?? 1) * custoElegivelAcumulado.get(d.nome)!);
         disponivel = Math.max(0, desejadoAcum - liberadoAcumulado.get(d.nome)!);
       } else {

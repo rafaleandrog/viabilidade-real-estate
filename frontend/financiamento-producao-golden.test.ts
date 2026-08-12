@@ -520,3 +520,41 @@ test('§38: sem liberação nenhuma o bloco não é renderizado', () => {
     fluxoLivreDaPlanilha().slice(1), 12);
   assert.deepEqual(f?.financiamentoProducao ?? [], []);
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #408: na modalidade `por_necessidade`, a medição do custo elegível não
+// pode ser perdida num mês em que a necessidade de caixa já era zero.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#408: custo elegível medido mesmo num mês sem necessidade de caixa (por_necessidade)', () => {
+  // 3 meses, reservaMinima = 0, 100% financiável, sem teto de crédito.
+  //
+  // t=1: caixa fica negativo (-100) → precisa de 100 → libera 40 (o custo
+  //      elegível do mês) → sobra necessidade de 60, mas não há mais custo a
+  //      medir; caixa fecha em -60.
+  // t=2: entrada grande de caixa (+200) cobre tudo (caixa fica positivo) →
+  //      necessidade = 0 → NENHUMA liberação. É exatamente o mês em que o
+  //      `break` antigo saltava a medição — custoElegivelMensal[2] = 30 não
+  //      podia ser perdido só porque o banco não foi acionado.
+  // t=3: caixa negativo de novo (-500) → precisa de 360. Sem custo elegível
+  //      novo neste mês, mas o acumulado TEM que refletir os 30 do mês 2:
+  //      alvo = 100% × (40+30+0) = 70; já liberado = 40; libera 30.
+  // `por_necessidade` NÃO trata `limiteComprometido: 0` como "sem teto" — essa
+  // convenção existe só na modalidade `retroativo`. Aqui 0 seria um teto real
+  // de zero, então usa-se um teto folgado o bastante para não interferir.
+  const fin: InstrumentoDivida = {
+    tipo: 'divida', nome: 'Fin', limiteComprometido: 1_000_000,
+    taxaMensal: 0, politicaAmortizacao: 'cash_sweep',
+    custoElegivelMensal: [0, 40, 30, 0],
+    percentualFinanciavel: 1,
+    prioridadeFunding: 1, prioridadePagamento: 1,
+  };
+  const r = simularCapitalStack({
+    nome: 'x', meses: 3, fluxoLivreMensal: [0, -100, 200, -500],
+    reservaMinima: 0, instrumentos: [fin],
+  });
+  assert.deepEqual(r.liberacaoPorInstrumento['Fin'], [0, 40, 0, 30],
+    'o custo do mês 2 não pode ser perdido — a liberação do mês 3 precisa refleti-lo');
+  assert.ok(perto(soma(r.liberacaoPorInstrumento['Fin']), 70, 0.01),
+    'total liberado tem que convergir para 100% da base financiável (40+30+0)');
+});
