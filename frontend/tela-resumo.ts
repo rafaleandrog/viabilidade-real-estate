@@ -19,8 +19,9 @@ import {
 //
 // Frontend puro, sem lógica de entrada própria: consolida os resultados já
 // calculados pelas outras abas em "poucos itens destacados":
-//  · 8 KPIs — 4 do Fluxo de Caixa (VPL, TIR, Payback, Exposição máx.) e 4 "de
-//    negócio" (VGV, Resultado, Margem líquida, ROI). Seleção definida com o autor.
+//  · 7 KPIs — 3 do Fluxo de Caixa (VPL, TIR, Exposição máx.) e 4 "de negócio"
+//    (VGV, Resultado, Margem líquida, ROI). Seleção definida com o autor.
+//    #325 removeu daqui Payback, VGV vendável e VGV em permuta física.
 //  · 4 gráficos-chave — Fluxo Acumulado (curva S) e Fluxo Mensal (reusados de
 //    fluxo-graficos, idênticos à aba Fluxo de Caixa), Composição de custos
 //    (pizza) e Indicadores vs. benchmark (medidores), reusados de Cenários.

@@ -30,30 +30,46 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — 🔵 RODADA 7 ABERTA
+## Estado do backlog — ✅ RODADA 7 CONCLUÍDA
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
-| **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | 🔵 **aberta em 2026-08-10** |
+| **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | ✅ **concluída em 2026-08-12** |
 | **5 — EVI** | Auditoria do app contra os documentos EVI | **#220–#241** (22) | ✅ **concluída em 2026-08-02** |
 | **6 — lista de bugs** | `lista_bugs.xlsx`, 24 itens `BUGLIST-001`…`BUGLIST-024` | **#238, #239, #244–#281** (37 destinos) | ✅ **concluída em 2026-08-02** |
 
-### Rodada 7 — planejamento
+### Rodada 7 — como foi
 
-Diagnóstico completo, ordem de execução (E01→E47, 11 fases com portão de merge entre elas) e o
-detalhamento arquivo:linha de cada item estão no plano de sessão gerado em 2026-08-10 (mesmo texto
-usado para redigir as 47 issues). Cada issue leva no título `[BUG7-NN]`, onde `NN` é a ordem de
-execução — **não** o número do item da planilha, que está citado no corpo. Seis decisões (D1–D7)
-ficam registradas em cada issue afetada, com o padrão seguido na ausência de resposta do autor; a
-mais bloqueante é **D6**: a issue #355 (item 48, Funding/Capital Stack) está formalmente **bloqueada**
-até o autor anexar o documento `fluxo_investidor_FORMULAS`, que não está no repositório.
+Executada em 11 fases (E01→E47), uma issue por vez, com portão de merge entre fases. Cada issue leva
+no título `[BUG7-NN]`, onde `NN` é a ordem de execução — **não** o número do item da planilha, que
+está citado no corpo. Dependências usam `Sem-fechamento: #NNN pré-requisito`: não fecham a issue
+citada, só declaram a ordem.
 
-Dependências entre issues desta rodada usam `Sem-fechamento: #NNN pré-requisito` no corpo — não
-fecham a issue citada, só declaram a ordem. **Fase 11 (issue #355) é isolada por exigência
-explícita do autor**: nunca trabalhar nela junto de outra issue na mesma sessão.
+**O bloqueio D6 foi levantado.** A issue #355 (item 48, Funding/Capital Stack) esteve formalmente
+bloqueada porque o documento `fluxo_investidor_FORMULAS` não estava no repositório; o autor o anexou
+em **2026-08-11** e a Fase 11 foi entregue no dia seguinte pelo **PR #412**. A planilha está hoje
+transcrita em **`docs/viabilidade/fluxo-investidor-formulas.md`** — que é a **especificação vigente**
+de `divida` e `equity`.
 
-Quem fechar a Rodada 7 atualiza esta seção na mesma alteração — regra de baixo, § *Lição das rodadas
-anteriores*.
+O Capital Stack (4 instrumentos com waterfall) **deixou de existir**: saíram
+`capital-stack-motor.ts`, `tela-capital-stack.ts`, `backend/rotas/capital-stack.ts` e os 16 golden
+cases de `frontend/fixtures/`. No lugar, 3 operações independentes — sem waterfall, sem prioridades,
+sem competição por caixa — em `funding-motor.ts` / `tela-funding.ts` / `backend/rotas/funding.ts`,
+tabela `avancado_funding_operacoes` (migração `029`). `docs/viabilidade/funding-capital-stack.md`
+virou ADR histórico, **exceto a §4.3** (Financiamento à produção), que continua vigente: a #405
+aprovou ali o gatilho de exposição mínima, o catch-up retroativo e o cash sweep, e a #355 preservou
+esse produto de propósito — ele é o único que **não** segue a planilha nova.
+
+> ⚠️ **Auditoria de 2026-08-17.** A Rodada 7 fechou com **três passos do próprio plano da #355 sem
+> executar**: a spec `fluxo-investidor-formulas.md` (F11.1) nunca entrou no repo, embora 4 arquivos
+> a citassem como fonte; a decisão **D14** (alerta de caixa negativo após funding) não foi
+> implementada; e esta seção continuou dizendo "Rodada 7 aberta / #355 bloqueada" (F11.6). As três
+> viraram as issues **#413**, **#414** e **#416**. A quarta, **#415**, é o aviso regulatório da §17,
+> que a #277 entregou e a reescrita da #355 apagou junto com `tela-capital-stack.ts`.
+>
+> A lição é a de sempre, com uma volta a mais: **"a issue fechou" não é evidência de entrega, e o
+> plano publicado na issue também não** — só o diff é. Quando um plano tem passo de documentação ou
+> de estado, ele morre calado se ninguém conferir, porque nenhum teste fica vermelho por causa dele.
 
 **As duas foram executadas juntas por uma trilha única de 10 fases** (plano aprovado pelo autor em
 2026-08-01), com portão de merge ao fim de cada fase. Os quatro cruzamentos entre rodadas (itens 5,
