@@ -103,6 +103,8 @@ export class ViabFunding extends LitElement {
   private receitaLiquida: number[] = [];
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
+    /* §17: aviso regulatório permanente, acima de tudo na aba. */
+    urbi-banner.aviso-regulatorio { display: block; margin-bottom: 16px; }
     .barra { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
     .barra .espaco { flex: 1; }
     .ops { display: flex; flex-direction: column; gap: 14px; }
@@ -603,6 +605,21 @@ export class ViabFunding extends LitElement {
     if (this.carregando) return html`<urbi-loading mensagem="Carregando funding..."></urbi-loading>`;
 
     return html`
+      <!-- §17 / #277: o app simula CONTRATOS PRIVADOS e não valida a legalidade
+           da captação. Aviso permanente e não fechável, FORA do ramo de lista
+           vazia: ele é sobre a ferramenta, não sobre o dado — quem ainda não
+           cadastrou operação nenhuma é exatamente quem mais precisa lê-lo.
+           Entregue na #277 (PR #296) em tela-capital-stack.ts e perdido quando
+           a #355 substituiu aquele arquivo por este; a §17 nunca foi
+           supersedida. -->
+      <urbi-banner class="aviso-regulatorio" variante="info">
+        Esta é uma <strong>simulação de contratos privados</strong>. O app não valida a legalidade da
+        captação nem substitui assessoria jurídica, tributária ou regulatória — e uma captação
+        oferecida ao público, ou com característica de contrato de investimento coletivo, pode ter
+        obrigações regulatórias próprias. Antes de usar esta estrutura numa oferta real, submeta-a
+        aos responsáveis jurídicos e financeiros.
+      </urbi-banner>
+
       ${this.editavel ? html`
         <div class="barra">
           ${TIPOS.map((t) => html`

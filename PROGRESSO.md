@@ -4,14 +4,52 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Auditoria de issues fechadas sem entrega — 4 lacunas (2026-08-17)
+
+Auditoria pedida pelo autor: procurar issues **fechadas cujo trabalho não foi de fato entregue**,
+trazendo só o que fosse certo. Método da triagem de 2026-08-03 — ler o critério de aceite e conferir
+contra `arquivo:linha` no código de hoje —, aplicado às 29 "parciais" daquela triagem (hoje todas
+fechadas) e à Rodada 7 inteira (#309–#355), a leva menos auditada.
+
+**As 29 parciais quase todas se resolveram**, umas por entrega posterior (#240/#245/#248/#252/#255/
+#257/#268/#269/#279/#281/#283), outras por substituição deliberada (#256 revertida pela #335; #241
+pela #349; #272–#276 pela reescrita da #355). Descartei também 4 falsos positivos que o código
+desmente (#320, #341, #325, #266 — detalhe nos comentários das issues novas).
+
+**Sobraram 4 lacunas certas — e 3 são passos do próprio plano publicado na #355:**
+
+| Issue | Lacuna | Evidência |
+|---|---|---|
+| **#413** | `docs/viabilidade/fluxo-investidor-formulas.md` **nunca existiu em git**, apesar de `funding-motor.ts:9`, `funding-motor.test.ts:11`, `migracoes/029:4` e `funding-capital-stack.md:17,35,453` a citarem como a spec vigente (link markdown quebrado) | passo **F11.1** |
+| **#414** | decisão **D14** — alerta de caixa acumulado negativo após funding — nunca implementada; `validarFunding` só olhava saldo devedor e reconciliação | `fluxo-invariantes.ts:332-368` |
+| **#415** | o aviso regulatório da **§17** sumiu: entregue pela #277 (PR #296) em `tela-capital-stack.ts`, não transportado quando a #355 criou `tela-funding.ts` | zero `urbi-banner` na tela nova; §17 não está entre as seções supersedidas |
+| **#416** | `CLAUDE.md` e `PROGRESSO.md` ainda diziam "Rodada 7 aberta" e "#355 bloqueada pela D6", com as 47 issues fechadas e o código na `main` | passo **F11.6** |
+
+**As quatro foram corrigidas nesta sessão.** A #414 acrescentou
+`CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING` (severidade `alerta`, um item por estudo, 4 testes) — ele
+importa porque `divida` e `equity` pagam **sem checar o caixa do projeto**, e era esse buraco que a
+D14 existia para tornar visível. Suíte de frontend: **393 testes verdes**.
+
+Nada aqui toca backend, `schema.json` ou migração → `versao` permanece **0.1.28**.
+
+> **O padrão que a auditoria expôs:** as três lacunas da #355 são passos de **documentação e de
+> estado**, não de código. Nenhum teste fica vermelho quando eles são pulados, e o plano que os
+> declarava vivia num comentário de issue — que sessão nenhuma lê. Passo de plano que não deixa
+> rastro no repo morre calado.
+
+---
+
 ## Financiamento à Produção — modelo da planilha implementado (2026-08-11)
 
 Trabalho **fora da Rodada 7**, a partir de um pedido do autor com a planilha `20260730_EVI_Urbita`
 anexada. Fecha a dívida que o `funding-capital-stack.md` declarava explicitamente em aberto: as
 nuances de financiamento à produção achadas na planilha (exposição mínima antes da 1ª liberação,
 cash sweep condicional a flag/fase de Chaves) tinham ficado **fora da Rodada 6 por decisão do autor
-em 2026-08-03**. Não é a #355 — aquela é a reescrita do Funding/Capital Stack, segue bloqueada pela
-D6 (falta o `fluxo_investidor_FORMULAS`) e isolada por exigência do autor.
+em 2026-08-03**. Não é a #355 — aquela é a reescrita do Funding/Capital Stack, que na data desta
+entrada seguia bloqueada pela D6 (faltava o `fluxo_investidor_FORMULAS`) e isolada por exigência do
+autor. *(Atualização de 2026-08-17: a D6 foi levantada em 2026-08-11 e a #355 entregue pelo PR #412;
+o modelo desta entrada foi preservado de propósito — é a §4.3, a única parte vigente do
+`funding-capital-stack.md`.)*
 
 **O diagnóstico.** O app já tinha a camada `financiamento_producao`, mas ela liberava dívida
 **por necessidade de caixa** (`min(disponível, necessidade)`). A planilha faz o oposto: libera
@@ -84,9 +122,18 @@ branch → PR → CI verde → merge → confirmação de fechamento via `issue_
 Nenhum portão de fase pulado.
 
 **Próximo passo — Fase 11 (E47/#355), isolada por exigência explícita do autor**: reescrita do
-Funding/Capital Stack. Continua **bloqueada pela D6** — falta o autor anexar o documento
-`fluxo_investidor_FORMULAS`, que não está no repositório. Sessão parou aqui; não avança
-unilateralmente para a última fase sem esse documento nem sem confirmação do autor.
+Funding/Capital Stack. Na data desta entrada continuava **bloqueada pela D6** — faltava o autor
+anexar o documento `fluxo_investidor_FORMULAS`, que não estava no repositório. Sessão parou aqui;
+não avançou unilateralmente para a última fase sem esse documento.
+
+> ✅ **Desfecho (2026-08-12):** o autor anexou a planilha em 2026-08-11, o diagnóstico exigido pelo
+> critério de aceite foi publicado como comentário da #355 antes de qualquer código, e a Fase 11 foi
+> entregue pelo **PR #412** — 3 operações independentes (`financiamento_producao` única por estudo ·
+> `divida` · `equity` em 2 modos) em `frontend/funding-motor.ts`, `frontend/tela-funding.ts` e
+> `backend/rotas/funding.ts`, tabela `avancado_funding_operacoes` (migração `029`), com o Capital
+> Stack removido do código. `financiamento_producao` **não** migrou para a matemática de calendário
+> da planilha nova: preservou o modelo da #405 (§4.3), por decisão do autor de 2026-08-12.
+> A spec entrou no repo só depois, pela **#413** — ver a entrada de 2026-08-17 no topo.
 
 ---
 

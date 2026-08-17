@@ -1,0 +1,242 @@
+---
+titulo: Fluxo do Investidor — fórmulas das operações de Funding
+descricao: Especificação vigente das operações de Funding (Dívida e Equity), transcrita da planilha fluxo_investidor_FORMULAS. Financiamento à produção é exceção e segue a §4.3 de funding-capital-stack.
+tipo: app
+ordem: 9
+---
+<!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
+
+# Fluxo do Investidor — fórmulas das operações de Funding
+
+> ✅ **Este documento descreve COMPORTAMENTO VIGENTE.** É a especificação de `divida` e `equity` no
+> modelo implementado pela #355 (`frontend/funding-motor.ts`, `frontend/tela-funding.ts`,
+> `backend/rotas/funding.ts`, tabela `avancado_funding_operacoes`, migração `029`).
+>
+> O modelo anterior — 4 instrumentos com waterfall e prioridades — está em
+> [Funding, Capital Stack e Retorno do Capital](funding-capital-stack), hoje majoritariamente ADR
+> histórico. **A exceção é a §4.3 daquele documento**, que continua vigente e descreve
+> `financiamento_producao` — ver a §4.3 aqui.
+
+## 1. Contexto e escopo
+
+A aba **Funding** do estudo Avançado cria operações de captação. São **três tipos, independentes
+entre si** — sem waterfall, sem prioridade, sem competição por caixa:
+
+| Tipo | Cardinalidade | Matemática |
+|---|---|---|
+| `financiamento_producao` | **única por estudo** | medição de custo elegível + cash sweep (**§4.3** — não é esta planilha) |
+| `divida` | quantas quiser, nomeáveis | calendário + Price (**§4.1**) |
+| `equity` | quantas quiser, nomeáveis | aporte + retorno em 2 modos (**§4.2**) |
+
+A fonte de `divida` e `equity` é a planilha `fluxo_investidor_FORMULAS.xlsx`, entregue pelo autor em
+2026-08-11 (é o documento que manteve a #355 bloqueada pela decisão D6 por uma rodada inteira). As
+duas abas da planilha estão transcritas na §4.
+
+**O que a simplificação apagou** em relação ao modelo antigo: waterfall de 8 passos ·
+`prioridade_funding` / `prioridade_pagamento` · liberação automática por lacuna de caixa ·
+`reservaMinima` · os 4 modos de Preferred Equity (viraram 2 modos de Equity) · as políticas
+`cash_sweep` e `bullet` para dívida de calendário (resta Price com carência).
+
+> ⚠️ **Consequência assumida:** na planilha os pagamentos **não são limitados pelo caixa do
+> projeto** — o PMT é capado pelo saldo devedor, e o retorno do equity sai como % da receita, haja
+> ou não caixa. O fluxo alavancado pode, portanto, ficar negativo. A decisão **D14** trata isso como
+> risco visível, não como bloqueio: a Reconciliação (`frontend/fluxo-invariantes.ts`) alerta quando
+> o acumulado após funding fica negativo.
+
+## 2. Modelo de dados
+
+Tabela `avancado_funding_operacoes` (migração `029_funding_operacoes.js`, que substitui
+`avancado_capital_instrumentos` da `019`):
+
+| Coluna | Aplica a | Papel |
+|---|---|---|
+| `estudo_id`, `tipo`, `nome`, `ordem` | todas | identidade e ordem de exibição |
+| `valor` | todas | dívida: principal contratado · equity: aporte |
+| `inicio_mes` | todas | mês do aporte/1ª liberação, **0-based** (ancorado, ver §3) |
+| `distribuir_aporte`, `aporte_meses` | `divida` | liberação em N tranches iguais |
+| `taxa_anual` | `divida` | % a.a., não fração |
+| `periodo_amortizacao_meses`, `periodo_carencia_meses` | `divida` | prazo total e carência |
+| `modo_retorno`, `pct_retorno` | `equity` | `permuta_financeira` \| `resultado_final`, e o % |
+| `exposicao_minima`, `percentual_financiavel`, `amortizar_com_caixa`, `custo_linha_ids` | `financiamento_producao` | premissas da §4.3 |
+
+## 3. Convenções
+
+**Tempo.** Meses **relativos, 0-based** — índice do array = mês, igual a `fluxo-caixa-motor.ts` e
+`fluxo-shared.ts`. A planilha conta a partir de 1; a conversão acontece na borda. Onde este
+documento cita um mês da planilha, ele vem marcado como tal.
+
+**Âncora (decisão D11).** "Mês do aporte" não é número cru na UI: é **âncora + deslocamento**
+(`EVENTOS_ANCORA`), como nas linhas de Custo. Número absoluto quebraria quando o Cronograma muda.
+O `inicio_mes` persistido já é o resultado 0-based dessa resolução.
+
+**Sinal.** A planilha raciocina na **visão do investidor** (desembolso negativo, recebimento
+positivo); a tabela de Resultados precisa da **visão do projeto**. O motor produz as duas e nomeia
+cada uma:
+
+- `entradas` / `saidas` — o que o **projeto** recebe / paga;
+- `fluxoInvestidor` = `saidas − entradas` — o fluxo de quem põe o dinheiro, e a base da TIR/VPL/
+  payback dele.
+
+**Percentuais.** As colunas guardam percentual (`20` = 20% a.a.), não fração. As conversões ficam
+todas em `funding-motor.ts`.
+
+**Arredondamento.** Todo valor monetário sai com 2 casas (`round2`), conforme o contrato do
+`CLAUDE.md`. A planilha arredonda **só o saldo devedor** (coluna F) e deixa juros/PMT com precisão
+cheia — daí a tolerância de centavos nos golden cases da §6. O caminho do **saldo** é idêntico: o
+motor carrega adiante o saldo já arredondado, como a coluna F.
+
+## 4. Fórmulas das operações
+
+### 4.1 Dívida (aba `divida` da planilha)
+
+**Entradas:** `C8` Valor · `C9` Mês do aporte · `C10` Distribuir aporte? · `C11` Aporte em quantos
+meses · `C12` Taxa anual · `C13` Período de amortização · `C14` Período de carência.
+
+**Derivados:**
+
+```
+C15 (taxa mensal) = (1 + C12)^(1/12) − 1
+
+C16 (PMT) = SE(C13 <= C14; 0;
+            PMT(C15; C13 − C14; SE(C10; C8/C11 * ((1+C15)^C11 − 1)/C15 ; C8)))
+```
+
+> ⚠️ **Quando o aporte é distribuído, a base do PMT não é `C8`**: é o *valor futuro* das tranches
+> liberadas ao fim do período de liberação — os juros do período de liberação capitalizam no saldo.
+> Errar isso subestima a parcela.
+
+Com `ini = C9 + SE(C10; C11; 1)` e `fim = ini − 1 + C13`:
+
+| Coluna | Fórmula no mês `t` |
+|---|---|
+| B — Libera | `SE(C10; SE(C9 <= t <= C9+C11−1; C8/C11; 0); SE(t = C9; C8; 0))` |
+| C — Carência | `1` se `ini <= t <= ini+C14−1` |
+| D — Juros | `t=1 → 0`; senão `SE(t <= fim; saldo_ant * C15; 0)` |
+| E — PMT | `0` se `t < ini` ou `t > fim`; `saldo_ant + B + D` se `t = fim` (quitação); `MIN(D; saldo_ant+B+D)` na carência (só juros); senão `MIN(C16; saldo_ant+B+D)` |
+| F — Saldo | `MAX(0; ARRED(saldo_ant + B + D − E; 2))` |
+| G — Fluxo investidor | `E − B` |
+
+Juros incidem sobre o saldo de **abertura** e só dentro da janela da operação. Implementação:
+`simularDivida` (`funding-motor.ts:237`).
+
+### 4.2 Equity (aba `equity` da planilha)
+
+**Entradas da operação:** `C22` Valor do aporte · `C23` Mês do aporte · `C24` modo · `C25` % de
+retorno.
+
+`C24` = **TRUE** → `permuta_financeira`: % progressivo sobre a Receita Líquida, mês a mês.
+`C24` = **FALSE** → `resultado_final`: % do Resultado Final, pago **de uma vez**, no mês do repasse.
+
+| Coluna | Fórmula no mês `t` |
+|---|---|
+| B — Receita bruta | `0` se `t > C5`; `C4*C9` se `t = C6`; `C4*C10/MAX(1; C7−1)` se `C6 < t < C8`; `C4*C12` se `t = C8`; `C4*C11/MAX(1; C5−C8)` se `t > C8` |
+| C — Receita líquida | `B * (1 − C15 − C16 − C17)` |
+| D — Retorno equity | `SE(C24; C * C25; SE(t = C8; C19 * C25; 0))` |
+| E — Aporte | `SE(t = C23; C22; 0)` |
+| F — Fluxo investidor | `D − E` |
+| G — Caixa acumulado | `G_ant + F` |
+
+**Decisão D8 — as premissas do projeto não são redigitadas.** A aba `equity` da planilha pede de
+novo VGV, % entrada/parcelas/repasse, corretagem, marketing, impostos, duração da obra e mês do
+repasse (`C4`–`C19`). O app **deriva tudo do próprio estudo**: `receitaLiquidaMensal`,
+`resultadoFinal` e `mesRepasseValor` chegam prontos a `simularEquity` por
+`fundingDoEstudo` (`funding-motor.ts:710`). Redigitar criaria uma segunda fonte de verdade,
+divergindo em silêncio da aba Resultados — exatamente o que as #349/#351 eliminaram.
+
+O invariante da curva vale como conferência: `Σ receita bruta = VGV`.
+
+Implementação: `simularEquity` (`funding-motor.ts:425`).
+
+### 4.3 Financiamento à produção — **exceção, não segue esta planilha**
+
+> 🔴 **Leia isto antes de mexer no motor.** A planilha `fluxo_investidor_FORMULAS` modela dívida por
+> calendário: aporte num mês (ou distribuído em N), amortização Price após carência. Aplicar isso a
+> `financiamento_producao` **reverteria o modelo aprovado na #405**.
+
+Decisão do autor (2026-08-12): as duas planilhas especificam **produtos diferentes**, e o app
+precisa dos dois. `financiamento_producao` preserva o modelo da planilha `Incorp Individual`,
+especificado na **§4.3 de [funding-capital-stack](funding-capital-stack)** — a única seção daquele
+documento que continua vigente:
+
+- liberação **incondicional contra medição de custo elegível**, não por necessidade de caixa;
+- **gatilho de exposição mínima** sobre o custo incorrido antes da 1ª liberação;
+- **catch-up retroativo** na 1ª liberação;
+- janela de obra/chaves;
+- caixa disponível e teto de amortização calculados **sem** a liberação do próprio mês;
+- **cash sweep puro**, sem prestação contratual — este produto não tem parcela fixa;
+- sem teto de crédito.
+
+Por isso é a **única** operação cujo desembolso e amortização dependem do fluxo de caixa do projeto;
+`divida` e `equity` seguem a matemática desta planilha sem checar caixa.
+
+Implementação: `simularFinanciamentoProducao` (`funding-motor.ts:312`) — a matemática da §4.3 foi
+apenas **realocada** de `capital-stack-motor.ts`, não reescrita. Oráculo próprio:
+`frontend/financiamento-producao-golden.test.ts` (80 períodos do cenário real, tolerância R$ 0,15).
+
+## 5. Indicadores do investidor
+
+`indicadoresOperacao` (`funding-motor.ts:490`) devolve, na visão do investidor: investimento total
+(negativo), retorno total, juros pagos, lucro, VPL, TIR mensal e anual, MOIC e payback.
+
+**Duas divergências deliberadas em relação à planilha:**
+
+| # | A planilha faz | O app faz | Por quê |
+|---|---|---|---|
+| **D9** | `NPV(0,1; série_mensal)` — 10% **ao mês** (≈214% a.a.) | VPL com a `taxaDescontoAa` **do estudo**, convertida a mês por `vplFluxo` | 10% ao mês produz VPL fortemente negativo numa operação que rende 20% a.a.; e a taxa do estudo é a que todo o resto do app usa |
+| **D10** | `MATCH(...)+28−1` no payback — soma o deslocamento da linha à resposta e devolve **59** onde o caixa vira positivo no mês **32** | 1º mês com acumulado ≥ 0 | é erro de planilha, não regra de negócio; é a convenção já usada em `paybackMes` |
+
+O payback só conta depois de ter havido desembolso — um fluxo que começa em zero não "pagou de
+volta" nada no mês 0.
+
+## 6. Exemplo numérico (golden case)
+
+Conferido célula a célula contra a planilha; `Σ receita bruta = 199.999.999,99 ≈ VGV` ✓.
+Reproduzido em `frontend/funding-motor.test.ts`.
+
+**Dívida** — 10M, 20% a.a., 3 tranches, carência 12, amortização 36:
+
+| Grandeza | Valor |
+|---|---|
+| Taxa mensal | `0,015309470499731193` |
+| PMT | `508.746,97518660501` |
+| Retorno total (Σ PMT) | `14.075.333,009917879` |
+| Juros pagos | `4.075.332,9857015153` |
+| Saldo final (mês 39 da planilha) | `0` |
+| TIR mensal / anual | `0,015309470578088513` / `0,20000000111133076` |
+
+**Equity** — 5M no mês 1 da planilha, modo `permuta_financeira`, 4%; projeto de VGV 200M em 36
+meses, lançamento no mês 2, obra 30, repasse no 32, 20% entrada / 30% parcelas / 0% pós-chaves /
+50% repasse, deduções 14%:
+
+| Grandeza | Valor |
+|---|---|
+| Receita líquida total | `171.999.999,99999997` |
+| Resultado final | `166.999.999,99999997` |
+| Retorno total recebido | `6.879.999,9999999981` |
+| Lucro do investidor | `1.879.999,9999999981` |
+| TIR mensal | `0,016823843299068608` |
+| Payback (**D10**) | mês 32 da planilha — **não** 59 |
+
+## 7. Como o funding entra na tabela de Resultados
+
+A costura é `FundingNoFluxo` (`funding-motor.ts:655`), criada pela #349 e preservada de propósito
+pela reescrita: as liberações/aportes entram como categoria de receita e as parcelas/retornos como
+categoria de custo, dentro da tabela principal — não há segunda tabela.
+
+Consumidores: `fluxo-tabela.ts` · `exportar.ts` · `tela-fluxo-ver.ts` · `tela-cenarios.ts` ·
+`proforma-avancado.ts`. As KPIs desalavancadas (§8.1) são preservadas pela linha "Fluxo de Caixa
+Livre (antes do funding)".
+
+## 8. Rastreabilidade
+
+| O quê | Onde |
+|---|---|
+| Diagnóstico completo e decisões D8–D14 | issue **#355**, comentário de 2026-08-11 |
+| Modelo antigo (ADR) e a §4.3 vigente | [funding-capital-stack](funding-capital-stack) |
+| Financiamento à produção — decodificação da planilha `Incorp Individual` | PR **#405** |
+| Motor | `frontend/funding-motor.ts` |
+| Tela | `frontend/tela-funding.ts` |
+| Rotas e validação de entrada | `backend/rotas/funding.ts` |
+| Migração | `migracoes/029_funding_operacoes.js` |
+| Golden cases | `frontend/funding-motor.test.ts` · `frontend/financiamento-producao-golden.test.ts` |
+| Invariantes (inclui a **D14**) | `frontend/fluxo-invariantes.ts` — `validarFunding` |

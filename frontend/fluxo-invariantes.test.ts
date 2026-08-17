@@ -460,3 +460,41 @@ test('validarFunding: equity (sem saldo) não é checado pela invariante de dív
   };
   assert.deepEqual(validarFunding(equity, [0, 0]), []);
 });
+
+// ── D14 (#355): caixa acumulado negativo depois do funding ──────────────────
+//
+// `divida` e `equity` pagam sem checar o caixa do projeto — o PMT é capado só
+// pelo saldo devedor e o retorno do equity é % da receita. O alerta torna o
+// risco visível sem bloquear (severidade `alerta`, como a D5/#335).
+
+test('#355 D14: acumulado sempre >= 0 não gera alerta', () => {
+  const calc = fundingBase([0, 0], [0, 0], [0, 0]);
+  calc.noFluxo.fluxoAcumulado = [10, 5, 0];
+  assert.deepEqual(validarFunding(calc, [0, 0]), []);
+});
+
+test('#355 D14: acumulado que mergulha gera UM alerta, no primeiro mês negativo', () => {
+  const calc = fundingBase([0, 0], [0, 0], [0, 0]);
+  calc.noFluxo.fluxoAcumulado = [100, 50, -30, -80, -120];
+  const divs = validarFunding(calc, [0, 0]).filter(
+    (d) => d.codigo === 'CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING',
+  );
+  assert.equal(divs.length, 1, 'um só item, não um por mês negativo');
+  assert.equal(divs[0].mes, 2);
+  assert.equal(divs[0].encontrado, -30);
+});
+
+test('#355 D14: é alerta, não erro — não bloqueia o cálculo', () => {
+  const calc = fundingBase([0, 0], [0, 0], [0, 0]);
+  calc.noFluxo.fluxoAcumulado = [0, -500];
+  const d = validarFunding(calc, [0, 0]).find(
+    (x) => x.codigo === 'CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING',
+  );
+  assert.equal(d?.severidade, 'alerta');
+});
+
+test('#355 D14: mergulho dentro da tolerância não acusa (ruído de arredondamento)', () => {
+  const calc = fundingBase([0, 0], [0, 0], [0, 0]);
+  calc.noFluxo.fluxoAcumulado = [0, -0.005];
+  assert.deepEqual(validarFunding(calc, [0, 0]), []);
+});

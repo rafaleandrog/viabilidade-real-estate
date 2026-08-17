@@ -223,9 +223,12 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const vgvPermutaNaoResidencial = areaPermutaNaoResidencial * precoNR;
   // #315: quando o catálogo de Produtos está populado, ele substitui o VGV
   // bruto (área×preço legados) como fonte — um bucket único (a tabela não
-  // distingue R/NR). Interim documentado: a divisão fina residencial/não
-  // residencial de permuta física/financeira e a sensibilidade continuam
-  // lendo os campos legados até as issues #317/#320 integrarem o catálogo.
+  // distingue R/NR). Interim que RESTA: a divisão fina residencial/não
+  // residencial da permuta física/financeira ainda lê os campos legados.
+  // A sensibilidade NÃO está mais nesse interim — a #320 passou o fator a
+  // parâmetro de `calcularProforma` e `fatorSens` incide sobre os canônicos
+  // (`:211,216,250,254,267,271`), com teste por variável × modo em
+  // `proforma.test.ts` sob a tag BUG7-08.
   const produtosTotal = e.produtos && e.produtos.length > 0 ? totalProdutos(e.produtos) : null;
   if (produtosTotal) {
     vgvResidencial = produtosTotal.vgv - (vgvPermutaResidencial + vgvPermutaNaoResidencial);
