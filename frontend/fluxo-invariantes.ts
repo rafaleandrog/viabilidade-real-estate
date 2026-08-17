@@ -328,6 +328,14 @@ export function validarProduto(
  * "lacuna de funding" a reportar — cada operação roda independente, sem
  * competir por caixa nem checar se ele é suficiente (equity/dívida) ou com
  * gate próprio de caixa (financiamento_producao, dentro do motor).
+ *
+ * É justamente essa independência que exige a 3ª checagem (**decisão D14** da
+ * #355): como `divida` e `equity` pagam sem olhar o caixa — o PMT é capado só
+ * pelo saldo devedor, e o retorno do equity é % da receita, haja caixa ou não
+ * —, o fluxo alavancado pode mergulhar abaixo de zero sem que nada acuse. O
+ * modelo antigo não tinha esse buraco porque o waterfall capava pelo caixa.
+ * Segue a planilha (não bloqueia o cálculo) e torna o risco VISÍVEL: severidade
+ * `alerta`, mesmo padrão da D5/#335 em `validarCustosDuplicados`.
  */
 export function validarFunding(
   calc: FundingCalc,
@@ -364,6 +372,20 @@ export function validarFunding(
     });
     break;
   }
+
+  // D14: caixa acumulado do projeto DEPOIS do funding. Um só item por estudo —
+  // o mês em que mergulha basta para investigar, e um estudo com 40 meses
+  // negativos geraria 40 linhas idênticas na Reconciliação.
+  const mergulho = nf.fluxoAcumulado.findIndex((v) => Number(v) < -tol);
+  if (mergulho >= 0) out.push({
+    codigo: 'CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING', severidade: 'alerta', mes: mergulho,
+    esperado: 0,
+    encontrado: Number(nf.fluxoAcumulado[mergulho]),
+    diferenca: Number(nf.fluxoAcumulado[mergulho]),
+    mensagem: `Mês ${mergulho + 1}: o caixa acumulado fica negativo depois do funding `
+      + '— as operações pagam sem checar o caixa do projeto.',
+  });
+
   return out;
 }
 
