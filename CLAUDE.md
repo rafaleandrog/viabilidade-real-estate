@@ -391,6 +391,34 @@ O workflow `.github/workflows/release.yml` gera a tag com sha sozinho quando dis
 > migração cria um degrau vazio; adicionar migração sem bumpar quebra a regra na direção oposta
 > (aconteceu uma vez: a migração `004_fases_gantt.js` entrou sem bump — ver `PROGRESSO.md`).
 
+### A release nasce NÃO homologada — e é assim que tem que ser
+
+Desde 2026-08-18 o `release.yml` publica com **`--prerelease`**. Para a plataforma,
+"não homologado" ⟺ `prerelease=true`: é a **atestação na origem**, lida por todas as instâncias que
+consomem o repo. O ciclo é:
+
+| Passo | Onde | Quem |
+|---|---|---|
+| publica a release (`prerelease=true`) | Actions → release → Run workflow | workflow |
+| instala e roda | **Pinguim** (`homolog.urbiverso.com.br`), `aceitacao = 'releases'` | auto-update, se ligado |
+| testa de verdade, logado | Pinguim | autor |
+| **Homologar** → flipa `prerelease=false` no GitHub | Admin → Apps → viabilidade → Geral | autor |
+| instala a versão já atestada | **Laputa** (produção), `aceitacao = 'homologado'` (default) | auto-update / manual |
+
+Até essa data o workflow chamava `gh release create` **sem** o flag, então toda release nascia
+`prerelease=false` — ou seja, **atestada por ninguém**. Isso não dá erro em lugar nenhum: só
+curto-circuita o ciclo, porque produção passa a enxergar na hora uma versão que nunca foi testada.
+
+Dois detalhes que se aprende errado:
+
+- **Prerelease não trava a primeira instalação.** Instalação de app **nova** é soberana, sem gate de
+  aceitação — o gate só vale na *atualização*. Na tela de instalar, marque **"Incluir não
+  homologadas"** (o checkbox nasce desligado) para a release aparecer.
+- **O botão "Homologar" só existe com `aceitacao = 'releases'`.** Numa instância em `homologado` ele
+  não aparece, e `POST /:appId/homologar` recusa com `422 ACEITACAO_NAO_ATESTA` — ela declarou
+  consumir só o que outro já atestou. Configure a homolog em `releases` e deixe a produção em
+  `homologado`.
+
 ---
 
 ## Sessões paralelas

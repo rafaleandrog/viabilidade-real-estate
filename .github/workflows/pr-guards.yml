@@ -137,3 +137,24 @@ jobs:
             echo "::error title=JSON inválido::schema.json ou manifesto.json não é JSON estrito. O shell reprova o pacote na instalação com 'Pacote reprovado na validacao' antes de olhar qualquer tabela. Comentário // não existe em JSON."
             exit 1
           fi
+
+  schema-ciclos:
+    name: schema.json não tem ciclo de FK entre tabelas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Guard de ciclos no schema
+        run: |
+          set -uo pipefail
+          # Só `node` — sem pnpm install, sem SDK, sem credencial.
+          # A FK nasce INLINE no CREATE TABLE do sincronizador: num ciclo não existe
+          # ordem de criação que satisfaça as duas pontas, e a instalação numa
+          # instância VIRGEM reprova com `[dry_run_schema] relation ... does not exist`.
+          # Instância que já tem a app não acusa (as colunas chegaram por ALTER TABLE),
+          # então typecheck, testes, esbuild e o harness de migrações ficam todos
+          # verdes. Ver scripts/guard-schema-ciclos.mjs.
+          if ! node scripts/guard-schema-ciclos.mjs; then
+            echo "::error title=Ciclo no schema.json::Ciclo de dependência entre tabelas. A instalação numa instância virgem (homolog/prod nova) reprova no dry-run com 'relation \"<app>.<tabela>\" does not exist'. Instância que já tem a app não acusa."
+            exit 1
+          fi

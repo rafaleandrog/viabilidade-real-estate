@@ -4,6 +4,70 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## A app nunca foi instalável do zero — ciclo de FK no `schema.json` (2026-08-18)
+
+O autor tentou instalar a app na **Pinguim** (`homolog.urbiverso.com.br`), para depois removê-la da
+**Gondoa** (`dev.urbiverso.com.br`). A instalação reprovou:
+
+```
+[dry_run_schema] relation "viabilidade.estudos" does not exist
+```
+
+**Causa: ciclo de chave estrangeira.** `preliminar_produtos.estudo_id` aponta para `estudos`
+(obrigatório, `cascata`) e `estudos.permuta_fisica_produto_id` / `_nr_produto_id` apontavam de volta
+para `preliminar_produtos`. O sincronizador do shell emite a FK **inline no `CREATE TABLE`** e, ao
+topar um ciclo, apenas **desiste da aresta** (`sincronizador.ts` — comentário literal
+`// Circular reference — skip to avoid infinite loop`): não reprova, não adia a FK, cria as tabelas
+fora de ordem. Simulando o algoritmo real contra o nosso `schema.json`, a ordem saía
+`mercado_regioes, preliminar_produtos, estudos, …` — `preliminar_produtos` nascia **antes** de
+`estudos`, e o seu `REFERENCES viabilidade.estudos(id)` estourava. A mensagem do erro é literalmente
+essa linha.
+
+**O que mais importa aqui não é o ciclo, é o que ele revela: a app nunca foi instalável do zero.**
+`preliminar_produtos` chegou na migração `021` e os `permuta_fisica_*_produto_id` na `022` — em
+instância que já tinha a app, as colunas nasceram por `ALTER TABLE ADD COLUMN`, onde o alvo já
+existe. A instalação virgem **pula as migrações** e materializa tudo pelo `schema.json`: é o único
+caminho que exercita a ordem de criação. Dev estava verde havia meses sobre um schema que não
+instala. Só a primeira instância nova podia acusar — e acusou.
+
+**Correção:** os dois `*_produto_id` viraram `inteiro` (referência lógica, sem FK). O lado forte
+(`preliminar_produtos.estudo_id`) ficou como estava. Custo real nenhum: os dois campos são memória
+da seleção da UI, não fonte de cálculo — o motor consome o canônico em m² gravado na edição
+(`frontend/tela-premissas.ts:719-729`), e nenhum ponto do backend dereferencia o `produto_id`.
+`referencia` e `inteiro` são o mesmo `INTEGER` no DDL, e o reconciliador do shell poda sozinho a FK
+que deixou de ser derivável — sem migração, sem bump de `versao` (segue `0.1.28`).
+
+**Prevenção:** `scripts/guard-schema-ciclos.mjs`, na etapa 1/5 do `validar-frontend.sh` e como job
+`schema-ciclos` no `pr-guards.yml`. Conferi que ele reprova o `schema.json` anterior (aponta o ciclo
+por extenso) e passa no corrigido. Esta é a mesma família do guard de aspas curvas e do de JSON
+estrito: falha **silenciosa** — typecheck, testes, esbuild e o harness de migrações ficam todos
+verdes, e o defeito só aparece na instalação de outra instância. O validador estático do shell não
+ajuda: ele reprova ciclo que passe por uma `referencias` **composta**, e diz explicitamente que
+"ciclo só de `referencia` simples continua valendo como sempre"
+(`docs/shell/banco-de-dados.md`). É um buraco do shell — vale abrir issue em `urbiverso/urbiverso`,
+mas não está no caminho crítico.
+
+### Segundo defeito, independente: a release nascia já homologada
+
+O autor notou no GitHub que a release disponível estava com `prerelease=false`. Causa: o
+`release.yml` chama `gh release create` **sem `--prerelease`**, enquanto o `urbi-release` do SDK
+publica sempre como prerelease. Para a plataforma, "não homologado" ⟺ `prerelease=true`, então toda
+release nossa nascia **atestada por ninguém** — e produção, que roda em `aceitacao = 'homologado'`,
+passava a enxergá-la na hora. A doc da plataforma já nomeava a virada como pendência do repo do app
+(`distribuicao.md`: "a data de corte é por repo: o dia em que o workflow do repo do app passa a
+publicar `prerelease: true`").
+
+Acrescentado `--prerelease` ao workflow, com o ciclo documentado em `CLAUDE.md` § "A release nasce
+NÃO homologada". Dois pontos que se aprende errado e ficaram escritos: prerelease **não** trava a
+primeira instalação (install de app nova é soberano — basta marcar "Incluir não homologadas" na
+tela), e o botão **Homologar** só existe numa instância com `aceitacao = 'releases'`.
+
+**Fica com o autor, no ambiente autenticado:** disparar o release (Actions → release → Run
+workflow), instalar na Pinguim marcando "Incluir não homologadas", pôr a Pinguim em
+`aceitacao = 'releases'`, testar, clicar em Homologar, e desinstalar da Gondoa.
+
+---
+
 ## Workflow de revisão de PR em diálogo portado do monorepo (2026-08-18)
 
 Pedido do autor, a partir de um workflow que ele já usa noutras apps: implementar numa sessão,
