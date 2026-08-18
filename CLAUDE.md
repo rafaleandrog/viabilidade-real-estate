@@ -201,6 +201,31 @@ numerada contra a `main` do momento, com a `versao` bumpada.
 > branch → push e se deixa ao autor o link
 > `https://github.com/<owner>/<repo>/pull/new/<branch>`.
 
+### Revisão de PR em diálogo
+
+Este repo tem, em `.claude/`, o mesmo mecanismo de revisão em diálogo do monorepo
+`urbiverso/urbiverso` — portado de lá em 2026-08-18, porque uma sessão trabalhando só neste
+repo não enxerga o `.claude/` do monorepo (ver `urbiverso/CLAUDE.md` § "Sessão de app não
+enxerga o monorepo"). Duas sessões conversam pelos comentários do PR até convergir:
+
+- **Sessão implementadora** (`.claude/skills/acompanhar-revisao/`): escreveu o código, abre o
+  PR, invoca a skill `acompanhar-revisao`, e fica respondendo ao revisor em rodadas — teto
+  padrão de **3**, parametrizável na chamada.
+- **Sessão revisora** (`.claude/skills/revisar-pr-apps/`): outra sessão (Claude ou Codex),
+  aponta para o mesmo PR e invoca `revisar-pr-apps`. Publica o relatório como comentário; usa o
+  bundle publicado do `@urbiverso/sdk` como superfície de contrato, nunca o monorepo.
+- O protocolo de comentários (header de máquina, contagem de rodadas, regra do SHA, portão de
+  merge) está em `.claude/protocolo-revisao-pr.md`. As duas skills exigem esse arquivo antes de
+  agir — não o edite sem entender o impacto nas duas.
+
+**Merge nunca é automático nesse ciclo** — mesma regra da seção acima: só o usuário autoriza,
+e só para aquela chamada. `revisar-pr-shell` **não** foi portado — é exclusivo de PR no
+monorepo `urbiverso/urbiverso`, que não é este repositório.
+
+**Cópia, não link vivo.** Os três arquivos são cópia do que existia em `urbiverso/urbiverso` na
+data acima. Se o protocolo ou as skills mudarem lá, alguém precisa portar a mudança para cá
+manualmente — nada aqui sincroniza sozinho.
+
 ---
 
 ## Validação no ambiente Claude Code (web/remoto) — NÃO redescobrir isto

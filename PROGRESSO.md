@@ -4,6 +4,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Workflow de revisão de PR em diálogo portado do monorepo (2026-08-18)
+
+Pedido do autor, a partir de um workflow que ele já usa noutras apps: implementar numa sessão,
+abrir o PR, disparar a revisão numa **segunda** sessão independente, e deixar as duas
+convergirem trocando comentários no PR — merge nunca automático.
+
+O mecanismo (duas skills mais um protocolo de comentário) já existia em
+`urbiverso/urbiverso` (`.claude/skills/{acompanhar-revisao,revisar-pr-apps}` e
+`.claude/protocolo-revisao-pr.md`), mas invisível para uma sessão que só tem este repo
+anexado — regra do próprio `CLAUDE.md` do monorepo (§ "Sessão de app não enxerga o monorepo").
+Portei os três arquivos **verbatim** para `.claude/` deste repo (conferido: nenhum caminho de
+monorepo vazava neles — `revisar-pr-apps` já é desenhada para rodar contra repo de app externo,
+usando o bundle publicado do `@urbiverso/sdk`, não o monorepo). `revisar-pr-shell` ficou de
+fora — é exclusiva de PR no próprio `urbiverso/urbiverso`.
+
+Documentado em `CLAUDE.md` § "Revisão de PR em diálogo" (dentro de § Merge). **É cópia, não
+link vivo**: se o protocolo ou as skills mudarem no monorepo, a atualização não chega aqui
+sozinha — alguém precisa portar de novo.
+
+Não disparei um ciclo de verdade nesta sessão (não havia PR aberto no momento); fica para a
+próxima vez que houver uma mudança real a revisar.
+
+---
+
 ## Auditoria de issues fechadas sem entrega — 4 lacunas (2026-08-17)
 
 Auditoria pedida pelo autor: procurar issues **fechadas cujo trabalho não foi de fato entregue**,
