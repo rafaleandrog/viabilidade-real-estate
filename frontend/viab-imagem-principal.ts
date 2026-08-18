@@ -17,6 +17,14 @@ import {
 // A tabela `estudo_documentos` é `restrito`, então a prévia usa a URL assinada
 // (`url`) que o backend anexa a cada documento — não o download direto por sessão.
 
+// Extraída para ser testável sem harness de DOM: decide se `updated()` deve
+// recarregar, comparando o id do estudo atual contra o último carregado —
+// nunca contra um booleano "já carreguei alguma vez", que ficava preso na
+// capa do primeiro estudo ao navegar para outro sem reload de página.
+export function precisaCarregar(estudoId: number | null | undefined, idCarregado: number | null): boolean {
+  return estudoId != null && estudoId !== idCarregado;
+}
+
 @customElement('viab-imagem-principal')
 export class ViabImagemPrincipal extends LitElement {
   @property({ type: Object }) estudo: any = null;
@@ -25,7 +33,7 @@ export class ViabImagemPrincipal extends LitElement {
   @state() private doc: any = null;
   @state() private carregando = true;
   @state() private enviando = false;
-  private carregado = false;
+  private idCarregado: number | null = null;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .previa {
@@ -41,8 +49,8 @@ export class ViabImagemPrincipal extends LitElement {
   `];
 
   updated() {
-    if (this.estudo?.id && !this.carregado) {
-      this.carregado = true;
+    if (precisaCarregar(this.estudo?.id, this.idCarregado)) {
+      this.idCarregado = this.estudo.id;
       this._carregar();
     }
   }
