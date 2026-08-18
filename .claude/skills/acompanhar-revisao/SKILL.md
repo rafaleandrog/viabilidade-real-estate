@@ -317,8 +317,11 @@ porque ninguém fica olhando aba de PR esperando um agente parar.
 
 Terminando o ciclo, você é quem melhor sabe **o que nenhum teste cobriu por construção** — não
 por esquecimento: dublê que achata `.where` e neutraliza todo filtro SQL, `.pg` que pulou,
-comportamento só observável em instância viva. Isso não é motivo para segurar o PR; é entrada
-para a skill `qa`, que aceita roteiro escrito em comentário de PR como modo de operação.
+comportamento só observável em instância viva. Isso não é motivo para segurar o PR. **Se a skill
+`qa` estiver disponível nesta sessão**, ela é o destino natural — aceita roteiro escrito em
+comentário de PR como modo de operação. **Se não estiver** (ela depende de credenciais de
+instância que nem toda árvore de trabalho tem provisionadas), deixe o roteiro escrito no
+comentário de encerramento do mesmo jeito — vira registro para quem for exercitar na mão.
 
 Quando houver uma faixa assim, o encerramento a nomeia — e, se ela for relevante, vale um
 comentário com o roteiro: o que exercitar, com que perfil de credencial, em que instância, e o
@@ -357,7 +360,8 @@ do monitor) e devolva à sessão o resumo com o timestamp de fechamento.
 - **Sem empurrar com rodada em voo** (§ 2).
 - **Sem editar, esconder ou resolver o comentário do revisor.** O histórico é o registro.
 - **Sem tocar rota de API de instância** para "verificar" o conserto. Instância quente é da
-  skill `qa`; aqui a verificação é suíte, gate e CI.
+  skill `qa`, quando ela estiver disponível nesta sessão; aqui a verificação é suíte, gate e CI —
+  nunca requisição direta, com `qa` presente ou não.
 - **Sem `AskUserQuestion`** — bugada nesta instalação; pergunta vai em texto corrido.
 - **Sem as rotas proibidas do `CLAUDE.md`** (`homologacao`, `upgrade`, `release`, `atestado`),
   por motivo nenhum.
