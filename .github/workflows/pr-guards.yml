@@ -158,3 +158,33 @@ jobs:
             echo "::error title=Ciclo no schema.json::Ciclo de dependência entre tabelas. A instalação numa instância virgem (homolog/prod nova) reprova no dry-run com 'relation \"<app>.<tabela>\" does not exist'. Instância que já tem a app não acusa."
             exit 1
           fi
+
+  migracao-declarativa:
+    name: Migração não declara estrutura no retorno
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Guard de retorno declarativo em migração
+        run: |
+          set -uo pipefail
+          # `remover_colunas`/`remover_tabelas` no retorno de uma migração é migração
+          # DECLARANDO estrutura — o oposto do que o schema.json garante. Obsoleto na
+          # plataforma desde 2026-08-08 e GATE a partir de 2026-08-23: passada a data,
+          # a app é reprovada na instalação. O caminho é tirar a coluna/tabela do
+          # schema.json e esvaziá-la com dados.limparColuna/limparTabela — a poda do
+          # reconciliador derruba a estrutura vazia no mesmo boot. Ver issue #422.
+          #
+          # Aqui em vez de no validar-backend.sh porque este CI não precisa do token
+          # do SDK e roda em todo PR. A etapa 5 do harness de migrações cobre o mesmo
+          # caso executando a migração — as duas defesas são complementares.
+          # Linha de COMENTÁRIO fica de fora: a própria 003 explica no cabeçalho por
+          # que o retorno declarativo saiu de lá, e um guard que reprovasse a
+          # explicação obrigaria a apagar a memória do conserto.
+          achados="$(grep -rnE 'remover_(colunas|tabelas)' migracoes/ | grep -vE '^[^:]+:[0-9]+: *(//|\*)' || true)"
+          if [ -n "$achados" ]; then
+            echo "$achados"
+            echo "::error title=Retorno declarativo em migração::As linhas acima usam remover_colunas/remover_tabelas fora de comentário. Isso é migração declarando estrutura — obsoleto desde 2026-08-08 e GATE a partir de 2026-08-23, quando a app passa a ser REPROVADA na instalação. Remova a coluna/tabela do schema.json e esvazie com dados.limparColuna/limparTabela (ver #422)."
+            exit 1
+          fi
+          echo "ok: nenhuma migração declara estrutura no retorno."

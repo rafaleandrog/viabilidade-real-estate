@@ -37,7 +37,7 @@ Este README é o mapa do projeto. **Releia-o no início de cada sessão** antes 
 | **Nome da tag / release** | `viabilidade-v<x.y.z>_<sha8>` (ex.: `viabilidade-v0.1.0_c03c34e1`) — ver [Lançar uma release](#lançar-uma-release) |
 | **Web component** | `app-viabilidade` |
 | **Prefixo de rota** | shell prefixa tudo com `/api/viabilidade/` — **nunca** escreva o prefixo você mesmo |
-| **Versão do shell / SDK alvo** | `0.50.3` (é o `shell_min` e a versão do `@urbiverso/sdk`) |
+| **Versão do shell / SDK alvo** | `shell_min` = `0.53.8`; `@urbiverso/sdk` = `0.50.3` (os dois deixaram de andar juntos em 2026-08-19 — ver [Os 4 contratos inegociáveis](#os-4-contratos-inegociáveis)) |
 | **Escopo** | **Somente MVP.** Tudo marcado como "v2" na spec fica **de fora**. |
 
 ### Fontes de verdade que você DEVE ler (não invente contratos)
@@ -55,7 +55,12 @@ Se um contrato (comando, formato, assinatura de `req.*`, API do Núcleo) puder s
 1. **Backend 100% self-contained.** `backend/rotas.js` roda em produção sem `npm install`. Use o comando de build canônico (com `--minify` e o banner `createRequire`). Nada de `--packages=external` no backend.
 2. **Sem `instanceof` cruzando o limite shell↔app.** Faça matching por propriedade (`erro?.name === '...'` ou um `codigo` estável). Prefira `import type` quando só precisa da identidade de tipo.
 3. **Seed inicial fora de migração.** `schema.json` é o genesis da app — numa instalação virgem o schema nasce no estado final e as migrações sofrem baseline (registradas sem rodar). Dados semente devem ser idempotentes no boot ou declarativos. Migração é só para transformar dados de instâncias que já têm a app.
-4. **`shell_min` honesto.** `0.50.3`, formato `x.y.z` completo.
+4. **`shell_min` honesto.** `0.53.8`, formato `x.y.z` completo. Subiu de `0.50.3` em 2026-08-19
+   (issue #422): a migração `003` trocou o retorno declarativo `remover_colunas` — obsoleto e
+   **gate** da plataforma a partir de 2026-08-23 — pelo fluxo canônico, que precisa de
+   `dados.limparColuna` (shell 0.53.5) e `dados.varrerTudo` (shell 0.53.8). "Honesto" é literal:
+   o piso declara o menor shell em que a app **de fato** roda, e mentir para baixo faz a app passar
+   no gate de instalação e quebrar em runtime.
 
 ### Disciplina de trabalho (toda etapa)
 

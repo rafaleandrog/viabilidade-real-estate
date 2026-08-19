@@ -67,7 +67,12 @@ Gráficos) · **Imóveis** (imóveis do Núcleo e em quais estudos são usados).
 - **Sem `instanceof` cruzando shell↔app** — matching por propriedade (`erro?.name`/`codigo`), `import type`.
 - **Seed fora de migração** — `schema.json` é o genesis; semente idempotente no boot; migração só
   transforma dados de instâncias que já têm a app.
-- **`shell_min` = `0.50.3`** (formato `x.y.z`), SDK alvo `0.50.3`.
+- **`shell_min` = `0.53.8`** (formato `x.y.z`), SDK alvo `0.50.3`. Subiu de `0.50.3` em
+  2026-08-19 (issue #422): a migração `003` saiu do retorno declarativo `remover_colunas` — que
+  vira **gate** da plataforma em 2026-08-23 — para o fluxo canônico, que usa `dados.limparColuna`
+  (shell 0.53.5) e `dados.varrerTudo` (shell 0.53.8). O `sdk_min` **não** foi declarado: ele exige
+  `shell_min ≥ 0.53.10` pareado e um SDK em versionamento inteiro ("SDK N"), e o alvo aqui ainda é
+  o `0.50.3`.
 - **Precisão decimal:** R$ e m² → `decimal(12,2)`; % digitado/default → `inteiro`; % calculado →
   `decimal(5,1)`.
 - **Precisão de resultado (2026-08-01):** **todo valor monetário que é resultado de fórmula é
