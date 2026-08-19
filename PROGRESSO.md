@@ -4,6 +4,90 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Retorno declarativo de migração: a `003` sai do `remover_colunas` (2026-08-19)
+
+A auditoria de obsolescências da plataforma acusou **um** arquivo desta app:
+
+```
+[migracao-remover-colunas] Retorno declarativo de migração de app (`remover_colunas` /
+`remover_tabelas`) — breaking após 2026-08-23
+ * migracoes/003_receitas_fases_alocacoes.js
+```
+
+`migracoes/003_receitas_fases_alocacoes.js` terminava em
+`return { remover_colunas: { avancado_tipologias: ['linha_receita_id'] } }` — o único ponto do repo
+com retorno declarativo. Isso é **migração declarando estrutura**, o oposto do que o `schema.json`
+passou a garantir: a estrutura de uma app é 100% derivada dele, e migração só toca DADOS.
+
+**Por que não dava para deixar passar.** O item está marcado `"gate": true` em
+`sdk/obsolescencias.json`: passado **2026-08-23** ele deixa de ser aviso e **reprova a app na
+instalação**. A allowlist de perdão nominal do detector cobre só as 8 migrações históricas que já
+estavam no monorepo quando o contrato apertou, e está **congelada** — esta app nunca foi bundled,
+então nada aqui casa. O caminho prescrito pela própria plataforma para esse caso é reescrever a
+migração no fluxo canônico antes do fim da janela.
+
+**Metade do caminho já estava feita e ninguém tinha reparado:** `linha_receita_id` já não está no
+`schema.json`. Faltava só o passo de DADO. A `003` agora faz
+`await dados.limparColuna('avancado_tipologias', 'linha_receita_id')`, sem `return`. No boot: o
+reconciliador não toca na coluna (ela tem dado) → a migração esvazia → a poda pós-migrações derruba
+a estrutura vazia. Numa instância onde a coluna nunca recebeu dado, a poda pré-migrações já a
+derrubou e o `limparColuna` vira **no-op com log** — o mesmo release converge nas duas populações.
+
+Reescrever migração já aplicada é seguro: o runner é forward-only e rastreia por número em
+`shell.versoes`. Quem já rodou a `003` não a roda de novo; quem está atrasado roda a versão nova e
+chega ao mesmo estado final.
+
+### O defeito irmão, que era o pior dos dois
+
+A `003` lia com `dados.listar(..., { por_pagina: 100000 })`. **Até o shell 0.53.8 esse `por_pagina`
+era ignorado** e a chamada devolvia **100 linhas**, sem erro e sem aviso. Encostado num
+esvaziamento de coluna, isso é a receita que os docs da plataforma marcam como irreversível: migra
+100 tipologias e apaga a coluna de **todas**. As duas leituras passaram a `dados.varrerTudo`, que
+não tem número para chutar. O aviso de obsolescência não falava disso — apareceu porque a correção
+obrigou a olhar o arquivo inteiro.
+
+### `shell_min`: `0.50.3` → `0.53.8`
+
+| Verbo | Piso |
+|---|---|
+| `dados.limparColuna` | shell **0.53.5** |
+| `dados.varrerTudo` | shell **0.53.8** |
+
+O `shell_min = 0.50.3` estava listado como contrato inegociável no `CLAUDE.md`, no
+`INSTRUCOES-CODE.md` e no `README.md` — os três foram atualizados na mesma alteração. **O piso
+existe para ser honesto**, e não havia alternativa: sem `limparColuna` a remoção não tem passo de
+dado. Risco baixo — o monorepo está em `0.53.11`, e o próprio aviso de obsolescência só é emitido
+por shell ≥ 0.53.x. `sdk_min` **não** entrou: exige `shell_min ≥ 0.53.10` pareado e um SDK em
+versionamento inteiro ("SDK N"), e a app segue pinada em `@urbiverso/sdk 0.50.3`, anterior a esse
+esquema. **`versao` intocada** (`0.1.28`): não há migração nova nem mudança de schema, e o guard do
+`validar-backend.sh` reprova bump sem migração nova.
+
+### Prevenção — duas defesas, porque uma não bastava
+
+- **`scripts/migracoes-harness.mjs`:** o banco em memória ganhou `varrerTudo`, `limparColuna` e
+  `limparTabela`; a etapa 4 passou a **afirmar sobre o efeito** (depois da cadeia,
+  `avancado_tipologias.linha_receita_id` tem que estar vazia — a fixture semeia a coluna
+  preenchida); e existe uma etapa **5** que executa cada migração e reprova retorno com
+  `remover_colunas`/`remover_tabelas`. Conferido que as duas ficam **vermelhas** sem o conserto.
+- **`.github/workflows/pr-guards.yml`:** job `migracao-declarativa`, só `grep`, que barra
+  `remover_colunas`/`remover_tabelas` **fora de comentário** em `migracoes/`. Fica no CI leve
+  porque o `validation.yml` depende do token do SDK e pode nem rodar.
+
+Uma executa, a outra lê o texto: o harness pega o retorno construído de qualquer jeito, o guard
+pega o PR mesmo quando o CI pesado não roda.
+
+### Pendente do autor (ambiente autenticado)
+
+- **confirmar que a instância-alvo roda shell ≥ 0.53.8** antes de publicar a release — abaixo disso
+  a app é reprovada na atualização com `422`;
+- `pnpm exec urbi-empacotar viabilidade`;
+- execução real da cadeia `001`→`029` no Postgres (segue nunca rodada em produção).
+
+Issue **#422**. Validado aqui: `guard-json.mjs` ✓ · harness de migrações ✓ (etapas 1–5) · guard de
+`versao` ✓.
+
+---
+
 ## A app nunca foi instalável do zero — ciclo de FK no `schema.json` (2026-08-18)
 
 O autor tentou instalar a app na **Pinguim** (`homolog.urbiverso.com.br`), para depois removê-la da
@@ -2423,6 +2507,9 @@ Branch `claude/lote-6-issues-b21wlr`. Toca **schema + backend + frontend + motor
 - **Migração 003 (forward-only):** cada `avancado_linhas_receita` → `avancado_fases` (absorção convertida p/ distribuído,
   fluxo p/ multi-linha); cada `avancado_tipologias` legada → uma `avancado_alocacoes` na fase da sua linha; drop de
   `avancado_tipologias.linha_receita_id` via `remover_colunas`. Numa instância virgem o runner faz baseline (inócua).
+  > ⚠️ **Vencido em 2026-08-19 (#422):** o `remover_colunas` saiu. A `003` hoje esvazia a coluna com
+  > `dados.limparColuna` e a poda do reconciliador derruba a estrutura vazia no mesmo boot — ver a
+  > entrada do topo deste arquivo.
 - **Decisão registrada (área p/ custos `rs_m2_priv`):** a área privativa total do motor passa a somar as **alocações**
   (unidades × área do catálogo), mantendo VGV e base de custo consistentes entre si. Se o autor quiser a área do
   **catálogo inteiro** (construído, não só vendido) para custo de obra, ajustar `montarLinhasReceita`/motor num passo próprio.

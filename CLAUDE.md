@@ -345,7 +345,11 @@ Git Bash — ver PROGRESSO).
 - Backend 100% self-contained (`backend/rotas.js`, sem `--packages=external`)
 - Sem `instanceof` cruzando shell↔app
 - Seed fora de migração; migração só transforma dados existentes
-- `shell_min = "0.50.3"`
+- `shell_min = "0.53.8"` — subiu de `0.50.3` em 2026-08-19 (issue #422). O piso existe para ser
+  **honesto**, e a plataforma retirou a alternativa: o retorno declarativo de migração
+  (`remover_colunas`) vira **gate** em 2026-08-23, e o fluxo canônico que o substitui exige
+  `dados.limparColuna` (shell **0.53.5**) e `dados.varrerTudo` (shell **0.53.8**). Subir o piso
+  **não** bumpa a `versao` — ela descreve o schema, e nada de schema mudou.
 - Precisão: R$ e m² → `decimal(12,2)`; % digitado → inteiro; % calculado → `decimal(5,1)`
 - **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e
   no motor. Representações derivadas **não monetárias** (% e R$/m²) carregam **precisão plena**
