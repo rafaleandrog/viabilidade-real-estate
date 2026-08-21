@@ -45,7 +45,7 @@ correção, o revisor acusaria bloqueante inventado em **todo** PR que sobe piso
 `CLAUDE.md` § Processo obrigatório. O resumo honesto: `permissions.deny` **não** alcança `Bash` nem
 ferramenta MCP (casa nome de ferramenta, não argumento) e falha **calado** se o padrão de caminho não
 casar — por isso o `PreToolUse` `guarda-monorepo.sh` é a peça que realmente sustenta a proibição, com
-46 casos de teste versionados. E o guard `revisao-registrada` é **autoatestação**: confere forma,
+57 casos de teste versionados. E o guard `revisao-registrada` é **autoatestação**: confere forma,
 nunca substância.
 
 Duas decisões de desenho que custaram um erro cada, e vale não repetir:

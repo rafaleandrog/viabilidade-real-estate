@@ -208,6 +208,7 @@ jobs:
             exit 1
           fi
       - name: Bateria da guarda do monorepo
+        if: always()
         run: |
           set -uo pipefail
           # Falso NEGATIVO deixa a escrita no monorepo passar; falso POSITIVO
@@ -219,6 +220,7 @@ jobs:
             exit 1
           fi
       - name: Bateria do parsing do revisao-registrada
+        if: always()
         run: |
           set -uo pipefail
           # O job `revisao-registrada` não fica vermelho quando o parsing quebra:

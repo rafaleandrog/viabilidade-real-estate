@@ -24,6 +24,16 @@ export function fmtR$(v: number, comSimbolo = true): string {
 export const fmtNum = (v: number, d = 0) =>
   new Intl.NumberFormat('pt-BR', { maximumFractionDigits: d }).format(v || 0);
 
+// Área em m². Existia montado à mão em cada chamador (`${fmtNum(x)} m²`), o que
+// deixava a casa decimal a critério de quem escrevia a linha — e o contrato do
+// repo é `decimal(12,2)` para m². Duas casas, como o R$, e o mesmo separador de
+// milhar do Intl pt-BR. `null`/`undefined` viram "—", nunca "0,00 m²": zero é um
+// terreno de área zero, ausência é ausência, e a tabela precisa distinguir.
+export const fmtM2 = (v: number | null | undefined): string =>
+  v == null || !Number.isFinite(Number(v))
+    ? '—'
+    : `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v))} m²`;
+
 // Porcentagem calculada (resultado de conta): 1 casa decimal, vírgula.
 export const fmtPct = (v: number) =>
   `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(v || 0)}%`;
