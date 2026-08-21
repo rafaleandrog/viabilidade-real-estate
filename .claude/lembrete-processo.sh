@@ -6,8 +6,9 @@
 # direto, é pequeno") fica tentador. Este hook reinjeta o ESTADO a cada prompt.
 #
 # Imprime estado, nunca regra. Regra repetida vira papel de parede; estado muda,
-# e por isso continua sendo lido. Teto de 4 linhas, de propósito: ~40 tokens por
-# turno é o preço, e ele só se paga enquanto for curto.
+# e por isso continua sendo lido. Emite UMA linha no caso normal e uma segunda só
+# no aviso de `main` suja — teto de 2, de propósito: ~25 tokens por turno é o
+# preço, e ele só se paga enquanto for curto. Cresceu? Corte antes de somar.
 #
 # ⚠️ NUNCA sai != 0. Em UserPromptSubmit, exit != 0 BLOQUEIA o prompt do usuário.
 set -uo pipefail

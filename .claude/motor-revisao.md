@@ -175,8 +175,8 @@ codex exec -s read-only -C "$WT" --ephemeral -c model_reasoning_effort=<esforço
   diff de três pontos sozinho a partir dali (verificado: as lentes rodam
   `git diff <merge-base>...HEAD` por conta própria).
 - **O esforço é controlável e honrado:** `-c model_reasoning_effort=<low|medium|high>`.
-- **`-s read-only` sempre.** O `review` já não aceita escrita, mas a §8 não depende de o motor
-  obedecer.
+- **`-s read-only` sempre.** O `review` já não aceita escrita, mas a **§10 (Proibições)** da skill não
+  depende de o motor obedecer.
 - **`--ephemeral`** para não acumular arquivo de sessão.
 - **`</dev/null` não é enfeite:** sem ele o `codex` fica lendo stdin e a lente trava.
 
@@ -304,6 +304,10 @@ lentes, mesmos briefings, mesmo orçamento: muda o veículo.
 
 ## O que nunca sai daqui
 
+> ⚠️ **Referência de seção cita NÚMERO e NOME.** Este arquivo já apontou para `§8` e `§9` depois de
+> a skill ser renumerada no mesmo PR — número solo deriva calado, e duas lentes independentes da
+> revisão do #424 acharam a mesma coisa. Com o nome junto, o leitor percebe quando não bate.
+
 Ficam com você, no modelo da sessão, sempre: a triagem (§1), a calibração (§2.1), a
-**verificação de todo achado bloqueante e a reconferência da citação no arquivo** (§9), a
-deduplicação, a síntese e a postagem. O motor produz evidência; **veredito é seu**.
+**verificação de todo achado bloqueante e a reconferência da citação no arquivo**
+(**§11, Operação**), a deduplicação, a síntese e a postagem. O motor produz evidência; **veredito é seu**.

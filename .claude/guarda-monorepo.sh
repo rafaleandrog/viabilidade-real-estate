@@ -14,22 +14,52 @@
 #   - E se o padrão de caminho do deny não casar, ele falha CALADO.
 # Os dois mecanismos são redundantes DE PROPÓSITO.
 #
-# O QUE ELE NÃO É: sandbox. `cd` + caminho relativo, symlink, caminho montado em
-# variável ou script intermediário passam. Ele guarda a sessão distraída, não a
-# determinada. A defesa hermética seria não anexar o monorepo a estas sessões.
+# ─── DESENHO, e por que ele mudou (revisão do PR #424, rodada 1) ───────────────
+#
+# A v1 decidia por "não é verbo de leitura → bloqueia". Isso produziu os DOIS
+# erros ao mesmo tempo, e os dois foram provados na revisão:
+#
+#   - FALSO POSITIVO: `grep -v` inverte por LINHA. Um comando de duas linhas
+#     (`git -C mono log` + `echo x`) era bloqueado, embora fosse leitura pura.
+#     Falso positivo aqui não é inofensivo: guard que atrapalha é desligado.
+#   - FALSO NEGATIVO: `cd /home/user/urbiverso && git commit` passava, porque o
+#     caminho não aparecia depois do `git` na mesma cláusula. É o idioma MAIS
+#     natural para editar o monorepo — e foi exatamente assim que a própria
+#     sessão que escreveu esta guarda escreveu no monorepo sem querer, minutos
+#     depois de escrevê-la, com `cd` + caminho relativo.
+#
+# A v2 inverte a lógica: **passa por padrão, bloqueia em VERBO DE ESCRITA
+# explícito.** Nunca "não reconheci, então bloqueio". E soma o `cwd` do payload
+# do hook ao teste de "isto encosta no monorepo?", que é o que fecha o buraco do
+# `cd` — o comando pode não citar caminho nenhum.
+#
+# O QUE ELE CONTINUA NÃO SENDO: sandbox. Symlink, caminho montado em variável ou
+# script intermediário passam. Ele guarda a sessão distraída, não a determinada.
+# A defesa hermética seria não anexar o monorepo a estas sessões.
 #
 # Contrato: exit 0 = deixa passar; exit 2 = BLOQUEIA (o stderr volta ao modelo).
-# Qualquer erro interno deixa passar — um guard quebrado não pode travar a sessão.
+# Erro interno deixa passar — um guard quebrado não pode travar a sessão.
 set -uo pipefail
 
 MONO_PATH='/home/user/urbiverso'
 MONO_REPO='urbiverso/urbiverso'
 
 ENTRADA="$(cat)" || exit 0
-command -v jq >/dev/null 2>&1 || exit 0
 
-FERRAMENTA="$(printf '%s' "$ENTRADA" | jq -r '.tool_name // empty' 2>/dev/null)" || exit 0
+# `jq` é o caminho normal. Sem ele, NÃO viramos no-op: caímos num extrator de
+# emergência por grep, que é grosseiro mas cobre os casos de caminho literal.
+# Virar no-op calado seria a mesma falha que este arquivo existe para evitar.
+campo() { # campo <chave>
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$ENTRADA" | jq -r --arg k "$1" '.[$k] // .tool_input[$k] // empty' 2>/dev/null
+  else
+    printf '%s' "$ENTRADA" | grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//'
+  fi
+}
+
+FERRAMENTA="$(campo tool_name)"
 [ -n "$FERRAMENTA" ] || exit 0
+CWD="$(campo cwd)"
 
 bloqueia() {
   echo "BLOQUEADO pela guarda do monorepo: $1" >&2
@@ -44,53 +74,65 @@ bloqueia() {
   exit 2
 }
 
+dentro_do_mono() { case "$1" in "$MONO_PATH"|"$MONO_PATH"/*) return 0 ;; *) return 1 ;; esac; }
+
 case "$FERRAMENTA" in
   Write|Edit|MultiEdit|NotebookEdit)
-    ALVO="$(printf '%s' "$ENTRADA" | jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' 2>/dev/null)"
-    case "$ALVO" in
-      "$MONO_PATH"|"$MONO_PATH"/*) bloqueia "$FERRAMENTA em $ALVO" ;;
-    esac
+    ALVO="$(campo file_path)"; [ -n "$ALVO" ] || ALVO="$(campo notebook_path)"
+    # Caminho relativo com a sessão dentro do monorepo é escrita no monorepo.
+    case "$ALVO" in /*) ;; *) [ -n "$CWD" ] && dentro_do_mono "$CWD" && bloqueia "$FERRAMENTA em caminho relativo com cwd no monorepo ($CWD)" ;; esac
+    dentro_do_mono "$ALVO" && bloqueia "$FERRAMENTA em $ALVO"
     ;;
 
   Bash)
-    CMD="$(printf '%s' "$ENTRADA" | jq -r '.tool_input.command // empty' 2>/dev/null)"
-    # Só interessa comando que ENCOSTA no monorepo. Sem isso, o guard acusaria
-    # `rm` de qualquer coisa e viraria ruído — e guard ruidoso é desligado.
-    if printf '%s' "$CMD" | grep -qF -e "$MONO_PATH" -e "$MONO_REPO"; then
-      # git -C <monorepo> com verbo que escreve, em qualquer posição
-      if printf '%s' "$CMD" | grep -qE "git[[:space:]]+(-C[[:space:]]+)?[^|;&]*${MONO_PATH//\//\\/}[^|;&]*[[:space:]]+(commit|push|add|checkout|switch|merge|rebase|reset|apply|am|cherry-pick|tag|worktree|clean|rm|mv|stash)"; then
-        bloqueia "comando git de escrita no monorepo"
-      fi
-      if printf '%s' "$CMD" | grep -qE "git[[:space:]]+-C[[:space:]]+${MONO_PATH//\//\\/}"; then
-        # `git -C <mono>` com verbo de leitura (log, show, diff, status) é legítimo.
-        if printf '%s' "$CMD" | grep -qvE "git[[:space:]]+-C[[:space:]]+${MONO_PATH//\//\\/}[[:space:]]+(log|show|diff|status|rev-parse|rev-list|ls-files|ls-tree|cat-file|blame|describe|branch[[:space:]]+--show-current|config[[:space:]]+--get)"; then
-          bloqueia "comando git potencialmente de escrita no monorepo"
-        fi
-      fi
-      # Verbos de escrita de shell apontando para lá
-      if printf '%s' "$CMD" | grep -qE "(^|[[:space:]]|\||&)(rm|mv|cp|mkdir|touch|tee|truncate|chmod|chown|ln|dd)([[:space:]]|$)" \
-         && printf '%s' "$CMD" | grep -qF "$MONO_PATH"; then
-        bloqueia "comando de escrita de arquivo apontando para o monorepo"
-      fi
-      if printf '%s' "$CMD" | grep -qE "sed[[:space:]]+(-[a-zA-Z]*i|--in-place)"; then
-        bloqueia "sed --in-place tocando o monorepo"
-      fi
-      if printf '%s' "$CMD" | grep -qE ">>?[[:space:]]*[\"']?${MONO_PATH//\//\\/}"; then
-        bloqueia "redirecionamento de saída para dentro do monorepo"
-      fi
+    CMD="$(campo command)"
+    [ -n "$CMD" ] || exit 0
+
+    # 1. Isto encosta no monorepo? Três formas — e a terceira é a que a v1 não via.
+    ENCOSTA=0
+    printf '%s' "$CMD" | grep -qF -e "$MONO_PATH" -e "$MONO_REPO" && ENCOSTA=1
+    printf '%s' "$CMD" | grep -qE "cd[[:space:]]+[\"']?${MONO_PATH}" && ENCOSTA=1
+    [ -n "$CWD" ] && dentro_do_mono "$CWD" && ENCOSTA=1
+    [ "$ENCOSTA" = "1" ] || exit 0
+
+    # 2. Encostando, procure VERBO DE ESCRITA. Só bloqueia se achar um: leitura
+    #    desconhecida passa, de propósito (ver o desenho, no cabeçalho).
+    GIT_ESCRITA='commit|push|add|checkout|switch|merge|rebase|reset|apply|am|cherry-pick|tag|worktree|clean|stash|fetch|pull|remote|init|gc|prune|filter-branch|update-ref|symbolic-ref|notes|replace'
+    if printf '%s' "$CMD" | grep -qE "(^|[[:space:];&|])git([[:space:]]+-[Cc][[:space:]]+[^[:space:]]+)?[[:space:]]+($GIT_ESCRITA)([[:space:]]|$)"; then
+      bloqueia "comando git de escrita encostando no monorepo"
     fi
+    # `git branch`/`git config` só escrevem com flag; a forma nua lista e passa.
+    if printf '%s' "$CMD" | grep -qE "(^|[[:space:];&|])git([[:space:]]+-[Cc][[:space:]]+[^[:space:]]+)?[[:space:]]+(branch[[:space:]]+-[dDmMf]|config[[:space:]]+--(global|local|add|unset|replace-all))"; then
+      bloqueia "git branch/config de escrita encostando no monorepo"
+    fi
+    if printf '%s' "$CMD" | grep -qE "(^|[[:space:];&|])(rm|mv|cp|mkdir|rmdir|touch|tee|truncate|chmod|chown|ln|dd|install)([[:space:]]|$)"; then
+      bloqueia "comando de escrita de arquivo encostando no monorepo"
+    fi
+    if printf '%s' "$CMD" | grep -qE "(^|[[:space:];&|])sed[[:space:]]+(-[a-zA-Z]*i|--in-place)"; then
+      bloqueia "sed --in-place encostando no monorepo"
+    fi
+    if printf '%s' "$CMD" | grep -qE ">>?[[:space:]]*[\"']?(${MONO_PATH}|[^[:space:]/])"; then
+      # Redirecionamento para caminho no monorepo, ou para caminho relativo com
+      # a sessão dentro dele. `> /outro/lugar` absoluto fora do mono não casa.
+      bloqueia "redirecionamento de saída encostando no monorepo"
+    fi
+    # Interpretador em uma linha é opaco para qualquer regex: `python3 -c
+    # "open('<mono>/x','w')"` escreve sem usar nenhum verbo de shell. Encostando
+    # no monorepo, ele é bloqueado por princípio — leitura se faz com Read/Grep.
+    if printf '%s' "$CMD" | grep -qE "(^|[[:space:];&|])(python3?|node|perl|ruby|php)[[:space:]]+(-[a-zA-Z]*[ce])[[:space:]]"; then
+      bloqueia "interpretador em uma linha encostando no monorepo (use Read/Grep para ler)"
+    fi
+    exit 0
     ;;
 
   mcp__github__*)
-    OWNER="$(printf '%s' "$ENTRADA" | jq -r '.tool_input.owner // empty' 2>/dev/null)"
+    OWNER="$(campo owner)"
     if [ "$OWNER" = "urbiverso" ]; then
       # Leitura pelo GitHub é referência legítima; só a escrita é proibida.
       #
-      # O verbo casa por PREFIXO ou por SUFIXO `_write`, nunca por substring solta:
-      # `pull_request_read` contém "request" e seria bloqueado por engano — o que
-      # quebraria a própria revisão de PR, que precisa ler PR. Falso positivo aqui
-      # não é inofensivo: um guard que atrapalha o trabalho legítimo é desligado, e
-      # aí ele não guarda mais nada.
+      # O verbo casa por PREFIXO ou por SUFIXO `_write`, nunca por substring
+      # solta: `pull_request_read` contém "request" e seria bloqueado por engano
+      # — o que quebraria a própria revisão de PR, que precisa ler PR.
       LOCAL="${FERRAMENTA#mcp__github__}"
       case "$LOCAL" in
         create_*|update_*|delete_*|add_*|merge_*|push_*|fork_*|enable_*|disable_*|request_*|resolve_*|unresolve_*|run_*|*_write|actions_run_trigger)

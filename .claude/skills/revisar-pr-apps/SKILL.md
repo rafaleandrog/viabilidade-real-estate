@@ -629,6 +629,24 @@ Anuncie a escolha e o motivo em uma linha, como no passo 2.1, e repita o motivo 
 inclusive quando não houve fan-out: o **quadro de execução da § 7 continua obrigatório**, ainda
 que com uma linha só. Rodada sem quadro lê-se como rodada sem registro.
 
+### O histórico entre rodadas não se reescreve
+
+> **ADAPTADO — regra salva da geração anterior**, que a reescrita do upstream deixou cair. Ela
+> valia para o modelo de duas sessões, mas **não era dele**: vale para qualquer revisão em rodadas.
+
+**Ninguém reescreve histórico enquanto o ciclo está aberto — sem `--force`, sem rebase, sem squash
+intermediário, sem amend de commit já empurrado.** Toda a §8 acima raciocina por **delta desde a
+rodada anterior**, e o delta é calculado por SHA: reescrever apaga o chão em que o revisor pisou. O
+placar dos achados anteriores passa a apontar para commits que não existem mais, e o decaimento de
+esforço — que é o que impede o ciclo de ficar caro — vira decaimento sobre nada.
+
+Precisa incorporar a `main`? **Mergeie para dentro** (`git merge origin/main`), que preserva os SHAs
+já revisados. Numa branch que só você tem e **antes** de abrir o ciclo, a convenção do repositório
+vale normalmente — o que a regra protege é a janela entre a primeira rodada e o encerramento.
+
+O mesmo motivo sustenta a outra metade: **não empurre com uma rodada em voo.** O revisor releu o
+HEAD para postar; se ele se move no meio, o relatório nasce falando de código que já não está lá.
+
 ### Releia o HEAD imediatamente antes de postar
 
 Já aconteceu: relatório publicado sobre um HEAD que tinha acabado de mover, com o único achado
@@ -682,6 +700,8 @@ autorize: encerre com o PR pronto e parado, que é o desfecho normal.
 Com autorização, confira o portão item por item antes de mergear:
 
 - zero bloqueantes pendentes e nenhuma decisão de desenho aberta;
+- **o histórico não foi reescrito durante o ciclo** (§8) — se foi, o placar das rodadas anteriores
+  não vale, e a revisão recomeça do zero em vez de mergear;
 - **CI verde no SHA final, lido pela API** — não no SHA que você revisou, se ele mudou;
 - suíte executada com os pulados declarados (§ 6);
 - `Closes #<n>` **em inglês** no corpo do PR, repetido por issue e na forma completa quando a

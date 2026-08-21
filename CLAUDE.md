@@ -256,8 +256,12 @@ um plugin do Codex inexistente e, não achando, **parava para perguntar** — in
 pergunta, nunca uma revisão. O guard `processo-integro` barra a volta dos dois arquivos.
 
 **Duas sessões continuam permitidas** quando você quiser independência de verdade: aponte outra
-sessão para o mesmo PR e mande revisar. Toda a coordenação (rodada, head, placar dos achados) vive
-no corpo do comentário. Vale saber por que isso às vezes importa: **com uma sessão só, quem revisa
+sessão para o mesmo PR e mande revisar. A **gramática compartilhada** que sobrou do protocolo antigo
+é a linha de máquina no topo de todo relatório — `rodada`, `head`, `motor`, `bloqueantes`,
+`contratos` —, e ela basta para a segunda sessão se localizar sem inventar formato próprio. O que
+morreu junto com o protocolo foi o que só o modelo de duas sessões precisava: papéis, teto de
+rodadas e encerramento obrigatório. Este último não faz falta porque a sessão revisora não se
+inscreve em nada — ela revisa quando chamada e termina. Vale saber por que isso às vezes importa: **com uma sessão só, quem revisa
 é quem escreveu** — a §8 da skill compensa com lentes novas a cada rodada, mas não é a mesma coisa.
 
 **O motor é Codex quando dá, nativo quando não** — e a queda é **declarada**, nunca silenciosa. Hoje
@@ -296,7 +300,13 @@ caminho não casar:
 | Camada | Cobre |
 |---|---|
 | `permissions.deny` em `.claude/settings.json` | `Write`/`Edit`/`NotebookEdit` sob `/home/user/urbiverso` |
-| `.claude/guarda-monorepo.sh` (`PreToolUse`) | o mesmo, **mais** `Bash` com verbo de escrita e **`mcp__github__*` com `owner=urbiverso`** |
+| `.claude/guarda-monorepo.sh` (`PreToolUse`) | o mesmo, **mais** `Bash` com verbo de escrita, `cwd` dentro do monorepo, e **`mcp__github__*` com `owner=urbiverso`** |
+
+> ⚠️ **A barra dupla de `Write(//home/user/urbiverso/**)` não é erro de digitação.** É a sintaxe de
+> **caminho absoluto** em regra de permissão; com barra simples o caminho é lido como relativo ao
+> projeto e a regra **deixa de casar, sem avisar**. Não "corrija" para uma barra só. E confira com
+> `/permissions` que ela aparece **parseada** — regra de deny que não casa falha calada, que é
+> exatamente por que o hook cobre o mesmo caso.
 
 A bateria `scripts/testar-guarda-monorepo.sh` (46 casos, roda no CI) cobre os dois sentidos: falso
 negativo deixa a escrita passar; **falso positivo atrapalha trabalho legítimo, alguém desliga o

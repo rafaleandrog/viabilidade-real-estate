@@ -76,9 +76,13 @@ if (settings?.hooks) {
       }
     }
   }
-  for (const ev of ['SessionStart', 'UserPromptSubmit', 'PreToolUse']) {
-    if (!settings.hooks[ev]) erros.push(`hook ${ev} sumiu do ${SETTINGS}.`);
-  }
+}
+
+// ⚠️ FORA do `if` acima, de propósito. Este laço já esteve dentro dele, e aí
+// apagar a chave `hooks` INTEIRA — o jeito mais provável de furar a rede —
+// passava verde, com um alegre "17 verificações". Achado da revisão do PR #424.
+for (const ev of ['SessionStart', 'UserPromptSubmit', 'PreToolUse']) {
+  if (settings && !settings.hooks?.[ev]) erros.push(`hook ${ev} sumiu do ${SETTINGS}.`);
 }
 
 // ── 5. As regras de deny do monorepo continuam lá ───────────────────────────

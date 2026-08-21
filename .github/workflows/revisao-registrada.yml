@@ -25,6 +25,12 @@
 #     Acrescentar `issue_comment` ao pr-guards.yml faria os outros 6 jobs
 #     dispararem fora de contexto de PR.
 #
+#     ⚠️ E uma limitação que morde na estreia: `issue_comment` executa sempre a
+#     versão do workflow que está na branch DEFAULT, não na branch do PR. No
+#     próprio PR que introduz este arquivo, portanto, o gatilho de comentário NÃO
+#     roda — o status fica no que o gatilho `pull_request` publicou. É esperado, e
+#     some depois do primeiro merge.
+#
 #  2. O JOB SEMPRE PASSA; quem reprova é o COMMIT STATUS. Se o job falhasse, o
 #     check do run original ficaria vermelho e nenhum comentário posterior o
 #     pintaria de verde — o status, não. Ele fica preso ao SHA e é reescrito por
@@ -54,11 +60,19 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number || github.event.issue.number }}
         run: |
+          # ⚠️ `set +e` NÃO é redundante. O shell default de `run:` é `bash -e {0}`:
+          # o errexit já vem ligado de fábrica, e `set -uo pipefail` acrescenta `u`
+          # e `pipefail` sem removê-lo. Sem o `+e`, um `grep` que não casa (linha de
+          # máquina sem `motor=`, por exemplo) mata o job ANTES de publicar o status
+          # — e a decisão de desenho 2 do cabeçalho, que é a razão deste arquivo
+          # existir separado, ia por água abaixo. Achado da revisão do PR #424,
+          # reproduzido sob `bash -e`. Todo o defaulting `${BLOQ:-1}` era código morto.
+          set +e
           set -uo pipefail
 
           HEAD_SHA="$(gh api "repos/$REPO/pulls/$PR" --jq '.head.sha')"
           if [ -z "$HEAD_SHA" ]; then
-            echo "não consegui ler o head do PR #$PR — nada a atestar"
+            echo "::warning title=Revisão não atestada::não consegui ler o head do PR #$PR pela API; o status revisao/bloqueantes NÃO foi atualizado e pode estar preso num valor antigo."
             exit 0
           fi
           CURTO="${HEAD_SHA:0:8}"
@@ -67,7 +81,14 @@ jobs:
           # `--paginate` importa: em PR com muita conversa o relatório sai da
           # primeira página, e sem isso a revisão "some" e o status reprova um PR
           # revisado. Falha calada na direção mais irritante possível.
-          LINHAS="$(gh api --paginate "repos/$REPO/issues/$PR/comments" --jq '.[].body' \
+          #
+          # O filtro por AUTOR importa por outro motivo: sem ele, QUALQUER pessoa
+          # que comente a linha de máquina — inclusive só para discuti-la — pinta
+          # o status de verde. Isto continua sendo autoatestação (ver o cabeçalho),
+          # mas passa a ser atestação de quem escreveu o PR, não de qualquer um.
+          AUTOR="$(gh api "repos/$REPO/pulls/$PR" --jq '.user.login')"
+          LINHAS="$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
+                      --jq --arg a "$AUTOR" '.[] | select(.user.login == $a) | .body' \
                     | grep -o '<!-- revisao-viabilidade [^>]*-->' || true)"
 
           if [ -z "$LINHAS" ]; then
@@ -102,6 +123,17 @@ jobs:
             -f state="$ESTADO" \
             -f context='revisao/bloqueantes' \
             -f description="$DESC" >/dev/null
+          RC=$?
+
+          # O POST pode falhar, e o modo mais provável é PR de FORK: ali o
+          # GITHUB_TOKEN é rebaixado para leitura mesmo com `permissions:
+          # statuses: write`, e o POST toma 403. Sem checar o rc, o job saía 0 com
+          # o erro só no log — e o status ficava CONGELADO no valor do push
+          # anterior. Um `success` velho continuaria verde sobre código novo, que é
+          # a pior falha calada possível num guard de revisão.
+          if [ "$RC" != "0" ]; then
+            echo "::warning title=Status de revisão não publicado::o POST do commit status falhou (rc=$RC). Em PR de fork o GITHUB_TOKEN é somente leitura e isso é esperado — mas o status revisao/bloqueantes NÃO reflete este head. Trate como NÃO ATESTADO."
+          fi
 
           # O job passa sempre — ver a decisão de desenho 2 no cabeçalho.
           exit 0
