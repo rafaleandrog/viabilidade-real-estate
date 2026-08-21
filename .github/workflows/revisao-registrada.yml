@@ -86,9 +86,14 @@ jobs:
           # que comente a linha de máquina — inclusive só para discuti-la — pinta
           # o status de verde. Isto continua sendo autoatestação (ver o cabeçalho),
           # mas passa a ser atestação de quem escreveu o PR, não de qualquer um.
-          AUTOR="$(gh api "repos/$REPO/pulls/$PR" --jq '.user.login')"
+          # ⚠️ `gh api --jq` aceita UMA expressão e mais nada: `--jq --arg a "$X" '…'`
+          # morre com "accepts 1 arg(s), received 4" e a busca volta VAZIA — quer
+          # dizer, um PR revisado seria reprovado por "nenhuma revisão registrada".
+          # Foi o que aconteceu no head 310156e. O autor entra pelo AMBIENTE, que é
+          # como jq lê variável aqui (`env.AUTOR`).
+          export AUTOR="$(gh api "repos/$REPO/pulls/$PR" --jq '.user.login')"
           LINHAS="$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
-                      --jq --arg a "$AUTOR" '.[] | select(.user.login == $a) | .body' \
+                      --jq '.[] | select(.user.login == env.AUTOR) | .body' \
                     | grep -o '<!-- revisao-viabilidade [^>]*-->' || true)"
 
           if [ -z "$LINHAS" ]; then

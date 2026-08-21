@@ -45,6 +45,7 @@ const OBRIGATORIOS = [
   ['.claude/lembrete-processo.sh', 'hook UserPromptSubmit'],
   ['.claude/guarda-monorepo.sh', 'hook PreToolUse — a única defesa contra escrita no monorepo'],
   ['scripts/testar-guarda-monorepo.sh', 'a bateria da guarda'],
+  ['scripts/testar-revisao-registrada.sh', 'a bateria do parsing da atestação'],
 ];
 for (const [arq, motivo] of OBRIGATORIOS) {
   if (existsSync(caminho(arq))) ok.push(`${arq} presente`);

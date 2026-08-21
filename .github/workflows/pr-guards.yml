@@ -218,3 +218,13 @@ jobs:
             echo "::error title=Guarda do monorepo falhou::A guarda que impede escrita em urbiverso/urbiverso não se comporta como o esperado. Veja quais casos falharam no log."
             exit 1
           fi
+      - name: Bateria do parsing do revisao-registrada
+        run: |
+          set -uo pipefail
+          # O job `revisao-registrada` não fica vermelho quando o parsing quebra:
+          # ele reprova um PR revisado com "nenhuma revisão registrada", que parece
+          # veredito legítimo. Já aconteceu (`gh api --jq --arg`, head 310156e).
+          if ! bash scripts/testar-revisao-registrada.sh; then
+            echo "::error title=Parsing da atestação de revisão falhou::A extração da linha de máquina não se comporta como o esperado — o status revisao/bloqueantes reprovaria PR revisado."
+            exit 1
+          fi
