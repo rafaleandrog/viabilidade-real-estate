@@ -91,7 +91,19 @@ jobs:
           # dizer, um PR revisado seria reprovado por "nenhuma revisão registrada".
           # Foi o que aconteceu no head 310156e. O autor entra pelo AMBIENTE, que é
           # como jq lê variável aqui (`env.AUTOR`).
-          export AUTOR="$(gh api "repos/$REPO/pulls/$PR" --jq '.user.login')"
+          # Atribui e SÓ DEPOIS exporta: `export A="$(false)"` devolve rc=0 e apaga o
+          # único sinal de que a chamada falhou. Separado, o rc sobrevive.
+          AUTOR="$(gh api "repos/$REPO/pulls/$PR" --jq '.user.login')"
+          RC_AUTOR=$?
+          export AUTOR
+          if [ "$RC_AUTOR" != "0" ] || [ -z "$AUTOR" ]; then
+            # Mesma postura do HEAD_SHA vazio: preserva o status em vez de culpar o
+            # revisor por uma falha de API. "Não consegui perguntar" não é
+            # "ninguém revisou", e o segundo texto manda alguém procurar o erro no
+            # lugar errado.
+            echo "::warning title=Revisão não atestada::não consegui ler o autor do PR #$PR (rc=$RC_AUTOR); o status revisao/bloqueantes NÃO foi atualizado e pode estar preso num valor antigo."
+            exit 0
+          fi
           LINHAS="$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
                       --jq '.[] | select(.user.login == env.AUTOR) | .body' \
                     | grep -o '<!-- revisao-viabilidade [^>]*-->' || true)"

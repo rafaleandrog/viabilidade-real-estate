@@ -2,7 +2,7 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, state, property } from 'lit/decorators.js';
 import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, formatarData } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
+import { fmtR$, fmtPct, fmtNum, fmtM2 } from './viab-format.js';
 import { calcularProforma } from './proforma.js';
 import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { areaPrivativaTotalLinhas, mesRepasse } from './fluxo-shared.js';
@@ -12,7 +12,8 @@ import {
   type FundingNoFluxo,
 } from './funding-motor.js';
 import {
-  urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo,
+  urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo, transicaoStatus,
+  listarRegioesMercado,
   listarGlebasNucleo, listarLotesNucleo,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   buscarCronogramaAvancado, buscarParametrosAvancado, listarFundingOperacoes,
@@ -20,8 +21,26 @@ import {
 import './viabilidade-config-benchmarks.js';
 import './viabilidade-config-curvas.js';
 
-/** VGV / Resultado / Margem prontos para a listagem — a mesma grandeza que a sub-aba Proforma mostra. */
-export interface ResumoListagem { vgv: number; resultado: number; margemPct: number }
+/**
+ * As grandezas que a listagem mostra, prontas — as mesmas que a sub-aba Proforma
+ * do estudo mostra, para a tabela nunca contar história diferente da tela.
+ *
+ * `areaPrivativa`, `areaConstruida` e `roiPct` entraram com o Painel de estudos.
+ * As três saem da MESMA definição nos dois níveis, o que é o ponto: coluna que
+ * compara Preliminar com Avançado precisa comparar a mesma conta.
+ *   - `areaConstruida` = área privativa + área comum (`proforma.ts`, cascata de
+ *     Incorporação). Loteamento não tem área comum: fica igual à privativa.
+ *   - `roiPct` = resultado / (custo direto + indireto) × 100 — a fórmula do
+ *     Preliminar, aplicada às séries do Avançado.
+ */
+export interface ResumoListagem {
+  vgv: number;
+  resultado: number;
+  margemPct: number;
+  areaPrivativa: number;
+  areaConstruida: number;
+  roiPct: number;
+}
 
 /**
  * #406: um estudo Avançado não tem os campos fixos que `calcularProforma`
@@ -53,7 +72,19 @@ export function resumoListagem(
     return calc.vgv > 0 ? calc : null;
   }
   const p = calcularProforma(linha);
-  return p.vgv > 0 ? { vgv: p.vgv, resultado: p.resultado, margemPct: p.margemLiquidaPct } : null;
+  return p.vgv > 0
+    ? {
+        vgv: p.vgv,
+        resultado: p.resultado,
+        margemPct: p.margemLiquidaPct,
+        areaPrivativa: p.areaPrivativa,
+        // Loteamento não modela área comum: `areaConstruida` fica 0 no motor, e
+        // exibir "0,00 m²" ao lado de uma área privativa real seria mentira. A
+        // área construída de um loteamento É a privativa (os lotes).
+        areaConstruida: p.areaConstruida > 0 ? p.areaConstruida : p.areaPrivativa,
+        roiPct: p.roiPct,
+      }
+    : null;
 }
 
 @customElement('viab-tela-dashboard')
@@ -69,6 +100,13 @@ export class ViabTelaDashboard extends LitElement {
   @state() private calculosAvancado: Record<number, ResumoListagem | 'indisponivel'> = {};
   @state() private carregando = true;
   @state() private filtros: Record<string, string> = {};
+  /** Escopo do Painel: só os estudos que eu criei, ou os da equipe a que tenho acesso. */
+  @state() private escopo: 'meus' | 'equipe' = 'meus';
+  /** Arquivado sai da lista por padrão — é o estado "fora do radar". */
+  @state() private mostrarArquivados = false;
+  @state() private statusEmCurso: number | null = null;
+  /** id → região de mercado, para a coluna Cidade. Uma chamada por página, não por linha. */
+  @state() private regioes: Record<number, { nome: string; uf: string }> = {};
   @state() private mostrarForm = false;
   @state() private form: Record<string, any> = {};
   @state() private salvando = false;
@@ -85,6 +123,17 @@ export class ViabTelaDashboard extends LitElement {
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
     .acoes-linha { display: inline-flex; gap: 6px; }
+    .escopo-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .cel-nome { font-weight: 600; }
+    .cel-criador { display: inline-flex; align-items: center; }
+    .miniatura {
+      width: 40px; height: 28px; border-radius: 6px; object-fit: cover; display: block;
+      background: var(--cor-superficie-2, rgba(255,255,255,0.06));
+    }
+    .miniatura-vazia {
+      width: 40px; height: 28px; border-radius: 6px; display: block;
+      background: var(--cor-superficie-2, rgba(255,255,255,0.06));
+    }
     .filtros-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .filtros-bar urbi-select { min-width: 200px; }
     .nivel-campo label { display: block; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-bottom: 6px; }
@@ -137,6 +186,25 @@ export class ViabTelaDashboard extends LitElement {
     }
     this.carregando = false;
     this._calcularAvancados();
+    this._carregarRegioes();
+  }
+
+  /**
+   * Regiões de mercado, para a coluna Cidade. É GLOBAL (não por estudo), então
+   * vem uma vez por página — mesmo raciocínio de `listarCurvas()` em
+   * `_calcularAvancados`. Falha aqui não derruba a tabela: a coluna cai para a
+   * `uf`, que é o que o estudo já carrega.
+   */
+  private async _carregarRegioes() {
+    if (Object.keys(this.regioes).length > 0) return;
+    try {
+      const res = await listarRegioesMercado();
+      const mapa: Record<number, { nome: string; uf: string }> = {};
+      for (const r of res?.dados ?? []) mapa[Number(r.id)] = { nome: r.nome, uf: r.uf };
+      this.regioes = mapa;
+    } catch {
+      // Silêncio de propósito: a coluna degrada para `uf` e a tabela segue.
+    }
   }
 
   /**
@@ -203,9 +271,24 @@ export class ViabTelaDashboard extends LitElement {
 
       const area = areaPrivativaTotalLinhas(linhasReceita);
       const p = proformaAvancado(c, area, funding);
+      // A área privativa já era calculada aqui e DESCARTADA — o mapa só guardava
+      // VGV/Resultado/Margem. Agora ela sai junto, sem custo nenhum.
+      //
+      // Área construída: o Avançado não modela área comum nas suas séries, mas o
+      // estudo tem o campo `area_comum_total` (é o mesmo que o Preliminar soma em
+      // `proforma.ts`). Somar os dois mantém a coluna com UMA definição só nos
+      // dois níveis; sem o campo preenchido, cai na privativa, como no Loteamento.
+      const areaComum = Number(estudo?.area_comum_total) || 0;
       this.calculosAvancado = {
         ...this.calculosAvancado,
-        [estudo.id]: { vgv: p.vgv, resultado: p.resultado, margemPct: p.margemPct },
+        [estudo.id]: {
+          vgv: p.vgv,
+          resultado: p.resultado,
+          margemPct: p.margemPct,
+          areaPrivativa: p.areaPrivativa,
+          areaConstruida: p.areaPrivativa + areaComum,
+          roiPct: p.roiPct,
+        },
       };
     } catch (e) {
       console.error(`Erro ao calcular VGV/Resultado/Margem do estudo ${estudo.id}:`, e);
@@ -215,9 +298,17 @@ export class ViabTelaDashboard extends LitElement {
 
   render() {
     return html`
-      <urbi-shell-page dashboard titulo="Estudos de Viabilidade">
+      <urbi-shell-page dashboard titulo="Painel de estudos">
         ${this.aba === 'estudos'
           ? html`
+              <urbi-botao
+                slot="actions"
+                variante=${this.mostrarArquivados ? 'secundario' : 'fantasma'}
+                pequeno
+                icone="fa-solid fa-box-archive"
+                title=${this.mostrarArquivados ? 'Ocultar arquivados' : 'Mostrar arquivados'}
+                @click=${() => { this.mostrarArquivados = !this.mostrarArquivados; }}
+              ></urbi-botao>
               <urbi-botao
                 slot="actions"
                 variante="primario"
@@ -258,11 +349,29 @@ export class ViabTelaDashboard extends LitElement {
     `;
   }
 
+  /**
+   * Cidade — o `schema.json` não tem a coluna. O mais próximo que o estudo já
+   * carrega é a região de mercado (`mercado_regioes.nome`, que na prática é o
+   * município) e a `uf`. Deriva daí em vez de inventar campo: a alternativa
+   * seria migração de schema, que é mudança de outra natureza e merece PR
+   * próprio. Sem nada dos dois, "—" honesto.
+   */
+  private _cidade(l: any): string {
+    const regiao = this.regioes[Number(l.regiao_mercado_id)];
+    if (regiao?.nome) return l.uf && regiao.uf !== l.uf ? `${regiao.nome} · ${l.uf}` : regiao.nome;
+    return l.uf || '—';
+  }
+
+  /** Área do terreno: mesma escolha por origem que o motor faz (`proforma.ts`). */
+  private _areaTerreno(l: any): number | null {
+    const v = Number(l.terreno_manual_area) || Number(l.area_terreno_nucleo) || 0;
+    return v > 0 ? v : null;
+  }
+
   private _colunas() {
-    // #406: "…" enquanto a linha Avançada ainda está calculando (assíncrono,
-    // não bloqueia o resto da tabela); "—" quando terminou e não há dado
-    // suficiente — mesmo guard de sempre (`vgv > 0`), agora também para o
-    // Avançado. Preliminar não muda: mesma chamada síncrona de antes.
+    // "…" enquanto a linha Avançada ainda está calculando (assíncrono, não
+    // bloqueia o resto da tabela); "—" quando terminou e não há dado suficiente
+    // — mesmo guard de sempre (`vgv > 0`), para os dois níveis.
     const numero = (fn: (p: ResumoListagem) => string): (l: unknown) => string =>
       (l) => {
         const r = resumoListagem(l, this.calculosAvancado);
@@ -270,23 +379,41 @@ export class ViabTelaDashboard extends LitElement {
         return r ? fn(r) : '—';
       };
     return [
-      { id: 'nome', label: 'Estudo', valor: (l: any) => l.nome_exibicao || l.nome },
       {
-        id: 'tipo', label: 'Tipo',
-        valor: (l: any) => TIPO_LABEL[l.tipo_empreendimento] || l.tipo_empreendimento,
+        id: 'imagem', label: '', largura: '52px',
+        render: (l: any) => l.imagem_principal_url
+          ? html`<img class="miniatura" src=${l.imagem_principal_url} alt="" loading="lazy">`
+          : html`<span class="miniatura-vazia" aria-hidden="true"></span>`,
       },
       {
-        id: 'nivel', label: 'Nível',
-        render: (l: any) => html`<urbi-badge cor=${l.nivel_analise === 'avancado' ? 'info' : 'alerta'}>${NIVEL_LABEL[l.nivel_analise] || 'Preliminar'}</urbi-badge>`,
+        id: 'nome', label: 'Nome do estudo',
+        render: (l: any) => html`<span class="cel-nome">${l.nome_exibicao || l.nome}</span>`,
       },
+      {
+        id: 'status', label: 'Status', alinhamento: 'centro',
+        render: (l: any) => this._renderStatus(l),
+      },
+      {
+        id: 'area_terreno', label: 'Área do terreno', alinhamento: 'direita',
+        valor: (l: any) => { const a = this._areaTerreno(l); return a == null ? '—' : fmtM2(a); },
+      },
+      { id: 'area_privativa', label: 'Área privativa', alinhamento: 'direita',
+        valor: numero((p) => (p.areaPrivativa > 0 ? fmtM2(p.areaPrivativa) : '—')) },
+      { id: 'area_construida', label: 'Área total construída', alinhamento: 'direita',
+        valor: numero((p) => (p.areaConstruida > 0 ? fmtM2(p.areaConstruida) : '—')) },
       { id: 'vgv', label: 'VGV', alinhamento: 'direita', valor: numero((p) => fmtR$(p.vgv)) },
-      { id: 'resultado', label: 'Resultado', alinhamento: 'direita', valor: numero((p) => fmtR$(p.resultado)) },
       { id: 'margem', label: 'Margem', alinhamento: 'direita', valor: numero((p) => fmtPct(p.margemPct)) },
+      { id: 'roi', label: 'ROI', alinhamento: 'direita', valor: numero((p) => fmtPct(p.roiPct)) },
       {
-        id: 'status', label: 'Status',
-        render: (l: any) => html`<urbi-badge cor=${COR_STATUS[l.status] ?? 'padrao'}>${STATUS_LABEL[l.status] || l.status}</urbi-badge>`,
+        id: 'criador', label: 'Criador', alinhamento: 'centro',
+        // `autor_nome`/`autor_avatar_url` já vinham na listagem (junção declarada
+        // no schema) e nunca eram exibidos. Zero custo de backend.
+        render: (l: any) => html`
+          <span class="cel-criador" title=${l.autor_nome || ''}>
+            <urbi-avatar tamanho="28" nome=${l.autor_nome || '?'} foto=${l.autor_avatar_url || ''}></urbi-avatar>
+          </span>`,
       },
-      { id: 'criado', label: 'Criado em', valor: (l: any) => formatarData(l.criado_em) },
+      { id: 'cidade', label: 'Cidade', valor: (l: any) => this._cidade(l) },
       {
         id: 'acoes', label: '',
         render: (l: any) => html`
@@ -302,14 +429,85 @@ export class ViabTelaDashboard extends LitElement {
     ];
   }
 
+  /**
+   * Status na linha, editável — o chevron da referência visual.
+   *
+   * Quem decide se a transição vale é o BACKEND (`gateTransicao`, em
+   * `backend/rotas/estudos.ts`), não esta tela: a regra depende do papel do
+   * usuário no estudo e mora do outro lado. Replicar a tabela de transições aqui
+   * criaria uma segunda fonte de verdade, que é a armadilha que a #281 arrasta
+   * até hoje com as duas formatações de R$. Então oferecemos os status e
+   * deixamos o 422 `TRANSICAO_INVALIDA` responder, virando notificação.
+   *
+   * Leitor não muda status de nada — para ele, badge simples.
+   */
+  private _renderStatus(l: any) {
+    const cor = COR_STATUS[l.status] ?? 'padrao';
+    const rotulo = STATUS_LABEL[l.status] || l.status;
+    if (l._funcao === 'leitor') {
+      return html`<urbi-badge cor=${cor}>${rotulo}</urbi-badge>`;
+    }
+    return html`
+      <urbi-select
+        .valor=${l.status}
+        ?desabilitado=${this.statusEmCurso === l.id}
+        .opcoes=${Object.entries(STATUS_LABEL).map(([valor, r]) => ({ valor, rotulo: r }))}
+        @click=${(ev: Event) => ev.stopPropagation()}
+        @urbi:select-change=${(ev: CustomEvent) => {
+          ev.stopPropagation();
+          this._mudarStatus(l, ev.detail?.valor);
+        }}
+      ></urbi-select>`;
+  }
+
+  private async _mudarStatus(l: any, novo: string) {
+    if (!novo || novo === l.status) return;
+    this.statusEmCurso = l.id;
+    const anterior = l.status;
+    try {
+      await transicaoStatus(l.id, novo);
+      this.estudos = this.estudos.map((e) => (e.id === l.id ? { ...e, status: novo } : e));
+      urbiVerso.notificar(`Status de "${l.nome_exibicao || l.nome}" agora é ${STATUS_LABEL[novo] || novo}.`, 'sucesso');
+    } catch (e: any) {
+      // O backend recusou (transição inválida ou falta de alçada). A linha volta
+      // ao que era — sem isso o select ficaria mostrando um estado que o servidor
+      // não tem, que é pior que a recusa.
+      this.estudos = this.estudos.map((x) => (x.id === l.id ? { ...x, status: anterior } : x));
+      urbiVerso.notificar(e?.message || 'Não foi possível mudar o status desse estudo.', 'erro');
+    }
+    this.statusEmCurso = null;
+  }
+
   private _linhasFiltradas() {
+    const eu = urbiVerso.usuario?.()?.id;
     return this.estudos.filter((e) =>
       (!this.filtros.tipo || e.tipo_empreendimento === this.filtros.tipo) &&
-      (!this.filtros.status || e.status === this.filtros.status));
+      (!this.filtros.status || e.status === this.filtros.status) &&
+      // Arquivado é o estado "fora do radar": some da lista a menos que o botão
+      // de arquivados esteja ligado. Filtrar por status "Arquivado" no seletor
+      // continua funcionando — quem pediu explicitamente quer ver.
+      (this.mostrarArquivados || this.filtros.status === 'arquivado' || e.status !== 'arquivado') &&
+      // "Meus" = eu criei. "Equipe" = tudo que eu enxergo, que já é o que o
+      // backend devolve (ele filtra por membership). Sem id de usuário — o que
+      // não deve acontecer com o shell montado — não escondemos nada.
+      (this.escopo === 'equipe' || eu == null || Number(e.autor_id) === Number(eu)));
   }
 
   private _renderEstudos(): TemplateResult {
     return html`
+      <div class="escopo-bar">
+        <urbi-chips-atalho
+          .opcoes=${[
+            { id: 'meus', rotulo: 'Meus estudos' },
+            { id: 'equipe', rotulo: 'Equipe' },
+          ]}
+          ativo=${this.escopo}
+          @urbi:chip-atalho:click=${(e: CustomEvent) => {
+            const id = e.detail?.id;
+            if (id === 'meus' || id === 'equipe') this.escopo = id;
+          }}
+        ></urbi-chips-atalho>
+      </div>
       <div class="filtros-bar">
         <urbi-select
           label="Tipo de estudo"

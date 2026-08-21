@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtPct, fmtPctEntrada, parseNumeroBR } from './viab-format.js';
+import { CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtPct, fmtPctEntrada, fmtM2, parseNumeroBR } from './viab-format.js';
 
 test('#281: fmtR$ é a fonte única de valores monetários com 2 casas', () => {
   assert.equal(CASAS_DECIMAIS_MONETARIAS, 2);
@@ -37,4 +37,18 @@ test('parseNumeroBR: vazio ou inválido vira null', () => {
   assert.equal(parseNumeroBR(null), null);
   assert.equal(parseNumeroBR('abc'), null);
   assert.equal(parseNumeroBR('-'), null);
+});
+
+test('fmtM2: duas casas e separador de milhar pt-BR', () => {
+  assert.equal(fmtM2(1611.14), '1.611,14 m²');
+  assert.equal(fmtM2(335.66), '335,66 m²');
+  assert.equal(fmtM2(0), '0,00 m²');
+});
+
+test('fmtM2: ausência vira "—", nunca "0,00 m²"', () => {
+  // Zero é um terreno de área zero; ausência é ausência. A tabela precisa
+  // distinguir "não informado" de "informado como zero".
+  assert.equal(fmtM2(null), '—');
+  assert.equal(fmtM2(undefined), '—');
+  assert.equal(fmtM2(NaN), '—');
 });

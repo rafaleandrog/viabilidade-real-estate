@@ -308,7 +308,8 @@ caminho não casar:
 > `/permissions` que ela aparece **parseada** — regra de deny que não casa falha calada, que é
 > exatamente por que o hook cobre o mesmo caso.
 
-A bateria `scripts/testar-guarda-monorepo.sh` (46 casos, roda no CI) cobre os dois sentidos: falso
+As baterias `scripts/testar-guarda-monorepo.sh` (57 casos) e
+`scripts/testar-revisao-registrada.sh` (9 casos), as duas no CI, cobrem os dois sentidos: falso
 negativo deixa a escrita passar; **falso positivo atrapalha trabalho legítimo, alguém desliga o
 hook, e aí ele não guarda mais nada.**
 

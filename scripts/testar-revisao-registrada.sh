@@ -39,6 +39,17 @@ else
   ok "nenhum 'gh api --jq --arg' (o erro que reprovou o head 310156e)"
 fi
 
+# ⚠️ A regressão GÊMEA, e a que quase escapou: sem `export`, `AUTOR` não entra em
+# `os.Environ()`, `env.AUTOR` vira `null` e NENHUM comentário casa — mesmo sintoma
+# do `--jq --arg`, uma palavra adiante. A bateria não via porque `extrai()` injeta
+# a variável no próprio ambiente do jq: testava a expressão, nunca como o workflow
+# alimenta a variável.
+if grep -qE '^[[:space:]]*export AUTOR$|^[[:space:]]*export AUTOR=' "$WF"; then
+  ok "'export AUTOR' presente (sem ele, env.AUTOR é null e nada casa)"
+else
+  falha "export AUTOR" "AUTOR precisa estar exportado para o jq do gh enxergar em env.AUTOR"
+fi
+
 COMENTARIOS='[
  {"user":{"login":"autor"},   "body":"<!-- revisao-viabilidade rodada=1 head=aaaa1111 motor=nativo bloqueantes=0 contratos=nao-executados -->\nrelatorio"},
  {"user":{"login":"forjador"},"body":"<!-- revisao-viabilidade rodada=9 head=aaaa1111 motor=codex bloqueantes=0 contratos=ok -->"},
