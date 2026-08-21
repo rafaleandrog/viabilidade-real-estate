@@ -17,6 +17,31 @@ import {
 // A tabela `estudo_documentos` é `restrito`, então a prévia usa a URL assinada
 // (`url`) que o backend anexa a cada documento — não o download direto por sessão.
 
+// Extraída para ser testável sem harness de DOM: decide se `updated()` deve
+// recarregar, comparando o id do estudo atual contra o último carregado —
+// nunca contra um booleano "já carreguei alguma vez", que ficava preso na
+// capa do primeiro estudo ao navegar para outro sem reload de página.
+//
+// `Number.isFinite` descarta `NaN`/`Infinity`: sem o guard, um id malformado
+// chegando do backend faria `NaN !== NaN` (sempre `true` em JS) recarregar em
+// loop a cada `updated()`. Achado na revisão do PR, registrado como observação
+// não-bloqueante — corrigido junto por ser uma linha.
+export function precisaCarregar(estudoId: number | null | undefined, idCarregado: number | null): boolean {
+  return Number.isFinite(estudoId) && estudoId !== idCarregado;
+}
+
+/**
+ * O guard usado nos três pontos de `_carregar()` (abaixo) para descartar a
+ * resposta de uma fetch que ficou para trás — extraída pelo mesmo motivo de
+ * `precisaCarregar`: sem harness de DOM neste repo, a decisão precisa ser uma
+ * função pura para ter cobertura de teste. `_carregar()` chama esta mesma
+ * função nos três pontos, não uma cópia inline — o teste exercita o código
+ * real, não uma reimplementação que poderia divergir dele.
+ */
+export function respostaAindaVale(idDaChamada: number | undefined, idAtual: number | undefined): boolean {
+  return idDaChamada === idAtual;
+}
+
 @customElement('viab-imagem-principal')
 export class ViabImagemPrincipal extends LitElement {
   @property({ type: Object }) estudo: any = null;
@@ -25,7 +50,7 @@ export class ViabImagemPrincipal extends LitElement {
   @state() private doc: any = null;
   @state() private carregando = true;
   @state() private enviando = false;
-  private carregado = false;
+  private idCarregado: number | null = null;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .previa {
@@ -41,22 +66,40 @@ export class ViabImagemPrincipal extends LitElement {
   `];
 
   updated() {
-    if (this.estudo?.id && !this.carregado) {
-      this.carregado = true;
+    if (precisaCarregar(this.estudo?.id, this.idCarregado)) {
+      this.idCarregado = this.estudo.id;
       this._carregar();
     }
   }
 
+  /**
+   * Achado bloqueante da revisão do PR (2026-08-18): trocar o guard booleano
+   * por comparação de id (acima) permite, pela primeira vez, DUAS chamadas de
+   * `_carregar()` concorrentes — antes `_carregar()` só rodava uma vez por
+   * tempo de vida do componente. Sem controle de qual fetch é a mais recente,
+   * uma resposta antiga (estudo 42) pode chegar DEPOIS de uma nova (estudo
+   * 99) — não há ordem garantida entre duas fetches HTTP — e sobrescrever
+   * `this.doc` com a capa errada: o mesmo bug que este componente existe para
+   * corrigir, reaparecendo por uma corrida assíncrona em vez do booleano.
+   *
+   * O `id` é capturado no início; toda escrita de estado (`doc`, `carregando`
+   * no catch, `carregando` no fim) confere que o estudo não mudou de novo
+   * enquanto a fetch estava em voo, e descarta a resposta em silêncio quando
+   * mudou — quem vai atualizar a tela é a chamada mais nova, não esta.
+   */
   private async _carregar() {
+    const id = this.estudo?.id;
     this.carregando = true;
     try {
-      const res = await listarDocumentosEmpreendimento(this.estudo.id);
+      const res = await listarDocumentosEmpreendimento(id);
+      if (!respostaAindaVale(id, this.estudo?.id)) return; // estudo mudou de novo enquanto isto estava em voo
       const docs: any[] = res?.dados || [];
       this.doc = docs.find((d) => d.categoria === 'imagem_principal') || null;
     } catch (e: any) {
+      if (!respostaAindaVale(id, this.estudo?.id)) return;
       urbiVerso.notificar(e?.message || 'Erro ao carregar imagem', 'erro');
     }
-    this.carregando = false;
+    if (respostaAindaVale(id, this.estudo?.id)) this.carregando = false;
   }
 
   render(): TemplateResult {
