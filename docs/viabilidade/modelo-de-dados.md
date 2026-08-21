@@ -42,6 +42,50 @@ Todas as tabelas usam `acesso_externo: "restrito"` — a escrita passa pelas rot
 
 Integridade (Lote 6 · #19): excluir uma tipologia do catálogo com alocações é **bloqueado** (422 `TIPOLOGIA_EM_USO`); editar nome/área reflete ao vivo nas alocações (a alocação guarda só unidades + preço).
 
+## Referências lógicas — colunas de id sem FK
+
+Três colunas guardam id de outra linha **sem** chave estrangeira no banco. Não é descuido; cada
+uma tem motivo próprio, e nenhuma delas deve ser "corrigida" para `referencia`.
+
+| Coluna | Por quê |
+|---|---|
+| `estudo_imoveis.imovel_nucleo_id` | o alvo vive no Núcleo, fora do schema `viabilidade` — cross-schema não é expressável aqui |
+| `estudos.permuta_fisica_produto_id` | quebra do ciclo com `preliminar_produtos` (abaixo) |
+| `estudos.permuta_fisica_nr_produto_id` | idem |
+
+### O ciclo `estudos` ↔ `preliminar_produtos`
+
+`preliminar_produtos.estudo_id` aponta para `estudos` (obrigatório, `cascata`) e, até a correção
+de 2026-08-18, os dois `permuta_fisica_*_produto_id` de `estudos` apontavam de volta para
+`preliminar_produtos`. Isso é um **ciclo**, e ciclo quebra a instalação numa instância **virgem**:
+o sincronizador do shell emite a FK **inline no `CREATE TABLE`**, e num ciclo não existe ordem de
+criação que satisfaça as duas pontas. Ele não reprova nem adia a FK — só desiste da aresta e cria
+as tabelas fora de ordem, o que estoura com
+
+```
+[dry_run_schema] relation "viabilidade.estudos" does not exist
+```
+
+**Por que ninguém viu antes:** `preliminar_produtos` chegou na migração `021` e os
+`permuta_fisica_*_produto_id` na `022` — em instância que já tinha a app, as colunas nasceram por
+`ALTER TABLE ADD COLUMN`, onde o alvo já existe. A instalação virgem **pula as migrações** e
+materializa tudo pelo `schema.json`: é o único caminho que exercita a ordem de criação. A app
+nunca foi instalável do zero, e o defeito só apareceu na primeira instância nova.
+
+**A saída** foi soltar o lado **fraco**: os dois `*_produto_id` viraram `inteiro`. O lado forte
+(`preliminar_produtos.estudo_id`, obrigatório e `cascata`) ficou como estava — é ele que garante
+que produto não sobreviva ao estudo.
+
+**Custo real: nenhum.** Os dois campos são memória da seleção da UI, não fonte de cálculo. O que o
+motor consome é o canônico em m², gravado no momento da edição
+(`frontend/tela-premissas.ts:719-729` — `area_media_m2 × quantidade`), e nenhum ponto do backend
+ou do motor dereferencia o `produto_id`. Apagado o produto, o `<urbi-select>` fica vazio dos dois
+jeitos: antes porque a FK `anular` zerava o id, agora porque o id pendurado não está em `.opcoes`.
+
+O guard `scripts/guard-schema-ciclos.mjs` (etapa 1/5 do `validar-frontend.sh` e job
+`schema-ciclos` no `pr-guards.yml`) impede a volta do ciclo. Ele existe porque esta falha é
+**silenciosa** no repo inteiro: typecheck, testes, esbuild e o harness de migrações ficam verdes.
+
 ## Evolução de domínio prevista para recebíveis
 
 > ⚠️ **Seção consultiva.** Nada aqui existe no `schema.json`, em migração ou em runtime. Ela

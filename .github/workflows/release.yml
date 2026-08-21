@@ -6,6 +6,15 @@
 #      sem sha a plataforma não faz upgrade de build em mesma versão).
 # Em ambos: build → urbi-empacotar → release GitHub com viabilidade-<versao>.urbiapp.tgz
 # + .sha256 (convenção que a plataforma consome para instalar/atualizar a app).
+#
+# A release nasce SEMPRE `--prerelease` (= "não homologada" para a plataforma:
+# "não homologado" ⟺ `prerelease=true`), igual ao `urbi-release` do SDK. Quem
+# vira o flag para `false` é o botão **Homologar** da instância de homologação,
+# depois de a app ter sido testada lá — e aí a produção (que roda em
+# `aceitacao = 'homologado'`) passa a enxergar a versão. Publicar já como
+# `prerelease=false` (o que este workflow fazia até aqui) atesta sozinho uma
+# versão que ninguém testou e curto-circuita o ciclo inteiro. O fluxo-alvo:
+#   release (não homologada) → homolog instala e testa → Homologar → prod instala.
 name: release
 on:
   push:
@@ -78,4 +87,5 @@ jobs:
             dist/viabilidade-${{ steps.tag.outputs.versao }}.urbiapp.tgz.sha256 \
             --target "$(git rev-parse HEAD)" \
             --title "viabilidade v${{ steps.tag.outputs.versao }} ($(git rev-parse --short=8 HEAD))" \
-            --generate-notes
+            --generate-notes \
+            --prerelease

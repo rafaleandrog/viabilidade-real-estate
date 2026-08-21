@@ -43,6 +43,19 @@ export interface ProformaAvancado {
   areaPrivativa: number;
   resultado: number;
   margemPct: number;
+  /**
+   * Custo direto + custo indireto — a MESMA definição do Preliminar
+   * (`proforma.ts`, `investimentoTotal = custoDiretoTotal + custoIndiretoTotal`).
+   * Exposto porque a listagem precisa de ROI, e ROI sem denominador comum entre
+   * os dois níveis compara coisas diferentes na mesma coluna.
+   */
+  investimentoTotal: number;
+  /**
+   * `resultado / investimentoTotal * 100` — de novo, literalmente a fórmula do
+   * Preliminar. Não é indicador novo: é o mesmo indicador, calculado a partir das
+   * séries do Avançado em vez dos campos fixos que ele não tem.
+   */
+  roiPct: number;
 }
 
 const soma = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
@@ -99,11 +112,15 @@ export function proformaAvancado(
   const resultado = receitaLiquida - custoDireto - custoIndireto;
   linhas.push({ nome: '= Resultado', valor: resultado, nivel: 0, tipo: 'resultado' });
 
+  const investimentoTotal = custoDireto + custoIndireto;
+
   return {
     linhas,
     vgv: receitaBruta,
     areaPrivativa,
     resultado,
     margemPct: receitaBruta > 0 ? (resultado / receitaBruta) * 100 : 0,
+    investimentoTotal,
+    roiPct: investimentoTotal > 0 ? (resultado / investimentoTotal) * 100 : 0,
   };
 }

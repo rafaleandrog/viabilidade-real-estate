@@ -2,7 +2,8 @@
 //
 // Por que existe: `urbi-empacotar` e a execução real das migrações exigem o
 // ambiente autenticado do autor, mas a superfície que uma migração usa é
-// minúscula — `dados.listar` / `dados.atualizar` / `dados.criar` — e o módulo é
+// minúscula — `dados.listar` / `dados.varrerTudo` / `dados.atualizar` /
+// `dados.criar` / `dados.limparColuna` / `dados.limparTabela` — e o módulo é
 // JS puro (`export default async function ({ dados })`). Dá para exercitá-las
 // aqui contra um banco em memória e pegar, ANTES do autor rodar, a classe de
 // erro que mais custa: migração que quebra em instalação virgem, que quebra ao
@@ -102,7 +103,7 @@ function bancoFake(seed = {}) {
     Object.entries(filtros ?? {}).every(([k, v]) => String(row[k]) === String(v));
   return {
     db,
-    escritas: { atualizar: 0, criar: 0 },
+    escritas: { atualizar: 0, criar: 0, limparColuna: 0, limparTabela: 0 },
     async listar(t, opts = {}) {
       const rows = tabela(t).filter((r) => casa(r, opts.filtros));
       return { dados: rows.map((r) => ({ ...r })), total: rows.length };
@@ -120,6 +121,36 @@ function bancoFake(seed = {}) {
       tabela(t).push(row);
       this.escritas.criar++;
       return { ...row };
+    },
+    // Varredura completa (shell >= 0.53.8). Devolve ARRAY, não `{ dados }` — é o
+    // verbo de "preciso de todas as linhas", sem `por_pagina` para chutar. Ordena
+    // por `id` ascendente, como o do shell.
+    async varrerTudo(t, opts = {}) {
+      const rows = tabela(t)
+        .filter((r) => casa(r, opts.filtros))
+        .sort((a, b) => Number(a.id) - Number(b.id));
+      return rows.map((r) => ({ ...r }));
+    },
+    // Passo de DADO da remoção (shell >= 0.53.5): a coluna saiu do `schema.json`,
+    // a migração a esvazia, a poda do reconciliador derruba a estrutura vazia no
+    // mesmo boot. Devolve quantas linhas foram tocadas.
+    async limparColuna(t, coluna) {
+      let n = 0;
+      for (const row of tabela(t)) {
+        if (row[coluna] !== null && row[coluna] !== undefined) {
+          row[coluna] = null;
+          n++;
+        }
+      }
+      this.escritas.limparColuna += n;
+      return n;
+    },
+    // Irmão do anterior, para tabela inteira que saiu do `schema.json`.
+    async limparTabela(t) {
+      const n = tabela(t).length;
+      db.set(t, []);
+      this.escritas.limparTabela += n;
+      return n;
     },
   };
 }
@@ -183,10 +214,60 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
   const banco = bancoFake(SEED);
   try {
     for (const { fn } of lista) await fn({ dados: banco });
-    ok(`cadeia aplicada (${banco.escritas.atualizar} updates, ${banco.escritas.criar} inserts)`);
+    ok(`cadeia aplicada (${banco.escritas.atualizar} updates, ${banco.escritas.criar} inserts, `
+      + `${banco.escritas.limparColuna} células esvaziadas)`);
+
+    // Asserção sobre o que a cadeia FEZ, não sobre o texto dos scripts: a `003`
+    // esvazia `avancado_tipologias.linha_receita_id` (a coluna já saiu do
+    // `schema.json`; a poda do reconciliador derruba a estrutura vazia no mesmo
+    // boot). A fixture semeia a coluna preenchida, então este teste FALHA se o
+    // `limparColuna` sumir — que é o único jeito de ele valer alguma coisa.
+    const sujas = (banco.db.get('avancado_tipologias') ?? [])
+      .filter((t) => t.linha_receita_id !== null && t.linha_receita_id !== undefined);
+    if (sujas.length > 0) {
+      erro(
+        `avancado_tipologias.linha_receita_id continua preenchida em ${sujas.length} linha(s) `
+          + 'depois da cadeia — a coluna saiu do schema.json e precisa ser esvaziada pela 003',
+        new Error('coluna órfã com dado deixa a app !saudavel no boot'),
+      );
+    } else {
+      ok('avancado_tipologias.linha_receita_id ficou vazia (poda derruba a estrutura no boot)');
+    }
   } catch (e) {
     erro('cadeia de migrações quebrou', e);
   }
+}
+
+// 5. Retorno declarativo (`remover_colunas` / `remover_tabelas`) é OBSOLETO desde
+// 2026-08-08 e vira GATE em 2026-08-23: migração que DECLARA estrutura é o oposto
+// do que o `schema.json` garante. O caminho é tirar a coluna/tabela do
+// `schema.json` e esvaziá-la com `dados.limparColuna`/`dados.limparTabela` — a
+// poda do reconciliador derruba a estrutura vazia no mesmo boot. Esta etapa existe
+// para a prática não voltar por outro arquivo (ver issue #422).
+console.log('\n5) nenhuma migração devolve estrutura declarativa');
+{
+  const DECLARATIVAS = ['remover_colunas', 'remover_tabelas'];
+  let achou = false;
+  for (const { arq, fn } of lista) {
+    const banco = bancoFake(SEED);
+    let retorno;
+    try {
+      retorno = await fn({ dados: banco });
+    } catch {
+      continue; // quebra já é acusada pelas etapas 2–4; aqui só o retorno importa
+    }
+    if (retorno && typeof retorno === 'object') {
+      const chaves = DECLARATIVAS.filter((k) => k in retorno);
+      if (chaves.length > 0) {
+        achou = true;
+        erro(
+          `${arq} devolve ${chaves.join('/')} — retorno declarativo vira GATE da plataforma em 2026-08-23`,
+          new Error('use dados.limparColuna/limparTabela + remoção pelo schema.json'),
+        );
+      }
+    }
+  }
+  if (!achou) ok('nenhuma migração declara estrutura no retorno');
 }
 
 console.log();
@@ -194,4 +275,4 @@ if (falhas > 0) {
   console.error(`❌ ${falhas} problema(s) nas migrações.`);
   process.exit(1);
 }
-console.log('✅ Migrações OK (contrato, banco vazio, reexecução e cadeia completa).');
+console.log('✅ Migrações OK (contrato, banco vazio, reexecução, cadeia completa e retorno não-declarativo).');

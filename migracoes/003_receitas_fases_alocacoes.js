@@ -17,11 +17,23 @@
 //  2. cada `avancado_tipologias` (que tinha `linha_receita_id`) → permanece no
 //     catálogo (já tem `estudo_id`) E gera uma `avancado_alocacoes` na fase da
 //     sua linha de origem (unidades = quantidade, preço/m² = preco_m2);
-//  3. remove a coluna `avancado_tipologias.linha_receita_id` (retorno
-//     declarativo).
+//  3. ESVAZIA `avancado_tipologias.linha_receita_id` — o vínculo com a linha de
+//     receita não existe mais.
 //
 // A tabela `avancado_linhas_receita` é preservada no schema (vestigial) para
 // não exigir drop de tabela — o app não a lê nem escreve mais.
+//
+// Remoção pelo fluxo canônico (`schema.json` + esvaziar), não por retorno
+// declarativo. A coluna já saiu do `schema.json`; aqui só cai o DADO, e a poda
+// do reconciliador derruba a estrutura vazia no mesmo boot. Numa instância onde
+// ela nunca recebeu dado, a poda pré-migrações já a derrubou e `limparColuna`
+// vira no-op com log — o mesmo release converge nas duas populações. O retorno
+// `{ remover_colunas: … }` que estava aqui é migração DECLARANDO estrutura, o
+// oposto do que o `schema.json` garante: obsoleto desde 2026-08-08, gate a
+// partir de 2026-08-23 (ver issue #422).
+//
+// Os backfills varrem com `varrerTudo`, nunca `listar` com `por_pagina` grande:
+// o que não for copiado antes do `limparColuna` some sem erro e sem volta.
 //
 // Forward-only. Numa instalação virgem não há dado avançado — o runner faz
 // baseline e esta migração é inócua.
@@ -76,7 +88,7 @@ function converterFluxo(fp) {
 
 export default async function ({ dados }) {
   // 1. Linhas de receita → fases (mapeando linha antiga → nova fase).
-  const { dados: linhas } = await dados.listar('avancado_linhas_receita', { por_pagina: 100000 });
+  const linhas = await dados.varrerTudo('avancado_linhas_receita');
   const faseDaLinha = new Map(); // linha_receita_id → fase_id
   for (const l of linhas) {
     const fase = await dados.criar('avancado_fases', {
@@ -90,7 +102,7 @@ export default async function ({ dados }) {
   }
 
   // 2. Tipologias legadas → alocação na fase da sua linha de origem.
-  const { dados: tipologias } = await dados.listar('avancado_tipologias', { por_pagina: 100000 });
+  const tipologias = await dados.varrerTudo('avancado_tipologias');
   for (const t of tipologias) {
     const faseId = faseDaLinha.get(Number(t.linha_receita_id));
     if (!faseId) continue; // tipologia sem linha (não deveria ocorrer no legado)
@@ -104,6 +116,8 @@ export default async function ({ dados }) {
     });
   }
 
-  // 3. Tipologia vira catálogo puro — remove o vínculo com a linha de receita.
-  return { remover_colunas: { avancado_tipologias: ['linha_receita_id'] } };
+  // 3. Tipologia vira catálogo puro — o vínculo com a linha de receita cai.
+  // A coluna já não está no `schema.json`; aqui só o dado é esvaziado, e a poda
+  // do reconciliador derruba a estrutura vazia no mesmo boot.
+  await dados.limparColuna('avancado_tipologias', 'linha_receita_id');
 }

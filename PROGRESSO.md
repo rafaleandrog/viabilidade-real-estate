@@ -4,6 +4,216 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Revisão de PR vira processo fixo, e o monorepo vira só-leitura (2026-08-21)
+
+O autor pediu duas coisas: que **todo** pedido de trabalho neste app passe por PR + revisão, e que
+ficasse proibido mexer em `urbiverso/urbiverso`, que ele usa só como referência.
+
+**O que já existia estava morto, não desatualizado.** Os três arquivos portados em 2026-08-18
+(`protocolo-revisao-pr.md`, `skills/acompanhar-revisao/`, `skills/revisar-pr-apps/`) implementavam
+revisão em **diálogo entre duas sessões**. Duas descobertas mataram a cópia:
+
+1. `revisar-pr-apps/SKILL.md:182` procurava o plugin `codex-companion.mjs` em
+   `~/.claude/plugins/cache/*/codex/*/scripts/` e, não achando, mandava **PARAR e perguntar**. O
+   plugin **não existe** neste ambiente e não vai existir — a arquitetura do upstream mudou para
+   `codex exec` direto. Invocar a skill produzia **uma pergunta, nunca uma revisão**.
+2. Ela usava `gh repo clone`, e o `gh` não existe aqui — o próprio `CLAUDE.md` já dizia isso.
+
+E o upstream tinha apagado o modelo inteiro no commit `b0361f6` (PR #2540): *"era o contorno para
+despachar revisão a agentes de outro provedor de outra máquina, e o contorno morreu quando a mesma
+sessão passou a conseguir isso sozinha."*
+
+**Portada a geração nova**, com `.claude/motor-revisao.md` (motor único: preflight do Codex, fan-out
+em Bash de fundo, colheita com guarda contra falha virar laudo limpo, fallback nativo **declarado**)
+e `revisar-pr-apps` reescrita. As adaptações estão marcadas `ADAPTADO` **com o motivo ao lado**, para
+o próximo port não desfazê-las. A maior: **a regra da `versao`**. O upstream manda bumpar quando o PR
+mexe em `shell_min`/`sdk_min`; aqui é o oposto (§ Versão do manifesto, decisão da #422). Sem essa
+correção, o revisor acusaria bloqueante inventado em **todo** PR que sobe piso.
+
+**Três achados de ambiente que valem mais que o port:**
+
+- **`npm view @urbiverso/sdk` dá `E401`**, não só o `pnpm install`. Ou seja: a camada de contratos da
+  revisão é **estruturalmente inexecutável** aqui, e a checagem *"esse verbo está publicado?"* não
+  tem como ser feita. Vira pergunta ao autor no relatório, nunca achado de memória.
+- **`node_modules/` não existe** num clone novo — o `CLAUDE.md` afirmava o contrário (§ Validação),
+  e o texto estava **vencido**. Consequência real: `validar-backend.sh` aborta na etapa 1/5.
+  Corrigido na mesma alteração.
+- **O monorepo está clonado em `/home/user/urbiverso` e é gravável**, contrariando o pressuposto de
+  `urbiverso/CLAUDE.md` § "Sessão de app não enxerga o monorepo", em que as skills descansavam.
+
+**A rede que torna o processo fixo**, e o que cada peça de fato garante, está na tabela do
+`CLAUDE.md` § Processo obrigatório. O resumo honesto: `permissions.deny` **não** alcança `Bash` nem
+ferramenta MCP (casa nome de ferramenta, não argumento) e falha **calado** se o padrão de caminho não
+casar — por isso o `PreToolUse` `guarda-monorepo.sh` é a peça que realmente sustenta a proibição, com
+57 casos de teste versionados. E o guard `revisao-registrada` é **autoatestação**: confere forma,
+nunca substância.
+
+Duas decisões de desenho que custaram um erro cada, e vale não repetir:
+
+- A regex do guard casava `request` como verbo de escrita e **bloqueava
+  `mcp__github__pull_request_read`** — isto é, quebrava a própria revisão. Falso positivo em guard
+  não é inofensivo: guard que atrapalha é desligado. Agora casa por **prefixo** ou sufixo `_write`.
+- O `revisao-registrada` é **workflow separado** e o **job sempre passa** — quem reprova é o commit
+  status. Se o job falhasse, o check ficaria vermelho e nenhum comentário posterior o pintaria de
+  verde; e o gatilho `issue_comment` precisa existir porque o relatório é postado **depois** do
+  último push.
+
+**Pendências do autor** (nenhuma dá para fazer daqui): `OPENAI_API_KEY` nas variáveis do *cloud
+environment* — sem ela a revisão roda no motor nativo, para sempre, e nativo é menos adversarial
+porque revisa patch escrito pela mesma família de modelo; **branch protection** com
+`revisao/bloqueantes` como required check, sem o que o guard é conselho e não portão; e decidir se o
+monorepo continua anexado a estas sessões — a defesa hermética seria não anexar.
+
+---
+
+## Retorno declarativo de migração: a `003` sai do `remover_colunas` (2026-08-19)
+
+A auditoria de obsolescências da plataforma acusou **um** arquivo desta app:
+
+```
+[migracao-remover-colunas] Retorno declarativo de migração de app (`remover_colunas` /
+`remover_tabelas`) — breaking após 2026-08-23
+ * migracoes/003_receitas_fases_alocacoes.js
+```
+
+`migracoes/003_receitas_fases_alocacoes.js` terminava em
+`return { remover_colunas: { avancado_tipologias: ['linha_receita_id'] } }` — o único ponto do repo
+com retorno declarativo. Isso é **migração declarando estrutura**, o oposto do que o `schema.json`
+passou a garantir: a estrutura de uma app é 100% derivada dele, e migração só toca DADOS.
+
+**Por que não dava para deixar passar.** O item está marcado `"gate": true` em
+`sdk/obsolescencias.json`: passado **2026-08-23** ele deixa de ser aviso e **reprova a app na
+instalação**. A allowlist de perdão nominal do detector cobre só as 8 migrações históricas que já
+estavam no monorepo quando o contrato apertou, e está **congelada** — esta app nunca foi bundled,
+então nada aqui casa. O caminho prescrito pela própria plataforma para esse caso é reescrever a
+migração no fluxo canônico antes do fim da janela.
+
+**Metade do caminho já estava feita e ninguém tinha reparado:** `linha_receita_id` já não está no
+`schema.json`. Faltava só o passo de DADO. A `003` agora faz
+`await dados.limparColuna('avancado_tipologias', 'linha_receita_id')`, sem `return`. No boot: o
+reconciliador não toca na coluna (ela tem dado) → a migração esvazia → a poda pós-migrações derruba
+a estrutura vazia. Numa instância onde a coluna nunca recebeu dado, a poda pré-migrações já a
+derrubou e o `limparColuna` vira **no-op com log** — o mesmo release converge nas duas populações.
+
+Reescrever migração já aplicada é seguro: o runner é forward-only e rastreia por número em
+`shell.versoes`. Quem já rodou a `003` não a roda de novo; quem está atrasado roda a versão nova e
+chega ao mesmo estado final.
+
+### O defeito irmão, que era o pior dos dois
+
+A `003` lia com `dados.listar(..., { por_pagina: 100000 })`. **Até o shell 0.53.8 esse `por_pagina`
+era ignorado** e a chamada devolvia **100 linhas**, sem erro e sem aviso. Encostado num
+esvaziamento de coluna, isso é a receita que os docs da plataforma marcam como irreversível: migra
+100 tipologias e apaga a coluna de **todas**. As duas leituras passaram a `dados.varrerTudo`, que
+não tem número para chutar. O aviso de obsolescência não falava disso — apareceu porque a correção
+obrigou a olhar o arquivo inteiro.
+
+### `shell_min`: `0.50.3` → `0.53.8`
+
+| Verbo | Piso |
+|---|---|
+| `dados.limparColuna` | shell **0.53.5** |
+| `dados.varrerTudo` | shell **0.53.8** |
+
+O `shell_min = 0.50.3` estava listado como contrato inegociável no `CLAUDE.md`, no
+`INSTRUCOES-CODE.md` e no `README.md` — os três foram atualizados na mesma alteração. **O piso
+existe para ser honesto**, e não havia alternativa: sem `limparColuna` a remoção não tem passo de
+dado. Risco baixo — o monorepo está em `0.53.11`, e o próprio aviso de obsolescência só é emitido
+por shell ≥ 0.53.x. `sdk_min` **não** entrou: exige `shell_min ≥ 0.53.10` pareado e um SDK em
+versionamento inteiro ("SDK N"), e a app segue pinada em `@urbiverso/sdk 0.50.3`, anterior a esse
+esquema. **`versao` intocada** (`0.1.28`): não há migração nova nem mudança de schema, e o guard do
+`validar-backend.sh` reprova bump sem migração nova.
+
+### Prevenção — duas defesas, porque uma não bastava
+
+- **`scripts/migracoes-harness.mjs`:** o banco em memória ganhou `varrerTudo`, `limparColuna` e
+  `limparTabela`; a etapa 4 passou a **afirmar sobre o efeito** (depois da cadeia,
+  `avancado_tipologias.linha_receita_id` tem que estar vazia — a fixture semeia a coluna
+  preenchida); e existe uma etapa **5** que executa cada migração e reprova retorno com
+  `remover_colunas`/`remover_tabelas`. Conferido que as duas ficam **vermelhas** sem o conserto.
+- **`.github/workflows/pr-guards.yml`:** job `migracao-declarativa`, só `grep`, que barra
+  `remover_colunas`/`remover_tabelas` **fora de comentário** em `migracoes/`. Fica no CI leve
+  porque o `validation.yml` depende do token do SDK e pode nem rodar.
+
+Uma executa, a outra lê o texto: o harness pega o retorno construído de qualquer jeito, o guard
+pega o PR mesmo quando o CI pesado não roda.
+
+### Pendente do autor (ambiente autenticado)
+
+- **confirmar que a instância-alvo roda shell ≥ 0.53.8** antes de publicar a release — abaixo disso
+  a app é reprovada na atualização com `422`;
+- `pnpm exec urbi-empacotar viabilidade`;
+- execução real da cadeia `001`→`029` no Postgres (segue nunca rodada em produção).
+
+Issue **#422**. Validado aqui: `guard-json.mjs` ✓ · harness de migrações ✓ (etapas 1–5) · guard de
+`versao` ✓.
+
+---
+
+## A app nunca foi instalável do zero — ciclo de FK no `schema.json` (2026-08-18)
+
+O autor tentou instalar a app na **Pinguim** (`homolog.urbiverso.com.br`), para depois removê-la da
+**Gondoa** (`dev.urbiverso.com.br`). A instalação reprovou:
+
+```
+[dry_run_schema] relation "viabilidade.estudos" does not exist
+```
+
+**Causa: ciclo de chave estrangeira.** `preliminar_produtos.estudo_id` aponta para `estudos`
+(obrigatório, `cascata`) e `estudos.permuta_fisica_produto_id` / `_nr_produto_id` apontavam de volta
+para `preliminar_produtos`. O sincronizador do shell emite a FK **inline no `CREATE TABLE`** e, ao
+topar um ciclo, apenas **desiste da aresta** (`sincronizador.ts` — comentário literal
+`// Circular reference — skip to avoid infinite loop`): não reprova, não adia a FK, cria as tabelas
+fora de ordem. Simulando o algoritmo real contra o nosso `schema.json`, a ordem saía
+`mercado_regioes, preliminar_produtos, estudos, …` — `preliminar_produtos` nascia **antes** de
+`estudos`, e o seu `REFERENCES viabilidade.estudos(id)` estourava. A mensagem do erro é literalmente
+essa linha.
+
+**O que mais importa aqui não é o ciclo, é o que ele revela: a app nunca foi instalável do zero.**
+`preliminar_produtos` chegou na migração `021` e os `permuta_fisica_*_produto_id` na `022` — em
+instância que já tinha a app, as colunas nasceram por `ALTER TABLE ADD COLUMN`, onde o alvo já
+existe. A instalação virgem **pula as migrações** e materializa tudo pelo `schema.json`: é o único
+caminho que exercita a ordem de criação. Dev estava verde havia meses sobre um schema que não
+instala. Só a primeira instância nova podia acusar — e acusou.
+
+**Correção:** os dois `*_produto_id` viraram `inteiro` (referência lógica, sem FK). O lado forte
+(`preliminar_produtos.estudo_id`) ficou como estava. Custo real nenhum: os dois campos são memória
+da seleção da UI, não fonte de cálculo — o motor consome o canônico em m² gravado na edição
+(`frontend/tela-premissas.ts:719-729`), e nenhum ponto do backend dereferencia o `produto_id`.
+`referencia` e `inteiro` são o mesmo `INTEGER` no DDL, e o reconciliador do shell poda sozinho a FK
+que deixou de ser derivável — sem migração, sem bump de `versao` (segue `0.1.28`).
+
+**Prevenção:** `scripts/guard-schema-ciclos.mjs`, na etapa 1/5 do `validar-frontend.sh` e como job
+`schema-ciclos` no `pr-guards.yml`. Conferi que ele reprova o `schema.json` anterior (aponta o ciclo
+por extenso) e passa no corrigido. Esta é a mesma família do guard de aspas curvas e do de JSON
+estrito: falha **silenciosa** — typecheck, testes, esbuild e o harness de migrações ficam todos
+verdes, e o defeito só aparece na instalação de outra instância. O validador estático do shell não
+ajuda: ele reprova ciclo que passe por uma `referencias` **composta**, e diz explicitamente que
+"ciclo só de `referencia` simples continua valendo como sempre"
+(`docs/shell/banco-de-dados.md`). É um buraco do shell — vale abrir issue em `urbiverso/urbiverso`,
+mas não está no caminho crítico.
+
+### Segundo defeito, independente: a release nascia já homologada
+
+O autor notou no GitHub que a release disponível estava com `prerelease=false`. Causa: o
+`release.yml` chama `gh release create` **sem `--prerelease`**, enquanto o `urbi-release` do SDK
+publica sempre como prerelease. Para a plataforma, "não homologado" ⟺ `prerelease=true`, então toda
+release nossa nascia **atestada por ninguém** — e produção, que roda em `aceitacao = 'homologado'`,
+passava a enxergá-la na hora. A doc da plataforma já nomeava a virada como pendência do repo do app
+(`distribuicao.md`: "a data de corte é por repo: o dia em que o workflow do repo do app passa a
+publicar `prerelease: true`").
+
+Acrescentado `--prerelease` ao workflow, com o ciclo documentado em `CLAUDE.md` § "A release nasce
+NÃO homologada". Dois pontos que se aprende errado e ficaram escritos: prerelease **não** trava a
+primeira instalação (install de app nova é soberano — basta marcar "Incluir não homologadas" na
+tela), e o botão **Homologar** só existe numa instância com `aceitacao = 'releases'`.
+
+**Fica com o autor, no ambiente autenticado:** disparar o release (Actions → release → Run
+workflow), instalar na Pinguim marcando "Incluir não homologadas", pôr a Pinguim em
+`aceitacao = 'releases'`, testar, clicar em Homologar, e desinstalar da Gondoa.
+
+---
+
 ## Workflow de revisão de PR em diálogo portado do monorepo (2026-08-18)
 
 Pedido do autor, a partir de um workflow que ele já usa noutras apps: implementar numa sessão,
@@ -2359,6 +2569,9 @@ Branch `claude/lote-6-issues-b21wlr`. Toca **schema + backend + frontend + motor
 - **Migração 003 (forward-only):** cada `avancado_linhas_receita` → `avancado_fases` (absorção convertida p/ distribuído,
   fluxo p/ multi-linha); cada `avancado_tipologias` legada → uma `avancado_alocacoes` na fase da sua linha; drop de
   `avancado_tipologias.linha_receita_id` via `remover_colunas`. Numa instância virgem o runner faz baseline (inócua).
+  > ⚠️ **Vencido em 2026-08-19 (#422):** o `remover_colunas` saiu. A `003` hoje esvazia a coluna com
+  > `dados.limparColuna` e a poda do reconciliador derruba a estrutura vazia no mesmo boot — ver a
+  > entrada do topo deste arquivo.
 - **Decisão registrada (área p/ custos `rs_m2_priv`):** a área privativa total do motor passa a somar as **alocações**
   (unidades × área do catálogo), mantendo VGV e base de custo consistentes entre si. Se o autor quiser a área do
   **catálogo inteiro** (construído, não só vendido) para custo de obra, ajustar `montarLinhasReceita`/motor num passo próprio.
