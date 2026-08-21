@@ -1,18 +1,42 @@
 ---
 name: revisar-pr-apps
-description: Revisa um PR de uma app da plataforma urbiverso antes do merge — revisão adversarial delegada a subagentes, mais confronto do diff contra os contratos dos frameworks tal como o SDK publicado os expõe (nunca contra os docs do monorepo, exceto para app bundled). Publica o relatório como comentário no PR. Use quando o PR está num repositório de app, ou quando toca apenas apps/<nome>/ no monorepo. Para PR do shell, use revisar-pr-shell.
+description: Revisa um PR deste repositório antes do merge — revisão adversarial delegada ao Codex (nativo quando o Codex não estiver disponível), mais confronto do diff contra os contratos dos frameworks tal como o SDK publicado os expõe, nunca contra o monorepo. Publica o relatório como comentário no PR e repete a revisão a cada conserto, até não sobrar bloqueante. Use sempre que um PR deste repo precisar de revisão — é o passo 5 do processo obrigatório do CLAUDE.md, não uma etapa opcional.
 ---
+
+<!-- Portado de urbiverso/urbiverso `.claude/skills/revisar-pr-apps/SKILL.md` @ b0361f6 (PR #2540),
+     em 2026-08-21. CÓPIA, NÃO LINK VIVO. As adaptações deste repo estão marcadas com `ADAPTADO`
+     — não as "corrija" de volta para o upstream sem ler o motivo escrito ao lado. -->
 
 # Revisão de PR de app
 
+> **Confirme o runtime antes do passo 1.** Este arquivo é do catálogo **Claude**
+> (`.claude/skills/`), e a pasta onde ele está não diz quem está lendo. Confirme por um fato, não
+> pela impressão de onde você está: `printenv CLAUDECODE` — sessão Claude Code imprime um valor,
+> fora dela sai vazio.
+>
+> **ADAPTADO.** No monorepo existe um catálogo `.cursor/` espelhado, e a instrução era "saiu vazio,
+> abra a sua contraparte lá". **Este repositório não tem `.cursor/`** — mandar alguém para lá é
+> mandar para um arquivo que não existe. Aqui a regra é: saiu vazio, ou você não é o Claude,
+> **PARE e diga ao usuário**, com o que cada teste respondeu. Falso "não sou" custa uma frase dele;
+> falso "sou" custa uma revisão inteira rodada com o motor errado.
+
 Você é o revisor de código de apps da plataforma urbiverso. Revisa PRs **antes** do merge.
 
-Não revisa funcionamento específico do shell. Exceção: quando o PR altera o shell **junto**
-com a app — aí revisa, e o relatório registra que misturar as duas coisas num mesmo PR não é
-prática recomendada.
+Não revisa funcionamento específico do shell — e **ADAPTADO:** aqui não existe a exceção do
+upstream ("PR que altera o shell junto com a app"), porque um PR deste repositório não tem como
+tocar o shell. Se algum dia parecer que toca, o achado é esse: alguém editou fora do repo.
 
 **Não implementa, não commita, não faz push, não abre PR.** Quando a correção é óbvia, ela é
-**descrita no relatório**, nunca vira patch.
+**descrita no relatório**, nunca vira patch. Isso vale mesmo quando a sessão é a autora do PR:
+consertar é trabalho dela **fora** desta skill, e a rodada seguinte volta por aqui (§ 8).
+
+**O ciclo termina quando não há bloqueante pendente** (§ 9). Merge, só com autorização expressa
+nesta chamada.
+
+**ADAPTADO — não existe router aqui.** No monorepo esta skill podia ser despachada pela
+`revisar-pr`, que escolhia entre shell e app. Este repositório só tem app, então o router seria uma
+árvore de decisão de um ramo só e um quarto arquivo para manter sincronizado: ele **não foi
+portado**. Esta skill é a porta de entrada, e é autossuficiente.
 
 ## Superfície de leitura — o SDK publicado, e só ele
 
@@ -24,6 +48,17 @@ superfície usou**, sempre.
    correta: tipos, **os docs de framework** e `obsolescencias.json`, todos na versão do SDK que
    a app tem instalada. Confira essa versão contra o que existe publicado
    (`npm view @urbiverso/sdk dist-tags`) e reporte se ela estiver atrás.
+
+   > ⚠️ **ADAPTADO — neste ambiente as duas coisas falham, e é preciso saber que falham.**
+   > Medido em 2026-08-21: `node_modules/` **não existe** no clone (o `pnpm install` dá 401 no
+   > `@urbiverso/sdk`, que é GitHub Packages privado), **e `npm view @urbiverso/sdk` dá o mesmo
+   > `E401`**. Consequências, as duas obrigatórias no relatório:
+   >
+   > - a **camada de contratos não roda** — ver o item 2 abaixo, que aqui é a regra, não a
+   >   exceção;
+   > - a verificação *"esse verbo está publicado?"* é **inexecutável**. Ela não vira achado
+   >   inventado nem "conferido de memória": vira **pergunta ao autor** no relatório, porque só
+   >   ele tem credencial para responder.
 
    **A SSOT do autor de app é documentação, não tipo.** O bundle carrega os mesmos docs de
    framework de `docs/shell/`, recortados: `filtrar-docs-sdk.js` embarca as seções marcadas
@@ -64,39 +99,49 @@ versions` responde, e é o que a revisão deve fazer:
 - verbo ausente de **toda** versão publicada → **achado forte**: a app está sendo autorada
   contra superfície não publicada. Ela só vai instalar onde roda build não homologado, e o
   prazo de qualquer obsolescência que dependa desse verbo é incumprível de fora do monorepo.
-  Registre e sugira issue no shell.
+  Registre no relatório, para o autor levar ao shell (ver a nota acima).
 
 Quando o contrato necessário não estiver no bundle, isso **já é o achado**: deficiência de
-superfície. Registre e sugira issue no shell para ampliar o que o SDK expõe — nunca preencha a
-lacuna lendo o shell.
+superfície. Registre no relatório, para o autor levar ao shell a ampliação do que o SDK expõe —
+nunca preencha a lacuna lendo o shell, e nunca abra a issue você mesmo.
 
 Ler o repositório do shell — **docs ou código** — exige autorização explícita do usuário na
 hora e registro expresso no relatório, e o relatório precisa dizer que a conclusão vale contra
 `main`, não contra o publicado.
 
-**Única exceção: app bundled no monorepo** (`apps/<nome>/` dentro de `urbiverso/urbiverso`).
-Ela é distribuída junto com o shell, então o contrato dela **é** o `main` — ali `docs/shell/`
-é a superfície certa. A exceção é pelo modo de distribuição, não por conveniência de quem
-revisa: app em repositório próprio nunca cai nela, nem quando o monorepo está na máquina.
+**ADAPTADO — a exceção "app bundled" do upstream não existe aqui, e foi removida de propósito.**
+Ela valia para app distribuída dentro de `urbiverso/urbiverso`, cujo contrato é o `main`. Esta app
+mora em repositório próprio e **nunca** é bundled, então não há caso em que ler o monorepo seja
+certo. Manter a exceção no texto só ofereceria uma porta que alguém acabaria usando.
 
-Cada execução é independente, analisa **um** PR aberto, sem memória entre execuções. O
-relatório final é **sempre** publicado como comentário no PR, e é o fim do trabalho — exceto no
-**modo diálogo** (§ 10), em que uma sessão implementadora está do outro lado esperando, e o
-relatório abre um ciclo de rodadas em vez de fechar o trabalho.
+**E há uma proibição mais dura que a do upstream.** Lá, a regra descansava em o monorepo não estar
+na máquina. Aqui **ele está**, em `/home/user/urbiverso`, clonado e gravável. Então: **ler o
+monorepo para compensar a falta do bundle é proibido, e escrever nele é proibido em qualquer
+hipótese** — inclusive abrir issue ou PR lá. Ver `CLAUDE.md` § "O monorepo `urbiverso/urbiverso` é
+só leitura". Se o contrato que você precisa não está no bundle, a lente é **NÃO EXECUTADA**; não
+existe terceiro caminho.
+
+> **ADAPTADO — o que "issue no shell" quer dizer daqui em diante.** Vários pontos desta skill
+> terminam com *"registre e sugira issue no shell"* (deficiência de superfície, contrato ambíguo,
+> DDL que a migração de app não pode fazer). No upstream isso era literal: abrir a issue em
+> `urbiverso/urbiverso`. **Aqui não é, e não pode ser** — nem por você, que não abre issue nem PR em
+> lugar nenhum (§10), nem em geral, porque escrever no monorepo é proibido.
+>
+> Traduza sempre para: **descreva a lacuna no relatório**, endereçada ao autor, com o texto pronto
+> que ele levaria — o que falta, por que a app não consegue contornar, e o que ela precisaria da
+> plataforma. Quem decide levar isso ao monorepo é ele, na conta dele. O achado continua existindo;
+> o que muda é quem o transporta.
 
 ## 1. Triagem — antes de qualquer análise
 
-<!-- ESPELHO: seção quase idêntica à homônima de `revisar-pr-shell`. Se alterar aqui, espelhe
-     lá. Isto é recado de manutenção: quem está EXECUTANDO a skill não deve abrir, carregar
-     nem consultar a outra. -->
 
 Leia o PR e **todos** os comentários. Decida:
 
 | Situação | Ação |
 |---|---|
-| Sem comentário de revisão | **Segue** |
-| Revisão anterior + comentário posterior que a mencione (inclusive resposta parcial) | **Segue** — revise o delta e o que a resposta afirma |
-| Revisão anterior + commit posterior a ela | **Segue** — commit é alteração e vale revisão nova |
+| Sem comentário de revisão | **Rodada 1** |
+| Revisão anterior + commit posterior a ela | **Rodada N+1** (§ 8) — o conserto é código novo e vale revisão |
+| Revisão anterior + comentário posterior que a mencione (inclusive resposta parcial) | **Rodada N+1** (§ 8) — revise o delta e o que a resposta afirma |
 | Revisão anterior **intocada**: nenhum comentário depois, nenhum commit depois | **PARE** |
 
 Revisão intocada é provável disparo em duplicidade. Ao parar, diga qual comentário é a
@@ -129,6 +174,42 @@ git merge-base origin/main <head>
 git diff <merge-base>...<head> --stat
 ```
 
+### ADAPTADO — a sessão já está no repositório, e não existe `gh`
+
+O upstream abria esta seção com "PR de app mora em repositório próprio, e a sessão quase nunca tem
+um clone dele", e mandava clonar. **Aqui a sessão roda dentro do repositório do PR**, então clonar
+seria trabalho a mais e uma segunda árvore para confundir. A seção de clone foi removida; no lugar,
+confirme os três fatos antes de qualquer análise:
+
+```bash
+git rev-parse --show-toplevel          # tem que ser a raiz DESTE repositório
+git rev-parse --is-shallow-repository  # `true` → `git fetch --unshallow` antes do merge-base
+git status --porcelain                 # vazio; sujeira entra na revisão como se fosse do PR
+```
+
+O resto — head do PR contra head da sessão, e quando montar worktree — está no motor, seção *A
+árvore que o motor lê*. Não duplique a regra aqui: regra duplicada diverge.
+
+**Nunca monte árvore de trabalho fora deste repositório**, e em particular nunca dentro de
+`/home/user/urbiverso`.
+
+### ADAPTADO — GitHub pelo MCP, nunca pelo `gh`
+
+**O `gh` CLI não existe neste ambiente** (`CLAUDE.md` § Merge, nota de ambiente). Toda conversa com
+o GitHub é pelas ferramentas MCP:
+
+| Para | Ferramenta |
+|---|---|
+| Ler o PR, o diff, os arquivos, os comentários e as revisões (§1, §8) | `mcp__github__pull_request_read` |
+| Publicar o relatório como comentário (§7) | `mcp__github__add_issue_comment` |
+| Conferir CI verde no SHA final (§9) | `mcp__github__get_check_run`, `mcp__github__actions_list` |
+| Mergear, **se e só se** autorizado (§9) | `mcp__github__merge_pull_request` |
+
+**Se as ferramentas MCP do GitHub não estiverem nesta sessão, PARE e diga ao usuário.** Não
+improvise com `git` puro para adivinhar o estado do PR, e não peça para ele colar o diff: uma
+revisão que não consegue ler os comentários não sabe em que rodada está, e a §8 inteira depende
+disso.
+
 ## 2.1 Calibre o esforço e ANUNCIE — não pergunte
 
 Com o diffstat na mão, escolha o nível por fatos medíveis:
@@ -149,228 +230,67 @@ não é uma faixa para cada. Ler as duas faixas como independentes já produziu 
 de 4 arquivos, com três deles achando exatamente o mesmo defeito.
 
 **Anuncie a decisão em uma linha e siga** — não pare para perguntar. O usuário lê o anúncio em
-segundos e os agentes levam minutos: se discordar, ele interrompe, e isso é grátis. Parar para
-pedir validação a cada revisão é atrito puro numa varredura de vários PRs.
+segundos e os agentes levam minutos: se discordar, ele interrompe, e isso é grátis.
 
 ```
-Rodando revisar-pr-apps no PR #<n>. <N> arquivos, +<x>/−<y>, <áreas tocadas>.
-Esforço <nível>: <N> lentes (<lista>), motor <Codex|nativo>. Agora são <timestamp>.
+Revisando o PR #<n> (rodada <N>). <N> arquivos, +<x>/−<y>, <áreas>.
+Esforço <nível>: <N> lentes, motor <Codex|nativo — motivo>. Início <timestamp>.
 ```
-
-O timestamp existe para o usuário medir a duração — repita no fim. O anúncio também é
-registro: se a revisão deixar passar alguma coisa, dá para ver em que esforço e em que motor
-ela rodou.
 
 **Override explícito manda mais que o diagnóstico:** se o usuário pedir `completo` ou
 `simples` junto do número do PR, use o que ele pediu e diga no anúncio que foi ele quem
 escolheu.
 
-## 2.2 Motor da fan-out — Codex quando existir, pergunta quando não
+## 2.2 Motor da fan-out — mora fora desta skill
 
-<!-- ESPELHO: seção quase idêntica à homônima de `revisar-pr-shell`, trocando os docs do SDK
-     pelos de `docs/shell`. Se alterar aqui, espelhe lá. -->
+Leia **`.claude/motor-revisao.md`** deste repositório, por inteiro. Ele traz o preflight do Codex, o
+fallback nativo, os tiers por papel, a regra da árvore que o motor lê, o que todo briefing carrega e
+as invariantes de falha. **Não achou, PARE e diga** — improvisar o motor de memória é como se perde
+a guarda contra falha virar laudo limpo.
 
-As lentes dos passos 3 e 4 rodam **fora da conta Anthropic** quando esta máquina tem o plugin
-do Codex. O revisor lê muito e escreve pouco — uma lente engole um doc inteiro, o diff e o
-código em volta para devolver 400 palavras —, então o custo mora no input, e é ali que o
-motor externo paga.
+> **ADAPTADO.** O upstream avisava que "numa sessão de app o `.claude/` pode não estar na árvore que
+> você tem aberta". Aqui está: skill e motor moram no mesmo repositório que está sendo revisado.
 
-**A presença do plugin é fato verificado, nunca suposto.** Descubra o script antes de montar
-o lote:
+### O que esta skill informa ao motor
 
-```bash
-CODEX=$(ls -1d ~/.claude/plugins/cache/*/codex/*/scripts/codex-companion.mjs 2>/dev/null | sort -V | tail -1)
-```
+- **Superfície de docs do briefing de contratos:** `node_modules/@urbiverso/sdk/docs/`, lido
+  **por inteiro**. Ver *Superfície de leitura*, no topo — e a nota de que neste ambiente ela
+  costuma **não existir**.
+- **Faixas que sobem para `gpt-5.6-sol` no Profundo:** migração, `schema.json`,
+  `manifesto.json`, permissões, contas, auditoria.
+- **`BASE`** é o merge-base calculado no passo 2 (nunca o nome da branch) e **`WT`** é a árvore
+  que as lentes leem.
+- **ADAPTADO — a proibição do briefing é mais larga aqui.** No upstream era *"não ler o repositório
+  do shell"*. Aqui é: *"não ler, não abrir, não fazer `grep` e **não escrever** em
+  `/home/user/urbiverso`"* — porque o monorepo está nesta máquina e é gravável, o que o upstream não
+  precisava supor.
 
-Vazio significa ausente — e aí **PARE e pergunte** se ele quer que a revisão rode nativa. Isso
-não é hesitação: rodar nativo gasta a cota Anthropic que esta seção existe para poupar, e a
-escolha é do usuário, não sua. Diga que o plugin não está aqui, quanto custa mais ou menos
-rodar nativo naquele esforço, e espere. Com autorização, siga o passo 3 como está escrito, com
-subagentes nativos.
+### A árvore do motor e os docs do SDK
 
-### Tier por papel
+**O motor lê UMA árvore só, e os docs da plataforma podem não estar nela.** Resolva antes de
+despachar:
 
-Um comando por lente. O tier vai no `--model`, e é ele que faz o trabalho que num subagente
-nativo o modelo faria:
-
-| Papel | Modelo |
-|---|---|
-| L1 varredura, L5 armadilhas de linguagem, S1 documentação, e a camada de contratos de PR **só de doc** | `gpt-5.6-luna` |
-| L2 comportamento removido, L3 rastreador, L4 concorrência, T1–T3, S2, S3, e a camada de contratos em geral | `gpt-5.6-terra` |
-| Contratos de framework sensível no **Profundo** — migração, `schema.json`, `manifesto.json`, permissões, contas, auditoria | `gpt-5.6-sol` |
-
-A camada de contratos fica em `terra` por padrão de propósito: a §4 manda cortar da camada
-adversarial antes de cortar dela, então ela não é o lugar de economizar. `luna` só quando o PR
-é doc puro; `sol` só nas faixas em que contrato perdido custa caro.
-
-### O repositório da app pode nem estar nesta máquina
-
-PR de app mora em repositório próprio, e a sessão quase nunca tem um clone dele. Antes de
-qualquer coisa, clone — num diretório descartável, **fora** da árvore da sessão:
-
-```bash
-gh repo clone <owner>/<repo> <destino> -- --quiet
-git -C <destino> fetch origin <branch-do-pr>
-```
-
-Use a **scratchpad da sessão** como destino: o clone é material de trabalho, não árvore de
-projeto, e some junto com a sessão. Nunca clone dentro da árvore do monorepo.
-
-**Clone dedicado dispensa worktree.** A regra do worktree existe para não trocar a branch de
-uma árvore que a sessão usa para outra coisa; um clone feito agora, só para esta revisão, não
-tem esse problema — faça `git checkout <branch-do-pr>` nele, confirme o HEAD e siga. O worktree
-volta a ser obrigatório quando a árvore já existia antes da revisão.
-
-### A árvore que o motor lê — passo obrigatório, e o mais fácil de esquecer
-
-**O motor revisa a árvore que está checada, não o PR que você digitou.** Numa árvore
-preexistente a sessão está quase sempre na branch padrão, e o PR mora noutra. Sem corrigir
-isso, as lentes revisam um diff **vazio** e voltam **limpas** — JSON válido, `verdict: approve`,
-indistinguível de revisão de verdade. É o pior modo de falha desta skill, e ele não dispara
-nenhuma das defesas da seção seguinte.
-
-Compare e resolva antes de despachar qualquer coisa:
-
-```bash
-git rev-parse HEAD                              # o que a sessão tem checado
-git rev-parse origin/<branch-do-pr>             # o que o PR é
-```
-
-Iguais, use a própria árvore. Diferentes, monte worktree do head do PR e aponte **todas** as
-lentes para lá com `--cwd`:
-
-```bash
-git worktree add ../<repo>-wt-pr<n> origin/<branch-do-pr>
-```
-
-Confira que o worktree está no commit certo antes de despachar (`git -C <dir> rev-parse HEAD`)
-— worktree no commit errado é a mesma revisão vazia com outra roupa. Ao terminar,
-`git worktree remove ../<repo>-wt-pr<n>`, e o `--cwd` deixa a árvore da sessão intacta o tempo
-todo.
-
-**O motor lê UMA árvore só, e os docs da plataforma podem não estar nela.** Resolva pela
-cascata da seção *Superfície de leitura*, antes de despachar:
-
-- **Com o bundle na árvore** — se o repo da app tem `node_modules`, o SDK já está lá e o
-  briefing aponta para `node_modules/@urbiverso/sdk/docs/`. Worktree novo **não** tem
-  `node_modules` (ele não é compartilhado): ou instale (`pnpm install` na árvore, o que exige
-  credencial de leitura do GitHub Packages), ou use a árvore da sessão com a branch do PR
-  checada. Instalar é preferível a reaproveitar árvore — a versão do SDK que o lockfile do PR
+- **Com o bundle na árvore** — o briefing aponta para `node_modules/@urbiverso/sdk/docs/`. Worktree
+  novo **não** tem `node_modules` (ele não é compartilhado): ou instale na árvore, ou use a árvore
+  da sessão com a branch do PR checada. Instalar é preferível — a versão do SDK que o lockfile do PR
   resolve é parte do que se está revisando.
-- **Sem o bundle** — não despache lente de contrato nenhuma. Elas entram no relatório como não
-  executadas, com o motivo. **Não substitua por cópia de `docs/shell/`**: era o que a versão
-  anterior desta skill mandava fazer, e é justamente o anti-padrão que ela agora proíbe.
-- **App bundled no monorepo** — aí sim os docs de framework são a superfície certa. Copie os
-  que as lentes vão usar para dentro da árvore do PR, fora do controle de versão:
+- **Sem o bundle — que é o caso normal deste repositório** — não despache lente de contrato nenhuma.
+  Elas entram no relatório como **não executadas, com o motivo**, e o resumo curto da §7 diz isso em
+  uma linha. **Não substitua por cópia de `docs/shell/` nem por memória.**
 
-  ```bash
-  mkdir -p "$WT/.docs-shell" && cp <monorepo>/docs/shell/{a,b,c}.md "$WT/.docs-shell/"
-  ```
+> **ADAPTADO — o bloco `.docs-shell` do upstream foi removido.** Ele mandava copiar
+> `docs/shell/*.md` do monorepo para dentro da árvore quando a app fosse *bundled*. Esta app nunca é
+> bundled, e copiar doc do monorepo para dentro desta árvore é exatamente o que a proibição do
+> `CLAUDE.md` veda. Não recrie o bloco.
 
-  Cópia não entra no diff (o `--base ... --scope branch` vem do git), então não contamina a
-  revisão. **Apague ao terminar**, junto com o worktree.
+> ⚠️ **E o risco que essa ausência cria: a linha "contratos não executados" vira papel de parede.**
+> Aqui ela vai aparecer em **100%** das revisões, e o que aparece sempre para de ser lido — aí
+> "revisão limpa" passa a ser lido como "contratos conferidos", que é falso. Duas defesas, use as
+> duas: `contratos=nao-executados` no comentário de máquina da §7 (greppável, contável), e o
+> relatório dizendo **o que exatamente ficou descoberto** — props de primitivo `urbi-*`, verbos do
+> SDK, e a aderência de `shell_min`/`sdk_min` ao que está publicado.
 
 Lente de contrato que não achou o doc é **não executada**, nunca aprovada.
-
-### O comando
-
-```bash
-node "$CODEX" adversarial-review --json --model <tier> --cwd "$WT" --base <merge-base> --scope branch "<briefing>" \
-  | jq -c '{verdict: .result.verdict, summary: .result.summary, findings: .result.findings}'
-```
-
-- `--base <merge-base> --scope branch` é a regra de três pontos da §2 — o runtime monta o diff
-  sozinho, e você não paga por isso.
-- **Read-only por construção:** os comandos de review não aceitam `--write`. A §8 sobrevive
-  sem depender de o motor obedecer.
-- **`--effort` não existe aqui**, só em `task`. O esforço cai no padrão do modelo (`sol` roda
-  em `low`, `terra` e `luna` em `medium`). Não invente o flag: ele é ignorado em silêncio.
-- **O `jq` não é enfeite.** O payload cru traz o relatório **três vezes** (`codex.stdout`,
-  `result`, `rawOutput`); sem o filtro, o triplo entra inteiro no contexto do orquestrador, que
-  é o recurso que a §9 chama de escasso.
-
-### Um invólucro por lente
-
-**Cada lente é despachada dentro de um subagente Haiku que só executa o comando.** Não é
-cerimônia: é o que dá paralelismo de verdade (chamadas Bash soltas na mesma mensagem não
-provaram correr concorrentes), progresso visível enquanto rodam, e — o ganho maior — mantém o
-JSON fora do seu contexto, porque quem lê o payload é o invólucro, não você.
-
-Dispare **todos os invólucros numa mensagem só**, `subagent_type: "general-purpose"` e
-`model: "haiku"`. O prompt de cada um manda, literalmente: rodar **um** comando Bash com
-`timeout` de 600000 ms, não analisar o repositório, não formar opinião própria, não completar
-nada que o motor não tenha dito, e devolver **texto livre em formato fixo** (saída estruturada
-não funciona nesta instalação — ver `CLAUDE.md`):
-
-```
-LENTE: <id>            MOTOR: codex/<tier>      DURACAO: <s>
-VEREDITO: approve | needs-attention | NAO_EXECUTADA
-RESUMO: <uma linha>
---- por achado:
-ACHADO: <severidade> | <arquivo>:<linha> | <título>
-CITACAO: "<a citação literal que veio no body>"
-CORPO: <2 a 3 frases>
-```
-
-Para medir a duração, o invólucro cerca o comando: `S=$(date +%s)` antes e
-`echo "DURACAO=$(( $(date +%s) - S ))s"` depois.
-
-**A instrução mais importante do invólucro é a de não inventar:** comando falhou, saída vazia,
-JSON inválido ou payload sem `findings` → devolver `VEREDITO: NAO_EXECUTADA` e o motivo cru.
-Um invólucro que "resume o que provavelmente teria sido achado" transforma falha em laudo, que
-é exatamente o que a seção seguinte existe para impedir.
-
-### O briefing viaja sozinho
-
-Nada do `CLAUDE.md`, desta skill ou dos docs entra no prompt do motor — só o focus text. Todo
-briefing carrega, além da lente ou do framework:
-
-- Para a camada de contratos: **o caminho do doc dentro de
-  `node_modules/@urbiverso/sdk/docs/`, a ordem de ler o doc por inteiro e de listar as
-  asserções verificáveis antes de abrir qualquer código** — é isso que impede o motor de apenas
-  concordar com o que o PR afirma. O motor lê o SDK instalado na árvore, que é a superfície que
-  o autor da app enxerga.
-- **A citação literal do contrato dentro de `body`.** O schema não tem campo para ela, e a §7
-  exige citação literal em todo achado. Sem essa frase, o relatório volta parafraseado.
-- A proibição da §8, cravada: **não tocar rota de API de instância nenhuma** — nem produção,
-  nem homologação, nem local, nem "só um GET".
-- **Não editar arquivo, não commitar, não propor patch aplicado.** O sandbox já proíbe, mas a
-  frase evita relatório escrito como se fosse aplicar.
-- **Não ler o repositório do shell.** A superfície é o SDK; contrato ausente do bundle já é o
-  achado, e ler o shell exige autorização que o motor não tem como pedir.
-- Só achados materiais, com `file` e `line_start`; nada de estilo nem de código que o diff não
-  toca.
-
-### Falha é falha, nunca "passou"
-
-Contam como **lente não executada**: `NAO_EXECUTADA` vindo do invólucro, invólucro que não
-devolveu nada, saída vazia, exit diferente de zero, JSON inválido, ou resposta com cara de job
-enfileirado em vez de relatório. Re-despache **uma** vez; persistindo, a lente entra no
-comentário do PR como não executada, com o motivo.
-
-Uma lente não executada **nunca** vira linha do "o que foi confrontado e passou" da §7. Esse é
-o único jeito de a ausência de resultado virar ausência visível, em vez de laudo limpo falso.
-
-### Grok — divergência sob demanda
-
-O Grok entra só quando o usuário pedir uma segunda opinião em motor distinto, tipicamente na
-L2 ou na S2. Ele não é uma faixa de capacidade: tem um modelo só (`grok-4.5`), e custa mais ou
-menos o mesmo que uma lente `terra`.
-
-```bash
-GROK=$(ls -1d ~/.claude/plugins/cache/*/grok-build/*/scripts/grok-bridge.mjs 2>/dev/null | sort -V | tail -1)
-node "$GROK" critique --json --wait --effort high --cwd "$WT" --base <merge-base> --scope branch "<briefing>" \
-  | jq -c '{verdict: .result.verdict, summary: .result.summary, findings: .result.findings}'
-```
-
-Diferente do Codex, o `critique` **honra** `--background` — por isso o `--wait` explícito. Vai
-no mesmo invólucro Haiku e obedece às mesmas regras de worktree, `jq` e formato de retorno.
-
-### O que nunca sai daqui
-
-Ficam com você, no modelo da sessão, sempre: a triagem (§1), a calibração (§2.1), a
-**verificação de todo achado bloqueante e a reconferência da citação no arquivo** (§9), a
-deduplicação, a síntese e a postagem. Motor externo produz evidência; veredito é seu.
 
 ## 3. Corpo da revisão — adversarial, delegada
 
@@ -379,10 +299,6 @@ dele e pelos arquivos tocados** — não rode o catálogo inteiro. O número de 
 orçamento **combinado** que você fixou no passo 2.1, dividido entre esta camada e a do passo 4.
 Todos em paralelo, numa mensagem só.
 
-O veículo de cada lente — motor externo ou subagente nativo — é o que o passo 2.2 decidiu. As
-instruções abaixo descrevem **o que** a lente procura; o passo 2.2 diz **onde** ela roda e o
-que o briefing tem que carregar.
-
 ### Lentes — como olhar. Escolha 2 a 4
 
 - **L1 · Varredura linha a linha.** Cada hunk, e a função inteira em volta: bug em linha não
@@ -390,7 +306,7 @@ que o briefing tem que carregar.
   invertida, off-by-one, `await` faltando, zero falsy, erro engolido no catch, variável errada
   por copiar-colar. **"Função tocada" é função com pelo menos uma linha dentro de um hunk deste
   diff** — não é "qualquer função do arquivo tocado". Sem esse corte a lente varre o arquivo
-  inteiro e devolve achado sobre código que o PR não encostou, que a §9 proíbe; já aconteceu.
+  inteiro e devolve achado sobre código que o PR não encostou, que a §11 proíbe; já aconteceu.
 - **L2 · Auditor de comportamento removido.** Para cada linha que o diff **apaga** ou
   substitui, nomeie a invariante que ela sustentava e procure onde ela foi restabelecida. Não
   achou, é candidato: guarda removida, caminho de erro descartado, validação estreitada, teste
@@ -455,8 +371,7 @@ barramento ao mesmo tempo sem que nenhum desses assuntos apareça no diff.
 adversariais ficam presos aos arquivos do diff; os de framework leem o doc inteiro e seguem o
 fluxo irmão para fora dele. O achado que ninguém mais pega costuma vir daqui.
 
-Uma lente por framework, no tier que a tabela do passo 2.2 manda, cada uma com estas
-instruções:
+Uma lente por framework, no tier que a tabela do motor manda, cada uma com estas instruções:
 
 - Leia o doc do framework **por inteiro**, na versão exposta pelo SDK. Não pule seção, não
   faça busca por palavra-chave. O doc é a fonte de verdade; a implementação é a suspeita.
@@ -468,31 +383,73 @@ instruções:
   - **(a)** o diff **viola** um contrato → defeito, o código da app tem que mudar;
   - **(b)** o doc da **app** ficou errado por causa desta mudança → o doc muda **neste** PR;
   - **(c)** o contrato é **ambíguo, silencioso, ou não está exposto no SDK** → dívida de
-    superfície; formule a pergunta que o doc não responde e sugira a issue no shell.
+    superfície; formule a pergunta que o doc não responde e deixe-a pronta no relatório, para o
+    autor levar ao shell.
 
 Numa app, a classe **(a)** é a que manda: o contrato da plataforma não é negociável daqui. O
 que este PR não pode fazer é mudar o contrato — se parece que precisa, o desfecho é **(c)**.
 
-## 5. Convenções da plataforma que a revisão sempre confere
+## 5. Convenções que a revisão sempre confere
 
-Estas falham em silêncio e por isso quase nunca aparecem sozinhas:
+Estas falham em silêncio e por isso quase nunca aparecem sozinhas. **ADAPTADO:** a lista do upstream
+foi trocada pela deste repositório — as convenções da plataforma que sobrevivem estão aqui, mais as
+que só existem neste repo, e **menos** a regra da `versao`, que diverge (ver o box no fim).
 
-- **`Closes #123` em inglês.** `Fecha #123` não fecha nada — o PR mergeia, a issue fica aberta
-  e ninguém percebe. A keyword repete por issue (`Closes #1, closes #2`), vale só no corpo do
-  PR ou na mensagem de commit, **nunca no título**, e issue de outro repositório exige a forma
-  completa (`Closes <owner>/<repo>#308`).
+**Da plataforma**
+
+- **`Closes #123` em inglês.** `Fecha #123` não fecha nada — o PR mergeia, a issue fica aberta e
+  ninguém percebe. A keyword **repete por issue** (`Closes #1, closes #2` — `Closes #1, #2` fecha só
+  a primeira), vale só no corpo do PR ou na mensagem de commit, **nunca no título**, e **nunca em
+  intervalo** (`Closes #273-276` fecha zero). Para citar sem fechar, o corpo declara
+  `Sem-fechamento: #NNN <motivo>` — é o que o guard `issue-fechamento` cobra.
 - **UI e API andam juntas.** Capacidade na API sem controle correspondente na tela é feature
   invisível. Se não merece UI, não deve existir na API.
-- **Doc no mesmo PR.** Mudou a app → os docs da app.
-- **Telas usam os primitivos de UI** — ver S3.
+- **Doc no mesmo PR.** Mudou o comportamento → mudou `docs/viabilidade/*.md`.
+- **Telas usam os primitivos `urbi-*`** — e **só as props que eles declaram**. Atributo inexistente
+  não dá erro: ele simplesmente não faz nada. Ver S3.
 - **Permissão usa `nivelApp`/`rolesApp`**, nunca `usuario.tipo`.
-- **Natureza (`humano`/`openclaw`) nunca segrega.** Regra que ramifica por natureza está no
-  eixo errado — o certo é `tipo`, permissão ou credencial.
-- **Nada de SQL manual como solução.** Correção de dados entra por migração, endpoint/UI de
-  admin ou código versionado.
-- **Identificador da app** é `snake_case` e é também o schema PostgreSQL — hífen, maiúscula ou
-  acento quebram o `CREATE SCHEMA`.
-- **`versao` do `manifesto.json`** é ordenada (`x.y.z`), e **`z` só bumpa com migração**.
+- **Natureza (`humano`/`openclaw`) nunca segrega.** Regra que ramifica por natureza está no eixo
+  errado — o certo é `tipo`, permissão ou credencial.
+- **Nada de SQL manual como solução.** Correção de dados entra por migração, endpoint/UI de admin ou
+  código versionado.
+
+**Deste repositório** (todas em `CLAUDE.md`, e todas já pagas ao menos uma vez)
+
+- **Aspas curvas em posição de atributo.** `variante=”alerta”` deixa o atributo **inerte** e
+  atravessa typecheck, testes e esbuild em verde. Aspas curvas em conteúdo de texto são tipografia
+  legítima e não são achado.
+- **`schema.json` e `manifesto.json` são JSON estrito.** Comentário `//` reprova o pacote na
+  instalação, antes de olhar qualquer tabela.
+- **Migração de app transforma dado, nunca schema**, e **seed fica fora de migração**.
+- **Retorno declarativo de migração (`remover_colunas`/`remover_tabelas`) é achado** — vira gate da
+  plataforma em 2026-08-23; o fluxo canônico usa `dados.limparColuna` e `dados.varrerTudo`.
+- **Precisão.** R$ e m² → `decimal(12,2)`; % digitado → inteiro; % calculado → `decimal(5,1)`. **Todo
+  valor monetário resultado de fórmula tem 2 casas decimais.** Representações derivadas não
+  monetárias (% e R$/m²) carregam precisão plena internamente e arredondam **só para exibir**.
+- **Tokens CSS do design system, nunca cor literal** — com **uma exceção real**: o CSS dos
+  documentos de impressão em `frontend/exportar.ts` roda em janela própria, onde `var(--cor-*)` não
+  resolve. Acusar isso é falso positivo.
+- **Todo job de CI declara `timeout-minutes`; todo `node --test` declara `--test-timeout`.** Sem o
+  primeiro, o default do GitHub é 6 horas e o job pendura em vez de ficar vermelho.
+- **O glob de teste precisa dos dois padrões** (`frontend/*.test.ts frontend/fixtures/*.test.ts`) —
+  o primeiro sozinho não alcança subdiretório, e teste que não roda é pior que teste que não existe.
+
+> ⚠️ **ADAPTADO — a regra da `versao`, e ela é o oposto da do upstream.**
+>
+> O upstream manda a `versao` do `manifesto.json` avançar "em todo release que altera `schema.json`,
+> traz migração **ou mexe em `shell_min`/`sdk_min`**". **Neste repositório isso está errado**, e a
+> regra vigente é a do `CLAUDE.md`:
+>
+> - **`z` só bumpa quando há migração nova.** A `versao` descreve o **schema**, não o código.
+> - **Subir `shell_min`/`sdk_min` NÃO bumpa a `versao`** — decisão da issue #422: "o piso existe
+>   para ser honesto, e nada de schema mudou".
+> - Mudança só de frontend/backend **mantém** a versão. Release de código se distribui pela tag com
+>   sha (`viabilidade-v<x.y.z>_<sha8>`), não por degrau de versão vazio.
+>
+> O guard de `versao` do `validar-backend.sh` barra os **dois** erros simétricos: migração nova sem
+> bump, e bump sem migração nova. **Portanto: acusar "faltou bumpar a versão" num PR que só sobe o
+> piso é achado inventado** — e seria um achado recorrente, em todo PR de piso, se esta nota não
+> existisse. Não "corrija" este box de volta para o texto do upstream.
 
 ## 6. Regras especiais
 
@@ -508,8 +465,10 @@ uma instância nova estruturalmente **diferente** de uma instância atualizada �
 silenciosa que só aparece muito depois.
 
 Consequência para a revisão: **DDL em migração de app é achado bloqueante.** O desfecho não é
-"reescreva a migração" — é abrir **issue no shell** para ampliar o vocabulário do `schema.json`
-e a capacidade do sincronizador, e o PR espera essa mudança. Diga isso no relatório com todas
+"reescreva a migração" — é **ampliar o vocabulário do `schema.json` e a capacidade do
+sincronizador**, do lado da plataforma, e o PR espera essa mudança. **ADAPTADO:** essa mudança vira
+texto pronto no relatório, para o autor levar ao shell; você não abre a issue (ver a nota da
+*Superfície de leitura*). Diga isso no relatório com todas
 as letras, inclusive que o vocabulário vem sendo enriquecido e que esses casos tendem a ficar
 mais raros.
 
@@ -548,33 +507,59 @@ Módulos que só usam `import type` (o tipo some no runtime) rodam direto no Nod
 na vida real roda antes dela — e a "prova" não prova nada. Reproduza sempre pelo ponto de
 entrada real.
 
+### O que você não conseguiu executar, você declara
+
+Suíte com casos pulados em silêncio relata `0 fail` igual a uma que rodou tudo, e CI verde não
+quer dizer testado. Quando não der para rodar, escreva a frase honesta e **atribua o número a
+quem mediu**: *"esse arquivo sai `skipped` nesta máquina; a execução verde é relato do autor,
+não medição minha"*. Herdar número alheio em silêncio é o mesmo laudo limpo falso que o motor
+combate na lente não executada.
+
 ## 7. Entrega
 
-<!-- ESPELHO: seção quase idêntica à homônima de `revisar-pr-shell`. Se alterar aqui, espelhe
-     lá. Recado de manutenção — não carregue a outra skill. -->
+**O relatório completo é um comentário no PR, sempre** — inclusive quando não houver nenhum
+achado, porque o comentário é o registro de que a revisão rodou e do que foi confrontado.
+**A sessão recebe só o resumo curto**, mais abaixo.
 
-**Um comentário no PR, sempre** — inclusive quando não houver nenhum achado, porque o
-comentário é o registro de que a revisão rodou e do que foi confrontado.
+Estrutura do comentário:
 
-Estrutura:
+- **ADAPTADO — primeiro, uma linha legível por máquina**, invisível para quem lê, no topo do corpo:
 
-- Achados ordenados do mais grave para o mais leve.
+  ```
+  <!-- revisao-viabilidade rodada=N head=<sha8> motor=codex|nativo bloqueantes=<n> contratos=ok|nao-executados -->
+  ```
+
+  É o que o job `revisao-registrada` do CI procura para saber que **houve revisão neste head**, e
+  o que torna `contratos=nao-executados` contável em vez de uma frase que ninguém lê. Ela vai no
+  **comentário**, nunca na descrição do PR — a API remove HTML da descrição, e a linha some sem
+  erro. Só isto sobreviveu do protocolo de duas sessões que este repo tinha antes; o resto
+  (máquina de estados, teto de rodadas, papéis) morreu com ele.
+- Uma linha de cabeçalho humana: `Revisão de app — rodada <N> · head <sha curto> · motor <Codex|nativo>`.
+  É por ela que a rodada seguinte se localiza, e o `<sha>` é o que você **de fato** revisou.
+- **Qual superfície de leitura foi usada**, logo no começo: bundle do SDK instalado (**com a
+  versão**, e se ela é a mais nova publicada) ou **nenhuma** — e então **quais** lentes de contrato
+  não rodaram e **o que ficou descoberto**. Quem lê precisa saber contra qual contrato o "passou"
+  foi conferido: um achado ausente pode significar "não existe" ou "não havia contrato para ler".
+  **ADAPTADO:** neste repositório o caso normal é "nenhuma"; e quando o motor for nativo, diga
+  também, em uma linha, que revisão nativa de patch escrito pela mesma família de modelo é **menos
+  adversarial**.
+- Achados ordenados do mais grave para o mais leve, em **três blocos distintos** — **ADAPTADO:**
+  o upstream tem dois, e o terceiro foi salvo da geração anterior deste repo, porque a §9 depende
+  do conceito e não o previa como bloco:
+  1. **Bloqueante** — segura o ciclo. Consertar, ou derrubar com evidência.
+  2. **Observação** — não segura o ciclo.
+  3. **Decisão de desenho** — não é defeito nem opinião: é escolha que **não cabe a você nem a
+     quem escreveu o código**. Encerra o ciclo e devolve ao autor com a **pergunta formulada**,
+     não com um veredito.
 - Cada um com `arquivo:linha`, a citação **literal** do contrato ou da regra, e — opcional —
   o desfecho proposto. Contrato parafraseado não serve: quem lê precisa comparar as duas
   coisas sem reabrir o doc.
-- **Bloqueante separado de observação**, em blocos distintos.
+- A partir da rodada 2, **o placar dos achados anteriores**: consertado, ainda aberto, ou
+  **retirado** (com o motivo). É o que sustenta o critério de conclusão da § 9.
 - No fim, o que foi confrontado e passou — **no máximo 10 itens, uma linha cada**. É registro
-  do que a revisão cobriu, não um segundo relatório: acima disso ele compete com os achados
-  pela atenção de quem lê. Sobrando mais, mantenha o que alguém poderia duvidar que foi
-  conferido e descarte o resto.
-- **Qual superfície de leitura foi usada**, logo no começo: bundle do SDK instalado (**com a
-  versão**, e se ela é a mais nova publicada), nenhuma (e então quais lentes de contrato não
-  rodaram), ou — só para app bundled — `docs/shell/` do monorepo. Quem lê precisa saber contra
-  qual contrato o "passou" foi conferido, e a versão do SDK é parte da resposta: um achado
-  ausente pode significar "não existe" ou "o bundle é velho demais para ver".
+  do que a revisão cobriu, não um segundo relatório.
 - **Um quadro de execução, obrigatório**, fechando o comentário: uma linha por lente, com
-  motor, tier, esforço, duração e veredito. É o que permite comparar duas revisões do mesmo PR
-  e descobrir, depois, que um achado escapou porque aquela faixa rodou rasa.
+  motor, tier, esforço, duração e veredito.
 
   | Lente | Motor | Tier | Esforço | Duração | Veredito |
   |---|---|---|---|---|---|
@@ -586,8 +571,7 @@ Estrutura:
   estourado, saída inválida. Sumir do relatório é pior que aparecer como falha: quem lê presume
   cobertura que não houve.
 
-Nunca use "approve" nem "request changes" do GitHub — comentário normal. Quem decide o estado
-do PR é o usuário.
+Nunca use "approve" nem "request changes" do GitHub — comentário normal.
 
 Rodapé obrigatório:
 
@@ -596,219 +580,196 @@ Rodapé obrigatório:
 _Generated by [Claude Code](https://claude.ai/code)_
 ```
 
-Na sessão, devolva **só o resumo**, com o timestamp de fechamento para comparar com o do
-início, seguido do **mesmo quadro de execução** que foi para o comentário:
+### A saída na sessão é curta — e é só isso
+
+O relatório é o comentário. Na sessão vai **uma lista de achados por severidade, uma frase
+curta cada**, e nada mais:
 
 ```
-Concluído às <timestamp> (início <timestamp>, <duração total>). Relatório em <link>.
-2 achados bloqueantes e 5 menores. <N> de <M> lentes executadas.
+PR #<n> · rodada <N> · <link do comentário>
+
+Bloqueantes (2)
+1. migracoes/003.sql:12 — DDL em migração de app; instância nova nasce diferente.
+2. manifesto.json:4 — `sdk_min` acima da maior versão publicada do SDK.
+
+Observações (3)
+1. ...
+
+10/11 lentes (S3 não executada: timeout). Detalhe qualquer achado se quiser.
 ```
 
-Ou, quando a triagem para:
+**Não repita o relatório na sessão.** Nada de citação literal, quadro de execução, raciocínio
+ou lista do que passou — tudo isso está no PR, e quem quiser detalhe pede. Rodada limpa é uma
+linha: `PR #<n> · rodada <N> · sem bloqueantes · <link>`.
+
+Quando a triagem para:
 
 ```
-Parado às <timestamp>. O PR já tem revisão de <data> sem resposta e sem commits depois
-(<link>). Revisar de novo só com pedido expresso.
+Parado. O PR já tem revisão de <data> sem resposta e sem commits depois (<link>).
+Revisar de novo só com pedido expresso.
 ```
 
-## 8. Proibições
+## 8. Rodada seguinte — depois do conserto
 
-<!-- ESPELHO: seção quase idêntica à homônima de `revisar-pr-shell`. Se alterar aqui, espelhe
-     lá. Recado de manutenção — não carregue a outra skill. -->
+A revisão não acaba no primeiro relatório: **cada conserto reabre a revisão**, e o ciclo só
+fecha pela § 9. Quem consertou pode ser o usuário, outra sessão, ou esta mesma sessão fora
+desta skill — para a rodada, tanto faz: o que existe é commit novo sobre um PR que já tem
+relatório.
 
-- **Sem commit, sem push, sem abrir PR, sem empurrar correção.**
+Os passos 1 a 7 valem inteiros em toda rodada. O que muda é a calibragem — **o padrão é
+decair**, e rodada 2 rodando a skill inteira por reflexo é o modo caro de errar:
+
+| Delta desde a rodada anterior | Ação |
+|---|---|
+| Escopado aos achados, fora dos caminhos de runtime que a rodada anterior confrontou | conferência de delta, **sem fan-out** |
+| Toca caminho que a rodada anterior confrontou-e-passou | fan-out reduzido: as lentes daquele caminho, mais S2 |
+| Mudança estrutural, ou mexeu em SDK, lockfile ou `sdk_min` | skill inteira, esforço recalibrado e **superfície reconferida** |
+
+Anuncie a escolha e o motivo em uma linha, como no passo 2.1, e repita o motivo no relatório —
+inclusive quando não houve fan-out: o **quadro de execução da § 7 continua obrigatório**, ainda
+que com uma linha só. Rodada sem quadro lê-se como rodada sem registro.
+
+### O histórico entre rodadas não se reescreve
+
+> **ADAPTADO — regra salva da geração anterior**, que a reescrita do upstream deixou cair. Ela
+> valia para o modelo de duas sessões, mas **não era dele**: vale para qualquer revisão em rodadas.
+
+**Ninguém reescreve histórico enquanto o ciclo está aberto — sem `--force`, sem rebase, sem squash
+intermediário, sem amend de commit já empurrado.** Toda a §8 acima raciocina por **delta desde a
+rodada anterior**, e o delta é calculado por SHA: reescrever apaga o chão em que o revisor pisou. O
+placar dos achados anteriores passa a apontar para commits que não existem mais, e o decaimento de
+esforço — que é o que impede o ciclo de ficar caro — vira decaimento sobre nada.
+
+Precisa incorporar a `main`? **Mergeie para dentro** (`git merge origin/main`), que preserva os SHAs
+já revisados. Numa branch que só você tem e **antes** de abrir o ciclo, a convenção do repositório
+vale normalmente — o que a regra protege é a janela entre a primeira rodada e o encerramento.
+
+O mesmo motivo sustenta a outra metade: **não empurre com uma rodada em voo.** O revisor releu o
+HEAD para postar; se ele se move no meio, o relatório nasce falando de código que já não está lá.
+
+### Releia o HEAD imediatamente antes de postar
+
+Já aconteceu: relatório publicado sobre um HEAD que tinha acabado de mover, com o único achado
+já corrigido. Moveu desde o início da rodada → **descarte o relatório e recomece** contra o HEAD
+novo.
+
+### A independência se perde — recompre-a
+
+Sua sessão tem memória, e memória ancora: a tendência é conferir "os meus achados saíram?" e
+parar. **O defeito da rodada N costuma ser filho do conserto da rodada N−1.** Pior ainda quando
+a mesma sessão consertou: aí ela revisa o próprio patch.
+
+Duas consequências, e as duas são obrigatórias:
+
+1. A rodada começa pelo lado **adversarial do conserto**, não pela conferência dele: os commits
+   novos entram como código fresco, olhados por lentes **novas**, que não viram a rodada
+   anterior.
+2. **Releia o que você mesmo declarou "confrontado e passou"** na rodada anterior, se o conserto
+   encostou naquilo. É a lista de coisas que ninguém mais vai checar.
+
+### Contestação é conferida, não descontada
+
+Quando alguém contesta um achado com evidência — comentário no PR, ou a própria sessão ao
+consertar —, **abra o arquivo e confira**. Achado seu que morre na contestação é desfecho
+certo: registre "**achado retirado**", com o motivo, no relatório da rodada, e ele sai da
+conta de bloqueantes pendentes. Insistir num achado já derrubado queima rodada.
+
+## 9. Conclusão do ciclo — e merge só se autorizado
+
+**O critério é um só: nenhum bloqueante pendente.** Pendente é o bloqueante que não foi
+consertado nem retirado. Observação não segura ciclo; ela vira registro no PR e o usuário
+decide. Zerou, diga na sessão em uma linha que o PR está pronto e **pare**.
+
+O ciclo também termina, antes disso, em dois casos — e nos dois você **diz qual é a pergunta**
+que o usuário precisa responder, em vez de deixar "aguardando decisão" solto:
+
+- **Decisão de desenho:** o conserto mexeria em algo que o usuário decidiu. Use com parcimônia
+  — usado à toa, vira jeito de terceirizar julgamento que era seu.
+- **Achado que não converge:** a mesma faixa volta rodada após rodada. Pare, diga o que está
+  girando e devolva ao usuário. Numa app isso inclui o caso em que o desfecho depende de issue
+  no shell: o PR não fecha sozinho, e insistir só gasta rodada.
+
+### Merge
+
+**Só com autorização expressa nesta chamada.** "Pode mergear no final", "se ficar limpo,
+mergeia" autorizam. **Não** autorizam: silêncio, "toca até o fim", "resolve isso pra mim",
+autorização dada em tarefa anterior, ou o fato de a própria revisão ter ficado limpa. **Na
+dúvida, não está autorizado** — e não peça a autorização agora nem sugira que o usuário
+autorize: encerre com o PR pronto e parado, que é o desfecho normal.
+
+Com autorização, confira o portão item por item antes de mergear:
+
+- zero bloqueantes pendentes e nenhuma decisão de desenho aberta;
+- **o histórico não foi reescrito durante o ciclo** (§8) — se foi, o placar das rodadas anteriores
+  não vale, e a revisão recomeça do zero em vez de mergear;
+- **CI verde no SHA final, lido pela API** — não no SHA que você revisou, se ele mudou;
+- suíte executada com os pulados declarados (§ 6);
+- `Closes #<n>` **em inglês** no corpo do PR, repetido por issue e na forma completa quando a
+  issue é de outro repositório;
+- doc da app no mesmo PR, quando o comportamento mudou;
+- **ADAPTADO — `versao` do `manifesto.json` coerente com a regra DESTE repo** (§ 5): bumpou **se e
+  só se** há migração nova. PR que só sobe `shell_min`/`sdk_min`, ou que só mexe em
+  frontend/backend, **mantém** a versão — cobrar bump ali é barrar por achado inventado;
+- **ADAPTADO — os itens de validação do `CLAUDE.md` § Merge**, que o upstream não tem:
+  `scripts/validar-frontend.sh` verde; `scripts/validar-backend.sh` verde **se** o PR tocou
+  backend, `schema.json` ou migração; diff **não vazio**; migração numerada contra a `main` do
+  momento; pré-requisitos já na `main`.
+  > ⚠️ E o que fazer quando um desses não puder rodar aqui — `validar-backend.sh` aborta no portão
+  > do SDK neste ambiente: **declare "não executado" com o motivo e não mergeie por conta própria**.
+  > "Não deu para rodar" nunca é "passou"; é item do portão falhando, e o desfecho é devolver ao
+  > autor, que tem o ambiente autenticado.
+
+Qualquer item falhando, **não mergeie** — encerre e diga qual item barrou. Depois de mergear,
+**confira que a issue realmente fechou**: `Fecha #123` não fecha nada, `Closes #1, #2` fecha só
+a #1, e keyword no título não vale. Não fechou, feche na mão e registre o motivo.
+
+## 10. Proibições
+
+- **Sem commit, sem push, sem abrir PR, sem empurrar correção** por dentro desta skill.
+- **Sem merge sem autorização expressa** (§ 9). Revisão limpa não é autorização.
 - **Proibido tocar qualquer rota de API de qualquer instância** — produção, homologação,
   desenvolvimento local, qualquer uma. Nem para diagnóstico, nem para caso negativo de teste,
   nem "só um GET". **O revisor trabalha sobre superfície fria: código e documentação.**
-  Instância quente é assunto do validador, não deste trabalho. Essa proibição vai cravada no
-  briefing de **cada** agente — agente com shell e rede acha natural "testar o endpoint", e
-  nenhum arquivo de convenção do repositório viaja no prompt dele.
+  Instância quente é assunto da skill `qa`. Essa proibição vai cravada no briefing de **cada**
+  agente — agente com shell e rede acha natural "testar o endpoint", e nenhum arquivo de
+  convenção do repositório viaja no prompt dele.
+- **ADAPTADO — `urbiverso/urbiverso` é só leitura, e nem isso durante a revisão.** O monorepo
+  está clonado nesta máquina, em `/home/user/urbiverso`, e é **gravável** — o upstream podia
+  supor que não estava; aqui não dá. Então, nesta ordem de dureza:
+  - **proibido escrever nele em qualquer hipótese** — editar arquivo, commitar, fazer push,
+    abrir issue ou PR. Não existe autorização de sessão que destrave isso;
+  - **proibido lê-lo como superfície de revisão**, ou para compensar a falta do bundle do SDK.
+    Contrato ausente do bundle **já é o achado**.
+
+  Consulta de referência pelo autor, fora de uma revisão, continua legítima — é para isso que ele
+  está aqui. Ver `CLAUDE.md` § "O monorepo `urbiverso/urbiverso` é só leitura".
+- **Sem `AskUserQuestion`** — bugada nesta instalação; pergunta vai em texto corrido.
+- **Sem editar, esconder ou resolver comentário de outra sessão.** O histórico é o registro.
 - A branch principal é só para puxar. Se precisar de árvore própria, use worktree — nunca duas
   sessões na mesma árvore de trabalho.
 
-## 9. Operação
+## 11. Operação
 
-<!-- ESPELHO: seção quase idêntica à homônima de `revisar-pr-shell`. Se alterar aqui, espelhe
-     lá. Recado de manutenção — não carregue a outra skill. -->
 
 Roda no modelo atual da sessão. **Delegue tudo que der** — o contexto do orquestrador é o
 recurso escasso.
 
-**Escolha o modelo de cada lente pela natureza da tarefa, e passe `model` explicitamente.**
-Sem o parâmetro o subagente herda o modelo do orquestrador, que aqui é o caro — e a fan-out
-multiplica isso por lente e por rodada. Em subagente nativo o padrão é **`sonnet`**; sobe para
-**`opus`** nas faixas em que a tabela de tier do passo 2.2 manda `sol`; e `haiku` fica no papel
-de **transporte** — o invólucro do passo 2.2, rodar-e-relatar — **nunca numa lente**: lente
-caça defeito sem diagnóstico nenhum, e é por isso que o piso dela é `sonnet`. **Nunca `fable`
-num subagente** — tarefa delimitada não é assento dele. Nem capacidade em excesso (caro), nem
-insuficiente (perde achado). Varredura mecânica e leitura de doc com confronto
-ponto a ponto são bem servidas por um modelo intermediário; síntese e julgamento ficam com
-você. No motor externo isso é a tabela de tier do passo 2.2; em subagente nativo, vale o mesmo
-critério. Um orquestrador de menor capacidade **pode** escalar uma lente de maior capacidade,
-se o ambiente permitir.
+**A fan-out inteira vai para o motor do passo 2.2**, no tier que a tabela de lá manda. Subagente
+nativo fora do fallback só entra por exceção sua: uma refutação de bloqueante com outra cabeça.
 
 **Limite rígido de 350 a 450 palavras por agente.** Só achados; o que passou vira **uma**
 linha no fim. Sem esse limite o contexto do orquestrador estoura antes do relatório.
 
 Todo agente devolve **evidência, não veredito**: `arquivo:linha`, citação literal, e o
 raciocínio que liga uma coisa à outra. Nada de estilo, preferência, ou código que o diff não
-toca.
-
-**Agentes não postam.** Você recebe os relatórios, deduplica e escreve o comentário.
+toca. **Agentes não postam.** Você recebe os relatórios, deduplica e escreve o comentário.
 
 **Todo achado bloqueante é verificado por você antes de reportar.** Se for útil, peça
-refutação a um agente novo — mas isso é opção sua, caso a caso: achado que você já tem contexto
-para derrubar na hora não precisa de um agente para isso. Agentes já se contradisseram entre
-si, e achado próprio já morreu na verificação — que é o desfecho certo, não vergonha.
+refutação a um agente novo — mas isso é opção sua, caso a caso. Agentes já se contradisseram
+entre si, e achado próprio já morreu na verificação — que é o desfecho certo, não vergonha.
 
 **Toda citação que sustenta um bloqueante é reconferida por você, no arquivo, abrindo a linha.**
 Verificar o achado e verificar a citação são coisas diferentes, e a segunda não sai de graça
 com a primeira: um agente já apontou `arquivo:339` para uma frase que estava em OUTRO arquivo,
 na mesma linha. Confira o caminho, o número e o texto — se a citação não bate, o achado volta
 para investigação antes de virar bloqueante, mesmo que o raciocínio pareça de pé.
-
-## 10. Modo diálogo — quando o autor está esperando do outro lado
-
-<!-- ESPELHO: seção quase idêntica à homônima de `revisar-pr-shell`. Se alterar aqui, espelhe
-     lá. Recado de manutenção — não carregue a outra skill. -->
-
-Ativado quando o PR já carrega header do protocolo — tipicamente o comentário de abertura que a
-`acompanhar-revisao` posta antes de esperar —, ou quando o usuário disser que há uma sessão
-implementadora do outro lado. Fora disso, nada nesta seção se aplica.
-
-**`sem diálogo` na chamada desliga**, e manda mais que a detecção: o usuário pode querer uma
-revisão só, ou conduzir o resto na mão. Aí a skill roda como sempre e encerra no relatório.
-
-Nesse caso, **se houver abertura no PR**, você não pode simplesmente sumir: a implementadora
-responderia e ficaria esperando uma rodada 2 que ninguém vai escrever. Carimbe `dialogo=nao` no
-header e diga no texto que não haverá rodada seguinte. Uma linha resolve; a ausência dela deixa
-uma sessão pendurada até o container morrer.
-
-**Leia `.claude/protocolo-revisao-pr.md`** — na árvore `.claude/` de onde **esta skill** foi
-carregada, não no clone da app na scratchpad. Ele define o header de máquina, a contagem de
-rodadas, a regra do SHA e o encerramento. Não achou, **PARE e diga**.
-
-O protocolo é o único arquivo do ciclo que a superfície de leitura da app **não** governa: ele
-não é contrato de plataforma nem doc de framework, é o formato dos comentários deste PR. Lê-lo
-não fere a regra de não ler o monorepo.
-
-A revisão em si não muda: os passos 1 a 9 valem inteiros, em toda rodada — inclusive a
-declaração de qual superfície foi usada, que se repete a cada relatório. O que muda é o começo,
-o fim, e a calibragem das rodadas seguintes.
-
-### A triagem da § 1 inverte de sentido
-
-"Revisão anterior intocada → **PARE**" existe para não revisar duas vezes o mesmo código por
-disparo em duplicidade. No diálogo, revisão intocada é o **estado normal de quem está
-esperando**: vira "continue aguardando", nunca "encerre a sessão". Quem encerra o ciclo é o
-implementador, com `veredito=encerrado` ou `merged`.
-
-### Releia o HEAD imediatamente antes de postar
-
-Já aconteceu: relatório publicado sobre um HEAD que tinha acabado de mover, com o único achado
-já corrigido. Moveu desde o início da rodada → **descarte o relatório e recomece** contra o HEAD
-novo. O `head=` do seu header é o SHA que você **de fato** revisou, e é por ele que o
-implementador confere se a rodada olhou o código dele.
-
-Numa árvore clonada só para a revisão, isso quer dizer buscar de novo (`git fetch`) antes de
-postar — o clone da scratchpad não se atualiza sozinho.
-
-### Depois de postar, inscreva-se e espere
-
-`subscribe_pr_activity` quando existir; senão `Monitor` persistente com poll dos comentários.
-**Nunca `sleep`.** Descarte o evento que ecoa o seu próprio comentário — distinga pelo `papel=`.
-Passou muito tempo sem sinal, consulte os comentários direto: webhook é best-effort.
-
-### A profundidade de cada rodada — decaimento
-
-O julgamento é seu, mas o padrão é decair. Rodada 2 rodando a skill inteira por reflexo é o modo
-caro de errar:
-
-| Delta desde a rodada anterior | Ação |
-|---|---|
-| Escopado aos achados, fora dos caminhos de runtime que a rodada anterior confrontou | conferência de delta, **sem fan-out** |
-| Toca caminho que a rodada anterior confrontou-e-passou | fan-out reduzido: as lentes daquele caminho, mais S2 |
-| Mudança estrutural, ou achado novo de classe (a) | skill inteira, esforço recalibrado pelo passo 2.1 |
-
-Anuncie a escolha e o motivo em uma linha, como no passo 2.1, e repita o motivo no relatório —
-inclusive quando não houve fan-out: o **quadro de execução da § 7 continua obrigatório**, ainda
-que com uma linha só (`leitura direta + execução de testes | nativo (sessão) | — | ~6min | 0
-achados novos`). Rodada sem quadro lê-se como rodada sem registro.
-
-**Diga, no fim de cada relatório, o que a próxima rodada vai ser.** "Fechadas essas três,
-recomendo o merge sem outra rodada de lentes — confiro o diff e sigo" custa uma frase e deixa o
-outro lado calibrar o conserto.
-
-### O que você não conseguiu executar, você declara
-
-Suíte de app pode não rodar na árvore da revisão — sem `node_modules`, sem Postgres, sem
-credencial do registry —, e teste que **pula** relata `0 fail` igual a teste que passou. O viés é
-duplo: o PR parece testado porque está verde, e o número do autor parece medido porque tem três
-dígitos.
-
-Quando der para rodar e o PR mexer em caminho de runtime, **rode você**. Quando não der, escreva
-a frase honesta e **atribua o número a quem mediu**: *"esse arquivo sai `skipped` nesta máquina;
-a execução verde é relato do autor, não medição minha"*. Herdar número alheio em silêncio é o
-mesmo laudo limpo falso que a § 2.2 combate na lente não executada.
-
-**Mexeu no SDK instalado** — `package.json`, lockfile, `sdk_min` do manifesto —, a rodada volta
-a ser inteira, e a superfície de leitura é reconferida do zero. O conserto de um achado de
-contrato pode mudar a versão do bundle contra o qual todos os outros foram avaliados.
-
-### A independência se perde — recompre-a
-
-Sua sessão agora tem memória, e memória ancora: a tendência é conferir "os meus achados
-saíram?" e parar. **O defeito da rodada N costuma ser filho do conserto da rodada N−1** — já
-aconteceu, e o único achado de uma rodada 2 foi exatamente isso, num item que a rodada 1 tinha
-conferido como verde.
-
-Duas consequências, e as duas são obrigatórias:
-
-1. A rodada começa pelo lado **adversarial do conserto**, não pela conferência dele: os commits
-   novos entram como código fresco, olhados por subagentes **novos**, que não viram a rodada
-   anterior. É barato e é o que restaura a independência que a sessão perdeu.
-2. **Releia o que você mesmo declarou "confrontado e passou"** na rodada anterior, se o conserto
-   encostou naquilo. É a lista de coisas que ninguém mais vai checar.
-
-### Contestação do implementador é conferida, não descontada
-
-Quando ele contesta um achado com evidência, **abra o arquivo e confira**. Achado seu que morre
-na contestação é desfecho certo — registre "**achado retirado**", com o motivo, no relatório da
-rodada. Insistir num achado derrubado queima rodada do teto, e o teto é de quem implementa.
-
-Vale em dobro para achado de classe (c) — contrato ausente do bundle. Se o implementador mostrar
-que o verbo **está** publicado numa versão que a app pode alcançar, o achado muda de natureza:
-vira "suba o SDK", não "abra issue no shell".
-
-### Três severidades, não duas
-
-No diálogo, a § 7 ganha um terceiro bloco além de bloqueante e observação: **decisão de
-desenho** — achado cujo conserto mexe em algo que o usuário decidiu. Ele não é para o
-implementador resolver: um achado ali **encerra o ciclo** e devolve a decisão ao usuário. Use
-com parcimônia; usado à toa, vira um jeito de terceirizar julgamento que era seu.
-
-**O sinal que a outra sessão lê é o `veredito` do header, não o título do bloco.** Escreva os
-blocos em português natural, como sempre — "Bloqueante" no singular quando é um, "Bloqueantes"
-quando são vários. Havendo mais de uma severidade, o veredito segue a precedência
-`decisao-de-desenho` › `bloqueado` › `observacoes` › `merge-recomendado`.
-
-Dívida de superfície (classe **(c)**) é candidata natural a esse carimbo quando o desfecho é
-esperar mudança no shell: o ciclo não tem como convergir esperando por outro repositório.
-
-### Recomendar merge — e nunca mergear
-
-`veredito=merge-recomendado` quando a revisão já cumpriu o papel. É **recomendação**: a sessão
-implementadora não mergeia sem autorização expressa do usuário, e você não mergeia nunca, em
-hipótese nenhuma. A § 8 continua valendo inteira.
-
-Na última rodada do teto, **diga se o que você está abrindo é regressão de conserto ou achado
-inédito**. Inédito tão tarde significa que a rodada 1 não cumpriu o papel, e é informação que
-vale mais para o usuário do que para o ciclo.
-
-### O fim
-
-Leu `veredito=encerrado` (qualquer motivo) ou `veredito=merged` → o trabalho acabou. Derrube
-tudo que você armou — `unsubscribe_pr_activity`, `TaskStop` do monitor, gatilhos, worktree e
-clone da scratchpad — e devolva à sessão o placar do ciclo: rodadas, achados por rodada,
-retirados, e como terminou. **Sessão revisora inscrita num PR encerrado acorda com cada evento
-do GitHub até o container morrer.**

@@ -201,30 +201,124 @@ numerada contra a `main` do momento, com a `versao` bumpada.
 > branch → push e se deixa ao autor o link
 > `https://github.com/<owner>/<repo>/pull/new/<branch>`.
 
-### Revisão de PR em diálogo
+### Processo obrigatório de trabalho
 
-Este repo tem, em `.claude/`, o mesmo mecanismo de revisão em diálogo do monorepo
-`urbiverso/urbiverso` — portado de lá em 2026-08-18, porque uma sessão trabalhando só neste
-repo não enxerga o `.claude/` do monorepo (ver `urbiverso/CLAUDE.md` § "Sessão de app não
-enxerga o monorepo"). Duas sessões conversam pelos comentários do PR até convergir:
+> **Todo pedido de trabalho neste repositório passa por: branch → PR → revisão → rodadas → merge
+> só com autorização do autor.** Não é modo opcional para pedido grande. **Pedido de uma linha
+> também abre branch e PR.**
 
-- **Sessão implementadora** (`.claude/skills/acompanhar-revisao/`): escreveu o código, abre o
-  PR, invoca a skill `acompanhar-revisao`, e fica respondendo ao revisor em rodadas — teto
-  padrão de **3**, parametrizável na chamada.
-- **Sessão revisora** (`.claude/skills/revisar-pr-apps/`): outra sessão (Claude ou Codex),
-  aponta para o mesmo PR e invoca `revisar-pr-apps`. Publica o relatório como comentário; usa o
-  bundle publicado do `@urbiverso/sdk` como superfície de contrato, nunca o monorepo.
-- O protocolo de comentários (header de máquina, contagem de rodadas, regra do SHA, portão de
-  merge) está em `.claude/protocolo-revisao-pr.md`. As duas skills exigem esse arquivo antes de
-  agir — não o edite sem entender o impacto nas duas.
+1. **Branch própria, criada de `origin/main`** — `main` é só para puxar (ver § Sessões paralelas).
+   Logo depois de criar, `git branch --unset-upstream`: branch criada com `checkout -B <nome>
+   origin/main` rastreia a **`main`**, e aí um `git push` pelado empurra para lá. Confira com
+   `git rev-parse --abbrev-ref @{u}`; se responder `origin/main`, a armadilha está armada.
+2. **Implementar e validar** com o script que couber (§ Validação): `validar-frontend.sh` sempre,
+   `validar-backend.sh` se tocou backend, `schema.json` ou migração.
+3. **Commit + `git push -u origin <branch>`** — sempre com o nome explícito, nunca `git push` pelado.
+4. **Abrir o PR pelas ferramentas MCP do GitHub** (o `gh` não existe aqui — ver a nota de ambiente
+   da § Merge), com o template preenchido e `Closes #NNN` **em inglês** quando houver issue.
+5. **Revisar, na mesma sessão**, invocando a skill **`revisar-pr-apps`**. Ela publica o relatório
+   completo como comentário no PR e devolve à conversa só o resumo por severidade.
+6. **Consertar e abrir rodada nova**, com lentes novas sobre o conserto. **O ciclo fecha quando não
+   há bloqueante pendente** — consertado, ou retirado por contestação com evidência. Não há teto de
+   rodadas; o que impede o loop caro é o decaimento de esforço da §8 da skill.
+7. **Parar.** O PR fica pronto e parado. Merge é decisão do autor — ver § Merge, que não mudou.
 
-**Merge nunca é automático nesse ciclo** — mesma regra da seção acima: só o usuário autoriza,
-e só para aquela chamada. `revisar-pr-shell` **não** foi portado — é exclusivo de PR no
-monorepo `urbiverso/urbiverso`, que não é este repositório.
+**Não viu a linha `[processo]` no começo da sessão?** Então o hook `SessionStart` não rodou, e nem
+o lembrete nem o aviso de branch estão te protegendo. Avise o autor em vez de seguir: hook que não
+roda não imprime nada, e "não imprimiu" é indistinguível de "está tudo normal".
 
-**Cópia, não link vivo.** Os três arquivos são cópia do que existia em `urbiverso/urbiverso` na
-data acima. Se o protocolo ou as skills mudarem lá, alguém precisa portar a mudança para cá
-manualmente — nada aqui sincroniza sozinho.
+#### As peças, e o que cada uma garante
+
+| Peça | Onde | Garante | **Não** garante |
+|---|---|---|---|
+| Esta seção | `CLAUDE.md` | Entra no contexto de toda sessão | Obediência — e enfraquece depois de compactação |
+| `preparar-sessao.sh` | hook `SessionStart` | Põe no contexto **fatos medidos**: branch, sujeira da árvore, motor de revisão | Não roda no meio do turno |
+| `lembrete-processo.sh` | hook `UserPromptSubmit` | Reinjeta o estado a cada prompt — é o que sobrevive à compactação | Não bloqueia nada (e não deve: exit ≠0 ali trava o prompt do usuário) |
+| `guarda-monorepo.sh` | hook `PreToolUse` | **Bloqueio real** de escrita no monorepo, inclusive por MCP | Não é sandbox |
+| `guard-processo.mjs` | CI (`processo-integro`) | Que a rede acima não seja desmontada em silêncio | Não valida a semântica dos hooks |
+| `revisao-registrada` | CI + commit status | Que "houve revisão neste head, com zero bloqueantes" seja um fato **greppável**, invalidado a cada push | **É autoatestação** — confere forma, não substância. E só vira portão com branch protection |
+
+Nenhuma delas força uma revisão a ser **boa**. O que elas compram é que o caminho preguiçoso deixe
+de ser o fácil, e que a ausência de revisão seja **visível** em vez de calada.
+
+#### A revisão em si
+
+`.claude/skills/revisar-pr-apps/SKILL.md` é o revisor; `.claude/motor-revisao.md` é o motor da
+fan-out. Os dois são **cópia** de `urbiverso/urbiverso` @ `b0361f6` (PR #2540), portados em
+2026-08-18 e **substituídos pela geração nova em 2026-08-21**.
+
+**O que foi apagado, e por quê** — para a próxima sessão não reportar como "faltando":
+`protocolo-revisao-pr.md` e `skills/acompanhar-revisao/` implementavam revisão em **diálogo entre
+duas sessões**, com header de máquina e teto de 3 rodadas. O upstream apagou esse modelo ("era o
+contorno para despachar revisão a agentes de outro provedor de outra máquina, e o contorno morreu
+quando a mesma sessão passou a conseguir isso sozinha"), e a cópia daqui estava **morta**: procurava
+um plugin do Codex inexistente e, não achando, **parava para perguntar** — invocá-la produzia uma
+pergunta, nunca uma revisão. O guard `processo-integro` barra a volta dos dois arquivos.
+
+**Duas sessões continuam permitidas** quando você quiser independência de verdade: aponte outra
+sessão para o mesmo PR e mande revisar. A **gramática compartilhada** que sobrou do protocolo antigo
+é a linha de máquina no topo de todo relatório — `rodada`, `head`, `motor`, `bloqueantes`,
+`contratos` —, e ela basta para a segunda sessão se localizar sem inventar formato próprio. O que
+morreu junto com o protocolo foi o que só o modelo de duas sessões precisava: papéis, teto de
+rodadas e encerramento obrigatório. Este último não faz falta porque a sessão revisora não se
+inscreve em nada — ela revisa quando chamada e termina. Vale saber por que isso às vezes importa: **com uma sessão só, quem revisa
+é quem escreveu** — a §8 da skill compensa com lentes novas a cada rodada, mas não é a mesma coisa.
+
+**O motor é Codex quando dá, nativo quando não** — e a queda é **declarada**, nunca silenciosa. Hoje
+é nativo: falta `OPENAI_API_KEY` nas variáveis do *cloud environment*. O CLI o preflight instala
+sozinho; só a chave é do autor. Enquanto for nativo, o relatório diz em uma linha que revisão nativa
+de patch escrito pela mesma família de modelo é **menos adversarial**.
+
+**A camada de contratos não roda neste ambiente, e isso é estrutural.** Ela lê
+`node_modules/@urbiverso/sdk/docs/`, e aqui **tanto o `pnpm install` quanto o `npm view
+@urbiverso/sdk` dão 401** — o SDK é GitHub Packages privado. Toda revisão vai trazer
+`contratos=nao-executados`. ⚠️ **Isso vira papel de parede se ninguém cobrar o que ficou
+descoberto:** props de primitivo `urbi-*`, verbos do SDK, e a aderência de `shell_min`/`sdk_min` ao
+que está **publicado** — esta última nem verificável daqui.
+
+**Cópia, não link vivo.** Mudou no monorepo, alguém porta para cá à mão — nada sincroniza sozinho.
+As adaptações deste repo estão marcadas `ADAPTADO` nos dois arquivos, **com o motivo ao lado**. Não
+as "corrija" de volta. A maior delas: a skill do upstream manda bumpar a `versao` do `manifesto.json`
+quando o PR mexe em `shell_min`/`sdk_min`; **aqui é o contrário** (§ Versão do manifesto, decisão da
+issue #422), e sem essa correção o revisor acusaria bloqueante inventado em todo PR que sobe piso.
+
+### O monorepo `urbiverso/urbiverso` é só leitura
+
+**É proibido editar, commitar, empurrar, abrir issue ou abrir PR em `urbiverso/urbiverso`.** Ele é
+**referência**: como o app roda no ambiente da plataforma, props de primitivo `urbi-*`, docs do
+shell. Ler é o uso legítimo e continua livre.
+
+A regra precisa estar escrita porque o pressuposto que a protegia é **falso nesta máquina**: as
+skills portadas supunham que o monorepo simplesmente não estaria aqui (é o que
+`urbiverso/CLAUDE.md` § "Sessão de app não enxerga o monorepo" prescreve), mas ele **está clonado em
+`/home/user/urbiverso` e é gravável**.
+
+Duas camadas defendem isso, redundantes de propósito — `permissions.deny` não alcança `Bash` nem
+ferramenta MCP (ele casa **nome** de ferramenta, não argumento), e falha **calada** se o padrão de
+caminho não casar:
+
+| Camada | Cobre |
+|---|---|
+| `permissions.deny` em `.claude/settings.json` | `Write`/`Edit`/`NotebookEdit` sob `/home/user/urbiverso` |
+| `.claude/guarda-monorepo.sh` (`PreToolUse`) | o mesmo, **mais** `Bash` com verbo de escrita, `cwd` dentro do monorepo, e **`mcp__github__*` com `owner=urbiverso`** |
+
+> ⚠️ **A barra dupla de `Write(//home/user/urbiverso/**)` não é erro de digitação.** É a sintaxe de
+> **caminho absoluto** em regra de permissão; com barra simples o caminho é lido como relativo ao
+> projeto e a regra **deixa de casar, sem avisar**. Não "corrija" para uma barra só. E confira com
+> `/permissions` que ela aparece **parseada** — regra de deny que não casa falha calada, que é
+> exatamente por que o hook cobre o mesmo caso.
+
+A bateria `scripts/testar-guarda-monorepo.sh` (46 casos, roda no CI) cobre os dois sentidos: falso
+negativo deixa a escrita passar; **falso positivo atrapalha trabalho legítimo, alguém desliga o
+hook, e aí ele não guarda mais nada.**
+
+> **Nenhuma das duas é sandbox.** `cd` + caminho relativo, symlink ou script intermediário passam.
+> Elas guardam a sessão distraída, não a determinada. A defesa hermética seria **não anexar o
+> monorepo a estas sessões** — decisão do autor, e o que o próprio `urbiverso/CLAUDE.md` prescreve.
+
+**E quando a mudança pertence mesmo à plataforma?** Descreva-a — no relatório de revisão ou numa
+issue **deste** repositório — com o texto pronto que o autor levaria: o que falta, por que a app não
+consegue contornar, e o que ela precisaria. Quem transporta isso para o monorepo é ele.
 
 ---
 
@@ -313,10 +407,23 @@ bash scripts/validar-backend.sh
 ```
 
 Ele roda **guard de JSON estrito (etapa 0/5, antes do portão do SDK) + typecheck do backend +
-testes de lógica pura das rotas + harness de migrações + guard de `versao`**. Funciona aqui porque:
+testes de lógica pura das rotas + harness de migrações + guard de `versao`**.
 
-- o `@urbiverso/sdk` **já está** em `node_modules/@urbiverso/sdk` com o `dist/index.d.ts` — o que
-  falha com 401 é *reinstalar* o pacote, e o typecheck só precisa dos tipos, que estão no disco;
+> 🔴 **Esta seção descrevia um estado que a sessão de nuvem não tem — corrigido em 2026-08-21.**
+> O texto dizia que "o `@urbiverso/sdk` **já está** em `node_modules/@urbiverso/sdk`". Numa sessão
+> nova o repositório é clonado do zero e **`node_modules/` não existe**, então o
+> `validar-backend.sh` **aborta na etapa 1/5**, no portão do SDK. Backend, `schema.json` e migração
+> **não têm typecheck aqui** — a validação deles é do autor, no ambiente autenticado, e o PR precisa
+> **declarar isso** em vez de deixar implícito. "Não deu para rodar" nunca é "passou".
+>
+> Pior: **`npm view @urbiverso/sdk` dá o mesmo `E401`**. Não dá nem para perguntar ao registry o que
+> está publicado — o que também derruba a camada de contratos da revisão (§ Processo obrigatório).
+>
+> O que **continua valendo** do texto original é a explicação de *por que ele funcionaria* com o
+> `node_modules` no disco:
+
+- o typecheck do backend só precisa dos **tipos** do SDK (`dist/index.d.ts`) — o que falha com 401 é
+  baixar o pacote, não usá-lo depois de baixado;
 - só `backend/rotas.ts` importa o SDK (`import '@urbiverso/sdk/express'`, augmentação de tipo);
   todo o resto do backend depende só do `express`, que é **público**;
 - os testes de backend importam apenas as **funções puras** dos módulos de rota — não sobem
@@ -327,9 +434,14 @@ contrato do módulo, instalação virgem, **reexecução** e a cadeia completa e
 barra os dois erros simétricos de versionamento: migração nova **sem** bump da `versao`, e bump
 **sem** migração nova.
 
-> ⚠️ O `dist/index.d.ts` do SDK é também a **fonte para conferir props de primitivo `urbi-*`**
+> ⚠️ O `dist/index.d.ts` do SDK é a **fonte canônica para conferir props de primitivo `urbi-*`**
 > antes de usar (`grep -n "declare class UrbiGraficoArea" -A 30`). Atributo ou elemento inexistente
 > **não dá erro, só não faz nada** — leia antes de presumir.
+>
+> **Sem `node_modules` no disco, essa fonte não existe.** A alternativa é ler
+> `ui/src/urbi-<nome>.ts` no monorepo (leitura é permitida — § O monorepo é só leitura), sabendo que
+> ele está em `main` e **à frente** do SDK publicado. Conferiu por ali, **diga no PR** que a fonte
+> foi o `main` e não o bundle: a prop pode existir lá e não na versão que a instância roda.
 
 **Continua sendo do autor, no ambiente autenticado:** `urbi-empacotar`, a sincronização de
 `schema.json` pelo SDK (uma migração pode passar aqui e mesmo assim citar coluna que o schema não
