@@ -1,0 +1,107 @@
+# Registro de revisão — o único mecanismo do processo que continua valendo DEPOIS
+# que a sessão acaba.
+#
+# O que ele faz: procura, entre os comentários do PR, a linha de máquina que a
+# skill `revisar-pr-apps` publica no topo do relatório (§7):
+#
+#   <!-- revisao-viabilidade rodada=N head=<sha8> motor=codex|nativo bloqueantes=<n> contratos=ok|nao-executados -->
+#
+# e publica o commit status `revisao/bloqueantes` no head do PR: sucesso quando
+# há revisão NESTE head com zero bloqueantes, falha caso contrário.
+#
+# ⚠️ O QUE ELE NÃO GARANTE — leia antes de confiar nele. Isto é AUTOATESTAÇÃO:
+# quem publica o comentário é a mesma sessão que revisa, então o guard confere a
+# FORMA, nunca a substância. Uma sessão que mentir no corpo passa. O que ele compra
+# é outra coisa, e é real: "houve revisão neste head, com zero bloqueantes" vira um
+# fato greppável e DATADO, e todo push novo invalida a atestação anterior — porque
+# o `head=` deixa de bater.
+#
+# DUAS DECISÕES DE DESENHO QUE NÃO SÃO ACIDENTE:
+#
+#  1. Arquivo SEPARADO do `pr-guards.yml`. Este workflow precisa do gatilho
+#     `issue_comment` (o relatório é postado DEPOIS do último push; sem esse
+#     gatilho o job nunca re-rodaria e o PR ficaria vermelho para sempre — e todo
+#     mundo aprenderia a mergear com check vermelho, que é pior que não ter guard).
+#     Acrescentar `issue_comment` ao pr-guards.yml faria os outros 6 jobs
+#     dispararem fora de contexto de PR.
+#
+#  2. O JOB SEMPRE PASSA; quem reprova é o COMMIT STATUS. Se o job falhasse, o
+#     check do run original ficaria vermelho e nenhum comentário posterior o
+#     pintaria de verde — o status, não. Ele fica preso ao SHA e é reescrito por
+#     qualquer run. Torne `revisao/bloqueantes` um required check em branch
+#     protection: sem isso, este workflow é conselho, não portão.
+name: revisao-registrada
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  issue_comment:
+    types: [created]
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+jobs:
+  registrar:
+    name: Houve revisão neste head, sem bloqueante pendente?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Comentário de issue que não é de PR não tem head para atestar.
+    if: github.event_name == 'pull_request' || github.event.issue.pull_request
+    steps:
+      - name: Conferir e publicar o status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          set -uo pipefail
+
+          HEAD_SHA="$(gh api "repos/$REPO/pulls/$PR" --jq '.head.sha')"
+          if [ -z "$HEAD_SHA" ]; then
+            echo "não consegui ler o head do PR #$PR — nada a atestar"
+            exit 0
+          fi
+          CURTO="${HEAD_SHA:0:8}"
+          echo "PR #$PR · head $CURTO"
+
+          # `--paginate` importa: em PR com muita conversa o relatório sai da
+          # primeira página, e sem isso a revisão "some" e o status reprova um PR
+          # revisado. Falha calada na direção mais irritante possível.
+          LINHAS="$(gh api --paginate "repos/$REPO/issues/$PR/comments" --jq '.[].body' \
+                    | grep -o '<!-- revisao-viabilidade [^>]*-->' || true)"
+
+          if [ -z "$LINHAS" ]; then
+            ESTADO=failure
+            DESC="nenhuma revisão registrada — invoque a skill revisar-pr-apps"
+          else
+            # Só interessa a atestação DESTE head. Revisão de head anterior não
+            # vale: o conserto que veio depois é justamente o que não foi revisto.
+            DESTE="$(printf '%s\n' "$LINHAS" | grep -F "head=$CURTO" || true)"
+            if [ -z "$DESTE" ]; then
+              ESTADO=failure
+              DESC="a revisão registrada é de outro head — revise $CURTO"
+            else
+              # Havendo várias rodadas neste head, a última é a que vale.
+              ULTIMA="$(printf '%s\n' "$DESTE" | tail -1)"
+              BLOQ="$(printf '%s' "$ULTIMA" | grep -o 'bloqueantes=[0-9]*' | cut -d= -f2)"
+              RODADA="$(printf '%s' "$ULTIMA" | grep -o 'rodada=[0-9]*' | cut -d= -f2)"
+              MOTOR="$(printf '%s' "$ULTIMA" | grep -o 'motor=[a-z]*' | cut -d= -f2)"
+              CONTRATOS="$(printf '%s' "$ULTIMA" | grep -o 'contratos=[a-z-]*' | cut -d= -f2)"
+              if [ "${BLOQ:-1}" = "0" ]; then
+                ESTADO=success
+                DESC="rodada ${RODADA:-?} · motor ${MOTOR:-?} · contratos ${CONTRATOS:-?} · 0 bloqueantes"
+              else
+                ESTADO=failure
+                DESC="rodada ${RODADA:-?} · ${BLOQ} bloqueante(s) pendente(s)"
+              fi
+            fi
+          fi
+
+          echo "status: $ESTADO — $DESC"
+          gh api -X POST "repos/$REPO/statuses/$HEAD_SHA" \
+            -f state="$ESTADO" \
+            -f context='revisao/bloqueantes' \
+            -f description="$DESC" >/dev/null
+
+          # O job passa sempre — ver a decisão de desenho 2 no cabeçalho.
+          exit 0

@@ -24,6 +24,21 @@ Closes #NNN
 
 Sem-fechamento: #NNN motivo.
 
+## Revisão
+
+<!--
+O passo 5 do processo obrigatório (CLAUDE.md § Processo obrigatório de trabalho).
+O relatório completo é um COMENTÁRIO neste PR, publicado pela skill revisar-pr-apps —
+não cole o relatório aqui. Estas três linhas são só o ponteiro para ele.
+
+O commit status `revisao/bloqueantes` é publicado a partir do comentário, não daqui:
+preencher estas linhas sem ter revisado não deixa o PR verde.
+-->
+
+- Relatório: <!-- link do comentário da última rodada -->
+- Head revisado: <!-- sha curto -->
+- Motor: <!-- codex | nativo (e o motivo, se nativo) -->
+
 ## Validação
 
 <!-- Liste os comandos/checks executados e qualquer limitação conhecida. -->

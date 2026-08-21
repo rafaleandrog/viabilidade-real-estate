@@ -4,6 +4,68 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Revisão de PR vira processo fixo, e o monorepo vira só-leitura (2026-08-21)
+
+O autor pediu duas coisas: que **todo** pedido de trabalho neste app passe por PR + revisão, e que
+ficasse proibido mexer em `urbiverso/urbiverso`, que ele usa só como referência.
+
+**O que já existia estava morto, não desatualizado.** Os três arquivos portados em 2026-08-18
+(`protocolo-revisao-pr.md`, `skills/acompanhar-revisao/`, `skills/revisar-pr-apps/`) implementavam
+revisão em **diálogo entre duas sessões**. Duas descobertas mataram a cópia:
+
+1. `revisar-pr-apps/SKILL.md:182` procurava o plugin `codex-companion.mjs` em
+   `~/.claude/plugins/cache/*/codex/*/scripts/` e, não achando, mandava **PARAR e perguntar**. O
+   plugin **não existe** neste ambiente e não vai existir — a arquitetura do upstream mudou para
+   `codex exec` direto. Invocar a skill produzia **uma pergunta, nunca uma revisão**.
+2. Ela usava `gh repo clone`, e o `gh` não existe aqui — o próprio `CLAUDE.md` já dizia isso.
+
+E o upstream tinha apagado o modelo inteiro no commit `b0361f6` (PR #2540): *"era o contorno para
+despachar revisão a agentes de outro provedor de outra máquina, e o contorno morreu quando a mesma
+sessão passou a conseguir isso sozinha."*
+
+**Portada a geração nova**, com `.claude/motor-revisao.md` (motor único: preflight do Codex, fan-out
+em Bash de fundo, colheita com guarda contra falha virar laudo limpo, fallback nativo **declarado**)
+e `revisar-pr-apps` reescrita. As adaptações estão marcadas `ADAPTADO` **com o motivo ao lado**, para
+o próximo port não desfazê-las. A maior: **a regra da `versao`**. O upstream manda bumpar quando o PR
+mexe em `shell_min`/`sdk_min`; aqui é o oposto (§ Versão do manifesto, decisão da #422). Sem essa
+correção, o revisor acusaria bloqueante inventado em **todo** PR que sobe piso.
+
+**Três achados de ambiente que valem mais que o port:**
+
+- **`npm view @urbiverso/sdk` dá `E401`**, não só o `pnpm install`. Ou seja: a camada de contratos da
+  revisão é **estruturalmente inexecutável** aqui, e a checagem *"esse verbo está publicado?"* não
+  tem como ser feita. Vira pergunta ao autor no relatório, nunca achado de memória.
+- **`node_modules/` não existe** num clone novo — o `CLAUDE.md` afirmava o contrário (§ Validação),
+  e o texto estava **vencido**. Consequência real: `validar-backend.sh` aborta na etapa 1/5.
+  Corrigido na mesma alteração.
+- **O monorepo está clonado em `/home/user/urbiverso` e é gravável**, contrariando o pressuposto de
+  `urbiverso/CLAUDE.md` § "Sessão de app não enxerga o monorepo", em que as skills descansavam.
+
+**A rede que torna o processo fixo**, e o que cada peça de fato garante, está na tabela do
+`CLAUDE.md` § Processo obrigatório. O resumo honesto: `permissions.deny` **não** alcança `Bash` nem
+ferramenta MCP (casa nome de ferramenta, não argumento) e falha **calado** se o padrão de caminho não
+casar — por isso o `PreToolUse` `guarda-monorepo.sh` é a peça que realmente sustenta a proibição, com
+46 casos de teste versionados. E o guard `revisao-registrada` é **autoatestação**: confere forma,
+nunca substância.
+
+Duas decisões de desenho que custaram um erro cada, e vale não repetir:
+
+- A regex do guard casava `request` como verbo de escrita e **bloqueava
+  `mcp__github__pull_request_read`** — isto é, quebrava a própria revisão. Falso positivo em guard
+  não é inofensivo: guard que atrapalha é desligado. Agora casa por **prefixo** ou sufixo `_write`.
+- O `revisao-registrada` é **workflow separado** e o **job sempre passa** — quem reprova é o commit
+  status. Se o job falhasse, o check ficaria vermelho e nenhum comentário posterior o pintaria de
+  verde; e o gatilho `issue_comment` precisa existir porque o relatório é postado **depois** do
+  último push.
+
+**Pendências do autor** (nenhuma dá para fazer daqui): `OPENAI_API_KEY` nas variáveis do *cloud
+environment* — sem ela a revisão roda no motor nativo, para sempre, e nativo é menos adversarial
+porque revisa patch escrito pela mesma família de modelo; **branch protection** com
+`revisao/bloqueantes` como required check, sem o que o guard é conselho e não portão; e decidir se o
+monorepo continua anexado a estas sessões — a defesa hermética seria não anexar.
+
+---
+
 ## Retorno declarativo de migração: a `003` sai do `remover_colunas` (2026-08-19)
 
 A auditoria de obsolescências da plataforma acusou **um** arquivo desta app:
