@@ -101,16 +101,68 @@ function propsDe(fonte) {
 const dirUi = join(MONO, 'ui', 'src');
 const arquivos = readdirSync(dirUi).filter((a) => a.endsWith('.ts') && !a.includes('.test.'));
 
-// bases, para herdar o `:host` — é onde mora (ou falta) o box model
-const bases = {};
-for (const arq of arquivos.filter((a) => a.startsWith('urbi-primitivo'))) {
+// ── registro de TODAS as classes de ui/src, para resolver herança ────────────
+// Não basta conhecer `urbi-primitivo*`: a cadeia real tem degraus intermediários
+// (`UrbiGraficoBase`, por exemplo), e é neles que moram as props que o app usa.
+// Achado do Codex no PR 497: sem percorrer a cadeia, `urbi-grafico-pizza` e
+// `urbi-grafico-colunas` saíam com `props: []` — e um guard sobre esse espelho
+// reprovaria prop legítima.
+const classes = {};
+for (const arq of arquivos) {
   const fonte = semComentarios(readFileSync(join(dirUi, arq), 'utf8'));
   const host = declaracoesDeHost(fonte);
-  // Todas as classes exportadas do arquivo, não só a primeira.
-  for (const m of fonte.matchAll(/export class (\w+)/g)) {
-    bases[m[1]] = { arquivo: `ui/src/${arq}`, host };
+  const props = propsDe(fonte);
+  for (const m of fonte.matchAll(/export (?:abstract )?class (\w+)(?:\s+extends\s+(\w+))?/g)) {
+    classes[m[1]] = { arquivo: `ui/src/${arq}`, base: m[2] ?? null, host, props };
   }
 }
+
+/** Sobe a cadeia de heranças. Devolve da base mais distante para a mais próxima. */
+function cadeia(nome) {
+  const fora = [];
+  const vistos = new Set();
+  let atual = nome;
+  while (atual && classes[atual] && !vistos.has(atual)) {
+    vistos.add(atual);           // guarda contra ciclo — herança circular trava o laço
+    fora.unshift({ nome: atual, ...classes[atual] });
+    atual = classes[atual].base;
+  }
+  return fora;
+}
+
+// ── box model: julgar pelo VALOR EFETIVO, não pela presença da propriedade ───
+// Achado do Codex no PR 497, e os dois lados produziam FALSO NEGATIVO — o exato
+// erro que este campo existe para impedir:
+//   · `padding: 0 16px` era descartado por casar com /^0( |$)/, apesar dos 16px
+//     horizontais que somam à largura;
+//   · qualquer `box-sizing`, inclusive `content-box`, contava como protegido.
+
+const ZERO = /^0([a-z%]*)$/;
+
+/** `0`, `0px`, `0 0`, `0 0 0 0` → não soma nada. Qualquer lado não-zero soma. */
+const shorthandZerado = (valor) => valor.trim().split(/\s+/).every((v) => ZERO.test(v));
+
+function acrescentaLargura(host) {
+  for (const d of host) {
+    const { prop, valor } = d;
+    const v = valor.trim();
+    if (/^padding(-(top|right|bottom|left|inline|block).*)?$/.test(prop)) {
+      if (!shorthandZerado(v)) return true;
+    } else if (/^border(-(width|top|right|bottom|left|inline|block).*)?$/.test(prop)) {
+      // `none` e `0` não desenham; qualquer outra coisa tem espessura.
+      if (v === 'none' || shorthandZerado(v)) continue;
+      // `border: 0 solid X` — a largura é o primeiro token.
+      const largura = v.split(/\s+/)[0];
+      if (ZERO.test(largura) || largura === 'none') continue;
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Só `border-box` protege. `content-box` é o default e é justamente o problema. */
+const protegidoPorBorderBox = (host) =>
+  host.some((d) => d.prop === 'box-sizing' && d.valor.trim() === 'border-box');
 
 const primitivos = {};
 const ausentes = new Set(usados);
@@ -121,22 +173,29 @@ for (const arq of arquivos) {
     const [, tag, classe, base] = m;
     if (!usados.has(tag)) continue;
     ausentes.delete(tag);
-    const proprio = declaracoesDeHost(fonte);
-    const herdado = base && bases[base] ? bases[base].host : [];
-    const host = [...herdado.map((d) => ({ ...d, de: base })), ...proprio.map((d) => ({ ...d, de: classe }))];
 
-    const temBoxSizing = host.some((d) => d.prop === 'box-sizing');
-    const temPaddingOuBorda = host.some((d) => /^(padding|border)(-|$)/.test(d.prop) && d.valor !== 'none' && !/^0( |$)/.test(d.valor));
+    // Cadeia completa, da base mais distante até a classe concreta. A ordem
+    // importa: quem vem depois sobrescreve, como no CSS e no TS.
+    const linhagem = cadeia(classe);
+    const host = linhagem.flatMap((c) => c.host.map((d) => ({ ...d, de: c.nome })));
+
+    // Props herdadas entram; a redeclaração na subclasse vence.
+    const porNome = new Map();
+    for (const c of linhagem) {
+      for (const pr of c.props) porNome.set(pr.propriedade, { ...pr, de: c.nome });
+    }
 
     primitivos[tag] = {
       classe,
       arquivo: `ui/src/${arq}`,
       base: base ?? null,
-      props: propsDe(fonte),
+      linhagem: linhagem.map((c) => c.nome),
+      props: [...porNome.values()],
       host,
-      // O caso urbi-kpi: padding/border no :host SEM box-sizing significa que um
-      // `width` aplicado de fora vira largura de CONTEUDO, e a caixa transborda.
-      risco_box_model: temPaddingOuBorda && !temBoxSizing,
+      // O caso urbi-kpi: padding/border no :host SEM `box-sizing: border-box`
+      // significa que um `width` aplicado de fora vira largura de CONTEUDO, e a
+      // caixa renderizada mede width + padding + border. Ela transborda.
+      risco_box_model: acrescentaLargura(host) && !protegidoPorBorderBox(host),
     };
   }
 }
@@ -145,7 +204,10 @@ for (const arq of arquivos) {
 const arqTokens = join(MONO, 'compartilhado', 'tokens.css');
 const tokens = {};
 if (existsSync(arqTokens)) {
-  const css = readFileSync(arqTokens, 'utf8');
+  // Comentário fora ANTES do matchAll. Sem isso a regex lia prosa como valor:
+  // `--cor-alerta` aparecia com cinco valores, um deles carregando o texto do
+  // comentário e a declaração seguinte. Achado do Codex no PR 497.
+  const css = readFileSync(arqTokens, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   for (const m of css.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) {
     (tokens[m[1]] ??= []).push(m[2].trim());
   }

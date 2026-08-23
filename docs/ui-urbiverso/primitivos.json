@@ -10,60 +10,73 @@
       "classe": "UrbiAbas",
       "arquivo": "ui/src/urbi-abas.ts",
       "base": "UrbiPrimitivoDeLayout",
+      "linhagem": [
+        "UrbiPrimitivoDeLayout",
+        "UrbiAbas"
+      ],
       "props": [
         {
           "propriedade": "abas",
           "atributo": "abas",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAbas"
         },
         {
           "propriedade": "ativa",
           "atributo": "ativa",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAbas"
         },
         {
           "propriedade": "formatoDesktop",
           "atributo": "formato-desktop",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAbas"
         },
         {
           "propriedade": "formatoMobile",
           "atributo": "formato-mobile",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAbas"
         },
         {
           "propriedade": "acoes",
           "atributo": "acoes",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAbas"
         },
         {
           "propriedade": "semScrollAuto",
           "atributo": "sem-scroll-auto",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiAbas"
         },
         {
           "propriedade": "navegacaoMobileInferior",
           "atributo": "navegacao-mobile-inferior",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiAbas"
         },
         {
           "propriedade": "acoesIconeOnlyMobile",
           "atributo": "acoes-icone-only-mobile",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiAbas"
         },
         {
           "propriedade": "acoesIconeOnlyEstreito",
           "atributo": "acoes-icone-only-estreito",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiAbas"
         }
       ],
       "host": [
@@ -272,72 +285,86 @@
       "classe": "UrbiAvatar",
       "arquivo": "ui/src/urbi-avatar.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiAvatar"
+      ],
       "props": [
         {
           "propriedade": "nome",
           "atributo": "nome",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         },
         {
           "propriedade": "foto",
           "atributo": "foto",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         },
         {
           "propriedade": "tamanho",
           "atributo": "tamanho",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         },
         {
           "propriedade": "natureza",
           "atributo": "natureza",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         },
         {
           "propriedade": "dot",
           "atributo": "dot",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         },
         {
           "propriedade": "sticker",
           "atributo": "sticker",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         },
         {
           "propriedade": "stickerCor",
           "atributo": "sticker-cor",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         },
         {
           "propriedade": "stickers",
           "atributo": "stickers",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         },
         {
           "propriedade": "apagado",
           "atributo": "apagado",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         },
         {
           "propriedade": "bordaCor",
           "atributo": "borda-cor",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         },
         {
           "propriedade": "icone",
           "atributo": "icone",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiAvatar"
         }
       ],
       "host": [
@@ -360,42 +387,51 @@
       "classe": "UrbiBadge",
       "arquivo": "ui/src/urbi-badge.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiBadge"
+      ],
       "props": [
         {
           "propriedade": "cor",
           "atributo": "cor",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBadge"
         },
         {
           "propriedade": "interativo",
           "atributo": "interativo",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiBadge"
         },
         {
           "propriedade": "ativo",
           "atributo": "ativo",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiBadge"
         },
         {
           "propriedade": "caixaAlta",
           "atributo": "caixa-alta",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiBadge"
         },
         {
           "propriedade": "quebraLinha",
           "atributo": "quebra-linha",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiBadge"
         },
         {
           "propriedade": "semQuebra",
           "atributo": "sem-quebra",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiBadge"
         }
       ],
       "host": [
@@ -418,24 +454,30 @@
       "classe": "UrbiBanner",
       "arquivo": "ui/src/urbi-banner.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiBanner"
+      ],
       "props": [
         {
           "propriedade": "variante",
           "atributo": "variante",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBanner"
         },
         {
           "propriedade": "icone",
           "atributo": "icone",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBanner"
         },
         {
           "propriedade": "fechavel",
           "atributo": "fechavel",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBanner"
         }
       ],
       "host": [
@@ -452,36 +494,44 @@
       "classe": "UrbiBotaoVoltar",
       "arquivo": "ui/src/urbi-botao-voltar.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiBotaoVoltar"
+      ],
       "props": [
         {
           "propriedade": "rotulo",
           "atributo": "rotulo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
         },
         {
           "propriedade": "href",
           "atributo": "href",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
         },
         {
           "propriedade": "cor",
           "atributo": "cor",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
         },
         {
           "propriedade": "texto",
           "atributo": "texto",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
         },
         {
           "propriedade": "autoVoltar",
           "atributo": "auto-voltar",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
         }
       ],
       "host": [
@@ -510,42 +560,51 @@
       "classe": "UrbiBotao",
       "arquivo": "ui/src/urbi-botao.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiBotao"
+      ],
       "props": [
         {
           "propriedade": "variante",
           "atributo": "variante",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotao"
         },
         {
           "propriedade": "pequeno",
           "atributo": "pequeno",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotao"
         },
         {
           "propriedade": "desabilitado",
           "atributo": "desabilitado",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotao"
         },
         {
           "propriedade": "carregando",
           "atributo": "carregando",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotao"
         },
         {
           "propriedade": "bloco",
           "atributo": "bloco",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotao"
         },
         {
           "propriedade": "icone",
           "atributo": "icone",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiBotao"
         }
       ],
       "host": [
@@ -574,18 +633,24 @@
       "classe": "UrbiCard",
       "arquivo": "ui/src/urbi-card.ts",
       "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiCard"
+      ],
       "props": [
         {
           "propriedade": "titulo",
           "atributo": "titulo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiCard"
         },
         {
           "propriedade": "clicavel",
           "atributo": "clicavel",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiCard"
         }
       ],
       "host": [
@@ -620,24 +685,30 @@
       "classe": "UrbiCheckbox",
       "arquivo": "ui/src/urbi-checkbox.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiCheckbox"
+      ],
       "props": [
         {
           "propriedade": "label",
           "atributo": "label",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiCheckbox"
         },
         {
           "propriedade": "marcado",
           "atributo": "marcado",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiCheckbox"
         },
         {
           "propriedade": "desabilitado",
           "atributo": "desabilitado",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiCheckbox"
         }
       ],
       "host": [
@@ -654,18 +725,24 @@
       "classe": "UrbiChipsAtalho",
       "arquivo": "ui/src/urbi-chips-atalho.ts",
       "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiChipsAtalho"
+      ],
       "props": [
         {
           "propriedade": "opcoes",
           "atributo": "opcoes",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiChipsAtalho"
         },
         {
           "propriedade": "ativo",
           "atributo": "ativo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiChipsAtalho"
         }
       ],
       "host": [
@@ -724,24 +801,30 @@
       "classe": "UrbiEstadoVazio",
       "arquivo": "ui/src/urbi-estado-vazio.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiEstadoVazio"
+      ],
       "props": [
         {
           "propriedade": "icone",
           "atributo": "icone",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiEstadoVazio"
         },
         {
           "propriedade": "mensagem",
           "atributo": "mensagem",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiEstadoVazio"
         },
         {
           "propriedade": "submensagem",
           "atributo": "submensagem",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiEstadoVazio"
         }
       ],
       "host": [
@@ -758,80 +841,813 @@
       "classe": "UrbiGraficoArea",
       "arquivo": "ui/src/urbi-grafico-area.ts",
       "base": "UrbiGraficoBase",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiGraficoBase",
+        "UrbiGraficoArea"
+      ],
       "props": [
+        {
+          "propriedade": "categorias",
+          "atributo": "categorias",
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "series",
+          "atributo": "series",
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "titulo",
+          "atributo": "titulo",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "formato",
+          "atributo": "formato",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "legenda",
+          "atributo": "legenda",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "altura",
+          "atributo": "altura",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "empilhado",
+          "atributo": "empilhado",
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "minY",
+          "atributo": "min-y",
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "maxY",
+          "atributo": "max-y",
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "rotulosXVerticais",
+          "atributo": "rotulos-x-verticais",
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
         {
           "propriedade": "marcadores",
           "atributo": "marcadores",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiGraficoArea"
         }
       ],
-      "host": [],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-texto",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-grade",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-1",
+          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-2",
+          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-3",
+          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-4",
+          "valor": "var(--cor-categoria-4, #F092B0)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-5",
+          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-6",
+          "valor": "var(--cor-categoria-6, #9DC498)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-7",
+          "valor": "var(--cor-categoria-7, #E9A082)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-8",
+          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "background",
+          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border",
+          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border-radius",
+          "valor": "var(--raio-md, 8px)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "12px 14px",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "box-sizing",
+          "valor": "border-box",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "max-width",
+          "valor": "100%",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiGraficoBase"
+        }
+      ],
       "risco_box_model": false
     },
     "urbi-grafico-colunas": {
       "classe": "UrbiGraficoColunas",
       "arquivo": "ui/src/urbi-grafico-colunas.ts",
       "base": "UrbiGraficoBase",
-      "props": [],
-      "host": [],
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiGraficoBase",
+        "UrbiGraficoColunas"
+      ],
+      "props": [
+        {
+          "propriedade": "categorias",
+          "atributo": "categorias",
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "series",
+          "atributo": "series",
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "titulo",
+          "atributo": "titulo",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "formato",
+          "atributo": "formato",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "legenda",
+          "atributo": "legenda",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "altura",
+          "atributo": "altura",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "empilhado",
+          "atributo": "empilhado",
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "minY",
+          "atributo": "min-y",
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "maxY",
+          "atributo": "max-y",
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "rotulosXVerticais",
+          "atributo": "rotulos-x-verticais",
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-texto",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-grade",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-1",
+          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-2",
+          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-3",
+          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-4",
+          "valor": "var(--cor-categoria-4, #F092B0)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-5",
+          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-6",
+          "valor": "var(--cor-categoria-6, #9DC498)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-7",
+          "valor": "var(--cor-categoria-7, #E9A082)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-8",
+          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "background",
+          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border",
+          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border-radius",
+          "valor": "var(--raio-md, 8px)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "12px 14px",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "box-sizing",
+          "valor": "border-box",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "max-width",
+          "valor": "100%",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiGraficoBase"
+        }
+      ],
       "risco_box_model": false
     },
     "urbi-grafico-linha": {
       "classe": "UrbiGraficoLinha",
       "arquivo": "ui/src/urbi-grafico-linha.ts",
       "base": "UrbiGraficoBase",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiGraficoBase",
+        "UrbiGraficoLinha"
+      ],
       "props": [
+        {
+          "propriedade": "categorias",
+          "atributo": "categorias",
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "series",
+          "atributo": "series",
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "titulo",
+          "atributo": "titulo",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "formato",
+          "atributo": "formato",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "legenda",
+          "atributo": "legenda",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "altura",
+          "atributo": "altura",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "empilhado",
+          "atributo": "empilhado",
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "minY",
+          "atributo": "min-y",
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "maxY",
+          "atributo": "max-y",
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "rotulosXVerticais",
+          "atributo": "rotulos-x-verticais",
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
         {
           "propriedade": "marcadores",
           "atributo": "marcadores",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiGraficoLinha"
         }
       ],
-      "host": [],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-texto",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-grade",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-1",
+          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-2",
+          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-3",
+          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-4",
+          "valor": "var(--cor-categoria-4, #F092B0)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-5",
+          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-6",
+          "valor": "var(--cor-categoria-6, #9DC498)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-7",
+          "valor": "var(--cor-categoria-7, #E9A082)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-8",
+          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "background",
+          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border",
+          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border-radius",
+          "valor": "var(--raio-md, 8px)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "12px 14px",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "box-sizing",
+          "valor": "border-box",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "max-width",
+          "valor": "100%",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiGraficoBase"
+        }
+      ],
       "risco_box_model": false
     },
     "urbi-grafico-medidor": {
       "classe": "UrbiGraficoMedidor",
       "arquivo": "ui/src/urbi-grafico-medidor.ts",
       "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiGraficoMedidor"
+      ],
       "props": [
         {
           "propriedade": "rotulo",
           "atributo": "rotulo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
         },
         {
           "propriedade": "min",
           "atributo": "min",
           "tipo": "Number",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
         },
         {
           "propriedade": "max",
           "atributo": "max",
           "tipo": "Number",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
         },
         {
           "propriedade": "valor",
           "atributo": "valor",
           "tipo": "Number",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
         },
         {
           "propriedade": "faixas",
           "atributo": "faixas",
           "tipo": "Array",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
         },
         {
           "propriedade": "formato",
           "atributo": "formato",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
         }
       ],
       "host": [
@@ -932,14 +1748,259 @@
       "classe": "UrbiGraficoPizza",
       "arquivo": "ui/src/urbi-grafico-pizza.ts",
       "base": "UrbiGraficoBase",
-      "props": [],
-      "host": [],
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiGraficoBase",
+        "UrbiGraficoPizza"
+      ],
+      "props": [
+        {
+          "propriedade": "categorias",
+          "atributo": "categorias",
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "series",
+          "atributo": "series",
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "titulo",
+          "atributo": "titulo",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "formato",
+          "atributo": "formato",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "legenda",
+          "atributo": "legenda",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "altura",
+          "atributo": "altura",
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "empilhado",
+          "atributo": "empilhado",
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "minY",
+          "atributo": "min-y",
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "maxY",
+          "atributo": "max-y",
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "rotulosXVerticais",
+          "atributo": "rotulos-x-verticais",
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-texto",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-grade",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-1",
+          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-2",
+          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-3",
+          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-4",
+          "valor": "var(--cor-categoria-4, #F092B0)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-5",
+          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-6",
+          "valor": "var(--cor-categoria-6, #9DC498)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-7",
+          "valor": "var(--cor-categoria-7, #E9A082)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-8",
+          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "background",
+          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border",
+          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border-radius",
+          "valor": "var(--raio-md, 8px)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "12px 14px",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "box-sizing",
+          "valor": "border-box",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "max-width",
+          "valor": "100%",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiGraficoBase"
+        }
+      ],
       "risco_box_model": false
     },
     "urbi-hospedeiro": {
       "classe": "UrbiHospedeiro",
       "arquivo": "ui/src/urbi-hospedeiro.ts",
       "base": "UrbiPrimitivoHospedeiro",
+      "linhagem": [
+        "UrbiPrimitivoHospedeiro",
+        "UrbiHospedeiro"
+      ],
       "props": [],
       "host": [
         {
@@ -973,72 +2034,86 @@
       "classe": "UrbiIcone",
       "arquivo": "ui/src/urbi-icone.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiIcone"
+      ],
       "props": [
         {
           "propriedade": "classe",
           "atributo": "classe",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         },
         {
           "propriedade": "icone",
           "atributo": "icone",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         },
         {
           "propriedade": "familia",
           "atributo": "familia",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         },
         {
           "propriedade": "colecao",
           "atributo": "colecao",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         },
         {
           "propriedade": "tamanho",
           "atributo": "tamanho",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         },
         {
           "propriedade": "fw",
           "atributo": "fw",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         },
         {
           "propriedade": "li",
           "atributo": "li",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         },
         {
           "propriedade": "girando",
           "atributo": "girando",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         },
         {
           "propriedade": "contador",
           "atributo": "contador",
           "tipo": "Number",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         },
         {
           "propriedade": "indicador",
           "atributo": "indicador",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         },
         {
           "propriedade": "borda",
           "atributo": "borda",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiIcone"
         }
       ],
       "host": [
@@ -1061,48 +2136,58 @@
       "classe": "UrbiInputData",
       "arquivo": "ui/src/urbi-input-data.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiInputData"
+      ],
       "props": [
         {
           "propriedade": "label",
           "atributo": "label",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInputData"
         },
         {
           "propriedade": "valor",
           "atributo": "valor",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInputData"
         },
         {
           "propriedade": "min",
           "atributo": "min",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInputData"
         },
         {
           "propriedade": "max",
           "atributo": "max",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInputData"
         },
         {
           "propriedade": "obrigatorio",
           "atributo": "obrigatorio",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInputData"
         },
         {
           "propriedade": "desabilitado",
           "atributo": "desabilitado",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInputData"
         },
         {
           "propriedade": "erro",
           "atributo": "erro",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInputData"
         }
       ],
       "host": [
@@ -1119,72 +2204,86 @@
       "classe": "UrbiInput",
       "arquivo": "ui/src/urbi-input.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiInput"
+      ],
       "props": [
         {
           "propriedade": "label",
           "atributo": "label",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         },
         {
           "propriedade": "valor",
           "atributo": "valor",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         },
         {
           "propriedade": "tipo",
           "atributo": "tipo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         },
         {
           "propriedade": "placeholder",
           "atributo": "placeholder",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         },
         {
           "propriedade": "autocomplete",
           "atributo": "autocomplete",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         },
         {
           "propriedade": "obrigatorio",
           "atributo": "obrigatorio",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         },
         {
           "propriedade": "desabilitado",
           "atributo": "desabilitado",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         },
         {
           "propriedade": "sujo",
           "atributo": "sujo",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         },
         {
           "propriedade": "erro",
           "atributo": "erro",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         },
         {
           "propriedade": "icone",
           "atributo": "icone",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         },
         {
           "propriedade": "pattern",
           "atributo": "pattern",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiInput"
         }
       ],
       "host": [
@@ -1201,30 +2300,38 @@
       "classe": "UrbiKpi",
       "arquivo": "ui/src/urbi-kpi.ts",
       "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiKpi"
+      ],
       "props": [
         {
           "propriedade": "rotulo",
           "atributo": "rotulo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiKpi"
         },
         {
           "propriedade": "valor",
           "atributo": "valor",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiKpi"
         },
         {
           "propriedade": "variante",
           "atributo": "variante",
           "tipo": "String",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiKpi"
         },
         {
           "propriedade": "formato",
           "atributo": "formato",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiKpi"
         }
       ],
       "host": [
@@ -1289,60 +2396,73 @@
       "classe": "UrbiLista",
       "arquivo": "ui/src/urbi-lista.ts",
       "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiLista"
+      ],
       "props": [
         {
           "propriedade": "itens",
           "atributo": "itens",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiLista"
         },
         {
           "propriedade": "render_item",
           "atributo": "render_item",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiLista"
         },
         {
           "propriedade": "clicavel",
           "atributo": "clicavel",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiLista"
         },
         {
           "propriedade": "separador",
           "atributo": "separador",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiLista"
         },
         {
           "propriedade": "carregando",
           "atributo": "carregando",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiLista"
         },
         {
           "propriedade": "mensagemVazio",
           "atributo": "mensagem-vazio",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiLista"
         },
         {
           "propriedade": "classeItem",
           "atributo": "classe-item",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiLista"
         },
         {
           "propriedade": "indicador",
           "atributo": "indicador",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiLista"
         },
         {
           "propriedade": "itemAtivo",
           "atributo": "item-ativo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiLista"
         }
       ],
       "host": [
@@ -1377,12 +2497,16 @@
       "classe": "UrbiLoading",
       "arquivo": "ui/src/urbi-loading.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiLoading"
+      ],
       "props": [
         {
           "propriedade": "mensagem",
           "atributo": "mensagem",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiLoading"
         }
       ],
       "host": [
@@ -1399,30 +2523,37 @@
       "classe": "UrbiModal",
       "arquivo": "ui/src/urbi-modal.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiModal"
+      ],
       "props": [
         {
           "propriedade": "title",
           "atributo": "title",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiModal"
         },
         {
           "propriedade": "maxWidth",
           "atributo": "max-width",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiModal"
         },
         {
           "propriedade": "closeOnBackdrop",
           "atributo": "close-on-backdrop",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiModal"
         },
         {
           "propriedade": "hideClose",
           "atributo": "hide-close",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiModal"
         }
       ],
       "host": [
@@ -1469,24 +2600,30 @@
       "classe": "UrbiNav",
       "arquivo": "ui/src/urbi-nav.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiNav"
+      ],
       "props": [
         {
           "propriedade": "secoes",
           "atributo": "secoes",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiNav"
         },
         {
           "propriedade": "ativo",
           "atributo": "ativo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiNav"
         },
         {
           "propriedade": "modoSanfona",
           "atributo": "modo-sanfona",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiNav"
         }
       ],
       "host": [
@@ -1515,60 +2652,72 @@
       "classe": "UrbiSelect",
       "arquivo": "ui/src/urbi-select.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiSelect"
+      ],
       "props": [
         {
           "propriedade": "label",
           "atributo": "label",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSelect"
         },
         {
           "propriedade": "valor",
           "atributo": "valor",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSelect"
         },
         {
           "propriedade": "opcoes",
           "atributo": "opcoes",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSelect"
         },
         {
           "propriedade": "grupos",
           "atributo": "grupos",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSelect"
         },
         {
           "propriedade": "placeholder",
           "atributo": "placeholder",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSelect"
         },
         {
           "propriedade": "desabilitado",
           "atributo": "desabilitado",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSelect"
         },
         {
           "propriedade": "obrigatorio",
           "atributo": "obrigatorio",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSelect"
         },
         {
           "propriedade": "erro",
           "atributo": "erro",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSelect"
         },
         {
           "propriedade": "pesquisavel",
           "atributo": "pesquisavel",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSelect"
         }
       ],
       "host": [
@@ -1591,60 +2740,73 @@
       "classe": "UrbiSeletorArquivo",
       "arquivo": "ui/src/urbi-seletor-arquivo.ts",
       "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiSeletorArquivo"
+      ],
       "props": [
         {
           "propriedade": "label",
           "atributo": "label",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
         },
         {
           "propriedade": "texto",
           "atributo": "texto",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
         },
         {
           "propriedade": "icone",
           "atributo": "icone",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
         },
         {
           "propriedade": "variante",
           "atributo": "variante",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
         },
         {
           "propriedade": "accept",
           "atributo": "accept",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
         },
         {
           "propriedade": "multiplo",
           "atributo": "multiplo",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
         },
         {
           "propriedade": "drop",
           "atributo": "drop",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
         },
         {
           "propriedade": "desabilitado",
           "atributo": "desabilitado",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
         },
         {
           "propriedade": "dica",
           "atributo": "dica",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
         }
       ],
       "host": [
@@ -1685,36 +2847,45 @@
       "classe": "UrbiShellPage",
       "arquivo": "ui/src/urbi-shell-page.ts",
       "base": "UrbiPrimitivoDeLayout",
+      "linhagem": [
+        "UrbiPrimitivoDeLayout",
+        "UrbiShellPage"
+      ],
       "props": [
         {
           "propriedade": "titulo",
           "atributo": "titulo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiShellPage"
         },
         {
           "propriedade": "subtitulo",
           "atributo": "subtitulo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiShellPage"
         },
         {
           "propriedade": "compacta",
           "atributo": "compacta",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiShellPage"
         },
         {
           "propriedade": "dashboard",
           "atributo": "dashboard",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiShellPage"
         },
         {
           "propriedade": "preencher",
           "atributo": "preencher",
           "tipo": "Boolean",
-          "reflete": true
+          "reflete": true,
+          "de": "UrbiShellPage"
         }
       ],
       "host": [
@@ -1839,54 +3010,66 @@
       "classe": "UrbiTabela",
       "arquivo": "ui/src/urbi-tabela.ts",
       "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiTabela"
+      ],
       "props": [
         {
           "propriedade": "colunas",
           "atributo": "colunas",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTabela"
         },
         {
           "propriedade": "linhas",
           "atributo": "linhas",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTabela"
         },
         {
           "propriedade": "clicavel",
           "atributo": "clicavel",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTabela"
         },
         {
           "propriedade": "carregando",
           "atributo": "carregando",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTabela"
         },
         {
           "propriedade": "mensagemVazio",
           "atributo": "mensagem-vazio",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTabela"
         },
         {
           "propriedade": "classeLinha",
           "atributo": "classe-linha",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTabela"
         },
         {
           "propriedade": "filtrosIniciais",
           "atributo": "filtros-iniciais",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTabela"
         },
         {
           "propriedade": "responsivo",
           "atributo": "responsivo",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTabela"
         }
       ],
       "host": [
@@ -1921,66 +3104,79 @@
       "classe": "UrbiTextarea",
       "arquivo": "ui/src/urbi-textarea.ts",
       "base": "LitElement",
+      "linhagem": [
+        "UrbiTextarea"
+      ],
       "props": [
         {
           "propriedade": "label",
           "atributo": "label",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTextarea"
         },
         {
           "propriedade": "valor",
           "atributo": "valor",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTextarea"
         },
         {
           "propriedade": "placeholder",
           "atributo": "placeholder",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTextarea"
         },
         {
           "propriedade": "obrigatorio",
           "atributo": "obrigatorio",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTextarea"
         },
         {
           "propriedade": "desabilitado",
           "atributo": "desabilitado",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTextarea"
         },
         {
           "propriedade": "sujo",
           "atributo": "sujo",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTextarea"
         },
         {
           "propriedade": "erro",
           "atributo": "erro",
           "tipo": "String",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTextarea"
         },
         {
           "propriedade": "rows",
           "atributo": "rows",
           "tipo": "Number",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTextarea"
         },
         {
           "propriedade": "autoResize",
           "atributo": "auto-resize",
           "tipo": "Boolean",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTextarea"
         },
         {
           "propriedade": "maxRows",
           "atributo": "max-rows",
           "tipo": "Number",
-          "reflete": false
+          "reflete": false,
+          "de": "UrbiTextarea"
         }
       ],
       "host": [

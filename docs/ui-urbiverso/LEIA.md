@@ -8,7 +8,7 @@
 > | SHA | `22ba477a` |
 > | Versão do monorepo | `0.53.11` |
 > | Data do commit | 2026-08-22 |
-> | Conteúdo | 29 primitivos · 149 props · 85 tokens |
+> | Conteúdo | 29 primitivos · 197 props (incluindo herdadas) · 85 tokens |
 
 ## Por que este diretório existe
 
@@ -51,9 +51,15 @@ Espelhar tudo seria ruído, e espelho que ninguém lê não protege ninguém.
 | Campo | O que é |
 |---|---|
 | `classe`, `arquivo`, `base` | de onde veio, e de quem herda |
-| `props[]` | `propriedade` (nome em TS), `atributo` (o que se escreve no HTML), `tipo`, `reflete` |
-| `host[]` | as declarações de `:host`, **incluindo as herdadas da classe base**, cada uma com `de` |
+| `linhagem[]` | a cadeia de heranças, da base mais distante até a classe concreta |
+| `props[]` | `propriedade` (nome em TS), `atributo` (o que se escreve no HTML), `tipo`, `reflete`, e `de` — a classe que a declarou |
+| `host[]` | as declarações de `:host` de **toda a linhagem**, cada uma com `de` |
 | `risco_box_model` | `true` quando o `:host` tem `padding`/`border` **sem** `box-sizing: border-box` |
+
+⚠️ **A herança é percorrida inteira, e isso não é detalhe.** `urbi-grafico-pizza` declara **duas**
+props no próprio arquivo e usa **doze** — as outras dez vêm de `UrbiGraficoBase`, e o app usa várias
+delas (`formato`, `categorias`, `series`). Um espelho que só olhasse a classe concreta faria um guard
+reprovar prop legítima.
 
 ⚠️ **`atributo` não é o nome da propriedade.** Vários primitivos declaram `attribute:` e renomeiam —
 `caixaAlta` vira `caixa-alta`. Escrever `caixaAlta=` no HTML **não dá erro**: o atributo
@@ -65,6 +71,18 @@ simplesmente não faz nada. É a falha silenciosa que o contrato do `CLAUDE.md` 
 declara `box-sizing: border-box`, então um `width` aplicado **de fora** — pela folha do app — é
 largura de **conteúdo**, e a caixa renderizada mede `width + padding + border`. Ela transborda o
 container, e pinta sobre o vizinho.
+
+O campo julga pelo **valor efetivo**, não pela presença da propriedade — as duas simplificações
+óbvias produzem **falso negativo**, que é o pior erro possível aqui:
+
+| Caso | Veredito |
+|---|---|
+| `padding: 0 16px` | **soma** — há 16px horizontais, mesmo começando em `0` |
+| `padding: 0` · `padding: 0 0 0 0` | não soma |
+| `border: none` · `border: 0 solid X` | não soma |
+| `border: 1px solid X` | **soma** |
+| `border-radius` | não soma — não é espessura |
+| `box-sizing: content-box` · `inherit` | **não protege** — só `border-box` protege |
 
 Hoje, com este carimbo, o único primitivo nessa condição é **`urbi-kpi`**.
 
