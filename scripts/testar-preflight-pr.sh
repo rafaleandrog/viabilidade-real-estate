@@ -165,6 +165,50 @@ else
   falhou=$((falhou + 1)); echo '  FALHA arquivo inexistente deveria sair com 2'
 fi
 
+# ── Hermeticidade — a propriedade, não mais um caso ─────────────────────────
+#
+# POR QUE ESTA SEÇÃO EXISTE. Quatro vezes seguidas o preflight leu do ambiente
+# algo que a bateria achava estar declarando: a lista de arquivos, as mensagens
+# de commit, o nome da branch e a `versao` do manifesto. As quatro passavam aqui
+# e falhavam noutro lugar; a quarta foi CAUSADA pelo conserto da segunda.
+#
+# Caso novo cobre a instância que já se conhece — e o defeito era sempre a
+# leitura seguinte, ainda desconhecida. Isto aqui é a PROPRIEDADE: a bateria
+# inteira roda de novo numa worktree separada, com branch de nome diferente e
+# `versao` diferente, e o resultado tem que ser IDÊNTICO. Qualquer leitura de
+# ambiente não declarada — inclusive as que ninguém mapeou — aparece como
+# divergência, sem precisar ser prevista.
+#
+# A worktree é descartável e a árvore real NÃO é tocada. O preflight resolve a
+# raiz a partir da própria localização do arquivo, então rodá-lo de lá troca o
+# ambiente inteiro de uma vez.
+if [ -z "${PREFLIGHT_BATERIA_FILHA:-}" ] && [ "$falhou" -eq 0 ]; then
+  WT="$TMP/wt-hermetica"
+  if git worktree add --detach "$WT" HEAD >/dev/null 2>&1; then
+    node -e '
+      const fs = require("fs"), f = process.argv[1] + "/manifesto.json";
+      const j = JSON.parse(fs.readFileSync(f, "utf8"));
+      j.versao = "9.9.9";
+      fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
+    ' "$WT"
+    filha="$(PREFLIGHT_BATERIA_FILHA=1 bash "$WT/scripts/testar-preflight-pr.sh" 2>&1 | tail -1)"
+    git worktree remove --force "$WT" >/dev/null 2>&1
+    esperado="ok: $passou caso(s) do preflight passaram."
+    if [ "$filha" = "$esperado" ]; then
+      passou=$((passou + 1))
+      echo "  ok   hermeticidade: mesmo veredito noutra worktree, outro branch, outra versao"
+    else
+      falhou=$((falhou + 1))
+      echo "  FALHA hermeticidade: o veredito MUDOU com o ambiente."
+      echo "        aqui:  $esperado"
+      echo "        lá:    $filha"
+      echo "        Alguma entrada esta vindo do ambiente em vez de ser declarada."
+    fi
+  else
+    echo "  --   hermeticidade: pulada (git worktree indisponivel aqui)"
+  fi
+fi
+
 echo
 if [ "$falhou" -eq 0 ]; then
   echo "ok: $passou caso(s) do preflight passaram."
