@@ -1,0 +1,3390 @@
+{
+  "carimbo": {
+    "gerado_de": "main do monorepo urbiverso",
+    "sha": "22ba477aac5e2e3b6a5b9bfa0e8c64c9e6310ed0",
+    "versao_monorepo": "0.53.11",
+    "data_do_commit": "2026-08-22"
+  },
+  "primitivos": {
+    "urbi-abas": {
+      "classe": "UrbiAbas",
+      "arquivo": "ui/src/urbi-abas.ts",
+      "base": "UrbiPrimitivoDeLayout",
+      "linhagem": [
+        "UrbiPrimitivoDeLayout",
+        "UrbiAbas"
+      ],
+      "props": [
+        {
+          "propriedade": "abas",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAbas"
+        },
+        {
+          "propriedade": "ativa",
+          "atributo": "ativa",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAbas"
+        },
+        {
+          "propriedade": "formatoDesktop",
+          "atributo": "formato-desktop",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAbas"
+        },
+        {
+          "propriedade": "formatoMobile",
+          "atributo": "formato-mobile",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAbas"
+        },
+        {
+          "propriedade": "acoes",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAbas"
+        },
+        {
+          "propriedade": "semScrollAuto",
+          "atributo": "sem-scroll-auto",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiAbas"
+        },
+        {
+          "propriedade": "navegacaoMobileInferior",
+          "atributo": "navegacao-mobile-inferior",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiAbas"
+        },
+        {
+          "propriedade": "acoesIconeOnlyMobile",
+          "atributo": "acoes-icone-only-mobile",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiAbas"
+        },
+        {
+          "propriedade": "acoesIconeOnlyEstreito",
+          "atributo": "acoes-icone-only-estreito",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiAbas"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeLayout"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeLayout"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeLayout"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeLayout"
+        },
+        {
+          "seletor": ":host",
+          "prop": "overflow",
+          "valor": "hidden",
+          "de": "UrbiPrimitivoDeLayout"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--slot-padding",
+          "valor": "0",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-borda",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-aba-cor",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-aba-cor-hover",
+          "valor": "var(--cor-texto, rgba(255,255,255,0.85))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-aba-cor-ativa",
+          "valor": "var(--cor-primaria-solida, #2AA9E0)",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-aba-fonte-tamanho",
+          "valor": "0.8125rem",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-aba-fonte-peso",
+          "valor": "600",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-aba-bg",
+          "valor": "transparent",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-aba-bg-ativa",
+          "valor": "transparent",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-aba-borda-chrome",
+          "valor": "none",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-aba-radius-topo",
+          "valor": "0",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-aba-borda-bottom-ativa",
+          "valor": "var(--urbi-abas-aba-cor-ativa)",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-botao-bg",
+          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-botao-bg-hover",
+          "valor": "var(--cor-superficie-hover, rgba(255,255,255,0.08))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-botao-bg-ativo",
+          "valor": "var(--cor-primaria-fundo, rgba(42,169,224,0.12))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-botao-borda",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-botao-borda-ativa",
+          "valor": "var(--cor-primaria-borda, rgba(42,169,224,0.30))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-botao-cor",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-botao-cor-ativa",
+          "valor": "var(--cor-primaria-solida, #2AA9E0)",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-acao-bg",
+          "valor": "transparent",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-acao-bg-hover",
+          "valor": "var(--cor-superficie-hover, rgba(255,255,255,0.08))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-acao-borda",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-acao-cor",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-acao-cor-hover",
+          "valor": "var(--cor-texto-forte, rgba(255,255,255,0.95))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-scroll-bg",
+          "valor": "var(--cor-overlay, rgba(0,0,0,0.6))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-scroll-cor",
+          "valor": "var(--cor-texto, rgba(255,255,255,0.85))",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-abas-fade-cor",
+          "valor": "var(--cor-fundo, #0D1B2A)",
+          "de": "UrbiAbas"
+        },
+        {
+          "seletor": ":host([acoes-icone-only-estreito])",
+          "prop": "container-type",
+          "valor": "inline-size",
+          "de": "UrbiAbas"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-avatar": {
+      "classe": "UrbiAvatar",
+      "arquivo": "ui/src/urbi-avatar.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiAvatar"
+      ],
+      "props": [
+        {
+          "propriedade": "nome",
+          "atributo": "nome",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        },
+        {
+          "propriedade": "foto",
+          "atributo": "foto",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        },
+        {
+          "propriedade": "tamanho",
+          "atributo": "tamanho",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        },
+        {
+          "propriedade": "natureza",
+          "atributo": "natureza",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        },
+        {
+          "propriedade": "dot",
+          "atributo": "dot",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        },
+        {
+          "propriedade": "sticker",
+          "atributo": "sticker",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        },
+        {
+          "propriedade": "stickerCor",
+          "atributo": "sticker-cor",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        },
+        {
+          "propriedade": "stickers",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        },
+        {
+          "propriedade": "apagado",
+          "atributo": "apagado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        },
+        {
+          "propriedade": "bordaCor",
+          "atributo": "borda-cor",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        },
+        {
+          "propriedade": "icone",
+          "atributo": "icone",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiAvatar"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "inline-block",
+          "de": "UrbiAvatar"
+        },
+        {
+          "seletor": ":host",
+          "prop": "position",
+          "valor": "relative",
+          "de": "UrbiAvatar"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-badge": {
+      "classe": "UrbiBadge",
+      "arquivo": "ui/src/urbi-badge.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiBadge"
+      ],
+      "props": [
+        {
+          "propriedade": "cor",
+          "atributo": "cor",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBadge"
+        },
+        {
+          "propriedade": "interativo",
+          "atributo": "interativo",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiBadge"
+        },
+        {
+          "propriedade": "ativo",
+          "atributo": "ativo",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiBadge"
+        },
+        {
+          "propriedade": "caixaAlta",
+          "atributo": "caixa-alta",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiBadge"
+        },
+        {
+          "propriedade": "quebraLinha",
+          "atributo": "quebra-linha",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiBadge"
+        },
+        {
+          "propriedade": "semQuebra",
+          "atributo": "sem-quebra",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiBadge"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "inline-block",
+          "de": "UrbiBadge"
+        },
+        {
+          "seletor": ":host([quebra-linha])",
+          "prop": "max-width",
+          "valor": "100%",
+          "de": "UrbiBadge"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-banner": {
+      "classe": "UrbiBanner",
+      "arquivo": "ui/src/urbi-banner.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiBanner"
+      ],
+      "props": [
+        {
+          "propriedade": "variante",
+          "atributo": "variante",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBanner"
+        },
+        {
+          "propriedade": "icone",
+          "atributo": "icone",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBanner"
+        },
+        {
+          "propriedade": "fechavel",
+          "atributo": "fechavel",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiBanner"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "block",
+          "de": "UrbiBanner"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-botao-voltar": {
+      "classe": "UrbiBotaoVoltar",
+      "arquivo": "ui/src/urbi-botao-voltar.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiBotaoVoltar"
+      ],
+      "props": [
+        {
+          "propriedade": "rotulo",
+          "atributo": "rotulo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
+        },
+        {
+          "propriedade": "href",
+          "atributo": "href",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
+        },
+        {
+          "propriedade": "cor",
+          "atributo": "cor",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
+        },
+        {
+          "propriedade": "texto",
+          "atributo": "texto",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
+        },
+        {
+          "propriedade": "autoVoltar",
+          "atributo": "auto-voltar",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiBotaoVoltar"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "inline-flex",
+          "de": "UrbiBotaoVoltar"
+        },
+        {
+          "seletor": ":host",
+          "prop": "align-items",
+          "valor": "center",
+          "de": "UrbiBotaoVoltar"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-shrink",
+          "valor": "0",
+          "de": "UrbiBotaoVoltar"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-botao": {
+      "classe": "UrbiBotao",
+      "arquivo": "ui/src/urbi-botao.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiBotao"
+      ],
+      "props": [
+        {
+          "propriedade": "variante",
+          "atributo": "variante",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBotao"
+        },
+        {
+          "propriedade": "pequeno",
+          "atributo": "pequeno",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiBotao"
+        },
+        {
+          "propriedade": "desabilitado",
+          "atributo": "desabilitado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiBotao"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiBotao"
+        },
+        {
+          "propriedade": "bloco",
+          "atributo": "bloco",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiBotao"
+        },
+        {
+          "propriedade": "icone",
+          "atributo": "icone",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBotao"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "inline-block",
+          "de": "UrbiBotao"
+        },
+        {
+          "seletor": ":host([bloco])",
+          "prop": "display",
+          "valor": "block",
+          "de": "UrbiBotao"
+        },
+        {
+          "seletor": ":host([bloco])",
+          "prop": "width",
+          "valor": "100%",
+          "de": "UrbiBotao"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-card": {
+      "classe": "UrbiCard",
+      "arquivo": "ui/src/urbi-card.ts",
+      "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiCard"
+      ],
+      "props": [
+        {
+          "propriedade": "titulo",
+          "atributo": "titulo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiCard"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiCard"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-checkbox": {
+      "classe": "UrbiCheckbox",
+      "arquivo": "ui/src/urbi-checkbox.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiCheckbox"
+      ],
+      "props": [
+        {
+          "propriedade": "label",
+          "atributo": "label",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiCheckbox"
+        },
+        {
+          "propriedade": "marcado",
+          "atributo": "marcado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiCheckbox"
+        },
+        {
+          "propriedade": "desabilitado",
+          "atributo": "desabilitado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiCheckbox"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "inline-block",
+          "de": "UrbiCheckbox"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-chips-atalho": {
+      "classe": "UrbiChipsAtalho",
+      "arquivo": "ui/src/urbi-chips-atalho.ts",
+      "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiChipsAtalho"
+      ],
+      "props": [
+        {
+          "propriedade": "opcoes",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiChipsAtalho"
+        },
+        {
+          "propriedade": "ativo",
+          "atributo": "ativo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiChipsAtalho"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiChipsAtalho"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "row",
+          "de": "UrbiChipsAtalho"
+        },
+        {
+          "seletor": ":host",
+          "prop": "gap",
+          "valor": "8px",
+          "de": "UrbiChipsAtalho"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-wrap",
+          "valor": "wrap",
+          "de": "UrbiChipsAtalho"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-estado-vazio": {
+      "classe": "UrbiEstadoVazio",
+      "arquivo": "ui/src/urbi-estado-vazio.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiEstadoVazio"
+      ],
+      "props": [
+        {
+          "propriedade": "icone",
+          "atributo": "icone",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiEstadoVazio"
+        },
+        {
+          "propriedade": "mensagem",
+          "atributo": "mensagem",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiEstadoVazio"
+        },
+        {
+          "propriedade": "submensagem",
+          "atributo": "submensagem",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiEstadoVazio"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "block",
+          "de": "UrbiEstadoVazio"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-grafico-area": {
+      "classe": "UrbiGraficoArea",
+      "arquivo": "ui/src/urbi-grafico-area.ts",
+      "base": "UrbiGraficoBase",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiGraficoBase",
+        "UrbiGraficoArea"
+      ],
+      "props": [
+        {
+          "propriedade": "categorias",
+          "atributo": "categorias",
+          "so_propriedade": false,
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "series",
+          "atributo": "series",
+          "so_propriedade": false,
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "titulo",
+          "atributo": "titulo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "formato",
+          "atributo": "formato",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "legenda",
+          "atributo": "legenda",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "altura",
+          "atributo": "altura",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "empilhado",
+          "atributo": "empilhado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "minY",
+          "atributo": "min-y",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "maxY",
+          "atributo": "max-y",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "rotulosXVerticais",
+          "atributo": "rotulos-x-verticais",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "marcadores",
+          "atributo": "marcadores",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoArea"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-texto",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-grade",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-1",
+          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-2",
+          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-3",
+          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-4",
+          "valor": "var(--cor-categoria-4, #F092B0)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-5",
+          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-6",
+          "valor": "var(--cor-categoria-6, #9DC498)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-7",
+          "valor": "var(--cor-categoria-7, #E9A082)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-8",
+          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "background",
+          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border",
+          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border-radius",
+          "valor": "var(--raio-md, 8px)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "12px 14px",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "box-sizing",
+          "valor": "border-box",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "max-width",
+          "valor": "100%",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiGraficoBase"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-grafico-colunas": {
+      "classe": "UrbiGraficoColunas",
+      "arquivo": "ui/src/urbi-grafico-colunas.ts",
+      "base": "UrbiGraficoBase",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiGraficoBase",
+        "UrbiGraficoColunas"
+      ],
+      "props": [
+        {
+          "propriedade": "categorias",
+          "atributo": "categorias",
+          "so_propriedade": false,
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "series",
+          "atributo": "series",
+          "so_propriedade": false,
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "titulo",
+          "atributo": "titulo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "formato",
+          "atributo": "formato",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "legenda",
+          "atributo": "legenda",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "altura",
+          "atributo": "altura",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "empilhado",
+          "atributo": "empilhado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "minY",
+          "atributo": "min-y",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "maxY",
+          "atributo": "max-y",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "rotulosXVerticais",
+          "atributo": "rotulos-x-verticais",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-texto",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-grade",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-1",
+          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-2",
+          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-3",
+          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-4",
+          "valor": "var(--cor-categoria-4, #F092B0)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-5",
+          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-6",
+          "valor": "var(--cor-categoria-6, #9DC498)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-7",
+          "valor": "var(--cor-categoria-7, #E9A082)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-8",
+          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "background",
+          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border",
+          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border-radius",
+          "valor": "var(--raio-md, 8px)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "12px 14px",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "box-sizing",
+          "valor": "border-box",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "max-width",
+          "valor": "100%",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiGraficoBase"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-grafico-linha": {
+      "classe": "UrbiGraficoLinha",
+      "arquivo": "ui/src/urbi-grafico-linha.ts",
+      "base": "UrbiGraficoBase",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiGraficoBase",
+        "UrbiGraficoLinha"
+      ],
+      "props": [
+        {
+          "propriedade": "categorias",
+          "atributo": "categorias",
+          "so_propriedade": false,
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "series",
+          "atributo": "series",
+          "so_propriedade": false,
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "titulo",
+          "atributo": "titulo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "formato",
+          "atributo": "formato",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "legenda",
+          "atributo": "legenda",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "altura",
+          "atributo": "altura",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "empilhado",
+          "atributo": "empilhado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "minY",
+          "atributo": "min-y",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "maxY",
+          "atributo": "max-y",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "rotulosXVerticais",
+          "atributo": "rotulos-x-verticais",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "marcadores",
+          "atributo": "marcadores",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoLinha"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-texto",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-grade",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-1",
+          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-2",
+          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-3",
+          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-4",
+          "valor": "var(--cor-categoria-4, #F092B0)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-5",
+          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-6",
+          "valor": "var(--cor-categoria-6, #9DC498)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-7",
+          "valor": "var(--cor-categoria-7, #E9A082)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-8",
+          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "background",
+          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border",
+          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border-radius",
+          "valor": "var(--raio-md, 8px)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "12px 14px",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "box-sizing",
+          "valor": "border-box",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "max-width",
+          "valor": "100%",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiGraficoBase"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-grafico-medidor": {
+      "classe": "UrbiGraficoMedidor",
+      "arquivo": "ui/src/urbi-grafico-medidor.ts",
+      "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiGraficoMedidor"
+      ],
+      "props": [
+        {
+          "propriedade": "rotulo",
+          "atributo": "rotulo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "propriedade": "min",
+          "atributo": "min",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "propriedade": "max",
+          "atributo": "max",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "propriedade": "valor",
+          "atributo": "valor",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "propriedade": "faixas",
+          "atributo": "faixas",
+          "so_propriedade": false,
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "propriedade": "formato",
+          "atributo": "formato",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoMedidor"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "background",
+          "valor": "var(--cor-superficie, rgba(255, 255, 255, 0.04))",
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border",
+          "valor": "1px solid var(--cor-borda, rgba(255, 255, 255, 0.08))",
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border-radius",
+          "valor": "var(--raio-md, 8px)",
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "12px 14px",
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "seletor": ":host",
+          "prop": "box-sizing",
+          "valor": "border-box",
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "seletor": ":host",
+          "prop": "max-width",
+          "valor": "100%",
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-medidor-cor-arco",
+          "valor": "var(--cor-texto-sec, rgba(255, 255, 255, 0.5))",
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-medidor-cor-agulha",
+          "valor": "var(--cor-texto-forte, rgba(255, 255, 255, 0.95))",
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-medidor-cor-trilho",
+          "valor": "var(--cor-borda, rgba(255, 255, 255, 0.08))",
+          "de": "UrbiGraficoMedidor"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-medidor-espessura",
+          "valor": "16",
+          "de": "UrbiGraficoMedidor"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-grafico-pizza": {
+      "classe": "UrbiGraficoPizza",
+      "arquivo": "ui/src/urbi-grafico-pizza.ts",
+      "base": "UrbiGraficoBase",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiGraficoBase",
+        "UrbiGraficoPizza"
+      ],
+      "props": [
+        {
+          "propriedade": "categorias",
+          "atributo": "categorias",
+          "so_propriedade": false,
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "series",
+          "atributo": "series",
+          "so_propriedade": false,
+          "tipo": "Array",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "titulo",
+          "atributo": "titulo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "formato",
+          "atributo": "formato",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "legenda",
+          "atributo": "legenda",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "altura",
+          "atributo": "altura",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "empilhado",
+          "atributo": "empilhado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "minY",
+          "atributo": "min-y",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "maxY",
+          "atributo": "max-y",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "propriedade": "rotulosXVerticais",
+          "atributo": "rotulos-x-verticais",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiGraficoBase"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-texto",
+          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-grade",
+          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-1",
+          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-2",
+          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-3",
+          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-4",
+          "valor": "var(--cor-categoria-4, #F092B0)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-5",
+          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-6",
+          "valor": "var(--cor-categoria-6, #9DC498)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-7",
+          "valor": "var(--cor-categoria-7, #E9A082)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--urbi-grafico-cor-8",
+          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "background",
+          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border",
+          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border-radius",
+          "valor": "var(--raio-md, 8px)",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "12px 14px",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "box-sizing",
+          "valor": "border-box",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host",
+          "prop": "max-width",
+          "valor": "100%",
+          "de": "UrbiGraficoBase"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiGraficoBase"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-hospedeiro": {
+      "classe": "UrbiHospedeiro",
+      "arquivo": "ui/src/urbi-hospedeiro.ts",
+      "base": "UrbiPrimitivoHospedeiro",
+      "linhagem": [
+        "UrbiPrimitivoHospedeiro",
+        "UrbiHospedeiro"
+      ],
+      "props": [],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoHospedeiro"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoHospedeiro"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoHospedeiro"
+        },
+        {
+          "seletor": ":host([preencher])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoHospedeiro"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-icone": {
+      "classe": "UrbiIcone",
+      "arquivo": "ui/src/urbi-icone.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiIcone"
+      ],
+      "props": [
+        {
+          "propriedade": "classe",
+          "atributo": "classe",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiIcone"
+        },
+        {
+          "propriedade": "icone",
+          "atributo": "icone",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiIcone"
+        },
+        {
+          "propriedade": "familia",
+          "atributo": "familia",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiIcone"
+        },
+        {
+          "propriedade": "colecao",
+          "atributo": "colecao",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiIcone"
+        },
+        {
+          "propriedade": "tamanho",
+          "atributo": "tamanho",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiIcone"
+        },
+        {
+          "propriedade": "fw",
+          "atributo": "fw",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiIcone"
+        },
+        {
+          "propriedade": "li",
+          "atributo": "li",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiIcone"
+        },
+        {
+          "propriedade": "girando",
+          "atributo": "girando",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiIcone"
+        },
+        {
+          "propriedade": "contador",
+          "atributo": "contador",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiIcone"
+        },
+        {
+          "propriedade": "indicador",
+          "atributo": "indicador",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiIcone"
+        },
+        {
+          "propriedade": "borda",
+          "atributo": "borda",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiIcone"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "inline-flex",
+          "de": "UrbiIcone"
+        },
+        {
+          "seletor": ":host",
+          "prop": "position",
+          "valor": "relative",
+          "de": "UrbiIcone"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-input-data": {
+      "classe": "UrbiInputData",
+      "arquivo": "ui/src/urbi-input-data.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiInputData"
+      ],
+      "props": [
+        {
+          "propriedade": "label",
+          "atributo": "label",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInputData"
+        },
+        {
+          "propriedade": "valor",
+          "atributo": "valor",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInputData"
+        },
+        {
+          "propriedade": "min",
+          "atributo": "min",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInputData"
+        },
+        {
+          "propriedade": "max",
+          "atributo": "max",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInputData"
+        },
+        {
+          "propriedade": "obrigatorio",
+          "atributo": "obrigatorio",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiInputData"
+        },
+        {
+          "propriedade": "desabilitado",
+          "atributo": "desabilitado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiInputData"
+        },
+        {
+          "propriedade": "erro",
+          "atributo": "erro",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInputData"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "block",
+          "de": "UrbiInputData"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-input": {
+      "classe": "UrbiInput",
+      "arquivo": "ui/src/urbi-input.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiInput"
+      ],
+      "props": [
+        {
+          "propriedade": "label",
+          "atributo": "label",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInput"
+        },
+        {
+          "propriedade": "valor",
+          "atributo": "valor",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInput"
+        },
+        {
+          "propriedade": "tipo",
+          "atributo": "tipo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInput"
+        },
+        {
+          "propriedade": "placeholder",
+          "atributo": "placeholder",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInput"
+        },
+        {
+          "propriedade": "autocomplete",
+          "atributo": "autocomplete",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInput"
+        },
+        {
+          "propriedade": "obrigatorio",
+          "atributo": "obrigatorio",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiInput"
+        },
+        {
+          "propriedade": "desabilitado",
+          "atributo": "desabilitado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiInput"
+        },
+        {
+          "propriedade": "sujo",
+          "atributo": "sujo",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiInput"
+        },
+        {
+          "propriedade": "erro",
+          "atributo": "erro",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInput"
+        },
+        {
+          "propriedade": "icone",
+          "atributo": "icone",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInput"
+        },
+        {
+          "propriedade": "pattern",
+          "atributo": "pattern",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiInput"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "block",
+          "de": "UrbiInput"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-kpi": {
+      "classe": "UrbiKpi",
+      "arquivo": "ui/src/urbi-kpi.ts",
+      "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiKpi"
+      ],
+      "props": [
+        {
+          "propriedade": "rotulo",
+          "atributo": "rotulo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiKpi"
+        },
+        {
+          "propriedade": "valor",
+          "atributo": "valor",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiKpi"
+        },
+        {
+          "propriedade": "variante",
+          "atributo": "variante",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": true,
+          "de": "UrbiKpi"
+        },
+        {
+          "propriedade": "formato",
+          "atributo": "formato",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiKpi"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "background",
+          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "de": "UrbiKpi"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border",
+          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "de": "UrbiKpi"
+        },
+        {
+          "seletor": ":host",
+          "prop": "border-radius",
+          "valor": "var(--raio-md, 8px)",
+          "de": "UrbiKpi"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "14px 16px",
+          "de": "UrbiKpi"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "140px",
+          "de": "UrbiKpi"
+        }
+      ],
+      "risco_box_model": true
+    },
+    "urbi-lista": {
+      "classe": "UrbiLista",
+      "arquivo": "ui/src/urbi-lista.ts",
+      "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiLista"
+      ],
+      "props": [
+        {
+          "propriedade": "itens",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiLista"
+        },
+        {
+          "propriedade": "render_item",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiLista"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiLista"
+        },
+        {
+          "propriedade": "separador",
+          "atributo": "separador",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiLista"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiLista"
+        },
+        {
+          "propriedade": "mensagemVazio",
+          "atributo": "mensagem-vazio",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiLista"
+        },
+        {
+          "propriedade": "classeItem",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiLista"
+        },
+        {
+          "propriedade": "indicador",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiLista"
+        },
+        {
+          "propriedade": "itemAtivo",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiLista"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-loading": {
+      "classe": "UrbiLoading",
+      "arquivo": "ui/src/urbi-loading.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiLoading"
+      ],
+      "props": [
+        {
+          "propriedade": "mensagem",
+          "atributo": "mensagem",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiLoading"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "block",
+          "de": "UrbiLoading"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-modal": {
+      "classe": "UrbiModal",
+      "arquivo": "ui/src/urbi-modal.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiModal"
+      ],
+      "props": [
+        {
+          "propriedade": "title",
+          "atributo": "title",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiModal"
+        },
+        {
+          "propriedade": "maxWidth",
+          "atributo": "maxwidth",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiModal"
+        },
+        {
+          "propriedade": "closeOnBackdrop",
+          "atributo": "closeonbackdrop",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiModal"
+        },
+        {
+          "propriedade": "hideClose",
+          "atributo": "hideclose",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiModal"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "position",
+          "valor": "fixed",
+          "de": "UrbiModal"
+        },
+        {
+          "seletor": ":host",
+          "prop": "inset",
+          "valor": "0",
+          "de": "UrbiModal"
+        },
+        {
+          "seletor": ":host",
+          "prop": "z-index",
+          "valor": "1000",
+          "de": "UrbiModal"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiModal"
+        },
+        {
+          "seletor": ":host",
+          "prop": "align-items",
+          "valor": "center",
+          "de": "UrbiModal"
+        },
+        {
+          "seletor": ":host",
+          "prop": "justify-content",
+          "valor": "center",
+          "de": "UrbiModal"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-nav": {
+      "classe": "UrbiNav",
+      "arquivo": "ui/src/urbi-nav.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiNav"
+      ],
+      "props": [
+        {
+          "propriedade": "secoes",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiNav"
+        },
+        {
+          "propriedade": "ativo",
+          "atributo": "ativo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiNav"
+        },
+        {
+          "propriedade": "modoSanfona",
+          "atributo": "modo-sanfona",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiNav"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "block",
+          "de": "UrbiNav"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
+          "de": "UrbiNav"
+        },
+        {
+          "seletor": ":host",
+          "prop": "font-family",
+          "valor": "var(--fonte, 'Montserrat', sans-serif)",
+          "de": "UrbiNav"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-select": {
+      "classe": "UrbiSelect",
+      "arquivo": "ui/src/urbi-select.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiSelect"
+      ],
+      "props": [
+        {
+          "propriedade": "label",
+          "atributo": "label",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSelect"
+        },
+        {
+          "propriedade": "valor",
+          "atributo": "valor",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSelect"
+        },
+        {
+          "propriedade": "opcoes",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSelect"
+        },
+        {
+          "propriedade": "grupos",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSelect"
+        },
+        {
+          "propriedade": "placeholder",
+          "atributo": "placeholder",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSelect"
+        },
+        {
+          "propriedade": "desabilitado",
+          "atributo": "desabilitado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiSelect"
+        },
+        {
+          "propriedade": "obrigatorio",
+          "atributo": "obrigatorio",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiSelect"
+        },
+        {
+          "propriedade": "erro",
+          "atributo": "erro",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSelect"
+        },
+        {
+          "propriedade": "pesquisavel",
+          "atributo": "pesquisavel",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiSelect"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "block",
+          "de": "UrbiSelect"
+        },
+        {
+          "seletor": ":host",
+          "prop": "position",
+          "valor": "relative",
+          "de": "UrbiSelect"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-seletor-arquivo": {
+      "classe": "UrbiSeletorArquivo",
+      "arquivo": "ui/src/urbi-seletor-arquivo.ts",
+      "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiSeletorArquivo"
+      ],
+      "props": [
+        {
+          "propriedade": "label",
+          "atributo": "label",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
+        },
+        {
+          "propriedade": "texto",
+          "atributo": "texto",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
+        },
+        {
+          "propriedade": "icone",
+          "atributo": "icone",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
+        },
+        {
+          "propriedade": "variante",
+          "atributo": "variante",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
+        },
+        {
+          "propriedade": "accept",
+          "atributo": "accept",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
+        },
+        {
+          "propriedade": "multiplo",
+          "atributo": "multiplo",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
+        },
+        {
+          "propriedade": "drop",
+          "atributo": "drop",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
+        },
+        {
+          "propriedade": "desabilitado",
+          "atributo": "desabilitado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
+        },
+        {
+          "propriedade": "dica",
+          "atributo": "dica",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiSeletorArquivo"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "gap",
+          "valor": "8px",
+          "de": "UrbiSeletorArquivo"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-shell-page": {
+      "classe": "UrbiShellPage",
+      "arquivo": "ui/src/urbi-shell-page.ts",
+      "base": "UrbiPrimitivoDeLayout",
+      "linhagem": [
+        "UrbiPrimitivoDeLayout",
+        "UrbiShellPage"
+      ],
+      "props": [
+        {
+          "propriedade": "titulo",
+          "atributo": "titulo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiShellPage"
+        },
+        {
+          "propriedade": "subtitulo",
+          "atributo": "subtitulo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiShellPage"
+        },
+        {
+          "propriedade": "compacta",
+          "atributo": "compacta",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiShellPage"
+        },
+        {
+          "propriedade": "dashboard",
+          "atributo": "dashboard",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiShellPage"
+        },
+        {
+          "propriedade": "preencher",
+          "atributo": "preencher",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiShellPage"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeLayout"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeLayout"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeLayout"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeLayout"
+        },
+        {
+          "seletor": ":host",
+          "prop": "overflow",
+          "valor": "hidden",
+          "de": "UrbiPrimitivoDeLayout"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "24px",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host",
+          "prop": "max-width",
+          "valor": "1200px",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host",
+          "prop": "width",
+          "valor": "100%",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host",
+          "prop": "margin",
+          "valor": "0 auto",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host",
+          "prop": "box-sizing",
+          "valor": "border-box",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host([compacta])",
+          "prop": "max-width",
+          "valor": "900px",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host([dashboard])",
+          "prop": "max-width",
+          "valor": "none",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host([dashboard])",
+          "prop": "padding-bottom",
+          "valor": "16px",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "12px",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host([dashboard])",
+          "prop": "padding",
+          "valor": "8px 4px",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "block",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host",
+          "prop": "height",
+          "valor": "auto",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host",
+          "prop": "overflow",
+          "valor": "visible",
+          "de": "UrbiShellPage"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "0",
+          "de": "UrbiShellPage"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-tabela": {
+      "classe": "UrbiTabela",
+      "arquivo": "ui/src/urbi-tabela.ts",
+      "base": "UrbiPrimitivoDeConteudo",
+      "linhagem": [
+        "UrbiPrimitivoDeConteudo",
+        "UrbiTabela"
+      ],
+      "props": [
+        {
+          "propriedade": "colunas",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiTabela"
+        },
+        {
+          "propriedade": "linhas",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiTabela"
+        },
+        {
+          "propriedade": "clicavel",
+          "atributo": "clicavel",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiTabela"
+        },
+        {
+          "propriedade": "carregando",
+          "atributo": "carregando",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiTabela"
+        },
+        {
+          "propriedade": "mensagemVazio",
+          "atributo": "mensagem-vazio",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiTabela"
+        },
+        {
+          "propriedade": "classeLinha",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiTabela"
+        },
+        {
+          "propriedade": "filtrosIniciais",
+          "atributo": null,
+          "so_propriedade": true,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiTabela"
+        },
+        {
+          "propriedade": "responsivo",
+          "atributo": "responsivo",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiTabela"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "flex",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "column",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-height",
+          "valor": "0",
+          "de": "UrbiPrimitivoDeConteudo"
+        },
+        {
+          "seletor": ":host([expandir])",
+          "prop": "flex",
+          "valor": "1",
+          "de": "UrbiPrimitivoDeConteudo"
+        }
+      ],
+      "risco_box_model": false
+    },
+    "urbi-textarea": {
+      "classe": "UrbiTextarea",
+      "arquivo": "ui/src/urbi-textarea.ts",
+      "base": "LitElement",
+      "linhagem": [
+        "UrbiTextarea"
+      ],
+      "props": [
+        {
+          "propriedade": "label",
+          "atributo": "label",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiTextarea"
+        },
+        {
+          "propriedade": "valor",
+          "atributo": "valor",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiTextarea"
+        },
+        {
+          "propriedade": "placeholder",
+          "atributo": "placeholder",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiTextarea"
+        },
+        {
+          "propriedade": "obrigatorio",
+          "atributo": "obrigatorio",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiTextarea"
+        },
+        {
+          "propriedade": "desabilitado",
+          "atributo": "desabilitado",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiTextarea"
+        },
+        {
+          "propriedade": "sujo",
+          "atributo": "sujo",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiTextarea"
+        },
+        {
+          "propriedade": "erro",
+          "atributo": "erro",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiTextarea"
+        },
+        {
+          "propriedade": "rows",
+          "atributo": "rows",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiTextarea"
+        },
+        {
+          "propriedade": "autoResize",
+          "atributo": "autoresize",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": false,
+          "de": "UrbiTextarea"
+        },
+        {
+          "propriedade": "maxRows",
+          "atributo": "maxrows",
+          "so_propriedade": false,
+          "tipo": "Number",
+          "reflete": false,
+          "de": "UrbiTextarea"
+        }
+      ],
+      "host": [
+        {
+          "seletor": ":host",
+          "prop": "display",
+          "valor": "block",
+          "de": "UrbiTextarea"
+        }
+      ],
+      "risco_box_model": false
+    }
+  }
+}
