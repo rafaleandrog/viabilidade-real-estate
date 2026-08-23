@@ -181,15 +181,14 @@ jobs:
           # destino. O script não veria arquivo de processo nenhum e aprovaria a
           # mistura — reproduzido pelo Codex no PR 496, exit 0. Sem a detecção, a
           # origem removida também aparece e é classificada.
-          # `-c core.quotePath=false`: com o padrão, um caminho não-ASCII volta
-          # entre aspas e com escapes (`"frontend/corre\303\247\303\243o.ts"`), não
-          # casa com `/^frontend\//` e o guard aprova a mistura de processo com
-          # produto. Aqui não dá para usar `-z`, porque o NUL não sobrevive à
-          # variável de ambiente que alimenta o script; desligar o quoting resolve
-          # sem isso. O preflight já usa `-z` do lado dele — os dois precisam
-          # entregar o mesmo nome ao mesmo guard. Achado do Codex no PR 502.
-          ARQUIVOS="$(git -c core.quotePath=false diff --no-renames --name-only "$BASE_SHA"..."$HEAD_SHA")"
-          export PR_ARQUIVOS="$ARQUIVOS"
+          # Saída `-z` gravada em ARQUIVO, não em variável: NUL não sobrevive a
+          # variável de ambiente, e é a única representação inequívoca de caminho.
+          # `core.quotePath=false` resolvia só o não-ASCII — a doc do git ressalva
+          # que aspas, barra invertida e caracteres de controle são SEMPRE
+          # escapados, então `frontend/a\b.ts` voltava citado, não casava com
+          # `/^frontend\//` e o guard aprovava a mistura. Achado do Codex no PR 502.
+          git diff --no-renames -z --name-only "$BASE_SHA"..."$HEAD_SHA" > /tmp/pr-arquivos.nul
+          export PR_ARQUIVOS_NUL=/tmp/pr-arquivos.nul
           if ! node scripts/guard-pr-escopo-processo.mjs; then
             echo "::error title=Escopo do PR::Arquivo de .claude/ junto com codigo de produto. Regra R1 do CLAUDE.md: o PR de processo sai sozinho, com todos os documentos propagados no mesmo diff. Editar processo dentro de um PR em revisao produz um ciclo que nao converge."
             exit 1

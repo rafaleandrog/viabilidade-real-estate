@@ -18,16 +18,30 @@
 // Uso (CI):    PR_ARQUIVOS="$(git diff --name-only base...head)" node scripts/guard-pr-escopo-processo.mjs
 // Uso (local): PR_ARQUIVOS="$(git diff --name-only origin/main...HEAD)" node scripts/guard-pr-escopo-processo.mjs
 
-const entrada = (process.env.PR_ARQUIVOS ?? '').trim();
+// `PR_ARQUIVOS_NUL` aponta para um arquivo com a saída de `git … -z`: caminhos
+// separados por NUL, **sem escape nenhum**. É a única representação inequívoca —
+// `core.quotePath=false` resolve só o não-ASCII, e a doc do próprio git ressalva
+// que aspas, barra invertida e caracteres de controle são **sempre** escapados.
+// Um caminho como `frontend/a\b.ts` voltava como `"frontend/a\\b.ts"`, não casava
+// com `/^frontend\//`, e o guard aprovava a mistura de processo com produto.
+// Achado do Codex no PR 502, rodada 15. `PR_ARQUIVOS` continua aceito para quem
+// só tem lista simples em mãos.
+import { readFileSync } from 'node:fs';
+
+const arquivoNul = process.env.PR_ARQUIVOS_NUL ?? '';
+const entrada = arquivoNul
+  ? readFileSync(arquivoNul, 'utf8')
+  : (process.env.PR_ARQUIVOS ?? '').trim();
+const separador = arquivoNul ? '\0' : '\n';
 
 // Sem lista, não há o que julgar — e guard que inventa veredito é pior que guard
 // ausente. Sai 0 dizendo que não rodou.
 if (!entrada) {
-  console.log('  aviso: PR_ARQUIVOS vazio — nada a conferir (o guard não rodou).');
+  console.log('  aviso: lista de arquivos vazia — nada a conferir (o guard não rodou).');
   process.exit(0);
 }
 
-const arquivos = entrada.split('\n').map((l) => l.trim()).filter(Boolean);
+const arquivos = entrada.split(separador).map((l) => l.trim()).filter(Boolean);
 
 // Processo: o que a R1 protege. O CLAUDE.md fica FORA de propósito — ele é um
 // arquivo só, a regra vale para uma seção dele, e marcá-lo inteiro barraria todo

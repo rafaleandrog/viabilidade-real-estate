@@ -54,7 +54,9 @@
 //
 // Só `node` + `git`: sem SDK, sem credencial, sem rede.
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -399,8 +401,13 @@ rodar('guard de fechamento de issue', 'scripts/guard-issue-fechamento.mjs', {
   PR_COMMITS: commits,
   PR_NUMERO: NUMERO,
 });
+// Grava a lista separada por NUL e passa o ARQUIVO, como o job faz — caminho com
+// barra invertida, aspas ou tab não sobrevive à representação textual, e o guard
+// precisa receber exatamente o mesmo nome dos dois lados. Rodada 15.
+const listaNul = join(tmpdir(), `preflight-arquivos-${process.pid}.nul`);
+writeFileSync(listaNul, arquivos.join('\0'));
 rodar('guard de escopo (regra R1)', 'scripts/guard-pr-escopo-processo.mjs', {
-  PR_ARQUIVOS: arquivos.join('\n'),
+  PR_ARQUIVOS_NUL: listaNul,
 });
 rodar('guard de JSON estrito', 'scripts/guard-json.mjs', {});
 rodar('guard de ciclos no schema', 'scripts/guard-schema-ciclos.mjs', {});
@@ -524,6 +531,8 @@ if (migracoesNovas.length === 0 && bumpou) {
 // planeja o backlog. Este script prevê CI; misturar política com previsão é como
 // um preditor perde a única propriedade que o torna útil. Achado do Codex,
 // rodada 12, e veio de dentro da enumeração que eu tinha pedido.
+
+try { rmSync(listaNul, { force: true }); } catch { /* nada a fazer */ }
 
 // ── Saída ───────────────────────────────────────────────────────────────────
 console.log(`preflight de PR — corpo: ${CORPO_ARQ} · base: ${BASE}\n`);
