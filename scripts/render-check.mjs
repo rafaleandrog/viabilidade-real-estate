@@ -180,10 +180,11 @@ export async function harnessDisponivel() {
  * linha, a grade de pagamento é medida contra a largura livre do host e
  * qualquer transbordo real produz ZERO achados. Achado P1 do Codex no PR 506.
  *
- * A regra para mexer aqui: só entra prop cuja semântica de restrição seja
- * inequívoca. Prop de tamanho que NÃO estiver mapeada não é adivinhada — vira
- * LACUNA declarada (ver `lacunasDeDimensao`), porque errar o eixo silenciosamente
- * é pior do que assumir que não sabe.
+ * A regra para mexer aqui: só entra prop cuja restrição o stub consiga aplicar
+ * fielmente ao painel. O que não estiver aqui NÃO é adivinhado — entra
+ * automaticamente na lista de props NÃO REPRODUZIDAS (ver `mapaDeReproducao`),
+ * e aparece assim que um caso usar. Adivinhar o eixo em silêncio é pior do que
+ * assumir que não se sabe.
  */
 const PROPS_QUE_DIMENSIONAM = {
   'urbi-modal': { maxWidth: 'max-width' },
@@ -194,27 +195,60 @@ const PROPS_QUE_DIMENSIONAM = {
   'urbi-grafico-medidor': { altura: 'height' },
 };
 
-/** Nome de prop que CHEIRA a tamanho — usado só para detectar o que falta mapear. */
-const RE_CHEIRO_DE_TAMANHO = /(width|height|largura|altura|tamanho)/i;
-
 /**
- * Props de tamanho que o espelho declara e o mapa acima NÃO cobre.
+ * O que o stub REPRODUZ de cada primitivo — e, por diferença, o que ele não
+ * reproduz.
  *
- * Não é erro por si: `urbi-icone.tamanho` provavelmente é escala tipográfica, e
- * chutar `width` ali inventaria restrição que não existe. O que não pode
- * acontecer é a lacuna ficar CALADA — um caso que usa uma dessas props está
- * medindo uma caixa menos restrita que a real, e o resultado "limpo" dele vale
- * menos do que parece. O harness devolve a lista; quem monta o caso decide.
+ * ⚠️ A versão anterior tentava adivinhar isto por REGEX no nome da prop
+ * (`/width|height|largura|altura|tamanho/`) e envelheceu na primeira olhada:
+ * `urbi-textarea.rows` e `maxRows` restringem a altura do controle real, não
+ * casam com nenhum nome plausível, e não viravam nem lacuna declarada. Achado
+ * P2 do Codex, rodada 2 — e o segundo achado seguido no mesmo mapa.
+ *
+ * O conserto tira a SEMÂNTICA da conta. "Esta prop restringe tamanho?" exige
+ * conhecer o primitivo por dentro, que é justamente o que o espelho não traz;
+ * qualquer resposta minha ali é chute, e chute em inventário envelhece.
+ * "O stub reproduz esta prop?" é FATO, e sai do próprio espelho:
+ *
+ *   a) está em `PROPS_QUE_DIMENSIONAM` — o stub aplica a restrição no painel;
+ *   b) o atributo aparece numa regra `:host([attr])` da linhagem — o stub emite
+ *      a regra, então o navegador aplica igual ao primitivo real;
+ *   c) é `rotulo`/`valor` — o stub as desenha como texto.
+ *
+ * Todo o resto NÃO é reproduzido, sem exceção e sem juízo. O harness lista as
+ * não reproduzidas que estão EM USO num nó visível, e cada caso declara em
+ * `aceitaNaoReproduzido` as que já revisou. Prop nova no espelho aparece
+ * sozinha, no primeiro caso que a usar.
  */
-export function lacunasDeDimensao() {
-  const { primitivos } = JSON.parse(readFileSync(ESPELHO_PRIMITIVOS, 'utf8'));
-  const fora = [];
+function mapaDeReproducao(primitivos) {
+  const mapa = {};
   for (const [tag, p] of Object.entries(primitivos)) {
-    for (const x of p.props) {
-      if (!x.atributo || !RE_CHEIRO_DE_TAMANHO.test(x.propriedade)) continue;
-      if (PROPS_QUE_DIMENSIONAM[tag]?.[x.propriedade]) continue;
-      fora.push({ tag, prop: x.propriedade, atributo: x.atributo });
+    const atributosNoHost = new Set();
+    for (const h of p.host) {
+      const m = /^:host\(\[([a-z0-9-]+)/.exec(h.seletor);
+      if (m) atributosNoHost.add(m[1]);
     }
+    mapa[tag] = p.props
+      .filter((x) => x.atributo)
+      .map((x) => ({
+        prop: x.propriedade,
+        atributo: x.atributo,
+        reproduzida: Boolean(PROPS_QUE_DIMENSIONAM[tag]?.[x.propriedade])
+          || atributosNoHost.has(x.atributo)
+          || x.propriedade === 'rotulo'
+          || x.propriedade === 'valor',
+      }));
+  }
+  return mapa;
+}
+
+/** O inventário, para inspeção — quantas props o stub reproduz e quantas não. */
+export function inventarioDeReproducao() {
+  const { primitivos } = JSON.parse(readFileSync(ESPELHO_PRIMITIVOS, 'utf8'));
+  const mapa = mapaDeReproducao(primitivos);
+  const fora = [];
+  for (const [tag, lista] of Object.entries(mapa)) {
+    for (const x of lista) fora.push({ tag, prop: x.prop, atributo: x.atributo, reproduzida: x.reproduzida });
   }
   return fora;
 }
@@ -552,7 +586,7 @@ function sonda(tol) {
  * spinner TEM conteúdo. Por isso cada caso declara `exigir` — os seletores que
  * provam que a tela sob medição é aquela, e não outra.
  */
-function sondaMontagem({ exigir, lacunas }) {
+function sondaMontagem({ exigir, mapa }) {
   const elementos = [];
   (function coletar(raiz) {
     for (const el of raiz.querySelectorAll('*')) {
@@ -561,30 +595,65 @@ function sondaMontagem({ exigir, lacunas }) {
     }
   })(document.getElementById('raiz'));
 
-  const areaVisivel = elementos.reduce((soma, el) => {
+  // ⚠️ VISIBILIDADE É PARTE DA PROVA, e a primeira versão não exigia.
+  //
+  // `el.matches(seletor)` casa com nó OCULTO. Uma regressão de estado que deixe
+  // o spinner na frente e a tela concluída sob `display: none` passava na prova
+  // (os 7 urbi-kpi existem), o spinner ainda dava área visível positiva, e as
+  // lentes de layout pulavam a subárvore invisível por definição — tudo "limpo"
+  // sem ter medido, que é exatamente o que esta sonda existe para impedir.
+  // Medido antes do conserto: 213 nós, 36.352px² visíveis, três larguras limpas.
+  // Achado P1 do Codex, rodada 2; coberto por `casos/controle-oculto.ts`.
+  //
+  // É a MESMA definição de visível da sonda de layout — de propósito. Se as duas
+  // divergirem, volta a existir nó que a prova conta e a medição ignora.
+  const visivel = (el) => {
+    const e = getComputedStyle(el);
+    if (e.display === 'none' || e.visibility === 'hidden' || Number(e.opacity) === 0) return false;
     const r = el.getBoundingClientRect();
-    return soma + Math.max(0, r.width) * Math.max(0, r.height);
+    return r.width > 0 && r.height > 0;
+  };
+  const visiveis = elementos.filter(visivel);
+
+  const areaVisivel = visiveis.reduce((soma, el) => {
+    const r = el.getBoundingClientRect();
+    return soma + r.width * r.height;
   }, 0);
 
   const faltando = [];
   for (const { seletor, minimo } of exigir) {
     let n = 0;
+    let ocultos = 0;
     for (const el of elementos) {
-      try { if (el.matches(seletor)) n++; } catch { /* seletor inválido: cai abaixo */ }
+      try {
+        if (!el.matches(seletor)) continue;
+        if (visivel(el)) n++; else ocultos++;
+      } catch { /* seletor inválido: cai abaixo, como se não casasse */ }
     }
-    if (n < minimo) faltando.push({ seletor, minimo, achou: n });
+    if (n < minimo) faltando.push({ seletor, minimo, achou: n, ocultos });
   }
   // LACUNAS EM USO: prop de tamanho que o espelho declara, o stub não sabe
   // honrar, e o caso usa mesmo assim. Não é erro — é a medida valendo menos do
   // que parece, e precisa aparecer em vez de ficar calada.
-  const lacunasPresentes = [];
-  for (const { tag, prop, atributo } of lacunas) {
-    const n = elementos.filter(
-      (el) => el.tagName.toLowerCase() === tag && (el.hasAttribute(atributo) || el[prop] != null),
-    ).length;
-    if (n > 0) lacunasPresentes.push({ tag, prop, usos: n });
+  // Props NÃO REPRODUZIDAS em uso num nó VISÍVEL. Só visível: prop numa
+  // subárvore oculta não afeta medida nenhuma, e avisar sobre ela é o ruído que
+  // faz ignorar o aviso.
+  const naoReproduzidas = new Set();
+  for (const el of visiveis) {
+    const lista = mapa[el.tagName.toLowerCase()];
+    if (!lista) continue;
+    for (const { prop, atributo, reproduzida } of lista) {
+      if (reproduzida) continue;
+      const v = el[prop];
+      const usada = el.hasAttribute(atributo) || (v !== undefined && v !== null && v !== '' && v !== false);
+      if (usada) naoReproduzidas.add(`${el.tagName.toLowerCase()}.${prop}`);
+    }
   }
-  return { nos: elementos.length, areaVisivel: Math.round(areaVisivel), faltando, lacunasPresentes };
+  return {
+    nos: elementos.length, nosVisiveis: visiveis.length,
+    areaVisivel: Math.round(areaVisivel), faltando,
+    naoReproduzidas: [...naoReproduzidas].sort(),
+  };
 }
 
 // Segunda sonda, de COR. Separada porque roda uma vez por variante de tema,
@@ -775,6 +844,7 @@ export async function verificarRender(opcoes) {
     await document.fonts.ready;
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     window.__exigir = caso.exigir;
+    window.__aceita = caso.aceitaNaoReproduzido ?? [];
     document.title = 'pronto';
   } catch (e) {
     window.__erroMontagem = String(e && e.stack || e);
@@ -796,10 +866,12 @@ export async function verificarRender(opcoes) {
 
     navegador = await chromium.launch();
     const versaoNavegador = navegador.version();
+    const mapaRep = mapaDeReproducao(JSON.parse(readFileSync(ESPELHO_PRIMITIVOS, 'utf8')).primitivos);
+    const naoReproduzidasUniao = new Set();
+    let aceitoPeloCaso = [];
     const achados = {
       caso, larguras: {}, variantes: {}, erroConsole: [], nVariantes: temas.n,
       fingerprint: null, navegador: versaoNavegador, avisos: [], montagem: null,
-      lacunasDeDimensao: lacunasDeDimensao(),
     };
     // ⚠️ A versão do motor de layout MUDA a geometria, e esta suíte asserta
     // pixel (os 22px de sobreposição do urbi-kpi). A versão é FIXADA pelo pin
@@ -842,23 +914,32 @@ export async function verificarRender(opcoes) {
           'reporta "limpo" em todas as lentes.',
         );
       }
-      const m = await pag.evaluate(sondaMontagem, { exigir, lacunas: achados.lacunasDeDimensao });
+      const m = await pag.evaluate(sondaMontagem, { exigir, mapa: mapaRep });
       achados.montagem = { ...m, largura, assentou: await pag.evaluate(() => window.__assentou === true) };
       if (m.faltando.length || m.areaVisivel <= 0) {
         throw new Error(
           `o caso "${caso}" não montou o que declara, em ${largura}px — nada foi medido.\n` +
-          `  nós: ${m.nos} · área visível: ${m.areaVisivel}px²\n` +
-          m.faltando.map((f) => `  faltou "${f.seletor}": exigia ${f.minimo}, achou ${f.achou}`).join('\n'),
+          `  nós: ${m.nos} (${m.nosVisiveis} visíveis) · área visível: ${m.areaVisivel}px²\n` +
+          m.faltando.map((f) => `  faltou "${f.seletor}": exigia ${f.minimo} visível(is), achou ${f.achou}`
+            + (f.ocultos ? ` — e ${f.ocultos} OCULTO(s): o nó existe mas ninguém o vê, e as lentes de layout pulam subárvore invisível` : '')).join('\n'),
         );
       }
       if (!achados.montagem.assentou) {
         achados.avisos.push(`em ${largura}px o Lit não assentou em 20 voltas — a medição pode ser de árvore incompleta.`);
       }
-      for (const l of m.lacunasPresentes) {
-        const aviso = `${l.tag} usa "${l.prop}" (${l.usos}x) e o stub não sabe restringir por essa prop — `
-          + 'a caixa medida é menos restrita que a real. Ver PROPS_QUE_DIMENSIONAM em scripts/render-check.mjs.';
-        if (!achados.avisos.includes(aviso)) achados.avisos.push(aviso);
-      }
+      // Confronto entre o que o caso ACEITA não ter reproduzido e o que ele de
+      // fato usa. Os dois sentidos, porque declaração que envelhece é a forma
+      // silenciosa de a verificação parar de verificar:
+      //   · em uso e NÃO declarada → a medida é mais frouxa que a tela real e
+      //     ninguém sabe;
+      //   · declarada e SEM uso → a lista virou papel de parede, e a próxima
+      //     prop de verdade entra escondida embaixo dela.
+      // ⚠️ UNIÃO entre as larguras, não a última. `achados.montagem` é
+      // sobrescrito a cada volta, e uma prop que só entra em jogo num
+      // breakpoint (o app tem vários) sumiria do confronto por acidente de
+      // ordem do laço — mais um caso de "reporta limpo por não ter medido".
+      aceitoPeloCaso = await pag.evaluate(() => window.__aceita ?? []);
+      for (const x of m.naoReproduzidas) naoReproduzidasUniao.add(x);
 
       achados.larguras[largura] = await pag.evaluate(sonda, TOL);
       achados.fingerprint ??= achados.larguras[largura].fingerprint;
@@ -873,6 +954,19 @@ export async function verificarRender(opcoes) {
         }
       }
       await ctx.close();
+    }
+    // Confronto entre o que o caso ACEITA não ter reproduzido e o que ele de
+    // fato usa, somando todas as larguras. Os dois sentidos, porque declaração
+    // que envelhece é a forma silenciosa de a verificação parar de verificar:
+    //   · em uso e NÃO declarada → a medida é mais frouxa que a tela real e
+    //     ninguém sabe;
+    //   · declarada e SEM uso → a lista virou papel de parede, e a próxima prop
+    //     de verdade entra escondida embaixo dela.
+    if (achados.montagem) {
+      const usadas = [...naoReproduzidasUniao].sort();
+      achados.montagem.naoReproduzidas = usadas;
+      achados.montagem.naoDeclaradas = usadas.filter((x) => !aceitoPeloCaso.includes(x));
+      achados.montagem.declaracoesOciosas = aceitoPeloCaso.filter((x) => !usadas.includes(x));
     }
     return achados;
   } finally {
@@ -897,7 +991,9 @@ export function descrever(achados, teto = 4) {
     : lista;
   linhas.push(`caso: ${achados.caso} · ${achados.nVariantes} variante(s) de tema · Chromium ${achados.navegador} · fonte ${achados.fingerprint?.largura}px em ${achados.fingerprint?.familia}`);
   if (achados.montagem) {
-    linhas.push(`  montagem: ${achados.montagem.nos} nós · ${achados.montagem.areaVisivel}px² visíveis · Lit ${achados.montagem.assentou ? 'assentado' : 'NÃO assentado'}`);
+    linhas.push(`  montagem: ${achados.montagem.nos} nós (${achados.montagem.nosVisiveis} visíveis) · ${achados.montagem.areaVisivel}px² · Lit ${achados.montagem.assentou ? 'assentado' : 'NÃO assentado'}`);
+    if (achados.montagem.naoDeclaradas?.length) linhas.push(`  props NÃO reproduzidas e NÃO declaradas: ${achados.montagem.naoDeclaradas.join(', ')}`);
+    if (achados.montagem.declaracoesOciosas?.length) linhas.push(`  declarações ociosas em aceitaNaoReproduzido: ${achados.montagem.declaracoesOciosas.join(', ')}`);
   }
   for (const a of achados.avisos ?? []) linhas.push(`  ⚠️ ${a}`);
   for (const [largura, r] of Object.entries(achados.larguras)) {

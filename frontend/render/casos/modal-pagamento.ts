@@ -38,6 +38,23 @@ export const caso = {
     { seletor: 'div.pag-grid', minimo: 1 },
     { seletor: 'viab-num', minimo: 5 },
   ],
+  // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a
+  // uma. Não é isenção: é o registro do que a medida deste caso NÃO cobre. O
+  // harness confronta nos dois sentidos (usada e não declarada → falha; declarada
+  // e sem uso → falha), então a lista não envelhece em silêncio.
+  aceitaNaoReproduzido: [
+    // `urbi-modal.maxWidth` NÃO está aqui de propósito: ela É reproduzida, pelo
+    // PROPS_QUE_DIMENSIONAM — é o conserto que faz este caso medir contra os
+    // 860px reais em vez da largura livre da janela.
+    'urbi-botao.icone',
+    'urbi-botao.pequeno',
+    'urbi-botao.variante',
+    // `urbi-estado-vazio.*` NÃO entra: o stub dele renderiza vazio, fica com
+    // altura zero e a sonda o classifica como invisível — logo não influencia
+    // medida nenhuma. Declarar viraria declaração ociosa, e o harness reprova
+    // isso de propósito: lista que envelhece esconde a próxima entrada de verdade.
+    'urbi-modal.title',
+  ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-fluxo-receitas');
     forcarEstado(el, {

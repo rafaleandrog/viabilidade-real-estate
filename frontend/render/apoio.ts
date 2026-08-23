@@ -55,9 +55,23 @@ export function avisos(a: Achados): string[] {
   return a.avisos ?? [];
 }
 
-/** Props de tamanho em uso que o stub não sabe restringir — medida menos restrita que a real. */
-export function lacunasEmUso(a: Achados): string[] {
-  return (a.montagem?.lacunasPresentes ?? []).map((l) => `${l.tag}.${l.prop} (${l.usos}x)`);
+/**
+ * Props que o stub NÃO reproduz, o caso usa, e o caso NÃO declarou em
+ * `aceitaNaoReproduzido`. Cada uma torna a caixa medida mais frouxa que a real
+ * sem ninguém saber.
+ */
+export function naoDeclaradas(a: Achados): string[] {
+  return a.montagem?.naoDeclaradas ?? [];
+}
+
+/**
+ * O sentido oposto: o caso declarou e não usa mais. Reprovar também aqui não é
+ * preciosismo — declaração que envelhece vira papel de parede, e a próxima prop
+ * de verdade entra escondida embaixo dela. Mesma regra das DISPENSAS de
+ * `scripts/guard-box-model-urbi.mjs`.
+ */
+export function declaracoesOciosas(a: Achados): string[] {
+  return a.montagem?.declaracoesOciosas ?? [];
 }
 
 /** Larguras em que o DOCUMENTO rolou na horizontal. */

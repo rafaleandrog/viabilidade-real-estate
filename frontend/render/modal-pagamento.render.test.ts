@@ -22,7 +22,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { verificarRender } from '../../scripts/render-check.mjs';
 import {
-  contar, lacunasEmUso, larguraComOverflowDeDocumento, motivoParaPular, relato, textosInvisiveis,
+  contar, declaracoesOciosas, larguraComOverflowDeDocumento, naoDeclaradas, motivoParaPular, relato, textosInvisiveis,
   tokensSemValor,
 } from './apoio.js';
 
@@ -36,7 +36,8 @@ test('Modal de Pagamento: a grade de campos cabe em 1280/900/600px', { skip: pul
   assert.equal(contar(a, 'corte'), 0, 'conteúdo cortado por overflow oculto' + relato(a));
   assert.deepEqual(larguraComOverflowDeDocumento(a), [], 'o modal empurrou o documento na horizontal' + relato(a));
   assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
-  assert.deepEqual(lacunasEmUso(a), [], 'prop de tamanho que o stub não honra' + relato(a));
+  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
+  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 });
 

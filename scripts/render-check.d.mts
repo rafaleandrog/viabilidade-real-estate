@@ -24,15 +24,26 @@ export interface MedidaDeVariante {
   invisiveis: AchadoInvisivel[];
 }
 
-export interface LacunaDeDimensao { tag: string; prop: string; atributo: string }
+export interface PropDoEspelho {
+  tag: string;
+  prop: string;
+  atributo: string;
+  reproduzida: boolean;
+}
 
 export interface Montagem {
   nos: number;
+  nosVisiveis: number;
   areaVisivel: number;
   largura: number;
   assentou: boolean;
-  faltando: { seletor: string; minimo: number; achou: number }[];
-  lacunasPresentes: { tag: string; prop: string; usos: number }[];
+  faltando: { seletor: string; minimo: number; achou: number; ocultos: number }[];
+  /** Props não reproduzidas pelo stub e em uso num nó visível — união das larguras. */
+  naoReproduzidas: string[];
+  /** Dessas, as que o caso não declarou em `aceitaNaoReproduzido`. */
+  naoDeclaradas: string[];
+  /** O sentido oposto: declaradas e sem uso. */
+  declaracoesOciosas: string[];
 }
 
 export interface Achados {
@@ -41,7 +52,6 @@ export interface Achados {
   navegador: string;
   avisos: string[];
   montagem: Montagem | null;
-  lacunasDeDimensao: LacunaDeDimensao[];
   fingerprint: { largura: number; familia: string } | null;
   erroConsole: string[];
   larguras: Record<string, MedidaDeLargura>;
@@ -58,4 +68,4 @@ export function harnessDisponivel(): Promise<{ ok: boolean; motivo?: string }>;
 
 export function descrever(achados: Achados, teto?: number): string[];
 
-export function lacunasDeDimensao(): LacunaDeDimensao[];
+export function inventarioDeReproducao(): PropDoEspelho[];

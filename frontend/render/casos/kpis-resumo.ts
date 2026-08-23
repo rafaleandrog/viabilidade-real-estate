@@ -23,6 +23,19 @@ export const caso = {
     { seletor: 'div.kpi-cel', minimo: 7 },
     { seletor: 'urbi-kpi', minimo: 7 },
   ],
+  // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a
+  // uma. Não é isenção: é o registro do que a medida deste caso NÃO cobre. O
+  // harness confronta nos dois sentidos (usada e não declarada → falha; declarada
+  // e sem uso → falha), então a lista não envelhece em silêncio.
+  aceitaNaoReproduzido: [
+    // Só cor/semântica e conteúdo — nenhuma restringe a caixa, que é o que este
+    // caso mede. `altura` do gráfico É reproduzida (PROPS_QUE_DIMENSIONAM).
+    'urbi-card.titulo',
+    'urbi-grafico-pizza.categorias',
+    'urbi-grafico-pizza.formato',
+    'urbi-grafico-pizza.series',
+    'urbi-kpi.variante',
+  ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-tela-resumo');
     // `estudo` fica NULO de propósito: é o que impede o `updated()` de disparar

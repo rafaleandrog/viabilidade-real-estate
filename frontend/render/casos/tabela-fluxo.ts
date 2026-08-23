@@ -23,6 +23,19 @@ export const caso = {
     { seletor: 'table.fx', minimo: 1 },
     { seletor: 'table.fx tbody tr', minimo: 4 },
   ],
+  // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a
+  // uma. Não é isenção: é o registro do que a medida deste caso NÃO cobre. O
+  // harness confronta nos dois sentidos (usada e não declarada → falha; declarada
+  // e sem uso → falha), então a lista não envelhece em silêncio.
+  aceitaNaoReproduzido: [
+    'urbi-badge.ativo',
+    'urbi-badge.cor',
+    'urbi-badge.interativo',
+    'urbi-botao.icone',
+    'urbi-botao.pequeno',
+    'urbi-botao.variante',
+    'urbi-card.titulo',
+  ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-fluxo-ver');
     forcarEstado(el, {

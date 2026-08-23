@@ -28,7 +28,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { verificarRender } from '../../scripts/render-check.mjs';
-import { contar, motivoParaPular, relato } from './apoio.js';
+import { contar, declaracoesOciosas, motivoParaPular, naoDeclaradas, relato } from './apoio.js';
 
 const pular = await motivoParaPular();
 
@@ -45,6 +45,17 @@ test('KPIs do Resumo: o urbi-kpi ainda transborda a célula e pinta sobre o vizi
     contar(a, 'sobreposicao') > 0,
     'A sobreposição entre cards de KPI sumiu — ver a instrução acima (#488).' + relato(a),
   );
+
+  // ⚠️ O IRMÃO DAS OUTRAS ASSERÇÕES, e ele faltava aqui: um teste de falha
+  // esperada é o mais fácil de continuar verde por acidente, porque ele já
+  // espera achar coisa errada. Se a medição estivesse frouxa — prop não
+  // reproduzida em uso, declaração ociosa, Lit não assentado —, os dois `ok`
+  // acima passariam mesmo assim. Este bloco é o que impede a falha esperada de
+  // virar a desculpa para não conferir a qualidade da medida.
+  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
+  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
+  assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
+  assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
 
   // O tamanho da invasão é estável nas três larguras porque vem do box model
   // (padding + borda), não da largura da célula: 2 x 16px de padding + 2 x 1px

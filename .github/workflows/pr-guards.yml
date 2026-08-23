@@ -327,7 +327,19 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          set -uo pipefail
+          # ⚠️ `-e` LIGADO, e é ele que faz o resto deste passo valer.
+          #
+          # Com `errexit` desligado (era assim), as duas pré-condições eram
+          # decorativas: se o `git diff` falhasse, ARQUIVOS ficava VAZIO e a lista
+          # vazia é classificada como fora de escopo — o job pularia tudo e ficaria
+          # verde; e se o `--autoteste` reprovasse, o shell seguia para a decisão
+          # real assim mesmo, ou seja, a bateria de 8.001 caminhos NÃO garantia que
+          # a regressão dela deixasse o CI vermelho. O conserto do SIGPIPE estava
+          # aqui, mas a rede que o protege não prendia. Achado P1 do Codex, rodada 2.
+          #
+          # A decisão em si continua podendo dar 1 sem abortar: comando em condição
+          # de `if` é exceção do `errexit`, e é exatamente o que se quer ali.
+          set -euo pipefail
           # ⚠️ A decisão NÃO passa por pipe, e isso não é estilo.
           #
           # A primeira versão era `git diff --name-only ... | grep -qE '^frontend/'`.
@@ -411,6 +423,13 @@ jobs:
           # inteira viraria enfeite sem nada ficar vermelho.
           RENDER_CHECK_OBRIGATORIO: '1'
         run: |
+          # `-e` fica DESLIGADO só aqui, e de propósito: o passo captura `rc=$?`
+          # logo depois do `timeout` para distinguir 124 (travou) de qualquer
+          # outro não-zero, e com `errexit` o shell abortaria antes de chegar no
+          # `if`, perdendo a mensagem que diz o que aconteceu. Conferido: TODO
+          # caminho não-zero abaixo é tratado explicitamente e termina em
+          # `exit 1` — inclusive 127, se o `node` sumir. O passo de escopo, que
+          # tinha pré-condições NÃO tratadas, foi para `-euo`.
           set -uo pipefail
           # As DUAS defesas de timeout, porque cobrem casos diferentes e nenhuma
           # cobre o do outro (CLAUDE.md § Duas regras de CI):

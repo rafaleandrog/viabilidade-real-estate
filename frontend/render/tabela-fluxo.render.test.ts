@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { verificarRender } from '../../scripts/render-check.mjs';
 import {
-  contar, lacunasEmUso, larguraComOverflowDeDocumento, motivoParaPular, relato, tokensSemValor,
+  contar, declaracoesOciosas, larguraComOverflowDeDocumento, naoDeclaradas, motivoParaPular, relato, tokensSemValor,
 } from './apoio.js';
 
 const pular = await motivoParaPular();
@@ -34,7 +34,8 @@ test('Tabela do Fluxo: a largura fica no scroller declarado, sem caixa sobre cai
   assert.deepEqual(larguraComOverflowDeDocumento(a), [], 'a tabela empurrou o DOCUMENTO na horizontal' + relato(a));
   assert.deepEqual(tokensSemValor(a), [], 'token citado pelo CSS não resolve em alguma variante' + relato(a));
   assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
-  assert.deepEqual(lacunasEmUso(a), [], 'prop de tamanho que o stub não honra' + relato(a));
+  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
+  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 
   // Não são asserções — são o registro do que as lentes dependentes de fonte

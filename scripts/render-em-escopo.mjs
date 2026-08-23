@@ -32,12 +32,21 @@
 // telas, o espelho que gera os stubs dos primitivos, o próprio harness, os
 // casos, ou o wiring que os executa.
 const PREFIXOS = [
-  'frontend/',
-  'docs/ui-urbiverso/',
-  'scripts/render-check',
-  'scripts/render-em-escopo',
-  'scripts/validar-frontend.sh',
-  '.github/workflows/pr-guards.yml',
+  'frontend/',                        // as telas medidas e os casos
+  'docs/ui-urbiverso/',               // o espelho que gera os stubs dos primitivos
+  'scripts/render-check',             // o harness (.mjs e .d.mts)
+  'scripts/render-em-escopo',         // este arquivo
+  'scripts/validar-frontend.sh',      // o wiring local
+  '.github/workflows/pr-guards.yml',  // o wiring do CI
+  // ⚠️ Os três abaixo entraram na rodada 2 da revisão do PR 506, e a ausência do
+  // primeiro era irônica: as versões foram FIXADAS para o determinismo do
+  // render, e um PR que mudasse só o pin ou o lockfile era classificado como
+  // fora de escopo — pulava o único `npm ci`, a instalação do navegador, a
+  // sonda de lançamento e a suíte inteira. Cadeia de ferramentas inválida
+  // entraria sem nunca ser exercitada.
+  '.github/render-deps/',             // a toolchain pinada que o job instala
+  'package.json',                     // dono do glob que decide se os testes de render rodam
+  'tsconfig.json',                    // o harness empacota os casos com este tsconfig
 ];
 
 export function emEscopo(lista) {
@@ -59,6 +68,14 @@ function autoteste() {
   checar('um arquivo de frontend entra', emEscopo('frontend/tela-resumo.ts').casaram === 1);
   checar('o espelho de UI entra', emEscopo('docs/ui-urbiverso/primitivos.json').casaram === 1);
   checar('o próprio harness entra', emEscopo('scripts/render-check.mjs').casaram === 1);
+  checar('o pin da toolchain entra', emEscopo('.github/render-deps/package.json').casaram === 1);
+  checar('o lockfile da toolchain entra', emEscopo('.github/render-deps/package-lock.json').casaram === 1);
+  checar('o package.json da raiz entra (é o dono do glob de teste)',
+    emEscopo('package.json').casaram === 1);
+  checar('o tsconfig da raiz entra (o harness empacota com ele)',
+    emEscopo('tsconfig.json').casaram === 1);
+  checar('package.json de OUTRO diretório não entra',
+    emEscopo('backend/package.json').casaram === 0);
   checar('caminho que só CONTÉM frontend/ no meio não entra',
     emEscopo('docs/notas/frontend/coisa.md').casaram === 0);
 

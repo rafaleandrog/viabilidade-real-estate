@@ -24,6 +24,19 @@ export const caso = {
     { seletor: 'urbi-kpi', minimo: 4 },
     { seletor: 'table.pf', minimo: 1 },
   ],
+  // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a
+  // uma. Não é isenção: é o registro do que a medida deste caso NÃO cobre. O
+  // harness confronta nos dois sentidos (usada e não declarada → falha; declarada
+  // e sem uso → falha), então a lista não envelhece em silêncio.
+  aceitaNaoReproduzido: [
+    // `urbi-botao.pequeno` muda o padding do botão de verdade; aqui os botões
+    // ficam FORA da faixa de KPIs medida, então não deslocam o que se afere.
+    'urbi-botao.icone',
+    'urbi-botao.pequeno',
+    'urbi-botao.variante',
+    'urbi-card.titulo',
+    'urbi-kpi.variante',
+  ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-tela-proforma');
     // `_init()` roda no `connectedCallback` e vai à API por benchmarks, config

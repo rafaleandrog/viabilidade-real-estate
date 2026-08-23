@@ -13,7 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { verificarRender } from '../../scripts/render-check.mjs';
 import {
-  contar, lacunasEmUso, larguraComOverflowDeDocumento, motivoParaPular, relato, textosInvisiveis,
+  contar, declaracoesOciosas, larguraComOverflowDeDocumento, naoDeclaradas, motivoParaPular, relato, textosInvisiveis,
   tokensSemValor,
 } from './apoio.js';
 
@@ -32,7 +32,8 @@ test('KPIs da Proforma: min-width:0 não estoura a célula em 1280/900/600px', {
   // A medida só vale se o stub soube reproduzir as restrições de tamanho em
   // jogo. Prop de dimensão não mapeada torna a caixa medida MENOS restrita que
   // a real — e "limpo" numa caixa mais folgada não prova nada.
-  assert.deepEqual(lacunasEmUso(a), [], 'prop de tamanho que o stub não honra' + relato(a));
+  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
+  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 });
 
