@@ -663,23 +663,31 @@ fecha pela § 9. Quem consertou pode ser o usuário, outra sessão, ou esta mesm
 desta skill — para a rodada, tanto faz: o que existe é commit novo sobre um PR que já tem
 relatório.
 
-> 🛑 **TETO DE DUAS RODADAS — regra R2 do `CLAUDE.md` § Processo obrigatório.**
+> 🛑 **O CICLO FECHA POR CONVERGÊNCIA — regra R2 do `CLAUDE.md` § Processo obrigatório.**
 >
-> A partir da rodada 3, a revisão **só reabre se houver bloqueante de código**. Observação sobre
-> **documentação, texto ou processo** vira **issue**, com o achado transcrito, e o ciclo fecha.
+> **Não há teto de rodadas.** O critério é o da § 9: **zero bloqueantes pendentes**, onde pendente é
+> o que não foi consertado nem **retirado por contestação com evidência**. Rodada que acha defeito
+> novo, distinto e real é rodada funcionando — reabra.
 >
-> **Isto é uma condição executável, não um conselho** — e esta seção precisa carregá-la porque **a
-> skill é o procedimento**: o `CLAUDE.md` institui o teto, mas quem executa lê aqui. Achado do Codex
-> no PR 496, e ele estava certo: sem esta linha, a §8 mandava reabrir a cada conserto e continuava
-> exatamente o ciclo documental que o teto existe para encerrar.
+> **Isto é uma condição executável, não um conselho**, e esta seção precisa carregá-la porque **a
+> skill é o procedimento**: o `CLAUDE.md` institui a regra, mas quem executa lê aqui.
 >
-> **A conta do teto é de rodadas, não de achados.** Rodada 3 com bloqueante de código é legítima, e
-> a 4 também — o que o teto barra é a rodada que existe só para conferir um ajuste de texto.
+> **Pare antes da § 9 em dois casos, e nos dois diga qual é a pergunta:**
 >
-> **Por que o teto, com o caso medido:** o PR 494 acumulou rodada após rodada, **nenhum achado
-> falso**, e mesmo assim o ciclo não fechava — porque cada conserto de documentação envelhecia a
-> descrição vizinha e gerava o achado seguinte. O teto é o que impede o decaimento de esforço de
-> virar assíntota.
+> - **decisão de desenho** — o conserto mexeria em algo que o autor decidiu;
+> - **achado que não converge** — a mesma faixa volta rodada após rodada, ou cada conserto puxa um
+>   achado novo *na mesma área*. Não é revisão, é laço.
+>
+> Da rodada 3 em diante, achado que seja **só observação** (documentação, texto, estilo) **vira
+> issue** com o achado transcrito, em vez de mais uma volta. É a única parte do teto antigo que
+> sobrevive, e é ela que impede o ciclo documental do PR 494 de voltar.
+>
+> **Por que o teto saiu, com o caso medido:** ele contava rodadas, e contagem não distingue a
+> rodada que descobre defeito novo da que gira em falso. No PR 502, em 2026-08-23, foram **quatro**
+> rodadas, **todas** com bloqueante de código real, cada uma achando um membro diferente da mesma
+> classe — e uma delas pegou um defeito que o conserto anterior tinha criado. Teto de duas teria
+> mergeado um preflight que quebrava o CI de toda migração. O PR 494, que motivou o teto, era
+> não-convergência de verdade, e disso cuida a **R1**.
 
 Os passos 1 a 7 valem inteiros em toda rodada. O que muda é a calibragem — **o padrão é
 decair**, e rodada 2 rodando a skill inteira por reflexo é o modo caro de errar:

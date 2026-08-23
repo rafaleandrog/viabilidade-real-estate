@@ -238,10 +238,32 @@ seguinte. Vão em **PR próprio**, com todos os documentos propagados **no mesmo
 O guard `scripts/guard-pr-escopo-processo.mjs` (job `escopo-processo`) barra o PR que misture
 processo com código de produto.
 
-**R2 · Teto de duas rodadas de revisão por PR.**
-Terceira rodada **só com bloqueante de código**. Observação sobre documentação, a partir da
-terceira, **vira issue** — não vira mais uma volta no laço. A §8 da skill continua mandando o
-esforço decair; o teto é o que impede o decaimento de virar assíntota.
+**R2 · O ciclo fecha por convergência, não por contagem.**
+Critério único, o mesmo do upstream: **zero bloqueantes pendentes** — consertado, ou **retirado por
+contestação com evidência**. Rodada que acha defeito novo, distinto e real é rodada funcionando, e
+**não tem teto**.
+
+O ciclo também termina antes disso em dois casos, e nos dois você **diz qual é a pergunta** que o
+autor precisa responder, em vez de deixar "aguardando decisão" solto:
+
+- **Decisão de desenho** — o conserto mexeria em algo que o autor decidiu. Com parcimônia: usado à
+  toa, vira jeito de terceirizar julgamento que era seu.
+- **Achado que não converge** — a mesma faixa volta rodada após rodada, ou cada conserto puxa um
+  achado novo *na mesma área*. Aí não é revisão, é laço: pare, diga o que está girando, devolva.
+
+A única parte do teto antigo que sobrevive: da terceira rodada em diante, achado que seja **só
+observação** (documentação, texto, estilo) **vira issue** em vez de mais uma volta.
+
+> ⚠️ **Esta regra já foi "teto de duas rodadas", e o teto era invenção desta cópia — o upstream
+> nunca teve contador.** Ele mede a coisa errada: trata como igual a rodada que descobre defeito
+> novo e a que gira em falso. Medido em 2026-08-23: o PR 502 fez **quatro** rodadas, **todas** com
+> bloqueante de código real, cada uma achando um membro diferente da mesma classe — e uma delas
+> pegou um defeito que o conserto anterior tinha *criado*. Um teto de duas teria mergeado um
+> preflight que quebrava o CI de toda migração.
+>
+> O caso que motivou o teto — o PR 494, dez rodadas sem fechar — **era** não-convergência, e a
+> causa raiz dele já é tratada pela **R1**: mudança de processo não entra em PR sob revisão. O teto
+> tratava sintoma de doença curada, e cobrava o preço no PR que estava funcionando.
 
 **R3 · Um assunto por PR.**
 O PR 494 misturou cinco. Além de alargar a revisão, isso impede reverter uma parte sem reverter as
