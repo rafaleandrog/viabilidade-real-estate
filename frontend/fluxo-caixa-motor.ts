@@ -508,10 +508,12 @@ export function pctRepasseDerivado(fp: any): number {
 //
 // ESTRATÉGIA CONSERVADORA (corpo da #230): definir o shape canônico → criar o
 // normalizador do dado ATUAL → preservar a leitura legada → só migrar
-// persistência se o ganho justificar. Este PR entrega o TIPO e o ADAPTER
-// (`componentesDoLegado`); a matemática de safra/PMT que os CONSOME é #232+ —
-// `receitaMensalLinha` continua lendo o `fluxo_pagamento` legado diretamente,
-// sem mudança de comportamento nesta issue.
+// persistência se o ganho justificar. A #230 entregou o TIPO e o ADAPTER
+// (`componentesDoLegado`); a matemática de safra/PMT veio em #232+; e a #283
+// LIGOU as duas ao fluxo consolidado. Hoje `recebimentoBrutoMensal` (:1335)
+// consulta `recebiveisComponentesLinha` PRIMEIRO e só cai no motor legado
+// (`entrada`/`parcelas`/`repasse`) quando a linha não tem
+// `fluxo_pagamento.componentes` persistido.
 
 /** Componente de pagamento — 4 regras econômicas, campos mínimos da #230. */
 export type ComponentePagamento =
@@ -641,12 +643,23 @@ export function componentesPagamento(fluxoPagamento: any, cronograma: EventoCron
 // Estas funções calculam os pagamentos de UMA safra para UM componente —
 // reconciliadas mês a mês contra o oráculo dourado Calliandra
 // (`frontend/fixtures/calliandra-golden.ts`, #220). São o motor de cálculo
-// que o corpo de #230 previa para #232+; NÃO estão ligadas a
-// `receitaMensalLinha`/`calcularFluxo` nesta fase — nenhum estudo existente
-// muda de resultado. A integração ao fluxo consolidado (para uma linha que
-// opte pelo contrato de componentes) é trabalho de issue futura, quando a UI
-// oferecer o novo modelo; até lá, o motor legado (`entrada`/`parcelas`/
-// `repasse`) continua sendo o único caminho de cálculo real.
+// que o corpo de #230 previa para #232+, e desde a #283 ele É o caminho de
+// cálculo real: `calcularRecebiveisComponentes` (:1064) consolida as safras
+// de uma linha e `calcularFluxo` (:2025-2053) agrega principal, juros,
+// carteira, repasse e as séries por componente. A porta de entrada é
+// `fluxo_pagamento.componentes` na linha; sem ele, a linha segue pelo motor
+// legado (`entrada`/`parcelas`/`repasse`), que continua existindo para
+// estudo nunca reeditado. Como `fluxoPagamentoParaSalvar`
+// (`frontend/fluxo-pagamento-editor.ts:90`) grava `componentes` em toda
+// escrita, todo Grupo já editado desde a #248 usa este caminho.
+//
+// ⚠️ A matemática de juros existe e é exercitada por estudo real; o que falta
+// é a ENTRADA. Há linha em produção com `taxaMensal` diferente de 0 (estudo 5
+// de Pinguim: 0.0098636 = 12,5% a.a., R$ 1.259.273,59). O modal não oferece
+// campo de taxa nem de sinal, e o adaptador fixa `taxaMensal: 0` /
+// `sinalPct: 0` (:589,601,608,617) — então abrir o modal e clicar "Aplicar"
+// APAGA os juros da linha, sem aviso e sem undo. Escrever "`jurosClientes` é
+// sempre 0" é errado: os juros existem e viram zero no primeiro Aplicar.
 
 /** PMT — parcela fixa que amortiza `principal` em `n` períodos à `taxaMensal`.
  * Taxa zero → divisão simples (sem juros). `n` ≤ 0 → 0 (guarda defensiva). */

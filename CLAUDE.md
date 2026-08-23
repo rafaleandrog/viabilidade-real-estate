@@ -30,13 +30,66 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — ✅ RODADA 7 CONCLUÍDA
+## Estado do backlog — 🟡 RODADA 8/9 ABERTA
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
+| **9 — execução da Rodada 8** | Ondas de PRs que entregam as issues #426–#493, na ordem de dependência | **#426–#493** | 🟡 **em curso desde 2026-08-23** |
+| **8 — auditoria cruzada** | Reverificação da `lista bugs 20260807.xlsx` + regras derivadas das 3 planilhas (EVI Urbitá, fluxo do investidor) + conferência numérica em Pinguim + auditoria de UI | **#426–#493** (61 abertas) | 🟡 **aberta desde 2026-08-21** |
 | **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | ✅ **concluída em 2026-08-12** |
 | **5 — EVI** | Auditoria do app contra os documentos EVI | **#220–#241** (22) | ✅ **concluída em 2026-08-02** |
 | **6 — lista de bugs** | `lista_bugs.xlsx`, 24 itens `BUGLIST-001`…`BUGLIST-024` | **#238, #239, #244–#281** (37 destinos) | ✅ **concluída em 2026-08-02** |
+
+### Rodada 8 — o que é, e o placar honesto
+
+Oito agentes auditaram o app contra a lista de bugs `20260807`, a EVI Urbitá, a planilha
+`fluxo_investidor_FORMULAS` e a instância Pinguim; documentos em `docs/rodada-8/` (comece por
+`LEIA-PRIMEIRO.md`). A pergunta era: **o que da Rodada 7 realmente se sustenta no código, e que
+regras as três planilhas do autor exigem que o app ainda não representa?**
+
+**Placar da reverificação dos 47 itens** — a lista foi auditada **inteira**, item a item, pelo
+**corpo** da coluna `Issue` e não pelo título:
+
+| Veredito | Qtd | Itens |
+|---|---:|---|
+| ✅ confirmado no código | 38 | os demais |
+| 🟡 parcial — uma cláusula sobreviveu | 5 | 2, 11, 22, 24, 41 |
+| 🔴 reprovado/reaberto | 2 | 15, 31 |
+| ⚪ correto na `main`, sem diff próprio | 1 | 20 |
+| ⚫ indecidível sem o print da planilha | 1 | 45 |
+
+> **O que fez a diferença no método:** ler o **corpo** da coluna `Issue` da planilha, não o título.
+> O item 6 pedia "no máximo 3 campos por linha"; o **título** dizia "reordenar" — o oposto do
+> pedido. Quatro itens (14, 18, 32, 43) teriam recebido veredito oposto se lidos pelo título.
+> **Título de planilha não é requisito.**
+
+**Decisões do autor, vinculantes:**
+
+1. **Nenhum bug foi consertado na Rodada 8 — tudo virou issue.** O autor autorizou o conserto de 3
+   bugs graves e depois **reverteu**; o material virou corpo de issue (`docs/rodada-8/09-consertos.md`).
+2. **Capital de giro: só o rótulo.** O tipo `divida` já **é** o produto de CG por calendário. A
+   linha de crédito **rotativa** foi **recusada**: reintroduziria a competição por caixa que a #355
+   apagou.
+3. **A base de receita líquida do equity não muda** (`frontend/funding-motor.ts:58-67`) — a
+   divergência com as duas planilhas é **intencional**, e vira nota, não issue.
+4. **`avancado_capital_instrumentos` não é apagada do `schema.json`** nesta rodada.
+   > ⚠️ **A redação original desta decisão dizia que a tabela é mantida porque "guarda o dado
+   > migrado pela `019`", e isso não se sustenta** — a `019` nunca rodou em Postgres. A #479
+   > (mergeada em 2026-08-23) estabeleceu os motivos que **de fato** valem: remover é mudança de
+   > schema, e portanto escopo; e a tabela é a evidência viva do modelo apagado. O caminho de
+   > remoção **existe** (`dados.limparTabela` + poda do reconciliador) — não é falta de mecanismo.
+   > Enquanto ela existir, quem guarda o reúso é `scripts/guard-tabelas-obsoletas.mjs`.
+
+### Rodada 9 — como está sendo executada
+
+Ondas de PRs, uma issue (ou um grupo coeso) por PR, em fila indiana, com merge ao fim de cada uma.
+**Onda 1** (infra de verificação de UI: espelho `docs/ui-urbiverso/`, três guards estáticos e o
+harness de render em Chromium) está concluída e mergeada. As ondas seguintes entregam o backlog na
+ordem de dependência, com a cadeia do denominador (#426 → #433 → #429 → #431 → {#432, #435} → #434
+→ #428) **estritamente serial**, porque todos movem o mesmo denominador.
+
+> ⚠️ **Quem encerrar a Rodada 9 atualiza esta tabela na MESMA alteração que fechar a última issue.**
+> Não delegue para "depois": foi exatamente assim que a #416 nasceu.
 
 ### Rodada 7 — como foi
 
@@ -60,16 +113,24 @@ virou ADR histórico, **exceto a §4.3** (Financiamento à produção), que cont
 aprovou ali o gatilho de exposição mínima, o catch-up retroativo e o cash sweep, e a #355 preservou
 esse produto de propósito — ele é o único que **não** segue a planilha nova.
 
-> ⚠️ **Auditoria de 2026-08-17.** A Rodada 7 fechou com **três passos do próprio plano da #355 sem
-> executar**: a spec `fluxo-investidor-formulas.md` (F11.1) nunca entrou no repo, embora 4 arquivos
-> a citassem como fonte; a decisão **D14** (alerta de caixa negativo após funding) não foi
-> implementada; e esta seção continuou dizendo "Rodada 7 aberta / #355 bloqueada" (F11.6). As três
-> viraram as issues **#413**, **#414** e **#416**. A quarta, **#415**, é o aviso regulatório da §17,
-> que a #277 entregou e a reescrita da #355 apagou junto com `tela-capital-stack.ts`.
+> ⚠️ **Auditoria de 2026-08-17 — as 4 lacunas, e o fechamento delas.** A Rodada 7 fechou com três
+> passos do próprio plano da #355 sem executar: a spec `fluxo-investidor-formulas.md` (F11.1) nunca
+> entrou no repo, embora 4 arquivos a citassem como fonte; a decisão **D14** (alerta de caixa
+> negativo após funding) não foi implementada; e esta seção continuou dizendo "Rodada 7 aberta /
+> #355 bloqueada" (F11.6). A quarta, o aviso regulatório da §17, a #277 entregou e a reescrita da
+> #355 apagou junto com `tela-capital-stack.ts`.
+>
+> **As quatro viraram #413, #414, #415 e #416, e todas fecharam com diff no commit `ba06add`
+> (PR #417, 2026-08-17).** Evidência hoje: `docs/viabilidade/fluxo-investidor-formulas.md` existe;
+> D14 está em `frontend/fluxo-invariantes.ts:376-387`
+> (`CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING`, severidade `alerta`); o aviso regulatório, em
+> `frontend/tela-funding.ts:615-619`.
 >
 > A lição é a de sempre, com uma volta a mais: **"a issue fechou" não é evidência de entrega, e o
 > plano publicado na issue também não** — só o diff é. Quando um plano tem passo de documentação ou
 > de estado, ele morre calado se ninguém conferir, porque nenhum teste fica vermelho por causa dele.
+> **E o corolário, que esta própria nota exemplifica: nota de auditoria também envelhece.** Quem
+> fechar as issues de uma auditoria reescreve a nota na mesma alteração.
 
 **As duas foram executadas juntas por uma trilha única de 10 fases** (plano aprovado pelo autor em
 2026-08-01), com portão de merge ao fim de cada fase. Os quatro cruzamentos entre rodadas (itens 5,
@@ -95,10 +156,15 @@ critério de aceite não é código:
 > "entregue". Cada issue aberta tem comentário dizendo o que falta; a tabela completa, com evidência
 > `arquivo:linha`, está em **`docs/triagem-issues-2026-08-03.md`**.
 >
-> O maior buraco: nove issues da cadeia EVI de recebíveis (#230, #232–#237, #240, #241) têm a
-> matemática pronta e testada, mas **não ligada a `calcularFluxo`** — o próprio motor declara isso
-> em `frontend/fluxo-caixa-motor.ts:505-511`. A integração virou a **#283**, e ela é precondição
-> das nove.
+> O maior buraco daquela triagem — nove issues da cadeia EVI de recebíveis (#230, #232–#237, #240,
+> #241) com a matemática pronta mas **não ligada a `calcularFluxo`** — **foi fechado pela #283**:
+> `recebimentoBrutoMensal` consulta o contrato canônico em
+> `frontend/fluxo-caixa-motor.ts:1340-1341` e `calcularFluxo` agrega juros, principal, carteira e
+> repasse em `:2025-2053` (teste `frontend/fluxo-caixa-motor.test.ts:1762-1787`). A porta é
+> `fluxo_pagamento.componentes`, que `frontend/fluxo-pagamento-editor.ts:90` grava em toda escrita.
+> **O que continua faltando não é a integração, é o INPUT de taxa e de sinal no modal:** há linha
+> em produção com `taxaMensal: 0.0098636` (R$ 1.259.273,59 de juros), e como o adaptador fixa
+> `taxaMensal: 0`, abrir o modal e clicar "Aplicar" **apaga os juros da linha**, sem aviso.
 
 - **#254** (epic de rastreio) — fecha porque #220, #221, #227–#237, #240 e #241 (suas executoras)
   já fecharam com diff; não tem diff próprio.
@@ -595,13 +661,14 @@ Git Bash — ver PROGRESSO).
   no motor. Representações derivadas **não monetárias** (% e R$/m²) carregam **precisão plena**
   internamente e arredondam **só para exibir**; nunca são persistidas arredondadas. Decisão do autor
   em 2026-08-01; é o contrato que fecha a #259 e dá regra às #260 e #281.
-  > ⚠️ **Parcialmente resolvido — o texto anterior desta nota estava vencido** (dizia que `fmtR$`
-  > usava `maximumFractionDigits: 0`, o que deixou de ser verdade e ninguém atualizou; foi pego na
-  > triagem de 2026-08-03). Hoje `frontend/viab-format.ts:14` já usa 2 casas, e o Orçamento de
-  > Custos em `rs` também (`frontend/tela-fluxo-custos.ts:673,933`). **O que ainda falta** é
-  > `frontend/exportar.ts:10` deixar de definir o seu próprio `const R$ = v.toFixed(2)`: enquanto
-  > houver duas fontes de formatação, tela e exportação podem divergir de novo. Continua sendo a
-  > #281 — não corrija pontualmente.
+  > ⚠️ **Resolvido na exportação e na sensibilidade, ainda aberto na tabela do Fluxo.**
+  > `frontend/viab-format.ts:11-23` usa 2 casas com mínimo e máximo, o Orçamento de Custos em `rs`
+  > também (`frontend/tela-fluxo-custos.ts:673,933`), `frontend/exportar.ts:10` passou a
+  > **importar** `fmtR$` em vez de definir formatador próprio, e a tabela de sensibilidade da
+  > proforma migrou para `fmtR$(v, false)` (`frontend/tela-proforma.ts:458`, #492). **O que ainda
+  > diverge é uma fonte só:** `frontend/fluxo-tabela.ts:34` (`celula`) arredonda para **0 casas** e
+  > esconde valor abaixo de R$ 0,50, então a mesma célula sai `1.235` na tela e `1.234,56` no PDF,
+  > e R$ 0,20 sai **branco** na tela. A #281 **mudou de endereço** — não corrija pontualmente.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa

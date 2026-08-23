@@ -606,13 +606,12 @@ fim de Durante a obra
 
 A interface deve evitar mostrar a mesma janela integral da Obra em três linhas de absorção simultâneas.
 
-> **Comportamento vigente.** `faixasAbsorcao`, em `frontend/fluxo-shared.ts`, deriva a faixa `obra`
-> como `inicio_mes` até `inicio_mes + duracao_meses − 1` do **evento Obra inteiro**. Como a Obra
-> cobre o Pré-lançamento e o Lançamento, os três períodos comerciais **se sobrepõem** e percentuais
-> de absorção diferentes incidem sobre os mesmos meses.
->
-> **Evolução dependente de issue.** EVI-006 — derivar "Durante a obra" a partir do fim do
-> Lançamento, com os quatro períodos contíguos ou explicitamente vazios.
+> ✅ **Comportamento vigente, alinhado ao padrão (#225).** `faixasAbsorcao`, em
+> `frontend/fluxo-shared.ts:257-283`, deriva "Durante a obra" a partir do **mês seguinte ao fim do
+> Lançamento** (`:276-278`), não do início físico da Obra — os quatro períodos comerciais são
+> contíguos e não se sobrepõem. Quando o Lançamento termina em ou depois do fim da Obra, a faixa
+> fica vazia e `problemaJanelaDuranteObra` (`:292-302`) devolve o texto que a UI mostra, em vez de
+> calcular em silêncio. Pré-lançamento ausente vira faixa vazia (`fim < inicio`, `:270-272`).
 
 ### 8.4 Entrega é marco, não período de venda
 
@@ -634,13 +633,29 @@ duração do Após-chaves = 12 meses
 O período começa no primeiro mês posterior ao fim da Obra.
 
 > **Comportamento vigente.** O início já é o mês seguinte ao fim da Obra (`pos_obra` travado em
-> `recalcularTravados`), mas a **duração é livre e editável**: `faixasAbsorcao` lê
-> `Math.max(1, Math.round(posObraMeses ?? pos.duracao_meses))`, em `frontend/fluxo-shared.ts`. Há
-> estudos gravados com duração diferente de 12.
+> ✅ **Comportamento vigente, alinhado ao padrão e à EVI (#226 / EVI-007).** O início é o mês
+> seguinte ao fim da Obra (`pos_obra` travado por `recalcularTravados`) e a duração é a
+> **constante** `APOS_CHAVES_MESES = 12` (`frontend/fluxo-shared.ts:237`), consumida em
+> `faixasAbsorcao:281` e declarada em `absorcaoMensal:366-367`.
 >
-> **Evolução dependente de issue.** EVI-007 — fixar a janela em 12 meses. É a issue com maior
-> impacto em dados legados desta rodada: exige decidir explicitamente o tratamento dos estudos
-> existentes **antes** de implementar.
+> **A planilha de referência vota do mesmo lado.** Na EVI Urbitá, `cfINC!J` divide por **12
+> literal** e ignora os próprios inputs `EtapaChavesDuracao`/`EtapaPosChavesDuracao` — a janela de
+> vendas pós-entrega nunca foi parâmetro, nem lá. O travamento **reproduz** o oráculo; não é
+> simplificação do app.
+>
+> ⚠️ **São duas variáveis distintas, e o app hoje as chama pelo mesmo nome.** Decisão do autor de
+> 2026-08-22 (**D1**, issue **#430**): **Pós-obras** é o prazo do Cronograma que rege os
+> **desembolsos** de pós-obra; **Pós-chaves** é a janela de **vendas e pagamento** posterior à
+> entrega, ao lado de pré-lançamento, lançamento e durante-obras. Os 12 meses travados acima são o
+> **Pós-chaves** — e ficam. O que muda é a taxonomia: cada um passa a ter nome e campo próprios.
+>
+> ⚠️ **Enquanto isso, `pos_obra.duracao_meses` continua editável e não faz o que o nome promete.**
+> O evento nasce com `duracao_meses: 12` e `travado_duracao: false`
+> (`backend/rotas/avancado.ts:42`); editá-lo **não** move a janela de vendas, só a **âncora de
+> custos** pós-entrega — que é exatamente por que a D1 os separa. Medido em Pinguim: o estudo 6 tem
+> `duracao_meses: 13` e uma curva de absorção `personalizado` que chega ao 13º mês; o 13º mês cai
+> fora de `periodoAbsorcao` e `absorcaoMensal:375-376` o **descarta em silêncio** — **1,41% das
+> vendas, R$ 2.007.856,95**. Ver a issue **#485**.
 
 ### 8.6 Representação temporal no app
 
@@ -810,16 +825,15 @@ A configuração informa quanto do estoque do Grupo será vendido em cada perío
 
 A soma dos três percentuais informados não pode ultrapassar 100%.
 
-> **Comportamento vigente.** O JSON `absorcao` de `avancado_fases` guarda o modo **Distribuído** em
-> **três** períodos: `lancamento` (que cobre Pré-lançamento **e** Lançamento juntos), `obra` e
-> `pos_obra`. O resíduo derivado é o `pos_obra` (`100 − p1 − p2`), e a validação de entrada
-> (`frontend/premissas-validacao.ts`) barra `lancamento + obra > 100`.
->
-> **Divergência:** o padrão exige **quatro** períodos informados separadamente, com Pré-lançamento
-> distinto do Lançamento.
->
-> **Evolução dependente de issue.** EVI-006 (separação da janela comercial) e EVI-010 (contrato
-> canônico), que juntas definem o novo shape sem quebrar o JSON legado.
+> ✅ **Comportamento vigente, alinhado ao padrão (#108/#347).** O JSON `absorcao` de
+> `avancado_fases` guarda o modo **Distribuído** em **quatro** blocos —
+> `pre_lancamento`, `lancamento`, `obra` e `pos_obra` (`frontend/tela-fluxo-receitas.ts:535-540`).
+> Os três primeiros são informados; o Pós-chaves é **derivado**
+> (`pctPosObraDerivado`, `frontend/fluxo-shared.ts:324-326`: `100 − p1 − p2 − p3`). A soma dos três
+> informados é validada por `erroFormularioAbsorcao` (`frontend/fluxo-shared.ts:337-345`) — sem
+> isso, um total acima de 100% clampava no derivado e a absorção fechava abaixo de 100% sem aviso.
+> Quando o Cronograma não tem Pré-lançamento, a tela nem mostra o campo e o bloco chega zerado
+> (`tela-fluxo-receitas.ts:522`).
 
 ### 10.3 Distribuição mensal
 
@@ -892,15 +906,22 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 > 🔄 **Nota de UX acrescentada em 2026-08-01.** Esta seção descreve o **contrato econômico**. A
 > **experiência de configuração** do editor tem issue própria: **#248** (`BUGLIST-005`).
 >
-> **Comportamento vigente:** o editor expõe a estrutura de persistência, não o modelo econômico —
-> listas genéricas `entrada[]` e `parcelas[]` com quatro periodicidades (`mensal`, `trimestral`,
-> `semestral`, `anual`), no máximo 4 linhas, uma periodicidade por linha, mais um checkbox `juros`
-> que **não alimenta cálculo nenhum** (`frontend/tela-fluxo-receitas.ts:33-34,633-637,668-681,745-780`).
+> **Comportamento vigente (pós-#248/#342/#345/#346).** O modal
+> (`frontend/tela-fluxo-receitas.ts:720-830`) tem três blocos: *Definições* (só texto — corretagem
+> e RET migraram para Custos, `:728-737`), *Condições de entrada* (`% do total`, `Nº parcelas`,
+> `Desconto %`, `:741-763`) e *Parcelamento* (`% do total`, `Nº parcelas` ou checkbox "Ao longo da
+> obra", máximo 4 linhas, `:764-806`); o *Repasse* é **derivado e somente-leitura**
+> (`100 − entradas − parcelas`, `:807-817`), sempre no 1º mês após o fim da Obra. O checkbox de
+> juros foi **removido**; a badge de periodicidade também (#342) — linha nova nasce `mensal` e
+> linha legada mantém a periodicidade gravada, que o motor continua lendo
+> (`fluxo-caixa-motor.ts:318-320`).
 >
-> **Modelo funcional de referência:** o editor apresenta pagamento no ato, quantidade de parcelas
-> **mensais**, taxa quando aplicável e evento de liquidação/repasse — sem periodicidades fora do
-> padrão aprovado. A #248 depende do contrato canônico da **#230** e não implementa motor: ela
-> **não substitui** a cadeia #232–#237.
+> **O que ainda falta para o modelo econômico:** não há campo de **taxa** nem de **sinal**. Como
+> `fluxoPagamentoParaSalvar` grava `componentes: componentesDoLegado(...)`
+> (`frontend/fluxo-pagamento-editor.ts:90`) e o adaptador fixa `taxaMensal: 0` / `sinalPct: 0`
+> (`fluxo-caixa-motor.ts:589,601,608,617`), aplicar o modal numa linha que tinha juros **apaga os
+> juros**: é o que acontece hoje com o estudo 5 de Pinguim (`taxaMensal: 0.0098636`,
+> R$ 1.259.273,59).
 
 ### 11.1 Propriedade do Grupo
 
@@ -1078,12 +1099,16 @@ A fronteira é explícita: vendas até o mês da entrega preservam o plano do Gr
 
 O comprador pode pagar parte diretamente e financiar parte com o banco, mas ambas chegam à incorporadora no mesmo mês.
 
-> **Comportamento vigente.** O motor **não distingue** venda anterior de venda posterior à entrega:
-> o mesmo `fluxo_pagamento` do Grupo é aplicado a todas as safras, inclusive às contratadas no
-> Após-chaves — que assim geram parcelas e repasse como se fossem vendas pré-entrega
-> (`frontend/fluxo-caixa-motor.ts` → `receitaMensalLinha`).
+> ✅ **Comportamento vigente no caminho canônico (#235/#283).** `ehVendaAposChaves`
+> (`frontend/fluxo-caixa-motor.ts:945-947`) marca como Após-chaves toda safra com
+> `safra > mesEntrega`, e `componentesEfetivosSafra` (`:949-956`) substitui os componentes do Grupo
+> por um único `imediato` de 100% sem desconto — sem sinal futuro, parcela nem repasse para aquela
+> venda. Cada safra é tratada isoladamente: contratos antigos não são afetados. A aplicação por
+> safra está em `calcularRecebiveisComponentes:1096`, via `componentesIntegradosSafra:1030-1043`.
 >
-> **Evolução dependente de issue.** EVI-015 / #235.
+> ⚠️ **Vale só para linha com `fluxo_pagamento.componentes` persistido.** A linha que nunca passou
+> pelo modal desde a #248 cai no motor legado (`recebimentoBrutoMensal:1342` em diante), que
+> **não** distingue a fronteira da entrega — aplica o plano do Grupo a toda safra.
 
 ### 11.9 Recebimentos antigos continuam
 
@@ -1189,15 +1214,17 @@ Ao fim da absorção:
 
 ## 13. Recebimentos, safras, carteiras e repasse
 
-> ⚠️ **Esta seção descreve o modelo funcional de referência, não o app instalado.**
+> ✅ **Esta seção descreve comportamento vigente desde a #283.** `frontend/fluxo-caixa-motor.ts`
+> implementa safra (`:958-962`, laço em `:1094`), PMT (`:653`), taxa sobre o saldo de abertura
+> (`:1122-1123`), carteira por safra (`carteiraSaldoSafra`; consolidação em `:1191`) e
+> reconciliação por componente (`receitaPorComponenteMensal`/`carteiraPorComponenteMensal`,
+> `:1077-1083`, agregadas em `calcularFluxo:2035-2047`; invariantes em
+> `frontend/fluxo-invariantes.ts:404`).
 >
-> **Comportamento vigente.** `frontend/fluxo-caixa-motor.ts` distribui valores nominais por linhas de
-> entrada, parcelas e repasse. Não há safra, PMT, taxa aplicada ao saldo, carteira ou reconciliação
-> por componente.
->
-> **Revisão obrigatória.** Os corpos atuais de EVI-012, EVI-013 e EVI-014 foram escritos antes da
-> validação completa dos dois fluxos de Calliandra. Antes de implementar, devem ser corrigidos para
-> refletir as regras abaixo.
+> ⚠️ **Duas ressalvas.** (1) A porta é `fluxo_pagamento.componentes` — linha nunca reeditada segue
+> pelo motor legado. (2) A **taxa** chega 0 pelo adaptador (`:589,601,608,617`) sempre que a linha
+> passa pelo modal, porque ele não a oferece: a carteira existe, e os juros — que existem em estudo
+> real — são apagados no "Aplicar".
 
 ### 13.1 Safras
 
@@ -1394,7 +1421,7 @@ Elas não criam:
 
 No mesmo mês podem continuar parcelas e repasses de contratos antigos.
 
-> **Evolução dependente de issue.** EVI-015 / #235 — ver §11.8 para o comportamento vigente.
+> ✅ **Entregue (#235/#283)** — ver §11.8, que descreve o comportamento vigente e as ressalvas.
 
 ### 13.9 O que muda nas issues da Rodada 5
 
@@ -1525,23 +1552,15 @@ A futura forma de cadastro e identificação das unidades permutadas será espec
 > ganhou escopo: é a epic **#258** (`BUGLIST-015`), com quatro sub-issues (**#266** modelo e UI,
 > **#267** fonte de verdade e migração, **#268** motor, **#269** relatórios e invariantes).
 >
-> **Comportamento vigente:** a quantidade permutada é informada no **catálogo de Tipologias**
-> (`frontend/tela-empreendimento-tipologias.ts:212`, `schema.json:289`) e consumida pelo motor via
-> `vgvPermutaFisicaLinha` (`frontend/fluxo-shared.ts:149-154`, #195). Não existe vínculo
-> tipologia ↔ quantidade na linha de custo do Terreno.
->
-> **Modelo funcional de referência:** ao selecionar `Permuta física`, a célula **Orçamento** passa a
-> conter um single-select de tipologia e um campo de quantidade; **Distribuição** exibe "Entrega de
-> unidades", bloqueada; **Cronograma, Início e Duração ficam vazios**. Uma linha representa uma
-> tipologia. Depois disso — e só depois —, a coluna do catálogo é desligada pela **#253**
-> (`BUGLIST-010`), que nasce bloqueada até a #267 fechar.
->
-> **ADR da #266 — decidido pelo autor em 2026-08-02.** Quando a mesma tipologia tem `preco_m2`
-> diferente em Grupos diferentes (`avancado_alocacoes`), a base de valoração da permuta física NÃO é
-> derivada (nem média ponderada, nem "preço do Grupo de origem" — que só reintroduziria a mesma
-> ambiguidade sob outro nome). É **declarada explicitamente** pelo usuário na própria linha de
-> permuta, no momento de configurá-la: um valor auditável, escrito, não calculado. Funciona igual
-> com 1 ou N alocações de preços diferentes para a mesma tipologia.
+> ✅ **Comportamento vigente (#266/#267/#268).** A fonte de verdade da permuta física é a **linha de
+> custo** `Preço → Permuta física`, com `permuta_tipologia_id` + `permuta_quantidade`
+> (`schema.json:373-374`) e valor declarado explicitamente. O CRUD de tipologias deixou de ler e
+> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:744-749`, #253); a coluna permanece no
+> schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
+> (`frontend/fluxo-caixa-motor.ts:1768`) e a projeta de volta nas tipologias uma única vez
+> (`:1780-1788`), para que toda função que já lia `t.unidades_permutadas` fique correta sem
+> replicar a reserva. **Sem linha de custo de Permuta física, o KPI é 0** — não há fallback para o
+> campo legado (`:1999-2006`, decisão do autor de 2026-08-02).
 
 Até essa definição:
 
@@ -1577,31 +1596,17 @@ base líquida
 > fluxo. As duas séries paralelas (bruta e líquida de imposto e corretagem) não são calculadas nem
 > expostas para auditoria.
 >
-> ⚠️ **As duas séries que a fórmula da visão líquida consome não existem.** Não há série mensal de
-> imposto (o único tributo do Avançado é o RET por Grupo, embutido no fator do recebível, e o bloco
-> `regime_tributario`/`aliquota_*` é ignorado pelo motor) nem de corretagem. E o app aplica os
-> descontos de forma **multiplicativa**, que é justamente o que o padrão pede para evitar quando o
-> contrato determina subtração direta.
+> ✅ **As duas séries existem (#227/#228/#346).** `impostoMensal`
+> (`frontend/fluxo-caixa-motor.ts:1434-1444`) devolve a série mensal do RET aplicada ao recebimento
+> bruto, com o RET já resolvido como parâmetro **global** do estudo; `corretagemMensal` (`:1503`)
+> devolve a série mensal da linha de custo obrigatória "Corretagem de vendas", com base
+> **bruto/VGV** — a única fonte oficial desde que a #228 removeu a dedução concorrente de
+> `vglLinha`.
 >
-> **Evolução dependente de issue.** **EVI-022** precisa vir antes, produzindo `imposto_t` e
-> `corretagem_t` como séries próprias. Só então EVI-018 calcula as duas visões no regime de caixa e
-> declara qual delas alimenta o fluxo. O redesenho do **cadastro** da permuta física permanece fora
-> do backlog por decisão do autor.
->
-> 🔄 **Contrato de interface acrescentado em 2026-08-01** (item 16 da lista de bugs,
-> `BUGLIST-016`), como emenda **aditiva** da **#238**. Além das duas séries, a linha de
-> `Permuta financeira` passa a ter comportamento de tela definido:
->
-> - **Orçamento** aceita `% VGV` **ou** `R$`, com o valor canônico da **#259**;
-> - **Distribuição** é preenchida com **"Receita das vendas"** e fica **bloqueada** — mesmo padrão
->   da Corretagem;
-> - **Cronograma, Início e Duração ficam vazios** (`—`): nada ali influencia a velocidade com que a
->   despesa entra no fluxo, porque ela sai **conforme a receita entra**.
->
-> **Comportamento vigente a corrigir:** hoje esses campos só somem quando
-> `distribuicao_modo !== 'fixo'` (`frontend/tela-fluxo-custos.ts:697-699,728-730,762-764`) — a regra
-> depende da **curva de rateio**, não da subcategoria. Quem classifica a permuta como financeira é
-> a subcategoria (`frontend/fluxo-caixa-motor.ts:385-387`). Ver a armadilha **A10** no Anexo D.
+> ⚠️ **O que continua divergente:** o bloco `regime_tributario`/`aliquota_*` da aba Financeiro
+> segue **ignorado** pelo motor do Avançado (`frontend/fluxo-shared.ts:208-222`), e o app aplica os
+> descontos de forma **multiplicativa**, que é o que o padrão pede para evitar quando o contrato
+> determina subtração direta.
 
 ```text
 permuta financeira líquida
@@ -1743,15 +1748,25 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > Esta seção continua sendo a visão funcional resumida dentro do padrão; o documento novo é a
 > especificação vinculante da epic **#239** e das dez sub-issues **#270–#279** (FIN-01…FIN-10).
 >
-> **Comportamento vigente, inalterado:** a aba `Viabilidade → Financeiro` é **inerte**. O Bloco G
-> inteiro — ~25 colunas de financiamento, estrutura de capital, investidor e correção — é
-> persistido e renderizado, mas o motor **não referencia nenhuma delas** (grep = 0 em
-> `frontend/fluxo-caixa-motor.ts`, `frontend/proforma.ts` e `frontend/fluxo-shared.ts`). Nada
-> descrito abaixo, nem no documento novo, está implementado.
+> ✅ **Comportamento vigente desde a #355 (2026-08-12).** O funding existe e roda: três operações
+> independentes — `financiamento_producao` (única por estudo), `divida` e `equity` —, **sem
+> waterfall, sem prioridades e sem competição por caixa**. Motor: `frontend/funding-motor.ts`;
+> tela: `frontend/tela-funding.ts` (aba "Funding"); rotas: `backend/rotas/funding.ts`; tabela
+> `avancado_funding_operacoes` (migração `029`). A spec de `divida`/`equity` é
+> [Fluxo do Investidor](fluxo-investidor-formulas); a de `financiamento_producao` continua sendo a
+> §4.3 de [Funding, Capital Stack e Retorno do Capital](funding-capital-stack), preservada de
+> propósito. O resto daquele documento é **ADR histórico**.
 >
-> **Decisão registrada (2026-08-01):** o alvo do Capital Stack é a aba **`Viabilidade → Financeiro`**
-> (`frontend/tela-financeiro.ts`). O grupo de custos `Custos → Financeiro` permanece sendo despesa
-> financeira operacional e **não** é absorvido pelo Capital Stack.
+> ⚠️ **O que sobrou inerte na aba `Viabilidade → Financeiro`**, e só isso: `regime_tributario` e os
+> cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`), mais
+> `imposto_sobre_permuta_fisica` (`:182`). Os campos de financiamento, investidor, estrutura de
+> capital e correção monetária **saíram do formulário** (#279/#355); as colunas continuam no schema
+> como dado histórico, sem tela e sem leitor.
+>
+> ⚠️ **Continua ausente:** capital de giro, linha rotativa e empréstimo-ponte. Os tipos aceitos são
+> exatamente `['financiamento_producao','divida','equity']` (`backend/rotas/funding.ts:43`);
+> `capital_giro` é rejeitado (`backend/rotas/funding.test.ts:26`). A §17.4 abaixo descreve o
+> conceito como **modelo funcional de referência**, não como comportamento instalado.
 
 ### 17.1 Separação entre projeto e capital
 
@@ -1786,27 +1801,6 @@ O estudo completo deve conseguir representar:
 > Continua valendo o aviso abaixo para o **resto** do Bloco G — estrutura de capital, investidor,
 > regime tributário e correção seguem inertes.
 
-> **Comportamento vigente — a aba Financeiro inteira é inerte.** Não são só os campos de
-> financiamento: é o **Bloco G completo**. `schema.json` declara e `frontend/tela-financeiro.ts`
-> renderiza controles para financiamento à produção (`financiamento_*`), estrutura de capital
-> (`estrutura_*_pct`), investidor (`investidor_*`), regime tributário
-> (`regime_tributario`, `aliquota_*_pct`, `imposto_sobre_permuta_fisica`) e correção
-> (`indice_correcao`, `juros_financeiros_aa`, …). **O motor não lê nenhum deles** —
-> `backend/rotas/estudos.ts` os trata apenas como colunas persistíveis. O usuário preenche uma aba
-> inteira que não altera número nenhum, sem qualquer aviso.
->
-> Isso viola a convenção do monorepo de que **UI e API andam sempre juntas**: capacidade que existe
-> na tela tem que existir no cálculo, e vice-versa.
->
-> **Há ainda duas entradas fiscais concorrentes.** O único imposto que o Avançado aplica é o **RET
-> por Grupo**, marcado no modal de Fluxo de Pagamento e **desligado por default** — enquanto o bloco
-> de regime tributário desta aba fica sem uso. A Proforma (Preliminar) usa uma terceira regra,
-> `sujeito_ret`/`imposto_percentual`.
->
-> **Evolução dependente de issue.** **EVI-022** resolve o eixo fiscal (escolhe a entrada oficial e
-> cria a série mensal de imposto). **EVI-019** decide, campo a campo, o destino do funding —
-> **integrar ou remover as duas pontas**. Manter como está não é opção, e todo campo que não for
-> implementado sai da tela.
 
 ### 17.3 Repasse não é financiamento à produção
 
@@ -1907,11 +1901,12 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> **Comportamento vigente.** `frontend/fluxo-caixa-motor.ts` deriva o prazo sem considerar todas as
-> parcelas e possui fallback que empilha excedentes no último mês.
->
-> **Evolução dependente de issue.** EVI-011 / #231 deve dimensionar o horizonte a partir dos
-> componentes normalizados e remover o fallback silencioso.
+> ✅ **Comportamento vigente (#231).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:1762-1766`)
+> dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
+> último mês de custo, 11) + 1`, com `ultimoMesRecebivelLinha` derivando o recebível a partir dos
+> componentes normalizados. O fallback silencioso que empilhava excedente no último mês **foi
+> removido** (`:1358-1360`); no caminho canônico, um pagamento fora do horizonte emite
+> `console.warn` e não é computado (`:1085-1092`), em vez de deformar o último mês em silêncio.
 
 ### 18.4.1 Visão Mensal e Anual da tela
 
