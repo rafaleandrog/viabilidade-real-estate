@@ -101,15 +101,22 @@ completa dos pontos que comparam nome — com o veredito da especificação em c
 | `!IMPORTANT` | insensível | `normalizar` (`i`) | ✅ |
 | At-rule (`@MEDIA`) | insensível | detectada por estrutura, não por nome | ✅ |
 | Unidade (`100PX`) | insensível | `imponeTamanho`, sobre valor já normalizado | ✅ |
+| `?attr=` (binding booleano) | **insensível** — escreve um atributo HTML | `guard-props-urbi` (`toLowerCase` quando o prefixo é `?`) | ✅ |
 | **Nome de custom property** (`--Cor`) | **SENSÍVEL** | captura exata, sem `toLowerCase` | ✅ correto assim |
-| **`.prop=`, `@evento=`, `?attr=`** | **SENSÍVEL** | comparados com a caixa original | ✅ correto assim |
-| **`<![CDATA[`** | **SENSÍVEL** | comparação exata | ✅ correto assim |
-| **Tag de template** (`` css` ``, `` html` ``) | **SENSÍVEL** (é identificador JS) | `ehCss`, `ehMarcacao` | ✅ correto assim |
+| **`.prop=`** | **SENSÍVEL** — é nome de propriedade JS | comparado com a caixa original | ✅ correto assim |
+| **Tag de template** (`` css` ``, `` html` ``) | **SENSÍVEL** — é identificador JS | `ehCss`, `ehMarcacao` | ✅ correto assim |
+| `@evento=` | sensível (tipo de evento no DOM) | **não é comparado** — o espelho não traz eventos | — |
 
 **Regra para quem mexer aqui:** antes de comparar um nome, pergunte de qual linguagem ele é. HTML e
 CSS são ASCII case-insensitive em quase tudo; JavaScript não é em nada. Errar para "insensível" onde
 a spec é sensível junta coisas distintas; errar para "sensível" onde ela é insensível deixa passar a
 forma maiúscula — que foi o que aconteceu cinco vezes.
+
+⚠️ **A linha do `?attr=` já esteve errada nesta tabela**, agrupada com `.prop=` como sensível. O
+binding booleano do Lit **escreve um atributo HTML**, cujo nome é insensível — e o código sempre fez
+`toLowerCase` nele. Não era o código que estava errado: era o artefato que documenta o código, o que
+é pior, porque daria respaldo escrito a uma regressão. Tabela que descreve implementação tem de ser
+conferida contra a implementação, não contra a lembrança de quem a escreveu.
 
 ### Posição externa: quem pode dizer que ali começa uma tag
 
@@ -143,6 +150,24 @@ um comentário que mascara o componente seguinte.
 como HTML fazia `const doc = \`<style>:root{--x:red}</style>\`` — prosa — registrar `--x` como token
 conhecido do app e liberar um `var(--x)` real. É a ponta oposta do eixo que já restringiu a
 *declaração* à superfície CSS de verdade: ali a fonte era larga, aqui a superfície é que nascia larga.
+
+⚠️ **O que não é modelado RECUSA o arquivo.** O modo de falha invertido começou valendo para o
+**malformado** (`/*` sem `*/`, tag sem `>`); desde a 6ª rodada vale também para o **não modelado**.
+A alternativa era implementar o tokenizer do HTML — uma dúzia de estados de conteúdo mais as regras
+de conteúdo estrangeiro —, e cada rodada de revisão revelava o estado seguinte. Recusar fecha o eixo
+por construção: deixa de ser preciso acertar a spec e passa a ser preciso **saber o que não se sabe**.
+
+| Modelado | Recusado |
+|---|---|
+| `<!-- -->` · `<script>` · `<style>` · `<title>` · `<textarea>` · tag comum com valores citados | qualquer `<!…` que não seja comentário (inclui `<!DOCTYPE` e `<![CDATA[`) · `<?…` · `<iframe>` `<xmp>` `<noembed>` `<noframes>` `<noscript>` `<plaintext>` |
+
+`<![CDATA[` saiu do lado modelado de propósito: ele só vale em conteúdo estrangeiro, e dentro de
+`html` o tokenizer o trata como comentário inválido até o primeiro `>`. Modelar só um dos dois casos
+era pior que não modelar nenhum. `<svg>` inline **continua** modelado como tag comum — o que muda em
+conteúdo estrangeiro é justamente o CDATA, que agora recusa.
+
+**Custo medido no `frontend/` real: zero arquivos recusados.** As únicas ocorrências das construções
+acima são 5 `<svg>` inline, que seguem modelados.
 
 ⚠️ **HTML é ASCII case-insensitive em nome de tag E de atributo.** `<URBI-KPI STYLE="…">` é o mesmo
 elemento com o mesmo atributo. Vale também para seletor de tipo em CSS (`.a URBI-KPI`). Não vale para

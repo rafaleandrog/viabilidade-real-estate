@@ -154,47 +154,77 @@ function declaracoesDe(bloco, base = 0) {
 }
 
 /**
- * As regras de uma superficie CSS, em UMA passada.
+ * As regras de uma superficie CSS, em UMA passada, com PILHA de blocos.
  *
  * Substitui o regex `([^{};]*)\{([^{}]*)\}` aplicado a superficie inteira. Aquele
  * regex custava 46 SEGUNDOS sobre os 1,18 MiB do `frontend/`: o primeiro grupo
  * nao e ancorado, entao a cada offset ele tentava consumir trechos enormes sem
- * `{`, retrocedia e recomecava — retrocesso quadratico. E a superficie e quase
- * toda espaco (so ~2,5% dela e CSS), o que da ao regex exatamente o pior insumo
- * possivel.
+ * `{`, retrocedia e recomecava — retrocesso quadratico.
  *
- * A varredura por indice tem o mesmo criterio — regra MAIS INTERNA, seletor
- * delimitado por `{`, `}` ou `;`, o que atravessa `@media` de graca — e e linear.
+ * ⚠️ A versao por indice que o substituiu so emitia a regra MAIS INTERNA. Com
+ * aninhamento, as declaracoes do bloco EXTERNO sumiam:
+ *
+ *     .x urbi-kpi { width: 100%; &:hover { color: red } }
+ *
+ * dava zero regras em risco e saida ZERO — enquanto o `width` externo continua
+ * aplicado pelo navegador. Bloco dentro de valor de custom property fazia igual.
+ * Agora cada bloco guarda os SEGMENTOS do proprio conteudo que nao pertencem a
+ * nenhum filho, e todos sao emitidos.
  */
 function regrasDe(css) {
   const regras = [];
+  const pilha = [];
+  let inicio = 0;   // inicio do seletor corrente, ou da proxima declaracao
   let aberta = -1;
-  let inicio = 0;
-  let i = 0;
-  while (i < css.length) {
+
+  for (let i = 0; i < css.length; i++) {
     const ch = css[i];
-    if (ch === ';' || ch === '}') { inicio = i + 1; i++; continue; }
-    if (ch !== '{') { i++; continue; }
-    const fecha = css.indexOf('}', i + 1);
-    // `{` sem `}` e estrutura que nao da para ler. Antes o laco so parava, e o
-    // resto do arquivo saia da analise em silencio.
-    if (fecha === -1) { aberta = i; break; }
-    const proximoAbre = css.indexOf('{', i + 1);
-    if (proximoAbre !== -1 && proximoAbre < fecha) {
-      // Ha regra dentro desta: e at-rule (`@media`), entao desce em vez de casar.
+    if (ch === ';') { inicio = i + 1; continue; }
+
+    if (ch === '{') {
+      // O texto de `inicio` ate aqui e o SELETOR do filho, nao declaracao do pai.
+      const pai = pilha[pilha.length - 1];
+      if (pai) pai.segmentos.push({ de: pai.segDe, ate: inicio });
+      pilha.push({
+        seletor: css.slice(inicio, i).trim().replace(/\s+/g, ' '),
+        paiSeletor: pai ? pai.seletor : '',
+        segmentos: [],
+        segDe: i + 1,
+        abre: i,
+      });
       inicio = i + 1;
-      i++;
       continue;
     }
-    regras.push({
-      seletor: css.slice(inicio, i).trim().replace(/\s+/g, ' '),
-      bloco: css.slice(i + 1, fecha),
-      inicioBloco: i + 1,
-    });
-    inicio = fecha + 1;
-    i = fecha + 1;
+
+    if (ch === '}') {
+      const q = pilha.pop();
+      inicio = i + 1;
+      if (!q) continue;                        // `}` orfao: ignora
+      q.segmentos.push({ de: q.segDe, ate: i });
+      const pai = pilha[pilha.length - 1];
+      if (pai) pai.segDe = i + 1;
+      regras.push({ seletor: seletorEfetivo(q.paiSeletor, q.seletor), segmentos: q.segmentos });
+      continue;
+    }
   }
+
+  if (pilha.length) aberta = pilha[0].abre;
   return { regras, aberta };
+}
+
+/**
+ * O seletor que uma regra aninhada REALMENTE casa.
+ *
+ * `&` e substituido pelo pai; sem `&`, aninhar e descender. Filho de at-rule
+ * (`@media`) nao compoe: o `@media` nao e seletor.
+ *
+ * Sem isto, `.x urbi-kpi { &:hover { width: 100% } }` sairia com seletor
+ * `&:hover`, que nao alcanca primitivo nenhum — e o `width` passaria.
+ */
+function seletorEfetivo(pai, filho) {
+  if (!pai || pai.startsWith('@')) return filho;
+  if (filho.includes('&')) return filho.replaceAll('&', pai);
+  return `${pai} ${filho}`;
 }
 
 /**
@@ -249,9 +279,10 @@ for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
     continue;
   }
   for (const regra of doArquivo) {
-    const { seletor, bloco, inicioBloco } = regra;
+    const { seletor, segmentos } = regra;
     if (!seletor || seletor.startsWith('@')) continue;
-    const decls = declaracoesDe(bloco, inicioBloco);
+    // Os segmentos sao os pedacos do bloco que NAO pertencem a filho nenhum.
+    const decls = segmentos.flatMap((g) => declaracoesDe(css.slice(g.de, g.ate), g.de));
     if (!decls.length) continue;
 
     for (const [tag, perigosas] of emRisco) {

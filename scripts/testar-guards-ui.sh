@@ -569,7 +569,11 @@ caso guard-props-urbi 0 "<urbi-*> dentro de <script> (texto cru)" <<'TS'
 const e = html`<script>const s = "<urbi-seguro inventado='x'>";</script>`;
 TS
 
-caso guard-props-urbi 0 "<urbi-*> dentro de CDATA num svg" <<'TS'
+# ⚠️ VEREDITO INVERTIDO na 6ª rodada: CDATA deixou de ser modelado e passou a
+# ser RECUSADO — ele só vale em conteúdo estrangeiro, e dentro de `html` o
+# tokenizer o trata como comentário inválido até o primeiro `>`.
+caso guard-props-urbi 1 "CDATA não é modelado — recusa" \
+  'nao consegui analisar' <<'TS'
 const e = svg`<![CDATA[ <urbi-seguro inventado="x"> ]]>`;
 TS
 
@@ -802,6 +806,65 @@ secao "E o que continua valendo:"
 caso guard-tokens-css 0 "<style> de verdade continua declarando" <<'TS'
 const e = html`<style>:root{--minha:red}</style>`;
 const f = css`.x { color: var(--minha); }`;
+TS
+
+# ════════════════════════════════════════════════════════════════════════════
+# Rodada 6 — o modo invertido passa a valer para o NÃO MODELADO
+#
+# Os achados desta rodada pediam estados do tokenizer do HTML: CDATA em conteúdo
+# estrangeiro, RAWTEXT de `iframe`/`xmp`/`noembed`/`noframes`, `plaintext`. Isso
+# não é mais "o irmão do conserto anterior" — é implementar a spec, e cada rodada
+# revelaria o estado seguinte. Em vez disso, o que não é modelado RECUSA.
+# Custo medido no `frontend/` real: zero arquivos.
+
+secao "CSS aninhado — as declarações do bloco EXTERNO não podem sumir:"
+
+caso guard-box-model-urbi 1 "declaração antes de um bloco aninhado" \
+  'caso\.ts:1 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.x urbi-arriscado { width: 100%; &:hover { color: red } }`;
+TS
+
+caso guard-box-model-urbi 1 "declaração depois de um bloco aninhado" \
+  'caso\.ts:1 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.x urbi-arriscado { &:hover { color: red } width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 1 "seletor aninhado com & compõe com o pai" \
+  'caso\.ts:1 +\.x urbi-arriscado:hover \{ width: 100% \}' <<'TS'
+const e = css`.x urbi-arriscado { color: red; &:hover { width: 100%; } }`;
+TS
+
+caso guard-box-model-urbi 1 "aninhamento por descendência compõe" \
+  'caso\.ts:1 +\.wrap urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.wrap { color: red; urbi-arriscado { width: 100%; } }`;
+TS
+
+caso guard-box-model-urbi 0 "min-width: 0 aninhado continua sendo a correção" <<'TS'
+const e = css`.wrap { color: red; urbi-arriscado { min-width: 0; } }`;
+TS
+
+secao "Construção não modelada — RECUSA, nunca aproxima:"
+
+caso guard-props-urbi 1 "<!doctype> recusa" 'nao consegui analisar' <<'TS'
+const e = html`<!doctype html><urbi-seguro inventado="x"></urbi-seguro>`;
+TS
+
+caso guard-props-urbi 1 "<iframe> recusa" 'nao consegui analisar' <<'TS'
+const e = html`<iframe srcdoc="<urbi-seguro inventado='x'>"></iframe>`;
+TS
+
+caso guard-props-urbi 1 "<plaintext> recusa" 'nao consegui analisar' <<'TS'
+const e = html`<plaintext><urbi-seguro inventado="x">`;
+TS
+
+secao "Texto cru — o fechamento vem depois da tag de abertura:"
+
+caso guard-props-urbi 0 "</script> dentro do valor da abertura não fecha o script" <<'TS'
+const e = html`<script title="</script>">var s = "<urbi-seguro inventado='x'>";</script>`;
+TS
+
+caso guard-props-urbi 0 "<svg> inline continua modelado como tag comum" <<'TS'
+const e = html`<svg viewBox="0 0 1 1"><path d="M0 0"/></svg><urbi-seguro></urbi-seguro>`;
 TS
 
 # ════════════════════════════════════════════════════════════════════════════

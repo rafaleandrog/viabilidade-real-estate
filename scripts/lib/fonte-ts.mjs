@@ -242,6 +242,16 @@ const CRU = /^<(script|title|textarea|style)[\s>]/i;
 const SEM_BURACO = new Set(['style']);
 
 /**
+ * Elementos cujo conteudo tem regra de tokenizacao PROPRIA e que este modulo
+ * NAO modela. Encontrar um deles nao e erro do autor do codigo — e limite nosso,
+ * e por isso recusa o arquivo em vez de ser analisado por aproximacao.
+ *
+ * `noscript` entra porque o conteudo dele so e texto cru com scripting ligado:
+ * ambiguo, e ambiguidade resolve para o lado que acusa.
+ */
+const NAO_MODELADOS = /^<(iframe|xmp|noembed|noframes|noscript|plaintext)[\s>/]/i;
+
+/**
  * Fim de uma tag `<…>` a partir do `<`, ATRAVESSANDO valores citados. `-1` se
  * nao fecha.
  *
@@ -301,34 +311,54 @@ function varrerHtml(s, de, ate, onde) {
       i = f + 3;
       continue;
     }
-    if (s.startsWith('<![CDATA[', i)) {
-      const f = s.indexOf(']]>', i + 9);
-      if (f === -1 || f + 3 > ate) {
-        problemas.push(`${onde}: \`<![CDATA[\` sem \`]]>\``);
-        return { buracos, problemas, tags, estilos };
-      }
-      buracos.push({ de: i, ate: f + 3 });
-      i = f + 3;
-      continue;
+    // ── o que NAO modelamos recusa o arquivo ────────────────────────────
+    // Estender o modo de falha invertido do MALFORMADO para o NAO MODELADO. A
+    // alternativa seria implementar o tokenizer do HTML — uma duzia de estados
+    // de conteudo mais as regras de conteudo estrangeiro —, e cada rodada de
+    // revisao revelava o proximo estado. Aqui deixa de ser preciso acertar a
+    // spec e passa a ser preciso saber o que nao se sabe.
+    //
+    // `<![CDATA[` esta entre eles de proposito: ele so vale em conteudo
+    // estrangeiro; dentro de `html` o tokenizer o trata como comentario
+    // invalido ate o primeiro `>`. Modelar so um dos dois casos era pior que
+    // nao modelar nenhum.
+    //
+    // Medido no `frontend/` real: ZERO ocorrencias de qualquer um deles.
+    if (s[i + 1] === '!' || s[i + 1] === '?') {
+      const trecho = s.slice(i, Math.min(i + 12, ate)).replace(/\s+/g, ' ');
+      problemas.push(`${onde}: nao modelo a construcao \`${trecho}\` — confira a mao`);
+      return { buracos, problemas, tags, estilos };
+    }
+    const naoModelado = NAO_MODELADOS.exec(s.slice(i, i + 12));
+    if (naoModelado) {
+      problemas.push(
+        `${onde}: nao modelo o conteudo de <${naoModelado[1].toLowerCase()}> — confira a mao`,
+      );
+      return { buracos, problemas, tags, estilos };
     }
     const cru = CRU.exec(s.slice(i, i + 12));
     if (cru) {
       const tag = cru[1].toLowerCase();
+      // ⚠️ A tag de ABERTURA e atravessada antes de procurar o fechamento. Sem
+      // isso, `<script title="</script>">` fechava no `</script>` que mora
+      // DENTRO do valor citado, e o conteudo real do script virava marcacao.
+      // Mesma coisa para o `>` que delimita a abertura.
+      const inicioConteudo = fimDaTag(s, i, ate);
+      if (inicioConteudo === -1) {
+        problemas.push(`${onde}: <${tag}> aberta e sem \`>\``);
+        return { buracos, problemas, tags, estilos };
+      }
       // Nome de tag e case-insensitive, e o fechamento admite espaco: `</STYLE >`.
-      const fecha = new RegExp(`</${tag}\\s*>`, 'i');
-      const resto = s.slice(i, ate);
-      const m = fecha.exec(resto);
+      const m = new RegExp(`</${tag}\\s*>`, 'i').exec(s.slice(inicioConteudo, ate));
       if (!m) {
         problemas.push(`${onde}: <${tag}> sem </${tag}>`);
         return { buracos, problemas, tags, estilos };
       }
-      const abre = resto.indexOf('>');
-      if (abre !== -1) {
-        tags.push(i);
-        if (SEM_BURACO.has(tag)) estilos.push({ de: i + abre + 1, ate: i + m.index });
-        else buracos.push({ de: i + abre + 1, ate: i + m.index });
-      }
-      i = i + m.index + m[0].length;
+      tags.push(i);
+      const fimConteudo = inicioConteudo + m.index;
+      if (SEM_BURACO.has(tag)) estilos.push({ de: inicioConteudo, ate: fimConteudo });
+      else buracos.push({ de: inicioConteudo, ate: fimConteudo });
+      i = fimConteudo + m[0].length;
       continue;
     }
     // Qualquer outra tag: atravessa-a inteira, com os valores citados, ANTES de

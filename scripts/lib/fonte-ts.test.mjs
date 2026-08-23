@@ -224,9 +224,51 @@ test('<script> e texto cru — nao abre tag', () => {
   assert.ok(marcacao.includes('<urbi-b'));
 });
 
-test('CDATA nao abre tag', () => {
+// ⚠️ VEREDITO INVERTIDO na 6ª rodada. Antes o módulo modelava CDATA; agora o
+// RECUSA. Motivo: CDATA só vale em conteúdo estrangeiro, e dentro de `html` o
+// tokenizer o trata como comentário inválido até o primeiro `>`. Modelar só um
+// dos dois casos é pior que não modelar nenhum.
+test('CDATA nao e modelado — recusa o arquivo', () => {
   const txt = 'const e = svg`<![CDATA[ <urbi-a ruim=1> ]]><urbi-b></urbi-b>`;';
-  assert.ok(!limpo(txt).marcacao.includes('<urbi-a'));
+  const p = superficies(txt).problemas;
+  assert.equal(p.length, 1);
+  assert.match(p[0], /nao modelo a construcao/);
+});
+
+test('construcoes nao modeladas recusam, uma a uma', () => {
+  const casos = {
+    '<!doctype html>': /nao modelo a construcao/,
+    '<?xml version="1.0"?>': /nao modelo a construcao/,
+    '<iframe srcdoc="x"></iframe>': /<iframe>/,
+    '<xmp>a</xmp>': /<xmp>/,
+    '<noembed>a</noembed>': /<noembed>/,
+    '<noframes>a</noframes>': /<noframes>/,
+    '<noscript>a</noscript>': /<noscript>/,
+    '<plaintext>a': /<plaintext>/,
+  };
+  for (const [trecho, esperado] of Object.entries(casos)) {
+    const p = superficies(`const e = html\`${trecho}\`;`).problemas;
+    assert.ok(p.length > 0, `passou calado: ${trecho}`);
+    assert.match(p[0], esperado, trecho);
+  }
+});
+
+test('o que E modelado continua passando', () => {
+  for (const trecho of [
+    '<!-- comentario -->', '<div a="1"></div>', '<style>.a{b:c}</style>',
+    '<script>var a = 1;</script>', '<title>x</title>', '<textarea>x</textarea>',
+    '<svg><path d="M0 0"/></svg>',
+  ]) {
+    assert.deepEqual(
+      superficies(`const e = html\`${trecho}\`;`).problemas, [], `recusou: ${trecho}`,
+    );
+  }
+});
+
+test('fechamento de texto cru e procurado DEPOIS da tag de abertura', () => {
+  // `</script>` dentro do valor do atributo nao fecha o elemento.
+  const txt = 'const e = html`<script title="</script>">var s = "<urbi-a b=1>";</script>`;';
+  assert.ok(!limpo(txt).marcacao.includes('<urbi-a'), 'o conteudo do script virou marcacao');
 });
 
 test('comentario de CSS sai da superficie de CSS', () => {
