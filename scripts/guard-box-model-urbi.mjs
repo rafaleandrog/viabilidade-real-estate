@@ -65,15 +65,11 @@ const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
 // ⚠️ Dispensa que NAO CASA MAIS reprova o guard. Sem isso ela vira papel de
 // parede: o conserto entra, ninguem apaga a entrada, e a proxima ocorrencia da
 // mesma familia passa despercebida por baixo dela.
-const DISPENSAS = [
-  {
-    arquivo: 'frontend/tela-resumo.ts',
-    seletor: '.kpis .kpi-cel urbi-kpi',
-    prop: 'width',
-    issue: 488,
-    motivo: 'conserto do urbi-kpi na Onda 2 da Rodada 9 — este guard e a prova de que ele fechou',
-  },
-];
+// Vazio, e foi assim que a unica entrada saiu: a #488 apagou o `width: 100%` de
+// `frontend/tela-resumo.ts`, a dispensa deixou de casar e o guard passou a
+// REPROVAR por causa dela — que era exatamente o desenho. Dispensa que nao casa
+// mais com nada nao vira papel de parede aqui: ela cobra a propria remocao.
+const DISPENSAS = [];
 
 function morrer(msg) {
   console.error(`ERRO: ${msg}`);

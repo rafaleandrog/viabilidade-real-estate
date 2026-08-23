@@ -1,13 +1,20 @@
 // Caso de render: a faixa de KPIs da aba RESUMO do Avançado.
 //
-// É o caso que EXISTE PARA FALHAR. `frontend/tela-resumo.ts:67` aplica
-// `width: 100%` de fora a um `urbi-kpi`, cujo `:host` soma `padding: 14px 16px`
-// e `border: 1px` SEM `box-sizing: border-box`. A caixa renderizada mede
-// `largura da célula + 34px` e invade a coluna vizinha.
+// ⚠️ Este caso NASCEU PARA FALHAR e hoje passa — a #488 consertou o defeito, e
+// esta é a virada. Antes, `frontend/tela-resumo.ts:67` aplicava `width: 100%` de
+// fora a um `urbi-kpi` cujo `:host` soma `padding: 14px 16px` + `border: 1px`
+// SEM `box-sizing: border-box`: a caixa media 34px a mais que a track e invadia
+// a coluna vizinha em 22px.
 //
-// Reportado quatro vezes — #176, #262, #326, #352 — e fechado quatro. O
-// conserto é da Onda 2 (#488) e NÃO é deste PR (regra R3). O que este caso
-// entrega é a prova de que o defeito está vivo, medida em pixel.
+// O conserto foi apagar a imposição de largura e deixar os `urbi-kpi` como itens
+// diretos do grid, com a regra do Preliminar (`min-width: 0`). Por isso o
+// `exigir` deixou de pedir o div intermediário: ele não existe mais, e um
+// `exigir` que pede markup extinto reprova a montagem antes de medir qualquer
+// pixel — foi assim que este arquivo avisou que precisava ser atualizado.
+//
+// Reportado quatro vezes antes (#176, #262, #326, #352) e fechado quatro sem
+// nada ficar vermelho em lugar nenhum. Agora fica: se o `width` voltar, a
+// asserção de zero sobreposição neste caso quebra.
 
 import '../../tela-resumo.js';
 import { CRONO, DATA_INICIO, fluxo, forcarEstado } from './dados.js';
@@ -20,7 +27,6 @@ export const caso = {
   // Estes seletores são a prova de que a tela sob medição está na tela.
   exigir: [
     { seletor: 'div.kpis', minimo: 1 },
-    { seletor: 'div.kpi-cel', minimo: 7 },
     { seletor: 'urbi-kpi', minimo: 7 },
   ],
   // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a

@@ -1,29 +1,25 @@
-// Render dos KPIs do RESUMO — a FALHA ESPERADA desta rodada.
+// Render dos KPIs do RESUMO — a asserção que VIROU, e o que ela guarda agora.
 //
-// ⚠️ Leia antes de "consertar" este arquivo.
+// ⚠️ Leia antes de mexer.
 //
-// `frontend/tela-resumo.ts:67` aplica `width: 100%` de fora a um `urbi-kpi`.
-// O `:host` do primitivo soma `padding: 14px 16px` + `border: 1px` e NÃO
-// declara `box-sizing: border-box` (`docs/ui-urbiverso/primitivos.json`), então
-// a caixa renderizada mede 34px a mais que a célula e invade a coluna vizinha.
-// Medido aqui: 22px de sobreposição, nas três larguras.
+// Este teste nasceu INVERTIDO: enquanto o defeito da #488 existia, ele exigia
+// achar transbordo e sobreposição, e passava por isso. A #488 apagou o
+// `width: 100%` que `frontend/tela-resumo.ts` impunha de fora ao `urbi-kpi`, o
+// defeito sumiu, o teste ficou vermelho pedindo esta inversão — e é ela.
 //
-// O defeito foi reportado quatro vezes — #176, #262, #326, #352 — e fechado
-// quatro. O conserto é da **Onda 2 (#488)** e NÃO é deste PR: regra R3 do
-// CLAUDE.md, um assunto por PR. Este PR entrega a infraestrutura que prova.
+// O mecanismo, para não voltar pela quinta vez: o `:host` de `urbi-kpi` soma
+// `padding: 14px 16px` + `border: 1px` e NÃO declara `box-sizing: border-box`
+// (`docs/ui-urbiverso/primitivos.json`). Logo `width` vindo de fora é largura de
+// CONTEÚDO, e a caixa mede 34px a mais que a track — dos quais 22px caíam sobre
+// a coluna seguinte depois do `gap: 12px`. O conserto é não impor largura: item
+// de grid com `stretch` já dimensiona a border box, que é por que o Preliminar
+// (`tela-proforma.ts:53`) sempre esteve certo.
 //
-// POR QUE O TESTE AFIRMA A FALHA EM VEZ DE FICAR DESLIGADO
-//
-// Um teste desligado com `TODO` não roda, não mede e não avisa quando o mundo
-// muda — foi assim que 16 golden cases ficaram uma rodada inteira escritos e
-// nunca executados. Aqui a asserção é INVERTIDA e ativa: enquanto o defeito
-// existir, ela passa; quando a Onda 2 o consertar, ela FICA VERMELHA com a
-// instrução do que fazer. É o mesmo desenho da DISPENSA de
-// `scripts/guard-box-model-urbi.mjs`, e pelo mesmo motivo — dispensa que não
-// casa mais precisa reprovar, senão vira papel de parede.
-//
-// O `guard-box-model` acusa o padrão perigoso no CSS; este teste mede o efeito
-// em pixel. A Onda 2 fecha as duas na mesma alteração.
+// Reportado e fechado quatro vezes antes — #176, #262, #326, #352 — sempre sem
+// nada ficar vermelho em lugar nenhum. Esta é a rede que faltava: se alguém
+// reintroduzir a imposição de largura, ESTE teste quebra, e o
+// `guard-box-model-urbi` acusa o padrão no CSS antes mesmo de rodar o navegador.
+// As duas pontas, uma estática e uma em pixel.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -32,39 +28,45 @@ import { contar, declaracoesOciosas, motivoParaPular, naoDeclaradas, relato } fr
 
 const pular = await motivoParaPular();
 
-test('KPIs do Resumo: o urbi-kpi ainda transborda a célula e pinta sobre o vizinho (#488)', { skip: pular ?? false }, async () => {
+test('KPIs do Resumo: nenhum urbi-kpi estoura a track nem pinta sobre o vizinho (#488)', { skip: pular ?? false }, async () => {
   const a = await verificarRender({ caso: 'kpis-resumo' });
 
-  assert.ok(
-    contar(a, 'transbordoDeCaixa') > 0,
-    'O transbordo de CAIXA do urbi-kpi sumiu.\n' +
-      'Se a #488 foi resolvida, esta é a prova — e o certo agora é INVERTER este teste\n' +
-      '(passar a exigir zero) e apagar a dispensa de scripts/guard-box-model-urbi.mjs.' + relato(a),
+  assert.equal(
+    contar(a, 'transbordoDeCaixa'), 0,
+    'Um urbi-kpi voltou a transbordar a célula.\n' +
+      'Quase certamente alguém impôs largura de fora (width/max-width) a um primitivo\n' +
+      'cujo :host tem padding/border sem box-sizing: border-box. Ver #488.' + relato(a),
   );
-  assert.ok(
-    contar(a, 'sobreposicao') > 0,
-    'A sobreposição entre cards de KPI sumiu — ver a instrução acima (#488).' + relato(a),
+  assert.equal(
+    contar(a, 'sobreposicao'), 0,
+    'Dois cards de KPI voltaram a se sobrepor — mesma causa da #488.' + relato(a),
   );
+  for (const [largura, m] of Object.entries(a.larguras)) {
+    // `overflowDocumento` é um OBJETO quando há overflow e `undefined` quando não
+    // há (`render-check.mjs:616,1229`) — não é booleano. Comparar com `false`
+    // reprova sempre, inclusive no caso limpo; foi o que aconteceu aqui.
+    assert.ok(
+      !m.overflowDocumento,
+      `em ${largura}px a faixa de KPIs passou a rolar o documento na horizontal` + relato(a),
+    );
+  }
 
-  // ⚠️ O IRMÃO DAS OUTRAS ASSERÇÕES, e ele faltava aqui: um teste de falha
-  // esperada é o mais fácil de continuar verde por acidente, porque ele já
-  // espera achar coisa errada. Se a medição estivesse frouxa — prop não
-  // reproduzida em uso, declaração ociosa, Lit não assentado —, os dois `ok`
-  // acima passariam mesmo assim. Este bloco é o que impede a falha esperada de
-  // virar a desculpa para não conferir a qualidade da medida.
+  // ⚠️ O IRMÃO DAS OUTRAS ASSERÇÕES. Com a inversão, o risco mudou de lado: um
+  // teste que agora exige ZERO passa de graça se a medição não estiver medindo
+  // — stub que não reproduz, Lit não assentado, página que lançou. Antes isso
+  // era coberto porque o teste precisava ACHAR algo; agora não é mais, e por
+  // isso este bloco deixou de ser complementar e virou a parte que sustenta as
+  // três asserções acima.
   assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
   assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
   assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
 
-  // O tamanho da invasão é estável nas três larguras porque vem do box model
-  // (padding + borda), não da largura da célula: 2 x 16px de padding + 2 x 1px
-  // de borda = 34px de estouro, dos quais 22px caem sobre a coluna seguinte
-  // depois do `gap: 12px`. Ancorar o NÚMERO é o que impede o teste de continuar
-  // verde com uma sobreposição de outra natureza.
-  for (const [largura, m] of Object.entries(a.larguras)) {
-    for (const s of m.sobreposicao) {
-      assert.equal(s.px, 22, `em ${largura}px a sobreposição mudou de tamanho` + relato(a));
-    }
-  }
+  // E a prova de que havia o que medir não mora aqui: mora no `exigir` do caso
+  // (`div.kpis` ≥ 1 e `urbi-kpi` ≥ 7), que o harness verifica ANTES de medir e
+  // com o qual ele LANÇA em vez de devolver zero. Isso não é teoria — foi
+  // exatamente o que aconteceu ao consertar a #488: o `exigir` ainda pedia o div
+  // intermediário extinto, e o caso recusou montar em vez de reportar limpo.
+  // Um `assert` de contagem aqui seria uma segunda implementação da mesma
+  // garantia, livre para divergir dela.
 });
