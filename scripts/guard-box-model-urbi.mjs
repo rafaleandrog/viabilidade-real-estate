@@ -50,7 +50,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { superficies, lerTags, limparCss } from './lib/fonte-ts.mjs';
+import { superficies, lerTags, limparCss, disponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
@@ -86,6 +86,8 @@ if (!existsSync(ESPELHO)) {
       '      Rode `node scripts/sincronizar-referencia-ui.mjs` (precisa do monorepo clonado).',
   );
 }
+
+if (!disponivel) morrer(porqueIndisponivel);
 
 const espelho = JSON.parse(readFileSync(ESPELHO, 'utf8'));
 const primitivos = espelho.primitivos ?? {};
@@ -163,6 +165,7 @@ function declaracoesDe(bloco, base = 0) {
  */
 function regrasDe(css) {
   const regras = [];
+  let aberta = -1;
   let inicio = 0;
   let i = 0;
   while (i < css.length) {
@@ -170,7 +173,9 @@ function regrasDe(css) {
     if (ch === ';' || ch === '}') { inicio = i + 1; i++; continue; }
     if (ch !== '{') { i++; continue; }
     const fecha = css.indexOf('}', i + 1);
-    if (fecha === -1) break;
+    // `{` sem `}` e estrutura que nao da para ler. Antes o laco so parava, e o
+    // resto do arquivo saia da analise em silencio.
+    if (fecha === -1) { aberta = i; break; }
     const proximoAbre = css.indexOf('{', i + 1);
     if (proximoAbre !== -1 && proximoAbre < fecha) {
       // Ha regra dentro desta: e at-rule (`@media`), entao desce em vez de casar.
@@ -186,7 +191,7 @@ function regrasDe(css) {
     inicio = fecha + 1;
     i = fecha + 1;
   }
-  return regras;
+  return { regras, aberta };
 }
 
 /** Todos os `.ts` de `frontend/`, recursivo. */
@@ -202,13 +207,16 @@ function arquivosTs(dir) {
 
 // ── varredura ───────────────────────────────────────────────────────────────
 const achados = [];
+const inseguros = [];     // arquivo que o lexer nao conseguiu analisar
 const usadas = new Set(); // indices de DISPENSAS que casaram
 let regras = 0;
 
 for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   const rel = relative(RAIZ, arq).replaceAll('\\', '/');
   const txt = readFileSync(arq, 'utf8');
-  const { marcacao, css, linhaDe } = superficies(txt);
+  const { marcacao, css, linhaDe, problemas } = superficies(txt, rel);
+  // Modo de falha invertido — ver o cabecalho de `scripts/lib/fonte-ts.mjs`.
+  if (problemas.length) { inseguros.push({ rel, problemas }); continue; }
 
   // A superficie CSS vem do lexer: texto de template `css` mais o conteudo dos
   // `<style>`, ja SEM comentario e SEM string de CSS — era um `}` dentro de
@@ -218,7 +226,12 @@ for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   // aprovava um `width: 100%` logo abaixo, com saida ZERO. E era procurando
   // ``css` `` no texto cru que um COMENTARIO citando uma regra abria regiao e
   // era acusado por documentar o proprio defeito.
-  for (const regra of regrasDe(css)) {
+  const { regras: doArquivo, aberta } = regrasDe(css);
+  if (aberta !== -1) {
+    inseguros.push({ rel, problemas: [`linha ${linhaDe(aberta)}: bloco CSS \`{\` sem \`}\``] });
+    continue;
+  }
+  for (const regra of doArquivo) {
     const { seletor, bloco, inicioBloco } = regra;
     if (!seletor || seletor.startsWith('@')) continue;
     const decls = declaracoesDe(bloco, inicioBloco);
@@ -280,6 +293,14 @@ console.log(
 
 const obsoletas = DISPENSAS.map((d, i) => ({ ...d, i })).filter((d) => !usadas.has(d.i));
 let falhou = false;
+
+if (inseguros.length) {
+  falhou = true;
+  console.error('');
+  console.error('FALHOU: nao consegui analisar estes arquivos — confira a mao.');
+  console.error('        O guard reprova em vez de aprovar o que nao leu.');
+  for (const i of inseguros) for (const m of i.problemas) console.error(`  ${i.rel}  ${m}`);
+}
 
 if (achados.length) {
   falhou = true;

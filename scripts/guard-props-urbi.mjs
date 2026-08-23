@@ -46,7 +46,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { superficies, lerTags } from './lib/fonte-ts.mjs';
+import { superficies, lerTags, disponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
@@ -62,6 +62,8 @@ if (!existsSync(ESPELHO)) {
       '      Rode `node scripts/sincronizar-referencia-ui.mjs` (precisa do monorepo clonado).',
   );
 }
+
+if (!disponivel) morrer(porqueIndisponivel);
 
 const espelho = JSON.parse(readFileSync(ESPELHO, 'utf8'));
 const primitivos = espelho.primitivos ?? {};
@@ -117,6 +119,7 @@ function arquivosTs(dir) {
 
 // ── varredura ───────────────────────────────────────────────────────────────
 const achados = [];
+const inseguros = [];     // arquivo que o lexer nao conseguiu analisar
 const desconhecidos = []; // primitivo fora do espelho
 let tags = 0;
 let atributosVistos = 0;
@@ -125,7 +128,10 @@ let eventos = 0;
 for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   const rel = relative(RAIZ, arq).replaceAll('\\', '/');
   const txt = readFileSync(arq, 'utf8');
-  const { marcacao, linhaDe } = superficies(txt);
+  const { marcacao, linhaDe, problemas } = superficies(txt, rel);
+  // Modo de falha invertido: superficie incompleta NAO e analisada. Um guard que
+  // seguisse com ela devolveria "limpo" sobre o que nao conseguiu ler.
+  if (problemas.length) { inseguros.push({ rel, problemas }); continue; }
 
   for (const t of lerTags(marcacao, 'urbi-')) {
     const tag = t.tag;
@@ -175,6 +181,14 @@ const c = espelho.carimbo ?? {};
 console.log(
   `  espelho: ${c.sha?.slice(0, 8) ?? '?'} · monorepo ${c.versao_monorepo ?? '?'} · ${c.data_do_commit ?? '?'} · ${indice.size} primitivos`,
 );
+
+if (inseguros.length) {
+  console.error('');
+  console.error('FALHOU: nao consegui analisar estes arquivos — confira a mao.');
+  console.error('        O guard reprova em vez de aprovar o que nao leu.');
+  for (const i of inseguros) for (const m of i.problemas) console.error(`  ${i.rel}  ${m}`);
+  process.exit(1);
+}
 
 if (desconhecidos.length) {
   console.error('');

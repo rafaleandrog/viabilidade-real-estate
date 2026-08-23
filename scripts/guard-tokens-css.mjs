@@ -35,7 +35,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { superficies, lerTags, limparCss } from './lib/fonte-ts.mjs';
+import { superficies, lerTags, limparCss, disponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso');
@@ -51,6 +51,8 @@ if (!existsSync(join(ESPELHO, 'tokens.json'))) {
       '      Rode `node scripts/sincronizar-referencia-ui.mjs` (precisa do monorepo clonado).',
   );
 }
+
+if (!disponivel) morrer(porqueIndisponivel);
 
 const espelhoTokens = JSON.parse(readFileSync(join(ESPELHO, 'tokens.json'), 'utf8'));
 const espelhoPrims = existsSync(join(ESPELHO, 'primitivos.json'))
@@ -108,11 +110,15 @@ const achados = [];
 const usados = new Set();
 let usos = 0;
 
+const inseguros = [];
 const superficiesPorArquivo = arquivos.map((arq) => {
   const txt = readFileSync(arq, 'utf8');
-  const { marcacao, css, texto, linhaDe } = superficies(txt);
+  const rel = relative(RAIZ, arq).replaceAll('\\', '/');
+  const { marcacao, css, texto, linhaDe, problemas } = superficies(txt, rel);
+  // Modo de falha invertido — ver o cabecalho de `scripts/lib/fonte-ts.mjs`.
+  if (problemas.length) { inseguros.push({ rel, problemas }); return null; }
   return {
-    rel: relative(RAIZ, arq).replaceAll('\\', '/'),
+    rel,
     linhaDe,
     css,
     texto,
@@ -121,7 +127,15 @@ const superficiesPorArquivo = arquivos.map((arq) => {
       .flatMap((t) => t.atributos.filter((a) => a.nome === 'style' && a.valor)
         .map((a) => ({ valor: limparCss(a.valor), offset: a.offset }))),
   };
-});
+}).filter(Boolean);
+
+if (inseguros.length) {
+  console.error('');
+  console.error('FALHOU: nao consegui analisar estes arquivos — confira a mao.');
+  console.error('        O guard reprova em vez de aprovar o que nao leu.');
+  for (const i of inseguros) for (const m of i.problemas) console.error(`  ${i.rel}  ${m}`);
+  process.exit(1);
+}
 
 // passada 1 — declaracoes, so de superficie CSS
 for (const s of superficiesPorArquivo) {

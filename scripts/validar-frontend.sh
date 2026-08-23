@@ -15,12 +15,13 @@
 #      estrito em schema.json/manifesto.json (comentário `//` neles reprova o pacote
 #      na instalação — foi o que derrubou a v0.1.19) e ciclo de FK no schema.json
 #      (quebra a instalação numa instância virgem, e só lá);
-#   2. guards de UI contra o espelho `docs/ui-urbiverso/`: token que não existe,
+#   2. roda `pnpm install` (a falha de 401 do SDK é ESPERADA e ignorada);
+#   3. cria os symlinks de topo dos pacotes públicos a partir de `.pnpm/`;
+#   4. guards de UI contra o espelho `docs/ui-urbiverso/`: token que não existe,
 #      atributo que o primitivo não declara, `width`/`height` de fora num
 #      primitivo sem `box-sizing` — as três são falhas 100% SILENCIOSAS, que
-#      atravessam typecheck, teste e build em verde;
-#   3. roda `pnpm install` (a falha de 401 do SDK é ESPERADA e ignorada);
-#   4. cria os symlinks de topo dos pacotes públicos a partir de `.pnpm/`;
+#      atravessam typecheck, teste e build em verde. Depois do link porque o
+#      lexer deles é o parser do `typescript`;
 #   5. typecheck do frontend (tsconfig só-frontend);
 #   6. testes de frontend e build do bundle via esbuild.
 #
@@ -102,36 +103,14 @@ echo "  ok: nenhuma aspa curva em atributo"
 #     caixa maior que o pedido, e pinta sobre o vizinho (o urbi-kpi, quatro vezes
 #     reportado: #176, #262, #326, #352).
 # Nenhuma delas aparece no typecheck, nos testes ou no esbuild.
-echo "== 2/6 guards de UI (tokens + props de primitivo + box model) =="
-node scripts/guard-tokens-css.mjs || exit 1
-node scripts/guard-props-urbi.mjs || exit 1
-node scripts/guard-box-model-urbi.mjs || exit 1
-# As duas baterias. Guard falha calado nos DOIS sentidos: falso negativo deixa o
-# defeito passar; falso positivo reprova código correto, alguém desliga o guard,
-# e aí ele não guarda mais nada.
-#
-# `testar-fonte-ts.sh` é a do lexer compartilhado, que é onde os três decidem
-# fronteira de comentário, string e template — um erro lá erra nos três de uma
-# vez. O teste DIFERENCIAL contra o scanner do compilador não roda aqui: precisa
-# do `typescript`, que só existe depois do link. Ele entra na etapa 6/6.
-com_limite 120 bash scripts/testar-fonte-ts.sh >/dev/null || {
-  echo "  bateria do lexer FALHOU — rode: bash scripts/testar-fonte-ts.sh" >&2
-  exit 1
-}
-com_limite 120 bash scripts/testar-guards-ui.sh >/dev/null || {
-  echo "  bateria dos guards de UI FALHOU — rode: bash scripts/testar-guards-ui.sh" >&2
-  exit 1
-}
-echo "  ok: baterias do lexer e dos guards de UI verdes"
-
-echo "== 3/6 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
+echo "== 2/6 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
 pnpm install >/dev/null 2>&1 || true
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — o pnpm não conseguiu baixar nem os pacotes públicos (sem rede?)." >&2
   exit 1
 fi
 
-echo "== 4/6 linkando pacotes públicos do store virtual (.pnpm) =="
+echo "== 3/6 linkando pacotes públicos do store virtual (.pnpm) =="
 # link_pkg <glob-do-dir-em-.pnpm> <subcaminho-interno> <alvo-em-node_modules>
 link_pkg() {
   local glob="$1" interno="$2" alvo="$3"
@@ -155,6 +134,32 @@ link_pkg 'esbuild@0.24*'             'esbuild'                'esbuild'
 tsc="node_modules/typescript/bin/tsc"
 esbuild_bin="node_modules/esbuild/bin/esbuild"
 
+# ⚠️ ESTA ETAPA VEM DEPOIS DO LINK, e não junto dos outros guards estáticos, por
+# um motivo: desde a 3ª rodada de revisão do PR 505 o lexer de JS/TS dos guards é
+# o PARSER do `typescript`. Sem o pacote linkado eles RECUSAM analisar — que é o
+# comportamento certo, mas num clone novo faria a validação morrer antes de
+# instalar o que ela mesma precisa.
+echo "== 4/6 guards de UI (tokens + props de primitivo + box model) =="
+node scripts/guard-tokens-css.mjs || exit 1
+node scripts/guard-props-urbi.mjs || exit 1
+node scripts/guard-box-model-urbi.mjs || exit 1
+# As duas baterias. Guard falha calado nos DOIS sentidos: falso negativo deixa o
+# defeito passar; falso positivo reprova código correto, alguém desliga o guard,
+# e aí ele não guarda mais nada.
+#
+# `testar-fonte-ts.sh` é a do lexer compartilhado, que é onde os três decidem
+# fronteira de comentário, string e template — um erro lá erra nos três de uma
+# vez.
+com_limite 120 bash scripts/testar-fonte-ts.sh >/dev/null || {
+  echo "  bateria do lexer FALHOU — rode: bash scripts/testar-fonte-ts.sh" >&2
+  exit 1
+}
+com_limite 120 bash scripts/testar-guards-ui.sh >/dev/null || {
+  echo "  bateria dos guards de UI FALHOU — rode: bash scripts/testar-guards-ui.sh" >&2
+  exit 1
+}
+echo "  ok: baterias do lexer e dos guards de UI verdes"
+
 echo "== 5/6 typecheck do frontend =="
 cat > tsconfig.frontend.json <<'JSON'
 { "extends": "./tsconfig.json", "include": ["frontend/**/*"] }
@@ -176,10 +181,7 @@ echo "== 6/6 testes de frontend + build do bundle =="
 # INTEIRA — silenciosamente correto localmente (Node 22), vermelho no runner
 # do CI. Só inclui o segundo glob quando `compgen` confirma que ele casa com
 # algo.
-# O diferencial do lexer entra aqui, e não na etapa 2/6, porque importa o
-# `typescript` — o oráculo é o scanner do próprio compilador. Ver
-# `scripts/lib/fonte-ts.oraculo.mjs`.
-test_globs=(frontend/*.test.ts scripts/lib/fonte-ts.diferencial.test.mjs)
+test_globs=(frontend/*.test.ts)
 if compgen -G "frontend/fixtures/*.test.ts" > /dev/null; then
   test_globs+=(frontend/fixtures/*.test.ts)
 fi

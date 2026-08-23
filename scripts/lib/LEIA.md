@@ -10,14 +10,12 @@ Cada um exporta funções puras, sem efeito colateral, sem ler `process.argv` e 
 | Módulo | Quem importa | O que resolve |
 |---|---|---|
 | `fonte-ts.mjs` | `guard-tokens-css.mjs` · `guard-props-urbi.mjs` · `guard-box-model-urbi.mjs` | Onde termina um comentário, uma string, um template e um `${…}` — **nas três linguagens que vivem num `.ts` deste app** |
-| `fonte-ts.oraculo.mjs` | **só a bateria** | A mesma classificação, feita pelo scanner do compilador TypeScript — o oráculo do teste diferencial |
 
-Os dois `*.test.mjs` daqui não são exceção à regra: quem os roda é o `node --test`, chamado por
-`scripts/testar-fonte-ts.sh` (casos escritos à mão, `node` puro) e pela etapa 6/6 de
-`scripts/validar-frontend.sh` (o diferencial, que precisa do `typescript` linkado).
+O `fonte-ts.test.mjs` daqui não é exceção à regra: quem o roda é o `node --test`, chamado por
+`scripts/testar-fonte-ts.sh`.
 
-⚠️ **Nenhum guard pode importar `fonte-ts.oraculo.mjs`.** Os guards rodam sem `node_modules` — é o
-que os deixa rodar no `pr-guards.yml`, que não faz install nenhum.
+⚠️ **`fonte-ts.mjs` importa o pacote `typescript`** — ver abaixo. Faltando o pacote, ele não tem
+plano B silencioso: os guards **recusam** analisar.
 
 ## Por que `fonte-ts.mjs` existe
 
@@ -33,6 +31,37 @@ achados na varredura seguinte, todos da mesma classe:
 
 Consertar as instâncias uma a uma significaria escrever este lexer **sete vezes**. Ele existe para
 que exista **um** lugar onde essa pergunta é respondida — e **um** lugar para estar errado.
+
+## Por que o lexer de JS/TS foi embora
+
+Três rodadas de revisão, três classes novas, sempre depois de uma previsão de fechamento razoável:
+
+| Rodada | Achados | Classe |
+|---:|---:|---|
+| 1 | 6 | parsers cegos a comentário e string |
+| 2 | 3 | as sub-linguagens CSS e HTML |
+| 3 | 6 | continuidade de estado, operador pós-fixo (`i++ / 2`), grafia (`<STYLE>`) |
+
+O eixo nunca foi *quais construções faltam*. Era **lexer de JS/TS escrito à mão**, cuja cauda é a
+especificação inteira da linguagem — não se fecha enumerando. Então ele saiu:
+
+**1 · JS/TS é o parser do próprio TypeScript** (`createSourceFile`). Não o *scanner*: scanner não
+decide `/` de regex contra `/` de divisão, porque isso é posição de expressão, informação do parser —
+e foi exatamente o que fez o oráculo da rodada 2 errar 33 arquivos. Medido na troca: os spans de
+template saem **idênticos** aos do lexer artesanal nos 66 arquivos reais, e o parser reporta **zero**
+erros de sintaxe neles.
+
+**2 · CSS e HTML seguem à mão, com o modo de falha INVERTIDO.** O lexer não precisa estar certo:
+precisa **nunca dizer "limpo" quando está confuso**. Construção que ele não consegue fechar —
+`/*` sem `*/`, `<!--` sem `-->`, `url(` sem `)`, `{` sem `}`, `<style>` sem `</style>` — vira
+**problema**, e o guard reprova o arquivo com *"não consegui analisar, confira à mão"*.
+
+Isso termina a cauda por construção. Cada achado futuro dessa família vira, no pior caso, um falso
+positivo barulhento — que alguém conserta — em vez de um guard mudo, que é o pior desfecho possível.
+
+⚠️ **As varreduras de CSS e HTML rodam sobre a superfície já mascarada, não sobre cada pedaço de
+texto do template.** É o que faz o estado atravessar a interpolação: `<!-- ${x} -->` e
+`.b { padding: ${x}; }` são uma construção só, com brancos no meio.
 
 ## As três sub-linguagens, e por que a lista fecha
 
@@ -56,27 +85,15 @@ Por isso a entrada única é `superficies(txt)`: ela limpa cada superfície com 
 
 ## Como ele é validado
 
-Duas camadas, complementares — e a segunda existe porque **lexer artesanal errado é exatamente o
-defeito que os guards existem para consertar**:
+`scripts/testar-fonte-ts.sh` — casos escritos à mão, cobrindo **CSS, HTML e o modo de falha
+invertido**. Não há mais nada cobrindo JS/TS, e é de propósito: quem lexa JS/TS agora é o
+compilador, e não se testa o compilador.
 
-| Camada | Prova | Não prova |
-|---|---|---|
-| `fonte-ts.test.mjs` (21 casos, `node` puro) | **intenção** — cada caso é um defeito que já aconteceu, ou a sua imagem espelhada | o que ninguém lembrou de listar |
-| `fonte-ts.diferencial.test.mjs` (67 casos) | **propriedade** — para os 66 arquivos do `frontend/` real e para as 66 concatenações de pares, a classificação bate com a do compilador TypeScript, offset a offset | o eixo `/` (ver abaixo), e a delimitação do CSS dentro de `` css`…` `` |
+**O que existia e foi apagado, para a próxima sessão não reportar como faltando:**
+`fonte-ts.oraculo.mjs` e `fonte-ts.diferencial.test.mjs` comparavam o lexer artesanal com o scanner
+do TypeScript. Com o parser do TypeScript virando a *implementação*, o diferencial passaria a
+comparar TypeScript com TypeScript — teste circular, verde por construção. Sumiram junto com o
+lexer que existiam para vigiar.
 
-Medido: apagar o reconhecimento de comentário de linha ou de string faz o diferencial acusar **66
-de 66** arquivos; apagar o de comentário de bloco, 30. Já o tratamento de **crase escapada** nenhum
-arquivo real exercita — é o caso escrito à mão que o cobre. As duas camadas pegam coisas diferentes.
-
-**O eixo `/` é coberto por validação, não por detecção independente.** Distinguir regex de divisão
-exige posição de expressão, que é informação do parser; um scanner não tem, e o do TypeScript
-reinterpreta qualquer `/` como regex se você pedir. Então o oráculo recebe de nós as posições de
-início de regex — e **recusa** as que não são regex de verdade, o que reprova o diferencial. A dica
-não é passe livre: uma regex **inventada** pelo lexer é acusada, e a **extensão** de toda regex é
-comparada. O que continua descoberto é a regex *não detectada*, que vira código — e essa costuma
-aparecer como divergência logo adiante.
-
-⚠️ **O `frontend/` real é um corpus de sorte.** Ele cobre o que o app por acaso escreveu:
-`` `abc` / 2 `` não existe em nenhum arquivo, então o diferencial sobre arquivos reais **não teria
-pego** o defeito da crase antes da divisão — medido, não suposto. Por isso o diferencial roda também
-sobre um **corpus sintético** de construções válidas que o repo ainda não tem.
+A bateria dos guards (`scripts/testar-guards-ui.sh`) é que prova que cada guard está de fato
+pendurado neste módulo, inclusive **um caso por construção que deve REPROVAR**.

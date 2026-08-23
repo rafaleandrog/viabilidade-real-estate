@@ -44,12 +44,23 @@ trap 'rm -rf "$TMP"' EXIT
 FALHAS=0
 TOTAL=0
 
-# ── espelho sintético ───────────────────────────────────────────────────────
-mkdir -p "$TMP/scripts/lib" "$TMP/docs/ui-urbiverso"
-cp scripts/guard-tokens-css.mjs scripts/guard-props-urbi.mjs scripts/guard-box-model-urbi.mjs "$TMP/scripts/"
-cp scripts/lib/fonte-ts.mjs "$TMP/scripts/lib/"
+# O repositório de mentira não tem `node_modules`, e desde a 3ª rodada de revisão
+# do PR 505 os guards precisam do parser do `typescript`. Aponta-se o do repo —
+# que é o MESMO mecanismo que o job `guards-ui` do CI usa, então esta bateria
+# também exercita o caminho da variável.
+TS_REAL="$RAIZ/node_modules/typescript/lib/typescript.js"
+if [ ! -f "$TS_REAL" ]; then
+  echo "ERRO: não achei $TS_REAL — rode antes: bash scripts/validar-frontend.sh" >&2
+  exit 1
+fi
+export URBI_TYPESCRIPT="$TS_REAL"
 
-cat > "$TMP/docs/ui-urbiverso/tokens.json" <<'JSON'
+# ── espelho sintético ───────────────────────────────────────────────────────
+mkdir -p "$TMP/base/scripts/lib" "$TMP/base/docs/ui-urbiverso"
+cp scripts/guard-tokens-css.mjs scripts/guard-props-urbi.mjs scripts/guard-box-model-urbi.mjs "$TMP/base/scripts/"
+cp scripts/lib/fonte-ts.mjs "$TMP/base/scripts/lib/"
+
+cat > "$TMP/base/docs/ui-urbiverso/tokens.json" <<'JSON'
 {
   "carimbo": { "gerado_de": "fixture", "sha": "0000000000", "versao_monorepo": "0.0.0", "data_do_commit": "2026-01-01" },
   "tokens": {
@@ -69,7 +80,7 @@ JSON
 #                      seletor real. O risco dele é declarado POR ESTA FIXTURE,
 #                      não lido do monorepo: no dia em que o `:host` de verdade
 #                      ganhar `box-sizing`, nada aqui muda de veredito.
-cat > "$TMP/docs/ui-urbiverso/primitivos.json" <<'JSON'
+cat > "$TMP/base/docs/ui-urbiverso/primitivos.json" <<'JSON'
 {
   "carimbo": { "gerado_de": "fixture", "sha": "0000000000", "versao_monorepo": "0.0.0", "data_do_commit": "2026-01-01" },
   "primitivos": {
@@ -145,40 +156,62 @@ BASE_DISPENSA='const e = css`.kpis .kpi-cel urbi-kpi { width: 100%; }`;'
 # para todos os casos seguintes — foi o que aconteceu na primeira versão desta
 # bateria, e ela ficou vermelha em seis casos corretos.
 SEM_BASE=0
-# `caso <guard> <saída-esperada> <descrição> [padrão-ERE]`
+# `caso <guard> <saída-esperada> <descrição> [padrão-ERE]`, com o corpo em stdin.
 #
 # ⚠️ O quarto argumento não é enfeite. Conferir só o CÓDIGO DE SAÍDA deixa passar
 # o pior tipo de teste verde: o que acerta pelo motivo errado. Aconteceu duas
 # vezes na revisão do PR 505 — com `${`${'{'}`}` e com `// abre {` dentro de uma
 # interpolação, o guard acusava, mas com o SELETOR CORROMPIDO (`color: .x
 # urbi-arriscado`), e só continuava acusando porque o sujeito é o último composto.
-# Uma edição adiante virava falso negativo. Todo caso que ACUSA declara o padrão
-# que a mensagem tem que casar.
+# Todo caso que ACUSA declara o padrão que a mensagem tem que casar.
+#
+# Os casos são ENFILEIRADOS aqui e executados em paralelo no fim. Motivo: desde
+# que o lexer passou a ser o parser do `typescript`, cada invocação de guard
+# carrega ~9 MB de compilador (≈540 ms), e 86 casos em série levavam 48 s. Cada
+# caso roda no seu próprio diretório, então o paralelismo não os mistura.
+declare -a ORDEM=()
+N=0
+SEM_BASE=0
+
+secao() { ORDEM+=("S|$1"); }
+
 caso() {
-  local guard="$1" esperado="$2" desc="$3" padrao="${4:-}" rc saida
+  local guard="$1" esperado="$2" desc="$3" padrao="${4:-}"
   local sem_base="$SEM_BASE"; SEM_BASE=0
-  TOTAL=$((TOTAL+1))
-  rm -rf "$TMP/frontend"; mkdir -p "$TMP/frontend"
-  cat > "$TMP/frontend/caso.ts"
-  [ "$sem_base" = "1" ] || printf '%s\n' "$BASE_DISPENSA" > "$TMP/frontend/tela-resumo.ts"
-  saida="$(cd "$TMP" && node "scripts/$guard.mjs" 2>&1)"; rc=$?
-  if [ "$rc" != "$esperado" ]; then
-    printf '  FALHA %s — saída esperada=%s obtida=%s\n' "$desc" "$esperado" "$rc"
-    printf '%s\n' "$saida" | sed 's/^/          | /'
-    FALHAS=$((FALHAS+1))
-    return
-  fi
-  if [ -n "$padrao" ] && ! printf '%s' "$saida" | grep -qE "$padrao"; then
-    printf '  FALHA %s — saída certa (%s) pelo MOTIVO ERRADO: nada casa /%s/\n' "$desc" "$rc" "$padrao"
-    printf '%s\n' "$saida" | sed 's/^/          | /'
-    FALHAS=$((FALHAS+1))
-    return
-  fi
-  printf '  ok    %s\n' "$desc"
+  N=$((N+1)); TOTAL=$((TOTAL+1))
+  local dir="$TMP/c$N"
+  mkdir -p "$dir/scripts/lib" "$dir/docs/ui-urbiverso" "$dir/frontend"
+  cp "$TMP/base/scripts/"*.mjs "$dir/scripts/"
+  cp "$TMP/base/scripts/lib/"*.mjs "$dir/scripts/lib/"
+  cp "$TMP/base/docs/ui-urbiverso/"*.json "$dir/docs/ui-urbiverso/"
+  cat > "$dir/frontend/caso.ts"
+  [ "$sem_base" = "1" ] || printf '%s\n' "$BASE_DISPENSA" > "$dir/frontend/tela-resumo.ts"
+  printf '%s\n%s\n%s\n%s\n' "$guard" "$esperado" "$desc" "$padrao" > "$dir/spec"
+  ORDEM+=("C|$N")
 }
 
-# ════════════════════════════════════════════════════════════════════════════
-echo "guard-tokens-css — ACUSA (falso negativo é o que se procura aqui):"
+# Executor de um caso, chamado pelo pool. Escreve o veredito em `$dir/veredito`.
+cat > "$TMP/rodar-caso.sh" <<'RUNNER'
+#!/bin/bash
+dir="$1"
+mapfile -t spec < "$dir/spec"
+guard="${spec[0]}"; esperado="${spec[1]}"; desc="${spec[2]}"; padrao="${spec[3]}"
+saida="$(cd "$dir" && node "scripts/$guard.mjs" 2>&1)"; rc=$?
+if [ "$rc" != "$esperado" ]; then
+  { printf 'FALHA %s — saída esperada=%s obtida=%s\n' "$desc" "$esperado" "$rc"
+    printf '%s\n' "$saida" | sed 's/^/          | /'; } > "$dir/veredito"
+  exit 0
+fi
+if [ -n "$padrao" ] && ! printf '%s' "$saida" | grep -qE "$padrao"; then
+  { printf 'FALHA %s — saída certa (%s) pelo MOTIVO ERRADO: nada casa /%s/\n' "$desc" "$rc" "$padrao"
+    printf '%s\n' "$saida" | sed 's/^/          | /'; } > "$dir/veredito"
+  exit 0
+fi
+printf 'ok    %s\n' "$desc" > "$dir/veredito"
+RUNNER
+chmod +x "$TMP/rodar-caso.sh"
+
+secao "guard-tokens-css — ACUSA (falso negativo é o que se procura aqui):"
 
 caso guard-tokens-css 1 "token inexistente com fallback (o caso da #475)" 'caso\.ts:1 +--cor-nao-existe' <<'TS'
 const e = css`.x { background: var(--cor-nao-existe, rgba(255,255,255,0.06)); }`;
@@ -188,7 +221,7 @@ caso guard-tokens-css 1 "token inexistente ANINHADO dentro de um var() válido" 
 const e = css`.x { color: var(--cor-texto, var(--cor-inventada, #fff)); }`;
 TS
 
-echo "guard-tokens-css — NÃO acusa (falso positivo desliga a guarda):"
+secao "guard-tokens-css — NÃO acusa (falso positivo desliga a guarda):"
 
 caso guard-tokens-css 0 "tokens do espelho, com e sem fallback" <<'TS'
 const e = css`.x { color: var(--cor-texto); border-color: var(--cor-borda, #111); }`;
@@ -203,7 +236,7 @@ const e = css`urbi-conv { border-width: var(--urbi-conv-borda); }`;
 TS
 
 # ════════════════════════════════════════════════════════════════════════════
-echo "guard-props-urbi — ACUSA:"
+secao "guard-props-urbi — ACUSA:"
 
 caso guard-props-urbi 1 "kebab-case onde o Lit usa minúsculo (max-width= é o inerte)" 'caso\.ts:1 +<urbi-seguro> max-width' <<'TS'
 const e = html`<urbi-seguro max-width="420px"></urbi-seguro>`;
@@ -236,7 +269,7 @@ caso guard-props-urbi 1 "primitivo que não está no espelho" <<'TS'
 const e = html`<urbi-nunca-visto rotulo="x"></urbi-nunca-visto>`;
 TS
 
-echo "guard-props-urbi — NÃO acusa:"
+secao "guard-props-urbi — NÃO acusa:"
 
 caso guard-props-urbi 0 "maxWidth= (o Lit minusculiza; 17 usos reais dependem disto)" <<'TS'
 const e = html`<urbi-seguro maxWidth="420px"></urbi-seguro>`;
@@ -272,7 +305,7 @@ const e = html`<urbi-seguro maxWidth=${`${'a>b'}px`} .maxWidth=${"}"}></urbi-seg
 TS
 
 # ════════════════════════════════════════════════════════════════════════════
-echo "guard-box-model-urbi — ACUSA:"
+secao "guard-box-model-urbi — ACUSA:"
 
 caso guard-box-model-urbi 1 "width de fora num primitivo em risco (o caso do urbi-kpi)" 'caso\.ts:1 +\.kpis \.cel urbi-arriscado \{ width: 100% \}' <<'TS'
 const e = css`.kpis .cel urbi-arriscado { width: 100%; }`;
@@ -303,7 +336,7 @@ caso guard-box-model-urbi 1 "dispensa que não casa mais com nada" <<'TS'
 const e = css`.x { color: red; }`;
 TS
 
-echo "guard-box-model-urbi — NÃO acusa:"
+secao "guard-box-model-urbi — NÃO acusa:"
 
 caso guard-box-model-urbi 0 "min-width: 0 — é a correção recomendada, não o defeito" <<'TS'
 const e = css`.kpis urbi-arriscado { min-width: 0; }`;
@@ -343,7 +376,7 @@ TS
 # substituem a bateria do lexer: provam que cada guard está de fato pendurado
 # nele, o que a bateria do lexer não pode provar.
 
-echo "Fronteira de \${…} — ACUSA (era falso negativo, com saída ZERO):"
+secao "Fronteira de \${…} — ACUSA (era falso negativo, com saída ZERO):"
 
 caso guard-props-urbi 1 "chave em comentário de bloco não engole o arquivo" \
   'caso\.ts:3 +<urbi-seguro> inventado' <<'TS'
@@ -413,7 +446,7 @@ const doc = `<!doctype html><style>
 </style>`;
 TS
 
-echo "Comentário e string — NÃO acusa (era falso positivo, que faz desligar a guarda):"
+secao "Comentário e string — NÃO acusa (era falso positivo, que faz desligar a guarda):"
 
 caso guard-props-urbi 0 "<urbi-*> citado em comentário de linha" <<'TS'
 // nao use <urbi-seguro inventado="x"> aqui
@@ -469,7 +502,7 @@ TS
 # CSS que EXPLICA por que o app abandonou o `urbi-kpi`, e o guard de box model o
 # contava como uma regra alcançando `urbi-kpi` — 5 regras onde há 4.
 
-echo "Sub-linguagens — ACUSA (era falso negativo, com saída ZERO):"
+secao "Sub-linguagens — ACUSA (era falso negativo, com saída ZERO):"
 
 caso guard-props-urbi 1 "crase de fechamento antes de / é divisão, não regex" \
   'caso\.ts:1 +<urbi-seguro> inventado' <<'TS'
@@ -497,7 +530,7 @@ caso guard-box-model-urbi 1 "chave dentro de string CSS não fecha a regra" \
 const e = css`.x urbi-arriscado { content: "}"; width: 100%; }`;
 TS
 
-echo "Sub-linguagens — NÃO acusa (era falso positivo, ou virava regra fantasma):"
+secao "Sub-linguagens — NÃO acusa (era falso positivo, ou virava regra fantasma):"
 
 caso guard-box-model-urbi 0 "comentário CSS citando urbi-* não vira regra (o fluxo-tabela.ts:56-64)" <<'TS'
 const e = css`
@@ -532,16 +565,141 @@ caso guard-box-model-urbi 0 "width dentro de comentário CSS não é acusado" <<
 const e = css`.a urbi-arriscado { /* width: 100%; */ min-width: 0; }`;
 TS
 
+# ════════════════════════════════════════════════════════════════════════════
+# Rodada 3 — o lexer de JS/TS saiu e virou o parser do TypeScript
+#
+# Três rodadas seguidas acharam classe nova num lexer artesanal: comentário e
+# string; sub-linguagens; operador pós-fixo, continuidade de estado e grafia. O
+# eixo não era "quais construções faltam" — era escrever um lexer de JS/TS à mão,
+# cuja cauda é a especificação inteira. Agora quem lexa JS/TS é o parser do
+# `typescript`, e CSS/HTML seguem à mão mas com o MODO DE FALHA INVERTIDO.
+
+secao "Operador antes de / — ACUSA (era falso negativo, com saída ZERO):"
+
+caso guard-props-urbi 1 "i++ / 2 é divisão, não regex" \
+  'caso\.ts:1 +<urbi-seguro> inventado' <<'TS'
+let i = 1; const e = html`${i++ / 2}<urbi-seguro inventado="x"></urbi-seguro>`;
+TS
+
+caso guard-props-urbi 1 "x! / 2 é divisão, não regex" \
+  'caso\.ts:1 +<urbi-seguro> inventado' <<'TS'
+const x: any = 1; const e = html`${x! / 2}<urbi-seguro inventado="y"></urbi-seguro>`;
+TS
+
+secao "Estado atravessando \${…} e grafia — ACUSA:"
+
+caso guard-box-model-urbi 1 "comentário CSS que atravessa a interpolação" \
+  'caso\.ts:2 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.a { /* ${x} } */ color: red; }
+  .x urbi-arriscado { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 1 'url("a)b.png") — o ) mora dentro da string' \
+  'caso\.ts:1 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.x urbi-arriscado { background: url("a)b.png"); width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 1 "<STYLE> maiúsculo é CSS, e </STYLE > admite espaço" \
+  'caso\.ts:1 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = html`<STYLE>.x urbi-arriscado { width: 100%; }</STYLE >`;
+TS
+
+secao "Estado atravessando \${…} e RCDATA — NÃO acusa:"
+
+caso guard-props-urbi 0 "comentário HTML que atravessa a interpolação" <<'TS'
+const e = html`<!-- ${x} <urbi-seguro inventado="y"></urbi-seguro> -->`;
+TS
+
+caso guard-props-urbi 0 "conteúdo de <title> é RCDATA, não marcação" <<'TS'
+const e = html`<title><urbi-seguro inventado="x"></urbi-seguro></title>`;
+TS
+
+caso guard-props-urbi 0 "conteúdo de <textarea> é RCDATA" <<'TS'
+const e = html`<textarea><urbi-seguro inventado="x"></urbi-seguro></textarea>`;
+TS
+
+caso guard-tokens-css 0 "declaração num <STYLE> maiúsculo é conhecida" <<'TS'
+const e = html`<STYLE>.a { --minha: red; }</STYLE >`;
+const f = css`.x { color: var(--minha); }`;
+TS
+
+secao "Modo de falha invertido — construção que não fecha REPROVA, nunca passa:"
+
+caso guard-props-urbi 1 "comentário HTML sem fechar" \
+  'nao consegui analisar' <<'TS'
+const e = html`<!-- nunca fecha <urbi-seguro inventado="x">`;
+TS
+
+caso guard-box-model-urbi 1 "comentário CSS sem fechar" \
+  'nao consegui analisar' <<'TS'
+const e = css`.x urbi-arriscado { /* nunca fecha width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 1 "url( sem fechar" \
+  'nao consegui analisar' <<'TS'
+const e = css`.x urbi-arriscado { background: url(a}b ; width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 1 "bloco CSS { sem }" \
+  'nao consegui analisar' <<'TS'
+const e = css`.x urbi-arriscado { width: 100%;`;
+TS
+
+caso guard-tokens-css 1 "<style> sem fechar" \
+  'nao consegui analisar' <<'TS'
+const e = html`<style>.a { --x: red; }`;
+const f = css`.y { color: var(--nada); }`;
+TS
+
+caso guard-props-urbi 1 "arquivo que o TypeScript não parseia" \
+  'nao consegui analisar' <<'TS'
+const e = html`<urbi-seguro></urbi-seguro>`;
+function ( { ] }
+TS
+
+# ════════════════════════════════════════════════════════════════════════════
+# Executa a fila em paralelo e imprime na ordem de declaração.
+POOL="${POOL:-8}"
+find "$TMP" -maxdepth 1 -name 'c[0-9]*' -type d -print0 \
+  | xargs -0 -r -P "$POOL" -n 1 "$TMP/rodar-caso.sh"
+
+for item in "${ORDEM[@]}"; do
+  tipo="${item%%|*}"; val="${item#*|}"
+  if [ "$tipo" = "S" ]; then printf '%s\n' "$val"; continue; fi
+  if [ ! -f "$TMP/c$val/veredito" ]; then
+    printf '  FALHA caso %s não produziu veredito\n' "$val"; FALHAS=$((FALHAS+1)); continue
+  fi
+  sed 's/^/  /' "$TMP/c$val/veredito"
+  grep -q '^FALHA' "$TMP/c$val/veredito" && FALHAS=$((FALHAS+1))
+done
+
+# ── casos que não passam pelo harness: mexem no ambiente, não no código ─────
 echo "Setup ausente — os três morrem com 2, e não passam calados:"
 for g in guard-tokens-css guard-props-urbi guard-box-model-urbi; do
   TOTAL=$((TOTAL+1))
-  rm -rf "$TMP/docs-guardado"; mv "$TMP/docs" "$TMP/docs-guardado"
-  rc=0; (cd "$TMP" && node "scripts/$g.mjs" >/dev/null 2>&1) || rc=$?
-  mv "$TMP/docs-guardado" "$TMP/docs"
+  d="$TMP/semespelho"; rm -rf "$d"; mkdir -p "$d/scripts/lib" "$d/frontend"
+  cp "$TMP/base/scripts/"*.mjs "$d/scripts/"; cp "$TMP/base/scripts/lib/"*.mjs "$d/scripts/lib/"
+  rc=0; (cd "$d" && node "scripts/$g.mjs" >/dev/null 2>&1) || rc=$?
   if [ "$rc" = "2" ]; then
     printf '  ok    %s sem espelho → 2\n' "$g"
   else
     printf '  FALHA %s sem espelho — esperado=2 obtido=%s\n' "$g" "$rc"
+    FALHAS=$((FALHAS+1))
+  fi
+done
+
+# Sem o parser, o guard não tem como analisar nada. O desfecho certo é RECUSAR:
+# "não deu para rodar" nunca é "passou".
+echo "Sem o pacote typescript — os três recusam, e não aprovam:"
+for g in guard-tokens-css guard-props-urbi guard-box-model-urbi; do
+  TOTAL=$((TOTAL+1))
+  rc=0
+  saida="$(cd "$TMP/c1" && URBI_TYPESCRIPT=/nao/existe.js node "scripts/$g.mjs" 2>&1)" || rc=$?
+  if [ "$rc" = "2" ] && printf '%s' "$saida" | grep -q 'typescript'; then
+    printf '  ok    %s sem typescript → 2, dizendo por quê\n' "$g"
+  else
+    printf '  FALHA %s sem typescript — esperado=2 obtido=%s\n' "$g" "$rc"
+    printf '%s\n' "$saida" | sed 's/^/          | /'
     FALHAS=$((FALHAS+1))
   fi
 done
