@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseMesAno, rotuloMesRelativo, mesRelativoCompleto, rotuloPeriodo,
   vgvTipologia, vgvLinha, receitaLiquidaLinha, periodoAbsorcao, absorcaoMensal,
-  faixasAbsorcao, pctPosObraDerivado, erroFormularioAbsorcao, problemaJanelaDuranteObra, APOS_CHAVES_MESES,
+  faixasAbsorcao, pctPosChavesDerivado, erroFormularioAbsorcao, problemaJanelaDuranteObra, APOS_CHAVES_MESES,
   areaPrivativaTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
   totalAntesAlocacao, ePermutaFisica,
@@ -109,7 +109,7 @@ test('#226/#348: a janela Pós-chaves ignora pos_obra.duracao_meses — é const
   const f = faixasAbsorcao(cronoPosLongo)!;
   assert.equal(APOS_CHAVES_MESES, 12);
   // A absorção usa 12 meses fixos, não os 24 do evento pos_obra.
-  assert.deepEqual(f.pos_obra, { inicio: 31, fim: 31 + APOS_CHAVES_MESES - 1 });
+  assert.deepEqual(f.pos_chaves, { inicio: 31, fim: 31 + APOS_CHAVES_MESES - 1 });
   // Alterar pos_obra.duracao_meses não muda mais o período total de absorção.
   const cronoPosCurto: EventoCrono[] = [
     ...cronoPosLongo.slice(0, 2),
@@ -125,11 +125,11 @@ test('faixasAbsorcao: 4 períodos contíguos sem sobreposição (#225)', () => {
   // #225: "Durante a obra" começa no mês seguinte ao fim do Lançamento (13),
   // não no início físico da Obra (17) — sem sobrepor pré/lançamento.
   assert.deepEqual(f.obra, { inicio: 13, fim: 40 });
-  assert.deepEqual(f.pos_obra, { inicio: 41, fim: 52 });
+  assert.deepEqual(f.pos_chaves, { inicio: 41, fim: 52 });
   // Contíguo: cada faixa começa no mês seguinte ao fim da anterior.
   assert.equal(f.lancamento.inicio, f.pre_lancamento.fim + 1);
   assert.equal(f.obra.inicio, f.lancamento.fim + 1);
-  assert.equal(f.pos_obra.inicio, f.obra.fim + 1);
+  assert.equal(f.pos_chaves.inicio, f.obra.fim + 1);
 });
 
 test('problemaJanelaDuranteObra: Lançamento que alcança o fim da Obra é reportado (#225)', () => {
@@ -153,14 +153,14 @@ test('faixasAbsorcao sem pré-lançamento: faixa pre_lancamento vazia (fim < ini
   assert.deepEqual(f.lancamento, { inicio: 6, fim: 6 });
 });
 
-test('pctPosObraDerivado = 100 − pré-lançamento − lançamento − obra', () => {
-  assert.equal(pctPosObraDerivado([{ evento: 'pre_lancamento', pct: 10 }, { evento: 'lancamento', pct: 20 }, { evento: 'obra', pct: 35 }]), 35);
-  assert.equal(pctPosObraDerivado([{ evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 35 }]), 35); // sem bloco pre (backward compat)
-  assert.equal(pctPosObraDerivado([{ evento: 'lancamento', pct: 60 }, { evento: 'obra', pct: 60 }]), 0); // clamp em 0
+test('pctPosChavesDerivado = 100 − pré-lançamento − lançamento − obra', () => {
+  assert.equal(pctPosChavesDerivado([{ evento: 'pre_lancamento', pct: 10 }, { evento: 'lancamento', pct: 20 }, { evento: 'obra', pct: 35 }]), 35);
+  assert.equal(pctPosChavesDerivado([{ evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 35 }]), 35); // sem bloco pre (backward compat)
+  assert.equal(pctPosChavesDerivado([{ evento: 'lancamento', pct: 60 }, { evento: 'obra', pct: 60 }]), 0); // clamp em 0
 });
 
 // #347: antes desta issue, uma soma > 100% clampava em silêncio no Pós-obra
-// (pctPosObraDerivado usa Math.max(0, ...)) e a absorção real fechava abaixo
+// (pctPosChavesDerivado usa Math.max(0, ...)) e a absorção real fechava abaixo
 // de 100% — erroFormularioAbsorcao existe para bloquear isso ANTES de salvar.
 test('erroFormularioAbsorcao: soma > 100% é rejeitada; soma ≤ 100% passa', () => {
   assert.equal(erroFormularioAbsorcao({ pre_lancamento_pct: 20, lancamento_pct: 30, obra_pct: 40 }), null); // 90
@@ -386,4 +386,55 @@ test('ePermutaFisica: só a linha Preço/terreno com subcategoria "Permuta físi
   assert.equal(ePermutaFisica({ grupo: 'terreno', categoria: 'Outro', subcategoria: 'Permuta física' }), false);
   assert.equal(ePermutaFisica({ grupo: 'obra', categoria: 'Preço', subcategoria: 'Permuta física' }), false);
   assert.equal(ePermutaFisica({}), false);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #430 — Pós-obras (custo) e Pós-chaves (comercial) sao conceitos separados
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#430: esticar o Pos-obras nao move UM UNICO ponto da absorcao', () => {
+  // A promessa da issue e taxonomica: nenhum numero muda. Este teste amarra
+  // isso na serie inteira, nao so na janela — e a serie e o que vira receita.
+  const base = (durPos: number): EventoCrono[] => [
+    { evento: 'pre_lancamento', inicio_mes: 0, duracao_meses: 6 },
+    { evento: 'lancamento', inicio_mes: 6, duracao_meses: 1 },
+    { evento: 'obra', inicio_mes: 7, duracao_meses: 24 },
+    { evento: 'pos_obra', inicio_mes: 31, duracao_meses: durPos },
+  ];
+  const abs = {
+    modo: 'distribuido',
+    blocos: [
+      { evento: 'pre_lancamento', pct: 10 },
+      { evento: 'lancamento', pct: 20 },
+      { evento: 'obra', pct: 40 },
+      // O 4o bloco continua gravado com o nome LEGADO `pos_obra` — e dado em
+      // coluna json, reconhecido por esse nome pelo backend. O que a #430
+      // renomeia e o identificador em memoria, nao o dado.
+      { evento: 'pos_obra', pct: 0 },
+    ],
+  };
+  const curto = absorcaoMensal(abs, base(12))!;
+  const longo = absorcaoMensal(abs, base(13))!;
+  const gigante = absorcaoMensal(abs, base(48))!;
+  assert.deepEqual(longo, curto);
+  assert.deepEqual(gigante, curto);
+  // E a serie fecha 100%: os 30% restantes caem no Pos-chaves derivado.
+  const soma = curto.pcts.reduce((s, v) => s + v, 0);
+  assert.ok(Math.abs(soma - 100) < 1e-9, `soma = ${soma}`);
+});
+
+test('#430: a janela comercial se chama pos_chaves, e o evento de custo segue pos_obra', () => {
+  const crono: EventoCrono[] = [
+    { evento: 'pre_lancamento', inicio_mes: 0, duracao_meses: 6 },
+    { evento: 'lancamento', inicio_mes: 6, duracao_meses: 1 },
+    { evento: 'obra', inicio_mes: 7, duracao_meses: 24 },
+    { evento: 'pos_obra', inicio_mes: 31, duracao_meses: 13 },
+  ];
+  const f = faixasAbsorcao(crono)! as Record<string, { inicio: number; fim: number }>;
+  // A chave comercial existe sob o nome novo...
+  assert.deepEqual(f.pos_chaves, { inicio: 31, fim: 42 });
+  // ...e o nome antigo nao sobrevive como apelido silencioso.
+  assert.equal(f.pos_obra, undefined);
+  // O inicio ainda e herdado do evento de custo; so a duracao e que nao e.
+  assert.equal(f.pos_chaves.fim - f.pos_chaves.inicio + 1, APOS_CHAVES_MESES);
 });

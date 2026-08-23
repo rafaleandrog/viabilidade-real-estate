@@ -55,6 +55,9 @@ export class ViabFluxoCronograma extends LitElement {
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .params { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 8px; }
+    /* #430: nota de escopo da duração do Pós-obras — fica sob o nome da fase,
+       não ao lado, para não competir com o rótulo. */
+    .nota-pos-obras { display: block; font-size: var(--texto-rotulo, 0.75rem); }
     .params urbi-input-data { width: 190px; }
     /* #245: o viab-num agrega número + setas + sufixo ("meses") + sufixo-mes
        ("jun/29") na mesma linha. A correção do truncamento é no primitivo
@@ -257,6 +260,11 @@ export class ViabFluxoCronograma extends LitElement {
             <span class="ponto-cor" style="background:${cor}"></span>
             ${EVENTO_LABEL[ev.evento] || ev.evento}
           </span>
+          <!-- #430: "Pós-obras" é a fase de CUSTO. A janela COMERCIAL depois da
+               entrega chama-se "Pós-chaves", tem 12 meses fixos (#226) e não
+               sai daqui: esticar esta duração NÃO amplia a janela de venda. -->
+          ${ev.evento === 'pos_obra' ? html`
+            <span class="sec nota-pos-obras" title="A janela de vendas e de pagamento depois da entrega é o Pós-chaves, de 12 meses fixos (#226) — ela não muda com esta duração.">duração de custos</span>` : nothing}
         </td>
         <td>
           <span class="campo-mes">

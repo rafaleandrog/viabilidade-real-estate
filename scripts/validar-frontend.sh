@@ -167,8 +167,16 @@ com_limite 120 bash scripts/testar-guards-ui.sh >/dev/null || {
 echo "  ok: baterias do lexer e dos guards de UI verdes"
 
 echo "== 5/7 typecheck do frontend =="
+# ⚠️ `scripts/**/*.ts` entra aqui, e NÃO é enfeite. O `tsconfig.json` da raiz
+# inclui só `frontend/` e `backend/`, então nada typechecava os scripts — e eles
+# IMPORTAM o frontend. Em 2026-08-23 o PR da #430 renomeou `pctPosObraDerivado`
+# e deixou `scripts/conferir-estudo.ts` importando um símbolo inexistente: o
+# script morria no link do módulo, e `validar-frontend.sh` ficava verde.
+# Não era um script qualquer — é o único que reexecuta os motores contra a
+# instância viva, ou seja, exatamente o instrumento que mediria a promessa
+# "nenhum número muda" daquele PR.
 cat > tsconfig.frontend.json <<'JSON'
-{ "extends": "./tsconfig.json", "include": ["frontend/**/*"] }
+{ "extends": "./tsconfig.json", "include": ["frontend/**/*", "scripts/**/*.ts"] }
 JSON
 node "$tsc" --noEmit -p tsconfig.frontend.json
 tc=$?

@@ -28,7 +28,7 @@ import {
 } from '../frontend/funding-motor.js';
 import { proformaAvancado } from '../frontend/proforma-avancado.js';
 import {
-  mesRepasse, areaPrivativaTotalLinhas, absorcaoMensal, pctPosObraDerivado,
+  mesRepasse, areaPrivativaTotalLinhas, absorcaoMensal, pctPosChavesDerivado,
   type EventoCrono,
 } from '../frontend/fluxo-shared.js';
 import {
@@ -186,7 +186,7 @@ export async function conferir(id: number): Promise<Conferencia> {
     const posGravado = blocos.find((b: any) => b.evento === 'pos_obra');
     if (posGravado) {
       conta(`pós-chaves "${l.nome}": pct GRAVADO vs DERIVADO (100−pre−lanc−obra)`,
-        pctPosObraDerivado(blocos), n(posGravado.pct));
+        pctPosChavesDerivado(blocos), n(posGravado.pct));
     }
     void somaBlocos;
     // Σ participacaoPct dos componentes canônicos
