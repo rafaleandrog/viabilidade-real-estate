@@ -321,6 +321,28 @@ if (TUDO_DECLARADO) {
 // commits; sem ele aqui, um PR com `Closes #123` só no título e diff vazio
 // passava no preflight e reprovava no CI — quebrando a garantia de que verde
 // aqui antecipa aquele guard. Achado do Codex no PR 502, rodada 6.
+// Branch atrasada em relação à base: o CI valida o **merge prospectivo** (o
+// `actions/checkout` usa o merge commit do PR), enquanto tudo aqui lê só a
+// árvore da branch. Interação entre mudanças independentes — a base acrescenta
+// `B → A` ao schema, a branch acrescenta `A → B`, o git mescla sem conflito e o
+// ciclo só existe no merge — passa neste script e reprova lá. Não dá para
+// reproduzir o merge sem construí-lo; o que dá é **avisar que a diferença
+// existe**, em vez de prometer uma antecipação que não se sustenta.
+// Achado do Codex, rodada 11.
+if (baseSha && headSha) {
+  try {
+    const tipo = git('rev-parse', `${BASE}`);
+    if (tipo !== baseSha) {
+      avisos.push(
+        `a branch está atrás de ${BASE} (merge-base \`${baseSha.slice(0, 8)}\`, tip ` +
+          `\`${tipo.slice(0, 8)}\`). O CI valida o MERGE prospectivo, este script valida só a ` +
+          'branch: defeito que só nasce da interação entre as duas passa aqui e reprova lá. ' +
+          `Traga a base (\`git merge ${BASE}\`) antes de confiar no verde.`,
+      );
+    }
+  } catch { /* base inalcançável já foi reportada acima */ }
+}
+
 const texto = `${TITULO}\n${corpo}\n${commits}`;
 
 // ── 3. Diff vazio + keyword de fechamento ───────────────────────────────────
@@ -434,8 +456,13 @@ const versaoDe = (ref) => {
     // e não contava aqui: PR sem migração passava no preflight e reprovava no
     // `validation.yml`. Predicado tem de ter a semântica do previsto, inclusive
     // quando a do previsto é mais crua. Rodada 9.
-    const m = bruto.match(/"versao"[^,]*/);
-    return m ? m[0] : null;
+    // TODAS as ocorrências, como o `grep -o` do guard emite — não só a primeira.
+    // `manifesto.json` com duas chaves `versao` passa no JSON.parse e no guard de
+    // JSON estrito; se o PR alterasse só a segunda, o `match` simples concluía
+    // "nada mudou" e o `validar-backend.sh:113-114` reprovava o mesmo PR.
+    // Achado do Codex, rodada 11.
+    const todas = [...bruto.matchAll(/"versao"[^,]*/g)].map((m) => m[0]);
+    return todas.length ? todas.join('\n') : null;
   } catch {
     return null;
   }
