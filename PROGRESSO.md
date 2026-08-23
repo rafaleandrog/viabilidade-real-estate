@@ -120,9 +120,25 @@ bloqueante inventado em todo PR que suba piso.
 Nada foi apagado, e cada caso tem motivo: `acompanhar-revisao` **não existe mais** e
 `guard-processo.mjs:100-104` **reprova o CI** se ela voltar (*"a geração de duas sessões foi apagada
 de propósito"*); `revisar-pr-shell`, `revisar-pr` e `qa` moram no monorepo, que é somente-leitura e
-cujas próprias sessões as usam. A correção foi uma **porta de runtime** no topo do `SKILL.md` do
-app: além do `printenv CLAUDECODE`, conferir `git rev-parse --show-toplevel` e parar se não terminar
-em `viabilidade-real-estate`.
+cujas próprias sessões as usam.
+
+**A primeira correção estava errada, e quem a derrubou foi o Codex** — vale registrar o caminho, não
+só o destino. A tentativa inicial foi uma porta de runtime no `SKILL.md` mandando conferir
+`git rev-parse --show-toplevel` e parar se não terminasse em `viabilidade-real-estate`. **Não
+funciona, por dois motivos:** carregar a skill do monorepo **não muda o diretório da sessão**, então
+o toplevel continua sendo o do app e a cópia errada **passa** no teste; e o aviso mora dentro da
+cópia do app, que é justamente a que **não é lida** quando a outra é a servida. Era teatro. O
+caminho absoluto de recuperação também estava cravado em `/home/user/...`, e o próprio checkout do
+Codex fica em `/workspace/...`.
+
+**O que ficou.** O desempate é **material**, não de localização, e mora no
+`CLAUDE.md` (§ *A revisão em si*) — a única superfície que nenhuma skill sombreia, porque é conteúdo
+do repositório e entra no contexto de qualquer sessão que trabalhe aqui. Dois discriminadores: se as
+instruções mandarem **bumpar a `versao` por causa de `shell_min`**, ou confrontar o diff contra
+**`docs/shell/`**, é a cópia errada. Regra de precedência: **o `CLAUDE.md` vence**, e a divergência
+se conta ao autor. O caminho de reabertura é derivado —
+`"$(git rev-parse --show-toplevel)"/.claude/skills/revisar-pr-apps/SKILL.md`. A cópia na skill fica
+como reforço, não como única defesa.
 
 ### Codex — os três caminhos, medidos
 
