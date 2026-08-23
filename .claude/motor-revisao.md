@@ -148,9 +148,30 @@ Então, **antes** de publicar o relatório da §7, execute nesta ordem:
 **Se o teto estourar** — nenhuma review no head da rodada em 15 min —, o ciclo fica **aberto**, e a
 atestação tem de refletir isso **na máquina, não na prosa**:
 
-> 🔴 **Publique a linha de máquina com `bloqueantes=1`**, tendo como bloqueante *"revisão do App não
-> chegou no head desta rodada"* — ele some quando ela chegar. Diga também, em uma linha de prosa,
-> que o App foi acionado no head `<sha>` e não respondeu dentro do teto.
+> 🔴 **Publique a linha de máquina com `bloqueantes=1`**, tendo como bloqueante *"resposta do App
+> não detectável no head desta rodada"*. Diga também, em uma linha de prosa, que o App foi acionado
+> no head `<sha>` e que nenhuma resposta detectável chegou dentro do teto.
+>
+> ⚠️ **Escreva "não detectável", nunca "não respondeu" — e o bloqueante precisa de saída própria.**
+> Uma das formas de resposta do App é uma **reação 👍 no seu comentário de acionamento**, e ela
+> **não é detectável por este procedimento** (ver o passo 3): a reação não cria comentário do bot
+> nem traz `Reviewed commit:`. Nesse caso a reação **já é a resposta final** — nenhuma review vai
+> chegar depois. Um bloqueante redigido como *"some quando a review chegar"* fica **permanente**, e
+> o passo 1 da execução seguinte também trava esperando uma resposta que não existe.
+>
+> **A saída, em duas etapas:**
+>
+> 1. **Reacione uma vez, no mesmo head**, dizendo no comentário que é o segundo e último
+>    acionamento. Se vier resposta detectável, siga o fluxo normal.
+> 2. **Se o segundo acionamento também não produzir resposta detectável**, encerre a rodada
+>    declarando a **camada A como `app=nao-detectado`** na linha de máquina, e conte na prosa: dois
+>    acionamentos, nenhuma resposta detectável, a independência adversarial **não foi obtida neste
+>    head**. Os seus bloqueantes voltam a mandar sozinhos em `bloqueantes=` — que pode ser `0`.
+>
+> É o mesmo tratamento que a camada de contratos já recebe com `contratos=nao-executados`: uma
+> lacuna **declarada e visível** vale mais que um portão travado, porque portão travado é desligado
+> por quem precisa trabalhar. Para o passo 1, um acionamento que passou pelas duas etapas conta como
+> **drenado**, não como pendente. Achado do Codex no PR 500, rodada 2.
 >
 > **Duas armadilhas aqui, as duas achadas pelo próprio Codex, e a segunda derrubou a primeira
 > resposta:**
