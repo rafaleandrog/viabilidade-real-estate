@@ -106,14 +106,23 @@ echo "== 2/6 guards de UI (tokens + props de primitivo + box model) =="
 node scripts/guard-tokens-css.mjs || exit 1
 node scripts/guard-props-urbi.mjs || exit 1
 node scripts/guard-box-model-urbi.mjs || exit 1
-# A bateria dos próprios guards. Guard falha calado nos DOIS sentidos: falso
-# negativo deixa o defeito passar; falso positivo reprova código correto, alguém
-# desliga o guard, e aí ele não guarda mais nada.
+# As duas baterias. Guard falha calado nos DOIS sentidos: falso negativo deixa o
+# defeito passar; falso positivo reprova código correto, alguém desliga o guard,
+# e aí ele não guarda mais nada.
+#
+# `testar-fonte-ts.sh` é a do lexer compartilhado, que é onde os três decidem
+# fronteira de comentário, string e template — um erro lá erra nos três de uma
+# vez. O teste DIFERENCIAL contra o scanner do compilador não roda aqui: precisa
+# do `typescript`, que só existe depois do link. Ele entra na etapa 6/6.
+com_limite 120 bash scripts/testar-fonte-ts.sh >/dev/null || {
+  echo "  bateria do lexer FALHOU — rode: bash scripts/testar-fonte-ts.sh" >&2
+  exit 1
+}
 com_limite 120 bash scripts/testar-guards-ui.sh >/dev/null || {
   echo "  bateria dos guards de UI FALHOU — rode: bash scripts/testar-guards-ui.sh" >&2
   exit 1
 }
-echo "  ok: bateria dos guards de UI verde"
+echo "  ok: baterias do lexer e dos guards de UI verdes"
 
 echo "== 3/6 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
 pnpm install >/dev/null 2>&1 || true
@@ -167,7 +176,10 @@ echo "== 6/6 testes de frontend + build do bundle =="
 # INTEIRA — silenciosamente correto localmente (Node 22), vermelho no runner
 # do CI. Só inclui o segundo glob quando `compgen` confirma que ele casa com
 # algo.
-test_globs=(frontend/*.test.ts)
+# O diferencial do lexer entra aqui, e não na etapa 2/6, porque importa o
+# `typescript` — o oráculo é o scanner do próprio compilador. Ver
+# `scripts/lib/fonte-ts.oraculo.mjs`.
+test_globs=(frontend/*.test.ts scripts/lib/fonte-ts.diferencial.test.mjs)
 if compgen -G "frontend/fixtures/*.test.ts" > /dev/null; then
   test_globs+=(frontend/fixtures/*.test.ts)
 fi

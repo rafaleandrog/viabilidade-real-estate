@@ -290,6 +290,21 @@ jobs:
             echo "::error title=Guard de UI reprovou::Token inexistente, atributo que o primitivo não declara, ou width/height de fora num urbi-* sem box-sizing. Nenhuma das três aparece no typecheck, nos testes ou no build — veja o log acima para o arquivo:linha."
             exit 1
           fi
+      - name: Bateria do lexer compartilhado
+        if: always()
+        run: |
+          set -uo pipefail
+          # `scripts/lib/fonte-ts.mjs` e o unico lugar onde os tres guards decidem
+          # fronteira de comentario, string, template e `${…}`. Essa e a vantagem —
+          # um lugar para consertar — e o risco: um erro ali erra nos tres de uma
+          # vez, e em silencio. Sao os casos escritos a mao, que rodam com `node`
+          # puro. O teste DIFERENCIAL contra o scanner do compilador TypeScript
+          # roda no `validation.yml`, via `validar-frontend.sh`, porque precisa do
+          # pacote instalado.
+          if ! bash scripts/testar-fonte-ts.sh; then
+            echo "::error title=Bateria do lexer falhou::scripts/lib/fonte-ts.mjs nao delimita comentario, string ou template como o esperado. Os tres guards de UI dependem dele."
+            exit 1
+          fi
       - name: Bateria dos guards de UI
         if: always()
         run: |

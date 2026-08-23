@@ -45,8 +45,9 @@ FALHAS=0
 TOTAL=0
 
 # ── espelho sintético ───────────────────────────────────────────────────────
-mkdir -p "$TMP/scripts" "$TMP/docs/ui-urbiverso"
+mkdir -p "$TMP/scripts/lib" "$TMP/docs/ui-urbiverso"
 cp scripts/guard-tokens-css.mjs scripts/guard-props-urbi.mjs scripts/guard-box-model-urbi.mjs "$TMP/scripts/"
+cp scripts/lib/fonte-ts.mjs "$TMP/scripts/lib/"
 
 cat > "$TMP/docs/ui-urbiverso/tokens.json" <<'JSON'
 {
@@ -144,27 +145,42 @@ BASE_DISPENSA='const e = css`.kpis .kpi-cel urbi-kpi { width: 100%; }`;'
 # para todos os casos seguintes — foi o que aconteceu na primeira versão desta
 # bateria, e ela ficou vermelha em seis casos corretos.
 SEM_BASE=0
+# `caso <guard> <saída-esperada> <descrição> [padrão-ERE]`
+#
+# ⚠️ O quarto argumento não é enfeite. Conferir só o CÓDIGO DE SAÍDA deixa passar
+# o pior tipo de teste verde: o que acerta pelo motivo errado. Aconteceu duas
+# vezes na revisão do PR 505 — com `${`${'{'}`}` e com `// abre {` dentro de uma
+# interpolação, o guard acusava, mas com o SELETOR CORROMPIDO (`color: .x
+# urbi-arriscado`), e só continuava acusando porque o sujeito é o último composto.
+# Uma edição adiante virava falso negativo. Todo caso que ACUSA declara o padrão
+# que a mensagem tem que casar.
 caso() {
-  local guard="$1" esperado="$2" desc="$3" rc saida
+  local guard="$1" esperado="$2" desc="$3" padrao="${4:-}" rc saida
   local sem_base="$SEM_BASE"; SEM_BASE=0
   TOTAL=$((TOTAL+1))
   rm -rf "$TMP/frontend"; mkdir -p "$TMP/frontend"
   cat > "$TMP/frontend/caso.ts"
   [ "$sem_base" = "1" ] || printf '%s\n' "$BASE_DISPENSA" > "$TMP/frontend/tela-resumo.ts"
   saida="$(cd "$TMP" && node "scripts/$guard.mjs" 2>&1)"; rc=$?
-  if [ "$rc" = "$esperado" ]; then
-    printf '  ok    %s\n' "$desc"
-  else
+  if [ "$rc" != "$esperado" ]; then
     printf '  FALHA %s — saída esperada=%s obtida=%s\n' "$desc" "$esperado" "$rc"
     printf '%s\n' "$saida" | sed 's/^/          | /'
     FALHAS=$((FALHAS+1))
+    return
   fi
+  if [ -n "$padrao" ] && ! printf '%s' "$saida" | grep -qE "$padrao"; then
+    printf '  FALHA %s — saída certa (%s) pelo MOTIVO ERRADO: nada casa /%s/\n' "$desc" "$rc" "$padrao"
+    printf '%s\n' "$saida" | sed 's/^/          | /'
+    FALHAS=$((FALHAS+1))
+    return
+  fi
+  printf '  ok    %s\n' "$desc"
 }
 
 # ════════════════════════════════════════════════════════════════════════════
 echo "guard-tokens-css — ACUSA (falso negativo é o que se procura aqui):"
 
-caso guard-tokens-css 1 "token inexistente com fallback (o caso da #475)" <<'TS'
+caso guard-tokens-css 1 "token inexistente com fallback (o caso da #475)" 'caso\.ts:1 +--cor-nao-existe' <<'TS'
 const e = css`.x { background: var(--cor-nao-existe, rgba(255,255,255,0.06)); }`;
 TS
 
@@ -189,7 +205,7 @@ TS
 # ════════════════════════════════════════════════════════════════════════════
 echo "guard-props-urbi — ACUSA:"
 
-caso guard-props-urbi 1 "kebab-case onde o Lit usa minúsculo (max-width= é o inerte)" <<'TS'
+caso guard-props-urbi 1 "kebab-case onde o Lit usa minúsculo (max-width= é o inerte)" 'caso\.ts:1 +<urbi-seguro> max-width' <<'TS'
 const e = html`<urbi-seguro max-width="420px"></urbi-seguro>`;
 TS
 
@@ -258,7 +274,7 @@ TS
 # ════════════════════════════════════════════════════════════════════════════
 echo "guard-box-model-urbi — ACUSA:"
 
-caso guard-box-model-urbi 1 "width de fora num primitivo em risco (o caso do urbi-kpi)" <<'TS'
+caso guard-box-model-urbi 1 "width de fora num primitivo em risco (o caso do urbi-kpi)" 'caso\.ts:1 +\.kpis \.cel urbi-arriscado \{ width: 100% \}' <<'TS'
 const e = css`.kpis .cel urbi-arriscado { width: 100%; }`;
 TS
 
@@ -270,11 +286,11 @@ caso guard-box-model-urbi 1 "min-width NÃO-zero (impõe tamanho, ao contrário 
 const e = css`.kpis urbi-arriscado { min-width: 200px; }`;
 TS
 
-caso guard-box-model-urbi 1 "regra dentro de @media" <<'TS'
+caso guard-box-model-urbi 1 "regra dentro de @media" '\.kpis urbi-arriscado \{ width: 50% \}' <<'TS'
 const e = css`@media (min-width: 700px) { .kpis urbi-arriscado { width: 50%; } }`;
 TS
 
-caso guard-box-model-urbi 1 "style= inline na própria tag" <<'TS'
+caso guard-box-model-urbi 1 "style= inline na própria tag" 'style= inline \{ width: 100% \}' <<'TS'
 const e = html`<urbi-arriscado style="width: 100%"></urbi-arriscado>`;
 TS
 
@@ -314,6 +330,134 @@ const e = css`.a urbi-arriscado { width: auto; max-width: none; height: fit-cont
 TS
 
 # ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
+# As dez varreduras de código bruto — regressão do PR 505
+#
+# Os três guards escreviam, cada um, o próprio varredor: dez lugares perguntando
+# "isto é código, comentário, string, regex ou template?" e nenhum sabendo
+# responder. Deram quatro P1 e dois P2 (Codex) mais quatro falsos positivos
+# (varredura seguinte). Hoje a resposta mora num lugar só,
+# `scripts/lib/fonte-ts.mjs`, com bateria própria em `scripts/testar-fonte-ts.sh`.
+#
+# Os casos abaixo são os dez defeitos, cada um nos DOIS sentidos. Eles não
+# substituem a bateria do lexer: provam que cada guard está de fato pendurado
+# nele, o que a bateria do lexer não pode provar.
+
+echo "Fronteira de \${…} — ACUSA (era falso negativo, com saída ZERO):"
+
+caso guard-props-urbi 1 "chave em comentário de bloco não engole o arquivo" \
+  'caso\.ts:3 +<urbi-seguro> inventado' <<'TS'
+const e = html`<urbi-seguro
+  @click=${() => { /* { */ return true; }}
+  inventado="x"
+></urbi-seguro>`;
+TS
+
+caso guard-props-urbi 1 "chave em comentário de linha não engole o arquivo" \
+  'caso\.ts:5 +<urbi-seguro> inventado' <<'TS'
+const e = html`<urbi-seguro
+  @click=${() => {
+    // abre {
+    return 1; }}
+  inventado="x"
+></urbi-seguro>`;
+TS
+
+caso guard-props-urbi 1 "chave dentro de string não engole o arquivo" \
+  'caso\.ts:1 +<urbi-seguro> inventado' <<'TS'
+const e = html`<urbi-seguro .maxWidth=${sufixo('{')} inventado="x"></urbi-seguro>`;
+TS
+
+caso guard-box-model-urbi 1 "chave em comentário não mascara as regras seguintes" \
+  'caso\.ts:3 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`
+  .b { padding: ${unsafeCSS(/* { { */ '')}; }
+  .x urbi-arriscado { width: 100%; }
+`;
+TS
+
+caso guard-box-model-urbi 1 "template aninhado: o seletor sai LIMPO, sem prefixo" \
+  'caso\.ts:3 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`
+  .b { color: ${`${'{'}`}; }
+  .x urbi-arriscado { width: 100%; }
+`;
+TS
+
+caso guard-box-model-urbi 1 "style= inline depois de um > de arrow function" \
+  'caso\.ts:1 +style= inline \{ width: 100% \}' <<'TS'
+const e = html`<urbi-arriscado .v=${a.filter((x) => x > 0)} style="width:100%"></urbi-arriscado>`;
+TS
+
+caso guard-tokens-css 1 "declaração em comentário não vira token conhecido" \
+  'caso\.ts:2 +--inventado' <<'TS'
+// legado --inventado: red
+const e = css`.x { color: var(--inventado); }`;
+TS
+
+caso guard-tokens-css 1 "declaração em string comum não vira token conhecido" \
+  'caso\.ts:2 +--inventado' <<'TS'
+const dica = 'no legado era --inventado: red';
+const e = css`.x { color: var(--inventado); }`;
+TS
+
+caso guard-box-model-urbi 1 "border-boxx não protege — o navegador descarta a declaração" \
+  'caso\.ts:1 +\.a urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.a urbi-arriscado { width: 100%; box-sizing: border-boxx; }`;
+TS
+
+caso guard-box-model-urbi 1 "<style> de template SEM tag é CSS de verdade (o caso do exportar.ts)" \
+  'caso\.ts:2 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const doc = `<!doctype html><style>
+  .x urbi-arriscado { width: 100%; }
+</style>`;
+TS
+
+echo "Comentário e string — NÃO acusa (era falso positivo, que faz desligar a guarda):"
+
+caso guard-props-urbi 0 "<urbi-*> citado em comentário de linha" <<'TS'
+// nao use <urbi-seguro inventado="x"> aqui
+const e = html`<urbi-seguro></urbi-seguro>`;
+TS
+
+caso guard-props-urbi 0 "<urbi-*> citado dentro de string" <<'TS'
+const doc = 'exemplo: <urbi-seguro inventado="x"></urbi-seguro>';
+TS
+
+caso guard-box-model-urbi 0 "comentário que DOCUMENTA o defeito não é acusado por isso" <<'TS'
+// exemplo antigo: css`.a urbi-arriscado { width: 100%; }`
+const e = css`.b { color: red; }`;
+TS
+
+caso guard-tokens-css 0 "var(--inexistente) citado em comentário" <<'TS'
+// antigamente era var(--fantasma, #fff)
+const e = css`.x { color: var(--cor-texto); }`;
+TS
+
+caso guard-box-model-urbi 0 "border-box escrito inteiro protege" <<'TS'
+const e = css`.a urbi-arriscado { width: 100%; box-sizing: border-box; }`;
+TS
+
+caso guard-box-model-urbi 0 "border-box com !important protege" <<'TS'
+const e = css`.a urbi-arriscado { width: 100%; box-sizing: border-box !important; }`;
+TS
+
+caso guard-tokens-css 0 'declaração em css de verdade amplia o permitido' <<'TS'
+const e = css`.x { --minha: red; color: var(--minha); }`;
+TS
+
+caso guard-tokens-css 0 'declaração em style= inline amplia o permitido' <<'TS'
+const e = html`<div style="--minha: red"><span style="color: var(--minha)"></span></div>`;
+TS
+
+caso guard-props-urbi 0 'interpolação de prosa não vira atributo (title com template dentro)' <<'TS'
+const e = html`<urbi-seguro title=${`Coletas — ${x.nome}`} maxWidth="720px"></urbi-seguro>`;
+TS
+
+caso guard-props-urbi 0 'template comum dentro de @evento não vira atributo' <<'TS'
+const e = html`<urbi-seguro @click=${() => ir(`/detalhe/${l.id}`)}></urbi-seguro>`;
+TS
+
 echo "Setup ausente — os três morrem com 2, e não passam calados:"
 for g in guard-tokens-css guard-props-urbi guard-box-model-urbi; do
   TOTAL=$((TOTAL+1))

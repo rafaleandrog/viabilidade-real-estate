@@ -35,6 +35,9 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  analisar, superficieCss, superficieTexto, superficieMarcacao, lerTags, contadorDeLinha,
+} from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso');
@@ -80,38 +83,71 @@ function arquivosTs(dir) {
 
 const arquivos = arquivosTs(join(RAIZ, 'frontend'));
 
-// ── custom properties declaradas pelo proprio app ───────────────────────────
-// Generoso de proposito: isto so AMPLIA o conjunto de nomes aceitos, entao um
-// falso positivo aqui vira, no maximo, um achado nao reportado de uma property
-// que o app realmente declara. O que nao pode e o contrario.
-const doApp = new Map(); // --nome -> primeiro local de declaracao
-for (const arq of arquivos) {
+// ── AS DUAS VARREDURAS SAO ASSIMETRICAS, E ISSO E DE PROPOSITO ──────────────
+//
+// Nao "uniformize" os dois lados. Eles erram para lados OPOSTOS, e por isso
+// merecem regras opostas:
+//
+//   · DECLARACAO (`--x: …`) AMPLIA o que o guard aceita. Colher uma a mais
+//     produz FALSO NEGATIVO — o token inventado passa a ser considerado
+//     legitimo e o `var()` que o usa deixa de ser acusado. Logo: so de
+//     superficie que e CSS DE VERDADE (template `css`, bloco `<style>`,
+//     atributo `style=`). Antes deste corte, um simples
+//     `// legado --inventado: red` num comentario bastava para o guard aprovar
+//     um `var(--inventado)` real, algumas linhas abaixo.
+//
+//   · USO (`var(--x)`) e o que o guard ACUSA. Colher um a mais produz FALSO
+//     POSITIVO — e falso positivo faz alguem desligar a guarda, e aí ela nao
+//     guarda mais nada. Logo: superficie larga (texto de qualquer template mais
+//     o interior das strings), mas NUNCA comentario. Antes deste corte, um
+//     `// antigamente era var(--fantasma)` era reprovado.
+//
+// Se um dia os dois lados forem igualados, um dos dois buracos reabre — e o que
+// reabrir vai depender de para qual lado a igualacao for.
+
+const doApp = new Map();     // --nome -> primeiro local de declaracao
+const achados = [];
+const usados = new Set();
+let usos = 0;
+
+const superficiesPorArquivo = arquivos.map((arq) => {
   const txt = readFileSync(arq, 'utf8');
-  txt.split('\n').forEach((linha, i) => {
-    for (const m of linha.matchAll(/(--[A-Za-z0-9_-]+)\s*:/g)) {
-      if (!doApp.has(m[1])) doApp.set(m[1], `${relative(RAIZ, arq)}:${i + 1}`);
+  const analise = analisar(txt);
+  return {
+    arq,
+    rel: relative(RAIZ, arq).replaceAll('\\', '/'),
+    txt,
+    linhaDe: contadorDeLinha(txt),
+    // `style="--x: 1"` tambem e CSS, e o lexer ja separou o valor do atributo.
+    estilosInline: lerTags(superficieMarcacao(txt, analise), '[a-z]')
+      .flatMap((t) => t.atributos.filter((a) => a.nome === 'style' && a.valor)
+        .map((a) => ({ valor: a.valor, offset: a.offset }))),
+    css: superficieCss(txt, analise),
+    texto: superficieTexto(txt, analise),
+  };
+});
+
+// passada 1 — declaracoes, so de superficie CSS
+for (const s of superficiesPorArquivo) {
+  for (const m of s.css.matchAll(/(--[A-Za-z0-9_-]+)\s*:/g)) {
+    if (!doApp.has(m[1])) doApp.set(m[1], `${s.rel}:${s.linhaDe(m.index)}`);
+  }
+  for (const e of s.estilosInline) {
+    for (const m of e.valor.matchAll(/(--[A-Za-z0-9_-]+)\s*:/g)) {
+      if (!doApp.has(m[1])) doApp.set(m[1], `${s.rel}:${s.linhaDe(e.offset)}`);
     }
-  });
+  }
 }
 
-// ── varredura ───────────────────────────────────────────────────────────────
-const achados = [];
-let usos = 0;
-const usados = new Set();
-
-for (const arq of arquivos) {
-  const rel = relative(RAIZ, arq).replaceAll('\\', '/');
-  readFileSync(arq, 'utf8')
-    .split('\n')
-    .forEach((linha, i) => {
-      for (const m of linha.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/g)) {
-        const token = m[1];
-        usos++;
-        usados.add(token);
-        if (conhecidos.has(token) || doApp.has(token) || doPrimitivo.has(token)) continue;
-        achados.push({ onde: `${rel}:${i + 1}`, token });
-      }
-    });
+// passada 2 — usos, de superficie de texto
+for (const s of superficiesPorArquivo) {
+  for (const m of s.texto.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/g)) {
+    const token = m[1];
+    usos++;
+    usados.add(token);
+    if (conhecidos.has(token) || doApp.has(token) || doPrimitivo.has(token)) continue;
+    achados.push({ onde: `${s.rel}:${s.linhaDe(m.index)}`, token });
+  }
 }
 
 // ── relatorio ───────────────────────────────────────────────────────────────

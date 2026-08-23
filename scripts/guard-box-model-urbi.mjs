@@ -50,6 +50,9 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  analisar, superficieCss, superficieMarcacao, lerTags, contadorDeLinha,
+} from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
@@ -101,12 +104,24 @@ for (const [tag, p] of Object.entries(primitivos)) {
 
 // Valores que NAO impoem tamanho — `min-width: 0` e a correcao recomendada, e
 // `auto`/`fit-content` sao o comportamento default escrito por extenso.
+/**
+ * `box-sizing` protege? So `border-box` protege, e so ESCRITO INTEIRO.
+ * `border-boxx` nao e valor valido: o navegador DESCARTA a declaracao e mantem
+ * `content-box`, entao o defeito continua la. Um `startsWith` dava o contrario —
+ * considerava protegido justamente o caso em que nao ha protecao nenhuma.
+ */
+const protegeBoxSizing = (valor) => normalizar(valor) === 'border-box';
+
+/** Valor de CSS sem comentario, sem `!important`, sem caixa e sem sobra. */
+const normalizar = (valor) =>
+  valor.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/!\s*important/i, '').trim().toLowerCase();
+
 const NEUTROS = new Set([
   'auto', 'none', 'inherit', 'initial', 'unset', 'revert', 'revert-layer',
   'fit-content', 'min-content', 'max-content',
 ]);
 const imponeTamanho = (valor) => {
-  const v = valor.trim().toLowerCase().replace(/\s*!important$/, '');
+  const v = normalizar(valor);
   return !(NEUTROS.has(v) || /^0([a-z%]*)$/.test(v));
 };
 
@@ -119,84 +134,61 @@ function seletorAlcanca(seletor, tag) {
   });
 }
 
-/** `prop: valor` de um bloco de declaracoes. */
-function declaracoesDe(bloco) {
+/** `prop: valor` de um bloco de declaracoes, com o offset de cada uma. */
+function declaracoesDe(bloco, base = 0) {
   const fora = [];
+  let pos = 0;
   for (const pedaco of bloco.split(';')) {
     const i = pedaco.indexOf(':');
-    if (i === -1) continue;
-    const prop = pedaco.slice(0, i).trim().toLowerCase();
-    const valor = pedaco.slice(i + 1).trim();
-    if (prop && valor) fora.push({ prop, valor, texto: pedaco });
+    if (i !== -1) {
+      const prop = pedaco.slice(0, i).trim().toLowerCase();
+      const valor = pedaco.slice(i + 1).trim();
+      if (prop && valor) fora.push({ prop, valor, offset: base + pos + pedaco.indexOf(prop[0]) });
+    }
+    pos += pedaco.length + 1;
   }
   return fora;
 }
 
 /**
- * As REGIOES de CSS de um arquivo `.ts`: o conteudo dos blocos `` css`…` `` e dos
- * `<style>…</style>`. Devolve uma copia do arquivo inteiro em que tudo que NAO e
- * CSS virou espaco — os offsets ficam intactos, entao a linha reportada continua
- * certa, e o parser de regras nao ve mais nada alem de CSS.
+ * As regras de uma superficie CSS, em UMA passada.
  *
- * Recortar assim, em vez de varrer o arquivo cru, evita dois erros:
- *   · o texto antes da primeira regra (`const x = css\``) era colado no SELETOR,
- *     o que nao atrapalha a deteccao (o sujeito e o ultimo composto) mas quebrava
- *     o casamento exato das DISPENSAS;
- *   · um objeto TypeScript `{ largura: '100%' }` tem a forma de um bloco de
- *     declaracoes e podia ser lido como regra.
+ * Substitui o regex `([^{};]*)\{([^{}]*)\}` aplicado a superficie inteira. Aquele
+ * regex custava 46 SEGUNDOS sobre os 1,18 MiB do `frontend/`: o primeiro grupo
+ * nao e ancorado, entao a cada offset ele tentava consumir trechos enormes sem
+ * `{`, retrocedia e recomecava — retrocesso quadratico. E a superficie e quase
+ * toda espaco (so ~2,5% dela e CSS), o que da ao regex exatamente o pior insumo
+ * possivel.
  *
- * Interpolacao `${…}` dentro do CSS tambem vira espaco: ela pode conter chaves,
- * e uma chave solta desalinha todas as regras seguintes.
+ * A varredura por indice tem o mesmo criterio — regra MAIS INTERNA, seletor
+ * delimitado por `{`, `}` ou `;`, o que atravessa `@media` de graca — e e linear.
  */
-function regioesDeCss(txt) {
-  const fora = new Array(txt.length).fill(' ');
-  const manter = (de, ate) => {
-    for (let k = de; k < ate && k < txt.length; k++) fora[k] = txt[k];
-  };
-  // Quebras de linha preservadas em toda parte, para a contagem de linhas.
-  for (let k = 0; k < txt.length; k++) if (txt[k] === '\n') fora[k] = '\n';
-
-  const apagarInterpolacoes = (de, ate) => {
-    for (let k = de; k < ate; k++) {
-      if (txt[k] !== '$' || txt[k + 1] !== '{') continue;
-      let prof = 0;
-      let j = k + 1;
-      for (; j < ate; j++) {
-        if (txt[j] === '{') prof++;
-        else if (txt[j] === '}' && --prof === 0) { j++; break; }
-      }
-      for (let z = k; z < j; z++) if (txt[z] !== '\n') fora[z] = ' ';
-      k = j - 1;
-    }
-  };
-
-  for (const m of txt.matchAll(/\bcss`/g)) {
-    const de = m.index + m[0].length;
-    let i = de;
-    while (i < txt.length) {
-      if (txt[i] === '\\') { i += 2; continue; }
-      if (txt[i] === '`') break;
-      if (txt[i] === '$' && txt[i + 1] === '{') {
-        let prof = 0;
-        for (; i < txt.length; i++) {
-          if (txt[i] === '{') prof++;
-          else if (txt[i] === '}' && --prof === 0) { i++; break; }
-        }
-        continue;
-      }
+function regrasDe(css) {
+  const regras = [];
+  let inicio = 0;
+  let i = 0;
+  while (i < css.length) {
+    const ch = css[i];
+    if (ch === ';' || ch === '}') { inicio = i + 1; i++; continue; }
+    if (ch !== '{') { i++; continue; }
+    const fecha = css.indexOf('}', i + 1);
+    if (fecha === -1) break;
+    const proximoAbre = css.indexOf('{', i + 1);
+    if (proximoAbre !== -1 && proximoAbre < fecha) {
+      // Ha regra dentro desta: e at-rule (`@media`), entao desce em vez de casar.
+      inicio = i + 1;
       i++;
+      continue;
     }
-    manter(de, i);
-    apagarInterpolacoes(de, i);
+    regras.push({
+      seletor: css.slice(inicio, i).trim().replace(/\s+/g, ' '),
+      bloco: css.slice(i + 1, fecha),
+      inicioBloco: i + 1,
+    });
+    inicio = fecha + 1;
+    i = fecha + 1;
   }
-
-  for (const m of txt.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
-    const de = m.index + m[0].indexOf('>') + 1;
-    manter(de, de + m[1].length);
-    apagarInterpolacoes(de, de + m[1].length);
-  }
-
-  return fora.join('');
+  return regras;
 }
 
 /** Todos os `.ts` de `frontend/`, recursivo. */
@@ -218,20 +210,19 @@ let regras = 0;
 for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   const rel = relative(RAIZ, arq).replaceAll('\\', '/');
   const txt = readFileSync(arq, 'utf8');
-  const linhaDe = (off) => {
-    let n = 1;
-    for (let k = 0; k < off; k++) if (txt[k] === '\n') n++;
-    return n;
-  };
+  const analise = analisar(txt);
+  const linhaDe = contadorDeLinha(txt);
 
-  // Regras CSS, so dentro das regioes que sao CSS de verdade. O `[^{}]` de cada
-  // lado e o truque que atravessa `@media`: a regra ANINHADA casa, e o at-rule
-  // que a envolve nao atrapalha.
-  const css = regioesDeCss(txt);
-  for (const m of css.matchAll(/([^{};]*)\{([^{}]*)\}/g)) {
-    const seletor = m[1].trim().replace(/\s+/g, ' ');
+  // A superficie CSS vem do lexer: texto de template `css` mais o conteudo dos
+  // `<style>`. Este guard nao caca mais crase nem conta chave — era contando
+  // chave que `${unsafeCSS(/* { */ '')}` mascarava as regras seguintes e
+  // aprovava um `width: 100%` logo abaixo, com saida ZERO. E era procurando
+  // ``css` `` no texto cru que um COMENTARIO citando uma regra abria regiao e
+  // era acusado por documentar o proprio defeito.
+  for (const regra of regrasDe(superficieCss(txt, analise))) {
+    const { seletor, bloco, inicioBloco } = regra;
     if (!seletor || seletor.startsWith('@')) continue;
-    const decls = declaracoesDe(m[2]);
+    const decls = declaracoesDe(bloco, inicioBloco);
     if (!decls.length) continue;
 
     for (const [tag, perigosas] of emRisco) {
@@ -239,41 +230,43 @@ for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
       regras++;
 
       // Saida 2: `box-sizing: border-box` na MESMA regra vence o `:host`.
-      const protegido = decls.some(
-        (d) => d.prop === 'box-sizing' && d.valor.trim().toLowerCase().startsWith('border-box'),
-      );
-      if (protegido) continue;
+      if (decls.some((d) => d.prop === 'box-sizing' && protegeBoxSizing(d.valor))) continue;
 
       for (const d of decls) {
         if (!perigosas.has(d.prop) || !imponeTamanho(d.valor)) continue;
-        const linha = linhaDe(m.index + m[0].indexOf(d.texto));
         const iDispensa = DISPENSAS.findIndex(
           (x) => x.arquivo === rel && x.seletor === seletor && x.prop === d.prop,
         );
-        if (iDispensa !== -1) {
-          usadas.add(iDispensa);
-          continue;
-        }
-        achados.push({ onde: `${rel}:${linha}`, tag, seletor, prop: d.prop, valor: d.valor.trim() });
+        if (iDispensa !== -1) { usadas.add(iDispensa); continue; }
+        achados.push({
+          onde: `${rel}:${linhaDe(d.offset)}`,
+          tag, seletor, prop: d.prop, valor: normalizar(d.valor),
+        });
       }
     }
   }
 
-  // Inline: `<urbi-kpi style="width: 100%">`. Nao ha regra para receber
-  // `box-sizing`, entao aqui nao existe a saida 2 — so apagar.
-  for (const m of txt.matchAll(/<(urbi-[a-z0-9-]+)([^>]*?)style="([^"]*)"/g)) {
-    const perigosas = emRisco.get(m[1]);
+  // Inline: `<urbi-kpi style="width: 100%">`. Vem do MESMO leitor de tags do
+  // guard de props — antes era um regex `<(urbi-…)([^>]*?)style="…"`, e o
+  // `[^>]*?` parava no `>` de uma arrow function (`.v=${x.filter((y) => y > 0)}`),
+  // fazendo o `style` perigoso nunca ser examinado.
+  //
+  // `style=${…}` chega com valor nulo — o lexer apaga a expressao e nao ha o que
+  // ler. E lacuna conhecida: estilo dinamico nao e conferido por este guard.
+  for (const t of lerTags(superficieMarcacao(txt, analise), 'urbi-')) {
+    const perigosas = emRisco.get(t.tag);
     if (!perigosas) continue;
-    if (/box-sizing\s*:\s*border-box/i.test(m[3])) continue;
-    for (const d of declaracoesDe(m[3])) {
-      if (!perigosas.has(d.prop) || !imponeTamanho(d.valor)) continue;
-      achados.push({
-        onde: `${rel}:${linhaDe(m.index)}`,
-        tag: m[1],
-        seletor: 'style= inline',
-        prop: d.prop,
-        valor: d.valor.trim(),
-      });
+    for (const a of t.atributos) {
+      if (a.nome !== 'style' || !a.valor) continue;
+      const decls = declaracoesDe(a.valor);
+      if (decls.some((d) => d.prop === 'box-sizing' && protegeBoxSizing(d.valor))) continue;
+      for (const d of decls) {
+        if (!perigosas.has(d.prop) || !imponeTamanho(d.valor)) continue;
+        achados.push({
+          onde: `${rel}:${linhaDe(a.offset)}`,
+          tag: t.tag, seletor: 'style= inline', prop: d.prop, valor: normalizar(d.valor),
+        });
+      }
     }
   }
 }
