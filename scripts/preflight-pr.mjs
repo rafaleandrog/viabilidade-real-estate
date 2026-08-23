@@ -119,7 +119,9 @@ try {
   bloqueantes.push('não consegui ler a branch atual — isto é um repositório git?');
 }
 
-if (branch === 'main') {
+if (branch === 'main' && MODO_DECLARADO) {
+  avisos.push('estado da árvore: na `main` — informativo no modo declarado.');
+} else if (branch === 'main') {
   bloqueantes.push(
     'estado da árvore: você está na `main`. O processo obrigatório exige branch própria criada de ' +
       '`origin/main` (CLAUDE.md § Processo obrigatório, passo 1).',
@@ -141,7 +143,9 @@ if (branch === 'main') {
 // SUCESSO do comando é o problema.
 try {
   const upstream = git('rev-parse', '--abbrev-ref', '@{u}');
-  if (upstream === 'origin/main') {
+  if (upstream === 'origin/main' && MODO_DECLARADO) {
+    avisos.push('estado da árvore: upstream `origin/main` — informativo no modo declarado.');
+  } else if (upstream === 'origin/main') {
     bloqueantes.push(
       'a branch rastreia `origin/main` — um `git push` sem argumentos empurra para a main. ' +
         'Rode `git branch --unset-upstream` (CLAUDE.md § Processo obrigatório, passo 1).',
@@ -194,47 +198,57 @@ let arquivos = [];
 let adicionados = [];
 let commits = '';
 
-try {
-  // Três pontos: o CI usa merge-base. Dois pontos acusaria arquivo que veio da
-  // base no meio do caminho, produzindo falso positivo em branch desatualizada.
-  baseSha = git('merge-base', BASE, 'HEAD');
-  headSha = git('rev-parse', 'HEAD');
-  // --no-renames: sem ele, mover um arquivo emite só o caminho de DESTINO, e o
-  // guard de escopo deixa de ver a origem. Reproduzido pelo Codex no PR 496.
-  const saida = git('diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`);
-  arquivos = saida ? saida.split('\n').filter(Boolean) : [];
-  // Só arquivo ADICIONADO conta como migração nova. Com `--name-only` puro, um
-  // PR que CONSERTA uma migração existente aparecia como migração nova e o
-  // preflight exigia bump — divergindo do guard do `validar-backend.sh`, que
-  // usa `--diff-filter=A` de propósito. Commits históricos de conserto de
-  // migração seriam barrados. Achado do Codex no PR 502, rodada 2.
-  // SEM `--no-renames` aqui, de propósito, e é o oposto do que a lista de
-  // escopo precisa. Com ele, uma migração apenas RENOMEADA vira exclusão +
-  // adição, o destino entra em `adicionados` e o preflight exige bump de versão
-  // que não é devido. O `validar-backend.sh:110` usa `--diff-filter=A` sem
-  // desabilitar renames, e é com ele que este número tem de concordar.
-  // Achado do Codex no PR 502, rodada 4.
-  const adicionadosBrutos = git('diff', '--diff-filter=A', '--name-only', `${baseSha}...${headSha}`);
-  adicionados = adicionadosBrutos ? adicionadosBrutos.split('\n').filter(Boolean) : [];
-  commits = git('log', '--format=%B', `${baseSha}..${headSha}`);
-  if (COMMITS_MANUAIS !== undefined) {
-    commits = COMMITS_MANUAIS === '-' ? '' : readFileSync(COMMITS_MANUAIS, 'utf8');
-    ok.push(`mensagens de commit DECLARADAS por --commits (o git não foi consultado)`);
+// ⚠️ As overrides são aplicadas ANTES de consultar o git, e quando as três
+// estão presentes o git NÃO é consultado. A versão anterior resolvia
+// `merge-base origin/main HEAD` primeiro: num clone sem essa ref remota, a
+// resolução falhava e derrubava TODOS os casos declarados, apesar de nenhum
+// deles depender do git. O Codex mediu — 11 de 22 casos da bateria reprovando
+// num checkout sem `origin/main`. Entrada declarada tem de ser soberana sobre o
+// ambiente, senão a declaração não vale nada. Achado do PR 502, rodada 5.
+if (COMMITS_MANUAIS !== undefined) {
+  commits = COMMITS_MANUAIS === '-' ? '' : readFileSync(COMMITS_MANUAIS, 'utf8');
+  ok.push('mensagens de commit DECLARADAS por --commits');
+}
+if (ARQUIVOS_MANUAIS !== undefined) {
+  arquivos = ARQUIVOS_MANUAIS === '-' ? [] : ARQUIVOS_MANUAIS.split(',').map((a) => a.trim()).filter(Boolean);
+  // Lista declarada não carrega status de mudança; tratar tudo como ADICIONADO
+  // é o que a bateria exercita, e está dito aqui para não virar surpresa.
+  adicionados = arquivos;
+  ok.push(`diff DECLARADO por --arquivos: ${arquivos.length} arquivo(s), todos tratados como adicionados`);
+}
+
+const TUDO_DECLARADO =
+  ARQUIVOS_MANUAIS !== undefined && COMMITS_MANUAIS !== undefined && VERSAO_MANUAL !== undefined;
+
+if (TUDO_DECLARADO) {
+  ok.push('git NÃO consultado — as três entradas vieram declaradas');
+} else {
+  try {
+    // Três pontos: o CI usa merge-base. Dois pontos acusaria arquivo que veio da
+    // base no meio do caminho, produzindo falso positivo em branch desatualizada.
+    baseSha = git('merge-base', BASE, 'HEAD');
+    headSha = git('rev-parse', 'HEAD');
+    if (ARQUIVOS_MANUAIS === undefined) {
+      // --no-renames: sem ele, mover um arquivo emite só o caminho de DESTINO, e
+      // o guard de escopo deixa de ver a origem. Reproduzido no PR 496.
+      const saida = git('diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`);
+      arquivos = saida ? saida.split('\n').filter(Boolean) : [];
+      // SEM `--no-renames` aqui, ao contrário da lista de escopo: com ele, uma
+      // migração apenas RENOMEADA vira exclusão + adição e o preflight exigiria
+      // bump indevido. O `validar-backend.sh:110` também não desabilita renames.
+      const add = git('diff', '--diff-filter=A', '--name-only', `${baseSha}...${headSha}`);
+      adicionados = add ? add.split('\n').filter(Boolean) : [];
+      ok.push(`diff vs. ${BASE}: ${arquivos.length} arquivo(s), base \`${baseSha.slice(0, 8)}\``);
+    }
+    if (COMMITS_MANUAIS === undefined) {
+      commits = git('log', '--format=%B', `${baseSha}..${headSha}`);
+    }
+  } catch (e) {
+    bloqueantes.push(
+      `não consegui calcular o diff contra ${BASE} (${String(e.message).split('\n')[0]}). ` +
+        'Rode `git fetch origin main` antes, ou declare as entradas com --arquivos/--commits/--versao.',
+    );
   }
-  if (ARQUIVOS_MANUAIS !== undefined) {
-    arquivos = ARQUIVOS_MANUAIS === '-' ? [] : ARQUIVOS_MANUAIS.split(',').map((a) => a.trim()).filter(Boolean);
-    // Lista declarada não carrega status de mudança; tratar tudo como ADICIONADO
-    // é o que a bateria quer exercitar, e está dito aqui para não virar surpresa.
-    adicionados = arquivos;
-    ok.push(`diff DECLARADO por --arquivos: ${arquivos.length} arquivo(s), todos tratados como adicionados`);
-  } else {
-    ok.push(`diff vs. ${BASE}: ${arquivos.length} arquivo(s), base \`${baseSha.slice(0, 8)}\``);
-  }
-} catch (e) {
-  bloqueantes.push(
-    `não consegui calcular o diff contra ${BASE} (${String(e.message).split('\n')[0]}). ` +
-      'Rode `git fetch origin main` antes.',
-  );
 }
 
 const texto = `${corpo}\n${commits}`;
@@ -316,7 +330,12 @@ if (/@codex/i.test(corpo)) {
 
 // Migração nova sem bump da `versao`, e o inverso. O guard completo mora no
 // validar-backend.sh, que aborta sem o SDK — aqui é a versão que roda sempre.
-const migracoesNovas = adicionados.filter((a) => /^migracoes\/\d+.*\.js$/.test(a));
+// TODO arquivo adicionado sob `migracoes/`, e não só o `NNN*.js`. O
+// `validar-backend.sh:110` conta o diretório inteiro (`-- migracoes/`), então um
+// doc ou helper novo ali faria o preflight dizer "sem migração" e o guard do
+// backend reprovar o mesmo PR — o oposto de antecipar a falha do CI.
+// Achado do Codex no PR 502, rodada 5.
+const migracoesNovas = adicionados.filter((a) => a.startsWith('migracoes/'));
 
 // Comparar o VALOR de `versao`, não só o caminho do arquivo: um PR que edita
 // outro campo do manifesto marcava "bumpou" sem ter bumpado, e o preflight
