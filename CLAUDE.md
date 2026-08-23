@@ -219,9 +219,39 @@ numerada contra a `main` do momento, com a `versao` bumpada.
 5. **Revisar, na mesma sessão**, invocando a skill **`revisar-pr-apps`**. Ela publica o relatório
    completo como comentário no PR e devolve à conversa só o resumo por severidade.
 6. **Consertar e abrir rodada nova**, com lentes novas sobre o conserto. **O ciclo fecha quando não
-   há bloqueante pendente** — consertado, ou retirado por contestação com evidência. Não há teto de
-   rodadas; o que impede o loop caro é o decaimento de esforço da §8 da skill.
+   há bloqueante pendente** — consertado, ou retirado por contestação com evidência.
 7. **Parar.** O PR fica pronto e parado. Merge é decisão do autor — ver § Merge, que não mudou.
+
+#### As três regras de escopo — o que impede o ciclo de não fechar
+
+> ⚠️ **Escritas depois de um incidente, e o incidente está fechado** — PR 494, mergeado em
+> 2026-08-23. Ele levou rodada após rodada de revisão para entregar o que já estava pronto no
+> primeiro commit, e **nenhum achado do revisor foi falso**: o revisor funcionou, o escopo do PR é
+> que estava errado. Estas três regras não são estilo — são a diferença entre uma rodada e dez.
+
+**R1 · Mudança de processo não entra em PR que está sob revisão.**
+Arquivo de processo é `.claude/**` — a skill de revisão, o motor da fan-out — mais a
+§ *A revisão em si* deste arquivo. Eles **se referenciam**: toda regra nova precisa aparecer em
+todos, e o revisor acusa, com razão, cada um que ficou para trás. Editá-los de dentro de um PR em
+revisão cria um ciclo que **não converge por construção** — cada conserto vira o achado da rodada
+seguinte. Vão em **PR próprio**, com todos os documentos propagados **no mesmo diff**.
+O guard `scripts/guard-pr-escopo-processo.mjs` (job `escopo-processo`) barra o PR que misture
+processo com código de produto.
+
+**R2 · Teto de duas rodadas de revisão por PR.**
+Terceira rodada **só com bloqueante de código**. Observação sobre documentação, a partir da
+terceira, **vira issue** — não vira mais uma volta no laço. A §8 da skill continua mandando o
+esforço decair; o teto é o que impede o decaimento de virar assíntota.
+
+**R3 · Um assunto por PR.**
+O PR 494 misturou cinco. Além de alargar a revisão, isso impede reverter uma parte sem reverter as
+outras. A exceção declarada é o **PR único de documentação** que a decisão D-Q04 autorizou — ali o
+assunto *é* "as correções de documentação".
+
+> **Duas armadilhas de redação que custaram rodadas, e valem para qualquer PR:** não escreva no
+> repositório uma frase que cite **o resultado de um comando que o próprio commit muda** (um `grep`
+> que passa a casar por causa do diff), nem um **contador do estado corrente da revisão** (quantas
+> rodadas, quantos achados) — ele envelhece a cada rodada por construção. O placar vive no PR.
 
 **Não viu a linha `[processo]` no começo da sessão?** Então o hook `SessionStart` não rodou, e nem
 o lembrete nem o aviso de branch estão te protegendo. Avise o autor em vez de seguir: hook que não
@@ -242,6 +272,32 @@ Nenhuma delas força uma revisão a ser **boa**. O que elas compram é que o cam
 de ser o fácil, e que a ausência de revisão seja **visível** em vez de calada.
 
 #### A revisão em si
+
+> ⚠️ **Existem DUAS skills chamadas `revisar-pr-apps`, e a que responder pode ser a errada.** O
+> monorepo tem uma cópia própria, e quando ele está clonado ao lado — o caso das sessões de nuvem,
+> em `/home/user/urbiverso` — **as duas entram no catálogo com o mesmo nome**, sem prefixo de
+> caminho na listagem. Invocar a skill **não diz qual cópia respondeu**.
+>
+> Esta advertência mora **aqui**, e não só na skill, de propósito: a revisão do PR 494 mostrou que
+> um aviso escrito dentro da cópia do app **não é lido quando a cópia do monorepo é a servida**, e
+> que conferir `git rev-parse --show-toplevel` não resolve — carregar a skill do monorepo não muda o
+> diretório da sessão, então a cópia errada passa no teste. O `CLAUDE.md` é a única superfície que
+> nenhuma skill sombreia.
+>
+> **Dois discriminadores materiais.** Se as instruções que a sessão está seguindo disserem que:
+>
+> - a `versao` do `manifesto.json` **bumpa** quando o PR mexe em `shell_min`/`sdk_min` — **é a cópia
+>   errada**. Aqui é o contrário (§ Versão do manifesto, issue #422): subir piso não bumpa, porque a
+>   `versao` descreve o **schema**. Acusar isso é bloqueante inventado, e acontece em todo PR que
+>   sobe piso;
+> - o diff se confronta contra `docs/shell/` do monorepo — **é a cópia errada**. Aqui a superfície é
+>   o bundle do SDK publicado, e **sem bundle a lente é NÃO EXECUTADA** (§ Superfície de leitura da
+>   skill).
+>
+> **Em qualquer divergência entre a skill e este arquivo, este arquivo vence** — e a divergência é
+> para **contar ao autor**, porque significa que o catálogo serviu a cópia errada. Para reabrir a
+> certa, derive o caminho em vez de cravá-lo:
+> `"$(git rev-parse --show-toplevel)"/.claude/skills/revisar-pr-apps/SKILL.md`.
 
 `.claude/skills/revisar-pr-apps/SKILL.md` é o revisor; `.claude/motor-revisao.md` é o motor da
 fan-out. Os dois são **cópia** de `urbiverso/urbiverso` @ `b0361f6` (PR #2540), portados em
@@ -264,10 +320,26 @@ rodadas e encerramento obrigatório. Este último não faz falta porque a sessã
 inscreve em nada — ela revisa quando chamada e termina. Vale saber por que isso às vezes importa: **com uma sessão só, quem revisa
 é quem escreveu** — a §8 da skill compensa com lentes novas a cada rodada, mas não é a mesma coisa.
 
-**O motor é Codex quando dá, nativo quando não** — e a queda é **declarada**, nunca silenciosa. Hoje
-é nativo: falta `OPENAI_API_KEY` nas variáveis do *cloud environment*. O CLI o preflight instala
-sozinho; só a chave é do autor. Enquanto for nativo, o relatório diz em uma linha que revisão nativa
-de patch escrito pela mesma família de modelo é **menos adversarial**.
+**O motor é Codex, e ele está ligado** — por **`@codex review`** no PR, não pelo CLI. O GitHub App
+está instalado neste repositório e foi exercitado em rodadas sucessivas no PR 494 (~2 min cada), com
+achados P1 e P2 reais. É o **caminho normal**, e a sequência obrigatória — acionar, esperar com teto de 15 min,
+colher os *review threads*, verificar, só então atestar — está em `.claude/motor-revisao.md`
+§ *Sequência obrigatória do App*.
+
+> ⚠️ **`bloqueantes=` conta os achados do Codex ainda não resolvidos**, porque
+> `revisao-registrada.yml` filtra comentários **pelo autor do PR** e nunca enxerga o bot. E se o App
+> não responder no teto, **publique a linha com `bloqueantes=1`**, tendo a ausência da review como o
+> bloqueante. **Omitir a linha não serve**: o próprio relatório dispara `issue_comment`, o job varre
+> todos os comentários do head e, se houver uma atestação `bloqueantes=0` anterior **no mesmo head**,
+> **republica `success`**. Ausência de linha nova não apaga linha velha — só uma linha nova
+> sobrescreve.
+
+**São duas camadas que somam, não uma fila.** A **revisão do App** (`@codex review`) e a **fan-out
+das lentes** rodam as duas. O que é condicional é o motor *dentro* da fan-out: **CLI local**
+(`codex exec`) quando houver `OPENAI_API_KEY` **e** a liberação de `api.openai.com` — aqui não há, o
+proxy dá **403 no CONNECT** —, e **subagente nativo** quando não houver, **declarado** no relatório
+como menos adversarial, por revisar patch escrito pela mesma família de modelo. O App **não
+dispensa** a fan-out: neste repositório os dois acharam classes de defeito diferentes.
 
 **A camada de contratos não roda neste ambiente, e isso é estrutural.** Ela lê
 `node_modules/@urbiverso/sdk/docs/`, e aqui **tanto o `pnpm install` quanto o `npm view

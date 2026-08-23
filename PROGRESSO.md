@@ -4,6 +4,60 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## As três regras de escopo viram contrato, e a maquinaria de revisão fica pronta (2026-08-23)
+
+PR de processo puro, feito **numa passada só** — que é o que a regra que ele institui manda fazer.
+Fecha a **#495** e resolve o que o incidente do PR 494 apurou.
+
+### O que muda para toda sessão futura, em qualquer conversa
+
+As três regras entraram no **`CLAUDE.md` § Processo obrigatório**, e não só no `PROGRESSO.md`. A
+diferença importa: o `CLAUDE.md` é lido no começo de **toda** sessão deste repositório; o
+`PROGRESSO.md` é memória que alguém precisa abrir.
+
+| | Regra | Como se sustenta |
+|---|---|---|
+| **R1** | Mudança de processo não entra em PR sob revisão | **Guard no CI** — `scripts/guard-pr-escopo-processo.mjs`, job `escopo-processo` |
+| **R2** | Teto de duas rodadas por PR; a terceira só com bloqueante de código | Prosa — não é decidível por caminho de arquivo |
+| **R3** | Um assunto por PR | Prosa, com a exceção declarada do PR único de documentação (D-Q04) |
+
+O guard da R1 barra o PR que misture `.claude/**` com `frontend/`, `backend/`, `migracoes/`,
+`schema.json` ou `manifesto.json`. **O `CLAUDE.md` ficou de fora da lista de propósito:** a regra
+vale para uma seção dele, o guard só enxerga caminho de arquivo, e marcá-lo inteiro barraria todo PR
+que documenta a própria mudança — que é o que a convenção do monorepo exige. Guard que atrapalha
+trabalho legítimo é guard que alguém desliga.
+
+`guard-processo.mjs` passou a exigir o script novo: **20 verificações**, não mais 19.
+
+### A maquinaria de revisão, com os sete consertos da #495
+
+Todos já tinham sido escritos e revisados dentro do PR 494 e foram **revertidos de propósito** —
+agora voltam num diff só, com os quatro documentos propagados juntos:
+
+1. **Colisão das duas `revisar-pr-apps`** — desempate **material**, no `CLAUDE.md`, a única
+   superfície que nenhuma skill sombreia. ⚠️ A solução óbvia (conferir
+   `git rev-parse --show-toplevel`) **não funciona e está registrada como reprovada**: carregar a
+   skill do monorepo não muda o diretório da sessão, então a cópia errada passa no teste; e o aviso
+   mora na cópia que não é lida quando a outra é servida.
+2. **Caminho de recuperação derivado**, nunca cravado — o checkout do Codex fica em `/workspace/…`.
+3. **O GitHub App do Codex documentado** no `motor-revisao.md`, que só conhecia o CLI local.
+4. **Sequência obrigatória do App** — marcar a linha de base **antes** de acionar, esperar review
+   posterior a ela *e* no head certo, colher os threads, verificar, só então atestar.
+5. **Timeout deixa o portão vermelho** — `bloqueantes=1`. ⚠️ Omitir a linha de máquina **não serve**,
+   e isso também está registrado como reprovado: o job varre todos os comentários do head e
+   republica um `success` anterior.
+6. **App e fan-out são duas camadas que somam.** O condicional é CLI × nativo, dentro da fan-out.
+7. **Nada de contador do estado corrente da revisão** dentro do artefato revisado.
+
+### Por que isto é um PR separado
+
+Porque é literalmente a regra R1. Os arquivos de `.claude/` se referenciam, então toda regra nova
+precisa aparecer em todos, e o revisor acusa — com razão — cada um que ficou para trás. Editá-los de
+dentro de um PR em revisão produz um ciclo que **não converge por construção**: cada conserto vira o
+achado da rodada seguinte. Num PR só, propagados juntos, o ciclo tem onde fechar.
+
+---
+
 ## Rodada 9 aberta — e o Bloco 8-A, que a Rodada 8 perdeu no caminho (2026-08-23)
 
 A Rodada 8 fechou em 2026-08-22 com **19.931 linhas** de auditoria em `docs/rodada-8/`, **61 issues** e
