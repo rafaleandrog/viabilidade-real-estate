@@ -17,7 +17,7 @@ import { estiloPagina } from './estilos.js';
 
 interface Rota {
   tela: 'dashboard' | 'estudo';
-  aba?: 'estudos' | 'terrenos' | 'benchmark' | 'curvas';
+  aba?: 'estudos' | 'terrenos' | 'benchmark' | 'curvas' | 'regioes';
   estudoId?: number;
   abaEstudo?: string;    // guia dentro do estudo. Preliminar: premissas|proforma|graficos|apelo.
                          // Avançado: resumo|empreendimento|viabilidade|custos|fluxo|cenarios|mercado.
@@ -35,6 +35,10 @@ function parsearSubRota(sub: string): Rota {
   // BUG7-16: Curvas como aba geral — a tela já existia só em telas_config.curvas
   // (Admin → Apps); esta rota nova é a 2ª exposição, mesmo padrão do Benchmark.
   if (partes[0] === 'curvas') return { tela: 'dashboard', aba: 'curvas' };
+  // #437: Regiões monitoradas como aba geral. A tela existia só em
+  // telas_config.mercado_regioes (Admin → Apps) e o autor relatou não achá-la;
+  // esta rota é a 2ª exposição, no mesmo padrão que a #314 deu às Curvas.
+  if (partes[0] === 'regioes') return { tela: 'dashboard', aba: 'regioes' };
   return { tela: 'dashboard', aba: 'estudos' };
 }
 

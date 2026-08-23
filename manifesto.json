@@ -53,6 +53,11 @@
       "titulo": "Curvas",
       "rota": "/curvas",
       "icone": "fa-solid fa-wave-square"
+    },
+    {
+      "titulo": "Regiões monitoradas",
+      "rota": "/regioes",
+      "icone": "fa-solid fa-map-location-dot"
     }
   ],
   "ia": true,
