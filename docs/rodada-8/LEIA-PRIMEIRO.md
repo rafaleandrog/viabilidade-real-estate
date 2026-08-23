@@ -67,15 +67,39 @@ seguem **sem verificação automática** — quem revisa cobra à mão.
 
 ## Fatos de ambiente que custam tempo se você os redescobrir
 
-- **`pnpm` NÃO existe nesta máquina.** O `node_modules` é install flat do npm. Os dois scripts de
-  validação abortam cedo. Rode na mão:
+- ⚠️ **Estes fatos dependem da MÁQUINA. Confira antes de agir — corrigido em 2026-08-23.** O texto
+  abaixo descrevia a máquina Windows do autor e mandava contornar os validadores. **Na sessão de
+  nuvem é diferente**, e seguir o contorno é trabalhar às cegas.
+
+  | | Máquina do autor (Windows) | **Sessão de nuvem, medido 2026-08-23** |
+  |---|---|---|
+  | `pnpm` | não existe | **existe** (`/opt/node22/bin/pnpm`) |
+  | `scripts/validar-frontend.sh` | aborta cedo | **roda inteiro e passa** |
+  | testes de frontend | 411 | **408** |
+  | testes de backend | 104 | **101** |
+  | navegador | nenhum | **Chromium + Playwright** (`/opt/pw-browsers/`) |
+
+  **Na nuvem, use os scripts** — não o contorno:
+  ```
+  pnpm install                       # o 401 do @urbiverso/sdk é esperado e ignorado
+  bash scripts/validar-frontend.sh   # typecheck + 408 testes + build
+  ```
+  Para o **backend**, chame `bash scripts/validar-backend.sh` **primeiro**, mesmo sabendo que ele
+  aborta na etapa 1/5 no portão do SDK: as etapas 0 e 1 rodam antes e **linkam o `express`**. Só
+  depois:
+  ```
+  node --import tsx/esm --test --test-timeout=60000 backend/rotas/*.test.ts backend/*.test.ts
+  ```
+  Sem esse passo, os 5 arquivos de `backend/rotas/` falham com `ERR_MODULE_NOT_FOUND: Cannot find
+  package 'express'` — que **não é teste quebrado**, é a cascata do 401. Não confunda os dois.
+
+  **O contorno manual abaixo continua válido onde `pnpm` de fato não existe:**
   ```
   echo '{ "extends": "./tsconfig.json", "include": ["frontend/**/*"] }' > tsconfig.fe.json
   node node_modules/typescript/bin/tsc --noEmit -p tsconfig.fe.json ; rm -f tsconfig.fe.json
   node --import tsx/esm --test --test-timeout=60000 frontend/*.test.ts
   node --import tsx/esm --test --test-timeout=60000 backend/rotas/*.test.ts backend/*.test.ts
   ```
-  Baseline verde na `main`: **411 testes de frontend, 104 de backend, typecheck exit 0**.
 - **O `@urbiverso/sdk` em `node_modules` é STUB** (só `express.d.ts`/`express.js`). Não há
   `dist/index.d.ts` nem `docs/`. Props de primitivo se conferem em
   `C:\Users\raafa\urbiverso\ui\src\urbi-*.ts` — **que é SÓ LEITURA** —, declarando no relatório que
