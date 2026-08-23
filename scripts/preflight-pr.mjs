@@ -297,13 +297,20 @@ if (TUDO_DECLARADO) {
     if (ARQUIVOS_MANUAIS === undefined) {
       // --no-renames: sem ele, mover um arquivo emite só o caminho de DESTINO, e
       // o guard de escopo deixa de ver a origem. Reproduzido no PR 496.
-      const saida = git('diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`);
-      arquivos = saida ? saida.split('\n').filter(Boolean) : [];
+      // `-z` também aqui, e é o IRMÃO do conserto que fiz no `git status`: sem
+      // ele, `core.quotePath` devolve caminho não-ASCII entre aspas e com escapes
+      // (`"migracoes/030_corre\303\247\303\243o.js"`), o `startsWith('migracoes/')`
+      // não casa, e uma migração acentuada some de `migracoesNovas` — verde aqui,
+      // vermelho no `validar-backend.sh:110`, que conta pelo pathspec.
+      // Consertei o `status` na rodada 10 e deixei o `diff` para trás.
+      // Achado do Codex, rodada 13.
+      const saida = git('diff', '--no-renames', '-z', '--name-only', `${baseSha}...${headSha}`);
+      arquivos = saida ? saida.split('\0').filter(Boolean) : [];
       // SEM `--no-renames` aqui, ao contrário da lista de escopo: com ele, uma
       // migração apenas RENOMEADA vira exclusão + adição e o preflight exigiria
       // bump indevido. O `validar-backend.sh:110` também não desabilita renames.
-      const add = git('diff', '--diff-filter=A', '--name-only', `${baseSha}...${headSha}`);
-      adicionados = add ? add.split('\n').filter(Boolean) : [];
+      const add = git('diff', '--diff-filter=A', '-z', '--name-only', `${baseSha}...${headSha}`);
+      adicionados = add ? add.split('\0').filter(Boolean) : [];
       ok.push(`diff vs. ${BASE}: ${arquivos.length} arquivo(s), base \`${baseSha.slice(0, 8)}\``);
     }
     if (COMMITS_MANUAIS === undefined) {
