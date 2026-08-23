@@ -943,6 +943,17 @@ em **960 combinações** (5 abas × 4 categorias × 3 subcategorias × 4 modos d
 
 ## Triagem executada: 23 fechadas, 30 seguem abertas com o que falta (2026-08-03)
 
+> 📌 **Tudo nesta entrada é o estado de 2026-08-03 e ficou como está, de propósito** — é registro
+> histórico, não descrição do runtime. **Três afirmações dela venceram**, e ficam listadas aqui em
+> vez de serem editadas frase a frase no corpo (foi tentado; o resultado foi um texto que se
+> contradizia em dois parágrafos):
+>
+> | O que a entrada diz | O que vale hoje |
+> |---|---|
+> | as funções de safra "NÃO estão ligadas a `calcularFluxo`" e **"nenhum estudo real passa por elas"** | a **#283** ligou: `recebimentoBrutoMensal` consulta `recebiveisComponentesLinha` primeiro (`fluxo-caixa-motor.ts:1353`) e o `FluxoCalc` agrega as séries (`:2040-2046`) |
+> | a #283 está **"não implementada de propósito"** | implementada e mergeada |
+> | o que resta da #281 é **`exportar.ts:10` ter o seu próprio formatador** | `exportar.ts` passou a **importar** `fmtR$`; o que resta são `fluxo-tabela.ts:34`, `tela-proforma.ts:314` e `tela-fluxo-receitas.ts:382-383` |
+
 Conferência das 53 issues **contra o código da `main`**, critério de aceite a critério de aceite.
 Relatório com evidência `arquivo:linha` por issue: `docs/triagem-issues-2026-08-03.md`.
 
@@ -958,9 +969,9 @@ previsto.
 
 **Achado estrutural — a #283 nasceu daqui.** Nove issues da cadeia EVI de recebíveis (#230,
 #232–#237, #240, #241) têm a matemática construída e testada, mas **não ligada ao cálculo real**.
-Não é inferência: `frontend/fluxo-caixa-motor.ts:505-511` declara que as funções "NÃO estão ligadas
-a `receitaMensalLinha`/`calcularFluxo`" e que "o motor legado continua sendo o único caminho de
-cálculo real". `pmt`, `pagamentosPrazoFixo`, `pagamentosAteMarco`, `pagamentosConcentrado`,
+Não é inferência: `frontend/fluxo-caixa-motor.ts:505-511` declara que as funções "NÃO
+estão ligadas a `receitaMensalLinha`/`calcularFluxo`" e que "o motor legado continua sendo o único
+caminho de cálculo real". `pmt`, `pagamentosPrazoFixo`, `pagamentosAteMarco`, `pagamentosConcentrado`,
 `receitaBrutaSafra`, `jurosSafra`, `componentesEfetivosSafra` existem, têm teste, e **nenhum estudo
 real passa por elas**.
 
