@@ -77,20 +77,58 @@ printf '      run: grep -r %s frontend/\n' "$ALVO" >> "$R/.github/workflows/pr-g
 [ "$(roda "$R")" = "1" ] && ok ".github/ não é caminho permitido" \
   || falha "falso negativo em .github/" "workflow não está na allowlist e deveria ser barrado"
 
-# ── Comentário: o precedente do job `migracao-declarativa` ───────────────────
-# A base já contém o comentário de `backend/rotas/funding.ts` e passou acima; os
-# casos abaixo fixam que é o COMENTÁRIO que salva, não o arquivo.
-R="$(arvore com)"
-printf '# menção em comentário de shell/yaml: %s\n' "$ALVO" >> "$R/frontend/tela-funding.ts"
-printf ' * menção em bloco jsdoc: %s\n'            "$ALVO" >> "$R/frontend/tela-funding.ts"
-printf '<!-- menção em html: %s -->\n'             "$ALVO" >> "$R/frontend/tela-funding.ts"
-[ "$(roda "$R")" = "0" ] && ok "linha de comentário em caminho barrado NÃO é acusada (precedente do job migracao-declarativa)" \
-  || falha "comentário acusado" "reprovar a explicação obrigaria a apagar a memória do conserto"
+# ── As QUATRO combinações de comentário × código ─────────────────────────────
+# A primeira versão do guard descartava a LINHA INTEIRA quando ela começava com
+# qualquer marcador de qualquer linguagem. Dava exit 0 para código executável
+# real — o Codex provou executando. Guard que dá licença é pior que guard
+# nenhum, então as quatro combinações são fixadas aqui, uma a uma.
 
+# (1) comentário PURO → passa. É o precedente do job `migracao-declarativa`: a
+#     base já traz o cabeçalho de `backend/rotas/funding.ts`, e reprová-lo
+#     obrigaria a apagar a memória do conserto.
+R="$(arvore com1)"
+printf '// menção histórica em comentário de linha: %s\n' "$ALVO" >> "$R/frontend/tela-funding.ts"
+printf '/* menção histórica\n   em bloco multi-linha: %s\n */\n' "$ALVO" >> "$R/frontend/tela-funding.ts"
+[ "$(roda "$R")" = "0" ] && ok "(1) comentário puro em caminho barrado NÃO é acusado (linha e bloco multi-linha)" \
+  || falha "(1) comentário acusado" "reprovar a explicação obrigaria a apagar a memória do conserto"
+
+# (2) código PURO → barra.
 R="$(arvore com2)"
-printf 'const t = "%s"; // menção em comentário de FIM de linha\n' "$ALVO" >> "$R/frontend/tela-funding.ts"
-[ "$(roda "$R")" = "1" ] && ok "código com comentário no fim da linha continua sendo barrado (não é linha de comentário)" \
-  || falha "comentário de fim de linha" "só a linha que COMEÇA com comentário é dispensada"
+printf 'const t = "%s";\n' "$ALVO" >> "$R/frontend/tela-funding.ts"
+[ "$(roda "$R")" = "1" ] && ok "(2) código puro é barrado" \
+  || falha "(2) falso negativo" "referência em código executável tem que ser barrada"
+
+# (3) código DEPOIS de bloco fechado na mesma linha → barra.
+#     ⚠️ REGRESSÃO VERIFICADA: antes do conserto isto dava exit 0.
+R="$(arvore com3)"
+printf '/* compat */ const t = "%s";\n' "$ALVO" >> "$R/frontend/tela-funding.ts"
+[ "$(roda "$R")" = "1" ] && ok "(3) código depois de bloco /* … */ fechado é barrado (dava exit 0 antes do conserto)" \
+  || falha "(3) falso negativo do bloco fechado" "a dispensa é da PORÇÃO comentada, nunca da linha inteira"
+
+# (4) campo privado de classe `#` em TS → barra.
+#     ⚠️ REGRESSÃO VERIFICADA: antes do conserto isto dava exit 0, porque `#`
+#     era tratado como comentário em TODO tipo de arquivo. `#` é comentário em
+#     shell/YAML e é campo privado em JS/TS — a família importa.
+R="$(arvore com4)"
+printf 'class Repo {\n  #tabela = "%s";\n}\n' "$ALVO" >> "$R/frontend/tela-funding.ts"
+[ "$(roda "$R")" = "1" ] && ok "(4) campo privado #tabela em TS é barrado (dava exit 0 antes do conserto)" \
+  || falha "(4) falso negativo do campo privado" "'#' é comentário em shell/YAML, NÃO em JS/TS"
+
+# ── Consequências do scanner ser por FAMÍLIA e ciente de string ──────────────
+R="$(arvore fam)"
+printf '# comentário de YAML: %s\n' "$ALVO" >> "$R/.github/workflows/pr-guards.yml"
+[ "$(roda "$R")" = "0" ] && ok "'#' É comentário em .yml (o job novo cita a tabela num comentário)" \
+  || falha "família yaml" "'#' precisa continuar valendo como comentário em YAML"
+
+R="$(arvore str)"
+printf 'const u = "http://api/%s";\n' "$ALVO" >> "$R/frontend/tela-funding.ts"
+[ "$(roda "$R")" = "1" ] && ok "'//' dentro de string NÃO vira comentário (scanner é ciente de aspas)" \
+  || falha "string engolida" "http:// não pode cegar o resto da linha"
+
+R="$(arvore blk)"
+printf '/* abre bloco\n%s\n*/ const t = "%s";\n' "$ALVO" "$ALVO" >> "$R/frontend/tela-funding.ts"
+[ "$(roda "$R")" = "1" ] && ok "bloco multi-linha dispensa o miolo mas NÃO o código depois do fechamento" \
+  || falha "estado de bloco" "o código depois de */ na última linha tem que ser barrado"
 
 # ── Casamento: não pode ser substring solta nem perder o alvo ────────────────
 R="$(arvore vizinho)"
@@ -106,11 +144,16 @@ node -e '
     if (n.length === 0) process.exit(1);
     for (const m of Object.values(OBSOLETAS)) {
       if (!m.substituta || !m.issue || !m.motivo) process.exit(1);
+      // `consumidores` entrou porque o `motivo` afirmava que so a 029 lia a
+      // tabela — falso: a 019 cria e a 028 le E ESCREVE. Texto de diagnostico
+      // do CI nao pode nascer mentindo.
+      if (!Array.isArray(m.consumidores) || m.consumidores.length < 3) process.exit(1);
+      if (!m.consumidores.some((c) => c.includes("028"))) process.exit(1);
     }
     if (!OBSOLETAS["'"$ALVO"'"]) process.exit(1);
     process.exit(0);
   }).catch(() => process.exit(1));
-' && ok "registro OBSOLETAS exportado, não vazio, com substituta/issue/motivo e contendo $ALVO" \
+' && ok "registro OBSOLETAS exportado, com substituta/issue/motivo/consumidores (as 3 migrações, a 028 inclusive)" \
   || falha "registro OBSOLETAS" "a etiqueta é o registro; sem ele o guard não tem o que guardar"
 
 # ── O guard não pode depender de SDK nem de rede ─────────────────────────────

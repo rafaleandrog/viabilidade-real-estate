@@ -35,11 +35,23 @@ ordem: 8
 > é só o que `fluxo-investidor-formulas.md` e a §4.3 abaixo descrevem.
 
 > 🛡️ **A tabela `avancado_capital_instrumentos` continua declarada — e agora tem etiqueta
-> mecânica (issue #479, 2026-08-23).** Ela não pode ser removida: a camada de dados das migrações
-> só tem `listar`/`atualizar`/`criar`, **não há DDL** (`migracoes/029_funding_operacoes.js:55-58`),
-> então tirá-la do `schema.json` não apaga nada do Postgres — só faz o app parar de declarar uma
-> tabela que continua existindo, **órfã e inalcançável** por qualquer migração futura. Estritamente
-> pior que mantê-la declarada.
+> mecânica (issue #479, 2026-08-23).** Ela **não é removida agora por escopo e decisão, não por
+> falta de mecanismo** — e a distinção é o ponto: escrever que a limpeza é impossível ensina a quem
+> vier depois a nem tentar.
+>
+> **O mecanismo existe e é o suportado hoje:** tirar a tabela do `schema.json` e esvaziá-la com
+> `dados.limparTabela` (`scripts/migracoes-harness.mjs:148-153`), deixando a **poda do
+> reconciliador** derrubar a estrutura vazia no mesmo boot. É literalmente o que o job
+> `migracao-declarativa` deste repositório manda fazer (`.github/workflows/pr-guards.yml:216`), e o
+> `shell_min` do manifesto já está em **`0.53.8`**, acima dos pisos que esse fluxo exige.
+>
+> **O que impede é escopo:** remover a tabela é mudança de schema — pede migração nova e bump da
+> `versao` —, e a #479 põe a remoção explicitamente fora de escopo (regra **R3**, um assunto por PR).
+>
+> ⚠️ **A frase "não há DDL na camada de migração" está vencida como justificativa.** Ela vem de
+> `migracoes/029_funding_operacoes.js:55-58` e era verdadeira quando a `029` foi escrita — o fluxo
+> `limparTabela` veio depois, com a #422. Não a repita como se ainda descrevesse a plataforma; a
+> versão da #479 e a primeira redação desta nota faziam isso.
 >
 > O risco que sobra é o **reúso acidental**: uma sessão futura mexendo em funding topa com a
 > tabela — nome sugestivo, `prioridade_funding` e `prioridade_pagamento` inclusive — e a adota,

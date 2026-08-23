@@ -273,9 +273,12 @@ jobs:
           # `avancado_capital_instrumentos` é o resto do Capital Stack apagado pela
           # #355: declarada no schema.json, vazia, com nome sugestivo e com os campos
           # de waterfall (`prioridade_funding`, `prioridade_pagamento`) que a decisão
-          # enterrou. Não dá para removê-la — não há DDL na camada de migração
-          # (029:55-58), então tirá-la do schema.json a deixaria órfã no Postgres,
-          # inalcançável. Fica declarada, e o guard é a etiqueta contra o reúso.
+          # enterrou. Ela não é removida agora por ESCOPO — remover é mudança de
+          # schema (migração nova + bump de `versao`) e a #479 deixa isso fora de
+          # escopo —, NÃO por falta de mecanismo: o fluxo suportado é tirá-la do
+          # schema.json e esvaziá-la com `dados.limparTabela`, como o job
+          # `migracao-declarativa` acima manda fazer. Enquanto ela existe, o guard
+          # é a etiqueta contra o reúso.
           # O registro das tabelas aposentadas mora no próprio script (OBSOLETAS).
           # Linha de COMENTÁRIO fica de fora, mesma regra do job `migracao-declarativa`.
           if ! node scripts/guard-tabelas-obsoletas.mjs; then
