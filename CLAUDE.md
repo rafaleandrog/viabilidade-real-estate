@@ -243,32 +243,6 @@ de ser o fácil, e que a ausência de revisão seja **visível** em vez de calad
 
 #### A revisão em si
 
-> ⚠️ **Existem DUAS skills chamadas `revisar-pr-apps`, e a que responder pode ser a errada.** O
-> monorepo tem uma cópia própria, e quando ele está clonado ao lado — o caso das sessões de nuvem,
-> em `/home/user/urbiverso` — **as duas entram no catálogo com o mesmo nome**, sem prefixo de
-> caminho na listagem. Invocar a skill **não diz qual cópia respondeu**.
->
-> Esta advertência mora **aqui**, e não só na skill, de propósito: a revisão do PR 494 mostrou que
-> um aviso escrito dentro da cópia do app **não é lido quando a cópia do monorepo é a servida**, e
-> que conferir `git rev-parse --show-toplevel` não resolve — carregar a skill do monorepo não muda o
-> diretório da sessão, então a cópia errada passa no teste. O `CLAUDE.md` é a única superfície que
-> nenhuma skill sombreia.
->
-> **Dois discriminadores materiais.** Se as instruções que a sessão está seguindo disserem que:
->
-> - a `versao` do `manifesto.json` **bumpa** quando o PR mexe em `shell_min`/`sdk_min` — **é a cópia
->   errada**. Aqui é o contrário (§ Versão do manifesto, issue #422): subir piso não bumpa, porque a
->   `versao` descreve o **schema**. Acusar isso é bloqueante inventado, e acontece em todo PR que
->   sobe piso;
-> - o diff se confronta contra `docs/shell/` do monorepo — **é a cópia errada**. Aqui a superfície é
->   o bundle do SDK publicado, e **sem bundle a lente é NÃO EXECUTADA** (§ Superfície de leitura da
->   skill).
->
-> **Em qualquer divergência entre a skill e este arquivo, este arquivo vence** — e a divergência é
-> para **contar ao autor**, porque significa que o catálogo serviu a cópia errada. Para reabrir a
-> certa, derive o caminho em vez de cravá-lo:
-> `"$(git rev-parse --show-toplevel)"/.claude/skills/revisar-pr-apps/SKILL.md`.
-
 `.claude/skills/revisar-pr-apps/SKILL.md` é o revisor; `.claude/motor-revisao.md` é o motor da
 fan-out. Os dois são **cópia** de `urbiverso/urbiverso` @ `b0361f6` (PR #2540), portados em
 2026-08-18 e **substituídos pela geração nova em 2026-08-21**.
@@ -290,26 +264,10 @@ rodadas e encerramento obrigatório. Este último não faz falta porque a sessã
 inscreve em nada — ela revisa quando chamada e termina. Vale saber por que isso às vezes importa: **com uma sessão só, quem revisa
 é quem escreveu** — a §8 da skill compensa com lentes novas a cada rodada, mas não é a mesma coisa.
 
-**O motor é Codex, e ele está ligado** — por **`@codex review`** no PR, não pelo CLI. O GitHub App
-está instalado neste repositório e foi exercitado em rodadas sucessivas no PR 494 (~2 min cada), com
-achados P1 e P2 reais. É o **caminho normal**, e a sequência obrigatória — acionar, esperar com teto de 15 min,
-colher os *review threads*, verificar, só então atestar — está em `.claude/motor-revisao.md`
-§ *Sequência obrigatória do App*.
-
-> ⚠️ **`bloqueantes=` conta os achados do Codex ainda não resolvidos**, porque
-> `revisao-registrada.yml` filtra comentários **pelo autor do PR** e nunca enxerga o bot. E se o App
-> não responder no teto, **publique a linha com `bloqueantes=1`**, tendo a ausência da review como o
-> bloqueante. **Omitir a linha não serve**: o próprio relatório dispara `issue_comment`, o job varre
-> todos os comentários do head e, se houver uma atestação `bloqueantes=0` anterior **no mesmo head**,
-> **republica `success`**. Ausência de linha nova não apaga linha velha — só uma linha nova
-> sobrescreve.
-
-**São duas camadas que somam, não uma fila.** A **revisão do App** (`@codex review`) e a **fan-out
-das lentes** rodam as duas. O que é condicional é o motor *dentro* da fan-out: **CLI local**
-(`codex exec`) quando houver `OPENAI_API_KEY` **e** a liberação de `api.openai.com` — aqui não há, o
-proxy dá **403 no CONNECT** —, e **subagente nativo** quando não houver, **declarado** no relatório
-como menos adversarial, por revisar patch escrito pela mesma família de modelo. O App **não
-dispensa** a fan-out: neste repositório os dois acharam classes de defeito diferentes.
+**O motor é Codex quando dá, nativo quando não** — e a queda é **declarada**, nunca silenciosa. Hoje
+é nativo: falta `OPENAI_API_KEY` nas variáveis do *cloud environment*. O CLI o preflight instala
+sozinho; só a chave é do autor. Enquanto for nativo, o relatório diz em uma linha que revisão nativa
+de patch escrito pela mesma família de modelo é **menos adversarial**.
 
 **A camada de contratos não roda neste ambiente, e isso é estrutural.** Ela lê
 `node_modules/@urbiverso/sdk/docs/`, e aqui **tanto o `pnpm install` quanto o `npm view

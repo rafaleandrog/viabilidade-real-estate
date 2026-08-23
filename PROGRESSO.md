@@ -122,30 +122,45 @@ Nada foi apagado, e cada caso tem motivo: `acompanhar-revisao` **não existe mai
 de propósito"*); `revisar-pr-shell`, `revisar-pr` e `qa` moram no monorepo, que é somente-leitura e
 cujas próprias sessões as usam.
 
-**A primeira correção estava errada, e quem a derrubou foi o Codex** — vale registrar o caminho, não
-só o destino. A tentativa inicial foi uma porta de runtime no `SKILL.md` mandando conferir
-`git rev-parse --show-toplevel` e parar se não terminasse em `viabilidade-real-estate`. **Não
-funciona, por dois motivos:** carregar a skill do monorepo **não muda o diretório da sessão**, então
-o toplevel continua sendo o do app e a cópia errada **passa** no teste; e o aviso mora dentro da
-cópia do app, que é justamente a que **não é lida** quando a outra é a servida. Era teatro. O
-caminho absoluto de recuperação também estava cravado em `/home/user/...`, e o próprio checkout do
-Codex fica em `/workspace/...`.
+⚠️ **O conserto NÃO entra neste PR — e a razão é a lição mais cara desta sessão.** Ele foi escrito,
+revisado dez vezes e **revertido de propósito**; o desenho aprovado e todos os achados estão na
+issue de acompanhamento.
 
-**O que ficou.** O desempate é **material**, não de localização, e mora no
-`CLAUDE.md` (§ *A revisão em si*) — a única superfície que nenhuma skill sombreia, porque é conteúdo
-do repositório e entra no contexto de qualquer sessão que trabalhe aqui. Dois discriminadores: se as
-instruções mandarem **bumpar a `versao` por causa de `shell_min`**, ou confrontar o diff contra
-**`docs/shell/`**, é a cópia errada. Regra de precedência: **o `CLAUDE.md` vence**, e a divergência
-se conta ao autor. O caminho de reabertura é derivado —
-`"$(git rev-parse --show-toplevel)"/.claude/skills/revisar-pr-apps/SKILL.md`. A cópia na skill fica
-como reforço, não como única defesa.
+**Por que reverter.** Este PR nasceu para recuperar seis issues perdidas. Eu o deixei crescer para
+dentro da maquinaria de revisão — `SKILL.md`, `motor-revisao.md`, `CLAUDE.md` —, e aí o ciclo parou
+de convergir. O mecanismo é estrutural, não acidente: **os quatro documentos de processo se
+referenciam**, então toda regra nova precisa ser propagada aos quatro, e o revisor acusa
+corretamente cada um que ficou para trás. Dez rodadas, dezenove achados, **nenhum falso** — e o
+gerador era eu, editando o processo dentro do processo.
+
+**A regra que fica, e vale para todo PR deste repositório:** mudança em arquivo de processo
+(`.claude/**`, a § *A revisão em si* do `CLAUDE.md`) **não entra em PR que está sob revisão**. Vai
+em PR próprio, feita de uma vez, com os quatro documentos propagados no mesmo diff. E o teto é de
+**2 rodadas** por PR, salvo bloqueante de código.
+
+**O que o ciclo apurou, e não se perde** — está tudo na issue de acompanhamento, com o texto pronto:
+
+- a primeira tentativa (porta de runtime conferindo `git rev-parse --show-toplevel`) **não funciona**:
+  carregar a skill do monorepo não muda o diretório da sessão, então a cópia errada **passa** no
+  teste; e o aviso mora na cópia que **não é lida** quando a outra é servida;
+- o desempate tem de ser **material** e morar no `CLAUDE.md`, a única superfície que nenhuma skill
+  sombreia — dois discriminadores (a regra da `versao`, a superfície de contratos) e a precedência
+  declarada;
+- caminho de recuperação **derivado** de `git rev-parse --show-toplevel`, nunca cravado;
+- no timeout do App, publicar `bloqueantes=1`; **omitir a linha de máquina não serve**, porque o job
+  varre todos os comentários do head e republica um `success` anterior;
+- o predicado de espera precisa exigir review **posterior ao acionamento**, não só com o head certo
+  — numa rodada que nasce de comentário o head não muda;
+- App e fan-out são **duas camadas que somam**; o condicional é CLI × nativo, dentro da fan-out;
+- **não citar contagem de rodadas nem de achados dentro do artefato revisado** — o contador envelhece
+  a cada rodada por construção, e foi o que gerou metade dos achados deste ciclo.
 
 ### Codex — os três caminhos, medidos
 
 | Caminho | Estado |
 |---|---|
 | **GitHub App (`@codex review`)** | ✅ **instalado e funcionando — é o caminho normal deste repositório.** Exercitado em rodadas sucessivas no PR 494 (~2 min cada), com achados P1 e P2 reais. O placar vive no PR, não aqui |
-| CLI local (`codex exec`), que `.claude/motor-revisao.md` prescrevia como único | ✅ funciona em `urbiverso/urbiverso` (PR #2595, `gpt-5.6-terra`/`sol`). ❌ **não sobe aqui** |
+| CLI local (`codex exec`), o único que o `.claude/motor-revisao.md` documenta hoje | ✅ funciona em `urbiverso/urbiverso` (PR #2595, `gpt-5.6-terra`/`sol`). ❌ **não sobe aqui** |
 | ChatGPT/Codex web sobre a URL do PR | ✅ funciona, e não depende de `OPENAI_API_KEY` |
 
 > 🔴 **Eu afirmei que o App não estava instalado, e estava errado.** A afirmação vinha de
