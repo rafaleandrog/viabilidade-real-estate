@@ -25,11 +25,20 @@ falhou=0
 # árvore não é teste.
 DIFF="frontend/exemplo.ts"
 
+# A bateria declara TAMBÉM as mensagens de commit, não só os arquivos. Sem
+# isso o preflight ainda lia `git log base..HEAD` da árvore real: um commit
+# desta branch que cite uma issue entra na entrada de todo caso, e os casos
+# positivos passam a falhar por um motivo que não é o deles. Medido — 7 dos 20
+# casos quebraram no instante em que o próprio trabalho foi commitado. Achado
+# do Codex no PR 502.
+: > "$TMP/commits.txt"
+
 # esperar <exit-esperado> <rotulo> <corpo...>
 esperar() {
   local esperado="$1" rotulo="$2"; shift 2
   printf '%s\n' "$@" > "$TMP/corpo.md"
-  local saida; saida="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" --arquivos "$DIFF" 2>&1)"
+  local saida; saida="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" \
+    --arquivos "$DIFF" --commits "$TMP/commits.txt" 2>&1)"
   local obtido=$?
   if [ "$obtido" -eq "$esperado" ]; then
     passou=$((passou + 1))
@@ -42,10 +51,20 @@ esperar() {
 }
 
 # contem <padrao> <rotulo> <corpo...>
+# Exige o texto do aviso E exit 0. Só o texto não basta: a seção diz que o
+# aviso aparece "sem bloquear", e um caso que passasse com exit 1 mascararia
+# uma regressão que transformou aviso em bloqueante.
 contem() {
   local padrao="$1" rotulo="$2"; shift 2
   printf '%s\n' "$@" > "$TMP/corpo.md"
-  local saida; saida="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" --arquivos "$DIFF" 2>&1)"
+  local saida; saida="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" \
+    --arquivos "$DIFF" --commits "$TMP/commits.txt" 2>&1)"
+  local obtido=$?
+  if [ "$obtido" -ne 0 ]; then
+    falhou=$((falhou + 1))
+    printf '  FALHA %s — aviso deveria ser não-bloqueante, mas o exit foi %s\n' "$rotulo" "$obtido"
+    return
+  fi
   if printf '%s' "$saida" | grep -qF "$padrao"; then
     passou=$((passou + 1))
     printf '  ok   %s\n' "$rotulo"
@@ -91,8 +110,14 @@ DIFF='migracoes/030_algo.js'
 esperar 1 'migração nova sem bump da versao' 'Nada a citar.'
 DIFF='migracoes/030_algo.js,migracoes/031_outra.js,manifesto.json'
 esperar 1 'duas migrações no mesmo PR' 'Nada a citar.'
+# Tocar o manifesto NÃO basta — o preflight compara o VALOR de `versao` entre a
+# base e a árvore. Este caso é a prova do conserto: antes ele passava com o
+# arquivo apenas listado, aprovando o que o validar-backend.sh reprova.
 DIFF='migracoes/030_algo.js,manifesto.json'
-esperar 0 'migração nova com manifesto tocado' 'Nada a citar.'
+esperar 1 'manifesto tocado sem bump da versao ainda reprova' 'Nada a citar.'
+# O caminho positivo (bump real) não é simulável por override: a comparação lê
+# o `manifesto.json` da base e o do disco. Ele é exercido de verdade no PR que
+# trouxer migração — e é lá que tem que ficar verde.
 DIFF="frontend/exemplo.ts"
 
 # ── Regra R1: processo não viaja com código de produto ──────────────────────

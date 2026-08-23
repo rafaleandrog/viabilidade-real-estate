@@ -31,8 +31,14 @@
 //
 // `--arquivos a.ts,b.ts` substitui a lista vinda do `git diff`. Serve para
 // conferir um corpo ANTES de commitar — sem isso o diff é zero e a regra do
-// PR #142 (fecha issue com diff vazio) reprova um corpo que está correto.
-// Use `--arquivos -` para declarar explicitamente que o diff é vazio.
+// diff vazio reprova um corpo que está correto. Use `--arquivos -` para
+// declarar explicitamente que o diff é vazio.
+//
+// `--commits <arquivo|->` substitui as mensagens de commit. As duas overrides
+// andam juntas: sobrescrever só a lista de arquivos deixa METADE da entrada
+// vindo da árvore, e uma bateria de testes passa ou falha conforme o que
+// estiver commitado. Foi achado do Codex no PR 502 — a bateria deste script
+// passava antes do commit e quebrava depois dele, em 7 dos 20 casos.
 //
 // Fluxo canônico: escreva o corpo num arquivo, rode isto, e só então passe o
 // MESMO arquivo para `mcp__github__create_pull_request`. O arquivo é o
@@ -58,6 +64,7 @@ const CORPO_ARQ = arg('--corpo');
 const BASE = arg('--base', 'origin/main');
 const NUMERO = arg('--numero', '');
 const ARQUIVOS_MANUAIS = arg('--arquivos');
+const COMMITS_MANUAIS = arg('--commits');
 
 if (!CORPO_ARQ) {
   console.error('uso: node scripts/preflight-pr.mjs --corpo <arquivo.md> [--base origin/main]');
@@ -152,6 +159,10 @@ try {
   const saida = git('diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`);
   arquivos = saida ? saida.split('\n').filter(Boolean) : [];
   commits = git('log', '--format=%B', `${baseSha}..${headSha}`);
+  if (COMMITS_MANUAIS !== undefined) {
+    commits = COMMITS_MANUAIS === '-' ? '' : readFileSync(COMMITS_MANUAIS, 'utf8');
+    ok.push(`mensagens de commit DECLARADAS por --commits (o git não foi consultado)`);
+  }
   if (ARQUIVOS_MANUAIS !== undefined) {
     arquivos = ARQUIVOS_MANUAIS === '-' ? [] : ARQUIVOS_MANUAIS.split(',').map((a) => a.trim()).filter(Boolean);
     ok.push(`diff DECLARADO por --arquivos: ${arquivos.length} arquivo(s) (o git não foi consultado)`);
@@ -245,11 +256,34 @@ if (/@codex/i.test(corpo)) {
 // Migração nova sem bump da `versao`, e o inverso. O guard completo mora no
 // validar-backend.sh, que aborta sem o SDK — aqui é a versão que roda sempre.
 const migracoesNovas = arquivos.filter((a) => /^migracoes\/\d+.*\.js$/.test(a));
-const mexeuManifesto = arquivos.includes('manifesto.json');
-if (migracoesNovas.length > 0 && !mexeuManifesto) {
+
+// Comparar o VALOR de `versao`, não só o caminho do arquivo: um PR que edita
+// outro campo do manifesto marcava "bumpou" sem ter bumpado, e o preflight
+// aprovava o que o validar-backend.sh reprova. Achado do Codex no PR 502.
+const versaoDe = (ref) => {
+  try {
+    const bruto = ref === null
+      ? readFileSync(resolve(RAIZ, 'manifesto.json'), 'utf8')
+      : git('show', `${ref}:manifesto.json`);
+    return JSON.parse(bruto).versao ?? null;
+  } catch {
+    return null;
+  }
+};
+const versaoBase = baseSha ? versaoDe(baseSha) : null;
+const versaoAtual = versaoDe(null);
+const bumpou = versaoBase !== null && versaoAtual !== null && versaoBase !== versaoAtual;
+
+if (migracoesNovas.length > 0 && !bumpou) {
   bloqueantes.push(
-    `migração nova (${migracoesNovas.join(', ')}) sem tocar o manifesto.json — ` +
-      'a `versao` precisa bumpar junto.',
+    `migração nova (${migracoesNovas.join(', ')}) sem bump da \`versao\` no manifesto.json ` +
+      `(base \`${versaoBase ?? '?'}\` → atual \`${versaoAtual ?? '?'}\`). Tocar o arquivo não basta.`,
+  );
+}
+if (migracoesNovas.length === 0 && bumpou) {
+  bloqueantes.push(
+    `\`versao\` bumpada (\`${versaoBase}\` → \`${versaoAtual}\`) sem migração nova. ` +
+      'A `versao` descreve o SCHEMA — bumpar sem migração cria um degrau vazio.',
   );
 }
 if (migracoesNovas.length > 1) {

@@ -224,6 +224,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          # A bateria do preflight chama `git merge-base origin/main HEAD`, e o
+          # checkout de PR traz só o commit do head. Sem o histórico o merge-base
+          # falha ANTES do override de `--arquivos`, e o job reprova por falta de
+          # base, não por defeito. Achado do Codex no PR 502.
+          fetch-depth: 0
       - name: Guard da rede do processo
         run: |
           set -uo pipefail
