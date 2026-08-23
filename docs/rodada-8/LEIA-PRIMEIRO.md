@@ -103,10 +103,25 @@ nada derivado é persistido. Não existe `GET` de resultado.
 ## O que NÃO refazer — já está apurado, com `arquivo:linha`
 
 - **A lista de 47 itens está inteiramente auditada**, pelo corpo do pedido e não pelo título:
-  **36 confirmados · 8 não se sustentam (2, 11, 15, 17, 22, 24, 31, 41) · 3 dependem de print
-  (38, 43, 45)**. Detalhe em `01-verificacao-47-itens.md` e `08-auditoria-39-itens.md`.
+  **36 confirmados · 8 com a correção anterior reprovada (2, 11, 15, 17, 22, 24, 31, 41) · 3 dependem
+  de print (38, 43, 45)**. Detalhe em `01-verificacao-47-itens.md` e `08-auditoria-39-itens.md`.
+  > 🔴 **Corrigido em 2026-08-23 — a redação anterior custou seis issues.** Esta linha dizia
+  > *"8 **não se sustentam**"*, que se lê como *"o bug relatado não existe"*. **Não é o que os
+  > vereditos individuais dizem.** Do que aquele balde de 8 continha:
+  > `:137` item 11 → "NÃO SE SUSTENTA **(parcial)**" · `:199` item 17 → título "NÃO SE SUSTENTA" com
+  > corpo que prova o **oposto** (o bug é real; o que não se sustenta é **a correção da #326**) ·
+  > `:254` item 24 → "🟡 **PARCIAL — reaberto**" · `:405` item 22 → "🟡 PARCIAL" · `:435` item 31 →
+  > "🟡 PARCIAL". **Nenhum é "o bug não existe".**
+  >
+  > A consequência foi concreta: o **Bloco 8-A inteiro** — seis issues com corpo pronto em
+  > `07-consolidado-issues.md` — ficou de fora de `25-issues-final.md`, que é o arquivo que alimenta
+  > `scripts/criar-issues-rodada-8.mjs`, e **nenhuma das seis chegou ao GitHub**. Entre elas a do
+  > `urbi-kpi`, que o autor já havia reportado em #176, #262, #326 e #352. Recuperadas em 2026-08-23
+  > como **#488–#493** — ver o apêndice de `25-issues-final.md`.
   > **Lição de método da rodada:** o título da planilha **diverge do pedido com frequência**.
-  > Quatro itens teriam recebido veredito oposto se lidos pelo título (14, 18, 32, 43).
+  > Quatro itens teriam recebido veredito oposto se lidos pelo título (14, 18, 32, 43). E a lição
+  > desta correção: **um resumo que colapsa "a correção falhou" em "o pedido não procede" apaga
+  > trabalho** — e apaga calado, porque ninguém confere um balde contra os vereditos que ele resume.
 - **Zero problemas de prop `urbi-*`** — 391 tags, 29 primitivos, ~1.100 atributos varridos
   (`06-auditoria-ui.md`).
 - **O motor de recebíveis por safras ESTÁ ligado ao `calcularFluxo`** desde a #283, e

@@ -20,6 +20,26 @@ description: Revisa um PR deste repositório antes do merge — revisão adversa
 > **PARE e diga ao usuário**, com o que cada teste respondeu. Falso "não sou" custa uma frase dele;
 > falso "sou" custa uma revisão inteira rodada com o motor errado.
 
+> ⚠️ **Confirme também QUAL repositório, e não por impressão — existem DUAS skills com este nome.**
+>
+>     git rev-parse --show-toplevel     # tem que terminar em /viabilidade-real-estate
+>
+> **ADAPTADO — 2026-08-23.** O monorepo tem uma `.claude/skills/revisar-pr-apps/` própria, e quando
+> ele está clonado ao lado (em `/home/user/urbiverso`, que é o caso nas sessões de nuvem) **as duas
+> entram no catálogo da sessão com o mesmo nome**. A listagem não mostra o caminho, então invocar
+> `revisar-pr-apps` **não diz qual cópia respondeu**.
+>
+> Não é empate inofensivo: a cópia do monorepo confronta o diff contra `docs/shell/` e aplica a regra
+> **upstream** da `versao` — bumpar quando `shell_min` sobe. **Aqui a regra é a inversa** (decisão da
+> issue #422, § Versão do manifesto do `CLAUDE.md`), então a cópia errada acusa **bloqueante
+> inventado em todo PR que suba piso** — exatamente o defeito que esta adaptação existe para evitar.
+>
+> Respondeu um toplevel que não é o deste repositório: **PARE e diga ao usuário qual arquivo você
+> abriu**. Não "adapte" a cópia do monorepo de cabeça — abra
+> `/home/user/viabilidade-real-estate/.claude/skills/revisar-pr-apps/SKILL.md` pelo caminho absoluto
+> e siga esse. Marca para conferir que você está no arquivo certo: **este** tem a seção
+> *"ADAPTADO — a sessão já está no repositório, e não existe `gh`"*.
+
 Você é o revisor de código de apps da plataforma urbiverso. Revisa PRs **antes** do merge.
 
 Não revisa funcionamento específico do shell — e **ADAPTADO:** aqui não existe a exceção do
