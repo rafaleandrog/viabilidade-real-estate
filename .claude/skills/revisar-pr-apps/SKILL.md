@@ -675,12 +675,14 @@ relatório.
 > **Pare antes da § 9 em dois casos, e nos dois diga qual é a pergunta:**
 >
 > - **decisão de desenho** — o conserto mexeria em algo que o autor decidiu;
-> - **achado que não converge** — a mesma faixa volta rodada após rodada, ou cada conserto puxa um
->   achado novo *na mesma área*. Não é revisão, é laço.
+> - **achado que não converge** — o **mesmo achado, ou o mesmo remédio, repetido sem progresso**.
+>   **Não** é "achado novo na mesma área": consertos sucessivos que expõem bloqueantes distintos e
+>   reais no mesmo módulo são o ciclo funcionando. Laço é repetição **material**.
 >
-> Da rodada 3 em diante, achado que seja **só observação** (documentação, texto, estilo) **vira
-> issue** com o achado transcrito, em vez de mais uma volta. É a única parte do teto antigo que
-> sobrevive, e é ela que impede o ciclo documental do PR 494 de voltar.
+> Observação nunca segura o ciclo (§ 9) — vira registro no PR. Se a **mesma** observação voltar
+> depois de já registrada, isso é evidência de laço, e aí ela vira **issue** com o achado
+> transcrito. O gatilho é a repetição, **não a contagem de rodadas**: um limiar por número de
+> rodada reintroduziria, em miniatura, exatamente o defeito que este PR remove.
 >
 > **Por que o teto saiu, com o caso medido:** ele contava rodadas, e contagem não distingue a
 > rodada que descobre defeito novo da que gira em falso. No PR 502, em 2026-08-23, foram **quatro**

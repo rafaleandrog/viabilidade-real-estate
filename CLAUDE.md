@@ -248,11 +248,14 @@ autor precisa responder, em vez de deixar "aguardando decisão" solto:
 
 - **Decisão de desenho** — o conserto mexeria em algo que o autor decidiu. Com parcimônia: usado à
   toa, vira jeito de terceirizar julgamento que era seu.
-- **Achado que não converge** — a mesma faixa volta rodada após rodada, ou cada conserto puxa um
-  achado novo *na mesma área*. Aí não é revisão, é laço: pare, diga o que está girando, devolva.
+- **Achado que não converge** — o **mesmo achado, ou o mesmo remédio, repetido sem progresso**.
+  Não é "achado novo na mesma área": consertos sucessivos que expõem bloqueantes **distintos e
+  reais** no mesmo módulo são o ciclo funcionando, e mandá-los parar contradiz a linha de cima.
+  Laço é repetição **material**; pare, diga o que está girando, devolva.
 
-A única parte do teto antigo que sobrevive: da terceira rodada em diante, achado que seja **só
-observação** (documentação, texto, estilo) **vira issue** em vez de mais uma volta.
+Observação nunca segura o ciclo — ela vira registro no PR, e o autor decide. Se a **mesma**
+observação voltar depois de já registrada, ela é evidência de laço: vira **issue**, com o achado
+transcrito.
 
 > ⚠️ **Esta regra já foi "teto de duas rodadas", e o teto era invenção desta cópia — o upstream
 > nunca teve contador.** Ele mede a coisa errada: trata como igual a rodada que descobre defeito

@@ -71,7 +71,7 @@ diferença importa: o `CLAUDE.md` é lido no começo de **toda** sessão deste r
 | | Regra | Como se sustenta |
 |---|---|---|
 | **R1** | Mudança de processo não entra em PR sob revisão | **Guard no CI** — `scripts/guard-pr-escopo-processo.mjs`, job `escopo-processo` |
-| **R2** | Teto de duas rodadas por PR; a terceira só com bloqueante de código | Prosa — não é decidível por caminho de arquivo |
+| **R2** | O ciclo fecha por convergência: zero bloqueantes pendentes, sem teto de rodadas | Prosa — não é decidível por caminho de arquivo |
 | **R3** | Um assunto por PR | Prosa, com a exceção declarada do PR único de documentação (D-Q04) |
 
 O guard da R1 barra o PR que misture `.claude/**` com `frontend/`, `backend/`, `migracoes/`,
@@ -242,8 +242,12 @@ gerador era eu, editando o processo dentro do processo.
 
 **A regra que fica, e vale para todo PR deste repositório:** mudança em arquivo de processo
 (`.claude/**`, a § *A revisão em si* do `CLAUDE.md`) **não entra em PR que está sob revisão**. Vai
-em PR próprio, feita de uma vez, com os quatro documentos propagados no mesmo diff. E o teto é de
-**2 rodadas** por PR, salvo bloqueante de código.
+em PR próprio, feita de uma vez, com os quatro documentos propagados no mesmo diff.
+
+> ⚠️ **A segunda metade desta regra foi revogada em 2026-08-23 (PR 507).** Ela dizia "o teto é de
+> 2 rodadas por PR, salvo bloqueante de código". **Não há teto** — o upstream nunca teve, e contar
+> rodadas trata como igual a rodada que acha defeito novo e a que gira em falso. O ciclo fecha por
+> **convergência**: zero bloqueantes pendentes. Ver `CLAUDE.md` § As três regras de escopo.
 
 **O que o ciclo apurou, e não se perde** — está tudo na issue de acompanhamento, com o texto pronto:
 
