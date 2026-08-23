@@ -76,15 +76,54 @@ Então, **antes** de publicar o relatório da §7, execute nesta ordem:
 
 1. **Drene o que estiver em voo — antes de acionar.** Conte, no PR, quantos acionamentos já existem
    (comentários com `@codex review`, mais **um** se o PR foi aberto para revisão, porque a abertura
-   aciona sozinha) e quantas reviews do bot já chegaram. **Se houver acionamento sem resposta, espere
-   essa resposta primeiro** — ela é da rodada anterior, não da sua.
+   aciona sozinha) e quantas **respostas** do bot já chegaram. **Se houver acionamento sem resposta,
+   espere essa resposta primeiro** — ela é da rodada anterior, não da sua.
+
+   > ⚠️ **"Resposta" aqui são as DUAS formas, não só review.** Contar apenas reviews faz a drenagem
+   > enxergar como pendente um acionamento que já foi respondido **por comentário** — o caso limpo
+   > dos PRs 498 e 499 — e a execução seguinte fica esperando uma review formal que nunca vem,
+   > **antes mesmo de acionar**. O passo 3 conserta a colheita; sem esta linha, o passo 1 continua
+   > com o mesmo defeito, uma etapa antes. Achado do Codex no PR 500.
 
 2. **Acione, e guarde o carimbo do SEU comentário.** Comente `@codex review` com o head da rodada
    declarado, e anote o `created_at`/`id` do comentário que você acabou de publicar.
 
-3. **Espere, com teto.** Releia as reviews até aparecer uma que satisfaça **as três** condições:
-   `commit_id` igual ao head da rodada · `submitted_at`/`id` **posterior ao seu comentário** · e ela
-   é a **primeira** review a chegar depois dele. Teto de **15 minutos**.
+3. **Espere, com teto — e procure nos DOIS lugares.**
+
+   > 🔴 **O App responde de duas formas, e só uma delas é uma *review*.**
+   >
+   > | Resultado | Onde aparece | Como ler |
+   > |---|---|---|
+   > | **Com achados** | *review* formal + threads inline | `pull_request_read` com `get_reviews` e `get_review_comments` |
+   > | **Sem achados** | **comentário comum** do bot: *"Codex Review: Didn't find any major issues. Reviewed commit: `<sha>`"* | `pull_request_read` com **`get_comments`**, filtrando `user.login == 'chatgpt-codex-connector[bot]'` |
+
+   > ⚠️ **A documentação do próprio App menciona uma terceira forma — "otherwise it will react with
+   > 👍" — e ela NÃO é detectável por este procedimento.** A reação se anexa ao **comentário de
+   > acionamento**, cujo autor continua sendo humano: `get_comments` não devolve comentário novo do
+   > bot, e não há `Reviewed commit:` para amarrar ao head. Reconhecê-la exigiria consultar as
+   > reações daquele comentário específico e correlacionar o ator. **Enquanto isso não for medido e
+   > implementado, uma rodada respondida só por 👍 estoura o teto** — e é isso que o passo 5 trata.
+   > Não documente essa forma como suportada. Achado do Codex no PR 500, respondendo a uma pergunta
+   > explícita sobre não documentar comportamento não medido.
+   >
+   > **Leia os dois lugares na MESMA passada, sempre — não um, depois o outro se faltar.** Em
+   > 2026-08-23, no PR 500, li só `get_comments`, não vi resposta e anunciei que o Codex estava em
+   > silêncio há 24 minutos. A review estava lá desde 2m30s depois do acionamento, com dois P1. Ou
+   > seja: o defeito que este arquivo conserta tem **simétrico**, e eu caí nele dentro do próprio PR
+   > que o conserta. A forma "com achados" chega como review cujo corpo é genérico
+   > (*"Here are some automated review suggestions"*) — **o conteúdo está nos threads inline**, que
+   > só `get_review_comments` devolve.
+   >
+   > **Procurar só por review faz o laço nunca fechar em PR limpo** — ele estoura os 15 minutos e
+   > publica `bloqueantes=1`, um **bloqueante falso**, exatamente no caso em que não há nada errado.
+   > Medido nos PRs 498 e 499: `get_reviews` devolveu `[]` nos dois, e o Codex tinha revisado os
+   > dois, dizendo isso por comentário. O `Reviewed commit:` no corpo é o que amarra a resposta ao
+   > head.
+
+   Releia **reviews e comentários do bot** até aparecer uma resposta que satisfaça **as três**
+   condições: refere-se ao **head da rodada** (`commit_id` da review, ou o `Reviewed commit:` do
+   comentário) · é **posterior ao seu comentário** de acionamento · e é a **primeira** a chegar
+   depois dele. Teto de **15 minutos**.
 
    > ⚠️ **Três corridas, e cada conserto revelou a seguinte.** Vale ler inteiro antes de "simplificar"
    > este passo — as três formas óbvias já foram tentadas e reprovadas, pelo Codex, no PR 496.
@@ -109,9 +148,30 @@ Então, **antes** de publicar o relatório da §7, execute nesta ordem:
 **Se o teto estourar** — nenhuma review no head da rodada em 15 min —, o ciclo fica **aberto**, e a
 atestação tem de refletir isso **na máquina, não na prosa**:
 
-> 🔴 **Publique a linha de máquina com `bloqueantes=1`**, tendo como bloqueante *"revisão do App não
-> chegou no head desta rodada"* — ele some quando ela chegar. Diga também, em uma linha de prosa,
-> que o App foi acionado no head `<sha>` e não respondeu dentro do teto.
+> 🔴 **Publique a linha de máquina com `bloqueantes=1`**, tendo como bloqueante *"resposta do App
+> não detectável no head desta rodada"*. Diga também, em uma linha de prosa, que o App foi acionado
+> no head `<sha>` e que nenhuma resposta detectável chegou dentro do teto.
+>
+> ⚠️ **Escreva "não detectável", nunca "não respondeu" — e o bloqueante precisa de saída própria.**
+> Uma das formas de resposta do App é uma **reação 👍 no seu comentário de acionamento**, e ela
+> **não é detectável por este procedimento** (ver o passo 3): a reação não cria comentário do bot
+> nem traz `Reviewed commit:`. Nesse caso a reação **já é a resposta final** — nenhuma review vai
+> chegar depois. Um bloqueante redigido como *"some quando a review chegar"* fica **permanente**, e
+> o passo 1 da execução seguinte também trava esperando uma resposta que não existe.
+>
+> **A saída, em duas etapas:**
+>
+> 1. **Reacione uma vez, no mesmo head**, dizendo no comentário que é o segundo e último
+>    acionamento. Se vier resposta detectável, siga o fluxo normal.
+> 2. **Se o segundo acionamento também não produzir resposta detectável**, encerre a rodada
+>    declarando a **camada A como `app=nao-detectado`** na linha de máquina, e conte na prosa: dois
+>    acionamentos, nenhuma resposta detectável, a independência adversarial **não foi obtida neste
+>    head**. Os seus bloqueantes voltam a mandar sozinhos em `bloqueantes=` — que pode ser `0`.
+>
+> É o mesmo tratamento que a camada de contratos já recebe com `contratos=nao-executados`: uma
+> lacuna **declarada e visível** vale mais que um portão travado, porque portão travado é desligado
+> por quem precisa trabalhar. Para o passo 1, um acionamento que passou pelas duas etapas conta como
+> **drenado**, não como pendente. Achado do Codex no PR 500, rodada 2.
 >
 > **Duas armadilhas aqui, as duas achadas pelo próprio Codex, e a segunda derrubou a primeira
 > resposta:**
