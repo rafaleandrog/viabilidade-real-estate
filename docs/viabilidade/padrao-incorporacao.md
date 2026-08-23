@@ -532,9 +532,10 @@ Os totais precisam reconciliar com as alocações dos Grupos.
 
 ### 7.6 Permuta física
 
-A futura forma de entrada das unidades permutadas ainda será tratada separadamente.
+A forma de entrada das unidades permutadas **já foi definida** — ver a §15.1, que descreve a
+linha de custo `Preço → Permuta física` como fonte de verdade. Esta seção fixa a consequência
+funcional, que não mudou:
 
-Este documento fixa apenas a consequência funcional:
 
 - estoque permutado não pode gerar receita;
 - estoque permutado não pode ser vendido novamente;
@@ -1545,7 +1546,9 @@ A permuta física:
 - não gera saída de caixa no momento da transferência;
 - pode ter valor econômico informativo.
 
-A futura forma de cadastro e identificação das unidades permutadas será especificada separadamente.
+> 📌 **Texto original do padrão, mantido como registro:** *"A futura forma de cadastro e
+> identificação das unidades permutadas será especificada separadamente."* Ela **foi** especificada
+> — o bloco abaixo descreve o resultado.
 
 > 🔄 **Evolução dependente de issue — acrescentado em 2026-08-01.** Essa "futura forma de cadastro"
 > ganhou escopo: é a epic **#258** (`BUGLIST-015`), com quatro sub-issues (**#266** modelo e UI,
@@ -1561,11 +1564,10 @@ A futura forma de cadastro e identificação das unidades permutadas será espec
 > replicar a reserva. **Sem linha de custo de Permuta física, o KPI é 0** — não há fallback para o
 > campo legado (`:1999-2006`, decisão do autor de 2026-08-02).
 
-Até essa definição:
-
-- o app não deve receber uma refatoração ampla improvisada;
-- a documentação deve preservar o princípio econômico;
-- qualquer inconsistência atual deve ser tratada em issue própria e conservadora.
+> A ressalva original ("até essa definição, nada de refatoração ampla improvisada; inconsistência
+> vira issue própria e conservadora") **cumpriu o papel dela**: a definição chegou pelas
+> #266/#267/#268, e o que restou de conservador virou o comportamento descrito acima — a coluna
+> `unidades_permutadas` permanece no schema como dado histórico em vez de ser removida.
 
 ### 15.2 Permuta financeira
 
@@ -1820,8 +1822,10 @@ O estudo completo deve conseguir representar:
 > `docs/viabilidade/funding-capital-stack.md` §4.3; o oráculo de regressão contra a planilha, em
 > `frontend/financiamento-producao-golden.test.ts`.
 >
-> Continua valendo o aviso abaixo para o **resto** do Bloco G — estrutura de capital, investidor,
-> regime tributário e correção seguem inertes.
+> **O inventário do que sobrou inerte é o da §17**, e é menor do que este parágrafo dizia: só
+> `regime_tributario`, os cinco `aliquota_*_pct` e `imposto_sobre_permuta_fisica`. Estrutura de
+> capital, investidor e correção monetária **saíram do formulário** (#279/#355) — não estão inertes,
+> não estão lá.
 
 
 ### 17.3 Repasse não é financiamento à produção
@@ -2763,7 +2767,7 @@ com os do estudo.
 | **C4** | **No Avançado, o tempo é em meses relativos 0-based**: mês 0 = `data_inicio_projeto`; o índice do array mensal coincide com o número do mês. **Não há meses negativos.** | `fluxo-caixa-motor.ts` |
 | **C5** | **Permuta física não entra no fluxo** — reduz a área/VGV vendável do incorporador. **Permuta financeira é dedução da receita**, % do VGV residencial/não residencial (ou valor fixo). | `proforma.ts`, `formulas.md` |
 | **C6** | **Imposto segue o regime tributário**: `4%` quando `sujeito_ret`, senão `imposto_percentual`. Corretagem, marketing e permutas financeiras são deduções da receita antes dos custos. | `formulas.md`, schema |
-| **C7** | **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e no motor. O **valor canônico** de uma premissa multiunidade é o monetário; `% do VGV` e `R$/m²` são representações **derivadas**, que carregam precisão plena internamente e arredondam só para exibir. Contrato do autor, 2026-08-01. **Ainda não implementado:** a tela usa 0 casas (`viab-format.ts:8`) e a exportação usa 2 (`exportar.ts:9`) — ver #259, #260 e #281. | `formulas.md`, `viab-format.ts`, `premissas-conversao.ts` |
+| **C7** | **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e no motor. O **valor canônico** de uma premissa multiunidade é o monetário; `% do VGV` e `R$/m²` são representações **derivadas**, que carregam precisão plena internamente e arredondam só para exibir. Contrato do autor, 2026-08-01. **Estado:** `fmtR$` (`viab-format.ts:11-23`) usa 2 casas, a exportação passou a importá-lo em vez de definir formatador próprio (`exportar.ts:10`) e a sensibilidade da Proforma migrou (`tela-proforma.ts:458`, #492). **Três fontes ainda divergem** e mantêm a #281 aberta: `fluxo-tabela.ts:34` (`celula`, arredonda para 0 casas e esconde valor abaixo de R$ 0,50), `tela-proforma.ts:314` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383` (`precoUnit`/`precoTotal`) — as duas últimas chamam `fmtNum` sem casas. Tabela completa em `formulas.md`. | `formulas.md`, `viab-format.ts`, `premissas-conversao.ts` |
 
 ## Anexo B — Dicionário de premissas (campos reais)
 
@@ -2850,8 +2854,10 @@ Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescre
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
 (`frontend/tela-fluxo-custos.ts:790-791`). Quem classifica é a **subcategoria**: toda linha
 `Preço/Permuta` é tratada como permuta **financeira** pelo motor
-(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:518-520`). A permuta **física** vem de outra entidade,
-`unidades_permutadas` no catálogo de Tipologias. Usar `distribuicao_modo` como critério de migração
+(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:518-520`). A permuta **física** vem da linha de custo
+`Preço → Permuta física` (`permuta_tipologia_id` + `permuta_quantidade`), e **não** de
+`unidades_permutadas` no catálogo de Tipologias: desde as #266/#267/#268 esse campo é dado
+histórico, sem fallback — sem a linha de custo, o KPI é 0 (§15.1). Usar `distribuicao_modo` como critério de migração
 reclassifica linhas financeiras como físicas, remove a dedução de caixa e conta a permuta física em
 dobro. → **#257**, **#258**.
 
