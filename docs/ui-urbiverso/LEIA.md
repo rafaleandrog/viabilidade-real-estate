@@ -2,6 +2,7 @@
 
 > **Gerado por `scripts/sincronizar-referencia-ui.mjs`. Não edite à mão** — rode o script.
 >
+<!-- CARIMBO:INICIO — bloco gerado por scripts/sincronizar-referencia-ui.mjs. Não edite. -->
 > | | |
 > |---|---|
 > | Fonte | `main` do monorepo `urbiverso/urbiverso` |
@@ -9,6 +10,7 @@
 > | Versão do monorepo | `0.53.11` |
 > | Data do commit | 2026-08-22 |
 > | Conteúdo | 29 primitivos · 197 props (incluindo herdadas) · 85 tokens |
+<!-- CARIMBO:FIM -->
 
 ## Por que este diretório existe
 

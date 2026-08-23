@@ -56,7 +56,15 @@ for (const arq of readdirSync(dirFrontend).filter((a) => a.endsWith('.ts'))) {
 }
 
 // ── extração ────────────────────────────────────────────────────────────────
-const kebab = (s) => s.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+// ⚠️ O Lit NAO usa kebab-case por default — ele MINUSCULIZA o nome da propriedade.
+// `maxWidth` vira `maxwidth`, nao `max-width`. Isso e contraintuitivo e ja esta
+// documentado em `docs/rodada-8/06-auditoria-ui.md:142-144`, com a instrucao
+// explicita de "não corrija para max-width".
+//
+// A versao anterior deste script convertia para kebab. Um guard sobre aquele
+// espelho reprovaria os 17 usos de `maxWidth=` que FUNCIONAM — o falso positivo
+// que faz alguem desligar a guarda. Achado P1 do Codex no PR 497.
+const atributoPadraoDoLit = (nome) => nome.toLowerCase();
 
 /** Todos os blocos `:host...{ ... }` de um arquivo, achatados numa lista de declarações. */
 function declaracoesDeHost(fonte) {
@@ -87,10 +95,16 @@ function propsDe(fonte) {
   for (const m of fonte.matchAll(/@property\((\{[^}]*\})?\)\s*([A-Za-z0-9_]+)/g)) {
     const opts = m[1] ?? '';
     const nome = m[2];
-    const attr = opts.match(/attribute:\s*'([^']+)'/);
+    const explicito = opts.match(/attribute:\s*'([^']+)'/);
+    // `attribute: false` — a prop NAO tem atributo HTML. Fabricar um nome aqui e
+    // perigoso: sao os contratos de objeto, array e callback, passados por
+    // `.prop=${...}`, e um guard aceitaria escrita por atributo que o componente
+    // ignora em silencio. Achado P1 do Codex no PR 497.
+    const semAtributo = /attribute:\s*false/.test(opts);
     props.push({
       propriedade: nome,
-      atributo: attr ? attr[1] : kebab(nome),
+      atributo: semAtributo ? null : (explicito ? explicito[1] : atributoPadraoDoLit(nome)),
+      so_propriedade: semAtributo,
       tipo: (opts.match(/type:\s*([A-Za-z]+)/) ?? [, 'String'])[1],
       reflete: /reflect:\s*true/.test(opts),
     });
@@ -130,39 +144,65 @@ function cadeia(nome) {
   return fora;
 }
 
-// ── box model: julgar pelo VALOR EFETIVO, não pela presença da propriedade ───
-// Achado do Codex no PR 497, e os dois lados produziam FALSO NEGATIVO — o exato
-// erro que este campo existe para impedir:
-//   · `padding: 0 16px` era descartado por casar com /^0( |$)/, apesar dos 16px
-//     horizontais que somam à largura;
-//   · qualquer `box-sizing`, inclusive `content-box`, contava como protegido.
+// ── box model: valor efetivo, EIXO HORIZONTAL, e cascata resolvida ──────────
+// Tres achados do Codex nos PRs 497. Todos produziam FALSO NEGATIVO ou FALSO
+// POSITIVO — os dois inaceitaveis num campo que vai sustentar guard.
+//
+//  · `padding: 0 16px` era descartado por casar com /^0( |$)/, apesar dos 16px;
+//  · qualquer `box-sizing`, inclusive `content-box`, contava como protegido;
+//  · `padding-top` e `border-bottom` contavam como acrescimo de LARGURA, quando
+//    so aumentam altura — falso positivo, que faz desligar a guarda.
 
 const ZERO = /^0([a-z%]*)$/;
+const ehZero = (v) => ZERO.test(v) || v === 'none';
 
-/** `0`, `0px`, `0 0`, `0 0 0 0` → não soma nada. Qualquer lado não-zero soma. */
-const shorthandZerado = (valor) => valor.trim().split(/\s+/).every((v) => ZERO.test(v));
+/** Dos valores de um shorthand, os que valem para ESQUERDA/DIREITA. */
+function horizontaisDoShorthand(valor) {
+  const v = valor.trim().split(/\s+/);
+  if (v.length === 1) return [v[0]];          // todos os lados
+  if (v.length === 2) return [v[1]];          // vertical | horizontal
+  if (v.length === 3) return [v[1]];          // topo | horizontal | baixo
+  return [v[1], v[3]];                        // topo | dir | baixo | esq
+}
 
-function acrescentaLargura(host) {
-  for (const d of host) {
-    const { prop, valor } = d;
-    const v = valor.trim();
-    if (/^padding(-(top|right|bottom|left|inline|block).*)?$/.test(prop)) {
-      if (!shorthandZerado(v)) return true;
-    } else if (/^border(-(width|top|right|bottom|left|inline|block).*)?$/.test(prop)) {
-      // `none` e `0` não desenham; qualquer outra coisa tem espessura.
-      if (v === 'none' || shorthandZerado(v)) continue;
-      // `border: 0 solid X` — a largura é o primeiro token.
-      const largura = v.split(/\s+/)[0];
-      if (ZERO.test(largura) || largura === 'none') continue;
-      return true;
-    }
+/** Uma declaração acrescenta LARGURA? Só o eixo horizontal conta. */
+function declaracaoSomaLargura({ prop, valor }) {
+  const v = valor.trim();
+  if (prop === 'border-radius' || prop.startsWith('border-radius')) return false;
+
+  // Lados explicitamente verticais nunca somam largura.
+  if (/^(padding|border)-(top|bottom|block)/.test(prop)) return false;
+
+  // Lados explicitamente horizontais.
+  if (/^padding-(left|right|inline)/.test(prop)) return !valor.trim().split(/\s+/).every(ehZero);
+  if (/^border-(left|right|inline)/.test(prop)) {
+    return !ehZero(v.split(/\s+/)[0]);
   }
+
+  // Shorthands que valem para todos os lados.
+  if (prop === 'padding') return !horizontaisDoShorthand(v).every(ehZero);
+  if (prop === 'border-width') return !horizontaisDoShorthand(v).every(ehZero);
+  if (prop === 'border') return !ehZero(v.split(/\s+/)[0]);
+
   return false;
 }
 
-/** Só `border-box` protege. `content-box` é o default e é justamente o problema. */
-const protegidoPorBorderBox = (host) =>
-  host.some((d) => d.prop === 'box-sizing' && d.valor.trim() === 'border-box');
+// Conservador de propósito: QUALQUER seletor conta para somar largura, inclusive
+// `:host([compacta])`, porque naquele estado a caixa transborda de verdade.
+const acrescentaLargura = (host) => host.some(declaracaoSomaLargura);
+
+/**
+ * Protegido só quando a declaração VENCEDORA do `:host` incondicional é
+ * `border-box`. Testar presença na lista achatada dava falso negativo: uma
+ * subclasse declarando `content-box` depois, ou um `border-box` que só existe em
+ * `:host([compacta])`, marcavam o componente como protegido. Achado P1 do Codex.
+ */
+function protegidoPorBorderBox(host) {
+  const vencedora = host
+    .filter((d) => d.seletor === ':host' && d.prop === 'box-sizing')
+    .at(-1);                                   // a última da linhagem vence
+  return vencedora?.valor.trim() === 'border-box';
+}
 
 const primitivos = {};
 const ausentes = new Set(usados);
@@ -231,6 +271,39 @@ const carimbo = { gerado_de: 'main do monorepo urbiverso', sha, versao_monorepo:
 
 writeFileSync(join(SAIDA, 'primitivos.json'), JSON.stringify({ carimbo, primitivos }, null, 2) + '\n');
 writeFileSync(join(SAIDA, 'tokens.json'), JSON.stringify({ carimbo, tokens }, null, 2) + '\n');
+
+// ── carimbo do LEIA.md, GERADO ───────────────────────────────────────────────
+// Achado P1 do Codex no PR 497: o carimbo era escrito a mao, entao ressincronizar
+// regravava os dois JSONs e deixava o LEIA.md exibindo SHA, data e contagens
+// antigos — e o proprio documento manda o revisor citar o carimbo que ele mostra.
+// Uma ressincronizacao normal produziria achado atribuido a revisao errada do
+// monorepo. So o bloco entre os marcadores e reescrito; a prosa fica editavel.
+const nProps = Object.values(primitivos).reduce((n, p) => n + p.props.length, 0);
+const arqLeia = join(SAIDA, 'LEIA.md');
+if (existsSync(arqLeia)) {
+  const INI = '<!-- CARIMBO:INICIO — bloco gerado por scripts/sincronizar-referencia-ui.mjs. Não edite. -->';
+  const FIM = '<!-- CARIMBO:FIM -->';
+  const bloco = [
+    INI,
+    '> | | |',
+    '> |---|---|',
+    '> | Fonte | `main` do monorepo `urbiverso/urbiverso` |',
+    `> | SHA | \`${sha.slice(0, 8)}\` |`,
+    `> | Versão do monorepo | \`${versao}\` |`,
+    `> | Data do commit | ${data} |`,
+    `> | Conteúdo | ${Object.keys(primitivos).length} primitivos · ${nProps} props (incluindo herdadas) · ${Object.keys(tokens).length} tokens |`,
+    FIM,
+  ].join('\n');
+  const texto = readFileSync(arqLeia, 'utf8');
+  const i = texto.indexOf(INI);
+  const f = texto.indexOf(FIM);
+  if (i === -1 || f === -1) {
+    console.error('ERRO: marcadores CARIMBO:INICIO/FIM ausentes em docs/ui-urbiverso/LEIA.md.');
+    console.error('      Sem eles o carimbo envelhece em silêncio, que é o defeito que eles evitam.');
+    process.exit(1);
+  }
+  writeFileSync(arqLeia, texto.slice(0, i) + bloco + texto.slice(f + FIM.length));
+}
 
 const comRisco = Object.entries(primitivos).filter(([, p]) => p.risco_box_model).map(([t]) => t);
 
