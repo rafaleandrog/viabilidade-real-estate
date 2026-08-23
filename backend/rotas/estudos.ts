@@ -42,6 +42,57 @@ const CAMPOS_SOMENTE_AVANCADO = new Set([
   'investidor_juros_aa', 'investidor_carencia_meses', 'investidor_parcelas',
 ]);
 
+// Nunca via PATCH: identidade/estado/autor gerados, colunas de soft-delete
+// geridas pelo framework (removido_em/removido_por_id — DADOS_CAMPO_RESERVADO se
+// repassadas a req.dados.atualizar). tipo_empreendimento só em rascunho.
+const CAMPOS_BLOQUEADOS_PATCH = new Set([
+  'id', 'id_legivel', 'nome_exibicao', 'sequencia', 'status', 'autor_id',
+  'criado_em', 'atualizado_em', 'removido_em', 'removido_por_id',
+]);
+
+/**
+ * Decide o que um `PATCH /estudos/:id` grava, ou qual erro devolve.
+ *
+ * ⚠️ Extraída do handler pelo mesmo motivo de `gateTransicao` e
+ * `montarCopiaEstudo`: enquanto morava inline, **nenhum teste a alcançava** —
+ * nenhum arquivo de teste deste repositório sobe servidor. O guard mais
+ * importante que ela carrega é o `NIVEL_IMUTAVEL`, e a #486 concluiu que
+ * "não existe promoção Preliminar → Avançado" apoiada exatamente nele. Um
+ * veredito que se apoia num guard sem teste é um veredito que envelhece calado.
+ *
+ * Devolve `{ dados }` quando o PATCH pode prosseguir, ou
+ * `{ http, codigo, mensagem }` quando deve ser recusado.
+ */
+export function montarPatchEstudo(
+  body: Record<string, any>,
+  estudo: { nivel_analise?: string; status?: string },
+): { dados: Record<string, any> } | { http: number; codigo: string; mensagem: string } {
+  const dados: Record<string, any> = {};
+  for (const [k, v] of Object.entries(body ?? {})) {
+    if (CAMPOS_BLOQUEADOS_PATCH.has(k)) continue;
+    // Campos exclusivos do Avançado nunca chegam ao validador quando o estudo
+    // é Preliminar (valores null disparariam "deve ser um número" no shell).
+    if (estudo?.nivel_analise === 'preliminar' && CAMPOS_SOMENTE_AVANCADO.has(k)) continue;
+    if (k === 'tipo_empreendimento' && estudo?.status !== 'rascunho') {
+      return { http: 422, codigo: 'TIPO_TRAVADO', mensagem: 'tipo_empreendimento só pode mudar em Rascunho' };
+    }
+    // Nível de análise é imutável após a criação (Preliminar × Avançado definem
+    // estruturas diferentes — trocar corromperia o estudo). Repetir o valor
+    // atual é aceito e ignorado; qualquer outro valor é recusado.
+    if (k === 'nivel_analise') {
+      if (v !== estudo?.nivel_analise) {
+        return { http: 422, codigo: 'NIVEL_IMUTAVEL', mensagem: 'nivel_analise não pode ser alterado após a criação do estudo' };
+      }
+      continue;
+    }
+    dados[k] = v;
+  }
+  if (Object.keys(dados).length === 0) {
+    return { http: 400, codigo: 'NENHUM_CAMPO', mensagem: 'Nenhum campo para atualizar' };
+  }
+  return { dados };
+}
+
 // Campos que não são copiados na duplicação (gerados ou de junção do shell).
 const CAMPOS_NAO_COPIAVEIS = new Set([
   'id', 'criado_em', 'atualizado_em', 'removido_em', 'removido_por_id',
@@ -317,38 +368,9 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    // Nunca via PATCH: identidade/estado/autor gerados, colunas de soft-delete
-    // geridas pelo framework (removido_em/removido_por_id — DADOS_CAMPO_RESERVADO
-    // se repassadas a req.dados.atualizar). tipo_empreendimento só em rascunho.
-    const bloqueados = new Set([
-      'id', 'id_legivel', 'nome_exibicao', 'sequencia', 'status', 'autor_id',
-      'criado_em', 'atualizado_em', 'removido_em', 'removido_por_id',
-    ]);
-    const dados: Record<string, any> = {};
-    for (const [k, v] of Object.entries(req.body)) {
-      if (bloqueados.has(k)) continue;
-      // Campos exclusivos do Avançado nunca chegam ao validador quando o estudo
-      // é Preliminar (valores null disparariam "deve ser um número" no shell).
-      if (estudo.nivel_analise === 'preliminar' && CAMPOS_SOMENTE_AVANCADO.has(k)) continue;
-      if (k === 'tipo_empreendimento' && estudo.status !== 'rascunho') {
-        erro(res, 422, 'TIPO_TRAVADO', 'tipo_empreendimento só pode mudar em Rascunho');
-        return;
-      }
-      // Nível de análise é imutável após a criação (Preliminar × Avançado
-      // definem estruturas diferentes — trocar corromperia o estudo).
-      if (k === 'nivel_analise') {
-        if (v !== estudo.nivel_analise) {
-          erro(res, 422, 'NIVEL_IMUTAVEL', 'nivel_analise não pode ser alterado após a criação do estudo');
-          return;
-        }
-        continue;
-      }
-      dados[k] = v;
-    }
-    if (Object.keys(dados).length === 0) {
-      erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar');
-      return;
-    }
+    const decisao = montarPatchEstudo(req.body, estudo);
+    if ('codigo' in decisao) { erro(res, decisao.http, decisao.codigo, decisao.mensagem); return; }
+    const dados = decisao.dados;
 
     const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
     res.json(atualizado);

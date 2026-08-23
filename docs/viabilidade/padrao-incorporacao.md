@@ -367,6 +367,54 @@ Premissas comuns devem ser reutilizadas ou reconciliadas. O usuário não deve i
 
 Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve mostrar a relação entre ambos.
 
+> **Comportamento vigente — NÃO EXISTE promoção de nível (#486).** Um estudo nasce Preliminar ou
+> Avançado e **continua o que nasceu**: `nivel_analise` só é gravado na criação
+> (`backend/rotas/estudos.ts:180`) e o `PATCH` recusa alterá-lo com **422 `NIVEL_IMUTAVEL`**
+> (`:339-345`). A duplicação **preserva** o nível — ela copia os dados do Avançado justamente
+> quando `novo.nivel_analise === 'avancado'` (`:420-422`). Nenhuma rota promove.
+>
+> Quem preserva o nível na duplicação é `CAMPOS_NAO_COPIAVEIS` (`:46-50`) **não** listar
+> `nivel_analise`, mais `montarCopiaEstudo` (`:59-67`). O `if` de `:420` apenas **consome** o nível
+> já preservado, para decidir se copia as tabelas do Avançado.
+>
+> Isso responde a pergunta que a #486 fazia sobre a permuta física dos estudos de Pinguim, e a
+> resposta **não é nenhuma das duas hipóteses dela**. O estado observado nos Avançados —
+> `permuta_fisica_modo: 'area_m2'`, valores nulos, `quantidade: 0` — é **exatamente o padrão de
+> criação declarado no `schema.json`** (`permuta_fisica_modo.padrao = "area_m2"`,
+> `permuta_fisica_quantidade.padrao = 0`, `schema.json:116,121`), e o `POST /estudos` monta os
+> dados por allowlist (`backend/rotas/estudos.ts:176-190`) sem citar campo de permuta algum.
+>
+> **Nenhuma tela grava esses campos num Avançado:** `frontend/tela-premissas.ts:490` devolve
+> `nothing` quando `nivel_analise === 'avancado'`, e Premissas é a **única** escritora de
+> `permuta_fisica_*` no frontend — `proforma.ts` e `premissas-conversao.ts` só leem.
+>
+> ⚠️ **Até aqui é o que a leitura do código prova. O que segue é inferência, e fica separada de
+> propósito.** O estado observado é *indistinguível* do padrão de criação — mas indistinguível não
+> é o mesmo que "nunca preenchido". Escrita direta por API, importação ou qualquer coisa fora da UI
+> produziria o **mesmo** estado final, e este ambiente não tem trilha de auditoria da instância
+> para separar as hipóteses. A porta de API está aberta: o `PATCH /estudos/:id` **não** bloqueia
+> `permuta_fisica_*` num Avançado — o filtro de `CAMPOS_SOMENTE_AVANCADO` só pula campos quando o
+> estudo é **Preliminar**. "Nenhuma UI escreve" não é "ninguém escreveu".
+>
+> **O que muda com essa ressalva, e o que não muda.** A conclusão que interessa à gravidade
+> **não** depende da proveniência: como não há promoção, o pior caso da #486 — *"atinge todo estudo
+> promovido"* — não existe, venha o estado de onde vier. O que a proveniência decidiria é se há
+> ainda um terceiro ator escrevendo nesses campos, e isso **não foi verificado**.
+>
+> ⚠️ **A divergência entre as camadas continua real** — é a **#441** que decide o que fazer com
+> ela. O que a #486 estabeleceu é só que a causa não é um bug de conversão, e portanto **não
+> atinge "todo estudo promovido"**: não há estudo promovido.
+>
+> ⚠️ **Se um caminho de promoção for criado**, ele passa a precisar converter
+> `pct_area_venda → area_m2` — e a família `permuta_fisica_nr_*` junto, que a #486 não mencionava.
+> **Atenção à grandeza de ligação, que difere por tipo:** na **Incorporação** ela é
+> `area_pvt_r_fechada` / `area_pvt_nr_fechada` (`frontend/proforma.ts:202-203`), convertida por
+> `converterUnidade`/`paraBase` (`frontend/premissas-conversao.ts`); a ALV da cascata
+> (`CASCATA_LOTEAMENTO`) só existe no **Loteamento** (`frontend/proforma.ts:186`, dentro do
+> `if (lot)`). `CASCATA_INCORPORACAO` **não é importada por nenhum módulo de produção** e está
+> rotulada como proposta aguardando confirmação (`frontend/areas-cascata.ts:139-140`) — não é fonte.
+> Sem isso, o bug que a #486 procurou passa a existir de verdade.
+
 ---
 
 ## 5. Ciclo de vida, membros e permissões
@@ -3011,6 +3059,18 @@ na tela e `1.234,56` no PDF. → **#281**, que segue aberta só por elas.
 (`backend/rotas/avancado.ts:53-75`). Corrigir o default em `cronogramaPadrao()` não alcança os
 registros já gravados: a leitura devolve a flag antiga (`:278,299`) e o PATCH toma 422 (`:422`).
 Toda correção de flag precisa valer **na leitura**, não só na criação. → **#246**.
+
+**A14 — Não existe promoção Preliminar → Avançado, e o conserto dela tem grandeza diferente por
+tipo (#486).** `nivel_analise` é gravado só na criação (`backend/rotas/estudos.ts:180`) e o `PATCH`
+recusa alterá-lo com 422 `NIVEL_IMUTAVEL` (`montarPatchEstudo`, `:339-345` no handler antigo). Quem
+supuser que existe promoção vai procurar um bug de conversão que não existe — o estado
+`permuta_fisica_modo: 'area_m2'` com nulos é **indistinguível do padrão de criação**
+(`schema.json:116,121`), e como não há promoção, a hipótese de resíduo de conversão cai
+independentemente de qual seja a proveniência. E quem **criar** o caminho de promoção precisa saber que a grandeza de ligação difere: na
+Incorporação é `area_pvt_r_fechada`/`area_pvt_nr_fechada` (`frontend/proforma.ts:202-203`); a ALV da
+cascata só existe no Loteamento, e `CASCATA_INCORPORACAO` não é importada por módulo de produção
+nenhum (`frontend/areas-cascata.ts:139-140`). A família `permuta_fisica_nr_*` vai junto.
+→ registro completo na **§4.3**; a reconciliação entre as camadas é a **#441**.
 
 ## Anexo E — API
 
