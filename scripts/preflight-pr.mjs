@@ -27,7 +27,7 @@
 //
 // USO
 //
-//   node scripts/preflight-pr.mjs --corpo <arquivo.md> [--base origin/main]
+//   node scripts/preflight-pr.mjs --corpo <arquivo.md> --titulo "<título>" [--base origin/main]
 //
 // `--arquivos a.ts,b.ts` substitui a lista vinda do `git diff`. Serve para
 // conferir um corpo ANTES de commitar — sem isso o diff é zero e a regra do
@@ -65,7 +65,11 @@ const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
 const arg = (nome, padrao) => {
   const i = argv.indexOf(nome);
-  return i >= 0 && argv[i + 1] ? argv[i + 1] : padrao;
+  // `i + 1 < argv.length`, não a veracidade do valor: `--titulo ""` é um título
+  // vazio DECLARADO, e tratá-lo como ausente confundiria "não passei" com
+  // "passei vazio" — a mesma distinção que o resto do script faz questão de
+  // manter entre entrada declarada e entrada do ambiente.
+  return i >= 0 && i + 1 < argv.length ? argv[i + 1] : padrao;
 };
 
 const CORPO_ARQ = arg('--corpo');
@@ -74,7 +78,7 @@ const NUMERO = arg('--numero', '');
 const ARQUIVOS_MANUAIS = arg('--arquivos');
 const COMMITS_MANUAIS = arg('--commits');
 const VERSAO_MANUAL = arg('--versao');
-const TITULO = arg('--titulo', '');
+const TITULO = arg('--titulo');
 // `--arvore <branch>[:<upstream>]` declara o estado de árvore. Sem ele, as
 // checagens de branch e upstream NUNCA são exercitadas pela bateria: tanto o
 // checkout de PR quanto a worktree hermética são destacados, então uma
@@ -96,6 +100,14 @@ const ARVORE_MANUAL = arg('--arvore');
 // portão morre calado. Achado do Codex no PR 502, rodada 4.
 const MODO_DECLARADO = argv.includes('--declarado');
 
+if (CORPO_ARQ && TITULO === undefined) {
+  console.error('uso: falta --titulo "<título do PR>".');
+  console.error('\nO job `diff-vazio` do CI concatena TÍTULO + corpo + commits. Sem o título aqui,');
+  console.error('um PR com "Closes #123" só no título e diff vazio passa neste script e reprova');
+  console.error('no CI — quebrando a única coisa que ele promete. Por isso é obrigatório, e não');
+  console.error('opcional com default vazio: opcional o fluxo canônico esquece.');
+  process.exit(2);
+}
 if (!CORPO_ARQ) {
   console.error('uso: node scripts/preflight-pr.mjs --corpo <arquivo.md> [--base origin/main]');
   console.error('\nEscreva o corpo do PR num arquivo e passe-o aqui. O mesmo arquivo vai');
@@ -177,7 +189,10 @@ try {
 
 const sujo = (() => {
   try {
-    const bruto = git('status', '--porcelain');
+    // `--untracked-files=all`: sem isso um diretório inteiramente novo sai como
+    // `?? .tmp/`, e o arquivo de corpo dentro dele nunca casaria com a exclusão
+    // abaixo — o artefato canônico voltaria a bloquear. Achado do Codex, rodada 7.
+    const bruto = git('status', '--porcelain', '--untracked-files=all');
     if (!bruto) return '';
     // O PRÓPRIO arquivo de corpo não conta como sujeira. O fluxo obrigatório
     // manda escrevê-lo (`--corpo <arquivo.md>`), e escrito dentro do repositório
@@ -187,7 +202,16 @@ const sujo = (() => {
     const alvo = resolve(process.cwd(), CORPO_ARQ);
     return bruto
       .split('\n')
-      .filter((l) => resolve(RAIZ, l.slice(3).trim()) !== alvo)
+      .filter((l) => {
+        // SÓ perdoa entrada NÃO RASTREADA (`??`). Perdoar `M` reabriria o buraco
+        // que tornou a árvore suja bloqueante: apontar `--corpo` para um arquivo
+        // rastreado sobrescrito — `manifesto.json` depois de um bump não
+        // commitado, por exemplo — faria os guards e a `versao` lerem o disco e
+        // aprovarem, enquanto o HEAD enviado ao CI ainda tem a versão antiga.
+        // Achado do Codex, rodada 7.
+        if (!l.startsWith('??')) return true;
+        return resolve(RAIZ, l.slice(3).trim()) !== alvo;
+      })
       .join('\n');
   } catch {
     return '';

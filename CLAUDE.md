@@ -215,7 +215,9 @@ numerada contra a `main` do momento, com a `versao` bumpada.
    `validar-backend.sh` se tocou backend, `schema.json` ou migração.
 3. **Commit + `git push -u origin <branch>`** — sempre com o nome explícito, nunca `git push` pelado.
 4. **Escrever o corpo do PR num arquivo e rodar o preflight** — `node scripts/preflight-pr.mjs
-   --corpo <arquivo.md>`. Ele roda, **antes** do PR existir, os guards que só leem corpo e diff:
+   --corpo <arquivo.md> --titulo "<título do PR>"`. **O título é obrigatório**: o job `diff-vazio`
+   do CI concatena título + corpo + commits, e sem ele um PR com `Closes #NNN` só no título e diff
+   vazio passa aqui e reprova lá. Ele roda, **antes** do PR existir, os guards que só leem corpo e diff:
    fechamento de issue, escopo R1, diff vazio, JSON, ciclos de schema, regra da migração, mais as
    armadilhas de árvore (branch `main`, upstream armado, árvore suja) que o CI já não pode pegar.
    Verde → **abra o PR passando esse mesmo arquivo**, sem reescrever o corpo na chamada do MCP;

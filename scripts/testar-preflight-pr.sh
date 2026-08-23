@@ -55,7 +55,7 @@ esperar() {
   local esperado="$1" rotulo="$2"; shift 2
   printf '%s\n' "$@" > "$TMP/corpo.md"
   local saida; saida="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" \
-    --declarado --arquivos "$DIFF" --commits "$TMP/commits.txt" --versao "$VERSAO" \
+    --titulo "" --declarado --arquivos "$DIFF" --commits "$TMP/commits.txt" --versao "$VERSAO" \
     --arvore "$ARVORE" 2>&1)"
   local obtido=$?
   if [ "$obtido" -eq "$esperado" ]; then
@@ -76,7 +76,7 @@ contem() {
   local padrao="$1" rotulo="$2"; shift 2
   printf '%s\n' "$@" > "$TMP/corpo.md"
   local saida; saida="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" \
-    --declarado --arquivos "$DIFF" --commits "$TMP/commits.txt" --versao "$VERSAO" \
+    --titulo "" --declarado --arquivos "$DIFF" --commits "$TMP/commits.txt" --versao "$VERSAO" \
     --arvore "$ARVORE" 2>&1)"
   local obtido=$?
   if [ "$obtido" -ne 0 ]; then
