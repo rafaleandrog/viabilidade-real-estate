@@ -88,6 +88,12 @@
           "de": "UrbiAbas"
         }
       ],
+      "atributos_convencao": [
+        "acoes-icone-only-estreito",
+        "expandir",
+        "papel-layout",
+        "sem-expandir"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -288,7 +294,8 @@
           "de": "UrbiAbas"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-avatar": {
       "classe": "UrbiAvatar",
@@ -387,6 +394,7 @@
           "de": "UrbiAvatar"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -401,7 +409,8 @@
           "de": "UrbiAvatar"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-badge": {
       "classe": "UrbiBadge",
@@ -460,6 +469,9 @@
           "de": "UrbiBadge"
         }
       ],
+      "atributos_convencao": [
+        "quebra-linha"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -474,7 +486,8 @@
           "de": "UrbiBadge"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-banner": {
       "classe": "UrbiBanner",
@@ -509,6 +522,7 @@
           "de": "UrbiBanner"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -517,7 +531,8 @@
           "de": "UrbiBanner"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-botao-voltar": {
       "classe": "UrbiBotaoVoltar",
@@ -568,6 +583,7 @@
           "de": "UrbiBotaoVoltar"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -588,7 +604,8 @@
           "de": "UrbiBotaoVoltar"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-botao": {
       "classe": "UrbiBotao",
@@ -647,6 +664,9 @@
           "de": "UrbiBotao"
         }
       ],
+      "atributos_convencao": [
+        "bloco"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -667,7 +687,8 @@
           "de": "UrbiBotao"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-card": {
       "classe": "UrbiCard",
@@ -695,6 +716,9 @@
           "de": "UrbiCard"
         }
       ],
+      "atributos_convencao": [
+        "expandir"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -721,7 +745,8 @@
           "de": "UrbiPrimitivoDeConteudo"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-checkbox": {
       "classe": "UrbiCheckbox",
@@ -756,6 +781,7 @@
           "de": "UrbiCheckbox"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -764,7 +790,8 @@
           "de": "UrbiCheckbox"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-chips-atalho": {
       "classe": "UrbiChipsAtalho",
@@ -791,6 +818,9 @@
           "reflete": false,
           "de": "UrbiChipsAtalho"
         }
+      ],
+      "atributos_convencao": [
+        "expandir"
       ],
       "host": [
         {
@@ -842,7 +872,8 @@
           "de": "UrbiChipsAtalho"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-estado-vazio": {
       "classe": "UrbiEstadoVazio",
@@ -877,6 +908,7 @@
           "de": "UrbiEstadoVazio"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -885,7 +917,8 @@
           "de": "UrbiEstadoVazio"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-grafico-area": {
       "classe": "UrbiGraficoArea",
@@ -1002,6 +1035,10 @@
           "de": "UrbiGraficoArea"
         }
       ],
+      "atributos_convencao": [
+        "expandir",
+        "papel-fill"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -1154,7 +1191,8 @@
           "de": "UrbiGraficoBase"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-grafico-colunas": {
       "classe": "UrbiGraficoColunas",
@@ -1263,6 +1301,10 @@
           "de": "UrbiGraficoBase"
         }
       ],
+      "atributos_convencao": [
+        "expandir",
+        "papel-fill"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -1415,7 +1457,8 @@
           "de": "UrbiGraficoBase"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-grafico-linha": {
       "classe": "UrbiGraficoLinha",
@@ -1532,6 +1575,10 @@
           "de": "UrbiGraficoLinha"
         }
       ],
+      "atributos_convencao": [
+        "expandir",
+        "papel-fill"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -1684,7 +1731,8 @@
           "de": "UrbiGraficoBase"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-grafico-medidor": {
       "classe": "UrbiGraficoMedidor",
@@ -1743,6 +1791,9 @@
           "reflete": false,
           "de": "UrbiGraficoMedidor"
         }
+      ],
+      "atributos_convencao": [
+        "expandir"
       ],
       "host": [
         {
@@ -1836,7 +1887,8 @@
           "de": "UrbiGraficoMedidor"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-grafico-pizza": {
       "classe": "UrbiGraficoPizza",
@@ -1945,6 +1997,10 @@
           "de": "UrbiGraficoBase"
         }
       ],
+      "atributos_convencao": [
+        "expandir",
+        "papel-fill"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -2097,7 +2153,8 @@
           "de": "UrbiGraficoBase"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-hospedeiro": {
       "classe": "UrbiHospedeiro",
@@ -2108,6 +2165,10 @@
         "UrbiHospedeiro"
       ],
       "props": [],
+      "atributos_convencao": [
+        "papel-host",
+        "preencher"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -2134,7 +2195,8 @@
           "de": "UrbiPrimitivoHospedeiro"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-icone": {
       "classe": "UrbiIcone",
@@ -2233,6 +2295,7 @@
           "de": "UrbiIcone"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -2247,7 +2310,8 @@
           "de": "UrbiIcone"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-input-data": {
       "classe": "UrbiInputData",
@@ -2314,6 +2378,7 @@
           "de": "UrbiInputData"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -2322,7 +2387,8 @@
           "de": "UrbiInputData"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-input": {
       "classe": "UrbiInput",
@@ -2421,6 +2487,7 @@
           "de": "UrbiInput"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -2429,7 +2496,8 @@
           "de": "UrbiInput"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-kpi": {
       "classe": "UrbiKpi",
@@ -2472,6 +2540,9 @@
           "reflete": false,
           "de": "UrbiKpi"
         }
+      ],
+      "atributos_convencao": [
+        "expandir"
       ],
       "host": [
         {
@@ -2529,7 +2600,8 @@
           "de": "UrbiKpi"
         }
       ],
-      "risco_box_model": true
+      "risco_box_model": true,
+      "risco_box_model_altura": true
     },
     "urbi-lista": {
       "classe": "UrbiLista",
@@ -2613,6 +2685,9 @@
           "de": "UrbiLista"
         }
       ],
+      "atributos_convencao": [
+        "expandir"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -2639,7 +2714,8 @@
           "de": "UrbiPrimitivoDeConteudo"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-loading": {
       "classe": "UrbiLoading",
@@ -2658,6 +2734,7 @@
           "de": "UrbiLoading"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -2666,7 +2743,8 @@
           "de": "UrbiLoading"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-modal": {
       "classe": "UrbiModal",
@@ -2709,6 +2787,7 @@
           "de": "UrbiModal"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -2747,7 +2826,8 @@
           "de": "UrbiModal"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-nav": {
       "classe": "UrbiNav",
@@ -2782,6 +2862,7 @@
           "de": "UrbiNav"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -2802,7 +2883,8 @@
           "de": "UrbiNav"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-select": {
       "classe": "UrbiSelect",
@@ -2885,6 +2967,7 @@
           "de": "UrbiSelect"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -2899,7 +2982,8 @@
           "de": "UrbiSelect"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-seletor-arquivo": {
       "classe": "UrbiSeletorArquivo",
@@ -2983,6 +3067,9 @@
           "de": "UrbiSeletorArquivo"
         }
       ],
+      "atributos_convencao": [
+        "expandir"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -3015,7 +3102,8 @@
           "de": "UrbiSeletorArquivo"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-shell-page": {
       "classe": "UrbiShellPage",
@@ -3066,6 +3154,13 @@
           "reflete": true,
           "de": "UrbiShellPage"
         }
+      ],
+      "atributos_convencao": [
+        "compacta",
+        "dashboard",
+        "expandir",
+        "papel-layout",
+        "sem-expandir"
       ],
       "host": [
         {
@@ -3183,7 +3278,8 @@
           "de": "UrbiShellPage"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-tabela": {
       "classe": "UrbiTabela",
@@ -3259,6 +3355,10 @@
           "de": "UrbiTabela"
         }
       ],
+      "atributos_convencao": [
+        "expandir",
+        "papel-fill"
+      ],
       "host": [
         {
           "seletor": ":host",
@@ -3285,7 +3385,8 @@
           "de": "UrbiPrimitivoDeConteudo"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     },
     "urbi-textarea": {
       "classe": "UrbiTextarea",
@@ -3376,6 +3477,7 @@
           "de": "UrbiTextarea"
         }
       ],
+      "atributos_convencao": [],
       "host": [
         {
           "seletor": ":host",
@@ -3384,7 +3486,8 @@
           "de": "UrbiTextarea"
         }
       ],
-      "risco_box_model": false
+      "risco_box_model": false,
+      "risco_box_model_altura": false
     }
   }
 }
