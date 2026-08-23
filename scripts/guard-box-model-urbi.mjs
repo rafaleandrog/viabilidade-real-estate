@@ -140,11 +140,50 @@ const imponeTamanho = (valor) => {
  *   3. le o tipo no inicio dele.
  */
 function seletorAlcanca(seletor, tag) {
-  return seletor.split(',').some((parte) => {
-    const compostos = esvaziarGrupos(parte).trim().split(/[\s>+~]+/).filter(Boolean);
-    const tipo = /^([a-zA-Z][a-zA-Z0-9-]*)/.exec(compostos.at(-1) ?? '');
+  return dividirVirgulasExternas(seletor).some((parte) => {
+    const composto = esvaziarGrupos(parte).trim().split(/[\s>+~]+/).filter(Boolean).at(-1) ?? '';
+    if (PSEUDO_ELEMENTO.test(composto)) return false;
+    const tipo = /^([a-zA-Z][a-zA-Z0-9-]*)/.exec(composto);
     return tipo != null && tipo[1].toLowerCase() === tag;
   });
+}
+
+/**
+ * A caixa que recebe a declaracao e a do PSEUDO-ELEMENTO, nao a do host.
+ *
+ * `urbi-kpi::part(icone) { width: 100% }` dimensiona a parte exposta, que nao
+ * tem o padding/border do `:host` — acusa-la era falso positivo. Qualquer `::`
+ * introduz pseudo-elemento por sintaxe, o que torna a deteccao exaustiva sem
+ * lista de nomes; as quatro formas legadas de dois-pontos UNICO sao fechadas, e
+ * sao so estas quatro na spec.
+ *
+ * ⚠️ Pseudo-CLASSE de dois-pontos unico (`:hover`, `:first-child`) continua
+ * alcancando o host e NAO entra aqui.
+ */
+const PSEUDO_ELEMENTO = /::|:(?:before|after|first-line|first-letter)\b/i;
+
+/**
+ * Separa a lista de seletores pelas virgulas de FORA de `(…)` e `[…]`.
+ *
+ * ⚠️ Nao use `seletor.split(',')`. A virgula tambem separa dentro de pseudo-classe
+ * funcional, e dividir antes de esvaziar os grupos inventava uma parte:
+ * `.wrapper:not(.a, urbi-kpi)` virava `.wrapper:not(.a` + ` urbi-kpi)`, cujo
+ * ultimo composto le o tipo `urbi-kpi` — e o guard bloqueava um seletor que
+ * EXCLUI o primitivo de proposito. Falso positivo, o lado que faz desligarem o
+ * guard.
+ */
+function dividirVirgulasExternas(sel) {
+  const partes = [];
+  let atual = '';
+  let profundidade = 0;
+  for (const ch of sel) {
+    if (ch === '(' || ch === '[') profundidade++;
+    else if (ch === ')' || ch === ']') profundidade = Math.max(0, profundidade - 1);
+    else if (ch === ',' && profundidade === 0) { partes.push(atual); atual = ''; continue; }
+    atual += ch;
+  }
+  partes.push(atual);
+  return partes;
 }
 
 /**

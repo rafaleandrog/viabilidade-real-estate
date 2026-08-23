@@ -174,15 +174,28 @@ a um conjunto — não há terceiro caminho por onde escapar, e um nome novo ent
 |---|---|
 | `<!--` | comentário — **modelado** |
 | `<!…` ou `<?…` | **recusa** |
-| não há nome de tag depois do `<` | é **texto**, e em HTML é mesmo (`i++`) |
+| `<` sem letra depois | é **texto**, e em HTML é mesmo (`i++`) |
+| `</` sem letra depois | **recusa** — `</>` é ignorado e `</ x>` é *bogus comment*, dois tratamentos que não modelamos |
+| o trecho acaba no meio do nome | **recusa** |
 | nome em `NAO_MODELADOS` | **recusa** |
 | nome em `CRU`, abrindo | texto cru — **modelado**; `/>` ou sem fechamento → **recusa** |
 | qualquer outro nome | tag comum — **modelada**; sem `>` → **recusa** |
 
 Não há `else` silencioso: o único caminho que segue sem modelar nem recusar é o do `<` que não
-inicia tag, e esse é o comportamento do próprio HTML. A janela de 64 caracteres em que o nome é
-procurado só pode **encurtar** um nome absurdo, e nome encurtado não pertence a nenhum dos conjuntos
-— cai em tag comum, que atravessa pelo texto inteiro.
+inicia tag, e esse é o comportamento do próprio HTML.
+
+⚠️ **O nome é lido INTEIRO, até um delimitador da spec** — tab, LF, FF, espaço, `/`, `>`. Qualquer
+outro caractere (`.`, `_`, `:`, dígito, acento) **faz parte do nome**, e a leitura não tem janela de
+tamanho. Prefixo de nome não é nome: a versão anterior lia com `/^<(\/?)([a-zA-Z][a-zA-Z0-9-]*)/`,
+que casa prefixo, e em `<style.foo>` devolvia `style` — o despacho classificava como texto cru e
+mascarava tudo até `</style>`, embora para o navegador `style.foo` seja um elemento **comum** e o
+que estava "dentro" fosse marcação de verdade, com componente real por conferir.
+
+> Este parágrafo substitui um que dizia o **oposto**, e o oposto era a justificativa do defeito:
+> *"a janela de 64 caracteres só pode encurtar um nome absurdo, e nome encurtado não pertence a
+> nenhum dos conjuntos"*. Encurtar é exatamente o que **faz** um nome pertencer a um conjunto —
+> `style.foo` encurta para `style`, que está em `CRU`. Argumento de segurança escrito em prosa, que
+> nada executa, envelhece calado e vira a explicação de por que o buraco não existe.
 
 `<![CDATA[` saiu do lado modelado de propósito: ele só vale em conteúdo estrangeiro, e dentro de
 `html` o tokenizer o trata como comentário inválido até o primeiro `>`. Modelar só um dos dois casos

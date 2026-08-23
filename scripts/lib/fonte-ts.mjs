@@ -240,8 +240,39 @@ function buracosCss(s, de, ate, onde) {
 // CSS logo adiante.
 const CRU = new Set(['script', 'title', 'textarea', 'style']);
 const SEM_BURACO = new Set(['style']);
-/** `<nome` ou `</nome`, sem depender de qual caractere vem depois do nome. */
-const NOME_DE_TAG = /^<(\/?)([a-zA-Z][a-zA-Z0-9-]*)/;
+/**
+ * Delimitadores que ENCERRAM um nome de tag, pela spec do HTML: tab, LF, FF,
+ * espaco, `/` e `>`. CR entra porque a normalizacao de fim de linha o troca por
+ * LF antes de o tokenizer ver. QUALQUER outro caractere — `.`, `_`, `:`, digito,
+ * acento — FAZ PARTE do nome.
+ */
+const FIM_DE_NOME_DE_TAG = new Set(['\t', '\n', '\f', '\r', ' ', '/', '>']);
+
+/**
+ * Le o nome de tag INTEIRO a partir do `<`, ate um delimitador de verdade.
+ *
+ * ⚠️ Nao aceite correspondencia PARCIAL de nome. A versao anterior era o regex
+ * `/^<(\/?)([a-zA-Z][a-zA-Z0-9-]*)/`, que casa um PREFIXO: em `<style.foo>` ela
+ * devolvia `style`, o despacho classificava como texto cru e mascarava tudo ate
+ * `</style>`. Mas `style.foo` e um elemento COMUM para o navegador, e o que
+ * estava "dentro" era marcacao de verdade — um `<urbi-*>` ali passava sem ser
+ * conferido. Prefixo de nome nao e nome, e o despacho por nome so e exaustivo
+ * se o nome for lido inteiro.
+ *
+ * Devolve `null` quando o `<` nao abre tag nenhuma (e TEXTO em HTML), ou
+ * `{ fechando, nome, fimDoNome }` com `nome` em minusculas — nome de tag e
+ * case-insensitive. `fimDoNome === -1` diz que o trecho ACABOU no meio do nome.
+ */
+function lerNomeDeTag(s, i, ate) {
+  let k = i + 1;
+  const fechando = s[k] === '/';
+  if (fechando) k++;
+  if (k >= ate || !/[a-zA-Z]/.test(s[k])) return null;
+  const inicio = k;
+  while (k < ate && !FIM_DE_NOME_DE_TAG.has(s[k])) k++;
+  const nome = s.slice(inicio, k).toLowerCase();
+  return { fechando, nome, fimDoNome: k >= ate ? -1 : k };
+}
 
 /**
  * Elementos cujo conteudo tem regra de tokenizacao PROPRIA e que este modulo
@@ -342,10 +373,24 @@ function varrerHtml(s, de, ate, onde) {
     // por pertinencia a um CONJUNTO de nomes, sem delimitador escrito a mao e
     // sem janela de tamanho fixo. Nome novo entra no conjunto; nao ha
     // terceiro caminho por onde escapar.
-    const nomeTag = NOME_DE_TAG.exec(s.slice(i, i + 64));
-    if (!nomeTag) { i++; continue; }            // `<` solto e TEXTO em HTML
-    const fechando = nomeTag[1] === '/';
-    const nome = nomeTag[2].toLowerCase();
+    const lido = lerNomeDeTag(s, i, ate);
+    if (!lido) {
+      // `<` seguido do que nao e letra e TEXTO, e a varredura segue. Ja `</`
+      // sem nome e "bogus comment" na spec (`</ x>`) ou ignorado por completo
+      // (`</>`) — dois tratamentos diferentes que nao modelamos, entao recusa.
+      // Medido: zero ocorrencias no `frontend/`.
+      if (s[i + 1] === '/') {
+        problemas.push(`${onde}: nao modelo \`</\` sem nome — confira a mao`);
+        return { buracos, problemas, tags, estilos };
+      }
+      i++;
+      continue;
+    }
+    if (lido.fimDoNome === -1) {
+      problemas.push(`${onde}: o trecho acaba no meio do nome de tag \`<${lido.nome}\``);
+      return { buracos, problemas, tags, estilos };
+    }
+    const { fechando, nome } = lido;
 
     if (NAO_MODELADOS.has(nome)) {
       problemas.push(`${onde}: nao modelo o conteudo de <${nome}> — confira a mao`);

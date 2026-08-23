@@ -943,6 +943,73 @@ caso guard-box-model-urbi 0 'atributo com espaço no valor: [data-x="a urbi-arri
 const e = css`[data-x="a urbi-arriscado"] { width: 100%; }`;
 TS
 
+secao "Vírgula: separa seletores SÓ fora de grupo (e continua separando fora):"
+
+# Sem `dividirVirgulasExternas`, o `split(',')` corta ANTES de esvaziar o grupo,
+# a segunda metade vira ` urbi-arriscado)` e o guard bloqueia um seletor que
+# EXCLUI o primitivo de propósito.
+caso guard-box-model-urbi 0 "vírgula DENTRO de :not() não separa seletores" <<'TS'
+const e = css`.wrapper:not(.a, urbi-arriscado) { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 0 "vírgula dentro de [] também não separa" <<'TS'
+const e = css`.wrapper[data-x="a,urbi-arriscado"] { width: 100%; }`;
+TS
+
+# O outro sentido do mesmo conserto: vírgula de verdade PRECISA continuar
+# separando, senão o conserto do falso positivo vira falso negativo.
+caso guard-box-model-urbi 1 "vírgula EXTERNA continua separando — o segundo alcança" \
+  'caso\.ts:1 +\.x, urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.x, urbi-arriscado { width: 100%; }`;
+TS
+
+secao "Pseudo-elemento não é o host — a caixa que recebe a declaração é outra:"
+
+caso guard-box-model-urbi 0 "::part() dimensiona a parte exposta, não o host" <<'TS'
+const e = css`urbi-arriscado::part(icone) { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 0 "::before é caixa própria, sem o padding do :host" <<'TS'
+const e = css`urbi-arriscado::before { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 0 ":before legado — dois-pontos único, mesma caixa" <<'TS'
+const e = css`urbi-arriscado:before { width: 100%; }`;
+TS
+
+# O contra-caso: pseudo-CLASSE de dois-pontos único continua sendo o host, e
+# excluí-la junto seria trocar o falso positivo por um falso negativo.
+caso guard-box-model-urbi 1 "pseudo-CLASSE :hover continua alcançando o host" \
+  'caso\.ts:1 +urbi-arriscado:hover \{ width: 100% \}' <<'TS'
+const e = css`urbi-arriscado:hover { width: 100%; }`;
+TS
+
+secao "Nome de tag é lido INTEIRO — prefixo de nome não é nome:"
+
+# `<style.foo>` é elemento COMUM para o navegador. Lendo só o prefixo `style`, o
+# despacho o classificava como texto cru e mascarava até `</style>` — o
+# `urbi-seguro` de dentro é marcação de verdade e passava sem conferência.
+caso guard-props-urbi 1 "<style.foo> não é <style> — o componente dentro é conferido" \
+  'caso\.ts:1 +<urbi-seguro> inventado' <<'TS'
+const t = html`<style.foo><urbi-seguro inventado="x"></urbi-seguro></style.foo>`;
+TS
+
+caso guard-props-urbi 1 "<style> de verdade continua sendo texto cru" \
+  'caso\.ts:2 +<urbi-seguro> inventado' <<'TS'
+const t = html`<style><urbi-seguro inventado="x"></urbi-seguro></style>
+<urbi-seguro inventado="y"></urbi-seguro>`;
+TS
+
+caso guard-props-urbi 1 "nome de tag interrompido pelo fim do trecho — recusa" \
+  'no meio do nome de tag' <<'TS'
+const t = html`<urbi-seguro`;
+TS
+
+caso guard-props-urbi 1 "</ sem nome não é modelado — recusa" \
+  'nao modelo' <<'TS'
+const t = html`<div></ x></div>`;
+TS
+
 # ════════════════════════════════════════════════════════════════════════════
 # Executa a fila em paralelo e imprime na ordem de declaração.
 POOL="${POOL:-8}"
