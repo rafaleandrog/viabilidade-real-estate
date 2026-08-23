@@ -34,13 +34,20 @@ const arquivos = entrada.split('\n').map((l) => l.trim()).filter(Boolean);
 // PR que documenta a própria mudança, que é o que o monorepo exige.
 const PROCESSO = [/^\.claude\//];
 
-// Produto: o que não pode viajar junto.
+// Produto: o que não pode viajar junto. Inclui os manifests de raiz — achado do
+// Codex no PR 496: um PR com `.claude/motor-revisao.md` + `package.json` +
+// `pnpm-lock.yaml` passava como "processo puro" e podia trocar dependência
+// executada ou o comando de build. Mudar o build do produto é mudar o produto.
 const PRODUTO = [
   /^frontend\//,
   /^backend\//,
   /^migracoes\//,
   /^schema\.json$/,
   /^manifesto\.json$/,
+  /^package\.json$/,
+  /^pnpm-lock\.yaml$/,
+  /^pnpm-workspace\.yaml$/,
+  /^tsconfig(\.[a-z]+)?\.json$/,
 ];
 
 const casa = (arq, padroes) => padroes.some((re) => re.test(arq));

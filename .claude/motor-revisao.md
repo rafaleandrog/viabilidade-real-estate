@@ -74,31 +74,34 @@ de um passo.
 
 Então, **antes** de publicar o relatório da §7, execute nesta ordem:
 
-1. **Marque a linha de base — ANTES de acionar.** Leia as reviews do PR e anote o `id` (ou o
-   `submitted_at`) da review mais recente do bot. Se não houver nenhuma, anote "nenhuma".
+1. **Acione, e guarde o carimbo do SEU comentário.** Comente `@codex review` no PR, com o head da
+   rodada declarado no texto, e **anote o `created_at` (ou o `id`) do comentário que você acabou de
+   publicar**. Esse carimbo — e não uma leitura feita antes — é a referência da rodada.
 
-   > ⚠️ **Este passo vem primeiro, e a ordem é o conserto** — achado do próprio Codex no PR 494. Se
-   > você acionar antes de marcar, e o App responder no intervalo entre as duas ações, **a review
-   > nova vira a sua linha de base** e o laço passa 15 minutos esperando uma terceira que nunca vem.
+2. **Espere, com teto.** Releia as reviews até aparecer uma que satisfaça **as duas** condições:
+   `commit_id` igual ao head da rodada **e** `submitted_at`/`id` **posterior ao comentário do passo
+   1**. Teto de **15 minutos**.
 
-2. **Acione.** Comente `@codex review` no PR, com o head da rodada declarado no texto. (Abrir o PR
-   também aciona; um `@codex review` explícito por rodada é o que torna a rodada rastreável.)
-
-3. **Espere, com teto.** Releia as reviews até aparecer uma que satisfaça **as duas** condições:
-   `commit_id` igual ao head da rodada **e** `id`/`submitted_at` **posterior à linha de base do
-   passo 1**. Teto de **15 minutos**.
-
-   > ⚠️ **Casar só o head não basta.** Numa rodada N+1 que nasce de comentário, e não de push, o
-   > head **não muda**: a review da rodada anterior já tem aquele `commit_id`, o predicado passa
-   > **na hora**, e a atestação sai antes de a revisão nova chegar. É a mesma corrida que esta
-   > sequência existe para fechar, uma volta adiante.
-4. **Colhe.** Leia os *review threads*, não só o corpo da review — os achados vêm como comentários
+   > ⚠️ **Duas corridas diferentes, e a segunda derrubou o conserto da primeira.**
+   >
+   > - **Casar só o head não basta.** Numa rodada N+1 que nasce de comentário, e não de push, o head
+   >   **não muda**: a review da rodada anterior já tem aquele `commit_id` e o predicado passa na
+   >   hora.
+   > - **Marcar a linha de base *antes* de acionar também não basta** — e esta foi a primeira
+   >   resposta, reprovada pelo Codex no PR 496. Se já houver uma review **em voo** (o acionamento
+   >   automático da abertura do PR, ou uma rodada anterior que estourou o teto), ela pode chegar
+   >   **no intervalo entre ler a base e postar o comentário**. Tem o head certo e é posterior à
+   >   base, então passa — e você atesta com a review **da rodada anterior**.
+   >
+   > Correlacionar com o **próprio comentário de acionamento** fecha as duas: nenhuma review anterior
+   > a ele pode ser resposta a ele.
+3. **Colhe.** Leia os *review threads*, não só o corpo da review — os achados vêm como comentários
    inline, com `path` e `line`. Cada um tem severidade (P1/P2).
-5. **Verifique cada achado você mesmo**, como qualquer bloqueante (§11 da skill). Achado do Codex
+4. **Verifique cada achado você mesmo**, como qualquer bloqueante (§11 da skill). Achado do Codex
    não é verdade revelada: ele erra, e contestação com evidência é legítima.
-6. **Só então** monte `bloqueantes=` = seus bloqueantes **+** os achados do Codex ainda não
+5. **Só então** monte `bloqueantes=` = seus bloqueantes **+** os achados do Codex ainda não
    resolvidos, e publique.
-7. **Resolva os threads que você endereçou**, para a próxima rodada distinguir o que é novo.
+6. **Resolva os threads que você endereçou**, para a próxima rodada distinguir o que é novo.
 
 **Se o teto estourar** — nenhuma review no head da rodada em 15 min —, o ciclo fica **aberto**, e a
 atestação tem de refletir isso **na máquina, não na prosa**:

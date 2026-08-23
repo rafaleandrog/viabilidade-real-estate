@@ -663,6 +663,24 @@ fecha pela § 9. Quem consertou pode ser o usuário, outra sessão, ou esta mesm
 desta skill — para a rodada, tanto faz: o que existe é commit novo sobre um PR que já tem
 relatório.
 
+> 🛑 **TETO DE DUAS RODADAS — regra R2 do `CLAUDE.md` § Processo obrigatório.**
+>
+> A partir da rodada 3, a revisão **só reabre se houver bloqueante de código**. Observação sobre
+> **documentação, texto ou processo** vira **issue**, com o achado transcrito, e o ciclo fecha.
+>
+> **Isto é uma condição executável, não um conselho** — e esta seção precisa carregá-la porque **a
+> skill é o procedimento**: o `CLAUDE.md` institui o teto, mas quem executa lê aqui. Achado do Codex
+> no PR 496, e ele estava certo: sem esta linha, a §8 mandava reabrir a cada conserto e continuava
+> exatamente o ciclo documental que o teto existe para encerrar.
+>
+> **A conta do teto é de rodadas, não de achados.** Rodada 3 com bloqueante de código é legítima, e
+> a 4 também — o que o teto barra é a rodada que existe só para conferir um ajuste de texto.
+>
+> **Por que o teto, com o caso medido:** o PR 494 acumulou rodada após rodada, **nenhum achado
+> falso**, e mesmo assim o ciclo não fechava — porque cada conserto de documentação envelhecia a
+> descrição vizinha e gerava o achado seguinte. O teto é o que impede o decaimento de esforço de
+> virar assíntota.
+
 Os passos 1 a 7 valem inteiros em toda rodada. O que muda é a calibragem — **o padrão é
 decair**, e rodada 2 rodando a skill inteira por reflexo é o modo caro de errar:
 
