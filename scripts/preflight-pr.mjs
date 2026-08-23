@@ -100,6 +100,14 @@ const ARVORE_MANUAL = arg('--arvore');
 // portão morre calado. Achado do Codex no PR 502, rodada 4.
 const MODO_DECLARADO = argv.includes('--declarado');
 
+if (CORPO_ARQ && TITULO !== undefined && TITULO.trim() === '' && !argv.includes('--declarado')) {
+  console.error('uso: --titulo veio VAZIO.');
+  console.error('\nPR do GitHub não tem título vazio, então vazio aqui é quase sempre variável de');
+  console.error('shell não definida se expandindo. Aceitar isso faria o script omitir o título real');
+  console.error('do predicado e aprovar o que o job `diff-vazio` reprova. Só o modo declarado');
+  console.error('(--declarado, entrada sintética) pode passar vazio.');
+  process.exit(2);
+}
 if (CORPO_ARQ && TITULO === undefined) {
   console.error('uso: falta --titulo "<título do PR>".');
   console.error('\nO job `diff-vazio` do CI concatena TÍTULO + corpo + commits. Sem o título aqui,');
@@ -192,8 +200,13 @@ const sujo = (() => {
     // `--untracked-files=all`: sem isso um diretório inteiramente novo sai como
     // `?? .tmp/`, e o arquivo de corpo dentro dele nunca casaria com a exclusão
     // abaixo — o artefato canônico voltaria a bloquear. Achado do Codex, rodada 7.
-    const bruto = git('status', '--porcelain', '--untracked-files=all');
-    if (!bruto) return '';
+    // `-z`: registros separados por NUL e **sem** o quoting de `core.quotePath`.
+    // No formato padrão, um nome não-ASCII sai como `?? "corpo-pr\303\251.md"`,
+    // a comparação de caminho nunca casa, e o preflight canônico volta a
+    // bloquear no próprio artefato dele. Reproduzido pelo Codex, rodada 10.
+    const cru = git('status', '--porcelain', '-z', '--untracked-files=all');
+    if (!cru) return '';
+    const bruto = cru.split('\0').filter(Boolean).join('\n');
     // O PRÓPRIO arquivo de corpo não conta como sujeira. O fluxo obrigatório
     // manda escrevê-lo (`--corpo <arquivo.md>`), e escrito dentro do repositório
     // ele aparece como untracked — então o procedimento canônico reprovava por
@@ -427,7 +440,12 @@ const versaoDe = (ref) => {
     return null;
   }
 };
-let versaoBase = baseSha ? versaoDe(baseSha) : null;
+// O TIP de `BASE`, não o merge-base — é o que o `validar-backend.sh:113` lê
+// (`git show "$base:manifesto.json"`, com `base=origin/main`). Numa branch
+// desatualizada em que a main já bumpou, ler do merge-base fazia o preflight
+// enxergar bump onde o guard vê fragmentos iguais e reprova a migração como não
+// bumpada. Achado do Codex, rodada 10.
+let versaoBase = versaoDe(BASE);
 let versaoAtual = versaoDe(null);
 if (VERSAO_MANUAL !== undefined) {
   const [b, a] = VERSAO_MANUAL === '-' ? [null, null] : VERSAO_MANUAL.split(':');
@@ -435,7 +453,12 @@ if (VERSAO_MANUAL !== undefined) {
   versaoAtual = a || null;
   ok.push(`versao DECLARADA por --versao: \`${versaoBase ?? '—'}\` → \`${versaoAtual ?? '—'}\``);
 }
-const bumpou = versaoBase !== null && versaoAtual !== null && versaoBase !== versaoAtual;
+// Ausência de UM lado é mudança; só ausência dos DOIS é igualdade. Antes, um PR
+// que REMOVE o campo `versao` deixava `versaoAtual` nulo, `bumpou` virava false
+// e o preflight aprovava — enquanto o `validar-backend.sh:113-123` compara
+// fragmento cheio com vazio e reprova, e o `guard-json.mjs` só olha sintaxe.
+// Achado do Codex, rodada 10.
+const bumpou = versaoBase !== versaoAtual;
 
 if (migracoesNovas.length > 0 && !bumpou) {
   bloqueantes.push(
