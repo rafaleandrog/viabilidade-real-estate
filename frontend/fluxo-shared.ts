@@ -691,3 +691,33 @@ export function vgvVendidoMensal(
   }
   return saida;
 }
+
+/**
+ * #442: o dinheiro de uma linha de custo para EXIBIR num seletor, quando quem
+ * exibe não tem as grandezas de ligação para converter unidade.
+ *
+ * O seletor de base financiável do Funding lia `orcamento_valor` cru — a mesma
+ * coluna que a #442 mostrou congelada — e rotulava "R$ 0,24" um custo de
+ * quatrocentos mil reais. Depois da #442 a coluna é `null` em unidade derivada,
+ * o que ali viraria "R$ 0,00".
+ *
+ * A fonte certa é o total que o MOTOR aplica. `calcLinhas` é `calc.linhasCusto`,
+ * já resolvido; permuta física e financeira não entram lá (#268), e para elas o
+ * canônico é a fonte — exceto na permuta FÍSICA, em que o backend zera os dois
+ * campos de propósito (`backend/rotas/avancado.ts:1394-1397`), e aí não há
+ * dinheiro nenhum a mostrar. Sem canônico, a coluna crua só é R$ quando a
+ * unidade é `rs`; nas demais devolve `null`, para o chamador não afirmar um
+ * número que não sabe.
+ */
+export function dinheiroParaRotulo(custo: any, calcLinhas: Array<{ id: any; total: number }>): number | null {
+  const doMotor = (calcLinhas ?? []).find((l) => l.id === custo?.id);
+  if (doMotor) return doMotor.total;
+  const canonico = custo?.orcamento_valor_canonico;
+  if (canonico !== null && canonico !== undefined && canonico !== '' && Number.isFinite(Number(canonico))) {
+    return Number(canonico);
+  }
+  const bruto = custo?.orcamento_valor;
+  if ((custo?.orcamento_unidade || 'rs') !== 'rs') return null;
+  if (bruto === null || bruto === undefined || bruto === '' || !Number.isFinite(Number(bruto))) return null;
+  return Number(bruto);
+}
