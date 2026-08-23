@@ -247,9 +247,17 @@ export const APOS_CHAVES_MESES = 12;
  *    Pré-lançamento e Lançamento; a janela comercial "Durante a obra" começa só
  *    depois do Lançamento. Fica vazia (fim < início) se o Lançamento terminar
  *    em ou depois do fim da Obra — ver `problemaJanelaDuranteObra`.
- *  - `pos_obra`       (período 4, "Pós-chaves"): início no fim da Obra + 1
- *    (herdado do evento `pos_obra` do Cronograma), duração FIXA de
- *    `APOS_CHAVES_MESES` — #226, ignora `pos_obra.duracao_meses`.
+ *  - `pos_chaves`     (período 4, "Pós-chaves"): início no fim da Obra + 1
+ *    (herdado do evento `pos_obra` do Cronograma — dele vem só o INÍCIO),
+ *    duração FIXA de `APOS_CHAVES_MESES` — #226, ignora
+ *    `pos_obra.duracao_meses`.
+ *
+ *    #430: a chave se chama `pos_chaves`, não `pos_obra`, porque é outro
+ *    conceito. "Pós-obras" é a fase de CUSTO do Cronograma, com duração
+ *    digitada pelo usuário e consumida pela ancoragem de custo; "Pós-chaves"
+ *    é a janela COMERCIAL — em que ainda se vende e o cliente termina de
+ *    pagar —, de 12 meses fixos. Compartilhar o nome fazia o usuário esticar
+ *    o campo de custo achando que ganhava janela de venda, e vender MENOS.
  * Retorna null se faltar Lançamento, Obra ou Pós-obra no cronograma.
  * Quando não há Pré-lançamento, `pre_lancamento` tem fim < inicio (faixa vazia,
  * sem absorção nesse período).
@@ -260,7 +268,7 @@ export function faixasAbsorcao(
   pre_lancamento: { inicio: number; fim: number };
   lancamento: { inicio: number; fim: number };
   obra: { inicio: number; fim: number };
-  pos_obra: { inicio: number; fim: number };
+  pos_chaves: { inicio: number; fim: number };
 } | null {
   const pre = crono.find((e) => e.evento === 'pre_lancamento');
   const lanc = crono.find((e) => e.evento === 'lancamento');
@@ -278,7 +286,7 @@ export function faixasAbsorcao(
     obra: { inicio: n(lanc.inicio_mes) + Math.max(1, n(lanc.duracao_meses)), fim: n(obra.inicio_mes) + Math.max(1, n(obra.duracao_meses)) - 1 },
     // #226: início herdado do Cronograma (fim da Obra + 1, travado por
     // recalcularTravados); duração é a CONSTANTE, não `pos.duracao_meses`.
-    pos_obra: { inicio: n(pos.inicio_mes), fim: n(pos.inicio_mes) + APOS_CHAVES_MESES - 1 },
+    pos_chaves: { inicio: n(pos.inicio_mes), fim: n(pos.inicio_mes) + APOS_CHAVES_MESES - 1 },
   };
 }
 
@@ -311,7 +319,7 @@ export function periodoAbsorcao(
 ): { inicio: number; fim: number } | null {
   const f = faixasAbsorcao(crono);
   if (!f) return null;
-  return { inicio: f.pre_lancamento.inicio, fim: f.pos_obra.fim };
+  return { inicio: f.pre_lancamento.inicio, fim: f.pos_chaves.fim };
 }
 
 /** Lê o % de um bloco de absorção por chave de evento (0 se ausente). */
@@ -320,15 +328,15 @@ function pctBloco(blocos: any[], evento: string): number {
   return b ? n(b.pct) : 0;
 }
 
-/** % da Pós-obra = 100 − Pré-lançamento − Lançamento − Obra (derivado, #108). */
-export function pctPosObraDerivado(blocos: any[]): number {
+/** % do Pós-chaves = 100 − Pré-lançamento − Lançamento − Obra (derivado, #108). */
+export function pctPosChavesDerivado(blocos: any[]): number {
   return Math.max(0, 100 - pctBloco(blocos, 'pre_lancamento') - pctBloco(blocos, 'lancamento') - pctBloco(blocos, 'obra'));
 }
 
 /**
  * #347: valida a soma dos três períodos INFORMADOS do formulário de Absorção
  * (Pré-lançamento + Lançamento + Obra) — sem isso, um total acima de 100%
- * clampava silenciosamente no Pós-obra (`pctPosObraDerivado` usa
+ * clampava silenciosamente no Pós-chaves (`pctPosChavesDerivado` usa
  * `Math.max(0, ...)`) e a soma real da absorção fechava abaixo de 100%,
  * perdendo % de vendas sem aviso nenhum. `pre_lancamento_pct` já chega aqui
  * zerado quando o Cronograma não tem a fase (a tela nem mostra o campo nesse
@@ -351,8 +359,16 @@ export function erroFormularioAbsorcao(f: {
  *
  * Modelo vigente (#108): apenas **Distribuído** em 4 períodos —
  * Pré-lançamento (bloco `pre_lancamento`), Lançamento (bloco `lancamento`),
- * Durante a obra (bloco `obra`) e Pós-obra (bloco `pos_obra`, derivado =
- * 100 − p1 − p2 − p3). Cada bloco espalha seu % uniformemente pela faixa.
+ * Durante a obra (bloco `obra`) e Pós-chaves (derivado = 100 − p1 − p2 − p3).
+ * Cada bloco espalha seu % uniformemente pela faixa.
+ *
+ * #430: o bloco persistido do 4º período continua gravado com
+ * `evento: 'pos_obra'` — é dado em coluna `json`, e o backend o reconhece por
+ * esse nome ao excluí-lo da soma informada (`backend/rotas/avancado.ts:217`).
+ * Renomeá-lo seria mudança de DADO, com migração; o que a #430 renomeia é o
+ * identificador em memória. O `pct` desse bloco nunca é lido PELO MOTOR — o 4º
+ * período é sempre derivado. (`scripts/conferir-estudo.ts` o lê de propósito,
+ * justamente para comparar o gravado com o derivado; é conferência, não cálculo.)
  *
  * Compat: `personalizado` (dado legado) usa `absorcao.meses`; qualquer outro
  * modo cai em `linear` (uniforme por todo o período de absorção).
@@ -393,7 +409,7 @@ export function absorcaoMensal(
     espalhar(faixas.pre_lancamento, pctBloco(blocos, 'pre_lancamento'));
     espalhar(faixas.lancamento, pctBloco(blocos, 'lancamento'));
     espalhar(faixas.obra, pctBloco(blocos, 'obra'));
-    espalhar(faixas.pos_obra, pctPosObraDerivado(blocos));
+    espalhar(faixas.pos_chaves, pctPosChavesDerivado(blocos));
     return { inicio: periodo.inicio, pcts };
   }
 

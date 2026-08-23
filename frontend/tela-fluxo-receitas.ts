@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import {
-  rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosObraDerivado,
+  rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosChavesDerivado, APOS_CHAVES_MESES,
   erroFormularioAbsorcao, totalAntesAlocacao,
   type EventoCrono,
 } from './fluxo-shared.js';
@@ -550,7 +550,7 @@ export class ViabFluxoReceitas extends LitElement {
     const dis = !this.editavel;
     const temPre = this._temPreLancamento();
     const faixas = faixasAbsorcao(this.crono);
-    const posDerivado = pctPosObraDerivado(this._absorcaoJson().blocos);
+    const posDerivado = pctPosChavesDerivado(this._absorcaoJson().blocos);
     const erroAbs = erroFormularioAbsorcao(f);
     // rot: formata o rótulo de período; retorna '—' para faixas vazias (fim < inicio).
     const rot = (fx?: { inicio: number; fim: number }) =>
@@ -585,7 +585,10 @@ export class ViabFluxoReceitas extends LitElement {
                        duração da fase "Pós-obras" do Cronograma (#328), que é
                        livre e serve de âncora de CUSTO. Nomes parecidos, dois
                        conceitos diferentes — não confundir. -->
-                  <td>Pós-chaves<br /><span class="sec">${rot(faixas?.pos_obra)}</span></td>
+                  <!-- #430: a duração fixa passa a ser DITA, não só implicada
+                       pela faixa — é o que impede o usuário de procurá-la no
+                       campo "Pós-obras" do Cronograma, que é de custo. -->
+                  <td>Pós-chaves<br /><span class="sec">${rot(faixas?.pos_chaves)} · ${APOS_CHAVES_MESES} meses fixos</span></td>
                   <td><span class="derivado">${posDerivado.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</span></td>
                 </tr>
               </tbody>

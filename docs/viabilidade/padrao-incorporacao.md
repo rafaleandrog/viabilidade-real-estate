@@ -613,15 +613,15 @@ fim de Durante a obra
 A interface deve evitar mostrar a mesma janela integral da Obra em três linhas de absorção simultâneas.
 
 > ✅ **Comportamento vigente para cronograma coerente (#225).** `faixasAbsorcao`, em
-> `frontend/fluxo-shared.ts:257-283`, deriva "Durante a obra" a partir do **mês seguinte ao fim do
-> Lançamento** (`:276-278`), não do início físico da Obra — e aí os quatro períodos comerciais são
+> `frontend/fluxo-shared.ts:265-291`, deriva "Durante a obra" a partir do **mês seguinte ao fim do
+> Lançamento** (`:284-286`), não do início físico da Obra — e aí os quatro períodos comerciais são
 > contíguos e não se sobrepõem. Pré-lançamento ausente vira faixa vazia (`fim < inicio`,
-> `:270-272`).
+> `:278-280`).
 >
 > ⚠️ **A não-sobreposição NÃO é garantida quando o Lançamento alcança o fim da Obra.** Nesse caso
-> a faixa `obra` fica vazia, mas `lancamento` continua até o **próprio** fim (`:275`) enquanto o
-> Pós-chaves começa em fim-da-Obra + 1 (`:281`) — os dois **se sobrepõem**, e `absorcaoMensal`
-> espalha percentual nas duas faixas. `problemaJanelaDuranteObra` (`:292-302`) só devolve texto
+> a faixa `obra` fica vazia, mas `lancamento` continua até o **próprio** fim (`:283`) enquanto o
+> Pós-chaves começa em fim-da-Obra + 1 (`:289`) — os dois **se sobrepõem**, e `absorcaoMensal`
+> espalha percentual nas duas faixas. `problemaJanelaDuranteObra` (`:300-310`) só devolve texto
 > para um `urbi-banner variante="alerta"` (`tela-fluxo-cronograma.ts:186-187`): **não bloqueia o
 > salvamento** nem impede o cálculo. É aviso, não invariante.
 
@@ -647,7 +647,7 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > ✅ **Comportamento vigente, alinhado ao padrão e à EVI (#226 / EVI-007).** O início é o mês
 > seguinte ao fim da Obra (`pos_obra` travado por `recalcularTravados`) e a duração é a
 > **constante** `APOS_CHAVES_MESES = 12` (`frontend/fluxo-shared.ts:237`), consumida em
-> `faixasAbsorcao:281` e declarada em `absorcaoMensal:366-367`.
+> `faixasAbsorcao:289` e declarada em `absorcaoMensal:381-382`.
 >
 > **A planilha de referência vota do mesmo lado.** Na EVI Urbitá, `cfINC!J` divide por **12
 > literal** e ignora os próprios inputs `EtapaChavesDuracao`/`EtapaPosChavesDuracao` — a janela de
@@ -660,13 +660,21 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > entrega, ao lado de pré-lançamento, lançamento e durante-obras. Os 12 meses travados acima são o
 > **Pós-chaves** — e ficam. O que muda é a taxonomia: cada um passa a ter nome e campo próprios.
 >
+> **Comportamento vigente (pós-#430).** A separação está feita **no identificador e na tela**, não no
+> dado: a faixa comercial de `faixasAbsorcao` chama-se `pos_chaves`, o derivado chama-se
+> `pctPosChavesDerivado`, a linha da tabela de Absorção diz "Pós-chaves · 12 meses fixos", e a linha
+> do Pós-obras no Cronograma diz "duração de custos". O **bloco persistido** do 4º período continua
+> gravado com `evento: 'pos_obra'` — é dado em coluna `json`, reconhecido por esse nome pelo backend
+> (`backend/rotas/avancado.ts:217`), e renomeá-lo seria mudança de dado com migração.
+>
 > ⚠️ **Enquanto isso, `pos_obra.duracao_meses` continua editável e não faz o que o nome promete.**
 > O evento nasce com `duracao_meses: 12` e `travado_duracao: false`
 > (`backend/rotas/avancado.ts:42`); editá-lo **não** move a janela de vendas, só a **âncora de
 > custos** pós-entrega — que é exatamente por que a D1 os separa. Medido em Pinguim: o estudo 6 tem
 > `duracao_meses: 13` e uma curva de absorção `personalizado` que chega ao 13º mês; o 13º mês cai
-> fora de `periodoAbsorcao` e `absorcaoMensal:375-376` o **descarta em silêncio** — **1,41% das
-> vendas, R$ 2.007.856,95**. Ver a issue **#485**.
+> fora de `periodoAbsorcao` e `absorcaoMensal:390-391` o **descarta em silêncio** — **1,41% das
+> vendas, R$ 2.007.856,95**. Ver a issue **#429** (o texto anterior apontava a #485, que é outra
+> coisa — o destravamento do início da obra, decisão D6).
 
 ### 8.6 Representação temporal no app
 
@@ -840,8 +848,8 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > `avancado_fases` guarda o modo **Distribuído** em **quatro** blocos —
 > `pre_lancamento`, `lancamento`, `obra` e `pos_obra` (`frontend/tela-fluxo-receitas.ts:535-540`).
 > Os três primeiros são informados; o Pós-chaves é **derivado**
-> (`pctPosObraDerivado`, `frontend/fluxo-shared.ts:324-326`: `100 − p1 − p2 − p3`). A soma dos três
-> informados é validada por `erroFormularioAbsorcao` (`frontend/fluxo-shared.ts:337-345`) — sem
+> (`pctPosChavesDerivado`: `100 − p1 − p2 − p3`; o nome era `pctPosObraDerivado` até a #430). A soma dos três
+> informados é validada por `erroFormularioAbsorcao` (`frontend/fluxo-shared.ts:345-353`) — sem
 > isso, um total acima de 100% clampava no derivado e a absorção fechava abaixo de 100% sem aviso.
 > ⚠️ **Quando o Cronograma não tem Pré-lançamento, o bloco NÃO chega zerado ao motor — e some
 > silenciosamente uma fatia das vendas.** `tela-fluxo-receitas.ts:522` zera apenas o valor **do
@@ -851,7 +859,7 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 >
 > Até alguém abrir o modal e clicar em **Aplicar**, `absorcaoMensal` segue lendo esse bloco e o
 > **descarta**, porque a faixa é vazia — `espalhar` retorna cedo quando `fim < inicio`
-> (`frontend/fluxo-shared.ts:384-386`). Como o Pós-chaves é `100 − p1 − p2 − p3`, o percentual do
+> (`frontend/fluxo-shared.ts:399-401`). Como o Pós-chaves é `100 − p1 − p2 − p3`, o percentual do
 > Pré-lançamento **não é redistribuído**: a absorção fecha abaixo de 100% e ninguém é avisado. Um
 > estudo com 20% em Pré-lançamento que desative a fase passa a vender 80%.
 >
@@ -2964,7 +2972,7 @@ Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescre
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
 (`frontend/tela-fluxo-custos.ts:790-791`). Quem classifica é a **subcategoria**: toda linha
 `Preço/Permuta` é tratada como permuta **financeira** pelo motor
-(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:518-520`). A permuta **física** vem da linha de custo
+(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:533-535`). A permuta **física** vem da linha de custo
 `Preço → Permuta física` (`permuta_tipologia_id` + `permuta_quantidade`), e **não** de
 `unidades_permutadas` no catálogo de Tipologias: desde as #266/#267/#268 esse campo é dado
 histórico, sem fallback — sem a linha de custo, o KPI é 0 (§15.1). Usar `distribuicao_modo` como critério de migração
