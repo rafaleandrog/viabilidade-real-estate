@@ -140,20 +140,38 @@ test('#442 pct_vgv → rs reescreve orcamento_valor no dinheiro certo', () => {
   assert.equal(r.orcamento_valor_canonico, undefined);
 });
 
-test('#442 rs → pct_vgv NÃO grava a derivada: grava null', () => {
+test('#442 rs → pct_vgv reconverte, com precisão plena', () => {
   const r = camposDaTrocaDeUnidade(411_476.16, 411_476.16, RS, PCT_VGV, CTX_442);
-  // A coluna é decimal(15,2) (`schema.json:362`): gravar 0,2333…% ali persiste
-  // `0.23` — derivada arredondada, que é o que o C7 proíbe, e o leitor
-  // reconstruiria R$ 394.331,32 em vez de R$ 411.476,16. Null não mente.
-  assert.equal(r.orcamento_valor, null);
+  // O espelho grava exatamente o que `_valorExibido` mostra sob essa badge — é
+  // esse o invariante da regra da casa. O arredondamento da coluna
+  // (`decimal(15,2)`) é o preço conhecido do espelho; o número de registro é o
+  // canônico, e ele não se move.
+  assert.equal(r.orcamento_valor, (411_476.16 / 171_448_400) * 100);
   assert.equal(r.orcamento_valor_canonico, undefined, 'o canônico continua sendo a fonte');
 });
 
-test('#442 rs → R$/m² privativo também grava null', () => {
-  // Mesmo motivo: `por_area` é derivada. Este caso NÃO era coberto antes —
-  // nenhum teste exercitava destino `por_area`.
+test('#442 rs → R$/m² privativo também reconverte', () => {
   const r = camposDaTrocaDeUnidade(411_476.16, 411_476.16, RS, RS_M2_PRIV, CTX_442);
-  assert.equal(r.orcamento_valor, null);
+  assert.equal(r.orcamento_valor, 411_476.16 / 4_000);
+});
+
+test('#442 o valor gravado é o MESMO que a tela exibe — nos SEIS destinos', () => {
+  // O invariante da regra: coluna e tela dizem o mesmo número. `_valorExibido`
+  // faz `converterUnidade(rs → destino, canonico)`, que é `daBase` sem
+  // arredondar em destino derivado — a mesma conta.
+  //
+  // ⚠️ Os seis, não três. `pct_obra` em particular: é ele que sustenta adiar a
+  // #514 ("o gravado é o que a tela exibe, mesmo estando errado por outro
+  // motivo"), e era justamente o que não tinha teste.
+  const TODOS = { ...CONV_TELA };
+  const ctx = { ...CTX_442, receita: 150_000_000 };
+  for (const [nome, destino] of Object.entries(TODOS)) {
+    const r = camposDaTrocaDeUnidade(0.24, 411_476.16, PCT_VGV, destino as any, ctx);
+    assert.equal(
+      r.orcamento_valor, converterUnidade(RS, destino as any, 411_476.16, ctx),
+      `destino ${nome}`,
+    );
+  }
 });
 
 test('#442 o discriminante é o DESTINO, não a origem', () => {
@@ -219,8 +237,8 @@ test('#442 critério 3: o motor lê o MESMO dinheiro antes e depois da troca', (
     ...camposDaTrocaDeUnidade(0.24, 411_476.16, PCT_VGV, RS_M2_PRIV, CTX_442),
     orcamento_unidade: 'rs_m2_priv',
   };
-  assert.equal(paraDerivada.orcamento_valor, null);
-  assert.equal(resolverCustoTotal(paraDerivada, ctxMotor), 411_476.16);
+  assert.equal(paraDerivada.orcamento_valor, 411_476.16 / 4_000);
+  assert.equal(resolverCustoTotal(paraDerivada, ctxMotor), 411_476.16, 'o canônico manda');
 });
 
 test('#442 numeroDaColuna: string vazia é "sem valor", não zero', () => {
@@ -278,8 +296,25 @@ test('#442 fiação: coluna VAZIA não vira R$ 0,00', () => {
 test('#442 fiação: unidade omitida na linha é lida como rs', () => {
   const patch = dadosDaTrocaDeUnidade({ orcamento_valor: 1_000 }, 'pct_vgv', CONV as any, CTX_442);
   assert.equal(patch?.orcamento_valor_canonico, 1_000, 'a origem foi tratada como R$');
-  assert.equal(patch?.orcamento_valor, null, 'destino derivado');
+  assert.equal(patch?.orcamento_valor, (1_000 / 171_448_400) * 100);
 });
+
+test('#442 sem a grandeza do DESTINO, a coluna não é tocada', () => {
+  // `daBase` não consegue representar, e aí a chave some do patch em vez de
+  // gravar um número inventado ou apagar o que estava lá.
+  const r = camposDaTrocaDeUnidade(411_476.16, 411_476.16, RS, PCT_VGV, {});
+  assert.equal('orcamento_valor' in r, false);
+});
+
+// Vocabulário real da tela, para o invariante ser testado nos seis destinos.
+const CONV_TELA = {
+  rs: { tipo: 'identidade' },
+  rs_m2_priv: { tipo: 'por_area', link: 'areaPrivativa' },
+  rs_m2_terreno: { tipo: 'por_area', link: 'areaTerreno' },
+  pct_vgv: { tipo: 'pct', link: 'vgv' },
+  pct_receita: { tipo: 'pct', link: 'receita' },
+  pct_obra: { tipo: 'pct', link: 'vgv' },
+} as const;
 
 // ── o rótulo do Funding (#442) ──────────────────────────────────────────────
 
@@ -316,4 +351,22 @@ test('#442 canônico derivado de linha legada é arredondado — é dinheiro (C7
   const r = camposDaTrocaDeUnidade(7.77, null, PCT_VGV, RS, CTX_442);
   assert.equal(r.orcamento_valor_canonico, 13_321_540.68);
   assert.equal(r.orcamento_valor, 13_321_540.68);
+});
+
+test('#442 destino irrepresentável NÃO troca a unidade — a #442 de volta seria pior', () => {
+  // Estudo sem área de terreno, linha em `rs` com R$ 9.000.000, indo para
+  // `rs_m2_terreno`. Trocar só a badge deixaria "9.000.000 R$/m² de terreno".
+  const linha = { orcamento_unidade: 'rs', orcamento_valor: 9_000_000, orcamento_valor_canonico: 9_000_000 };
+  const semTerreno = { vgv: 171_448_400, areaPrivativa: 4_000, areaTerreno: 0 };
+  assert.equal(dadosDaTrocaDeUnidade(linha, 'rs_m2_terreno', CONV_TELA as any, semTerreno), null);
+  // E com a área definida, troca normalmente.
+  const comTerreno = { ...semTerreno, areaTerreno: 2_500 };
+  const patch = dadosDaTrocaDeUnidade(linha, 'rs_m2_terreno', CONV_TELA as any, comTerreno);
+  assert.equal(patch?.orcamento_valor, 3_600);
+  assert.equal(patch?.orcamento_unidade, 'rs_m2_terreno');
+});
+
+test('#442 linha VAZIA troca de unidade normalmente — não há o que contradizer', () => {
+  const patch = dadosDaTrocaDeUnidade({ orcamento_unidade: 'rs' }, 'pct_receita', CONV_TELA as any, {});
+  assert.deepEqual(patch, { orcamento_unidade: 'pct_receita' });
 });

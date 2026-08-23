@@ -94,33 +94,50 @@ export function numeroDaColuna(v: unknown): number | null {
 // (`resolverCustoTotal`, `fluxo-shared.ts:426-440`), vê R$ 0,24 onde o motor usa
 // R$ 411.476,16.
 //
-// ⚠️ POR QUE O DESTINO DERIVADO GRAVA `null`, E NÃO O NÚMERO CONVERTIDO.
-// A intenção da #442 é que `orcamento_valor` + `orcamento_unidade` sempre
-// descrevam o MESMO dinheiro que o canônico. Para destino `rs` isso é exato: o
-// canônico já é o número, e 2 casas é o contrato do dinheiro. Para destino
-// derivado (`%` ou `R$/m²`) é INALCANÇÁVEL nesta coluna, por dois motivos
-// independentes, os dois conferidos:
+// ⚠️ POR QUE ELA RECONVERTE, INCLUSIVE PARA DESTINO DERIVADO.
+// O que a implementação de referência estabelece, e o que ela NÃO estabelece —
+// a distinção importa, porque a primeira versão deste comentário errava nela.
 //
-//  1. `orcamento_valor` é `decimal(15,2)` (`schema.json:362`). Uma derivada
-//     gravada ali é ARREDONDADA na persistência — que é literalmente o que o
-//     contrato C7 proíbe ("nunca são persistidas arredondadas"). O erro não é
-//     teórico: canônico R$ 400.000 sobre VGV 171.448.400 dá 0,23330634…%, grava
-//     `0.23`, e o leitor reconstrói R$ 394.331,32 — R$ 5.668,68 a menos. Ou seja,
-//     gravar a derivada trocaria uma mentira grande por uma mentira menor, em vez
-//     de acabar com ela.
-//  2. `pct_obra` nem sequer tem conversão honesta: `CONV_UNIDADE.pct_obra` usa
-//     `link: 'vgv'` "só na conversão de display", enquanto o motor aplica
-//     `totalObra` (`fluxo-shared.ts:436`). Escrever por esse caminho grava um % do
-//     VGV rotulado "% Obra" — corrupção ativa, e é um caminho alcançável
-//     (`obra`/`Gestão da obra`). O conserto do apelido é outro assunto, com issue
-//     própria; aqui basta não escrever por ele.
+// A referência é o campo de Infraestrutura do Preliminar de Loteamento,
+// `tela-premissas.ts`, cujo contrato está escrito em `:70-73`:
 //
-// `null` é um estado suportado e já existente da coluna: ela é anulável e o
-// backend grava `null` nela em dois pontos (`backend/rotas/avancado.ts:1395,1458`).
-// E nenhum leitor perde informação, porque o canônico está sempre presente depois
-// desta escrita — `resolverCustoTotal` e `_valorCanonico` o preferem, e só caem no
-// campo legado quando ele não existe.
+//     Fonte de verdade da quantidade econômica. Para custos é R$; para a
+//     permuta física é m². Os campos históricos por unidade permanecem apenas
+//     como compatibilidade até que todos os consumidores passem ao resolver
+//     (#260).
 //
+// ELA ESTABELECE: o canônico é o número de registro, a badge troca só a
+// representação, e o valor mostrado em cada unidade é derivado do canônico
+// (`_valorUnidade`, `tela-premissas.ts:470-474`).
+//
+// ELA NÃO ESTABELECE que se deva escrever a coluna por unidade — ao contrário:
+// `_trocarUnidade` (`tela-premissas.ts:455-468`) **não escreve coluna nenhuma**,
+// nem a de destino nem a de origem. O único `_set(op.campo, …)` do arquivo está
+// em `_editarCustoUnidade:477`, quando o usuário DIGITA. A coluna por unidade lá
+// não é espelho: é valor histórico congelado que só o teclado atualiza.
+//
+// ENTÃO POR QUE AQUI SE ESCREVE. Porque a estrutura é outra, e é ela que decide.
+// Premissas tem UMA COLUNA POR UNIDADE (`infra_pct`, `infra_valor_fixo`,
+// `custo_infra_m2`): `infra_pct = 30` convivendo com `infra_modo = 'valor_fixo'`
+// não é contradição — é "o % que você digitou por último, inativo", e o modo diz
+// qual está valendo. Custos do Avançado tem UMA COLUNA SÓ, `orcamento_valor`,
+// **rotulada** por `orcamento_unidade`; ali não existe "inativo", e deixar o
+// número da unidade antiga sob o rótulo da nova é exatamente a mentira da #442.
+// Só há duas saídas coerentes: reconverter, ou não trocar a unidade. É o que se
+// faz abaixo — reconverte quando dá, e não troca nada quando não dá.
+//
+// ⚠️ E o C7? Ele rege o valor AUTORITATIVO, que é o canônico — precisão plena, e
+// não tocado aqui. A coluna por unidade é compatibilidade, na estrada de saída
+// pela #260. Gravar a derivada arredondada em `orcamento_valor` (`decimal(15,2)`)
+// é o preço conhecido dessa coluna, não perda de informação.
+//
+// ⚠️ `pct_obra` grava número errado, porque `CONV_UNIDADE.pct_obra` usa
+// `link: 'vgv'` (`tela-fluxo-custos.ts:105`) enquanto o motor aplica `totalObra`.
+// Não é exceção de propósito: o gravado passa a ser EXATAMENTE o que a tela
+// exibe naquela badge, que é o invariante desta regra, e nenhum cálculo consome
+// esse número (o motor só lê a coluna crua quando falta o canônico, o que esta
+// função torna impossível). A #514 conserta os dois de uma vez.
+
 // `canonicoPersistido` é o valor da coluna `orcamento_valor_canonico` como ela
 // está ANTES da troca (`null` em linha legada). Ausência da chave
 // `orcamento_valor` no retorno significa "não mexer" — o que acontece quando não
@@ -152,14 +169,17 @@ export function camposDaTrocaDeUnidade(
   }
   if (canonico === null) return saida;
 
-  // Destino R$: exato, e 2 casas é o contrato do dinheiro (C7).
-  if (convNova.tipo === 'identidade') {
-    saida.orcamento_valor = Math.round(canonico * 100) / 100;
-    return saida;
+  // O espelho acompanha a unidade nova — a mesma conversão que `_valorExibido`
+  // usa para MOSTRAR o valor sob essa badge, então coluna e tela passam a dizer
+  // o mesmo número. Monetário arredonda a 2 casas; derivada vai como está e é a
+  // coluna que a acomoda, exatamente como `infra_pct` faz em Premissas.
+  const naNova = daBase(convNova, canonico, ctx);
+  if (naNova !== null) {
+    saida.orcamento_valor = convNova.tipo === 'identidade' ? Math.round(naNova * 100) / 100 : naNova;
   }
-  // Destino derivado: ver o bloco acima. A coluna não consegue carregar a
-  // derivada sem arredondá-la, então ela para de afirmar o que não sabe.
-  saida.orcamento_valor = null;
+  // `daBase` devolve `null` quando a grandeza de ligação do DESTINO não está
+  // definida. Aí não há representação a gravar, e a chave fica ausente — o
+  // chamador não mexe na coluna.
   return saida;
 }
 
@@ -185,11 +205,30 @@ export function dadosDaTrocaDeUnidade(
   const convAtual = convPor[atual];
   const convNova = convPor[nova];
   if (!convAtual || !convNova) return null;
+  const valorAtual = numeroDaColuna(linha?.orcamento_valor);
+  const canonicoAtual = numeroDaColuna(linha?.orcamento_valor_canonico);
+  const campos = camposDaTrocaDeUnidade(valorAtual, canonicoAtual, convAtual, convNova, ctx);
+
+  // ⚠️ SE O DESTINO NÃO PODE SER REPRESENTADO, NÃO SE TROCA NADA.
+  // `camposDaTrocaDeUnidade` omite `orcamento_valor` quando `daBase` não
+  // consegue converter — grandeza de ligação do destino em 0 ou indefinida
+  // (estudo sem área de terreno indo para `rs_m2_terreno`, receita 0 indo para
+  // `pct_receita`). Trocar só a unidade nesse caso deixaria o número da unidade
+  // ANTIGA sob o rótulo da NOVA: R$ 9.000.000 lidos como "9.000.000 R$/m² de
+  // terreno". É a mentira da #442 de volta, e a tela nem denuncia — `_valorExibido`
+  // devolve `null` pela mesma impossibilidade, e o campo aparece vazio.
+  //
+  // Então não se troca a unidade: não há como mudar de representação sem saber
+  // representar. É a MESMA decisão que a #515 tomou para Premissas — lá a badge
+  // não muda o modo quando o canônico não pôde ser estabelecido.
+  //
+  // A linha VAZIA é a exceção legítima: sem valor e sem canônico não há o que
+  // contradizer, e trocar a unidade de uma linha em branco é operação normal.
+  const temValor = valorAtual !== null || canonicoAtual !== null;
+  if (temValor && !('orcamento_valor' in campos)) return null;
+
   return {
-    ...camposDaTrocaDeUnidade(
-      numeroDaColuna(linha?.orcamento_valor), numeroDaColuna(linha?.orcamento_valor_canonico),
-      convAtual, convNova, ctx,
-    ),
+    ...campos,
     // Depois do spread de propósito: a unidade nova é o único campo que esta
     // troca SEMPRE grava, e ficar por último torna isso estrutural em vez de
     // depender de a função de cima nunca devolver a chave.
