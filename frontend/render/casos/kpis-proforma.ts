@@ -13,6 +13,17 @@ import { ESTUDO, forcarEstado } from './dados.js';
 
 export const caso = {
   nome: 'kpis-proforma',
+  // `exigir` é OBRIGATÓRIO em todo caso, e o harness lança sem ele. Motivo: um
+  // caso que não renderiza nada — spinner, campo de estado renomeado, seletor
+  // que mudou — passa por TODAS as lentes com "limpo". Reproduzido no PR 506.
+  // Estes seletores são a prova de que a tela sob medição está na tela.
+  // 4 KPIs fixos (Área vendável, Nº de unidades, Custo obras/VGV, Margem
+  // líquida); o de Área permutada só aparece com permuta, que a fixtura não tem.
+  exigir: [
+    { seletor: 'div.kpis', minimo: 1 },
+    { seletor: 'urbi-kpi', minimo: 4 },
+    { seletor: 'table.pf', minimo: 1 },
+  ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-tela-proforma');
     // `_init()` roda no `connectedCallback` e vai à API por benchmarks, config

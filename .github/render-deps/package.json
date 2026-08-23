@@ -1,0 +1,17 @@
+{
+  "name": "viabilidade-render-deps",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Toolchain PINADA do job `render` de pr-guards.yml. Não é dependência do produto: existe só para o CI montar as telas num Chromium. Ver scripts/render-check.mjs.",
+  "dependencies": {
+    "esbuild": "0.24.2",
+    "lit": "3.3.3",
+    "playwright": "1.56.1",
+    "tsx": "4.23.0",
+    "typescript": "5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.30",
+    "@types/trusted-types": "2.0.7"
+  }
+}

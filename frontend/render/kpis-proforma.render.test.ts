@@ -13,7 +13,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { verificarRender } from '../../scripts/render-check.mjs';
 import {
-  contar, larguraComOverflowDeDocumento, motivoParaPular, relato, textosInvisiveis, tokensSemValor,
+  contar, lacunasEmUso, larguraComOverflowDeDocumento, motivoParaPular, relato, textosInvisiveis,
+  tokensSemValor,
 } from './apoio.js';
 
 const pular = await motivoParaPular();
@@ -24,7 +25,15 @@ test('KPIs da Proforma: min-width:0 não estoura a célula em 1280/900/600px', {
   assert.equal(contar(a, 'transbordoDeCaixa'), 0, 'controle transbordou — suspeite do harness' + relato(a));
   assert.equal(contar(a, 'sobreposicao'), 0, 'controle sobrepôs — suspeite do harness' + relato(a));
   assert.deepEqual(larguraComOverflowDeDocumento(a), [], 'o documento rolou na horizontal' + relato(a));
+  assert.equal(contar(a, 'corte'), 0, 'conteúdo cortado por overflow oculto' + relato(a));
+  assert.deepEqual(larguraComOverflowDeDocumento(a), [], 'o documento rolou na horizontal' + relato(a));
   assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
+
+  // A medida só vale se o stub soube reproduzir as restrições de tamanho em
+  // jogo. Prop de dimensão não mapeada torna a caixa medida MENOS restrita que
+  // a real — e "limpo" numa caixa mais folgada não prova nada.
+  assert.deepEqual(lacunasEmUso(a), [], 'prop de tamanho que o stub não honra' + relato(a));
+  assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 });
 
 test('KPIs da Proforma: as cores resolvem em todas as variantes de tema do espelho', { skip: pular ?? false }, async () => {

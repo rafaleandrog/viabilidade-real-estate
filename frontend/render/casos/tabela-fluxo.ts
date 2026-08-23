@@ -13,6 +13,16 @@ import { CRONO, CUSTOS, DATA_INICIO, RECEITAS, fluxo, forcarEstado } from './dad
 
 export const caso = {
   nome: 'tabela-fluxo',
+  // `exigir` é OBRIGATÓRIO em todo caso, e o harness lança sem ele. Motivo: um
+  // caso que não renderiza nada — spinner, campo de estado renomeado, seletor
+  // que mudou — passa por TODAS as lentes com "limpo". Reproduzido no PR 506.
+  // Estes seletores são a prova de que a tela sob medição está na tela.
+  exigir: [
+    { seletor: 'div.fx-kpis', minimo: 1 },
+    { seletor: 'div.kpi-card', minimo: 5 },
+    { seletor: 'table.fx', minimo: 1 },
+    { seletor: 'table.fx tbody tr', minimo: 4 },
+  ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-fluxo-ver');
     forcarEstado(el, {

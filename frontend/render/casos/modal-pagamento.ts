@@ -27,6 +27,17 @@ const FASE = {
 
 export const caso = {
   nome: 'modal-pagamento',
+  // `exigir` é OBRIGATÓRIO em todo caso, e o harness lança sem ele. Motivo: um
+  // caso que não renderiza nada — spinner, campo de estado renomeado, seletor
+  // que mudou — passa por TODAS as lentes com "limpo". Reproduzido no PR 506.
+  // Estes seletores são a prova de que a tela sob medição está na tela.
+  // `viab-num` é o campo numérico do app (não é stub): a grade de pagamento tem
+  // entrada, parcelamento e repasse, e é a densidade deles que o caso mede.
+  exigir: [
+    { seletor: 'urbi-modal', minimo: 1 },
+    { seletor: 'div.pag-grid', minimo: 1 },
+    { seletor: 'viab-num', minimo: 5 },
+  ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-fluxo-receitas');
     forcarEstado(el, {

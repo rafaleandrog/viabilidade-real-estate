@@ -142,11 +142,22 @@ da linhagem inteira, que é o que decide se um `width` vindo de fora transborda.
 Por que o espelho, e não `ui/src/` do monorepo: o CI faz checkout **só deste repositório**. Um
 harness que lesse o monorepo rodaria na máquina e seria impossível no runner.
 
-⚠️ **O limite que isso impõe.** O espelho carrega o `:host` de cada primitivo, e **não** o markup
-interno dele. O harness serve para julgar o box model **externo** — transbordo, sobreposição,
-overflow — e **não** o layout de dentro de um `urbi-*`. O `tokens.json` também é lido, para montar
-as variantes de tema; ali o limite é outro e está descrito em `scripts/render-check.mjs`
-(§ `gerarTemas`): o arquivo guarda os **valores** de cada token, **não o nome do tema** de cada um.
+⚠️ **O limite que isso impõe, e onde ele já mordeu.** O espelho carrega o `:host` de cada
+primitivo, e **não** o markup interno dele. O harness serve para julgar o box model **externo** —
+transbordo, sobreposição, overflow — e **não** o layout de dentro de um `urbi-*`.
+
+Isso não é ressalva teórica. O `:host` do `urbi-modal` é `position: fixed; inset: 0` com flex
+centrado — o **fundo** de tela inteira; quem carrega o `max-width` é o painel de dentro, que o
+espelho não conhece. Com o stub genérico, um caso de modal media a grade contra a largura livre da
+janela e **qualquer transbordo real dava zero achados**. A saída é o mapa `PROPS_QUE_DIMENSIONAM`
+em `scripts/render-check.mjs`: prop de tamanho declarada no espelho → propriedade CSS aplicada ao
+painel do stub. Prop de tamanho que **não** está no mapa não é adivinhada — vira **lacuna
+declarada**, e o harness avisa quando um caso usa uma delas, em vez de deixar a medida parecer mais
+apertada do que foi.
+
+O `tokens.json` também é lido, para montar as variantes de tema; ali o limite é outro e está
+descrito em `scripts/render-check.mjs` (§ `gerarTemas`): o arquivo guarda os **valores** de cada
+token, **não o nome do tema** de cada um.
 
 **Nenhum dos três recalcula nada.** O julgamento — qual é o atributo do Lit, o que soma largura, o
 que protege — mora aqui, no gerador. Uma segunda implementação do lado do guard existiria só para

@@ -103,6 +103,10 @@ const CONTEXTO = {
 };
 const FAMILIA_FIXA = "'Liberation Sans', 'DejaVu Sans', Arial, Helvetica, sans-serif";
 const TAMANHO_FIXO = '13px';
+// Versão do Chromium que o pin do Playwright entrega — ver
+// `.github/render-deps/package.json`. Não é asserção; é o nome que uma
+// divergência de geometria precisa ter para não virar mistério.
+const CHROMIUM_FIXADO = '141.0.7390.37';
 const LARGURAS_PADRAO = [1280, 900, 600];
 const ALTURA_PADRAO = 900;
 // Tolerância em px. 1px absorve o arredondamento de subpixel do layout engine
@@ -161,8 +165,60 @@ export async function harnessDisponivel() {
 // ── geração dos stubs de primitivo, a partir do espelho ─────────────────────
 // Um custom element por primitivo espelhado. O shadow root recebe as
 // declarações `:host` REAIS da linhagem inteira — é o dado que decide se um
-// `width` vindo de fora transborda. As props viram accessors para que
-// `.valor=${...}` do Lit funcione igual ao primitivo de verdade.
+// `width` vindo de fora transborda.
+
+/**
+ * Props que RESTRINGEM TAMANHO, e a propriedade CSS que cada uma aplica ao
+ * painel interno do stub.
+ *
+ * ⚠️ Por que este mapa existe, escrito à mão, num arquivo que evita
+ * conhecimento à mão em todo o resto: o espelho carrega o `:host` de cada
+ * primitivo, e NÃO o markup interno. Para o `urbi-modal` isso é a diferença
+ * entre medir e não medir — o `:host` dele é `position: fixed; inset: 0` com
+ * flex centrado, ou seja, um FUNDO de tela inteira; quem carrega o
+ * `max-width: 860px` é o painel de dentro, que o espelho não conhece. Sem esta
+ * linha, a grade de pagamento é medida contra a largura livre do host e
+ * qualquer transbordo real produz ZERO achados. Achado P1 do Codex no PR 506.
+ *
+ * A regra para mexer aqui: só entra prop cuja semântica de restrição seja
+ * inequívoca. Prop de tamanho que NÃO estiver mapeada não é adivinhada — vira
+ * LACUNA declarada (ver `lacunasDeDimensao`), porque errar o eixo silenciosamente
+ * é pior do que assumir que não sabe.
+ */
+const PROPS_QUE_DIMENSIONAM = {
+  'urbi-modal': { maxWidth: 'max-width' },
+  'urbi-grafico-area': { altura: 'height' },
+  'urbi-grafico-colunas': { altura: 'height' },
+  'urbi-grafico-linha': { altura: 'height' },
+  'urbi-grafico-pizza': { altura: 'height' },
+  'urbi-grafico-medidor': { altura: 'height' },
+};
+
+/** Nome de prop que CHEIRA a tamanho — usado só para detectar o que falta mapear. */
+const RE_CHEIRO_DE_TAMANHO = /(width|height|largura|altura|tamanho)/i;
+
+/**
+ * Props de tamanho que o espelho declara e o mapa acima NÃO cobre.
+ *
+ * Não é erro por si: `urbi-icone.tamanho` provavelmente é escala tipográfica, e
+ * chutar `width` ali inventaria restrição que não existe. O que não pode
+ * acontecer é a lacuna ficar CALADA — um caso que usa uma dessas props está
+ * medindo uma caixa menos restrita que a real, e o resultado "limpo" dele vale
+ * menos do que parece. O harness devolve a lista; quem monta o caso decide.
+ */
+export function lacunasDeDimensao() {
+  const { primitivos } = JSON.parse(readFileSync(ESPELHO_PRIMITIVOS, 'utf8'));
+  const fora = [];
+  for (const [tag, p] of Object.entries(primitivos)) {
+    for (const x of p.props) {
+      if (!x.atributo || !RE_CHEIRO_DE_TAMANHO.test(x.propriedade)) continue;
+      if (PROPS_QUE_DIMENSIONAM[tag]?.[x.propriedade]) continue;
+      fora.push({ tag, prop: x.propriedade, atributo: x.atributo });
+    }
+  }
+  return fora;
+}
+
 function gerarPrimitivos() {
   if (!existsSync(ESPELHO_PRIMITIVOS)) {
     throw new Error(`docs/ui-urbiverso/primitivos.json não existe — rode scripts/sincronizar-referencia-ui.mjs.`);
@@ -179,8 +235,14 @@ function gerarPrimitivos() {
       porSeletor.get(d.seletor).push(`${d.prop}: ${d.valor};`);
     }
     const regras = [...porSeletor].map(([sel, ds]) => `${sel}{${ds.join('')}}`).join('\n');
-    const props = p.props.filter((x) => x.atributo).map((x) => x.propriedade);
-    defs.push({ tag, regras, props });
+    // `[propriedade, atributo]` — os DOIS. O atributo não é o nome da prop:
+    // `maxWidth` vira `maxwidth`, e é por atributo que o Lit escreve o literal
+    // estático do template (`<urbi-modal maxWidth="860px">` chega no DOM como
+    // `maxwidth`). Um stub que só olhasse a propriedade JS ignoraria em silêncio
+    // tudo que o template escreve como atributo.
+    const props = p.props.filter((x) => x.atributo).map((x) => [x.propriedade, x.atributo]);
+    const dimensiona = PROPS_QUE_DIMENSIONAM[tag] ?? {};
+    defs.push({ tag, regras, props, dimensiona });
   }
   return `// GERADO por scripts/render-check.mjs a partir de docs/ui-urbiverso/primitivos.json
 // Espelho de ${carimbo.sha.slice(0, 8)} (monorepo ${carimbo.versao_monorepo}, ${carimbo.data_do_commit}).
@@ -193,10 +255,13 @@ const INTERNO = \`
     text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
   .rc-valor{font-size:var(--texto-destaque,1rem);color:var(--cor-texto-forte,#fff);
     font-weight:700;white-space:nowrap}
+  .rc-corpo{display:flex;flex-direction:column;min-width:0}
 \`;
-for (const { tag, regras, props } of DEFS) {
+for (const { tag, regras, props, dimensiona } of DEFS) {
   if (customElements.get(tag)) continue;
+  const ATRIBUTOS = props.map(([, atributo]) => atributo);
   class Stub extends HTMLElement {
+    static get observedAttributes() { return ATRIBUTOS; }
     constructor() {
       super();
       const r = this.attachShadow({ mode: 'open' });
@@ -208,9 +273,24 @@ for (const { tag, regras, props } of DEFS) {
       r.appendChild(this._corpo);
       this._pintar();
     }
+    /** Valor efetivo de uma prop: propriedade JS primeiro, atributo depois. */
+    _v(nome) {
+      const viaProp = this['_p_' + nome];
+      if (viaProp !== undefined && viaProp !== null) return viaProp;
+      const par = props.find(([p]) => p === nome);
+      const attr = par ? this.getAttribute(par[1]) : null;
+      return attr === null ? undefined : attr;
+    }
     _pintar() {
-      const rot = this.rotulo ?? this.getAttribute('rotulo');
-      const val = this.valor ?? this.getAttribute('valor');
+      if (!this._corpo) return;
+      // Restrição de tamanho vinda de prop/atributo — sem isto o painel do
+      // stub é livre e nada nunca transborda. Ver PROPS_QUE_DIMENSIONAM.
+      for (const [prop, css] of Object.entries(dimensiona)) {
+        const v = this._v(prop);
+        this._corpo.style.setProperty(css, v == null || v === '' ? '' : String(v));
+      }
+      const rot = this._v('rotulo');
+      const val = this._v('valor');
       this._corpo.textContent = '';
       if (rot != null) {
         const d = document.createElement('div'); d.className = 'rc-rotulo'; d.textContent = String(rot);
@@ -222,13 +302,14 @@ for (const { tag, regras, props } of DEFS) {
       }
       this._corpo.appendChild(document.createElement('slot'));
     }
+    attributeChangedCallback() { this._pintar(); }
     connectedCallback() { this._pintar(); }
   }
-  for (const nome of props) {
+  for (const [nome] of props) {
     if (nome in Stub.prototype) continue;
     Object.defineProperty(Stub.prototype, nome, {
       get() { return this['_p_' + nome]; },
-      set(v) { this['_p_' + nome] = v; if (this._corpo) this._pintar(); },
+      set(v) { this['_p_' + nome] = v; this._pintar(); },
       configurable: true,
     });
   }
@@ -273,7 +354,16 @@ function gerarTemas() {
       // `url(...)` fica de fora: a imagem não existe no servidor do harness e
       // renderia um 404 por variante, sem acrescentar nada à medição.
       .filter((nome) => !/url\(/.test(tokens[nome][0]))
-      .map((nome) => `${nome}: ${tokens[nome][Math.min(k, tokens[nome].length - 1)]};`)
+      // ⚠️ `valores[k]` quando EXISTE, `valores[0]` quando não — e nunca
+      // `valores[length-1]`. A versão anterior usava `Math.min(k, length-1)`,
+      // que repete o ÚLTIMO valor nas variantes de índice alto: para os 10
+      // tokens de dois valores (entre eles `--cor-titulo`, `--cor-texto-sobre-primaria`
+      // e os `--raio-*`), as variantes 2 e 3 recebiam `valores[1]` em vez do
+      // valor base. Isso contradizia a aproximação declarada no bloco acima E a
+      // cascata CSS — um token não redefinido num tema vale o do `:root` —, e
+      // produzia paleta sintética que não é tema nenhum: falso "texto invisível"
+      // de um lado, falsa limpeza do outro. Achado P2 do Codex no PR 506.
+      .map((nome) => `${nome}: ${k < tokens[nome].length ? tokens[nome][k] : tokens[nome][0]};`)
       .join('\n  ');
     blocos.push(`:root[data-variante="${k}"] {\n  ${decls}\n}`);
   }
@@ -336,14 +426,26 @@ function sonda(tol) {
   //    da MÉTRICA DE GLIFO, que muda com as fontes instaladas: `Liberation
   //    Sans` no runner, `Montserrat` na instância. Este harness reporta, e
   //    deixa a asserção a cargo do caso que quiser assumir o risco.
+  //
+  //  · `corte` — terceira lista, e ela existe porque a versão anterior desta
+  //    sonda PULAVA todo nó com `overflow-x` diferente de `visible`. Scroller
+  //    (`auto`/`scroll`) é intenção; mas `hidden`/`clip` que corta conteúdo é
+  //    justamente o "número cortado sem aviso", e ficava invisível para o
+  //    harness. Sai em lista própria porque `hidden` + `text-overflow` também é
+  //    padrão legítimo — quem monta o caso decide.
   const transbordoDeCaixa = [];
   const transbordoDeTexto = [];
+  const corte = [];
   for (const el of elementos) {
     if (typeof el.scrollWidth !== 'number' || !visivel(el)) continue;
     const s = cs(el);
     const ox = s.overflowX;
-    if (ox === 'auto' || ox === 'scroll' || ox === 'hidden' || ox === 'clip') continue;
+    if (ox === 'auto' || ox === 'scroll') continue;
     if (el.scrollWidth <= el.clientWidth + tol) continue;
+    if (ox === 'hidden' || ox === 'clip') {
+      corte.push({ onde: caminho(el), scrollWidth: el.scrollWidth, clientWidth: el.clientWidth });
+      continue;
+    }
     const r = el.getBoundingClientRect();
     const bordaDeConteudo = r.left + parseFloat(s.borderLeftWidth || '0') + el.clientWidth;
     const filhos = [...el.children, ...(el.shadowRoot ? el.shadowRoot.children : [])];
@@ -433,7 +535,56 @@ function sonda(tol) {
   };
   sonda_.remove();
 
-  return { overflowDocumento, transbordoDeCaixa, transbordoDeTexto, sobreposicao, fingerprint };
+  return { overflowDocumento, transbordoDeCaixa, transbordoDeTexto, corte, sobreposicao, fingerprint };
+}
+
+/**
+ * Terceira sonda: PROVA DE MONTAGEM. Roda antes das outras duas.
+ *
+ * ⚠️ É a sonda mais importante deste arquivo, e ela não existia. Sem ela, um
+ * caso que não renderiza nada — porque a tela ficou no spinner, porque um campo
+ * de estado foi renomeado, porque o seletor mudou — passa por TODAS as lentes
+ * com "limpo", e a suíte inteira fica verde sem ter medido um pixel.
+ * Reproduzido no PR 506: um caso vazio e um caso preso em `carregando` deram
+ * "600px — limpo · 900px — limpo · 1280px — limpo".
+ *
+ * O piso genérico (haver conteúdo visível) não bastaria: o caso preso no
+ * spinner TEM conteúdo. Por isso cada caso declara `exigir` — os seletores que
+ * provam que a tela sob medição é aquela, e não outra.
+ */
+function sondaMontagem({ exigir, lacunas }) {
+  const elementos = [];
+  (function coletar(raiz) {
+    for (const el of raiz.querySelectorAll('*')) {
+      elementos.push(el);
+      if (el.shadowRoot) coletar(el.shadowRoot);
+    }
+  })(document.getElementById('raiz'));
+
+  const areaVisivel = elementos.reduce((soma, el) => {
+    const r = el.getBoundingClientRect();
+    return soma + Math.max(0, r.width) * Math.max(0, r.height);
+  }, 0);
+
+  const faltando = [];
+  for (const { seletor, minimo } of exigir) {
+    let n = 0;
+    for (const el of elementos) {
+      try { if (el.matches(seletor)) n++; } catch { /* seletor inválido: cai abaixo */ }
+    }
+    if (n < minimo) faltando.push({ seletor, minimo, achou: n });
+  }
+  // LACUNAS EM USO: prop de tamanho que o espelho declara, o stub não sabe
+  // honrar, e o caso usa mesmo assim. Não é erro — é a medida valendo menos do
+  // que parece, e precisa aparecer em vez de ficar calada.
+  const lacunasPresentes = [];
+  for (const { tag, prop, atributo } of lacunas) {
+    const n = elementos.filter(
+      (el) => el.tagName.toLowerCase() === tag && (el.hasAttribute(atributo) || el[prop] != null),
+    ).length;
+    if (n > 0) lacunasPresentes.push({ tag, prop, usos: n });
+  }
+  return { nos: elementos.length, areaVisivel: Math.round(areaVisivel), faltando, lacunasPresentes };
 }
 
 // Segunda sonda, de COR. Separada porque roda uma vez por variante de tema,
@@ -586,13 +737,44 @@ export async function verificarRender(opcoes) {
   import './primitivos.js';
   import { caso } from './caso.js';
   const raiz = document.getElementById('raiz');
+
+  // Assentamento: o montar() do caso aguarda o updateComplete do componente de
+  // TOPO, e isso nao cobre os filhos — um viab-num dentro do modal pode ainda
+  // estar no ciclo seguinte. Medir cedo devolve geometria de uma arvore
+  // incompleta, que e "limpo" por nao ter medido. O laco espera ate que nenhum
+  // update fique pendente (updateComplete do Lit resolve false quando outro ja
+  // foi agendado), com teto para nao pendurar num componente que se atualiza
+  // sozinho para sempre.
+  //
+  // (Sem crase neste bloco de proposito: ele mora DENTRO de um template literal
+  // do render-check.mjs, e uma crase aqui fecha o literal — foi o que quebrou
+  // este arquivo uma vez.)
+  async function assentar() {
+    for (let volta = 0; volta < 20; volta++) {
+      const pendentes = [];
+      (function coletar(no) {
+        for (const el of no.querySelectorAll('*')) {
+          if (el.updateComplete && typeof el.updateComplete.then === 'function') pendentes.push(el.updateComplete);
+          if (el.shadowRoot) coletar(el.shadowRoot);
+        }
+      })(document);
+      if (pendentes.length === 0) return true;
+      const prontos = await Promise.all(pendentes);
+      if (prontos.every(Boolean)) return true;
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    return false;
+  }
+
   try {
     await caso.montar(raiz);
+    window.__assentou = await assentar();
     // Duas voltas de rAF depois das fontes: a primeira deixa o Lit escoar o
     // ciclo de update, a segunda garante que o layout da primeira já foi
     // resolvido antes de qualquer medida.
     await document.fonts.ready;
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    window.__exigir = caso.exigir;
     document.title = 'pronto';
   } catch (e) {
     window.__erroMontagem = String(e && e.stack || e);
@@ -613,7 +795,27 @@ export async function verificarRender(opcoes) {
     const porta = srv.address().port;
 
     navegador = await chromium.launch();
-    const achados = { caso, larguras: {}, variantes: {}, erroConsole: [], nVariantes: temas.n, fingerprint: null };
+    const versaoNavegador = navegador.version();
+    const achados = {
+      caso, larguras: {}, variantes: {}, erroConsole: [], nVariantes: temas.n,
+      fingerprint: null, navegador: versaoNavegador, avisos: [], montagem: null,
+      lacunasDeDimensao: lacunasDeDimensao(),
+    };
+    // ⚠️ A versão do motor de layout MUDA a geometria, e esta suíte asserta
+    // pixel (os 22px de sobreposição do urbi-kpi). A versão é FIXADA pelo pin
+    // exato do Playwright em `.github/render-deps/package-lock.json`; esta
+    // conferência existe porque um pin pode ser mexido sem que ninguém ligue os
+    // dois fatos, e aí um teste começa a falhar por uma causa que não aparece em
+    // lugar nenhum. Aviso, não falha: um upgrade legítimo não deve reprovar a
+    // suíte — só precisa ser VISÍVEL.
+    if (versaoNavegador !== CHROMIUM_FIXADO) {
+      achados.avisos.push(
+        `Chromium ${versaoNavegador}, mas o pin é ${CHROMIUM_FIXADO} ` +
+        '(.github/render-deps/package-lock.json). Geometria pode divergir; se uma asserção de pixel ' +
+        'mudou de veredito sem o diff explicar, a causa provável é esta.',
+      );
+      console.warn(`  aviso do render-check: ${achados.avisos[0]}`);
+    }
 
     for (const largura of larguras) {
       const ctx = await navegador.newContext({ ...CONTEXTO, viewport: { width: largura, height: altura } });
@@ -627,6 +829,36 @@ export async function verificarRender(opcoes) {
       await pag.waitForFunction(() => document.title === 'pronto' || document.title === 'erro', null, { timeout: 30000 });
       const erroMontagem = await pag.evaluate(() => window.__erroMontagem ?? null);
       if (erroMontagem) throw new Error(`montagem do caso "${caso}" falhou:\n${erroMontagem}`);
+
+      // PROVA DE MONTAGEM antes de qualquer medida. Ela LANÇA, e é intencional:
+      // "não montou" não é achado a ponderar, é medição inválida. Devolver
+      // achados vazios aqui seria a própria falha que esta sonda existe para
+      // impedir.
+      const exigir = await pag.evaluate(() => window.__exigir ?? null);
+      if (!Array.isArray(exigir) || exigir.length === 0) {
+        throw new Error(
+          `o caso "${caso}" não declara \`exigir\`. Todo caso precisa declarar os seletores que ` +
+          'provam que a tela sob medição está na tela — sem isso um caso que não renderiza nada ' +
+          'reporta "limpo" em todas as lentes.',
+        );
+      }
+      const m = await pag.evaluate(sondaMontagem, { exigir, lacunas: achados.lacunasDeDimensao });
+      achados.montagem = { ...m, largura, assentou: await pag.evaluate(() => window.__assentou === true) };
+      if (m.faltando.length || m.areaVisivel <= 0) {
+        throw new Error(
+          `o caso "${caso}" não montou o que declara, em ${largura}px — nada foi medido.\n` +
+          `  nós: ${m.nos} · área visível: ${m.areaVisivel}px²\n` +
+          m.faltando.map((f) => `  faltou "${f.seletor}": exigia ${f.minimo}, achou ${f.achou}`).join('\n'),
+        );
+      }
+      if (!achados.montagem.assentou) {
+        achados.avisos.push(`em ${largura}px o Lit não assentou em 20 voltas — a medição pode ser de árvore incompleta.`);
+      }
+      for (const l of m.lacunasPresentes) {
+        const aviso = `${l.tag} usa "${l.prop}" (${l.usos}x) e o stub não sabe restringir por essa prop — `
+          + 'a caixa medida é menos restrita que a real. Ver PROPS_QUE_DIMENSIONAM em scripts/render-check.mjs.';
+        if (!achados.avisos.includes(aviso)) achados.avisos.push(aviso);
+      }
 
       achados.larguras[largura] = await pag.evaluate(sonda, TOL);
       achados.fingerprint ??= achados.larguras[largura].fingerprint;
@@ -663,12 +895,17 @@ export function descrever(achados, teto = 4) {
   const corta = (lista) => lista.length > teto
     ? [...lista.slice(0, teto), `(+${lista.length - teto} do mesmo tipo)`]
     : lista;
-  linhas.push(`caso: ${achados.caso} · ${achados.nVariantes} variante(s) de tema · fonte ${achados.fingerprint?.largura}px em ${achados.fingerprint?.familia}`);
+  linhas.push(`caso: ${achados.caso} · ${achados.nVariantes} variante(s) de tema · Chromium ${achados.navegador} · fonte ${achados.fingerprint?.largura}px em ${achados.fingerprint?.familia}`);
+  if (achados.montagem) {
+    linhas.push(`  montagem: ${achados.montagem.nos} nós · ${achados.montagem.areaVisivel}px² visíveis · Lit ${achados.montagem.assentou ? 'assentado' : 'NÃO assentado'}`);
+  }
+  for (const a of achados.avisos ?? []) linhas.push(`  ⚠️ ${a}`);
   for (const [largura, r] of Object.entries(achados.larguras)) {
     const p = [];
     if (r.overflowDocumento) p.push(`overflow do documento (${r.overflowDocumento.scrollWidth} > ${r.overflowDocumento.clientWidth})`);
     p.push(...corta(r.transbordoDeCaixa.map((t) => `transbordo de CAIXA em ${t.onde} (${t.scrollWidth} > ${t.clientWidth})`)));
     p.push(...corta(r.transbordoDeTexto.map((t) => `transbordo de TEXTO em ${t.onde} (${t.scrollWidth} > ${t.clientWidth}) — depende da fonte`)));
+    p.push(...corta(r.corte.map((t) => `CORTE silencioso em ${t.onde} (${t.scrollWidth} > ${t.clientWidth}, overflow oculto)`)));
     p.push(...corta(r.sobreposicao.map((s) => `sobreposição ${s.px}x${s.py}px entre ${s.a} e ${s.b}`)));
     if (p.length) {
       linhas.push(`  ${largura}px:`);

@@ -20,7 +20,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { verificarRender } from '../../scripts/render-check.mjs';
-import { contar, larguraComOverflowDeDocumento, motivoParaPular, relato, tokensSemValor } from './apoio.js';
+import {
+  contar, lacunasEmUso, larguraComOverflowDeDocumento, motivoParaPular, relato, tokensSemValor,
+} from './apoio.js';
 
 const pular = await motivoParaPular();
 
@@ -32,9 +34,15 @@ test('Tabela do Fluxo: a largura fica no scroller declarado, sem caixa sobre cai
   assert.deepEqual(larguraComOverflowDeDocumento(a), [], 'a tabela empurrou o DOCUMENTO na horizontal' + relato(a));
   assert.deepEqual(tokensSemValor(a), [], 'token citado pelo CSS não resolve em alguma variante' + relato(a));
   assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
+  assert.deepEqual(lacunasEmUso(a), [], 'prop de tamanho que o stub não honra' + relato(a));
+  assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 
-  // Não é asserção — é o registro do que a lente dependente de fonte viu neste
-  // ambiente. Sem isto o achado sumiria da saída quando o teste passa.
+  // Não são asserções — são o registro do que as lentes dependentes de fonte
+  // viram neste ambiente. Sem isto o achado sumiria da saída quando o teste
+  // passa, que é a definição de medir e jogar fora.
   const texto = contar(a, 'transbordoDeTexto');
-  if (texto > 0) console.log(`  nota: ${texto} transbordo(s) de TEXTO — dependem da fonte, não asseverados.${relato(a)}`);
+  const cortado = contar(a, 'corte');
+  if (texto + cortado > 0) {
+    console.log(`  nota: ${texto} transbordo(s) de TEXTO e ${cortado} corte(s) por overflow oculto — dependem da fonte, não asseverados.${relato(a)}`);
+  }
 });

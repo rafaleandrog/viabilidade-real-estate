@@ -13,6 +13,7 @@ export interface MedidaDeLargura {
   overflowDocumento: { scrollWidth: number; clientWidth: number } | null;
   transbordoDeCaixa: AchadoTransbordo[];
   transbordoDeTexto: AchadoTransbordo[];
+  corte: AchadoTransbordo[];
   sobreposicao: AchadoSobreposicao[];
   fingerprint: { largura: number; familia: string };
 }
@@ -23,9 +24,24 @@ export interface MedidaDeVariante {
   invisiveis: AchadoInvisivel[];
 }
 
+export interface LacunaDeDimensao { tag: string; prop: string; atributo: string }
+
+export interface Montagem {
+  nos: number;
+  areaVisivel: number;
+  largura: number;
+  assentou: boolean;
+  faltando: { seletor: string; minimo: number; achou: number }[];
+  lacunasPresentes: { tag: string; prop: string; usos: number }[];
+}
+
 export interface Achados {
   caso: string;
   nVariantes: number;
+  navegador: string;
+  avisos: string[];
+  montagem: Montagem | null;
+  lacunasDeDimensao: LacunaDeDimensao[];
   fingerprint: { largura: number; familia: string } | null;
   erroConsole: string[];
   larguras: Record<string, MedidaDeLargura>;
@@ -41,3 +57,5 @@ export function verificarRender(opcoes: {
 export function harnessDisponivel(): Promise<{ ok: boolean; motivo?: string }>;
 
 export function descrever(achados: Achados, teto?: number): string[];
+
+export function lacunasDeDimensao(): LacunaDeDimensao[];

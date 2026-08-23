@@ -328,41 +328,63 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -uo pipefail
+          # ⚠️ A decisão NÃO passa por pipe, e isso não é estilo.
+          #
+          # A primeira versão era `git diff --name-only ... | grep -qE '^frontend/'`.
+          # `grep -q` sai no primeiro casamento e fecha o pipe; com lista maior que
+          # o buffer de 64 KiB o `git diff` leva SIGPIPE e sai 141; sob `pipefail` o
+          # `if` toma o ramo FALSO. Um PR que mexe em meio frontend é classificado
+          # como fora de escopo, TODOS os passos abaixo são pulados por `if:`, e o
+          # job fica verde sem medir nada. Reproduzido com 8.001 caminhos (152 KiB).
+          #
+          # Capturar numa variável ANTES não resolve — quem escreve no pipe passa a
+          # ser o `printf` e ele leva o mesmo sinal. O que resolve é não haver
+          # consumidor que sai cedo: a lista vai por VARIÁVEL DE AMBIENTE para um
+          # script `node`, o mesmo padrão do job `escopo-processo`.
+          #
           # Diff de TRÊS pontos, como os demais guards: dois pontos acusaria
           # arquivo que veio da base no meio do caminho.
-          if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
-               | grep -qE '^(frontend/|docs/ui-urbiverso/|scripts/render-check)'; then
+          ARQUIVOS="$(git diff --no-renames --name-only "$BASE_SHA...$HEAD_SHA")"
+          export PR_ARQUIVOS="$ARQUIVOS"
+          # A bateria do próprio script roda ANTES da decisão: ela contém o caso de
+          # 8.001 caminhos, então uma regressão para a forma com pipe fica vermelha
+          # aqui em vez de virar um job verde que não mediu nada.
+          node scripts/render-em-escopo.mjs --autoteste
+          if node scripts/render-em-escopo.mjs; then
             echo "roda=1" >> "$GITHUB_OUTPUT"
           else
             echo "roda=0" >> "$GITHUB_OUTPUT"
-            echo "PR não toca frontend/ nem o espelho de UI — render não é exercido."
           fi
       - uses: actions/setup-node@v4
         if: steps.escopo.outputs.roda == '1'
         with:
           node-version: '22'
-      - name: Instalar toolchain de render (só pacotes PÚBLICOS)
+      - name: Instalar toolchain de render (pinada, só pacotes PÚBLICOS)
         if: steps.escopo.outputs.roda == '1'
         run: |
           set -euo pipefail
-          # Nada de `pnpm install` aqui: o `@urbiverso/sdk` é GitHub Packages
-          # privado e o GITHUB_TOKEN efêmero deste repo toma 401 — é o motivo de
-          # todo este workflow ser leve. A saída é um diretório PRÓPRIO, com
-          # package.json próprio, onde só entram pacotes públicos; o repo é
-          # ligado a ele por symlink, exatamente como scripts/validar-frontend.sh
-          # faz com o store do pnpm.
+          # ⚠️ VERSÕES EXATAS, COM LOCKFILE, E O MOTIVO É DETERMINISMO.
           #
-          # As versões acompanham as do package.json deste repo. Divergir aqui
-          # significaria medir render num Lit que o app não usa.
-          mkdir -p "$RUNNER_TEMP/render-deps"
-          cd "$RUNNER_TEMP/render-deps"
-          printf '{"name":"render-deps","private":true,"version":"1.0.0"}\n' > package.json
-          npm install --no-audit --no-fund --loglevel=error \
-            lit@^3.2.0 tsx@^4.21.0 esbuild@^0.24.0 typescript@^5.6.0 \
-            playwright@^1.49.0 @types/node@^20 @types/trusted-types@^2
-          # O download do navegador é passo EXPLÍCITO do preparo do ambiente,
-          # nunca efeito colateral de rodar teste — o harness não baixa nada.
-          npx playwright install --with-deps chromium
+          # A primeira versão escrevia um package.json na hora, sem lockfile, com
+          # faixas de caret. Playwright em `^1.49.0` traz OUTRA revisão do Chromium
+          # a cada release compatível — e esta suíte asserta geometria exata, os
+          # 22px de sobreposição do urbi-kpi entre eles. Mudança do motor de layout
+          # sem nenhuma mudança no repositório faria um commit inalterado começar a
+          # falhar, ou esconderia uma regressão. Achado P1 do Codex no PR 506.
+          #
+          # Agora o pin mora versionado em `.github/render-deps/`, com
+          # package-lock.json, e o `npm ci` recusa qualquer coisa fora dele.
+          # `playwright 1.56.1` fixa o Chromium em 141.0.7390.37, que é o mesmo
+          # build em que os números desta suíte foram medidos — a constante
+          # CHROMIUM_FIXADO de scripts/render-check.mjs avisa se divergir.
+          #
+          # Nada de `pnpm install` na raiz: o @urbiverso/sdk é GitHub Packages
+          # privado e o GITHUB_TOKEN efêmero deste repo toma 401. Aqui só entram
+          # pacotes públicos, num diretório próprio, ligado à raiz por symlink —
+          # o mesmo padrão que scripts/validar-frontend.sh usa com o store do pnpm.
+          cd "$GITHUB_WORKSPACE/.github/render-deps"
+          npm ci --no-audit --no-fund --loglevel=error
+          npx --no-install playwright install --with-deps chromium
           cd "$GITHUB_WORKSPACE"
           mkdir -p node_modules
           # `if` em vez de `[ ... ] && ...`: com `set -e`, um teste falso na
@@ -370,15 +392,15 @@ jobs:
           # muda conforme a resolução do npm. Falha por acidente de sintaxe é
           # pior que falha real, porque manda procurar no lugar errado.
           for p in lit lit-html lit-element @lit tsx esbuild typescript playwright playwright-core @types; do
-            if [ -e "$RUNNER_TEMP/render-deps/node_modules/$p" ]; then
-              ln -sfn "$RUNNER_TEMP/render-deps/node_modules/$p" "node_modules/$p"
+            if [ -e ".github/render-deps/node_modules/$p" ]; then
+              ln -sfn "$GITHUB_WORKSPACE/.github/render-deps/node_modules/$p" "node_modules/$p"
               echo "  ligado: $p"
             else
               echo "  ausente no store: $p"
             fi
           done
           node -e "console.log('esbuild em', require.resolve('esbuild/package.json'))"
-          node -e "import('playwright').then((m) => console.log('chromium em', m.chromium.executablePath()))"
+          node -e "import('playwright').then(async (m) => { const b = await m.chromium.launch(); console.log('Chromium', b.version()); await b.close(); })"
       - name: Verificação de render
         if: steps.escopo.outputs.roda == '1'
         env:

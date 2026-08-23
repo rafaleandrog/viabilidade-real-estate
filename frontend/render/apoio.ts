@@ -35,8 +35,29 @@ export function relato(a: Achados): string {
 }
 
 /** Total de achados de uma lente, somado em todas as larguras medidas. */
-export function contar(a: Achados, lente: 'transbordoDeCaixa' | 'transbordoDeTexto' | 'sobreposicao'): number {
+export function contar(
+  a: Achados,
+  lente: 'transbordoDeCaixa' | 'transbordoDeTexto' | 'corte' | 'sobreposicao',
+): number {
   return Object.values(a.larguras).reduce((s, m) => s + m[lente].length, 0);
+}
+
+/**
+ * Avisos que o harness emitiu — Chromium fora do pin, Lit que não assentou,
+ * prop de tamanho que o stub não sabe honrar.
+ *
+ * ⚠️ Cada caso decide o que fazer com eles, mas **ignorar em silêncio não é
+ * opção**: aviso que ninguém lê é a forma educada de não medir. Os casos deste
+ * diretório imprimem a lista sempre e asseveram que ela está vazia nas duas
+ * classes que invalidam a medida (Lit não assentado, lacuna de dimensão em uso).
+ */
+export function avisos(a: Achados): string[] {
+  return a.avisos ?? [];
+}
+
+/** Props de tamanho em uso que o stub não sabe restringir — medida menos restrita que a real. */
+export function lacunasEmUso(a: Achados): string[] {
+  return (a.montagem?.lacunasPresentes ?? []).map((l) => `${l.tag}.${l.prop} (${l.usos}x)`);
 }
 
 /** Larguras em que o DOCUMENTO rolou na horizontal. */
