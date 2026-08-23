@@ -86,7 +86,7 @@ apenas para linha nunca reeditada.
 
 As fórmulas de **dívida** (aporte único ou em tranches, carência, PMT Price, quitação),
 **equity** (aporte, retorno progressivo sobre receita líquida ou concentrado sobre o resultado
-final, MOIC/TIR/ROI do investidor) e **financiamento à produção** (base de custos elegíveis,
+final, MOIC e TIR do investidor) e **financiamento à produção** (base de custos elegíveis,
 gatilho de exposição mínima, catch-up retroativo, juros capitalizados e cash sweep) estão
 **implementadas** em `frontend/funding-motor.ts`, tela em `frontend/tela-funding.ts`, rotas em
 `backend/rotas/funding.ts`, tabela `avancado_funding_operacoes` (migração `029`).
