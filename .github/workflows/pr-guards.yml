@@ -287,8 +287,28 @@ jobs:
     name: Tabela aposentada não é reusada por código novo
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      URBI_TYPESCRIPT: ${{ github.workspace }}/.ts-guards/node_modules/typescript/lib/typescript.js
     steps:
       - uses: actions/checkout@v7
+      - name: Instalar só o typescript, isolado
+        run: |
+          set -uo pipefail
+          # ⚠️ Este passo existe porque o guard passou a decidir onde há comentário
+          # em JS/TS pelo PARSER do typescript (`scripts/lib/fonte-ts.mjs`), e não
+          # mais por um scanner por linha — que não sobrevivia a template literal
+          # multi-linha. Sem o pacote o guard sai 2 (recusa, e não aprova), e a
+          # bateria inteira fica vermelha: foi o que aconteceu, 19 casos de uma vez.
+          #
+          # Mesmo padrão do job `guards-ui`: diretório PRÓPRIO com package.json
+          # próprio, nunca a raiz — `npm install` na raiz leria o package.json do
+          # repo e tentaria baixar o `@urbiverso/sdk`, que é GitHub Packages
+          # privado (401). O `typescript` é público.
+          mkdir -p .ts-guards
+          cd .ts-guards
+          echo '{"name":"ts-guards","private":true}' > package.json
+          npm install --no-audit --no-fund --loglevel=error typescript@5.9.3
+          node -e "console.log('typescript', require('./node_modules/typescript').version)"
       - name: Guard de tabelas obsoletas
         run: |
           set -uo pipefail
