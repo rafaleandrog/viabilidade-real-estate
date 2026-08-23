@@ -225,10 +225,29 @@ fi
 WF='.github/workflows/pr-guards.yml'
 grep -q '^  tabelas-obsoletas:$' "$WF" && ok "job 'tabelas-obsoletas' presente em $WF" \
   || falha "job ausente" "o guard só protege se estiver ligado no CI"
-awk '/^  tabelas-obsoletas:$/,0' "$WF" | grep -q 'timeout-minutes:' \
+# ⚠️ Duas correções aqui, e as duas já morderam.
+#
+# 1. NADA de `awk ... | grep -q`. Sob `set -o pipefail` isso é uma corrida: o
+#    `grep -q` sai no primeiro casamento e fecha o pipe, o `awk` toma SIGPIPE
+#    nas escritas seguintes e sai 141, e o pipeline inteiro vira 141 — então o
+#    `&&` é pulado e o `||` reprova um caso CORRETO. Medido: 0/100 numa máquina
+#    ociosa de 4 CPUs, 4/60 com os dois estágios presos a um CPU só. Por isso
+#    "passa local, falha no runner de 2 vCPU", em job nenhum que mudou. O
+#    `render` já documenta esta mesma classe em `pr-guards.yml` — a saída é não
+#    haver consumidor que sai cedo, e aqui isso é capturar antes.
+#
+# 2. O range `/^  tabelas-obsoletas:$/,0` vai até o FIM DO ARQUIVO, não até o
+#    fim do job. Como `timeout-minutes:` também aparece em `guards-ui` e em
+#    `render`, o teste passaria mesmo que o job `tabelas-obsoletas` não tivesse
+#    nenhum — ele não fazia a verificação que anunciava. O range agora fecha no
+#    próximo job de topo.
+bloco_job="$(awk '/^  tabelas-obsoletas:$/ { dentro = 1; print; next }
+                  dentro && /^  [a-z][a-z0-9_-]*:$/ { exit }
+                  dentro { print }' "$WF")"
+grep -q 'timeout-minutes:' <<<"$bloco_job" \
   && ok "job declara timeout-minutes (sem ele o default do GitHub é 6 HORAS)" \
   || falha "sem timeout-minutes" "regra do CLAUDE.md § Duas regras de CI"
-awk '/^  tabelas-obsoletas:$/,0' "$WF" | grep -q 'scripts/testar-guard-tabelas-obsoletas.sh' \
+grep -q 'scripts/testar-guard-tabelas-obsoletas.sh' <<<"$bloco_job" \
   && ok "o job também roda esta bateria" \
   || falha "bateria não ligada" "bateria que não roda no CI é pior que bateria que não existe"
 
