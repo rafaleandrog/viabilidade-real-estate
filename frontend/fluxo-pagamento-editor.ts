@@ -91,3 +91,60 @@ export function fluxoPagamentoParaSalvar(
     aplicado: true,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// #436: juros de tabela já persistidos, em LEITURA
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Uma taxa distinta encontrada nos componentes, com os componentes que a usam. */
+export interface JurosDeTabela {
+  /**
+   * Taxa ANUAL equivalente, em pontos percentuais — `(1 + i_m)^12 − 1`, com
+   * **precisão plena** (contrato C7: derivada não monetária arredonda só para
+   * exibir). Quem exibe usa `fmtPct`, que dá 1 casa.
+   */
+  anualPct: number;
+  /** Rótulo de cada componente que carrega esta taxa, na ordem em que aparecem. */
+  rotulos: string[];
+}
+
+/**
+ * Lê os juros de tabela que já estão persistidos em `fluxo_pagamento.componentes`
+ * e os converte para taxa anual equivalente, agrupando por taxa.
+ *
+ * Existe porque hoje `taxaMensal` entra no resultado (VGV, margem, TIR) sem
+ * aparecer em lugar nenhum da interface — o usuário lê a TIR e não tem como
+ * descobrir de onde ela vem. Isto NÃO edita nem recalcula nada: só deixa de
+ * esconder. O campo editável é issue própria, da qual esta é pré-requisito.
+ *
+ * Taxa `0` não entra: o bloco só existe para revelar juros que existem.
+ * O agrupamento usa a taxa já arredondada para 1 casa — a mesma precisão em
+ * que ela será exibida (contrato C7: % calculado carrega 1 casa) —, então
+ * duas taxas que só divergem além da casa exibida aparecem como uma linha só,
+ * que é o que a tela pode honestamente distinguir.
+ */
+export function jurosDeTabelaConfigurados(fluxoPagamento: any): JurosDeTabela[] {
+  const comps = Array.isArray(fluxoPagamento?.componentes) ? fluxoPagamento.componentes : [];
+  const porTaxa = new Map<number, JurosDeTabela>();
+  for (const c of comps) {
+    const mensal = Number(c?.taxaMensal);
+    if (!Number.isFinite(mensal) || mensal === 0) continue;
+    const anualPct = (Math.pow(1 + mensal, 12) - 1) * 100;
+    // A chave agrupa pela precisão EXIBIDA (1 casa) — duas taxas que só divergem
+    // além dela aparecem numa linha só, que é o que a tela pode honestamente
+    // distinguir. Mas o VALOR guardado é o cru: `anualPct` é derivada não
+    // monetária, e o C7 manda carregar precisão plena e arredondar só para
+    // exibir, o que `fmtPct` faz.
+    const chave = Math.round(anualPct * 10) / 10;
+    // ⚠️ E o filtro de "sem juros" é aqui, não só no `mensal === 0` acima: uma
+    // taxa mensal minúscula (0,003% a.m. → 0,036% a.a.) exibiria
+    // "0,0% a.a." acompanhada do aviso vermelho de destruição — anunciando juros
+    // que a tela não consegue mostrar.
+    if (chave === 0) continue;
+    const rotulo = typeof c?.rotulo === 'string' && c.rotulo.trim() !== '' ? c.rotulo : String(c?.tipo ?? 'componente');
+    const ja = porTaxa.get(chave);
+    if (ja) ja.rotulos.push(rotulo);
+    else porTaxa.set(chave, { anualPct, rotulos: [rotulo] });
+  }
+  return [...porTaxa.values()];
+}

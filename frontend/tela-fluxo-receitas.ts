@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, svg, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import {
   rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosObraDerivado,
   erroFormularioAbsorcao, totalAntesAlocacao,
@@ -10,6 +10,7 @@ import {
 import { pctRepasseDerivado, parcelasAoLongoObra } from './fluxo-caixa-motor.js';
 import {
   erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento,
+  jurosDeTabelaConfigurados,
 } from './fluxo-pagamento-editor.js';
 import {
   urbiVerso,
@@ -151,6 +152,9 @@ export class ViabFluxoReceitas extends LitElement {
     .pag-grid { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
     @media (max-width: 760px) { .pag-grid { grid-template-columns: 1fr; } }
     .pag-secao { margin-bottom: 14px; }
+    /* #436: o aviso de que "Aplicar" apaga os juros precisa competir com o
+       número que ele qualifica, senão vira letra miúda ao lado de um destaque. */
+    .aviso-juros { color: var(--cor-alerta, #b45309); }
     .pag-secao h4 {
       margin: 0 0 8px; font-size: var(--texto-rotulo, 0.75rem); letter-spacing: 0.04em;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5)); text-transform: uppercase;
@@ -721,6 +725,18 @@ export class ViabFluxoReceitas extends LitElement {
     const dis = !this.editavel;
     const repasse = pctRepasseDerivado(f);
     const erroPagamento = erroFormularioPagamento(f, this.crono);
+    // #436: os juros vêm do fluxo_pagamento PERSISTIDO, não de pagForm — o
+    // formulário não tem campo de taxa, então editar o modal não muda o que este
+    // bloco mostra. Ele revela o que já está gravado e o que o motor já aplica:
+    // `componentesPagamento` (`fluxo-caixa-motor.ts:631-635`) devolve os
+    // componentes persistidos sem passar pelo adaptador legado, e
+    // `calcularFluxo` soma os juros em `jurosClientes` (`:2045,2063`).
+    //
+    // Os KPIs que se movem são Receita Bruta, Resultado, margem, VPL e TIR — NÃO
+    // o "VGV Vendável", que sai de `vgvLinha(tipologias)` (`:1802-1807`, área ×
+    // preço) e não conhece juros. Medido na Rodada 8: R$ 1.259.273,59 de juros,
+    // TIR 18,59% contra 17,53%, VPL −R$ 959.500,19.
+    const juros = jurosDeTabelaConfigurados(this.modalPag?.fluxo_pagamento);
     return html`
       <urbi-modal title="Fluxo de pagamento" maxWidth="860px" @urbi-modal:close=${() => this.modalPag = null}>
         <div class="pag-grid">
@@ -737,6 +753,33 @@ export class ViabFluxoReceitas extends LitElement {
             </div>
           </div>
           <div>
+            ${juros.length > 0 ? html`
+              <div class="pag-secao">
+                <h4>Juros de tabela</h4>
+                <!-- #436: somente-leitura. A taxa existe, entra em Receita Bruta,
+                     Resultado, margem, VPL e TIR, e até esta issue não aparecia em
+                     lugar nenhum da interface. O campo editável é a #428. -->
+                ${juros.length === 1 ? html`
+                  <p class="sec">Juros de tabela configurados:
+                    <strong>${fmtPct(juros[0].anualPct)} a.a.</strong> (não editáveis nesta versão)</p>`
+                  : html`
+                  <p class="sec">Juros de tabela configurados, por taxa (não editáveis nesta versão):</p>
+                  ${juros.map((j) => html`
+                    <p class="sec">${j.rotulos.join(', ')}: <strong>${fmtPct(j.anualPct)} a.a.</strong></p>`)}`}
+                <!-- Exibir a taxa sem dizer isto seria pior do que não exibir: o
+                     usuário passaria a saber que ela existe, e continuaria sem
+                     motivo para desconfiar do botão que a apaga. Quem conserta a
+                     destruição é a #431.
+                     Só aparece quando há o que apagar: em estudo somente-leitura
+                     o botão "Aplicar" nem é renderizado, e o aviso instruiria
+                     sobre um controle ausente. -->
+                ${dis ? nothing : html`
+                  <p class="sec aviso-juros"><strong>Atenção:</strong> clicar em
+                    <strong>Aplicar</strong> apaga estes juros — este formulário não tem campo de
+                    taxa, e salvar reescreve os componentes sem ela. Ele também descarta a
+                    <strong>periodicidade legada</strong> do parcelamento. Feche o modal sem
+                    aplicar para preservá-los.</p>`}
+              </div>` : nothing}
             <div class="pag-secao">
               <h4>Condições de entrada</h4>
               <p class="sec">Pagamento no ato — 1 parcela paga no mês da contratação; mais de uma

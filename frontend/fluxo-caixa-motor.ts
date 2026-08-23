@@ -658,7 +658,8 @@ export function componentesPagamento(fluxoPagamento: any, cronograma: EventoCron
 // de Pinguim: 0.0098636 = 12,5% a.a., R$ 1.259.273,59). O modal não oferece
 // campo de taxa nem de sinal, e o adaptador fixa `taxaMensal: 0` /
 // `sinalPct: 0` (:589,601,608,617) — então abrir o modal e clicar "Aplicar"
-// APAGA os juros da linha, sem aviso e sem undo. Escrever "`jurosClientes` é
+// APAGA os juros da linha, sem undo — e, desde a #436, com aviso na tela (o
+// bloco "Juros de tabela" do modal diz isso). Escrever "`jurosClientes` é
 // sempre 0" é errado: os juros existem e viram zero no primeiro Aplicar.
 
 /** PMT — parcela fixa que amortiza `principal` em `n` períodos à `taxaMensal`.

@@ -929,7 +929,9 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 > **experiência de configuração** do editor tem issue própria: **#248** (`BUGLIST-005`).
 >
 > **Comportamento vigente (pós-#248/#342/#345/#346).** O modal
-> (`frontend/tela-fluxo-receitas.ts:720-830`) tem três blocos: *Definições* (só texto — corretagem
+> (`frontend/tela-fluxo-receitas.ts:720-830`) tem quatro blocos. *Juros de tabela* (#436) é
+> **somente-leitura** e só aparece quando algum componente persistido tem `taxaMensal ≠ 0`: mostra a
+> taxa anual equivalente e avisa que "Aplicar" a apaga. Os outros três são *Definições* (só texto — corretagem
 > e RET migraram para Custos, `:728-737`), *Condições de entrada* (`% do total`, `Nº parcelas`,
 > `Desconto %`, `:741-763`) e *Parcelamento* (`% do total`, `Nº parcelas` ou checkbox "Ao longo da
 > obra", máximo 4 linhas, `:764-806`); o *Repasse* é **derivado e somente-leitura**

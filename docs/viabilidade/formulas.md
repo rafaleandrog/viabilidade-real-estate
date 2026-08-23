@@ -72,7 +72,8 @@ apenas para linha nunca reeditada.
 > `taxaMensal: 0` / `sinalPct: 0` (`frontend/fluxo-caixa-motor.ts:589,601,608,617`) porque o espelho
 > legado não tem onde guardar essas grandezas. Como `fluxoPagamentoParaSalvar`
 > (`frontend/fluxo-pagamento-editor.ts:90`) regenera os componentes do espelho em toda escrita,
-> **abrir o modal e clicar "Aplicar" apaga os juros da linha**, sem aviso e sem undo. Escrever
+> **abrir o modal e clicar "Aplicar" apaga os juros da linha**, sem undo — e, desde a #436, com
+> aviso na própria tela (o bloco "Juros de tabela" diz que Aplicar os apaga). Escrever
 > "`jurosClientes` é sempre 0" é errado: o certo é **"os juros existem e viram zero no primeiro
 > Aplicar"**.
 
