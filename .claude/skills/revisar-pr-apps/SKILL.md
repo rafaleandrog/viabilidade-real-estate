@@ -645,6 +645,11 @@ Observações (3)
 10/11 lentes (S3 não executada: timeout). Detalhe qualquer achado se quiser.
 ```
 
+> ⚠️ **Todo bloqueante nomeia o contrato ou invariante que viola** — é o que as duas linhas de
+> exemplo acima fazem ("DDL em migração de app", "`sdk_min` acima do publicado"). O campo não é
+> estilo: a saída de não-convergência da § 8 se decide comparando **a lista de contratos nomeados**
+> entre rodadas, e sem ele o teste deixa de ser auditável por quem está de fora.
+
 **Não repita o relatório na sessão.** Nada de citação literal, quadro de execução, raciocínio
 ou lista do que passou — tudo isso está no PR, e quem quiser detalhe pede. Rodada limpa é uma
 linha: `PR #<n> · rodada <N> · sem bloqueantes · <link>`.
@@ -675,9 +680,16 @@ relatório.
 > **Pare antes da § 9 em dois casos, e nos dois diga qual é a pergunta:**
 >
 > - **decisão de desenho** — o conserto mexeria em algo que o autor decidiu;
-> - **achado que não converge** — o **mesmo achado, ou o mesmo remédio, repetido sem progresso**.
->   **Não** é "achado novo na mesma área": consertos sucessivos que expõem bloqueantes distintos e
->   reais no mesmo módulo são o ciclo funcionando. Laço é repetição **material**.
+> - **achado que não converge** — a identidade de um achado é o **contrato ou invariante
+>   violado**, não o remédio nem o arquivo. **Defeito distinto vence remédio repetido**, e essa é a
+>   precedência. É laço quando a rodada **não nomeia nenhum contrato que as anteriores já não
+>   tenham nomeado** — teste auditável, porque a lista de contratos está nos relatórios. Por isso
+>   **todo bloqueante do relatório nomeia o contrato que viola**: sem esse campo, a saída não é
+>   verificável por ninguém de fora.
+>
+>   Consequência declarada: a **terminação é condicional**. Se cada conserto expuser contrato novo,
+>   o ciclo reabre — e é o que se quer, porque a alternativa é mergear com defeito conhecido. Quem
+>   encerra de fato é o **autor**, que decide o merge a qualquer rodada.
 >
 > Observação nunca segura o ciclo (§ 9) — vira registro no PR. Se a **mesma** observação voltar
 > depois de já registrada, isso é evidência de laço, e aí ela vira **issue** com o achado
@@ -793,8 +805,9 @@ que o usuário precisa responder, em vez de deixar "aguardando decisão" solto:
 
 - **Decisão de desenho:** o conserto mexeria em algo que o usuário decidiu. Use com parcimônia
   — usado à toa, vira jeito de terceirizar julgamento que era seu.
-- **Achado que não converge:** a mesma faixa volta rodada após rodada. Pare, diga o que está
-  girando e devolva ao usuário. Numa app isso inclui o caso em que o desfecho depende de issue
+- **Achado que não converge:** a rodada não nomeia nenhum contrato que as anteriores já não
+  tenham nomeado — ver a § 8 para a definição, que é a mesma. Pare, diga o que está girando e
+  devolva ao usuário. Numa app isso inclui o caso em que o desfecho depende de issue
   no shell: o PR não fecha sozinho, e insistir só gasta rodada.
 
 ### Merge

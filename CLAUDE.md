@@ -248,10 +248,20 @@ autor precisa responder, em vez de deixar "aguardando decisão" solto:
 
 - **Decisão de desenho** — o conserto mexeria em algo que o autor decidiu. Com parcimônia: usado à
   toa, vira jeito de terceirizar julgamento que era seu.
-- **Achado que não converge** — o **mesmo achado, ou o mesmo remédio, repetido sem progresso**.
-  Não é "achado novo na mesma área": consertos sucessivos que expõem bloqueantes **distintos e
-  reais** no mesmo módulo são o ciclo funcionando, e mandá-los parar contradiz a linha de cima.
-  Laço é repetição **material**; pare, diga o que está girando, devolva.
+- **Achado que não converge.** A identidade de um achado é o **contrato ou invariante violado**,
+  não o remédio nem o arquivo — dois bloqueantes distintos podem pedir o mesmo tipo de conserto, e
+  isso é o ciclo funcionando. **Precedência: defeito distinto vence remédio repetido.** É laço
+  quando uma rodada **não nomeia nenhum contrato que as anteriores já não tenham nomeado**. Isso é
+  auditável — a lista de contratos nomeados está nos relatórios — e termina, porque o conjunto de
+  contratos do repositório é finito. Pare, diga o que está girando, devolva.
+
+> ⚠️ **A terminação é condicional à convergência, e isto é declarado de propósito.** O teto
+> antigo terminava por construção; esta regra **não**. Se cada conserto expuser um bloqueante
+> genuinamente novo, o ciclo reabre indefinidamente — e é isso que se quer, porque a alternativa é
+> mergear com defeito conhecido. Três coisas o limitam na prática: o teste do contrato acima; a
+> **contestação com evidência**, que retira achado; e o fato de que **o merge é do autor** — ele
+> encerra o ciclo quando quiser, a qualquer rodada, e a sessão não pede essa autorização.
+> Achado do Codex no PR 507, respondendo a uma pergunta que eu tinha feito e não sabia responder.
 
 Observação nunca segura o ciclo — ela vira registro no PR, e o autor decide. Se a **mesma**
 observação voltar depois de já registrada, ela é evidência de laço: vira **issue**, com o achado
