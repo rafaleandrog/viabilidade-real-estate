@@ -48,9 +48,22 @@ TOTAL=0
 # do PR 505 os guards precisam do parser do `typescript`. Aponta-se o do repo —
 # que é o MESMO mecanismo que o job `guards-ui` do CI usa, então esta bateria
 # também exercita o caminho da variável.
-TS_REAL="$RAIZ/node_modules/typescript/lib/typescript.js"
+# ⚠️ HONRA o `URBI_TYPESCRIPT` herdado antes de cair no `node_modules` da raiz.
+# A versão anterior SOBRESCREVIA a variável com o caminho da raiz — e no CI o
+# `typescript` é instalado isolado, em `.ts-guards/`, justamente para não ler o
+# `package.json` do repo e tomar 401 do SDK privado. Resultado: o job definia a
+# variável certa, a bateria a jogava fora, procurava na raiz, não achava e
+# reprovava. Verde local, vermelho no CI.
+if [ -n "${URBI_TYPESCRIPT:-}" ] && [ -f "${URBI_TYPESCRIPT}" ]; then
+  TS_REAL="$URBI_TYPESCRIPT"
+else
+  TS_REAL="$RAIZ/node_modules/typescript/lib/typescript.js"
+fi
 if [ ! -f "$TS_REAL" ]; then
-  echo "ERRO: não achei $TS_REAL — rode antes: bash scripts/validar-frontend.sh" >&2
+  echo "ERRO: não achei o parser do typescript." >&2
+  echo "      procurei em: $TS_REAL" >&2
+  echo "      rode antes: bash scripts/validar-frontend.sh" >&2
+  echo "      ou aponte URBI_TYPESCRIPT para .../typescript/lib/typescript.js" >&2
   exit 1
 fi
 export URBI_TYPESCRIPT="$TS_REAL"
