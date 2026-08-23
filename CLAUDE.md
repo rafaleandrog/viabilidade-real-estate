@@ -214,13 +214,26 @@ numerada contra a `main` do momento, com a `versao` bumpada.
 2. **Implementar e validar** com o script que couber (§ Validação): `validar-frontend.sh` sempre,
    `validar-backend.sh` se tocou backend, `schema.json` ou migração.
 3. **Commit + `git push -u origin <branch>`** — sempre com o nome explícito, nunca `git push` pelado.
-4. **Abrir o PR pelas ferramentas MCP do GitHub** (o `gh` não existe aqui — ver a nota de ambiente
+4. **Escrever o corpo do PR num arquivo e rodar o preflight** — `node scripts/preflight-pr.mjs
+   --corpo <arquivo.md>`. Ele roda, **antes** do PR existir, os guards que só leem corpo e diff:
+   fechamento de issue, escopo R1, diff vazio, JSON, ciclos de schema, regra da migração, mais as
+   armadilhas de árvore (branch `main`, upstream armado, árvore suja) que o CI já não pode pegar.
+   Verde → **abra o PR passando esse mesmo arquivo**, sem reescrever o corpo na chamada do MCP;
+   reescrever desfaz o que foi verificado.
+5. **Abrir o PR pelas ferramentas MCP do GitHub** (o `gh` não existe aqui — ver a nota de ambiente
    da § Merge), com o template preenchido e `Closes #NNN` **em inglês** quando houver issue.
-5. **Revisar, na mesma sessão**, invocando a skill **`revisar-pr-apps`**. Ela publica o relatório
+6. **Revisar, na mesma sessão**, invocando a skill **`revisar-pr-apps`**. Ela publica o relatório
    completo como comentário no PR e devolve à conversa só o resumo por severidade.
-6. **Consertar e abrir rodada nova**, com lentes novas sobre o conserto. **O ciclo fecha quando não
+7. **Consertar e abrir rodada nova**, com lentes novas sobre o conserto. **O ciclo fecha quando não
    há bloqueante pendente** — consertado, ou retirado por contestação com evidência.
-7. **Parar.** O PR fica pronto e parado. Merge é decisão do autor — ver § Merge, que não mudou.
+8. **Parar.** O PR fica pronto e parado. Merge é decisão do autor — ver § Merge, que não mudou.
+
+> **Por que o passo 4 existe.** Os guards de `pr-guards.yml` leem duas coisas que não existem
+> enquanto o PR não foi aberto: o **corpo** e o **diff**. Então o erro de metadado só aparece
+> *depois* — o PR nasce vermelho, custa um ciclo de edição e re-run, e quem olha de fora lê "o
+> código quebrou". No PR 501 foi uma citação `#440 → #450` em prosa sem linha `Sem-fechamento:`:
+> nove jobs verdes, um vermelho, zero problema de código. O preflight move essa classe inteira
+> para antes do push, onde consertar custa uma linha.
 
 #### As três regras de escopo — o que impede o ciclo de não fechar
 

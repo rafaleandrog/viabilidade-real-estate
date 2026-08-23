@@ -248,6 +248,17 @@ jobs:
             echo "::error title=Guarda do monorepo falhou::A guarda que impede escrita em urbiverso/urbiverso não se comporta como o esperado. Veja quais casos falharam no log."
             exit 1
           fi
+      - name: Bateria do preflight de PR
+        if: always()
+        run: |
+          set -uo pipefail
+          # O preflight é um PORTÃO: se ele aprovar corpo errado, o CI fica vermelho
+          # depois (o que ele existe para evitar); se reprovar corpo certo, alguém
+          # para de rodá-lo e ele deixa de guardar. Os dois sentidos têm caso.
+          if ! bash scripts/testar-preflight-pr.sh; then
+            echo "::error title=Bateria do preflight falhou::O preflight de PR não se comporta como o esperado. Veja quais casos falharam no log."
+            exit 1
+          fi
       - name: Bateria do parsing do revisao-registrada
         if: always()
         run: |

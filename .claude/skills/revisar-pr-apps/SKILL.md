@@ -1,6 +1,6 @@
 ---
 name: revisar-pr-apps
-description: Revisa um PR deste repositório antes do merge — revisão adversarial delegada ao Codex (nativo quando o Codex não estiver disponível), mais confronto do diff contra os contratos dos frameworks tal como o SDK publicado os expõe, nunca contra o monorepo. Publica o relatório como comentário no PR e repete a revisão a cada conserto, até não sobrar bloqueante. Use sempre que um PR deste repo precisar de revisão — é o passo 5 do processo obrigatório do CLAUDE.md, não uma etapa opcional.
+description: Revisa um PR deste repositório antes do merge — revisão adversarial delegada ao Codex (nativo quando o Codex não estiver disponível), mais confronto do diff contra os contratos dos frameworks tal como o SDK publicado os expõe, nunca contra o monorepo. Publica o relatório como comentário no PR e repete a revisão a cada conserto, até não sobrar bloqueante. Use sempre que um PR deste repo precisar de revisão — é o passo 6 do processo obrigatório do CLAUDE.md, não uma etapa opcional.
 ---
 
 <!-- Portado de urbiverso/urbiverso `.claude/skills/revisar-pr-apps/SKILL.md` @ b0361f6 (PR #2540),
