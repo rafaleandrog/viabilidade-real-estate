@@ -12,6 +12,17 @@ test('#281: fmtR$ é a fonte única de valores monetários com 2 casas', () => {
   assert.equal(fmtR$(-2_500.789, false), '-2.500,79');
 });
 
+// #492: a tabela de sensibilidade do Proforma (Preliminar → Resultado → Cenários)
+// usava `fmtNum` com 2 casas, que declara só `maximumFractionDigits` e portanto
+// entrega *até* 2 casas. Numa coluna alinhada à direita a vírgula deixava de bater
+// entre as linhas. `fmtR$(v, false)` fixa min = max = 2 — é o que a tela chama hoje.
+test('#492: fmtR$ sem símbolo fixa 2 casas decimais, não "até 2"', () => {
+  assert.equal(fmtR$(1_500_000, false), '1.500.000,00');
+  assert.equal(fmtR$(1_500_000.5, false), '1.500.000,50');
+  assert.equal(fmtR$(1_500_000.55, false), '1.500.000,55');
+  assert.equal(fmtR$(21_230_000, false), '21.230.000,00');
+});
+
 test('fmtPct: valor calculado usa 1 casa decimal com vírgula', () => {
   assert.equal(fmtPct(12.34), '12,3%');
   assert.equal(fmtPct(0), '0,0%');

@@ -450,7 +450,12 @@ export class ViabTelaProforma extends LitElement {
       { l: 'Margem líquida', f: (c) => c.p.margemLiquidaPct, natureza: 'receita', pct: true, badge: true, bmCampo: 'margem_liquida' },
     ];
     // BUG7-12: sem símbolo "R$" — número puro com 2 casas decimais.
-    const fmt = (m: { pct?: boolean }, v: number) => (m.pct ? fmtPct(v) : fmtNum(v, 2));
+    // #492: `fmtNum` com 2 casas dava *até* 2 casas (declara só o
+    // `maximumFractionDigits`, nunca o `minimumFractionDigits`), então
+    // a vírgula decimal não batia entre as linhas de uma coluna alinhada à direita.
+    // `fmtR$(v, false)` é a fonte única de arredondamento monetário do contrato C7
+    // (#281): min = max = 2, sem o símbolo.
+    const fmt = (m: { pct?: boolean }, v: number) => (m.pct ? fmtPct(v) : fmtR$(v, false));
     // #11: título de cada cenário num urbi-badge ESTÁTICO — Bear=perigo (vermelho),
     // Base=sucesso (verde), Bull=info (azul). Os NÚMEROS agora seguem a mesma cor
     // do cenário (tokens correspondentes ao badge).
