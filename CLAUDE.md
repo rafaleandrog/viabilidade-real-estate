@@ -243,6 +243,32 @@ de ser o fácil, e que a ausência de revisão seja **visível** em vez de calad
 
 #### A revisão em si
 
+> ⚠️ **Existem DUAS skills chamadas `revisar-pr-apps`, e a que responder pode ser a errada.** O
+> monorepo tem uma cópia própria, e quando ele está clonado ao lado — o caso das sessões de nuvem,
+> em `/home/user/urbiverso` — **as duas entram no catálogo com o mesmo nome**, sem prefixo de
+> caminho na listagem. Invocar a skill **não diz qual cópia respondeu**.
+>
+> Esta advertência mora **aqui**, e não só na skill, de propósito: a revisão do PR 494 mostrou que
+> um aviso escrito dentro da cópia do app **não é lido quando a cópia do monorepo é a servida**, e
+> que conferir `git rev-parse --show-toplevel` não resolve — carregar a skill do monorepo não muda o
+> diretório da sessão, então a cópia errada passa no teste. O `CLAUDE.md` é a única superfície que
+> nenhuma skill sombreia.
+>
+> **Dois discriminadores materiais.** Se as instruções que a sessão está seguindo disserem que:
+>
+> - a `versao` do `manifesto.json` **bumpa** quando o PR mexe em `shell_min`/`sdk_min` — **é a cópia
+>   errada**. Aqui é o contrário (§ Versão do manifesto, issue #422): subir piso não bumpa, porque a
+>   `versao` descreve o **schema**. Acusar isso é bloqueante inventado, e acontece em todo PR que
+>   sobe piso;
+> - o diff se confronta contra `docs/shell/` do monorepo — **é a cópia errada**. Aqui a superfície é
+>   o bundle do SDK publicado, e **sem bundle a lente é NÃO EXECUTADA** (§ Superfície de leitura da
+>   skill).
+>
+> **Em qualquer divergência entre a skill e este arquivo, este arquivo vence** — e a divergência é
+> para **contar ao autor**, porque significa que o catálogo serviu a cópia errada. Para reabrir a
+> certa, derive o caminho em vez de cravá-lo:
+> `"$(git rev-parse --show-toplevel)"/.claude/skills/revisar-pr-apps/SKILL.md`.
+
 `.claude/skills/revisar-pr-apps/SKILL.md` é o revisor; `.claude/motor-revisao.md` é o motor da
 fan-out. Os dois são **cópia** de `urbiverso/urbiverso` @ `b0361f6` (PR #2540), portados em
 2026-08-18 e **substituídos pela geração nova em 2026-08-21**.
