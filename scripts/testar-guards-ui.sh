@@ -963,6 +963,21 @@ caso guard-box-model-urbi 1 "vírgula EXTERNA continua separando — o segundo a
 const e = css`.x, urbi-arriscado { width: 100%; }`;
 TS
 
+secao "Escape CSS é texto, não estrutura (os dois sentidos deixavam verde):"
+
+# `\(` escapado contava como abertura de grupo: a profundidade nunca voltava a
+# zero, a vírgula real não dividia, e o segundo seletor era apagado.
+caso guard-box-model-urbi 1 "parêntese ESCAPADO não abre grupo — a vírgula depois dele divide" \
+  'caso\.ts:1' <<'TS'
+const e = css`.x\(foo, urbi-arriscado { width: 100%; }`;
+TS
+
+# `\:` escapado casava como pseudo-elemento legado e dispensava a regra.
+caso guard-box-model-urbi 1 "dois-pontos ESCAPADO é parte do identificador, não pseudo-elemento" \
+  'caso\.ts:1' <<'TS'
+const e = css`urbi-arriscado.foo\:before { width: 100%; }`;
+TS
+
 secao "Pseudo-elemento não é o host — a caixa que recebe a declaração é outra:"
 
 caso guard-box-model-urbi 0 "::part() dimensiona a parte exposta, não o host" <<'TS'

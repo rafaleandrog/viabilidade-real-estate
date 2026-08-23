@@ -140,12 +140,39 @@ const imponeTamanho = (valor) => {
  *   3. le o tipo no inicio dele.
  */
 function seletorAlcanca(seletor, tag) {
-  return dividirVirgulasExternas(seletor).some((parte) => {
+  return dividirVirgulasExternas(neutralizarEscapes(seletor)).some((parte) => {
     const composto = esvaziarGrupos(parte).trim().split(/[\s>+~]+/).filter(Boolean).at(-1) ?? '';
     if (PSEUDO_ELEMENTO.test(composto)) return false;
     const tipo = /^([a-zA-Z][a-zA-Z0-9-]*)/.exec(composto);
     return tipo != null && tipo[1].toLowerCase() === tag;
   });
+}
+
+/**
+ * Troca cada `\\X` do seletor por dois `_`, PRESERVANDO o comprimento.
+ *
+ * ⚠️ Em CSS a barra invertida escapa o caractere seguinte DENTRO de um
+ * identificador, e sem isso os tres consumidores abaixo leem estrutura onde ha
+ * texto — os dois em sentidos opostos, e os dois deixando o guard verde:
+ *
+ *   · `.x\\(foo, urbi-kpi { … }` — o `(` escapado contava como abertura de
+ *     grupo, a profundidade nunca voltava a zero, a virgula real nao dividia e
+ *     `esvaziarGrupos` apagava o segundo seletor;
+ *   · `urbi-kpi.foo\\:before { … }` — o `:` escapado casava como pseudo-elemento
+ *     legado e a regra era dispensada.
+ *
+ * `_` e legal em identificador CSS e nao e `(`, `[`, `,` nem `:`, entao some
+ * como estrutura e sobrevive como texto. Dois por escape mantem o comprimento,
+ * o que deixa qualquer offset calculado sobre o resultado valer no original.
+ * Achado do Codex, rodada 9 — os dois P1.
+ */
+function neutralizarEscapes(sel) {
+  let fora = '';
+  for (let i = 0; i < sel.length; i++) {
+    if (sel[i] === '\\' && i + 1 < sel.length) { fora += '__'; i++; continue; }
+    fora += sel[i];
+  }
+  return fora;
 }
 
 /**
