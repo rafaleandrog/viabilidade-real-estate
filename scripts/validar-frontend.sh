@@ -187,6 +187,14 @@ bd=$?
 [ $bd -eq 0 ] || { echo "  build FALHOU"; exit 1; }
 
 echo "== 7/7 verificação de render em Chromium =="
+# ⚠️ Este marcador é o que impede a ÚLTIMA LINHA de mentir. A versão anterior
+# anunciava "render OK" mesmo quando esta etapa era pulada por falta de
+# Playwright — um cenário que o próprio script suporta de propósito. Quem lê só
+# a linha de resumo registrava validação que não aconteceu, e a linha de resumo
+# é onde mais gente olha. É a mesma classe do defeito central deste PR
+# (reportar limpo sem ter medido), e é literalmente o que o CLAUDE.md chama de
+# "não deu para rodar nunca é passou". Achado do Codex, rodada 4.
+render_rodou=0
 # Por que esta etapa existe: até aqui NENHUM teste toca DOM. Overflow,
 # transbordo, sobreposição de caixa e cor efetiva por tema não existem antes do
 # layout — e é dessa classe o defeito do `urbi-kpi`, reportado quatro vezes
@@ -213,6 +221,7 @@ if node -e "import('$raiz/scripts/render-check.mjs').then((m) => m.harnessDispon
       --test-timeout=180000 frontend/render/*.render.test.ts
     rd=$?
     [ $rd -eq 0 ] || { echo "  render FALHOU"; exit 1; }
+    render_rodou=1
   else
     echo "  aviso: nenhum caso em frontend/render/*.render.test.ts" >&2
   fi
@@ -228,4 +237,10 @@ else
 fi
 
 echo
-echo "✅ Frontend validado: typecheck + testes + build + render OK."
+if [ "$render_rodou" = "1" ]; then
+  echo "✅ Frontend validado: typecheck + testes + build + render OK."
+else
+  echo "⚠️  Frontend validado PARCIALMENTE: typecheck + testes + build OK."
+  echo "    RENDER NÃO EXECUTADO (etapa 7/7 pulada) — nada foi medido em DOM."
+  echo "    Isto NÃO é 'render OK'. O job \`render\` do CI reprova nesta condição."
+fi

@@ -55,6 +55,32 @@ test('o harness REJEITA um caso oculto por `opacity: 0` num ANCESTRAL', { skip: 
   );
 });
 
+test('o harness REJEITA um caso posicionado FORA DA ÁREA ROLÁVEL', { skip: pular ?? false }, async () => {
+  // A 12ª forma de ocultação, e a que precisou de checagem própria: nem
+  // `checkVisibility` (diz true) nem o retângulo (200x40) a pegam. O que a
+  // denuncia é `right = -9799` — coordenada negativa não amplia o scroll, então
+  // não existe rolagem que chegue lá. Distingue-se de conteúdo abaixo da dobra,
+  // que tem `bottom` positivo e é medido de propósito.
+  await assert.rejects(
+    () => verificarRender({ caso: 'controle-fora-da-area', larguras: [1280] }),
+    /OCULTO/,
+    'left:-9999px esconde a tela sem que estilo computado ou tamanho denunciem',
+  );
+});
+
+test('caixa zerada PELO STUB é cobrada; zerada por TRANSFORM não é', { skip: pular ?? false }, async () => {
+  // Os dois sentidos do discriminador, num caso só — é o que prova que a
+  // distinção distingue, em vez de só existir. Medido antes do conserto: os
+  // DOIS eram cobrados, forçando dispensa para conteúdo que nenhuma lente mede.
+  const a = await verificarRender({ caso: 'controle-transform-zero', larguras: [1280] });
+  assert.deepEqual(
+    a.montagem?.naoDeclaradas,
+    ['urbi-select.opcoes'],
+    'o select zerado pelo stub tem de ser cobrado (a prop é a causa de a caixa sumir); '
+      + 'o botão sob transform:scale(0) não, porque nenhuma lente o mede',
+  );
+});
+
 test('o harness REJEITA um caso que usa primitivo sem stub', { skip: pular ?? false }, async () => {
   // Sem stub o navegador trata a tag como elemento desconhecido: nenhuma das
   // declarações `:host` do primitivo real se aplica, e a geometria medida ali é

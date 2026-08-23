@@ -447,17 +447,57 @@ function gerarTemas() {
 // | atributo hidden                         | false |   0   | SIM                |
 // | <details> fechado                       | false |   +   | SIM                |
 // | transform: scale(0)                     | TRUE  |   0   | SIM  ← só R pega   |
+// | left:-9999px  (right <= 0)              | TRUE  |   +   | SIM  ← nem V nem R |
+// | top:-9999px   (bottom <= 0)             | TRUE  |   +   | SIM  ← nem V nem R |
 // | aria-hidden="true"                      | true  |   +   | NÃO                |
 // | inert                                   | true  |   +   | NÃO                |
-// | fora do viewport (left:-9999px)         | true  |   +   | NÃO                |
+// | abaixo da dobra (top: 3000px)           | true  |   +   | NÃO                |
+// | à direita além da largura (left:3000px) | true  |   +   | NÃO                |
 //
-// As três últimas são decisões, não omissões:
+// A DÉCIMA SEGUNDA forma — coordenada negativa — precisou de uma terceira
+// checagem, porque nem V nem R a pegam: `checkVisibility` diz `true` e o
+// retângulo tem 200x40. O que a distingue de conteúdo legítimo fora da dobra é
+// que **coordenada negativa não amplia o scroll**: medido, `left: -9999px` dá
+// `right = -9799`, e não existe rolagem que leve até lá (LTR/TTB). Já
+// `top: 3000px` dá `bottom = 3040` e é conteúdo abaixo da dobra, que o harness
+// mede de propósito — ele afere a página inteira, não a dobra.
+//
+//   F = fora da área rolável: (largura > 0 e right + scrollX <= 0)
+//                          ou (altura  > 0 e bottom + scrollY <= 0)
+//
+// ⚠️ `left: 3000px` fica como VISÍVEL de propósito, mesmo quando o documento
+// não rola até lá. Errar para "visível" faz o harness MEDIR a mais, que é
+// inócuo; errar para "oculto" faz ele PULAR, que é o defeito desta família
+// inteira. Além disso, conteúdo largo demais é assunto da lente de overflow,
+// que usa o `scrollWidth` do próprio navegador.
+//
+// As decisões de NÃO contar como oculto:
 //
 //  · `aria-hidden` e `inert` escondem de tecnologia assistiva e de interação —
 //    os pixels continuam lá, ocupando espaço e podendo transbordar. Este harness
 //    mede GEOMETRIA; ignorá-los seria deixar de medir tela que aparece.
-//  · fora do viewport é posicionamento legítimo: o harness mede a página
-//    inteira, não a dobra. Um nó a 3000px de altura é conteúdo, não ocultação.
+//  · abaixo da dobra é posicionamento legítimo: um nó a 3000px é conteúdo.
+//
+// ── E a caixa de tamanho zero: DUAS causas, vereditos opostos ───────────────
+//
+// Zero não quer dizer a mesma coisa nos dois casos, e tratá-los juntos quebra
+// para um lado ou para o outro:
+//
+//  · zerada PELO STUB — o stub não desenha o conteúdo que não sabe reproduzir,
+//    então um `urbi-select` com 5 opções fica 1183x0. Precisa CONTINUAR no
+//    inventário de props não reproduzidas: a prop não reproduzida é a causa de
+//    a caixa ter sumido, e descartá-la apaga o aviso exatamente onde ele serve;
+//  · zerada por TRANSFORM do caso — `transform: scale(0)` num ancestral. Aqui
+//    todas as lentes descartam a subárvore, então cobrar declaração de props
+//    dela é forçar dispensa para conteúdo que não participa de medição nenhuma.
+//
+// O discriminador é limpo e não é heurística: `offsetWidth`/`offsetHeight` são
+// métricas de LAYOUT e ignoram transform; `getBoundingClientRect` as aplica.
+// Medido: `scale(0)` dá rect 0x0 com offset 150x30; o stub vazio dá rect 784x0
+// com offset 784x0. Logo:
+//
+//   T = colapsada por transform: (offsetWidth > 0 e rect.width === 0)
+//                             ou (offsetHeight > 0 e rect.height === 0)
 //
 // ⚠️ LIMITES CONHECIDOS, e ficam escritos para ninguém os redescobrir:
 // `clip-path: inset(100%)` e `filter: opacity(0)` escondem sem zerar o
@@ -478,13 +518,29 @@ function gerarSondasCompartilhadas() {
     'if (typeof Element.prototype.checkVisibility !== "function") {',
     '  throw new Error("Element.checkVisibility ausente neste navegador: o harness nao sabe detectar ocultacao por ancestral e NAO deve seguir medindo.");',
     '}',
-    '// DUAS checagens, e a diferenca entre elas importa:',
-    '//  · naoOcultoPorCss = so o checkVisibility. Nao exige tamanho.',
-    '//  · visivel         = aquilo E retangulo maior que zero.',
-    '// Ver a nota sobre o criterio CIRCULAR em scripts/render-check.mjs.',
+    '// DUAS checagens publicas, e a diferenca entre elas importa:',
+    '//  · participaDaMedicao = o no nao foi escondido por ninguem. NAO exige tamanho,',
+    '//    porque caixa zerada PELO STUB tem de continuar contando (a prop nao',
+    '//    reproduzida e a causa de ela ter sumido).',
+    '//  · visivel            = aquilo E retangulo maior que zero.',
+    '// Ver a tabela de OCULTACAO em scripts/render-check.mjs.',
     'const naoOcultoPorCss = (el) => el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true });',
+    '// Coordenada negativa nao amplia o scroll: nao ha rolagem que chegue la.',
+    'const foraDaAreaRolavel = (el) => {',
+    '  const r = el.getBoundingClientRect();',
+    '  return (r.width > 0 && r.right + window.scrollX <= 0)',
+    '      || (r.height > 0 && r.bottom + window.scrollY <= 0);',
+    '};',
+    '// offsetWidth/Height sao metricas de LAYOUT e ignoram transform; o rect a aplica.',
+    'const colapsadaPorTransform = (el) => {',
+    '  const r = el.getBoundingClientRect();',
+    '  return (el.offsetWidth > 0 && r.width === 0) || (el.offsetHeight > 0 && r.height === 0);',
+    '};',
+    'const participaDaMedicao = (el) => naoOcultoPorCss(el)',
+    '  && !colapsadaPorTransform(el)',
+    '  && !foraDaAreaRolavel(el);',
     'const visivel = (el) => {',
-    '  if (!naoOcultoPorCss(el)) return false;',
+    '  if (!participaDaMedicao(el)) return false;',
     '  const r = el.getBoundingClientRect();',
     '  return r.width > 0 && r.height > 0;',
     '};',
@@ -511,7 +567,7 @@ function gerarSondasCompartilhadas() {
     '  }',
     '  return partes.join(" > ");',
     '};',
-    'window.__rc = { visivel, naoOcultoPorCss, coletar, caminho, paiComposto };',
+    'window.__rc = { visivel, participaDaMedicao, coletar, caminho, paiComposto };',
   ].join('\n');
 }
 
@@ -674,7 +730,7 @@ function sonda(tol) {
  * provam que a tela sob medição é aquela, e não outra.
  */
 function sondaMontagem({ exigir, mapa }) {
-  const { visivel, naoOcultoPorCss, coletar } = window.__rc;
+  const { visivel, participaDaMedicao, coletar } = window.__rc;
   const elementos = coletar(document.getElementById('raiz'));
 
   // ⚠️ VISIBILIDADE É PARTE DA PROVA — e a definição é COMPARTILHADA.
@@ -716,7 +772,7 @@ function sondaMontagem({ exigir, mapa }) {
   // que parece, e precisa aparecer em vez de ficar calada.
   // Props NÃO REPRODUZIDAS em uso.
   //
-  // ⚠️ AQUI O CRITÉRIO É `naoOcultoPorCss`, E NÃO `visivel` — a diferença é a
+  // ⚠️ AQUI O CRITÉRIO É `participaDaMedicao`, E NÃO `visivel` — a diferença é a
   // única coisa não óbvia desta sonda, e usar `visivel` aqui é CIRCULAR.
   //
   // O stub não desenha o conteúdo que não sabe reproduzir. Um `urbi-select` com
@@ -726,12 +782,20 @@ function sondaMontagem({ exigir, mapa }) {
   // reproduzida é a CAUSA de a caixa ter sumido. Medido em `kpis-resumo`:
   // `urbi-select` com 5 opções, 1183x0 px, silenciosamente fora da conta.
   //
-  // `naoOcultoPorCss` mantém o nó na conta enquanto ninguém o escondeu de
+  // `participaDaMedicao` mantém o nó na conta enquanto ninguém o escondeu de
   // propósito. Prop em subárvore que o app ocultou continua fora — essa não
   // afeta medida nenhuma, e avisar sobre ela seria o ruído que faz ignorar o
   // aviso.
+  //
+  // ⚠️ E a exceção vale SÓ para a caixa zerada pelo stub. A primeira versão
+  // usava apenas `checkVisibility`, e com isso subárvore sob
+  // `transform: scale(0)` entrava: todas as lentes a descartam, mas o inventário
+  // cobrava declaração em `aceitaNaoReproduzido` para conteúdo que não participa
+  // de medição nenhuma — e a dispensa continuaria válida se a transformação
+  // sumisse depois. A distinção entre as duas causas de tamanho zero está na
+  // tabela em scripts/render-check.mjs. Achado do Codex, rodada 4.
   const naoReproduzidas = new Set();
-  for (const el of elementos.filter(naoOcultoPorCss)) {
+  for (const el of elementos.filter(participaDaMedicao)) {
     const lista = mapa[el.tagName.toLowerCase()];
     if (!lista) continue;
     for (const { prop, atributo, reproduzida } of lista) {

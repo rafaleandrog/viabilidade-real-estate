@@ -449,3 +449,19 @@ jobs:
             exit 1
           fi
           echo "ok: render verificado."
+      - name: Registrar no resumo se o render rodou
+        if: always()
+        env:
+          RODOU: ${{ steps.escopo.outputs.roda }}
+        run: |
+          set -uo pipefail
+          # O IRMÃO, no CI, do "render OK" que o validar-frontend.sh anunciava
+          # mesmo pulando a etapa. Quando o PR está fora de escopo os passos
+          # acima são pulados por `if:` e o job fica VERDE — o que é correto,
+          # mas o nome do check ("Render em Chromium") se lê como se algo
+          # tivesse sido medido. Esta linha põe o estado onde mais gente olha.
+          if [ "${RODOU:-0}" = "1" ]; then
+            echo "Render em Chromium: **executado**." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Render em Chromium: **NÃO executado** — o diff não toca frontend/, o espelho de UI, a toolchain pinada nem o harness. Nada foi medido em DOM (o que é esperado neste caso)." >> "$GITHUB_STEP_SUMMARY"
+          fi
