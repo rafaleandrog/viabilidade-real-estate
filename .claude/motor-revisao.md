@@ -50,8 +50,34 @@ relatório e na linha de anúncio. O que nunca acontece é lente sumir porque o 
 > **pelo autor do PR**, então uma review do bot **nunca** satisfaz o status `revisao/bloqueantes` —
 > e, pior, publicar a linha de máquina com `bloqueantes=0` deixa o status **verde** com thread do
 > Codex em aberto. Por isso: **`bloqueantes=` conta os achados do Codex ainda não resolvidos**, e o
-> quadro de execução da §7 traz uma linha por rodada do Codex, com o commit revisado. Threads
-> endereçados se resolvem antes de fechar o ciclo.
+> quadro de execução da §7 traz uma linha por rodada do Codex, com o commit revisado.
+
+### Sequência obrigatória do App — acionar, ESPERAR, colher, só então atestar
+
+**ADAPTADO — 2026-08-23, achado P1 do próprio Codex no PR 494.** A resposta do App é
+**assíncrona**, e dizer que `bloqueantes=` conta os achados dele **não basta**: sem um passo de
+espera, o relatório sai antes de o achado chegar e o status fica verde sobre uma revisão que ainda
+não aconteceu. Era exatamente o furo que esta seção existia para fechar, aberto de novo pela falta
+de um passo.
+
+Então, **antes** de publicar o relatório da §7, execute nesta ordem:
+
+1. **Acione.** Comente `@codex review` no PR, com o head da rodada declarado no texto. (Abrir o PR
+   também aciona; um `@codex review` explícito por rodada é o que torna a rodada rastreável.)
+2. **Espere, com teto.** Releia as reviews do PR até aparecer uma cujo `commit_id` seja **o head da
+   rodada** — não o anterior. Teto de **15 minutos**. Medido no PR 494: ~2 min por rodada.
+3. **Colhe.** Leia os *review threads*, não só o corpo da review — os achados vêm como comentários
+   inline, com `path` e `line`. Cada um tem severidade (P1/P2).
+4. **Verifique cada achado você mesmo**, como qualquer bloqueante (§11 da skill). Achado do Codex
+   não é verdade revelada: ele erra, e contestação com evidência é legítima.
+5. **Só então** monte `bloqueantes=` = seus bloqueantes **+** os achados do Codex ainda não
+   resolvidos, e publique.
+6. **Resolva os threads que você endereçou**, para a próxima rodada distinguir o que é novo.
+
+**Se o teto estourar** — nenhuma review no head da rodada em 15 min —, isso **não** vira
+`bloqueantes=0` calado. Publique com `motor=nativo` na linha de máquina, diga **em uma linha** que o
+App foi acionado e não respondeu no prazo, e trate o ciclo como **não fechado** até ele responder ou
+o autor dispensar. Silêncio do motor nunca é aprovação do motor.
 
 ## Entradas que a skill chamadora fornece
 

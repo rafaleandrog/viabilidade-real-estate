@@ -144,14 +144,27 @@ como reforço, não como única defesa.
 
 | Caminho | Estado |
 |---|---|
-| CLI local (`codex exec`), que `.claude/motor-revisao.md` prescreve | ✅ funciona em `urbiverso/urbiverso` (PR #2595, `gpt-5.6-terra`/`sol`). ❌ **nunca rodou aqui**: PRs #420 e #424 dizem no corpo *"motor nativo"* |
-| GitHub App (`@codex review`) | ❌ não instalado em nenhum dos dois repos — `commenter:app/chatgpt-codex-connector` → 0 resultados em 40 PRs |
+| **GitHub App (`@codex review`)** | ✅ **instalado e funcionando — é o caminho normal deste repositório.** Provado no PR 494: cinco rodadas, ~2 min cada, **sete achados** (um P1, seis P2), todos reais |
+| CLI local (`codex exec`), que `.claude/motor-revisao.md` prescrevia como único | ✅ funciona em `urbiverso/urbiverso` (PR #2595, `gpt-5.6-terra`/`sol`). ❌ **não sobe aqui** |
 | ChatGPT/Codex web sobre a URL do PR | ✅ funciona, e não depende de `OPENAI_API_KEY` |
 
-Para o primeiro caminho faltam **duas** coisas neste ambiente, e a doc do repo só cita a primeira:
+> 🔴 **Eu afirmei que o App não estava instalado, e estava errado.** A afirmação vinha de
+> `commenter:app/chatgpt-codex-connector` → 0 resultados em 40 PRs. A busca estava certa; a
+> conclusão, não: zero comentários provava que ele nunca fora **chamado** aqui, não que estivesse
+> ausente. Bastou comentar `@codex review`. **Lição de método:** ausência de uso não é ausência de
+> capacidade — e o custo de confundir os dois foi quase adotar o motor mais fraco tendo o melhor
+> disponível.
+
+Para o **CLI local** faltam **duas** coisas neste ambiente, e a doc do repo só citava a primeira:
 `OPENAI_API_KEY` nas variáveis do *cloud environment*, **e** `api.openai.com` liberado na política de
 rede — medido: o proxy devolve **403 no CONNECT**, com `connect_rejected` registrado. O ambiente do
-`urbiverso` evidentemente libera; este não.
+`urbiverso` evidentemente libera; este não. **Nada disso é bloqueio**, porque o App não passa por
+aqui: ele roda na infraestrutura da OpenAI, acionado pelo GitHub.
+
+**App e lentes nativas somam.** No PR 494 a divisão foi limpa: o Codex achou os defeitos de
+**lógica** (uma guarda que não testava o que dizia testar; um caminho absoluto inexistente noutro
+layout; uma atestação que podia sair antes da revisão chegar), e as lentes nativas acharam as
+**imprecisões factuais** do texto. Nenhum dos dois acharia o conjunto sozinho.
 
 ### Também nesta alteração
 
