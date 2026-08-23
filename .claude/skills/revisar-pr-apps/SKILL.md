@@ -668,7 +668,7 @@ decair**, e rodada 2 rodando a skill inteira por reflexo é o modo caro de errar
 
 | Delta desde a rodada anterior | Ação |
 |---|---|
-| Escopado aos achados, fora dos caminhos de runtime que a rodada anterior confrontou | conferência de delta, **sem fan-out** |
+| Escopado aos achados, fora dos caminhos de runtime que a rodada anterior confrontou | conferência de delta, **sem fan-out nativo** — a revisão do App continua obrigatória |
 | Toca caminho que a rodada anterior confrontou-e-passou | fan-out reduzido: as lentes daquele caminho, mais S2 |
 | Mudança estrutural, ou mexeu em SDK, lockfile ou `sdk_min` | skill inteira, esforço recalibrado e **superfície reconferida** |
 

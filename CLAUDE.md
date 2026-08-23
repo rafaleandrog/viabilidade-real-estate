@@ -298,13 +298,18 @@ colher os *review threads*, verificar, só então atestar — está em `.claude/
 
 > ⚠️ **`bloqueantes=` conta os achados do Codex ainda não resolvidos**, porque
 > `revisao-registrada.yml` filtra comentários **pelo autor do PR** e nunca enxerga o bot. E se o App
-> não responder no teto, **não se publica a linha de máquina** — `bloqueantes=0` deixaria o portão
-> verde sobre um ciclo aberto, já que o job lê só o número, nunca a prosa.
+> não responder no teto, **publique a linha com `bloqueantes=1`**, tendo a ausência da review como o
+> bloqueante. **Omitir a linha não serve**: o próprio relatório dispara `issue_comment`, o job varre
+> todos os comentários do head e, se houver uma atestação `bloqueantes=0` anterior **no mesmo head**,
+> **republica `success`**. Ausência de linha nova não apaga linha velha — só uma linha nova
+> sobrescreve.
 
-Os outros dois caminhos continuam existindo e são o **fallback**: o **CLI local** (`codex exec`) —
-que aqui não sobe, porque falta `OPENAI_API_KEY` **e** a liberação de `api.openai.com`, hoje **403 no
-CONNECT** — e o **fan-out nativo**, que só entra quando os dois falham e é **declarado** no relatório
-como menos adversarial, por ser patch revisado pela mesma família de modelo que o escreveu.
+**São duas camadas que somam, não uma fila.** A **revisão do App** (`@codex review`) e a **fan-out
+das lentes** rodam as duas. O que é condicional é o motor *dentro* da fan-out: **CLI local**
+(`codex exec`) quando houver `OPENAI_API_KEY` **e** a liberação de `api.openai.com` — aqui não há, o
+proxy dá **403 no CONNECT** —, e **subagente nativo** quando não houver, **declarado** no relatório
+como menos adversarial, por revisar patch escrito pela mesma família de modelo. O App **não
+dispensa** a fan-out: neste repositório os dois acharam classes de defeito diferentes.
 
 **A camada de contratos não roda neste ambiente, e isso é estrutural.** Ela lê
 `node_modules/@urbiverso/sdk/docs/`, e aqui **tanto o `pnpm install` quanto o `npm view

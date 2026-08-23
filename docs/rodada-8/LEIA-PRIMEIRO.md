@@ -49,9 +49,10 @@ nova rodada de revisão → parar. **Merge é decisão do autor.**
 > de rede, que hoje devolve **403 no CONNECT**. Nada disso bloqueia o App, que roda fora daqui.
 > Detalhe em `.claude/motor-revisao.md` § *Sequência obrigatória do App*.
 
-O motor de revisão está montado em `.claude/motor-revisao.md`, com três caminhos em ordem de
-preferência: **GitHub App** (`@codex review`, o normal), **CLI local** (`codex exec`, se houver chave
-e rede) e **fan-out nativo** (só quando os dois falham, e **declarado** como menos adversarial).
+O motor de revisão está montado em `.claude/motor-revisao.md`, em **duas camadas que somam**: a
+**revisão do App** (`@codex review`, sempre) e a **fan-out das lentes** (sempre). O condicional é o
+motor *dentro* da fan-out — **CLI local** (`codex exec`) se houver chave e rede, **nativo** se não
+houver, **declarado** como menos adversarial. O App **não dispensa** a fan-out.
 
 > ⚠️ **A chave é por ambiente.** Numa sessão web, ela vai nas variáveis do *cloud environment*;
 > numa sessão local, no ambiente da máquina. Definir num lado não vale para o outro.

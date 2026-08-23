@@ -76,8 +76,14 @@ Então, **antes** de publicar o relatório da §7, execute nesta ordem:
 
 1. **Acione.** Comente `@codex review` no PR, com o head da rodada declarado no texto. (Abrir o PR
    também aciona; um `@codex review` explícito por rodada é o que torna a rodada rastreável.)
-2. **Espere, com teto.** Releia as reviews do PR até aparecer uma cujo `commit_id` seja **o head da
-   rodada** — não o anterior. Teto de **15 minutos**. Medido no PR 494: ~2 min por rodada.
+2. **Espere, com teto.** Antes de acionar, **anote o `id` da review mais recente do bot**. Depois
+   releia as reviews até aparecer uma que satisfaça **as duas** condições: `commit_id` igual ao head
+   da rodada **e** `id` (ou `submitted_at`) **posterior ao que você anotou**. Teto de **15 minutos**.
+
+   > ⚠️ **Casar só o head não basta** — achado P1 da rodada 10 do próprio Codex. Numa rodada N+1 que
+   > nasce de comentário, e não de push, o head **não muda**: a review da rodada anterior já tem
+   > aquele `commit_id`, o predicado passa **na hora**, e os passos 3 a 5 atestam antes de a revisão
+   > nova chegar. É a mesma corrida que esta sequência existe para fechar, uma volta adiante.
 3. **Colhe.** Leia os *review threads*, não só o corpo da review — os achados vêm como comentários
    inline, com `path` e `line`. Cada um tem severidade (P1/P2).
 4. **Verifique cada achado você mesmo**, como qualquer bloqueante (§11 da skill). Achado do Codex
