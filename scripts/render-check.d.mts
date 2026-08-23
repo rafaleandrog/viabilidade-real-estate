@@ -27,7 +27,8 @@ export interface MedidaDeVariante {
 export interface PropDoEspelho {
   tag: string;
   prop: string;
-  atributo: string;
+  /** `null` para prop `so_propriedade` — o Lit a entrega por binding, sem atributo. */
+  atributo: string | null;
   reproduzida: boolean;
 }
 
@@ -38,6 +39,8 @@ export interface Montagem {
   largura: number;
   assentou: boolean;
   faltando: { seletor: string; minimo: number; achou: number; ocultos: number }[];
+  /** Tags `urbi-*` presentes na árvore que não existem no espelho — logo, sem stub. */
+  semStub: string[];
   /** Props não reproduzidas pelo stub e em uso num nó visível — união das larguras. */
   naoReproduzidas: string[];
   /** Dessas, as que o caso não declarou em `aceitaNaoReproduzido`. */

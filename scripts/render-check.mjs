@@ -228,16 +228,33 @@ function mapaDeReproducao(primitivos) {
       const m = /^:host\(\[([a-z0-9-]+)/.exec(h.seletor);
       if (m) atributosNoHost.add(m[1]);
     }
-    mapa[tag] = p.props
-      .filter((x) => x.atributo)
-      .map((x) => ({
-        prop: x.propriedade,
-        atributo: x.atributo,
-        reproduzida: Boolean(PROPS_QUE_DIMENSIONAM[tag]?.[x.propriedade])
-          || atributosNoHost.has(x.atributo)
-          || x.propriedade === 'rotulo'
-          || x.propriedade === 'valor',
-      }));
+    // ⚠️ NADA é filtrado para fora daqui, e a versão anterior filtrava.
+    //
+    // Ela descartava as props `so_propriedade` (as 16 com `attribute: false`)
+    // antes de classificar — mas o Lit as usa normalmente, por binding de
+    // propriedade, e o app faz isso: `tela-resumo.ts` passa `.opcoes` ao
+    // `urbi-select`, e `urbi-select.opcoes` nunca aparecia como não
+    // reproduzida, embora o stub não desenhe opção nenhuma. O confronto nos
+    // dois sentidos, desenhado justamente para não envelhecer, estava verde com
+    // lacuna real. Achado P2 do Codex, rodada 3.
+    //
+    // Os `atributos_convencao` entram pelo mesmo motivo: `expandir` não é
+    // `@property` e mesmo assim muda o layout do primitivo real. Onde a
+    // linhagem tem regra `:host([attr])`, o stub reproduz — o espelho traz a
+    // regra e o navegador a aplica. Onde não tem (o primitivo lê o atributo em
+    // JS), não reproduz, e agora isso aparece.
+    const declaradas = p.props.map((x) => ({ prop: x.propriedade, atributo: x.atributo ?? null }));
+    for (const attr of p.atributos_convencao ?? []) {
+      if (!declaradas.some((d) => d.atributo === attr)) declaradas.push({ prop: attr, atributo: attr });
+    }
+    mapa[tag] = declaradas.map((x) => ({
+      prop: x.prop,
+      atributo: x.atributo,
+      reproduzida: Boolean(PROPS_QUE_DIMENSIONAM[tag]?.[x.prop])
+        || (x.atributo !== null && atributosNoHost.has(x.atributo))
+        || x.prop === 'rotulo'
+        || x.prop === 'valor',
+    }));
   }
   return mapa;
 }
@@ -404,37 +421,107 @@ function gerarTemas() {
   return { css: blocos.join('\n\n'), n };
 }
 
+// ── OCULTAÇÃO: a família inteira, num lugar só ──────────────────────────────
+//
+// Três rodadas de revisão acharam a mesma classe de defeito por formas
+// diferentes: um nó que o harness conta como presente, mas que ninguém vê — e
+// as lentes de layout pulam justamente o que ninguém vê, então o resultado é
+// "limpo" sobre uma tela que nunca foi medida. Primeiro foi `display: none`
+// (rodada 2), depois `opacity: 0` num ANCESTRAL (rodada 3), que não se propaga
+// para o estilo computado do descendente.
+//
+// Tratar a próxima forma quando ela aparecer é aceitar uma rodada por forma.
+// Esta é a tabela inteira, com veredito medido em Chromium 141 — e o que
+// decide é a soma de DUAS checagens, porque nenhuma sozinha cobre tudo:
+//
+//   V = el.checkVisibility({ opacityProperty, visibilityProperty, contentVisibilityAuto })
+//   R = o retângulo de borda tem largura E altura maiores que zero
+//
+// | forma                                   |   V   |   R   | conta como oculta? |
+// |-----------------------------------------|-------|-------|--------------------|
+// | display:none (próprio ou ancestral)     | false |   0   | SIM                |
+// | visibility:hidden em ancestral          | false |   +   | SIM                |
+// | opacity:0 em ancestral                  | false |   +   | SIM  ← rodada 3    |
+// | opacity:0 em ancestral, nó no shadow    | false |   +   | SIM  (V atravessa) |
+// | content-visibility:hidden em ancestral  | false |   +   | SIM                |
+// | atributo hidden                         | false |   0   | SIM                |
+// | <details> fechado                       | false |   +   | SIM                |
+// | transform: scale(0)                     | TRUE  |   0   | SIM  ← só R pega   |
+// | aria-hidden="true"                      | true  |   +   | NÃO                |
+// | inert                                   | true  |   +   | NÃO                |
+// | fora do viewport (left:-9999px)         | true  |   +   | NÃO                |
+//
+// As três últimas são decisões, não omissões:
+//
+//  · `aria-hidden` e `inert` escondem de tecnologia assistiva e de interação —
+//    os pixels continuam lá, ocupando espaço e podendo transbordar. Este harness
+//    mede GEOMETRIA; ignorá-los seria deixar de medir tela que aparece.
+//  · fora do viewport é posicionamento legítimo: o harness mede a página
+//    inteira, não a dobra. Um nó a 3000px de altura é conteúdo, não ocultação.
+//
+// ⚠️ LIMITES CONHECIDOS, e ficam escritos para ninguém os redescobrir:
+// `clip-path: inset(100%)` e `filter: opacity(0)` escondem sem zerar o
+// retângulo e sem serem vistos pelo `checkVisibility` — medido: os dois passam
+// como visíveis. Nenhum dos dois é usado por este app hoje. Se algum entrar,
+// esta tabela é o lugar de resolver, e a saída provável é comparar pixels em
+// vez de estilo computado.
+//
+// `checkVisibility` é OBRIGATÓRIO: sem ele o harness reprova em vez de cair num
+// substituto pior. Degradar em silêncio para uma checagem que não enxerga
+// ancestral é exatamente o defeito que esta tabela existe para fechar.
+function gerarSondasCompartilhadas() {
+  return [
+    '// GERADO por scripts/render-check.mjs — helpers usados pelas TRES sondas.',
+    '// Uma definicao so, de proposito: quando a prova de montagem e as lentes de',
+    '// layout tinham cada uma a sua, passou a existir no que a prova contava e a',
+    '// medicao ignorava. Ver a tabela de OCULTACAO em scripts/render-check.mjs.',
+    'if (typeof Element.prototype.checkVisibility !== "function") {',
+    '  throw new Error("Element.checkVisibility ausente neste navegador: o harness nao sabe detectar ocultacao por ancestral e NAO deve seguir medindo.");',
+    '}',
+    '// DUAS checagens, e a diferenca entre elas importa:',
+    '//  · naoOcultoPorCss = so o checkVisibility. Nao exige tamanho.',
+    '//  · visivel         = aquilo E retangulo maior que zero.',
+    '// Ver a nota sobre o criterio CIRCULAR em scripts/render-check.mjs.',
+    'const naoOcultoPorCss = (el) => el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true });',
+    'const visivel = (el) => {',
+    '  if (!naoOcultoPorCss(el)) return false;',
+    '  const r = el.getBoundingClientRect();',
+    '  return r.width > 0 && r.height > 0;',
+    '};',
+    'const coletar = (raiz) => {',
+    '  const fora = [];',
+    '  (function anda(no) {',
+    '    for (const el of no.querySelectorAll("*")) {',
+    '      fora.push(el);',
+    '      if (el.shadowRoot) anda(el.shadowRoot);',
+    '    }',
+    '  })(raiz);',
+    '  return fora;',
+    '};',
+    'const paiComposto = (n) => n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);',
+    'const caminho = (el, teto) => {',
+    '  const partes = [];',
+    '  let n = el;',
+    '  while (n && partes.length < (teto || 6)) {',
+    '    let p = n.tagName.toLowerCase();',
+    '    if (n.id) p += "#" + n.id;',
+    '    else if (n.classList && n.classList.length) p += "." + [...n.classList].join(".");',
+    '    partes.unshift(p);',
+    '    n = paiComposto(n);',
+    '  }',
+    '  return partes.join(" > ");',
+    '};',
+    'window.__rc = { visivel, naoOcultoPorCss, coletar, caminho, paiComposto };',
+  ].join('\n');
+}
+
 // ── a sonda: roda DENTRO da página ──────────────────────────────────────────
 // Uma função só, serializada pelo Playwright. Não pode referenciar nada do
 // escopo de fora — tudo entra por argumento.
 function sonda(tol) {
-  const elementos = [];
-  (function coletar(raiz) {
-    for (const el of raiz.querySelectorAll('*')) {
-      elementos.push(el);
-      if (el.shadowRoot) coletar(el.shadowRoot);
-    }
-  })(document.getElementById('raiz'));
-
+  const { visivel, coletar, caminho, paiComposto } = window.__rc;
+  const elementos = coletar(document.getElementById('raiz'));
   const cs = (el) => getComputedStyle(el);
-  const visivel = (el) => {
-    const s = cs(el);
-    if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false;
-    const r = el.getBoundingClientRect();
-    return r.width > 0 && r.height > 0;
-  };
-  const caminho = (el) => {
-    const partes = [];
-    let n = el;
-    while (n && partes.length < 6) {
-      let p = n.tagName.toLowerCase();
-      if (n.id) p += '#' + n.id;
-      else if (n.classList && n.classList.length) p += '.' + [...n.classList].join('.');
-      partes.unshift(p);
-      n = n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
-    }
-    return partes.join(' > ');
-  };
 
   // ── overflow do documento ────────────────────────────────────────────────
   const de = document.documentElement;
@@ -534,7 +621,7 @@ function sonda(tol) {
     let n = b;
     while (n) {
       if (n === a) return true;
-      n = n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
+      n = paiComposto(n);
     }
     return false;
   };
@@ -587,32 +674,24 @@ function sonda(tol) {
  * provam que a tela sob medição é aquela, e não outra.
  */
 function sondaMontagem({ exigir, mapa }) {
-  const elementos = [];
-  (function coletar(raiz) {
-    for (const el of raiz.querySelectorAll('*')) {
-      elementos.push(el);
-      if (el.shadowRoot) coletar(el.shadowRoot);
-    }
-  })(document.getElementById('raiz'));
+  const { visivel, naoOcultoPorCss, coletar } = window.__rc;
+  const elementos = coletar(document.getElementById('raiz'));
 
-  // ⚠️ VISIBILIDADE É PARTE DA PROVA, e a primeira versão não exigia.
+  // ⚠️ VISIBILIDADE É PARTE DA PROVA — e a definição é COMPARTILHADA.
   //
-  // `el.matches(seletor)` casa com nó OCULTO. Uma regressão de estado que deixe
-  // o spinner na frente e a tela concluída sob `display: none` passava na prova
-  // (os 7 urbi-kpi existem), o spinner ainda dava área visível positiva, e as
-  // lentes de layout pulavam a subárvore invisível por definição — tudo "limpo"
-  // sem ter medido, que é exatamente o que esta sonda existe para impedir.
-  // Medido antes do conserto: 213 nós, 36.352px² visíveis, três larguras limpas.
-  // Achado P1 do Codex, rodada 2; coberto por `casos/controle-oculto.ts`.
+  // `el.matches(seletor)` casa com nó oculto. Uma regressão de estado que deixe
+  // o spinner na frente e a tela concluída escondida passava na prova (os nós
+  // existem), o spinner ainda dava área positiva, e as lentes de layout pulavam
+  // a subárvore por invisível — tudo "limpo" sem ter medido.
   //
-  // É a MESMA definição de visível da sonda de layout — de propósito. Se as duas
-  // divergirem, volta a existir nó que a prova conta e a medição ignora.
-  const visivel = (el) => {
-    const e = getComputedStyle(el);
-    if (e.display === 'none' || e.visibility === 'hidden' || Number(e.opacity) === 0) return false;
-    const r = el.getBoundingClientRect();
-    return r.width > 0 && r.height > 0;
-  };
+  // A primeira correção usava uma cópia da checagem, e a cópia só olhava o
+  // PRÓPRIO nó: `opacity: 0` num ancestral não se propaga para o computado do
+  // descendente, então a mesma falha voltava por outra porta. Hoje as três
+  // sondas chamam a MESMA `window.__rc.visivel` — se elas divergirem, volta a
+  // existir nó que a prova conta e a medição ignora. A tabela com todas as
+  // formas de ocultação e o veredito de cada uma está em scripts/render-check.mjs.
+  // Coberto por `casos/controle-oculto.ts` (display) e
+  // `casos/controle-opacidade-zero.ts` (opacity em ancestral).
   const visiveis = elementos.filter(visivel);
 
   const areaVisivel = visiveis.reduce((soma, el) => {
@@ -635,23 +714,54 @@ function sondaMontagem({ exigir, mapa }) {
   // LACUNAS EM USO: prop de tamanho que o espelho declara, o stub não sabe
   // honrar, e o caso usa mesmo assim. Não é erro — é a medida valendo menos do
   // que parece, e precisa aparecer em vez de ficar calada.
-  // Props NÃO REPRODUZIDAS em uso num nó VISÍVEL. Só visível: prop numa
-  // subárvore oculta não afeta medida nenhuma, e avisar sobre ela é o ruído que
-  // faz ignorar o aviso.
+  // Props NÃO REPRODUZIDAS em uso.
+  //
+  // ⚠️ AQUI O CRITÉRIO É `naoOcultoPorCss`, E NÃO `visivel` — a diferença é a
+  // única coisa não óbvia desta sonda, e usar `visivel` aqui é CIRCULAR.
+  //
+  // O stub não desenha o conteúdo que não sabe reproduzir. Um `urbi-select` com
+  // `.opcoes` vira uma caixa de altura ZERO, porque o stub não desenha opção
+  // nenhuma — então `visivel` o descarta, e o aviso de "prop não reproduzida"
+  // desaparece exatamente no caso em que ele era necessário: a prop não
+  // reproduzida é a CAUSA de a caixa ter sumido. Medido em `kpis-resumo`:
+  // `urbi-select` com 5 opções, 1183x0 px, silenciosamente fora da conta.
+  //
+  // `naoOcultoPorCss` mantém o nó na conta enquanto ninguém o escondeu de
+  // propósito. Prop em subárvore que o app ocultou continua fora — essa não
+  // afeta medida nenhuma, e avisar sobre ela seria o ruído que faz ignorar o
+  // aviso.
   const naoReproduzidas = new Set();
-  for (const el of visiveis) {
+  for (const el of elementos.filter(naoOcultoPorCss)) {
     const lista = mapa[el.tagName.toLowerCase()];
     if (!lista) continue;
     for (const { prop, atributo, reproduzida } of lista) {
       if (reproduzida) continue;
+      // `atributo` pode ser nulo (prop `so_propriedade`): aí o único sinal é a
+      // PROPRIEDADE, que é como o Lit a entrega (`.opcoes=${...}`). Array vazio
+      // conta como uso: a intenção de passar dados está lá, e o stub não os
+      // desenha de qualquer forma.
       const v = el[prop];
-      const usada = el.hasAttribute(atributo) || (v !== undefined && v !== null && v !== '' && v !== false);
-      if (usada) naoReproduzidas.add(`${el.tagName.toLowerCase()}.${prop}`);
+      const porAtributo = atributo !== null && el.hasAttribute(atributo);
+      const porPropriedade = v !== undefined && v !== null && v !== '' && v !== false;
+      if (porAtributo || porPropriedade) naoReproduzidas.add(`${el.tagName.toLowerCase()}.${prop}`);
     }
   }
+  // Primitivo SEM STUB: o espelho é gerado a partir dos `<urbi-*>` que aparecem
+  // em `frontend/*.ts` — varredura NÃO recursiva, então um primitivo usado só
+  // por um caso de `frontend/render/casos/` não entra nele. Sem entrada no
+  // espelho não há stub, e o navegador trata a tag como elemento desconhecido:
+  // `display: inline`, sem shadow root, sem nenhuma das declarações `:host` que
+  // governam o box model. A geometria da região vira ficção, e nenhuma lente
+  // reclama — a mesma família de "reporta limpo por não ter medido".
+  const semStub = [...new Set(
+    elementos
+      .filter((el) => el.tagName.toLowerCase().startsWith('urbi-') && !mapa[el.tagName.toLowerCase()])
+      .map((el) => el.tagName.toLowerCase()),
+  )].sort();
+
   return {
     nos: elementos.length, nosVisiveis: visiveis.length,
-    areaVisivel: Math.round(areaVisivel), faltando,
+    areaVisivel: Math.round(areaVisivel), faltando, semStub,
     naoReproduzidas: [...naoReproduzidas].sort(),
   };
 }
@@ -659,25 +769,8 @@ function sondaMontagem({ exigir, mapa }) {
 // Segunda sonda, de COR. Separada porque roda uma vez por variante de tema,
 // enquanto a de layout roda uma vez por largura.
 function sondaCor() {
-  const elementos = [];
-  (function coletar(raiz) {
-    for (const el of raiz.querySelectorAll('*')) {
-      elementos.push(el);
-      if (el.shadowRoot) coletar(el.shadowRoot);
-    }
-  })(document.getElementById('raiz'));
-
-  const caminho = (el) => {
-    const partes = [];
-    let n = el;
-    while (n && partes.length < 5) {
-      let p = n.tagName.toLowerCase();
-      if (n.classList && n.classList.length) p += '.' + [...n.classList].join('.');
-      partes.unshift(p);
-      n = n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
-    }
-    return partes.join(' > ');
-  };
+  const { visivel, coletar, caminho, paiComposto } = window.__rc;
+  const elementos = coletar(document.getElementById('raiz'));
 
   // Todo `--token` citado por qualquer folha em uso — inclusive as adotadas
   // pelos shadow roots do Lit, que não aparecem em `document.styleSheets`.
@@ -715,7 +808,7 @@ function sondaCor() {
     while (n) {
       const c = rgba(getComputedStyle(n).backgroundColor);
       if (c && c.a >= 0.99) return c;
-      n = n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
+      n = paiComposto(n);
     }
     return { r: 255, g: 255, b: 255, a: 1 };
   };
@@ -723,8 +816,10 @@ function sondaCor() {
   for (const el of elementos) {
     const temTexto = [...el.childNodes].some((n) => n.nodeType === 3 && (n.textContent || '').trim() !== '');
     if (!temTexto) continue;
+    // A MESMA checagem das outras duas sondas — esta também tinha a sua cópia,
+    // e a cópia também só olhava o próprio nó.
+    if (!visivel(el)) continue;
     const s = getComputedStyle(el);
-    if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) continue;
     const cor = rgba(s.color);
     if (!cor) continue;
     const fundo = fundoEfetivo(el);
@@ -763,6 +858,7 @@ export async function verificarRender(opcoes) {
     ], { stdio: 'pipe' });
 
     writeFileSync(join(dir, 'primitivos.js'), gerarPrimitivos());
+    writeFileSync(join(dir, 'sondas.js'), gerarSondasCompartilhadas());
     const temas = gerarTemas();
     writeFileSync(join(dir, 'temas.css'), temas.css);
 
@@ -788,6 +884,10 @@ export async function verificarRender(opcoes) {
   #raiz { padding: 16px; }
 </style>
 <div id="raiz"></div>
+<!-- Script CLASSICO e antes de tudo: define window.__rc, de que as tres sondas
+     dependem. Ele LANCA se o navegador nao tiver checkVisibility, em vez de
+     degradar para uma checagem que nao enxerga ancestral. -->
+<script src="./sondas.js"></script>
 <script>
   window.urbiVerso = {
     api: async () => ({ dados: [] }),
@@ -922,6 +1022,16 @@ export async function verificarRender(opcoes) {
           `  nós: ${m.nos} (${m.nosVisiveis} visíveis) · área visível: ${m.areaVisivel}px²\n` +
           m.faltando.map((f) => `  faltou "${f.seletor}": exigia ${f.minimo} visível(is), achou ${f.achou}`
             + (f.ocultos ? ` — e ${f.ocultos} OCULTO(s): o nó existe mas ninguém o vê, e as lentes de layout pulam subárvore invisível` : '')).join('\n'),
+        );
+      }
+      if (m.semStub.length) {
+        throw new Error(
+          `o caso "${caso}" usa primitivo(s) sem stub: ${m.semStub.join(', ')}.\n` +
+          '  Eles não estão em docs/ui-urbiverso/primitivos.json, então o navegador os trata como\n' +
+          '  elemento desconhecido (display:inline, sem shadow root, sem as declarações :host que\n' +
+          '  governam o box model) — a geometria dessa região é ficção e nenhuma lente reclama.\n' +
+          '  O espelho só varre `frontend/*.ts`, sem recursão: use o primitivo numa tela de verdade\n' +
+          '  ou ressincronize o espelho (node scripts/sincronizar-referencia-ui.mjs).',
         );
       }
       if (!achados.montagem.assentou) {

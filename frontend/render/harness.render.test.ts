@@ -42,6 +42,30 @@ test('o harness REJEITA um caso cujo nó exigido existe mas está OCULTO', { ski
   );
 });
 
+test('o harness REJEITA um caso oculto por `opacity: 0` num ANCESTRAL', { skip: pular ?? false }, async () => {
+  // O irmão do anterior, e separado de propósito: `display: none` zera o
+  // retângulo do descendente, `opacity: 0` NÃO se propaga para o computado dele
+  // — os filhos seguem com `opacity: 1` e caixa positiva. Uma checagem que olhe
+  // só o próprio nó dá tudo por visível, que foi o achado da rodada 3.
+  // A tabela com as demais formas de ocultação está em scripts/render-check.mjs.
+  await assert.rejects(
+    () => verificarRender({ caso: 'controle-opacidade-zero', larguras: [1280] }),
+    /OCULTO/,
+    'opacity:0 em ancestral esconde a tela e as lentes de layout pulam a subárvore',
+  );
+});
+
+test('o harness REJEITA um caso que usa primitivo sem stub', { skip: pular ?? false }, async () => {
+  // Sem stub o navegador trata a tag como elemento desconhecido: nenhuma das
+  // declarações `:host` do primitivo real se aplica, e a geometria medida ali é
+  // ficção que nenhuma lente acusa.
+  await assert.rejects(
+    () => verificarRender({ caso: 'controle-sem-stub', larguras: [1280] }),
+    /sem stub/,
+    'primitivo fora do espelho não tem box model — medir aquela região é inventar',
+  );
+});
+
 test('o harness ACUSA prop não reproduzida que o caso não declarou', { skip: pular ?? false }, async () => {
   // O outro sentido do confronto: sem este controle, um `naoDeclaradas` sempre
   // vazio deixaria os quatro casos reais verdes e a verificação seria enfeite.
@@ -59,7 +83,9 @@ test('o inventário de reprodução é derivado do espelho, não escrito à mão
   for (const x of inv) {
     assert.match(x.tag, /^urbi-/, 'entrada precisa apontar um primitivo do espelho');
     assert.equal(typeof x.prop, 'string');
-    assert.equal(typeof x.atributo, 'string');
+    // `atributo` é `string` OU `null` — nulo é a prop `so_propriedade`, que o
+    // Lit entrega por binding e que precisa continuar no inventário.
+    assert.ok(typeof x.atributo === 'string' || x.atributo === null, `atributo inválido em ${x.tag}.${x.prop}`);
     assert.equal(typeof x.reproduzida, 'boolean');
   }
   // `urbi-textarea.rows` é o caso que reprovou o inventário por regex de nome na
@@ -68,4 +94,15 @@ test('o inventário de reprodução é derivado do espelho, não escrito à mão
   const rows = inv.find((x) => x.tag === 'urbi-textarea' && x.prop === 'rows');
   assert.ok(rows, 'urbi-textarea.rows sumiu do espelho?');
   assert.equal(rows?.reproduzida, false, 'o stub não tem textarea — rows não pode contar como reproduzida');
+
+  // ⚠️ E as props SEM atributo precisam estar aqui. Elas eram filtradas para
+  // fora antes de classificar, e o Lit as usa normalmente por binding de
+  // propriedade: `urbi-select.opcoes` nunca aparecia como não reproduzida,
+  // embora o stub não desenhe opção nenhuma. Achado P2 do Codex, rodada 3.
+  const semAtributo = inv.filter((x) => x.atributo === null);
+  assert.ok(semAtributo.length >= 10, `props so_propriedade sumiram do inventário (${semAtributo.length})`);
+  const opcoes = inv.find((x) => x.tag === 'urbi-select' && x.prop === 'opcoes');
+  assert.ok(opcoes, 'urbi-select.opcoes precisa estar no inventário mesmo sem atributo');
+  assert.equal(opcoes?.atributo, null);
+  assert.equal(opcoes?.reproduzida, false, 'o stub não desenha opções');
 });

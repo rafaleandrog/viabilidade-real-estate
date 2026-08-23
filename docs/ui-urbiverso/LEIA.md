@@ -155,6 +155,10 @@ painel do stub. Prop de tamanho que **não** está no mapa não é adivinhada �
 declarada**, e o harness avisa quando um caso usa uma delas, em vez de deixar a medida parecer mais
 apertada do que foi.
 
+O harness lê o `primitivos.json` **inteiro** — inclusive as props `so_propriedade` (o Lit as entrega
+por binding, sem atributo: `urbi-select.opcoes` é uma delas) e os `atributos_convencao`. Filtrar
+qualquer um dos dois deixa o confronto de props não reproduzidas verde com lacuna real.
+
 O `tokens.json` também é lido, para montar as variantes de tema; ali o limite é outro e está
 descrito em `scripts/render-check.mjs` (§ `gerarTemas`): o arquivo guarda os **valores** de cada
 token, **não o nome do tema** de cada um.

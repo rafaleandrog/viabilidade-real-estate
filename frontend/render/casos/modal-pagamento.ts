@@ -49,10 +49,15 @@ export const caso = {
     'urbi-botao.icone',
     'urbi-botao.pequeno',
     'urbi-botao.variante',
-    // `urbi-estado-vazio.*` NÃO entra: o stub dele renderiza vazio, fica com
-    // altura zero e a sonda o classifica como invisível — logo não influencia
-    // medida nenhuma. Declarar viraria declaração ociosa, e o harness reprova
-    // isso de propósito: lista que envelhece esconde a próxima entrada de verdade.
+    // Os três abaixo têm a mesma natureza entre si: o stub não desenha o
+    // conteúdo deles, então as caixas ficam com altura zero e não contribuem
+    // geometria. O que este caso mede é a GRADE do modal, que é feita de
+    // `viab-num` — componente do app, não stub, e portanto renderizado de
+    // verdade. O `urbi-estado-vazio` só aparece porque a lista de Grupos está
+    // vazia de propósito, para isolar o modal.
+    'urbi-checkbox.label',
+    'urbi-estado-vazio.icone',
+    'urbi-estado-vazio.mensagem',
     'urbi-modal.title',
   ],
   async montar(raiz: HTMLElement): Promise<void> {

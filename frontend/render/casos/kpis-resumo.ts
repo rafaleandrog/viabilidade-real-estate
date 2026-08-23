@@ -35,6 +35,12 @@ export const caso = {
     'urbi-grafico-pizza.formato',
     'urbi-grafico-pizza.series',
     'urbi-kpi.variante',
+    // ⚠️ Este é de outra natureza, e vale ler antes de tirar. `.opcoes` é
+    // binding de PROPRIEDADE (o Lit nem escreve atributo), e o stub não desenha
+    // opção nenhuma: o `urbi-select` da pizza fica com 1183x0 px. Ou seja, a
+    // caixa do seletor NÃO tem geometria neste caso, e nada do que este teste
+    // afere diz respeito a ela. O que se mede aqui é a faixa de KPIs, acima.
+    'urbi-select.opcoes',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-tela-resumo');
