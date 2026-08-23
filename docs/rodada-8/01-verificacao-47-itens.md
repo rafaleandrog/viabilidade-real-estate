@@ -28,6 +28,21 @@
 **Dos 8 reauditados, 3 não se sustentaram:** itens **11**, **17** e **24**.
 Sustentaram-se: **6, 13, 27, 39, 46**.
 
+> 🔴 **Leia esta frase com cuidado — a redação dela custou seis issues (nota de 2026-08-23).**
+> "Não se sustentaram", aqui, qualifica **a correção anterior**, não o pedido do autor. Os três itens
+> **continuam sendo bugs abertos** — a própria tabela acima os conta duas linhas antes, em
+> *"Sobreviveram como pendência"*, e a linha seguinte anuncia as **6 issues do bloco 8-A**. As duas
+> leituras convivem no mesmo resumo e se contradizem.
+>
+> Quem leu só o balde entendeu "o bug não existe": o `LEIA-PRIMEIRO.md` repetiu como *"8 não se
+> sustentam"*, e o **Bloco 8-A inteiro** ficou fora de `25-issues-final.md` — nenhuma das seis chegou
+> ao GitHub. Entre elas a do `urbi-kpi`, já reportado em #176, #262, #326 e #352. Recuperadas em
+> 2026-08-23 como **#488** a **#493**.
+>
+> Os vereditos individuais, que é o que vale: `:137` item 11 → "NÃO SE SUSTENTA (**parcial**)" ·
+> `:199` item 17 → título "NÃO SE SUSTENTA" com corpo que prova o **oposto** · `:254` item 24 →
+> "🟡 **PARCIAL — reaberto**".
+
 > ⚠️ **Uma correção ao dossiê.** O §4.1 usa o item 6 como exemplo canônico de "o código faz algo
 > próximo, mas não o que foi pedido" — "o item 6 pedia *reordenar lista de custos* e o que foi
 > entregue foi um grid de 3 colunas, que é agrupamento, não reordenação". **Isso está errado.** O

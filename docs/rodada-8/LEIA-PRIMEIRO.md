@@ -37,15 +37,25 @@ nova rodada de revisão → parar. **Merge é decisão do autor.**
 
 ### Ligar o Codex na revisão
 
-O motor de revisão já está montado em `.claude/motor-revisao.md`: ele roda as lentes **fora da conta
-Anthropic**, instala o CLI sozinho (`npm i -g @openai/codex`) e cai para subagente nativo se falhar,
-**declarando a queda no relatório**. Falta **uma coisa só**: a variável `OPENAI_API_KEY`.
+> ✅ **CORRIGIDO em 2026-08-23 — o Codex já está ligado, e o texto abaixo dizia o contrário.**
+> Esta seção afirmava que faltava *"uma coisa só"* (a `OPENAI_API_KEY`) e que sem ela a revisão cai
+> para o motor nativo. **O caminho que funciona é outro, e não precisa de chave nenhuma:** o
+> **GitHub App do Codex** está instalado neste repositório e revisa quando se comenta
+> **`@codex review`** no PR — exercitado em rodadas sucessivas no PR 494, ~2 min cada, com achados
+> P1 e P2 reais. **Comente `@codex review` — é o caminho normal.**
+>
+> A `OPENAI_API_KEY` continua sendo o que falta para o **CLI local** (`codex exec`), que é um
+> caminho diferente — e neste *cloud environment* falta também liberar `api.openai.com` na política
+> de rede, que hoje devolve **403 no CONNECT**. Nada disso bloqueia o App, que roda fora daqui.
+> Detalhe em `.claude/motor-revisao.md` § *Sequência obrigatória do App*.
+
+O motor de revisão está montado em `.claude/motor-revisao.md`, em **duas camadas que somam**: a
+**revisão do App** (`@codex review`, sempre) e a **fan-out das lentes** (sempre). O condicional é o
+motor *dentro* da fan-out — **CLI local** (`codex exec`) se houver chave e rede, **nativo** se não
+houver, **declarado** como menos adversarial. O App **não dispensa** a fan-out.
 
 > ⚠️ **A chave é por ambiente.** Numa sessão web, ela vai nas variáveis do *cloud environment*;
 > numa sessão local, no ambiente da máquina. Definir num lado não vale para o outro.
-
-Sem ela, quem revisa o patch é a mesma família de modelo que o escreveu — o próprio documento diz
-que isso é **menos adversarial**, e o relatório precisa dizer isso em uma linha.
 
 ⚠️ **A camada de contratos não roda em ambiente nenhum**, com Codex ou sem: ela lê
 `node_modules/@urbiverso/sdk/docs/`, e o SDK é **stub** nos dois lugares. Toda revisão vai trazer
@@ -61,21 +71,45 @@ seguem **sem verificação automática** — quem revisa cobra à mão.
 | 1 | **Nenhum bug é consertado nesta rodada. Tudo vira issue.** O autor autorizou o conserto e depois reverteu | Os 3 consertos **foram revertidos**; a árvore está idêntica à `main`. `09-consertos.md` virou corpo de issue |
 | 2 | **Capital de giro: só o rótulo.** `divida` **já é** o produto de CG por calendário | O desenho `linha_credito` rotativo do A3 foi **RECUSADO**. Sem migração `030`, sem bump para 0.1.29 |
 | 3 | **Base de receita líquida do equity NÃO muda.** *"equity é um retorno líquido ao investidor, não importa esse fator para o cálculo"* | `funding-motor.ts:58-67` fica como está. A divergência com as duas planilhas é **intencional** → nota, não issue |
-| 4 | **Erros visuais sem navegador** — API + leitura de código | Não proponha usar browser |
+| 4 | ~~**Erros visuais sem navegador** — API + leitura de código~~ · 🔄 **REVOGADA em 2026-08-23** | A decisão descrevia a máquina Windows do autor. **Na sessão de nuvem há navegador**: Chromium e Playwright instalados (`/opt/pw-browsers/chromium`), e `scripts/render-check-cronograma.mjs` (#245) já os usa — medido, passa na `main` e sai com código 1 sob regressão injetada. O autor autorizou o caminho. **Verificação visual passa a ser render automatizado**, não print. Ver `PROGRESSO.md` (2026-08-23) |
 
 ---
 
 ## Fatos de ambiente que custam tempo se você os redescobrir
 
-- **`pnpm` NÃO existe nesta máquina.** O `node_modules` é install flat do npm. Os dois scripts de
-  validação abortam cedo. Rode na mão:
+- ⚠️ **Estes fatos dependem da MÁQUINA. Confira antes de agir — corrigido em 2026-08-23.** O texto
+  abaixo descrevia a máquina Windows do autor e mandava contornar os validadores. **Na sessão de
+  nuvem é diferente**, e seguir o contorno é trabalhar às cegas.
+
+  | | Máquina do autor (Windows) | **Sessão de nuvem, medido 2026-08-23** |
+  |---|---|---|
+  | `pnpm` | não existe | **existe** (`/opt/node22/bin/pnpm`) |
+  | `scripts/validar-frontend.sh` | aborta cedo | **roda inteiro e passa** |
+  | testes de frontend | 411 | **408** |
+  | testes de backend | 104 | **101** |
+  | navegador | nenhum | **Chromium + Playwright** (`/opt/pw-browsers/`) |
+
+  **Na nuvem, use os scripts** — não o contorno:
+  ```
+  pnpm install                       # o 401 do @urbiverso/sdk é esperado e ignorado
+  bash scripts/validar-frontend.sh   # typecheck + 408 testes + build
+  ```
+  Para o **backend**, chame `bash scripts/validar-backend.sh` **primeiro**, mesmo sabendo que ele
+  aborta na etapa 1/5 no portão do SDK: as etapas 0 e 1 rodam antes e **linkam o `express`**. Só
+  depois:
+  ```
+  node --import tsx/esm --test --test-timeout=60000 backend/rotas/*.test.ts backend/*.test.ts
+  ```
+  Sem esse passo, os 5 arquivos de `backend/rotas/` falham com `ERR_MODULE_NOT_FOUND: Cannot find
+  package 'express'` — que **não é teste quebrado**, é a cascata do 401. Não confunda os dois.
+
+  **O contorno manual abaixo continua válido onde `pnpm` de fato não existe:**
   ```
   echo '{ "extends": "./tsconfig.json", "include": ["frontend/**/*"] }' > tsconfig.fe.json
   node node_modules/typescript/bin/tsc --noEmit -p tsconfig.fe.json ; rm -f tsconfig.fe.json
   node --import tsx/esm --test --test-timeout=60000 frontend/*.test.ts
   node --import tsx/esm --test --test-timeout=60000 backend/rotas/*.test.ts backend/*.test.ts
   ```
-  Baseline verde na `main`: **411 testes de frontend, 104 de backend, typecheck exit 0**.
 - **O `@urbiverso/sdk` em `node_modules` é STUB** (só `express.d.ts`/`express.js`). Não há
   `dist/index.d.ts` nem `docs/`. Props de primitivo se conferem em
   `C:\Users\raafa\urbiverso\ui\src\urbi-*.ts` — **que é SÓ LEITURA** —, declarando no relatório que
@@ -103,10 +137,25 @@ nada derivado é persistido. Não existe `GET` de resultado.
 ## O que NÃO refazer — já está apurado, com `arquivo:linha`
 
 - **A lista de 47 itens está inteiramente auditada**, pelo corpo do pedido e não pelo título:
-  **36 confirmados · 8 não se sustentam (2, 11, 15, 17, 22, 24, 31, 41) · 3 dependem de print
-  (38, 43, 45)**. Detalhe em `01-verificacao-47-itens.md` e `08-auditoria-39-itens.md`.
+  **36 confirmados · 8 com a correção anterior reprovada (2, 11, 15, 17, 22, 24, 31, 41) · 3 dependem
+  de print (38, 43, 45)**. Detalhe em `01-verificacao-47-itens.md` e `08-auditoria-39-itens.md`.
+  > 🔴 **Corrigido em 2026-08-23 — a redação anterior custou seis issues.** Esta linha dizia
+  > *"8 **não se sustentam**"*, que se lê como *"o bug relatado não existe"*. **Não é o que os
+  > vereditos individuais dizem.** Do que aquele balde de 8 continha:
+  > `:137` item 11 → "NÃO SE SUSTENTA **(parcial)**" · `:199` item 17 → título "NÃO SE SUSTENTA" com
+  > corpo que prova o **oposto** (o bug é real; o que não se sustenta é **a correção da #326**) ·
+  > `:254` item 24 → "🟡 **PARCIAL — reaberto**" · `:405` item 22 → "🟡 PARCIAL" · `:435` item 31 →
+  > "🟡 PARCIAL". **Nenhum é "o bug não existe".**
+  >
+  > A consequência foi concreta: o **Bloco 8-A inteiro** — seis issues com corpo pronto em
+  > `07-consolidado-issues.md` — ficou de fora de `25-issues-final.md`, que é o arquivo que alimenta
+  > `scripts/criar-issues-rodada-8.mjs`, e **nenhuma das seis chegou ao GitHub**. Entre elas a do
+  > `urbi-kpi`, que o autor já havia reportado em #176, #262, #326 e #352. Recuperadas em 2026-08-23
+  > como **#488–#493** — ver o apêndice de `25-issues-final.md`.
   > **Lição de método da rodada:** o título da planilha **diverge do pedido com frequência**.
-  > Quatro itens teriam recebido veredito oposto se lidos pelo título (14, 18, 32, 43).
+  > Quatro itens teriam recebido veredito oposto se lidos pelo título (14, 18, 32, 43). E a lição
+  > desta correção: **um resumo que colapsa "a correção falhou" em "o pedido não procede" apaga
+  > trabalho** — e apaga calado, porque ninguém confere um balde contra os vereditos que ele resume.
 - **Zero problemas de prop `urbi-*`** — 391 tags, 29 primitivos, ~1.100 atributos varridos
   (`06-auditoria-ui.md`).
 - **O motor de recebíveis por safras ESTÁ ligado ao `calcularFluxo`** desde a #283, e

@@ -26,6 +26,12 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # A regra do CLAUDE.md § "Duas regras de CI, sem exceção" — e este era o único job dos quatro
+    # workflows que não a cumpria. Sem `timeout-minutes` o default do GitHub é 6 HORAS, e a API só
+    # serve log de job CONCLUÍDO: um release pendurado no `pnpm test` ou no `urbi-empacotar` fica
+    # `in_progress` sem nada para ler. 15 min é folgado — o baseline de `validation.yml`, que roda
+    # os dois validadores, é 33s; aqui há build + empacotamento + upload da release por cima.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4

@@ -4,6 +4,191 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 9 aberta — e o Bloco 8-A, que a Rodada 8 perdeu no caminho (2026-08-23)
+
+A Rodada 8 fechou em 2026-08-22 com **19.931 linhas** de auditoria em `docs/rodada-8/`, **61 issues** e
+**zero linhas de código de app** (o autor autorizou 3 consertos e reverteu; a árvore ficou idêntica à
+`main`). Duas issues fecharam por decisão — #461 (D13, fora de escopo) e #480 (D11, sem interruptor)
+—, restando **59 abertas**. Ela **não escreveu nada aqui**: `grep "Rodada 8" PROGRESSO.md` dava zero.
+
+### O achado que abriu esta rodada
+
+🔴 **Seis issues foram escritas e nunca criadas.** O `07-consolidado-issues.md` redigiu o **Bloco
+8-A** — a dívida da Rodada 7 — completo: título, corpo, mecanismo em `arquivo:linha`, critério de
+aceite. **Nenhuma entrou em `25-issues-final.md`**, que é o arquivo que alimenta
+`scripts/criar-issues-rodada-8.mjs`. Conferido título por título: `fix(resumo): urbi-kpi` → 0
+ocorrências no arquivo final, `fix(proforma): sensibilidade` → 0, `Data de início por mês` → 0,
+`larguras da tabela` → 0, `Exposição máxima coerente` → 0. As 59 abertas eram só o Bloco 8-B.
+
+A causa é uma linha de resumo. `LEIA-PRIMEIRO.md` dizia *"8 **não se sustentam** (2, 11, 15, 17, 22,
+24, 31, 41)"*, que se lê como "o bug relatado não existe". Os vereditos individuais dizem outra
+coisa: `01-verificacao-47-itens.md:199` (item 17) tem título "NÃO SE SUSTENTA" e corpo que prova o
+**oposto** — o bug é real, com conserto de uma linha; o que não se sustenta é a **correção da #326**.
+Idem `:254` item 24 ("PARCIAL — reaberto"), `:405` item 22, `:435` item 31, `:137` item 11
+("parcial"). **Nenhum é "o bug não existe".**
+
+O custo: entre as seis está a do `urbi-kpi` sobrepondo, que o autor reportou em **#176 → #262 → #326
+→ #352** — quatro issues fechadas, o bug vivo, e na quinta passada a issue sumiu do backlog. A queixa
+dele de que *"issues visuais nunca são realmente resolvidas"* estava literalmente certa: não estavam
+na lista.
+
+Recuperadas como **#488–#493**. Correção da linha de resumo e apêndice novo em `25-issues-final.md`
+na mesma alteração.
+
+> **Lição:** um resumo que colapsa *"a correção falhou"* em *"o pedido não procede"* apaga trabalho —
+> e apaga **calado**, porque ninguém confere um balde de 8 números contra os 8 vereditos que ele
+> resume. Vale para todo balde: quem escreve o resumo carrega a semântica de cada item, ou não
+> agrupa.
+
+### O mecanismo do `urbi-kpi`, finalmente escrito
+
+`urbiverso/ui/src/urbi-kpi.ts:41-46` põe `padding: 14px 16px` + `border: 1px` no `:host` e **não**
+declara `box-sizing: border-box`. A cadeia inteira foi conferida e não há reset em lugar nenhum:
+`UrbiPrimitivoDeConteudo.estiloConteudo` (`urbi-primitivo-conteudo.ts:39-48`) só traz
+`display`/`flex-direction`/`min-height`; a única ocorrência no arquivo está em `:81`, dentro de
+`.estado-erro`, e não alcança o `:host`; `compartilhado/tokens.css` não tem reset global.
+
+`box-sizing` não é herdado. Logo `tela-resumo.ts:67` (`.kpi-cel urbi-kpi { width: 100% }`) define
+largura de **conteúdo**, e a caixa mede `100% + 32px + 2px`. O Preliminar acerta porque
+`tela-proforma.ts:53` usa **só** `min-width: 0` — grid `stretch` dimensiona a **border box**. O autor
+já tinha dado o gabarito: *"nos estudos Preliminares isso já está certo"*.
+
+Duas agravantes de método: o commit `bd1244e` **nomeia o mecanismo na mensagem** e mantém o
+`width: 100%`; e o comentário `tela-resumo.ts:63-65` chama `fluxo-tabela.ts:73-74` de "padrão já
+comprovado" quando aquele código **não usa `urbi-kpi`** — é uma `<div>` do próprio app. Um `div` da
+sua folha é caixa que você controla; um custom element com `:host` estilizado no shadow DOM não é.
+
+### O que mudou de ambiente, e derruba a decisão D4
+
+A D4 da Rodada 8 dizia *"erros visuais sem navegador — não proponha usar browser"*. Ela foi tomada
+descrevendo a máquina Windows do autor. **Nesta sessão de nuvem não vale:** Chromium e Playwright
+estão instalados (`/opt/pw-browsers/chromium`), e o repositório **já tem**
+`scripts/render-check-cronograma.mjs` usando os dois desde a #245. Medido em 2026-08-23: passa verde
+na `main` e **sai com código 1** sob regressão injetada (`--largura 148px`). E ele **nunca rodou no
+CI**: na `main`, `git grep -n "render-check" -- '*.sh' '*.yml' '*.json' '*.md'` devolvia **zero
+ocorrências** — nenhum script de validação, workflow ou doc o invocava.
+
+O autor autorizou o caminho. A Rodada 9 generaliza aquele script; hoje são **408 testes de frontend e
+zero tocam DOM**, então um bug de CSS atravessa grep + JSON + tsc + `node --test` + esbuild e sai com
+"✅ Frontend validado".
+
+### Baseline medido nesta sessão (números da doc estavam desatualizados)
+
+| | Doc dizia | Medido |
+|---|---|---|
+| testes de frontend | 411 | **408** |
+| testes de backend | 104 | **101** |
+| `pnpm` existe? | "NÃO existe nesta máquina" | **existe** (`/opt/node22/bin/pnpm`) |
+
+⚠️ **Para rodar os testes de backend é preciso chamar `scripts/validar-backend.sh` antes**, mesmo
+sabendo que ele aborta na etapa 1/5 no portão do SDK: as etapas 0 e 1 rodam primeiro e **linkam o
+`express`** do store virtual. Sem isso, os 5 arquivos de `backend/rotas/` falham com
+`ERR_MODULE_NOT_FOUND: Cannot find package 'express'` — que **não** é teste quebrado, é a cascata do
+401 do `@urbiverso/sdk`. Não confunda um com o outro numa sessão futura.
+
+### Três issues perderam a dependência de instância viva
+
+Decisão do autor: a correção tem de valer para todos, sem depender de teste externo.
+**#468** (baseline dos KPIs) deixou de ser um retrato colado dos estudos 5 e 6 de Pinguim e virou
+**fixture de regressão no repo** — uma catraca: PR que move KPI sem declarar fica vermelho.
+**#469** trocou o cadastro de 3 operações de equity por `POST` por **três casos de teste** que
+afirmam as divergências de hoje. **#464** passou a fechar com a função de contagem testada e o
+subcomando, com o número virando comentário em vez de critério.
+
+Continua fora de alcance de sessão de nuvem: Pinguim e produção são **inalcançáveis** (403 no proxy
+de saída), e o token é do autor.
+
+### Estado dos hooks nesta sessão — a rede do processo estava INERTE
+
+O projeto do Claude Code é `/home/user`, e **`/home/user/.claude/` não existe**: o
+`.claude/settings.json` do app mora num subdiretório. `CLAUDE.md` e skills são descobertos em
+subdiretório; **hooks e `permissions.deny` não**. Prova empírica: `cd /home/user/urbiverso && node -e
+"…"` **executou**, quando `guarda-monorepo.sh:122-124` deveria tê-lo bloqueado com exit 2.
+
+Consequências: não houve linha `[processo]`; não houve lembrete por prompt; **a proteção de escrita
+do monorepo esteve desligada** a sessão inteira. E o CI `processo-integro` seguiu **verde**, porque
+ele confere que os arquivos existem, não que o harness os carrega — a falha calada de sempre, num
+lugar novo. Resolver isso é ação de ambiente do autor, não do repositório.
+
+### Colisão de skills, e por que nada foi apagado
+
+Existem **duas** `revisar-pr-apps` no catálogo da sessão — a do app e a de `/home/user/urbiverso`,
+mesmo nome, sem prefixo de caminho na listagem. A do monorepo aplica a regra **upstream** da `versao`
+(bumpar quando `shell_min` sobe), que aqui é **invertida** pela #422: invocar a errada acusa
+bloqueante inventado em todo PR que suba piso.
+
+Nada foi apagado, e cada caso tem motivo: `acompanhar-revisao` **não existe mais** e
+`guard-processo.mjs:100-104` **reprova o CI** se ela voltar (*"a geração de duas sessões foi apagada
+de propósito"*); `revisar-pr-shell`, `revisar-pr` e `qa` moram no monorepo, que é somente-leitura e
+cujas próprias sessões as usam.
+
+⚠️ **O conserto NÃO entra neste PR — e a razão é a lição mais cara desta sessão.** Ele foi escrito,
+revisado dez vezes e **revertido de propósito**; o desenho aprovado e todos os achados estão na
+issue de acompanhamento.
+
+**Por que reverter.** Este PR nasceu para recuperar seis issues perdidas. Eu o deixei crescer para
+dentro da maquinaria de revisão — `SKILL.md`, `motor-revisao.md`, `CLAUDE.md` —, e aí o ciclo parou
+de convergir. O mecanismo é estrutural, não acidente: **os quatro documentos de processo se
+referenciam**, então toda regra nova precisa ser propagada aos quatro, e o revisor acusa
+corretamente cada um que ficou para trás. Dez rodadas, dezenove achados, **nenhum falso** — e o
+gerador era eu, editando o processo dentro do processo.
+
+**A regra que fica, e vale para todo PR deste repositório:** mudança em arquivo de processo
+(`.claude/**`, a § *A revisão em si* do `CLAUDE.md`) **não entra em PR que está sob revisão**. Vai
+em PR próprio, feita de uma vez, com os quatro documentos propagados no mesmo diff. E o teto é de
+**2 rodadas** por PR, salvo bloqueante de código.
+
+**O que o ciclo apurou, e não se perde** — está tudo na issue de acompanhamento, com o texto pronto:
+
+- a primeira tentativa (porta de runtime conferindo `git rev-parse --show-toplevel`) **não funciona**:
+  carregar a skill do monorepo não muda o diretório da sessão, então a cópia errada **passa** no
+  teste; e o aviso mora na cópia que **não é lida** quando a outra é servida;
+- o desempate tem de ser **material** e morar no `CLAUDE.md`, a única superfície que nenhuma skill
+  sombreia — dois discriminadores (a regra da `versao`, a superfície de contratos) e a precedência
+  declarada;
+- caminho de recuperação **derivado** de `git rev-parse --show-toplevel`, nunca cravado;
+- no timeout do App, publicar `bloqueantes=1`; **omitir a linha de máquina não serve**, porque o job
+  varre todos os comentários do head e republica um `success` anterior;
+- o predicado de espera precisa exigir review **posterior ao acionamento**, não só com o head certo
+  — numa rodada que nasce de comentário o head não muda;
+- App e fan-out são **duas camadas que somam**; o condicional é CLI × nativo, dentro da fan-out;
+- **não citar contagem de rodadas nem de achados dentro do artefato revisado** — o contador envelhece
+  a cada rodada por construção, e foi o que gerou metade dos achados deste ciclo.
+
+### Codex — os três caminhos, medidos
+
+| Caminho | Estado |
+|---|---|
+| **GitHub App (`@codex review`)** | ✅ **instalado e funcionando — é o caminho normal deste repositório.** Exercitado em rodadas sucessivas no PR 494 (~2 min cada), com achados P1 e P2 reais. O placar vive no PR, não aqui |
+| CLI local (`codex exec`), o único que o `.claude/motor-revisao.md` documenta hoje | ✅ funciona em `urbiverso/urbiverso` (PR #2595, `gpt-5.6-terra`/`sol`). ❌ **não sobe aqui** |
+| ChatGPT/Codex web sobre a URL do PR | ✅ funciona, e não depende de `OPENAI_API_KEY` |
+
+> 🔴 **Eu afirmei que o App não estava instalado, e estava errado.** A afirmação vinha de
+> `commenter:app/chatgpt-codex-connector` → 0 resultados em 40 PRs. A busca estava certa; a
+> conclusão, não: zero comentários provava que ele nunca fora **chamado** aqui, não que estivesse
+> ausente. Bastou comentar `@codex review`. **Lição de método:** ausência de uso não é ausência de
+> capacidade — e o custo de confundir os dois foi quase adotar o motor mais fraco tendo o melhor
+> disponível.
+
+Para o **CLI local** faltam **duas** coisas neste ambiente, e a doc do repo só citava a primeira:
+`OPENAI_API_KEY` nas variáveis do *cloud environment*, **e** `api.openai.com` liberado na política de
+rede — medido: o proxy devolve **403 no CONNECT**, com `connect_rejected` registrado. O ambiente do
+`urbiverso` evidentemente libera; este não. **Nada disso é bloqueio**, porque o App não passa por
+aqui: ele roda na infraestrutura da OpenAI, acionado pelo GitHub.
+
+**App e lentes nativas somam.** No PR 494 a divisão foi limpa: o Codex achou os defeitos de
+**lógica** (uma guarda que não testava o que dizia testar; um caminho absoluto inexistente noutro
+layout; uma atestação que podia sair antes da revisão chegar), e as lentes nativas acharam as
+**imprecisões factuais** do texto. Nenhum dos dois acharia o conjunto sozinho.
+
+### Também nesta alteração
+
+`release.yml` ganhou `timeout-minutes: 15`. Era o único job dos quatro workflows sem ele,
+contrariando a regra que o `CLAUDE.md` chama de "sem exceção" — e sem o timeout o default é **6
+horas**, com a API servindo log só de job concluído.
+
+---
+
 ## Revisão de PR vira processo fixo, e o monorepo vira só-leitura (2026-08-21)
 
 O autor pediu duas coisas: que **todo** pedido de trabalho neste app passe por PR + revisão, e que
@@ -58,11 +243,19 @@ Duas decisões de desenho que custaram um erro cada, e vale não repetir:
   verde; e o gatilho `issue_comment` precisa existir porque o relatório é postado **depois** do
   último push.
 
-**Pendências do autor** (nenhuma dá para fazer daqui): `OPENAI_API_KEY` nas variáveis do *cloud
-environment* — sem ela a revisão roda no motor nativo, para sempre, e nativo é menos adversarial
-porque revisa patch escrito pela mesma família de modelo; **branch protection** com
-`revisao/bloqueantes` como required check, sem o que o guard é conselho e não portão; e decidir se o
-monorepo continua anexado a estas sessões — a defesa hermética seria não anexar.
+**Pendências do autor** (nenhuma dá para fazer daqui):
+
+- ~~`OPENAI_API_KEY` nas variáveis do *cloud environment*~~ — 🔄 **deixou de ser pendência em
+  2026-08-23.** O texto dizia que sem a chave a revisão roda no motor nativo *"para sempre"*. **Não
+  roda:** o **GitHub App do Codex está instalado** e revisa a `@codex review`, sem chave nenhuma. A
+  chave segue sendo o que falta ao **CLI local**, junto com a liberação de `api.openai.com` na
+  política de rede (hoje **403 no CONNECT**) — mas o CLI é o fallback, não o caminho.
+- **Branch protection** com `revisao/bloqueantes` como required check — sem isso o guard é conselho,
+  não portão, e `main` está `protected: false` hoje.
+- Decidir se o monorepo continua anexado a estas sessões — a defesa hermética seria não anexar.
+- Fazer os hooks do repo carregarem: o projeto do Claude Code é `/home/user`, e o
+  `.claude/settings.json` do app mora num subdiretório, então **hooks e `permissions.deny` não são
+  lidos** (ver a seção de estado dos hooks, acima).
 
 ---
 

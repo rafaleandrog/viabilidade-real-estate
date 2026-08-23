@@ -5589,3 +5589,47 @@ GitHub; ficam registradas aqui para o mapa `R8-NN → #NNN` não mentir por omis
 **Elas não têm bloco aqui de propósito.** O `--sincronizar` só toca blocos com `numero:`; acrescentá-las
 exigiria copiar o corpo inteiro, e duas fontes de verdade para o mesmo texto é como se cria
 divergência. Para editá-las, use o GitHub — ou traga o corpo para cá e acrescente `numero:`.
+
+---
+
+# Apêndice 2 — o Bloco 8-A, recuperado (2026-08-23)
+
+🔴 **Seis issues deste arquivo nunca existiram.** O `07-consolidado-issues.md` escreveu o **Bloco
+8-A** — a dívida da Rodada 7 — com título, corpo, mecanismo em `arquivo:linha` e critério de aceite,
+seis issues completas. **Nenhuma delas entrou aqui**, e como é este arquivo que alimenta
+`scripts/criar-issues-rodada-8.mjs`, **nenhuma chegou ao GitHub**. As 59 criadas eram só o Bloco 8-B.
+
+A causa está registrada em `LEIA-PRIMEIRO.md`, na seção *"O que NÃO refazer"*: o resumo colapsou
+*"a correção anterior não se sustenta"* em *"o item não se sustenta"* e levou o bloco junto. A
+gravidade: entre as seis está a do `urbi-kpi`, que o autor já reportara em **#176, #262, #326 e
+#352** — quatro correções fechadas, o bug vivo, e na quinta passada a issue sumiu.
+
+| Issue | Título | Origem | P |
+|---|---|---|---|
+| **#488** | `fix(resumo): urbi-kpi para de estourar a track — remover width:100%, espelhar o Preliminar` | `07-consolidado-issues.md` § 8-A.2 (`:180`) · item 17 | P1 |
+| **#489** | `fix(tipologias): larguras de coluna medidas contra a fonte certa, cabeçalho legível` | § 8-A.4 (`:354`) · item 24 | P2 |
+| **#490** | `fix(receitas): remover o bloco "Definições" do modal de Fluxo de pagamento` | § 8-A.5 (`:456`) · item 31 | P3 |
+| **#491** | `fix(cenarios): Exposição máxima com a mesma leitura no KPI e na tabela de cenários` | § 8-A.6 (`:524`) · colateral do item 46 | P2 |
+| **#492** | `fix(proforma): sensibilidade com 2 casas decimais fixas, não "até 2"` | § 8-A.1 (`:113`) · item 11 | P2 |
+| **#493** | `feat(cronograma): Data de início do projeto selecionada só por mês e ano` | § 8-A.3 (`:276`) · item 22 | P3 |
+
+**Também sem bloco aqui, pela mesma razão da nota acima** — o corpo vivo está no GitHub, a origem
+está em `07-consolidado-issues.md`. Duplicar seria criar a divergência que aquela nota descreve.
+
+⚠️ **Duas delas foram publicadas com o texto emendado**, e a emenda está marcada no corpo da issue:
+**#488** (critério 5) e **#489** (passo 1) mandavam *"confirmar na Pinguim"* porque *"não há navegador
+no ambiente Claude Code"*. **Isso deixou de ser verdade** — Chromium e Playwright estão instalados
+(`/opt/pw-browsers/chromium`) e `scripts/render-check-cronograma.mjs` já os usa; verificado em
+2026-08-23, passando na `main` e saindo com código 1 sob regressão injetada (`--largura 148px`). Nas
+duas, a verificação virou caso de render automatizado.
+
+## As três issues que perderam a dependência de instância viva
+
+Mesma data, mesma razão — decisão do autor de que a correção tem de valer para todos, sem depender de
+teste externo. Corpo vivo no GitHub:
+
+| Issue | O que era | O que passou a ser |
+|---|---|---|
+| **#468** | baseline colado, tirado de `conferir-estudo.ts` nos estudos 5 e 6 de Pinguim | **fixture de regressão dos 4 KPIs** no repo — uma catraca: PR que move KPI sem declarar fica vermelho |
+| **#469** | cadastrar 3 operações `[teste]` de equity em Pinguim por `POST`, printar, apagar | **três casos de teste** que afirmam as divergências hoje; o PR que conserta inverte a asserção |
+| **#464** | fechava só com a tabela do censo anexada | fecha com **a função de contagem testada + o subcomando**; o número vira comentário, não critério |
