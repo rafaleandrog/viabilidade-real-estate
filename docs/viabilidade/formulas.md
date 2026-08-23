@@ -114,10 +114,17 @@ alimente o cash sweep.
 > são exatamente `['financiamento_producao','divida','equity']` (`backend/rotas/funding.ts:43`), e o
 > literal `capital_giro` é recusado como tipo novo (`backend/rotas/funding.test.ts:26`). **Isso não
 > quer dizer que o produto falte:** `divida` **é** o capital de giro por calendário (decisão 2 do
-> autor), a migração `029_funding_operacoes.js:38-43,127-130` converte `capital_giro` para `divida`
-> **sem perda**, e `frontend/funding-motor.test.ts:28-38` exercita uma operação `divida` chamada
-> "Capital de giro". O que foi recusado, por decisão, é a linha **rotativa** — ela reintroduziria a
-> competição por caixa que a #355 apagou. Falta o **rótulo** na tela (#466), não o produto.
+> autor), a migração `029_funding_operacoes.js:38-43,127-130` converte `capital_giro` para `divida` — **sem perda de parâmetro** (valor, taxa anual, carência e prazo
+> são os mesmos nos dois modelos) —, e `frontend/funding-motor.test.ts:28-38` exercita uma operação
+> `divida` chamada "Capital de giro".
+>
+> ⚠️ **A conversão não é fiel em todo caso, e o próprio código sinaliza:** `politicaAmortizacao`
+> deixa de existir no modelo novo, que só tem Price com carência. Camada legada com `cash_sweep` ou
+> `bullet` vira Price com o mesmo prazo e recebe **`[revisar]` no nome**
+> (`migracoes/029_funding_operacoes.js:138-159`) — é pedido de conferência humana, não equivalência.
+>
+> O que foi recusado, por decisão, é a linha **rotativa** — ela reintroduziria a competição por
+> caixa que a #355 apagou. Falta o **rótulo** na tela (#466), não o produto.
 
 > ⚠️ **O que continua inerte na aba `Viabilidade → Financeiro`**, e só isso: `regime_tributario` e
 > os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`), mais

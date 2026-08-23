@@ -1764,8 +1764,15 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 >
 > ⚠️ **Capital de giro EXISTE, sob o nome `divida`** — decisão 2 do autor, 2026-08-22. O tipo
 > `divida` **é** o produto de CG por calendário: a migração `029_funding_operacoes.js:38-43,127-130`
-> converte `capital_giro` para `divida` **sem perda**, e o golden case
-> `frontend/funding-motor.test.ts:28-38` exercita uma operação `divida` chamada "Capital de giro".
+> converte `capital_giro` para `divida` — **sem perda de parâmetro** (valor, taxa anual, carência e prazo
+> são os mesmos nos dois modelos) —, e `frontend/funding-motor.test.ts:28-38` exercita uma operação
+> `divida` chamada "Capital de giro".
+>
+> ⚠️ **A conversão não é fiel em todo caso, e o próprio código sinaliza:** `politicaAmortizacao`
+> deixa de existir no modelo novo, que só tem Price com carência. Camada legada com `cash_sweep` ou
+> `bullet` vira Price com o mesmo prazo e recebe **`[revisar]` no nome**
+> (`migracoes/029_funding_operacoes.js:138-159`) — é pedido de conferência humana, não equivalência.
+>
 > O que o enum recusa é o **literal** `capital_giro` como tipo novo
 > (`backend/rotas/funding.ts:43`, `backend/rotas/funding.test.ts:26`) — não o produto.
 >
