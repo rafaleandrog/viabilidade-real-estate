@@ -13,7 +13,16 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+WT=''
+# O trap DESREGISTRA a worktree antes de apagar o diretório. Sem isso, uma
+# execução interrompida entre o `git worktree add` e a remoção explícita deixa
+# `.git/worktrees/*` órfão, e as órfãs se acumulam a cada interrupção local.
+# Achado do Codex no PR 502, rodada 3.
+limpar() {
+  [ -n "$WT" ] && git worktree remove --force "$WT" >/dev/null 2>&1
+  rm -rf "$TMP"
+}
+trap limpar EXIT
 
 passou=0
 falhou=0
@@ -193,6 +202,7 @@ if [ -z "${PREFLIGHT_BATERIA_FILHA:-}" ] && [ "$falhou" -eq 0 ]; then
     ' "$WT"
     filha="$(PREFLIGHT_BATERIA_FILHA=1 bash "$WT/scripts/testar-preflight-pr.sh" 2>&1 | tail -1)"
     git worktree remove --force "$WT" >/dev/null 2>&1
+    WT=''
     esperado="ok: $passou caso(s) do preflight passaram."
     if [ "$filha" = "$esperado" ]; then
       passou=$((passou + 1))
@@ -205,6 +215,7 @@ if [ -z "${PREFLIGHT_BATERIA_FILHA:-}" ] && [ "$falhou" -eq 0 ]; then
       echo "        Alguma entrada esta vindo do ambiente em vez de ser declarada."
     fi
   else
+    WT=''
     echo "  --   hermeticidade: pulada (git worktree indisponivel aqui)"
   fi
 fi

@@ -75,6 +75,15 @@ const ARQUIVOS_MANUAIS = arg('--arquivos');
 const COMMITS_MANUAIS = arg('--commits');
 const VERSAO_MANUAL = arg('--versao');
 
+// MODO DECLARADO: qualquer override presente significa que quem chama está
+// exercitando o script contra entrada sintética, não conferindo um PR de
+// verdade. Aí as checagens de ÁRVORE viram informativas — elas falam do
+// ambiente por definição, e num modo declarado o ambiente não é o assunto.
+// Sem esta distinção, tornar "árvore suja" bloqueante reprovaria toda a
+// bateria sempre que houvesse trabalho não commitado.
+const MODO_DECLARADO =
+  ARQUIVOS_MANUAIS !== undefined || COMMITS_MANUAIS !== undefined || VERSAO_MANUAL !== undefined;
+
 if (!CORPO_ARQ) {
   console.error('uso: node scripts/preflight-pr.mjs --corpo <arquivo.md> [--base origin/main]');
   console.error('\nEscreva o corpo do PR num arquivo e passe-o aqui. O mesmo arquivo vai');
@@ -148,16 +157,30 @@ const sujo = (() => {
   }
 })();
 if (sujo) {
-  avisos.push(
-    `a árvore tem ${sujo.split('\n').length} arquivo(s) não commitado(s) — eles NÃO entram no PR:\n` +
-      sujo
-        .split('\n')
-        .slice(0, 10)
-        .map((l) => `      ${l}`)
-        .join('\n'),
-  );
+  // BLOQUEANTE, não aviso. O preflight roda DEPOIS do commit e do push (passo 4
+  // do processo), então neste ponto a árvore tem de estar limpa. Enquanto isso
+  // era só aviso havia um buraco real: `versao`, JSON, schema e a rede do
+  // processo são conferidos lendo o DISCO. Uma correção que existisse só na
+  // árvore — o bump do manifesto ainda não commitado, por exemplo — fazia o
+  // preflight aprovar, dizendo que o PR podia ser aberto, enquanto o commit
+  // JÁ EMPURRADO reprovaria no CI. Exatamente o que este script existe para
+  // impedir. Achado do Codex no PR 502, rodada 3 — o quinto membro da classe
+  // "entrada vindo do ambiente", encontrado quando parei de pedir lente de
+  // instância e passei a pedir a categoria.
+  const lista = sujo.split('\n');
+  const detalhe = lista.slice(0, 10).map((l) => `      ${l}`).join('\n');
+  if (MODO_DECLARADO) {
+    avisos.push(`estado da árvore: ${lista.length} arquivo(s) não commitado(s) — informativo no modo declarado.`);
+  } else {
+    bloqueantes.push(
+      `estado da árvore: ${lista.length} arquivo(s) não commitado(s). O preflight confere o que foi ` +
+        'EMPURRADO, mas `versao`, JSON, schema e a rede do processo são lidos do disco — então um ' +
+        'conserto que só existe aqui faria este script aprovar um commit que o CI reprova. ' +
+        `Commite e empurre antes de rodar.\n${detalhe}`,
+    );
+  }
 } else {
-  ok.push('árvore limpa');
+  ok.push('estado da árvore: limpa');
 }
 
 // ── 2. Base, head e diff — do mesmo jeito que o CI calcula ──────────────────
