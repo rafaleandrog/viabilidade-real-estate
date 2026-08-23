@@ -6,7 +6,7 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ## Rodada 9 aberta — e o Bloco 8-A, que a Rodada 8 perdeu no caminho (2026-08-23)
 
-A Rodada 8 fechou em 2026-08-22 com 20.446 linhas de auditoria em `docs/rodada-8/`, **61 issues** e
+A Rodada 8 fechou em 2026-08-22 com **19.931 linhas** de auditoria em `docs/rodada-8/`, **61 issues** e
 **zero linhas de código de app** (o autor autorizou 3 consertos e reverteu; a árvore ficou idêntica à
 `main`). Duas issues fecharam por decisão — #461 (D13, fora de escopo) e #480 (D11, sem interruptor)
 —, restando **59 abertas**. Ela **não escreveu nada aqui**: `grep "Rodada 8" PROGRESSO.md` dava zero.
@@ -64,8 +64,9 @@ A D4 da Rodada 8 dizia *"erros visuais sem navegador — não proponha usar brow
 descrevendo a máquina Windows do autor. **Nesta sessão de nuvem não vale:** Chromium e Playwright
 estão instalados (`/opt/pw-browsers/chromium`), e o repositório **já tem**
 `scripts/render-check-cronograma.mjs` usando os dois desde a #245. Medido em 2026-08-23: passa verde
-na `main` e **sai com código 1** sob regressão injetada (`--largura 148px`). Ele nunca rodou no CI —
-`grep -rn "render-check"` em `.sh`/`.yml`/`.json`/`.md` retorna **só o próprio arquivo**.
+na `main` e **sai com código 1** sob regressão injetada (`--largura 148px`). E ele **nunca rodou no
+CI**: na `main`, `git grep -n "render-check" -- '*.sh' '*.yml' '*.json' '*.md'` devolvia **zero
+ocorrências** — nenhum script de validação, workflow ou doc o invocava.
 
 O autor autorizou o caminho. A Rodada 9 generaliza aquele script; hoje são **408 testes de frontend e
 zero tocam DOM**, então um bug de CSS atravessa grep + JSON + tsc + `node --test` + esbuild e sai com

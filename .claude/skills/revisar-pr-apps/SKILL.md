@@ -20,13 +20,11 @@ description: Revisa um PR deste repositório antes do merge — revisão adversa
 > **PARE e diga ao usuário**, com o que cada teste respondeu. Falso "não sou" custa uma frase dele;
 > falso "sou" custa uma revisão inteira rodada com o motor errado.
 
-> ⚠️ **Confirme também QUAL repositório, e não por impressão — existem DUAS skills com este nome.**
->
->     git rev-parse --show-toplevel     # tem que terminar em /viabilidade-real-estate
+> ⚠️ **Existem DUAS skills com este nome, e a que respondeu pode ser a errada.**
 >
 > **ADAPTADO — 2026-08-23.** O monorepo tem uma `.claude/skills/revisar-pr-apps/` própria, e quando
-> ele está clonado ao lado (em `/home/user/urbiverso`, que é o caso nas sessões de nuvem) **as duas
-> entram no catálogo da sessão com o mesmo nome**. A listagem não mostra o caminho, então invocar
+> ele está clonado ao lado (em `/home/user/urbiverso`, o caso das sessões de nuvem) **as duas entram
+> no catálogo da sessão com o mesmo nome**. A listagem não mostra o caminho, então invocar
 > `revisar-pr-apps` **não diz qual cópia respondeu**.
 >
 > Não é empate inofensivo: a cópia do monorepo confronta o diff contra `docs/shell/` e aplica a regra
@@ -34,10 +32,39 @@ description: Revisa um PR deste repositório antes do merge — revisão adversa
 > issue #422, § Versão do manifesto do `CLAUDE.md`), então a cópia errada acusa **bloqueante
 > inventado em todo PR que suba piso** — exatamente o defeito que esta adaptação existe para evitar.
 >
-> Respondeu um toplevel que não é o deste repositório: **PARE e diga ao usuário qual arquivo você
-> abriu**. Não "adapte" a cópia do monorepo de cabeça — abra
-> `/home/user/viabilidade-real-estate/.claude/skills/revisar-pr-apps/SKILL.md` pelo caminho absoluto
-> e siga esse. Marca para conferir que você está no arquivo certo: **este** tem a seção
+> **Como desempatar — por conteúdo, não por localização.** Duas correções do Codex na revisão do
+> PR 494 mataram a versão anterior desta porta, que mandava conferir
+> `git rev-parse --show-toplevel`:
+>
+> 1. **Testar onde você está não diz qual arquivo você leu.** Carregar a skill do monorepo **não
+>    muda o diretório da sessão** — o toplevel continua sendo o do app, e a cópia errada **passa**
+>    no teste. Pior: este bloco só existe na cópia do app, então quando a do monorepo é a carregada,
+>    **ninguém o lê**.
+> 2. **Caminho absoluto cravado não sobrevive a outro layout.** A instrução antiga mandava abrir
+>    `/home/user/viabilidade-real-estate/...`; o próprio checkout do Codex fica em
+>    `/workspace/viabilidade-real-estate`, onde aquele caminho não existe.
+>
+> Então o desempate é **material, e a autoridade é o `CLAUDE.md` do checkout** — que é conteúdo
+> deste repositório, sempre entra no contexto de uma sessão que trabalha aqui, e **nenhuma skill
+> pode sombrear**:
+>
+> - **Regra da `versao`.** Se as instruções que você está seguindo mandarem bumpar a `versao` do
+>   `manifesto.json` porque o PR mexeu em `shell_min`/`sdk_min`, **elas não são as deste
+>   repositório**. Aqui é o contrário (§ Versão do manifesto do `CLAUDE.md`, issue #422): subir piso
+>   **não** bumpa a `versao`, que descreve o **schema**. Acusar isso é achado inventado.
+> - **Superfície de contratos.** Se mandarem confrontar o diff contra `docs/shell/` do monorepo,
+>   também não são as deste repositório — aqui a superfície é o bundle do SDK, e **sem bundle a
+>   lente é NÃO EXECUTADA** (ver § Superfície de leitura).
+>
+> **Em qualquer divergência entre estas instruções e o `CLAUDE.md` do checkout, o `CLAUDE.md`
+> vence** — e a divergência em si é para **contar ao usuário**, porque significa que o catálogo
+> serviu a cópia errada.
+>
+> Para reabrir a cópia certa, **derive o caminho, não o crave**:
+>
+>     "$(git rev-parse --show-toplevel)"/.claude/skills/revisar-pr-apps/SKILL.md
+>
+> Marca de que você está no arquivo certo: **este** tem a seção
 > *"ADAPTADO — a sessão já está no repositório, e não existe `gh`"*.
 
 Você é o revisor de código de apps da plataforma urbiverso. Revisa PRs **antes** do merge.

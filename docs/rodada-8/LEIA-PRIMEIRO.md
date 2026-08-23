@@ -61,7 +61,7 @@ seguem **sem verificação automática** — quem revisa cobra à mão.
 | 1 | **Nenhum bug é consertado nesta rodada. Tudo vira issue.** O autor autorizou o conserto e depois reverteu | Os 3 consertos **foram revertidos**; a árvore está idêntica à `main`. `09-consertos.md` virou corpo de issue |
 | 2 | **Capital de giro: só o rótulo.** `divida` **já é** o produto de CG por calendário | O desenho `linha_credito` rotativo do A3 foi **RECUSADO**. Sem migração `030`, sem bump para 0.1.29 |
 | 3 | **Base de receita líquida do equity NÃO muda.** *"equity é um retorno líquido ao investidor, não importa esse fator para o cálculo"* | `funding-motor.ts:58-67` fica como está. A divergência com as duas planilhas é **intencional** → nota, não issue |
-| 4 | **Erros visuais sem navegador** — API + leitura de código | Não proponha usar browser |
+| 4 | ~~**Erros visuais sem navegador** — API + leitura de código~~ · 🔄 **REVOGADA em 2026-08-23** | A decisão descrevia a máquina Windows do autor. **Na sessão de nuvem há navegador**: Chromium e Playwright instalados (`/opt/pw-browsers/chromium`), e `scripts/render-check-cronograma.mjs` (#245) já os usa — medido, passa na `main` e sai com código 1 sob regressão injetada. O autor autorizou o caminho. **Verificação visual passa a ser render automatizado**, não print. Ver `PROGRESSO.md` (2026-08-23) |
 
 ---
 
