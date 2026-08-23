@@ -290,10 +290,21 @@ rodadas e encerramento obrigatório. Este último não faz falta porque a sessã
 inscreve em nada — ela revisa quando chamada e termina. Vale saber por que isso às vezes importa: **com uma sessão só, quem revisa
 é quem escreveu** — a §8 da skill compensa com lentes novas a cada rodada, mas não é a mesma coisa.
 
-**O motor é Codex quando dá, nativo quando não** — e a queda é **declarada**, nunca silenciosa. Hoje
-é nativo: falta `OPENAI_API_KEY` nas variáveis do *cloud environment*. O CLI o preflight instala
-sozinho; só a chave é do autor. Enquanto for nativo, o relatório diz em uma linha que revisão nativa
-de patch escrito pela mesma família de modelo é **menos adversarial**.
+**O motor é Codex, e ele está ligado** — por **`@codex review`** no PR, não pelo CLI. O GitHub App
+está instalado neste repositório; provado no PR 494, seis rodadas, ~2 min cada, nove achados reais
+(dois P1). É o **caminho normal**, e a sequência obrigatória — acionar, esperar com teto de 15 min,
+colher os *review threads*, verificar, só então atestar — está em `.claude/motor-revisao.md`
+§ *Sequência obrigatória do App*.
+
+> ⚠️ **`bloqueantes=` conta os achados do Codex ainda não resolvidos**, porque
+> `revisao-registrada.yml` filtra comentários **pelo autor do PR** e nunca enxerga o bot. E se o App
+> não responder no teto, **não se publica a linha de máquina** — `bloqueantes=0` deixaria o portão
+> verde sobre um ciclo aberto, já que o job lê só o número, nunca a prosa.
+
+Os outros dois caminhos continuam existindo e são o **fallback**: o **CLI local** (`codex exec`) —
+que aqui não sobe, porque falta `OPENAI_API_KEY` **e** a liberação de `api.openai.com`, hoje **403 no
+CONNECT** — e o **fan-out nativo**, que só entra quando os dois falham e é **declarado** no relatório
+como menos adversarial, por ser patch revisado pela mesma família de modelo que o escreveu.
 
 **A camada de contratos não roda neste ambiente, e isso é estrutural.** Ela lê
 `node_modules/@urbiverso/sdk/docs/`, e aqui **tanto o `pnpm install` quanto o `npm view

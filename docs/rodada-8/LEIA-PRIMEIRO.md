@@ -37,15 +37,24 @@ nova rodada de revisão → parar. **Merge é decisão do autor.**
 
 ### Ligar o Codex na revisão
 
-O motor de revisão já está montado em `.claude/motor-revisao.md`: ele roda as lentes **fora da conta
-Anthropic**, instala o CLI sozinho (`npm i -g @openai/codex`) e cai para subagente nativo se falhar,
-**declarando a queda no relatório**. Falta **uma coisa só**: a variável `OPENAI_API_KEY`.
+> ✅ **CORRIGIDO em 2026-08-23 — o Codex já está ligado, e o texto abaixo dizia o contrário.**
+> Esta seção afirmava que faltava *"uma coisa só"* (a `OPENAI_API_KEY`) e que sem ela a revisão cai
+> para o motor nativo. **O caminho que funciona é outro, e não precisa de chave nenhuma:** o
+> **GitHub App do Codex** está instalado neste repositório e revisa quando se comenta
+> **`@codex review`** no PR. Provado no PR 494: seis rodadas, ~2 min cada, nove achados reais (dois
+> P1). **Comente `@codex review` — é o caminho normal.**
+>
+> A `OPENAI_API_KEY` continua sendo o que falta para o **CLI local** (`codex exec`), que é um
+> caminho diferente — e neste *cloud environment* falta também liberar `api.openai.com` na política
+> de rede, que hoje devolve **403 no CONNECT**. Nada disso bloqueia o App, que roda fora daqui.
+> Detalhe em `.claude/motor-revisao.md` § *Sequência obrigatória do App*.
+
+O motor de revisão está montado em `.claude/motor-revisao.md`, com três caminhos em ordem de
+preferência: **GitHub App** (`@codex review`, o normal), **CLI local** (`codex exec`, se houver chave
+e rede) e **fan-out nativo** (só quando os dois falham, e **declarado** como menos adversarial).
 
 > ⚠️ **A chave é por ambiente.** Numa sessão web, ela vai nas variáveis do *cloud environment*;
 > numa sessão local, no ambiente da máquina. Definir num lado não vale para o outro.
-
-Sem ela, quem revisa o patch é a mesma família de modelo que o escreveu — o próprio documento diz
-que isso é **menos adversarial**, e o relatório precisa dizer isso em uma linha.
 
 ⚠️ **A camada de contratos não roda em ambiente nenhum**, com Codex ou sem: ela lê
 `node_modules/@urbiverso/sdk/docs/`, e o SDK é **stub** nos dois lugares. Toda revisão vai trazer

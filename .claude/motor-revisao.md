@@ -74,10 +74,25 @@ Então, **antes** de publicar o relatório da §7, execute nesta ordem:
    resolvidos, e publique.
 6. **Resolva os threads que você endereçou**, para a próxima rodada distinguir o que é novo.
 
-**Se o teto estourar** — nenhuma review no head da rodada em 15 min —, isso **não** vira
-`bloqueantes=0` calado. Publique com `motor=nativo` na linha de máquina, diga **em uma linha** que o
-App foi acionado e não respondeu no prazo, e trate o ciclo como **não fechado** até ele responder ou
-o autor dispensar. Silêncio do motor nunca é aprovação do motor.
+**Se o teto estourar** — nenhuma review no head da rodada em 15 min —, o ciclo fica **aberto**, e a
+atestação tem de refletir isso **na máquina, não na prosa**:
+
+> 🔴 **NÃO publique a linha de máquina.** Publique o relatório **sem** o comentário HTML
+> `<!-- revisao-viabilidade … -->`, dizendo em uma linha que o App foi acionado no head `<sha>` e não
+> respondeu dentro do teto.
+>
+> **Por quê, e é o achado P1 da rodada 6 do próprio Codex:** `revisao-registrada.yml:124-130` lê
+> **só o número** de `bloqueantes=`. Publicar `bloqueantes=0` com prosa explicando que o ciclo está
+> aberto deixa o status **verde** assim mesmo — a prosa não é lida por ninguém que decida. Sem a
+> linha de máquina, o job não acha atestação e o status fica *"nenhuma revisão registrada"*, que é
+> **exatamente o estado verdadeiro**.
+>
+> Alternativa aceitável, se você quiser o relatório rastreável na contagem de rodadas: publique a
+> linha com `bloqueantes=1` e o achado *"revisão do App não chegou no head desta rodada"* como o
+> bloqueante — ele some quando ela chegar. **O que não é aceitável é `bloqueantes=0`.**
+
+Silêncio do motor nunca é aprovação do motor — e "eu expliquei no texto" não é o mesmo que "o portão
+sabe".
 
 ## Entradas que a skill chamadora fornece
 
