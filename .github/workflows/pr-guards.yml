@@ -259,3 +259,38 @@ jobs:
             echo "::error title=Parsing da atestação de revisão falhou::A extração da linha de máquina não se comporta como o esperado — o status revisao/bloqueantes reprovaria PR revisado."
             exit 1
           fi
+
+  tabelas-obsoletas:
+    name: Tabela aposentada não é reusada por código novo
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Guard de tabelas obsoletas
+        run: |
+          set -uo pipefail
+          # Só `node` — sem pnpm install, sem SDK, sem credencial.
+          # `avancado_capital_instrumentos` é o resto do Capital Stack apagado pela
+          # #355: declarada no schema.json, vazia, com nome sugestivo e com os campos
+          # de waterfall (`prioridade_funding`, `prioridade_pagamento`) que a decisão
+          # enterrou. Não dá para removê-la — não há DDL na camada de migração
+          # (029:55-58), então tirá-la do schema.json a deixaria órfã no Postgres,
+          # inalcançável. Fica declarada, e o guard é a etiqueta contra o reúso.
+          # O registro das tabelas aposentadas mora no próprio script (OBSOLETAS).
+          # Linha de COMENTÁRIO fica de fora, mesma regra do job `migracao-declarativa`.
+          if ! node scripts/guard-tabelas-obsoletas.mjs; then
+            echo "::error title=Tabela aposentada reusada::As linhas acima referenciam uma tabela APOSENTADA fora dos caminhos permitidos (migracoes/, docs/, scripts/, schema.json, CLAUDE.md, PROGRESSO.md). Use a tabela substituta indicada na saída do guard; menção histórica pertence a docs/ ou a uma linha de comentário. Ver issue #479."
+            exit 1
+          fi
+      - name: Bateria do guard de tabelas obsoletas
+        if: always()
+        run: |
+          set -uo pipefail
+          # Falso NEGATIVO deixa o reúso passar e o guard vira papel de parede; falso
+          # POSITIVO atrapalha trabalho legítimo, alguém tira o job, e aí ele não
+          # guarda mais nada. A bateria roda contra fixtures em mktemp, não contra a
+          # árvore — o veredito não muda conforme o que estiver commitado.
+          if ! bash scripts/testar-guard-tabelas-obsoletas.sh; then
+            echo "::error title=Bateria do guard de tabelas obsoletas falhou::O guard não se comporta como o esperado nos dois sentidos. Veja quais casos falharam no log."
+            exit 1
+          fi
