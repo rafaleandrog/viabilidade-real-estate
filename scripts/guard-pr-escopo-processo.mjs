@@ -32,7 +32,21 @@ const arquivos = entrada.split('\n').map((l) => l.trim()).filter(Boolean);
 // Processo: o que a R1 protege. O CLAUDE.md fica FORA de propósito — ele é um
 // arquivo só, a regra vale para uma seção dele, e marcá-lo inteiro barraria todo
 // PR que documenta a própria mudança, que é o que o monorepo exige.
-const PROCESSO = [/^\.claude\//];
+// A própria guarda entra na classe que ela protege — achado do Codex no PR 496.
+// Sem isto, um PR podia enfraquecer `guard-pr-escopo-processo.mjs` no mesmo diff
+// que o código que ele deveria barrar, e passar pela regra que estava alterando.
+// `guard-processo.mjs` só confere que o arquivo EXISTE, então não pegaria.
+const PROCESSO = [
+  /^\.claude\//,
+  /^scripts\/guard-pr-escopo-processo\.mjs$/,
+  /^scripts\/guard-processo\.mjs$/,
+];
+
+// ⚠️ O job `escopo-processo` do `.github/workflows/pr-guards.yml` NÃO entra aqui,
+// e é limitação conhecida: o guard decide por caminho de arquivo, e o workflow é
+// um arquivo só, com oito jobs. Classificá-lo inteiro barraria todo PR que
+// acrescente um job de CI junto de uma feature — caso legítimo e comum. Quem
+// revisa cobre isso à mão; está declarado para não parecer esquecimento.
 
 // Produto: o que não pode viajar junto. Inclui os manifests de raiz — achado do
 // Codex no PR 496: um PR com `.claude/motor-revisao.md` + `package.json` +
