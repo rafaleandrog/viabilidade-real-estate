@@ -109,7 +109,7 @@ if (CORPO_ARQ && TITULO === undefined) {
   process.exit(2);
 }
 if (!CORPO_ARQ) {
-  console.error('uso: node scripts/preflight-pr.mjs --corpo <arquivo.md> [--base origin/main]');
+  console.error('uso: node scripts/preflight-pr.mjs --corpo <arquivo.md> --titulo "<título do PR>" [--base origin/main]');
   console.error('\nEscreva o corpo do PR num arquivo e passe-o aqui. O mesmo arquivo vai');
   console.error('para o create_pull_request — se você reescrever o corpo na chamada do');
   console.error('MCP, o que foi verificado não é o que foi publicado.');
@@ -319,7 +319,13 @@ const texto = `${TITULO}\n${corpo}\n${commits}`;
 // este script promete: antecipar aquele job. Predicado tem de ter a MESMA
 // semântica do que ele prevê, mesmo quando a semântica é discutível. Achado do
 // Codex no PR 502, rodada 8.
-const RE_KEYWORD = /(?:clos(?:e|es|ed)|fix(?:es|ed)?|resolv(?:e|es|ed))\s*:?\s*#(\d+)/gi;
+// `[^\S\r\n]` — espaço que NÃO é quebra de linha. Com `\s*`, a keyword do
+// título podia se juntar ao `#123` que abre o corpo e formar um casamento que o
+// job NÃO faz: ele usa `grep -E`, que avalia linha a linha. Eu tinha tirado o
+// `\b` para alinhar a semântica e, na mesma regex, deixei passar o erro
+// simétrico — o preditor reprovando onde o previsto aprova. Rodada 9.
+const RE_KEYWORD =
+  /(?:clos(?:e|es|ed)|fix(?:es|ed)?|resolv(?:e|es|ed))[^\S\r\n]*:?[^\S\r\n]*#(\d+)/gi;
 const fecha = [...texto.matchAll(RE_KEYWORD)].map((m) => m[1]);
 if (arquivos.length === 0 && fecha.length > 0) {
   bloqueantes.push(
@@ -409,7 +415,14 @@ const versaoDe = (ref) => {
     const bruto = ref === null
       ? readFileSync(resolve(RAIZ, 'manifesto.json'), 'utf8')
       : git('show', `${ref}:manifesto.json`);
-    return JSON.parse(bruto).versao ?? null;
+    // Fragmento TEXTUAL, não o valor parseado. O `validar-backend.sh:113-123`
+    // compara o que o `grep -o '"versao"[^,]*'` extrai, então reformatar a
+    // linha — mesmo valor, espaçamento diferente — conta como versão mudada lá
+    // e não contava aqui: PR sem migração passava no preflight e reprovava no
+    // `validation.yml`. Predicado tem de ter a semântica do previsto, inclusive
+    // quando a do previsto é mais crua. Rodada 9.
+    const m = bruto.match(/"versao"[^,]*/);
+    return m ? m[0] : null;
   } catch {
     return null;
   }
