@@ -259,3 +259,50 @@ jobs:
             echo "::error title=Parsing da atestação de revisão falhou::A extração da linha de máquina não se comporta como o esperado — o status revisao/bloqueantes reprovaria PR revisado."
             exit 1
           fi
+
+  guards-ui:
+    name: Tokens, props de primitivo e box model do urbi-*
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Guards de UI contra o espelho docs/ui-urbiverso/
+        run: |
+          set -uo pipefail
+          # Só `node` — os três leem `docs/ui-urbiverso/`, que é conteúdo DESTE
+          # repositório (o espelho versionado da referência do urbiverso). Sem
+          # pnpm install, sem SDK, sem credencial, sem rede.
+          #
+          # As três classes que eles pegam são falhas 100% SILENCIOSAS — atravessam
+          # typecheck, testes e esbuild em verde, exatamente como as aspas curvas:
+          #   · `var(--nao-existe, #hex)` → o fallback vira a cor efetiva, para
+          #     sempre, e não acompanha nenhum dos quatro temas do shell (#475);
+          #   · atributo que o primitivo não declara → não faz nada, a prop fica
+          #     no default;
+          #   · `width` de fora num urbi-* sem `box-sizing: border-box` → a caixa
+          #     renderizada mede width + padding + border e pinta sobre o vizinho.
+          #     Reportado quatro vezes (#176, #262, #326, #352) e fechado quatro.
+          falhou=0
+          node scripts/guard-tokens-css.mjs || falhou=1
+          node scripts/guard-props-urbi.mjs || falhou=1
+          node scripts/guard-box-model-urbi.mjs || falhou=1
+          if [ "$falhou" != "0" ]; then
+            echo "::error title=Guard de UI reprovou::Token inexistente, atributo que o primitivo não declara, ou width/height de fora num urbi-* sem box-sizing. Nenhuma das três aparece no typecheck, nos testes ou no build — veja o log acima para o arquivo:linha."
+            exit 1
+          fi
+      - name: Bateria dos guards de UI
+        if: always()
+        run: |
+          set -uo pipefail
+          # Guard falha calado nos DOIS sentidos, e a bateria cobre os dois: falso
+          # negativo deixa o defeito passar (guard vira teatro); falso positivo
+          # reprova código correto, alguém desliga o guard, e aí ele não guarda
+          # mais nada. A construção do espelho já produziu falso positivo duas
+          # vezes — kebab-case em vez de minúsculo, e herança não percorrida.
+          #
+          # A bateria é determinística: monta um repositório de mentira com espelho
+          # sintético num diretório temporário e não lê o `frontend/` do repo.
+          if ! bash scripts/testar-guards-ui.sh; then
+            echo "::error title=Bateria dos guards de UI falhou::Um dos três guards não se comporta como o esperado. Veja quais casos falharam no log."
+            exit 1
+          fi

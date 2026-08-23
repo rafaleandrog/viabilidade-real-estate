@@ -15,10 +15,14 @@
 #      estrito em schema.json/manifesto.json (comentário `//` neles reprova o pacote
 #      na instalação — foi o que derrubou a v0.1.19) e ciclo de FK no schema.json
 #      (quebra a instalação numa instância virgem, e só lá);
-#   2. roda `pnpm install` (a falha de 401 do SDK é ESPERADA e ignorada);
-#   3. cria os symlinks de topo dos pacotes públicos a partir de `.pnpm/`;
-#   4. typecheck do frontend (tsconfig só-frontend);
-#   5. testes de frontend e build do bundle via esbuild.
+#   2. guards de UI contra o espelho `docs/ui-urbiverso/`: token que não existe,
+#      atributo que o primitivo não declara, `width`/`height` de fora num
+#      primitivo sem `box-sizing` — as três são falhas 100% SILENCIOSAS, que
+#      atravessam typecheck, teste e build em verde;
+#   3. roda `pnpm install` (a falha de 401 do SDK é ESPERADA e ignorada);
+#   4. cria os symlinks de topo dos pacotes públicos a partir de `.pnpm/`;
+#   5. typecheck do frontend (tsconfig só-frontend);
+#   6. testes de frontend e build do bundle via esbuild.
 #
 # Backend / `urbi-empacotar` / typecheck do backend precisam do SDK → só rodam no
 # ambiente autenticado do autor. Para mudanças de frontend, este script basta.
@@ -32,7 +36,7 @@ raiz="$(pwd)"
 # ficou `in_progress` no passo `Testes` por horas, sem log nenhum para ler (a API do
 # GitHub só serve log de job concluído). São duas defesas, porque cobrem casos
 # diferentes e nenhuma cobre as duas:
-#   - `--test-timeout` (usado na etapa 5/5) mata teste ASSÍNCRONO pendurado e diz o
+#   - `--test-timeout` (usado na etapa 6/6) mata teste ASSÍNCRONO pendurado e diz o
 #     NOME do teste. Não pega laço síncrono: `while(true){}` bloqueia o event loop e o
 #     próprio timer do runner nunca dispara.
 #   - `com_limite` mata o PROCESSO inteiro — é esta que pega o laço síncrono.
@@ -62,7 +66,7 @@ com_limite() {
 # ambiente, LANG vazio) o grep casa a classe BYTE a byte, e como ”/“/—/→ compartilham
 # o primeiro byte 0xE2, `=[”“]` daria falso positivo em `=—` e `=→`. A alternância
 # compara as sequências de 3 bytes inteiras e acerta em qualquer locale.
-echo "== 1/5 guards estáticos (aspas curvas + JSON estrito + ciclos de schema) =="
+echo "== 1/6 guards estáticos (aspas curvas + JSON estrito + ciclos de schema) =="
 if grep -rn '=\(”\|“\|‘\|’\)' frontend/; then
   echo "  FALHOU: aspas curvas em atributo — o atributo fica inerte. Use aspas retas." >&2
   exit 1
@@ -84,14 +88,41 @@ node scripts/guard-json.mjs || exit 1
 node scripts/guard-schema-ciclos.mjs || exit 1
 echo "  ok: nenhuma aspa curva em atributo"
 
-echo "== 2/5 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
+# Os três guards de UI leem `docs/ui-urbiverso/` — o espelho versionado da
+# referência do urbiverso — e por isso rodam com `node` puro, sem SDK, sem
+# credencial e sem rede. Ficam ANTES do `pnpm install` de propósito: são a etapa
+# mais barata do script e falham em menos de um segundo.
+#
+# As três classes que eles pegam são 100% silenciosas, cada uma por um motivo:
+#   · `var(--nao-existe, #hex)` não dá erro — o fallback vira a cor efetiva, para
+#     sempre, e some quando o tema muda (foi o `--cor-superficie-2`, #475);
+#   · atributo que o primitivo não declara não dá erro — ele não faz nada, e a
+#     prop fica no default;
+#   · `width` de fora num `urbi-*` sem `box-sizing: border-box` renderiza uma
+#     caixa maior que o pedido, e pinta sobre o vizinho (o urbi-kpi, quatro vezes
+#     reportado: #176, #262, #326, #352).
+# Nenhuma delas aparece no typecheck, nos testes ou no esbuild.
+echo "== 2/6 guards de UI (tokens + props de primitivo + box model) =="
+node scripts/guard-tokens-css.mjs || exit 1
+node scripts/guard-props-urbi.mjs || exit 1
+node scripts/guard-box-model-urbi.mjs || exit 1
+# A bateria dos próprios guards. Guard falha calado nos DOIS sentidos: falso
+# negativo deixa o defeito passar; falso positivo reprova código correto, alguém
+# desliga o guard, e aí ele não guarda mais nada.
+com_limite 120 bash scripts/testar-guards-ui.sh >/dev/null || {
+  echo "  bateria dos guards de UI FALHOU — rode: bash scripts/testar-guards-ui.sh" >&2
+  exit 1
+}
+echo "  ok: bateria dos guards de UI verde"
+
+echo "== 3/6 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
 pnpm install >/dev/null 2>&1 || true
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — o pnpm não conseguiu baixar nem os pacotes públicos (sem rede?)." >&2
   exit 1
 fi
 
-echo "== 3/5 linkando pacotes públicos do store virtual (.pnpm) =="
+echo "== 4/6 linkando pacotes públicos do store virtual (.pnpm) =="
 # link_pkg <glob-do-dir-em-.pnpm> <subcaminho-interno> <alvo-em-node_modules>
 link_pkg() {
   local glob="$1" interno="$2" alvo="$3"
@@ -115,7 +146,7 @@ link_pkg 'esbuild@0.24*'             'esbuild'                'esbuild'
 tsc="node_modules/typescript/bin/tsc"
 esbuild_bin="node_modules/esbuild/bin/esbuild"
 
-echo "== 4/5 typecheck do frontend =="
+echo "== 5/6 typecheck do frontend =="
 cat > tsconfig.frontend.json <<'JSON'
 { "extends": "./tsconfig.json", "include": ["frontend/**/*"] }
 JSON
@@ -124,7 +155,7 @@ tc=$?
 rm -f tsconfig.frontend.json
 [ $tc -eq 0 ] && echo "  typecheck OK" || { echo "  typecheck FALHOU"; exit 1; }
 
-echo "== 5/5 testes de frontend + build do bundle =="
+echo "== 6/6 testes de frontend + build do bundle =="
 # `frontend/*.test.ts` NÃO alcança subdiretório: até 2026-08-11 os 16 golden
 # cases do Capital Stack (frontend/fixtures/capital-stack-golden.test.ts, hoje
 # apagado — a #355 substituiu o modelo) nunca rodaram, nem aqui nem no
