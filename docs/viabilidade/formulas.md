@@ -79,8 +79,16 @@ apenas para linha nunca reeditada.
 > 🚫 **Não copiar fórmula de carteira do arquivo Urbitá.** As fórmulas de carteira daquele arquivo
 > admitem saldo negativo e saldo que volta a crescer depois da última parcela. A recorrência correta
 > é por safra: `saldo_s,s = principal_s`, depois
-> `saldo_s,t = saldo_s,t-1 + juros_s,t − pagamento_s,t` — que é o que
-> `validarComponentesSafra` (`frontend/fluxo-invariantes.ts:404`) fiscaliza.
+> `saldo_s,t = saldo_s,t-1 + juros_s,t − pagamento_s,t` — que é o que `carteiraSaldoSafra`
+> (`frontend/fluxo-caixa-motor.ts:826`) implementa.
+>
+> ⚠️ **`validarComponentesSafra` NÃO é fiscalização independente dessa recorrência** — e o texto
+> anterior dizia que era. Ele lê os saldos da **própria** `carteiraSaldoSafra`
+> (`frontend/fluxo-invariantes.ts:404+`) e confere três coisas: as participações somam 100%, o
+> saldo final zera e a série não volta a crescer. **Não reconstrói** `saldo anterior + juros −
+> pagamento` a partir dos pagamentos, e o produtor ainda força o último saldo a zero. Uma regressão
+> que mantenha a carteira monotonicamente decrescente mas erre juros ou pagamento intermediário
+> **passa**. O oráculo de verdade são os cenários dourados, não o validador.
 
 ## Funding — onde as fórmulas vivem
 
@@ -114,9 +122,16 @@ alimente o cash sweep.
 > são exatamente `['financiamento_producao','divida','equity']` (`backend/rotas/funding.ts:43`), e o
 > literal `capital_giro` é recusado como tipo novo (`backend/rotas/funding.test.ts:26`). **Isso não
 > quer dizer que o produto falte:** `divida` **é** o capital de giro por calendário (decisão 2 do
-> autor), a migração `029_funding_operacoes.js:38-43,127-130` converte `capital_giro` para `divida` — **sem perda de parâmetro** (valor, taxa anual, carência e prazo
-> são os mesmos nos dois modelos) —, e `frontend/funding-motor.test.ts:28-38` exercita uma operação
-> `divida` chamada "Capital de giro".
+> autor), a migração `029_funding_operacoes.js:38-43,127-130` converte `capital_giro` para `divida`, e
+> `frontend/funding-motor.test.ts:28-38` exercita uma operação `divida` chamada "Capital de giro".
+>
+> ⚠️ **A conversão preserva valor, taxa anual, carência e prazo — mas NÃO o calendário de
+> liberações.** A migração guarda só o **primeiro mês** e a **quantidade** (`inicio_mes` `:149`,
+> `aporte_meses` `:156`), descartando os meses e valores individuais de `liberacaoProgramada`; e
+> `simularDivida` recria **tranches iguais em meses consecutivos**
+> (`frontend/funding-motor.ts:245`). Liberação **não contígua ou de valores diferentes** muda o
+> caixa e os juros mesmo com todos os outros parâmetros iguais. Dizer "sem perda de parâmetro" era
+> verdade sobre os quatro escalares e falso sobre o cronograma.
 >
 > ⚠️ **A conversão não é fiel em todo caso, e o próprio código sinaliza:** `politicaAmortizacao`
 > deixa de existir no modelo novo, que só tem Price com carência. Camada legada com `cash_sweep` ou
@@ -127,10 +142,18 @@ alimente o cash sweep.
 > caixa que a #355 apagou. Falta o **rótulo** na tela (#466), não o produto.
 
 > ⚠️ **O que continua inerte na aba `Viabilidade → Financeiro`**, e só isso: `regime_tributario` e
-> os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`), mais
-> `imposto_sobre_permuta_fisica` (`:182`). Nenhum motor os lê. Os campos de financiamento,
-> investidor, estrutura de capital e correção monetária **saíram da tela** (#279/#355); as colunas
-> continuam no schema, sem formulário e sem leitor.
+> os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`),
+> `imposto_sobre_permuta_fisica` (`:182`) e mais **dois que este inventário omitia**:
+> `sujeito_ret` (`:176-177`) e `imposto_percentual` (`:188`).
+>
+> Os dois últimos **não** são inertes em absoluto — alimentam a Proforma do **Preliminar**
+> (`frontend/proforma.ts:245`). O que não os lê é o **Avançado**, que recebe o RET pelo par global
+> `considerar_ret`/`ret_pct` (`frontend/tela-fluxo-ver.ts:122`). Preenchê-los numa tela de Avançado
+> não muda cálculo nenhum. `regime_tributario` e os `aliquota_*_pct`, esses sim, não têm leitor em
+> nível nenhum.
+>
+> Os campos de financiamento, investidor, estrutura de capital e correção monetária **saíram da
+> tela** (#279/#355); as colunas continuam no schema, sem formulário e sem leitor.
 
 ## Valor canônico dos campos multiunidade
 

@@ -2921,12 +2921,18 @@ primeira edição. A #260 migra todos os demais consumidores para o resolver can
 > (`frontend/premissas-conversao.ts:50-58`), inclusive o percentual, é o que quebra o round-trip —
 > o percentual não é monetário e não deveria ser quantizado.
 
-**A13 — A tela e a exportação formatam dinheiro diferente.** `fmtR$` usa
-`maximumFractionDigits: 0` (`frontend/viab-format.ts:8`) e serve **53 chamadas em 11 telas**;
-`exportar.ts:9` define o seu próprio `R$ = (v) => v.toFixed(2)`. O mesmo estudo mostra valores
-diferentes no CSV e na tela, e a diferença cresce com o número de linhas somadas. Como `fmtR$` é
-definido num ponto só, a correção é pequena — mas ela muda **toda** a apresentação monetária do app
-de uma vez, então não é ajuste pontual. → **#281**.
+**A13 — A tela e a exportação formatavam dinheiro diferente; hoje a divergência é outra.**
+🔄 **Reescrita:** o texto anterior dizia que `fmtR$` usava `maximumFractionDigits: 0` e que
+`exportar.ts` definia o próprio `R$ = (v) => v.toFixed(2)`. **As duas coisas deixaram de valer** —
+`fmtR$` fixa **2 casas** (`frontend/viab-format.ts:11-23`) e a exportação **importa** `fmtR$`
+(`exportar.ts:10`). Mantê-lo como estava deixava duas descrições vigentes incompatíveis no mesmo
+documento, contra o contrato **C7** do Anexo A.
+
+A armadilha que **sobra** é mais estreita: três fontes ainda formatam por conta própria —
+`fluxo-tabela.ts:34` (`celula`, arredonda para 0 casas e **esconde** valor abaixo de R$ 0,50),
+`tela-proforma.ts:314` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383`
+(`precoUnit`/`precoTotal`), as duas últimas chamando `fmtNum` sem casas. A mesma célula sai `1.235`
+na tela e `1.234,56` no PDF. → **#281**, que segue aberta só por elas.
 
 **A12 — `travado_*` legado não é normalizado em leitura.** `recalcularTravados` corrige
 `travado_inicio` de três eventos e **nunca toca `travado_duracao`**
