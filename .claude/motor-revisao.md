@@ -82,9 +82,25 @@ Então, **antes** de publicar o relatório da §7, execute nesta ordem:
 2. **Acione, e guarde o carimbo do SEU comentário.** Comente `@codex review` com o head da rodada
    declarado, e anote o `created_at`/`id` do comentário que você acabou de publicar.
 
-3. **Espere, com teto.** Releia as reviews até aparecer uma que satisfaça **as três** condições:
-   `commit_id` igual ao head da rodada · `submitted_at`/`id` **posterior ao seu comentário** · e ela
-   é a **primeira** review a chegar depois dele. Teto de **15 minutos**.
+3. **Espere, com teto — e procure nos DOIS lugares.**
+
+   > 🔴 **O App responde de duas formas, e só uma delas é uma *review*.**
+   >
+   > | Resultado | Onde aparece | Como ler |
+   > |---|---|---|
+   > | **Com achados** | *review* formal + threads inline | `pull_request_read` com `get_reviews` e `get_review_comments` |
+   > | **Sem achados** | **comentário comum** do bot: *"Codex Review: Didn't find any major issues. Reviewed commit: `<sha>`"* — ou só uma reação 👍 | `pull_request_read` com **`get_comments`**, filtrando `user.login == 'chatgpt-codex-connector[bot]'` |
+   >
+   > **Procurar só por review faz o laço nunca fechar em PR limpo** — ele estoura os 15 minutos e
+   > publica `bloqueantes=1`, um **bloqueante falso**, exatamente no caso em que não há nada errado.
+   > Medido nos PRs 498 e 499: `get_reviews` devolveu `[]` nos dois, e o Codex tinha revisado os
+   > dois, dizendo isso por comentário. O `Reviewed commit:` no corpo é o que amarra a resposta ao
+   > head.
+
+   Releia **reviews e comentários do bot** até aparecer uma resposta que satisfaça **as três**
+   condições: refere-se ao **head da rodada** (`commit_id` da review, ou o `Reviewed commit:` do
+   comentário) · é **posterior ao seu comentário** de acionamento · e é a **primeira** a chegar
+   depois dele. Teto de **15 minutos**.
 
    > ⚠️ **Três corridas, e cada conserto revelou a seguinte.** Vale ler inteiro antes de "simplificar"
    > este passo — as três formas óbvias já foram tentadas e reprovadas, pelo Codex, no PR 496.
