@@ -360,10 +360,8 @@ export class ViabTelaCenarios extends LitElement {
     if (resultado === null) return html`${nothing}`;
     return html`
       <div class="fx-kpis">
-        <div class="kpi-cel">
-          <urbi-kpi rotulo="Resultado após custo financeiro" .valor=${fmtR$(resultado)}
-            variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        </div>
+        <urbi-kpi rotulo="Resultado após custo financeiro" .valor=${fmtR$(resultado)}
+          variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
       </div>
     `;
   }

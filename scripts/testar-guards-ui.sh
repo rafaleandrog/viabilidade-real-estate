@@ -156,19 +156,25 @@ JSON
 # `caso <guard> <esperado> <descrição>` lê o conteúdo do arquivo de fronteira em
 # stdin e o grava como `frontend/caso.ts`. `<esperado>` é o código de saída.
 #
-# A linha de base existe por causa da lista DISPENSAS do guard de box model: ela
-# aponta para `frontend/tela-resumo.ts`, e o guard reprova dispensa que não casa
-# com nada. Escrevendo a linha de base em todo caso, a dispensa sempre casa — e o
-# caso "dispensa obsoleta" a omite de propósito, o que testa esse mecanismo em
-# vez de contorná-lo.
-BASE_DISPENSA='const e = css`.kpis .kpi-cel urbi-kpi { width: 100%; }`;'
+# ⚠️ A bateria NÃO depende mais da lista DISPENSAS de produção. Ela dependia:
+# havia uma entrada real apontando para `frontend/tela-resumo.ts`, e como o guard
+# reprova dispensa que não casa com nada, todo caso precisava escrever a linha
+# dispensada só para a dispensa continuar casando. Quando a #488 apagou aquele
+# `width: 100%`, a entrada saiu — e os dez casos que herdavam a linha de base
+# viraram violação, cada um acusando um defeito que não era o dele.
+#
+# Bateria que quebra porque o PRODUTO foi consertado testava o produto, não o
+# guard. Agora a dispensa é SINTÉTICA e injetada por caso, na cópia do guard que
+# aquele caso usa — o mecanismo continua coberto nos dois sentidos e a lista real
+# pode ficar vazia para sempre.
+DISPENSA_SINTETICA='const e = css`.kpis .cel-sintetica urbi-arriscado { width: 100%; }`;'
 
-# `SEM_BASE=1` vale para UM caso e é consumido aqui dentro. Não escreva
-# `SEM_BASE=1 caso …`: prefixo de atribuição antes de FUNÇÃO persiste no bash
+# `COM_DISPENSA=1` vale para UM caso e é consumido aqui dentro. Não escreva
+# `COM_DISPENSA=1 caso …`: prefixo de atribuição antes de FUNÇÃO persiste no bash
 # (ao contrário do que acontece com um comando externo), e a variável vazaria
 # para todos os casos seguintes — foi o que aconteceu na primeira versão desta
 # bateria, e ela ficou vermelha em seis casos corretos.
-SEM_BASE=0
+COM_DISPENSA=0
 # `caso <guard> <saída-esperada> <descrição> [padrão-ERE]`, com o corpo em stdin.
 #
 # ⚠️ O quarto argumento não é enfeite. Conferir só o CÓDIGO DE SAÍDA deixa passar
@@ -184,13 +190,13 @@ SEM_BASE=0
 # caso roda no seu próprio diretório, então o paralelismo não os mistura.
 declare -a ORDEM=()
 N=0
-SEM_BASE=0
+COM_DISPENSA=0
 
 secao() { ORDEM+=("S|$1"); }
 
 caso() {
   local guard="$1" esperado="$2" desc="$3" padrao="${4:-}"
-  local sem_base="$SEM_BASE"; SEM_BASE=0
+  local com_dispensa="$COM_DISPENSA"; COM_DISPENSA=0
   N=$((N+1)); TOTAL=$((TOTAL+1))
   local dir="$TMP/c$N"
   mkdir -p "$dir/scripts/lib" "$dir/docs/ui-urbiverso" "$dir/frontend"
@@ -198,7 +204,24 @@ caso() {
   cp "$TMP/base/scripts/lib/"*.mjs "$dir/scripts/lib/"
   cp "$TMP/base/docs/ui-urbiverso/"*.json "$dir/docs/ui-urbiverso/"
   cat > "$dir/frontend/caso.ts"
-  [ "$sem_base" = "1" ] || printf '%s\n' "$BASE_DISPENSA" > "$dir/frontend/tela-resumo.ts"
+  # `COM_DISPENSA=1` injeta uma entrada SINTÉTICA na cópia do guard deste caso.
+  # `COM_DISPENSA=2` injeta a entrada mas NÃO escreve o arquivo que ela casaria —
+  # é como se testa que dispensa obsoleta reprova.
+  if [ "$com_dispensa" != "0" ]; then
+    python3 - "$dir/scripts/guard-box-model-urbi.mjs" <<'INJETA'
+import sys
+p = sys.argv[1]
+s = open(p, encoding='utf-8').read()
+entrada = (
+  "const DISPENSAS = [{ arquivo: 'frontend/tela-resumo.ts',"
+  " seletor: '.kpis .cel-sintetica urbi-arriscado', prop: 'width',"
+  " issue: 0, motivo: 'entrada sintetica da bateria' }];"
+)
+assert 'const DISPENSAS = [];' in s, 'a lista DISPENSAS mudou de forma — ajuste a injecao'
+open(p, 'w', encoding='utf-8').write(s.replace('const DISPENSAS = [];', entrada, 1))
+INJETA
+    [ "$com_dispensa" = "1" ] && printf '%s\n' "$DISPENSA_SINTETICA" > "$dir/frontend/tela-resumo.ts"
+  fi
   printf '%s\n%s\n%s\n%s\n' "$guard" "$esperado" "$desc" "$padrao" > "$dir/spec"
   ORDEM+=("C|$N")
 }
@@ -344,8 +367,15 @@ caso guard-box-model-urbi 1 "box-sizing: content-box não protege — só border
 const e = css`.kpis urbi-arriscado { width: 100%; box-sizing: content-box; }`;
 TS
 
-SEM_BASE=1
-caso guard-box-model-urbi 1 "dispensa que não casa mais com nada" <<'TS'
+# Os DOIS sentidos do mecanismo de dispensa, com entrada sintética — a lista de
+# produção está vazia e deve poder continuar assim.
+COM_DISPENSA=1
+caso guard-box-model-urbi 0 "dispensa ATIVA suprime o achado que ela nomeia" <<'TS'
+const e = css`.x { color: red; }`;
+TS
+
+COM_DISPENSA=2
+caso guard-box-model-urbi 1 "dispensa que não casa mais com nada REPROVA" <<'TS'
 const e = css`.x { color: red; }`;
 TS
 
