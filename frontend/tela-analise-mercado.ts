@@ -256,9 +256,10 @@ export class ViabTelaAnaliseMercado extends LitElement {
       </div>
       ${this.regioes.length === 0 ? html`
         <p class="nota">
-          Nenhuma região monitorada cadastrada. Um administrador pode cadastrá-las em
-          <strong>Admin → Apps → viabilidade → Regiões monitoradas</strong>; a coleta diária passa a
-          varrer notícias e anúncios dessas regiões automaticamente.
+          Nenhuma região monitorada cadastrada. Um administrador pode cadastrá-las na aba
+          <strong>Regiões monitoradas</strong> do Painel (ou em
+          <strong>Admin → Apps → viabilidade → Regiões monitoradas</strong>); a coleta diária passa
+          a varrer notícias e anúncios dessas regiões automaticamente.
         </p>` : nothing}
     `;
   }

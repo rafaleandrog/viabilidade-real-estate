@@ -57,7 +57,7 @@
     {
       "titulo": "Regiões monitoradas",
       "rota": "/regioes",
-      "icone": "fa-solid fa-map-location-dot"
+      "icone": "fa-solid fa-location-dot"
     }
   ],
   "ia": true,
