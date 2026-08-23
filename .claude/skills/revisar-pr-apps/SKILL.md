@@ -678,7 +678,12 @@ relatório.
 > skill é o procedimento**: o `CLAUDE.md` institui a regra, mas quem executa lê aqui.
 >
 > **Pare antes da § 9 em dois casos, e nos dois diga qual é a pergunta:** decisão de desenho, e
-> **achado que não converge — a mesma faixa volta rodada após rodada**.
+> **achado que não converge — o mesmo defeito volta rodada após rodada**.
+>
+> **Precedência, e ela decide os empates: bloqueante julgado distinto SEMPRE reabre.** Mesma faixa
+> não basta, mesmo remédio não basta — a saída é só para o defeito que **continua recorrendo**. Sem
+> isso, uma sequência de bloqueantes reais e diferentes na mesma área satisfaz "reabra" e "pare" ao
+> mesmo tempo, e o desfecho vira escolha de quem lê.
 >
 > ⚠️ **Não transforme "a mesma faixa volta" em teste formal.** Já foi tentado neste repositório, no
 > PR 507: par `contrato + ocorrência`, âncoras estáveis, condições conjuntas. Custou **cinco
@@ -800,8 +805,9 @@ que o usuário precisa responder, em vez de deixar "aguardando decisão" solto:
 
 - **Decisão de desenho:** o conserto mexeria em algo que o usuário decidiu. Use com parcimônia
   — usado à toa, vira jeito de terceirizar julgamento que era seu.
-- **Achado que não converge:** a mesma faixa volta rodada após rodada. Pare, diga o que está
-  girando e devolva ao usuário. É julgamento, não teste — registre o que o sustenta.
+- **Achado que não converge:** **o mesmo defeito** volta rodada após rodada. Pare, diga o que
+  está girando e devolva ao usuário. É julgamento, não teste — registre o que o sustenta.
+  **Bloqueante julgado distinto sempre reabre**, mesmo na mesma faixa (§ 8).
 
 ### Merge
 

@@ -248,8 +248,12 @@ autor precisa responder, em vez de deixar "aguardando decisão" solto:
 
 - **Decisão de desenho** — o conserto mexeria em algo que o autor decidiu. Com parcimônia: usado à
   toa, vira jeito de terceirizar julgamento que era seu.
-- **Achado que não converge** — a mesma faixa volta rodada após rodada. Pare, diga o que está
-  girando, devolva.
+- **Achado que não converge** — **o mesmo defeito** volta rodada após rodada. Pare, diga o que
+  está girando, devolva. **Precedência: bloqueante que você julga distinto SEMPRE reabre**, mesmo
+  caindo na mesma faixa ou pedindo o mesmo conserto; esta saída é só para o defeito que **continua
+  recorrendo**. Sem essa ordem, uma sequência de bloqueantes reais e diferentes na mesma área
+  satisfaz ao mesmo tempo "reabra" e "pare", e dois revisores encerram o mesmo histórico de formas
+  opostas — um deles deixando bloqueante conhecido pendente.
 
 > ⚠️ **A terminação é condicional, e quem termina de fato é o autor.** O teto antigo terminava por
 > construção; isto **não**. Se cada conserto expuser bloqueante genuinamente novo, o ciclo reabre —
