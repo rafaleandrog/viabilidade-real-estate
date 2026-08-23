@@ -461,7 +461,14 @@ const versaoDe = (ref) => {
     // JSON estrito; se o PR alterasse só a segunda, o `match` simples concluía
     // "nada mudou" e o `validar-backend.sh:113-114` reprovava o mesmo PR.
     // Achado do Codex, rodada 11.
-    const todas = [...bruto.matchAll(/"versao"[^,]*/g)].map((m) => m[0]);
+    // Coleta LINHA A LINHA, porque é assim que o `grep -o` trabalha. Com a regex
+    // sobre o texto inteiro, `"versao":\n  "0.1.29"` incluía o valor no
+    // fragmento, enquanto o grep devolve só `"versao":` — e uma migração
+    // acompanhada dessa reformatação ficava verde aqui e vermelha no backend.
+    // Achado do Codex, rodada 12.
+    const todas = bruto
+      .split('\n')
+      .flatMap((linha) => [...linha.matchAll(/"versao"[^,]*/g)].map((m) => m[0]));
     return todas.length ? todas.join('\n') : null;
   } catch {
     return null;
@@ -499,12 +506,17 @@ if (migracoesNovas.length === 0 && bumpou) {
       'A `versao` descreve o SCHEMA — bumpar sem migração cria um degrau vazio.',
   );
 }
-if (migracoesNovas.length > 1) {
-  bloqueantes.push(
-    `${migracoesNovas.length} migrações no mesmo PR (${migracoesNovas.join(', ')}). ` +
-      'Regra da Rodada 9: um número por PR.',
-  );
-}
+// ⚠️ NÃO bloqueie duas migrações no mesmo PR. Já bloqueou, e era **política
+// minha travestida de previsão**: o guard previsto (`validar-backend.sh:110-125`)
+// testa só `novas > 0` contra a mudança textual da versão e aceita qualquer
+// contagem positiva; o contrato do `CLAUDE.md` § Versão do manifesto também exige
+// apenas que o bump acompanhe migração nova. O preflight reprovava um PR que o
+// guard aceita — o oposto exato do que ele promete.
+//
+// "Um número por PR" é regra da Rodada 9, de organização, e quem a aplica é quem
+// planeja o backlog. Este script prevê CI; misturar política com previsão é como
+// um preditor perde a única propriedade que o torna útil. Achado do Codex,
+// rodada 12, e veio de dentro da enumeração que eu tinha pedido.
 
 // ── Saída ───────────────────────────────────────────────────────────────────
 console.log(`preflight de PR — corpo: ${CORPO_ARQ} · base: ${BASE}\n`);

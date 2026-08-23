@@ -127,8 +127,15 @@ DIFF="frontend/exemplo.ts"
 # ── Regras de migração ──────────────────────────────────────────────────────
 DIFF='migracoes/030_algo.js'
 esperar 1 'migração nova sem bump da versao' 'Nada a citar.'
+# Duas migrações com bump PASSAM: o guard previsto (validar-backend.sh) testa
+# `novas > 0` contra a mudança de versão e aceita qualquer contagem positiva.
+# "Um número por PR" é regra de organização da Rodada 9, não previsão de CI —
+# este script prevê o CI, e misturar política com previsão o inutiliza.
 DIFF='migracoes/030_algo.js,migracoes/031_outra.js,manifesto.json'
-esperar 1 'duas migrações no mesmo PR' 'Nada a citar.'
+VERSAO='0.1.28:0.1.29'
+esperar 0 'duas migrações COM bump passam — o guard previsto aceita' 'Nada a citar.'
+VERSAO='0.1.28:0.1.28'
+esperar 1 'duas migrações SEM bump reprovam' 'Nada a citar.'
 # Tocar o manifesto NÃO basta — o preflight compara o VALOR de `versao`.
 DIFF='migracoes/030_algo.js,manifesto.json'
 esperar 1 'manifesto tocado sem bump da versao ainda reprova' 'Nada a citar.'
