@@ -175,7 +175,13 @@ jobs:
           # Só `git` + `node` — sem pnpm install, sem SDK, sem credencial.
           # Diff de TRÊS PONTOS: dois pontos compara as pontas e acusa arquivo que
           # veio da main no meio, produzindo falso positivo em PR desatualizado.
-          ARQUIVOS="$(git diff --name-only "$BASE_SHA"..."$HEAD_SHA")"
+          #
+          # --no-renames NÃO é enfeite: com detecção de rename ligada (o default),
+          # mover `.claude/regra.md` para fora da árvore emite SÓ o caminho de
+          # destino. O script não veria arquivo de processo nenhum e aprovaria a
+          # mistura — reproduzido pelo Codex no PR 496, exit 0. Sem a detecção, a
+          # origem removida também aparece e é classificada.
+          ARQUIVOS="$(git diff --no-renames --name-only "$BASE_SHA"..."$HEAD_SHA")"
           export PR_ARQUIVOS="$ARQUIVOS"
           if ! node scripts/guard-pr-escopo-processo.mjs; then
             echo "::error title=Escopo do PR::Arquivo de .claude/ junto com codigo de produto. Regra R1 do CLAUDE.md: o PR de processo sai sozinho, com todos os documentos propagados no mesmo diff. Editar processo dentro de um PR em revisao produz um ciclo que nao converge."
