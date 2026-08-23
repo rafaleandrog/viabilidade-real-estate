@@ -514,9 +514,15 @@ if (migracoesNovas.length > 0 && !bumpou) {
       `(base \`${versaoBase ?? '?'}\` → atual \`${versaoAtual ?? '?'}\`). Tocar o arquivo não basta.`,
   );
 }
-if (migracoesNovas.length === 0 && bumpou) {
+// ⚠️ `versaoBase != null` reproduz o `-n "$ver_base"` de `validar-backend.sh:120`,
+// e a assimetria é DELIBERADA lá: quando a base não tem o campo, o guard não
+// reprova o PR que o acrescenta. Sem esta condição o preflight bloqueava um PR
+// que o guard previsto aceita — o oposto do que ele promete. O caso simétrico
+// (base TEM e o PR REMOVE) continua bloqueando, porque ali `ver_base` é não-vazio
+// e o guard reprova de verdade. Achado do Codex, rodada 16.
+if (migracoesNovas.length === 0 && bumpou && versaoBase != null) {
   bloqueantes.push(
-    `\`versao\` bumpada (\`${versaoBase}\` → \`${versaoAtual}\`) sem migração nova. ` +
+    `\`versao\` bumpada (\`${versaoBase}\` → \`${versaoAtual ?? '—'}\`) sem migração nova. ` +
       'A `versao` descreve o SCHEMA — bumpar sem migração cria um degrau vazio.',
   );
 }

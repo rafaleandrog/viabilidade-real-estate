@@ -146,6 +146,17 @@ VERSAO='0.1.28:0.1.29'
 esperar 0 'migração nova COM bump da versao passa' 'Nada a citar.'
 DIFF='frontend/exemplo.ts'
 esperar 1 'bump da versao SEM migração nova reprova' 'Nada a citar.'
+
+# A assimetria do `-n "$ver_base"` em `validar-backend.sh:120`. Quando a BASE não
+# tem o campo `versao`, o guard previsto NÃO reprova o PR que o acrescenta — e o
+# preflight reprovava. Bloquear o que o guard aceita é o oposto do que este
+# script promete. O caso simétrico, abaixo, continua bloqueando: ali a base TEM o
+# campo e o PR o REMOVE, e aí o guard reprova de verdade.
+VERSAO=':0.1.29'
+esperar 0 'base SEM o campo versao — acrescentá-lo não reprova, como no guard' 'Nada a citar.'
+VERSAO='0.1.28:'
+esperar 1 'base COM o campo e o PR o REMOVE — continua reprovando' 'Nada a citar.'
+
 VERSAO='0.1.28:0.1.28'
 DIFF="frontend/exemplo.ts"
 
