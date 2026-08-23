@@ -7,7 +7,7 @@
   "scripts": {
     "build": "esbuild frontend/index.ts --bundle --external:@urbiverso/ui --format=esm --outfile=frontend/index.js --target=es2022 --minify --tsconfig=tsconfig.json && esbuild backend/rotas.ts --bundle --minify --format=esm --outfile=backend/rotas.js --platform=node --target=node20 --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx/esm --test --test-timeout=60000 backend/*.test.ts backend/rotas/*.test.ts frontend/*.test.ts $(ls frontend/fixtures/*.test.ts 2>/dev/null)",
+    "test": "node --import tsx/esm --test --test-timeout=60000 backend/*.test.ts backend/rotas/*.test.ts frontend/*.test.ts $(ls frontend/fixtures/*.test.ts 2>/dev/null) $(ls frontend/render/*.render.test.ts 2>/dev/null)",
     "empacotar": "urbi-empacotar viabilidade --dir . --saida ./dist"
   },
   "dependencies": {

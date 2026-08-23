@@ -12,6 +12,14 @@
 //   · alinhamento horizontal das colunas (mesmo x) entre linha travada e editável;
 //   · overflow horizontal do documento.
 //
+// ⚠️ ESTE ARQUIVO FOI GENERALIZADO. `scripts/render-check.mjs` faz o mesmo para
+// qualquer tela, roda no `validar-frontend.sh` (etapa 7/7) e no job `render` do
+// CI, e é onde vive a verificação de render que tem rede. Este continua aqui
+// como ferramenta de conferência MANUAL dos campos Início/Duração — ele mede
+// coisas específicas daqueles campos (largura igual entre Início e Duração,
+// alinhamento de coluna entre linha travada e editável, hierarquia de tamanho
+// entre número e afixo) que o harness genérico não tem como saber.
+//
 // NÃO roda no CI e não é um teste do `pnpm test`: depende do Playwright, que não
 // está no package.json (o ambiente Claude Code o tem instalado globalmente, com
 // o Chromium em PLAYWRIGHT_BROWSERS_PATH). É ferramenta de conferência manual

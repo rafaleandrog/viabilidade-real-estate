@@ -1,0 +1,31 @@
+// Caso de render: a faixa de KPIs da aba RESUMO do Avançado.
+//
+// É o caso que EXISTE PARA FALHAR. `frontend/tela-resumo.ts:67` aplica
+// `width: 100%` de fora a um `urbi-kpi`, cujo `:host` soma `padding: 14px 16px`
+// e `border: 1px` SEM `box-sizing: border-box`. A caixa renderizada mede
+// `largura da célula + 34px` e invade a coluna vizinha.
+//
+// Reportado quatro vezes — #176, #262, #326, #352 — e fechado quatro. O
+// conserto é da Onda 2 (#488) e NÃO é deste PR (regra R3). O que este caso
+// entrega é a prova de que o defeito está vivo, medida em pixel.
+
+import '../../tela-resumo.js';
+import { CRONO, DATA_INICIO, fluxo, forcarEstado } from './dados.js';
+
+export const caso = {
+  nome: 'kpis-resumo',
+  async montar(raiz: HTMLElement): Promise<void> {
+    const el = document.createElement('viab-tela-resumo');
+    // `estudo` fica NULO de propósito: é o que impede o `updated()` de disparar
+    // o carregamento por API. O estado já carregado entra logo abaixo.
+    forcarEstado(el, {
+      carregando: false,
+      calc: fluxo(),
+      benchmarks: [],
+      dados: { crono: CRONO, dataInicio: DATA_INICIO },
+      carregado: true,
+    });
+    raiz.appendChild(el);
+    await (el as any).updateComplete;
+  },
+};

@@ -120,7 +120,7 @@ quando o tema muda. Foi assim que `--cor-superficie-2` sobreviveu no `tela-dashb
 ## Quem lê este espelho
 
 Três guards estáticos, todos com `node` puro — sem SDK, sem credencial e sem rede. Rodam na etapa
-**2/6** de `scripts/validar-frontend.sh` e no job `guards-ui` de `.github/workflows/pr-guards.yml`:
+**2/7** de `scripts/validar-frontend.sh` e no job `guards-ui` de `.github/workflows/pr-guards.yml`:
 
 | Guard | Lê | Barra |
 |---|---|---|
@@ -131,6 +131,22 @@ Três guards estáticos, todos com `node` puro — sem SDK, sem credencial e sem
 `scripts/testar-guards-ui.sh` é a bateria dos três, nos dois sentidos (falso negativo e falso
 positivo). Ela **não lê este espelho**: monta um sintético num diretório temporário, de propósito —
 ressincronizar não pode mudar veredito de teste.
+
+### O quarto leitor: `scripts/render-check.mjs`
+
+Não é guard, e a diferença importa. Os três acima acusam o **risco** no CSS do app; o harness de
+render monta a tela num Chromium e mede o **efeito**. Ele lê o espelho para uma coisa só, e é a que
+não tem substituto: **gerar os stubs dos primitivos `urbi-*`**, cada um com as declarações `:host`
+da linhagem inteira, que é o que decide se um `width` vindo de fora transborda.
+
+Por que o espelho, e não `ui/src/` do monorepo: o CI faz checkout **só deste repositório**. Um
+harness que lesse o monorepo rodaria na máquina e seria impossível no runner.
+
+⚠️ **O limite que isso impõe.** O espelho carrega o `:host` de cada primitivo, e **não** o markup
+interno dele. O harness serve para julgar o box model **externo** — transbordo, sobreposição,
+overflow — e **não** o layout de dentro de um `urbi-*`. O `tokens.json` também é lido, para montar
+as variantes de tema; ali o limite é outro e está descrito em `scripts/render-check.mjs`
+(§ `gerarTemas`): o arquivo guarda os **valores** de cada token, **não o nome do tema** de cada um.
 
 **Nenhum dos três recalcula nada.** O julgamento — qual é o atributo do Lit, o que soma largura, o
 que protege — mora aqui, no gerador. Uma segunda implementação do lado do guard existiria só para

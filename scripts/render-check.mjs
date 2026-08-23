@@ -1,0 +1,702 @@
+// Harness de VERIFICAÇÃO DE RENDER: monta uma tela deste app num Chromium de
+// verdade e mede o que só existe depois do layout.
+//
+// POR QUE ESTE ARQUIVO EXISTE
+//
+// Os 409 testes de frontend deste repositório são de lógica pura: nenhum toca
+// DOM. Isso deixa uma classe inteira de defeito sem nenhuma rede — a classe em
+// que o número está certo, o teste passa, e a tela está errada. O `urbi-kpi`
+// é o caso emblemático: reportado quatro vezes (#176, #262, #326, #352),
+// fechado quatro, e vivo. Nenhuma dessas quatro voltas tinha como falhar em
+// verde, porque não havia render nenhum sendo medido.
+//
+// O guard estático `scripts/guard-box-model-urbi.mjs` acusa o RISCO lendo o
+// espelho `docs/ui-urbiverso/`. Este harness prova o EFEITO. As duas camadas
+// somam: o guard pega o padrão perigoso antes de ele render; o harness diz se
+// a caixa realmente transbordou e pintou sobre a vizinha.
+//
+// Este arquivo é a generalização de `scripts/render-check-cronograma.mjs`
+// (#245), que fazia isto para UMA tela e nunca foi ligado a nada. Aquele
+// continua existindo como ferramenta de conferência manual dos campos do
+// Cronograma; este é o que roda no `validar-frontend.sh` e no CI.
+//
+// ── O QUE ELE MEDE ──────────────────────────────────────────────────────────
+//
+//   · overflow horizontal do DOCUMENTO;
+//   · `scrollWidth > clientWidth` em qualquer nó que NÃO seja um scroller
+//     declarado (um `overflow-x: auto` é intenção, não defeito);
+//   · SOBREPOSIÇÃO de retângulos entre IRMÃOS em fluxo normal — é esta que
+//     mata a classe de defeito do `urbi-kpi`, e é a única que não tem
+//     substituto estático: só existe depois que o navegador resolve o box
+//     model do shadow DOM, que a folha do app nem enxerga;
+//   · COR EFETIVA, por variante de tema: todo `--token` citado pelo CSS em uso
+//     resolve para valor não vazio, e nenhum texto acaba pintado da mesma cor
+//     do próprio fundo.
+//
+// ── DE ONDE VÊM OS PRIMITIVOS `urbi-*` ──────────────────────────────────────
+//
+// Do espelho `docs/ui-urbiverso/primitivos.json`, e NÃO do monorepo. Não é
+// preferência: o CI faz checkout só deste repositório, então um harness que
+// lesse `/home/user/urbiverso/ui/src/` rodaria na máquina e seria IMPOSSÍVEL
+// no runner — exatamente o modo de falha "passa aqui, quebra lá" que esta
+// rodada já viu três vezes.
+//
+// O espelho carrega as declarações `:host` de TODA a linhagem de cada
+// primitivo, com valor efetivo. É precisamente a parte que governa o box model
+// externo — `padding`, `border`, `box-sizing`, `display`, `min-width` — que é
+// a parte de que a medição depende. O que o espelho NÃO carrega é o markup
+// interno de cada primitivo; então o stub tem conteúdo genérico, e este
+// harness NÃO serve para julgar o layout de DENTRO de um `urbi-*`. Ver
+// `docs/ui-urbiverso/LEIA.md`.
+//
+// ── DETERMINISMO ────────────────────────────────────────────────────────────
+//
+// Três testes desta rodada mudaram de veredito conforme o ambiente. Render em
+// navegador tem fontes de variação próprias, e o que dá para fixar está fixado
+// aqui, num lugar só (`CONTEXTO`): viewport, `deviceScaleFactor`, locale,
+// fuso, `reducedMotion`. O que NÃO dá para fixar é a métrica de glifo — as
+// fontes instaladas variam por máquina. Por isso o harness publica um
+// FINGERPRINT DE FONTE junto do resultado: quando o veredito de truncamento
+// mudar de ambiente, a causa aparece com nome em vez de virar mistério.
+//
+// Uso como biblioteca (é assim que os testes de `frontend/render/` o usam):
+//
+//   import { verificarRender } from '../../scripts/render-check.mjs';
+//   const r = await verificarRender({ caso: 'kpis-resumo' });
+//
+// Uso como CLI, para conferência manual de uma tela:
+//
+//   node scripts/render-check.mjs kpis-resumo
+//   node scripts/render-check.mjs kpis-resumo --larguras 1280,600
+
+import { createServer } from 'node:http';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
+const ESPELHO_PRIMITIVOS = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
+const ESPELHO_TOKENS = join(RAIZ, 'docs', 'ui-urbiverso', 'tokens.json');
+
+// ── constantes de determinismo ──────────────────────────────────────────────
+// Tudo que fixa o ambiente do navegador mora AQUI, e só aqui. Espalhar isto
+// pelos casos é como o teste vira dependente de quem o escreveu.
+//
+//  · `deviceScaleFactor: 1` — em DPR fracionário o Chromium arredonda posições
+//    de layout de formas diferentes, e uma sobreposição de 1px aparece e some;
+//  · `locale`/`timezoneId` — `fmtR$` e `fmtPct` passam por `Intl`, e o app
+//    formata em pt-BR. Num runner em `C`/UTC o separador muda, a string muda de
+//    largura e o veredito de truncamento junto;
+//  · `reducedMotion: 'reduce'` — transição em curso no instante da medição é
+//    fonte clássica de teste que falha 1 vez em 20;
+//  · `FAMILIA_FIXA` — a família aplicada no `body`. Não elimina a variação de
+//    métrica entre máquinas (ver FINGERPRINT), mas tira do caminho a variação
+//    MAIOR, que é `system-ui` resolver para fontes diferentes.
+const CONTEXTO = {
+  deviceScaleFactor: 1,
+  locale: 'pt-BR',
+  timezoneId: 'UTC',
+  reducedMotion: 'reduce',
+  colorScheme: 'dark',
+};
+const FAMILIA_FIXA = "'Liberation Sans', 'DejaVu Sans', Arial, Helvetica, sans-serif";
+const TAMANHO_FIXO = '13px';
+const LARGURAS_PADRAO = [1280, 900, 600];
+const ALTURA_PADRAO = 900;
+// Tolerância em px. 1px absorve o arredondamento de subpixel do layout engine
+// sem esconder defeito: a sobreposição do `urbi-kpi` mede DEZENAS de px.
+const TOL = 1;
+
+// ── Playwright ──────────────────────────────────────────────────────────────
+// O pacote NÃO está no `package.json` (ele não é dependência do produto), então
+// a resolução é por tentativa, da mais específica para a mais geral. Este
+// harness NUNCA baixa navegador: `playwright install` é decisão de quem prepara
+// o ambiente, não efeito colateral de rodar teste.
+async function carregarChromium() {
+  const tentativas = [];
+  try { return (await import('playwright')).chromium; } catch (e) { tentativas.push(`import 'playwright': ${e.code ?? e.message}`); }
+  if (process.env.PLAYWRIGHT_MODULO) {
+    try { return (await import(process.env.PLAYWRIGHT_MODULO)).chromium; }
+    catch (e) { tentativas.push(`PLAYWRIGHT_MODULO: ${e.code ?? e.message}`); }
+  }
+  try {
+    const global = execFileSync('npm', ['root', '-g'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return (await import(join(global, 'playwright', 'index.mjs'))).chromium;
+  } catch (e) { tentativas.push(`npm root -g: ${e.code ?? e.message}`); }
+  const erro = new Error(
+    'Playwright não encontrado. Tentativas:\n  - ' + tentativas.join('\n  - ') +
+    '\nInstale o pacote (global ou local) e tenha o Chromium disponível.',
+  );
+  erro.code = 'SEM_PLAYWRIGHT';
+  throw erro;
+}
+
+/**
+ * O harness está utilizável neste ambiente?
+ *
+ * Existe para o chamador poder DECIDIR entre pular e reprovar — e a decisão
+ * nunca é do harness. `validar-frontend.sh` pula com aviso alto quando o
+ * navegador não está aqui; o CI exporta `RENDER_CHECK_OBRIGATORIO=1` e a
+ * ausência vira falha. Sem essa separação, "não deu para rodar" viraria
+ * "passou", que é o modo de falha que o CLAUDE.md nomeia.
+ */
+export async function harnessDisponivel() {
+  try {
+    const chromium = await carregarChromium();
+    // `executablePath()` não sobe navegador: responde onde o binário DEVERIA
+    // estar. Subir um Chromium só para perguntar se ele existe custaria meio
+    // segundo por arquivo de teste, e a resposta é a mesma.
+    const bin = chromium.executablePath();
+    if (!bin || !existsSync(bin)) {
+      return { ok: false, motivo: `Playwright encontrado, mas o Chromium não está em ${bin || '(caminho vazio)'}.` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, motivo: e.message };
+  }
+}
+
+// ── geração dos stubs de primitivo, a partir do espelho ─────────────────────
+// Um custom element por primitivo espelhado. O shadow root recebe as
+// declarações `:host` REAIS da linhagem inteira — é o dado que decide se um
+// `width` vindo de fora transborda. As props viram accessors para que
+// `.valor=${...}` do Lit funcione igual ao primitivo de verdade.
+function gerarPrimitivos() {
+  if (!existsSync(ESPELHO_PRIMITIVOS)) {
+    throw new Error(`docs/ui-urbiverso/primitivos.json não existe — rode scripts/sincronizar-referencia-ui.mjs.`);
+  }
+  const { carimbo, primitivos } = JSON.parse(readFileSync(ESPELHO_PRIMITIVOS, 'utf8'));
+  const defs = [];
+  for (const [tag, p] of Object.entries(primitivos)) {
+    // As declarações `:host` saem na ordem da linhagem (o espelho já as entrega
+    // assim), agrupadas por seletor — `:host` e `:host([expandir])` são regras
+    // diferentes e não podem ser fundidas.
+    const porSeletor = new Map();
+    for (const d of p.host) {
+      if (!porSeletor.has(d.seletor)) porSeletor.set(d.seletor, []);
+      porSeletor.get(d.seletor).push(`${d.prop}: ${d.valor};`);
+    }
+    const regras = [...porSeletor].map(([sel, ds]) => `${sel}{${ds.join('')}}`).join('\n');
+    const props = p.props.filter((x) => x.atributo).map((x) => x.propriedade);
+    defs.push({ tag, regras, props });
+  }
+  return `// GERADO por scripts/render-check.mjs a partir de docs/ui-urbiverso/primitivos.json
+// Espelho de ${carimbo.sha.slice(0, 8)} (monorepo ${carimbo.versao_monorepo}, ${carimbo.data_do_commit}).
+const DEFS = ${JSON.stringify(defs)};
+// Estilo INTERNO do stub. Mínimo de propósito: o espelho não carrega o markup
+// de dentro do primitivo, então tudo aqui é convenção do harness, não contrato.
+// Só existe para o retângulo ter conteúdo com altura plausível.
+const INTERNO = \`
+  .rc-rotulo{font-size:var(--texto-rotulo,0.75rem);color:var(--cor-texto-sec,#9aa0a6);
+    text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  .rc-valor{font-size:var(--texto-destaque,1rem);color:var(--cor-texto-forte,#fff);
+    font-weight:700;white-space:nowrap}
+\`;
+for (const { tag, regras, props } of DEFS) {
+  if (customElements.get(tag)) continue;
+  class Stub extends HTMLElement {
+    constructor() {
+      super();
+      const r = this.attachShadow({ mode: 'open' });
+      const s = document.createElement('style');
+      s.textContent = regras + INTERNO;
+      r.appendChild(s);
+      this._corpo = document.createElement('div');
+      this._corpo.className = 'rc-corpo';
+      r.appendChild(this._corpo);
+      this._pintar();
+    }
+    _pintar() {
+      const rot = this.rotulo ?? this.getAttribute('rotulo');
+      const val = this.valor ?? this.getAttribute('valor');
+      this._corpo.textContent = '';
+      if (rot != null) {
+        const d = document.createElement('div'); d.className = 'rc-rotulo'; d.textContent = String(rot);
+        this._corpo.appendChild(d);
+      }
+      if (val != null) {
+        const d = document.createElement('div'); d.className = 'rc-valor'; d.textContent = String(val);
+        this._corpo.appendChild(d);
+      }
+      this._corpo.appendChild(document.createElement('slot'));
+    }
+    connectedCallback() { this._pintar(); }
+  }
+  for (const nome of props) {
+    if (nome in Stub.prototype) continue;
+    Object.defineProperty(Stub.prototype, nome, {
+      get() { return this['_p_' + nome]; },
+      set(v) { this['_p_' + nome] = v; if (this._corpo) this._pintar(); },
+      configurable: true,
+    });
+  }
+  customElements.define(tag, Stub);
+}
+`;
+}
+
+// ── variantes de tema, a partir do espelho de tokens ────────────────────────
+/**
+ * Quantas variantes o espelho descreve, e o que cada uma vale.
+ *
+ * ⚠️ LIMITE REAL, e ele precisa estar escrito onde se lê o código:
+ * `tokens.json` guarda, por token, a LISTA DE VALORES na ordem em que
+ * aparecem em `compartilhado/tokens.css` — e NÃO o nome do tema de cada valor.
+ * Um token com 4 valores é redefinido em 4 lugares; um com 2 valores é
+ * redefinido em UM dos temas não-base, e o espelho não diz qual.
+ *
+ * Consequência: o harness deriva o NÚMERO de variantes do dado (hoje 4 — não
+ * é constante escrita à mão em lugar nenhum) e monta a variante `k` com
+ * `valores[k]` quando existe e `valores[0]` quando não existe. Isso é a
+ * semântica correta da cascata para todo token NÃO redefinido naquele tema, e
+ * é uma APROXIMAÇÃO para os 10 tokens de 2 valores, cujo segundo valor pode
+ * pertencer a outra variante que não a de índice 1.
+ *
+ * Por que serve mesmo assim: a lente de cor pergunta "este token resolve?" e
+ * "este texto ficou da cor do próprio fundo?", e as duas se respondem sobre
+ * qualquer paleta coerente. Ela não afirma "no tema sepia a cor é X".
+ * Para isso o espelho precisaria gravar o nome do tema — issue, não conserto
+ * de bastidor daqui.
+ */
+function gerarTemas() {
+  if (!existsSync(ESPELHO_TOKENS)) {
+    throw new Error('docs/ui-urbiverso/tokens.json não existe — rode scripts/sincronizar-referencia-ui.mjs.');
+  }
+  const { tokens } = JSON.parse(readFileSync(ESPELHO_TOKENS, 'utf8'));
+  const nomes = Object.keys(tokens);
+  const n = Math.max(1, ...nomes.map((k) => tokens[k].length));
+  const blocos = [];
+  for (let k = 0; k < n; k++) {
+    const decls = nomes
+      // `url(...)` fica de fora: a imagem não existe no servidor do harness e
+      // renderia um 404 por variante, sem acrescentar nada à medição.
+      .filter((nome) => !/url\(/.test(tokens[nome][0]))
+      .map((nome) => `${nome}: ${tokens[nome][Math.min(k, tokens[nome].length - 1)]};`)
+      .join('\n  ');
+    blocos.push(`:root[data-variante="${k}"] {\n  ${decls}\n}`);
+  }
+  return { css: blocos.join('\n\n'), n };
+}
+
+// ── a sonda: roda DENTRO da página ──────────────────────────────────────────
+// Uma função só, serializada pelo Playwright. Não pode referenciar nada do
+// escopo de fora — tudo entra por argumento.
+function sonda(tol) {
+  const elementos = [];
+  (function coletar(raiz) {
+    for (const el of raiz.querySelectorAll('*')) {
+      elementos.push(el);
+      if (el.shadowRoot) coletar(el.shadowRoot);
+    }
+  })(document.getElementById('raiz'));
+
+  const cs = (el) => getComputedStyle(el);
+  const visivel = (el) => {
+    const s = cs(el);
+    if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  const caminho = (el) => {
+    const partes = [];
+    let n = el;
+    while (n && partes.length < 6) {
+      let p = n.tagName.toLowerCase();
+      if (n.id) p += '#' + n.id;
+      else if (n.classList && n.classList.length) p += '.' + [...n.classList].join('.');
+      partes.unshift(p);
+      n = n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
+    }
+    return partes.join(' > ');
+  };
+
+  // ── overflow do documento ────────────────────────────────────────────────
+  const de = document.documentElement;
+  const overflowDocumento = de.scrollWidth > de.clientWidth + tol
+    ? { scrollWidth: de.scrollWidth, clientWidth: de.clientWidth }
+    : null;
+
+  // ── transbordo por nó, separado em DOIS ──────────────────────────────────
+  // Scroller DECLARADO (`overflow-x: auto|scroll`) é intenção do autor — o app
+  // usa `.tabela-wrap{overflow-x:auto}` de propósito. Acusá-lo seria o falso
+  // positivo que faz alguém desligar a verificação.
+  //
+  // ⚠️ A separação entre CAIXA e TEXTO não é organização: é a fronteira do
+  // determinismo deste harness, e por isso ela existe no dado e não só na
+  // prosa.
+  //
+  //  · `transbordoDeCaixa` — algum FILHO ultrapassa a borda de conteúdo do
+  //    pai. Vem de box model (largura imposta, padding que soma, grade que não
+  //    encolhe) e NÃO depende de que fontes a máquina tem instaladas. É o caso
+  //    do `urbi-kpi`, e é o que dá para asseverar em qualquer ambiente.
+  //  · `transbordoDeTexto` — o nó transborda sem nenhum filho fora da linha,
+  //    isto é, quem não coube foi a própria caixa de texto. O veredito depende
+  //    da MÉTRICA DE GLIFO, que muda com as fontes instaladas: `Liberation
+  //    Sans` no runner, `Montserrat` na instância. Este harness reporta, e
+  //    deixa a asserção a cargo do caso que quiser assumir o risco.
+  const transbordoDeCaixa = [];
+  const transbordoDeTexto = [];
+  for (const el of elementos) {
+    if (typeof el.scrollWidth !== 'number' || !visivel(el)) continue;
+    const s = cs(el);
+    const ox = s.overflowX;
+    if (ox === 'auto' || ox === 'scroll' || ox === 'hidden' || ox === 'clip') continue;
+    if (el.scrollWidth <= el.clientWidth + tol) continue;
+    const r = el.getBoundingClientRect();
+    const bordaDeConteudo = r.left + parseFloat(s.borderLeftWidth || '0') + el.clientWidth;
+    const filhos = [...el.children, ...(el.shadowRoot ? el.shadowRoot.children : [])];
+    const porFilho = filhos.some((c) => c.getBoundingClientRect().right > bordaDeConteudo + tol);
+    const achado = { onde: caminho(el), scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+    (porFilho ? transbordoDeCaixa : transbordoDeTexto).push(achado);
+  }
+
+  // ── sobreposição entre CAIXAS PINTADAS ───────────────────────────────────
+  // Duas decisões que a primeira versão desta sonda errou, e as duas mudam o
+  // veredito no caso que interessa:
+  //
+  //  1. NÃO basta comparar IRMÃOS. No `tela-resumo.ts` cada `urbi-kpi` mora
+  //     dentro do seu próprio `div.kpi-cel` — os cards que se sobrepõem são
+  //     PRIMOS, não irmãos, e uma sonda de irmãos passaria em verde sobre o
+  //     defeito que ela existe para pegar. O que importa é a relação de
+  //     ANCESTRALIDADE: duas caixas que não se contêm não podem se cruzar.
+  //  2. Comparar TODO elemento produz lixo. Dentro de um `<svg>` de gráfico,
+  //     `path` cruza `text` por projeto — foram 20 achados falsos por largura,
+  //     e verificação que grita sempre é verificação que alguém desliga.
+  //
+  // O filtro que resolve os dois é o mesmo: só CAIXA PINTADA entra — fundo
+  // opaco ou borda visível. É o que torna a sobreposição perceptível a olho
+  // (uma pinta sobre a outra), é exatamente o que o `urbi-kpi` tem
+  // (`background` + `border: 1px` no `:host`), e exclui as formas de SVG, que
+  // não têm `background-color` nenhum.
+  //
+  // Exceção pontual: marque o nó com `data-render-ignorar="sobreposicao"`.
+  const naoImpoeFluxo = (el) => {
+    const s = cs(el);
+    return (s.position === 'static' || s.position === 'relative')
+      && s.float === 'none'
+      && el.getAttribute?.('data-render-ignorar') !== 'sobreposicao';
+  };
+  const alfa = (cor) => {
+    const m = /rgba?\(([^)]+)\)/.exec(cor);
+    if (!m) return 1;
+    const p = m[1].split(',');
+    return p.length > 3 ? parseFloat(p[3]) : 1;
+  };
+  const pintada = (el) => {
+    const s = cs(el);
+    if (alfa(s.backgroundColor) >= 0.05) return true;
+    for (const lado of ['Top', 'Right', 'Bottom', 'Left']) {
+      if (parseFloat(s['border' + lado + 'Width']) > 0 && alfa(s['border' + lado + 'Color']) >= 0.05) return true;
+    }
+    return false;
+  };
+  // Ancestralidade ATRAVESSANDO shadow boundary: `el.contains` para na raiz de
+  // sombra, e aí um primitivo e o conteúdo dele pareceriam caixas separadas.
+  const contem = (a, b) => {
+    let n = b;
+    while (n) {
+      if (n === a) return true;
+      n = n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
+    }
+    return false;
+  };
+  const caixas = elementos.filter((el) => visivel(el) && naoImpoeFluxo(el) && pintada(el));
+  const sobreposicao = [];
+  for (let i = 0; i < caixas.length; i++) {
+    for (let j = i + 1; j < caixas.length; j++) {
+      if (contem(caixas[i], caixas[j]) || contem(caixas[j], caixas[i])) continue;
+      const a = caixas[i].getBoundingClientRect();
+      const b = caixas[j].getBoundingClientRect();
+      const dx = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const dy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (dx > tol && dy > tol) {
+        sobreposicao.push({
+          a: caminho(caixas[i]), b: caminho(caixas[j]),
+          px: Math.round(dx * 10) / 10, py: Math.round(dy * 10) / 10,
+        });
+      }
+    }
+  }
+
+  // ── fingerprint de fonte ─────────────────────────────────────────────────
+  // A única variável que este harness NÃO consegue fixar. Medida aqui para que
+  // uma divergência de veredito entre máquinas apareça com nome.
+  const sonda_ = document.createElement('span');
+  sonda_.style.cssText = 'position:absolute;left:-9999px;white-space:pre;font-size:100px';
+  sonda_.textContent = 'MMMMMMMMMMiiiiiiiiii 0123456789 R$ 1.234.567,89';
+  document.body.appendChild(sonda_);
+  const fingerprint = {
+    largura: Math.round(sonda_.getBoundingClientRect().width * 100) / 100,
+    familia: getComputedStyle(document.body).fontFamily,
+  };
+  sonda_.remove();
+
+  return { overflowDocumento, transbordoDeCaixa, transbordoDeTexto, sobreposicao, fingerprint };
+}
+
+// Segunda sonda, de COR. Separada porque roda uma vez por variante de tema,
+// enquanto a de layout roda uma vez por largura.
+function sondaCor() {
+  const elementos = [];
+  (function coletar(raiz) {
+    for (const el of raiz.querySelectorAll('*')) {
+      elementos.push(el);
+      if (el.shadowRoot) coletar(el.shadowRoot);
+    }
+  })(document.getElementById('raiz'));
+
+  const caminho = (el) => {
+    const partes = [];
+    let n = el;
+    while (n && partes.length < 5) {
+      let p = n.tagName.toLowerCase();
+      if (n.classList && n.classList.length) p += '.' + [...n.classList].join('.');
+      partes.unshift(p);
+      n = n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
+    }
+    return partes.join(' > ');
+  };
+
+  // Todo `--token` citado por qualquer folha em uso — inclusive as adotadas
+  // pelos shadow roots do Lit, que não aparecem em `document.styleSheets`.
+  const textoCss = [];
+  const folhas = [...document.styleSheets];
+  const vistos = new Set();
+  (function coletarFolhas(raiz) {
+    for (const s of raiz.adoptedStyleSheets ?? []) folhas.push(s);
+    for (const el of raiz.querySelectorAll('*')) {
+      if (el.shadowRoot && !vistos.has(el.shadowRoot)) { vistos.add(el.shadowRoot); coletarFolhas(el.shadowRoot); }
+      if (el.tagName === 'STYLE') textoCss.push(el.textContent || '');
+    }
+  })(document);
+  for (const f of folhas) {
+    try { for (const r of f.cssRules) textoCss.push(r.cssText); } catch { /* folha de outra origem */ }
+  }
+  const citados = new Set();
+  for (const t of textoCss) for (const m of t.matchAll(/var\(\s*(--[a-z0-9-]+)/g)) citados.add(m[1]);
+
+  const raizEstilo = getComputedStyle(document.documentElement);
+  const naoResolvem = [...citados]
+    .filter((t) => raizEstilo.getPropertyValue(t).trim() === '')
+    .sort();
+
+  // Texto invisível: cor efetiva == cor de fundo efetiva. É o desfecho de um
+  // token que sumiu e caiu num fallback que por acaso é a cor do fundo.
+  const rgba = (s) => {
+    const m = /rgba?\(([^)]+)\)/.exec(s);
+    if (!m) return null;
+    const p = m[1].split(',').map((x) => parseFloat(x));
+    return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+  };
+  const fundoEfetivo = (el) => {
+    let n = el;
+    while (n) {
+      const c = rgba(getComputedStyle(n).backgroundColor);
+      if (c && c.a >= 0.99) return c;
+      n = n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
+    }
+    return { r: 255, g: 255, b: 255, a: 1 };
+  };
+  const invisiveis = [];
+  for (const el of elementos) {
+    const temTexto = [...el.childNodes].some((n) => n.nodeType === 3 && (n.textContent || '').trim() !== '');
+    if (!temTexto) continue;
+    const s = getComputedStyle(el);
+    if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) continue;
+    const cor = rgba(s.color);
+    if (!cor) continue;
+    const fundo = fundoEfetivo(el);
+    if (cor.a < 0.05 || (cor.r === fundo.r && cor.g === fundo.g && cor.b === fundo.b && cor.a >= 0.99)) {
+      invisiveis.push({ onde: caminho(el), cor: s.color, fundo: `rgb(${fundo.r}, ${fundo.g}, ${fundo.b})` });
+    }
+  }
+  return { tokensCitados: citados.size, naoResolvem, invisiveis };
+}
+
+// ── o harness ───────────────────────────────────────────────────────────────
+/**
+ * Monta o caso `frontend/render/casos/<caso>.ts` num Chromium e devolve os
+ * achados. Nunca lança por causa de achado — devolve; quem decide o que é
+ * falha é o teste que chamou.
+ *
+ * @param {{caso: string, larguras?: number[], altura?: number}} opcoes
+ */
+export async function verificarRender(opcoes) {
+  const caso = opcoes.caso;
+  const larguras = opcoes.larguras ?? LARGURAS_PADRAO;
+  const altura = opcoes.altura ?? ALTURA_PADRAO;
+  const entrada = join(RAIZ, 'frontend', 'render', 'casos', `${caso}.ts`);
+  if (!existsSync(entrada)) throw new Error(`caso não existe: ${entrada}`);
+
+  const chromium = await carregarChromium();
+  const dir = mkdtempSync(join(tmpdir(), `render-${caso}-`));
+  let srv;
+  let navegador;
+  try {
+    const esbuild = join(RAIZ, 'node_modules', 'esbuild', 'bin', 'esbuild');
+    if (!existsSync(esbuild)) throw new Error('node_modules/esbuild não existe — rode scripts/validar-frontend.sh antes.');
+    execFileSync('node', [
+      esbuild, entrada, '--bundle', '--format=esm', `--outfile=${join(dir, 'caso.js')}`,
+      '--target=es2022', `--tsconfig=${join(RAIZ, 'tsconfig.json')}`, '--external:@urbiverso/ui',
+    ], { stdio: 'pipe' });
+
+    writeFileSync(join(dir, 'primitivos.js'), gerarPrimitivos());
+    const temas = gerarTemas();
+    writeFileSync(join(dir, 'temas.css'), temas.css);
+
+    // O stub de `window.urbiVerso` é script CLÁSSICO e vem ANTES do módulo:
+    // `viabilidade-api.ts` captura `globalThis.urbiVerso` no corpo do módulo, e
+    // import de ESM roda antes de qualquer coisa que o módulo faça. Um caso que
+    // precise de resposta específica muta `urbiVerso.api` dentro do `montar` —
+    // o objeto capturado é o mesmo.
+    writeFileSync(join(dir, 'p.html'), `<!doctype html><meta charset="utf-8">
+<link rel="stylesheet" href="./temas.css">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--cor-fundo, #0D1B2A);
+    color: var(--cor-texto, #e8e8ea);
+    /* Família e tamanho FIXOS — ver a nota de determinismo no topo do
+       scripts/render-check.mjs. O token --fonte é deliberadamente NÃO
+       aplicado: ele muda por variante e faria a medição de layout depender
+       de qual variante estava ativa. */
+    font-family: ${FAMILIA_FIXA};
+    font-size: ${TAMANHO_FIXO};
+  }
+  #raiz { padding: 16px; }
+</style>
+<div id="raiz"></div>
+<script>
+  window.urbiVerso = {
+    api: async () => ({ dados: [] }),
+    nucleo: async () => ({ dados: [] }),
+    usuario: () => ({ id: 1, nome: 'Render Check', email: 'render@check', tipo: 'interno', avatar_url: '' }),
+    contexto: () => ({ nivel: 'admin', roles: [] }),
+    navegar: () => {},
+    notificar: () => {},
+    subRota: () => '',
+    href: (s) => '#' + s,
+    navegarSub: () => {},
+    escutarRota: () => () => {},
+  };
+</script>
+<script type="module">
+  import './primitivos.js';
+  import { caso } from './caso.js';
+  const raiz = document.getElementById('raiz');
+  try {
+    await caso.montar(raiz);
+    // Duas voltas de rAF depois das fontes: a primeira deixa o Lit escoar o
+    // ciclo de update, a segunda garante que o layout da primeira já foi
+    // resolvido antes de qualquer medida.
+    await document.fonts.ready;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    document.title = 'pronto';
+  } catch (e) {
+    window.__erroMontagem = String(e && e.stack || e);
+    document.title = 'erro';
+  }
+</script>`);
+
+    const tipos = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css' };
+    srv = createServer((req, res) => {
+      const nome = req.url === '/' ? '/p.html' : req.url.split('?')[0];
+      try {
+        const corpo = readFileSync(join(dir, nome));
+        res.writeHead(200, { 'content-type': tipos[nome.slice(nome.lastIndexOf('.'))] ?? 'text/plain' });
+        res.end(corpo);
+      } catch { res.writeHead(404).end(); }
+    }).listen(0, '127.0.0.1');
+    await new Promise((r) => srv.once('listening', r));
+    const porta = srv.address().port;
+
+    navegador = await chromium.launch();
+    const achados = { caso, larguras: {}, variantes: {}, erroConsole: [], nVariantes: temas.n, fingerprint: null };
+
+    for (const largura of larguras) {
+      const ctx = await navegador.newContext({ ...CONTEXTO, viewport: { width: largura, height: altura } });
+      const pag = await ctx.newPage();
+      pag.on('pageerror', (e) => achados.erroConsole.push(`${largura}px: ${e.message}`));
+      await pag.goto(`http://127.0.0.1:${porta}/p.html`);
+      // A variante 0 é a base: as medidas de LAYOUT saem todas dela, para que
+      // nenhuma diferença de layout entre larguras seja na verdade diferença
+      // de tema.
+      await pag.evaluate(() => { document.documentElement.dataset.variante = '0'; });
+      await pag.waitForFunction(() => document.title === 'pronto' || document.title === 'erro', null, { timeout: 30000 });
+      const erroMontagem = await pag.evaluate(() => window.__erroMontagem ?? null);
+      if (erroMontagem) throw new Error(`montagem do caso "${caso}" falhou:\n${erroMontagem}`);
+
+      achados.larguras[largura] = await pag.evaluate(sonda, TOL);
+      achados.fingerprint ??= achados.larguras[largura].fingerprint;
+
+      // A lente de COR roda numa largura só (a primeira): cor não depende de
+      // viewport, e repeti-la por largura seria custo sem achado novo.
+      if (largura === larguras[0]) {
+        for (let k = 0; k < temas.n; k++) {
+          await pag.evaluate((i) => { document.documentElement.dataset.variante = String(i); }, k);
+          await pag.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+          achados.variantes[k] = await pag.evaluate(sondaCor);
+        }
+      }
+      await ctx.close();
+    }
+    return achados;
+  } finally {
+    if (navegador) await navegador.close();
+    if (srv) srv.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Achados formatados como linhas legíveis — usado pelo CLI e pelas mensagens de
+ * falha dos testes.
+ *
+ * `TETO` existe porque uma tela com defeito de grade produz o MESMO achado uma
+ * vez por card: sem corte, a mensagem de falha do `node --test` sai com sete
+ * linhas idênticas e a informação some no meio do próprio relatório.
+ */
+export function descrever(achados, teto = 4) {
+  const linhas = [];
+  const corta = (lista) => lista.length > teto
+    ? [...lista.slice(0, teto), `(+${lista.length - teto} do mesmo tipo)`]
+    : lista;
+  linhas.push(`caso: ${achados.caso} · ${achados.nVariantes} variante(s) de tema · fonte ${achados.fingerprint?.largura}px em ${achados.fingerprint?.familia}`);
+  for (const [largura, r] of Object.entries(achados.larguras)) {
+    const p = [];
+    if (r.overflowDocumento) p.push(`overflow do documento (${r.overflowDocumento.scrollWidth} > ${r.overflowDocumento.clientWidth})`);
+    p.push(...corta(r.transbordoDeCaixa.map((t) => `transbordo de CAIXA em ${t.onde} (${t.scrollWidth} > ${t.clientWidth})`)));
+    p.push(...corta(r.transbordoDeTexto.map((t) => `transbordo de TEXTO em ${t.onde} (${t.scrollWidth} > ${t.clientWidth}) — depende da fonte`)));
+    p.push(...corta(r.sobreposicao.map((s) => `sobreposição ${s.px}x${s.py}px entre ${s.a} e ${s.b}`)));
+    if (p.length) {
+      linhas.push(`  ${largura}px:`);
+      for (const x of p) linhas.push(`    · ${x}`);
+    } else {
+      linhas.push(`  ${largura}px — limpo`);
+    }
+  }
+  for (const [k, v] of Object.entries(achados.variantes)) {
+    const p = [];
+    if (v.naoResolvem.length) p.push(`tokens sem valor: ${v.naoResolvem.join(', ')}`);
+    p.push(...corta(v.invisiveis.map((i) => `texto invisível em ${i.onde} (${i.cor} sobre ${i.fundo})`)));
+    linhas.push(p.length ? `  variante ${k} — ${p.join(' · ')}` : `  variante ${k} — ${v.tokensCitados} token(s) citado(s), todos resolvem`);
+  }
+  for (const e of achados.erroConsole) linhas.push(`  erro de página: ${e}`);
+  return linhas;
+}
+
+// ── CLI ─────────────────────────────────────────────────────────────────────
+if (process.argv[1] && process.argv[1].endsWith('render-check.mjs')) {
+  const caso = process.argv[2];
+  if (!caso) {
+    console.error('uso: node scripts/render-check.mjs <caso> [--larguras 1280,600]');
+    console.error('     casos em frontend/render/casos/*.ts');
+    process.exit(2);
+  }
+  const iL = process.argv.indexOf('--larguras');
+  const larguras = iL !== -1 ? process.argv[iL + 1].split(',').map(Number) : undefined;
+  const r = await verificarRender({ caso, larguras });
+  console.log(descrever(r).join('\n'));
+}

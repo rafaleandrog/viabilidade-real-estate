@@ -306,3 +306,105 @@ jobs:
             echo "::error title=Bateria dos guards de UI falhou::Um dos três guards não se comporta como o esperado. Veja quais casos falharam no log."
             exit 1
           fi
+
+  render:
+    name: Render em Chromium (overflow, sobreposição, cor)
+    runs-on: ubuntu-latest
+    # ⚠️ 20 min, e não 5 como os demais: este job instala pacotes e baixa o
+    # Chromium. O baseline dos passos de medição é ~15s (6 testes, 4 telas,
+    # 3 larguras, 4 variantes de tema); o resto é preparo. Sem `timeout-minutes`
+    # o default do GitHub é SEIS HORAS — foi assim que a PR #304 ficou
+    # `in_progress` sem log nenhum para ler (a API só serve log de job
+    # concluído). Ver o cabeçalho deste arquivo e o do validation.yml.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # precisa do histórico para o merge-base do diff
+      - name: O PR toca frontend/?
+        id: escopo
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          # Diff de TRÊS pontos, como os demais guards: dois pontos acusaria
+          # arquivo que veio da base no meio do caminho.
+          if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
+               | grep -qE '^(frontend/|docs/ui-urbiverso/|scripts/render-check)'; then
+            echo "roda=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "roda=0" >> "$GITHUB_OUTPUT"
+            echo "PR não toca frontend/ nem o espelho de UI — render não é exercido."
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.escopo.outputs.roda == '1'
+        with:
+          node-version: '22'
+      - name: Instalar toolchain de render (só pacotes PÚBLICOS)
+        if: steps.escopo.outputs.roda == '1'
+        run: |
+          set -euo pipefail
+          # Nada de `pnpm install` aqui: o `@urbiverso/sdk` é GitHub Packages
+          # privado e o GITHUB_TOKEN efêmero deste repo toma 401 — é o motivo de
+          # todo este workflow ser leve. A saída é um diretório PRÓPRIO, com
+          # package.json próprio, onde só entram pacotes públicos; o repo é
+          # ligado a ele por symlink, exatamente como scripts/validar-frontend.sh
+          # faz com o store do pnpm.
+          #
+          # As versões acompanham as do package.json deste repo. Divergir aqui
+          # significaria medir render num Lit que o app não usa.
+          mkdir -p "$RUNNER_TEMP/render-deps"
+          cd "$RUNNER_TEMP/render-deps"
+          printf '{"name":"render-deps","private":true,"version":"1.0.0"}\n' > package.json
+          npm install --no-audit --no-fund --loglevel=error \
+            lit@^3.2.0 tsx@^4.21.0 esbuild@^0.24.0 typescript@^5.6.0 \
+            playwright@^1.49.0 @types/node@^20 @types/trusted-types@^2
+          # O download do navegador é passo EXPLÍCITO do preparo do ambiente,
+          # nunca efeito colateral de rodar teste — o harness não baixa nada.
+          npx playwright install --with-deps chromium
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p node_modules
+          # `if` em vez de `[ ... ] && ...`: com `set -e`, um teste falso na
+          # ÚLTIMA volta do laço derruba o passo inteiro, e o pacote que faltar
+          # muda conforme a resolução do npm. Falha por acidente de sintaxe é
+          # pior que falha real, porque manda procurar no lugar errado.
+          for p in lit lit-html lit-element @lit tsx esbuild typescript playwright playwright-core @types; do
+            if [ -e "$RUNNER_TEMP/render-deps/node_modules/$p" ]; then
+              ln -sfn "$RUNNER_TEMP/render-deps/node_modules/$p" "node_modules/$p"
+              echo "  ligado: $p"
+            else
+              echo "  ausente no store: $p"
+            fi
+          done
+          node -e "console.log('esbuild em', require.resolve('esbuild/package.json'))"
+          node -e "import('playwright').then((m) => console.log('chromium em', m.chromium.executablePath()))"
+      - name: Verificação de render
+        if: steps.escopo.outputs.roda == '1'
+        env:
+          # ⚠️ Esta variável é o que separa "pulou" de "passou". No
+          # validar-frontend.sh a ausência de navegador PULA a etapa, porque a
+          # máquina do autor não tem Playwright; aqui ela REPROVA. Sem isto, um
+          # runner sem Chromium devolveria verde sem medir um pixel, e a camada
+          # inteira viraria enfeite sem nada ficar vermelho.
+          RENDER_CHECK_OBRIGATORIO: '1'
+        run: |
+          set -uo pipefail
+          # As DUAS defesas de timeout, porque cobrem casos diferentes e nenhuma
+          # cobre o do outro (CLAUDE.md § Duas regras de CI):
+          #   · `--test-timeout` mata teste ASSÍNCRONO pendurado e diz o NOME
+          #     dele — é o caso provável aqui (página que nunca fica pronta);
+          #   · `timeout` mata o PROCESSO, e é o único que pega laço SÍNCRONO,
+          #     que bloqueia o event loop e impede o timer do runner de disparar.
+          timeout 900 node --import tsx/esm --test --test-timeout=180000 \
+            frontend/render/*.render.test.ts
+          rc=$?
+          if [ $rc -eq 124 ]; then
+            echo "::error title=Render travou::A suíte de render passou de 900s sem terminar — provável laço síncrono (o --test-timeout não pega esse caso)."
+            exit 1
+          fi
+          if [ $rc -ne 0 ]; then
+            echo "::error title=Render reprovou::Uma tela transbordou, pintou sobre a vizinha, deixou o documento rolar na horizontal, ou usou token que não resolve. O relatório com arquivo, largura e pixels está no log acima. Ver scripts/render-check.mjs."
+            exit 1
+          fi
+          echo "ok: render verificado."
