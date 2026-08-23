@@ -74,6 +74,14 @@ const NUMERO = arg('--numero', '');
 const ARQUIVOS_MANUAIS = arg('--arquivos');
 const COMMITS_MANUAIS = arg('--commits');
 const VERSAO_MANUAL = arg('--versao');
+const TITULO = arg('--titulo', '');
+// `--arvore <branch>[:<upstream>]` declara o estado de árvore. Sem ele, as
+// checagens de branch e upstream NUNCA são exercitadas pela bateria: tanto o
+// checkout de PR quanto a worktree hermética são destacados, então uma
+// regressão que volte a torná-las bloqueantes em modo declarado passa verde —
+// justamente a lacuna que a hermeticidade deveria cobrir. Achado do Codex no
+// PR 502, rodada 6.
+const ARVORE_MANUAL = arg('--arvore');
 
 // MODO DECLARADO: quem chama está exercitando o script contra entrada
 // sintética, não conferindo um PR de verdade. Aí as checagens de ÁRVORE viram
@@ -113,10 +121,18 @@ const ok = [];
 // O CI nunca vê isto: quando ele roda, o push já aconteceu. Se foi para o
 // lugar errado, o estrago está feito.
 let branch = '';
-try {
-  branch = git('branch', '--show-current');
-} catch {
-  bloqueantes.push('não consegui ler a branch atual — isto é um repositório git?');
+let upstreamDeclarado;
+if (ARVORE_MANUAL !== undefined) {
+  const [b, u] = ARVORE_MANUAL.split(':');
+  branch = b ?? '';
+  upstreamDeclarado = u ?? '';
+  ok.push(`estado da árvore DECLARADO por --arvore: branch \`${branch || '—'}\`, upstream \`${upstreamDeclarado || '—'}\``);
+} else {
+  try {
+    branch = git('branch', '--show-current');
+  } catch {
+    bloqueantes.push('não consegui ler a branch atual — isto é um repositório git?');
+  }
 }
 
 if (branch === 'main' && MODO_DECLARADO) {
@@ -142,7 +158,9 @@ if (branch === 'main' && MODO_DECLARADO) {
 // `origin/main`, e um `git push` pelado empurra o trabalho para lá. Aqui o
 // SUCESSO do comando é o problema.
 try {
-  const upstream = git('rev-parse', '--abbrev-ref', '@{u}');
+  const upstream = upstreamDeclarado !== undefined
+    ? (upstreamDeclarado || (() => { throw new Error('sem upstream declarado'); })())
+    : git('rev-parse', '--abbrev-ref', '@{u}');
   if (upstream === 'origin/main' && MODO_DECLARADO) {
     avisos.push('estado da árvore: upstream `origin/main` — informativo no modo declarado.');
   } else if (upstream === 'origin/main') {
@@ -159,7 +177,18 @@ try {
 
 const sujo = (() => {
   try {
-    return git('status', '--porcelain');
+    const bruto = git('status', '--porcelain');
+    if (!bruto) return '';
+    // O PRÓPRIO arquivo de corpo não conta como sujeira. O fluxo obrigatório
+    // manda escrevê-lo (`--corpo <arquivo.md>`), e escrito dentro do repositório
+    // ele aparece como untracked — então o procedimento canônico reprovava por
+    // causa do artefato que ele mesmo mandou criar, a menos que se adivinhasse
+    // gravá-lo fora da árvore. Achado do Codex no PR 502, rodada 6.
+    const alvo = resolve(process.cwd(), CORPO_ARQ);
+    return bruto
+      .split('\n')
+      .filter((l) => resolve(RAIZ, l.slice(3).trim()) !== alvo)
+      .join('\n');
   } catch {
     return '';
   }
@@ -251,7 +280,11 @@ if (TUDO_DECLARADO) {
   }
 }
 
-const texto = `${corpo}\n${commits}`;
+// O TÍTULO entra junto. O job `diff-vazio` do CI concatena título + corpo +
+// commits; sem ele aqui, um PR com `Closes #123` só no título e diff vazio
+// passava no preflight e reprovava no CI — quebrando a garantia de que verde
+// aqui antecipa aquele guard. Achado do Codex no PR 502, rodada 6.
+const texto = `${TITULO}\n${corpo}\n${commits}`;
 
 // ── 3. Diff vazio + keyword de fechamento ───────────────────────────────────
 // O caso do PR #142: 12 issues fechadas, zero arquivos alterados.

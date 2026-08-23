@@ -48,13 +48,15 @@ DIFF="frontend/exemplo.ts"
 # como este job roda em TODO PR, toda migracao corretamente versionada
 # derrubaria o CI. Terceira override pelo mesmo motivo que as duas anteriores.
 VERSAO='0.1.28:0.1.28'   # sem bump, o caso comum
+ARVORE='claude/teste:'   # branch propria, sem upstream — o estado saudavel
 
 # esperar <exit-esperado> <rotulo> <corpo...>
 esperar() {
   local esperado="$1" rotulo="$2"; shift 2
   printf '%s\n' "$@" > "$TMP/corpo.md"
   local saida; saida="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" \
-    --declarado --arquivos "$DIFF" --commits "$TMP/commits.txt" --versao "$VERSAO" 2>&1)"
+    --declarado --arquivos "$DIFF" --commits "$TMP/commits.txt" --versao "$VERSAO" \
+    --arvore "$ARVORE" 2>&1)"
   local obtido=$?
   if [ "$obtido" -eq "$esperado" ]; then
     passou=$((passou + 1))
@@ -74,7 +76,8 @@ contem() {
   local padrao="$1" rotulo="$2"; shift 2
   printf '%s\n' "$@" > "$TMP/corpo.md"
   local saida; saida="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" \
-    --declarado --arquivos "$DIFF" --commits "$TMP/commits.txt" --versao "$VERSAO" 2>&1)"
+    --declarado --arquivos "$DIFF" --commits "$TMP/commits.txt" --versao "$VERSAO" \
+    --arvore "$ARVORE" 2>&1)"
   local obtido=$?
   if [ "$obtido" -ne 0 ]; then
     falhou=$((falhou + 1))
@@ -146,6 +149,19 @@ DIFF='.claude/motor-revisao.md'
 esperar 0 'processo sozinho passa na R1' 'Nada a citar.'
 DIFF="frontend/exemplo.ts"
 
+# ── Estado de árvore — os dois eixos que a hermeticidade NÃO alcança ────────
+#
+# Nem o checkout de PR nem a worktree hermética têm branch nomeada ou upstream:
+# as duas são destacadas. Sem estes casos, uma regressão que volte a tornar
+# `branch === 'main'` ou `upstream === 'origin/main'` bloqueante em modo
+# declarado passaria verde — a lacuna que a hermeticidade deveria cobrir.
+# Achado do Codex no PR 502, rodada 6.
+ARVORE='main:'
+contem 'informativo no modo declarado' 'na main, modo declarado: informativo' 'Nada a citar.'
+ARVORE='claude/teste:origin/main'
+contem 'informativo no modo declarado' 'upstream origin/main, declarado: informativo' 'Nada a citar.'
+ARVORE='claude/teste:'
+
 # ── Avisos: têm que aparecer, sem bloquear ──────────────────────────────────
 contem 'keyword em PORTUGUÊS' 'avisa sobre "Fecha #NNN"' \
   'Fecha #123' '' 'Sem-fechamento: #123 contexto.'
@@ -191,7 +207,15 @@ fi
 # A worktree é descartável e a árvore real NÃO é tocada. O preflight resolve a
 # raiz a partir da própria localização do arquivo, então rodá-lo de lá troca o
 # ambiente inteiro de uma vez.
-if [ -z "${PREFLIGHT_BATERIA_FILHA:-}" ] && [ "$falhou" -eq 0 ]; then
+# A worktree filha sai de HEAD, entao ela roda a bateria COMMITADA. Com trabalho
+# nao commitado as duas execucoes comparam versoes diferentes do script, e a
+# divergencia que aparece e artefato disso, nao vazamento de ambiente. Pular com
+# aviso e o desfecho honesto — e o preflight ja exige arvore limpa fora do modo
+# declarado, entao o uso canonico nunca cai aqui.
+if [ -z "${PREFLIGHT_BATERIA_FILHA:-}" ] && [ "$falhou" -eq 0 ] && [ -n "$(git status --porcelain -- scripts/ 2>/dev/null)" ]; then
+  echo "  --   hermeticidade: pulada — ha mudanca nao commitada em scripts/, e a"
+  echo "       worktree filha sai de HEAD; a comparacao seria entre versoes diferentes."
+elif [ -z "${PREFLIGHT_BATERIA_FILHA:-}" ] && [ "$falhou" -eq 0 ]; then
   WT="$TMP/wt-hermetica"
   if git worktree add --detach "$WT" HEAD >/dev/null 2>&1; then
     node -e '
