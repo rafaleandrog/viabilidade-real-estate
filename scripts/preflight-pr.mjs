@@ -75,14 +75,18 @@ const ARQUIVOS_MANUAIS = arg('--arquivos');
 const COMMITS_MANUAIS = arg('--commits');
 const VERSAO_MANUAL = arg('--versao');
 
-// MODO DECLARADO: qualquer override presente significa que quem chama está
-// exercitando o script contra entrada sintética, não conferindo um PR de
-// verdade. Aí as checagens de ÁRVORE viram informativas — elas falam do
-// ambiente por definição, e num modo declarado o ambiente não é o assunto.
-// Sem esta distinção, tornar "árvore suja" bloqueante reprovaria toda a
-// bateria sempre que houvesse trabalho não commitado.
-const MODO_DECLARADO =
-  ARQUIVOS_MANUAIS !== undefined || COMMITS_MANUAIS !== undefined || VERSAO_MANUAL !== undefined;
+// MODO DECLARADO: quem chama está exercitando o script contra entrada
+// sintética, não conferindo um PR de verdade. Aí as checagens de ÁRVORE viram
+// informativas — elas falam do ambiente por definição.
+//
+// ⚠️ EXPLÍCITO, nunca inferido das overrides de dado. A versão anterior ligava
+// este modo sempre que houvesse `--arquivos`, `--commits` ou `--versao` — e o
+// `--arquivos` tem uso documentado ANTES do commit. Resultado: um conserto não
+// commitado alimentava `versao`, JSON, schema e a rede do processo, o script
+// saía 0 imprimindo "Pode abrir o PR", e o HEAD já empurrado reprovava no CI.
+// Enfraquecer o portão como efeito colateral de uma opção de DADO é como o
+// portão morre calado. Achado do Codex no PR 502, rodada 4.
+const MODO_DECLARADO = argv.includes('--declarado');
 
 if (!CORPO_ARQ) {
   console.error('uso: node scripts/preflight-pr.mjs --corpo <arquivo.md> [--base origin/main]');
@@ -204,7 +208,13 @@ try {
   // preflight exigia bump — divergindo do guard do `validar-backend.sh`, que
   // usa `--diff-filter=A` de propósito. Commits históricos de conserto de
   // migração seriam barrados. Achado do Codex no PR 502, rodada 2.
-  const adicionadosBrutos = git('diff', '--no-renames', '--diff-filter=A', '--name-only', `${baseSha}...${headSha}`);
+  // SEM `--no-renames` aqui, de propósito, e é o oposto do que a lista de
+  // escopo precisa. Com ele, uma migração apenas RENOMEADA vira exclusão +
+  // adição, o destino entra em `adicionados` e o preflight exige bump de versão
+  // que não é devido. O `validar-backend.sh:110` usa `--diff-filter=A` sem
+  // desabilitar renames, e é com ele que este número tem de concordar.
+  // Achado do Codex no PR 502, rodada 4.
+  const adicionadosBrutos = git('diff', '--diff-filter=A', '--name-only', `${baseSha}...${headSha}`);
   adicionados = adicionadosBrutos ? adicionadosBrutos.split('\n').filter(Boolean) : [];
   commits = git('log', '--format=%B', `${baseSha}..${headSha}`);
   if (COMMITS_MANUAIS !== undefined) {
