@@ -1081,18 +1081,24 @@ referência** depois da reconciliação com Calliandra: no modelo por safra o pr
 contratação, e a primeira parcela vence em `s + 1`. EVI-013 / #233 substitui uma mecânica pela
 outra — e **muda os números de estudos existentes**.
 
-### 11.7 Evolução dependente de issues
+### 11.7 A cadeia EVI de recebíveis — entregue, e o que sobrou
 
-As issues já abertas precisam ser revisadas antes de implementação:
+> ✅ **As seis issues abaixo estão implementadas e ligadas ao cálculo real desde a #283.** A lista é
+> mantida como **registro do que cada uma pedia**, não como trabalho a fazer — era ela que dizia
+> "precisam ser revisadas antes de implementação", e dois agentes desta rodada quase
+> reimplementaram o motor por causa disso.
 
-- **EVI-010 / #230** — contrato canônico deve ser baseado nas quatro regras de componente, não apenas em à vista/curta/longa rígidas;
-- **EVI-012 / #232** — deve implementar componente de prazo fixo por safra, incluindo curta de 36 e longa de 120 meses;
-- **EVI-013 / #233** — deve implementar componente até marco, com primeira parcela no mês seguinte, substituindo a premissa anterior de parcela no mês da contratação;
-- **EVI-014 / #234** — deve implementar pagamento concentrado e repasse, com convenção explícita de juros;
-- **EVI-016 / #236** — deve consolidar saldos reais por safra e componente;
-- **EVI-017 / #237** — deve reconciliar Receita Bruta com valor contratado líquido e juros.
+| Issue | O que pedia | Onde está |
+|---|---|---|
+| **EVI-010 / #230** | contrato canônico pelas quatro regras de componente | `ComponentePagamento` (`fluxo-caixa-motor.ts:519-550`) |
+| **EVI-012 / #232** | componente de prazo fixo por safra (curta 36, longa 120) | `pagamentosComponenteSafra` `:1058` |
+| **EVI-013 / #233** | componente até marco, 1ª parcela no mês seguinte | mesmo motor, `tipo: 'ate_marco'` |
+| **EVI-014 / #234** | pagamento concentrado e repasse, com juros convencionados | `tipo: 'concentrado'`, `taxaMensal` |
+| **EVI-016 / #236** | saldos reais por safra e componente | `carteiraSaldoSafra` `:826`, consolidação `:1149-1169` |
+| **EVI-017 / #237** | Receita Bruta = contratado líquido + juros | separação em `:1126-1141` |
 
-A documentação e os corpos das issues precisam ser atualizados antes de qualquer alteração no motor.
+> ⚠️ **A porta continua sendo o opt-in da §11.6:** linha sem `componentes` persistido segue pelo
+> caminho legado. "Implementado" não quer dizer "aplicado a todo estudo".
 
 ### 11.8 Regra para novas vendas Após-chaves
 
@@ -1439,19 +1445,22 @@ No mesmo mês podem continuar parcelas e repasses de contratos antigos.
 
 > ✅ **Entregue (#235/#283)** — ver §11.8, que descreve o comportamento vigente e as ressalvas.
 
-### 13.9 O que muda nas issues da Rodada 5
+### 13.9 O que as issues da Rodada 5 pediram — e o que foi entregue
 
-| Issue | Correção necessária |
-|---|---|
-| **EVI-001 / #220** | Dois cenários dourados: Calliandra prazo fixo e Calliandra até Obra + repasse |
-| **EVI-010 / #230** | Contrato baseado em componentes e regras temporais |
-| **EVI-012 / #232** | Generalizar para prazo fixo por safra; curta de 36 e longa de 120 |
-| **EVI-013 / #233** | Primeira parcela no mês seguinte; componente até marco, não parcela no ato |
-| **EVI-014 / #234** | Repasse como pagamento concentrado, taxa zero ou positiva e juros explicitamente convencionados |
-| **EVI-016 / #236** | Carteira derivada de saldos por safra, não de recorrência agregada defeituosa |
-| **EVI-017 / #237** | Receita Bruta = valor contratado líquido + juros |
-| **EVI-020 / #240** | Invariantes por safra e identificação do primeiro mês divergente |
-| **EVI-021 / #241** | Exibir bruto, desconto, líquido, principal, juros, parcelas, repasse e carteira |
+> ✅ **Registro histórico, não backlog.** A tabela dizia "Correção necessária" para trabalho que a
+> **#283** entregou. Fica como memória do que cada issue pedia, com o estado real ao lado.
+
+| Issue | O que pedia | Estado |
+|---|---|---|
+| **EVI-001 / #220** | Dois cenários dourados: Calliandra prazo fixo e até Obra + repasse | ✅ |
+| **EVI-010 / #230** | Contrato baseado em componentes e regras temporais | ✅ |
+| **EVI-012 / #232** | Prazo fixo por safra; curta de 36 e longa de 120 | ✅ |
+| **EVI-013 / #233** | Primeira parcela no mês seguinte; componente até marco | ✅ |
+| **EVI-014 / #234** | Repasse concentrado, juros explicitamente convencionados | ✅ no motor — **falta a ENTRADA**: o modal não tem campo de taxa nem de sinal (§11) |
+| **EVI-016 / #236** | Carteira por saldos de safra, não recorrência agregada | ✅ |
+| **EVI-017 / #237** | Receita Bruta = contratado líquido + juros | ✅ |
+| **EVI-020 / #240** | Invariantes por safra e primeiro mês divergente | ✅ `validarComponentesSafra` (`fluxo-invariantes.ts:404`) |
+| **EVI-021 / #241** | Exibir bruto, desconto, líquido, principal, juros, parcelas, repasse e carteira | 🟡 **parcial** — o motor produz tudo, mas os 6 "Componente · …" e a carteira por componente **saíram da tabela** (`fluxo-tabela.ts:462-467`); a tela mostra só as séries agregadas |
 
 ## 14. Receita Bruta — VGV
 
