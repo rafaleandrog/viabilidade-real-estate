@@ -22,6 +22,17 @@ const FASE = {
     entrada: [{ pct: 20, parcelas: 3, descontoPct: 0 }],
     parcelas: [{ pct: 50, parcelas: 24, periodicidade: 'mensal' }],
     repasse: [{ pct: 30, mesesAposObra: 3 }],
+    // #436: `componentes` PERSISTIDOS com juros — é o que faz o bloco "Juros de
+    // tabela" existir na tela. Sem isto o caso media um modal sem esse bloco, e
+    // qualquer defeito nele passava despercebido: medi por mutação que ler do
+    // formulário em vez do persistido sobrevivia à suíte inteira.
+    //
+    // A taxa é a do estudo 5 de Pinguim (12,5% a.a.); a segunda difere para o
+    // caso exercitar o ramo de taxas divergentes, que é o layout mais largo.
+    componentes: [
+      { tipo: 'prazo_fixo', participacaoPct: 50, taxaMensal: 0.0098636, rotulo: 'parcelas' },
+      { tipo: 'concentrado', participacaoPct: 30, taxaMensal: 0.005, rotulo: 'repasse' },
+    ],
   },
 };
 
@@ -37,6 +48,9 @@ export const caso = {
     { seletor: 'urbi-modal', minimo: 1 },
     { seletor: 'div.pag-grid', minimo: 1 },
     { seletor: 'viab-num', minimo: 5 },
+    // #436: o bloco de juros e o aviso de que "Aplicar" os apaga. Sem estas duas
+    // linhas o bloco novo não é medido por nada.
+    { seletor: 'p.aviso-juros', minimo: 1 },
   ],
   // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a
   // uma. Não é isenção: é o registro do que a medida deste caso NÃO cobre. O
