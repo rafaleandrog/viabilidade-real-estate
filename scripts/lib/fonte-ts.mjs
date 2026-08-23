@@ -238,8 +238,10 @@ function buracosCss(s, de, ate, onde) {
 // Elementos cujo conteudo NAO e marcacao. `style` entra na travessia (para o
 // `<` de dentro nao ser lido como tag) mas NAO vira buraco: ele e extraido como
 // CSS logo adiante.
-const CRU = /^<(script|title|textarea|style)[\s>]/i;
+const CRU = new Set(['script', 'title', 'textarea', 'style']);
 const SEM_BURACO = new Set(['style']);
+/** `<nome` ou `</nome`, sem depender de qual caractere vem depois do nome. */
+const NOME_DE_TAG = /^<(\/?)([a-zA-Z][a-zA-Z0-9-]*)/;
 
 /**
  * Elementos cujo conteudo tem regra de tokenizacao PROPRIA e que este modulo
@@ -249,7 +251,9 @@ const SEM_BURACO = new Set(['style']);
  * `noscript` entra porque o conteudo dele so e texto cru com scripting ligado:
  * ambiguo, e ambiguidade resolve para o lado que acusa.
  */
-const NAO_MODELADOS = /^<(iframe|xmp|noembed|noframes|noscript|plaintext)[\s>/]/i;
+const NAO_MODELADOS = new Set([
+  'iframe', 'xmp', 'noembed', 'noframes', 'noscript', 'plaintext',
+]);
 
 /**
  * Fim de uma tag `<…>` a partir do `<`, ATRAVESSANDO valores citados. `-1` se
@@ -329,52 +333,66 @@ function varrerHtml(s, de, ate, onde) {
       problemas.push(`${onde}: nao modelo a construcao \`${trecho}\` — confira a mao`);
       return { buracos, problemas, tags, estilos };
     }
-    const naoModelado = NAO_MODELADOS.exec(s.slice(i, i + 12));
-    if (naoModelado) {
-      problemas.push(
-        `${onde}: nao modelo o conteudo de <${naoModelado[1].toLowerCase()}> — confira a mao`,
-      );
+    // ── despacho POR NOME, e nao por classe de caractere ────────────────
+    // ⚠️ A versao anterior reconhecia texto cru com `/^<(script|…)[\s>]/` — uma
+    // classe de delimitadores escrita a mao, que OMITIA a barra. `<style/>`
+    // entao nao casava como texto cru, nao casava como nao-modelado, e escorria
+    // para o caminho de tag comum: nem reconhecido, NEM RECUSADO. Era o vao do
+    // desenho novo, e nao um caso a mais — por isso a classificacao passou a ser
+    // por pertinencia a um CONJUNTO de nomes, sem delimitador escrito a mao e
+    // sem janela de tamanho fixo. Nome novo entra no conjunto; nao ha
+    // terceiro caminho por onde escapar.
+    const nomeTag = NOME_DE_TAG.exec(s.slice(i, i + 64));
+    if (!nomeTag) { i++; continue; }            // `<` solto e TEXTO em HTML
+    const fechando = nomeTag[1] === '/';
+    const nome = nomeTag[2].toLowerCase();
+
+    if (NAO_MODELADOS.has(nome)) {
+      problemas.push(`${onde}: nao modelo o conteudo de <${nome}> — confira a mao`);
       return { buracos, problemas, tags, estilos };
     }
-    const cru = CRU.exec(s.slice(i, i + 12));
-    if (cru) {
-      const tag = cru[1].toLowerCase();
+    if (CRU.has(nome) && !fechando) {
       // ⚠️ A tag de ABERTURA e atravessada antes de procurar o fechamento. Sem
       // isso, `<script title="</script>">` fechava no `</script>` que mora
       // DENTRO do valor citado, e o conteudo real do script virava marcacao.
-      // Mesma coisa para o `>` que delimita a abertura.
       const inicioConteudo = fimDaTag(s, i, ate);
       if (inicioConteudo === -1) {
-        problemas.push(`${onde}: <${tag}> aberta e sem \`>\``);
+        problemas.push(`${onde}: <${nome}> aberta e sem \`>\``);
         return { buracos, problemas, tags, estilos };
       }
-      // Nome de tag e case-insensitive, e o fechamento admite espaco: `</STYLE >`.
-      const m = new RegExp(`</${tag}\\s*>`, 'i').exec(s.slice(inicioConteudo, ate));
+      // `<style/>`: em HTML a barra e IGNORADA num elemento nao-void e o
+      // conteudo segue ate `</style>`; em conteudo estrangeiro (dentro de
+      // `<svg>`) ela FECHA o elemento. Nao modelamos conteudo estrangeiro, entao
+      // nao da para escolher — recusa. Medido: zero ocorrencias no `frontend/`.
+      if (s[inicioConteudo - 2] === '/') {
+        problemas.push(
+          `${onde}: nao modelo <${nome}/> — a barra e ignorada em HTML e fecha em conteudo estrangeiro`,
+        );
+        return { buracos, problemas, tags, estilos };
+      }
+      const m = new RegExp(`</${nome}\\s*>`, 'i').exec(s.slice(inicioConteudo, ate));
       if (!m) {
-        problemas.push(`${onde}: <${tag}> sem </${tag}>`);
+        problemas.push(`${onde}: <${nome}> sem </${nome}>`);
         return { buracos, problemas, tags, estilos };
       }
       tags.push(i);
       const fimConteudo = inicioConteudo + m.index;
-      if (SEM_BURACO.has(tag)) estilos.push({ de: inicioConteudo, ate: fimConteudo });
+      if (SEM_BURACO.has(nome)) estilos.push({ de: inicioConteudo, ate: fimConteudo });
       else buracos.push({ de: inicioConteudo, ate: fimConteudo });
       i = fimConteudo + m[0].length;
       continue;
     }
-    // Qualquer outra tag: atravessa-a inteira, com os valores citados, ANTES de
-    // voltar a procurar `<!--`. Sem isto, um `<!--` dentro de um valor abria
-    // comentario e mascarava o componente seguinte.
-    if (/^<[a-zA-Z/]/.test(s.slice(i, i + 2))) {
-      const f = fimDaTag(s, i, ate);
-      if (f === -1) {
-        problemas.push(`${onde}: tag aberta com \`<\` e sem \`>\``);
-        return { buracos, problemas, tags, estilos };
-      }
-      tags.push(i);
-      i = f;
-      continue;
+
+    // Tag comum: atravessa-a inteira, com os valores citados, ANTES de voltar a
+    // procurar `<!--`. Sem isto, um `<!--` dentro de um valor abria comentario e
+    // mascarava o componente seguinte.
+    const f = fimDaTag(s, i, ate);
+    if (f === -1) {
+      problemas.push(`${onde}: tag aberta com \`<\` e sem \`>\``);
+      return { buracos, problemas, tags, estilos };
     }
-    i++;
+    tags.push(i);
+    i = f;
   }
   return { buracos, problemas, tags, estilos };
 }

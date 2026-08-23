@@ -92,9 +92,9 @@ completa dos pontos que comparam nome — com o veredito da especificação em c
 | O que se compara | A spec diz | Onde | Respeita? |
 |---|---|---|---|
 | Nome de elemento (`<URBI-KPI>`) | insensível | `lerTags` (`gi`, normaliza p/ minúsculas) | ✅ |
-| Nome de elemento no fechamento (`</STYLE >`) | insensível | `CRU`, `fecha` (`i`) | ✅ |
+| Nome de elemento no fechamento (`</STYLE >`) | insensível | nome normalizado + regex de fechamento (`i`) | ✅ |
 | Nome de atributo (`STYLE=`) | insensível | `ehStyleHtml`, `atributos` do espelho (`toLowerCase`) | ✅ |
-| Seletor de **tipo** em CSS (`.a URBI-KPI`) | insensível em documento HTML | `seletorAlcanca` (`i`) | ✅ |
+| Seletor de **tipo** em CSS (`.a URBI-KPI`) | insensível em documento HTML | `seletorAlcanca` compara o tipo em minúsculas | ✅ |
 | Nome de **função** CSS (`URL(`, `VAR(`) | insensível | `buracosCss` (`i`), `var\(` (`gi`) | ✅ |
 | Nome de **propriedade** CSS (`WIDTH:`) | insensível | `declaracoesDe` (`toLowerCase`) | ✅ |
 | Valor-palavra-chave CSS (`BORDER-BOX`, `AUTO`) | insensível | `normalizar` (`toLowerCase`) | ✅ |
@@ -159,7 +159,30 @@ por construção: deixa de ser preciso acertar a spec e passa a ser preciso **sa
 
 | Modelado | Recusado |
 |---|---|
-| `<!-- -->` · `<script>` · `<style>` · `<title>` · `<textarea>` · tag comum com valores citados | qualquer `<!…` que não seja comentário (inclui `<!DOCTYPE` e `<![CDATA[`) · `<?…` · `<iframe>` `<xmp>` `<noembed>` `<noframes>` `<noscript>` `<plaintext>` |
+| `<!-- -->` · `<script>` · `<style>` · `<title>` · `<textarea>` · tag comum com valores citados | qualquer `<!…` que não seja comentário (inclui `<!DOCTYPE` e `<![CDATA[`) · `<?…` · `<iframe>` `<xmp>` `<noembed>` `<noframes>` `<noscript>` `<plaintext>` · **`<style/>` e afins** (a barra é ignorada em HTML e fecha em conteúdo estrangeiro) · **`:is()` e `:where()`** no seletor (podem carregar o tipo do sujeito) |
+
+⚠️ **O despacho é por NOME, não por classe de caractere.** A primeira versão reconhecia texto cru com
+`/^<(script|…)[\s>]/` — uma classe de delimitadores escrita à mão, que **omitia a barra**. `<style/>`
+então não casava como texto cru, não casava como não-modelado, e escorria para o caminho de tag
+comum: **nem reconhecido, nem recusado**. Esse é o vão que o desenho precisa não ter, e uma classe de
+caractere escrita à mão sempre pode tê-lo. Hoje o nome é lido uma vez e classificado por pertinência
+a um conjunto — não há terceiro caminho por onde escapar, e um nome novo entra no conjunto.
+
+**Os caminhos possíveis a partir de um `<`, e são todos:**
+
+| Condição | Destino |
+|---|---|
+| `<!--` | comentário — **modelado** |
+| `<!…` ou `<?…` | **recusa** |
+| não há nome de tag depois do `<` | é **texto**, e em HTML é mesmo (`i++`) |
+| nome em `NAO_MODELADOS` | **recusa** |
+| nome em `CRU`, abrindo | texto cru — **modelado**; `/>` ou sem fechamento → **recusa** |
+| qualquer outro nome | tag comum — **modelada**; sem `>` → **recusa** |
+
+Não há `else` silencioso: o único caminho que segue sem modelar nem recusar é o do `<` que não
+inicia tag, e esse é o comportamento do próprio HTML. A janela de 64 caracteres em que o nome é
+procurado só pode **encurtar** um nome absurdo, e nome encurtado não pertence a nenhum dos conjuntos
+— cai em tag comum, que atravessa pelo texto inteiro.
 
 `<![CDATA[` saiu do lado modelado de propósito: ele só vale em conteúdo estrangeiro, e dentro de
 `html` o tokenizer o trata como comentário inválido até o primeiro `>`. Modelar só um dos dois casos
@@ -170,8 +193,10 @@ conteúdo estrangeiro é justamente o CDATA, que agora recusa.
 acima são 5 `<svg>` inline, que seguem modelados.
 
 ⚠️ **HTML é ASCII case-insensitive em nome de tag E de atributo.** `<URBI-KPI STYLE="…">` é o mesmo
-elemento com o mesmo atributo. Vale também para seletor de tipo em CSS (`.a URBI-KPI`). Não vale para
-`.prop=`, `@evento=` e `?attr=`: o Lit lê as strings cruas do template e preserva a caixa desses.
+elemento com o mesmo atributo. Vale também para seletor de tipo em CSS (`.a URBI-KPI`) e para `?attr=`,
+que **escreve um atributo HTML**. Não vale para `.prop=` (nome de propriedade JS) nem para `@evento=`
+(tipo de evento no DOM): o Lit lê as strings cruas do template e preserva a caixa desses dois.
+A tabela acima é a fonte; este parágrafo é resumo dela.
 
 ## As três sub-linguagens, e por que a lista fecha
 

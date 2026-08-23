@@ -868,6 +868,82 @@ const e = html`<svg viewBox="0 0 1 1"><path d="M0 0"/></svg><urbi-seguro></urbi-
 TS
 
 # ════════════════════════════════════════════════════════════════════════════
+# Rodada 7 — o vão da recusa, at-rule dentro de regra, e sujeito do seletor
+
+secao "O que não é modelado NEM recusado — o vão do desenho:"
+
+caso guard-box-model-urbi 1 "<style/> recusa em vez de escorrer para tag comum" \
+  'nao consegui analisar' <<'TS'
+const e = html`<style/>.x urbi-arriscado { width:100% }</style>`;
+TS
+
+caso guard-props-urbi 1 "<script/> recusa" 'nao consegui analisar' <<'TS'
+const e = html`<script/>var s = "<urbi-seguro inventado='x'>";</script>`;
+TS
+
+caso guard-props-urbi 1 "<textarea/> recusa" 'nao consegui analisar' <<'TS'
+const e = html`<textarea/>x</textarea>`;
+TS
+
+secao "At-rule DENTRO de regra é agrupamento — herda o seletor do pai:"
+
+caso guard-box-model-urbi 1 "@media dentro de regra" \
+  'caso\.ts:1 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.x urbi-arriscado { @media (min-width: 700px) { width: 100% } }`;
+TS
+
+caso guard-box-model-urbi 1 "regra dentro de @media dentro de regra" \
+  'caso\.ts:1 +\.a urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.a { @media (min-width: 700px) { urbi-arriscado { width: 100% } } }`;
+TS
+
+secao "Sujeito do seletor é TIPO, não substring (falso positivo é o lado perigoso):"
+
+caso guard-box-model-urbi 0 "a classe .urbi-arriscado não é o elemento" <<'TS'
+const e = css`.urbi-arriscado { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 0 '[data-kind="urbi-arriscado"] não é o elemento' <<'TS'
+const e = css`[data-kind="urbi-arriscado"] { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 0 ".wrapper:has(urbi-arriscado) tem sujeito .wrapper" <<'TS'
+const e = css`.wrapper:has(urbi-arriscado) { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 0 ".a:not(urbi-arriscado) seleciona quem NÃO é" <<'TS'
+const e = css`.a:not(urbi-arriscado) { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 1 "tipo no sujeito, com classe junto, alcança" \
+  'caso\.ts:1 +\.a urbi-arriscado\.destaque \{ width: 100% \}' <<'TS'
+const e = css`.a urbi-arriscado.destaque { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 1 "urbi-arriscado:not(.x) alcança — o argumento não é o sujeito" \
+  'caso\.ts:1 +urbi-arriscado:not\(\.x\) \{ width: 100% \}' <<'TS'
+const e = css`urbi-arriscado:not(.x) { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 1 ":is() não é modelado — recusa" \
+  'nao modelo o seletor' <<'TS'
+const e = css`:is(urbi-arriscado, .x) { width: 100%; }`;
+TS
+
+# ⚠️ Estes dois é que exercitam o esvaziamento dos grupos. Os de cima passam
+# mesmo SEM ele, porque o tipo já não está no início do composto — descoberto por
+# mutação: apagar `esvaziarGrupos` deixava a bateria inteira verde. Aqui há um
+# COMBINADOR dentro do grupo, e sem esvaziar o `split` parte o composto e o
+# último pedaço vira `urbi-arriscado)`, que casa como tipo.
+caso guard-box-model-urbi 0 ":has(.a urbi-arriscado) — combinador dentro do grupo" <<'TS'
+const e = css`.wrapper:has(.a urbi-arriscado) { width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 0 'atributo com espaço no valor: [data-x="a urbi-arriscado"]' <<'TS'
+const e = css`[data-x="a urbi-arriscado"] { width: 100%; }`;
+TS
+
+# ════════════════════════════════════════════════════════════════════════════
 # Executa a fila em paralelo e imprime na ordem de declaração.
 POOL="${POOL:-8}"
 find "$TMP" -maxdepth 1 -name 'c[0-9]*' -type d -print0 \

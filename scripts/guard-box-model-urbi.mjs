@@ -125,17 +125,54 @@ const imponeTamanho = (valor) => {
   return !(NEUTROS.has(v) || /^0([a-z%]*)$/.test(v));
 };
 
-/** O SUJEITO do seletor e a tag? `.a urbi-kpi` sim; `urbi-kpi .a` nao. */
+/**
+ * O SUJEITO do seletor e um seletor de TIPO com este nome?
+ *
+ * ⚠️ Antes a comparacao era por SUBSTRING delimitada, e por isso `.urbi-kpi`,
+ * `[data-kind="urbi-kpi"]` e `.wrapper:has(urbi-kpi)` contavam como se a regra
+ * alcancasse o elemento. Eram falsos POSITIVOS — o lado que bloqueia CSS valido
+ * e faz alguem desligar o guard.
+ *
+ * O seletor de tipo, quando existe, esta no COMECO do composto. Entao:
+ *   1. esvazia `(…)` e `[…]` — argumento de pseudo-classe e valor de atributo
+ *      nunca sao o tipo do sujeito (`.a:not(urbi-kpi)` seleciona quem NAO e);
+ *   2. separa por combinador e pega o ultimo composto;
+ *   3. le o tipo no inicio dele.
+ */
 function seletorAlcanca(seletor, tag) {
-  // `i` porque seletor de TIPO em CSS e ASCII case-insensitive num documento
-  // HTML: `.a URBI-KPI { … }` casa o mesmo elemento que `.a urbi-kpi { … }`.
-  // Irmao do `lerTags`, que tinha o mesmo esquecimento.
-  const limite = new RegExp(`(^|[^a-z0-9-])${tag}($|[^a-z0-9-])`, 'i');
   return seletor.split(',').some((parte) => {
-    const compostos = parte.trim().split(/[\s>+~]+/).filter(Boolean);
-    return limite.test(compostos.at(-1) ?? '');
+    const compostos = esvaziarGrupos(parte).trim().split(/[\s>+~]+/).filter(Boolean);
+    const tipo = /^([a-zA-Z][a-zA-Z0-9-]*)/.exec(compostos.at(-1) ?? '');
+    return tipo != null && tipo[1].toLowerCase() === tag;
   });
 }
+
+/**
+ * `a:not(b) [c="d"]` → `a:not() []`.
+ *
+ * O conteudo e REMOVIDO, nao trocado por espaco: espaco e combinador em CSS, e
+ * trocar por espaco partia o composto — `urbi-kpi:not(.x)` virava
+ * `urbi-kpi:not(` + `)`, cujo ultimo composto e `)`, sem tipo. Falso negativo
+ * introduzido pelo proprio conserto do falso positivo.
+ */
+function esvaziarGrupos(sel) {
+  let fora = '';
+  let profundidade = 0;
+  for (const ch of sel) {
+    if (ch === '(' || ch === '[') { profundidade++; fora += ch; continue; }
+    if (ch === ')' || ch === ']') { profundidade = Math.max(0, profundidade - 1); fora += ch; continue; }
+    if (profundidade === 0) fora += ch;
+  }
+  return fora;
+}
+
+/**
+ * `:is()` e `:where()` PODEM carregar o tipo do sujeito (`:is(urbi-kpi, .x)`),
+ * entao esvazia-los produziria falso NEGATIVO em silencio. Nao sao modelados —
+ * recusam. Medido: zero ocorrencias no `frontend/` (`:not()` tem uma, e essa e
+ * tratada, porque o argumento dela nunca e o sujeito).
+ */
+const SELETOR_NAO_MODELADO = /:(is|where)\(/i;
 
 /** `prop: valor` de um bloco de declaracoes, com o offset de cada uma. */
 function declaracoesDe(bloco, base = 0) {
@@ -185,9 +222,14 @@ function regrasDe(css) {
       // O texto de `inicio` ate aqui e o SELETOR do filho, nao declaracao do pai.
       const pai = pilha[pilha.length - 1];
       if (pai) pai.segmentos.push({ de: pai.segDe, ate: inicio });
+      // O quadro guarda o seletor EFETIVO: e contra ele que os filhos compoem.
+      // Guardar o bruto fazia a composicao pular um nivel quando havia at-rule
+      // no meio (`.a { @media { .b { … } } }` compunha `.b` com `@media`).
       pilha.push({
-        seletor: css.slice(inicio, i).trim().replace(/\s+/g, ' '),
-        paiSeletor: pai ? pai.seletor : '',
+        seletor: seletorEfetivo(
+          pai ? pai.seletor : '',
+          css.slice(inicio, i).trim().replace(/\s+/g, ' '),
+        ),
         segmentos: [],
         segDe: i + 1,
         abre: i,
@@ -203,7 +245,7 @@ function regrasDe(css) {
       q.segmentos.push({ de: q.segDe, ate: i });
       const pai = pilha[pilha.length - 1];
       if (pai) pai.segDe = i + 1;
-      regras.push({ seletor: seletorEfetivo(q.paiSeletor, q.seletor), segmentos: q.segmentos });
+      regras.push({ seletor: q.seletor, segmentos: q.segmentos });
       continue;
     }
   }
@@ -222,6 +264,11 @@ function regrasDe(css) {
  * `&:hover`, que nao alcanca primitivo nenhum — e o `width` passaria.
  */
 function seletorEfetivo(pai, filho) {
+  // At-rule DENTRO de regra e AGRUPAMENTO: as declaracoes dela valem para o
+  // seletor do pai. Sem esta linha, `.x urbi-kpi { @media (…) { width: 100% } }`
+  // virava o pseudo-seletor `.x urbi-kpi @media (…)`, cujo sujeito e `(…)` — e o
+  // `width` passava. E o sentido inverso do caso de baixo, que ja estava tratado.
+  if (filho.startsWith('@')) return pai || filho;
   if (!pai || pai.startsWith('@')) return filho;
   if (filho.includes('&')) return filho.replaceAll('&', pai);
   return `${pai} ${filho}`;
@@ -281,6 +328,10 @@ for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   for (const regra of doArquivo) {
     const { seletor, segmentos } = regra;
     if (!seletor || seletor.startsWith('@')) continue;
+    if (SELETOR_NAO_MODELADO.test(seletor)) {
+      inseguros.push({ rel, problemas: [`nao modelo o seletor \`${seletor}\` — confira a mao`] });
+      continue;
+    }
     // Os segmentos sao os pedacos do bloco que NAO pertencem a filho nenhum.
     const decls = segmentos.flatMap((g) => declaracoesDe(css.slice(g.de, g.ate), g.de));
     if (!decls.length) continue;
