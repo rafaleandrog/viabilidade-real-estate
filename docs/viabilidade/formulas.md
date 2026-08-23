@@ -58,11 +58,11 @@ apenas para linha nunca reeditada.
 |---|---|
 | Safra (mês de contratação) | `fluxo-caixa-motor.ts:958-962`, laço em `:1094` |
 | PMT | `fluxo-caixa-motor.ts:666` |
-| Pagamentos de uma safra | `pagamentosComponenteSafra`, `:1045` |
-| Juros e principal separados | `:1113-1131` |
-| Carteira por safra | `carteiraSaldoSafra`; consolidação em `:1191` |
-| Agregação no `FluxoCalc` | `calcularFluxo`, `:2025-2053` |
-| Regra Após-chaves (venda pós-entrega é à vista) | `ehVendaAposChaves` `:945`, aplicada em `:1096` |
+| Pagamentos de uma safra | `pagamentosComponenteSafra`, `:1058` |
+| Juros e principal separados | `:1126-1141` |
+| Carteira por safra | `carteiraSaldoSafra` `:826`; consolidação em `:1149-1169` |
+| Agregação no `FluxoCalc` | `calcularFluxo` `:1759`; séries somadas em `:2040-2046` |
+| Regra Após-chaves (venda pós-entrega é à vista) | `ehVendaAposChaves` `:958`, aplicada em `:1109` |
 
 > ⚠️ **A matemática de juros existe e é exercitada por estudo real; o que falta é a ENTRADA.** Há
 > linha em produção com `taxaMensal` diferente de 0 persistida em `fluxo_pagamento.componentes`

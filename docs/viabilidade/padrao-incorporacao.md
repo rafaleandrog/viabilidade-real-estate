@@ -922,6 +922,14 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 > (`fluxo-caixa-motor.ts:589,601,608,617`), aplicar o modal numa linha que tinha juros **apaga os
 > juros**: é o que acontece hoje com o estudo 5 de Pinguim (`taxaMensal: 0.0098636`,
 > R$ 1.259.273,59).
+>
+> ⚠️ **E não é só o juro: a PERIODICIDADE legada também se perde no "Aplicar".** O mesmo adaptador
+> converte `ao_longo_obra` em `ate_marco` com `defasagemMeses: 1`, **descartando a periodicidade**
+> (`:599-604`); e converte o parcelamento comum em `prazo_fixo` usando a periodicidade **só como
+> defasagem da primeira parcela** — as seguintes voltam a ser mensais (`:606-611`). Como
+> `recebimentoBrutoMensal` passa a preferir os componentes canônicos, uma linha trimestral,
+> semestral ou anual **muda de calendário** ao ser aplicada. O texto acima diz que "o motor continua
+> lendo" a periodicidade gravada, e isso vale **enquanto ninguém abre e aplica o modal**.
 
 ### 11.1 Propriedade do Grupo
 
@@ -1214,17 +1222,25 @@ Ao fim da absorção:
 
 ## 13. Recebimentos, safras, carteiras e repasse
 
-> ✅ **Esta seção descreve comportamento vigente desde a #283.** `frontend/fluxo-caixa-motor.ts`
-> implementa safra (`:958-962`, laço em `:1094`), PMT (`:653`), taxa sobre o saldo de abertura
-> (`:1122-1123`), carteira por safra (`carteiraSaldoSafra`; consolidação em `:1191`) e
-> reconciliação por componente (`receitaPorComponenteMensal`/`carteiraPorComponenteMensal`,
-> `:1077-1083`, agregadas em `calcularFluxo:2035-2047`; invariantes em
+> ✅ **O CÁLCULO desta seção é comportamento vigente desde a #283.** `frontend/fluxo-caixa-motor.ts`
+> implementa safra (`ehVendaAposChaves` `:958`, laço das contratações em `:1107`), PMT (`pmt`
+> `:666`), taxa sobre o saldo de abertura (`:1122-1141`), carteira por safra (`carteiraSaldoSafra`
+> `:826`; consolidação em `:1149-1169`) e reconciliação por componente
+> (`receitaPorComponenteMensal`/`carteiraPorComponenteMensal`, `:1090`/`:1094`, agregadas em
+> `calcularFluxo` `:2040-2046`; invariantes em `validarComponentesSafra`,
 > `frontend/fluxo-invariantes.ts:404`).
 >
-> ⚠️ **Duas ressalvas.** (1) A porta é `fluxo_pagamento.componentes` — linha nunca reeditada segue
-> pelo motor legado. (2) A **taxa** chega 0 pelo adaptador (`:589,601,608,617`) sempre que a linha
-> passa pelo modal, porque ele não a oferece: a carteira existe, e os juros — que existem em estudo
-> real — são apagados no "Aplicar".
+> ⚠️ **O ✅ é do MOTOR, não da INTERFACE.** A §13.7 pede que prazo curto, prazo longo, até marco e
+> saldo para repasse sejam **abertos na tela**, e isso **não** está entregue: os seis
+> "Componente · …" de receita e o bloco "Carteira de clientes com seus 3 componentes" foram
+> **removidos da tabela do Fluxo** (`frontend/fluxo-tabela.ts:462-467`). Continuam existindo no
+> motor e nos testes; a tela mostra só as séries **agregadas** de carteira e repasse. A abertura
+> por componente segue **evolução pendente**.
+>
+> ⚠️ **Mais duas ressalvas.** (1) A porta é `fluxo_pagamento.componentes` — linha nunca reeditada
+> segue pelo motor legado. (2) A **taxa** chega 0 pelo adaptador (`:589,601,608,617`) sempre que a
+> linha passa pelo modal, porque ele não a oferece: a carteira existe, e os juros — que existem em
+> estudo real — são apagados no "Aplicar".
 
 ### 13.1 Safras
 
@@ -1607,10 +1623,15 @@ base líquida
 > e `corretagemMensal` (`:1516`, linha de custo obrigatória "Corretagem de vendas", base
 > **bruto/VGV** — fonte única desde que a #228 removeu a dedução concorrente de `vglLinha`).
 >
-> ℹ️ **O bloco `regime_tributario`/`aliquota_*` da aba Financeiro não é lido pelo motor do
-> Avançado — e isso é decisão, não pendência.** O regime é exclusivo do Preliminar; o imposto
-> oficial do Avançado é o RET (`frontend/fluxo-shared.ts:210-212`, #228, decisão do autor em
-> 2026-08-01).
+> ℹ️ **O bloco `regime_tributario`/`aliquota_*` não é lido pelo motor do Avançado** — o imposto
+> oficial dele é o RET (`frontend/fluxo-shared.ts:210-212`, #228, decisão do autor em 2026-08-01).
+>
+> ⚠️ **Correção: dizer que o regime é "exclusivo do Preliminar" está errado, e a frase anterior
+> desta nota dizia isso.** A Proforma **não** lê `regime_tributario`: `frontend/proforma.ts:245`
+> calcula o imposto só a partir de `sujeito_ret`, `aliquota_ret_pct` e `imposto_percentual`. Fora
+> do schema, da persistência e da própria tela (`tela-financeiro.ts:187,215`), `regime_tributario`
+> não tem leitor nenhum. Ele e os cinco `aliquota_*_pct` estão inertes nos **dois** níveis — não
+> são "do Preliminar", são de ninguém.
 
 ```text
 permuta financeira líquida
@@ -1753,8 +1774,14 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > 🔄 **Atualizado em 2026-08-01.** O modelo funcional completo de funding — Capital Stack por
 > instrumentos, waterfall de pagamentos, retorno por provedor de capital e reconciliação mensal —
 > passou a viver em documento próprio: **[Funding, Capital Stack e Retorno do Capital](funding-capital-stack)**.
-> Esta seção continua sendo a visão funcional resumida dentro do padrão; o documento novo é a
-> especificação vinculante da epic **#239** e das dez sub-issues **#270–#279** (FIN-01…FIN-10).
+> Esta seção continua sendo a visão funcional resumida dentro do padrão.
+>
+> ⚠️ **O que este parágrafo dizia a seguir venceu.** Ele chamava o documento novo de "especificação
+> vinculante da epic #239 e das dez sub-issues #270–#279". A **#355 apagou esse modelo inteiro**: a
+> epic e as sub-issues não existem mais como caminho, e do documento **só a §4.3** (Financiamento à
+> produção) continua vigente — o resto é **ADR histórico**. A spec de `divida`/`equity` é
+> [Fluxo do Investidor](fluxo-investidor-formulas). Ver o bloco de comportamento vigente abaixo,
+> que é a fonte de verdade desta seção.
 >
 > ✅ **Comportamento vigente desde a #355 (2026-08-12).** O funding existe e roda: três operações
 > independentes — `financiamento_producao` (única por estudo), `divida` e `equity` —, **sem
@@ -1765,9 +1792,14 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > §4.3 de [Funding, Capital Stack e Retorno do Capital](funding-capital-stack), preservada de
 > propósito. O resto daquele documento é **ADR histórico**.
 >
-> ⚠️ **O que sobrou inerte na aba `Viabilidade → Financeiro`**, e só isso: `regime_tributario` e os
-> cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`), mais
-> `imposto_sobre_permuta_fisica` (`:182`). Os campos de financiamento, investidor, estrutura de
+> ⚠️ **O que sobrou sem efeito no motor do Avançado, na aba `Viabilidade → Financeiro`:**
+> `regime_tributario` e os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`),
+> `imposto_sobre_permuta_fisica` (`:182`) e — **acrescentados aqui porque o inventário anterior os
+> omitia** — `sujeito_ret` (`:176-177`) e `imposto_percentual` (`:188`). Estes dois últimos não são
+> inertes em absoluto: **alimentam a Proforma do Preliminar** (`frontend/proforma.ts:245`). Para o
+> Avançado é que não valem — ele recebe o RET pelo par global `considerar_ret`/`ret_pct`
+> (`frontend/tela-fluxo-ver.ts:122`). Preencher os dois numa tela de Avançado não muda cálculo
+> nenhum. Os campos de financiamento, investidor, estrutura de
 > capital e correção monetária **saíram do formulário** (#279/#355); as colunas continuam no schema
 > como dado histórico, sem tela e sem leitor.
 >
@@ -1932,7 +1964,15 @@ Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 > último mês de custo, 11) + 1`, com `ultimoMesRecebivelLinha` derivando o recebível a partir dos
 > componentes normalizados. O fallback silencioso que empilhava excedente no último mês **foi
 > removido** (`:1358-1360`); no caminho canônico, um pagamento fora do horizonte emite
-> `console.warn` e não é computado (`:1085-1092`), em vez de deformar o último mês em silêncio.
+> `console.warn` e não é computado (`deposita`, `:1098-1104`), em vez de deformar o último mês em
+> silêncio.
+>
+> ⚠️ **A proteção é PARCIAL, e o requisito acima não é atendido quando o chamador passa
+> `config.prazoMeses`.** A linha é `const prazo = Math.max(1, Math.round(n(config.prazoMeses) ||
+> prazoDerivado))` (`:1779`): o valor explícito **vence** o horizonte derivado. Se for menor, o
+> horizonte **não é ampliado** — os recebíveis excedentes são descartados por `deposita`, com
+> `console.warn` e sem entrar no fluxo. O aviso na consola é melhor que o empilhamento silencioso
+> de antes, mas **não é** "o horizonte deve ser ampliado": nesse caminho, há perda de valor.
 
 ### 18.4.1 Visão Mensal e Anual da tela
 

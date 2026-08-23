@@ -30,12 +30,12 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — 🟡 RODADA 8/9 ABERTA
+## Estado do backlog — 🟡 RODADA 9 EM CURSO (executa o saldo da 8)
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
 | **9 — execução da Rodada 8** | Ondas de PRs que entregam as issues #426–#493, na ordem de dependência | **#426–#493** | 🟡 **em curso desde 2026-08-23** |
-| **8 — auditoria cruzada** | Reverificação da `lista bugs 20260807.xlsx` + regras derivadas das 3 planilhas (EVI Urbitá, fluxo do investidor) + conferência numérica em Pinguim + auditoria de UI | **#426–#493** (61 abertas) | 🟡 **aberta desde 2026-08-21** |
+| **8 — auditoria cruzada** | Reverificação da `lista bugs 20260807.xlsx` + regras derivadas das 3 planilhas (EVI Urbitá, fluxo do investidor) + conferência numérica em Pinguim + auditoria de UI | **#426–#493** (61 abertas; #461 e #480 fecharam por decisão) | ✅ **auditoria concluída em 2026-08-22** — o saldo de **59 issues** é executado pela Rodada 9 |
 | **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | ✅ **concluída em 2026-08-12** |
 | **5 — EVI** | Auditoria do app contra os documentos EVI | **#220–#241** (22) | ✅ **concluída em 2026-08-02** |
 | **6 — lista de bugs** | `lista_bugs.xlsx`, 24 itens `BUGLIST-001`…`BUGLIST-024` | **#238, #239, #244–#281** (37 destinos) | ✅ **concluída em 2026-08-02** |
