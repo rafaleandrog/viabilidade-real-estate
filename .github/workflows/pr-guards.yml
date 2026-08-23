@@ -283,6 +283,63 @@ jobs:
             exit 1
           fi
 
+  tabelas-obsoletas:
+    name: Tabela aposentada não é reusada por código novo
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      URBI_TYPESCRIPT: ${{ github.workspace }}/.ts-guards/node_modules/typescript/lib/typescript.js
+    steps:
+      - uses: actions/checkout@v7
+      - name: Instalar só o typescript, isolado
+        run: |
+          set -uo pipefail
+          # ⚠️ Este passo existe porque o guard passou a decidir onde há comentário
+          # em JS/TS pelo PARSER do typescript (`scripts/lib/fonte-ts.mjs`), e não
+          # mais por um scanner por linha — que não sobrevivia a template literal
+          # multi-linha. Sem o pacote o guard sai 2 (recusa, e não aprova), e a
+          # bateria inteira fica vermelha: foi o que aconteceu, 19 casos de uma vez.
+          #
+          # Mesmo padrão do job `guards-ui`: diretório PRÓPRIO com package.json
+          # próprio, nunca a raiz — `npm install` na raiz leria o package.json do
+          # repo e tentaria baixar o `@urbiverso/sdk`, que é GitHub Packages
+          # privado (401). O `typescript` é público.
+          mkdir -p .ts-guards
+          cd .ts-guards
+          echo '{"name":"ts-guards","private":true}' > package.json
+          npm install --no-audit --no-fund --loglevel=error typescript@5.9.3
+          node -e "console.log('typescript', require('./node_modules/typescript').version)"
+      - name: Guard de tabelas obsoletas
+        run: |
+          set -uo pipefail
+          # Só `node` — sem pnpm install, sem SDK, sem credencial.
+          # `avancado_capital_instrumentos` é o resto do Capital Stack apagado pela
+          # #355: declarada no schema.json, vazia, com nome sugestivo e com os campos
+          # de waterfall (`prioridade_funding`, `prioridade_pagamento`) que a decisão
+          # enterrou. Ela não é removida agora por ESCOPO — remover é mudança de
+          # schema (migração nova + bump de `versao`) e a #479 deixa isso fora de
+          # escopo —, NÃO por falta de mecanismo: o fluxo suportado é tirá-la do
+          # schema.json e esvaziá-la com `dados.limparTabela`, como o job
+          # `migracao-declarativa` acima manda fazer. Enquanto ela existe, o guard
+          # é a etiqueta contra o reúso.
+          # O registro das tabelas aposentadas mora no próprio script (OBSOLETAS).
+          # Linha de COMENTÁRIO fica de fora, mesma regra do job `migracao-declarativa`.
+          if ! node scripts/guard-tabelas-obsoletas.mjs; then
+            echo "::error title=Tabela aposentada reusada::As linhas acima referenciam uma tabela APOSENTADA fora dos caminhos permitidos (migracoes/, docs/, scripts/, schema.json, CLAUDE.md, PROGRESSO.md). Use a tabela substituta indicada na saída do guard; menção histórica pertence a docs/ ou a uma linha de comentário. Ver issue #479."
+            exit 1
+          fi
+      - name: Bateria do guard de tabelas obsoletas
+        if: always()
+        run: |
+          set -uo pipefail
+          # Falso NEGATIVO deixa o reúso passar e o guard vira papel de parede; falso
+          # POSITIVO atrapalha trabalho legítimo, alguém tira o job, e aí ele não
+          # guarda mais nada. A bateria roda contra fixtures em mktemp, não contra a
+          # árvore — o veredito não muda conforme o que estiver commitado.
+          if ! bash scripts/testar-guard-tabelas-obsoletas.sh; then
+            echo "::error title=Bateria do guard de tabelas obsoletas falhou::O guard não se comporta como o esperado nos dois sentidos. Veja quais casos falharam no log."
+            exit 1
+          fi
   guards-ui:
     name: Tokens, props de primitivo e box model do urbi-*
     runs-on: ubuntu-latest

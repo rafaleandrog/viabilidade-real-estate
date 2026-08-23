@@ -34,6 +34,43 @@ ordem: 8
 > — útil para quem perguntar "por que não voltamos ao waterfall". O comportamento **atual**, porém,
 > é só o que `fluxo-investidor-formulas.md` e a §4.3 abaixo descrevem.
 
+> 🛡️ **A tabela `avancado_capital_instrumentos` continua declarada — e agora tem etiqueta
+> mecânica (issue #479, 2026-08-23).** Ela **não é removida agora por escopo e decisão, não por
+> falta de mecanismo** — e a distinção é o ponto: escrever que a limpeza é impossível ensina a quem
+> vier depois a nem tentar.
+>
+> **O mecanismo existe e é o suportado hoje:** tirar a tabela do `schema.json` e esvaziá-la com
+> `dados.limparTabela` (`scripts/migracoes-harness.mjs:148-153`), deixando a **poda do
+> reconciliador** derrubar a estrutura vazia no mesmo boot. É literalmente o que o job
+> `migracao-declarativa` deste repositório manda fazer (`.github/workflows/pr-guards.yml:216`), e o
+> `shell_min` do manifesto já está em **`0.53.8`**, acima dos pisos que esse fluxo exige.
+>
+> **O que impede é escopo:** remover a tabela é mudança de schema — pede migração nova e bump da
+> `versao` —, e a #479 põe a remoção explicitamente fora de escopo (regra **R3**, um assunto por PR).
+>
+> ⚠️ **A frase "não há DDL na camada de migração" está vencida como justificativa.** Ela vem de
+> `migracoes/029_funding_operacoes.js:55-58` e era verdadeira quando a `029` foi escrita — o fluxo
+> `limparTabela` veio depois, com a #422. Não a repita como se ainda descrevesse a plataforma; a
+> versão da #479 e a primeira redação desta nota faziam isso.
+>
+> O risco que sobra é o **reúso acidental**: uma sessão futura mexendo em funding topa com a
+> tabela — nome sugestivo, `prioridade_funding` e `prioridade_pagamento` inclusive — e a adota,
+> ressuscitando por acidente o modelo que duas decisões separadas enterraram. A etiqueta contra
+> isso é o guard **`scripts/guard-tabelas-obsoletas.mjs`** (job `tabelas-obsoletas` do
+> `pr-guards.yml`), que barra qualquer referência a `avancado_capital_instrumentos` fora de
+> `migracoes/`, `docs/`, `scripts/`, `schema.json`, `CLAUDE.md` e `PROGRESSO.md`. O registro das
+> tabelas aposentadas — substituta, issue e motivo — mora **dentro do próprio script**, na
+> constante `OBSOLETAS`.
+>
+> ⚠️ **Por que a etiqueta não está no `schema.json`.** A #479 pedia uma propriedade `descricao` na
+> tabela. Isso **reprovaria a app na instalação**: o validador do shell tem allowlist **fechada** de
+> 8 propriedades de tabela (`colunas`, `unicos`, `indices`, `referencias`, `soft_delete`,
+> `acesso_externo`, `id_legivel`, `segregada_por_conta`) e trata propriedade desconhecida como
+> **erro** — `shell/backend/src/dados/validador-schema.ts:45-58` e `:126-133`, confirmado em
+> `docs/shell/banco-de-dados.md:200-212` e `:430-436`. Mesma classe de falha da **v0.1.19**
+> (comentário `//` no `schema.json`). Comentário também não serve: JSON não tem comentário, e é
+> exatamente isso que o `guard-json.mjs` existe para barrar. Não "conserte" o `schema.json` de volta.
+
 > ✅ **Este documento descrevia COMPORTAMENTO VIGENTE** desde o fechamento da FIN-10 (#279) — texto
 > original preservado abaixo como histórico da epic #239, que a #355 substituiu.
 >
