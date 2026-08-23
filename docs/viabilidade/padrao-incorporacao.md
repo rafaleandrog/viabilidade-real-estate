@@ -538,8 +538,13 @@ funcional, que não mudou:
 
 
 - estoque permutado não pode gerar receita;
-- estoque permutado não pode ser vendido novamente;
-- a evolução da interface não deve ser feita de forma improvisada enquanto a dinâmica de entrada não estiver aprovada.
+- estoque permutado não pode ser vendido novamente.
+
+> 📌 **O terceiro item saiu.** Ele dizia que *"a evolução da interface não deve ser feita de forma
+> improvisada enquanto a dinâmica de entrada não estiver aprovada"* — condição que a abertura desta
+> mesma seção agora declara **cumprida**, e manter as duas era contradição em um parágrafo. A
+> cautela dele já está honrada: a entrada é a linha de custo `Preço → Permuta física`, definida
+> pelas #266/#267/#268.
 
 ---
 
@@ -1598,7 +1603,14 @@ A permuta física:
 >
 > ✅ **Comportamento vigente (#266/#267/#268).** A fonte de verdade da permuta física é a **linha de
 > custo** `Preço → Permuta física`, com `permuta_tipologia_id` + `permuta_quantidade`
-> (`schema.json:373-374`) e valor declarado explicitamente. O CRUD de tipologias deixou de ler e
+> (`schema.json:373-374`).
+>
+> ⚠️ **O valor NÃO é declarado — é derivado, e o texto anterior desta linha dizia o contrário.** A
+> coluna Orçamento dessa linha renderiza **só** a tipologia e a quantidade
+> (`frontend/tela-fluxo-custos.ts:704-716`): não há campo de valor. E `reservarPermutasFisicas`
+> calcula o KPI como `quantidade × area_privativa_m2 × preco_m2` da tipologia alocada
+> (`frontend/fluxo-caixa-motor.ts:85`), **sem ler `orcamento_valor`**. Quem procurar uma entrada de
+> valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
 > escrever `unidades_permutadas` (`backend/rotas/avancado.ts:744-749`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
 > (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1781`) e a projeta de volta nas tipologias uma
