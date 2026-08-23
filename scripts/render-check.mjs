@@ -948,10 +948,32 @@ export async function verificarRender(opcoes) {
   try {
     const esbuild = join(RAIZ, 'node_modules', 'esbuild', 'bin', 'esbuild');
     if (!existsSync(esbuild)) throw new Error('node_modules/esbuild não existe — rode scripts/validar-frontend.sh antes.');
-    execFileSync('node', [
-      esbuild, entrada, '--bundle', '--format=esm', `--outfile=${join(dir, 'caso.js')}`,
+    const argsEsbuild = [
+      entrada, '--bundle', '--format=esm', `--outfile=${join(dir, 'caso.js')}`,
       '--target=es2022', `--tsconfig=${join(RAIZ, 'tsconfig.json')}`, '--external:@urbiverso/ui',
-    ], { stdio: 'pipe' });
+    ];
+    // ⚠️ `bin/esbuild` é DUAS COISAS DIFERENTES conforme quem instalou, e chamá-lo
+    // sempre por `node` funcionava só numa delas:
+    //
+    //   · pnpm (aqui e na máquina do autor) → é o SHIM em JavaScript, que acha o
+    //     binário da plataforma em `@esbuild/<os>-<arch>` e o executa;
+    //   · npm (o job `render` do CI, que instala em `.github/render-deps/`) → o
+    //     postinstall do esbuild SOBRESCREVE esse caminho com o binário NATIVO,
+    //     para economizar o salto de processo.
+    //
+    // No segundo caso `node <caminho>` lê um ELF como se fosse JavaScript e morre
+    // com `SyntaxError: Invalid or unexpected token` na primeira linha, apontando
+    // para `ELF\x02\x01\x01`. O erro não tem nada a ver com Chromium nem com
+    // render — mas aparece dentro de cada teste de render, o que faz o job
+    // parecer um problema de navegador. Foram 15 dos 16 testes vermelhos por isto.
+    //
+    // Executar o ARQUIVO diretamente serve aos dois: o ELF roda nativo, e o shim
+    // tem shebang `#!/usr/bin/env node` mais o bit de execução. O sniff dos
+    // quatro primeiros bytes deixa a razão explícita em vez de depender de exceção.
+    const magica = readFileSync(esbuild).subarray(0, 4);
+    const ehNativo = magica[0] === 0x7f && magica[1] === 0x45 && magica[2] === 0x4c && magica[3] === 0x46;
+    if (ehNativo) execFileSync(esbuild, argsEsbuild, { stdio: 'pipe' });
+    else execFileSync('node', [esbuild, ...argsEsbuild], { stdio: 'pipe' });
 
     writeFileSync(join(dir, 'primitivos.js'), gerarPrimitivos());
     writeFileSync(join(dir, 'sondas.js'), gerarSondasCompartilhadas());
