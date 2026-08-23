@@ -57,7 +57,7 @@ apenas para linha nunca reeditada.
 | Grandeza | Onde vive |
 |---|---|
 | Safra (mês de contratação) | `fluxo-caixa-motor.ts:958-962`, laço em `:1094` |
-| PMT | `fluxo-caixa-motor.ts:653` |
+| PMT | `fluxo-caixa-motor.ts:666` |
 | Pagamentos de uma safra | `pagamentosComponenteSafra`, `:1045` |
 | Juros e principal separados | `:1113-1131` |
 | Carteira por safra | `carteiraSaldoSafra`; consolidação em `:1191` |

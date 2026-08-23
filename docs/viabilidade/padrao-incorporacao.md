@@ -1099,7 +1099,7 @@ A fronteira é explícita: vendas até o mês da entrega preservam o plano do Gr
 O comprador pode pagar parte diretamente e financiar parte com o banco, mas ambas chegam à incorporadora no mesmo mês.
 
 > ✅ **Comportamento vigente no caminho canônico (#235/#283).** `ehVendaAposChaves`
-> (`frontend/fluxo-caixa-motor.ts:945-947`) marca como Após-chaves toda safra com
+> (`frontend/fluxo-caixa-motor.ts:958-960`) marca como Após-chaves toda safra com
 > `safra > mesEntrega`, e `componentesEfetivosSafra` (`:949-956`) substitui os componentes do Grupo
 > por um único `imediato` de 100% sem desconto — sem sinal futuro, parcela nem repasse para aquela
 > venda. Cada safra é tratada isoladamente: contratos antigos não são afetados. A aplicação por
@@ -1556,7 +1556,7 @@ A futura forma de cadastro e identificação das unidades permutadas será espec
 > (`schema.json:373-374`) e valor declarado explicitamente. O CRUD de tipologias deixou de ler e
 > escrever `unidades_permutadas` (`backend/rotas/avancado.ts:744-749`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
-> (`frontend/fluxo-caixa-motor.ts:1768`) e a projeta de volta nas tipologias uma única vez
+> (`frontend/fluxo-caixa-motor.ts:1777`) e a projeta de volta nas tipologias uma única vez
 > (`:1780-1788`), para que toda função que já lia `t.unidades_permutadas` fique correta sem
 > replicar a reserva. **Sem linha de custo de Permuta física, o KPI é 0** — não há fallback para o
 > campo legado (`:1999-2006`, decisão do autor de 2026-08-02).
@@ -1589,23 +1589,26 @@ base líquida
 − corretagem dedutível
 ```
 
-> **Comportamento vigente.** A permuta física já reduz unidades vendidas, VGV e Resultado no
-> Avançado (#195), e a permuta financeira do Terreno já é deduzida da receita (#196), em
-> `frontend/fluxo-caixa-motor.ts`. O que existe hoje é **uma visão só** — a dedução aplicada ao
-> fluxo. As duas séries paralelas (bruta e líquida de imposto e corretagem) não são calculadas nem
-> expostas para auditoria.
+> ✅ **Comportamento vigente — as duas visões existem, e a escolha é do usuário
+> (#195/#196/#227/#228/#346).** A permuta física reduz unidades vendidas, VGV e Resultado no
+> Avançado (#195), e a permuta financeira do Terreno é deduzida da receita (#196).
+> `permutaFinanceiraBrutaMensal` (`frontend/fluxo-caixa-motor.ts:1570-1573`) aplica o percentual
+> sobre a receita de caixa; `permutaFinanceiraLiquidaMensal` (`:1575-1586`) **subtrai imposto e
+> corretagem diretamente** do recebimento do mês — `max(0, v − imposto − corretagem)` — e só então
+> aplica o percentual. É a **subtração direta** que o padrão pede: a dedução não é composta
+> multiplicativamente.
 >
-> ✅ **As duas séries existem (#227/#228/#346).** `impostoMensal`
-> (`frontend/fluxo-caixa-motor.ts:1434-1444`) devolve a série mensal do RET aplicada ao recebimento
-> bruto, com o RET já resolvido como parâmetro **global** do estudo; `corretagemMensal` (`:1503`)
-> devolve a série mensal da linha de custo obrigatória "Corretagem de vendas", com base
-> **bruto/VGV** — a única fonte oficial desde que a #228 removeu a dedução concorrente de
-> `vglLinha`.
+> `calcularFluxo` calcula **as duas séries**, usa a escolhida em `permuta_financeira_base`
+> (default `bruta`) e devolve a não escolhida como `alternativa` (`:1972-1980`); a tela oferece o
+> seletor e exibe o total da outra base (`frontend/tela-fluxo-custos.ts:769-775`). As séries de
+> dedução são `impostoMensal` (`:1447`, RET já resolvido como parâmetro **global** do estudo)
+> e `corretagemMensal` (`:1516`, linha de custo obrigatória "Corretagem de vendas", base
+> **bruto/VGV** — fonte única desde que a #228 removeu a dedução concorrente de `vglLinha`).
 >
-> ⚠️ **O que continua divergente:** o bloco `regime_tributario`/`aliquota_*` da aba Financeiro
-> segue **ignorado** pelo motor do Avançado (`frontend/fluxo-shared.ts:208-222`), e o app aplica os
-> descontos de forma **multiplicativa**, que é o que o padrão pede para evitar quando o contrato
-> determina subtração direta.
+> ℹ️ **O bloco `regime_tributario`/`aliquota_*` da aba Financeiro não é lido pelo motor do
+> Avançado — e isso é decisão, não pendência.** O regime é exclusivo do Preliminar; o imposto
+> oficial do Avançado é o RET (`frontend/fluxo-shared.ts:210-212`, #228, decisão do autor em
+> 2026-08-01).
 
 ```text
 permuta financeira líquida
@@ -1617,6 +1620,10 @@ permuta financeira líquida
 O fluxo visível deve usar a visão que representa o contrato e a realidade de caixa do incorporador.
 
 As duas visões devem permanecer disponíveis para auditoria.
+
+> ✅ **Comportamento vigente.** É o que a §15.2 descreve: a visão do fluxo é a de
+> `permuta_financeira_base`, e a outra continua disponível como `alternativa`, exibida na tela ao
+> lado do seletor.
 
 ### 15.4 Momento
 
@@ -1916,7 +1923,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:1762-1766`)
+> ✅ **Comportamento vigente (#231).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:1777-1778`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, 11) + 1`, com `ultimoMesRecebivelLinha` derivando o recebível a partir dos
 > componentes normalizados. O fallback silencioso que empilhava excedente no último mês **foi
@@ -2841,9 +2848,9 @@ Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescre
 
 **A10 — `distribuicao_modo` não classifica permuta.** `unit_delivery` e `sales_revenue` são
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
-(`frontend/tela-fluxo-custos.ts:163-167`). Quem classifica é a **subcategoria**: toda linha
+(`frontend/tela-fluxo-custos.ts:790-791`). Quem classifica é a **subcategoria**: toda linha
 `Preço/Permuta` é tratada como permuta **financeira** pelo motor
-(`frontend/fluxo-caixa-motor.ts:385-387`). A permuta **física** vem de outra entidade,
+(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:518-520`). A permuta **física** vem de outra entidade,
 `unidades_permutadas` no catálogo de Tipologias. Usar `distribuicao_modo` como critério de migração
 reclassifica linhas financeiras como físicas, remove a dedução de caixa e conta a permuta física em
 dobro. → **#257**, **#258**.
