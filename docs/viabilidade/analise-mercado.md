@@ -161,8 +161,14 @@ O prompt pede que a IA não invente número. Isso é **conselho**. O que **vincu
 
 ### 7.5 Onde o usuário mexe
 
-- **Admin → Apps → viabilidade → Regiões monitoradas** — cadastra regiões administrativas/bairros
-  e palavras-chave; vê o status da última coleta e o material coletado.
+- **Painel → Regiões monitoradas** (aba de topo, `/regioes`) — cadastra regiões
+  administrativas/bairros e palavras-chave; vê o status da última coleta e o material coletado.
+  **Visível a todos, mas edição E consulta às coletas são admin-only:** o botão "Ver coletas" está
+  dentro do mesmo portão de escrita que Editar e Remover
+  (`frontend/viabilidade-config-mercado.ts:141-144`), embora o `GET` das coletas não exija admin no
+  backend (`backend/rotas/analise-mercado.ts:243`). Agrupamento de UI, não política.
+- **Admin → Apps → viabilidade → Regiões monitoradas** — a **mesma** tela, pela segunda porta. A
+  dupla exposição é deliberada (#437), no padrão que a #314 deu às Curvas.
 - **Estudo → Análise de mercado** — vincula o estudo a uma região monitorada e roda a análise pelo
   botão. A análise é **sob demanda**, nunca por carga de tela: ela custa IA.
 
