@@ -4,6 +4,62 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Onda 1 · A referência de UI do urbiverso vira artefato deste repositório (2026-08-23)
+
+Primeiro PR da onda que existe para fazer correção visual ser **verificável**. Este entrega a
+**referência**; os guards e o render-check vêm nos dois seguintes.
+
+### O impasse que ele resolve
+
+A fonte canônica de props `urbi-*` e de tokens é o **bundle do SDK**, e aqui ele **não existe** —
+GitHub Packages privado, 401 no `pnpm install` e no `npm view`. Isso já era sabido. O que não estava
+escrito é o efeito composto:
+
+- a referência virava **leitura ad-hoc** — um agente abre `ui/src/`, confere uma prop, e o
+  conhecimento morre com a sessão;
+- a skill de revisão **proíbe** ler o monorepo para compensar a falta do bundle, e **com razão**: o
+  `main` está à frente do publicado, e validar contra ele faz a revisão *passar* citando contrato que
+  a instância não tem;
+- resultado: a lente de UI marcava **NÃO EXECUTADA** em toda revisão, e ninguém cobrava, porque a
+  marca parecia normal.
+
+`docs/ui-urbiverso/`, gerado por `scripts/sincronizar-referencia-ui.mjs`, quebra o impasse: a leitura
+do monorepo vira **um passo explícito e auditável** — a execução do script, revisável no PR — e o
+resultado é **conteúdo deste repositório**. Quem revisa lê daqui, o que respeita a letra da proibição
+sem ficar cego.
+
+⚠️ **Ele fecha o eixo do recorte, não o do tempo.** O espelho sai da `main`; a pergunta *"isso está
+publicado?"* continua sendo pergunta ao autor. Por isso tudo carrega **carimbo de SHA e data**, e o
+`LEIA.md` obriga a citá-lo em qualquer achado.
+
+### O que ele já provou, sozinho
+
+Na primeira execução, o gerador acusou:
+
+```
+atenção: padding/border no :host sem box-sizing → urbi-kpi
+```
+
+É **o mecanismo exato** do defeito reportado quatro vezes (#176, #262, #326, #352), fechado quatro
+vezes, e vivo — agora recuperado como **#488**. Levou cinco passadas humanas para alguém ler a cadeia
+do shadow DOM à mão e achar. O espelho acusa **mecanicamente**, em um segundo, e vai continuar
+acusando enquanto a plataforma não declarar `box-sizing: border-box` no `:host` do primitivo.
+
+### Detalhes que custam tempo se forem redescobertos
+
+- **`atributo` ≠ `propriedade`.** Vários primitivos declaram `attribute:` e renomeiam — `caixaAlta`
+  vira `caixa-alta`. Escrever o nome errado **não dá erro**; o atributo só não faz nada.
+- **O parser tira comentário de bloco antes de extrair.** Sem isso, o exemplo de uso no JSDoc de
+  `urbi-primitivo-conteudo.ts` — que declara um `export class UrbiMeuWidget` fictício — era capturado
+  como se fosse a classe base real, e o **`:host` herdado sumia do espelho**. Justamente o `:host`
+  que diz se existe `box-sizing`.
+- **Determinístico por SHA:** a data vem do commit do monorepo, não do relógio. Rodar o script duas
+  vezes sem o monorepo mudar produz **diff vazio** — ressincronizar sem motivo não suja PR.
+- Espelha só os **29 primitivos que o frontend usa**, não os 89 do monorepo. Espelho que ninguém lê
+  não protege ninguém.
+
+---
+
 ## Rodada 9 aberta — e o Bloco 8-A, que a Rodada 8 perdeu no caminho (2026-08-23)
 
 A Rodada 8 fechou em 2026-08-22 com **19.931 linhas** de auditoria em `docs/rodada-8/`, **61 issues** e
