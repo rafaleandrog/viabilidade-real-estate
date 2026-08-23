@@ -238,10 +238,50 @@ seguinte. Vão em **PR próprio**, com todos os documentos propagados **no mesmo
 O guard `scripts/guard-pr-escopo-processo.mjs` (job `escopo-processo`) barra o PR que misture
 processo com código de produto.
 
-**R2 · Teto de duas rodadas de revisão por PR.**
-Terceira rodada **só com bloqueante de código**. Observação sobre documentação, a partir da
-terceira, **vira issue** — não vira mais uma volta no laço. A §8 da skill continua mandando o
-esforço decair; o teto é o que impede o decaimento de virar assíntota.
+**R2 · O ciclo fecha por convergência, não por contagem.**
+Critério único, o mesmo do upstream: **zero bloqueantes pendentes** — consertado, ou **retirado por
+contestação com evidência**. Rodada que acha defeito novo, distinto e real é rodada funcionando, e
+**não tem teto**. Observação nunca segura o ciclo: vira registro no PR, e o autor decide.
+
+O ciclo também termina antes disso em dois casos, e nos dois você **diz qual é a pergunta** que o
+autor precisa responder, em vez de deixar "aguardando decisão" solto:
+
+- **Decisão de desenho** — o conserto mexeria em algo que o autor decidiu. Com parcimônia: usado à
+  toa, vira jeito de terceirizar julgamento que era seu.
+- **Achado que não converge** — **o mesmo defeito** volta rodada após rodada. Pare, diga o que
+  está girando, devolva. **Precedência: bloqueante que você julga distinto SEMPRE reabre**, mesmo
+  caindo na mesma faixa ou pedindo o mesmo conserto; esta saída é só para o defeito que **continua
+  recorrendo**. Sem essa ordem, uma sequência de bloqueantes reais e diferentes na mesma área
+  satisfaz ao mesmo tempo "reabra" e "pare", e dois revisores encerram o mesmo histórico de formas
+  opostas — um deles deixando bloqueante conhecido pendente.
+
+> ⚠️ **A terminação é condicional, e quem termina de fato é o autor.** O teto antigo terminava por
+> construção; isto **não**. Se cada conserto expuser bloqueante genuinamente novo, o ciclo reabre —
+> e é o que se quer, porque a alternativa é mergear com defeito conhecido. O que fecha na prática é
+> a **contestação com evidência**, que retira achado, e o fato de que **o merge é do autor**: ele
+> encerra quando quiser, a qualquer rodada, e a sessão não pede essa autorização.
+
+> ⚠️ **Não formalize "a mesma faixa volta".** Esta seção já teve um predicado formal — par
+> `contrato + ocorrência`, âncoras estáveis, condições conjuntas — e ele levou **cinco rodadas de
+> revisão e dez achados**, todos em maquinaria que o upstream não tem. Cada conserto criava o
+> buraco seguinte: a chave com número de linha nunca dispararia, porque linha muda a cada conserto;
+> a identidade só por contrato colapsava defeitos distintos; a rodada de confirmação satisfazia o
+> próprio predicado de laço. E a defesa que eu tinha escrito contra não-terminação era **circular**
+> — citava o teste de laço, que por construção não dispara quando os defeitos são novos.
+>
+> A frase informal é do upstream de propósito: **ela é um julgamento a ser exercido e registrado,
+> não um teste a ser satisfeito.** Quem parar por ela diz o que está girando, e o autor confere.
+
+> ⚠️ **Esta regra já foi "teto de duas rodadas", e o teto era invenção desta cópia — o upstream
+> nunca teve contador.** Ele mede a coisa errada: trata como igual a rodada que descobre defeito
+> novo e a que gira em falso. Medido em 2026-08-23: o PR 502 fez **seis** rodadas, todas com
+> bloqueante de código real, cada uma achando um membro diferente da mesma classe — e uma delas
+> pegou um defeito que o conserto anterior tinha *criado*. Um teto de duas teria mergeado um
+> preflight que quebrava o CI de toda migração.
+>
+> O caso que motivou o teto — o PR 494, dez rodadas sem fechar — **era** não-convergência, e a
+> causa raiz dele já é tratada pela **R1**: mudança de processo não entra em PR sob revisão. O teto
+> tratava sintoma de doença curada, e cobrava o preço no PR que estava funcionando.
 
 **R3 · Um assunto por PR.**
 O PR 494 misturou cinco. Além de alargar a revisão, isso impede reverter uma parte sem reverter as
