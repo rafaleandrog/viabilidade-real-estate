@@ -958,9 +958,11 @@ previsto.
 
 **Achado estrutural — a #283 nasceu daqui.** Nove issues da cadeia EVI de recebíveis (#230,
 #232–#237, #240, #241) têm a matemática construída e testada, mas **não ligada ao cálculo real**.
-Não é inferência: `frontend/fluxo-caixa-motor.ts:505-511` declara que as funções "NÃO estão ligadas
-a `receitaMensalLinha`/`calcularFluxo`" e que "o motor legado continua sendo o único caminho de
-cálculo real". `pmt`, `pagamentosPrazoFixo`, `pagamentosAteMarco`, `pagamentosConcentrado`,
+Não é inferência: à época, `frontend/fluxo-caixa-motor.ts:505-511` declarava que as funções "NÃO
+estão ligadas a `receitaMensalLinha`/`calcularFluxo`" e que "o motor legado continua sendo o único
+caminho de cálculo real". **Essas linhas não dizem mais isso** — a #283 ligou as duas ao fluxo
+consolidado, e `recebimentoBrutoMensal` consulta `recebiveisComponentesLinha` primeiro. O registro
+fica como estava porque descreve o estado daquela data; o endereço é que deixou de sustentá-lo. `pmt`, `pagamentosPrazoFixo`, `pagamentosAteMarco`, `pagamentosConcentrado`,
 `receitaBrutaSafra`, `jurosSafra`, `componentesEfetivosSafra` existem, têm teste, e **nenhum estudo
 real passa por elas**.
 
