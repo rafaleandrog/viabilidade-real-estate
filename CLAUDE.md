@@ -665,10 +665,14 @@ Git Bash — ver PROGRESSO).
   > `frontend/viab-format.ts:11-23` usa 2 casas com mínimo e máximo, o Orçamento de Custos em `rs`
   > também (`frontend/tela-fluxo-custos.ts:673,933`), `frontend/exportar.ts:10` passou a
   > **importar** `fmtR$` em vez de definir formatador próprio, e a tabela de sensibilidade da
-  > proforma migrou para `fmtR$(v, false)` (`frontend/tela-proforma.ts:458`, #492). **O que ainda
-  > diverge é uma fonte só:** `frontend/fluxo-tabela.ts:34` (`celula`) arredonda para **0 casas** e
-  > esconde valor abaixo de R$ 0,50, então a mesma célula sai `1.235` na tela e `1.234,56` no PDF,
-  > e R$ 0,20 sai **branco** na tela. A #281 **mudou de endereço** — não corrija pontualmente.
+  > proforma migrou para `fmtR$(v, false)` (`frontend/tela-proforma.ts:458`, #492). **Três fontes
+  > ainda divergem:** `frontend/fluxo-tabela.ts:34` (`celula`) arredonda para **0 casas** e esconde
+  > valor abaixo de R$ 0,50 — a mesma célula sai `1.235` na tela e `1.234,56` no PDF, e R$ 0,20 sai
+  > **branco**; e `frontend/tela-proforma.ts:314` (`_fmtContabil`, a coluna R$ da Proforma) e
+  > `frontend/tela-fluxo-receitas.ts:382-383` (`precoUnit`/`precoTotal`) chamam `fmtNum` **sem o
+  > segundo argumento**, e `fmtNum` (`frontend/viab-format.ts:24-25`) declara só
+  > `maximumFractionDigits` — valor monetário sai com zero casas. A #281 **mudou de endereço, não
+  > foi resolvida** — não corrija pontualmente.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa

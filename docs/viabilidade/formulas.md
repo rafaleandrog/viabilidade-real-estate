@@ -168,15 +168,22 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/tela-proforma.ts:458` — sensibilidade, via `fmtR$(v, false)` | 2 | ✅ desde a #492 |
 | `frontend/fluxo-caixa-motor.ts` — resultados monetários (`round2`, C7) | 2 | ✅ |
 | **`frontend/fluxo-tabela.ts:34`** — `celula` da tabela do Fluxo | **0** | ❌ formatador próprio: `Math.round`, e célula **vazia** abaixo de R$ 0,50 → #281 |
+| **`frontend/tela-proforma.ts:314`** — `_fmtContabil`, a coluna R$ da Proforma | **0** | ❌ `fmtNum(Math.abs(r.v))` com `d` no default → #281 |
+| **`frontend/tela-fluxo-receitas.ts:382-383`** — `precoUnit` e `precoTotal` | **0** | ❌ mesma causa → #281 |
 
-> ⚠️ **Esta tabela diverge do texto substituto publicado na #482, e a divergência é deliberada.**
-> Aquele texto listava um segundo ❌ para `fmtNum` (`frontend/viab-format.ts:24-25`), porque
-> `frontend/tela-proforma.ts` chamava `fmtNum(v, 2)` e número redondo saía sem casas. **A #492
-> fechou isso** (PR #499, 2026-08-23): a linha hoje é `fmtR$(v, false)`. O `fmtNum` continua
-> declarando só `maximumFractionDigits`, mas **não tem mais consumidor monetário** — os que restam
-> são m², hectare e percentual, grandezas não monetárias, que por contrato carregam precisão plena
-> e arredondam só para exibir. Manter o ❌ seria mandar consertar o que já foi consertado, que é
-> exatamente o defeito que esta issue existe para corrigir.
+> ⚠️ **Os endereços do ❌ de `fmtNum` mudaram, e a #482 lista o antigo.** Aquele texto apontava
+> `frontend/tela-proforma.ts:453` (`fmtNum(v, 2)`, tabela de sensibilidade), que **a #492 fechou**
+> (PR 499, 2026-08-23) — a linha hoje é `fmtR$(v, false)` em `:458`. Mas o problema de fundo
+> **continua**, em dois outros lugares: `fmtNum` (`frontend/viab-format.ts:24-25`) declara só
+> `maximumFractionDigits`, e quem o chama **sem** o segundo argumento exibe valor monetário com
+> **zero** casas. É o caso de `_fmtContabil` (a coluna R$ da Proforma inteira) e do preço unitário
+> e total da alocação de receitas.
+>
+> Os demais chamadores de `fmtNum` — m², hectare, unidades, percentual — são grandezas **não
+> monetárias**, que por contrato carregam precisão plena e arredondam só para exibir; ficam fora do
+> ❌ de propósito. `_fmtContabilM2` (`tela-proforma.ts:326`) é R$/m², da mesma família.
+
+
 
 Áreas (m²) seguem `decimal(12,2)` na persistência; a regra de resultado acima é declarada para
 **valor monetário**.
