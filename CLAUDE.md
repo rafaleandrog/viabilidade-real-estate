@@ -241,42 +241,36 @@ processo com código de produto.
 **R2 · O ciclo fecha por convergência, não por contagem.**
 Critério único, o mesmo do upstream: **zero bloqueantes pendentes** — consertado, ou **retirado por
 contestação com evidência**. Rodada que acha defeito novo, distinto e real é rodada funcionando, e
-**não tem teto**.
+**não tem teto**. Observação nunca segura o ciclo: vira registro no PR, e o autor decide.
 
 O ciclo também termina antes disso em dois casos, e nos dois você **diz qual é a pergunta** que o
 autor precisa responder, em vez de deixar "aguardando decisão" solto:
 
 - **Decisão de desenho** — o conserto mexeria em algo que o autor decidiu. Com parcimônia: usado à
   toa, vira jeito de terceirizar julgamento que era seu.
-- **Achado que não converge.** A identidade de um achado é o par **contrato violado + ocorrência**
-  — o **texto literal** da regra mais a **âncora nomeada** que contém o defeito (função, classe,
-  seletor, seção), **nunca o número de linha**, que muda a cada conserto acima dele —, não o
-  remédio. Dois bloqueantes distintos podem pedir o mesmo
-  conserto, e **duas ocorrências do mesmo contrato em lugares diferentes são dois achados**: duas
-  rotas que omitem a mesma regra de autorização não são repetição. **Precedência: defeito distinto
-  vence remédio repetido.**
+- **Achado que não converge** — a mesma faixa volta rodada após rodada. Pare, diga o que está
+  girando, devolva.
 
-  É laço quando uma rodada **ainda tem bloqueante pendente** e **não traz nenhum par novo**. As duas
-  condições juntas, e a primeira é o que impede a rodada de confirmação — aquela que só verifica que
-  o último conserto pegou — de ser lida como laço: ela não traz par novo **porque acabou**, e o
-  desfecho dela é a § 9, não a saída. Auditável, porque os pares estão nos relatórios; finito,
-  porque contrato e ocorrência são conjuntos finitos.
+> ⚠️ **A terminação é condicional, e quem termina de fato é o autor.** O teto antigo terminava por
+> construção; isto **não**. Se cada conserto expuser bloqueante genuinamente novo, o ciclo reabre —
+> e é o que se quer, porque a alternativa é mergear com defeito conhecido. O que fecha na prática é
+> a **contestação com evidência**, que retira achado, e o fato de que **o merge é do autor**: ele
+> encerra quando quiser, a qualquer rodada, e a sessão não pede essa autorização.
 
-> ⚠️ **A terminação é condicional à convergência, e isto é declarado de propósito.** O teto
-> antigo terminava por construção; esta regra **não**. Se cada conserto expuser um bloqueante
-> genuinamente novo, o ciclo reabre indefinidamente — e é isso que se quer, porque a alternativa é
-> mergear com defeito conhecido. Três coisas o limitam na prática: o teste do contrato acima; a
-> **contestação com evidência**, que retira achado; e o fato de que **o merge é do autor** — ele
-> encerra o ciclo quando quiser, a qualquer rodada, e a sessão não pede essa autorização.
-> Achado do Codex no PR 507, respondendo a uma pergunta que eu tinha feito e não sabia responder.
-
-Observação nunca segura o ciclo — ela vira registro no PR, e o autor decide. Se a **mesma**
-observação voltar depois de já registrada, ela é evidência de laço: vira **issue**, com o achado
-transcrito.
+> ⚠️ **Não formalize "a mesma faixa volta".** Esta seção já teve um predicado formal — par
+> `contrato + ocorrência`, âncoras estáveis, condições conjuntas — e ele levou **cinco rodadas de
+> revisão e dez achados**, todos em maquinaria que o upstream não tem. Cada conserto criava o
+> buraco seguinte: a chave com número de linha nunca dispararia, porque linha muda a cada conserto;
+> a identidade só por contrato colapsava defeitos distintos; a rodada de confirmação satisfazia o
+> próprio predicado de laço. E a defesa que eu tinha escrito contra não-terminação era **circular**
+> — citava o teste de laço, que por construção não dispara quando os defeitos são novos.
+>
+> A frase informal é do upstream de propósito: **ela é um julgamento a ser exercido e registrado,
+> não um teste a ser satisfeito.** Quem parar por ela diz o que está girando, e o autor confere.
 
 > ⚠️ **Esta regra já foi "teto de duas rodadas", e o teto era invenção desta cópia — o upstream
 > nunca teve contador.** Ele mede a coisa errada: trata como igual a rodada que descobre defeito
-> novo e a que gira em falso. Medido em 2026-08-23: o PR 502 fez **quatro** rodadas, **todas** com
+> novo e a que gira em falso. Medido em 2026-08-23: o PR 502 fez **seis** rodadas, todas com
 > bloqueante de código real, cada uma achando um membro diferente da mesma classe — e uma delas
 > pegou um defeito que o conserto anterior tinha *criado*. Um teto de duas teria mergeado um
 > preflight que quebrava o CI de toda migração.

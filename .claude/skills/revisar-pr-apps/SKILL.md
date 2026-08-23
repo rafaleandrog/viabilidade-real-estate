@@ -645,13 +645,9 @@ Observações (3)
 10/11 lentes (S3 não executada: timeout). Detalhe qualquer achado se quiser.
 ```
 
-> ⚠️ **Todo bloqueante nomeia o contrato violado E o cita.** O rótulo é o título — "DDL em
-> migração de app", "`sdk_min` acima do publicado" —, mas a **chave** é o **texto literal** da
-> regra mais a **âncora nomeada** da ocorrência. O `arquivo:linha` entra como referência para o
-> leitor, **fora** da chave: linha muda a cada conserto acima dela. O campo não é estilo. A saída de não-convergência da § 8 se
-> decide comparando pares **contrato + ocorrência** entre rodadas, e rótulo em texto livre não
-> serve de chave: o mesmo contrato ganharia duas redações e pareceria novo, ou dois contratos
-> receberiam o mesmo resumo e disparariam laço cedo demais.
+> ⚠️ **Todo bloqueante nomeia o contrato ou invariante que viola** — é o que as duas linhas de
+> exemplo acima fazem ("DDL em migração de app", "`sdk_min` acima do publicado"). Não é estilo:
+> sem isso, "a mesma faixa volta" não tem como ser julgado por quem lê os relatórios de fora.
 
 **Não repita o relatório na sessão.** Nada de citação literal, quadro de execução, raciocínio
 ou lista do que passou — tudo isso está no PR, e quem quiser detalhe pede. Rodada limpa é uma
@@ -675,48 +671,29 @@ relatório.
 >
 > **Não há teto de rodadas.** O critério é o da § 9: **zero bloqueantes pendentes**, onde pendente é
 > o que não foi consertado nem **retirado por contestação com evidência**. Rodada que acha defeito
-> novo, distinto e real é rodada funcionando — reabra.
+> novo, distinto e real é rodada funcionando — reabra. Observação nunca segura o ciclo: vira
+> registro no PR.
 >
 > **Isto é uma condição executável, não um conselho**, e esta seção precisa carregá-la porque **a
 > skill é o procedimento**: o `CLAUDE.md` institui a regra, mas quem executa lê aqui.
 >
-> **Pare antes da § 9 em dois casos, e nos dois diga qual é a pergunta:**
+> **Pare antes da § 9 em dois casos, e nos dois diga qual é a pergunta:** decisão de desenho, e
+> **achado que não converge — a mesma faixa volta rodada após rodada**.
 >
-> - **decisão de desenho** — o conserto mexeria em algo que o autor decidiu;
-> - **achado que não converge** — a identidade é o par **contrato violado + ocorrência**
->   (`arquivo:linha`), nunca o remédio. **Defeito distinto vence remédio repetido**, e duas
->   ocorrências do mesmo contrato em lugares diferentes **são dois achados**.
+> ⚠️ **Não transforme "a mesma faixa volta" em teste formal.** Já foi tentado neste repositório, no
+> PR 507: par `contrato + ocorrência`, âncoras estáveis, condições conjuntas. Custou **cinco
+> rodadas e dez achados**, e cada conserto criava o buraco seguinte — chave com número de linha
+> nunca dispararia, identidade só por contrato colapsava defeitos distintos, a rodada de
+> confirmação satisfazia o próprio predicado. A frase é informal **de propósito**: é julgamento a
+> exercer e registrar, não teste a satisfazer. Quem parar por ela **diz o que está girando**, e o
+> autor confere.
 >
->   É laço quando a rodada **ainda tem bloqueante pendente** *e* **não traz par novo**. As duas
->   condições, sempre: sem a primeira, a rodada de confirmação — a que só verifica que o último
->   conserto pegou — cairia aqui, porque ela não traz par novo **por ter acabado**. O desfecho dela
->   é a § 9.
->
->   Para o par ser comparável entre rodadas, o **contrato é citado, não resumido**, e a chave
->   **não inclui número de linha**:
->
->   | Metade do par | Chave estável | Só informativo |
->   |---|---|---|
->   | contrato | **texto literal da regra**, espaços normalizados | `arquivo:linha` de onde ela está |
->   | ocorrência | `arquivo` + a **âncora nomeada** que a contém — função, classe, seletor, título de seção | a linha |
->
->   **Linha muda a cada conserto que insere ou remove qualquer coisa acima**, e o texto literal não
->   compensa isso enquanto o número fizer parte da chave: um bloqueante ainda pendente ganharia par
->   novo e a saída nunca dispararia. Rótulo redigido livremente ("DDL em migração de app") serve de
->   título; a chave é a **citação mais a âncora**.
->
->   Consequência declarada: a **terminação é condicional**. Se cada conserto expuser contrato novo,
->   o ciclo reabre — e é o que se quer, porque a alternativa é mergear com defeito conhecido. Quem
->   encerra de fato é o **autor**, que decide o merge a qualquer rodada.
->
-> Observação nunca segura o ciclo (§ 9) — vira registro no PR. Se a **mesma** observação voltar
-> depois de já registrada, isso é evidência de laço, e aí ela vira **issue** com o achado
-> transcrito. O gatilho é a repetição, **não a contagem de rodadas**: um limiar por número de
-> rodada reintroduziria, em miniatura, exatamente o defeito que este PR remove.
+> **A terminação é condicional**, e quem encerra de fato é o **autor**, que decide o merge a
+> qualquer rodada.
 >
 > **Por que o teto saiu, com o caso medido:** ele contava rodadas, e contagem não distingue a
-> rodada que descobre defeito novo da que gira em falso. No PR 502, em 2026-08-23, foram **quatro**
-> rodadas, **todas** com bloqueante de código real, cada uma achando um membro diferente da mesma
+> rodada que descobre defeito novo da que gira em falso. No PR 502, em 2026-08-23, foram **seis**
+> rodadas, todas com bloqueante de código real, cada uma achando um membro diferente da mesma
 > classe — e uma delas pegou um defeito que o conserto anterior tinha criado. Teto de duas teria
 > mergeado um preflight que quebrava o CI de toda migração. O PR 494, que motivou o teto, era
 > não-convergência de verdade, e disso cuida a **R1**.
@@ -823,13 +800,8 @@ que o usuário precisa responder, em vez de deixar "aguardando decisão" solto:
 
 - **Decisão de desenho:** o conserto mexeria em algo que o usuário decidiu. Use com parcimônia
   — usado à toa, vira jeito de terceirizar julgamento que era seu.
-- **Achado que não converge:** a rodada **ainda tem bloqueante pendente** *e* **não traz nenhum
-  par novo** — par é `contrato citado + ocorrência ancorada`, como a § 8 define. **As duas
-  condições, sempre.** Sem a primeira, a rodada limpa de confirmação cairia aqui, porque ela não
-  traz par novo por ter acabado — e o desfecho dela é o encerramento por zero pendentes, logo
-  acima. Sem a segunda metade do par, uma segunda ocorrência real do mesmo contrato pareceria laço.
-  Pare, diga o que está girando e devolva ao usuário. Numa app isso inclui o caso em que o desfecho depende de issue
-  no shell: o PR não fecha sozinho, e insistir só gasta rodada.
+- **Achado que não converge:** a mesma faixa volta rodada após rodada. Pare, diga o que está
+  girando e devolva ao usuário. É julgamento, não teste — registre o que o sustenta.
 
 ### Merge
 
