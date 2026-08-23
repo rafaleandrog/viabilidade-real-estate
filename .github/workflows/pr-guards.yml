@@ -181,8 +181,14 @@ jobs:
           # destino. O script não veria arquivo de processo nenhum e aprovaria a
           # mistura — reproduzido pelo Codex no PR 496, exit 0. Sem a detecção, a
           # origem removida também aparece e é classificada.
-          ARQUIVOS="$(git diff --no-renames --name-only "$BASE_SHA"..."$HEAD_SHA")"
-          export PR_ARQUIVOS="$ARQUIVOS"
+          # Saída `-z` gravada em ARQUIVO, não em variável: NUL não sobrevive a
+          # variável de ambiente, e é a única representação inequívoca de caminho.
+          # `core.quotePath=false` resolvia só o não-ASCII — a doc do git ressalva
+          # que aspas, barra invertida e caracteres de controle são SEMPRE
+          # escapados, então `frontend/a\b.ts` voltava citado, não casava com
+          # `/^frontend\//` e o guard aprovava a mistura. Achado do Codex no PR 502.
+          git diff --no-renames -z --name-only "$BASE_SHA"..."$HEAD_SHA" > /tmp/pr-arquivos.nul
+          export PR_ARQUIVOS_NUL=/tmp/pr-arquivos.nul
           if ! node scripts/guard-pr-escopo-processo.mjs; then
             echo "::error title=Escopo do PR::Arquivo de .claude/ junto com codigo de produto. Regra R1 do CLAUDE.md: o PR de processo sai sozinho, com todos os documentos propagados no mesmo diff. Editar processo dentro de um PR em revisao produz um ciclo que nao converge."
             exit 1
@@ -224,6 +230,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          # A bateria do preflight chama `git merge-base origin/main HEAD`, e o
+          # checkout de PR traz só o commit do head. Sem o histórico o merge-base
+          # falha ANTES do override de `--arquivos`, e o job reprova por falta de
+          # base, não por defeito. Achado do Codex no PR 502.
+          fetch-depth: 0
       - name: Guard da rede do processo
         run: |
           set -uo pipefail
@@ -246,6 +258,17 @@ jobs:
           # que bloqueava `pull_request_read`, isto é, quebrava a própria revisão.
           if ! bash scripts/testar-guarda-monorepo.sh; then
             echo "::error title=Guarda do monorepo falhou::A guarda que impede escrita em urbiverso/urbiverso não se comporta como o esperado. Veja quais casos falharam no log."
+            exit 1
+          fi
+      - name: Bateria do preflight de PR
+        if: always()
+        run: |
+          set -uo pipefail
+          # O preflight é um PORTÃO: se ele aprovar corpo errado, o CI fica vermelho
+          # depois (o que ele existe para evitar); se reprovar corpo certo, alguém
+          # para de rodá-lo e ele deixa de guardar. Os dois sentidos têm caso.
+          if ! bash scripts/testar-preflight-pr.sh; then
+            echo "::error title=Bateria do preflight falhou::O preflight de PR não se comporta como o esperado. Veja quais casos falharam no log."
             exit 1
           fi
       - name: Bateria do parsing do revisao-registrada
