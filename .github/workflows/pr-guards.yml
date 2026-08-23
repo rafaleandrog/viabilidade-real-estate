@@ -363,3 +363,179 @@ jobs:
             echo "::error title=Bateria dos guards de UI falhou::Um dos três guards não se comporta como o esperado. Veja quais casos falharam no log."
             exit 1
           fi
+
+  render:
+    name: Render em Chromium (overflow, sobreposição, cor)
+    runs-on: ubuntu-latest
+    # ⚠️ 20 min, e não 5 como os demais: este job instala pacotes e baixa o
+    # Chromium. O baseline dos passos de medição é ~15s (6 testes, 4 telas,
+    # 3 larguras, 4 variantes de tema); o resto é preparo. Sem `timeout-minutes`
+    # o default do GitHub é SEIS HORAS — foi assim que a PR #304 ficou
+    # `in_progress` sem log nenhum para ler (a API só serve log de job
+    # concluído). Ver o cabeçalho deste arquivo e o do validation.yml.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # precisa do histórico para o merge-base do diff
+      - name: O PR toca frontend/?
+        id: escopo
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # ⚠️ `-e` LIGADO, e é ele que faz o resto deste passo valer.
+          #
+          # Com `errexit` desligado (era assim), as duas pré-condições eram
+          # decorativas: se o `git diff` falhasse, ARQUIVOS ficava VAZIO e a lista
+          # vazia é classificada como fora de escopo — o job pularia tudo e ficaria
+          # verde; e se o `--autoteste` reprovasse, o shell seguia para a decisão
+          # real assim mesmo, ou seja, a bateria de 8.001 caminhos NÃO garantia que
+          # a regressão dela deixasse o CI vermelho. O conserto do SIGPIPE estava
+          # aqui, mas a rede que o protege não prendia. Achado P1 do Codex, rodada 2.
+          #
+          # A decisão em si continua podendo dar 1 sem abortar: comando em condição
+          # de `if` é exceção do `errexit`, e é exatamente o que se quer ali.
+          set -euo pipefail
+          # ⚠️ A decisão NÃO passa por pipe, e isso não é estilo.
+          #
+          # A primeira versão era `git diff --name-only ... | grep -qE '^frontend/'`.
+          # `grep -q` sai no primeiro casamento e fecha o pipe; com lista maior que
+          # o buffer de 64 KiB o `git diff` leva SIGPIPE e sai 141; sob `pipefail` o
+          # `if` toma o ramo FALSO. Um PR que mexe em meio frontend é classificado
+          # como fora de escopo, TODOS os passos abaixo são pulados por `if:`, e o
+          # job fica verde sem medir nada. Reproduzido com 8.001 caminhos (152 KiB).
+          #
+          # Capturar numa variável ANTES não resolve — quem escreve no pipe passa a
+          # ser o `printf` e ele leva o mesmo sinal. O que resolve é não haver
+          # consumidor que sai cedo: a lista vai por VARIÁVEL DE AMBIENTE para um
+          # script `node`, o mesmo padrão do job `escopo-processo`.
+          #
+          # Diff de TRÊS pontos, como os demais guards: dois pontos acusaria
+          # arquivo que veio da base no meio do caminho.
+          ARQUIVOS="$(git diff --no-renames --name-only "$BASE_SHA...$HEAD_SHA")"
+          export PR_ARQUIVOS="$ARQUIVOS"
+          # A bateria do próprio script roda ANTES da decisão: ela contém o caso de
+          # 8.001 caminhos, então uma regressão para a forma com pipe fica vermelha
+          # aqui em vez de virar um job verde que não mediu nada.
+          node scripts/render-em-escopo.mjs --autoteste
+          if node scripts/render-em-escopo.mjs; then
+            echo "roda=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "roda=0" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.escopo.outputs.roda == '1'
+        with:
+          node-version: '22'
+      - name: Instalar toolchain de render (pinada, só pacotes PÚBLICOS)
+        if: steps.escopo.outputs.roda == '1'
+        run: |
+          set -euo pipefail
+          # ⚠️ VERSÕES EXATAS, COM LOCKFILE, E O MOTIVO É DETERMINISMO.
+          #
+          # A primeira versão escrevia um package.json na hora, sem lockfile, com
+          # faixas de caret. Playwright em `^1.49.0` traz OUTRA revisão do Chromium
+          # a cada release compatível — e esta suíte asserta geometria exata, os
+          # 22px de sobreposição do urbi-kpi entre eles. Mudança do motor de layout
+          # sem nenhuma mudança no repositório faria um commit inalterado começar a
+          # falhar, ou esconderia uma regressão. Achado P1 do Codex no PR 506.
+          #
+          # Agora o pin mora versionado em `.github/render-deps/`, com
+          # package-lock.json, e o `npm ci` recusa qualquer coisa fora dele.
+          # `playwright 1.56.1` fixa o Chromium em 141.0.7390.37, que é o mesmo
+          # build em que os números desta suíte foram medidos — a constante
+          # CHROMIUM_FIXADO de scripts/render-check.mjs avisa se divergir.
+          #
+          # Nada de `pnpm install` na raiz: o @urbiverso/sdk é GitHub Packages
+          # privado e o GITHUB_TOKEN efêmero deste repo toma 401. Aqui só entram
+          # pacotes públicos, num diretório próprio, ligado à raiz por symlink —
+          # o mesmo padrão que scripts/validar-frontend.sh usa com o store do pnpm.
+          cd "$GITHUB_WORKSPACE/.github/render-deps"
+          npm ci --no-audit --no-fund --loglevel=error
+          npx --no-install playwright install --with-deps chromium
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p node_modules
+          # `if` em vez de `[ ... ] && ...`: com `set -e`, um teste falso na
+          # ÚLTIMA volta do laço derruba o passo inteiro, e o pacote que faltar
+          # muda conforme a resolução do npm. Falha por acidente de sintaxe é
+          # pior que falha real, porque manda procurar no lugar errado.
+          for p in lit lit-html lit-element @lit tsx esbuild typescript playwright playwright-core @types; do
+            if [ -e ".github/render-deps/node_modules/$p" ]; then
+              ln -sfn "$GITHUB_WORKSPACE/.github/render-deps/node_modules/$p" "node_modules/$p"
+              echo "  ligado: $p"
+            else
+              echo "  ausente no store: $p"
+            fi
+          done
+          node -e "console.log('esbuild em', require.resolve('esbuild/package.json'))"
+          node -e "import('playwright').then(async (m) => { const b = await m.chromium.launch(); console.log('Chromium', b.version()); await b.close(); })"
+      - name: Verificação de render
+        id: render
+        if: steps.escopo.outputs.roda == '1'
+        env:
+          # ⚠️ Esta variável é o que separa "pulou" de "passou". No
+          # validar-frontend.sh a ausência de navegador PULA a etapa, porque a
+          # máquina do autor não tem Playwright; aqui ela REPROVA. Sem isto, um
+          # runner sem Chromium devolveria verde sem medir um pixel, e a camada
+          # inteira viraria enfeite sem nada ficar vermelho.
+          RENDER_CHECK_OBRIGATORIO: '1'
+        run: |
+          # `-e` fica DESLIGADO só aqui, e de propósito: o passo captura `rc=$?`
+          # logo depois do `timeout` para distinguir 124 (travou) de qualquer
+          # outro não-zero, e com `errexit` o shell abortaria antes de chegar no
+          # `if`, perdendo a mensagem que diz o que aconteceu. Conferido: TODO
+          # caminho não-zero abaixo é tratado explicitamente e termina em
+          # `exit 1` — inclusive 127, se o `node` sumir. O passo de escopo, que
+          # tinha pré-condições NÃO tratadas, foi para `-euo`.
+          set -uo pipefail
+          # As DUAS defesas de timeout, porque cobrem casos diferentes e nenhuma
+          # cobre o do outro (CLAUDE.md § Duas regras de CI):
+          #   · `--test-timeout` mata teste ASSÍNCRONO pendurado e diz o NOME
+          #     dele — é o caso provável aqui (página que nunca fica pronta);
+          #   · `timeout` mata o PROCESSO, e é o único que pega laço SÍNCRONO,
+          #     que bloqueia o event loop e impede o timer do runner de disparar.
+          timeout 900 node --import tsx/esm --test --test-timeout=180000 \
+            frontend/render/*.render.test.ts
+          rc=$?
+          if [ $rc -eq 124 ]; then
+            echo "::error title=Render travou::A suíte de render passou de 900s sem terminar — provável laço síncrono (o --test-timeout não pega esse caso)."
+            exit 1
+          fi
+          if [ $rc -ne 0 ]; then
+            echo "::error title=Render reprovou::Uma tela transbordou, pintou sobre a vizinha, deixou o documento rolar na horizontal, ou usou token que não resolve. O relatório com arquivo, largura e pixels está no log acima. Ver scripts/render-check.mjs."
+            exit 1
+          fi
+          echo "ok: render verificado."
+      - name: Registrar no resumo se o render rodou
+        if: always()
+        env:
+          ESCOPO: ${{ steps.escopo.outcome }}
+          RODOU: ${{ steps.escopo.outputs.roda }}
+          RENDER: ${{ steps.render.outcome }}
+        run: |
+          set -uo pipefail
+          # O IRMÃO, no CI, do "render OK" que o validar-frontend.sh anunciava
+          # mesmo pulando a etapa. Quando o PR está fora de escopo os passos
+          # acima são pulados por `if:` e o job fica VERDE — o que é correto,
+          # mas o nome do check ("Render em Chromium") se lê como se algo
+          # tivesse sido medido. Esta linha põe o estado onde mais gente olha.
+          #
+          # ⚠️ A fonte é o RESULTADO DA ETAPA DE MEDIÇÃO, não a classificação do
+          # diff. A versão anterior lia só `steps.escopo.outputs.roda`, que é
+          # escrito ANTES da instalação: se `npm ci`, o download do Chromium ou a
+          # sonda de lançamento falhassem, a medição nunca começava e este passo,
+          # com `if: always()`, escrevia **executado** assim mesmo. E uma falha do
+          # próprio passo de escopo caía no ramo que atribui a ausência à
+          # classificação do diff, dizendo "fora de escopo" para um
+          # pré-requisito reprovado. Três estados distintos, três mensagens.
+          # Achado do Codex, rodada 5.
+          if [ "$ESCOPO" != "success" ]; then
+            echo "Render em Chromium: **INDETERMINADO** — a própria classificação do diff falhou (\`$ESCOPO\`), então não se sabe se este PR precisava de render. Nada foi medido." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${RODOU:-0}" != "1" ]; then
+            echo "Render em Chromium: **NÃO executado** — o diff não toca frontend/, o espelho de UI, a toolchain pinada nem o harness. Nada foi medido em DOM (o que é esperado neste caso)." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$RENDER" = "success" ] || [ "$RENDER" = "failure" ]; then
+            echo "Render em Chromium: **executado** (\`$RENDER\`)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Render em Chromium: **NÃO executado, e o PR estava em escopo** — a etapa de medição não chegou a começar (\`${RENDER:-ausente}\`); provável falha de pré-requisito: \`npm ci\`, download do Chromium ou a sonda de lançamento. Isto NÃO é 'passou'." >> "$GITHUB_STEP_SUMMARY"
+          fi

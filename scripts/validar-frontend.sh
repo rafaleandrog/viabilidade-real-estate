@@ -23,7 +23,13 @@
 #      atravessam typecheck, teste e build em verde. Depois do link porque o
 #      lexer deles é o parser do `typescript`;
 #   5. typecheck do frontend (tsconfig só-frontend);
-#   6. testes de frontend e build do bundle via esbuild.
+#   6. testes de frontend e build do bundle via esbuild;
+#   7. verificação de RENDER em Chromium: monta quatro telas de verdade e mede
+#      overflow, transbordo, sobreposição de caixas e cor efetiva por variante
+#      de tema. É a única etapa que toca DOM — as etapas anteriores são todas de
+#      lógica pura, e nenhuma delas enxerga "o card pintou sobre o vizinho".
+#      Depende do Playwright, que NÃO é dependência do produto: sem ele a etapa
+#      PULA com aviso alto. No CI ela é obrigatória (job `render`).
 #
 # Backend / `urbi-empacotar` / typecheck do backend precisam do SDK → só rodam no
 # ambiente autenticado do autor. Para mudanças de frontend, este script basta.
@@ -37,7 +43,7 @@ raiz="$(pwd)"
 # ficou `in_progress` no passo `Testes` por horas, sem log nenhum para ler (a API do
 # GitHub só serve log de job concluído). São duas defesas, porque cobrem casos
 # diferentes e nenhuma cobre as duas:
-#   - `--test-timeout` (usado na etapa 6/6) mata teste ASSÍNCRONO pendurado e diz o
+#   - `--test-timeout` (usado nas etapas 6/7 e 7/7) mata teste ASSÍNCRONO pendurado e diz o
 #     NOME do teste. Não pega laço síncrono: `while(true){}` bloqueia o event loop e o
 #     próprio timer do runner nunca dispara.
 #   - `com_limite` mata o PROCESSO inteiro — é esta que pega o laço síncrono.
@@ -67,7 +73,7 @@ com_limite() {
 # ambiente, LANG vazio) o grep casa a classe BYTE a byte, e como ”/“/—/→ compartilham
 # o primeiro byte 0xE2, `=[”“]` daria falso positivo em `=—` e `=→`. A alternância
 # compara as sequências de 3 bytes inteiras e acerta em qualquer locale.
-echo "== 1/6 guards estáticos (aspas curvas + JSON estrito + ciclos de schema) =="
+echo "== 1/7 guards estáticos (aspas curvas + JSON estrito + ciclos de schema) =="
 if grep -rn '=\(”\|“\|‘\|’\)' frontend/; then
   echo "  FALHOU: aspas curvas em atributo — o atributo fica inerte. Use aspas retas." >&2
   exit 1
@@ -103,14 +109,14 @@ echo "  ok: nenhuma aspa curva em atributo"
 #     caixa maior que o pedido, e pinta sobre o vizinho (o urbi-kpi, quatro vezes
 #     reportado: #176, #262, #326, #352).
 # Nenhuma delas aparece no typecheck, nos testes ou no esbuild.
-echo "== 2/6 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
+echo "== 2/7 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
 pnpm install >/dev/null 2>&1 || true
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — o pnpm não conseguiu baixar nem os pacotes públicos (sem rede?)." >&2
   exit 1
 fi
 
-echo "== 3/6 linkando pacotes públicos do store virtual (.pnpm) =="
+echo "== 3/7 linkando pacotes públicos do store virtual (.pnpm) =="
 # link_pkg <glob-do-dir-em-.pnpm> <subcaminho-interno> <alvo-em-node_modules>
 link_pkg() {
   local glob="$1" interno="$2" alvo="$3"
@@ -139,7 +145,7 @@ esbuild_bin="node_modules/esbuild/bin/esbuild"
 # o PARSER do `typescript`. Sem o pacote linkado eles RECUSAM analisar — que é o
 # comportamento certo, mas num clone novo faria a validação morrer antes de
 # instalar o que ela mesma precisa.
-echo "== 4/6 guards de UI (tokens + props de primitivo + box model) =="
+echo "== 4/7 guards de UI (tokens + props de primitivo + box model) =="
 node scripts/guard-tokens-css.mjs || exit 1
 node scripts/guard-props-urbi.mjs || exit 1
 node scripts/guard-box-model-urbi.mjs || exit 1
@@ -160,7 +166,7 @@ com_limite 120 bash scripts/testar-guards-ui.sh >/dev/null || {
 }
 echo "  ok: baterias do lexer e dos guards de UI verdes"
 
-echo "== 5/6 typecheck do frontend =="
+echo "== 5/7 typecheck do frontend =="
 cat > tsconfig.frontend.json <<'JSON'
 { "extends": "./tsconfig.json", "include": ["frontend/**/*"] }
 JSON
@@ -169,7 +175,7 @@ tc=$?
 rm -f tsconfig.frontend.json
 [ $tc -eq 0 ] && echo "  typecheck OK" || { echo "  typecheck FALHOU"; exit 1; }
 
-echo "== 6/6 testes de frontend + build do bundle =="
+echo "== 6/7 testes de frontend + build do bundle =="
 # `frontend/*.test.ts` NÃO alcança subdiretório: até 2026-08-11 os 16 golden
 # cases do Capital Stack (frontend/fixtures/capital-stack-golden.test.ts, hoje
 # apagado — a #355 substituiu o modelo) nunca rodaram, nem aqui nem no
@@ -194,5 +200,61 @@ tst=$?
 bd=$?
 [ $bd -eq 0 ] || { echo "  build FALHOU"; exit 1; }
 
+echo "== 7/7 verificação de render em Chromium =="
+# ⚠️ Este marcador é o que impede a ÚLTIMA LINHA de mentir. A versão anterior
+# anunciava "render OK" mesmo quando esta etapa era pulada por falta de
+# Playwright — um cenário que o próprio script suporta de propósito. Quem lê só
+# a linha de resumo registrava validação que não aconteceu, e a linha de resumo
+# é onde mais gente olha. É a mesma classe do defeito central deste PR
+# (reportar limpo sem ter medido), e é literalmente o que o CLAUDE.md chama de
+# "não deu para rodar nunca é passou". Achado do Codex, rodada 4.
+render_rodou=0
+# Por que esta etapa existe: até aqui NENHUM teste toca DOM. Overflow,
+# transbordo, sobreposição de caixa e cor efetiva por tema não existem antes do
+# layout — e é dessa classe o defeito do `urbi-kpi`, reportado quatro vezes
+# (#176, #262, #326, #352) e fechado quatro sem nunca ficar vermelho em lugar
+# nenhum. Ver o cabeçalho de scripts/render-check.mjs.
+#
+# ⚠️ A ASSIMETRIA ENTRE AQUI E O CI É DELIBERADA, e é a parte que se lê errado:
+#   · aqui, sem Playwright, a etapa PULA — a máquina do autor não tem o pacote
+#     (ele não é dependência do produto) e não deveria ficar impedida de validar
+#     frontend por causa disso;
+#   · no CI (job `render` de pr-guards.yml) `RENDER_CHECK_OBRIGATORIO=1` faz a
+#     ausência REPROVAR.
+# Sem a segunda metade, "não deu para rodar" viraria "passou" — o modo de falha
+# que o CLAUDE.md nomeia. Por isso o aviso abaixo é ALTO: pulo silencioso faria
+# desta camada inteira enfeite.
+if node -e "import('$raiz/scripts/render-check.mjs').then((m) => m.harnessDisponivel()).then((d) => process.exit(d.ok ? 0 : 1)).catch(() => process.exit(1));" 2>/dev/null; then
+  # `frontend/render/*.render.test.ts` NÃO é alcançado por `frontend/*.test.ts`
+  # — o mesmo buraco que deixou os 16 golden cases do Capital Stack escritos e
+  # nunca executados por uma rodada inteira. O `compgen` confirma que o glob
+  # casa antes de passá-lo ao node (glob que não casa fica literal, e algumas
+  # versões do Node abortam a suíte inteira nessa condição).
+  if compgen -G "frontend/render/*.render.test.ts" > /dev/null; then
+    RENDER_CHECK_OBRIGATORIO=1 com_limite 600 node --import tsx/esm --test \
+      --test-timeout=180000 frontend/render/*.render.test.ts
+    rd=$?
+    [ $rd -eq 0 ] || { echo "  render FALHOU"; exit 1; }
+    render_rodou=1
+  else
+    echo "  aviso: nenhum caso em frontend/render/*.render.test.ts" >&2
+  fi
+else
+  echo
+  echo "  ####################################################################"
+  echo "  #  ETAPA 7/7 (RENDER) NAO EXECUTADA - Playwright/Chromium ausente. #"
+  echo "  #  Nada foi medido em DOM. Isto NAO e 'passou'.                    #"
+  echo "  #  O job render do CI roda com RENDER_CHECK_OBRIGATORIO=1 e        #"
+  echo "  #  reprova exatamente nesta condicao.                              #"
+  echo "  ####################################################################"
+  echo
+fi
+
 echo
-echo "✅ Frontend validado: typecheck + testes + build OK."
+if [ "$render_rodou" = "1" ]; then
+  echo "✅ Frontend validado: typecheck + testes + build + render OK."
+else
+  echo "⚠️  Frontend validado PARCIALMENTE: typecheck + testes + build OK."
+  echo "    RENDER NÃO EXECUTADO (etapa 7/7 pulada) — nada foi medido em DOM."
+  echo "    Isto NÃO é 'render OK'. O job \`render\` do CI reprova nesta condição."
+fi
