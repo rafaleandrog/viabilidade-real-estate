@@ -9,7 +9,7 @@ import {
   listarFundingOperacoes, criarFundingOperacao, atualizarFundingOperacao, removerFundingOperacao,
 } from './viabilidade-api.js';
 import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { mesRepasse, rotuloMesRelativo, type EventoCrono } from './fluxo-shared.js';
+import { dinheiroParaRotulo, mesRepasse, rotuloMesRelativo, type EventoCrono } from './fluxo-shared.js';
 import {
   fundingDoEstudo, indicadoresOperacao, indicadoresFinanciamentoProducao,
   receitaLiquidaComCorretagemMensal, linhasFinanciaveisPadrao,
@@ -209,6 +209,13 @@ export class ViabFunding extends LitElement {
       resultadoFinal, mesRepasse(this.crono), this.taxaDescontoAa,
       { custosRaw: this.custos, linhasCusto: this.calc.linhasCusto, cronograma: this.crono },
     );
+  }
+
+  // #442: este rótulo lia `orcamento_valor` cru — a mesma coluna que a issue
+  // mostrou congelada. A decisão mora em `dinheiroParaRotulo`, pura e testada.
+  private _rotuloValor(custo: any): string {
+    const v = dinheiroParaRotulo(custo, this.calc?.linhasCusto ?? []);
+    return v === null ? '—' : fmtR$(v);
   }
 
   private _set(o: any, campo: string, valor: any) {
@@ -416,7 +423,7 @@ export class ViabFunding extends LitElement {
         <div class="custo-lista">
           ${this.custos.map((custo) => html`
             <urbi-checkbox
-              label=${`${custo.categoria || 'Custo'} — ${fmtR$(n(custo.orcamento_valor))}`}
+              label=${`${custo.categoria || 'Custo'} — ${this._rotuloValor(custo)}`}
               ?desabilitado=${!this.editavel}
               ?marcado=${efetiva.includes(custo.id)}
               @urbi:checkbox-change=${(e: CustomEvent) => {

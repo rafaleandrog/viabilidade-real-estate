@@ -15,7 +15,7 @@ import {
   listarFasesAvancado, listarTipologiasCatalogo,
 } from './viabilidade-api.js';
 import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
+import { converterUnidade, dadosDaTrocaDeUnidade, numeroDaColuna, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import './viab-num.js';
 
 // Sub-tela "Custos" do nível Avançado (Viabilidade › Custos): cinco seções
@@ -1027,16 +1027,28 @@ export class ViabFluxoCustos extends LitElement {
     const dados: Record<string, any> = { categoria: novaCategoria, subcategoria: null };
     const unidAtual = c.orcamento_unidade || 'rs';
     const perm = this._unidsPerm(grupo, novaCategoria);
-    if (!perm.includes(unidAtual)) dados.orcamento_unidade = perm[0] ?? 'rs';
+    // #442: este é o SEGUNDO escritor de `orcamento_unidade`, e tinha o mesmo
+    // defeito da badge — trocava a unidade e deixava `orcamento_valor` como
+    // estava. Caminho concreto: `diretos`/`Marketing & Publicidade` em `rs` com
+    // R$ 300.000 passa a `Corretagem de vendas`, cuja única unidade permitida é
+    // `pct_vgv`, e os 300.000 viravam "300.000 %". Mesma decisão, mesmo caminho.
+    if (!perm.includes(unidAtual)) {
+      Object.assign(dados,
+        dadosDaTrocaDeUnidade(c, perm[0] ?? 'rs', CONV_UNIDADE, this._ctxConversao())
+        ?? { orcamento_unidade: perm[0] ?? 'rs' });
+    }
     this._salvar(c, dados);
   }
 
   private _valorCanonico(c: any): number | null {
-    const salvo = c.orcamento_valor_canonico;
-    if (salvo !== null && salvo !== undefined && Number.isFinite(Number(salvo))) return Number(salvo);
-    const valor = c.orcamento_valor;
-    if (valor === null || valor === undefined || !Number.isFinite(Number(valor))) return null;
-    return converterUnidade(CONV_UNIDADE[c.orcamento_unidade || 'rs'], CONV_UNIDADE.rs, Number(valor), this._ctxConversao());
+    // Mesma coerção da troca de unidade (`numeroDaColuna`): antes daqui havia
+    // duas, e elas DISCORDAVAM em coluna vazia — `Number('')` é 0 e finito, então
+    // uma linha em branco virava R$ 0,00 num caminho e "sem valor" no outro.
+    const salvo = numeroDaColuna(c.orcamento_valor_canonico);
+    if (salvo !== null) return salvo;
+    const valor = numeroDaColuna(c.orcamento_valor);
+    if (valor === null) return null;
+    return converterUnidade(CONV_UNIDADE[c.orcamento_unidade || 'rs'], CONV_UNIDADE.rs, valor, this._ctxConversao());
   }
 
   private _valorExibido(c: any): number | null {
@@ -1049,22 +1061,18 @@ export class ViabFluxoCustos extends LitElement {
     const unidade = c.orcamento_unidade || 'rs';
     const canonico = valor === null ? null
       : converterUnidade(CONV_UNIDADE[unidade], CONV_UNIDADE.rs, Number(valor), this._ctxConversao());
-    // O campo antigo acompanha somente uma edição consciente; a badge não o toca.
+    // Edição consciente: o campo antigo recebe exatamente o que foi digitado, na
+    // unidade ativa. A badge tem regra própria — ver `_trocarUnidade`.
     this._salvar(c, { orcamento_valor: valor, orcamento_valor_canonico: canonico });
   }
 
-  // A badge só troca a unidade de apresentação. Para linhas legadas, inicializa
-  // o canônico uma vez a partir do valor ativo, sem alterar o orçamento legado.
+  // #442: a badge troca a unidade E acerta o campo legado, que antes ficava
+  // congelado na unidade ANTIGA. A decisão inteira — inclusive a fiação — mora
+  // em `dadosDaTrocaDeUnidade`, pura e testada; aqui só se despacha.
   private _trocarUnidade(c: any, nova: string) {
     if (!this.editavel) return;
-    const atual = c.orcamento_unidade || 'rs';
-    if (nova === atual) return;
-    const dados: Record<string, any> = { orcamento_unidade: nova };
-    if (c.orcamento_valor_canonico === null || c.orcamento_valor_canonico === undefined) {
-      const canonico = this._valorCanonico(c);
-      if (canonico !== null) dados.orcamento_valor_canonico = canonico;
-    }
-    this._salvar(c, dados);
+    const dados = dadosDaTrocaDeUnidade(c, nova, CONV_UNIDADE, this._ctxConversao());
+    if (dados) this._salvar(c, dados);
   }
 
   private async _salvar(c: any, dados: Record<string, any>) {
