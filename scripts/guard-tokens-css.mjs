@@ -35,6 +35,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { superficies, lerTags, limparCss, disponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso');
@@ -50,6 +51,8 @@ if (!existsSync(join(ESPELHO, 'tokens.json'))) {
       '      Rode `node scripts/sincronizar-referencia-ui.mjs` (precisa do monorepo clonado).',
   );
 }
+
+if (!disponivel) morrer(porqueIndisponivel);
 
 const espelhoTokens = JSON.parse(readFileSync(join(ESPELHO, 'tokens.json'), 'utf8'));
 const espelhoPrims = existsSync(join(ESPELHO, 'primitivos.json'))
@@ -67,6 +70,20 @@ for (const [tag, prim] of Object.entries(espelhoPrims.primitivos ?? {})) {
   }
 }
 
+/**
+ * O atributo e um `style=` de HTML?
+ *
+ * Nome de atributo em HTML e ASCII case-insensitive — `STYLE=` e o mesmo
+ * atributo —, e este era o IRMAO esquecido do conserto de `lerTags`: a tag
+ * passou a casar em qualquer caixa e a comparacao do atributo continuou exata.
+ *
+ * Os prefixados ficam de fora de proposito: `.style=${…}` e binding de
+ * PROPRIEDADE (o objeto CSSStyleDeclaration, que nao da para ler daqui) e
+ * `?style` nao existe. Lit preserva a caixa desses porque le as strings cruas do
+ * template, entao compara-los em minusculas seria errado.
+ */
+const ehStyleHtml = (nome) => !'.@?'.includes(nome[0]) && nome.toLowerCase() === 'style';
+
 /** Todos os `.ts` de `frontend/`, recursivo. */
 function arquivosTs(dir) {
   const fora = [];
@@ -80,38 +97,98 @@ function arquivosTs(dir) {
 
 const arquivos = arquivosTs(join(RAIZ, 'frontend'));
 
-// ── custom properties declaradas pelo proprio app ───────────────────────────
-// Generoso de proposito: isto so AMPLIA o conjunto de nomes aceitos, entao um
-// falso positivo aqui vira, no maximo, um achado nao reportado de uma property
-// que o app realmente declara. O que nao pode e o contrario.
-const doApp = new Map(); // --nome -> primeiro local de declaracao
-for (const arq of arquivos) {
+// ── AS DUAS VARREDURAS SAO ASSIMETRICAS, E ISSO E DE PROPOSITO ──────────────
+//
+// Nao "uniformize" os dois lados. Eles erram para lados OPOSTOS, e por isso
+// merecem regras opostas:
+//
+//   · DECLARACAO (`--x: …`) AMPLIA o que o guard aceita. Colher uma a mais
+//     produz FALSO NEGATIVO — o token inventado passa a ser considerado
+//     legitimo e o `var()` que o usa deixa de ser acusado. Logo: so de
+//     superficie que e CSS DE VERDADE (template `css`, bloco `<style>`,
+//     atributo `style=`). Antes deste corte, um simples
+//     `// legado --inventado: red` num comentario bastava para o guard aprovar
+//     um `var(--inventado)` real, algumas linhas abaixo.
+//
+//   · USO (`var(--x)`) e o que o guard ACUSA. Colher um a mais produz FALSO
+//     POSITIVO — e falso positivo faz alguem desligar a guarda, e aí ela nao
+//     guarda mais nada. Logo: superficie larga (texto de qualquer template mais
+//     o interior das strings), mas NUNCA comentario. Antes deste corte, um
+//     `// antigamente era var(--fantasma)` era reprovado.
+//
+// Se um dia os dois lados forem igualados, um dos dois buracos reabre — e o que
+// reabrir vai depender de para qual lado a igualacao for.
+
+const doApp = new Map();     // --nome -> primeiro local de declaracao
+const achados = [];
+const usados = new Set();
+let usos = 0;
+
+const inseguros = [];
+const superficiesPorArquivo = arquivos.map((arq) => {
   const txt = readFileSync(arq, 'utf8');
-  txt.split('\n').forEach((linha, i) => {
-    for (const m of linha.matchAll(/(--[A-Za-z0-9_-]+)\s*:/g)) {
-      if (!doApp.has(m[1])) doApp.set(m[1], `${relative(RAIZ, arq)}:${i + 1}`);
-    }
-  });
+  const rel = relative(RAIZ, arq).replaceAll('\\', '/');
+  const { marcacao, css, texto, linhaDe, problemas, posicoesDeTag } = superficies(txt, rel);
+  // Modo de falha invertido — ver o cabecalho de `scripts/lib/fonte-ts.mjs`.
+  if (problemas.length) { inseguros.push({ rel, problemas }); return null; }
+  return {
+    rel,
+    linhaDe,
+    css,
+    texto,
+    // `style="--x: 1"` tambem e CSS — e `limparCss` tira o `/* */` de dentro dele.
+    // Fragmento que nao da para ler recusa o ARQUIVO, em vez de virar branco: era
+    // o unico ponto onde o modo de falha invertido ainda engolia problema.
+    estilosInline: lerTags(marcacao, '[a-z]', posicoesDeTag)
+      .flatMap((t) => t.atributos.filter((a) => ehStyleHtml(a.nome) && a.valor)
+        .map((a) => {
+          const limpo = limparCss(a.valor);
+          if (limpo.problemas.length) {
+            inseguros.push({
+              rel,
+              problemas: limpo.problemas.map((m) => `linha ${linhaDe(a.offset)}: ${m}`),
+            });
+          }
+          return { valor: limpo.texto, offset: a.offset };
+        })),
+  };
+}).filter(Boolean);
+
+if (inseguros.length) {
+  console.error('');
+  console.error('FALHOU: nao consegui analisar estes arquivos — confira a mao.');
+  console.error('        O guard reprova em vez de aprovar o que nao leu.');
+  for (const i of inseguros) for (const m of i.problemas) console.error(`  ${i.rel}  ${m}`);
+  process.exit(1);
 }
 
-// ── varredura ───────────────────────────────────────────────────────────────
-const achados = [];
-let usos = 0;
-const usados = new Set();
+// passada 1 — declaracoes, so de superficie CSS
+for (const s of superficiesPorArquivo) {
+  for (const m of s.css.matchAll(/(--[A-Za-z0-9_-]+)\s*:/g)) {
+    if (!doApp.has(m[1])) doApp.set(m[1], `${s.rel}:${s.linhaDe(m.index)}`);
+  }
+  for (const e of s.estilosInline) {
+    for (const m of e.valor.matchAll(/(--[A-Za-z0-9_-]+)\s*:/g)) {
+      if (!doApp.has(m[1])) doApp.set(m[1], `${s.rel}:${s.linhaDe(e.offset)}`);
+    }
+  }
+}
 
-for (const arq of arquivos) {
-  const rel = relative(RAIZ, arq).replaceAll('\\', '/');
-  readFileSync(arq, 'utf8')
-    .split('\n')
-    .forEach((linha, i) => {
-      for (const m of linha.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/g)) {
-        const token = m[1];
-        usos++;
-        usados.add(token);
-        if (conhecidos.has(token) || doApp.has(token) || doPrimitivo.has(token)) continue;
-        achados.push({ onde: `${rel}:${i + 1}`, token });
-      }
-    });
+// passada 2 — usos, de superficie de texto
+for (const s of superficiesPorArquivo) {
+  // ⚠️ `gi`: nome de FUNCAO em CSS e ASCII case-insensitive, e o navegador aplica
+  // `VAR(--x)` igualzinho a `var(--x)`. Sem a flag, escrever em maiusculas
+  // contornava a validacao inteira — o uso nao era contado e o guard saia verde.
+  // Terceiro irmao da cadeia de caixa, depois de `lerTags`, `seletorAlcanca` e
+  // `ehStyleHtml`. O NOME do token, esse, e case-SENSITIVE por especificacao:
+  // `--Cor` e `--cor` sao propriedades diferentes, entao a captura nao muda.
+  for (const m of s.texto.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/gi)) {
+    const token = m[1];
+    usos++;
+    usados.add(token);
+    if (conhecidos.has(token) || doApp.has(token) || doPrimitivo.has(token)) continue;
+    achados.push({ onde: `${s.rel}:${s.linhaDe(m.index)}`, token });
+  }
 }
 
 // ── relatorio ───────────────────────────────────────────────────────────────

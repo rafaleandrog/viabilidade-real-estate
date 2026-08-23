@@ -42,6 +42,24 @@ test('o harness REJEITA um caso cujo nó exigido existe mas está OCULTO', { ski
   );
 });
 
+test('o harness REJEITA um nó RECORTADO por ancestral recolhido', { skip: pular ?? false }, async () => {
+  // A décima terceira forma, e ela fechava o vão que as outras três deixavam:
+  // `height: 0; overflow: hidden` num ancestral. `checkVisibility` diz true, o
+  // retângulo do descendente segue positivo, e como o ancestral tem retângulo
+  // zero a lente de corte também o pulava — prova de montagem verde e todas as
+  // lentes limpas com zero pixel na tela. Achado do Codex, rodada 5.
+  //
+  // O caso pede 3 `urbi-kpi` e monta 3: âncora, um dentro do painel recolhido e
+  // um dentro de um painel ROLÁVEL. Só o recortado deixa de contar — se o
+  // rolável também deixasse, a rejeição viria pelo motivo errado, e é por isso
+  // que os dois moram no mesmo caso.
+  await assert.rejects(
+    () => verificarRender({ caso: 'controle-recorte-ancestral', larguras: [1280] }),
+    /OCULTO/,
+    'nó dentro de painel recolhido não aparece — não pode contar como montado',
+  );
+});
+
 test('o harness REJEITA um caso oculto por `opacity: 0` num ANCESTRAL', { skip: pular ?? false }, async () => {
   // O irmão do anterior, e separado de propósito: `display: none` zera o
   // retângulo do descendente, `opacity: 0` NÃO se propaga para o computado dele

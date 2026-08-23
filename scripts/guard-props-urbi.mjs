@@ -46,6 +46,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { superficies, lerTags, disponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
@@ -61,6 +62,8 @@ if (!existsSync(ESPELHO)) {
       '      Rode `node scripts/sincronizar-referencia-ui.mjs` (precisa do monorepo clonado).',
   );
 }
+
+if (!disponivel) morrer(porqueIndisponivel);
 
 const espelho = JSON.parse(readFileSync(ESPELHO, 'utf8'));
 const primitivos = espelho.primitivos ?? {};
@@ -91,102 +94,17 @@ for (const [tag, p] of Object.entries(primitivos)) {
   indice.set(tag, { atributos, propriedades, convencao, linhagem: p.linhagem ?? [] });
 }
 
-// ── tokenizador de tags ─────────────────────────────────────────────────────
-// Necessario porque template literal do Lit tem `=>`, `>`, `}`, aspas e template
-// literais ANINHADOS dentro do valor de atributo. Um regex de tag engoliria o
-// primeiro `>` de uma arrow function e leria o resto do arquivo como texto.
-
-const ASPAS = { "'": "'", '"': '"' };
-
-/** `txt[i]` e `{`. Devolve o indice DEPOIS do `}` que o fecha. */
-function fimDaExpressao(txt, i) {
-  let profundidade = 0;
-  while (i < txt.length) {
-    const ch = txt[i];
-    if (ch === '\\') { i += 2; continue; }
-    if (ch === '{') { profundidade++; i++; continue; }
-    if (ch === '}') { profundidade--; i++; if (profundidade === 0) return i; continue; }
-    if (ch === '`') { i = fimDoTemplate(txt, i); continue; }
-    if (ASPAS[ch]) { i = fimDaString(txt, i, ch); continue; }
-    i++;
-  }
-  return i; // arquivo acabou sem fechar — o typecheck acusa isso antes de nos
-}
-
-/** `txt[i]` e a aspa de abertura. Devolve o indice DEPOIS da aspa de fechamento. */
-function fimDaString(txt, i, aspa) {
-  i++;
-  while (i < txt.length) {
-    if (txt[i] === '\\') { i += 2; continue; }
-    if (txt[i] === aspa) return i + 1;
-    i++;
-  }
-  return i;
-}
-
-/** `txt[i]` e a crase de abertura. Devolve o indice DEPOIS da crase de fechamento. */
-function fimDoTemplate(txt, i) {
-  i++;
-  while (i < txt.length) {
-    if (txt[i] === '\\') { i += 2; continue; }
-    if (txt[i] === '`') return i + 1;
-    if (txt[i] === '$' && txt[i + 1] === '{') { i = fimDaExpressao(txt, i + 1); continue; }
-    i++;
-  }
-  return i;
-}
-
-const FIM_DO_NOME = new Set([' ', '\t', '\n', '\r', '=', '/', '>', '<']);
-
-/**
- * Le os atributos de UMA tag `<urbi-*>` que comeca em `inicio`.
- * Devolve `{ atributos: [{nome, linha}], fim }`.
- */
-function lerTag(txt, inicio, linhaInicial) {
-  let i = inicio;
-  let linha = linhaInicial;
-  const atributos = [];
-  const avancar = (ate) => {
-    for (let k = i; k < ate; k++) if (txt[k] === '\n') linha++;
-    i = ate;
-  };
-
-  while (i < txt.length) {
-    const ch = txt[i];
-    if (ch === '\n') { linha++; i++; continue; }
-    if (ch === ' ' || ch === '\t' || ch === '\r') { i++; continue; }
-    if (ch === '>') return { atributos, fim: i + 1, linha };
-    if (ch === '/' && txt[i + 1] === '>') return { atributos, fim: i + 2, linha };
-    // Element-part do Lit: `<urbi-x ${ref(el)}>` — nao e atributo nomeado.
-    if (ch === '$' && txt[i + 1] === '{') { avancar(fimDaExpressao(txt, i + 1)); continue; }
-
-    // nome do atributo
-    const inicioNome = i;
-    const linhaNome = linha;
-    while (i < txt.length && !FIM_DO_NOME.has(txt[i])) i++;
-    const nome = txt.slice(inicioNome, i);
-    if (!nome) { i++; continue; } // char inesperado — nao trava o laco
-    atributos.push({ nome, linha: linhaNome });
-
-    // valor, se houver
-    let j = i;
-    while (j < txt.length && (txt[j] === ' ' || txt[j] === '\t' || txt[j] === '\n' || txt[j] === '\r')) j++;
-    if (txt[j] !== '=') continue; // atributo booleano sem valor
-    j++;
-    while (j < txt.length && (txt[j] === ' ' || txt[j] === '\t' || txt[j] === '\n' || txt[j] === '\r')) j++;
-    const v = txt[j];
-    let fimValor;
-    if (ASPAS[v]) fimValor = fimDaString(txt, j, v);
-    else if (v === '$' && txt[j + 1] === '{') fimValor = fimDaExpressao(txt, j + 1);
-    else if (v === '`') fimValor = fimDoTemplate(txt, j);
-    else {
-      fimValor = j;
-      while (fimValor < txt.length && !' \t\n\r>'.includes(txt[fimValor])) fimValor++;
-    }
-    avancar(fimValor);
-  }
-  return { atributos, fim: i, linha };
-}
+// ── de onde vem a superficie ────────────────────────────────────────────────
+// `scripts/lib/fonte-ts.mjs`. Este guard NAO conta chave, NAO procura crase e
+// NAO sabe o que e um comentario — o lexer ja decidiu tudo isso, e a superficie
+// que chega aqui e so o TEXTO dos templates de marcacao, com os `${…}` e os
+// comentarios de HTML em branco.
+//
+// Isso nao e refatoracao cosmetica. Enquanto o tokenizador morava aqui, ele
+// contava chave a mao, e `@click=${() => { /* { */ }}` fazia a contagem nunca
+// voltar a zero: o guard engolia o resto do arquivo e reportava
+// `0 atributos conferidos` com saida ZERO. O contrario tambem doia — um
+// `<urbi-card>` citado dentro de um comentario era acusado como codigo.
 
 /** Todos os `.ts` de `frontend/`, recursivo. */
 function arquivosTs(dir) {
@@ -201,6 +119,7 @@ function arquivosTs(dir) {
 
 // ── varredura ───────────────────────────────────────────────────────────────
 const achados = [];
+const inseguros = [];     // arquivo que o lexer nao conseguiu analisar
 const desconhecidos = []; // primitivo fora do espelho
 let tags = 0;
 let atributosVistos = 0;
@@ -209,26 +128,22 @@ let eventos = 0;
 for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   const rel = relative(RAIZ, arq).replaceAll('\\', '/');
   const txt = readFileSync(arq, 'utf8');
+  const { marcacao, linhaDe, problemas, posicoesDeTag } = superficies(txt, rel);
+  // Modo de falha invertido: superficie incompleta NAO e analisada. Um guard que
+  // seguisse com ela devolveria "limpo" sobre o que nao conseguiu ler.
+  if (problemas.length) { inseguros.push({ rel, problemas }); continue; }
 
-  // Linha de cada offset, calculada uma vez.
-  const linhaDe = (off) => {
-    let n = 1;
-    for (let k = 0; k < off; k++) if (txt[k] === '\n') n++;
-    return n;
-  };
-
-  for (const m of txt.matchAll(/<(urbi-[a-z0-9-]+)/g)) {
-    const tag = m[1];
+  for (const t of lerTags(marcacao, 'urbi-', posicoesDeTag)) {
+    const tag = t.tag;
     tags++;
-    const linhaTag = linhaDe(m.index);
-    const { atributos } = lerTag(txt, m.index + m[0].length, linhaTag);
+    const linhaTag = linhaDe(t.offset);
     const decl = indice.get(tag);
     if (!decl) {
       desconhecidos.push({ onde: `${rel}:${linhaTag}`, tag });
       continue;
     }
-    for (const { nome, linha } of atributos) {
-      const onde = `${rel}:${linha}`;
+    for (const { nome, offset } of t.atributos) {
+      const onde = `${rel}:${linhaDe(offset)}`;
       const prefixo = nome[0];
 
       if (prefixo === '@') { eventos++; continue; } // sem dado no espelho — ver cabecalho
@@ -266,6 +181,14 @@ const c = espelho.carimbo ?? {};
 console.log(
   `  espelho: ${c.sha?.slice(0, 8) ?? '?'} · monorepo ${c.versao_monorepo ?? '?'} · ${c.data_do_commit ?? '?'} · ${indice.size} primitivos`,
 );
+
+if (inseguros.length) {
+  console.error('');
+  console.error('FALHOU: nao consegui analisar estes arquivos — confira a mao.');
+  console.error('        O guard reprova em vez de aprovar o que nao leu.');
+  for (const i of inseguros) for (const m of i.problemas) console.error(`  ${i.rel}  ${m}`);
+  process.exit(1);
+}
 
 if (desconhecidos.length) {
   console.error('');

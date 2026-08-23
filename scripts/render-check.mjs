@@ -464,6 +464,18 @@ function gerarTemas() {
 //
 //   F = fora da área rolável: (largura > 0 e right + scrollX <= 0)
 //                          ou (altura  > 0 e bottom + scrollY <= 0)
+//   R = recortada por ancestral: algum ancestral com `overflow-x|y: hidden|clip`
+//                                cuja caixa não intersecta a do nó naquele eixo
+//
+// A décima terceira forma, e a que fecha o vão que as outras três deixavam: um
+// painel recolhido (`height: 0; overflow: hidden`). `checkVisibility` diz true,
+// o retângulo do descendente continua positivo, e como o ancestral tem
+// retângulo zero a lente de corte também o pulava — prova de montagem verde e
+// todas as lentes limpas com zero pixel na tela.
+//
+// ⚠️ `scroll` e `auto` NÃO recortam para este fim: ali o conteúdo é alcançável
+// pelo usuário. Incluí-los erraria para "oculto", que é o lado que PULA — a
+// mesma assimetria que mantém `left: 3000px` como visível.
 //
 // ⚠️ `left: 3000px` fica como VISÍVEL de propósito, mesmo quando o documento
 // não rola até lá. Errar para "visível" faz o harness MEDIR a mais, que é
@@ -524,7 +536,27 @@ function gerarSondasCompartilhadas() {
     '//    reproduzida e a causa de ela ter sumido).',
     '//  · visivel            = aquilo E retangulo maior que zero.',
     '// Ver a tabela de OCULTACAO em scripts/render-check.mjs.',
+    'const paiComposto = (n) => n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);',
     'const naoOcultoPorCss = (el) => el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true });',
+    '// RECORTE POR ANCESTRAL: um painel recolhido (`height: 0; overflow: hidden`)',
+    '// nao zera o retangulo do descendente e nao e visto pelo `checkVisibility` —',
+    '// o no contava como visivel com zero pixel na tela, e como o ancestral tem',
+    '// retangulo zero a lente de corte tambem o pulava. Achado do Codex, rodada 5.',
+    '//',
+    '// So `hidden` e `clip` entram. `scroll` e `auto` NAO: la o conteudo e',
+    '// alcancavel pelo usuario, e trata-lo como oculto seria errar para o lado que',
+    '// PULA a medicao — o defeito desta familia inteira.',
+    'const RECORTA = new Set(["hidden", "clip"]);',
+    'const recortadoPorAncestral = (el) => {',
+    '  const r = el.getBoundingClientRect();',
+    '  for (let p = paiComposto(el); p; p = paiComposto(p)) {',
+    '    const cs = getComputedStyle(p);',
+    '    const c = p.getBoundingClientRect();',
+    '    if (RECORTA.has(cs.overflowX) && Math.min(r.right, c.right) - Math.max(r.left, c.left) <= 0) return true;',
+    '    if (RECORTA.has(cs.overflowY) && Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top) <= 0) return true;',
+    '  }',
+    '  return false;',
+    '};',
     '// Coordenada negativa nao amplia o scroll: nao ha rolagem que chegue la.',
     'const foraDaAreaRolavel = (el) => {',
     '  const r = el.getBoundingClientRect();',
@@ -538,7 +570,8 @@ function gerarSondasCompartilhadas() {
     '};',
     'const participaDaMedicao = (el) => naoOcultoPorCss(el)',
     '  && !colapsadaPorTransform(el)',
-    '  && !foraDaAreaRolavel(el);',
+    '  && !foraDaAreaRolavel(el)',
+    '  && !recortadoPorAncestral(el);',
     'const visivel = (el) => {',
     '  if (!participaDaMedicao(el)) return false;',
     '  const r = el.getBoundingClientRect();',
@@ -554,7 +587,6 @@ function gerarSondasCompartilhadas() {
     '  })(raiz);',
     '  return fora;',
     '};',
-    'const paiComposto = (n) => n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);',
     'const caminho = (el, teto) => {',
     '  const partes = [];',
     '  let n = el;',

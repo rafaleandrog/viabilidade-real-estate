@@ -264,14 +264,34 @@ jobs:
     name: Tokens, props de primitivo e box model do urbi-*
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      URBI_TYPESCRIPT: ${{ github.workspace }}/.ts-guards/node_modules/typescript/lib/typescript.js
     steps:
       - uses: actions/checkout@v7
+      - name: Instalar só o typescript, isolado
+        run: |
+          set -uo pipefail
+          # Desde a 3ª rodada de revisão do PR 505 o lexer de JS/TS dos guards é o
+          # PARSER do `typescript` — três rodadas seguidas acharam classe nova num
+          # lexer artesanal, e a saída foi parar de escrever um.
+          #
+          # ⚠️ O install é num diretório PRÓPRIO, com package.json próprio, e nunca
+          # na raiz: `npm install` na raiz leria o package.json do repo e tentaria
+          # baixar o `@urbiverso/sdk`, que é GitHub Packages privado — 401, e este
+          # workflow existe justamente para nunca depender de credencial. O
+          # `typescript` é público, então este passo não reintroduz esse problema.
+          mkdir -p .ts-guards
+          cd .ts-guards
+          echo '{"name":"ts-guards","private":true}' > package.json
+          npm install --no-audit --no-fund --loglevel=error typescript@5.9.3
+          node -e "console.log('typescript', require('./node_modules/typescript').version)"
       - name: Guards de UI contra o espelho docs/ui-urbiverso/
         run: |
           set -uo pipefail
-          # Só `node` — os três leem `docs/ui-urbiverso/`, que é conteúdo DESTE
-          # repositório (o espelho versionado da referência do urbiverso). Sem
-          # pnpm install, sem SDK, sem credencial, sem rede.
+          # Os três leem `docs/ui-urbiverso/`, que é conteúdo DESTE repositório (o
+          # espelho versionado da referência do urbiverso). Sem SDK, sem
+          # credencial. Faltando o `typescript`, eles RECUSAM analisar em vez de
+          # aprovar — "não deu para rodar" nunca é "passou".
           #
           # As três classes que eles pegam são falhas 100% SILENCIOSAS — atravessam
           # typecheck, testes e esbuild em verde, exatamente como as aspas curvas:
@@ -288,6 +308,20 @@ jobs:
           node scripts/guard-box-model-urbi.mjs || falhou=1
           if [ "$falhou" != "0" ]; then
             echo "::error title=Guard de UI reprovou::Token inexistente, atributo que o primitivo não declara, ou width/height de fora num urbi-* sem box-sizing. Nenhuma das três aparece no typecheck, nos testes ou no build — veja o log acima para o arquivo:linha."
+            exit 1
+          fi
+      - name: Bateria do lexer compartilhado
+        if: always()
+        run: |
+          set -uo pipefail
+          # `scripts/lib/fonte-ts.mjs` e o unico lugar onde os tres guards decidem
+          # fronteira de comentario, string, template e `${…}`. Essa e a vantagem —
+          # um lugar para consertar — e o risco: um erro ali erra nos tres de uma
+          # vez, e em silencio. JS/TS quem resolve e o parser do TypeScript; o que
+          # a bateria cobre e a camada CSS/HTML, escrita a mao, e o modo de falha
+          # invertido.
+          if ! bash scripts/testar-fonte-ts.sh; then
+            echo "::error title=Bateria do lexer falhou::scripts/lib/fonte-ts.mjs nao delimita comentario, string ou template como o esperado. Os tres guards de UI dependem dele."
             exit 1
           fi
       - name: Bateria dos guards de UI
@@ -414,6 +448,7 @@ jobs:
           node -e "console.log('esbuild em', require.resolve('esbuild/package.json'))"
           node -e "import('playwright').then(async (m) => { const b = await m.chromium.launch(); console.log('Chromium', b.version()); await b.close(); })"
       - name: Verificação de render
+        id: render
         if: steps.escopo.outputs.roda == '1'
         env:
           # ⚠️ Esta variável é o que separa "pulou" de "passou". No
@@ -452,7 +487,9 @@ jobs:
       - name: Registrar no resumo se o render rodou
         if: always()
         env:
+          ESCOPO: ${{ steps.escopo.outcome }}
           RODOU: ${{ steps.escopo.outputs.roda }}
+          RENDER: ${{ steps.render.outcome }}
         run: |
           set -uo pipefail
           # O IRMÃO, no CI, do "render OK" que o validar-frontend.sh anunciava
@@ -460,8 +497,22 @@ jobs:
           # acima são pulados por `if:` e o job fica VERDE — o que é correto,
           # mas o nome do check ("Render em Chromium") se lê como se algo
           # tivesse sido medido. Esta linha põe o estado onde mais gente olha.
-          if [ "${RODOU:-0}" = "1" ]; then
-            echo "Render em Chromium: **executado**." >> "$GITHUB_STEP_SUMMARY"
-          else
+          #
+          # ⚠️ A fonte é o RESULTADO DA ETAPA DE MEDIÇÃO, não a classificação do
+          # diff. A versão anterior lia só `steps.escopo.outputs.roda`, que é
+          # escrito ANTES da instalação: se `npm ci`, o download do Chromium ou a
+          # sonda de lançamento falhassem, a medição nunca começava e este passo,
+          # com `if: always()`, escrevia **executado** assim mesmo. E uma falha do
+          # próprio passo de escopo caía no ramo que atribui a ausência à
+          # classificação do diff, dizendo "fora de escopo" para um
+          # pré-requisito reprovado. Três estados distintos, três mensagens.
+          # Achado do Codex, rodada 5.
+          if [ "$ESCOPO" != "success" ]; then
+            echo "Render em Chromium: **INDETERMINADO** — a própria classificação do diff falhou (\`$ESCOPO\`), então não se sabe se este PR precisava de render. Nada foi medido." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${RODOU:-0}" != "1" ]; then
             echo "Render em Chromium: **NÃO executado** — o diff não toca frontend/, o espelho de UI, a toolchain pinada nem o harness. Nada foi medido em DOM (o que é esperado neste caso)." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$RENDER" = "success" ] || [ "$RENDER" = "failure" ]; then
+            echo "Render em Chromium: **executado** (\`$RENDER\`)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Render em Chromium: **NÃO executado, e o PR estava em escopo** — a etapa de medição não chegou a começar (\`${RENDER:-ausente}\`); provável falha de pré-requisito: \`npm ci\`, download do Chromium ou a sonda de lançamento. Isto NÃO é 'passou'." >> "$GITHUB_STEP_SUMMARY"
           fi
