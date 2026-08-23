@@ -646,8 +646,9 @@ Observações (3)
 ```
 
 > ⚠️ **Todo bloqueante nomeia o contrato violado E o cita.** O rótulo é o título — "DDL em
-> migração de app", "`sdk_min` acima do publicado" —, mas a **chave** é a citação: `arquivo:linha`
-> da regra mais o texto literal dela. O campo não é estilo. A saída de não-convergência da § 8 se
+> migração de app", "`sdk_min` acima do publicado" —, mas a **chave** é o **texto literal** da
+> regra mais a **âncora nomeada** da ocorrência. O `arquivo:linha` entra como referência para o
+> leitor, **fora** da chave: linha muda a cada conserto acima dela. O campo não é estilo. A saída de não-convergência da § 8 se
 > decide comparando pares **contrato + ocorrência** entre rodadas, e rótulo em texto livre não
 > serve de chave: o mesmo contrato ganharia duas redações e pareceria novo, ou dois contratos
 > receberiam o mesmo resumo e disparariam laço cedo demais.
@@ -691,11 +692,18 @@ relatório.
 >   conserto pegou — cairia aqui, porque ela não traz par novo **por ter acabado**. O desfecho dela
 >   é a § 9.
 >
->   Para o par ser comparável entre rodadas, o **contrato é citado, não resumido**: o relatório dá
->   `arquivo:linha` da regra violada mais o texto literal dela, do jeito que a § 7 já exige para o
->   achado. Rótulo redigido livremente ("DDL em migração de app") serve de título; **a chave é a
->   citação.** Sem isso, o mesmo contrato ganha duas redações e parece novo, ou dois contratos
->   diferentes recebem o mesmo resumo e disparam laço cedo demais.
+>   Para o par ser comparável entre rodadas, o **contrato é citado, não resumido**, e a chave
+>   **não inclui número de linha**:
+>
+>   | Metade do par | Chave estável | Só informativo |
+>   |---|---|---|
+>   | contrato | **texto literal da regra**, espaços normalizados | `arquivo:linha` de onde ela está |
+>   | ocorrência | `arquivo` + a **âncora nomeada** que a contém — função, classe, seletor, título de seção | a linha |
+>
+>   **Linha muda a cada conserto que insere ou remove qualquer coisa acima**, e o texto literal não
+>   compensa isso enquanto o número fizer parte da chave: um bloqueante ainda pendente ganharia par
+>   novo e a saída nunca dispararia. Rótulo redigido livremente ("DDL em migração de app") serve de
+>   título; a chave é a **citação mais a âncora**.
 >
 >   Consequência declarada: a **terminação é condicional**. Se cada conserto expuser contrato novo,
 >   o ciclo reabre — e é o que se quer, porque a alternativa é mergear com defeito conhecido. Quem
@@ -815,9 +823,12 @@ que o usuário precisa responder, em vez de deixar "aguardando decisão" solto:
 
 - **Decisão de desenho:** o conserto mexeria em algo que o usuário decidiu. Use com parcimônia
   — usado à toa, vira jeito de terceirizar julgamento que era seu.
-- **Achado que não converge:** a rodada não nomeia nenhum contrato que as anteriores já não
-  tenham nomeado — ver a § 8 para a definição, que é a mesma. Pare, diga o que está girando e
-  devolva ao usuário. Numa app isso inclui o caso em que o desfecho depende de issue
+- **Achado que não converge:** a rodada **ainda tem bloqueante pendente** *e* **não traz nenhum
+  par novo** — par é `contrato citado + ocorrência ancorada`, como a § 8 define. **As duas
+  condições, sempre.** Sem a primeira, a rodada limpa de confirmação cairia aqui, porque ela não
+  traz par novo por ter acabado — e o desfecho dela é o encerramento por zero pendentes, logo
+  acima. Sem a segunda metade do par, uma segunda ocorrência real do mesmo contrato pareceria laço.
+  Pare, diga o que está girando e devolva ao usuário. Numa app isso inclui o caso em que o desfecho depende de issue
   no shell: o PR não fecha sozinho, e insistir só gasta rodada.
 
 ### Merge

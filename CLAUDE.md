@@ -249,7 +249,9 @@ autor precisa responder, em vez de deixar "aguardando decisão" solto:
 - **Decisão de desenho** — o conserto mexeria em algo que o autor decidiu. Com parcimônia: usado à
   toa, vira jeito de terceirizar julgamento que era seu.
 - **Achado que não converge.** A identidade de um achado é o par **contrato violado + ocorrência**
-  — `arquivo:linha` do defeito —, não o remédio. Dois bloqueantes distintos podem pedir o mesmo
+  — o **texto literal** da regra mais a **âncora nomeada** que contém o defeito (função, classe,
+  seletor, seção), **nunca o número de linha**, que muda a cada conserto acima dele —, não o
+  remédio. Dois bloqueantes distintos podem pedir o mesmo
   conserto, e **duas ocorrências do mesmo contrato em lugares diferentes são dois achados**: duas
   rotas que omitem a mesma regra de autorização não são repetição. **Precedência: defeito distinto
   vence remédio repetido.**
