@@ -632,7 +632,6 @@ duração do Após-chaves = 12 meses
 
 O período começa no primeiro mês posterior ao fim da Obra.
 
-> **Comportamento vigente.** O início já é o mês seguinte ao fim da Obra (`pos_obra` travado em
 > ✅ **Comportamento vigente, alinhado ao padrão e à EVI (#226 / EVI-007).** O início é o mês
 > seguinte ao fim da Obra (`pos_obra` travado por `recalcularTravados`) e a duração é a
 > **constante** `APOS_CHAVES_MESES = 12` (`frontend/fluxo-shared.ts:237`), consumida em
@@ -1763,10 +1762,19 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > capital e correção monetária **saíram do formulário** (#279/#355); as colunas continuam no schema
 > como dado histórico, sem tela e sem leitor.
 >
-> ⚠️ **Continua ausente:** capital de giro, linha rotativa e empréstimo-ponte. Os tipos aceitos são
-> exatamente `['financiamento_producao','divida','equity']` (`backend/rotas/funding.ts:43`);
-> `capital_giro` é rejeitado (`backend/rotas/funding.test.ts:26`). A §17.4 abaixo descreve o
-> conceito como **modelo funcional de referência**, não como comportamento instalado.
+> ⚠️ **Capital de giro EXISTE, sob o nome `divida`** — decisão 2 do autor, 2026-08-22. O tipo
+> `divida` **é** o produto de CG por calendário: a migração `029_funding_operacoes.js:38-43,127-130`
+> converte `capital_giro` para `divida` **sem perda**, e o golden case
+> `frontend/funding-motor.test.ts:28-38` exercita uma operação `divida` chamada "Capital de giro".
+> O que o enum recusa é o **literal** `capital_giro` como tipo novo
+> (`backend/rotas/funding.ts:43`, `backend/rotas/funding.test.ts:26`) — não o produto.
+>
+> **O que de fato não existe é a linha ROTATIVA**, e por decisão: ela reintroduziria a competição
+> por caixa que a #355 apagou. Empréstimo-ponte também não existe. A §17.4 abaixo descreve o
+> conceito rotativo como **modelo funcional de referência**, não como comportamento instalado.
+>
+> ⚠️ **O que falta é o RÓTULO**, não o produto — a tela ainda chama de "Dívida" o que também é
+> capital de giro. É a issue #466.
 
 ### 17.1 Separação entre projeto e capital
 

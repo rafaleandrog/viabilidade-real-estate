@@ -110,9 +110,14 @@ depois do funding (`:376-387`, severidade `alerta`).
 **somente** no bloco de funding; o repasse continua sendo recebimento do cliente, ainda que o caixa
 alimente o cash sweep.
 
-> ⚠️ **Linha rotativa e empréstimo-ponte não existem.** Os tipos aceitos são exatamente
-> `['financiamento_producao','divida','equity']` (`backend/rotas/funding.ts:43`); `capital_giro` é
-> rejeitado com `tipo deve ser um de…` (`backend/rotas/funding.test.ts:26`).
+> ⚠️ **Linha rotativa e empréstimo-ponte não existem — capital de giro EXISTE.** Os tipos aceitos
+> são exatamente `['financiamento_producao','divida','equity']` (`backend/rotas/funding.ts:43`), e o
+> literal `capital_giro` é recusado como tipo novo (`backend/rotas/funding.test.ts:26`). **Isso não
+> quer dizer que o produto falte:** `divida` **é** o capital de giro por calendário (decisão 2 do
+> autor), a migração `029_funding_operacoes.js:38-43,127-130` converte `capital_giro` para `divida`
+> **sem perda**, e `frontend/funding-motor.test.ts:28-38` exercita uma operação `divida` chamada
+> "Capital de giro". O que foi recusado, por decisão, é a linha **rotativa** — ela reintroduziria a
+> competição por caixa que a #355 apagou. Falta o **rótulo** na tela (#466), não o produto.
 
 > ⚠️ **O que continua inerte na aba `Viabilidade → Financeiro`**, e só isso: `regime_tributario` e
 > os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`), mais
