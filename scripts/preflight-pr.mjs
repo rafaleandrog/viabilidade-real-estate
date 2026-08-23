@@ -99,11 +99,19 @@ try {
 
 if (branch === 'main') {
   bloqueantes.push(
-    'você está na `main`. O processo obrigatório exige branch própria criada de `origin/main` ' +
-      '(CLAUDE.md § Processo obrigatório, passo 1).',
+    'estado da árvore: você está na `main`. O processo obrigatório exige branch própria criada de ' +
+      '`origin/main` (CLAUDE.md § Processo obrigatório, passo 1).',
   );
 } else if (branch) {
-  ok.push(`branch \`${branch}\` (não é a main)`);
+  ok.push(`estado da árvore: branch \`${branch}\`, não é a main`);
+} else {
+  // `actions/checkout` deixa o repositório em HEAD DESTACADO, e aí
+  // `git branch --show-current` devolve vazio. Sem este ramo a checagem não
+  // imprimia nada no CI, e um teste que assertava o texto da branch falhava lá
+  // e passava aqui — a mesma classe de defeito que o `--arquivos` e o
+  // `--commits` já tinham corrigido em outras entradas. As três checagens de
+  // árvore são de PRÉ-PUSH: no CI o push já aconteceu e elas não se aplicam.
+  ok.push('estado da árvore: HEAD destacado — branch e upstream não se aplicam (é o caso do CI)');
 }
 
 // A armadilha do `checkout -B <branch> origin/main`: a branch nasce rastreando

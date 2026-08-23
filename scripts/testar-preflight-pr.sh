@@ -134,7 +134,10 @@ contem 'o guard lê isso como issue citada' 'avisa sobre "PR #NNN"' \
   'Ver PR #499.' '' 'Sem-fechamento: #499 é PR, não issue.'
 contem 'ACIONA o App' 'avisa sobre @codex no corpo' \
   'Pedi @codex review antes.'
-contem 'não é a main' 'reporta a branch atual' \
+# Asserta o PREFIXO estável, não o texto da branch: no CI o checkout deixa HEAD
+# destacado e o nome da branch não existe. Um caso que assertasse o nome passa
+# aqui e falha lá — e foi assim que este PR ficou vermelho.
+contem 'estado da árvore:' 'reporta o estado da árvore em qualquer ambiente' \
   'Nada a citar.'
 
 # ── Contrato de uso ─────────────────────────────────────────────────────────
