@@ -700,6 +700,31 @@ Já aconteceu: relatório publicado sobre um HEAD que tinha acabado de mover, co
 já corrigido. Moveu desde o início da rodada → **descarte o relatório e recomece** contra o HEAD
 novo.
 
+### PR que toca vários documentos: releia TODOS contra o estado final
+
+**ADAPTADO — 2026-08-23, lição do PR 494.** Quando o PR toca mais de um documento e eles descrevem
+uns aos outros, **cada conserto envelhece a descrição vizinha** — e o envelhecimento acontece
+*dentro do próprio PR*, depois que você já revisou aquele arquivo.
+
+Não é hipótese: no PR 494 as três rodadas do Codex acharam **a mesma classe** de defeito, uma por
+rodada, sempre criada pelo conserto da rodada anterior. A guarda foi consertada no `SKILL.md` →
+o `CLAUDE.md` ficou sem a instrução → consertado o `CLAUDE.md` → o `PROGRESSO.md` passou a descrever
+a guarda **rejeitada** como se fosse a vigente. Cada uma passaria por "documentação, risco baixo".
+
+Então, antes de postar o relatório de **qualquer** rodada num PR que toca 2+ documentos:
+
+1. Liste os documentos que o diff toca.
+2. Para cada um, releia-o **inteiro contra o estado final do diff** — não contra o que ele dizia
+   quando a rodada começou.
+3. Pergunte de cada afirmação: *isto ainda é verdade depois dos consertos desta rodada?* Em especial
+   toda frase que descreve **como algo funciona** ou **qual foi a decisão** — são as que envelhecem.
+4. Confira também os documentos que o diff **não** toca mas que descrevem o que ele mudou. Doc de
+   ponto de entrada (`LEIA-PRIMEIRO`, `PROGRESSO.md`, `CLAUDE.md`) é o caso perigoso: quem chega
+   depois lê **ele**, não o diff.
+
+Um documento que descreve a tentativa descartada é pior que um documento omisso: ele **manda a
+próxima sessão refazer o caminho errado**, e com a autoridade de estar escrito.
+
 ### A independência se perde — recompre-a
 
 Sua sessão tem memória, e memória ancora: a tendência é conferir "os meus achados saíram?" e

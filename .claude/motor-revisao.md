@@ -20,6 +20,39 @@ palavras —, então o custo mora no input, e é ali que o motor externo paga.
 abaixo tenta, e o que ele não conseguir vira fan-out em subagente Anthropic, **declarada** no
 relatório e na linha de anúncio. O que nunca acontece é lente sumir porque o motor caiu.
 
+> ✅ **ADAPTADO — 2026-08-23: existe um TERCEIRO caminho, e neste repositório ele é o que funciona.**
+>
+> Este documento descrevia só dois motores: o **CLI local** (`codex exec`, o preflight abaixo) e o
+> **fallback nativo**. Falta o **GitHub App do Codex** (`chatgpt-codex-connector`), que **está
+> instalado neste repositório** e revisa quando se comenta `@codex review` no PR — ou quando o PR é
+> aberto. Medido no PR 494: três rodadas seguidas, ~2 min cada, cinco achados P2 reais.
+>
+> **Por que isto precisa estar escrito.** Sem esta nota, a sessão faz o que a de 2026-08-23 fez:
+> mede que o CLI não sobe (sem `OPENAI_API_KEY`, e com `api.openai.com` devolvendo **403 no CONNECT**
+> pela política de rede do *cloud environment*), conclui *"não há Codex"* e cai para o nativo — com
+> o motor bom disponível a um comentário de distância. A conclusão errada é barata de tirar e cara
+> de manter.
+>
+> **Ordem de preferência neste repositório:**
+>
+> | # | Motor | Quando |
+> |---|---|---|
+> | 1 | **GitHub App** — comentar `@codex review` no PR | Sempre que houver PR aberto. É o caminho normal |
+> | 2 | CLI local (`codex exec`, preflight abaixo) | Se a chave e a liberação de rede existirem |
+> | 3 | Fan-out nativo Anthropic | Só quando 1 e 2 falharem, **declarado** como menos adversarial |
+>
+> **Os dois primeiros não competem — somam.** No PR 494 a divisão foi limpa e vale registrar: o
+> Codex achou os defeitos de **lógica** (uma guarda que não testava o que dizia testar; um caminho
+> absoluto que não existe noutro layout), e as lentes nativas acharam as **imprecisões factuais** do
+> texto. Rodar as duas é mais barato que descobrir depois qual faltou.
+>
+> ⚠️ **O portão do CI não enxerga o Codex.** `revisao-registrada.yml:108` filtra os comentários
+> **pelo autor do PR**, então uma review do bot **nunca** satisfaz o status `revisao/bloqueantes` —
+> e, pior, publicar a linha de máquina com `bloqueantes=0` deixa o status **verde** com thread do
+> Codex em aberto. Por isso: **`bloqueantes=` conta os achados do Codex ainda não resolvidos**, e o
+> quadro de execução da §7 traz uma linha por rodada do Codex, com o commit revisado. Threads
+> endereçados se resolvem antes de fechar o ciclo.
+
 ## Entradas que a skill chamadora fornece
 
 O motor é o mesmo para shell e para app; o que difere vem de quem chama, e **tem que estar
