@@ -76,8 +76,14 @@ Então, **antes** de publicar o relatório da §7, execute nesta ordem:
 
 1. **Drene o que estiver em voo — antes de acionar.** Conte, no PR, quantos acionamentos já existem
    (comentários com `@codex review`, mais **um** se o PR foi aberto para revisão, porque a abertura
-   aciona sozinha) e quantas reviews do bot já chegaram. **Se houver acionamento sem resposta, espere
-   essa resposta primeiro** — ela é da rodada anterior, não da sua.
+   aciona sozinha) e quantas **respostas** do bot já chegaram. **Se houver acionamento sem resposta,
+   espere essa resposta primeiro** — ela é da rodada anterior, não da sua.
+
+   > ⚠️ **"Resposta" aqui são as DUAS formas, não só review.** Contar apenas reviews faz a drenagem
+   > enxergar como pendente um acionamento que já foi respondido **por comentário** — o caso limpo
+   > dos PRs 498 e 499 — e a execução seguinte fica esperando uma review formal que nunca vem,
+   > **antes mesmo de acionar**. O passo 3 conserta a colheita; sem esta linha, o passo 1 continua
+   > com o mesmo defeito, uma etapa antes. Achado do Codex no PR 500.
 
 2. **Acione, e guarde o carimbo do SEU comentário.** Comente `@codex review` com o head da rodada
    declarado, e anote o `created_at`/`id` do comentário que você acabou de publicar.
@@ -89,7 +95,24 @@ Então, **antes** de publicar o relatório da §7, execute nesta ordem:
    > | Resultado | Onde aparece | Como ler |
    > |---|---|---|
    > | **Com achados** | *review* formal + threads inline | `pull_request_read` com `get_reviews` e `get_review_comments` |
-   > | **Sem achados** | **comentário comum** do bot: *"Codex Review: Didn't find any major issues. Reviewed commit: `<sha>`"* — ou só uma reação 👍 | `pull_request_read` com **`get_comments`**, filtrando `user.login == 'chatgpt-codex-connector[bot]'` |
+   > | **Sem achados** | **comentário comum** do bot: *"Codex Review: Didn't find any major issues. Reviewed commit: `<sha>`"* | `pull_request_read` com **`get_comments`**, filtrando `user.login == 'chatgpt-codex-connector[bot]'` |
+
+   > ⚠️ **A documentação do próprio App menciona uma terceira forma — "otherwise it will react with
+   > 👍" — e ela NÃO é detectável por este procedimento.** A reação se anexa ao **comentário de
+   > acionamento**, cujo autor continua sendo humano: `get_comments` não devolve comentário novo do
+   > bot, e não há `Reviewed commit:` para amarrar ao head. Reconhecê-la exigiria consultar as
+   > reações daquele comentário específico e correlacionar o ator. **Enquanto isso não for medido e
+   > implementado, uma rodada respondida só por 👍 estoura o teto** — e é isso que o passo 5 trata.
+   > Não documente essa forma como suportada. Achado do Codex no PR 500, respondendo a uma pergunta
+   > explícita sobre não documentar comportamento não medido.
+   >
+   > **Leia os dois lugares na MESMA passada, sempre — não um, depois o outro se faltar.** Em
+   > 2026-08-23, no PR 500, li só `get_comments`, não vi resposta e anunciei que o Codex estava em
+   > silêncio há 24 minutos. A review estava lá desde 2m30s depois do acionamento, com dois P1. Ou
+   > seja: o defeito que este arquivo conserta tem **simétrico**, e eu caí nele dentro do próprio PR
+   > que o conserta. A forma "com achados" chega como review cujo corpo é genérico
+   > (*"Here are some automated review suggestions"*) — **o conteúdo está nos threads inline**, que
+   > só `get_review_comments` devolve.
    >
    > **Procurar só por review faz o laço nunca fechar em PR limpo** — ele estoura os 15 minutos e
    > publica `bloqueantes=1`, um **bloqueante falso**, exatamente no caso em que não há nada errado.
