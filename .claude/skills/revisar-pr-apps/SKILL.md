@@ -706,10 +706,18 @@ novo.
 uns aos outros, **cada conserto envelhece a descrição vizinha** — e o envelhecimento acontece
 *dentro do próprio PR*, depois que você já revisou aquele arquivo.
 
-Não é hipótese: no PR 494 as três rodadas do Codex acharam **a mesma classe** de defeito, uma por
-rodada, sempre criada pelo conserto da rodada anterior. A guarda foi consertada no `SKILL.md` →
-o `CLAUDE.md` ficou sem a instrução → consertado o `CLAUDE.md` → o `PROGRESSO.md` passou a descrever
-a guarda **rejeitada** como se fosse a vigente. Cada uma passaria por "documentação, risco baixo".
+Não é hipótese: no PR 494, rodada após rodada, o Codex achou **a mesma classe** de defeito, sempre
+criada pelo conserto da rodada anterior. A guarda foi consertada no `SKILL.md` → o `CLAUDE.md` ficou
+sem a instrução → consertado o `CLAUDE.md` → o `PROGRESSO.md` passou a descrever a guarda
+**rejeitada** como vigente → consertado o `PROGRESSO.md`, o `LEIA-PRIMEIRO.md` seguia mandando caçar
+uma chave desnecessária. Cada uma passaria por "documentação, risco baixo".
+
+E o fecho da cadeia é a própria lição: o que a sustentava era um **contador** — quantas rodadas,
+quantos achados — escrito dentro dos documentos que a revisão estava revisando. Ele envelhecia a
+cada rodada por construção. A classe só fechou quando o contador saiu, não quando foi sincronizado
+pela enésima vez. **Descrição que depende do estado corrente da revisão não entra no artefato
+revisado** — é a mesma armadilha da frase que cita o resultado de um `grep` que o próprio commit
+muda.
 
 Então, antes de postar o relatório de **qualquer** rodada num PR que toca 2+ documentos:
 
