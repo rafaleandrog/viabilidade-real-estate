@@ -56,6 +56,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { disponivel as tsDisponivel, porqueIndisponivel, analisar } from './lib/fonte-ts.mjs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // O REGISTRO. É aqui que uma tabela é declarada aposentada — e é esta estrutura
@@ -88,8 +89,20 @@ export const OBSOLETAS = {
 // lido e explicado; `scripts/` porque é onde vivem este registro e o harness que
 // exercita as migrações `019`/`028`/`029`; os três arquivos de raiz porque são
 // memória de projeto, não código.
-const PERMITIDOS_PREFIXO = ['migracoes/', 'docs/', 'scripts/'];
-const PERMITIDOS_EXATOS = new Set(['schema.json', 'CLAUDE.md', 'PROGRESSO.md']);
+const PERMITIDOS_PREFIXO = ['migracoes/', 'docs/'];
+
+// ⚠️ `scripts/` NAO e prefixo permitido, e ja foi. Qualquer consumidor novo
+// posto ali escapava do guard inteiro — reproduzido com um `scripts/reusar.mjs`
+// chamando `dados.listar('avancado_capital_instrumentos', {})`: exit 0. Pior, o
+// proprio guard era descartado antes do scanner, entao ele nao provava o proprio
+// tratamento de comentario. Sao TRES arquivos legitimos, e eles se nomeiam.
+// Achado do Codex, rodada 2.
+const PERMITIDOS_EXATOS = new Set([
+  'schema.json', 'CLAUDE.md', 'PROGRESSO.md',
+  'scripts/guard-tabelas-obsoletas.mjs',      // este registro
+  'scripts/testar-guard-tabelas-obsoletas.sh', // a bateria dele
+  'scripts/migracoes-harness.mjs',             // exercita as migracoes 019/028/029
+]);
 
 // Diretórios que não são fonte do repositório.
 const PULAR_DIR = new Set(['.git', 'node_modules', 'dist', '.pnpm', 'coverage', '.turbo']);
@@ -126,8 +139,20 @@ const EXT_BINARIA = new Set([
 // Extensão desconhecida NÃO dispensa nada. É a direção segura: o custo é um
 // falso positivo, que é barulhento e se conserta; o custo do contrário é a
 // cegueira silenciosa que originou este parágrafo.
+//
+// ⚠️ JS/TS NAO ESTA MAIS AQUI. O scanner por linha nao sobrevive a template
+// literal multi-linha, que este repositorio usa em toda tela: reiniciar o estado
+// de aspas a cada linha faz o conteudo do template ser relido como JavaScript, e
+// entao um `//` que e TEXTO (`https://exemplo.test/${…}`) vira comentario e
+// engole o resto da linha; e um `/*` literal dentro do template prende
+// `dentroBloco` e esconde tudo o que vem depois. Os dois deixam o guard verde.
+//
+// Para essa familia quem decide onde ha comentario e `scripts/lib/fonte-ts.mjs`,
+// que usa o PARSER do TypeScript — a mesma autoridade dos tres guards de UI.
+// Duas implementacoes da mesma pergunta divergem, e a que diverge calada e esta.
+// Achado do Codex, rodada 2.
 const FAMILIAS = [
-  { ext: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.scss'],
+  { ext: ['.css', '.scss'],
     linha: ['//'], bloco: [['/*', '*/']], aspas: ['\'', '"', '`'] },
   { ext: ['.sh', '.bash', '.zsh', '.yml', '.yaml', '.toml', '.ini', '.py', '.rb', '.conf'],
     linha: ['#'], bloco: [], aspas: ['\'', '"'] },
@@ -189,6 +214,36 @@ function removerComentarios(linha, fam, dentroBloco) {
   return { codigo, dentroBloco: bloco };
 }
 
+const EXT_JS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
+const ehJs = (rel) => {
+  const ponto = rel.lastIndexOf('.');
+  return ponto > -1 && EXT_JS.has(rel.slice(ponto).toLowerCase());
+};
+
+/**
+ * O texto com as porcoes COMENTADAS viradas espaco, pelo parser do TypeScript.
+ *
+ * Espaco, e nao remocao, para o comprimento nao mudar: a linha reportada
+ * continua sendo a do arquivo. String e template literal NAO sao apagados de
+ * proposito — a referencia que o guard procura mora dentro de uma string, e
+ * apaga-las cegaria o guard por completo.
+ *
+ * Modo de falha INVERTIDO, como no resto da familia: arquivo que o TypeScript
+ * nao parseia e arquivo que nao entendemos, e ele RECUSA em vez de ser analisado
+ * por aproximacao.
+ */
+function semComentariosJs(txt, rel) {
+  const a = analisar(txt, rel);
+  if (a.diagnosticos > 0) {
+    return { texto: null, problema: `${rel}: o TypeScript nao parseia (${a.diagnosticos} erro(s) de sintaxe)` };
+  }
+  const buf = [...txt];
+  for (const { de, ate } of a.comentarios) {
+    for (let i = de; i < ate && i < buf.length; i += 1) if (buf[i] !== '\n') buf[i] = ' ';
+  }
+  return { texto: buf.join(''), problema: null };
+}
+
 function permitido(rel) {
   if (PERMITIDOS_EXATOS.has(rel)) return true;
   return PERMITIDOS_PREFIXO.some((p) => rel.startsWith(p));
@@ -210,6 +265,13 @@ function* arquivos(raiz, dir = raiz) {
 function main() {
   const raiz = process.argv[2] ?? fileURLToPath(new URL('..', import.meta.url));
 
+  // Sem o parser nao ha como analisar JS/TS, e "nao deu para rodar" nunca e
+  // "passou": sai 2, dizendo por que, como os tres guards de UI.
+  if (!tsDisponivel) {
+    console.error(`guard-tabelas-obsoletas: ${porqueIndisponivel}`);
+    return 2;
+  }
+
   // Autoconferência do registro: guard cujo dado apodreceu é pior que guard
   // ausente, porque continua saindo verde.
   const nomes = Object.keys(OBSOLETAS);
@@ -230,7 +292,44 @@ function main() {
   }
 
   const padroes = nomes.map((nome) => ({ nome, re: new RegExp(`\\b${nome}\\b`) }));
+
+  // ⚠️ `consumidores` é conferido contra a REALIDADE, não só contra vazio.
+  // Como `migracoes/` inteiro é dispensado antes do scanner, acrescentar uma
+  // migração que usa a tabela saía verde enquanto o diagnóstico continuava
+  // dizendo "quem ainda a consome, e só isto" com a lista antiga. Inventário que
+  // apodrece é pior que inventário ausente: ele é lido como se fosse verdade.
+  // Achado do Codex, rodada 2.
+  const desatualizados = [];
+  for (const [nome, meta] of Object.entries(OBSOLETAS)) {
+    const re = new RegExp(`\\b${nome}\\b`);
+    const reais = new Set();
+    const dirMigracoes = join(raiz, 'migracoes');
+    let entradas = [];
+    try { entradas = readdirSync(dirMigracoes, { withFileTypes: true }); } catch { entradas = []; }
+    for (const e of entradas) {
+      if (!e.isFile()) continue;
+      let txt;
+      try { txt = readFileSync(join(dirMigracoes, e.name), 'utf-8'); } catch { continue; }
+      if (re.test(txt)) reais.add(`migracoes/${e.name}`);
+    }
+    const declarados = new Set(meta.consumidores.map((c) => c.split(':')[0]));
+    const faltam = [...reais].filter((r) => !declarados.has(r));
+    const sobram = [...declarados].filter((d) => d.startsWith('migracoes/') && !reais.has(d));
+    if (faltam.length > 0 || sobram.length > 0) desatualizados.push({ nome, faltam, sobram });
+  }
+  if (desatualizados.length > 0) {
+    console.error('guard-tabelas-obsoletas: o inventário `consumidores` não bate com as migrações reais\n');
+    for (const d of desatualizados) {
+      if (d.faltam.length) console.error(`  ${d.nome}: consome, mas NÃO está declarado → ${d.faltam.join(', ')}`);
+      if (d.sobram.length) console.error(`  ${d.nome}: declarado, mas NÃO consome mais → ${d.sobram.join(', ')}`);
+    }
+    console.error('\n        Atualize `consumidores` no registro OBSOLETAS. Ele é impresso no');
+    console.error('        diagnóstico do CI como se fosse a lista completa — e é lida como verdade.');
+    return 1;
+  }
+
   const achados = [];
+  const recusados = [];
   let conferidos = 0;
 
   try {
@@ -256,18 +355,42 @@ function main() {
     if (texto.includes('\0')) continue; // binário sem extensão conhecida
 
     conferidos += 1;
-    const fam = familia(rel);
     const linhas = texto.split('\n');
-    let dentroBloco = null;
-    for (let i = 0; i < linhas.length; i += 1) {
-      const { codigo, dentroBloco: proximo } = removerComentarios(linhas[i], fam, dentroBloco);
-      dentroBloco = proximo;
-      // Casa contra o CÓDIGO — o que sobrou depois de tirar só a porção
-      // comentada. `/* x */ const t = '…'` chega aqui como `const t = '…'`.
-      for (const { nome, re } of padroes) {
-        if (re.test(codigo)) achados.push({ rel, linha: i + 1, nome, texto: linhas[i].trim() });
+
+    // JS/TS vai pelo parser; o resto, pelo scanner por linha.
+    let semComentario;
+    if (ehJs(rel)) {
+      const r = semComentariosJs(texto, rel);
+      if (r.problema) { recusados.push(r.problema); continue; }
+      semComentario = r.texto.split('\n');
+    } else {
+      const fam = familia(rel);
+      semComentario = [];
+      let dentroBloco = null;
+      for (const linha of linhas) {
+        const { codigo, dentroBloco: proximo } = removerComentarios(linha, fam, dentroBloco);
+        dentroBloco = proximo;
+        semComentario.push(codigo);
       }
     }
+
+    // Casa contra o CÓDIGO — o que sobrou depois de tirar só a porção
+    // comentada. `/* x */ const t = '…'` chega aqui como `const t = '…'`.
+    for (let i = 0; i < semComentario.length; i += 1) {
+      for (const { nome, re } of padroes) {
+        if (re.test(semComentario[i])) {
+          achados.push({ rel, linha: i + 1, nome, texto: (linhas[i] ?? '').trim() });
+        }
+      }
+    }
+  }
+
+  if (recusados.length > 0) {
+    console.error('guard-tabelas-obsoletas: NAO consegui analisar arquivo(s) — recuso em vez de aproximar\n');
+    for (const r of recusados) console.error(`  ${r}`);
+    console.error('\n        Arquivo que o parser nao entende nao pode sair verde: seria o guard');
+    console.error('        dizendo "nao achei" quando o certo e "nao procurei".');
+    return 1;
   }
 
   if (achados.length > 0) {

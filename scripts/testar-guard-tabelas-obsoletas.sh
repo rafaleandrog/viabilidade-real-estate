@@ -30,8 +30,13 @@ trap 'rm -rf "$TMPRAIZ"' EXIT
 arvore() {
   local raiz="$TMPRAIZ/$1"
   mkdir -p "$raiz"/{migracoes,docs,scripts,frontend,backend/rotas,.github/workflows}
-  printf 'await dados.listar("%s", {});\n'          "$ALVO" > "$raiz/migracoes/029_funding.js"
-  printf 'await dados.atualizar("%s", id, {});\n'   "$ALVO" > "$raiz/migracoes/028_retro.js"
+  # ⚠️ Os nomes das migrações são os REAIS do registro OBSOLETAS, não inventados.
+  # A autoconferência compara `consumidores` com quem de fato referencia a tabela
+  # na árvore varrida, então uma fixture com nome próprio faria a base reprovar —
+  # e o falso positivo apareceria como se fosse defeito do guard.
+  printf 'await dados.listar("%s", {});\n'        "$ALVO" > "$raiz/migracoes/019_capital_stack_camadas.js"
+  printf 'await dados.atualizar("%s", id, {});\n' "$ALVO" > "$raiz/migracoes/028_financiamento_producao_retroativo.js"
+  printf 'await dados.listar("%s", {});\n'        "$ALVO" > "$raiz/migracoes/029_funding_operacoes.js"
   printf 'A tabela `%s` foi aposentada pela #355.\n' "$ALVO" > "$raiz/docs/adr.md"
   printf '  %s: [ { id: 1 } ],\n'                    "$ALVO" > "$raiz/scripts/migracoes-harness.mjs"
   printf '{ "tabelas": { "%s": {} } }\n'             "$ALVO" > "$raiz/schema.json"
@@ -76,6 +81,59 @@ R="$(arvore ci)"
 printf '      run: grep -r %s frontend/\n' "$ALVO" >> "$R/.github/workflows/pr-guards.yml"
 [ "$(roda "$R")" = "1" ] && ok ".github/ não é caminho permitido" \
   || falha "falso negativo em .github/" "workflow não está na allowlist e deveria ser barrado"
+
+# ── O que o scanner por linha NÃO conseguia ver ──────────────────────────────
+# Estes três eram falso NEGATIVO com o scanner artesanal: ele reiniciava o estado
+# de aspas a cada linha, então o conteúdo de um template multi-linha voltava a ser
+# lido como JavaScript. Hoje quem decide onde há comentário é o parser do
+# TypeScript, via scripts/lib/fonte-ts.mjs. Achados do Codex, rodada 2.
+
+R="$(arvore tpl)"
+cat >> "$R/frontend/tela-funding.ts" <<TS
+const t = html\`
+  <a href="https://exemplo.test/\${await dados.listar('$ALVO', {})}">x</a>
+\`;
+TS
+[ "$(roda "$R")" = "1" ] && ok "referência dentro de template multi-linha (o // do texto NÃO é comentário)" \
+  || falha "falso negativo em template multi-linha" "o // de uma URL dentro do template engoliu a linha"
+
+R="$(arvore tpl2)"
+cat >> "$R/frontend/tela-funding.ts" <<TS
+const a = html\`<span>/* isto é texto, não abre bloco */</span>\`;
+const t = "$ALVO";
+TS
+[ "$(roda "$R")" = "1" ] && ok "/* literal dentro de template não prende o estado de bloco" \
+  || falha "falso negativo por bloco preso" "um /* que é TEXTO escondeu o código seguinte"
+
+R="$(arvore campo)"
+printf 'class A { #%s = 1; }
+' "$ALVO" >> "$R/frontend/tela-funding.ts"
+[ "$(roda "$R")" = "1" ] && ok "campo privado #nome não é comentário de shell num arquivo .ts" \
+  || falha "falso negativo em campo privado" "o # foi lido como comentário num arquivo JS/TS"
+
+# ── `scripts/` não é mais prefixo permitido ──────────────────────────────────
+# Qualquer consumidor novo posto ali escapava do guard inteiro, e o próprio guard
+# era descartado antes do scanner. São três arquivos nomeados, não um prefixo.
+R="$(arvore scripts_novo)"
+printf "await dados.listar('%s', {});\n" "$ALVO" > "$R/scripts/reusar.mjs"
+[ "$(roda "$R")" = "1" ] && ok "consumidor novo em scripts/ é barrado (o prefixo deixou de ser permitido)" \
+  || falha "falso negativo em scripts/" "scripts/ inteiro escapava do guard"
+
+R="$(arvore scripts_ok)"
+[ "$(roda "$R")" = "0" ] && ok "os três arquivos nomeados de scripts/ continuam permitidos" \
+  || falha "falso positivo em scripts/" "o harness legítimo passou a ser acusado"
+
+# ── Arquivo que o parser não entende: RECUSA, não aprova ─────────────────────
+R="$(arvore quebrado)"
+printf 'const x = { ;;; @@@ \n' > "$R/frontend/quebrado.ts"
+[ "$(roda "$R")" != "0" ] && ok "arquivo que o TypeScript não parseia é RECUSADO, não aprovado" \
+  || falha "aprovou o que não conseguiu ler" "'não deu para analisar' virou 'não achei'"
+
+# ── O inventário `consumidores` é conferido contra a realidade ───────────────
+R="$(arvore inventario)"
+printf 'await dados.listar("%s", {});\n' "$ALVO" > "$R/migracoes/030_nova.js"
+[ "$(roda "$R")" = "1" ] && ok "migração nova que consome a tabela obriga a atualizar consumidores" \
+  || falha "inventário apodrecido passou" "migracoes/ é dispensado, então só a autoconferência pega isto"
 
 # ── As QUATRO combinações de comentário × código ─────────────────────────────
 # A primeira versão do guard descartava a LINHA INTEIRA quando ela começava com

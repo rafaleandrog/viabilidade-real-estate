@@ -40,13 +40,15 @@ if (!existsSync(caminho(SETTINGS))) {
 // ── 2. Os arquivos que o processo exige existem ─────────────────────────────
 const OBRIGATORIOS = [
   ['.claude/motor-revisao.md', 'a skill de revisão manda PARAR se ele faltar'],
-  ['.claude/skills/revisar-pr-apps/SKILL.md', 'é o passo 5 do processo'],
+  ['.claude/skills/revisar-pr-apps/SKILL.md', 'é o passo 6 do processo'],
   ['.claude/preparar-sessao.sh', 'hook SessionStart'],
   ['.claude/lembrete-processo.sh', 'hook UserPromptSubmit'],
   ['.claude/guarda-monorepo.sh', 'hook PreToolUse — a única defesa contra escrita no monorepo'],
   ['scripts/testar-guarda-monorepo.sh', 'a bateria da guarda'],
   ['scripts/testar-revisao-registrada.sh', 'a bateria do parsing da atestação'],
   ['scripts/guard-pr-escopo-processo.mjs', 'a regra R1 — processo não viaja com código de produto'],
+  ['scripts/preflight-pr.mjs', 'o portão que roda os guards de corpo/diff ANTES de abrir o PR'],
+  ['scripts/testar-preflight-pr.sh', 'a bateria do preflight — portão sem bateria dá licença'],
 ];
 for (const [arq, motivo] of OBRIGATORIOS) {
   if (existsSync(caminho(arq))) ok.push(`${arq} presente`);

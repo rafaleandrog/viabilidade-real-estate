@@ -126,13 +126,18 @@ export class ViabTelaDashboard extends LitElement {
     .escopo-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .cel-nome { font-weight: 600; }
     .cel-criador { display: inline-flex; align-items: center; }
+    /* #475: o token que estava aqui nunca existiu — nem em compartilhado/tokens.css
+       nem em nenhum outro arquivo do monorepo. O fallback dele era, portanto, a cor
+       EFETIVA, sempre: branco a 6%, calibrado para tema escuro, e invisível nos três
+       temas claros que o shell tem desde 2026-08-19. O fallback agora é cinza médio,
+       que sobrevive aos quatro temas; scripts/guard-tokens-css.mjs impede a volta. */
     .miniatura {
       width: 40px; height: 28px; border-radius: 6px; object-fit: cover; display: block;
-      background: var(--cor-superficie-2, rgba(255,255,255,0.06));
+      background: var(--cor-superficie-sutil, rgba(128,128,128,0.08));
     }
     .miniatura-vazia {
       width: 40px; height: 28px; border-radius: 6px; display: block;
-      background: var(--cor-superficie-2, rgba(255,255,255,0.06));
+      background: var(--cor-superficie-sutil, rgba(128,128,128,0.08));
     }
     .filtros-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .filtros-bar urbi-select { min-width: 200px; }

@@ -8,11 +8,26 @@ import { montarMedidor } from './medidor-faixas.js';
 
 const n = (v: any): number => Number(v) || 0;
 
-// Paleta categórica para segmentar os custos por cor (12 tons distintos —
-// mais que os 6 da paleta padrão do gráfico, para não repetir cor entre custos).
+// Paleta categórica para segmentar os custos por cor: 12 posições, mais que os 6
+// da paleta padrão do gráfico, para não repetir cor entre custos.
+//
+// #476 / decisão D15 do autor (2026-08-22): as 12 posições vêm dos tokens do
+// tema — `--cor-categoria-1..8` nas oito primeiras e `--cor-escala-1..4` nas
+// quatro últimas. A CONTAGEM é a mesma de antes, na mesma ordem, então o
+// comportamento com N categorias de custo (inclusive o ciclo quando N > 12) é
+// idêntico; o que muda é que a pizza passa a acompanhar os quatro temas do
+// shell, como já fazem todos os outros gráficos do app.
+//
+// O hexadecimal de cada posição é o literal que ocupava aquela posição antes, e
+// fica como fallback — é o padrão de `fluxo-graficos.ts:18-24`, e é o que
+// preserva a aparência atual num shell que não tenha os tokens.
 const PALETA_CUSTOS = [
-  '#2AA9E0', '#13A98D', '#F7A111', '#D45A3A', '#8E7CC3', '#5BAF7A',
-  '#E0699B', '#7FB3D5', '#C0A16B', '#59C3C3', '#B57EDC', '#9AA5B1',
+  'var(--cor-categoria-1, #2AA9E0)', 'var(--cor-categoria-2, #13A98D)',
+  'var(--cor-categoria-3, #F7A111)', 'var(--cor-categoria-4, #D45A3A)',
+  'var(--cor-categoria-5, #8E7CC3)', 'var(--cor-categoria-6, #5BAF7A)',
+  'var(--cor-categoria-7, #E0699B)', 'var(--cor-categoria-8, #7FB3D5)',
+  'var(--cor-escala-1, #C0A16B)', 'var(--cor-escala-2, #59C3C3)',
+  'var(--cor-escala-3, #B57EDC)', 'var(--cor-escala-4, #9AA5B1)',
 ];
 
 @customElement('viab-tela-graficos')

@@ -112,6 +112,33 @@ function propsDe(fonte) {
   return props;
 }
 
+/**
+ * Atributos de CONVENCAO do design system: nao sao `@property`, e mesmo assim
+ * sao legitimos, porque o primitivo os consome. Duas origens, e as DUAS contam:
+ *
+ *   · regra CSS `:host([nome])` — o primitivo REAGE ao atributo;
+ *   · `this.setAttribute('nome', …)` / `this.hasAttribute('nome')` no corpo da
+ *     classe — o primitivo o POE ou o LE.
+ *
+ * A segunda origem nao e detalhe: `UrbiPrimitivoDeLayout.connectedCallback`
+ * (`ui/src/urbi-primitivo.ts:34-40`) poe `expandir` sozinho e le `sem-expandir`,
+ * e NAO tem regra `:host([expandir])` — o `flex: 1` dele e incondicional. Um
+ * espelho que so olhasse o CSS faria um guard reprovar `<urbi-abas expandir>`,
+ * que a auditoria classificou como inofensivo (`docs/rodada-8/06-auditoria-ui.md:139`).
+ *
+ * O `this.` e obrigatorio no padrao: sem ele, um `botao.setAttribute('disabled','')`
+ * sobre um elemento INTERNO viraria atributo aceito no host.
+ */
+function convencaoDe(fonte, host) {
+  const nomes = new Set();
+  for (const d of host) {
+    const m = d.seletor.match(/^:host\(\[([a-z0-9-]+)\]\)$/);
+    if (m) nomes.add(m[1]);
+  }
+  for (const m of fonte.matchAll(/\bthis\.(?:set|has)Attribute\(\s*'([a-z0-9-]+)'/g)) nomes.add(m[1]);
+  return [...nomes];
+}
+
 const dirUi = join(MONO, 'ui', 'src');
 const arquivos = readdirSync(dirUi).filter((a) => a.endsWith('.ts') && !a.includes('.test.'));
 
@@ -126,8 +153,9 @@ for (const arq of arquivos) {
   const fonte = semComentarios(readFileSync(join(dirUi, arq), 'utf8'));
   const host = declaracoesDeHost(fonte);
   const props = propsDe(fonte);
+  const convencao = convencaoDe(fonte, host);
   for (const m of fonte.matchAll(/export (?:abstract )?class (\w+)(?:\s+extends\s+(\w+))?/g)) {
-    classes[m[1]] = { arquivo: `ui/src/${arq}`, base: m[2] ?? null, host, props };
+    classes[m[1]] = { arquivo: `ui/src/${arq}`, base: m[2] ?? null, host, props, convencao };
   }
 }
 
@@ -156,40 +184,49 @@ function cadeia(nome) {
 const ZERO = /^0([a-z%]*)$/;
 const ehZero = (v) => ZERO.test(v) || v === 'none';
 
-/** Dos valores de um shorthand, os que valem para ESQUERDA/DIREITA. */
-function horizontaisDoShorthand(valor) {
+/** Dos valores de um shorthand, os que valem para o eixo pedido. */
+function ladosDoShorthand(valor, eixo) {
   const v = valor.trim().split(/\s+/);
-  if (v.length === 1) return [v[0]];          // todos os lados
-  if (v.length === 2) return [v[1]];          // vertical | horizontal
-  if (v.length === 3) return [v[1]];          // topo | horizontal | baixo
-  return [v[1], v[3]];                        // topo | dir | baixo | esq
+  const horizontal = eixo === 'largura';
+  if (v.length === 1) return [v[0]];                            // todos os lados
+  if (v.length === 2) return [horizontal ? v[1] : v[0]];        // vertical | horizontal
+  if (v.length === 3) return horizontal ? [v[1]] : [v[0], v[2]]; // topo | horizontal | baixo
+  return horizontal ? [v[1], v[3]] : [v[0], v[2]];              // topo | dir | baixo | esq
 }
 
-/** Uma declaração acrescenta LARGURA? Só o eixo horizontal conta. */
-function declaracaoSomaLargura({ prop, valor }) {
+/**
+ * Uma declaração acrescenta tamanho NO EIXO pedido (`largura` ou `altura`)?
+ *
+ * Os dois eixos existem porque o guard `scripts/guard-box-model-urbi.mjs` acusa
+ * `width` E `height` aplicados de fora, e usar o veredito de um eixo para o outro
+ * daria falso positivo (`padding-top` não alarga nada) ou falso negativo
+ * (`padding: 16px 0` não alarga, mas aumenta a altura).
+ */
+function declaracaoSomaNoEixo({ prop, valor }, eixo) {
   const v = valor.trim();
   if (prop === 'border-radius' || prop.startsWith('border-radius')) return false;
 
-  // Lados explicitamente verticais nunca somam largura.
-  if (/^(padding|border)-(top|bottom|block)/.test(prop)) return false;
+  const doOutroEixo = eixo === 'largura' ? /-(top|bottom|block)/ : /-(left|right|inline)/;
+  const desteEixo = eixo === 'largura' ? /-(left|right|inline)/ : /-(top|bottom|block)/;
 
-  // Lados explicitamente horizontais.
-  if (/^padding-(left|right|inline)/.test(prop)) return !valor.trim().split(/\s+/).every(ehZero);
-  if (/^border-(left|right|inline)/.test(prop)) {
-    return !ehZero(v.split(/\s+/)[0]);
-  }
+  // Lados explicitamente do outro eixo nunca somam neste.
+  if (/^(padding|border)-/.test(prop) && doOutroEixo.test(prop)) return false;
+
+  // Lados explicitamente deste eixo.
+  if (/^padding-/.test(prop) && desteEixo.test(prop)) return !v.split(/\s+/).every(ehZero);
+  if (/^border-/.test(prop) && desteEixo.test(prop)) return !ehZero(v.split(/\s+/)[0]);
 
   // Shorthands que valem para todos os lados.
-  if (prop === 'padding') return !horizontaisDoShorthand(v).every(ehZero);
-  if (prop === 'border-width') return !horizontaisDoShorthand(v).every(ehZero);
+  if (prop === 'padding') return !ladosDoShorthand(v, eixo).every(ehZero);
+  if (prop === 'border-width') return !ladosDoShorthand(v, eixo).every(ehZero);
   if (prop === 'border') return !ehZero(v.split(/\s+/)[0]);
 
   return false;
 }
 
-// Conservador de propósito: QUALQUER seletor conta para somar largura, inclusive
+// Conservador de propósito: QUALQUER seletor conta para somar, inclusive
 // `:host([compacta])`, porque naquele estado a caixa transborda de verdade.
-const acrescentaLargura = (host) => host.some(declaracaoSomaLargura);
+const acrescentaNoEixo = (host, eixo) => host.some((d) => declaracaoSomaNoEixo(d, eixo));
 
 /**
  * Protegido só quando a declaração VENCEDORA do `:host` incondicional é
@@ -231,11 +268,19 @@ for (const arq of arquivos) {
       base: base ?? null,
       linhagem: linhagem.map((c) => c.nome),
       props: [...porNome.values()],
+      // Herdados tambem: quem estende `UrbiPrimitivoDeLayout` honra `expandir`
+      // sem redeclarar nada.
+      atributos_convencao: [...new Set(linhagem.flatMap((c) => c.convencao))].sort(),
       host,
       // O caso urbi-kpi: padding/border no :host SEM `box-sizing: border-box`
       // significa que um `width` aplicado de fora vira largura de CONTEUDO, e a
       // caixa renderizada mede width + padding + border. Ela transborda.
-      risco_box_model: acrescentaLargura(host) && !protegidoPorBorderBox(host),
+      //
+      // Os dois eixos saem separados porque o guard acusa `width` E `height`, e
+      // reusar o veredito de um eixo no outro erra nas duas direções:
+      // `padding: 0 16px` alarga sem aumentar altura, `padding: 16px 0` o inverso.
+      risco_box_model: acrescentaNoEixo(host, 'largura') && !protegidoPorBorderBox(host),
+      risco_box_model_altura: acrescentaNoEixo(host, 'altura') && !protegidoPorBorderBox(host),
     };
   }
 }

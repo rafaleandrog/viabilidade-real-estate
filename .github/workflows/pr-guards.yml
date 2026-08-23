@@ -181,8 +181,14 @@ jobs:
           # destino. O script não veria arquivo de processo nenhum e aprovaria a
           # mistura — reproduzido pelo Codex no PR 496, exit 0. Sem a detecção, a
           # origem removida também aparece e é classificada.
-          ARQUIVOS="$(git diff --no-renames --name-only "$BASE_SHA"..."$HEAD_SHA")"
-          export PR_ARQUIVOS="$ARQUIVOS"
+          # Saída `-z` gravada em ARQUIVO, não em variável: NUL não sobrevive a
+          # variável de ambiente, e é a única representação inequívoca de caminho.
+          # `core.quotePath=false` resolvia só o não-ASCII — a doc do git ressalva
+          # que aspas, barra invertida e caracteres de controle são SEMPRE
+          # escapados, então `frontend/a\b.ts` voltava citado, não casava com
+          # `/^frontend\//` e o guard aprovava a mistura. Achado do Codex no PR 502.
+          git diff --no-renames -z --name-only "$BASE_SHA"..."$HEAD_SHA" > /tmp/pr-arquivos.nul
+          export PR_ARQUIVOS_NUL=/tmp/pr-arquivos.nul
           if ! node scripts/guard-pr-escopo-processo.mjs; then
             echo "::error title=Escopo do PR::Arquivo de .claude/ junto com codigo de produto. Regra R1 do CLAUDE.md: o PR de processo sai sozinho, com todos os documentos propagados no mesmo diff. Editar processo dentro de um PR em revisao produz um ciclo que nao converge."
             exit 1
@@ -224,6 +230,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          # A bateria do preflight chama `git merge-base origin/main HEAD`, e o
+          # checkout de PR traz só o commit do head. Sem o histórico o merge-base
+          # falha ANTES do override de `--arquivos`, e o job reprova por falta de
+          # base, não por defeito. Achado do Codex no PR 502.
+          fetch-depth: 0
       - name: Guard da rede do processo
         run: |
           set -uo pipefail
@@ -246,6 +258,17 @@ jobs:
           # que bloqueava `pull_request_read`, isto é, quebrava a própria revisão.
           if ! bash scripts/testar-guarda-monorepo.sh; then
             echo "::error title=Guarda do monorepo falhou::A guarda que impede escrita em urbiverso/urbiverso não se comporta como o esperado. Veja quais casos falharam no log."
+            exit 1
+          fi
+      - name: Bateria do preflight de PR
+        if: always()
+        run: |
+          set -uo pipefail
+          # O preflight é um PORTÃO: se ele aprovar corpo errado, o CI fica vermelho
+          # depois (o que ele existe para evitar); se reprovar corpo certo, alguém
+          # para de rodá-lo e ele deixa de guardar. Os dois sentidos têm caso.
+          if ! bash scripts/testar-preflight-pr.sh; then
+            echo "::error title=Bateria do preflight falhou::O preflight de PR não se comporta como o esperado. Veja quais casos falharam no log."
             exit 1
           fi
       - name: Bateria do parsing do revisao-registrada
@@ -295,5 +318,85 @@ jobs:
           # árvore — o veredito não muda conforme o que estiver commitado.
           if ! bash scripts/testar-guard-tabelas-obsoletas.sh; then
             echo "::error title=Bateria do guard de tabelas obsoletas falhou::O guard não se comporta como o esperado nos dois sentidos. Veja quais casos falharam no log."
+            exit 1
+          fi
+  guards-ui:
+    name: Tokens, props de primitivo e box model do urbi-*
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      URBI_TYPESCRIPT: ${{ github.workspace }}/.ts-guards/node_modules/typescript/lib/typescript.js
+    steps:
+      - uses: actions/checkout@v7
+      - name: Instalar só o typescript, isolado
+        run: |
+          set -uo pipefail
+          # Desde a 3ª rodada de revisão do PR 505 o lexer de JS/TS dos guards é o
+          # PARSER do `typescript` — três rodadas seguidas acharam classe nova num
+          # lexer artesanal, e a saída foi parar de escrever um.
+          #
+          # ⚠️ O install é num diretório PRÓPRIO, com package.json próprio, e nunca
+          # na raiz: `npm install` na raiz leria o package.json do repo e tentaria
+          # baixar o `@urbiverso/sdk`, que é GitHub Packages privado — 401, e este
+          # workflow existe justamente para nunca depender de credencial. O
+          # `typescript` é público, então este passo não reintroduz esse problema.
+          mkdir -p .ts-guards
+          cd .ts-guards
+          echo '{"name":"ts-guards","private":true}' > package.json
+          npm install --no-audit --no-fund --loglevel=error typescript@5.9.3
+          node -e "console.log('typescript', require('./node_modules/typescript').version)"
+      - name: Guards de UI contra o espelho docs/ui-urbiverso/
+        run: |
+          set -uo pipefail
+          # Os três leem `docs/ui-urbiverso/`, que é conteúdo DESTE repositório (o
+          # espelho versionado da referência do urbiverso). Sem SDK, sem
+          # credencial. Faltando o `typescript`, eles RECUSAM analisar em vez de
+          # aprovar — "não deu para rodar" nunca é "passou".
+          #
+          # As três classes que eles pegam são falhas 100% SILENCIOSAS — atravessam
+          # typecheck, testes e esbuild em verde, exatamente como as aspas curvas:
+          #   · `var(--nao-existe, #hex)` → o fallback vira a cor efetiva, para
+          #     sempre, e não acompanha nenhum dos quatro temas do shell (#475);
+          #   · atributo que o primitivo não declara → não faz nada, a prop fica
+          #     no default;
+          #   · `width` de fora num urbi-* sem `box-sizing: border-box` → a caixa
+          #     renderizada mede width + padding + border e pinta sobre o vizinho.
+          #     Reportado quatro vezes (#176, #262, #326, #352) e fechado quatro.
+          falhou=0
+          node scripts/guard-tokens-css.mjs || falhou=1
+          node scripts/guard-props-urbi.mjs || falhou=1
+          node scripts/guard-box-model-urbi.mjs || falhou=1
+          if [ "$falhou" != "0" ]; then
+            echo "::error title=Guard de UI reprovou::Token inexistente, atributo que o primitivo não declara, ou width/height de fora num urbi-* sem box-sizing. Nenhuma das três aparece no typecheck, nos testes ou no build — veja o log acima para o arquivo:linha."
+            exit 1
+          fi
+      - name: Bateria do lexer compartilhado
+        if: always()
+        run: |
+          set -uo pipefail
+          # `scripts/lib/fonte-ts.mjs` e o unico lugar onde os tres guards decidem
+          # fronteira de comentario, string, template e `${…}`. Essa e a vantagem —
+          # um lugar para consertar — e o risco: um erro ali erra nos tres de uma
+          # vez, e em silencio. JS/TS quem resolve e o parser do TypeScript; o que
+          # a bateria cobre e a camada CSS/HTML, escrita a mao, e o modo de falha
+          # invertido.
+          if ! bash scripts/testar-fonte-ts.sh; then
+            echo "::error title=Bateria do lexer falhou::scripts/lib/fonte-ts.mjs nao delimita comentario, string ou template como o esperado. Os tres guards de UI dependem dele."
+            exit 1
+          fi
+      - name: Bateria dos guards de UI
+        if: always()
+        run: |
+          set -uo pipefail
+          # Guard falha calado nos DOIS sentidos, e a bateria cobre os dois: falso
+          # negativo deixa o defeito passar (guard vira teatro); falso positivo
+          # reprova código correto, alguém desliga o guard, e aí ele não guarda
+          # mais nada. A construção do espelho já produziu falso positivo duas
+          # vezes — kebab-case em vez de minúsculo, e herança não percorrida.
+          #
+          # A bateria é determinística: monta um repositório de mentira com espelho
+          # sintético num diretório temporário e não lê o `frontend/` do repo.
+          if ! bash scripts/testar-guards-ui.sh; then
+            echo "::error title=Bateria dos guards de UI falhou::Um dos três guards não se comporta como o esperado. Veja quais casos falharam no log."
             exit 1
           fi
