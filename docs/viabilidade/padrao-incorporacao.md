@@ -2562,7 +2562,13 @@ O relatório é uma visão horizontal de séries temporais; o modelo interno dev
 
 Esta seção é diagnóstica. Ela não substitui o documento de issues e não autoriza mudanças diretas.
 
-A auditoria original está em `docs/rodada-5-evi-2026-07-31.md`. A validação posterior dos recebíveis acrescenta uma segunda conclusão: o motor-alvo precisa ser **por safras e componentes**, e algumas premissas dos corpos já abertos devem ser corrigidas antes da implementação.
+A auditoria original está em `docs/rodada-5-evi-2026-07-31.md`. A validação posterior dos recebíveis
+concluiu que o motor-alvo precisa ser **por safras e componentes**.
+
+> ✅ **Esse motor-alvo foi construído — a #283 o ligou ao `calcularFluxo`.** O texto abaixo foi
+> escrito quando ele não existia, e as subseções que descreviam ausências levam agora o estado real
+> ao lado. Leia a §24 como **diagnóstico datado com anotação**, não como lista de trabalho: foi
+> tomando-a ao pé da letra que dois agentes desta rodada quase reimplementaram o motor.
 
 ### 24.1 Estruturas já alinhadas
 
@@ -2581,20 +2587,24 @@ O desenho atual possui fundamentos adequados:
 
 Esses fundamentos devem ser preservados.
 
-### 24.2 Lacunas do motor de recebíveis
+### 24.2 Lacunas do motor de recebíveis — **fechadas pela #283**
 
-O runtime atual:
+> ✅ **Esta lista descrevia o runtime ANTES da #283 e não vale mais.** A §24 se apresenta como
+> diagnóstico do app **atual**, então deixá-la como estava mandava reimplementar um motor pronto.
+> Mantida como registro do ponto de partida, com o estado de cada item:
 
-- distribui valor nominal por linhas genéricas;
-- não cria safras;
-- não calcula PMT;
-- não separa prazo fixo de prazo até marco;
-- não controla primeiro vencimento de forma econômica;
-- não possui descontos como série;
-- não possui principal e juros separados;
-- não possui carteira real;
-- trata repasse como vencimento residual;
-- pode truncar valores no último mês.
+| A lista dizia | Hoje |
+|---|---|
+| não cria safras | ✅ laço das contratações, `fluxo-caixa-motor.ts:1107` |
+| não calcula PMT | ✅ `pmt` `:666` |
+| não separa prazo fixo de até marco | ✅ `tipo: 'prazo_fixo'` × `'ate_marco'` |
+| não controla o primeiro vencimento | ✅ `defasagemMeses` por componente |
+| não tem descontos como série | ✅ `descontoComercialMensal` (#227) |
+| não separa principal e juros | ✅ `:1126-1141` |
+| não tem carteira real | ✅ `carteiraSaldoSafra` `:826`, consolidação `:1149-1169` |
+| trata repasse como vencimento residual | ✅ `tipo: 'concentrado'` |
+| pode truncar valores no último mês | 🟡 o empilhamento silencioso saiu (`:1371-1373`), mas com `prazoMeses` explícito menor que o derivado ainda **há descarte**, com `console.warn` — ver §18 |
+| distribui valor nominal por linhas genéricas | 🟡 só no caminho **legado**, para linha sem `componentes` persistido (§11.6) |
 
 ### 24.3 Correção de premissas anteriores
 
@@ -2608,9 +2618,14 @@ A reconciliação com Calliandra corrige os seguintes pontos:
 - a carteira deve ser derivada por safra;
 - Urbitá serve como referência de sobreposição de recebimentos, mas não de carteira.
 
-### 24.4 Issues que precisam de revisão documental
+### 24.4 Issues que precisavam de revisão documental — **registro**
 
-Antes de implementação, revisar:
+> ✅ **A cadeia foi entregue pela #283; esta lista não é backlog.** Ela dizia "antes de
+> implementação, revisar", e é exatamente o texto que quase fez dois agentes desta rodada
+> reimplementarem o motor. Fica como registro de quais issues compunham a cadeia — o estado de cada
+> uma está na §11.7 e na §13.9.
+
+Compunham a cadeia:
 
 - #220;
 - #227;
@@ -2625,7 +2640,9 @@ Antes de implementação, revisar:
 - #240;
 - #241.
 
-A revisão pode ser feita por atualização dos corpos ou comentários de escopo aprovados. Nenhuma mudança de runtime deve começar com uma premissa desatualizada.
+A recomendação original — *"nenhuma mudança de runtime deve começar com uma premissa
+desatualizada"* — continua valendo como princípio, e é justamente ela que este PR aplica ao próprio
+documento.
 
 ### 24.5 Funding e permutas
 
@@ -2633,8 +2650,13 @@ As conclusões anteriores permanecem:
 
 - financiamento à produção é separado do repasse;
 - permuta física não gera caixa;
-- permuta financeira acompanha recebimentos;
-- o Bloco Financeiro ainda precisa de decisão de integração ou remoção.
+- permuta financeira acompanha recebimentos.
+
+> ✅ **O quarto item saiu: o Bloco Financeiro já teve a decisão.** Ele dizia que o bloco "ainda
+> precisa de decisão de integração ou remoção". A #279/#355 decidiram — os campos de financiamento,
+> estrutura de capital, investidor e correção **saíram do formulário**, e o funding passou a rodar
+> por `avancado_funding_operacoes` na aba Funding (§17). O que sobrou sem leitor é
+> `regime_tributario` e os `aliquota_*_pct`.
 
 ### 24.6 Conversão em mudanças
 
@@ -2844,7 +2866,7 @@ com os do estudo.
 | **C3** | **Receita positiva, custos positivos nos arrays; o sinal entra na consolidação** (`fluxo = receita − custo`). A Proforma e o Fluxo somam linhas, nunca invertem sinal na apresentação. | `fluxo-caixa-motor.ts` |
 | **C4** | **No Avançado, o tempo é em meses relativos 0-based**: mês 0 = `data_inicio_projeto`; o índice do array mensal coincide com o número do mês. **Não há meses negativos.** | `fluxo-caixa-motor.ts` |
 | **C5** | **Permuta física não entra no fluxo** — reduz a área/VGV vendável do incorporador. **Permuta financeira é dedução da receita**, % do VGV residencial/não residencial (ou valor fixo). | `proforma.ts`, `formulas.md` |
-| **C6** | **Imposto segue o regime tributário**: `4%` quando `sujeito_ret`, senão `imposto_percentual`. Corretagem, marketing e permutas financeiras são deduções da receita antes dos custos. | `formulas.md`, schema |
+| **C6** | **O imposto NÃO segue `regime_tributario`** — a redação anterior desta convenção dizia que sim, e é falso. **Preliminar:** `frontend/proforma.ts:245` escolhe pelo booleano `sujeito_ret` (`aliquota_ret_pct`, default 4) ou, se falso, `imposto_percentual`; o campo `regime_tributario` **não é consultado**. **Avançado:** usa o par global `considerar_ret`/`ret_pct` e ignora os três (§17). Corretagem, marketing e permutas financeiras são deduções da receita antes dos custos. | `formulas.md`, `proforma.ts:245`, schema |
 | **C7** | **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e no motor. O **valor canônico** de uma premissa multiunidade é o monetário; `% do VGV` e `R$/m²` são representações **derivadas**, que carregam precisão plena internamente e arredondam só para exibir. Contrato do autor, 2026-08-01. **Estado:** `fmtR$` (`viab-format.ts:11-23`) usa 2 casas, a exportação passou a importá-lo em vez de definir formatador próprio (`exportar.ts:10`) e a sensibilidade da Proforma migrou (`tela-proforma.ts:458`, #492). **Três fontes ainda divergem** e mantêm a #281 aberta: `fluxo-tabela.ts:34` (`celula`, arredonda para 0 casas e esconde valor abaixo de R$ 0,50), `tela-proforma.ts:314` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383` (`precoUnit`/`precoTotal`) — as duas últimas chamam `fmtNum` sem casas. Tabela completa em `formulas.md`. | `formulas.md`, `viab-format.ts`, `premissas-conversao.ts` |
 
 ## Anexo B — Dicionário de premissas (campos reais)
@@ -2871,9 +2893,17 @@ são **digitados como número inteiro/decimal** (ex.: `7` = 7%), não como fraç
 
 **Funding (Avançado):** `estrutura_capital_proprio_pct`, `estrutura_financiamento_pct`, `estrutura_investidores_pct`, `financiamento_obra_pct`, `financiamento_juros_aa`, `financiamento_sistema_amortizacao`, `financiamento_prazo_meses`, `financiamento_carencia_meses`, `investidor_aporte_valor`, `investidor_retorno_tipo`, `investidor_juros_aa`, `investidor_carencia_meses`, `investidor_parcelas`, `regime_tributario`, `aliquota_*_pct`, `indice_correcao`/`_taxa_aa`, `juros_financeiros_aa`, `juros_inicio_cobranca_mes`.
 
-> ⚠️ **Todo o Bloco G acima é inerte no Avançado**: financiamento, estrutura de capital, investidor,
-> regime tributário e correção estão declarados e têm controle na tela, mas o motor **não lê nenhum
-> deles**. Ver §17.2, EVI-019 (funding) e EVI-022 (regime tributário).
+> 🔄 **Reescrito — o aviso anterior está vencido em duas frentes.** Ele dizia que todo o Bloco G é
+> inerte **e** que os campos "têm controle na tela". Hoje:
+>
+> - **O funding roda**, desde a #355 — mas por **outras** colunas, na tabela
+>   `avancado_funding_operacoes` e na aba **Funding** (§17). As colunas de Bloco G listadas acima
+>   (`estrutura_*`, `financiamento_*`, `investidor_*`, `indice_correcao*`, `juros_financeiros_aa`)
+>   são **dado histórico**: saíram do formulário pela #279/#355 e **não têm mais controle na tela**.
+>   Procurá-las na interface é procurar o que foi removido.
+> - **`regime_tributario` e os `aliquota_*_pct` continuam sem leitor nenhum**, em qualquer nível.
+>
+> O inventário vigente do que sobra sem efeito no Avançado está na **§17**.
 
 Para os campos das tabelas `avancado_*`, ver [Modelo de Dados](modelo-de-dados).
 
