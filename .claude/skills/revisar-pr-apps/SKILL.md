@@ -20,6 +20,53 @@ description: Revisa um PR deste repositório antes do merge — revisão adversa
 > **PARE e diga ao usuário**, com o que cada teste respondeu. Falso "não sou" custa uma frase dele;
 > falso "sou" custa uma revisão inteira rodada com o motor errado.
 
+> ⚠️ **Existem DUAS skills com este nome, e a que respondeu pode ser a errada.**
+>
+> **ADAPTADO — 2026-08-23.** O monorepo tem uma `.claude/skills/revisar-pr-apps/` própria, e quando
+> ele está clonado ao lado (em `/home/user/urbiverso`, o caso das sessões de nuvem) **as duas entram
+> no catálogo da sessão com o mesmo nome**. A listagem não mostra o caminho, então invocar
+> `revisar-pr-apps` **não diz qual cópia respondeu**.
+>
+> Não é empate inofensivo: a cópia do monorepo confronta o diff contra `docs/shell/` e aplica a regra
+> **upstream** da `versao` — bumpar quando `shell_min` sobe. **Aqui a regra é a inversa** (decisão da
+> issue #422, § Versão do manifesto do `CLAUDE.md`), então a cópia errada acusa **bloqueante
+> inventado em todo PR que suba piso** — exatamente o defeito que esta adaptação existe para evitar.
+>
+> **Como desempatar — por conteúdo, não por localização.** Duas correções do Codex na revisão do
+> PR 494 mataram a versão anterior desta porta, que mandava conferir
+> `git rev-parse --show-toplevel`:
+>
+> 1. **Testar onde você está não diz qual arquivo você leu.** Carregar a skill do monorepo **não
+>    muda o diretório da sessão** — o toplevel continua sendo o do app, e a cópia errada **passa**
+>    no teste. Pior: este bloco só existe na cópia do app, então quando a do monorepo é a carregada,
+>    **ninguém o lê**.
+> 2. **Caminho absoluto cravado não sobrevive a outro layout.** A instrução antiga mandava abrir
+>    `/home/user/viabilidade-real-estate/...`; o próprio checkout do Codex fica em
+>    `/workspace/viabilidade-real-estate`, onde aquele caminho não existe.
+>
+> Então o desempate é **material, e a autoridade é o `CLAUDE.md` do checkout** — que é conteúdo
+> deste repositório, sempre entra no contexto de uma sessão que trabalha aqui, e **nenhuma skill
+> pode sombrear**:
+>
+> - **Regra da `versao`.** Se as instruções que você está seguindo mandarem bumpar a `versao` do
+>   `manifesto.json` porque o PR mexeu em `shell_min`/`sdk_min`, **elas não são as deste
+>   repositório**. Aqui é o contrário (§ Versão do manifesto do `CLAUDE.md`, issue #422): subir piso
+>   **não** bumpa a `versao`, que descreve o **schema**. Acusar isso é achado inventado.
+> - **Superfície de contratos.** Se mandarem confrontar o diff contra `docs/shell/` do monorepo,
+>   também não são as deste repositório — aqui a superfície é o bundle do SDK, e **sem bundle a
+>   lente é NÃO EXECUTADA** (ver § Superfície de leitura).
+>
+> **Em qualquer divergência entre estas instruções e o `CLAUDE.md` do checkout, o `CLAUDE.md`
+> vence** — e a divergência em si é para **contar ao usuário**, porque significa que o catálogo
+> serviu a cópia errada.
+>
+> Para reabrir a cópia certa, **derive o caminho, não o crave**:
+>
+>     "$(git rev-parse --show-toplevel)"/.claude/skills/revisar-pr-apps/SKILL.md
+>
+> Marca de que você está no arquivo certo: **este** tem a seção
+> *"ADAPTADO — a sessão já está no repositório, e não existe `gh`"*.
+
 Você é o revisor de código de apps da plataforma urbiverso. Revisa PRs **antes** do merge.
 
 Não revisa funcionamento específico do shell — e **ADAPTADO:** aqui não existe a exceção do
@@ -621,7 +668,7 @@ decair**, e rodada 2 rodando a skill inteira por reflexo é o modo caro de errar
 
 | Delta desde a rodada anterior | Ação |
 |---|---|
-| Escopado aos achados, fora dos caminhos de runtime que a rodada anterior confrontou | conferência de delta, **sem fan-out** |
+| Escopado aos achados, fora dos caminhos de runtime que a rodada anterior confrontou | fan-out **reduzida ao delta** — uma lente sobre o que mudou. A revisão do App **nunca decai** |
 | Toca caminho que a rodada anterior confrontou-e-passou | fan-out reduzido: as lentes daquele caminho, mais S2 |
 | Mudança estrutural, ou mexeu em SDK, lockfile ou `sdk_min` | skill inteira, esforço recalibrado e **superfície reconferida** |
 
@@ -652,6 +699,39 @@ HEAD para postar; se ele se move no meio, o relatório nasce falando de código 
 Já aconteceu: relatório publicado sobre um HEAD que tinha acabado de mover, com o único achado
 já corrigido. Moveu desde o início da rodada → **descarte o relatório e recomece** contra o HEAD
 novo.
+
+### PR que toca vários documentos: releia TODOS contra o estado final
+
+**ADAPTADO — 2026-08-23, lição do PR 494.** Quando o PR toca mais de um documento e eles descrevem
+uns aos outros, **cada conserto envelhece a descrição vizinha** — e o envelhecimento acontece
+*dentro do próprio PR*, depois que você já revisou aquele arquivo.
+
+Não é hipótese: no PR 494, rodada após rodada, o Codex achou **a mesma classe** de defeito, sempre
+criada pelo conserto da rodada anterior. A guarda foi consertada no `SKILL.md` → o `CLAUDE.md` ficou
+sem a instrução → consertado o `CLAUDE.md` → o `PROGRESSO.md` passou a descrever a guarda
+**rejeitada** como vigente → consertado o `PROGRESSO.md`, o `LEIA-PRIMEIRO.md` seguia mandando caçar
+uma chave desnecessária. Cada uma passaria por "documentação, risco baixo".
+
+E o fecho da cadeia é a própria lição: o que a sustentava era um **contador** — quantas rodadas,
+quantos achados — escrito dentro dos documentos que a revisão estava revisando. Ele envelhecia a
+cada rodada por construção. A classe só fechou quando o contador saiu, não quando foi sincronizado
+pela enésima vez. **Descrição que depende do estado corrente da revisão não entra no artefato
+revisado** — é a mesma armadilha da frase que cita o resultado de um `grep` que o próprio commit
+muda.
+
+Então, antes de postar o relatório de **qualquer** rodada num PR que toca 2+ documentos:
+
+1. Liste os documentos que o diff toca.
+2. Para cada um, releia-o **inteiro contra o estado final do diff** — não contra o que ele dizia
+   quando a rodada começou.
+3. Pergunte de cada afirmação: *isto ainda é verdade depois dos consertos desta rodada?* Em especial
+   toda frase que descreve **como algo funciona** ou **qual foi a decisão** — são as que envelhecem.
+4. Confira também os documentos que o diff **não** toca mas que descrevem o que ele mudou. Doc de
+   ponto de entrada (`LEIA-PRIMEIRO`, `PROGRESSO.md`, `CLAUDE.md`) é o caso perigoso: quem chega
+   depois lê **ele**, não o diff.
+
+Um documento que descreve a tentativa descartada é pior que um documento omisso: ele **manda a
+próxima sessão refazer o caminho errado**, e com a autoridade de estar escrito.
 
 ### A independência se perde — recompre-a
 

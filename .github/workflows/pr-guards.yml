@@ -159,6 +159,29 @@ jobs:
             exit 1
           fi
 
+  escopo-processo:
+    name: PR de processo não mistura código de produto
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      - name: Guard de escopo (regra R1)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          # Só `git` + `node` — sem pnpm install, sem SDK, sem credencial.
+          # Diff de TRÊS PONTOS: dois pontos compara as pontas e acusa arquivo que
+          # veio da main no meio, produzindo falso positivo em PR desatualizado.
+          ARQUIVOS="$(git diff --name-only "$BASE_SHA"..."$HEAD_SHA")"
+          export PR_ARQUIVOS="$ARQUIVOS"
+          if ! node scripts/guard-pr-escopo-processo.mjs; then
+            echo "::error title=Escopo do PR::Arquivo de .claude/ junto com codigo de produto. Regra R1 do CLAUDE.md: o PR de processo sai sozinho, com todos os documentos propagados no mesmo diff. Editar processo dentro de um PR em revisao produz um ciclo que nao converge."
+            exit 1
+          fi
+
   migracao-declarativa:
     name: Migração não declara estrutura no retorno
     runs-on: ubuntu-latest

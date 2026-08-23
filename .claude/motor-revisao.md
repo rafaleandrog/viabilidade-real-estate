@@ -20,6 +20,110 @@ palavras —, então o custo mora no input, e é ali que o motor externo paga.
 abaixo tenta, e o que ele não conseguir vira fan-out em subagente Anthropic, **declarada** no
 relatório e na linha de anúncio. O que nunca acontece é lente sumir porque o motor caiu.
 
+> ✅ **ADAPTADO — 2026-08-23: existe um TERCEIRO caminho, e neste repositório ele é o que funciona.**
+>
+> Este documento descrevia só dois motores: o **CLI local** (`codex exec`, o preflight abaixo) e o
+> **fallback nativo**. Falta o **GitHub App do Codex** (`chatgpt-codex-connector`), que **está
+> instalado neste repositório** e revisa quando se comenta `@codex review` no PR — ou quando o PR é
+> aberto. Exercitado em rodadas sucessivas no PR 494, ~2 min cada, com achados P1 e P2 reais.
+>
+> ⚠️ **Não cite aqui quantas rodadas ou quantos achados.** O placar vive no PR. Três documentos
+> deste repositório chegaram a carregar três contagens diferentes do **mesmo** PR, porque cada uma
+> foi escrita num momento diferente da revisão que as gerava — achado da rodada 7 do próprio Codex.
+> Contador dentro do artefato revisado **envelhece a cada rodada**, por construção: sincronizá-lo é
+> alimentar o loop, e a saída é não tê-lo.
+>
+> **Por que isto precisa estar escrito.** Sem esta nota, a sessão faz o que a de 2026-08-23 fez:
+> mede que o CLI não sobe (sem `OPENAI_API_KEY`, e com `api.openai.com` devolvendo **403 no CONNECT**
+> pela política de rede do *cloud environment*), conclui *"não há Codex"* e cai para o nativo — com
+> o motor bom disponível a um comentário de distância. A conclusão errada é barata de tirar e cara
+> de manter.
+>
+> **Ordem de preferência neste repositório:**
+>
+> **São DUAS camadas que somam, não três motores em fila.** A tabela anterior dizia que o fan-out
+> nativo só entra "quando 1 e 2 falharem", e isso contradizia o parágrafo seguinte — achado P2 da
+> rodada 9 do próprio Codex. Quem seguisse a tabela **pularia a fan-out sempre que o App
+> respondesse**, que é justamente o caso normal.
+>
+> | Camada | O que é | Quando |
+> |---|---|---|
+> | **A — revisão do App** | `@codex review` no PR | **Sempre** que houver PR aberto. É o caminho normal, e não substitui a camada B |
+> | **B — fan-out das lentes** | `codex exec` (preflight abaixo) **ou** subagente nativo | **Sempre.** O `codex exec` quando a chave e a rede existirem; **nativo** quando não, declarado como menos adversarial |
+>
+> A escolha condicional é **dentro da camada B** — CLI × nativo. A camada A não dispensa a B.
+>
+> **As duas camadas não competem — somam.** No PR 494 a divisão foi limpa e vale registrar: o
+> Codex achou os defeitos de **lógica** (uma guarda que não testava o que dizia testar; um caminho
+> absoluto que não existe noutro layout), e as lentes nativas acharam as **imprecisões factuais** do
+> texto. Rodar as duas é mais barato que descobrir depois qual faltou.
+>
+> ⚠️ **O portão do CI não enxerga o Codex.** `revisao-registrada.yml:108` filtra os comentários
+> **pelo autor do PR**, então uma review do bot **nunca** satisfaz o status `revisao/bloqueantes` —
+> e, pior, publicar a linha de máquina com `bloqueantes=0` deixa o status **verde** com thread do
+> Codex em aberto. Por isso: **`bloqueantes=` conta os achados do Codex ainda não resolvidos**, e o
+> quadro de execução da §7 traz uma linha por rodada do Codex, com o commit revisado.
+
+### Sequência obrigatória do App — acionar, ESPERAR, colher, só então atestar
+
+**ADAPTADO — 2026-08-23, achado P1 do próprio Codex no PR 494.** A resposta do App é
+**assíncrona**, e dizer que `bloqueantes=` conta os achados dele **não basta**: sem um passo de
+espera, o relatório sai antes de o achado chegar e o status fica verde sobre uma revisão que ainda
+não aconteceu. Era exatamente o furo que esta seção existia para fechar, aberto de novo pela falta
+de um passo.
+
+Então, **antes** de publicar o relatório da §7, execute nesta ordem:
+
+1. **Marque a linha de base — ANTES de acionar.** Leia as reviews do PR e anote o `id` (ou o
+   `submitted_at`) da review mais recente do bot. Se não houver nenhuma, anote "nenhuma".
+
+   > ⚠️ **Este passo vem primeiro, e a ordem é o conserto** — achado do próprio Codex no PR 494. Se
+   > você acionar antes de marcar, e o App responder no intervalo entre as duas ações, **a review
+   > nova vira a sua linha de base** e o laço passa 15 minutos esperando uma terceira que nunca vem.
+
+2. **Acione.** Comente `@codex review` no PR, com o head da rodada declarado no texto. (Abrir o PR
+   também aciona; um `@codex review` explícito por rodada é o que torna a rodada rastreável.)
+
+3. **Espere, com teto.** Releia as reviews até aparecer uma que satisfaça **as duas** condições:
+   `commit_id` igual ao head da rodada **e** `id`/`submitted_at` **posterior à linha de base do
+   passo 1**. Teto de **15 minutos**.
+
+   > ⚠️ **Casar só o head não basta.** Numa rodada N+1 que nasce de comentário, e não de push, o
+   > head **não muda**: a review da rodada anterior já tem aquele `commit_id`, o predicado passa
+   > **na hora**, e a atestação sai antes de a revisão nova chegar. É a mesma corrida que esta
+   > sequência existe para fechar, uma volta adiante.
+4. **Colhe.** Leia os *review threads*, não só o corpo da review — os achados vêm como comentários
+   inline, com `path` e `line`. Cada um tem severidade (P1/P2).
+5. **Verifique cada achado você mesmo**, como qualquer bloqueante (§11 da skill). Achado do Codex
+   não é verdade revelada: ele erra, e contestação com evidência é legítima.
+6. **Só então** monte `bloqueantes=` = seus bloqueantes **+** os achados do Codex ainda não
+   resolvidos, e publique.
+7. **Resolva os threads que você endereçou**, para a próxima rodada distinguir o que é novo.
+
+**Se o teto estourar** — nenhuma review no head da rodada em 15 min —, o ciclo fica **aberto**, e a
+atestação tem de refletir isso **na máquina, não na prosa**:
+
+> 🔴 **Publique a linha de máquina com `bloqueantes=1`**, tendo como bloqueante *"revisão do App não
+> chegou no head desta rodada"* — ele some quando ela chegar. Diga também, em uma linha de prosa,
+> que o App foi acionado no head `<sha>` e não respondeu dentro do teto.
+>
+> **Duas armadilhas aqui, as duas achadas pelo próprio Codex, e a segunda derrubou a primeira
+> resposta:**
+>
+> 1. **`bloqueantes=0` com prosa explicando não serve.** `revisao-registrada.yml` lê **só o número**;
+>    a prosa não é lida por ninguém que decida, e o status fica **verde** sobre um ciclo aberto.
+> 2. **Omitir a linha também não serve** — foi a correção que eu tinha escrito, e está errada. O
+>    próprio relatório de timeout dispara `issue_comment`, e o job varre **todos** os comentários do
+>    head: se já houver uma atestação `bloqueantes=0` **no mesmo head** — o caso da rodada N+1 que
+>    nasce de comentário, previsto na §1 da skill —, ele acha a linha antiga e **republica
+>    `success`**. Ausência de linha nova não apaga linha velha.
+>
+> Por isso a regra é **positiva, não por omissão**: emita `bloqueantes=1`. É a única forma de
+> **sobrescrever** um `success` anterior no mesmo head.
+
+Silêncio do motor nunca é aprovação do motor — e "eu expliquei no texto" não é o mesmo que "o portão
+sabe".
+
 ## Entradas que a skill chamadora fornece
 
 O motor é o mesmo para shell e para app; o que difere vem de quem chama, e **tem que estar
