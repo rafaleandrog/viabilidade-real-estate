@@ -291,8 +291,8 @@ inscreve em nada — ela revisa quando chamada e termina. Vale saber por que iss
 é quem escreveu** — a §8 da skill compensa com lentes novas a cada rodada, mas não é a mesma coisa.
 
 **O motor é Codex, e ele está ligado** — por **`@codex review`** no PR, não pelo CLI. O GitHub App
-está instalado neste repositório; provado no PR 494, seis rodadas, ~2 min cada, nove achados reais
-(dois P1). É o **caminho normal**, e a sequência obrigatória — acionar, esperar com teto de 15 min,
+está instalado neste repositório e foi exercitado em rodadas sucessivas no PR 494 (~2 min cada), com
+achados P1 e P2 reais. É o **caminho normal**, e a sequência obrigatória — acionar, esperar com teto de 15 min,
 colher os *review threads*, verificar, só então atestar — está em `.claude/motor-revisao.md`
 § *Sequência obrigatória do App*.
 

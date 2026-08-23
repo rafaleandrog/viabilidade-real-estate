@@ -25,7 +25,13 @@ relatório e na linha de anúncio. O que nunca acontece é lente sumir porque o 
 > Este documento descrevia só dois motores: o **CLI local** (`codex exec`, o preflight abaixo) e o
 > **fallback nativo**. Falta o **GitHub App do Codex** (`chatgpt-codex-connector`), que **está
 > instalado neste repositório** e revisa quando se comenta `@codex review` no PR — ou quando o PR é
-> aberto. Medido no PR 494: três rodadas seguidas, ~2 min cada, cinco achados P2 reais.
+> aberto. Exercitado em rodadas sucessivas no PR 494, ~2 min cada, com achados P1 e P2 reais.
+>
+> ⚠️ **Não cite aqui quantas rodadas ou quantos achados.** O placar vive no PR. Três documentos
+> deste repositório chegaram a carregar três contagens diferentes do **mesmo** PR, porque cada uma
+> foi escrita num momento diferente da revisão que as gerava — achado da rodada 7 do próprio Codex.
+> Contador dentro do artefato revisado **envelhece a cada rodada**, por construção: sincronizá-lo é
+> alimentar o loop, e a saída é não tê-lo.
 >
 > **Por que isto precisa estar escrito.** Sem esta nota, a sessão faz o que a de 2026-08-23 fez:
 > mede que o CLI não sobe (sem `OPENAI_API_KEY`, e com `api.openai.com` devolvendo **403 no CONNECT**

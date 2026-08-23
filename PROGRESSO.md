@@ -144,7 +144,7 @@ como reforço, não como única defesa.
 
 | Caminho | Estado |
 |---|---|
-| **GitHub App (`@codex review`)** | ✅ **instalado e funcionando — é o caminho normal deste repositório.** Provado no PR 494: cinco rodadas, ~2 min cada, **sete achados** (um P1, seis P2), todos reais |
+| **GitHub App (`@codex review`)** | ✅ **instalado e funcionando — é o caminho normal deste repositório.** Exercitado em rodadas sucessivas no PR 494 (~2 min cada), com achados P1 e P2 reais. O placar vive no PR, não aqui |
 | CLI local (`codex exec`), que `.claude/motor-revisao.md` prescrevia como único | ✅ funciona em `urbiverso/urbiverso` (PR #2595, `gpt-5.6-terra`/`sol`). ❌ **não sobe aqui** |
 | ChatGPT/Codex web sobre a URL do PR | ✅ funciona, e não depende de `OPENAI_API_KEY` |
 
@@ -228,11 +228,19 @@ Duas decisões de desenho que custaram um erro cada, e vale não repetir:
   verde; e o gatilho `issue_comment` precisa existir porque o relatório é postado **depois** do
   último push.
 
-**Pendências do autor** (nenhuma dá para fazer daqui): `OPENAI_API_KEY` nas variáveis do *cloud
-environment* — sem ela a revisão roda no motor nativo, para sempre, e nativo é menos adversarial
-porque revisa patch escrito pela mesma família de modelo; **branch protection** com
-`revisao/bloqueantes` como required check, sem o que o guard é conselho e não portão; e decidir se o
-monorepo continua anexado a estas sessões — a defesa hermética seria não anexar.
+**Pendências do autor** (nenhuma dá para fazer daqui):
+
+- ~~`OPENAI_API_KEY` nas variáveis do *cloud environment*~~ — 🔄 **deixou de ser pendência em
+  2026-08-23.** O texto dizia que sem a chave a revisão roda no motor nativo *"para sempre"*. **Não
+  roda:** o **GitHub App do Codex está instalado** e revisa a `@codex review`, sem chave nenhuma. A
+  chave segue sendo o que falta ao **CLI local**, junto com a liberação de `api.openai.com` na
+  política de rede (hoje **403 no CONNECT**) — mas o CLI é o fallback, não o caminho.
+- **Branch protection** com `revisao/bloqueantes` como required check — sem isso o guard é conselho,
+  não portão, e `main` está `protected: false` hoje.
+- Decidir se o monorepo continua anexado a estas sessões — a defesa hermética seria não anexar.
+- Fazer os hooks do repo carregarem: o projeto do Claude Code é `/home/user`, e o
+  `.claude/settings.json` do app mora num subdiretório, então **hooks e `permissions.deny` não são
+  lidos** (ver a seção de estado dos hooks, acima).
 
 ---
 

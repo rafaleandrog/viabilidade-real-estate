@@ -41,8 +41,8 @@ nova rodada de revisão → parar. **Merge é decisão do autor.**
 > Esta seção afirmava que faltava *"uma coisa só"* (a `OPENAI_API_KEY`) e que sem ela a revisão cai
 > para o motor nativo. **O caminho que funciona é outro, e não precisa de chave nenhuma:** o
 > **GitHub App do Codex** está instalado neste repositório e revisa quando se comenta
-> **`@codex review`** no PR. Provado no PR 494: seis rodadas, ~2 min cada, nove achados reais (dois
-> P1). **Comente `@codex review` — é o caminho normal.**
+> **`@codex review`** no PR — exercitado em rodadas sucessivas no PR 494, ~2 min cada, com achados
+> P1 e P2 reais. **Comente `@codex review` — é o caminho normal.**
 >
 > A `OPENAI_API_KEY` continua sendo o que falta para o **CLI local** (`codex exec`), que é um
 > caminho diferente — e neste *cloud environment* falta também liberar `api.openai.com` na política
