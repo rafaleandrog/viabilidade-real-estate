@@ -607,12 +607,18 @@ fim de Durante a obra
 
 A interface deve evitar mostrar a mesma janela integral da Obra em três linhas de absorção simultâneas.
 
-> ✅ **Comportamento vigente, alinhado ao padrão (#225).** `faixasAbsorcao`, em
+> ✅ **Comportamento vigente para cronograma coerente (#225).** `faixasAbsorcao`, em
 > `frontend/fluxo-shared.ts:257-283`, deriva "Durante a obra" a partir do **mês seguinte ao fim do
-> Lançamento** (`:276-278`), não do início físico da Obra — os quatro períodos comerciais são
-> contíguos e não se sobrepõem. Quando o Lançamento termina em ou depois do fim da Obra, a faixa
-> fica vazia e `problemaJanelaDuranteObra` (`:292-302`) devolve o texto que a UI mostra, em vez de
-> calcular em silêncio. Pré-lançamento ausente vira faixa vazia (`fim < inicio`, `:270-272`).
+> Lançamento** (`:276-278`), não do início físico da Obra — e aí os quatro períodos comerciais são
+> contíguos e não se sobrepõem. Pré-lançamento ausente vira faixa vazia (`fim < inicio`,
+> `:270-272`).
+>
+> ⚠️ **A não-sobreposição NÃO é garantida quando o Lançamento alcança o fim da Obra.** Nesse caso
+> a faixa `obra` fica vazia, mas `lancamento` continua até o **próprio** fim (`:275`) enquanto o
+> Pós-chaves começa em fim-da-Obra + 1 (`:281`) — os dois **se sobrepõem**, e `absorcaoMensal`
+> espalha percentual nas duas faixas. `problemaJanelaDuranteObra` (`:292-302`) só devolve texto
+> para um `urbi-banner variante="alerta"` (`tela-fluxo-cronograma.ts:186-187`): **não bloqueia o
+> salvamento** nem impede o cálculo. É aviso, não invariante.
 
 ### 8.4 Entrega é marco, não período de venda
 
@@ -832,8 +838,19 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > (`pctPosObraDerivado`, `frontend/fluxo-shared.ts:324-326`: `100 − p1 − p2 − p3`). A soma dos três
 > informados é validada por `erroFormularioAbsorcao` (`frontend/fluxo-shared.ts:337-345`) — sem
 > isso, um total acima de 100% clampava no derivado e a absorção fechava abaixo de 100% sem aviso.
-> Quando o Cronograma não tem Pré-lançamento, a tela nem mostra o campo e o bloco chega zerado
-> (`tela-fluxo-receitas.ts:522`).
+> ⚠️ **Quando o Cronograma não tem Pré-lançamento, o bloco NÃO chega zerado ao motor — e some
+> silenciosamente uma fatia das vendas.** `tela-fluxo-receitas.ts:522` zera apenas o valor **do
+> formulário**, ao abrir o modal. Salvar os parâmetros do Cronograma **não toca no JSON de
+> absorção** (`backend/rotas/avancado.ts:479-504`): o bloco `pre_lancamento` persistido continua
+> lá, com o percentual antigo.
+>
+> Até alguém abrir o modal e clicar em **Aplicar**, `absorcaoMensal` segue lendo esse bloco e o
+> **descarta**, porque a faixa é vazia — `espalhar` retorna cedo quando `fim < inicio`
+> (`frontend/fluxo-shared.ts:384-386`). Como o Pós-chaves é `100 − p1 − p2 − p3`, o percentual do
+> Pré-lançamento **não é redistribuído**: a absorção fecha abaixo de 100% e ninguém é avisado. Um
+> estudo com 20% em Pré-lançamento que desative a fase passa a vender 80%.
+>
+> A normalização acontece **só ao reaplicar o modal**, não ao desativar a fase.
 
 ### 10.3 Distribuição mensal
 
