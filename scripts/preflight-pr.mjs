@@ -34,6 +34,14 @@
 // diff vazio reprova um corpo que está correto. Use `--arquivos -` para
 // declarar explicitamente que o diff é vazio.
 //
+// `--versao <base>:<atual>` substitui as duas versões do manifesto, e `-`
+// declara "sem manifesto". É a TERCEIRA override, e ela existe pelo mesmo
+// motivo das outras duas: a comparação de `versao` lia o `manifesto.json` do
+// disco, então a bateria — que declara um diff sintético — reprovava os casos
+// dela em qualquer PR que legitimamente bumpasse a versão. Como este job roda
+// em TODO PR, isso faria toda migração corretamente versionada derrubar o CI.
+// Achado do Codex no PR 502, rodada 2: o conserto da rodada 1 abriu isto.
+//
 // `--commits <arquivo|->` substitui as mensagens de commit. As duas overrides
 // andam juntas: sobrescrever só a lista de arquivos deixa METADE da entrada
 // vindo da árvore, e uma bateria de testes passa ou falha conforme o que
@@ -65,6 +73,7 @@ const BASE = arg('--base', 'origin/main');
 const NUMERO = arg('--numero', '');
 const ARQUIVOS_MANUAIS = arg('--arquivos');
 const COMMITS_MANUAIS = arg('--commits');
+const VERSAO_MANUAL = arg('--versao');
 
 if (!CORPO_ARQ) {
   console.error('uso: node scripts/preflight-pr.mjs --corpo <arquivo.md> [--base origin/main]');
@@ -155,6 +164,7 @@ if (sujo) {
 let baseSha = '';
 let headSha = '';
 let arquivos = [];
+let adicionados = [];
 let commits = '';
 
 try {
@@ -166,6 +176,13 @@ try {
   // guard de escopo deixa de ver a origem. Reproduzido pelo Codex no PR 496.
   const saida = git('diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`);
   arquivos = saida ? saida.split('\n').filter(Boolean) : [];
+  // Só arquivo ADICIONADO conta como migração nova. Com `--name-only` puro, um
+  // PR que CONSERTA uma migração existente aparecia como migração nova e o
+  // preflight exigia bump — divergindo do guard do `validar-backend.sh`, que
+  // usa `--diff-filter=A` de propósito. Commits históricos de conserto de
+  // migração seriam barrados. Achado do Codex no PR 502, rodada 2.
+  const adicionadosBrutos = git('diff', '--no-renames', '--diff-filter=A', '--name-only', `${baseSha}...${headSha}`);
+  adicionados = adicionadosBrutos ? adicionadosBrutos.split('\n').filter(Boolean) : [];
   commits = git('log', '--format=%B', `${baseSha}..${headSha}`);
   if (COMMITS_MANUAIS !== undefined) {
     commits = COMMITS_MANUAIS === '-' ? '' : readFileSync(COMMITS_MANUAIS, 'utf8');
@@ -173,7 +190,10 @@ try {
   }
   if (ARQUIVOS_MANUAIS !== undefined) {
     arquivos = ARQUIVOS_MANUAIS === '-' ? [] : ARQUIVOS_MANUAIS.split(',').map((a) => a.trim()).filter(Boolean);
-    ok.push(`diff DECLARADO por --arquivos: ${arquivos.length} arquivo(s) (o git não foi consultado)`);
+    // Lista declarada não carrega status de mudança; tratar tudo como ADICIONADO
+    // é o que a bateria quer exercitar, e está dito aqui para não virar surpresa.
+    adicionados = arquivos;
+    ok.push(`diff DECLARADO por --arquivos: ${arquivos.length} arquivo(s), todos tratados como adicionados`);
   } else {
     ok.push(`diff vs. ${BASE}: ${arquivos.length} arquivo(s), base \`${baseSha.slice(0, 8)}\``);
   }
@@ -263,7 +283,7 @@ if (/@codex/i.test(corpo)) {
 
 // Migração nova sem bump da `versao`, e o inverso. O guard completo mora no
 // validar-backend.sh, que aborta sem o SDK — aqui é a versão que roda sempre.
-const migracoesNovas = arquivos.filter((a) => /^migracoes\/\d+.*\.js$/.test(a));
+const migracoesNovas = adicionados.filter((a) => /^migracoes\/\d+.*\.js$/.test(a));
 
 // Comparar o VALOR de `versao`, não só o caminho do arquivo: um PR que edita
 // outro campo do manifesto marcava "bumpou" sem ter bumpado, e o preflight
@@ -278,8 +298,14 @@ const versaoDe = (ref) => {
     return null;
   }
 };
-const versaoBase = baseSha ? versaoDe(baseSha) : null;
-const versaoAtual = versaoDe(null);
+let versaoBase = baseSha ? versaoDe(baseSha) : null;
+let versaoAtual = versaoDe(null);
+if (VERSAO_MANUAL !== undefined) {
+  const [b, a] = VERSAO_MANUAL === '-' ? [null, null] : VERSAO_MANUAL.split(':');
+  versaoBase = b || null;
+  versaoAtual = a || null;
+  ok.push(`versao DECLARADA por --versao: \`${versaoBase ?? '—'}\` → \`${versaoAtual ?? '—'}\``);
+}
 const bumpou = versaoBase !== null && versaoAtual !== null && versaoBase !== versaoAtual;
 
 if (migracoesNovas.length > 0 && !bumpou) {

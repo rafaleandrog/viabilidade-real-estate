@@ -33,12 +33,19 @@ DIFF="frontend/exemplo.ts"
 # do Codex no PR 502.
 : > "$TMP/commits.txt"
 
+# E declara TAMBEM as duas versoes do manifesto. Sem isso a comparacao lia o
+# manifesto.json do disco: num PR que legitimamente bumpasse a versao, os casos
+# desta bateria seriam reprovados com "versao bumpada sem migracao nova" — e
+# como este job roda em TODO PR, toda migracao corretamente versionada
+# derrubaria o CI. Terceira override pelo mesmo motivo que as duas anteriores.
+VERSAO='0.1.28:0.1.28'   # sem bump, o caso comum
+
 # esperar <exit-esperado> <rotulo> <corpo...>
 esperar() {
   local esperado="$1" rotulo="$2"; shift 2
   printf '%s\n' "$@" > "$TMP/corpo.md"
   local saida; saida="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" \
-    --arquivos "$DIFF" --commits "$TMP/commits.txt" 2>&1)"
+    --arquivos "$DIFF" --commits "$TMP/commits.txt" --versao "$VERSAO" 2>&1)"
   local obtido=$?
   if [ "$obtido" -eq "$esperado" ]; then
     passou=$((passou + 1))
@@ -58,7 +65,7 @@ contem() {
   local padrao="$1" rotulo="$2"; shift 2
   printf '%s\n' "$@" > "$TMP/corpo.md"
   local saida; saida="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" \
-    --arquivos "$DIFF" --commits "$TMP/commits.txt" 2>&1)"
+    --arquivos "$DIFF" --commits "$TMP/commits.txt" --versao "$VERSAO" 2>&1)"
   local obtido=$?
   if [ "$obtido" -ne 0 ]; then
     falhou=$((falhou + 1))
@@ -110,14 +117,17 @@ DIFF='migracoes/030_algo.js'
 esperar 1 'migração nova sem bump da versao' 'Nada a citar.'
 DIFF='migracoes/030_algo.js,migracoes/031_outra.js,manifesto.json'
 esperar 1 'duas migrações no mesmo PR' 'Nada a citar.'
-# Tocar o manifesto NÃO basta — o preflight compara o VALOR de `versao` entre a
-# base e a árvore. Este caso é a prova do conserto: antes ele passava com o
-# arquivo apenas listado, aprovando o que o validar-backend.sh reprova.
+# Tocar o manifesto NÃO basta — o preflight compara o VALOR de `versao`.
 DIFF='migracoes/030_algo.js,manifesto.json'
 esperar 1 'manifesto tocado sem bump da versao ainda reprova' 'Nada a citar.'
-# O caminho positivo (bump real) não é simulável por override: a comparação lê
-# o `manifesto.json` da base e o do disco. Ele é exercido de verdade no PR que
-# trouxer migração — e é lá que tem que ficar verde.
+
+# O caminho POSITIVO, que a rodada 1 não conseguia exercitar. A override
+# `--versao` o destravou: agora a bateria prova os dois sentidos da regra.
+VERSAO='0.1.28:0.1.29'
+esperar 0 'migração nova COM bump da versao passa' 'Nada a citar.'
+DIFF='frontend/exemplo.ts'
+esperar 1 'bump da versao SEM migração nova reprova' 'Nada a citar.'
+VERSAO='0.1.28:0.1.28'
 DIFF="frontend/exemplo.ts"
 
 # ── Regra R1: processo não viaja com código de produto ──────────────────────
