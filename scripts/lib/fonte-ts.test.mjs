@@ -244,6 +244,44 @@ test('url() sem aspas sai da superficie de CSS', () => {
 });
 
 test('limparCss limpa fragmento solto (valor de style=)', () => {
-  assert.ok(!limparCss('/* --oculto: 1 */ width: 2px').includes('--oculto'));
-  assert.ok(limparCss('/* x */ width: 2px').includes('width: 2px'));
+  const r = limparCss('/* --oculto: 1 */ width: 2px');
+  assert.deepEqual(r.problemas, []);
+  assert.ok(!r.texto.includes('--oculto'));
+  assert.ok(r.texto.includes('width: 2px'));
+});
+
+test('limparCss PROPAGA o problema em vez de devolver branco', () => {
+  // Era o unico ponto onde o modo de falha invertido se contradizia: o
+  // fragmento sumia inteiro, o guard via zero declaracoes e saia verde —
+  // enquanto o navegador ainda aplica o `width` anterior ao comentario.
+  const r = limparCss('width:100%; /*');
+  assert.equal(r.problemas.length, 1, 'engoliu o problema');
+  assert.match(r.problemas[0], /sem `\*\//);
+});
+
+test('so `html` e `svg` sao marcacao — string comum nao vira <style>', () => {
+  const txt = 'const doc = `<style>:root{--inventado:red}</style>`;';
+  assert.ok(!limpo(txt).css.includes('--inventado'), 'string comum virou superficie de CSS');
+});
+
+test('<!-- dentro de valor de atributo nao abre comentario', () => {
+  const txt = 'const e = html`<div data-nota="<!--"><urbi-a b="1"></urbi-a>-->`;';
+  assert.ok(limpo(txt).marcacao.includes('<urbi-a'), 'o componente foi mascarado');
+});
+
+test('tag sem `>` e aspas sem fechar viram PROBLEMA', () => {
+  for (const txt of [
+    'const e = html`<div <urbi-a b="1"`;',
+    'const e = html`<urbi-a b="nao fecha></urbi-a>`;',
+  ]) {
+    assert.ok(superficies(txt).problemas.length > 0, `passou calado: ${txt}`);
+  }
+});
+
+test('lerTags casa tag em qualquer caixa e normaliza para minusculas', () => {
+  const txt = 'const e = html`<URBI-A STYLE="width:1px"></URBI-A>`;';
+  const tags = lerTags(limpo(txt).marcacao, 'urbi-');
+  assert.equal(tags.length, 1);
+  assert.equal(tags[0].tag, 'urbi-a');
+  assert.equal(tags[0].atributos[0].nome, 'STYLE');
 });

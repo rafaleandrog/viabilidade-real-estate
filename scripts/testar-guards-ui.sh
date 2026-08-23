@@ -452,8 +452,16 @@ caso guard-box-model-urbi 1 "border-boxx não protege — o navegador descarta a
 const e = css`.a urbi-arriscado { width: 100%; box-sizing: border-boxx; }`;
 TS
 
-caso guard-box-model-urbi 1 "<style> de template SEM tag é CSS de verdade (o caso do exportar.ts)" \
-  'caso\.ts:2 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+# ⚠️ VEREDITO INVERTIDO na rodada 4, de propósito. Este caso exigia que um
+# `<style>` dentro de template SEM TAG virasse CSS de verdade, pensando no
+# documento de impressão de `exportar.ts`. Mas template sem tag também é STRING
+# COMUM — prosa, exemplo, documentação —, e tratá-la como HTML deixava
+# `const doc = `<style>:root{--x:red}</style>`` registrar `--x` como token
+# conhecido do app, liberando um `var(--x)` real algumas linhas abaixo.
+# Preço aceito: o CSS de impressão de `exportar.ts` não é analisado. Ele roda em
+# janela própria (o `CLAUDE.md` já o trata como exceção), não usa `urbi-*` e não
+# declara custom property nenhuma.
+caso guard-box-model-urbi 0 "<style> de template SEM tag NÃO é superfície de CSS" <<'TS'
 const doc = `<!doctype html><style>
   .x urbi-arriscado { width: 100%; }
 </style>`;
@@ -668,6 +676,84 @@ caso guard-props-urbi 1 "arquivo que o TypeScript não parseia" \
   'nao consegui analisar' <<'TS'
 const e = html`<urbi-seguro></urbi-seguro>`;
 function ( { ] }
+TS
+
+# ════════════════════════════════════════════════════════════════════════════
+# Rodada 4 — o modo de falha invertido não era uniforme, e dois consertos
+# tinham irmão esquecido
+#
+# Nenhum dos achados desta rodada é de JS/TS: o parser fechou aquele eixo. Os
+# quatro caem na parte CSS/HTML escrita à mão, e metade deles é o mesmo erro de
+# método — o conserto foi aplicado num lugar e não no irmão.
+
+secao "Modo de falha invertido, uniforme — ACUSA (era ZERO em silêncio):"
+
+caso guard-box-model-urbi 1 "style= com /* sem fechar recusa, em vez de virar branco" \
+  'nao consegui analisar' <<'TS'
+const e = html`<urbi-arriscado style="width:100%; /*"></urbi-arriscado>`;
+TS
+
+caso guard-tokens-css 1 "style= com /* sem fechar recusa também no guard de tokens" \
+  'nao consegui analisar' <<'TS'
+const e = html`<div style="--minha: red; /*"></div>`;
+const f = css`.x { color: var(--minha); }`;
+TS
+
+secao "Superfície de CSS não pode nascer larga demais — ACUSA:"
+
+caso guard-tokens-css 1 "<style> dentro de STRING COMUM não declara token" \
+  'caso\.ts:2 +--inventado' <<'TS'
+const doc = `<style>:root{--inventado:red}</style>`;
+const f = css`.x { color: var(--inventado); }`;
+TS
+
+secao "Grafia: HTML é case-insensitive em tag E em atributo — ACUSA:"
+
+caso guard-box-model-urbi 1 "<URBI-ARRISCADO> maiúsculo" \
+  'style= inline \{ width: 100% \}' <<'TS'
+const e = html`<URBI-ARRISCADO style="width:100%"></URBI-ARRISCADO>`;
+TS
+
+caso guard-box-model-urbi 1 "STYLE= maiúsculo (o irmão esquecido de lerTags)" \
+  'style= inline \{ width: 100% \}' <<'TS'
+const e = html`<urbi-arriscado STYLE="width:100%"></urbi-arriscado>`;
+TS
+
+caso guard-box-model-urbi 1 "seletor CSS de tipo em maiúsculas (o outro irmão)" \
+  'caso\.ts:1 +\.a URBI-ARRISCADO \{ width: 100% \}' <<'TS'
+const e = css`.a URBI-ARRISCADO { width: 100%; }`;
+TS
+
+secao "Construção iniciada por < só vale fora de tag e de valor citado:"
+
+caso guard-props-urbi 1 "<!-- dentro de valor de atributo não abre comentário" \
+  'caso\.ts:1 +<urbi-seguro> inventado' <<'TS'
+const e = html`<div data-nota="<!--"><urbi-seguro inventado="x"></urbi-seguro>-->`;
+TS
+
+caso guard-props-urbi 1 "tag aberta e nunca fechada recusa" \
+  'nao consegui analisar' <<'TS'
+const e = html`<div <urbi-seguro inventado="x"`;
+TS
+
+caso guard-props-urbi 1 "aspas de atributo sem fechar recusam" \
+  'nao consegui analisar' <<'TS'
+const e = html`<urbi-seguro rotulo="nao fecha></urbi-seguro>`;
+TS
+
+secao "E o que NÃO pode passar a acusar:"
+
+caso guard-tokens-css 0 "STYLE= maiúsculo declara token igual a style=" <<'TS'
+const e = html`<div STYLE="--minha: red"></div>`;
+const f = css`.x { color: var(--minha); }`;
+TS
+
+caso guard-box-model-urbi 0 ".style=\${} é binding de propriedade, não atributo HTML" <<'TS'
+const e = html`<urbi-arriscado .style=${o}></urbi-arriscado>`;
+TS
+
+caso guard-box-model-urbi 0 "/* dentro de string CSS não abre comentário" <<'TS'
+const e = css`.x urbi-arriscado { content: "/*"; min-width: 0; }`;
 TS
 
 # ════════════════════════════════════════════════════════════════════════════

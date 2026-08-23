@@ -70,6 +70,20 @@ for (const [tag, prim] of Object.entries(espelhoPrims.primitivos ?? {})) {
   }
 }
 
+/**
+ * O atributo e um `style=` de HTML?
+ *
+ * Nome de atributo em HTML e ASCII case-insensitive — `STYLE=` e o mesmo
+ * atributo —, e este era o IRMAO esquecido do conserto de `lerTags`: a tag
+ * passou a casar em qualquer caixa e a comparacao do atributo continuou exata.
+ *
+ * Os prefixados ficam de fora de proposito: `.style=${…}` e binding de
+ * PROPRIEDADE (o objeto CSSStyleDeclaration, que nao da para ler daqui) e
+ * `?style` nao existe. Lit preserva a caixa desses porque le as strings cruas do
+ * template, entao compara-los em minusculas seria errado.
+ */
+const ehStyleHtml = (nome) => !'.@?'.includes(nome[0]) && nome.toLowerCase() === 'style';
+
 /** Todos os `.ts` de `frontend/`, recursivo. */
 function arquivosTs(dir) {
   const fora = [];
@@ -123,9 +137,20 @@ const superficiesPorArquivo = arquivos.map((arq) => {
     css,
     texto,
     // `style="--x: 1"` tambem e CSS — e `limparCss` tira o `/* */` de dentro dele.
+    // Fragmento que nao da para ler recusa o ARQUIVO, em vez de virar branco: era
+    // o unico ponto onde o modo de falha invertido ainda engolia problema.
     estilosInline: lerTags(marcacao, '[a-z]')
-      .flatMap((t) => t.atributos.filter((a) => a.nome === 'style' && a.valor)
-        .map((a) => ({ valor: limparCss(a.valor), offset: a.offset }))),
+      .flatMap((t) => t.atributos.filter((a) => ehStyleHtml(a.nome) && a.valor)
+        .map((a) => {
+          const limpo = limparCss(a.valor);
+          if (limpo.problemas.length) {
+            inseguros.push({
+              rel,
+              problemas: limpo.problemas.map((m) => `linha ${linhaDe(a.offset)}: ${m}`),
+            });
+          }
+          return { valor: limpo.texto, offset: a.offset };
+        })),
   };
 }).filter(Boolean);
 

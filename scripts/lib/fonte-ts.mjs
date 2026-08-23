@@ -235,10 +235,36 @@ function buracosCss(s, de, ate, onde) {
   return { buracos, problemas };
 }
 
-// Elementos de texto cru/RCDATA: o conteudo NAO e marcacao. `style` fica de
-// fora desta lista porque e extraido como CSS — mas o conteudo dele tambem sai
-// da superficie de marcacao, logo abaixo.
-const CRU = /^<(script|title|textarea)\b/i;
+// Elementos cujo conteudo NAO e marcacao. `style` entra na travessia (para o
+// `<` de dentro nao ser lido como tag) mas NAO vira buraco: ele e extraido como
+// CSS logo adiante.
+const CRU = /^<(script|title|textarea|style)[\s>]/i;
+const SEM_BURACO = new Set(['style']);
+
+/**
+ * Fim de uma tag `<…>` a partir do `<`, ATRAVESSANDO valores citados. `-1` se
+ * nao fecha.
+ *
+ * Existe porque `<div data-nota="<!--">` tem um `<!--` que pertence ao VALOR, e
+ * a varredura o lia como abertura de comentario — mascarando tudo ate o proximo
+ * `-->`, inclusive componentes reais. Construcao iniciada por `<` so pode ser
+ * interpretada depois de saber que nao se esta dentro de uma tag.
+ */
+function fimDaTag(s, i, ate) {
+  let k = i + 1;
+  while (k < ate) {
+    const c = s[k];
+    if (c === '"' || c === "'") {
+      const f = s.indexOf(c, k + 1);
+      if (f === -1 || f >= ate) return -1;
+      k = f + 1;
+      continue;
+    }
+    if (c === '>') return k + 1;
+    k++;
+  }
+  return -1;
+}
 
 /** Trechos de HTML que escondem `<tag`, `<style>` ou `--x:`, e os problemas. */
 function buracosHtml(s, de, ate, onde) {
@@ -281,8 +307,20 @@ function buracosHtml(s, de, ate, onde) {
         return { buracos, problemas };
       }
       const abre = resto.indexOf('>');
-      if (abre !== -1) buracos.push({ de: i + abre + 1, ate: i + m.index });
+      if (abre !== -1 && !SEM_BURACO.has(tag)) buracos.push({ de: i + abre + 1, ate: i + m.index });
       i = i + m.index + m[0].length;
+      continue;
+    }
+    // Qualquer outra tag: atravessa-a inteira, com os valores citados, ANTES de
+    // voltar a procurar `<!--`. Sem isto, um `<!--` dentro de um valor abria
+    // comentario e mascarava o componente seguinte.
+    if (/^<[a-zA-Z/]/.test(s.slice(i, i + 2))) {
+      const f = fimDaTag(s, i, ate);
+      if (f === -1) {
+        problemas.push(`${onde}: tag aberta com \`<\` e sem \`>\``);
+        return { buracos, problemas };
+      }
+      i = f;
       continue;
     }
     i++;
@@ -327,13 +365,20 @@ function recortar(txt, trechos, manter, branco = embranquecer(txt)) {
 export const mascarar = (txt, trechos) => recortar(txt, trechos, true);
 const apagar = (str, buracos, branco) => recortar(str, buracos, false, branco);
 
-/** Um fragmento solto de CSS (o valor de um `style="…"`) sem os seus buracos. */
+/**
+ * Um fragmento solto de CSS (o valor de um `style="…"`) sem os seus buracos.
+ *
+ * ⚠️ Devolve `{ texto, problemas }`, e quem chama TEM que propagar `problemas`.
+ * A versao anterior devolvia so o texto e, diante de um fragmento confuso,
+ * entregava tudo em branco — o que faz o guard ver zero declaracoes e sair
+ * VERDE. Era o modo de falha invertido contradizendo a si mesmo no unico ponto
+ * onde ninguem olhou: `style="width:100%; /*"` some inteiro, mas o navegador
+ * ainda aplica o `width` que veio antes do comentario.
+ */
 export function limparCss(fragmento) {
   const { buracos, problemas } = buracosCss(fragmento, 0, fragmento.length, 'style=');
-  // Fragmento confuso vira fragmento VAZIO, nunca fragmento aceito: some da
-  // superficie em vez de entrar meio lido.
-  if (problemas.length) return embranquecer(fragmento);
-  return apagar(fragmento, buracos);
+  if (problemas.length) return { texto: embranquecer(fragmento), problemas };
+  return { texto: apagar(fragmento, buracos), problemas: [] };
 }
 
 const textosCom = (analise, aceita) =>
@@ -364,7 +409,18 @@ export function superficies(txt, nome = 'arquivo.ts') {
   const ehMarcacao = (tag) => tag === 'html' || tag === 'svg';
 
   // 1. buracos de HTML, sobre a superficie contigua de cada template nao-CSS.
-  const naoCss = analise.templates.filter((t) => !ehCss(t.tag));
+  // ⚠️ SO `html`/`svg`. Incluir template sem tag fazia uma STRING COMUM virar
+  // marcacao: `const doc = \`<style>:root{--x:red}</style>\`` — prosa, exemplo,
+  // documentacao — era lida como HTML de verdade, o bloco entrava na superficie
+  // de CSS, a declaracao virava token conhecido do app e um `var(--x)` real
+  // passava. E a ponta oposta do mesmo eixo que ja fez a declaracao ser restrita
+  // a superficie CSS de verdade: aqui a superficie CSS e que nascia larga demais.
+  //
+  // O preco: CSS dentro de template SEM TAG nao e analisado. O unico lugar assim
+  // e o documento de impressao de `frontend/exportar.ts` — que roda em janela
+  // propria, fora do escopo das variaveis do shell (o `CLAUDE.md` ja o trata como
+  // excecao), nao usa nenhum `urbi-*` e nao declara custom property nenhuma.
+  const naoCss = analise.templates.filter((t) => ehMarcacao(t.tag));
   const brutoMarcacao = recortar(txt, naoCss.flatMap((t) => t.textos), true, branco);
   const deHtml = [];
   for (const t of naoCss) {
@@ -386,13 +442,6 @@ export function superficies(txt, nome = 'arquivo.ts') {
     trechosCss.push(trecho);
     doStyle.push(trecho);
   }
-  // `<style>` aberto e nunca fechado: o conteudo dele nao e marcacao nem CSS
-  // delimitado — nao da para analisar o arquivo.
-  for (const m of marcacaoLimpa.matchAll(/<style\b[^>]*>/gi)) {
-    const fecha = /<\/style\s*>/i.exec(marcacaoLimpa.slice(m.index));
-    if (!fecha) problemas.push(`linha ${linhaDe(m.index)}: <style> sem </style>`);
-  }
-
   // 3. buracos de CSS, sobre a superficie contigua de cada regiao de CSS.
   const brutoCss = recortar(semHtml, trechosCss, true, branco);
   const deCss = [];
@@ -462,7 +511,11 @@ const BRANCO = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r';
  */
 export function lerTags(superficie, prefixo) {
   const fora = [];
-  const re = new RegExp(`<(${prefixo}[a-z0-9-]*)`, 'g');
+  // Nome de elemento em HTML e ASCII case-insensitive: `<URBI-KPI>` e `<urbi-kpi>`
+  // sao o MESMO elemento para o parser do navegador. Sem a flag `i` os dois
+  // guards saiam verdes diante da forma maiuscula. O nome volta normalizado em
+  // minusculas, que e a forma com que o espelho o indexa.
+  const re = new RegExp(`<(${prefixo}[a-z0-9-]*)`, 'gi');
   for (const m of superficie.matchAll(re)) {
     const atributos = [];
     let i = m.index + m[0].length;
@@ -504,7 +557,7 @@ export function lerTags(superficie, prefixo) {
       }
       atributos.push({ nome, valor, offset: inicioNome });
     }
-    fora.push({ tag: m[1], offset: m.index, atributos });
+    fora.push({ tag: m[1].toLowerCase(), offset: m.index, atributos });
   }
   return fora;
 }

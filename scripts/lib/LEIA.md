@@ -59,9 +59,46 @@ precisa **nunca dizer "limpo" quando está confuso**. Construção que ele não 
 Isso termina a cauda por construção. Cada achado futuro dessa família vira, no pior caso, um falso
 positivo barulhento — que alguém conserta — em vez de um guard mudo, que é o pior desfecho possível.
 
+### O modo invertido só vale se for uniforme — a auditoria dos pontos que podem engolir
+
+Uma promessa dessas falha no único lugar onde ninguém olhou. `limparCss` era esse lugar: diante de
+`style="width:100%; /*"` ele **achava** o problema e devolvia o fragmento todo em branco, o guard
+via zero declarações e saía verde — enquanto o navegador ainda aplica o `width` anterior ao
+comentário. A promessa central contradita por dentro.
+
+Por isso a lista abaixo existe, e por isso cada linha tem caso na bateria:
+
+| Ponto | Podia engolir? | Como propaga hoje |
+|---|---|---|
+| `limparCss` | **sim, e engolia** | devolve `{ texto, problemas }`; os dois guards recusam o arquivo |
+| `buracosCss` | não | retorna cedo com `problemas` — `/*` sem `*/`, string aberta, `url(` sem `)` |
+| `buracosHtml` | não | idem — `<!--` sem `-->`, CDATA, `<script>`/`<style>` sem fechar, tag sem `>` |
+| `fimDaTag`, `fimDaStringCss` | não | devolvem `-1`, e quem chama transforma em problema |
+| `regrasDe` (guard de box model) | não | `{` sem `}` vira problema em vez de encerrar o laço calado |
+| `analisar` | não | `parseDiagnostics` do TypeScript vira problema |
+| `lerTags` | não mais | tag ou aspas sem fechar são pegas por `buracosHtml` **antes** dele rodar |
+| `declaracoesDe` | não se aplica | trecho sem `:` não é declaração — é ausência, não confusão |
+| `recortar`, `mascarar`, `embranquecer` | não se aplica | puros, sem noção de problema |
+
+**Regra para quem mexer aqui:** helper que decide alguma coisa devolve o que decidiu **e** o que não
+conseguiu decidir. Devolver só o resultado limpo é como o defeito volta.
+
 ⚠️ **As varreduras de CSS e HTML rodam sobre a superfície já mascarada, não sobre cada pedaço de
 texto do template.** É o que faz o estado atravessar a interpolação: `<!-- ${x} -->` e
 `.b { padding: ${x}; }` são uma construção só, com brancos no meio.
+
+⚠️ **Construção iniciada por `<` só é interpretada fora de tag.** A varredura de HTML atravessa cada
+tag inteira, com os valores citados, antes de procurar `<!--` — senão `<div data-nota="<!--">` abre
+um comentário que mascara o componente seguinte.
+
+⚠️ **Só `html` e `svg` são marcação.** Template sem tag é string comum tanto quanto documento: tratá-lo
+como HTML fazia `const doc = \`<style>:root{--x:red}</style>\`` — prosa — registrar `--x` como token
+conhecido do app e liberar um `var(--x)` real. É a ponta oposta do eixo que já restringiu a
+*declaração* à superfície CSS de verdade: ali a fonte era larga, aqui a superfície é que nascia larga.
+
+⚠️ **HTML é ASCII case-insensitive em nome de tag E de atributo.** `<URBI-KPI STYLE="…">` é o mesmo
+elemento com o mesmo atributo. Vale também para seletor de tipo em CSS (`.a URBI-KPI`). Não vale para
+`.prop=`, `@evento=` e `?attr=`: o Lit lê as strings cruas do template e preserva a caixa desses.
 
 ## As três sub-linguagens, e por que a lista fecha
 
