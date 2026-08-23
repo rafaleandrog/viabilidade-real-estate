@@ -43,7 +43,7 @@ preencher estas linhas sem ter revisado não deixa o PR verde.
 
 <!-- Liste os comandos/checks executados e qualquer limitação conhecida. -->
 
-- [ ] `node scripts/preflight-pr.mjs --corpo <arquivo>` verde ANTES de abrir o PR
+- [ ] `node scripts/preflight-pr.mjs --corpo <arquivo> --titulo "<título do PR>"` verde ANTES de abrir o PR
 - [ ] Guards locais aplicáveis
 - [ ] Testes aplicáveis
 - [ ] Typecheck/build aplicáveis

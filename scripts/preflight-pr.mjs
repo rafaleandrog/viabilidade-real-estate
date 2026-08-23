@@ -312,7 +312,14 @@ const texto = `${TITULO}\n${corpo}\n${commits}`;
 
 // ── 3. Diff vazio + keyword de fechamento ───────────────────────────────────
 // O caso do PR #142: 12 issues fechadas, zero arquivos alterados.
-const RE_KEYWORD = /\b(?:clos(?:e|es|ed)|fix(?:es|ed)?|resolv(?:e|es|ed))\s*:?\s*#(\d+)/gi;
+// SEM `\b`, de propósito, e é o oposto do que o bom senso pede. O job
+// `diff-vazio` do CI usa `grep -qiE` com um padrão SEM limite de palavra, então
+// ele casa `closes #123` dentro de `discloses #123` e reprova. Com `\b` aqui, o
+// preflight saía 0 e o CI reprovava o mesmo PR — quebrando a única coisa que
+// este script promete: antecipar aquele job. Predicado tem de ter a MESMA
+// semântica do que ele prevê, mesmo quando a semântica é discutível. Achado do
+// Codex no PR 502, rodada 8.
+const RE_KEYWORD = /(?:clos(?:e|es|ed)|fix(?:es|ed)?|resolv(?:e|es|ed))\s*:?\s*#(\d+)/gi;
 const fecha = [...texto.matchAll(RE_KEYWORD)].map((m) => m[1]);
 if (arquivos.length === 0 && fecha.length > 0) {
   bloqueantes.push(
