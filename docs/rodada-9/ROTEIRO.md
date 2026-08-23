@@ -32,8 +32,15 @@ Fora de onda, aberto: **PR 500** (o Codex responde de duas formas — conserto d
 Ordem fixada pela **#468**. Cada PR sai sozinho, com a tabela `antes → depois` dos 4 KPIs:
 
 ```
-#426 → #433 → #429 → #431 → {#432, #435} → #434 → #428
+#468 → #426 → #433 → #429 → #431 → {#432, #435} → #434 → #428
 ```
+
+> 🔴 **A #468 é o primeiro PR da cadeia, não só quem fixa a ordem.** Ela foi reescrita para entregar
+> a **fixture de regressão dos 4 KPIs** (`docs/rodada-8/25-issues-final.md:5628-5634`), e uma
+> fixture de regressão só vale se registrar a `main` **intacta**. Criada depois da #426, ela grava
+> como baseline o primeiro resultado **já alterado** — e deixa de proteger exatamente a mudança que
+> existe para vigiar. Toda a tabela `antes → depois` dos PRs seguintes sai dela. Achado do Codex no
+> PR 501.
 
 Armadilhas que o corpo do PR precisa carregar:
 - **#429** — *"verificar que a curva voltou não fecha esta issue"*; o critério é `Σ pcts` fechar em 100%.
@@ -63,10 +70,18 @@ esperam conserto nenhum.
 
 | Arquivo | Issues que o citam |
 |---|---|
-| `frontend/fluxo-caixa-motor.ts` | **25** |
+| `frontend/fluxo-caixa-motor.ts` | **26** |
 | `frontend/funding-motor.ts` | 15 |
-| `frontend/tela-fluxo-receitas.ts` | 14 |
-| `frontend/fluxo-shared.ts` · `frontend/fluxo-invariantes.ts` | 13 cada |
+| `frontend/tela-fluxo-receitas.ts` | 15 |
+| `frontend/fluxo-shared.ts` | 15 |
+| `frontend/fluxo-invariantes.ts` | 13 |
+
+> ⚠️ **Estas contagens incluem o Bloco 8-A recuperado (#488–#493), e a primeira versão desta tabela
+> não incluía.** Os corpos vivos daquelas seis vêm de `07-consolidado-issues.md`, não de
+> `25-issues-final.md`, e uma varredura que só lesse o segundo arquivo as perderia — que foi como
+> as seis sumiram do backlog na Rodada 8, em primeiro lugar. A #490 cita `fluxo-caixa-motor.ts` e
+> `tela-fluxo-receitas.ts`; #490 e #493 citam `fluxo-shared.ts`
+> (`07-consolidado-issues.md:505-509` e seção 8-A.3). Achado do Codex no PR 501.
 
 Colisões declaradas, a ordenar: **#431 × #452** (#431 primeiro, ou quebra o `deepEqual` do no-op) ·
 **#444 × #445** (mesmo arquivo, direções opostas) · **#447 × #472** · **#454 × #466** ·
@@ -75,9 +90,19 @@ Colisões declaradas, a ordenar: **#431 × #452** (#431 primeiro, ou quebra o `d
 ## Migrações — Onda 8
 
 Quatro issues exigem migração **e bump da `versao`** (hoje `0.1.28`): **#459 · #473 · #462 · #478**.
-Só uma toma o número `030`; as outras tomam `031`/`032`/`033`, e o PR **declara qual**. O `030` está
-livre — o que o autor recusou foi a migração `030` **do `linha_credito`**, não o número.
-**As demais issues não bumpam `versao`.**
+O `030` está livre — o que o autor recusou foi a migração `030` **do `linha_credito`**, não o
+número.
+
+> 🔴 **Não reserve `030`–`033` de antemão, e não trate "só estas quatro bumpam" como fato.** A
+> **#477** permite explicitamente implementar o default herdado em **coluna própria**
+> (`docs/rodada-8/25-issues-final.md:5060-5064`); nesse caminho ela também exige migração e bump. E
+> o único vínculo de ordem que ela tem é *depois da #428* — Onda 5 —, então ela pode chegar **antes**
+> da Onda 8 e consumir o `030`. Reserva antecipada aqui produz número duplicado ou orienta a omitir
+> um bump obrigatório. Achado do Codex no PR 501.
+>
+> **A regra que substitui a reserva:** cada migração é **numerada contra a `main` do momento do
+> PR**, e o PR **declara o número escolhido**. A #477 fica registrada como **condicional** — decida
+> o caminho dela antes de assumir que não bumpa.
 
 ## Fora de alcance de sessão de nuvem
 
