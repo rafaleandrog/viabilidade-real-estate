@@ -201,10 +201,24 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/tela-empreendimento-tipologias.ts:178` | 2 (default) | ✅ |
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
 | `frontend/tela-proforma.ts:458` — sensibilidade, via `fmtR$(v, false)` | 2 | ✅ desde a #492 |
-| `frontend/fluxo-caixa-motor.ts` — resultados monetários (`round2`, C7) | 2 | ✅ |
+| `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
+| `frontend/fluxo-caixa-motor.ts:2095-2103` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
 | **`frontend/fluxo-tabela.ts:34`** — `celula` da tabela do Fluxo | **0** | ❌ formatador próprio: `Math.round`, e célula **vazia** abaixo de R$ 0,50 → #281 |
 | **`frontend/tela-proforma.ts:314`** — `_fmtContabil`, a coluna R$ da Proforma | **0** | ❌ `fmtNum(Math.abs(r.v))` com `d` no default → #281 |
 | **`frontend/tela-fluxo-receitas.ts:382-383`** — `precoUnit` e `precoTotal` | **0** | ❌ mesma causa → #281 |
+
+> 🟡 **O motor não é integralmente conforme ao C7, e marcar a linha inteira ✅ escondia isso.** As
+> **séries mensais** passam por `round2` a cada depósito. Mas quatro **agregados escalares** saem do
+> `calcularFluxo` com precisão plena: `vgvTotal` (vem direto de `ctxCusto.vgvTotal`, e o acumulador
+> é `usada × area_privativa_m2 × preco_m2` sem arredondar, `:85`), `vpl` (`vplFluxo` `:1594-1597` é
+> um `reduce` com divisão, sem `round2`), `vgvPermutaFisica` e `receitaBrutaVgv` (`:2020`, subtração
+> crua dos dois anteriores).
+>
+> Área × preço e desconto de VPL produzem fração de centavo com facilidade, então esses quatro
+> **podem** carregar mais de duas casas. Hoje o dano é contido porque quem os exibe formata com
+> `fmtR$`; vira dano real no dia em que alguém os consumir direto (export, BI, API). Quantizar é
+> mudança de motor e **não** cabe num PR de documentação — fica registrado aqui como divergência
+> conhecida, não como conformidade.
 
 > ⚠️ **Os endereços do ❌ de `fmtNum` mudaram, e a #482 lista o antigo.** Aquele texto apontava
 > `frontend/tela-proforma.ts:453` (`fmtNum(v, 2)`, tabela de sensibilidade), que **a #492 fechou**
