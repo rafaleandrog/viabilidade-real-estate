@@ -231,7 +231,7 @@ let regras = 0;
 for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   const rel = relative(RAIZ, arq).replaceAll('\\', '/');
   const txt = readFileSync(arq, 'utf8');
-  const { marcacao, css, linhaDe, problemas } = superficies(txt, rel);
+  const { marcacao, css, linhaDe, problemas, posicoesDeTag } = superficies(txt, rel);
   // Modo de falha invertido — ver o cabecalho de `scripts/lib/fonte-ts.mjs`.
   if (problemas.length) { inseguros.push({ rel, problemas }); continue; }
 
@@ -282,7 +282,7 @@ for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   //
   // `style=${…}` chega com valor nulo — o lexer apaga a expressao e nao ha o que
   // ler. E lacuna conhecida: estilo dinamico nao e conferido por este guard.
-  for (const t of lerTags(marcacao, 'urbi-')) {
+  for (const t of lerTags(marcacao, 'urbi-', posicoesDeTag)) {
     const perigosas = emRisco.get(t.tag);
     if (!perigosas) continue;
     for (const a of t.atributos) {

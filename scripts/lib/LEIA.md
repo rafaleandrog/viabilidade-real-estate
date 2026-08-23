@@ -83,6 +83,54 @@ Por isso a lista abaixo existe, e por isso cada linha tem caso na bateria:
 **Regra para quem mexer aqui:** helper que decide alguma coisa devolve o que decidiu **e** o que não
 conseguiu decidir. Devolver só o resultado limpo é como o defeito volta.
 
+### Caixa: o que é case-insensitive por especificação, e onde o código respeita isso
+
+A cadeia de caixa já produziu **cinco** ocorrências em duas rodadas (`lerTags`, `seletorAlcanca`,
+`a.nome === 'style'`, o nome de tag no fechamento, e `var(`). Em vez de caçar a sexta, a lista
+completa dos pontos que comparam nome — com o veredito da especificação em cada um:
+
+| O que se compara | A spec diz | Onde | Respeita? |
+|---|---|---|---|
+| Nome de elemento (`<URBI-KPI>`) | insensível | `lerTags` (`gi`, normaliza p/ minúsculas) | ✅ |
+| Nome de elemento no fechamento (`</STYLE >`) | insensível | `CRU`, `fecha` (`i`) | ✅ |
+| Nome de atributo (`STYLE=`) | insensível | `ehStyleHtml`, `atributos` do espelho (`toLowerCase`) | ✅ |
+| Seletor de **tipo** em CSS (`.a URBI-KPI`) | insensível em documento HTML | `seletorAlcanca` (`i`) | ✅ |
+| Nome de **função** CSS (`URL(`, `VAR(`) | insensível | `buracosCss` (`i`), `var\(` (`gi`) | ✅ |
+| Nome de **propriedade** CSS (`WIDTH:`) | insensível | `declaracoesDe` (`toLowerCase`) | ✅ |
+| Valor-palavra-chave CSS (`BORDER-BOX`, `AUTO`) | insensível | `normalizar` (`toLowerCase`) | ✅ |
+| `!IMPORTANT` | insensível | `normalizar` (`i`) | ✅ |
+| At-rule (`@MEDIA`) | insensível | detectada por estrutura, não por nome | ✅ |
+| Unidade (`100PX`) | insensível | `imponeTamanho`, sobre valor já normalizado | ✅ |
+| **Nome de custom property** (`--Cor`) | **SENSÍVEL** | captura exata, sem `toLowerCase` | ✅ correto assim |
+| **`.prop=`, `@evento=`, `?attr=`** | **SENSÍVEL** | comparados com a caixa original | ✅ correto assim |
+| **`<![CDATA[`** | **SENSÍVEL** | comparação exata | ✅ correto assim |
+| **Tag de template** (`` css` ``, `` html` ``) | **SENSÍVEL** (é identificador JS) | `ehCss`, `ehMarcacao` | ✅ correto assim |
+
+**Regra para quem mexer aqui:** antes de comparar um nome, pergunte de qual linguagem ele é. HTML e
+CSS são ASCII case-insensitive em quase tudo; JavaScript não é em nada. Errar para "insensível" onde
+a spec é sensível junta coisas distintas; errar para "sensível" onde ela é insensível deixa passar a
+forma maiúscula — que foi o que aconteceu cinco vezes.
+
+### Posição externa: quem pode dizer que ali começa uma tag
+
+Um `<span>` dentro de `title='…'` é **texto** para o navegador. Qualquer regex global sobre a
+marcação o encontra assim mesmo — e foi assim que uma declaração inexistente entrou na lista de
+tokens do app e liberou um `var()` real.
+
+Hoje há **uma** autoridade sobre isso, `varrerHtml`, e ela devolve as posições em que uma tag
+realmente começa e o conteúdo de cada `<style>`:
+
+| Quem precisa achar tag ou `<style>` | Como faz |
+|---|---|
+| `varrerHtml` | é a autoridade: atravessa tag, valor citado, comentário e texto cru |
+| `lerTags` | recebe `posicoesDeTag` e **exige** o parâmetro — sem default "aceita tudo" |
+| superfície de CSS (`<style>`) | vem de `varrerHtml.estilos`, não mais de um regex global |
+| guards | nunca varrem marcação por conta própria; só chamam `lerTags` |
+
+**Regra para quem mexer aqui:** nenhum `matchAll(/<.../)` novo sobre marcação. Se precisar achar
+algo em posição de tag, peça a `varrerHtml` — ou o `<style>` dentro de um `title=` volta a contar.
+
+
 ⚠️ **As varreduras de CSS e HTML rodam sobre a superfície já mascarada, não sobre cada pedaço de
 texto do template.** É o que faz o estado atravessar a interpolação: `<!-- ${x} -->` e
 `.b { padding: ${x}; }` são uma construção só, com brancos no meio.

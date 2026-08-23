@@ -9,6 +9,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { analisar, mascarar, superficies, contadorDeLinha, lerTags, limparCss } from './fonte-ts.mjs';
 
+/** Atalho: le as tags de um trecho, exigindo que ele seja analisavel. */
+function tagsDe(txt, prefixo) {
+  const s = limpo(txt);
+  return lerTags(s.marcacao, prefixo, s.posicoesDeTag);
+}
+
 /** Atalho: as superficies de um trecho, exigindo que ele seja analisavel. */
 function limpo(txt) {
   const s = superficies(txt);
@@ -142,7 +148,7 @@ test('contadorDeLinha acerta inclusive com CRLF', () => {
 
 test('lerTags le nomes de atributo e nao se perde num > de arrow function', () => {
   const txt = 'const e = html`<urbi-a .v=${x.filter((y) => y > 0)} style="width:100%" b></urbi-a>`;';
-  const tags = lerTags(limpo(txt).marcacao, 'urbi-');
+  const tags = tagsDe(txt, 'urbi-');
   assert.equal(tags.length, 1);
   assert.deepEqual(tags[0].atributos.map((a) => a.nome), ['.v', 'style', 'b']);
   assert.equal(tags[0].atributos[1].valor, 'width:100%');
@@ -150,21 +156,21 @@ test('lerTags le nomes de atributo e nao se perde num > de arrow function', () =
 
 test('lerTags devolve valor null quando o valor era um ${…}', () => {
   const txt = 'const e = html`<urbi-a rotulo=${x}></urbi-a>`;';
-  const tags = lerTags(limpo(txt).marcacao, 'urbi-');
+  const tags = tagsDe(txt, 'urbi-');
   assert.deepEqual(tags[0].atributos.map((a) => a.nome), ['rotulo']);
   assert.equal(tags[0].atributos[0].valor, null);
 });
 
 test('lerTags nao deixa uma tag engolir a seguinte', () => {
   const txt = 'const e = html`<urbi-a x="1"></urbi-a><urbi-b y="2"></urbi-b>`;';
-  const tags = lerTags(limpo(txt).marcacao, 'urbi-');
+  const tags = tagsDe(txt, 'urbi-');
   assert.deepEqual(tags.map((t) => t.tag), ['urbi-a', 'urbi-b']);
   assert.deepEqual(tags[1].atributos.map((a) => a.nome), ['y']);
 });
 
 test('lerTags atravessa atributo com aspas contendo > e =', () => {
   const txt = 'const e = html`<urbi-a title="a > b = c" ruim="1"></urbi-a>`;';
-  const tags = lerTags(limpo(txt).marcacao, 'urbi-');
+  const tags = tagsDe(txt, 'urbi-');
   assert.deepEqual(tags[0].atributos.map((a) => a.nome), ['title', 'ruim']);
 });
 
@@ -280,8 +286,30 @@ test('tag sem `>` e aspas sem fechar viram PROBLEMA', () => {
 
 test('lerTags casa tag em qualquer caixa e normaliza para minusculas', () => {
   const txt = 'const e = html`<URBI-A STYLE="width:1px"></URBI-A>`;';
-  const tags = lerTags(limpo(txt).marcacao, 'urbi-');
+  const tags = tagsDe(txt, 'urbi-');
   assert.equal(tags.length, 1);
   assert.equal(tags[0].tag, 'urbi-a');
   assert.equal(tags[0].atributos[0].nome, 'STYLE');
+});
+
+// ── posicao externa a valor citado ──────────────────────────────────────────
+
+test('lerTags EXIGE as posicoes — sem elas, lanca em vez de aceitar tudo', () => {
+  const txt = 'const e = html`<urbi-a b="1"></urbi-a>`;';
+  assert.throws(() => lerTags(limpo(txt).marcacao, 'urbi-'), /posicoesDeTag/);
+});
+
+test('tag dentro de valor citado nao e tag', () => {
+  const txt = `const e = html\`<div title='<span style="--x:red">'></div>\`;`;
+  assert.deepEqual(tagsDe(txt, '[a-z]').map((t) => t.tag), ['div']);
+});
+
+test('<style> dentro de valor citado nao vira superficie de CSS', () => {
+  const txt = 'const e = html`<div title="<style>:root{--inventado:red}</style>"></div>`;';
+  assert.ok(!limpo(txt).css.includes('--inventado'));
+});
+
+test('<style> de verdade vem da travessia, com o conteudo certo', () => {
+  const txt = 'const e = html`<style>:root{--minha:red}</style>`;';
+  assert.ok(limpo(txt).css.includes('--minha'));
 });

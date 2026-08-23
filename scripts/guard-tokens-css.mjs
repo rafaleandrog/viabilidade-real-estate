@@ -128,7 +128,7 @@ const inseguros = [];
 const superficiesPorArquivo = arquivos.map((arq) => {
   const txt = readFileSync(arq, 'utf8');
   const rel = relative(RAIZ, arq).replaceAll('\\', '/');
-  const { marcacao, css, texto, linhaDe, problemas } = superficies(txt, rel);
+  const { marcacao, css, texto, linhaDe, problemas, posicoesDeTag } = superficies(txt, rel);
   // Modo de falha invertido — ver o cabecalho de `scripts/lib/fonte-ts.mjs`.
   if (problemas.length) { inseguros.push({ rel, problemas }); return null; }
   return {
@@ -139,7 +139,7 @@ const superficiesPorArquivo = arquivos.map((arq) => {
     // `style="--x: 1"` tambem e CSS — e `limparCss` tira o `/* */` de dentro dele.
     // Fragmento que nao da para ler recusa o ARQUIVO, em vez de virar branco: era
     // o unico ponto onde o modo de falha invertido ainda engolia problema.
-    estilosInline: lerTags(marcacao, '[a-z]')
+    estilosInline: lerTags(marcacao, '[a-z]', posicoesDeTag)
       .flatMap((t) => t.atributos.filter((a) => ehStyleHtml(a.nome) && a.valor)
         .map((a) => {
           const limpo = limparCss(a.valor);
@@ -176,7 +176,13 @@ for (const s of superficiesPorArquivo) {
 
 // passada 2 — usos, de superficie de texto
 for (const s of superficiesPorArquivo) {
-  for (const m of s.texto.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/g)) {
+  // ⚠️ `gi`: nome de FUNCAO em CSS e ASCII case-insensitive, e o navegador aplica
+  // `VAR(--x)` igualzinho a `var(--x)`. Sem a flag, escrever em maiusculas
+  // contornava a validacao inteira — o uso nao era contado e o guard saia verde.
+  // Terceiro irmao da cadeia de caixa, depois de `lerTags`, `seletorAlcanca` e
+  // `ehStyleHtml`. O NOME do token, esse, e case-SENSITIVE por especificacao:
+  // `--Cor` e `--cor` sao propriedades diferentes, entao a captura nao muda.
+  for (const m of s.texto.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/gi)) {
     const token = m[1];
     usos++;
     usados.add(token);

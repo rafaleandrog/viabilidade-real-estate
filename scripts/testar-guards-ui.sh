@@ -757,6 +757,54 @@ const e = css`.x urbi-arriscado { content: "/*"; min-width: 0; }`;
 TS
 
 # ════════════════════════════════════════════════════════════════════════════
+# Rodada 5 — os dois últimos irmãos das famílias já conhecidas
+#
+# Nenhum eixo novo: um é o irmão do conserto do `<!--` (posição externa a valor
+# citado), o outro é o quinto elo da cadeia de caixa. As duas famílias estão
+# varridas por inteiro em `scripts/lib/LEIA.md`, com tabela.
+
+secao "Posição externa a valor citado — ACUSA (era ZERO em silêncio):"
+
+caso guard-tokens-css 1 "<span style=…> dentro de title='…' não declara token" \
+  'caso\.ts:2 +--inventado' <<'TS'
+const e = html`<div title='<span style="--inventado:red">'></div>`;
+const f = css`.x { color: var(--inventado); }`;
+TS
+
+caso guard-tokens-css 1 "<style> dentro de valor de atributo não vira CSS" \
+  'caso\.ts:2 +--inventado' <<'TS'
+const e = html`<div title="<style>:root{--inventado:red}</style>"></div>`;
+const f = css`.x { color: var(--inventado); }`;
+TS
+
+caso guard-props-urbi 0 "<urbi-*> dentro de valor de atributo não é elemento" <<'TS'
+const e = html`<div title="<urbi-seguro inventado='x'>"></div>`;
+TS
+
+secao "Caixa — quinto elo da cadeia:"
+
+caso guard-tokens-css 1 "VAR() maiúsculo é a mesma função, e é acusado" \
+  'caso\.ts:1 +--inventado' <<'TS'
+const f = css`.x { color: VAR(--inventado, red); }`;
+TS
+
+caso guard-tokens-css 0 "VAR() de token que existe continua passando" <<'TS'
+const f = css`.x { color: VAR(--cor-texto); }`;
+TS
+
+caso guard-tokens-css 1 "nome de custom property é case-SENSÍVEL — --Cor ≠ --cor" \
+  'caso\.ts:1 +--Cor-Texto' <<'TS'
+const f = css`.x { --cor-texto: red; color: var(--Cor-Texto); }`;
+TS
+
+secao "E o que continua valendo:"
+
+caso guard-tokens-css 0 "<style> de verdade continua declarando" <<'TS'
+const e = html`<style>:root{--minha:red}</style>`;
+const f = css`.x { color: var(--minha); }`;
+TS
+
+# ════════════════════════════════════════════════════════════════════════════
 # Executa a fila em paralelo e imprime na ordem de declaração.
 POOL="${POOL:-8}"
 find "$TMP" -maxdepth 1 -name 'c[0-9]*' -type d -print0 \

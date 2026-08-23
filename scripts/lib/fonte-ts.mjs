@@ -266,10 +266,26 @@ function fimDaTag(s, i, ate) {
   return -1;
 }
 
-/** Trechos de HTML que escondem `<tag`, `<style>` ou `--x:`, e os problemas. */
-function buracosHtml(s, de, ate, onde) {
+/**
+ * A varredura de HTML — a UNICA autoridade sobre onde comeca uma tag.
+ *
+ * Devolve `{ buracos, problemas, tags, estilos }`:
+ *   `tags`    — offsets em que uma tag REALMENTE comeca (fora de valor citado,
+ *               fora de comentario, fora de texto cru);
+ *   `estilos` — o conteudo de cada `<style>`, que vira superficie de CSS.
+ *
+ * ⚠️ Quem precisa achar tag ou `<style>` PERGUNTA AQUI; nao varre a marcacao com
+ * regex global por conta propria. Um `<span>` dentro de `title='…'` e TEXTO para
+ * o navegador, e um regex global o encontra assim mesmo — foi o que deixou
+ * `<div title='<span style="--x:red">'>` registrar uma declaracao inexistente e
+ * liberar um `var(--x)` real. A travessia ja existia desde o conserto do `<!--`;
+ * o que faltava era todo mundo usa-la.
+ */
+function varrerHtml(s, de, ate, onde) {
   const buracos = [];
   const problemas = [];
+  const tags = [];
+  const estilos = [];
   let i = de;
   while (i < ate) {
     const j = s.indexOf('<', i);
@@ -279,7 +295,7 @@ function buracosHtml(s, de, ate, onde) {
       const f = s.indexOf('-->', i + 4);
       if (f === -1 || f + 3 > ate) {
         problemas.push(`${onde}: comentario HTML \`<!--\` sem \`-->\``);
-        return { buracos, problemas };
+        return { buracos, problemas, tags, estilos };
       }
       buracos.push({ de: i, ate: f + 3 });
       i = f + 3;
@@ -289,7 +305,7 @@ function buracosHtml(s, de, ate, onde) {
       const f = s.indexOf(']]>', i + 9);
       if (f === -1 || f + 3 > ate) {
         problemas.push(`${onde}: \`<![CDATA[\` sem \`]]>\``);
-        return { buracos, problemas };
+        return { buracos, problemas, tags, estilos };
       }
       buracos.push({ de: i, ate: f + 3 });
       i = f + 3;
@@ -304,10 +320,14 @@ function buracosHtml(s, de, ate, onde) {
       const m = fecha.exec(resto);
       if (!m) {
         problemas.push(`${onde}: <${tag}> sem </${tag}>`);
-        return { buracos, problemas };
+        return { buracos, problemas, tags, estilos };
       }
       const abre = resto.indexOf('>');
-      if (abre !== -1 && !SEM_BURACO.has(tag)) buracos.push({ de: i + abre + 1, ate: i + m.index });
+      if (abre !== -1) {
+        tags.push(i);
+        if (SEM_BURACO.has(tag)) estilos.push({ de: i + abre + 1, ate: i + m.index });
+        else buracos.push({ de: i + abre + 1, ate: i + m.index });
+      }
       i = i + m.index + m[0].length;
       continue;
     }
@@ -318,14 +338,15 @@ function buracosHtml(s, de, ate, onde) {
       const f = fimDaTag(s, i, ate);
       if (f === -1) {
         problemas.push(`${onde}: tag aberta com \`<\` e sem \`>\``);
-        return { buracos, problemas };
+        return { buracos, problemas, tags, estilos };
       }
+      tags.push(i);
       i = f;
       continue;
     }
     i++;
   }
-  return { buracos, problemas };
+  return { buracos, problemas, tags, estilos };
 }
 
 // ── recorte ─────────────────────────────────────────────────────────────────
@@ -423,25 +444,22 @@ export function superficies(txt, nome = 'arquivo.ts') {
   const naoCss = analise.templates.filter((t) => ehMarcacao(t.tag));
   const brutoMarcacao = recortar(txt, naoCss.flatMap((t) => t.textos), true, branco);
   const deHtml = [];
+  const posicoesDeTag = new Set();
+  const doStyle = [];
   for (const t of naoCss) {
     const { de, ate } = extensao(t);
-    const r = buracosHtml(brutoMarcacao, de, ate, `linha ${linhaDe(de)}`);
+    const r = varrerHtml(brutoMarcacao, de, ate, `linha ${linhaDe(de)}`);
     deHtml.push(...r.buracos);
     problemas.push(...r.problemas);
+    for (const p of r.tags) posicoesDeTag.add(p);
+    doStyle.push(...r.estilos);
   }
   const semHtml = apagar(txt, deHtml, branco);
 
-  // 2. so agora `<style>` e procurado — sobre o texto ja sem comentario de HTML.
-  //    Nome de tag e case-insensitive, e o fechamento admite espaco.
-  const trechosCss = textosCom(analise, ehCss);
-  const doStyle = [];
-  const marcacaoLimpa = recortar(semHtml, naoCss.flatMap((t) => t.textos), true, branco);
-  for (const m of marcacaoLimpa.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
-    const de = m.index + m[0].indexOf('>') + 1;
-    const trecho = { de, ate: de + m[1].length };
-    trechosCss.push(trecho);
-    doStyle.push(trecho);
-  }
+  // 2. `<style>` vem da PROPRIA travessia, e nao de um regex global sobre a
+  //    marcacao. O regex achava `<style>` dentro de `title="…"` — que e texto
+  //    para o navegador — e registrava as declaracoes dele como do app.
+  const trechosCss = [...textosCom(analise, ehCss), ...doStyle];
   // 3. buracos de CSS, sobre a superficie contigua de cada regiao de CSS.
   const brutoCss = recortar(semHtml, trechosCss, true, branco);
   const deCss = [];
@@ -465,6 +483,8 @@ export function superficies(txt, nome = 'arquivo.ts') {
     analise,
     linhaDe,
     problemas,
+    /** Offsets em que uma tag REALMENTE comeca. `lerTags` exige esta lista. */
+    posicoesDeTag,
     /** Texto dos templates `html`/`svg`, sem comentario de HTML nem texto cru. */
     marcacao: recortar(semStyle, textosCom(analise, ehMarcacao), true, branco),
     /** Templates `css` e conteudo dos `<style>`, sem comentario nem string. */
@@ -509,7 +529,14 @@ const BRANCO = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r';
  * `valor` e `null` quando o atributo nao tem valor ou quando o valor era um
  * `${…}` (que chega aqui em branco) — o nome ainda vale, o conteudo nao.
  */
-export function lerTags(superficie, prefixo) {
+export function lerTags(superficie, prefixo, posicoes) {
+  // ⚠️ `posicoes` e OBRIGATORIO, e vem de `superficies(txt).posicoesDeTag`. Um
+  // default "aceita tudo" seria exatamente o buraco silencioso que este modulo
+  // existe para nao ter: sem o filtro, `<div title='<span style="--x:red">'>`
+  // devolve uma tag `<span>` que so existe dentro de um valor citado.
+  if (!(posicoes instanceof Set)) {
+    throw new TypeError('lerTags: passe `posicoesDeTag` de superficies(txt)');
+  }
   const fora = [];
   // Nome de elemento em HTML e ASCII case-insensitive: `<URBI-KPI>` e `<urbi-kpi>`
   // sao o MESMO elemento para o parser do navegador. Sem a flag `i` os dois
@@ -517,6 +544,7 @@ export function lerTags(superficie, prefixo) {
   // minusculas, que e a forma com que o espelho o indexa.
   const re = new RegExp(`<(${prefixo}[a-z0-9-]*)`, 'gi');
   for (const m of superficie.matchAll(re)) {
+    if (!posicoes.has(m.index)) continue;   // `<` dentro de valor citado, ou texto
     const atributos = [];
     let i = m.index + m[0].length;
     while (i < superficie.length) {

@@ -128,12 +128,12 @@ let eventos = 0;
 for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   const rel = relative(RAIZ, arq).replaceAll('\\', '/');
   const txt = readFileSync(arq, 'utf8');
-  const { marcacao, linhaDe, problemas } = superficies(txt, rel);
+  const { marcacao, linhaDe, problemas, posicoesDeTag } = superficies(txt, rel);
   // Modo de falha invertido: superficie incompleta NAO e analisada. Um guard que
   // seguisse com ela devolveria "limpo" sobre o que nao conseguiu ler.
   if (problemas.length) { inseguros.push({ rel, problemas }); continue; }
 
-  for (const t of lerTags(marcacao, 'urbi-')) {
+  for (const t of lerTags(marcacao, 'urbi-', posicoesDeTag)) {
     const tag = t.tag;
     tags++;
     const linhaTag = linhaDe(t.offset);
