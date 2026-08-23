@@ -159,9 +159,11 @@ alimente o cash sweep.
 
 **ADR #259 — valor canônico (implementado).** Todo campo multiunidade guarda uma quantidade
 canônica: R$ a duas casas para custos e permutas financeiras; m² a duas casas para permuta física.
-A unidade exibida é apresentação. **Emenda da #442:** alternar a badge regrava o campo legado —
-dinheiro no destino R$, `null` no destino derivado —, porque deixá-lo congelado na unidade antiga
-fazia a coluna descrever outro valor. O canônico continua intocado. Estudos antigos
+A unidade exibida é apresentação. **Emenda da #442:** alternar a badge **regrava o campo legado**
+na unidade nova — o mesmo número que a tela exibe sob aquela badge —, porque deixá-lo congelado na
+unidade antiga fazia a coluna descrever outro valor. O canônico continua intocado, e é ele que
+carrega precisão plena; a coluna por unidade é espelho de compatibilidade, na mesma condição de
+`infra_pct` em Premissas. Estudos antigos
 permanecem legíveis: seu valor ativo é adotado como canônico apenas na primeira interação deliberada.
 
 No Preliminar, os novos campos `*_canonico` coexistem com os campos legados por unidade. No

@@ -2970,9 +2970,10 @@ reclassifica linhas financeiras como físicas, remove a dedução de caixa e con
 dobro. → **#257**, **#258**.
 
 **A11 — valor canônico multiunidade (#259).** Premissas persistem `*_canonico` e Custos do
-Avançado persistem `orcamento_valor_canonico`. A badge altera a unidade exibida **e acerta o campo legado** (#442): destino R$ recebe o
-dinheiro; destino derivado (% ou R$/m²) recebe `null`, porque a coluna é `decimal(15,2)` e não
-carrega a derivada sem arredondá-la. O canônico não se move. Editar o
+Avançado persistem `orcamento_valor_canonico`. A badge altera a unidade exibida **e acerta o campo legado** (#442): ele passa a carregar o mesmo
+número que a tela mostra sob a badge nova, em vez de ficar congelado na unidade antiga. É a regra do
+campo de Infraestrutura do Preliminar de Loteamento aplicada aqui — o canônico é o valor de registro
+e não se move; a coluna por unidade é espelho de compatibilidade, que a #260 aposenta. Editar o
 valor visível recalcula o canônico uma vez. Registros antigos mantêm seu valor econômico até a
 primeira edição. A #260 migra todos os demais consumidores para o resolver canônico.
 

@@ -698,8 +698,8 @@ export function vgvVendidoMensal(
  *
  * O seletor de base financiável do Funding lia `orcamento_valor` cru — a mesma
  * coluna que a #442 mostrou congelada — e rotulava "R$ 0,24" um custo de
- * quatrocentos mil reais. Depois da #442 a coluna é `null` em unidade derivada,
- * o que ali viraria "R$ 0,00".
+ * quatrocentos mil reais — e a coluna pode estar em qualquer unidade, então lê-la
+ * como R$ é errado por construção, não só quando ela está congelada.
  *
  * A fonte certa é o total que o MOTOR aplica. `calcLinhas` é `calc.linhasCusto`,
  * já resolvido; permuta física e financeira não entram lá (#268), e para elas o
