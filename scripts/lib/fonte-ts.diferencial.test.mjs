@@ -70,21 +70,23 @@ for (const arq of arquivos) {
   test(`fronteiras conferem com o compilador — ${rel}`, () => {
     const txt = readFileSync(arq, 'utf8');
     const nosso = classificarNosso(txt);
-    // A dica de onde comeca cada regex — ver o cabecalho do oraculo. E o unico
-    // eixo em que ele nao e independente, porque nenhum scanner e.
-    const deles = classificar(txt, new Set(analisar(txt).regexes.map((r) => r.de)));
+    const dicas = new Set(analisar(txt).regexes.map((r) => r.de));
+    const { mapa: deles, recusadas } = classificar(txt, dicas);
+    assert.deepEqual(
+      recusadas, [],
+      `o lexer disse que ha regex nestes offsets e o compilador discordou: ${recusadas}`,
+    );
 
     for (let i = 0; i < txt.length; i++) {
       // So exigimos concordancia nas classes que os guards CONSOMEM. Onde o
       // oraculo diz "codigo" e nos dizemos "codigo", nada a fazer; onde ele diz
       // comentario/texto/regex, nos temos que dizer o mesmo — e vice-versa.
-      // Eixo do `/` fora da comparacao: o oraculo nao consegue decidir regex
-      // contra divisao (precisa de posicao de expressao, que e do parser). Para
-      // a comparacao, o que classificamos como regex conta como codigo — e o
-      // conteudo de uma regex nao e nem comentario nem texto, que e o que
-      // importa aqui. O eixo em si esta coberto pelos casos de `fonte-ts.test.mjs`.
-      const n = nosso[i] === 3 ? 0 : nosso[i];
-      const d = deles[i] === 3 ? 0 : deles[i];
+      // Nada de dobrar regex em codigo: a versao anterior fazia isso, e com ela
+      // uma regex INVENTADA pelo lexer ficava invisivel — foi assim que
+      // `` `abc` / 2 `` passou pelo diferencial. Hoje a extensao da regex tambem
+      // e comparada, e uma dica recusada ja reprovou acima.
+      const n = nosso[i];
+      const d = deles[i];
       if (n === d) continue;
 
       // Exceção declarada: os delimitadores. O oraculo marca a crase, o `${` e o
@@ -107,6 +109,45 @@ for (const arq of arquivos) {
   });
 }
 
+// ── corpus sintetico ────────────────────────────────────────────────────────
+// O `frontend/` real e um corpus de sorte: ele cobre o que o app por acaso
+// escreveu. `` `abc` / 2 `` nao existe em nenhum arquivo, entao o diferencial
+// sobre arquivos reais NAO teria pego o P1-a — medido, nao suposto. Estes
+// trechos sao construcoes validas que o repo ainda nao tem, comparadas contra o
+// compilador do mesmo jeito.
+
+const SINTETICOS = {
+  'crase antes de divisao': 'const e = html`${`abc` / 2}<urbi-a b="1">`;',
+  'string antes de divisao': "const e = html`${'abc' / 2}<urbi-a b=\"1\">`;",
+  'regex logo depois de return': 'function f() { return /a`b/.test(x); }\nconst e = css`.x { width: 1px; }`;',
+  'regex com barras duplas dentro': "const p = (s) => s.replace(/^\\//, '');\nconst e = css`.x { width: 1px; }`;",
+  'divisao depois de chamada': 'const m = f(1) / g(2);\nconst e = css`.x { width: 1px; }`;',
+  'comentario HTML com chaves': 'const e = html`<!-- { <style>.a{b:c}</style> } --><urbi-a></urbi-a>`;',
+  'comentario CSS com chave': 'const e = css`.x urbi-a { /* } */ width: 1px; }`;',
+  'string CSS com chave': 'const e = css`.x::after { content: "}"; width: 1px; }`;',
+  'crase escapada em css': 'const e = css`.a { content: "\\`"; }\n.x { width: 1px; }`;',
+  'template aninhado em atributo': 'const e = html`<urbi-a t=${`x — ${y}`} u="1"></urbi-a>`;',
+  'CRLF': 'const e = css`.x { width: 1px; }`;\r\nconst f = 1;\r\n',
+};
+
+test('corpus sintetico tambem confere com o compilador', () => {
+  for (const [nome, txt] of Object.entries(SINTETICOS)) {
+    const nosso = classificarNosso(txt);
+    const dicas = new Set(analisar(txt).regexes.map((r) => r.de));
+    const { mapa: deles, recusadas } = classificar(txt, dicas);
+    assert.deepEqual(recusadas, [], `${nome}: regex inventada nos offsets ${recusadas}`);
+    for (let k = 0; k < txt.length; k++) {
+      if (nosso[k] === deles[k]) continue;
+      if (deles[k] === 2 && nosso[k] === 0 && '`${}"\''.includes(txt[k])) continue;
+      const nomes = ['codigo', 'comentario', 'texto', 'regex'];
+      assert.fail(
+        `${nome}: offset ${k} (char ${JSON.stringify(txt[k])}) ` +
+          `nos=${nomes[nosso[k]]} compilador=${nomes[deles[k]]}\n  ${txt}`,
+      );
+    }
+  }
+});
+
 // ── fuzz barato e DETERMINISTICO ────────────────────────────────────────────
 // Cada arquivo concatenado com o SEGUINTE (o ultimo com o primeiro). Sem sorteio:
 // o conjunto e sempre o mesmo, entao um vermelho aqui e reproduzivel.
@@ -120,10 +161,12 @@ test('concatenacoes de pares tambem conferem com o compilador', () => {
     const a = relative(RAIZ, arquivos[i]).replaceAll('\\', '/');
     const txt = `${readFileSync(arquivos[i], 'utf8')}\n${readFileSync(arquivos[(i + 1) % arquivos.length], 'utf8')}`;
     const nosso = classificarNosso(txt);
-    const deles = classificar(txt, new Set(analisar(txt).regexes.map((r) => r.de)));
+    const dicas = new Set(analisar(txt).regexes.map((r) => r.de));
+    const { mapa: deles, recusadas } = classificar(txt, dicas);
+    assert.deepEqual(recusadas, [], `regex inventada no par comecando em ${a}: ${recusadas}`);
     for (let k = 0; k < txt.length; k++) {
-      const n = nosso[k] === 3 ? 0 : nosso[k];
-      const d = deles[k] === 3 ? 0 : deles[k];
+      const n = nosso[k];
+      const d = deles[k];
       if (n === d) continue;
       if (d === 2 && n === 0 && '`${}"\''.includes(txt[k])) continue;
       const nomes = ['codigo', 'comentario', 'texto', 'regex'];

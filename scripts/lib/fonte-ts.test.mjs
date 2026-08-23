@@ -7,10 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  analisar, mascarar, superficieCss, superficieMarcacao, superficieTexto,
-  contadorDeLinha, lerTags,
-} from './fonte-ts.mjs';
+import { analisar, mascarar, superficies, contadorDeLinha, lerTags, limparCss } from './fonte-ts.mjs';
 
 /** O texto de um template, ja sem os `${…}`, concatenado. */
 const texto = (txt, t) => t.textos.map(({ de, ate }) => txt.slice(de, ate)).join('§');
@@ -87,14 +84,14 @@ test('a tag do template e o identificador colado na crase', () => {
 
 test('superficieCss ignora css` citado dentro de comentario', () => {
   const txt = '// exemplo: css`.a urbi-kpi { width: 100%; }`\nconst e = css`.b { color: red; }`;';
-  const s = superficieCss(txt, analisar(txt));
+  const s = superficies(txt).css;
   assert.ok(!s.includes('urbi-kpi'), 'o comentario vazou para a superficie CSS');
   assert.ok(s.includes('.b { color: red; }'));
 });
 
 test('superficieMarcacao ignora <urbi-*> em comentario e em string', () => {
   const txt = '// nao use <urbi-a x="1">\nconst d = \'<urbi-b y="2">\';\nconst e = html`<urbi-c z="3">`;';
-  const s = superficieMarcacao(txt, analisar(txt));
+  const s = superficies(txt).marcacao;
   assert.ok(!s.includes('<urbi-a'), 'comentario vazou');
   assert.ok(!s.includes('<urbi-b'), 'string vazou');
   assert.ok(s.includes('<urbi-c'), 'o template de verdade sumiu');
@@ -102,7 +99,7 @@ test('superficieMarcacao ignora <urbi-*> em comentario e em string', () => {
 
 test('superficieTexto pega string e template, nunca comentario', () => {
   const txt = '// var(--fantasma)\nconst d = "var(--daString)";\nconst e = css`var(--doTemplate)`;';
-  const s = superficieTexto(txt, analisar(txt));
+  const s = superficies(txt).texto;
   assert.ok(!s.includes('--fantasma'), 'comentario vazou');
   assert.ok(s.includes('--daString'));
   assert.ok(s.includes('--doTemplate'));
@@ -111,7 +108,7 @@ test('superficieTexto pega string e template, nunca comentario', () => {
 test('superficieCss pega <style> da marcacao, nao <style> de comentario', () => {
   const txt = '// <style> .falso urbi-kpi { width: 9px; } </style>\n'
     + 'const e = html`<style> .real { width: 1px; } </style>`;';
-  const s = superficieCss(txt, analisar(txt));
+  const s = superficies(txt).css;
   assert.ok(!s.includes('.falso'), 'o <style> comentado abriu regiao');
   assert.ok(s.includes('.real { width: 1px; }'));
 });
@@ -135,7 +132,7 @@ test('contadorDeLinha acerta inclusive com CRLF', () => {
 
 test('lerTags le nomes de atributo e nao se perde num > de arrow function', () => {
   const txt = 'const e = html`<urbi-a .v=${x.filter((y) => y > 0)} style="width:100%" b></urbi-a>`;';
-  const tags = lerTags(superficieMarcacao(txt, analisar(txt)), 'urbi-');
+  const tags = lerTags(superficies(txt).marcacao, 'urbi-');
   assert.equal(tags.length, 1);
   assert.deepEqual(tags[0].atributos.map((a) => a.nome), ['.v', 'style', 'b']);
   assert.equal(tags[0].atributos[1].valor, 'width:100%');
@@ -143,21 +140,21 @@ test('lerTags le nomes de atributo e nao se perde num > de arrow function', () =
 
 test('lerTags devolve valor null quando o valor era um ${…}', () => {
   const txt = 'const e = html`<urbi-a rotulo=${x}></urbi-a>`;';
-  const tags = lerTags(superficieMarcacao(txt, analisar(txt)), 'urbi-');
+  const tags = lerTags(superficies(txt).marcacao, 'urbi-');
   assert.deepEqual(tags[0].atributos.map((a) => a.nome), ['rotulo']);
   assert.equal(tags[0].atributos[0].valor, null);
 });
 
 test('lerTags nao deixa uma tag engolir a seguinte', () => {
   const txt = 'const e = html`<urbi-a x="1"></urbi-a><urbi-b y="2"></urbi-b>`;';
-  const tags = lerTags(superficieMarcacao(txt, analisar(txt)), 'urbi-');
+  const tags = lerTags(superficies(txt).marcacao, 'urbi-');
   assert.deepEqual(tags.map((t) => t.tag), ['urbi-a', 'urbi-b']);
   assert.deepEqual(tags[1].atributos.map((a) => a.nome), ['y']);
 });
 
 test('lerTags atravessa atributo com aspas contendo > e =', () => {
   const txt = 'const e = html`<urbi-a title="a > b = c" ruim="1"></urbi-a>`;';
-  const tags = lerTags(superficieMarcacao(txt, analisar(txt)), 'urbi-');
+  const tags = lerTags(superficies(txt).marcacao, 'urbi-');
   assert.deepEqual(tags[0].atributos.map((a) => a.nome), ['title', 'ruim']);
 });
 
@@ -171,4 +168,72 @@ test('template sem fechar termina no fim do arquivo, sem laco infinito', () => {
 test('comentario de bloco sem fechar termina no fim do arquivo', () => {
   const { comentarios } = analisar('const a = 1; /* nunca fecha');
   assert.equal(comentarios.length, 1);
+});
+
+// ── as tres sub-linguagens ──────────────────────────────────────────────────
+// CSS nao tem `//`; HTML nao tem `/* */`. Lexar so o JS/TS deixava as duas
+// cegas, e cada uma escondia delimitador do seu jeito.
+
+test('valor antes de / e DIVISAO, nao inicio de regex', () => {
+  for (const antes of ['`abc`', "'abc'", '[1,2][0]', 'f(1)', '{a:1}']) {
+    const txt = `const e = html\`\${${antes} / 2}<urbi-a b="1"></urbi-a>\`;`;
+    const s = superficies(txt);
+    assert.ok(s.marcacao.includes('<urbi-a'), `regex engoliu o template depois de ${antes}`);
+    assert.equal(analisar(txt).regexes.length, 0, `inventou regex depois de ${antes}`);
+  }
+});
+
+test('comentario de HTML sai da superficie de marcacao', () => {
+  const txt = 'const e = html`<!-- <urbi-a ruim="1"> --><urbi-b ok="2"></urbi-b>`;';
+  const { marcacao } = superficies(txt);
+  assert.ok(!marcacao.includes('<urbi-a'), 'comentario HTML vazou');
+  assert.ok(marcacao.includes('<urbi-b'));
+});
+
+test('<style> DENTRO de comentario HTML nao vira CSS', () => {
+  const txt = 'const e = html`<!-- <style>.a { --inventado: red; }</style> -->`;';
+  const { css } = superficies(txt);
+  assert.ok(!css.includes('--inventado'), 'o <style> comentado virou CSS de verdade');
+});
+
+test('<style> de verdade continua virando CSS', () => {
+  const txt = 'const e = html`<style>.a { --real: red; }</style>`;';
+  assert.ok(superficies(txt).css.includes('--real'));
+});
+
+test('<script> e texto cru — nao abre tag', () => {
+  const txt = 'const e = html`<script>const s = "<urbi-a ruim=1>";</script><urbi-b></urbi-b>`;';
+  const { marcacao } = superficies(txt);
+  assert.ok(!marcacao.includes('<urbi-a'), 'conteudo de <script> vazou');
+  assert.ok(marcacao.includes('<urbi-b'));
+});
+
+test('CDATA nao abre tag', () => {
+  const txt = 'const e = svg`<![CDATA[ <urbi-a ruim=1> ]]><urbi-b></urbi-b>`;';
+  assert.ok(!superficies(txt).marcacao.includes('<urbi-a'));
+});
+
+test('comentario de CSS sai da superficie de CSS', () => {
+  const txt = 'const e = css`.x urbi-a { /* } velho: --antigo: red; */ width: 1px; }`;';
+  const { css } = superficies(txt);
+  assert.ok(!css.includes('--antigo'), 'declaracao comentada vazou');
+  assert.ok(css.includes('width: 1px'));
+  assert.ok(!/\}\s*velho/.test(css), 'a chave do comentario sobreviveu');
+});
+
+test('string de CSS sai da superficie de CSS', () => {
+  const txt = 'const e = css`.x::after { content: "} --naoehdecl: 1"; width: 1px; }`;';
+  const { css } = superficies(txt);
+  assert.ok(!css.includes('--naoehdecl'));
+  assert.ok(css.includes('width: 1px'));
+});
+
+test('url() sem aspas sai da superficie de CSS', () => {
+  const txt = 'const e = css`.x { background: url(a}b.png); width: 1px; }`;';
+  assert.ok(!/url\(a\}b/.test(superficies(txt).css));
+});
+
+test('limparCss limpa fragmento solto (valor de style=)', () => {
+  assert.ok(!limparCss('/* --oculto: 1 */ width: 2px').includes('--oculto'));
+  assert.ok(limparCss('/* x */ width: 2px').includes('width: 2px'));
 });

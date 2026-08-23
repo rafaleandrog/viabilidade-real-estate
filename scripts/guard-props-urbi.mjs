@@ -46,7 +46,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { analisar, superficieMarcacao, lerTags, contadorDeLinha } from './lib/fonte-ts.mjs';
+import { superficies, lerTags } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
@@ -95,7 +95,8 @@ for (const [tag, p] of Object.entries(primitivos)) {
 // ── de onde vem a superficie ────────────────────────────────────────────────
 // `scripts/lib/fonte-ts.mjs`. Este guard NAO conta chave, NAO procura crase e
 // NAO sabe o que e um comentario — o lexer ja decidiu tudo isso, e a superficie
-// que chega aqui e so o TEXTO dos templates de marcacao, com os `${…}` em branco.
+// que chega aqui e so o TEXTO dos templates de marcacao, com os `${…}` e os
+// comentarios de HTML em branco.
 //
 // Isso nao e refatoracao cosmetica. Enquanto o tokenizador morava aqui, ele
 // contava chave a mao, e `@click=${() => { /* { */ }}` fazia a contagem nunca
@@ -124,9 +125,9 @@ let eventos = 0;
 for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   const rel = relative(RAIZ, arq).replaceAll('\\', '/');
   const txt = readFileSync(arq, 'utf8');
-  const linhaDe = contadorDeLinha(txt);
+  const { marcacao, linhaDe } = superficies(txt);
 
-  for (const t of lerTags(superficieMarcacao(txt, analisar(txt)), 'urbi-')) {
+  for (const t of lerTags(marcacao, 'urbi-')) {
     const tag = t.tag;
     tags++;
     const linhaTag = linhaDe(t.offset);

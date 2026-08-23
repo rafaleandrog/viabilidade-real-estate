@@ -50,9 +50,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  analisar, superficieCss, superficieMarcacao, lerTags, contadorDeLinha,
-} from './lib/fonte-ts.mjs';
+import { superficies, lerTags, limparCss } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
@@ -210,16 +208,17 @@ let regras = 0;
 for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   const rel = relative(RAIZ, arq).replaceAll('\\', '/');
   const txt = readFileSync(arq, 'utf8');
-  const analise = analisar(txt);
-  const linhaDe = contadorDeLinha(txt);
+  const { marcacao, css, linhaDe } = superficies(txt);
 
   // A superficie CSS vem do lexer: texto de template `css` mais o conteudo dos
-  // `<style>`. Este guard nao caca mais crase nem conta chave — era contando
+  // `<style>`, ja SEM comentario e SEM string de CSS — era um `}` dentro de
+  // `/* old: } */` que fechava a regra cedo e deixava passar o `width` seguinte.
+  // Este guard nao caca mais crase nem conta chave — era contando
   // chave que `${unsafeCSS(/* { */ '')}` mascarava as regras seguintes e
   // aprovava um `width: 100%` logo abaixo, com saida ZERO. E era procurando
   // ``css` `` no texto cru que um COMENTARIO citando uma regra abria regiao e
   // era acusado por documentar o proprio defeito.
-  for (const regra of regrasDe(superficieCss(txt, analise))) {
+  for (const regra of regrasDe(css)) {
     const { seletor, bloco, inicioBloco } = regra;
     if (!seletor || seletor.startsWith('@')) continue;
     const decls = declaracoesDe(bloco, inicioBloco);
@@ -253,12 +252,12 @@ for (const arq of arquivosTs(join(RAIZ, 'frontend'))) {
   //
   // `style=${…}` chega com valor nulo — o lexer apaga a expressao e nao ha o que
   // ler. E lacuna conhecida: estilo dinamico nao e conferido por este guard.
-  for (const t of lerTags(superficieMarcacao(txt, analise), 'urbi-')) {
+  for (const t of lerTags(marcacao, 'urbi-')) {
     const perigosas = emRisco.get(t.tag);
     if (!perigosas) continue;
     for (const a of t.atributos) {
       if (a.nome !== 'style' || !a.valor) continue;
-      const decls = declaracoesDe(a.valor);
+      const decls = declaracoesDe(limparCss(a.valor));
       if (decls.some((d) => d.prop === 'box-sizing' && protegeBoxSizing(d.valor))) continue;
       for (const d of decls) {
         if (!perigosas.has(d.prop) || !imponeTamanho(d.valor)) continue;

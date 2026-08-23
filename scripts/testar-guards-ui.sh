@@ -458,6 +458,80 @@ caso guard-props-urbi 0 'template comum dentro de @evento não vira atributo' <<
 const e = html`<urbi-seguro @click=${() => ir(`/detalhe/${l.id}`)}></urbi-seguro>`;
 TS
 
+# ════════════════════════════════════════════════════════════════════════════
+# As três sub-linguagens — regressão da rodada 2 do PR 505
+#
+# O módulo lexava JS/TS certo e não conhecia as regras de comentário das outras
+# duas linguagens que vivem dentro do arquivo: CSS (`/* */`, sem `//`) e HTML
+# (`<!-- -->`, sem `/* */`). Os três guards herdavam a cegueira.
+#
+# Um dos casos não é hipotético: `frontend/fluxo-tabela.ts:56-64` é um comentário
+# CSS que EXPLICA por que o app abandonou o `urbi-kpi`, e o guard de box model o
+# contava como uma regra alcançando `urbi-kpi` — 5 regras onde há 4.
+
+echo "Sub-linguagens — ACUSA (era falso negativo, com saída ZERO):"
+
+caso guard-props-urbi 1 "crase de fechamento antes de / é divisão, não regex" \
+  'caso\.ts:1 +<urbi-seguro> inventado' <<'TS'
+const e = html`${`abc` / 2}<urbi-seguro inventado="x"></urbi-seguro>`;
+TS
+
+caso guard-props-urbi 1 "string antes de / é divisão, não regex" \
+  'caso\.ts:1 +<urbi-seguro> inventado' <<'TS'
+const e = html`${'abc' / 2}<urbi-seguro inventado="x"></urbi-seguro>`;
+TS
+
+caso guard-tokens-css 1 "declaração num <style> COMENTADO não autoriza o token" \
+  'caso\.ts:2 +--inventado' <<'TS'
+const e = html`<!-- <style>.a { --inventado: red; }</style> -->`;
+const f = css`.x { color: var(--inventado); }`;
+TS
+
+caso guard-box-model-urbi 1 "chave dentro de comentário CSS não fecha a regra" \
+  'caso\.ts:1 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.x urbi-arriscado { /* old: } */ width: 100%; }`;
+TS
+
+caso guard-box-model-urbi 1 "chave dentro de string CSS não fecha a regra" \
+  'caso\.ts:1 +\.x urbi-arriscado \{ width: 100% \}' <<'TS'
+const e = css`.x urbi-arriscado { content: "}"; width: 100%; }`;
+TS
+
+echo "Sub-linguagens — NÃO acusa (era falso positivo, ou virava regra fantasma):"
+
+caso guard-box-model-urbi 0 "comentário CSS citando urbi-* não vira regra (o fluxo-tabela.ts:56-64)" <<'TS'
+const e = css`
+  /* #352: a variação precisa ficar na mesma moldura, mas urbi-arriscado
+     só declara 4 props, então o card é do próprio app. */
+  .kpi-card { display: flex; width: 100%; }
+`;
+TS
+
+caso guard-props-urbi 0 "<urbi-*> dentro de comentário HTML" <<'TS'
+const e = html`<!-- <urbi-seguro inventado="x"></urbi-seguro> --><urbi-seguro></urbi-seguro>`;
+TS
+
+caso guard-props-urbi 0 "<urbi-*> dentro de <script> (texto cru)" <<'TS'
+const e = html`<script>const s = "<urbi-seguro inventado='x'>";</script>`;
+TS
+
+caso guard-props-urbi 0 "<urbi-*> dentro de CDATA num svg" <<'TS'
+const e = svg`<![CDATA[ <urbi-seguro inventado="x"> ]]>`;
+TS
+
+caso guard-tokens-css 0 "declaração num <style> DE VERDADE continua valendo" <<'TS'
+const e = html`<style>.a { --minha: red; }</style>`;
+const f = css`.x { color: var(--minha); }`;
+TS
+
+caso guard-tokens-css 0 "var() dentro de comentário CSS não é acusado" <<'TS'
+const e = css`.x { /* antes era var(--fantasma) */ color: var(--cor-texto); }`;
+TS
+
+caso guard-box-model-urbi 0 "width dentro de comentário CSS não é acusado" <<'TS'
+const e = css`.a urbi-arriscado { /* width: 100%; */ min-width: 0; }`;
+TS
+
 echo "Setup ausente — os três morrem com 2, e não passam calados:"
 for g in guard-tokens-css guard-props-urbi guard-box-model-urbi; do
   TOTAL=$((TOTAL+1))

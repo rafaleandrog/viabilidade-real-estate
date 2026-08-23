@@ -15,6 +15,11 @@
 // caso — para todo arquivo do `frontend/`, as duas classificações têm que
 // concordar, inclusive em construções que ninguém listou.
 //
+// ⚠️ Mas o `frontend/` é um corpus de SORTE: ele só cobre o que o app por acaso
+// escreveu. Por isso o diferencial roda também sobre um corpus sintético — sem
+// ele, o defeito da crase antes da divisão passaria, porque nenhum arquivo real
+// tem `` `abc` / 2 ``.
+//
 // ⚠️ ARMADILHA: `ts.SyntaxKind[k]` NÃO é um nome confiável. Vários valores têm
 // apelido `First*`/`Last*` registrado no mesmo número, e o lookup reverso
 // devolve o apelido: um comentário de linha aparece como `FirstTriviaToken`, e
@@ -42,6 +47,11 @@ const TEXTO = new Set([
  */
 export function classificar(txt, inicioDeRegex = new Set()) {
   const mapa = new Uint8Array(txt.length);
+  // Dicas que o scanner RECUSOU: dissemos "regex comeca aqui" e o compilador
+  // discordou. Cada uma e um erro nosso, e o diferencial reprova por elas — e o
+  // que faz a dica NAO ser passe livre.
+  const recusadas = [];
+  const usadas = new Set();
   const sc = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.JSX, txt);
   const marcar = (ini, fim, v) => {
     for (let i = ini; i < fim && i < txt.length; i++) mapa[i] = v;
@@ -82,8 +92,11 @@ export function classificar(txt, inicioDeRegex = new Set()) {
       // como comentário — o oráculo desincroniza e passa a acusar tudo depois
       // dali. Aceitar a dica NÃO é passe livre: se o lexer inventasse uma regex
       // onde não há, o oráculo desincronizaria e o teste estouraria adiante.
+      usadas.add(sc.getTokenPos());
       if (sc.reScanSlashToken() === K.RegularExpressionLiteral) {
         marcar(sc.getTokenPos(), sc.getTextPos(), 3);
+      } else {
+        recusadas.push(sc.getTokenPos());
       }
     }
     // ⚠️ TERCEIRA ARMADILHA, e esta limita o oráculo. Não dá para chamar
@@ -95,5 +108,9 @@ export function classificar(txt, inicioDeRegex = new Set()) {
     // coberto só pelos casos escritos à mão, e o lexer erra de propósito para o
     // lado da divisão, que é o lado seguro (ver `podeSerRegex`).
   }
-  return mapa;
+  // Dica que o scanner nunca chegou a ver e tao ruim quanto recusada: significa
+  // que o offset nem era comeco de token — o lexer inventou uma regex no meio de
+  // outra coisa.
+  for (const off of inicioDeRegex) if (!usadas.has(off)) recusadas.push(off);
+  return { mapa, recusadas: recusadas.sort((a, b) => a - b) };
 }

@@ -39,20 +39,30 @@ const ANTES_DE_REGEX = new Set([
 ]);
 
 /**
+ * Tokens que PRODUZEM VALOR. Depois de qualquer um deles, `/` DIVIDE.
+ *
+ * A crase e a string estavam faltando, e nao era detalhe: `` `abc` / 2 `` fazia
+ * o lexer abrir uma regex no `/` e consumir o resto do template inteiro — o
+ * guard de props devolvia `0 tags` com saida ZERO. `'abc' / 2` idem. O `]` ja
+ * estava aqui e por isso `[1,2][0] / 2` sempre funcionou, o que mostra que a
+ * lista e que estava incompleta, nao a ideia.
+ */
+const PRODUZ_VALOR = new Set([')', ']', '}', '`', 'valor']);
+
+/**
  * `/` abre regex ou divide?
  *
- * Divisao so pode vir depois de algo que PRODUZ VALOR: identificador, numero,
- * `)`, `]`, `}`, string ou template. Depois de operador, virgula, `(`, `=`, `:`,
- * `;` ou inicio de arquivo, so pode ser regex.
+ * Divisao so pode vir depois de algo que produz valor (a lista acima). Depois de
+ * operador, virgula, `(`, `=`, `:`, `;` ou inicio de arquivo, so pode ser regex.
  *
  * O caso ambiguo real e o identificador: `a / b` divide, mas `return /x/` nao.
- * Dai a lista de palavras acima. Na duvida o modulo escolhe DIVISAO, que e o erro
+ * Dai a lista de palavras. Na duvida o modulo escolhe DIVISAO, que e o erro
  * seguro: o trecho fica classificado como codigo, e nenhuma superficie le codigo.
  */
 function podeSerRegex(anterior, palavra) {
   if (anterior === '') return true;
   if (anterior === 'palavra') return ANTES_DE_REGEX.has(palavra);
-  return !')]}'.includes(anterior);
+  return !PRODUZ_VALOR.has(anterior);
 }
 
 const EH_IDENT = (c) => c !== undefined && /[A-Za-z0-9_$]/.test(c);
@@ -224,69 +234,186 @@ export function analisar(txt) {
  * de verdade.
  */
 export function mascarar(txt, trechos) {
-  const fora = new Array(txt.length);
-  for (let k = 0; k < txt.length; k++) fora[k] = txt[k] === '\n' ? '\n' : ' ';
-  for (const { de, ate } of trechos) {
-    for (let k = Math.max(0, de); k < Math.min(ate, txt.length); k++) fora[k] = txt[k];
+  return recortar(txt, trechos, true);
+}
+
+/** O mesmo texto com todo caractere que nao seja `\n` virado espaco. */
+const embranquecer = (s) => s.replace(/[^\n]/g, ' ');
+
+/**
+ * `manter = true`: so os trechos sobrevivem. `manter = false`: so os trechos
+ * viram branco.
+ *
+ * Feito por FATIAS, e nao caractere a caractere: montar um array de 1,18 milhao
+ * de strings de um caractere e dar `join` custava ~93 ms por passada.
+ *
+ * `branco` e o arquivo inteiro ja embranquecido, de onde as fatias em branco
+ * saem por `slice`. Ele e passado de fora de proposito: chamar
+ * `replace(/[^\n]/g, ' ')` em cada uma das ~1.000 fatias de um arquivo e MAIS
+ * lento que a versao por caractere (medido: 506 ms contra 310 ms). E o mesmo
+ * branco serve para todas as passadas do arquivo — apagar so troca caractere por
+ * espaco, nunca mexe em `\n`, entao o embranquecido nao muda.
+ */
+function recortar(txt, trechos, manter, branco = embranquecer(txt)) {
+  if (!trechos.length) return manter ? branco : txt;
+  const ordenados = [...trechos].sort((a, b) => a.de - b.de);
+  const partes = [];
+  let pos = 0;
+  for (const t of ordenados) {
+    const de = Math.max(pos, t.de);
+    const ate = Math.min(t.ate, txt.length);
+    if (ate <= de) continue;
+    partes.push(manter ? branco.slice(pos, de) : txt.slice(pos, de));
+    partes.push(manter ? txt.slice(de, ate) : branco.slice(de, ate));
+    pos = ate;
   }
-  return fora.join('');
+  partes.push(manter ? branco.slice(pos) : txt.slice(pos));
+  return partes.join('');
 }
 
 const textosCom = (analise, aceita) =>
   analise.templates.filter((t) => aceita(t.tag)).flatMap((t) => t.textos);
 
-/**
- * MARCACAO: o texto dos templates `html` e `svg`, com os `${…}` ja em branco.
- *
- * ⚠️ Template SEM TAG fica de fora, e isso foi medido, nao presumido. Um
- * `title=${`Coletas — ${x.nome}`}` tem, dentro da expressao, um template comum
- * cujo texto e PROSA — mas que, incluido na superficie, cai bem depois de
- * `<urbi-modal` e e lido como atributo. Sao 7 falsos positivos assim no
- * `frontend/` de hoje (`viabilidade-config-mercado.ts:264`,
- * `tela-dashboard.ts:545`, `tela-funding.ts:419,630`, …), contra ZERO usos reais
- * de `<urbi-*>` fora de template `html`/`svg` — `exportar.ts`, que e quem monta
- * marcacao em template comum, tem 0 ocorrencias.
- *
- * O preco: marcacao `urbi-*` escrita num template sem tag nao seria conferida.
- * Se um dia isso passar a existir, a saida certa e dar-lhe a tag `html`, nao
- * alargar esta superficie de volta.
- */
-export const superficieMarcacao = (txt, analise) =>
-  mascarar(txt, textosCom(analise, (tag) => tag === 'html' || tag === 'svg'));
+// ── AS TRES SUB-LINGUAGENS ──────────────────────────────────────────────────
+//
+// Um arquivo `.ts` deste app tem TRES linguagens aninhadas, e cada uma esconde
+// delimitador do seu jeito. Lexar so a de fora deixa as outras duas cegas:
+//
+//   | linguagem | onde vive                          | o que esconde delimitador   |
+//   |-----------|------------------------------------|-----------------------------|
+//   | JS/TS     | o arquivo                          | `//` `/* */` string template|
+//   | CSS       | `css`…``, `<style>`, `style="…"`   | `/* */` string `url()`      |
+//   | HTML      | `html`…``, `svg`…``                | `<!-- -->` CDATA `<script>` |
+//
+// CSS **nao tem** `//`; HTML **nao tem** `/* */`. Aplicar a regra da linguagem
+// errada e tao ruim quanto nao aplicar nenhuma.
+//
+// A lista acima e FECHADA, e fecha por construcao: os guards consomem exatamente
+// duas superficies — marcacao e CSS —, e o conjunto de construcoes que escondem
+// delimitador em cada uma vem da especificacao dela, nao do que o repo hoje usa.
+// So apareceria sub-linguagem nova se aparecesse GUARD novo consumindo superficie
+// nova; nao ha como um arquivo introduzir uma.
 
-/** Texto de QUALQUER template, com ou sem tag. So para achar `<style>`. */
-const superficieDeTemplates = (txt, analise) =>
-  mascarar(txt, analise.templates.flatMap((t) => t.textos));
-
-/**
- * CSS: o texto dos templates `css` mais o conteudo dos `<style>` que aparecem na
- * marcacao. O `<style>` e procurado na superficie de MARCACAO, ja mascarada —
- * entao um `<style>` citado num comentario nao abre regiao nenhuma.
- */
-export function trechosCss(txt, analise) {
-  const trechos = textosCom(analise, (tag) => tag === 'css');
-  // `<style>` procurado em TODO template, e nao so na marcacao: o documento de
-  // impressao de `exportar.ts` e montado em template sem tag, e o CSS dele e CSS
-  // de verdade. Comentario continua de fora, que e o que importa.
-  const comMarcacao = superficieDeTemplates(txt, analise);
-  for (const m of comMarcacao.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
-    const de = m.index + m[0].indexOf('>') + 1;
-    trechos.push({ de, ate: de + m[1].length });
+/** Intervalos de um pedaco de CSS que escondem `{`, `}`, `;` ou `--x:`. */
+function buracosCss(txt, de, ate) {
+  const fora = [];
+  let i = de;
+  while (i < ate) {
+    const ch = txt[i];
+    if (ch === '/' && txt[i + 1] === '*') {
+      let f = txt.indexOf('*/', i + 2);
+      f = f === -1 || f + 2 > ate ? ate : f + 2;
+      fora.push({ de: i, ate: f });
+      i = f;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      let f = i + 1;
+      while (f < ate && txt[f] !== ch) { if (txt[f] === '\\') f++; f++; }
+      f = Math.min(f + 1, ate);
+      fora.push({ de: i, ate: f });
+      i = f;
+      continue;
+    }
+    // `url(` sem aspas pode conter `}` — raro, mas legal em CSS.
+    if (ch === 'u' && txt.startsWith('url(', i)) {
+      let f = txt.indexOf(')', i + 4);
+      f = f === -1 || f + 1 > ate ? ate : f + 1;
+      fora.push({ de: i, ate: f });
+      i = f;
+      continue;
+    }
+    i++;
   }
-  return trechos;
+  return fora;
 }
 
-export const superficieCss = (txt, analise) => mascarar(txt, trechosCss(txt, analise));
+/** Intervalos de um pedaco de HTML que escondem `<tag`, `<style>` ou `--x:`. */
+function buracosHtml(txt, de, ate) {
+  const fora = [];
+  const ateMarca = (i, marca) => {
+    let f = txt.indexOf(marca, i);
+    return f === -1 || f + marca.length > ate ? ate : f + marca.length;
+  };
+  // Salta de `<` em `<`. A versao anterior testava as tres construcoes em CADA
+  // caractere — com um `slice` e um regex por caractere sobre 1,18 MiB, o que
+  // dominava o tempo dos tres guards.
+  let i = de;
+  while (i < ate) {
+    i = txt.indexOf('<', i);
+    if (i === -1 || i >= ate) break;
+    if (txt.startsWith('<!--', i)) { const f = ateMarca(i + 4, '-->'); fora.push({ de: i, ate: f }); i = f; continue; }
+    if (txt.startsWith('<![CDATA[', i)) { const f = ateMarca(i + 9, ']]>'); fora.push({ de: i, ate: f }); i = f; continue; }
+    // `<script>` e texto cru: `<` la dentro nao abre tag. `<style>` NAO entra
+    // aqui — ele e extraido como CSS logo abaixo.
+    if (/^<script[\s>]/i.test(txt.substr(i, 8))) {
+      const f = ateMarca(i, '</script>');
+      fora.push({ de: i, ate: f });
+      i = f;
+      continue;
+    }
+    i++;
+  }
+  return fora;
+}
+
+const apagar = (str, buracos, branco) => recortar(str, buracos, false, branco);
+
+/** Um fragmento solto de CSS (o valor de um `style="…"`) sem os seus buracos. */
+export const limparCss = (fragmento) =>
+  apagar(fragmento, buracosCss(fragmento, 0, fragmento.length));
 
 /**
- * TEXTO: tudo que e conteudo — texto de QUALQUER template mais o interior das
- * strings. Nunca comentario, nunca regex, nunca codigo.
+ * TUDO de um arquivo, numa passada: analise, superficies ja limpas das tres
+ * sub-linguagens, e o contador de linha.
  *
- * E a superficie mais larga do modulo, para a pergunta "isto aparece em algum
- * lugar que vira conteudo?".
+ * A ordem importa e nao e negociavel:
+ *   1. buracos de HTML, em todo template que nao seja `css`;
+ *   2. superficie de marcacao — so ai `<style>` e procurado, para que um
+ *      `<!-- <style>…</style> -->` NAO vire regiao de CSS (era P1-b: documentar
+ *      um bloco de estilo autorizava token inexistente no app inteiro);
+ *   3. buracos de CSS, nos templates `css` e nos `<style>` que sobraram.
  */
-export const superficieTexto = (txt, analise) =>
-  mascarar(txt, [...analise.templates.flatMap((t) => t.textos), ...analise.strings]);
+export function superficies(txt) {
+  const analise = analisar(txt);
+  const ehCss = (tag) => tag === 'css';
+  // Uma vez por arquivo, reusado nas cinco passadas — ver `recortar`.
+  const branco = embranquecer(txt);
+
+  // Estagio 1 — buracos de HTML, em todo template que nao seja `css`.
+  const deHtml = [];
+  for (const t of analise.templates) {
+    if (ehCss(t.tag)) continue;
+    for (const x of t.textos) deHtml.push(...buracosHtml(txt, x.de, x.ate));
+  }
+  const semHtml = apagar(txt, deHtml, branco);
+
+  // Estagio 2 — so agora `<style>` e procurado, sobre o texto JA sem comentario
+  // de HTML: e o que impede um `<!-- <style>…</style> -->` de virar regiao de
+  // CSS de verdade. A ordem nao e negociavel.
+  const trechosCss = textosCom(analise, ehCss);
+  const todosOsTextos = analise.templates.flatMap((t) => t.textos);
+  for (const m of recortar(semHtml, todosOsTextos, true, branco).matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
+    const de = m.index + m[0].indexOf('>') + 1;
+    trechosCss.push({ de, ate: de + m[1].length });
+  }
+  const deCss = trechosCss.flatMap((x) => buracosCss(semHtml, x.de, x.ate));
+
+  // Um unico texto ja limpo das TRES linguagens; cada superficie e so um recorte
+  // dele. Antes eram cinco passadas de limpeza por arquivo.
+  const limpo = apagar(semHtml, deCss, branco);
+
+  return {
+    analise,
+    linhaDe: contadorDeLinha(txt),
+    /** Texto dos templates `html`/`svg`, sem comentario de HTML. */
+    marcacao: recortar(limpo, textosCom(analise, (tag) => tag === 'html' || tag === 'svg'), true, branco),
+    /** Templates `css` e conteudo dos `<style>`, sem comentario nem string de CSS. */
+    css: recortar(limpo, trechosCss, true, branco),
+    /** Conteudo em geral: texto de qualquer template mais o miolo das strings. */
+    texto: recortar(limpo, [...todosOsTextos, ...analise.strings], true, branco),
+  };
+}
 
 /** `(offset) => linha`, com busca binaria. O ingenuo era O(offset) por chamada. */
 export function contadorDeLinha(txt) {

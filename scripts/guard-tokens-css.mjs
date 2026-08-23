@@ -35,9 +35,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  analisar, superficieCss, superficieTexto, superficieMarcacao, lerTags, contadorDeLinha,
-} from './lib/fonte-ts.mjs';
+import { superficies, lerTags, limparCss } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso');
@@ -112,18 +110,16 @@ let usos = 0;
 
 const superficiesPorArquivo = arquivos.map((arq) => {
   const txt = readFileSync(arq, 'utf8');
-  const analise = analisar(txt);
+  const { marcacao, css, texto, linhaDe } = superficies(txt);
   return {
-    arq,
     rel: relative(RAIZ, arq).replaceAll('\\', '/'),
-    txt,
-    linhaDe: contadorDeLinha(txt),
-    // `style="--x: 1"` tambem e CSS, e o lexer ja separou o valor do atributo.
-    estilosInline: lerTags(superficieMarcacao(txt, analise), '[a-z]')
+    linhaDe,
+    css,
+    texto,
+    // `style="--x: 1"` tambem e CSS — e `limparCss` tira o `/* */` de dentro dele.
+    estilosInline: lerTags(marcacao, '[a-z]')
       .flatMap((t) => t.atributos.filter((a) => a.nome === 'style' && a.valor)
-        .map((a) => ({ valor: a.valor, offset: a.offset }))),
-    css: superficieCss(txt, analise),
-    texto: superficieTexto(txt, analise),
+        .map((a) => ({ valor: limparCss(a.valor), offset: a.offset }))),
   };
 });
 
