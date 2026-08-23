@@ -41,13 +41,19 @@ relatório e na linha de anúncio. O que nunca acontece é lente sumir porque o 
 >
 > **Ordem de preferência neste repositório:**
 >
-> | # | Motor | Quando |
-> |---|---|---|
-> | 1 | **GitHub App** — comentar `@codex review` no PR | Sempre que houver PR aberto. É o caminho normal |
-> | 2 | CLI local (`codex exec`, preflight abaixo) | Se a chave e a liberação de rede existirem |
-> | 3 | Fan-out nativo Anthropic | Só quando 1 e 2 falharem, **declarado** como menos adversarial |
+> **São DUAS camadas que somam, não três motores em fila.** A tabela anterior dizia que o fan-out
+> nativo só entra "quando 1 e 2 falharem", e isso contradizia o parágrafo seguinte — achado P2 da
+> rodada 9 do próprio Codex. Quem seguisse a tabela **pularia a fan-out sempre que o App
+> respondesse**, que é justamente o caso normal.
 >
-> **Os dois primeiros não competem — somam.** No PR 494 a divisão foi limpa e vale registrar: o
+> | Camada | O que é | Quando |
+> |---|---|---|
+> | **A — revisão do App** | `@codex review` no PR | **Sempre** que houver PR aberto. É o caminho normal, e não substitui a camada B |
+> | **B — fan-out das lentes** | `codex exec` (preflight abaixo) **ou** subagente nativo | **Sempre.** O `codex exec` quando a chave e a rede existirem; **nativo** quando não, declarado como menos adversarial |
+>
+> A escolha condicional é **dentro da camada B** — CLI × nativo. A camada A não dispensa a B.
+>
+> **As duas camadas não competem — somam.** No PR 494 a divisão foi limpa e vale registrar: o
 > Codex achou os defeitos de **lógica** (uma guarda que não testava o que dizia testar; um caminho
 > absoluto que não existe noutro layout), e as lentes nativas acharam as **imprecisões factuais** do
 > texto. Rodar as duas é mais barato que descobrir depois qual faltou.
@@ -83,19 +89,23 @@ Então, **antes** de publicar o relatório da §7, execute nesta ordem:
 **Se o teto estourar** — nenhuma review no head da rodada em 15 min —, o ciclo fica **aberto**, e a
 atestação tem de refletir isso **na máquina, não na prosa**:
 
-> 🔴 **NÃO publique a linha de máquina.** Publique o relatório **sem** o comentário HTML
-> `<!-- revisao-viabilidade … -->`, dizendo em uma linha que o App foi acionado no head `<sha>` e não
-> respondeu dentro do teto.
+> 🔴 **Publique a linha de máquina com `bloqueantes=1`**, tendo como bloqueante *"revisão do App não
+> chegou no head desta rodada"* — ele some quando ela chegar. Diga também, em uma linha de prosa,
+> que o App foi acionado no head `<sha>` e não respondeu dentro do teto.
 >
-> **Por quê, e é o achado P1 da rodada 6 do próprio Codex:** `revisao-registrada.yml:124-130` lê
-> **só o número** de `bloqueantes=`. Publicar `bloqueantes=0` com prosa explicando que o ciclo está
-> aberto deixa o status **verde** assim mesmo — a prosa não é lida por ninguém que decida. Sem a
-> linha de máquina, o job não acha atestação e o status fica *"nenhuma revisão registrada"*, que é
-> **exatamente o estado verdadeiro**.
+> **Duas armadilhas aqui, as duas achadas pelo próprio Codex, e a segunda derrubou a primeira
+> resposta:**
 >
-> Alternativa aceitável, se você quiser o relatório rastreável na contagem de rodadas: publique a
-> linha com `bloqueantes=1` e o achado *"revisão do App não chegou no head desta rodada"* como o
-> bloqueante — ele some quando ela chegar. **O que não é aceitável é `bloqueantes=0`.**
+> 1. **`bloqueantes=0` com prosa explicando não serve.** `revisao-registrada.yml` lê **só o número**;
+>    a prosa não é lida por ninguém que decida, e o status fica **verde** sobre um ciclo aberto.
+> 2. **Omitir a linha também não serve** — foi a correção que eu tinha escrito, e está errada. O
+>    próprio relatório de timeout dispara `issue_comment`, e o job varre **todos** os comentários do
+>    head: se já houver uma atestação `bloqueantes=0` **no mesmo head** — o caso da rodada N+1 que
+>    nasce de comentário, previsto na §1 da skill —, ele acha a linha antiga e **republica
+>    `success`**. Ausência de linha nova não apaga linha velha.
+>
+> Por isso a regra é **positiva, não por omissão**: emita `bloqueantes=1`. É a única forma de
+> **sobrescrever** um `success` anterior no mesmo head.
 
 Silêncio do motor nunca é aprovação do motor — e "eu expliquei no texto" não é o mesmo que "o portão
 sabe".
