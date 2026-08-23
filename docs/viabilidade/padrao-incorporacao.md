@@ -1109,7 +1109,7 @@ O comprador pode pagar parte diretamente e financiar parte com o banco, mas amba
 
 > ✅ **Comportamento vigente no caminho canônico (#235/#283).** `ehVendaAposChaves`
 > (`frontend/fluxo-caixa-motor.ts:958-960`) marca como Após-chaves toda safra com
-> `safra > mesEntrega`, e `componentesEfetivosSafra` (`:949-956`) substitui os componentes do Grupo
+> `safra > mesEntrega`, e `componentesEfetivosSafra` (`:962`) substitui os componentes do Grupo
 > por um único `imediato` de 100% sem desconto — sem sinal futuro, parcela nem repasse para aquela
 > venda. Cada safra é tratada isoladamente: contratos antigos não são afetados. A aplicação por
 > safra está em `calcularRecebiveisComponentes:1096`, via `componentesIntegradosSafra:1030-1043`.
@@ -1575,10 +1575,10 @@ A permuta física:
 > (`schema.json:373-374`) e valor declarado explicitamente. O CRUD de tipologias deixou de ler e
 > escrever `unidades_permutadas` (`backend/rotas/avancado.ts:744-749`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
-> (`frontend/fluxo-caixa-motor.ts:1777`) e a projeta de volta nas tipologias uma única vez
-> (`:1780-1788`), para que toda função que já lia `t.unidades_permutadas` fique correta sem
-> replicar a reserva. **Sem linha de custo de Permuta física, o KPI é 0** — não há fallback para o
-> campo legado (`:1999-2006`, decisão do autor de 2026-08-02).
+> (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1781`) e a projeta de volta nas tipologias uma
+> única vez (`:1791-1798`), para que toda função que já lia `t.unidades_permutadas` fique correta
+> sem replicar a reserva. **Sem linha de custo de Permuta física, o KPI é 0** — não há fallback
+> para o campo legado (`:2016-2019`, decisão do autor de 2026-08-02, #267).
 
 > A ressalva original ("até essa definição, nada de refatoração ampla improvisada; inconsistência
 > vira issue própria e conservadora") **cumpriu o papel dela**: a definição chegou pelas
@@ -1963,7 +1963,7 @@ Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, 11) + 1`, com `ultimoMesRecebivelLinha` derivando o recebível a partir dos
 > componentes normalizados. O fallback silencioso que empilhava excedente no último mês **foi
-> removido** (`:1358-1360`); no caminho canônico, um pagamento fora do horizonte emite
+> removido** (`:1371-1373`); no caminho canônico, um pagamento fora do horizonte emite
 > `console.warn` e não é computado (`deposita`, `:1098-1104`), em vez de deformar o último mês em
 > silêncio.
 >
