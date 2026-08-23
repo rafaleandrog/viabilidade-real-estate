@@ -248,12 +248,17 @@ autor precisa responder, em vez de deixar "aguardando decisão" solto:
 
 - **Decisão de desenho** — o conserto mexeria em algo que o autor decidiu. Com parcimônia: usado à
   toa, vira jeito de terceirizar julgamento que era seu.
-- **Achado que não converge.** A identidade de um achado é o **contrato ou invariante violado**,
-  não o remédio nem o arquivo — dois bloqueantes distintos podem pedir o mesmo tipo de conserto, e
-  isso é o ciclo funcionando. **Precedência: defeito distinto vence remédio repetido.** É laço
-  quando uma rodada **não nomeia nenhum contrato que as anteriores já não tenham nomeado**. Isso é
-  auditável — a lista de contratos nomeados está nos relatórios — e termina, porque o conjunto de
-  contratos do repositório é finito. Pare, diga o que está girando, devolva.
+- **Achado que não converge.** A identidade de um achado é o par **contrato violado + ocorrência**
+  — `arquivo:linha` do defeito —, não o remédio. Dois bloqueantes distintos podem pedir o mesmo
+  conserto, e **duas ocorrências do mesmo contrato em lugares diferentes são dois achados**: duas
+  rotas que omitem a mesma regra de autorização não são repetição. **Precedência: defeito distinto
+  vence remédio repetido.**
+
+  É laço quando uma rodada **ainda tem bloqueante pendente** e **não traz nenhum par novo**. As duas
+  condições juntas, e a primeira é o que impede a rodada de confirmação — aquela que só verifica que
+  o último conserto pegou — de ser lida como laço: ela não traz par novo **porque acabou**, e o
+  desfecho dela é a § 9, não a saída. Auditável, porque os pares estão nos relatórios; finito,
+  porque contrato e ocorrência são conjuntos finitos.
 
 > ⚠️ **A terminação é condicional à convergência, e isto é declarado de propósito.** O teto
 > antigo terminava por construção; esta regra **não**. Se cada conserto expuser um bloqueante

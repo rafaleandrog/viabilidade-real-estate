@@ -645,10 +645,12 @@ Observações (3)
 10/11 lentes (S3 não executada: timeout). Detalhe qualquer achado se quiser.
 ```
 
-> ⚠️ **Todo bloqueante nomeia o contrato ou invariante que viola** — é o que as duas linhas de
-> exemplo acima fazem ("DDL em migração de app", "`sdk_min` acima do publicado"). O campo não é
-> estilo: a saída de não-convergência da § 8 se decide comparando **a lista de contratos nomeados**
-> entre rodadas, e sem ele o teste deixa de ser auditável por quem está de fora.
+> ⚠️ **Todo bloqueante nomeia o contrato violado E o cita.** O rótulo é o título — "DDL em
+> migração de app", "`sdk_min` acima do publicado" —, mas a **chave** é a citação: `arquivo:linha`
+> da regra mais o texto literal dela. O campo não é estilo. A saída de não-convergência da § 8 se
+> decide comparando pares **contrato + ocorrência** entre rodadas, e rótulo em texto livre não
+> serve de chave: o mesmo contrato ganharia duas redações e pareceria novo, ou dois contratos
+> receberiam o mesmo resumo e disparariam laço cedo demais.
 
 **Não repita o relatório na sessão.** Nada de citação literal, quadro de execução, raciocínio
 ou lista do que passou — tudo isso está no PR, e quem quiser detalhe pede. Rodada limpa é uma
@@ -680,12 +682,20 @@ relatório.
 > **Pare antes da § 9 em dois casos, e nos dois diga qual é a pergunta:**
 >
 > - **decisão de desenho** — o conserto mexeria em algo que o autor decidiu;
-> - **achado que não converge** — a identidade de um achado é o **contrato ou invariante
->   violado**, não o remédio nem o arquivo. **Defeito distinto vence remédio repetido**, e essa é a
->   precedência. É laço quando a rodada **não nomeia nenhum contrato que as anteriores já não
->   tenham nomeado** — teste auditável, porque a lista de contratos está nos relatórios. Por isso
->   **todo bloqueante do relatório nomeia o contrato que viola**: sem esse campo, a saída não é
->   verificável por ninguém de fora.
+> - **achado que não converge** — a identidade é o par **contrato violado + ocorrência**
+>   (`arquivo:linha`), nunca o remédio. **Defeito distinto vence remédio repetido**, e duas
+>   ocorrências do mesmo contrato em lugares diferentes **são dois achados**.
+>
+>   É laço quando a rodada **ainda tem bloqueante pendente** *e* **não traz par novo**. As duas
+>   condições, sempre: sem a primeira, a rodada de confirmação — a que só verifica que o último
+>   conserto pegou — cairia aqui, porque ela não traz par novo **por ter acabado**. O desfecho dela
+>   é a § 9.
+>
+>   Para o par ser comparável entre rodadas, o **contrato é citado, não resumido**: o relatório dá
+>   `arquivo:linha` da regra violada mais o texto literal dela, do jeito que a § 7 já exige para o
+>   achado. Rótulo redigido livremente ("DDL em migração de app") serve de título; **a chave é a
+>   citação.** Sem isso, o mesmo contrato ganha duas redações e parece novo, ou dois contratos
+>   diferentes recebem o mesmo resumo e disparam laço cedo demais.
 >
 >   Consequência declarada: a **terminação é condicional**. Se cada conserto expuser contrato novo,
 >   o ciclo reabre — e é o que se quer, porque a alternativa é mergear com defeito conhecido. Quem
