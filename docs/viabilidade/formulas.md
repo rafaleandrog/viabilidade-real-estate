@@ -210,19 +210,17 @@ alimente o cash sweep.
 > O que foi recusado, por decisão, é a linha **rotativa** — ela reintroduziria a competição por
 > caixa que a #355 apagou. Falta o **rótulo** na tela (#466), não o produto.
 
-> ⚠️ **O que continua inerte na aba `Viabilidade → Financeiro`**, e só isso: `regime_tributario` e
-> os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`),
-> `imposto_sobre_permuta_fisica` (`:182`) e mais **dois que este inventário omitia**:
-> `sujeito_ret` (`:176-177`) e `imposto_percentual` (`:188`).
->
-> Os dois últimos **não** são inertes em absoluto — alimentam a Proforma do **Preliminar**
-> (`frontend/proforma.ts:245`). O que não os lê é o **Avançado**, que recebe o RET pelo par global
-> `considerar_ret`/`ret_pct` (`frontend/tela-fluxo-ver.ts:122`). Preenchê-los numa tela de Avançado
-> não muda cálculo nenhum. `regime_tributario` e os `aliquota_*_pct`, esses sim, não têm leitor em
-> nível nenhum.
+> ✅ **#450 (2026-08-24): não sobrou mais nada inerte na aba `Viabilidade → Financeiro`.**
+> `regime_tributario`, os cinco `aliquota_*_pct` e `imposto_sobre_permuta_fisica` saíram do render
+> (não tinham leitor em nível nenhum). `sujeito_ret` também saiu — é condição de nível
+> (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:81-83`): a aba só existe para
+> `nivel_analise === 'avancado'`, onde a Proforma não é consultada, então a condição colapsa em
+> "sempre oculto". `imposto_percentual` fica **visível, sempre desabilitado**
+> (`impostoPercentualEditavel`, `:87-89`) — o único editor de verdade continua sendo Premissas
+> (Preliminar, `frontend/proforma.ts:245`), que grava a mesma coluna.
 >
 > Os campos de financiamento, investidor, estrutura de capital e correção monetária **saíram da
-> tela** (#279/#355); as colunas continuam no schema, sem formulário e sem leitor.
+> tela** antes (#279/#355); as colunas continuam no schema, sem formulário e sem leitor.
 
 ## Valor canônico dos campos multiunidade
 
@@ -270,7 +268,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/viab-format.ts:11-23` — `fmtR$` (`CASAS_DECIMAIS_MONETARIAS = 2`) | 2 | ✅ |
 | `frontend/exportar.ts:10` — importa `fmtR$`, sem formatador próprio | 2 | ✅ |
 | `frontend/exportar.ts:167` — `celulaFx` (CSV e PDF) | 2 | ✅ corte em R$ 0,005 |
-| `frontend/tela-financeiro.ts:143` | 2 | ✅ |
+| `frontend/tela-financeiro.ts:154` — `_n` (`casas-decimais="2"`) | 2 | ✅ |
 | `frontend/tela-empreendimento-tipologias.ts:178` | 2 (default) | ✅ |
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
 | `frontend/tela-proforma.ts:458` — sensibilidade, via `fmtR$(v, false)` | 2 | ✅ desde a #492 |

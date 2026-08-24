@@ -1814,10 +1814,13 @@ base líquida
 >
 > ⚠️ **Correção: dizer que o regime é "exclusivo do Preliminar" está errado, e a frase anterior
 > desta nota dizia isso.** A Proforma **não** lê `regime_tributario`: `frontend/proforma.ts:245`
-> calcula o imposto só a partir de `sujeito_ret`, `aliquota_ret_pct` e `imposto_percentual`. Fora
-> do schema, da persistência e da própria tela (`tela-financeiro.ts:187,215`), `regime_tributario`
-> não tem leitor nenhum. Ele e os cinco `aliquota_*_pct` estão inertes nos **dois** níveis — não
-> são "do Preliminar", são de ninguém.
+> calcula o imposto só a partir de `sujeito_ret`, `aliquota_ret_pct` e `imposto_percentual`.
+> `regime_tributario` não tem leitor nenhum, em nenhum nível — só era mais um controle sem efeito.
+>
+> ✅ **#450 (2026-08-24): saiu do render.** `regime_tributario` e os cinco `aliquota_*_pct` não
+> aparecem mais na aba `Viabilidade → Financeiro` — `camposVisiveisFinanceiro`
+> (`frontend/tela-financeiro.ts:74-77`) só lista `taxa_desconto_aa` e `imposto_percentual`. As
+> colunas continuam no schema como dado histórico; só o formulário saiu.
 
 ```text
 permuta financeira líquida
@@ -1978,16 +1981,15 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > §4.3 de [Funding, Capital Stack e Retorno do Capital](funding-capital-stack), preservada de
 > propósito. O resto daquele documento é **ADR histórico**.
 >
-> ⚠️ **O que sobrou sem efeito no motor do Avançado, na aba `Viabilidade → Financeiro`:**
-> `regime_tributario` e os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`),
-> `imposto_sobre_permuta_fisica` (`:182`) e — **acrescentados aqui porque o inventário anterior os
-> omitia** — `sujeito_ret` (`:176-177`) e `imposto_percentual` (`:188`). Estes dois últimos não são
-> inertes em absoluto: **alimentam a Proforma do Preliminar** (`frontend/proforma.ts:245`). Para o
-> Avançado é que não valem — ele recebe o RET pelo par global `considerar_ret`/`ret_pct`
-> (`frontend/tela-fluxo-ver.ts:122`). Preencher os dois numa tela de Avançado não muda cálculo
-> nenhum. Os campos de financiamento, investidor, estrutura de
-> capital e correção monetária **saíram do formulário** (#279/#355); as colunas continuam no schema
-> como dado histórico, sem tela e sem leitor.
+> ✅ **#450 (2026-08-24): o inventário abaixo está desatualizado — os sete controles citados
+> saíram do render.** `regime_tributario`, os cinco `aliquota_*_pct` e
+> `imposto_sobre_permuta_fisica` foram removidos da aba `Viabilidade → Financeiro` (sem leitor em
+> nenhum nível — não havia o que preservar). `sujeito_ret` também saiu do render **dali**: é
+> condição de nível (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:81-83`) — a aba só
+> existe para `nivel_analise === 'avancado'`, e nesse nível a Proforma não é consultada, então a
+> condição colapsa em "sempre oculto". `imposto_percentual` é o único que fica **visível**, mas
+> sempre **desabilitado** (`impostoPercentualEditavel`, `:87-89`) — o único editor de verdade é
+> Premissas (Preliminar), que grava a mesma coluna. Nenhuma coluna saiu do schema; só o formulário.
 >
 > ⚠️ **Capital de giro EXISTE, sob o nome `divida`** — decisão 2 do autor, 2026-08-22. O tipo
 > `divida` **é** o produto de CG por calendário: a migração `029_funding_operacoes.js:38-43,127-130`
@@ -2040,10 +2042,10 @@ O estudo completo deve conseguir representar:
 > `docs/viabilidade/funding-capital-stack.md` §4.3; o oráculo de regressão contra a planilha, em
 > `frontend/financiamento-producao-golden.test.ts`.
 >
-> **O inventário do que sobrou inerte é o da §17**, e é menor do que este parágrafo dizia: só
-> `regime_tributario`, os cinco `aliquota_*_pct` e `imposto_sobre_permuta_fisica`. Estrutura de
-> capital, investidor e correção monetária **saíram do formulário** (#279/#355) — não estão inertes,
-> não estão lá.
+> **O inventário do que sobrou inerte era o da §17** — e a #450 (2026-08-24) fechou até esse
+> resto: `regime_tributario`, os cinco `aliquota_*_pct` e `imposto_sobre_permuta_fisica` saíram do
+> render da aba Financeiro (não tinham leitor em nível nenhum). Estrutura de capital, investidor e
+> correção monetária **saíram do formulário** antes (#279/#355) — não estão inertes, não estão lá.
 
 
 ### 17.3 Repasse não é financiamento à produção
@@ -2812,8 +2814,8 @@ As conclusões anteriores permanecem:
 > ✅ **O quarto item saiu: o Bloco Financeiro já teve a decisão.** Ele dizia que o bloco "ainda
 > precisa de decisão de integração ou remoção". A #279/#355 decidiram — os campos de financiamento,
 > estrutura de capital, investidor e correção **saíram do formulário**, e o funding passou a rodar
-> por `avancado_funding_operacoes` na aba Funding (§17). O que sobrou sem leitor é
-> `regime_tributario` e os `aliquota_*_pct`.
+> por `avancado_funding_operacoes` na aba Funding (§17). O que sobrava sem leitor
+> (`regime_tributario`, os `aliquota_*_pct`) também saiu do formulário — #450, 2026-08-24.
 
 ### 24.6 Conversão em mudanças
 
@@ -3058,7 +3060,8 @@ são **digitados como número inteiro/decimal** (ex.: `7` = 7%), não como fraç
 >   (`estrutura_*`, `financiamento_*`, `investidor_*`, `indice_correcao*`, `juros_financeiros_aa`)
 >   são **dado histórico**: saíram do formulário pela #279/#355 e **não têm mais controle na tela**.
 >   Procurá-las na interface é procurar o que foi removido.
-> - **`regime_tributario` e os `aliquota_*_pct` continuam sem leitor nenhum**, em qualquer nível.
+> - **`regime_tributario` e os `aliquota_*_pct` continuavam sem leitor nenhum**, em qualquer
+>   nível — até a #450 (2026-08-24), que os tirou também da tela (§17 tem o detalhe).
 >
 > O inventário vigente do que sobra sem efeito no Avançado está na **§17**.
 

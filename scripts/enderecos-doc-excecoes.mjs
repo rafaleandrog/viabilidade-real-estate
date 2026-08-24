@@ -80,12 +80,6 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/tela-fluxo-ver.ts:122",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :122 — \"considerar_ret\" está em :132; \"ret_pct\" está em :132. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/formulas.md",
     endereco: "frontend/exportar.ts:10",
     motivo:
       "VENCIDO PELO MERGE DA MAIN, e nao por este PR — nada em ±3 linhas de :10 — \"fmtR$\" está em :16. Este endereco estava CERTO na base 0cc2cf86 e quebrou quando a branch trouxe a main de 2026-08-24: e a demonstracao ao vivo da classe que o guard existe para pegar. Conserto e documentacao de PRODUTO e sai em PR separado (regras R1 e R3).",
