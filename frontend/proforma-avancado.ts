@@ -98,7 +98,14 @@ export interface LinhaProformaAv {
   valor: number;
   /** 0 = subtotal/resultado (destacado); 1 = item detalhado. */
   nivel: 0 | 1;
-  tipo: 'receita' | 'custo' | 'resultado';
+  /**
+   * #447: `'informativo'` é uma linha que a TELA soma de fora (nunca dentro
+   * de `resultado`/`investimentoTotal`) — hoje só a leitura do serviço da
+   * dívida do funding, montada em `tela-fluxo-ver.ts` porque esta função não
+   * recebe `funding` (arity travada em teste, #426). Quem renderiza a lista
+   * trata este tipo separado de `'custo'` para não somá-lo por engano.
+   */
+  tipo: 'receita' | 'custo' | 'resultado' | 'informativo';
 }
 
 export interface ProformaAvancado {
@@ -124,6 +131,42 @@ export interface ProformaAvancado {
 }
 
 const soma = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
+
+/**
+ * #447: override LOCAL de rótulo, só para esta proforma — nunca edite
+ * `GRUPO_CUSTO_LABEL` (`fluxo-tabela.ts:25`) para "consertar" isto, porque
+ * esse mapa é compartilhado pela aba Fluxo de Caixa (`fluxo-tabela.ts`) e
+ * pelo Resumo (`tela-resumo.ts`), e uma edição ali renomeia as duas.
+ *
+ * Aqui, e só aqui, "Custos Financeiros" ganha o parêntese porque esta
+ * proforma é DESALAVANCADA (ver o cabeçalho do arquivo): o grupo vale
+ * EXATAMENTE as linhas de custo que o usuário classificou como financeiras,
+ * nunca o serviço da dívida do funding — que na aba Fluxo de Caixa está
+ * incluído no mesmo rótulo, sem parêntese. Duas grandezas, dois rótulos.
+ */
+const ROTULO_PROFORMA: Partial<Record<string, string>> = {
+  financeiro: 'Custos Financeiros (exclui serviço da dívida)',
+};
+
+/**
+ * #447: linha do rodapé que avisa sobre o serviço da dívida do funding —
+ * informativa, NUNCA somada em `resultado`/`investimentoTotal`. Existe fora
+ * de `proformaAvancado` porque a função não recebe `funding` (arity travada
+ * em teste pela #426); quem monta esta linha é a TELA
+ * (`tela-fluxo-ver.ts`, que ainda tem `this.funding`) e a acrescenta ao final
+ * de `p.linhas` antes de renderizar. `total` é `Σ funding.linhasSaida` — o
+ * MESMO total que a aba Fluxo de Caixa soma dentro do subtotal do grupo
+ * `financeiro` (`fluxo-tabela.ts`); aqui ele só é EXIBIDO, nunca somado.
+ */
+export function linhaInformativaFunding(totalSaidasFunding: number): LinhaProformaAv | null {
+  if (Math.abs(totalSaidasFunding) < 0.005) return null;
+  return {
+    nome: 'Serviço da dívida do funding (informativo — efeito do funding: ver a aba Fluxo de Caixa)',
+    valor: -totalSaidasFunding,
+    nivel: 1,
+    tipo: 'informativo',
+  };
+}
 
 /**
  * Monta a proforma econômica do Avançado — sempre DESALAVANCADA.
@@ -164,7 +207,7 @@ export function proformaAvancado(
     const temLinha = linhasDoGrupo(g).length > 0;
     if (!temLinha) continue;
     custoDireto += total;
-    linhas.push({ nome: `(-) ${GRUPO_CUSTO_LABEL[g]}`, valor: -total, nivel: 1, tipo: 'custo' });
+    linhas.push({ nome: `(-) ${ROTULO_PROFORMA[g] ?? GRUPO_CUSTO_LABEL[g]}`, valor: -total, nivel: 1, tipo: 'custo' });
   }
   linhas.push({ nome: '= Custo direto total', valor: -custoDireto, nivel: 0, tipo: 'custo' });
 

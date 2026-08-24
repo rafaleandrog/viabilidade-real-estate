@@ -5,7 +5,7 @@ import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
-import { proformaAvancado } from './proforma-avancado.js';
+import { proformaAvancado, linhaInformativaFunding } from './proforma-avancado.js';
 import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { graficoFluxoMensal, graficoFluxoAcumulado, seriesEconomicasFluxo } from './fluxo-graficos.js';
 import {
@@ -88,6 +88,12 @@ export class ViabFluxoVer extends LitElement {
     table.proforma tr.n1 td:first-child { padding-left: 26px; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
     table.proforma tr.n0 td { font-weight: 700; border-top: 1px solid var(--cor-borda, rgba(255,255,255,0.14)); }
     table.proforma tr.resultado td { border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2)); }
+    /* #447: linha informativa do funding — nunca somada, por isso o itálico
+       e a borda tracejada (não é uma linha da hierarquia de totais acima). */
+    table.proforma tr.informativo td {
+      font-style: italic; color: var(--cor-texto-sec, rgba(255,255,255,0.55));
+      border-top: 1px dashed var(--cor-borda-sutil, rgba(255,255,255,0.14));
+    }
   `];
 
   updated() {
@@ -231,10 +237,20 @@ export class ViabFluxoVer extends LitElement {
    * custo. `this.funding` continua servindo à tabela do fluxo e aos KPIs da
    * aba Análise Financeira, que são outra leitura. Ver a nota do topo de
    * `proforma-avancado.ts`.
+   *
+   * #447: a linha informativa do serviço da dívida é montada AQUI — não
+   * dentro de `proformaAvancado` — e só por isso `this.funding` (que a
+   * função não recebe) chega até ela. `linhaInformativaFunding` devolve
+   * `null` sem funding ou sem saída, e o `.filter` a tira da lista.
    */
   private _renderProforma(c: FluxoCalc): TemplateResult {
     const area = areaPrivativaTotalLinhas(this.dados?.receitas ?? []);
     const p = proformaAvancado(c, area);
+    const totalSaidasFunding = this.funding
+      ? this.funding.linhasSaida.reduce((s, l) => s + l.total, 0)
+      : 0;
+    const informativa = linhaInformativaFunding(totalSaidasFunding);
+    const linhas = informativa ? [...p.linhas, informativa] : p.linhas;
     const porM2 = (v: number) => (p.areaPrivativa > 0 ? v / p.areaPrivativa : 0);
     const pctVgv = (v: number) => (p.vgv > 0 ? (v / p.vgv) * 100 : 0);
     return html`
@@ -244,7 +260,7 @@ export class ViabFluxoVer extends LitElement {
             <tr><th>Linha</th><th class="num">R$</th><th class="num">R$/m²</th><th class="num">% VGV</th></tr>
           </thead>
           <tbody>
-            ${p.linhas.map((l) => html`
+            ${linhas.map((l) => html`
               <tr class=${`n${l.nivel} ${l.tipo}`}>
                 <td>${l.nome}</td>
                 <td class="num">${fmtR$(l.valor)}</td>

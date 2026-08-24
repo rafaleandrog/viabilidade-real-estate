@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { periodosAnuais } from './fluxo-shared.js';
 import { linhasFluxo } from './exportar.js';
-import { chavesColapso } from './fluxo-tabela.js';
+import { chavesColapso, GRUPO_CUSTO_LABEL } from './fluxo-tabela.js';
 import { seriesEconomicasFluxo } from './fluxo-graficos.js';
 import { fundingDoEstudo, type OperacaoFunding } from './funding-motor.js';
-import { proformaAvancado } from './proforma-avancado.js';
+import { proformaAvancado, linhaInformativaFunding } from './proforma-avancado.js';
 
 const CRONO = [
   { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6 },
@@ -304,12 +304,13 @@ test('#426 proforma do Avançado é DESALAVANCADA (D14)', () => {
   assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01,
     `Resultado ${p.resultado} != Σ fluxoMensal ${soma(c.fluxoMensal)}`);
 
-  // 2. "(-) Custos Financeiros" vale EXATAMENTE as linhas de custo que o
-  //    usuário classificou no grupo `financeiro` — nunca o serviço da dívida;
+  // 2. "(-) Custos Financeiros (exclui serviço da dívida)" vale EXATAMENTE as
+  //    linhas de custo que o usuário classificou no grupo `financeiro` —
+  //    nunca o serviço da dívida (#447: rótulo desambiguado da proforma).
   const custoFinanceiroProprio = c.linhasCusto
     .filter((x) => x.grupo === 'financeiro')
     .reduce((s, x) => s + x.total, 0);
-  const linhaFinanceira = p.linhas.find((l) => l.nome === '(-) Custos Financeiros')!;
+  const linhaFinanceira = p.linhas.find((l) => l.nome.startsWith('(-) Custos Financeiros'))!;
   assert.ok(linhaFinanceira, 'a fixture tem linha no grupo financeiro; a proforma precisa mostrá-la');
   assert.ok(Math.abs(-linhaFinanceira.valor - custoFinanceiroProprio) <= 0.01,
     'Custos Financeiros da proforma tem que ser só o custo próprio do estudo');
@@ -319,6 +320,91 @@ test('#426 proforma do Avançado é DESALAVANCADA (D14)', () => {
   // 3. o investimento total reconcilia com o custo do motor.
   assert.ok(Math.abs(p.investimentoTotal - soma(c.custoMensal)) <= 0.01,
     `investimentoTotal ${p.investimentoTotal} != Σ custoMensal ${soma(c.custoMensal)}`);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #447 — desambiguação do rótulo "Custos Financeiros" na proforma, sem
+// vazar para o mapa compartilhado `GRUPO_CUSTO_LABEL` (aba Fluxo + Resumo).
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#447 a proforma rotula o grupo diferente da aba Fluxo, sem editar o mapa compartilhado', () => {
+  const c = calcularFluxo(CONFIG_COMPLETA);
+  const p = proformaAvancado(c, 1000);
+  const linhaFinanceira = p.linhas.find((l) => l.nome.startsWith('(-) Custos Financeiros'))!;
+
+  // O rótulo da proforma NÃO é o do mapa compartilhado, e cita a exclusão.
+  assert.notEqual(linhaFinanceira.nome, '(-) Custos Financeiros');
+  assert.ok(linhaFinanceira.nome.includes('exclui serviço da dívida'),
+    `rótulo "${linhaFinanceira.nome}" precisa declarar a exclusão`);
+
+  // Teste de NÃO-VAZAMENTO: `GRUPO_CUSTO_LABEL.financeiro` — consumido pela
+  // aba Fluxo (`fluxo-tabela.ts:599`) e pelo Resumo (`tela-resumo.ts:220`) —
+  // continua EXATAMENTE 'Custos Financeiros'. Sem este teste, editar o mapa
+  // compartilhado (em vez do override local) passaria nos critérios acima e
+  // renomearia as outras duas telas por engano.
+  assert.equal(GRUPO_CUSTO_LABEL.financeiro, 'Custos Financeiros');
+
+  // E a exportação da aba Fluxo de Caixa (`linhasFluxo`, `exportar.ts`) — que
+  // é outra superfície, de CAIXA, e não deve mudar — continua com o rótulo
+  // sem parêntese.
+  const linhasExportadas = linhasFluxo(c);
+  assert.ok(linhasExportadas.some((l) => l.nome === 'Custos Financeiros'),
+    'a exportação do Fluxo de Caixa não pode herdar o rótulo da proforma');
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #447 — linha informativa do funding no rodapé da proforma: mostra o
+// serviço da dívida sem somá-lo em nenhum total.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Igual a `CONFIG_COMPLETA`, mas SEM linha de custo própria no grupo `financeiro`. */
+const CONFIG_SEM_FINANCEIRO_PROPRIO: FluxoConfig = {
+  ...CONFIG_COMPLETA,
+  linhasCusto: CONFIG_COMPLETA.linhasCusto.filter((l) => l.grupo !== 'financeiro'),
+};
+
+test('#447 linha informativa do funding aparece sem linha de custo financeira própria, e não soma no Resultado', () => {
+  const c = calcularFluxo(CONFIG_SEM_FINANCEIRO_PROPRIO);
+  const fin: OperacaoFunding = {
+    tipo: 'divida', nome: 'Fin produção', valor: 5_000_000, inicio_mes: 0,
+    taxa_anual: 12, periodo_amortizacao_meses: 36, periodo_carencia_meses: 6,
+  };
+  const fundingCalc = fundingDoEstudo(
+    [fin], c.fluxoMensal, new Array(c.prazo).fill(0), 0, 0, CONFIG_SEM_FINANCEIRO_PROPRIO.taxaDescontoAa,
+  );
+  const funding = fundingCalc!.noFluxo;
+  const totalSaidas = funding.linhasSaida.reduce((s, l) => s + l.total, 0);
+  assert.ok(totalSaidas > 0, 'a fixture precisa gerar serviço de dívida, senão o teste não prova nada');
+
+  // Na proforma: sem linha de custo própria no grupo, "(-) Custos Financeiros…"
+  // não aparece — o grupo só existe aqui através da linha informativa.
+  const p = proformaAvancado(c, 1000);
+  assert.equal(p.linhas.find((l) => l.nome.startsWith('(-) Custos Financeiros')), undefined);
+
+  const informativa = linhaInformativaFunding(totalSaidas);
+  assert.ok(informativa, 'com serviço de dívida > 0, a linha informativa tem que existir');
+  assert.equal(informativa!.tipo, 'informativo');
+  assert.ok(informativa!.nome.includes('efeito do funding'));
+  assert.ok(informativa!.nome.toLowerCase().includes('fluxo de caixa'));
+  assert.ok(Math.abs(informativa!.valor - -totalSaidas) <= 0.01);
+
+  // A invariante da #426 não muda com a linha presente: `resultado` é campo
+  // próprio de `ProformaAvancado`, nunca recomputado a partir de `linhas`.
+  assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01,
+    `Resultado ${p.resultado} != Σ fluxoMensal ${soma(c.fluxoMensal)}`);
+
+  // Na aba Fluxo de Caixa (outra superfície, de CAIXA), o mesmo funding
+  // aparece DENTRO do subtotal "Custos Financeiros" — conteúdo declaradamente
+  // diferente do da proforma (lá é exibido, nunca somado; aqui é somado).
+  const linhasFx = linhasFluxo(c, funding);
+  const financeiroFx = linhasFx.find((l) => l.nome === 'Custos Financeiros')!;
+  assert.ok(financeiroFx, 'sem linha própria, o grupo só existe na aba Fluxo por causa do funding');
+  assert.ok(Math.abs(financeiroFx.total - totalSaidas) <= 0.01);
+});
+
+test('#447 sem funding (ou sem serviço de dívida), a linha informativa não existe', () => {
+  assert.equal(linhaInformativaFunding(0), null);
+  assert.equal(linhaInformativaFunding(0.001), null);
 });
 
 test('#426 a assinatura de `proformaAvancado` não aceita funding — trava de volta', () => {
