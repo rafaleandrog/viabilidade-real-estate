@@ -8,3 +8,8 @@ frontend/index.js
 # logs e temporários
 *.log
 .DS_Store
+
+# corpo de PR: rascunho que o passo 4 do processo obrigatorio manda escrever num
+# arquivo e passar ao `preflight-pr.mjs` antes de abrir o PR. Depois de aberto, o
+# texto vive no GitHub — o arquivo e descartavel e NAO entra no repositorio.
+CORPO-PR.md
