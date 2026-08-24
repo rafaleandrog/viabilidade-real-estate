@@ -89,7 +89,11 @@ export function impostoPercentualEditavel(_nivel: string): boolean {
 }
 
 const CAMPOS_NUM: string[] = [
-  'taxa_desconto_aa',
+  // #450 (D-Q08, 2026-08-22): os 5 `aliquota_*_pct` saíram daqui — inertes,
+  // sem consumidor. Não reintroduzir; ver o bloco de comentário no topo do
+  // arquivo. `juros_tabela_aa_padrao` é campo NOVO da #477, sem relação com
+  // aquela remoção.
+  'taxa_desconto_aa', 'juros_tabela_aa_padrao',
   'imposto_percentual',
 ];
 const NUM = new Set(CAMPOS_NUM);
@@ -174,6 +178,22 @@ export class ViabTelaFinanceiro extends LitElement {
         <div class="grid">
           ${visiveis.includes('taxa_desconto_aa')
             ? this._n('taxa_desconto_aa', 'Taxa de desconto p/ VP', '% a.a.', dis) : nothing}
+        </div>
+      </urbi-card>
+
+      <urbi-card titulo="Regime comercial das linhas de receita">
+        <!-- #477: cada linha de receita (Grupo, em Receitas) já é a unidade de
+             regime comercial — tem sua própria absorção, plano de pagamento e
+             juros de tabela. Este default só se aplica a linhas NOVAS, na
+             criação; nunca sobrescreve uma linha já gravada. -->
+        <p class="dica">
+          Cada linha de receita (Grupo, na aba Receitas) tem seu próprio regime — absorção, plano de
+          pagamento e juros de tabela. Para dois regimes diferentes (ex.: Residencial × Não
+          residencial), crie duas linhas. O valor abaixo é só o <strong>default de linhas novas</strong>
+          — editá-lo não muda nenhuma linha já criada.
+        </p>
+        <div class="grid">
+          ${this._n('juros_tabela_aa_padrao', 'Juros de tabela padrão (linhas novas)', '% a.a.', dis)}
         </div>
       </urbi-card>
 

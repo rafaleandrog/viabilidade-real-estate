@@ -276,7 +276,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/fluxo-caixa-motor.ts:2125-2133` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
 | `frontend/tela-proforma.ts:313` — `_fmtContabil`, a coluna R$ da Proforma | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
-| `frontend/tela-fluxo-receitas.ts:416,417` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
+| `frontend/tela-fluxo-receitas.ts:428,429` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
 
 > 🟡 **O motor não é integralmente conforme ao C7, e marcar a linha inteira ✅ escondia isso.** As
 > **séries mensais** passam por `round2` a cada depósito. Mas quatro **agregados escalares** saem do

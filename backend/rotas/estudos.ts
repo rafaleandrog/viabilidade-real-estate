@@ -25,7 +25,7 @@ const STATUS = ['rascunho', 'em_analise', 'aprovado', 'reprovado', 'arquivado'];
 // payload, disparando a validação numérica do shell. Filtrá-los no PATCH elimina
 // o erro "Campo X deve ser um número" ao salvar Premissas de um Preliminar.
 const CAMPOS_SOMENTE_AVANCADO = new Set([
-  'taxa_desconto_aa',
+  'taxa_desconto_aa', 'juros_tabela_aa_padrao',
   'estrutura_capital_proprio_pct', 'estrutura_financiamento_pct',
   'estrutura_investidores_pct', 'taxa_juros_valor_futuro_aa',
   'tarifas_bancarias_pct', 'taxa_adm_carteira_pct',

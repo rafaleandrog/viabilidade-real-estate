@@ -706,6 +706,7 @@ function fundingBase(saldoBanco: number[], entradas: number[], saidas: number[])
       operacao: OP_BANCO, entradas, saidas,
       fluxoInvestidor: saidas.map((v, t) => v - entradas[t]),
       juros: saldoBanco.map(() => 0), saldo: saldoBanco,
+      tarifas: saldoBanco.map(() => 0),
     }],
     noFluxo: {
       entradas, saidas, linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
@@ -742,7 +743,7 @@ test('#445 validarFunding: equity ganha diagnóstico próprio — (a) retorno ne
     operacoes: [{
       operacao: { tipo: 'equity', nome: 'Investidor', valor: 0, inicio_mes: 0, pct_retorno: 5 },
       entradas: [0, 0], saidas: [-10, 50], fluxoInvestidor: [10, 50],
-      juros: [0, 0], saldo: [0, 0],
+      juros: [0, 0], saldo: [0, 0], tarifas: [0, 0],
     }],
     noFluxo: {
       entradas: [0, 0], saidas: [-10, 50], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
@@ -766,7 +767,7 @@ test('#445 validarFunding: equity SAUDÁVEL (aportou, retorno positivo) produz Z
     operacoes: [{
       operacao: { tipo: 'equity', nome: 'Investidor', valor: 1000, inicio_mes: 0, pct_retorno: 5 },
       entradas: [1000, 0], saidas: [0, 50], fluxoInvestidor: [-1000, 50],
-      juros: [0, 0], saldo: [0, 0],
+      juros: [0, 0], saldo: [0, 0], tarifas: [0, 0],
     }],
     noFluxo: {
       entradas: [1000, 0], saidas: [0, 50], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
@@ -777,13 +778,13 @@ test('#445 validarFunding: equity SAUDÁVEL (aportou, retorno positivo) produz Z
 });
 
 test('#445 validarFunding: (a) modo resultado_final com resultadoFinal negativo produz retorno negativo', () => {
-  // funding-motor.ts:489 — `saidas[t] = t === mesRepasseValor ? round2(resultadoFinal * pct) : 0`,
-  // sem clamp; um `resultadoFinal` negativo vira retorno negativo diretamente.
+  // funding-motor.ts:564 — `saidas[t] = round2(resultadoFinal * pct)`, sem
+  // clamp; um `resultadoFinal` negativo vira retorno negativo diretamente.
   const equity: FundingCalc = {
     operacoes: [{
       operacao: { tipo: 'equity', nome: 'Investidor', valor: 1000, inicio_mes: 0, pct_retorno: 5, modo_retorno: 'resultado_final' },
       entradas: [1000, 0], saidas: [0, -500], fluxoInvestidor: [-1000, -500],
-      juros: [0, 0], saldo: [0, 0],
+      juros: [0, 0], saldo: [0, 0], tarifas: [0, 0],
     }],
     noFluxo: {
       entradas: [1000, 0], saidas: [0, -500], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
@@ -804,7 +805,7 @@ test('#445 validarFunding: (a) modo progressivo (permuta_financeira) também é 
     operacoes: [{
       operacao: { tipo: 'equity', nome: 'Investidor', valor: 1000, inicio_mes: 0, pct_retorno: 5, modo_retorno: 'permuta_financeira' },
       entradas: [1000, 0], saidas: [-20, 50], fluxoInvestidor: [980, 50],
-      juros: [0, 0], saldo: [0, 0],
+      juros: [0, 0], saldo: [0, 0], tarifas: [0, 0],
     }],
     noFluxo: {
       entradas: [1000, 0], saidas: [-20, 50], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
@@ -820,7 +821,7 @@ test('#445 validarFunding: dívida com saldo TODO ZERO (nunca desembolsou) conti
     operacoes: [{
       operacao: { tipo: 'divida', nome: 'Linha sem saque', valor: 0, inicio_mes: 0 },
       entradas: [0, 0], saidas: [0, 0], fluxoInvestidor: [0, 0],
-      juros: [0, 0], saldo: [0, 0],
+      juros: [0, 0], saldo: [0, 0], tarifas: [0, 0],
     }],
     noFluxo: {
       entradas: [0, 0], saidas: [0, 0], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
@@ -832,13 +833,13 @@ test('#445 validarFunding: dívida com saldo TODO ZERO (nunca desembolsou) conti
 
 const opEquitySoma = (nome: string, pctRetorno: number, saidaMes0: number, modoRetorno?: 'permuta_financeira' | 'resultado_final') => ({
   operacao: { tipo: 'equity' as const, nome, valor: 1, inicio_mes: 0, pct_retorno: pctRetorno, modo_retorno: modoRetorno },
-  entradas: [0], saidas: [saidaMes0], fluxoInvestidor: [saidaMes0], juros: [0], saldo: [0],
+  entradas: [0], saidas: [saidaMes0], fluxoInvestidor: [saidaMes0], juros: [0], saldo: [0], tarifas: [0],
 });
 
 test('#445 validarFunding (b): Σ retorno de equity (permuta_financeira) EXCEDE a receita líquida do mês — R$ 120.000 > R$ 100.000, um só alerta', () => {
   const calc: FundingCalc = {
     // "A" sem `modo_retorno` — prova que o default `permuta_financeira`
-    // (funding-motor.ts:437) foi aplicado: se não fosse, só "B" (50.000)
+    // (funding-motor.ts:512) foi aplicado: se não fosse, só "B" (50.000)
     // entraria na soma e 50.000 ≤ 100.000 não dispararia nada.
     operacoes: [opEquitySoma('A', 70, 70_000), opEquitySoma('B', 50, 50_000, 'permuta_financeira')],
     noFluxo: {
@@ -895,7 +896,7 @@ test('#445 validarFunding (c): { valor: 0, pct_retorno: 5 } acusa EQUITY_SEM_APO
   const semAporte: FundingCalc = {
     operacoes: [{
       operacao: { tipo: 'equity', nome: 'X', valor: 0, inicio_mes: 0, pct_retorno: 5 },
-      entradas: [0], saidas: [0], fluxoInvestidor: [0], juros: [0], saldo: [0],
+      entradas: [0], saidas: [0], fluxoInvestidor: [0], juros: [0], saldo: [0], tarifas: [0],
     }],
     noFluxo: {
       entradas: [0], saidas: [0], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
@@ -908,7 +909,7 @@ test('#445 validarFunding (c): { valor: 0, pct_retorno: 5 } acusa EQUITY_SEM_APO
   const comAporte: FundingCalc = {
     operacoes: [{
       operacao: { tipo: 'equity', nome: 'X', valor: 1000, inicio_mes: 0, pct_retorno: 5 },
-      entradas: [1000], saidas: [0], fluxoInvestidor: [-1000], juros: [0], saldo: [0],
+      entradas: [1000], saidas: [0], fluxoInvestidor: [-1000], juros: [0], saldo: [0], tarifas: [0],
     }],
     noFluxo: {
       entradas: [1000], saidas: [0], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],

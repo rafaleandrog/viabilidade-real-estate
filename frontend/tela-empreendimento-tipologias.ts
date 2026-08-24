@@ -55,12 +55,35 @@ export class ViabEmpreendimentoTipologias extends LitElement {
       width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums;
       table-layout: fixed;
     }
+    /* #489 (Problema 2): o cabecalho QUEBRA em vez de ser cortado.
+       Antes, "overflow: hidden" aqui, somado ao "table-layout: fixed" da
+       .tip, recortava o rotulo em silencio — e "Dormitorios" e palavra
+       unica de 11 caracteres, que nao quebra sozinha em coluna de 7ch.
+       E a opcao (b) da issue, a recomendada: preserva o pedido do autor
+       (colunas estreitas, dimensionadas por digitos) sem inventar
+       abreviacao e sem alargar a coluna de volta.
+
+       Por que esta e a saida que NAO depende de medir fonte: ela nao
+       verifica se o rotulo cabe — ela REMOVE o mecanismo que cortava. Sem
+       "overflow: hidden" no th nao existe recorte a medir, em nenhuma das
+       duas familias de fonte do tema (Montserrat, Chakra Petch) nem em
+       nenhum dos quatro temas. O td MANTEM o recorte, porque ali o
+       conteudo e numerico e de largura previsivel.
+
+       "overflow-wrap: anywhere" (e nao "break-word") e o que permite
+       quebrar DENTRO de "Dormitorios": break-word so quebra palavra longa
+       depois de tentar caber na linha.
+
+       ATENCAO a quem editar este comentario: ele esta DENTRO de um
+       template literal css e uma CRASE aqui encerra o template. Nao use
+       crase para citar propriedade CSS neste bloco — use aspas. */
     table.tip th {
       text-align: left; font-weight: 600; padding: 8px 8px;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5));
       font-size: var(--texto-rotulo, 0.75rem);
       border-bottom: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
-      overflow: hidden;
+      white-space: normal; overflow-wrap: anywhere;
+      vertical-align: bottom;
     }
     table.tip th.num, table.tip td.num { text-align: right; }
     table.tip td {

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   simularDivida, simularEquity, simularFinanciamentoProducao, indicadoresOperacao, fundingDoEstudo,
-  agregarFundingPorPeriodos, taxaMensalEquivalente, pmtPrice, tirAnual,
+  agregarFundingPorPeriodos, taxaMensalEquivalente, pmtPrice, tirAnual, riscoTarifaDuplicada,
   receitaLiquidaComCorretagemMensal,
   type OperacaoFunding,
 } from './funding-motor.js';
@@ -97,6 +97,107 @@ test('#355 dívida: Σ PMT − Σ liberado = Σ juros (conservação)', () => {
   const liberado = s.entradas.reduce((a, b) => a + b, 0);
   const juros = s.juros.reduce((a, b) => a + b, 0);
   assert.ok(Math.abs((pago - liberado) - juros) < 0.5, `${pago - liberado} vs ${juros}`);
+});
+
+// ── #478: tarifas/estruturação/encargos das operações de dívida ──────────
+
+test('#478 default (tarifa 0 nas três): saidas idênticas a antes, tarifas toda zero', () => {
+  // DIVIDA_GOLDEN não seta os três campos novos — é o caso real de toda
+  // operação existente hoje (undefined → 0 via `n()`).
+  const s = simularDivida(DIVIDA_GOLDEN, PRAZO_DIVIDA);
+  assert.ok(s.tarifas.every((v) => v === 0), 'tarifas deve ser série zerada quando os 3 campos são omitidos');
+  // O teste de conservação original (Σ PMT − Σ liberado = Σ juros) continua
+  // valendo dígito a dígito — é a prova de que esta issue não muda nenhum
+  // estudo existente.
+  const pago = s.saidas.reduce((a, b) => a + b, 0);
+  const liberado = s.entradas.reduce((a, b) => a + b, 0);
+  const juros = s.juros.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs((pago - liberado) - juros) < 0.5, `${pago - liberado} vs ${juros}`);
+});
+
+test('#478 conservação estendida: Σ saidas − Σ entradas = Σ juros + Σ tarifas', () => {
+  const op: OperacaoFunding = {
+    ...DIVIDA_GOLDEN,
+    taxa_estruturacao_pct: 2,          // 2% de 10M = 200.000, no mês 0
+    taxa_administracao_mensal: 1_000,  // R$ 1.000/mês enquanto houver saldo
+    outros_encargos_iniciais: 5_000,   // R$ 5.000, no mês 0
+  };
+  const s = simularDivida(op, PRAZO_DIVIDA);
+  const saidas = s.saidas.reduce((a, b) => a + b, 0);
+  const entradas = s.entradas.reduce((a, b) => a + b, 0);
+  const juros = s.juros.reduce((a, b) => a + b, 0);
+  const tarifas = s.tarifas.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs((saidas - entradas) - (juros + tarifas)) < 0.5,
+    `${saidas - entradas} vs ${juros + tarifas}`);
+
+  // Estruturação (200.000) + encargo inicial (5.000) + administração do mês
+  // (1.000, já há saldo pela 1ª tranche liberada) no mês 0.
+  assert.ok(Math.abs(s.tarifas[0] - 206_000) < 0.01, `tarifa do mês 0: ${s.tarifas[0]}`);
+});
+
+test('#478 tarifa de administração cobra todo mês com saldo devedor, nada antes nem depois', () => {
+  const op: OperacaoFunding = { ...DIVIDA_GOLDEN, taxa_administracao_mensal: 1_000 };
+  const s = simularDivida(op, PRAZO_DIVIDA);
+  // Mês 0: primeira tranche libera, já há saldo (devido > 0) → cobra.
+  assert.ok(s.tarifas[0] > 0, 'mês 0 já tem saldo (1ª tranche liberada) — deve cobrar');
+  // fim = ini(3) - 1 + 36 = 38: último mês com saldo devedor.
+  assert.ok(s.tarifas[38] >= 1_000 - 0.01, 'mês da quitação ainda tem saldo antes do PMT — deve cobrar');
+  // Depois da quitação, sem saldo — não cobra mais.
+  assert.equal(s.tarifas[39], 0, 'depois de quitado não há mais saldo — não cobra');
+  assert.equal(s.tarifas[45], 0);
+});
+
+test('#478 tarifa NUNCA entra no saldo devedor (mutação: somá-la ao saldo derruba este teste)', () => {
+  const semTarifa = simularDivida(DIVIDA_GOLDEN, PRAZO_DIVIDA);
+  const comTarifa = simularDivida({
+    ...DIVIDA_GOLDEN,
+    taxa_estruturacao_pct: 5, taxa_administracao_mensal: 2_000, outros_encargos_iniciais: 50_000,
+  }, PRAZO_DIVIDA);
+  // O SALDO é idêntico com ou sem tarifa — ela não é principal, não capitaliza.
+  for (let t = 0; t < PRAZO_DIVIDA; t++) {
+    assert.ok(Math.abs(semTarifa.saldo[t] - comTarifa.saldo[t]) < 0.01,
+      `saldo diverge no mês ${t}: ${semTarifa.saldo[t]} vs ${comTarifa.saldo[t]}`);
+  }
+  // Mas SAIDAS diverge — a tarifa está lá, só não no saldo.
+  const totalSemTarifa = semTarifa.saidas.reduce((a, b) => a + b, 0);
+  const totalComTarifa = comTarifa.saidas.reduce((a, b) => a + b, 0);
+  assert.ok(totalComTarifa > totalSemTarifa + 1000, 'saidas com tarifa tem de ser maior');
+});
+
+test('#478 riscoTarifaDuplicada: só true quando as DUAS representações coexistem', () => {
+  const semNada: OperacaoFunding[] = [DIVIDA_GOLDEN];
+  assert.equal(riscoTarifaDuplicada(semNada, []), false, 'sem tarifa configurada, sem risco');
+
+  const comTarifaSemCusto: OperacaoFunding[] = [{ ...DIVIDA_GOLDEN, taxa_estruturacao_pct: 2 }];
+  assert.equal(riscoTarifaDuplicada(comTarifaSemCusto, []), false, 'tarifa na operação, mas nenhuma linha de custo — sem risco');
+
+  const semTarifaComCusto: OperacaoFunding[] = [DIVIDA_GOLDEN];
+  const custoFinanceiro = [{ grupo: 'financeiro', categoria: 'Taxas bancárias', orcamento_valor: 10_000 }];
+  assert.equal(riscoTarifaDuplicada(semTarifaComCusto, custoFinanceiro), false, 'só a linha de custo, sem tarifa na operação — sem risco');
+
+  const comAsDuas: OperacaoFunding[] = [{ ...DIVIDA_GOLDEN, taxa_administracao_mensal: 500 }];
+  assert.equal(riscoTarifaDuplicada(comAsDuas, custoFinanceiro), true, 'as duas coexistem — risco real');
+
+  // Categoria fora das duas-alvo não conta.
+  const custoOutraCategoria = [{ grupo: 'financeiro', categoria: 'Juros de financiamento', orcamento_valor: 10_000 }];
+  assert.equal(riscoTarifaDuplicada(comAsDuas, custoOutraCategoria), false, 'categoria financeira fora das duas-alvo não conta');
+
+  // Grupo errado não conta, mesmo com a categoria certa (defesa contra colisão de nome).
+  const custoGrupoErrado = [{ grupo: 'diretos', categoria: 'Taxas bancárias', orcamento_valor: 10_000 }];
+  assert.equal(riscoTarifaDuplicada(comAsDuas, custoGrupoErrado), false, 'grupo != financeiro não conta');
+});
+
+test('#478 financiamento_producao e equity não têm tarifa (série zerada, campo sempre presente)', () => {
+  const fp = simularFinanciamentoProducao(
+    { tipo: 'financiamento_producao', nome: 'FP', valor: 0, inicio_mes: 0 },
+    new Array(12).fill(0), null, null, new Array(12).fill(0), 12,
+  );
+  assert.ok(fp.tarifas.every((v) => v === 0));
+  const eq = simularEquity(
+    { tipo: 'equity', nome: 'Investidor', valor: 1_000_000, inicio_mes: 0, modo_retorno: 'resultado_final', pct_retorno: 20 },
+    new Array(12).fill(0), 0, 6, 12,
+  );
+  assert.ok(eq.tarifas.every((v) => v === 0));
 });
 
 test('#355 dívida sem distribuir: libera tudo num mês só e o PMT usa o valor cru', () => {

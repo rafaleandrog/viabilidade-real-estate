@@ -13,7 +13,7 @@ import { dinheiroParaRotulo, mesRepasse, rotuloMesRelativo, type EventoCrono } f
 import {
   fundingDoEstudo, indicadoresOperacao, indicadoresFinanciamentoProducao,
   receitaLiquidaComCorretagemMensal, linhasFinanciaveisPadrao,
-  reordenarCamadas, camadasComOrdemAlterada, eDivida,
+  reordenarCamadas, camadasComOrdemAlterada, eDivida, riscoTarifaDuplicada,
   PADRAO_EXPOSICAO_MINIMA, PADRAO_PERCENTUAL_FINANCIAVEL, PADRAO_AMORTIZAR_COM_CAIXA,
   type FundingCalc, type OperacaoFunding, type TipoOperacao, type SerieOperacao,
 } from './funding-motor.js';
@@ -392,6 +392,20 @@ export class ViabFunding extends LitElement {
         <p class="nota">A carência faz parte do prazo de amortização — a parcela é calculada sobre
           <strong>amortização − carência</strong>. Durante a carência paga-se só os juros.</p>
       </div>
+      <div class="secao">
+        <h4>Tarifas e encargos</h4>
+        <div class="grid">
+          ${this._num(o, 'taxa_estruturacao_pct', 'Estruturação', '%')}
+          ${this._num(o, 'taxa_administracao_mensal', 'Administração', 'R$/mês')}
+          ${this._num(o, 'outros_encargos_iniciais', 'Outros encargos', 'R$')}
+        </div>
+        <p class="nota">
+          Entram em <strong>saídas</strong> — reduzem a TIR do investidor e o fluxo alavancado —,
+          nunca no saldo devedor (não são principal). A estruturação é cobrada uma vez, no mês da
+          1ª liberação; os outros encargos, uma vez, no mês da contratação; a administração,
+          todo mês enquanto houver saldo devedor.
+        </p>
+      </div>
     `;
   }
 
@@ -652,6 +666,18 @@ export class ViabFunding extends LitElement {
         obrigações regulatórias próprias. Antes de usar esta estrutura numa oferta real, submeta-a
         aos responsáveis jurídicos e financeiros.
       </urbi-banner>
+
+      ${riscoTarifaDuplicada(this.operacoes, this.custos) ? html`
+        <!-- #478: mesma classe de defeito do EVI-008 — dedução contada duas
+             vezes. Aviso, não trava: as duas representações (linha de custo
+             do projeto × tarifa da operação) são legítimas isoladamente. -->
+        <urbi-banner variante="alerta" icone="fa-solid fa-triangle-exclamation">
+          Há tarifa configurada numa operação de <strong>Dívida</strong> e, ao mesmo tempo, uma
+          linha de custo em "Taxas bancárias" ou "Estruturação de dívida" no grupo Financeiro.
+          Confira se não é a <strong>mesma</strong> tarifa lançada duas vezes — uma vez como custo
+          do projeto, outra como encargo da operação.
+        </urbi-banner>
+      ` : nothing}
 
       ${this.editavel ? html`
         <div class="barra">
