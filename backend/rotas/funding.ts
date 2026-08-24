@@ -52,6 +52,9 @@ const CAMPOS_OPERACAO = [
   'modo_retorno', 'pct_retorno',
   // ── financiamento_producao (§4.3, planilha `Incorp Individual`) ──
   'exposicao_minima', 'percentual_financiavel', 'amortizar_com_caixa_disponivel', 'custo_linha_ids',
+  // #478: tarifas/estruturação/encargos — só `divida` (motor ignora nas
+  // outras duas). Whitelisted igual às demais: sem isso a tela grava no vazio.
+  'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
 ];
 
 /** Campos numéricos que não fazem sentido negativos. */
@@ -59,10 +62,11 @@ const CAMPOS_NAO_NEGATIVOS = [
   'valor', 'inicio_mes', 'aporte_meses', 'taxa_anual',
   'periodo_amortizacao_meses', 'periodo_carencia_meses', 'pct_retorno',
   'exposicao_minima', 'percentual_financiavel',
+  'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
 ];
 
 /** Campos percentuais que não fazem sentido acima de 100 (%). */
-const CAMPOS_PERCENTUAL_0_100 = ['exposicao_minima', 'percentual_financiavel', 'pct_retorno'];
+const CAMPOS_PERCENTUAL_0_100 = ['exposicao_minima', 'percentual_financiavel', 'pct_retorno', 'taxa_estruturacao_pct'];
 
 /** Default de `modo_retorno` — o mesmo do banco (`schema.json`) e do motor. */
 const MODO_RETORNO_PADRAO = 'permuta_financeira';

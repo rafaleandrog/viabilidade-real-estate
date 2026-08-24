@@ -147,6 +147,18 @@ export interface OperacaoFunding {
   taxa_anual?: number;
   periodo_amortizacao_meses?: number;
   periodo_carencia_meses?: number;
+  // #478: tarifas/estruturação/encargos — só `divida`. Entram em `saidas`
+  // (TIR/fluxo alavancado do investidor), NUNCA no `saldo` (não são
+  // principal). Sem oráculo de planilha para os valores — só a restrição
+  // estrutural (encargo não é nem principal nem juros) vem de
+  // `fluxo-investidor-formulas.md`. Default 0 em todas: nenhum estudo
+  // existente muda de número.
+  /** Percentual (2 = 2%) sobre `valor`, pago uma vez no mês da 1ª liberação. */
+  taxa_estruturacao_pct?: number;
+  /** R$/mês, cobrada enquanto houver saldo devedor > 0. */
+  taxa_administracao_mensal?: number;
+  /** R$, cobrados uma vez no mês da contratação (`inicio_mes`). */
+  outros_encargos_iniciais?: number;
   // ── equity ──
   modo_retorno?: ModoRetorno;
   /** Percentual (4 = 4%). */
@@ -210,12 +222,47 @@ export interface SerieOperacao {
   /** Só dívida — vazios em equity. */
   juros: number[];
   saldo: number[];
+  /**
+   * #478: tarifas/estruturação/encargos, isoladas de `juros` para auditoria —
+   * já estão SOMADAS em `saidas` (não é preciso somar as duas). Só `divida`
+   * preenche; `financiamento_producao` e `equity` devolvem série zerada — a
+   * §4.3 de `funding-capital-stack.md` lista tarifa como fora de escopo do
+   * financiamento à produção, e equity não tem o conceito.
+   */
+  tarifas: number[];
   /** Só `financiamento_producao` — os campos que alimentam o §38 e o §37. */
   diagnostico?: DiagnosticoFinanciamentoProducao;
 }
 
 export function eDivida(tipo: TipoOperacao): boolean {
   return tipo === 'financiamento_producao' || tipo === 'divida';
+}
+
+/**
+ * #478: risco de DUPLA CONTAGEM — a mesma classe de defeito do EVI-008
+ * (corretagem contada duas vezes, corrigida pela #228). `fluxoMensal`
+ * (fluxoAlavancado) soma `fluxoLivreMensal` (que já inclui `custoMensal` do
+ * projeto — toda linha de custo do grupo `financeiro`) com `Σ saidas` das
+ * operações de dívida (que agora inclui as três tarifas). Um estudo que
+ * lance a MESMA tarifa como linha de custo "Taxas bancárias"/"Estruturação
+ * de dívida" **e** preencha as colunas novas de uma operação `divida` paga a
+ * tarifa duas vezes no fluxo alavancado.
+ *
+ * Escolha deste PR: **avisar, não travar** — as duas representações são
+ * legítimas isoladamente (uma é custo do projeto, a outra é encargo da
+ * operação de financiamento), e o app não tem como saber se o usuário
+ * pretendia as duas ou só uma. `true` quando há tarifa configurada em
+ * QUALQUER operação `divida` E QUALQUER linha de custo financeiro nas duas
+ * categorias-alvo tem orçamento não-zero.
+ */
+export function riscoTarifaDuplicada(operacoes: OperacaoFunding[], linhasCusto: any[]): boolean {
+  const temTarifaOperacao = (operacoes ?? []).some((op) => op.tipo === 'divida' && (
+    n(op.taxa_estruturacao_pct) > 0 || n(op.taxa_administracao_mensal) > 0 || n(op.outros_encargos_iniciais) > 0
+  ));
+  if (!temTarifaOperacao) return false;
+  const CATEGORIAS_TARIFA_PROJETO = new Set(['Taxas bancárias', 'Estruturação de dívida']);
+  return (linhasCusto ?? []).some((c) =>
+    c?.grupo === 'financeiro' && CATEGORIAS_TARIFA_PROJETO.has(c?.categoria) && n(c?.orcamento_valor) > 0);
 }
 
 const serieZerada = (prazo: number): number[] => new Array<number>(Math.max(0, prazo)).fill(0);
@@ -239,6 +286,7 @@ export function simularDivida(op: OperacaoFunding, prazo: number): SerieOperacao
   const saidas = serieZerada(prazo);
   const juros = serieZerada(prazo);
   const saldo = serieZerada(prazo);
+  const tarifas = serieZerada(prazo);
 
   const i = taxaMensalEquivalente(n(op.taxa_anual) / 100);
   const distribuir = op.distribuir_aporte === true;
@@ -246,6 +294,13 @@ export function simularDivida(op: OperacaoFunding, prazo: number): SerieOperacao
   const amort = Math.floor(n(op.periodo_amortizacao_meses));
   const carencia = Math.floor(n(op.periodo_carencia_meses));
   const valor = n(op.valor);
+
+  // #478: tarifas — % de estruturação sobre `valor`, taxa de administração
+  // mensal enquanto houver saldo devedor, e encargos iniciais fixos. Default
+  // 0 nos três: nenhum estudo existente muda de número.
+  const taxaEstruturacaoPct = n(op.taxa_estruturacao_pct) / 100;
+  const taxaAdministracaoMensal = n(op.taxa_administracao_mensal);
+  const outrosEncargosIniciais = n(op.outros_encargos_iniciais);
 
   const m0 = Math.max(0, Math.floor(n(op.inicio_mes)));
   const ini = m0 + nTranches;
@@ -274,9 +329,20 @@ export function simularDivida(op: OperacaoFunding, prazo: number): SerieOperacao
     else if (t <= ini + carencia - 1) pmt = Math.min(jurosMes, devido); // carência: só juros
     else pmt = Math.min(parcela, devido);
 
+    // #478: tarifa do mês — estruturação + encargos iniciais uma vez no mês
+    // da contratação (`m0`), administração enquanto houver saldo devedor
+    // (`devido > 0`, o saldo ANTES do pagamento — cobre inclusive o próprio
+    // mês da quitação). NUNCA entra no saldo: `saldo[t]` abaixo continua
+    // `devido − pmt`, sem o termo de tarifa.
+    let tarifaMes = 0;
+    if (t === m0) tarifaMes += round2(taxaEstruturacaoPct * valor) + round2(outrosEncargosIniciais);
+    if (devido > 0.005) tarifaMes += taxaAdministracaoMensal;
+    tarifaMes = round2(tarifaMes);
+
     entradas[t] = round2(libera);
-    saidas[t] = round2(pmt);
+    saidas[t] = round2(pmt + tarifaMes);
     juros[t] = round2(jurosMes);
+    tarifas[t] = tarifaMes;
     saldo[t] = Math.max(0, round2(devido - pmt));
     saldoAnt = saldo[t];
   }
@@ -288,6 +354,7 @@ export function simularDivida(op: OperacaoFunding, prazo: number): SerieOperacao
     fluxoInvestidor: saidas.map((v, t) => round2(v - entradas[t])),
     juros,
     saldo,
+    tarifas,
   };
 }
 
@@ -402,6 +469,10 @@ export function simularFinanciamentoProducao(
     fluxoInvestidor: saidas.map((v, t) => round2(v - entradas[t])),
     juros,
     saldo,
+    // #478: tarifa é conceito exclusivo de `divida` — a §4.3 (vigente) de
+    // funding-capital-stack.md lista taxas de contratação como fora de
+    // escopo do financiamento à produção; série zerada aqui.
+    tarifas: serieZerada(prazo),
     diagnostico: {
       custoElegivel, custoElegivelAcumulado, percentualIncorrido,
       liberacaoHabilitada, alvoAcumulado, liberacaoAcumulada, caixaDisponivelAmortizacao,
@@ -484,6 +555,8 @@ export function simularEquity(
     fluxoInvestidor: saidas.map((v, t) => round2(v - entradas[t])),
     juros: serieZerada(prazo),
     saldo: serieZerada(prazo),
+    // #478: tarifa é conceito exclusivo de `divida` — equity não tem.
+    tarifas: serieZerada(prazo),
   };
 }
 

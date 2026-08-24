@@ -550,6 +550,7 @@ function fundingBase(saldoBanco: number[], entradas: number[], saidas: number[])
       operacao: OP_BANCO, entradas, saidas,
       fluxoInvestidor: saidas.map((v, t) => v - entradas[t]),
       juros: saldoBanco.map(() => 0), saldo: saldoBanco,
+      tarifas: saldoBanco.map(() => 0),
     }],
     noFluxo: {
       entradas, saidas, linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
@@ -582,7 +583,7 @@ test('validarFunding: equity (sem saldo) não é checado pela invariante de dív
     operacoes: [{
       operacao: { tipo: 'equity', nome: 'Investidor', valor: 0, inicio_mes: 0 },
       entradas: [100, 0], saidas: [0, 50], fluxoInvestidor: [-100, 50],
-      juros: [0, 0], saldo: [0, 0],
+      juros: [0, 0], saldo: [0, 0], tarifas: [0, 0],
     }],
     noFluxo: {
       entradas: [100, 0], saidas: [0, 50], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
