@@ -764,7 +764,7 @@ export class ViabFluxoCustos extends LitElement {
             const alt = this._permutaAlternativa(c);
             return html`
               <div class="dist-preco">
-                <span class="mes-calc" title="A permuta financeira sai proporcionalmente à receita de caixa do mês — não segue curva nem evento próprio (#238)">
+                <span class="mes-calc" title="A permuta financeira sai proporcionalmente à receita de caixa do mês — não segue curva nem evento próprio">
                   Receita das vendas <span>🔒</span></span>
                 ${ePct ? html`
                   <div class="permuta-flags">

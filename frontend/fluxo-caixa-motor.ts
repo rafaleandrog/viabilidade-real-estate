@@ -59,7 +59,7 @@ type ReservaPermutaFisica = {
   usaFonteNova: boolean;
 };
 
-function chaveTipologiaLinha(linha: any, linhaIndex: number, tipologia: any, tipologiaIndex: number): string {
+export function chaveTipologiaLinha(linha: any, linhaIndex: number, tipologia: any, tipologiaIndex: number): string {
   return `${linha?.id ?? linhaIndex}:${tipologia?.id ?? tipologiaIndex}`;
 }
 
@@ -69,7 +69,7 @@ function chaveTipologiaLinha(linha: any, linhaIndex: number, tipologia: any, tip
  * aparece em vários Grupos; o preço/m² da alocação correspondente é usado só
  * para medir o VGV informativo. Nenhuma parcela desta reserva entra no caixa.
  */
-function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]): ReservaPermutaFisica {
+export function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]): ReservaPermutaFisica {
   const custos = (linhasCusto ?? []).filter(ePermutaFisica);
   const usaFonteNova = custos.length > 0;
   const reservas = new Map<number, number>();
@@ -102,6 +102,26 @@ function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]): Rese
     }
   }
   return { porTipologia, vgv, usaFonteNova };
+}
+
+/**
+ * #444: mesma transformação que `calcularFluxo` aplica às linhas de Receita
+ * antes de calcular (reserva de permuta física escrita em
+ * `unidades_permutadas`), exposta para quem valida fora do motor —
+ * `validarContratacao`/`validarSafrasReceita` em `fluxo-invariantes.ts`
+ * recebem as linhas CRUAS do banco e precisam da mesma fonte de permuta que
+ * o motor usa, senão nunca reconciliam num estudo com permuta física.
+ */
+export function linhasReceitaComPermutaReservada(linhasReceita: any[], linhasCusto: any[]): any[] {
+  const reservas = reservarPermutasFisicas(linhasReceita, linhasCusto);
+  if (!reservas.usaFonteNova) return linhasReceita;
+  return linhasReceita.map((l: any, li: number) => ({
+    ...l,
+    tipologias: (l.tipologias ?? []).map((t: any, ti: number) => ({
+      ...t,
+      unidades_permutadas: reservas.porTipologia.get(chaveTipologiaLinha(l, li, t, ti)) ?? 0,
+    })),
+  }));
 }
 
 export type CurvaPersonalizada = { mes: number; pct: number }[];
@@ -1041,7 +1061,7 @@ export function pagamentosAteMarco(
   if (nParcelas <= 0) {
     throw new Error(
       `pagamentosAteMarco: N_s = ${nParcelas} ≤ 0 na safra ${safra} (marco ${c.marcoMes}). ` +
-      'O motor não cria prazo negativo — converta o componente para imediato ou concentrado (#233).',
+      'O motor não cria prazo negativo — converta o componente para imediato ou concentrado.',
     );
   }
   const out: PagamentoSafra[] = [];
@@ -1085,7 +1105,7 @@ export function pagamentosConcentrado(
   if (c.mesPagamento < safra) {
     throw new Error(
       `pagamentosConcentrado: mês de pagamento ${c.mesPagamento} anterior à safra ${safra}. ` +
-      'O repasse não pode ser antecipado para antes da contratação (#234).',
+      'O repasse não pode ser antecipado para antes da contratação.',
     );
   }
   // #234: saldo_s,s = principal (0 períodos decorridos no próprio mês da
@@ -1346,7 +1366,7 @@ export type ResiduoAteMarco = 'concentrado' | 'imediato';
  * OBRIGATÓRIO de propósito (não tem default aqui): os dois call sites deste
  * módulo precisam decidir explicitamente, e omitir a passagem tem de estourar
  * `TS2554` na compilação, não cair calado num comportamento não pretendido. */
-function componentesIntegradosSafra(
+export function componentesIntegradosSafra(
   componentes: ComponentePagamento[],
   safra: number,
   mesEntrega: number,

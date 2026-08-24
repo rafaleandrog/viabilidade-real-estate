@@ -179,9 +179,9 @@ Duas identidades que o motor mantém:
 fluxo_apos_funding_t = fluxo_livre_projeto_t + entradas_funding_t − saidas_funding_t
 ```
 
-fiscalizada por `validarFunding` (`frontend/fluxo-invariantes.ts:455-466`), que também acusa saldo
-de dívida negativo, dívida que não zera no horizonte e — decisão **D14** — caixa acumulado negativo
-depois do funding (`:468-479`, severidade `alerta`).
+fiscalizada por `validarFunding` (`frontend/fluxo-invariantes.ts:496`), que também acusa saldo
+de dívida negativo, dívida que não zera no horizonte, diagnóstico próprio de equity (#445) e —
+decisão **D14** — caixa acumulado negativo depois do funding (severidade `alerta`).
 
 **Funding nunca integra a Receita Bruta — VGV.** Liberação de dívida e aporte de equity aparecem
 **somente** no bloco de funding; o repasse continua sendo recebimento do cliente, ainda que o caixa
@@ -268,17 +268,17 @@ dízima e retornar exatamente ao mesmo canônico.
 | Ponto | Casas hoje | Conforme? |
 |---|---|---|
 | `frontend/viab-format.ts:11-23` — `fmtR$` (`CASAS_DECIMAIS_MONETARIAS = 2`) | 2 | ✅ |
-| `frontend/exportar.ts:10` — importa `fmtR$`, sem formatador próprio | 2 | ✅ |
-| `frontend/exportar.ts:167` — `celulaFx` (CSV e PDF) | 2 | ✅ corte em R$ 0,005 |
+| `frontend/exportar.ts:16` — importa `fmtR$`, sem formatador próprio | 2 | ✅ |
+| `frontend/exportar.ts:171` — `celulaFx` (CSV e PDF), desde a #449 delega para `celula` de `viab-format.ts` — fonte única com a tela | 2 | ✅ corte em R$ 0,005 |
 | `frontend/tela-financeiro.ts:143` | 2 | ✅ |
 | `frontend/tela-empreendimento-tipologias.ts:178` | 2 (default) | ✅ |
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
 | `frontend/tela-proforma.ts:458` — sensibilidade, via `fmtR$(v, false)` | 2 | ✅ desde a #492 |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
 | `frontend/fluxo-caixa-motor.ts:2125-2133` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
-| **`frontend/fluxo-tabela.ts:34`** — `celula` da tabela do Fluxo | **0** | ❌ formatador próprio: `Math.round`, e célula **vazia** abaixo de R$ 0,50 → #281 |
-| **`frontend/tela-proforma.ts:314`** — `_fmtContabil`, a coluna R$ da Proforma | **0** | ❌ `fmtNum(Math.abs(r.v))` com `d` no default → #281 |
-| **`frontend/tela-fluxo-receitas.ts:382-383`** — `precoUnit` e `precoTotal` | **0** | ❌ mesma causa → #281 |
+| `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
+| `frontend/tela-proforma.ts:313` — `_fmtContabil`, a coluna R$ da Proforma | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
+| `frontend/tela-fluxo-receitas.ts:416,417` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
 
 > 🟡 **O motor não é integralmente conforme ao C7, e marcar a linha inteira ✅ escondia isso.** As
 > **séries mensais** passam por `round2` a cada depósito. Mas quatro **agregados escalares** saem do
@@ -293,17 +293,15 @@ dízima e retornar exatamente ao mesmo canônico.
 > mudança de motor e **não** cabe num PR de documentação — fica registrado aqui como divergência
 > conhecida, não como conformidade.
 
-> ⚠️ **Os endereços do ❌ de `fmtNum` mudaram, e a #482 lista o antigo.** Aquele texto apontava
-> `frontend/tela-proforma.ts:453` (`fmtNum(v, 2)`, tabela de sensibilidade), que **a #492 fechou**
-> (PR 499, 2026-08-23) — a linha hoje é `fmtR$(v, false)` em `:458`. Mas o problema de fundo
-> **continua**, em dois outros lugares: `fmtNum` (`frontend/viab-format.ts:24-25`) declara só
-> `maximumFractionDigits`, e quem o chama **sem** o segundo argumento exibe valor monetário com
-> **zero** casas. É o caso de `_fmtContabil` (a coluna R$ da Proforma inteira) e do preço unitário
-> e total da alocação de receitas.
->
-> Os demais chamadores de `fmtNum` — m², hectare, unidades, percentual — são grandezas **não
-> monetárias**, que por contrato carregam precisão plena e arredondam só para exibir; ficam fora do
-> ❌ de propósito. `_fmtContabilM2` (`tela-proforma.ts:326`) é R$/m², da mesma família.
+> ✅ **Resolvido pela #449 (2026-08-24).** A #492 fechou o primeiro ponto (`fmtNum(v, 2)` da
+> tabela de sensibilidade, `frontend/tela-proforma.ts:458` desde então); o problema de fundo — quem
+> chamava `fmtNum` **sem** o segundo argumento numa posição monetária (`_fmtContabil`, a coluna R$
+> da Proforma inteira; e `precoUnit`/`precoTotal` da alocação de receitas) — a #449 trocou por
+> `fmtR$(v, false)`, que fixa 2 casas sempre (`fmtNum` declara só `maximumFractionDigits`, então
+> "até 2" podia sair "0"). `fmtNum` em si **não mudou de assinatura** — continua servindo m²,
+> hectare, unidades e percentual, grandezas **não monetárias** que carregam precisão plena e
+> arredondam só para exibir; `_fmtContabilM2` (`frontend/tela-proforma.ts:326`, R$/m²) é da mesma
+> família e continua fora do escopo do C7 monetário.
 
 
 
