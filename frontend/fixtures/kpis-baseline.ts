@@ -300,7 +300,26 @@ export const CASOS: CasoBaseline[] = [
       + 'NÃO vigia #432 (equity aqui é `resultado_final`, e o clamp mora no ramo '
       + '`progressivo` — ver caso E) nem #435 (validação de rota, backend puro).',
     config: BASE, operacoes: OPS_C,
-    esperado: { resultado: 3_899_999.94, margemPct: 38.99999963400001, roiPct: 63.93442524590166, tir: 31.018485354972892, caixaFinalAlavancado: 4_137_114.51, vplLiquidoFunding: 1_361_408.79, fundingSaidas: 7_262_885.43 },
+    // ⚠️ ATUALIZADO PELA #434 (o cash sweep enxerga o caixa das outras
+    // operações). Movem-se DOIS campos, e os dois são ALAVANCADOS:
+    //   caixaFinalAlavancado  4_137_114.51 → 4_572_620.74  (+435_506.23)
+    //   fundingSaidas         7_262_885.43 → 6_827_379.20  (−435_506.23)
+    // Iguais e opostos de propósito: é o mesmo dinheiro. O financiamento
+    // enxerga o aporte de equity e a liberação da dívida, amortiza mais cedo
+    // e paga MENOS juros — o que deixa de sair como serviço da dívida fica no
+    // caixa. Verificado por decomposição na revisão do PR 526: a LIBERAÇÃO do
+    // financiamento é idêntica nos dois cenários (R$ 4.000.000,00) e o saldo
+    // devedor zera nos dois, então o que se moveu foram só os JUROS
+    // (652.253,12 → 216.746,89, Δ −435.506,23) — não o principal.
+    // Os desalavancados (resultado/margem/ROI) e a TIR NÃO se movem:
+    // depois da #521 a proforma é desalavancada, e a TIR sempre foi.
+    // ⚠️ `vplLiquidoFunding` fica em 1_361_408.79 por uma COINCIDÊNCIA desta
+    // fixture, não por invariância estrutural: a `taxa_anual` do FP (12%) é
+    // igual à `taxaDescontoAa` (12%), e empréstimo descontado à própria taxa
+    // tem VPL zero. Medido na revisão do PR 526: com `taxaDescontoAa` em 20%,
+    // o mesmo caso C move o campo de 1_833_631.75 para 1_667_632.45. Ou seja,
+    // este campo NÃO vigia a #434 aqui — quem vigia são os outros dois.
+    esperado: { resultado: 3_899_999.94, margemPct: 38.99999963400001, roiPct: 63.93442524590166, tir: 31.018485354972892, caixaFinalAlavancado: 4_572_620.74, vplLiquidoFunding: 1_361_408.79, fundingSaidas: 6_827_379.20 },
   },
   {
     id: 'D',

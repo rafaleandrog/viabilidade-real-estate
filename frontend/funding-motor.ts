@@ -759,18 +759,86 @@ export function fundingDoEstudo(
   const janela = marcos ? janelaLiberacaoDeMarcos(marcos, prazo) : null;
   const mesChaves = marcos ? marcos.mesEntrega + 1 : null;
 
-  const series = operacoes.map((op) => {
-    if (op.tipo === 'financiamento_producao') {
-      const ids = Array.isArray(op.custo_linha_ids) && op.custo_linha_ids.length
-        ? op.custo_linha_ids
-        : linhasFinanciaveisPadrao(contexto?.custosRaw ?? []);
-      const custoElegivel = custoElegivelMensalDeLinhas(contexto?.linhasCusto ?? [], ids, prazo);
-      return simularFinanciamentoProducao(op, custoElegivel, janela, mesChaves, fluxoLivreMensal, prazo);
-    }
-    return eDivida(op.tipo)
+  // #434 — DUAS PASSADAS, porque o cash sweep tem de enxergar o caixa que as
+  // outras operações deixaram. Passos 23–24 de
+  // `docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`: processa-se
+  // o capital de giro e os demais instrumentos e só então se forma o
+  // "fluxo final = fluxo de caixa livre + fluxos líquidos dos instrumentos de
+  // funding" — no plural, e NUMA ORDEM.
+  //
+  // ⚠️ NÃO É WATERFALL: não há prioridade nem competição por caixa. O
+  // waterfall foi apagado de propósito pela #355 e não volta. O que existe
+  // aqui é só a ORDEM DE LEITURA do caixa, em duas classes:
+  //
+  //   1. CEGAS ao caixa — `divida` e `equity`. Não recebem `fluxoLivreMensal`
+  //      e não o consultam, então a ordem ENTRE ELAS é irrelevante: não
+  //      interagem.
+  //   2. DIRIGIDA por caixa — `financiamento_producao`, a única cujo
+  //      desembolso/amortização depende do fluxo do projeto. Lê
+  //      `fluxoLivreMensal + entradasCegas − saidasCegas`.
+  //
+  // Se um dia houver MAIS DE UMA operação dirigida por caixa, elas são
+  // processadas na ordem de `operacoes` e cada uma vê o caixa já alterado pela
+  // anterior — passando a ser a única dependência de ordem do modelo. Hoje
+  // `financiamento_producao` é única por estudo
+  // (`docs/viabilidade/fluxo-investidor-formulas.md:27`), então o caso não
+  // ocorre.
+  //
+  // ⚠️ `series` é REMONTADA NA ORDEM ORIGINAL de `operacoes`: ela alimenta
+  // `linhasEntrada`/`linhasSaida` abaixo, que são as linhas da tabela do Fluxo
+  // de Caixa. Simular em duas passadas e devolver na ordem de simulação
+  // trocaria a ordem das linhas na tela sem ninguém pedir.
+  const series: SerieOperacao[] = new Array(operacoes.length);
+  const indicesDirigidas: number[] = [];
+
+  // Passada 1 — cegas ao caixa.
+  operacoes.forEach((op, idx) => {
+    if (op.tipo === 'financiamento_producao') { indicesDirigidas.push(idx); return; }
+    series[idx] = eDivida(op.tipo)
       ? simularDivida(op, prazo)
       : simularEquity(op, receitaLiquidaMensal, resultadoFinal, mesRepasseValor, prazo);
   });
+
+  // Caixa que a passada 2 enxerga. Mesma disciplina de arredondamento da
+  // costura final `fluxoMensal` (C7): round2 na composição por período.
+  // Sem nenhuma cega, é o próprio `fluxoLivreMensal` — operação única não
+  // muda de comportamento.
+  let fluxoParaDirigidas = fluxoLivreMensal;
+  if (indicesDirigidas.length < operacoes.length) {
+    const entradasCegas = serieZerada(prazo);
+    const saidasCegas = serieZerada(prazo);
+    for (const s of series) {
+      if (!s) continue;
+      for (let t = 0; t < prazo; t++) {
+        entradasCegas[t] = round2(entradasCegas[t] + s.entradas[t]);
+        saidasCegas[t] = round2(saidasCegas[t] + s.saidas[t]);
+      }
+    }
+    fluxoParaDirigidas = fluxoLivreMensal.map(
+      (v, t) => round2(n(v) + entradasCegas[t] - saidasCegas[t]),
+    );
+  }
+
+  // Passada 2 — dirigidas por caixa, na ordem de `operacoes`.
+  for (const idx of indicesDirigidas) {
+    const op = operacoes[idx];
+    const ids = Array.isArray(op.custo_linha_ids) && op.custo_linha_ids.length
+      ? op.custo_linha_ids
+      : linhasFinanciaveisPadrao(contexto?.custosRaw ?? []);
+    const custoElegivel = custoElegivelMensalDeLinhas(contexto?.linhasCusto ?? [], ids, prazo);
+    const serie = simularFinanciamentoProducao(
+      op, custoElegivel, janela, mesChaves, fluxoParaDirigidas, prazo,
+    );
+    series[idx] = serie;
+    // A próxima dirigida, se houver, vê o caixa já alterado por esta. Hoje o
+    // laço roda uma vez só (cardinalidade 1), então o `if` nunca abre — ele
+    // existe para o comentário acima não descrever comportamento inexistente.
+    if (indicesDirigidas.length > 1) {
+      fluxoParaDirigidas = fluxoParaDirigidas.map(
+        (v, t) => round2(v + serie.entradas[t] - serie.saidas[t]),
+      );
+    }
+  }
 
   const linha = (nome: string, mensal: number[]): LinhaFunding => ({
     nome,
