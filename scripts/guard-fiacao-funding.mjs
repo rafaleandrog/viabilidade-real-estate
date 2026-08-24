@@ -47,6 +47,18 @@ function varrer(dir, acc = []) {
 // consumo, e O QUE o consumidor tem de passar.
 //
 // Formato de cada regra: { nome, consumidor, ignorar, exige, comoConsertar }.
+/** Vírgulas no nível de topo de uma chamada — ignora as de parênteses/colchetes internos. */
+function contarVirgulasDeTopo(chamada) {
+  const dentro = chamada.slice(chamada.indexOf('(') + 1, chamada.lastIndexOf(')'));
+  let nivel = 0, virgulas = 0;
+  for (const c of dentro) {
+    if (c === '(' || c === '[' || c === '{') nivel++;
+    else if (c === ')' || c === ']' || c === '}') nivel--;
+    else if (c === ',' && nivel === 0) virgulas++;
+  }
+  return virgulas;
+}
+
 const REGRAS = [
   {
     nome: 'operacoesFunding no horizonte (#446)',
@@ -70,9 +82,25 @@ const REGRAS = [
     // consumidor de PRODUÇÃO — teste e fixture ficam de fora pelo filtro de
     // arquivos, que é o mesmo do resto do guard.
     consumidor: (src) => src.includes('validarFunding('),
-    ignorar: (arq) => arq.endsWith('fluxo-invariantes.ts'),
-    exige: /validarFunding\([^)]*,[^)]*,[^)]*,[^)]*\)/,
-    comoConsertar: 'Passe a receita líquida como 4º argumento de `validarFunding(...)`.',
+    // `frontend/fixtures/**` fica de fora: a fixture da #469 chama as DUAS
+    // formas de propósito, para provar que a checagem (b) só roda com o
+    // argumento. Ela não é consumidor de produção. Sem esta exclusão o guard
+    // reprovaria a própria prova que ele existe para proteger.
+    ignorar: (arq) => arq.endsWith('fluxo-invariantes.ts') || arq.includes('/fixtures/'),
+    // ⚠️ TODA chamada precisa dos 4 argumentos, não "pelo menos uma".
+    //
+    // A primeira versão desta regra usava um `exige` simples, e uma pergunta
+    // adversarial no PR expôs o buraco: um arquivo com DUAS chamadas — uma
+    // certa e uma sem o argumento — passaria, porque a regex achava a certa e
+    // parava. Aqui a conferência é por CHAMADA, e basta uma incompleta para
+    // reprovar.
+    conferir: (src) => {
+      const todas = src.match(/validarFunding\([^;]*?\)(?=[,;\s)])/g) ?? [];
+      // 4 argumentos ⇒ 3 vírgulas no nível de topo da chamada.
+      const incompleta = todas.filter((ch) => contarVirgulasDeTopo(ch) < 3);
+      return incompleta.length === 0;
+    },
+    comoConsertar: 'Passe a receita líquida como 4º argumento de TODA chamada de `validarFunding(...)`.',
     dano: 'a checagem (b) — retorno de equity acima da receita do mês — simplesmente NÃO RODA, sem avisar',
   },
   {
@@ -83,7 +111,7 @@ const REGRAS = [
     // NENHUM teste fica vermelho — medido em 2026-08-24: apagar a chamada
     // deixou 672 de 672 testes verdes.
     consumidor: (src) => src.includes('validarProduto(') && src.includes('divergencias'),
-    ignorar: (arq) => arq.endsWith('fluxo-invariantes.ts'),
+    ignorar: (arq) => arq.endsWith('fluxo-invariantes.ts') || arq.includes('/fixtures/'),
     exige: /validarReconciliacaoCamadas\(/,
     comoConsertar: 'Acrescente `...validarReconciliacaoCamadas(estudo, custos, tipologias)` à lista de divergências.',
     dano: 'a divergência entre Catálogo e Premissas deixa de ser reportada',
@@ -97,7 +125,8 @@ for (const raiz of RAIZ) {
     for (const regra of REGRAS) {
       if (regra.ignorar(arquivo)) continue;
       if (!regra.consumidor(src)) continue;
-      if (!regra.exige.test(src)) faltando.push({ arquivo, regra });
+      const ok = regra.conferir ? regra.conferir(src) : regra.exige.test(src);
+      if (!ok) faltando.push({ arquivo, regra });
     }
   }
 }
