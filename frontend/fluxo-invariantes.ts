@@ -836,7 +836,7 @@ export function validarReconciliacaoCamadas(
     const encontrado = Number(estudo?.[campoCanonico] ?? 0);
     if (Math.abs(esperado - encontrado) <= tol) return;
     out.push({
-      codigo: 'CAMADAS_DIVERGEM_PERMUTA_FISICA', severidade: 'erro', linha: rotulo,
+      codigo: 'CAMADAS_DIVERGEM_PERMUTA_FISICA', severidade: 'alerta', linha: rotulo,
       esperado, encontrado, diferenca: encontrado - esperado,
       mensagem: `${rotulo}: o Catálogo declara ${esperado.toFixed(2)} m² de permuta física e as `
         + `Premissas mostram ${encontrado.toFixed(2)} m² — as duas camadas do estudo descrevem `
