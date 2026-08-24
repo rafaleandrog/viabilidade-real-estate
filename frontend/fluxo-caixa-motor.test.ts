@@ -12,7 +12,7 @@ import {
   jurosSafra, receitaBrutaSafra, componentesEfetivosSafra, ehVendaAposChaves,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos, pctDeReceitaBruta,
-  permutaFinanceiraBrutaMensal, permutaFinanceiraLiquidaMensal,
+  permutaFinanceiraBrutaMensal, permutaFinanceiraLiquidaMensal, permutaFinanceiraDeduzidaMensal,
   areaVendidaMensal, unidadesVendidasMensal, estoqueM2Mensal, estoqueM2Semente, vsoMensal,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
@@ -796,7 +796,8 @@ test('#238: permuta financeira líquida deduz imposto e corretagem da base antes
       { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
       {
         id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
-        orcamento_valor: 10, orcamento_unidade: 'pct_vgv', permuta_financeira_base: 'liquida',
+        orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
+        permuta_financeira_deduzir_imposto: true, permuta_financeira_deduzir_corretagem: true,
       },
     ],
     areaTerreno: 0,
@@ -825,7 +826,7 @@ test('#238: permuta financeira em valor fixo (rs) não distingue bruta/líquida'
   const r = calcularFluxo(config);
   const deducao = r.linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
   // Valor fixo integral (única safra, único mês de receita) — mesma dedução
-  // independente de `permuta_financeira_base` (não setado aqui).
+  // independente dos flags de dedução (não setados aqui).
   assert.ok(perto(deducao.total, -3_000_000, 1));
 });
 
@@ -2510,19 +2511,47 @@ test('#238 meses sem receita não geram permuta', () => {
   assert.deepEqual(permutaFinanceiraBrutaMensal([0, 0, 500], 20), [0, 0, 100]);
 });
 
+// ── #459: permutaFinanceiraDeduzidaMensal — generalização com dois flags ───
+
+test('#459 permutaFinanceiraDeduzidaMensal: as quatro combinações batem com as funções antigas', () => {
+  const receita = [1000];
+  const imposto = [200];
+  const corretagem = [50];
+  assert.deepEqual(
+    permutaFinanceiraDeduzidaMensal(receita, imposto, corretagem, 10, false, false),
+    permutaFinanceiraBrutaMensal(receita, 10),
+  );
+  assert.deepEqual(
+    permutaFinanceiraDeduzidaMensal(receita, imposto, corretagem, 10, true, true),
+    permutaFinanceiraLiquidaMensal(receita, imposto, corretagem, 10),
+  );
+  // Mistas: só imposto e só corretagem, cada uma isolada do outro flag.
+  assert.deepEqual(permutaFinanceiraDeduzidaMensal(receita, imposto, corretagem, 10, true, false), [80]);
+  assert.deepEqual(permutaFinanceiraDeduzidaMensal(receita, imposto, corretagem, 10, false, true), [95]);
+});
+
+test('#459 permutaFinanceiraDeduzidaMensal: mutação — trocar `&&` por `||` nos dois flags quebra o teste acima', () => {
+  // Documenta a armadilha: se a implementação decidisse "deduz se QUALQUER
+  // flag estiver ligado" em vez de cada flag controlar sua própria dedução,
+  // (true,false) devolveria a base líquida inteira (75), não 80.
+  const r = permutaFinanceiraDeduzidaMensal([1000], [200], [50], 10, true, false);
+  assert.notEqual(r[0], 75);
+  assert.deepEqual(r, [80]);
+});
+
 test('#238 série ausente de imposto/corretagem é tratada como zero', () => {
   // O motor passa séries de comprimentos possivelmente distintos.
   assert.deepEqual(permutaFinanceiraLiquidaMensal([1000, 1000], [100], [], 10), [90, 100]);
 });
 
-test('#238 permutaAlternativa expõe a base NÃO escolhida, para auditoria', () => {
-  // Mesma fixture do teste da base líquida: VGV 100M, RET 4%, corretagem 5%,
-  // permuta 10%. Escolhida = líquida (9,1M); alternativa = bruta (10M).
-  const linhaPermuta = (base: 'bruta' | 'liquida') => ({
-    id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
-    orcamento_valor: 10, orcamento_unidade: 'pct_vgv', permuta_financeira_base: base,
-  });
-  const montar = (base: 'bruta' | 'liquida'): FluxoConfig => ({
+// #459: as quatro combinações dos dois flags independentes de dedução.
+// VGV 100M, RET 4% (imposto = 4M), corretagem 5% (5M), permuta 10%.
+//   (false,false) "bruta"     → base 100M            → permuta 10,0M
+//   (true, false) só imposto  → base 100M − 4M  = 96M → permuta  9,6M
+//   (false,true ) só corret.  → base 100M − 5M  = 95M → permuta  9,5M
+//   (true, true ) "líquida"   → base 100M −4M−5M= 91M → permuta  9,1M
+test('#459: as quatro combinações de deduzir_imposto × deduzir_corretagem', () => {
+  const montar = (deduzirImposto: boolean, deduzirCorretagem: boolean): FluxoConfig => ({
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
@@ -2532,7 +2561,12 @@ test('#238 permutaAlternativa expõe a base NÃO escolhida, para auditoria', () 
     }],
     linhasCusto: [
       { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
-      linhaPermuta(base),
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
+        orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
+        permuta_financeira_deduzir_imposto: deduzirImposto,
+        permuta_financeira_deduzir_corretagem: deduzirCorretagem,
+      },
     ],
     areaTerreno: 0,
     ret: { ativo: true, pct: 4 }, // #346: RET é global, não mais lido de fluxo_pagamento
@@ -2540,16 +2574,69 @@ test('#238 permutaAlternativa expõe a base NÃO escolhida, para auditoria', () 
   const achar = (c: FluxoConfig) =>
     calcularFluxo(c).linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
 
-  const comLiquida = achar(montar('liquida'));
-  assert.equal(comLiquida.permutaAlternativa?.base, 'bruta');
+  const brutaBruta = achar(montar(false, false));
+  assert.ok(perto(brutaBruta.total, -10_000_000, 1));
+
+  const soImposto = achar(montar(true, false));
+  assert.ok(perto(soImposto.total, -9_600_000, 1));
+
+  const soCorretagem = achar(montar(false, true));
+  assert.ok(perto(soCorretagem.total, -9_500_000, 1));
+
+  const liquida = achar(montar(true, true));
+  assert.ok(perto(liquida.total, -9_100_000, 1));
+
+  // Mutação: as combinações mistas ficam ESTRITAMENTE entre os dois extremos —
+  // `total` é NEGATIVO (dedução de receita), então "entre" em módulo significa
+  // maior que o extremo bruto (-10M) e menor que o extremo líquido (-9,1M).
+  assert.ok(soImposto.total > brutaBruta.total && soImposto.total < liquida.total);
+  assert.ok(soCorretagem.total > brutaBruta.total && soCorretagem.total < liquida.total);
+});
+
+test('#459 permutaAlternativa expõe a base OPOSTA (flags invertidos), para auditoria', () => {
+  // Mesma fixture do teste acima. Escolhida = líquida (9,1M); oposta = bruta (10M).
+  const montar = (deduzirImposto: boolean, deduzirCorretagem: boolean): FluxoConfig => ({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
+        orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
+        permuta_financeira_deduzir_imposto: deduzirImposto,
+        permuta_financeira_deduzir_corretagem: deduzirCorretagem,
+      },
+    ],
+    areaTerreno: 0,
+    ret: { ativo: true, pct: 4 }, // #346: RET é global, não mais lido de fluxo_pagamento
+  });
+  const achar = (c: FluxoConfig) =>
+    calcularFluxo(c).linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
+
+  const comLiquida = achar(montar(true, true));
+  assert.equal(comLiquida.permutaAlternativa?.deduzirImposto, false);
+  assert.equal(comLiquida.permutaAlternativa?.deduzirCorretagem, false);
   assert.ok(perto(comLiquida.permutaAlternativa!.total, 10_000_000, 1));
 
-  // Escolhendo bruta, a alternativa é a líquida — simétrico.
-  const comBruta = achar(montar('bruta'));
-  assert.equal(comBruta.permutaAlternativa?.base, 'liquida');
+  // Escolhendo bruta, a oposta é a líquida — simétrico.
+  const comBruta = achar(montar(false, false));
+  assert.equal(comBruta.permutaAlternativa?.deduzirImposto, true);
+  assert.equal(comBruta.permutaAlternativa?.deduzirCorretagem, true);
   assert.ok(perto(comBruta.permutaAlternativa!.total, 9_100_000, 1));
   // E a escolhida continua sendo a que alimenta o fluxo.
   assert.ok(perto(comBruta.total, -10_000_000, 1));
+
+  // Combinação mista: a oposta de (imposto=true, corretagem=false) é
+  // (imposto=false, corretagem=true) — bem definida mesmo fora dos extremos.
+  const soImposto = achar(montar(true, false));
+  assert.equal(soImposto.permutaAlternativa?.deduzirImposto, false);
+  assert.equal(soImposto.permutaAlternativa?.deduzirCorretagem, true);
+  assert.ok(perto(soImposto.permutaAlternativa!.total, 9_500_000, 1));
 });
 
 test('#238 permuta em R$ não tem alternativa — as duas bases dão o mesmo valor', () => {
@@ -2583,7 +2670,8 @@ test('#238 auditoria preserva o valor canônico quando o percentual visível est
     linhasCusto: [{
       id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
       orcamento_valor: 50, orcamento_unidade: 'pct_vgv',
-      orcamento_valor_canonico: 10_000_000, permuta_financeira_base: 'bruta',
+      orcamento_valor_canonico: 10_000_000,
+      permuta_financeira_deduzir_imposto: false, permuta_financeira_deduzir_corretagem: false,
     }],
     areaTerreno: 0,
   };

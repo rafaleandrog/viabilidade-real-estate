@@ -194,12 +194,6 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
-    endereco: "frontend/fluxo-caixa-motor.ts:1570-1573",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :1570-1573 — \"permutaFinanceiraBrutaMensal\" está em :1844. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
     endereco: "frontend/proforma.ts:245",
     motivo:
       "LIMITE DO GUARD — a frase afirma a AUSENCIA do simbolo no alvo (\"nao le X\", \"sem ler X\", \"nao ha campo\"). Exigir que ele apareca inverte o sentido do texto. Classe conhecida, sem deteccao automatica confiavel.",

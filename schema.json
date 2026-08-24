@@ -372,7 +372,8 @@
         "distribuicao_modo": { "tipo": "texto", "limite": 20, "opcoes": ["fixo", "unit_delivery", "sales_revenue"], "padrao": "fixo" },
         "permuta_tipologia_id": { "tipo": "referencia", "tabela_ref": "avancado_tipologias", "ao_deletar": "anular" },
         "permuta_quantidade":   { "tipo": "inteiro", "padrao": 0 },
-        "permuta_financeira_base": { "tipo": "texto", "limite": 10, "opcoes": ["bruta", "liquida"], "padrao": "bruta" }
+        "permuta_financeira_deduzir_imposto":    { "tipo": "booleano", "padrao": false },
+        "permuta_financeira_deduzir_corretagem": { "tipo": "booleano", "padrao": false }
       },
       "indices": [["estudo_id"]]
     },

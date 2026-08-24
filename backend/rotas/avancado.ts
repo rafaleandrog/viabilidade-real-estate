@@ -1345,10 +1345,13 @@ rotasAvancado.get('/estudos/:id/avancado/custos', async (req: Request, res: Resp
 // quantidade entregue na linha de Preço/Permuta física (modelo/UI). O valor
 // declarado que valora a permuta continua em orcamento_valor/orcamento_unidade
 // (ADR: nunca derivado — ver docs/viabilidade/padrao-incorporacao.md §15.1).
-// #238: permuta_financeira_base escolhe qual visão (bruta/líquida, §15.2)
-// alimenta o fluxo para a linha de Preço/Permuta financeira.
-const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_valor_canonico', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo', 'permuta_tipologia_id', 'permuta_quantidade', 'permuta_financeira_base'];
-const BASES_PERMUTA_FINANCEIRA = ['bruta', 'liquida'];
+// #459: `permuta_financeira_base` (enum bruta/liquida) deu lugar a dois
+// booleanos independentes — `permuta_financeira_deduzir_imposto` e
+// `permuta_financeira_deduzir_corretagem` — que escolhem, cada um por conta
+// própria, se a base da permuta financeira em % VGV (§15.2) deduz o imposto
+// e/ou a corretagem antes de aplicar o percentual. `(false,false)` é o
+// comportamento histórico ("bruta"); `(true,true)` reproduz "liquida".
+const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_valor_canonico', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo', 'permuta_tipologia_id', 'permuta_quantidade', 'permuta_financeira_deduzir_imposto', 'permuta_financeira_deduzir_corretagem'];
 
 // #257: as quatro subcategorias CANÔNICAS da linha `terreno`/`Preço`. Mesma
 // lista que a UI oferece (`frontend/tela-fluxo-custos.ts:58`) — aqui ela vira
@@ -1412,8 +1415,12 @@ function validarCamposCusto(
     erro(res, 400, 'PERMUTA_QUANTIDADE_INVALIDA', 'permuta_quantidade deve ser um inteiro ≥ 0');
     return false;
   }
-  if (dados.permuta_financeira_base !== undefined && !BASES_PERMUTA_FINANCEIRA.includes(dados.permuta_financeira_base)) {
-    erro(res, 400, 'PERMUTA_FINANCEIRA_BASE_INVALIDA', `permuta_financeira_base deve ser um de: ${BASES_PERMUTA_FINANCEIRA.join(', ')}`);
+  if (dados.permuta_financeira_deduzir_imposto !== undefined && typeof dados.permuta_financeira_deduzir_imposto !== 'boolean') {
+    erro(res, 400, 'PERMUTA_FINANCEIRA_DEDUZIR_IMPOSTO_INVALIDO', 'permuta_financeira_deduzir_imposto deve ser booleano');
+    return false;
+  }
+  if (dados.permuta_financeira_deduzir_corretagem !== undefined && typeof dados.permuta_financeira_deduzir_corretagem !== 'boolean') {
+    erro(res, 400, 'PERMUTA_FINANCEIRA_DEDUZIR_CORRETAGEM_INVALIDO', 'permuta_financeira_deduzir_corretagem deve ser booleano');
     return false;
   }
   // #257: grupo/categoria efetivos = o que o payload manda, senão o que a linha
