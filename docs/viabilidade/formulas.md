@@ -107,7 +107,7 @@ hierarquia de linhas do Preliminar, para que os dois níveis se comparem na mesm
 > ⚠️ **A proforma do Avançado é DESALAVANCADA — nenhum lado do funding entra nela.** Nem as saídas
 > (parcelas, retorno ao investidor), nem as entradas (liberações, aportes). É visão **econômica** do
 > empreendimento, antes de decidir como ele é capitalizado, e é o que mantém TIR, VPL e ROI
-> comparáveis entre estudos com e sem funding — a mesma decisão que `frontend/funding-motor.ts:652-656`
+> comparáveis entre estudos com e sem funding — a mesma decisão que `frontend/funding-motor.ts:685-689`
 > registra para as KPIs do projeto (e que a §8.1 de
 > [Funding, Capital Stack e Retorno do Capital](funding-capital-stack) guarda como **ADR histórico**,
 > não como norma vigente — a seção está carimbada "Supersedida pela #355"). Quem quiser ler o efeito
