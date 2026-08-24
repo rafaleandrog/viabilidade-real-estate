@@ -29,6 +29,19 @@ const n = (v: any): number => Number(v) || 0;
 const round2 = (v: number): number => Math.round(v * 100) / 100;
 
 /**
+ * #456: percentual de uma grandeza monetária sobre a Receita Bruta
+ * (`receitaBruta`, grandeza 6 da taxonomia #229) — o divisor que os três KPIs
+ * novos usam (juros/Receita Bruta, carteira máxima/VGV, exposição máxima/VGV).
+ * A EVI nomeia esse denominador `VGVIncorpIndividual`; no app ele corresponde
+ * a `c.receitaBruta`, não a `vgvTotal`/`vgvVendavel` (ver corpo da #456).
+ * Divisor `<= 0` devolve `0`, nunca `NaN` — contrato C7: derivada NÃO
+ * monetária, precisão plena, arredonda só na exibição (`fmtPct`).
+ */
+export function pctDeReceitaBruta(v: number, receitaBruta: number): number {
+  return receitaBruta > 0 ? (v / receitaBruta) * 100 : 0;
+}
+
+/**
  * Nome de exibição de uma linha de custo: categoria + subcategoria — mas só
  * para `terreno`, o único grupo com subcategoria editável na tela (#173).
  * Dado legado de subcategoria em outro grupo (categoria "Outro" aceitava
@@ -276,6 +289,15 @@ export interface FluxoCalc {
   paybackMes: number | null;       // índice 0-based no array mensal
   paybackData: string | null;      // "jul/2030"
   exposicaoMaxima: number;         // min(fluxoAcumulado) — tipicamente negativo
+  /**
+   * #456: mês (0-based) em que `exposicaoMaxima` ocorre —
+   * `fluxoAcumulado.indexOf(exposicaoMaxima)`. Único lugar que calcula isto:
+   * `frontend/fluxo-graficos.ts` lia por conta própria antes desta issue; ler
+   * o campo em vez de recalcular evita a segunda fonte. `null` só quando o
+   * fluxo não tem meses (`prazo === 0`) — em todo estudo real o mínimo do
+   * array sempre está no próprio array.
+   */
+  mesExposicaoMaxima: number | null;
   vgvPermutaFisica: number;        // #188 — VGV atribuído às unidades permutadas (informativo)
   /**
    * #427 — total ISOLADO da dedução de Permuta financeira (`ePermutaFinanceira`),
@@ -1916,10 +1938,25 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
     itens: l.itens ? l.itens.map(agregarLinha) : undefined,
   });
 
+  // #456 — achado de auto-revisão: `exposicaoMaxima` (o valor) é preservado
+  // sem recálculo pelo spread abaixo — é o MÍNIMO MENSAL verdadeiro, e a view
+  // Anual só mostra fim de período (comentário de `fluxo-graficos.ts`). Mas
+  // `mesExposicaoMaxima` é um ÍNDICE, e o índice do mês na série mensal não é
+  // o índice do período na série agregada — sem recalcular aqui, o consumidor
+  // (`graficoFluxoAcumulado`, chamado com `exib`) armaria o marcador na
+  // posição errada do eixo X em vez de -1 (ausente), que era o que o
+  // `indexOf` inline de antes desta issue produzia sempre que o mínimo não
+  // caísse exatamente num fim de período. Mesma semântica, agora recalculada
+  // contra a série JÁ agregada (`fluxoAcumuladoAgregado`, computada uma vez).
+  const fluxoAcumuladoAgregado = ultimo(c.fluxoAcumulado);
+  const mesExposicaoMaximaAgregado = fluxoAcumuladoAgregado.length
+    ? fluxoAcumuladoAgregado.indexOf(c.exposicaoMaxima)
+    : null;
   return {
     ...c,
     prazo: periodos.length,
     meses: periodos.map((p) => p.rotulo),
+    mesExposicaoMaxima: mesExposicaoMaximaAgregado === -1 ? null : mesExposicaoMaximaAgregado,
     receitaMensal: soma(c.receitaMensal),
     vendaBrutaContratadaMensal: soma(c.vendaBrutaContratadaMensal),
     descontoComercialMensal: soma(c.descontoComercialMensal),
@@ -1944,7 +1981,7 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
     },
     custoMensal: soma(c.custoMensal),
     fluxoMensal: soma(c.fluxoMensal),
-    fluxoAcumulado: ultimo(c.fluxoAcumulado),
+    fluxoAcumulado: fluxoAcumuladoAgregado,
     linhasReceitaBruta: c.linhasReceitaBruta.map(agregarLinha),
     linhasVendasContratadas: c.linhasVendasContratadas.map(agregarLinha),
     linhasReceita: c.linhasReceita.map(agregarLinha),
@@ -2295,6 +2332,9 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
 
   const paybackMes = fluxoAcumulado.findIndex((v, i) => v >= 0 && fluxoMensal.slice(0, i + 1).some((x) => x < 0));
   const exposicaoMaxima = fluxoAcumulado.length ? Math.min(...fluxoAcumulado) : 0;
+  // #456: mesmo padrão de `mesCarteiraClientesMaxima` — a derivação mora no
+  // motor, não na tela que a consome.
+  const mesExposicaoMaxima = fluxoAcumulado.length ? fluxoAcumulado.indexOf(exposicaoMaxima) : null;
 
   // #188/#268 — VGV Total / VGV Permuta Física (sem caixa) / Receita Bruta
   // (VGV): grandezas informativas. A permuta física agora é medida pelas
@@ -2385,6 +2425,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     paybackMes: paybackMes >= 0 ? paybackMes : null,
     paybackData: paybackMes >= 0 ? mesRelativoCompleto(config.dataInicio, paybackMes) : null,
     exposicaoMaxima,
+    mesExposicaoMaxima,
     vgvPermutaFisica,
     permutaFinanceiraTotal,
     receitaBrutaVgv,
