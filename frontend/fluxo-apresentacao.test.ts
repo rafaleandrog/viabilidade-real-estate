@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { periodosAnuais } from './fluxo-shared.js';
-import { linhasFluxo } from './exportar.js';
-import { chavesColapso, GRUPO_CUSTO_LABEL } from './fluxo-tabela.js';
+import { linhasFluxo, celulaFx } from './exportar.js';
+import { chavesColapso, GRUPO_CUSTO_LABEL, celula as celulaTela } from './fluxo-tabela.js';
 import { seriesEconomicasFluxo } from './fluxo-graficos.js';
 import { fundingDoEstudo, type OperacaoFunding } from './funding-motor.js';
 import { proformaAvancado, linhaInformativaFunding } from './proforma-avancado.js';
@@ -102,6 +102,40 @@ test('#349 CSV/PDF espelham a tabela reduzida: VGV, grupos de receita, 5 custos 
     'Auditoria · Principal recebido', 'Auditoria · Juros de clientes']) {
     assert.ok(!nomes.includes(fora), `linha removida ainda exportada: ${fora}`);
   }
+});
+
+// #449: `celula` (tela, fluxo-tabela.ts) e `celulaFx` (exportação,
+// exportar.ts) chamam a MESMA fonte (`celula` de viab-format.ts) — antes,
+// cada uma tinha sua própria expressão de formatação e divergiam em casas
+// decimais, limiar de célula vazia e representação do negativo.
+//
+// Decisão de desenho (o "Como corrigir" da issue pedia para decidir e
+// declarar): a TELA sempre usa notação contábil (parênteses) — nunca existiu
+// modo "sinal de menos" nela, e não é criado agora. O modo `comParenteses:
+// false` (sinal de menos, `-100,00`) é exclusivo da EXPORTAÇÃO, herdado da
+// linha informativa "antes do funding" de `celulaFx`. Por isso a equivalência
+// testada é: para as DUAS combinações do parâmetro que `celula` (tela) já
+// tinha (`ehCusto`/`negativoEntreParenteses`, true/false — que sempre operou
+// em modo parênteses), `celulaTela` e `celulaFx` com `comParenteses: true`
+// produzem texto IDÊNTICO. O modo exclusivo da exportação é testado à parte.
+test('#449 celula (tela) e celulaFx (exportação, comParenteses=true) produzem texto idêntico', () => {
+  const valores = [1234.56, 0.20, 0.004, -1234.56, -0.004, 0, -0, 1e9];
+  for (const custo of [true, false]) {
+    for (const v of valores) {
+      const daTela = celulaTela(v, custo);
+      const daExportacao = celulaFx(v, { custo }, true);
+      assert.equal(
+        daTela, daExportacao,
+        `celula(${v}, ${custo}) = "${daTela}" ≠ celulaFx(${v}, {custo:${custo}}, true) = "${daExportacao}"`,
+      );
+    }
+  }
+});
+
+test('#449 celulaFx: comParenteses=false (exclusivo da exportação) usa sinal de menos, não parênteses', () => {
+  assert.equal(celulaFx(-1234.56, { custo: true }, false), '-1.234,56');
+  assert.equal(celulaFx(-1234.56, { custo: false }, false), '-1.234,56');
+  assert.equal(celulaFx(1234.56, { custo: true }, false), '1.234,56');
 });
 
 test('#241 gráfico econômico usa os mesmos arrays da tabela e respeita visão anual', () => {
