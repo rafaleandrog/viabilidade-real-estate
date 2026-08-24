@@ -2,7 +2,7 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
-import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
+import { type FluxoCalc, type LinhaCalc, pctDeReceitaBruta } from './fluxo-caixa-motor.js';
 import { type FundingNoFluxo, type LinhaFinanciamentoProducao } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
@@ -90,6 +90,13 @@ export const estiloFluxoTabela = css`
   }
   .kpi-var.melhor { color: var(--cor-sucesso, #13a98d); }
   .kpi-var.pior { color: var(--cor-erro, #d45a3a); }
+  /* #456: linha de detalhe (% + mês) dos três KPIs derivados — neutra, ao
+     contrário de .kpi-var, que carrega semântica de melhor/pior. */
+  .kpi-info {
+    margin-top: 6px;
+    font-size: 0.72rem;
+    color: var(--cor-texto-sec, rgba(255,255,255,0.6));
+  }
 
   .fx-wrap { overflow: auto; max-height: 72vh; border: 1px solid var(--cor-borda, rgba(255,255,255,0.12)); border-radius: 8px; }
   table.fx { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; width: max-content; min-width: 100%; }
@@ -252,6 +259,17 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
   const expBaseMag = base ? Math.abs(base.exposicaoMaxima) : undefined;
   const expVariacao = expBaseMag !== undefined ? calcularVariacao(expMag, expBaseMag, false) : null;
   const expVariante = expVariacao ? (expVariacao.melhor ? 'sucesso' : 'erro') : 'erro';
+  // #456: os três indicadores de decisão que a EVI trata como KPI de primeira
+  // classe e que o app só publicava na exportação — juros de clientes,
+  // carteira máxima e o mês/%VGV da exposição. Nada editável, tudo derivado
+  // do que `calcularFluxo` já expõe (`jurosClientes`, `carteiraClientesMaxima`
+  // + `mesCarteiraClientesMaxima`, `mesExposicaoMaxima`). O "VGV" dos três
+  // percentuais é `receitaBruta` (grandeza 6, #229) — é o que corresponde ao
+  // `VGVIncorpIndividual` da EVI, não `vgvTotal`/`vgvVendavel` (ver #456).
+  const pctJuros = pctDeReceitaBruta(c.jurosClientes, c.receitaBruta);
+  const pctCarteira = pctDeReceitaBruta(c.carteiraClientesMaxima, c.receitaBruta);
+  const pctExp = pctDeReceitaBruta(expMag, c.receitaBruta);
+  const mesTxt = (mes: number | null) => mes === null ? '' : ` — ${c.meses[mes] ?? `M${mes + 1}`}`;
   return html`
     <div class="fx-kpis">
       <div class="kpi-card ${resultado >= 0 ? 'sucesso' : 'erro'}">
@@ -274,9 +292,24 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
         <div class="valor">${c.paybackData ?? '—'}</div>
       </div>
       <div class="kpi-card ${expVariante}">
-        <div class="rotulo">Exposição máxima</div>
+        <!-- #456 critério 6: o rótulo declara que é o fluxo LIVRE (desalavancado)
+             — FluxoCalc.exposicaoMaxima nunca inclui funding. Sem esta
+             declaração, um estudo com Capital Stack leria "exposição" e
+             suporia que já é pós-financiamento. -->
+        <div class="rotulo">Exposição máxima (fluxo livre)</div>
         <div class="valor">${fmtR$(expMag)}</div>
         ${varKpi(expMag, expBaseMag, false)}
+        <div class="kpi-info">${fmtPct(pctExp)} do VGV${mesTxt(c.mesExposicaoMaxima)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="rotulo">Juros de clientes</div>
+        <div class="valor">${fmtR$(c.jurosClientes)}</div>
+        <div class="kpi-info">${fmtPct(pctJuros)} da Receita Bruta</div>
+      </div>
+      <div class="kpi-card">
+        <div class="rotulo">Carteira máxima de clientes</div>
+        <div class="valor">${fmtR$(c.carteiraClientesMaxima)}</div>
+        <div class="kpi-info">${fmtPct(pctCarteira)} do VGV${mesTxt(c.mesCarteiraClientesMaxima)}</div>
       </div>
       <div class="kpi-card">
         <div class="rotulo">Receita Bruta — VGV</div>
@@ -288,8 +321,8 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
           // #241: as três grandezas de contratação (#227/#229) — bruto, desconto
           // comercial e líquido — não tinham lugar na tela nem na exportação.
           // Ficam aqui, junto das outras informativas, em vez de virarem 3 KPIs
-          // novos (mudaria o grid de 6 para 9 cards sem poder validar em
-          // navegador neste ambiente).
+          // novos — decisão que segue valendo depois da #456 (que já levou o
+          // grid a 9 cards com os três indicadores novos de decisão).
           `Venda Bruta Contratada ${fmtR$(c.vendaBrutaContratada)} · ` +
           `Desconto Comercial ${fmtR$(c.descontoComercial)} · ` +
           `Venda Líquida Contratada ${fmtR$(c.vendaLiquidaContratada)}`}>
