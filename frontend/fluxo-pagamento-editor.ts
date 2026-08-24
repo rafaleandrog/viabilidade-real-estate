@@ -1,6 +1,6 @@
 import {
   componentesDoLegado, taxaMensalDoPlano,
-  type ComponentePagamento,
+  type ComponentePagamento, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import type { EventoCrono } from './fluxo-shared.js';
 
@@ -47,6 +47,22 @@ export interface FormularioPagamento {
    * `form.juros_tabela_aa` cru.
    */
   juros_tabela_aa?: number;
+  /**
+   * #460 — destino do resíduo de um `ate_marco` sem prazo (venda contratada
+   * no mês do marco ou depois, `N_s ≤ 0`): rolar para o `concentrado` da
+   * mesma linha (a regra da EVI, `cfINC!AH`) ou virar `imediato` (o
+   * comportamento de sempre, e o default quando a chave não existe).
+   *
+   * ⚠️ OPCIONAL de propósito, MESMA disciplina do `juros_tabela_aa`: a chave
+   * só existe no formulário quando já existia no persistido ou quando o
+   * usuário escolhe no controle novo. Presente sempre, ela apareceria no JSON
+   * de toda linha aplicada — e o "Aplicar" sem edição deixaria de ser
+   * byte-idêntico (a regra de classe da #431). Este campo não afeta
+   * `componentesParaSalvar`: ele não descreve NENHUM componente, só é lido
+   * direto de `fluxo_pagamento.residuoAteMarco` pelo motor
+   * (`componentesIntegradosSafra`), no momento do cálculo.
+   */
+  residuoAteMarco?: ResiduoAteMarco;
 }
 
 /**
@@ -98,6 +114,11 @@ export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
     ...(fp.juros_tabela_aa !== undefined && fp.juros_tabela_aa !== null
       ? { juros_tabela_aa: Number(fp.juros_tabela_aa) || 0 }
       : {}),
+    // #460: mesmo padrão — a chave só nasce no formulário se já existia no
+    // persistido. Ver a nota de contrato em `FormularioPagamento`.
+    ...(fp.residuoAteMarco === 'concentrado' || fp.residuoAteMarco === 'imediato'
+      ? { residuoAteMarco: fp.residuoAteMarco as ResiduoAteMarco }
+      : {}),
   };
 }
 
@@ -124,26 +145,34 @@ export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
 
 /**
  * Os campos que o espelho legado (`entrada`/`parcelas`/`repasse`) SABE dizer.
- * São eles, e só eles, que decidem se o usuário mexeu na ESTRUTURA do plano —
- * divergência em `sinalPct` NÃO pode contar como edição, porque a UI não tem
- * como produzi-la.
+ * São eles, e só eles, que decidem se o usuário mexeu na ESTRUTURA do plano.
  *
  * `taxaMensal` fica fora desta lista mesmo depois da #428: ela não é produzida
  * pelo espelho legado, e sim por um campo próprio do cabeçalho do modal, com
  * eixo próprio (`taxaFoiEditada`). Misturá-la aqui quebraria o pareamento por
  * identidade — dois componentes com a mesma estrutura e taxas diferentes
  * deixariam de casar, e o transplante levaria a taxa para o componente errado.
+ *
+ * `sinalPct` ENTRA aqui desde a #455, e por um motivo diferente do de
+ * `taxaMensal`: ele é um campo POR LINHA (a issue pede "editável por
+ * componente"), não um campo único do plano inteiro. `componentesDoLegado`
+ * já o lê direto de `parcelas[i].sinalPct` — o espelho SABE dizê-lo, então
+ * ele se comporta exatamente como `pct`/`descontoPct`: identidade e no-op
+ * cuidam dele sozinhos, sem precisar do eixo "foi editado" que `taxaMensal`
+ * exige. (Entrada parcelada continua fixando `sinalPct: 0` — decisão
+ * declarada em `componentesDoLegado`, não um campo editável ali.)
  */
 const CAMPOS_DO_ESPELHO = [
-  'tipo', 'participacaoPct', 'descontoPct', 'prazoMeses',
+  'tipo', 'participacaoPct', 'descontoPct', 'sinalPct', 'prazoMeses',
   'defasagemMeses', 'marcoMes', 'mesPagamento',
 ] as const;
 
 /**
  * O que o transplante move é o COMPLEMENTO de `CAMPOS_DO_ESPELHO`: toda chave
  * que o componente persistido tenha e que o formulário não saiba produzir.
- * Hoje isso dá `sinalPct`, `jurosNoMesDaContratacao`, `rotulo` e — só enquanto
- * o campo de juros não for tocado — `taxaMensal`.
+ * Hoje isso dá `jurosNoMesDaContratacao`, `rotulo` e — só enquanto o campo de
+ * juros não for tocado — `taxaMensal`. (`sinalPct` SAIU desta lista na #455:
+ * o espelho passou a sabê-lo, então ele não é mais só-canônico.)
  *
  * ⚠️ É de propósito que este conjunto seja DERIVADO e não uma lista fechada.
  * Uma lista fechada envelheceria calada: no dia em que o contrato canônico

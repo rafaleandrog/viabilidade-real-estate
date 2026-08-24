@@ -609,9 +609,14 @@ export function descontoComercialMensal(
     const obra = cronograma.find((e) => e.evento === 'obra');
     const mesEntrega = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : 0;
     const componentes = componentesPagamento(linha.fluxo_pagamento, cronograma);
+    // #460: mesma política de resíduo que `recebiveisComponentesLinha` lê da
+    // linha — o desconto comercial só se aplica a componentes `imediato`, mas
+    // a LISTA de componentes efetivos da safra (quem vira `imediato` por
+    // N_s ≤ 0) tem de ser a mesma dos dois caminhos.
+    const residuoAteMarco: ResiduoAteMarco = linha?.fluxo_pagamento?.residuoAteMarco ?? 'imediato';
     for (let safra = 0; safra < bruto.length; safra++) {
       if (bruto[safra] <= 0) continue;
-      for (const c of componentesIntegradosSafra(componentes, safra, mesEntrega)) {
+      for (const c of componentesIntegradosSafra(componentes, safra, mesEntrega, residuoAteMarco)) {
         if (c.tipo === 'imediato' && c.descontoPct > 0) {
           saida[safra] += bruto[safra] * (c.participacaoPct / 100) * (c.descontoPct / 100);
         }
@@ -852,6 +857,13 @@ export function componentesDoLegado(
     if (nParc <= 1) {
       componentes.push({ tipo: 'imediato', participacaoPct: n(e?.pct), descontoPct: n(e?.descontoPct) });
     } else {
+      // #455: Entrada parcelada NÃO ganhou campo de sinal — a issue é
+      // "sinal na contratação por componente PARCELADO" (a seção
+      // "Parcelamento" do modal), e Entrada já é, ela própria, o adiantamento
+      // da venda (% do TOTAL, não deste componente). Sobrepor os dois
+      // conceitos na mesma linha confundiria a distinção que a tela agora
+      // explicita. `sinalPct` fica 0, como sempre — decisão declarada, não
+      // esquecida.
       componentes.push({
         tipo: 'prazo_fixo', participacaoPct: n(e?.pct), sinalPct: 0, prazoMeses: nParc,
         defasagemMeses: 0, taxaMensal, jurosNoMesDaContratacao: false, rotulo: 'entrada (legado)',
@@ -863,15 +875,21 @@ export function componentesDoLegado(
   const fimObra = obra ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1 : 0;
 
   for (const p of normalizarLinhasPagamento(fp.parcelas)) {
+    // #455: o sinal é % DESTE componente (Parcelamento), lido direto da linha
+    // do espelho — ao contrário de `taxaMensal` (#428, um valor por PLANO
+    // inteiro, `juros_tabela_aa`), `sinalPct` é por LINHA, então não precisa
+    // do eixo "foi editado": o espelho já sabe dizê-lo, e `CAMPOS_DO_ESPELHO`
+    // em `fluxo-pagamento-editor.ts` o trata como qualquer outro campo direto
+    // (`pct`, `descontoPct`, ...), não mais como campo só-canônico.
     if (p?.ao_longo_obra) {
       componentes.push({
-        tipo: 'ate_marco', participacaoPct: n(p?.pct), sinalPct: 0, marcoMes: fimObra,
+        tipo: 'ate_marco', participacaoPct: n(p?.pct), sinalPct: n(p?.sinalPct), marcoMes: fimObra,
         defasagemMeses: 1, taxaMensal, jurosNoMesDaContratacao: false, rotulo: 'ao longo da obra (legado)',
       });
     } else {
       const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
       componentes.push({
-        tipo: 'prazo_fixo', participacaoPct: n(p?.pct), sinalPct: 0,
+        tipo: 'prazo_fixo', participacaoPct: n(p?.pct), sinalPct: n(p?.sinalPct),
         prazoMeses: Math.max(1, Math.round(n(p?.parcelas) || 1)),
         defasagemMeses: intervalo, taxaMensal, jurosNoMesDaContratacao: false,
         rotulo: `parcelamento ${p?.periodicidade ?? 'mensal'} (legado)`,
@@ -1314,17 +1332,52 @@ export const ROTULOS_COMPONENTES_CARTEIRA: Record<keyof SeriesComponentesCarteir
   saldoARepassar: 'Saldo a repassar',
 };
 
+/** #460: os dois destinos declarados para o resíduo de um `ate_marco` sem
+ * prazo (`N_s ≤ 0`) — venda contratada no próprio mês do marco ou depois
+ * dele. `imediato` é o comportamento de sempre e o default (preserva todo
+ * estudo existente); `concentrado` é o que a EVI faz (`cfINC!AH`): o saldo
+ * rola inteiro para o repasse, e passa a capitalizar com ele. */
+export type ResiduoAteMarco = 'concentrado' | 'imediato';
+
+/** #460: a fração de um `ate_marco` cujo N_s ≤ 0 nesta safra — parâmetro
+ * OBRIGATÓRIO de propósito (não tem default aqui): os dois call sites deste
+ * módulo precisam decidir explicitamente, e omitir a passagem tem de estourar
+ * `TS2554` na compilação, não cair calado num comportamento não pretendido. */
 function componentesIntegradosSafra(
   componentes: ComponentePagamento[],
   safra: number,
   mesEntrega: number,
+  residuoAteMarco: ResiduoAteMarco,
 ): ComponentePagamento[] {
   const efetivos = componentesEfetivosSafra(componentes, safra, mesEntrega);
-  // #233 delega ao chamador a decisão para N_s <= 0. Na integração real, a
-  // fração "até o marco" contratada no próprio marco vence imediatamente;
-  // não se cria prazo negativo nem se invalida toda a safra.
-  return efetivos.map((c) => c.tipo === 'ate_marco'
-    && c.marcoMes - safra - (c.defasagemMeses - 1) <= 0
+  const semPrazo = (c: ComponentePagamento): c is Extract<ComponentePagamento, { tipo: 'ate_marco' }> =>
+    c.tipo === 'ate_marco' && c.marcoMes - safra - (c.defasagemMeses - 1) <= 0;
+
+  // #460: com o destino 'concentrado' E um componente `concentrado` na MESMA
+  // linha, a participação do resíduo é TRANSFERIDA para ele — nunca mutando o
+  // componente persistido (`efetivos` pode ser o próprio array `componentes`
+  // de entrada, quando a safra não é Após-chaves — ver `componentesEfetivosSafra`),
+  // sempre devolvendo uma CÓPIA. O resíduo transferido passa a ser pago (e
+  // capitalizado) no calendário do `concentrado`, exatamente como
+  // `pagamentosConcentrado` já faz — sem lógica nova ali.
+  if (residuoAteMarco === 'concentrado' && efetivos.some((c) => c.tipo === 'concentrado')) {
+    let transferido = 0;
+    const semResiduo: ComponentePagamento[] = [];
+    for (const c of efetivos) {
+      if (semPrazo(c)) { transferido += c.participacaoPct; continue; }
+      semResiduo.push(c);
+    }
+    if (transferido <= 0) return semResiduo;
+    return semResiduo.map((c) => (c.tipo === 'concentrado'
+      ? { ...c, participacaoPct: c.participacaoPct + transferido }
+      : c));
+  }
+
+  // #233 delega ao chamador a decisão para N_s <= 0. Sem `concentrado` na
+  // linha, ou com o destino 'imediato' (default): a fração "até o marco"
+  // contratada no próprio marco vence imediatamente; não se cria prazo
+  // negativo nem se invalida toda a safra.
+  return efetivos.map((c) => semPrazo(c)
     ? { tipo: 'imediato' as const, participacaoPct: c.participacaoPct, descontoPct: 0, rotulo: c.rotulo }
     : c);
 }
@@ -1353,6 +1406,11 @@ export function calcularRecebiveisComponentes(
   contratacoes: ContratacaoSafra[],
   mesEntrega: number,
   prazoTotal: number,
+  // #460: OPCIONAL aqui — ao contrário do parâmetro interno de
+  // `componentesIntegradosSafra`, esta é a fronteira pública, chamada por
+  // dezenas de testes que não conhecem o campo novo. Default 'imediato'
+  // preserva 100% do comportamento anterior a esta issue.
+  residuoAteMarco: ResiduoAteMarco = 'imediato',
 ): RecebiveisComponentesCalc {
   const tamanho = Math.max(0, prazoTotal);
   const bruto = new Array<number>(tamanho).fill(0);
@@ -1380,7 +1438,7 @@ export function calcularRecebiveisComponentes(
 
   for (const contratacao of contratacoes) {
     if (contratacao.valorContratado <= 0) continue;
-    const efetivos = componentesIntegradosSafra(componentes, contratacao.safra, mesEntrega);
+    const efetivos = componentesIntegradosSafra(componentes, contratacao.safra, mesEntrega, residuoAteMarco);
     const aposChaves = ehVendaAposChaves(contratacao.safra, mesEntrega);
     for (const componente of efetivos) {
       const chaveReceita: keyof SeriesComponentesReceita = aposChaves ? 'aposChaves'
@@ -1466,6 +1524,9 @@ function recebiveisComponentesLinha(
     contratacoes,
     mesEntrega,
     prazoTotal,
+    // #460: a política vive na LINHA (`fluxo_pagamento.residuoAteMarco`), não
+    // no componente — é aqui, e só aqui, que ela entra na assinatura.
+    linha?.fluxo_pagamento?.residuoAteMarco ?? 'imediato',
   );
 }
 

@@ -14,7 +14,7 @@ import {
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos, pctDeReceitaBruta,
   permutaFinanceiraBrutaMensal, permutaFinanceiraLiquidaMensal,
   areaVendidaMensal, unidadesVendidasMensal, estoqueM2Mensal, estoqueM2Semente, vsoMensal,
-  type FluxoConfig, type FluxoCalc, type ComponentePagamento,
+  type FluxoConfig, type FluxoCalc, type ComponentePagamento, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import { periodosAnuais, CATEGORIA_CORRETAGEM, type EventoCrono } from './fluxo-shared.js';
 import {
@@ -1303,6 +1303,35 @@ test('componentesDoLegado: parcelamento sem "ao longo da obra" → prazo_fixo co
   assert.equal(c.defasagemMeses, 3); // trimestral = intervalo 3
 });
 
+test('#455 componentesDoLegado: sinal do Parcelamento chega a sinalPct (ate_marco e prazo_fixo)', () => {
+  const fp = {
+    parcelas: [
+      { pct: 40, ao_longo_obra: true, periodicidade: 'mensal', sinalPct: 15 },
+      { pct: 25, ao_longo_obra: false, periodicidade: 'trimestral', parcelas: 6, sinalPct: 8.5 },
+    ],
+  };
+  const r = componentesDoLegado(fp, CRONO) as any[];
+  const ateMarco = r.find((c) => c.tipo === 'ate_marco');
+  const prazoFixo = r.find((c) => c.tipo === 'prazo_fixo');
+  assert.equal(ateMarco.sinalPct, 15);
+  assert.equal(prazoFixo.sinalPct, 8.5);
+
+  // Regressão: sem a chave (todo estudo anterior a esta issue), continua 0.
+  const semSinal = componentesDoLegado(
+    { parcelas: [{ pct: 40, ao_longo_obra: true, periodicidade: 'mensal' }] }, CRONO,
+  ) as any[];
+  assert.equal(semSinal.find((c) => c.tipo === 'ate_marco').sinalPct, 0);
+});
+
+test('#455 componentesDoLegado: Entrada parcelada NÃO ganha campo de sinal — decisão declarada', () => {
+  // O sinal é da seção "Parcelamento"; Entrada com `parcelas > 1` também vira
+  // `prazo_fixo`, mas fica sempre em 0 — mesmo que a chave exista no dado
+  // persistido (ela não deveria existir ali, mas o motor não confia nisso).
+  const fp = { entrada: [{ pct: 20, parcelas: 3, sinalPct: 99 } as any] };
+  const r = componentesDoLegado(fp, CRONO) as any[];
+  assert.equal(r.find((c) => c.tipo === 'prazo_fixo').sinalPct, 0);
+});
+
 test('#345 componentesDoLegado: repasse deriva concentrado no mês fixo (fim da Obra + 1, travado)', () => {
   // `apos_entrega_meses: 2` é persistido mas IGNORADO — o offset é sempre 1,
   // inclusive para estudo legado com outro valor gravado.
@@ -1889,6 +1918,116 @@ test('#283 motor de produção reproduz Calliandra G.2 e separa o repasse', () =
   assert.equal(r.carteiraPorComponenteMensal.saldoARepassar[25], 0);
   assert.equal(soma(r.jurosMensal), 0);
   assert.equal(r.carteiraMensal[25], 0);
+});
+
+// ── #460: resíduo de `ate_marco` sem prazo (N_s ≤ 0) — imediato × concentrado ─
+//
+// Venda contratada no próprio mês do marco (ou depois) não tem prazo restante
+// para parcelar. A EVI rola esse resíduo para o saldo a repassar (`cfINC!AH`);
+// o app SEMPRE fez o oposto (converte para `imediato`, R-A2-07 original). O
+// campo `residuoAteMarco` torna a regra da EVI um opt-in, com o comportamento
+// de sempre como default — nenhum estudo existente muda de número sem
+// alguém marcar o controle novo.
+
+test('#460 residuoAteMarco ausente/"imediato": resíduo vira caixa no mês do marco (comportamento de sempre)', () => {
+  const fimObra = 10;
+  const componentes: ComponentePagamento[] = [
+    { tipo: 'ate_marco', participacaoPct: 24, sinalPct: 0, marcoMes: fimObra, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'até o marco' },
+    { tipo: 'concentrado', participacaoPct: 56, mesPagamento: fimObra + 1, taxaMensal: 0, rotulo: 'repasse' },
+  ];
+  const contratacoes = [{ safra: fimObra, valorContratado: 1_000_000 }];
+
+  // Sem o campo — o comportamento de sempre, nenhum número muda.
+  const semCampo = calcularRecebiveisComponentes(componentes, contratacoes, fimObra, fimObra + 5);
+  assert.equal(semCampo.recebimentoBrutoMensal[fimObra], 240_000, '24% imediato no mês do marco');
+  assert.equal(semCampo.recebimentoBrutoMensal[fimObra + 1], 560_000, '56% do concentrado, sem o resíduo');
+
+  // Com 'imediato' EXPLÍCITO — idêntico ao ausente.
+  const explicito = calcularRecebiveisComponentes(componentes, contratacoes, fimObra, fimObra + 5, 'imediato');
+  assert.deepEqual(explicito.recebimentoBrutoMensal, semCampo.recebimentoBrutoMensal);
+});
+
+test('#460 residuoAteMarco "concentrado": o resíduo rola para o Repasse — as DUAS séries mensais, não o total', () => {
+  // ⚠️ O total é IGUAL nos dois modos (80% de 1.000.000 = 800.000, sempre); o
+  // que muda é o MÊS. Um teste de total passaria nos dois — este assevera as
+  // duas séries.
+  const fimObra = 10;
+  const componentes: ComponentePagamento[] = [
+    { tipo: 'ate_marco', participacaoPct: 24, sinalPct: 0, marcoMes: fimObra, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'até o marco' },
+    { tipo: 'concentrado', participacaoPct: 56, mesPagamento: fimObra + 1, taxaMensal: 0, rotulo: 'repasse' },
+  ];
+  const contratacoes = [{ safra: fimObra, valorContratado: 1_000_000 }];
+
+  const r = calcularRecebiveisComponentes(componentes, contratacoes, fimObra, fimObra + 5, 'concentrado');
+  assert.equal(r.recebimentoBrutoMensal[fimObra], 0, 'nada fica no mês do marco — tudo rolou');
+  assert.equal(r.recebimentoBrutoMensal[fimObra + 1], 800_000, '80% (24% + 56%) no mês do Repasse');
+
+  // O total é o mesmo dos dois modos — não é isto que distingue.
+  const semCampo = calcularRecebiveisComponentes(componentes, contratacoes, fimObra, fimObra + 5);
+  assert.equal(soma(r.recebimentoBrutoMensal), soma(semCampo.recebimentoBrutoMensal));
+});
+
+test('#460 "concentrado" capitaliza o resíduo pela taxa do componente concentrado — não é só calendário', () => {
+  const fimObra = 10;
+  const TAXA = 0.0098635806;
+  const componentes: ComponentePagamento[] = [
+    { tipo: 'ate_marco', participacaoPct: 24, sinalPct: 0, marcoMes: fimObra, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'até o marco' },
+    { tipo: 'concentrado', participacaoPct: 56, mesPagamento: fimObra + 1, taxaMensal: TAXA, rotulo: 'repasse' },
+  ];
+  const contratacoes = [{ safra: fimObra, valorContratado: 1_000_000 }];
+
+  const r = calcularRecebiveisComponentes(componentes, contratacoes, fimObra, fimObra + 5, 'concentrado');
+  const esperado = Math.round(800_000 * Math.pow(1 + TAXA, 1) * 100) / 100;
+  assert.equal(r.recebimentoBrutoMensal[fimObra + 1], esperado);
+  // Sem isto, o dinheiro rolaria sem capitalizar — meia entrega.
+  assert.ok(r.recebimentoBrutoMensal[fimObra + 1] > 800_000, 'o resíduo capitalizou junto com o repasse');
+});
+
+test('#460 FIAÇÃO: `linha.fluxo_pagamento.residuoAteMarco` chega a `recebimentoBrutoMensal` — não só o motor isolado', () => {
+  // Os três testes acima constroem `ComponentePagamento[]` à mão e chamam
+  // `calcularRecebiveisComponentes` direto — provam o CÁLCULO, não a FIAÇÃO
+  // entre o campo persistido na linha e o motor. Este entra pela porta real:
+  // `recebimentoBrutoMensal(linha, ...)`, que é o que `descontoComercialMensal`
+  // e `recebiveisComponentesLinha` (privada) leem de verdade.
+  const CRONO_460: EventoCrono[] = [
+    { evento: 'lancamento', inicio_mes: 0, duracao_meses: 1 },
+    { evento: 'obra', inicio_mes: 1, duracao_meses: 10 }, // fim da Obra = mês 10
+    { evento: 'pos_obra', inicio_mes: 11, duracao_meses: 6 },
+  ];
+  const linha = (residuoAteMarco?: ResiduoAteMarco) => ({
+    tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 50, preco_m2: 10_000 }], // VGV 5.000.000
+    absorcao: { modo: 'personalizado', meses: [{ mes: 10, pct: 100 }] }, // 100% no mês do marco
+    fluxo_pagamento: {
+      ...(residuoAteMarco ? { residuoAteMarco } : {}),
+      componentes: [
+        { tipo: 'imediato', participacaoPct: 20, descontoPct: 0, rotulo: 'sinal' },
+        { tipo: 'ate_marco', participacaoPct: 24, sinalPct: 0, marcoMes: 10, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'x' },
+        { tipo: 'concentrado', participacaoPct: 56, mesPagamento: 11, taxaMensal: 0, rotulo: 'y' },
+      ],
+    },
+  });
+
+  const semCampo = recebimentoBrutoMensal(linha(), CRONO_460, 20);
+  const comCampo = recebimentoBrutoMensal(linha('concentrado'), CRONO_460, 20);
+
+  // Sem o campo: 20% (imediato) + 24% (ate_marco virado imediato) = 44% no mês 10.
+  assert.equal(semCampo[10], 2_200_000);
+  assert.equal(semCampo[11], 2_800_000); // só os 56% do concentrado
+  // Com 'concentrado': só os 20% do imediato ficam no mês 10; o resto foi.
+  assert.equal(comCampo[10], 1_000_000);
+  assert.equal(comCampo[11], 4_000_000); // 56% + 24% transferidos
+  assert.equal(soma(semCampo), soma(comCampo), 'o total da linha não muda — só o calendário');
+});
+
+test('#460 fallback: sem `concentrado` na linha, "concentrado" continua virando imediato', () => {
+  const marco = 20;
+  const componentes: ComponentePagamento[] = [
+    { tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: marco, defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'até o marco, sem repasse' },
+  ];
+  const contratacoes = [{ safra: marco, valorContratado: 500_000 }];
+
+  const r = calcularRecebiveisComponentes(componentes, contratacoes, marco, marco + 3, 'concentrado');
+  assert.equal(r.recebimentoBrutoMensal[marco], 500_000, 'sem concentrado, o resíduo tem de ir a algum lugar: imediato');
 });
 
 // ── #428: juros de tabela — a conversão, o adaptador e os goldens da EVI ───
