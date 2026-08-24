@@ -695,7 +695,7 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > ✅ **Comportamento vigente, alinhado ao padrão e à EVI (#226 / EVI-007).** O início é o mês
 > seguinte ao fim da Obra (`pos_obra` travado por `recalcularTravados`) e a duração é a
 > **constante** `APOS_CHAVES_MESES = 12` (`frontend/fluxo-shared.ts:237`), consumida em
-> `faixasAbsorcao:289` e declarada em `absorcaoMensal:381-382`.
+> `faixasAbsorcao:289` e declarada em `absorcaoMensal:407-408`.
 >
 > **A planilha de referência vota do mesmo lado.** Na EVI Urbitá, `cfINC!J` divide por **12
 > literal** e ignora os próprios inputs `EtapaChavesDuracao`/`EtapaPosChavesDuracao` — a janela de
@@ -720,9 +720,31 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > (`backend/rotas/avancado.ts:42`); editá-lo **não** move a janela de vendas, só a **âncora de
 > custos** pós-entrega — que é exatamente por que a D1 os separa. Medido em Pinguim: o estudo 6 tem
 > `duracao_meses: 13` e uma curva de absorção `personalizado` que chega ao 13º mês; o 13º mês cai
-> fora de `periodoAbsorcao` e `absorcaoMensal:390-391` o **descarta em silêncio** — **1,41% das
-> vendas, R$ 2.007.856,95**. Ver a issue **#429** (o texto anterior apontava a #485, que é outra
-> coisa — o destravamento do início da obra, decisão D6).
+> fora de `periodoAbsorcao` e **não é computado** — **1,41% das vendas, R$ 2.007.856,95**. Ver a
+> issue **#429** (o texto anterior apontava a #485, que é outra coisa — o destravamento do início
+> da obra, decisão D6).
+>
+> ✅ **Comportamento vigente (#429): o descarte deixou de ser silencioso.** Ele **continua não
+> sendo computado** — a camada denuncia, não corrige, e nenhum número de estudo existente muda.
+> O que mudou é que `absorcaoMensal` devolve `pctTotal`/`pctDescartado`/`mesesDescartados` ao lado
+> de `pcts` (`frontend/fluxo-shared.ts:365-376`, acumulados em `:424-432` no modo `personalizado`
+> e em `:439-457` no `distribuido`), `calcularFluxo` emite `console.warn`
+> (`frontend/fluxo-caixa-motor.ts:1768-1786`) e o painel de Reconciliação acusa
+> **`ABSORCAO_NAO_FECHA`** (severidade `erro`, `encontrado:` a absorção efetiva; `esperado:` 100,
+> ou o total que a curva declarou quando houve descarte —
+> `frontend/fluxo-invariantes.ts:266-322`, chamada por `validarProduto:333`).
+>
+> 🔴 **Por que ela não podia sair da validação existente.** `validarContratacao`
+> (`pctNoHorizonte`) soma `abs.pcts`, a saída **já truncada** de `absorcaoMensal`: consome a saída
+> de quem deveria fiscalizar, e por isso `VENDA_BRUTA_NAO_RECONCILIA` fechava certinho enquanto
+> 1,41% do VGV evaporava. O `somaPct` de `validarProduto` chegava a comparar essa soma com 100,
+> mas só para **suprimir** `ESTOQUE_FINAL_NAO_ZERA` — a informação existia, o relato é que não.
+>
+> A invariante tem **duas condições**, e é a segunda que a torna impossível de derivar de `pcts`:
+> `pctAbsorcaoEfetivo` (= `pctTotal − pctDescartado`) fora de 100, **ou** `pctDescartado > 0`.
+> Sozinha, a primeira seria numericamente idêntica a `Σ pcts` no modo `personalizado`; a segunda
+> pega o caso em que a soma truncada fecha 100 por coincidência — uma curva que declara 110% e
+> perde 10 pp fora da janela.
 
 ### 8.6 Representação temporal no app
 
@@ -903,24 +925,51 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 
 > ✅ **Comportamento vigente, alinhado ao padrão (#108/#347).** O JSON `absorcao` de
 > `avancado_fases` guarda o modo **Distribuído** em **quatro** blocos —
-> `pre_lancamento`, `lancamento`, `obra` e `pos_obra` (`frontend/tela-fluxo-receitas.ts:535-540`).
+> `pre_lancamento`, `lancamento`, `obra` e `pos_obra` (`absorcaoParaSalvar`,
+> `frontend/fluxo-absorcao-editor.ts`).
 > Os três primeiros são informados; o Pós-chaves é **derivado**
 > (`pctPosChavesDerivado`: `100 − p1 − p2 − p3`; o nome era `pctPosObraDerivado` até a #430). A soma dos três
 > informados é validada por `erroFormularioAbsorcao` (`frontend/fluxo-shared.ts:345-353`) — sem
 > isso, um total acima de 100% clampava no derivado e a absorção fechava abaixo de 100% sem aviso.
-> ⚠️ **Quando o Cronograma não tem Pré-lançamento, o bloco NÃO chega zerado ao motor — e some
-> silenciosamente uma fatia das vendas.** `tela-fluxo-receitas.ts:522` zera apenas o valor **do
-> formulário**, ao abrir o modal. Salvar os parâmetros do Cronograma **não toca no JSON de
-> absorção** (`backend/rotas/avancado.ts:479-504`): o bloco `pre_lancamento` persistido continua
-> lá, com o percentual antigo.
+> ⚠️ **Quando o Cronograma não tem Pré-lançamento, o bloco NÃO chega zerado ao motor — e uma
+> fatia das vendas deixa de ser computada.** `formularioAbsorcao(..., temPreLancamento=false)`
+> (`frontend/fluxo-absorcao-editor.ts`) zera apenas o valor **do formulário**, ao abrir o modal — e
+> guarda o valor cru em `form.lido`, justamente para que esse zero conte como **edição** e não seja
+> engolido pelo no-op da #431. Salvar os parâmetros do Cronograma **não toca no JSON de absorção**
+> (`backend/rotas/avancado.ts:479-504`): o bloco `pre_lancamento` persistido continua lá, com o
+> percentual antigo.
 >
 > Até alguém abrir o modal e clicar em **Aplicar**, `absorcaoMensal` segue lendo esse bloco e o
 > **descarta**, porque a faixa é vazia — `espalhar` retorna cedo quando `fim < inicio`
-> (`frontend/fluxo-shared.ts:399-401`). Como o Pós-chaves é `100 − p1 − p2 − p3`, o percentual do
-> Pré-lançamento **não é redistribuído**: a absorção fecha abaixo de 100% e ninguém é avisado. Um
-> estudo com 20% em Pré-lançamento que desative a fase passa a vender 80%.
+> (`frontend/fluxo-shared.ts:441-447`). Como o Pós-chaves é `100 − p1 − p2 − p3`, o percentual do
+> Pré-lançamento **não é redistribuído**: a absorção fecha abaixo de 100%. Um estudo com 20% em
+> Pré-lançamento que desative a fase passa a vender 80%.
+>
+> ✅ **Desde a #429, "e ninguém é avisado" deixou de valer.** O percentual da faixa vazia entra em
+> `pctDescartado` (`frontend/fluxo-shared.ts:445`) e o painel de Reconciliação acusa
+> `ABSORCAO_NAO_FECHA`. O comportamento **não** mudou: o percentual continua não sendo computado e
+> continua não sendo redistribuído — a camada denuncia, não corrige.
 >
 > A normalização acontece **só ao reaplicar o modal**, não ao desativar a fase.
+
+> ✅ **A curva `personalizado` sobrevive ao modal desde a #431.** `absorcao.modo` aceita
+> `personalizado` com uma série mês a mês em `absorcao.meses[]`, e `absorcaoMensal`
+> (`frontend/fluxo-shared.ts`) a consome. **Esse dado veio da própria app** — o commit `2c0e793`
+> tinha o seletor "Personalizado" na tela; a UI perdeu o modo depois e o motor continuou lendo, o
+> que faz disto uma **regressão de interface**, não uma feature que nunca existiu. Até a #431,
+> abrir o modal de Absorção e clicar em "Aplicar" convertia a linha para `distribuido` e descartava
+> a curva inteira, sem aviso e sem undo (medido no estudo 6 de Pinguim: 43 pontos, VPL
+> −R$ 360.591,41).
+>
+> Hoje: aplicar **sem editar bloco nenhum** devolve o registro **verbatim**; trocar só o badge
+> "Correção de estoque" também preserva a curva; e editar um percentual de bloco **substitui**, mas
+> só depois de um aviso `urbi-banner variante="alerta"` no corpo do modal e de uma **confirmação
+> explícita** (`_renderConfirmAbsorcao`, `frontend/tela-fluxo-receitas.ts`).
+>
+> ⚠️ **Isto não dá superfície para EDITAR a curva** (criar ou mover pontos) — continua sendo
+> feature. E não conserta a janela fixa de 12 meses que a trunca, que é a **#429**: depois deste
+> conserto a curva do estudo 6 sobrevive **e continua truncada**. "A curva voltou" não fecha
+> aquela issue.
 
 ### 10.3 Distribuição mensal
 
@@ -994,9 +1043,11 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 > **experiência de configuração** do editor tem issue própria: **#248** (`BUGLIST-005`).
 >
 > **Comportamento vigente (pós-#248/#342/#345/#346).** O modal
-> (`frontend/tela-fluxo-receitas.ts:720-830`) tem quatro blocos. *Juros de tabela* (#436) é
-> **somente-leitura** e só aparece quando algum componente persistido tem `taxaMensal ≠ 0`: mostra a
-> taxa anual equivalente e avisa que "Aplicar" a apaga. Os outros três são *Definições* (só texto — corretagem
+> (`_renderModalPagamento`, `frontend/tela-fluxo-receitas.ts`) tem quatro blocos. *Juros de tabela*
+> (#436) é **somente-leitura** e só aparece quando algum componente persistido tem `taxaMensal ≠ 0`:
+> mostra a taxa anual equivalente e — desde a #431, que fez o "Aplicar" parar de destruí-la — diz
+> que ela é **preservada** ao aplicar, e que o que falta é onde **criar** uma (#428). Os outros três
+> são *Definições* (só texto — corretagem
 > e RET migraram para Custos, `:728-737`), *Condições de entrada* (`% do total`, `Nº parcelas`,
 > `Desconto %`, `:741-763`) e *Parcelamento* (`% do total`, `Nº parcelas` ou checkbox "Ao longo da
 > obra", máximo 4 linhas, `:764-806`); o *Repasse* é **derivado e somente-leitura**
@@ -1005,12 +1056,17 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 > linha legada mantém a periodicidade gravada, que o motor continua lendo
 > (`fluxo-caixa-motor.ts:318-320`).
 >
-> **O que ainda falta para o modelo econômico:** não há campo de **taxa** nem de **sinal**. Como
-> `fluxoPagamentoParaSalvar` grava `componentes: componentesDoLegado(...)`
-> (`frontend/fluxo-pagamento-editor.ts:90`) e o adaptador fixa `taxaMensal: 0` / `sinalPct: 0`
-> (`fluxo-caixa-motor.ts:589,601,608,617`), aplicar o modal numa linha que tinha juros **apaga os
-> juros**: é o que acontece hoje com o estudo 5 de Pinguim (`taxaMensal: 0.0098636`,
-> R$ 1.259.273,59).
+> **O que ainda falta para o modelo econômico:** não há campo de **taxa** nem de **sinal** — é a
+> **#428**. O adaptador `componentesDoLegado` continua fixando `taxaMensal: 0`
+> (`fluxo-caixa-motor.ts:591,603,610,619`) e `sinalPct: 0` (`:590,602,608`), porque o espelho legado
+> não tem onde guardar essas grandezas.
+>
+> **O que MUDOU na #431:** `fluxoPagamentoParaSalvar` não grava mais
+> `componentes: componentesDoLegado(...)`, e sim `componentesParaSalvar(...)` — que devolve o array
+> persistido verbatim quando o espelho legado não mudou, e transplanta os campos só-canônicos por
+> identidade quando mudou. Aplicar o modal numa linha que tinha juros **não os apaga mais**; o
+> estudo 5 de Pinguim (`taxaMensal: 0.0098636`, R$ 1.259.273,59) sobrevive ao "Aplicar". O que ainda
+> não existe é **criar** taxa pela tela.
 >
 > ⚠️ **E não é só o juro: a PERIODICIDADE legada também se perde no "Aplicar".** O mesmo adaptador
 > converte `ao_longo_obra` em `ate_marco` com `defasagemMeses: 1`, **descartando a periodicidade**
@@ -1323,8 +1379,8 @@ Ao fim da absorção:
 > `:666`), taxa sobre o saldo de abertura (`:1122-1141`), carteira por safra (`carteiraSaldoSafra`
 > `:826`; consolidação em `:1149-1169`) e reconciliação por componente
 > (`receitaPorComponenteMensal`/`carteiraPorComponenteMensal`, `:1090`/`:1094`, agregadas em
-> `calcularFluxo` `:2040-2046`; invariantes em `validarComponentesSafra`,
-> `frontend/fluxo-invariantes.ts:404`).
+> `calcularFluxo` `:2070-2076`; invariantes em `validarComponentesSafra`,
+> `frontend/fluxo-invariantes.ts:496`).
 >
 > ⚠️ **O ✅ é do MOTOR, não da INTERFACE.** A §13.7 pede que prazo curto, prazo longo, até marco e
 > saldo para repasse sejam **abertos na tela**, e isso **não** está entregue: os seis
@@ -1334,9 +1390,9 @@ Ao fim da absorção:
 > por componente segue **evolução pendente**.
 >
 > ⚠️ **Mais duas ressalvas.** (1) A porta é `fluxo_pagamento.componentes` — linha nunca reeditada
-> segue pelo motor legado. (2) A **taxa** chega 0 pelo adaptador (`:589,601,608,617`) sempre que a
-> linha passa pelo modal, porque ele não a oferece: a carteira existe, e os juros — que existem em
-> estudo real — são apagados no "Aplicar".
+> segue pelo motor legado. (2) A **taxa** ainda não tem onde ser digitada (#428); o que a #431
+> mudou é que ela deixou de ser **apagada** quando a linha passa pelo modal — os juros que existem
+> em estudo real sobrevivem ao "Aplicar".
 
 ### 13.1 Safras
 
@@ -1549,7 +1605,7 @@ No mesmo mês podem continuar parcelas e repasses de contratos antigos.
 | **EVI-014 / #234** | Repasse concentrado, juros explicitamente convencionados | ✅ no motor — **falta a ENTRADA**: o modal não tem campo de taxa nem de sinal (§11) |
 | **EVI-016 / #236** | Carteira por saldos de safra, não recorrência agregada | ✅ |
 | **EVI-017 / #237** | Receita Bruta = contratado líquido + juros | ✅ |
-| **EVI-020 / #240** | Invariantes por safra e primeiro mês divergente | ✅ `validarComponentesSafra` (`fluxo-invariantes.ts:404`) |
+| **EVI-020 / #240** | Invariantes por safra e primeiro mês divergente | ✅ `validarComponentesSafra` (`fluxo-invariantes.ts:496`) |
 | **EVI-021 / #241** | Exibir bruto, desconto, líquido, principal, juros, parcelas, repasse e carteira | 🟡 **parcial** — o motor produz tudo, mas os 6 "Componente · …" e a carteira por componente **saíram da tabela** (`fluxo-tabela.ts:462-467`); a tela mostra só as séries agregadas |
 
 ## 14. Receita Bruta — VGV
@@ -1681,10 +1737,10 @@ A permuta física:
 > valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
 > escrever `unidades_permutadas` (`backend/rotas/avancado.ts:744-749`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
-> (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1781`) e a projeta de volta nas tipologias uma
-> única vez (`:1791-1798`), para que toda função que já lia `t.unidades_permutadas` fique correta
+> (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1811`) e a projeta de volta nas tipologias uma
+> única vez (`:1821-1828`), para que toda função que já lia `t.unidades_permutadas` fique correta
 > sem replicar a reserva. **Sem linha de custo de Permuta física, o KPI é 0** — não há fallback
-> para o campo legado (`:2016-2019`, decisão do autor de 2026-08-02, #267).
+> para o campo legado (`:2046-2049`, decisão do autor de 2026-08-02, #267).
 
 > A ressalva original ("até essa definição, nada de refatoração ampla improvisada; inconsistência
 > vira issue própria e conservadora") **cumpriu o papel dela**: a definição chegou pelas
@@ -1723,7 +1779,7 @@ base líquida
 > multiplicativamente.
 >
 > `calcularFluxo` calcula **as duas séries**, usa a escolhida em `permuta_financeira_base`
-> (default `bruta`) e devolve a não escolhida como `alternativa` (`:1972-1980`); a tela oferece o
+> (default `bruta`) e devolve a não escolhida como `alternativa` (`:2002-2010`); a tela oferece o
 > seletor e exibe o total da outra base (`frontend/tela-fluxo-custos.ts:769-775`). As séries de
 > dedução são `impostoMensal` (`:1447`, RET já resolvido como parâmetro **global** do estudo)
 > e `corretagemMensal` (`:1516`, linha de custo obrigatória "Corretagem de vendas", base
@@ -2065,7 +2121,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:1777-1778`)
+> ✅ **Comportamento vigente (#231).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:1807-1808`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, 11) + 1`, com `ultimoMesRecebivelLinha` derivando o recebível a partir dos
 > componentes normalizados. O fallback silencioso que empilhava excedente no último mês **foi
@@ -2075,7 +2131,7 @@ Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 >
 > ⚠️ **A proteção é PARCIAL, e o requisito acima não é atendido quando o chamador passa
 > `config.prazoMeses`.** A linha é `const prazo = Math.max(1, Math.round(n(config.prazoMeses) ||
-> prazoDerivado))` (`:1779`): o valor explícito **vence** o horizonte derivado. Se for menor, o
+> prazoDerivado))` (`:1809`): o valor explícito **vence** o horizonte derivado. Se for menor, o
 > horizonte **não é ampliado** — os recebíveis excedentes são descartados por `deposita`, com
 > `console.warn` e sem entrar no fluxo. O aviso na consola é melhor que o empilhamento silencioso
 > de antes, mas **não é** "o horizonte deve ser ampliado": nesse caminho, há perda de valor.
@@ -3030,7 +3086,7 @@ Cronograma apaga a duração editada sem aviso, porque `reancorarCustos` reescre
 **curvas de rateio** do Preço do Terreno — receita em caixa e VGV vendido
 (`frontend/tela-fluxo-custos.ts:790-791`). Quem classifica é a **subcategoria**: toda linha
 `Preço/Permuta` é tratada como permuta **financeira** pelo motor
-(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:533-535`). A permuta **física** vem da linha de custo
+(`ePermutaFinanceira`, `frontend/fluxo-shared.ts:601-603`). A permuta **física** vem da linha de custo
 `Preço → Permuta física` (`permuta_tipologia_id` + `permuta_quantidade`), e **não** de
 `unidades_permutadas` no catálogo de Tipologias: desde as #266/#267/#268 esse campo é dado
 histórico, sem fallback — sem a linha de custo, o KPI é 0 (§15.1). Usar `distribuicao_modo` como critério de migração

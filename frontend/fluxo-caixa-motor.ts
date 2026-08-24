@@ -660,17 +660,24 @@ export function componentesPagamento(fluxoPagamento: any, cronograma: EventoCron
 // `fluxo_pagamento.componentes` na linha; sem ele, a linha segue pelo motor
 // legado (`entrada`/`parcelas`/`repasse`), que continua existindo para
 // estudo nunca reeditado. Como `fluxoPagamentoParaSalvar`
-// (`frontend/fluxo-pagamento-editor.ts:90`) grava `componentes` em toda
+// (`frontend/fluxo-pagamento-editor.ts`) grava `componentes` em toda
 // escrita, todo Grupo já editado desde a #248 usa este caminho.
 //
 // ⚠️ A matemática de juros existe e é exercitada por estudo real; o que falta
 // é a ENTRADA. Há linha em produção com `taxaMensal` diferente de 0 (estudo 5
-// de Pinguim: 0.0098636 = 12,5% a.a., R$ 1.259.273,59). O modal não oferece
-// campo de taxa nem de sinal, e o adaptador fixa `taxaMensal: 0` /
-// `sinalPct: 0` (:589,601,608,617) — então abrir o modal e clicar "Aplicar"
-// APAGA os juros da linha, sem undo — e, desde a #436, com aviso na tela (o
-// bloco "Juros de tabela" do modal diz isso). Escrever "`jurosClientes` é
-// sempre 0" é errado: os juros existem e viram zero no primeiro Aplicar.
+// de Pinguim: 0.0098636 = 12,5% a.a., R$ 1.259.273,59). O modal continua sem
+// campo de taxa nem de sinal (é a #428), e `componentesDoLegado` continua
+// fixando `taxaMensal: 0` (`:591`, `:603`, `:610`, `:619`) e `sinalPct: 0`
+// (`:590`, `:602`, `:608` — o ramo `concentrado` de `:619` não emite
+// `sinalPct`), porque o espelho legado não tem onde guardar essas grandezas.
+//
+// O que MUDOU na #431: quem grava não é mais este adaptador. Toda escrita do
+// modal passa por `componentesParaSalvar`
+// (`frontend/fluxo-pagamento-editor.ts`), que devolve o array persistido
+// verbatim quando o espelho não mudou e transplanta os campos só-canônicos
+// quando mudou. Ou seja: abrir o modal e clicar "Aplicar" NÃO apaga mais os
+// juros da linha. Escrever "`jurosClientes` é sempre 0" continua errado — os
+// juros existem, e agora sobrevivem à edição.
 
 /** PMT — parcela fixa que amortiza `principal` em `n` períodos à `taxaMensal`.
  * Taxa zero → divisão simples (sem juros). `n` ≤ 0 → 0 (guarda defensiva). */
@@ -1767,9 +1774,39 @@ function recorte(mensal: number[]): { inicio: number; duracao: number } {
   return { inicio: primeiro, duracao: ultimo - primeiro + 1 };
 }
 
+/**
+ * #429: a curva de absorção que não fecha 100% dentro da janela derivada
+ * deixa de sumir calada. Mesmo padrão dos dois `deposita` deste módulo
+ * (recebível fora do horizonte): o motor **não corrige** — segue computando
+ * só o que cabe na janela —, mas o descarte passa a deixar rastro. A
+ * denúncia visível ao usuário é a `ABSORCAO_NAO_FECHA` do painel de
+ * Reconciliação (`fluxo-invariantes.ts`); este aviso é o rastro de console.
+ */
+function avisarAbsorcaoDescartada(linhasReceita: any[], crono: EventoCrono[]): void {
+  for (const linha of linhasReceita ?? []) {
+    const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, crono);
+    if (!abs) continue;
+    const efetivo = abs.pctTotal - abs.pctDescartado;
+    // Mesmas duas condições da invariante: o descarte precisa avisar mesmo
+    // quando a soma truncada, por coincidência, fecha 100 (curva que declara
+    // 110% e perde 10 pp fora da janela).
+    if (Math.abs(efetivo - 100) <= 0.01 && abs.pctDescartado <= 0.01) continue;
+    const nome = String(linha?.nome || 'Receita');
+    const meses = abs.mesesDescartados.map((m) => m + 1).join(', ');
+    console.warn(
+      `fluxo-caixa-motor: absorção da linha "${nome}" soma ${efetivo.toFixed(2)}% ` +
+      `(curva declara ${abs.pctTotal.toFixed(2)}%); ${abs.pctDescartado.toFixed(2)} pp ` +
+      `caem fora da janela de vendas${meses ? ` (mês ${meses}; a janela vai até o mês ` +
+      `${abs.inicio + abs.pcts.length})` : ''} e NÃO foram computados.`,
+    );
+  }
+}
+
 export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const crono = config.cronograma ?? [];
   const linhasReceitaOriginal = config.linhasReceita ?? [];
+  // #429: antes de qualquer conta — a absorção que não fecha deixa rastro.
+  avisarAbsorcaoDescartada(linhasReceitaOriginal, crono);
   const linhasCusto = config.linhasCusto ?? [];
   const taxa = n(config.taxaDescontoAa) || 12;
 

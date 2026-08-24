@@ -4,6 +4,7 @@ import {
   parseMesAno, rotuloMesRelativo, mesRelativoCompleto, rotuloPeriodo,
   vgvTipologia, vgvLinha, receitaLiquidaLinha, periodoAbsorcao, absorcaoMensal,
   faixasAbsorcao, pctPosChavesDerivado, erroFormularioAbsorcao, problemaJanelaDuranteObra, APOS_CHAVES_MESES,
+  pctAbsorcaoEfetivo, fimJanelaAbsorcao,
   areaPrivativaTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
   totalAntesAlocacao, ePermutaFisica,
@@ -267,6 +268,96 @@ test('absorcaoMensal personalizado (legado) usa os meses relativos informados', 
   assert.ok(perto(r.pcts[12 - 6], 60));
   assert.ok(perto(r.pcts[19 - 6], 40));
   assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 100));
+  // #429: curva íntegra — nada descartado, e o efetivo é o total.
+  assert.equal(r.pctTotal, 100);
+  assert.equal(r.pctDescartado, 0);
+  assert.deepEqual(r.mesesDescartados, []);
+  assert.equal(pctAbsorcaoEfetivo(r), 100);
+});
+
+// ── #429: conservação da absorção ───────────────────────────────────────
+
+test('#429 absorcaoMensal personalizado: ponto fora da janela NÃO é computado, mas é CONTABILIZADO', () => {
+  // periodoAbsorcao(CRONO) = { inicio: 6, fim: 52 } (travado acima), então o
+  // mês 53 é o primeiro ponto fora da janela derivada.
+  const abs = {
+    modo: 'personalizado',
+    meses: [{ mes: 12, pct: 60 }, { mes: 19, pct: 30 }, { mes: 53, pct: 10 }],
+  };
+  const r = absorcaoMensal(abs, CRONO)!;
+  // O motor continua não computando o mês 53 — a camada denuncia, não corrige.
+  assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 90));
+  assert.equal(r.pcts.length, 47);
+  // ...mas o descarte deixou de sumir sem rastro.
+  assert.equal(r.pctTotal, 100);
+  assert.equal(r.pctDescartado, 10);
+  assert.deepEqual(r.mesesDescartados, [53]);
+  assert.equal(pctAbsorcaoEfetivo(r), 90);
+  assert.equal(fimJanelaAbsorcao(r), 52);
+});
+
+test('#429 absorcaoMensal personalizado: ponto ANTES da janela também é descarte contabilizado', () => {
+  const abs = { modo: 'personalizado', meses: [{ mes: 3, pct: 25 }, { mes: 12, pct: 75 }] };
+  const r = absorcaoMensal(abs, CRONO)!;
+  assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 75));
+  assert.equal(r.pctDescartado, 25);
+  assert.deepEqual(r.mesesDescartados, [3]);
+  assert.equal(pctAbsorcaoEfetivo(r), 75);
+});
+
+test('#429 absorcaoMensal: ponto de 0% fora da janela não conta como descarte', () => {
+  const abs = {
+    modo: 'personalizado',
+    meses: [{ mes: 12, pct: 100 }, { mes: 60, pct: 0 }],
+  };
+  const r = absorcaoMensal(abs, CRONO)!;
+  assert.equal(r.pctDescartado, 0);
+  assert.deepEqual(r.mesesDescartados, []);
+  assert.equal(pctAbsorcaoEfetivo(r), 100);
+});
+
+test('#429 não-regressão: linear e distribuído mantêm pcts e não descartam nada', () => {
+  const lin = absorcaoMensal({ modo: 'linear' }, CRONO)!;
+  assert.equal(lin.pcts.length, 47);
+  assert.ok(perto(lin.pcts[0], 100 / 47));
+  assert.equal(lin.pctTotal, 100);
+  assert.equal(lin.pctDescartado, 0);
+  assert.equal(pctAbsorcaoEfetivo(lin), 100);
+
+  const dist = absorcaoMensal({
+    modo: 'distribuido',
+    blocos: [
+      { evento: 'pre_lancamento', pct: 15 }, { evento: 'lancamento', pct: 15 },
+      { evento: 'obra', pct: 35 }, { evento: 'pos_obra', pct: 0 },
+    ],
+  }, CRONO)!;
+  assert.ok(perto(dist.pcts[6 - 6], 15 / 6));
+  assert.ok(perto(dist.pcts[12 - 6], 15));
+  assert.ok(perto(dist.pcts.reduce((s, x) => s + x, 0), 100));
+  assert.equal(dist.pctTotal, 100);
+  assert.equal(dist.pctDescartado, 0);
+  assert.equal(pctAbsorcaoEfetivo(dist), 100);
+});
+
+test('#429 distribuído: % de faixa VAZIA (sem Pré-lançamento no Cronograma) é descarte, não sumiço', () => {
+  // Sem evento `pre_lancamento`, faixasAbsorcao devolve a faixa vazia
+  // (fim < inicio) e `espalhar` não tem onde pôr o %: antes evaporava calado.
+  const semPre: EventoCrono[] = [
+    { evento: 'lancamento', inicio_mes: 6, duracao_meses: 1 },
+    { evento: 'obra', inicio_mes: 7, duracao_meses: 24 },
+    { evento: 'pos_obra', inicio_mes: 31, duracao_meses: 12 },
+  ];
+  const r = absorcaoMensal({
+    modo: 'distribuido',
+    blocos: [
+      { evento: 'pre_lancamento', pct: 20 }, { evento: 'lancamento', pct: 20 },
+      { evento: 'obra', pct: 30 }, { evento: 'pos_obra', pct: 0 },
+    ],
+  }, semPre)!;
+  assert.ok(perto(r.pcts.reduce((s, x) => s + x, 0), 80)); // os 20 do pré não caem em lugar nenhum
+  assert.equal(r.pctTotal, 100);                            // 20 + 20 + 30 + 30 derivado
+  assert.equal(r.pctDescartado, 20);
+  assert.equal(pctAbsorcaoEfetivo(r), 80);
 });
 
 // ── View Anual (S17 · #127) ──
