@@ -73,7 +73,7 @@ test('vendaBrutaContratadaMensal: soma o VGV vendável, distribuído pela absor�
     tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }], // VGV 50M
     absorcao: { modo: 'linear' },
   };
-  const r = vendaBrutaContratadaMensal(linha, CRONO, 60);
+  const r = vendaBrutaContratadaMensal(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 50_000_000, 1));
   assert.equal(r.slice(0, 6).every((v) => v === 0), true); // nada antes do Pré-lançamento
 });
@@ -83,7 +83,7 @@ test('vendaBrutaContratadaMensal exclui a permuta física (usa VGV vendável, #1
     tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000, unidades_permutadas: 20 }],
     absorcao: { modo: 'linear' },
   };
-  const r = vendaBrutaContratadaMensal(linha, CRONO, 60);
+  const r = vendaBrutaContratadaMensal(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 40_000_000, 1)); // 80/100 unidades vendáveis
 });
 
@@ -93,7 +93,7 @@ test('descontoComercialMensal: zero sem entrada configurada — nenhum estudo ex
     absorcao: { modo: 'linear' },
     fluxo_pagamento: null,
   };
-  const r = descontoComercialMensal(linha, CRONO, 60);
+  const r = descontoComercialMensal(linha, CRONO, 60, 0);
   assert.ok(r.every((v) => v === 0));
 });
 
@@ -103,8 +103,8 @@ test('descontoComercialMensal: aplica só sobre a fração da entrada, não sobr
     absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] }, // tudo no mês 12
     fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] },
   };
-  const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60);
-  const desconto = descontoComercialMensal(linha, CRONO, 60);
+  const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60, 0);
+  const desconto = descontoComercialMensal(linha, CRONO, 60, 0);
   // desconto = 5% de (20% da venda bruta do mês), não 5% da venda inteira.
   assert.ok(perto(desconto[12], bruto[12] * 0.20 * 0.05, 1));
   assert.ok(desconto[12] < bruto[12] * 0.05); // bem menor que 5% do total
@@ -116,9 +116,9 @@ test('vendaLiquidaContratadaMensal = bruta − desconto, mês a mês', () => {
     absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
     fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] },
   };
-  const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60);
-  const desconto = descontoComercialMensal(linha, CRONO, 60);
-  const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60);
+  const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60, 0);
+  const desconto = descontoComercialMensal(linha, CRONO, 60, 0);
+  const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60, 0);
   for (let i = 0; i < liquido.length; i++) assert.ok(perto(liquido[i], bruto[i] - desconto[i], 1e-6));
 });
 
@@ -133,9 +133,9 @@ test('#260: vendaBrutaContratadaMensal/descontoComercialMensal/vendaLiquidaContr
     fluxo_pagamento: { entrada: [{ pct: 33, parcelas: 1, descontoPct: 7 }] },
   };
   const casas2 = (v: number) => Math.round(v * 100) / 100 === v;
-  const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60);
-  const desconto = descontoComercialMensal(linha, CRONO, 60);
-  const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60);
+  const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60, 0);
+  const desconto = descontoComercialMensal(linha, CRONO, 60, 0);
+  const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60, 0);
   assert.ok(bruto.every(casas2), 'venda bruta com resíduo além de 2 casas');
   assert.ok(desconto.every(casas2), 'desconto comercial com resíduo além de 2 casas');
   assert.ok(liquido.every(casas2), 'venda líquida com resíduo além de 2 casas');
@@ -309,12 +309,63 @@ test('#260: recebimentoBrutoMensal/impostoMensal/recebimentoLiquidoMensal têm 2
     },
   };
   const casas2 = (v: number) => Math.round(v * 100) / 100 === v;
-  const bruto = recebimentoBrutoMensal(linha, CRONO, 60);
-  const imposto = impostoMensal(linha, CRONO, 60);
-  const liquido = recebimentoLiquidoMensal(linha, CRONO, 60);
+  const bruto = recebimentoBrutoMensal(linha, CRONO, 60, 0);
+  const imposto = impostoMensal(linha, CRONO, 60, 0);
+  const liquido = recebimentoLiquidoMensal(linha, CRONO, 60, 0);
   assert.ok(bruto.every(casas2), 'recebimento bruto com resíduo além de 2 casas');
   assert.ok(imposto.every(casas2), 'imposto com resíduo além de 2 casas');
   assert.ok(liquido.every(casas2), 'recebimento líquido com resíduo além de 2 casas');
+});
+
+// #462: área aberta + deflator mudam a CADEIA DE RECEBÍVEIS inteira, não só
+// o VGV — a issue exigia esta prova explicitamente (critério de aceite 3),
+// porque `vgvVendavelLinha` (a base de `vendaBrutaContratadaMensal` e, por
+// ela, de `recebimentoBrutoMensal`/`impostoMensal`/`recebimentoLiquidoMensal`)
+// passou a receber o deflator (frontend/fluxo-shared.ts:164-166).
+test('#462: área aberta + deflator mudam recebimentoBruto/imposto/líquido — não só o VGV', () => {
+  const base = {
+    tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
+    absorcao: { modo: 'linear' },
+    fluxo_pagamento: {
+      entrada: [{ pct: 20, parcelas: 3, descontoPct: 0 }],
+      parcelas: [{ pct: 80, parcelas: 7, periodicidade: 'mensal' }],
+      ret: { ativo: true, pct: 4 },
+    },
+  };
+  // Mesma tipologia, com 20 m² de área aberta por unidade e deflator 50% —
+  // preço efetivo por unidade: 100×10.000 + 20×10.000×0,5 = 1.100.000
+  // (era 1.000.000) → VGV da linha sobe de 10M para 11M (+10%).
+  const comAberta = {
+    ...base,
+    tipologias: [{ ...base.tipologias[0], area_privativa_aberta_m2: 20 }],
+  };
+  const brutoBase = recebimentoBrutoMensal(base, CRONO, 60, 0);
+  const brutoAberta = recebimentoBrutoMensal(comAberta, CRONO, 60, 50);
+  const impostoBase = impostoMensal(base, CRONO, 60, 0, base.fluxo_pagamento.ret);
+  const impostoAberta = impostoMensal(comAberta, CRONO, 60, 50, comAberta.fluxo_pagamento.ret);
+  const liquidoBase = recebimentoLiquidoMensal(base, CRONO, 60, 0, base.fluxo_pagamento.ret);
+  const liquidoAberta = recebimentoLiquidoMensal(comAberta, CRONO, 60, 50, comAberta.fluxo_pagamento.ret);
+
+  const somaBruto = brutoBase.reduce((s, v) => s + v, 0);
+  const somaBrutoAberta = brutoAberta.reduce((s, v) => s + v, 0);
+  const somaImposto = impostoBase.reduce((s, v) => s + v, 0);
+  const somaImpostoAberta = impostoAberta.reduce((s, v) => s + v, 0);
+  const somaLiquido = liquidoBase.reduce((s, v) => s + v, 0);
+  const somaLiquidoAberta = liquidoAberta.reduce((s, v) => s + v, 0);
+
+  // Não é só o VGV nominal que muda — as TRÊS séries mensais de recebível
+  // sobem na mesma proporção (+10%): imposto e líquido são derivados do
+  // bruto, então o efeito se propaga pela cadeia inteira, não fica preso na
+  // contratação.
+  assert.ok(perto(somaBrutoAberta, somaBruto * 1.1, 1), 'recebimento bruto não subiu 10%');
+  assert.ok(perto(somaImpostoAberta, somaImposto * 1.1, 1), 'imposto não subiu 10%');
+  assert.ok(perto(somaLiquidoAberta, somaLiquido * 1.1, 1), 'recebimento líquido não subiu 10%');
+  // Mês a mês — não só o total: prova que a mudança está na SÉRIE, não numa
+  // agregação que por acaso bate.
+  for (let i = 0; i < 60; i++) {
+    if (brutoBase[i] === 0 && brutoAberta[i] === 0) continue;
+    assert.ok(perto(brutoAberta[i], brutoBase[i] * 1.1, 0.5), `mês ${i}: bruto não escalou 10%`);
+  }
 });
 
 // #227 reconciliado contra o Anexo G.1 (Calliandra prazo fixo): à vista do mês 1
@@ -343,7 +394,7 @@ test('#227: desconto de entrada reproduz o à vista do mês 1 do cenário G.1 (C
   // prazoTotal folgado (140) para não estourar o horizonte do repasse derivado
   // (80% da venda, no fim da Obra do cenário = mês 132) — este teste só confere
   // o mês 1, mas #231 agora avisa (console.warn) se algo cair fora do array.
-  const r = receitaMensalLinha(linha, cronoG1, 140);
+  const r = receitaMensalLinha(linha, cronoG1, 140, 0);
   // Mês 1: só a fração de entrada cai no mês da venda (as demais modalidades —
   // curta/longa, #232+ — ainda não existem nesta fase); confere isoladamente o
   // valor da entrada com desconto.
@@ -365,7 +416,7 @@ test('absorção distribuída: vendas caem nos 4 períodos e somam o VGV', () =>
     },
     fluxo_pagamento: null, // sem config → recebe à vista no mês da venda
   };
-  const r = receitaMensalLinha(linha, CRONO, 60);
+  const r = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 50_000_000, 1));
   assert.ok(perto(r[6], (0.20 * 50_000_000) / 6, 1));   // pré-lançamento: 20% / 6 meses
   assert.ok(perto(r[12], (0.10 * 50_000_000) / 1, 1));  // lançamento: 10% em 1 mês
@@ -389,7 +440,7 @@ test('fluxo de pagamento distribui entrada, parcelas na obra e repasse na entreg
       repasse: { pct: 70, apos_entrega_meses: 2 }, // #345: ignorado — offset travado em 1
     },
   };
-  const r = receitaMensalLinha(linha, CRONO, 60);
+  const r = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 10_000_000, 1));                   // nada se perde
   assert.ok(perto(r[12], 1_500_000, 1));                      // entrada no mês 12
   // #190: parcelas ancoradas nos MESES DA OBRA (17..40 = 24 parcelas), não mais
@@ -430,7 +481,7 @@ test('#190 venda no meio da obra: 1ª parcela no 1º vencimento >= mês da venda
       repasse: { pct: 0, apos_entrega_meses: 0 },
     },
   };
-  const r = receitaMensalLinha(linha, CRONO, 60);
+  const r = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 10_000_000, 1));                   // conservação da receita
   assert.ok(perto(r[24], 0, 1));                              // antes da venda: nada
   assert.ok(perto(r[25], 10_000_000 / 16, 1));                // parcela maior, total igual
@@ -472,7 +523,7 @@ test('#191 semestral: receita se conserva e vence no intervalo certo', () => {
       repasse: { pct: 0, apos_entrega_meses: 0 },
     },
   };
-  const r = receitaMensalLinha(linha, CRONO, 60);
+  const r = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 10_000_000, 1));            // conservação da receita
   // 4 parcelas iguais nos meses 17, 23, 29 e 35 — e nada nos meses do meio.
   for (const mes of [17, 23, 29, 35]) assert.ok(perto(r[mes], 10_000_000 / 4, 1));
@@ -504,7 +555,7 @@ test('fluxo de pagamento: múltiplas entradas + repasse derivado (100 − entrad
       repasse: { apos_entrega_meses: 2 }, // #345: ignorado — pct derivado = 100 − 15 − 15 = 70
     },
   };
-  const r = receitaMensalLinha(linha, CRONO, 60);
+  const r = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 10_000_000, 1));       // nada se perde
   assert.ok(perto(r[12], 1_500_000, 1));          // 10% + 5% de entrada no mês 12
   // #190: parcelas ao longo da obra vencem nos MESES DA OBRA (17..40 = 24), não
@@ -2143,8 +2194,8 @@ test('#460 FIAÇÃO: `linha.fluxo_pagamento.residuoAteMarco` chega a `recebiment
     },
   });
 
-  const semCampo = recebimentoBrutoMensal(linha(), CRONO_460, 20);
-  const comCampo = recebimentoBrutoMensal(linha('concentrado'), CRONO_460, 20);
+  const semCampo = recebimentoBrutoMensal(linha(), CRONO_460, 20, 0);
+  const comCampo = recebimentoBrutoMensal(linha('concentrado'), CRONO_460, 20, 0);
 
   // Sem o campo: 20% (imediato) + 24% (ate_marco virado imediato) = 44% no mês 10.
   assert.equal(semCampo[10], 2_200_000);
@@ -2388,7 +2439,7 @@ test('#283 estudo legado sem componentes mantém exatamente o caminho vigente', 
       repasse: { apos_entrega_meses: 2 }, // #345: ignorado — offset travado em 1
     },
   };
-  const vigente = receitaMensalLinha(linha, CRONO, 60);
+  const vigente = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(vigente[12], 1_500_000, 0.01));
   assert.ok(perto(vigente[17], 1_500_000 / 24, 0.01));
   assert.ok(perto(vigente[41], 7_000_000, 0.01));
@@ -2398,7 +2449,7 @@ test('#283 estudo legado sem componentes mantém exatamente o caminho vigente', 
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     linhasReceita: [linha], linhasCusto: [], areaTerreno: 0,
   });
-  assert.deepEqual(consolidado.receitaBrutaMensal, recebimentoBrutoMensal(linha, CRONO, consolidado.prazo));
+  assert.deepEqual(consolidado.receitaBrutaMensal, recebimentoBrutoMensal(linha, CRONO, consolidado.prazo, 0));
   assert.deepEqual(consolidado.principalRecebidoMensal, consolidado.receitaBrutaMensal);
   assert.equal(consolidado.jurosClientes, 0);
   assert.equal(consolidado.carteiraClientesMaxima, 0);
@@ -2452,8 +2503,8 @@ test('#458: ramo legado × ramo canônico divergem no MESMO fluxo_pagamento — 
   const comps = (canonico.fluxo_pagamento as any).componentes;
   assert.ok(Array.isArray(comps) && comps.length > 0, 'pré-condição: a linha canônica tem componentes');
 
-  const brutoLegado = recebimentoBrutoMensal(legado, CRONO, 60);
-  const brutoCanonico = recebimentoBrutoMensal(canonico, CRONO, 60);
+  const brutoLegado = recebimentoBrutoMensal(legado, CRONO, 60, 0);
+  const brutoCanonico = recebimentoBrutoMensal(canonico, CRONO, 60, 0);
 
   assert.notDeepEqual(brutoCanonico, brutoLegado, 'os dois ramos têm de produzir séries diferentes');
   assert.ok(brutoLegado[mesVenda] > 0,
@@ -2470,7 +2521,7 @@ test('#458 caso negativo: com `componentes` presente nos DOIS Grupos, as séries
   const mesVenda = 20;
   const a = linha458(mesVenda, true);
   const b = linha458(mesVenda, true);
-  assert.deepEqual(recebimentoBrutoMensal(a, CRONO, 60), recebimentoBrutoMensal(b, CRONO, 60));
+  assert.deepEqual(recebimentoBrutoMensal(a, CRONO, 60, 0), recebimentoBrutoMensal(b, CRONO, 60, 0));
 });
 
 // ── #456: KPIs de tela — juros de clientes, carteira máxima, exposição máxima

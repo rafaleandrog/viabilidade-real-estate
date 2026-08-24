@@ -365,7 +365,7 @@ test('#429 validarProduto: a invariante NÃO pode ser satisfeita pela saída tru
   const receitas = receitaComCurva([{ mes: 0, pct: 60 }, { mes: 2, pct: 30 }, { mes: 15, pct: 10 }]);
   const vgvContratadoQueOMotorProduz = 0; // sem tipologias com preço, a conta fecha em zero
   assert.deepEqual(
-    validarContratacao(receitas, CRONO_PRODUTO, 4, vgvContratadoQueOMotorProduz, undefined, []), [],
+    validarContratacao(receitas, CRONO_PRODUTO, 4, vgvContratadoQueOMotorProduz, undefined, [], 0), [],
     'validarContratacao continua cega ao descarte — é por isso que a #429 existe',
   );
   assert.equal(
@@ -468,8 +468,30 @@ test('validarContratacao: bruto fecha por quantidade × área × preço × absor
     ...RECEITA_PRODUTO[0],
     tipologias: [{ tipologia_id: 1, quantidade: 20, area_privativa_m2: 50, preco_m2: 10_000 }],
   }];
-  assert.deepEqual(validarContratacao(linhas, CRONO_PRODUTO, 20, 10_000_000, undefined, []), []);
-  const div = validarContratacao(linhas, CRONO_PRODUTO, 20, 9_000_000, undefined, [])[0];
+  assert.deepEqual(validarContratacao(linhas, CRONO_PRODUTO, 20, 10_000_000, undefined, [], 0), []);
+  const div = validarContratacao(linhas, CRONO_PRODUTO, 20, 9_000_000, undefined, [], 0)[0];
+  assert.equal(div.codigo, 'VENDA_BRUTA_NAO_RECONCILIA');
+  assert.equal(div.diferenca, -1_000_000);
+});
+
+// #462 critério 4: `validarContratacao` continua verde com área aberta > 0
+// — a issue avisa que este validador tem a MESMA fórmula de `vgvVendavelLinha`
+// (agora com deflator), e é ele quem denuncia se o conserto ficar pela
+// metade: se um dos dois caminhos esquecer o deflator, este teste reprova.
+test('#462: validarContratacao reconcilia com área aberta + deflator (fechada 50 + aberta 10×50% = 550 m² efetivos/un.)', () => {
+  const linhas = [{
+    ...RECEITA_PRODUTO[0],
+    tipologias: [{
+      tipologia_id: 1, quantidade: 20,
+      area_privativa_m2: 50, area_privativa_aberta_m2: 10, preco_m2: 10_000,
+    }],
+  }];
+  const deflatorPct = 50;
+  // VGV = 20 × (50×10.000 + 10×10.000×0,5) = 20 × 550.000 = 11.000.000
+  // (sem área aberta seria 10.000.000 — a diferença prova que o deflator
+  // participou da conta, não só a área bruta).
+  assert.deepEqual(validarContratacao(linhas, CRONO_PRODUTO, 20, 11_000_000, undefined, [], deflatorPct), []);
+  const div = validarContratacao(linhas, CRONO_PRODUTO, 20, 10_000_000, undefined, [], deflatorPct)[0];
   assert.equal(div.codigo, 'VENDA_BRUTA_NAO_RECONCILIA');
   assert.equal(div.diferenca, -1_000_000);
 });
@@ -484,17 +506,17 @@ test('#444 validarContratacao: permuta física reservada em Custos reconcilia co
     grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
     permuta_tipologia_id: 1, permuta_quantidade: 5,
   }];
-  const linhasReservadas = linhasReceitaComPermutaReservada(linhas, custos);
+  const linhasReservadas = linhasReceitaComPermutaReservada(linhas, custos, 0);
   const esperadoMotor = linhasReservadas.reduce(
-    (s, l) => s + vendaBrutaContratadaMensal(l, CRONO_PRODUTO, 20).reduce((ss, v) => ss + v, 0), 0);
+    (s, l) => s + vendaBrutaContratadaMensal(l, CRONO_PRODUTO, 20, 0).reduce((ss, v) => ss + v, 0), 0);
   // Sanidade: a permuta (5 × 50 × 10.000 = 2.500.000) reduziu o VGV vendável
   // de 10.000.000 para 7.500.000.
   assert.equal(esperadoMotor, 7_500_000);
-  assert.deepEqual(validarContratacao(linhas, CRONO_PRODUTO, 20, esperadoMotor, TOLERANCIA_PADRAO, custos), []);
+  assert.deepEqual(validarContratacao(linhas, CRONO_PRODUTO, 20, esperadoMotor, TOLERANCIA_PADRAO, custos, 0), []);
   // Sem `linhasCusto`, o validador cai no VGV BRUTO (10.000.000) — regressão
   // que prova que a permuta entrou de fato na conta quando `linhasCusto` é
   // passado, e não por coincidência.
-  const semReserva = validarContratacao(linhas, CRONO_PRODUTO, 20, esperadoMotor, undefined, []);
+  const semReserva = validarContratacao(linhas, CRONO_PRODUTO, 20, esperadoMotor, undefined, [], 0);
   assert.equal(semReserva[0]?.codigo, 'VENDA_BRUTA_NAO_RECONCILIA');
 });
 
@@ -526,7 +548,7 @@ test('#444 validarContratacao: absorção que NÃO fecha 100% no horizonte repro
   // no horizonte); a 2ª contribui 2.500.000 (vendável 5.000.000 × 50% no
   // horizonte — o outro 50% caiu fora do prazo e não conta). Total: 12.500.000.
   assert.deepEqual(
-    validarContratacao(linhas, CRONO_PARCIAL, prazo, 12_500_000, TOLERANCIA_PADRAO, custos), [],
+    validarContratacao(linhas, CRONO_PARCIAL, prazo, 12_500_000, TOLERANCIA_PADRAO, custos, 0), [],
   );
   // Errado: subtrair o escalar `vgvPermutaFisica` do ESTUDO (5.000.000, sem
   // peso de absorção) do bruto ponderado (10.000.000 + 5.000.000 =
@@ -534,8 +556,7 @@ test('#444 validarContratacao: absorção que NÃO fecha 100% no horizonte repro
   // fecha 100% no horizonte, que NÃO é o caso aqui. O validador tem de
   // ACUSAR esse número.
   const comEscalarErrado = validarContratacao(
-    linhas, CRONO_PARCIAL, prazo, 10_000_000, TOLERANCIA_PADRAO, custos,
-  );
+    linhas, CRONO_PARCIAL, prazo, 10_000_000, TOLERANCIA_PADRAO, custos, 0);
   assert.equal(comEscalarErrado[0]?.codigo, 'VENDA_BRUTA_NAO_RECONCILIA');
 });
 
@@ -549,7 +570,7 @@ test('validarSafrasReceita: identifica linha e safra com componentes que não fe
     tipologias: [{ quantidade: 1, area_privativa_m2: 50, preco_m2: 10_000 }],
     fluxo_pagamento: { componentes: [{ tipo: 'imediato', participacaoPct: 90, descontoPct: 0 }] },
   }];
-  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [])[0];
+  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0)[0];
   assert.equal(div.codigo, 'SOMA_COMPONENTES_DIVERGE');
   assert.equal(div.linha, 'Torre A');
   assert.equal(div.safra, 1);
@@ -571,7 +592,7 @@ test('#444 validarSafrasReceita: ate_marco degenerado (N_s ≤ 0, mesmo mecanism
   }];
   // safra 1 (lançamento) == marcoMes 1 → N_s = 0 ≤ 0 — o motor converte para
   // `imediato`; o validador precisa fazer o mesmo, não lançar/capturar.
-  const r = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, []);
+  const r = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0);
   assert.deepEqual(r.filter((d) => d.codigo === 'COMPONENTE_INVALIDO'), []);
 
   // `calcularFluxo` roda sem exceção sobre a MESMA fixture e produz número —
@@ -598,7 +619,7 @@ test('#444 validarSafrasReceita: componente GENUINAMENTE inválido (concentrado 
   // contratação na safra 1 (lançamento, inicio_mes 1); mesPagamento 0 < safra
   // 1 — `pagamentosConcentrado` lança (#234), independente da conversão do
   // `ate_marco` degenerado que esta issue introduziu.
-  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, []).find((d) => d.codigo === 'COMPONENTE_INVALIDO');
+  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0).find((d) => d.codigo === 'COMPONENTE_INVALIDO');
   assert.ok(div, 'componente genuinamente inválido deveria continuar sendo acusado');
 });
 

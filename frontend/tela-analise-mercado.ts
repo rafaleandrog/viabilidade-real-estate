@@ -196,9 +196,10 @@ export class ViabTelaAnaliseMercado extends LitElement {
     if (this.carregando) return html`<urbi-loading mensagem="Carregando análise de mercado..."></urbi-loading>`;
 
     const m = this.analise;
-    const precoProjeto = precoMedioM2Projeto(this.receitas);
+    const deflatorPct = Number(this.estudo?.deflator_area_aberta_pct) || 0;
+    const precoProjeto = precoMedioM2Projeto(this.receitas, deflatorPct);
     const custoProjeto = custoObraM2Projeto(this.calc?.linhasCusto ?? [], this.areaPrivativaTotal);
-    const vsoProjeto = vsoProjetoPct(this.receitas, this.crono);
+    const vsoProjeto = vsoProjetoPct(this.receitas, this.crono, deflatorPct);
 
     // Sem NENHUM lado: o estudo ainda não tem dados para comparar nada.
     if (precoProjeto === null && custoProjeto === null && vsoProjeto === null && !m) {

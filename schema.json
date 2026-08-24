@@ -172,7 +172,9 @@
         "investidor_retorno_tipo":          { "tipo": "texto", "limite": 16, "opcoes": ["remunerado", "pct_receita", "pct_resultado"], "padrao": "remunerado" },
         "investidor_juros_aa":              { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
         "investidor_carencia_meses":        { "tipo": "inteiro", "padrao": 0 },
-        "investidor_parcelas":              { "tipo": "inteiro", "padrao": 0 }
+        "investidor_parcelas":              { "tipo": "inteiro", "padrao": 0 },
+
+        "deflator_area_aberta_pct":         { "tipo": "inteiro", "padrao": 0 }
       },
       "indices": [["tipo_empreendimento"], ["status"], ["autor_id"]],
       "unicos": [["id_legivel"]]
@@ -332,6 +334,7 @@
         "nome":              { "tipo": "texto", "limite": 100 },
         "tipo_unidade":      { "tipo": "texto", "limite": 20, "opcoes": ["apartamento", "cobertura", "loja", "lote", "outro"], "padrao": "apartamento" },
         "area_privativa_m2": { "tipo": "decimal", "precisao": 10, "escala": 2 },
+        "area_privativa_aberta_m2": { "tipo": "decimal", "precisao": 10, "escala": 2, "padrao": 0 },
         "dormitorios":         { "tipo": "inteiro" },
         "vagas":               { "tipo": "inteiro" },
         "quantidade":          { "tipo": "inteiro", "padrao": 0 },

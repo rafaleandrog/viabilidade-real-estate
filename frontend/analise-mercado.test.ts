@@ -27,18 +27,18 @@ const LINHA_MISTA = {
 
 test('#199 preço médio do projeto é ponderado pela área, não a média dos preços', () => {
   // VGV 13M / 900 m² = 14.444,44 — a média aritmética dos preços daria 15.000.
-  const r = precoMedioM2Projeto([LINHA_MISTA]);
+  const r = precoMedioM2Projeto([LINHA_MISTA], 0);
   assert.ok(r !== null);
   assert.ok(perto(r!, 13_000_000 / 900));
   assert.ok(!perto(r!, 15_000, 1), 'não pode ser a média aritmética dos preco_m2');
 });
 
 test('#199 sem tipologia/VGV o preço do projeto é null, não zero', () => {
-  assert.equal(precoMedioM2Projeto([]), null);
-  assert.equal(precoMedioM2Projeto([{ tipologias: [] }]), null);
+  assert.equal(precoMedioM2Projeto([], 0), null);
+  assert.equal(precoMedioM2Projeto([{ tipologias: [] }], 0), null);
   // Área existe mas preço zerado → VGV 0 → não há preço a comparar.
   assert.equal(
-    precoMedioM2Projeto([{ tipologias: [{ quantidade: 1, area_privativa_m2: 50, preco_m2: 0 }] }]),
+    precoMedioM2Projeto([{ tipologias: [{ quantidade: 1, area_privativa_m2: 50, preco_m2: 0 }] }], 0),
     null,
   );
 });
@@ -69,7 +69,7 @@ test('#199 VSO do projeto = 100% dividido pelos meses com venda', () => {
       meses: [{ mes: 12, pct: 25 }, { mes: 13, pct: 25 }, { mes: 14, pct: 25 }, { mes: 15, pct: 25 }],
     },
   };
-  const r = vsoProjetoPct([linha], CRONO);
+  const r = vsoProjetoPct([linha], CRONO, 0);
   assert.ok(r !== null);
   assert.ok(perto(r!, 25));
 });
@@ -84,15 +84,15 @@ test('#199 VSO pondera as fases pelo VGV, não pela contagem de fases', () => {
     tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // 10M
     absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 50 }, { mes: 13, pct: 50 }] },
   };
-  const r = vsoProjetoPct([grande, pequena], CRONO);
+  const r = vsoProjetoPct([grande, pequena], CRONO, 0);
   assert.ok(r !== null);
   // Ponderado: (10×90M + 50×10M) / 100M = 14 — a média simples daria 30.
   assert.ok(perto(r!, 14, 0.5));
 });
 
 test('#199 VSO é null sem receita utilizável', () => {
-  assert.equal(vsoProjetoPct([], CRONO), null);
-  assert.equal(vsoProjetoPct([{ tipologias: [], absorcao: { modo: 'linear' } }], CRONO), null);
+  assert.equal(vsoProjetoPct([], CRONO, 0), null);
+  assert.equal(vsoProjetoPct([{ tipologias: [], absorcao: { modo: 'linear' } }], CRONO, 0), null);
 });
 
 test('#199 comparação projeto × mercado: acima, abaixo e alinhado', () => {
