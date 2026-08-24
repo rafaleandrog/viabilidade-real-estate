@@ -136,16 +136,44 @@ retorno.
 | F — Fluxo investidor | `D − E` |
 | G — Caixa acumulado | `G_ant + F` |
 
+> ⚠️ **Divergência deliberada do app — retorno de equity quando a receita líquida do mês é
+> negativa (#432).** A linha `D` acima é a transcrição fiel da planilha, e a planilha **não** tem
+> `MAX(0; …)` ali. Ela é **silenciosa, não permissiva**: `C = B × (1 − C15 − C16 − C17)` é uma
+> dedução **multiplicativa** sobre uma decomposição do VGV em frações não negativas
+> (`não-negativo × 0,86`), então o estado negativo é **estruturalmente irrepresentável** na
+> planilha. No app a dedução é uma **série subtraída com cronograma próprio** — a corretagem é paga
+> integralmente no mês da venda (`frontend/fluxo-shared.ts:502-509`, `eCorretagem`, #121) enquanto o
+> recebimento é espalhado pelo plano —, e o estado **existe**: um mês de lançamento cujo sinal é
+> menor que a corretagem produz receita líquida negativa.
+>
+> **O app aplica clamp em 0 com carry-forward do déficit**, no modo `permuta_financeira`:
+>
+> 1. o mês nunca paga negativo — se `base × pct < déficit acumulado`, `saidas[t] = 0`;
+> 2. o que deixou de ser pago **não some**: vira déficit acumulado e abate os meses seguintes;
+> 3. um mês que não zera o déficit inteiro paga zero e **carrega o resto**;
+> 4. o **total** pago ao investidor é preservado quando o acumulado fecha não negativo — muda o
+>    calendário, não o montante. Déficit que sobra ao fim do horizonte é **extinto**, e **não** vira
+>    pagamento negativo: nesse caso o total pago é menor.
+>
+> O déficit é acumulado em **precisão plena** e vive **por operação** (variável local de
+> `simularEquity`); só `saidas[t]` é arredondado, pelo contrato C7 do `CLAUDE.md`.
+>
+> **Decisão do autor, 2026-08-22.** Não é restauração do clamp que existia em
+> `capital-stack-motor.ts` antes da #355 — aquele era um `Math.max(0, …)` seco, **sem memória de
+> déficit**, e teria produzido um total pago maior. O precedente interno do clamp (sem a memória) é
+> `frontend/fluxo-caixa-motor.ts:1584`, em `permutaFinanceiraLiquidaMensal` (`:1576-1587`). Implementação:
+> `simularEquity` (`funding-motor.ts:426`).
+
 **Decisão D8 — as premissas do projeto não são redigitadas.** A aba `equity` da planilha pede de
 novo VGV, % entrada/parcelas/repasse, corretagem, marketing, impostos, duração da obra e mês do
 repasse (`C4`–`C19`). O app **deriva tudo do próprio estudo**: `receitaLiquidaMensal`,
 `resultadoFinal` e `mesRepasseValor` chegam prontos a `simularEquity` por
-`fundingDoEstudo` (`funding-motor.ts:710`). Redigitar criaria uma segunda fonte de verdade,
+`fundingDoEstudo` (`funding-motor.ts:743`). Redigitar criaria uma segunda fonte de verdade,
 divergindo em silêncio da aba Resultados — exatamente o que as #349/#351 eliminaram.
 
 O invariante da curva vale como conferência: `Σ receita bruta = VGV`.
 
-Implementação: `simularEquity` (`funding-motor.ts:425`).
+Implementação: `simularEquity` (`funding-motor.ts:426`).
 
 ### 4.3 Financiamento à produção — **exceção, não segue esta planilha**
 
@@ -175,7 +203,7 @@ apenas **realocada** de `capital-stack-motor.ts`, não reescrita. Oráculo próp
 
 ## 5. Indicadores do investidor
 
-`indicadoresOperacao` (`funding-motor.ts:490`) devolve, na visão do investidor: investimento total
+`indicadoresOperacao` (`funding-motor.ts:523`) devolve, na visão do investidor: investimento total
 (negativo), retorno total, juros pagos, lucro, VPL, TIR mensal e anual, MOIC e payback.
 
 **Duas divergências deliberadas em relação à planilha:**
@@ -219,7 +247,7 @@ meses, lançamento no mês 2, obra 30, repasse no 32, 20% entrada / 30% parcelas
 
 ## 7. Como o funding entra na tabela de Resultados
 
-A costura é `FundingNoFluxo` (`funding-motor.ts:655`), criada pela #349 e preservada de propósito
+A costura é `FundingNoFluxo` (`funding-motor.ts:688`), criada pela #349 e preservada de propósito
 pela reescrita: as liberações/aportes entram como categoria de receita e as parcelas/retornos como
 categoria de custo, dentro da tabela principal — não há segunda tabela.
 
