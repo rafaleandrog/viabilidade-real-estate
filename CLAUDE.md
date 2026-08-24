@@ -387,9 +387,9 @@ roda não imprime nada, e "não imprimiu" é indistinguível de "está tudo norm
 
 **1 · O defeito mora na FIAÇÃO, não no cálculo.**
 A função pura existe, está testada, e o componente pode nunca chamá-la — ou chamar com o argumento
-errado. Cinco PRs seguidos tiveram o bloqueante aí, nenhum no cálculo. **Medido: apagar a chamada
-deixou 488, 513 e 555 testes verdes**, em três PRs diferentes. Teste de função pura não prova
-ligação, e a suíte inteira não fica vermelha por causa dela.
+errado. **Sete PRs desta rodada tiveram o bloqueante aí, nenhum no cálculo. Medido: apagar a chamada
+no componente deixou 488, 513, 542 e 555 testes verdes**, em quatro deles. Teste de função pura não
+prova ligação, e a suíte inteira não fica vermelha por causa dela.
 
 **Defesa, e ela é um passo, não um princípio:** depois de implementar, **apague a chamada e rode a
 suíte**. Se ficar verde, a cobertura daquele caminho é decoração — e o conserto não é escrever mais

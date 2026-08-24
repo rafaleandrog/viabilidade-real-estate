@@ -52,19 +52,19 @@ export const EXCECOES = [
     arquivo: "backend/rotas/funding.ts",
     endereco: "frontend/fluxo-shared.ts:349",
     motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :349 — \"erroFormularioAbsorcao\" está em :403. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
+      "VENCIDO DE VERDADE — nada em ±3 linhas de :349 — \"erroFormularioAbsorcao\" está em :414. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "backend/rotas/funding.ts",
     endereco: "frontend/fluxo-pagamento-editor.ts:66",
     motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :66 — \"erroFormularioPagamento\" está em :361. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
+      "VENCIDO DE VERDADE — nada em ±3 linhas de :66 — \"erroFormularioPagamento\" está em :364. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "docs/viabilidade/fluxo-investidor-formulas.md",
     endereco: "frontend/fluxo-shared.ts:502-509",
     motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :502-509 — \"eCorretagem\" está em :632. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
+      "VENCIDO DE VERDADE — nada em ±3 linhas de :502-509 — \"eCorretagem\" está em :643. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "docs/viabilidade/fluxo-investidor-formulas.md",
@@ -86,15 +86,21 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/fluxo-caixa-motor.ts:2125-2133",
+    endereco: "frontend/exportar.ts:10",
     motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :2125-2133 — \"FluxoCalc\" está em :2076. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
+      "VENCIDO PELO MERGE DA MAIN, e nao por este PR — nada em ±3 linhas de :10 — \"fmtR$\" está em :16. Este endereco estava CERTO na base 0cc2cf86 e quebrou quando a branch trouxe a main de 2026-08-24: e a demonstracao ao vivo da classe que o guard existe para pegar. Conserto e documentacao de PRODUTO e sai em PR separado (regras R1 e R3).",
   },
   {
     arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/tela-fluxo-receitas.ts:382-383",
+    endereco: "frontend/exportar.ts:167",
     motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :382-383 — \"precoUnit\" está em :369; \"precoTotal\" está em :369. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
+      "VENCIDO PELO MERGE DA MAIN, e nao por este PR — nada em ±3 linhas de :167 — \"celulaFx\" está em :173. Este endereco estava CERTO na base 0cc2cf86 e quebrou quando a branch trouxe a main de 2026-08-24: e a demonstracao ao vivo da classe que o guard existe para pegar. Conserto e documentacao de PRODUTO e sai em PR separado (regras R1 e R3).",
+  },
+  {
+    arquivo: "docs/viabilidade/formulas.md",
+    endereco: "frontend/fluxo-caixa-motor.ts:2125-2133",
+    motivo:
+      "VENCIDO DE VERDADE — nada em ±3 linhas de :2125-2133 — \"FluxoCalc\" está em :2076. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "docs/viabilidade/funding-capital-stack.md",
@@ -124,7 +130,7 @@ export const EXCECOES = [
     arquivo: "docs/viabilidade/modelo-de-dados.md",
     endereco: "frontend/exportar.ts:9",
     motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :9 — \"maximumFractionDigits\" não aparece em frontend/exportar.ts; \"toFixed\" está em :14. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
+      "VENCIDO DE VERDADE — nada em ±3 linhas de :9 — \"maximumFractionDigits\" não aparece em frontend/exportar.ts; \"toFixed\" está em :20. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
@@ -154,13 +160,7 @@ export const EXCECOES = [
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
     endereco: "frontend/fluxo-shared.ts:345-353",
     motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :345-353 — \"erroFormularioAbsorcao\" está em :403. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
-    endereco: "frontend/fluxo-shared.ts:445",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :445 — \"pctDescartado\" está em :431. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
+      "VENCIDO DE VERDADE — nada em ±3 linhas de :345-353 — \"erroFormularioAbsorcao\" está em :414. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
@@ -220,13 +220,13 @@ export const EXCECOES = [
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
     endereco: "frontend/fluxo-shared.ts:601-603",
     motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :601-603 — \"ePermutaFinanceira\" está em :659. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
+      "VENCIDO DE VERDADE — nada em ±3 linhas de :601-603 — \"ePermutaFinanceira\" está em :670. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "frontend/premissas-conversao.ts",
     endereco: "fluxo-shared.ts:426-440",
     motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :426-440 — \"resolverCustoTotal\" está em :567. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
+      "VENCIDO DE VERDADE — nada em ±3 linhas de :426-440 — \"resolverCustoTotal\" está em :578. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "frontend/proforma-avancado.ts",
