@@ -364,6 +364,47 @@ test('validarProduto: alocação + permuta acima do catálogo identifica tipolog
   const r = validarProduto(RECEITA_PRODUTO, custos, TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
   assert.equal(r.find((d) => d.codigo === 'PRODUTO_EXCEDE_ESTOQUE')?.linha, 'Studio');
   assert.equal(r.find((d) => d.codigo === 'ESTOQUE_MENSAL_NEGATIVO')?.mes, 1);
+  // #457: sem `area_privativa_m2` no catálogo (caso de `TIPOLOGIAS`), a
+  // dimensão m² não tem como ser calculada — nenhum código M2 aparece.
+  assert.equal(r.find((d) => d.codigo?.includes('_M2_')), undefined);
+});
+
+// #457: a dimensão m² do livro de estoque (ver `validarProduto` acima) reusa
+// o MESMO laço de vendas/estoque em unidades — não duplica a absorção, só
+// escala por `area_privativa_m2`. Por isso os dois pares abaixo reproduzem
+// EXATAMENTE os cenários de `ESTOQUE_MENSAL_NEGATIVO`/`ESTOQUE_FINAL_NAO_ZERA`
+// acima, trocando `TIPOLOGIAS` (sem área) por `TIPOLOGIAS_COM_AREA`.
+
+test('#457 validarProduto: ESTOQUE_MENSAL_NEGATIVO tem par em m² como alerta (mesma violação, escalada por área)', () => {
+  const custos = [{
+    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+    permuta_tipologia_id: 1, permuta_quantidade: 2,
+  }];
+  const r = validarProduto(RECEITA_PRODUTO, custos, TIPOLOGIAS_COM_AREA.slice(0, 1), CRONO_PRODUTO, 4);
+  const erroUnidades = r.find((d) => d.codigo === 'ESTOQUE_MENSAL_NEGATIVO');
+  const alertaM2 = r.find((d) => d.codigo === 'ESTOQUE_M2_MENSAL_NEGATIVO');
+  assert.equal(erroUnidades?.severidade, 'erro');
+  assert.equal(erroUnidades?.mes, 1);
+  assert.ok(alertaM2, 'esperava o par em m² (#457)');
+  assert.equal(alertaM2!.severidade, 'alerta'); // #457 item 6 — nasce alerta, não erro
+  assert.equal(alertaM2!.mes, 1);
+  assert.ok(Math.abs(alertaM2!.encontrado - erroUnidades!.encontrado * 25) < 1e-6); // Studio: 25 m²/unid.
+});
+
+test('#457 validarProduto: ESTOQUE_FINAL_NAO_ZERA tem par em m² como alerta (prazo mais curto que a janela de absorção)', () => {
+  // Só o Lançamento (50%) cabe dentro de `prazo=4`; o Pós-chaves derivado
+  // (50%, espalhado por `cfINC`-style 12 meses fixos a partir do mês 3)
+  // conta para `somaPct` (absorção "completa") mas cai majoritariamente fora
+  // da janela rastreada — resíduo real de estoque ao fim do horizonte.
+  const receita = [{ ...RECEITA_PRODUTO[0], absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 50 }] } }];
+  const r = validarProduto(receita, [], TIPOLOGIAS_COM_AREA.slice(0, 1), CRONO_PRODUTO, 4);
+  const erroUnidades = r.find((d) => d.codigo === 'ESTOQUE_FINAL_NAO_ZERA');
+  const alertaM2 = r.find((d) => d.codigo === 'ESTOQUE_M2_FINAL_NAO_ZERA');
+  assert.ok(erroUnidades, 'esperava ESTOQUE_FINAL_NAO_ZERA em unidades');
+  assert.equal(erroUnidades!.severidade, 'erro');
+  assert.ok(alertaM2, 'esperava o par em m² (#457)');
+  assert.equal(alertaM2!.severidade, 'alerta');
+  assert.ok(Math.abs(alertaM2!.encontrado - erroUnidades!.encontrado * 25) < 1e-6);
 });
 
 test('#340 validarProduto: sub-alocação vira PRODUTO_SUBALOCADO, alerta não erro', () => {

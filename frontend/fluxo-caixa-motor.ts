@@ -19,6 +19,7 @@ import {
   vgvVendavelTipologia, vgvVendavelLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, vgvVendidoMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
+  areaTotalLinha, areaPermutaFisicaLinha, areaVendavelLinha, unidadesVendaveisLinha,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado,
 } from './fluxo-shared.js';
 
@@ -430,6 +431,132 @@ export function vendaBrutaContratadaMensal(
     if (idx >= 0 && idx < saida.length) saida[idx] += (vgv * abs.pcts[i]) / 100;
   }
   return saida.map(round2); // #260 — C7
+}
+
+// ─────────────────────────────────────────────────────────────────
+// #457: livro de estoque — área (m²), unidades e VSO
+// ─────────────────────────────────────────────────────────────────
+//
+// Camada 2 do invariante de conservação (#429): a EVI carrega um livro de
+// estoque (`cfINC!M/N`) que o app não carregava — foi a ausência dele que
+// deixou R$ 2.007.856,95 sumirem em silêncio no estudo 6. As séries abaixo
+// derivam SÓ das tipologias já carregadas e da mesma `absorcaoMensal` usada
+// por `vendaBrutaContratadaMensal` — nenhum input novo, nenhum número
+// financeiro muda.
+//
+// Semente e timing seguem a EVI (BRIEF-EVI.md T4, `Areas e Precos!F14` e
+// `cfINC!G19`), não o critério original da issue (que partia da área já
+// líquida e teria baixado a permuta duas vezes):
+//  - a semente é a área privativa TOTAL da linha (`areaTotalLinha`), não a
+//    "área de venda" já líquida — essa é RESULTADO (`F17 = F14 − F18`);
+//  - a permuta física baixa o estoque integralmente no mês do LANÇAMENTO
+//    (`cfINC!G/H`), não no início do período de absorção (que, havendo
+//    Pré-lançamento, vem antes).
+//
+// Contrato C7: nenhuma destas séries é monetária — carregam precisão plena
+// e NÃO são quantizadas a 2 casas (diferente de `vendaBrutaContratadaMensal`
+// acima). Unidades são fracionárias no cálculo; a exibição arredonda.
+
+/** Mês ABSOLUTO (0-based, mesma base dos arrays mensais) em que a permuta
+ * física baixa o estoque — o mês do Lançamento (`cfINC!G/H`). `null` sem
+ * evento de Lançamento no cronograma (mesma guarda de `faixasAbsorcao`). */
+function mesLancamento(cronograma: EventoCrono[]): number | null {
+  const lanc = (cronograma ?? []).find((e) => e.evento === 'lancamento');
+  return lanc ? Math.max(0, Math.round(n(lanc.inicio_mes))) : null;
+}
+
+/** #457: área vendida mensal (m²) de uma linha — espelha
+ * `vendaBrutaContratadaMensal`, trocando o VGV vendável pela ÁREA vendável
+ * (`areaVendavelLinha`). Sem arredondamento — derivada não monetária (C7). */
+export function areaVendidaMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+  const area = areaVendavelLinha(linha?.tipologias ?? []);
+  if (area <= 0) return saida;
+  const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, cronograma);
+  if (!abs) return saida;
+  for (let i = 0; i < abs.pcts.length; i++) {
+    const idx = abs.inicio + i;
+    if (idx >= 0 && idx < saida.length) saida[idx] += (area * abs.pcts[i]) / 100;
+  }
+  return saida;
+}
+
+/** #457: unidades vendidas mensal de uma linha — mesma distribuição de
+ * `areaVendidaMensal`, em unidades vendáveis (`unidadesVendaveisLinha`). Sem
+ * oráculo na planilha (a EVI não tem coluna de unidades, BRIEF-EVI.md T4);
+ * assegura coerência interna com `areaVendidaMensal`, não paridade externa. */
+export function unidadesVendidasMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+  const unidades = unidadesVendaveisLinha(linha?.tipologias ?? []);
+  if (unidades <= 0) return saida;
+  const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, cronograma);
+  if (!abs) return saida;
+  for (let i = 0; i < abs.pcts.length; i++) {
+    const idx = abs.inicio + i;
+    if (idx >= 0 && idx < saida.length) saida[idx] += (unidades * abs.pcts[i]) / 100;
+  }
+  return saida;
+}
+
+/** #457: valor SEMENTE do livro de estoque (m²) de uma linha — a área
+ * privativa TOTAL, antes de qualquer baixa (permuta ou venda). Ver
+ * `estoqueM2Mensal` para o saldo mês a mês. */
+export function estoqueM2Semente(linha: any): number {
+  return areaTotalLinha(linha?.tipologias ?? []);
+}
+
+/** #457: estoque em m² ao FIM de cada mês de uma linha — `estoqueM2Semente`
+ * menos a permuta física (baixada integralmente no mês do Lançamento) menos
+ * `areaVendidaMensal` acumulada. Fecha em 0 (tolerância de ponto flutuante)
+ * quando a absorção soma 100%; sobra > 0 quando ela não fecha — é o mesmo
+ * resíduo visível que faltava no estudo 6 (#429). */
+export function estoqueM2Mensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+  const permuta = areaPermutaFisicaLinha(linha?.tipologias ?? []);
+  const vendida = areaVendidaMensal(linha, cronograma, prazoTotal);
+  const mesBaixa = mesLancamento(cronograma);
+  let saldo = estoqueM2Semente(linha);
+  for (let mes = 0; mes < saida.length; mes++) {
+    if (mesBaixa !== null && mes === mesBaixa) saldo -= permuta;
+    saldo -= vendida[mes];
+    saida[mes] = saldo;
+  }
+  return saida;
+}
+
+/** #457: VSO mensal de uma linha = vendas do mês ÷ estoque disponível no
+ * INÍCIO do mês (antes da baixa do próprio mês, depois da permuta já baixada
+ * nos meses anteriores/no mês do Lançamento). `0` quando o estoque de início
+ * é `<= 0` — nunca `NaN`/divisão por zero. Sem oráculo na planilha
+ * (BRIEF-EVI.md T4: a EVI não calcula VSO) — verifica coerência interna. */
+export function vsoMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+  const permuta = areaPermutaFisicaLinha(linha?.tipologias ?? []);
+  const vendida = areaVendidaMensal(linha, cronograma, prazoTotal);
+  const mesBaixa = mesLancamento(cronograma);
+  let saldo = estoqueM2Semente(linha);
+  for (let mes = 0; mes < saida.length; mes++) {
+    if (mesBaixa !== null && mes === mesBaixa) saldo -= permuta;
+    saida[mes] = saldo > 0 ? vendida[mes] / saldo : 0;
+    saldo -= vendida[mes];
+  }
+  return saida;
 }
 
 /**

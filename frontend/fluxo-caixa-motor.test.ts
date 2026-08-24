@@ -12,6 +12,7 @@ import {
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   permutaFinanceiraBrutaMensal, permutaFinanceiraLiquidaMensal,
+  areaVendidaMensal, unidadesVendidasMensal, estoqueM2Mensal, estoqueM2Semente, vsoMensal,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
 } from './fluxo-caixa-motor.js';
 import { periodosAnuais, CATEGORIA_CORRETAGEM, type EventoCrono } from './fluxo-shared.js';
@@ -137,6 +138,86 @@ test('#260: vendaBrutaContratadaMensal/descontoComercialMensal/vendaLiquidaContr
   assert.ok(bruto.every(casas2), 'venda bruta com resíduo além de 2 casas');
   assert.ok(desconto.every(casas2), 'desconto comercial com resíduo além de 2 casas');
   assert.ok(liquido.every(casas2), 'venda líquida com resíduo além de 2 casas');
+});
+
+// ── #457: livro de estoque em m²/unidades e VSO ──
+//
+// Cronograma dedicado: SEM Pré-lançamento, para que `periodoAbsorcao.inicio`
+// (usado para indexar `abs.pcts`) coincida com `lancamento.inicio_mes` (usado
+// para a baixa da permuta) — os dois caem no índice 0. Lançamento de 3 meses,
+// como pede o critério de aceite ("Lançamento de 3 meses"); absorção
+// distribuída 15/20/65 (lançamento/obra/pós-chaves; pré-lançamento 0%, não
+// citado) — 15%/3 = 5%/mês no Lançamento, a fonte do "5%" do critério 1.
+const CRONO_LANCAMENTO_3M: EventoCrono[] = [
+  { evento: 'lancamento', inicio_mes: 0, duracao_meses: 3 },
+  { evento: 'obra', inicio_mes: 3, duracao_meses: 20 },
+  { evento: 'pos_obra', inicio_mes: 23, duracao_meses: 12 },
+];
+
+// Área privativa TOTAL da linha = 18.438,410033 m² (100 unid. × 184,38410033
+// m²/unid., a "semente" da EVI — `Areas e Precos!F14`). 11 unidades
+// permutadas fisicamente = 2.028,22510363 m² ≈ 2.028,225104 (`cfINC!G19`,
+// arredondado a 6 casas na planilha). Área de venda resultante (89 unidades)
+// = 16.410,18492937 m² ≈ 16.410,184929 (`Areas e Precos!F17`).
+function linhaEstoqueTeste(absorcao: any = { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 15 }, { evento: 'obra', pct: 20 }] }) {
+  return {
+    tipologias: [{ quantidade: 100, area_privativa_m2: 184.38410033, preco_m2: 10_000, unidades_permutadas: 11 }],
+    absorcao,
+  };
+}
+
+test('#457: areaVendidaMensal/estoqueM2Mensal reproduzem cfINC — semente = privativa TOTAL, permuta baixa no mês do Lançamento', () => {
+  const linha = linhaEstoqueTeste();
+  const semente = estoqueM2Semente(linha);
+  const vendida = areaVendidaMensal(linha, CRONO_LANCAMENTO_3M, 60);
+  const estoque = estoqueM2Mensal(linha, CRONO_LANCAMENTO_3M, 60);
+
+  // A asserção que distingue o modelo (issue #457): a semente é a privativa
+  // TOTAL (18.438,41...), não a área de venda já líquida (16.410,18...) — sem
+  // ela, semear com a área líquida E baixar a permuta de novo produziria
+  // 13.561,45 no mês 0 e passaria em tudo, menos nisto.
+  assert.ok(perto(semente, 18_438.410033, 1e-6), `semente esperada 18438.410033, achei ${semente}`);
+
+  assert.ok(perto(vendida[0], 820.509246, 1e-6), `areaVendidaMensal[0] esperado 820.509246, achei ${vendida[0]}`);
+  assert.ok(perto(estoque[0], 15_589.675683, 1e-6), `estoqueM2Mensal[0] esperado 15589.675683, achei ${estoque[0]}`);
+});
+
+test('#457: conservação — estoqueM2Mensal fecha em 0 quando a absorção soma 100%, e ≠ 0 quando falta 1,41% (caso do estudo 6)', () => {
+  const linhaCompleta = linhaEstoqueTeste(); // distribuído 15/20/65 — soma 100% por construção
+  const estoqueCompleto = estoqueM2Mensal(linhaCompleta, CRONO_LANCAMENTO_3M, 60);
+  assert.ok(perto(estoqueCompleto[59], 0, 0.01), `estoque final esperado ~0, achei ${estoqueCompleto[59]}`);
+
+  // Absorção 'personalizado' que só declara 98,59% de vendas — reproduz o
+  // descarte silencioso do estudo 6 (#429): 1,41% de área fica sem vender e
+  // o resíduo tem que aparecer no estoque final, não sumir.
+  const linhaIncompleta = linhaEstoqueTeste({ modo: 'personalizado', meses: [{ mes: 0, pct: 98.59 }] });
+  const estoqueIncompleto = estoqueM2Mensal(linhaIncompleta, CRONO_LANCAMENTO_3M, 60);
+  const areaVendavelLinhaTeste = 16_410.184929; // 89 unid. × 184,38410033 m²
+  assert.ok(
+    Math.abs(estoqueIncompleto[59] - areaVendavelLinhaTeste * 0.0141) < 0.5,
+    `resíduo de 1,41% esperado, achei ${estoqueIncompleto[59]}`,
+  );
+  assert.ok(Math.abs(estoqueIncompleto[59]) > 0.01, 'estoque incompleto não pode fechar em 0');
+});
+
+test('#457: unidadesVendidasMensal/vsoMensal — coerência interna, sem oráculo de planilha (BRIEF-EVI.md T4)', () => {
+  const linha = linhaEstoqueTeste();
+  const areaPrivativa = 184.38410033;
+  const unidades = unidadesVendidasMensal(linha, CRONO_LANCAMENTO_3M, 60);
+  const area = areaVendidaMensal(linha, CRONO_LANCAMENTO_3M, 60);
+  for (let i = 0; i < unidades.length; i++) {
+    assert.ok(perto(unidades[i] * areaPrivativa, area[i], 1e-6), `mês ${i}: unidades×área diverge de areaVendidaMensal`);
+  }
+
+  const vso = vsoMensal(linha, CRONO_LANCAMENTO_3M, 60);
+  // Mês 0: 820,509246 m² vendidos sobre 16.410,184929 m² de estoque de
+  // início (semente − permuta, já baixada no mesmo mês) = 5% — bate com o
+  // bloco de Lançamento (15% / 3 meses).
+  assert.ok(perto(vso[0], 0.05, 1e-6), `vso[0] esperado 0.05, achei ${vso[0]}`);
+  // Fora do período de absorção (antes do Lançamento não existe aqui;
+  // depois do Pós-chaves, estoque zerado): sem NaN, sem divisão por zero.
+  assert.ok(vso.every((v) => Number.isFinite(v)), 'vso não pode conter NaN/Infinity');
+  assert.equal(vso[59], 0, 'vso deve ser 0 quando o estoque de início já é 0 (sem divisão por zero)');
 });
 
 test('#260: rateio monetário fecha exatamente com o total da linha', () => {

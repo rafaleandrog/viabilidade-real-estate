@@ -295,6 +295,17 @@ export function validarProduto(
       }
     }
     let estoque = total - permutado;
+    // #457: dimensão m² do MESMO livro — reusa `estoque`/`vendas` já
+    // calculados acima (não duplica o laço de absorção), só escala pela área
+    // privativa da tipologia. Nasce como 'alerta': o pré-requisito de dado da
+    // #433 (`quantidade < alocadas + permutadas`) ainda não foi saneado em
+    // produção (Pinguim: 234 + 42 > 234), e essa violação já dispara
+    // PRODUTO_EXCEDE_ESTOQUE/ESTOQUE_MENSAL_NEGATIVO em 'erro' acima — a
+    // versão em m² promove a 'erro' só depois que a varredura de saneamento
+    // (#464, `GET /estudos/:id/avancado/tipologias`) confirmar vazio para
+    // todo estudo em violação.
+    const areaUnit = Number(tip.area_privativa_m2 ?? 0);
+    let jaAcusouM2Negativo = false;
     for (let mes = 0; mes < vendas.length; mes++) {
       estoque -= vendas[mes];
       if (estoque >= -tol) continue;
@@ -303,6 +314,15 @@ export function validarProduto(
         esperado: 0, encontrado: estoque, diferenca: estoque,
         mensagem: `${nome}, mês ${mes + 1}: estoque ficou negativo (${estoque}).`,
       });
+      if (areaUnit > 0 && !jaAcusouM2Negativo) {
+        jaAcusouM2Negativo = true;
+        const estoqueM2 = estoque * areaUnit;
+        out.push({
+          codigo: 'ESTOQUE_M2_MENSAL_NEGATIVO', severidade: 'alerta', linha: nome, mes,
+          esperado: 0, encontrado: estoqueM2, diferenca: estoqueM2,
+          mensagem: `${nome}, mês ${mes + 1}: estoque em m² ficou negativo (${estoqueM2.toFixed(2)} m²) — mesma violação de ESTOQUE_MENSAL_NEGATIVO, exposta em m² (#457).`,
+        });
+      }
       break;
     }
     if (absorcaoCompleta && Math.abs(comprometido - total) <= tol && Math.abs(estoque) > tol) {
@@ -311,6 +331,14 @@ export function validarProduto(
         esperado: 0, encontrado: estoque, diferenca: estoque,
         mensagem: `${nome}: absorção de 100% não zerou o estoque ao fim do horizonte.`,
       });
+      if (areaUnit > 0) {
+        const estoqueM2 = estoque * areaUnit;
+        out.push({
+          codigo: 'ESTOQUE_M2_FINAL_NAO_ZERA', severidade: 'alerta', linha: nome, mes: Math.max(0, prazo - 1),
+          esperado: 0, encontrado: estoqueM2, diferenca: estoqueM2,
+          mensagem: `${nome}: absorção de 100% não zerou o estoque em m² ao fim do horizonte (${estoqueM2.toFixed(2)} m²) — camada 2 do invariante de conservação (#429).`,
+        });
+      }
     }
   }
   return out;
