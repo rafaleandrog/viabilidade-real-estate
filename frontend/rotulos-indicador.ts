@@ -82,7 +82,7 @@ export const INVENTARIO_ROTULOS_INDICADOR: RotuloIndicador[] = [
     rotulo: 'ROI',
     arquivos: ['frontend/tela-dashboard.ts'],
     // A MESMA fórmula nos dois níveis — por isso não precisa de exceção:
-    // proforma.ts:316 e proforma-avancado.ts:320 calculam ambas
+    // proforma.ts:320 e proforma-avancado.ts:320 calculam ambas
     // `resultado / (custoDireto + custoIndireto)`.
     fonte: 'resultado / investimentoTotal — mesma fórmula nos dois níveis (proforma.ts e proforma-avancado.ts)',
   },
