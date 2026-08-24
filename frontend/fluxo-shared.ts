@@ -205,6 +205,64 @@ export function vgvVendavelLinha(tipologias: any[]): number {
   return (tipologias ?? []).reduce((s, t) => s + vgvVendavelTipologia(t), 0);
 }
 
+// #457: livro de estoque em m²/unidades — espelham EXATAMENTE o padrão dos
+// helpers de VGV acima (total / permuta física / vendável), trocando
+// `preco_m2` por 1 (unidades) ou por `area_privativa_m2` sozinho (m²). Sem
+// oráculo de planilha para unidades (BRIEF-EVI.md T4: a EVI só trabalha em
+// m² e não tem célula de VSO) — os testes de unidades/VSO verificam
+// coerência interna com a série em m², não paridade externa.
+
+/** Área privativa TOTAL de uma tipologia (quantidade × área) — é a SEMENTE
+ * do livro de estoque em m² (#457): a EVI semeia com a privativa total, não
+ * com a área já líquida de permuta (`Areas e Precos!F14`, não `F17`). */
+export function areaTotalTipologia(t: any): number {
+  return n(t?.quantidade) * n(t?.area_privativa_m2);
+}
+
+/** Área privativa total de uma linha de receita (soma das tipologias). */
+export function areaTotalLinha(tipologias: any[]): number {
+  return (tipologias ?? []).reduce((s, t) => s + areaTotalTipologia(t), 0);
+}
+
+/** Área (m²) atribuída às unidades permutadas fisicamente de uma tipologia —
+ * mesma fonte/fallback de `vgvPermutaFisicaTipologia`, sem o preço/m². */
+export function areaPermutaFisicaTipologia(t: any, unidadesPermutadas?: number): number {
+  const qtd = n(t?.quantidade);
+  const solicitadas = unidadesPermutadas === undefined ? n(t?.unidades_permutadas) : n(unidadesPermutadas);
+  const permutadas = Math.min(Math.max(0, solicitadas), qtd);
+  return permutadas * n(t?.area_privativa_m2);
+}
+
+/** Área (m²) de permuta física de uma linha de receita (soma das tipologias). */
+export function areaPermutaFisicaLinha(tipologias: any[]): number {
+  return (tipologias ?? []).reduce((s, t) => s + areaPermutaFisicaTipologia(t), 0);
+}
+
+/** Área VENDÁVEL (m²) de uma tipologia — total menos a fatia de permuta
+ * física, mesmo modelo de `vgvVendavelTipologia`. */
+export function areaVendavelTipologia(t: any, unidadesPermutadas?: number): number {
+  return areaTotalTipologia(t) - areaPermutaFisicaTipologia(t, unidadesPermutadas);
+}
+
+/** Área vendável (m²) de uma linha de receita (soma das tipologias). */
+export function areaVendavelLinha(tipologias: any[]): number {
+  return (tipologias ?? []).reduce((s, t) => s + areaVendavelTipologia(t), 0);
+}
+
+/** Unidades VENDÁVEIS de uma tipologia — quantidade menos as permutadas
+ * fisicamente (mesmo modelo de `vgvVendavelTipologia`, sem preço nem área). */
+export function unidadesVendaveisTipologia(t: any, unidadesPermutadas?: number): number {
+  const qtd = n(t?.quantidade);
+  const solicitadas = unidadesPermutadas === undefined ? n(t?.unidades_permutadas) : n(unidadesPermutadas);
+  const permutadas = Math.min(Math.max(0, solicitadas), qtd);
+  return qtd - permutadas;
+}
+
+/** Unidades vendáveis de uma linha de receita (soma das tipologias). */
+export function unidadesVendaveisLinha(tipologias: any[]): number {
+  return (tipologias ?? []).reduce((s, t) => s + unidadesVendaveisTipologia(t), 0);
+}
+
 /**
  * Receita líquida de uma linha, para fins de BASE DE CUSTO (`pct_receita`) —
  * VGV menos o único imposto oficial do Avançado: RET (#228, decisão do autor
