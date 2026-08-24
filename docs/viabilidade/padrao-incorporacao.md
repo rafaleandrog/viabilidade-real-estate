@@ -2004,8 +2004,10 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > (`backend/rotas/funding.ts:43`, `backend/rotas/funding.test.ts:26`) — não o produto.
 >
 > **O que de fato não existe é a linha ROTATIVA**, e por decisão: ela reintroduziria a competição
-> por caixa que a #355 apagou. Empréstimo-ponte também não existe. A §17.4 abaixo descreve o
-> conceito rotativo como **modelo funcional de referência**, não como comportamento instalado.
+> por caixa que a #355 apagou. Empréstimo-ponte também não existe. **A §17.4 abaixo NÃO descreve
+> o conceito rotativo** — é uma lista de oito atributos que `simularDivida`
+> (`frontend/funding-motor.ts:237-292`) já implementa hoje, pelo tipo `divida`; o rotativo não
+> tem seção neste documento.
 >
 > ⚠️ **O que falta é o RÓTULO**, não o produto — a tela ainda chama de "Dívida" o que também é
 > capital de giro. É a issue #466.
@@ -2056,6 +2058,12 @@ O estudo completo deve conseguir representar:
 O repasse pode gerar caixa utilizado para amortizar o financiamento à produção, mas as duas linhas devem permanecer separadas.
 
 ### 17.4 Capital de giro e investidores
+
+> ✅ **Comportamento vigente.** Os oito atributos abaixo são o que `simularDivida`
+> (`frontend/funding-motor.ts:237-292`) já implementa hoje, pelo tipo `divida` (rotulado
+> "Dívida / Capital de giro" na UI, #466). **Esta lista NÃO descreve a linha rotativa** — a
+> decisão sobre o rotativo, e por que ela não existe, está em `frontend/tela-funding.ts` (o
+> comentário junto ao rótulo) e na nota da §17 acima.
 
 Quando utilizados, precisam ter:
 

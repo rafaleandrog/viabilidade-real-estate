@@ -970,7 +970,7 @@ export class ViabFluxoReceitas extends LitElement {
             <div class="pag-secao">
               <h4>Repasse</h4>
               <p class="sec">Evento de liquidação concentrada — o saldo que restar após entrada e
-                parcelamento é pago de uma vez, sempre no 1º mês após o fim da obra (#345).</p>
+                parcelamento é pago de uma vez, sempre no 1º mês após o fim da obra.</p>
               <div class="pag-linha">
                 <div class="repasse-box">
                   <span class="sec">Repasse</span><br />
