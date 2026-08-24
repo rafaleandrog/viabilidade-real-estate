@@ -85,7 +85,7 @@ apenas para linha nunca reeditada.
 >
 > ⚠️ **`validarComponentesSafra` NÃO é fiscalização independente dessa recorrência** — e o texto
 > anterior dizia que era. Ele lê os saldos da **própria** `carteiraSaldoSafra`
-> (`frontend/fluxo-invariantes.ts:404+`) e confere três coisas: as participações somam 100%, o
+> (`frontend/fluxo-invariantes.ts:496+`) e confere três coisas: as participações somam 100%, o
 > saldo final zera e a série não volta a crescer. **Não reconstrói** `saldo anterior + juros −
 > pagamento` a partir dos pagamentos, e o produtor ainda força o último saldo a zero. Uma regressão
 > que mantenha a carteira monotonicamente decrescente mas erre juros ou pagamento intermediário
@@ -111,7 +111,7 @@ Duas identidades que o motor mantém:
 fluxo_apos_funding_t = fluxo_livre_projeto_t + entradas_funding_t − saidas_funding_t
 ```
 
-fiscalizada por `validarFunding` (`frontend/fluxo-invariantes.ts:363-374`), que também acusa saldo
+fiscalizada por `validarFunding` (`frontend/fluxo-invariantes.ts:455-466`), que também acusa saldo
 de dívida negativo, dívida que não zera no horizonte e — decisão **D14** — caixa acumulado negativo
 depois do funding (`:376-387`, severidade `alerta`).
 
@@ -207,7 +207,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
 | `frontend/tela-proforma.ts:458` — sensibilidade, via `fmtR$(v, false)` | 2 | ✅ desde a #492 |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
-| `frontend/fluxo-caixa-motor.ts:2095-2103` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
+| `frontend/fluxo-caixa-motor.ts:2125-2133` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
 | **`frontend/fluxo-tabela.ts:34`** — `celula` da tabela do Fluxo | **0** | ❌ formatador próprio: `Math.round`, e célula **vazia** abaixo de R$ 0,50 → #281 |
 | **`frontend/tela-proforma.ts:314`** — `_fmtContabil`, a coluna R$ da Proforma | **0** | ❌ `fmtNum(Math.abs(r.v))` com `d` no default → #281 |
 | **`frontend/tela-fluxo-receitas.ts:382-383`** — `precoUnit` e `precoTotal` | **0** | ❌ mesma causa → #281 |
