@@ -161,10 +161,11 @@ critério de aceite não é código:
 > `recebimentoBrutoMensal` consulta o contrato canônico em
 > `frontend/fluxo-caixa-motor.ts:1340-1341` e `calcularFluxo` agrega juros, principal, carteira e
 > repasse em `:2025-2053` (teste `frontend/fluxo-caixa-motor.test.ts:1762-1787`). A porta é
-> `fluxo_pagamento.componentes`, que `frontend/fluxo-pagamento-editor.ts:90` grava em toda escrita.
-> **O que continua faltando não é a integração, é o INPUT de taxa e de sinal no modal:** há linha
-> em produção com `taxaMensal: 0.0098636` (R$ 1.259.273,59 de juros), e como o adaptador fixa
-> `taxaMensal: 0`, abrir o modal e clicar "Aplicar" **apaga os juros da linha**, sem aviso.
+> `fluxo_pagamento.componentes`, que `fluxoPagamentoParaSalvar` grava em toda escrita.
+> **O que continua faltando não é a integração, é o INPUT de taxa e de sinal no modal (#428):** há
+> linha em produção com `taxaMensal: 0.0098636` (R$ 1.259.273,59 de juros). Abrir o modal e clicar
+> "Aplicar" **apagava** esses juros; desde a #431 não apaga mais — `componentesParaSalvar` preserva
+> o que o espelho legado não sabe representar.
 
 - **#254** (epic de rastreio) — fecha porque #220, #221, #227–#237, #240 e #241 (suas executoras)
   já fecharam com diff; não tem diff próprio.

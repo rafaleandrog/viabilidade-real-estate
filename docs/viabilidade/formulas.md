@@ -51,8 +51,8 @@ em `s + defasagemMeses`, carteira por safra e repasse — estão descritas nos d
 
 **Estão implementadas desde a #283** e são o caminho de cálculo real de toda linha de receita com
 `fluxo_pagamento.componentes` persistido — o que a tela grava em toda escrita
-(`frontend/fluxo-pagamento-editor.ts:90`). O motor legado (`entrada`/`parcelas`/`repasse`) sobrevive
-apenas para linha nunca reeditada.
+(`fluxoPagamentoParaSalvar`, `frontend/fluxo-pagamento-editor.ts`). O motor legado
+(`entrada`/`parcelas`/`repasse`) sobrevive apenas para linha nunca reeditada.
 
 | Grandeza | Onde vive |
 |---|---|
@@ -67,15 +67,20 @@ apenas para linha nunca reeditada.
 > ⚠️ **A matemática de juros existe e é exercitada por estudo real; o que falta é a ENTRADA.** Há
 > linha em produção com `taxaMensal` diferente de 0 persistida em `fluxo_pagamento.componentes`
 > (estudo 5 de Pinguim: `0.0098636` = 12,5% a.a., R$ 1.259.273,59 de juros de clientes). O modal de
-> Fluxo de Pagamento não oferece campo de **taxa** nem de **sinal**
-> (`frontend/tela-fluxo-receitas.ts:741-816`), e o adaptador `componentesDoLegado` fixa
-> `taxaMensal: 0` / `sinalPct: 0` (`frontend/fluxo-caixa-motor.ts:589,601,608,617`) porque o espelho
-> legado não tem onde guardar essas grandezas. Como `fluxoPagamentoParaSalvar`
-> (`frontend/fluxo-pagamento-editor.ts:90`) regenera os componentes do espelho em toda escrita,
-> **abrir o modal e clicar "Aplicar" apaga os juros da linha**, sem undo — e, desde a #436, com
-> aviso na própria tela (o bloco "Juros de tabela" diz que Aplicar os apaga). Escrever
-> "`jurosClientes` é sempre 0" é errado: o certo é **"os juros existem e viram zero no primeiro
-> Aplicar"**.
+> Fluxo de Pagamento não oferece campo de **taxa** nem de **sinal** (`_renderModalPagamento`,
+> `frontend/tela-fluxo-receitas.ts`) — é a **#428** —, e o adaptador `componentesDoLegado` fixa
+> `taxaMensal: 0` (`frontend/fluxo-caixa-motor.ts:591,603,610,619`) e `sinalPct: 0`
+> (`:590,602,608` — o ramo `concentrado` de `:619` não emite `sinalPct`) porque o espelho legado não
+> tem onde guardar essas grandezas.
+>
+> **Até a #431 isso significava que "Aplicar" APAGAVA os juros da linha**, porque
+> `fluxoPagamentoParaSalvar` regenerava os componentes pelo espelho em toda escrita. Desde a #431
+> quem grava é `componentesParaSalvar`, que devolve o array persistido verbatim quando o espelho não
+> mudou e transplanta `taxaMensal`/`sinalPct`/`jurosNoMesDaContratacao`/`rotulo` — por identidade,
+> não por índice — quando mudou. Abrir o modal e aplicar é **no-op**; editar preserva o que o
+> espelho não sabe dizer. O que continua faltando é a ENTRADA: uma linha de parcelamento criada
+> agora nasce sem taxa e não há onde digitá-la. Escrever "`jurosClientes` é sempre 0" é errado — e
+> escrever "os juros viram zero no primeiro Aplicar" passou a ser errado também.
 
 > 🚫 **Não copiar fórmula de carteira do arquivo Urbitá.** As fórmulas de carteira daquele arquivo
 > admitem saldo negativo e saldo que volta a crescer depois da última parcela. A recorrência correta

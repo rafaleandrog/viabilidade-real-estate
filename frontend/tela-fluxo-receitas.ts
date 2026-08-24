@@ -152,8 +152,11 @@ export class ViabFluxoReceitas extends LitElement {
     .pag-grid { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
     @media (max-width: 760px) { .pag-grid { grid-template-columns: 1fr; } }
     .pag-secao { margin-bottom: 14px; }
-    /* #436: o aviso de que "Aplicar" apaga os juros precisa competir com o
-       número que ele qualifica, senão vira letra miúda ao lado de um destaque. */
+    /* #436/#431: a nota sobre os juros precisa competir com o número que ela
+       qualifica, senão vira letra miúda ao lado de um destaque. O texto mudou
+       na #431 — "Aplicar apaga estes juros" virou "estes juros são
+       preservados; o que falta é onde criar taxa" —, mas o destaque continua
+       valendo: é a única linha da tela que fala do limite do formulário. */
     .aviso-juros { color: var(--cor-alerta, #b45309); }
     .pag-secao h4 {
       margin: 0 0 8px; font-size: var(--texto-rotulo, 0.75rem); letter-spacing: 0.04em;
@@ -769,19 +772,26 @@ export class ViabFluxoReceitas extends LitElement {
                   <p class="sec">Juros de tabela configurados, por taxa (não editáveis nesta versão):</p>
                   ${juros.map((j) => html`
                     <p class="sec">${j.rotulos.join(', ')}: <strong>${fmtPct(j.anualPct)} a.a.</strong></p>`)}`}
-                <!-- Exibir a taxa sem dizer isto seria pior do que não exibir: o
-                     usuário passaria a saber que ela existe, e continuaria sem
-                     motivo para desconfiar do botão que a apaga. Quem conserta a
-                     destruição é a #431.
-                     Só aparece quando há o que apagar: em estudo somente-leitura
-                     o botão "Aplicar" nem é renderizado, e o aviso instruiria
-                     sobre um controle ausente. -->
+                <!-- #431: até esta issue, o texto aqui avisava que "Aplicar"
+                     APAGAVA estes juros — era verdade, e deixou de ser:
+                     componentesParaSalvar preserva taxaMensal e sinalPct tanto
+                     no no-op quanto na edição real. Manter o aviso antigo seria
+                     pior que não ter nenhum: ele mandaria o usuário fechar o
+                     modal sem aplicar para proteger um dado que já está
+                     protegido.
+                     (Sem crase neste comentário de propósito: ele mora dentro
+                     de um template literal do lit, e uma crase o encerraria.)
+                     O que SOBRA de honesto é a lacuna que a #428 fecha: linha de
+                     parcelamento criada agora nasce sem taxa, e não há campo
+                     onde digitá-la.
+                     Só aparece quando há Aplicar de verdade: em estudo
+                     somente-leitura o botão nem é renderizado. -->
                 ${dis ? nothing : html`
-                  <p class="sec aviso-juros"><strong>Atenção:</strong> clicar em
-                    <strong>Aplicar</strong> apaga estes juros — este formulário não tem campo de
-                    taxa, e salvar reescreve os componentes sem ela. Ele também descarta a
-                    <strong>periodicidade legada</strong> do parcelamento. Feche o modal sem
-                    aplicar para preservá-los.</p>`}
+                  <p class="sec aviso-juros">Estes juros são <strong>preservados</strong> ao clicar
+                    em <strong>Aplicar</strong>, inclusive quando você edita entrada ou
+                    parcelamento. O que este formulário ainda não faz é <strong>criar</strong>
+                    taxa: uma linha de parcelamento adicionada agora nasce sem juros, e não há
+                    campo onde digitá-los nesta versão.</p>`}
               </div>` : nothing}
             <div class="pag-secao">
               <h4>Condições de entrada</h4>

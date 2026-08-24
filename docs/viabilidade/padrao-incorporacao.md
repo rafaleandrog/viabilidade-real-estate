@@ -985,9 +985,11 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 > **experiência de configuração** do editor tem issue própria: **#248** (`BUGLIST-005`).
 >
 > **Comportamento vigente (pós-#248/#342/#345/#346).** O modal
-> (`frontend/tela-fluxo-receitas.ts:720-830`) tem quatro blocos. *Juros de tabela* (#436) é
-> **somente-leitura** e só aparece quando algum componente persistido tem `taxaMensal ≠ 0`: mostra a
-> taxa anual equivalente e avisa que "Aplicar" a apaga. Os outros três são *Definições* (só texto — corretagem
+> (`_renderModalPagamento`, `frontend/tela-fluxo-receitas.ts`) tem quatro blocos. *Juros de tabela*
+> (#436) é **somente-leitura** e só aparece quando algum componente persistido tem `taxaMensal ≠ 0`:
+> mostra a taxa anual equivalente e — desde a #431, que fez o "Aplicar" parar de destruí-la — diz
+> que ela é **preservada** ao aplicar, e que o que falta é onde **criar** uma (#428). Os outros três
+> são *Definições* (só texto — corretagem
 > e RET migraram para Custos, `:728-737`), *Condições de entrada* (`% do total`, `Nº parcelas`,
 > `Desconto %`, `:741-763`) e *Parcelamento* (`% do total`, `Nº parcelas` ou checkbox "Ao longo da
 > obra", máximo 4 linhas, `:764-806`); o *Repasse* é **derivado e somente-leitura**
@@ -996,12 +998,17 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 > linha legada mantém a periodicidade gravada, que o motor continua lendo
 > (`fluxo-caixa-motor.ts:318-320`).
 >
-> **O que ainda falta para o modelo econômico:** não há campo de **taxa** nem de **sinal**. Como
-> `fluxoPagamentoParaSalvar` grava `componentes: componentesDoLegado(...)`
-> (`frontend/fluxo-pagamento-editor.ts:90`) e o adaptador fixa `taxaMensal: 0` / `sinalPct: 0`
-> (`fluxo-caixa-motor.ts:589,601,608,617`), aplicar o modal numa linha que tinha juros **apaga os
-> juros**: é o que acontece hoje com o estudo 5 de Pinguim (`taxaMensal: 0.0098636`,
-> R$ 1.259.273,59).
+> **O que ainda falta para o modelo econômico:** não há campo de **taxa** nem de **sinal** — é a
+> **#428**. O adaptador `componentesDoLegado` continua fixando `taxaMensal: 0`
+> (`fluxo-caixa-motor.ts:591,603,610,619`) e `sinalPct: 0` (`:590,602,608`), porque o espelho legado
+> não tem onde guardar essas grandezas.
+>
+> **O que MUDOU na #431:** `fluxoPagamentoParaSalvar` não grava mais
+> `componentes: componentesDoLegado(...)`, e sim `componentesParaSalvar(...)` — que devolve o array
+> persistido verbatim quando o espelho legado não mudou, e transplanta os campos só-canônicos por
+> identidade quando mudou. Aplicar o modal numa linha que tinha juros **não os apaga mais**; o
+> estudo 5 de Pinguim (`taxaMensal: 0.0098636`, R$ 1.259.273,59) sobrevive ao "Aplicar". O que ainda
+> não existe é **criar** taxa pela tela.
 >
 > ⚠️ **E não é só o juro: a PERIODICIDADE legada também se perde no "Aplicar".** O mesmo adaptador
 > converte `ao_longo_obra` em `ate_marco` com `defasagemMeses: 1`, **descartando a periodicidade**
@@ -1324,9 +1331,9 @@ Ao fim da absorção:
 > por componente segue **evolução pendente**.
 >
 > ⚠️ **Mais duas ressalvas.** (1) A porta é `fluxo_pagamento.componentes` — linha nunca reeditada
-> segue pelo motor legado. (2) A **taxa** chega 0 pelo adaptador (`:589,601,608,617`) sempre que a
-> linha passa pelo modal, porque ele não a oferece: a carteira existe, e os juros — que existem em
-> estudo real — são apagados no "Aplicar".
+> segue pelo motor legado. (2) A **taxa** ainda não tem onde ser digitada (#428); o que a #431
+> mudou é que ela deixou de ser **apagada** quando a linha passa pelo modal — os juros que existem
+> em estudo real sobrevivem ao "Aplicar".
 
 ### 13.1 Safras
 
