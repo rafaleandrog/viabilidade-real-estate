@@ -59,6 +59,47 @@ Tabela `avancado_funding_operacoes` (migração `029_funding_operacoes.js`, que 
 | `modo_retorno`, `pct_retorno` | `equity` | `permuta_financeira` \| `resultado_final`, e o % |
 | `exposicao_minima`, `percentual_financiavel`, `amortizar_com_caixa`, `custo_linha_ids` | `financiamento_producao` | premissas da §4.3 |
 
+**Teto de `Σ pct_retorno` — duas somas, uma por `modo_retorno`.** A soma de `pct_retorno` das
+operações `equity` de um estudo **não pode passar de 100%**, e a checagem é feita **por
+`modo_retorno`, separadamente**:
+
+| Soma | Operações que entram | Base que ela distribui |
+|---|---|---|
+| A | `tipo = equity` **e** `modo_retorno = permuta_financeira` | Receita Líquida mensal (planilha: `C18`) |
+| B | `tipo = equity` **e** `modo_retorno = resultado_final` | Resultado Final (planilha: `C19`) |
+
+As duas **não competem**: são grandezas diferentes, e a planilha as separa (`D28 = SE(C24; C×C25;
+SE(t = C8; C19×C25; 0))`). Uma operação em cada modo pode ter 100% sem conflito.
+
+Três regras de leitura que a validação tem de respeitar, sob pena de somar o que não deve:
+
+- **`modo_retorno` tem default.** A coluna nasce `permuta_financeira` (`schema.json`, e o motor
+  aplica o mesmo default em memória): uma operação gravada sem o campo conta na **soma A**, não
+  fica de fora das duas.
+- **`tipo ≠ equity` não entra.** `pct_retorno` existe na tabela para os três tipos, com default
+  `0`, mas só é significativo em `equity`.
+- **No `PATCH`, vale o estado FINAL** (`atual + payload`), e a operação sendo editada **não conta
+  duas vezes** — senão toda edição recusaria a si mesma.
+
+A comparação usa **tolerância** (`> 100.01`, não `> 100` estrito): `pct_retorno` é percentual e
+carrega precisão plena, então `60 + 40,001` de ponto flutuante recusaria indevidamente. É o mesmo
+padrão de `erroFormularioAbsorcao` e `erroFormularioPagamento`.
+
+**Onde isso é imposto:** `backend/rotas/funding.ts` — `validarCamposOperacao` barra uma operação
+isolada acima de 100 (`400 CAMPO_INVALIDO`) e `somaRetornoExcede` barra a soma do estudo no `POST`
+e no `PATCH` (`422 RETORNO_EXCEDE_RECEITA`). A validação nasce **só no backend**: a tela ainda
+deixa salvar e mostra o erro depois.
+
+> ⚠️ **De onde vem esta regra, e por que ela está aqui.** O enunciado original é
+> [funding-capital-stack](funding-capital-stack) §6.2 — *"a soma das participações de receita não
+> pode superar 100%"* —, mas aquela §6 é **ADR histórico supersedido** pela reescrita do Funding, e
+> não serve de norma. A planilha `fluxo_investidor_FORMULAS` é **fonte nula** para esta regra: ela
+> tem **uma** operação só (`C25` é um número digitado, sem soma nem validação), então nunca
+> exercita o caso. O que ela dá é o **denominador** — `C18` e `C19` são grandezas únicas e fixas, e
+> `D28 = C28 × C25` distribui uma fração delas. Distribuir mais de 100% é distribuir o que não
+> existe: o instrumento deixaria de ser equity e viraria dívida disfarçada, sem saldo devedor, sem
+> juros e sem quitação. A regra passa a valer **aqui**, na spec vigente, pela **#435**.
+
 ## 3. Convenções
 
 **Tempo.** Meses **relativos, 0-based** — índice do array = mês, igual a `fluxo-caixa-motor.ts` e
