@@ -93,15 +93,23 @@ test('#468 os casos distinguem estruturas de capital — E CONTINUAM distinguind
   //
   // Os campos ALAVANCADOS existem por isso. Eles vêm de `FundingNoFluxo`, o
   // rodapé da tabela, que é a única superfície exibida que enxerga funding
-  // (`funding-motor.ts:650-653` declara isso: "as KPIs do projeto continuam
+  // (`funding-motor.ts:652-656` declara isso: "as KPIs do projeto continuam
   // desalavancadas … só o rodapé da tabela alavanca").
   const [a, b, c] = CASOS.map((x) => x.esperado);
 
   // ⚠️ DEPOIS DA #426 os desalavancados de A, B e C são IDÊNTICOS, e essa
   // igualdade é a invariante do conserto: a proforma parou de olhar a estrutura
   // de capital. Antes dela, B e C tinham margem negativa contra +39% do mesmo
-  // projeto. Se estes voltarem a divergir, o funding vazou de volta para a
-  // proforma.
+  // projeto.
+  //
+  // ⚠️ MAS NÃO CONFUNDA O QUE ESTA ASSERÇÃO GUARDA. Ela compara três literais
+  // desta fixture entre si, então só quebra quando um humano edita
+  // `kpis-baseline.ts`. Medido: readicionar o parâmetro `funding` em
+  // `proformaAvancado` E o termo em `totalDoGrupo` deixa estas três asserções
+  // VERDES — quem fica vermelho é a trava de arity de
+  // `fluxo-apresentacao.test.ts:335,348-350`. É ela que impede o funding de
+  // voltar; esta aqui documenta a invariante e impede que a fixture seja
+  // recapturada com valores divergentes.
   assert.equal(a.resultado, b.resultado, 'a #426 desalavancou a proforma: A e B têm o mesmo resultado');
   assert.equal(a.resultado, c.resultado, 'idem para C');
   assert.equal(a.margemPct, c.margemPct, 'idem na margem');

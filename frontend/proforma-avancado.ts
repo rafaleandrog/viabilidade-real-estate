@@ -59,6 +59,15 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 //   | aba Resultados / Painel | ECONÔMICA,  | NENHUMA PONTA                 |
 //   | (esta função)           | antes de    |                               |
 //   |                         | capitalizar |                               |
+//   | aba Cenários, KPI       | ECONÔMICA   | SÓ O CUSTO: subtrai juros de  |
+//   | "Resultado após custo   | menos o     | toda dívida + retorno de      |
+//   | financeiro"             | custo de    | equity do resultado DESTA     |
+//   | (`tela-cenarios.ts`     | capital     | função — nunca o principal    |
+//   |  `:256-265`, `:363`)    |             |                               |
+//
+// A terceira linha é a que confunde: ela NÃO é uma variante desta função, é uma
+// subtração feita depois, na tela de Cenários. Quem for reabrir o rótulo (#447)
+// precisa das três, não das duas primeiras.
 //
 // ⚠️ Note que "as duas pontas" NÃO quer dizer que elas se anulam: o principal
 // devolvido cancela o principal liberado, mas os juros e qualquer saldo
@@ -69,12 +78,18 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 // "(-) Custos Financeiros" vale EXATAMENTE as linhas de custo que o usuário
 // classificou no grupo `financeiro` — nunca o serviço da dívida.
 //
-// 📎 Nota de referência (consultiva, não normativa): a planilha EVI do autor
-// (`Premissas e Resultados!P28`, "Despesas Financeiras") é PARCIALMENTE
-// alavancada — ela também NÃO soma amortização a custo nenhum, mas soma os
-// JUROS das duas operações de funding dentro do custo direto. O app foi além e
+// 📎 Nota de referência (consultiva, não normativa): a planilha EVI do autor é
+// PARCIALMENTE alavancada — ela agrega despesa financeira junto com os juros do
+// financiamento à produção, em vez de deixar a proforma limpa. O app foi além e
 // desalavancou a proforma inteira, pelas razões 2 e 3 acima. A divergência é
 // deliberada e está registrada; a EVI é consultiva e não governa o runtime.
+//
+// ⚠️ O que desta nota é VERIFICÁVEL a partir deste repositório: a agregação da
+// despesa financeira com os juros, em `docs/rodada-8/02-regras-evi.md:702`
+// (célula `Premissas!P28`). O resto — o rótulo exato "Despesas Financeiras", a
+// colocação dentro do "Custo direto total" e o "não soma amortização" — vem da
+// leitura da planilha, que NÃO está no repo. Quem for citar isso numa issue
+// (#447, #448) confira na planilha antes, em vez de citar este comentário.
 // ─────────────────────────────────────────────────────────────────────────
 
 export interface LinhaProformaAv {

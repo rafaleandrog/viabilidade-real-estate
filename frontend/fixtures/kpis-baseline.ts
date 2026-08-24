@@ -177,9 +177,11 @@ const CONFIG_D: FluxoConfig = {
  * Roda o motor real para um caso e devolve os quatro KPIs.
  *
  * ⚠️ Esta função é **fiação**, não conta: ela só encadeia `calcularFluxo` →
- * `fundingDoEstudo` → `proformaAvancado` na mesma ordem que a tela de Funding
- * usa (`tela-dashboard.ts:267-285`). Se ela reproduzisse a matemática, o teste
- * pararia de vigiar o motor e passaria a vigiar a si mesmo.
+ * `fundingDoEstudo` → `proformaAvancado` na mesma ordem que a aba Fluxo de
+ * Caixa usa (`tela-fluxo-ver.ts:147`, `:159`, `:237`). **Não é mais a ordem do
+ * Painel**: a #426 tirou `fundingDoEstudo` de `tela-dashboard.ts`, que hoje
+ * chama `proformaAvancado` sem funding nenhum. Se esta função reproduzisse a
+ * matemática, o teste pararia de vigiar o motor e passaria a vigiar a si mesmo.
  */
 export function kpisDoCaso(config: FluxoConfig, operacoes: OperacaoFunding[]): KpisBaseline {
   const c = calcularFluxo(config);
