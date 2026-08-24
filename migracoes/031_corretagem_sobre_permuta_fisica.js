@@ -1,4 +1,4 @@
-// 030_corretagem_sobre_permuta_fisica.js — issue #473 (Rodada 8, R8-48)
+// 031_corretagem_sobre_permuta_fisica.js — issue #473 (Rodada 8, R8-48)
 //
 // Adiciona `corretagem_sobre_permuta_fisica` a `estudos`: escolhe se a
 // Corretagem de vendas do Avançado incide sobre o VGV BRUTO (permuta física
