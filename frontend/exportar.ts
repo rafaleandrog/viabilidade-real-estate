@@ -13,11 +13,9 @@ import type { Proforma } from './proforma.js';
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, celula as celulaCompartilhada } from './viab-format.js';
 import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
-
-const pct1 = (v: number) => v.toFixed(1).replace('.', ',');
 
 function baixar(nome: string, conteudo: string, mime: string) {
   const blob = new Blob(['﻿' + conteudo], { type: mime });
@@ -79,11 +77,11 @@ export function exportarExcel(estudo: any, p: Proforma, lot: boolean) {
   rows.push('');
   rows.push('Linha;R$;% VGV');
   for (const r of linhas) {
-    const pct = p.vgv > 0 ? pct1(Math.abs(r.v) / p.vgv * 100) : '';
+    const pct = p.vgv > 0 ? fmtPct(Math.abs(r.v) / p.vgv * 100) : '';
     rows.push(`${r.l};${fmtR$(r.v, false)};${pct}`);
   }
   rows.push('');
-  rows.push(`Margem sobre VGV (%);${pct1(p.margemLiquidaPct)}`);
+  rows.push(`Margem sobre VGV;${fmtPct(p.margemLiquidaPct)}`);
   const nome = (estudo.id_legivel || 'estudo') + '_proforma.csv';
   baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
 }
@@ -170,13 +168,11 @@ export interface LinhaFx {
  * PDF: as duas exportações têm de mostrar o mesmo texto, e antes desta função
  * cada uma tinha a sua própria expressão de formatação.
  */
-function celulaFx(v: number, l: Pick<LinhaFx, 'custo' | 'formato'>, comParenteses: boolean): string {
-  if (l.formato === 'percentual') return v ? `${pct1(v * 100)}%` : '';
-  if (l.formato === 'sinal') return v ? 'sim' : '';
-  if (!v || Math.abs(v) < 0.005) return '';
-  const abs = fmtR$(Math.abs(v), false);
-  if (!comParenteses) return v < 0 ? `-${abs}` : abs;
-  return l.custo || v < 0 ? `(${abs})` : abs;
+export function celulaFx(v: number, l: Pick<LinhaFx, 'custo' | 'formato'>, comParenteses: boolean): string {
+  return celulaCompartilhada(v, {
+    comParenteses, custo: l.custo,
+    formato: l.formato === 'moeda' ? undefined : l.formato,
+  });
 }
 
 /**
@@ -338,12 +334,12 @@ export function exportarFluxoCSV(
       l.duracao ? `${l.duracao}m` : '',
       l.ocultarTotal ? '' : fmtR$(l.total, false),
       l.vpl !== undefined ? fmtR$(l.vpl, false) : '',
-      l.pctVgv !== undefined ? pct1(l.pctVgv) : '',
+      l.pctVgv !== undefined ? fmtPct(l.pctVgv) : '',
       ...l.mensal.map((v) => celulaFx(v, l, false)),
     ].join(';'));
   }
   rows.push('');
-  rows.push(`TIR (% a.a.);${c.tir === null ? '' : pct1(c.tir)}`);
+  rows.push(`TIR (a.a.);${c.tir === null ? '' : fmtPct(c.tir)}`);
   rows.push(`VPL;${fmtR$(c.vpl, false)}`);
   rows.push(`Payback;${c.paybackData ?? ''}`);
   rows.push(`Exposição Máxima;${fmtR$(c.exposicaoMaxima, false)}`);
@@ -468,7 +464,7 @@ export function exportarFluxoPDF(
         <td class="v">${l.duracao ? `${l.duracao}m` : ''}</td>
         <td class="v">${l.ocultarTotal ? '' : fmtCel(l.total, l.custo)}</td>
         <td class="v">${l.vpl !== undefined ? fmtCel(l.vpl, l.custo) : ''}</td>
-        <td class="v">${l.pctVgv !== undefined ? `${pct1(l.pctVgv)}%` : ''}</td>${tds}</tr>`;
+        <td class="v">${l.pctVgv !== undefined ? fmtPct(l.pctVgv) : ''}</td>${tds}</tr>`;
     }).join('');
     paginas.push(`
       <section class="pagina">

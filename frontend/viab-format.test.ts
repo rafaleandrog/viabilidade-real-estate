@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtPct, fmtPctEntrada, fmtM2, parseNumeroBR } from './viab-format.js';
+import {
+  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtPct, fmtPctEntrada, fmtM2, parseNumeroBR, celula,
+} from './viab-format.js';
 
 test('#281: fmtR$ é a fonte única de valores monetários com 2 casas', () => {
   assert.equal(CASAS_DECIMAIS_MONETARIAS, 2);
@@ -62,4 +64,41 @@ test('fmtM2: ausência vira "—", nunca "0,00 m²"', () => {
   assert.equal(fmtM2(null), '—');
   assert.equal(fmtM2(undefined), '—');
   assert.equal(fmtM2(NaN), '—');
+});
+
+// ── #449: célula da tela (fluxo-tabela.ts) e da exportação (exportar.ts)
+// chamam a MESMA função de viab-format.ts — antes cada uma tinha a sua
+// própria expressão de formatação, e divergiam em casas decimais, limiar de
+// célula vazia e representação do negativo.
+
+test('#449 celula: valor literal — 2 casas, thousand separator, célula vazia abaixo de R$ 0,005', () => {
+  assert.equal(celula(1234.56, { comParenteses: false }), '1.234,56');
+  assert.equal(celula(0.004, { comParenteses: false }), '');
+  assert.equal(celula(0.20, { comParenteses: false }), '0,20');
+  assert.equal(celula(0, { comParenteses: false }), '');
+  assert.equal(celula(-0, { comParenteses: false }), '');
+});
+
+test('#449 celula: comParenteses=false usa sinal de menos; comParenteses=true usa parênteses', () => {
+  assert.equal(celula(-1234.56, { comParenteses: false }), '-1.234,56');
+  assert.equal(celula(-1234.56, { comParenteses: true }), '(1.234,56)');
+  assert.equal(celula(-0.004, { comParenteses: false }), '');
+  assert.equal(celula(-0.004, { comParenteses: true }), '');
+});
+
+test('#449 celula: custo=true força parênteses mesmo em valor POSITIVO (notação contábil), só com comParenteses=true', () => {
+  assert.equal(celula(1234.56, { comParenteses: true, custo: true }), '(1.234,56)');
+  assert.equal(celula(1234.56, { comParenteses: true, custo: false }), '1.234,56');
+  assert.equal(celula(1234.56, { comParenteses: false, custo: true }), '1.234,56');
+});
+
+test('#449 celula: formato percentual e sinal ignoram a formatação monetária', () => {
+  assert.equal(celula(0.4321, { comParenteses: true, formato: 'percentual' }), '43,2%');
+  assert.equal(celula(0, { comParenteses: true, formato: 'percentual' }), '');
+  assert.equal(celula(1, { comParenteses: true, formato: 'sinal' }), 'sim');
+  assert.equal(celula(0, { comParenteses: true, formato: 'sinal' }), '');
+});
+
+test('#449 celula: valores grandes (1e9) não perdem casas nem separador', () => {
+  assert.equal(celula(1e9, { comParenteses: false }), '1.000.000.000,00');
 });
