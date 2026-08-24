@@ -1,4 +1,4 @@
-// 030_juros_tabela_aa_padrao.js — #477 (Rodada 8, R8-52).
+// 033_juros_tabela_aa_padrao.js — #477 (Rodada 8, R8-52).
 //
 // `estudos` ganha a coluna `juros_tabela_aa_padrao` (decimal(5,2), sem
 // `padrao` — nula por default). É o "default herdado" que o painel de
