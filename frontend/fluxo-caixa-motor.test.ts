@@ -277,7 +277,15 @@ test('#260: rateio monetário fecha exatamente com o total da linha', () => {
     linhasCusto: [{ id: 1, grupo: 'indireto', categoria: 'Projetos', orcamento_valor: 100, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 3 }],
   });
   const linha = r.linhasCusto[0];
-  assert.deepEqual(linha.mensal, [33.33, 33.33, 33.34]);
+  // #446: `prazoMeses` virou PISO, não teto — os `prazoMeses: 3` daqui não
+  // encurtam mais o horizonte, que agora é o derivado (12, pelo piso de
+  // `11 + 1`). `mensal` é a série INTEIRA do horizonte, então o rateio de 3
+  // meses ocupa as 3 primeiras posições e o resto é zero. O que este teste
+  // prova NÃO mudou: o rateio fecha exatamente em 100, com 2 casas e o
+  // resíduo no último mês com valor.
+  assert.equal(linha.mensal.length, 12);
+  assert.deepEqual(linha.mensal.slice(0, 3), [33.33, 33.33, 33.34]);
+  assert.ok(linha.mensal.slice(3).every((v) => v === 0), 'meses sem rateio têm de ser zero');
   assert.equal(linha.total, 100);
   assert.equal(r.custoMensal.reduce((s, v) => s + v, 0), 100);
 });
@@ -2741,4 +2749,102 @@ test('#429 o aviso NÃO corrige: a venda bruta contratada continua a truncada', 
   // 100 un × 50 m² × 20.000 = 100.000.000 de VGV; 90% contratados, não 100%.
   assert.ok(perto(comDescarte.vendaBrutaContratada, 90_000_000));
   assert.ok(perto(semDescarte.vendaBrutaContratada, 100_000_000));
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #446 — o horizonte cobre TODO mês em que algo entra ou sai.
+//
+// Decisão do autor, 2026-08-22: "o fluxo vai até o último mês que é enquanto
+// alguma coisa está entrando ou saindo do fluxo". Antes, cronograma, custos e
+// recebíveis entravam no `Math.max` do horizonte e as operações de FUNDING
+// não — e o funding herda o horizonte já fechado (`fundingDoEstudo`:
+// `const prazo = fluxoLivreMensal.length`), então uma operação que amortizava
+// além do último evento operacional era CORTADA, em silêncio.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Estudo cujo último evento operacional é o mês 23 (obra 0..23). */
+const baseAte23 = (): FluxoConfig => ({
+  dataInicio: 'jan/2027', taxaDescontoAa: 12, areaTerreno: 0,
+  cronograma: [{ evento: 'obra', inicio_mes: 0, duracao_meses: 24 } as any],
+  linhasReceita: [],
+  linhasCusto: [{ id: 1, grupo: 'obra', categoria: 'Construção', orcamento_valor: 1_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 24 }],
+});
+
+test('#446: o horizonte alcança a quitação da dívida — a conta, não um >=', () => {
+  const semFunding = calcularFluxo(baseAte23());
+  // Ancoragem: sem funding o horizonte é o operacional. Se este número mudar,
+  // o teste abaixo deixa de provar o que diz.
+  assert.equal(semFunding.prazo, 24, 'último evento operacional é o mês 23 ⇒ 24 meses');
+
+  const comFunding = calcularFluxo({
+    ...baseAte23(),
+    operacoesFunding: [{
+      tipo: 'divida', inicio_mes: 0, distribuir_aporte: false, periodo_amortizacao_meses: 36,
+    }],
+  });
+  // fim = inicio_mes + nTranches - 1 + amort = 0 + 1 - 1 + 36 = 36, 0-based e
+  // INCLUSIVO (a quitação é paga no próprio mês `fim`) ⇒ comprimento 37.
+  assert.equal(comFunding.prazo, 37);
+  assert.equal(comFunding.fluxoMensal.length, 37);
+});
+
+test('#446: prazoMeses é PISO — um valor menor que o derivado não trunca nada', () => {
+  // Derivado: obra 0..47 ⇒ 48.
+  const cfg: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, areaTerreno: 0,
+    cronograma: [{ evento: 'obra', inicio_mes: 0, duracao_meses: 48 } as any],
+    linhasReceita: [], linhasCusto: [],
+  };
+  assert.equal(calcularFluxo(cfg).prazo, 48, 'ancoragem: o derivado deste estudo é 48');
+
+  const curto = calcularFluxo({ ...cfg, prazoMeses: 12 });
+  assert.equal(curto.prazo, 48);
+  assert.equal(curto.fluxoMensal.length, 48);
+});
+
+test('#446: prazoMeses ainda ESTICA — piso não é o mesmo que ignorar', () => {
+  const cfg: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, areaTerreno: 0,
+    cronograma: [{ evento: 'obra', inicio_mes: 0, duracao_meses: 48 } as any],
+    linhasReceita: [], linhasCusto: [],
+  };
+  const longo = calcularFluxo({ ...cfg, prazoMeses: 60 });
+  assert.equal(longo.prazo, 60);
+  assert.equal(longo.fluxoMensal.length, 60);
+});
+
+test('#446: o aporte de equity além do último evento operacional entra no horizonte', () => {
+  const c = calcularFluxo({
+    ...baseAte23(),
+    operacoesFunding: [{ tipo: 'equity', inicio_mes: 40 }],
+  });
+  // Sem `periodo_amortizacao_meses`, o que manda é `max(inicio_mes, mesRepasse)`
+  // — aqui o aporte no mês 40 é o último evento financeiro ⇒ 41 meses.
+  assert.equal(c.prazo, 41);
+});
+
+test('#446: estudo SEM funding tem horizonte idêntico ao baseline', () => {
+  const semCampo = calcularFluxo(baseAte23());
+  const comCampoVazio = calcularFluxo({ ...baseAte23(), operacoesFunding: [] });
+  assert.equal(semCampo.prazo, comCampoVazio.prazo);
+  assert.deepEqual(semCampo.fluxoMensal, comCampoVazio.fluxoMensal);
+});
+
+test('#446: esticar o horizonte NÃO move o resultado final desalavancado (#474)', () => {
+  // Por que este teste existe: quatro telas (Resumo, Dashboard, Análise de
+  // Mercado, Orçamento de Custos) leem o fluxo DESALAVANCADO e, de propósito,
+  // não carregam operações — então o horizonte delas continua o operacional,
+  // menor que o das telas que simulam funding. A #474 avisa que
+  // `resultadoFinal` é remontado em cinco lugares e que um horizonte maior
+  // muda o valor lido em todas elas. Aqui se prova que NÃO muda: os meses
+  // extras não carregam movimento operacional, então o acumulado fica plano e
+  // `fluxoAcumulado[último]` é o mesmo. Só o COMPRIMENTO difere.
+  const curto = calcularFluxo(baseAte23());
+  const longo = calcularFluxo({
+    ...baseAte23(),
+    operacoesFunding: [{ tipo: 'divida', inicio_mes: 0, distribuir_aporte: false, periodo_amortizacao_meses: 36 }],
+  });
+  assert.notEqual(curto.prazo, longo.prazo, 'ancoragem: os horizontes têm de ser diferentes');
+  const ultimo = (s: number[]) => s[s.length - 1];
+  assert.equal(ultimo(longo.fluxoAcumulado), ultimo(curto.fluxoAcumulado));
 });
