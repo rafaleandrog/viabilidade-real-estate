@@ -174,6 +174,9 @@ export class ViabTelaCenarios extends LitElement {
         ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
         // #473: default true preserva o comportamento histórico (VGV bruto).
         corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
+        // #446: o horizonte precisa cobrir a quitação das operações, senão a
+        // série é cortada e `saldoFinal` exibe um saldo truncado.
+        operacoesFunding: this.operacoes,
       };
       this.faixaPreco = this._faixa(bm?.dados || [], 'preco');
       this.faixaCusto = this._faixa(bm?.dados || [], 'custo_obras');

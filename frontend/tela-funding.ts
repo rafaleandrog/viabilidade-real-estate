@@ -51,9 +51,21 @@ import './viab-num.js';
 // a API; só "Salvar" persiste — mesmo padrão da tela anterior e do #51/#252.
 // ─────────────────────────────────────────────────────────────────────────
 
+// #466: `divida` já É o produto de capital de giro por calendário — a própria
+// planilha do autor rotula a aba `divida` de `fluxo_investidor_FORMULAS.xlsx`
+// como a folha de Capital de Giro (A8 = "Valor CG (R$):", B18 = "Libera CG",
+// C18 = "Carencia CG"). O rótulo abaixo deixa isso visível na UI; o
+// identificador persistido (`tipo='divida'`) não muda.
+//
+// 🛑 DECISÃO DO AUTOR, 2026-08-22 — linha de crédito rotativa RECUSADA. Não
+// ressuscitar. O desenho (saque dirigido por falta de caixa, devolução
+// automática quando sobra, limite reutilizável) foi proposto e recusado: ele
+// reintroduziria a competição por caixa entre operações que a reescrita do
+// funding (#355) apagou de propósito. Não há migração para isso, não há
+// bump de `versao`.
 const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
   { valor: 'financiamento_producao', rotulo: 'Financiamento à produção', icone: 'fa-solid fa-building-columns' },
-  { valor: 'divida', rotulo: 'Dívida', icone: 'fa-solid fa-file-invoice-dollar' },
+  { valor: 'divida', rotulo: 'Dívida / Capital de giro', icone: 'fa-solid fa-file-invoice-dollar' },
   { valor: 'equity', rotulo: 'Equity', icone: 'fa-solid fa-handshake' },
 ];
 
@@ -190,6 +202,9 @@ export class ViabFunding extends LitElement {
         ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
         // #473: default true preserva o comportamento histórico (VGV bruto).
         corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
+        // #446: o horizonte precisa cobrir a quitação das operações, senão a
+        // série é cortada e `saldoFinal` exibe um saldo truncado.
+        operacoesFunding: this.operacoes,
       };
       this.calc = calcularFluxo(config);
       this.receitaLiquida = receitaLiquidaComCorretagemMensal(
@@ -502,8 +517,8 @@ export class ViabFunding extends LitElement {
           ${eDivida(o.tipo) ? card('Saldo final', fmtR$(ind.saldoFinal), Math.abs(ind.saldoFinal) < 0.01 ? '' : 'neg') : nothing}
         </div>
         ${eDivida(o.tipo) && Math.abs(ind.saldoFinal) >= 0.01
-          ? html`<p class="nota">⚠️ A dívida não zera dentro do horizonte do estudo: o prazo de
-              amortização ultrapassa o fim do projeto.</p>`
+          ? html`<p class="nota">⚠️ A dívida não zera: no mês da quitação contratual ainda resta
+              saldo devedor.</p>`
           : nothing}
       </div>
     `;

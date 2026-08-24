@@ -128,7 +128,7 @@ export function calcularRecebiveis(cen: CenarioRecebiveis): ResultadoRecebiveis 
         if (N <= 0) {
           throw new Error(
             `ate_marco: N_s = ${N} ≤ 0 na safra ${s} (marco ${c.marcoM}). ` +
-            'Converta para imediato ou concentrado — o motor não cria prazo negativo (#233).',
+            'Converta para imediato ou concentrado — o motor não cria prazo negativo.',
           );
         }
         const parcela = pmt(c.taxaMensal, N, principal);

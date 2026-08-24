@@ -1,4 +1,4 @@
-import { eCorretagem, eFinanciavelPadrao, marcosObra, type EventoCrono } from './fluxo-shared.js';
+import { eCorretagem, eFinanciavelPadrao, janelaDivida, marcosObra, type EventoCrono } from './fluxo-shared.js';
 import { vplFluxo } from './fluxo-caixa-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -242,14 +242,17 @@ export function simularDivida(op: OperacaoFunding, prazo: number): SerieOperacao
 
   const i = taxaMensalEquivalente(n(op.taxa_anual) / 100);
   const distribuir = op.distribuir_aporte === true;
-  const nTranches = distribuir ? Math.max(1, Math.floor(n(op.aporte_meses)) || 1) : 1;
   const amort = Math.floor(n(op.periodo_amortizacao_meses));
   const carencia = Math.floor(n(op.periodo_carencia_meses));
   const valor = n(op.valor);
 
-  const m0 = Math.max(0, Math.floor(n(op.inicio_mes)));
-  const ini = m0 + nTranches;
-  const fim = ini - 1 + amort;
+  // #446 — a janela vem de `janelaDivida` (fluxo-shared.ts), que é a MESMA
+  // fonte que `calcularFluxo` usa para derivar o horizonte. Antes esta conta
+  // morava só aqui, e o horizonte não a enxergava: uma operação que amortizava
+  // além do último evento operacional era cortada no meio da série. Duas
+  // cópias da fórmula reintroduziriam exatamente esse buraco na primeira vez
+  // que uma delas mudasse.
+  const { m0, nTranches, ini, fim } = janelaDivida(op);
 
   // Base do PMT: valor futuro das tranches liberadas (ver nota acima).
   const principalPmt = distribuir && i > 0

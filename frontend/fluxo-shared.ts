@@ -786,6 +786,73 @@ export function mesRepasse(crono: EventoCrono[]): number {
 }
 
 /**
+ * #446 — a forma mínima de uma operação de funding, do ponto de vista de QUEM
+ * SÓ PRECISA SABER ATÉ QUANDO ELA MOVIMENTA CAIXA.
+ *
+ * Declarada aqui, estruturalmente, e não importada de `funding-motor.ts`, por
+ * um motivo mecânico: `funding-motor.ts` importa `vplFluxo` de
+ * `fluxo-caixa-motor.ts`, e o motor de caixa é quem precisa deste tipo para
+ * derivar o horizonte. Importar `OperacaoFunding` de volta fecharia um ciclo
+ * de VALOR entre os dois módulos. `OperacaoFunding` satisfaz esta interface
+ * estruturalmente — o TypeScript aceita a passagem sem nenhuma conversão.
+ */
+export interface OperacaoParaHorizonte {
+  tipo?: string | null;
+  inicio_mes?: number | string | null;
+  aporte_meses?: number | string | null;
+  distribuir_aporte?: boolean | null;
+  periodo_amortizacao_meses?: number | string | null;
+}
+
+/**
+ * #446 — a janela de uma operação de `divida`, em meses 0-based.
+ *
+ * ⚠️ **Esta é a ÚNICA fonte da conta.** `simularDivida` (`funding-motor.ts`)
+ * consome exatamente este resultado, e o horizonte do fluxo
+ * (`calcularFluxo`, `fluxo-caixa-motor.ts`) também. Antes da #446 a conta
+ * existia só dentro de `simularDivida`, e o horizonte não a conhecia — era
+ * essa ausência que cortava a operação no meio.
+ *
+ * `fim` é **inclusivo**: a quitação é paga no próprio mês `fim`, então uma
+ * série que cubra a operação inteira tem `fim + 1` posições.
+ */
+export function janelaDivida(op: OperacaoParaHorizonte): { m0: number; nTranches: number; ini: number; fim: number } {
+  const distribuir = op.distribuir_aporte === true;
+  const nTranches = distribuir ? Math.max(1, Math.floor(n(op.aporte_meses)) || 1) : 1;
+  const amort = Math.floor(n(op.periodo_amortizacao_meses));
+  const m0 = Math.max(0, Math.floor(n(op.inicio_mes)));
+  const ini = m0 + nTranches;
+  return { m0, nTranches, ini, fim: ini - 1 + amort };
+}
+
+/**
+ * #446 — o último mês (0-based, **inclusivo**) em que a operação ainda
+ * movimenta caixa. É o termo que faltava no `Math.max` do horizonte.
+ *
+ * Os três tipos não se calculam do mesmo jeito:
+ *
+ * - **`divida`** — `janelaDivida(op).fim`, a quitação contratual. É o buraco
+ *   principal que a #446 fecha: uma amortização de 120 meses dentro de um
+ *   horizonte de 48 era simplesmente cortada.
+ * - **`equity`** — `max(inicio_mes, mesRepasse)`. O aporte entra em
+ *   `inicio_mes`; o retorno do modo `resultado_final` é pago no mês do
+ *   repasse. O repasse já costuma estar coberto pelo cronograma, mas um
+ *   aporte lançado depois dele não estava.
+ * - **`financiamento_producao`** — `max(inicio_mes, mesRepasse)`, e **só
+ *   isso**. A amortização dele é por *cash sweep*, que depende do caixa
+ *   disponível, que depende do horizonte: estender o horizonte "até a
+ *   quitação" seria circular. Decisão da #446: cobrir só o que é derivável
+ *   (as chaves, do cronograma) e deixar saldo residual ser denunciado por
+ *   `DIVIDA_FINAL_NAO_ZERA`, que aí passa a ser verdadeiro positivo em vez de
+ *   artefato de truncamento. NÃO iterar o motor até convergir.
+ */
+export function ultimoMesFunding(op: OperacaoParaHorizonte, mesRepasseValor: number): number {
+  const m0 = Math.max(0, Math.floor(n(op.inicio_mes)));
+  if (op.tipo === 'divida') return Math.max(m0, janelaDivida(op).fim);
+  return Math.max(m0, Math.max(0, Math.floor(n(mesRepasseValor))));
+}
+
+/**
  * Regime de cronograma de uma linha de custo (#255).
  *
  * Por que existe: esta classificação estava INLINE no render de

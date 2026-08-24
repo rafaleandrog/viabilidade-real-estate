@@ -20,7 +20,8 @@ import {
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, vgvVendidoBrutoMensal, vgvVendidoVendavelMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   areaTotalLinha, areaPermutaFisicaLinha, areaVendavelLinha, unidadesVendaveisLinha,
-  type EventoCrono, type ContextoCusto, type PeriodoAgregado,
+  mesRepasse, ultimoMesFunding,
+  type EventoCrono, type ContextoCusto, type PeriodoAgregado, type OperacaoParaHorizonte,
 } from './fluxo-shared.js';
 
 const n = (v: any): number => Number(v) || 0;
@@ -59,7 +60,7 @@ type ReservaPermutaFisica = {
   usaFonteNova: boolean;
 };
 
-function chaveTipologiaLinha(linha: any, linhaIndex: number, tipologia: any, tipologiaIndex: number): string {
+export function chaveTipologiaLinha(linha: any, linhaIndex: number, tipologia: any, tipologiaIndex: number): string {
   return `${linha?.id ?? linhaIndex}:${tipologia?.id ?? tipologiaIndex}`;
 }
 
@@ -69,7 +70,7 @@ function chaveTipologiaLinha(linha: any, linhaIndex: number, tipologia: any, tip
  * aparece em vários Grupos; o preço/m² da alocação correspondente é usado só
  * para medir o VGV informativo. Nenhuma parcela desta reserva entra no caixa.
  */
-function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]): ReservaPermutaFisica {
+export function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]): ReservaPermutaFisica {
   const custos = (linhasCusto ?? []).filter(ePermutaFisica);
   const usaFonteNova = custos.length > 0;
   const reservas = new Map<number, number>();
@@ -102,6 +103,26 @@ function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]): Rese
     }
   }
   return { porTipologia, vgv, usaFonteNova };
+}
+
+/**
+ * #444: mesma transformação que `calcularFluxo` aplica às linhas de Receita
+ * antes de calcular (reserva de permuta física escrita em
+ * `unidades_permutadas`), exposta para quem valida fora do motor —
+ * `validarContratacao`/`validarSafrasReceita` em `fluxo-invariantes.ts`
+ * recebem as linhas CRUAS do banco e precisam da mesma fonte de permuta que
+ * o motor usa, senão nunca reconciliam num estudo com permuta física.
+ */
+export function linhasReceitaComPermutaReservada(linhasReceita: any[], linhasCusto: any[]): any[] {
+  const reservas = reservarPermutasFisicas(linhasReceita, linhasCusto);
+  if (!reservas.usaFonteNova) return linhasReceita;
+  return linhasReceita.map((l: any, li: number) => ({
+    ...l,
+    tipologias: (l.tipologias ?? []).map((t: any, ti: number) => ({
+      ...t,
+      unidades_permutadas: reservas.porTipologia.get(chaveTipologiaLinha(l, li, t, ti)) ?? 0,
+    })),
+  }));
 }
 
 export type CurvaPersonalizada = { mes: number; pct: number }[];
@@ -177,7 +198,9 @@ export function reamostrarCurva(curva: CurvaPersonalizada, dur: number): number[
 
 export interface FluxoConfig {
   dataInicio: string | null;       // "mmm/AAAA" (ancora os rótulos; pode faltar)
-  prazoMeses?: number;             // horizonte fixo; se ausente, é derivado
+  // #446: PISO do horizonte, nunca teto. Um prazo digitado pode ESTICAR o
+  // fluxo; jamais encurtá-lo. Ausente ⇒ vale só o derivado.
+  prazoMeses?: number;
   taxaDescontoAa: number;          // % a.a. para o VPL
   cronograma: EventoCrono[];
   linhasReceita: any[];            // { id, nome, fase_label, tipologias[], absorcao, fluxo_pagamento }
@@ -193,6 +216,13 @@ export interface FluxoConfig {
    * física inclusa; `false` = VGV vendável, exclui a permuta física.
    */
   corretagemSobrePermutaFisica?: boolean;
+  // #446: as operações de Funding, lidas SÓ para derivar o horizonte — o
+  // motor de caixa não as simula (quem simula é `fundingDoEstudo`, depois).
+  // Sem elas, uma operação que amortiza além do último evento operacional é
+  // cortada, e `saldoFinal` passa a exibir um saldo truncado que não
+  // corresponde a compromisso nenhum. Tipo estrutural, para não fechar ciclo
+  // de import com `funding-motor.ts` — ver `OperacaoParaHorizonte`.
+  operacoesFunding?: OperacaoParaHorizonte[];
 }
 
 export interface LinhaCalc {
@@ -206,11 +236,14 @@ export interface LinhaCalc {
   vpl: number;
   mensal: number[];
   itens?: LinhaCalc[];             // tipologias (receita) — sub-linhas
-  // #238: só em linha de Permuta financeira em % VGV. O motor calcula as DUAS
-  // bases (bruta e líquida) e usa a escolhida em `permuta_financeira_base`;
-  // esta é a NÃO escolhida, exposta para auditoria — o critério da issue pede
-  // que a outra visão fique disponível, não que seja descartada em silêncio.
-  permutaAlternativa?: { base: 'bruta' | 'liquida'; total: number };
+  // #238/#459: só em linha de Permuta financeira em % VGV. O motor calcula a
+  // base ESCOLHIDA (os dois booleanos `permuta_financeira_deduzir_imposto`/
+  // `_corretagem`) e a base OPOSTA (os dois booleanos invertidos), exposta
+  // aqui para auditoria — generaliza a antiga oposição bruta×líquida para as
+  // quatro combinações possíveis: a oposta de qualquer combinação é sempre
+  // bem definida (inverte os dois flags), e reduz exatamente ao par
+  // bruta/líquida quando a escolha é um dos dois extremos.
+  permutaAlternativa?: { deduzirImposto: boolean; deduzirCorretagem: boolean; total: number };
 }
 
 /**
@@ -1050,7 +1083,7 @@ export function pagamentosAteMarco(
   if (nParcelas <= 0) {
     throw new Error(
       `pagamentosAteMarco: N_s = ${nParcelas} ≤ 0 na safra ${safra} (marco ${c.marcoMes}). ` +
-      'O motor não cria prazo negativo — converta o componente para imediato ou concentrado (#233).',
+      'O motor não cria prazo negativo — converta o componente para imediato ou concentrado.',
     );
   }
   const out: PagamentoSafra[] = [];
@@ -1094,7 +1127,7 @@ export function pagamentosConcentrado(
   if (c.mesPagamento < safra) {
     throw new Error(
       `pagamentosConcentrado: mês de pagamento ${c.mesPagamento} anterior à safra ${safra}. ` +
-      'O repasse não pode ser antecipado para antes da contratação (#234).',
+      'O repasse não pode ser antecipado para antes da contratação.',
     );
   }
   // #234: saldo_s,s = principal (0 períodos decorridos no próprio mês da
@@ -1355,7 +1388,7 @@ export type ResiduoAteMarco = 'concentrado' | 'imediato';
  * OBRIGATÓRIO de propósito (não tem default aqui): os dois call sites deste
  * módulo precisam decidir explicitamente, e omitir a passagem tem de estourar
  * `TS2554` na compilação, não cair calado num comportamento não pretendido. */
-function componentesIntegradosSafra(
+export function componentesIntegradosSafra(
   componentes: ComponentePagamento[],
   safra: number,
   mesEntrega: number,
@@ -1729,7 +1762,8 @@ export function recebimentoBrutoMensal(
     if (idx < saida.length) { saida[idx] += valor; return; }
     console.warn(
       `fluxo-caixa-motor: recebimento de ${valor.toFixed(2)} no mês ${mes} cai fora do horizonte ` +
-      `(${saida.length} meses) — prazoMeses explícito menor que o necessário? Valor NÃO computado.`,
+      `(${saida.length} meses) — o horizonte deveria cobrir todo mês em que algo entra ou sai ` +
+      `(#446). Valor NÃO computado.`,
     );
   };
 
@@ -1923,36 +1957,62 @@ export function distribuirProporcional(custo: any, pesos: number[], ctx: Context
 }
 
 /**
- * #238 (padrao-incorporacao.md §15.2): duas visões da permuta financeira, no
- * regime de caixa — só quando o orçamento é `% VGV`; em valor fixo (`rs`)
- * não há distinção bruta/líquida (um total fixo distribuído proporcionalmente
- * à receita de caixa é o mesmo valor nas duas visões).
+ * #238/#459 (padrao-incorporacao.md §15.2): a base da permuta financeira, no
+ * regime de caixa — só quando o orçamento é `% VGV`; em valor fixo (`rs`) não
+ * há distinção de base (um total fixo distribuído proporcionalmente à
+ * receita de caixa é o mesmo valor em qualquer combinação).
  *
- *   bruta   = receita de caixa × % de permuta
- *   líquida = (receita de caixa − imposto − corretagem) × % de permuta
+ *   base = receita de caixa
+ *          − (deduzirImposto    ? imposto    : 0)
+ *          − (deduzirCorretagem ? corretagem : 0)
+ *   permuta = MAX(0, base) × % de permuta
  *
- * Ambas ficam disponíveis para auditoria (§15.3); qual alimenta o fluxo é
- * escolha do estudo (`permuta_financeira_base`, default `bruta` — preserva o
- * resultado de todo estudo existente, que hoje não deduz imposto/corretagem
- * da base). A base líquida nunca fica negativa (clamp em 0): imposto e
- * corretagem que excedam a receita do mês não geram permuta negativa.
+ * #459 separou a dedução em DOIS booleanos independentes por linha de custo
+ * (`permuta_financeira_deduzir_imposto`/`_corretagem` — a EVI declara
+ * exatamente essa dupla, `Premissas!N17`/`N18`), no lugar do enum único
+ * `bruta`/`liquida` da #238. A base nunca fica negativa (clamp em 0): imposto
+ * e corretagem que excedam a receita do mês não geram permuta negativa.
  */
-export function permutaFinanceiraBrutaMensal(receitaCaixaMensal: number[], pctPermuta: number): number[] {
+export function permutaFinanceiraDeduzidaMensal(
+  receitaCaixaMensal: number[],
+  impostoMensalTotal: number[],
+  corretagemMensalSerie: number[],
+  pctPermuta: number,
+  deduzirImposto: boolean,
+  deduzirCorretagem: boolean,
+): number[] {
   const f = pctPermuta / 100;
-  return receitaCaixaMensal.map((v) => round2(v * f));
+  return receitaCaixaMensal.map((v, i) => {
+    const base = Math.max(0, v
+      - (deduzirImposto ? (impostoMensalTotal[i] ?? 0) : 0)
+      - (deduzirCorretagem ? (corretagemMensalSerie[i] ?? 0) : 0));
+    return round2(base * f);
+  });
 }
 
+/**
+ * `(false, false)` de `permutaFinanceiraDeduzidaMensal` — o extremo "bruta"
+ * histórico (enum pré-#459). Mantida com a assinatura original: é o oráculo
+ * dos testes de #238, que continuam valendo sem alteração.
+ */
+export function permutaFinanceiraBrutaMensal(receitaCaixaMensal: number[], pctPermuta: number): number[] {
+  return permutaFinanceiraDeduzidaMensal(receitaCaixaMensal, [], [], pctPermuta, false, false);
+}
+
+/**
+ * `(true, true)` de `permutaFinanceiraDeduzidaMensal` — o extremo "líquida"
+ * histórico (enum pré-#459). Mantida com a assinatura original pelo mesmo
+ * motivo de `permutaFinanceiraBrutaMensal`.
+ */
 export function permutaFinanceiraLiquidaMensal(
   receitaCaixaMensal: number[],
   impostoMensalTotal: number[],
   corretagemMensalSerie: number[],
   pctPermuta: number,
 ): number[] {
-  const f = pctPermuta / 100;
-  return receitaCaixaMensal.map((v, i) => {
-    const base = Math.max(0, v - (impostoMensalTotal[i] ?? 0) - (corretagemMensalSerie[i] ?? 0));
-    return round2(base * f);
-  });
+  return permutaFinanceiraDeduzidaMensal(
+    receitaCaixaMensal, impostoMensalTotal, corretagemMensalSerie, pctPermuta, true, true,
+  );
 }
 
 
@@ -2177,9 +2237,12 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const linhasCusto = config.linhasCusto ?? [];
   const taxa = n(config.taxaDescontoAa) || 12;
 
-  // Horizonte: usa prazoMeses se dado; senão deriva do conteúdo. Meses
-  // 0-based: o último mês usado é `ultimo*`, então o comprimento do array é
-  // `ultimo* + 1`.
+  // Horizonte: cobre TODO mês em que algo entra ou sai (#446 — decisão do
+  // autor, 2026-08-22: "o fluxo vai até o último mês que é enquanto alguma
+  // coisa está entrando ou saindo do fluxo"). Meses 0-based: o último mês
+  // usado é `ultimo*`, então o comprimento do array é `ultimo* + 1`.
+  //
+  // #446: `config.prazoMeses` é PISO, não teto — ver logo abaixo.
   //
   // #231: `ultimoRecebivel` considera TODOS os componentes de pagamento de
   // cada linha (entrada, parcelamento — ao longo da obra ou por
@@ -2190,8 +2253,16 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const ultimoCrono = Math.max(0, ...crono.map((e) => n(e.inicio_mes) + n(e.duracao_meses) - 1));
   const ultimoCustos = Math.max(0, ...linhasCusto.map((c) => n(c.inicio_mes) + n(c.duracao_meses) - 1));
   const ultimoRecebivel = Math.max(0, ...linhasReceitaOriginal.map((l) => ultimoMesRecebivelLinha(l, crono)));
-  const prazoDerivado = Math.max(ultimoCrono, ultimoRecebivel, ultimoCustos, 11) + 1;
-  const prazo = Math.max(1, Math.round(n(config.prazoMeses) || prazoDerivado));
+  // #446: o termo que faltava. Cronograma, custos e recebíveis entravam no
+  // `max`; dívida e equity NÃO — e o funding herda o horizonte já fechado
+  // (`funding-motor.ts`: `const prazo = fluxoLivreMensal.length`), então a
+  // operação era truncada sem que nada avisasse.
+  const ultimoFunding = Math.max(0, ...(config.operacoesFunding ?? []).map((op) => ultimoMesFunding(op, mesRepasse(crono))));
+  const prazoDerivado = Math.max(ultimoCrono, ultimoRecebivel, ultimoCustos, ultimoFunding, 11) + 1;
+  // #446: PISO, não teto. O `||` anterior descartava o derivado inteiro assim
+  // que houvesse um valor digitado — armadilha armada para o primeiro chamador
+  // que preenchesse o campo.
+  const prazo = Math.max(prazoDerivado, Math.round(n(config.prazoMeses) || 0), 1);
 
   const reservasPermuta = reservarPermutasFisicas(linhasReceitaOriginal, linhasCusto);
   const usaFonteNovaPermuta = reservasPermuta.usaFonteNova;
@@ -2350,18 +2421,19 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   });
   calcCustos = calcCustos.map((linha) => quantizarLinhaMonetaria(linha, taxa));
 
-  // Permuta financeira (#196/#238): sai da RECEITA DAS VENDAS (em caixa),
-  // sempre — não é mais escolha de `distribuicao_modo` (armadilha A10, Anexo
-  // D: quem classifica é a subcategoria; a UI antes lia `distribuicao_modo`,
-  // que é curva de rateio do Preço do Terreno, não critério de permuta). O
-  // resultado entra NEGATIVO em `linhasReceita` — dedução da receita, não
-  // custo. Em `% VGV`, calcula as duas visões (bruta/líquida, §15.2) sobre a
-  // receita de caixa BRUTA (`recebimentoBrutoMensal`, ANTES do RET — nunca
-  // `receitaMensalVendas`, que já é líquida de RET/#228: usá-la subtrairia o
-  // imposto duas vezes na visão líquida) para auditoria, e usa a escolhida
-  // (`permuta_financeira_base`, default bruta) no fluxo; em valor fixo
-  // (`rs`), distribui proporcionalmente à receita de caixa (sem distinção
-  // bruta/líquida — um total fixo não tem base a que aplicar deduções).
+  // Permuta financeira (#196/#238/#459): sai da RECEITA DAS VENDAS (em
+  // caixa), sempre — não é mais escolha de `distribuicao_modo` (armadilha
+  // A10, Anexo D: quem classifica é a subcategoria; a UI antes lia
+  // `distribuicao_modo`, que é curva de rateio do Preço do Terreno, não
+  // critério de permuta). O resultado entra NEGATIVO em `linhasReceita` —
+  // dedução da receita, não custo. Em `% VGV`, calcula a base ESCOLHIDA pelos
+  // dois flags independentes (`permuta_financeira_deduzir_imposto`/
+  // `_corretagem`, #459) sobre a receita de caixa BRUTA
+  // (`recebimentoBrutoMensal`, ANTES do RET — nunca `receitaMensalVendas`,
+  // que já é líquida de RET/#228: usá-la subtrairia o imposto duas vezes) e
+  // também a base OPOSTA (os dois flags invertidos), para auditoria; em
+  // valor fixo (`rs`), distribui proporcionalmente à receita de caixa (sem
+  // distinção de base — um total fixo não tem base a que aplicar deduções).
   const receitaCaixaBrutaMensal = new Array<number>(prazo).fill(0);
   const impostoTotalMensal = new Array<number>(prazo).fill(0);
   for (const l of linhasReceita) {
@@ -2380,21 +2452,26 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   let calcDeducoesReceita: LinhaCalc[] = linhasPermutaFinanceira.map((c) => {
     const nome = nomeLinhaCusto(c);
     let mensalBruto: number[];
-    // #238: a base NÃO escolhida vira auditoria em vez de ser descartada.
-    let alternativa: { base: 'bruta' | 'liquida'; total: number } | undefined;
+    // #459: a base OPOSTA (flags invertidos) vira auditoria em vez de ser
+    // descartada — generaliza o antigo "base NÃO escolhida" da #238.
+    let alternativa: { deduzirImposto: boolean; deduzirCorretagem: boolean; total: number } | undefined;
     if ((c.orcamento_unidade || 'rs') === 'pct_vgv') {
       // Quando existe canônico, o percentual é somente a representação dele.
       const pct = c.orcamento_valor_canonico !== null && c.orcamento_valor_canonico !== undefined
         ? (ctxCusto.vgvTotal > 0 ? resolverCustoTotal(c, ctxCusto) / ctxCusto.vgvTotal * 100 : 0)
         : n(c.orcamento_valor);
-      const bruta = permutaFinanceiraBrutaMensal(receitaCaixaBrutaMensal, pct);
-      const liquida = permutaFinanceiraLiquidaMensal(receitaCaixaBrutaMensal, impostoTotalMensal, corretagemSerie, pct);
-      const eLiquida = c.permuta_financeira_base === 'liquida';
-      mensalBruto = eLiquida ? liquida : bruta;
-      const outra = eLiquida ? bruta : liquida;
+      const deduzImposto = c.permuta_financeira_deduzir_imposto === true;
+      const deduzCorretagem = c.permuta_financeira_deduzir_corretagem === true;
+      mensalBruto = permutaFinanceiraDeduzidaMensal(
+        receitaCaixaBrutaMensal, impostoTotalMensal, corretagemSerie, pct, deduzImposto, deduzCorretagem,
+      );
+      const oposta = permutaFinanceiraDeduzidaMensal(
+        receitaCaixaBrutaMensal, impostoTotalMensal, corretagemSerie, pct, !deduzImposto, !deduzCorretagem,
+      );
       alternativa = {
-        base: eLiquida ? 'bruta' : 'liquida',
-        total: round2(outra.reduce((t, v) => t + v, 0)),
+        deduzirImposto: !deduzImposto,
+        deduzirCorretagem: !deduzCorretagem,
+        total: round2(oposta.reduce((t, v) => t + v, 0)),
       };
     } else {
       mensalBruto = distribuirProporcional(c, receitaMensalVendas, ctxCusto);

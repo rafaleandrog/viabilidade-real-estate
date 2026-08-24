@@ -1803,31 +1803,43 @@ base líquida
 − corretagem dedutível
 ```
 
-> ✅ **Comportamento vigente — as duas visões existem, e a escolha é do usuário
-> (#195/#196/#227/#228/#346).** A permuta física reduz unidades vendidas, VGV e Resultado no
-> Avançado (#195), e a permuta financeira do Terreno é deduzida da receita (#196).
-> `permutaFinanceiraBrutaMensal` (`frontend/fluxo-caixa-motor.ts:1570-1573`) aplica o percentual
-> sobre a receita de caixa; `permutaFinanceiraLiquidaMensal` (`:1575-1586`) **subtrai imposto e
-> corretagem diretamente** do recebimento do mês — `max(0, v − imposto − corretagem)` — e só então
-> aplica o percentual. É a **subtração direta** que o padrão pede: a dedução não é composta
-> multiplicativamente.
+> ✅ **Comportamento vigente — a base é DOIS flags independentes, por linha de custo
+> (#195/#196/#227/#228/#346/#459).** A permuta física reduz unidades vendidas, VGV e Resultado no
+> Avançado (#195), e a permuta financeira do Terreno é deduzida da receita (#196). Até a #459, a
+> base era um enum único `bruta`/`liquida` (#238); a EVI declara dois booleanos separados
+> (`Premissas!N17`/`N18`, "deduzir das permutas financeiras: ☑ corretagem ☑ impostos"), e a #459
+> separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
+> `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `calcularFluxo` calcula **as duas séries**, usa a escolhida em `permuta_financeira_base`
-> (default `bruta`) e devolve a não escolhida como `alternativa` (`:2002-2010`); a tela oferece o
-> seletor e exibe o total da outra base (`frontend/tela-fluxo-custos.ts:769-775`). As séries de
-> dedução são `impostoMensal` (`:1447`, RET já resolvido como parâmetro **global** do estudo)
-> e `corretagemMensal` (`:1516`, linha de custo obrigatória "Corretagem de vendas", base
-> **bruto/VGV** — fonte única desde que a #228 removeu a dedução concorrente de `vglLinha`).
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:1930-1945`) **subtrai** cada
+> série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
+> (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
+> que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
+> uma por conta própria (as quatro combinações são todas representáveis, inclusive as duas mistas
+> que o enum não representava). `permutaFinanceiraBrutaMensal`/`permutaFinanceiraLiquidaMensal`
+> (`:1952-1970`) sobrevivem como os dois extremos `(false,false)`/`(true,true)`, para
+> compatibilidade com os testes e o vocabulário histórico "bruta"/"líquida".
+>
+> `calcularFluxo` calcula a série ESCOLHIDA pelos dois flags da linha e a série OPOSTA (os dois
+> flags invertidos) para auditoria; a tela oferece dois checkboxes ("Deduzir das permutas
+> financeiras: ☑ corretagem ☑ impostos", `frontend/tela-fluxo-custos.ts:761-777`) e exibe o total
+> da base oposta ao lado deles. As séries de dedução são `impostoMensal` (`:1447`, RET já resolvido
+> como parâmetro **global** do estudo) e `corretagemMensal` (`:1516`, linha de custo obrigatória
+> "Corretagem de vendas", base **bruto/VGV** — fonte única desde que a #228 removeu a dedução
+> concorrente de `vglLinha`).
 >
 > ℹ️ **O bloco `regime_tributario`/`aliquota_*` não é lido pelo motor do Avançado** — o imposto
 > oficial dele é o RET (`frontend/fluxo-shared.ts:210-212`, #228, decisão do autor em 2026-08-01).
 >
 > ⚠️ **Correção: dizer que o regime é "exclusivo do Preliminar" está errado, e a frase anterior
 > desta nota dizia isso.** A Proforma **não** lê `regime_tributario`: `frontend/proforma.ts:245`
-> calcula o imposto só a partir de `sujeito_ret`, `aliquota_ret_pct` e `imposto_percentual`. Fora
-> do schema, da persistência e da própria tela (`tela-financeiro.ts:187,215`), `regime_tributario`
-> não tem leitor nenhum. Ele e os cinco `aliquota_*_pct` estão inertes nos **dois** níveis — não
-> são "do Preliminar", são de ninguém.
+> calcula o imposto só a partir de `sujeito_ret`, `aliquota_ret_pct` e `imposto_percentual`.
+> `regime_tributario` não tem leitor nenhum, em nenhum nível — só era mais um controle sem efeito.
+>
+> ✅ **#450 (2026-08-24): saiu do render.** `regime_tributario` e os cinco `aliquota_*_pct` não
+> aparecem mais na aba `Viabilidade → Financeiro` — `camposVisiveisFinanceiro`
+> (`frontend/tela-financeiro.ts:74-77`) só lista `taxa_desconto_aa` e `imposto_percentual`. As
+> colunas continuam no schema como dado histórico; só o formulário saiu.
 
 ```text
 permuta financeira líquida
@@ -1840,9 +1852,10 @@ O fluxo visível deve usar a visão que representa o contrato e a realidade de c
 
 As duas visões devem permanecer disponíveis para auditoria.
 
-> ✅ **Comportamento vigente.** É o que a §15.2 descreve: a visão do fluxo é a de
-> `permuta_financeira_base`, e a outra continua disponível como `alternativa`, exibida na tela ao
-> lado do seletor.
+> ✅ **Comportamento vigente.** É o que a §15.2 descreve: a visão do fluxo é a que os dois flags da
+> linha escolhem (`permuta_financeira_deduzir_imposto`/`_corretagem`), e a base oposta (os dois
+> flags invertidos) continua disponível como `permutaAlternativa`, exibida na tela ao lado dos
+> checkboxes.
 
 ### 15.4 Momento
 
@@ -1988,16 +2001,15 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > §4.3 de [Funding, Capital Stack e Retorno do Capital](funding-capital-stack), preservada de
 > propósito. O resto daquele documento é **ADR histórico**.
 >
-> ⚠️ **O que sobrou sem efeito no motor do Avançado, na aba `Viabilidade → Financeiro`:**
-> `regime_tributario` e os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`),
-> `imposto_sobre_permuta_fisica` (`:182`) e — **acrescentados aqui porque o inventário anterior os
-> omitia** — `sujeito_ret` (`:176-177`) e `imposto_percentual` (`:188`). Estes dois últimos não são
-> inertes em absoluto: **alimentam a Proforma do Preliminar** (`frontend/proforma.ts:245`). Para o
-> Avançado é que não valem — ele recebe o RET pelo par global `considerar_ret`/`ret_pct`
-> (`frontend/tela-fluxo-ver.ts:122`). Preencher os dois numa tela de Avançado não muda cálculo
-> nenhum. Os campos de financiamento, investidor, estrutura de
-> capital e correção monetária **saíram do formulário** (#279/#355); as colunas continuam no schema
-> como dado histórico, sem tela e sem leitor.
+> ✅ **#450 (2026-08-24): o inventário abaixo está desatualizado — os sete controles citados
+> saíram do render.** `regime_tributario`, os cinco `aliquota_*_pct` e
+> `imposto_sobre_permuta_fisica` foram removidos da aba `Viabilidade → Financeiro` (sem leitor em
+> nenhum nível — não havia o que preservar). `sujeito_ret` também saiu do render **dali**: é
+> condição de nível (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:81-83`) — a aba só
+> existe para `nivel_analise === 'avancado'`, e nesse nível a Proforma não é consultada, então a
+> condição colapsa em "sempre oculto". `imposto_percentual` é o único que fica **visível**, mas
+> sempre **desabilitado** (`impostoPercentualEditavel`, `:87-89`) — o único editor de verdade é
+> Premissas (Preliminar), que grava a mesma coluna. Nenhuma coluna saiu do schema; só o formulário.
 >
 > ⚠️ **Capital de giro EXISTE, sob o nome `divida`** — decisão 2 do autor, 2026-08-22. O tipo
 > `divida` **é** o produto de CG por calendário: a migração `029_funding_operacoes.js:38-43,127-130`
@@ -2014,8 +2026,10 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > (`backend/rotas/funding.ts:43`, `backend/rotas/funding.test.ts:26`) — não o produto.
 >
 > **O que de fato não existe é a linha ROTATIVA**, e por decisão: ela reintroduziria a competição
-> por caixa que a #355 apagou. Empréstimo-ponte também não existe. A §17.4 abaixo descreve o
-> conceito rotativo como **modelo funcional de referência**, não como comportamento instalado.
+> por caixa que a #355 apagou. Empréstimo-ponte também não existe. **A §17.4 abaixo NÃO descreve
+> o conceito rotativo** — é uma lista de oito atributos que `simularDivida`
+> (`frontend/funding-motor.ts:237-292`) já implementa hoje, pelo tipo `divida`; o rotativo não
+> tem seção neste documento.
 >
 > ⚠️ **O que falta é o RÓTULO**, não o produto — a tela ainda chama de "Dívida" o que também é
 > capital de giro. É a issue #466.
@@ -2050,10 +2064,10 @@ O estudo completo deve conseguir representar:
 > `docs/viabilidade/funding-capital-stack.md` §4.3; o oráculo de regressão contra a planilha, em
 > `frontend/financiamento-producao-golden.test.ts`.
 >
-> **O inventário do que sobrou inerte é o da §17**, e é menor do que este parágrafo dizia: só
-> `regime_tributario`, os cinco `aliquota_*_pct` e `imposto_sobre_permuta_fisica`. Estrutura de
-> capital, investidor e correção monetária **saíram do formulário** (#279/#355) — não estão inertes,
-> não estão lá.
+> **O inventário do que sobrou inerte era o da §17** — e a #450 (2026-08-24) fechou até esse
+> resto: `regime_tributario`, os cinco `aliquota_*_pct` e `imposto_sobre_permuta_fisica` saíram do
+> render da aba Financeiro (não tinham leitor em nível nenhum). Estrutura de capital, investidor e
+> correção monetária **saíram do formulário** antes (#279/#355) — não estão inertes, não estão lá.
 
 
 ### 17.3 Repasse não é financiamento à produção
@@ -2066,6 +2080,12 @@ O estudo completo deve conseguir representar:
 O repasse pode gerar caixa utilizado para amortizar o financiamento à produção, mas as duas linhas devem permanecer separadas.
 
 ### 17.4 Capital de giro e investidores
+
+> ✅ **Comportamento vigente.** Os oito atributos abaixo são o que `simularDivida`
+> (`frontend/funding-motor.ts:237-292`) já implementa hoje, pelo tipo `divida` (rotulado
+> "Dívida / Capital de giro" na UI, #466). **Esta lista NÃO descreve a linha rotativa** — a
+> decisão sobre o rotativo, e por que ela não existe, está em `frontend/tela-funding.ts` (o
+> comentário junto ao rótulo) e na nota da §17 acima.
 
 Quando utilizados, precisam ter:
 
@@ -2155,10 +2175,13 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:1807-1808`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2197`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
-> último mês de custo, 11) + 1`, com `ultimoMesRecebivelLinha` derivando o recebível a partir dos
-> componentes normalizados. O fallback silencioso que empilhava excedente no último mês **foi
+> último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
+> derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`
+> (`frontend/fluxo-shared.ts`) derivando o das operações — a #446 acrescentou este último termo,
+> porque dívida e equity ficavam de fora e eram truncadas. `config.prazoMeses` é **piso**, nunca
+> teto: um prazo digitado pode esticar o fluxo, jamais encurtá-lo. O fallback silencioso que empilhava excedente no último mês **foi
 > removido** (`:1371-1373`); no caminho canônico, um pagamento fora do horizonte emite
 > `console.warn` e não é computado (`deposita`, `:1098-1104`), em vez de deformar o último mês em
 > silêncio.
@@ -2822,8 +2845,8 @@ As conclusões anteriores permanecem:
 > ✅ **O quarto item saiu: o Bloco Financeiro já teve a decisão.** Ele dizia que o bloco "ainda
 > precisa de decisão de integração ou remoção". A #279/#355 decidiram — os campos de financiamento,
 > estrutura de capital, investidor e correção **saíram do formulário**, e o funding passou a rodar
-> por `avancado_funding_operacoes` na aba Funding (§17). O que sobrou sem leitor é
-> `regime_tributario` e os `aliquota_*_pct`.
+> por `avancado_funding_operacoes` na aba Funding (§17). O que sobrava sem leitor
+> (`regime_tributario`, os `aliquota_*_pct`) também saiu do formulário — #450, 2026-08-24.
 
 ### 24.6 Conversão em mudanças
 
@@ -3068,7 +3091,8 @@ são **digitados como número inteiro/decimal** (ex.: `7` = 7%), não como fraç
 >   (`estrutura_*`, `financiamento_*`, `investidor_*`, `indice_correcao*`, `juros_financeiros_aa`)
 >   são **dado histórico**: saíram do formulário pela #279/#355 e **não têm mais controle na tela**.
 >   Procurá-las na interface é procurar o que foi removido.
-> - **`regime_tributario` e os `aliquota_*_pct` continuam sem leitor nenhum**, em qualquer nível.
+> - **`regime_tributario` e os `aliquota_*_pct` continuavam sem leitor nenhum**, em qualquer
+>   nível — até a #450 (2026-08-24), que os tirou também da tela (§17 tem o detalhe).
 >
 > O inventário vigente do que sobra sem efeito no Avançado está na **§17**.
 
