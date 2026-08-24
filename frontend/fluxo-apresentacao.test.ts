@@ -448,3 +448,88 @@ test('#351 proforma: R$/m² e % VGV têm base declarada e sobrevivem a área/VGV
   assert.equal(pv.margemPct, 0);
   assert.ok(pv.linhas.every((l) => Number.isFinite(l.valor)));
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #427 — a proforma do Avançado fecha com TRÊS linhas de resultado, como a
+// EVI (`Premissas e Resultados!K35/K37/K39`): Resultado puro, + permuta
+// financeira estornada, + permuta física (numerador E denominador).
+// ─────────────────────────────────────────────────────────────────────────
+
+/** CONFIG_COMPLETA + permuta financeira (8% VGV) + permuta física (2 unidades). */
+const CONFIG_PERMUTAS: FluxoConfig = {
+  ...CONFIG_COMPLETA,
+  linhasCusto: [
+    ...CONFIG_COMPLETA.linhasCusto,
+    { id: 6, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira', orcamento_valor: 8, orcamento_unidade: 'pct_vgv' },
+    { id: 7, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 11, permuta_quantidade: 2, orcamento_valor: null },
+  ],
+};
+
+test('#427 proforma fecha com três leituras, cada uma com sua própria base', () => {
+  const c = calcularFluxo(CONFIG_PERMUTAS);
+  // A fixture precisa de facto gerar as duas permutas, senão o teste não prova nada.
+  assert.ok(c.permutaFinanceiraTotal > 0, 'permutaFinanceiraTotal deveria ser > 0 nesta fixture');
+  assert.ok(c.vgvPermutaFisica > 0, 'vgvPermutaFisica deveria ser > 0 nesta fixture');
+
+  const p = proformaAvancado(c, 1000);
+
+  // resultado (linha 1) — a definição não muda com esta issue.
+  assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01);
+
+  // resultadoMaisPermutaFinanceira = resultado + permutaFinanceiraTotal — o
+  // ESTORNO da dedução (P37 = P39 − P15 − P16 na EVI), não uma soma às cegas.
+  assert.ok(Math.abs(p.resultadoMaisPermutaFinanceira - (p.resultado + c.permutaFinanceiraTotal)) <= 0.01);
+
+  // resultadoMaisPermutas = resultadoMaisPermutaFinanceira + c.vgvPermutaFisica.
+  assert.ok(Math.abs(p.resultadoMaisPermutas - (p.resultadoMaisPermutaFinanceira + c.vgvPermutaFisica)) <= 0.01);
+
+  // Os três percentuais, cada um com a base declarada na issue.
+  assert.ok(Math.abs(p.margemPct - (p.resultado / p.vgv) * 100) <= 1e-9);
+  assert.ok(Math.abs(p.pctResultadoMaisPermutaFinanceira - (p.resultadoMaisPermutaFinanceira / p.vgv) * 100) <= 1e-9);
+  assert.ok(Math.abs(
+    p.pctResultadoMaisPermutas - (p.resultadoMaisPermutas / (p.vgv + c.vgvPermutaFisica)) * 100,
+  ) <= 1e-9);
+
+  // ⚠️ Asserção NEGATIVA — a que distingue: se alguém "unificar" os
+  // denominadores (usar só `p.vgv` na 3ª linha), este teste tem de reprovar.
+  assert.notEqual(p.pctResultadoMaisPermutas, (p.resultadoMaisPermutas / p.vgv) * 100);
+
+  // As três linhas de fecho aparecem na tabela, com pctOverride e — só a 3ª,
+  // só porque há permuta física — o rótulo/nota condicionais (K35/K36).
+  const linhasResultado = p.linhas.filter((l) => l.tipo === 'resultado');
+  assert.equal(linhasResultado.length, 3);
+  assert.equal(linhasResultado[0].nome, '= Resultado');
+  assert.equal(linhasResultado[1].nome, '= Resultado + Perm. Financ.');
+  assert.equal(linhasResultado[2].nome, '= Resultado + Permutas');
+  assert.equal(linhasResultado[2].notaBase, '1 / (VGV + Permutas Físicas)');
+  assert.ok(linhasResultado.every((l) => typeof l.pctOverride === 'number'));
+});
+
+test('#427 degenerescência: sem permutas as três linhas coincidem, sem rótulo/nota extra (K35/K36)', () => {
+  const c = calcularFluxo(CONFIG_COMPLETA);
+  assert.equal(c.permutaFinanceiraTotal, 0);
+  assert.equal(c.vgvPermutaFisica, 0);
+
+  const p = proformaAvancado(c, 1000);
+  assert.ok(Math.abs(p.resultado - p.resultadoMaisPermutaFinanceira) <= 0.01);
+  assert.ok(Math.abs(p.resultado - p.resultadoMaisPermutas) <= 0.01);
+  assert.ok(Math.abs(p.margemPct - p.pctResultadoMaisPermutaFinanceira) <= 1e-9);
+  assert.ok(Math.abs(p.margemPct - p.pctResultadoMaisPermutas) <= 1e-9);
+
+  const linhasResultado = p.linhas.filter((l) => l.tipo === 'resultado');
+  assert.equal(linhasResultado.length, 3);
+  // Sem permuta física, o rótulo da 3ª linha cai para "= Resultado" (molde de
+  // K35) e a nota de denominador não aparece (molde de K36).
+  assert.equal(linhasResultado[2].nome, '= Resultado');
+  assert.equal(linhasResultado[2].notaBase, undefined);
+});
+
+test('#427 não-regressão: o campo `resultado` de #351/#426 não muda de valor com esta issue', () => {
+  // Trava explícita, além dos testes #351/#426 acima seguirem verdes sem
+  // edição: mesmo com as duas permutas presentes, `resultado` (linha 1)
+  // continua sendo receitaLiquida − custoDireto − custoIndireto, igual antes
+  // desta issue — só as linhas 2 e 3 são NOVAS, nenhuma redefine a 1ª.
+  const c = calcularFluxo(CONFIG_PERMUTAS);
+  const p = proformaAvancado(c, 1000);
+  assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01);
+});

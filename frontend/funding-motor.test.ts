@@ -368,3 +368,177 @@ test('#355 tirAnual devolve null quando não há troca de sinal', () => {
   assert.equal(tirAnual([100, 200, 300]), null);
   assert.equal(tirAnual([-100, -200]), null);
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #434 — o cash sweep do Financiamento à produção enxerga o caixa que as
+// outras operações deixaram.
+//
+// `fundingDoEstudo` simula em DUAS PASSADAS: primeiro as cegas ao caixa
+// (`divida`, `equity`), depois a dirigida por caixa (`financiamento_producao`)
+// contra `fluxoLivreMensal + entradasCegas − saidasCegas`. Passos 23–24 de
+// `docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`.
+//
+// ⚠️ NÃO é o waterfall que a #355 apagou: sem prioridade, sem fila, sem
+// competição por caixa — só ordem de leitura.
+//
+// Os testes exercitam `fundingDoEstudo` (a COMPOSIÇÃO), não
+// `simularFinanciamentoProducao` isolada: é a composição que muda. A função
+// tem oráculo próprio em `frontend/financiamento-producao-golden.test.ts`,
+// e a assinatura dela não mudou.
+//
+// ⚠️ Os pares `antes → depois` abaixo são MEDIDOS, não estimados: a série
+// `ANTES_434` foi capturada rodando estes mesmos cenários contra o motor de
+// uma passada. Ela é a MESMA nos três cenários — e é exatamente esse o
+// defeito: pré-conserto o FP amortizava igual houvesse R$ 5 MM de equity no
+// caixa ou não.
+// ─────────────────────────────────────────────────────────────────────────
+
+const PRAZO_434 = 12;
+const CTX_434 = {
+  linhasCusto: [{ id: 1, mensal: new Array(PRAZO_434).fill(0).map((_, i) => (i < 6 ? 1_000_000 : 0)) }],
+  custosRaw: [{ id: 1, grupo: 'obra' }],
+};
+/** Livre apertado durante a obra (−200k/mês), folgado depois (+400k/mês). */
+const LIVRE_434 = new Array(PRAZO_434).fill(0).map((_, i) => (i < 6 ? -200_000 : 400_000));
+const LIQUIDA_434 = new Array(PRAZO_434).fill(100_000);
+
+const FIN_434: OperacaoFunding = {
+  id: 'f1', tipo: 'financiamento_producao', nome: 'FP', valor: 0, inicio_mes: 0,
+  taxa_anual: 12, exposicao_minima: 20, percentual_financiavel: 80,
+  custo_linha_ids: [1], amortizar_com_caixa_disponivel: true,
+};
+/** Aporte de R$ 5 MM no mês 1 — bem no meio da obra, com o livre negativo. */
+const EQUITY_434: OperacaoFunding = {
+  id: 'e1', tipo: 'equity', nome: 'Investidor', valor: 5_000_000, inicio_mes: 1,
+  modo_retorno: 'resultado_final', pct_retorno: 0,
+};
+/** Parcela pesada: 3 MM a 24% a.a. amortizados em 6 meses, sem carência. */
+const DIVIDA_434: OperacaoFunding = {
+  id: 'd1', tipo: 'divida', nome: 'Giro', valor: 3_000_000, inicio_mes: 0,
+  taxa_anual: 24, periodo_amortizacao_meses: 6, periodo_carencia_meses: 0,
+};
+
+/** Amortização do FP no motor de UMA passada — idêntica nos três cenários. */
+const ANTES_434 = [0, 0, 1_000_000, 600_000, 600_000, 600_000, 1_200_000, 400_000, 400_000, 95_022.25, 0, 0];
+
+const serieFin434 = (ops: OperacaoFunding[]) => {
+  const f = fundingDoEstudo(ops, LIVRE_434, LIQUIDA_434, 1_000_000, 10, 12, CTX_434)!;
+  return { calc: f, fin: f.operacoes.find((s) => s.operacao.tipo === 'financiamento_producao')! };
+};
+
+test('#434 equity aumenta o caixa que o cash sweep enxerga', () => {
+  const { fin } = serieFin434([FIN_434, EQUITY_434]);
+
+  // Mês 2: o aporte de R$ 5 MM do mês 1 já está no caixa, então o sweep
+  // amortiza até o TETO do mês (`saldo_abertura + juros`) em vez de parar no
+  // caixa magro do projeto desalavancado.
+  assert.equal(ANTES_434[2], 1_000_000);          // antes  — teto era o caixa
+  assert.equal(fin.saidas[2], 1_615_182.07);      // depois — teto vira a dívida
+  assert.ok(fin.saidas[2] > ANTES_434[2]);
+
+  // E a consequência que importa: o saldo devedor zera no mês 6 em vez de
+  // arrastar até o 9, e o total de juros pagos cai.
+  assert.equal(fin.saldo[6], 0);
+  assert.ok(fin.juros.reduce((a, b) => a + b, 0) < 200_000);
+});
+
+test('#434 parcela de dívida reduz o caixa que o cash sweep enxerga', () => {
+  const { fin } = serieFin434([FIN_434, DIVIDA_434]);
+
+  // Mês 5: as parcelas acumuladas da dívida (24% a.a. em 6 meses, sem
+  // carência) já drenaram o caixa que o aporte dela injetou no mês 0, e o
+  // sweep tem MENOS caixa para amortizar do que o livre desalavancado sugeria.
+  assert.equal(ANTES_434[5], 600_000);            // antes
+  assert.equal(fin.saidas[5], 67_873.98);         // depois
+  assert.ok(fin.saidas[5] < ANTES_434[5]);
+
+  // O saldo devedor do mês fica maior — é o efeito no número que a issue
+  // aponta como o de maior impacto do documento de funding.
+  assert.equal(fin.saldo[5], 1_700_092.73);
+});
+
+test('#434 sem outras operações, nada muda', () => {
+  // ⚠️ Este é o teste que impede o conserto de VAZAR para o caso de operação
+  // única — o único que a instância tem hoje. Com uma só operação não há
+  // "cegas" para somar, e a série tem de sair idêntica à de uma passada.
+  const { fin } = serieFin434([FIN_434]);
+  assert.deepEqual(fin.saidas, ANTES_434);
+  assert.deepEqual(fin.entradas, [0, 1_600_000, 800_000, 800_000, 800_000, 800_000, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(
+    fin.saldo,
+    [0, 1_600_000, 1_415_182.07, 1_628_610.44, 1_844_063.99, 2_061_561.93,
+      881_123.66, 489_484.46, 94_129.08, 0, 0, 0],
+  );
+});
+
+test('#434 a ordem das linhas não muda', () => {
+  // `series` é simulada em duas passadas mas REMONTADA na ordem de
+  // `operacoes` — `linhasEntrada`/`linhasSaida` são as linhas da tabela do
+  // Fluxo de Caixa, e reordená-las mudaria a tela sem ninguém pedir.
+  const { calc } = serieFin434([EQUITY_434, FIN_434, DIVIDA_434]);
+
+  assert.deepEqual(calc.operacoes.map((s) => s.operacao.id), ['e1', 'f1', 'd1']);
+  assert.deepEqual(calc.noFluxo.linhasEntrada.map((l) => l.nome), [
+    'Investidor (Equity) — aporte',
+    'FP — liberações',
+    'Giro — liberações',
+  ]);
+  assert.deepEqual(calc.noFluxo.linhasSaida.map((l) => l.nome), [
+    'Funding · FP — parcelas',
+    'Funding · Giro — parcelas',
+  ]);
+});
+
+test('#434 duas dirigidas leem o MESMO caixa — a ordem não vira prioridade', () => {
+  // ⚠️ ESTE TESTE EXISTE POR CAUSA DE UM ACHADO DO CODEX (revisão do PR 526,
+  // P1). A primeira versão do conserto ENCADEAVA as dirigidas: a segunda via o
+  // caixa já alterado pela primeira. Isso faz a posição no array virar
+  // PRIORIDADE DE PAGAMENTO — a competição por caixa que a #355 apagou.
+  //
+  // E o estado não é impossível, só improvável: quem impede dois
+  // `financiamento_producao` no mesmo estudo é `conflitoFinanciamentoUnico`
+  // (`backend/rotas/funding.ts`), que LÊ e depois GRAVA — dois POSTs
+  // concorrentes passam os dois —, e o `schema.json` não tem índice único para
+  // o par (só `[["estudo_id"]]`). Então o motor tem de se comportar bem nele.
+  //
+  // ⚠️ O CAIXA AQUI É APERTADO DE PROPÓSITO (`+150k/mês` depois da obra, e uma
+  // `divida` pequena no lugar do aporte de R$ 5 MM). Com o caixa folgado o
+  // sweep bate no TETO DA DÍVIDA (`saldo_abertura + juros`) e não no caixa —
+  // e aí encadear ou não encadear dá o MESMO número, o que faria este teste
+  // passar verde sob a própria mutação que ele deveria matar. Medido: com
+  // `LIVRE_434` o encadeamento é indistinguível; com este, f1 e f2 divergem
+  // (1.236.824 vs 1.615.182 no mês 2).
+  const P = 12;
+  const livreApertado = new Array(P).fill(0).map((_, i) => (i < 6 ? -200_000 : 150_000));
+  const fin2: OperacaoFunding = { ...FIN_434, id: 'f2', nome: 'FP 2' };
+  const giro: OperacaoFunding = {
+    id: 'd2', tipo: 'divida', nome: 'Giro leve', valor: 300_000, inicio_mes: 0,
+    taxa_anual: 12, periodo_amortizacao_meses: 10, periodo_carencia_meses: 0,
+  };
+  const rodar = (ops: OperacaoFunding[]) =>
+    fundingDoEstudo(ops, livreApertado, LIQUIDA_434, 1_000_000, 10, 12, CTX_434)!;
+
+  const ab = rodar([FIN_434, fin2, giro]);
+  const ba = rodar([fin2, FIN_434, giro]);
+  const porId = (c: typeof ab, id: string) => c.operacoes.find((s) => s.operacao.id === id)!;
+
+  // 1) trocar a ordem das duas dirigidas não muda a série de nenhuma delas.
+  for (const id of ['f1', 'f2']) {
+    assert.deepEqual(porId(ab, id).saidas, porId(ba, id).saidas, `saídas de ${id} dependem da ordem`);
+    assert.deepEqual(porId(ab, id).entradas, porId(ba, id).entradas, `entradas de ${id} dependem da ordem`);
+    assert.deepEqual(porId(ab, id).saldo, porId(ba, id).saldo, `saldo de ${id} depende da ordem`);
+  }
+
+  // 2) e as duas, lendo o MESMO caixa, saem idênticas entre si — é isto que
+  //    cai no instante em que alguém reintroduzir o encadeamento.
+  assert.deepEqual(porId(ab, 'f1').saidas, porId(ab, 'f2').saidas);
+  // O par declarado, para a asserção não ser só uma comparação de iguais:
+  // limitado pelo CAIXA (1.236.824,34), não pelo teto da dívida (1.615.182,07),
+  // que é o número que a segunda dirigida receberia se houvesse fila.
+  assert.equal(porId(ab, 'f1').saidas[2], 1_236_824.34);
+  assert.equal(porId(ab, 'f2').saidas[2], 1_236_824.34);
+
+  // 3) a remontagem continua respeitando a ordem original em cada arranjo.
+  assert.deepEqual(ab.operacoes.map((s) => s.operacao.id), ['f1', 'f2', 'd2']);
+  assert.deepEqual(ba.operacoes.map((s) => s.operacao.id), ['f2', 'f1', 'd2']);
+});

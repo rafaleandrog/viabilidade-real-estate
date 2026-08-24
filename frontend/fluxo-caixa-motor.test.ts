@@ -5,6 +5,7 @@ import {
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   recebimentoBrutoMensal, impostoMensal, recebimentoLiquidoMensal,
   componentesDoLegado, componentesPagamento, ultimoMesRecebivelLinha,
+  taxaMensalDeAnual, taxaAnualDeMensal, jurosTabelaAnualPct, taxaMensalDoPlano,
   pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
   carteiraSaldoSafra, consolidarCarteiraClientes,
   calcularRecebiveisComponentes,
@@ -12,6 +13,7 @@ import {
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   permutaFinanceiraBrutaMensal, permutaFinanceiraLiquidaMensal,
+  areaVendidaMensal, unidadesVendidasMensal, estoqueM2Mensal, estoqueM2Semente, vsoMensal,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
 } from './fluxo-caixa-motor.js';
 import { periodosAnuais, CATEGORIA_CORRETAGEM, type EventoCrono } from './fluxo-shared.js';
@@ -137,6 +139,136 @@ test('#260: vendaBrutaContratadaMensal/descontoComercialMensal/vendaLiquidaContr
   assert.ok(bruto.every(casas2), 'venda bruta com resíduo além de 2 casas');
   assert.ok(desconto.every(casas2), 'desconto comercial com resíduo além de 2 casas');
   assert.ok(liquido.every(casas2), 'venda líquida com resíduo além de 2 casas');
+});
+
+// ── #457: livro de estoque em m²/unidades e VSO ──
+//
+// Cronograma dedicado: SEM Pré-lançamento, para que `periodoAbsorcao.inicio`
+// (usado para indexar `abs.pcts`) coincida com `lancamento.inicio_mes` (usado
+// para a baixa da permuta) — os dois caem no índice 0. Lançamento de 3 meses,
+// como pede o critério de aceite ("Lançamento de 3 meses"); absorção
+// distribuída 15/20/65 (lançamento/obra/pós-chaves; pré-lançamento 0%, não
+// citado) — 15%/3 = 5%/mês no Lançamento, a fonte do "5%" do critério 1.
+const CRONO_LANCAMENTO_3M: EventoCrono[] = [
+  { evento: 'lancamento', inicio_mes: 0, duracao_meses: 3 },
+  { evento: 'obra', inicio_mes: 3, duracao_meses: 20 },
+  { evento: 'pos_obra', inicio_mes: 23, duracao_meses: 12 },
+];
+
+// Área privativa TOTAL da linha = 18.438,410033 m² (100 unid. × 184,38410033
+// m²/unid., a "semente" da EVI — `Areas e Precos!F14`). 11 unidades
+// permutadas fisicamente = 2.028,22510363 m² ≈ 2.028,225104 (`cfINC!G19`,
+// arredondado a 6 casas na planilha). Área de venda resultante (89 unidades)
+// = 16.410,18492937 m² ≈ 16.410,184929 (`Areas e Precos!F17`).
+function linhaEstoqueTeste(absorcao: any = { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 15 }, { evento: 'obra', pct: 20 }] }) {
+  return {
+    tipologias: [{ quantidade: 100, area_privativa_m2: 184.38410033, preco_m2: 10_000, unidades_permutadas: 11 }],
+    absorcao,
+  };
+}
+
+test('#457: areaVendidaMensal/estoqueM2Mensal reproduzem cfINC — semente = privativa TOTAL, permuta baixa no mês do Lançamento', () => {
+  const linha = linhaEstoqueTeste();
+  const semente = estoqueM2Semente(linha);
+  const vendida = areaVendidaMensal(linha, CRONO_LANCAMENTO_3M, 60);
+  const estoque = estoqueM2Mensal(linha, CRONO_LANCAMENTO_3M, 60);
+
+  // A asserção que distingue o modelo (issue #457): a semente é a privativa
+  // TOTAL (18.438,41...), não a área de venda já líquida (16.410,18...) — sem
+  // ela, semear com a área líquida E baixar a permuta de novo produziria
+  // 13.561,45 no mês 0 e passaria em tudo, menos nisto.
+  assert.ok(perto(semente, 18_438.410033, 1e-6), `semente esperada 18438.410033, achei ${semente}`);
+
+  assert.ok(perto(vendida[0], 820.509246, 1e-6), `areaVendidaMensal[0] esperado 820.509246, achei ${vendida[0]}`);
+  assert.ok(perto(estoque[0], 15_589.675683, 1e-6), `estoqueM2Mensal[0] esperado 15589.675683, achei ${estoque[0]}`);
+});
+
+test('#457: conservação — estoqueM2Mensal fecha em 0 quando a absorção soma 100%, e ≠ 0 quando falta 1,41% (caso do estudo 6)', () => {
+  const linhaCompleta = linhaEstoqueTeste(); // distribuído 15/20/65 — soma 100% por construção
+  const estoqueCompleto = estoqueM2Mensal(linhaCompleta, CRONO_LANCAMENTO_3M, 60);
+  assert.ok(perto(estoqueCompleto[59], 0, 0.01), `estoque final esperado ~0, achei ${estoqueCompleto[59]}`);
+
+  // Absorção 'personalizado' que só declara 98,59% de vendas — reproduz o
+  // descarte silencioso do estudo 6 (#429): 1,41% de área fica sem vender e
+  // o resíduo tem que aparecer no estoque final, não sumir.
+  const linhaIncompleta = linhaEstoqueTeste({ modo: 'personalizado', meses: [{ mes: 0, pct: 98.59 }] });
+  const estoqueIncompleto = estoqueM2Mensal(linhaIncompleta, CRONO_LANCAMENTO_3M, 60);
+  const areaVendavelLinhaTeste = 16_410.184929; // 89 unid. × 184,38410033 m²
+  assert.ok(
+    Math.abs(estoqueIncompleto[59] - areaVendavelLinhaTeste * 0.0141) < 0.5,
+    `resíduo de 1,41% esperado, achei ${estoqueIncompleto[59]}`,
+  );
+  assert.ok(Math.abs(estoqueIncompleto[59]) > 0.01, 'estoque incompleto não pode fechar em 0');
+});
+
+test('#457: unidadesVendidasMensal/vsoMensal — coerência interna, sem oráculo de planilha (BRIEF-EVI.md T4)', () => {
+  const linha = linhaEstoqueTeste();
+  const areaPrivativa = 184.38410033;
+  const unidades = unidadesVendidasMensal(linha, CRONO_LANCAMENTO_3M, 60);
+  const area = areaVendidaMensal(linha, CRONO_LANCAMENTO_3M, 60);
+  for (let i = 0; i < unidades.length; i++) {
+    assert.ok(perto(unidades[i] * areaPrivativa, area[i], 1e-6), `mês ${i}: unidades×área diverge de areaVendidaMensal`);
+  }
+
+  const vso = vsoMensal(linha, CRONO_LANCAMENTO_3M, 60);
+  // Mês 0: 820,509246 m² vendidos sobre 16.410,184929 m² de estoque de
+  // início (semente − permuta, já baixada no mesmo mês) = 5% — bate com o
+  // bloco de Lançamento (15% / 3 meses).
+  assert.ok(perto(vso[0], 0.05, 1e-6), `vso[0] esperado 0.05, achei ${vso[0]}`);
+  // Fora do período de absorção (antes do Lançamento não existe aqui;
+  // depois do Pós-chaves, estoque zerado): sem NaN, sem divisão por zero.
+  assert.ok(vso.every((v) => Number.isFinite(v)), 'vso não pode conter NaN/Infinity');
+  assert.equal(vso[59], 0, 'vso deve ser 0 quando o estoque de início já é 0 (sem divisão por zero)');
+});
+
+// Rodada de revisão do PR 531: `CRONO_LANCAMENTO_3M` (usado nos 3 testes
+// acima) não tem evento `pre_lancamento` — o Lançamento já começa no mês 0,
+// então "baixa no mês do Lançamento" e "baixa no início/imediatamente" são
+// INDISTINGUÍVEIS nesses testes. A mutação que reverte `estoqueM2Mensal`/
+// `vsoMensal` para subtrair a permuta ANTES do laço (em vez de em
+// `mesLancamento`) passa nos 3 testes acima sem derrubar nenhuma asserção.
+// Este teste fecha o buraco: cronograma COM Pré-lançamento, checando que o
+// estoque nos meses de Pré-lançamento ainda NÃO tem a permuta baixada.
+test('#457: com Pré-lançamento, a permuta só baixa no mês do Lançamento — não antes', () => {
+  const CRONO_COM_PRE: EventoCrono[] = [
+    { evento: 'pre_lancamento', inicio_mes: 0, duracao_meses: 6 },
+    { evento: 'lancamento', inicio_mes: 6, duracao_meses: 3 },
+    { evento: 'obra', inicio_mes: 9, duracao_meses: 20 },
+    { evento: 'pos_obra', inicio_mes: 29, duracao_meses: 12 },
+  ];
+  const linha = linhaEstoqueTeste({ modo: 'distribuido', blocos: [
+    { evento: 'pre_lancamento', pct: 40 },
+    { evento: 'lancamento', pct: 15 },
+    { evento: 'obra', pct: 20 },
+  ]});
+  const semente = estoqueM2Semente(linha);
+  const vendida = areaVendidaMensal(linha, CRONO_COM_PRE, 60);
+  const estoque = estoqueM2Mensal(linha, CRONO_COM_PRE, 60);
+  const permuta = 11 * 184.38410033; // 2.028,225104 m² (11 unid. permutadas)
+
+  // Mês 5 (último mês de Pré-lançamento, ANTES do mês do Lançamento = 6):
+  // o estoque só reflete as vendas do Pré-lançamento — a permuta ainda não
+  // baixou. Se baixasse no início (upfront, como o livro em unidades faz),
+  // o valor seria ~9.846,11 em vez de ~11.874,34 — uma diferença de mais de
+  // 2.000 m² que nenhuma tolerância esconde.
+  const esperadoSemPermutaAinda = semente - 6 * vendida[0];
+  assert.ok(
+    perto(estoque[5], esperadoSemPermutaAinda, 1e-3),
+    `estoque[5] esperado ${esperadoSemPermutaAinda} (SEM permuta baixada), achei ${estoque[5]}`,
+  );
+
+  // Mês 6 (mês do Lançamento): a permuta baixa integralmente aqui, além da
+  // venda do próprio mês.
+  const esperadoComPermuta = estoque[5] - permuta - vendida[6];
+  assert.ok(
+    perto(estoque[6], esperadoComPermuta, 1e-3),
+    `estoque[6] esperado ${esperadoComPermuta} (COM permuta baixada), achei ${estoque[6]}`,
+  );
+
+  // Conservação também vale com Pré-lançamento no cronograma: sem sobra,
+  // sem negativo nos meses intermediários.
+  assert.ok(perto(estoque[59], 0, 0.01), `estoque final esperado ~0, achei ${estoque[59]}`);
+  assert.ok(estoque.every((v) => v >= -0.01), 'estoque não pode ficar negativo em nenhum mês');
 });
 
 test('#260: rateio monetário fecha exatamente com o total da linha', () => {
@@ -1757,6 +1889,151 @@ test('#283 motor de produção reproduz Calliandra G.2 e separa o repasse', () =
   assert.equal(r.carteiraPorComponenteMensal.saldoARepassar[25], 0);
   assert.equal(soma(r.jurosMensal), 0);
   assert.equal(r.carteiraMensal[25], 0);
+});
+
+// ── #428: juros de tabela — a conversão, o adaptador e os goldens da EVI ───
+//
+// O oráculo é a EVI Urbitá (consultiva, nunca contrato): `ClienteJurosAA =
+// 12,5% a.a.` em `Premissas e Resultados!H14`, convertido por
+// `ClienteJurosAM = (1 + ClienteJurosAA)^(1/12) − 1` — nome definido, fórmula
+// pura, sem arredondamento: 0,00986358055321146.
+
+test('#428 a conversão é COMPOSTA, nunca aa/12, e a volta desfaz a ida', () => {
+  // O valor exato de `ClienteJurosAM` na EVI. `12,5 / 12 / 100` daria
+  // 0,010416…, quase 6% a mais de juros mensais — o erro que esta asserção
+  // existe para impedir.
+  assert.equal(taxaMensalDeAnual(12.5), 0.00986358055321146);
+  assert.notEqual(taxaMensalDeAnual(12.5), 12.5 / 12 / 100);
+  // A taxa não residencial da EVI (`!H22`, válida só com `H16 = TRUE`).
+  assert.ok(perto(taxaMensalDeAnual(13) * 100, 1.0237, 0.0001));
+  // Contrato C7: derivada NÃO monetária carrega precisão plena. Se alguma
+  // dessas duas arredondasse, a volta não fecharia em 12 casas.
+  assert.ok(perto(taxaAnualDeMensal(taxaMensalDeAnual(12.5)), 12.5, 1e-12));
+  // 0% continua 0% nos dois sentidos — é o default de todo estudo existente.
+  assert.equal(taxaMensalDeAnual(0), 0);
+  assert.equal(taxaAnualDeMensal(0), 0);
+  // Lixo não vira NaN dentro dos componentes.
+  assert.equal(taxaMensalDeAnual(NaN), 0);
+  assert.equal(taxaAnualDeMensal(undefined as any), 0);
+});
+
+test('#428 a taxa do plano vem da chave digitada e, na falta dela, dos componentes', () => {
+  // 1) A chave que a #428 grava vence: é o dígito que o usuário escreveu.
+  assert.equal(taxaMensalDoPlano({ juros_tabela_aa: 12.5 }), taxaMensalDeAnual(12.5));
+  // 2) Estudo anterior à #428 (o caso do estudo 5, que recebeu a taxa pela
+  //    API): sem a chave, a taxa sai dos componentes — e CRUA, sem a ida e
+  //    volta em ponto flutuante que devolveria 0,009863600000000083.
+  assert.equal(taxaMensalDoPlano({ componentes: [{ tipo: 'ate_marco', taxaMensal: 0.0098636 }] }), 0.0098636);
+  assert.ok(perto(jurosTabelaAnualPct({ componentes: [{ taxaMensal: 0.0098636 }] }), 12.5, 0.001));
+  // 3) Chave presente e igual a 0 é RESPOSTA (o usuário desligou os juros),
+  //    não ausência: não pode cair na derivação e ressuscitar a taxa velha.
+  assert.equal(taxaMensalDoPlano({ juros_tabela_aa: 0, componentes: [{ taxaMensal: 0.0098636 }] }), 0);
+  // 4) Nada declarado é 0 — o default de todo estudo existente.
+  assert.equal(taxaMensalDoPlano({}), 0);
+  assert.equal(taxaMensalDoPlano(null), 0);
+});
+
+test('#428 componentesDoLegado propaga a taxa do plano nos QUATRO caminhos', () => {
+  const fp = {
+    juros_tabela_aa: 12.5,
+    entrada: [
+      { pct: 10, parcelas: 1, descontoPct: 0 },   // imediato — não tem taxa, e não deve ter
+      { pct: 10, parcelas: 3, descontoPct: 0 },   // prazo_fixo (entrada parcelada)
+    ],
+    parcelas: [
+      { pct: 20, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true },  // ate_marco
+      { pct: 20, periodicidade: 'mensal', parcelas: 12 },                      // prazo_fixo
+    ],
+  };
+  const comps = componentesDoLegado(fp, CRONO) as any[];
+  const esperada = taxaMensalDeAnual(12.5);
+  assert.deepEqual(comps.map((c) => c.tipo),
+    ['imediato', 'prazo_fixo', 'ate_marco', 'prazo_fixo', 'concentrado']);
+  // Os quatro caminhos que gravavam `taxaMensal: 0` — entrada parcelada, ao
+  // longo da obra, prazo fixo e repasse — passam a gravar a MESMA taxa (D-Q02).
+  for (const c of comps.filter((x) => x.tipo !== 'imediato')) {
+    assert.equal(c.taxaMensal, esperada, `${c.rotulo} ficou sem a taxa do plano`);
+  }
+  assert.equal('taxaMensal' in comps[0], false, 'imediato não tem juros: paga no mês da venda');
+
+  // Regressão: o MESMO plano sem a chave continua em 0 — nenhum estudo muda de
+  // número sem alguém digitar a taxa.
+  const semTaxa = componentesDoLegado({ ...fp, juros_tabela_aa: undefined }, CRONO) as any[];
+  for (const c of semTaxa.filter((x) => x.tipo !== 'imediato')) assert.equal(c.taxaMensal, 0);
+});
+
+test('#428 golden EVI safra única: sinal de 15% e 36 parcelas de R$ 21.414,48 (cfINC!AY20)', () => {
+  // Mês 0 do cenário dourado (`docs/rodada-8/02-regras-evi.md` §3).
+  //
+  // ⚠️ SAFRA ÚNICA, e só. `cfINC!AY` é um PMT rolante sobre um pool, não
+  // amortização por safra: as "36 parcelas iguais" só existem quando há UMA
+  // safra. Cobrar paridade com AY em cenário multi-safra pediria ao app um
+  // método que ele não tem — e não deve ter: o contrato do app é por safra.
+  const BASE = 7_603_022.19;
+  const componente: ComponentePagamento = {
+    tipo: 'prazo_fixo', participacaoPct: 10, sinalPct: 15, prazoMeses: 36,
+    defasagemMeses: 1, taxaMensal: 0.0098635806,
+    jurosNoMesDaContratacao: false, rotulo: 'tabela curta',
+  };
+  const pagamentos = pagamentosPrazoFixo(componente, 0, BASE);
+
+  const sinal = pagamentos.filter((p) => p.tipo === 'sinal');
+  assert.equal(sinal.length, 1);
+  assert.equal(sinal[0].mes, 0, 'o sinal é pago no mês da contratação');
+  assert.equal(sinal[0].valor, 114_045.33);        // 7.603.022,19 × 10% × 15%
+
+  const parcelas = pagamentos.filter((p) => p.tipo !== 'sinal');
+  assert.equal(parcelas.length, 36);
+  assert.equal(parcelas[0].mes, 1, 'defasagem 1: a 1ª parcela vence no mês seguinte');
+  assert.equal(parcelas[35].mes, 36);
+  for (const p of parcelas) {
+    assert.ok(perto(p.valor, 21_414.48, 0.10), `parcela do mês ${p.mes}: ${p.valor}`);
+  }
+  // As 35 primeiras são exatas; a última carrega o resíduo de centavos da
+  // quantização (C7, `round2` parcela a parcela).
+  for (const p of parcelas.slice(0, 35)) assert.equal(p.valor, 21_414.48);
+
+  // E o principal recuperado é exatamente a fração contratada: os juros são
+  // acréscimo, nunca reclassificação de principal.
+  const r = calcularRecebiveisComponentes([componente], [{ safra: 0, valorContratado: BASE }], 999, 60);
+  assert.ok(perto(soma(r.principalRecebidoMensal), BASE * 0.10, 0.01));
+  assert.ok(perto(soma(r.jurosMensal), 124_664.47, 0.01));
+  assert.ok(perto(soma(r.recebimentoBrutoMensal),
+    soma(r.principalRecebidoMensal) + soma(r.jurosMensal), 0.01));
+});
+
+test('#428 golden EVI repasse: o saldo a repassar capitaliza, e os juros são série própria', () => {
+  // `cfINC!AJ/AK/AL` — o maior item de juros da EVI: R$ 4.257.692,43 de
+  // principal (`cfINC!AH19`) viram R$ 5.715.517,93 no mês 30, dos quais
+  // R$ 1.457.825,50 são juros (78% dos juros daquela safra).
+  const PRINCIPAL = 4_257_692.43;
+  const componente: ComponentePagamento = {
+    tipo: 'concentrado', participacaoPct: 100, mesPagamento: 30,
+    taxaMensal: 0.0098635806, rotulo: 'saldo a repassar',
+  };
+  const r = calcularRecebiveisComponentes(
+    [componente], [{ safra: 0, valorContratado: PRINCIPAL }], 999, 60);
+
+  // ⚠️ A issue cita 5.715.517,93 / 1.457.825,50; o motor arredonda por `round2`
+  // e dá 5.715.517,94 / 1.457.825,51. É UM centavo, do último arredondamento
+  // (o exato é 5.715.517,9379…) — a tolerância de 2 centavos abaixo é isso, e
+  // não folga para erro de modelo.
+  assert.ok(perto(r.recebimentoBrutoMensal[30], 5_715_517.93, 0.02));
+  assert.ok(perto(r.recebimentoBrutoMensal[30], PRINCIPAL * Math.pow(1.0098635806, 30), 0.01));
+
+  // AS DUAS SÉRIES, que é o que prova que os juros não são principal disfarçado.
+  assert.equal(r.principalRecebidoMensal[30], PRINCIPAL, 'o principal do repasse não pode crescer');
+  assert.ok(perto(r.jurosMensal[30], 1_457_825.50, 0.02));
+  assert.equal(soma(r.principalRecebidoMensal), PRINCIPAL);
+  assert.equal(r.repasseMensal[30], r.recebimentoBrutoMensal[30]);
+
+  // "Os juros começam no mês seguinte à contratação": nada é recebido antes.
+  assert.equal(soma(r.recebimentoBrutoMensal.slice(0, 30)), 0);
+  // Taxa 0 é o mesmo repasse de sempre, sem um centavo de juros — o default.
+  const semJuros = calcularRecebiveisComponentes(
+    [{ ...componente, taxaMensal: 0 }], [{ safra: 0, valorContratado: PRINCIPAL }], 999, 60);
+  assert.equal(semJuros.recebimentoBrutoMensal[30], PRINCIPAL);
+  assert.equal(soma(semJuros.jurosMensal), 0);
 });
 
 test('#283 linha opt-in alimenta juros, principal e carteira no FluxoCalc', () => {

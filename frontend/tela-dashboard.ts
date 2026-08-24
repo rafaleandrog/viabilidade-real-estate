@@ -274,6 +274,11 @@ export class ViabTelaDashboard extends LitElement {
       // `proforma.ts`). Somar os dois mantém a coluna com UMA definição só nos
       // dois níveis; sem o campo preenchido, cai na privativa, como no Loteamento.
       const areaComum = Number(estudo?.area_comum_total) || 0;
+      // #427 — a EVI fecha com TRÊS leituras (Resultado / +Perm. Financ. /
+      // +Permutas — ver `proforma-avancado.ts`). O Painel só declara UMA: esta
+      // continua sendo `p.resultado`/`p.margemPct`, a leitura "= Resultado"
+      // (sem permutas) — igual ao que já vale para o Preliminar
+      // (`p.margemLiquidaPct` em `resumoListagem` acima). Não muda de valor.
       this.calculosAvancado = {
         ...this.calculosAvancado,
         [estudo.id]: {

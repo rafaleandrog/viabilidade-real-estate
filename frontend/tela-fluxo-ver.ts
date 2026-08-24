@@ -94,6 +94,10 @@ export class ViabFluxoVer extends LitElement {
       font-style: italic; color: var(--cor-texto-sec, rgba(255,255,255,0.55));
       border-top: 1px dashed var(--cor-borda-sutil, rgba(255,255,255,0.14));
     }
+    /* #427 — nota do denominador do fecho "= Resultado + Permutas", só
+       exibida quando a base difere do VGV (molde de Premissas e
+       Resultados K36 da EVI: a nota é gerada e some quando não se aplica). */
+    table.proforma .nota-base { font-size: 0.72rem; font-weight: 400; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
   `];
 
   updated() {
@@ -252,6 +256,9 @@ export class ViabFluxoVer extends LitElement {
     const informativa = linhaInformativaFunding(totalSaidasFunding);
     const linhas = informativa ? [...p.linhas, informativa] : p.linhas;
     const porM2 = (v: number) => (p.areaPrivativa > 0 ? v / p.areaPrivativa : 0);
+    // #427 — % VGV de toda linha usa o VGV puro, EXCETO os fechos cujo
+    // `pctOverride` já veio calculado com a base própria (`= Resultado +
+    // Permutas` soma a permuta física ao denominador — ver proforma-avancado.ts).
     const pctVgv = (v: number) => (p.vgv > 0 ? (v / p.vgv) * 100 : 0);
     return html`
       <urbi-card titulo="Proforma">
@@ -262,14 +269,15 @@ export class ViabFluxoVer extends LitElement {
           <tbody>
             ${linhas.map((l) => html`
               <tr class=${`n${l.nivel} ${l.tipo}`}>
-                <td>${l.nome}</td>
+                <td>${l.nome}${l.notaBase ? html` <span class="nota-base">(${l.notaBase})</span>` : ''}</td>
                 <td class="num">${fmtR$(l.valor)}</td>
                 <td class="num">${fmtNum(porM2(l.valor))}</td>
-                <td class="num">${fmtPct(pctVgv(l.valor))}</td>
+                <td class="num">${fmtPct(l.pctOverride ?? pctVgv(l.valor))}</td>
               </tr>`)}
           </tbody>
         </table>
         <p class="sec">Área privativa: ${fmtNum(p.areaPrivativa)} m² · Margem sobre VGV: ${fmtPct(p.margemPct)}.
+          A coluna "Margem" do Painel de estudos usa esta mesma linha — "= Resultado", sem permutas.
           Esta proforma é desalavancada: nenhuma ponta do funding entra aqui — nem liberações e aportes
           na receita, nem amortização e juros no custo. “Custos Financeiros” vale só as linhas de custo
           que você classificou nesse grupo. Quem quiser ler o efeito do funding lê a aba Fluxo de Caixa,

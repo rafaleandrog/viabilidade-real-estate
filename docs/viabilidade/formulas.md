@@ -127,6 +127,38 @@ hierarquia de linhas do Preliminar, para que os dois níveis se comparem na mesm
 > não uma inconsistência. A tabela completa das três superfícies está no cabeçalho de
 > `frontend/proforma-avancado.ts:48-70`.
 
+### O fecho de três linhas (#427)
+
+> Esta subseção migrou para dentro do bloco "proforma desalavancada" (#448) — o corpo do PR #530
+> já declarava essa migração como o destino planejado assim que este bloco existisse.
+
+A EVI fecha a proforma com **três** leituras do mesmo projeto
+(`Premissas e Resultados!K35/K37/K39` do `EVI_Urbita.xlsx`), cada uma com sua própria base — "a
+base acompanha a grandeza": quando a linha soma a permuta física ao numerador, ela soma também ao
+denominador; a permuta financeira não entra na base, porque já está dentro do VGV.
+
+| Linha | Fórmula (app) | Fórmula (EVI) | Denominador |
+|---|---|---|---|
+| `= Resultado` | `resultado` | `P39 = SUBTOTAL(9;P8:P33)` | VGV |
+| `= Resultado + Perm. Financ.` | `resultado + c.permutaFinanceiraTotal` | `P37 = P39 − P15 − P16` (ESTORNO, não soma) | VGV |
+| `= Resultado + Permutas` | `resultadoMaisPermutaFinanceira + c.vgvPermutaFisica` | `P35 = P37 + permutasFisicasValorTotal` | VGV + permutas físicas |
+
+`c.permutaFinanceiraTotal` (`frontend/fluxo-caixa-motor.ts`) é o total ISOLADO da dedução de
+permuta financeira, já com o sinal estornado (positivo) — soma direto de `calcDeducoesReceita`
+(que já filtra só `ePermutaFinanceira`). `c.vgvPermutaFisica` já existia (#188/#268).
+
+O rótulo/nota da 3ª linha é condicional, no molde de `K35`/`K36` da EVI: só aparece quando há
+permuta física. Com física **e** financeira zeradas, as três linhas coincidem em valor e
+percentual, e a linha 3 cai de volta para o rótulo `= Resultado`, sem nota de denominador — a
+mesma degenerescência que a linha informativa do funding (acima) também respeita: cada extra some
+sozinho quando a grandeza que ele mede é zero, em vez de aparecer com valor zerado.
+
+**Qual das três alimenta cada superfície:** hoje, todas as superfícies (Painel de estudos —
+`frontend/tela-dashboard.ts` — e a linha `resultado` lida em `frontend/tela-fluxo-ver.ts`)
+continuam usando a **1ª leitura** (`= Resultado`, sem permutas) — a #427 só **acrescenta** as
+outras duas à tabela da aba Proforma; nenhuma coluna existente mudou de definição. Unificar
+qual leitura cada superfície deveria mostrar é a **#443**, não esta.
+
 ## Funding — onde as fórmulas vivem
 
 As fórmulas de **dívida** (aporte único ou em tranches, carência, PMT Price, quitação),

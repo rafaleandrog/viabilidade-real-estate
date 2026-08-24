@@ -19,6 +19,7 @@ import {
   vgvVendavelTipologia, vgvVendavelLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, vgvVendidoMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
+  areaTotalLinha, areaPermutaFisicaLinha, areaVendavelLinha, unidadesVendaveisLinha,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado,
 } from './fluxo-shared.js';
 
@@ -276,6 +277,16 @@ export interface FluxoCalc {
   paybackData: string | null;      // "jul/2030"
   exposicaoMaxima: number;         // min(fluxoAcumulado) — tipicamente negativo
   vgvPermutaFisica: number;        // #188 — VGV atribuído às unidades permutadas (informativo)
+  /**
+   * #427 — total ISOLADO da dedução de Permuta financeira (`ePermutaFinanceira`),
+   * já com o sinal ESTORNADO: positivo, pronto para SOMAR de volta ao Resultado
+   * — o mesmo mecanismo de `Premissas e Resultados!P37 = P39 − P15 − P16` da
+   * EVI. Soma direto de `calcDeducoesReceita` (que já filtra só essas linhas);
+   * NÃO reconstruir por `Σ min(0, total)` sobre `linhasReceita` — funciona só
+   * por acidente de sinal e quebra na primeira dedução nova. Zero quando não
+   * há linha de permuta financeira.
+   */
+  permutaFinanceiraTotal: number;
   // #188/#229: nome histórico, MANTIDO por compatibilidade (8+ consumidores em
   // fluxo-tabela.ts/exportar.ts) — mas o valor NÃO é "Receita Bruta" no sentido
   // do EVI (recebimento em caixa); é VGV VENDÁVEL. Use `vgvVendavel` (idêntico,
@@ -432,6 +443,132 @@ export function vendaBrutaContratadaMensal(
   return saida.map(round2); // #260 — C7
 }
 
+// ─────────────────────────────────────────────────────────────────
+// #457: livro de estoque — área (m²), unidades e VSO
+// ─────────────────────────────────────────────────────────────────
+//
+// Camada 2 do invariante de conservação (#429): a EVI carrega um livro de
+// estoque (`cfINC!M/N`) que o app não carregava — foi a ausência dele que
+// deixou R$ 2.007.856,95 sumirem em silêncio no estudo 6. As séries abaixo
+// derivam SÓ das tipologias já carregadas e da mesma `absorcaoMensal` usada
+// por `vendaBrutaContratadaMensal` — nenhum input novo, nenhum número
+// financeiro muda.
+//
+// Semente e timing seguem a EVI (BRIEF-EVI.md T4, `Areas e Precos!F14` e
+// `cfINC!G19`), não o critério original da issue (que partia da área já
+// líquida e teria baixado a permuta duas vezes):
+//  - a semente é a área privativa TOTAL da linha (`areaTotalLinha`), não a
+//    "área de venda" já líquida — essa é RESULTADO (`F17 = F14 − F18`);
+//  - a permuta física baixa o estoque integralmente no mês do LANÇAMENTO
+//    (`cfINC!G/H`), não no início do período de absorção (que, havendo
+//    Pré-lançamento, vem antes).
+//
+// Contrato C7: nenhuma destas séries é monetária — carregam precisão plena
+// e NÃO são quantizadas a 2 casas (diferente de `vendaBrutaContratadaMensal`
+// acima). Unidades são fracionárias no cálculo; a exibição arredonda.
+
+/** Mês ABSOLUTO (0-based, mesma base dos arrays mensais) em que a permuta
+ * física baixa o estoque — o mês do Lançamento (`cfINC!G/H`). `null` sem
+ * evento de Lançamento no cronograma (mesma guarda de `faixasAbsorcao`). */
+function mesLancamento(cronograma: EventoCrono[]): number | null {
+  const lanc = (cronograma ?? []).find((e) => e.evento === 'lancamento');
+  return lanc ? Math.max(0, Math.round(n(lanc.inicio_mes))) : null;
+}
+
+/** #457: área vendida mensal (m²) de uma linha — espelha
+ * `vendaBrutaContratadaMensal`, trocando o VGV vendável pela ÁREA vendável
+ * (`areaVendavelLinha`). Sem arredondamento — derivada não monetária (C7). */
+export function areaVendidaMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+  const area = areaVendavelLinha(linha?.tipologias ?? []);
+  if (area <= 0) return saida;
+  const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, cronograma);
+  if (!abs) return saida;
+  for (let i = 0; i < abs.pcts.length; i++) {
+    const idx = abs.inicio + i;
+    if (idx >= 0 && idx < saida.length) saida[idx] += (area * abs.pcts[i]) / 100;
+  }
+  return saida;
+}
+
+/** #457: unidades vendidas mensal de uma linha — mesma distribuição de
+ * `areaVendidaMensal`, em unidades vendáveis (`unidadesVendaveisLinha`). Sem
+ * oráculo na planilha (a EVI não tem coluna de unidades, BRIEF-EVI.md T4);
+ * assegura coerência interna com `areaVendidaMensal`, não paridade externa. */
+export function unidadesVendidasMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+  const unidades = unidadesVendaveisLinha(linha?.tipologias ?? []);
+  if (unidades <= 0) return saida;
+  const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, cronograma);
+  if (!abs) return saida;
+  for (let i = 0; i < abs.pcts.length; i++) {
+    const idx = abs.inicio + i;
+    if (idx >= 0 && idx < saida.length) saida[idx] += (unidades * abs.pcts[i]) / 100;
+  }
+  return saida;
+}
+
+/** #457: valor SEMENTE do livro de estoque (m²) de uma linha — a área
+ * privativa TOTAL, antes de qualquer baixa (permuta ou venda). Ver
+ * `estoqueM2Mensal` para o saldo mês a mês. */
+export function estoqueM2Semente(linha: any): number {
+  return areaTotalLinha(linha?.tipologias ?? []);
+}
+
+/** #457: estoque em m² ao FIM de cada mês de uma linha — `estoqueM2Semente`
+ * menos a permuta física (baixada integralmente no mês do Lançamento) menos
+ * `areaVendidaMensal` acumulada. Fecha em 0 (tolerância de ponto flutuante)
+ * quando a absorção soma 100%; sobra > 0 quando ela não fecha — é o mesmo
+ * resíduo visível que faltava no estudo 6 (#429). */
+export function estoqueM2Mensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+  const permuta = areaPermutaFisicaLinha(linha?.tipologias ?? []);
+  const vendida = areaVendidaMensal(linha, cronograma, prazoTotal);
+  const mesBaixa = mesLancamento(cronograma);
+  let saldo = estoqueM2Semente(linha);
+  for (let mes = 0; mes < saida.length; mes++) {
+    if (mesBaixa !== null && mes === mesBaixa) saldo -= permuta;
+    saldo -= vendida[mes];
+    saida[mes] = saldo;
+  }
+  return saida;
+}
+
+/** #457: VSO mensal de uma linha = vendas do mês ÷ estoque disponível no
+ * INÍCIO do mês (antes da baixa do próprio mês, depois da permuta já baixada
+ * nos meses anteriores/no mês do Lançamento). `0` quando o estoque de início
+ * é `<= 0` — nunca `NaN`/divisão por zero. Sem oráculo na planilha
+ * (BRIEF-EVI.md T4: a EVI não calcula VSO) — verifica coerência interna. */
+export function vsoMensal(
+  linha: any,
+  cronograma: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
+  const permuta = areaPermutaFisicaLinha(linha?.tipologias ?? []);
+  const vendida = areaVendidaMensal(linha, cronograma, prazoTotal);
+  const mesBaixa = mesLancamento(cronograma);
+  let saldo = estoqueM2Semente(linha);
+  for (let mes = 0; mes < saida.length; mes++) {
+    if (mesBaixa !== null && mes === mesBaixa) saldo -= permuta;
+    saida[mes] = saldo > 0 ? vendida[mes] / saldo : 0;
+    saldo -= vendida[mes];
+  }
+  return saida;
+}
+
 /**
  * #227: desconto comercial mensal de uma linha — soma, mês a mês, o abatimento
  * configurado em cada linha de Entrada (`entrada[].descontoPct`, ex.: 5% no
@@ -551,6 +688,106 @@ export type ComponentePagamento =
       rotulo?: string;
     };
 
+// ─────────────────────────────────────────────────────────────────
+// #428 — juros de tabela do plano: UMA taxa por Grupo (decisão D-Q02)
+// ─────────────────────────────────────────────────────────────────
+//
+// A EVI Urbitá pratica juros de tabela em toda venda a prazo
+// (`Premissas e Resultados!H14`, `ClienteJurosAA = 12,5% a.a.`). A matemática
+// já estava ligada — `calcularRecebiveisComponentes` consome `taxaMensal` —,
+// mas não havia onde digitar a taxa: `componentesDoLegado` escrevia `0` nos
+// quatro caminhos. Estas três funções são a ponte entre o número que o usuário
+// digita (% a.a.) e o que o motor consome (taxa mensal).
+
+/**
+ * Taxa anual de tabela DIGITADA (em pontos percentuais) → taxa mensal
+ * equivalente, pela composição da EVI: `i_m = (1 + i_aa)^(1/12) − 1`.
+ * **Nunca `i_aa / 12`** — a planilha define `ClienteJurosAM` como fórmula
+ * composta pura, sem arredondamento (12,5% a.a. → 0,00986358055321146).
+ *
+ * Contrato C7: `taxaMensal` é derivada NÃO monetária. O retorno carrega
+ * precisão plena e não é arredondado aqui nem na persistência; quem arredonda
+ * é só a exibição.
+ */
+export function taxaMensalDeAnual(anualPct: number): number {
+  const aa = Number(anualPct);
+  if (!Number.isFinite(aa) || aa === 0) return 0;
+  // Revisao da #428, B2 — fora do dominio (queda de mais de 100% ao ano) a base
+  // `1 + aa/100` fica negativa e `Math.pow` com expoente fracionario devolve
+  // NaN. NaN NAO fica contido: `JSON.stringify(NaN)` e `null`, entao um unico
+  // "Aplicar" gravaria `taxaMensal: null` em todo componente financiado e
+  // apagaria a taxa persistida sem aviso — a classe de defeito da #431 de volta
+  // por esta porta. Quem barra a digitacao e `erroFormularioPagamento`; este
+  // `return` existe para que nem um caminho NOVO consiga persistir o NaN.
+  if (aa <= -100) return 0;
+  return Math.pow(1 + aa / 100, 1 / 12) - 1;
+}
+
+/** O caminho de volta: taxa mensal → % a.a. equivalente, `(1 + i_m)^12 − 1`. */
+export function taxaAnualDeMensal(mensal: number): number {
+  const m = Number(mensal);
+  if (!Number.isFinite(m) || m === 0) return 0;
+  return (Math.pow(1 + m, 12) - 1) * 100;
+}
+
+/**
+ * A taxa de tabela do plano, em % a.a. — o valor que o campo do modal mostra e
+ * que `componentesDoLegado` grava nos componentes financiados.
+ *
+ * Duas fontes, nesta ordem:
+ *
+ *  1. `fluxo_pagamento.juros_tabela_aa` — a chave que a #428 passou a gravar.
+ *     É o dígito que o usuário DIGITOU, e por isso vence: a ida e volta
+ *     `12,5 → mensal → 12,4999…%` devolveria um número diferente do escrito.
+ *     Chave presente e igual a `0` é RESPOSTA, não ausência — é o usuário
+ *     tendo desligado os juros —, então ela não pode cair na derivação;
+ *  2. na falta dela — todo estudo anterior à #428, inclusive os que receberam
+ *     a taxa pela API, como o estudo 5 —, a taxa do primeiro componente que
+ *     tenha uma, por `(1 + i_m)^12 − 1`. Sem este ramo o modal abriria em 0%
+ *     numa linha que TEM juros, e a primeira edição os apagaria.
+ *
+ * ⚠️ Só o primeiro componente com taxa manda, porque D-Q02 define UMA taxa por
+ * Grupo/plano. Plano com taxas heterogêneas (o caso residencial × não
+ * residencial da EVI) continua preservado enquanto ninguém mexer no campo —
+ * quem garante isso é `componentesParaSalvar`, não esta função.
+ */
+export function jurosTabelaAnualPct(fluxoPagamento: any): number {
+  const fp = fluxoPagamento ?? {};
+  if (fp.juros_tabela_aa !== undefined && fp.juros_tabela_aa !== null) {
+    return Number(fp.juros_tabela_aa) || 0;
+  }
+  return taxaAnualDeMensal(primeiraTaxaMensalPersistida(fp));
+}
+
+/** A primeira `taxaMensal` diferente de zero entre os componentes persistidos. */
+function primeiraTaxaMensalPersistida(fp: any): number {
+  const comps = Array.isArray(fp?.componentes) ? fp.componentes : [];
+  for (const c of comps) {
+    const m = Number(c?.taxaMensal);
+    if (Number.isFinite(m) && m !== 0) return m;
+  }
+  return 0;
+}
+
+/**
+ * A taxa MENSAL do plano — o que `componentesDoLegado` grava nos componentes.
+ *
+ * É o par de `jurosTabelaAnualPct`, e não a sua composição com
+ * `taxaMensalDeAnual`: quando a taxa vem derivada dos componentes (estudo sem
+ * a chave `juros_tabela_aa`), passar por % a.a. e voltar é uma ida e volta de
+ * ponto flutuante que devolve `0,009863600000000083` no lugar de `0,0098636`.
+ * A diferença é economicamente nada e mesmo assim custa caro: ela reescreveria
+ * um dado que ninguém pediu para mudar, e faria "não mexeu na taxa" precisar de
+ * tolerância em vez de ser igualdade.
+ */
+export function taxaMensalDoPlano(fluxoPagamento: any): number {
+  const fp = fluxoPagamento ?? {};
+  if (fp.juros_tabela_aa !== undefined && fp.juros_tabela_aa !== null) {
+    return taxaMensalDeAnual(Number(fp.juros_tabela_aa) || 0);
+  }
+  return primeiraTaxaMensalPersistida(fp);
+}
+
 /**
  * Adapter do JSON legado (`fluxo_pagamento`: `entrada[]`/`parcelas[]`/
  * `repasse`) para o contrato de componentes (#230). Leitura pura, sem
@@ -579,6 +816,13 @@ export function componentesDoLegado(
   const fp = fluxoPagamento ?? null;
   if (!fp) return [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }];
 
+  // #428: a taxa de tabela do plano, a MESMA em todos os componentes
+  // financiados (D-Q02). Ela chega pelo PRIMEIRO argumento — que é o próprio
+  // `fluxo_pagamento`/formulário —, e não por um terceiro parâmetro: os 39
+  // testes que chamam esta função direto passam objetos sem a chave, caem em
+  // `0` e continuam valendo sem uma linha de edição.
+  const taxaMensal = taxaMensalDoPlano(fp);
+
   const componentes: ComponentePagamento[] = [];
 
   for (const e of normalizarLinhasPagamento(fp.entrada)) {
@@ -588,7 +832,7 @@ export function componentesDoLegado(
     } else {
       componentes.push({
         tipo: 'prazo_fixo', participacaoPct: n(e?.pct), sinalPct: 0, prazoMeses: nParc,
-        defasagemMeses: 0, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'entrada (legado)',
+        defasagemMeses: 0, taxaMensal, jurosNoMesDaContratacao: false, rotulo: 'entrada (legado)',
       });
     }
   }
@@ -600,14 +844,14 @@ export function componentesDoLegado(
     if (p?.ao_longo_obra) {
       componentes.push({
         tipo: 'ate_marco', participacaoPct: n(p?.pct), sinalPct: 0, marcoMes: fimObra,
-        defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'ao longo da obra (legado)',
+        defasagemMeses: 1, taxaMensal, jurosNoMesDaContratacao: false, rotulo: 'ao longo da obra (legado)',
       });
     } else {
       const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
       componentes.push({
         tipo: 'prazo_fixo', participacaoPct: n(p?.pct), sinalPct: 0,
         prazoMeses: Math.max(1, Math.round(n(p?.parcelas) || 1)),
-        defasagemMeses: intervalo, taxaMensal: 0, jurosNoMesDaContratacao: false,
+        defasagemMeses: intervalo, taxaMensal, jurosNoMesDaContratacao: false,
         rotulo: `parcelamento ${p?.periodicidade ?? 'mensal'} (legado)`,
       });
     }
@@ -616,7 +860,7 @@ export function componentesDoLegado(
   const pctRepasse = pctRepasseDerivado(fp);
   if (pctRepasse > 0) {
     const mesRepasse = fimObra + REPASSE_MESES_APOS_ENTREGA;
-    componentes.push({ tipo: 'concentrado', participacaoPct: pctRepasse, mesPagamento: mesRepasse, taxaMensal: 0, rotulo: 'repasse (legado)' });
+    componentes.push({ tipo: 'concentrado', participacaoPct: pctRepasse, mesPagamento: mesRepasse, taxaMensal, rotulo: 'repasse (legado)' });
   }
 
   return componentes;
@@ -2032,6 +2276,11 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   });
   calcDeducoesReceita = calcDeducoesReceita.map((linha) => quantizarLinhaMonetaria(linha, taxa));
 
+  // #427 — total isolado da permuta financeira, positivo (estornado): a
+  // proforma do Avançado precisa dele para fechar `Resultado + Perm. Financ.`
+  // sem agregar o RET junto (o que a linha única de deduções da proforma faz).
+  const permutaFinanceiraTotal = round2(-calcDeducoesReceita.reduce((s, l) => s + l.total, 0)) || 0;
+
   const linhasReceitaFinal = [...calcReceitas, ...calcDeducoesReceita];
   const receitaMensal = new Array<number>(prazo).fill(0);
   for (const l of linhasReceitaFinal) for (let i = 0; i < prazo; i++) receitaMensal[i] = round2(receitaMensal[i] + l.mensal[i]);
@@ -2137,6 +2386,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     paybackData: paybackMes >= 0 ? mesRelativoCompleto(config.dataInicio, paybackMes) : null,
     exposicaoMaxima,
     vgvPermutaFisica,
+    permutaFinanceiraTotal,
     receitaBrutaVgv,
     vgvVendavel: receitaBrutaVgv,
     vendaBrutaContratada,
