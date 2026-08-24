@@ -777,8 +777,8 @@ test('#445 validarFunding: equity SAUDÁVEL (aportou, retorno positivo) produz Z
 });
 
 test('#445 validarFunding: (a) modo resultado_final com resultadoFinal negativo produz retorno negativo', () => {
-  // funding-motor.ts:474 — `saidas[t] = round2(resultadoFinal * pct)`, sem
-  // clamp; um `resultadoFinal` negativo vira retorno negativo diretamente.
+  // funding-motor.ts:489 — `saidas[t] = t === mesRepasseValor ? round2(resultadoFinal * pct) : 0`,
+  // sem clamp; um `resultadoFinal` negativo vira retorno negativo diretamente.
   const equity: FundingCalc = {
     operacoes: [{
       operacao: { tipo: 'equity', nome: 'Investidor', valor: 1000, inicio_mes: 0, pct_retorno: 5, modo_retorno: 'resultado_final' },

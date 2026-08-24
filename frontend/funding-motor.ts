@@ -54,6 +54,21 @@ const n = (v: any): number => Number(v) || 0;
  * de custo comum (fonte oficial única, #227/#228) já calculada dentro de
  * `linhasCusto` com seu próprio `.mensal`. Única fonte para não duplicar
  * `corretagemMensal` (fluxo-caixa-motor.ts) nem divergir entre telas.
+ *
+ * ⚠️ **#465 — divergência DELIBERADA com as duas planilhas do autor, e ela
+ * NÃO muda.** `Premissas e Resultados!P19` (Receita líquida) e
+ * `fluxo_investidor_FORMULAS!equity!C18` deduzem QUATRO parcelas
+ * (imposto + corretagem + marketing + permuta financeira); esta função só
+ * deduz corretagem — **marketing NÃO entra na base do retorno de equity.**
+ * Decisão do autor, verbatim, 2026-08-21: *"equity é um retorno líquido ao
+ * investidor, não importa esse fator para o cálculo"*. Não é bug, não é
+ * pendência — é a base que a Rodada 8 registrou como intencional
+ * (`CLAUDE.md` § Decisões do autor, item 3) e que a #465 tornou testável:
+ * `receitaLiquidaDeProformaMensal` (`fluxo-caixa-motor.ts`) É a composição
+ * de quatro parcelas da planilha, e um teste afirma que as duas divergem
+ * de propósito — se algum dia alinhá-las por engano, o teste fica vermelho.
+ * Nota completa, com a fórmula lado a lado:
+ * `docs/viabilidade/fluxo-investidor-formulas.md` §4.2.
  */
 export function receitaLiquidaComCorretagemMensal(
   receitaMensal: number[],

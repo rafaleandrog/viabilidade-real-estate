@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import {
   simularDivida, simularEquity, simularFinanciamentoProducao, indicadoresOperacao, fundingDoEstudo,
   agregarFundingPorPeriodos, taxaMensalEquivalente, pmtPrice, tirAnual,
+  receitaLiquidaComCorretagemMensal,
   type OperacaoFunding,
 } from './funding-motor.js';
+import { receitaLiquidaDeProformaMensal } from './fluxo-caixa-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #355 — golden cases da planilha `fluxo_investidor_FORMULAS.xlsx`, transcrita
@@ -541,4 +543,54 @@ test('#434 duas dirigidas leem o MESMO caixa — a ordem não vira prioridade', 
   // 3) a remontagem continua respeitando a ordem original em cada arranjo.
   assert.deepEqual(ab.operacoes.map((s) => s.operacao.id), ['f1', 'f2', 'd2']);
   assert.deepEqual(ba.operacoes.map((s) => s.operacao.id), ['f2', 'f1', 'd2']);
+});
+
+// ── #465 — a base do equity e a "Receita líquida de proforma" divergem DE PROPÓSITO ──
+//
+// Trava para o "conserto ingênuo": se alguém alinhar receitaLiquidaComCorretagemMensal
+// à planilha (deduzindo marketing também), este teste fica vermelho — é a
+// prova de que a divergência é intencional, não pendência esquecida (decisão
+// do autor 2026-08-21, citada verbatim no comentário da função).
+test('#465 receitaLiquidaComCorretagemMensal (base do equity) e receitaLiquidaDeProformaMensal (EVI) divergem quando há marketing', () => {
+  const receitaMensal = [1_000_000, 1_000_000];
+  const linhasCusto = [
+    { id: 'corretagem', mensal: [50_000, 50_000] },
+    { id: 'marketing', mensal: [10_000, 10_000] },
+  ];
+  const custosRaw = [
+    { id: 'corretagem', grupo: 'diretos', categoria: 'Corretagem de vendas' },
+    { id: 'marketing', grupo: 'diretos', categoria: 'Marketing & Publicidade' },
+  ];
+
+  const baseEquity = receitaLiquidaComCorretagemMensal(receitaMensal, linhasCusto, custosRaw);
+  const baseEvi = receitaLiquidaDeProformaMensal(receitaMensal, linhasCusto, custosRaw);
+
+  // A base do equity só deduz corretagem — marketing continua dentro dela.
+  assert.deepEqual(baseEquity, [950_000, 950_000]);
+  // A base EVI deduz corretagem E marketing — R$ 10.000/mês a menos.
+  assert.deepEqual(baseEvi, [940_000, 940_000]);
+
+  // A divergência É o ponto: as duas NÃO podem ficar iguais enquanto a
+  // decisão do autor (funding-motor.ts, ao lado de receitaLiquidaComCorretagemMensal)
+  // não mudar. Sem marketing na linha de custo, as duas convergem (prova que
+  // marketing é a ÚNICA diferença entre as duas funções).
+  const semMarketing = linhasCusto.filter((l) => l.id !== 'marketing');
+  const custosRawSemMarketing = custosRaw.filter((c) => c.id !== 'marketing');
+  assert.deepEqual(
+    receitaLiquidaComCorretagemMensal(receitaMensal, semMarketing, custosRawSemMarketing),
+    receitaLiquidaDeProformaMensal(receitaMensal, semMarketing, custosRawSemMarketing),
+  );
+});
+
+test('#465 receitaLiquidaDeProformaMensal soma marketing dos DOIS grupos possíveis (diretos + indireto)', () => {
+  const receitaMensal = [1_000_000];
+  const linhasCusto = [
+    { id: 'mkt1', mensal: [10_000] },
+    { id: 'mkt2', mensal: [5_000] },
+  ];
+  const custosRaw = [
+    { id: 'mkt1', grupo: 'diretos', categoria: 'Marketing & Publicidade' },
+    { id: 'mkt2', grupo: 'indireto', categoria: 'Marketing global' },
+  ];
+  assert.deepEqual(receitaLiquidaDeProformaMensal(receitaMensal, linhasCusto, custosRaw), [985_000]);
 });

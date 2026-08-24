@@ -203,6 +203,29 @@ export function linhaInformativaFunding(totalSaidasFunding: number): LinhaProfor
 }
 
 /**
+ * #465: linha informativa da "Receita líquida de proforma" — a composição
+ * da EVI (`Premissas e Resultados!P19` = Receita Bruta − imposto −
+ * corretagem − marketing − permuta financeira), calculada por
+ * `receitaLiquidaDeProformaMensal` (`fluxo-caixa-motor.ts`). Mesma técnica
+ * de `linhaInformativaFunding` acima: existe FORA de `proformaAvancado`
+ * porque a função não recebe `custosRaw` (só `linhasCusto`, sem
+ * `categoria` — a arity é a mesma travada pela #426), então quem monta é a
+ * TELA (`tela-fluxo-ver.ts`, que tem `d.custos`).
+ *
+ * `informativo`, nunca somada em `resultado` — é uma SEGUNDA leitura de
+ * "receita líquida", ao lado de `= Receita líquida` (que continua sendo
+ * `receitaMensal`, sem corretagem/marketing). Nenhum cálculo existente muda.
+ */
+export function linhaInformativaReceitaLiquidaEvi(receitaLiquidaEviTotal: number): LinhaProformaAv {
+  return {
+    nome: 'Receita líquida de proforma — composição EVI (informativo: imposto + corretagem + marketing + permuta financeira)',
+    valor: receitaLiquidaEviTotal,
+    nivel: 1,
+    tipo: 'informativo',
+  };
+}
+
+/**
  * Monta a proforma econômica do Avançado — sempre DESALAVANCADA.
  *
  * ⚠️ Não existe parâmetro de funding, e a ausência é deliberada (#426): o

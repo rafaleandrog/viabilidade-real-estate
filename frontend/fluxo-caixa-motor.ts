@@ -18,7 +18,7 @@ import {
   absorcaoMensal, periodoAbsorcao, vgvLinha, receitaLiquidaLinha,
   vgvVendavelTipologia, vgvVendavelLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
-  eCorretagem, vgvVendidoMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
+  eCorretagem, eMarketing, vgvVendidoMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   areaTotalLinha, areaPermutaFisicaLinha, areaVendavelLinha, unidadesVendaveisLinha,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado,
 } from './fluxo-shared.js';
@@ -1937,6 +1937,50 @@ export function permutaFinanceiraLiquidaMensal(
   return receitaCaixaMensal.map((v, i) => {
     const base = Math.max(0, v - (impostoMensalTotal[i] ?? 0) - (corretagemMensalSerie[i] ?? 0));
     return round2(base * f);
+  });
+}
+
+/**
+ * #465 — "Receita líquida de proforma": `Receita Bruta − imposto − corretagem
+ * − marketing − permuta financeira`. É a composição da EVI
+ * (`Premissas e Resultados!P19`, `docs/viabilidade/fluxo-investidor-formulas.md`
+ * §4.2), exposta aqui como grandeza NOMEADA e TESTÁVEL — sem substituir
+ * nenhuma outra "líquida" que o app já tem:
+ *
+ *   · `receitaMensal` (`FluxoCalc`, este arquivo) — líquida de RET +
+ *     permuta financeira (#228). É a que `proformaAvancado` usa hoje em
+ *     `= Receita líquida`; NÃO deduz corretagem nem marketing;
+ *   · `permutaFinanceiraLiquidaMensal` (acima) — líquida de imposto +
+ *     corretagem, mas é a base de RATEIO da permuta financeira, não uma
+ *     leitura do projeto inteiro;
+ *   · `receitaLiquidaComCorretagemMensal` (`funding-motor.ts:73-81`) — a
+ *     base do RETORNO DE EQUITY: `receitaMensal` menos corretagem, SEM
+ *     marketing, por decisão do autor (nota datada ao lado da assinatura).
+ *   · **esta função** — a única das quatro que deduz as QUATRO parcelas da
+ *     EVI juntas. Nenhum cálculo existente muda: ela é aditiva.
+ *
+ * `receitaMensal` já entra aqui líquida de RET + permuta financeira — só
+ * falta subtrair corretagem e marketing (que hoje só aparecem como linha de
+ * custo em `linhasCusto`, nunca pré-deduzidos de `receitaMensal`). Mesmo
+ * padrão de busca de `receitaLiquidaComCorretagemMensal`: casa a linha RAW
+ * (`custosRaw`, que tem `categoria`) com a linha CALCULADA (`linhasCusto`,
+ * que tem `.mensal`) pelo `id` — `LinhaCalc` não carrega `categoria`.
+ */
+export function receitaLiquidaDeProformaMensal(
+  receitaMensal: number[],
+  linhasCusto: { id: any; mensal: number[] }[],
+  custosRaw: any[],
+): number[] {
+  const linhaCorretagem = custosRaw.find(eCorretagem);
+  const corretagem = linhaCorretagem
+    ? linhasCusto.find((l) => l.id === linhaCorretagem.id)?.mensal ?? []
+    : [];
+  const idsMarketing = new Set(custosRaw.filter(eMarketing).map((c) => c.id));
+  const seriesMarketing = linhasCusto.filter((l) => idsMarketing.has(l.id)).map((l) => l.mensal);
+  return receitaMensal.map((v, i) => {
+    const corr = corretagem[i] ?? 0;
+    const mkt = seriesMarketing.reduce((s, serie) => s + (serie[i] ?? 0), 0);
+    return round2(v - corr - mkt);
   });
 }
 

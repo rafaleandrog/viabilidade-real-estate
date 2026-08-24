@@ -644,6 +644,28 @@ export function eCorretagem(custo: any): boolean {
   return custo?.grupo === 'diretos' && custo?.categoria === CATEGORIA_CORRETAGEM;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Marketing (#465) — duas categorias, sem categoria única unificada
+// ─────────────────────────────────────────────────────────────────
+
+/** Categoria de Marketing dentro do grupo `diretos` (`tela-fluxo-custos.ts`). */
+export const CATEGORIA_MARKETING_DIRETOS = 'Marketing & Publicidade';
+/** Categoria de Marketing dentro do grupo `indireto` (`tela-fluxo-custos.ts`). */
+export const CATEGORIA_MARKETING_INDIRETO = 'Marketing global';
+
+/**
+ * Identifica uma linha de Marketing, em QUALQUER um dos dois grupos onde o
+ * catálogo de categorias (`tela-fluxo-custos.ts`) a oferece — não há
+ * categoria única unificada como em Corretagem/Preço do Terreno. `#465`
+ * (Receita líquida de proforma) soma TODAS as linhas que casarem, porque a
+ * EVI tem uma única dedução "Marketing" e o app deixa o usuário escolher
+ * onde classificar a dela.
+ */
+export function eMarketing(custo: any): boolean {
+  return (custo?.grupo === 'diretos' && custo?.categoria === CATEGORIA_MARKETING_DIRETOS)
+    || (custo?.grupo === 'indireto' && custo?.categoria === CATEGORIA_MARKETING_INDIRETO);
+}
+
 /** Categoria da linha obrigatória de Preço do Terreno (renomeada de "Compra" no #193). */
 export const CATEGORIA_PRECO_TERRENO = 'Preço';
 
@@ -772,6 +794,21 @@ export function marcosObra(crono: EventoCrono[]): { inicioObra: number; fimObra:
  * mesmo que `REPASSE_MESES_APOS_ENTREGA` usa em `fluxo-caixa-motor.ts` para
  * os recebíveis do cliente — uma fonte só para "quando o repasse acontece".
  * `0` quando o cronograma não tem evento `obra`.
+ *
+ * ⚠️ **#467 — o `+1` existe para CANCELAR uma segunda divergência, não para
+ * corrigi-la.** `!equity!C8 = C6+C7` (lançamento + duração da obra, 1-based)
+ * é o mês do repasse NA PLANILHA — e ela define "fim da obra" como o mês
+ * SEGUINTE ao último mês de obra (`marcosObra` acima já registra: o app usa
+ * o ÚLTIMO mês de obra, um mês antes). As duas convenções erradas SE
+ * CANCELAM: o `+1` aqui compensa exatamente a diferença de um mês da
+ * definição de entrega, e o golden bate com a planilha porque as duas
+ * convenções somam zero, não porque as duas estão certas isoladamente.
+ * **Quem "corrigir" a definição de entrega em `marcosObra` (a lacuna nº 15
+ * do dossiê, ainda aberta) TEM que mexer neste `+1` no mesmo diff** — do
+ * contrário o equity em modo `resultado_final` passa a pagar um mês antes
+ * (ou depois) do que deveria, e nenhum teste acusa sozinho, porque o golden
+ * do equity usaria a `marcosObra` nova e se moveria junto. Nota completa em
+ * `docs/viabilidade/fluxo-investidor-formulas.md` §4.2.
  */
 export function mesRepasse(crono: EventoCrono[]): number {
   const marcos = marcosObra(crono ?? []);

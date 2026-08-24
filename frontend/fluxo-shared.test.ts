@@ -10,6 +10,8 @@ import {
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
   totalAntesAlocacao, ePermutaFisica,
   mesAnoParaISO, isoParaMesAno,
+  marcosObra, mesRepasse,
+  eMarketing, CATEGORIA_MARKETING_DIRETOS, CATEGORIA_MARKETING_INDIRETO,
   type EventoCrono,
 } from './fluxo-shared.js';
 
@@ -560,4 +562,43 @@ test('#430: a janela comercial se chama pos_chaves, e o evento de custo segue po
   assert.equal(f.pos_obra, undefined);
   // O inicio ainda e herdado do evento de custo; so a duracao e que nao e.
   assert.equal(f.pos_chaves.fim - f.pos_chaves.inicio + 1, APOS_CHAVES_MESES);
+});
+
+// ── #467 — mesRepasse: as duas convenções de entrega se cancelam ──
+
+test('#467 regressão: mesRepasse com obra 2..31 dá 31 — trava para o "conserto ingênuo" da lacuna 15 não mover o equity', () => {
+  // Obra de 30 meses, mês 2 a mês 31 (0-based, inicio_mes=2, duracao_meses=30
+  // → fim = 2+30-1 = 31). marcosObra usa o ÚLTIMO mês de obra (31) como
+  // mesEntrega; mesRepasse soma +1 = 32. Isso não é o "31" citado no critério
+  // de aceite da issue por acaso: é o valor de `marcosObra().mesEntrega`
+  // ANTES do +1 — a issue pede exatamente essa trava (mesEntrega, sem
+  // repasse) para separar as duas metades da conta.
+  const crono: EventoCrono[] = [
+    { evento: 'planejamento', inicio_mes: 0, duracao_meses: 2 },
+    { evento: 'obra', inicio_mes: 2, duracao_meses: 30 },
+  ];
+  const marcos = marcosObra(crono)!;
+  // !equity!C8 = C6+C7 (lançamento + duração da obra) na planilha; aqui é
+  // "o último mês de obra" — a mesma diferença de 1 mês que o +1 de
+  // mesRepasse cancela (comentário completo em mesRepasse, fluxo-shared.ts).
+  assert.equal(marcos.mesEntrega, 31);
+  assert.equal(mesRepasse(crono), 32); // mesEntrega + 1 — o marco que o Equity usa
+});
+
+test('#467 mesRepasse é 0 sem evento obra no cronograma', () => {
+  assert.equal(mesRepasse([{ evento: 'planejamento', inicio_mes: 0, duracao_meses: 6 }]), 0);
+  assert.equal(marcosObra([{ evento: 'planejamento', inicio_mes: 0, duracao_meses: 6 }]), null);
+});
+
+// ── #465 — eMarketing: as duas categorias possíveis ──
+
+test('#465 eMarketing reconhece as duas categorias, cada uma só no grupo certo', () => {
+  assert.ok(eMarketing({ grupo: 'diretos', categoria: CATEGORIA_MARKETING_DIRETOS }));
+  assert.ok(eMarketing({ grupo: 'indireto', categoria: CATEGORIA_MARKETING_INDIRETO }));
+  // Grupo errado para a categoria — não casa (mesma disciplina de eCorretagem).
+  assert.equal(eMarketing({ grupo: 'indireto', categoria: CATEGORIA_MARKETING_DIRETOS }), false);
+  assert.equal(eMarketing({ grupo: 'diretos', categoria: CATEGORIA_MARKETING_INDIRETO }), false);
+  assert.equal(eMarketing({ grupo: 'diretos', categoria: 'Outro' }), false);
+  assert.equal(eMarketing(null), false);
+  assert.equal(eMarketing(undefined), false);
 });

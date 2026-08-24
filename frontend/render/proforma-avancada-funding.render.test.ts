@@ -1,10 +1,12 @@
-// Render da PROFORMA do Avançado com funding — prova de FIAÇÃO da linha
-// informativa do rodapé (#447).
+// Render da PROFORMA do Avançado com funding — prova de FIAÇÃO das DUAS
+// linhas informativas do rodapé (funding, #447; "Receita líquida de
+// proforma" da EVI, #465).
 //
 // A geometria não é o ponto principal aqui (embora as mesmas lentes rodem,
 // de graça, por cima do que já se mede). O ponto é que `exigir` só passa se
-// `tela-fluxo-ver.ts` de fato chamou `linhaInformativaFunding` e anexou o
-// resultado antes de render — ver a nota no topo de
+// `tela-fluxo-ver.ts` de fato chamou `linhaInformativaFunding` **e**
+// `linhaInformativaReceitaLiquidaEvi` e anexou os dois resultados antes de
+// render — ver a nota no topo de
 // `frontend/render/casos/proforma-avancada-funding.ts`.
 
 import { test } from 'node:test';

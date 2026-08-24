@@ -5,8 +5,11 @@ import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
-import { proformaAvancado, linhaInformativaFunding } from './proforma-avancado.js';
-import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
+import {
+  proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi,
+  type LinhaProformaAv,
+} from './proforma-avancado.js';
+import { calcularFluxo, agregarFluxoPorPeriodos, receitaLiquidaDeProformaMensal, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { graficoFluxoMensal, graficoFluxoAcumulado, seriesEconomicasFluxo } from './fluxo-graficos.js';
 import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo,
@@ -276,7 +279,14 @@ export class ViabFluxoVer extends LitElement {
       ? this.funding.linhasSaida.reduce((s, l) => s + l.total, 0)
       : 0;
     const informativa = linhaInformativaFunding(totalSaidasFunding);
-    const linhas = informativa ? [...p.linhas, informativa] : p.linhas;
+    // #465: "Receita líquida de proforma" — composição de 4 parcelas da EVI
+    // (imposto + corretagem + marketing + permuta financeira), ao lado da
+    // "= Receita líquida" existente (que só deduz RET + permuta financeira,
+    // #228). As duas convivem; nenhuma substitui a outra.
+    const receitaLiquidaEvi = receitaLiquidaDeProformaMensal(c.receitaMensal, c.linhasCusto, this.dados?.custos ?? [])
+      .reduce((s, v) => s + v, 0);
+    const informativaEvi = linhaInformativaReceitaLiquidaEvi(receitaLiquidaEvi);
+    const linhas: LinhaProformaAv[] = [...p.linhas, informativa, informativaEvi].filter((l): l is LinhaProformaAv => l !== null);
     const porM2 = (v: number) => (p.areaPrivativa > 0 ? v / p.areaPrivativa : 0);
     // #427 — % VGV de toda linha usa o VGV puro, EXCETO os fechos cujo
     // `pctOverride` já veio calculado com a base própria (`= Resultado +
