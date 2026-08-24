@@ -1341,13 +1341,23 @@ A área contratada é a base de:
 
 A corretagem acompanha a contratação e precisa declarar se sua base é o valor bruto ou líquido. A mesma despesa não pode existir simultaneamente como dedução embutida e linha de custo.
 
-> **Comportamento vigente.** Existe `vgvVendidoMensal`, em `frontend/fluxo-shared.ts`, mas ela não
-> é canônica: reparte o **VGV bruto** da linha (`vgvLinha`, que conta a tipologia inteira), enquanto
-> `receitaMensalLinha`, em `frontend/fluxo-caixa-motor.ts`, reparte o **VGV vendável**
-> (`vgvVendavelLinha`, que exclui as unidades permutadas fisicamente). As bases divergem.
+> **Comportamento vigente (#473, 2026-08-24).** `frontend/fluxo-shared.ts` expõe as DUAS bases,
+> nomeadas explicitamente — é o que a #227 pedia e ficou pela metade até aqui:
+> `vgvVendidoBrutoMensal` reparte o **VGV bruto** da linha (`vgvLinha`, tipologia inteira) e
+> `vgvVendidoVendavelMensal` reparte o **VGV vendável** (`vgvVendavelLinha`, exclui as unidades
+> permutadas fisicamente — a mesma base de `vendaBrutaContratadaMensal`/`receitaMensalLinha`).
 >
-> **Evolução dependente de issue.** EVI-008 / #227 deve criar uma função canônica e agora também
-> separar valor bruto, desconto e valor líquido. EVI-009 / #229 deve atualizar a taxonomia.
+> A Corretagem de vendas (`corretagemMensal`, `frontend/fluxo-caixa-motor.ts`) escolhe entre as
+> duas por `estudos.corretagem_sobre_permuta_fisica` (só no Avançado — `CAMPOS_SOMENTE_AVANCADO`,
+> `backend/rotas/estudos.ts`): **default `true`** (VGV bruto, permuta física inclusa — preserva o
+> número de todo estudo existente) ou `false` (VGV vendável, alinhando a corretagem à baixa de
+> estoque). O Preço do Terreno em `distribuicao_modo: 'sales_revenue'` (#194) continua na base
+> bruta histórica — a chave não se estende a ele, é fora do escopo da #473.
+>
+> 📊 **A base vendável tem lastro na EVI** (`cfINC!BL` × `cfINC!U` × `Areas e Precos!F17` —
+> `BRIEF-EVI.md` T10): a planilha não incide corretagem sobre a permuta física. O default do app
+> continua sendo a base bruta, por decisão do autor (D7) — a EVI é consultiva e não autoriza mudar
+> lógica existente; o achado só pesa na escolha de quem configura o estudo.
 
 ### 12.3 Contratação não contém juros futuros
 
@@ -1801,13 +1811,13 @@ base líquida
 > separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
 > `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:1930-1945`) **subtrai** cada
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:1976-1991`) **subtrai** cada
 > série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
 > (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
 > que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
 > uma por conta própria (as quatro combinações são todas representáveis, inclusive as duas mistas
 > que o enum não representava). `permutaFinanceiraBrutaMensal`/`permutaFinanceiraLiquidaMensal`
-> (`:1952-1970`) sobrevivem como os dois extremos `(false,false)`/`(true,true)`, para
+> (`:1998-2016`) sobrevivem como os dois extremos `(false,false)`/`(true,true)`, para
 > compatibilidade com os testes e o vocabulário histórico "bruta"/"líquida".
 >
 > `calcularFluxo` calcula a série ESCOLHIDA pelos dois flags da linha e a série OPOSTA (os dois
@@ -2165,7 +2175,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2197`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2232`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`
