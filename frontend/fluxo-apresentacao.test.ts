@@ -222,12 +222,14 @@ test('#349 com funding: entradas viram receita, saídas entram em Custos Finance
     assert.ok(Math.abs(somaFilhas - financeiro.mensal[m]) <= 0.01, `custos financeiros mês ${m}`);
   }
 
-  // Rodapé: livre e alavancado convivem, e o alavancado é livre + entradas − saídas.
-  const livre = nome('Fluxo de Caixa Livre (antes do funding)');
+  // Rodapé: a linha de rodapé "Fluxo de Caixa Livre (antes do funding)" saiu
+  // da tabela principal (#472, decisão D12) — a comparação livre × real é o
+  // card da aba Análise Financeira. Aqui só sobra o alavancado, e ele
+  // continua sendo livre + entradas − saídas.
+  assert.equal(linhas.find((l) => l.nome === 'Fluxo de Caixa Livre (antes do funding)'), undefined);
   const fluxo = nome('Fluxo de Caixa Mensal');
-  assert.deepEqual(livre.mensal, c.fluxoMensal);
   for (let m = 0; m < c.prazo; m++) {
-    assert.ok(Math.abs((livre.mensal[m] + funding.entradas[m] - funding.saidas[m]) - fluxo.mensal[m]) <= 0.01,
+    assert.ok(Math.abs((c.fluxoMensal[m] + funding.entradas[m] - funding.saidas[m]) - fluxo.mensal[m]) <= 0.01,
       `alavancado mês ${m}`);
   }
 
@@ -237,6 +239,62 @@ test('#349 com funding: entradas viram receita, saídas entram em Custos Finance
   for (let m = 0; m < c.prazo; m++) {
     const esperado = liquida.mensal[m] + capital.mensal[m] - custo.mensal[m];
     assert.ok(Math.abs(esperado - fluxo.mensal[m]) <= 0.01, `conservação mês ${m}`);
+  }
+});
+
+// #472 (D12): com financiamento à produção — o único tipo que gera o bloco de
+// detalhamento removido —, a tabela principal não ganha o bloco "(detalhamento)"
+// nem a linha de rodapé "Fluxo de Caixa Livre (antes do funding)", a lista de
+// nomes de NÍVEL 0 fecha exatamente como o critério de aceite pede, e os
+// totais/VPL não mudam (o bloco removido já tinha total e VPL zerados).
+test('#472 com financiamento à produção: sem bloco de detalhamento na tabela, nível 0 fecha exato', () => {
+  const c = calcularFluxo(CONFIG_COMPLETA);
+  const fin: OperacaoFunding = {
+    tipo: 'financiamento_producao', nome: 'Banco X', valor: 0, inicio_mes: 0,
+    taxa_anual: 12, exposicao_minima: 5, percentual_financiavel: 80, custo_linha_ids: [2],
+    amortizar_com_caixa_disponivel: true,
+  };
+  const fundingCalc = fundingDoEstudo(
+    [fin], c.fluxoMensal, new Array(c.prazo).fill(0), 0, 42, CONFIG_COMPLETA.taxaDescontoAa,
+    { custosRaw: c.linhasCusto, linhasCusto: c.linhasCusto, cronograma: CONFIG_COMPLETA.cronograma },
+  );
+  const funding = fundingCalc!.noFluxo;
+  assert.ok(funding.financiamentoProducao.length > 0,
+    'a fixture precisa efetivamente liberar financiamento, senão o teste não prova nada');
+
+  const linhas = linhasFluxo(c, funding);
+
+  // Critérios 1 e 2: nada de "detalhamento" nem "fin-prod" na tabela.
+  assert.equal(linhas.find((l) => l.nome.includes('detalhamento')), undefined);
+  assert.equal(linhas.find((l) => l.nome === 'Fluxo de Caixa Livre (antes do funding)'), undefined);
+
+  // Critério 3: a lista de nomes de NÍVEL 0, na ordem, sem nenhuma outra linha.
+  const nomesNivel0 = linhas.filter((l) => l.nivel === 0).map((l) => l.nome);
+  assert.deepEqual(nomesNivel0, [
+    'Receita Bruta — VGV',
+    'Funding — Capital (entradas)',
+    'Custo Total',
+    'Fluxo de Caixa Mensal',
+    'Fluxo de Caixa Acumulado',
+  ]);
+
+  // Critério 4: Fluxo de Caixa Acumulado continua — regressão do endereço
+  // errado (a redação anterior da issue mandava apagar :610, que hoje é
+  // exatamente esta linha).
+  assert.ok(linhas.find((l) => l.nome === 'Fluxo de Caixa Acumulado'));
+
+  // Critério 5: totais/VPL do rodapé (Mensal e Acumulado) idênticos ao que
+  // seriam sem o bloco de detalhamento — comparado contra um `linhasFluxo`
+  // calculado sem funding algum, que nunca teve o bloco para começar.
+  const semFunding = linhasFluxo(c, null);
+  const mensalSemFunding = semFunding.find((l) => l.nome === 'Fluxo de Caixa Mensal')!;
+  const mensalComFunding = linhas.find((l) => l.nome === 'Fluxo de Caixa Mensal')!;
+  // O bloco removido tinha total/VPL zerados: a diferença entre os dois
+  // rodapés é só o efeito do funding em si (entradas − saídas), não um
+  // resíduo do bloco de auditoria.
+  for (let m = 0; m < c.prazo; m++) {
+    const esperado = mensalSemFunding.mensal[m] + funding.entradas[m] - funding.saidas[m];
+    assert.ok(Math.abs(esperado - mensalComFunding.mensal[m]) <= 0.01, `mensal com funding, mês ${m}`);
   }
 });
 

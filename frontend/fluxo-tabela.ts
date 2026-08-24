@@ -3,7 +3,7 @@ import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import { type FluxoCalc, type LinhaCalc, pctDeReceitaBruta } from './fluxo-caixa-motor.js';
-import { type FundingNoFluxo, type LinhaFinanciamentoProducao } from './funding-motor.js';
+import { type FundingNoFluxo } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -389,18 +389,17 @@ export function controlesFluxo(p: ControlesFluxoProps): TemplateResult {
 }
 
 /**
- * Chaves que NASCEM recolhidas. Só o detalhamento de financiamento à produção:
- * são oito linhas de auditoria por camada, que expandidas empurrariam as
- * linhas de resultado para fora da tela em toda abertura da tela.
- *
- * A regra mora aqui, num lugar só, porque três consumidores precisam
- * concordar: o render (que arrow desenhar), o toggle de uma chave (`_t` nas
- * telas) e o "recolher/expandir tudo". Se o toggle não soubesse do padrão, o
- * primeiro clique no bloco calcularia `!undefined === true` e o "expandir"
- * recolheria o que já estava recolhido.
+ * Chaves que NASCEM recolhidas. Nenhuma hoje — o único caso, o detalhamento
+ * de financiamento à produção (oito linhas de auditoria por camada), saiu da
+ * tabela (#472, decisão D12). A função fica como infraestrutura genérica: se
+ * um bloco futuro precisar nascer recolhido, o padrão já é conhecido pelos
+ * três consumidores que têm de concordar — o render (que arrow desenhar), o
+ * toggle de uma chave (`_t` nas telas) e o "recolher/expandir tudo". Se o
+ * toggle não soubesse do padrão, o primeiro clique no bloco calcularia
+ * `!undefined === true` e o "expandir" recolheria o que já estava recolhido.
  */
 export function nasceRecolhido(chave: string): boolean {
-  return chave.startsWith('fin-prod-');
+  return false;
 }
 
 /** Um bloco está recolhido quando o estado diz que sim — ou, sem estado, quando nasce recolhido. */
@@ -442,33 +441,6 @@ function linhaTabela(
       <td class="c5 num">${linha.vpl !== undefined ? celula(linha.vpl, ehCusto) : ''}</td>
       <td class="c6 num">${pctVgv(linha.total, vgv, ocultarPct)}</td>
       ${linha.mensal.map((v) => html`<td class="num">${celula(v, ehCusto)}</td>`)}
-    </tr>
-  `;
-}
-
-/**
- * §38 — linha do detalhamento de financiamento à produção. Precisa de um
- * renderizador próprio porque nem toda linha do bloco é dinheiro: `%
- * incorrido` é fração e `liberação habilitada` é um sinal. Passá-las por
- * `celula` mostraria "0" para 20,55% e "1" para "sim".
- *
- * Não tem VPL nem %VGV: descontar um saldo devedor ou uma medição de obra não
- * significa nada. As colunas ficam vazias de propósito.
- */
-function linhaFinanciamento(l: LinhaFinanciamentoProducao): TemplateResult {
-  const fmt = (v: number): string => {
-    if (l.formato === 'percentual') return v ? fmtPct(v * 100) : '';
-    if (l.formato === 'sinal') return v ? 'sim' : '';
-    return celula(v, false);
-  };
-  const total = l.mostrarTotal ? celula(l.mensal.reduce((s, v) => s + v, 0), false) : '';
-  return html`
-    <tr class="subgrupo custo">
-      <td class="c1">${l.nome}</td>
-      <td class="c2"></td><td class="c3"></td>
-      <td class="c4 num">${total}</td>
-      <td class="c5"></td><td class="c6"></td>
-      ${l.mensal.map((v) => html`<td class="num">${fmt(v)}</td>`)}
     </tr>
   `;
 }
@@ -638,22 +610,7 @@ export function tabelaFluxo(
             ` : nothing}
           `;})}
 
-          ${(funding?.financiamentoProducao ?? []).map((bloco, i) => {
-            // Bloco de AUDITORIA, fora da aritmética da tabela: as liberações,
-            // juros e amortizações daqui já entraram no fluxo pelas linhas de
-            // funding acima. Somá-lo de novo seria contagem dupla — por isso a
-            // linha-título carrega total/VPL zerados e vem colapsada.
-            const chave = `fin-prod-${i}`;
-            return html`
-              ${linhaTabela('grupo', chave, `Financiamento à produção — ${bloco.nome} (detalhamento)`,
-                { mensal: c.meses.map(() => 0), total: 0 },
-                dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
-              ${!estaColapsado(colapso, chave) ? bloco.linhas.map(linhaFinanciamento) : nothing}
-            `;
-          })}
-
           <tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${c.meses.map(() => html`<td></td>`)}</tr>
-          ${funding ? linhaResultado('Fluxo de Caixa Livre (antes do funding)', c.fluxoMensal, c.vpl) : nothing}
           ${linhaResultado('Fluxo de Caixa Mensal', fluxoMensalExib, vplExib)}
           ${linhaResultado('Fluxo de Caixa Acumulado', fluxoAcumuladoExib, vplExib)}
         </tbody>
@@ -664,14 +621,14 @@ export function tabelaFluxo(
 
 /**
  * Chaves de colapso de todos os grupos expansíveis (para "recolher/expandir
- * tudo"). `funding` é opcional porque o detalhamento de financiamento à
- * produção só existe quando há camada com liberação — sem ele, "expandir
- * tudo" deixaria o bloco recolhido, que é o único estado que o usuário não
- * consegue mudar pelo botão.
+ * tudo"). `funding` é aceito por compatibilidade de assinatura dos dois
+ * chamadores (`tela-fluxo-ver.ts`, `tela-cenarios.ts`) mas não é mais
+ * consultado: o bloco de detalhamento de financiamento à produção que
+ * consumia essa informação saiu da tabela (#472, decisão D12) — a
+ * informação continua nas linhas de funding dentro de Custos Financeiros.
  */
 export function chavesColapso(c: FluxoCalc, funding?: FundingNoFluxo | null): string[] {
-  const finProd = (funding?.financiamentoProducao ?? []).map((_, i) => `fin-prod-${i}`);
-  return [...chavesColapsoBase(c), ...finProd];
+  return chavesColapsoBase(c);
 }
 
 function chavesColapsoBase(c: FluxoCalc): string[] {
