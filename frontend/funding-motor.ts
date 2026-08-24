@@ -1,4 +1,4 @@
-import { eCorretagem, eFinanciavelPadrao, marcosObra, type EventoCrono } from './fluxo-shared.js';
+import { eCorretagem, eFinanciavelPadrao, janelaDivida, marcosObra, type EventoCrono } from './fluxo-shared.js';
 import { vplFluxo } from './fluxo-caixa-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -290,10 +290,18 @@ export function simularDivida(op: OperacaoFunding, prazo: number): SerieOperacao
 
   const i = taxaMensalEquivalente(n(op.taxa_anual) / 100);
   const distribuir = op.distribuir_aporte === true;
-  const nTranches = distribuir ? Math.max(1, Math.floor(n(op.aporte_meses)) || 1) : 1;
   const amort = Math.floor(n(op.periodo_amortizacao_meses));
   const carencia = Math.floor(n(op.periodo_carencia_meses));
   const valor = n(op.valor);
+
+  // #446 — a janela vem de `janelaDivida` (fluxo-shared.ts), que é a MESMA
+  // fonte que `calcularFluxo` usa para derivar o horizonte. Antes esta conta
+  // morava só aqui, e o horizonte não a enxergava: uma operação que amortizava
+  // além do último evento operacional era cortada no meio da série. Duas
+  // cópias da fórmula reintroduziriam exatamente esse buraco na primeira vez
+  // que uma delas mudasse. NÃO recalcule m0/ini/fim localmente aqui — é
+  // exatamente o buraco que a #446 fechou.
+  const { m0, nTranches, ini, fim } = janelaDivida(op);
 
   // #478: tarifas — % de estruturação sobre `valor`, taxa de administração
   // mensal enquanto houver saldo devedor, e encargos iniciais fixos. Default
@@ -301,10 +309,6 @@ export function simularDivida(op: OperacaoFunding, prazo: number): SerieOperacao
   const taxaEstruturacaoPct = n(op.taxa_estruturacao_pct) / 100;
   const taxaAdministracaoMensal = n(op.taxa_administracao_mensal);
   const outrosEncargosIniciais = n(op.outros_encargos_iniciais);
-
-  const m0 = Math.max(0, Math.floor(n(op.inicio_mes)));
-  const ini = m0 + nTranches;
-  const fim = ini - 1 + amort;
 
   // Base do PMT: valor futuro das tranches liberadas (ver nota acima).
   const principalPmt = distribuir && i > 0

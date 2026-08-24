@@ -44,10 +44,14 @@ import {
 } from '../frontend/fluxo-shared.js';
 import {
   validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita,
-  validarFunding, validarPermutaFisica, validarCustosDuplicados,
+  validarFunding, validarPermutaFisica, validarCustosDuplicados, validarReconciliacaoCamadas,
   permutaFisicaPorTipologia,
   type Divergencia,
 } from '../frontend/fluxo-invariantes.js';
+import {
+  contarConfiguracoesAvancadas,
+  type LinhaReceitaAuditavel, type ContagemConfiguracoesAvancadas,
+} from '../frontend/auditoria-configuracoes.js';
 
 const BASE = process.env.URBI_BASE || 'https://homolog.urbiverso.com.br';
 const TOKEN = process.env.URBI_TOKEN || '';
@@ -143,12 +147,20 @@ export async function conferir(id: number): Promise<Conferencia> {
     curvas: d.curvas,
     areaTerreno: Number(estudo?.terreno_manual_area) || Number(estudo?.area_terreno_nucleo) || 0,
     ret: d.ret,
+    // #473: default true preserva o comportamento histórico (VGV bruto).
+    corretagemSobrePermutaFisica: estudo?.corretagem_sobre_permuta_fisica !== false,
+    // #446: o horizonte precisa cobrir a quitação das operações, senão a série
+    // é cortada e `saldoFinal` exibe um saldo truncado.
+    operacoesFunding: ops,
   };
   const calc = calcularFluxo(config);
   out.calc = calc;
 
+  // #445: içada para fora do `if` — a checagem (b) de `validarFunding` a
+  // usa mesmo com `out.funding` nulo.
+  let receitaLiquida: number[] | undefined;
   if (ops.length > 0) {
-    const receitaLiquida = receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, d.custos);
+    receitaLiquida = receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, d.custos);
     const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
     out.funding = fundingDoEstudo(
       ops, calc.fluxoMensal, receitaLiquida, resultadoFinal, mesRepasse(d.crono), d.taxa,
@@ -160,10 +172,12 @@ export async function conferir(id: number): Promise<Conferencia> {
     ...validarProduto(d.receitas, d.custos, d.tipologias, d.crono, calc.prazo),
     ...validarPermutaFisica(d.custos, d.tipologias),
     ...validarCustosDuplicados(d.custos),
-    ...validarContratacao(d.receitas, d.crono, calc.prazo, calc.vendaBrutaContratada),
-    ...validarSafrasReceita(d.receitas, d.crono, calc.prazo),
+    ...validarContratacao(d.receitas, d.crono, calc.prazo, calc.vendaBrutaContratada, undefined, d.custos),
+    ...validarSafrasReceita(d.receitas, d.crono, calc.prazo, undefined, d.custos),
     ...validarFluxoCalc(calc),
-    ...(out.funding ? validarFunding(out.funding, calc.fluxoMensal) : []),
+    ...(out.funding ? validarFunding(out.funding, calc.fluxoMensal, undefined, receitaLiquida) : []),
+    // #441: reconciliação Catálogo × Premissas.
+    ...validarReconciliacaoCamadas(estudo, d.custos, d.tipologias),
   ];
 
   // ── Contas próprias (b): o que TEM que somar ──
@@ -299,17 +313,93 @@ function imprimir(c: Conferencia) {
   }
 }
 
+/**
+ * #464 (item 2) — subcomando `GET`-only: varre estudos Avançados e imprime o
+ * inventário de `contarConfiguracoesAvancadas` (item 1, `auditoria-
+ * configuracoes.ts`) numa tabela pronta para colar. NÃO reimplementa a
+ * contagem — só busca `/avancado/receitas` de cada estudo e passa `dados`
+ * direto para a função pura.
+ *
+ * `ids`: se vazio, varre TODOS os estudos com `nivel_analise === 'avancado'`
+ * que a credencial enxerga (`GET /estudos`, o mesmo endpoint da listagem —
+ * admin de app vê todos, membro só os seus, exatamente como o resto do
+ * script já respeita).
+ */
+async function inventario(ids: number[]): Promise<void> {
+  let alvos: { id: number; nome: string }[];
+  if (ids.length > 0) {
+    alvos = ids.map((id) => ({ id, nome: '' }));
+  } else {
+    const lista = await GET('/estudos');
+    const dados = lista?.erro || lista?._http ? [] : (lista.dados ?? []);
+    alvos = dados
+      .filter((e: any) => e?.nivel_analise === 'avancado')
+      .map((e: any) => ({ id: Number(e.id), nome: String(e.nome ?? '') }));
+  }
+  if (alvos.length === 0) {
+    console.log('Nenhum estudo Avançado encontrado (ou nenhum id passado resolveu).');
+    return;
+  }
+
+  const linhas: { id: number; nome: string; c: ContagemConfiguracoesAvancadas }[] = [];
+  for (const alvo of alvos) {
+    const receitas = await GET(`/estudos/${alvo.id}/avancado/receitas`);
+    const dados: LinhaReceitaAuditavel[] = receitas?.erro || receitas?._http ? [] : (receitas.dados ?? []);
+    let nome = alvo.nome;
+    if (!nome) {
+      const estudo = await GET(`/estudos/${alvo.id}`);
+      nome = estudo?.erro || estudo?._http ? '?' : String(estudo?.nome ?? '?');
+    }
+    linhas.push({ id: alvo.id, nome, c: contarConfiguracoesAvancadas(dados) });
+  }
+
+  console.log(`HOST ${BASE}`);
+  console.log('INVENTÁRIO DE CONFIGURAÇÕES DO AVANÇADO (#464)');
+  const col = (s: string, w: number) => s.padEnd(w).slice(0, w);
+  console.log(
+    col('id', 6) + col('nome', 30) + col('total', 7) + col('comTaxa', 9)
+    + col('comSinal', 10) + col('comJuros', 10) + col('absPers', 9) + col('legado', 8),
+  );
+  const soma: ContagemConfiguracoesAvancadas = {
+    total: 0, comTaxa: 0, comSinal: 0, comJurosNaContratacao: 0, absorcaoPersonalizada: 0, ramoLegado: 0,
+  };
+  for (const { id, nome, c } of linhas) {
+    console.log(
+      col(String(id), 6) + col(nome, 30) + col(String(c.total), 7) + col(String(c.comTaxa), 9)
+      + col(String(c.comSinal), 10) + col(String(c.comJurosNaContratacao), 10)
+      + col(String(c.absorcaoPersonalizada), 9) + col(String(c.ramoLegado), 8),
+    );
+    soma.total += c.total; soma.comTaxa += c.comTaxa; soma.comSinal += c.comSinal;
+    soma.comJurosNaContratacao += c.comJurosNaContratacao;
+    soma.absorcaoPersonalizada += c.absorcaoPersonalizada; soma.ramoLegado += c.ramoLegado;
+  }
+  console.log(
+    col('TOTAL', 6) + col('', 30) + col(String(soma.total), 7) + col(String(soma.comTaxa), 9)
+    + col(String(soma.comSinal), 10) + col(String(soma.comJurosNaContratacao), 10)
+    + col(String(soma.absorcaoPersonalizada), 9) + col(String(soma.ramoLegado), 8),
+  );
+}
+
 // Só roda o CLI quando ESTE arquivo é o ponto de entrada — o módulo também é
 // importado por scripts de análise, que só querem `conferir()`.
 const ehEntrada = /conferir-estudo\.ts$/.test(String(process.argv[1] ?? '').replace(/\\/g, '/'));
 if (ehEntrada) {
-  const ids = process.argv.slice(2).map(Number).filter((x) => Number.isFinite(x));
-  if (ids.length === 0) {
-    console.error('uso: node --import tsx/esm scripts/conferir-estudo.ts <id> [<id> ...]');
-    process.exit(2);
-  }
-  console.log(`HOST ${BASE}`);
-  for (const id of ids) {
-    imprimir(await conferir(id));
+  const argv = process.argv.slice(2);
+  if (argv[0] === 'inventario') {
+    const ids = argv.slice(1).map(Number).filter((x) => Number.isFinite(x));
+    await inventario(ids);
+  } else {
+    const ids = argv.map(Number).filter((x) => Number.isFinite(x));
+    if (ids.length === 0) {
+      console.error(
+        'uso: node --import tsx/esm scripts/conferir-estudo.ts <id> [<id> ...]\n' +
+        '  ou: node --import tsx/esm scripts/conferir-estudo.ts inventario [<id> ...]  (#464)',
+      );
+      process.exit(2);
+    }
+    console.log(`HOST ${BASE}`);
+    for (const id of ids) {
+      imprimir(await conferir(id));
+    }
   }
 }

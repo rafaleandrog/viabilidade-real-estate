@@ -122,6 +122,8 @@ export class ViabTelaResumo extends LitElement {
         areaTerreno: n(this.estudo?.terreno_manual_area) || n(this.estudo?.area_terreno_nucleo),
         // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret).
         ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+        // #473: default true preserva o comportamento histórico (VGV bruto).
+        corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
       };
       this.dados = { crono: cronoDados, dataInicio };
       this.calc = calcularFluxo(config);

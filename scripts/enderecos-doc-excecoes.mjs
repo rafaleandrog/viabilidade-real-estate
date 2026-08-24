@@ -80,24 +80,6 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/tela-fluxo-ver.ts:122",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :122 — \"considerar_ret\" está em :132; \"ret_pct\" está em :132. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/exportar.ts:10",
-    motivo:
-      "VENCIDO PELO MERGE DA MAIN, e nao por este PR — nada em ±3 linhas de :10 — \"fmtR$\" está em :16. Este endereco estava CERTO na base 0cc2cf86 e quebrou quando a branch trouxe a main de 2026-08-24: e a demonstracao ao vivo da classe que o guard existe para pegar. Conserto e documentacao de PRODUTO e sai em PR separado (regras R1 e R3).",
-  },
-  {
-    arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/exportar.ts:167",
-    motivo:
-      "VENCIDO PELO MERGE DA MAIN, e nao por este PR — nada em ±3 linhas de :167 — \"celulaFx\" está em :173. Este endereco estava CERTO na base 0cc2cf86 e quebrou quando a branch trouxe a main de 2026-08-24: e a demonstracao ao vivo da classe que o guard existe para pegar. Conserto e documentacao de PRODUTO e sai em PR separado (regras R1 e R3).",
-  },
-  {
-    arquivo: "docs/viabilidade/formulas.md",
     endereco: "frontend/fluxo-caixa-motor.ts:2125-2133",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :2125-2133 — \"FluxoCalc\" está em :2076. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
@@ -152,12 +134,6 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
-    endereco: "frontend/fluxo-invariantes.ts:266-322",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :266-322 — \"validarProduto\" está em :255. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
     endereco: "frontend/fluxo-shared.ts:345-353",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :345-353 — \"erroFormularioAbsorcao\" está em :414. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
@@ -194,21 +170,9 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
-    endereco: "frontend/fluxo-caixa-motor.ts:1570-1573",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :1570-1573 — \"permutaFinanceiraBrutaMensal\" está em :1844. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
     endereco: "frontend/proforma.ts:245",
     motivo:
       "LIMITE DO GUARD — a frase afirma a AUSENCIA do simbolo no alvo (\"nao le X\", \"sem ler X\", \"nao ha campo\"). Exigir que ele apareca inverte o sentido do texto. Classe conhecida, sem deteccao automatica confiavel.",
-  },
-  {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
-    endereco: "frontend/fluxo-caixa-motor.ts:1807-1808",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :1807-1808 — \"calcularFluxo\" está em :1718. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",

@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { periodosAnuais } from './fluxo-shared.js';
-import { linhasFluxo } from './exportar.js';
-import { chavesColapso, GRUPO_CUSTO_LABEL } from './fluxo-tabela.js';
+import { linhasFluxo, celulaFx } from './exportar.js';
+import { chavesColapso, GRUPO_CUSTO_LABEL, celula as celulaTela } from './fluxo-tabela.js';
 import { seriesEconomicasFluxo } from './fluxo-graficos.js';
 import { fundingDoEstudo, type OperacaoFunding } from './funding-motor.js';
 import { proformaAvancado, linhaInformativaFunding } from './proforma-avancado.js';
@@ -102,6 +102,40 @@ test('#349 CSV/PDF espelham a tabela reduzida: VGV, grupos de receita, 5 custos 
     'Auditoria · Principal recebido', 'Auditoria · Juros de clientes']) {
     assert.ok(!nomes.includes(fora), `linha removida ainda exportada: ${fora}`);
   }
+});
+
+// #449: `celula` (tela, fluxo-tabela.ts) e `celulaFx` (exportação,
+// exportar.ts) chamam a MESMA fonte (`celula` de viab-format.ts) — antes,
+// cada uma tinha sua própria expressão de formatação e divergiam em casas
+// decimais, limiar de célula vazia e representação do negativo.
+//
+// Decisão de desenho (o "Como corrigir" da issue pedia para decidir e
+// declarar): a TELA sempre usa notação contábil (parênteses) — nunca existiu
+// modo "sinal de menos" nela, e não é criado agora. O modo `comParenteses:
+// false` (sinal de menos, `-100,00`) é exclusivo da EXPORTAÇÃO, herdado da
+// linha informativa "antes do funding" de `celulaFx`. Por isso a equivalência
+// testada é: para as DUAS combinações do parâmetro que `celula` (tela) já
+// tinha (`ehCusto`/`negativoEntreParenteses`, true/false — que sempre operou
+// em modo parênteses), `celulaTela` e `celulaFx` com `comParenteses: true`
+// produzem texto IDÊNTICO. O modo exclusivo da exportação é testado à parte.
+test('#449 celula (tela) e celulaFx (exportação, comParenteses=true) produzem texto idêntico', () => {
+  const valores = [1234.56, 0.20, 0.004, -1234.56, -0.004, 0, -0, 1e9];
+  for (const custo of [true, false]) {
+    for (const v of valores) {
+      const daTela = celulaTela(v, custo);
+      const daExportacao = celulaFx(v, { custo }, true);
+      assert.equal(
+        daTela, daExportacao,
+        `celula(${v}, ${custo}) = "${daTela}" ≠ celulaFx(${v}, {custo:${custo}}, true) = "${daExportacao}"`,
+      );
+    }
+  }
+});
+
+test('#449 celulaFx: comParenteses=false (exclusivo da exportação) usa sinal de menos, não parênteses', () => {
+  assert.equal(celulaFx(-1234.56, { custo: true }, false), '-1.234,56');
+  assert.equal(celulaFx(-1234.56, { custo: false }, false), '-1.234,56');
+  assert.equal(celulaFx(1234.56, { custo: true }, false), '1.234,56');
 });
 
 test('#241 gráfico econômico usa os mesmos arrays da tabela e respeita visão anual', () => {
@@ -222,12 +256,14 @@ test('#349 com funding: entradas viram receita, saídas entram em Custos Finance
     assert.ok(Math.abs(somaFilhas - financeiro.mensal[m]) <= 0.01, `custos financeiros mês ${m}`);
   }
 
-  // Rodapé: livre e alavancado convivem, e o alavancado é livre + entradas − saídas.
-  const livre = nome('Fluxo de Caixa Livre (antes do funding)');
+  // Rodapé: a linha de rodapé "Fluxo de Caixa Livre (antes do funding)" saiu
+  // da tabela principal (#472, decisão D12) — a comparação livre × real é o
+  // card da aba Análise Financeira. Aqui só sobra o alavancado, e ele
+  // continua sendo livre + entradas − saídas.
+  assert.equal(linhas.find((l) => l.nome === 'Fluxo de Caixa Livre (antes do funding)'), undefined);
   const fluxo = nome('Fluxo de Caixa Mensal');
-  assert.deepEqual(livre.mensal, c.fluxoMensal);
   for (let m = 0; m < c.prazo; m++) {
-    assert.ok(Math.abs((livre.mensal[m] + funding.entradas[m] - funding.saidas[m]) - fluxo.mensal[m]) <= 0.01,
+    assert.ok(Math.abs((c.fluxoMensal[m] + funding.entradas[m] - funding.saidas[m]) - fluxo.mensal[m]) <= 0.01,
       `alavancado mês ${m}`);
   }
 
@@ -237,6 +273,62 @@ test('#349 com funding: entradas viram receita, saídas entram em Custos Finance
   for (let m = 0; m < c.prazo; m++) {
     const esperado = liquida.mensal[m] + capital.mensal[m] - custo.mensal[m];
     assert.ok(Math.abs(esperado - fluxo.mensal[m]) <= 0.01, `conservação mês ${m}`);
+  }
+});
+
+// #472 (D12): com financiamento à produção — o único tipo que gera o bloco de
+// detalhamento removido —, a tabela principal não ganha o bloco "(detalhamento)"
+// nem a linha de rodapé "Fluxo de Caixa Livre (antes do funding)", a lista de
+// nomes de NÍVEL 0 fecha exatamente como o critério de aceite pede, e os
+// totais/VPL não mudam (o bloco removido já tinha total e VPL zerados).
+test('#472 com financiamento à produção: sem bloco de detalhamento na tabela, nível 0 fecha exato', () => {
+  const c = calcularFluxo(CONFIG_COMPLETA);
+  const fin: OperacaoFunding = {
+    tipo: 'financiamento_producao', nome: 'Banco X', valor: 0, inicio_mes: 0,
+    taxa_anual: 12, exposicao_minima: 5, percentual_financiavel: 80, custo_linha_ids: [2],
+    amortizar_com_caixa_disponivel: true,
+  };
+  const fundingCalc = fundingDoEstudo(
+    [fin], c.fluxoMensal, new Array(c.prazo).fill(0), 0, 42, CONFIG_COMPLETA.taxaDescontoAa,
+    { custosRaw: c.linhasCusto, linhasCusto: c.linhasCusto, cronograma: CONFIG_COMPLETA.cronograma },
+  );
+  const funding = fundingCalc!.noFluxo;
+  assert.ok(funding.financiamentoProducao.length > 0,
+    'a fixture precisa efetivamente liberar financiamento, senão o teste não prova nada');
+
+  const linhas = linhasFluxo(c, funding);
+
+  // Critérios 1 e 2: nada de "detalhamento" nem "fin-prod" na tabela.
+  assert.equal(linhas.find((l) => l.nome.includes('detalhamento')), undefined);
+  assert.equal(linhas.find((l) => l.nome === 'Fluxo de Caixa Livre (antes do funding)'), undefined);
+
+  // Critério 3: a lista de nomes de NÍVEL 0, na ordem, sem nenhuma outra linha.
+  const nomesNivel0 = linhas.filter((l) => l.nivel === 0).map((l) => l.nome);
+  assert.deepEqual(nomesNivel0, [
+    'Receita Bruta — VGV',
+    'Funding — Capital (entradas)',
+    'Custo Total',
+    'Fluxo de Caixa Mensal',
+    'Fluxo de Caixa Acumulado',
+  ]);
+
+  // Critério 4: Fluxo de Caixa Acumulado continua — regressão do endereço
+  // errado (a redação anterior da issue mandava apagar :610, que hoje é
+  // exatamente esta linha).
+  assert.ok(linhas.find((l) => l.nome === 'Fluxo de Caixa Acumulado'));
+
+  // Critério 5: totais/VPL do rodapé (Mensal e Acumulado) idênticos ao que
+  // seriam sem o bloco de detalhamento — comparado contra um `linhasFluxo`
+  // calculado sem funding algum, que nunca teve o bloco para começar.
+  const semFunding = linhasFluxo(c, null);
+  const mensalSemFunding = semFunding.find((l) => l.nome === 'Fluxo de Caixa Mensal')!;
+  const mensalComFunding = linhas.find((l) => l.nome === 'Fluxo de Caixa Mensal')!;
+  // O bloco removido tinha total/VPL zerados: a diferença entre os dois
+  // rodapés é só o efeito do funding em si (entradas − saídas), não um
+  // resíduo do bloco de auditoria.
+  for (let m = 0; m < c.prazo; m++) {
+    const esperado = mensalSemFunding.mensal[m] + funding.entradas[m] - funding.saidas[m];
+    assert.ok(Math.abs(esperado - mensalComFunding.mensal[m]) <= 0.01, `mensal com funding, mês ${m}`);
   }
 });
 
