@@ -551,6 +551,98 @@ export type ComponentePagamento =
       rotulo?: string;
     };
 
+// ─────────────────────────────────────────────────────────────────
+// #428 — juros de tabela do plano: UMA taxa por Grupo (decisão D-Q02)
+// ─────────────────────────────────────────────────────────────────
+//
+// A EVI Urbitá pratica juros de tabela em toda venda a prazo
+// (`Premissas e Resultados!H14`, `ClienteJurosAA = 12,5% a.a.`). A matemática
+// já estava ligada — `calcularRecebiveisComponentes` consome `taxaMensal` —,
+// mas não havia onde digitar a taxa: `componentesDoLegado` escrevia `0` nos
+// quatro caminhos. Estas três funções são a ponte entre o número que o usuário
+// digita (% a.a.) e o que o motor consome (taxa mensal).
+
+/**
+ * Taxa anual de tabela DIGITADA (em pontos percentuais) → taxa mensal
+ * equivalente, pela composição da EVI: `i_m = (1 + i_aa)^(1/12) − 1`.
+ * **Nunca `i_aa / 12`** — a planilha define `ClienteJurosAM` como fórmula
+ * composta pura, sem arredondamento (12,5% a.a. → 0,00986358055321146).
+ *
+ * Contrato C7: `taxaMensal` é derivada NÃO monetária. O retorno carrega
+ * precisão plena e não é arredondado aqui nem na persistência; quem arredonda
+ * é só a exibição.
+ */
+export function taxaMensalDeAnual(anualPct: number): number {
+  const aa = Number(anualPct);
+  if (!Number.isFinite(aa) || aa === 0) return 0;
+  return Math.pow(1 + aa / 100, 1 / 12) - 1;
+}
+
+/** O caminho de volta: taxa mensal → % a.a. equivalente, `(1 + i_m)^12 − 1`. */
+export function taxaAnualDeMensal(mensal: number): number {
+  const m = Number(mensal);
+  if (!Number.isFinite(m) || m === 0) return 0;
+  return (Math.pow(1 + m, 12) - 1) * 100;
+}
+
+/**
+ * A taxa de tabela do plano, em % a.a. — o valor que o campo do modal mostra e
+ * que `componentesDoLegado` grava nos componentes financiados.
+ *
+ * Duas fontes, nesta ordem:
+ *
+ *  1. `fluxo_pagamento.juros_tabela_aa` — a chave que a #428 passou a gravar.
+ *     É o dígito que o usuário DIGITOU, e por isso vence: a ida e volta
+ *     `12,5 → mensal → 12,4999…%` devolveria um número diferente do escrito.
+ *     Chave presente e igual a `0` é RESPOSTA, não ausência — é o usuário
+ *     tendo desligado os juros —, então ela não pode cair na derivação;
+ *  2. na falta dela — todo estudo anterior à #428, inclusive os que receberam
+ *     a taxa pela API, como o estudo 5 —, a taxa do primeiro componente que
+ *     tenha uma, por `(1 + i_m)^12 − 1`. Sem este ramo o modal abriria em 0%
+ *     numa linha que TEM juros, e a primeira edição os apagaria.
+ *
+ * ⚠️ Só o primeiro componente com taxa manda, porque D-Q02 define UMA taxa por
+ * Grupo/plano. Plano com taxas heterogêneas (o caso residencial × não
+ * residencial da EVI) continua preservado enquanto ninguém mexer no campo —
+ * quem garante isso é `componentesParaSalvar`, não esta função.
+ */
+export function jurosTabelaAnualPct(fluxoPagamento: any): number {
+  const fp = fluxoPagamento ?? {};
+  if (fp.juros_tabela_aa !== undefined && fp.juros_tabela_aa !== null) {
+    return Number(fp.juros_tabela_aa) || 0;
+  }
+  return taxaAnualDeMensal(primeiraTaxaMensalPersistida(fp));
+}
+
+/** A primeira `taxaMensal` diferente de zero entre os componentes persistidos. */
+function primeiraTaxaMensalPersistida(fp: any): number {
+  const comps = Array.isArray(fp?.componentes) ? fp.componentes : [];
+  for (const c of comps) {
+    const m = Number(c?.taxaMensal);
+    if (Number.isFinite(m) && m !== 0) return m;
+  }
+  return 0;
+}
+
+/**
+ * A taxa MENSAL do plano — o que `componentesDoLegado` grava nos componentes.
+ *
+ * É o par de `jurosTabelaAnualPct`, e não a sua composição com
+ * `taxaMensalDeAnual`: quando a taxa vem derivada dos componentes (estudo sem
+ * a chave `juros_tabela_aa`), passar por % a.a. e voltar é uma ida e volta de
+ * ponto flutuante que devolve `0,009863600000000083` no lugar de `0,0098636`.
+ * A diferença é economicamente nada e mesmo assim custa caro: ela reescreveria
+ * um dado que ninguém pediu para mudar, e faria "não mexeu na taxa" precisar de
+ * tolerância em vez de ser igualdade.
+ */
+export function taxaMensalDoPlano(fluxoPagamento: any): number {
+  const fp = fluxoPagamento ?? {};
+  if (fp.juros_tabela_aa !== undefined && fp.juros_tabela_aa !== null) {
+    return taxaMensalDeAnual(Number(fp.juros_tabela_aa) || 0);
+  }
+  return primeiraTaxaMensalPersistida(fp);
+}
+
 /**
  * Adapter do JSON legado (`fluxo_pagamento`: `entrada[]`/`parcelas[]`/
  * `repasse`) para o contrato de componentes (#230). Leitura pura, sem
@@ -579,6 +671,13 @@ export function componentesDoLegado(
   const fp = fluxoPagamento ?? null;
   if (!fp) return [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }];
 
+  // #428: a taxa de tabela do plano, a MESMA em todos os componentes
+  // financiados (D-Q02). Ela chega pelo PRIMEIRO argumento — que é o próprio
+  // `fluxo_pagamento`/formulário —, e não por um terceiro parâmetro: os 39
+  // testes que chamam esta função direto passam objetos sem a chave, caem em
+  // `0` e continuam valendo sem uma linha de edição.
+  const taxaMensal = taxaMensalDoPlano(fp);
+
   const componentes: ComponentePagamento[] = [];
 
   for (const e of normalizarLinhasPagamento(fp.entrada)) {
@@ -588,7 +687,7 @@ export function componentesDoLegado(
     } else {
       componentes.push({
         tipo: 'prazo_fixo', participacaoPct: n(e?.pct), sinalPct: 0, prazoMeses: nParc,
-        defasagemMeses: 0, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'entrada (legado)',
+        defasagemMeses: 0, taxaMensal, jurosNoMesDaContratacao: false, rotulo: 'entrada (legado)',
       });
     }
   }
@@ -600,14 +699,14 @@ export function componentesDoLegado(
     if (p?.ao_longo_obra) {
       componentes.push({
         tipo: 'ate_marco', participacaoPct: n(p?.pct), sinalPct: 0, marcoMes: fimObra,
-        defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'ao longo da obra (legado)',
+        defasagemMeses: 1, taxaMensal, jurosNoMesDaContratacao: false, rotulo: 'ao longo da obra (legado)',
       });
     } else {
       const intervalo = INTERVALO_PERIODICIDADE[p?.periodicidade] ?? 1;
       componentes.push({
         tipo: 'prazo_fixo', participacaoPct: n(p?.pct), sinalPct: 0,
         prazoMeses: Math.max(1, Math.round(n(p?.parcelas) || 1)),
-        defasagemMeses: intervalo, taxaMensal: 0, jurosNoMesDaContratacao: false,
+        defasagemMeses: intervalo, taxaMensal, jurosNoMesDaContratacao: false,
         rotulo: `parcelamento ${p?.periodicidade ?? 'mensal'} (legado)`,
       });
     }
@@ -616,7 +715,7 @@ export function componentesDoLegado(
   const pctRepasse = pctRepasseDerivado(fp);
   if (pctRepasse > 0) {
     const mesRepasse = fimObra + REPASSE_MESES_APOS_ENTREGA;
-    componentes.push({ tipo: 'concentrado', participacaoPct: pctRepasse, mesPagamento: mesRepasse, taxaMensal: 0, rotulo: 'repasse (legado)' });
+    componentes.push({ tipo: 'concentrado', participacaoPct: pctRepasse, mesPagamento: mesRepasse, taxaMensal, rotulo: 'repasse (legado)' });
   }
 
   return componentes;

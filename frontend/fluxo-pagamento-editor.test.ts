@@ -7,7 +7,12 @@ import {
   formularioPagamento,
   jurosDeTabelaConfigurados,
 } from './fluxo-pagamento-editor.js';
-import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
+import {
+  calcularFluxo, jurosTabelaAnualPct, taxaMensalDeAnual,
+  type FluxoConfig,
+} from './fluxo-caixa-motor.js';
+import { validarFluxoCalc } from './fluxo-invariantes.js';
+import { readFileSync } from 'node:fs';
 import {
   receitaLiquidaComCorretagemMensal,
   simularEquity,
@@ -16,6 +21,7 @@ import {
 } from './funding-motor.js';
 
 const CRONO = [{ evento: 'obra', inicio_mes: 12, duracao_meses: 24 }];
+const perto12 = (a: number, b: number, tol = 1e-4) => Math.abs(a - b) <= tol;
 
 test('#248 configuração nova persiste contrato canônico e espelho legado', () => {
   const form = formularioPagamento(null);
@@ -415,11 +421,23 @@ test('#431 identidade: marcar/desmarcar "Ao longo da obra" preserva a taxa da li
 
   const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
   assert.equal(salvo.componentes[0].tipo, 'prazo_fixo');
-  // Tipo diferente: nenhum dos dois passes acha doador, e a taxa cai no default
-  // do espelho. Isto está DOCUMENTADO como o limite do conserto — o par
-  // ate_marco↔prazo_fixo é uma troca de regra econômica, não uma edição de
-  // parâmetro, e transplantar taxa entre regras diferentes seria adivinhação.
-  assert.equal(taxaDe(salvo.componentes, 'prazo_fixo'), 0);
+  // ⚠️ #428 MUDOU esta linha, e é a única asserção existente que ela move.
+  //
+  // Tipo diferente: nenhum dos dois passes acha doador. Até a #428 a taxa caía
+  // então em 0, e o comentário aqui defendia esse 0 dizendo que transplantar
+  // taxa entre regras econômicas diferentes seria adivinhação. Era verdade
+  // enquanto a taxa só existia DENTRO de cada componente persistido.
+  //
+  // Com a #428 a taxa é campo do PLANO (D-Q02), digitado no cabeçalho do modal,
+  // e este plano declara 12,5% a.a. Aplicá-la ao prazo_fixo recém-criado não é
+  // adivinhar a taxa de um componente que morreu: é usar a taxa que o usuário
+  // declarou para a tabela inteira. Zerar seria o defeito — desmarcar um
+  // checkbox apagaria os juros de 30% do plano sem aviso.
+  //
+  // O valor é o CRU do persistido, não `(1+aa)^(1/12)−1` de volta: sem taxa
+  // editada, `taxaMensalDoPlano` não faz a ida e volta em ponto flutuante, e
+  // por isso é 0,0098636 e não 0,009863600000000083.
+  assert.equal(taxaDe(salvo.componentes, 'prazo_fixo'), TAXA);
   // Mas o `concentrado` sobrevivente mantém o que era dele.
   assert.equal(taxaDe(salvo.componentes, 'concentrado'), 0);
   assert.deepEqual(particao(salvo.componentes), [['prazo_fixo', 30], ['concentrado', 70]]);
@@ -633,4 +651,207 @@ test('#431 LIMITE declarado: permutar valores entre linhas do mesmo tipo move a 
   // no plano, cada uma no componente cujo percentual o usuário lhe deu.
   const taxas = salvo.componentes.map((c: any) => c.taxaMensal).sort();
   assert.deepEqual(taxas, [0.005, TAXA].sort(), 'nenhuma taxa do plano pode sumir nem nascer');
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #428 — o campo de juros de tabela: onde digitar, e o que isso faz ao
+//        transplante que a #431 construiu
+// ─────────────────────────────────────────────────────────────────────────
+//
+// A #431 fez o modal PARAR DE DESTRUIR `taxaMensal`, preservando-a como campo
+// "só-canônico" — aquilo que o formulário não sabe representar. A #428 dá o
+// campo onde digitá-la, e com isso `taxaMensal` deixa de ser só-canônica no
+// momento em que o usuário mexe nele. Os testes abaixo cobrem os DOIS lados
+// desse eixo, porque errar qualquer um dos dois é um defeito calado:
+//
+//   - taxa intocada → segue só-canônica, transplantada componente a
+//     componente. Errar aqui ressuscita a destruição que a #431 consertou;
+//   - taxa editada  → o valor digitado manda em todo o plano (D-Q02). Errar
+//     aqui deixa o campo INERTE: ele aceita o número e descarta.
+
+test('#428 ida e volta: o que o campo grava é o que o formulário relê', () => {
+  // Critério 5. É aqui que a conversão % a.a. ↔ mensal pode perder dígito.
+  const form = formularioPagamento({
+    entrada: [{ pct: 20, parcelas: 1, descontoPct: 0 }],
+    parcelas: [{ pct: 30, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true }],
+  });
+  form.juros_tabela_aa = 12.5;                       // o usuário digita
+
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO);
+  // A DECISÃO DE PERSISTÊNCIA desta issue: a taxa anual digitada vira chave
+  // própria do mesmo blob `json` (sem migração). É ela que preserva o dígito —
+  // derivar 12,5 de volta de `(1 + i_m)^12 − 1` devolveria 12,4999…%.
+  assert.equal(salvo.juros_tabela_aa, 12.5);
+  // E a taxa mensal chegou aos componentes financiados, com precisão plena (C7).
+  const mensal = (salvo.componentes.find((c: any) => c.tipo === 'ate_marco') as any).taxaMensal;
+  assert.equal(mensal, 0.00986358055321146);
+  assert.equal((salvo.componentes.find((c: any) => c.tipo === 'concentrado') as any).taxaMensal, mensal);
+  assert.equal('taxaMensal' in salvo.componentes[0], false, 'imediato não recebe juros');
+
+  // A volta: reabrir o modal mostra o número DIGITADO, não o derivado.
+  assert.equal(formularioPagamento(salvo).juros_tabela_aa, 12.5);
+  // …e reaplicar não move nada (idempotência).
+  assert.deepEqual(fluxoPagamentoParaSalvar(formularioPagamento(salvo), CRONO), salvo);
+});
+
+test('#428 estudo anterior à issue abre mostrando a taxa que ele TEM, não 0%', () => {
+  // O estudo 5 de Pinguim recebeu `taxaMensal` pela API, sem a chave nova. Se
+  // o campo abrisse em 0%, o primeiro "Aplicar" apagaria os juros — o defeito
+  // que a #431 acabou de consertar, de volta pela porta do campo novo.
+  const fp = FP_TABELA_LONGA();
+  const form = formularioPagamento(fp);
+  assert.equal(form.juros_tabela_aa, undefined, 'a chave não existe no dado, e não pode ser fabricada');
+  assert.ok(perto12(jurosTabelaAnualPct(form), 12.500026), 'o campo tem de exibir a taxa derivada');
+  // E o "Aplicar" sem tocar em nada continua BYTE-idêntico: nem a taxa se move,
+  // nem a chave nova aparece no JSON gravado.
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  assert.equal(JSON.stringify(salvo.componentes), JSON.stringify(fp.componentes));
+  assert.equal('juros_tabela_aa' in salvo, false, 'o no-op inventou uma chave no JSON persistido');
+});
+
+test('#428 digitar a taxa VENCE o transplante — senão o campo é decorativo', () => {
+  // O caso que a mudança de `camposSoCanonicos` existe para atender. Sem ela,
+  // o transplante devolveria a taxa velha por cima da digitada e o campo
+  // aceitaria o número sem efeito nenhum.
+  const fp = FP_TABELA_LONGA();
+  const form = formularioPagamento(fp);
+  form.juros_tabela_aa = 18;                          // só a taxa muda
+
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  const esperada = taxaMensalDeAnual(18);
+  // D-Q02: UMA taxa por Grupo — a mesma em TODOS os componentes financiados,
+  // inclusive no `concentrado`, que estava em 0.
+  assert.equal(taxaDe(salvo.componentes, 'ate_marco'), esperada);
+  assert.equal(taxaDe(salvo.componentes, 'concentrado'), esperada);
+  assert.equal(salvo.juros_tabela_aa, 18);
+  // A estrutura não mudou, e o resto do que é só-canônico continua preservado.
+  assert.deepEqual(particao(salvo.componentes), [['ate_marco', 30], ['concentrado', 70]]);
+  assert.match(salvo.componentes[0].rotulo!, /Tabela longa/);
+  assert.equal((salvo.componentes[0] as any).sinalPct, 0);
+});
+
+test('#428 digitar 0 DESLIGA os juros, e não cai de volta na derivação', () => {
+  const fp = FP_TABELA_LONGA();
+  const form = formularioPagamento(fp);
+  form.juros_tabela_aa = 0;
+
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  assert.equal(taxaDe(salvo.componentes, 'ate_marco'), 0);
+  assert.equal(salvo.juros_tabela_aa, 0);
+  // A chave 0 é resposta, não ausência: reabrir tem de mostrar 0%, e não a
+  // taxa velha ressuscitada dos componentes.
+  assert.equal(jurosTabelaAnualPct(formularioPagamento(salvo)), 0);
+});
+
+test('#428 taxa INTOCADA continua só-canônica: plano heterogêneo sobrevive', () => {
+  // O caso residencial × não residencial da EVI (`!H14` 12,5% × `!H22` 13%):
+  // duas taxas no mesmo plano, e o campo único guarda uma. Enquanto ninguém
+  // mexer nele, o transplante da #431 preserva as DUAS, componente a
+  // componente — é por isso que o eixo é "foi editado", e não "existe campo".
+  const fp = FP_TABELA_LONGA();
+  (fp.componentes[1] as any).taxaMensal = taxaMensalDeAnual(13);
+  const form = formularioPagamento(fp);
+  form.parcelas = [{ ...form.parcelas[0], pct: 40 }];   // edita o espelho, não a taxa
+
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  assert.deepEqual(particao(salvo.componentes), [['ate_marco', 40], ['concentrado', 60]]);
+  assert.equal(taxaDe(salvo.componentes, 'ate_marco'), TAXA);
+  assert.equal(taxaDe(salvo.componentes, 'concentrado'), taxaMensalDeAnual(13));
+  assert.equal('juros_tabela_aa' in salvo, false, 'editar o espelho não pode inventar a chave');
+
+  // E quando o usuário MEXE na taxa, o achatamento é explícito e assumido —
+  // é o que o aviso do modal anuncia quando há mais de uma taxa gravada.
+  const form2 = formularioPagamento(fp);
+  form2.juros_tabela_aa = 10;
+  const achatado = fluxoPagamentoParaSalvar(form2, CRONO_LONGA);
+  assert.equal(taxaDe(achatado.componentes, 'ate_marco'), taxaMensalDeAnual(10));
+  assert.equal(taxaDe(achatado.componentes, 'concentrado'), taxaMensalDeAnual(10));
+});
+
+test('#428 espelho legado vazio: o campo continua tendo efeito', () => {
+  // A guarda da #431 (`entrada` e `parcelas` vazios → devolve o persistido
+  // verbatim) não pode engolir a taxa: sem este ramo o campo seria inerte
+  // justamente na linha "Tabela longa" do estudo 5.
+  const fp = { ...FP_TABELA_LONGA(), entrada: [], parcelas: [] };
+  const form = formularioPagamento(fp);
+  assert.deepEqual(fluxoPagamentoParaSalvar(form, CRONO_LONGA).componentes, fp.componentes);
+
+  form.juros_tabela_aa = 13;
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  assert.equal(taxaDe(salvo.componentes, 'ate_marco'), taxaMensalDeAnual(13));
+  assert.equal(taxaDe(salvo.componentes, 'concentrado'), taxaMensalDeAnual(13));
+  // A partição não se mexe: não houve espelho de onde regenerar.
+  assert.deepEqual(particao(salvo.componentes), [['ate_marco', 30], ['concentrado', 70]]);
+});
+
+test('#428 linha NOVA: a taxa digitada chega ao motor e a Receita Bruta fecha', () => {
+  // Critério 3 (invariante R-A2-18, `RECEITA_BRUTA_NAO_CONSERVA`) exercitado
+  // ponta a ponta, e não sobre um `FluxoCalc` montado à mão: campo do modal →
+  // `fluxoPagamentoParaSalvar` → `componentes` → `calcularFluxo`. É a FIAÇÃO
+  // que este teste cobre; a matemática já era testada.
+  const semTaxa = formularioPagamento({
+    entrada: [{ pct: 20, parcelas: 1, descontoPct: 0 }],
+    parcelas: [{ pct: 30, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true }],
+  });
+  const base = calcularFluxo(configComFluxoPagamento(fluxoPagamentoParaSalvar(semTaxa, OBRA_FUNDING)));
+  assert.equal(base.jurosClientes, 0, 'sem taxa digitada, nenhum estudo muda de número');
+  // ⚠️ Tolerância de 10 centavos, e não a padrão de 1: sobre R$ 50.000.000,00
+  // repartidos em dezenas de safras, cada uma quantizada em centavos (C7,
+  // `round2` parcela a parcela), o resíduo acumulado é de R$ 0,06 — MEDIDO na
+  // linha SEM juros, portanto anterior a esta issue e alheio a ela. É o mesmo
+  // motivo da tolerância de R$ 1,00 nos goldens Calliandra.
+  const TOL = 0.10;
+  assert.deepEqual(validarFluxoCalc(base, TOL), []);
+
+  const comTaxa = formularioPagamento({
+    entrada: [{ pct: 20, parcelas: 1, descontoPct: 0 }],
+    parcelas: [{ pct: 30, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true }],
+  });
+  comTaxa.juros_tabela_aa = 12.5;
+  const com = calcularFluxo(configComFluxoPagamento(fluxoPagamentoParaSalvar(comTaxa, OBRA_FUNDING)));
+
+  assert.ok(com.jurosClientes > 0, 'a taxa digitada não chegou ao motor');
+  // R-A2-18: Receita Bruta = contratação líquida + juros, com taxa ≠ 0. É este
+  // fechamento que prova que os juros estão SEPARADOS do principal.
+  assert.deepEqual(validarFluxoCalc(com, TOL), []);
+  assert.ok(perto12(com.receitaBruta, com.vendaLiquidaContratada + com.jurosClientes, TOL));
+  // A contratação não se mexe: juros são acréscimo, nunca reclassificação.
+  assert.ok(perto12(com.vendaLiquidaContratada, base.vendaLiquidaContratada, TOL));
+  assert.ok(com.receitaBruta > base.receitaBruta);
+  // Fora de escopo, e por isso travado aqui: ligar juros aumenta a base do RET
+  // (incide sobre recebido) e NÃO a da corretagem (incide sobre contratado).
+  assert.ok(perto12(com.vendaBrutaContratada, base.vendaBrutaContratada, TOL));
+});
+
+test('#428 FIAÇÃO: o modal tem o campo, e ele lê a taxa efetiva — não a chave crua', () => {
+  // ⚠️ Este é um teste de FONTE, e ele existe por falta de opção melhor: não há
+  // harness de DOM para o modal de Pagamento, e `modais-json-regra-classe.test.ts`
+  // já registra que "nenhum teste de módulo puro cobre que a TELA de fato chame
+  // estas funções". Todo o resto da #428 é lógica pura e bem coberta; o que
+  // sobra descoberto é exatamente a linha de template — e é ali que mora o
+  // defeito recorrente desta rodada, que é de fiação e não de cálculo.
+  //
+  // Ele trava três coisas, cada uma um defeito CALADO se quebrar:
+  const fonte = readFileSync(new URL('./tela-fluxo-receitas.ts', import.meta.url), 'utf8');
+
+  // 1. o campo existe e está ligado ao setter. Sem ele, toda a lógica acima
+  //    fica inalcançável pela interface — que é o estado anterior a esta issue.
+  assert.match(fonte, /<viab-num label="Juros de tabela \(% a\.a\.\)"/);
+  assert.match(fonte, /@urbi:input-numero-change=\$\{\(ev: CustomEvent\) => this\._setJurosTabela\(/);
+
+  // 2. o `.valor` sai de `jurosTabelaAnualPct(f)`, e NUNCA de `f.juros_tabela_aa`
+  //    cru. Ler a chave direto faz o estudo 5 — que tem a taxa nos componentes e
+  //    não tem a chave — abrir o campo em 0%, e o primeiro Aplicar apaga
+  //    R$ 1.259.273,59 de juros. O typecheck não pega: as duas leituras são
+  //    `number | undefined` e as duas compilam.
+  assert.match(fonte, /\.valor=\$\{jurosAA\}/);
+  assert.match(fonte, /const jurosAA = jurosTabelaAnualPct\(f\);/);
+  assert.equal(/\.valor=\$\{f\.juros_tabela_aa/.test(fonte), false,
+    'o campo está lendo a chave crua e vai mostrar 0% em estudo anterior à #428');
+
+  // 3. o texto que a #431 deixou dizendo que NÃO há onde digitar a taxa saiu.
+  //    Um aviso que descreve o estado anterior é pior que nenhum: ele manda o
+  //    usuário desconfiar de um campo que está bem ali, funcionando.
+  assert.equal(/não editáveis nesta versão|não há\s+campo onde digitá/.test(fonte), false,
+    'a tela ainda anuncia que os juros não são editáveis');
 });
