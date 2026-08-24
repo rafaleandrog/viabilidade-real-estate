@@ -2197,6 +2197,59 @@ test('#456 mesExposicaoMaxima bate com fluxoAcumulado.indexOf(exposicaoMaxima)',
   assert.notEqual(r.mesExposicaoMaxima, null, 'estudo com prazo > 0 sempre tem o mínimo dentro do próprio array');
 });
 
+test('#456 agregarFluxoPorPeriodos recalcula mesExposicaoMaxima contra a série JÁ agregada — achado de auto-revisão', () => {
+  // `agregarFluxoPorPeriodos` espalha (`...c`) o `FluxoCalc` mensal e SÓ
+  // sobrescreve as séries que resume; `exposicaoMaxima` fica de propósito
+  // sem recalcular (é o mínimo MENSAL verdadeiro — ver o teste "acumulado é
+  // o saldo do ÚLTIMO mês", mais acima). Mas `mesExposicaoMaxima` é um
+  // ÍNDICE, e o índice do mês na série mensal não é o índice do período na
+  // série agregada: sem recalcular, o consumidor (`graficoFluxoAcumulado`)
+  // armaria o marcador na posição errada do eixo X em vez de sumir (-1),
+  // que era o comportamento de antes desta issue.
+  const base: FluxoCalc = calcularFluxo({
+    dataInicio: 'jan/2027', prazoMeses: 6, taxaDescontoAa: 12,
+    cronograma: [], linhasReceita: [], linhasCusto: [], areaTerreno: 0,
+  });
+  // Mínimo verdadeiro (-100) cai no mês 2, que NÃO é fim de nenhum período —
+  // o período 0 termina no mês 3. A série agregada é
+  // [fluxoAcumuladoMensal[3], fluxoAcumuladoMensal[5]] = [-100, -60]: o valor
+  // -100 aparece ali de novo (mês 3), então o marcador é legítimo — mas o
+  // índice tem de ser 0 (posição do PERÍODO), nunca 2 ou 3 (posição do MÊS).
+  // `mesExposicaoMaxima: 999` é sentinela deliberada: se `agregarFluxoPorPeriodos`
+  // voltar a espalhar `...c` sem recalcular este campo (a regressão real desta
+  // auto-revisão), o teste falha com 999 em vez de coincidir com a resposta certa.
+  const fluxoAcumuladoMensal = [0, -50, -100, -100, -80, -60];
+  const mensal: FluxoCalc = {
+    ...base, prazo: 6, fluxoAcumulado: fluxoAcumuladoMensal, exposicaoMaxima: -100, mesExposicaoMaxima: 999,
+  };
+  const periodos = [{ rotulo: 'P0', inicio: 0, fim: 3 }, { rotulo: 'P1', inicio: 4, fim: 5 }];
+  const anual = agregarFluxoPorPeriodos(mensal, periodos);
+
+  assert.deepEqual(anual.fluxoAcumulado, [-100, -60]);
+  assert.equal(anual.exposicaoMaxima, -100, 'o VALOR não recalcula — continua o mínimo mensal verdadeiro');
+  assert.equal(anual.mesExposicaoMaxima, 0,
+    'o ÍNDICE aponta pro período 0 (agregado), não pro mês 2 nem 3 (mensal), nem sobra a sentinela 999');
+});
+
+test('#456 agregarFluxoPorPeriodos: mesExposicaoMaxima vira null quando o mínimo não cai em fim de período', () => {
+  const base: FluxoCalc = calcularFluxo({
+    dataInicio: 'jan/2027', prazoMeses: 4, taxaDescontoAa: 12,
+    cronograma: [], linhasReceita: [], linhasCusto: [], areaTerreno: 0,
+  });
+  // Mínimo único no mês 2; os períodos terminam nos meses 1 e 3 — o valor
+  // -100 nunca aparece na série agregada [-30, -60].
+  const fluxoAcumuladoMensal = [0, -30, -100, -60];
+  const mensal: FluxoCalc = {
+    ...base, prazo: 4, fluxoAcumulado: fluxoAcumuladoMensal, exposicaoMaxima: -100, mesExposicaoMaxima: 999,
+  };
+  const periodos = [{ rotulo: 'P0', inicio: 0, fim: 1 }, { rotulo: 'P1', inicio: 2, fim: 3 }];
+  const anual = agregarFluxoPorPeriodos(mensal, periodos);
+
+  assert.deepEqual(anual.fluxoAcumulado, [-30, -60]);
+  assert.equal(anual.mesExposicaoMaxima, null,
+    'nao pode sobrar indice STALE (999 nem 2) quando o minimo mensal nao cai em fim de periodo');
+});
+
 test('#456 pctDeReceitaBruta: divisor zero devolve 0, nunca NaN', () => {
   assert.equal(pctDeReceitaBruta(1_000, 0), 0);
   assert.equal(pctDeReceitaBruta(1_000, -500), 0);

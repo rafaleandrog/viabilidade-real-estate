@@ -1,7 +1,8 @@
-// Render dos KPIs do FLUXO DE CAIXA (#456) — os três indicadores novos (Juros
-// de clientes, Carteira máxima de clientes, Exposição máxima com %VGV + mês)
-// levaram `kpisFluxo` (`frontend/fluxo-tabela.ts`) de 6 para 9 `div.kpi-card`
-// na mesma track (`.fx-kpis`, `grid-template-columns: repeat(auto-fit, ...)`).
+// Render dos KPIs do FLUXO DE CAIXA (#456) — os dois cards novos (Juros de
+// clientes, Carteira máxima de clientes) mais o card de Exposição máxima já
+// existente, que ganhou %VGV + mês, levaram `kpisFluxo`
+// (`frontend/fluxo-tabela.ts`) de 7 para 9 `div.kpi-card` na mesma track
+// (`.fx-kpis`, `grid-template-columns: repeat(auto-fit, ...)`).
 //
 // A #488 já mostrou que "cabe visualmente na tela do autor" não é evidência —
 // o defeito daquela issue nunca apareceu em nenhum teste até o harness de

@@ -1938,10 +1938,25 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
     itens: l.itens ? l.itens.map(agregarLinha) : undefined,
   });
 
+  // #456 — achado de auto-revisão: `exposicaoMaxima` (o valor) é preservado
+  // sem recálculo pelo spread abaixo — é o MÍNIMO MENSAL verdadeiro, e a view
+  // Anual só mostra fim de período (comentário de `fluxo-graficos.ts`). Mas
+  // `mesExposicaoMaxima` é um ÍNDICE, e o índice do mês na série mensal não é
+  // o índice do período na série agregada — sem recalcular aqui, o consumidor
+  // (`graficoFluxoAcumulado`, chamado com `exib`) armaria o marcador na
+  // posição errada do eixo X em vez de -1 (ausente), que era o que o
+  // `indexOf` inline de antes desta issue produzia sempre que o mínimo não
+  // caísse exatamente num fim de período. Mesma semântica, agora recalculada
+  // contra a série JÁ agregada (`fluxoAcumuladoAgregado`, computada uma vez).
+  const fluxoAcumuladoAgregado = ultimo(c.fluxoAcumulado);
+  const mesExposicaoMaximaAgregado = fluxoAcumuladoAgregado.length
+    ? fluxoAcumuladoAgregado.indexOf(c.exposicaoMaxima)
+    : null;
   return {
     ...c,
     prazo: periodos.length,
     meses: periodos.map((p) => p.rotulo),
+    mesExposicaoMaxima: mesExposicaoMaximaAgregado === -1 ? null : mesExposicaoMaximaAgregado,
     receitaMensal: soma(c.receitaMensal),
     vendaBrutaContratadaMensal: soma(c.vendaBrutaContratadaMensal),
     descontoComercialMensal: soma(c.descontoComercialMensal),
@@ -1966,7 +1981,7 @@ export function agregarFluxoPorPeriodos(c: FluxoCalc, periodos: PeriodoAgregado[
     },
     custoMensal: soma(c.custoMensal),
     fluxoMensal: soma(c.fluxoMensal),
-    fluxoAcumulado: ultimo(c.fluxoAcumulado),
+    fluxoAcumulado: fluxoAcumuladoAgregado,
     linhasReceitaBruta: c.linhasReceitaBruta.map(agregarLinha),
     linhasVendasContratadas: c.linhasVendasContratadas.map(agregarLinha),
     linhasReceita: c.linhasReceita.map(agregarLinha),
