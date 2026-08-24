@@ -1,5 +1,5 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
-import { fmtR$, fmtPct, fmtNum } from './viab-format.js';
+import { fmtR$, fmtPct, fmtNum, celula as celulaCompartilhada } from './viab-format.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import { type FluxoCalc, type LinhaCalc, pctDeReceitaBruta } from './fluxo-caixa-motor.js';
@@ -30,12 +30,15 @@ export const GRUPO_CUSTO_LABEL: Record<string, string> = {
   financeiro: 'Custos Financeiros',
 };
 
-/** Notação contábil da célula: vazio para zero; custos entre parênteses. */
-function celula(v: number, negativoEntreParenteses: boolean): string {
-  if (!v || Math.abs(v) < 0.5) return '';
-  const abs = Math.round(Math.abs(v)).toLocaleString('pt-BR');
-  if (negativoEntreParenteses) return `(${abs})`;
-  return v < 0 ? `(${abs})` : abs;
+/**
+ * Notação contábil da célula: vazio para zero; custos entre parênteses.
+ * #449: delega para `celula` de `viab-format.ts` — fonte única com a
+ * exportação (`celulaFx`, `frontend/exportar.ts`). `negativoEntreParenteses`
+ * aqui é na verdade "linha de custo" (`ehCusto`, no call site) — o nome do
+ * parâmetro é preservado para não tocar os ~9 call sites deste arquivo.
+ */
+export function celula(v: number, negativoEntreParenteses: boolean): string {
+  return celulaCompartilhada(v, { comParenteses: true, custo: negativoEntreParenteses });
 }
 
 /** Estilos da tabela + KPIs — o componente hospedeiro os adiciona a `static styles`. */

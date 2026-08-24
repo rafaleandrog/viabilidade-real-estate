@@ -59,6 +59,12 @@ export class ViabFluxoCronograma extends LitElement {
        não ao lado, para não competir com o rótulo. */
     .nota-pos-obras { display: block; font-size: var(--texto-rotulo, 0.75rem); }
     .params urbi-input-data { width: 190px; }
+    /* #493 etapa 1: urbi-input-data não tem granularidade de mês (pedido à
+       plataforma, sem prop hoje) — o seletor nativo exige escolher um dia,
+       que é descartado no handler. Este texto substitui a interação que
+       falta até a prop existir. */
+    .campo-data-inicio { display: flex; flex-direction: column; gap: 2px; }
+    .nota-dia-ignorado { display: block; font-size: var(--texto-rotulo, 0.75rem); }
     /* #245: o viab-num agrega número + setas + sufixo ("meses") + sufixo-mes
        ("jun/29") na mesma linha. A correção do truncamento é no primitivo
        ("viab-num.ts": o input ganhou "min-width: 4ch", o afixo foi para corpo
@@ -155,19 +161,24 @@ export class ViabFluxoCronograma extends LitElement {
     return html`
       <urbi-card titulo="Cronograma do empreendimento">
         <div class="params">
-          <urbi-input-data
-            label="Data de início do projeto"
-            obrigatorio
-            ?desabilitado=${dis}
-            .valor=${mesAnoParaISO(this.paramsForm.data_inicio_projeto)}
-            @urbi:input-data-change=${(e: CustomEvent) => {
-              // BUG7-19: urbi-input-data não tem modo mês/ano — o seletor nativo
-              // sempre mostra um dia, mas ele é descartado aqui: o formato
-              // persistido continua "mmm/AAAA" (contrato do motor, mês 0
-              // relativo), como se o dia fosse sempre 1º.
-              this.paramsForm = { ...this.paramsForm, data_inicio_projeto: isoParaMesAno(e.detail.valor) };
-            }}
-          ></urbi-input-data>
+          <span class="campo-data-inicio">
+            <urbi-input-data
+              label="Data de início do projeto"
+              obrigatorio
+              ?desabilitado=${dis}
+              .valor=${mesAnoParaISO(this.paramsForm.data_inicio_projeto)}
+              @urbi:input-data-change=${(e: CustomEvent) => {
+                // BUG7-19: urbi-input-data não tem modo mês/ano — o seletor nativo
+                // sempre mostra um dia, mas ele é descartado aqui: o formato
+                // persistido continua "mmm/AAAA" (contrato do motor, mês 0
+                // relativo), como se o dia fosse sempre 1º.
+                this.paramsForm = { ...this.paramsForm, data_inicio_projeto: isoParaMesAno(e.detail.valor) };
+              }}
+            ></urbi-input-data>
+            <!-- #493 etapa 1: sem granularidade de mês no primitivo (pedido à
+                 plataforma), este texto é a compensação até ela existir. -->
+            <span class="sec nota-dia-ignorado">O dia é ignorado — sempre tratado como o 1º do mês.</span>
+          </span>
           <urbi-checkbox
             label="Este empreendimento tem Pré-lançamento"
             ?desabilitado=${dis}

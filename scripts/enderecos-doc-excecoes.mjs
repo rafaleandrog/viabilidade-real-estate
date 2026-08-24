@@ -86,18 +86,6 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/exportar.ts:10",
-    motivo:
-      "VENCIDO PELO MERGE DA MAIN, e nao por este PR — nada em ±3 linhas de :10 — \"fmtR$\" está em :16. Este endereco estava CERTO na base 0cc2cf86 e quebrou quando a branch trouxe a main de 2026-08-24: e a demonstracao ao vivo da classe que o guard existe para pegar. Conserto e documentacao de PRODUTO e sai em PR separado (regras R1 e R3).",
-  },
-  {
-    arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/exportar.ts:167",
-    motivo:
-      "VENCIDO PELO MERGE DA MAIN, e nao por este PR — nada em ±3 linhas de :167 — \"celulaFx\" está em :173. Este endereco estava CERTO na base 0cc2cf86 e quebrou quando a branch trouxe a main de 2026-08-24: e a demonstracao ao vivo da classe que o guard existe para pegar. Conserto e documentacao de PRODUTO e sai em PR separado (regras R1 e R3).",
-  },
-  {
-    arquivo: "docs/viabilidade/formulas.md",
     endereco: "frontend/fluxo-caixa-motor.ts:2125-2133",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :2125-2133 — \"FluxoCalc\" está em :2076. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
@@ -149,12 +137,6 @@ export const EXCECOES = [
     endereco: "frontend/fluxo-shared.ts:237",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :237 — \"APOS_CHAVES_MESES\" está em :295. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
-    endereco: "frontend/fluxo-invariantes.ts:266-322",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :266-322 — \"validarProduto\" está em :255. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
