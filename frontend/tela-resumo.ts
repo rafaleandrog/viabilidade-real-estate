@@ -7,6 +7,7 @@ import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-m
 import { graficoFluxoMensal, graficoFluxoAcumulado } from './fluxo-graficos.js';
 import { GRUPOS_CUSTO, GRUPO_CUSTO_LABEL } from './fluxo-tabela.js';
 import { montarMedidor } from './medidor-faixas.js';
+import { resolverIndicadoresBenchmark } from './benchmarks-indicadores.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
@@ -79,6 +80,7 @@ export class ViabTelaResumo extends LitElement {
     .graficos { display: flex; flex-direction: column; gap: 16px; }
     .lado-a-lado { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
     .medidores { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .medidor-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .graf svg { display: block; width: 100%; height: auto; min-width: 560px; }
     .graf-wrap { overflow-x: auto; }
     /* #184: seletor macro/por grupo acima da pizza de composição de custos. */
@@ -265,33 +267,53 @@ export class ViabTelaResumo extends LitElement {
   // Indicadores vs. benchmark — mesmos medidores da aba Cenários (montarMedidor).
   // #183: vinham do Proforma (zerados no Avançado, mesma causa do #182) — agora
   // usam os KPIs derivados do FluxoCalc (`_kpisAvancado`).
+  //
+  // #451 (etapa 1, metade que faltava do PR 533): o mapa campo→indicador e o
+  // descarte-com-motivo (`custo_obras`/`preco`/`permuta_*` = sensibilidade,
+  // `margem_bruta` = sem fonte até a #453 ligar de verdade) vêm da tabela
+  // ÚNICA `benchmarks-indicadores.ts`, compartilhada com `tela-graficos.ts`
+  // (o Preliminar) — mesmo padrão dos 4 campos. Cada tela continua resolvendo
+  // o VALOR na sua própria fonte (aqui, `_kpisAvancado`/`FluxoCalc`); não
+  // unifica valores — isso é a alternativa (a) recusada pela D-Q03 (#443).
+  //
+  // ⚠️ `margem_liquida` e `roi` NÃO usam o rótulo devolvido pela tabela
+  // compartilhada. Os dois já têm rótulo próprio, registrado em
+  // `rotulos-indicador.ts`, para a MESMA fórmula usada aqui ("Margem de
+  // caixa" = fluxoAcumulado/vgvTotal; "ROI sobre custo total" =
+  // resultado/custoTotal — os dois em `_kpisAvancado`, `_renderKpis` acima).
+  // O rótulo compartilhado representa uma fórmula DIFERENTE no Preliminar
+  // ("Margem sobre VGV" = resultado/vgv; "ROI" bare = resultado/investimentoTotal,
+  // só direto+indireto) — reusá-lo aqui reabriria a MESMA colisão rótulo↔fórmula
+  // que a #443 fechou para os dois, dentro do MESMO arquivo. `resultado_final`
+  // não tem rótulo próprio pré-existente no Avançado, então segue o
+  // compartilhado ("Resultado final"), igual ao Preliminar.
+  private static readonly ROTULO_OVERRIDE: Partial<Record<string, string>> = {
+    margem_liquida: 'Margem de caixa',
+    roi: 'ROI sobre custo total',
+  };
+
   private _renderMedidores(k: ReturnType<ViabTelaResumo['_kpisAvancado']>): TemplateResult {
-    const MAPA: Record<string, number> = {
+    const { exibiveis } = resolverIndicadoresBenchmark(this.benchmarks, {
       custo_obras_vgv: k.custoObrasVgvPct,
       margem_liquida: k.margemLiquidaPct,
-    };
-    const ROTULOS: Record<string, string> = {
-      // "Custo obras / VGV" (plural) — mesmo rótulo usado em exportar.ts,
-      // tela-premissas.ts e tela-proforma.ts (o singular era inconsistência).
-      custo_obras_vgv: 'Custo obras / VGV',
-      // #443: "Margem de caixa" — mesmo rótulo do KPI acima (`_renderKpis`),
-      // mesma fórmula (`k.margemLiquidaPct` = fluxoAcumulado/vgvTotal). NÃO
-      // usar "Margem líquida" aqui: esse rótulo já está reservado ao Preliminar
-      // (`resultado/vgv`, ver `frontend/rotulos-indicador.ts`).
-      margem_liquida: 'Margem de caixa',
-    };
-    const medidores = this.benchmarks
-      .map((b) => {
-        const val = MAPA[b.campo];
-        if (val === undefined) return null;
-        const cfg = montarMedidor(b, val);
+      resultado_final: k.margemLiquidaPct,
+      roi: k.roiPct,
+    });
+    const medidores = exibiveis
+      .map(({ benchmark, campo, rotulo, valor }) => {
+        const cfg = montarMedidor(benchmark, valor);
         if (!cfg) return null;
-        return html`<urbi-grafico-medidor
-          rotulo=${ROTULOS[b.campo] ?? b.campo}
-          .min=${cfg.min} .max=${cfg.max} .valor=${val}
-          .faixas=${cfg.faixas}
-          formato="porcentagem"
-        ></urbi-grafico-medidor>`;
+        return html`<div class="medidor-item">
+          <urbi-grafico-medidor
+            rotulo=${ViabTelaResumo.ROTULO_OVERRIDE[campo] ?? rotulo}
+            .min=${cfg.min} .max=${cfg.max} .valor=${valor}
+            .faixas=${cfg.faixas}
+            formato="porcentagem"
+          ></urbi-grafico-medidor>
+          ${cfg.foraEscala
+            ? html`<urbi-badge cor="alerta" class="fora-escala">Fora da escala</urbi-badge>`
+            : nothing}
+        </div>`;
       })
       .filter((m) => m !== null);
     if (medidores.length === 0) return html`${nothing}`;
