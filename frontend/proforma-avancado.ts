@@ -99,6 +99,20 @@ export interface LinhaProformaAv {
   /** 0 = subtotal/resultado (destacado); 1 = item detalhado. */
   nivel: 0 | 1;
   tipo: 'receita' | 'custo' | 'resultado';
+  /**
+   * #427 — % já calculado com a base PRÓPRIA da linha, para as linhas de
+   * fecho cujo denominador não é o VGV puro (`Resultado + Permutas` usa
+   * `VGV + permutas físicas`). Quando ausente, a tela calcula `valor / vgv`
+   * como faz para todas as outras linhas.
+   */
+  pctOverride?: number;
+  /**
+   * #427 — nota do denominador usado (ex.: "1 / (VGV + Permutas Físicas)"),
+   * no molde de `Premissas e Resultados!K36` da EVI: só presente quando a
+   * base difere do VGV puro, isto é, só na linha `= Resultado + Permutas` e
+   * só quando há permuta física.
+   */
+  notaBase?: string;
 }
 
 export interface ProformaAvancado {
@@ -108,6 +122,24 @@ export interface ProformaAvancado {
   areaPrivativa: number;
   resultado: number;
   margemPct: number;
+  /**
+   * #427 — segunda leitura da EVI (`Premissas e Resultados!P37/R37`):
+   * `resultado` com a permuta financeira ESTORNADA de volta (ela havia sido
+   * deduzida dentro de `receitaLiquida`). Denominador ainda é o VGV — a
+   * permuta financeira já mora dentro dele, não muda o denominador.
+   */
+  resultadoMaisPermutaFinanceira: number;
+  /** `resultadoMaisPermutaFinanceira / vgv * 100` — precisão plena (C7). */
+  pctResultadoMaisPermutaFinanceira: number;
+  /**
+   * #427 — terceira leitura da EVI (`Premissas e Resultados!P35/R35`):
+   * `resultadoMaisPermutaFinanceira` mais a permuta física (que nunca passou
+   * pela receita — é só informativa). Aqui o denominador MUDA: soma a mesma
+   * permuta física, porque ela também não estava no VGV.
+   */
+  resultadoMaisPermutas: number;
+  /** `resultadoMaisPermutas / (vgv + permuta física) * 100` — precisão plena. */
+  pctResultadoMaisPermutas: number;
   /**
    * Custo direto + custo indireto — a MESMA definição do Preliminar
    * (`proforma.ts`, `investimentoTotal = custoDiretoTotal + custoIndiretoTotal`).
@@ -124,6 +156,8 @@ export interface ProformaAvancado {
 }
 
 const soma = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
+/** Contrato C7: todo valor monetário resultado de fórmula tem 2 casas. */
+const round2 = (v: number): number => Math.round(v * 100) / 100;
 
 /**
  * Monta a proforma econômica do Avançado — sempre DESALAVANCADA.
@@ -174,8 +208,58 @@ export function proformaAvancado(
   }
   linhas.push({ nome: '= Custo indireto total', valor: -custoIndireto, nivel: 0, tipo: 'custo' });
 
-  const resultado = receitaLiquida - custoDireto - custoIndireto;
-  linhas.push({ nome: '= Resultado', valor: resultado, nivel: 0, tipo: 'resultado' });
+  // #427 (achado do Codex, rodada 1): normaliza a 2 casas AQUI, antes de
+  // derivar os outros dois fechos. `receitaLiquida`/`custoDireto`/
+  // `custoIndireto` são somas de séries já round2'das mês a mês, mas somar
+  // dezenas/centenas de valores de 2 casas em ponto flutuante ainda pode
+  // deixar resíduo (`0.1 + 0.2 = 0.30000000000000004`). Sem este round2, a
+  // 1ª linha (sem round2) e as duas linhas novas (com round2 explícito logo
+  // abaixo) podiam divergir na última casa — quebrando o C7 na 1ª linha e a
+  // igualdade exata que a degenerescência (permutas zeradas) promete.
+  const resultado = round2(receitaLiquida - custoDireto - custoIndireto);
+
+  // #427 — a EVI fecha com TRÊS leituras do mesmo projeto
+  // (`Premissas e Resultados!K35/K37/K39`), cada uma com sua própria base:
+  //   Resultado                  → resultado                          / VGV
+  //   Resultado + Perm. Financ.  → resultado + permutaFinanceiraTotal  / VGV
+  //   Resultado + Permutas       → (…) + vgvPermutaFisica              / (VGV + vgvPermutaFisica)
+  // `permutaFinanceiraTotal` já vem ESTORNADO (positivo) do motor — somar,
+  // não subtrair, é o mecanismo de `P37 = P39 − P15 − P16`. A permuta física
+  // nunca passou pela receita, então soma no numerador E no denominador da
+  // 3ª linha; a financeira já está dentro do VGV, então não muda a base.
+  const resultadoMaisPermutaFinanceira = round2(resultado + c.permutaFinanceiraTotal);
+  const resultadoMaisPermutas = round2(resultadoMaisPermutaFinanceira + c.vgvPermutaFisica);
+  const baseComPermutaFisica = receitaBruta + c.vgvPermutaFisica;
+
+  const pctResultado = receitaBruta > 0 ? (resultado / receitaBruta) * 100 : 0;
+  const pctResultadoMaisPermutaFinanceira = receitaBruta > 0
+    ? (resultadoMaisPermutaFinanceira / receitaBruta) * 100 : 0;
+  const pctResultadoMaisPermutas = baseComPermutaFisica > 0
+    ? (resultadoMaisPermutas / baseComPermutaFisica) * 100 : 0;
+
+  // O rótulo/nota extra só aparece quando há permuta física — molde de
+  // `K35` (rótulo condicional: "Resultado" & IF(OR(permutas≠0); " + Permutas"; ""))
+  // e `K36` (nota de denominador gerada, também condicional à permuta física).
+  // Com física E financeira zeradas as três linhas coincidem em valor e %, e
+  // nem o rótulo nem a nota aparecem — degenerescência do critério de aceite 4.
+  const temPermutaFisica = Math.abs(c.vgvPermutaFisica) > 0.005;
+
+  linhas.push({ nome: '= Resultado', valor: resultado, nivel: 0, tipo: 'resultado', pctOverride: pctResultado });
+  linhas.push({
+    nome: '= Resultado + Perm. Financ.',
+    valor: resultadoMaisPermutaFinanceira,
+    nivel: 0,
+    tipo: 'resultado',
+    pctOverride: pctResultadoMaisPermutaFinanceira,
+  });
+  linhas.push({
+    nome: temPermutaFisica ? '= Resultado + Permutas' : '= Resultado',
+    valor: resultadoMaisPermutas,
+    nivel: 0,
+    tipo: 'resultado',
+    pctOverride: pctResultadoMaisPermutas,
+    ...(temPermutaFisica ? { notaBase: '1 / (VGV + Permutas Físicas)' } : {}),
+  });
 
   const investimentoTotal = custoDireto + custoIndireto;
 
@@ -184,7 +268,11 @@ export function proformaAvancado(
     vgv: receitaBruta,
     areaPrivativa,
     resultado,
-    margemPct: receitaBruta > 0 ? (resultado / receitaBruta) * 100 : 0,
+    margemPct: pctResultado,
+    resultadoMaisPermutaFinanceira,
+    pctResultadoMaisPermutaFinanceira,
+    resultadoMaisPermutas,
+    pctResultadoMaisPermutas,
     investimentoTotal,
     roiPct: investimentoTotal > 0 ? (resultado / investimentoTotal) * 100 : 0,
   };
