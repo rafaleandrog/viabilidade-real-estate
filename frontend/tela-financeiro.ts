@@ -56,7 +56,7 @@ const OPT_REGIME: Op[] = [
 // de cálculo as lia (confirmado antes da #279: zero ocorrências em
 // fluxo-caixa-motor.ts, fluxo-shared.ts, proforma.ts).
 const CAMPOS_NUM: string[] = [
-  'taxa_desconto_aa',
+  'taxa_desconto_aa', 'juros_tabela_aa_padrao',
   'aliquota_pis_pct', 'aliquota_cofins_pct', 'aliquota_csll_pct', 'aliquota_irpj_pct', 'aliquota_itbi_pct',
   'imposto_percentual',
 ];
@@ -165,6 +165,22 @@ export class ViabTelaFinanceiro extends LitElement {
         <p class="dica">Valor presente e despesas financeiras paramétricas. Linhas manuais de custo financeiro seguem em Obra → Financeiro.</p>
         <div class="grid">
           ${this._n('taxa_desconto_aa', 'Taxa de desconto p/ VP', '% a.a.', dis)}
+        </div>
+      </urbi-card>
+
+      <urbi-card titulo="Regime comercial das linhas de receita">
+        <!-- #477: cada linha de receita (Grupo, em Receitas) já é a unidade de
+             regime comercial — tem sua própria absorção, plano de pagamento e
+             juros de tabela. Este default só se aplica a linhas NOVAS, na
+             criação; nunca sobrescreve uma linha já gravada. -->
+        <p class="dica">
+          Cada linha de receita (Grupo, na aba Receitas) tem seu próprio regime — absorção, plano de
+          pagamento e juros de tabela. Para dois regimes diferentes (ex.: Residencial × Não
+          residencial), crie duas linhas. O valor abaixo é só o <strong>default de linhas novas</strong>
+          — editá-lo não muda nenhuma linha já criada.
+        </p>
+        <div class="grid">
+          ${this._n('juros_tabela_aa_padrao', 'Juros de tabela padrão (linhas novas)', '% a.a.', dis)}
         </div>
       </urbi-card>
 

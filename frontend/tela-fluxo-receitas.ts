@@ -146,6 +146,7 @@ export class ViabFluxoReceitas extends LitElement {
     .total-rotulo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-size: var(--texto-rotulo, 0.75rem); margin-right: 6px; }
     .total-valor { font-weight: 600; font-variant-numeric: tabular-nums; }
     .add-linha { margin-top: 16px; }
+    .nota-regime-comercial { display: block; margin-top: 6px; font-size: var(--texto-rotulo, 0.75rem); max-width: 60ch; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
     .aviso-cat { padding: 8px 0; }
 
@@ -270,6 +271,14 @@ export class ViabFluxoReceitas extends LitElement {
           <urbi-botao variante="secundario" icone="fa-solid fa-plus" @click=${this._adicionarFase}>
             Adicionar Grupo
           </urbi-botao>
+          <!-- #477: cada Grupo já é a unidade de regime comercial — absorção,
+               plano de pagamento e juros de tabela próprios. Precisa de dois
+               regimes (ex.: Residencial × Não residencial)? É dois Grupos. -->
+          <span class="sec nota-regime-comercial">
+            Cada Grupo tem sua própria absorção, plano de pagamento e juros de tabela — para dois
+            regimes comerciais diferentes (ex.: Residencial × Não residencial), crie dois Grupos.
+            O default de juros para Grupos novos fica em Financeiro.
+          </span>
         </div>` : nothing}
       ${this.modalAbs ? this._renderModalAbsorcao() : nothing}
       ${this.confirmAbs ? this._renderConfirmAbsorcao() : nothing}

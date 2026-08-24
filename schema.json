@@ -133,6 +133,8 @@
         "taxa_desconto_aa":    { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 12 },
         "tem_pre_lancamento":  { "tipo": "booleano", "padrao": true },
 
+        "juros_tabela_aa_padrao": { "tipo": "decimal", "precisao": 5, "escala": 2 },
+
         "considerar_ret": { "tipo": "booleano", "padrao": false },
         "ret_pct":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 4 },
 

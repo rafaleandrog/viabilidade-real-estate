@@ -211,9 +211,9 @@ alimente o cash sweep.
 > caixa que a #355 apagou. Falta o **rótulo** na tela (#466), não o produto.
 
 > ⚠️ **O que continua inerte na aba `Viabilidade → Financeiro`**, e só isso: `regime_tributario` e
-> os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`),
-> `imposto_sobre_permuta_fisica` (`:182`) e mais **dois que este inventário omitia**:
-> `sujeito_ret` (`:176-177`) e `imposto_percentual` (`:188`).
+> os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:203-209`),
+> `imposto_sobre_permuta_fisica` (`:198-199`) e mais **dois que este inventário omitia**:
+> `sujeito_ret` (`:192-193`) e `imposto_percentual` (`:204`).
 >
 > Os dois últimos **não** são inertes em absoluto — alimentam a Proforma do **Preliminar**
 > (`frontend/proforma.ts:245`). O que não os lê é o **Avançado**, que recebe o RET pelo par global
@@ -278,7 +278,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/fluxo-caixa-motor.ts:2125-2133` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
 | **`frontend/fluxo-tabela.ts:34`** — `celula` da tabela do Fluxo | **0** | ❌ formatador próprio: `Math.round`, e célula **vazia** abaixo de R$ 0,50 → #281 |
 | **`frontend/tela-proforma.ts:314`** — `_fmtContabil`, a coluna R$ da Proforma | **0** | ❌ `fmtNum(Math.abs(r.v))` com `d` no default → #281 |
-| **`frontend/tela-fluxo-receitas.ts:382-383`** — `precoUnit` e `precoTotal` | **0** | ❌ mesma causa → #281 |
+| **`frontend/tela-fluxo-receitas.ts:392-393`** — `precoUnit` e `precoTotal` | **0** | ❌ mesma causa → #281 |
 
 > 🟡 **O motor não é integralmente conforme ao C7, e marcar a linha inteira ✅ escondia isso.** As
 > **séries mensais** passam por `round2` a cada depósito. Mas quatro **agregados escalares** saem do

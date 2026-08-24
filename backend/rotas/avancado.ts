@@ -296,6 +296,24 @@ export function fluxoPagamentoPadrao(): Record<string, any> {
   };
 }
 
+/**
+ * #477: fluxo_pagamento inicial de uma linha de receita NOVA, aplicando o
+ * default herdado do estudo (`estudos.juros_tabela_aa_padrao`, painel de
+ * premissas → aba Financeiro) quando ele estiver configurado.
+ *
+ * Só a CRIAÇÃO usa isto — nenhuma linha já gravada é tocada, e editar o
+ * default depois não altera nada que já existe (o motor só lê
+ * `juros_tabela_aa` de DENTRO do `fluxo_pagamento` de cada linha; o default
+ * do estudo não é consultado de novo depois deste momento).
+ */
+export function fluxoPagamentoComDefaultJuros(jurosTabelaAaPadrao: unknown): Record<string, any> {
+  const base = fluxoPagamentoPadrao();
+  if (jurosTabelaAaPadrao === null || jurosTabelaAaPadrao === undefined) return base;
+  const v = Number(jurosTabelaAaPadrao);
+  if (!Number.isFinite(v)) return base;
+  return { ...base, juros_tabela_aa: v };
+}
+
 const GRUPOS_CUSTO = ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'];
 const UNIDADES_ORCAMENTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita'];
 const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado']; // #339
@@ -1060,7 +1078,8 @@ rotasAvancado.post('/estudos/:id/avancado/fases', async (req: Request, res: Resp
     // Cronograma nunca lê/edita esses campos.
     if (tipo === 'receita') {
       dados.absorcao = absorcaoPadrao(estudo.tem_pre_lancamento !== false);
-      dados.fluxo_pagamento = fluxoPagamentoPadrao();
+      // #477: herda juros_tabela_aa_padrao do estudo, se configurado.
+      dados.fluxo_pagamento = fluxoPagamentoComDefaultJuros(estudo.juros_tabela_aa_padrao);
     }
     const criada = await req.dados!.criar('avancado_fases', dados);
     res.status(201).json({ ...criada, alocacoes: [] });

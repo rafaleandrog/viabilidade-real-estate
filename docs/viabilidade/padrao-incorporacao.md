@@ -907,6 +907,28 @@ Cada Grupo possui um perfil único de absorção, aplicado a todas as suas aloca
 
 A configuração informa quanto do estoque do Grupo será vendido em cada período global.
 
+> ✅ **Modelo funcional de referência, confirmado por escrito pela #477: o Grupo (linha de
+> receita) é a UNIDADE DE REGIME COMERCIAL do app.** Não é só a absorção — cada Grupo tem sua
+> própria absorção (§10.1 acima), seu próprio plano de pagamento (`fluxo_pagamento`, com
+> `entrada`/`parcelas`/`repasse`/`comissao`/`ret`) e sua própria taxa de juros de tabela
+> (`fluxo_pagamento.juros_tabela_aa`, `avancado_fases.fluxo_pagamento` — coluna `json`,
+> `schema.json:320`). Isso já é suficiente para representar dois regimes comerciais
+> diferentes dentro do mesmo estudo (ex.: Residencial a 12,5% a.a. × Não residencial a
+> 13% a.a., o par que a EVI trata via `VendasNaoResidDiferenciarCondicoes`,
+> `Premissas!H16`) — **basta criar dois Grupos**, um por regime. O app não replica o flag
+> global da planilha; a equivalência funcional é esta seção.
+>
+> Cada Grupo participa do `jurosClientes` e do `receitaPorComponenteMensal` do estudo
+> independentemente, com sua própria carteira de safras — o motor nunca mistura a carteira de
+> um Grupo com a de outro (`frontend/fluxo-caixa-motor.ts:1094`: cada safra é isolada por linha).
+> `estudos.juros_tabela_aa_padrao` (painel de premissas → aba Financeiro) é só um **default
+> herdado**, aplicado somente à criação de um Grupo novo — nunca sobrescreve um Grupo já
+> existente, e editar o default não altera nenhum Grupo já gravado.
+>
+> Fora de escopo desta seção: "venda à vista num único mês" (a "NR diferenciada" da EVI,
+> `Premissas!M11`) não é um modo de absorção implementado — é modelo novo, sem demanda
+> registrada.
+
 ### 10.2 Quatro períodos
 
 | Período | Percentual |
@@ -1759,7 +1781,7 @@ A permuta física:
 > calcula o KPI como `quantidade × area_privativa_m2 × preco_m2` da tipologia alocada
 > (`frontend/fluxo-caixa-motor.ts:85`), **sem ler `orcamento_valor`**. Quem procurar uma entrada de
 > valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
-> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:744-749`, #253); a coluna permanece no
+> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:761-766`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
 > (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1811`) e a projeta de volta nas tipologias uma
 > única vez (`:1821-1828`), para que toda função que já lia `t.unidades_permutadas` fique correta
@@ -1979,9 +2001,9 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > propósito. O resto daquele documento é **ADR histórico**.
 >
 > ⚠️ **O que sobrou sem efeito no motor do Avançado, na aba `Viabilidade → Financeiro`:**
-> `regime_tributario` e os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:187-193`),
-> `imposto_sobre_permuta_fisica` (`:182`) e — **acrescentados aqui porque o inventário anterior os
-> omitia** — `sujeito_ret` (`:176-177`) e `imposto_percentual` (`:188`). Estes dois últimos não são
+> `regime_tributario` e os cinco `aliquota_*_pct` (`frontend/tela-financeiro.ts:203-209`),
+> `imposto_sobre_permuta_fisica` (`:198-199`) e — **acrescentados aqui porque o inventário anterior os
+> omitia** — `sujeito_ret` (`:192-193`) e `imposto_percentual` (`:204`). Estes dois últimos não são
 > inertes em absoluto: **alimentam a Proforma do Preliminar** (`frontend/proforma.ts:245`). Para o
 > Avançado é que não valem — ele recebe o RET pelo par global `considerar_ret`/`ret_pct`
 > (`frontend/tela-fluxo-ver.ts:122`). Preencher os dois numa tela de Avançado não muda cálculo
