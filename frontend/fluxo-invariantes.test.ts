@@ -5,6 +5,7 @@ import {
   validarProduto, validarContratacao, validarSafrasReceita, validarFunding, validarCustosDuplicados,
   unidadesNaoAlocadasPorTipologia, TOLERANCIA_PADRAO,
 } from './fluxo-invariantes.js';
+import { absorcaoMensal } from './fluxo-shared.js';
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
 import type { FundingCalc, OperacaoFunding } from './funding-motor.js';
 
@@ -278,6 +279,95 @@ const RECEITA_PRODUTO = [{
 
 test('validarProduto: estoque totalmente alocado e absorvido fecha em zero', () => {
   assert.deepEqual(validarProduto(RECEITA_PRODUTO, [], TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4), []);
+});
+
+// ── #429: conservação da absorção ───────────────────────────────────────
+// periodoAbsorcao(CRONO_PRODUTO) = { inicio: 0, fim: 14 } — pos_obra começa no
+// mês 3 e a janela Pós-chaves tem 12 meses fixos (#226). Logo, o mês 15 é o
+// primeiro fora da janela.
+const receitaComCurva = (meses: { mes: number; pct: number }[]) => ([{
+  nome: 'Fase 1',
+  absorcao: { modo: 'personalizado', meses },
+  tipologias: [{ tipologia_id: 1, quantidade: 20 }],
+}]);
+
+test('#429 validarProduto: curva com ponto fora da janela vira ABSORCAO_NAO_FECHA', () => {
+  const receitas = receitaComCurva([{ mes: 0, pct: 60 }, { mes: 2, pct: 30 }, { mes: 15, pct: 10 }]);
+  const r = validarProduto(receitas, [], TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
+  const d = r.filter((x) => x.codigo === 'ABSORCAO_NAO_FECHA');
+  assert.equal(d.length, 1, `divergências: ${r.map((x) => x.codigo).join(', ')}`);
+  assert.equal(d[0].severidade, 'erro');
+  assert.equal(d[0].linha, 'Fase 1');
+  assert.equal(d[0].esperado, 100);
+  assert.ok(Math.abs(d[0].encontrado - 90) < 1e-9);
+  assert.ok(Math.abs(d[0].diferenca + 10) < 1e-9);
+  assert.equal(d[0].mes, 15);
+  // A mensagem diz QUANTO falta e O QUE zeraria (desenho do VGV SOMADO da EVI).
+  assert.match(d[0].mensagem, /90\.00%/);
+  assert.match(d[0].mensagem, /faltam 10\.00 pp/);
+  assert.match(d[0].mensagem, /mês 16/);   // 0-based 15 → 1-based 16 na mensagem
+  assert.match(d[0].mensagem, /até o mês 15/); // janela 0..14 → 1-based até 15
+});
+
+test('#429 a checagem NÃO é derivável de `abs.pcts`: curva que declara 110% e perde 10 pp', () => {
+  // Σ abs.pcts = 100 exatamente — uma invariante que somasse a saída truncada
+  // diria "fechou". Mas o usuário escreveu 110%, e 10 pp foram jogados fora.
+  const receitas = receitaComCurva([
+    { mes: 0, pct: 60 }, { mes: 2, pct: 40 }, { mes: 15, pct: 10 },
+  ]);
+  const abs = absorcaoMensal(receitas[0].absorcao, CRONO_PRODUTO)!;
+  assert.ok(Math.abs(abs.pcts.reduce((s, x) => s + x, 0) - 100) < 1e-9, 'a saída truncada fecha 100');
+
+  const d = validarProduto(receitas, [], TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4)
+    .filter((x) => x.codigo === 'ABSORCAO_NAO_FECHA');
+  assert.equal(d.length, 1);
+  assert.equal(d[0].esperado, 110);   // o que a curva prometia
+  assert.ok(Math.abs(d[0].encontrado - 100) < 1e-9);
+  assert.ok(Math.abs(d[0].diferenca + 10) < 1e-9);
+  assert.match(d[0].mensagem, /declara 110\.00%/);
+  assert.match(d[0].mensagem, /NÃO são computados/);
+});
+
+test('#429 validarProduto: curva que fecha 100% DENTRO da janela não gera divergência', () => {
+  const receitas = receitaComCurva([{ mes: 0, pct: 60 }, { mes: 2, pct: 40 }]);
+  const r = validarProduto(receitas, [], TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4);
+  assert.deepEqual(r, []);
+});
+
+test('#429 validarProduto: a mesma curva descartada não vira uma divergência por tipologia', () => {
+  // Duas tipologias na MESMA linha: a curva é uma só, o alarme também.
+  const receitas = [{
+    nome: 'Fase 1',
+    absorcao: { modo: 'personalizado', meses: [{ mes: 0, pct: 90 }, { mes: 15, pct: 10 }] },
+    tipologias: [{ tipologia_id: 1, quantidade: 20 }, { tipologia_id: 2, quantidade: 10 }],
+  }];
+  const r = validarProduto(receitas, [], TIPOLOGIAS.slice(0, 2), CRONO_PRODUTO, 4);
+  assert.equal(r.filter((x) => x.codigo === 'ABSORCAO_NAO_FECHA').length, 1);
+});
+
+test('#429 validarProduto: linha cuja tipologia não está no catálogo AINDA é checada', () => {
+  // O laço de produto itera o CATÁLOGO; a checagem de absorção itera as
+  // LINHAS — senão uma curva quebrada passaria batida por falta de catálogo.
+  const receitas = receitaComCurva([{ mes: 0, pct: 90 }, { mes: 15, pct: 10 }]);
+  const r = validarProduto(receitas, [], [], CRONO_PRODUTO, 4);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].codigo, 'ABSORCAO_NAO_FECHA');
+});
+
+test('#429 validarProduto: a invariante NÃO pode ser satisfeita pela saída truncada', () => {
+  // Regressão do achado estrutural da vistoria: `Σ abs.pcts` fecha em 90 e é
+  // internamente consistente — validarContratacao passa. Só o dado bruto da
+  // curva (pctTotal/pctDescartado) revela a perda.
+  const receitas = receitaComCurva([{ mes: 0, pct: 60 }, { mes: 2, pct: 30 }, { mes: 15, pct: 10 }]);
+  const vgvContratadoQueOMotorProduz = 0; // sem tipologias com preço, a conta fecha em zero
+  assert.deepEqual(
+    validarContratacao(receitas, CRONO_PRODUTO, 4, vgvContratadoQueOMotorProduz), [],
+    'validarContratacao continua cega ao descarte — é por isso que a #429 existe',
+  );
+  assert.equal(
+    validarProduto(receitas, [], TIPOLOGIAS.slice(0, 1), CRONO_PRODUTO, 4)
+      .filter((x) => x.codigo === 'ABSORCAO_NAO_FECHA').length, 1,
+  );
 });
 
 test('#335 validarCustosDuplicados: sem duplicata, sem divergência', () => {
