@@ -20,7 +20,8 @@ import {
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
   eCorretagem, vgvVendidoMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   areaTotalLinha, areaPermutaFisicaLinha, areaVendavelLinha, unidadesVendaveisLinha,
-  type EventoCrono, type ContextoCusto, type PeriodoAgregado,
+  mesRepasse, ultimoMesFunding,
+  type EventoCrono, type ContextoCusto, type PeriodoAgregado, type OperacaoParaHorizonte,
 } from './fluxo-shared.js';
 
 const n = (v: any): number => Number(v) || 0;
@@ -197,7 +198,9 @@ export function reamostrarCurva(curva: CurvaPersonalizada, dur: number): number[
 
 export interface FluxoConfig {
   dataInicio: string | null;       // "mmm/AAAA" (ancora os rótulos; pode faltar)
-  prazoMeses?: number;             // horizonte fixo; se ausente, é derivado
+  // #446: PISO do horizonte, nunca teto. Um prazo digitado pode ESTICAR o
+  // fluxo; jamais encurtá-lo. Ausente ⇒ vale só o derivado.
+  prazoMeses?: number;
   taxaDescontoAa: number;          // % a.a. para o VPL
   cronograma: EventoCrono[];
   linhasReceita: any[];            // { id, nome, fase_label, tipologias[], absorcao, fluxo_pagamento }
@@ -206,6 +209,13 @@ export interface FluxoConfig {
   areaTerreno: number;             // m² (Premissas)
   // #346: RET é global do estudo (era por Grupo, `linhasReceita[i].fluxo_pagamento.ret`).
   ret?: { ativo: boolean; pct: number };
+  // #446: as operações de Funding, lidas SÓ para derivar o horizonte — o
+  // motor de caixa não as simula (quem simula é `fundingDoEstudo`, depois).
+  // Sem elas, uma operação que amortiza além do último evento operacional é
+  // cortada, e `saldoFinal` passa a exibir um saldo truncado que não
+  // corresponde a compromisso nenhum. Tipo estrutural, para não fechar ciclo
+  // de import com `funding-motor.ts` — ver `OperacaoParaHorizonte`.
+  operacoesFunding?: OperacaoParaHorizonte[];
 }
 
 export interface LinhaCalc {
@@ -1737,7 +1747,8 @@ export function recebimentoBrutoMensal(
     if (idx < saida.length) { saida[idx] += valor; return; }
     console.warn(
       `fluxo-caixa-motor: recebimento de ${valor.toFixed(2)} no mês ${mes} cai fora do horizonte ` +
-      `(${saida.length} meses) — prazoMeses explícito menor que o necessário? Valor NÃO computado.`,
+      `(${saida.length} meses) — o horizonte deveria cobrir todo mês em que algo entra ou sai ` +
+      `(#446). Valor NÃO computado.`,
     );
   };
 
@@ -2162,9 +2173,12 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const linhasCusto = config.linhasCusto ?? [];
   const taxa = n(config.taxaDescontoAa) || 12;
 
-  // Horizonte: usa prazoMeses se dado; senão deriva do conteúdo. Meses
-  // 0-based: o último mês usado é `ultimo*`, então o comprimento do array é
-  // `ultimo* + 1`.
+  // Horizonte: cobre TODO mês em que algo entra ou sai (#446 — decisão do
+  // autor, 2026-08-22: "o fluxo vai até o último mês que é enquanto alguma
+  // coisa está entrando ou saindo do fluxo"). Meses 0-based: o último mês
+  // usado é `ultimo*`, então o comprimento do array é `ultimo* + 1`.
+  //
+  // #446: `config.prazoMeses` é PISO, não teto — ver logo abaixo.
   //
   // #231: `ultimoRecebivel` considera TODOS os componentes de pagamento de
   // cada linha (entrada, parcelamento — ao longo da obra ou por
@@ -2175,8 +2189,16 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const ultimoCrono = Math.max(0, ...crono.map((e) => n(e.inicio_mes) + n(e.duracao_meses) - 1));
   const ultimoCustos = Math.max(0, ...linhasCusto.map((c) => n(c.inicio_mes) + n(c.duracao_meses) - 1));
   const ultimoRecebivel = Math.max(0, ...linhasReceitaOriginal.map((l) => ultimoMesRecebivelLinha(l, crono)));
-  const prazoDerivado = Math.max(ultimoCrono, ultimoRecebivel, ultimoCustos, 11) + 1;
-  const prazo = Math.max(1, Math.round(n(config.prazoMeses) || prazoDerivado));
+  // #446: o termo que faltava. Cronograma, custos e recebíveis entravam no
+  // `max`; dívida e equity NÃO — e o funding herda o horizonte já fechado
+  // (`funding-motor.ts`: `const prazo = fluxoLivreMensal.length`), então a
+  // operação era truncada sem que nada avisasse.
+  const ultimoFunding = Math.max(0, ...(config.operacoesFunding ?? []).map((op) => ultimoMesFunding(op, mesRepasse(crono))));
+  const prazoDerivado = Math.max(ultimoCrono, ultimoRecebivel, ultimoCustos, ultimoFunding, 11) + 1;
+  // #446: PISO, não teto. O `||` anterior descartava o derivado inteiro assim
+  // que houvesse um valor digitado — armadilha armada para o primeiro chamador
+  // que preenchesse o campo.
+  const prazo = Math.max(prazoDerivado, Math.round(n(config.prazoMeses) || 0), 1);
 
   const reservasPermuta = reservarPermutasFisicas(linhasReceitaOriginal, linhasCusto);
   const usaFonteNovaPermuta = reservasPermuta.usaFonteNova;

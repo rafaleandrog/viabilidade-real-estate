@@ -99,6 +99,13 @@ node scripts/guard-json.mjs || exit 1
 # `[dry_run_schema] relation "viabilidade.estudos" does not exist`.
 # Ver o cabeçalho de scripts/guard-schema-ciclos.mjs.
 node scripts/guard-schema-ciclos.mjs || exit 1
+
+# #446 — a FIAÇÃO do horizonte de funding. Só `readFileSync` + regex, então
+# roda aqui, antes do `pnpm install`, junto dos guards mais baratos.
+# Medido: apagar `operacoesFunding` de `tela-funding.ts` deixou a suíte INTEIRA
+# verde. Nenhuma outra etapa deste script enxerga essa omissão.
+# Ver o cabeçalho de scripts/guard-fiacao-funding.mjs.
+node scripts/guard-fiacao-funding.mjs || exit 1
 echo "  ok: nenhuma aspa curva em atributo"
 
 # Os três guards de UI leem `docs/ui-urbiverso/` — o espelho versionado da
