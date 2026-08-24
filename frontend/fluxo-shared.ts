@@ -565,6 +565,13 @@ export interface ContextoCusto {
   vgvTotal: number;           // VGV somado das linhas de receita
   receitaTotal?: number;      // receita líquida (VGL) — para pct_receita
   totalObra?: number;         // total do grupo Obra (excl. linhas pct_obra) — para pct_obra
+  /**
+   * #473: base da Corretagem de vendas quanto à permuta física. `true`
+   * (default — preserva todo estudo existente) = VGV BRUTO, permuta física
+   * inclusa; `false` = VGV VENDÁVEL, exclui a permuta física. Escolha do
+   * estudo (`estudos.corretagem_sobre_permuta_fisica`), só no Avançado.
+   */
+  corretagemSobrePermutaFisica?: boolean;
 }
 
 /** Área privativa total (área × quantidade) de todas as tipologias das linhas. */
@@ -887,19 +894,23 @@ export function regimeCronogramaLinha(custo: any): RegimeCronograma {
 }
 
 /**
- * VGV VENDIDO mês a mês (meses RELATIVOS 0-based), somando todas as linhas de
- * receita: o VGV de cada linha é repartido pela sua própria curva de absorção.
- * Devolve um array de `prazoTotal` posições; vendas fora do horizonte são
- * ignoradas. Linhas sem VGV ou com cronograma insuficiente não contribuem.
+ * #473: implementação comum de "VGV VENDIDO mês a mês" — o VGV de cada linha
+ * (calculado por `vgvDaLinha`, que decide a base) é repartido pela própria
+ * curva de absorção da linha. Meses RELATIVOS 0-based, `prazoTotal` posições;
+ * vendas fora do horizonte são ignoradas, e linhas sem VGV ou com cronograma
+ * insuficiente não contribuem. Privada — as duas bases exportadas abaixo são
+ * a API pública, para que o nome da função já diga qual VGV está sendo usado
+ * (#227 pedia essa distinção explícita; ficou pela metade até aqui).
  */
-export function vgvVendidoMensal(
+function vgvVendidoMensalPor(
   linhasReceita: any[],
   crono: EventoCrono[],
   prazoTotal: number,
+  vgvDaLinha: (tipologias: any[]) => number,
 ): number[] {
   const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
   for (const l of linhasReceita ?? []) {
-    const vgv = vgvLinha(l?.tipologias ?? []);
+    const vgv = vgvDaLinha(l?.tipologias ?? []);
     if (vgv <= 0) continue;
     const abs = absorcaoMensal(l?.absorcao ?? { modo: 'linear' }, crono);
     if (!abs) continue;
@@ -909,6 +920,34 @@ export function vgvVendidoMensal(
     }
   }
   return saida;
+}
+
+/**
+ * VGV BRUTO vendido mês a mês — inclui a fatia de permuta física (`vgvLinha`,
+ * a tipologia inteira). Base histórica da Corretagem (#227/#228, decisão do
+ * autor de 2026-08-01) e do Preço do Terreno em `distribuicao_modo:
+ * 'sales_revenue'` (#194) — nenhum dos dois muda de comportamento com a #473.
+ */
+export function vgvVendidoBrutoMensal(
+  linhasReceita: any[],
+  crono: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  return vgvVendidoMensalPor(linhasReceita, crono, prazoTotal, vgvLinha);
+}
+
+/**
+ * VGV VENDÁVEL vendido mês a mês — exclui a fatia de permuta física
+ * (`vgvVendavelLinha`, #195), a mesma base de `vendaBrutaContratadaMensal`
+ * (baixa de estoque). #473: alternativa de base da Corretagem, escolhida por
+ * `estudos.corretagem_sobre_permuta_fisica = false`.
+ */
+export function vgvVendidoVendavelMensal(
+  linhasReceita: any[],
+  crono: EventoCrono[],
+  prazoTotal: number,
+): number[] {
+  return vgvVendidoMensalPor(linhasReceita, crono, prazoTotal, vgvVendavelLinha);
 }
 
 /**

@@ -18,7 +18,7 @@ import {
   absorcaoMensal, periodoAbsorcao, vgvLinha, receitaLiquidaLinha,
   vgvVendavelTipologia, vgvVendavelLinha,
   areaPrivativaTotalLinhas, resolverCustoTotal, mesRelativoCompleto, rotuloMesRelativo,
-  eCorretagem, vgvVendidoMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
+  eCorretagem, vgvVendidoBrutoMensal, vgvVendidoVendavelMensal, ePrecoTerreno, ePermutaFisica, ePermutaFinanceira,
   areaTotalLinha, areaPermutaFisicaLinha, areaVendavelLinha, unidadesVendaveisLinha,
   mesRepasse, ultimoMesFunding,
   type EventoCrono, type ContextoCusto, type PeriodoAgregado, type OperacaoParaHorizonte,
@@ -209,6 +209,13 @@ export interface FluxoConfig {
   areaTerreno: number;             // m² (Premissas)
   // #346: RET é global do estudo (era por Grupo, `linhasReceita[i].fluxo_pagamento.ret`).
   ret?: { ativo: boolean; pct: number };
+  /**
+   * #473: base da Corretagem de vendas quanto à permuta física —
+   * `estudos.corretagem_sobre_permuta_fisica`, só no Avançado. `true`
+   * (default — nenhum estudo existente muda de número) = VGV bruto, permuta
+   * física inclusa; `false` = VGV vendável, exclui a permuta física.
+   */
+  corretagemSobrePermutaFisica?: boolean;
   // #446: as operações de Funding, lidas SÓ para derivar o horizonte — o
   // motor de caixa não as simula (quem simula é `fundingDoEstudo`, depois).
   // Sem elas, uma operação que amortiza além do último evento operacional é
@@ -302,12 +309,17 @@ function quantizarLinhaMonetaria(linha: LinhaCalc, taxaAa: number): LinhaCalc {
 // quantizam a 2 casas (`round2`, contrato C7) — a dívida técnica registrada
 // na verificação da Fase 4 foi fechada aqui.
 //
-// Também identificado na verificação: a corretagem (`corretagemMensal`,
-// via `vgvVendidoMensal`) segue usando VGV BRUTO (`vgvLinha`) como base,
-// enquanto a série canônica de contratação (`vendaBrutaContratadaMensal`)
-// usa VGV VENDÁVEL. O corpo da #227 pedia uma função única para as duas — a
-// unificação ficou incompleta (decisão do autor mantida — corretagem
-// bruto/VGV — mas via caminho de código separado, não a mesma série).
+// ✅ #473 (2026-08-24): a corretagem (`corretagemMensal`) usava sempre VGV
+// BRUTO (`vgvVendidoMensal`/`vgvLinha`) como base, enquanto a série canônica
+// de contratação (`vendaBrutaContratadaMensal`) usa VGV VENDÁVEL — o corpo da
+// #227 pedia uma função única para as duas, e a distinção "bruto" × "vendável"
+// ficou explícita no NOME das funções: `vgvVendidoBrutoMensal` (permuta física
+// inclusa, default — nenhum estudo existente muda) e `vgvVendidoVendavelMensal`
+// (exclui a permuta física, mesma base de `vendaBrutaContratadaMensal`).
+// `corretagemMensal` escolhe entre as duas por `ContextoCusto.corretagemSobrePermutaFisica`
+// — chave do estudo (`estudos.corretagem_sobre_permuta_fisica`, só no Avançado).
+// O Preço do Terreno em `distribuicao_modo: 'sales_revenue'` continua na base
+// bruta histórica — a #473 não estende a chave a ele (fora de escopo).
 
 export interface FluxoCalc {
   prazo: number;
@@ -1881,6 +1893,12 @@ export function receitaMensalLinha(
  * reduzia o recebível) foi REMOVIDA pela #228 — contaria a corretagem duas
  * vezes se as duas ficassem ativas ao mesmo tempo (o defeito do EVI-008).
  * Esta linha de custo é a única fonte oficial.
+ *
+ * #473: a base é ESCOLHA DO ESTUDO — `ctx.corretagemSobrePermutaFisica`
+ * (default `true`, undefined incluso, para preservar todo estudo existente).
+ * `true` usa `vgvVendidoBrutoMensal` (comportamento histórico, permuta física
+ * inclusa); `false` usa `vgvVendidoVendavelMensal` (exclui a permuta física,
+ * alinhando a corretagem à mesma base de `vendaBrutaContratadaMensal`).
  */
 export function corretagemMensal(
   custo: any,
@@ -1889,13 +1907,30 @@ export function corretagemMensal(
   prazoTotal: number,
   ctx: ContextoCusto,
 ): number[] {
-  const vendas = vgvVendidoMensal(linhasReceita, cronograma, prazoTotal);
+  const vgvBrutoNaCorretagem = ctx.corretagemSobrePermutaFisica !== false;
+  const vendas = vgvBrutoNaCorretagem
+    ? vgvVendidoBrutoMensal(linhasReceita, cronograma, prazoTotal)
+    : vgvVendidoVendavelMensal(linhasReceita, cronograma, prazoTotal);
   const somaVendas = vendas.reduce((s, v) => s + v, 0);
   if (somaVendas <= 0) return new Array<number>(Math.max(prazoTotal, 0)).fill(0);
 
-  if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv'
-    && (custo?.orcamento_valor_canonico === null || custo?.orcamento_valor_canonico === undefined)) {
-    const pct = n(custo?.orcamento_valor) / 100;
+  if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv') {
+    // #473: mesmo com `orcamento_valor_canonico` persistido — o caso comum,
+    // já que toda edição do valor pela tela (`_editarOrcamento`,
+    // `tela-fluxo-custos.ts`) grava o R$ congelado junto — o TOTAL da
+    // corretagem tem de reagir à base escolhida. Antes desta correção, um
+    // canônico presente pulava direto para `resolverCustoTotal` e
+    // redistribuía o R$ FIXO por `vendas`: a soma da linha não mudava com o
+    // flag, só o calendário mudava — a capacidade inteira desta issue ficava
+    // muda para toda linha já editada uma vez pela tela (achado do Codex,
+    // PR #545 rodada 1). A correção: deriva o PERCENTUAL efetivo do
+    // canônico sobre o VGV BRUTO total (`ctx.vgvTotal`, a mesma base que
+    // `converterUnidade` usou para congelar o R$ em `_editarOrcamento`), e
+    // aplica esse percentual sobre a base ESCOLHIDA (`vendas`) — nunca o R$
+    // congelado direto. Sem canônico, cai no percentual digitado cru.
+    const pct = custo?.orcamento_valor_canonico !== null && custo?.orcamento_valor_canonico !== undefined
+      ? (ctx.vgvTotal > 0 ? resolverCustoTotal(custo, ctx) / ctx.vgvTotal : 0)
+      : n(custo?.orcamento_valor) / 100;
     return vendas.map((v) => v * pct);
   }
   const total = resolverCustoTotal(custo, ctx);
@@ -2261,6 +2296,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     areaPrivativaTotal: areaPrivativaTotalLinhas(linhasReceita),
     areaTerreno: n(config.areaTerreno),
     vgvTotal: linhasReceita.reduce((s, l) => s + vgvLinha(l.tipologias), 0),
+    corretagemSobrePermutaFisica: config.corretagemSobrePermutaFisica,
   };
   ctxCusto.receitaTotal = linhasReceita.reduce(
     (s, l, i) => s + receitaLiquidaLinha(vgvVendavelLinhaMotor(l, i), config.ret), 0);
@@ -2351,13 +2387,15 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
 
     // Preço do Terreno em `unit_delivery`/`sales_revenue` (#194): sem
     // cronograma próprio, distribuído proporcionalmente a um peso mensal —
-    // `sales_revenue` acompanha o VGV VENDIDO (igual à Corretagem, absorção
-    // das vendas); `unit_delivery` acompanha a RECEITA EM CAIXA (entrada +
-    // parcelas + repasse na entrega das unidades). `fixo` (padrão) cai no
-    // caminho normal abaixo, igual às demais linhas de Terreno.
+    // `sales_revenue` acompanha o VGV VENDIDO BRUTO (igual à base histórica
+    // da Corretagem, absorção das vendas — #473 não muda esta linha: é fora
+    // de escopo, só a Corretagem tem a chave de base configurável);
+    // `unit_delivery` acompanha a RECEITA EM CAIXA (entrada + parcelas +
+    // repasse na entrega das unidades). `fixo` (padrão) cai no caminho normal
+    // abaixo, igual às demais linhas de Terreno.
     if (ePrecoTerreno(c) && (c.distribuicao_modo === 'unit_delivery' || c.distribuicao_modo === 'sales_revenue')) {
       const pesos = c.distribuicao_modo === 'sales_revenue'
-        ? vgvVendidoMensal(linhasReceita, crono, prazo)
+        ? vgvVendidoBrutoMensal(linhasReceita, crono, prazo)
         : receitaMensalVendas;
       const mensal = distribuirProporcional(c, pesos, ctxCusto);
       const r = recorte(mensal);

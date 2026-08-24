@@ -12,7 +12,7 @@ import {
   urbiVerso,
   buscarParametrosAvancado, atualizarParametrosAvancado, buscarCronogramaAvancado, listarReceitasAvancado,
   listarCurvas, listarCustosAvancado, criarCustoAvancado, atualizarCustoAvancado, removerCustoAvancado,
-  listarFasesAvancado, listarTipologiasCatalogo,
+  listarFasesAvancado, listarTipologiasCatalogo, atualizarEstudo,
 } from './viabilidade-api.js';
 import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { converterUnidade, dadosDaTrocaDeUnidade, numeroDaColuna, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
@@ -255,6 +255,10 @@ export class ViabFluxoCustos extends LitElement {
   private ret: { ativo: boolean; pct: number } = { ativo: false, pct: 4 };
   @state() private retForm: { ativo: boolean; pct: number } = { ativo: false, pct: 4 };
   @state() private salvandoRet = false;
+  // #473: base da Corretagem de vendas quanto à permuta física —
+  // `estudos.corretagem_sobre_permuta_fisica`, salva na hora do toggle (sem
+  // rascunho: é um booleano isolado, não precisa do padrão Salvar do RET).
+  @state() private salvandoCorretagemPermuta = false;
   @state() private carregando = true;
   @state() private removerAlvo: any = null;
   // #192: empilha "Gestão da obra" junto da Construção nos gráficos de avanço.
@@ -461,6 +465,7 @@ export class ViabFluxoCustos extends LitElement {
         </div>
 
         ${g.id === 'financeiro' ? this._renderRet() : nothing}
+        ${g.id === 'diretos' ? this._renderCorretagemPermutaFisica() : nothing}
 
         <urbi-tabela
           expandir
@@ -510,6 +515,40 @@ export class ViabFluxoCustos extends LitElement {
     `;
   }
 
+  // #473: toggle da base da Corretagem de vendas quanto à permuta física —
+  // `estudos.corretagem_sobre_permuta_fisica`, default `true` (VGV bruto,
+  // permuta física inclusa — preserva o número de todo estudo existente).
+  // Salva na hora do toggle (não precisa de rascunho: é um booleano isolado).
+  private _renderCorretagemPermutaFisica(): TemplateResult {
+    const dis = !this.editavel;
+    const marcado = this.estudo?.corretagem_sobre_permuta_fisica !== false;
+    return html`
+      <div class="ret-box">
+        <urbi-checkbox
+          label="Corretagem incide sobre a permuta física"
+          title="Marcado (padrão): a corretagem é cobrada também sobre as unidades permutadas fisicamente pelo terreno. Desmarcado: a corretagem incide só sobre a base vendável, excluindo a permuta física."
+          ?desabilitado=${dis || this.salvandoCorretagemPermuta}
+          ?marcado=${marcado}
+          @urbi:checkbox-change=${(e: CustomEvent) => this._salvarCorretagemPermutaFisica(e.detail.marcado)}
+        ></urbi-checkbox>
+      </div>
+    `;
+  }
+
+  private async _salvarCorretagemPermutaFisica(v: boolean) {
+    this.salvandoCorretagemPermuta = true;
+    try {
+      const res = await atualizarEstudo(this.estudo.id, { corretagem_sobre_permuta_fisica: v });
+      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      this.estudo = { ...this.estudo, corretagem_sobre_permuta_fisica: v };
+      urbiVerso.notificar('Base da corretagem atualizada.', 'sucesso');
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao salvar a base da corretagem', 'erro');
+    } finally {
+      this.salvandoCorretagemPermuta = false;
+    }
+  }
+
   // ── #192: gráficos de avanço da obra (só a linha Projetado) ──────────────
   //
   // Escopo decidido pelo autor (2026-07-27): a referência visual da planilha
@@ -549,6 +588,8 @@ export class ViabFluxoCustos extends LitElement {
       curvas: this.curvas,
       areaTerreno: this.ctxCusto.areaTerreno,
       ret: this.ret,
+      // #473: default true preserva o comportamento histórico (VGV bruto).
+      corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
     };
     return calcularFluxo(config);
   }

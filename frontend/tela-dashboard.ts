@@ -261,6 +261,8 @@ export class ViabTelaDashboard extends LitElement {
         curvas,
         areaTerreno: Number(estudo?.terreno_manual_area) || Number(estudo?.area_terreno_nucleo) || 0,
         ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+        // #473: default true preserva o comportamento histórico (VGV bruto).
+        corretagemSobrePermutaFisica: estudo?.corretagem_sobre_permuta_fisica !== false,
       };
       const c = calcularFluxo(config);
 
