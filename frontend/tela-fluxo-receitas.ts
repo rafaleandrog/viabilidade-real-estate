@@ -7,10 +7,10 @@ import {
   erroFormularioAbsorcao, totalAntesAlocacao,
   type EventoCrono,
 } from './fluxo-shared.js';
-import { pctRepasseDerivado, parcelasAoLongoObra } from './fluxo-caixa-motor.js';
+import { pctRepasseDerivado, parcelasAoLongoObra, jurosTabelaAnualPct } from './fluxo-caixa-motor.js';
 import {
   erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento,
-  jurosDeTabelaConfigurados,
+  taxasDistintasDoPlano,
 } from './fluxo-pagamento-editor.js';
 // #431: a lógica do modal de Absorção mora fora do componente, como a do modal
 // de Pagamento — método privado de LitElement não é testável neste repo.
@@ -733,6 +733,20 @@ export class ViabFluxoReceitas extends LitElement {
     this.modalPag = f;
   }
 
+  /**
+   * #428 — a taxa de juros de tabela do plano. É UM campo por Grupo (D-Q02),
+   * não um por componente: gravá-lo aqui faz `componentesDoLegado` escrever a
+   * mesma `taxaMensal` em todo componente financiado do plano.
+   *
+   * Escrever a chave `juros_tabela_aa` no formulário é o que marca "o usuário
+   * mexeu": enquanto ela não existir, `componentesParaSalvar` trata a taxa
+   * como só-canônica e preserva a que está persistida, componente a
+   * componente. Ver `fluxo-pagamento-editor.ts` § `taxaFoiEditada`.
+   */
+  private _setJurosTabela(valor: number) {
+    this.pagForm = { ...this.pagForm, juros_tabela_aa: valor };
+  }
+
   private _setLinha(bloco: 'entrada' | 'parcelas', i: number, campo: string, valor: any) {
     const f = this.pagForm;
     const linhas = f[bloco].map((x: any, j: number) => (j === i ? { ...x, [campo]: valor } : x));
@@ -778,18 +792,32 @@ export class ViabFluxoReceitas extends LitElement {
     const dis = !this.editavel;
     const repasse = pctRepasseDerivado(f);
     const erroPagamento = erroFormularioPagamento(f, this.crono);
-    // #436: os juros vêm do fluxo_pagamento PERSISTIDO, não de pagForm — o
-    // formulário não tem campo de taxa, então editar o modal não muda o que este
-    // bloco mostra. Ele revela o que já está gravado e o que o motor já aplica:
-    // `componentesPagamento` (`fluxo-caixa-motor.ts:631-635`) devolve os
-    // componentes persistidos sem passar pelo adaptador legado, e
-    // `calcularFluxo` soma os juros em `jurosClientes` (`:2045,2063`).
+    // #436/#428: o bloco de juros. A #436 o criou somente-leitura, lendo o
+    // fluxo_pagamento PERSISTIDO; a #428 lhe deu o campo editável, e o campo lê
+    // `pagForm` — é ele que o "Aplicar" grava.
     //
-    // Os KPIs que se movem são Receita Bruta, Resultado, margem, VPL e TIR — NÃO
-    // o "VGV Vendável", que sai de `vgvLinha(tipologias)` (`:1802-1807`, área ×
-    // preço) e não conhece juros. Medido na Rodada 8: R$ 1.259.273,59 de juros,
-    // TIR 18,59% contra 17,53%, VPL −R$ 959.500,19.
-    const juros = jurosDeTabelaConfigurados(this.modalPag?.fluxo_pagamento);
+    // As duas leituras convivem de propósito e NÃO são redundantes:
+    //  - `jurosAA` é a taxa DO PLANO, uma só (D-Q02). Sai de `pagForm` pela
+    //    chave `juros_tabela_aa` se ela existir, senão derivada dos componentes
+    //    persistidos — sem esse segundo ramo, o estudo 5 (que recebeu a taxa
+    //    pela API, sem a chave) abriria em 0% e o primeiro Aplicar a apagaria;
+    //  - `taxasPlano` continua lendo o persistido para responder UMA pergunta
+    //    que o campo único não responde: o plano tem mais de uma taxa gravada?
+    //    Esse é o caso residencial × não residencial da EVI, e é a única
+    //    situação em que mexer no campo achata dado. O aviso abaixo só aparece
+    //    nela.
+    //
+    // Os KPIs que se movem com a taxa são Receita Bruta, Resultado, margem, VPL
+    // e TIR — NÃO o "VGV Vendável", que sai de `vgvLinha(tipologias)` (área ×
+    // preço) e não conhece juros. Medido na Rodada 8 sobre o estudo 5:
+    // R$ 1.259.273,59 de juros, TIR 18,59% contra 17,53%, VPL -R$ 959.500,19.
+    // Revisao da #428, B3 — o gatilho do aviso NAO pode ser
+    // `jurosDeTabelaConfigurados`, que descarta taxa zero por contrato da #436:
+    // no plano canonico do estudo 5 (12,5% no `ate_marco`, 0% no Repasse de
+    // 70%) isso suprimia o aviso exatamente onde alterar o campo move mais
+    // dinheiro. `taxasDistintasDoPlano` conta o zero.
+    const taxasPlano = taxasDistintasDoPlano(this.modalPag?.fluxo_pagamento);
+    const jurosAA = jurosTabelaAnualPct(f);
     return html`
       <urbi-modal title="Fluxo de pagamento" maxWidth="860px" @urbi-modal:close=${() => this.modalPag = null}>
         <div class="pag-grid">
@@ -806,40 +834,29 @@ export class ViabFluxoReceitas extends LitElement {
             </div>
           </div>
           <div>
-            ${juros.length > 0 ? html`
-              <div class="pag-secao">
-                <h4>Juros de tabela</h4>
-                <!-- #436: somente-leitura. A taxa existe, entra em Receita Bruta,
-                     Resultado, margem, VPL e TIR, e até esta issue não aparecia em
-                     lugar nenhum da interface. O campo editável é a #428. -->
-                ${juros.length === 1 ? html`
-                  <p class="sec">Juros de tabela configurados:
-                    <strong>${fmtPct(juros[0].anualPct)} a.a.</strong> (não editáveis nesta versão)</p>`
-                  : html`
-                  <p class="sec">Juros de tabela configurados, por taxa (não editáveis nesta versão):</p>
-                  ${juros.map((j) => html`
-                    <p class="sec">${j.rotulos.join(', ')}: <strong>${fmtPct(j.anualPct)} a.a.</strong></p>`)}`}
-                <!-- #431: até esta issue, o texto aqui avisava que "Aplicar"
-                     APAGAVA estes juros — era verdade, e deixou de ser:
-                     componentesParaSalvar preserva taxaMensal e sinalPct tanto
-                     no no-op quanto na edição real. Manter o aviso antigo seria
-                     pior que não ter nenhum: ele mandaria o usuário fechar o
-                     modal sem aplicar para proteger um dado que já está
-                     protegido.
-                     (Sem crase neste comentário de propósito: ele mora dentro
-                     de um template literal do lit, e uma crase o encerraria.)
-                     O que SOBRA de honesto é a lacuna que a #428 fecha: linha de
-                     parcelamento criada agora nasce sem taxa, e não há campo
-                     onde digitá-la.
-                     Só aparece quando há Aplicar de verdade: em estudo
-                     somente-leitura o botão nem é renderizado. -->
-                ${dis ? nothing : html`
-                  <p class="sec aviso-juros">Estes juros são <strong>preservados</strong> ao clicar
-                    em <strong>Aplicar</strong>, inclusive quando você edita entrada ou
-                    parcelamento. O que este formulário ainda não faz é <strong>criar</strong>
-                    taxa: uma linha de parcelamento adicionada agora nasce sem juros, e não há
-                    campo onde digitá-los nesta versão.</p>`}
-              </div>` : nothing}
+            <div class="pag-secao">
+              <h4>Juros de tabela</h4>
+              <!-- #428: o campo editável, um por Grupo/plano (decisão D-Q02) e
+                   NÃO um por componente. A persistência grava a mesma taxa
+                   mensal equivalente em todo componente financiado do plano.
+                   O sinal (sinalPct) é campo à parte, de issue própria. -->
+              <p class="sec">Juros da tabela de venda a prazo, em % ao ano. Valem para o plano
+                inteiro — entrada parcelada, parcelamento e repasse —, convertidos para a taxa
+                mensal equivalente pela composição (1 + i)^(1/12) - 1, nunca por i/12.
+                0% é venda sem juros, e é como fica todo plano em que ninguém digitar nada.</p>
+              <div class="pag-linha">
+                <viab-num label="Juros de tabela (% a.a.)" sufixo="%" casas-minimas="2"
+                  ?desabilitado=${dis} .valor=${jurosAA}
+                  @urbi:input-numero-change=${(ev: CustomEvent) => this._setJurosTabela(ev.detail.valor ?? 0)}></viab-num>
+              </div>
+              ${taxasPlano.length > 1 ? html`
+                <p class="sec aviso-juros">Este plano tem <strong>${taxasPlano.length} taxas
+                  diferentes</strong> gravadas (${taxasPlano.map((j) => fmtPct(j.anualPct) + ' a.a. em ' + j.rotulos.join(', ')).join(' · ')}),
+                  e este campo guarda <strong>uma</strong>. Enquanto você não mexer nele, as taxas
+                  dos componentes que sobrevivem à edição são preservadas como estão; ao
+                  alterá-lo, a taxa acima passa a valer para <strong>todos</strong> os componentes
+                  do plano — inclusive os que hoje estão em 0%.</p>` : nothing}
+            </div>
             <div class="pag-secao">
               <h4>Condições de entrada</h4>
               <p class="sec">Pagamento no ato — 1 parcela paga no mês da contratação; mais de uma

@@ -5,6 +5,7 @@ import {
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   recebimentoBrutoMensal, impostoMensal, recebimentoLiquidoMensal,
   componentesDoLegado, componentesPagamento, ultimoMesRecebivelLinha,
+  taxaMensalDeAnual, taxaAnualDeMensal, jurosTabelaAnualPct, taxaMensalDoPlano,
   pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
   carteiraSaldoSafra, consolidarCarteiraClientes,
   calcularRecebiveisComponentes,
@@ -1757,6 +1758,151 @@ test('#283 motor de produção reproduz Calliandra G.2 e separa o repasse', () =
   assert.equal(r.carteiraPorComponenteMensal.saldoARepassar[25], 0);
   assert.equal(soma(r.jurosMensal), 0);
   assert.equal(r.carteiraMensal[25], 0);
+});
+
+// ── #428: juros de tabela — a conversão, o adaptador e os goldens da EVI ───
+//
+// O oráculo é a EVI Urbitá (consultiva, nunca contrato): `ClienteJurosAA =
+// 12,5% a.a.` em `Premissas e Resultados!H14`, convertido por
+// `ClienteJurosAM = (1 + ClienteJurosAA)^(1/12) − 1` — nome definido, fórmula
+// pura, sem arredondamento: 0,00986358055321146.
+
+test('#428 a conversão é COMPOSTA, nunca aa/12, e a volta desfaz a ida', () => {
+  // O valor exato de `ClienteJurosAM` na EVI. `12,5 / 12 / 100` daria
+  // 0,010416…, quase 6% a mais de juros mensais — o erro que esta asserção
+  // existe para impedir.
+  assert.equal(taxaMensalDeAnual(12.5), 0.00986358055321146);
+  assert.notEqual(taxaMensalDeAnual(12.5), 12.5 / 12 / 100);
+  // A taxa não residencial da EVI (`!H22`, válida só com `H16 = TRUE`).
+  assert.ok(perto(taxaMensalDeAnual(13) * 100, 1.0237, 0.0001));
+  // Contrato C7: derivada NÃO monetária carrega precisão plena. Se alguma
+  // dessas duas arredondasse, a volta não fecharia em 12 casas.
+  assert.ok(perto(taxaAnualDeMensal(taxaMensalDeAnual(12.5)), 12.5, 1e-12));
+  // 0% continua 0% nos dois sentidos — é o default de todo estudo existente.
+  assert.equal(taxaMensalDeAnual(0), 0);
+  assert.equal(taxaAnualDeMensal(0), 0);
+  // Lixo não vira NaN dentro dos componentes.
+  assert.equal(taxaMensalDeAnual(NaN), 0);
+  assert.equal(taxaAnualDeMensal(undefined as any), 0);
+});
+
+test('#428 a taxa do plano vem da chave digitada e, na falta dela, dos componentes', () => {
+  // 1) A chave que a #428 grava vence: é o dígito que o usuário escreveu.
+  assert.equal(taxaMensalDoPlano({ juros_tabela_aa: 12.5 }), taxaMensalDeAnual(12.5));
+  // 2) Estudo anterior à #428 (o caso do estudo 5, que recebeu a taxa pela
+  //    API): sem a chave, a taxa sai dos componentes — e CRUA, sem a ida e
+  //    volta em ponto flutuante que devolveria 0,009863600000000083.
+  assert.equal(taxaMensalDoPlano({ componentes: [{ tipo: 'ate_marco', taxaMensal: 0.0098636 }] }), 0.0098636);
+  assert.ok(perto(jurosTabelaAnualPct({ componentes: [{ taxaMensal: 0.0098636 }] }), 12.5, 0.001));
+  // 3) Chave presente e igual a 0 é RESPOSTA (o usuário desligou os juros),
+  //    não ausência: não pode cair na derivação e ressuscitar a taxa velha.
+  assert.equal(taxaMensalDoPlano({ juros_tabela_aa: 0, componentes: [{ taxaMensal: 0.0098636 }] }), 0);
+  // 4) Nada declarado é 0 — o default de todo estudo existente.
+  assert.equal(taxaMensalDoPlano({}), 0);
+  assert.equal(taxaMensalDoPlano(null), 0);
+});
+
+test('#428 componentesDoLegado propaga a taxa do plano nos QUATRO caminhos', () => {
+  const fp = {
+    juros_tabela_aa: 12.5,
+    entrada: [
+      { pct: 10, parcelas: 1, descontoPct: 0 },   // imediato — não tem taxa, e não deve ter
+      { pct: 10, parcelas: 3, descontoPct: 0 },   // prazo_fixo (entrada parcelada)
+    ],
+    parcelas: [
+      { pct: 20, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true },  // ate_marco
+      { pct: 20, periodicidade: 'mensal', parcelas: 12 },                      // prazo_fixo
+    ],
+  };
+  const comps = componentesDoLegado(fp, CRONO) as any[];
+  const esperada = taxaMensalDeAnual(12.5);
+  assert.deepEqual(comps.map((c) => c.tipo),
+    ['imediato', 'prazo_fixo', 'ate_marco', 'prazo_fixo', 'concentrado']);
+  // Os quatro caminhos que gravavam `taxaMensal: 0` — entrada parcelada, ao
+  // longo da obra, prazo fixo e repasse — passam a gravar a MESMA taxa (D-Q02).
+  for (const c of comps.filter((x) => x.tipo !== 'imediato')) {
+    assert.equal(c.taxaMensal, esperada, `${c.rotulo} ficou sem a taxa do plano`);
+  }
+  assert.equal('taxaMensal' in comps[0], false, 'imediato não tem juros: paga no mês da venda');
+
+  // Regressão: o MESMO plano sem a chave continua em 0 — nenhum estudo muda de
+  // número sem alguém digitar a taxa.
+  const semTaxa = componentesDoLegado({ ...fp, juros_tabela_aa: undefined }, CRONO) as any[];
+  for (const c of semTaxa.filter((x) => x.tipo !== 'imediato')) assert.equal(c.taxaMensal, 0);
+});
+
+test('#428 golden EVI safra única: sinal de 15% e 36 parcelas de R$ 21.414,48 (cfINC!AY20)', () => {
+  // Mês 0 do cenário dourado (`docs/rodada-8/02-regras-evi.md` §3).
+  //
+  // ⚠️ SAFRA ÚNICA, e só. `cfINC!AY` é um PMT rolante sobre um pool, não
+  // amortização por safra: as "36 parcelas iguais" só existem quando há UMA
+  // safra. Cobrar paridade com AY em cenário multi-safra pediria ao app um
+  // método que ele não tem — e não deve ter: o contrato do app é por safra.
+  const BASE = 7_603_022.19;
+  const componente: ComponentePagamento = {
+    tipo: 'prazo_fixo', participacaoPct: 10, sinalPct: 15, prazoMeses: 36,
+    defasagemMeses: 1, taxaMensal: 0.0098635806,
+    jurosNoMesDaContratacao: false, rotulo: 'tabela curta',
+  };
+  const pagamentos = pagamentosPrazoFixo(componente, 0, BASE);
+
+  const sinal = pagamentos.filter((p) => p.tipo === 'sinal');
+  assert.equal(sinal.length, 1);
+  assert.equal(sinal[0].mes, 0, 'o sinal é pago no mês da contratação');
+  assert.equal(sinal[0].valor, 114_045.33);        // 7.603.022,19 × 10% × 15%
+
+  const parcelas = pagamentos.filter((p) => p.tipo !== 'sinal');
+  assert.equal(parcelas.length, 36);
+  assert.equal(parcelas[0].mes, 1, 'defasagem 1: a 1ª parcela vence no mês seguinte');
+  assert.equal(parcelas[35].mes, 36);
+  for (const p of parcelas) {
+    assert.ok(perto(p.valor, 21_414.48, 0.10), `parcela do mês ${p.mes}: ${p.valor}`);
+  }
+  // As 35 primeiras são exatas; a última carrega o resíduo de centavos da
+  // quantização (C7, `round2` parcela a parcela).
+  for (const p of parcelas.slice(0, 35)) assert.equal(p.valor, 21_414.48);
+
+  // E o principal recuperado é exatamente a fração contratada: os juros são
+  // acréscimo, nunca reclassificação de principal.
+  const r = calcularRecebiveisComponentes([componente], [{ safra: 0, valorContratado: BASE }], 999, 60);
+  assert.ok(perto(soma(r.principalRecebidoMensal), BASE * 0.10, 0.01));
+  assert.ok(perto(soma(r.jurosMensal), 124_664.47, 0.01));
+  assert.ok(perto(soma(r.recebimentoBrutoMensal),
+    soma(r.principalRecebidoMensal) + soma(r.jurosMensal), 0.01));
+});
+
+test('#428 golden EVI repasse: o saldo a repassar capitaliza, e os juros são série própria', () => {
+  // `cfINC!AJ/AK/AL` — o maior item de juros da EVI: R$ 4.257.692,43 de
+  // principal (`cfINC!AH19`) viram R$ 5.715.517,93 no mês 30, dos quais
+  // R$ 1.457.825,50 são juros (78% dos juros daquela safra).
+  const PRINCIPAL = 4_257_692.43;
+  const componente: ComponentePagamento = {
+    tipo: 'concentrado', participacaoPct: 100, mesPagamento: 30,
+    taxaMensal: 0.0098635806, rotulo: 'saldo a repassar',
+  };
+  const r = calcularRecebiveisComponentes(
+    [componente], [{ safra: 0, valorContratado: PRINCIPAL }], 999, 60);
+
+  // ⚠️ A issue cita 5.715.517,93 / 1.457.825,50; o motor arredonda por `round2`
+  // e dá 5.715.517,94 / 1.457.825,51. É UM centavo, do último arredondamento
+  // (o exato é 5.715.517,9379…) — a tolerância de 2 centavos abaixo é isso, e
+  // não folga para erro de modelo.
+  assert.ok(perto(r.recebimentoBrutoMensal[30], 5_715_517.93, 0.02));
+  assert.ok(perto(r.recebimentoBrutoMensal[30], PRINCIPAL * Math.pow(1.0098635806, 30), 0.01));
+
+  // AS DUAS SÉRIES, que é o que prova que os juros não são principal disfarçado.
+  assert.equal(r.principalRecebidoMensal[30], PRINCIPAL, 'o principal do repasse não pode crescer');
+  assert.ok(perto(r.jurosMensal[30], 1_457_825.50, 0.02));
+  assert.equal(soma(r.principalRecebidoMensal), PRINCIPAL);
+  assert.equal(r.repasseMensal[30], r.recebimentoBrutoMensal[30]);
+
+  // "Os juros começam no mês seguinte à contratação": nada é recebido antes.
+  assert.equal(soma(r.recebimentoBrutoMensal.slice(0, 30)), 0);
+  // Taxa 0 é o mesmo repasse de sempre, sem um centavo de juros — o default.
+  const semJuros = calcularRecebiveisComponentes(
+    [{ ...componente, taxaMensal: 0 }], [{ safra: 0, valorContratado: PRINCIPAL }], 999, 60);
+  assert.equal(semJuros.recebimentoBrutoMensal[30], PRINCIPAL);
+  assert.equal(soma(semJuros.jurosMensal), 0);
 });
 
 test('#283 linha opt-in alimenta juros, principal e carteira no FluxoCalc', () => {
