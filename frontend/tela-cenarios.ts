@@ -550,7 +550,19 @@ export class ViabTelaCenarios extends LitElement {
    * dois valores em módulo e `maiorMelhor = false`, a mesma convenção do KPI
    * de `frontend/fluxo-tabela.ts` (`varKpi`).
    */
-  private _badgeVar(novo: number | null, base: number | null, maiorMelhor = true) {
+  // #491 (auditoria de 2026-08-24): `maiorMelhor` NÃO tem default, de
+  // propósito. O commit da #491 afirmava que já era assim e estava errado — a
+  // obrigatoriedade valia só para `calcularVariacao` (cenario-variacao.ts), a
+  // função pura; este wrapper, que é quem o template de fato chama, tinha
+  // `= true`. Medido: apagar o `false` da chamada da Exposição máxima
+  // compilava LIMPO e reintroduzia o bug que a #491 existe para consertar —
+  // o badge voltava a ler por sinal em vez de por magnitude, em silêncio.
+  //
+  // Teste de função pura não alcança este ponto: a chamada mora dentro de um
+  // template `html` do Lit. Com o parâmetro obrigatório, a omissão vira
+  // TS2554 — é a defesa que o `CLAUDE.md` prescreve para a classe de defeito
+  // nº 1, aplicada onde ela de fato precisava estar.
+  private _badgeVar(novo: number | null, base: number | null, maiorMelhor: boolean) {
     const v = calcularVariacao(novo, base, maiorMelhor);
     if (!v) return nothing;
     return html`<urbi-badge cor=${v.melhor ? 'sucesso' : 'perigo'}>${v.texto}</urbi-badge>`;
@@ -567,9 +579,9 @@ export class ViabTelaCenarios extends LitElement {
         <td class="cen-estreita">${pctTxt(n(c.preco_venda_pct))}</td>
         <td class="cen-estreita">${pctTxt(n(c.custo_obra_pct))}</td>
         <td class=${calc.vpl >= 0 ? 'pos' : 'neg'}>${fmtR$(calc.vpl)}</td>
-        <td class="cen-var">${this._badgeVar(calc.vpl, base.vpl)}</td>
+        <td class="cen-var">${this._badgeVar(calc.vpl, base.vpl, true)}</td>
         <td>${tir}</td>
-        <td class="cen-var">${this._badgeVar(calc.tir, base.tir)}</td>
+        <td class="cen-var">${this._badgeVar(calc.tir, base.tir, true)}</td>
         <td>${calc.paybackData ?? '—'}</td>
         <td class="neg">${fmtR$(Math.abs(calc.exposicaoMaxima))}</td>
         <td class="cen-var">${this._badgeVar(Math.abs(calc.exposicaoMaxima), Math.abs(base.exposicaoMaxima), false)}</td>
