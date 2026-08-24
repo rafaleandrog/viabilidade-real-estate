@@ -58,7 +58,10 @@ const PARES: ParDeModal[] = [
   {
     nome: 'Fluxo de pagamento',
     coluna: 'avancado_fases.fluxo_pagamento',
-    oQueOFormularioNaoSabe: 'taxaMensal, sinalPct, jurosNoMesDaContratacao e rotulo por componente',
+    // #455: `sinalPct` SAIU desta lista — o espelho (parcelas[].sinalPct)
+    // passou a sabê-lo, e a fixture abaixo tem sinalPct 0 nos dois lados
+    // (persistido e mirror), então o no-op continua fechando sem ele.
+    oQueOFormularioNaoSabe: 'taxaMensal, jurosNoMesDaContratacao e rotulo por componente',
     // A linha "Tabela longa (80%)" do estudo 5 de Pinguim.
     dado: () => ({
       comissao: { ativo: true, tipo: 'embutida', pct: 0 },

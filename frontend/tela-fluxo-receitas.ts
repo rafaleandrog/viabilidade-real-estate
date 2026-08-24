@@ -7,7 +7,9 @@ import {
   erroFormularioAbsorcao, totalAntesAlocacao, ramoLegadoDeRecebiveis,
   type EventoCrono,
 } from './fluxo-shared.js';
-import { pctRepasseDerivado, parcelasAoLongoObra, jurosTabelaAnualPct } from './fluxo-caixa-motor.js';
+import {
+  pctRepasseDerivado, parcelasAoLongoObra, jurosTabelaAnualPct, type ResiduoAteMarco,
+} from './fluxo-caixa-motor.js';
 import {
   erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento,
   taxasDistintasDoPlano,
@@ -776,6 +778,18 @@ export class ViabFluxoReceitas extends LitElement {
     this.pagForm = { ...this.pagForm, juros_tabela_aa: valor };
   }
 
+  /**
+   * #460 — destino do resíduo de um Parcelamento "Ao longo da obra" sem prazo
+   * (venda contratada no mês do marco ou depois): rolar para o Repasse
+   * (`concentrado`) ou virar caixa imediato (o comportamento de sempre).
+   * Escrever a chave é o que marca "o usuário escolheu" — `formularioPagamento`
+   * só a propaga quando já existia no persistido (ver a nota de contrato em
+   * `FormularioPagamento`).
+   */
+  private _setResiduoAteMarco(valor: ResiduoAteMarco) {
+    this.pagForm = { ...this.pagForm, residuoAteMarco: valor };
+  }
+
   private _setLinha(bloco: 'entrada' | 'parcelas', i: number, campo: string, valor: any) {
     const f = this.pagForm;
     const linhas = f[bloco].map((x: any, j: number) => (j === i ? { ...x, [campo]: valor } : x));
@@ -868,7 +882,8 @@ export class ViabFluxoReceitas extends LitElement {
               <!-- #428: o campo editável, um por Grupo/plano (decisão D-Q02) e
                    NÃO um por componente. A persistência grava a mesma taxa
                    mensal equivalente em todo componente financiado do plano.
-                   O sinal (sinalPct) é campo à parte, de issue própria. -->
+                   O sinal (sinalPct, #455) é por LINHA de Parcelamento —
+                   ver o bloco "Parcelamento" abaixo. -->
               <p class="sec">Juros da tabela de venda a prazo, em % ao ano. Valem para o plano
                 inteiro — entrada parcelada, parcelamento e repasse —, convertidos para a taxa
                 mensal equivalente pela composição (1 + i)^(1/12) - 1, nunca por i/12.
@@ -914,11 +929,19 @@ export class ViabFluxoReceitas extends LitElement {
               <h4>Parcelamento</h4>
               <p class="sec">Quantidade de parcelas mensais — "Ao longo da obra" liquida no evento
                 do Cronograma (a quantidade vem de lá); sem marcar, é um prazo fixo de N parcelas.</p>
+              <!-- #455: a distinção que o critério de aceite exige — Entrada é
+                   % do TOTAL da venda; Sinal é % DESTE componente. -->
+              <p class="sec">Sinal: um adiantamento pago no mês da contratação, em % <strong>deste
+                componente</strong> — diferente da Entrada (acima), que é % do total da venda. O
+                sinal não entra na base de juros da parcela (a PMT roda sobre o valor já líquido do
+                sinal). 0% é o comportamento de sempre.</p>
               ${f.parcelas.map((p: any, i: number) => {
                 return html`
                 <div class="pag-linha">
                   <viab-num label="% do total" sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${p.pct}
                     @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'pct', ev.detail.valor ?? 0)}></viab-num>
+                  <viab-num label="Sinal" sufixo="%" casas-minimas="2" ?desabilitado=${dis} .valor=${n(p.sinalPct)}
+                    @urbi:input-numero-change=${(ev: CustomEvent) => this._setLinha('parcelas', i, 'sinalPct', ev.detail.valor ?? 0)}></viab-num>
                   ${/* #342: a badge de periodicidade foi removida — só "Mensal"
                        existe desde a #248, então marcar/clicar não tinha mais
                        função (era sempre a única opção, sempre ativa). A
@@ -962,6 +985,23 @@ export class ViabFluxoReceitas extends LitElement {
                   <span class="sec">Repasse</span><br />
                   <span class="derivado">${repasse.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</span>
                 </div>
+              </div>
+              <!-- #460: destino do resíduo de um "Ao longo da obra" sem prazo
+                   (venda no mês do marco ou depois). 'imediato' preserva todo
+                   estudo existente; 'concentrado' é a regra da EVI — rola
+                   para o Repasse e passa a capitalizar com ele. -->
+              <p class="sec">Quando uma venda "Ao longo da obra" acontece no próprio mês do marco
+                (ou depois), sem prazo restante para parcelar, o valor pode virar caixa imediato
+                (padrão) ou rolar para o Repasse, capitalizando junto com ele.</p>
+              <div class="pag-linha">
+                <urbi-select label="Resíduo sem prazo" ?desabilitado=${dis}
+                  .valor=${f.residuoAteMarco ?? 'imediato'}
+                  .opcoes=${[
+                    { valor: 'imediato', rotulo: 'Caixa imediato (padrão)' },
+                    { valor: 'concentrado', rotulo: 'Rola para o Repasse' },
+                  ]}
+                  @urbi:select-change=${(ev: CustomEvent) =>
+                    this._setResiduoAteMarco(ev.detail.valor as ResiduoAteMarco)}></urbi-select>
               </div>
             </div>
           </div>

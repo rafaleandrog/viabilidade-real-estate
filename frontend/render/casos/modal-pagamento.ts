@@ -47,10 +47,14 @@ export const caso = {
   exigir: [
     { seletor: 'urbi-modal', minimo: 1 },
     { seletor: 'div.pag-grid', minimo: 1 },
-    { seletor: 'viab-num', minimo: 5 },
+    // #455: 3 na Entrada (% do total, Nº parcelas, Desconto) + 3 no
+    // Parcelamento (% do total, Sinal, Nº parcelas) + 1 no bloco de Juros.
+    { seletor: 'viab-num', minimo: 7 },
     // #436: o bloco de juros e o aviso de que "Aplicar" os apaga. Sem estas duas
     // linhas o bloco novo não é medido por nada.
     { seletor: 'p.aviso-juros', minimo: 1 },
+    // #460: o controle de destino do resíduo — primeiro `urbi-select` deste caso.
+    { seletor: 'urbi-select', minimo: 1 },
   ],
   // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a
   // uma. Não é isenção: é o registro do que a medida deste caso NÃO cobre. O
@@ -63,6 +67,14 @@ export const caso = {
     'urbi-botao.icone',
     'urbi-botao.pequeno',
     'urbi-botao.variante',
+    // Binding de PROPRIEDADE (o Lit nem escreve atributo); o stub não desenha
+    // opção nenhuma — mesma natureza documentada em kpis-resumo.ts e
+    // grupo-badge-legado.ts. O que este caso mede é a grade de `viab-num`.
+    'urbi-select.opcoes',
+    // O espelho de `urbi-select` não desenha o rótulo — medido aqui: mesmo
+    // com `label` em atributo, a caixa fica sem esse texto. Igual natureza
+    // das duas acima; não é isenção, é o registro do que este caso não cobre.
+    'urbi-select.label',
     // Os três abaixo têm a mesma natureza entre si: o stub não desenha o
     // conteúdo deles, então as caixas ficam com altura zero e não contribuem
     // geometria. O que este caso mede é a GRADE do modal, que é feita de

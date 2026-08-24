@@ -228,10 +228,4 @@ export const EXCECOES = [
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :426-440 — \"resolverCustoTotal\" está em :578. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
-  {
-    arquivo: "frontend/proforma-avancado.ts",
-    endereco: "fluxo-caixa-motor.ts:2010-2101",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :2010-2101 — \"fluxoMensal\" está em :2108. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
 ];

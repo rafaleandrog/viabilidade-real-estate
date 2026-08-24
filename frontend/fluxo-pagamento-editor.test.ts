@@ -1005,3 +1005,145 @@ test('#428 revisão R1: o setter do campo grava a chave que o editor lê', () =>
   // E o campo continua respeitando estudo somente-leitura.
   assert.match(fonte, /<viab-num label="Juros de tabela \(% a\.a\.\)"[\s\S]{0,120}\?desabilitado=\$\{dis\}/);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #455 — sinal na contratação por componente parcelado
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FP_PARCELAMENTO_COM_SINAL = () => ({
+  comissao: { ativo: true, tipo: 'embutida', pct: 0 },
+  entrada: [],
+  parcelas: [{ pct: 30, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, sinalPct: 15 }],
+  repasse: { apos_entrega_meses: 0 },
+  componentes: [
+    {
+      tipo: 'ate_marco', rotulo: 'Tabela longa (legado)', marcoMes: 38, sinalPct: 15,
+      taxaMensal: 0, defasagemMeses: 1, participacaoPct: 30, jurosNoMesDaContratacao: false,
+    },
+    { tipo: 'concentrado', rotulo: 'Repasse', mesPagamento: 39, taxaMensal: 0, participacaoPct: 70 },
+  ],
+  aplicado: true,
+});
+
+test('#455 no-op: abrir e aplicar sem mexer preserva sinalPct — byte-idêntico', () => {
+  const fp = FP_PARCELAMENTO_COM_SINAL();
+  const form = formularioPagamento(fp);
+  assert.equal(form.parcelas[0].sinalPct, 15, 'o espelho tem de mostrar o sinal persistido');
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  assert.equal(JSON.stringify(salvo.componentes), JSON.stringify(fp.componentes));
+});
+
+test('#455 ida e volta pelo editor puro: o sinal digitado chega a sinalPct e volta ao formulário igual', () => {
+  const fp = FP_PARCELAMENTO_COM_SINAL();
+  const form = formularioPagamento(fp);
+  // O que o campo novo faz: `_setLinha('parcelas', 0, 'sinalPct', valor)`.
+  form.parcelas = [{ ...form.parcelas[0], sinalPct: 22.5 }];
+
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  const ateMarco = salvo.componentes.find((c: any) => c.tipo === 'ate_marco') as any;
+  assert.equal(ateMarco.sinalPct, 22.5, 'o sinal digitado não chegou ao componente');
+  // A partição não se mexe: só o sinal mudou.
+  assert.deepEqual(particao(salvo.componentes), [['ate_marco', 30], ['concentrado', 70]]);
+  // E reabrir mostra 22,5 de volta — não o valor antigo, nem 0.
+  const reaberto = formularioPagamento(salvo);
+  assert.equal(reaberto.parcelas[0].sinalPct, 22.5);
+  // Idempotência: aplicar de novo sobre o gravado não move nada.
+  const denovo = fluxoPagamentoParaSalvar(reaberto, CRONO_LONGA);
+  assert.deepEqual(denovo.componentes, salvo.componentes);
+});
+
+test('#455 identidade: mexer no sinal de UMA linha não muda o sinal da outra', () => {
+  const fp = {
+    ...FP_TABELA_LONGA(),
+    entrada: [],
+    parcelas: [
+      { pct: 20, periodicidade: 'mensal', parcelas: 10, ao_longo_obra: false, sinalPct: 5 },
+      { pct: 30, periodicidade: 'mensal', parcelas: 5, ao_longo_obra: false, sinalPct: 12 },
+    ],
+    componentes: [
+      {
+        tipo: 'prazo_fixo', participacaoPct: 20, sinalPct: 5, prazoMeses: 10, defasagemMeses: 1,
+        taxaMensal: TAXA, jurosNoMesDaContratacao: false, rotulo: 'A',
+      },
+      {
+        tipo: 'prazo_fixo', participacaoPct: 30, sinalPct: 12, prazoMeses: 5, defasagemMeses: 1,
+        taxaMensal: 0.005, jurosNoMesDaContratacao: false, rotulo: 'B',
+      },
+      { tipo: 'concentrado', participacaoPct: 50, mesPagamento: 39, taxaMensal: 0, rotulo: 'R' },
+    ],
+  };
+  const form = formularioPagamento(fp);
+  form.parcelas = [{ ...form.parcelas[0], sinalPct: 9 }, form.parcelas[1]]; // só a primeira muda
+
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  const porRotulo = (r: string) => salvo.componentes.find((c: any) => c.rotulo === r) as any;
+  assert.equal(porRotulo('A').sinalPct, 9, 'o sinal digitado na linha A não chegou');
+  assert.equal(porRotulo('B').sinalPct, 12, 'o sinal de B se moveu sem ninguém editá-lo');
+  // E a taxa de cada linha, que é campo diferente, continua na linha certa.
+  assert.equal(porRotulo('A').taxaMensal, TAXA);
+  assert.equal(porRotulo('B').taxaMensal, 0.005);
+});
+
+test('#455 FIAÇÃO: o modal tem o campo Sinal por linha de Parcelamento, ligado ao setter certo', () => {
+  const fonte = readFileSync(new URL('./tela-fluxo-receitas.ts', import.meta.url), 'utf8');
+
+  // 1. o campo existe dentro do bloco de Parcelamento e está ligado a
+  //    `_setLinha('parcelas', i, 'sinalPct', ...)` — não a outra chave.
+  assert.match(fonte, /<viab-num label="Sinal" sufixo="%"/);
+  assert.match(fonte,
+    /@urbi:input-numero-change=\$\{\(ev: CustomEvent\) => this\._setLinha\('parcelas', i, 'sinalPct', ev\.detail\.valor \?\? 0\)\}/);
+
+  // 2. o `.valor` lê `p.sinalPct` (via `n(...)`), não uma constante nem outro
+  //    campo — senão o controle mostraria sempre 0 ou o valor errado.
+  assert.match(fonte, /label="Sinal" sufixo="%" casas-minimas="2" \?desabilitado=\$\{dis\} \.valor=\$\{n\(p\.sinalPct\)\}/);
+
+  // 3. o texto que distingue Entrada (% do total) de Sinal (% do componente)
+  //    está na tela — critério de aceite 6 da issue.
+  assert.match(fonte, /% do total da venda/);
+  assert.match(fonte, /deste[\s\S]{0,20}componente/);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #460 — resíduo de parcelamento sem prazo rola para o repasse (opt-in)
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('#460 no-op: sem residuoAteMarco no persistido, a chave não nasce no JSON gravado', () => {
+  const fp = FP_TABELA_LONGA();
+  const form = formularioPagamento(fp);
+  assert.equal('residuoAteMarco' in form, false, 'a chave foi fabricada onde o dado não tinha');
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  assert.equal('residuoAteMarco' in salvo, false, 'o no-op inventou uma chave no JSON persistido');
+  assert.deepEqual(salvo.componentes, fp.componentes);
+});
+
+test('#460 a escolha do controle sobrevive ao Aplicar e volta ao reabrir', () => {
+  const fp = FP_TABELA_LONGA();
+  const form = formularioPagamento(fp);
+  (form as any).residuoAteMarco = 'concentrado';
+
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  assert.equal((salvo as any).residuoAteMarco, 'concentrado');
+  // O array de componentes não muda por causa deste campo — ele não descreve
+  // NENHUM componente, só é lido pelo motor no momento do cálculo.
+  assert.deepEqual(salvo.componentes, fp.componentes);
+
+  const reaberto = formularioPagamento(salvo);
+  assert.equal(reaberto.residuoAteMarco, 'concentrado');
+});
+
+test('#460 FIAÇÃO: o modal tem o controle de destino do resíduo, ligado ao setter certo', () => {
+  const fonte = readFileSync(new URL('./tela-fluxo-receitas.ts', import.meta.url), 'utf8');
+
+  // 1. o controle existe e está ligado ao setter.
+  assert.match(fonte, /<urbi-select label="Resíduo sem prazo"/);
+  assert.match(fonte,
+    /@urbi:select-change=\$\{\(ev: CustomEvent\) =>\s*\n?\s*this\._setResiduoAteMarco\(ev\.detail\.valor as ResiduoAteMarco\)\}/);
+
+  // 2. o `.valor` lê `f.residuoAteMarco`, com o default 'imediato' — não uma
+  //    constante, e não outra chave.
+  assert.match(fonte, /\.valor=\$\{f\.residuoAteMarco \?\? 'imediato'\}/);
+
+  // 3. o setter grava a chave que `componentesIntegradosSafra` lê.
+  assert.match(fonte,
+    /_setResiduoAteMarco\(valor: ResiduoAteMarco\)\s*\{[^}]*residuoAteMarco: valor/);
+});
