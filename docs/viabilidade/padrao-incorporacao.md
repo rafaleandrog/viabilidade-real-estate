@@ -1289,9 +1289,9 @@ O comprador pode pagar parte diretamente e financiar parte com o banco, mas amba
 > safra está em `calcularRecebiveisComponentes:1096`, via `componentesIntegradosSafra:1030-1043`.
 >
 > ⚠️ **Vale só para linha com `fluxo_pagamento.componentes` persistido.** A linha que nunca passou
-> pelo modal desde a #248 cai no motor legado (`recebimentoBrutoMensal:1600` em diante, ramo a
-> partir de `:1607`), que **não** distingue a fronteira da entrega — aplica o plano do Grupo a toda
-> safra. 🔧 endereço conferido na #458 (2026-08-24) — era `:1342`.
+> pelo modal desde a #248 cai no motor legado (`recebimentoBrutoMensal:1622` em diante, ramo a
+> partir de `:1629`), que **não** distingue a fronteira da entrega — aplica o plano do Grupo a toda
+> safra. 🔧 endereço conferido na #458 (2026-08-24, depois do merge com a #532/main) — era `:1342`.
 
 ### 11.9 Recebimentos antigos continuam
 
