@@ -317,6 +317,9 @@ Ele não precisa reproduzir toda a dinâmica mensal de recebíveis, carteira e f
 >
 > A engine devolve a interface `Proforma`, que alimenta a aba Proforma, os KPIs ao vivo da aba
 > Premissas e a exportação. O backend **nunca** calcula indicadores — não há endpoint de "simular".
+>
+> O Avançado tem proforma própria e **desalavancada** — ver
+> [Fórmulas da Proforma](formulas) § A segunda proforma.
 
 A navegação típica inclui:
 

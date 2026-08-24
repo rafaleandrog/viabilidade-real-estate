@@ -1,6 +1,6 @@
 ---
 titulo: Fórmulas da Proforma
-descricao: Referência das linhas e cálculos da Proforma (Loteamento e Incorporação).
+descricao: Referência das linhas e cálculos da Proforma do Preliminar (Loteamento e Incorporação) e da proforma desalavancada do Avançado.
 tipo: app
 ordem: 3
 ---
@@ -96,11 +96,41 @@ em `s + defasagemMeses`, carteira por safra e repasse — estão descritas nos d
 > que mantenha a carteira monotonicamente decrescente mas erre juros ou pagamento intermediário
 > **passa**. O oráculo de verdade são os cenários dourados, não o validador.
 
-## Proforma do Avançado — fecho de três linhas (#427)
+## A segunda proforma — nível Avançado
 
-> Esta seção documenta só o **fecho** da proforma do Avançado (`frontend/proforma-avancado.ts`).
-> O bloco maior "proforma desalavancada" (#448) ainda não existe neste arquivo — quando entrar,
-> as três definições abaixo migram para lá; até então elas vivem aqui, sozinhas.
+O Avançado tem proforma própria (`frontend/proforma-avancado.ts`), que **não** roda as fórmulas
+do Preliminar: ela relê as séries mensais já calculadas por `calcularFluxo` e as achata na mesma
+hierarquia de linhas do Preliminar, para que os dois níveis se comparem na mesma coluna
+(`investimentoTotal` e `roiPct` são literalmente a fórmula do Preliminar — ver
+`frontend/proforma-avancado.ts:150-162`).
+
+> ⚠️ **A proforma do Avançado é DESALAVANCADA — nenhum lado do funding entra nela.** Nem as saídas
+> (parcelas, retorno ao investidor), nem as entradas (liberações, aportes). É visão **econômica** do
+> empreendimento, antes de decidir como ele é capitalizado, e é o que mantém TIR, VPL e ROI
+> comparáveis entre estudos com e sem funding — a mesma decisão que `frontend/funding-motor.ts:685-689`
+> registra para as KPIs do projeto (e que a §8.1 de
+> [Funding, Capital Stack e Retorno do Capital](funding-capital-stack) guarda como **ADR histórico**,
+> não como norma vigente — a seção está carimbada "Supersedida pela #355"). Quem quiser ler o efeito
+> do funding lê a **aba Fluxo de Caixa**, cuja tabela é visão de **caixa** e onde as duas pontas
+> existem e se cancelam no principal (`FundingNoFluxo.fluxoMensal`).
+>
+> Até 2026-08-22 esta função somava `funding.linhasSaida` ao custo sem nunca creditar as entradas:
+> o estudo 5 de Pinguim exibia −R$ 62.364.749,03 de resultado onde o valor real é
+> R$ 24.668.189,10 (margem −47,87% contra **18,94%**), e o Δ era, ao centavo, a Σ das saídas de
+> funding. Todo estudo Avançado **com** funding aparecia no painel como prejuízo catastrófico.
+> Corrigido pela issue #426 (medição em Pinguim: `docs/rodada-8/04-regras-reconciliacao.md:1512-1517`).
+
+> ⚠️ **"Custos Financeiros" não significa a mesma coisa em toda tela.** Na proforma (aqui) o grupo
+> vale só o custo que o usuário classificou como financeiro — por isso o rótulo desta tela leva o
+> parêntese "(exclui serviço da dívida)" (#447). Na aba Fluxo de Caixa e no Resumo o rótulo
+> permanece sem parêntese e inclui as duas pontas do funding — são visões diferentes de propósito,
+> não uma inconsistência. A tabela completa das três superfícies está no cabeçalho de
+> `frontend/proforma-avancado.ts:48-70`.
+
+### O fecho de três linhas (#427)
+
+> Esta subseção migrou para dentro do bloco "proforma desalavancada" (#448) — o corpo do PR #530
+> já declarava essa migração como o destino planejado assim que este bloco existisse.
 
 A EVI fecha a proforma com **três** leituras do mesmo projeto
 (`Premissas e Resultados!K35/K37/K39` do `EVI_Urbita.xlsx`), cada uma com sua própria base — "a
@@ -119,7 +149,9 @@ permuta financeira, já com o sinal estornado (positivo) — soma direto de `cal
 
 O rótulo/nota da 3ª linha é condicional, no molde de `K35`/`K36` da EVI: só aparece quando há
 permuta física. Com física **e** financeira zeradas, as três linhas coincidem em valor e
-percentual, e a linha 3 cai de volta para o rótulo `= Resultado`, sem nota de denominador.
+percentual, e a linha 3 cai de volta para o rótulo `= Resultado`, sem nota de denominador — a
+mesma degenerescência que a linha informativa do funding (acima) também respeita: cada extra some
+sozinho quando a grandeza que ele mede é zero, em vez de aparecer com valor zerado.
 
 **Qual das três alimenta cada superfície:** hoje, todas as superfícies (Painel de estudos —
 `frontend/tela-dashboard.ts` — e a linha `resultado` lida em `frontend/tela-fluxo-ver.ts`)
