@@ -199,6 +199,15 @@ export class ViabFunding extends LitElement {
     }
   }
 
+  // #474 (Passos 23–25, D-Q03 2026-08-22): esta montagem
+  // (resultadoFinal → fundingDoEstudo) é LOCAL. O app não tem uma função
+  // única para essa sequência (`docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`)
+  // — cada consumidor remonta à mão, e pode divergir (R-A36). Fonte única
+  // foi CONSIDERADA E RECUSADA pelo autor; ver
+  // `docs/viabilidade/fluxo-investidor-formulas.md` §9. Os outros quatro
+  // consumidores: frontend/tela-fluxo-ver.ts:169 · frontend/tela-cenarios.ts:230
+  // · frontend/tela-resumo.ts:171 (só remonta resultadoFinal, não chama
+  // fundingDoEstudo) · scripts/conferir-estudo.ts:142.
   /** Prévia sobre o DRAFT: o que está sendo digitado já aparece nos indicadores. */
   private _recalcular() {
     if (!this.calc) { this.funding = null; return; }

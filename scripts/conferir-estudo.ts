@@ -18,6 +18,17 @@
  * ⚠️ O token NUNCA é embutido nem impresso: vem só de `process.env.URBI_TOKEN`.
  * ⚠️ Só emite `GET`. A credencial de auditoria *pode* escrever (a flag
  *    `somente_leitura` é falsa e imutável) — a postura é disciplina, não trava.
+ *
+ * #474 (Passos 23–25, D-Q03 2026-08-22): a montagem `resultadoFinal →
+ * fundingDoEstudo` logo abaixo (`:141-142`) é LOCAL — o app não tem uma
+ * função única para essa sequência
+ * (`docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`). Cada
+ * consumidor remonta à mão e pode divergir (R-A36); fonte única foi
+ * CONSIDERADA E RECUSADA pelo autor — ver
+ * `docs/viabilidade/fluxo-investidor-formulas.md` §9. Os outros quatro:
+ * frontend/tela-fluxo-ver.ts:169 · frontend/tela-funding.ts:207 ·
+ * frontend/tela-cenarios.ts:230 · frontend/tela-resumo.ts:171 (só remonta
+ * resultadoFinal, não chama fundingDoEstudo).
  */
 
 import { calcularFluxo, type FluxoCalc, type FluxoConfig } from '../frontend/fluxo-caixa-motor.js';

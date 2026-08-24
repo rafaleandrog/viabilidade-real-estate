@@ -214,7 +214,11 @@ export class ViabTelaGraficos extends LitElement {
       // "Custo obras / VGV" (plural) — mesmo rótulo usado em exportar.ts,
       // tela-premissas.ts e tela-proforma.ts (#183).
       custo_obras_vgv: 'Custo obras / VGV',
-      margem_liquida: 'Margem líquida',
+      // #443: "Margem sobre VGV" — este `p` é sempre o Proforma do Preliminar
+      // (`resultado/vgv`); não confundir com a "Margem de caixa" do Avançado
+      // (`tela-resumo.ts`) nem com a "Margem sobre Receita Bruta" da Proforma
+      // do Avançado (`proforma-avancado.ts`).
+      margem_liquida: 'Margem sobre VGV',
     };
     const medidores = this.benchmarks
       .map((b) => {

@@ -210,7 +210,7 @@ export class ViabTelaProforma extends LitElement {
     // Texto colorido nos 3 níveis do velocímetro do benchmark (sem emoji; a bola
     // fica só nos badges da análise de sensibilidade).
     kpis.push({ rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: varianteFaixa(co, p.custoObrasVgvPct) });
-    kpis.push({ rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) });
+    kpis.push({ rot: 'Margem sobre VGV', val: fmtPct(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) });
     return html`<div class="kpis">
       ${kpis.map((k) => html`<urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>`)}
     </div>`;
@@ -447,7 +447,7 @@ export class ViabTelaProforma extends LitElement {
       { l: 'Custo indireto total', f: (c) => c.p.custoIndiretoTotal, natureza: 'despesa' },
       { l: 'Resultado', f: (c) => c.p.resultado, natureza: 'receita' },
       { l: 'Custo obras / VGV', f: (c) => c.p.custoObrasVgvPct, natureza: 'despesa', pct: true, badge: true, bmCampo: 'custo_obras_vgv', divisoria: true },
-      { l: 'Margem líquida', f: (c) => c.p.margemLiquidaPct, natureza: 'receita', pct: true, badge: true, bmCampo: 'margem_liquida' },
+      { l: 'Margem sobre VGV', f: (c) => c.p.margemLiquidaPct, natureza: 'receita', pct: true, badge: true, bmCampo: 'margem_liquida' },
     ];
     // BUG7-12: sem símbolo "R$" — número puro com 2 casas decimais.
     // #492: `fmtNum` com 2 casas dava *até* 2 casas (declara só o

@@ -264,6 +264,13 @@ export class ViabTelaDashboard extends LitElement {
       };
       const c = calcularFluxo(config);
 
+      // #474: este arquivo NÃO é (mais) consumidor da cadeia dos Passos
+      // 23–25 (fundingDoEstudo + fluxoAcumulado) — a #521/#529 (proforma do
+      // Avançado desalavancada) tiraram daqui a chamada a `fundingDoEstudo`
+      // que existia na vistoria de pré-PR da issue. `proformaAvancado` nem
+      // recebe funding (#426). Os cinco consumidores reais estão listados em
+      // `docs/viabilidade/fluxo-investidor-formulas.md` §9 — não adicione
+      // este arquivo de volta à lista sem reintroduzir a chamada.
       const area = areaPrivativaTotalLinhas(linhasReceita);
       const p = proformaAvancado(c, area);
       // A área privativa já era calculada aqui e DESCARTADA — o mapa só guardava
@@ -382,6 +389,23 @@ export class ViabTelaDashboard extends LitElement {
         if (r === 'carregando') return '…';
         return r ? fn(r) : '—';
       };
+    // #443 itens 2 e 6: "VGV" e "Margem" são colunas ÚNICAS que misturam DUAS
+    // grandezas — o Preliminar lê `proforma.ts`, o Avançado lê
+    // `proforma-avancado.ts`, e as fórmulas divergem (ver `resumoListagem`
+    // acima). Uma coluna não pode ter dois rótulos, e colapsar as duas na
+    // mesma grandeza moveria o número de um dos níveis — fora do escopo de
+    // "sem unificar as definições" desta issue. Saída escolhida: rótulo
+    // genérico + `title` (tooltip nativo) por LINHA, dizendo qual é qual.
+    // Inventário completo em `frontend/rotulos-indicador.ts`.
+    const numeroTitulo = (
+      fn: (p: ResumoListagem) => string,
+      titulo: (l: any) => string,
+    ): ((l: any) => TemplateResult) => (l) => {
+      const r = resumoListagem(l, this.calculosAvancado);
+      if (r === 'carregando') return html`…`;
+      if (!r) return html`—`;
+      return html`<span title=${titulo(l)}>${fn(r)}</span>`;
+    };
     return [
       {
         id: 'imagem', label: '', largura: '52px',
@@ -405,8 +429,26 @@ export class ViabTelaDashboard extends LitElement {
         valor: numero((p) => (p.areaPrivativa > 0 ? fmtM2(p.areaPrivativa) : '—')) },
       { id: 'area_construida', label: 'Área total construída', alinhamento: 'direita',
         valor: numero((p) => (p.areaConstruida > 0 ? fmtM2(p.areaConstruida) : '—')) },
-      { id: 'vgv', label: 'VGV', alinhamento: 'direita', valor: numero((p) => fmtR$(p.vgv)) },
-      { id: 'margem', label: 'Margem', alinhamento: 'direita', valor: numero((p) => fmtPct(p.margemPct)) },
+      {
+        id: 'vgv', label: 'VGV', alinhamento: 'direita',
+        render: numeroTitulo(
+          (p) => fmtR$(p.vgv),
+          (l) => l.nivel_analise === 'avancado'
+            ? 'Receita Bruta — recebimento realizado no fluxo de caixa (Avançado)'
+            : 'VGV nominal — soma dos preços das unidades (Preliminar)',
+        ),
+      },
+      {
+        id: 'margem', label: 'Margem', alinhamento: 'direita',
+        render: numeroTitulo(
+          (p) => fmtPct(p.margemPct),
+          (l) => l.nivel_analise === 'avancado'
+            ? 'Margem sobre Receita Bruta — "= Resultado", sem permutas (Avançado)'
+            : 'Margem sobre VGV — resultado / VGV nominal (Preliminar)',
+        ),
+      },
+      // ROI já é uma fórmula só nos dois níveis (resultado / investimentoTotal
+      // — ver comentário de `ResumoListagem` acima), então não precisa de title.
       { id: 'roi', label: 'ROI', alinhamento: 'direita', valor: numero((p) => fmtPct(p.roiPct)) },
       {
         id: 'criador', label: 'Criador', alinhamento: 'centro',
