@@ -2064,3 +2064,66 @@ test('#238 auditoria preserva o valor canônico quando o percentual visível est
   assert.equal(d.total, -10_000_000); // canônico equivale a 10%, não aos 50% visíveis
   assert.equal(d.permutaAlternativa?.total, 10_000_000);
 });
+
+// ── #429: o descarte de absorção deixa rastro no motor ───────────────────
+
+/** Captura os `console.warn` emitidos durante `fn`, restaurando o original. */
+const capturarWarns = (fn: () => void): string[] => {
+  const original = console.warn;
+  const out: string[] = [];
+  console.warn = (...args: unknown[]) => { out.push(args.map(String).join(' ')); };
+  try { fn(); } finally { console.warn = original; }
+  return out;
+};
+
+const configAbsorcao = (meses: { mes: number; pct: number }[]): FluxoConfig => ({
+  dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+  linhasReceita: [{
+    id: 1, nome: 'Vendas',
+    tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+    absorcao: { modo: 'personalizado', meses },
+    fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+  }],
+  linhasCusto: [], areaTerreno: 0,
+} as unknown as FluxoConfig);
+
+test('#429 calcularFluxo avisa quando a curva de absorção não fecha na janela', () => {
+  // periodoAbsorcao(CRONO) = { inicio: 6, fim: 52 } → o mês 53 fica de fora.
+  const avisos = capturarWarns(() => calcularFluxo(
+    configAbsorcao([{ mes: 12, pct: 60 }, { mes: 19, pct: 30 }, { mes: 53, pct: 10 }])));
+  const meu = avisos.filter((a) => a.includes('absorção da linha'));
+  assert.equal(meu.length, 1, `avisos: ${avisos.join(' | ')}`);
+  assert.match(meu[0], /"Vendas"/);
+  assert.match(meu[0], /90\.00%/);
+  assert.match(meu[0], /10\.00 pp/);
+  assert.match(meu[0], /NÃO foram computados/);
+});
+
+test('#429 calcularFluxo avisa mesmo quando a soma truncada fecha 100 por coincidência', () => {
+  // 60 + 40 dentro da janela + 10 no mês 53: Σ pcts = 100, mas a curva
+  // declarava 110 e 10 pp foram descartados.
+  const avisos = capturarWarns(() => calcularFluxo(
+    configAbsorcao([{ mes: 12, pct: 60 }, { mes: 19, pct: 40 }, { mes: 53, pct: 10 }])));
+  const meu = avisos.filter((a) => a.includes('absorção da linha'));
+  assert.equal(meu.length, 1, `avisos: ${avisos.join(' | ')}`);
+  assert.match(meu[0], /declara 110\.00%/);
+});
+
+test('#429 calcularFluxo NÃO avisa quando a curva fecha 100% dentro da janela', () => {
+  const avisos = capturarWarns(() => calcularFluxo(
+    configAbsorcao([{ mes: 12, pct: 60 }, { mes: 19, pct: 40 }])));
+  assert.deepEqual(avisos.filter((a) => a.includes('absorção da linha')), []);
+});
+
+test('#429 o aviso NÃO corrige: a venda bruta contratada continua a truncada', () => {
+  let comDescarte!: FluxoCalc;
+  let semDescarte!: FluxoCalc;
+  capturarWarns(() => { // silencia o aviso esperado; o assunto aqui é o número
+    comDescarte = calcularFluxo(
+      configAbsorcao([{ mes: 12, pct: 60 }, { mes: 19, pct: 30 }, { mes: 53, pct: 10 }]));
+    semDescarte = calcularFluxo(configAbsorcao([{ mes: 12, pct: 60 }, { mes: 19, pct: 40 }]));
+  });
+  // 100 un × 50 m² × 20.000 = 100.000.000 de VGV; 90% contratados, não 100%.
+  assert.ok(perto(comDescarte.vendaBrutaContratada, 90_000_000));
+  assert.ok(perto(semDescarte.vendaBrutaContratada, 100_000_000));
+});

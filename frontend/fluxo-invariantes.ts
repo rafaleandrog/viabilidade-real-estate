@@ -23,7 +23,10 @@ import {
   carteiraSaldoSafra, componentesEfetivosSafra, componentesPagamento,
   vendaLiquidaContratadaMensal,
 } from './fluxo-caixa-motor.js';
-import { absorcaoMensal, ePermutaFisica, type EventoCrono } from './fluxo-shared.js';
+import {
+  absorcaoMensal, ePermutaFisica, fimJanelaAbsorcao, pctAbsorcaoEfetivo,
+  type AbsorcaoMensal, type EventoCrono,
+} from './fluxo-shared.js';
 import type { FundingCalc } from './funding-motor.js';
 
 export type Severidade = 'erro' | 'alerta';
@@ -238,10 +241,95 @@ export function validarCustosDuplicados(linhasCusto: any[]): Divergencia[] {
   return out;
 }
 
+/**
+ * #429: conservação da absorção. A curva de uma linha de Receitas declara
+ * `pctTotal`; o motor só computa o que cabe na janela derivada
+ * (`periodoAbsorcao`). O resto era **descartado em silêncio** — sem `else`,
+ * sem `console.warn`, sem erro —, e o estudo saía internamente consistente e
+ * simplesmente menor que a realidade.
+ *
+ * 🔴 **Por que esta checagem não saiu da validação que já existia.**
+ * `validarContratacao` (`pctNoHorizonte`) soma `abs.pcts`, a saída JÁ
+ * TRUNCADA de `absorcaoMensal`: consome a saída de quem deveria fiscalizar,
+ * então `VENDA_BRUTA_NAO_RECONCILIA` fecha certinho enquanto o percentual
+ * evapora. O `somaPct` de `validarProduto` (abaixo) chega a comparar essa
+ * soma com 100, mas só para SUPRIMIR `ESTOQUE_FINAL_NAO_ZERA`.
+ *
+ * ⚠️ E ler `pcts` não bastaria nem se alguém o relatasse: no modo
+ * `personalizado`, `Σ pcts` é aritmeticamente igual a
+ * `pctTotal − pctDescartado`, então a 1ª condição abaixo seria equivalente —
+ * mas a 2ª (`pctDescartado > tol`) não é derivável de `pcts` de jeito nenhum.
+ *
+ * A mensagem segue o desenho do `VGV SOMADO` da EVI (`Perfil Vendas!B28`):
+ * diz **quanto falta e o que o zeraria**, não só "não fecha".
+ */
+function divergenciasAbsorcao(
+  linhasReceita: any[],
+  cronograma: EventoCrono[],
+  tol: number,
+): Divergencia[] {
+  const out: Divergencia[] = [];
+  for (const linha of linhasReceita ?? []) {
+    const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, cronograma);
+    if (!abs) continue;
+    const efetivo = pctAbsorcaoEfetivo(abs);
+    // DUAS condições, e a segunda é a que torna esta checagem impossível de
+    // derivar de `abs.pcts`: uma curva que declara 110% e perde 10 pp fora da
+    // janela soma exatamente 100 em `pcts` — a leitura truncada diz "fechou"
+    // enquanto 10 pp do que o usuário escreveu foram jogados fora. Só o dado
+    // bruto separa "vendeu 100%" de "declarou 110% e computou 100%".
+    const naoFecha = Math.abs(efetivo - 100) > tol;
+    const houveDescarte = abs.pctDescartado > tol;
+    if (!naoFecha && !houveDescarte) continue;
+    // `esperado` é o que a curva prometia: 100 quando nada foi descartado, o
+    // total declarado quando foi — assim `esperado − encontrado` é sempre a
+    // perda de que a mensagem fala. Numa curva que declara 100 e perde 1,41
+    // (o caso medido em Pinguim) os dois coincidem: esperado 100, encontrado
+    // 98,59.
+    const esperado = houveDescarte ? abs.pctTotal : 100;
+    out.push({
+      codigo: 'ABSORCAO_NAO_FECHA', severidade: 'erro',
+      linha: String(linha?.nome || 'Receita'),
+      ...(abs.mesesDescartados.length ? { mes: Math.min(...abs.mesesDescartados) } : {}),
+      esperado, encontrado: efetivo, diferenca: efetivo - esperado,
+      mensagem: mensagemAbsorcaoNaoFecha(abs, efetivo, tol),
+    });
+  }
+  return out;
+}
+
+function mensagemAbsorcaoNaoFecha(abs: AbsorcaoMensal, efetivo: number, tol: number): string {
+  const partes: string[] = [`Absorção efetiva soma ${efetivo.toFixed(2)}%`];
+  if (abs.pctDescartado > tol) {
+    // Meses são 0-based internamente e 1-based na tela (mesmo padrão de
+    // `Mês ${mes + 1}` das outras mensagens deste módulo e do painel).
+    const janela = fimJanelaAbsorcao(abs) + 1;
+    const meses = [...new Set(abs.mesesDescartados)].sort((a, b) => a - b).map((m) => m + 1);
+    const lista = meses.length <= 3 ? meses.join(', ') : `${meses.slice(0, 3).join(', ')}…`;
+    const ponto = meses.length === 1 ? 'ponto' : 'pontos';
+    partes.push(
+      `${abs.pctDescartado.toFixed(2)} pp da curva (que declara ${abs.pctTotal.toFixed(2)}%) `
+      + `caem fora da janela de vendas e NÃO são computados`
+      + (meses.length ? ` — ${meses.length} ${ponto}, mês ${lista}; a janela vai até o mês ${janela}` : '')
+      + '. Traga esses pontos para dentro da janela',
+    );
+  }
+  if (Math.abs(efetivo - 100) > tol) {
+    const falta = 100 - efetivo;
+    partes.push(`${falta > 0 ? 'faltam' : 'sobram'} ${Math.abs(falta).toFixed(2)} pp para fechar 100%`);
+  }
+  return `${partes.join(': ')}.`;
+}
+
 /** Produto/estoque: alocação + permuta nunca excede o catálogo e a baixa
  * mensal pela absorção não produz estoque negativo. Premissas abaixo de 100%
  * podem deixar saldo e não são erro; quando todo o estoque está comprometido
- * e a absorção fecha 100%, o saldo terminal obrigatoriamente zera. */
+ * e a absorção fecha 100%, o saldo terminal obrigatoriamente zera.
+ *
+ * #429: emite também `ABSORCAO_NAO_FECHA`, uma vez por LINHA de Receitas —
+ * `divergenciasAbsorcao` roda fora do laço do catálogo de propósito, senão a
+ * mesma curva viraria uma divergência por tipologia alocada, e uma linha cuja
+ * tipologia não está no catálogo nunca seria checada. */
 export function validarProduto(
   linhasReceita: any[],
   linhasCusto: any[],
@@ -250,7 +338,7 @@ export function validarProduto(
   prazo: number,
   tol: number = TOLERANCIA_PADRAO,
 ): Divergencia[] {
-  const out: Divergencia[] = [];
+  const out: Divergencia[] = [...divergenciasAbsorcao(linhasReceita, cronograma, tol)];
   const permutas = quantidadesPermutadas(linhasCusto);
 
   for (const tip of tipologiasCatalogo) {
@@ -287,6 +375,10 @@ export function validarProduto(
     for (const a of alocacoes) {
       const abs = absorcaoMensal(a.linha.absorcao ?? { modo: 'linear' }, cronograma);
       if (!abs) { absorcaoCompleta = false; continue; }
+      // Este `somaPct` lê `abs.pcts` DE PROPÓSITO: aqui a pergunta é se o que
+      // o motor efetivamente baixa do estoque chega a 100% — se não chega, o
+      // saldo terminal não tem obrigação de zerar. Quem denuncia o descarte é
+      // `divergenciasAbsorcao` (#429), que lê o dado bruto da curva.
       const somaPct = abs.pcts.reduce((s, pct) => s + Number(pct || 0), 0);
       if (Math.abs(somaPct - 100) > tol) absorcaoCompleta = false;
       for (let i = 0; i < abs.pcts.length; i++) {

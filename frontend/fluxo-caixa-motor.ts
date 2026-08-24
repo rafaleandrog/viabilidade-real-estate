@@ -1884,9 +1884,39 @@ function recorte(mensal: number[]): { inicio: number; duracao: number } {
   return { inicio: primeiro, duracao: ultimo - primeiro + 1 };
 }
 
+/**
+ * #429: a curva de absorção que não fecha 100% dentro da janela derivada
+ * deixa de sumir calada. Mesmo padrão dos dois `deposita` deste módulo
+ * (recebível fora do horizonte): o motor **não corrige** — segue computando
+ * só o que cabe na janela —, mas o descarte passa a deixar rastro. A
+ * denúncia visível ao usuário é a `ABSORCAO_NAO_FECHA` do painel de
+ * Reconciliação (`fluxo-invariantes.ts`); este aviso é o rastro de console.
+ */
+function avisarAbsorcaoDescartada(linhasReceita: any[], crono: EventoCrono[]): void {
+  for (const linha of linhasReceita ?? []) {
+    const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, crono);
+    if (!abs) continue;
+    const efetivo = abs.pctTotal - abs.pctDescartado;
+    // Mesmas duas condições da invariante: o descarte precisa avisar mesmo
+    // quando a soma truncada, por coincidência, fecha 100 (curva que declara
+    // 110% e perde 10 pp fora da janela).
+    if (Math.abs(efetivo - 100) <= 0.01 && abs.pctDescartado <= 0.01) continue;
+    const nome = String(linha?.nome || 'Receita');
+    const meses = abs.mesesDescartados.map((m) => m + 1).join(', ');
+    console.warn(
+      `fluxo-caixa-motor: absorção da linha "${nome}" soma ${efetivo.toFixed(2)}% ` +
+      `(curva declara ${abs.pctTotal.toFixed(2)}%); ${abs.pctDescartado.toFixed(2)} pp ` +
+      `caem fora da janela de vendas${meses ? ` (mês ${meses}; a janela vai até o mês ` +
+      `${abs.inicio + abs.pcts.length})` : ''} e NÃO foram computados.`,
+    );
+  }
+}
+
 export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const crono = config.cronograma ?? [];
   const linhasReceitaOriginal = config.linhasReceita ?? [];
+  // #429: antes de qualquer conta — a absorção que não fecha deixa rastro.
+  avisarAbsorcaoDescartada(linhasReceitaOriginal, crono);
   const linhasCusto = config.linhasCusto ?? [];
   const taxa = n(config.taxaDescontoAa) || 12;
 
