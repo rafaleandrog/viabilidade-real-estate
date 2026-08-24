@@ -22,9 +22,15 @@
 #      primitivo sem `box-sizing` — as três são falhas 100% SILENCIOSAS, que
 #      atravessam typecheck, teste e build em verde. Depois do link porque o
 #      lexer deles é o parser do `typescript`;
-#   5. typecheck do frontend (tsconfig só-frontend);
-#   6. testes de frontend e build do bundle via esbuild;
-#   7. verificação de RENDER em Chromium: monta quatro telas de verdade e mede
+#   5. guard de ENDEREÇOS de doc: todo `arquivo:linha` citado em
+#      `docs/viabilidade/` e em comentário de `frontend/`/`backend/` ainda
+#      resolve — o arquivo existe, a linha existe, e o símbolo que a frase cita
+#      está a ±3 linhas do alvo. É a única afirmação do repo que nenhuma outra
+#      etapa consegue derrubar: um merge da `main` desloca as linhas do arquivo
+#      citado e a prosa passa a apontar para outra coisa, em verde;
+#   6. typecheck do frontend (tsconfig só-frontend);
+#   7. testes de frontend e build do bundle via esbuild;
+#   8. verificação de RENDER em Chromium: monta quatro telas de verdade e mede
 #      overflow, transbordo, sobreposição de caixas e cor efetiva por variante
 #      de tema. É a única etapa que toca DOM — as etapas anteriores são todas de
 #      lógica pura, e nenhuma delas enxerga "o card pintou sobre o vizinho".
@@ -43,7 +49,7 @@ raiz="$(pwd)"
 # ficou `in_progress` no passo `Testes` por horas, sem log nenhum para ler (a API do
 # GitHub só serve log de job concluído). São duas defesas, porque cobrem casos
 # diferentes e nenhuma cobre as duas:
-#   - `--test-timeout` (usado nas etapas 6/7 e 7/7) mata teste ASSÍNCRONO pendurado e diz o
+#   - `--test-timeout` (usado nas etapas 7/8 e 8/8) mata teste ASSÍNCRONO pendurado e diz o
 #     NOME do teste. Não pega laço síncrono: `while(true){}` bloqueia o event loop e o
 #     próprio timer do runner nunca dispara.
 #   - `com_limite` mata o PROCESSO inteiro — é esta que pega o laço síncrono.
@@ -73,7 +79,7 @@ com_limite() {
 # ambiente, LANG vazio) o grep casa a classe BYTE a byte, e como ”/“/—/→ compartilham
 # o primeiro byte 0xE2, `=[”“]` daria falso positivo em `=—` e `=→`. A alternância
 # compara as sequências de 3 bytes inteiras e acerta em qualquer locale.
-echo "== 1/7 guards estáticos (aspas curvas + JSON estrito + ciclos de schema) =="
+echo "== 1/8 guards estáticos (aspas curvas + JSON estrito + ciclos de schema) =="
 if grep -rn '=\(”\|“\|‘\|’\)' frontend/; then
   echo "  FALHOU: aspas curvas em atributo — o atributo fica inerte. Use aspas retas." >&2
   exit 1
@@ -109,14 +115,14 @@ echo "  ok: nenhuma aspa curva em atributo"
 #     caixa maior que o pedido, e pinta sobre o vizinho (o urbi-kpi, quatro vezes
 #     reportado: #176, #262, #326, #352).
 # Nenhuma delas aparece no typecheck, nos testes ou no esbuild.
-echo "== 2/7 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
+echo "== 2/8 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
 pnpm install >/dev/null 2>&1 || true
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — o pnpm não conseguiu baixar nem os pacotes públicos (sem rede?)." >&2
   exit 1
 fi
 
-echo "== 3/7 linkando pacotes públicos do store virtual (.pnpm) =="
+echo "== 3/8 linkando pacotes públicos do store virtual (.pnpm) =="
 # link_pkg <glob-do-dir-em-.pnpm> <subcaminho-interno> <alvo-em-node_modules>
 link_pkg() {
   local glob="$1" interno="$2" alvo="$3"
@@ -145,7 +151,7 @@ esbuild_bin="node_modules/esbuild/bin/esbuild"
 # o PARSER do `typescript`. Sem o pacote linkado eles RECUSAM analisar — que é o
 # comportamento certo, mas num clone novo faria a validação morrer antes de
 # instalar o que ela mesma precisa.
-echo "== 4/7 guards de UI (tokens + props de primitivo + box model) =="
+echo "== 4/8 guards de UI (tokens + props de primitivo + box model) =="
 node scripts/guard-tokens-css.mjs || exit 1
 node scripts/guard-props-urbi.mjs || exit 1
 node scripts/guard-box-model-urbi.mjs || exit 1
@@ -166,7 +172,25 @@ com_limite 120 bash scripts/testar-guards-ui.sh >/dev/null || {
 }
 echo "  ok: baterias do lexer e dos guards de UI verdes"
 
-echo "== 5/7 typecheck do frontend =="
+echo "== 5/8 guard de endereços de doc (arquivo:linha que deixou de resolver) =="
+# Endereço `arquivo:linha` em prosa é a ÚNICA afirmação deste repositório que
+# nenhuma outra etapa consegue derrubar: `tsc`, `node --test`, o `esbuild` e o
+# render-check não leem prosa. Um merge da `main` desloca as linhas do arquivo
+# citado e a citação passa a apontar para outra coisa, em verde.
+#
+# Fica DEPOIS do link (etapa 3/8) porque, em `.ts`, quem decide o que é
+# comentário é o parser do `typescript` — a mesma autoridade dos guards de UI.
+node scripts/guard-enderecos-doc.mjs || exit 1
+# A bateria, pelos DOIS sentidos. Falso positivo aqui é o modo de falha mais
+# caro: guard que atrapalha trabalho legítimo é desligado, e aí não guarda mais
+# nada. Por isso ela tem mais casos de "não acusa" do que de "acusa".
+com_limite 120 bash scripts/testar-guard-enderecos-doc.sh >/dev/null || {
+  echo "  bateria do guard de endereços FALHOU — rode: bash scripts/testar-guard-enderecos-doc.sh" >&2
+  exit 1
+}
+echo "  ok: bateria do guard de endereços verde"
+
+echo "== 6/8 typecheck do frontend =="
 # ⚠️ `scripts/**/*.ts` entra aqui, e NÃO é enfeite. O `tsconfig.json` da raiz
 # inclui só `frontend/` e `backend/`, então nada typechecava os scripts — e eles
 # IMPORTAM o frontend. Em 2026-08-23 o PR da #430 renomeou `pctPosObraDerivado`
@@ -183,7 +207,7 @@ tc=$?
 rm -f tsconfig.frontend.json
 [ $tc -eq 0 ] && echo "  typecheck OK" || { echo "  typecheck FALHOU"; exit 1; }
 
-echo "== 6/7 testes de frontend + build do bundle =="
+echo "== 7/8 testes de frontend + build do bundle =="
 # `frontend/*.test.ts` NÃO alcança subdiretório: até 2026-08-11 os 16 golden
 # cases do Capital Stack (frontend/fixtures/capital-stack-golden.test.ts, hoje
 # apagado — a #355 substituiu o modelo) nunca rodaram, nem aqui nem no
@@ -208,7 +232,7 @@ tst=$?
 bd=$?
 [ $bd -eq 0 ] || { echo "  build FALHOU"; exit 1; }
 
-echo "== 7/7 verificação de render em Chromium =="
+echo "== 8/8 verificação de render em Chromium =="
 # ⚠️ Este marcador é o que impede a ÚLTIMA LINHA de mentir. A versão anterior
 # anunciava "render OK" mesmo quando esta etapa era pulada por falta de
 # Playwright — um cenário que o próprio script suporta de propósito. Quem lê só
@@ -250,7 +274,7 @@ if node -e "import('$raiz/scripts/render-check.mjs').then((m) => m.harnessDispon
 else
   echo
   echo "  ####################################################################"
-  echo "  #  ETAPA 7/7 (RENDER) NAO EXECUTADA - Playwright/Chromium ausente. #"
+  echo "  #  ETAPA 8/8 (RENDER) NAO EXECUTADA - Playwright/Chromium ausente. #"
   echo "  #  Nada foi medido em DOM. Isto NAO e 'passou'.                    #"
   echo "  #  O job render do CI roda com RENDER_CHECK_OBRIGATORIO=1 e        #"
   echo "  #  reprova exatamente nesta condicao.                              #"
@@ -263,6 +287,6 @@ if [ "$render_rodou" = "1" ]; then
   echo "✅ Frontend validado: typecheck + testes + build + render OK."
 else
   echo "⚠️  Frontend validado PARCIALMENTE: typecheck + testes + build OK."
-  echo "    RENDER NÃO EXECUTADO (etapa 7/7 pulada) — nada foi medido em DOM."
+  echo "    RENDER NÃO EXECUTADO (etapa 8/8 pulada) — nada foi medido em DOM."
   echo "    Isto NÃO é 'render OK'. O job \`render\` do CI reprova nesta condição."
 fi

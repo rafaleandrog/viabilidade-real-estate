@@ -421,6 +421,61 @@ jobs:
             exit 1
           fi
 
+  enderecos-doc:
+    name: Endereço arquivo:linha citado em prosa ainda resolve
+    runs-on: ubuntu-latest
+    # ⚠️ `timeout-minutes` em TODO job, sem exceção — o default do GitHub é 6
+    # HORAS. O baseline deste job é de segundos (166 endereços, 127 arquivos).
+    timeout-minutes: 5
+    env:
+      URBI_TYPESCRIPT: ${{ github.workspace }}/.ts-guards/node_modules/typescript/lib/typescript.js
+    steps:
+      - uses: actions/checkout@v7
+      - name: Instalar só o typescript, isolado
+        run: |
+          set -uo pipefail
+          # Em `.ts` quem decide o que é COMENTÁRIO é o parser do `typescript` — a
+          # mesma autoridade dos guards de UI e do guard de tabelas obsoletas.
+          #
+          # ⚠️ O install é num diretório PRÓPRIO, com package.json próprio, e nunca
+          # na raiz: `npm install` na raiz leria o package.json do repo e tentaria
+          # baixar o `@urbiverso/sdk`, que é GitHub Packages privado — 401, e este
+          # workflow existe justamente para nunca depender de credencial.
+          mkdir -p .ts-guards
+          cd .ts-guards
+          echo '{"name":"ts-guards","private":true}' > package.json
+          npm install --no-audit --no-fund --loglevel=error typescript@5.9.3
+          node -e "console.log('typescript', require('./node_modules/typescript').version)"
+      - name: Guard de endereços de documentação
+        run: |
+          set -uo pipefail
+          # Endereço `arquivo:linha` em prosa é a única afirmação deste repositório
+          # que NENHUMA outra checagem consegue derrubar: `tsc`, `node --test`, o
+          # `esbuild` e o render-check não leem prosa. Um merge da `main`, ou o
+          # próprio diff do PR, desloca as linhas do arquivo citado e a citação
+          # passa a apontar para outra coisa — em verde, para sempre.
+          #
+          # A dívida herdada está declarada, com motivo por linha, em
+          # `scripts/enderecos-doc-excecoes.mjs`. O guard reprova quando uma dessas
+          # exceções deixa de ser necessária: entrada morta desligaria a
+          # conferência daquele endereço para sempre, e caladamente.
+          if ! node scripts/guard-enderecos-doc.mjs; then
+            echo "::error title=Endereço de doc não resolve::Um `arquivo:linha` citado em docs/viabilidade/ ou em comentário de frontend//backend/ deixou de apontar para o que a frase diz. O log traz a linha onde o símbolo está hoje."
+            exit 1
+          fi
+      - name: Bateria do guard de endereços
+        if: always()
+        run: |
+          set -uo pipefail
+          # Guard falha calado nos DOIS sentidos, e a bateria cobre os dois. Aqui o
+          # lado que mais importa é o FALSO POSITIVO: este guard lê prosa em
+          # português, e acusar texto correto faria alguém desligar o job — a
+          # bateria tem mais casos de "não acusa" do que de "acusa", de propósito.
+          if ! bash scripts/testar-guard-enderecos-doc.sh; then
+            echo "::error title=Bateria do guard de endereços falhou::O guard não se comporta como o esperado. Veja quais casos falharam no log."
+            exit 1
+          fi
+
   render:
     name: Render em Chromium (overflow, sobreposição, cor)
     runs-on: ubuntu-latest

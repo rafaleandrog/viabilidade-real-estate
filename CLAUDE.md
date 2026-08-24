@@ -379,6 +379,69 @@ assunto *é* "as correções de documentação".
 o lembrete nem o aviso de branch estão te protegendo. Avise o autor em vez de seguir: hook que não
 roda não imprime nada, e "não imprimiu" é indistinguível de "está tudo normal".
 
+#### As quatro classes de defeito que esta rodada repetiu
+
+> Escritas a partir do que a Rodada 9 achou PR após PR. Não são conselho geral: cada uma traz o
+> número medido que a produziu e o mecanismo que hoje a barra. Onde o mecanismo é humano, ele está
+> dito como passo, não como intenção.
+
+**1 · O defeito mora na FIAÇÃO, não no cálculo.**
+A função pura existe, está testada, e o componente pode nunca chamá-la — ou chamar com o argumento
+errado. Cinco PRs seguidos tiveram o bloqueante aí, nenhum no cálculo. **Medido: apagar a chamada
+deixou 488, 513 e 555 testes verdes**, em três PRs diferentes. Teste de função pura não prova
+ligação, e a suíte inteira não fica vermelha por causa dela.
+
+**Defesa, e ela é um passo, não um princípio:** depois de implementar, **apague a chamada e rode a
+suíte**. Se ficar verde, a cobertura daquele caminho é decoração — e o conserto não é escrever mais
+um teste da função pura. Os dois consertos que funcionaram nesta rodada:
+
+- **tornar o parâmetro obrigatório**, para a mutação virar erro de compilação (`TS2554`) em vez de
+  silêncio;
+- **caso de render em Chromium** que exige o seletor na tela (`frontend/render/*.render.test.ts`) —
+  a única camada que enxerga "o componente não chamou".
+
+**2 · Endereço `arquivo:linha` que deixou de resolver.**
+Foi o achado nº 1 da rodada, em quase todo PR: o próprio diff, ou um merge da `main`, desloca as
+linhas do arquivo citado e a prosa passa a apontar para outra coisa. Nada fica vermelho — nenhuma
+etapa de validação lê prosa. Conferir à mão não resolve: a conferência é feita antes do último
+merge e envelhece nele.
+
+**Defesa: `scripts/guard-enderecos-doc.mjs`** (etapa 5/8 do `validar-frontend.sh`, job
+`enderecos-doc` no `pr-guards.yml`). Ele confere que o arquivo existe, que a linha existe e que o
+**símbolo citado pela frase** aparece a ±3 linhas do alvo — esta última é a que pega o caso comum,
+em que o endereço continua dentro do arquivo e só deixou de apontar para o que o texto diz. A
+dívida herdada está declarada, com motivo por linha, em `scripts/enderecos-doc-excecoes.mjs`, e o
+guard **reprova quando uma exceção deixa de ser necessária**: entrada morta desligaria a
+conferência daquele endereço para sempre, e caladamente.
+
+> Ele é deliberadamente **conservador** — prefere deixar passar citação ambígua a acusar prosa
+> correta, porque guard que atrapalha trabalho legítimo é desligado, e aí não guarda mais nada.
+> `docs/rodada-8/**` fica de fora de propósito: é fotografia datada, e envelhecer é o comportamento
+> certo dela.
+
+**3 · CI verde sobre base vencida.**
+**Medido: os check runs de um PR nasceram 37 segundos antes de a base dele mergear.** O CI valida o
+**merge prospectivo** — então aquele verde descreve uma `main` que já não existia quando o merge
+aconteceu. O PR não estava errado; o verde é que respondia a outra pergunta.
+
+**Defesa:** antes de mergear, confira que os check runs são **posteriores ao último commit da
+`main`**. Verde mais velho que a base não é verde: é resultado de outra corrida.
+
+**4 · `Closes #NNN` numa issue com critério de aceite não cumprido.**
+Aconteceu na **#451**: o PR declarava `Closes`, o próprio implementador registrava no corpo que o
+critério 1 não fora cumprido, e a issue precisou ser reaberta. A keyword fecha sozinha, no merge,
+sem ler nada — a divergência entre "o que o PR entrega" e "o que a issue pede" não tem quem a
+acuse.
+
+**Defesa:** `Closes` **só quando TODOS os critérios de aceite estão cumpridos**. Entrega parcial usa
+`Sem-fechamento: #NNN <o que falta>`, que é exatamente o que o guard `issue-fechamento` existe para
+permitir — ele não obriga a fechar, obriga a **decidir**.
+
+> É a mesma lição de 2026-08-03, pelo avesso. Lá, 53 issues estavam **fechadas** descrevendo
+> trabalho que não se sustentava no código; a conferência dos critérios contra o código reprovou 29
+> delas. Fechar cedo e citar errado são o mesmo erro: tratar a keyword como registro do que foi
+> feito, quando ela é uma **ação** que ninguém revisa depois.
+
 #### As peças, e o que cada uma garante
 
 | Peça | Onde | Garante | **Não** garante |
