@@ -18,13 +18,13 @@
 //     total da tipologia no catálogo — sem essa checagem, um estudo pode
 //     "entregar" mais unidades do que produziu sem nenhum aviso.
 
-import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
+import type { FluxoCalc, ComponentePagamento, ResiduoAteMarco } from './fluxo-caixa-motor.js';
 import {
-  carteiraSaldoSafra, componentesEfetivosSafra, componentesPagamento,
-  vendaLiquidaContratadaMensal,
+  carteiraSaldoSafra, componentesIntegradosSafra, componentesPagamento,
+  linhasReceitaComPermutaReservada, vendaLiquidaContratadaMensal,
 } from './fluxo-caixa-motor.js';
 import {
-  absorcaoMensal, ePermutaFisica, fimJanelaAbsorcao, pctAbsorcaoEfetivo,
+  absorcaoMensal, ePermutaFisica, fimJanelaAbsorcao, pctAbsorcaoEfetivo, vgvVendavelLinha,
   type AbsorcaoMensal, type EventoCrono,
 } from './fluxo-shared.js';
 import type { FundingCalc } from './funding-motor.js';
@@ -140,18 +140,30 @@ export function validarFluxoCalc(r: FluxoCalc, tol: number = TOLERANCIA_PADRAO):
 }
 
 /** Contratação bruta independente do total calculado: Σ quantidade × área ×
- * preço/m² × absorção efetiva de cada fase. */
+ * preço/m² × absorção efetiva de cada fase.
+ *
+ * #444: a grandeza é o VGV VENDÁVEL (`vgvVendavelLinha`, a mesma que
+ * `vendaBrutaContratadaMensal` usa) — não o VGV bruto. Num estudo com permuta
+ * física, a fonte vigente da permuta é a reserva feita em Custos (#266/#268),
+ * não o campo legado `unidades_permutadas` da tipologia; `linhasCusto` é
+ * OPCIONAL de propósito (compatível com os chamadores que ainda não a
+ * passam) mas OBRIGATÓRIO para reconciliar num estudo com permuta — sem ela,
+ * `vgvVendavelLinha` cai no fallback do campo cru, que nas linhas do banco é
+ * sempre 0. */
 export function validarContratacao(
   linhasReceita: any[],
   cronograma: EventoCrono[],
   prazo: number,
   vendaBrutaEncontrada: number,
   tol: number = TOLERANCIA_PADRAO,
+  linhasCusto: any[], // #444: OBRIGATÓRIO — omitir vira TS2554, não silêncio (a mutação de fiação provou que um parâmetro opcional aqui deixa a suíte inteira verde mesmo sem o wiring)
 ): Divergencia[] {
+  const linhas = linhasCusto.length > 0
+    ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto)
+    : linhasReceita;
   let esperado = 0;
-  for (const linha of linhasReceita) {
-    const vgv = (linha.tipologias ?? []).reduce((s: number, t: any) => s
-      + Number(t.quantidade ?? 0) * Number(t.area_privativa_m2 ?? 0) * Number(t.preco_m2 ?? 0), 0);
+  for (const linha of linhas) {
+    const vgv = vgvVendavelLinha(linha.tipologias ?? []);
     const abs = absorcaoMensal(linha.absorcao ?? { modo: 'linear' }, cronograma);
     if (!abs) continue;
     const pctNoHorizonte = abs.pcts.reduce((s, pct, i) => {
@@ -176,16 +188,28 @@ export function validarSafrasReceita(
   cronograma: EventoCrono[],
   prazo: number,
   tol: number = TOLERANCIA_PADRAO,
+  linhasCusto: any[], // #444: OBRIGATÓRIO — omitir vira TS2554, não silêncio (a mutação de fiação provou que um parâmetro opcional aqui deixa a suíte inteira verde mesmo sem o wiring)
 ): Divergencia[] {
   const out: Divergencia[] = [];
+  const linhas = linhasCusto.length > 0
+    ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto)
+    : linhasReceita;
   const obra = cronograma.find((e) => e.evento === 'obra');
   const mesEntrega = obra ? Number(obra.inicio_mes) + Number(obra.duracao_meses) - 1 : 0;
-  for (const linha of linhasReceita) {
+  for (const linha of linhas) {
     const componentes = componentesPagamento(linha.fluxo_pagamento, cronograma);
     const contratacoes = vendaLiquidaContratadaMensal(linha, cronograma, prazo);
+    // #444: mesma regra do motor para o `ate_marco` degenerado (N_s ≤ 0) —
+    // `componentesIntegradosSafra` converte para `imediato`, exatamente como
+    // `calcularFluxo` faz (`residuoAteMarco` vive em
+    // `linha.fluxo_pagamento.residuoAteMarco`, mesma leitura do motor).
+    // Antes, o validador chamava só `componentesEfetivosSafra` e o componente
+    // degenerado chegava intacto a `carteiraSaldoSafra`, que lança — o motor
+    // roda sem exceção e produz número porque passa pela integrada.
+    const residuoAteMarco: ResiduoAteMarco = linha?.fluxo_pagamento?.residuoAteMarco ?? 'imediato';
     for (let safra = 0; safra < contratacoes.length; safra++) {
       if ((contratacoes[safra] ?? 0) <= tol) continue;
-      const efetivos = componentesEfetivosSafra(componentes, safra, mesEntrega);
+      const efetivos = componentesIntegradosSafra(componentes, safra, mesEntrega, residuoAteMarco);
       const divergencias = validarComponentesSafra(efetivos, safra, contratacoes[safra], tol);
       for (const d of divergencias) out.push({
         ...d,
@@ -220,22 +244,34 @@ function quantidadesPermutadas(linhasCusto: any[]): Map<number, number> {
  */
 export function validarCustosDuplicados(linhasCusto: any[]): Divergencia[] {
   const out: Divergencia[] = [];
-  const contagem = new Map<string, { grupo: string; categoria: string; count: number }>();
+  // #444: chaveia também por `subcategoria` — sem ela, o grupo `terreno`
+  // (única `categoria` que a editam, #173) alerta duplicata garantida em
+  // todo estudo com permuta: "Preço" tem 4 subcategorias canônicas ("Valor à
+  // vista", "Parcelado", "Permuta física", "Permuta financeira") mais a linha
+  // sem subcategoria, e cada uma é uma linha de custo legítima e distinta.
+  // Ausência de subcategoria é tratada como chave própria (`''`), para que
+  // duas linhas sem subcategoria continuem sendo duplicata entre si — nos
+  // demais grupos ela nunca é editável (`tela-fluxo-custos.ts`), então a
+  // chave nova coincide com a antiga e a detecção não afrouxa ali.
+  const contagem = new Map<string, { grupo: string; categoria: string; subcategoria: string; count: number }>();
   for (const c of linhasCusto) {
     const categoria = String(c?.categoria || '');
     if (!categoria || categoria === 'Outro') continue;
     const grupo = String(c?.grupo || '');
-    const chave = `${grupo}::${categoria}`;
+    const subcategoria = String(c?.subcategoria || '');
+    const chave = `${grupo}::${categoria}::${subcategoria}`;
     const atual = contagem.get(chave);
     if (atual) atual.count++;
-    else contagem.set(chave, { grupo, categoria, count: 1 });
+    else contagem.set(chave, { grupo, categoria, subcategoria, count: 1 });
   }
-  for (const { grupo, categoria, count } of contagem.values()) {
+  for (const { grupo, categoria, subcategoria, count } of contagem.values()) {
     if (count <= 1) continue;
+    const rotulo = subcategoria ? `${categoria} — ${subcategoria}` : categoria;
     out.push({
-      codigo: 'CATEGORIA_CUSTO_DUPLICADA', severidade: 'alerta', linha: categoria,
+      codigo: 'CATEGORIA_CUSTO_DUPLICADA', severidade: 'alerta', linha: rotulo,
       esperado: 1, encontrado: count, diferenca: count - 1,
-      mensagem: `${categoria} (${grupo}): ${count} linhas com a mesma categoria no grupo — confirme se é intencional.`,
+      mensagem: `${rotulo} (${grupo}): ${count} linhas com a mesma categoria`
+        + `${subcategoria ? ' e subcategoria' : ''} no grupo — confirme se é intencional.`,
     });
   }
   return out;
@@ -461,11 +497,50 @@ export function validarFunding(
   calc: FundingCalc,
   fluxoLivreMensal: number[],
   tol: number = TOLERANCIA_PADRAO,
+  // #445: OPCIONAL — nenhuma das 8 chamadas existentes no repositório passa
+  // `tol` posicionalmente, então acrescentar ao fim não desloca argumento
+  // nenhum. Alimenta só a checagem (b); sem ela, (b) simplesmente não roda
+  // (as checagens (a) e (c) não precisam de receita).
+  receitaLiquidaMensal?: number[],
 ): Divergencia[] {
   const out: Divergencia[] = [];
   for (const s of calc.operacoes) {
-    if (s.saldo.every((v) => v === 0)) continue; // equity: sem dívida, nada a checar
     const nome = s.operacao.nome || s.operacao.tipo;
+    // #445: o `continue` antigo testava "saldo é todo zero" — verdade para
+    // TODA operação de equity (`funding-motor.ts:486`, sem dívida por
+    // construção), mas TAMBÉM para uma dívida que nunca desembolsou. O
+    // desvio agora é por TIPO, não por saldo: equity ganha diagnóstico
+    // próprio; dívida sem desembolso continua pulada (fora do escopo desta
+    // issue — ela não tem checagem hoje e não ganha uma aqui).
+    if (s.operacao.tipo === 'equity') {
+      // (a) RETORNO_EQUITY_NEGATIVO — erro. No modo `resultado_final`
+      // (`funding-motor.ts:474`) um `resultadoFinal` negativo produz saída
+      // negativa sem clamp. No modo progressivo (`funding-motor.ts:439-486`, decisão #432)
+      // há clamp + carry-forward do déficit — não deveria acontecer, mas a
+      // checagem cobre os dois modos porque lê `saidas` diretamente, sem
+      // presumir qual mecanismo gerou o valor.
+      const negativo = s.saidas.findIndex((v) => v < -tol);
+      if (negativo >= 0) out.push({
+        codigo: 'RETORNO_EQUITY_NEGATIVO', severidade: 'erro', linha: nome, mes: negativo,
+        esperado: 0, encontrado: s.saidas[negativo], diferenca: s.saidas[negativo],
+        mensagem: `${nome}, mês ${negativo + 1}: retorno de equity negativo — o projeto estaria `
+          + 'recebendo do investidor a título de "retorno".',
+      });
+
+      // (c) EQUITY_SEM_APORTE — remunera (`pct_retorno` > 0) sem ter
+      // aportado (`valor` = 0). Estado espelho do `[revisar]` da migração
+      // `029` (`valor > 0`, `pct_retorno = 0`, #445 Fora de escopo) — esta
+      // checagem não o alcança, é o caso oposto.
+      const pctRetorno = Number(s.operacao.pct_retorno ?? 0);
+      const valorAportado = Number(s.operacao.valor ?? 0);
+      if (pctRetorno > tol && valorAportado === 0) out.push({
+        codigo: 'EQUITY_SEM_APORTE', severidade: 'alerta', linha: nome,
+        esperado: 0, encontrado: pctRetorno, diferenca: pctRetorno,
+        mensagem: `${nome}: pct_retorno de ${pctRetorno}% configurado com valor aportado igual a zero.`,
+      });
+      continue;
+    }
+    if (s.saldo.every((v) => v === 0)) continue; // dívida sem desembolso — fora do escopo desta issue
     const negativo = s.saldo.findIndex((v) => v < -tol);
     if (negativo >= 0) out.push({
       codigo: 'DIVIDA_NEGATIVA', severidade: 'erro', linha: nome, mes: negativo,
@@ -478,6 +553,32 @@ export function validarFunding(
       esperado: 0, encontrado: final, diferenca: final,
       mensagem: `${nome}: dívida termina o horizonte com saldo ${final}.`,
     });
+  }
+
+  // (b) RETORNO_EQUITY_EXCEDE_RECEITA — alerta. Leitura MENSAL do teto de
+  // 100% de `pct_retorno` (a leitura NOMINAL é a #435). Só operações de
+  // equity em modo `permuta_financeira` — o default de `funding-motor.ts:437`
+  // quando `modo_retorno` é nulo/ausente, repetido aqui de propósito: sem
+  // repetir o default, a operação legada sem `modo_retorno` escaparia da
+  // checagem. `resultado_final` fica de fora — é pagamento único no repasse,
+  // não uma fração mensal da receita.
+  if (receitaLiquidaMensal) {
+    const equityProgressivo = calc.operacoes.filter(
+      (s) => s.operacao.tipo === 'equity'
+        && (s.operacao.modo_retorno ?? 'permuta_financeira') === 'permuta_financeira',
+    );
+    const meses = equityProgressivo.reduce((m, s) => Math.max(m, s.saidas.length), 0);
+    for (let t = 0; t < meses; t++) {
+      const somaSaidas = equityProgressivo.reduce((s, op) => s + Number(op.saidas[t] ?? 0), 0);
+      const receita = Number(receitaLiquidaMensal[t] ?? 0);
+      if (somaSaidas <= receita + tol) continue;
+      out.push({
+        codigo: 'RETORNO_EQUITY_EXCEDE_RECEITA', severidade: 'alerta', mes: t,
+        esperado: receita, encontrado: somaSaidas, diferenca: somaSaidas - receita,
+        mensagem: `Mês ${t + 1}: retorno de equity (permuta financeira) soma `
+          + `${somaSaidas.toFixed(2)}, acima da receita líquida do mês (${receita.toFixed(2)}).`,
+      });
+    }
   }
 
   const nf = calc.noFluxo;
@@ -651,6 +752,99 @@ export function permutaFisicaPorTipologia(
       areaPermutada: quantidadePermutada * Number(tip?.area_privativa_m2 ?? 0),
     });
   }
+  return out;
+}
+
+// ── #441: reconciliação de camadas (Catálogo × Premissas) ────────────────
+
+/**
+ * #441: mapa `tipo_unidade` (catálogo do Avançado, `schema.json:330`) → a
+ * família de permuta física das Premissas (`permuta_fisica_*` residencial /
+ * `permuta_fisica_nr_*` não residencial, split desde a #10). O app não tinha
+ * esse mapeamento em nenhum lugar — é uma decisão desta issue, testada:
+ * `apartamento`/`cobertura` são claramente residenciais; `lote` entra como
+ * residencial porque em Loteamento (o produto que usa esse tipo) o lote É a
+ * unidade vendável residencial, mesma família de "apartamento", só produto
+ * diferente; `loja` é claramente não residencial; `outro` cai em não
+ * residencial por default — sem sinal de residencial no nome, tratar como a
+ * família "genérica" evita subestimar corretagem/tributos que a EVI aplica
+ * de forma diferenciada por família.
+ */
+const FAMILIA_TIPO_UNIDADE: Record<string, 'residencial' | 'naoResidencial'> = {
+  apartamento: 'residencial',
+  cobertura: 'residencial',
+  lote: 'residencial',
+  loja: 'naoResidencial',
+  outro: 'naoResidencial',
+};
+
+export interface PermutaFisicaFamilia { areaM2: number; quantidade: number; }
+
+/**
+ * #441: a permuta física do Catálogo (linhas de custo `Preço/Permuta
+ * física`, via `permutaFisicaPorTipologia` — NÃO `unidades_permutadas`, que
+ * a #253 retirou do CRUD e vale sempre 0 em estudo novo), repartida entre as
+ * duas famílias das Premissas (`FAMILIA_TIPO_UNIDADE`). É a metade "derivar"
+ * da decisão do autor (comentário da #441, 2026-08-24): esta função é PURA —
+ * não lê nem grava `estudos`, só calcula o que as Premissas DEVERIAM mostrar
+ * se derivassem do Catálogo.
+ */
+export function permutaFisicaDerivadaCatalogo(
+  linhasCusto: any[],
+  tipologiasCatalogo: any[],
+): { residencial: PermutaFisicaFamilia; naoResidencial: PermutaFisicaFamilia } {
+  const out = {
+    residencial: { areaM2: 0, quantidade: 0 },
+    naoResidencial: { areaM2: 0, quantidade: 0 },
+  };
+  for (const p of permutaFisicaPorTipologia(linhasCusto, tipologiasCatalogo)) {
+    const tip = tipologiasCatalogo.find((t) => Number(t.id) === p.tipologiaId);
+    const familia = FAMILIA_TIPO_UNIDADE[String(tip?.tipo_unidade || 'apartamento')] ?? 'naoResidencial';
+    out[familia].areaM2 += p.areaPermutada;
+    out[familia].quantidade += p.quantidadePermutada;
+  }
+  return out;
+}
+
+/**
+ * #441: reconciliação ENTRE CAMADAS de um estudo Avançado — Catálogo ×
+ * Premissas. Diferente de `validarPermutaFisica` (permutada × estoque,
+ * DENTRO do Catálogo) e `validarProduto` (alocado+permutado × estoque):
+ * aqui a pergunta é "o que o Catálogo declara bate com o que as Premissas
+ * mostram?". Só se aplica a `nivel_analise === 'avancado'` — o Preliminar
+ * não tem Catálogo para comparar contra.
+ *
+ * Direção Catálogo → Premissas (decisão do autor, 2026-08-22): é o Avançado
+ * que tem granularidade de unidade e é onde a permuta física é declarada.
+ * Esta função só DIAGNOSTICA — não persiste nada em `estudos` (decisão
+ * "derivar, não persistir", comentário da #441, 2026-08-24, motivada pela
+ * #452): é a "rede" que impede a divergência de voltar sem ninguém notar,
+ * não a reconciliação em si (que precisa de leitura derivada na Proforma,
+ * fora do escopo do que este diff entrega — ver o PR).
+ */
+export function validarReconciliacaoCamadas(
+  estudo: any,
+  linhasCusto: any[],
+  tipologiasCatalogo: any[],
+  tol: number = TOLERANCIA_PADRAO,
+): Divergencia[] {
+  if (estudo?.nivel_analise !== 'avancado') return [];
+  const derivado = permutaFisicaDerivadaCatalogo(linhasCusto, tipologiasCatalogo);
+  const out: Divergencia[] = [];
+  const checar = (familia: 'residencial' | 'naoResidencial', campoCanonico: string, rotulo: string) => {
+    const esperado = derivado[familia].areaM2;
+    const encontrado = Number(estudo?.[campoCanonico] ?? 0);
+    if (Math.abs(esperado - encontrado) <= tol) return;
+    out.push({
+      codigo: 'CAMADAS_DIVERGEM_PERMUTA_FISICA', severidade: 'alerta', linha: rotulo,
+      esperado, encontrado, diferenca: encontrado - esperado,
+      mensagem: `${rotulo}: o Catálogo declara ${esperado.toFixed(2)} m² de permuta física e as `
+        + `Premissas mostram ${encontrado.toFixed(2)} m² — as duas camadas do estudo descrevem `
+        + 'projetos diferentes.',
+    });
+  };
+  checar('residencial', 'permuta_fisica_area_canonica', 'Permuta física residencial');
+  checar('naoResidencial', 'permuta_fisica_nr_area_canonica', 'Permuta física não residencial');
   return out;
 }
 

@@ -44,7 +44,7 @@ import {
 } from '../frontend/fluxo-shared.js';
 import {
   validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita,
-  validarFunding, validarPermutaFisica, validarCustosDuplicados,
+  validarFunding, validarPermutaFisica, validarCustosDuplicados, validarReconciliacaoCamadas,
   permutaFisicaPorTipologia,
   type Divergencia,
 } from '../frontend/fluxo-invariantes.js';
@@ -147,8 +147,11 @@ export async function conferir(id: number): Promise<Conferencia> {
   const calc = calcularFluxo(config);
   out.calc = calc;
 
+  // #445: içada para fora do `if` — a checagem (b) de `validarFunding` a
+  // usa mesmo com `out.funding` nulo.
+  let receitaLiquida: number[] | undefined;
   if (ops.length > 0) {
-    const receitaLiquida = receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, d.custos);
+    receitaLiquida = receitaLiquidaComCorretagemMensal(calc.receitaMensal, calc.linhasCusto, d.custos);
     const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
     out.funding = fundingDoEstudo(
       ops, calc.fluxoMensal, receitaLiquida, resultadoFinal, mesRepasse(d.crono), d.taxa,
@@ -160,10 +163,12 @@ export async function conferir(id: number): Promise<Conferencia> {
     ...validarProduto(d.receitas, d.custos, d.tipologias, d.crono, calc.prazo),
     ...validarPermutaFisica(d.custos, d.tipologias),
     ...validarCustosDuplicados(d.custos),
-    ...validarContratacao(d.receitas, d.crono, calc.prazo, calc.vendaBrutaContratada),
-    ...validarSafrasReceita(d.receitas, d.crono, calc.prazo),
+    ...validarContratacao(d.receitas, d.crono, calc.prazo, calc.vendaBrutaContratada, undefined, d.custos),
+    ...validarSafrasReceita(d.receitas, d.crono, calc.prazo, undefined, d.custos),
     ...validarFluxoCalc(calc),
-    ...(out.funding ? validarFunding(out.funding, calc.fluxoMensal) : []),
+    ...(out.funding ? validarFunding(out.funding, calc.fluxoMensal, undefined, receitaLiquida) : []),
+    // #441: reconciliação Catálogo × Premissas.
+    ...validarReconciliacaoCamadas(estudo, d.custos, d.tipologias),
   ];
 
   // ── Contas próprias (b): o que TEM que somar ──

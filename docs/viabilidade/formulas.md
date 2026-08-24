@@ -179,9 +179,9 @@ Duas identidades que o motor mantém:
 fluxo_apos_funding_t = fluxo_livre_projeto_t + entradas_funding_t − saidas_funding_t
 ```
 
-fiscalizada por `validarFunding` (`frontend/fluxo-invariantes.ts:455-466`), que também acusa saldo
-de dívida negativo, dívida que não zera no horizonte e — decisão **D14** — caixa acumulado negativo
-depois do funding (`:468-479`, severidade `alerta`).
+fiscalizada por `validarFunding` (`frontend/fluxo-invariantes.ts:496`), que também acusa saldo
+de dívida negativo, dívida que não zera no horizonte, diagnóstico próprio de equity (#445) e —
+decisão **D14** — caixa acumulado negativo depois do funding (severidade `alerta`).
 
 **Funding nunca integra a Receita Bruta — VGV.** Liberação de dívida e aporte de equity aparecem
 **somente** no bloco de funding; o repasse continua sendo recebimento do cliente, ainda que o caixa

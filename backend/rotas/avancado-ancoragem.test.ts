@@ -105,7 +105,9 @@ test('legado: recalcularTravados não derruba com cronograma parcial (só alguns
   const rec = recalcularTravados(parcial);
   assert.equal(rec.length, 2); // preserva só os presentes, sem inventar linhas
   const obra = rec.find((e) => e.evento === 'obra')!;
-  assert.equal(obra.inicio_mes, 6); // #224: ainda deriva do fim do Planejamento
+  // #485: obra.inicio_mes não é mais derivado — o valor de entrada (6, já
+  // coincidindo com o fim do Planejamento) simplesmente atravessa intacto.
+  assert.equal(obra.inicio_mes, 6);
 });
 
 test('legado: linha com duracao_meses divergente da âncora (drift de antes da #249) é corrigida ao re-ancorar', () => {
