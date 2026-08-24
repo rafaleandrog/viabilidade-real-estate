@@ -158,6 +158,16 @@ export class ViabFluxoVer extends LitElement {
     this.fundingCalc = null;
     this.funding = null;
 
+    // #474 (Passos 23–25, D-Q03 2026-08-22): esta montagem
+    // (resultadoFinal → fundingDoEstudo) é LOCAL. O app não tem uma função
+    // única para essa sequência (`docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`)
+    // — cada consumidor remonta à mão, e pode divergir (R-A36). Fonte única
+    // foi CONSIDERADA E RECUSADA pelo autor; ver
+    // `docs/viabilidade/fluxo-investidor-formulas.md` §9. Os outros quatro
+    // consumidores: frontend/tela-funding.ts:216 · frontend/tela-cenarios.ts:240
+    // · frontend/tela-resumo.ts:182 (só remonta resultadoFinal, não chama
+    // fundingDoEstudo) · scripts/conferir-estudo.ts:153.
+    //
     // Sem operações de Funding, `fundingDoEstudo` devolve `null` e a tabela
     // não ganha nenhuma linha nova (blast radius zero em estudo sem captação).
     if (this.operacoes.length > 0) {
@@ -276,8 +286,9 @@ export class ViabFluxoVer extends LitElement {
               </tr>`)}
           </tbody>
         </table>
-        <p class="sec">Área privativa: ${fmtNum(p.areaPrivativa)} m² · Margem sobre VGV: ${fmtPct(p.margemPct)}.
-          A coluna "Margem" do Painel de estudos usa esta mesma linha — "= Resultado", sem permutas.
+        <p class="sec">Área privativa: ${fmtNum(p.areaPrivativa)} m² · Margem sobre Receita Bruta: ${fmtPct(p.margemPct)}.
+          A coluna "Margem" do Painel de estudos usa esta mesma linha — "= Resultado", sem permutas
+          (para a linha do Avançado; ver o atributo "title" da célula no Painel — #443).
           Esta proforma é desalavancada: nenhuma ponta do funding entra aqui — nem liberações e aportes
           na receita, nem amortização e juros no custo. “Custos Financeiros” vale só as linhas de custo
           que você classificou nesse grupo. Quem quiser ler o efeito do funding lê a aba Fluxo de Caixa,

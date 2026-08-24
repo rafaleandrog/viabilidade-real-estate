@@ -4,7 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import {
   rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosChavesDerivado, APOS_CHAVES_MESES,
-  erroFormularioAbsorcao, totalAntesAlocacao,
+  erroFormularioAbsorcao, totalAntesAlocacao, ramoLegadoDeRecebiveis,
   type EventoCrono,
 } from './fluxo-shared.js';
 import { pctRepasseDerivado, parcelasAoLongoObra, jurosTabelaAnualPct } from './fluxo-caixa-motor.js';
@@ -85,6 +85,9 @@ export class ViabFluxoReceitas extends LitElement {
   @state() private draftNome: Record<number, string> = {};
 
   private carregado = false;
+  // #458: dedupe do console.warn por Grupo — sem isto, cada re-render (a tela
+  // é reativa) reimprimiria o mesmo aviso, afogando o console.
+  private _avisadoRamoLegado = new Set<any>();
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .cards { display: flex; flex-direction: column; gap: 16px; }
@@ -278,6 +281,8 @@ export class ViabFluxoReceitas extends LitElement {
   private _renderFase(f: any): TemplateResult {
     const dis = !this.editavel;
     const vgv = this._vgvFase(f);
+    const ramoLegado = ramoLegadoDeRecebiveis(f?.fluxo_pagamento);
+    this._avisarRamoLegadoSeNecessario(f, ramoLegado);
     return html`
       <urbi-card>
         <div class="card-cab">
@@ -299,6 +304,14 @@ export class ViabFluxoReceitas extends LitElement {
           <urbi-botao variante="secundario" pequeno @click=${() => this._abrirPagamento(f)}>
             <span class="stat ${this._aplicado(f, 'fluxo') ? 'ok' : ''}"></span>Fluxo de Pagamento
           </urbi-botao>
+          <!-- #458: torna visível qual motor de recebíveis esta linha usa —
+               hoje a escolha é invisível, decidida só pela forma do JSON
+               (Array.isArray(fp?.componentes), o mesmo teste que
+               recebimentoBrutoMensal faz em fluxo-caixa-motor.ts). -->
+          ${ramoLegado ? html`
+            <urbi-badge cor="alerta" title="Plano não migrado: abra Fluxo de Pagamento e aplique para usar o modelo de safras.">
+              Plano não migrado
+            </urbi-badge>` : nothing}
           ${!dis ? html`
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
               @click=${() => { this.confirmRemover = { tipo: 'fase', fase: f }; }}></urbi-botao>` : nothing}
@@ -455,6 +468,22 @@ export class ViabFluxoReceitas extends LitElement {
     return tipo === 'absorcao'
       ? Boolean(f.absorcao?.aplicado)
       : Boolean(f.fluxo_pagamento?.aplicado);
+  }
+
+  /**
+   * #458: `console.warn` no ramo legado, nomeando a linha — mesma dupla de
+   * sinais que a issue pede (badge + warn), do mesmo lado (a tela sabe qual
+   * Grupo está em qual ramo sem precisar chamar o motor). Deduplicado por
+   * `f.id`: dispara uma vez por Grupo por sessão de tela, não a cada render.
+   */
+  private _avisarRamoLegadoSeNecessario(f: any, ramoLegado: boolean): void {
+    if (!ramoLegado || f?.id === undefined || this._avisadoRamoLegado.has(f.id)) return;
+    this._avisadoRamoLegado.add(f.id);
+    console.warn(
+      `viab-fluxo-receitas: Grupo "${f?.nome || f?.id}" (fase ${f?.id}) ainda está no ramo ` +
+      'legado de recebíveis (fluxo_pagamento sem componentes) — abra "Fluxo de Pagamento" e ' +
+      'aplique para migrar ao modelo de safras.',
+    );
   }
 
   private async _adicionarAlocacao(f: any) {

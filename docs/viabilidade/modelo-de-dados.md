@@ -36,9 +36,30 @@ Todas as tabelas usam `acesso_externo: "restrito"` — a escrita passa pelas rot
 | `avancado_linhas_receita` | **Vestigial** — modelo antigo (linha de receita com tipologias filhas). Preservada no schema, mas o app não a lê/escreve após a migração 003 (fases + alocações). |
 | `avancado_linhas_custo` | Linhas de custo em 5 grupos (terreno/obra/diretos/indireto/financeiro) com unidade de orçamento e ancoragem ao cronograma. |
 
-**Absorção (`avancado_fases.absorcao`)** — só o modo **Distribuído** em 3 períodos (Lote 6 · #20): `blocos: [{evento:'lancamento',pct}, {evento:'obra',pct}, {evento:'pos_obra',pct}]`. O período 1 (`lancamento`) cobre **Pré-lançamento + Lançamento**; o Pós-obra é **derivado** (`100 − p1 − p2`) e seu período vem do Cronograma.
+**Absorção (`avancado_fases.absorcao`)** — modo **Distribuído** em até 4 períodos (Lote 6 · #20,
+depois #330/#347): `blocos: [{evento:'pre_lancamento',pct}, {evento:'lancamento',pct},
+{evento:'obra',pct}, {evento:'pos_obra',pct}]` (`pre_lancamento` só existe quando o Cronograma tem
+essa fase). **Pós-chaves é sempre derivado** — `100 − Σpre_lancamento − Σlancamento − Σobra`
+(`pctPosChavesDerivado`, `frontend/fluxo-shared.ts`) — e seu período vem do Cronograma, não do
+bloco. ⚠️ **Campo derivado espelhado, não fonte** (#452): desde a issue #452, `pos_obra.pct` grava
+o **valor efetivo** que o motor usa (a saída de `pctPosChavesDerivado` sobre os três primeiros
+blocos), com precisão plena (C7 — derivado não monetário, não arredonda ao persistir). Antes disso
+o campo era gravado como `0` sempre, e nenhum leitor da API tinha como saber a % real de Pós-chaves.
+Nada no app **relê** este bloco — é espelho de compatibilidade, o canônico é o cálculo sobre os três
+primeiros.
 
-**Fluxo de Pagamento (`avancado_fases.fluxo_pagamento`)** — o JSON legado mantém `comissao`, `ret`, **`entrada` e `parcelas` como LISTAS** de linhas (Lote 6 · #20), e `repasse: { apos_entrega_meses }`; nele, o `%` do Repasse é **derivado** (`100 − Σentrada − Σparcelas`), não persistido. Desde a #230, o mesmo campo também aceita o contrato canônico opt-in `componentes`: lista não vazia dos tipos `imediato`, `prazo_fixo`, `ate_marco` ou `concentrado`, cujas `participacaoPct` fecham 100%. A leitura legada segue preservada por adaptador até o motor por safras passar a consumir os componentes (#283).
+**Fluxo de Pagamento (`avancado_fases.fluxo_pagamento`)** — o JSON legado mantém `comissao`,
+**`entrada` e `parcelas` como LISTAS** de linhas (Lote 6 · #20), e `repasse: { apos_entrega_meses }`;
+nele, o `%` do Repasse é **derivado** (`100 − Σentrada − Σparcelas`, `pctRepasseDerivado`,
+`frontend/fluxo-caixa-motor.ts`) e **não é persistido** — quem ler `entrada`/`parcelas` pela API e
+somar os dois **não** vai fechar 100%, por construção; o resto é o Repasse. ⚠️ O sub-objeto por
+linha `ret` (RET) **saiu** deste blob (#452): desde a #346 a RET é global do estudo
+(`estudos.considerar_ret`/`estudos.ret_pct`), e o legado continuava regravando `ret` morto em toda
+escrita — um consumidor da API lia `ret.ativo: false` numa linha de estudo com RET ligada. Desde a
+#230, o mesmo campo também aceita o contrato canônico opt-in `componentes`: lista não vazia dos
+tipos `imediato`, `prazo_fixo`, `ate_marco` ou `concentrado`, cujas `participacaoPct` fecham 100%. A
+leitura legada segue preservada por adaptador até o motor por safras passar a consumir os
+componentes (#283).
 
 Integridade (Lote 6 · #19): excluir uma tipologia do catálogo com alocações é **bloqueado** (422 `TIPOLOGIA_EM_USO`); editar nome/área reflete ao vivo nas alocações (a alocação guarda só unidades + preço). E, desde a #433, **reduzir a `quantidade` do catálogo abaixo do que já está comprometido** — alocações de venda **mais** permuta física — é recusado com 422 `SALDO_EXCEDIDO`: era a quarta porta do saldo, e a única que não validava nada. `PATCH` parcial sem o campo `quantidade` não é assunto da regra.
 

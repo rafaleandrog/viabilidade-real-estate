@@ -11,7 +11,11 @@ const lista = (v: any): any[] => Array.isArray(v)
 
 export interface FormularioPagamento {
   comissao: { ativo: boolean; tipo: string; pct: number };
-  ret: { ativo: boolean; pct: number };
+  // #452: o sub-objeto de RET por linha SAIU do tipo e da leitura. A #346
+  // tornou a RET global do estudo (`considerar_ret`/`ret_pct`, fora da linha),
+  // mas `fluxoPagamentoParaSalvar` continuava regravando o sub-objeto morto
+  // pelo spread `{ ...form }` — tirar só a leitura não bastava, o campo tinha
+  // de sumir do tipo para o spread parar de reproduzi-lo.
   entrada: any[];
   parcelas: any[];
   // #345: apos_entrega_meses deixou de ser lido pelo motor (repasse travado
@@ -81,7 +85,6 @@ export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
       tipo: fp.comissao?.tipo ?? 'embutida',
       pct: n(fp.comissao?.pct),
     },
-    ret: { ativo: fp.ret?.ativo ?? false, pct: n(fp.ret?.pct) },
     entrada: entradas.length || !semCanonicos ? entradas : [{ pct: 15, parcelas: 1, descontoPct: 0 }],
     parcelas: parcelas.length || !semCanonicos
       ? parcelas

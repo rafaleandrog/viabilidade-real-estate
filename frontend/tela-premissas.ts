@@ -985,7 +985,7 @@ export class ViabTelaPremissas extends LitElement {
         { rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: varianteFaixa(ef, p.eficienciaPct) },
         { rot: 'VGV', val: fmtR$(p.vgv), variante: '' },
         { rot: 'Nº de lotes', val: fmtNum(p.numUnidades), variante: '' },
-        { rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: '' },
+        { rot: 'Margem sobre VGV', val: fmtPct(p.margemLiquidaPct), variante: '' },
       );
     } else {
       const co = this._benchmark('custo_obras_vgv');
@@ -996,7 +996,7 @@ export class ViabTelaPremissas extends LitElement {
         { rot: 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
         { rot: 'Preço médio/unid.', val: fmtR$(p.precoMedioUnidade), variante: '' },
         { rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: varianteFaixa(co, p.custoObrasVgvPct) },
-        { rot: 'Margem líquida', val: fmtPct(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) },
+        { rot: 'Margem sobre VGV', val: fmtPct(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) },
       );
     }
 

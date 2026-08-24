@@ -312,3 +312,83 @@ As KPIs desalavancadas (§8.1) são preservadas pela linha "Fluxo de Caixa Livre
 | Migração | `migracoes/029_funding_operacoes.js` |
 | Golden cases | `frontend/funding-motor.test.ts` · `frontend/financiamento-producao-golden.test.ts` |
 | Invariantes (inclui a **D14**) | `frontend/fluxo-invariantes.ts` — `validarFunding` |
+
+## 9. Passos 23–25 — montagem por consumidor, e a recusa da fonte única (#474)
+
+`docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594` (Passos 23–25) descreve **uma**
+sequência, executada **uma** vez: processar os instrumentos de funding → formar o fluxo final →
+atualizar acumulados e indicadores. **No app essa sequência não existe como código.** Ela é
+remontada, à mão, por consumidores independentes, cada um com a sua montagem — e é o que a #474
+existe para registrar, depois que o autor **recusou** a alternativa (fonte única,
+`estadoFinanceiroDoEstudo`) em **D-Q03, 2026-08-22**: *"corrigir o erro da proforma, mas **não**
+unificar as definições"*. A #426 (o "erro da proforma") já mergeou; a fonte única, não — e não vai.
+
+### 9.1 A definição vigente de `resultadoFinal`
+
+O app pratica:
+
+```
+resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1]
+```
+
+— o fluxo de caixa livre **acumulado ao fim do horizonte modelado**. É a MESMA leitura em todo
+consumidor (ver §9.2); o que diverge entre consumidores é se e como esse número alimenta
+`fundingDoEstudo` depois.
+
+**Divergência em relação à planilha `fluxo_investidor_FORMULAS`:** lá o fecho é
+`!equity!C19 = C18 − divida!C5` — a soma de TODAS as entradas e saídas de caixa do investidor ao
+longo de toda a operação (um total econômico, sem corte de tempo), não um valor amarrado ao
+horizonte que o `FluxoConfig` do estudo modela.
+
+**As duas coincidem quando o horizonte alcança o último evento financeiro relevante** (última
+parcela, último recebimento, quitação de toda dívida) **e divergem quando não alcança** — um
+horizonte mais curto que a cauda de recebíveis/dívida do projeto deixa `resultadoFinal` sem contar
+o que viria depois do corte, enquanto `C19` da planilha não tem esse problema (ela não corta no
+tempo).
+
+**O entregável desta seção é registrar a definição vigente, não escolher entre as duas.** Adotar a
+definição da planilha seria mudança de comportamento — decisão do autor, issue própria. Ninguém
+está autorizado a "corrigir" `resultadoFinal` para bater com `C19` a partir desta nota.
+
+### 9.2 Os cinco consumidores (inventário executável)
+
+| # | Consumidor | remonta `resultadoFinal` | chama `fundingDoEstudo` |
+|---|---|---|---|
+| 1 | `frontend/tela-fluxo-ver.ts` | `:175` | `:179` |
+| 2 | `frontend/tela-funding.ts` | `:215` | `:216` |
+| 3 | `frontend/tela-cenarios.ts` | `:239` (e de novo em `:273`, como `resultadoDesalavancado`) | `:240` |
+| 4 | `frontend/tela-resumo.ts` | `:182` | — (só remonta; é a "Margem de caixa" da #443) |
+| 5 | `scripts/conferir-estudo.ts` | `:152` | `:153` |
+
+Cada um dos cinco arquivos carrega um comentário (`grep -c "Passos 23"` → `1`) citando os outros
+quatro por `arquivo:linha` — é o formato em que a decisão se defende sozinha: quem for escrever a
+próxima tela lê o aviso no arquivo que está copiando. O teste de inventário,
+`frontend/consumidores-passos-23-25.test.ts`, conta os arquivos que casam os dois padrões acima
+(fora de testes/fixtures/motor) e falha se o número deixar de ser exatamente 5 — é o que impede a
+sexta montagem de entrar em silêncio.
+
+**`frontend/tela-proforma.ts` NÃO é consumidor desta cadeia** — usa `calcularProforma` (o Preliminar
+puro), nunca `proformaAvancado` nem `fundingDoEstudo`.
+
+> ⚠️ **`frontend/tela-dashboard.ts` SAIU da lista com a #426/#529.** Numa vistoria anterior da
+> issue #474 (contra `85e6d617`) ele constava como sexto consumidor, citando linhas onde chamava
+> `fundingDoEstudo`. A proforma do Avançado ficou desalavancada nesse meio-tempo (`proformaAvancado`
+> não recebe mais `funding`), e o Painel de estudos passou a ler só `proformaAvancado(c, area)` —
+> sem funding, sem `fluxoAcumulado[...]` direto. Reintroduzir a chamada reabriria a lista para seis;
+> não faça isso sem atualizar esta seção e o teste de inventário junto.
+
+### 9.3 A consequência de não unificar — declarada
+
+Enquanto a montagem for por consumidor, todo conserto local (ex.: a correção de sinal do funding
+da #426) resolve **um** sintoma sem tocar os outros — as superfícies continuam podendo divergir
+entre si, e nada impede que a **próxima tela** que alguém escrever crie mais uma definição
+concorrente. O app aceita esse risco **por decisão, não por descuido**: a fonte única
+(`estadoFinanceiroDoEstudo`, que executaria os Passos 23–25 uma vez só e devolveria um objeto que
+os consumidores apenas leem) foi desenhada, revisada e **recusada** pelo autor em D-Q03. Os rótulos
+que ajudam o usuário a distinguir as definições concorrentes (não a eliminá-las) são a #443.
+
+**Contraponto da EVI (consultivo, não normativo):** na planilha do autor, o resultado é montado
+**uma vez só** (`Premissas e Resultados!P39 = SUBTOTAL(9;P8:P33)`), e os outros dois fechos
+(`P37`, `P35`) são **derivados** dele — a alternativa que o app recusou é o que o próprio oráculo
+pratica. Registrar isso é mais honesto que registrar só a decisão do app, e é o tipo de frase que
+poupa a próxima auditoria de "redescobrir" o assunto.

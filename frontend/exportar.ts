@@ -1,6 +1,12 @@
 // Exportação de relatórios a partir da própria UI/formatação do app (§6.3).
 // PDF: abre uma janela com HTML formatado (mesmos tokens/estilos) e chama print
 // (o usuário salva como PDF). Excel: gera CSV (pt-BR, separador ';').
+//
+// #443: "Margem sobre VGV" (era "Margem líquida") — `p.margemLiquidaPct` é
+// SEMPRE do Preliminar aqui (`p: Proforma`, o tipo de `proforma.ts`), a leitura
+// `resultado / vgv`. O Avançado tem sua PRÓPRIA "Margem sobre Receita Bruta"
+// (`proforma-avancado.ts`), com denominador diferente — ver
+// `frontend/rotulos-indicador.ts` para o inventário completo.
 import type { Proforma } from './proforma.js';
 // #349: `ROTULOS_COMPONENTES_*` saíram daqui junto com os blocos "Componente ·
 // …" e Carteira, que a exportação deixou de listar para espelhar a tabela.
@@ -77,7 +83,7 @@ export function exportarExcel(estudo: any, p: Proforma, lot: boolean) {
     rows.push(`${r.l};${fmtR$(r.v, false)};${pct}`);
   }
   rows.push('');
-  rows.push(`Margem líquida (%);${pct1(p.margemLiquidaPct)}`);
+  rows.push(`Margem sobre VGV (%);${pct1(p.margemLiquidaPct)}`);
   const nome = (estudo.id_legivel || 'estudo') + '_proforma.csv';
   baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
 }
@@ -91,8 +97,8 @@ export function exportarPDF(estudo: any, p: Proforma, lot: boolean) {
   }).join('');
 
   const kpis = lot
-    ? [['Área vendável', `${fmtNum(p.areaVendavel)} m²`], ['VGV', fmtR$(p.vgv)], ['Eficiência', fmtPct(p.eficienciaPct)], ['Margem líquida', fmtPct(p.margemLiquidaPct)]]
-    : [['Área privativa', `${fmtNum(p.areaPrivativa)} m²`], ['VGV', fmtR$(p.vgv)], ['Custo obras/VGV', fmtPct(p.custoObrasVgvPct)], ['Margem líquida', fmtPct(p.margemLiquidaPct)]];
+    ? [['Área vendável', `${fmtNum(p.areaVendavel)} m²`], ['VGV', fmtR$(p.vgv)], ['Eficiência', fmtPct(p.eficienciaPct)], ['Margem sobre VGV', fmtPct(p.margemLiquidaPct)]]
+    : [['Área privativa', `${fmtNum(p.areaPrivativa)} m²`], ['VGV', fmtR$(p.vgv)], ['Custo obras/VGV', fmtPct(p.custoObrasVgvPct)], ['Margem sobre VGV', fmtPct(p.margemLiquidaPct)]];
 
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome}</title>
   <style>
@@ -110,7 +116,7 @@ export function exportarPDF(estudo: any, p: Proforma, lot: boolean) {
     <div class="sub-h">${estudo.tipo_empreendimento} · ${estudo.status} · Estudo de Viabilidade — UrbiVerso</div>
     <div class="kpis">${kpis.map(([r, v]) => `<div class="kpi"><div class="r">${r}</div><div class="v">${v}</div></div>`).join('')}</div>
     <table><thead><tr><td>Linha</td><td class="v">R$</td><td class="v">% VGV</td></tr></thead>
-    <tbody>${linhasHtml}<tr class="sub"><td>Margem líquida</td><td class="v">${fmtPct(p.margemLiquidaPct)}</td><td class="v"></td></tr></tbody></table>
+    <tbody>${linhasHtml}<tr class="sub"><td>Margem sobre VGV</td><td class="v">${fmtPct(p.margemLiquidaPct)}</td><td class="v"></td></tr></tbody></table>
     <button onclick="window.print()" style="margin-top:16px;padding:8px 16px">Imprimir / Salvar PDF</button>
   </body></html>`;
 

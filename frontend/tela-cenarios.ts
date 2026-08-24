@@ -222,6 +222,16 @@ export class ViabTelaCenarios extends LitElement {
     return periodosAnuais(this.dataInicio, prazo);
   }
 
+  // #474 (Passos 23–25, D-Q03 2026-08-22): esta montagem
+  // (resultadoFinal → fundingDoEstudo) é LOCAL. O app não tem uma função
+  // única para essa sequência (`docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`)
+  // — cada consumidor remonta à mão, e pode divergir (R-A36). Fonte única
+  // foi CONSIDERADA E RECUSADA pelo autor; ver
+  // `docs/viabilidade/fluxo-investidor-formulas.md` §9. Os outros quatro
+  // consumidores: frontend/tela-fluxo-ver.ts:179 · frontend/tela-funding.ts:216
+  // · frontend/tela-resumo.ts:182 (só remonta resultadoFinal, não chama
+  // fundingDoEstudo) · scripts/conferir-estudo.ts:153. (Este arquivo remonta
+  // resultadoFinal DE NOVO em `:263`, como `resultadoDesalavancado`.)
   /** §13.3/item 5: simula o Funding sobre o `FluxoCalc` de UM cenário (base ou simulado). `null` sem operações. */
   private _fundingCalcDe(calc: FluxoCalc): FundingCalc | null {
     if (this.operacoes.length === 0) return null;
