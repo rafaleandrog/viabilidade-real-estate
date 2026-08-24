@@ -7,8 +7,12 @@
 // tabela de cenários salvos.
 //
 // A direção NÃO é a do sinal da variação — é a do indicador:
-//   · Resultado / VPL / TIR       → maior é melhor;
-//   · Exposição máxima (negativa) → maior (menos negativa) é melhor.
+//   · Resultado / VPL / TIR → maior é melhor (`maiorMelhor = true`);
+//   · Exposição máxima (#491, 2026-08-24) → lida por MAGNITUDE, não por
+//     sinal: o chamador passa os dois valores já em módulo e
+//     `maiorMelhor = false` — crescer em módulo é sempre pior (mais
+//     dinheiro em risco), independente do sinal que o motor guarda
+//     internamente (`fluxo-caixa-motor.ts`, sempre negativo ou zero).
 // Por isso `maiorMelhor` é sempre explícito no ponto de uso.
 // ─────────────────────────────────────────────────────────────────────────
 
