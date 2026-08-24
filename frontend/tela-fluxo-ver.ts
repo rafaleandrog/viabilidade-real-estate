@@ -224,12 +224,17 @@ export class ViabFluxoVer extends LitElement {
   /**
    * #351 · aba Proforma — leitura econômica do mesmo `FluxoCalc`, na
    * segmentação da imagem de referência da planilha (aba `#43`): três colunas
-   * (R$ · R$/m² da área privativa · % VGV). Entradas de funding ficam de fora
-   * de propósito; ver a nota do topo de `proforma-avancado.ts`.
+   * (R$ · R$/m² da área privativa · % VGV).
+   *
+   * ⚠️ #426: a proforma é DESALAVANCADA e a função nem recebe `funding` —
+   * nenhuma ponta entra, nem liberação na receita nem serviço da dívida no
+   * custo. `this.funding` continua servindo à tabela do fluxo e aos KPIs da
+   * aba Análise Financeira, que são outra leitura. Ver a nota do topo de
+   * `proforma-avancado.ts`.
    */
   private _renderProforma(c: FluxoCalc): TemplateResult {
     const area = areaPrivativaTotalLinhas(this.dados?.receitas ?? []);
-    const p = proformaAvancado(c, area, this.funding);
+    const p = proformaAvancado(c, area);
     const porM2 = (v: number) => (p.areaPrivativa > 0 ? v / p.areaPrivativa : 0);
     const pctVgv = (v: number) => (p.vgv > 0 ? (v / p.vgv) * 100 : 0);
     return html`
@@ -249,8 +254,10 @@ export class ViabFluxoVer extends LitElement {
           </tbody>
         </table>
         <p class="sec">Área privativa: ${fmtNum(p.areaPrivativa)} m² · Margem sobre VGV: ${fmtPct(p.margemPct)}.
-          Aportes e liberações de funding não entram aqui — proforma é resultado econômico, não caixa;
-          o custo do funding aparece em Custos Financeiros.</p>
+          Esta proforma é desalavancada: nenhuma ponta do funding entra aqui — nem liberações e aportes
+          na receita, nem amortização e juros no custo. “Custos Financeiros” vale só as linhas de custo
+          que você classificou nesse grupo. Quem quiser ler o efeito do funding lê a aba Fluxo de Caixa,
+          não esta.</p>
       </urbi-card>
     `;
   }

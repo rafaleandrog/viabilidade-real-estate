@@ -5,18 +5,14 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct, fmtNum, fmtM2 } from './viab-format.js';
 import { calcularProforma } from './proforma.js';
 import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { areaPrivativaTotalLinhas, mesRepasse } from './fluxo-shared.js';
+import { areaPrivativaTotalLinhas } from './fluxo-shared.js';
 import { proformaAvancado } from './proforma-avancado.js';
-import {
-  receitaLiquidaComCorretagemMensal, fundingDoEstudo,
-  type FundingNoFluxo,
-} from './funding-motor.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo, transicaoStatus,
   listarRegioesMercado,
   listarGlebasNucleo, listarLotesNucleo,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
-  buscarCronogramaAvancado, buscarParametrosAvancado, listarFundingOperacoes,
+  buscarCronogramaAvancado, buscarParametrosAvancado,
 } from './viabilidade-api.js';
 import './viabilidade-config-benchmarks.js';
 import './viabilidade-config-curvas.js';
@@ -235,24 +231,26 @@ export class ViabTelaDashboard extends LitElement {
 
   /**
    * Reproduz exatamente o caminho da sub-aba Proforma (`tela-fluxo-ver.ts`
-   * `_carregar`/`_recalcular`, com `funding` incluído quando há Capital
-   * Stack ativo) — para que o número da listagem nunca divirja do que o
-   * usuário vê ao abrir o estudo. Cada linha resolve de forma independente:
-   * uma falha não derruba as demais.
+   * `_carregar`/`_recalcular`) — para que o número da listagem nunca divirja
+   * do que o usuário vê ao abrir o estudo. Cada linha resolve de forma
+   * independente: uma falha não derruba as demais.
+   *
+   * ⚠️ #426: a proforma é DESALAVANCADA, então este caminho não carrega mais
+   * as operações de Funding — elas não movem nenhuma das quatro colunas (VGV,
+   * Resultado, Margem, ROI). Efeito colateral: um request a menos por estudo
+   * Avançado da página.
    */
   private async _calcularUmAvancado(estudo: any, curvas: any[]) {
     try {
-      const [receitas, custos, crono, params, operacoes] = await Promise.all([
+      const [receitas, custos, crono, params] = await Promise.all([
         listarReceitasAvancado(estudo.id),
         listarCustosAvancado(estudo.id),
         buscarCronogramaAvancado(estudo.id),
         buscarParametrosAvancado(estudo.id),
-        listarFundingOperacoes(estudo.id),
       ]);
       const linhasReceita = receitas?.erro ? [] : (receitas.dados || []);
       const linhasCusto = custos?.erro ? [] : (custos.dados || []);
       const cronograma = crono?.erro ? [] : (crono.dados || []);
-      const operacoesFunding = operacoes?.erro ? [] : (operacoes.dados || []);
       const taxaDescontoAa = params?.erro ? 12 : Number(params.taxa_desconto_aa ?? 12);
       const config: FluxoConfig = {
         dataInicio: params?.erro ? null : (params.data_inicio_projeto ?? null),
@@ -266,23 +264,8 @@ export class ViabTelaDashboard extends LitElement {
       };
       const c = calcularFluxo(config);
 
-      // Sem operações de Funding, `fundingDoEstudo` devolve `null` e
-      // `proformaAvancado` calcula desalavancado (mesma regra da tela de
-      // Resultados, blast radius zero em estudo sem captação).
-      let funding: FundingNoFluxo | null = null;
-      if (operacoesFunding.length > 0) {
-        const receitaLiquida = receitaLiquidaComCorretagemMensal(c.receitaMensal, c.linhasCusto, linhasCusto);
-        const resultadoFinal = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] ?? 0;
-        const fundingCalc = fundingDoEstudo(
-          operacoesFunding, c.fluxoMensal, receitaLiquida, resultadoFinal,
-          mesRepasse(cronograma), taxaDescontoAa,
-          { custosRaw: linhasCusto, linhasCusto: c.linhasCusto, cronograma },
-        );
-        funding = fundingCalc?.noFluxo ?? null;
-      }
-
       const area = areaPrivativaTotalLinhas(linhasReceita);
-      const p = proformaAvancado(c, area, funding);
+      const p = proformaAvancado(c, area);
       // A área privativa já era calculada aqui e DESCARTADA — o mapa só guardava
       // VGV/Resultado/Margem. Agora ela sai junto, sem custo nenhum.
       //
