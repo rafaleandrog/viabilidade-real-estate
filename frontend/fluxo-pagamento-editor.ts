@@ -117,6 +117,24 @@ function projecaoDoEspelho(c: any): string {
 }
 
 /**
+ * Quantos campos do espelho dois componentes têm iguais. É o desempate do
+ * passe 2 do transplante.
+ *
+ * Existe porque `find` guloso — "o primeiro doador não usado daquele tipo" —
+ * escolhe errado quando há mais de um candidato: apagar a 1ª de duas linhas
+ * `prazo_fixo` e mexer no percentual da que sobrou fazia a sobrevivente herdar
+ * `taxaMensal` e `rotulo` da linha APAGADA, porque ela era a primeira da fila.
+ * Comparar semelhança faz a sobrevivente achar o doador que de fato é dela.
+ */
+function semelhancaDeEspelho(a: any, b: any): number {
+  return CAMPOS_DO_ESPELHO.reduce((n, k) => {
+    const va = a?.[k] === undefined ? null : a[k];
+    const vb = b?.[k] === undefined ? null : b[k];
+    return n + (va === vb ? 1 : 0);
+  }, 0);
+}
+
+/**
  * Decide o array de `componentes` que uma escrita do modal deve gravar.
  *
  * Três casos, em ordem:
@@ -139,7 +157,20 @@ function projecaoDoEspelho(c: any): string {
  * posição faz "Adicionar entrada" deslocar todo mundo e matar a taxa dos
  * componentes preexistentes — o mesmo dano que esta função existe para
  * impedir, a um clique de distância. São dois passes: casamento exato de
- * estrutura primeiro, depois mesmo `tipo` na ordem de aparição.
+ * estrutura primeiro, depois mesmo `tipo` escolhendo o doador MAIS PARECIDO
+ * (`semelhancaDeEspelho`), com empate pela ordem de aparição.
+ *
+ * ⚠️ LIMITE DECLARADO, e ele é irredutível sem identidade estável de linha:
+ * **permutar valores entre duas linhas do mesmo `tipo` move o campo
+ * só-canônico junto com o VALOR, não com a linha.** Dois `prazo_fixo` de 30% e
+ * 70% com taxas diferentes: se o usuário digita 70 na primeira e 30 na
+ * segunda, o passe 1 casa a primeira regenerada com o componente que tinha 70%
+ * — e a taxa troca de linha. Não há como distinguir isso de "o usuário
+ * reordenou as duas linhas", que produz entrada byte-idêntica e cujo
+ * comportamento correto é justamente esse (é o teste `identidade: REORDENAR`).
+ * O espelho legado não guarda identidade de linha; enquanto não guardar, um
+ * dos dois casos tem de perder, e o escolhido é o mais raro. Fixado por teste
+ * para não virar surpresa.
  *
  * O que o caso 3 transplanta não é uma lista fixa de quatro campos: é TUDO o
  * que o doador carrega e o espelho legado não sabe produzir (ver
@@ -180,11 +211,18 @@ export function componentesParaSalvar(
     const d = doadores.find((x) => !x.usado && projecaoDoEspelho(x.c) === chave);
     if (d) { d.usado = true; parDe[i] = d.c; }
   });
-  // passe 2 — mesmo `tipo`, na ordem de aparição daquele tipo
+  // passe 2 — mesmo `tipo`, escolhendo o doador MAIS PARECIDO, não o primeiro
+  // da fila. Empate resolve pela ordem de aparição, que é o critério antigo.
   regenerados.forEach((r, i) => {
     if (parDe[i]) return;
-    const d = doadores.find((x) => !x.usado && x.c?.tipo === (r as any).tipo);
-    if (d) { d.usado = true; parDe[i] = d.c; }
+    let melhor: { c: any; usado: boolean } | null = null;
+    let melhorNota = -1;
+    for (const x of doadores) {
+      if (x.usado || x.c?.tipo !== (r as any).tipo) continue;
+      const nota = semelhancaDeEspelho(r, x.c);
+      if (nota > melhorNota) { melhorNota = nota; melhor = x; }
+    }
+    if (melhor) { melhor.usado = true; parDe[i] = melhor.c; }
   });
   return regenerados.map((r, i) => {
     const doador = parDe[i];

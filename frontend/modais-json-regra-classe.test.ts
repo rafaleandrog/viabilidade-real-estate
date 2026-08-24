@@ -79,7 +79,7 @@ const PARES: ParDeModal[] = [
       meses: Array.from({ length: 43 }, (_, i) => ({ mes: 3 + i, pct: 100 / 43 })),
       aplicado: true,
     }),
-    ler: (dado) => formularioAbsorcao(dado),
+    ler: (dado) => formularioAbsorcao(dado, true),
     salvar: (form, dado) => absorcaoParaSalvar(form, dado),
   },
 ];

@@ -74,8 +74,17 @@ function pctBloco(absorcao: any, evento: string): number {
  *
  * `temPreLancamento` vem do Cronograma (#330/#347): sem a fase, a linha some da
  * tela e o percentual é apresentado zerado. O valor cru continua em `lido`.
+ *
+ * ⚠️ `temPreLancamento` é OBRIGATÓRIO de propósito — não tem default. Com um
+ * default, apagar `this._temPreLancamento()` da chamada da tela passava por
+ * typecheck, pelos testes de unidade e pelos de render, e o estrago era mudo e
+ * ao contrário do que a intuição diz: o formulário deixaria de zerar o
+ * percentual legado, `editouOsBlocos` deixaria de acusar a zeragem deliberada
+ * da #347, e aí o no-op da #431 ENGOLIRIA a correção — gravando para sempre o
+ * percentual que a #347 existe para remover. Sem default, a omissão é erro de
+ * compilação. Quem chama de teste passa `true` explicitamente.
  */
-export function formularioAbsorcao(absorcao: any, temPreLancamento = true): FormularioAbsorcao {
+export function formularioAbsorcao(absorcao: any, temPreLancamento: boolean): FormularioAbsorcao {
   const lido: ProjecaoAbsorcao = {
     correcao_estoque: Boolean(absorcao?.correcao_estoque),
     pre_lancamento_pct: pctBloco(absorcao, 'pre_lancamento'),

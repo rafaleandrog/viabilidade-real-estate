@@ -40,12 +40,12 @@ const ABS_DISTRIBUIDO = () => ({
 
 test('#431: abrir e aplicar sem mexer é no-op — modo e meses inclusive', () => {
   const abs = ABS_PERSONALIZADO();
-  const salvo = absorcaoParaSalvar(formularioAbsorcao(abs), abs);
+  const salvo = absorcaoParaSalvar(formularioAbsorcao(abs, true), abs);
   assert.deepEqual(salvo, abs);
   assert.equal(salvo.modo, 'personalizado');
   assert.equal(salvo.meses.length, 43);
   // Idempotência: aplicar de novo sobre o gravado também não move nada.
-  assert.deepEqual(absorcaoParaSalvar(formularioAbsorcao(salvo), salvo), abs);
+  assert.deepEqual(absorcaoParaSalvar(formularioAbsorcao(salvo, true), salvo), abs);
 });
 
 test('#431: o no-op é BYTE-idêntico, não só deepEqual', () => {
@@ -53,7 +53,7 @@ test('#431: o no-op é BYTE-idêntico, não só deepEqual', () => {
   // byte-idêntico — mais forte que deepEqual, que ignora ordem de chave.
   const abs = ABS_PERSONALIZADO();
   assert.equal(
-    JSON.stringify(absorcaoParaSalvar(formularioAbsorcao(abs), abs)),
+    JSON.stringify(absorcaoParaSalvar(formularioAbsorcao(abs, true), abs)),
     JSON.stringify(abs),
   );
 });
@@ -62,7 +62,7 @@ test('#431: o modal abre zerado numa linha personalizada — e isso não é edi�
   // Numa linha `personalizado` não existem `blocos`, então os três campos
   // abrem em 0. Antes desta issue, esse zero era gravado como se o usuário o
   // tivesse digitado. Agora ele é o valor LIDO, e o no-op o reconhece.
-  const form = formularioAbsorcao(ABS_PERSONALIZADO());
+  const form = formularioAbsorcao(ABS_PERSONALIZADO(), true);
   assert.deepEqual(
     [form.pre_lancamento_pct, form.lancamento_pct, form.obra_pct], [0, 0, 0]);
   assert.deepEqual(form.lido, {
@@ -72,7 +72,7 @@ test('#431: o modal abre zerado numa linha personalizada — e isso não é edi�
 
 test('#431: edição real de um bloco converte para distribuido — e descarta meses', () => {
   const abs = ABS_PERSONALIZADO();
-  const form = formularioAbsorcao(abs);
+  const form = formularioAbsorcao(abs, true);
   const salvo = absorcaoParaSalvar({ ...form, obra_pct: 50 }, abs);
   assert.equal(salvo.modo, 'distribuido');
   assert.equal(salvo.meses, undefined, 'a curva substituída não pode ficar de carona');
@@ -87,7 +87,7 @@ test('#431: edição real de um bloco converte para distribuido — e descarta m
 
 test('#431: a linha distribuida comum continua funcionando como sempre', () => {
   const abs = ABS_DISTRIBUIDO();
-  const form = formularioAbsorcao(abs);
+  const form = formularioAbsorcao(abs, true);
   assert.deepEqual(
     [form.pre_lancamento_pct, form.lancamento_pct, form.obra_pct], [10, 20, 40]);
   assert.deepEqual(absorcaoParaSalvar(form, abs), abs); // no-op
@@ -98,7 +98,7 @@ test('#431: a linha distribuida comum continua funcionando como sempre', () => {
 
 test('#431: linha NOVA (sem absorcao persistida) monta o distribuido do formulário', () => {
   for (const vazio of [null, undefined, {}]) {
-    const form = formularioAbsorcao(vazio);
+    const form = formularioAbsorcao(vazio, true);
     const salvo = absorcaoParaSalvar({ ...form, lancamento_pct: 30, obra_pct: 40 }, vazio);
     assert.equal(salvo.modo, 'distribuido');
     assert.equal(salvo.aplicado, true);
@@ -111,7 +111,7 @@ test('#431: mexer só na correção de estoque NÃO destrói a curva', () => {
   // inteiro. Tratá-la como "o usuário editou" faria o badge Não/Sim virar um
   // botão de apagar 43 pontos — o mesmo dano, por outra porta.
   const abs = ABS_PERSONALIZADO();
-  const form = formularioAbsorcao(abs);
+  const form = formularioAbsorcao(abs, true);
   const salvo = absorcaoParaSalvar({ ...form, correcao_estoque: true }, abs);
   assert.equal(salvo.modo, 'personalizado');
   assert.equal(salvo.meses.length, 43);
@@ -145,7 +145,7 @@ test('#431: curvaNaoRepresentavel só acusa o que o formulário não sabe desenh
 
 test('#431: a confirmação só dispara quando a aplicação REALMENTE substitui a curva', () => {
   const abs = ABS_PERSONALIZADO();
-  const form = formularioAbsorcao(abs);
+  const form = formularioAbsorcao(abs, true);
   assert.equal(absorcaoSubstituiCurva(form, abs), null, 'abrir e aplicar não substitui nada');
   assert.equal(absorcaoSubstituiCurva({ ...form, correcao_estoque: true }, abs), null,
     'trocar o badge de estoque não substitui nada');
@@ -153,7 +153,7 @@ test('#431: a confirmação só dispara quando a aplicação REALMENTE substitui
     { modo: 'personalizado', pontos: 43 });
   // E numa linha distribuida comum não há nada a confirmar, nem editando.
   const d = ABS_DISTRIBUIDO();
-  assert.equal(absorcaoSubstituiCurva({ ...formularioAbsorcao(d), obra_pct: 99 }, d), null);
+  assert.equal(absorcaoSubstituiCurva({ ...formularioAbsorcao(d, true), obra_pct: 99 }, d), null);
 });
 
 // ── A consequência que o motor enxerga ──
@@ -170,7 +170,7 @@ test('#431: a curva de 43 pontos continua chegando no motor depois do "Aplicar"'
   ];
   const abs = ABS_PERSONALIZADO();
   const antes = absorcaoMensal(abs, CRONO);
-  const depois = absorcaoMensal(absorcaoParaSalvar(formularioAbsorcao(abs), abs), CRONO);
+  const depois = absorcaoMensal(absorcaoParaSalvar(formularioAbsorcao(abs, true), abs), CRONO);
   assert.deepEqual(depois, antes);
   assert.ok(antes!.pcts.some((p) => p > 0), 'pré-condição: a curva distribui alguma coisa');
 });

@@ -543,3 +543,94 @@ test('#431 funding: o ciclo abrir/aplicar não move o retorno do investidor, nos
     assert.deepEqual(d.entradas, a.entradas, `entradas do investidor mudaram em ${modo}`);
   }
 });
+
+// ── Os dois casos que a rodada 1 de revisão do PR 523 achou ──
+//
+// Os dois são da mesma família: o pareamento persistido×regenerado não tem
+// identidade de LINHA para se apoiar, só os valores do espelho. Um deles é
+// defeito e foi consertado; o outro é limite, e este teste existe para que ele
+// pare de ser surpresa.
+
+test('#431 identidade: apagar uma linha e mexer na que sobrou NÃO herda a taxa da apagada', () => {
+  // Achado P1 do Codex, confirmado por medição. Dois `prazo_fixo` de taxas
+  // diferentes; o usuário apaga o primeiro E muda o percentual do segundo.
+  // Nenhum casa exato, então tudo cai no passe 2 — e o `find` guloso entregava
+  // ao sobrevivente o doador que estava primeiro na fila, que é justamente a
+  // linha APAGADA. A sobrevivente saía com a `taxaMensal` e o `rotulo` de um
+  // componente que o usuário acabou de mandar embora.
+  const fp = {
+    ...FP_TABELA_LONGA(),
+    entrada: [],
+    parcelas: [
+      { pct: 30, periodicidade: 'mensal', parcelas: 10, ao_longo_obra: false },
+      { pct: 70, periodicidade: 'mensal', parcelas: 20, ao_longo_obra: false },
+    ],
+    componentes: [
+      {
+        tipo: 'prazo_fixo', participacaoPct: 30, sinalPct: 0, prazoMeses: 10, defasagemMeses: 1,
+        taxaMensal: TAXA, jurosNoMesDaContratacao: false, rotulo: 'A',
+      },
+      {
+        tipo: 'prazo_fixo', participacaoPct: 70, sinalPct: 0, prazoMeses: 20, defasagemMeses: 1,
+        taxaMensal: 0.005, jurosNoMesDaContratacao: false, rotulo: 'B',
+      },
+    ],
+  };
+  const form = formularioPagamento(fp);
+  form.parcelas = [{ ...form.parcelas[1], pct: 100 }]; // apaga A, põe B em 100%
+
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  assert.equal(salvo.componentes.length, 1);
+  const sobrevivente = salvo.componentes[0] as any;
+  assert.equal(sobrevivente.rotulo, 'B', 'a sobrevivente herdou o rótulo da linha APAGADA');
+  assert.equal(sobrevivente.taxaMensal, 0.005, 'a sobrevivente herdou a taxa da linha APAGADA');
+  assert.equal(sobrevivente.prazoMeses, 20, 'e o prazo continua sendo o dela, que vem do espelho');
+});
+
+test('#431 LIMITE declarado: permutar valores entre linhas do mesmo tipo move a taxa junto com o VALOR', () => {
+  // Este teste NÃO afirma o comportamento desejável — afirma o que o conserto
+  // consegue, e por quê ele não consegue mais.
+  //
+  // Dois `prazo_fixo` de estrutura idêntica exceto o percentual: 30% a 12,5% e
+  // 70% a 6,2%. O usuário digita 70 na PRIMEIRA linha e 30 na segunda, sem
+  // reordenar nada. O passe 1 casa por projeção exata, então a primeira
+  // regenerada (agora 70%) acha o componente que tinha 70% — e a taxa troca de
+  // linha junto com o valor.
+  //
+  // Não há como distinguir isso de "o usuário arrastou as duas linhas", que
+  // produz entrada byte-idêntica e cujo comportamento correto é exatamente
+  // este (é o que `identidade: REORDENAR` exige, logo acima). Enquanto o
+  // espelho legado não guardar identidade de linha, um dos dois casos tem de
+  // perder. Escolhemos perder o mais raro — e escrevemos isto para que a
+  // escolha seja visível em vez de virar um bug reportado daqui a seis meses.
+  const fp = {
+    ...FP_TABELA_LONGA(),
+    entrada: [],
+    parcelas: [
+      { pct: 30, periodicidade: 'mensal', parcelas: 10, ao_longo_obra: false },
+      { pct: 70, periodicidade: 'mensal', parcelas: 10, ao_longo_obra: false },
+    ],
+    componentes: [
+      {
+        tipo: 'prazo_fixo', participacaoPct: 30, sinalPct: 0, prazoMeses: 10, defasagemMeses: 1,
+        taxaMensal: TAXA, jurosNoMesDaContratacao: false, rotulo: 'A',
+      },
+      {
+        tipo: 'prazo_fixo', participacaoPct: 70, sinalPct: 0, prazoMeses: 10, defasagemMeses: 1,
+        taxaMensal: 0.005, jurosNoMesDaContratacao: false, rotulo: 'B',
+      },
+    ],
+  };
+  const form = formularioPagamento(fp);
+  form.parcelas = [{ ...form.parcelas[0], pct: 70 }, { ...form.parcelas[1], pct: 30 }];
+
+  const salvo = fluxoPagamentoParaSalvar(form, CRONO_LONGA);
+  assert.deepEqual(salvo.componentes.map((c: any) => [c.participacaoPct, c.taxaMensal, c.rotulo]), [
+    [70, 0.005, 'B'],
+    [30, TAXA, 'A'],
+  ], 'o limite mudou de forma — releia o docblock de componentesParaSalvar antes de "consertar" isto');
+  // O que o limite NÃO faz: inventar taxa nem perder taxa. As duas continuam
+  // no plano, cada uma no componente cujo percentual o usuário lhe deu.
+  const taxas = salvo.componentes.map((c: any) => c.taxaMensal).sort();
+  assert.deepEqual(taxas, [0.005, TAXA].sort(), 'nenhuma taxa do plano pode sumir nem nascer');
+});
