@@ -9,7 +9,7 @@
 // real reproduz este cenário em Pinguim hoje).
 //
 // ⚠️ SAFRA ÚNICA, e só — mesma restrição que `#428 golden EVI safra única`
-// já declara em `frontend/fluxo-caixa-motor.test.ts:2104-2110`: `cfINC!AY` é
+// já declara em `frontend/fluxo-caixa-motor.test.ts:2240-2246`: `cfINC!AY` é
 // um PMT rolante sobre um POOL multi-safra, não amortização por safra
 // isolada. As "36 parcelas iguais" e as "29 parcelas iguais" só existem
 // quando há UMA safra. Este fixture não tenta, e não deve tentar, reproduzir

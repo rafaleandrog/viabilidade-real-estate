@@ -200,6 +200,11 @@ export class ViabFunding extends LitElement {
         curvas: curvas?.erro ? [] : (curvas.dados || []),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
         ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+        // #473: default true preserva o comportamento histórico (VGV bruto).
+        corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
+        // #446: o horizonte precisa cobrir a quitação das operações, senão a
+        // série é cortada e `saldoFinal` exibe um saldo truncado.
+        operacoesFunding: this.operacoes,
       };
       this.calc = calcularFluxo(config);
       this.receitaLiquida = receitaLiquidaComCorretagemMensal(
@@ -512,8 +517,8 @@ export class ViabFunding extends LitElement {
           ${eDivida(o.tipo) ? card('Saldo final', fmtR$(ind.saldoFinal), Math.abs(ind.saldoFinal) < 0.01 ? '' : 'neg') : nothing}
         </div>
         ${eDivida(o.tipo) && Math.abs(ind.saldoFinal) >= 0.01
-          ? html`<p class="nota">⚠️ A dívida não zera dentro do horizonte do estudo: o prazo de
-              amortização ultrapassa o fim do projeto.</p>`
+          ? html`<p class="nota">⚠️ A dívida não zera: no mês da quitação contratual ainda resta
+              saldo devedor.</p>`
           : nothing}
       </div>
     `;

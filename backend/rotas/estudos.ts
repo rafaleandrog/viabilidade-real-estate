@@ -35,6 +35,9 @@ const CAMPOS_SOMENTE_AVANCADO = new Set([
   'regime_tributario', 'aliquota_pis_pct', 'aliquota_cofins_pct',
   'aliquota_csll_pct', 'aliquota_irpj_pct', 'aliquota_itbi_pct',
   'imposto_sobre_permuta_fisica',
+  // #473: base da Corretagem de vendas quanto à permuta física — só existe
+  // no motor do Avançado (`corretagemMensal`); o Preliminar não lê.
+  'corretagem_sobre_permuta_fisica',
   'financiamento_obra_pct', 'financiamento_juros_aa',
   'financiamento_sistema_amortizacao', 'financiamento_prazo_meses',
   'financiamento_carencia_meses',

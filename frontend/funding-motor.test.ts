@@ -545,6 +545,34 @@ test('#434 duas dirigidas leem o MESMO caixa — a ordem não vira prioridade', 
   assert.deepEqual(ba.operacoes.map((s) => s.operacao.id), ['f2', 'f1', 'd2']);
 });
 
+// ─────────────────────────────────────────────────────────────────────────
+// #446 — com o horizonte certo, `saldoFinal` passa a ser o saldo NA QUITAÇÃO.
+//
+// Nenhuma lógica nova de KPI: `saldoFinal` continua sendo a última posição da
+// série (`funding-motor.ts`, `indicadoresOperacao`). O que mudou é que a série
+// agora chega ao mês da quitação. Antes, num horizonte curto, ele exibia um
+// saldo truncado — "R$ 3 MM" numa operação de 120 meses dentro de 48 — que não
+// correspondia a compromisso nenhum.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#446: saldoFinal zera quando o horizonte alcança a quitação', () => {
+  const op = {
+    tipo: 'divida', nome: 'CG', valor: 1_000_000, taxa_anual: 12,
+    inicio_mes: 0, distribuir_aporte: false, periodo_amortizacao_meses: 36,
+    periodo_carencia_meses: 0,
+  } as OperacaoFunding;
+
+  // Horizonte truncado (24 meses, o operacional): a dívida NÃO zera.
+  const truncado = indicadoresOperacao(simularDivida(op, 24), 12);
+  assert.ok(Math.abs(truncado.saldoFinal) > 0.01,
+    'ancoragem: com 24 meses a série é cortada antes da quitação');
+
+  // Horizonte da #446 (fim + 1 = 37): zera dentro de R$ 0,01.
+  const inteiro = indicadoresOperacao(simularDivida(op, 37), 12);
+  assert.ok(Math.abs(inteiro.saldoFinal) <= 0.01,
+    `saldo na quitação deveria ser ~0, achei ${inteiro.saldoFinal}`);
+});
+
 // ── #465 — a base do equity e a "Receita líquida de proforma" divergem DE PROPÓSITO ──
 //
 // Trava para o "conserto ingênuo": se alguém alinhar receitaLiquidaComCorretagemMensal

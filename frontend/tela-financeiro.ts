@@ -25,24 +25,21 @@ import './viab-num.js';
 // remoção física é issue própria, e esta tela simplesmente deixou de escrevê-las
 // (saíram de CAMPOS_NUM e da lista de `_salvar`). Nada foi apagado.
 //
-// Os `aliquota_*` continuam na tela mesmo sem consumidor: são campos de regime
-// tributário, escopo declarado da #228, e fora do escopo desta issue.
+// #450 (D8/D-Q08, 2026-08-22): a auditoria seguinte achou mais 9 controles
+// inertes NESTE nível — `regime_tributario`, os 5 `aliquota_*_pct` (o
+// parágrafo acima dizia que eram "escopo da #228" e ficavam; não ficam mais),
+// `imposto_sobre_permuta_fisica` e `sujeito_ret` só tinham leitor na proforma
+// do Preliminar (o `sujeito_ret` de `frontend/proforma.ts:249`). Todos saíram
+// do render e de `CAMPOS_NUM` — ver o bloco de comentário acima de
+// `CAMPOS_NUM` para o destino de cada um.
 //
 // Campos REALOCADOS de outras telas (mesma coluna do schema, sem duplicar dado):
-//  · `taxa_desconto_aa`  → editor mora aqui (removido do Cronograma no Lote 4;
+//  · `taxa_desconto_aa`   → editor mora aqui (removido do Cronograma no Lote 4;
 //    é lido pelo motor de fluxo para VPL/TIR).
-//  · `sujeito_ret` / `imposto_percentual` → também editáveis em Premissas
-//    (componente compartilhado com o Preliminar, não mexido); aqui são a
-//    referência do bloco de Impostos do Avançado. Editar em qualquer tela grava
-//    a mesma coluna.
+//  · `imposto_percentual` → visível aqui, mas SEMPRE DESABILITADO — o único
+//    editor de verdade é Premissas (Preliminar, componente compartilhado, não
+//    mexido). Editar lá grava a mesma coluna que esta tela mostra.
 
-type Op = { valor: string; rotulo: string };
-
-const OPT_REGIME: Op[] = [
-  { valor: 'ret', rotulo: 'RET (patrimônio de afetação)' },
-  { valor: 'lucro_presumido', rotulo: 'Lucro Presumido' },
-  { valor: 'lucro_real', rotulo: 'Lucro Real' },
-];
 // Todos os campos numéricos (decimais + inteiros) — para coerção '' → null e
 // Number(...) no salvar.
 //
@@ -55,9 +52,44 @@ const OPT_REGIME: Op[] = [
 // no schema — dado histórico preservado — só o formulário saiu; nenhum motor
 // de cálculo as lia (confirmado antes da #279: zero ocorrências em
 // fluxo-caixa-motor.ts, fluxo-shared.ts, proforma.ts).
+// #450 (D8/D-Q08, 2026-08-22): dos 10 controles que a aba tinha, 9 eram
+// inertes no Avançado — só liam a proforma do PRELIMINAR (`imposto_percentual`,
+// `sujeito_ret`) ou não tinham leitor nenhum (`regime_tributario`, os 5
+// `aliquota_*_pct`, `imposto_sobre_permuta_fisica`). Destino, por controle:
+//  · `sujeito_ret`                    → sai do RENDER (condição de nível —
+//    D-Q08). A aba só existe para `nivel_analise === 'avancado'`, então a
+//    condição colapsa em "sempre oculto aqui"; as funções puras abaixo
+//    parametrizam por `nivel` para o teste provar a regra sem montar DOM.
+//  · `imposto_percentual`             → fica VISÍVEL, sempre DESABILITADO,
+//    com nota — é o único com leitor fora daqui (Preliminar:
+//    `frontend/proforma.ts:245`, `frontend/tela-proforma.ts:226`).
+//  · os outros 7 (`regime_tributario`, os 5 `aliquota_*_pct`,
+//    `imposto_sobre_permuta_fisica`) → saem do render, do `_salvar` e de
+//    `CAMPOS_NUM`. Nenhuma coluna sai do `schema.json` — dado histórico
+//    preservado, só o formulário sai.
+
+/** Campos de Taxas e Impostos que continuam no render da aba Financeiro do
+ * Avançado — só `taxa_desconto_aa` (Custos Financeiros) e `imposto_percentual`
+ * (desabilitado). Fora do Avançado a aba inteira não renderiza nada. */
+export function camposVisiveisFinanceiro(nivel: string): string[] {
+  if (nivel !== 'avancado') return [];
+  return ['taxa_desconto_aa', 'imposto_percentual'];
+}
+
+/** #450 (D-Q08): `sujeito_ret` é condição de RENDER, não um campo desabilitado
+ * — só aparece fora do Avançado. */
+export function sujeitoRetVisivelFinanceiro(nivel: string): boolean {
+  return nivel !== 'avancado';
+}
+
+/** `imposto_percentual` é o único campo do bloco de Impostos com leitor fora
+ * desta tela (Preliminar) — fica visível, mas nunca editável por aqui. */
+export function impostoPercentualEditavel(_nivel: string): boolean {
+  return false;
+}
+
 const CAMPOS_NUM: string[] = [
   'taxa_desconto_aa',
-  'aliquota_pis_pct', 'aliquota_cofins_pct', 'aliquota_csll_pct', 'aliquota_irpj_pct', 'aliquota_itbi_pct',
   'imposto_percentual',
 ];
 const NUM = new Set(CAMPOS_NUM);
@@ -82,13 +114,6 @@ export class ViabTelaFinanceiro extends LitElement {
     .grid > * { width: 210px; max-width: 100%; box-sizing: border-box; }
     .grid > .p1 { width: 165px; }
     .grid > .p3 { width: 330px; }
-    .checks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-    .sel-campo { display: flex; flex-direction: column; gap: 4px; }
-    .sel-rotulo {
-      font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.4px;
-      color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
-      display: flex; align-items: flex-end; min-height: 2.4em; line-height: 1.2;
-    }
     .soma { margin: 10px 0 0; font-size: 0.78rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
     .soma strong { color: var(--cor-texto-forte, rgba(255,255,255,0.95)); font-variant-numeric: tabular-nums; }
     urbi-card + urbi-card { margin-top: 16px; }
@@ -121,11 +146,6 @@ export class ViabTelaFinanceiro extends LitElement {
     return Number.isNaN(n) ? null : n;
   }
 
-  private _str(k: string, padrao = ''): string {
-    const v = this.form[k];
-    return v == null || v === '' ? padrao : String(v);
-  }
-
   // Campo numérico (decimal ou inteiro) com sufixo.
   private _n(k: string, label: string, sufixo: string, dis: boolean, w = 'p1'): TemplateResult {
     return html`<viab-num
@@ -137,23 +157,11 @@ export class ViabTelaFinanceiro extends LitElement {
     ></viab-num>`;
   }
 
-  // Select (single) com rótulo alinhado ao padrão dos campos numéricos.
-  private _s(k: string, label: string, opcoes: Op[], padrao: string, dis: boolean, w = 'p3'): TemplateResult {
-    return html`
-      <div class="sel-campo ${w}">
-        <label class="sel-rotulo">${label}</label>
-        <urbi-select
-          ?desabilitado=${dis}
-          .valor=${this._str(k, padrao)}
-          .opcoes=${opcoes}
-          @urbi:select-change=${(e: CustomEvent) => this._set(k, e.detail.valor)}
-        ></urbi-select>
-      </div>`;
-  }
-
   render(): TemplateResult {
-    if (this.estudo?.nivel_analise !== 'avancado') return html`${nothing}`;
+    const nivel = this.estudo?.nivel_analise;
+    if (nivel !== 'avancado') return html`${nothing}`;
     const dis = !this.editavel;
+    const visiveis = camposVisiveisFinanceiro(nivel);
 
     return html`
       <urbi-banner variante="info">
@@ -164,34 +172,19 @@ export class ViabTelaFinanceiro extends LitElement {
       <urbi-card titulo="Custos Financeiros">
         <p class="dica">Valor presente e despesas financeiras paramétricas. Linhas manuais de custo financeiro seguem em Obra → Financeiro.</p>
         <div class="grid">
-          ${this._n('taxa_desconto_aa', 'Taxa de desconto p/ VP', '% a.a.', dis)}
+          ${visiveis.includes('taxa_desconto_aa')
+            ? this._n('taxa_desconto_aa', 'Taxa de desconto p/ VP', '% a.a.', dis) : nothing}
         </div>
       </urbi-card>
 
       <urbi-card titulo="Taxas e Impostos">
-        <div class="checks">
-          <urbi-checkbox
-            label="Sujeito a RET (patrimônio de afetação)"
-            ?desabilitado=${dis}
-            ?marcado=${!!this.form.sujeito_ret}
-            @urbi:checkbox-change=${(e: CustomEvent) => this._set('sujeito_ret', e.detail.marcado)}
-          ></urbi-checkbox>
-          <urbi-checkbox
-            label="Tributar permuta física"
-            ?desabilitado=${dis}
-            ?marcado=${!!this.form.imposto_sobre_permuta_fisica}
-            @urbi:checkbox-change=${(e: CustomEvent) => this._set('imposto_sobre_permuta_fisica', e.detail.marcado)}
-          ></urbi-checkbox>
-        </div>
         <div class="grid">
-          ${this._s('regime_tributario', 'Regime tributário', OPT_REGIME, 'ret', dis)}
-          ${this._n('imposto_percentual', 'Imposto s/ vendas (se não RET)', '%', dis)}
-          ${this._n('aliquota_pis_pct', 'PIS', '%', dis)}
-          ${this._n('aliquota_cofins_pct', 'COFINS', '%', dis)}
-          ${this._n('aliquota_csll_pct', 'CSLL', '%', dis)}
-          ${this._n('aliquota_irpj_pct', 'IRPJ', '%', dis)}
-          ${this._n('aliquota_itbi_pct', 'ITBI (terreno)', '%', dis)}
+          ${visiveis.includes('imposto_percentual')
+            ? this._n('imposto_percentual', 'Imposto (se não RET)', '%', !impostoPercentualEditavel(nivel))
+            : nothing}
         </div>
+        <p class="sec">Vale só para o Preliminar — editado aqui ou em Premissas, é o mesmo campo.
+          O Avançado não tem consumidor para ele.</p>
       </urbi-card>
 
       ${this.editavel
@@ -210,11 +203,7 @@ export class ViabTelaFinanceiro extends LitElement {
     this.salvando = true;
     try {
       const dados: Record<string, any> = {};
-      for (const k of [
-        ...CAMPOS_NUM,
-        'regime_tributario',
-        'sujeito_ret', 'imposto_sobre_permuta_fisica',
-      ]) {
+      for (const k of CAMPOS_NUM) {
         if (!(k in this.form)) continue;
         const v = this.form[k];
         if (NUM.has(k)) dados[k] = v === '' || v == null ? null : Number(v);

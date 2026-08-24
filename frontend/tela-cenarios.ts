@@ -172,6 +172,11 @@ export class ViabTelaCenarios extends LitElement {
         areaTerreno: n(this.estudo?.terreno_manual_area) || n(this.estudo?.area_terreno_nucleo),
         // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret).
         ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+        // #473: default true preserva o comportamento histórico (VGV bruto).
+        corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
+        // #446: o horizonte precisa cobrir a quitação das operações, senão a
+        // série é cortada e `saldoFinal` exibe um saldo truncado.
+        operacoesFunding: this.operacoes,
       };
       this.faixaPreco = this._faixa(bm?.dados || [], 'preco');
       this.faixaCusto = this._faixa(bm?.dados || [], 'custo_obras');
@@ -291,7 +296,7 @@ export class ViabTelaCenarios extends LitElement {
     const itens = [
       ...marcos(this.crono).map((m) => ({ rotulo: m.rotulo, valor: rotuloMesRelativo(this.dataInicio, m.mes) })),
       { rotulo: 'Payback', valor: c.paybackData ?? '—' },
-      { rotulo: 'Exposição máxima', valor: fmtR$(c.exposicaoMaxima) },
+      { rotulo: 'Exposição máxima', valor: fmtR$(Math.abs(c.exposicaoMaxima)) },
     ];
     return html`
       <div class="marcos-lista">
@@ -530,7 +535,7 @@ export class ViabTelaCenarios extends LitElement {
         <td>${tir}</td>
         <td class="cen-var"></td>
         <td>${base.paybackData ?? '—'}</td>
-        <td class="neg">${fmtR$(base.exposicaoMaxima)}</td>
+        <td class="neg">${fmtR$(Math.abs(base.exposicaoMaxima))}</td>
         <td class="cen-var"></td>
         ${comFunding ? html`<td class=${resultado !== null && resultado >= 0 ? 'pos' : 'neg'}>${resultado === null ? '—' : fmtR$(resultado)}</td>` : nothing}
         <td></td>
@@ -539,12 +544,14 @@ export class ViabTelaCenarios extends LitElement {
   }
 
   /**
-   * Badge de variação do indicador contra o cenário real (#132). Todos os
-   * indicadores da tabela são "maior é melhor" — inclusive a exposição máxima,
-   * que sendo negativa melhora ao subir (ficar menos negativa).
+   * Badge de variação do indicador contra o cenário real (#132). VPL e TIR
+   * são "maior é melhor" (`maiorMelhor = true`, o default). A Exposição
+   * máxima (#491) é lida por MAGNITUDE, não por sinal — o chamador passa os
+   * dois valores em módulo e `maiorMelhor = false`, a mesma convenção do KPI
+   * de `frontend/fluxo-tabela.ts` (`varKpi`).
    */
-  private _badgeVar(novo: number | null, base: number | null) {
-    const v = calcularVariacao(novo, base, true);
+  private _badgeVar(novo: number | null, base: number | null, maiorMelhor = true) {
+    const v = calcularVariacao(novo, base, maiorMelhor);
     if (!v) return nothing;
     return html`<urbi-badge cor=${v.melhor ? 'sucesso' : 'perigo'}>${v.texto}</urbi-badge>`;
   }
@@ -564,8 +571,8 @@ export class ViabTelaCenarios extends LitElement {
         <td>${tir}</td>
         <td class="cen-var">${this._badgeVar(calc.tir, base.tir)}</td>
         <td>${calc.paybackData ?? '—'}</td>
-        <td class="neg">${fmtR$(calc.exposicaoMaxima)}</td>
-        <td class="cen-var">${this._badgeVar(calc.exposicaoMaxima, base.exposicaoMaxima)}</td>
+        <td class="neg">${fmtR$(Math.abs(calc.exposicaoMaxima))}</td>
+        <td class="cen-var">${this._badgeVar(Math.abs(calc.exposicaoMaxima), Math.abs(base.exposicaoMaxima), false)}</td>
         ${comFunding ? html`<td class=${resultado !== null && resultado >= 0 ? 'pos' : 'neg'}>${resultado === null ? '—' : fmtR$(resultado)}</td>` : nothing}
         <td>
           <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"

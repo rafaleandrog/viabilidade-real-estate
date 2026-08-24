@@ -156,6 +156,11 @@ export class ViabFluxoVer extends LitElement {
       curvas: d.curvas,
       areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
       ret: d.ret,
+      // #473: default true preserva o comportamento histórico (VGV bruto).
+      corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
+      // #446: o horizonte precisa cobrir a quitação das operações, senão a
+      // série é cortada e `saldoFinal` exibe um saldo truncado.
+      operacoesFunding: this.operacoes,
     };
     this.calc = calcularFluxo(config);
     this.fundingCalc = null;
