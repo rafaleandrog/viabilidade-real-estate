@@ -5,7 +5,14 @@
 // automática de 2 cores em torno da meta. Função pura, testada.
 
 export interface FaixaMedidor { ate: number; cor: string; }
-export interface ConfigMedidor { min: number; max: number; faixas: FaixaMedidor[]; }
+export interface ConfigMedidor {
+  min: number; max: number; faixas: FaixaMedidor[];
+  // #451: o valor recebido está fora de [min, max]. Só o ramo CONFIGURADO
+  // estoura — o fallback automático (abaixo) adapta o `max` ao valor e nunca
+  // dispara. Sem isto, um valor 70,32 num medidor 20–40 desenhava o ponteiro
+  // encostado no fim da escala, indistinguível de um valor exatamente 40.
+  foraEscala: boolean;
+}
 
 const COR = {
   erro: 'var(--cor-erro, #D45A3A)',
@@ -27,16 +34,19 @@ export function montarMedidor(b: any, val: number): ConfigMedidor | null {
     return {
       min: cMin, max: cMax,
       faixas: [{ ate: c1, cor: cores[0] }, { ate: c2, cor: cores[1] }, { ate: cMax, cor: cores[2] }],
+      foraEscala: val < cMin || val > cMax,
     };
   }
-  // Fallback automático (2 faixas em torno da meta).
+  // Fallback automático (2 faixas em torno da meta). `max` já se adapta ao
+  // valor recebido (`val * 1.2` entra no máximo), então este ramo nunca
+  // estoura — `foraEscala` fica sempre false aqui, por construção.
   const meta = Number(b?.valor) || 0;
   if (meta <= 0) return null;
   const max = Math.max(meta * 2, val * 1.2, meta + 10);
   const faixas: FaixaMedidor[] = naoExceder
     ? [{ ate: meta, cor: COR.sucesso }, { ate: max, cor: COR.erro }]
     : [{ ate: meta, cor: COR.erro }, { ate: max, cor: COR.sucesso }];
-  return { min: 0, max, faixas };
+  return { min: 0, max, faixas, foraEscala: false };
 }
 
 // Cor da faixa do velocímetro em que o valor cai — a MESMA faixa/cor do medidor

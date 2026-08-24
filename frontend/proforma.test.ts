@@ -75,6 +75,29 @@ test('loteamento: custos, resultado e margem', () => {
   assert.ok(perto(p.precoMedioUnidade, 300_000));
 });
 
+// #453: campo renomeado — o nome antigo mentia, dando a entender que havia
+// custo no numerador. Trava a fórmula sob o nome novo E compara com o valor
+// que o campo antigo produzia para o MESMO fixture (LOT) nas duas outras
+// suítes desta rodada: 65.250.000 / 75.000.000 × 100 = 87% — idêntico ao que
+// a issue #453 mediu antes do rename. Renome puro: nenhum número muda.
+test('#453: receitaLiquidaSobreVgvPct = receitaLiquida / vgv × 100 (renome, não fórmula nova)', () => {
+  const p = calcularProforma(LOT);
+  assert.ok(perto(p.receitaLiquidaSobreVgvPct, 87, 0.01), `receitaLiquidaSobreVgvPct=${p.receitaLiquidaSobreVgvPct}`);
+  assert.ok(
+    perto(p.receitaLiquidaSobreVgvPct, (p.receitaLiquida / p.vgv) * 100, 1e-9),
+    'tem que ser exatamente receitaLiquida/vgv*100, não outra fórmula',
+  );
+  // Não é a mesma grandeza de margemLiquidaPct — o renome não colapsou dois
+  // conceitos num só.
+  assert.notEqual(p.receitaLiquidaSobreVgvPct, p.margemLiquidaPct);
+});
+
+test('#453: vgv === 0 → receitaLiquidaSobreVgvPct = 0 (caso de borda que a fórmula já tratava)', () => {
+  const p = calcularProforma({ tipo_empreendimento: 'loteamento' } as ProformaInput);
+  assert.equal(p.vgv, 0);
+  assert.equal(p.receitaLiquidaSobreVgvPct, 0);
+});
+
 test('custo do terreno desconsiderado zera a linha', () => {
   const p = calcularProforma({ ...LOT, considerar_custo_terreno: false });
   assert.equal(p.custoTerreno, 0);
