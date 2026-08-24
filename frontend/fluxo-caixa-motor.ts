@@ -276,6 +276,16 @@ export interface FluxoCalc {
   paybackData: string | null;      // "jul/2030"
   exposicaoMaxima: number;         // min(fluxoAcumulado) — tipicamente negativo
   vgvPermutaFisica: number;        // #188 — VGV atribuído às unidades permutadas (informativo)
+  /**
+   * #427 — total ISOLADO da dedução de Permuta financeira (`ePermutaFinanceira`),
+   * já com o sinal ESTORNADO: positivo, pronto para SOMAR de volta ao Resultado
+   * — o mesmo mecanismo de `Premissas e Resultados!P37 = P39 − P15 − P16` da
+   * EVI. Soma direto de `calcDeducoesReceita` (que já filtra só essas linhas);
+   * NÃO reconstruir por `Σ min(0, total)` sobre `linhasReceita` — funciona só
+   * por acidente de sinal e quebra na primeira dedução nova. Zero quando não
+   * há linha de permuta financeira.
+   */
+  permutaFinanceiraTotal: number;
   // #188/#229: nome histórico, MANTIDO por compatibilidade (8+ consumidores em
   // fluxo-tabela.ts/exportar.ts) — mas o valor NÃO é "Receita Bruta" no sentido
   // do EVI (recebimento em caixa); é VGV VENDÁVEL. Use `vgvVendavel` (idêntico,
@@ -1995,6 +2005,11 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   });
   calcDeducoesReceita = calcDeducoesReceita.map((linha) => quantizarLinhaMonetaria(linha, taxa));
 
+  // #427 — total isolado da permuta financeira, positivo (estornado): a
+  // proforma do Avançado precisa dele para fechar `Resultado + Perm. Financ.`
+  // sem agregar o RET junto (o que a linha única de deduções da proforma faz).
+  const permutaFinanceiraTotal = round2(-calcDeducoesReceita.reduce((s, l) => s + l.total, 0)) || 0;
+
   const linhasReceitaFinal = [...calcReceitas, ...calcDeducoesReceita];
   const receitaMensal = new Array<number>(prazo).fill(0);
   for (const l of linhasReceitaFinal) for (let i = 0; i < prazo; i++) receitaMensal[i] = round2(receitaMensal[i] + l.mensal[i]);
@@ -2100,6 +2115,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     paybackData: paybackMes >= 0 ? mesRelativoCompleto(config.dataInicio, paybackMes) : null,
     exposicaoMaxima,
     vgvPermutaFisica,
+    permutaFinanceiraTotal,
     receitaBrutaVgv,
     vgvVendavel: receitaBrutaVgv,
     vendaBrutaContratada,
