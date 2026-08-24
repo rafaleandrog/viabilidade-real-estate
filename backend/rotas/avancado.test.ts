@@ -517,3 +517,50 @@ test('#433 o portão não engoliu as validações que já existiam', async () =>
   const ok: any = await montarPatchTipologia({ nome: 'X', estudo_id: 99, id: 7 }, TIP_CORROMPIDA, saldoNegativo);
   assert.deepEqual(ok, { dados: { nome: 'X' } });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Achado da revisão do PR 522: `quantidade` PRESENTE e inaproveitável.
+//
+// `erroQuantidadeTipologia` devolve `null` para tudo que não vira número — e
+// está certa, porque ela não sabe se o campo veio ou não. Quem sabe é
+// `montarPatchTipologia`. Antes deste conserto, `PATCH {"quantidade": null}`
+// atravessava a quarta porta e gravava `NULL` numa coluna sem `obrigatorio`,
+// numa tipologia com 276 unidades comprometidas: o mesmo estado impossível da
+// #433, um degrau pior — e é o gesto normal da tela (backspace até esvaziar).
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('#433 quantidade presente e não numérica é 400, não NULL no banco', async () => {
+  for (const valor of [null, '', '   ', 'abc', NaN, Infinity, {}, []]) {
+    let consultas = 0;
+    const saldo = async () => { consultas++; return 0; };
+    const r: any = await montarPatchTipologia({ quantidade: valor }, TIP_CORROMPIDA, saldo);
+    assert.equal(r.http, 400, `quantidade=${JSON.stringify(valor)} deveria ser 400`);
+    assert.equal(r.codigo, 'QUANTIDADE_INVALIDA');
+    assert.equal(r.dados, undefined, 'nada pode ser gravado');
+    assert.equal(consultas, 0, 'o saldo nem precisa ser consultado para recusar');
+  }
+});
+
+test('#433 o 400 novo não engoliu o que já era aceito', async () => {
+  // Número, string numérica e zero continuam passando pelo portão do saldo.
+  assert.deepEqual(
+    await montarPatchTipologia({ quantidade: 300 }, TIP_CORROMPIDA, saldoCheio),
+    { dados: { quantidade: 300 } },
+  );
+  assert.deepEqual(
+    await montarPatchTipologia({ quantidade: '300' }, TIP_CORROMPIDA, saldoCheio),
+    { dados: { quantidade: '300' } },
+  );
+  // E o 422 do saldo continua vindo antes de qualquer gravação.
+  const r: any = await montarPatchTipologia({ quantidade: 1 }, TIP_CORROMPIDA, saldoNegativo);
+  assert.equal(r.http, 422);
+  assert.equal(r.codigo, 'SALDO_EXCEDIDO');
+  // `quantidade` ausente segue sendo PATCH parcial, sem consultar saldo.
+  let consultas = 0;
+  const saldo = async () => { consultas++; return 0; };
+  assert.deepEqual(
+    await montarPatchTipologia({ nome: 'Studio' }, TIP_CORROMPIDA, saldo),
+    { dados: { nome: 'Studio' } },
+  );
+  assert.equal(consultas, 0);
+});

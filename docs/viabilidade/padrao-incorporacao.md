@@ -761,10 +761,18 @@ Cada Grupo é um card ou bloco comercial que reúne:
 > gantt (nome/início/duração), sem Absorção, Fluxo nem Alocações. As duas telas faziam CRUD na
 > mesma lista antes de o `tipo` existir; hoje cada uma só enxerga as suas.
 >
-> A trava de saldo é **agregada por estudo** (`saldoTipologiaNoEstudo`): a soma das unidades
-> alocadas da tipologia em **todos** os Grupos não pode exceder a `quantidade` do catálogo. Na
-> tela, as unidades **cascateiam** de um Grupo para o seguinte — o `Total` de cada linha é a
-> quantidade do catálogo menos o que as linhas acima já venderam (#170).
+> A trava de saldo é **agregada por estudo** (`saldoTipologiaNoEstudo`): o comprometido da
+> tipologia — as alocações em **todos** os Grupos **mais a permuta física**, que consome catálogo
+> igual — não pode exceder a `quantidade`. Na tela, as unidades **cascateiam** de um Grupo para o
+> seguinte: o `Total` de cada linha é a quantidade do catálogo menos o que as linhas acima já
+> venderam (#170).
+>
+> São **quatro** as portas que gravam contra esse saldo, e a #433 fechou a última:
+> `POST` e `PATCH` de alocação, a permuta física, e o **`PATCH` da própria tipologia** — reduzir o
+> catálogo por baixo do comprometido chegava ao mesmo estado impossível sem `422` nenhum. O portão
+> do `PATCH` de tipologia recusa a redução com `422 SALDO_EXCEDIDO`, e recusa `quantidade`
+> **presente e não numérica** (`null`, `''`, `'abc'`) com `400 QUANTIDADE_INVALIDA` — sem esse
+> segundo, esvaziar o campo na tela gravaria `NULL` e apagaria o teto.
 >
 > **Estrutura vestigial.** A tabela `avancado_linhas_receita` continua declarada no `schema.json` e
 > convive com `avancado_fases` + `avancado_alocacoes`, que a superaram. Inventariá-la é objeto de
@@ -836,9 +844,10 @@ O saldo é global por tipologia:
 saldo disponível
 = quantidade vendável da tipologia
 − soma das alocações anteriores em todos os Grupos
+− unidades comprometidas em permuta física
 ```
 
-A ordem de exibição pode determinar a leitura em cascata, mas a validação final deve considerar o estudo inteiro.
+A ordem de exibição pode determinar a leitura em cascata, mas a validação final deve considerar o estudo inteiro — e a permuta física entra na conta, porque consome catálogo igual a uma venda.
 
 ### 9.6 Quando criar outro Grupo
 
@@ -1304,7 +1313,8 @@ Ao fim da absorção:
 
 - o estoque vendável deve ser zero;
 - o estoque nunca pode ser negativo;
-- a soma das alocações não pode ultrapassar o catálogo.
+- a soma das alocações **mais a permuta física** não pode ultrapassar o catálogo — e o catálogo não
+  pode ser reduzido por baixo desse total (#433).
 
 ## 13. Recebimentos, safras, carteiras e repasse
 

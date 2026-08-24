@@ -835,15 +835,27 @@ export function comprometidasDeTipologia(quantidadeCatalogo: unknown, saldo: unk
  *
  * Dois casos que **não** são assunto desta regra, e passam:
  *  - `quantidade` ausente ou não numérica — `PATCH` parcial (nome, preço, ordem)
- *    não pode ser barrado, e tipo de campo é do validador do shell;
+ *    não pode ser barrado, e tipo de campo é do validador do shell.
+ *    ⚠️ **Ausente e presente-mas-inaproveitável não são a mesma coisa**, e esta
+ *    função não distingue as duas: ela recebe só o valor. Quem distingue é
+ *    `montarPatchTipologia`, que barra `quantidade` **presente** e não numérica
+ *    com `400 QUANTIDADE_INVALIDA` antes de chegar aqui — senão
+ *    `PATCH {"quantidade": null}` cairia no ramo `NaN`, sairia `null` daqui e
+ *    gravaria `quantidade = NULL` numa tipologia com unidades comprometidas:
+ *    o mesmo estado impossível que a #433 existe para impedir, um degrau pior;
  *  - nada comprometido — sem alocação nem permuta não há o que proteger, e
  *    zerar (ou até um valor negativo, que esta regra não fiscaliza) segue livre.
  */
+export function quantidadeNumerica(valor: unknown): number | null {
+  const n = typeof valor === 'number'
+    ? valor
+    : (typeof valor === 'string' && valor.trim() !== '' ? Number(valor) : NaN);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function erroQuantidadeTipologia(quantidadeNova: unknown, comprometidas: unknown): string | null {
-  const nova = typeof quantidadeNova === 'number'
-    ? quantidadeNova
-    : (typeof quantidadeNova === 'string' && quantidadeNova.trim() !== '' ? Number(quantidadeNova) : NaN);
-  if (!Number.isFinite(nova)) return null;
+  const nova = quantidadeNumerica(quantidadeNova);
+  if (nova === null) return null;
 
   const c = Number(comprometidas);
   const usadas = Number.isFinite(c) ? Math.max(0, c) : 0;
@@ -883,6 +895,18 @@ export async function montarPatchTipologia(
   // recusam estourar o catálogo; reduzir o catálogo por baixo do comprometido
   // chegava ao mesmo estado impossível sem 422 nenhum.
   if (dados.quantidade !== undefined) {
+    // Presente e inaproveitável não é "PATCH parcial": é uma escrita que o
+    // cliente pediu e o portão do saldo não sabe julgar. `null`, `''` e
+    // `'abc'` chegavam aqui, `erroQuantidadeTipologia` devolvia `null` pelo
+    // ramo `NaN` e a coluna — que não é `obrigatorio` no schema — recebia
+    // `NULL`. É o gesto normal da tela: apagar o campo com backspace.
+    if (quantidadeNumerica(dados.quantidade) === null) {
+      return {
+        http: 400,
+        codigo: 'QUANTIDADE_INVALIDA',
+        mensagem: 'quantidade precisa ser um número; para não alterá-la, omita o campo do PATCH',
+      };
+    }
     const comprometidas = comprometidasDeTipologia(tipologia?.quantidade, await saldoNoEstudo());
     const msg = erroQuantidadeTipologia(dados.quantidade, comprometidas);
     if (msg) return { http: 422, codigo: 'SALDO_EXCEDIDO', mensagem: msg };
