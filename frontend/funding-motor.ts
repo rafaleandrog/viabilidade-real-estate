@@ -675,9 +675,12 @@ export interface LinhaFunding {
  * séries são 0-based e do comprimento do fluxo livre.
  *
  * ⚠️ Este shape é consumido por `fluxo-tabela.ts`, `exportar.ts`,
- * `tela-fluxo-ver.ts`, `tela-cenarios.ts` e `proforma-avancado.ts`. Ele
- * sobreviveu à reescrita do #355 de propósito: é a fronteira que manteve a
- * entrega da Fase 9 de pé enquanto todo o motor por trás era trocado.
+ * `tela-fluxo-ver.ts` e `tela-cenarios.ts`. Ele sobreviveu à reescrita do #355
+ * de propósito: é a fronteira que manteve a entrega da Fase 9 de pé enquanto
+ * todo o motor por trás era trocado.
+ *
+ * ⚠️ `proforma-avancado.ts` SAIU desta lista com a #426: a proforma do
+ * Avançado é desalavancada e a função nem recebe mais funding.
  *
  * As KPIs do projeto continuam DESALAVANCADAS (§8.1 de
  * funding-capital-stack.md) — TIR/VPL/Payback/Exposição seguem lendo

@@ -177,9 +177,11 @@ const CONFIG_D: FluxoConfig = {
  * Roda o motor real para um caso e devolve os quatro KPIs.
  *
  * ⚠️ Esta função é **fiação**, não conta: ela só encadeia `calcularFluxo` →
- * `fundingDoEstudo` → `proformaAvancado` na mesma ordem que a tela de Funding
- * usa (`tela-dashboard.ts:267-285`). Se ela reproduzisse a matemática, o teste
- * pararia de vigiar o motor e passaria a vigiar a si mesmo.
+ * `fundingDoEstudo` → `proformaAvancado` na mesma ordem que a aba Fluxo de
+ * Caixa usa (`tela-fluxo-ver.ts:147`, `:159`, `:237`). **Não é mais a ordem do
+ * Painel**: a #426 tirou `fundingDoEstudo` de `tela-dashboard.ts`, que hoje
+ * chama `proformaAvancado` sem funding nenhum. Se esta função reproduzisse a
+ * matemática, o teste pararia de vigiar o motor e passaria a vigiar a si mesmo.
  */
 export function kpisDoCaso(config: FluxoConfig, operacoes: OperacaoFunding[]): KpisBaseline {
   const c = calcularFluxo(config);
@@ -197,7 +199,10 @@ export function kpisDoCaso(config: FluxoConfig, operacoes: OperacaoFunding[]): K
     );
     funding = fc?.noFluxo ?? null;
   }
-  const p = proformaAvancado(c, areaPrivativa, funding);
+  // #426: a proforma passou a ser DESALAVANCADA e não aceita mais `funding`.
+  // O `funding` continua sendo calculado acima porque os três KPIs alavancados
+  // saem dele — é justamente o que impede a catraca de cegar com este conserto.
+  const p = proformaAvancado(c, areaPrivativa);
   const soma = (xs: number[] | undefined) => (xs ?? []).reduce((t, v) => t + v, 0);
   return {
     resultado: p.resultado, margemPct: p.margemPct, roiPct: p.roiPct, tir: c.tir,
@@ -224,11 +229,12 @@ export function kpisDoCaso(config: FluxoConfig, operacoes: OperacaoFunding[]): K
 //    KPIs que as cinco mudanças movem — para as de funding, isso não se
 //    verifica no símbolo exposto hoje.
 //
-// 2. **B e C nascem com margem NEGATIVA, e isso é o defeito da #426**, não erro
-//    da fixture: a proforma soma o principal da dívida como custo. O caso A,
-//    sem funding, dá +39% de margem sobre o MESMO projeto. O salto entre A e C
-//    (−33,63 pp de margem) é a medida do defeito, e é ele que a #426 tem de
-//    fechar declarando o número.
+// 2. **Depois da #426, os DESALAVANCADOS de A, B e C são idênticos** — e isso é
+//    a invariante do conserto, não perda de cobertura. Antes dela, B e C tinham
+//    margem NEGATIVA (−7,52% e −33,63%) contra +39% do MESMO projeto sem
+//    funding, porque a proforma somava o principal da dívida como custo. Com o
+//    conserto, a proforma deixa de olhar a estrutura de capital, e é isso que
+//    ela tem de fazer. Quem continua distinguindo B de C são os ALAVANCADOS.
 
 /**
  * `E` — equity em `permuta_financeira` sobre receita líquida que FICA NEGATIVA.
@@ -284,7 +290,7 @@ export const CASOS: CasoBaseline[] = [
       + 'exige que uma operação sozinha produza série `deepEqual` à de hoje — B tem uma só, '
       + 'então ficar VERDE aqui é o comportamento correto do conserto, não cegueira.',
     config: BASE, operacoes: OPS_B,
-    esperado: { resultado: -752_253.18, margemPct: -7.522531845135188, roiPct: -6.996237640655539, tir: 31.018485354972892, caixaFinalAlavancado: 3_247_746.82, vplLiquidoFunding: 0.01, fundingSaidas: 4_652_253.12 },
+    esperado: { resultado: 3_899_999.94, margemPct: 38.99999963400001, roiPct: 63.93442524590166, tir: 31.018485354972892, caixaFinalAlavancado: 3_247_746.82, vplLiquidoFunding: 0.01, fundingSaidas: 4_652_253.12 },
   },
   {
     id: 'C',
@@ -294,7 +300,7 @@ export const CASOS: CasoBaseline[] = [
       + 'NÃO vigia #432 (equity aqui é `resultado_final`, e o clamp mora no ramo '
       + '`progressivo` — ver caso E) nem #435 (validação de rota, backend puro).',
     config: BASE, operacoes: OPS_C,
-    esperado: { resultado: -3_362_885.49, margemPct: -33.62885510177311, roiPct: -25.165863372967635, tir: 31.018485354972892, caixaFinalAlavancado: 4_137_114.51, vplLiquidoFunding: 1_361_408.79, fundingSaidas: 7_262_885.43 },
+    esperado: { resultado: 3_899_999.94, margemPct: 38.99999963400001, roiPct: 63.93442524590166, tir: 31.018485354972892, caixaFinalAlavancado: 4_137_114.51, vplLiquidoFunding: 1_361_408.79, fundingSaidas: 7_262_885.43 },
   },
   {
     id: 'D',
@@ -319,6 +325,8 @@ export const CASOS: CasoBaseline[] = [
     // 1_027_495.56 → 1_027_362.61 (Δ −132,95). É o efeito de CALENDÁRIO, e só ele:
     // `fundingSaidas` fica em 1_409_999.99 porque o carry-forward preserva o TOTAL
     // pago — o que muda é quando ele é pago, e o desconto do VPL enxerga isso.
-    esperado: { resultado: 2_389_999.67, margemPct: 23.899997512599914, roiPct: 31.40604038292515, tir: 26.644417484686667, caixaFinalAlavancado: 4_389_999.67, vplLiquidoFunding: 1_027_362.61, fundingSaidas: 1_409_999.99 },
+    // Os DESALAVANCADOS (`resultado`, `margemPct`, `roiPct`) são os da #426/#521
+    // (proforma desalavancada) e o clamp não os toca — são eixos independentes.
+    esperado: { resultado: 3_799_999.66, margemPct: 37.99999789199993, roiPct: 61.290317096774196, tir: 26.644417484686667, caixaFinalAlavancado: 4_389_999.67, vplLiquidoFunding: 1_027_362.61, fundingSaidas: 1_409_999.99 },
   },
 ];

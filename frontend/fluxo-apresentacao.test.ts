@@ -267,7 +267,13 @@ test('#351 proforma: Resultado reconcilia com o fluxo do motor (sem funding)', (
   assert.ok(Math.abs((direto + indireto) - soma(c.custoMensal)) <= 0.01);
 });
 
-test('#351 proforma: custo do funding entra em Custos Financeiros; aporte NÃO vira receita', () => {
+// ⚠️ SUBSTITUI o teste `#351 proforma: custo do funding entra em Custos
+// Financeiros; aporte NÃO vira receita`. Aquele teste TRAVAVA O DEFEITO: a
+// última asserção dele exigia `semFunding.resultado − comFunding.resultado ===
+// Σ linhasSaida`, ou seja, exigia que o principal da dívida fosse cobrado como
+// custo. Ele não podia sobreviver ao conserto — não é "teste que passou a
+// falhar", é teste cujo critério estava errado.
+test('#426 proforma do Avançado é DESALAVANCADA (D14)', () => {
   const c = calcularFluxo(CONFIG_COMPLETA);
   const fin: OperacaoFunding = {
     tipo: 'divida', nome: 'Fin produção', valor: 5_000_000, inicio_mes: 0,
@@ -277,21 +283,71 @@ test('#351 proforma: custo do funding entra em Custos Financeiros; aporte NÃO v
     [fin], c.fluxoMensal, new Array(c.prazo).fill(0), 0, 0, CONFIG_COMPLETA.taxaDescontoAa,
   );
   const funding = fundingCalc!.noFluxo;
-  const semFunding = proformaAvancado(c, 1000);
-  const comFunding = proformaAvancado(c, 1000, funding);
 
-  const financeiro = (p: typeof comFunding) => -p.linhas.find((l) => l.nome === '(-) Custos Financeiros')!.valor;
+  // ── (a) por que a alternativa "creditar as duas pontas" também está errada.
+  // As pontas NÃO se cancelam. Só o PRINCIPAL devolvido cancela o principal
+  // liberado; as saídas carregam os JUROS por cima, e num horizonte que
+  // termine antes da quitação ainda sobra saldo devedor jamais pago. Nesta
+  // fixture o resíduo é R$ 1.053.567,77 sobre R$ 5.000.000,00 liberados — e
+  // ele vazaria para o Resultado como se fosse lucro (ou prejuízo).
+  const entradas = soma(funding.entradas);
   const saidas = funding.linhasSaida.reduce((s, l) => s + l.total, 0);
+  assert.ok(entradas > 0, 'a fixture precisa gerar liberação, senão não prova nada');
   assert.ok(saidas > 0, 'a fixture precisa gerar serviço de dívida');
-  assert.ok(Math.abs((financeiro(comFunding) - financeiro(semFunding)) - saidas) <= 0.01,
-    'o custo do funding tem que entrar em Custos Financeiros');
+  assert.ok(Math.abs(entradas - saidas) > 0.01,
+    'as duas pontas do funding NÃO se cancelam — é por isso que creditar ambas não serve');
 
-  // Receita bruta e líquida NÃO mudam: liberação de dívida é caixa, não receita.
-  assert.equal(comFunding.vgv, semFunding.vgv);
-  const liquida = (p: typeof comFunding) => p.linhas.find((l) => l.nome === '= Receita líquida')!.valor;
-  assert.equal(liquida(comFunding), liquida(semFunding));
-  // E o Resultado cai exatamente o custo do funding.
-  assert.ok(Math.abs((semFunding.resultado - comFunding.resultado) - saidas) <= 0.01);
+  // ── (b) as três invariantes da proforma desalavancada.
+  const p = proformaAvancado(c, 1000);
+
+  // 1. o Resultado reconcilia com o fluxo LIVRE do motor;
+  assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01,
+    `Resultado ${p.resultado} != Σ fluxoMensal ${soma(c.fluxoMensal)}`);
+
+  // 2. "(-) Custos Financeiros" vale EXATAMENTE as linhas de custo que o
+  //    usuário classificou no grupo `financeiro` — nunca o serviço da dívida;
+  const custoFinanceiroProprio = c.linhasCusto
+    .filter((x) => x.grupo === 'financeiro')
+    .reduce((s, x) => s + x.total, 0);
+  const linhaFinanceira = p.linhas.find((l) => l.nome === '(-) Custos Financeiros')!;
+  assert.ok(linhaFinanceira, 'a fixture tem linha no grupo financeiro; a proforma precisa mostrá-la');
+  assert.ok(Math.abs(-linhaFinanceira.valor - custoFinanceiroProprio) <= 0.01,
+    'Custos Financeiros da proforma tem que ser só o custo próprio do estudo');
+  assert.ok(Math.abs(-linhaFinanceira.valor - (custoFinanceiroProprio + saidas)) > 0.01,
+    'se bater com custo próprio + serviço da dívida, o defeito da #426 voltou');
+
+  // 3. o investimento total reconcilia com o custo do motor.
+  assert.ok(Math.abs(p.investimentoTotal - soma(c.custoMensal)) <= 0.01,
+    `investimentoTotal ${p.investimentoTotal} != Σ custoMensal ${soma(c.custoMensal)}`);
+});
+
+test('#426 a assinatura de `proformaAvancado` não aceita funding — trava de volta', () => {
+  // ⚠️ `assert.equal(proformaAvancado.length, 2)`, que o critério de aceite da
+  // issue pedia, NÃO DISTINGUE NADA: `Function.length` ignora parâmetro com
+  // valor default, então a assinatura ANTIGA — `(c, area, funding = null)` —
+  // já respondia 2. Medido: `function f(a,b,c=null){}` → `f.length === 2`.
+  // Fica registrado porque é barato, mas o que morde são as duas travas abaixo.
+  assert.equal(proformaAvancado.length, 2);
+
+  // TRAVA 1 (compilação) — se alguém readicionar um terceiro parâmetro, mesmo
+  // opcional e mesmo com default, `Parameters<...>['length']` deixa de ser
+  // exatamente `2` (vira `2 | 3`) e o typecheck fica VERMELHO nesta linha.
+  const arityDaAssinatura: 2 = 2 as Parameters<typeof proformaAvancado>['length'];
+  assert.equal(arityDaAssinatura, 2);
+
+  // TRAVA 2 (runtime) — passar funding por um terceiro argumento não pode
+  // mudar nada. Hoje o argumento extra é ignorado pelo JS; se alguém voltar a
+  // consumi-lo, esta comparação quebra. O cast existe para o grep do critério
+  // de aceite 2 continuar verdadeiro: nenhuma chamada literal com 3 argumentos.
+  const c = calcularFluxo(CONFIG_COMPLETA);
+  const fundingCalc = fundingDoEstudo(
+    [{ tipo: 'divida', nome: 'Fin produção', valor: 5_000_000, inicio_mes: 0,
+       taxa_anual: 12, periodo_amortizacao_meses: 36, periodo_carencia_meses: 6 }],
+    c.fluxoMensal, new Array(c.prazo).fill(0), 0, 0, CONFIG_COMPLETA.taxaDescontoAa,
+  );
+  const comTerceiroArgumento = (proformaAvancado as unknown as
+    (...args: unknown[]) => ReturnType<typeof proformaAvancado>)(c, 1000, fundingCalc!.noFluxo);
+  assert.deepEqual(comTerceiroArgumento, proformaAvancado(c, 1000));
 });
 
 test('#351 proforma: R$/m² e % VGV têm base declarada e sobrevivem a área/VGV zero', () => {
