@@ -354,11 +354,11 @@ está autorizado a "corrigir" `resultadoFinal` para bater com `C19` a partir des
 
 | # | Consumidor | remonta `resultadoFinal` | chama `fundingDoEstudo` |
 |---|---|---|---|
-| 1 | `frontend/tela-fluxo-ver.ts` | `:165` | `:169` |
-| 2 | `frontend/tela-funding.ts` | `:206` | `:207` |
-| 3 | `frontend/tela-cenarios.ts` | `:229` (e de novo em `:263`, como `resultadoDesalavancado`) | `:230` |
-| 4 | `frontend/tela-resumo.ts` | `:171` | — (só remonta; é a "Margem de caixa" da #443) |
-| 5 | `scripts/conferir-estudo.ts` | `:141` | `:142` |
+| 1 | `frontend/tela-fluxo-ver.ts` | `:175` | `:179` |
+| 2 | `frontend/tela-funding.ts` | `:215` | `:216` |
+| 3 | `frontend/tela-cenarios.ts` | `:239` (e de novo em `:273`, como `resultadoDesalavancado`) | `:240` |
+| 4 | `frontend/tela-resumo.ts` | `:182` | — (só remonta; é a "Margem de caixa" da #443) |
+| 5 | `scripts/conferir-estudo.ts` | `:152` | `:153` |
 
 Cada um dos cinco arquivos carrega um comentário (`grep -c "Passos 23"` → `1`) citando os outros
 quatro por `arquivo:linha` — é o formato em que a decisão se defende sozinha: quem for escrever a

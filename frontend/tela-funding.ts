@@ -205,9 +205,9 @@ export class ViabFunding extends LitElement {
   // — cada consumidor remonta à mão, e pode divergir (R-A36). Fonte única
   // foi CONSIDERADA E RECUSADA pelo autor; ver
   // `docs/viabilidade/fluxo-investidor-formulas.md` §9. Os outros quatro
-  // consumidores: frontend/tela-fluxo-ver.ts:169 · frontend/tela-cenarios.ts:230
-  // · frontend/tela-resumo.ts:171 (só remonta resultadoFinal, não chama
-  // fundingDoEstudo) · scripts/conferir-estudo.ts:142.
+  // consumidores: frontend/tela-fluxo-ver.ts:179 · frontend/tela-cenarios.ts:240
+  // · frontend/tela-resumo.ts:182 (só remonta resultadoFinal, não chama
+  // fundingDoEstudo) · scripts/conferir-estudo.ts:153.
   /** Prévia sobre o DRAFT: o que está sendo digitado já aparece nos indicadores. */
   private _recalcular() {
     if (!this.calc) { this.funding = null; return; }
