@@ -1,6 +1,5 @@
 import { GRUPOS_CUSTO, GRUPO_CUSTO_LABEL } from './fluxo-tabela.js';
 import type { FluxoCalc } from './fluxo-caixa-motor.js';
-import type { FundingNoFluxo } from './funding-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #351: Proforma do nível AVANÇADO — a segunda sub-aba de Resultados.
@@ -19,12 +18,63 @@ import type { FundingNoFluxo } from './funding-motor.js';
 // fluxo. Aqui a proforma deriva das mesmas séries do motor, então as duas
 // sub-abas nunca contam histórias diferentes.
 //
-// ⚠️ Aporte de funding NÃO é receita. As entradas de capital (liberações e
-// aportes) ficam fora desta tabela de propósito: proforma é resultado
-// econômico, não caixa. O CUSTO do funding (juros, retorno preferencial,
-// participações) aparece normalmente dentro de Custos Financeiros, como
-// "Despesas Financeiras" na imagem de referência. É a mesma convenção que a
-// #349 usou ao separar "Fluxo de Caixa Livre" do fluxo alavancado.
+// ⚠️ ESTA PROFORMA É DESALAVANCADA, E A FUNÇÃO NEM RECEBE `funding` (#426).
+// Nenhuma ponta do funding entra: nem as entradas (liberações e aportes) na
+// receita, nem as saídas (amortização e juros) no custo. Quatro razões, para
+// ninguém reabrir isto ao contrário:
+//
+//   1. financiamento é atividade de FINANCIAMENTO, não custo econômico —
+//      amortização devolve principal, e o custo do capital já é remunerado
+//      pela TMA que o VPL/TIR descontam. Somar as SAÍDAS do funding
+//      (amortização + juros) ao grupo `financeiro` cobrava o principal inteiro
+//      como se fosse despesa, sem nunca creditar a liberação que o originou;
+//   2. os indicadores de PROJETO já são desalavancados no app, e não por
+//      convenção — por construção: `tir`, `vpl`, `paybackMes` e
+//      `exposicaoMaxima` nascem dentro de `calcularFluxo`
+//      (`fluxo-caixa-motor.ts:2010-2101`), a partir de `fluxoMensal` /
+//      `fluxoAcumulado`, e essa função nunca vê funding — ele é costurado
+//      depois, na tela. Proforma alavancada no meio de indicadores
+//      desalavancados produz uma margem que nenhum outro número reconcilia;
+//   3. o Painel de estudos compara Preliminar e Avançado nas MESMAS colunas
+//      (VGV, Resultado, Margem, ROI), e o Preliminar não modela funding;
+//   4. creditar as DUAS pontas também não serve: elas não se cancelam. Só o
+//      principal devolvido cancela o principal liberado — os JUROS vêm por
+//      cima, e num horizonte que termine antes da quitação ainda sobra saldo
+//      devedor jamais pago. O resíduo vazaria para o Resultado como se fosse
+//      lucro. Medido em `fluxo-apresentacao.test.ts`, teste "#426 proforma do
+//      Avançado é DESALAVANCADA (D14)": R$ 1.053.567,77 de resíduo sobre
+//      R$ 5.000.000,00 liberados.
+//
+// ⚠️ DESAMBIGUAÇÃO DO RÓTULO "Custos Financeiros" — ele significa coisas
+// diferentes em duas telas, e sem saber disso alguém reabre o bug ao contrário
+// ("sumiu o custo financeiro"):
+//
+//   | Superfície              | Visão       | Funding                       |
+//   |-------------------------|-------------|-------------------------------|
+//   | aba Fluxo de Caixa      | CAIXA       | AS DUAS PONTAS: a liberação   |
+//   | (`fluxo-tabela.ts`,     |             | no bloco "Funding — Capital   |
+//   |  bloco `funding-capital`|             | (entradas)" e o serviço da    |
+//   |  + subtotal do grupo    |             | dívida dentro do subtotal do  |
+//   |  `financeiro`)          |             | grupo `financeiro`            |
+//   | aba Resultados / Painel | ECONÔMICA,  | NENHUMA PONTA                 |
+//   | (esta função)           | antes de    |                               |
+//   |                         | capitalizar |                               |
+//
+// ⚠️ Note que "as duas pontas" NÃO quer dizer que elas se anulam: o principal
+// devolvido cancela o principal liberado, mas os juros e qualquer saldo
+// devedor remanescente no fim do horizonte não — é exatamente por isso que
+// creditar as duas pontas AQUI não resolveria nada (razão 4 acima).
+//
+// Quem quiser ler o efeito do funding lê a aba Fluxo de Caixa, não esta. Aqui
+// "(-) Custos Financeiros" vale EXATAMENTE as linhas de custo que o usuário
+// classificou no grupo `financeiro` — nunca o serviço da dívida.
+//
+// 📎 Nota de referência (consultiva, não normativa): a planilha EVI do autor
+// (`Premissas e Resultados!P28`, "Despesas Financeiras") é PARCIALMENTE
+// alavancada — ela também NÃO soma amortização a custo nenhum, mas soma os
+// JUROS das duas operações de funding dentro do custo direto. O app foi além e
+// desalavancou a proforma inteira, pelas razões 2 e 3 acima. A divergência é
+// deliberada e está registrada; a EVI é consultiva e não governa o runtime.
 // ─────────────────────────────────────────────────────────────────────────
 
 export interface LinhaProformaAv {
@@ -61,15 +111,16 @@ export interface ProformaAvancado {
 const soma = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
 
 /**
- * Monta a proforma econômica do Avançado.
+ * Monta a proforma econômica do Avançado — sempre DESALAVANCADA.
  *
- * `funding` só entra pelo lado do CUSTO (ver a nota do topo) — passar `null`
- * dá a proforma desalavancada, que é o que um estudo sem Capital Stack tem.
+ * ⚠️ Não existe parâmetro de funding, e a ausência é deliberada (#426): o
+ * conserto tirou o parâmetro em vez de ignorá-lo, para que reintroduzi-lo
+ * exija mudar a assinatura e todos os call sites, em vez de bastar uma linha
+ * esquecida. A arity está travada em teste.
  */
 export function proformaAvancado(
   c: FluxoCalc,
   areaPrivativa: number,
-  funding: FundingNoFluxo | null = null,
 ): ProformaAvancado {
   const linhas: LinhaProformaAv[] = [];
   const receitaBruta = c.receitaBruta;
@@ -89,14 +140,13 @@ export function proformaAvancado(
   // Manutenção e Despesas Financeiras no direto, e só Marketing global e
   // Gestão/outros no indireto) para os 5 grupos que o Avançado modela.
   const linhasDoGrupo = (g: string) => c.linhasCusto.filter((x) => x.grupo === g);
-  const totalDoGrupo = (g: string) => linhasDoGrupo(g).reduce((s, x) => s + x.total, 0)
-    + (g === 'financeiro' ? (funding?.linhasSaida ?? []).reduce((s, l) => s + l.total, 0) : 0);
+  const totalDoGrupo = (g: string) => linhasDoGrupo(g).reduce((s, x) => s + x.total, 0);
 
   const diretos = GRUPOS_CUSTO.filter((g) => g !== 'indireto');
   let custoDireto = 0;
   for (const g of diretos) {
     const total = totalDoGrupo(g);
-    const temLinha = linhasDoGrupo(g).length > 0 || (g === 'financeiro' && (funding?.linhasSaida.length ?? 0) > 0);
+    const temLinha = linhasDoGrupo(g).length > 0;
     if (!temLinha) continue;
     custoDireto += total;
     linhas.push({ nome: `(-) ${GRUPO_CUSTO_LABEL[g]}`, valor: -total, nivel: 1, tipo: 'custo' });

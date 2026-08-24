@@ -97,8 +97,14 @@ test('#468 os casos distinguem estruturas de capital — E CONTINUAM distinguind
   // desalavancadas … só o rodapé da tabela alavanca").
   const [a, b, c] = CASOS.map((x) => x.esperado);
 
-  // Hoje os desalavancados distinguem — e vão parar de distinguir na #426.
-  assert.notEqual(a.resultado, b.resultado);
+  // ⚠️ DEPOIS DA #426 os desalavancados de A, B e C são IDÊNTICOS, e essa
+  // igualdade é a invariante do conserto: a proforma parou de olhar a estrutura
+  // de capital. Antes dela, B e C tinham margem negativa contra +39% do mesmo
+  // projeto. Se estes voltarem a divergir, o funding vazou de volta para a
+  // proforma.
+  assert.equal(a.resultado, b.resultado, 'a #426 desalavancou a proforma: A e B têm o mesmo resultado');
+  assert.equal(a.resultado, c.resultado, 'idem para C');
+  assert.equal(a.margemPct, c.margemPct, 'idem na margem');
 
   // Os alavancados distinguem por um caminho que a #426 NÃO toca. Se estas três
   // asserções caírem, a catraca perdeu a capacidade de vigiar funding.
@@ -128,15 +134,22 @@ test('#468 o caso E alcança o ramo `progressivo` do equity, que os outros não 
 });
 
 test('#468 a fixture não reimplementa o motor', () => {
-  // Critério de aceite explícito da issue. A catraca só vigia enquanto os
-  // números vierem de `calcularFluxo`/`proformaAvancado`; no dia em que
-  // alguém colar uma conta aqui, ela passa a ficar verde junto com o motor
-  // errado. Esta asserção é fraca de propósito — a de verdade é a revisão —,
-  // mas pega o caso óbvio de alguém trocar a chamada por um literal.
+  // A catraca só vigia enquanto os números vierem de `calcularFluxo`/
+  // `proformaAvancado`/`fundingDoEstudo`; no dia em que alguém colar uma conta
+  // aqui, ela fica verde junto com o motor errado. Esta asserção é fraca de
+  // propósito — a de verdade é a revisão —, mas pega o caso óbvio de alguém
+  // trocar a chamada por um literal.
+  //
+  // ⚠️ A sonda mede pelos ALAVANCADOS, não pelo `resultado`. Depois da #426 a
+  // proforma é desalavancada, então passar operações NÃO move mais o resultado —
+  // e a versão anterior desta asserção, que comparava `resultado`, ficaria
+  // permanentemente vermelha por medir a coisa que o conserto eliminou.
   const semFunding = kpisDoCaso(CASOS[0].config, []);
   const comFunding = kpisDoCaso(CASOS[2].config, CASOS[2].operacoes);
-  assert.notEqual(semFunding.resultado, comFunding.resultado,
+  assert.equal(semFunding.fundingSaidas, null, 'sem operações não há saída de funding');
+  assert.notEqual(comFunding.fundingSaidas, null,
     'kpisDoCaso tem que REAGIR às operações; se não reage, virou literal');
+  assert.ok((comFunding.fundingSaidas as number) > 0);
 });
 
 test('#468 a catraca MORDE — medido por mutação, não por esperança', () => {
