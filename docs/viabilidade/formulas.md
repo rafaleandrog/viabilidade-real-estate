@@ -102,7 +102,7 @@ O Avançado tem proforma própria (`frontend/proforma-avancado.ts`), que **não*
 do Preliminar: ela relê as séries mensais já calculadas por `calcularFluxo` e as achata na mesma
 hierarquia de linhas do Preliminar, para que os dois níveis se comparem na mesma coluna
 (`investimentoTotal` e `roiPct` são literalmente a fórmula do Preliminar — ver
-`frontend/proforma-avancado.ts:118-129`).
+`frontend/proforma-avancado.ts:150-162`).
 
 > ⚠️ **A proforma do Avançado é DESALAVANCADA — nenhum lado do funding entra nela.** Nem as saídas
 > (parcelas, retorno ao investidor), nem as entradas (liberações, aportes). É visão **econômica** do
