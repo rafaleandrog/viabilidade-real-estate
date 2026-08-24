@@ -650,17 +650,24 @@ export function componentesPagamento(fluxoPagamento: any, cronograma: EventoCron
 // `fluxo_pagamento.componentes` na linha; sem ele, a linha segue pelo motor
 // legado (`entrada`/`parcelas`/`repasse`), que continua existindo para
 // estudo nunca reeditado. Como `fluxoPagamentoParaSalvar`
-// (`frontend/fluxo-pagamento-editor.ts:90`) grava `componentes` em toda
+// (`frontend/fluxo-pagamento-editor.ts`) grava `componentes` em toda
 // escrita, todo Grupo já editado desde a #248 usa este caminho.
 //
 // ⚠️ A matemática de juros existe e é exercitada por estudo real; o que falta
 // é a ENTRADA. Há linha em produção com `taxaMensal` diferente de 0 (estudo 5
-// de Pinguim: 0.0098636 = 12,5% a.a., R$ 1.259.273,59). O modal não oferece
-// campo de taxa nem de sinal, e o adaptador fixa `taxaMensal: 0` /
-// `sinalPct: 0` (:589,601,608,617) — então abrir o modal e clicar "Aplicar"
-// APAGA os juros da linha, sem undo — e, desde a #436, com aviso na tela (o
-// bloco "Juros de tabela" do modal diz isso). Escrever "`jurosClientes` é
-// sempre 0" é errado: os juros existem e viram zero no primeiro Aplicar.
+// de Pinguim: 0.0098636 = 12,5% a.a., R$ 1.259.273,59). O modal continua sem
+// campo de taxa nem de sinal (é a #428), e `componentesDoLegado` continua
+// fixando `taxaMensal: 0` (`:591`, `:603`, `:610`, `:619`) e `sinalPct: 0`
+// (`:590`, `:602`, `:608` — o ramo `concentrado` de `:619` não emite
+// `sinalPct`), porque o espelho legado não tem onde guardar essas grandezas.
+//
+// O que MUDOU na #431: quem grava não é mais este adaptador. Toda escrita do
+// modal passa por `componentesParaSalvar`
+// (`frontend/fluxo-pagamento-editor.ts`), que devolve o array persistido
+// verbatim quando o espelho não mudou e transplanta os campos só-canônicos
+// quando mudou. Ou seja: abrir o modal e clicar "Aplicar" NÃO apaga mais os
+// juros da linha. Escrever "`jurosClientes` é sempre 0" continua errado — os
+// juros existem, e agora sobrevivem à edição.
 
 /** PMT — parcela fixa que amortiza `principal` em `n` períodos à `taxaMensal`.
  * Taxa zero → divisão simples (sem juros). `n` ≤ 0 → 0 (guarda defensiva). */

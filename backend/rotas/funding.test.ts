@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validarCamposOperacao, conflitoFinanciamentoUnico } from './funding.js';
+import { validarCamposOperacao, conflitoFinanciamentoUnico, somaRetornoExcede } from './funding.js';
 
 // #355 — validação das operações de Funding. Só lógica pura: as rotas em si
 // exigem servidor e banco, que este ambiente não sobe (ver CLAUDE.md).
@@ -102,4 +102,120 @@ test('#355 custo_linha_ids precisa ser uma lista de números', () => {
 test('#355 amortizar_com_caixa_disponivel não passa pela checagem numérica (é booleano)', () => {
   assert.equal(validarCamposOperacao({ amortizar_com_caixa_disponivel: true }), null);
   assert.equal(validarCamposOperacao({ amortizar_com_caixa_disponivel: false }), null);
+});
+
+// ── #435 — teto de `Σ pct_retorno` ────────────────────────────────────────
+//
+// A regra é da spec vigente (`docs/viabilidade/fluxo-investidor-formulas.md`
+// §2, "Teto de Σ pct_retorno"), NÃO da planilha: a planilha tem uma operação
+// só e é fonte nula aqui. O enunciado original vivia na §6 de
+// `funding-capital-stack.md`, que é ADR supersedido.
+
+test('#435 pct_retorno entra na faixa 0-100 (uma operação isolada)', () => {
+  assert.equal(validarCamposOperacao({ pct_retorno: 0 }), null);
+  assert.equal(validarCamposOperacao({ pct_retorno: 100 }), null);
+  assert.match(String(validarCamposOperacao({ pct_retorno: 101 })), /não pode passar de 100/);
+  // A regra antiga (negativo) continua valendo.
+  assert.match(String(validarCamposOperacao({ pct_retorno: -2 })), /não pode ser negativo/);
+});
+
+test('#435 a soma do estudo é barrada em 100%, não a operação isolada', () => {
+  const eq = (pct: number, id = 1, modo = 'permuta_financeira') =>
+    ({ id, tipo: 'equity', modo_retorno: modo, pct_retorno: pct });
+
+  // 60 + 40 = 100: cabe.
+  assert.equal(somaRetornoExcede([eq(60)], { tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 40 }), null);
+  // 60 + 41 = 101: recusa, e a mensagem diz a soma e o que sobra.
+  const m = somaRetornoExcede([eq(60)], { tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 41 });
+  assert.match(String(m), /não pode superar 100%/);
+  assert.match(String(m), /60\.00%/);
+  assert.match(String(m), /101\.00%/);
+  assert.match(String(m), /Sobra 40\.00%/);
+});
+
+test('#435 o PATCH da própria operação não se conta duas vezes', () => {
+  const existentes = [{ id: 1, tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 60 }];
+  // Sem `ignorarId` isto somaria 60 + 70 = 130 e travaria TODA edição.
+  assert.equal(somaRetornoExcede(existentes, { tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 70 }, 1), null);
+  // Uma SEGUNDA operação a 70, porém, estoura.
+  assert.match(
+    String(somaRetornoExcede(existentes, { tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 70 }, 2)),
+    /não pode superar 100%/,
+  );
+});
+
+test('#435 as duas somas são independentes — bases diferentes não competem', () => {
+  const existentes = [{ id: 1, tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 90 }];
+  // 90% da Receita Líquida + 90% do Resultado Final: válido.
+  assert.equal(somaRetornoExcede(existentes, { tipo: 'equity', modo_retorno: 'resultado_final', pct_retorno: 90 }), null);
+  // Mas 90 + 90 no MESMO modo, não.
+  assert.match(
+    String(somaRetornoExcede(existentes, { tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 90 })),
+    /não pode superar 100%/,
+  );
+  // E o teto do `resultado_final` existe de verdade.
+  assert.match(
+    String(somaRetornoExcede(
+      [{ id: 1, tipo: 'equity', modo_retorno: 'resultado_final', pct_retorno: 90 }],
+      { tipo: 'equity', modo_retorno: 'resultado_final', pct_retorno: 20 },
+    )),
+    /Resultado Final/,
+  );
+});
+
+test('#435 operação gravada SEM modo_retorno conta como permuta_financeira (default)', () => {
+  // O default vive no banco (`schema.json:413`) e no motor; sem aplicá-lo aqui,
+  // a linha escaparia das DUAS somas.
+  const existentes = [{ id: 1, tipo: 'equity', pct_retorno: 90 }];
+  assert.match(
+    String(somaRetornoExcede(existentes, { tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 20 })),
+    /não pode superar 100%/,
+  );
+  // E o novo sem o campo também cai na soma A.
+  assert.match(
+    String(somaRetornoExcede(existentes, { tipo: 'equity', pct_retorno: 20 })),
+    /não pode superar 100%/,
+  );
+  // Contra `resultado_final`, porém, o existente sem campo não compete.
+  assert.equal(somaRetornoExcede(existentes, { tipo: 'equity', modo_retorno: 'resultado_final', pct_retorno: 20 }), null);
+});
+
+test('#435 tipo diferente de equity não entra na soma, nem como existente nem como novo', () => {
+  // `pct_retorno` existe na tabela para os 3 tipos, com default 0 — somar
+  // dívida/financiamento contaria linha que não distribui receita.
+  assert.equal(somaRetornoExcede(
+    [{ id: 1, tipo: 'divida', pct_retorno: 90 }],
+    { tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 90 },
+  ), null);
+  assert.equal(somaRetornoExcede(
+    [{ id: 1, tipo: 'financiamento_producao', pct_retorno: 90 }],
+    { tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 90 },
+  ), null);
+  // Uma dívida nova nunca é barrada, mesmo com equity cheio no estudo.
+  assert.equal(somaRetornoExcede(
+    [{ id: 1, tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 100 }],
+    { tipo: 'divida', pct_retorno: 90 },
+  ), null);
+});
+
+test('#435 tolerância de ponto flutuante: 60 + 40,001 cabe, 60 + 40,02 não', () => {
+  // `> 100.01`, não `> 100` estrito — mesmo padrão de `erroFormularioAbsorcao`.
+  const existentes = [{ id: 1, tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 60 }];
+  assert.equal(somaRetornoExcede(existentes, { tipo: 'equity', pct_retorno: 40.001 }), null);
+  assert.match(
+    String(somaRetornoExcede(existentes, { tipo: 'equity', pct_retorno: 40.02 })),
+    /não pode superar 100%/,
+  );
+});
+
+test('#435 estudo sem equity ainda aceita a primeira operação inteira', () => {
+  assert.equal(somaRetornoExcede([], { tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 100 }), null);
+  // 100 é o limite; a segunda a 0,02 já estoura.
+  assert.match(
+    String(somaRetornoExcede(
+      [{ id: 1, tipo: 'equity', modo_retorno: 'permuta_financeira', pct_retorno: 100 }],
+      { tipo: 'equity', pct_retorno: 0.02 },
+    )),
+    /Sobra 0\.00%/,
+  );
 });

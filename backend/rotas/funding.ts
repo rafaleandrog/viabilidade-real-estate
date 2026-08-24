@@ -62,7 +62,10 @@ const CAMPOS_NAO_NEGATIVOS = [
 ];
 
 /** Campos percentuais que não fazem sentido acima de 100 (%). */
-const CAMPOS_PERCENTUAL_0_100 = ['exposicao_minima', 'percentual_financiavel'];
+const CAMPOS_PERCENTUAL_0_100 = ['exposicao_minima', 'percentual_financiavel', 'pct_retorno'];
+
+/** Default de `modo_retorno` — o mesmo do banco (`schema.json`) e do motor. */
+const MODO_RETORNO_PADRAO = 'permuta_financeira';
 
 function erro(res: Response, http: number, codigo: string, mensagem: string) {
   res.status(http).json({ erro: true, codigo, mensagem });
@@ -158,6 +161,62 @@ export function conflitoFinanciamentoUnico<T extends Record<string, any>>(
 }
 
 /**
+ * Teto de `Σ pct_retorno` (#435) — a soma das participações de equity de um
+ * estudo não pode passar de 100%. Devolve a mensagem de recusa, ou `null`
+ * quando cabe. Puro e testável, no molde de `validarCamposOperacao` e de
+ * `conflitoFinanciamentoUnico` (de onde vem o `ignorarId`).
+ *
+ * A regra está na spec vigente:
+ * `docs/viabilidade/fluxo-investidor-formulas.md` §2, "Teto de Σ pct_retorno".
+ * Ela NÃO vem da planilha `fluxo_investidor_FORMULAS`, que é fonte nula aqui
+ * (tem uma operação só, `C25` é um número digitado sem soma nem validação); o
+ * que a planilha dá é o denominador — `C18`/`C19` são grandezas únicas, e
+ * distribuir mais de 100% delas é distribuir o que não existe.
+ *
+ * SÃO DUAS SOMAS INDEPENDENTES, uma por `modo_retorno`: `permuta_financeira`
+ * incide sobre a Receita Líquida (`C18`) e `resultado_final` sobre o Resultado
+ * Final (`C19`). Bases diferentes não competem, então 100% + 100% é válido.
+ *
+ * Três armadilhas, cada uma com caso de teste próprio:
+ *  · `modo_retorno` tem DEFAULT (`permuta_financeira`) no banco e no motor —
+ *    sem aplicá-lo aqui, uma linha gravada sem o campo escaparia das duas somas;
+ *  · só `tipo === 'equity'` entra — a coluna existe para os 3 tipos, com
+ *    default 0, e somar as outras contaria linha que não distribui receita;
+ *  · `ignorarId` é o que faz o PATCH não contar a própria operação duas vezes.
+ *    O chamador passa o estado FINAL (`{ ...atual, ...payload }`) em `novo`.
+ *
+ * Tolerância `> 100.01`, não `> 100` estrito: `pct_retorno` é percentual em
+ * precisão plena, e `60 + 40.001` de ponto flutuante recusaria indevidamente.
+ * Mesmo padrão de `erroFormularioAbsorcao` (`frontend/fluxo-shared.ts:349`) e
+ * `erroFormularioPagamento` (`frontend/fluxo-pagamento-editor.ts:66`).
+ */
+export function somaRetornoExcede<T extends Record<string, any>>(
+  existentes: T[],
+  novo: Record<string, any>,
+  ignorarId?: number,
+): string | null {
+  if (novo?.tipo !== 'equity') return null;
+  const modo = String(novo.modo_retorno ?? MODO_RETORNO_PADRAO);
+  const pctNovo = Number(novo.pct_retorno ?? 0);
+  if (!Number.isFinite(pctNovo)) return null; // já barrado por validarCamposOperacao
+
+  const jaUsado = existentes
+    .filter((o) => o?.tipo === 'equity'
+      && String(o.modo_retorno ?? MODO_RETORNO_PADRAO) === modo
+      && (ignorarId === undefined || Number(o.id) !== ignorarId))
+    .reduce((acc, o) => acc + (Number(o.pct_retorno) || 0), 0);
+
+  const total = jaUsado + pctNovo;
+  if (total <= 100.01) return null;
+
+  const base = modo === 'resultado_final' ? 'do Resultado Final' : 'da Receita Líquida';
+  const sobra = Math.max(0, 100 - jaUsado);
+  return `As operações de Equity em "${modo}" já distribuem ${jaUsado.toFixed(2)}% ${base}; `
+    + `com esta passariam a ${total.toFixed(2)}%, e o total não pode superar 100%. `
+    + `Sobra ${sobra.toFixed(2)}% — reduza esta operação ou as existentes antes de salvar.`;
+}
+
+/**
  * Resolve `inicio_mes` a partir da âncora, do mesmo jeito que as linhas de
  * Custo (#249): ancorada em evento fixo ou em fase → mês DERIVADO do
  * Cronograma; `customizado` → o mês que o usuário mandou. Roda para os 3
@@ -226,6 +285,9 @@ rotasFunding.post('/estudos/:id/avancado/funding', async (req: Request, res: Res
       return;
     }
 
+    const erroSoma = somaRetornoExcede(existentes, dados);
+    if (erroSoma) { erro(res, 422, 'RETORNO_EXCEDE_RECEITA', erroSoma); return; }
+
     const erroAncora = await resolverInicio(req, estudo, dados);
     if (erroAncora) { erro(res, 400, 'FASE_ANCORA_INVALIDA', erroAncora); return; }
 
@@ -269,6 +331,12 @@ rotasFunding.patch('/estudos/:id/avancado/funding/:oid', async (req: Request, re
         'Já existe um Financiamento à produção neste estudo — só pode haver um.');
       return;
     }
+
+    // Estado FINAL (atual + patch), pelo mesmo motivo de `validarCamposOperacao`
+    // acima: um PATCH que manda só o `nome` computaria `pct_retorno = 0` e
+    // aprovaria qualquer coisa. `oid` faz a operação não se contar duas vezes.
+    const erroSoma = somaRetornoExcede(existentes, { ...operacao, ...dados }, oid);
+    if (erroSoma) { erro(res, 422, 'RETORNO_EXCEDE_RECEITA', erroSoma); return; }
 
     const erroAncora = await resolverInicio(req, estudo, dados, operacao);
     if (erroAncora) { erro(res, 400, 'FASE_ANCORA_INVALIDA', erroAncora); return; }
