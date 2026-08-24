@@ -413,7 +413,8 @@ export function simularFinanciamentoProducao(
  * Equity — colunas D a F da aba `equity`, nos dois modos:
  *
  *  · `permuta_financeira` — `pct` incide sobre a RECEITA LÍQUIDA mensal, mês a
- *    mês, progressivamente;
+ *    mês, progressivamente, com clamp em 0 e CARRY-FORWARD do déficit quando a
+ *    receita líquida do mês é negativa (#432 — ver o bloco no laço);
  *  · `resultado_final`    — `pct` incide sobre o RESULTADO FINAL do projeto e
  *    é pago de uma vez, no mês do repasse.
  *
@@ -435,14 +436,46 @@ export function simularEquity(
   const m0 = Math.max(0, Math.floor(n(op.inicio_mes)));
   const progressivo = (op.modo_retorno ?? 'permuta_financeira') === 'permuta_financeira';
 
+  // #432 — clamp em 0 com CARRY-FORWARD do déficit, no modo progressivo.
+  //
+  // A planilha não tem `MAX(0; …)` na coluna D porque o estado negativo é
+  // ESTRUTURALMENTE IRREPRESENTÁVEL nela: `C = B × (1 − C15 − C16 − C17)` é uma
+  // dedução MULTIPLICATIVA sobre frações não negativas do VGV. No app a dedução
+  // é uma SÉRIE SUBTRAÍDA com cronograma próprio — a corretagem é paga
+  // integralmente no mês da venda (`fluxo-shared.ts:502-509`, #121) enquanto o
+  // recebimento é espalhado pelo plano —, e o estado existe: um lançamento cujo
+  // sinal é menor que a corretagem produz receita líquida negativa, e a fórmula
+  // crua fazia o INVESTIDOR pagar ao projeto a título de "retorno".
+  //
+  // Decisão do autor, 2026-08-22 (ver `docs/viabilidade/fluxo-investidor-formulas.md` §4.2):
+  // o mês paga zero, o déficit fica registrado e abate os meses seguintes até se
+  // extinguir. NÃO é o `Math.max(0, …)` seco que existia em `capital-stack-motor.ts`
+  // antes da #355 — aquele não tinha memória e inflava o total pago.
+  //
+  // O acumulador é LOCAL — `simularEquity` é chamada uma vez por operação, em
+  // `fundingDoEstudo` — e carrega PRECISÃO PLENA: só `saidas[t]` é arredondado
+  // (contrato C7). Arredondar o déficit a cada mês acumularia erro ao longo de
+  // 36+ meses.
+  let deficit = 0;
+
   for (let t = 0; t < prazo; t++) {
     entradas[t] = t === m0 ? round2(n(op.valor)) : 0;
     if (progressivo) {
-      saidas[t] = round2(n(receitaLiquidaMensal[t]) * pct);
+      const devido = n(receitaLiquidaMensal[t]) * pct - deficit;
+      if (devido < 0) {
+        // Nada a pagar: o que faltou vira (ou engorda) o déficit carregado.
+        deficit = -devido;
+        saidas[t] = 0;
+      } else {
+        deficit = 0;
+        saidas[t] = round2(devido);
+      }
     } else {
       saidas[t] = t === mesRepasseValor ? round2(resultadoFinal * pct) : 0;
     }
   }
+  // Déficit que sobra ao fim do horizonte é EXTINTO — nunca vira pagamento
+  // negativo. Nesse caso o total pago ao investidor é menor que `Σ base × pct`.
 
   return {
     operacao: op,
