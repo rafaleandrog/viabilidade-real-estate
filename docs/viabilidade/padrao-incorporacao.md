@@ -925,16 +925,19 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 
 > ✅ **Comportamento vigente, alinhado ao padrão (#108/#347).** O JSON `absorcao` de
 > `avancado_fases` guarda o modo **Distribuído** em **quatro** blocos —
-> `pre_lancamento`, `lancamento`, `obra` e `pos_obra` (`frontend/tela-fluxo-receitas.ts:535-540`).
+> `pre_lancamento`, `lancamento`, `obra` e `pos_obra` (`absorcaoParaSalvar`,
+> `frontend/fluxo-absorcao-editor.ts`).
 > Os três primeiros são informados; o Pós-chaves é **derivado**
 > (`pctPosChavesDerivado`: `100 − p1 − p2 − p3`; o nome era `pctPosObraDerivado` até a #430). A soma dos três
 > informados é validada por `erroFormularioAbsorcao` (`frontend/fluxo-shared.ts:345-353`) — sem
 > isso, um total acima de 100% clampava no derivado e a absorção fechava abaixo de 100% sem aviso.
 > ⚠️ **Quando o Cronograma não tem Pré-lançamento, o bloco NÃO chega zerado ao motor — e uma
-> fatia das vendas deixa de ser computada.** `tela-fluxo-receitas.ts:522` zera apenas o valor **do
-> formulário**, ao abrir o modal. Salvar os parâmetros do Cronograma **não toca no JSON de
-> absorção** (`backend/rotas/avancado.ts:479-504`): o bloco `pre_lancamento` persistido continua
-> lá, com o percentual antigo.
+> fatia das vendas deixa de ser computada.** `formularioAbsorcao(..., temPreLancamento=false)`
+> (`frontend/fluxo-absorcao-editor.ts`) zera apenas o valor **do formulário**, ao abrir o modal — e
+> guarda o valor cru em `form.lido`, justamente para que esse zero conte como **edição** e não seja
+> engolido pelo no-op da #431. Salvar os parâmetros do Cronograma **não toca no JSON de absorção**
+> (`backend/rotas/avancado.ts:479-504`): o bloco `pre_lancamento` persistido continua lá, com o
+> percentual antigo.
 >
 > Até alguém abrir o modal e clicar em **Aplicar**, `absorcaoMensal` segue lendo esse bloco e o
 > **descarta**, porque a faixa é vazia — `espalhar` retorna cedo quando `fim < inicio`
@@ -948,6 +951,25 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > continua não sendo redistribuído — a camada denuncia, não corrige.
 >
 > A normalização acontece **só ao reaplicar o modal**, não ao desativar a fase.
+
+> ✅ **A curva `personalizado` sobrevive ao modal desde a #431.** `absorcao.modo` aceita
+> `personalizado` com uma série mês a mês em `absorcao.meses[]`, e `absorcaoMensal`
+> (`frontend/fluxo-shared.ts`) a consome. **Esse dado veio da própria app** — o commit `2c0e793`
+> tinha o seletor "Personalizado" na tela; a UI perdeu o modo depois e o motor continuou lendo, o
+> que faz disto uma **regressão de interface**, não uma feature que nunca existiu. Até a #431,
+> abrir o modal de Absorção e clicar em "Aplicar" convertia a linha para `distribuido` e descartava
+> a curva inteira, sem aviso e sem undo (medido no estudo 6 de Pinguim: 43 pontos, VPL
+> −R$ 360.591,41).
+>
+> Hoje: aplicar **sem editar bloco nenhum** devolve o registro **verbatim**; trocar só o badge
+> "Correção de estoque" também preserva a curva; e editar um percentual de bloco **substitui**, mas
+> só depois de um aviso `urbi-banner variante="alerta"` no corpo do modal e de uma **confirmação
+> explícita** (`_renderConfirmAbsorcao`, `frontend/tela-fluxo-receitas.ts`).
+>
+> ⚠️ **Isto não dá superfície para EDITAR a curva** (criar ou mover pontos) — continua sendo
+> feature. E não conserta a janela fixa de 12 meses que a trunca, que é a **#429**: depois deste
+> conserto a curva do estudo 6 sobrevive **e continua truncada**. "A curva voltou" não fecha
+> aquela issue.
 
 ### 10.3 Distribuição mensal
 
@@ -1021,9 +1043,11 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 > **experiência de configuração** do editor tem issue própria: **#248** (`BUGLIST-005`).
 >
 > **Comportamento vigente (pós-#248/#342/#345/#346).** O modal
-> (`frontend/tela-fluxo-receitas.ts:720-830`) tem quatro blocos. *Juros de tabela* (#436) é
-> **somente-leitura** e só aparece quando algum componente persistido tem `taxaMensal ≠ 0`: mostra a
-> taxa anual equivalente e avisa que "Aplicar" a apaga. Os outros três são *Definições* (só texto — corretagem
+> (`_renderModalPagamento`, `frontend/tela-fluxo-receitas.ts`) tem quatro blocos. *Juros de tabela*
+> (#436) é **somente-leitura** e só aparece quando algum componente persistido tem `taxaMensal ≠ 0`:
+> mostra a taxa anual equivalente e — desde a #431, que fez o "Aplicar" parar de destruí-la — diz
+> que ela é **preservada** ao aplicar, e que o que falta é onde **criar** uma (#428). Os outros três
+> são *Definições* (só texto — corretagem
 > e RET migraram para Custos, `:728-737`), *Condições de entrada* (`% do total`, `Nº parcelas`,
 > `Desconto %`, `:741-763`) e *Parcelamento* (`% do total`, `Nº parcelas` ou checkbox "Ao longo da
 > obra", máximo 4 linhas, `:764-806`); o *Repasse* é **derivado e somente-leitura**
@@ -1032,12 +1056,17 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 > linha legada mantém a periodicidade gravada, que o motor continua lendo
 > (`fluxo-caixa-motor.ts:318-320`).
 >
-> **O que ainda falta para o modelo econômico:** não há campo de **taxa** nem de **sinal**. Como
-> `fluxoPagamentoParaSalvar` grava `componentes: componentesDoLegado(...)`
-> (`frontend/fluxo-pagamento-editor.ts:90`) e o adaptador fixa `taxaMensal: 0` / `sinalPct: 0`
-> (`fluxo-caixa-motor.ts:589,601,608,617`), aplicar o modal numa linha que tinha juros **apaga os
-> juros**: é o que acontece hoje com o estudo 5 de Pinguim (`taxaMensal: 0.0098636`,
-> R$ 1.259.273,59).
+> **O que ainda falta para o modelo econômico:** não há campo de **taxa** nem de **sinal** — é a
+> **#428**. O adaptador `componentesDoLegado` continua fixando `taxaMensal: 0`
+> (`fluxo-caixa-motor.ts:591,603,610,619`) e `sinalPct: 0` (`:590,602,608`), porque o espelho legado
+> não tem onde guardar essas grandezas.
+>
+> **O que MUDOU na #431:** `fluxoPagamentoParaSalvar` não grava mais
+> `componentes: componentesDoLegado(...)`, e sim `componentesParaSalvar(...)` — que devolve o array
+> persistido verbatim quando o espelho legado não mudou, e transplanta os campos só-canônicos por
+> identidade quando mudou. Aplicar o modal numa linha que tinha juros **não os apaga mais**; o
+> estudo 5 de Pinguim (`taxaMensal: 0.0098636`, R$ 1.259.273,59) sobrevive ao "Aplicar". O que ainda
+> não existe é **criar** taxa pela tela.
 >
 > ⚠️ **E não é só o juro: a PERIODICIDADE legada também se perde no "Aplicar".** O mesmo adaptador
 > converte `ao_longo_obra` em `ate_marco` com `defasagemMeses: 1`, **descartando a periodicidade**
@@ -1361,9 +1390,9 @@ Ao fim da absorção:
 > por componente segue **evolução pendente**.
 >
 > ⚠️ **Mais duas ressalvas.** (1) A porta é `fluxo_pagamento.componentes` — linha nunca reeditada
-> segue pelo motor legado. (2) A **taxa** chega 0 pelo adaptador (`:589,601,608,617`) sempre que a
-> linha passa pelo modal, porque ele não a oferece: a carteira existe, e os juros — que existem em
-> estudo real — são apagados no "Aplicar".
+> segue pelo motor legado. (2) A **taxa** ainda não tem onde ser digitada (#428); o que a #431
+> mudou é que ela deixou de ser **apagada** quando a linha passa pelo modal — os juros que existem
+> em estudo real sobrevivem ao "Aplicar".
 
 ### 13.1 Safras
 
