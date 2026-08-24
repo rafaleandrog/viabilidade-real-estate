@@ -1880,9 +1880,23 @@ export function corretagemMensal(
   const somaVendas = vendas.reduce((s, v) => s + v, 0);
   if (somaVendas <= 0) return new Array<number>(Math.max(prazoTotal, 0)).fill(0);
 
-  if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv'
-    && (custo?.orcamento_valor_canonico === null || custo?.orcamento_valor_canonico === undefined)) {
-    const pct = n(custo?.orcamento_valor) / 100;
+  if ((custo?.orcamento_unidade || 'rs') === 'pct_vgv') {
+    // #473: mesmo com `orcamento_valor_canonico` persistido — o caso comum,
+    // já que toda edição do valor pela tela (`_editarOrcamento`,
+    // `tela-fluxo-custos.ts`) grava o R$ congelado junto — o TOTAL da
+    // corretagem tem de reagir à base escolhida. Antes desta correção, um
+    // canônico presente pulava direto para `resolverCustoTotal` e
+    // redistribuía o R$ FIXO por `vendas`: a soma da linha não mudava com o
+    // flag, só o calendário mudava — a capacidade inteira desta issue ficava
+    // muda para toda linha já editada uma vez pela tela (achado do Codex,
+    // PR #545 rodada 1). A correção: deriva o PERCENTUAL efetivo do
+    // canônico sobre o VGV BRUTO total (`ctx.vgvTotal`, a mesma base que
+    // `converterUnidade` usou para congelar o R$ em `_editarOrcamento`), e
+    // aplica esse percentual sobre a base ESCOLHIDA (`vendas`) — nunca o R$
+    // congelado direto. Sem canônico, cai no percentual digitado cru.
+    const pct = custo?.orcamento_valor_canonico !== null && custo?.orcamento_valor_canonico !== undefined
+      ? (ctx.vgvTotal > 0 ? resolverCustoTotal(custo, ctx) / ctx.vgvTotal : 0)
+      : n(custo?.orcamento_valor) / 100;
     return vendas.map((v) => v * pct);
   }
   const total = resolverCustoTotal(custo, ctx);

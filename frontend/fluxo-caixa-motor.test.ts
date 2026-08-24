@@ -714,6 +714,49 @@ test('#473: com corretagemSobrePermutaFisica=true explícito, idêntico ao defau
   assert.equal(semFlag.total, comTrue.total);
 });
 
+// #473 — achado do Codex (PR #545, rodada 1): quando `orcamento_valor_canonico`
+// está persistido (o caso comum — toda edição pela tela grava o R$ congelado
+// junto, `tela-fluxo-custos.ts:_editarOrcamento`), a base ESCOLHIDA tinha de
+// mudar o TOTAL da corretagem, não só o calendário. Mesma fixture do teste
+// acima (VGV 100M, 30 unidades permutadas → vendável 70M), mas com
+// `orcamento_valor_canonico` no lugar de `orcamento_valor` puro — o caminho
+// que TODA linha de custo editada uma vez pela tela usa de fato.
+test('#473 com orcamento_valor_canonico persistido, o TOTAL da corretagem reage à base (não só o calendário)', () => {
+  const base = (flag: boolean | undefined): FluxoConfig => ({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      // canônico = 4% do VGV bruto (100M) no momento em que foi digitado —
+      // o valor R$ FIXO que `_editarOrcamento` grava junto do percentual.
+      {
+        id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas',
+        orcamento_valor: 4, orcamento_unidade: 'pct_vgv', orcamento_valor_canonico: 4_000_000,
+      },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+        permuta_tipologia_id: 1, permuta_quantidade: 30,
+      },
+    ],
+    areaTerreno: 0,
+    ...(flag === undefined ? {} : { corretagemSobrePermutaFisica: flag }),
+  });
+  const achar = (c: FluxoConfig) => calcularFluxo(c).linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
+
+  const bruta = achar(base(true));
+  assert.ok(perto(bruta.total, 4_000_000, 1), `esperado 4.000.000 (bruto), veio ${bruta.total}`);
+
+  const vendavel = achar(base(false));
+  // Mutação: SEM a correção, isto continuaria batendo 4.000.000 (o R$
+  // congelado redistribuído por peso, sem mudar o total).
+  assert.ok(perto(vendavel.total, 2_800_000, 1), `esperado 2.800.000 (vendável), veio ${vendavel.total}`);
+  assert.notEqual(vendavel.total, bruta.total, 'a base tem de mudar o TOTAL, não só o calendário');
+});
+
 // 5c. Corretagem sem vendas no horizonte não gera desembolso (#121)
 test('corretagem sem linhas de receita não gera custo', () => {
   const config: FluxoConfig = {
