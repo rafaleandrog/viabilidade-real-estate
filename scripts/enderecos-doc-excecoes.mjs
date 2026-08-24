@@ -80,12 +80,6 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/tela-fluxo-ver.ts:122",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :122 — \"considerar_ret\" está em :132; \"ret_pct\" está em :132. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/formulas.md",
     endereco: "frontend/fluxo-caixa-motor.ts:2125-2133",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :2125-2133 — \"FluxoCalc\" está em :2076. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
