@@ -169,14 +169,11 @@ const EVENTOS_ANCORA = [
 // normal (evento + curva, igual às demais linhas); "Unit Delivery" e "Sales
 // Revenue" não têm cronograma próprio — o motor rateia proporcionalmente à
 // receita em caixa (entrada+parcelas+repasse) ou ao VGV vendido, respectivamente.
-// #238: base econômica da permuta financeira. `bruta` é o default e preserva o
-// resultado de todo estudo existente — a base líquida deduz imposto e
-// corretagem da receita antes de aplicar o percentual, e só passa a valer se o
-// usuário escolher explicitamente.
-const BASES_PERMUTA_FINANCEIRA = [
-  { valor: 'bruta', rotulo: 'Receita bruta' },
-  { valor: 'liquida', rotulo: 'Receita líquida (− imposto e corretagem)' },
-];
+// #459: base econômica da permuta financeira — dois checkboxes independentes
+// (a EVI declara exatamente essa dupla, `Premissas!N17`/`N18`, aba #43 da
+// planilha de bugs). Os dois desmarcados (default) preservam o resultado de
+// todo estudo existente — cada um, marcado, deduz sua própria série (imposto
+// ou corretagem) da receita antes de aplicar o percentual da permuta.
 
 // Linhas obrigatórias por grupo (na ordem declarada): sempre nas primeiras
 // posições ao abrir a tela pela primeira vez — a linha inexistente é criada
@@ -347,6 +344,9 @@ export class ViabFluxoCustos extends LitElement {
     .campo-mes viab-num { width: 100%; }
     /* #194: modo de distribuição do Preço do Terreno + curva (só em "Fixo"), empilhados. */
     .dist-preco { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+    /* #459: os dois checkboxes de dedução da permuta financeira, lado a lado —
+       mesmo layout da tela do autor (aba #43 da planilha de bugs). */
+    .permuta-flags { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
     /* #192: gráficos de avanço da obra (barras mensais + área acumulada) + tabela mensal. */
     .avanco-ctrl { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -522,7 +522,7 @@ export class ViabFluxoCustos extends LitElement {
   // carregados por `_carregar`, e lê-se `c.linhasCusto`. Qualquer regra de
   // distribuição (curva, âncora de cronograma, unidade de orçamento) sai de
   // graça e não pode divergir por construção.
-  // #238: total da linha na base econômica NÃO escolhida, para auditoria.
+  // #459: total da linha na base econômica OPOSTA (flags invertidos), para auditoria.
   // Vem do MESMO `calcularFluxo` que produz o número do fluxo (`_calcObra`),
   // então não há risco de a tela mostrar uma conta paralela que diverge do
   // motor. `null` quando a linha não é permuta em % VGV, ou quando ainda não
@@ -753,12 +753,13 @@ export class ViabFluxoCustos extends LitElement {
             <span class="mes-calc" title="A entrega da unidade não segue curva de distribuição — é a transferência da tipologia selecionada">
               Entrega de unidades <span>🔒</span></span>`;
           if (ePermutaFinanceira(c)) {
-            // #238: a distribuição é travada (sai conforme a receita entra), mas
-            // a BASE é escolha do estudo — o motor já lia
-            // `permuta_financeira_base` e o backend já a validava; faltava o
-            // controle, que é o que tornava a capacidade invisível.
-            // Só faz sentido em % VGV: em R$ o total é fixo e as duas bases dão
-            // o mesmo valor (ver nota de permutaFinanceiraBrutaMensal).
+            // #459: a distribuição é travada (sai conforme a receita entra), mas
+            // a BASE é escolha da linha — dois checkboxes independentes (a EVI
+            // declara exatamente essa dupla, `Premissas!N17`/`N18`, aba #43 da
+            // planilha de bugs), no lugar do enum único bruta/líquida da #238.
+            // Só faz sentido em % VGV: em R$ o total é fixo e nenhuma
+            // combinação de flags muda o valor (ver nota de
+            // permutaFinanceiraDeduzidaMensal).
             const ePct = (c.orcamento_unidade || 'rs') === 'pct_vgv';
             const alt = this._permutaAlternativa(c);
             return html`
@@ -766,13 +767,24 @@ export class ViabFluxoCustos extends LitElement {
                 <span class="mes-calc" title="A permuta financeira sai proporcionalmente à receita de caixa do mês — não segue curva nem evento próprio">
                   Receita das vendas <span>🔒</span></span>
                 ${ePct ? html`
-                  <urbi-select .valor=${c.permuta_financeira_base || 'bruta'} .opcoes=${BASES_PERMUTA_FINANCEIRA}
-                    ?desabilitado=${dis}
-                    @urbi:select-change=${(e: CustomEvent) => this._salvar(c, { permuta_financeira_base: e.detail.valor })}
-                  ></urbi-select>
+                  <div class="permuta-flags">
+                    <span class="sec">Deduzir das permutas financeiras:</span>
+                    <urbi-checkbox
+                      label="corretagem"
+                      ?marcado=${c.permuta_financeira_deduzir_corretagem === true}
+                      ?desabilitado=${dis}
+                      @urbi:checkbox-change=${(e: CustomEvent) => this._salvar(c, { permuta_financeira_deduzir_corretagem: e.detail.marcado })}
+                    ></urbi-checkbox>
+                    <urbi-checkbox
+                      label="impostos"
+                      ?marcado=${c.permuta_financeira_deduzir_imposto === true}
+                      ?desabilitado=${dis}
+                      @urbi:checkbox-change=${(e: CustomEvent) => this._salvar(c, { permuta_financeira_deduzir_imposto: e.detail.marcado })}
+                    ></urbi-checkbox>
+                  </div>
                   ${alt !== null ? html`
-                    <span class="sec" title="Valor que esta linha teria na outra base econômica — disponível para auditoria">
-                      base ${c.permuta_financeira_base === 'liquida' ? 'bruta' : 'líquida'}: ${fmtR$(alt)}</span>` : nothing}
+                    <span class="sec" title="Valor que esta linha teria com os dois flags invertidos — disponível para auditoria (#459)">
+                      base oposta: ${fmtR$(alt)}</span>` : nothing}
                 ` : nothing}
               </div>`;
           }

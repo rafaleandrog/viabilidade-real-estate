@@ -1793,21 +1793,30 @@ base líquida
 − corretagem dedutível
 ```
 
-> ✅ **Comportamento vigente — as duas visões existem, e a escolha é do usuário
-> (#195/#196/#227/#228/#346).** A permuta física reduz unidades vendidas, VGV e Resultado no
-> Avançado (#195), e a permuta financeira do Terreno é deduzida da receita (#196).
-> `permutaFinanceiraBrutaMensal` (`frontend/fluxo-caixa-motor.ts:1570-1573`) aplica o percentual
-> sobre a receita de caixa; `permutaFinanceiraLiquidaMensal` (`:1575-1586`) **subtrai imposto e
-> corretagem diretamente** do recebimento do mês — `max(0, v − imposto − corretagem)` — e só então
-> aplica o percentual. É a **subtração direta** que o padrão pede: a dedução não é composta
-> multiplicativamente.
+> ✅ **Comportamento vigente — a base é DOIS flags independentes, por linha de custo
+> (#195/#196/#227/#228/#346/#459).** A permuta física reduz unidades vendidas, VGV e Resultado no
+> Avançado (#195), e a permuta financeira do Terreno é deduzida da receita (#196). Até a #459, a
+> base era um enum único `bruta`/`liquida` (#238); a EVI declara dois booleanos separados
+> (`Premissas!N17`/`N18`, "deduzir das permutas financeiras: ☑ corretagem ☑ impostos"), e a #459
+> separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
+> `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `calcularFluxo` calcula **as duas séries**, usa a escolhida em `permuta_financeira_base`
-> (default `bruta`) e devolve a não escolhida como `alternativa` (`:2002-2010`); a tela oferece o
-> seletor e exibe o total da outra base (`frontend/tela-fluxo-custos.ts:769-775`). As séries de
-> dedução são `impostoMensal` (`:1447`, RET já resolvido como parâmetro **global** do estudo)
-> e `corretagemMensal` (`:1516`, linha de custo obrigatória "Corretagem de vendas", base
-> **bruto/VGV** — fonte única desde que a #228 removeu a dedução concorrente de `vglLinha`).
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:1930-1945`) **subtrai** cada
+> série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
+> (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
+> que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
+> uma por conta própria (as quatro combinações são todas representáveis, inclusive as duas mistas
+> que o enum não representava). `permutaFinanceiraBrutaMensal`/`permutaFinanceiraLiquidaMensal`
+> (`:1952-1970`) sobrevivem como os dois extremos `(false,false)`/`(true,true)`, para
+> compatibilidade com os testes e o vocabulário histórico "bruta"/"líquida".
+>
+> `calcularFluxo` calcula a série ESCOLHIDA pelos dois flags da linha e a série OPOSTA (os dois
+> flags invertidos) para auditoria; a tela oferece dois checkboxes ("Deduzir das permutas
+> financeiras: ☑ corretagem ☑ impostos", `frontend/tela-fluxo-custos.ts:761-777`) e exibe o total
+> da base oposta ao lado deles. As séries de dedução são `impostoMensal` (`:1447`, RET já resolvido
+> como parâmetro **global** do estudo) e `corretagemMensal` (`:1516`, linha de custo obrigatória
+> "Corretagem de vendas", base **bruto/VGV** — fonte única desde que a #228 removeu a dedução
+> concorrente de `vglLinha`).
 >
 > ℹ️ **O bloco `regime_tributario`/`aliquota_*` não é lido pelo motor do Avançado** — o imposto
 > oficial dele é o RET (`frontend/fluxo-shared.ts:210-212`, #228, decisão do autor em 2026-08-01).
@@ -1833,9 +1842,10 @@ O fluxo visível deve usar a visão que representa o contrato e a realidade de c
 
 As duas visões devem permanecer disponíveis para auditoria.
 
-> ✅ **Comportamento vigente.** É o que a §15.2 descreve: a visão do fluxo é a de
-> `permuta_financeira_base`, e a outra continua disponível como `alternativa`, exibida na tela ao
-> lado do seletor.
+> ✅ **Comportamento vigente.** É o que a §15.2 descreve: a visão do fluxo é a que os dois flags da
+> linha escolhem (`permuta_financeira_deduzir_imposto`/`_corretagem`), e a base oposta (os dois
+> flags invertidos) continua disponível como `permutaAlternativa`, exibida na tela ao lado dos
+> checkboxes.
 
 ### 15.4 Momento
 
@@ -2155,7 +2165,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2168`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2197`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`
