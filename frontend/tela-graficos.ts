@@ -5,6 +5,7 @@ import { fmtR$ } from './viab-format.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
 import { listarBenchmarks, buscarConfig } from './viabilidade-api.js';
 import { montarMedidor } from './medidor-faixas.js';
+import { resolverIndicadoresBenchmark } from './benchmarks-indicadores.js';
 
 const n = (v: any): number => Number(v) || 0;
 
@@ -42,6 +43,7 @@ export class ViabTelaGraficos extends LitElement {
     .graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
     .graficos + .graficos { margin-top: 16px; }
     .medidores { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .medidor-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .resultado { margin-top: 12px; }
   `];
 
@@ -199,37 +201,40 @@ export class ViabTelaGraficos extends LitElement {
     `;
   }
 
-  // #15: medidores de indicadores a partir dos benchmarks do estudo. As faixas de
-  // status usam a `regra_comparacao`: `atingir_ou_superar` (maior é melhor) → verde
-  // acima da meta; `nao_exceder` (menor é melhor, ex.: Custo obras/VGV) → verde ABAIXO
-  // da meta (inversão pedida no item 15).
+  // #15/#451: medidores de indicadores a partir dos benchmarks do estudo. As
+  // faixas de status usam a `regra_comparacao`: `atingir_ou_superar` (maior é
+  // melhor) → verde acima da meta; `nao_exceder` (menor é melhor, ex.: Custo
+  // obras/VGV) → verde ABAIXO da meta (inversão pedida no item 15).
+  //
+  // O mapa benchmark→indicador (nomes, não valores) é compartilhado com
+  // tela-resumo.ts via `benchmarks-indicadores.ts`; cada tela resolve o VALOR
+  // na sua própria fonte (aqui, `Proforma`). O benchmark `margem_bruta` fica
+  // declaradamente sem fonte até existir um indicador de margem bruta de
+  // verdade (#453) — `resolverIndicadoresBenchmark` já sabe disso.
   private _renderMedidores(p: Proforma): TemplateResult {
-    // Mantidos: Custo obras/VGV e Margem líquida. Removidos desta aba: ROI, Resultado
-    // final, Margem bruta e Eficiência de aproveitamento.
-    const MAPA: Record<string, number> = {
+    const { exibiveis } = resolverIndicadoresBenchmark(this.benchmarks, {
       custo_obras_vgv: p.custoObrasVgvPct,
       margem_liquida: p.margemLiquidaPct,
-    };
-    const ROTULOS: Record<string, string> = {
-      // "Custo obras / VGV" (plural) — mesmo rótulo usado em exportar.ts,
-      // tela-premissas.ts e tela-proforma.ts (#183).
-      custo_obras_vgv: 'Custo obras / VGV',
-      margem_liquida: 'Margem líquida',
-    };
-    const medidores = this.benchmarks
-      .map((b) => {
-        const val = MAPA[b.campo];
-        if (val === undefined) return null;
+      resultado_final: p.margemLiquidaPct,
+      roi: p.roiPct,
+    });
+    const medidores = exibiveis
+      .map(({ benchmark, rotulo, valor }) => {
         // Limites e faixas: configurados na aba Benchmark (3 faixas) ou automáticos
         // (2 faixas em torno da meta). Ver `montarMedidor`.
-        const cfg = montarMedidor(b, val);
+        const cfg = montarMedidor(benchmark, valor);
         if (!cfg) return null;
-        return html`<urbi-grafico-medidor
-          rotulo=${ROTULOS[b.campo] ?? b.campo}
-          .min=${cfg.min} .max=${cfg.max} .valor=${val}
-          .faixas=${cfg.faixas}
-          formato="porcentagem"
-        ></urbi-grafico-medidor>`;
+        return html`<div class="medidor-item">
+          <urbi-grafico-medidor
+            rotulo=${rotulo}
+            .min=${cfg.min} .max=${cfg.max} .valor=${valor}
+            .faixas=${cfg.faixas}
+            formato="porcentagem"
+          ></urbi-grafico-medidor>
+          ${cfg.foraEscala
+            ? html`<urbi-badge cor="alerta" class="fora-escala">Fora da escala</urbi-badge>`
+            : nothing}
+        </div>`;
       })
       .filter((m) => m !== null);
     if (medidores.length === 0) return html``;
