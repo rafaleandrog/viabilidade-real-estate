@@ -208,7 +208,15 @@ export function proformaAvancado(
   }
   linhas.push({ nome: '= Custo indireto total', valor: -custoIndireto, nivel: 0, tipo: 'custo' });
 
-  const resultado = receitaLiquida - custoDireto - custoIndireto;
+  // #427 (achado do Codex, rodada 1): normaliza a 2 casas AQUI, antes de
+  // derivar os outros dois fechos. `receitaLiquida`/`custoDireto`/
+  // `custoIndireto` são somas de séries já round2'das mês a mês, mas somar
+  // dezenas/centenas de valores de 2 casas em ponto flutuante ainda pode
+  // deixar resíduo (`0.1 + 0.2 = 0.30000000000000004`). Sem este round2, a
+  // 1ª linha (sem round2) e as duas linhas novas (com round2 explícito logo
+  // abaixo) podiam divergir na última casa — quebrando o C7 na 1ª linha e a
+  // igualdade exata que a degenerescência (permutas zeradas) promete.
+  const resultado = round2(receitaLiquida - custoDireto - custoIndireto);
 
   // #427 — a EVI fecha com TRÊS leituras do mesmo projeto
   // (`Premissas e Resultados!K35/K37/K39`), cada uma com sua própria base:
