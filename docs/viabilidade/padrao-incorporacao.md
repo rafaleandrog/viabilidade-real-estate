@@ -1811,13 +1811,13 @@ base líquida
 > separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
 > `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:1930-1945`) **subtrai** cada
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:1976-1991`) **subtrai** cada
 > série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
 > (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
 > que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
 > uma por conta própria (as quatro combinações são todas representáveis, inclusive as duas mistas
 > que o enum não representava). `permutaFinanceiraBrutaMensal`/`permutaFinanceiraLiquidaMensal`
-> (`:1952-1970`) sobrevivem como os dois extremos `(false,false)`/`(true,true)`, para
+> (`:1998-2016`) sobrevivem como os dois extremos `(false,false)`/`(true,true)`, para
 > compatibilidade com os testes e o vocabulário histórico "bruta"/"líquida".
 >
 > `calcularFluxo` calcula a série ESCOLHIDA pelos dois flags da linha e a série OPOSTA (os dois
@@ -2175,7 +2175,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2197`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2232`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`
