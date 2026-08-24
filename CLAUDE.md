@@ -379,7 +379,7 @@ assunto *é* "as correções de documentação".
 o lembrete nem o aviso de branch estão te protegendo. Avise o autor em vez de seguir: hook que não
 roda não imprime nada, e "não imprimiu" é indistinguível de "está tudo normal".
 
-#### As quatro classes de defeito que esta rodada repetiu
+#### As cinco classes de defeito que esta rodada repetiu
 
 > Escritas a partir do que a Rodada 9 achou PR após PR. Não são conselho geral: cada uma traz o
 > número medido que a produziu e o mecanismo que hoje a barra. Onde o mecanismo é humano, ele está
@@ -441,6 +441,27 @@ permitir — ele não obriga a fechar, obriga a **decidir**.
 > trabalho que não se sustentava no código; a conferência dos critérios contra o código reprovou 29
 > delas. Fechar cedo e citar errado são o mesmo erro: tratar a keyword como registro do que foi
 > feito, quando ela é uma **ação** que ninguém revisa depois.
+
+**5 · Reimplementar à mão o que `validar-frontend.sh` já faz — e pendurar.**
+Um agente inventou `find node_modules/.pnpm -maxdepth 4 -path '*typescript/bin/tsc'` para localizar
+o compilador, em vez de usar o script. **Esse `find` devolve vazio**, e o `node ""` resultante
+**pendura indefinidamente** — sem erro, sem saída, sem timeout. Medido em 2026-08-24: **~50 minutos
+perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina ociosa o tempo todo.
+
+**Defesa, e ela é uma regra, não um conselho:**
+
+- **rode `bash scripts/validar-frontend.sh`.** Ele já resolve `pnpm install`, o link dos pacotes, os
+  guards, o typecheck, os testes, o build e o render;
+- **precisa só do typecheck?** O caminho é **`node_modules/typescript/bin/tsc`**, literal — é o que o
+  próprio script usa (`tsc="node_modules/typescript/bin/tsc"`). **Nunca** procure o binário com
+  `find`, `which`, `npx` ou `pnpm exec`;
+- **nunca invoque `node "$VAR"` sem checar que `$VAR` não está vazia.** `node ""` não falha: ele abre
+  o REPL e espera para sempre. É a razão pela qual este defeito é caro — ele não aparece como erro,
+  aparece como lentidão.
+
+> **O sinal de que isto está acontecendo não é o agente parecer parado — é o DIFF parado.** Um
+> agente `running` com `git diff --stat` congelado por minutos está preso, não pensando. Compare o
+> `--stat` com o de alguns minutos antes antes de concluir que "está trabalhando".
 
 #### As peças, e o que cada uma garante
 
