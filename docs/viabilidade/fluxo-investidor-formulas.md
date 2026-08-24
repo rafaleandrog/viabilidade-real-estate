@@ -165,7 +165,7 @@ Com `ini = C9 + SE(C10; C11; 1)` e `fim = ini − 1 + C13`:
 | G — Fluxo investidor | `E − B` |
 
 Juros incidem sobre o saldo de **abertura** e só dentro da janela da operação. Implementação:
-`simularDivida` (`funding-motor.ts:284`).
+`simularDivida` (`funding-motor.ts:299`).
 
 > ⚠️ **Emenda do app — tarifas/estruturação/encargos (#478), a planilha NÃO modela isto.** A aba
 > `divida` da `fluxo_investidor_FORMULAS` tem exatamente as entradas `C8:C14` acima — nenhuma
@@ -181,7 +181,7 @@ Juros incidem sobre o saldo de **abertura** e só dentro da janela da operação
 > `MAX(0; saldo_ant + B + D − PMT)` sem nenhum termo de tarifa. A única coisa que a planilha
 > sustenta aqui é a **restrição estrutural**: tarifa não é nem principal (não soma em F) nem juros
 > (D continua sendo só `saldo_ant × C15`) — a generalização de `Σ E − Σ B = Σ D` vira
-> `Σ saídas − Σ B = Σ D + Σ tarifas`. Implementação: `simularDivida` (`funding-motor.ts:284`),
+> `Σ saídas − Σ B = Σ D + Σ tarifas`. Implementação: `simularDivida` (`funding-motor.ts:299`),
 > campo `tarifas` de `SerieOperacao`.
 
 ### 4.2 Equity (aba `equity` da planilha)
@@ -201,6 +201,31 @@ retorno.
 | F — Fluxo investidor | `D − E` |
 | G — Caixa acumulado | `G_ant + F` |
 
+> ⚠️ **Divergência deliberada do app — composição da base de receita líquida do equity (#465).**
+> A linha `C` acima transcreve a planilha: `B * (1 − C15 − C16 − C17)`, onde `C15/C16/C17` somam as
+> três deduções — corretagem, marketing e impostos (a mesma composição de
+> `Premissas e Resultados!P19`, ≈ 14% no golden do §6 abaixo). O app usa outra composição —
+> `receitaLiquidaComCorretagemMensal` (`frontend/funding-motor.ts:73-81`): `receitaMensal`
+> (já líquido de RET + permuta financeira, #228) **menos só corretagem**. **Marketing não entra na
+> base do retorno de equity.**
+>
+> **Decisão do autor, verbatim, 2026-08-21:** *"equity é um retorno líquido ao investidor, não
+> importa esse fator para o cálculo"*. Registrada como intencional em `CLAUDE.md` § Decisões do
+> autor (item 3) desde a Rodada 8, e tornada testável pela #465:
+> `receitaLiquidaDeProformaMensal` (`frontend/fluxo-caixa-motor.ts`) **É** a composição de quatro
+> parcelas desta planilha — deduz imposto, corretagem, marketing e permuta financeira juntos —,
+> exposta na Proforma do Avançado como linha informativa separada ("Receita líquida de proforma —
+> composição EVI"), sem substituir a base do equity. Um teste
+> (`frontend/funding-motor.test.ts`, "#465 …divergem quando há marketing") **afirma que as duas
+> divergem**: se algum dia alguém alinhar `receitaLiquidaComCorretagemMensal` a esta planilha
+> (passando a deduzir marketing também), o teste fica vermelho — é a trava contra o "conserto"
+> desfazer esta decisão por engano.
+>
+> ⚠️ **`C8`, referenciado nas linhas B e D acima, é o mês do repasse** — não faz parte das
+> "Entradas da operação" listadas no topo desta seção porque é derivado, não digitado (Decisão D8,
+> abaixo). Ver a nota de `#467` mais adiante nesta seção para a convenção que o app usa para
+> derivá-lo.
+>
 > ⚠️ **Divergência deliberada do app — retorno de equity quando a receita líquida do mês é
 > negativa (#432).** A linha `D` acima é a transcrição fiel da planilha, e a planilha **não** tem
 > `MAX(0; …)` ali. Ela é **silenciosa, não permissiva**: `C = B × (1 − C15 − C16 − C17)` é uma
@@ -226,19 +251,19 @@ retorno.
 > **Decisão do autor, 2026-08-22.** Não é restauração do clamp que existia em
 > `capital-stack-motor.ts` antes da #355 — aquele era um `Math.max(0, …)` seco, **sem memória de
 > déficit**, e teria produzido um total pago maior. O precedente interno do clamp (sem a memória) é
-> `frontend/fluxo-caixa-motor.ts:1584`, em `permutaFinanceiraLiquidaMensal` (`:1576-1587`). Implementação:
-> `simularEquity` (`funding-motor.ts:501`).
+> `frontend/fluxo-caixa-motor.ts:2007`, em `permutaFinanceiraLiquidaMensal` (`:1576-1587`). Implementação:
+> `simularEquity` (`funding-motor.ts:516`).
 
 **Decisão D8 — as premissas do projeto não são redigitadas.** A aba `equity` da planilha pede de
 novo VGV, % entrada/parcelas/repasse, corretagem, marketing, impostos, duração da obra e mês do
 repasse (`C4`–`C19`). O app **deriva tudo do próprio estudo**: `receitaLiquidaMensal`,
 `resultadoFinal` e `mesRepasseValor` chegam prontos a `simularEquity` por
-`fundingDoEstudo` (`funding-motor.ts:823`). Redigitar criaria uma segunda fonte de verdade,
+`fundingDoEstudo` (`funding-motor.ts:838`). Redigitar criaria uma segunda fonte de verdade,
 divergindo em silêncio da aba Resultados — exatamente o que as #349/#351 eliminaram.
 
 O invariante da curva vale como conferência: `Σ receita bruta = VGV`.
 
-Implementação: `simularEquity` (`funding-motor.ts:501`).
+Implementação: `simularEquity` (`funding-motor.ts:516`).
 
 ### 4.3 Financiamento à produção — **exceção, não segue esta planilha**
 
@@ -262,13 +287,13 @@ documento que continua vigente:
 Por isso é a **única** operação cujo desembolso e amortização dependem do fluxo de caixa do projeto;
 `divida` e `equity` seguem a matemática desta planilha sem checar caixa.
 
-Implementação: `simularFinanciamentoProducao` (`funding-motor.ts:383`) — a matemática da §4.3 foi
+Implementação: `simularFinanciamentoProducao` (`funding-motor.ts:398`) — a matemática da §4.3 foi
 apenas **realocada** de `capital-stack-motor.ts`, não reescrita. Oráculo próprio:
 `frontend/financiamento-producao-golden.test.ts` (80 períodos do cenário real, tolerância R$ 0,15).
 
 ## 5. Indicadores do investidor
 
-`indicadoresOperacao` (`funding-motor.ts:600`) devolve, na visão do investidor: investimento total
+`indicadoresOperacao` (`funding-motor.ts:615`) devolve, na visão do investidor: investimento total
 (negativo), retorno total, juros pagos, lucro, VPL, TIR mensal e anual, MOIC e payback.
 
 **Duas divergências deliberadas em relação à planilha:**
@@ -312,7 +337,7 @@ meses, lançamento no mês 2, obra 30, repasse no 32, 20% entrada / 30% parcelas
 
 ## 7. Como o funding entra na tabela de Resultados
 
-A costura é `FundingNoFluxo` (`funding-motor.ts:768`), criada pela #349 e preservada de propósito
+A costura é `FundingNoFluxo` (`funding-motor.ts:783`), criada pela #349 e preservada de propósito
 pela reescrita: as liberações/aportes entram como categoria de receita e as parcelas/retornos como
 categoria de custo, dentro da tabela principal — não há segunda tabela.
 

@@ -67,22 +67,10 @@ export const EXCECOES = [
       "VENCIDO DE VERDADE — nada em ±3 linhas de :502-509 — \"eCorretagem\" está em :643. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
-    arquivo: "docs/viabilidade/fluxo-investidor-formulas.md",
-    endereco: "frontend/fluxo-caixa-motor.ts:1584",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :1584 — \"permutaFinanceiraLiquidaMensal\" está em :1849. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
     arquivo: "docs/viabilidade/formulas.md",
     endereco: "frontend/fluxo-caixa-motor.ts:591,603,610,619",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :591,603,610,619 — \"taxaMensal\" está em :691; \"sinalPct\" está em :688. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/fluxo-caixa-motor.ts:2125-2133",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :2125-2133 — \"FluxoCalc\" está em :2076. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
   {
     arquivo: "docs/viabilidade/funding-capital-stack.md",
