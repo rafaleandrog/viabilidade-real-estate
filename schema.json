@@ -417,7 +417,10 @@
         "exposicao_minima":              { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 20 },
         "percentual_financiavel":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 80 },
         "amortizar_com_caixa_disponivel":{ "tipo": "booleano", "padrao": true },
-        "custo_linha_ids":               { "tipo": "json" }
+        "custo_linha_ids":               { "tipo": "json" },
+        "taxa_estruturacao_pct":         { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "taxa_administracao_mensal":     { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 0 },
+        "outros_encargos_iniciais":      { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 0 }
       },
       "indices": [["estudo_id"]]
     },

@@ -58,6 +58,7 @@ Tabela `avancado_funding_operacoes` (migração `029_funding_operacoes.js`, que 
 | `periodo_amortizacao_meses`, `periodo_carencia_meses` | `divida` | prazo total e carência |
 | `modo_retorno`, `pct_retorno` | `equity` | `permuta_financeira` \| `resultado_final`, e o % |
 | `exposicao_minima`, `percentual_financiavel`, `amortizar_com_caixa`, `custo_linha_ids` | `financiamento_producao` | premissas da §4.3 |
+| `taxa_estruturacao_pct`, `taxa_administracao_mensal`, `outros_encargos_iniciais` | `divida` | tarifas/encargos (#478, emenda do app — ver §4.1, sem oráculo de planilha) |
 
 **Teto de `Σ pct_retorno` — duas somas, uma por `modo_retorno`.** A soma de `pct_retorno` das
 operações `equity` de um estudo **não pode passar de 100%**, e a checagem é feita **por
@@ -164,7 +165,24 @@ Com `ini = C9 + SE(C10; C11; 1)` e `fim = ini − 1 + C13`:
 | G — Fluxo investidor | `E − B` |
 
 Juros incidem sobre o saldo de **abertura** e só dentro da janela da operação. Implementação:
-`simularDivida` (`funding-motor.ts:237`).
+`simularDivida` (`funding-motor.ts:284`).
+
+> ⚠️ **Emenda do app — tarifas/estruturação/encargos (#478), a planilha NÃO modela isto.** A aba
+> `divida` da `fluxo_investidor_FORMULAS` tem exatamente as entradas `C8:C14` acima — nenhuma
+> tarifa, taxa de administração ou encargo. Três colunas foram acrescentadas ao modelo do app,
+> **sem oráculo de planilha para os valores**:
+>
+> - `taxa_estruturacao_pct` — % sobre `C8` (Valor), cobrado **uma vez**, no mês da 1ª liberação;
+> - `taxa_administracao_mensal` — R$/mês, cobrada em todo mês com saldo devedor (coluna F) `> 0`;
+> - `outros_encargos_iniciais` — R$, cobrados **uma vez**, no mês da contratação (`C9`).
+>
+> As três entram na coluna **E — PMT** (renomeada, na prática, para "saídas": `PMT + tarifas`), e
+> portanto na TIR do investidor (coluna G) — **nunca** na coluna **F — Saldo**, que continua
+> `MAX(0; saldo_ant + B + D − PMT)` sem nenhum termo de tarifa. A única coisa que a planilha
+> sustenta aqui é a **restrição estrutural**: tarifa não é nem principal (não soma em F) nem juros
+> (D continua sendo só `saldo_ant × C15`) — a generalização de `Σ E − Σ B = Σ D` vira
+> `Σ saídas − Σ B = Σ D + Σ tarifas`. Implementação: `simularDivida` (`funding-motor.ts:284`),
+> campo `tarifas` de `SerieOperacao`.
 
 ### 4.2 Equity (aba `equity` da planilha)
 
@@ -209,18 +227,18 @@ retorno.
 > `capital-stack-motor.ts` antes da #355 — aquele era um `Math.max(0, …)` seco, **sem memória de
 > déficit**, e teria produzido um total pago maior. O precedente interno do clamp (sem a memória) é
 > `frontend/fluxo-caixa-motor.ts:1584`, em `permutaFinanceiraLiquidaMensal` (`:1576-1587`). Implementação:
-> `simularEquity` (`funding-motor.ts:426`).
+> `simularEquity` (`funding-motor.ts:501`).
 
 **Decisão D8 — as premissas do projeto não são redigitadas.** A aba `equity` da planilha pede de
 novo VGV, % entrada/parcelas/repasse, corretagem, marketing, impostos, duração da obra e mês do
 repasse (`C4`–`C19`). O app **deriva tudo do próprio estudo**: `receitaLiquidaMensal`,
 `resultadoFinal` e `mesRepasseValor` chegam prontos a `simularEquity` por
-`fundingDoEstudo` (`funding-motor.ts:746`). Redigitar criaria uma segunda fonte de verdade,
+`fundingDoEstudo` (`funding-motor.ts:823`). Redigitar criaria uma segunda fonte de verdade,
 divergindo em silêncio da aba Resultados — exatamente o que as #349/#351 eliminaram.
 
 O invariante da curva vale como conferência: `Σ receita bruta = VGV`.
 
-Implementação: `simularEquity` (`funding-motor.ts:426`).
+Implementação: `simularEquity` (`funding-motor.ts:501`).
 
 ### 4.3 Financiamento à produção — **exceção, não segue esta planilha**
 
@@ -244,13 +262,13 @@ documento que continua vigente:
 Por isso é a **única** operação cujo desembolso e amortização dependem do fluxo de caixa do projeto;
 `divida` e `equity` seguem a matemática desta planilha sem checar caixa.
 
-Implementação: `simularFinanciamentoProducao` (`funding-motor.ts:312`) — a matemática da §4.3 foi
+Implementação: `simularFinanciamentoProducao` (`funding-motor.ts:383`) — a matemática da §4.3 foi
 apenas **realocada** de `capital-stack-motor.ts`, não reescrita. Oráculo próprio:
 `frontend/financiamento-producao-golden.test.ts` (80 períodos do cenário real, tolerância R$ 0,15).
 
 ## 5. Indicadores do investidor
 
-`indicadoresOperacao` (`funding-motor.ts:523`) devolve, na visão do investidor: investimento total
+`indicadoresOperacao` (`funding-motor.ts:600`) devolve, na visão do investidor: investimento total
 (negativo), retorno total, juros pagos, lucro, VPL, TIR mensal e anual, MOIC e payback.
 
 **Duas divergências deliberadas em relação à planilha:**
@@ -294,7 +312,7 @@ meses, lançamento no mês 2, obra 30, repasse no 32, 20% entrada / 30% parcelas
 
 ## 7. Como o funding entra na tabela de Resultados
 
-A costura é `FundingNoFluxo` (`funding-motor.ts:691`), criada pela #349 e preservada de propósito
+A costura é `FundingNoFluxo` (`funding-motor.ts:768`), criada pela #349 e preservada de propósito
 pela reescrita: as liberações/aportes entram como categoria de receita e as parcelas/retornos como
 categoria de custo, dentro da tabela principal — não há segunda tabela.
 
