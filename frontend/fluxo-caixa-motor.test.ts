@@ -220,6 +220,56 @@ test('#457: unidadesVendidasMensal/vsoMensal — coerência interna, sem orácul
   assert.equal(vso[59], 0, 'vso deve ser 0 quando o estoque de início já é 0 (sem divisão por zero)');
 });
 
+// Rodada de revisão do PR 531: `CRONO_LANCAMENTO_3M` (usado nos 3 testes
+// acima) não tem evento `pre_lancamento` — o Lançamento já começa no mês 0,
+// então "baixa no mês do Lançamento" e "baixa no início/imediatamente" são
+// INDISTINGUÍVEIS nesses testes. A mutação que reverte `estoqueM2Mensal`/
+// `vsoMensal` para subtrair a permuta ANTES do laço (em vez de em
+// `mesLancamento`) passa nos 3 testes acima sem derrubar nenhuma asserção.
+// Este teste fecha o buraco: cronograma COM Pré-lançamento, checando que o
+// estoque nos meses de Pré-lançamento ainda NÃO tem a permuta baixada.
+test('#457: com Pré-lançamento, a permuta só baixa no mês do Lançamento — não antes', () => {
+  const CRONO_COM_PRE: EventoCrono[] = [
+    { evento: 'pre_lancamento', inicio_mes: 0, duracao_meses: 6 },
+    { evento: 'lancamento', inicio_mes: 6, duracao_meses: 3 },
+    { evento: 'obra', inicio_mes: 9, duracao_meses: 20 },
+    { evento: 'pos_obra', inicio_mes: 29, duracao_meses: 12 },
+  ];
+  const linha = linhaEstoqueTeste({ modo: 'distribuido', blocos: [
+    { evento: 'pre_lancamento', pct: 40 },
+    { evento: 'lancamento', pct: 15 },
+    { evento: 'obra', pct: 20 },
+  ]});
+  const semente = estoqueM2Semente(linha);
+  const vendida = areaVendidaMensal(linha, CRONO_COM_PRE, 60);
+  const estoque = estoqueM2Mensal(linha, CRONO_COM_PRE, 60);
+  const permuta = 11 * 184.38410033; // 2.028,225104 m² (11 unid. permutadas)
+
+  // Mês 5 (último mês de Pré-lançamento, ANTES do mês do Lançamento = 6):
+  // o estoque só reflete as vendas do Pré-lançamento — a permuta ainda não
+  // baixou. Se baixasse no início (upfront, como o livro em unidades faz),
+  // o valor seria ~9.846,11 em vez de ~11.874,34 — uma diferença de mais de
+  // 2.000 m² que nenhuma tolerância esconde.
+  const esperadoSemPermutaAinda = semente - 6 * vendida[0];
+  assert.ok(
+    perto(estoque[5], esperadoSemPermutaAinda, 1e-3),
+    `estoque[5] esperado ${esperadoSemPermutaAinda} (SEM permuta baixada), achei ${estoque[5]}`,
+  );
+
+  // Mês 6 (mês do Lançamento): a permuta baixa integralmente aqui, além da
+  // venda do próprio mês.
+  const esperadoComPermuta = estoque[5] - permuta - vendida[6];
+  assert.ok(
+    perto(estoque[6], esperadoComPermuta, 1e-3),
+    `estoque[6] esperado ${esperadoComPermuta} (COM permuta baixada), achei ${estoque[6]}`,
+  );
+
+  // Conservação também vale com Pré-lançamento no cronograma: sem sobra,
+  // sem negativo nos meses intermediários.
+  assert.ok(perto(estoque[59], 0, 0.01), `estoque final esperado ~0, achei ${estoque[59]}`);
+  assert.ok(estoque.every((v) => v >= -0.01), 'estoque não pode ficar negativo em nenhum mês');
+});
+
 test('#260: rateio monetário fecha exatamente com o total da linha', () => {
   const r = calcularFluxo({
     dataInicio: 'jan/2027', prazoMeses: 3, taxaDescontoAa: 12, areaTerreno: 0, cronograma: [], linhasReceita: [],
