@@ -223,9 +223,12 @@ A costura é `FundingNoFluxo` (`funding-motor.ts:655`), criada pela #349 e prese
 pela reescrita: as liberações/aportes entram como categoria de receita e as parcelas/retornos como
 categoria de custo, dentro da tabela principal — não há segunda tabela.
 
-Consumidores: `fluxo-tabela.ts` · `exportar.ts` · `tela-fluxo-ver.ts` · `tela-cenarios.ts` ·
-`proforma-avancado.ts`. As KPIs desalavancadas (§8.1) são preservadas pela linha "Fluxo de Caixa
-Livre (antes do funding)".
+Consumidores: `fluxo-tabela.ts` · `exportar.ts` · `tela-fluxo-ver.ts` · `tela-cenarios.ts`.
+As KPIs desalavancadas (§8.1) são preservadas pela linha "Fluxo de Caixa Livre (antes do funding)".
+
+> ⚠️ **`proforma-avancado.ts` saiu da lista de consumidores com a #426.** A proforma do Avançado é
+> **desalavancada** — a função não recebe mais `FundingNoFluxo`, nem pela ponta da receita nem pela
+> do custo. Quem quiser ler o efeito do funding lê a aba Fluxo de Caixa.
 
 ## 8. Rastreabilidade
 

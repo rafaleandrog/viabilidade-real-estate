@@ -574,6 +574,21 @@ export function tabelaFluxo(
             const doGrupo = custosPorGrupo(g);
             // #349: as saídas de funding pertencem a "Custos Financeiros" — o
             // subtotal do grupo tem que somá-las, senão não bate com as linhas.
+            //
+            // ⚠️ #426 — "Custos Financeiros" NÃO significa o mesmo aqui e na
+            // aba Resultados, e a diferença é de propósito:
+            //   · aqui (aba Fluxo de Caixa) a visão é de CAIXA, e por isso as
+            //     DUAS pontas do funding aparecem: a liberação no bloco
+            //     "Funding — Capital (entradas)" logo acima, e o serviço da
+            //     dívida neste subtotal. O principal devolvido cancela o
+            //     principal liberado; os juros e o saldo devedor remanescente,
+            //     não — as duas pontas NÃO se anulam;
+            //   · na proforma (`proforma-avancado.ts`) a visão é ECONÔMICA,
+            //     antes de decidir como o projeto é capitalizado, e NENHUMA
+            //     ponta entra: lá o rótulo vale só as linhas de custo que o
+            //     usuário classificou no grupo `financeiro`.
+            // Quem quiser ler o efeito do funding lê esta aba, não aquela.
+            // Esta tabela NÃO muda com a #426.
             const ehFinanceiroComFunding = g === 'financeiro' && saidasFunding.length > 0;
             const mensalGrupo = ehFinanceiroComFunding
               ? somaLinhas(doGrupo).map((v, i) => v + (saidasFundingMensal[i] ?? 0))
