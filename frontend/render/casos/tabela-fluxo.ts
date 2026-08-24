@@ -19,7 +19,7 @@ export const caso = {
   // Estes seletores são a prova de que a tela sob medição está na tela.
   exigir: [
     { seletor: 'div.fx-kpis', minimo: 1 },
-    { seletor: 'div.kpi-card', minimo: 5 },
+    { seletor: 'div.kpi-card', minimo: 9 },
     { seletor: 'table.fx', minimo: 1 },
     { seletor: 'table.fx tbody tr', minimo: 4 },
   ],
