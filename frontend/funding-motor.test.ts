@@ -488,3 +488,57 @@ test('#434 a ordem das linhas não muda', () => {
     'Funding · Giro — parcelas',
   ]);
 });
+
+test('#434 duas dirigidas leem o MESMO caixa — a ordem não vira prioridade', () => {
+  // ⚠️ ESTE TESTE EXISTE POR CAUSA DE UM ACHADO DO CODEX (revisão do PR 526,
+  // P1). A primeira versão do conserto ENCADEAVA as dirigidas: a segunda via o
+  // caixa já alterado pela primeira. Isso faz a posição no array virar
+  // PRIORIDADE DE PAGAMENTO — a competição por caixa que a #355 apagou.
+  //
+  // E o estado não é impossível, só improvável: quem impede dois
+  // `financiamento_producao` no mesmo estudo é `conflitoFinanciamentoUnico`
+  // (`backend/rotas/funding.ts`), que LÊ e depois GRAVA — dois POSTs
+  // concorrentes passam os dois —, e o `schema.json` não tem índice único para
+  // o par (só `[["estudo_id"]]`). Então o motor tem de se comportar bem nele.
+  //
+  // ⚠️ O CAIXA AQUI É APERTADO DE PROPÓSITO (`+150k/mês` depois da obra, e uma
+  // `divida` pequena no lugar do aporte de R$ 5 MM). Com o caixa folgado o
+  // sweep bate no TETO DA DÍVIDA (`saldo_abertura + juros`) e não no caixa —
+  // e aí encadear ou não encadear dá o MESMO número, o que faria este teste
+  // passar verde sob a própria mutação que ele deveria matar. Medido: com
+  // `LIVRE_434` o encadeamento é indistinguível; com este, f1 e f2 divergem
+  // (1.236.824 vs 1.615.182 no mês 2).
+  const P = 12;
+  const livreApertado = new Array(P).fill(0).map((_, i) => (i < 6 ? -200_000 : 150_000));
+  const fin2: OperacaoFunding = { ...FIN_434, id: 'f2', nome: 'FP 2' };
+  const giro: OperacaoFunding = {
+    id: 'd2', tipo: 'divida', nome: 'Giro leve', valor: 300_000, inicio_mes: 0,
+    taxa_anual: 12, periodo_amortizacao_meses: 10, periodo_carencia_meses: 0,
+  };
+  const rodar = (ops: OperacaoFunding[]) =>
+    fundingDoEstudo(ops, livreApertado, LIQUIDA_434, 1_000_000, 10, 12, CTX_434)!;
+
+  const ab = rodar([FIN_434, fin2, giro]);
+  const ba = rodar([fin2, FIN_434, giro]);
+  const porId = (c: typeof ab, id: string) => c.operacoes.find((s) => s.operacao.id === id)!;
+
+  // 1) trocar a ordem das duas dirigidas não muda a série de nenhuma delas.
+  for (const id of ['f1', 'f2']) {
+    assert.deepEqual(porId(ab, id).saidas, porId(ba, id).saidas, `saídas de ${id} dependem da ordem`);
+    assert.deepEqual(porId(ab, id).entradas, porId(ba, id).entradas, `entradas de ${id} dependem da ordem`);
+    assert.deepEqual(porId(ab, id).saldo, porId(ba, id).saldo, `saldo de ${id} depende da ordem`);
+  }
+
+  // 2) e as duas, lendo o MESMO caixa, saem idênticas entre si — é isto que
+  //    cai no instante em que alguém reintroduzir o encadeamento.
+  assert.deepEqual(porId(ab, 'f1').saidas, porId(ab, 'f2').saidas);
+  // O par declarado, para a asserção não ser só uma comparação de iguais:
+  // limitado pelo CAIXA (1.236.824,34), não pelo teto da dívida (1.615.182,07),
+  // que é o número que a segunda dirigida receberia se houvesse fila.
+  assert.equal(porId(ab, 'f1').saidas[2], 1_236_824.34);
+  assert.equal(porId(ab, 'f2').saidas[2], 1_236_824.34);
+
+  // 3) a remontagem continua respeitando a ordem original em cada arranjo.
+  assert.deepEqual(ab.operacoes.map((s) => s.operacao.id), ['f1', 'f2', 'd2']);
+  assert.deepEqual(ba.operacoes.map((s) => s.operacao.id), ['f2', 'f1', 'd2']);
+});

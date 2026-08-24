@@ -777,12 +777,20 @@ export function fundingDoEstudo(
   //      desembolso/amortização depende do fluxo do projeto. Lê
   //      `fluxoLivreMensal + entradasCegas − saidasCegas`.
   //
-  // Se um dia houver MAIS DE UMA operação dirigida por caixa, elas são
-  // processadas na ordem de `operacoes` e cada uma vê o caixa já alterado pela
-  // anterior — passando a ser a única dependência de ordem do modelo. Hoje
-  // `financiamento_producao` é única por estudo
-  // (`docs/viabilidade/fluxo-investidor-formulas.md:27`), então o caso não
-  // ocorre.
+  // ⚠️ E SE HOUVER MAIS DE UMA DIRIGIDA? Todas leem o MESMO caixa — nenhuma
+  // enxerga o que a outra consumiu. É deliberado: encadeá-las faria a ordem do
+  // array virar PRIORIDADE DE PAGAMENTO, que é exatamente a competição por
+  // caixa que a #355 apagou. Enquanto não houver decisão do autor sobre como
+  // duas dirigidas dividem caixa, o motor não inventa uma — e a ausência de
+  // dependência de ordem está travada em teste (`#434 duas dirigidas leem o
+  // mesmo caixa`).
+  //
+  // O estado NÃO é impossível, só improvável: `financiamento_producao` é única
+  // por estudo (`docs/viabilidade/fluxo-investidor-formulas.md:27`), mas quem
+  // garante isso é `conflitoFinanciamentoUnico` em `backend/rotas/funding.ts`,
+  // que LÊ e depois GRAVA (dois POSTs concorrentes passam os dois), e o
+  // `schema.json` não tem índice único para o par — só `[["estudo_id"]]`.
+  // Fechar essa janela é decisão de schema, fora do escopo da #434.
   //
   // ⚠️ `series` é REMONTADA NA ORDEM ORIGINAL de `operacoes`: ela alimenta
   // `linhasEntrada`/`linhasSaida` abaixo, que são as linhas da tabela do Fluxo
@@ -819,25 +827,18 @@ export function fundingDoEstudo(
     );
   }
 
-  // Passada 2 — dirigidas por caixa, na ordem de `operacoes`.
+  // Passada 2 — dirigidas por caixa. `fluxoParaDirigidas` NÃO é atualizado
+  // dentro do laço: cada dirigida lê o mesmo caixa, e por isso o resultado de
+  // cada uma independe da posição dela em `operacoes` (ver o aviso acima).
   for (const idx of indicesDirigidas) {
     const op = operacoes[idx];
     const ids = Array.isArray(op.custo_linha_ids) && op.custo_linha_ids.length
       ? op.custo_linha_ids
       : linhasFinanciaveisPadrao(contexto?.custosRaw ?? []);
     const custoElegivel = custoElegivelMensalDeLinhas(contexto?.linhasCusto ?? [], ids, prazo);
-    const serie = simularFinanciamentoProducao(
+    series[idx] = simularFinanciamentoProducao(
       op, custoElegivel, janela, mesChaves, fluxoParaDirigidas, prazo,
     );
-    series[idx] = serie;
-    // A próxima dirigida, se houver, vê o caixa já alterado por esta. Hoje o
-    // laço roda uma vez só (cardinalidade 1), então o `if` nunca abre — ele
-    // existe para o comentário acima não descrever comportamento inexistente.
-    if (indicesDirigidas.length > 1) {
-      fluxoParaDirigidas = fluxoParaDirigidas.map(
-        (v, t) => round2(v + serie.entradas[t] - serie.saidas[t]),
-      );
-    }
   }
 
   const linha = (nome: string, mensal: number[]): LinhaFunding => ({
