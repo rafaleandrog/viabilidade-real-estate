@@ -20,8 +20,16 @@ import {
 // Frontend puro, sem lógica de entrada própria: consolida os resultados já
 // calculados pelas outras abas em "poucos itens destacados":
 //  · 7 KPIs — 3 do Fluxo de Caixa (VPL, TIR, Exposição máx.) e 4 "de negócio"
-//    (VGV, Resultado, Margem líquida, ROI). Seleção definida com o autor.
-//    #325 removeu daqui Payback, VGV vendável e VGV em permuta física.
+//    (VGV potencial, Resultado, Margem de caixa, ROI sobre custo total).
+//    Seleção definida com o autor. #325 removeu daqui Payback, VGV vendável e
+//    VGV em permuta física.
+//
+//    #443: os quatro rótulos "de negócio" foram renomeados — "VGV"→"VGV
+//    potencial", "Margem líquida"→"Margem de caixa", "ROI"→"ROI sobre custo
+//    total" — para não colidir com os rótulos homônimos que outras telas
+//    usam para FÓRMULAS DIFERENTES (Painel, Proforma do Avançado, Proforma
+//    do Preliminar). Nenhum número muda; ver `frontend/rotulos-indicador.ts`
+//    para o inventário completo rótulo → fórmula-fonte.
 //  · 4 gráficos-chave — Fluxo Acumulado (curva S) e Fluxo Mensal (reusados de
 //    fluxo-graficos, idênticos à aba Fluxo de Caixa), Composição de custos
 //    (pizza) e Indicadores vs. benchmark (medidores), reusados de Cenários.
@@ -158,6 +166,17 @@ export class ViabTelaResumo extends LitElement {
   // abas. Os dados certos já estão no `FluxoCalc` carregado (mesma fonte dos
   // KPIs de fluxo, que sempre estiveram corretos) — calculados uma vez aqui e
   // reusados pelos KPIs (#182) e pelos medidores vs. benchmark (#183).
+  // #474 (Passos 23–25, D-Q03 2026-08-22): `resultado` abaixo remonta
+  // `resultadoFinal` = `fluxoAcumulado[último]` — a MESMA remontagem que os
+  // outros quatro consumidores fazem, cada um do seu jeito (R-A36). Esta
+  // função NÃO chama `fundingDoEstudo` (é a leitura "de caixa" do Resumo,
+  // #443 "Margem de caixa") mas remonta o mesmo `resultadoFinal` da sequência
+  // descrita em
+  // `docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`. Fonte
+  // única foi CONSIDERADA E RECUSADA pelo autor — ver
+  // `docs/viabilidade/fluxo-investidor-formulas.md` §9. Os outros quatro:
+  // frontend/tela-fluxo-ver.ts:179 · frontend/tela-funding.ts:216 ·
+  // frontend/tela-cenarios.ts:240 · scripts/conferir-estudo.ts:153.
   private _kpisAvancado(c: FluxoCalc) {
     const vgv = c.vgvTotal;
     const resultado = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] || 0;
@@ -181,10 +200,10 @@ export class ViabTelaResumo extends LitElement {
         <!-- #353: exibida como magnitude (módulo) — sem cenário base para
              comparar aqui, a variante fica fixa em "erro" (é sempre risco). -->
         <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(Math.abs(c.exposicaoMaxima))} variante="erro"></urbi-kpi>
-        <urbi-kpi rotulo="VGV" .valor=${fmtR$(k.vgv)}></urbi-kpi>
+        <urbi-kpi rotulo="VGV potencial" .valor=${fmtR$(k.vgv)}></urbi-kpi>
         <urbi-kpi rotulo="Resultado" .valor=${fmtR$(k.resultado)} variante=${k.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        <urbi-kpi rotulo="Margem líquida" .valor=${fmtPct(k.margemLiquidaPct)} variante=${k.margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        <urbi-kpi rotulo="ROI" .valor=${fmtPct(k.roiPct)} variante=${k.roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="Margem de caixa" .valor=${fmtPct(k.margemLiquidaPct)} variante=${k.margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="ROI sobre custo total" .valor=${fmtPct(k.roiPct)} variante=${k.roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
       </div>
     `;
   }
@@ -255,7 +274,11 @@ export class ViabTelaResumo extends LitElement {
       // "Custo obras / VGV" (plural) — mesmo rótulo usado em exportar.ts,
       // tela-premissas.ts e tela-proforma.ts (o singular era inconsistência).
       custo_obras_vgv: 'Custo obras / VGV',
-      margem_liquida: 'Margem líquida',
+      // #443: "Margem de caixa" — mesmo rótulo do KPI acima (`_renderKpis`),
+      // mesma fórmula (`k.margemLiquidaPct` = fluxoAcumulado/vgvTotal). NÃO
+      // usar "Margem líquida" aqui: esse rótulo já está reservado ao Preliminar
+      // (`resultado/vgv`, ver `frontend/rotulos-indicador.ts`).
+      margem_liquida: 'Margem de caixa',
     };
     const medidores = this.benchmarks
       .map((b) => {

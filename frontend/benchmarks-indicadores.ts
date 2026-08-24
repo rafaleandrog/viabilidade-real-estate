@@ -16,11 +16,28 @@
 export const INDICADORES_SUPORTADOS = ['custo_obras_vgv', 'margem_liquida', 'resultado_final', 'roi'] as const;
 export type IndicadorSuportado = typeof INDICADORES_SUPORTADOS[number];
 
-/** Rótulo de tela — mesmo texto nas duas telas (era duplicado, mesmo conteúdo, mesmo comentário). */
+/**
+ * Rótulo de tela.
+ *
+ * ⚠️ #443 (mergeado depois desta tabela existir, resolvido no merge): esta
+ * tabela hoje só alimenta `tela-graficos.ts` (o medidor do Preliminar) — a
+ * doc-string original dizia "mesmo texto nas duas telas", mas
+ * `tela-resumo.ts` (o medidor do Avançado) NÃO importa este módulo; ele
+ * mantém seu próprio mapa local, com "Margem de caixa" em vez de
+ * "Margem sobre VGV" — são fórmulas diferentes (`resultado/vgv` aqui,
+ * `fluxoAcumulado[último]/vgvTotal` lá) e não podem compartilhar rótulo. Se
+ * um dia `tela-resumo.ts` passar a importar este módulo, ele PRECISA parar
+ * de usar `margem_liquida` daqui — o par (rótulo, fonte) tem que continuar
+ * único, ver `frontend/rotulos-indicador.ts`.
+ */
 export const ROTULOS_INDICADOR: Record<IndicadorSuportado, string> = {
   // "Custo obras / VGV" (plural) — mesmo rótulo usado em exportar.ts, tela-premissas.ts e tela-proforma.ts (#183).
   custo_obras_vgv: 'Custo obras / VGV',
-  margem_liquida: 'Margem líquida',
+  // #443: "Margem sobre VGV" — este indicador só alimenta o Preliminar
+  // (`resultado/vgv`, ver acima); não confundir com "Margem de caixa" do
+  // Avançado (`tela-resumo.ts`) nem "Margem sobre Receita Bruta" da
+  // Proforma do Avançado (`proforma-avancado.ts`).
+  margem_liquida: 'Margem sobre VGV',
   resultado_final: 'Resultado final',
   roi: 'ROI',
 };
