@@ -10,7 +10,7 @@ import {
 import { pctRepasseDerivado, parcelasAoLongoObra, jurosTabelaAnualPct } from './fluxo-caixa-motor.js';
 import {
   erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento,
-  jurosDeTabelaConfigurados,
+  taxasDistintasDoPlano,
 } from './fluxo-pagamento-editor.js';
 // #431: a lógica do modal de Absorção mora fora do componente, como a do modal
 // de Pagamento — método privado de LitElement não é testável neste repo.
@@ -801,16 +801,22 @@ export class ViabFluxoReceitas extends LitElement {
     //    chave `juros_tabela_aa` se ela existir, senão derivada dos componentes
     //    persistidos — sem esse segundo ramo, o estudo 5 (que recebeu a taxa
     //    pela API, sem a chave) abriria em 0% e o primeiro Aplicar a apagaria;
-    //  - `juros` continua lendo o persistido para responder UMA pergunta que o
-    //    campo único não responde: o plano tem mais de uma taxa gravada? Esse
-    //    é o caso residencial × não residencial da EVI, e é a única situação em
-    //    que mexer no campo achata dado. O aviso abaixo só aparece nela.
+    //  - `taxasPlano` continua lendo o persistido para responder UMA pergunta
+    //    que o campo único não responde: o plano tem mais de uma taxa gravada?
+    //    Esse é o caso residencial × não residencial da EVI, e é a única
+    //    situação em que mexer no campo achata dado. O aviso abaixo só aparece
+    //    nela.
     //
     // Os KPIs que se movem com a taxa são Receita Bruta, Resultado, margem, VPL
     // e TIR — NÃO o "VGV Vendável", que sai de `vgvLinha(tipologias)` (área ×
     // preço) e não conhece juros. Medido na Rodada 8 sobre o estudo 5:
     // R$ 1.259.273,59 de juros, TIR 18,59% contra 17,53%, VPL -R$ 959.500,19.
-    const juros = jurosDeTabelaConfigurados(this.modalPag?.fluxo_pagamento);
+    // Revisao da #428, B3 — o gatilho do aviso NAO pode ser
+    // `jurosDeTabelaConfigurados`, que descarta taxa zero por contrato da #436:
+    // no plano canonico do estudo 5 (12,5% no `ate_marco`, 0% no Repasse de
+    // 70%) isso suprimia o aviso exatamente onde alterar o campo move mais
+    // dinheiro. `taxasDistintasDoPlano` conta o zero.
+    const taxasPlano = taxasDistintasDoPlano(this.modalPag?.fluxo_pagamento);
     const jurosAA = jurosTabelaAnualPct(f);
     return html`
       <urbi-modal title="Fluxo de pagamento" maxWidth="860px" @urbi-modal:close=${() => this.modalPag = null}>
@@ -843,12 +849,13 @@ export class ViabFluxoReceitas extends LitElement {
                   ?desabilitado=${dis} .valor=${jurosAA}
                   @urbi:input-numero-change=${(ev: CustomEvent) => this._setJurosTabela(ev.detail.valor ?? 0)}></viab-num>
               </div>
-              ${juros.length > 1 ? html`
-                <p class="sec aviso-juros">Este plano tem <strong>${juros.length} taxas
-                  diferentes</strong> gravadas (${juros.map((j) => fmtPct(j.anualPct) + ' a.a. em ' + j.rotulos.join(', ')).join(' · ')}),
+              ${taxasPlano.length > 1 ? html`
+                <p class="sec aviso-juros">Este plano tem <strong>${taxasPlano.length} taxas
+                  diferentes</strong> gravadas (${taxasPlano.map((j) => fmtPct(j.anualPct) + ' a.a. em ' + j.rotulos.join(', ')).join(' · ')}),
                   e este campo guarda <strong>uma</strong>. Enquanto você não mexer nele, as taxas
-                  atuais são preservadas como estão; ao alterá-lo, a taxa acima passa a valer para
-                  <strong>todos</strong> os componentes do plano.</p>` : nothing}
+                  dos componentes que sobrevivem à edição são preservadas como estão; ao
+                  alterá-lo, a taxa acima passa a valer para <strong>todos</strong> os componentes
+                  do plano — inclusive os que hoje estão em 0%.</p>` : nothing}
             </div>
             <div class="pag-secao">
               <h4>Condições de entrada</h4>

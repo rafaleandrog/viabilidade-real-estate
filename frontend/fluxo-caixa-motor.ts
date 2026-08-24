@@ -575,6 +575,14 @@ export type ComponentePagamento =
 export function taxaMensalDeAnual(anualPct: number): number {
   const aa = Number(anualPct);
   if (!Number.isFinite(aa) || aa === 0) return 0;
+  // Revisao da #428, B2 — fora do dominio (queda de mais de 100% ao ano) a base
+  // `1 + aa/100` fica negativa e `Math.pow` com expoente fracionario devolve
+  // NaN. NaN NAO fica contido: `JSON.stringify(NaN)` e `null`, entao um unico
+  // "Aplicar" gravaria `taxaMensal: null` em todo componente financiado e
+  // apagaria a taxa persistida sem aviso — a classe de defeito da #431 de volta
+  // por esta porta. Quem barra a digitacao e `erroFormularioPagamento`; este
+  // `return` existe para que nem um caminho NOVO consiga persistir o NaN.
+  if (aa <= -100) return 0;
   return Math.pow(1 + aa / 100, 1 / 12) - 1;
 }
 

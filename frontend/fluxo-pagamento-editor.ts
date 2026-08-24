@@ -183,9 +183,30 @@ function camposSoCanonicos(doador: any, taxaEditada: boolean): string[] {
  */
 const EPS_TAXA_MENSAL = 1e-12;
 function taxaFoiEditada(form: FormularioPagamento, persistidos: ComponentePagamento[]): boolean {
+  // Revisao da #428, B1 — porta 1: a AUSENCIA da chave e o sinal de "nao
+  // tocou". `_setJurosTabela` e o unico caminho que a escreve, e
+  // `formularioPagamento` so a propaga quando ela ja estava no persistido —
+  // entao chave ausente significa, com certeza, que o campo nao foi mexido
+  // nesta sessao de modal. E ela que mantem de pe o no-op byte-identico da
+  // #431 num plano de taxas heterogeneas.
+  if (form.juros_tabela_aa === undefined || form.juros_tabela_aa === null) return false;
+
+  // Porta 2: com a chave presente, "editado" e o plano AINDA NAO ESTAR todo na
+  // taxa do campo. A versao anterior comparava so com a PRIMEIRA taxa
+  // persistida, e por isso ficava inerte no caso que mais importa: num plano
+  // heterogeneo (residencial 12,5% x nao residencial 13% da EVI) quem digitava
+  // 12,5 justamente para UNIFORMIZAR o plano batia com o primeiro componente,
+  // era lido como "nao editou", caia no no-op — e gravava
+  // `juros_tabela_aa: 12.5` sobre componentes que seguiam em 13%. A chave
+  // passava a contradizer o dado, e digitar 12,5 de novo nunca consertava.
   const doForm = taxaMensalDoPlano(form);
-  const doPlano = taxaMensalDoPlano({ componentes: persistidos });
-  return Math.abs(doForm - doPlano) > EPS_TAXA_MENSAL;
+  return persistidos.some((c: any) => {
+    if (!c || !('taxaMensal' in c)) return false;   // `imediato` nao tem taxa, e nao deve ter
+    const t = Number(c.taxaMensal);
+    // Taxa persistida ilegivel conta como divergencia: e melhor reescrever com
+    // o que o usuario digitou do que preservar lixo em silencio.
+    return !Number.isFinite(t) || Math.abs(t - doForm) > EPS_TAXA_MENSAL;
+  });
 }
 
 /** Assinatura de um componente restrita ao que o espelho legado enxerga. */
@@ -350,6 +371,18 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
       return 'O prazo fixo deve ter ao menos uma parcela mensal.';
     }
   }
+  // Revisao da #428, B2 — a taxa alimenta TODO componente financiado do plano,
+  // e ate aqui nada a validava: `viab-num` aceita o sinal de menos
+  // (`parseNumeroBR` preserva `-`), e `-150` produzia `NaN` que virava `null`
+  // no JSON, apagando a taxa persistida. Bloquear no formulario e o que
+  // desabilita o "Aplicar"; o motor tem a sua propria defesa em
+  // `taxaMensalDeAnual`.
+  if (form.juros_tabela_aa !== undefined && form.juros_tabela_aa !== null) {
+    const aa = Number(form.juros_tabela_aa);
+    if (!Number.isFinite(aa) || aa < 0) {
+      return 'Os juros de tabela devem ser um percentual ao ano maior ou igual a zero.';
+    }
+  }
   const somaInformada = [...form.entrada, ...form.parcelas].reduce((s, item) => s + n(item.pct), 0);
   if (somaInformada > 100.01) {
     return `Entrada e parcelamento somam ${somaInformada.toFixed(2)}%; o total não pode superar 100%.`;
@@ -421,6 +454,43 @@ export interface JurosDeTabela {
  * duas taxas que só divergem além da casa exibida aparecem como uma linha só,
  * que é o que a tela pode honestamente distinguir.
  */
+/**
+ * #428 (revisao, B3) — as taxas de tabela DISTINTAS do plano, **contando o
+ * zero**, entre os componentes que tem `taxaMensal` (os financiados).
+ *
+ * Irma de `jurosDeTabelaConfigurados` e deliberadamente diferente dela numa
+ * coisa so: aquela existe para o bloco somente-leitura da #436 — "revelar
+ * juros que EXISTEM" — e por isso descarta taxa zero, o que esta certo la.
+ * Como gatilho do aviso do campo unico, esse mesmo filtro erra, e erra no caso
+ * de maior dinheiro: a linha "Tabela longa" do estudo 5 tem 12,5% no
+ * `ate_marco` (30% do plano) e **0% no Repasse** (70%). Com o zero descartado
+ * o aviso nao aparecia, e quem mexesse a taxa de 12,5 para 13 ligava juros em
+ * 70% do plano que estavam desligados — sem ver nada. O saldo a repassar
+ * capitalizado e o maior item de juros da EVI.
+ *
+ * O agrupamento usa a mesma chave de 1 casa de `jurosDeTabelaConfigurados`:
+ * duas taxas que so divergem alem da casa exibida nao sao "diferentes" para
+ * quem le a tela, e prometer o contrario seria aviso que nao se pode honrar.
+ */
+export function taxasDistintasDoPlano(fluxoPagamento: any): JurosDeTabela[] {
+  const comps = Array.isArray(fluxoPagamento?.componentes) ? fluxoPagamento.componentes : [];
+  const porTaxa = new Map<number, JurosDeTabela>();
+  for (const c of comps) {
+    // Componente sem `taxaMensal` (`imediato`) nao entra: ele nao tem taxa a
+    // divergir, e conta-lo faria todo plano com pagamento no ato parecer
+    // heterogeneo.
+    if (!c || !('taxaMensal' in c)) continue;
+    const mensal = Number(c.taxaMensal);
+    const anualPct = Number.isFinite(mensal) && mensal !== 0 ? (Math.pow(1 + mensal, 12) - 1) * 100 : 0;
+    const chave = Math.round(anualPct * 10) / 10;
+    const rotulo = typeof c?.rotulo === 'string' && c.rotulo.trim() !== '' ? c.rotulo : String(c?.tipo ?? 'componente');
+    const ja = porTaxa.get(chave);
+    if (ja) ja.rotulos.push(rotulo);
+    else porTaxa.set(chave, { anualPct, rotulos: [rotulo] });
+  }
+  return [...porTaxa.values()];
+}
+
 export function jurosDeTabelaConfigurados(fluxoPagamento: any): JurosDeTabela[] {
   const comps = Array.isArray(fluxoPagamento?.componentes) ? fluxoPagamento.componentes : [];
   const porTaxa = new Map<number, JurosDeTabela>();

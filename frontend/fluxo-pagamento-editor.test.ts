@@ -6,6 +6,7 @@ import {
   fluxoPagamentoParaSalvar,
   formularioPagamento,
   jurosDeTabelaConfigurados,
+  taxasDistintasDoPlano,
 } from './fluxo-pagamento-editor.js';
 import {
   calcularFluxo, jurosTabelaAnualPct, taxaMensalDeAnual,
@@ -854,4 +855,153 @@ test('#428 FIAÇÃO: o modal tem o campo, e ele lê a taxa efetiva — não a ch
   //    usuário desconfiar de um campo que está bem ali, funcionando.
   assert.equal(/não editáveis nesta versão|não há\s+campo onde digitá/.test(fonte), false,
     'a tela ainda anuncia que os juros não são editáveis');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Revisão da #428 — rodada 1. Três bloqueantes, cada um com o teste que teria
+// impedido o defeito. Os dois primeiros vieram da revisão do App do Codex e
+// foram reproduzidos com execução antes de virarem conserto.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CRONO_REV = [{ evento: 'obra', inicio_mes: 12, duracao_meses: 27 }] as any;
+
+/** Plano heterogêneo escrito pela API: residencial 12,5% × não residencial 13%. */
+const planoHeterogeneo = () => ({
+  comissao: { ativo: false, pct: 0 }, ret: { ativo: false, pct: 0 },
+  entrada: [], parcelas: [{ pct: 30, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true }],
+  repasse: { apos_entrega_meses: 0 },
+  componentes: [
+    { tipo: 'ate_marco', rotulo: 'Residencial 12,5%', marcoMes: 38, sinalPct: 0,
+      taxaMensal: taxaMensalDeAnual(12.5), defasagemMeses: 1, participacaoPct: 30,
+      jurosNoMesDaContratacao: false },
+    { tipo: 'concentrado', rotulo: 'Nao residencial 13%', mesPagamento: 39,
+      taxaMensal: taxaMensalDeAnual(13), participacaoPct: 70 },
+  ],
+  aplicado: true,
+});
+
+test('#428 revisão B1: digitar a taxa do PRIMEIRO componente uniformiza o plano, não vira no-op', () => {
+  // O defeito: `taxaFoiEditada` comparava só com a primeira taxa persistida.
+  // Quem digitava 12,5 justamente para UNIFORMIZAR um plano heterogêneo batia
+  // com o primeiro componente, era lido como "não editou", e o save gravava
+  // `juros_tabela_aa: 12.5` sobre componentes que seguiam em 13%. A chave
+  // passava a contradizer o dado, e digitar 12,5 de novo nunca consertava.
+  const form: any = formularioPagamento(planoHeterogeneo());
+  form.juros_tabela_aa = 12.5;
+  const salvo: any = fluxoPagamentoParaSalvar(form, CRONO_REV);
+  assert.equal(salvo.juros_tabela_aa, 12.5);
+  for (const c of salvo.componentes) {
+    assert.equal(c.taxaMensal, taxaMensalDeAnual(12.5),
+      `${c.rotulo}: a chave anuncia 12,5% e o componente tem outra taxa — o campo ficou inerte`);
+  }
+  // E o que o campo passa a mostrar concorda com o que está gravado.
+  assert.equal(jurosTabelaAnualPct(salvo), 12.5);
+});
+
+test('#428 revisão B1: sem a chave, nada é edição — o no-op da #431 continua de pé', () => {
+  // A porta 1 do conserto. Ausência da chave é o sinal confiável de "não
+  // tocou", porque `_setJurosTabela` é o único caminho que a escreve.
+  const dado = planoHeterogeneo();
+  const salvo: any = fluxoPagamentoParaSalvar(formularioPagamento(dado), CRONO_REV);
+  assert.deepEqual(salvo.componentes, dado.componentes,
+    'abrir e aplicar sem mexer achatou um plano heterogêneo');
+  assert.equal('juros_tabela_aa' in salvo, false, 'a chave vazou sem ninguém digitar');
+});
+
+test('#428 revisão B1: plano já uniforme na taxa da chave não é reescrito', () => {
+  // O outro lado: com a chave presente e o plano inteiro já naquela taxa, não
+  // há edição — senão toda reabertura reescreveria o JSON.
+  const uniforme: any = planoHeterogeneo();
+  uniforme.juros_tabela_aa = 12.5;
+  uniforme.componentes = uniforme.componentes.map((c: any) => ({ ...c, taxaMensal: taxaMensalDeAnual(12.5) }));
+  const salvo: any = fluxoPagamentoParaSalvar(formularioPagamento(uniforme), CRONO_REV);
+  assert.deepEqual(salvo.componentes, uniforme.componentes);
+});
+
+test('#428 revisão B2: taxa anual negativa é barrada antes do Aplicar', () => {
+  const form: any = formularioPagamento(planoHeterogeneo());
+  for (const ruim of [-150, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    form.juros_tabela_aa = ruim;
+    assert.match(String(erroFormularioPagamento(form, CRONO_REV)), /juros de tabela/i,
+      `${ruim} deveria bloquear o Aplicar`);
+  }
+  // 0 e valores normais continuam passando.
+  for (const bom of [0, 12.5, 13]) {
+    form.juros_tabela_aa = bom;
+    assert.equal(erroFormularioPagamento(form, CRONO_REV), null, `${bom} não deveria bloquear`);
+  }
+});
+
+test('#428 revisão B2: nem um caminho novo consegue persistir taxaMensal NaN/null', () => {
+  // Defesa em profundidade no motor: `JSON.stringify(NaN)` é `null`, então um
+  // NaN que escapasse do formulário apagaria a taxa de todo componente
+  // financiado — a classe de defeito da #431 por esta porta.
+  assert.equal(taxaMensalDeAnual(-150), 0);
+  assert.equal(taxaMensalDeAnual(-100), 0);
+  assert.equal(taxaMensalDeAnual(Number.NaN), 0);
+  const form: any = formularioPagamento({
+    entrada: [{ pct: 20, parcelas: 3 }],
+    parcelas: [{ pct: 80, periodicidade: 'mensal', parcelas: 10, ao_longo_obra: false }],
+    repasse: { apos_entrega_meses: 0 },
+  });
+  form.juros_tabela_aa = -150;
+  const salvo: any = fluxoPagamentoParaSalvar(form, CRONO_REV);
+  const serializado = JSON.parse(JSON.stringify(salvo));
+  for (const c of serializado.componentes) {
+    assert.equal(Number.isFinite(c.taxaMensal), true, 'taxaMensal virou null no JSON');
+  }
+});
+
+test('#428 revisão B3: o aviso enxerga o plano do estudo 5 — 12,5% ao lado de 0%', () => {
+  // A linha "Tabela longa": 12,5% no `ate_marco` (30%) e 0% no Repasse (70%).
+  // `jurosDeTabelaConfigurados` descarta o zero — correto para o bloco
+  // somente-leitura da #436, errado como gatilho do aviso do campo único.
+  const estudo5 = {
+    componentes: [
+      { tipo: 'ate_marco', rotulo: 'Tabela longa, juros 12,5% a.a.', taxaMensal: 0.0098636,
+        marcoMes: 38, defasagemMeses: 1, sinalPct: 0, participacaoPct: 30 },
+      { tipo: 'concentrado', rotulo: 'Repasse', mesPagamento: 39, taxaMensal: 0, participacaoPct: 70 },
+    ],
+  };
+  assert.equal(jurosDeTabelaConfigurados(estudo5).length, 1, 'a função da #436 não muda');
+  assert.equal(taxasDistintasDoPlano(estudo5).length, 2,
+    'o aviso ficaria escondido justamente onde alterar o campo liga juros em 70% do plano');
+  // Plano de fato uniforme não dispara aviso nenhum.
+  assert.equal(taxasDistintasDoPlano({
+    componentes: [
+      { tipo: 'prazo_fixo', taxaMensal: 0.0098636, participacaoPct: 50 },
+      { tipo: 'prazo_fixo', taxaMensal: 0.0098636, participacaoPct: 50 },
+    ],
+  }).length, 1);
+  // Plano inteiro sem juros também não — 0% em todo mundo é uma taxa só.
+  assert.equal(taxasDistintasDoPlano({
+    componentes: [{ tipo: 'prazo_fixo', taxaMensal: 0 }, { tipo: 'concentrado', taxaMensal: 0 }],
+  }).length, 1);
+  // `imediato` não tem taxa e não pode fazer um plano parecer heterogêneo.
+  assert.equal(taxasDistintasDoPlano({
+    componentes: [{ tipo: 'imediato', participacaoPct: 30 }, { tipo: 'prazo_fixo', taxaMensal: 0.0098636 }],
+  }).length, 1);
+  assert.deepEqual(taxasDistintasDoPlano(null), []);
+});
+
+test('#428 revisão B3: a tela dispara o aviso por taxasDistintasDoPlano, não por jurosDeTabelaConfigurados', () => {
+  // Fiação — mesmo motivo do teste de fonte da #428: não há harness de DOM
+  // para este modal, e trocar a fonte do gatilho de volta é um defeito calado.
+  const fonte = readFileSync(new URL('./tela-fluxo-receitas.ts', import.meta.url), 'utf8');
+  assert.match(fonte, /const taxasPlano = taxasDistintasDoPlano\(/);
+  assert.match(fonte, /\$\{taxasPlano\.length > 1 \?/);
+  assert.equal(/\$\{juros\.length > 1 \?/.test(fonte), false,
+    'o aviso voltou a ser disparado pela contagem que descarta taxa zero');
+});
+
+test('#428 revisão R1: o setter do campo grava a chave que o editor lê', () => {
+  // A mutação de fiação que o teste de fonte da #428 não tentava: ele exigia
+  // que o template CHAMASSE `_setJurosTabela(`, mas nunca o que o setter faz.
+  // Renomear a chave para `jurosTabelaAa` passava typecheck e os 500 testes, e
+  // deixava o campo completamente inerte.
+  const fonte = readFileSync(new URL('./tela-fluxo-receitas.ts', import.meta.url), 'utf8');
+  assert.match(fonte, /_setJurosTabela\(valor: number\)\s*\{[^}]*juros_tabela_aa: valor/,
+    'o setter não está gravando `juros_tabela_aa` — o campo fica inerte, e em silêncio');
+  // E o campo continua respeitando estudo somente-leitura.
+  assert.match(fonte, /<viab-num label="Juros de tabela \(% a\.a\.\)"[\s\S]{0,120}\?desabilitado=\$\{dis\}/);
 });
