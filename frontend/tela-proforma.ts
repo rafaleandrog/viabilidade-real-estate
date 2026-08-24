@@ -311,7 +311,7 @@ export class ViabTelaProforma extends LitElement {
   // com `natureza: 'receita'`) são valores de receita — exibidos planos (positivo),
   // NUNCA entre parênteses, mesmo sendo `tipo: 'consolidado'`.
   private _fmtContabil(r: Linha): string {
-    const abs = fmtNum(Math.abs(r.v));
+    const abs = fmtR$(Math.abs(r.v), false);
     if (r.tipo === 'receita' || r.natureza === 'receita') return abs;
     if (r.tipo === 'resultado') return r.v < 0 ? `(${abs})` : abs;
     return `(${abs})`;

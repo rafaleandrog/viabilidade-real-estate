@@ -13,7 +13,7 @@ import { dinheiroParaRotulo, mesRepasse, rotuloMesRelativo, type EventoCrono } f
 import {
   fundingDoEstudo, indicadoresOperacao, indicadoresFinanciamentoProducao,
   receitaLiquidaComCorretagemMensal, linhasFinanciaveisPadrao,
-  reordenarCamadas, camadasComOrdemAlterada, eDivida,
+  reordenarCamadas, camadasComOrdemAlterada, eDivida, riscoTarifaDuplicada,
   PADRAO_EXPOSICAO_MINIMA, PADRAO_PERCENTUAL_FINANCIAVEL, PADRAO_AMORTIZAR_COM_CAIXA,
   type FundingCalc, type OperacaoFunding, type TipoOperacao, type SerieOperacao,
 } from './funding-motor.js';
@@ -51,9 +51,21 @@ import './viab-num.js';
 // a API; só "Salvar" persiste — mesmo padrão da tela anterior e do #51/#252.
 // ─────────────────────────────────────────────────────────────────────────
 
+// #466: `divida` já É o produto de capital de giro por calendário — a própria
+// planilha do autor rotula a aba `divida` de `fluxo_investidor_FORMULAS.xlsx`
+// como a folha de Capital de Giro (A8 = "Valor CG (R$):", B18 = "Libera CG",
+// C18 = "Carencia CG"). O rótulo abaixo deixa isso visível na UI; o
+// identificador persistido (`tipo='divida'`) não muda.
+//
+// 🛑 DECISÃO DO AUTOR, 2026-08-22 — linha de crédito rotativa RECUSADA. Não
+// ressuscitar. O desenho (saque dirigido por falta de caixa, devolução
+// automática quando sobra, limite reutilizável) foi proposto e recusado: ele
+// reintroduziria a competição por caixa entre operações que a reescrita do
+// funding (#355) apagou de propósito. Não há migração para isso, não há
+// bump de `versao`.
 const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
   { valor: 'financiamento_producao', rotulo: 'Financiamento à produção', icone: 'fa-solid fa-building-columns' },
-  { valor: 'divida', rotulo: 'Dívida', icone: 'fa-solid fa-file-invoice-dollar' },
+  { valor: 'divida', rotulo: 'Dívida / Capital de giro', icone: 'fa-solid fa-file-invoice-dollar' },
   { valor: 'equity', rotulo: 'Equity', icone: 'fa-solid fa-handshake' },
 ];
 
@@ -188,6 +200,11 @@ export class ViabFunding extends LitElement {
         curvas: curvas?.erro ? [] : (curvas.dados || []),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
         ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+        // #473: default true preserva o comportamento histórico (VGV bruto).
+        corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
+        // #446: o horizonte precisa cobrir a quitação das operações, senão a
+        // série é cortada e `saldoFinal` exibe um saldo truncado.
+        operacoesFunding: this.operacoes,
       };
       this.calc = calcularFluxo(config);
       this.receitaLiquida = receitaLiquidaComCorretagemMensal(
@@ -375,6 +392,20 @@ export class ViabFunding extends LitElement {
         <p class="nota">A carência faz parte do prazo de amortização — a parcela é calculada sobre
           <strong>amortização − carência</strong>. Durante a carência paga-se só os juros.</p>
       </div>
+      <div class="secao">
+        <h4>Tarifas e encargos</h4>
+        <div class="grid">
+          ${this._num(o, 'taxa_estruturacao_pct', 'Estruturação', '%')}
+          ${this._num(o, 'taxa_administracao_mensal', 'Administração', 'R$/mês')}
+          ${this._num(o, 'outros_encargos_iniciais', 'Outros encargos', 'R$')}
+        </div>
+        <p class="nota">
+          Entram em <strong>saídas</strong> — reduzem a TIR do investidor e o fluxo alavancado —,
+          nunca no saldo devedor (não são principal). A estruturação é cobrada uma vez, no mês da
+          1ª liberação; os outros encargos, uma vez, no mês da contratação; a administração,
+          todo mês enquanto houver saldo devedor.
+        </p>
+      </div>
     `;
   }
 
@@ -500,8 +531,8 @@ export class ViabFunding extends LitElement {
           ${eDivida(o.tipo) ? card('Saldo final', fmtR$(ind.saldoFinal), Math.abs(ind.saldoFinal) < 0.01 ? '' : 'neg') : nothing}
         </div>
         ${eDivida(o.tipo) && Math.abs(ind.saldoFinal) >= 0.01
-          ? html`<p class="nota">⚠️ A dívida não zera dentro do horizonte do estudo: o prazo de
-              amortização ultrapassa o fim do projeto.</p>`
+          ? html`<p class="nota">⚠️ A dívida não zera: no mês da quitação contratual ainda resta
+              saldo devedor.</p>`
           : nothing}
       </div>
     `;
@@ -635,6 +666,18 @@ export class ViabFunding extends LitElement {
         obrigações regulatórias próprias. Antes de usar esta estrutura numa oferta real, submeta-a
         aos responsáveis jurídicos e financeiros.
       </urbi-banner>
+
+      ${riscoTarifaDuplicada(this.operacoes, this.custos) ? html`
+        <!-- #478: mesma classe de defeito do EVI-008 — dedução contada duas
+             vezes. Aviso, não trava: as duas representações (linha de custo
+             do projeto × tarifa da operação) são legítimas isoladamente. -->
+        <urbi-banner variante="alerta" icone="fa-solid fa-triangle-exclamation">
+          Há tarifa configurada numa operação de <strong>Dívida</strong> e, ao mesmo tempo, uma
+          linha de custo em "Taxas bancárias" ou "Estruturação de dívida" no grupo Financeiro.
+          Confira se não é a <strong>mesma</strong> tarifa lançada duas vezes — uma vez como custo
+          do projeto, outra como encargo da operação.
+        </urbi-banner>
+      ` : nothing}
 
       ${this.editavel ? html`
         <div class="barra">

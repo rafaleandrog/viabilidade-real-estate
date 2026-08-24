@@ -73,14 +73,31 @@ export class ViabEmpreendimentoTipologias extends LitElement {
        #334: dimensionadas em "ch" (1ch = largura do dígito "0" na fonte) para
        casar direto com o pedido do autor — cabe exatamente o número de
        dígitos citado, sem sobra. Overhead fixo do viab-num (padding do
-       input-wrap + borda ≈ 3ch) soma-se aos dígitos de cada coluna. */
+       input-wrap + borda ≈ 3ch) soma-se aos dígitos de cada coluna.
+
+       #489 (Problema 1, 2026-08-24): "1ch" resolve contra a fonte COMPUTADA
+       do elemento onde a largura é declarada — aqui, col. A folha não dava
+       font-size a col, então ele herdava de table -> host -> :root =
+       1rem (16px); o conteúdo renderiza em td a 0.8125rem (13px,
+       --texto-corpo, linha 66 acima). As colunas ficavam dimensionadas
+       para dígitos de 16px e preenchidas com dígitos de 13px — ~23% mais
+       largas que o pedido do autor. Cada regra abaixo agora declara o MESMO
+       font-size do td, para o ch resolver contra a fonte que de fato
+       preenche a célula — a "alternativa aceitável" que a issue nomeia
+       (mantém ch, iguala o font-size ao do td). Isto NÃO resolve o
+       Problema 3 (a largura ainda muda entre as duas famílias de fonte do
+       tema — Montserrat x Chakra Petch) nem o Problema 2 (cabeçalho
+       cortado): os dois exigem medição por tema que o harness de render não
+       faz hoje (Achados.variantes só carrega cor,
+       scripts/render-check.d.mts) — ver o corpo do PR e o quadro vermelho
+       da própria issue. */
     col.c-nome   { width: 150px; }
     col.c-tipo   { width: 160px; }
-    col.c-area   { width: 16ch; }    /* 6 dígitos + milhar + decimais + sufixo "m²" */
-    col.c-dorm   { width: 7ch; }     /* 2 dígitos */
-    col.c-vagas  { width: 7ch; }     /* 2 dígitos */
-    col.c-un     { width: 8ch; }     /* 4 dígitos (5 com separador de milhar em ≥1000) */
-    col.c-areatot { width: 17ch; }   /* área privativa × unidades — tende a ser maior */
+    col.c-area   { width: 16ch; font-size: var(--texto-corpo, 0.8125rem); }    /* 6 dígitos + milhar + decimais + sufixo "m²" */
+    col.c-dorm   { width: 7ch; font-size: var(--texto-corpo, 0.8125rem); }     /* 2 dígitos */
+    col.c-vagas  { width: 7ch; font-size: var(--texto-corpo, 0.8125rem); }     /* 2 dígitos */
+    col.c-un     { width: 8ch; font-size: var(--texto-corpo, 0.8125rem); }     /* 4 dígitos (5 com separador de milhar em ≥1000) */
+    col.c-areatot { width: 17ch; font-size: var(--texto-corpo, 0.8125rem); }   /* área privativa × unidades — tende a ser maior */
     col.c-acao   { width: 90px; }
 
     table.tip td.nome urbi-input { width: 100%; }

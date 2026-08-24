@@ -67,6 +67,7 @@
         "sujeito_ret":                          { "tipo": "booleano", "padrao": false },
         "imposto_percentual":                   { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 7 },
         "corretagem_percentual":                { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 5 },
+        "corretagem_sobre_permuta_fisica":      { "tipo": "booleano", "padrao": true },
         "marketing_percentual":                 { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
         "permuta_financeira_residencial_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
         "permuta_financeira_nao_residencial_pct": { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
@@ -374,7 +375,8 @@
         "distribuicao_modo": { "tipo": "texto", "limite": 20, "opcoes": ["fixo", "unit_delivery", "sales_revenue"], "padrao": "fixo" },
         "permuta_tipologia_id": { "tipo": "referencia", "tabela_ref": "avancado_tipologias", "ao_deletar": "anular" },
         "permuta_quantidade":   { "tipo": "inteiro", "padrao": 0 },
-        "permuta_financeira_base": { "tipo": "texto", "limite": 10, "opcoes": ["bruta", "liquida"], "padrao": "bruta" }
+        "permuta_financeira_deduzir_imposto":    { "tipo": "booleano", "padrao": false },
+        "permuta_financeira_deduzir_corretagem": { "tipo": "booleano", "padrao": false }
       },
       "indices": [["estudo_id"]]
     },
@@ -417,7 +419,10 @@
         "exposicao_minima":              { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 20 },
         "percentual_financiavel":        { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 80 },
         "amortizar_com_caixa_disponivel":{ "tipo": "booleano", "padrao": true },
-        "custo_linha_ids":               { "tipo": "json" }
+        "custo_linha_ids":               { "tipo": "json" },
+        "taxa_estruturacao_pct":         { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
+        "taxa_administracao_mensal":     { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 0 },
+        "outros_encargos_iniciais":      { "tipo": "decimal", "precisao": 12, "escala": 2, "padrao": 0 }
       },
       "indices": [["estudo_id"]]
     },

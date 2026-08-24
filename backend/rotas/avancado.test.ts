@@ -50,10 +50,11 @@ test('cronograma padrão tem os 5 eventos com travados coerentes', () => {
   assert.ok(lanc.travado_inicio);
   // #166: duração do lançamento é livre (antes fixa em 1 mês).
   assert.ok(!lanc.travado_duracao);
-  // #224: Obra começa junto com o Pré-lançamento, no fim do Planejamento.
+  // #485: Obra nasce no fim do Planejamento (mesmo default da #224), mas como
+  // campo LIVRE, não mais travado — o usuário pode mover a âncora.
   assert.equal(obra.inicio_mes, plan.inicio_mes + plan.duracao_meses);
   assert.equal(obra.inicio_mes, pre.inicio_mes);
-  assert.ok(obra.travado_inicio);
+  assert.ok(!obra.travado_inicio);
   assert.equal(pos.inicio_mes, obra.inicio_mes + obra.duracao_meses); // fim da obra
   assert.ok(pos.travado_inicio);
   assert.ok(!pos.travado_duracao); // duração da pós-obra é livre
@@ -84,24 +85,52 @@ test('recalcularTravados propaga a duração do pré-lançamento para o lançame
   assert.equal(lancRec.duracao_meses, 3); // preservada, não forçada para 1
 });
 
-test('recalcularTravados: Obra ancora no fim do Planejamento e arrasta a Pós-obra (#224)', () => {
+test('recalcularTravados: Obra é campo livre (#485) — não segue mais o Planejamento, e a Pós-obra segue a Obra', () => {
   const c = cronogramaPadrao();
   const plan = c.find((e) => e.evento === 'planejamento')!;
   const obra = c.find((e) => e.evento === 'obra')!;
   const posAntes = c.find((e) => e.evento === 'pos_obra')!;
-  plan.duracao_meses = 10;  // deslocar o Planejamento move o início da Obra…
+  plan.duracao_meses = 10;  // deslocar o Planejamento NÃO move mais a Obra
   obra.duracao_meses = 30;
-  // Mesmo que um dado legado traga a Obra fora da âncora, o recálculo reimpõe.
+  // O usuário moveu a Obra para depois do que seria o fim do Planejamento —
+  // o recálculo PRESERVA o valor, não reimpõe mais a âncora da #224.
   obra.inicio_mes = 20;
   const rec = recalcularTravados(c);
   const obraRec = rec.find((e) => e.evento === 'obra')!;
-  const preRec = rec.find((e) => e.evento === 'pre_lancamento')!;
   const pos = rec.find((e) => e.evento === 'pos_obra')!;
-  assert.equal(obraRec.inicio_mes, 10);               // fim do planejamento (0 + 10)
-  assert.equal(obraRec.inicio_mes, preRec.inicio_mes); // junto com o pré-lançamento
-  assert.ok(obraRec.travado_inicio);
-  assert.equal(pos.inicio_mes, 40);                    // fim da obra (10 + 30)
+  assert.equal(obraRec.inicio_mes, 20);   // preservado, não recalculado
+  assert.ok(!obraRec.travado_inicio);
+  assert.equal(pos.inicio_mes, 50);       // fim da obra (20 + 30), continua ancorada NA obra
   assert.equal(pos.duracao_meses, posAntes.duracao_meses); // livre, preservada
+});
+
+test('recalcularTravados: obra.inicio_mes sobrevive a um PATCH que só mexe no Planejamento (regressão #485)', () => {
+  // Antes da #485 este cenário reimpunha obra.inicio_mes = fim do planejamento
+  // a cada normalização — mesmo quando o usuário já tinha movido a Obra. É o
+  // caso que a issue descreve: "a obra deixa de ser travada".
+  const c = cronogramaPadrao();
+  const obra = c.find((e) => e.evento === 'obra')!;
+  obra.inicio_mes = 40; // usuário moveu a obra para depois do Lançamento
+  const plan = c.find((e) => e.evento === 'planejamento')!;
+  plan.duracao_meses = plan.duracao_meses + 1; // outra edição, não relacionada à obra
+  const rec = recalcularTravados(c);
+  assert.equal(rec.find((e) => e.evento === 'obra')!.inicio_mes, 40);
+});
+
+test('recalcularTravados normaliza obra.travado_inicio=false em dado LEGADO, sem migração (#485)', () => {
+  // Estudo criado antes da #485: a linha 'obra' foi persistida com
+  // travado_inicio=true (imposto pela #224). Sem esta normalização, o
+  // primeiro GET depois do deploy continuaria mostrando o cadeado e
+  // recusando o PATCH com 422 CAMPO_TRAVADO — exatamente o defeito que a
+  // issue pede para corrigir, e que só a fiação de leitura (lerCronograma →
+  // recalcularTravados) alcança, sem tocar o banco.
+  const legado = cronogramaPadrao().map((e) =>
+    e.evento === 'obra' ? { ...e, travado_inicio: true, inicio_mes: 6 } : e,
+  );
+  const rec = recalcularTravados(legado);
+  const obra = rec.find((e) => e.evento === 'obra')!;
+  assert.equal(obra.travado_inicio, false);
+  assert.equal(obra.inicio_mes, 6); // o valor em si não muda, só a trava
 });
 
 test('recalcularTravados não muta o array de entrada', () => {
@@ -136,8 +165,10 @@ test('recalcularTravados sem Pré-lançamento: Lançamento ancora direto no fim 
   const obra = rec.find((e) => e.evento === 'obra')!;
   assert.equal(lanc.inicio_mes, plan.inicio_mes + plan.duracao_meses);
   assert.ok(lanc.travado_inicio);
-  // Obra continua ancorada no fim do Planejamento, como com Pré-lançamento (#224).
+  // #485: Obra é campo livre — o default de criação (fim do Planejamento)
+  // sobrevive porque nada nesta chamada mexeu nela, não porque é recalculada.
   assert.equal(obra.inicio_mes, plan.inicio_mes + plan.duracao_meses);
+  assert.ok(!obra.travado_inicio);
 });
 
 test('recalcularTravados sem Pré-lançamento propaga mudança do Planejamento para o Lançamento', () => {

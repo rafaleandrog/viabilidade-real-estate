@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, svg, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
+import { fmtR$, fmtPct, fmtM2, fmtPctEntrada } from './viab-format.js';
 import {
   rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosChavesDerivado, APOS_CHAVES_MESES,
   erroFormularioAbsorcao, totalAntesAlocacao, ramoLegadoDeRecebiveis,
@@ -166,8 +166,11 @@ export class ViabFluxoReceitas extends LitElement {
     .badges-par { display: inline-flex; gap: 6px; }
 
     /* Modal de pagamento */
-    .pag-grid { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
-    @media (max-width: 760px) { .pag-grid { grid-template-columns: 1fr; } }
+    /* #490: era um grid de 2 colunas (240px + 1fr) — a primeira era só o
+       bloco "Definições", removido por não ter controle nenhum. Com um só
+       filho, o grid de 2 colunas espremia o conteúdo inteiro nos 240px da
+       1ª faixa (auto-placement do CSS Grid); coluna única resolve. */
+    .pag-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
     .pag-secao { margin-bottom: 14px; }
     /* #436/#431: a nota sobre os juros precisa competir com o número que ela
        qualifica, senão vira letra miúda ao lado de um destaque. O texto mudou
@@ -407,7 +410,7 @@ export class ViabFluxoReceitas extends LitElement {
             @urbi:select-change=${(e: CustomEvent) => this._salvarAlocacao(f, a, { tipologia_id: Number(e.detail.valor) })}
           ></urbi-select>
         </td>
-        <td class="num">${area ? `${area.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²` : '—'}</td>
+        <td class="num">${area ? fmtM2(area) : '—'}</td>
         <td class="num">${tip ? total : '—'}</td>
         <td class="num">
           <viab-num casas-decimais="0" ?desabilitado=${dis}
@@ -422,8 +425,8 @@ export class ViabFluxoReceitas extends LitElement {
             @urbi:input-numero-change=${(e: CustomEvent) => this._salvarAlocacao(f, a, { preco_m2: e.detail.valor ?? 0 })}
           ></viab-num>
         </td>
-        <td class="num">${fmtNum(precoUnit)}</td>
-        <td class="num">${fmtNum(precoTotal)}</td>
+        <td class="num">${fmtR$(precoUnit, false)}</td>
+        <td class="num">${fmtR$(precoTotal, false)}</td>
         ${dis ? nothing : html`
           <td class="num">
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
@@ -637,7 +640,7 @@ export class ViabFluxoReceitas extends LitElement {
                        pela faixa — é o que impede o usuário de procurá-la no
                        campo "Pós-obras" do Cronograma, que é de custo. -->
                   <td>Pós-chaves<br /><span class="sec">${rot(faixas?.pos_chaves)} · ${APOS_CHAVES_MESES} meses fixos</span></td>
-                  <td><span class="derivado">${posDerivado.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</span></td>
+                  <td><span class="derivado">${fmtPctEntrada(posDerivado)}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -875,18 +878,6 @@ export class ViabFluxoReceitas extends LitElement {
         <div class="pag-grid">
           <div>
             <div class="pag-secao">
-              <h4>Definições</h4>
-              <!-- #346: corretagem e RET saíram deste bloco — corretagem porque
-                   já era só informativa (#228, sem efeito no motor: a linha
-                   real é "Corretagem de vendas" em Custos → Diretos), RET
-                   porque virou controle GLOBAL do estudo (era por Grupo). -->
-              <p class="sec">Corretagem: configurada na linha de custo obrigatória "Corretagem de
-                vendas" (Custos → Diretos).</p>
-              <p class="sec">RET: controle global do estudo, em Custos → Financeiro.</p>
-            </div>
-          </div>
-          <div>
-            <div class="pag-secao">
               <h4>Juros de tabela</h4>
               <!-- #428: o campo editável, um por Grupo/plano (decisão D-Q02) e
                    NÃO um por componente. A persistência grava a mesma taxa
@@ -988,11 +979,11 @@ export class ViabFluxoReceitas extends LitElement {
             <div class="pag-secao">
               <h4>Repasse</h4>
               <p class="sec">Evento de liquidação concentrada — o saldo que restar após entrada e
-                parcelamento é pago de uma vez, sempre no 1º mês após o fim da obra (#345).</p>
+                parcelamento é pago de uma vez, sempre no 1º mês após o fim da obra.</p>
               <div class="pag-linha">
                 <div class="repasse-box">
                   <span class="sec">Repasse</span><br />
-                  <span class="derivado">${repasse.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</span>
+                  <span class="derivado">${fmtPctEntrada(repasse)}</span>
                 </div>
               </div>
               <!-- #460: destino do resíduo de um "Ao longo da obra" sem prazo

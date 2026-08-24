@@ -35,10 +35,10 @@ export function cronogramaPadrao(): LinhaCronograma[] {
     { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6, travado_inicio: false, travado_duracao: false },
     { evento: 'pre_lancamento', inicio_mes: 6, duracao_meses: 6, travado_inicio: true, travado_duracao: false },
     { evento: 'lancamento', inicio_mes: 12, duracao_meses: 1, travado_inicio: true, travado_duracao: false },
-    // #224: Obra começa no fim do Planejamento, junto com o Pré-lançamento —
-    // início derivado e travado (recalcularTravados reimpõe). Antes nascia no
-    // mês 17, fora da regra.
-    { evento: 'obra', inicio_mes: 6, duracao_meses: 24, travado_inicio: true, travado_duracao: false },
+    // #485: Obra nasce no fim do Planejamento (mesmo default da #224), mas
+    // como campo LIVRE — travado_inicio: false. O usuário pode mover a âncora;
+    // recalcularTravados não a reimpõe mais.
+    { evento: 'obra', inicio_mes: 6, duracao_meses: 24, travado_inicio: false, travado_duracao: false },
     { evento: 'pos_obra', inicio_mes: 30, duracao_meses: 12, travado_inicio: true, travado_duracao: false },
   ];
   return recalcularTravados(base);
@@ -47,9 +47,13 @@ export function cronogramaPadrao(): LinhaCronograma[] {
 /**
  * Recalcula os campos travados do cronograma:
  *  - Pré-lançamento: início = fim do Planejamento (travado — #165)
- *  - Obra:           início = fim do Planejamento (travado — #224): a obra física
- *                     começa SIMULTÂNEA ao Pré-lançamento. Antes o início era livre,
- *                     permitindo lacuna entre Planejamento e Obra.
+ *  - Obra:           início LIVRE (#485 — revoga a trava da #224). O default de
+ *                     um cronograma novo continua ancorado no fim do
+ *                     Planejamento (mesmo mês do Pré-lançamento), mas é só
+ *                     ponto de partida: o usuário pode mover a obra para
+ *                     depois do Lançamento (ou de qualquer outro ponto), e o
+ *                     valor sobrevive a `recalcularTravados` porque este não
+ *                     mais re-deriva `obra.inicio_mes` a cada leitura/escrita.
  *  - Lançamento:     início = fim do Pré-lançamento (travado); duração LIVRE (#166 —
  *                     antes fixa em 1 mês, o usuário já podia editá-la na tela e
  *                     tomava 422 do backend, que ainda forçava o valor). Sem
@@ -74,14 +78,18 @@ export function recalcularTravados(eventos: LinhaCronograma[]): LinhaCronograma[
   const lanc = porEvento.get('lancamento');
   const obra = porEvento.get('obra');
   const pos = porEvento.get('pos_obra');
+  // #485: obra.travado_inicio é sempre false, incondicionalmente — mesmo
+  // padrão de normalização do #246 (travado_duracao acima), para que um
+  // estudo já existente, com `true` persistido de antes desta issue, destrave
+  // no primeiro GET/PATCH em vez de precisar de migração.
+  if (obra) obra.travado_inicio = false;
   if (plan && pre) {
     pre.inicio_mes = plan.inicio_mes + plan.duracao_meses; // fim do planejamento
     pre.travado_inicio = true;
   }
-  if (plan && obra) {
-    obra.inicio_mes = plan.inicio_mes + plan.duracao_meses; // #224: junto com o Pré-lançamento
-    obra.travado_inicio = true;
-  }
+  // #485: obra.inicio_mes deixou de ser derivado/travado aqui — a #224 travava
+  // este bloco; agora é campo livre, e o valor gravado (ou o delta acabado de
+  // aplicar em `aplicarDeltaEvento`) atravessa sem ser sobrescrito.
   if (pre && lanc) {
     lanc.inicio_mes = pre.inicio_mes + pre.duracao_meses; // fim do pré-lançamento
     lanc.travado_inicio = true;
@@ -1364,10 +1372,13 @@ rotasAvancado.get('/estudos/:id/avancado/custos', async (req: Request, res: Resp
 // quantidade entregue na linha de Preço/Permuta física (modelo/UI). O valor
 // declarado que valora a permuta continua em orcamento_valor/orcamento_unidade
 // (ADR: nunca derivado — ver docs/viabilidade/padrao-incorporacao.md §15.1).
-// #238: permuta_financeira_base escolhe qual visão (bruta/líquida, §15.2)
-// alimenta o fluxo para a linha de Preço/Permuta financeira.
-const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_valor_canonico', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo', 'permuta_tipologia_id', 'permuta_quantidade', 'permuta_financeira_base'];
-const BASES_PERMUTA_FINANCEIRA = ['bruta', 'liquida'];
+// #459: `permuta_financeira_base` (enum bruta/liquida) deu lugar a dois
+// booleanos independentes — `permuta_financeira_deduzir_imposto` e
+// `permuta_financeira_deduzir_corretagem` — que escolhem, cada um por conta
+// própria, se a base da permuta financeira em % VGV (§15.2) deduz o imposto
+// e/ou a corretagem antes de aplicar o percentual. `(false,false)` é o
+// comportamento histórico ("bruta"); `(true,true)` reproduz "liquida".
+const CAMPOS_CUSTO = ['grupo', 'categoria', 'subcategoria', 'orcamento_valor', 'orcamento_valor_canonico', 'orcamento_unidade', 'curva_id', 'cronograma_evento', 'fase_ancora_id', 'inicio_mes', 'duracao_meses', 'ordem', 'distribuicao_modo', 'permuta_tipologia_id', 'permuta_quantidade', 'permuta_financeira_deduzir_imposto', 'permuta_financeira_deduzir_corretagem'];
 
 // #257: as quatro subcategorias CANÔNICAS da linha `terreno`/`Preço`. Mesma
 // lista que a UI oferece (`frontend/tela-fluxo-custos.ts:58`) — aqui ela vira
@@ -1431,8 +1442,12 @@ function validarCamposCusto(
     erro(res, 400, 'PERMUTA_QUANTIDADE_INVALIDA', 'permuta_quantidade deve ser um inteiro ≥ 0');
     return false;
   }
-  if (dados.permuta_financeira_base !== undefined && !BASES_PERMUTA_FINANCEIRA.includes(dados.permuta_financeira_base)) {
-    erro(res, 400, 'PERMUTA_FINANCEIRA_BASE_INVALIDA', `permuta_financeira_base deve ser um de: ${BASES_PERMUTA_FINANCEIRA.join(', ')}`);
+  if (dados.permuta_financeira_deduzir_imposto !== undefined && typeof dados.permuta_financeira_deduzir_imposto !== 'boolean') {
+    erro(res, 400, 'PERMUTA_FINANCEIRA_DEDUZIR_IMPOSTO_INVALIDO', 'permuta_financeira_deduzir_imposto deve ser booleano');
+    return false;
+  }
+  if (dados.permuta_financeira_deduzir_corretagem !== undefined && typeof dados.permuta_financeira_deduzir_corretagem !== 'boolean') {
+    erro(res, 400, 'PERMUTA_FINANCEIRA_DEDUZIR_CORRETAGEM_INVALIDO', 'permuta_financeira_deduzir_corretagem deve ser booleano');
     return false;
   }
   // #257: grupo/categoria efetivos = o que o payload manda, senão o que a linha

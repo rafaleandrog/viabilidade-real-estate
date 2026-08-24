@@ -7,7 +7,7 @@ import {
   ramoLegadoDeRecebiveis,
   pctAbsorcaoEfetivo, fimJanelaAbsorcao,
   areaPrivativaTotalLinhas, resolverCustoTotal,
-  eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
+  eCorretagem, vgvVendidoBrutoMensal, vgvVendidoVendavelMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
   totalAntesAlocacao, ePermutaFisica,
   mesAnoParaISO, isoParaMesAno,
   type EventoCrono,
@@ -267,7 +267,7 @@ test('areaPrivativaTotalLinhas soma área × quantidade de todas as tipologias',
   assert.equal(areaPrivativaTotalLinhas(linhas), 7000 + 5000 + 5100);
 });
 
-test('vgvVendidoMensal reparte o VGV de cada linha pela sua absorção (#121)', () => {
+test('vgvVendidoBrutoMensal reparte o VGV de cada linha pela sua absorção (#121)', () => {
   const linhas = [
     { // VGV 50M, tudo vendido no lançamento (mês 12)
       tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }],
@@ -278,12 +278,35 @@ test('vgvVendidoMensal reparte o VGV de cada linha pela sua absorção (#121)', 
       absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 50 }, { mes: 20, pct: 50 }] },
     },
   ];
-  const r = vgvVendidoMensal(linhas, CRONO, 60);
+  const r = vgvVendidoBrutoMensal(linhas, CRONO, 60);
   assert.equal(r.length, 60);
   assert.ok(perto(r.reduce((s, x) => s + x, 0), 70_000_000));
   assert.ok(perto(r[12], 50_000_000 + 10_000_000));
   assert.ok(perto(r[20], 10_000_000));
   assert.ok(perto(r[13], 0));
+});
+
+// #473: vgvVendidoVendavelMensal exclui a permuta física — mesma fixture,
+// mas a 1ª linha tem 30 das 100 unidades permutadas fisicamente.
+test('vgvVendidoVendavelMensal exclui a fatia de permuta física (#473)', () => {
+  const linhas = [
+    { // VGV BRUTO 50M; 30 das 100 unidades permutadas → vendável 35M
+      tipologias: [{ quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000, unidades_permutadas: 30 }],
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+    },
+    { // VGV 20M, sem permuta física — vendável == bruto
+      tipologias: [{ quantidade: 40, area_privativa_m2: 50, preco_m2: 10_000 }],
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 50 }, { mes: 20, pct: 50 }] },
+    },
+  ];
+  const bruto = vgvVendidoBrutoMensal(linhas, CRONO, 60);
+  const vendavel = vgvVendidoVendavelMensal(linhas, CRONO, 60);
+  assert.ok(perto(bruto.reduce((s, x) => s + x, 0), 70_000_000));
+  assert.ok(perto(vendavel.reduce((s, x) => s + x, 0), 55_000_000)); // 35M + 20M
+  // Mutação: a diferença entre as duas é EXATAMENTE o VGV permutado (15M),
+  // todo ele no mês 12 (a linha 1 é 100% absorvida ali).
+  assert.ok(perto(bruto[12] - vendavel[12], 15_000_000));
+  assert.ok(perto(bruto[20] - vendavel[20], 0));
 });
 
 test('eCorretagem só reconhece a linha de Corretagem em Custos Diretos (#121)', () => {

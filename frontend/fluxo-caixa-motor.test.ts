@@ -12,7 +12,7 @@ import {
   jurosSafra, receitaBrutaSafra, componentesEfetivosSafra, ehVendaAposChaves,
   parcelasAoLongoObra, vencimentosAoLongoObra,
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos, pctDeReceitaBruta,
-  permutaFinanceiraBrutaMensal, permutaFinanceiraLiquidaMensal,
+  permutaFinanceiraBrutaMensal, permutaFinanceiraLiquidaMensal, permutaFinanceiraDeduzidaMensal,
   areaVendidaMensal, unidadesVendidasMensal, estoqueM2Mensal, estoqueM2Semente, vsoMensal,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
@@ -277,7 +277,15 @@ test('#260: rateio monetário fecha exatamente com o total da linha', () => {
     linhasCusto: [{ id: 1, grupo: 'indireto', categoria: 'Projetos', orcamento_valor: 100, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 3 }],
   });
   const linha = r.linhasCusto[0];
-  assert.deepEqual(linha.mensal, [33.33, 33.33, 33.34]);
+  // #446: `prazoMeses` virou PISO, não teto — os `prazoMeses: 3` daqui não
+  // encurtam mais o horizonte, que agora é o derivado (12, pelo piso de
+  // `11 + 1`). `mensal` é a série INTEIRA do horizonte, então o rateio de 3
+  // meses ocupa as 3 primeiras posições e o resto é zero. O que este teste
+  // prova NÃO mudou: o rateio fecha exatamente em 100, com 2 casas e o
+  // resíduo no último mês com valor.
+  assert.equal(linha.mensal.length, 12);
+  assert.deepEqual(linha.mensal.slice(0, 3), [33.33, 33.33, 33.34]);
+  assert.ok(linha.mensal.slice(3).every((v) => v === 0), 'meses sem rateio têm de ser zero');
   assert.equal(linha.total, 100);
   assert.equal(r.custoMensal.reduce((s, v) => s + v, 0), 100);
 });
@@ -630,6 +638,133 @@ test('corretagem de vendas cai no mês da venda, acompanhando a absorção', () 
   assert.equal(linha.duracao, 40 - 12 + 1);
 });
 
+// #473: a base da Corretagem quanto à permuta física é escolha do estudo.
+// VGV total 100M (100 un. × 50m² × 20.000); 30 unidades permutadas
+// fisicamente (VGV permutado 30M) → vendável 70M. Corretagem 4%.
+test('#473: default (undefined) preserva o comportamento histórico — corretagem sobre o VGV BRUTO, permuta física inclusa', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 4, orcamento_unidade: 'pct_vgv' },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+        permuta_tipologia_id: 1, permuta_quantidade: 30,
+      },
+    ],
+    areaTerreno: 0,
+    // corretagemSobrePermutaFisica OMITIDO de propósito — é o caso real de
+    // todo estudo existente antes da #473 (a coluna nasce mas o config não a
+    // manda explicitamente até a tela carregar).
+  };
+  const r = calcularFluxo(config);
+  const corretagem = r.linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
+  // 4% de 100M (bruto) — a permuta física NÃO reduz a base, como antes da #473.
+  assert.ok(perto(corretagem.total, 4_000_000, 1));
+});
+
+test('#473: corretagemSobrePermutaFisica=false usa o VGV VENDÁVEL, excluindo a permuta física', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 4, orcamento_unidade: 'pct_vgv' },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+        permuta_tipologia_id: 1, permuta_quantidade: 30,
+      },
+    ],
+    areaTerreno: 0,
+    corretagemSobrePermutaFisica: false,
+  };
+  const r = calcularFluxo(config);
+  const corretagem = r.linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
+  // 4% de 70M (vendável, 100M − 30M permutados).
+  assert.ok(perto(corretagem.total, 2_800_000, 1));
+
+  // Mutação: a diferença entre a base bruta e a vendável é EXATAMENTE 4% dos
+  // 30M permutados (1,2M) — reintroduzir "sempre bruto" faria este teste
+  // devolver 4.000.000 em vez de 2.800.000.
+  assert.ok(perto(4_000_000 - corretagem.total, 1_200_000, 1));
+});
+
+test('#473: com corretagemSobrePermutaFisica=true explícito, idêntico ao default (paridade)', () => {
+  const base = (flag: boolean | undefined): FluxoConfig => ({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 4, orcamento_unidade: 'pct_vgv' },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+        permuta_tipologia_id: 1, permuta_quantidade: 30,
+      },
+    ],
+    areaTerreno: 0,
+    ...(flag === undefined ? {} : { corretagemSobrePermutaFisica: flag }),
+  });
+  const semFlag = calcularFluxo(base(undefined)).linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
+  const comTrue = calcularFluxo(base(true)).linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
+  assert.equal(semFlag.total, comTrue.total);
+});
+
+// #473 — achado do Codex (PR #545, rodada 1): quando `orcamento_valor_canonico`
+// está persistido (o caso comum — toda edição pela tela grava o R$ congelado
+// junto, `tela-fluxo-custos.ts:_editarOrcamento`), a base ESCOLHIDA tinha de
+// mudar o TOTAL da corretagem, não só o calendário. Mesma fixture do teste
+// acima (VGV 100M, 30 unidades permutadas → vendável 70M), mas com
+// `orcamento_valor_canonico` no lugar de `orcamento_valor` puro — o caminho
+// que TODA linha de custo editada uma vez pela tela usa de fato.
+test('#473 com orcamento_valor_canonico persistido, o TOTAL da corretagem reage à base (não só o calendário)', () => {
+  const base = (flag: boolean | undefined): FluxoConfig => ({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      // canônico = 4% do VGV bruto (100M) no momento em que foi digitado —
+      // o valor R$ FIXO que `_editarOrcamento` grava junto do percentual.
+      {
+        id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas',
+        orcamento_valor: 4, orcamento_unidade: 'pct_vgv', orcamento_valor_canonico: 4_000_000,
+      },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+        permuta_tipologia_id: 1, permuta_quantidade: 30,
+      },
+    ],
+    areaTerreno: 0,
+    ...(flag === undefined ? {} : { corretagemSobrePermutaFisica: flag }),
+  });
+  const achar = (c: FluxoConfig) => calcularFluxo(c).linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
+
+  const bruta = achar(base(true));
+  assert.ok(perto(bruta.total, 4_000_000, 1), `esperado 4.000.000 (bruto), veio ${bruta.total}`);
+
+  const vendavel = achar(base(false));
+  // Mutação: SEM a correção, isto continuaria batendo 4.000.000 (o R$
+  // congelado redistribuído por peso, sem mudar o total).
+  assert.ok(perto(vendavel.total, 2_800_000, 1), `esperado 2.800.000 (vendável), veio ${vendavel.total}`);
+  assert.notEqual(vendavel.total, bruta.total, 'a base tem de mudar o TOTAL, não só o calendário');
+});
+
 // 5c. Corretagem sem vendas no horizonte não gera desembolso (#121)
 test('corretagem sem linhas de receita não gera custo', () => {
   const config: FluxoConfig = {
@@ -796,7 +931,8 @@ test('#238: permuta financeira líquida deduz imposto e corretagem da base antes
       { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
       {
         id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
-        orcamento_valor: 10, orcamento_unidade: 'pct_vgv', permuta_financeira_base: 'liquida',
+        orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
+        permuta_financeira_deduzir_imposto: true, permuta_financeira_deduzir_corretagem: true,
       },
     ],
     areaTerreno: 0,
@@ -825,7 +961,7 @@ test('#238: permuta financeira em valor fixo (rs) não distingue bruta/líquida'
   const r = calcularFluxo(config);
   const deducao = r.linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
   // Valor fixo integral (única safra, único mês de receita) — mesma dedução
-  // independente de `permuta_financeira_base` (não setado aqui).
+  // independente dos flags de dedução (não setados aqui).
   assert.ok(perto(deducao.total, -3_000_000, 1));
 });
 
@@ -2510,19 +2646,47 @@ test('#238 meses sem receita não geram permuta', () => {
   assert.deepEqual(permutaFinanceiraBrutaMensal([0, 0, 500], 20), [0, 0, 100]);
 });
 
+// ── #459: permutaFinanceiraDeduzidaMensal — generalização com dois flags ───
+
+test('#459 permutaFinanceiraDeduzidaMensal: as quatro combinações batem com as funções antigas', () => {
+  const receita = [1000];
+  const imposto = [200];
+  const corretagem = [50];
+  assert.deepEqual(
+    permutaFinanceiraDeduzidaMensal(receita, imposto, corretagem, 10, false, false),
+    permutaFinanceiraBrutaMensal(receita, 10),
+  );
+  assert.deepEqual(
+    permutaFinanceiraDeduzidaMensal(receita, imposto, corretagem, 10, true, true),
+    permutaFinanceiraLiquidaMensal(receita, imposto, corretagem, 10),
+  );
+  // Mistas: só imposto e só corretagem, cada uma isolada do outro flag.
+  assert.deepEqual(permutaFinanceiraDeduzidaMensal(receita, imposto, corretagem, 10, true, false), [80]);
+  assert.deepEqual(permutaFinanceiraDeduzidaMensal(receita, imposto, corretagem, 10, false, true), [95]);
+});
+
+test('#459 permutaFinanceiraDeduzidaMensal: mutação — trocar `&&` por `||` nos dois flags quebra o teste acima', () => {
+  // Documenta a armadilha: se a implementação decidisse "deduz se QUALQUER
+  // flag estiver ligado" em vez de cada flag controlar sua própria dedução,
+  // (true,false) devolveria a base líquida inteira (75), não 80.
+  const r = permutaFinanceiraDeduzidaMensal([1000], [200], [50], 10, true, false);
+  assert.notEqual(r[0], 75);
+  assert.deepEqual(r, [80]);
+});
+
 test('#238 série ausente de imposto/corretagem é tratada como zero', () => {
   // O motor passa séries de comprimentos possivelmente distintos.
   assert.deepEqual(permutaFinanceiraLiquidaMensal([1000, 1000], [100], [], 10), [90, 100]);
 });
 
-test('#238 permutaAlternativa expõe a base NÃO escolhida, para auditoria', () => {
-  // Mesma fixture do teste da base líquida: VGV 100M, RET 4%, corretagem 5%,
-  // permuta 10%. Escolhida = líquida (9,1M); alternativa = bruta (10M).
-  const linhaPermuta = (base: 'bruta' | 'liquida') => ({
-    id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
-    orcamento_valor: 10, orcamento_unidade: 'pct_vgv', permuta_financeira_base: base,
-  });
-  const montar = (base: 'bruta' | 'liquida'): FluxoConfig => ({
+// #459: as quatro combinações dos dois flags independentes de dedução.
+// VGV 100M, RET 4% (imposto = 4M), corretagem 5% (5M), permuta 10%.
+//   (false,false) "bruta"     → base 100M            → permuta 10,0M
+//   (true, false) só imposto  → base 100M − 4M  = 96M → permuta  9,6M
+//   (false,true ) só corret.  → base 100M − 5M  = 95M → permuta  9,5M
+//   (true, true ) "líquida"   → base 100M −4M−5M= 91M → permuta  9,1M
+test('#459: as quatro combinações de deduzir_imposto × deduzir_corretagem', () => {
+  const montar = (deduzirImposto: boolean, deduzirCorretagem: boolean): FluxoConfig => ({
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
@@ -2532,7 +2696,12 @@ test('#238 permutaAlternativa expõe a base NÃO escolhida, para auditoria', () 
     }],
     linhasCusto: [
       { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
-      linhaPermuta(base),
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
+        orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
+        permuta_financeira_deduzir_imposto: deduzirImposto,
+        permuta_financeira_deduzir_corretagem: deduzirCorretagem,
+      },
     ],
     areaTerreno: 0,
     ret: { ativo: true, pct: 4 }, // #346: RET é global, não mais lido de fluxo_pagamento
@@ -2540,16 +2709,69 @@ test('#238 permutaAlternativa expõe a base NÃO escolhida, para auditoria', () 
   const achar = (c: FluxoConfig) =>
     calcularFluxo(c).linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
 
-  const comLiquida = achar(montar('liquida'));
-  assert.equal(comLiquida.permutaAlternativa?.base, 'bruta');
+  const brutaBruta = achar(montar(false, false));
+  assert.ok(perto(brutaBruta.total, -10_000_000, 1));
+
+  const soImposto = achar(montar(true, false));
+  assert.ok(perto(soImposto.total, -9_600_000, 1));
+
+  const soCorretagem = achar(montar(false, true));
+  assert.ok(perto(soCorretagem.total, -9_500_000, 1));
+
+  const liquida = achar(montar(true, true));
+  assert.ok(perto(liquida.total, -9_100_000, 1));
+
+  // Mutação: as combinações mistas ficam ESTRITAMENTE entre os dois extremos —
+  // `total` é NEGATIVO (dedução de receita), então "entre" em módulo significa
+  // maior que o extremo bruto (-10M) e menor que o extremo líquido (-9,1M).
+  assert.ok(soImposto.total > brutaBruta.total && soImposto.total < liquida.total);
+  assert.ok(soCorretagem.total > brutaBruta.total && soCorretagem.total < liquida.total);
+});
+
+test('#459 permutaAlternativa expõe a base OPOSTA (flags invertidos), para auditoria', () => {
+  // Mesma fixture do teste acima. Escolhida = líquida (9,1M); oposta = bruta (10M).
+  const montar = (deduzirImposto: boolean, deduzirCorretagem: boolean): FluxoConfig => ({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 5, orcamento_unidade: 'pct_vgv' },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
+        orcamento_valor: 10, orcamento_unidade: 'pct_vgv',
+        permuta_financeira_deduzir_imposto: deduzirImposto,
+        permuta_financeira_deduzir_corretagem: deduzirCorretagem,
+      },
+    ],
+    areaTerreno: 0,
+    ret: { ativo: true, pct: 4 }, // #346: RET é global, não mais lido de fluxo_pagamento
+  });
+  const achar = (c: FluxoConfig) =>
+    calcularFluxo(c).linhasReceita.find((l) => l.grupo === 'receita' && l.nome.includes('Permuta'))!;
+
+  const comLiquida = achar(montar(true, true));
+  assert.equal(comLiquida.permutaAlternativa?.deduzirImposto, false);
+  assert.equal(comLiquida.permutaAlternativa?.deduzirCorretagem, false);
   assert.ok(perto(comLiquida.permutaAlternativa!.total, 10_000_000, 1));
 
-  // Escolhendo bruta, a alternativa é a líquida — simétrico.
-  const comBruta = achar(montar('bruta'));
-  assert.equal(comBruta.permutaAlternativa?.base, 'liquida');
+  // Escolhendo bruta, a oposta é a líquida — simétrico.
+  const comBruta = achar(montar(false, false));
+  assert.equal(comBruta.permutaAlternativa?.deduzirImposto, true);
+  assert.equal(comBruta.permutaAlternativa?.deduzirCorretagem, true);
   assert.ok(perto(comBruta.permutaAlternativa!.total, 9_100_000, 1));
   // E a escolhida continua sendo a que alimenta o fluxo.
   assert.ok(perto(comBruta.total, -10_000_000, 1));
+
+  // Combinação mista: a oposta de (imposto=true, corretagem=false) é
+  // (imposto=false, corretagem=true) — bem definida mesmo fora dos extremos.
+  const soImposto = achar(montar(true, false));
+  assert.equal(soImposto.permutaAlternativa?.deduzirImposto, false);
+  assert.equal(soImposto.permutaAlternativa?.deduzirCorretagem, true);
+  assert.ok(perto(soImposto.permutaAlternativa!.total, 9_500_000, 1));
 });
 
 test('#238 permuta em R$ não tem alternativa — as duas bases dão o mesmo valor', () => {
@@ -2583,7 +2805,8 @@ test('#238 auditoria preserva o valor canônico quando o percentual visível est
     linhasCusto: [{
       id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira',
       orcamento_valor: 50, orcamento_unidade: 'pct_vgv',
-      orcamento_valor_canonico: 10_000_000, permuta_financeira_base: 'bruta',
+      orcamento_valor_canonico: 10_000_000,
+      permuta_financeira_deduzir_imposto: false, permuta_financeira_deduzir_corretagem: false,
     }],
     areaTerreno: 0,
   };
@@ -2653,4 +2876,102 @@ test('#429 o aviso NÃO corrige: a venda bruta contratada continua a truncada', 
   // 100 un × 50 m² × 20.000 = 100.000.000 de VGV; 90% contratados, não 100%.
   assert.ok(perto(comDescarte.vendaBrutaContratada, 90_000_000));
   assert.ok(perto(semDescarte.vendaBrutaContratada, 100_000_000));
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #446 — o horizonte cobre TODO mês em que algo entra ou sai.
+//
+// Decisão do autor, 2026-08-22: "o fluxo vai até o último mês que é enquanto
+// alguma coisa está entrando ou saindo do fluxo". Antes, cronograma, custos e
+// recebíveis entravam no `Math.max` do horizonte e as operações de FUNDING
+// não — e o funding herda o horizonte já fechado (`fundingDoEstudo`:
+// `const prazo = fluxoLivreMensal.length`), então uma operação que amortizava
+// além do último evento operacional era CORTADA, em silêncio.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Estudo cujo último evento operacional é o mês 23 (obra 0..23). */
+const baseAte23 = (): FluxoConfig => ({
+  dataInicio: 'jan/2027', taxaDescontoAa: 12, areaTerreno: 0,
+  cronograma: [{ evento: 'obra', inicio_mes: 0, duracao_meses: 24 } as any],
+  linhasReceita: [],
+  linhasCusto: [{ id: 1, grupo: 'obra', categoria: 'Construção', orcamento_valor: 1_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 24 }],
+});
+
+test('#446: o horizonte alcança a quitação da dívida — a conta, não um >=', () => {
+  const semFunding = calcularFluxo(baseAte23());
+  // Ancoragem: sem funding o horizonte é o operacional. Se este número mudar,
+  // o teste abaixo deixa de provar o que diz.
+  assert.equal(semFunding.prazo, 24, 'último evento operacional é o mês 23 ⇒ 24 meses');
+
+  const comFunding = calcularFluxo({
+    ...baseAte23(),
+    operacoesFunding: [{
+      tipo: 'divida', inicio_mes: 0, distribuir_aporte: false, periodo_amortizacao_meses: 36,
+    }],
+  });
+  // fim = inicio_mes + nTranches - 1 + amort = 0 + 1 - 1 + 36 = 36, 0-based e
+  // INCLUSIVO (a quitação é paga no próprio mês `fim`) ⇒ comprimento 37.
+  assert.equal(comFunding.prazo, 37);
+  assert.equal(comFunding.fluxoMensal.length, 37);
+});
+
+test('#446: prazoMeses é PISO — um valor menor que o derivado não trunca nada', () => {
+  // Derivado: obra 0..47 ⇒ 48.
+  const cfg: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, areaTerreno: 0,
+    cronograma: [{ evento: 'obra', inicio_mes: 0, duracao_meses: 48 } as any],
+    linhasReceita: [], linhasCusto: [],
+  };
+  assert.equal(calcularFluxo(cfg).prazo, 48, 'ancoragem: o derivado deste estudo é 48');
+
+  const curto = calcularFluxo({ ...cfg, prazoMeses: 12 });
+  assert.equal(curto.prazo, 48);
+  assert.equal(curto.fluxoMensal.length, 48);
+});
+
+test('#446: prazoMeses ainda ESTICA — piso não é o mesmo que ignorar', () => {
+  const cfg: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, areaTerreno: 0,
+    cronograma: [{ evento: 'obra', inicio_mes: 0, duracao_meses: 48 } as any],
+    linhasReceita: [], linhasCusto: [],
+  };
+  const longo = calcularFluxo({ ...cfg, prazoMeses: 60 });
+  assert.equal(longo.prazo, 60);
+  assert.equal(longo.fluxoMensal.length, 60);
+});
+
+test('#446: o aporte de equity além do último evento operacional entra no horizonte', () => {
+  const c = calcularFluxo({
+    ...baseAte23(),
+    operacoesFunding: [{ tipo: 'equity', inicio_mes: 40 }],
+  });
+  // Sem `periodo_amortizacao_meses`, o que manda é `max(inicio_mes, mesRepasse)`
+  // — aqui o aporte no mês 40 é o último evento financeiro ⇒ 41 meses.
+  assert.equal(c.prazo, 41);
+});
+
+test('#446: estudo SEM funding tem horizonte idêntico ao baseline', () => {
+  const semCampo = calcularFluxo(baseAte23());
+  const comCampoVazio = calcularFluxo({ ...baseAte23(), operacoesFunding: [] });
+  assert.equal(semCampo.prazo, comCampoVazio.prazo);
+  assert.deepEqual(semCampo.fluxoMensal, comCampoVazio.fluxoMensal);
+});
+
+test('#446: esticar o horizonte NÃO move o resultado final desalavancado (#474)', () => {
+  // Por que este teste existe: quatro telas (Resumo, Dashboard, Análise de
+  // Mercado, Orçamento de Custos) leem o fluxo DESALAVANCADO e, de propósito,
+  // não carregam operações — então o horizonte delas continua o operacional,
+  // menor que o das telas que simulam funding. A #474 avisa que
+  // `resultadoFinal` é remontado em cinco lugares e que um horizonte maior
+  // muda o valor lido em todas elas. Aqui se prova que NÃO muda: os meses
+  // extras não carregam movimento operacional, então o acumulado fica plano e
+  // `fluxoAcumulado[último]` é o mesmo. Só o COMPRIMENTO difere.
+  const curto = calcularFluxo(baseAte23());
+  const longo = calcularFluxo({
+    ...baseAte23(),
+    operacoesFunding: [{ tipo: 'divida', inicio_mes: 0, distribuir_aporte: false, periodo_amortizacao_meses: 36 }],
+  });
+  assert.notEqual(curto.prazo, longo.prazo, 'ancoragem: os horizontes têm de ser diferentes');
+  const ultimo = (s: number[]) => s[s.length - 1];
+  assert.equal(ultimo(longo.fluxoAcumulado), ultimo(curto.fluxoAcumulado));
 });

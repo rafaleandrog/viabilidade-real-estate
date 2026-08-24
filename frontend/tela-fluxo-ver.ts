@@ -19,8 +19,8 @@ import {
   type FundingCalc, type FundingNoFluxo, type OperacaoFunding,
 } from './funding-motor.js';
 import {
-  validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita,
-  validarFunding, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia,
+  validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita, validarReconciliacaoCamadas,
+  validarFunding, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia, TOLERANCIA_PADRAO,
   type Divergencia, type PermutaFisicaTipologia,
 } from './fluxo-invariantes.js';
 import {
@@ -153,6 +153,11 @@ export class ViabFluxoVer extends LitElement {
       curvas: d.curvas,
       areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
       ret: d.ret,
+      // #473: default true preserva o comportamento histórico (VGV bruto).
+      corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
+      // #446: o horizonte precisa cobrir a quitação das operações, senão a
+      // série é cortada e `saldoFinal` exibe um saldo truncado.
+      operacoesFunding: this.operacoes,
     };
     this.calc = calcularFluxo(config);
     this.fundingCalc = null;
@@ -170,8 +175,15 @@ export class ViabFluxoVer extends LitElement {
     //
     // Sem operações de Funding, `fundingDoEstudo` devolve `null` e a tabela
     // não ganha nenhuma linha nova (blast radius zero em estudo sem captação).
+    //
+    // #445: `receitaLiquida` içada para fora do `if` — a checagem (b) de
+    // `validarFunding` (equity em modo permuta_financeira × receita líquida
+    // do mês) precisa dela mesmo quando `this.fundingCalc` é `null`. Sem
+    // operações a variável fica `undefined` e a checagem simplesmente não
+    // roda (não há equity para checar).
+    let receitaLiquida: number[] | undefined;
     if (this.operacoes.length > 0) {
-      const receitaLiquida = receitaLiquidaComCorretagemMensal(this.calc.receitaMensal, this.calc.linhasCusto, d.custos);
+      receitaLiquida = receitaLiquidaComCorretagemMensal(this.calc.receitaMensal, this.calc.linhasCusto, d.custos);
       const resultadoFinal = this.calc.fluxoAcumulado[this.calc.fluxoAcumulado.length - 1] ?? 0;
       // D8: receita líquida, resultado final e mês do repasse vêm do ESTUDO,
       // não de campos redigitados na aba de Funding — é o que impede a aba de
@@ -192,10 +204,15 @@ export class ViabFluxoVer extends LitElement {
       // #335: categoria de custo repetida no mesmo grupo — reversão da #179
       // deixou de bloquear, agora é alerta visível na Reconciliação.
       ...validarCustosDuplicados(d.custos),
-      ...validarContratacao(receitas, d.crono, this.calc.prazo, this.calc.vendaBrutaContratada),
-      ...validarSafrasReceita(receitas, d.crono, this.calc.prazo),
+      ...validarContratacao(receitas, d.crono, this.calc.prazo, this.calc.vendaBrutaContratada, TOLERANCIA_PADRAO, d.custos),
+      ...validarSafrasReceita(receitas, d.crono, this.calc.prazo, TOLERANCIA_PADRAO, d.custos),
       ...validarFluxoCalc(this.calc),
-      ...(this.fundingCalc ? validarFunding(this.fundingCalc, this.calc.fluxoMensal) : []),
+      // #441: reconciliação Catálogo × Premissas — só emite algo em estudo
+      // `nivel_analise === 'avancado'`.
+      ...validarReconciliacaoCamadas(this.estudo, d.custos, d.tipologias),
+      ...(this.fundingCalc
+        ? validarFunding(this.fundingCalc, this.calc.fluxoMensal, TOLERANCIA_PADRAO, receitaLiquida)
+        : []),
     ];
     // #269: mesma fonte para tela e exportação — computado uma vez aqui.
     this.permutaFisica = permutaFisicaPorTipologia(d.custos, d.tipologias);
@@ -332,9 +349,9 @@ export class ViabFluxoVer extends LitElement {
           </tbody>
         </table>
         <p class="sec">${this.funding
-          ? html`TIR, VPL e Payback continuam <strong>desalavancados</strong> — leem o Fluxo de Caixa Livre
-              (funding-capital-stack.md §8.1, para manter comparabilidade entre estruturas de capital).`
-          : html`Este estudo não tem camadas de Capital Stack: sem funding, o Fluxo de Caixa real é
+          ? html`TIR, VPL e Payback continuam <strong>desalavancados</strong> — leem o Fluxo de Caixa Livre,
+              para manter comparabilidade entre estruturas de capital.`
+          : html`Este estudo não tem operações de Funding: sem funding, o Fluxo de Caixa real é
               igual ao Livre.`}</p>
       </urbi-card>
       ${this._renderControles()}
