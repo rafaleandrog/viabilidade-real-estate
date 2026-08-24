@@ -1058,7 +1058,7 @@ export function pagamentosAteMarco(
   if (nParcelas <= 0) {
     throw new Error(
       `pagamentosAteMarco: N_s = ${nParcelas} ≤ 0 na safra ${safra} (marco ${c.marcoMes}). ` +
-      'O motor não cria prazo negativo — converta o componente para imediato ou concentrado (#233).',
+      'O motor não cria prazo negativo — converta o componente para imediato ou concentrado.',
     );
   }
   const out: PagamentoSafra[] = [];
@@ -1102,7 +1102,7 @@ export function pagamentosConcentrado(
   if (c.mesPagamento < safra) {
     throw new Error(
       `pagamentosConcentrado: mês de pagamento ${c.mesPagamento} anterior à safra ${safra}. ` +
-      'O repasse não pode ser antecipado para antes da contratação (#234).',
+      'O repasse não pode ser antecipado para antes da contratação.',
     );
   }
   // #234: saldo_s,s = principal (0 períodos decorridos no próprio mês da

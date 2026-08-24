@@ -271,37 +271,21 @@ export function linhasFluxo(c: FluxoCalc, funding: FundingNoFluxo | null = null)
     }
   }
 
-  // §38: detalhamento de auditoria do financiamento à produção. Espelha o
-  // bloco da tela (`tabelaFluxo`), inclusive em ser display-only — as
-  // liberações, juros e amortizações daqui já entraram no relatório pelas
-  // linhas de funding, e nenhuma linha deste bloco alimenta o Fluxo abaixo.
-  for (const bloco of funding?.financiamentoProducao ?? []) {
-    linhas.push({
-      nivel: 0, nome: `Financiamento à produção — ${bloco.nome} (detalhamento)`, custo: false,
-      separadorAntes: true, total: 0, ocultarTotal: true, mensal: new Array<number>(c.prazo).fill(0),
-    });
-    for (const l of bloco.linhas) {
-      linhas.push({
-        nivel: 1, nome: l.nome, custo: false, formato: l.formato,
-        total: l.mostrarTotal ? totalSerie(l.mensal) : 0, ocultarTotal: !l.mostrarTotal,
-        mensal: l.mensal,
-      });
-    }
-  }
+  // #472 (D12): o bloco de detalhamento de financiamento à produção e a
+  // linha de rodapé "Fluxo de Caixa Livre (antes do funding)" saíram da
+  // tabela principal (`fluxo-tabela.ts`) — a exportação acompanha, para não
+  // divergir tela × arquivo (#449). As liberações, juros e amortizações
+  // continuam no relatório pelas linhas de funding dentro de Custos
+  // Financeiros, acima.
 
   // Com funding, o Fluxo do rodapé é o ALAVANCADO; o livre — base de TIR/VPL,
-  // que §8.1 mantém desalavancados — fica explícito na linha de cima.
+  // que §8.1 mantém desalavancados — não aparece mais aqui: a comparação
+  // FCL × FC real é o card da aba Análise Financeira.
   const fluxoMensal = funding?.fluxoMensal ?? c.fluxoMensal;
   const fluxoAcumulado = funding?.fluxoAcumulado ?? c.fluxoAcumulado;
   const vplFluxoExib = c.vpl + (funding?.vplLiquido ?? 0);
-  if (funding) {
-    linhas.push({
-      nivel: 0, nome: 'Fluxo de Caixa Livre (antes do funding)', custo: false, separadorAntes: true,
-      total: totalSerie(c.fluxoMensal), vpl: c.vpl, mensal: c.fluxoMensal,
-    });
-  }
   linhas.push({
-    nivel: 0, nome: 'Fluxo de Caixa Mensal', custo: false, separadorAntes: !funding,
+    nivel: 0, nome: 'Fluxo de Caixa Mensal', custo: false, separadorAntes: true,
     total: totalSerie(fluxoMensal), vpl: vplFluxoExib, mensal: fluxoMensal,
   });
   linhas.push({

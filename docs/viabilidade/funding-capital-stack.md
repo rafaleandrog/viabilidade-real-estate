@@ -70,6 +70,13 @@ ordem: 8
 > `docs/shell/banco-de-dados.md:200-212` e `:430-436`. Mesma classe de falha da **v0.1.19**
 > (comentário `//` no `schema.json`). Comentário também não serve: JSON não tem comentário, e é
 > exatamente isso que o `guard-json.mjs` existe para barrar. Não "conserte" o `schema.json` de volta.
+>
+> O vocabulário das `opcoes` de `tipo` (`schema.json:384`) —
+> `["financiamento_producao","capital_giro","preferred_equity","sponsor_equity"]` — é do modelo
+> apagado pela #355 e **não descreve nenhum tipo aceito hoje**. Os tipos vigentes são
+> `['financiamento_producao', 'divida', 'equity']` (`backend/rotas/funding.ts:43`), e a API
+> **recusa** `capital_giro` explicitamente (`backend/rotas/funding.test.ts:23-30`). O produto
+> "capital de giro" existe, sob o tipo `divida` — ver a **#466**.
 
 > ✅ **Este documento descrevia COMPORTAMENTO VIGENTE** desde o fechamento da FIN-10 (#279) — texto
 > original preservado abaixo como histórico da epic #239, que a #355 substituiu.

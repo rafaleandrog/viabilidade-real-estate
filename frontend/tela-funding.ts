@@ -51,9 +51,21 @@ import './viab-num.js';
 // a API; só "Salvar" persiste — mesmo padrão da tela anterior e do #51/#252.
 // ─────────────────────────────────────────────────────────────────────────
 
+// #466: `divida` já É o produto de capital de giro por calendário — a própria
+// planilha do autor rotula a aba `divida` de `fluxo_investidor_FORMULAS.xlsx`
+// como a folha de Capital de Giro (A8 = "Valor CG (R$):", B18 = "Libera CG",
+// C18 = "Carencia CG"). O rótulo abaixo deixa isso visível na UI; o
+// identificador persistido (`tipo='divida'`) não muda.
+//
+// 🛑 DECISÃO DO AUTOR, 2026-08-22 — linha de crédito rotativa RECUSADA. Não
+// ressuscitar. O desenho (saque dirigido por falta de caixa, devolução
+// automática quando sobra, limite reutilizável) foi proposto e recusado: ele
+// reintroduziria a competição por caixa entre operações que a reescrita do
+// funding (#355) apagou de propósito. Não há migração para isso, não há
+// bump de `versao`.
 const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
   { valor: 'financiamento_producao', rotulo: 'Financiamento à produção', icone: 'fa-solid fa-building-columns' },
-  { valor: 'divida', rotulo: 'Dívida', icone: 'fa-solid fa-file-invoice-dollar' },
+  { valor: 'divida', rotulo: 'Dívida / Capital de giro', icone: 'fa-solid fa-file-invoice-dollar' },
   { valor: 'equity', rotulo: 'Equity', icone: 'fa-solid fa-handshake' },
 ];
 

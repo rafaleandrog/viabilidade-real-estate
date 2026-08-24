@@ -25,7 +25,7 @@ entre si** — sem waterfall, sem prioridade, sem competição por caixa:
 | Tipo | Cardinalidade | Matemática |
 |---|---|---|
 | `financiamento_producao` | **única por estudo** | medição de custo elegível + cash sweep (**§4.3** — não é esta planilha) |
-| `divida` | quantas quiser, nomeáveis | calendário + Price (**§4.1**) |
+| `divida` | quantas quiser, nomeáveis | calendário + Price — **é a folha de Capital de Giro do autor** (`A8` "Valor CG (R$):", `B18` "Libera CG", `C18` "Carencia CG"; **§4.1**) |
 | `equity` | quantas quiser, nomeáveis | aporte + retorno em 2 modos (**§4.2**) |
 
 A fonte de `divida` e `equity` é a planilha `fluxo_investidor_FORMULAS.xlsx`, entregue pelo autor em
@@ -129,6 +129,12 @@ motor carrega adiante o saldo já arredondado, como a coluna F.
 ## 4. Fórmulas das operações
 
 ### 4.1 Dívida (aba `divida` da planilha)
+
+> Esta aba **é** a folha de Capital de Giro do autor — não um tipo de operação genérico com o
+> nome "dívida" por acaso. A própria planilha rotula `A8` como **"Valor CG (R$):"**, `B18` como
+> **"Libera CG"** e `C18` como **"Carencia CG"**. Qualquer dívida por calendário com carência e
+> Price — capital de giro, empréstimo-ponte, ou outra — cabe aqui; ver `frontend/tela-funding.ts`
+> (rótulo "Dívida / Capital de giro").
 
 **Entradas:** `C8` Valor · `C9` Mês do aporte · `C10` Distribuir aporte? · `C11` Aporte em quantos
 meses · `C12` Taxa anual · `C13` Período de amortização · `C14` Período de carência.

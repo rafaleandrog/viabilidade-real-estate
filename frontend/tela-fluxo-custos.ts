@@ -763,7 +763,7 @@ export class ViabFluxoCustos extends LitElement {
             const alt = this._permutaAlternativa(c);
             return html`
               <div class="dist-preco">
-                <span class="mes-calc" title="A permuta financeira sai proporcionalmente à receita de caixa do mês — não segue curva nem evento próprio (#238)">
+                <span class="mes-calc" title="A permuta financeira sai proporcionalmente à receita de caixa do mês — não segue curva nem evento próprio">
                   Receita das vendas <span>🔒</span></span>
                 ${ePct ? html`
                   <urbi-select .valor=${c.permuta_financeira_base || 'bruta'} .opcoes=${BASES_PERMUTA_FINANCEIRA}
@@ -771,7 +771,7 @@ export class ViabFluxoCustos extends LitElement {
                     @urbi:select-change=${(e: CustomEvent) => this._salvar(c, { permuta_financeira_base: e.detail.valor })}
                   ></urbi-select>
                   ${alt !== null ? html`
-                    <span class="sec" title="Valor que esta linha teria na outra base econômica — disponível para auditoria (#238)">
+                    <span class="sec" title="Valor que esta linha teria na outra base econômica — disponível para auditoria">
                       base ${c.permuta_financeira_base === 'liquida' ? 'bruta' : 'líquida'}: ${fmtR$(alt)}</span>` : nothing}
                 ` : nothing}
               </div>`;

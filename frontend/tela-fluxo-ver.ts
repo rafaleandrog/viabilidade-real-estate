@@ -344,9 +344,9 @@ export class ViabFluxoVer extends LitElement {
           </tbody>
         </table>
         <p class="sec">${this.funding
-          ? html`TIR, VPL e Payback continuam <strong>desalavancados</strong> — leem o Fluxo de Caixa Livre
-              (funding-capital-stack.md §8.1, para manter comparabilidade entre estruturas de capital).`
-          : html`Este estudo não tem camadas de Capital Stack: sem funding, o Fluxo de Caixa real é
+          ? html`TIR, VPL e Payback continuam <strong>desalavancados</strong> — leem o Fluxo de Caixa Livre,
+              para manter comparabilidade entre estruturas de capital.`
+          : html`Este estudo não tem operações de Funding: sem funding, o Fluxo de Caixa real é
               igual ao Livre.`}</p>
       </urbi-card>
       ${this._renderControles()}
