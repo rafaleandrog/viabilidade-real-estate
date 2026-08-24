@@ -42,6 +42,42 @@ export const fmtPct = (v: number) =>
 export const fmtPctEntrada = (v: number) =>
   `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0)}%`;
 
+/** `formato` de uma célula não-monetária do Fluxo de Caixa — `percentual`
+ * (fração de tempo/base) ou `sinal` (booleano exibido como "sim"/vazio). */
+export type FormatoCelula = 'percentual' | 'sinal';
+
+export interface OpcoesCelula {
+  /** Notação contábil (parênteses) vs. sinal de menos para negativo. */
+  comParenteses: boolean;
+  /** Linha de CUSTO: com `comParenteses`, aparece entre parênteses mesmo
+   * quando positiva (o app grava custo como valor positivo). */
+  custo?: boolean;
+  formato?: FormatoCelula;
+}
+
+/**
+ * #449: célula do Fluxo de Caixa — FONTE ÚNICA para a tabela (tela) e para
+ * CSV/PDF (exportação); antes desta issue cada uma tinha sua própria
+ * expressão de formatação e divergiam em casas decimais, limiar de célula
+ * vazia e representação do negativo (C7 — `docs/viabilidade/formulas.md`).
+ *
+ * Regras: 2 casas decimais monetárias (`fmtR$`, contrato C7), célula vazia
+ * abaixo de R$ 0,005, thousand separator pt-BR. `comParenteses=true` é a
+ * notação contábil que a tabela sempre usou: negativo SEMPRE entre
+ * parênteses, e positivo também quando `custo=true` (custo é gravado
+ * positivo e a notação contábil marca despesa com parênteses independente
+ * do sinal). `comParenteses=false` usa sinal de menos (`-100,00`) — o modo
+ * que a linha informativa "antes do funding" da exportação usava.
+ */
+export function celula(v: number, opcoes: OpcoesCelula = { comParenteses: true }): string {
+  if (opcoes.formato === 'percentual') return v ? fmtPct(v * 100) : '';
+  if (opcoes.formato === 'sinal') return v ? 'sim' : '';
+  if (!v || Math.abs(v) < 0.005) return '';
+  const abs = fmtR$(Math.abs(v), false);
+  if (!opcoes.comParenteses) return v < 0 ? `-${abs}` : abs;
+  return opcoes.custo || v < 0 ? `(${abs})` : abs;
+}
+
 // Interpreta um número no formato pt-BR digitado pelo usuário: "." é separador
 // de milhar (descartado) e "," é o separador decimal. Vazio/inválido → null.
 export function parseNumeroBR(bruto: string | null | undefined): number | null {
