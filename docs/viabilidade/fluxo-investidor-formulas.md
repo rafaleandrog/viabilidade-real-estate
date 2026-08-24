@@ -223,8 +223,8 @@ retorno.
 >
 > ⚠️ **`C8`, referenciado nas linhas B e D acima, é o mês do repasse** — não faz parte das
 > "Entradas da operação" listadas no topo desta seção porque é derivado, não digitado (Decisão D8,
-> abaixo). Ver a nota de `#467` mais adiante nesta seção para a convenção que o app usa para
-> derivá-lo.
+> abaixo). Ver a nota **#467**, ao fim desta seção, para a convenção que o app usa para
+> derivá-lo — e para o que ela obriga quem mexer em `marcosObra`.
 >
 > ⚠️ **Divergência deliberada do app — retorno de equity quando a receita líquida do mês é
 > negativa (#432).** A linha `D` acima é a transcrição fiel da planilha, e a planilha **não** tem
@@ -264,6 +264,30 @@ divergindo em silêncio da aba Resultados — exatamente o que as #349/#351 elim
 O invariante da curva vale como conferência: `Σ receita bruta = VGV`.
 
 Implementação: `simularEquity` (`funding-motor.ts:516`).
+
+> ⚠️ **#467 — o `+1` de `mesRepasse` existe para CANCELAR uma segunda divergência, não para
+> corrigi-la.** Esta é a nota que a advertência sobre `C8`, mais acima nesta seção, promete.
+>
+> `!equity!C8 = C6+C7` (lançamento + duração da obra, 1-based) é o mês do repasse **na planilha**, e
+> ela define "fim da obra" como o mês **seguinte** ao último mês de obra. O app adota outra
+> convenção: `marcosObra(crono).mesEntrega` é o **último** mês de obra — um mês antes —, para não
+> ter duas definições de entrega convivendo no motor de recebíveis.
+>
+> **As duas convenções erradas se cancelam.** `mesRepasse` soma `+1` sobre `mesEntrega`, e esse `+1`
+> compensa exatamente a diferença de um mês da definição de entrega. O golden do equity bate com a
+> planilha **porque as duas somam zero**, não porque cada uma esteja certa isoladamente.
+>
+> **Consequência operacional, e é ela que esta nota existe para registrar:** quem "corrigir" a
+> definição de entrega em `marcosObra` — a lacuna nº 15 do dossiê, ainda aberta — **tem de mexer no
+> `+1` no mesmo diff**. Do contrário o equity em modo `resultado_final` passa a pagar um mês antes
+> (ou depois) do devido, e **nenhum teste acusa sozinho**: o golden do equity usaria a `marcosObra`
+> nova e se moveria junto com ela.
+>
+> A trava contra isso é o teste de `frontend/fluxo-shared.test.ts`, que prende as duas pontas na
+> mesma asserção — obra 2..31 dá `marcosObra(...).mesEntrega === 31` **e** `mesRepasse(...) === 32`.
+> Mutar qualquer um dos dois lados deixa esse teste vermelho.
+>
+> Implementação: `mesRepasse` e `marcosObra` (`frontend/fluxo-shared.ts`).
 
 ### 4.3 Financiamento à produção — **exceção, não segue esta planilha**
 
