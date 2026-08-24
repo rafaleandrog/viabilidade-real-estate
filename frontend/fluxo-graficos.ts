@@ -140,7 +140,9 @@ export function graficoFluxoAcumulado(
   // Exposição máxima é o pior saldo de um MÊS: na view agregada (#127) a curva
   // só passa pelos fins de período, então o marcador só aparece quando o pior
   // saldo cai exatamente no fim de um deles — nunca em cima de um ponto errado.
-  const iExp = c.fluxoAcumulado.indexOf(c.exposicaoMaxima);
+  // #456: lê o mês do motor em vez de recalcular por `indexOf` — era a
+  // segunda fonte que a issue #456 pedia para evitar (`FluxoCalc.mesExposicaoMaxima`).
+  const iExp = c.mesExposicaoMaxima ?? -1;
   const passo = Math.max(3, Math.ceil(c.prazo / 10 / 3) * 3);
   const ticks: number[] = [];
   for (let m = 0; m < c.prazo; m += passo) ticks.push(m);

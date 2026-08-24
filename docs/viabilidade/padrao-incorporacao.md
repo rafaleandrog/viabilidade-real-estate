@@ -2206,11 +2206,20 @@ O Resumo e o Fluxo devem exibir:
 - carteira máxima;
 - endividamento máximo.
 
-> **Comportamento vigente (#241).** O app calcula Resultado, margens, ROI,
+> **Comportamento vigente (#241, atualizado pela #456).** O app calcula Resultado, margens, ROI,
 > VPL, TIR, Payback, Exposição máxima e Receita Bruta — VGV. VGV Vendável
 > permanece um KPI separado. Contratação, recebimentos, carteira e funding são
 > blocos distintos na tabela e nas exportações mensal/anual. As séries
 > comerciais também alimentam um gráfico próprio, sem recálculo na UI.
+>
+> A #456 (2026-08-24) acrescentou **Juros de clientes** (R$ e % da Receita Bruta) e **Carteira
+> máxima de clientes** (R$, % da Receita Bruta e o mês) como KPIs próprios de `kpisFluxo`
+> (`frontend/fluxo-tabela.ts`), e o card de **Exposição máxima** ganhou o mesmo tratamento (% da
+> Receita Bruta e o mês) mais o rótulo "(fluxo livre)", que declara que a série é **desalavancada**
+> — `FluxoCalc.exposicaoMaxima` nunca inclui funding. O "VGV" dos três percentuais é a **Receita
+> Bruta** (`c.receitaBruta`), não `vgvTotal`/`vgvVendavel` — é a grandeza que corresponde ao
+> `VGVIncorpIndividual` da EVI. **Endividamento máximo** (funding) continua fora — não é grandeza do
+> `FluxoCalc` desalavancado, e fica para issue própria.
 
 ### 19.2 Exposição máxima
 

@@ -11,7 +11,7 @@ import {
   calcularRecebiveisComponentes,
   jurosSafra, receitaBrutaSafra, componentesEfetivosSafra, ehVendaAposChaves,
   parcelasAoLongoObra, vencimentosAoLongoObra,
-  vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
+  vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos, pctDeReceitaBruta,
   permutaFinanceiraBrutaMensal, permutaFinanceiraLiquidaMensal,
   areaVendidaMensal, unidadesVendidasMensal, estoqueM2Mensal, estoqueM2Semente, vsoMensal,
   type FluxoConfig, type FluxoCalc, type ComponentePagamento,
@@ -2196,6 +2196,131 @@ test('#458 caso negativo: com `componentes` presente nos DOIS Grupos, as séries
   const a = linha458(mesVenda, true);
   const b = linha458(mesVenda, true);
   assert.deepEqual(recebimentoBrutoMensal(a, CRONO, 60), recebimentoBrutoMensal(b, CRONO, 60));
+});
+
+// ── #456: KPIs de tela — juros de clientes, carteira máxima, exposição máxima
+// ── (e o mês em que cada uma ocorre) ────────────────────────────────────────
+//
+// A matemática já existia (`jurosClientes`/`carteiraClientesMaxima`/
+// `mesCarteiraClientesMaxima`, #283); estes testes cobrem o que a #456
+// acrescentou: `mesExposicaoMaxima` no motor (critério 2), o caso de borda
+// `mesCarteira === null` (critério 1) e o percentual com divisor zero →
+// `0`, nunca `NaN` (critério 3).
+
+test('#456 mesCarteiraClientesMaxima bate com Math.max/indexOf, e é null quando a carteira é toda zero', () => {
+  // Estudo com componente financiado → carteira > 0 em algum mês.
+  const comCarteira: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Venda financiada',
+      tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+      fluxo_pagamento: { componentes: [{
+        tipo: 'prazo_fixo', participacaoPct: 100, sinalPct: 0,
+        prazoMeses: 12, defasagemMeses: 1, taxaMensal: 0.01,
+        jurosNoMesDaContratacao: false,
+      }] },
+    }],
+    linhasCusto: [], areaTerreno: 0,
+  };
+  const r = calcularFluxo(comCarteira);
+  assert.ok(r.carteiraClientesMaxima > 0);
+  assert.equal(r.carteiraClientesMaxima, Math.max(0, ...r.carteiraClientesMensal));
+  assert.equal(r.mesCarteiraClientesMaxima, r.carteiraClientesMensal.indexOf(r.carteiraClientesMaxima));
+
+  // Estudo legado (sem `componentes`) → carteira toda zero → mês É `null`,
+  // não `-1` nem `0` — um KPI que renderizasse "mês null"/"mês -1" passaria
+  // sem este caso. É o comportamento que `:2352-2353` já implementa.
+  const semCarteira: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Venda legada',
+      tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
+      absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+    }],
+    linhasCusto: [], areaTerreno: 0,
+  };
+  const r2 = calcularFluxo(semCarteira);
+  assert.equal(r2.carteiraClientesMaxima, 0);
+  assert.equal(r2.mesCarteiraClientesMaxima, null);
+});
+
+test('#456 mesExposicaoMaxima bate com fluxoAcumulado.indexOf(exposicaoMaxima)', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Torre',
+      tipologias: [{ id: 1, quantidade: 20, area_privativa_m2: 80, preco_m2: 9_000 }],
+      absorcao: { modo: 'linear' },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'terreno', categoria: 'Preço', orcamento_valor: 5_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+      { id: 2, grupo: 'obra', categoria: 'Construção', orcamento_valor: 8_000_000, orcamento_unidade: 'rs', inicio_mes: 6, duracao_meses: 18 },
+    ],
+    areaTerreno: 0,
+  };
+  const r = calcularFluxo(config);
+  assert.equal(r.mesExposicaoMaxima, r.fluxoAcumulado.indexOf(r.exposicaoMaxima));
+  assert.notEqual(r.mesExposicaoMaxima, null, 'estudo com prazo > 0 sempre tem o mínimo dentro do próprio array');
+});
+
+test('#456 agregarFluxoPorPeriodos recalcula mesExposicaoMaxima contra a série JÁ agregada — achado de auto-revisão', () => {
+  // `agregarFluxoPorPeriodos` espalha (`...c`) o `FluxoCalc` mensal e SÓ
+  // sobrescreve as séries que resume; `exposicaoMaxima` fica de propósito
+  // sem recalcular (é o mínimo MENSAL verdadeiro — ver o teste "acumulado é
+  // o saldo do ÚLTIMO mês", mais acima). Mas `mesExposicaoMaxima` é um
+  // ÍNDICE, e o índice do mês na série mensal não é o índice do período na
+  // série agregada: sem recalcular, o consumidor (`graficoFluxoAcumulado`)
+  // armaria o marcador na posição errada do eixo X em vez de sumir (-1),
+  // que era o comportamento de antes desta issue.
+  const base: FluxoCalc = calcularFluxo({
+    dataInicio: 'jan/2027', prazoMeses: 6, taxaDescontoAa: 12,
+    cronograma: [], linhasReceita: [], linhasCusto: [], areaTerreno: 0,
+  });
+  // Mínimo verdadeiro (-100) cai no mês 2, que NÃO é fim de nenhum período —
+  // o período 0 termina no mês 3. A série agregada é
+  // [fluxoAcumuladoMensal[3], fluxoAcumuladoMensal[5]] = [-100, -60]: o valor
+  // -100 aparece ali de novo (mês 3), então o marcador é legítimo — mas o
+  // índice tem de ser 0 (posição do PERÍODO), nunca 2 ou 3 (posição do MÊS).
+  // `mesExposicaoMaxima: 999` é sentinela deliberada: se `agregarFluxoPorPeriodos`
+  // voltar a espalhar `...c` sem recalcular este campo (a regressão real desta
+  // auto-revisão), o teste falha com 999 em vez de coincidir com a resposta certa.
+  const fluxoAcumuladoMensal = [0, -50, -100, -100, -80, -60];
+  const mensal: FluxoCalc = {
+    ...base, prazo: 6, fluxoAcumulado: fluxoAcumuladoMensal, exposicaoMaxima: -100, mesExposicaoMaxima: 999,
+  };
+  const periodos = [{ rotulo: 'P0', inicio: 0, fim: 3 }, { rotulo: 'P1', inicio: 4, fim: 5 }];
+  const anual = agregarFluxoPorPeriodos(mensal, periodos);
+
+  assert.deepEqual(anual.fluxoAcumulado, [-100, -60]);
+  assert.equal(anual.exposicaoMaxima, -100, 'o VALOR não recalcula — continua o mínimo mensal verdadeiro');
+  assert.equal(anual.mesExposicaoMaxima, 0,
+    'o ÍNDICE aponta pro período 0 (agregado), não pro mês 2 nem 3 (mensal), nem sobra a sentinela 999');
+});
+
+test('#456 agregarFluxoPorPeriodos: mesExposicaoMaxima vira null quando o mínimo não cai em fim de período', () => {
+  const base: FluxoCalc = calcularFluxo({
+    dataInicio: 'jan/2027', prazoMeses: 4, taxaDescontoAa: 12,
+    cronograma: [], linhasReceita: [], linhasCusto: [], areaTerreno: 0,
+  });
+  // Mínimo único no mês 2; os períodos terminam nos meses 1 e 3 — o valor
+  // -100 nunca aparece na série agregada [-30, -60].
+  const fluxoAcumuladoMensal = [0, -30, -100, -60];
+  const mensal: FluxoCalc = {
+    ...base, prazo: 4, fluxoAcumulado: fluxoAcumuladoMensal, exposicaoMaxima: -100, mesExposicaoMaxima: 999,
+  };
+  const periodos = [{ rotulo: 'P0', inicio: 0, fim: 1 }, { rotulo: 'P1', inicio: 2, fim: 3 }];
+  const anual = agregarFluxoPorPeriodos(mensal, periodos);
+
+  assert.deepEqual(anual.fluxoAcumulado, [-30, -60]);
+  assert.equal(anual.mesExposicaoMaxima, null,
+    'nao pode sobrar indice STALE (999 nem 2) quando o minimo mensal nao cai em fim de periodo');
+});
+
+test('#456 pctDeReceitaBruta: divisor zero devolve 0, nunca NaN', () => {
+  assert.equal(pctDeReceitaBruta(1_000, 0), 0);
+  assert.equal(pctDeReceitaBruta(1_000, -500), 0);
+  assert.ok(perto(pctDeReceitaBruta(500_000, 10_000_000), 5, 0.0001));
 });
 
 // ── #238: permuta financeira — bases bruta e líquida ────────────────────────
