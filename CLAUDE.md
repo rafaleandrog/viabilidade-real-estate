@@ -30,11 +30,11 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — 🟡 RODADA 9 EM CURSO (executa o saldo da 8)
+## Estado do backlog — ✅ RODADA 9 CONCLUÍDA (2026-08-24)
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
-| **9 — execução da Rodada 8** | Ondas de PRs que entregam as issues #426–#493, na ordem de dependência | **#426–#493** | 🟡 **em curso desde 2026-08-23** |
+| **9 — execução da Rodada 8** | Ondas de PRs que entregam as issues #426–#493, na ordem de dependência | **#426–#493** | ✅ **concluída em 2026-08-24** — as 59 issues fechadas |
 | **8 — auditoria cruzada** | Reverificação da `lista bugs 20260807.xlsx` + regras derivadas das 3 planilhas (EVI Urbitá, fluxo do investidor) + conferência numérica em Pinguim + auditoria de UI | **#426–#493** (61 abertas; #461 e #480 fecharam por decisão) | ✅ **auditoria concluída em 2026-08-22** — o saldo de **59 issues** é executado pela Rodada 9 |
 | **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | ✅ **concluída em 2026-08-12** |
 | **5 — EVI** | Auditoria do app contra os documentos EVI | **#220–#241** (22) | ✅ **concluída em 2026-08-02** |
@@ -88,8 +88,60 @@ harness de render em Chromium) está concluída e mergeada. As ondas seguintes e
 ordem de dependência, com a cadeia do denominador (#426 → #433 → #429 → #431 → {#432, #435} → #434
 → #428) **estritamente serial**, porque todos movem o mesmo denominador.
 
-> ⚠️ **Quem encerrar a Rodada 9 atualiza esta tabela na MESMA alteração que fechar a última issue.**
-> Não delegue para "depois": foi exatamente assim que a #416 nasceu.
+**Encerrada em 2026-08-24.** As últimas a fechar foram #462 (deflator de área aberta, migração
+`034`), #469 (fixture das três divergências de equity), #484 (decisão do autor: **manter** o
+controle inerte de Correção de estoque) e #489 (larguras de coluna — Problemas 1 e 2 entregues, o 3
+resolvido como cosmético por medição). A `main` fechou o dia em `versao` `0.1.33`, com 688 testes,
+27 casos de render e a cadeia de migrações `030 → 034` íntegra.
+
+#### O que a auditoria retrospectiva mediu, e por que ela valeu
+
+Ao fim das ondas, cinco agentes conferiram **21 issues já mergeadas** contra os critérios de aceite
+literais, com evidência `arquivo:linha` e teste de mutação — o mesmo método que em 2026-08-03
+reprovou 29 de 52 issues fechadas. **Desta vez: zero 🔴.** Mas ela achou o que só se acha
+conferindo:
+
+- **Uma defesa declarada e inexistente.** O merge da #491 afirmava que `maiorMelhor` era parâmetro
+  obrigatório em `_badgeVar`; a obrigatoriedade valia só para `calcularVariacao`, a função pura. O
+  wrapper que o template chama tinha `= true`, e apagar o argumento **compilava limpo**,
+  reintroduzindo o bug em silêncio. Consertado pelo PR 557.
+- **Uma afirmação medida no ponto errado.** A #469 relatou "3 vermelhos" ao apagar o 4º argumento de
+  `validarFunding` — verdade **dentro da fixture**, falsa na fiação do componente, onde a mesma
+  mutação deixa 683/683 verdes. A fixture prova que a checagem funciona quando recebe o argumento;
+  não impede a tela de parar de passá-lo.
+- **Uma referência circular.** A #467 prometia uma nota no doc que apontava para si mesma, enquanto
+  o comentário de código apontava de volta para o doc. Nenhum dos dois tinha o conteúdo (PR 560).
+
+> **A lição do dia, e ela é diferente das anteriores:** as três descobertas vieram de **medir o
+> ponto certo**, não de medir mais. Uma medição verdadeira sobre a pergunta errada é
+> indistinguível de uma verificação boa — e foi assim que uma defesa inexistente atravessou um
+> merge com o corpo do PR afirmando que ela existia.
+
+#### Duas armadilhas de ferramenta que custaram tempo, e como reconhecê-las
+
+- **`tsc` numa worktree sem `node_modules`** morre no carregador de módulos e devolve **saída
+  vazia** — indistinguível de "nenhum erro". **Rode sempre o controle primeiro**: confirme que o
+  código sem mutação passa, senão a mutação não significa nada.
+- **`git checkout -B` com árvore suja carrega o não commitado para a outra branch**, e o `git add
+  -A` seguinte o varre para o commit errado. Foi assim que a correção do Problema 2 da #489 entrou
+  na `main` dentro do PR da #477 (`bc40d31`), sob um título que não a menciona. Use `git stash -u`
+  antes de trocar de branch, e `git add` com caminho explícito.
+
+#### ⚠️ O motor adversarial esteve AUSENTE nesta rodada
+
+O App do Codex respondeu **`"To use Codex here, create an environment for this repo"`** em todos os
+PRs em que foi acionado, e nos dois últimos não respondeu nada dentro do teto de 15 minutos. Ele
+está instalado, recebe o `@codex review`, mas **não tem ambiente configurado** — então não executa.
+Funcionava no PR 494 (2026-08-23) com achados P1 reais; parou entre aquela data e 2026-08-24.
+
+Consequência a não esquecer: **toda revisão desta rodada é autoatestação**, feita por quem escreveu
+ou por agentes da mesma família de modelo. Está declarado em cada relatório, inclusive o desvio de
+publicar `bloqueantes=0` onde a regra manda `bloqueantes=1` quando o App não responde. **Restaurar o
+ambiente do Codex é pré-requisito para a próxima rodada ter revisão independente de verdade.**
+
+> ⚠️ **Quem abrir a Rodada 10 atualiza esta tabela junto, e quem a encerrar faz o mesmo, na MESMA
+> alteração que fechar a última issue.** Não delegue para "depois": foi exatamente assim que a #416
+> nasceu.
 
 ### Rodada 7 — como foi
 
