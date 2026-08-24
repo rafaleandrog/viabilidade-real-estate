@@ -32,7 +32,7 @@ Todas as tabelas usam `acesso_externo: "restrito"` — a escrita passa pelas rot
 | `avancado_curvas` | Curvas de distribuição globais da instância (Curva S padrão + customizadas). |
 | `avancado_tipologias` | **Catálogo de tipologias do estudo** (Lote 6 · #19) — nome, tipo, área privativa, dormitórios, vagas, `quantidade` (total de unidades), `unidades_permutadas`. Cadastrado em Empreendimento → Tipologias, **desacoplado** da receita. |
 | `avancado_fases` | **Fase** (Lote 6 · #21) — entidade dona da **Absorção** (`absorcao` JSON) e do **Fluxo de Pagamento** (`fluxo_pagamento` JSON). Substitui o antigo `fase_label` de texto. |
-| `avancado_alocacoes` | **Alocação de venda** (Lote 6 · #19) — vende `unidades` de uma `tipologia_id` (catálogo) numa `fase_id`, a um `preco_m2`. Várias alocações por tipologia (preços diferentes). Trava de saldo **por fase**: Σ unidades alocadas da tipologia na fase ≤ `quantidade` do catálogo. |
+| `avancado_alocacoes` | **Alocação de venda** (Lote 6 · #19) — vende `unidades` de uma `tipologia_id` (catálogo) numa `fase_id`, a um `preco_m2`. Várias alocações por tipologia (preços diferentes). Trava de saldo **no estudo inteiro** (#52 — agregada por todas as fases, não por fase): Σ unidades alocadas da tipologia em qualquer fase + Σ unidades em permuta física ≤ `quantidade` do catálogo. |
 | `avancado_linhas_receita` | **Vestigial** — modelo antigo (linha de receita com tipologias filhas). Preservada no schema, mas o app não a lê/escreve após a migração 003 (fases + alocações). |
 | `avancado_linhas_custo` | Linhas de custo em 5 grupos (terreno/obra/diretos/indireto/financeiro) com unidade de orçamento e ancoragem ao cronograma. |
 
@@ -40,7 +40,7 @@ Todas as tabelas usam `acesso_externo: "restrito"` — a escrita passa pelas rot
 
 **Fluxo de Pagamento (`avancado_fases.fluxo_pagamento`)** — o JSON legado mantém `comissao`, `ret`, **`entrada` e `parcelas` como LISTAS** de linhas (Lote 6 · #20), e `repasse: { apos_entrega_meses }`; nele, o `%` do Repasse é **derivado** (`100 − Σentrada − Σparcelas`), não persistido. Desde a #230, o mesmo campo também aceita o contrato canônico opt-in `componentes`: lista não vazia dos tipos `imediato`, `prazo_fixo`, `ate_marco` ou `concentrado`, cujas `participacaoPct` fecham 100%. A leitura legada segue preservada por adaptador até o motor por safras passar a consumir os componentes (#283).
 
-Integridade (Lote 6 · #19): excluir uma tipologia do catálogo com alocações é **bloqueado** (422 `TIPOLOGIA_EM_USO`); editar nome/área reflete ao vivo nas alocações (a alocação guarda só unidades + preço).
+Integridade (Lote 6 · #19): excluir uma tipologia do catálogo com alocações é **bloqueado** (422 `TIPOLOGIA_EM_USO`); editar nome/área reflete ao vivo nas alocações (a alocação guarda só unidades + preço). E, desde a #433, **reduzir a `quantidade` do catálogo abaixo do que já está comprometido** — alocações de venda **mais** permuta física — é recusado com 422 `SALDO_EXCEDIDO`: era a quarta porta do saldo, e a única que não validava nada. `PATCH` parcial sem o campo `quantidade` não é assunto da regra.
 
 ## Referências lógicas — colunas de id sem FK
 

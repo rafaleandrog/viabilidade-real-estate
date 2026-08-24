@@ -806,6 +806,114 @@ rotasAvancado.post('/estudos/:id/avancado/tipologias', async (req: Request, res:
   }
 });
 
+/**
+ * Unidades de uma tipologia já COMPROMETIDAS no estudo — alocações de venda
+ * **mais** permuta física. É o complemento aritmético do saldo devolvido por
+ * `saldoTipologiaNoEstudo` (`quantidade − vendido − permutadas`), e por isso não
+ * reconta nada: recebe a quantidade do catálogo e o saldo, e devolve a diferença.
+ *
+ * Saldo negativo é entrada legítima — é exatamente o estado que a #433 encontrou
+ * na instância (234 no catálogo, 276 comprometidas ⇒ saldo −42).
+ */
+export function comprometidasDeTipologia(quantidadeCatalogo: unknown, saldo: unknown): number {
+  const q = Number(quantidadeCatalogo);
+  const s = Number(saldo);
+  const total = Number.isFinite(q) ? q : 0;
+  const disponivel = Number.isFinite(s) ? s : 0;
+  return Math.max(0, total - disponivel);
+}
+
+/**
+ * Regra do portão de `PATCH .../tipologias/:tid` (#433): a `quantidade` nova não
+ * pode ficar abaixo do que já está comprometido (alocações + permuta física).
+ * Devolve a mensagem do 422 `SALDO_EXCEDIDO`, ou `null` quando o PATCH passa.
+ *
+ * ⚠️ Pura de propósito — a contagem do comprometido é assíncrona (lê
+ * `req.dados`), a **decisão** não. Enquanto morasse dentro do handler nenhum
+ * teste a alcançaria: nenhum arquivo de teste deste repositório sobe servidor.
+ * Mesmo desenho de `montarPatchEstudo` (#486) e `validarCamposOperacao`.
+ *
+ * Dois casos que **não** são assunto desta regra, e passam:
+ *  - `quantidade` ausente ou não numérica — `PATCH` parcial (nome, preço, ordem)
+ *    não pode ser barrado, e tipo de campo é do validador do shell.
+ *    ⚠️ **Ausente e presente-mas-inaproveitável não são a mesma coisa**, e esta
+ *    função não distingue as duas: ela recebe só o valor. Quem distingue é
+ *    `montarPatchTipologia`, que barra `quantidade` **presente** e não numérica
+ *    com `400 QUANTIDADE_INVALIDA` antes de chegar aqui — senão
+ *    `PATCH {"quantidade": null}` cairia no ramo `NaN`, sairia `null` daqui e
+ *    gravaria `quantidade = NULL` numa tipologia com unidades comprometidas:
+ *    o mesmo estado impossível que a #433 existe para impedir, um degrau pior;
+ *  - nada comprometido — sem alocação nem permuta não há o que proteger, e
+ *    zerar (ou até um valor negativo, que esta regra não fiscaliza) segue livre.
+ */
+export function quantidadeNumerica(valor: unknown): number | null {
+  const n = typeof valor === 'number'
+    ? valor
+    : (typeof valor === 'string' && valor.trim() !== '' ? Number(valor) : NaN);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function erroQuantidadeTipologia(quantidadeNova: unknown, comprometidas: unknown): string | null {
+  const nova = quantidadeNumerica(quantidadeNova);
+  if (nova === null) return null;
+
+  const c = Number(comprometidas);
+  const usadas = Number.isFinite(c) ? Math.max(0, c) : 0;
+  if (usadas <= 0) return null;
+  if (nova >= usadas) return null;
+
+  return `Já há ${usadas} unidade(s) comprometida(s) desta tipologia (alocações de venda + permuta física) — a quantidade não pode ser reduzida para ${nova}`;
+}
+
+/**
+ * Decide o que um `PATCH .../tipologias/:tid` grava, ou qual erro devolve —
+ * mesmo desenho de `montarPatchEstudo` (#486): decisão pura, handler de despacho.
+ *
+ * `saldoNoEstudo` é **preguiçoso** de propósito: contar o saldo é uma consulta,
+ * e `PATCH` parcial (nome, preço/m², ordem) não pode pagá-la nem ser barrado por
+ * ela. Quem testa passa um stub e confere também que ele **não** foi chamado.
+ *
+ * Devolve `{ dados }` quando o PATCH pode prosseguir, ou
+ * `{ http, codigo, mensagem }` quando deve ser recusado.
+ */
+export async function montarPatchTipologia(
+  body: Record<string, any>,
+  tipologia: { quantidade?: unknown },
+  saldoNoEstudo: () => Promise<number>,
+): Promise<{ dados: Record<string, any> } | { http: number; codigo: string; mensagem: string }> {
+  const dados: Record<string, any> = {};
+  for (const campo of CAMPOS_TIPOLOGIA) {
+    if (body?.[campo] !== undefined) dados[campo] = body[campo];
+  }
+  if (dados.tipo_unidade !== undefined && !TIPOS_UNIDADE.includes(dados.tipo_unidade)) {
+    return { http: 400, codigo: 'TIPO_UNIDADE_INVALIDO', mensagem: `tipo_unidade deve ser um de: ${TIPOS_UNIDADE.join(', ')}` };
+  }
+  if (Object.keys(dados).length === 0) {
+    return { http: 400, codigo: 'NENHUM_CAMPO', mensagem: 'Nenhum campo para atualizar' };
+  }
+  // #433: a quarta porta do saldo. POST/PATCH de alocações e a permuta física já
+  // recusam estourar o catálogo; reduzir o catálogo por baixo do comprometido
+  // chegava ao mesmo estado impossível sem 422 nenhum.
+  if (dados.quantidade !== undefined) {
+    // Presente e inaproveitável não é "PATCH parcial": é uma escrita que o
+    // cliente pediu e o portão do saldo não sabe julgar. `null`, `''` e
+    // `'abc'` chegavam aqui, `erroQuantidadeTipologia` devolvia `null` pelo
+    // ramo `NaN` e a coluna — que não é `obrigatorio` no schema — recebia
+    // `NULL`. É o gesto normal da tela: apagar o campo com backspace.
+    if (quantidadeNumerica(dados.quantidade) === null) {
+      return {
+        http: 400,
+        codigo: 'QUANTIDADE_INVALIDA',
+        mensagem: 'quantidade precisa ser um número; para não alterá-la, omita o campo do PATCH',
+      };
+    }
+    const comprometidas = comprometidasDeTipologia(tipologia?.quantidade, await saldoNoEstudo());
+    const msg = erroQuantidadeTipologia(dados.quantidade, comprometidas);
+    if (msg) return { http: 422, codigo: 'SALDO_EXCEDIDO', mensagem: msg };
+  }
+  return { dados };
+}
+
 rotasAvancado.patch('/estudos/:id/avancado/tipologias/:tid', async (req: Request, res: Response) => {
   try {
     const estudo = await estudoAvancado(req, res);
@@ -814,16 +922,10 @@ rotasAvancado.patch('/estudos/:id/avancado/tipologias/:tid', async (req: Request
     const tip = await tipologiaDoEstudo(req, res, estudo.id);
     if (!tip) return;
 
-    const dados: Record<string, any> = {};
-    for (const campo of CAMPOS_TIPOLOGIA) {
-      if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
-    }
-    if (dados.tipo_unidade !== undefined && !TIPOS_UNIDADE.includes(dados.tipo_unidade)) {
-      erro(res, 400, 'TIPO_UNIDADE_INVALIDO', `tipo_unidade deve ser um de: ${TIPOS_UNIDADE.join(', ')}`);
-      return;
-    }
-    if (Object.keys(dados).length === 0) { erro(res, 400, 'NENHUM_CAMPO', 'Nenhum campo para atualizar'); return; }
-    const atualizada = await req.dados!.atualizar('avancado_tipologias', tip.id, dados);
+    const decisao = await montarPatchTipologia(req.body, tip, () => saldoTipologiaNoEstudo(req, tip));
+    if ('codigo' in decisao) { erro(res, decisao.http, decisao.codigo, decisao.mensagem); return; }
+
+    const atualizada = await req.dados!.atualizar('avancado_tipologias', tip.id, decisao.dados);
     res.json(atualizada);
   } catch (e: any) {
     console.error('Erro em PATCH /avancado/tipologias/:tid:', e);
@@ -1018,10 +1120,9 @@ rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', async (req: Request, re
 // ── Alocações de venda (tipologia → fase) ──
 
 /**
- * Saldo de unidades de uma tipologia no ESTUDO INTEIRO (#52 · trava agregada por
- * todas as fases): quantidade do catálogo − Σ unidades já alocadas em qualquer
- * fase (ignorando, opcionalmente, uma alocação em edição). Como cada tipologia
- * pertence a um único estudo, filtrar por `tipologia_id` já cobre todo o estudo.
+ * Σ de unidades desta tipologia entregues como PERMUTA FÍSICA no estudo — as
+ * linhas de custo `terreno / Preço / Permuta física` que apontam para ela
+ * (#266/#267/#268), ignorando opcionalmente uma linha em edição.
  */
 async function unidadesPermutadasNoEstudo(
   req: Request, estudoId: number, tipologiaId: number, ignorarCustoId?: number,
@@ -1036,6 +1137,14 @@ async function unidadesPermutadasNoEstudo(
     .reduce((s: number, c: any) => s + Math.max(0, Number(c.permuta_quantidade) || 0), 0);
 }
 
+/**
+ * Saldo de unidades de uma tipologia no ESTUDO INTEIRO (#52 · trava agregada por
+ * todas as fases): quantidade do catálogo − Σ unidades já alocadas em qualquer
+ * fase (ignorando, opcionalmente, uma alocação em edição) − Σ unidades dadas em
+ * permuta física. Como cada tipologia pertence a um único estudo, filtrar por
+ * `tipologia_id` já cobre todo o estudo. Pode ser **negativo** em estudo com o
+ * estado que a #433 fechou.
+ */
 async function saldoTipologiaNoEstudo(
   req: Request, tipologia: any, ignorarAlocId?: number,
 ): Promise<number> {
