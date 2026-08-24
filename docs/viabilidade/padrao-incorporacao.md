@@ -1195,10 +1195,15 @@ O JSON `fluxo_pagamento` guarda:
 
 - opcionalmente, `componentes`: plano canônico de pagamento com participações que fecham 100%;
 - `comissao`;
-- `ret`;
 - listas de `entrada`;
 - listas de `parcelas`;
 - `repasse.apos_entrega_meses`.
+
+> ⚠️ **`ret` saiu do blob (#452).** Até esta issue o sub-objeto `ret: { ativo, pct }` sobrevivia por
+> linha, regravado pelo spread de `fluxoPagamentoParaSalvar` em toda escrita — morto desde a #346,
+> que tornou a RET **global do estudo** (`estudos.considerar_ret`/`estudos.ret_pct`). Um consumidor
+> da API que lesse `ret.ativo: false` numa linha de estudo com RET ligada concluía, errado, que
+> aquela linha não tinha RET.
 
 Desde a #283, a compatibilidade é decidida **por linha de receita e por opt-in**:
 
@@ -1207,7 +1212,22 @@ Desde a #283, a compatibilidade é decidida **por linha de receita e por opt-in*
 - estudos aprovados ou arquivados não mudam retroativamente: só passam ao motor canônico se a linha for deliberadamente salva no novo contrato;
 - a tela de Cenários reutiliza o mesmo `FluxoCalc`, portanto recebe as mesmas séries e regras sem um cálculo paralelo.
 
-Essa escolha evita uma migração global silenciosa e permite auditar a adoção linha a linha. O caminho canônico calcula safra, PMT, juros sobre saldo, prazo fixo, vencimento até marco, carteira reconciliada e liquidação concentrada. O caminho legado permanece documentado abaixo apenas como regra de compatibilidade.
+Essa escolha evita reinterpretar dado durante a leitura. Na prática, porém, a adoção **não é
+gradual**: `fluxoPagamentoParaSalvar` (`frontend/fluxo-pagamento-editor.ts`) grava `componentes` em
+toda escrita, então qualquer "Aplicar" no modal de Fluxo de Pagamento converte a linha para o
+canônico. Só linha nunca reeditada desde a #248 permanece no legado — e os dois ramos **produzem
+números diferentes** com o mesmo `fluxo_pagamento` (PMT contra divisão simples, 1º vencimento em
+`s+1` contra o mês da venda, venda pós-entrega à vista contra plano do Grupo; ver o teste de
+divergência em `frontend/fluxo-caixa-motor.test.ts`, `#458`). O caminho canônico calcula safra, PMT,
+juros sobre saldo, prazo fixo, vencimento até marco, carteira reconciliada e liquidação concentrada.
+O caminho legado permanece documentado abaixo apenas como regra de compatibilidade.
+
+> ✅ **Desde a #458, o ramo deixou de ser invisível.** A tela marca com a badge "Plano não migrado"
+> (`frontend/tela-fluxo-receitas.ts`) todo Grupo cujo `fluxo_pagamento.componentes` não é um array —
+> o mesmo teste que `recebimentoBrutoMensal` usa para escolher o ramo — e a mesma checagem emite
+> `console.warn` nomeando a linha. **A migração continua sendo a mesma ("Aplicar" converte); o que
+> mudou é que agora dá para saber, olhando a tela, quais linhas ainda não passaram por ela.** O que
+> ainda não existe é um inventário agregado (quantas linhas, em quais estudos) — isso é a #464.
 
 ### 11.6.1 Parcelas legadas “ao longo da Obra”
 
@@ -1269,8 +1289,9 @@ O comprador pode pagar parte diretamente e financiar parte com o banco, mas amba
 > safra está em `calcularRecebiveisComponentes:1096`, via `componentesIntegradosSafra:1030-1043`.
 >
 > ⚠️ **Vale só para linha com `fluxo_pagamento.componentes` persistido.** A linha que nunca passou
-> pelo modal desde a #248 cai no motor legado (`recebimentoBrutoMensal:1342` em diante), que
-> **não** distingue a fronteira da entrega — aplica o plano do Grupo a toda safra.
+> pelo modal desde a #248 cai no motor legado (`recebimentoBrutoMensal:1600` em diante, ramo a
+> partir de `:1607`), que **não** distingue a fronteira da entrega — aplica o plano do Grupo a toda
+> safra. 🔧 endereço conferido na #458 (2026-08-24) — era `:1342`.
 
 ### 11.9 Recebimentos antigos continuam
 

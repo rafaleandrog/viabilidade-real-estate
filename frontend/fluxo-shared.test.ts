@@ -4,6 +4,7 @@ import {
   parseMesAno, rotuloMesRelativo, mesRelativoCompleto, rotuloPeriodo,
   vgvTipologia, vgvLinha, receitaLiquidaLinha, periodoAbsorcao, absorcaoMensal,
   faixasAbsorcao, pctPosChavesDerivado, erroFormularioAbsorcao, problemaJanelaDuranteObra, APOS_CHAVES_MESES,
+  ramoLegadoDeRecebiveis,
   pctAbsorcaoEfetivo, fimJanelaAbsorcao,
   areaPrivativaTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
@@ -158,6 +159,37 @@ test('pctPosChavesDerivado = 100 − pré-lançamento − lançamento − obra',
   assert.equal(pctPosChavesDerivado([{ evento: 'pre_lancamento', pct: 10 }, { evento: 'lancamento', pct: 20 }, { evento: 'obra', pct: 35 }]), 35);
   assert.equal(pctPosChavesDerivado([{ evento: 'lancamento', pct: 30 }, { evento: 'obra', pct: 35 }]), 35); // sem bloco pre (backward compat)
   assert.equal(pctPosChavesDerivado([{ evento: 'lancamento', pct: 60 }, { evento: 'obra', pct: 60 }]), 0); // clamp em 0
+});
+
+// #452, critério 2 (não-vazamento): desde que o bloco `pos_obra` passou a
+// gravar o valor efetivo (em vez de 0), é preciso um teste que distinga
+// "grava o derivado" de "passa a SOMAR o bloco gravado" — uma implementação
+// que somasse o pos_obra persistido produziria 100 − 10 − 15 − 10 − 65 = 0 e
+// ninguém veria até o próximo estudo. `pctPosChavesDerivado` ignora o bloco
+// `pos_obra`, mesmo quando ele traz um valor não-zero.
+test('#458: ramoLegadoDeRecebiveis segue o MESMO critério do motor (Array.isArray(componentes))', () => {
+  // A guarda de `recebiveisComponentesLinha` (fluxo-caixa-motor.ts) é só
+  // `Array.isArray` — SEM checar tamanho. `ramoLegadoDeRecebiveis` tem de
+  // acompanhar exatamente essa guarda, não a de `formularioPagamento` (que
+  // exige `length > 0`): a badge diz qual ramo o MOTOR escolhe, não se o
+  // editor considera a linha "com plano configurado".
+  assert.equal(ramoLegadoDeRecebiveis({ entrada: [], parcelas: [] }), true, 'sem componentes é legado');
+  assert.equal(ramoLegadoDeRecebiveis(null), true, 'sem fluxo_pagamento é legado');
+  assert.equal(ramoLegadoDeRecebiveis({}), true, 'objeto vazio é legado');
+  assert.equal(ramoLegadoDeRecebiveis({ componentes: [] }), false,
+    'array vazio ainda satisfaz Array.isArray — o motor entra no ramo canônico');
+  assert.equal(ramoLegadoDeRecebiveis({ componentes: [{ tipo: 'imediato', participacaoPct: 100 }] }), false,
+    'componentes presente e não vazio é canônico');
+});
+
+test('#452: pctPosChavesDerivado ignora o bloco pos_obra mesmo quando ele já traz valor', () => {
+  const blocos = [
+    { evento: 'pre_lancamento', pct: 10 },
+    { evento: 'lancamento', pct: 15 },
+    { evento: 'obra', pct: 10 },
+    { evento: 'pos_obra', pct: 65 },
+  ];
+  assert.equal(pctPosChavesDerivado(blocos), 65, 'não pode virar 0 por somar o próprio bloco pos_obra');
 });
 
 // #347: antes desta issue, uma soma > 100% clampava em silêncio no Pós-obra

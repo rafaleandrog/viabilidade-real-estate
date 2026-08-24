@@ -392,6 +392,17 @@ export function pctPosChavesDerivado(blocos: any[]): number {
 }
 
 /**
+ * #458: esta linha ainda cai no ramo LEGADO de recebíveis
+ * (`recebimentoBrutoMensal`, `fluxo-caixa-motor.ts`)? É o MESMO critério que o
+ * motor usa para escolher o ramo — `fluxo_pagamento.componentes` não é um
+ * array — extraído como função pura porque a tela é `LitElement` e nenhum
+ * `.test.ts` deste repo importa componente (mesma razão da extração da #431).
+ */
+export function ramoLegadoDeRecebiveis(fluxoPagamento: any): boolean {
+  return !Array.isArray(fluxoPagamento?.componentes);
+}
+
+/**
  * #347: valida a soma dos três períodos INFORMADOS do formulário de Absorção
  * (Pré-lançamento + Lançamento + Obra) — sem isso, um total acima de 100%
  * clampava silenciosamente no Pós-chaves (`pctPosChavesDerivado` usa
