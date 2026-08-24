@@ -894,16 +894,19 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 
 > ✅ **Comportamento vigente, alinhado ao padrão (#108/#347).** O JSON `absorcao` de
 > `avancado_fases` guarda o modo **Distribuído** em **quatro** blocos —
-> `pre_lancamento`, `lancamento`, `obra` e `pos_obra` (`frontend/tela-fluxo-receitas.ts:535-540`).
+> `pre_lancamento`, `lancamento`, `obra` e `pos_obra` (`absorcaoParaSalvar`,
+> `frontend/fluxo-absorcao-editor.ts`).
 > Os três primeiros são informados; o Pós-chaves é **derivado**
 > (`pctPosChavesDerivado`: `100 − p1 − p2 − p3`; o nome era `pctPosObraDerivado` até a #430). A soma dos três
 > informados é validada por `erroFormularioAbsorcao` (`frontend/fluxo-shared.ts:345-353`) — sem
 > isso, um total acima de 100% clampava no derivado e a absorção fechava abaixo de 100% sem aviso.
 > ⚠️ **Quando o Cronograma não tem Pré-lançamento, o bloco NÃO chega zerado ao motor — e some
-> silenciosamente uma fatia das vendas.** `tela-fluxo-receitas.ts:522` zera apenas o valor **do
-> formulário**, ao abrir o modal. Salvar os parâmetros do Cronograma **não toca no JSON de
-> absorção** (`backend/rotas/avancado.ts:479-504`): o bloco `pre_lancamento` persistido continua
-> lá, com o percentual antigo.
+> silenciosamente uma fatia das vendas.** `formularioAbsorcao(..., temPreLancamento=false)`
+> (`frontend/fluxo-absorcao-editor.ts`) zera apenas o valor **do formulário**, ao abrir o modal — e
+> guarda o valor cru em `form.lido`, justamente para que esse zero conte como **edição** e não seja
+> engolido pelo no-op da #431. Salvar os parâmetros do Cronograma **não toca no JSON de absorção**
+> (`backend/rotas/avancado.ts:479-504`): o bloco `pre_lancamento` persistido continua lá, com o
+> percentual antigo.
 >
 > Até alguém abrir o modal e clicar em **Aplicar**, `absorcaoMensal` segue lendo esse bloco e o
 > **descarta**, porque a faixa é vazia — `espalhar` retorna cedo quando `fim < inicio`
@@ -912,6 +915,25 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > estudo com 20% em Pré-lançamento que desative a fase passa a vender 80%.
 >
 > A normalização acontece **só ao reaplicar o modal**, não ao desativar a fase.
+
+> ✅ **A curva `personalizado` sobrevive ao modal desde a #431.** `absorcao.modo` aceita
+> `personalizado` com uma série mês a mês em `absorcao.meses[]`, e `absorcaoMensal`
+> (`frontend/fluxo-shared.ts`) a consome. **Esse dado veio da própria app** — o commit `2c0e793`
+> tinha o seletor "Personalizado" na tela; a UI perdeu o modo depois e o motor continuou lendo, o
+> que faz disto uma **regressão de interface**, não uma feature que nunca existiu. Até a #431,
+> abrir o modal de Absorção e clicar em "Aplicar" convertia a linha para `distribuido` e descartava
+> a curva inteira, sem aviso e sem undo (medido no estudo 6 de Pinguim: 43 pontos, VPL
+> −R$ 360.591,41).
+>
+> Hoje: aplicar **sem editar bloco nenhum** devolve o registro **verbatim**; trocar só o badge
+> "Correção de estoque" também preserva a curva; e editar um percentual de bloco **substitui**, mas
+> só depois de um aviso `urbi-banner variante="alerta"` no corpo do modal e de uma **confirmação
+> explícita** (`_renderConfirmAbsorcao`, `frontend/tela-fluxo-receitas.ts`).
+>
+> ⚠️ **Isto não dá superfície para EDITAR a curva** (criar ou mover pontos) — continua sendo
+> feature. E não conserta a janela fixa de 12 meses que a trunca, que é a **#429**: depois deste
+> conserto a curva do estudo 6 sobrevive **e continua truncada**. "A curva voltou" não fecha
+> aquela issue.
 
 ### 10.3 Distribuição mensal
 

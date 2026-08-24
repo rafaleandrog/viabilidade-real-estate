@@ -12,6 +12,12 @@ import {
   erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento,
   jurosDeTabelaConfigurados,
 } from './fluxo-pagamento-editor.js';
+// #431: a lógica do modal de Absorção mora fora do componente, como a do modal
+// de Pagamento — método privado de LitElement não é testável neste repo.
+import {
+  absorcaoParaSalvar, absorcaoSubstituiCurva, curvaNaoRepresentavel, formularioAbsorcao,
+  type FormularioAbsorcao,
+} from './fluxo-absorcao-editor.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
@@ -64,7 +70,12 @@ export class ViabFluxoReceitas extends LitElement {
 
   // Modais
   @state() private modalAbs: any = null;      // fase em edição
-  @state() private absForm: any = null;
+  @state() private absForm: FormularioAbsorcao | null = null;
+  // #431: confirmação explícita antes de substituir uma curva que o formulário
+  // não sabe desenhar. O app já tinha o padrão em casa
+  // (`confirmRemoverProduto`, tela-premissas.ts) — e reabrir este modal e
+  // clicar "Aplicar" destrói mais dado do que aquela exclusão.
+  @state() private confirmAbs: { modo: string; pontos: number } | null = null;
   @state() private modalPag: any = null;
   @state() private pagForm: any = null;
   @state() private modalErro = '';
@@ -256,6 +267,7 @@ export class ViabFluxoReceitas extends LitElement {
           </urbi-botao>
         </div>` : nothing}
       ${this.modalAbs ? this._renderModalAbsorcao() : nothing}
+      ${this.confirmAbs ? this._renderConfirmAbsorcao() : nothing}
       ${this.modalPag ? this._renderModalPagamento() : nothing}
       ${this.confirmRemover ? this._renderConfirmRemover() : nothing}
     `;
@@ -521,36 +533,29 @@ export class ViabFluxoReceitas extends LitElement {
   }
 
   private _abrirAbsorcao(f: any) {
-    const a = f.absorcao || {};
-    const blocos = Array.isArray(a.blocos) ? a.blocos : [];
-    const pct = (ev: string) => Number((blocos.find((b: any) => b?.evento === ev) || {}).pct) || 0;
-    this.absForm = {
-      correcao_estoque: Boolean(a.correcao_estoque),
-      pre_lancamento_pct: this._temPreLancamento() ? pct('pre_lancamento') : 0,
-      lancamento_pct: pct('lancamento'),
-      obra_pct: pct('obra'),
-    };
+    this.absForm = formularioAbsorcao(f.absorcao, this._temPreLancamento());
     this.modalErro = '';
+    this.confirmAbs = null;
     this.modalAbs = f;
   }
 
+  /**
+   * O que será gravado. #431: já não é "o formulário renderizado como JSON" —
+   * é `absorcaoParaSalvar`, que devolve o persistido verbatim quando os blocos
+   * não mudaram. A tabela derivada e o gráfico leem daqui de propósito: eles
+   * mostram o que vai ser salvo, não uma projeção parecida.
+   */
   private _absorcaoJson(): any {
-    const f = this.absForm;
-    return {
-      modo: 'distribuido',
-      correcao_estoque: f.correcao_estoque,
-      blocos: [
-        { evento: 'pre_lancamento', pct: n(f.pre_lancamento_pct) },
-        { evento: 'lancamento', pct: n(f.lancamento_pct) },
-        { evento: 'obra', pct: n(f.obra_pct) },
-        { evento: 'pos_obra', pct: 0 }, // derivado no motor
-      ],
-    };
+    return absorcaoParaSalvar(this.absForm!, this.modalAbs?.absorcao);
   }
 
   private _renderModalAbsorcao(): TemplateResult {
-    const f = this.absForm;
+    const f = this.absForm!;
     const dis = !this.editavel;
+    // #431: a curva própria que este formulário não sabe desenhar. Enquanto o
+    // usuário não editar bloco nenhum ela sobrevive ao "Aplicar"; se editar,
+    // ela é substituída — e é por isso que o aviso existe.
+    const curva = curvaNaoRepresentavel(this.modalAbs?.absorcao);
     const temPre = this._temPreLancamento();
     const faixas = faixasAbsorcao(this.crono);
     const posDerivado = pctPosChavesDerivado(this._absorcaoJson().blocos);
@@ -600,6 +605,16 @@ export class ViabFluxoReceitas extends LitElement {
           <div class="abs-grafico">${this._graficoAbsorcao()}</div>
         </div>
 
+        ${curva ? html`
+          <urbi-banner variante="alerta">
+            Este Grupo tem uma curva de absorção própria (modo "${curva.modo}"${curva.pontos
+              ? html`, ${curva.pontos} ponto${curva.pontos === 1 ? '' : 's'} mensais`
+              : nothing}) que este formulário não sabe desenhar — por isso os
+            percentuais acima aparecem zerados. Aplicar sem mexer neles
+            <strong>preserva a curva</strong>. Editar qualquer percentual a
+            <strong>substitui</strong> pelos períodos distribuídos, e não há como
+            recriá-la por aqui.
+          </urbi-banner>` : nothing}
         ${erroAbs ? html`<urbi-banner variante="erro">${erroAbs}</urbi-banner>` : nothing}
         ${this.modalErro && this.modalErro !== erroAbs ? html`<urbi-banner variante="erro">${this.modalErro}</urbi-banner>` : nothing}
 
@@ -657,13 +672,45 @@ export class ViabFluxoReceitas extends LitElement {
     `;
   }
 
+  /**
+   * #431: porta de entrada do "Aplicar". Se esta aplicação for substituir uma
+   * curva que o formulário não sabe recriar, ela PARA aqui e pede confirmação
+   * explícita — o mesmo padrão de `confirmRemoverProduto` em tela-premissas.ts.
+   * Nos demais casos segue direto, porque não há o que confirmar.
+   */
   private _aplicarAbsorcao = async () => {
+    const substitui = absorcaoSubstituiCurva(this.absForm!, this.modalAbs?.absorcao);
+    if (substitui) { this.confirmAbs = substitui; return; }
+    await this._gravarAbsorcao();
+  };
+
+  private _renderConfirmAbsorcao(): TemplateResult {
+    const c = this.confirmAbs!;
+    return html`
+      <urbi-modal title="Substituir a curva de absorção?" maxWidth="480px"
+        @urbi-modal:close=${() => this.confirmAbs = null}>
+        <p>Este Grupo tem uma curva própria (modo "${c.modo}"${c.pontos
+          ? html`, com ${c.pontos} ponto${c.pontos === 1 ? '' : 's'} mensais`
+          : nothing}). Aplicar os percentuais editados a substitui pelos períodos
+          distribuídos, e <strong>não há como recriá-la por esta tela</strong>.</p>
+        <div class="modal-rodape">
+          <span class="espaco"></span>
+          <urbi-botao variante="secundario" @click=${() => this.confirmAbs = null}>Cancelar</urbi-botao>
+          <urbi-botao variante="perigo" ?carregando=${this.aplicando}
+            @click=${() => { this.confirmAbs = null; void this._gravarAbsorcao(); }}>Substituir</urbi-botao>
+        </div>
+      </urbi-modal>
+    `;
+  }
+
+  private async _gravarAbsorcao(): Promise<void> {
     this.modalErro = '';
-    const invalido = erroFormularioAbsorcao(this.absForm);
+    const invalido = erroFormularioAbsorcao(this.absForm!);
     if (invalido) { this.modalErro = invalido; return; }
     this.aplicando = true;
     try {
-      const json = { ...this._absorcaoJson(), aplicado: true }; // #49 — marca como aplicado (bola verde)
+      // #49: `aplicado: true` (bola verde) já vem de `absorcaoParaSalvar`.
+      const json = this._absorcaoJson();
       const res = await atualizarFaseAvancado(this.estudo.id, this.modalAbs.id, { absorcao: json });
       if (res?.erro) { this.modalErro = res.mensagem || 'Erro ao aplicar'; return; }
       this.fases = this.fases.map((x) => (x.id === this.modalAbs.id ? { ...x, absorcao: json } : x));
@@ -674,7 +721,7 @@ export class ViabFluxoReceitas extends LitElement {
     } finally {
       this.aplicando = false;
     }
-  };
+  }
 
   // ─────────────────────────────────────────────────────────────────
   // Modal "Fluxo de Pagamento" (multi-linha; Repasse derivado)
