@@ -956,7 +956,6 @@ test('#355 D14: mergulho dentro da tolerância não acusa (ruído de arredondame
   assert.deepEqual(validarFunding(calc, [0, 0]), []);
 });
 
-<<<<<<< HEAD
 // ─────────────────────────────────────────────────────────────────────────
 // #446 — HORIZONTE_TRUNCA_FUNDING.
 //
@@ -1006,7 +1005,8 @@ test('#446: horizonte que cobre a quitação não dispara a invariante', () => {
   const prazo = 37;
   const divs = validarFunding(fundingComDivida(prazo), Array.from({ length: prazo }, () => 0));
   assert.equal(divs.filter((x) => x.codigo === 'HORIZONTE_TRUNCA_FUNDING').length, 0);
-=======
+});
+
 // ── #441: reconciliação Catálogo × Premissas ──────────────────────────────
 
 const TIPOLOGIAS_441 = [
@@ -1105,5 +1105,4 @@ test('#441 validarReconciliacaoCamadas: divisão R × NR — apartamento e loja 
   assert.match(r[0].linha!, /não residencial/);
   assert.equal(r[0].esperado, 90);
   assert.equal(r[0].encontrado, 0);
->>>>>>> origin/main
 });

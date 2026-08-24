@@ -2145,10 +2145,13 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:1807-1808`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2168`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
-> último mês de custo, 11) + 1`, com `ultimoMesRecebivelLinha` derivando o recebível a partir dos
-> componentes normalizados. O fallback silencioso que empilhava excedente no último mês **foi
+> último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
+> derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`
+> (`frontend/fluxo-shared.ts`) derivando o das operações — a #446 acrescentou este último termo,
+> porque dívida e equity ficavam de fora e eram truncadas. `config.prazoMeses` é **piso**, nunca
+> teto: um prazo digitado pode esticar o fluxo, jamais encurtá-lo. O fallback silencioso que empilhava excedente no último mês **foi
 > removido** (`:1371-1373`); no caminho canônico, um pagamento fora do horizonte emite
 > `console.warn` e não é computado (`deposita`, `:1098-1104`), em vez de deformar o último mês em
 > silêncio.
