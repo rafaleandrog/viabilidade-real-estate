@@ -24,7 +24,7 @@ import {
   vendaLiquidaContratadaMensal,
 } from './fluxo-caixa-motor.js';
 import {
-  absorcaoMensal, ePermutaFisica, fimJanelaAbsorcao, pctAbsorcaoEfetivo,
+  absorcaoMensal, ePermutaFisica, fimJanelaAbsorcao, pctAbsorcaoEfetivo, ultimoMesFunding,
   type AbsorcaoMensal, type EventoCrono,
 } from './fluxo-shared.js';
 import type { FundingCalc } from './funding-motor.js';
@@ -463,6 +463,40 @@ export function validarFunding(
   tol: number = TOLERANCIA_PADRAO,
 ): Divergencia[] {
   const out: Divergencia[] = [];
+
+  // #446 — HORIZONTE_TRUNCA_FUNDING, antes de qualquer outra checagem.
+  //
+  // Por que esta invariante existe, e por que ela vem PRIMEIRO: o conserto da
+  // #446 tem duas metades, e só uma delas é cálculo. A outra é FIAÇÃO — cada
+  // chamador de `calcularFluxo` que também simula funding tem de passar
+  // `operacoesFunding` no `FluxoConfig`. Quem esquecer não quebra teste
+  // nenhum: o motor devolve um horizonte curto, o funding herda esse
+  // horizonte (`fundingDoEstudo`: `const prazo = fluxoLivreMensal.length`) e
+  // a operação é cortada EM SILÊNCIO — exatamente o defeito que a #446 fecha,
+  // ressuscitado por omissão.
+  //
+  // Sem isto, o sintoma reaparece como `DIVIDA_FINAL_NAO_ZERA`, que aponta
+  // para o lugar errado: acusa a dívida de não quitar quando o que houve foi
+  // truncamento. Esta checagem nomeia a causa e é `erro`, não `alerta`,
+  // porque o número exibido não corresponde a compromisso nenhum.
+  const mesRepasseValor = calc.operacoes.length > 0 ? Math.max(0, fluxoLivreMensal.length - 1) : 0;
+  for (const s of calc.operacoes) {
+    const nome = s.operacao.nome || s.operacao.tipo;
+    // `mesRepasseValor` é o fim do horizonte corrente: para equity e
+    // financiamento à produção isso torna a checagem inerte por construção
+    // (o último mês deles nunca passa do horizonte), e é o que se quer —
+    // quem tem quitação contratual, e portanto é truncável, é a `divida`.
+    const ultimo = ultimoMesFunding(s.operacao, mesRepasseValor);
+    if (ultimo < fluxoLivreMensal.length) continue;
+    out.push({
+      codigo: 'HORIZONTE_TRUNCA_FUNDING', severidade: 'erro', linha: nome,
+      mes: Math.max(0, fluxoLivreMensal.length - 1),
+      esperado: ultimo + 1, encontrado: fluxoLivreMensal.length,
+      diferenca: ultimo + 1 - fluxoLivreMensal.length,
+      mensagem: `${nome}: a operação vai até o mês ${ultimo + 1}, mas o horizonte tem ${fluxoLivreMensal.length} meses — a série está cortada e o saldo final não corresponde ao compromisso contratual.`,
+    });
+  }
+
   for (const s of calc.operacoes) {
     if (s.saldo.every((v) => v === 0)) continue; // equity: sem dívida, nada a checar
     const nome = s.operacao.nome || s.operacao.tipo;

@@ -172,6 +172,9 @@ export class ViabTelaCenarios extends LitElement {
         areaTerreno: n(this.estudo?.terreno_manual_area) || n(this.estudo?.area_terreno_nucleo),
         // #346: RET global (era por Grupo, avancado_fases.fluxo_pagamento.ret).
         ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
+        // #446: o horizonte precisa cobrir a quitação das operações, senão a
+        // série é cortada e `saldoFinal` exibe um saldo truncado.
+        operacoesFunding: this.operacoes,
       };
       this.faixaPreco = this._faixa(bm?.dados || [], 'preco');
       this.faixaCusto = this._faixa(bm?.dados || [], 'custo_obras');

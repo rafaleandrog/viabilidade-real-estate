@@ -629,3 +629,54 @@ test('#355 D14: mergulho dentro da tolerância não acusa (ruído de arredondame
   calc.noFluxo.fluxoAcumulado = [0, -0.005];
   assert.deepEqual(validarFunding(calc, [0, 0]), []);
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #446 — HORIZONTE_TRUNCA_FUNDING.
+//
+// Esta invariante existe para a metade NÃO-CÁLCULO do conserto: a fiação.
+// Cada chamador de `calcularFluxo` que também simula funding tem de passar
+// `operacoesFunding` no `FluxoConfig`. Quem esquecer não quebra teste nenhum —
+// o motor devolve horizonte curto, o funding herda, e a operação é cortada em
+// silêncio. Sem esta checagem o sintoma reaparece como DIVIDA_FINAL_NAO_ZERA,
+// que aponta para o lugar errado: acusa a dívida de não quitar quando o que
+// houve foi truncamento.
+// ─────────────────────────────────────────────────────────────────────────
+
+const opDividaLonga = {
+  tipo: 'divida', nome: 'CG', valor: 1_000_000, taxa_anual: 12,
+  inicio_mes: 0, distribuir_aporte: false, periodo_amortizacao_meses: 36,
+  periodo_carencia_meses: 0,
+} as OperacaoFunding;
+
+/** FundingCalc mínimo: só o que as invariantes de funding leem. */
+const fundingComDivida = (prazo: number): FundingCalc => {
+  const zeros = Array.from({ length: prazo }, () => 0);
+  return {
+    operacoes: [{
+      operacao: opDividaLonga,
+      entradas: [...zeros], saidas: [...zeros], juros: [...zeros], saldo: [...zeros],
+    } as any],
+    noFluxo: {
+      entradas: [...zeros], saidas: [...zeros], linhasEntrada: [], linhasSaida: [],
+      financiamentoProducao: null, fluxoMensal: [...zeros], fluxoAcumulado: [...zeros],
+      vplLiquido: 0,
+    },
+  } as any;
+};
+
+test('#446: horizonte curto denuncia o truncamento, com a operação nomeada', () => {
+  const prazo = 24;                       // operacional, não alcança a quitação (mês 36)
+  const divs = validarFunding(fundingComDivida(prazo), Array.from({ length: prazo }, () => 0));
+  const d = divs.find((x) => x.codigo === 'HORIZONTE_TRUNCA_FUNDING');
+  assert.ok(d, 'a invariante tinha de disparar num horizonte de 24 meses');
+  assert.equal(d!.severidade, 'erro');
+  assert.equal(d!.linha, 'CG');
+  assert.equal(d!.esperado, 37);          // fim (36) + 1
+  assert.equal(d!.encontrado, 24);
+});
+
+test('#446: horizonte que cobre a quitação não dispara a invariante', () => {
+  const prazo = 37;
+  const divs = validarFunding(fundingComDivida(prazo), Array.from({ length: prazo }, () => 0));
+  assert.equal(divs.filter((x) => x.codigo === 'HORIZONTE_TRUNCA_FUNDING').length, 0);
+});

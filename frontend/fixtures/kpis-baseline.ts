@@ -184,7 +184,11 @@ const CONFIG_D: FluxoConfig = {
  * matemática, o teste pararia de vigiar o motor e passaria a vigiar a si mesmo.
  */
 export function kpisDoCaso(config: FluxoConfig, operacoes: OperacaoFunding[]): KpisBaseline {
-  const c = calcularFluxo(config);
+  // #446: as operações entram no `FluxoConfig` para que o horizonte cubra a
+  // quitação delas. Sem isto a fixture mediria os KPIs sobre uma série
+  // CORTADA — e a catraca passaria a defender o número truncado, que é o
+  // defeito, em vez do número certo.
+  const c = calcularFluxo({ ...config, operacoesFunding: operacoes });
   const areaPrivativa = areaPrivativaTotalLinhas(config.linhasReceita ?? []);
   let funding = null;
   if (operacoes.length > 0) {

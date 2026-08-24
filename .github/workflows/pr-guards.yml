@@ -283,6 +283,27 @@ jobs:
             exit 1
           fi
 
+  fiacao-funding:
+    name: Consumidor de funding passa operacoesFunding ao horizonte
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Guard de fiação do horizonte de funding (#446)
+        run: |
+          set -uo pipefail
+          # Só `readFileSync` + regex: sem typescript, sem SDK, sem credencial.
+          #
+          # Por que este job existe, medido em 2026-08-24: apagar
+          # `operacoesFunding: this.operacoes` de `frontend/tela-funding.ts`
+          # deixou 601 de 601 testes VERDES. É a metade não-cálculo do conserto
+          # da #446 — o horizonte só cobre a quitação da operação se cada
+          # consumidor de `fundingDoEstudo` passar as operações ao
+          # `calcularFluxo`. Quem esquecer não quebra teste nenhum: a série é
+          # cortada e `saldoFinal` exibe um saldo truncado, sem erro em lugar
+          # nenhum.
+          node scripts/guard-fiacao-funding.mjs
+
   tabelas-obsoletas:
     name: Tabela aposentada não é reusada por código novo
     runs-on: ubuntu-latest
