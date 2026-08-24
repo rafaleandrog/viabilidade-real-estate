@@ -14,6 +14,11 @@ Benchmarks são registro geral do app (não do Núcleo), definidos pelo **admini
 
 Tela **Config → Benchmarks** (`viabilidade-config-benchmarks`). Botão **“Criar indicadores padrão”** semeia o conjunto do MVP: `resultado_final`, `margem_bruta`, `margem_liquida`, `roi`, `custo_obras_vgv` e — só no Loteamento — `eficiencia_aproveitamento`. Edição restrita a administradores (aprovadores).
 
+> ⚠️ **`margem_bruta` nasce sem indicador correspondente.** O app não calcula uma margem bruta de
+> verdade hoje — o campo que tinha esse nome media `receita líquida / VGV` (#453), que não é
+> margem. Nenhuma tela lê o benchmark `margem_bruta` até existir um indicador de margem bruta de
+> verdade, com a fórmula que o autor declarar.
+
 ## Três funções
 
 1. **Validação de indicadores** — cada benchmark tem `valor` e `regra_comparacao`:
