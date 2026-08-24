@@ -126,7 +126,11 @@ export interface Proforma {
   resultado: number; valorPermutaFisica: number; margemLiquidaPct: number;
   // KPIs
   investimentoTotal: number; custoObras: number; custoObrasVgvPct: number;
-  margemBrutaPct: number; roiPct: number; eficienciaPct: number;
+  // #453: campo renomeado — o nome antigo dava a entender que havia custo no
+  // numerador, e não há. A fórmula é "1 − deduções" (receita líquida / VGV, a
+  // coluna "% VGV" da linha Receita líquida na EVI Urbitá). Renome puro,
+  // fórmula intacta — nenhum número muda.
+  receitaLiquidaSobreVgvPct: number; roiPct: number; eficienciaPct: number;
   numUnidades: number; precoMedioUnidade: number;
   // Detalhe por tipo (Incorporação — #7). Loteamento não separa R/NR: ficam 0.
   numUnidadesResidencial: number; numUnidadesNaoResidencial: number;
@@ -312,7 +316,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const investimentoTotal = custoDiretoTotal + custoIndiretoTotal;
   const custoObras = lot ? infraestrutura : (construcao + decoracao + gestaoConstrucao);
   const custoObrasVgvPct = vgv > 0 ? custoObras / vgv * 100 : 0;
-  const margemBrutaPct = vgv > 0 ? receitaLiquida / vgv * 100 : 0;
+  const receitaLiquidaSobreVgvPct = vgv > 0 ? receitaLiquida / vgv * 100 : 0;
   const roiPct = investimentoTotal > 0 ? resultado / investimentoTotal * 100 : 0;
   const eficienciaPct = areaTerreno > 0 ? areaVendavel / areaTerreno * 100 : 0;
   // Incorporação: nº de unidades vem dos dois campos R e NR (#2); mantém
@@ -344,7 +348,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
     receitaOperacional,
     marketingGlobal, gestaoIndiretos, custoIndiretoTotal,
     resultado, valorPermutaFisica, margemLiquidaPct,
-    investimentoTotal, custoObras, custoObrasVgvPct, margemBrutaPct, roiPct, eficienciaPct,
+    investimentoTotal, custoObras, custoObrasVgvPct, receitaLiquidaSobreVgvPct, roiPct, eficienciaPct,
     numUnidades, precoMedioUnidade,
     numUnidadesResidencial, numUnidadesNaoResidencial,
     precoMedioUnidadeResidencial, precoMedioUnidadeNaoResidencial,

@@ -34,7 +34,7 @@ export interface RotuloIndicador {
   fonte: string;
 }
 
-export const ROTULOS_INDICADOR: RotuloIndicador[] = [
+export const INVENTARIO_ROTULOS_INDICADOR: RotuloIndicador[] = [
   // ── Resumo do Avançado (frontend/tela-resumo.ts, _kpisAvancado) ────────
   {
     rotulo: 'VGV potencial',
@@ -64,7 +64,13 @@ export const ROTULOS_INDICADOR: RotuloIndicador[] = [
     rotulo: 'Margem sobre VGV',
     arquivos: [
       'frontend/exportar.ts',
-      'frontend/tela-graficos.ts',
+      // #451/#453 (mergeado depois deste inventário existir, resolvido no
+      // merge): tela-graficos.ts parou de ter um ROTULOS local — o rótulo
+      // agora mora em benchmarks-indicadores.ts, que ela consome via
+      // `resolverIndicadoresBenchmark`. tela-graficos.ts continua sendo a
+      // TELA que exibe "Margem sobre VGV"; benchmarks-indicadores.ts é onde
+      // o literal vive no código-fonte.
+      'frontend/benchmarks-indicadores.ts',
       'frontend/tela-premissas.ts',
       'frontend/tela-proforma.ts',
     ],

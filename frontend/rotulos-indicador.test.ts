@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ROTULOS_INDICADOR, ROTULOS_COM_EXCECAO_DOCUMENTADA } from './rotulos-indicador.js';
+import { INVENTARIO_ROTULOS_INDICADOR, ROTULOS_COM_EXCECAO_DOCUMENTADA } from './rotulos-indicador.js';
 
 // #443 critério de aceite 3: "um teste de unicidade de rótulo... sobre uma
-// tabela ROTULOS_INDICADOR exportada (rótulo → função-fonte). O teste afirma
+// tabela INVENTARIO_ROTULOS_INDICADOR exportada (rótulo → função-fonte). O teste afirma
 // que nenhum rótulo aparece duas vezes com funções-fonte diferentes."
 //
 // A tabela é mantida à mão (não há parser de AST aqui) — o que a torna mais
@@ -14,9 +14,9 @@ import { ROTULOS_INDICADOR, ROTULOS_COM_EXCECAO_DOCUMENTADA } from './rotulos-in
 // (pega quem reverte um rótulo no componente sem atualizar esta tabela — ou
 // vice-versa). Nenhuma das duas sozinha bastaria.
 
-test('ROTULOS_INDICADOR: nenhum rótulo repete com função-fonte diferente (fora das exceções documentadas)', () => {
+test('INVENTARIO_ROTULOS_INDICADOR: nenhum rótulo repete com função-fonte diferente (fora das exceções documentadas)', () => {
   const porRotulo = new Map<string, Set<string>>();
-  for (const r of ROTULOS_INDICADOR) {
+  for (const r of INVENTARIO_ROTULOS_INDICADOR) {
     if (!porRotulo.has(r.rotulo)) porRotulo.set(r.rotulo, new Set());
     porRotulo.get(r.rotulo)!.add(r.fonte);
   }
@@ -29,9 +29,9 @@ test('ROTULOS_INDICADOR: nenhum rótulo repete com função-fonte diferente (for
   }
 });
 
-test('ROTULOS_INDICADOR: nenhuma entrada duplicada exata (mesmo rótulo + mesmo arquivo)', () => {
+test('INVENTARIO_ROTULOS_INDICADOR: nenhuma entrada duplicada exata (mesmo rótulo + mesmo arquivo)', () => {
   const chaves = new Set<string>();
-  for (const r of ROTULOS_INDICADOR) {
+  for (const r of INVENTARIO_ROTULOS_INDICADOR) {
     for (const arq of r.arquivos) {
       const chave = `${r.rotulo}::${arq}`;
       assert.ok(!chaves.has(chave), `entrada duplicada: ${chave}`);
@@ -41,8 +41,8 @@ test('ROTULOS_INDICADOR: nenhuma entrada duplicada exata (mesmo rótulo + mesmo 
 });
 
 /**
- * Remove comentários (`//...` e `/* ... *&#47;`) antes de procurar um rótulo no
- * código-fonte.
+ * Remove comentários (linha `//...` e bloco `/star ... star/`) antes de
+ * procurar um rótulo no código-fonte.
  *
  * ⚠️ Sem isto o teste de wiring é decorativo: os próprios comentários que
  * este PR (#443/#474) acrescentou explicando a renomeação CITAM o texto do
@@ -64,8 +64,8 @@ function semComentarios(conteudo: string): string {
     .join('\n');
 }
 
-test('ROTULOS_INDICADOR: cada rótulo declarado existe DE FATO no(s) arquivo(s) citado(s), FORA de comentários (wiring)', () => {
-  for (const r of ROTULOS_INDICADOR) {
+test('INVENTARIO_ROTULOS_INDICADOR: cada rótulo declarado existe DE FATO no(s) arquivo(s) citado(s), FORA de comentários (wiring)', () => {
+  for (const r of INVENTARIO_ROTULOS_INDICADOR) {
     for (const arq of r.arquivos) {
       // `arq` é relativo à raiz do repo; este arquivo de teste mora em
       // `frontend/`, um nível abaixo — daí o `../`.
@@ -74,7 +74,7 @@ test('ROTULOS_INDICADOR: cada rótulo declarado existe DE FATO no(s) arquivo(s) 
       assert.ok(
         conteudo.includes(r.rotulo),
         `"${r.rotulo}" não foi encontrado em CÓDIGO (fora de comentários) de ${arq} — a tabela ` +
-        'ROTULOS_INDICADOR desincronizou do código (rótulo revertido no componente, ou a tabela ' +
+        'INVENTARIO_ROTULOS_INDICADOR desincronizou do código (rótulo revertido no componente, ou a tabela ' +
         'nunca foi atualizada). Um comentário citando o texto não basta.',
       );
     }

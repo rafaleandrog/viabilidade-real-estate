@@ -74,3 +74,50 @@ test('varianteFaixa: variante (sucesso/alerta/erro) da faixa, sem emoji', () => 
   assert.equal(varianteFaixa(b, 40), 'sucesso');
   assert.equal(varianteFaixa({ regra_comparacao: 'atingir_ou_superar', valor: 0 }, 0), '');
 });
+
+// #451: estado "fora da escala" — o valor real de custo_obras_vgv medido em
+// Pinguim (70,32%) contra o medidor calibrado 20/25/30/40. Número fechado do
+// critério de aceite da issue.
+test('#451: fora da escala — valor acima do máximo do ramo configurado', () => {
+  const c = montarMedidor(
+    { medidor_min: 20, medidor_faixa1_ate: 25, medidor_faixa2_ate: 30, medidor_max: 40, regra_comparacao: 'nao_exceder' },
+    70.32,
+  )!;
+  assert.equal(c.foraEscala, true);
+});
+
+// Caso negativo — sem ele, um sinal que dispara sempre passaria pelo teste
+// acima sem provar nada.
+test('#451: NÃO fora da escala — valor dentro de [min, max]', () => {
+  const c = montarMedidor(
+    { medidor_min: 20, medidor_faixa1_ate: 25, medidor_faixa2_ate: 30, medidor_max: 40, regra_comparacao: 'nao_exceder' },
+    30,
+  )!;
+  assert.equal(c.foraEscala, false);
+});
+
+// A outra ponta: abaixo do mínimo também é "fora da escala" — não só acima
+// do máximo. margem_liquida real (14,67%) contra o medidor 15/25/35/45.
+test('#451: fora da escala — valor abaixo do mínimo do ramo configurado', () => {
+  const c = montarMedidor(
+    { medidor_min: 15, medidor_faixa1_ate: 25, medidor_faixa2_ate: 35, medidor_max: 45, regra_comparacao: 'atingir_ou_superar' },
+    14.67,
+  )!;
+  assert.equal(c.foraEscala, true);
+});
+
+// Nos limites exatos (min e max) o valor ainda está DENTRO da escala.
+test('#451: nos limites exatos (min e max) não é fora da escala', () => {
+  const base = { medidor_min: 20, medidor_faixa1_ate: 25, medidor_faixa2_ate: 30, medidor_max: 40, regra_comparacao: 'nao_exceder' };
+  assert.equal(montarMedidor(base, 20)!.foraEscala, false);
+  assert.equal(montarMedidor(base, 40)!.foraEscala, false);
+});
+
+// O fallback automático (sem os 4 valores configurados) nunca estoura — o
+// `max` se adapta ao valor recebido. Os 9 testes acima deste bloco (ramo
+// fallback) seguem verdes SEM edição; este só acrescenta a asserção que
+// faltava sobre `foraEscala` num caso de fallback já existente na suíte.
+test('#451: fallback automático nunca sinaliza fora da escala, mesmo com valor alto', () => {
+  const c = montarMedidor({ regra_comparacao: 'atingir_ou_superar', valor: 25 }, 1000)!;
+  assert.equal(c.foraEscala, false);
+});

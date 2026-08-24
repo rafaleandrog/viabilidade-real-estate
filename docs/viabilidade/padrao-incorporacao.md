@@ -311,7 +311,7 @@ Ele não precisa reproduzir toda a dinâmica mensal de recebíveis, carteira e f
 >                     + incorporação/registro + manutenção + contingências
 > 5. Custos indiretos → marketing global + gestão/indiretos
 > 6. Resultado      → Receita líquida − Custo direto total − Custo indireto total (+ permutas)
-> 7. KPIs           → Margem bruta, Margem líquida, ROI, Custo obras/VGV, Investimento total,
+> 7. KPIs           → Receita líquida/VGV, Margem líquida, ROI, Custo obras/VGV, Investimento total,
 >                     Resultado por unidade (e por tipo R/NR)
 > ```
 >
