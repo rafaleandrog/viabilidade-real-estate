@@ -39,6 +39,17 @@ interface ParDeModal {
   salvar: (form: any, dado: any) => any;
   /** O que exatamente o formulário não sabe representar — para o teste dizer. */
   oQueOFormularioNaoSabe: string;
+  /**
+   * #452: campos que o "Aplicar" LEGITIMAMENTE deixa de regravar. Não é
+   * violação da regra da classe — é limpeza deliberada de campo morto: o
+   * sub-objeto `ret` por linha (RET virou global do estudo na #346) saiu do
+   * TIPO `FormularioPagamento`, então o spread de `fluxoPagamentoParaSalvar`
+   * para de reproduzi-lo. Um registro real de ANTES da #452 ainda o carrega
+   * (por isso a fixture abaixo o mantém — é o dado real que existe hoje); o
+   * "Aplicar" sobre ele não é mais byte-idêntico NESTE campo, e é isso que se
+   * quer. Vazio por default; só o par com a exceção declara.
+   */
+  camposRemovidos?: string[];
 }
 
 const CRONO = [{ evento: 'obra', inicio_mes: 12, duracao_meses: 27 }]; // fim 38, repasse 39
@@ -67,6 +78,7 @@ const PARES: ParDeModal[] = [
     }),
     ler: (dado) => formularioPagamento(dado),
     salvar: (form) => fluxoPagamentoParaSalvar(form, CRONO),
+    camposRemovidos: ['ret'],
   },
   {
     nome: 'Absorção de vendas',
@@ -88,7 +100,9 @@ for (const par of PARES) {
   test(`#431 regra da classe · ${par.nome}: parse → serializa sem edição é deepEqual`, () => {
     const dado = par.dado();
     const salvo = par.salvar(par.ler(dado), dado);
-    assert.deepEqual(salvo, dado,
+    const esperado = { ...dado };
+    for (const campo of par.camposRemovidos ?? []) delete esperado[campo];
+    assert.deepEqual(salvo, esperado,
       `o modal "${par.nome}" reescreveu ${par.coluna} sem o usuário editar nada. `
       + `O formulário não sabe representar: ${par.oQueOFormularioNaoSabe}.`);
   });

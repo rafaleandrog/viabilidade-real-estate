@@ -32,6 +32,8 @@
 // O que este módulo NÃO faz: dar superfície para editar a curva ponto a ponto.
 // Isso é feature; esta issue só impede a destruição.
 
+import { pctPosChavesDerivado } from './fluxo-shared.js';
+
 /** A projeção que o formulário sabe carregar — e só ela. */
 export interface FormularioAbsorcao {
   correcao_estoque: boolean;
@@ -161,17 +163,23 @@ export function absorcaoSubstituiCurva(
  * (O destino desse controle é a #484.)
  */
 export function absorcaoParaSalvar(form: FormularioAbsorcao, persistido: any): any {
+  const blocosBase = [
+    { evento: 'pre_lancamento', pct: n(form.pre_lancamento_pct) },
+    { evento: 'lancamento', pct: n(form.lancamento_pct) },
+    { evento: 'obra', pct: n(form.obra_pct) },
+  ];
   const novo = {
     modo: 'distribuido',
     correcao_estoque: Boolean(form.correcao_estoque),
     blocos: [
-      { evento: 'pre_lancamento', pct: n(form.pre_lancamento_pct) },
-      { evento: 'lancamento', pct: n(form.lancamento_pct) },
-      { evento: 'obra', pct: n(form.obra_pct) },
+      ...blocosBase,
       // #430: o 4º período continua gravado com `evento: 'pos_obra'` — é dado
-      // em coluna `json`, e o backend o reconhece por esse nome. O `pct` nunca
-      // é lido pelo motor: Pós-chaves é sempre derivado.
-      { evento: 'pos_obra', pct: 0 },
+      // em coluna `json`, e o backend o reconhece por esse nome. #452: o `pct`
+      // grava o valor EFETIVO (`pctPosChavesDerivado`), não um placeholder —
+      // nada no app relê este bloco (`pctPosChavesDerivado` soma só os três
+      // primeiros), mas quem ler o JSON cru pela API precisa ver o número
+      // real. Precisão plena: é derivado não monetário (C7), não arredonda.
+      { evento: 'pos_obra', pct: pctPosChavesDerivado(blocosBase) },
     ],
     aplicado: true as const,
   };

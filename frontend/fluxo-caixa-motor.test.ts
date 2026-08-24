@@ -2131,6 +2131,73 @@ test('#283 estudo legado sem componentes mantém exatamente o caminho vigente', 
   assert.deepEqual(consolidado.receitaPorComponenteMensal.outros, consolidado.receitaBrutaMensal);
 });
 
+// ─────────────────────────────────────────────────────────────────────────
+// #458 — a divergência ENTRE os dois ramos de recebíveis (legado x canônico)
+// é CONHECIDA e tem de ficar VERMELHA se alguém "unificar" os ramos sem
+// decisão explícita — hoje a escolha de ramo é `Array.isArray(fp?.componentes)`
+// (`recebimentoBrutoMensal`), invisível ao usuário.
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Duas linhas com o MESMO `fluxo_pagamento` — uma com `componentes` (ramo
+ * canônico), outra sem (ramo legado) — sobre o MESMO cronograma (`CRONO`,
+ * obra 17→40). `comComponentes` usa `componentesDoLegado` sobre o MESMO
+ * objeto legado, então a única variável entre as duas é a FORMA do JSON, não
+ * o conteúdo — é o que prova que a divergência vem do ramo, não da fixture.
+ */
+function linha458(mesVenda: number, comComponentes: boolean) {
+  const fluxoPagamentoLegado = {
+    entrada: [],
+    parcelas: [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, pct: 100 }],
+    repasse: { apos_entrega_meses: 0 },
+  };
+  return {
+    id: 1, nome: 'Grupo #458',
+    tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
+    absorcao: { modo: 'personalizado', meses: [{ mes: mesVenda, pct: 100 }] },
+    fluxo_pagamento: comComponentes
+      ? { componentes: componentesDoLegado(fluxoPagamentoLegado, CRONO) }
+      : fluxoPagamentoLegado,
+  };
+}
+
+test('#458: ramo legado × ramo canônico divergem no MESMO fluxo_pagamento — "ao longo da obra"', () => {
+  // Venda no mês 20, DENTRO da janela de obra (17..40). Diferença NOMEADA da
+  // tabela da issue: no ramo LEGADO, o vencimento é ancorado em
+  // `obra.inicio_mes + k×intervalo` e, com periodicidade mensal, sempre há um
+  // k que bate exatamente no mês da venda (`vencimentosAoLongoObra` filtra só
+  // `mes >= mesVenda`) — o mês da venda já recebe parcela. No ramo CANÔNICO
+  // (`ate_marco`, motor de safras), `pagamentosAteMarco` nunca paga na
+  // própria safra: a 1ª parcela cai em `safra + defasagemMeses` = safra + 1.
+  const mesVenda = 20;
+  const legado = linha458(mesVenda, false);
+  const canonico = linha458(mesVenda, true);
+  assert.equal(Array.isArray((legado.fluxo_pagamento as any).componentes), false,
+    'pré-condição: a linha legada não tem componentes');
+  const comps = (canonico.fluxo_pagamento as any).componentes;
+  assert.ok(Array.isArray(comps) && comps.length > 0, 'pré-condição: a linha canônica tem componentes');
+
+  const brutoLegado = recebimentoBrutoMensal(legado, CRONO, 60);
+  const brutoCanonico = recebimentoBrutoMensal(canonico, CRONO, 60);
+
+  assert.notDeepEqual(brutoCanonico, brutoLegado, 'os dois ramos têm de produzir séries diferentes');
+  assert.ok(brutoLegado[mesVenda] > 0,
+    'legado: o mês da venda já recebe parcela (vencimento ancorado na obra)');
+  assert.equal(brutoCanonico[mesVenda], 0,
+    'canônico: nada é recebido antes de safra + 1 — o mês da venda fica zerado');
+  assert.ok(brutoCanonico[mesVenda + 1] > 0, 'canônico: a 1ª parcela cai em safra + 1');
+});
+
+test('#458 caso negativo: com `componentes` presente nos DOIS Grupos, as séries são iguais', () => {
+  // Prova que a divergência acima vem do RAMO escolhido, não de uma diferença
+  // escondida na fixture: quando os dois lados já são canônicos, o mesmo
+  // fluxo_pagamento produz exatamente o mesmo resultado.
+  const mesVenda = 20;
+  const a = linha458(mesVenda, true);
+  const b = linha458(mesVenda, true);
+  assert.deepEqual(recebimentoBrutoMensal(a, CRONO, 60), recebimentoBrutoMensal(b, CRONO, 60));
+});
+
 // ── #456: KPIs de tela — juros de clientes, carteira máxima, exposição máxima
 // ── (e o mês em que cada uma ocorre) ────────────────────────────────────────
 //

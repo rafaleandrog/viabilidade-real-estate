@@ -6,7 +6,7 @@ import {
   curvaNaoRepresentavel,
   formularioAbsorcao,
 } from './fluxo-absorcao-editor.js';
-import { absorcaoMensal } from './fluxo-shared.js';
+import { absorcaoMensal, pctPosChavesDerivado } from './fluxo-shared.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #431 — Caso 2: o modal de Absorção para de apagar a curva própria
@@ -80,7 +80,8 @@ test('#431: edição real de um bloco converte para distribuido — e descarta m
     { evento: 'pre_lancamento', pct: 0 },
     { evento: 'lancamento', pct: 0 },
     { evento: 'obra', pct: 50 },
-    { evento: 'pos_obra', pct: 0 },
+    // #452: pos_obra grava o derivado (100 − 0 − 0 − 50), não 0.
+    { evento: 'pos_obra', pct: 50 },
   ]);
   assert.equal(salvo.aplicado, true);
 });
@@ -93,7 +94,8 @@ test('#431: a linha distribuida comum continua funcionando como sempre', () => {
   assert.deepEqual(absorcaoParaSalvar(form, abs), abs); // no-op
   const editado = absorcaoParaSalvar({ ...form, obra_pct: 50 }, abs);
   assert.equal(editado.modo, 'distribuido');
-  assert.deepEqual(editado.blocos.map((b: any) => b.pct), [10, 20, 50, 0]);
+  // #452: pos_obra grava o derivado (100 − 10 − 20 − 50 = 20), não 0.
+  assert.deepEqual(editado.blocos.map((b: any) => b.pct), [10, 20, 50, 20]);
 });
 
 test('#431: linha NOVA (sem absorcao persistida) monta o distribuido do formulário', () => {
@@ -102,7 +104,8 @@ test('#431: linha NOVA (sem absorcao persistida) monta o distribuido do formulá
     const salvo = absorcaoParaSalvar({ ...form, lancamento_pct: 30, obra_pct: 40 }, vazio);
     assert.equal(salvo.modo, 'distribuido');
     assert.equal(salvo.aplicado, true);
-    assert.deepEqual(salvo.blocos.map((b: any) => b.pct), [0, 30, 40, 0]);
+    // #452: pos_obra grava o derivado (100 − 0 − 30 − 40 = 30), não 0.
+    assert.deepEqual(salvo.blocos.map((b: any) => b.pct), [0, 30, 40, 30]);
   }
 });
 
@@ -128,7 +131,8 @@ test('#431: #347 continua valendo — sem a fase, o Pré-lançamento é zerado e
   assert.equal(form.pre_lancamento_pct, 0, 'a tela apresenta zerado');
   assert.equal(form.lido.pre_lancamento_pct, 10, 'mas o valor cru fica na memória');
   const salvo = absorcaoParaSalvar(form, abs);
-  assert.deepEqual(salvo.blocos.map((b: any) => b.pct), [0, 20, 40, 0]);
+  // #452: pos_obra grava o derivado (100 − 0 − 20 − 40 = 40), não 0.
+  assert.deepEqual(salvo.blocos.map((b: any) => b.pct), [0, 20, 40, 40]);
 });
 
 // ── O aviso e a confirmação ──
@@ -173,4 +177,22 @@ test('#431: a curva de 43 pontos continua chegando no motor depois do "Aplicar"'
   const depois = absorcaoMensal(absorcaoParaSalvar(formularioAbsorcao(abs, true), abs), CRONO);
   assert.deepEqual(depois, antes);
   assert.ok(antes!.pcts.some((p) => p > 0), 'pré-condição: a curva distribui alguma coisa');
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #452, critério 1 — pos_obra.pct grava o valor EFETIVO, não um placeholder
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#452: pos_obra grava o percentual EFETIVO (pctPosChavesDerivado), não 0', () => {
+  // Números fechados do critério de aceite: 10/15/10 → 65. E a comparação é
+  // contra a FUNÇÃO, não contra o literal `65` — para o teste não congelar o
+  // número se a fórmula um dia mudar.
+  const form = { ...formularioAbsorcao({}, true), pre_lancamento_pct: 10, lancamento_pct: 15, obra_pct: 10 };
+  const salvo = absorcaoParaSalvar(form, {});
+  assert.deepEqual(salvo.blocos[3], { evento: 'pos_obra', pct: 65 });
+  assert.equal(
+    salvo.blocos[3].pct,
+    pctPosChavesDerivado(salvo.blocos.slice(0, 3)),
+    'o valor gravado tem de bater com a função, não com um literal congelado',
+  );
 });
