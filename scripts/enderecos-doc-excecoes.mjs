@@ -152,12 +152,6 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
-    endereco: "frontend/fluxo-invariantes.ts:266-322",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :266-322 — \"validarProduto\" está em :255. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
     endereco: "frontend/fluxo-shared.ts:345-353",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :345-353 — \"erroFormularioAbsorcao\" está em :414. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",

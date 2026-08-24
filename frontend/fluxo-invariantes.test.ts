@@ -3,10 +3,14 @@ import assert from 'node:assert/strict';
 import {
   validarFluxoCalc, validarComponentesSafra, validarPermutaFisica, permutaFisicaPorTipologia,
   validarProduto, validarContratacao, validarSafrasReceita, validarFunding, validarCustosDuplicados,
-  unidadesNaoAlocadasPorTipologia, TOLERANCIA_PADRAO,
+  unidadesNaoAlocadasPorTipologia, TOLERANCIA_PADRAO, validarReconciliacaoCamadas, permutaFisicaDerivadaCatalogo,
 } from './fluxo-invariantes.js';
 import { absorcaoMensal } from './fluxo-shared.js';
+import {
+  calcularFluxo, linhasReceitaComPermutaReservada, vendaBrutaContratadaMensal,
+} from './fluxo-caixa-motor.js';
 import type { FluxoCalc, ComponentePagamento } from './fluxo-caixa-motor.js';
+import type { EventoCrono } from './fluxo-shared.js';
 import type { FundingCalc, OperacaoFunding } from './funding-motor.js';
 
 // FluxoCalc mínimo para exercitar validarFluxoCalc — só os campos que a
@@ -361,7 +365,7 @@ test('#429 validarProduto: a invariante NÃO pode ser satisfeita pela saída tru
   const receitas = receitaComCurva([{ mes: 0, pct: 60 }, { mes: 2, pct: 30 }, { mes: 15, pct: 10 }]);
   const vgvContratadoQueOMotorProduz = 0; // sem tipologias com preço, a conta fecha em zero
   assert.deepEqual(
-    validarContratacao(receitas, CRONO_PRODUTO, 4, vgvContratadoQueOMotorProduz), [],
+    validarContratacao(receitas, CRONO_PRODUTO, 4, vgvContratadoQueOMotorProduz, undefined, []), [],
     'validarContratacao continua cega ao descarte — é por isso que a #429 existe',
   );
   assert.equal(
@@ -422,16 +426,121 @@ test('#335 validarCustosDuplicados: 3 linhas na mesma categoria conta certo (enc
   assert.equal(r[0].diferenca, 2);
 });
 
+// ── #444: validarCustosDuplicados chaveia também por `subcategoria` ──────
+
+test('#444 validarCustosDuplicados: as 4 subcategorias canônicas de terreno/Preço + a linha sem subcategoria não são duplicata', () => {
+  const custos = [
+    { grupo: 'terreno', categoria: 'Preço' }, // "—", sem subcategoria
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Valor à vista' },
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira' },
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física' },
+  ];
+  assert.deepEqual(validarCustosDuplicados(custos), []);
+});
+
+test('#444 validarCustosDuplicados: mesma categoria e subcategoria continua sendo acusada', () => {
+  const custos = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Valor à vista' },
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Valor à vista' },
+  ];
+  const r = validarCustosDuplicados(custos);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].codigo, 'CATEGORIA_CUSTO_DUPLICADA');
+  assert.equal(r[0].encontrado, 2);
+  assert.equal(r[0].diferenca, 1);
+});
+
+test('#444 validarCustosDuplicados: duas linhas SEM subcategoria no grupo obra continuam duplicata (chave nova não abre buraco fora de terreno)', () => {
+  const custos = [
+    { grupo: 'obra', categoria: 'Construção' },
+    { grupo: 'obra', categoria: 'Construção' },
+  ];
+  const r = validarCustosDuplicados(custos);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].encontrado, 2);
+  assert.equal(r[0].diferenca, 1);
+});
+
+// ── #444: validarContratacao reconcilia contra o VGV VENDÁVEL ────────────
+
 test('validarContratacao: bruto fecha por quantidade × área × preço × absorção', () => {
   const linhas = [{
     ...RECEITA_PRODUTO[0],
     tipologias: [{ tipologia_id: 1, quantidade: 20, area_privativa_m2: 50, preco_m2: 10_000 }],
   }];
-  assert.deepEqual(validarContratacao(linhas, CRONO_PRODUTO, 20, 10_000_000), []);
-  const div = validarContratacao(linhas, CRONO_PRODUTO, 20, 9_000_000)[0];
+  assert.deepEqual(validarContratacao(linhas, CRONO_PRODUTO, 20, 10_000_000, undefined, []), []);
+  const div = validarContratacao(linhas, CRONO_PRODUTO, 20, 9_000_000, undefined, [])[0];
   assert.equal(div.codigo, 'VENDA_BRUTA_NAO_RECONCILIA');
   assert.equal(div.diferenca, -1_000_000);
 });
+
+test('#444 validarContratacao: permuta física reservada em Custos reconcilia contra a mesma grandeza do motor (vendaBrutaContratadaMensal)', () => {
+  const linhas = [{
+    nome: 'Torre E',
+    absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+    tipologias: [{ tipologia_id: 1, id: 1, quantidade: 20, area_privativa_m2: 50, preco_m2: 10_000 }],
+  }];
+  const custos = [{
+    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+    permuta_tipologia_id: 1, permuta_quantidade: 5,
+  }];
+  const linhasReservadas = linhasReceitaComPermutaReservada(linhas, custos);
+  const esperadoMotor = linhasReservadas.reduce(
+    (s, l) => s + vendaBrutaContratadaMensal(l, CRONO_PRODUTO, 20).reduce((ss, v) => ss + v, 0), 0);
+  // Sanidade: a permuta (5 × 50 × 10.000 = 2.500.000) reduziu o VGV vendável
+  // de 10.000.000 para 7.500.000.
+  assert.equal(esperadoMotor, 7_500_000);
+  assert.deepEqual(validarContratacao(linhas, CRONO_PRODUTO, 20, esperadoMotor, TOLERANCIA_PADRAO, custos), []);
+  // Sem `linhasCusto`, o validador cai no VGV BRUTO (10.000.000) — regressão
+  // que prova que a permuta entrou de fato na conta quando `linhasCusto` é
+  // passado, e não por coincidência.
+  const semReserva = validarContratacao(linhas, CRONO_PRODUTO, 20, esperadoMotor, undefined, []);
+  assert.equal(semReserva[0]?.codigo, 'VENDA_BRUTA_NAO_RECONCILIA');
+});
+
+const CRONO_PARCIAL: EventoCrono[] = [
+  { evento: 'lancamento', inicio_mes: 0, duracao_meses: 1 },
+  { evento: 'obra', inicio_mes: 0, duracao_meses: 1 },
+  { evento: 'pos_obra', inicio_mes: 1, duracao_meses: 12 },
+];
+
+test('#444 validarContratacao: absorção que NÃO fecha 100% no horizonte reprova a subtração do escalar global de permuta', () => {
+  const linhas = [
+    {
+      nome: 'Sem permuta',
+      absorcao: { modo: 'personalizado', meses: [{ mes: 0, pct: 100 }] },
+      tipologias: [{ tipologia_id: 1, id: 1, quantidade: 20, area_privativa_m2: 50, preco_m2: 10_000 }],
+    },
+    {
+      nome: 'Com permuta, absorção parcial no horizonte',
+      absorcao: { modo: 'personalizado', meses: [{ mes: 0, pct: 50 }, { mes: 11, pct: 50 }] },
+      tipologias: [{ tipologia_id: 2, id: 2, quantidade: 20, area_privativa_m2: 50, preco_m2: 10_000 }],
+    },
+  ];
+  const custos = [{
+    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+    permuta_tipologia_id: 2, permuta_quantidade: 10,
+  }];
+  const prazo = 6; // o mês 11 da 2ª linha cai FORA do horizonte
+  // Correto (por LINHA): a 1ª linha contribui 10.000.000 (sem permuta, 100%
+  // no horizonte); a 2ª contribui 2.500.000 (vendável 5.000.000 × 50% no
+  // horizonte — o outro 50% caiu fora do prazo e não conta). Total: 12.500.000.
+  assert.deepEqual(
+    validarContratacao(linhas, CRONO_PARCIAL, prazo, 12_500_000, TOLERANCIA_PADRAO, custos), [],
+  );
+  // Errado: subtrair o escalar `vgvPermutaFisica` do ESTUDO (5.000.000, sem
+  // peso de absorção) do bruto ponderado (10.000.000 + 5.000.000 =
+  // 15.000.000) dá 10.000.000 — só coincide com o correto quando a absorção
+  // fecha 100% no horizonte, que NÃO é o caso aqui. O validador tem de
+  // ACUSAR esse número.
+  const comEscalarErrado = validarContratacao(
+    linhas, CRONO_PARCIAL, prazo, 10_000_000, TOLERANCIA_PADRAO, custos,
+  );
+  assert.equal(comEscalarErrado[0]?.codigo, 'VENDA_BRUTA_NAO_RECONCILIA');
+});
+
+// ── #444: validarSafrasReceita usa a mesma regra do motor para o
+// `ate_marco` degenerado (N_s ≤ 0) ───────────────────────────────────────
 
 test('validarSafrasReceita: identifica linha e safra com componentes que não fecham 100%', () => {
   const linhas = [{
@@ -440,10 +549,57 @@ test('validarSafrasReceita: identifica linha e safra com componentes que não fe
     tipologias: [{ quantidade: 1, area_privativa_m2: 50, preco_m2: 10_000 }],
     fluxo_pagamento: { componentes: [{ tipo: 'imediato', participacaoPct: 90, descontoPct: 0 }] },
   }];
-  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20)[0];
+  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [])[0];
   assert.equal(div.codigo, 'SOMA_COMPONENTES_DIVERGE');
   assert.equal(div.linha, 'Torre A');
   assert.equal(div.safra, 1);
+  // #444 regressão: SOMA_COMPONENTES_DIVERGE continua sendo acusada depois da
+  // troca de `componentesEfetivosSafra` por `componentesIntegradosSafra`.
+});
+
+test('#444 validarSafrasReceita: ate_marco degenerado (N_s ≤ 0, mesmo mecanismo do motor) não emite COMPONENTE_INVALIDO', () => {
+  const linhas = [{
+    nome: 'Torre B',
+    absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+    tipologias: [{ tipologia_id: 1, quantidade: 1, area_privativa_m2: 50, preco_m2: 10_000 }],
+    fluxo_pagamento: {
+      componentes: [{
+        tipo: 'ate_marco', participacaoPct: 100, sinalPct: 0, marcoMes: 1,
+        defasagemMeses: 1, taxaMensal: 0, jurosNoMesDaContratacao: false, rotulo: 'até marco',
+      }],
+    },
+  }];
+  // safra 1 (lançamento) == marcoMes 1 → N_s = 0 ≤ 0 — o motor converte para
+  // `imediato`; o validador precisa fazer o mesmo, não lançar/capturar.
+  const r = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, []);
+  assert.deepEqual(r.filter((d) => d.codigo === 'COMPONENTE_INVALIDO'), []);
+
+  // `calcularFluxo` roda sem exceção sobre a MESMA fixture e produz número —
+  // asserção contra o array, não contra "não lançou": a venda é contratada e
+  // recebida integralmente no mês 1 (safra 1 → imediato): 1×50×10.000.
+  const calc = calcularFluxo({
+    dataInicio: null, taxaDescontoAa: 10, cronograma: CRONO_PRODUTO,
+    linhasReceita: linhas, linhasCusto: [], areaTerreno: 0,
+  });
+  assert.equal(calc.fluxoMensal[1], 500_000);
+});
+
+test('#444 validarSafrasReceita: componente GENUINAMENTE inválido (concentrado pago antes da safra, não o caso degenerado) continua acusado', () => {
+  const linhas = [{
+    nome: 'Torre D',
+    absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+    tipologias: [{ tipologia_id: 1, quantidade: 1, area_privativa_m2: 50, preco_m2: 10_000 }],
+    fluxo_pagamento: {
+      componentes: [{
+        tipo: 'concentrado', participacaoPct: 100, mesPagamento: 0, taxaMensal: 0, rotulo: 'repasse',
+      }],
+    },
+  }];
+  // contratação na safra 1 (lançamento, inicio_mes 1); mesPagamento 0 < safra
+  // 1 — `pagamentosConcentrado` lança (#234), independente da conversão do
+  // `ate_marco` degenerado que esta issue introduziu.
+  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, []).find((d) => d.codigo === 'COMPONENTE_INVALIDO');
+  assert.ok(div, 'componente genuinamente inválido deveria continuar sendo acusado');
 });
 
 test('validarProduto: alocação + permuta acima do catálogo identifica tipologia e mês negativo', () => {
@@ -577,19 +733,189 @@ test('validarFunding: acusa saldo devedor negativo', () => {
   assert.equal(divs.find((d) => d.codigo === 'DIVIDA_NEGATIVA')?.mes, 1);
 });
 
-test('validarFunding: equity (sem saldo) não é checado pela invariante de dívida', () => {
+// #445: o nome do teste antigo ("equity sem saldo não é checado pela
+// invariante de dívida") ficou FALSO — equity ganhou diagnóstico próprio.
+// Reescrito para exercitar exatamente essa borda: (a) e (c) na mesma
+// operação, e a prova de que nenhuma checagem de DÍVIDA dispara para ela.
+test('#445 validarFunding: equity ganha diagnóstico próprio — (a) retorno negativo + (c) sem aporte, nenhuma checagem de dívida', () => {
   const equity: FundingCalc = {
     operacoes: [{
-      operacao: { tipo: 'equity', nome: 'Investidor', valor: 0, inicio_mes: 0 },
-      entradas: [100, 0], saidas: [0, 50], fluxoInvestidor: [-100, 50],
+      operacao: { tipo: 'equity', nome: 'Investidor', valor: 0, inicio_mes: 0, pct_retorno: 5 },
+      entradas: [0, 0], saidas: [-10, 50], fluxoInvestidor: [10, 50],
       juros: [0, 0], saldo: [0, 0],
     }],
     noFluxo: {
-      entradas: [100, 0], saidas: [0, 50], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
-      fluxoMensal: [100, -50], fluxoAcumulado: [100, 50], vplLiquido: 0,
+      entradas: [0, 0], saidas: [-10, 50], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [10, -50], fluxoAcumulado: [10, -40], vplLiquido: 0,
+    },
+  };
+  const divs = validarFunding(equity, [0, 0]);
+  const negativo = divs.find((d) => d.codigo === 'RETORNO_EQUITY_NEGATIVO');
+  assert.ok(negativo, 'deveria acusar retorno negativo (a)');
+  assert.equal(negativo!.mes, 0);
+  const semAporte = divs.find((d) => d.codigo === 'EQUITY_SEM_APORTE');
+  assert.ok(semAporte, 'deveria acusar equity sem aporte (c)');
+  assert.deepEqual(
+    divs.filter((d) => d.codigo === 'DIVIDA_NEGATIVA' || d.codigo === 'DIVIDA_FINAL_NAO_ZERA'), [],
+    'equity não tem saldo devedor — as checagens de dívida nunca deveriam alcançá-la',
+  );
+});
+
+test('#445 validarFunding: equity SAUDÁVEL (aportou, retorno positivo) produz ZERO divergências — teste negativo', () => {
+  const equity: FundingCalc = {
+    operacoes: [{
+      operacao: { tipo: 'equity', nome: 'Investidor', valor: 1000, inicio_mes: 0, pct_retorno: 5 },
+      entradas: [1000, 0], saidas: [0, 50], fluxoInvestidor: [-1000, 50],
+      juros: [0, 0], saldo: [0, 0],
+    }],
+    noFluxo: {
+      entradas: [1000, 0], saidas: [0, 50], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [1000, -50], fluxoAcumulado: [1000, 950], vplLiquido: 0,
     },
   };
   assert.deepEqual(validarFunding(equity, [0, 0]), []);
+});
+
+test('#445 validarFunding: (a) modo resultado_final com resultadoFinal negativo produz retorno negativo', () => {
+  // funding-motor.ts:474 — `saidas[t] = round2(resultadoFinal * pct)`, sem
+  // clamp; um `resultadoFinal` negativo vira retorno negativo diretamente.
+  const equity: FundingCalc = {
+    operacoes: [{
+      operacao: { tipo: 'equity', nome: 'Investidor', valor: 1000, inicio_mes: 0, pct_retorno: 5, modo_retorno: 'resultado_final' },
+      entradas: [1000, 0], saidas: [0, -500], fluxoInvestidor: [-1000, -500],
+      juros: [0, 0], saldo: [0, 0],
+    }],
+    noFluxo: {
+      entradas: [1000, 0], saidas: [0, -500], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [1000, 500], fluxoAcumulado: [1000, 1500], vplLiquido: 0,
+    },
+  };
+  const div = validarFunding(equity, [0, 0]).find((d) => d.codigo === 'RETORNO_EQUITY_NEGATIVO');
+  assert.ok(div, 'resultado_final negativo deveria produzir retorno negativo');
+  assert.equal(div!.mes, 1);
+});
+
+test('#445 validarFunding: (a) modo progressivo (permuta_financeira) também é coberto pela checagem — mesmo com o clamp do #432 no motor', () => {
+  // O clamp+carry-forward de `simularEquity` (#432) impede saída negativa
+  // HOJE no motor real — mas a checagem opera sobre `saidas` diretamente,
+  // sem presumir qual mecanismo gerou o valor, e cobre uma regressão futura
+  // que reintroduza saída negativa no modo progressivo.
+  const equity: FundingCalc = {
+    operacoes: [{
+      operacao: { tipo: 'equity', nome: 'Investidor', valor: 1000, inicio_mes: 0, pct_retorno: 5, modo_retorno: 'permuta_financeira' },
+      entradas: [1000, 0], saidas: [-20, 50], fluxoInvestidor: [980, 50],
+      juros: [0, 0], saldo: [0, 0],
+    }],
+    noFluxo: {
+      entradas: [1000, 0], saidas: [-20, 50], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [1020, -50], fluxoAcumulado: [1020, 970], vplLiquido: 0,
+    },
+  };
+  const div = validarFunding(equity, [0, 0]).find((d) => d.codigo === 'RETORNO_EQUITY_NEGATIVO');
+  assert.ok(div, 'saída negativa em modo progressivo também deveria ser acusada');
+});
+
+test('#445 validarFunding: dívida com saldo TODO ZERO (nunca desembolsou) continua sem ser acusada — regressão do desvio por TIPO', () => {
+  const divida: FundingCalc = {
+    operacoes: [{
+      operacao: { tipo: 'divida', nome: 'Linha sem saque', valor: 0, inicio_mes: 0 },
+      entradas: [0, 0], saidas: [0, 0], fluxoInvestidor: [0, 0],
+      juros: [0, 0], saldo: [0, 0],
+    }],
+    noFluxo: {
+      entradas: [0, 0], saidas: [0, 0], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [0, 0], fluxoAcumulado: [0, 0], vplLiquido: 0,
+    },
+  };
+  assert.deepEqual(validarFunding(divida, [0, 0]), []);
+});
+
+const opEquitySoma = (nome: string, pctRetorno: number, saidaMes0: number, modoRetorno?: 'permuta_financeira' | 'resultado_final') => ({
+  operacao: { tipo: 'equity' as const, nome, valor: 1, inicio_mes: 0, pct_retorno: pctRetorno, modo_retorno: modoRetorno },
+  entradas: [0], saidas: [saidaMes0], fluxoInvestidor: [saidaMes0], juros: [0], saldo: [0],
+});
+
+test('#445 validarFunding (b): Σ retorno de equity (permuta_financeira) EXCEDE a receita líquida do mês — R$ 120.000 > R$ 100.000, um só alerta', () => {
+  const calc: FundingCalc = {
+    // "A" sem `modo_retorno` — prova que o default `permuta_financeira`
+    // (funding-motor.ts:437) foi aplicado: se não fosse, só "B" (50.000)
+    // entraria na soma e 50.000 ≤ 100.000 não dispararia nada.
+    operacoes: [opEquitySoma('A', 70, 70_000), opEquitySoma('B', 50, 50_000, 'permuta_financeira')],
+    noFluxo: {
+      entradas: [0], saidas: [120_000], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [-120_000], fluxoAcumulado: [-120_000], vplLiquido: 0,
+    },
+  };
+  const divs = validarFunding(calc, [0], TOLERANCIA_PADRAO, [100_000]);
+  const alerta = divs.filter((d) => d.codigo === 'RETORNO_EQUITY_EXCEDE_RECEITA');
+  assert.equal(alerta.length, 1, 'um alerta por mês, não um por operação');
+  assert.equal(alerta[0].severidade, 'alerta');
+  assert.equal(alerta[0].mes, 0);
+  assert.equal(alerta[0].esperado, 100_000);
+  assert.equal(alerta[0].encontrado, 120_000);
+});
+
+test('#445 validarFunding (b): Σ = R$ 100.000 (70 + 30), DENTRO da tolerância — nenhum alerta', () => {
+  const calc: FundingCalc = {
+    operacoes: [opEquitySoma('A', 70, 70_000), opEquitySoma('B', 30, 30_000)],
+    noFluxo: {
+      entradas: [0], saidas: [100_000], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [-100_000], fluxoAcumulado: [-100_000], vplLiquido: 0,
+    },
+  };
+  const divs = validarFunding(calc, [0], TOLERANCIA_PADRAO, [100_000]);
+  assert.deepEqual(divs.filter((d) => d.codigo === 'RETORNO_EQUITY_EXCEDE_RECEITA'), []);
+});
+
+test('#445 validarFunding (b): equity em modo resultado_final NÃO entra na soma mensal — é pagamento nominal, não fração da receita do mês', () => {
+  const calc: FundingCalc = {
+    operacoes: [opEquitySoma('A', 70, 200_000, 'resultado_final')],
+    noFluxo: {
+      entradas: [0], saidas: [200_000], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [-200_000], fluxoAcumulado: [-200_000], vplLiquido: 0,
+    },
+  };
+  const divs = validarFunding(calc, [0], TOLERANCIA_PADRAO, [100_000]);
+  assert.deepEqual(divs.filter((d) => d.codigo === 'RETORNO_EQUITY_EXCEDE_RECEITA'), []);
+});
+
+test('#445 validarFunding (b): sem `receitaLiquidaMensal`, a checagem simplesmente não roda (compatibilidade com os chamadores que não a passam)', () => {
+  const calc: FundingCalc = {
+    operacoes: [opEquitySoma('A', 70, 200_000)],
+    noFluxo: {
+      entradas: [0], saidas: [200_000], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [-200_000], fluxoAcumulado: [-200_000], vplLiquido: 0,
+    },
+  };
+  const divs = validarFunding(calc, [0]);
+  assert.deepEqual(divs.filter((d) => d.codigo === 'RETORNO_EQUITY_EXCEDE_RECEITA'), []);
+});
+
+test('#445 validarFunding (c): { valor: 0, pct_retorno: 5 } acusa EQUITY_SEM_APORTE; { valor: 1000, pct_retorno: 5 } não acusa nada', () => {
+  const semAporte: FundingCalc = {
+    operacoes: [{
+      operacao: { tipo: 'equity', nome: 'X', valor: 0, inicio_mes: 0, pct_retorno: 5 },
+      entradas: [0], saidas: [0], fluxoInvestidor: [0], juros: [0], saldo: [0],
+    }],
+    noFluxo: {
+      entradas: [0], saidas: [0], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [0], fluxoAcumulado: [0], vplLiquido: 0,
+    },
+  };
+  const divs = validarFunding(semAporte, [0]);
+  assert.equal(divs.filter((d) => d.codigo === 'EQUITY_SEM_APORTE').length, 1);
+
+  const comAporte: FundingCalc = {
+    operacoes: [{
+      operacao: { tipo: 'equity', nome: 'X', valor: 1000, inicio_mes: 0, pct_retorno: 5 },
+      entradas: [1000], saidas: [0], fluxoInvestidor: [-1000], juros: [0], saldo: [0],
+    }],
+    noFluxo: {
+      entradas: [1000], saidas: [0], linhasEntrada: [], linhasSaida: [], financiamentoProducao: [],
+      fluxoMensal: [1000], fluxoAcumulado: [1000], vplLiquido: 0,
+    },
+  };
+  assert.deepEqual(validarFunding(comAporte, [0]).filter((d) => d.codigo === 'EQUITY_SEM_APORTE'), []);
 });
 
 // ── D14 (#355): caixa acumulado negativo depois do funding ──────────────────
@@ -628,4 +954,104 @@ test('#355 D14: mergulho dentro da tolerância não acusa (ruído de arredondame
   const calc = fundingBase([0, 0], [0, 0], [0, 0]);
   calc.noFluxo.fluxoAcumulado = [0, -0.005];
   assert.deepEqual(validarFunding(calc, [0, 0]), []);
+});
+
+// ── #441: reconciliação Catálogo × Premissas ──────────────────────────────
+
+const TIPOLOGIAS_441 = [
+  { id: 1, nome: 'Apto A', tipo_unidade: 'apartamento', quantidade: 20, area_privativa_m2: 50 },
+  { id: 2, nome: 'Loja B', tipo_unidade: 'loja', quantidade: 10, area_privativa_m2: 30 },
+];
+
+const ESTUDO_AVANCADO_441 = { nivel_analise: 'avancado' };
+
+test('#441 validarReconciliacaoCamadas: só roda em nivel_analise avancado', () => {
+  const custos = [{
+    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+    permuta_tipologia_id: 1, permuta_quantidade: 5,
+  }];
+  assert.deepEqual(
+    validarReconciliacaoCamadas({ nivel_analise: 'preliminar' }, custos, TIPOLOGIAS_441), [],
+  );
+});
+
+test('#441 validarReconciliacaoCamadas: Catálogo com permuta e Premissas com canônico null acusa divergência (esperado = área do catálogo, encontrado = 0)', () => {
+  const custos = [{
+    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+    permuta_tipologia_id: 1, permuta_quantidade: 5,
+  }];
+  const estudo = { ...ESTUDO_AVANCADO_441, permuta_fisica_area_canonica: null };
+  const r = validarReconciliacaoCamadas(estudo, custos, TIPOLOGIAS_441);
+  const div = r.find((d) => d.codigo === 'CAMADAS_DIVERGEM_PERMUTA_FISICA' && d.linha?.includes('residencial') && !d.linha?.includes('não'));
+  assert.ok(div, 'deveria acusar divergência residencial');
+  assert.equal(div!.esperado, 250); // 5 × 50 m²
+  assert.equal(div!.encontrado, 0);
+});
+
+test('#441 validarReconciliacaoCamadas: reprova a leitura errada — unidades_permutadas legado, sem linha de custo de permuta, não acusa', () => {
+  const tipologiasComLegado = [
+    { ...TIPOLOGIAS_441[0], unidades_permutadas: 42 },
+    TIPOLOGIAS_441[1],
+  ];
+  const estudo = { ...ESTUDO_AVANCADO_441, permuta_fisica_area_canonica: null, permuta_fisica_nr_area_canonica: null };
+  // Nenhuma linha de custo `Preço/Permuta física` — a fonte legada
+  // (`unidades_permutadas`) não deve produzir divergência nenhuma, porque
+  // `permutaFisicaPorTipologia` (e portanto `permutaFisicaDerivadaCatalogo`)
+  // não a lê.
+  assert.deepEqual(validarReconciliacaoCamadas(estudo, [], tipologiasComLegado), []);
+});
+
+test('#441 validarReconciliacaoCamadas: regressão — camadas coerentes não acusam nada', () => {
+  const custos = [{
+    grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+    permuta_tipologia_id: 1, permuta_quantidade: 5,
+  }];
+  const estudo = {
+    ...ESTUDO_AVANCADO_441,
+    permuta_fisica_area_canonica: 250, // 5 × 50 m², igual ao Catálogo
+    permuta_fisica_nr_area_canonica: 0,
+  };
+  assert.deepEqual(validarReconciliacaoCamadas(estudo, custos, TIPOLOGIAS_441), []);
+});
+
+test('#441 permutaFisicaDerivadaCatalogo: divide entre as famílias R e NR pelo tipo_unidade', () => {
+  const custos = [
+    {
+      grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+      permuta_tipologia_id: 1, permuta_quantidade: 4, // apartamento → residencial: 4 × 50 = 200 m²
+    },
+    {
+      grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+      permuta_tipologia_id: 2, permuta_quantidade: 3, // loja → não residencial: 3 × 30 = 90 m²
+    },
+  ];
+  const d = permutaFisicaDerivadaCatalogo(custos, TIPOLOGIAS_441);
+  assert.equal(d.residencial.areaM2, 200);
+  assert.equal(d.residencial.quantidade, 4);
+  assert.equal(d.naoResidencial.areaM2, 90);
+  assert.equal(d.naoResidencial.quantidade, 3);
+});
+
+test('#441 validarReconciliacaoCamadas: divisão R × NR — apartamento e loja caem em famílias diferentes das Premissas', () => {
+  const custos = [
+    {
+      grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+      permuta_tipologia_id: 1, permuta_quantidade: 4,
+    },
+    {
+      grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+      permuta_tipologia_id: 2, permuta_quantidade: 3,
+    },
+  ];
+  // Premissas só têm o residencial certo — a NR está errada (0 em vez de 90).
+  const estudo = {
+    ...ESTUDO_AVANCADO_441,
+    permuta_fisica_area_canonica: 200,
+    permuta_fisica_nr_area_canonica: 0,
+  };
+  const r = validarReconciliacaoCamadas(estudo, custos, TIPOLOGIAS_441);
+  assert.equal(r.length, 1, 'só a família NR deveria divergir');
+  assert.match(r[0].linha!, /não residencial/);
+  assert.equal(r[0].esperado, 90);
+  assert.equal(r[0].encontrado, 0);
 });

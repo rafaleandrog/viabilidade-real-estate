@@ -19,8 +19,8 @@ import {
   type FundingCalc, type FundingNoFluxo, type OperacaoFunding,
 } from './funding-motor.js';
 import {
-  validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita,
-  validarFunding, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia,
+  validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita, validarReconciliacaoCamadas,
+  validarFunding, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia, TOLERANCIA_PADRAO,
   type Divergencia, type PermutaFisicaTipologia,
 } from './fluxo-invariantes.js';
 import {
@@ -170,8 +170,15 @@ export class ViabFluxoVer extends LitElement {
     //
     // Sem operações de Funding, `fundingDoEstudo` devolve `null` e a tabela
     // não ganha nenhuma linha nova (blast radius zero em estudo sem captação).
+    //
+    // #445: `receitaLiquida` içada para fora do `if` — a checagem (b) de
+    // `validarFunding` (equity em modo permuta_financeira × receita líquida
+    // do mês) precisa dela mesmo quando `this.fundingCalc` é `null`. Sem
+    // operações a variável fica `undefined` e a checagem simplesmente não
+    // roda (não há equity para checar).
+    let receitaLiquida: number[] | undefined;
     if (this.operacoes.length > 0) {
-      const receitaLiquida = receitaLiquidaComCorretagemMensal(this.calc.receitaMensal, this.calc.linhasCusto, d.custos);
+      receitaLiquida = receitaLiquidaComCorretagemMensal(this.calc.receitaMensal, this.calc.linhasCusto, d.custos);
       const resultadoFinal = this.calc.fluxoAcumulado[this.calc.fluxoAcumulado.length - 1] ?? 0;
       // D8: receita líquida, resultado final e mês do repasse vêm do ESTUDO,
       // não de campos redigitados na aba de Funding — é o que impede a aba de
@@ -192,10 +199,15 @@ export class ViabFluxoVer extends LitElement {
       // #335: categoria de custo repetida no mesmo grupo — reversão da #179
       // deixou de bloquear, agora é alerta visível na Reconciliação.
       ...validarCustosDuplicados(d.custos),
-      ...validarContratacao(receitas, d.crono, this.calc.prazo, this.calc.vendaBrutaContratada),
-      ...validarSafrasReceita(receitas, d.crono, this.calc.prazo),
+      ...validarContratacao(receitas, d.crono, this.calc.prazo, this.calc.vendaBrutaContratada, TOLERANCIA_PADRAO, d.custos),
+      ...validarSafrasReceita(receitas, d.crono, this.calc.prazo, TOLERANCIA_PADRAO, d.custos),
       ...validarFluxoCalc(this.calc),
-      ...(this.fundingCalc ? validarFunding(this.fundingCalc, this.calc.fluxoMensal) : []),
+      // #441: reconciliação Catálogo × Premissas — só emite algo em estudo
+      // `nivel_analise === 'avancado'`.
+      ...validarReconciliacaoCamadas(this.estudo, d.custos, d.tipologias),
+      ...(this.fundingCalc
+        ? validarFunding(this.fundingCalc, this.calc.fluxoMensal, TOLERANCIA_PADRAO, receitaLiquida)
+        : []),
     ];
     // #269: mesma fonte para tela e exportação — computado uma vez aqui.
     this.permutaFisica = permutaFisicaPorTipologia(d.custos, d.tipologias);
