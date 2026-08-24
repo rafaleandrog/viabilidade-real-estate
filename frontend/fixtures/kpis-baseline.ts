@@ -321,6 +321,12 @@ export const CASOS: CasoBaseline[] = [
       + 'o ramo `progressivo` do motor de equity — medido: só com A–D, o conserto da #432 '
       + 'passava 8/8 verde.',
     config: CONFIG_E, operacoes: OPS_E,
-    esperado: { resultado: 3_799_999.66, margemPct: 37.99999789199993, roiPct: 61.290317096774196, tir: 26.644417484686667, caixaFinalAlavancado: 4_389_999.67, vplLiquidoFunding: 1_027_495.56, fundingSaidas: 1_409_999.99 },
+    // #432 (clamp + carry-forward) moveu UM campo: `vplLiquidoFunding`
+    // 1_027_495.56 → 1_027_362.61 (Δ −132,95). É o efeito de CALENDÁRIO, e só ele:
+    // `fundingSaidas` fica em 1_409_999.99 porque o carry-forward preserva o TOTAL
+    // pago — o que muda é quando ele é pago, e o desconto do VPL enxerga isso.
+    // Os DESALAVANCADOS (`resultado`, `margemPct`, `roiPct`) são os da #426/#521
+    // (proforma desalavancada) e o clamp não os toca — são eixos independentes.
+    esperado: { resultado: 3_799_999.66, margemPct: 37.99999789199993, roiPct: 61.290317096774196, tir: 26.644417484686667, caixaFinalAlavancado: 4_389_999.67, vplLiquidoFunding: 1_027_362.61, fundingSaidas: 1_409_999.99 },
   },
 ];

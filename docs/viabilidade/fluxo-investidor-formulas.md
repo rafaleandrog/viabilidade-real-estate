@@ -59,6 +59,47 @@ Tabela `avancado_funding_operacoes` (migração `029_funding_operacoes.js`, que 
 | `modo_retorno`, `pct_retorno` | `equity` | `permuta_financeira` \| `resultado_final`, e o % |
 | `exposicao_minima`, `percentual_financiavel`, `amortizar_com_caixa`, `custo_linha_ids` | `financiamento_producao` | premissas da §4.3 |
 
+**Teto de `Σ pct_retorno` — duas somas, uma por `modo_retorno`.** A soma de `pct_retorno` das
+operações `equity` de um estudo **não pode passar de 100%**, e a checagem é feita **por
+`modo_retorno`, separadamente**:
+
+| Soma | Operações que entram | Base que ela distribui |
+|---|---|---|
+| A | `tipo = equity` **e** `modo_retorno = permuta_financeira` | Receita Líquida mensal (planilha: `C18`) |
+| B | `tipo = equity` **e** `modo_retorno = resultado_final` | Resultado Final (planilha: `C19`) |
+
+As duas **não competem**: são grandezas diferentes, e a planilha as separa (`D28 = SE(C24; C×C25;
+SE(t = C8; C19×C25; 0))`). Uma operação em cada modo pode ter 100% sem conflito.
+
+Três regras de leitura que a validação tem de respeitar, sob pena de somar o que não deve:
+
+- **`modo_retorno` tem default.** A coluna nasce `permuta_financeira` (`schema.json`, e o motor
+  aplica o mesmo default em memória): uma operação gravada sem o campo conta na **soma A**, não
+  fica de fora das duas.
+- **`tipo ≠ equity` não entra.** `pct_retorno` existe na tabela para os três tipos, com default
+  `0`, mas só é significativo em `equity`.
+- **No `PATCH`, vale o estado FINAL** (`atual + payload`), e a operação sendo editada **não conta
+  duas vezes** — senão toda edição recusaria a si mesma.
+
+A comparação usa **tolerância** (`> 100.01`, não `> 100` estrito): `pct_retorno` é percentual e
+carrega precisão plena, então `60 + 40,001` de ponto flutuante recusaria indevidamente. É o mesmo
+padrão de `erroFormularioAbsorcao` e `erroFormularioPagamento`.
+
+**Onde isso é imposto:** `backend/rotas/funding.ts` — `validarCamposOperacao` barra uma operação
+isolada acima de 100 (`400 CAMPO_INVALIDO`) e `somaRetornoExcede` barra a soma do estudo no `POST`
+e no `PATCH` (`422 RETORNO_EXCEDE_RECEITA`). A validação nasce **só no backend**: a tela ainda
+deixa salvar e mostra o erro depois.
+
+> ⚠️ **De onde vem esta regra, e por que ela está aqui.** O enunciado original é
+> [funding-capital-stack](funding-capital-stack) §6.2 — *"a soma das participações de receita não
+> pode superar 100%"* —, mas aquela §6 é **ADR histórico supersedido** pela reescrita do Funding, e
+> não serve de norma. A planilha `fluxo_investidor_FORMULAS` é **fonte nula** para esta regra: ela
+> tem **uma** operação só (`C25` é um número digitado, sem soma nem validação), então nunca
+> exercita o caso. O que ela dá é o **denominador** — `C18` e `C19` são grandezas únicas e fixas, e
+> `D28 = C28 × C25` distribui uma fração delas. Distribuir mais de 100% é distribuir o que não
+> existe: o instrumento deixaria de ser equity e viraria dívida disfarçada, sem saldo devedor, sem
+> juros e sem quitação. A regra passa a valer **aqui**, na spec vigente, pela **#435**.
+
 ## 3. Convenções
 
 **Tempo.** Meses **relativos, 0-based** — índice do array = mês, igual a `fluxo-caixa-motor.ts` e
@@ -136,16 +177,44 @@ retorno.
 | F — Fluxo investidor | `D − E` |
 | G — Caixa acumulado | `G_ant + F` |
 
+> ⚠️ **Divergência deliberada do app — retorno de equity quando a receita líquida do mês é
+> negativa (#432).** A linha `D` acima é a transcrição fiel da planilha, e a planilha **não** tem
+> `MAX(0; …)` ali. Ela é **silenciosa, não permissiva**: `C = B × (1 − C15 − C16 − C17)` é uma
+> dedução **multiplicativa** sobre uma decomposição do VGV em frações não negativas
+> (`não-negativo × 0,86`), então o estado negativo é **estruturalmente irrepresentável** na
+> planilha. No app a dedução é uma **série subtraída com cronograma próprio** — a corretagem é paga
+> integralmente no mês da venda (`frontend/fluxo-shared.ts:502-509`, `eCorretagem`, #121) enquanto o
+> recebimento é espalhado pelo plano —, e o estado **existe**: um mês de lançamento cujo sinal é
+> menor que a corretagem produz receita líquida negativa.
+>
+> **O app aplica clamp em 0 com carry-forward do déficit**, no modo `permuta_financeira`:
+>
+> 1. o mês nunca paga negativo — se `base × pct < déficit acumulado`, `saidas[t] = 0`;
+> 2. o que deixou de ser pago **não some**: vira déficit acumulado e abate os meses seguintes;
+> 3. um mês que não zera o déficit inteiro paga zero e **carrega o resto**;
+> 4. o **total** pago ao investidor é preservado quando o acumulado fecha não negativo — muda o
+>    calendário, não o montante. Déficit que sobra ao fim do horizonte é **extinto**, e **não** vira
+>    pagamento negativo: nesse caso o total pago é menor.
+>
+> O déficit é acumulado em **precisão plena** e vive **por operação** (variável local de
+> `simularEquity`); só `saidas[t]` é arredondado, pelo contrato C7 do `CLAUDE.md`.
+>
+> **Decisão do autor, 2026-08-22.** Não é restauração do clamp que existia em
+> `capital-stack-motor.ts` antes da #355 — aquele era um `Math.max(0, …)` seco, **sem memória de
+> déficit**, e teria produzido um total pago maior. O precedente interno do clamp (sem a memória) é
+> `frontend/fluxo-caixa-motor.ts:1584`, em `permutaFinanceiraLiquidaMensal` (`:1576-1587`). Implementação:
+> `simularEquity` (`funding-motor.ts:426`).
+
 **Decisão D8 — as premissas do projeto não são redigitadas.** A aba `equity` da planilha pede de
 novo VGV, % entrada/parcelas/repasse, corretagem, marketing, impostos, duração da obra e mês do
 repasse (`C4`–`C19`). O app **deriva tudo do próprio estudo**: `receitaLiquidaMensal`,
 `resultadoFinal` e `mesRepasseValor` chegam prontos a `simularEquity` por
-`fundingDoEstudo` (`funding-motor.ts:710`). Redigitar criaria uma segunda fonte de verdade,
+`fundingDoEstudo` (`funding-motor.ts:746`). Redigitar criaria uma segunda fonte de verdade,
 divergindo em silêncio da aba Resultados — exatamente o que as #349/#351 eliminaram.
 
 O invariante da curva vale como conferência: `Σ receita bruta = VGV`.
 
-Implementação: `simularEquity` (`funding-motor.ts:425`).
+Implementação: `simularEquity` (`funding-motor.ts:426`).
 
 ### 4.3 Financiamento à produção — **exceção, não segue esta planilha**
 
@@ -175,7 +244,7 @@ apenas **realocada** de `capital-stack-motor.ts`, não reescrita. Oráculo próp
 
 ## 5. Indicadores do investidor
 
-`indicadoresOperacao` (`funding-motor.ts:490`) devolve, na visão do investidor: investimento total
+`indicadoresOperacao` (`funding-motor.ts:523`) devolve, na visão do investidor: investimento total
 (negativo), retorno total, juros pagos, lucro, VPL, TIR mensal e anual, MOIC e payback.
 
 **Duas divergências deliberadas em relação à planilha:**
@@ -219,7 +288,7 @@ meses, lançamento no mês 2, obra 30, repasse no 32, 20% entrada / 30% parcelas
 
 ## 7. Como o funding entra na tabela de Resultados
 
-A costura é `FundingNoFluxo` (`funding-motor.ts:655`), criada pela #349 e preservada de propósito
+A costura é `FundingNoFluxo` (`funding-motor.ts:691`), criada pela #349 e preservada de propósito
 pela reescrita: as liberações/aportes entram como categoria de receita e as parcelas/retornos como
 categoria de custo, dentro da tabela principal — não há segunda tabela.
 
