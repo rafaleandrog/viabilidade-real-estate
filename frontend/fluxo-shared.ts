@@ -353,6 +353,29 @@ export function erroFormularioAbsorcao(f: {
 }
 
 /**
+ * #429: saída de `absorcaoMensal`. Além da série mensal, carrega a
+ * CONSERVAÇÃO da curva: `pctTotal` é o quanto ela declara vender e
+ * `pctDescartado` é a parte que não coube na janela derivada de absorção e,
+ * portanto, **não** está em `pcts`. Antes esse resto sumia sem log nem erro —
+ * o motor continua não o computando, mas agora quem valida consegue vê-lo.
+ *
+ * ⚠️ C7: `pctTotal`/`pctDescartado` são percentuais DERIVADOS, não monetários
+ * — carregam precisão plena aqui e só arredondam para exibir.
+ */
+export interface AbsorcaoMensal {
+  /** Mês relativo (0-based) do primeiro elemento de `pcts`. */
+  inicio: number;
+  /** % vendido no mês (`inicio` + i). Só o que caiu DENTRO da janela. */
+  pcts: number[];
+  /** Soma dos % que a curva declara vender — 100 numa curva íntegra. */
+  pctTotal: number;
+  /** Parte de `pctTotal` que caiu fora da janela e não entrou em `pcts`. */
+  pctDescartado: number;
+  /** Meses relativos com % descartado — alimenta a mensagem de diagnóstico. */
+  mesesDescartados: number[];
+}
+
+/**
  * Distribui a absorção (% de vendas) mês a mês, em meses RELATIVOS do projeto.
  * Retorna { inicio, pcts } onde pcts[i] é o % vendido no mês (inicio + i),
  * ou null se o cronograma for insuficiente.
@@ -372,11 +395,13 @@ export function erroFormularioAbsorcao(f: {
  *
  * Compat: `personalizado` (dado legado) usa `absorcao.meses`; qualquer outro
  * modo cai em `linear` (uniforme por todo o período de absorção).
+ *
+ * #429: a saída carrega também a CONSERVAÇÃO da curva — ver `AbsorcaoMensal`.
  */
 export function absorcaoMensal(
   absorcao: any,
   crono: EventoCrono[],
-): { inicio: number; pcts: number[] } | null {
+): AbsorcaoMensal | null {
   const modo = absorcao?.modo ?? 'linear';
   const blocos = Array.isArray(absorcao?.blocos) ? absorcao.blocos : [];
   // #226: a duração do Pós-chaves não é mais lida do bloco de absorção nem do
@@ -385,38 +410,80 @@ export function absorcaoMensal(
   if (!periodo) return null;
   const tamanho = periodo.fim - periodo.inicio + 1;
   const pcts = new Array<number>(tamanho).fill(0);
+  let pctTotal = 0;
+  let pctDescartado = 0;
+  const mesesDescartados: number[] = [];
 
   if (modo === 'personalizado' && Array.isArray(absorcao?.meses)) {
+    // #429: o ponto fora da janela derivada CONTINUA não sendo computado (a
+    // camada denuncia, não corrige — item 4 do Comportamento esperado), mas
+    // deixa de sumir sem rastro: entra em pctDescartado/mesesDescartados,
+    // que é o dado BRUTO de que `validarProduto` precisa. Derivar a checagem
+    // de `pcts` seria autoconsistente: `pcts` já é a saída truncada.
     for (const m of absorcao.meses) {
-      const idx = n(m?.mes) - periodo.inicio;
-      if (idx >= 0 && idx < tamanho) pcts[idx] += n(m?.pct);
+      const mes = n(m?.mes);
+      const pct = n(m?.pct);
+      pctTotal += pct;
+      const idx = mes - periodo.inicio;
+      if (idx >= 0 && idx < tamanho) { pcts[idx] += pct; continue; }
+      if (pct === 0) continue; // ponto vazio fora da janela não perde venda nenhuma
+      pctDescartado += pct;
+      mesesDescartados.push(mes);
     }
-    return { inicio: periodo.inicio, pcts };
+    return { inicio: periodo.inicio, pcts, pctTotal, pctDescartado, mesesDescartados };
   }
 
   if (modo === 'distribuido') {
     const faixas = faixasAbsorcao(crono);
     if (!faixas) return null;
     const espalhar = (faixa: { inicio: number; fim: number }, pct: number) => {
-      if (faixa.fim < faixa.inicio) return; // faixa vazia (ex.: sem Pré-lançamento)
+      pctTotal += pct;
+      if (faixa.fim < faixa.inicio) {
+        // Faixa vazia (sem Pré-lançamento, ou "Durante a obra" espremida pelo
+        // Lançamento — `problemaJanelaDuranteObra`). #429: o % do bloco não
+        // tem onde cair; antes evaporava calado, agora é contabilizado.
+        if (pct !== 0) pctDescartado += pct;
+        return;
+      }
       const dur = Math.max(1, faixa.fim - faixa.inicio + 1);
       const porMes = pct / dur;
       for (let m = faixa.inicio; m <= faixa.fim; m++) {
         const idx = m - periodo.inicio;
-        if (idx >= 0 && idx < tamanho) pcts[idx] += porMes;
+        if (idx >= 0 && idx < tamanho) { pcts[idx] += porMes; continue; }
+        if (porMes === 0) continue;
+        pctDescartado += porMes;
+        mesesDescartados.push(m);
       }
     };
     espalhar(faixas.pre_lancamento, pctBloco(blocos, 'pre_lancamento'));
     espalhar(faixas.lancamento, pctBloco(blocos, 'lancamento'));
     espalhar(faixas.obra, pctBloco(blocos, 'obra'));
     espalhar(faixas.pos_chaves, pctPosChavesDerivado(blocos));
-    return { inicio: periodo.inicio, pcts };
+    return { inicio: periodo.inicio, pcts, pctTotal, pctDescartado, mesesDescartados };
   }
 
-  // linear (fallback)
+  // linear (fallback): por construção cobre a janela inteira, nada a descartar.
   const porMes = 100 / tamanho;
   pcts.fill(porMes);
-  return { inicio: periodo.inicio, pcts };
+  return { inicio: periodo.inicio, pcts, pctTotal: 100, pctDescartado: 0, mesesDescartados: [] };
+}
+
+/**
+ * #429: quanto da curva o motor efetivamente computa — `pctTotal` menos o que
+ * caiu fora da janela. Numa curva íntegra dá 100. É a primeira das duas
+ * grandezas da invariante `ABSORCAO_NAO_FECHA`.
+ *
+ * ⚠️ No modo `personalizado` este número é aritmeticamente igual a `Σ pcts`
+ * (todo ponto ou cai dentro, ou é descartado) — quem NÃO é derivável de
+ * `pcts` é `pctDescartado`, e é por isso que a invariante olha os dois.
+ */
+export function pctAbsorcaoEfetivo(abs: AbsorcaoMensal): number {
+  return abs.pctTotal - abs.pctDescartado;
+}
+
+/** #429: último mês (relativo, 0-based) da janela derivada de absorção. */
+export function fimJanelaAbsorcao(abs: AbsorcaoMensal): number {
+  return abs.inicio + abs.pcts.length - 1;
 }
 
 // ─────────────────────────────────────────────────────────────────

@@ -181,6 +181,91 @@ test('#355 equity (resultado final): paga tudo de uma vez, no mês do repasse', 
   assert.equal(s.saidas[10], 0);
 });
 
+// ── #432 — receita líquida negativa: clamp em 0 com carry-forward ────────
+//
+// O estado NÃO existe na planilha: `!equity!C28 = B28*(1−C15−C16−C17)` é uma
+// dedução MULTIPLICATIVA sobre frações não negativas do VGV, logo `C ≥ 0` e a
+// coluna `D` não precisa de `MAX`. No app a dedução é uma SÉRIE SUBTRAÍDA com
+// cronograma próprio (corretagem integral no mês da venda, #121), e o mês de
+// lançamento cujo sinal é menor que a corretagem produz base NEGATIVA.
+//
+// Decisão do autor, 2026-08-22 — ver `docs/viabilidade/fluxo-investidor-formulas.md`
+// §4.2, bloco "Divergência deliberada do app".
+
+const EQUITY_432: OperacaoFunding = {
+  tipo: 'equity',
+  nome: 'Investidor',
+  valor: 0,
+  inicio_mes: 0,
+  modo_retorno: 'permuta_financeira',
+  pct_retorno: 10,
+};
+
+test('#432 base negativa não paga retorno negativo — o déficit abate o mês seguinte', () => {
+  const base = [-200_000, 2_000_000, 2_000_000];
+  const s = simularEquity(EQUITY_432, base, 0, 2, 3);
+
+  // Na `main` isto era [-20000, 200000, 200000]: o INVESTIDOR pagava ao projeto.
+  assert.deepEqual(s.saidas, [0, 180_000, 200_000]);
+
+  // A base negativa é MESMO exercitada — sem isto o teste passaria com o
+  // código antigo em qualquer curva não negativa.
+  assert.ok(base[0] < 0, 'o caso precisa ter receita líquida negativa');
+  assert.ok(base.some((v) => v < 0), 'pelo menos um mês com base negativa');
+
+  // ⚠️ Sem esta asserção o teste NÃO distingue carry-forward de um
+  // `Math.max(0, …)` seco, que devolveria [0, 200000, 200000] = 400.000.
+  const somaSemClamp = base.reduce((a, v) => a + v * 0.1, 0);
+  assert.equal(s.saidas.reduce((a, v) => a + v, 0), 380_000);
+  assert.equal(Math.round(somaSemClamp * 100) / 100, 380_000);
+});
+
+test('#432 déficit maior que o retorno dos meses seguintes: carrega e, no fim, extingue', () => {
+  const base = [-3_000_000, 100_000, 2_000_000];
+  const s = simularEquity(EQUITY_432, base, 0, 2, 3);
+
+  // mês 0: −300.000 → paga 0, déficit 300.000
+  // mês 1:  +10.000 → paga 0, déficit 290.000
+  // mês 2: +200.000 → paga 0, déficit 90.000 — EXTINTO, não vira pagamento negativo
+  assert.deepEqual(s.saidas, [0, 0, 0]);
+
+  // O total pago é MENOR que `Σ base × pct` (= −90.000): o déficit remanescente
+  // não é cobrado do investidor.
+  const somaSemClamp = base.reduce((a, v) => a + v * 0.1, 0);
+  assert.ok(somaSemClamp < 0, `sem clamp o total seria negativo (${somaSemClamp})`);
+  assert.equal(s.saidas.reduce((a, v) => a + v, 0), 0);
+});
+
+test('#432 o déficit é POR OPERAÇÃO — a segunda chamada não herda a primeira', () => {
+  // Se o acumulador virasse estado de módulo, a segunda chamada abriria com o
+  // déficit de 300.000 da primeira e devolveria [0, 0, 0].
+  simularEquity(EQUITY_432, [-3_000_000, 100_000, 2_000_000], 0, 2, 3);
+  const s = simularEquity(EQUITY_432, [-200_000, 2_000_000, 2_000_000], 0, 2, 3);
+  assert.deepEqual(s.saidas, [0, 180_000, 200_000]);
+});
+
+test('#432 o clamp NÃO toca o modo resultado_final nem curva sempre positiva', () => {
+  // `resultado_final` paga no mês do repasse, sem passar pelo carry-forward.
+  const op = { ...EQUITY_432, modo_retorno: 'resultado_final' as const };
+  const s = simularEquity(op, [-200_000, 2_000_000, 2_000_000], 1_000_000, 2, 3);
+  assert.deepEqual(s.saidas, [0, 0, 100_000]);
+
+  // Curva não negativa: o resultado é idêntico ao da fórmula crua.
+  const t = simularEquity(EQUITY_432, [100_000, 200_000, 300_000], 0, 2, 3);
+  assert.deepEqual(t.saidas, [10_000, 20_000, 30_000]);
+});
+
+test('#432 o déficit acumula em precisão plena — só `saidas` arredonda (C7)', () => {
+  // 3 meses de −0,333333 de base ×10% deixam um déficit que, arredondado a cada
+  // mês, divergiria do exato. Aqui o mês 3 paga a diferença completa.
+  const base = [-0.333_333, -0.333_333, -0.333_333, 1_000_000];
+  const s = simularEquity(EQUITY_432, base, 0, 3, 4);
+  const deficitExato = 3 * 0.333_333 * 0.1;
+  assert.deepEqual(s.saidas.slice(0, 3), [0, 0, 0]);
+  assert.equal(s.saidas[3], Math.round((100_000 - deficitExato) * 100) / 100);
+  assert.equal(s.saidas[3], 99_999.9);
+});
+
 test('#355 equity: o aporte não vira receita nem o retorno vira aporte (sinais)', () => {
   const liquida = receitaLiquidaGolden();
   const s = simularEquity(EQUITY_GOLDEN, liquida, 0, 31, 36);
