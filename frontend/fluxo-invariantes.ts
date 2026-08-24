@@ -157,13 +157,14 @@ export function validarContratacao(
   vendaBrutaEncontrada: number,
   tol: number = TOLERANCIA_PADRAO,
   linhasCusto: any[], // #444: OBRIGATÓRIO — omitir vira TS2554, não silêncio (a mutação de fiação provou que um parâmetro opcional aqui deixa a suíte inteira verde mesmo sem o wiring)
+  deflatorPct: number, // #462: OBRIGATÓRIO, mesma razão do parâmetro acima — omiti-lo vira TS2554
 ): Divergencia[] {
   const linhas = linhasCusto.length > 0
-    ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto)
+    ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto, deflatorPct)
     : linhasReceita;
   let esperado = 0;
   for (const linha of linhas) {
-    const vgv = vgvVendavelLinha(linha.tipologias ?? []);
+    const vgv = vgvVendavelLinha(linha.tipologias ?? [], deflatorPct);
     const abs = absorcaoMensal(linha.absorcao ?? { modo: 'linear' }, cronograma);
     if (!abs) continue;
     const pctNoHorizonte = abs.pcts.reduce((s, pct, i) => {
@@ -189,16 +190,17 @@ export function validarSafrasReceita(
   prazo: number,
   tol: number = TOLERANCIA_PADRAO,
   linhasCusto: any[], // #444: OBRIGATÓRIO — omitir vira TS2554, não silêncio (a mutação de fiação provou que um parâmetro opcional aqui deixa a suíte inteira verde mesmo sem o wiring)
+  deflatorPct: number, // #462: OBRIGATÓRIO, mesma razão do parâmetro acima — omiti-lo vira TS2554
 ): Divergencia[] {
   const out: Divergencia[] = [];
   const linhas = linhasCusto.length > 0
-    ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto)
+    ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto, deflatorPct)
     : linhasReceita;
   const obra = cronograma.find((e) => e.evento === 'obra');
   const mesEntrega = obra ? Number(obra.inicio_mes) + Number(obra.duracao_meses) - 1 : 0;
   for (const linha of linhas) {
     const componentes = componentesPagamento(linha.fluxo_pagamento, cronograma);
-    const contratacoes = vendaLiquidaContratadaMensal(linha, cronograma, prazo);
+    const contratacoes = vendaLiquidaContratadaMensal(linha, cronograma, prazo, deflatorPct);
     // #444: mesma regra do motor para o `ate_marco` degenerado (N_s ≤ 0) —
     // `componentesIntegradosSafra` converte para `imediato`, exatamente como
     // `calcularFluxo` faz (`residuoAteMarco` vive em
@@ -792,7 +794,7 @@ export function permutaFisicaPorTipologia(
 // ── #441: reconciliação de camadas (Catálogo × Premissas) ────────────────
 
 /**
- * #441: mapa `tipo_unidade` (catálogo do Avançado, `schema.json:330`) → a
+ * #441: mapa `tipo_unidade` (catálogo do Avançado, `schema.json:335`) → a
  * família de permuta física das Premissas (`permuta_fisica_*` residencial /
  * `permuta_fisica_nr_*` não residencial, split desde a #10). O app não tinha
  * esse mapeamento em nenhum lugar — é uma decisão desta issue, testada:

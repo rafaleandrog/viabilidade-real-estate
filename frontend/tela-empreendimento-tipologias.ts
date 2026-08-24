@@ -220,6 +220,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
           <col class="c-nome">
           ${lote ? nothing : html`<col class="c-tipo">`}
           <col class="c-area">
+          <col class="c-area">
           ${lote ? nothing : html`<col class="c-dorm"><col class="c-vagas">`}
           <col class="c-un">
           <col class="c-areatot">
@@ -230,6 +231,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
             <th>Nome</th>
             ${lote ? nothing : html`<th>Tipo</th>`}
             <th class="num">Área privativa</th>
+            <th class="num" title="Varanda, terraço, quintal — ponderada pelo deflator de preço do estudo (#462)">Área aberta</th>
             ${lote ? nothing : html`<th class="num">Dormitórios</th><th class="num">Vagas</th>`}
             <th class="num">Unidades</th>
             <th class="num">Área total</th>
@@ -241,6 +243,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
           <tr class="total">
             <td>Total</td>
             ${lote ? nothing : html`<td></td>`}
+            <td class="num"></td>
             <td class="num"></td>
             ${lote ? nothing : html`<td></td><td class="num">${fmtNum(totalVagas)}</td>`}
             <td class="num">${fmtNum(totalUnidades)}</td>
@@ -275,6 +278,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
             ></urbi-select>
           </td>`}
         <td class="num">${num('area_privativa_m2', 'm²')}</td>
+        <td class="num">${num('area_privativa_aberta_m2', 'm²')}</td>
         ${lote ? nothing : html`
           <td class="num">${num('dormitorios', '', 0)}</td>
           <td class="num">${num('vagas', '', 0)}</td>`}

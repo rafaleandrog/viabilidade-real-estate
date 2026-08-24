@@ -4,7 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct, fmtM2, fmtPctEntrada } from './viab-format.js';
 import {
   rotuloPeriodo, rotuloMesRelativo, absorcaoMensal, faixasAbsorcao, pctPosChavesDerivado, APOS_CHAVES_MESES,
-  erroFormularioAbsorcao, totalAntesAlocacao, ramoLegadoDeRecebiveis,
+  erroFormularioAbsorcao, totalAntesAlocacao, ramoLegadoDeRecebiveis, vgvTipologia,
   type EventoCrono,
 } from './fluxo-shared.js';
 import {
@@ -21,7 +21,7 @@ import {
   type FormularioAbsorcao,
 } from './fluxo-absorcao-editor.js';
 import {
-  urbiVerso,
+  urbiVerso, atualizarEstudo,
   buscarParametrosAvancado, buscarCronogramaAvancado,
   listarFasesAvancado, criarFaseAvancado, atualizarFaseAvancado, removerFaseAvancado,
   listarTipologiasCatalogo,
@@ -85,6 +85,8 @@ export class ViabFluxoReceitas extends LitElement {
   // #51 — rascunho local do nome da fase (evita que o re-render/round-trip
   // sobrescreva o input enquanto o usuário digita). Persiste via botão "Salvar".
   @state() private draftNome: Record<number, string> = {};
+  @state() private draftDeflator: number | null = null;
+  @state() private salvandoDeflator = false;
 
   private carregado = false;
   // #458: dedupe do console.warn por Grupo — sem isto, cada re-render (a tela
@@ -92,6 +94,7 @@ export class ViabFluxoReceitas extends LitElement {
   private _avisadoRamoLegado = new Set<any>();
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
+    .ret-box { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .cards { display: flex; flex-direction: column; gap: 16px; }
     .card-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .card-cab urbi-input.nome { width: 200px; }
@@ -223,6 +226,50 @@ export class ViabFluxoReceitas extends LitElement {
     return this.tipologias.find((t) => Number(t.id) === Number(id));
   }
 
+  /** #462: deflator de preço da área aberta — exclusivo do Avançado. */
+  private _deflatorPct(): number {
+    return Number(this.estudo?.deflator_area_aberta_pct) || 0;
+  }
+
+  /**
+   * #462: deflator de preço da área aberta (`estudos.deflator_area_aberta_pct`,
+   * % inteiro, exclusivo do Avançado — `CAMPOS_SOMENTE_AVANCADO` em
+   * `backend/rotas/estudos.ts`). Preço efetivo da tipologia =
+   * `(fechada × preço + aberta × preço × (1 − deflator))`. Default 0
+   * reproduz exatamente o VGV anterior a esta mudança.
+   */
+  private _renderDeflatorAreaAberta(): TemplateResult {
+    const dis = !this.editavel;
+    const valor = this.draftDeflator ?? this._deflatorPct();
+    return html`
+      <div class="ret-box">
+        <span>Deflator de preço da área aberta (varanda, terraço, quintal)</span>
+        <viab-num sufixo="%" casas-decimais="0" ?desabilitado=${dis} .valor=${valor}
+          @urbi:input-numero-change=${(e: CustomEvent) => { this.draftDeflator = e.detail.valor ?? 0; }}
+        ></viab-num>
+        ${!dis && this.draftDeflator !== null && this.draftDeflator !== this._deflatorPct() ? html`
+          <urbi-botao variante="secundario" pequeno ?carregando=${this.salvandoDeflator}
+            @click=${this._salvarDeflatorAreaAberta}>Salvar</urbi-botao>` : nothing}
+      </div>
+    `;
+  }
+
+  private _salvarDeflatorAreaAberta = async () => {
+    const v = Math.round(this.draftDeflator ?? 0);
+    this.salvandoDeflator = true;
+    try {
+      const res = await atualizarEstudo(this.estudo.id, { deflator_area_aberta_pct: v });
+      if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      this.estudo = { ...this.estudo, deflator_area_aberta_pct: v };
+      this.draftDeflator = null;
+      urbiVerso.notificar('Deflator da área aberta salvo.', 'sucesso');
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao salvar o deflator da área aberta', 'erro');
+    } finally {
+      this.salvandoDeflator = false;
+    }
+  };
+
   /**
    * Saldo global de unidades: quantidade do catálogo − Σ de todas as alocações
    * (todas as fases). Usado para checar disponibilidade ao adicionar/trocar tipologia.
@@ -248,9 +295,13 @@ export class ViabFluxoReceitas extends LitElement {
   }
 
   private _vgvFase(fase: any): number {
+    const deflatorPct = this._deflatorPct();
     return (fase.alocacoes || []).reduce((s: number, a: any) => {
       const tip = this._tip(a.tipologia_id);
-      return s + n(a.unidades) * n(tip?.area_privativa_m2) * n(a.preco_m2);
+      // #462: preço PRÓPRIO da alocação (`a.preco_m2`), área da tipologia
+      // (fechada + aberta, ponderada pelo mesmo deflator) — reusa a fórmula
+      // canônica de `vgvTipologia` em vez de duplicá-la.
+      return s + vgvTipologia({ ...tip, preco_m2: a.preco_m2, quantidade: a.unidades }, deflatorPct);
     }, 0);
   }
 
@@ -264,6 +315,7 @@ export class ViabFluxoReceitas extends LitElement {
             Nenhuma tipologia no catálogo. Cadastre as tipologias em <b>Empreendimento → Tipologias</b> antes de alocar vendas.
           </urbi-banner>
         </div>` : nothing}
+      ${this._renderDeflatorAreaAberta()}
       ${this.fases.length === 0 ? html`
         <urbi-estado-vazio icone="fa-solid fa-layer-group" mensagem="Nenhum grupo definido"></urbi-estado-vazio>` : nothing}
       <div class="cards">
@@ -392,8 +444,13 @@ export class ViabFluxoReceitas extends LitElement {
   private _renderAlocacao(f: any, a: any, dis: boolean): TemplateResult {
     const tip = this._tip(a.tipologia_id);
     const area = n(tip?.area_privativa_m2);
-    const precoUnit = area * n(a.preco_m2);
-    const precoTotal = precoUnit * n(a.unidades);
+    // #462: preço PRÓPRIO da alocação (`a.preco_m2`), ponderado entre a área
+    // fechada e a aberta com o deflator do estudo — reusa `vgvTipologia` em
+    // vez de duplicar a fórmula. `area` (fechada, sozinha) segue sendo o que
+    // a coluna de m² exibe — não muda de significado.
+    const deflatorPct = this._deflatorPct();
+    const precoUnit = vgvTipologia({ ...tip, preco_m2: a.preco_m2, quantidade: 1 }, deflatorPct);
+    const precoTotal = vgvTipologia({ ...tip, preco_m2: a.preco_m2, quantidade: n(a.unidades) }, deflatorPct);
     // #170: as unidades da tipologia cascateiam pelas fases. "Total" é o que
     // ainda estava disponível ao chegar nesta linha (catálogo − vendido acima);
     // "Saldo" é esse total menos as unidades vendidas na própria linha.

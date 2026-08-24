@@ -772,7 +772,7 @@ const TIPOS_UNIDADE = ['apartamento', 'cobertura', 'loja', 'lote', 'outro'];
 // (#266/#267/#268: permuta_tipologia_id + permuta_quantidade + valor
 // declarado). A coluna em si permanece no schema (dado histórico
 // preservado); só o CRUD deixa de ler/escrever nela.
-const CAMPOS_TIPOLOGIA = ['nome', 'tipo_unidade', 'area_privativa_m2', 'dormitorios', 'vagas', 'quantidade', 'preco_m2', 'ordem'];
+const CAMPOS_TIPOLOGIA = ['nome', 'tipo_unidade', 'area_privativa_m2', 'area_privativa_aberta_m2', 'dormitorios', 'vagas', 'quantidade', 'preco_m2', 'ordem'];
 
 // ── Catálogo de tipologias (nível estudo) ──
 
@@ -1322,6 +1322,7 @@ export function montarLinhasReceita(fases: any[], alocacoes: any[], tipologias: 
         tipologia_id: a.tipologia_id,
         nome: t?.nome || 'Tipologia',
         area_privativa_m2: t?.area_privativa_m2 ?? 0,
+        area_privativa_aberta_m2: t?.area_privativa_aberta_m2 ?? 0,
         quantidade: a.unidades,
         preco_m2: a.preco_m2,
       };

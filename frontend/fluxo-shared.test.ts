@@ -80,8 +80,67 @@ test('rotuloPeriodo formata intervalo com duração (0-based)', () => {
 test('vgv de tipologia e de linha', () => {
   const t1 = { quantidade: 10, area_privativa_m2: 70, preco_m2: 10000 }; // 7.000.000
   const t2 = { quantidade: 2, area_privativa_m2: 280, preco_m2: 12000 }; // 6.720.000
-  assert.equal(vgvTipologia(t1), 7_000_000);
-  assert.equal(vgvLinha([t1, t2]), 13_720_000);
+  assert.equal(vgvTipologia(t1, 0), 7_000_000);
+  assert.equal(vgvLinha([t1, t2], 0), 13_720_000);
+});
+
+// #462: área aberta 0 (o default) reproduz EXATAMENTE o cálculo anterior —
+// nenhum estudo pré-existente muda de VGV. `area_privativa_aberta_m2`
+// ausente do objeto (campo novo, dado legado) tem de se comportar como 0.
+test('#462 regressão: área aberta 0/ausente não muda o VGV, com qualquer deflator', () => {
+  const t = { quantidade: 10, area_privativa_m2: 70, preco_m2: 10000 };
+  const semCampo = { ...t }; // dado legado — nunca teve a coluna
+  const comZero = { ...t, area_privativa_aberta_m2: 0 };
+  assert.equal(vgvTipologia(semCampo, 0), 7_000_000);
+  assert.equal(vgvTipologia(comZero, 0), 7_000_000);
+  // O deflator não tem NENHUM efeito sem área aberta — a variação só entra
+  // pela área, nunca pelo % sozinho.
+  assert.equal(vgvTipologia(semCampo, 50), 7_000_000);
+  assert.equal(vgvTipologia(comZero, 100), 7_000_000);
+});
+
+// #462: dois testes de precisão que provam coisas DIFERENTES (decisão 4 do
+// comentário 5397793972 da #462) — não escolher um só.
+//
+//  · `formula`: com as áreas CHEIAS da EVI (BRIEF-EVI.md T8/`dump_Areas_e_Precos.txt`),
+//    prova que a FÓRMULA é a da planilha — preço médio ponderado 9.266,223655264535
+//    (`Areas e Precos!F6`) e VGV 170.854.431,21 (`!F20`, 2 casas — contrato C7).
+//  · `persistivel`: com as áreas na precisão que `decimal(…,2)` REALMENTE
+//    guarda (17.530,94 / 907,47), prova que o app — na precisão que consegue
+//    persistir — fica R$ 18,71 abaixo da planilha, e que isso é limite de
+//    schema, não erro de conta. Sem `toBeCloseTo`/épsilon largo: os dois
+//    valores são exatos nas próprias entradas.
+const round2 = (v: number): number => Math.round((v + Number.EPSILON) * 100) / 100;
+
+test('#462 preço efetivo/VGV — formula: áreas cheias da EVI reproduzem F6/F20', () => {
+  const t = {
+    quantidade: 1,
+    area_privativa_m2: 17530.94390649873,       // fechada — infoAreaPrivativaResidencialFechada
+    area_privativa_aberta_m2: 907.466126361201, // aberta — infoAreaPrivativaResidencialAberta
+    preco_m2: 9500,                             // PrecoTabelaResidencial
+  };
+  const deflatorPct = 50; // PrecoAreasAbertasDeflator
+  const vgv = vgvTipologia(t, deflatorPct);
+  assert.equal(round2(vgv), 170854431.21); // Areas e Precos!F20
+  const precoMedio = vgv / (t.area_privativa_m2 + t.area_privativa_aberta_m2);
+  // Preço médio: representação derivada não monetária (R$/m²) — precisão
+  // plena, arredonda só para exibir (contrato do CLAUDE.md § Contratos).
+  assert.equal(precoMedio, 9266.223655264535); // Areas e Precos!F6
+});
+
+test('#462 preço efetivo/VGV — persistivel: na precisão de decimal(…,2), R$ 18,71 abaixo da planilha', () => {
+  const t = {
+    quantidade: 1,
+    area_privativa_m2: 17530.94,       // o que decimal(10,2) guarda de 17.530,94390649873
+    area_privativa_aberta_m2: 907.47,  // o que decimal(10,2) guarda de 907,466126361201
+    preco_m2: 9500,
+  };
+  const vgv = vgvTipologia(t, 50);
+  assert.equal(round2(vgv), 170854412.50);
+  // O delta é EXATAMENTE R$ 18,71 (o corpo da issue #462 dizia "R$ 19"; o
+  // valor conferido é 18,71) — arredondamento das áreas, não folga de
+  // tolerância. As duas entradas são exatas; nada de épsilon largo.
+  assert.equal(round2(170854431.21 - round2(vgv)), 18.71);
 });
 
 // #228/#346: receitaLiquidaLinha substitui vglLinha — RET é o único imposto
@@ -280,7 +339,7 @@ test('vgvVendidoBrutoMensal reparte o VGV de cada linha pela sua absorção (#12
       absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 50 }, { mes: 20, pct: 50 }] },
     },
   ];
-  const r = vgvVendidoBrutoMensal(linhas, CRONO, 60);
+  const r = vgvVendidoBrutoMensal(linhas, CRONO, 60, 0);
   assert.equal(r.length, 60);
   assert.ok(perto(r.reduce((s, x) => s + x, 0), 70_000_000));
   assert.ok(perto(r[12], 50_000_000 + 10_000_000));
@@ -301,8 +360,8 @@ test('vgvVendidoVendavelMensal exclui a fatia de permuta física (#473)', () => 
       absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 50 }, { mes: 20, pct: 50 }] },
     },
   ];
-  const bruto = vgvVendidoBrutoMensal(linhas, CRONO, 60);
-  const vendavel = vgvVendidoVendavelMensal(linhas, CRONO, 60);
+  const bruto = vgvVendidoBrutoMensal(linhas, CRONO, 60, 0);
+  const vendavel = vgvVendidoVendavelMensal(linhas, CRONO, 60, 0);
   assert.ok(perto(bruto.reduce((s, x) => s + x, 0), 70_000_000));
   assert.ok(perto(vendavel.reduce((s, x) => s + x, 0), 55_000_000)); // 35M + 20M
   // Mutação: a diferença entre as duas é EXATAMENTE o VGV permutado (15M),
