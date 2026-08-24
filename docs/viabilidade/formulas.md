@@ -61,7 +61,7 @@ apenas para linha nunca reeditada.
 | Pagamentos de uma safra | `pagamentosComponenteSafra`, `:1058` |
 | Juros e principal separados | `:1126-1141` |
 | Carteira por safra | `carteiraSaldoSafra` `:826`; consolidação em `:1149-1169` |
-| Agregação no `FluxoCalc` | `calcularFluxo` `:1759`; séries somadas em `:2040-2046` |
+| Agregação no `FluxoCalc` | `calcularFluxo` `:1788`; séries somadas em `:2070-2076` |
 | Regra Após-chaves (venda pós-entrega é à vista) | `ehVendaAposChaves` `:958`, aplicada em `:1109` |
 
 > ⚠️ **A matemática de juros existe e é exercitada por estudo real; o que falta é a ENTRADA.** Há
@@ -113,7 +113,7 @@ fluxo_apos_funding_t = fluxo_livre_projeto_t + entradas_funding_t − saidas_fun
 
 fiscalizada por `validarFunding` (`frontend/fluxo-invariantes.ts:455-466`), que também acusa saldo
 de dívida negativo, dívida que não zera no horizonte e — decisão **D14** — caixa acumulado negativo
-depois do funding (`:376-387`, severidade `alerta`).
+depois do funding (`:468-479`, severidade `alerta`).
 
 **Funding nunca integra a Receita Bruta — VGV.** Liberação de dívida e aporte de equity aparecem
 **somente** no bloco de funding; o repasse continua sendo recebimento do cliente, ainda que o caixa
@@ -216,7 +216,7 @@ dízima e retornar exatamente ao mesmo canônico.
 > **séries mensais** passam por `round2` a cada depósito. Mas quatro **agregados escalares** saem do
 > `calcularFluxo` com precisão plena: `vgvTotal` (vem direto de `ctxCusto.vgvTotal`, e o acumulador
 > é `usada × area_privativa_m2 × preco_m2` sem arredondar, `:85`), `vpl` (`vplFluxo` `:1594-1597` é
-> um `reduce` com divisão, sem `round2`), `vgvPermutaFisica` e `receitaBrutaVgv` (`:2020`, subtração
+> um `reduce` com divisão, sem `round2`), `vgvPermutaFisica` e `receitaBrutaVgv` (`:2050`, subtração
 > crua dos dois anteriores).
 >
 > Área × preço e desconto de VPL produzem fração de centavo com facilidade, então esses quatro

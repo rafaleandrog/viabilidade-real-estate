@@ -1340,7 +1340,7 @@ Ao fim da absorção:
 > `:666`), taxa sobre o saldo de abertura (`:1122-1141`), carteira por safra (`carteiraSaldoSafra`
 > `:826`; consolidação em `:1149-1169`) e reconciliação por componente
 > (`receitaPorComponenteMensal`/`carteiraPorComponenteMensal`, `:1090`/`:1094`, agregadas em
-> `calcularFluxo` `:2040-2046`; invariantes em `validarComponentesSafra`,
+> `calcularFluxo` `:2070-2076`; invariantes em `validarComponentesSafra`,
 > `frontend/fluxo-invariantes.ts:496`).
 >
 > ⚠️ **O ✅ é do MOTOR, não da INTERFACE.** A §13.7 pede que prazo curto, prazo longo, até marco e
@@ -1698,10 +1698,10 @@ A permuta física:
 > valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
 > escrever `unidades_permutadas` (`backend/rotas/avancado.ts:744-749`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
-> (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1781`) e a projeta de volta nas tipologias uma
-> única vez (`:1791-1798`), para que toda função que já lia `t.unidades_permutadas` fique correta
+> (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1811`) e a projeta de volta nas tipologias uma
+> única vez (`:1821-1828`), para que toda função que já lia `t.unidades_permutadas` fique correta
 > sem replicar a reserva. **Sem linha de custo de Permuta física, o KPI é 0** — não há fallback
-> para o campo legado (`:2016-2019`, decisão do autor de 2026-08-02, #267).
+> para o campo legado (`:2046-2049`, decisão do autor de 2026-08-02, #267).
 
 > A ressalva original ("até essa definição, nada de refatoração ampla improvisada; inconsistência
 > vira issue própria e conservadora") **cumpriu o papel dela**: a definição chegou pelas
@@ -1740,7 +1740,7 @@ base líquida
 > multiplicativamente.
 >
 > `calcularFluxo` calcula **as duas séries**, usa a escolhida em `permuta_financeira_base`
-> (default `bruta`) e devolve a não escolhida como `alternativa` (`:1972-1980`); a tela oferece o
+> (default `bruta`) e devolve a não escolhida como `alternativa` (`:2002-2010`); a tela oferece o
 > seletor e exibe o total da outra base (`frontend/tela-fluxo-custos.ts:769-775`). As séries de
 > dedução são `impostoMensal` (`:1447`, RET já resolvido como parâmetro **global** do estudo)
 > e `corretagemMensal` (`:1516`, linha de custo obrigatória "Corretagem de vendas", base
@@ -2092,7 +2092,7 @@ Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 >
 > ⚠️ **A proteção é PARCIAL, e o requisito acima não é atendido quando o chamador passa
 > `config.prazoMeses`.** A linha é `const prazo = Math.max(1, Math.round(n(config.prazoMeses) ||
-> prazoDerivado))` (`:1779`): o valor explícito **vence** o horizonte derivado. Se for menor, o
+> prazoDerivado))` (`:1809`): o valor explícito **vence** o horizonte derivado. Se for menor, o
 > horizonte **não é ampliado** — os recebíveis excedentes são descartados por `deposita`, com
 > `console.warn` e sem entrar no fluxo. O aviso na consola é melhor que o empilhamento silencioso
 > de antes, mas **não é** "o horizonte deve ser ampliado": nesse caminho, há perda de valor.
