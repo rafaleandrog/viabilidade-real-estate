@@ -67,6 +67,7 @@
         "sujeito_ret":                          { "tipo": "booleano", "padrao": false },
         "imposto_percentual":                   { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 7 },
         "corretagem_percentual":                { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 5 },
+        "corretagem_sobre_permuta_fisica":      { "tipo": "booleano", "padrao": true },
         "marketing_percentual":                 { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 1 },
         "permuta_financeira_residencial_pct":     { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
         "permuta_financeira_nao_residencial_pct": { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },

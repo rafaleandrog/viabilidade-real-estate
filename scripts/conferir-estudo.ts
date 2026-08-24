@@ -143,6 +143,8 @@ export async function conferir(id: number): Promise<Conferencia> {
     curvas: d.curvas,
     areaTerreno: Number(estudo?.terreno_manual_area) || Number(estudo?.area_terreno_nucleo) || 0,
     ret: d.ret,
+    // #473: default true preserva o comportamento histórico (VGV bruto).
+    corretagemSobrePermutaFisica: estudo?.corretagem_sobre_permuta_fisica !== false,
   };
   const calc = calcularFluxo(config);
   out.calc = calc;

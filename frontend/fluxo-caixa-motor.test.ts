@@ -630,6 +630,90 @@ test('corretagem de vendas cai no mês da venda, acompanhando a absorção', () 
   assert.equal(linha.duracao, 40 - 12 + 1);
 });
 
+// #473: a base da Corretagem quanto à permuta física é escolha do estudo.
+// VGV total 100M (100 un. × 50m² × 20.000); 30 unidades permutadas
+// fisicamente (VGV permutado 30M) → vendável 70M. Corretagem 4%.
+test('#473: default (undefined) preserva o comportamento histórico — corretagem sobre o VGV BRUTO, permuta física inclusa', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 4, orcamento_unidade: 'pct_vgv' },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+        permuta_tipologia_id: 1, permuta_quantidade: 30,
+      },
+    ],
+    areaTerreno: 0,
+    // corretagemSobrePermutaFisica OMITIDO de propósito — é o caso real de
+    // todo estudo existente antes da #473 (a coluna nasce mas o config não a
+    // manda explicitamente até a tela carregar).
+  };
+  const r = calcularFluxo(config);
+  const corretagem = r.linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
+  // 4% de 100M (bruto) — a permuta física NÃO reduz a base, como antes da #473.
+  assert.ok(perto(corretagem.total, 4_000_000, 1));
+});
+
+test('#473: corretagemSobrePermutaFisica=false usa o VGV VENDÁVEL, excluindo a permuta física', () => {
+  const config: FluxoConfig = {
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 4, orcamento_unidade: 'pct_vgv' },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+        permuta_tipologia_id: 1, permuta_quantidade: 30,
+      },
+    ],
+    areaTerreno: 0,
+    corretagemSobrePermutaFisica: false,
+  };
+  const r = calcularFluxo(config);
+  const corretagem = r.linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
+  // 4% de 70M (vendável, 100M − 30M permutados).
+  assert.ok(perto(corretagem.total, 2_800_000, 1));
+
+  // Mutação: a diferença entre a base bruta e a vendável é EXATAMENTE 4% dos
+  // 30M permutados (1,2M) — reintroduzir "sempre bruto" faria este teste
+  // devolver 4.000.000 em vez de 2.800.000.
+  assert.ok(perto(4_000_000 - corretagem.total, 1_200_000, 1));
+});
+
+test('#473: com corretagemSobrePermutaFisica=true explícito, idêntico ao default (paridade)', () => {
+  const base = (flag: boolean | undefined): FluxoConfig => ({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
+      absorcao: { modo: 'distribuido', blocos: [{ evento: 'lancamento', pct: 100 }] },
+      fluxo_pagamento: { entrada: { modo: 'entrada', parcelas: 1, pct: 100 } },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 4, orcamento_unidade: 'pct_vgv' },
+      {
+        id: 2, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+        permuta_tipologia_id: 1, permuta_quantidade: 30,
+      },
+    ],
+    areaTerreno: 0,
+    ...(flag === undefined ? {} : { corretagemSobrePermutaFisica: flag }),
+  });
+  const semFlag = calcularFluxo(base(undefined)).linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
+  const comTrue = calcularFluxo(base(true)).linhasCusto.find((l) => l.nome === 'Corretagem de vendas')!;
+  assert.equal(semFlag.total, comTrue.total);
+});
+
 // 5c. Corretagem sem vendas no horizonte não gera desembolso (#121)
 test('corretagem sem linhas de receita não gera custo', () => {
   const config: FluxoConfig = {
