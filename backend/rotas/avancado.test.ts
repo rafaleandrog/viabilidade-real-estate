@@ -15,6 +15,9 @@ import {
   subcategoriaPrecoValida,
   SUBCATEGORIAS_PRECO_TERRENO,
   proximoNumeroFase,
+  comprometidasDeTipologia,
+  erroQuantidadeTipologia,
+  montarPatchTipologia,
   type LinhaCronograma,
 } from './avancado.js';
 
@@ -389,4 +392,128 @@ test('#257 vazio, nulo e indefinido sempre passam (é como se limpa o campo)', (
   assert.ok(subcategoriaPrecoValida('terreno', 'Preço', '   '));
   assert.ok(subcategoriaPrecoValida('terreno', 'Preço', null));
   assert.ok(subcategoriaPrecoValida('terreno', 'Preço', undefined));
+});
+
+// ── #433: portão de saldo no PATCH de tipologia ──
+//
+// A quarta porta do saldo. POST/PATCH de alocações e a permuta física já
+// recusavam estourar o catálogo; reduzir o catálogo por baixo do comprometido
+// chegava ao mesmo estado impossível sem 422 nenhum — e chegou, duas vezes, nos
+// estudos Avançados da instância (234 no catálogo, 276 comprometidas).
+//
+// As duas funções são puras porque nenhum arquivo de teste deste repositório
+// sobe servidor: guard que mora dentro do handler é guard sem teste.
+
+test('#433 reduzir a quantidade abaixo do comprometido é barrado', () => {
+  const msg = erroQuantidadeTipologia(234, 276);
+  assert.ok(msg, 'deveria devolver mensagem');
+  assert.match(msg!, /276/);              // a mensagem diz quanto está comprometido
+  // Um a menos que o comprometido já é o caso de borda que barra.
+  assert.ok(erroQuantidadeTipologia(275, 276));
+  assert.ok(erroQuantidadeTipologia(0, 276));
+  assert.ok(erroQuantidadeTipologia('100', 276));   // string numérica é número
+});
+
+test('#433 quantidade igual ou acima do comprometido passa', () => {
+  assert.equal(erroQuantidadeTipologia(276, 276), null);   // igual é o limite, e passa
+  assert.equal(erroQuantidadeTipologia(300, 276), null);
+  assert.equal(erroQuantidadeTipologia(0, 0), null);       // nada comprometido: pode zerar
+});
+
+test('#433 campo ausente ou não numérico não é assunto desta regra', () => {
+  // Sem isto, o portão barraria todo PATCH parcial — nome, preço/m², ordem —
+  // em qualquer tipologia com alocação, e os dois testes acima não notariam.
+  assert.equal(erroQuantidadeTipologia(undefined, 276), null);
+  assert.equal(erroQuantidadeTipologia(null, 276), null);
+  assert.equal(erroQuantidadeTipologia('', 276), null);
+  assert.equal(erroQuantidadeTipologia('   ', 276), null);
+  assert.equal(erroQuantidadeTipologia('abc', 276), null);
+  assert.equal(erroQuantidadeTipologia(NaN, 276), null);
+  // Comprometido inválido degrada para 0 e NÃO barra tudo.
+  assert.equal(erroQuantidadeTipologia(10, NaN), null);
+  assert.equal(erroQuantidadeTipologia(10, null), null);
+  assert.equal(erroQuantidadeTipologia(10, undefined), null);
+  assert.equal(erroQuantidadeTipologia(10, 'abc'), null);
+  // Esta regra não fiscaliza quantidade negativa — é outra validação, ausente hoje.
+  assert.equal(erroQuantidadeTipologia(-5, 0), null);
+});
+
+test('#433 comprometidas é o complemento do saldo, e o saldo pode ser negativo', () => {
+  // Estado real da instância: catálogo 234, saldo −42 ⇒ 276 comprometidas.
+  assert.equal(comprometidasDeTipologia(234, -42), 276);
+  assert.equal(comprometidasDeTipologia(234, 234), 0);     // nada alocado
+  assert.equal(comprometidasDeTipologia(234, 134), 100);
+  // Colunas chegam como string do driver — não podem virar concatenação.
+  assert.equal(comprometidasDeTipologia('234', '134'), 100);
+  // Lixo degrada para 0, nunca para NaN (NaN faria o portão passar sempre).
+  assert.equal(comprometidasDeTipologia(null, 0), 0);
+  assert.equal(comprometidasDeTipologia(234, NaN), 234);
+  assert.equal(comprometidasDeTipologia(NaN, 10), 0);
+});
+
+test('#433 a cadeia inteira: catálogo 234 com saldo −42 recusa 234 e aceita 276', () => {
+  // Fiação: é assim que a rota compõe as duas funções. Inverter a subtração de
+  // `comprometidasDeTipologia` faria este teste passar a aceitar 234.
+  const comprometidas = comprometidasDeTipologia(234, -42);
+  assert.ok(erroQuantidadeTipologia(234, comprometidas));
+  assert.equal(erroQuantidadeTipologia(276, comprometidas), null);
+  // E uma tipologia saudável (catálogo 100, saldo 100) aceita qualquer redução.
+  const zeradas = comprometidasDeTipologia(100, 100);
+  assert.equal(erroQuantidadeTipologia(1, zeradas), null);
+});
+
+// ── #433: a decisão inteira do PATCH, com o saldo injetado ──
+//
+// `montarPatchTipologia` é o que a rota realmente executa. Enquanto o portão
+// morava inline no handler, nenhum teste o alcançava — nenhum arquivo de teste
+// deste repositório sobe servidor —, então apagá-lo não deixava nada vermelho.
+
+const TIP_CORROMPIDA = { quantidade: 234 };   // catálogo 234, saldo −42 ⇒ 276 comprometidas
+const saldoNegativo = async () => -42;
+const saldoCheio = async () => 234;
+
+test('#433 PATCH que reduz a quantidade abaixo do comprometido devolve 422 SALDO_EXCEDIDO', async () => {
+  const r: any = await montarPatchTipologia({ quantidade: 234 }, TIP_CORROMPIDA, saldoNegativo);
+  assert.equal(r.http, 422);
+  assert.equal(r.codigo, 'SALDO_EXCEDIDO');
+  assert.match(r.mensagem, /276/);
+  assert.equal('dados' in r, false, 'não pode devolver dados junto com o erro');
+});
+
+test('#433 PATCH que sobe a quantidade até o comprometido passa e grava', async () => {
+  const r: any = await montarPatchTipologia({ quantidade: 276 }, TIP_CORROMPIDA, saldoNegativo);
+  assert.deepEqual(r, { dados: { quantidade: 276 } });
+});
+
+test('#433 PATCH parcial não é barrado NEM consulta o saldo', async () => {
+  // O portão não pode custar uma consulta a quem só renomeia — e, mais grave,
+  // não pode barrar edição de nome/preço numa tipologia já comprometida.
+  let consultas = 0;
+  const saldo = async () => { consultas++; return -42; };
+  const r: any = await montarPatchTipologia({ nome: 'Studio', preco_m2: 9000 }, TIP_CORROMPIDA, saldo);
+  assert.deepEqual(r, { dados: { nome: 'Studio', preco_m2: 9000 } });
+  assert.equal(consultas, 0, 'saldo não deveria ter sido consultado');
+});
+
+test('#433 tipologia sem nada comprometido pode reduzir e zerar', async () => {
+  assert.deepEqual(
+    await montarPatchTipologia({ quantidade: 10 }, { quantidade: 234 }, saldoCheio),
+    { dados: { quantidade: 10 } },
+  );
+  assert.deepEqual(
+    await montarPatchTipologia({ quantidade: 0 }, { quantidade: 234 }, saldoCheio),
+    { dados: { quantidade: 0 } },
+  );
+});
+
+test('#433 o portão não engoliu as validações que já existiam', async () => {
+  const tipo: any = await montarPatchTipologia({ tipo_unidade: 'mansão' }, TIP_CORROMPIDA, saldoNegativo);
+  assert.equal(tipo.http, 400);
+  assert.equal(tipo.codigo, 'TIPO_UNIDADE_INVALIDO');
+  const vazio: any = await montarPatchTipologia({ ignorado: 1 }, TIP_CORROMPIDA, saldoNegativo);
+  assert.equal(vazio.http, 400);
+  assert.equal(vazio.codigo, 'NENHUM_CAMPO');
+  // Campo fora de CAMPOS_TIPOLOGIA nunca chega ao `atualizar`.
+  const ok: any = await montarPatchTipologia({ nome: 'X', estudo_id: 99, id: 7 }, TIP_CORROMPIDA, saldoNegativo);
+  assert.deepEqual(ok, { dados: { nome: 'X' } });
 });
