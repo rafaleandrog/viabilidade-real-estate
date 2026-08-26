@@ -27,11 +27,14 @@ export const caso = {
   // que mudou — passa por TODAS as lentes com "limpo". Reproduzido no PR 506.
   exigir: [
     { seletor: 'table.areas', minimo: 1 },
-    // As 8 linhas de `CASCATA_INCORPORACAO`: Terreno + 4 áreas privativas +
-    // Área Privativa Total (computada) + Área Comum + Área Construída Total
-    // (computada) — 2 linhas `tr.computada`, 6 linhas normais.
+    // As 8 linhas de `CASCATA_INCORPORACAO`: Terreno (âncora 1) + 4 áreas
+    // privativas + Área Privativa Total (computada) + Área Comum + Área
+    // Construída Total (computada) — a classe `computada` do template
+    // (`l.papel.tipo !== 'editavel'`) marca TODA linha não-editável, e isso
+    // inclui a âncora 1: 3 linhas `tr.computada` (Terreno + as 2 computadas),
+    // 5 linhas normais (as 4 áreas privativas + Área Comum, as editáveis).
     { seletor: 'table.areas tbody tr', minimo: 8 },
-    { seletor: 'tr.computada', minimo: 2 },
+    { seletor: 'tr.computada', minimo: 3 },
     // As 5 linhas EDITÁVEIS da cascata (as 4 áreas privativas + comum) — sem
     // badge de unidade (critério 2 da #564): só o `viab-num` da própria célula.
     { seletor: 'table.areas viab-num.area-valor', minimo: 5 },

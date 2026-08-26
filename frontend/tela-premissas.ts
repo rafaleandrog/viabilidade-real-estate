@@ -1018,11 +1018,16 @@ export class ViabTelaPremissas extends LitElement {
   private _renderCampoAreaInc(l: LinhaResolvida, dis: boolean): TemplateResult {
     if (l.papel.tipo !== 'editavel') return html`${nothing}`;
     const campo = CAMPO_POR_LINHA_INC[l.id];
+    // Nome acessível (achado da revisão do PR #576): mesmo papel do `role="group"
+    // aria-label` de `_renderSeletorArea` (Loteamento) — sem a classe
+    // `area-seletor`, que é layout de badges que esta linha não tem.
     return html`
-      <viab-num class="area-valor" sufixo="m²" casas-decimais="2" ?desabilitado=${dis}
-        .valor=${this._num(campo)}
-        @urbi:input-numero-change=${(e: CustomEvent) => this._set(campo, e.detail.valor ?? 0)}
-      ></viab-num>
+      <div role="group" aria-label=${l.label}>
+        <viab-num class="area-valor" sufixo="m²" casas-decimais="2" ?desabilitado=${dis}
+          .valor=${this._num(campo)}
+          @urbi:input-numero-change=${(e: CustomEvent) => this._set(campo, e.detail.valor ?? 0)}
+        ></viab-num>
+      </div>
     `;
   }
 
