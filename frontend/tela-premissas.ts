@@ -10,7 +10,7 @@ import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, type Prof
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
-import { calcularCascata, CASCATA_LOTEAMENTO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
+import { calcularCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 import './viab-imagem-principal.js';
@@ -184,7 +184,10 @@ const TERRENO_COEF: Campo[] = [
   { k: 'coef_aproveitamento_maximo', label: 'Coeficiente máximo', t: 'num', w: 'p1' },
 ];
 
-// Incorporação — Áreas = as áreas privativas/comuns do produto.
+// Incorporação — Áreas = as áreas privativas/comuns do produto. Desde a #564
+// a tela renderiza estes 5 campos como tabela em cascata (`CASCATA_INCORPORACAO`,
+// `_renderTabelaAreasIncorporacao`) — este array só sobrevive em TODOS_NUM,
+// pro tipo numérico (mesmo papel que AREAS_LOT cumpre para o Loteamento).
 const AREAS_INC: Campo[] = [
   { k: 'area_pvt_r_fechada', label: 'Área PVT R Fechada', t: 'num', sufixo: 'm²' },
   { k: 'area_pvt_nr_fechada', label: 'Área PVT NR Fechada', t: 'num', sufixo: 'm²' },
@@ -213,6 +216,17 @@ const CAMPO_POR_LINHA_LOT: Record<string, string> = {
 // 'pct_parcelavel' — mesma tradução que proforma.ts faz para calcular).
 const MODO_SCHEMA_PARA_MOTOR: Record<string, UnidadeMestre> = { m2: 'm2', pct_poligonal: 'pct_ancora1', pct_parcelavel: 'pct_ancora2' };
 const MODO_MOTOR_PARA_SCHEMA: Record<UnidadeMestre, string> = { m2: 'm2', pct_ancora1: 'pct_poligonal', pct_ancora2: 'pct_parcelavel' };
+
+// Tabela de áreas em cascata da Incorporação (#564) — mesmo mapa id→campo,
+// sem badge de unidade: os pares `_modo` não existem para estes 5 campos
+// (critério 2 da issue), a entrada é sempre m². `terreno` não entra aqui pela
+// mesma razão do `poligonal` acima — é a linha "Terreno" já editada na seção
+// de cima (Núcleo/manual).
+const CAMPO_POR_LINHA_INC: Record<string, string> = {
+  pvt_r_fechada: 'area_pvt_r_fechada', pvt_r_aberta: 'area_pvt_r_aberta',
+  pvt_nr_fechada: 'area_pvt_nr_fechada', pvt_nr_aberta: 'area_pvt_nr_aberta',
+  comum: 'area_comum_total',
+};
 
 // Todas as definições de campo-com-unidade (para coletar seus campos numéricos).
 const CAMPOS_UNIDADE: CustoUnidade[] = [...CUSTOS_UNIDADE, PERMUTA_UNIDADE, PERMUTA_FIS_NR, PERMUTA_FIN_R, PERMUTA_FIN_NR];
@@ -491,10 +505,9 @@ export class ViabTelaPremissas extends LitElement {
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
     // No Avançado o Terreno vive em Empreendimento → Informações (#53).
     const avancado = this.estudo.nivel_analise === 'avancado';
-    // Loteamento usa a tabela em cascata (2026-08-03) — AREAS_LOT só sobrevive
-    // em TODOS_NUM, pra não perder o tipo numérico dos 7 campos antigos que
-    // ainda existem no schema (dado histórico, sem leitura/escrita na tela).
-    const areas = AREAS_INC;
+    // Loteamento e Incorporação usam a tabela em cascata (2026-08-03 / #564) —
+    // AREAS_LOT/AREAS_INC só sobrevivem em TODOS_NUM, pro tipo numérico dos
+    // campos que as duas tabelas editam.
     const custos = CUSTOS.filter((c) => !c.so || c.so === this.estudo.tipo_empreendimento);
     const dis = !this.editavel;
     this._obrigCache = camposObrigatorios(this.form, this.estudo.tipo_empreendimento);
@@ -526,7 +539,7 @@ export class ViabTelaPremissas extends LitElement {
 
           <div class="secao grupo grupo-b">
             <h4>Áreas</h4>
-            ${lot ? this._renderTabelaAreasLoteamento(dis) : html`<div class="grid">${areas.map((c) => this._input(c, dis))}</div>`}
+            ${lot ? this._renderTabelaAreasLoteamento(dis) : this._renderTabelaAreasIncorporacao(dis)}
           </div>
 
           ${this._renderRodapeForm()}
@@ -953,6 +966,63 @@ export class ViabTelaPremissas extends LitElement {
           @urbi:input-numero-change=${(e: CustomEvent) => this._set(`${campo}_valor`, e.detail.valor ?? 0)}
         ></viab-num>
       </div>
+    `;
+  }
+
+  private _estadosCascataAreasInc(): Record<string, EstadoLinha> {
+    const estados: Record<string, EstadoLinha> = {};
+    // #564 critério 2: entrada só em m² — sem par `_modo` para reinterpretar.
+    for (const [linhaId, campo] of Object.entries(CAMPO_POR_LINHA_INC)) {
+      estados[linhaId] = { modo: 'm2', valor: this._num(campo) ?? 0 };
+    }
+    return estados;
+  }
+
+  /**
+   * §Tabela de áreas em cascata da Incorporação (#564) — mesmo modelo visual
+   * da Loteamento (`_renderTabelaAreasLoteamento`): colunas Descrição · Área
+   * (m²) · ha · % Terreno · % Construída, linhas computadas em negrito/fundo.
+   * Sem a coluna de seletor de unidade — `_renderCampoAreaInc` é só um
+   * `viab-num` em m². A âncora 1 (Terreno) é só exibida aqui; a edição dela é
+   * a seção "Terreno" acima (origem Núcleo/manual, já existente).
+   */
+  private _renderTabelaAreasIncorporacao(dis: boolean): TemplateResult {
+    const ancora1 = this._areaTerreno();
+    const linhas = calcularCascata(CASCATA_INCORPORACAO, this._estadosCascataAreasInc(), ancora1);
+    return html`
+      <div class="areas-wrap">
+        <table class="areas">
+          <thead>
+            <tr>
+              <th>Descrição</th><th></th>
+              <th class="num">Área (m²)</th><th class="num">ha</th>
+              <th class="num">% Terreno</th><th class="num">% Construída</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linhas.map((l) => html`
+              <tr class=${l.papel.tipo !== 'editavel' ? 'computada' : ''}>
+                <td>${l.label}</td>
+                <td>${this._renderCampoAreaInc(l, dis)}</td>
+                <td class="num">${fmtNum(l.m2, 2)}</td>
+                <td class="num">${fmtNum(l.ha, 4)}</td>
+                <td class="num">${fmtPct(l.pctAncora1)}</td>
+                <td class="num">${l.pctAncora2 === null ? '' : fmtPct(l.pctAncora2)}</td>
+              </tr>`)}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  private _renderCampoAreaInc(l: LinhaResolvida, dis: boolean): TemplateResult {
+    if (l.papel.tipo !== 'editavel') return html`${nothing}`;
+    const campo = CAMPO_POR_LINHA_INC[l.id];
+    return html`
+      <viab-num class="area-valor" sufixo="m²" casas-decimais="2" ?desabilitado=${dis}
+        .valor=${this._num(campo)}
+        @urbi:input-numero-change=${(e: CustomEvent) => this._set(campo, e.detail.valor ?? 0)}
+      ></viab-num>
     `;
   }
 

@@ -108,7 +108,7 @@ export function numeroDaColuna(v: unknown): number | null {
 //
 // ELA ESTABELECE: o canônico é o número de registro, a badge troca só a
 // representação, e o valor mostrado em cada unidade é derivado do canônico
-// (`_valorUnidade`, `tela-premissas.ts:470-474`).
+// (`_valorUnidade`, `tela-premissas.ts:484-488`).
 //
 // ELA NÃO ESTABELECE que se deva escrever a coluna por unidade — ao contrário:
 // `_trocarUnidade` (`tela-premissas.ts:455-468`) **não escreve coluna nenhuma**,

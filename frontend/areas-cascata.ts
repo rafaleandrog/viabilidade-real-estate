@@ -136,8 +136,10 @@ export const CASCATA_LOTEAMENTO: DefinicaoLinha[] = [
   },
 ];
 
-// ── Cascata da Incorporação — proposta 2026-08-03 (aguardando confirmação
-// visual do autor antes de virar schema/UI — ver Fase 5 do plano) ─────────
+// ── Cascata da Incorporação — proposta em 2026-08-03, ligada à tela pela
+// issue #564: aba "Terreno & Áreas" renderiza esta cascata no mesmo modelo
+// visual do Loteamento (`frontend/tela-premissas.ts`), sem os pares `_modo`
+// de troca de unidade (a entrada é só em m², #564 critério 2). ──────────────
 
 export const CASCATA_INCORPORACAO: DefinicaoLinha[] = [
   { id: 'terreno', label: 'Área do Terreno', papel: { tipo: 'ancora1' } },

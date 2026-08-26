@@ -99,7 +99,7 @@ que produto não sobreviva ao estudo.
 
 **Custo real: nenhum.** Os dois campos são memória da seleção da UI, não fonte de cálculo. O que o
 motor consome é o canônico em m², gravado no momento da edição
-(`frontend/tela-premissas.ts:719-729` — `area_media_m2 × quantidade`), e nenhum ponto do backend
+(`frontend/tela-premissas.ts:732-743` — `area_media_m2 × quantidade`), e nenhum ponto do backend
 ou do motor dereferencia o `produto_id`. Apagado o produto, o `<urbi-select>` fica vazio dos dois
 jeitos: antes porque a FK `anular` zerava o id, agora porque o id pendurado não está em `.opcoes`.
 
