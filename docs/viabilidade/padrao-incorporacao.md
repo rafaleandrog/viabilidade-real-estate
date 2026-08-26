@@ -3079,7 +3079,7 @@ com os do estudo.
 | **C4** | **No Avançado, o tempo é em meses relativos 0-based**: mês 0 = `data_inicio_projeto`; o índice do array mensal coincide com o número do mês. **Não há meses negativos.** | `fluxo-caixa-motor.ts` |
 | **C5** | **Permuta física não entra no fluxo** — reduz a área/VGV vendável do incorporador. **Permuta financeira é dedução da receita**, % do VGV residencial/não residencial (ou valor fixo). | `proforma.ts`, `formulas.md` |
 | **C6** | **O imposto NÃO segue `regime_tributario`** — a redação anterior desta convenção dizia que sim, e é falso. **Preliminar:** `frontend/proforma.ts:245` escolhe pelo booleano `sujeito_ret` (`aliquota_ret_pct`, default 4) ou, se falso, `imposto_percentual`; o campo `regime_tributario` **não é consultado**. **Avançado:** usa o par global `considerar_ret`/`ret_pct` e ignora os três (§17). Corretagem, marketing e permutas financeiras são deduções da receita antes dos custos. | `formulas.md`, `proforma.ts:245`, schema |
-| **C7** | **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e no motor. O **valor canônico** de uma premissa multiunidade é o monetário; `% do VGV` e `R$/m²` são representações **derivadas**, que carregam precisão plena internamente e arredondam só para exibir. Contrato do autor, 2026-08-01. **Estado:** `fmtR$` (`viab-format.ts:11-23`) usa 2 casas, a exportação passou a importá-lo em vez de definir formatador próprio (`exportar.ts:10`) e a sensibilidade da Proforma migrou (`tela-proforma.ts:458`, #492). **Três fontes ainda divergem** e mantêm a #281 aberta: `fluxo-tabela.ts:34` (`celula`, arredonda para 0 casas e esconde valor abaixo de R$ 0,50), `tela-proforma.ts:351` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383` (`precoUnit`/`precoTotal`) — as duas últimas chamam `fmtNum` sem casas. Tabela completa em `formulas.md`. | `formulas.md`, `viab-format.ts`, `premissas-conversao.ts` |
+| **C7** | **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e no motor. O **valor canônico** de uma premissa multiunidade é o monetário; `% do VGV` e `R$/m²` são representações **derivadas**, que carregam precisão plena internamente e arredondam só para exibir. Contrato do autor, 2026-08-01. **Estado:** `fmtR$` (`viab-format.ts:11-23`) usa 2 casas, a exportação passou a importá-lo em vez de definir formatador próprio (`exportar.ts:10`) e a sensibilidade da Proforma migrou (`tela-proforma.ts:458`, #492). **Três fontes ainda divergem** e mantêm a #281 aberta: `fluxo-tabela.ts:34` (`celula`, arredonda para 0 casas e esconde valor abaixo de R$ 0,50), `tela-proforma.ts:358` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383` (`precoUnit`/`precoTotal`) — as duas últimas chamam `fmtNum` sem casas. Tabela completa em `formulas.md`. | `formulas.md`, `viab-format.ts`, `premissas-conversao.ts` |
 
 ## Anexo B — Dicionário de premissas (campos reais)
 
@@ -3205,7 +3205,7 @@ documento, contra o contrato **C7** do Anexo A.
 
 A armadilha que **sobra** é mais estreita: três fontes ainda formatam por conta própria —
 `fluxo-tabela.ts:34` (`celula`, arredonda para 0 casas e **esconde** valor abaixo de R$ 0,50),
-`tela-proforma.ts:351` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383`
+`tela-proforma.ts:358` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383`
 (`precoUnit`/`precoTotal`), as duas últimas chamando `fmtNum` sem casas. A mesma célula sai `1.235`
 na tela e `1.234,56` no PDF. → **#281**, que segue aberta só por elas.
 

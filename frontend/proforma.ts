@@ -270,13 +270,28 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // é PROPORCIONAL para preservar a divisão R/NR, e a permuta efetiva é o que
   // sai no resultado — assim `vgv + as duas permutas` continua sendo o bruto.
   const vgvPermutaEfetiva = Math.min(vgvPermutaSolicitada, vgvBrutoCatalogo);
-  const permutaCapada = vgvPermutaSolicitada > vgvPermutaEfetiva;
+  // Comparação ao CENTAVO, não em precisão plena: excedente abaixo de meio
+  // centavo some no arredondamento do contrato C7, e um aviso que mostrasse
+  // "informada R$ X sobre base R$ X" seria ruído.
+  const permutaCapada = moeda(vgvPermutaSolicitada) > moeda(vgvBrutoCatalogo);
   const fatorCap = vgvPermutaSolicitada > 0 ? vgvPermutaEfetiva / vgvPermutaSolicitada : 0;
-  const vgvPermutaResidencial = vgvPermutaSolicitadaR * fatorCap;
-  const vgvPermutaNaoResidencial = vgvPermutaSolicitadaNR * fatorCap;
+  // ⚠️ As três parcelas são quantizadas AQUI, e uma delas é o RESÍDUO das
+  // outras — não são três arredondamentos independentes. Independentes, cada
+  // um erra até meio centavo para o seu lado e a identidade
+  // `vgv + permutaR + permutaNR = VGV bruto` quebra: com base de R$ 0,01 e as
+  // duas permutas pedindo o mesmo, o fator 0,5 dá 0,005 em cada, que sobe para
+  // 0,01 nas duas e soma R$ 0,02 — o dobro da base. Derivando a parcela NR do
+  // total efetivo já quantizado, a identidade vale por construção, em qualquer
+  // entrada. O resíduo (no máximo um centavo) cai no NÃO residencial; no
+  // Loteamento ele é sempre zero, porque lá `precoNR` é zero.
+  const baseQuantizada = moeda(vgvBrutoCatalogo);
+  const permutaEfetivaQuantizada = moeda(vgvPermutaEfetiva);
+  const vgvPermutaResidencial = moeda(vgvPermutaSolicitadaR * fatorCap);
+  const vgvPermutaNaoResidencial = permutaEfetivaQuantizada - vgvPermutaResidencial;
   // Bucket único: a tabela de Produtos não distingue residencial de não
-  // residencial, então o VGV inteiro cai em `vgvResidencial`.
-  const vgvResidencial = vgvBrutoCatalogo - vgvPermutaEfetiva;
+  // residencial, então o VGV inteiro cai em `vgvResidencial`. `min` é monótono
+  // sob arredondamento, então a subtração nunca fica negativa.
+  const vgvResidencial = baseQuantizada - permutaEfetivaQuantizada;
   const vgvNaoResidencial = 0;
   const vgv = vgvResidencial + vgvNaoResidencial;
 

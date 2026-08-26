@@ -26,7 +26,34 @@ function baixar(nome: string, conteudo: string, mime: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-interface LinhaPf { l: string; v: number; }
+/**
+ * Uma linha do relatório da Proforma. `nota: true` marca a linha de TEXTO — o
+ * rótulo carrega a mensagem inteira e não há número nas colunas R$/% VGV.
+ */
+interface LinhaPf { l: string; v: number; nota?: boolean; }
+
+/**
+ * A frase do excedente de permuta física, ÚNICA para a tela e para as duas
+ * exportações.
+ *
+ * Ela mora aqui, e não em `tela-proforma.ts`, por causa da direção que o grafo
+ * de imports já tem: a tela importa este módulo (para os botões de exportar) e
+ * o contrário criaria ciclo. Mora numa função, e não duplicada nos três
+ * lugares, porque foi exatamente a divergência tela × exportação que a revisão
+ * apontou — o banner avisava do corte e o CSV/PDF saíam com a permuta efetiva,
+ * sem dizer que houve corte.
+ *
+ * Declara as três grandezas que o leitor precisa para conferir o corte:
+ * a área informada (que NÃO é capada — as áreas exibidas seguem o que foi
+ * digitado), o valor que ela pedia, e a base que o catálogo comporta.
+ */
+export function avisoPermutaCapada(p: Proforma): string {
+  const entregue = p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
+  return `Permuta física informada (${fmtNum(p.areaPermutaFisica)} m²) vale `
+    + `${fmtR$(p.vgvPermutaSolicitada)} e a receita bruta do catálogo é ${fmtR$(entregue)}. `
+    + 'O excedente foi desconsiderado no VGV, que para em zero e nunca fica negativo; '
+    + 'as áreas exibidas seguem as informadas.';
+}
 
 export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
   // Espelha a estrutura da tabela da Proforma (#8/#9/#10/#13): totais consolidados
@@ -35,6 +62,11 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
   const temPermuta = p.areaPermutaFisica > 0.005;
   const deducoesVgv = p.imposto + p.corretagem + p.marketing + p.permutaFinResidencial + p.permutaFinNaoResidencial;
   const linhas: (LinhaPf & { soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean })[] = [
+    // O aviso vem ANTES das linhas de permuta que ele explica. Sem ele o
+    // relatório mostrava a permuta EFETIVA sem sinal nenhum do corte — quem
+    // lesse o CSV veria um número menor que o informado nas Premissas e não
+    // teria como saber por quê.
+    ...(p.permutaCapada ? [{ l: avisoPermutaCapada(p), v: 0, nota: true }] : []),
     ...(temPermuta ? [
       { l: 'VGV sem permuta física', v: p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial, ocultarSeZero: true },
       { l: '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true },
@@ -69,7 +101,13 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     !(r.soLot && !lot) && !(r.soInc && lot) && !(r.ocultarSeZero && Math.abs(r.v) < 0.005));
 }
 
-export function exportarExcel(estudo: any, p: Proforma, lot: boolean) {
+/**
+ * O CSV da Proforma, como texto — separado de `exportarExcel` para poder ser
+ * conferido por teste. `exportarExcel` só faz o download, que precisa de
+ * `Blob`/`document` e não existe fora do navegador; a decisão de o que vai no
+ * arquivo é toda daqui.
+ */
+export function csvProforma(estudo: any, p: Proforma, lot: boolean): string {
   const linhas = linhasProforma(p, lot);
   const rows: string[] = [];
   rows.push('Estudo;' + (estudo.nome_exibicao || estudo.nome));
@@ -77,18 +115,34 @@ export function exportarExcel(estudo: any, p: Proforma, lot: boolean) {
   rows.push('');
   rows.push('Linha;R$;% VGV');
   for (const r of linhas) {
+    // Linha de nota: o texto ocupa a coluna do rótulo e as outras duas ficam
+    // vazias. "0,00" ali seria um número inventado.
+    if (r.nota) { rows.push(`${r.l};;`); continue; }
     const pct = p.vgv > 0 ? fmtPct(Math.abs(r.v) / p.vgv * 100) : '';
     rows.push(`${r.l};${fmtR$(r.v, false)};${pct}`);
   }
   rows.push('');
   rows.push(`Margem sobre VGV;${fmtPct(p.margemLiquidaPct)}`);
-  const nome = (estudo.id_legivel || 'estudo') + '_proforma.csv';
-  baixar(nome, rows.join('\n'), 'text/csv;charset=utf-8');
+  return rows.join('\n');
 }
 
-export function exportarPDF(estudo: any, p: Proforma, lot: boolean) {
+export function exportarExcel(estudo: any, p: Proforma, lot: boolean) {
+  const nome = (estudo.id_legivel || 'estudo') + '_proforma.csv';
+  baixar(nome, csvProforma(estudo, p, lot), 'text/csv;charset=utf-8');
+}
+
+/**
+ * O documento HTML da Proforma que vira PDF — separado de `exportarPDF` pelo
+ * mesmo motivo que `csvProforma`: `window.open`/`print` não existem fora do
+ * navegador, e sem esta separação nenhum teste conseguia afirmar o que sai no
+ * arquivo.
+ */
+export function htmlProforma(estudo: any, p: Proforma, lot: boolean): string {
   const linhas = linhasProforma(p, lot);
   const linhasHtml = linhas.map((r) => {
+    // Linha de nota: uma célula só, atravessando as três colunas — não há
+    // número para alinhar à direita.
+    if (r.nota) return `<tr class="nota"><td colspan="3">${r.l}</td></tr>`;
     const sub = r.l.startsWith('=');
     const pct = p.vgv > 0 ? fmtPct(Math.abs(r.v) / p.vgv * 100) : '—';
     return `<tr class="${sub ? 'sub' : ''}"><td>${r.l}</td><td class="v">${fmtR$(r.v)}</td><td class="v">${pct}</td></tr>`;
@@ -108,6 +162,7 @@ export function exportarPDF(estudo: any, p: Proforma, lot: boolean) {
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     td { padding: 5px 8px; border-bottom: 1px solid #eee; } td.v { text-align: right; font-variant-numeric: tabular-nums; }
     tr.sub td { font-weight: 700; border-top: 1px solid #bbb; }
+    tr.nota td { font-size: 11px; font-style: italic; color: #8a5a00; background: #fdf5e3; }
     @media print { button { display: none; } }
   </style></head><body>
     <h1>${estudo.nome_exibicao || estudo.nome}</h1>
@@ -117,10 +172,13 @@ export function exportarPDF(estudo: any, p: Proforma, lot: boolean) {
     <tbody>${linhasHtml}<tr class="sub"><td>Margem sobre VGV</td><td class="v">${fmtPct(p.margemLiquidaPct)}</td><td class="v"></td></tr></tbody></table>
     <button onclick="window.print()" style="margin-top:16px;padding:8px 16px">Imprimir / Salvar PDF</button>
   </body></html>`;
+  return html;
+}
 
+export function exportarPDF(estudo: any, p: Proforma, lot: boolean) {
   const w = window.open('', '_blank');
   if (!w) return false;
-  w.document.write(html); w.document.close();
+  w.document.write(htmlProforma(estudo, p, lot)); w.document.close();
   setTimeout(() => w.print(), 400);
   return true;
 }

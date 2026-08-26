@@ -773,3 +773,68 @@ test('loteamento também é capado — o estado vazio e o cap valem nos dois pad
   assert.ok(perto(capado.vgvPermutaResidencial, 3_000_000));
   assert.equal(capado.vgv, 0);
 });
+
+// ── Quantização do cap: a identidade tem de valer ao CENTAVO ─────────────
+//
+// O corte proporcional produz frações de centavo, e três arredondamentos
+// independentes não somam de volta à base. O caso abaixo é o mínimo que
+// quebra: base de R$ 0,01 com as duas permutas pedindo o mesmo valor. O fator
+// 0,5 dá R$ 0,005 em cada, que sobe para R$ 0,01 nas duas — R$ 0,02 de
+// permuta sobre uma base de R$ 0,01, o dobro.
+test('cap com meio centavo: a identidade fecha EXATAMENTE, sem resíduo de arredondamento', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    // Permutas iguais em valor: 1 m² × R$ 0,01 de cada lado = R$ 0,02 pedidos.
+    area_pvt_r_fechada: 1, preco_venda_m2_residencial: 0.01,
+    area_pvt_nr_fechada: 1, preco_venda_m2_nao_residencial: 0.01,
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 1,
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 1,
+    // Base de exatamente R$ 0,01.
+    produtos: [{ area_media_m2: 1, preco_venda_m2: 0.01, unidades: 1 }],
+  });
+  assert.equal(p.permutaCapada, true);
+  assert.equal(p.vgv, 0);
+  // A soma das três parcelas é a base, ao centavo — não R$ 0,02.
+  const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
+  assert.equal(vgvBruto, 0.01, `vgvBruto=${vgvBruto} (esperado 0,01 — o dobro seria o resíduo)`);
+  // E cada parcela continua sendo um valor de 2 casas.
+  for (const v of [p.vgv, p.vgvPermutaResidencial, p.vgvPermutaNaoResidencial]) {
+    assert.equal(Math.round(v * 100) / 100, v, `parcela fora do contrato de 2 casas: ${v}`);
+  }
+});
+
+test('a identidade fecha ao centavo mesmo SEM cap, com parcelas de fração de centavo', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1, preco_venda_m2_residencial: 0.333,
+    area_pvt_nr_fechada: 1, preco_venda_m2_nao_residencial: 0.333,
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 1,
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 1,
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 1, unidades: 1 }], // base 100, folgada
+  });
+  assert.equal(p.permutaCapada, false);
+  const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
+  assert.equal(vgvBruto, 100, `vgvBruto=${vgvBruto}`);
+});
+
+// A DECISÃO de não capar as áreas (só o valor) tem uma consequência: com a
+// permuta maior que a área vendável, `areaVendavelLiquida` fica NEGATIVA. Ela
+// é saída pública do motor, então o que este teste trava é o confinamento —
+// nenhum valor monetário derivado dela pode sair negativo ou inventado.
+test('permuta maior que a área vendável: a área líquida negativa não contamina valor monetário', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 100, preco_venda_m2_residencial: 1000,
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 100, unidades: 1 }], // base 10.000
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 300,          // 3× a área vendável
+  });
+  assert.ok(p.areaVendavelLiquida < 0, `areaVendavelLiquida=${p.areaVendavelLiquida}`);
+  assert.equal(p.permutaCapada, true);
+  assert.equal(p.vgv, 0);
+  // `precoMedioM2` é guardado por `areaVendavelLiquida > 0`, então o memo do
+  // valor de mercado da permuta zera em vez de sair negativo.
+  assert.equal(p.valorPermutaFisica, 0, `valorPermutaFisica=${p.valorPermutaFisica}`);
+  assert.ok(p.vgvPermutaResidencial >= 0 && p.vgvPermutaNaoResidencial >= 0);
+  // A área informada é preservada — é a decisão de desenho, e o aviso a declara.
+  assert.ok(perto(p.areaPermutaFisica, 300));
+});

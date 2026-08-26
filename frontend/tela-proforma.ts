@@ -4,7 +4,7 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
-import { exportarPDF, exportarExcel } from './exportar.js';
+import { exportarPDF, exportarExcel, avisoPermutaCapada } from './exportar.js';
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
 
 // `tipo` dá a categoria visual (#3): receita | consolidado | resultado;
@@ -226,15 +226,20 @@ export class ViabTelaProforma extends LitElement {
   // Aviso do corte de permuta física. `permutaCapada` só é verdade quando a
   // permuta pedida vale mais que a base — e nesse caso o VGV vai a zero, o que
   // sem aviso pareceria erro de digitação em vez de excedente.
+  //
+  // A frase vem de `avisoPermutaCapada`, a MESMA que o CSV e o PDF imprimem:
+  // banner e exportação divergirem sobre o corte foi o defeito que a revisão
+  // apontou. Ela declara os m² informados de propósito — as áreas NÃO são
+  // capadas (o KPI "Área permutada" e a memo por linha seguem o que foi
+  // digitado), e um aviso que só falasse de dinheiro deixaria o leitor com uma
+  // área grande ao lado de um VGV zerado, sem ligar as duas coisas. O que a
+  // tela acrescenta é só a orientação de onde corrigir.
   private _renderAvisoPermuta(p: Proforma): TemplateResult {
     if (!p.permutaCapada) return html``;
-    const entregue = p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
     return html`
       <urbi-banner class="aviso-permuta" variante="alerta">
-        A <strong>permuta física</strong> informada vale ${fmtR$(p.vgvPermutaSolicitada)} e a receita
-        bruta do catálogo é ${fmtR$(entregue)}. O excedente foi <strong>desconsiderado</strong>: a
-        permuta entra pelo que a base comporta e o VGV fica em zero, nunca negativo. Reveja a área
-        permutada em Premissas → Permutas ou o catálogo em Premissas → Produtos.
+        ${avisoPermutaCapada(p)}
+        Reveja a área permutada em Premissas → Permutas ou o catálogo em Premissas → Produtos.
       </urbi-banner>`;
   }
 

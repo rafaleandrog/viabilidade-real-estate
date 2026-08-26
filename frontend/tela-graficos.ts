@@ -4,6 +4,10 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
 import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
+// A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
+// do seu `_carregar()`. Reusada, e não recopiada: a cópia inline divergiria da
+// função que o teste exercita.
+import { respostaAindaVale } from './viab-imagem-principal.js';
 import { montarMedidor } from './medidor-faixas.js';
 import { resolverIndicadoresBenchmark } from './benchmarks-indicadores.js';
 
@@ -57,14 +61,31 @@ export class ViabTelaGraficos extends LitElement {
     if (ch.has('estudo') && this.estudo?.id !== this._idCarregado) this._init();
   }
 
+  /**
+   * ⚠️ Duas chamadas de `_init()` podem estar em voo ao mesmo tempo — navegar
+   * do estudo A para o B dispara a segunda antes de a primeira responder, e
+   * não há ordem garantida entre duas fetches HTTP. Sem guarda, a resposta de
+   * A pode chegar por último e colar o catálogo de A num componente que já
+   * mostra B: VGV, gráficos e medidores do estudo errado, sem nada indicando.
+   *
+   * São duas defesas, e as duas são necessárias:
+   *   · o catálogo é LIMPO na troca de estudo — senão o de A fica na tela
+   *     durante o carregamento de B, e PERMANECE se a busca de B falhar;
+   *   · o id é capturado antes das chamadas e conferido depois, e a resposta
+   *     que ficou para trás é descartada em silêncio (quem atualiza a tela é
+   *     a chamada mais nova).
+   */
   private async _init() {
     if (!this.estudo) return;
-    this._idCarregado = this.estudo.id ?? null;
+    const id = this.estudo.id;
+    this._idCarregado = id ?? null;
+    this.produtos = [];
     try {
       const [bm, cfg, prod] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
-        listarProdutosPreliminar(this.estudo.id),
+        listarProdutosPreliminar(id),
       ]);
+      if (!respostaAindaVale(id, this.estudo?.id)) return; // o estudo mudou enquanto isto estava em voo
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
       this.produtos = prod?.dados || [];
