@@ -1018,7 +1018,7 @@ export class ViabTelaPremissas extends LitElement {
   private _renderCampoAreaInc(l: LinhaResolvida, dis: boolean): TemplateResult {
     if (l.papel.tipo !== 'editavel') return html`${nothing}`;
     const campo = CAMPO_POR_LINHA_INC[l.id];
-    // Nome acessível (achado da revisão do PR #576): mesmo papel do `role="group"
+    // Nome acessível (achado da revisão do PR 576): mesmo papel do `role="group"
     // aria-label` de `_renderSeletorArea` (Loteamento) — sem a classe
     // `area-seletor`, que é layout de badges que esta linha não tem.
     return html`
