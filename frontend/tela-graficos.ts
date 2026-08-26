@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
-import { listarBenchmarks, buscarConfig } from './viabilidade-api.js';
+import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { montarMedidor } from './medidor-faixas.js';
 import { resolverIndicadoresBenchmark } from './benchmarks-indicadores.js';
 
@@ -37,6 +37,11 @@ export class ViabTelaGraficos extends LitElement {
   @state() private excluirTerreno = false;
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
+  // O catálogo de Produtos é a fonte do VGV (`frontend/proforma.ts`). Sem ele
+  // esta aba calculava com a mesma entrada da Proforma menos os produtos — ou
+  // seja, outro VGV — e desenhava gráfico e medidores de um estudo diferente
+  // do que a aba ao lado mostra.
+  @state() private produtos: any[] = [];
   private _idCarregado: number | null = null;
 
   static styles = [estiloConteudo, css`
@@ -56,16 +61,20 @@ export class ViabTelaGraficos extends LitElement {
     if (!this.estudo) return;
     this._idCarregado = this.estudo.id ?? null;
     try {
-      const [bm, cfg] = await Promise.all([listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig()]);
+      const [bm, cfg, prod] = await Promise.all([
+        listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
+        listarProdutosPreliminar(this.estudo.id),
+      ]);
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
+      this.produtos = prod?.dados || [];
     } catch (e) { console.error(e); }
   }
 
   render() {
     if (!this.estudo) return nothing;
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
-    const p = calcularProforma({ ...this.estudo, aliquota_ret_pct: this.aliquotaRet } as ProformaInput);
+    const p = calcularProforma({ ...this.estudo, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
     return html`
       <div class="graficos">
         <urbi-card titulo="Composição dos custos">

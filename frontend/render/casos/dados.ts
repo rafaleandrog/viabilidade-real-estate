@@ -59,6 +59,18 @@ export function fluxo(): FluxoCalc {
 export const RECEITAS = [LINHA_RECEITA];
 export const CUSTOS = LINHAS_CUSTO;
 
+/**
+ * Catálogo de Produtos do `ESTUDO` — a fonte do VGV do Preliminar.
+ *
+ * 80 unidades × 62 m² × R$ 11.000 = R$ 54.560.000, o mesmo VGV que os campos
+ * legados de área × preço produziam enquanto eram fallback (4.960 m² ×
+ * R$ 11.000). Os casos que medem a Proforma e os Gráficos continuam desenhando
+ * exatamente os mesmos números.
+ */
+export const PRODUTOS: Record<string, any>[] = [
+  { id: 1, nome: 'Torre A', ordem: 0, area_media_m2: 62, preco_venda_m2: 11_000, unidades: 80 },
+];
+
 /** Estudo Preliminar de Incorporação — entrada do `calcularProforma`. */
 export const ESTUDO: Record<string, any> = {
   id: 1,

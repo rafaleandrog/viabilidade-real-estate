@@ -9,7 +9,7 @@
 // um verificador assim é desligá-lo.
 
 import '../../tela-proforma.js';
-import { ESTUDO, forcarEstado } from './dados.js';
+import { ESTUDO, PRODUTOS, forcarEstado } from './dados.js';
 
 export const caso = {
   nome: 'kpis-proforma',
@@ -38,11 +38,20 @@ export const caso = {
     'urbi-kpi.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
+    // `_init()` roda no `connectedCallback`, é assíncrono e ESCREVE POR CIMA do
+    // estado forçado: com o `{ dados: [] }` default do espelho o catálogo
+    // voltaria a vazio depois da montagem, e a tela cairia no estado vazio.
+    // Mutação do MESMO objeto `urbiVerso` que o script clássico do harness
+    // define (ver o comentário em `scripts/render-check.mjs` sobre este padrão).
+    (globalThis as any).urbiVerso.api = async (rota: string) => {
+      if (rota.includes('/preliminar/produtos')) return { dados: PRODUTOS };
+      return { dados: [] };
+    };
     const el = document.createElement('viab-tela-proforma');
-    // `_init()` roda no `connectedCallback` e vai à API por benchmarks, config
-    // e produtos. Com o stub devolvendo `{ dados: [] }` isso é inofensivo: os
-    // três caem em lista vazia, que é o estado de um estudo sem catálogo.
-    forcarEstado(el, { estudo: ESTUDO, secao: 'proforma', benchmarks: [], produtos: [], aliquotaRet: 4 });
+    // O catálogo precisa estar POPULADO: sem produto que componha VGV a tela
+    // desenha o estado vazio, e nenhum dos seletores exigidos existe — que é
+    // o caso do `proforma-sem-produtos`, ao lado.
+    forcarEstado(el, { estudo: ESTUDO, secao: 'proforma', benchmarks: [], produtos: PRODUTOS, aliquotaRet: 4 });
     raiz.appendChild(el);
     await (el as any).updateComplete;
   },

@@ -43,12 +43,6 @@
 
 export const EXCECOES = [
   {
-    arquivo: "backend/rotas/estudos.ts",
-    endereco: "frontend/proforma.ts:229",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :229 — \"calcularProforma\" está em :233. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
     arquivo: "backend/rotas/funding.ts",
     endereco: "frontend/fluxo-shared.ts:349",
     motivo:
