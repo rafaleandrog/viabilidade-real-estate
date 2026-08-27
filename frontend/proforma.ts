@@ -77,6 +77,9 @@ export interface ProformaInput {
   // individualmente (que o motor ignora quando há canônico, tornando o
   // stress um no-op), o fator é aplicado aqui, no único lugar que sabe qual
   // valor (canônico ou legado) está realmente em uso.
+  // #568: `preco` alcança também o CATÁLOGO (`aplicarFatorPreco`), que é a
+  // fonte do VGV desde a #563 — antes o stress de preço só movia o valor da
+  // permuta física, e o VGV ficava igual nos três cenários.
   sensibilidade?: FatorSensibilidade;
 }
 
@@ -127,6 +130,29 @@ export function catalogoEfetivo(produtos: ProdutoPreliminar[] | undefined): Prod
   return (produtos ?? []).filter(produtoCompoeCatalogo);
 }
 
+/**
+ * #568 — o catálogo REPRECIFICADO pelo fator de stress da sensibilidade.
+ *
+ * Estressar "Preço/m²" é, literalmente, mexer no preço de cada linha do
+ * catálogo: desde a #563 ele é a ÚNICA fonte do VGV, e o fator só alcançava os
+ * campos legados `preco_venda_m2*` — que hoje sobraram como preço da permuta
+ * física. Resultado: com catálogo presente (o caso normal), Bear/Base/Bull
+ * saíam com o MESMO VGV, e a análise de sensibilidade não media nada.
+ *
+ * Escala o PREÇO, não o VGV da linha: `unidades` e `area_media_m2` seguem
+ * intactas, então nº de unidades, área e as duas ponderações de
+ * `resumoCatalogoProdutos` continuam descrevendo o mesmo portfólio — o cenário
+ * é o mesmo empreendimento a outro preço, não outro empreendimento.
+ *
+ * `fator` é OBRIGATÓRIO de propósito (sem valor default): apagar o argumento na
+ * chamada do motor vira erro de compilação em vez de silenciosamente
+ * reintroduzir o bug — a defesa que a auditoria da Rodada 9 cobrou depois da
+ * #491.
+ */
+export function aplicarFatorPreco(produtos: ProdutoPreliminar[], fator: number): ProdutoPreliminar[] {
+  return produtos.map((p) => ({ ...p, preco_venda_m2: (Number(p.preco_venda_m2) || 0) * fator }));
+}
+
 export interface ResumoCatalogo {
   areaMediaM2: number | null;
   unidades: number | null;
@@ -158,6 +184,11 @@ export interface ResumoCatalogo {
  * para montar o contexto da análise de IA a partir do catálogo de Produtos —
  * nunca dos campos legados congelados (`area_media_lote_m2`, `num_unidades*`,
  * `preco_venda_m2*`).
+ *
+ * #568: descreve o CADASTRO, não um cenário — não conhece fator de stress. Quem
+ * quiser o resumo de um cenário compõe (`resumoCatalogoProdutos(aplicarFatorPreco(
+ * catalogoEfetivo(produtos), fator))`): só `precoVendaM2` se move, porque o fator
+ * escala preço e a ponderação é por área.
  */
 export function resumoCatalogoProdutos(produtos: ProdutoPreliminar[] | undefined): ResumoCatalogo {
   const catalogo = catalogoEfetivo(produtos);
@@ -282,10 +313,23 @@ export function calcularProforma(e: ProformaInput): Proforma {
 
   // BUG7-08: fator de sensibilidade — 1 quando a variável estressada não é a
   // que este cálculo está resolvendo, senão o fator do estudo (Bear/Bull).
+  //
+  // #568: o piso em 0 é aplicado AQUI, na fonte, e não dentro de
+  // `aplicarFatorPreco` — clampar só lá deixaria o catálogo com fator 0 e a
+  // valoração da permuta física com fator negativo, e a identidade do cap
+  // (#563) deixaria de valer por construção. O benchmark aceita
+  // `variacao_negativa_pct > 100` e a tela deriva `1 − varNeg/100`, então o
+  // Bear pode pedir fator negativo: variação além de 100% degrada para preço
+  // ZERO, nunca para preço negativo — VGV negativo é o que a #563 proibiu.
   const fatorSens = (variavel: VariavelSensibilidade): number =>
-    e.sensibilidade?.variavel === variavel ? e.sensibilidade.fator : 1;
+    e.sensibilidade?.variavel === variavel ? Math.max(0, e.sensibilidade.fator) : 1;
 
   // ── Áreas + VGV ──
+  // Os três preços abaixo são hoje o preço da PERMUTA FÍSICA (interim do #315:
+  // ela ainda é valorada pelo campo legado do tipo, não pelo catálogo). Levam o
+  // MESMO `fatorSens('preco')` que o catálogo recebe logo abaixo — é o que
+  // mantém o cenário coerente: base e permuta escalam juntas, e a proporção que
+  // o cap do excedente (#563) mede não muda de cenário para cenário.
   let areaVendavel = 0, areaPrivativa = 0, areaConstruida = 0;
   const precoLot = n(e.preco_venda_m2) * fatorSens('preco');
   const precoR = lot ? precoLot : n(e.preco_venda_m2_residencial) * fatorSens('preco');
@@ -312,7 +356,19 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // produto vazio), então `semProdutos` é sobre catálogo EFETIVO.
   const catalogo = catalogoEfetivo(e.produtos);
   const semProdutos = catalogo.length === 0;
-  const totalCatalogo = totalProdutos(catalogo);
+  // #568: o stress de "Preço/m²" tem que alcançar o CATÁLOGO — sem isso o VGV
+  // ficava congelado entre Bear/Base/Bull, porque `fatorSens('preco')` só
+  // tocava os campos legados (hoje só o preço da permuta física).
+  //
+  // A ORDEM importa: filtrar ANTES de reprecificar. `semProdutos` é um fato
+  // CADASTRAL do estudo ("não há linha com as três grandezas preenchidas") e
+  // não pode depender do cenário — reprecificar primeiro faria um fator 0
+  // zerar os preços, derrubar todas as linhas no filtro e transformar o estudo
+  // em "sem produtos" só naquele cenário.
+  const catalogoEstressado = aplicarFatorPreco(catalogo, fatorSens('preco'));
+  // `unidades` sai daqui e NÃO é afetada pelo fator (só o preço escala), então
+  // nº de unidades e preço médio por unidade continuam coerentes no cenário.
+  const totalCatalogo = totalProdutos(catalogoEstressado);
   const vgvBrutoCatalogo = totalCatalogo.vgv;
 
   // Permuta física (#10) — R e NR separados. Cada uma sai da área vendável do seu
