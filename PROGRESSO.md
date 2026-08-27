@@ -4,6 +4,27 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #568 · A sensibilidade alcança o catálogo de Produtos (2026-08-27)
+
+Quarta issue do Trilho A da Rodada 10. `fatorSens('preco')` escalava só os campos legados
+`preco_venda_m2*` — que desde a #563 sobraram como preço da **permuta física** —, então com
+catálogo presente (o caso normal) Bear/Base/Bull saíam com o **mesmo VGV**. `aplicarFatorPreco`
+reprecifica o catálogo efetivo dentro de `calcularProforma`; a filtragem vem **antes** da
+reprecificação, para `semProdutos` continuar sendo fato cadastral e não do cenário. Base e permuta
+escalam pelo mesmo fator, então o cap do excedente (#563) e os indicadores indefinidos (#571) não
+mudam de veredito por causa do cenário.
+
+Junto, o critério 4 da issue: a tabela de cenários formatava com `fmtR$` cru e discordava da tabela
+principal sobre a mesma grandeza — passou a usar `celulaSensibilidade`, que **é** `celulaProforma`.
+
+Fixture dourado único (`frontend/fixtures/sensibilidade-catalogo.ts`, VGV do print:
+R$ 24.764.117,40 → Bear 22.287.705,66 / Bull 27.240.529,14) servindo motor, notação e o **primeiro
+caso de render da sub-aba Cenários** — antes dela `secao: 'cenarios'` nunca tinha sido montado em
+Chromium. Medido: neutralizar o fator no motor deixa 6 testes vermelhos; quebrar `_aplicarFator` na
+tela deixa os **747 testes de lógica pura verdes** e derruba só o caso de render novo.
+
+---
+
 ## Rodada 10 aberta · lista de bugs dos estudos Preliminares (2026-08-26)
 
 O autor enviou `lista_bugs_20260826.xlsx` com 9 itens sobre os estudos Preliminares — 8 de
