@@ -4,6 +4,44 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #572 · ordem das linhas de permuta unificada entre tela e exportação (2026-08-27)
+
+Item 8 da lista de bugs da Rodada 10. Diagnóstico: a tela mostrava "Receita bruta (VGV)" ANTES do
+bloco de permuta física ("VGV sem permuta física" + as duas deduções), enquanto a exportação
+(CSV/PDF, `frontend/exportar.ts`) já mostrava o bloco de permuta ANTES — lida de cima para baixo,
+só a ordem da exportação fecha a identidade real: `VGV sem permuta física − permuta física (R+NR) =
+Receita bruta (VGV)`.
+
+**Conserto: a tela passou a seguir a ordem que a exportação já usava** (a exportação não mudou de
+ordem — só ganhou o rótulo do achado 7, abaixo). `_linhas` (privado, `frontend/tela-proforma.ts`)
+virou uma função pura e exportada, `montarLinhasProforma`, com o bloco de permuta movido para ANTES
+do push de "Receita bruta (VGV)". `linhasProformaVisiveis` (nova, exportada) aplica o mesmo filtro
+`soLot`/`soInc`/`ocultarSeZero` que `linhasProforma` (exportar.ts) já aplicava internamente —
+extraído para não reimplementar o predicado numa terceira cópia; `_renderTabela` chama as duas.
+
+**Nota da auditoria #574, achado 7 — resolvido junto (dentro do escopo desta issue):** a exportação
+usava sempre "(-) Permuta física residencial", inclusive no Loteamento, onde a tela já usa
+"(-) Permuta física" (sem "residencial") desde a #570. `linhasProforma` (exportar.ts:81-84) ganhou o
+mesmo `lot ? … : …` que a tela já tinha — não é rótulo novo, é a exportação parar de divergir.
+
+**Achado 10 da mesma auditoria (notação de sinal da #567 não alcança CSV/PDF, `fmtR$` cru em
+`frontend/exportar.ts:137,163`) FICOU DE FORA desta issue** — é consistência de FORMATAÇÃO/sinal, não de
+ORDEM, os 4 critérios de aceite da #572 não cobrem isso, e é uma mudança de superfície maior
+(toda célula monetária das duas exportações, não só o bloco de permuta). Registrado como
+`Sem-fechamento: #574 <achado 10, formatação de sinal fmtR$ cru na exportação — fora do escopo de
+ordem da #572>` no corpo do PR; o autor decide se vira issue própria.
+
+**Testes** (`frontend/proforma-ordem-linhas.test.ts`, novo): paridade estrutural tela×exportação
+(Incorporação com/sem permuta, Loteamento com permuta) por `assert.deepEqual` da lista de rótulos;
+um teste de ORDEM explícito (índice de "VGV sem permuta física" < índice de "Receita bruta (VGV)",
+nos dois lados) que é o que pega mutação de reordenação sem depender de mais nada mudar; e a cadeia
+aritmética (VGV sem permuta → Receita bruta → Receita líquida → Receita operacional → Resultado)
+lida **das próprias linhas** (por rótulo), nos dois lados — não dos campos brutos de `Proforma`.
+Mutação verificada manualmente (reverter a ordem em `montarLinhasProforma`): 3 dos 7 testes novos
+caem para vermelho (as 2 paridades estruturais com permuta e o teste de índice); os 4 verdes são
+os 2 de identidade aritmética (lookup por rótulo, indiferentes a posição), a paridade da fixture
+sem permuta (a mutação não a alcança) e o "só filtra, não reordena" — confirma que o teste de
+índice é o que prova a fiação da ordem especificamente.
 ## #573 · indicador de área privativa alocada — produtos × Terreno & Áreas (2026-08-27)
 
 Item 6 da lista de bugs da Rodada 10, aba Produtos. `frontend/proforma.ts` ganha 3 campos
@@ -99,6 +137,7 @@ de render hoje).
 `validar-backend.sh` não roda. `frontend/proforma.ts`, `tela-proforma.ts`, `tela-premissas.ts` e
 `exportar.ts` (fila de merges do Preliminar) não foram tocados — nenhum critério desta issue
 exigia.
+
 ## #597 · A corrida de carregamento em Proforma e Premissas (2026-08-27)
 
 Achado colateral da revisão do PR 580 (#563): `tela-proforma.ts:_init()` e
