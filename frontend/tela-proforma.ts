@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum, fmtPct, celula, negativoContabil } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 import { exportarPDF, exportarExcel, avisoPermutaCapada } from './exportar.js';
@@ -294,8 +294,10 @@ export class ViabTelaProforma extends LitElement {
     if (temPermuta) kpis.push({ rot: 'Área permutada', val: `${fmtNum(p.areaPermutaFisica)} m²`, variante: '' });
     // Texto colorido nos 3 níveis do velocímetro do benchmark (sem emoji; a bola
     // fica só nos badges da análise de sensibilidade).
-    kpis.push({ rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: varianteFaixa(co, p.custoObrasVgvPct) });
-    kpis.push({ rot: 'Margem sobre VGV', val: fmtPct(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) });
+    // #571: VGV ≤ 0 (ex.: permuta física capa 100% da base) — os dois vêm
+    // `null` do motor, e `fmtPctOuIndef` mostra "—", nunca "0,0%".
+    kpis.push({ rot: 'Custo obras / VGV', val: fmtPctOuIndef(p.custoObrasVgvPct), variante: varianteFaixa(co, p.custoObrasVgvPct) });
+    kpis.push({ rot: 'Margem sobre VGV', val: fmtPctOuIndef(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) });
     return html`<div class="kpis">
       ${kpis.map((k) => html`<urbi-kpi rotulo=${k.rot} .valor=${k.val} variante=${k.variante}></urbi-kpi>`)}
     </div>`;
@@ -503,7 +505,10 @@ export class ViabTelaProforma extends LitElement {
     // rótulo (1ª coluna) e o fundo da linha (só tokens do design system).
     type Cen = { p: Proforma; vgvBruto: number };
     type Natureza = 'receita' | 'despesa';
-    const linhas: { l: string; f: (c: Cen) => number; natureza: Natureza; pct?: boolean; badge?: boolean; bmCampo?: string; divisoria?: boolean }[] = [
+    // #571: `f` pode devolver `null` — só as duas linhas `pct: true`
+    // (Custo obras/VGV, Margem sobre VGV) o fazem, quando o cenário cai com
+    // VGV ≤ 0; as monetárias continuam sempre `number`.
+    const linhas: { l: string; f: (c: Cen) => number | null; natureza: Natureza; pct?: boolean; badge?: boolean; bmCampo?: string; divisoria?: boolean }[] = [
       { l: 'VGV', f: (c) => c.vgvBruto, natureza: 'receita' },
       { l: 'Receita bruta', f: (c) => c.p.vgv, natureza: 'receita' },
       { l: 'Receita líquida', f: (c) => c.p.receitaLiquida, natureza: 'receita' },
@@ -520,7 +525,10 @@ export class ViabTelaProforma extends LitElement {
     // a vírgula decimal não batia entre as linhas de uma coluna alinhada à direita.
     // `fmtR$(v, false)` é a fonte única de arredondamento monetário do contrato C7
     // (#281): min = max = 2, sem o símbolo.
-    const fmt = (m: { pct?: boolean }, v: number) => (m.pct ? fmtPct(v) : fmtR$(v, false));
+    // #571: `v === null` só acontece nas duas linhas `pct: true` com o
+    // cenário em VGV ≤ 0 — "—", nunca "0,0%". `fmtR$` continua exigindo
+    // `number`: uma linha monetária nunca chega aqui como `null`.
+    const fmt = (m: { pct?: boolean }, v: number | null) => (v === null ? '—' : (m.pct ? fmtPct(v) : fmtR$(v, false)));
     // #11: título de cada cenário num urbi-badge ESTÁTICO — Bear=perigo (vermelho),
     // Base=sucesso (verde), Bull=info (azul). Os NÚMEROS agora seguem a mesma cor
     // do cenário (tokens correspondentes ao badge).

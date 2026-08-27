@@ -38,6 +38,15 @@ export const fmtM2 = (v: number | null | undefined): string =>
 export const fmtPct = (v: number) =>
   `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(v || 0)}%`;
 
+// #571: indicador cujo DENOMINADOR pode ser inválido (ex.: VGV ≤ 0) — o motor
+// devolve `null` nesse caso (nunca 0), e aqui vira "—", nunca "0,0%". Mesmo
+// padrão de `fmtM2`/`pctAproveitamentoCoef` (#569): ausência de base é
+// diferente de "mediu zero". `fmtPct` continua exigindo `number` — quem
+// chamá-lo direto com um campo agora `number | null` (`custoObrasVgvPct`,
+// `margemLiquidaPct`, `receitaLiquidaSobreVgvPct`) quebra o typecheck, e é
+// essa quebra que impede a regressão silenciosa de voltar a exibir "0,0%".
+export const fmtPctOuIndef = (v: number | null) => (v === null ? '—' : fmtPct(v));
+
 // Porcentagem digitada pelo usuário / benchmark: 2 casas decimais, vírgula.
 export const fmtPctEntrada = (v: number) =>
   `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0)}%`;

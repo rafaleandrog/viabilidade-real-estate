@@ -153,14 +153,18 @@ export interface Proforma {
   // custos indiretos
   marketingGlobal: number; gestaoIndiretos: number; custoIndiretoTotal: number;
   // resultado (final — permutas financeiras e físicas já o reduzem)
-  resultado: number; valorPermutaFisica: number; margemLiquidaPct: number;
+  // #571: os três indicadores "% VGV" abaixo (`margemLiquidaPct`,
+  // `custoObrasVgvPct`, `receitaLiquidaSobreVgvPct`) ficam `null` quando o
+  // denominador (`vgv`) é ≤ 0 — indefinido, não "mediu zero". Mesmo padrão de
+  // `tetoAproveitamentoM2`/`pctAproveitamentoCoef` (#569, abaixo).
+  resultado: number; valorPermutaFisica: number; margemLiquidaPct: number | null;
   // KPIs
-  investimentoTotal: number; custoObras: number; custoObrasVgvPct: number;
+  investimentoTotal: number; custoObras: number; custoObrasVgvPct: number | null;
   // #453: campo renomeado — o nome antigo dava a entender que havia custo no
   // numerador, e não há. A fórmula é "1 − deduções" (receita líquida / VGV, a
   // coluna "% VGV" da linha Receita líquida na EVI Urbitá). Renome puro,
   // fórmula intacta — nenhum número muda.
-  receitaLiquidaSobreVgvPct: number; roiPct: number; eficienciaPct: number;
+  receitaLiquidaSobreVgvPct: number | null; roiPct: number; eficienciaPct: number;
   numUnidades: number; precoMedioUnidade: number;
   // Detalhe por tipo (Incorporação — #7). Loteamento não separa R/NR: ficam 0.
   numUnidadesResidencial: number; numUnidadesNaoResidencial: number;
@@ -370,13 +374,16 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const precoMedioM2 = lot ? precoLot
     : (areaVendavelLiquida > 0 ? vgv / areaVendavelLiquida : 0);
   const valorPermutaFisica = areaPermutaFisica * precoMedioM2;
-  const margemLiquidaPct = vgv > 0 ? resultado / vgv * 100 : 0;
+  // #571: `null`, não 0 — vgv ≤ 0 é "sem base para medir", e um estudo
+  // deficitário de verdade (margem negativa) precisa continuar distinguível
+  // de "indefinido".
+  const margemLiquidaPct = vgv > 0 ? resultado / vgv * 100 : null;
 
   // ── KPIs ──
   const investimentoTotal = custoDiretoTotal + custoIndiretoTotal;
   const custoObras = lot ? infraestrutura : (construcao + decoracao + gestaoConstrucao);
-  const custoObrasVgvPct = vgv > 0 ? custoObras / vgv * 100 : 0;
-  const receitaLiquidaSobreVgvPct = vgv > 0 ? receitaLiquida / vgv * 100 : 0;
+  const custoObrasVgvPct = vgv > 0 ? custoObras / vgv * 100 : null;
+  const receitaLiquidaSobreVgvPct = vgv > 0 ? receitaLiquida / vgv * 100 : null;
   const roiPct = investimentoTotal > 0 ? resultado / investimentoTotal * 100 : 0;
   const eficienciaPct = areaTerreno > 0 ? areaVendavel / areaTerreno * 100 : 0;
   // Nº de unidades: também só do catálogo. Os campos legados que o alimentavam
@@ -455,7 +462,12 @@ export function precoSugeridoM2(e: ProformaInput, pisoResultadoPct: number): num
     const teste: ProformaInput = lot
       ? { ...e, preco_venda_m2: p, produtos }
       : { ...e, preco_venda_m2_residencial: p, preco_venda_m2_nao_residencial: p, produtos };
-    return calcularProforma(teste).margemLiquidaPct;
+    // #571: `margemLiquidaPct` agora é `number | null` (indefinido quando
+    // `vgv` fica ≤ 0). Aqui é busca numérica interna, não exibição — sem
+    // catálogo com quantidade/área o VGV fica 0 para QUALQUER preço testado
+    // (a bisseção nunca sai do lugar de qualquer forma), e `?? 0` preserva o
+    // comportamento numérico de antes da #571 só para esta busca.
+    return calcularProforma(teste).margemLiquidaPct ?? 0;
   };
   // Se nem com preço altíssimo atinge o piso, não há solução.
   const P_MAX = 1_000_000;

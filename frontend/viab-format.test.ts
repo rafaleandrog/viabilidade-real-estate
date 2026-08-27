@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtPct, fmtPctEntrada, fmtM2, parseNumeroBR, celula, negativoContabil,
+  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtPct, fmtPctOuIndef, fmtPctEntrada, fmtM2, parseNumeroBR, celula, negativoContabil,
 } from './viab-format.js';
 
 test('#281: fmtR$ é a fonte única de valores monetários com 2 casas', () => {
@@ -29,6 +29,17 @@ test('fmtPct: valor calculado usa 1 casa decimal com vírgula', () => {
   assert.equal(fmtPct(12.34), '12,3%');
   assert.equal(fmtPct(0), '0,0%');
   assert.equal(fmtPct(-3.25), '-3,3%');
+});
+
+// #571: indicador com denominador inválido (ex.: VGV ≤ 0) — o motor devolve
+// `null`, e aqui vira "—", nunca "0,0%". Mutação: apagar o `v === null ? '—'`
+// e chamar `fmtPct(v)` direto derrubaria a 1ª asserção (viraria "0,0%") — e
+// nem compilaria, já que `fmtPct` só aceita `number`.
+test('#571 fmtPctOuIndef: null vira "—"; número segue fmtPct normalmente', () => {
+  assert.equal(fmtPctOuIndef(null), '—');
+  assert.equal(fmtPctOuIndef(0), '0,0%');
+  assert.equal(fmtPctOuIndef(12.34), '12,3%');
+  assert.equal(fmtPctOuIndef(-3.25), '-3,3%');
 });
 
 test('fmtPctEntrada: valor de entrada usa 2 casas decimais com vírgula', () => {

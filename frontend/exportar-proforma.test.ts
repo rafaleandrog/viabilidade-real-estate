@@ -94,3 +94,27 @@ test('a tela usa a MESMA função, não uma frase própria', () => {
   assert.ok(fonte.includes('avisoPermutaCapada(p)'),
     'tela-proforma.ts precisa imprimir a frase compartilhada no banner');
 });
+
+// #571: o CAPADO acima é o estado VIVO — catálogo presente, permuta capa
+// 100% da base, vgv fecha em 0. Antes: o CSV mostrava a coluna % VGV VAZIA
+// nessas linhas (nem "0,00%" nem "—"), e "Margem sobre VGV" saía "0,0%" nos
+// dois arquivos — um número medido que não foi medido. Agora as três
+// superfícies (tela, CSV, PDF) concordam em "—". Mutação: trocar
+// `fmtPctOuIndef` de volta por `fmtPct` em `exportar.ts` não compila (`fmtPct`
+// não aceita `number | null`); trocar o `'—'` do CSV por `''` derruba a 1ª
+// asserção.
+test('#571: CSV e PDF mostram "—" na % VGV e em "Margem sobre VGV" quando vgv = 0, nunca "0,0%"', () => {
+  const p = calcularProforma(CAPADO);
+  assert.equal(p.vgv, 0, 'o fixture precisa estar com vgv = 0 para o teste significar algo');
+  assert.equal(p.semProdutos, false, 'catálogo presente — o caso vivo da #571, não "sem produtos"');
+
+  const csv = csvProforma(ESTUDO, p, false);
+  assert.ok(csv.includes('Receita bruta (VGV);0,00;—'), `linha da Receita bruta sem "—" no CSV:\n${csv}`);
+  assert.ok(csv.includes('Margem sobre VGV;—'), `"Margem sobre VGV" não saiu "—" no CSV:\n${csv}`);
+  assert.ok(!csv.includes('0,0%'), `CSV mostrou "0,0%" com VGV indefinido:\n${csv}`);
+
+  const html = htmlProforma(ESTUDO, p, false);
+  assert.ok(html.includes('<div class="r">Margem sobre VGV</div><div class="v">—</div>'),
+    `KPI "Margem sobre VGV" não saiu "—" no PDF:\n${html}`);
+  assert.ok(!html.includes('0,0%'), `PDF mostrou "0,0%" com VGV indefinido:\n${html}`);
+});

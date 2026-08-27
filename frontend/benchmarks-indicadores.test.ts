@@ -70,6 +70,25 @@ test('#451: benchmark sem indicador correspondente e que não é sensibilidade n
   assert.equal(descartados[0].motivo, 'sem indicador correspondente');
 });
 
+// #571: `valor: null` — a tela (Gráficos/Resumo) leu `custoObrasVgvPct`/
+// `margemLiquidaPct` num estudo com VGV ≤ 0. O campo TEM indicador
+// configurado — continua "exibível" (não é "sem indicador correspondente");
+// é a TELA, via `montarMedidor` (null-seguro), quem decide não desenhar o
+// medidor sem valor definido. Confundir os dois motivos faria um indicador
+// configurado sumir na lista errada (`descartados`) só porque a LEITURA da
+// vez veio indefinida.
+test('#571: valor null continua exibível (não vira "sem indicador correspondente")', () => {
+  const { exibiveis, descartados } = resolverIndicadoresBenchmark(
+    [{ campo: 'custo_obras_vgv', valor: 35 }, { campo: 'margem_liquida', valor: 20 }],
+    { custo_obras_vgv: null, margem_liquida: 14.67 },
+  );
+  assert.equal(descartados.length, 0, 'valor null não é "sem indicador" — o campo tem fonte, só não tem leitura definida agora');
+  assert.equal(exibiveis.length, 2);
+  const porCampo = Object.fromEntries(exibiveis.map((m) => [m.campo, m.valor]));
+  assert.equal(porCampo.custo_obras_vgv, null);
+  assert.equal(porCampo.margem_liquida, 14.67);
+});
+
 test('ROTULOS_INDICADOR e INDICADORES_SUPORTADOS cobrem exatamente os mesmos 4 campos', () => {
   assert.deepEqual(Object.keys(ROTULOS_INDICADOR).sort(), [...INDICADORES_SUPORTADOS].sort());
 });

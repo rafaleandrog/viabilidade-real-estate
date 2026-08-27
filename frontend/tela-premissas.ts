@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctEntrada, fmtM2 } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, fmtPctEntrada, fmtM2 } from './viab-format.js';
 import {
   urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig,
   listarProdutosPreliminar, criarProdutoPreliminar, atualizarProdutoPreliminar, removerProdutoPreliminar,
@@ -1101,7 +1101,8 @@ export class ViabTelaPremissas extends LitElement {
         { rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: varianteFaixa(ef, p.eficienciaPct) },
         { rot: 'VGV', val: fmtR$(p.vgv), variante: '' },
         { rot: 'Nº de lotes', val: fmtNum(p.numUnidades), variante: '' },
-        { rot: 'Margem sobre VGV', val: fmtPct(p.margemLiquidaPct), variante: '' },
+        // #571: VGV ≤ 0 vem `null` do motor — "—", nunca "0,0%".
+        { rot: 'Margem sobre VGV', val: fmtPctOuIndef(p.margemLiquidaPct), variante: '' },
       );
     } else {
       const co = this._benchmark('custo_obras_vgv');
@@ -1111,8 +1112,9 @@ export class ViabTelaPremissas extends LitElement {
         { rot: 'Área construída', val: `${fmtNum(p.areaConstruida)} m²`, variante: '' },
         { rot: 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
         { rot: 'Preço médio/unid.', val: fmtR$(p.precoMedioUnidade), variante: '' },
-        { rot: 'Custo obras / VGV', val: fmtPct(p.custoObrasVgvPct), variante: varianteFaixa(co, p.custoObrasVgvPct) },
-        { rot: 'Margem sobre VGV', val: fmtPct(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) },
+        // #571: idem — VGV ≤ 0 → "—", não "0,0%".
+        { rot: 'Custo obras / VGV', val: fmtPctOuIndef(p.custoObrasVgvPct), variante: varianteFaixa(co, p.custoObrasVgvPct) },
+        { rot: 'Margem sobre VGV', val: fmtPctOuIndef(p.margemLiquidaPct), variante: varianteFaixa(ml, p.margemLiquidaPct) },
       );
     }
 
