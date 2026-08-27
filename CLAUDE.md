@@ -30,10 +30,11 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — ✅ RODADA 9 CONCLUÍDA (2026-08-24)
+## Estado do backlog — 🔄 RODADA 10 EM EXECUÇÃO (2026-08-26)
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
+| **10 — lista de bugs dos Preliminares** | `lista_bugs_20260826.xlsx`, 9 itens (Incorporação: Premissas/Proforma/Cenários; Loteamento: conferência geral). Plano, diagnóstico e fila de PRs em `docs/rodada-10/planejamento.md` | **#563–#574** (12) | 🔄 **em execução desde 2026-08-26** — merges autorizados pelo autor por PR revisado com zero bloqueantes |
 | **9 — execução da Rodada 8** | Ondas de PRs que entregam as issues #426–#493, na ordem de dependência | **#426–#493** | ✅ **concluída em 2026-08-24** — as 59 issues fechadas |
 | **8 — auditoria cruzada** | Reverificação da `lista bugs 20260807.xlsx` + regras derivadas das 3 planilhas (EVI Urbitá, fluxo do investidor) + conferência numérica em Pinguim + auditoria de UI | **#426–#493** (61 abertas; #461 e #480 fecharam por decisão) | ✅ **auditoria concluída em 2026-08-22** — o saldo de **59 issues** é executado pela Rodada 9 |
 | **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | ✅ **concluída em 2026-08-12** |

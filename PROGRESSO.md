@@ -4,6 +4,39 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 10 aberta · lista de bugs dos estudos Preliminares (2026-08-26)
+
+O autor enviou `lista_bugs_20260826.xlsx` com 9 itens sobre os estudos Preliminares — 8 de
+Incorporação (Premissas: Terreno & Áreas, Produtos, Permutas; Resultado: Proforma e Cenários) e 1
+de conferência geral de Loteamento — mais 2 screenshots de produção com a Proforma e a Análise de
+sensibilidade erradas. As abas `#38/#39/#45` da planilha são resquícios (decisão do autor); a
+`#43` (prints da EVI "PROFORMA INCORPORAÇÃO") é gabarito de cálculo.
+
+**O diagnóstico que abriu a rodada:** o motor não erra a aritmética — o estudo do screenshot tem
+**VGV negativo** (catálogo de Produtos presente porém vazio zera a base e a permuta física deduz
+sem trava) e a tela imprime módulo nas linhas de receita, o que fabrica a leitura "custo somado em
+vez de subtraído". Os "—" da coluna % VGV e os 0,0% dos badges são o mesmo `vgv ≤ 0`. Defeito
+independente: o fator da sensibilidade não alcança o catálogo de Produtos — estressar Preço/m² não
+move o VGV. Detalhe completo, com evidência, nas issues.
+
+**As 12 issues:** #563 (fonte do VGV/estado vazio/negativo, P1), #567 (notação contábil da tela,
+P1), #571 (indefinido ≠ 0,0%, P1), #568 (sensibilidade×catálogo, P1), #572 (ordem tela×export,
+P2), #564 (cascata de áreas Incorporação, P2), #569 (indicador de aproveitamento, P2), #565
+(classificação R/NR nos produtos, P2 — migração 035), #566 (fim da permuta por unidade, P2 —
+migração 036), #570 (permutas por categoria, P2), #573 (área alocada nos produtos, P3), #574
+(conferência Loteamento + encerramento, P2). Mapa item→issue e fila de PRs em
+`docs/rodada-10/planejamento.md`.
+
+**Decisões do autor (2026-08-26, vinculantes):** VGV nunca negativo (excedente de permuta capado
+com aviso); estudo sem produto mostra estado vazio explícito; rótulos da Proforma mantidos como
+estão (Loteamento e Incorporação); merge autorizado à sessão, em fila, por PR revisado com zero
+bloqueantes; revisão via `@codex review` em todo PR (a conexão existe segundo o autor — o primeiro
+PR testa na prática).
+
+Fora do escopo da rodada, seguem abertas de antes: #504, #512, #514, #515.
+
+---
+
 ## Onda 1 · A referência de UI do urbiverso vira artefato deste repositório (2026-08-23)
 
 Primeiro PR da onda que existe para fazer correção visual ser **verificável**. Este entrega a
