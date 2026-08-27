@@ -413,7 +413,7 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 > **Atenção à grandeza de ligação, que difere por tipo:** na **Incorporação** ela é
 > `area_pvt_r_fechada` / `area_pvt_nr_fechada` (`frontend/proforma.ts:301`), convertida por
 > `converterUnidade`/`paraBase` (`frontend/premissas-conversao.ts`); a ALV da cascata
-> (`CASCATA_LOTEAMENTO`) só existe no **Loteamento** (`frontend/proforma.ts:290`, dentro do
+> (`CASCATA_LOTEAMENTO`) só existe no **Loteamento** (`frontend/proforma.ts:297`, dentro do
 > `if (lot)`). Desde a **#564**, `CASCATA_INCORPORACAO` (`frontend/areas-cascata.ts:139-144`) **é
 > renderizada** pela aba Terreno & Áreas do Preliminar de Incorporação (`frontend/tela-premissas.ts`,
 > tabela de Áreas) — mas continua **não sendo fonte da grandeza de ligação**: o motor citado acima lê
