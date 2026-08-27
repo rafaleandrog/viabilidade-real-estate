@@ -689,7 +689,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
     && areaPrivativa > tetoAproveitamentoM2;
 
   // Área privativa alocada nos produtos (#573) — `catalogo` é o mesmo
-  // `catalogoEfetivo(e.produtos)` de antes de reprecificar (linha ~420): a
+  // `catalogoEfetivo(e.produtos)` desta função, de antes de reprecificar: a
   // área média × unidades de cada linha não muda com o fator de sensibilidade
   // de preço, então usar o catálogo cru ou o estressado dá o mesmo total —
   // igual decisão de `resumoCatalogoProdutos`, que descreve o CADASTRO, não

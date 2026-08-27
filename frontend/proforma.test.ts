@@ -325,7 +325,7 @@ test('#573: sem NADA registrado em Terreno & Áreas → percentual null, nunca "
   assert.equal(p.areaPrivativa, 0);
   assert.ok(perto(p.areaProdutosAlocada, 1_000));
   assert.equal(p.pctAreaAlocada, null); // sem denominador — indefinido, não "0%" nem "100000%"
-  assert.ok(perto(p.diferencaAreaAlocada, 1_000)); // a subtração continua definida sem o catálogo
+  assert.ok(perto(p.diferencaAreaAlocada, 1_000)); // a subtração continua definida sem a área registrada
 });
 
 test('#573: catálogo vazio E nada registrado → os dois lados zerados, diferença zero (nada a alocar)', () => {

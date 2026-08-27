@@ -16,7 +16,9 @@ teto de aproveitamento já usa como "usada" (ALV da cascata no Loteamento; soma 
 na Incorporação) — nenhum campo novo no schema.
 
 `frontend/tela-premissas.ts:_renderAreaAlocada` desenha 3 `urbi-kpi` (alocada / registrada /
-diferença) logo abaixo da tabela de Produtos, com `variante` ecoando o sinal da diferença — em
+diferença) logo abaixo da tabela de Produtos — o KPI de área alocada carrega junto o percentual
+(`pctAreaAlocada`) quando há denominador, para o campo derivado ter consumidor de UI (achado da
+revisão do PR 616) — com `variante` ecoando o sinal da diferença — em
 branco quando tudo alocado, `alerta` quando sobra por alocar, `erro` quando o catálogo excede — e
 um `urbi-banner` condicional nos dois estados não neutros. Some da tela só quando os dois lados
 estão em zero (estudo recém-criado, nada para comparar ainda); qualquer outro caso — inclusive só

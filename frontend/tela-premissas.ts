@@ -959,15 +959,16 @@ export class ViabTelaPremissas extends LitElement {
     const variante = excesso ? 'erro' : sobra ? 'alerta' : '';
     return html`
       <div class="kpis area-alocada">
-        <urbi-kpi rotulo="Área alocada nos produtos" .valor=${fmtM2(p.areaProdutosAlocada)}></urbi-kpi>
+        <urbi-kpi rotulo="Área alocada nos produtos" .valor=${p.pctAreaAlocada === null
+          ? fmtM2(p.areaProdutosAlocada)
+          : `${fmtM2(p.areaProdutosAlocada)} (${fmtPct(p.pctAreaAlocada)})`}></urbi-kpi>
         <urbi-kpi rotulo="Área registrada em Terreno & Áreas" .valor=${fmtM2(p.areaPrivativa)}></urbi-kpi>
         <urbi-kpi rotulo="Diferença" .valor=${fmtM2(p.diferencaAreaAlocada)} variante=${variante}></urbi-kpi>
       </div>
       ${excesso ? html`
         <urbi-banner class="aviso-area-alocada" variante="erro">
-          A soma dos produtos (${fmtM2(p.areaProdutosAlocada)}) ultrapassa a área privativa de venda
-          registrada em Terreno & Áreas (${fmtM2(p.areaPrivativa)}) — reveja o catálogo ou as áreas
-          privativas.
+          A soma dos produtos (${fmtM2(p.areaProdutosAlocada)}) ultrapassa a área registrada em
+          Terreno & Áreas (${fmtM2(p.areaPrivativa)}) — reveja o catálogo ou as áreas registradas.
         </urbi-banner>` : nothing}
       ${sobra ? html`
         <urbi-banner class="aviso-area-alocada" variante="alerta">
