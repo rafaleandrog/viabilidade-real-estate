@@ -87,6 +87,11 @@ export interface ProdutoPreliminar {
   area_media_m2?: number | string | null;
   preco_venda_m2?: number | string | null;
   unidades?: number | string | null;
+  // #565: classificação Residencial/Não Residencial — nasce, persiste e
+  // aparece na tela nesta issue; o motor ainda NÃO lê este campo (bucket
+  // único de VGV, `vgvNaoResidencial = 0` em `calcularProforma`). Ligar
+  // `tipo` ao cálculo é a #570.
+  tipo?: string | null;
 }
 
 /** VGV de uma linha do catálogo: área média × preço × unidades (#315). */
@@ -120,6 +125,65 @@ export function produtoCompoeCatalogo(p: ProdutoPreliminar): boolean {
 /** As linhas do catálogo que compõem VGV; lista vazia = estudo sem receita modelada. */
 export function catalogoEfetivo(produtos: ProdutoPreliminar[] | undefined): ProdutoPreliminar[] {
   return (produtos ?? []).filter(produtoCompoeCatalogo);
+}
+
+export interface ResumoCatalogo {
+  areaMediaM2: number | null;
+  unidades: number | null;
+  precoVendaM2: number | null;
+}
+
+/**
+ * Resumo agregado do catálogo EFETIVO — área média por unidade, total de
+ * unidades e preço de venda médio (R$/m²), na mesma unidade das três colunas
+ * da tela.
+ *
+ * `unidades` é a soma simples das linhas do catálogo efetivo. `areaMediaM2` é
+ * ponderada por `unidades` (Σ área×unidades / Σunidades) — a área média real
+ * de uma unidade sorteada ao acaso do portfólio, não a média simples das
+ * linhas. `precoVendaM2` é ponderada pela área total de cada linha
+ * (Σ VGV / Σ área×unidades, reaproveitando `vgvProduto`/`totalProdutos`) — o
+ * preço médio de venda por m² pesado pelo volume de área que cada linha
+ * representa, não pelo número de linhas do catálogo.
+ *
+ * As duas ponderações são deliberadamente diferentes (unidades vs. área) mas
+ * consistentes entre si: `areaMediaM2 × precoVendaM2 × unidades` reproduz o
+ * VGV total do catálogo efetivo, porque `areaMediaM2 × unidades` é, por
+ * construção, a área total somada.
+ *
+ * Catálogo sem nenhuma linha efetiva devolve os três campos `null` —
+ * fallback honesto, nunca `0` (zero pareceria um dado real).
+ *
+ * Consumido pelo backend do Apelo Comercial (`backend/rotas/apelo-comercial.ts`)
+ * para montar o contexto da análise de IA a partir do catálogo de Produtos —
+ * nunca dos campos legados congelados (`area_media_lote_m2`, `num_unidades*`,
+ * `preco_venda_m2*`).
+ */
+export function resumoCatalogoProdutos(produtos: ProdutoPreliminar[] | undefined): ResumoCatalogo {
+  const catalogo = catalogoEfetivo(produtos);
+  const { vgv, unidades } = totalProdutos(catalogo);
+  const areaTotal = catalogo.reduce(
+    (s, p) => s + (Number(p.area_media_m2) || 0) * (Number(p.unidades) || 0), 0,
+  );
+  return {
+    unidades: unidades > 0 ? unidades : null,
+    areaMediaM2: unidades > 0 ? areaTotal / unidades : null,
+    precoVendaM2: areaTotal > 0 ? vgv / areaTotal : null,
+  };
+}
+
+/**
+ * Tipo efetivo de uma linha do catálogo — Residencial ou Não Residencial (#565).
+ *
+ * Produto LEGADO (gravado antes da migração `035`) não tem `tipo` no payload;
+ * o default é Residencial, a mesma leitura que o `padrao` do `schema.json`
+ * declara para a coluna. Qualquer valor que não seja exatamente
+ * `nao_residencial` cai em Residencial — fail-safe, não fail-loud, porque
+ * este campo ainda não alimenta cálculo nenhum (#570): uma classificação
+ * errada aqui não muda VGV.
+ */
+export function tipoProdutoEfetivo(p: ProdutoPreliminar): 'residencial' | 'nao_residencial' {
+  return p.tipo === 'nao_residencial' ? 'nao_residencial' : 'residencial';
 }
 
 export interface Proforma {

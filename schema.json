@@ -265,6 +265,7 @@
       "colunas": {
         "estudo_id":      { "tipo": "referencia", "tabela_ref": "estudos", "obrigatorio": true, "ao_deletar": "cascata" },
         "nome":           { "tipo": "texto", "limite": 100 },
+        "tipo":           { "tipo": "texto", "limite": 20, "opcoes": ["residencial", "nao_residencial"], "padrao": "residencial" },
         "area_media_m2":  { "tipo": "decimal", "precisao": 10, "escala": 2 },
         "preco_venda_m2": { "tipo": "decimal", "precisao": 12, "escala": 2 },
         "unidades":       { "tipo": "inteiro", "padrao": 0 },

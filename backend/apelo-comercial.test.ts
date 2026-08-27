@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FATORES, montarContextoApelo, normalizarRespostaApelo, calcularScores,
+  FATORES, montarContextoApelo, montarContextoApeloDoEstudo, normalizarRespostaApelo, calcularScores,
 } from './apelo-comercial.js';
 
 // ── BUG7-15: contexto — localidade é a causa dominante do diagnóstico ──
@@ -29,6 +29,61 @@ test('BUG7-15 montarContextoApelo: localidade/área/preço ausentes não quebram
   });
   assert.match(ctx, /não informada/);
   assert.match(ctx, /Nenhuma\./);
+});
+
+// ── #588: contexto deriva do catálogo EFETIVO de Produtos, nunca dos campos
+// legados congelados de `estudos` (area_media_lote_m2, num_unidades*,
+// preco_venda_m2*) — `montarContextoApeloDoEstudo` é o único ponto que o
+// handler HTTP chama, e recebe a lista crua de `preliminar_produtos`.
+
+test('#588 montarContextoApeloDoEstudo: estudo com catálogo editado — contexto reflete o catálogo, não campos legados', () => {
+  const ctx = montarContextoApeloDoEstudo({
+    localidade: 'Águas Claras/DF',
+    tipoEmpreendimento: 'incorporacao',
+    // Catálogo com DUAS linhas — a agregação (unidades = soma; área e preço
+    // ponderados) precisa aparecer no contexto, não um valor de linha isolada
+    // nem qualquer campo legado de `estudos` (que nem é passado a esta função
+    // — a assinatura não tem `areaMediaM2`/`unidades`/`precoVendaM2`).
+    produtos: [
+      { area_media_m2: 60, preco_venda_m2: 9000, unidades: 80 },
+      { area_media_m2: 100, preco_venda_m2: 12000, unidades: 20 },
+    ],
+    partes: ['[anuncios] texto de teste'],
+  });
+  // unidades: soma simples = 100.
+  assert.match(ctx, /Unidades: 100\b/);
+  // áreaMediaM2 ponderada por unidades: (60×80 + 100×20)/100 = 68.00.
+  assert.match(ctx, /Área média por unidade: 68\.00 m²/);
+  // precoVendaM2 ponderado pela área de cada linha: VGV total 67.200.000 /
+  // área total 6.800 = 9882,352941... → 9882.35 (2 casas, toFixed).
+  assert.match(ctx, /Preço de venda praticado: R\$ 9882\.35\/m²/);
+  assert.match(ctx, /Águas Claras\/DF/);
+  assert.match(ctx, /texto de teste/);
+});
+
+test('#588 montarContextoApeloDoEstudo: estudo sem catálogo efetivo — nulls honestos, sem linha de área/unidades/preço', () => {
+  const ctx = montarContextoApeloDoEstudo({
+    localidade: 'Ceilândia/DF',
+    tipoEmpreendimento: 'loteamento',
+    produtos: [],
+    partes: ['[anuncios] texto de teste'],
+  });
+  assert.match(ctx, /Ceilândia\/DF/);
+  assert.doesNotMatch(ctx, /Unidades:/);
+  assert.doesNotMatch(ctx, /Área média por unidade:/);
+  assert.doesNotMatch(ctx, /Preço de venda praticado:/);
+});
+
+test('#588 montarContextoApeloDoEstudo: linha em branco (o que "Adicionar Produto" cria) não compõe catálogo — mesmo resultado de produtos ausente', () => {
+  const semCatalogo = montarContextoApeloDoEstudo({
+    localidade: 'DF', tipoEmpreendimento: 'incorporacao', produtos: undefined, partes: [],
+  });
+  const linhaEmBranco = montarContextoApeloDoEstudo({
+    localidade: 'DF', tipoEmpreendimento: 'incorporacao',
+    produtos: [{ area_media_m2: null, preco_venda_m2: null, unidades: 0 }],
+    partes: [],
+  });
+  assert.equal(semCatalogo, linhaEmBranco);
 });
 
 // ── BUG7-15: normalização pós-resposta — a trava real, no molde de mercado-ia.ts ──

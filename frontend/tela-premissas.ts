@@ -6,7 +6,7 @@ import {
   urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig,
   listarProdutosPreliminar, criarProdutoPreliminar, atualizarProdutoPreliminar, removerProdutoPreliminar,
 } from './viabilidade-api.js';
-import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, type ProformaInput, type Proforma } from './proforma.js';
+import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, type ProformaInput, type Proforma } from './proforma.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
@@ -371,9 +371,10 @@ export class ViabTelaPremissas extends LitElement {
     }
     table.prod th.num, table.prod td.num { text-align: right; }
     table.prod td { padding: 6px 8px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); font-size: var(--texto-corpo, 0.8125rem); }
-    col.p-nome { width: 26%; } col.p-area { width: 20%; } col.p-preco { width: 20%; }
+    col.p-nome { width: 12%; } col.p-tipo { width: 14%; } col.p-area { width: 20%; } col.p-preco { width: 20%; }
     col.p-un { width: 12%; } col.p-vgv { width: 16%; } col.p-acao { width: 60px; }
     table.prod td.nome urbi-input { width: 100%; }
+    table.prod td.tipo urbi-select { width: 100%; }
     table.prod td viab-num { width: 100%; }
     table.prod td.vgv-calc { font-weight: 600; color: var(--cor-texto-forte, rgba(255,255,255,0.95)); }
     table.prod tr.total td { font-weight: 700; border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2)); border-bottom: none; padding-top: 10px; }
@@ -768,12 +769,12 @@ export class ViabTelaPremissas extends LitElement {
     return html`
       <table class="prod">
         <colgroup>
-          <col class="p-nome"><col class="p-area"><col class="p-preco"><col class="p-un"><col class="p-vgv">
+          <col class="p-nome"><col class="p-tipo"><col class="p-area"><col class="p-preco"><col class="p-un"><col class="p-vgv">
           ${dis ? nothing : html`<col class="p-acao">`}
         </colgroup>
         <thead>
           <tr>
-            <th>Nome</th><th class="num">Área média do lote</th><th class="num">Preço de venda</th>
+            <th>Nome</th><th>Tipo</th><th class="num">Área média do lote</th><th class="num">Preço de venda</th>
             <th class="num">Unidades</th><th class="num">VGV</th>
             ${dis ? nothing : html`<th></th>`}
           </tr>
@@ -781,7 +782,7 @@ export class ViabTelaPremissas extends LitElement {
         <tbody>
           ${this.produtos.map((p) => this._linhaProduto(p, dis))}
           <tr class="total">
-            <td>Total</td><td></td><td></td>
+            <td>Total</td><td></td><td></td><td></td>
             <td class="num">${fmtNum(unidades, 0)}</td>
             <td class="num">${fmtR$(vgv)}</td>
             ${dis ? nothing : html`<td></td>`}
@@ -804,6 +805,16 @@ export class ViabTelaPremissas extends LitElement {
           <urbi-input ?desabilitado=${dis} .valor=${p.nome || ''} placeholder="Ex.: Lote"
             @urbi:input-change=${(e: CustomEvent) => this._salvarProduto(p, { nome: e.detail.valor })}
           ></urbi-input>
+        </td>
+        <td class="tipo">
+          <urbi-select ?desabilitado=${dis}
+            .valor=${tipoProdutoEfetivo(p)}
+            .opcoes=${[
+              { valor: 'residencial', rotulo: 'Residencial' },
+              { valor: 'nao_residencial', rotulo: 'Não Residencial' },
+            ]}
+            @urbi:select-change=${(e: CustomEvent) => this._salvarProduto(p, { tipo: e.detail.valor })}
+          ></urbi-select>
         </td>
         <td class="num">
           <viab-num sufixo="m²" ?desabilitado=${dis}

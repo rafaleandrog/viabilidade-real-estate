@@ -3,7 +3,7 @@ import { exigirMembro, exigirEditor } from '../permissoes-estudo.js';
 import { publicarEvento, payloadApeloConcluido } from '../eventos-viabilidade.js';
 import {
   FATORES, SCHEMA_RESPOSTA, instrucoesSistema, calcularScores,
-  montarContextoApelo, normalizarRespostaApelo,
+  montarContextoApeloDoEstudo, normalizarRespostaApelo,
 } from '../apelo-comercial.js';
 
 export const rotasApelo: ReturnType<typeof Router> = Router();
@@ -141,12 +141,23 @@ rotasApelo.post('/estudos/:id/apelo-comercial', async (req: Request, res: Respon
       return;
     }
 
-    const contexto = montarContextoApelo({
+    // #588: área média, unidades e preço/m² vêm do catálogo EFETIVO de
+    // Produtos (`preliminar_produtos`), mesmo padrão de `anexarProdutos` em
+    // `backend/rotas/estudos.ts` — não mais dos campos legados congelados
+    // (`area_media_lote_m2`, `num_unidades*`, `preco_venda_m2*`), que a UI
+    // não escreve mais desde a #315 e que `calcularProforma` não lê mais
+    // desde a #563. Vale para os dois padrões (Loteamento e Incorporação):
+    // os dois usam `preliminar_produtos` como catálogo do Preliminar.
+    // `montarContextoApeloDoEstudo` recebe a lista crua — não um resumo já
+    // calculado — de propósito (ver o comentário na definição).
+    const produtosRes = await req.dados!.listar('preliminar_produtos', {
+      filtros: { estudo_id: estudoId }, por_pagina: 500,
+    });
+
+    const contexto = montarContextoApeloDoEstudo({
       localidade,
       tipoEmpreendimento: String(estudo.tipo_empreendimento ?? ''),
-      areaMediaM2: Number(estudo.area_media_lote_m2) || null,
-      unidades: Number(estudo.num_unidades) || Number(estudo.num_unidades_residencial) || null,
-      precoVendaM2: Number(estudo.preco_venda_m2) || Number(estudo.preco_venda_m2_residencial) || null,
+      produtos: produtosRes.dados,
       partes,
     });
 

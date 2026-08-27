@@ -104,12 +104,6 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
-    endereco: "frontend/proforma.ts:186",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :186 — \"CASCATA_LOTEAMENTO\" está em :190. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
     endereco: "frontend/fluxo-shared.ts:237",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :237 — \"APOS_CHAVES_MESES\" está em :295. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
