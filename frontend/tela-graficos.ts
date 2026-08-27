@@ -242,6 +242,10 @@ export class ViabTelaGraficos extends LitElement {
   // declaradamente sem fonte até existir um indicador de margem bruta de
   // verdade (#453) — `resolverIndicadoresBenchmark` já sabe disso.
   private _renderMedidores(p: Proforma): TemplateResult {
+    // #571: `custoObrasVgvPct`/`margemLiquidaPct` vêm `null` do motor quando
+    // vgv ≤ 0. `montarMedidor` é null-seguro (devolve `null`, sem desenhar o
+    // medidor) — um ponteiro não tem como pousar honestamente numa escala
+    // sem valor definido; é o mesmo desfecho de "sem indicador configurado".
     const { exibiveis } = resolverIndicadoresBenchmark(this.benchmarks, {
       custo_obras_vgv: p.custoObrasVgvPct,
       margem_liquida: p.margemLiquidaPct,

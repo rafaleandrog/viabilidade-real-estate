@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtPct } from './viab-format.js';
+import { fmtR$, fmtPct, fmtPctOuIndef } from './viab-format.js';
 import { type EventoCrono } from './fluxo-shared.js';
 import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { graficoFluxoMensal, graficoFluxoAcumulado } from './fluxo-graficos.js';
@@ -188,9 +188,11 @@ export class ViabTelaResumo extends LitElement {
     const custoObras = c.linhasCusto.filter((l) => l.grupo === 'obra').reduce((s, l) => s + l.total, 0);
     return {
       vgv, resultado,
-      margemLiquidaPct: vgv > 0 ? (resultado / vgv) * 100 : 0,
+      // #571: `null`, não 0 — mesmo padrão do Preliminar (`proforma.ts`):
+      // vgv ≤ 0 é "sem base", não "margem zero".
+      margemLiquidaPct: vgv > 0 ? (resultado / vgv) * 100 : null,
       roiPct: custoTotal > 0 ? (resultado / custoTotal) * 100 : 0,
-      custoObrasVgvPct: vgv > 0 ? (custoObras / vgv) * 100 : 0,
+      custoObrasVgvPct: vgv > 0 ? (custoObras / vgv) * 100 : null,
     };
   }
 
@@ -206,7 +208,8 @@ export class ViabTelaResumo extends LitElement {
         <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(Math.abs(c.exposicaoMaxima))} variante="erro"></urbi-kpi>
         <urbi-kpi rotulo="VGV potencial" .valor=${fmtR$(k.vgv)}></urbi-kpi>
         <urbi-kpi rotulo="Resultado" .valor=${fmtR$(k.resultado)} variante=${k.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-        <urbi-kpi rotulo="Margem de caixa" .valor=${fmtPct(k.margemLiquidaPct)} variante=${k.margemLiquidaPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="Margem de caixa" .valor=${fmtPctOuIndef(k.margemLiquidaPct)}
+          variante=${k.margemLiquidaPct === null ? '' : (k.margemLiquidaPct >= 0 ? 'sucesso' : 'erro')}></urbi-kpi>
         <urbi-kpi rotulo="ROI sobre custo total" .valor=${fmtPct(k.roiPct)} variante=${k.roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
       </div>
     `;
@@ -295,6 +298,8 @@ export class ViabTelaResumo extends LitElement {
   };
 
   private _renderMedidores(k: ReturnType<ViabTelaResumo['_kpisAvancado']>): TemplateResult {
+    // #571: vgv ≤ 0 → `k.custoObrasVgvPct`/`k.margemLiquidaPct` chegam `null`;
+    // `montarMedidor` é null-seguro e não desenha o medidor sem valor definido.
     const { exibiveis } = resolverIndicadoresBenchmark(this.benchmarks, {
       custo_obras_vgv: k.custoObrasVgvPct,
       margem_liquida: k.margemLiquidaPct,

@@ -20,7 +20,12 @@ const COR = {
   sucesso: 'var(--cor-sucesso, #13A98D)',
 } as const;
 
-export function montarMedidor(b: any, val: number): ConfigMedidor | null {
+// #571: `val` aceita `null` — indicador com denominador inválido (ex.: VGV ≤
+// 0). Sem valor definido não há como desenhar o ponteiro honestamente numa
+// escala; `null` é tratado como "sem medidor", o mesmo desfecho de um
+// benchmark sem configuração válida (`meta <= 0` abaixo).
+export function montarMedidor(b: any, val: number | null): ConfigMedidor | null {
+  if (val === null) return null;
   const naoExceder = b?.regra_comparacao === 'nao_exceder';
   const cMin = Number(b?.medidor_min);
   const cMax = Number(b?.medidor_max);
@@ -51,7 +56,11 @@ export function montarMedidor(b: any, val: number): ConfigMedidor | null {
 
 // Cor da faixa do velocímetro em que o valor cai — a MESMA faixa/cor do medidor
 // (config de 3 faixas ou fallback de 2). null quando não há medidor válido.
-function corFaixa(b: any, val: number): string | null {
+function corFaixa(b: any, val: number | null): string | null {
+  // #571: sai cedo e explícito — `montarMedidor` também recusa `null`, mas
+  // por dentro dele o TS não consegue estreitar o `val` desta função de volta
+  // para `number` só porque `cfg` saiu não-nulo.
+  if (val === null) return null;
   const cfg = montarMedidor(b, val);
   if (!cfg) return null;
   const faixa = cfg.faixas.find((f) => val <= f.ate) ?? cfg.faixas[cfg.faixas.length - 1];
@@ -73,12 +82,12 @@ const VARIANTE: Record<string, string> = {
   [COR.sucesso]: 'sucesso',
 };
 
-export function bolaFaixa(b: any, val: number): string {
+export function bolaFaixa(b: any, val: number | null): string {
   const cor = corFaixa(b, val);
   return cor ? (BOLA[cor] ?? '') : '';
 }
 
-export function varianteFaixa(b: any, val: number): string {
+export function varianteFaixa(b: any, val: number | null): string {
   const cor = corFaixa(b, val);
   return cor ? (VARIANTE[cor] ?? '') : '';
 }

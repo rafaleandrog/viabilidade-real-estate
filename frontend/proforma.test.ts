@@ -85,7 +85,10 @@ test('loteamento: custos, resultado e margem', () => {
   assert.ok(perto(p.custoDiretoTotal, 34_750_000), `custoDireto=${p.custoDiretoTotal}`);
   assert.ok(perto(p.custoIndiretoTotal, 1_687_500), `custoIndireto=${p.custoIndiretoTotal}`);
   assert.ok(perto(p.resultado, 28_812_500), `resultado=${p.resultado}`);
-  assert.ok(perto(p.margemLiquidaPct, 38.4167, 0.01), `margem=${p.margemLiquidaPct}`);
+  // #571: vgv > 0 neste fixture, então margemLiquidaPct nunca é `null` aqui —
+  // a checagem de runtime é o que deixa o `!` seguro para o TS.
+  assert.notEqual(p.margemLiquidaPct, null);
+  assert.ok(perto(p.margemLiquidaPct!, 38.4167, 0.01), `margem=${p.margemLiquidaPct}`);
   assert.equal(p.numUnidades, 250);
   assert.ok(perto(p.precoMedioUnidade, 300_000));
 });
@@ -97,9 +100,10 @@ test('loteamento: custos, resultado e margem', () => {
 // a issue #453 mediu antes do rename. Renome puro: nenhum número muda.
 test('#453: receitaLiquidaSobreVgvPct = receitaLiquida / vgv × 100 (renome, não fórmula nova)', () => {
   const p = calcularProforma(LOT);
-  assert.ok(perto(p.receitaLiquidaSobreVgvPct, 87, 0.01), `receitaLiquidaSobreVgvPct=${p.receitaLiquidaSobreVgvPct}`);
+  assert.notEqual(p.receitaLiquidaSobreVgvPct, null);
+  assert.ok(perto(p.receitaLiquidaSobreVgvPct!, 87, 0.01), `receitaLiquidaSobreVgvPct=${p.receitaLiquidaSobreVgvPct}`);
   assert.ok(
-    perto(p.receitaLiquidaSobreVgvPct, (p.receitaLiquida / p.vgv) * 100, 1e-9),
+    perto(p.receitaLiquidaSobreVgvPct!, (p.receitaLiquida / p.vgv) * 100, 1e-9),
     'tem que ser exatamente receitaLiquida/vgv*100, não outra fórmula',
   );
   // Não é a mesma grandeza de margemLiquidaPct — o renome não colapsou dois
@@ -107,10 +111,17 @@ test('#453: receitaLiquidaSobreVgvPct = receitaLiquida / vgv × 100 (renome, nã
   assert.notEqual(p.receitaLiquidaSobreVgvPct, p.margemLiquidaPct);
 });
 
-test('#453: vgv === 0 → receitaLiquidaSobreVgvPct = 0 (caso de borda que a fórmula já tratava)', () => {
+// #571: este teste dizia "= 0" — era exatamente o bug que a #571 fecha. Um
+// resultado de fórmula real de 0% (margem exatamente zero) e "sem VGV para
+// medir margem nenhuma" são estados DIFERENTES, e o motor agora os distingue:
+// `null` é o segundo, nunca o primeiro. Mutação: trocar o `null` de volta
+// para 0 em `proforma.ts` faz as duas asserções abaixo falharem.
+test('#453: vgv === 0 → receitaLiquidaSobreVgvPct = null (indefinido, não "mediu zero")', () => {
   const p = calcularProforma({ tipo_empreendimento: 'loteamento' } as ProformaInput);
   assert.equal(p.vgv, 0);
-  assert.equal(p.receitaLiquidaSobreVgvPct, 0);
+  assert.equal(p.receitaLiquidaSobreVgvPct, null);
+  assert.equal(p.margemLiquidaPct, null);
+  assert.equal(p.custoObrasVgvPct, null);
 });
 
 test('custo do terreno desconsiderado zera a linha', () => {
@@ -769,7 +780,9 @@ test('preço sugerido: atinge o piso do benchmark', () => {
     preco_venda_m2: preco!,
     produtos: LOT.produtos!.map((x) => ({ ...x, preco_venda_m2: preco! })),
   }).margemLiquidaPct;
-  assert.ok(perto(margem, piso, 0.05), `margem no preço sugerido=${margem}`);
+  // #571: preço/catálogo positivos aqui — margem nunca é `null` neste caso.
+  assert.notEqual(margem, null);
+  assert.ok(perto(margem!, piso, 0.05), `margem no preço sugerido=${margem}`);
 });
 
 // ── #407: o caso que a listagem quebrava ────────────────────────────────
@@ -799,11 +812,14 @@ test('#407: estudo com VGV só do catálogo tem vgv > 0 — a listagem não pode
   assert.equal(p.numUnidades, 40);
 });
 
+// #571: a asserção final dizia "margemLiquidaPct = 0" — a mesma confusão que
+// a #571 corrige em toda a tela. vgv 0 é "sem base", não "margem zero"; o
+// motor agora devolve `null`.
 test('#407: o MESMO estudo sem `produtos` no payload cai em vgv 0 — a causa do "—"', () => {
   const { produtos, ...semProdutos } = SO_CATALOGO;
   const p = calcularProforma(semProdutos as ProformaInput);
   assert.equal(p.vgv, 0);
-  assert.equal(p.margemLiquidaPct, 0);
+  assert.equal(p.margemLiquidaPct, null);
 });
 
 // ── Excedente de permuta física ─────────────────────────────────────────
@@ -847,6 +863,16 @@ test('permuta física maior que a base: a efetiva é capada, o VGV para em zero 
   assert.ok(perto(p.vgvPermutaResidencial, VGV_PRINT / 2), `efetiva=${p.vgvPermutaResidencial}`);
   assert.equal(p.vgv, 0, `vgv=${p.vgv}`);
   assert.ok(p.vgv >= 0, 'o VGV nunca pode ficar negativo');
+  // #571: este é exatamente o estado VIVO que a issue #571 mirava — catálogo
+  // presente (`semProdutos: false`, a Proforma mostra a tabela) e vgv=0 pela
+  // permuta capada, não por ausência de catálogo. Os três indicadores "% VGV"
+  // têm que sair `null` (indefinido), nunca 0 — 0 renderizaria "0,0%" na tela
+  // em vez de "—". Mutação: trocar qualquer `null` de volta para 0 em
+  // `proforma.ts` derruba uma destas três linhas.
+  assert.equal(p.semProdutos, false, 'catálogo presente — não é o caso "sem produtos"');
+  assert.equal(p.margemLiquidaPct, null, 'sem VGV, não há margem sobre VGV para medir');
+  assert.equal(p.custoObrasVgvPct, null, 'sem VGV, não há custo/VGV para medir');
+  assert.equal(p.receitaLiquidaSobreVgvPct, null, 'sem VGV, não há receita líquida/VGV para medir');
   // A identidade continua fechando sobre a permuta EFETIVA.
   const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
   assert.ok(perto(vgvBruto, VGV_PRINT / 2), `vgvBruto=${vgvBruto}`);

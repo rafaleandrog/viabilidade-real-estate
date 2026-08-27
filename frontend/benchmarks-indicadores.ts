@@ -58,7 +58,13 @@ const SEM_INDICADOR_MOTIVO = 'sem indicador correspondente';
 
 export interface BenchmarkCampo { campo: string; [k: string]: unknown; }
 export interface DescartadoBenchmark { campo: string; motivo: string; }
-export interface MedidorResolvido<B extends BenchmarkCampo> { benchmark: B; campo: IndicadorSuportado; rotulo: string; valor: number; }
+// #571: `valor` aceita `null` — o indicador tem fonte configurada, mas o
+// denominador ficou inválido (ex.: VGV ≤ 0) nesta leitura. Continua
+// "exibível" (a tela decide o que fazer com um valor indefinido — tipicamente
+// não desenhar o medidor, via `montarMedidor` também null-seguro); é
+// diferente de "sem indicador correspondente" (`descartados`, abaixo), que é
+// sobre o CAMPO não ter fonte nenhuma, não sobre o valor da vez.
+export interface MedidorResolvido<B extends BenchmarkCampo> { benchmark: B; campo: IndicadorSuportado; rotulo: string; valor: number | null; }
 export interface ResolucaoMedidores<B extends BenchmarkCampo> {
   exibiveis: MedidorResolvido<B>[];
   descartados: DescartadoBenchmark[];
@@ -72,7 +78,7 @@ export interface ResolucaoMedidores<B extends BenchmarkCampo> {
  */
 export function resolverIndicadoresBenchmark<B extends BenchmarkCampo>(
   benchmarks: B[],
-  valores: Partial<Record<IndicadorSuportado, number>>,
+  valores: Partial<Record<IndicadorSuportado, number | null>>,
 ): ResolucaoMedidores<B> {
   const exibiveis: MedidorResolvido<B>[] = [];
   const descartados: DescartadoBenchmark[] = [];
