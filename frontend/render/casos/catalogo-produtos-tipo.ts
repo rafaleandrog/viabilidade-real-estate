@@ -65,6 +65,13 @@ export const caso = {
     // Os 3 `urbi-kpi` do `_renderResumo` (KPIs de VGV/margem etc. abaixo do
     // catálogo) ligam `variante` — mesma natureza de `cascata-areas-incorporacao.ts`.
     'urbi-kpi.variante',
+    // #573: as 2 linhas somam 7.160 m² alocados contra os 4.960 m²
+    // registrados do `ESTUDO` base — excesso, então o indicador de área
+    // alocada desenha o `urbi-banner` do aviso, que liga `variante="erro"`.
+    // Efeito colateral esperado de o indicador ler o MESMO estudo/catálogo
+    // que este caso já montava para outro propósito (#565) — mesma natureza
+    // de `urbi-kpi.variante` acima.
+    'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     // `_init()` roda no `connectedCallback`, é assíncrono e escreve por cima do

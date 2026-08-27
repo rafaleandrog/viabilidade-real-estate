@@ -337,6 +337,31 @@ export interface Proforma {
   // `null` por construção, sempre.
   tetoAproveitamentoM2: number | null; pctAproveitamentoCoef: number | null;
   aproveitamentoExcedido: boolean;
+  // Área privativa alocada nos produtos (#573, Produtos): compara o que o
+  // catálogo aloca (Residencial + Não Residencial somados — `areaTotalProdutos`
+  // do catálogo EFETIVO, a mesma soma que `resumoCatalogoProdutos` usa) contra
+  // a área privativa de venda REGISTRADA em Terreno & Áreas (`areaPrivativa`,
+  // acima — a mesma grandeza que o teto de aproveitamento #569 usa como
+  // "usada"). É uma comparação por SUBTRAÇÃO, não por razão, então
+  // `areaProdutosAlocada` e `diferencaAreaAlocada` estão SEMPRE definidos —
+  // catálogo vazio aloca 0 m², e 0 m² registrados menos 0 m² alocados ainda é
+  // uma diferença válida (zero). `pctAreaAlocada` é a exceção: fica `null`
+  // sem área registrada (`areaPrivativa` ≤ 0) — mesmo padrão null-safe de
+  // `pctAproveitamentoCoef`, "indefinido" em vez de "0%" falso quando a razão
+  // não tem denominador.
+  //
+  // `diferencaAreaAlocada` é `alocada − registrada`: positivo = excesso
+  // alocado (o catálogo pede mais m² do que o terreno declara vender),
+  // negativo = sobra por alocar (falta produto para a área toda), zero =
+  // tudo alocado — os três estados do critério 2 da #573.
+  //
+  // Vale para os DOIS tipos de empreendimento sem ramo `lot` explícito: no
+  // Loteamento `areaPrivativa` é a ALV da cascata (não há parcelas PVT), e o
+  // catálogo — normalizado para o bucket residencial único (comentário acima,
+  // em `porTipo`) — soma do mesmo jeito, R+NR sendo sempre só R ali. A soma é
+  // agnóstica ao bucket por construção: não precisa saber quantas categorias
+  // existem para somar todas.
+  areaProdutosAlocada: number; pctAreaAlocada: number | null; diferencaAreaAlocada: number;
 }
 
 const n = (v: any): number => Number(v) || 0;
@@ -663,6 +688,16 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const aproveitamentoExcedido = tetoAproveitamentoM2 !== null && tetoAproveitamentoM2 > 0
     && areaPrivativa > tetoAproveitamentoM2;
 
+  // Área privativa alocada nos produtos (#573) — `catalogo` é o mesmo
+  // `catalogoEfetivo(e.produtos)` desta função, de antes de reprecificar: a
+  // área média × unidades de cada linha não muda com o fator de sensibilidade
+  // de preço, então usar o catálogo cru ou o estressado dá o mesmo total —
+  // igual decisão de `resumoCatalogoProdutos`, que descreve o CADASTRO, não
+  // um cenário.
+  const areaProdutosAlocada = areaTotalProdutos(catalogo);
+  const pctAreaAlocada = areaPrivativa > 0 ? (areaProdutosAlocada / areaPrivativa) * 100 : null;
+  const diferencaAreaAlocada = moeda(areaProdutosAlocada - areaPrivativa);
+
   const resultadoProforma: Proforma = {
     areaTerreno, areaVendavel, areaPermutaFisica, areaVendavelLiquida, areaPrivativa, areaConstruida,
     areaPermutaResidencial, areaPermutaNaoResidencial, vgvPermutaResidencial, vgvPermutaNaoResidencial,
@@ -680,6 +715,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
     numUnidadesResidencial, numUnidadesNaoResidencial,
     precoMedioUnidadeResidencial, precoMedioUnidadeNaoResidencial,
     tetoAproveitamentoM2, pctAproveitamentoCoef, aproveitamentoExcedido,
+    areaProdutosAlocada, pctAreaAlocada, diferencaAreaAlocada,
   };
   // #260/C7: toda saída monetária da Proforma é canônica a duas casas. As
   // métricas de área, quantidade e percentuais preservam sua própria precisão.

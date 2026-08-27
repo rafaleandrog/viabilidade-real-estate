@@ -42,6 +42,49 @@ caem para vermelho (as 2 paridades estruturais com permuta e o teste de índice)
 os 2 de identidade aritmética (lookup por rótulo, indiferentes a posição), a paridade da fixture
 sem permuta (a mutação não a alcança) e o "só filtra, não reordena" — confirma que o teste de
 índice é o que prova a fiação da ordem especificamente.
+## #573 · indicador de área privativa alocada — produtos × Terreno & Áreas (2026-08-27)
+
+Item 6 da lista de bugs da Rodada 10, aba Produtos. `frontend/proforma.ts` ganha 3 campos
+derivados, sempre null-safe: `areaProdutosAlocada` (Σ área média × unidades do catálogo EFETIVO,
+Residencial + Não Residencial somados — a mesma soma independente de bucket que
+`resumoCatalogoProdutos` usa), `diferencaAreaAlocada` (`alocada − registrada`, SEMPRE definida —
+é subtração, não razão) e `pctAreaAlocada` (`null` sem área registrada, nunca "0%" falso — mesmo
+padrão de `pctAproveitamentoCoef`, #569). "Registrada" é `areaPrivativa`, a mesma grandeza que o
+teto de aproveitamento já usa como "usada" (ALV da cascata no Loteamento; soma das 4 parcelas PVT
+na Incorporação) — nenhum campo novo no schema.
+
+`frontend/tela-premissas.ts:_renderAreaAlocada` desenha 3 `urbi-kpi` (alocada / registrada /
+diferença) logo abaixo da tabela de Produtos — o KPI de área alocada carrega junto o percentual
+(`pctAreaAlocada`) quando há denominador, para o campo derivado ter consumidor de UI (achado da
+revisão do PR 616) — com `variante` ecoando o sinal da diferença — em
+branco quando tudo alocado, `alerta` quando sobra por alocar, `erro` quando o catálogo excede — e
+um `urbi-banner` condicional nos dois estados não neutros. Some da tela só quando os dois lados
+estão em zero (estudo recém-criado, nada para comparar ainda); qualquer outro caso — inclusive só
+um lado preenchido — desenha.
+
+**Adaptação Loteamento (decisão desta issue, não do corpo original — ele não distinguia os dois
+tipos).** A soma R+NR é agnóstica a quantas categorias existem por construção, então nenhum ramo
+`lot` foi necessário no motor: o catálogo do Loteamento (bucket único residencial desde o PR 607)
+soma do mesmo jeito. Na tela, o rótulo da área registrada ficou genérico ("Área registrada em
+Terreno & Áreas", não "privativa de venda") porque o termo "privativa" é da Incorporação — o
+Loteamento chama a mesma grandeza de ALV/área vendável. O indicador aparece nos dois tipos.
+
+**Prova de mutação.** Apagar a chamada de `_renderAreaAlocada()` no template: os 3 `urbi-kpi` e o
+`urbi-banner` somem do DOM — o caso de render novo (`area-alocada-excedente`) vira vermelho por
+seletor ausente, e o caso `catalogo-produtos-tipo` (#565, cujo fixture também fecha em excesso
+desde este PR) vira vermelho por "declaração ociosa em `aceitaNaoReproduzido`" — a mesma classe de
+prova que `aproveitamento-coeficiente-excedido` usa para o indicador irmão (#569). Nenhum teste de
+lógica pura vê o DOM, então a suíte pura sozinha ficaria toda verde com a chamada apagada.
+
+Testes de lógica pura em `frontend/proforma.test.ts` (`#573: ...`): alocada == registrada
+(diferença zero, 100%), excesso (diferença positiva), sobra (diferença negativa), sem NADA
+registrado (percentual `null`, diferença ainda definida), catálogo e registro ambos zerados
+(diferença zero, percentual `null`), e o caso Loteamento (ALV × catálogo bucket único).
+
+**Efeito colateral em teste existente.** O fixture do caso de render `catalogo-produtos-tipo`
+(#565) aloca 7.160 m² contra 4.960 m² registrados no `ESTUDO` base — excesso não intencional pelo
+próprio propósito daquele caso, mas real: o `urbi-banner.aviso-area-alocada` passou a aparecer ali
+também, e a lista `aceitaNaoReproduzido` ganhou `urbi-banner.variante` para não falsear o veredito.
 
 ## #577 · A listagem de Estudos mostra Preliminar/Avançado (2026-08-27)
 

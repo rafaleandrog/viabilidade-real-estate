@@ -396,6 +396,10 @@ export class ViabTelaPremissas extends LitElement {
        de KPIs do Resumo (.kpis), logo abaixo da cascata da Incorporação. */
     .kpis.aproveitamento { margin-top: 14px; }
     urbi-banner.aviso-aproveitamento { display: block; margin-top: 12px; }
+    /* Indicador de área privativa alocada (#573) — mesmo padrão de faixa de
+       KPIs do indicador de aproveitamento, logo abaixo da tabela de Produtos. */
+    .kpis.area-alocada { margin-top: 14px; }
+    urbi-banner.aviso-area-alocada { display: block; margin-top: 12px; }
 
     /* Catálogo de Produtos (#315) — mesmo padrão de tabela dinâmica de
        tela-empreendimento-tipologias.ts: colgroup de larguras fixas, edição
@@ -659,6 +663,7 @@ export class ViabTelaPremissas extends LitElement {
             <h4>Produtos</h4>
             ${this._renderTabelaProdutos(dis, lot)}
           </div>
+          ${this._renderAreaAlocada()}
 
           ${this._renderRodapeForm()}
         </urbi-card>
@@ -917,6 +922,62 @@ export class ViabTelaPremissas extends LitElement {
       urbiVerso.notificar(e?.message || 'Erro ao remover produto', 'erro');
     }
   };
+
+  /**
+   * §Indicador de área privativa alocada (#573, aba Produtos).
+   *
+   * Compara o que o catálogo aloca (Residencial + Não Residencial somados —
+   * `p.areaProdutosAlocada`, calculado em `proforma.ts:calcularProforma`)
+   * contra a área privativa de venda REGISTRADA em Terreno & Áreas
+   * (`p.areaPrivativa` — a mesma grandeza que `_renderAproveitamentoCoeficiente`
+   * usa como "usada"). Vale para os dois tipos de empreendimento: no
+   * Loteamento `areaPrivativa` é a ALV da cascata, e o catálogo — bucket único
+   * residencial ali (comentário em `porTipo`, `proforma.ts`) — entra na mesma
+   * soma sem precisar de ramo `lot` aqui, porque a soma é agnóstica a quantas
+   * categorias existem.
+   *
+   * Sem NADA registrado e NADA alocado (estudo recém-criado, catálogo vazio,
+   * Terreno & Áreas ainda em branco) o indicador não desenha nada — mesmo
+   * espírito null-safe da #569, mas aqui a condição é "nada para comparar",
+   * não "razão sem denominador": a subtração continua definida com os dois
+   * lados em zero, só que mostrá-la seria ruído num estudo que ainda não
+   * começou. Qualquer outro caso — inclusive só um dos dois lados preenchido —
+   * desenha os 3 KPIs, porque já há algo concreto para comparar.
+   *
+   * `variante` ecoa o sinal de `p.diferencaAreaAlocada`: em branco quando
+   * tudo alocado (`=== 0`), "alerta" quando sobra por alocar (`< 0`, falta
+   * produto para a área toda) e "erro" quando o catálogo excede a área
+   * registrada (`> 0`) — os três estados do critério 2 da #573. O aviso abaixo
+   * só aparece nos dois estados não neutros, com o texto que diz qual lado
+   * está maior.
+   */
+  private _renderAreaAlocada(): TemplateResult {
+    const p = calcularProforma(this._entradaProforma());
+    if (p.areaPrivativa <= 0 && p.areaProdutosAlocada <= 0) return html``;
+    const excesso = p.diferencaAreaAlocada > 0;
+    const sobra = p.diferencaAreaAlocada < 0;
+    const variante = excesso ? 'erro' : sobra ? 'alerta' : '';
+    return html`
+      <div class="kpis area-alocada">
+        <urbi-kpi rotulo="Área alocada nos produtos" .valor=${p.pctAreaAlocada === null
+          ? fmtM2(p.areaProdutosAlocada)
+          : `${fmtM2(p.areaProdutosAlocada)} (${fmtPct(p.pctAreaAlocada)})`}></urbi-kpi>
+        <urbi-kpi rotulo="Área registrada em Terreno & Áreas" .valor=${fmtM2(p.areaPrivativa)}></urbi-kpi>
+        <urbi-kpi rotulo="Diferença" .valor=${fmtM2(p.diferencaAreaAlocada)} variante=${variante}></urbi-kpi>
+      </div>
+      ${excesso ? html`
+        <urbi-banner class="aviso-area-alocada" variante="erro">
+          A soma dos produtos (${fmtM2(p.areaProdutosAlocada)}) ultrapassa a área registrada em
+          Terreno & Áreas (${fmtM2(p.areaPrivativa)}) — reveja o catálogo ou as áreas registradas.
+        </urbi-banner>` : nothing}
+      ${sobra ? html`
+        <urbi-banner class="aviso-area-alocada" variante="alerta">
+          Ainda faltam ${fmtM2(Math.abs(p.diferencaAreaAlocada))} para alocar — a área registrada em
+          Terreno & Áreas (${fmtM2(p.areaPrivativa)}) é maior que a soma dos produtos
+          (${fmtM2(p.areaProdutosAlocada)}).
+        </urbi-banner>` : nothing}
+    `;
+  }
 
   // Área do terreno (mesma regra de proforma.ts/premissas-conversao.ts): do
   // Núcleo (soma das glebas) quando a origem é Núcleo, senão a manual.
