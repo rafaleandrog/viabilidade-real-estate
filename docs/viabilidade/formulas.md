@@ -38,6 +38,11 @@ ninguém conseguia conferir na tela:
   nunca fica negativo, e a Proforma mostra um aviso do excedente. A permuta que sai no resultado é
   a **efetiva**, então a identidade `VGV + permuta R + permuta NR = VGV bruto` continua fechando.
 
+Desde a #565, cada linha do catálogo carrega `tipo` (`residencial`/`nao_residencial`, padrão
+`residencial`), mas o VGV acima permanece um **bucket único** — a fórmula não separa por `tipo`
+ainda. `vgvNaoResidencial` continua `0` em `frontend/proforma.ts`, comentário do interim; ligar o
+catálogo à separação R/NR é a #570.
+
 ## Deduções da receita
 
 Imposto (`4%` se sujeito a RET, senão `imposto_percentual`), corretagem, marketing e permutas financeiras (% do VGV residencial/não residencial). `Receita líquida = VGV − deduções`.

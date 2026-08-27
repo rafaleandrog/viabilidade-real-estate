@@ -87,6 +87,11 @@ export interface ProdutoPreliminar {
   area_media_m2?: number | string | null;
   preco_venda_m2?: number | string | null;
   unidades?: number | string | null;
+  // #565: classificação Residencial/Não Residencial — nasce, persiste e
+  // aparece na tela nesta issue; o motor ainda NÃO lê este campo (bucket
+  // único de VGV, `vgvNaoResidencial = 0` em `calcularProforma`). Ligar
+  // `tipo` ao cálculo é a #570.
+  tipo?: string | null;
 }
 
 /** VGV de uma linha do catálogo: área média × preço × unidades (#315). */
@@ -165,6 +170,20 @@ export function resumoCatalogoProdutos(produtos: ProdutoPreliminar[] | undefined
     areaMediaM2: unidades > 0 ? areaTotal / unidades : null,
     precoVendaM2: areaTotal > 0 ? vgv / areaTotal : null,
   };
+}
+
+/**
+ * Tipo efetivo de uma linha do catálogo — Residencial ou Não Residencial (#565).
+ *
+ * Produto LEGADO (gravado antes da migração `035`) não tem `tipo` no payload;
+ * o default é Residencial, a mesma leitura que o `padrao` do `schema.json`
+ * declara para a coluna. Qualquer valor que não seja exatamente
+ * `nao_residencial` cai em Residencial — fail-safe, não fail-loud, porque
+ * este campo ainda não alimenta cálculo nenhum (#570): uma classificação
+ * errada aqui não muda VGV.
+ */
+export function tipoProdutoEfetivo(p: ProdutoPreliminar): 'residencial' | 'nao_residencial' {
+  return p.tipo === 'nao_residencial' ? 'nao_residencial' : 'residencial';
 }
 
 export interface Proforma {

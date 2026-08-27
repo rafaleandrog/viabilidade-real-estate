@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, catalogoEfetivo, produtoCompoeCatalogo,
-  resumoCatalogoProdutos,
+  resumoCatalogoProdutos, tipoProdutoEfetivo,
   type ProformaInput,
 } from './proforma.js';
 
@@ -605,6 +605,18 @@ test('resumoCatalogoProdutos: linha em branco convivendo com linha válida não 
   assert.equal(r.unidades, 10);
   assert.ok(perto(r.areaMediaM2!, 100));
   assert.ok(perto(r.precoVendaM2!, 10000));
+});
+
+test('#565: tipoProdutoEfetivo — produto LEGADO (sem `tipo`) cai em Residencial, sem quebrar', () => {
+  assert.equal(tipoProdutoEfetivo({}), 'residencial');
+  assert.equal(tipoProdutoEfetivo({ tipo: undefined }), 'residencial');
+  assert.equal(tipoProdutoEfetivo({ tipo: null as any }), 'residencial');
+  assert.equal(tipoProdutoEfetivo({ tipo: 'residencial' }), 'residencial');
+  assert.equal(tipoProdutoEfetivo({ tipo: 'nao_residencial' }), 'nao_residencial');
+  // Valor inesperado (nunca deveria chegar do backend, mas não é fail-loud
+  // aqui — este campo ainda não alimenta cálculo, ver #570) também cai em
+  // Residencial, não trava.
+  assert.equal(tipoProdutoEfetivo({ tipo: 'lixo' as any }), 'residencial');
 });
 
 test('#315: catálogo com múltiplos produtos (incorporação) — VGV combinado em bucket único', () => {
