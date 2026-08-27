@@ -78,7 +78,10 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     ...(p.permutaCapada ? [{ l: avisoPermutaCapada(p), v: 0, nota: true }] : []),
     ...(temPermuta ? [
       { l: 'VGV sem permuta física', v: p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial, ocultarSeZero: true },
-      { l: '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true },
+      // #574 (achado 7): rótulo espelha o que a tela já usa no Loteamento
+      // (`tela-proforma.ts`, `montarLinhasProforma`) — não é rótulo novo, é a
+      // exportação parar de divergir da tela.
+      { l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true },
       { l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true },
     ] : []),
     { l: 'Receita bruta (VGV)', v: p.vgv },
