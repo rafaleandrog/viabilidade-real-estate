@@ -97,11 +97,14 @@ nunca foi instalável do zero, e o defeito só apareceu na primeira instância n
 (`preliminar_produtos.estudo_id`, obrigatório e `cascata`) ficou como estava — é ele que garante
 que produto não sobreviva ao estudo.
 
-**Custo real: nenhum.** Os dois campos são memória da seleção da UI, não fonte de cálculo. O que o
-motor consome é o canônico em m², gravado no momento da edição
-(`frontend/tela-premissas.ts:732-743` — `area_media_m2 × quantidade`), e nenhum ponto do backend
-ou do motor dereferencia o `produto_id`. Apagado o produto, o `<urbi-select>` fica vazio dos dois
-jeitos: antes porque a FK `anular` zerava o id, agora porque o id pendurado não está em `.opcoes`.
+**Custo real: nenhum.** Os dois campos eram memória da seleção da UI, não fonte de cálculo — o
+motor sempre consumiu o canônico em m² (`permuta_fisica_area_canonica`/`_nr_area_canonica`), nunca
+o `produto_id`. **Desde a #566 a própria unidade "seleção de produto" saiu da tela** — só m² e %
+área de venda sobrevivem em `frontend/tela-premissas.ts` (`PERMUTA_UNIDADE`/`PERMUTA_FIS_NR`) — e os
+dois `*_produto_id` (com o par `_quantidade`) ficam **inertes** no schema: sem leitor, sem escritor.
+A migração `036_fim_permuta_unidade.js` converte todo estudo que ainda tinha
+`permuta_fisica_modo`/`permuta_fisica_nr_modo` = `'unidade'` para `'area_m2'`, usando o mesmo
+canônico que já era a fonte de cálculo — nenhum estudo muda de resultado.
 
 O guard `scripts/guard-schema-ciclos.mjs` (etapa 1/5 do `validar-frontend.sh` e job
 `schema-ciclos` no `pr-guards.yml`) impede a volta do ciclo. Ele existe porque esta falha é

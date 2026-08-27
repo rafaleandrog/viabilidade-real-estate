@@ -25,6 +25,49 @@ tela deixa os **747 testes de lógica pura verdes** e derruba só o caso de rend
 
 ---
 
+## #566 · fim da permuta física por seleção de unidade (2026-08-27)
+
+Item 4 da lista de bugs da Rodada 10. A opção "Unidade" (seleção de produto do catálogo +
+quantidade, #317) saiu da Permuta física nos dois padrões — Loteamento (`PERMUTA_UNIDADE`) e
+Incorporação (`PERMUTA_FIS_R`/`PERMUTA_FIS_NR`, `frontend/tela-premissas.ts`); só `m²` e `% área
+venda` sobrevivem. Removido junto: `_campoProdutoQuantidade`/`_editarPermutaProduto` (handlers),
+o desvio de render que os chamava, o campo `produto?` da interface `CustoUnidade`, e o CSS
+`.cu-produto`. `schema.json` encolheu `opcoes` de `permuta_fisica_modo`/`permuta_fisica_nr_modo`
+para `["area_m2","pct_area_venda"]`; as colunas `permuta_fisica_produto_id`/`_quantidade` (e o par
+`_nr_`) ficam **inertes** — sem leitor, sem escritor — porque remover coluna é mudança de schema
+fora deste escopo (`scripts/guard-tabelas-obsoletas.mjs` não as alcança: o registro dele é por
+TABELA, não por coluna).
+
+Migração **`036_fim_permuta_unidade.js`** converte todo estudo com `permuta_fisica_modo`/
+`permuta_fisica_nr_modo === 'unidade'` para `'area_m2'`, usando o m² já resolvido no campo
+canônico (`permuta_fisica_area_canonica`/`_nr_area_canonica`) — mesmo padrão de backfill de
+`015`/`021`. Bump `manifesto.json` `0.1.34 → 0.1.35`.
+
+Estudo salvo ANTES da migração rodar não quebra a tela: nova função pura exportada
+`modoEfetivo(cu, valorForm)` trata modo persistido ausente de `cu.opcoes` (o `'unidade'`
+aposentado, ou qualquer valor desconhecido) como o `padrao` do campo — a badge cai em `area_m2` e
+o valor mostrado vem do canônico, sem indexar `opcoes` fora do array.
+
+**Prova de mutação, nos dois sentidos que a issue exigia:**
+- Migração: neutralizando as duas condições `=== 'unidade'` em `036_fim_permuta_unidade.js`, a
+  asserção nova de `scripts/migracoes-harness.mjs` (adicionada junto com uma 2ª linha na fixture
+  `SEED.estudos`, id 2, com os dois modos em `'unidade'`) fica vermelha — harness confirmado
+  36/36 com a migração restaurada.
+- Frontend: reintroduzindo `{ valor: 'unidade', ... }` em `PERMUTA_UNIDADE.opcoes`, 2 dos 4 testes
+  novos de `frontend/tela-premissas.test.ts` (que importa `PERMUTA_UNIDADE`/`PERMUTA_FIS_NR`/
+  `modoEfetivo`, agora exportados) ficam vermelhos; restaurado, 4/4 verdes. Não existe caso de
+  render (Chromium) para a badge sumida — o harness de render deste repo só suporta
+  `exigir`/`minimo` (prova de presença, nunca de ausência ou contagem exata), então não dá para
+  provar mecanicamente "só 2 badges, não 3" por ali; o teste de unidade sobre o array `opcoes` é
+  a prova robusta, porque é o MESMO objeto que o template consome (`cu.opcoes.map(...)`) — sem
+  gap de fiação possível entre o array e o que renderiza.
+
+`bash scripts/validar-frontend.sh` (8/8) e `node scripts/migracoes-harness.mjs` (36/36) verdes.
+Backend/schema não têm typecheck neste ambiente (401 do SDK) — migração `036` real em Postgres
+fica para o autor, como todas as anteriores.
+
+---
+
 ## Rodada 10 aberta · lista de bugs dos estudos Preliminares (2026-08-26)
 
 O autor enviou `lista_bugs_20260826.xlsx` com 9 itens sobre os estudos Preliminares — 8 de

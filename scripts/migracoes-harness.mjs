@@ -26,6 +26,17 @@ const DIR = new URL('../migracoes/', import.meta.url);
 const SEED = {
   estudos: [
     { id: 1, nome: 'Estudo A', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    // #566: Preliminar com o modo aposentado 'unidade' nos dois pares
+    // (R e NR) — exercita o caminho de TRANSFORMAÇÃO da `036`, não só o
+    // early-return de banco vazio. Sem área/preço/unidades legados
+    // preenchidos, então a `021` não cria linha em `preliminar_produtos`
+    // para este estudo (nada preenchido, nada a migrar — mesma regra que
+    // já usa para pular).
+    {
+      id: 2, nome: 'Estudo B', nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
+      permuta_fisica_modo: 'unidade', permuta_fisica_area_canonica: 123.456,
+      permuta_fisica_nr_modo: 'unidade', permuta_fisica_nr_area_canonica: 67.891,
+    },
   ],
   avancado_cronograma: [
     { id: 1, estudo_id: 1, evento: 'planejamento', inicio_mes: 1, duracao_meses: 6 },
@@ -232,6 +243,29 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
       );
     } else {
       ok('avancado_tipologias.linha_receita_id ficou vazia (poda derruba a estrutura no boot)');
+    }
+
+    // #566: a `036` converte `permuta_fisica_modo`/`_nr_modo` = 'unidade' para
+    // 'area_m2', pelo valor do canônico já persistido. A fixture (`estudos`
+    // id 2) semeia os dois pares no modo aposentado — este teste FALHA se a
+    // conversão sumir, ou se o valor migrado não vier do canônico.
+    const estudoB = (banco.db.get('estudos') ?? []).find((e) => Number(e.id) === 2);
+    if (!estudoB) {
+      erro('estudo de fixture (id 2) sumiu da cadeia — não dá para provar a 036', new Error('fixture ausente'));
+    } else if (estudoB.permuta_fisica_modo === 'unidade' || estudoB.permuta_fisica_nr_modo === 'unidade') {
+      erro(
+        'permuta_fisica_modo/permuta_fisica_nr_modo continua \'unidade\' depois da cadeia — '
+          + 'a 036 precisa convertê-los para \'area_m2\'',
+        new Error('modo aposentado sobreviveu à cadeia de migrações'),
+      );
+    } else if (estudoB.permuta_fisica_area_m2 !== 123.46 || estudoB.permuta_fisica_nr_area_m2 !== 67.89) {
+      erro(
+        `permuta_fisica_area_m2/_nr_area_m2 não vieram do canônico (obtido: `
+          + `${estudoB.permuta_fisica_area_m2}/${estudoB.permuta_fisica_nr_area_m2}, esperado: 123.46/67.89)`,
+        new Error('036 não copiou o valor do canônico para o campo legado'),
+      );
+    } else {
+      ok("permuta_fisica_modo/_nr_modo migraram de 'unidade' para 'area_m2', com o m² do canônico");
     }
   } catch (e) {
     erro('cadeia de migrações quebrou', e);
