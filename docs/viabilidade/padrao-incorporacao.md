@@ -414,9 +414,11 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 > `area_pvt_r_fechada` / `area_pvt_nr_fechada` (`frontend/proforma.ts:223`), convertida por
 > `converterUnidade`/`paraBase` (`frontend/premissas-conversao.ts`); a ALV da cascata
 > (`CASCATA_LOTEAMENTO`) só existe no **Loteamento** (`frontend/proforma.ts:186`, dentro do
-> `if (lot)`). `CASCATA_INCORPORACAO` **não é importada por nenhum módulo de produção** e está
-> rotulada como proposta aguardando confirmação (`frontend/areas-cascata.ts:139-140`) — não é fonte.
-> Sem isso, o bug que a #486 procurou passa a existir de verdade.
+> `if (lot)`). Desde a **#564**, `CASCATA_INCORPORACAO` (`frontend/areas-cascata.ts:139-144`) **é
+> renderizada** pela aba Terreno & Áreas do Preliminar de Incorporação (`frontend/tela-premissas.ts`,
+> tabela de Áreas) — mas continua **não sendo fonte da grandeza de ligação**: o motor citado acima lê
+> `area_pvt_r_fechada`/`area_pvt_nr_fechada` direto do formulário, não pela cascata. Sem isso, o bug
+> que a #486 procurou passa a existir de verdade.
 
 ---
 
@@ -3223,8 +3225,10 @@ supuser que existe promoção vai procurar um bug de conversão que não existe 
 (`schema.json:116,121`), e como não há promoção, a hipótese de resíduo de conversão cai
 independentemente de qual seja a proveniência. E quem **criar** o caminho de promoção precisa saber que a grandeza de ligação difere: na
 Incorporação é `area_pvt_r_fechada`/`area_pvt_nr_fechada` (`frontend/proforma.ts:223`); a ALV da
-cascata só existe no Loteamento, e `CASCATA_INCORPORACAO` não é importada por módulo de produção
-nenhum (`frontend/areas-cascata.ts:139-140`). A família `permuta_fisica_nr_*` vai junto.
+cascata só existe no Loteamento. Desde a **#564** `CASCATA_INCORPORACAO` é renderizada pela tabela de
+Áreas da Incorporação (`frontend/tela-premissas.ts`), mas segue sem ser a grandeza de ligação: o
+motor citado acima lê os campos direto do formulário, não pela cascata
+(`frontend/areas-cascata.ts:139-144`). A família `permuta_fisica_nr_*` vai junto.
 → registro completo na **§4.3**; a reconciliação entre as camadas é a **#441**.
 
 ## Anexo E — API
