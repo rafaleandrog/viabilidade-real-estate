@@ -275,6 +275,83 @@ test('#569: área do terreno zerada com coeficiente preenchido — teto 0, sem N
   assert.equal(p.aproveitamentoExcedido, false); // sem teto positivo, não há "excedente" a acusar
 });
 
+// #573 — indicador de área privativa alocada nos produtos. `registrada` é
+// `areaPrivativa` (a MESMA grandeza que o teto de aproveitamento #569 usa
+// como "usada"); `alocada` é `areaTotalProdutos` do catálogo EFETIVO,
+// Residencial + Não Residencial somados.
+test('#573: alocada == registrada → diferença zero, percentual 100%, nenhum estado de excesso/sobra', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 4_000, area_pvt_nr_fechada: 1_000, // registrada = 5.000
+    produtos: [
+      { area_media_m2: 100, preco_venda_m2: 10_000, unidades: 30 }, // 3.000 residencial
+      { area_media_m2: 50, preco_venda_m2: 8_000, unidades: 40, tipo: 'nao_residencial' }, // 2.000 NR
+    ],
+  });
+  assert.ok(perto(p.areaPrivativa, 5_000));
+  assert.ok(perto(p.areaProdutosAlocada, 5_000), `alocada=${p.areaProdutosAlocada}`);
+  assert.equal(p.diferencaAreaAlocada, 0);
+  assert.ok(perto(p.pctAreaAlocada!, 100));
+});
+
+test('#573: catálogo excede a área registrada → diferença positiva (excesso alocado)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1_000, // registrada = 1.000
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 10_000, unidades: 15 }], // 1.500 alocado
+  });
+  assert.ok(perto(p.areaProdutosAlocada, 1_500));
+  assert.ok(perto(p.diferencaAreaAlocada, 500), `diferenca=${p.diferencaAreaAlocada}`); // 1.500 - 1.000
+  assert.ok(perto(p.pctAreaAlocada!, 150));
+});
+
+test('#573: catálogo aquém da área registrada → diferença negativa (sobra por alocar)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 2_000, // registrada = 2.000
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 10_000, unidades: 12 }], // 1.200 alocado
+  });
+  assert.ok(perto(p.areaProdutosAlocada, 1_200));
+  assert.ok(perto(p.diferencaAreaAlocada, -800), `diferenca=${p.diferencaAreaAlocada}`); // 1.200 - 2.000
+  assert.ok(perto(p.pctAreaAlocada!, 60));
+});
+
+test('#573: sem NADA registrado em Terreno & Áreas → percentual null, nunca "0%" falso', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    // area_pvt_* ausentes: registrada = 0.
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10 }], // 1.000 alocado
+  });
+  assert.equal(p.areaPrivativa, 0);
+  assert.ok(perto(p.areaProdutosAlocada, 1_000));
+  assert.equal(p.pctAreaAlocada, null); // sem denominador — indefinido, não "0%" nem "100000%"
+  assert.ok(perto(p.diferencaAreaAlocada, 1_000)); // a subtração continua definida sem a área registrada
+});
+
+test('#573: catálogo vazio E nada registrado → os dois lados zerados, diferença zero (nada a alocar)', () => {
+  const p = calcularProforma({ tipo_empreendimento: 'incorporacao' });
+  assert.equal(p.areaPrivativa, 0);
+  assert.equal(p.areaProdutosAlocada, 0);
+  assert.equal(p.diferencaAreaAlocada, 0);
+  assert.equal(p.pctAreaAlocada, null);
+});
+
+// Loteamento: `areaPrivativa` é a ALV da cascata (não há parcelas PVT), e o
+// catálogo é sempre bucket único — mesma soma, sem ramo `lot` no motor.
+test('#573: loteamento — registrada é a ALV da cascata, alocada é o catálogo (bucket único)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'loteamento',
+    terreno_manual_area: 100_000,
+    area_viario_publico_modo: 'pct_poligonal', area_viario_publico_valor: 25, // ALV = 75.000
+    area_media_lote_m2: 300, preco_venda_m2: 1_000,
+    produtos: [{ area_media_m2: 300, preco_venda_m2: 1_000, unidades: 200 }], // 60.000 alocado
+  });
+  assert.ok(perto(p.areaPrivativa, 75_000));
+  assert.ok(perto(p.areaProdutosAlocada, 60_000));
+  assert.ok(perto(p.diferencaAreaAlocada, -15_000)); // sobra por alocar
+  assert.ok(perto(p.pctAreaAlocada!, 80));
+});
+
 // O MESMO estudo sem catálogo: os preços legados por m² não têm campo em tela
 // nenhuma e deixaram de gerar receita. As áreas continuam, porque elas têm
 // campo próprio em Premissas → Terreno & Áreas.
