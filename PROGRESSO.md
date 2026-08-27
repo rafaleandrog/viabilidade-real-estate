@@ -17,6 +17,13 @@ mudam de veredito por causa do cenário.
 Junto, o critério 4 da issue: a tabela de cenários formatava com `fmtR$` cru e discordava da tabela
 principal sobre a mesma grandeza — passou a usar `celulaSensibilidade`, que **é** `celulaProforma`.
 
+**Rodada 1 de revisão, 1 bloqueante (P2):** o benchmark aceita `variacao_negativa_pct > 100` e a
+tela deriva `1 − varNeg/100`, então o Bear podia pedir fator **negativo** — catálogo reprecificado a
+preço negativo, VGV bruto negativo, e o cap escolhendo `Math.min(0, negativo)`: a tela mostrava
+"VGV" negativo com "Receita bruta" zero, violando o invariante da #563. Piso em 0 aplicado **na
+fonte** (`fatorSens`), não dentro de `aplicarFatorPreco`: só na fonte o catálogo e a valoração da
+permuta legada recebem o MESMO fator e a identidade do cap continua valendo por construção.
+
 Fixture dourado único (`frontend/fixtures/sensibilidade-catalogo.ts`, VGV do print:
 R$ 24.764.117,40 → Bear 22.287.705,66 / Bull 27.240.529,14) servindo motor, notação e o **primeiro
 caso de render da sub-aba Cenários** — antes dela `secao: 'cenarios'` nunca tinha sido montado em

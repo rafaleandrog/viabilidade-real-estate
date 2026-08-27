@@ -313,8 +313,16 @@ export function calcularProforma(e: ProformaInput): Proforma {
 
   // BUG7-08: fator de sensibilidade — 1 quando a variável estressada não é a
   // que este cálculo está resolvendo, senão o fator do estudo (Bear/Bull).
+  //
+  // #568: o piso em 0 é aplicado AQUI, na fonte, e não dentro de
+  // `aplicarFatorPreco` — clampar só lá deixaria o catálogo com fator 0 e a
+  // valoração da permuta física com fator negativo, e a identidade do cap
+  // (#563) deixaria de valer por construção. O benchmark aceita
+  // `variacao_negativa_pct > 100` e a tela deriva `1 − varNeg/100`, então o
+  // Bear pode pedir fator negativo: variação além de 100% degrada para preço
+  // ZERO, nunca para preço negativo — VGV negativo é o que a #563 proibiu.
   const fatorSens = (variavel: VariavelSensibilidade): number =>
-    e.sensibilidade?.variavel === variavel ? e.sensibilidade.fator : 1;
+    e.sensibilidade?.variavel === variavel ? Math.max(0, e.sensibilidade.fator) : 1;
 
   // ── Áreas + VGV ──
   // Os três preços abaixo são hoje o preço da PERMUTA FÍSICA (interim do #315:

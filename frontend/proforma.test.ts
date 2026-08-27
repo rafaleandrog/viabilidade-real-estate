@@ -874,6 +874,51 @@ test('#568: o cap do excedente de permuta (#563) e os indicadores indefinidos (#
   }
 });
 
+test('#568: variação negativa acima de 100% degrada o preço para ZERO — nunca para preço negativo', () => {
+  // O editor de benchmarks, o `schema.json` e a rota PATCH aceitam
+  // `variacao_negativa_pct > 100`, e a tela deriva `fatorBear = 1 − varNeg/100`
+  // — com 150% o fator pedido é **−0,5**. Sem o piso na fonte, o catálogo era
+  // reprecificado a preço NEGATIVO: o VGV bruto ficava negativo, o cap
+  // escolhia `Math.min(0, negativo)` como permuta efetiva, e a tela mostrava a
+  // linha "VGV" NEGATIVA com "Receita bruta" zerada — exatamente o que a #563
+  // proibiu.
+  const fatorPedido = 1 - 150 / 100;
+  assert.ok(fatorPedido < 0, 'o fixture deste teste precisa pedir um fator negativo');
+
+  const p = calcularProforma({
+    ...ESTUDO_SENSIBILIDADE, produtos: PRODUTOS_SENSIBILIDADE,
+    sensibilidade: { variavel: 'preco', fator: fatorPedido },
+  });
+  // Preço zero ⇒ VGV zero. Nem a base, nem a permuta, nem o VGV BRUTO que a
+  // tela imprime na linha "VGV" (`vgv + as duas permutas`) podem ficar
+  // negativos.
+  assert.equal(p.vgv, 0, `vgv=${p.vgv}`);
+  assert.equal(p.vgvResidencial, 0);
+  assert.equal(p.vgvNaoResidencial, 0);
+  assert.equal(p.vgvPermutaResidencial, 0, `permutaR=${p.vgvPermutaResidencial}`);
+  assert.equal(p.vgvPermutaNaoResidencial, 0, `permutaNR=${p.vgvPermutaNaoResidencial}`);
+  const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
+  assert.equal(vgvBruto, 0, `a linha "VGV" da tela saiu ${vgvBruto}`);
+  // #571: sem base, indicador é INDEFINIDO — nunca 0,0%.
+  assert.equal(p.margemLiquidaPct, null);
+  assert.equal(p.custoObrasVgvPct, null);
+  assert.equal(p.receitaLiquidaSobreVgvPct, null);
+
+  // O mesmo com permuta física no estudo, que é onde o cap opera: a permuta
+  // pedida também vale zero, então não há excedente a capar e a identidade
+  // `vgv + permutas = VGV bruto` continua fechando em zero.
+  const comPermuta = calcularProforma({
+    ...LOT, permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 3_000,
+    sensibilidade: { variavel: 'preco', fator: fatorPedido },
+  });
+  assert.equal(comPermuta.vgv, 0, `vgv com permuta=${comPermuta.vgv}`);
+  assert.equal(comPermuta.vgvPermutaSolicitada, 0);
+  assert.equal(comPermuta.permutaCapada, false, 'sem base e sem permuta não há excedente a capar');
+  assert.equal(
+    comPermuta.vgv + comPermuta.vgvPermutaResidencial + comPermuta.vgvPermutaNaoResidencial, 0,
+  );
+});
+
 test('#568: estressar CUSTO ou PERMUTA não reprecifica o catálogo — só a variável "preco"', () => {
   const base = calcularProforma({ ...ESTUDO_SENSIBILIDADE, produtos: PRODUTOS_SENSIBILIDADE });
   for (const variavel of ['custo_obras', 'custo_infra', 'permuta_fisica', 'permuta_financeira'] as const) {
