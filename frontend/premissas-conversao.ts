@@ -126,7 +126,7 @@ export function numeroDaColuna(v: unknown): number | null {
 // a distinção importa, porque a primeira versão deste comentário errava nela.
 //
 // A referência é o campo de Infraestrutura do Preliminar de Loteamento,
-// `tela-premissas.ts`, cujo contrato está escrito em `:70-73`:
+// `tela-premissas.ts`, cujo contrato está escrito em `:74-76`:
 //
 //     Fonte de verdade da quantidade econômica. Para custos é R$; para a
 //     permuta física é m². Os campos históricos por unidade permanecem apenas
@@ -135,12 +135,12 @@ export function numeroDaColuna(v: unknown): number | null {
 //
 // ELA ESTABELECE: o canônico é o número de registro, a badge troca só a
 // representação, e o valor mostrado em cada unidade é derivado do canônico
-// (`_valorUnidade`, `tela-premissas.ts:516-520`).
+// (`_valorUnidade`, `tela-premissas.ts:544-548`).
 //
 // ELA NÃO ESTABELECE que se deva escrever a coluna por unidade — ao contrário:
-// `_trocarUnidade` (`tela-premissas.ts:501-514`) **não escreve coluna nenhuma**,
+// `_trocarUnidade` (`tela-premissas.ts:529-542`) **não escreve coluna nenhuma**,
 // nem a de destino nem a de origem. O único `_set(op.campo, …)` do arquivo está
-// em `_editarCustoUnidade:523`, quando o usuário DIGITA. A coluna por unidade lá
+// em `_editarCustoUnidade:550`, quando o usuário DIGITA. A coluna por unidade lá
 // não é espelho: é valor histórico congelado que só o teclado atualiza.
 //
 // ENTÃO POR QUE AQUI SE ESCREVE. Porque a estrutura é outra, e é ela que decide.
