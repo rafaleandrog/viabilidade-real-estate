@@ -73,7 +73,10 @@ export function resumoListagem(
     ? {
         vgv: p.vgv,
         resultado: p.resultado,
-        margemPct: p.margemLiquidaPct,
+        // #571: `margemLiquidaPct` só é `null` quando `vgv <= 0` — o `? :`
+        // acima já garante `p.vgv > 0` aqui, então o `?? 0` é só para o
+        // typechecker (que não relaciona os dois campos); nunca dispara.
+        margemPct: p.margemLiquidaPct ?? 0,
         areaPrivativa: p.areaPrivativa,
         // Loteamento não modela área comum: `areaConstruida` fica 0 no motor, e
         // exibir "0,00 m²" ao lado de uma área privativa real seria mentira. A

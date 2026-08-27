@@ -13,7 +13,7 @@ import type { Proforma } from './proforma.js';
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, celula as celulaCompartilhada } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada } from './viab-format.js';
 import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
@@ -118,11 +118,14 @@ export function csvProforma(estudo: any, p: Proforma, lot: boolean): string {
     // Linha de nota: o texto ocupa a coluna do rótulo e as outras duas ficam
     // vazias. "0,00" ali seria um número inventado.
     if (r.nota) { rows.push(`${r.l};;`); continue; }
-    const pct = p.vgv > 0 ? fmtPct(Math.abs(r.v) / p.vgv * 100) : '';
+    // #571: "—", igual à tela (`_pctVgv`, tela-proforma.ts) e ao PDF logo
+    // abaixo — antes saía vazio aqui, e vazio não é a mesma coisa que
+    // indefinido para quem lê o CSV.
+    const pct = p.vgv > 0 ? fmtPct(Math.abs(r.v) / p.vgv * 100) : '—';
     rows.push(`${r.l};${fmtR$(r.v, false)};${pct}`);
   }
   rows.push('');
-  rows.push(`Margem sobre VGV;${fmtPct(p.margemLiquidaPct)}`);
+  rows.push(`Margem sobre VGV;${fmtPctOuIndef(p.margemLiquidaPct)}`);
   return rows.join('\n');
 }
 
@@ -148,9 +151,10 @@ export function htmlProforma(estudo: any, p: Proforma, lot: boolean): string {
     return `<tr class="${sub ? 'sub' : ''}"><td>${r.l}</td><td class="v">${fmtR$(r.v)}</td><td class="v">${pct}</td></tr>`;
   }).join('');
 
+  // #571: VGV ≤ 0 → "—", não "0,0%" (mesmo padrão do CSV e da tela).
   const kpis = lot
-    ? [['Área vendável', `${fmtNum(p.areaVendavel)} m²`], ['VGV', fmtR$(p.vgv)], ['Eficiência', fmtPct(p.eficienciaPct)], ['Margem sobre VGV', fmtPct(p.margemLiquidaPct)]]
-    : [['Área privativa', `${fmtNum(p.areaPrivativa)} m²`], ['VGV', fmtR$(p.vgv)], ['Custo obras/VGV', fmtPct(p.custoObrasVgvPct)], ['Margem sobre VGV', fmtPct(p.margemLiquidaPct)]];
+    ? [['Área vendável', `${fmtNum(p.areaVendavel)} m²`], ['VGV', fmtR$(p.vgv)], ['Eficiência', fmtPct(p.eficienciaPct)], ['Margem sobre VGV', fmtPctOuIndef(p.margemLiquidaPct)]]
+    : [['Área privativa', `${fmtNum(p.areaPrivativa)} m²`], ['VGV', fmtR$(p.vgv)], ['Custo obras/VGV', fmtPctOuIndef(p.custoObrasVgvPct)], ['Margem sobre VGV', fmtPctOuIndef(p.margemLiquidaPct)]];
 
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome}</title>
   <style>
@@ -169,7 +173,7 @@ export function htmlProforma(estudo: any, p: Proforma, lot: boolean): string {
     <div class="sub-h">${estudo.tipo_empreendimento} · ${estudo.status} · Estudo de Viabilidade — UrbiVerso</div>
     <div class="kpis">${kpis.map(([r, v]) => `<div class="kpi"><div class="r">${r}</div><div class="v">${v}</div></div>`).join('')}</div>
     <table><thead><tr><td>Linha</td><td class="v">R$</td><td class="v">% VGV</td></tr></thead>
-    <tbody>${linhasHtml}<tr class="sub"><td>Margem sobre VGV</td><td class="v">${fmtPct(p.margemLiquidaPct)}</td><td class="v"></td></tr></tbody></table>
+    <tbody>${linhasHtml}<tr class="sub"><td>Margem sobre VGV</td><td class="v">${fmtPctOuIndef(p.margemLiquidaPct)}</td><td class="v"></td></tr></tbody></table>
     <button onclick="window.print()" style="margin-top:16px;padding:8px 16px">Imprimir / Salvar PDF</button>
   </body></html>`;
   return html;

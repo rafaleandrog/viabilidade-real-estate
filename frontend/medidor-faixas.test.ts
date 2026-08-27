@@ -121,3 +121,23 @@ test('#451: fallback automático nunca sinaliza fora da escala, mesmo com valor 
   const c = montarMedidor({ regra_comparacao: 'atingir_ou_superar', valor: 25 }, 1000)!;
   assert.equal(c.foraEscala, false);
 });
+
+// #571: `val: null` — indicador com denominador inválido (ex.: VGV ≤ 0). Sem
+// valor definido não há como pousar honestamente o ponteiro numa escala:
+// `null` é o mesmo desfecho de "sem medidor válido" (linha 48/66/75 acima),
+// mesmo com benchmark configurado — é o VALOR que falta, não a configuração.
+// Mutação: apagar o `if (val === null) return null` de `montarMedidor` (ou o
+// de `corFaixa`) faz alguma das quatro asserções abaixo lançar/falhar — a
+// que usa `medidor_min: 0` (`!Number.isFinite(NaN)` derrubaria `configurado`,
+// mas as outras três dependem só do `null` explícito para não estourar em
+// `val <= f.ate` com `val` `null`.
+test('#571: val null → sem medidor, sem bola, sem variante — mesmo com benchmark configurado', () => {
+  const bConfigurado = { regra_comparacao: 'atingir_ou_superar', medidor_min: 0, medidor_faixa1_ate: 20, medidor_faixa2_ate: 30, medidor_max: 50 };
+  assert.equal(montarMedidor(bConfigurado, null), null);
+  assert.equal(bolaFaixa(bConfigurado, null), '');
+  assert.equal(varianteFaixa(bConfigurado, null), '');
+});
+
+test('#571: val null no fallback automático também não desenha nada', () => {
+  assert.equal(montarMedidor({ regra_comparacao: 'atingir_ou_superar', valor: 25 }, null), null);
+});
