@@ -43,11 +43,15 @@ ninguém conseguia conferir na tela:
   NR — continuam fechando, e a soma delas com elas.
 
 Cada linha do catálogo carrega `tipo` (`residencial`/`nao_residencial`, padrão `residencial`,
-#565), e **é ele que separa as duas categorias** (#570): VGV, área total e preço médio ponderado
-(`Σ VGV ÷ Σ área`) são calculados por categoria, e é sobre o total da categoria que as duas
-permutas do tipo incidem — a física converte `% área venda` sobre a área daquele `tipo` e valora os
-m² entregues pelo preço médio daquele `tipo`; a financeira em `% VGV` incide sobre o VGV daquele
-`tipo`. Produto gravado antes da migração `035` não tem `tipo` e conta como **residencial**.
+#565). **A separação em duas categorias é da INCORPORAÇÃO** (#570): lá, VGV, área total e preço
+médio ponderado (`Σ VGV ÷ Σ área`) são calculados por categoria, e é sobre o total da categoria que
+as duas permutas do tipo incidem — a física converte `% área venda` sobre a área daquele `tipo` e
+valora os m² entregues pelo preço médio daquele `tipo`; a financeira em `% VGV` incide sobre o VGV
+daquele `tipo`. **No Loteamento não há categorias**: o motor normaliza o catálogo inteiro para o
+bucket residencial antes da separação (a tela de Permutas do Loteamento só expõe os controles
+residenciais, e o grid de Produtos não exibe o seletor de tipo ali) — a permuta física valora pelo
+preço médio do catálogo, mas a base do `% área venda` continua sendo a **área vendável da cascata**.
+Produto gravado antes da migração `035` não tem `tipo` e conta como **residencial**.
 
 Nada disso vale para o estudo **sem catálogo efetivo**: ali não há receita modelada, e as bases das
 permutas continuam sendo as legadas (área vendável no Loteamento, `area_pvt_*_fechada` e
@@ -56,7 +60,7 @@ sentidos.
 
 ## Deduções da receita
 
-Imposto (`4%` se sujeito a RET, senão `imposto_percentual`), corretagem, marketing e permutas financeiras (% do VGV residencial/não residencial — cada uma sobre o VGV da **sua** categoria, #570). `Receita líquida = VGV − deduções`.
+Imposto (`4%` se sujeito a RET, senão `imposto_percentual`), corretagem, marketing e permutas financeiras (% do VGV residencial/não residencial — cada uma sobre o VGV da **sua** categoria na Incorporação; no Loteamento só a residencial existe, sobre o bucket único, #570). `Receita líquida = VGV − deduções`.
 
 ## Custos diretos
 
