@@ -35,10 +35,37 @@ test('KPIs do Fluxo de Caixa: os 9 cards (#456) cabem em 1280px e 768px', { skip
 
   // Transbordo de TEXTO depende da métrica de glifo (fonte deste ambiente ≠
   // fonte da instância) — mesma ressalva de `tabela-fluxo.render.test.ts`:
-  // reportado, não asseverado.
+  // reportado, não asseverado. (Este caso usa números pequenos — o teste que
+  // asserta ZERO com valores de 9 dígitos é o de baixo, #579.)
   const texto = contar(a, 'transbordoDeTexto');
   const cortado = contar(a, 'corte');
   if (texto + cortado > 0) {
     console.log(`  nota: ${texto} transbordo(s) de TEXTO e ${cortado} corte(s) por overflow oculto — dependem da fonte, não asseverados.${relato(a)}`);
   }
+});
+
+// #579 ("o VALOR salta para fora do quadro do KPI") — caso PRÓPRIO
+// (`kpis-fluxo-longos`), não uma edição do caso `tabela-fluxo` acima: aquele
+// alimenta ~30 outras asserções deste app que não têm relação com esta
+// issue. VPL/Exposição de 9 dígitos negativos, VGV/Resultado/Juros/Carteira
+// de 9 dígitos positivos — o exemplo literal da issue
+// (`R$ 171.448.400,00`). Aqui a asserção é dura: ZERO, nas 3 larguras
+// padrão (1280/900/600), porque `.kpi-card .valor` é markup PRÓPRIO (sem
+// shadow DOM) — a defesa (`overflow-wrap: anywhere`, `frontend/fluxo-tabela.ts`)
+// funciona de verdade aqui, ao contrário do `urbi-kpi` da #579 em
+// `tela-resumo.ts` (ver a nota daquele arquivo).
+test('KPIs do Fluxo de Caixa: um valor de 9 dígitos não salta da caixa (#579)', { skip: pular ?? false }, async () => {
+  const a = await verificarRender({ caso: 'kpis-fluxo-longos' });
+
+  assert.equal(contar(a, 'transbordoDeCaixa'), 0, 'algum .kpi-card estourou a track' + relato(a));
+  assert.equal(
+    contar(a, 'transbordoDeTexto'), 0,
+    'Um valor de KPI (9 dígitos) saltou para fora do quadro — #579.' + relato(a),
+  );
+  assert.equal(contar(a, 'sobreposicao'), 0, 'dois div.kpi-card se sobrepuseram' + relato(a));
+  assert.deepEqual(larguraComOverflowDeDocumento(a), [], 'a faixa de KPIs empurrou o DOCUMENTO na horizontal' + relato(a));
+  assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
+  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
+  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
+  assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 });

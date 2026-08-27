@@ -150,7 +150,15 @@ export class ViabFunding extends LitElement {
       font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
     }
-    .ind-card .val { font-size: 1.05rem; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .ind-card .val {
+      font-size: 1.05rem; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums;
+      /* #579: fmtR$ intercala R$ e o número com um ESPAÇO NÃO-QUEBRÁVEL
+         (Intl.NumberFormat pt-BR/BRL — U+00A0) — sem overflow-wrap o valor é
+         UM token que não quebra sozinho. Markup próprio (sem shadow DOM),
+         mesmo mecanismo de fluxo-tabela.ts .kpi-card .valor. */
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
     .ind-card.pos .val { color: var(--cor-sucesso, #13A98D); }
     .ind-card.neg .val { color: var(--cor-erro, #D45A3A); }
     .nota { font-size: 0.78rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-top: 8px; }

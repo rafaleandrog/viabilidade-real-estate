@@ -60,6 +60,37 @@ export const RECEITAS = [LINHA_RECEITA];
 export const CUSTOS = LINHAS_CUSTO;
 
 /**
+ * Variante de `fluxo()` com valores de 9 dígitos, positivos e negativos — o
+ * fixture de STRESS da #579 ("o VALOR salta para fora do quadro do KPI").
+ *
+ * NÃO é fixture de número (mesma ressalva do topo deste arquivo): nenhum caso
+ * que usa esta função audita consistência aritmética entre os campos — ela
+ * sobrescreve só os campos que os cards de KPI leem para exibir (`vpl`,
+ * `exposicaoMaxima`, `vgvTotal`, `fluxoAcumulado` — a base de "Resultado" em
+ * `tela-resumo.ts`/`fluxo-tabela.ts` —, `jurosClientes`, `carteiraClientesMaxima`,
+ * `receitaBruta`), sem tocar as séries mensais. O propósito é geometria: um
+ * valor deste tamanho (`R$ 171.448.400,00`, o exemplo literal da issue) e um
+ * negativo (`-R$ 12.345.678,90`) cabem na caixa do card?
+ */
+export function fluxoValoresLongos(): FluxoCalc {
+  const c = fluxo();
+  const grande = 171_448_400.00;   // 9 dígitos, 2 casas — o exemplo literal da #579
+  const negativo = -12_345_678.90; // negativo — testa o sinal/parênteses
+  return {
+    ...c,
+    vpl: negativo,
+    exposicaoMaxima: negativo,
+    vgvTotal: grande,
+    receitaBruta: grande,
+    receitaBrutaVgv: grande,
+    vgvVendavel: grande,
+    jurosClientes: grande,
+    carteiraClientesMaxima: grande,
+    fluxoAcumulado: [...c.fluxoAcumulado.slice(0, -1), negativo],
+  };
+}
+
+/**
  * Catálogo de Produtos do `ESTUDO` — a fonte do VGV do Preliminar.
  *
  * 80 unidades × 62 m² × R$ 11.000 = R$ 54.560.000, o mesmo VGV que os campos
@@ -101,6 +132,19 @@ export const ESTUDO: Record<string, any> = {
   infra_pct: 2,
   taxa_gestao_pct: 3,
 };
+
+/**
+ * Variante de `PRODUTOS` com preço de venda 10× maior — empurra o VGV de
+ * `calcularProforma` de 8 para 9 dígitos (80×62×R$110.000 = R$ 545.600.000).
+ * `produtos.produtos` é a ÚNICA fonte de VGV do Preliminar (`frontend/proforma.ts:67`)
+ * — o campo legado `preco_venda_m2_residencial` de `ESTUDO` não entra em jogo
+ * quando o catálogo está presente. Usada só pelo caso `resultado-graficos`
+ * (#579): a aba "Gráficos" (`tela-graficos.ts`) não lê `FluxoCalc`, lê
+ * `calcularProforma`.
+ */
+export const PRODUTOS_VALORES_LONGOS: Record<string, any>[] = [
+  { id: 1, nome: 'Torre A', ordem: 0, area_media_m2: 62, preco_venda_m2: 110_000, unidades: 80 },
+];
 
 /**
  * Empurra um componente do app para o estado JÁ CARREGADO, sem passar pela
