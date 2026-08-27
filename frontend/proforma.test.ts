@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, catalogoEfetivo, produtoCompoeCatalogo,
+  resumoCatalogoProdutos,
   type ProformaInput,
 } from './proforma.js';
 
@@ -556,6 +557,54 @@ test('produtoCompoeCatalogo / catalogoEfetivo: exigem área, preço E unidades',
   assert.equal(produtoCompoeCatalogo({ area_media_m2: 100, preco_venda_m2: 9000, unidades: 0 }), false);
   assert.equal(catalogoEfetivo(undefined).length, 0);
   assert.equal(catalogoEfetivo([{ unidades: 0 }, { area_media_m2: 100, preco_venda_m2: 1, unidades: 1 }]).length, 1);
+});
+
+// #588: resumo agregado do catálogo EFETIVO — consumido pelo backend do
+// Apelo Comercial (backend/rotas/apelo-comercial.ts) para montar o contexto
+// da IA, no lugar dos campos legados congelados de `estudos`.
+test('resumoCatalogoProdutos: sem catálogo efetivo devolve os três campos null (nunca zero)', () => {
+  assert.deepEqual(resumoCatalogoProdutos(undefined), { areaMediaM2: null, unidades: null, precoVendaM2: null });
+  assert.deepEqual(resumoCatalogoProdutos([]), { areaMediaM2: null, unidades: null, precoVendaM2: null });
+  // Linha em branco (o que "Adicionar Produto" cria) não compõe catálogo.
+  assert.deepEqual(
+    resumoCatalogoProdutos([{ area_media_m2: null, preco_venda_m2: null, unidades: 0 }]),
+    { areaMediaM2: null, unidades: null, precoVendaM2: null },
+  );
+});
+
+test('resumoCatalogoProdutos: linha única — área e preço batem com a própria linha', () => {
+  const r = resumoCatalogoProdutos([{ area_media_m2: 65.5, preco_venda_m2: 8500, unidades: 120 }]);
+  assert.equal(r.unidades, 120);
+  assert.ok(perto(r.areaMediaM2!, 65.5));
+  assert.ok(perto(r.precoVendaM2!, 8500));
+});
+
+test('resumoCatalogoProdutos: várias linhas — unidades soma simples; área e preço ponderados, e o produto dos três reproduz o VGV total', () => {
+  const produtos = [
+    { area_media_m2: 100, preco_venda_m2: 8000, unidades: 100 },  // VGV 80.000.000, área total 10.000
+    { area_media_m2: 300, preco_venda_m2: 12000, unidades: 20 },  // VGV 72.000.000, área total 6.000
+  ];
+  const r = resumoCatalogoProdutos(produtos);
+  // unidades: soma simples.
+  assert.equal(r.unidades, 120);
+  // áreaMediaM2: ponderada por unidades — Σ(área×unidades)/Σunidades = 16.000/120.
+  assert.ok(perto(r.areaMediaM2!, 16_000 / 120), `areaMediaM2=${r.areaMediaM2}`);
+  // precoVendaM2: ponderado pela área total de cada linha — Σ VGV/Σ(área×unidades) = 152.000.000/16.000.
+  assert.ok(perto(r.precoVendaM2!, 152_000_000 / 16_000), `precoVendaM2=${r.precoVendaM2}`);
+  // Consistência: areaMediaM2 × precoVendaM2 × unidades reproduz o VGV total do catálogo efetivo.
+  const vgvTotal = totalProdutos(produtos).vgv;
+  assert.ok(perto(r.areaMediaM2! * r.precoVendaM2! * r.unidades!, vgvTotal, 0.5), 'produto dos três != VGV total');
+});
+
+test('resumoCatalogoProdutos: linha em branco convivendo com linha válida não distorce o resumo', () => {
+  const r = resumoCatalogoProdutos([
+    { area_media_m2: 100, preco_venda_m2: 10000, unidades: 10 },
+    { area_media_m2: null, preco_venda_m2: null, unidades: null },
+    { area_media_m2: 80, preco_venda_m2: 9000, unidades: 0 }, // sem unidades: não compõe
+  ]);
+  assert.equal(r.unidades, 10);
+  assert.ok(perto(r.areaMediaM2!, 100));
+  assert.ok(perto(r.precoVendaM2!, 10000));
 });
 
 test('#315: catálogo com múltiplos produtos (incorporação) — VGV combinado em bucket único', () => {

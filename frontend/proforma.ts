@@ -122,6 +122,51 @@ export function catalogoEfetivo(produtos: ProdutoPreliminar[] | undefined): Prod
   return (produtos ?? []).filter(produtoCompoeCatalogo);
 }
 
+export interface ResumoCatalogo {
+  areaMediaM2: number | null;
+  unidades: number | null;
+  precoVendaM2: number | null;
+}
+
+/**
+ * Resumo agregado do catálogo EFETIVO — área média por unidade, total de
+ * unidades e preço de venda médio (R$/m²), na mesma unidade das três colunas
+ * da tela.
+ *
+ * `unidades` é a soma simples das linhas do catálogo efetivo. `areaMediaM2` é
+ * ponderada por `unidades` (Σ área×unidades / Σunidades) — a área média real
+ * de uma unidade sorteada ao acaso do portfólio, não a média simples das
+ * linhas. `precoVendaM2` é ponderada pela área total de cada linha
+ * (Σ VGV / Σ área×unidades, reaproveitando `vgvProduto`/`totalProdutos`) — o
+ * preço médio de venda por m² pesado pelo volume de área que cada linha
+ * representa, não pelo número de linhas do catálogo.
+ *
+ * As duas ponderações são deliberadamente diferentes (unidades vs. área) mas
+ * consistentes entre si: `areaMediaM2 × precoVendaM2 × unidades` reproduz o
+ * VGV total do catálogo efetivo, porque `areaMediaM2 × unidades` é, por
+ * construção, a área total somada.
+ *
+ * Catálogo sem nenhuma linha efetiva devolve os três campos `null` —
+ * fallback honesto, nunca `0` (zero pareceria um dado real).
+ *
+ * Consumido pelo backend do Apelo Comercial (`backend/rotas/apelo-comercial.ts`)
+ * para montar o contexto da análise de IA a partir do catálogo de Produtos —
+ * nunca dos campos legados congelados (`area_media_lote_m2`, `num_unidades*`,
+ * `preco_venda_m2*`).
+ */
+export function resumoCatalogoProdutos(produtos: ProdutoPreliminar[] | undefined): ResumoCatalogo {
+  const catalogo = catalogoEfetivo(produtos);
+  const { vgv, unidades } = totalProdutos(catalogo);
+  const areaTotal = catalogo.reduce(
+    (s, p) => s + (Number(p.area_media_m2) || 0) * (Number(p.unidades) || 0), 0,
+  );
+  return {
+    unidades: unidades > 0 ? unidades : null,
+    areaMediaM2: unidades > 0 ? areaTotal / unidades : null,
+    precoVendaM2: areaTotal > 0 ? vgv / areaTotal : null,
+  };
+}
+
 export interface Proforma {
   // áreas
   areaTerreno: number; areaVendavel: number; areaPermutaFisica: number; areaVendavelLiquida: number;

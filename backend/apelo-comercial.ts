@@ -2,6 +2,12 @@
 // 6 fatores × 4 perguntas-guia. A IA atribui nota 1–5 por pergunta (5 = mais
 // favorável), justificativa e nota consolidada por fator, além de um relatório.
 
+// #588: `resumoCatalogoProdutos` e `ProdutoPreliminar` vêm de `frontend/proforma.ts`
+// de propósito — funções puras, sem DOM (ver o cabeçalho daquele arquivo). É a
+// MESMA fonte que `calcularProforma` usa para o VGV, e é o que garante que o
+// contexto da IA e a Proforma nunca divirjam sobre o que é "catálogo válido".
+import { resumoCatalogoProdutos, type ProdutoPreliminar } from '../frontend/proforma.js';
+
 export const FATORES: { chave: string; nome: string; perguntas: string[] }[] = [
   {
     chave: 'localizacao', nome: 'Localização',
@@ -134,8 +140,20 @@ export function instrucoesSistema(tipoEmpreendimento: string): string {
 // (localidade em 1º lugar — a causa dominante do diagnóstico) que entra ANTES
 // das fontes anexadas pelo editor. Área/produto/preço são contexto descritivo
 // best-effort (não é cálculo de viabilidade — só ajuda o modelo a dimensionar
-// o empreendimento), lidos de campos já existentes no estudo, sem depender do
-// motor de proforma (backend não importa código do frontend).
+// o empreendimento).
+//
+// #588: até aqui os três vinham de colunas legadas cruas de `estudos`
+// (`area_media_lote_m2`, `num_unidades*`, `preco_venda_m2*`) — campos sem UI
+// desde a #315 e que o motor de Proforma não lê mais desde a #563. Agora a
+// função continua recebendo os três já resolvidos (ela não sabe de onde
+// vieram — fácil de testar sem tocar em `req.dados`), mas quem resolve é o
+// chamador em `backend/rotas/apelo-comercial.ts`, com
+// `resumoCatalogoProdutos` (`frontend/proforma.ts`) sobre o catálogo de
+// Produtos do estudo — a MESMA fonte que `calcularProforma` usa para o VGV.
+// `frontend/proforma.ts` é funções puras sem DOM (ver o cabeçalho do
+// arquivo); o backend importa daquele arquivo de propósito, para não duplicar
+// a regra de linha válida (`produtoCompoeCatalogo`) num segundo lugar que
+// divergiria dela silenciosamente.
 export function montarContextoApelo(entrada: {
   localidade: string;
   tipoEmpreendimento: string;
@@ -156,6 +174,33 @@ export function montarContextoApelo(entrada: {
   if (entrada.partes.length === 0) l.push('Nenhuma.');
   else l.push(...entrada.partes);
   return l.join('\n');
+}
+
+/**
+ * `montarContextoApelo` composta com `resumoCatalogoProdutos` (#588) — o
+ * ponto único que o handler HTTP chama. A assinatura recebe `produtos` (a
+ * lista crua de `preliminar_produtos` do estudo), nunca `areaMediaM2`/
+ * `unidades`/`precoVendaM2` prontos: isso torna impossível o handler voltar a
+ * ler os campos legados congelados de `estudos` (`area_media_lote_m2`,
+ * `num_unidades*`, `preco_venda_m2*`) sem também mudar esta assinatura — a
+ * mesma defesa de "parâmetro obrigatório" da Rodada 9 (CLAUDE.md § Classe 1),
+ * adaptada para tipo em vez de obrigatoriedade.
+ */
+export function montarContextoApeloDoEstudo(entrada: {
+  localidade: string;
+  tipoEmpreendimento: string;
+  produtos: ProdutoPreliminar[] | undefined;
+  partes: string[];
+}): string {
+  const resumo = resumoCatalogoProdutos(entrada.produtos);
+  return montarContextoApelo({
+    localidade: entrada.localidade,
+    tipoEmpreendimento: entrada.tipoEmpreendimento,
+    areaMediaM2: resumo.areaMediaM2,
+    unidades: resumo.unidades,
+    precoVendaM2: resumo.precoVendaM2,
+    partes: entrada.partes,
+  });
 }
 
 // Nota fora de 1–5 (ou não numérica) vira null — mesma trava anti-invenção de

@@ -411,7 +411,7 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 > ⚠️ **Se um caminho de promoção for criado**, ele passa a precisar converter
 > `pct_area_venda → area_m2` — e a família `permuta_fisica_nr_*` junto, que a #486 não mencionava.
 > **Atenção à grandeza de ligação, que difere por tipo:** na **Incorporação** ela é
-> `area_pvt_r_fechada` / `area_pvt_nr_fechada` (`frontend/proforma.ts:233`), convertida por
+> `area_pvt_r_fechada` / `area_pvt_nr_fechada` (`frontend/proforma.ts:278`), convertida por
 > `converterUnidade`/`paraBase` (`frontend/premissas-conversao.ts`); a ALV da cascata
 > (`CASCATA_LOTEAMENTO`) só existe no **Loteamento** (`frontend/proforma.ts:186`, dentro do
 > `if (lot)`). Desde a **#564**, `CASCATA_INCORPORACAO` (`frontend/areas-cascata.ts:139-144`) **é
@@ -3226,7 +3226,7 @@ supuser que existe promoção vai procurar um bug de conversão que não existe 
 `permuta_fisica_modo: 'area_m2'` com nulos é **indistinguível do padrão de criação**
 (`schema.json:116,121`), e como não há promoção, a hipótese de resíduo de conversão cai
 independentemente de qual seja a proveniência. E quem **criar** o caminho de promoção precisa saber que a grandeza de ligação difere: na
-Incorporação é `area_pvt_r_fechada`/`area_pvt_nr_fechada` (`frontend/proforma.ts:233`); a ALV da
+Incorporação é `area_pvt_r_fechada`/`area_pvt_nr_fechada` (`frontend/proforma.ts:278`); a ALV da
 cascata só existe no Loteamento. Desde a **#564** `CASCATA_INCORPORACAO` é renderizada pela tabela de
 Áreas da Incorporação (`frontend/tela-premissas.ts`), mas segue sem ser a grandeza de ligação: o
 motor citado acima lê os campos direto do formulário, não pela cascata
