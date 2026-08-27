@@ -411,7 +411,7 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 > ⚠️ **Se um caminho de promoção for criado**, ele passa a precisar converter
 > `pct_area_venda → area_m2` — e a família `permuta_fisica_nr_*` junto, que a #486 não mencionava.
 > **Atenção à grandeza de ligação, que difere por tipo:** na **Incorporação** ela é
-> `area_pvt_r_fechada` / `area_pvt_nr_fechada` (`frontend/proforma.ts:202-203`), convertida por
+> `area_pvt_r_fechada` / `area_pvt_nr_fechada` (`frontend/proforma.ts:223`), convertida por
 > `converterUnidade`/`paraBase` (`frontend/premissas-conversao.ts`); a ALV da cascata
 > (`CASCATA_LOTEAMENTO`) só existe no **Loteamento** (`frontend/proforma.ts:186`, dentro do
 > `if (lot)`). Desde a **#564**, `CASCATA_INCORPORACAO` (`frontend/areas-cascata.ts:139-144`) **é
@@ -3081,7 +3081,7 @@ com os do estudo.
 | **C4** | **No Avançado, o tempo é em meses relativos 0-based**: mês 0 = `data_inicio_projeto`; o índice do array mensal coincide com o número do mês. **Não há meses negativos.** | `fluxo-caixa-motor.ts` |
 | **C5** | **Permuta física não entra no fluxo** — reduz a área/VGV vendável do incorporador. **Permuta financeira é dedução da receita**, % do VGV residencial/não residencial (ou valor fixo). | `proforma.ts`, `formulas.md` |
 | **C6** | **O imposto NÃO segue `regime_tributario`** — a redação anterior desta convenção dizia que sim, e é falso. **Preliminar:** `frontend/proforma.ts:245` escolhe pelo booleano `sujeito_ret` (`aliquota_ret_pct`, default 4) ou, se falso, `imposto_percentual`; o campo `regime_tributario` **não é consultado**. **Avançado:** usa o par global `considerar_ret`/`ret_pct` e ignora os três (§17). Corretagem, marketing e permutas financeiras são deduções da receita antes dos custos. | `formulas.md`, `proforma.ts:245`, schema |
-| **C7** | **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e no motor. O **valor canônico** de uma premissa multiunidade é o monetário; `% do VGV` e `R$/m²` são representações **derivadas**, que carregam precisão plena internamente e arredondam só para exibir. Contrato do autor, 2026-08-01. **Estado:** `fmtR$` (`viab-format.ts:11-23`) usa 2 casas, a exportação passou a importá-lo em vez de definir formatador próprio (`exportar.ts:10`) e a sensibilidade da Proforma migrou (`tela-proforma.ts:458`, #492). **Três fontes ainda divergem** e mantêm a #281 aberta: `fluxo-tabela.ts:34` (`celula`, arredonda para 0 casas e esconde valor abaixo de R$ 0,50), `tela-proforma.ts:314` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383` (`precoUnit`/`precoTotal`) — as duas últimas chamam `fmtNum` sem casas. Tabela completa em `formulas.md`. | `formulas.md`, `viab-format.ts`, `premissas-conversao.ts` |
+| **C7** | **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e no motor. O **valor canônico** de uma premissa multiunidade é o monetário; `% do VGV` e `R$/m²` são representações **derivadas**, que carregam precisão plena internamente e arredondam só para exibir. Contrato do autor, 2026-08-01. **Estado:** `fmtR$` (`viab-format.ts:11-23`) usa 2 casas, a exportação passou a importá-lo em vez de definir formatador próprio (`exportar.ts:10`) e a sensibilidade da Proforma migrou (`tela-proforma.ts:458`, #492). **Três fontes ainda divergem** e mantêm a #281 aberta: `fluxo-tabela.ts:34` (`celula`, arredonda para 0 casas e esconde valor abaixo de R$ 0,50), `tela-proforma.ts:358` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383` (`precoUnit`/`precoTotal`) — as duas últimas chamam `fmtNum` sem casas. Tabela completa em `formulas.md`. | `formulas.md`, `viab-format.ts`, `premissas-conversao.ts` |
 
 ## Anexo B — Dicionário de premissas (campos reais)
 
@@ -3207,7 +3207,7 @@ documento, contra o contrato **C7** do Anexo A.
 
 A armadilha que **sobra** é mais estreita: três fontes ainda formatam por conta própria —
 `fluxo-tabela.ts:34` (`celula`, arredonda para 0 casas e **esconde** valor abaixo de R$ 0,50),
-`tela-proforma.ts:314` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383`
+`tela-proforma.ts:358` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383`
 (`precoUnit`/`precoTotal`), as duas últimas chamando `fmtNum` sem casas. A mesma célula sai `1.235`
 na tela e `1.234,56` no PDF. → **#281**, que segue aberta só por elas.
 
@@ -3224,7 +3224,7 @@ supuser que existe promoção vai procurar um bug de conversão que não existe 
 `permuta_fisica_modo: 'area_m2'` com nulos é **indistinguível do padrão de criação**
 (`schema.json:116,121`), e como não há promoção, a hipótese de resíduo de conversão cai
 independentemente de qual seja a proveniência. E quem **criar** o caminho de promoção precisa saber que a grandeza de ligação difere: na
-Incorporação é `area_pvt_r_fechada`/`area_pvt_nr_fechada` (`frontend/proforma.ts:202-203`); a ALV da
+Incorporação é `area_pvt_r_fechada`/`area_pvt_nr_fechada` (`frontend/proforma.ts:223`); a ALV da
 cascata só existe no Loteamento. Desde a **#564** `CASCATA_INCORPORACAO` é renderizada pela tabela de
 Áreas da Incorporação (`frontend/tela-premissas.ts`), mas segue sem ser a grandeza de ligação: o
 motor citado acima lê os campos direto do formulário, não pela cascata

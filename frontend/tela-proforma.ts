@@ -4,7 +4,7 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
-import { exportarPDF, exportarExcel } from './exportar.js';
+import { exportarPDF, exportarExcel, avisoPermutaCapada } from './exportar.js';
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
 
 // `tipo` dá a categoria visual (#3): receita | consolidado | resultado;
@@ -51,6 +51,10 @@ export class ViabTelaProforma extends LitElement {
        após o último vira respiro em vez de alargar os existentes. */
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 220px)); gap: 12px; margin-bottom: 16px; }
     .kpis urbi-kpi { min-width: 0; }
+    /* Aviso do excedente de permuta: acima da tabela, dentro do card. */
+    urbi-banner.aviso-permuta { display: block; margin-bottom: 14px; }
+    /* Mesmo respiro do estado vazio do catálogo em Premissas → Produtos. */
+    .pf-vazio { padding: 8px 0; }
     .barra-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; justify-content: flex-end; }
     .sens-var { max-width: 320px; margin-bottom: 12px; }
     urbi-card + urbi-card { margin-top: 16px; }
@@ -177,25 +181,66 @@ export class ViabTelaProforma extends LitElement {
     // #10/BUG7-07: VGV bruto = VGV se a permuta física (R e NR) NÃO fosse
     // entregue (vendida). Antes rodava o motor de novo zerando só os campos
     // LEGADOS de permuta — mas o motor prioriza o canônico
-    // (permuta_fisica_area_canonica/_nr_area_canonica, proforma.ts:100), que
+    // (permuta_fisica_area_canonica/_nr_area_canonica, proforma.ts:252), que
     // ficava fora do override e o tornava um no-op (vgvBruto === p.vgv em
     // qualquer estudo editado depois da introdução do canônico). Mesma
-    // identidade que exportar.ts:35 já usa (fonte única, sem 2ª execução).
+    // identidade que exportar.ts:39 já usa (fonte única, sem 2ª execução), e
+    // ela continua fechando com o cap: as duas permutas do resultado são as
+    // EFETIVAS, então a soma reconstrói a base sem estourá-la.
     const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
     return html`
-      ${this.secao === 'proforma' ? html`
+      ${this.secao === 'proforma'
+        ? (p.semProdutos ? this._renderSemProdutos() : html`
         ${this._renderKpis(p)}
         ${!lot ? this._renderUnidadesTipo(p) : nothing}
         <urbi-card titulo="Proforma">
+          ${this._renderAvisoPermuta(p)}
           ${this._renderTabela(p, lot, vgvBruto)}
           <div class="barra-acoes">
             <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-excel" @click=${() => this._exportar('excel')}>Exportar Excel</urbi-botao>
             <urbi-botao variante="secundario" pequeno icone="fa-solid fa-file-pdf" @click=${() => this._exportar('pdf')}>Exportar PDF</urbi-botao>
           </div>
         </urbi-card>
-      ` : nothing}
+      `)
+        : nothing}
       ${this.secao === 'cenarios' ? this._renderSensibilidade(lot) : nothing}
     `;
+  }
+
+  // Estado vazio: sem catálogo de Produtos que componha VGV não há receita
+  // modelada, e a Proforma inteira (KPIs e tabela) sairia zerada. Mostrar a
+  // tabela nessa condição era pior que nada — ela vinha preenchida a partir dos
+  // pares legados de área × preço, que não têm campo em tela nenhuma e por isso
+  // ninguém consegue conferir nem corrigir.
+  private _renderSemProdutos(): TemplateResult {
+    return html`<urbi-card titulo="Proforma">
+      <div class="pf-vazio">
+        <urbi-estado-vazio icone="fa-solid fa-boxes-stacked"
+          mensagem="Nenhum produto com área, preço e unidades cadastrado."
+          submensagem="A Proforma sai do catálogo de Produtos: preencha as três colunas em Premissas → Produtos para ver VGV, custos e resultado."
+        ></urbi-estado-vazio>
+      </div>
+    </urbi-card>`;
+  }
+
+  // Aviso do corte de permuta física. `permutaCapada` só é verdade quando a
+  // permuta pedida vale mais que a base — e nesse caso o VGV vai a zero, o que
+  // sem aviso pareceria erro de digitação em vez de excedente.
+  //
+  // A frase vem de `avisoPermutaCapada`, a MESMA que o CSV e o PDF imprimem:
+  // banner e exportação divergirem sobre o corte foi o defeito que a revisão
+  // apontou. Ela declara os m² informados de propósito — as áreas NÃO são
+  // capadas (o KPI "Área permutada" e a memo por linha seguem o que foi
+  // digitado), e um aviso que só falasse de dinheiro deixaria o leitor com uma
+  // área grande ao lado de um VGV zerado, sem ligar as duas coisas. O que a
+  // tela acrescenta é só a orientação de onde corrigir.
+  private _renderAvisoPermuta(p: Proforma): TemplateResult {
+    if (!p.permutaCapada) return html``;
+    return html`
+      <urbi-banner class="aviso-permuta" variante="alerta">
+        ${avisoPermutaCapada(p)}
+        Reveja a área permutada em Premissas → Permutas ou o catálogo em Premissas → Produtos.
+      </urbi-banner>`;
   }
 
   private _renderKpis(p: Proforma): TemplateResult {
@@ -428,7 +473,7 @@ export class ViabTelaProforma extends LitElement {
     // omissão do canônico corrigida acima em vgvBruto — aqui, em vez de rodar o
     // motor de novo com os campos legados zerados (no-op quando há canônico),
     // deriva-se do próprio Proforma já calculado do cenário (mesma identidade
-    // de exportar.ts:35), sem 2ª execução.
+    // de exportar.ts:39), sem 2ª execução.
     const proforma = (fator: number) => calcularProforma(this._aplicarFator(fator));
     const vgvBrutoDe = (cen: Proforma) => cen.vgv + cen.vgvPermutaResidencial + cen.vgvPermutaNaoResidencial;
     // Linhas monetárias (6) e, separados por uma divisória com mais respiro, os dois

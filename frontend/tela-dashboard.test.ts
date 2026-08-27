@@ -16,10 +16,15 @@ import { resumoListagem, type ResumoListagem } from './tela-dashboard.js';
 // deu vgv<=0) e o resultado pronto.
 // ─────────────────────────────────────────────────────────────────────────
 
-test('Preliminar com VGV nos campos legados: comportamento inalterado (sem calculosAvancado)', () => {
+// Migrado: o VGV do Preliminar saía dos campos legados de área × preço, que
+// deixaram de ser fonte — o catálogo de Produtos é a única. O que este teste
+// prova (Preliminar resolve na hora, sem passar pelo mapa do Avançado) é o
+// mesmo; a linha do catálogo repõe os mesmos R$ 10.000.000.
+test('Preliminar com VGV no catálogo: resolve na hora, sem calculosAvancado', () => {
   const estudo = {
     nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
-    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000, num_unidades_residencial: 10,
+    area_pvt_r_fechada: 1000,
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 10000, unidades: 10 }],
   };
   const r = resumoListagem(estudo, {});
   assert.notEqual(r, null);
@@ -29,6 +34,17 @@ test('Preliminar com VGV nos campos legados: comportamento inalterado (sem calcu
 
 test('Preliminar sem VGV nos campos legados nem no catálogo: "—" (null), não "carregando"', () => {
   const estudo = { id: 1, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao' };
+  assert.equal(resumoListagem(estudo, {}), null);
+});
+
+// O caso que o catálogo em branco criava: a listagem tratava a linha vazia
+// como catálogo presente e o estudo caía no mesmo "—", mas por outro caminho.
+test('Preliminar com catálogo só de linha em branco: "—" (null), como se não houvesse catálogo', () => {
+  const estudo = {
+    id: 2, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
+    produtos: [{ area_media_m2: null, preco_venda_m2: null, unidades: 0 }],
+  };
   assert.equal(resumoListagem(estudo, {}), null);
 });
 
@@ -83,7 +99,9 @@ test('Painel: Preliminar entrega área privativa, área construída e ROI junto 
     id: 7, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
     terreno_manual_area: 1000, origem_terreno: 'manual',
     area_pvt_r_fechada: 800, area_comum_total: 200,
-    preco_venda_m2_residencial: 10000,
+    // A receita vem do catálogo; as áreas continuam vindo dos campos de área,
+    // que é justamente o que este teste afere.
+    produtos: [{ area_media_m2: 80, preco_venda_m2: 10000, unidades: 10 }],
     custo_construcao_m2: 3000,
   };
   const r = resumoListagem(estudo, {}) as ResumoListagem;
@@ -99,12 +117,14 @@ test('Painel: Loteamento não tem área comum — construída cai na privativa, 
     id: 8, nivel_analise: 'preliminar', tipo_empreendimento: 'loteamento',
     terreno_manual_area: 10000, origem_terreno: 'manual',
     preco_venda_m2: 500, area_media_lote_m2: 250,
+    produtos: [{ area_media_m2: 250, preco_venda_m2: 500, unidades: 40 }],
   };
   const r = resumoListagem(estudo, {});
-  if (r && r !== 'carregando') {
-    assert.ok(r.areaConstruida > 0, 'área construída de loteamento não pode ser 0 com privativa > 0');
-    assert.equal(r.areaConstruida, r.areaPrivativa);
-  }
+  // Sem o `if`, e de propósito: com `resumoListagem` devolvendo null a asserção
+  // some, e o teste passava sem aferir nada.
+  assert.ok(r && r !== 'carregando', 'o estudo tem catálogo — a listagem tem que resolver');
+  assert.ok(r.areaConstruida > 0, 'área construída de loteamento não pode ser 0 com privativa > 0');
+  assert.equal(r.areaConstruida, r.areaPrivativa);
 });
 
 test('Painel: Avançado devolve as três grandezas novas vindas do mapa', () => {

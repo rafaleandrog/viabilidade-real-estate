@@ -9,8 +9,16 @@
 // tabela, os campos fixos saem do formulário).
 //
 // Os campos legados NÃO são apagados nem zerados — continuam no schema como
-// histórico; `frontend/proforma.ts` só os lê quando `produtos` está vazio
-// (compatibilidade retroativa, testada em proforma.test.ts).
+// histórico.
+//
+// ⚠️ A redação anterior dizia que `frontend/proforma.ts` "só os lê quando
+// `produtos` está vazio", e isso deixou de valer: o motor NUNCA MAIS lê o par
+// legado como fonte de VGV. Sem catálogo efetivo — nenhuma linha com área,
+// preço e unidades preenchidos — o estudo não tem receita modelada, e a
+// Proforma mostra estado vazio em vez de números tirados de campos que não
+// têm mais formulário. Isso torna esta migração o ÚNICO caminho de
+// continuidade dos estudos anteriores ao catálogo: sem a linha que ela cria,
+// um estudo antigo abre zerado. O corpo dela não mudou.
 //
 // ── Continuidade de VGV ──
 //

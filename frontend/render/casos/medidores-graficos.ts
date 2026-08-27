@@ -22,7 +22,7 @@
 // construção, sem precisar inventar limite.
 
 import '../../tela-graficos.js';
-import { ESTUDO, forcarEstado } from './dados.js';
+import { ESTUDO, PRODUTOS, forcarEstado } from './dados.js';
 
 // `custoObrasVgvPct` ≈ 37,45 e `roiPct` ≈ 58,03 para o `ESTUDO` deste espelho
 // (calculado por `calcularProforma`, conferido no PR). Os medidores abaixo
@@ -96,6 +96,10 @@ export const caso = {
     // acima, em vez do `{ dados: [] }` default do espelho.
     (globalThis as any).urbiVerso.api = async (rota: string) => {
       if (rota.includes('/benchmarks')) return { dados: BENCHMARKS };
+      // O catálogo é a fonte do VGV, e `tela-graficos.ts` o carrega por esta
+      // rota. Com `{ dados: [] }` o estudo ficaria sem receita e os dois
+      // indicadores em % de VGV cairiam em zero — outros números, outro caso.
+      if (rota.includes('/preliminar/produtos')) return { dados: PRODUTOS };
       return { dados: [] };
     };
     const el = document.createElement('viab-tela-graficos');

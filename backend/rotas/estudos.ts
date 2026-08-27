@@ -178,19 +178,18 @@ export function agruparProdutosPorEstudo(
 /**
  * Anexa `produtos` (catálogo do Preliminar, #315) a cada estudo da lista.
  *
- * Por que existe: `calcularProforma` (frontend/proforma.ts:229) escolhe a
- * fonte do VGV pela PRESENÇA de `e.produtos` — sem eles cai no ramo legado
- * (área × preço), e um estudo cujo VGV vem SÓ do catálogo fica com `vgv = 0`.
- * Na listagem isso virava "—" em VGV, Resultado e Margem, enquanto a aba
- * Premissas — que passa `produtos` explicitamente (frontend/tela-premissas.ts)
- * — mostrava os valores certos.
+ * Por que existe: o catálogo é a ÚNICA fonte do VGV em `calcularProforma`
+ * (`frontend/proforma.ts`, `catalogoEfetivo`) — sem `e.produtos` no payload
+ * TODO estudo do Preliminar calcularia `vgv = 0`, e a listagem mostraria "—"
+ * em VGV, Resultado e Margem, enquanto a aba Premissas — que passa `produtos`
+ * explicitamente (frontend/tela-premissas.ts) — mostraria os valores certos.
  *
  * São INPUTS persistidos, não valores derivados: devolver isto não move
  * cálculo para o backend (docs/viabilidade/formulas.md continua valendo).
  *
  * Uma query só para toda a página, mutação in-place — mesmo padrão de
  * `anexarImagemPrincipal`. Estudo sem produto fica com lista vazia, que é o
- * que o motor espera para cair no ramo legado.
+ * estado vazio: sem receita modelada, e a listagem mostra "—" com razão.
  */
 async function anexarProdutos(req: Request, estudos: any[]): Promise<void> {
   for (const e of estudos) e.produtos = [];
