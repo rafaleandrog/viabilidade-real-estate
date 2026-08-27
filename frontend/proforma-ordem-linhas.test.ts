@@ -21,11 +21,13 @@
 //
 // `montarLinhasProforma`/`linhasProformaVisiveis` são a MESMA função que
 // `_renderTabela` chama (frontend/tela-proforma.ts) — não uma cópia para
-// teste. Prova de fiação: apagar a chamada em `_renderTabela` (trocar por um
-// array vazio ou por uma cópia hand-rolled) não afeta este arquivo — quem
-// pega isso é o teste de import/typecheck (a assinatura fica sem uso) e o
-// caso de render `proforma-fonte-vgv.render.test.ts`, que exige `table.pf`
-// com linhas.
+// teste. Limite honesto desta defesa: a paridade tela×export que este arquivo
+// prova vale ENQUANTO `_renderTabela` chamar estas funções. Se o componente
+// trocar a chamada por uma cópia hand-rolled com outra ordem, nenhuma camada
+// automática acusa — typecheck compila (export sem chamador é válido) e os
+// casos de render selecionam por classe, não por posição de linha. Essa
+// mutação só é pega por revisão de diff; é a razão de a chamada única em
+// `_renderTabela` ser o ponto a vigiar.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

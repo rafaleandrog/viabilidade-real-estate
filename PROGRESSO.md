@@ -38,9 +38,10 @@ nos dois lados) que é o que pega mutação de reordenação sem depender de mai
 aritmética (VGV sem permuta → Receita bruta → Receita líquida → Receita operacional → Resultado)
 lida **das próprias linhas** (por rótulo), nos dois lados — não dos campos brutos de `Proforma`.
 Mutação verificada manualmente (reverter a ordem em `montarLinhasProforma`): 3 dos 7 testes novos
-caem para vermelho (a paridade estrutural e o teste de índice), os 4 de identidade aritmética
-continuam verdes por não dependerem de ordem — confirma que o teste de índice é o que prova a
-fiação da ordem especificamente.
+caem para vermelho (as 2 paridades estruturais com permuta e o teste de índice); os 4 verdes são
+os 2 de identidade aritmética (lookup por rótulo, indiferentes a posição), a paridade da fixture
+sem permuta (a mutação não a alcança) e o "só filtra, não reordena" — confirma que o teste de
+índice é o que prova a fiação da ordem especificamente.
 
 ## #577 · A listagem de Estudos mostra Preliminar/Avançado (2026-08-27)
 

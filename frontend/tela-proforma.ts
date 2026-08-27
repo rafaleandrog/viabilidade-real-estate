@@ -104,9 +104,10 @@ export interface ContextoLinhasProforma {
 }
 
 /**
- * Monta as linhas da tabela da Proforma — pura, sem `this`, extraída de
- * `_linhas` (que agora só delega) para poder ser importada por teste e
- * comparada estruturalmente com `linhasProforma` (frontend/exportar.ts).
+ * Monta as linhas da tabela da Proforma — pura, sem `this`. Substitui o
+ * antigo método privado `_linhas` (apagado; `_renderTabela` chama esta função
+ * diretamente) para poder ser importada por teste e comparada
+ * estruturalmente com `linhasProforma` (frontend/exportar.ts).
  *
  * #572: o bloco de permuta física vem ANTES de "Receita bruta (VGV)" — a
  * MESMA ordem que a exportação (CSV/PDF) já usava. Lida de cima para baixo, a
