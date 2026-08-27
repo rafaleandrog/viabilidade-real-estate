@@ -45,13 +45,22 @@ interface LinhaPf { l: string; v: number; nota?: boolean; }
  *
  * Declara as três grandezas que o leitor precisa para conferir o corte:
  * a área informada (que NÃO é capada — as áreas exibidas seguem o que foi
- * digitado), o valor que ela pedia, e a base que o catálogo comporta.
+ * digitado), o valor que ela pedia, e o valor que acabou considerado.
+ *
+ * ⚠️ A frase dizia "a receita bruta do catálogo é X", com X = permuta efetiva.
+ * Isso valia enquanto o cap era GLOBAL: capado, o efetivo era exatamente o
+ * catálogo inteiro. Com o cap por categoria (#570) as duas grandezas se
+ * separaram — uma categoria pode capar enquanto a outra ainda tem folga, e aí
+ * o efetivo é menor que o bruto do catálogo. Dizer "a receita bruta do catálogo
+ * é X" passou a ser falso; o que X sempre foi, de fato, é o que entrou no
+ * cálculo.
  */
 export function avisoPermutaCapada(p: Proforma): string {
-  const entregue = p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
+  const considerada = p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
   return `Permuta física informada (${fmtNum(p.areaPermutaFisica)} m²) vale `
-    + `${fmtR$(p.vgvPermutaSolicitada)} e a receita bruta do catálogo é ${fmtR$(entregue)}. `
-    + 'O excedente foi desconsiderado no VGV, que para em zero e nunca fica negativo; '
+    + `${fmtR$(p.vgvPermutaSolicitada)} e a permuta considerada é ${fmtR$(considerada)}. `
+    + 'O excedente foi desconsiderado: cada categoria é capada no VGV bruto da própria categoria, '
+    + 'e o VGV da categoria capada para em zero, nunca negativo; '
     + 'as áreas exibidas seguem as informadas.';
 }
 

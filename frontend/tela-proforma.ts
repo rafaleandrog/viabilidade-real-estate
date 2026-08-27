@@ -6,6 +6,10 @@ import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } f
 import { calcularProforma, vgvProduto, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 import { exportarPDF, exportarExcel, avisoPermutaCapada } from './exportar.js';
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
+// A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
+// do seu `_carregar()`, e que `tela-graficos.ts` reusa (PR 580/#597). Reusada,
+// e não recopiada: a cópia inline divergiria da função que o teste exercita.
+import { respostaAindaVale } from './viab-imagem-principal.js';
 
 // `tipo` dá a categoria visual (#3): receita | consolidado | resultado;
 // ausente = item comum (sub-linha discreta). `grupo` marca sub-linhas
@@ -238,18 +242,39 @@ export class ViabTelaProforma extends LitElement {
     if (ch.has('estudo') && this.estudo?.id !== this._idCarregado) this._init();
   }
 
+  /**
+   * #597 — mesma corrida que `tela-graficos.ts` teve (PR 580): navegar do
+   * estudo A para o B dispara uma 2ª `_init()` antes de a 1ª responder, e não
+   * há ordem garantida entre duas fetches HTTP. Sem guarda, a resposta de A
+   * podia chegar por último e sobrescrever `produtos`/`benchmarks`/
+   * `aliquotaRet` com o catálogo errado — silenciosamente, porque
+   * `_idCarregado` já tinha sido marcado para B e nada disparava recarga.
+   *
+   * `produtos` é LIMPO na troca de estudo (mesmo padrão de `tela-graficos.ts`)
+   * para o catálogo de A não continuar na tela durante o carregamento de B, e
+   * para não permanecer se a busca de B falhar. O `id` é capturado antes das
+   * chamadas e conferido depois (inclusive no `catch`), e a resposta que ficou
+   * para trás é descartada em silêncio — quem atualiza a tela é a chamada mais
+   * nova, nunca a mais antiga.
+   */
   private async _init() {
     if (!this.estudo) return;
-    this._idCarregado = this.estudo.id ?? null;
+    const id = this.estudo.id;
+    this._idCarregado = id ?? null;
+    this.produtos = [];
     try {
       const [bm, cfg, prod] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
         listarProdutosPreliminar(this.estudo.id),
       ]);
+      if (!respostaAindaVale(id, this.estudo?.id)) return; // o estudo mudou enquanto isto estava em voo
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
       this.produtos = prod?.dados || [];
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      if (!respostaAindaVale(id, this.estudo?.id)) return;
+      console.error(e);
+    }
   }
 
   private _entrada(over: Partial<ProformaInput> = {}): ProformaInput {
@@ -307,8 +332,9 @@ export class ViabTelaProforma extends LitElement {
   }
 
   // Aviso do corte de permuta física. `permutaCapada` só é verdade quando a
-  // permuta pedida vale mais que a base — e nesse caso o VGV vai a zero, o que
-  // sem aviso pareceria erro de digitação em vez de excedente.
+  // permuta pedida vale mais que a base de alguma das duas categorias (#570) —
+  // e nesse caso o VGV daquela categoria vai a zero, o que sem aviso pareceria
+  // erro de digitação em vez de excedente.
   //
   // A frase vem de `avisoPermutaCapada`, a MESMA que o CSV e o PDF imprimem:
   // banner e exportação divergirem sobre o corte foi o defeito que a revisão

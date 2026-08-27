@@ -20,8 +20,9 @@ As fórmulas rodam no **frontend em tempo real** (engine `frontend/proforma.ts`,
 **VGV — fonte única: o catálogo de Produtos** (`preliminar_produtos`), nos dois tipos:
 
 ```
-VGV bruto  = Σ (área média × preço de venda/m² × unidades) das linhas do catálogo
-VGV        = VGV bruto − permuta física EFETIVA
+VGV bruto da categoria = Σ (área média × preço de venda/m² × unidades) das linhas daquele `tipo`
+VGV da categoria       = VGV bruto da categoria − permuta física EFETIVA da categoria
+VGV                    = VGV residencial + VGV não residencial
 ```
 
 Duas regras governam essa fonte, e as duas existem porque a alternativa produzia número que
@@ -33,19 +34,33 @@ ninguém conseguia conferir na tela:
   (`semProdutos`): a Proforma não mostra tabela nem KPI, e **nenhuma** despesa em % de VGV produz
   valor. **Não há fallback** para os pares legados de área × preço da linha `estudos` — eles não
   têm campo em tela nenhuma desde a reestruturação do Preliminar.
-- **A permuta física é capada no VGV bruto.** A permuta pedida (`área entregue × preço do tipo`,
-  R e NR somados) é cortada proporcionalmente quando vale mais que a base; o VGV para em **zero** e
-  nunca fica negativo, e a Proforma mostra um aviso do excedente. A permuta que sai no resultado é
-  a **efetiva**, então a identidade `VGV + permuta R + permuta NR = VGV bruto` continua fechando.
+- **A permuta física é capada no VGV bruto da própria categoria** (#570). A permuta pedida de cada
+  `tipo` (`área entregue × preço médio daquele tipo`) é cortada quando vale mais que o VGV bruto
+  daquele `tipo` — cada categoria capa sozinha, sem corte proporcional entre as duas e sem que o
+  excedente de uma coma o VGV da outra. O VGV da categoria capada para em **zero** e nunca fica
+  negativo, e a Proforma mostra um aviso do excedente. A permuta que sai no resultado é a
+  **efetiva**, então as duas identidades por categoria — `VGV R + permuta R = VGV bruto R`, idem
+  NR — continuam fechando, e a soma delas com elas.
 
-Desde a #565, cada linha do catálogo carrega `tipo` (`residencial`/`nao_residencial`, padrão
-`residencial`), mas o VGV acima permanece um **bucket único** — a fórmula não separa por `tipo`
-ainda. `vgvNaoResidencial` continua `0` em `frontend/proforma.ts`, comentário do interim; ligar o
-catálogo à separação R/NR é a #570.
+Cada linha do catálogo carrega `tipo` (`residencial`/`nao_residencial`, padrão `residencial`,
+#565). **A separação em duas categorias é da INCORPORAÇÃO** (#570): lá, VGV, área total e preço
+médio ponderado (`Σ VGV ÷ Σ área`) são calculados por categoria, e é sobre o total da categoria que
+as duas permutas do tipo incidem — a física converte `% área venda` sobre a área daquele `tipo` e
+valora os m² entregues pelo preço médio daquele `tipo`; a financeira em `% VGV` incide sobre o VGV
+daquele `tipo`. **No Loteamento não há categorias**: o motor normaliza o catálogo inteiro para o
+bucket residencial antes da separação (a tela de Permutas do Loteamento só expõe os controles
+residenciais, e o grid de Produtos não exibe o seletor de tipo ali) — a permuta física valora pelo
+preço médio do catálogo, mas a base do `% área venda` continua sendo a **área vendável da cascata**.
+Produto gravado antes da migração `035` não tem `tipo` e conta como **residencial**.
+
+Nada disso vale para o estudo **sem catálogo efetivo**: ali não há receita modelada, e as bases das
+permutas continuam sendo as legadas (área vendável no Loteamento, `area_pvt_*_fechada` e
+`preco_venda_m2_*` na Incorporação). Não há fallback de uma fonte para a outra, em nenhum dos dois
+sentidos.
 
 ## Deduções da receita
 
-Imposto (`4%` se sujeito a RET, senão `imposto_percentual`), corretagem, marketing e permutas financeiras (% do VGV residencial/não residencial). `Receita líquida = VGV − deduções`.
+Imposto (`4%` se sujeito a RET, senão `imposto_percentual`), corretagem, marketing e permutas financeiras (% do VGV residencial/não residencial — cada uma sobre o VGV da **sua** categoria na Incorporação; no Loteamento só a residencial existe, sobre o bucket único, #570). `Receita líquida = VGV − deduções`.
 
 ## Custos diretos
 
@@ -295,15 +310,15 @@ dízima e retornar exatamente ao mesmo canônico.
 |---|---|---|
 | `frontend/viab-format.ts:11-23` — `fmtR$` (`CASAS_DECIMAIS_MONETARIAS = 2`) | 2 | ✅ |
 | `frontend/exportar.ts:16` — importa `fmtR$`, sem formatador próprio | 2 | ✅ |
-| `frontend/exportar.ts:233` — `celulaFx` (CSV e PDF), desde a #449 delega para `celula` de `viab-format.ts` — fonte única com a tela | 2 | ✅ corte em R$ 0,005 |
+| `frontend/exportar.ts:242` — `celulaFx` (CSV e PDF), desde a #449 delega para `celula` de `viab-format.ts` — fonte única com a tela | 2 | ✅ corte em R$ 0,005 |
 | `frontend/tela-financeiro.ts:154` — `_n` (`casas-decimais="2"`) | 2 | ✅ |
 | `frontend/tela-empreendimento-tipologias.ts:178` | 2 (default) | ✅ |
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
-| `frontend/tela-proforma.ts:79` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
+| `frontend/tela-proforma.ts:83` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
 | `frontend/fluxo-caixa-motor.ts:2125-2133` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
-| `frontend/tela-proforma.ts:46` — `celulaProforma`, a coluna R$ da Proforma | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado (`_fmtContabil`) para função pura testável pela #567 |
+| `frontend/tela-proforma.ts:50` — `celulaProforma`, a coluna R$ da Proforma | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado (`_fmtContabil`) para função pura testável pela #567 |
 | `frontend/tela-fluxo-receitas.ts:485,486` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
 
 > 🟡 **O motor não é integralmente conforme ao C7, e marcar a linha inteira ✅ escondia isso.** As
@@ -320,13 +335,13 @@ dízima e retornar exatamente ao mesmo canônico.
 > conhecida, não como conformidade.
 
 > ✅ **Resolvido pela #449 (2026-08-24).** A #492 fechou o primeiro ponto (`fmtNum(v, 2)` da
-> tabela de sensibilidade, `frontend/tela-proforma.ts:523` desde então); o problema de fundo — quem
+> tabela de sensibilidade, `frontend/tela-proforma.ts:532` desde então); o problema de fundo — quem
 > chamava `fmtNum` **sem** o segundo argumento numa posição monetária (`_fmtContabil`, a coluna R$
 > da Proforma inteira; e `precoUnit`/`precoTotal` da alocação de receitas) — a #449 trocou por
 > `fmtR$(v, false)`, que fixa 2 casas sempre (`fmtNum` declara só `maximumFractionDigits`, então
 > "até 2" podia sair "0"). `fmtNum` em si **não mudou de assinatura** — continua servindo m²,
 > hectare, unidades e percentual, grandezas **não monetárias** que carregam precisão plena e
-> arredondam só para exibir; `celulaProformaM2` (`frontend/tela-proforma.ts:53`, R$/m²) é da mesma
+> arredondam só para exibir; `celulaProformaM2` (`frontend/tela-proforma.ts:57`, R$/m²) é da mesma
 > família e continua fora do escopo do C7 monetário.
 >
 > ✅ **A #567 (2026-08-27) extraiu `_fmtContabil`/`_fmtContabilM2` — métodos privados de

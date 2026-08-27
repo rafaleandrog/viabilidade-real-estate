@@ -5,10 +5,13 @@ import {
   dadosDaTrocaDeUnidade,
   numeroDaColuna,
   converterUnidade,
+  ctxConversaoPreliminar,
   paraBase,
   type CtxConversao,
 } from './premissas-conversao.js';
 import { dinheiroParaRotulo, resolverCustoTotal } from './fluxo-shared.js';
+import { calcularProforma } from './proforma.js';
+import { readFileSync } from 'node:fs';
 
 const ctx = (over: Partial<CtxConversao> = {}): CtxConversao => ({
   vgv: 0, vgvResidencial: 0, vgvNaoResidencial: 0,
@@ -369,4 +372,53 @@ test('#442 destino irrepresentável NÃO troca a unidade — a #442 de volta ser
 test('#442 linha VAZIA troca de unidade normalmente — não há o que contradizer', () => {
   const patch = dadosDaTrocaDeUnidade({ orcamento_unidade: 'rs' }, 'pct_receita', CONV_TELA as any, {});
   assert.deepEqual(patch, { orcamento_unidade: 'pct_receita' });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #570 — `ctxConversaoPreliminar`: a tela e o motor falam da MESMA base
+//
+// A tela de Premissas montava o ctx à mão e, nas duas grandezas de área da
+// permuta física, lia `area_pvt_r_fechada`/`area_pvt_nr_fechada` do formulário
+// — enquanto o motor já capava a permuta contra o catálogo. A badge "% área
+// venda" convertia sobre uma base e o cálculo usava outra, sem nada acusar.
+//
+// ⚠️ Estes dois testes medem coisas DIFERENTES, e são precisos os dois: o
+// primeiro afere a tradução Proforma → ctx (função pura); o segundo afere que a
+// TELA a chama, em vez de reconstruir o objeto — nenhum teste de função pura
+// consegue provar isso, e a suíte inteira fica verde se a tela voltar atrás.
+
+test('#570 ctxConversaoPreliminar: as duas bases de área vêm de `areaBasePermuta*`, do motor', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    // Legados absurdos: se algum aparecer no ctx, a fonte errada venceu.
+    area_pvt_r_fechada: 9999, area_pvt_nr_fechada: 7777,
+    preco_venda_m2_residencial: 1, preco_venda_m2_nao_residencial: 2,
+    produtos: [
+      { area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10 },   // R: 1.000 m², 10M
+      { area_media_m2: 100, preco_venda_m2: 5_000, unidades: 4, tipo: 'nao_residencial' }, // NR: 400 m², 2M
+    ],
+  });
+  const c = ctxConversaoPreliminar(p);
+  assert.equal(c.areaVendavelR, 1000, `areaVendavelR=${c.areaVendavelR} (9999 seria o legado)`);
+  assert.equal(c.areaVendavelNR, 400, `areaVendavelNR=${c.areaVendavelNR} (7777 seria o legado)`);
+  assert.equal(c.vgvResidencial, 10_000_000);
+  assert.equal(c.vgvNaoResidencial, 2_000_000, 'antes da #570 esta base era 0 e a % NR não deduzia nada');
+  assert.equal(c.vgv, 12_000_000);
+  assert.equal(c.areaVendavel, p.areaVendavel);
+  assert.equal(c.areaPrivativa, p.areaPrivativa);
+  // E a conversão em cima desse ctx: 10% da área de venda NÃO residencial são
+  // 40 m² (10% de 400), não 777,7 (10% do legado).
+  assert.equal(converterUnidade({ tipo: 'pct', link: 'areaVendavelNR' }, IDENT, 10, c), 40);
+});
+
+test('#570: a TELA usa `ctxConversaoPreliminar`, não monta o ctx à mão', () => {
+  const fonte = readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8');
+  assert.ok(fonte.includes('return ctxConversaoPreliminar(calcularProforma('),
+    '`_ctxConversao` de tela-premissas.ts precisa delegar para a função pura');
+  // A mutação que este teste existe para pegar: voltar a montar o objeto
+  // literal na tela. Qualquer reconstrução à mão reintroduz estas chaves.
+  for (const chave of ['areaVendavelR:', 'areaVendavelNR:']) {
+    assert.ok(!fonte.includes(chave),
+      `tela-premissas.ts voltou a montar "${chave}" à mão — a base da tela pode divergir do motor`);
+  }
 });
