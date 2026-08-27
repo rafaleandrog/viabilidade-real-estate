@@ -15,7 +15,11 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
   res.status(http).json({ erro: true, codigo, mensagem });
 }
 
-const CAMPOS = ['nome', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem'];
+// #565: `tipo` (residencial/nao_residencial) entra ENTRE `nome` e `area_media_m2`
+// — mesma posição da coluna no `schema.json` e no grid da tela. O motor da
+// Proforma ainda não lê este campo (bucket único, `vgvNaoResidencial = 0`);
+// ligar `tipo` ao cálculo é a #570.
+export const CAMPOS = ['nome', 'tipo', 'area_media_m2', 'preco_venda_m2', 'unidades', 'ordem'];
 
 async function produtoDoEstudo(req: Request, res: Response, estudoId: number): Promise<any | null> {
   const pid = parseInt(req.params.pid);
