@@ -40,6 +40,20 @@ export interface ResumoListagem {
 }
 
 /**
+ * #577: nível de análise para exibição na tabela de Estudos — sempre resolve,
+ * inclusive para um estudo persistido ANTES desta coluna existir.
+ * `nivel_analise` tem `padrao: "preliminar"` no schema.json (linha 14); uma
+ * linha sem o campo lê "preliminar", que é o valor CORRETO (o mesmo default
+ * que já rege `resumoListagem` acima ao escolher `calcularProforma` em vez de
+ * `proformaAvancado`), não um fallback inventado por esta função. Pura e
+ * exportada para o mesmo motivo de `resumoListagem`: testável sem montar o
+ * componente Lit.
+ */
+export function nivelExibicao(l: any): 'preliminar' | 'avancado' {
+  return l?.nivel_analise === 'avancado' ? 'avancado' : 'preliminar';
+}
+
+/**
  * #406: um estudo Avançado não tem os campos fixos que `calcularProforma`
  * (motor do Preliminar) lê — por isso a listagem mostrava "—" em VGV,
  * Resultado e Margem para todo estudo Avançado, mesmo com os números prontos
@@ -427,6 +441,17 @@ export class ViabTelaDashboard extends LitElement {
         render: (l: any) => this._renderStatus(l),
       },
       {
+        // #577: a tabela sabia o nível (usava para escolher a fórmula de VGV/
+        // Margem, ver `numeroTitulo` abaixo) mas só mostrava via `title`
+        // (tooltip), invisível sem passar o mouse. Coluna própria, legível
+        // direto — badge igual ao padrão de `status` acima.
+        id: 'nivel_analise', label: 'Nível', alinhamento: 'centro',
+        render: (l: any) => {
+          const n = nivelExibicao(l);
+          return html`<urbi-badge cor=${n === 'avancado' ? 'info' : 'padrao'}>${NIVEL_LABEL[n]}</urbi-badge>`;
+        },
+      },
+      {
         id: 'area_terreno', label: 'Área do terreno', alinhamento: 'direita',
         valor: (l: any) => { const a = this._areaTerreno(l); return a == null ? '—' : fmtM2(a); },
       },
@@ -561,7 +586,7 @@ export class ViabTelaDashboard extends LitElement {
       </div>
       <div class="filtros-bar">
         <urbi-select
-          label="Tipo de estudo"
+          label="Tipo de empreendimento"
           .valor=${this.filtros.tipo ?? ''}
           .opcoes=${[
             { valor: '', rotulo: 'Todos os tipos' },
