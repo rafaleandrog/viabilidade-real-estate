@@ -46,6 +46,37 @@ registrado (percentual `null`, diferença ainda definida), catálogo e registro 
 próprio propósito daquele caso, mas real: o `urbi-banner.aviso-area-alocada` passou a aparecer ali
 também, e a lista `aceitaNaoReproduzido` ganhou `urbi-banner.variante` para não falsear o veredito.
 
+## #597 · A corrida de carregamento em Proforma e Premissas (2026-08-27)
+
+Achado colateral da revisão do PR 580 (#563): `tela-proforma.ts:_init()` e
+`tela-premissas.ts:_init()` marcavam `_idCarregado` **antes** do `await` e gravavam
+`benchmarks`/`aliquotaRet`/`produtos` sem reconferir o id ao voltar — mesma classe de defeito que
+`tela-graficos.ts` teve. Navegar do estudo A para o B antes de A responder deixava a resposta
+atrasada de A sobrescrever o estado de B em silêncio; em Premissas era pior, porque a tela é
+editável e um Salvar em cima do estado misturado grava o catálogo errado.
+
+Conserto: reuso de `respostaAindaVale` (`frontend/viab-imagem-principal.ts:41`), o mesmo padrão que
+`tela-graficos.ts` já usa — importada, não recopiada. Guarda nos dois pontos de escrita (sucesso e
+`catch`, seguindo os três pontos de `viab-imagem-principal.ts:_carregar()`) e `produtos` limpo na
+troca de estudo, para o catálogo de A não continuar na tela durante o carregamento de B.
+
+**Varredura do padrão (critério 6 da issue):** as 4 telas com `_idCarregado` no repo são
+`tela-graficos.ts` (já corrigida, PR 580), `tela-financeiro.ts` (`_init()` **síncrono**, sem fetch —
+sem risco de corrida) e as duas corrigidas aqui. Nenhuma outra tela usa `_idCarregado`.
+
+**Teste da corrida** (`frontend/carregamento-corrida.test.ts`, novo): sem harness de DOM neste repo,
+o teste chama `_init()` diretamente nas duas classes reais (`ViabTelaProforma` incorporação,
+`ViabTelaPremissas` loteamento — um estudo de cada tipo, critério 8), com `urbiVerso.api` mockado
+por promises controláveis. Resolve o estudo B primeiro, depois A com valores diferentes, e confirma
+que `produtos`/`benchmarks`/`aliquotaRet` continuam os de B. Mais um par de testes por tela cobrindo
+o `catch` guardado. **Prova de mutação (critério 5):** removida cada uma das 4 guardas (sucesso e
+catch, nas duas telas) manualmente, uma de cada vez — as 4 mutações deixaram exatamente o teste
+correspondente vermelho, suíte restaurada e reconferida verde depois. `docs/viabilidade/formulas.md`
+e `frontend/premissas-conversao.ts` tiveram citações `arquivo:linha` corrigidas (deslocadas pelo
+diff, acusadas pelo `guard-enderecos-doc`).
+
+Sem mudança de schema/migração — `versao` não bumpou.
+
 ## #570 · permutas Física e Financeira sobre o total de CADA categoria (2026-08-27)
 
 Item 3 da lista de bugs da Rodada 10, e o fim do interim que a #315 deixou aberto. Com a
