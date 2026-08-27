@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtPct, fmtPctEntrada, fmtM2, parseNumeroBR, celula,
+  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtPct, fmtPctEntrada, fmtM2, parseNumeroBR, celula, negativoContabil,
 } from './viab-format.js';
 
 test('#281: fmtR$ é a fonte única de valores monetários com 2 casas', () => {
@@ -101,4 +101,32 @@ test('#449 celula: formato percentual e sinal ignoram a formatação monetária'
 
 test('#449 celula: valores grandes (1e9) não perdem casas nem separador', () => {
   assert.equal(celula(1e9, { comParenteses: false }), '1.000.000.000,00');
+});
+
+// ── #567: `negativoContabil` é o núcleo de sinal que `celula` (R$) e
+// `celulaProformaM2` (`frontend/tela-proforma.ts`, R$/m²) reusam, e
+// `sempreExibir` é a opção que a Proforma precisa e o Fluxo de Caixa não —
+// mostrar "0,00" numa linha-total que fecha em zero, em vez de célula vazia.
+
+test('#567 negativoContabil: custo sempre entra entre parênteses; receita/resultado só quando negativo', () => {
+  assert.equal(negativoContabil(100, true), true);
+  assert.equal(negativoContabil(-100, true), true);
+  assert.equal(negativoContabil(0, true), true);
+  assert.equal(negativoContabil(100, false), false);
+  assert.equal(negativoContabil(-100, false), true);
+  assert.equal(negativoContabil(0, false), false);
+});
+
+test('#567 celula: sempreExibir mostra "0,00"/"(0,00)" em vez de célula vazia abaixo de R$ 0,005', () => {
+  assert.equal(celula(0, { comParenteses: true, custo: true, sempreExibir: true }), '(0,00)');
+  assert.equal(celula(0, { comParenteses: true, custo: false, sempreExibir: true }), '0,00');
+  assert.equal(celula(0.004, { comParenteses: true, custo: true, sempreExibir: true }), '(0,00)');
+  // Sem `sempreExibir`, o limiar de R$ 0,005 do Fluxo de Caixa continua valendo.
+  assert.equal(celula(0, { comParenteses: true, custo: true }), '');
+});
+
+test('#567 celula: sempreExibir NÃO muda a notação — custo sempre parênteses, receita/resultado pelo sinal real', () => {
+  assert.equal(celula(-259_500_000, { comParenteses: true, custo: false, sempreExibir: true }), '(259.500.000,00)');
+  assert.equal(celula(259_500_000, { comParenteses: true, custo: false, sempreExibir: true }), '259.500.000,00');
+  assert.equal(celula(259_500_000, { comParenteses: true, custo: true, sempreExibir: true }), '(259.500.000,00)');
 });
