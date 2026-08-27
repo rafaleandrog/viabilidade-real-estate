@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctEntrada } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctEntrada, fmtM2 } from './viab-format.js';
 import {
   urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig,
   listarProdutosPreliminar, criarProdutoPreliminar, atualizarProdutoPreliminar, removerProdutoPreliminar,
@@ -355,6 +355,10 @@ export class ViabTelaPremissas extends LitElement {
     .area-seletor { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
     .area-seletor urbi-badge { cursor: pointer; flex: 0 0 auto; }
     .area-valor { width: 130px; }
+    /* Indicador de aproveitamento do coeficiente máximo (#569) — mesma faixa
+       de KPIs do Resumo (.kpis), logo abaixo da cascata da Incorporação. */
+    .kpis.aproveitamento { margin-top: 14px; }
+    urbi-banner.aviso-aproveitamento { display: block; margin-top: 12px; }
 
     /* Catálogo de Produtos (#315) — mesmo padrão de tabela dinâmica de
        tela-empreendimento-tipologias.ts: colgroup de larguras fixas, edição
@@ -540,6 +544,7 @@ export class ViabTelaPremissas extends LitElement {
           <div class="secao grupo grupo-b">
             <h4>Áreas</h4>
             ${lot ? this._renderTabelaAreasLoteamento(dis) : this._renderTabelaAreasIncorporacao(dis)}
+            ${!lot ? this._renderAproveitamentoCoeficiente() : nothing}
           </div>
 
           ${this._renderRodapeForm()}
@@ -1028,6 +1033,42 @@ export class ViabTelaPremissas extends LitElement {
           @urbi:input-numero-change=${(e: CustomEvent) => this._set(campo, e.detail.valor ?? 0)}
         ></viab-num>
       </div>
+    `;
+  }
+
+  /**
+   * §Indicador de aproveitamento do coeficiente máximo (#569, só Incorporação).
+   * Teto DERIVADO — sem persistência nova, sem coluna de schema —
+   * `areaTerreno × coef_aproveitamento_maximo` (calculado em
+   * `proforma.ts:calcularProforma`, campo `tetoAproveitamentoM2`). A grandeza
+   * "usada" é `p.areaPrivativa`: a MESMA soma das 4 parcelas PVT que a cascata
+   * logo acima chama "Área Privativa Total" (`privativa_total` em
+   * `CASCATA_INCORPORACAO`, `areas-cascata.ts`) — o teto fala de área privativa
+   * de VENDA construível, e essa é a candidata natural (decisão registrada no
+   * corpo do PR #569, não a Área Construída Total, que inclui área comum).
+   *
+   * Sem coeficiente preenchido (0/vazio), `tetoAproveitamentoM2` sai `null` do
+   * motor e o indicador não desenha nada — critério 3 da #569, sem divisão por
+   * zero e sem falso alarme.
+   */
+  private _renderAproveitamentoCoeficiente(): TemplateResult {
+    const p = calcularProforma(this._entradaProforma());
+    if (p.tetoAproveitamentoM2 === null) return html``;
+    return html`
+      <div class="kpis aproveitamento">
+        <urbi-kpi rotulo="Área privativa usada" .valor=${fmtM2(p.areaPrivativa)}></urbi-kpi>
+        <urbi-kpi rotulo="Teto do coeficiente máximo" .valor=${fmtM2(p.tetoAproveitamentoM2)}></urbi-kpi>
+        <urbi-kpi rotulo="Aproveitamento do coeficiente"
+          .valor=${p.pctAproveitamentoCoef === null ? '—' : fmtPct(p.pctAproveitamentoCoef)}
+          variante=${p.aproveitamentoExcedido ? 'erro' : ''}
+        ></urbi-kpi>
+      </div>
+      ${p.aproveitamentoExcedido ? html`
+        <urbi-banner class="aviso-aproveitamento" variante="alerta">
+          Área privativa usada (${fmtM2(p.areaPrivativa)}) ultrapassa o teto do coeficiente máximo
+          (${fmtM2(p.tetoAproveitamentoM2)}) — reveja o Coeficiente máximo ou as áreas privativas
+          acima.
+        </urbi-banner>` : nothing}
     `;
   }
 

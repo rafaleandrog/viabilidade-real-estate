@@ -987,8 +987,8 @@ export function componentesPagamento(fluxoPagamento: any, cronograma: EventoCron
 // reconciliadas mês a mês contra o oráculo dourado Calliandra
 // (`frontend/fixtures/calliandra-golden.ts`, #220). São o motor de cálculo
 // que o corpo de #230 previa para #232+, e desde a #283 ele É o caminho de
-// cálculo real: `calcularRecebiveisComponentes` (:1064) consolida as safras
-// de uma linha e `calcularFluxo` (:2025-2053) agrega principal, juros,
+// cálculo real: `calcularRecebiveisComponentes` (:1463) consolida as safras
+// de uma linha e `calcularFluxo` (:2593-2634) agrega principal, juros,
 // carteira, repasse e as séries por componente. A porta de entrada é
 // `fluxo_pagamento.componentes` na linha; sem ele, a linha segue pelo motor
 // legado (`entrada`/`parcelas`/`repasse`), que continua existindo para
