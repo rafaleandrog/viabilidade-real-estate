@@ -11,6 +11,10 @@ import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.j
 import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
 import { calcularCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
+// A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
+// do seu `_carregar()`, e que `tela-graficos.ts` reusa (PR 580/#597). Reusada,
+// e não recopiada: a cópia inline divergiria da função que o teste exercita.
+import { respostaAindaVale } from './viab-imagem-principal.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 import './viab-imagem-principal.js';
@@ -395,23 +399,47 @@ export class ViabTelaPremissas extends LitElement {
     if (ch.has('estudo') && this.estudo?.id !== this._idCarregado) this._init();
   }
 
+  /**
+   * #597 — mesma corrida que `tela-graficos.ts` teve (PR 580): navegar do
+   * estudo A para o B dispara uma 2ª `_init()` antes de a 1ª responder, e não
+   * há ordem garantida entre duas fetches HTTP. Sem guarda, a resposta de A
+   * podia chegar por último e sobrescrever `produtos`/`benchmarks`/
+   * `aliquotaRet` com o catálogo errado — silenciosamente, porque
+   * `_idCarregado` já tinha sido marcado para B e nada disparava recarga.
+   * Aqui o dano é maior que em `tela-graficos.ts`: a tela é editável, e um
+   * Salvar em cima do estado misturado grava o catálogo errado.
+   *
+   * `form`/`_snapshot`/`_dirty`/`erros`/`erroGeral` são atribuídos ANTES do
+   * `await` — síncronos, sempre do `estudo` corrente na hora da chamada, sem
+   * corrida possível. `produtos` é LIMPO na troca de estudo (mesmo padrão de
+   * `tela-graficos.ts`) para o catálogo de A não continuar na tela durante o
+   * carregamento de B. O `id` é capturado antes das chamadas e conferido
+   * depois (inclusive no `catch`), e a resposta que ficou para trás é
+   * descartada em silêncio — quem atualiza a tela é a chamada mais nova.
+   */
   private async _init() {
     if (!this.estudo) return;
-    this._idCarregado = this.estudo.id ?? null;
+    const id = this.estudo.id;
+    this._idCarregado = id ?? null;
     this.form = { ...this.estudo };
     this._snapshot = { ...this.estudo };
     this._dirty = false;
     this.erros = {};
     this.erroGeral = '';
+    this.produtos = [];
     try {
       const [bm, cfg, prod] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
         listarProdutosPreliminar(this.estudo.id),
       ]);
+      if (!respostaAindaVale(id, this.estudo?.id)) return; // o estudo mudou enquanto isto estava em voo
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
       this.produtos = prod?.dados || [];
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      if (!respostaAindaVale(id, this.estudo?.id)) return;
+      console.error(e);
+    }
   }
 
   private _entradaProforma(): ProformaInput {
