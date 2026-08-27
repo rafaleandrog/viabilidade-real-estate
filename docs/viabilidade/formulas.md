@@ -294,11 +294,11 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/tela-financeiro.ts:154` — `_n` (`casas-decimais="2"`) | 2 | ✅ |
 | `frontend/tela-empreendimento-tipologias.ts:178` | 2 (default) | ✅ |
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
-| `frontend/tela-proforma.ts:501` — sensibilidade, via `fmtR$(v, false)` | 2 | ✅ desde a #492 |
+| `frontend/tela-proforma.ts:523` — sensibilidade, via `fmtR$(v, false)` | 2 | ✅ desde a #492 |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
 | `frontend/fluxo-caixa-motor.ts:2125-2133` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
-| `frontend/tela-proforma.ts:358` — `_fmtContabil`, a coluna R$ da Proforma | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
+| `frontend/tela-proforma.ts:46` — `celulaProforma`, a coluna R$ da Proforma | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado (`_fmtContabil`) para função pura testável pela #567 |
 | `frontend/tela-fluxo-receitas.ts:485,486` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
 
 > 🟡 **O motor não é integralmente conforme ao C7, e marcar a linha inteira ✅ escondia isso.** As
@@ -315,14 +315,23 @@ dízima e retornar exatamente ao mesmo canônico.
 > conhecida, não como conformidade.
 
 > ✅ **Resolvido pela #449 (2026-08-24).** A #492 fechou o primeiro ponto (`fmtNum(v, 2)` da
-> tabela de sensibilidade, `frontend/tela-proforma.ts:501` desde então); o problema de fundo — quem
+> tabela de sensibilidade, `frontend/tela-proforma.ts:523` desde então); o problema de fundo — quem
 > chamava `fmtNum` **sem** o segundo argumento numa posição monetária (`_fmtContabil`, a coluna R$
 > da Proforma inteira; e `precoUnit`/`precoTotal` da alocação de receitas) — a #449 trocou por
 > `fmtR$(v, false)`, que fixa 2 casas sempre (`fmtNum` declara só `maximumFractionDigits`, então
 > "até 2" podia sair "0"). `fmtNum` em si **não mudou de assinatura** — continua servindo m²,
 > hectare, unidades e percentual, grandezas **não monetárias** que carregam precisão plena e
-> arredondam só para exibir; `_fmtContabilM2` (`frontend/tela-proforma.ts:369`, R$/m²) é da mesma
+> arredondam só para exibir; `celulaProformaM2` (`frontend/tela-proforma.ts:53`, R$/m²) é da mesma
 > família e continua fora do escopo do C7 monetário.
+>
+> ✅ **A #567 (2026-08-27) extraiu `_fmtContabil`/`_fmtContabilM2` — métodos privados de
+> `ViabTelaProforma`, sem teste algum — para as funções puras `celulaProforma`/`celulaProformaM2`
+> acima, e fechou um bug de SINAL que era ortogonal às casas decimais (por isso não mudava a tabela
+> acima): as duas versões antigas mostravam TODA linha de receita/resultado em `Math.abs`,
+> escondendo o sinal negativo de uma Receita operacional ou Resultado deficitários. Hoje as duas
+> delegam a decisão de parênteses para `negativoContabil`/`celula` (`frontend/viab-format.ts`) — a
+> MESMA regra que o Fluxo de Caixa usa: linha de custo sempre entre parênteses, linha de
+> receita/resultado só quando o valor é realmente negativo.
 
 
 

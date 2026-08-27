@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, celula, negativoContabil } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 import { exportarPDF, exportarExcel, avisoPermutaCapada } from './exportar.js';
@@ -13,7 +13,7 @@ import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
 // BUG7-10: 'receita' colapsa a Receita bruta (VGV) por tipo de unidade
 // cadastrada no catálogo de Produtos, mesmo padrão dos grupos de custo.
 type Grupo = 'receita' | 'deducoes' | 'direto' | 'indireto';
-interface Linha {
+export interface Linha {
   l: string; v: number;
   tipo?: 'receita' | 'consolidado' | 'resultado';
   natureza?: 'receita';   // #74: consolidado de receita (fundo verde)
@@ -22,6 +22,38 @@ interface Linha {
   semPermuta?: boolean;   // #10: linha "VGV sem permuta" (itálico, sub-linha de contexto)
   memo?: string;          // #8: descrição da conta, na 2ª coluna (menor, itálico)
   soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean;
+}
+
+// #567: receita (VGV, sub-linhas de produto, consolidados marcados
+// `natureza: 'receita'`) e resultado mostram o SINAL REAL — negativo entre
+// parênteses, positivo sem marca nenhuma. Toda outra linha (custo/dedução,
+// inclusive os headers `tipo: 'consolidado'` sem `natureza`, como "Custo
+// direto total") é notação contábil pura: SEMPRE entre parênteses,
+// independente do sinal — a app grava custo como valor positivo. Pura e
+// exportada para ser testável: era decidido inline dentro de dois métodos
+// privados que nenhum teste tocava.
+export function ehLinhaReceitaOuResultado(r: Pick<Linha, 'tipo' | 'natureza'>): boolean {
+  return r.tipo === 'receita' || r.natureza === 'receita' || r.tipo === 'resultado';
+}
+
+// Coluna R$ da Proforma: delega para `celula` (frontend/viab-format.ts) —
+// fonte única de 2 casas decimais (C7) e da regra de parênteses
+// (`negativoContabil`), a mesma que o Fluxo de Caixa usa. `sempreExibir`
+// porque a Proforma controla visibilidade por LINHA (`ocultarSeZero` no
+// `Linha`), não por célula perto de zero como o Fluxo de Caixa — um header
+// como "Custo indireto total" que fecha em zero precisa mostrar "(0,00)",
+// não sumir.
+export function celulaProforma(r: Pick<Linha, 'v' | 'tipo' | 'natureza'>): string {
+  return celula(r.v, { comParenteses: true, custo: !ehLinhaReceitaOuResultado(r), sempreExibir: true });
+}
+
+// Coluna R$/m²: mesma decisão de sinal (`negativoContabil`) que `celula`
+// usa — mas com a formatação numérica própria da coluna (`fmtNum`, sem "R$"
+// e sem "/m²": a unidade já está no cabeçalho "R$/m²"). #9/#33.
+export function celulaProformaM2(r: Pick<Linha, 'v' | 'tipo' | 'natureza'>, areaVendavel: number): string {
+  if (areaVendavel <= 0) return '—';
+  const abs = fmtNum(Math.abs(r.v / areaVendavel));
+  return negativoContabil(r.v, !ehLinhaReceitaOuResultado(r)) ? `(${abs})` : abs;
 }
 
 // BUG7-08: mesmo conjunto de variáveis estressáveis que o motor resolve —
@@ -93,6 +125,14 @@ export class ViabTelaProforma extends LitElement {
     .pf tr.consolidado.nat-receita td {
       background: color-mix(in srgb, var(--cor-sucesso) 14%, transparent);
       color: var(--cor-sucesso);
+    }
+    /* #567 — mesma linha, mas NEGATIVA (ex.: Receita operacional num estudo
+       deficitário): o verde fixo acima mentiria que é receita "boa". A classe
+       td.neg (mesma que já marca o Resultado negativo) sobrepõe pela
+       especificidade — precisa vir DEPOIS da regra acima. */
+    .pf tr.consolidado.nat-receita td.neg {
+      background: color-mix(in srgb, var(--cor-erro) 14%, transparent);
+      color: var(--cor-erro);
     }
     /* Tipo 3 — Resultado final (bold + grande + highlight forte). #13: espaço extra
        acima, separando o Resultado da última linha de custos (onde saiu o memo). */
@@ -350,31 +390,6 @@ export class ViabTelaProforma extends LitElement {
       : fmtPct(Math.abs(r.v) / p.vgv * 100);
   }
 
-  // Coluna R$ em notação contábil: sem "R$"; custos/deduções (itens e consolidados)
-  // entre parênteses; receita plana; resultado pelo sinal real (negativo entre
-  // parênteses). #77: consolidados de receita (Receita líquida/operacional, marcados
-  // com `natureza: 'receita'`) são valores de receita — exibidos planos (positivo),
-  // NUNCA entre parênteses, mesmo sendo `tipo: 'consolidado'`.
-  private _fmtContabil(r: Linha): string {
-    const abs = fmtR$(Math.abs(r.v), false);
-    if (r.tipo === 'receita' || r.natureza === 'receita') return abs;
-    if (r.tipo === 'resultado') return r.v < 0 ? `(${abs})` : abs;
-    return `(${abs})`;
-  }
-
-  // #9/#33: R$ por m² vendável em notação contábil — análogo a _fmtContabil, sem
-  // prefixo "R$" e SEM sufixo "/m²" no valor (a unidade já está no cabeçalho da
-  // coluna "R$/m²"): custos/deduções entre parênteses, receita plana, resultado
-  // pelo sinal real.
-  private _fmtContabilM2(r: Linha, p: Proforma): string {
-    if (p.areaVendavel <= 0) return '—';
-    const abs = fmtNum(Math.abs(r.v / p.areaVendavel));
-    // #77: consolidados de receita exibidos planos (positivo), sem parênteses.
-    if (r.tipo === 'receita' || r.natureza === 'receita') return abs;
-    if (r.tipo === 'resultado') return r.v < 0 ? `(${abs})` : abs;
-    return `(${abs})`;
-  }
-
   private _renderTabela(p: Proforma, lot: boolean, vgvBruto: number): TemplateResult {
     const linhas = this._linhas(p, vgvBruto).filter((r) =>
       !(r.soLot && !lot) && !(r.soInc && lot)
@@ -389,7 +404,12 @@ export class ViabTelaProforma extends LitElement {
           <tbody>
             ${linhas.map((r) => {
               const cls = `${r.tipo ?? 'item'}${r.semPermuta ? ' italico' : ''}${r.natureza ? ` nat-${r.natureza}` : ''}`;
-              const sinal = r.tipo === 'resultado' ? (r.v < 0 ? 'neg' : 'pos') : '';
+              // #567: marca de negativo (parênteses + classe `neg`) vale para
+              // toda linha de receita/resultado — antes só `tipo: 'resultado'`
+              // ganhava a classe, e "Receita líquida"/"Receita operacional"
+              // (`natureza: 'receita'`) num estudo deficitário ficavam sem
+              // nenhuma marca visual mesmo exibindo o valor negativo.
+              const sinal = ehLinhaReceitaOuResultado(r) ? (r.v < 0 ? 'neg' : 'pos') : '';
               return html`<tr class=${cls}>
                 <td>
                   ${r.toggle
@@ -399,8 +419,8 @@ export class ViabTelaProforma extends LitElement {
                   ${r.l}
                 </td>
                 <td class="desc">${r.memo ?? ''}</td>
-                <td class="num ${sinal}">${this._fmtContabil(r)}</td>
-                <td class="num ${sinal}">${this._fmtContabilM2(r, p)}</td>
+                <td class="num ${sinal}">${celulaProforma(r)}</td>
+                <td class="num ${sinal}">${celulaProformaM2(r, p.areaVendavel)}</td>
                 <td class="num ${sinal}">${this._pctVgv(r, p)}</td>
               </tr>`;
             })}

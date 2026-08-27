@@ -53,6 +53,27 @@ export interface OpcoesCelula {
    * quando positiva (o app grava custo como valor positivo). */
   custo?: boolean;
   formato?: FormatoCelula;
+  /** #567: quando true, NÃO some com o valor abaixo de R$ 0,005 — mostra
+   * "0,00"/"(0,00)" em vez de célula vazia. O Fluxo de Caixa usa célula vazia
+   * de propósito (mês sem movimento); a Proforma (`celulaProforma`,
+   * `frontend/tela-proforma.ts`) controla visibilidade por LINHA
+   * (`ocultarSeZero`), não por célula, e uma linha-total que fecha em zero
+   * precisa continuar mostrando "0,00", não sumir. */
+  sempreExibir?: boolean;
+}
+
+/**
+ * #567: núcleo da notação contábil — decide só se o valor entra entre
+ * parênteses (sem formatar número), para `celula` (R$, `fmtR$`) e
+ * `celulaProformaM2` (`frontend/tela-proforma.ts`, R$/m², `fmtNum`) reusarem
+ * a MESMA regra em vez de cada formatação numérica duplicá-la: linha de
+ * CUSTO sempre entre parênteses (a app grava custo como valor positivo, e a
+ * notação contábil marca despesa independente do sinal); linha de
+ * receita/resultado só entre parênteses quando o valor é REALMENTE negativo
+ * — nunca em módulo.
+ */
+export function negativoContabil(v: number, ehCusto: boolean): boolean {
+  return ehCusto || v < 0;
 }
 
 /**
@@ -62,20 +83,20 @@ export interface OpcoesCelula {
  * vazia e representação do negativo (C7 — `docs/viabilidade/formulas.md`).
  *
  * Regras: 2 casas decimais monetárias (`fmtR$`, contrato C7), célula vazia
- * abaixo de R$ 0,005, thousand separator pt-BR. `comParenteses=true` é a
- * notação contábil que a tabela sempre usou: negativo SEMPRE entre
- * parênteses, e positivo também quando `custo=true` (custo é gravado
- * positivo e a notação contábil marca despesa com parênteses independente
- * do sinal). `comParenteses=false` usa sinal de menos (`-100,00`) — o modo
- * que a linha informativa "antes do funding" da exportação usava.
+ * abaixo de R$ 0,005 (a menos que `sempreExibir`), thousand separator pt-BR.
+ * `comParenteses=true` é a notação contábil que a tabela sempre usou:
+ * negativo SEMPRE entre parênteses, e positivo também quando `custo=true`
+ * (`negativoContabil`, acima). `comParenteses=false` usa sinal de menos
+ * (`-100,00`) — o modo que a linha informativa "antes do funding" da
+ * exportação usava.
  */
 export function celula(v: number, opcoes: OpcoesCelula = { comParenteses: true }): string {
   if (opcoes.formato === 'percentual') return v ? fmtPct(v * 100) : '';
   if (opcoes.formato === 'sinal') return v ? 'sim' : '';
-  if (!v || Math.abs(v) < 0.005) return '';
+  if (!opcoes.sempreExibir && (!v || Math.abs(v) < 0.005)) return '';
   const abs = fmtR$(Math.abs(v), false);
   if (!opcoes.comParenteses) return v < 0 ? `-${abs}` : abs;
-  return opcoes.custo || v < 0 ? `(${abs})` : abs;
+  return negativoContabil(v, !!opcoes.custo) ? `(${abs})` : abs;
 }
 
 // Interpreta um número no formato pt-BR digitado pelo usuário: "." é separador
