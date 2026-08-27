@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, catalogoEfetivo, produtoCompoeCatalogo,
-  resumoCatalogoProdutos, tipoProdutoEfetivo,
+  resumoCatalogoProdutos, tipoProdutoEfetivo, totaisPorTipoProdutos, areaTotalProdutos,
   type ProformaInput,
 } from './proforma.js';
 
@@ -16,9 +16,9 @@ const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 // R$ 1.000 × 250 lotes = R$ 75.000.000, com 250 unidades. Todos os números
 // conferidos à mão abaixo continuam valendo sem alteração.
 //
-// `area_media_lote_m2` e `preco_venda_m2` ficam no fixture porque a permuta
-// física ainda lê o preço legado do tipo (interim do #315) — não porque
-// alimentem receita.
+// `area_media_lote_m2` e `preco_venda_m2` ficam no fixture porque governam o
+// estudo SEM catálogo (a permuta física lê o preço legado ali, #570) — não
+// porque alimentem receita quando há catálogo.
 const LOT: ProformaInput = {
   tipo_empreendimento: 'loteamento',
   terreno_manual_area: 100000,
@@ -165,9 +165,10 @@ test('origem Núcleo: área vem de area_terreno_nucleo (ignora terreno_manual_ar
 // exatamente o fallback que deixou de existir. O catálogo abaixo reproduz os
 // mesmos R$ 11.600.000 (10M residenciais + 1,6M não residenciais), e as
 // asserções de ÁREA — que sempre saíram dos campos de área, não do fallback —
-// ficam idênticas. A separação R/NR do VGV não sobreviveu porque o catálogo é
-// bucket único; o teste do estado vazio, logo abaixo, cobre o que era o outro
-// lado deste.
+// ficam idênticas. A separação R/NR do VGV voltou pela #570 — as duas linhas
+// do catálogo aqui são residenciais (nenhuma leva `tipo`), então o VGV inteiro
+// sai em `vgvResidencial`; o teste do estado vazio, logo abaixo, cobre o que
+// era o outro lado deste.
 test('incorporação: o VGV vem do catálogo; as áreas continuam vindo dos campos de área', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',
@@ -378,30 +379,36 @@ test('incorporação: permuta física reduz VGV proporcionalmente e o resultado 
 // Migrado: o VGV bruto (10M residenciais + 4M não residenciais = 14M) veio
 // para o catálogo. A separação R/NR que este teste prova é a da PERMUTA — área
 // e VGV entregues de cada tipo —, e ela continua inteira: são os dois pares de
-// campos legados de permuta, cada um com o preço do seu tipo. O que o catálogo
-// não separa é o VGV, que passa a sair inteiro em `vgvResidencial`; o TOTAL
-// líquido (12,6M) é o mesmo de antes.
+// campos legados de permuta, cada um sobre a base da sua categoria.
+//
+// #570: as bases (área e preço) saem AGORA do catálogo da categoria, não mais
+// dos campos legados. O fixture foi montado para que os dois caminhos deem o
+// MESMO número — a área do catálogo R (100 × 10 = 1.000 m²) é igual a
+// `area_pvt_r_fechada`, e o preço médio R (10M ÷ 1.000) é igual a
+// `preco_venda_m2_residencial`; idem NR. Assim o que muda de veredito neste
+// teste é só o que a issue pediu: os dois VGV deixam de ser "14M em R e 0 em
+// NR" e passam a ser 9M em R e 3,6M em NR. O TOTAL (12,6M) não se move.
 test('incorporação: permuta física R e NR separadas reduzem cada VGV (#10)', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',
-    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,    // preço da permuta R
-    area_pvt_nr_fechada: 500, preco_venda_m2_nao_residencial: 8000, // preço da permuta NR
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,    // legado: idêntico ao catálogo R
+    area_pvt_nr_fechada: 500, preco_venda_m2_nao_residencial: 8000, // legado: idêntico ao catálogo NR
     produtos: [
-      { area_media_m2: 100, preco_venda_m2: 10000, unidades: 10 }, // VGV bruto R = 10M
-      { area_media_m2: 100, preco_venda_m2: 8000, unidades: 5 },   // VGV bruto NR =  4M
+      { area_media_m2: 100, preco_venda_m2: 10000, unidades: 10 },  // R (default): VGV 10M, 1.000 m²
+      { area_media_m2: 100, preco_venda_m2: 8000, unidades: 5, tipo: 'nao_residencial' }, // NR: VGV 4M, 500 m²
     ],
-    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,     // R: 10% de 1000 = 100 m²
+    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,     // R: 10% de 1.000 = 100 m²
     permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 50,  // NR: 50 m²
   });
   assert.ok(perto(p.areaPermutaResidencial, 100), `areaR=${p.areaPermutaResidencial}`);
   assert.ok(perto(p.areaPermutaNaoResidencial, 50), `areaNR=${p.areaPermutaNaoResidencial}`);
   assert.ok(perto(p.areaPermutaFisica, 150));
-  assert.equal(p.permutaCapada, false, '1,4M de permuta cabe nos 14M de base — nada a capar');
+  assert.equal(p.permutaCapada, false, '1M cabe nos 10M de R e 0,4M cabe nos 4M de NR — nada a capar');
   assert.ok(perto(p.vgvPermutaResidencial, 1_000_000), `vgvPermR=${p.vgvPermutaResidencial}`);     // 100 × 10000
   assert.ok(perto(p.vgvPermutaNaoResidencial, 400_000), `vgvPermNR=${p.vgvPermutaNaoResidencial}`); // 50 × 8000
-  // VGV líquido = 14M − 1M − 0,4M = 12,6M, o mesmo total de antes do catálogo.
-  assert.ok(perto(p.vgvResidencial, 12_600_000));
-  assert.ok(perto(p.vgvNaoResidencial, 0));
+  // #570: cada categoria líquida da SUA permuta — 10M − 1M e 4M − 0,4M.
+  assert.ok(perto(p.vgvResidencial, 9_000_000), `vgvR=${p.vgvResidencial}`);
+  assert.ok(perto(p.vgvNaoResidencial, 3_600_000), `vgvNR=${p.vgvNaoResidencial}`);
   assert.ok(perto(p.vgv, 12_600_000), `vgv=${p.vgv}`);
 });
 
@@ -417,7 +424,7 @@ test('BUG7-07: identidade "vgv + permutas" reconstrói o VGV bruto com o canôni
     area_pvt_nr_fechada: 500, preco_venda_m2_nao_residencial: 8000,  // preço da permuta NR
     produtos: [
       { area_media_m2: 100, preco_venda_m2: 10000, unidades: 10 },   // VGV bruto R = 10M
-      { area_media_m2: 100, preco_venda_m2: 8000, unidades: 5 },     // VGV bruto NR = 4M
+      { area_media_m2: 100, preco_venda_m2: 8000, unidades: 5, tipo: 'nao_residencial' }, // VGV bruto NR = 4M
     ],
     // Canônico preenchido diretamente (como _editarCustoUnidade grava a cada
     // digitação) — SEM os campos legados equivalentes, para provar que o
@@ -466,8 +473,8 @@ test('incorporação: nº de unidades soma as linhas do catálogo (#2)', () => {
 
 // Substituído pelo teste do estado vazio: este provava exatamente o fallback
 // legado — nº e preço médio por tipo saindo de num_unidades_* × preco_venda_m2_*,
-// quatro campos sem UI. O detalhe por tipo COM catálogo (bucket único em
-// Residencial) já é coberto por "catálogo com múltiplos produtos", abaixo.
+// quatro campos sem UI. O detalhe por tipo COM catálogo é coberto pelo bloco da
+// #570, no fim do arquivo.
 test('sem catálogo: o detalhe por tipo não sai de num_unidades_* nem dos preços legados', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',
@@ -624,13 +631,15 @@ test('#565: tipoProdutoEfetivo — produto LEGADO (sem `tipo`) cai em Residencia
   assert.equal(tipoProdutoEfetivo({ tipo: null as any }), 'residencial');
   assert.equal(tipoProdutoEfetivo({ tipo: 'residencial' }), 'residencial');
   assert.equal(tipoProdutoEfetivo({ tipo: 'nao_residencial' }), 'nao_residencial');
-  // Valor inesperado (nunca deveria chegar do backend, mas não é fail-loud
-  // aqui — este campo ainda não alimenta cálculo, ver #570) também cai em
-  // Residencial, não trava.
+  // Valor fora do domínio (o `opcoes` da coluna barra na escrita) também cai
+  // em Residencial: desde a #570 este campo governa cálculo, e a escolha é
+  // classificar em vez de derrubar a Proforma inteira.
   assert.equal(tipoProdutoEfetivo({ tipo: 'lixo' as any }), 'residencial');
 });
 
-test('#315: catálogo com múltiplos produtos (incorporação) — VGV combinado em bucket único', () => {
+// Duas linhas SEM `tipo`: o catálogo inteiro é residencial por default (#565),
+// e é assim que todo estudo anterior à migração `035` continua sendo lido.
+test('#315: catálogo com múltiplos produtos (incorporação) — VGV combinado, todas as linhas residenciais', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',
     produtos: [
@@ -640,17 +649,21 @@ test('#315: catálogo com múltiplos produtos (incorporação) — VGV combinado
   });
   assert.ok(perto(p.vgv, 11_600_000), `vgv=${p.vgv}`);
   assert.equal(p.numUnidades, 14);
-  // #315: interim — bucket único (residencial); NR zerado até #317/#320.
+  // Nenhuma linha é NR: as 14 unidades e o VGV todo ficam em Residencial.
   assert.equal(p.numUnidadesResidencial, 14);
   assert.equal(p.numUnidadesNaoResidencial, 0);
   assert.ok(perto(p.vgvNaoResidencial, 0));
 });
 
-test('#315: permuta física continua deduzindo o VGV quando produtos está presente (preço vem do campo legado — interim até #317)', () => {
+// #570: o preço da permuta passou a ser o médio do catálogo da categoria. Aqui
+// os dois coincidem em R$ 1.000/m² (75M ÷ 75.000 m²), então o número não muda —
+// o teste do Loteamento COM catálogo divergente, no bloco da #570, é o que
+// separa as duas fontes.
+test('#315: permuta física continua deduzindo o VGV quando produtos está presente', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'loteamento',
     terreno_manual_area: 100000,
-    preco_venda_m2: 1000, // interim: permuta física ainda lê o preço legado, não o catálogo
+    preco_venda_m2: 1000, // legado: idêntico ao preço médio do catálogo abaixo
     produtos: [{ area_media_m2: 300, preco_venda_m2: 1000, unidades: 250 }], // VGV bruto 75.000.000
     permuta_fisica_area_m2: 3000, // 3.000 m² × 1000 R$/m² = 3.000.000
   });
@@ -678,7 +691,13 @@ test('BUG7-08 preco: escala precoLot (loteamento) e precoR/precoNR (incorporaç�
     tipo_empreendimento: 'incorporacao',
     area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,
     area_pvt_nr_fechada: 500, preco_venda_m2_nao_residencial: 8000,
-    produtos: [{ area_media_m2: 100, preco_venda_m2: 10000, unidades: 100 }], // base 100M, sem cap
+    // #570: o preço que valora a permuta é o médio da categoria NO CATÁLOGO —
+    // montado aqui igual ao legado (10.000 em R, 8.000 em NR) para o fator
+    // continuar sendo a única variável do teste. Bases folgadas, sem cap.
+    produtos: [
+      { area_media_m2: 100, preco_venda_m2: 10000, unidades: 100 },  // R: 100M
+      { area_media_m2: 100, preco_venda_m2: 8000, unidades: 50, tipo: 'nao_residencial' }, // NR: 40M
+    ],
     permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 100,
     permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 50,
     sensibilidade: { variavel: 'preco', fator: 0.9 },
@@ -850,13 +869,19 @@ test('permuta física igual à base: VGV zera sem capar — o limite exato não 
   assert.ok(perto(p.vgvPermutaResidencial, VGV_PRINT), `vgvPermR=${p.vgvPermutaResidencial}`);
 });
 
+// #570: o modo tem que ser o m² ABSOLUTO aqui. Com o % incidindo sobre a área
+// do catálogo da categoria, "100%" passou a valer exatamente o VGV bruto dela —
+// nunca mais que ele —, e o cap deixou de ser alcançável por esse caminho. Quem
+// ainda pode exceder é o m² digitado (este caso), o valor canônico e o fator de
+// sensibilidade. O excedente medido é o mesmo do print: pede-se a área inteira
+// sobre um catálogo que tem metade dela.
 test('permuta física maior que a base: a efetiva é capada, o VGV para em zero e o aviso liga', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',
     area_pvt_r_fechada: AREA_PERMUTA_PRINT, preco_venda_m2_residencial: PRECO_PRINT,
-    // Base menor que a permuta: metade das unidades do teste acima.
+    // Base menor que a permuta: metade da área do teste acima.
     produtos: [{ area_media_m2: AREA_PERMUTA_PRINT / 2, preco_venda_m2: PRECO_PRINT, unidades: 1 }],
-    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 100,
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: AREA_PERMUTA_PRINT,
   });
   assert.equal(p.permutaCapada, true, 'o excedente tem que ser sinalizado');
   assert.ok(perto(p.vgvPermutaSolicitada, VGV_PRINT), `solicitada=${p.vgvPermutaSolicitada}`);
@@ -900,23 +925,55 @@ test('reconstituição do print: catálogo com produto em branco + permuta de 10
   assert.equal(p.marketing, 0);
 });
 
-test('permuta física R e NR acima da base: o corte é proporcional e preserva a divisão entre os dois', () => {
+// ⚠️ DECISÃO #570 — o cap é POR CATEGORIA, e este par de testes é a prova.
+//
+// Antes, o cap era global (a soma das duas permutas contra a soma do catálogo)
+// e o corte, proporcional entre R e NR. Com bases separadas isso deixaria o
+// excedente de uma categoria comendo o VGV da outra — e `vgvNaoResidencial`
+// deixaria de ser a base que a permuta financeira NR precisa.
+test('#570: cada categoria capa na PRÓPRIA base — as duas excedendo, cada uma para em zero', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',
-    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10000,     // solicita 6M
-    area_pvt_nr_fechada: 500, preco_venda_m2_nao_residencial: 8000,  // solicita 2M
-    produtos: [{ area_media_m2: 100, preco_venda_m2: 10000, unidades: 4 }], // base 4M
-    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 600,
-    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 250,
+    produtos: [
+      { area_media_m2: 100, preco_venda_m2: 10000, unidades: 4 },   // R:  400 m², 4M
+      { area_media_m2: 100, preco_venda_m2: 8000, unidades: 2, tipo: 'nao_residencial' }, // NR: 200 m², 1,6M
+    ],
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 600,        // R:  600 × 10.000 = 6M > 4M
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 250,  // NR: 250 ×  8.000 = 2M > 1,6M
   });
   assert.equal(p.permutaCapada, true);
   assert.ok(perto(p.vgvPermutaSolicitada, 8_000_000), `solicitada=${p.vgvPermutaSolicitada}`);
-  // Metade de cada: 4M de base sobre 8M pedidos.
-  assert.ok(perto(p.vgvPermutaResidencial, 3_000_000), `R=${p.vgvPermutaResidencial}`);
-  assert.ok(perto(p.vgvPermutaNaoResidencial, 1_000_000), `NR=${p.vgvPermutaNaoResidencial}`);
+  // Cada uma capa no próprio VGV bruto — nada de fator proporcional comum.
+  assert.ok(perto(p.vgvPermutaResidencial, 4_000_000), `R=${p.vgvPermutaResidencial}`);
+  assert.ok(perto(p.vgvPermutaNaoResidencial, 1_600_000), `NR=${p.vgvPermutaNaoResidencial}`);
+  assert.equal(p.vgvResidencial, 0);
+  assert.equal(p.vgvNaoResidencial, 0);
   assert.equal(p.vgv, 0);
   const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
-  assert.ok(perto(vgvBruto, 4_000_000), `vgvBruto=${vgvBruto}`);
+  assert.ok(perto(vgvBruto, 5_600_000), `vgvBruto=${vgvBruto}`);
+});
+
+// O caso que separa as duas regras: SÓ o NR excede. Sob o cap global antigo, o
+// corte proporcional teria mordido também a permuta residencial (e, com o VGV
+// em bucket único, o excedente NR sairia do VGV residencial). Aqui o VGV
+// residencial não sente nada.
+test('#570: excedente de UMA categoria não come o VGV da outra', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    produtos: [
+      { area_media_m2: 100, preco_venda_m2: 10000, unidades: 4 },   // R:  400 m², 4M
+      { area_media_m2: 100, preco_venda_m2: 8000, unidades: 2, tipo: 'nao_residencial' }, // NR: 200 m², 1,6M
+    ],
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 100,        // R:  1M, cabe nos 4M
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 250,  // NR: 2M, excede os 1,6M
+  });
+  assert.equal(p.permutaCapada, true, 'o excedente do NR tem que ligar o aviso');
+  assert.ok(perto(p.vgvPermutaResidencial, 1_000_000), `R=${p.vgvPermutaResidencial}`);
+  assert.ok(perto(p.vgvPermutaNaoResidencial, 1_600_000), `NR capado na própria base=${p.vgvPermutaNaoResidencial}`);
+  // A prova: o VGV residencial é 4M − 1M, intocado pelo excedente do NR.
+  assert.ok(perto(p.vgvResidencial, 3_000_000), `vgvR=${p.vgvResidencial}`);
+  assert.equal(p.vgvNaoResidencial, 0, 'a categoria capada é a que para em zero');
+  assert.ok(perto(p.vgv, 3_000_000), `vgv=${p.vgv}`);
 });
 
 test('loteamento também é capado — o estado vazio e o cap valem nos dois padrões', () => {
@@ -946,27 +1003,40 @@ test('loteamento também é capado — o estado vazio e o cap valem nos dois pad
 
 // ── Quantização do cap: a identidade tem de valer ao CENTAVO ─────────────
 //
-// O corte proporcional produz frações de centavo, e três arredondamentos
-// independentes não somam de volta à base. O caso abaixo é o mínimo que
-// quebra: base de R$ 0,01 com as duas permutas pedindo o mesmo valor. O fator
-// 0,5 dá R$ 0,005 em cada, que sobe para R$ 0,01 nas duas — R$ 0,02 de
-// permuta sobre uma base de R$ 0,01, o dobro.
-test('cap com meio centavo: a identidade fecha EXATAMENTE, sem resíduo de arredondamento', () => {
+// O caso histórico do #563 era o corte PROPORCIONAL sobre um cap global: com
+// base de R$ 0,01 e as duas permutas pedindo o mesmo, o fator 0,5 dava R$ 0,005
+// em cada, que subia para R$ 0,01 nas duas — R$ 0,02 de permuta sobre uma base
+// de R$ 0,01, o dobro. O cap por categoria (#570) apagou o fator proporcional,
+// mas a exigência continua a mesma e é ela que se afere aqui: cada VGV é o
+// RESÍDUO da sua base quantizada menos a sua permuta quantizada, então as duas
+// identidades por categoria fecham EXATAMENTE, com entradas de fração de
+// centavo dos dois lados.
+test('cap com meio centavo: a identidade fecha EXATAMENTE em cada categoria, sem resíduo', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',
-    // Permutas iguais em valor: 1 m² × R$ 0,01 de cada lado = R$ 0,02 pedidos.
-    area_pvt_r_fechada: 1, preco_venda_m2_residencial: 0.01,
-    area_pvt_nr_fechada: 1, preco_venda_m2_nao_residencial: 0.01,
-    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 1,
-    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 1,
-    // Base de exatamente R$ 0,01.
-    produtos: [{ area_media_m2: 1, preco_venda_m2: 0.01, unidades: 1 }],
+    // Base de exatamente R$ 0,005 em cada categoria — meio centavo, o valor que
+    // arredonda para cima e produzia o resíduo.
+    produtos: [
+      { area_media_m2: 1, preco_venda_m2: 0.005, unidades: 1 },
+      { area_media_m2: 1, preco_venda_m2: 0.005, unidades: 1, tipo: 'nao_residencial' },
+    ],
+    // Permuta de 4 m² em cada lado: R$ 0,02 pedidos sobre R$ 0,005 de base. O
+    // excedente é real AO CENTAVO (0,02 > 0,01), que é o limiar do aviso — a
+    // comparação é quantizada de propósito, para excedente de meio centavo não
+    // virar ruído na tela.
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 4,
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 4,
   });
   assert.equal(p.permutaCapada, true);
   assert.equal(p.vgv, 0);
-  // A soma das três parcelas é a base, ao centavo — não R$ 0,02.
+  // As duas identidades por categoria, cada uma ao centavo.
+  assert.equal(p.vgvResidencial + p.vgvPermutaResidencial, 0.01,
+    `R: ${p.vgvResidencial} + ${p.vgvPermutaResidencial}`);
+  assert.equal(p.vgvNaoResidencial + p.vgvPermutaNaoResidencial, 0.01,
+    `NR: ${p.vgvNaoResidencial} + ${p.vgvPermutaNaoResidencial}`);
+  // E o total: R$ 0,02 de base, não R$ 0,04.
   const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
-  assert.equal(vgvBruto, 0.01, `vgvBruto=${vgvBruto} (esperado 0,01 — o dobro seria o resíduo)`);
+  assert.equal(vgvBruto, 0.02, `vgvBruto=${vgvBruto} (o dobro seria o resíduo)`);
   // E cada parcela continua sendo um valor de 2 casas.
   for (const v of [p.vgv, p.vgvPermutaResidencial, p.vgvPermutaNaoResidencial]) {
     assert.equal(Math.round(v * 100) / 100, v, `parcela fora do contrato de 2 casas: ${v}`);
@@ -976,15 +1046,20 @@ test('cap com meio centavo: a identidade fecha EXATAMENTE, sem resíduo de arred
 test('a identidade fecha ao centavo mesmo SEM cap, com parcelas de fração de centavo', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',
-    area_pvt_r_fechada: 1, preco_venda_m2_residencial: 0.333,
-    area_pvt_nr_fechada: 1, preco_venda_m2_nao_residencial: 0.333,
+    // Preço de fração de centavo nas duas categorias, base folgada: a permuta
+    // de 1 m² vale R$ 0,333 de cada lado e nenhuma das duas capa.
+    produtos: [
+      { area_media_m2: 100, preco_venda_m2: 0.333, unidades: 1 },
+      { area_media_m2: 100, preco_venda_m2: 0.333, unidades: 1, tipo: 'nao_residencial' },
+    ],
     permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 1,
     permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 1,
-    produtos: [{ area_media_m2: 100, preco_venda_m2: 1, unidades: 1 }], // base 100, folgada
   });
   assert.equal(p.permutaCapada, false);
+  assert.equal(p.vgvResidencial + p.vgvPermutaResidencial, 33.3, `R=${p.vgvResidencial}`);
+  assert.equal(p.vgvNaoResidencial + p.vgvPermutaNaoResidencial, 33.3, `NR=${p.vgvNaoResidencial}`);
   const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
-  assert.equal(vgvBruto, 100, `vgvBruto=${vgvBruto}`);
+  assert.equal(vgvBruto, 66.6, `vgvBruto=${vgvBruto}`);
 });
 
 // A DECISÃO de não capar as áreas (só o valor) tem uma consequência: com a
@@ -1007,4 +1082,258 @@ test('permuta maior que a área vendável: a área líquida negativa não contam
   assert.ok(p.vgvPermutaResidencial >= 0 && p.vgvPermutaNaoResidencial >= 0);
   // A área informada é preservada — é a decisão de desenho, e o aviso a declara.
   assert.ok(perto(p.areaPermutaFisica, 300));
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #570 — as duas permutas incidem sobre o total da SUA categoria no catálogo
+//
+// Antes desta issue o catálogo era um bucket único: `vgvNaoResidencial` saía
+// sempre 0 (e a permuta financeira NR, em % de zero, não deduzia nada), e a
+// permuta física era medida e valorada pelos campos LEGADOS de área e preço —
+// os mesmos que a reestruturação do Preliminar tirou da tela. O motor calculava
+// a receita de um projeto e a permuta de outro.
+//
+// ⚠️ Todo fixture abaixo põe os campos legados em valores ABSURDOS de propósito
+// (área 9.999 m², preço R$ 1,00/m²). Qualquer número que bata com eles é prova
+// de que a fonte errada venceu — é essa a mutação que estes testes detectam.
+const MISTO: ProformaInput = {
+  tipo_empreendimento: 'incorporacao',
+  area_pvt_r_fechada: 9999, preco_venda_m2_residencial: 1,
+  area_pvt_nr_fechada: 7777, preco_venda_m2_nao_residencial: 2,
+  produtos: [
+    { area_media_m2: 100, preco_venda_m2: 10_000, unidades: 6 },  // R (default): 600 m², 6,0M
+    { area_media_m2: 50, preco_venda_m2: 12_000, unidades: 8 },   // R (default): 400 m², 4,8M
+    { area_media_m2: 200, preco_venda_m2: 5_000, unidades: 5, tipo: 'nao_residencial' }, // NR: 1.000 m², 5,0M
+  ],
+};
+// R: 1.000 m², R$ 10.800.000, preço médio ponderado 10.800/m², 14 unidades.
+// NR: 1.000 m², R$ 5.000.000, preço médio 5.000/m², 5 unidades.
+
+test('#570 totaisPorTipoProdutos: VGV, unidades, área e preço médio de cada categoria', () => {
+  const t = totaisPorTipoProdutos(MISTO.produtos);
+  assert.ok(perto(t.residencial.vgv, 10_800_000), `R.vgv=${t.residencial.vgv}`);
+  assert.equal(t.residencial.unidades, 14);
+  assert.ok(perto(t.residencial.areaTotalM2, 1000), `R.area=${t.residencial.areaTotalM2}`);
+  // Ponderado pela ÁREA (10,8M ÷ 1.000), não a média simples de 10.000 e 12.000.
+  assert.ok(perto(t.residencial.precoMedioM2!, 10_800), `R.preco=${t.residencial.precoMedioM2}`);
+  assert.ok(perto(t.nao_residencial.vgv, 5_000_000), `NR.vgv=${t.nao_residencial.vgv}`);
+  assert.equal(t.nao_residencial.unidades, 5);
+  assert.ok(perto(t.nao_residencial.areaTotalM2, 1000));
+  assert.ok(perto(t.nao_residencial.precoMedioM2!, 5_000));
+});
+
+test('#570 areaTotalProdutos: Σ área média × unidades, e lista vazia/ausente devolve 0', () => {
+  assert.ok(perto(areaTotalProdutos(MISTO.produtos), 2000), `area=${areaTotalProdutos(MISTO.produtos)}`);
+  assert.equal(areaTotalProdutos([]), 0);
+  assert.equal(areaTotalProdutos(undefined), 0);
+  // Coluna vazia é 0, não NaN — `Number(null)` é 0, `Number(undefined)` é NaN.
+  assert.equal(areaTotalProdutos([{ area_media_m2: null, unidades: undefined }]), 0);
+});
+
+test('#570 totaisPorTipoProdutos: categoria vazia devolve preço null (nunca 0) e linha em branco não entra', () => {
+  const t = totaisPorTipoProdutos([
+    { area_media_m2: 100, preco_venda_m2: 1_000, unidades: 2 },
+    { area_media_m2: null, preco_venda_m2: null, unidades: 0, tipo: 'nao_residencial' }, // em branco
+  ]);
+  assert.ok(perto(t.residencial.vgv, 200_000));
+  assert.equal(t.nao_residencial.vgv, 0);
+  assert.equal(t.nao_residencial.areaTotalM2, 0);
+  assert.equal(t.nao_residencial.precoMedioM2, null, 'preço 0 pareceria "vende de graça"');
+});
+
+test('#570 critério 1: o VGV de cada categoria sai do `tipo` de cada produto', () => {
+  const p = calcularProforma(MISTO);
+  assert.ok(perto(p.vgvResidencial, 10_800_000), `vgvR=${p.vgvResidencial}`);
+  assert.ok(perto(p.vgvNaoResidencial, 5_000_000), `vgvNR=${p.vgvNaoResidencial}`);
+  assert.ok(perto(p.vgv, 15_800_000), `vgv=${p.vgv}`);
+  // O detalhe por tipo acompanha — antes contava as 19 unidades em Residencial
+  // e mostrava preço médio NR zerado ao lado de um VGV NR que existia.
+  assert.equal(p.numUnidadesResidencial, 14);
+  assert.equal(p.numUnidadesNaoResidencial, 5);
+  assert.ok(perto(p.precoMedioUnidadeResidencial, 10_800_000 / 14), `pmR=${p.precoMedioUnidadeResidencial}`);
+  assert.ok(perto(p.precoMedioUnidadeNaoResidencial, 1_000_000), `pmNR=${p.precoMedioUnidadeNaoResidencial}`);
+});
+
+test('#570 critério 2: o modo "% área venda" incide sobre a ÁREA da categoria no catálogo', () => {
+  const p = calcularProforma({
+    ...MISTO,
+    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,       // 10% de 1.000 m² = 100
+    permuta_fisica_nr_modo: 'pct_area_venda', permuta_fisica_nr_pct: 20, // 20% de 1.000 m² = 200
+  });
+  // A base publicada pelo motor é a do catálogo, não `area_pvt_*_fechada`.
+  assert.ok(perto(p.areaBasePermutaResidencial, 1000), `baseR=${p.areaBasePermutaResidencial}`);
+  assert.ok(perto(p.areaBasePermutaNaoResidencial, 1000), `baseNR=${p.areaBasePermutaNaoResidencial}`);
+  // 10% de 9.999 seria 999,9 m² — o número que a fonte legada produziria.
+  assert.ok(perto(p.areaPermutaResidencial, 100), `areaR=${p.areaPermutaResidencial}`);
+  assert.ok(perto(p.areaPermutaNaoResidencial, 200), `areaNR=${p.areaPermutaNaoResidencial}`);
+});
+
+test('#570 critério 4: a permuta física é valorada pelo preço médio da SUA categoria', () => {
+  const p = calcularProforma({
+    ...MISTO,
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 100,
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 200,
+  });
+  // 100 m² × 10.800 (média ponderada de R), não × R$ 1,00 do campo legado.
+  assert.ok(perto(p.vgvPermutaResidencial, 1_080_000), `permR=${p.vgvPermutaResidencial}`);
+  // 200 m² × 5.000 (NR), não × R$ 2,00 do campo legado.
+  assert.ok(perto(p.vgvPermutaNaoResidencial, 1_000_000), `permNR=${p.vgvPermutaNaoResidencial}`);
+  assert.ok(perto(p.vgvPermutaSolicitada, 2_080_000), `solicitada=${p.vgvPermutaSolicitada}`);
+  assert.equal(p.permutaCapada, false);
+  // Cada VGV líquido da sua permuta; as duas identidades fecham.
+  assert.ok(perto(p.vgvResidencial, 10_800_000 - 1_080_000), `vgvR=${p.vgvResidencial}`);
+  assert.ok(perto(p.vgvNaoResidencial, 5_000_000 - 1_000_000), `vgvNR=${p.vgvNaoResidencial}`);
+  assert.ok(perto(p.vgvResidencial + p.vgvPermutaResidencial, 10_800_000));
+  assert.ok(perto(p.vgvNaoResidencial + p.vgvPermutaNaoResidencial, 5_000_000));
+  assert.ok(perto(p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial, 15_800_000));
+});
+
+// O defeito nominal do item 3 da planilha: a % de permuta financeira NR incidia
+// sobre `vgvNaoResidencial`, que era zero por construção — o campo existia na
+// tela, aceitava valor, e não deduzia nada.
+test('#570 critério 3: a permuta financeira de cada tipo incide sobre o VGV da SUA categoria', () => {
+  const p = calcularProforma({
+    ...MISTO,
+    permuta_financeira_residencial_pct: 5,      // 5% de 10,8M = 540.000
+    permuta_financeira_nao_residencial_pct: 10, // 10% de 5,0M = 500.000 (antes: 0)
+  });
+  assert.ok(perto(p.permutaFinResidencial, 540_000), `finR=${p.permutaFinResidencial}`);
+  assert.ok(perto(p.permutaFinNaoResidencial, 500_000), `finNR=${p.permutaFinNaoResidencial}`);
+  // E as duas chegam à receita líquida.
+  const semPermutas = calcularProforma(MISTO);
+  assert.ok(perto(semPermutas.receitaLiquida - p.receitaLiquida, 1_040_000),
+    `dif=${semPermutas.receitaLiquida - p.receitaLiquida}`);
+});
+
+test('#570 cap por categoria — fronteira: permuta que vale EXATAMENTE a base não é excedente', () => {
+  const p = calcularProforma({
+    ...MISTO,
+    // 1.000 m² de R = a área inteira da categoria; 1.000 m² de NR, idem.
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 1000,
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 1000,
+  });
+  assert.equal(p.permutaCapada, false, 'igual à base não é excedente (">", não ">=")');
+  assert.ok(perto(p.vgvPermutaResidencial, 10_800_000));
+  assert.ok(perto(p.vgvPermutaNaoResidencial, 5_000_000));
+  assert.equal(p.vgvResidencial, 0);
+  assert.equal(p.vgvNaoResidencial, 0);
+  assert.equal(p.vgv, 0);
+});
+
+test('#570 cap por categoria — um m² a mais em UMA categoria já liga o aviso', () => {
+  const p = calcularProforma({
+    ...MISTO,
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 1001,      // excede R
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 900, // cabe em NR
+  });
+  assert.equal(p.permutaCapada, true);
+  assert.ok(perto(p.vgvPermutaResidencial, 10_800_000), 'capado na base de R');
+  assert.ok(perto(p.vgvPermutaNaoResidencial, 900 * 5_000), 'NR não é tocado pelo excedente de R');
+  assert.equal(p.vgvResidencial, 0);
+  assert.ok(perto(p.vgvNaoResidencial, 5_000_000 - 4_500_000), `vgvNR=${p.vgvNaoResidencial}`);
+});
+
+test('#570: estudo só residencial e estudo só não residencial', () => {
+  const soR = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10 }],
+    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,
+    permuta_financeira_nao_residencial_pct: 50, // sem base NR: não deduz nada
+  });
+  assert.ok(perto(soR.vgvResidencial, 9_000_000), `soR.vgvR=${soR.vgvResidencial}`);
+  assert.equal(soR.vgvNaoResidencial, 0);
+  assert.equal(soR.permutaFinNaoResidencial, 0, 'sem catálogo NR não há base para deduzir');
+  assert.equal(soR.numUnidadesNaoResidencial, 0);
+
+  const soNR = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10, tipo: 'nao_residencial' }],
+    permuta_fisica_nr_modo: 'pct_area_venda', permuta_fisica_nr_pct: 10,
+    permuta_financeira_residencial_pct: 50, // sem base R: não deduz nada
+  });
+  assert.equal(soNR.vgvResidencial, 0);
+  assert.ok(perto(soNR.vgvNaoResidencial, 9_000_000), `soNR.vgvNR=${soNR.vgvNaoResidencial}`);
+  assert.equal(soNR.permutaFinResidencial, 0);
+  assert.equal(soNR.numUnidadesResidencial, 0);
+  assert.equal(soNR.numUnidadesNaoResidencial, 10);
+  // A permuta física do tipo ausente não vale nada: não há estoque daquela
+  // categoria para entregar, e a área informada segue exibida como informada.
+  const soRcomPermutaNR = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10 }],
+    area_pvt_nr_fechada: 500, preco_venda_m2_nao_residencial: 8_000, // legado, ignorado
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 50,
+  });
+  assert.ok(perto(soRcomPermutaNR.areaPermutaNaoResidencial, 50), 'a área informada não é reescrita');
+  assert.equal(soRcomPermutaNR.vgvPermutaNaoResidencial, 0, 'sem catálogo NR, a permuta NR vale zero');
+  assert.ok(perto(soRcomPermutaNR.vgv, 10_000_000), 'e não pode sair do VGV residencial');
+});
+
+test('#570: produto LEGADO (sem `tipo`) conta como Residencial no cálculo, não fica de fora', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    produtos: [
+      { area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10 },                 // sem `tipo`
+      { area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10, tipo: 'residencial' },
+      { area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10, tipo: 'lixo' as any }, // fora do domínio
+    ],
+    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,
+  });
+  // As três linhas na mesma categoria: 3.000 m², R$ 30M, 30 unidades.
+  assert.ok(perto(p.areaBasePermutaResidencial, 3000), `base=${p.areaBasePermutaResidencial}`);
+  assert.ok(perto(p.vgvPermutaResidencial, 3_000_000), `permR=${p.vgvPermutaResidencial}`); // 300 m² × 10.000
+  assert.ok(perto(p.vgvResidencial, 27_000_000), `vgvR=${p.vgvResidencial}`);
+  assert.equal(p.vgvNaoResidencial, 0);
+  assert.equal(p.numUnidadesResidencial, 30);
+});
+
+// A outra metade do contrato: SEM catálogo efetivo nada muda. O estudo não tem
+// receita modelada (`semProdutos`) e as bases legadas continuam sendo as de
+// antes — é a mesma decisão do #315, sem fallback em nenhum dos dois sentidos.
+test('#570: estudo SEM catálogo mantém as bases legadas, intocadas', () => {
+  const inc = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    area_pvt_r_fechada: 1000, preco_venda_m2_residencial: 10_000,
+    area_pvt_nr_fechada: 500, preco_venda_m2_nao_residencial: 8_000,
+    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,
+    permuta_fisica_nr_modo: 'pct_area_venda', permuta_fisica_nr_pct: 10,
+  });
+  assert.equal(inc.semProdutos, true);
+  assert.ok(perto(inc.areaBasePermutaResidencial, 1000), `baseR=${inc.areaBasePermutaResidencial}`);
+  assert.ok(perto(inc.areaBasePermutaNaoResidencial, 500), `baseNR=${inc.areaBasePermutaNaoResidencial}`);
+  assert.ok(perto(inc.areaPermutaResidencial, 100));
+  assert.ok(perto(inc.areaPermutaNaoResidencial, 50));
+  // Valorada pelos preços legados: 100×10.000 + 50×8.000 = 1,4M pedidos, todos
+  // capados contra a base zero do catálogo inexistente — o comportamento que a
+  // #563 fixou e esta issue não move.
+  assert.ok(perto(inc.vgvPermutaSolicitada, 1_400_000), `solicitada=${inc.vgvPermutaSolicitada}`);
+  assert.equal(inc.vgv, 0);
+  assert.equal(inc.permutaCapada, true);
+
+  const lot = calcularProforma({ ...LOT, produtos: [], permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 3000 });
+  assert.equal(lot.semProdutos, true);
+  // Loteamento sem catálogo: a base é a área vendável da cascata, como sempre.
+  assert.ok(perto(lot.areaBasePermutaResidencial, 75_000), `lot.base=${lot.areaBasePermutaResidencial}`);
+  assert.equal(lot.areaBasePermutaNaoResidencial, 0, 'Loteamento não tem categoria NR');
+  assert.ok(perto(lot.vgvPermutaSolicitada, 3_000_000), '3.000 m² × R$ 1.000 legado');
+});
+
+test('#570: Loteamento COM catálogo também mede e valora a permuta pelo catálogo', () => {
+  // Catálogo deliberadamente diferente da área vendável da cascata (75.000 m²)
+  // e do preço legado (R$ 1.000): 200 lotes de 250 m² a R$ 1.200.
+  const p = calcularProforma({
+    ...LOT,
+    produtos: [{ area_media_m2: 250, preco_venda_m2: 1200, unidades: 200 }], // 50.000 m², 60M
+    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,
+  });
+  assert.ok(perto(p.areaBasePermutaResidencial, 50_000), `base=${p.areaBasePermutaResidencial}`);
+  // 10% de 50.000 = 5.000 m² (e não 7.500, os 10% da área vendável).
+  assert.ok(perto(p.areaPermutaResidencial, 5000), `area=${p.areaPermutaResidencial}`);
+  // 5.000 × R$ 1.200 do catálogo (e não × R$ 1.000 do campo legado).
+  assert.ok(perto(p.vgvPermutaResidencial, 6_000_000), `permuta=${p.vgvPermutaResidencial}`);
+  assert.ok(perto(p.vgvResidencial, 54_000_000), `vgvR=${p.vgvResidencial}`);
+  assert.equal(p.vgvNaoResidencial, 0, 'Loteamento não tem NR: nem permuta, nem VGV de categoria');
+  // A área vendável da cascata continua sendo a da cascata — o catálogo governa
+  // a permuta e a receita, não a geometria do terreno.
+  assert.ok(perto(p.areaVendavel, 75_000), `areaVendavel=${p.areaVendavel}`);
 });

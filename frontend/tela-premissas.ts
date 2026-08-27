@@ -8,7 +8,7 @@ import {
 } from './viabilidade-api.js';
 import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, type ProformaInput, type Proforma } from './proforma.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
-import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
+import { converterUnidade, ctxConversaoPreliminar, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
 import { calcularCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
 import './tela-terreno-nucleo.js';
@@ -452,20 +452,14 @@ export class ViabTelaPremissas extends LitElement {
 
   // Grandezas de ligação para a conversão de unidades (Parte 2), do estado atual.
   // O VGV e as áreas não dependem dos campos de custo/permuta, então não há
-  // circularidade. areaVendavelR/NR = área de venda de cada tipo (loteamento é
-  // produto único ⇒ R = área vendável, NR = 0).
+  // circularidade.
+  //
+  // #570: a tradução Proforma → ctx mora em `ctxConversaoPreliminar`, e a tela
+  // não monta mais o objeto à mão. As duas bases de área da permuta física
+  // eram lidas AQUI dos campos legados enquanto o motor já usava o catálogo —
+  // a badge "% área venda" convertia sobre uma base e o cálculo usava outra.
   private _ctxConversao(): CtxConversao {
-    const p = calcularProforma(this._entradaProforma());
-    const lot = this.estudo.tipo_empreendimento === 'loteamento';
-    return {
-      vgv: p.vgv,
-      vgvResidencial: p.vgvResidencial,
-      vgvNaoResidencial: p.vgvNaoResidencial,
-      areaVendavel: p.areaVendavel,
-      areaVendavelR: lot ? p.areaVendavel : (Number(this.form.area_pvt_r_fechada) || 0),
-      areaVendavelNR: lot ? 0 : (Number(this.form.area_pvt_nr_fechada) || 0),
-      areaPrivativa: p.areaPrivativa,
-    };
+    return ctxConversaoPreliminar(calcularProforma(this._entradaProforma()));
   }
 
   // Troca a unidade de um campo (Parte 2): converte o valor atual para a unidade

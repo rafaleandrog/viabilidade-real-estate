@@ -4,6 +4,62 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #570 · permutas Física e Financeira sobre o total de CADA categoria (2026-08-27)
+
+Item 3 da lista de bugs da Rodada 10, e o fim do interim que a #315 deixou aberto. Com a
+classificação R/NR da #565 no lugar, `frontend/proforma.ts` passou a ler o catálogo **por
+categoria** (`totaisPorTipoProdutos`, exportada e testada): VGV, área total, preço médio ponderado
+(`Σ VGV ÷ Σ área`) e nº de unidades de cada `tipo`. Sobre esses totais incidem as três coisas que
+antes olhavam para a fonte errada:
+
+- **VGV** — `vgvNaoResidencial` era **0 por construção**; agora é o VGV das linhas
+  `nao_residencial`, líquido da permuta física delas. `numUnidadesNaoResidencial` idem (o preço
+  médio NR aparecia zerado ao lado de um VGV NR que existia).
+- **Permuta física** — `% área venda` converte sobre a área do catálogo da categoria (era
+  `area_pvt_*_fechada`), e os m² entregues são valorados pelo **preço médio da categoria** (era
+  `preco_venda_m2_*`, campos sem tela desde a reestruturação do Preliminar).
+- **Permuta financeira** — o `%` NR incidia sobre zero: campo aceitava valor e não deduzia nada.
+  É o defeito nominal do item 3.
+
+**Decisão registrada: o cap da permuta física é POR CATEGORIA.** Cada uma capa no VGV bruto da
+própria categoria, sem corte proporcional entre as duas — o corte proporcional da #563 existia
+porque o cap era global sobre um bucket único, e mantê-lo deixaria o excedente de uma categoria
+comendo o VGV da outra, destruindo a base que a permuta financeira daquele tipo precisa. Cada VGV
+é o resíduo da sua base quantizada menos a sua permuta quantizada, então as duas identidades por
+categoria fecham ao centavo por construção (a invariante da #563, agora em dobro).
+
+Consequência intencional de leitura: no modo `% área venda` o cap deixou de ser alcançável abaixo
+de 100%, porque o `%` incide sobre a mesma área que dá o preço médio. O cap segue guardando o modo
+m² absoluto, o canônico e o fator de sensibilidade.
+
+**Fonte legada intacta.** Sem catálogo efetivo (`semProdutos`) nada muda: bases e preços legados
+como estavam, sem fallback em nenhum dos dois sentidos — a mesma decisão da #315.
+
+**Fiação da tela (critério 5).** `_ctxConversao` de `frontend/tela-premissas.ts` montava o ctx à
+mão e lia os campos legados nas duas bases de área — a badge convertia sobre uma base e o motor
+calculava com outra. A tradução virou `ctxConversaoPreliminar(p)`
+(`frontend/premissas-conversao.ts`), pura, alimentada por duas saídas novas do motor
+(`areaBasePermutaResidencial`/`areaBasePermutaNaoResidencial`).
+
+`avisoPermutaCapada` (`frontend/exportar.ts`) foi reescrito: a frase dizia "a receita bruta do
+catálogo é X" com X = permuta efetiva, o que só era verdade sob o cap global. Com uma categoria
+capando e a outra não, X é menor que o bruto — a frase passou a dizer "a permuta considerada é X"
+e a declarar a regra do cap por categoria.
+
+**Prova de mutação** (controle antes: 756/756 + 37/37 render). Rodando `frontend/*.test.ts`
+(729 testes): neutralizar a separação por categoria → **17 vermelhos**; preço da permuta de volta
+ao campo legado → **10**; base de área de volta ao campo legado → **5**; cap de volta a global →
+**4**. A quinta é a que só a fiação pega: reverter `_ctxConversao` para o objeto literal deixa
+**728 verdes e 1 vermelho** — o teste de fonte de `frontend/premissas-conversao.test.ts`, a única
+camada que enxerga "a tela parou de chamar".
+
+**Sem backend, sem schema, sem migração** — a coluna `tipo` já existia (#565), então a `versao` do
+manifesto não bumpa. ⚠️ Fica um comentário obsoleto em `backend/rotas/preliminar-produtos.ts:19-21`
+("o motor da Proforma ainda não lê este campo"): não foi tocado porque o escopo da issue exclui
+`backend/`, e mexer ali arrastaria a validação de backend, que não roda nesta sessão (SDK 401).
+
+---
+
 ## #566 · fim da permuta física por seleção de unidade (2026-08-27)
 
 Item 4 da lista de bugs da Rodada 10. A opção "Unidade" (seleção de produto do catálogo +

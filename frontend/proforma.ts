@@ -64,12 +64,14 @@ export interface ProformaInput {
   permuta_fisica_modo?: string; permuta_fisica_area_m2?: number | string; permuta_fisica_pct?: number | string; permuta_fisica_area_canonica?: number | string;
   permuta_fisica_nr_modo?: string; permuta_fisica_nr_area_m2?: number | string; permuta_fisica_nr_pct?: number | string; permuta_fisica_nr_area_canonica?: number | string;
   aliquota_ret_pct?: number; // parâmetro da app (default 4)
-  // Catálogo de Produtos (tabela `preliminar_produtos`) — a ÚNICA fonte de VGV
-  // e de nº de unidades. Os pares legados (area_media_lote_m2/preco_venda_m2 no
-  // Loteamento; area_pvt_*_fechada/preco_venda_m2_*/num_unidades_* na
-  // Incorporação) continuam no schema e no tipo porque a permuta física ainda
-  // lê o preço deles, mas deixaram de gerar receita: sem catálogo efetivo o
-  // estudo não tem receita modelada (`semProdutos`), e não há fallback.
+  // Catálogo de Produtos (tabela `preliminar_produtos`) — a ÚNICA fonte de VGV,
+  // de área e de nº de unidades, e desde a #570 também das bases das duas
+  // permutas, separadas por categoria. Os pares legados
+  // (area_media_lote_m2/preco_venda_m2 no Loteamento;
+  // area_pvt_*_fechada/preco_venda_m2_*/num_unidades_* na Incorporação)
+  // continuam no schema e no tipo, mas só governam o estudo SEM catálogo
+  // efetivo — que, por não ter receita modelada (`semProdutos`), fecha em zero
+  // de qualquer forma. Não há fallback de um para o outro.
   produtos?: ProdutoPreliminar[];
   // BUG7-08: fator de stress da análise de sensibilidade (Bear/Base/Bull).
   // Escala o valor JÁ RESOLVIDO (canônico se houver, senão o legado) de uma
@@ -87,10 +89,11 @@ export interface ProdutoPreliminar {
   area_media_m2?: number | string | null;
   preco_venda_m2?: number | string | null;
   unidades?: number | string | null;
-  // #565: classificação Residencial/Não Residencial — nasce, persiste e
-  // aparece na tela nesta issue; o motor ainda NÃO lê este campo (bucket
-  // único de VGV, `vgvNaoResidencial = 0` em `calcularProforma`). Ligar
-  // `tipo` ao cálculo é a #570.
+  // Classificação Residencial/Não Residencial. Nasceu na #565 (coluna, tela e
+  // persistência) e passou a governar o cálculo na #570: é ela que separa o
+  // VGV, a área e o preço médio de cada categoria — e, com eles, a base das
+  // duas permutas do tipo. Ler o valor é sempre por `tipoProdutoEfetivo`,
+  // nunca pelo campo cru, para o produto legado (sem `tipo`) cair no default.
   tipo?: string | null;
 }
 
@@ -125,6 +128,13 @@ export function produtoCompoeCatalogo(p: ProdutoPreliminar): boolean {
 /** As linhas do catálogo que compõem VGV; lista vazia = estudo sem receita modelada. */
 export function catalogoEfetivo(produtos: ProdutoPreliminar[] | undefined): ProdutoPreliminar[] {
   return (produtos ?? []).filter(produtoCompoeCatalogo);
+}
+
+/** Área total de uma lista de produtos: Σ (área média × unidades). */
+export function areaTotalProdutos(produtos: ProdutoPreliminar[] | undefined): number {
+  return (produtos ?? []).reduce(
+    (s, p) => s + (Number(p.area_media_m2) || 0) * (Number(p.unidades) || 0), 0,
+  );
 }
 
 export interface ResumoCatalogo {
@@ -162,9 +172,7 @@ export interface ResumoCatalogo {
 export function resumoCatalogoProdutos(produtos: ProdutoPreliminar[] | undefined): ResumoCatalogo {
   const catalogo = catalogoEfetivo(produtos);
   const { vgv, unidades } = totalProdutos(catalogo);
-  const areaTotal = catalogo.reduce(
-    (s, p) => s + (Number(p.area_media_m2) || 0) * (Number(p.unidades) || 0), 0,
-  );
+  const areaTotal = areaTotalProdutos(catalogo);
   return {
     unidades: unidades > 0 ? unidades : null,
     areaMediaM2: unidades > 0 ? areaTotal / unidades : null,
@@ -178,12 +186,49 @@ export function resumoCatalogoProdutos(produtos: ProdutoPreliminar[] | undefined
  * Produto LEGADO (gravado antes da migração `035`) não tem `tipo` no payload;
  * o default é Residencial, a mesma leitura que o `padrao` do `schema.json`
  * declara para a coluna. Qualquer valor que não seja exatamente
- * `nao_residencial` cai em Residencial — fail-safe, não fail-loud, porque
- * este campo ainda não alimenta cálculo nenhum (#570): uma classificação
- * errada aqui não muda VGV.
+ * `nao_residencial` cai em Residencial — fail-safe, não fail-loud.
+ *
+ * ⚠️ Desde a #570 este campo GOVERNA cálculo (o VGV, a área e o preço médio de
+ * cada categoria saem daqui), então o fail-safe deixou de ser inconsequente e
+ * passou a ser uma escolha: valor fora do domínio classifica como Residencial
+ * em vez de derrubar a Proforma inteira. Quem barra o valor inválido é o
+ * `opcoes` da coluna no `schema.json`, na escrita — não este ponto, na leitura.
  */
 export function tipoProdutoEfetivo(p: ProdutoPreliminar): 'residencial' | 'nao_residencial' {
   return p.tipo === 'nao_residencial' ? 'nao_residencial' : 'residencial';
+}
+
+export interface TotalCategoria {
+  vgv: number;
+  unidades: number;
+  areaTotalM2: number;
+  /** Preço médio ponderado pela área (Σ VGV / Σ área); `null` sem área na categoria. */
+  precoMedioM2: number | null;
+}
+export interface TotaisPorTipo { residencial: TotalCategoria; nao_residencial: TotalCategoria; }
+
+/**
+ * Totais do catálogo EFETIVO separados por categoria (#570) — é este o "total
+ * de cada categoria" sobre o qual as duas permutas passam a incidir.
+ *
+ * `precoMedioM2` é ponderado pela ÁREA da categoria (Σ VGV / Σ área×unidades),
+ * a mesma ponderação de `resumoCatalogoProdutos`: é o preço por m² que o
+ * portfólio daquela categoria pratica, não a média das linhas. Categoria sem
+ * nenhuma linha efetiva devolve `null` — fallback honesto, nunca `0`, que
+ * pareceria "vende de graça" em vez de "não há o que vender".
+ *
+ * Linha em branco não entra (`catalogoEfetivo`), e produto legado sem `tipo`
+ * cai em Residencial (`tipoProdutoEfetivo`).
+ */
+export function totaisPorTipoProdutos(produtos: ProdutoPreliminar[] | undefined): TotaisPorTipo {
+  const catalogo = catalogoEfetivo(produtos);
+  const daCategoria = (t: 'residencial' | 'nao_residencial'): TotalCategoria => {
+    const linhas = catalogo.filter((p) => tipoProdutoEfetivo(p) === t);
+    const { vgv, unidades } = totalProdutos(linhas);
+    const areaTotalM2 = areaTotalProdutos(linhas);
+    return { vgv, unidades, areaTotalM2, precoMedioM2: areaTotalM2 > 0 ? vgv / areaTotalM2 : null };
+  };
+  return { residencial: daCategoria('residencial'), nao_residencial: daCategoria('nao_residencial') };
 }
 
 export interface Proforma {
@@ -191,19 +236,30 @@ export interface Proforma {
   areaTerreno: number; areaVendavel: number; areaPermutaFisica: number; areaVendavelLiquida: number;
   areaPrivativa: number; areaConstruida: number;
   // permuta física por tipo (#10): m² entregue e VGV correspondente, R e NR.
-  // Os dois `vgvPermuta*` são a permuta EFETIVA — já capada na base, para que
-  // `vgv + vgvPermutaResidencial + vgvPermutaNaoResidencial` continue sendo o
-  // VGV bruto.
+  // Os dois `vgvPermuta*` são a permuta EFETIVA — já capada na base DA PRÓPRIA
+  // CATEGORIA (#570), para que as duas identidades por categoria
+  // (`vgvResidencial + vgvPermutaResidencial` = VGV bruto residencial, idem NR)
+  // e a soma delas continuem fechando.
   areaPermutaResidencial: number; areaPermutaNaoResidencial: number;
   vgvPermutaResidencial: number; vgvPermutaNaoResidencial: number;
+  // Base de ÁREA da permuta física de cada categoria (#570) — é sobre ela que o
+  // modo "% área venda" converte % em m², e é a mesma grandeza que a badge de
+  // unidade da tela usa (`ctxConversaoPreliminar`, `premissas-conversao.ts`).
+  // Com catálogo efetivo é a área do catálogo DA CATEGORIA (Σ área×unidades);
+  // sem catálogo é a base legada de antes (área vendável no Loteamento,
+  // `area_pvt_*_fechada` na Incorporação).
+  areaBasePermutaResidencial: number; areaBasePermutaNaoResidencial: number;
   // Fonte do VGV e o que ela impõe a quem desenha a tela.
   // `semProdutos`: não há linha de catálogo que componha VGV — o estudo não tem
   // receita modelada, e a tela mostra estado vazio em vez de tabela.
-  // `permutaCapada`: a permuta física pedida vale mais que a base, e o
-  // excedente foi cortado; `vgvPermutaSolicitada` é o que ela pedia antes do
-  // corte, para o aviso poder dizer o tamanho do excedente.
+  // `permutaCapada`: a permuta física pedida vale mais que a base de ALGUMA das
+  // duas categorias, e o excedente daquela categoria foi cortado;
+  // `vgvPermutaSolicitada` é o que as duas pediam somadas, antes do corte, para
+  // o aviso poder dizer o tamanho do excedente.
   semProdutos: boolean; permutaCapada: boolean; vgvPermutaSolicitada: number;
-  // receita
+  // receita — os dois VGV por categoria saem do `tipo` de cada linha do
+  // catálogo (#565/#570), cada um já líquido da permuta física da SUA
+  // categoria. `vgv` é a soma.
   vgvResidencial: number; vgvNaoResidencial: number; vgv: number;
   // deduções
   imposto: number; corretagem: number; marketing: number;
@@ -313,16 +369,39 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const catalogo = catalogoEfetivo(e.produtos);
   const semProdutos = catalogo.length === 0;
   const totalCatalogo = totalProdutos(catalogo);
-  const vgvBrutoCatalogo = totalCatalogo.vgv;
+  // #570: o catálogo é lido POR CATEGORIA (`tipo` de cada linha, #565). VGV,
+  // área e preço médio de cada uma são as três bases das permutas do tipo.
+  const porTipo = totaisPorTipoProdutos(catalogo);
 
-  // Permuta física (#10) — R e NR separados. Cada uma sai da área vendável do seu
-  // tipo (loteamento é produto único ⇒ tudo "residencial", NR = 0). O par legado
-  // `permuta_fisica_*` é o residencial; `permuta_fisica_nr_*` é o não residencial.
-  const areaVendavelR = lot ? areaVendavel : n(e.area_pvt_r_fechada);
-  const areaVendavelNR = lot ? 0 : n(e.area_pvt_nr_fechada);
+  // Permuta física (#10) — R e NR separados. O par legado `permuta_fisica_*` é
+  // o residencial; `permuta_fisica_nr_*` é o não residencial (Loteamento não
+  // tem NR: a tela nem desenha o par, e aqui ele é zero por construção).
+  //
+  // #570 — a BASE de cada uma passou a ser a da sua categoria NO CATÁLOGO:
+  // área (para o modo "% área venda") e preço médio ponderado (para valorar os
+  // m² entregues). Enquanto o VGV vinha do catálogo e a permuta era medida e
+  // valorada por campos legados sem tela, os dois lados falavam de projetos
+  // diferentes — era o interim que esta issue fecha.
+  //
+  // Sem catálogo efetivo NADA disso muda: o estudo não tem receita modelada
+  // (`semProdutos`), e as bases legadas seguem exatamente como estavam. É a
+  // mesma decisão do #315 — não há fallback de uma fonte para a outra, em
+  // nenhum dos dois sentidos.
+  const areaBasePermutaResidencial = semProdutos
+    ? (lot ? areaVendavel : n(e.area_pvt_r_fechada))
+    : porTipo.residencial.areaTotalM2;
+  const areaBasePermutaNaoResidencial = lot ? 0
+    : (semProdutos ? n(e.area_pvt_nr_fechada) : porTipo.nao_residencial.areaTotalM2);
+  // O fator de sensibilidade de preço continua entrando aqui, e só aqui, como
+  // entrava nos preços legados (BUG7-08): estressar preço muda quanto vale a
+  // área permutada. Categoria sem linha no catálogo tem `precoMedioM2` nulo —
+  // vale zero, porque não há estoque daquela categoria para entregar.
+  const precoPermutaR = semProdutos ? precoR : (porTipo.residencial.precoMedioM2 ?? 0) * fatorSens('preco');
+  const precoPermutaNR = lot ? 0
+    : (semProdutos ? precoNR : (porTipo.nao_residencial.precoMedioM2 ?? 0) * fatorSens('preco'));
 
   const areaPermutaResidencialLegada = e.permuta_fisica_modo === 'pct_area_venda'
-    ? areaVendavelR * n(e.permuta_fisica_pct) / 100
+    ? areaBasePermutaResidencial * n(e.permuta_fisica_pct) / 100
     : n(e.permuta_fisica_area_m2);
   // BUG7-08: o fator escala o valor JÁ RESOLVIDO (canônico se houver, senão o
   // legado acima) — cobre os dois em vez de exigir que a UI escale campos
@@ -330,47 +409,51 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const areaPermutaResidencial = canonico(e.permuta_fisica_area_canonica, areaPermutaResidencialLegada) * fatorSens('permuta_fisica');
   const areaPermutaNaoResidencialLegada = lot ? 0
     : (e.permuta_fisica_nr_modo === 'pct_area_venda'
-      ? areaVendavelNR * n(e.permuta_fisica_nr_pct) / 100
+      ? areaBasePermutaNaoResidencial * n(e.permuta_fisica_nr_pct) / 100
       : n(e.permuta_fisica_nr_area_m2));
   const areaPermutaNaoResidencial = canonico(e.permuta_fisica_nr_area_canonica, areaPermutaNaoResidencialLegada) * fatorSens('permuta_fisica');
   const areaPermutaFisica = areaPermutaResidencial + areaPermutaNaoResidencial;
   const areaVendavelLiquida = areaVendavel - areaPermutaFisica;
 
-  // A permuta reduz o VGV (área entregue × preço do tipo) — reduz o resultado
-  // nos dois tipos de empreendimento (#14). Interim que RESTA do #315: o preço
-  // da permuta ainda sai do campo legado do tipo, não do catálogo.
-  const vgvPermutaSolicitadaR = areaPermutaResidencial * precoR;
-  const vgvPermutaSolicitadaNR = areaPermutaNaoResidencial * precoNR;
+  // A permuta reduz o VGV (área entregue × preço da SUA categoria) — reduz o
+  // resultado nos dois tipos de empreendimento (#14).
+  const vgvPermutaSolicitadaR = areaPermutaResidencial * precoPermutaR;
+  const vgvPermutaSolicitadaNR = areaPermutaNaoResidencial * precoPermutaNR;
   const vgvPermutaSolicitada = vgvPermutaSolicitadaR + vgvPermutaSolicitadaNR;
   // A permuta física não pode entregar mais do que existe para vender. A
   // subtração era feita sem piso: permuta de 100% da área sobre um catálogo
-  // zerado devolvia Receita bruta negativa, e nada na tela dizia isso. O corte
-  // é PROPORCIONAL para preservar a divisão R/NR, e a permuta efetiva é o que
-  // sai no resultado — assim `vgv + as duas permutas` continua sendo o bruto.
-  const vgvPermutaEfetiva = Math.min(vgvPermutaSolicitada, vgvBrutoCatalogo);
+  // zerado devolvia Receita bruta negativa, e nada na tela dizia isso (#563).
+  //
+  // ⚠️ DECISÃO #570 — o cap é POR CATEGORIA: cada uma capa no VGV bruto da
+  // própria categoria, e não há corte proporcional entre as duas. O corte
+  // proporcional existia porque o cap era global, sobre um bucket único; com
+  // as bases separadas ele passaria a deixar o excedente de uma categoria
+  // comendo o VGV da outra — e aí `vgvNaoResidencial` deixaria de ser "o VGV
+  // não residencial", que é justamente a base que a permuta financeira NR
+  // precisa (critério 3 da issue). Consequência aritmética: como `min` é
+  // monótono sob arredondamento, os DOIS VGV param em zero por baixo, cada um
+  // por conta própria, e nenhum fica negativo.
+  //
+  // Consequência de leitura, e ela é intencional: no modo "% área venda" o cap
+  // deixou de ser alcançável abaixo de 100%, porque o % agora incide sobre a
+  // mesma área que dá o preço médio — pedir 40% da área da categoria vale
+  // exatamente 40% do VGV dela. O cap continua guardando o modo m² absoluto, o
+  // valor canônico e o fator de sensibilidade, que não têm essa amarração.
+  const capadaR = moeda(vgvPermutaSolicitadaR) > moeda(porTipo.residencial.vgv);
+  const capadaNR = moeda(vgvPermutaSolicitadaNR) > moeda(porTipo.nao_residencial.vgv);
   // Comparação ao CENTAVO, não em precisão plena: excedente abaixo de meio
   // centavo some no arredondamento do contrato C7, e um aviso que mostrasse
   // "informada R$ X sobre base R$ X" seria ruído.
-  const permutaCapada = moeda(vgvPermutaSolicitada) > moeda(vgvBrutoCatalogo);
-  const fatorCap = vgvPermutaSolicitada > 0 ? vgvPermutaEfetiva / vgvPermutaSolicitada : 0;
-  // ⚠️ As três parcelas são quantizadas AQUI, e uma delas é o RESÍDUO das
-  // outras — não são três arredondamentos independentes. Independentes, cada
-  // um erra até meio centavo para o seu lado e a identidade
-  // `vgv + permutaR + permutaNR = VGV bruto` quebra: com base de R$ 0,01 e as
-  // duas permutas pedindo o mesmo, o fator 0,5 dá 0,005 em cada, que sobe para
-  // 0,01 nas duas e soma R$ 0,02 — o dobro da base. Derivando a parcela NR do
-  // total efetivo já quantizado, a identidade vale por construção, em qualquer
-  // entrada. O resíduo (no máximo um centavo) cai no NÃO residencial; no
-  // Loteamento ele é sempre zero, porque lá `precoNR` é zero.
-  const baseQuantizada = moeda(vgvBrutoCatalogo);
-  const permutaEfetivaQuantizada = moeda(vgvPermutaEfetiva);
-  const vgvPermutaResidencial = moeda(vgvPermutaSolicitadaR * fatorCap);
-  const vgvPermutaNaoResidencial = permutaEfetivaQuantizada - vgvPermutaResidencial;
-  // Bucket único: a tabela de Produtos não distingue residencial de não
-  // residencial, então o VGV inteiro cai em `vgvResidencial`. `min` é monótono
-  // sob arredondamento, então a subtração nunca fica negativa.
-  const vgvResidencial = baseQuantizada - permutaEfetivaQuantizada;
-  const vgvNaoResidencial = 0;
+  const permutaCapada = capadaR || capadaNR;
+  // ⚠️ Cada VGV é o RESÍDUO da sua base já quantizada menos a sua permuta já
+  // quantizada — não são dois arredondamentos independentes. Assim a identidade
+  // por categoria (`vgvResidencial + vgvPermutaResidencial` = VGV bruto R, idem
+  // NR) vale por construção, ao centavo, em qualquer entrada — inclusive nas de
+  // fração de centavo, que foram o que quebrou a versão anterior (#563).
+  const vgvPermutaResidencial = moeda(Math.min(vgvPermutaSolicitadaR, porTipo.residencial.vgv));
+  const vgvPermutaNaoResidencial = moeda(Math.min(vgvPermutaSolicitadaNR, porTipo.nao_residencial.vgv));
+  const vgvResidencial = moeda(porTipo.residencial.vgv) - vgvPermutaResidencial;
+  const vgvNaoResidencial = moeda(porTipo.nao_residencial.vgv) - vgvPermutaNaoResidencial;
   const vgv = vgvResidencial + vgvNaoResidencial;
 
   // ── Deduções da receita ──
@@ -458,10 +541,12 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const precoMedioUnidade = numUnidades > 0 ? vgv / numUnidades : 0;
   // Detalhe por tipo (#7): nº e preço médio por unidade, R e NR separados. Preço
   // médio = VGV do tipo (já líquido de permuta física) ÷ nº de unidades do tipo.
-  // O catálogo não distingue R/NR — bucket único em Residencial —, e Loteamento
-  // não separa os dois tipos: lá as duas métricas ficam em zero.
-  const numUnidadesResidencial = lot ? 0 : numUnidades;
-  const numUnidadesNaoResidencial = 0;
+  // A contagem por tipo vem do `tipo` de cada linha do catálogo (#570) — antes
+  // caía inteira em Residencial, e o preço médio NR mostrava zero mesmo com VGV
+  // não residencial existindo. Loteamento não separa os dois tipos: lá as duas
+  // métricas ficam em zero, como sempre estiveram.
+  const numUnidadesResidencial = lot ? 0 : porTipo.residencial.unidades;
+  const numUnidadesNaoResidencial = lot ? 0 : porTipo.nao_residencial.unidades;
   const precoMedioUnidadeResidencial = numUnidadesResidencial > 0 ? vgvResidencial / numUnidadesResidencial : 0;
   const precoMedioUnidadeNaoResidencial = numUnidadesNaoResidencial > 0 ? vgvNaoResidencial / numUnidadesNaoResidencial : 0;
 
@@ -481,6 +566,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const resultadoProforma: Proforma = {
     areaTerreno, areaVendavel, areaPermutaFisica, areaVendavelLiquida, areaPrivativa, areaConstruida,
     areaPermutaResidencial, areaPermutaNaoResidencial, vgvPermutaResidencial, vgvPermutaNaoResidencial,
+    areaBasePermutaResidencial, areaBasePermutaNaoResidencial,
     semProdutos, permutaCapada, vgvPermutaSolicitada,
     vgvResidencial, vgvNaoResidencial, vgv,
     imposto, corretagem, marketing, permutaFinResidencial, permutaFinNaoResidencial, receitaLiquida,
@@ -520,7 +606,9 @@ export function precoSugeridoM2(e: ProformaInput, pisoResultadoPct: number): num
   // O preço testado tem que chegar ao CATÁLOGO: ele é a fonte do VGV, e mexer
   // só nos campos legados deixaria a margem constante — a bisseção não teria
   // nada para procurar e devolveria sempre o mesmo extremo. Os campos legados
-  // seguem no override porque a permuta física ainda lê o preço deles.
+  // seguem no override para o estudo SEM catálogo, onde a permuta física ainda
+  // lê o preço deles (#570); com catálogo, o preço da permuta é o médio da
+  // categoria, e o override do catálogo já o move junto.
   const margemNoPreco = (p: number): number => {
     const produtos = e.produtos?.map((x) => ({ ...x, preco_venda_m2: p }));
     const teste: ProformaInput = lot
