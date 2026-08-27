@@ -4,6 +4,57 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #577 · A listagem de Estudos mostra Preliminar/Avançado (2026-08-27)
+
+Item 1 da leva Avançado da Rodada 10. A tabela do Painel já **sabia** o `nivel_analise` de cada
+linha — usava para escolher a fórmula de VGV/Margem (`numeroTitulo`, `frontend/tela-dashboard.ts`)
+— mas só expunha isso via `title` (tooltip nativo), invisível sem passar o mouse. Coluna nova
+"Nível" entre `status` e `area_terreno`, badge `Preliminar`/`Avançado` (mesmo padrão de badge da
+coluna `status`), sem `largura` fixa — segue o mesmo auto-dimensionamento das outras colunas de
+badge/texto da tabela (só `imagem` fixa largura, por ser miniatura quadrada).
+
+**Critério 2 (ambiguidade de nome) — decisão tomada, não deixada em aberto:** a issue propunha duas
+saídas e pedia confirmação do autor; escolhi a proposta principal dela mesma, por ser a menos
+invasiva e a que o próprio diagnóstico já defendia — coluna nova = "Nível", filtro existente
+(que filtra `tipo_empreendimento`, não `nivel_analise`) renomeado de "Tipo de estudo" para "Tipo de
+empreendimento" (`frontend/tela-dashboard.ts`, `_renderEstudos`). Os dois deixam de ser homônimos.
+
+**Critério 3 (estudos existentes):** sem migração — `nivel_analise` já tem `padrao: "preliminar"`
+no schema, e uma linha antiga sem o campo explícito lê "Preliminar" pela nova função pura exportada
+`nivelExibicao(l)`, o mesmo default que `resumoListagem` já assumia para escolher o motor. `versao`
+do manifesto **não bumpa** (sem migração, como a issue previa).
+
+**Critério 4 (paridade):** a coluna é sobre `nivel_analise`, ortogonal a `tipo_empreendimento` — é
+a MESMA `_colunas()`/tabela para Loteamento e Incorporação, então as 4 combinações resolvem pela
+mesma função. Teste dedicado cobre as 4 (`frontend/tela-dashboard.test.ts`).
+
+**Critério 5 (render case) — declarado, não entregue, com motivo estrutural:** `urbi-tabela` recebe
+`colunas`/`linhas` por *binding de propriedade* (`so_propriedade: true`, sem atributo —
+`docs/ui-urbiverso/primitivos.json`); o harness de render só desenha texto para props `rotulo`/
+`valor` (`scripts/render-check.mjs:216`) e filtra fora qualquer prop sem atributo antes mesmo de
+gerar o stub (`:294`, `p.props.filter((x) => x.atributo)`). Um caso de render aqui montaria um
+`<urbi-tabela>` de caixa vazia — não desenha nenhuma célula, badge ou coluna — provando zero sobre
+overflow de largura. **Nenhum caso hoje exercita `urbi-tabela`** (`tabela-fluxo.ts` mede
+`viab-fluxo-ver`, que usa `<table>` HTML crua, não o primitivo); criar esse suporte no harness é
+mudança de infraestrutura de teste, fora do escopo de uma coluna nova (R3). Mitigação: sem
+`largura` fixa (mesmo padrão das outras colunas de texto/badge da tabela — nenhuma delas tem caso
+de render hoje).
+
+**Prova de mutação, nos dois sentidos:**
+- Lógica: invertendo o `? :` de `nivelExibicao`, **6 dos 19 testes de `tela-dashboard.test.ts`**
+  ficam vermelhos.
+- Fiação: apagando o bloco da coluna nova dentro de `_colunas()` (privado, só alcançável com o
+  componente montado em DOM — que os testes deste arquivo, por convenção do próprio arquivo
+  (`resumoListagem` já é assim), nunca fazem), a suíte inteira continua com os **19 verdes** — é a
+  classe 1 de defeito que o `CLAUDE.md` nomeia, e a defesa aqui não existe além da revisão visual do
+  diff (2 linhas de mudança, adjacentes ao ponto testado): a issue #577 não cria nenhum mecanismo
+  novo de wiring que caiba num parâmetro obrigatório, e o caso de render que pegaria isso não
+  fecha, pelo motivo do critério 5.
+
+`bash scripts/validar-frontend.sh` verde (controle e final). Sem migração, sem toque em backend —
+`validar-backend.sh` não roda. `frontend/proforma.ts`, `tela-proforma.ts`, `tela-premissas.ts` e
+`exportar.ts` (fila de merges do Preliminar) não foram tocados — nenhum critério desta issue
+exigia.
 ## #597 · A corrida de carregamento em Proforma e Premissas (2026-08-27)
 
 Achado colateral da revisão do PR 580 (#563): `tela-proforma.ts:_init()` e
