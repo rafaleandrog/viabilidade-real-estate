@@ -2,9 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, catalogoEfetivo, produtoCompoeCatalogo,
-  resumoCatalogoProdutos, tipoProdutoEfetivo, totaisPorTipoProdutos, areaTotalProdutos,
+  resumoCatalogoProdutos, tipoProdutoEfetivo, aplicarFatorPreco,
+  totaisPorTipoProdutos, areaTotalProdutos,
   type ProformaInput,
 } from './proforma.js';
+import {
+  ESTUDO_SENSIBILIDADE, PRODUTOS_SENSIBILIDADE,
+  FATOR_BEAR, FATOR_BULL, VGV_BASE, VGV_BEAR, VGV_BULL,
+} from './fixtures/sensibilidade-catalogo.js';
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 
@@ -679,8 +684,9 @@ test('#315: permuta física continua deduzindo o VGV quando produtos está prese
 // legado do tipo sobreviveu num lugar só — o valor do m² entregue em permuta
 // física —, e é lá que o fator continua observável. O que o teste prova é o
 // mesmo: `fatorSens('preco')` escala o preço JÁ RESOLVIDO, nos dois tipos de
-// empreendimento. (O fator ainda não alcança o preço do catálogo; isso é #568,
-// fora do escopo desta correção.)
+// empreendimento. (O fator hoje alcança TAMBÉM o preço do catálogo — #568,
+// bloco no fim deste arquivo; este teste continua medindo só a permuta, que é
+// o que o preço legado ainda governa.)
 test('BUG7-08 preco: escala precoLot (loteamento) e precoR/precoNR (incorporação)', () => {
   const baseLot: ProformaInput = { ...LOT, permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 3000 };
   const lot = calcularProforma({ ...baseLot, sensibilidade: { variavel: 'preco', fator: 1.1 } });
@@ -785,6 +791,170 @@ test('BUG7-08: sensibilidade ausente/fator neutro preserva o comportamento anter
   const semSens = calcularProforma(LOT);
   const comFator1 = calcularProforma({ ...LOT, sensibilidade: { variavel: 'preco', fator: 1 } });
   assert.ok(perto(semSens.vgv, comFator1.vgv));
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #568 — a análise de sensibilidade alcança o CATÁLOGO DE PRODUTOS.
+//
+// O defeito: `fatorSens('preco')` escalava só os campos legados
+// `preco_venda_m2*`, que desde a #563 sobraram como preço da PERMUTA FÍSICA.
+// Com catálogo presente — o caso normal — Bear/Base/Bull saíam com o mesmo
+// VGV, e o print de produção que abriu a issue mostrava a linha "VGV"
+// congelada nos três cenários.
+//
+// O fixture dourado (`frontend/fixtures/sensibilidade-catalogo.ts`) é o do
+// print: VGV base R$ 24.764.117,40.
+// ─────────────────────────────────────────────────────────────────────────
+
+const sens = (fator: number): ProformaInput => ({
+  ...ESTUDO_SENSIBILIDADE,
+  produtos: PRODUTOS_SENSIBILIDADE,
+  sensibilidade: { variavel: 'preco', fator },
+});
+
+test('#568 preco: o fator escala o VGV do CATÁLOGO — Bear ×0,9 e Bull ×1,1, com 2 casas', () => {
+  // `toFixed(2)` e não `perto`: o critério de aceite é numérico ao CENTAVO
+  // (contrato C7), e uma tolerância de um centavo esconderia justamente o
+  // erro de quantização que o cap da #563 introduziria se o fator entrasse
+  // depois do arredondamento.
+  assert.equal(calcularProforma(sens(1)).vgv.toFixed(2), VGV_BASE.toFixed(2));
+  assert.equal(calcularProforma(sens(FATOR_BEAR)).vgv.toFixed(2), VGV_BEAR.toFixed(2));
+  assert.equal(calcularProforma(sens(FATOR_BULL)).vgv.toFixed(2), VGV_BULL.toFixed(2));
+  // E os três são DIFERENTES entre si — a asserção que o bug fazia falhar
+  // (antes da correção os três davam 24.764.117,40).
+  const vgvs = new Set([sens(FATOR_BEAR), sens(1), sens(FATOR_BULL)].map((e) => calcularProforma(e).vgv));
+  assert.equal(vgvs.size, 3, `o VGV não variou entre os cenários: ${[...vgvs].join(' | ')}`);
+});
+
+test('#568: o nº de unidades e o preço médio por unidade acompanham o cenário sem duplicar o fator', () => {
+  const base = calcularProforma(sens(1));
+  const bull = calcularProforma(sens(FATOR_BULL));
+  // Unidades são cadastro, não preço: idênticas nos dois cenários.
+  assert.equal(base.numUnidades, 50);
+  assert.equal(bull.numUnidades, 50);
+  // O preço médio por unidade sobe na mesma proporção do VGV — uma vez só.
+  assert.ok(perto(bull.precoMedioUnidade, base.precoMedioUnidade * FATOR_BULL, 0.02),
+    `precoMedioUnidade base=${base.precoMedioUnidade} bull=${bull.precoMedioUnidade}`);
+});
+
+test('#568 aplicarFatorPreco: escala o PREÇO de cada linha, nunca área ou unidades', () => {
+  const escalado = aplicarFatorPreco(PRODUTOS_SENSIBILIDADE, 1.1);
+  assert.equal(escalado.length, PRODUTOS_SENSIBILIDADE.length);
+  escalado.forEach((p, i) => {
+    const original = PRODUTOS_SENSIBILIDADE[i];
+    assert.ok(perto(Number(p.preco_venda_m2), Number(original.preco_venda_m2) * 1.1, 1e-6));
+    assert.equal(p.area_media_m2, original.area_media_m2);
+    assert.equal(p.unidades, original.unidades);
+  });
+  // Não muta a lista de entrada (o motor a reusa para `numUnidades`).
+  assert.equal(PRODUTOS_SENSIBILIDADE[0].preco_venda_m2, 10_000);
+  // Fator neutro devolve o mesmo VGV.
+  assert.ok(perto(totalProdutos(aplicarFatorPreco(PRODUTOS_SENSIBILIDADE, 1)).vgv, VGV_BASE));
+});
+
+test('#568: o resumo do catálogo composto com o fator move só o preço médio', () => {
+  const cadastro = resumoCatalogoProdutos(PRODUTOS_SENSIBILIDADE);
+  const cenario = resumoCatalogoProdutos(aplicarFatorPreco(catalogoEfetivo(PRODUTOS_SENSIBILIDADE), FATOR_BULL));
+  assert.equal(cenario.unidades, cadastro.unidades);
+  assert.ok(perto(cenario.areaMediaM2!, cadastro.areaMediaM2!, 1e-9));
+  assert.ok(perto(cenario.precoVendaM2!, cadastro.precoVendaM2! * FATOR_BULL, 1e-6),
+    `preço médio cadastro=${cadastro.precoVendaM2} cenário=${cenario.precoVendaM2}`);
+});
+
+test('#568 loteamento: catálogo e valoração da permuta física escalam JUNTOS — o VGV líquido é proporcional', () => {
+  // O Loteamento continua valorando a permuta pelo preço LEGADO
+  // (`preco_venda_m2`, interim do #315) enquanto o VGV sai do catálogo. Se só
+  // um dos dois recebesse o fator, o cenário mudaria a PROPORÇÃO entre base e
+  // permuta — e a permuta pareceria encolher (ou inchar) sozinha.
+  const base: ProformaInput = { ...LOT, permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 3_000 };
+  const semFator = calcularProforma(base);
+  const bull = calcularProforma({ ...base, sensibilidade: { variavel: 'preco', fator: 1.1 } });
+  assert.ok(perto(semFator.vgv, 72_000_000), `vgv base=${semFator.vgv}`);          // 75M − 3M
+  assert.ok(perto(bull.vgv, 79_200_000), `vgv bull=${bull.vgv}`);                   // 82,5M − 3,3M
+  assert.ok(perto(bull.vgv, semFator.vgv * 1.1, 0.02), 'o VGV líquido não é proporcional ao fator');
+  // A permuta pesa o mesmo sobre o bruto nos dois cenários.
+  const peso = (p: ReturnType<typeof calcularProforma>) =>
+    p.vgvPermutaResidencial / (p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial);
+  assert.ok(perto(peso(bull), peso(semFator), 1e-9), `peso base=${peso(semFator)} bull=${peso(bull)}`);
+});
+
+test('#568: o cap do excedente de permuta (#563) e os indicadores indefinidos (#571) sobrevivem ao stress', () => {
+  // Permuta que vale mais que a base inteira: 80.000 m² × R$ 1.000 = R$ 80M
+  // sobre catálogo de R$ 75M. Como base e permuta escalam pelo MESMO fator, o
+  // excedente continua excedente em qualquer cenário — o cap não é um efeito
+  // do cenário, é do estudo.
+  const capado: ProformaInput = { ...LOT, permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 80_000 };
+  for (const fator of [FATOR_BEAR, 1, FATOR_BULL]) {
+    const p = calcularProforma({ ...capado, sensibilidade: { variavel: 'preco', fator } });
+    assert.equal(p.permutaCapada, true, `fator ${fator}: a permuta deveria continuar capada`);
+    assert.equal(p.vgv, 0, `fator ${fator}: vgv=${p.vgv}`);
+    // #571: sem base, o indicador é INDEFINIDO — nunca 0,0%.
+    assert.equal(p.margemLiquidaPct, null, `fator ${fator}: margemLiquidaPct=${p.margemLiquidaPct}`);
+    assert.equal(p.custoObrasVgvPct, null, `fator ${fator}: custoObrasVgvPct=${p.custoObrasVgvPct}`);
+  }
+});
+
+test('#568: variação negativa acima de 100% degrada o preço para ZERO — nunca para preço negativo', () => {
+  // O editor de benchmarks, o `schema.json` e a rota PATCH aceitam
+  // `variacao_negativa_pct > 100`, e a tela deriva `fatorBear = 1 − varNeg/100`
+  // — com 150% o fator pedido é **−0,5**. Sem o piso na fonte, o catálogo era
+  // reprecificado a preço NEGATIVO: o VGV bruto ficava negativo, o cap
+  // escolhia `Math.min(0, negativo)` como permuta efetiva, e a tela mostrava a
+  // linha "VGV" NEGATIVA com "Receita bruta" zerada — exatamente o que a #563
+  // proibiu.
+  const fatorPedido = 1 - 150 / 100;
+  assert.ok(fatorPedido < 0, 'o fixture deste teste precisa pedir um fator negativo');
+
+  const p = calcularProforma({
+    ...ESTUDO_SENSIBILIDADE, produtos: PRODUTOS_SENSIBILIDADE,
+    sensibilidade: { variavel: 'preco', fator: fatorPedido },
+  });
+  // Preço zero ⇒ VGV zero. Nem a base, nem a permuta, nem o VGV BRUTO que a
+  // tela imprime na linha "VGV" (`vgv + as duas permutas`) podem ficar
+  // negativos.
+  assert.equal(p.vgv, 0, `vgv=${p.vgv}`);
+  assert.equal(p.vgvResidencial, 0);
+  assert.equal(p.vgvNaoResidencial, 0);
+  assert.equal(p.vgvPermutaResidencial, 0, `permutaR=${p.vgvPermutaResidencial}`);
+  assert.equal(p.vgvPermutaNaoResidencial, 0, `permutaNR=${p.vgvPermutaNaoResidencial}`);
+  const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
+  assert.equal(vgvBruto, 0, `a linha "VGV" da tela saiu ${vgvBruto}`);
+  // #571: sem base, indicador é INDEFINIDO — nunca 0,0%.
+  assert.equal(p.margemLiquidaPct, null);
+  assert.equal(p.custoObrasVgvPct, null);
+  assert.equal(p.receitaLiquidaSobreVgvPct, null);
+
+  // O mesmo com permuta física no estudo, que é onde o cap opera: a permuta
+  // pedida também vale zero, então não há excedente a capar e a identidade
+  // `vgv + permutas = VGV bruto` continua fechando em zero.
+  const comPermuta = calcularProforma({
+    ...LOT, permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 3_000,
+    sensibilidade: { variavel: 'preco', fator: fatorPedido },
+  });
+  assert.equal(comPermuta.vgv, 0, `vgv com permuta=${comPermuta.vgv}`);
+  assert.equal(comPermuta.vgvPermutaSolicitada, 0);
+  assert.equal(comPermuta.permutaCapada, false, 'sem base e sem permuta não há excedente a capar');
+  assert.equal(
+    comPermuta.vgv + comPermuta.vgvPermutaResidencial + comPermuta.vgvPermutaNaoResidencial, 0,
+  );
+});
+
+test('#568: estressar CUSTO ou PERMUTA não reprecifica o catálogo — só a variável "preco"', () => {
+  const base = calcularProforma({ ...ESTUDO_SENSIBILIDADE, produtos: PRODUTOS_SENSIBILIDADE });
+  for (const variavel of ['custo_obras', 'custo_infra', 'permuta_fisica', 'permuta_financeira'] as const) {
+    const p = calcularProforma({
+      ...ESTUDO_SENSIBILIDADE, produtos: PRODUTOS_SENSIBILIDADE,
+      sensibilidade: { variavel, fator: 1.5 },
+    });
+    assert.equal(p.vgv.toFixed(2), base.vgv.toFixed(2), `${variavel} moveu o VGV do catálogo`);
+  }
+  // ...e o custo de obras respondeu ao seu próprio fator (o stress não virou
+  // um no-op inteiro — critério 2 da issue).
+  const obras = calcularProforma({
+    ...ESTUDO_SENSIBILIDADE, produtos: PRODUTOS_SENSIBILIDADE,
+    sensibilidade: { variavel: 'custo_obras', fator: 1.5 },
+  });
+  assert.ok(perto(obras.construcao, base.construcao * 1.5, 0.02), `construcao=${obras.construcao}`);
 });
 
 test('preço sugerido: atinge o piso do benchmark', () => {
@@ -1130,15 +1300,35 @@ test('#570 areaTotalProdutos: Σ área média × unidades, e lista vazia/ausente
   assert.equal(areaTotalProdutos([{ area_media_m2: null, unidades: undefined }]), 0);
 });
 
-test('#570 totaisPorTipoProdutos: categoria vazia devolve preço null (nunca 0) e linha em branco não entra', () => {
-  const t = totaisPorTipoProdutos([
-    { area_media_m2: 100, preco_venda_m2: 1_000, unidades: 2 },
-    { area_media_m2: null, preco_venda_m2: null, unidades: 0, tipo: 'nao_residencial' }, // em branco
-  ]);
+test('#570 totaisPorTipoProdutos: categoria vazia devolve preço null (nunca 0)', () => {
+  const t = totaisPorTipoProdutos([{ area_media_m2: 100, preco_venda_m2: 1_000, unidades: 2 }]);
   assert.ok(perto(t.residencial.vgv, 200_000));
   assert.equal(t.nao_residencial.vgv, 0);
   assert.equal(t.nao_residencial.areaTotalM2, 0);
   assert.equal(t.nao_residencial.precoMedioM2, null, 'preço 0 pareceria "vende de graça"');
+});
+
+// ⚠️ Contrato deliberado, e o oposto do de `resumoCatalogoProdutos`: esta
+// função NÃO filtra — quem filtra é `calcularProforma`, uma vez, ANTES de
+// reprecificar pelo fator de sensibilidade (#568). Refiltrar depois da
+// reprecificação faria um fator 0 zerar os preços, derrubar as linhas no filtro
+// e a categoria perder suas unidades só naquele cenário. O teste da interação
+// #568×#570, no fim deste bloco, é o que mede essa consequência.
+test('#570 totaisPorTipoProdutos NÃO filtra — quem filtra é o motor, e a composição é explícita', () => {
+  // Linha com área e unidades mas SEM preço: não compõe catálogo, e sem filtro
+  // ela puxa o preço médio ponderado da categoria para baixo.
+  const comIncompleta = [
+    { area_media_m2: 100, preco_venda_m2: 1_000, unidades: 2 },   // 200 m², 200.000
+    { area_media_m2: 100, preco_venda_m2: null, unidades: 2 },    // 200 m², zero
+  ];
+  const cru = totaisPorTipoProdutos(comIncompleta);
+  assert.ok(perto(cru.residencial.areaTotalM2, 400), `área crua=${cru.residencial.areaTotalM2}`);
+  assert.ok(perto(cru.residencial.precoMedioM2!, 500), `preço cru=${cru.residencial.precoMedioM2}`);
+  // A composição com `catalogoEfetivo` é o que descreve o CADASTRO.
+  const efetivo = totaisPorTipoProdutos(catalogoEfetivo(comIncompleta));
+  assert.ok(perto(efetivo.residencial.areaTotalM2, 200), `área efetiva=${efetivo.residencial.areaTotalM2}`);
+  assert.ok(perto(efetivo.residencial.precoMedioM2!, 1_000), `preço efetivo=${efetivo.residencial.precoMedioM2}`);
+  assert.equal(totaisPorTipoProdutos(undefined).residencial.vgv, 0);
 });
 
 test('#570 critério 1: o VGV de cada categoria sai do `tipo` de cada produto', () => {
@@ -1336,4 +1526,72 @@ test('#570: Loteamento COM catálogo também mede e valora a permuta pelo catál
   // A área vendável da cascata continua sendo a da cascata — o catálogo governa
   // a permuta e a receita, não a geometria do terreno.
   assert.ok(perto(p.areaVendavel, 75_000), `areaVendavel=${p.areaVendavel}`);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #568 × #570 — o PONTO DE ENCONTRO dos dois PRs
+//
+// Os dois reescrevem o mesmo trecho do motor, e a ordem em que as operações
+// acontecem é o contrato entre eles:
+//
+//   catalogoEfetivo → aplicarFatorPreco (fator clampado em 0 na fonte)
+//                   → totaisPorTipoProdutos (SEM refiltrar) → permutas/cap por categoria
+//
+// O que este teste mede, e que nenhum dos dois PRs media sozinho: sob stress, a
+// base e a permuta física de CADA categoria escalam JUNTAS, porque o preço médio
+// da categoria sai do catálogo JÁ reprecificado. Se a reprecificação não chegar
+// ao caminho por categoria (ou chegar duas vezes), a permuta passa a escalar em
+// ritmo diferente da própria base e as duas identidades do cap deixam de fechar.
+test('#568×#570: sob o cenário Bear, as duas identidades de cap fecham e cada VGV escala pelo fator', () => {
+  const MISTO_STRESS: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    // Legados absurdos: se algum aparecer no resultado, a fonte errada venceu.
+    area_pvt_r_fechada: 9999, preco_venda_m2_residencial: 1,
+    area_pvt_nr_fechada: 7777, preco_venda_m2_nao_residencial: 2,
+    produtos: [
+      { area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10 },  // R: 1.000 m², 10,0M
+      { area_media_m2: 100, preco_venda_m2: 5_000, unidades: 4, tipo: 'nao_residencial' }, // NR: 400 m², 2,0M
+    ],
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 100,       // R: 100 m²
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 200, // NR: 200 m²
+  };
+  const base = calcularProforma(MISTO_STRESS);
+  const bear = calcularProforma({ ...MISTO_STRESS, sensibilidade: { variavel: 'preco', fator: FATOR_BEAR } });
+
+  // 1. O VGV bruto de CADA categoria escala pelo fator — não só o total.
+  const brutoR = (p: typeof base) => p.vgvResidencial + p.vgvPermutaResidencial;
+  const brutoNR = (p: typeof base) => p.vgvNaoResidencial + p.vgvPermutaNaoResidencial;
+  assert.ok(perto(brutoR(base), 10_000_000), `brutoR base=${brutoR(base)}`);
+  assert.ok(perto(brutoNR(base), 2_000_000), `brutoNR base=${brutoNR(base)}`);
+  assert.ok(perto(brutoR(bear), 10_000_000 * FATOR_BEAR), `brutoR bear=${brutoR(bear)}`);
+  assert.ok(perto(brutoNR(bear), 2_000_000 * FATOR_BEAR), `brutoNR bear=${brutoNR(bear)}`);
+
+  // 2. A permuta de cada categoria escala pelo MESMO fator, uma vez só. Duas
+  //    vezes (fator ao quadrado) daria 810.000 em R — o defeito que a
+  //    reconciliação evita ao não reaplicar `fatorSens('preco')` sobre
+  //    `precoMedioM2`, que já vem do catálogo reprecificado.
+  assert.ok(perto(base.vgvPermutaResidencial, 1_000_000), `permR base=${base.vgvPermutaResidencial}`);
+  assert.ok(perto(bear.vgvPermutaResidencial, 1_000_000 * FATOR_BEAR), `permR bear=${bear.vgvPermutaResidencial}`);
+  assert.ok(perto(bear.vgvPermutaNaoResidencial, 1_000_000 * FATOR_BEAR), `permNR bear=${bear.vgvPermutaNaoResidencial}`);
+
+  // 3. As DUAS identidades de cap fecham ao centavo DENTRO do cenário.
+  assert.equal(bear.vgvResidencial + bear.vgvPermutaResidencial, 9_000_000);
+  assert.equal(bear.vgvNaoResidencial + bear.vgvPermutaNaoResidencial, 1_800_000);
+  assert.equal(bear.vgv, bear.vgvResidencial + bear.vgvNaoResidencial);
+  assert.equal(bear.permutaCapada, false, 'nenhuma categoria excede no cenário');
+
+  // 4. O cap não muda de veredito por causa do cenário: a proporção
+  //    permuta ÷ base é a mesma nos dois, porque as duas escalam juntas.
+  assert.ok(perto(base.vgvPermutaResidencial / brutoR(base), bear.vgvPermutaResidencial / brutoR(bear)),
+    'a proporção da permuta mudou de cenário — base e permuta não escalaram juntas');
+
+  // 5. A consequência de NÃO refiltrar depois de reprecificar (#568): com fator
+  //    0 todo preço vira 0, e um refiltro derrubaria as linhas — a contagem por
+  //    categoria zeraria enquanto `numUnidades` continuaria certo.
+  const zerado = calcularProforma({ ...MISTO_STRESS, sensibilidade: { variavel: 'preco', fator: 0 } });
+  assert.equal(zerado.vgv, 0);
+  assert.equal(zerado.numUnidades, 14);
+  assert.equal(zerado.numUnidadesResidencial, 10, 'a categoria perdeu suas unidades no cenário');
+  assert.equal(zerado.numUnidadesNaoResidencial, 4, 'a categoria perdeu suas unidades no cenário');
+  assert.equal(zerado.semProdutos, false, '`semProdutos` é fato cadastral, não do cenário');
 });

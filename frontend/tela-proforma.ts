@@ -60,6 +60,37 @@ export function celulaProformaM2(r: Pick<Linha, 'v' | 'tipo' | 'natureza'>, area
 // reexportado como alias em vez de duplicar a união (proforma.ts é a fonte).
 type VarSens = VariavelSensibilidade;
 
+// #11: cada linha da tabela de cenários é receita ou despesa — é o que colore o
+// rótulo e o fundo da linha. #568: é também o que decide a NOTAÇÃO da célula,
+// no lugar do par `tipo`/`natureza` da tabela principal.
+export type NaturezaSensibilidade = 'receita' | 'despesa';
+
+/**
+ * #568 — célula monetária da tabela de CENÁRIOS.
+ *
+ * Delega para `celulaProforma`, a mesma função da tabela principal: despesa
+ * SEMPRE entre parênteses (a app grava custo como valor positivo), receita e
+ * resultado com o SINAL REAL. Antes desta issue a sensibilidade formatava com
+ * `fmtR$` cru — negativo saía com sinal de menos enquanto a tabela principal o
+ * mostrava entre parênteses, e as duas discordavam por construção sobre a mesma
+ * grandeza. Os dois parâmetros são obrigatórios: `natureza` esquecida vira erro
+ * de compilação, não uma célula que silenciosamente troca de convenção.
+ */
+export function celulaSensibilidade(v: number, natureza: NaturezaSensibilidade): string {
+  return celulaProforma({ v, natureza: natureza === 'receita' ? 'receita' : undefined });
+}
+
+/**
+ * #568 — classe de sinal da célula de cenário, espelhando a da tabela principal
+ * (`_renderTabela`): só linha de RECEITA/resultado ganha `pos`/`neg`; despesa
+ * fica sem classe e mantém a cor do cenário. É `neg` que sobrepõe o verde do
+ * Base num cenário deficitário — a mesma decisão da #567, que recusou pintar de
+ * "receita boa" um valor negativo.
+ */
+export function sinalSensibilidade(v: number, natureza: NaturezaSensibilidade): '' | 'pos' | 'neg' {
+  return natureza === 'receita' ? (v < 0 ? 'neg' : 'pos') : '';
+}
+
 @customElement('viab-tela-proforma')
 export class ViabTelaProforma extends LitElement {
   @property({ attribute: false }) estudo: any = null;
@@ -176,6 +207,18 @@ export class ViabTelaProforma extends LitElement {
     .pf.sens th.num { text-align: right; }
     /* #76 — valores da sensibilidade em negrito. */
     .pf.sens td.num { font-weight: 700; text-align: right; }
+    /* #11 — os NÚMEROS na cor do cenário. #568: por classe, e não mais por
+       atributo style inline: declaração inline vence qualquer seletor, e a
+       marca de negativo abaixo precisa poder sobrepô-la. (Sem crase neste
+       bloco: ele mora dentro do template literal do css.) */
+    .pf.sens td.num.cen-bear { color: var(--cor-erro, #D45A3A); }
+    .pf.sens td.num.cen-base { color: var(--cor-sucesso, #13A98D); }
+    .pf.sens td.num.cen-bull { color: var(--cor-info, #2AA9E0); }
+    /* #568/#567 — receita ou resultado REALMENTE negativo: vermelho, sobrepondo
+       a cor do cenário (o verde do Base mentiria "receita boa" num cenário
+       deficitário — a mesma decisão que a #567 tomou na tabela principal).
+       Mesma especificidade das três regras acima: vence por vir DEPOIS. */
+    .pf.sens td.num.neg { color: var(--cor-erro, #D45A3A); }
     /* #11 — unidades e preço médio por tipo. */
     .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; }
     .ut-item { display: flex; flex-direction: column; gap: 2px; }
@@ -505,7 +548,7 @@ export class ViabTelaProforma extends LitElement {
     // #11: `natureza` classifica cada linha como receita ou despesa para colorir o
     // rótulo (1ª coluna) e o fundo da linha (só tokens do design system).
     type Cen = { p: Proforma; vgvBruto: number };
-    type Natureza = 'receita' | 'despesa';
+    type Natureza = NaturezaSensibilidade;
     // #571: `f` pode devolver `null` — só as duas linhas `pct: true`
     // (Custo obras/VGV, Margem sobre VGV) o fazem, quando o cenário cai com
     // VGV ≤ 0; as monetárias continuam sempre `number`.
@@ -524,21 +567,18 @@ export class ViabTelaProforma extends LitElement {
     // #492: `fmtNum` com 2 casas dava *até* 2 casas (declara só o
     // `maximumFractionDigits`, nunca o `minimumFractionDigits`), então
     // a vírgula decimal não batia entre as linhas de uma coluna alinhada à direita.
-    // `fmtR$(v, false)` é a fonte única de arredondamento monetário do contrato C7
-    // (#281): min = max = 2, sem o símbolo.
+    // #568: o arredondamento monetário do contrato C7 (#281) continua o mesmo —
+    // ele agora chega por `celulaSensibilidade`, que é `celulaProforma`, que é
+    // `celula`/`fmtR$(v, false)`. O que muda é a NOTAÇÃO: despesa entre
+    // parênteses, receita/resultado com o sinal real, igual à tabela principal.
     // #571: `v === null` só acontece nas duas linhas `pct: true` com o
-    // cenário em VGV ≤ 0 — "—", nunca "0,0%". `fmtR$` continua exigindo
-    // `number`: uma linha monetária nunca chega aqui como `null`.
-    const fmt = (m: { pct?: boolean }, v: number | null) => (v === null ? '—' : (m.pct ? fmtPct(v) : fmtR$(v, false)));
+    // cenário em VGV ≤ 0 — "—", nunca "0,0%". As monetárias nunca chegam `null`.
+    const fmt = (m: { pct?: boolean; natureza: Natureza }, v: number | null) =>
+      (v === null ? '—' : (m.pct ? fmtPct(v) : celulaSensibilidade(v, m.natureza)));
     // #11: título de cada cenário num urbi-badge ESTÁTICO — Bear=perigo (vermelho),
-    // Base=sucesso (verde), Bull=info (azul). Os NÚMEROS agora seguem a mesma cor
-    // do cenário (tokens correspondentes ao badge).
+    // Base=sucesso (verde), Bull=info (azul). Os NÚMEROS seguem a mesma cor do
+    // cenário, por classe `cen-*` (ver o CSS) — exceto quando o valor é negativo.
     const COR_BADGE = { bear: 'perigo', base: 'sucesso', bull: 'info' } as const;
-    const COR_TXT = {
-      bear: 'var(--cor-erro, #D45A3A)',
-      base: 'var(--cor-sucesso, #13A98D)',
-      bull: 'var(--cor-info, #2AA9E0)',
-    } as const;
     const pBear = proforma(fatorBear), pBase = proforma(1), pBull = proforma(fatorBull);
     const cenarios: { id: 'bear' | 'base' | 'bull'; rot: string; p: Proforma; vgvBruto: number }[] = [
       { id: 'bear', rot: '📉 Bear', p: pBear, vgvBruto: vgvBrutoDe(pBear) },
@@ -575,7 +615,12 @@ export class ViabTelaProforma extends LitElement {
             const bola = m.bmCampo ? bolaFaixa(this._bm(m.bmCampo), valNum) : '';
             return html`<td class="num"><div class="sens-cab"><urbi-badge cor=${COR_BADGE[c.id]}>${bola ? `${bola} ` : ''}${txt}</urbi-badge></div></td>`;
           }
-          return html`<td class="num" style="color:${COR_TXT[c.id]}">${txt}</td>`;
+          // #568: `neg` é o que faz um Resultado negativo aparecer vermelho
+          // mesmo na coluna Base — e é a única marca desta tabela que depende
+          // do NÚMERO do cenário, e não da coluna. `valNum` nunca é `null`
+          // aqui: só as duas linhas `pct` (que são `badge`) podem sê-lo.
+          const sinal = sinalSensibilidade(valNum ?? 0, m.natureza);
+          return html`<td class="num cen-${c.id} ${sinal}">${txt}</td>`;
         })}
       </tr>`;
     return html`<urbi-card titulo="Análise de sensibilidade">

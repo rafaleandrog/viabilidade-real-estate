@@ -310,7 +310,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/tela-financeiro.ts:154` — `_n` (`casas-decimais="2"`) | 2 | ✅ |
 | `frontend/tela-empreendimento-tipologias.ts:178` | 2 (default) | ✅ |
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
-| `frontend/tela-proforma.ts:532` — sensibilidade, via `fmtR$(v, false)` | 2 | ✅ desde a #492 |
+| `frontend/tela-proforma.ts:79` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
 | `frontend/fluxo-caixa-motor.ts:2125-2133` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |

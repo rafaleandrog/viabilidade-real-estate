@@ -46,17 +46,69 @@ catálogo é X" com X = permuta efetiva, o que só era verdade sob o cap global.
 capando e a outra não, X é menor que o bruto — a frase passou a dizer "a permuta considerada é X"
 e a declarar a regra do cap por categoria.
 
-**Prova de mutação** (controle antes: 756/756 + 37/37 render). Rodando `frontend/*.test.ts`
-(729 testes): neutralizar a separação por categoria → **17 vermelhos**; preço da permuta de volta
+**Prova de mutação.** Controle pós-reconciliação: **771/771 + 39/39 render**. As cinco medidas
+abaixo são anteriores ao merge da #568, sobre o glob de então (`frontend/*.test.ts`, 729 testes) e
+o controle de então (756/756 + 37/37); a sexta, do ponto de encontro, está no parágrafo acima: neutralizar a separação por categoria → **17 vermelhos**; preço da permuta de volta
 ao campo legado → **10**; base de área de volta ao campo legado → **5**; cap de volta a global →
 **4**. A quinta é a que só a fiação pega: reverter `_ctxConversao` para o objeto literal deixa
 **728 verdes e 1 vermelho** — o teste de fonte de `frontend/premissas-conversao.test.ts`, a única
 camada que enxerga "a tela parou de chamar".
 
+**Reconciliação com a #568** (PR 606, mergeado enquanto esta branch estava aberta). Os dois PRs
+reescrevem o mesmo trecho do motor, e o acordo é a ORDEM das operações:
+`catalogoEfetivo` → `aplicarFatorPreco` (fator clampado em 0 **na fonte**, invariante da #563) →
+`totaisPorTipoProdutos` → permutas e cap por categoria. Duas consequências, e as duas viraram
+código:
+
+1. `totaisPorTipoProdutos` **deixou de filtrar** — passou a ter o contrato de `totalProdutos`, e
+   quem filtra é `calcularProforma`, uma vez, ANTES de reprecificar. Refiltrar depois faria um
+   fator 0 zerar os preços, derrubar as linhas no filtro e a categoria perder suas unidades só
+   naquele cenário, enquanto `numUnidades` continuaria certo.
+2. `precoPermuta*` **NÃO reaplica** `fatorSens('preco')`: `precoMedioM2` sai do catálogo já
+   reprecificado, e reaplicar elevaria o fator ao QUADRADO — a permuta escalaria mais rápido que a
+   própria base e o cap quebraria. Pela fonte legada (`semProdutos`) o fator entra em
+   `precoR`/`precoNR`, como a #568 deixou.
+
+Um teste novo mede só a interação (`#568×#570`, cenário Bear sobre catálogo misto com permuta nas
+duas categorias): os dois VGV brutos por categoria escalam pelo fator, a permuta de cada uma escala
+**uma vez só**, as duas identidades de cap fecham ao centavo dentro do cenário, a proporção
+permuta ÷ base não muda de cenário, e com fator 0 a contagem por categoria sobrevive. Mutação no
+ponto de encontro (`porTipo` calculado sobre o catálogo SEM fator): **8 vermelhos em 744** — o
+teste novo mais cinco da própria #568, que é o sinal de que as invariantes das duas issues passaram
+a se sustentar na mesma linha.
+
 **Sem backend, sem schema, sem migração** — a coluna `tipo` já existia (#565), então a `versao` do
 manifesto não bumpa. ⚠️ Fica um comentário obsoleto em `backend/rotas/preliminar-produtos.ts:19-21`
 ("o motor da Proforma ainda não lê este campo"): não foi tocado porque o escopo da issue exclui
 `backend/`, e mexer ali arrastaria a validação de backend, que não roda nesta sessão (SDK 401).
+
+---
+
+## #568 · A sensibilidade alcança o catálogo de Produtos (2026-08-27)
+
+Quarta issue do Trilho A da Rodada 10. `fatorSens('preco')` escalava só os campos legados
+`preco_venda_m2*` — que desde a #563 sobraram como preço da **permuta física** —, então com
+catálogo presente (o caso normal) Bear/Base/Bull saíam com o **mesmo VGV**. `aplicarFatorPreco`
+reprecifica o catálogo efetivo dentro de `calcularProforma`; a filtragem vem **antes** da
+reprecificação, para `semProdutos` continuar sendo fato cadastral e não do cenário. Base e permuta
+escalam pelo mesmo fator, então o cap do excedente (#563) e os indicadores indefinidos (#571) não
+mudam de veredito por causa do cenário.
+
+Junto, o critério 4 da issue: a tabela de cenários formatava com `fmtR$` cru e discordava da tabela
+principal sobre a mesma grandeza — passou a usar `celulaSensibilidade`, que **é** `celulaProforma`.
+
+**Rodada 1 de revisão, 1 bloqueante (P2):** o benchmark aceita `variacao_negativa_pct > 100` e a
+tela deriva `1 − varNeg/100`, então o Bear podia pedir fator **negativo** — catálogo reprecificado a
+preço negativo, VGV bruto negativo, e o cap escolhendo `Math.min(0, negativo)`: a tela mostrava
+"VGV" negativo com "Receita bruta" zero, violando o invariante da #563. Piso em 0 aplicado **na
+fonte** (`fatorSens`), não dentro de `aplicarFatorPreco`: só na fonte o catálogo e a valoração da
+permuta legada recebem o MESMO fator e a identidade do cap continua valendo por construção.
+
+Fixture dourado único (`frontend/fixtures/sensibilidade-catalogo.ts`, VGV do print:
+R$ 24.764.117,40 → Bear 22.287.705,66 / Bull 27.240.529,14) servindo motor, notação e o **primeiro
+caso de render da sub-aba Cenários** — antes dela `secao: 'cenarios'` nunca tinha sido montado em
+Chromium. Medido: neutralizar o fator no motor deixa 6 testes vermelhos; quebrar `_aplicarFator` na
+tela deixa os **747 testes de lógica pura verdes** e derruba só o caso de render novo.
 
 ---
 

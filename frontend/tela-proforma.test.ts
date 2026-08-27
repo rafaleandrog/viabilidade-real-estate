@@ -1,8 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ehLinhaReceitaOuResultado, celulaProforma, celulaProformaM2, type Linha } from './tela-proforma.js';
-import { calcularProforma, type ProformaInput } from './proforma.js';
+import {
+  ehLinhaReceitaOuResultado, celulaProforma, celulaProformaM2,
+  celulaSensibilidade, sinalSensibilidade, type Linha,
+} from './tela-proforma.js';
+import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
 import { fmtR$, fmtNum } from './viab-format.js';
+import {
+  ESTUDO_SENSIBILIDADE, PRODUTOS_SENSIBILIDADE, FATOR_BEAR, FATOR_BULL,
+  VGV_BASE, VGV_BEAR, VGV_BULL,
+} from './fixtures/sensibilidade-catalogo.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #567: a notação contábil da Proforma escondia o sinal real de receita e
@@ -153,4 +160,79 @@ test('#567: Custo direto/indireto total (linhas de custo) continuam SEMPRE entre
   const custoIndireto: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: p.custoIndiretoTotal, tipo: 'consolidado' };
   assert.equal(celulaProforma(custoDireto), `(${fmtR$(p.custoDiretoTotal, false)})`);
   assert.equal(celulaProforma(custoIndireto), `(${fmtR$(p.custoIndiretoTotal, false)})`);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #568 — a tabela de CENÁRIOS: a mesma notação contábil da tabela principal,
+// e a linha "VGV" que finalmente varia entre Bear/Base/Bull.
+//
+// A tabela de sensibilidade formatava com `fmtR$(v, false)` cru: negativo saía
+// "-598.646,51" enquanto a MESMA grandeza, na tabela principal logo acima,
+// saía "(598.646,51)" — e custo positivo saía sem parênteses nenhum, apagando
+// a distinção receita × despesa que a #567 tinha acabado de estabelecer.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** O que `_renderSensibilidade` monta por cenário, sem DOM: o Proforma e o
+ *  VGV bruto (`vgv + as duas permutas`, a identidade de `vgvBrutoDe`). */
+function cenario(fator: number): { p: Proforma; vgvBruto: number } {
+  const p = calcularProforma({
+    ...ESTUDO_SENSIBILIDADE, produtos: PRODUTOS_SENSIBILIDADE,
+    sensibilidade: { variavel: 'preco', fator },
+  });
+  return { p, vgvBruto: p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial };
+}
+
+test('#568 celulaSensibilidade: receita com o SINAL REAL, despesa SEMPRE entre parênteses — a mesma notação da tabela principal', () => {
+  assert.equal(celulaSensibilidade(1_234.56, 'receita'), '1.234,56');
+  assert.equal(celulaSensibilidade(-1_234.56, 'receita'), '(1.234,56)');
+  // Despesa: a app grava custo como valor POSITIVO, e a notação contábil o
+  // marca independentemente do sinal.
+  assert.equal(celulaSensibilidade(10_000, 'despesa'), '(10.000,00)');
+  // Fonte única: é literalmente a célula da tabela principal.
+  assert.equal(celulaSensibilidade(-900, 'receita'), celulaProforma({ v: -900, tipo: 'resultado' }));
+  assert.equal(celulaSensibilidade(900, 'despesa'), celulaProforma({ v: 900, tipo: 'consolidado' }));
+  // Linha que fecha em zero continua visível (`sempreExibir`), como na principal.
+  assert.equal(celulaSensibilidade(0, 'receita'), '0,00');
+  assert.equal(celulaSensibilidade(0, 'despesa'), '(0,00)');
+});
+
+test('#568 sinalSensibilidade: só receita ganha pos/neg; despesa fica sem classe (espelha a tabela principal)', () => {
+  assert.equal(sinalSensibilidade(10, 'receita'), 'pos');
+  assert.equal(sinalSensibilidade(-10, 'receita'), 'neg');
+  assert.equal(sinalSensibilidade(0, 'receita'), 'pos');
+  assert.equal(sinalSensibilidade(-10, 'despesa'), '');
+  assert.equal(sinalSensibilidade(10, 'despesa'), '');
+});
+
+test('#568: a linha "VGV" da tabela de cenários varia entre Bear/Base/Bull — três células DISTINTAS', () => {
+  const celulas = [FATOR_BEAR, 1, FATOR_BULL]
+    .map((f) => celulaSensibilidade(cenario(f).vgvBruto, 'receita'));
+  assert.deepEqual(celulas, [
+    fmtR$(VGV_BEAR, false), fmtR$(VGV_BASE, false), fmtR$(VGV_BULL, false),
+  ]);
+  assert.equal(new Set(celulas).size, 3, `a linha VGV não variou: ${celulas.join(' | ')}`);
+});
+
+test('#568: o Resultado deficitário do Bear sai entre parênteses — não com o sinal de menos do fmtR$ cru (o formato anterior)', () => {
+  const bear = cenario(FATOR_BEAR).p;
+  const base = cenario(1).p;
+  assert.ok(bear.resultado < 0, `o cenário Bear deveria ser deficitário: ${bear.resultado}`);
+  assert.ok(base.resultado > 0, `o cenário Base deveria ser positivo: ${base.resultado}`);
+  const celula = celulaSensibilidade(bear.resultado, 'receita');
+  assert.equal(celula, `(${fmtR$(Math.abs(bear.resultado), false)})`);
+  // O formato ANTERIOR desta tabela, e a razão do critério 4 da issue: a mesma
+  // grandeza saía com sinal de menos aqui e entre parênteses logo acima.
+  assert.notEqual(celula, fmtR$(bear.resultado, false),
+    'regressão: a tabela de cenários voltou ao fmtR$ cru, divergindo da tabela principal');
+  // E é a classe `neg` que pinta esse número de vermelho mesmo na coluna Base.
+  assert.equal(sinalSensibilidade(bear.resultado, 'receita'), 'neg');
+  assert.equal(sinalSensibilidade(base.resultado, 'receita'), 'pos');
+});
+
+test('#568: as linhas de CUSTO da tabela de cenários seguem entre parênteses nos três cenários', () => {
+  for (const fator of [FATOR_BEAR, 1, FATOR_BULL]) {
+    const { p } = cenario(fator);
+    assert.equal(celulaSensibilidade(p.custoDiretoTotal, 'despesa'), `(${fmtR$(p.custoDiretoTotal, false)})`);
+    assert.equal(celulaSensibilidade(p.custoIndiretoTotal, 'despesa'), `(${fmtR$(p.custoIndiretoTotal, false)})`);
+  }
 });
