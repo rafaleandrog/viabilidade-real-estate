@@ -282,9 +282,10 @@ export interface Proforma {
   // Base de ÁREA da permuta física de cada categoria (#570) — é sobre ela que o
   // modo "% área venda" converte % em m², e é a mesma grandeza que a badge de
   // unidade da tela usa (`ctxConversaoPreliminar`, `premissas-conversao.ts`).
-  // Com catálogo efetivo é a área do catálogo DA CATEGORIA (Σ área×unidades);
-  // sem catálogo é a base legada de antes (área vendável no Loteamento,
-  // `area_pvt_*_fechada` na Incorporação).
+  // Na Incorporação com catálogo efetivo é a área do catálogo DA CATEGORIA
+  // (Σ área×unidades); sem catálogo, `area_pvt_*_fechada`. No **Loteamento** é
+  // sempre a ALV da cascata — a base da área lá é do terreno, não do catálogo
+  // (#574); o que o catálogo governa no Loteamento é o preço.
   areaBasePermutaResidencial: number; areaBasePermutaNaoResidencial: number;
   // Fonte do VGV e o que ela impõe a quem desenha a tela.
   // `semProdutos`: não há linha de catálogo que componha VGV — o estudo não tem
@@ -445,11 +446,24 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // categoria escalam JUNTAS — é o que mantém as duas identidades do cap
   // (#563/#570) fechando em qualquer cenário. E é por isso que `precoPermuta*`
   // abaixo NÃO reaplica `fatorSens('preco')`: por este caminho ele já entrou.
-  const porTipo = totaisPorTipoProdutos(catalogoEstressado);
+  //
+  // ⚠️ O Loteamento normaliza TUDO para o bucket residencial antes de separar:
+  // a tela de Permutas dele só expõe os controles residenciais (física e
+  // financeira), então um produto marcado `nao_residencial` no grid sairia da
+  // única base que a tela sabe editar — permuta física ignorando o produto e %
+  // financeiro incidindo só sobre o resto, deduções subestimadas em silêncio.
+  // A semântica R/NR é da Incorporação; aqui o catálogo é um bucket só, como a
+  // tela sempre expôs (e, desde este PR, como o grid de Produtos também mostra:
+  // a coluna "Tipo" não é desenhada no Loteamento).
+  const porTipo = totaisPorTipoProdutos(
+    lot ? catalogoEstressado.map((x) => ({ ...x, tipo: 'residencial' })) : catalogoEstressado,
+  );
 
   // Permuta física (#10) — R e NR separados. O par legado `permuta_fisica_*` é
   // o residencial; `permuta_fisica_nr_*` é o não residencial (Loteamento não
-  // tem NR: a tela nem desenha o par, e aqui ele é zero por construção).
+  // tem NR: a tela nem desenha o par, e aqui ele é zero por construção — o que
+  // só é seguro porque o catálogo do Loteamento foi normalizado acima, senão
+  // haveria VGV numa categoria sem nenhum controle na tela).
   //
   // #570 — a BASE de cada uma passou a ser a da sua categoria NO CATÁLOGO:
   // área (para o modo "% área venda") e preço médio ponderado (para valorar os
@@ -461,9 +475,17 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // (`semProdutos`), e as bases legadas seguem exatamente como estavam. É a
   // mesma decisão do #315 — não há fallback de uma fonte para a outra, em
   // nenhum dos dois sentidos.
-  const areaBasePermutaResidencial = semProdutos
-    ? (lot ? areaVendavel : n(e.area_pvt_r_fechada))
-    : porTipo.residencial.areaTotalM2;
+  //
+  // ⚠️ E a troca de base da ÁREA é semântica da INCORPORAÇÃO, não do Loteamento.
+  // Lá o `%` da permuta física sempre incidiu sobre a **ALV da cascata** (a área
+  // líquida de venda que a tabela de Áreas calcula do terreno), e a auditoria do
+  // Loteamento (#574) reafirmou que é essa a base correta: o loteador entrega
+  // uma fração da área LOTEÁVEL, que é uma grandeza do terreno, não do catálogo.
+  // O que o catálogo governa no Loteamento é o PREÇO — e é isso que conserta a
+  // permuta que reduzia área sem reduzir VGV, porque `preco_venda_m2` não tem
+  // campo em tela nenhuma nem `padrao` no schema.
+  const areaBasePermutaResidencial = lot ? areaVendavel
+    : (semProdutos ? n(e.area_pvt_r_fechada) : porTipo.residencial.areaTotalM2);
   const areaBasePermutaNaoResidencial = lot ? 0
     : (semProdutos ? n(e.area_pvt_nr_fechada) : porTipo.nao_residencial.areaTotalM2);
   // ⚠️ O fator de sensibilidade de preço NÃO aparece nesta linha, e a ausência

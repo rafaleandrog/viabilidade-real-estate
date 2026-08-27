@@ -1508,7 +1508,12 @@ test('#570: estudo SEM catálogo mantém as bases legadas, intocadas', () => {
   assert.ok(perto(lot.vgvPermutaSolicitada, 3_000_000), '3.000 m² × R$ 1.000 legado');
 });
 
-test('#570: Loteamento COM catálogo também mede e valora a permuta pelo catálogo', () => {
+// ⚠️ No Loteamento as duas bases vêm de fontes DIFERENTES, e é de propósito
+// (#574): a ÁREA do modo "% área venda" é a ALV da cascata — o loteador entrega
+// uma fração da área loteável, que é grandeza do TERRENO —, e o PREÇO que valora
+// os m² entregues é o do catálogo. A troca de base da área é semântica da
+// Incorporação (critério 2 da #570) e não atravessa para cá.
+test('#570/#574: Loteamento — a base da ÁREA é a ALV da cascata; o PREÇO é o do catálogo', () => {
   // Catálogo deliberadamente diferente da área vendável da cascata (75.000 m²)
   // e do preço legado (R$ 1.000): 200 lotes de 250 m² a R$ 1.200.
   const p = calcularProforma({
@@ -1516,16 +1521,44 @@ test('#570: Loteamento COM catálogo também mede e valora a permuta pelo catál
     produtos: [{ area_media_m2: 250, preco_venda_m2: 1200, unidades: 200 }], // 50.000 m², 60M
     permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,
   });
-  assert.ok(perto(p.areaBasePermutaResidencial, 50_000), `base=${p.areaBasePermutaResidencial}`);
-  // 10% de 50.000 = 5.000 m² (e não 7.500, os 10% da área vendável).
-  assert.ok(perto(p.areaPermutaResidencial, 5000), `area=${p.areaPermutaResidencial}`);
-  // 5.000 × R$ 1.200 do catálogo (e não × R$ 1.000 do campo legado).
-  assert.ok(perto(p.vgvPermutaResidencial, 6_000_000), `permuta=${p.vgvPermutaResidencial}`);
-  assert.ok(perto(p.vgvResidencial, 54_000_000), `vgvR=${p.vgvResidencial}`);
+  // A base da ÁREA é a ALV (75.000), não os 50.000 m² do catálogo.
+  assert.ok(perto(p.areaBasePermutaResidencial, 75_000), `base=${p.areaBasePermutaResidencial}`);
+  assert.ok(perto(p.areaPermutaResidencial, 7_500), `area=${p.areaPermutaResidencial}`);
+  // O PREÇO é o do catálogo: 7.500 × R$ 1.200 (e não × R$ 1.000 do campo legado).
+  assert.ok(perto(p.vgvPermutaResidencial, 9_000_000), `permuta=${p.vgvPermutaResidencial}`);
+  assert.ok(perto(p.vgvResidencial, 51_000_000), `vgvR=${p.vgvResidencial}`);
   assert.equal(p.vgvNaoResidencial, 0, 'Loteamento não tem NR: nem permuta, nem VGV de categoria');
-  // A área vendável da cascata continua sendo a da cascata — o catálogo governa
-  // a permuta e a receita, não a geometria do terreno.
   assert.ok(perto(p.areaVendavel, 75_000), `areaVendavel=${p.areaVendavel}`);
+});
+
+// #574 (auditoria do Loteamento, medida na `main` SEM este diff): lá a permuta
+// física do Loteamento é valorada por `precoLot = n(e.preco_venda_m2)`, e
+// `estudos.preco_venda_m2` NÃO tem campo em tela nenhuma nem `padrao` no
+// schema — então em Loteamento NOVO a permuta reduzia a área e **não** reduzia
+// o VGV. O fixture `LOT` declara `preco_venda_m2: 1000`, e foi exatamente por
+// isso que o defeito atravessou as suítes: nenhum caso exercia a ausência.
+test('#574: Loteamento com catálogo e SEM `preco_venda_m2` — a permuta física deduz do VGV', () => {
+  const { preco_venda_m2: _semPrecoLegado, ...semPreco } = LOT;
+  assert.equal((semPreco as ProformaInput).preco_venda_m2, undefined,
+    'o fixture deste teste precisa NÃO ter o campo legado');
+  const p = calcularProforma({
+    ...(semPreco as ProformaInput),
+    produtos: [{ area_media_m2: 300, preco_venda_m2: 1_000, unidades: 250 }], // 75.000 m², 75M
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 7_500,
+  });
+  // Na `main` isto daria permuta ZERO (7.500 × preço legado ausente = 0) e o
+  // VGV sairia inteiro, com a área permutada reduzindo só a área líquida.
+  assert.ok(perto(p.vgvPermutaResidencial, 7_500_000), `permuta=${p.vgvPermutaResidencial}`);
+  assert.ok(perto(p.vgvResidencial, 67_500_000), `vgvR=${p.vgvResidencial}`);
+  assert.ok(perto(p.vgv, 67_500_000), `vgv=${p.vgv}`);
+  assert.ok(perto(p.areaVendavelLiquida, 67_500), `liq=${p.areaVendavelLiquida}`);
+  // Sem catálogo o comportamento continua o da `main` (sem fallback): o
+  // residual do achado é issue própria, não deste PR.
+  const semCatalogo = calcularProforma({ ...(semPreco as ProformaInput), produtos: [],
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 7_500 });
+  assert.equal(semCatalogo.semProdutos, true);
+  assert.equal(semCatalogo.vgvPermutaSolicitada, 0, 'sem catálogo, o preço legado ausente segue valendo zero');
+  assert.equal(semCatalogo.vgv, 0);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1594,4 +1627,60 @@ test('#568×#570: sob o cenário Bear, as duas identidades de cap fecham e cada 
   assert.equal(zerado.numUnidadesResidencial, 10, 'a categoria perdeu suas unidades no cenário');
   assert.equal(zerado.numUnidadesNaoResidencial, 4, 'a categoria perdeu suas unidades no cenário');
   assert.equal(zerado.semProdutos, false, '`semProdutos` é fato cadastral, não do cenário');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rodada 1 de revisão do PR 607 — o Loteamento não tem categoria NR
+//
+// O defeito: a separação por categoria movia para o bucket NR o produto que
+// alguém marcasse "Não Residencial" no grid — mas a tela de Permutas do
+// Loteamento só expõe os controles RESIDENCIAIS (física e financeira), e
+// `areaBasePermutaNaoResidencial` é zero por construção no Loteamento. O
+// produto sumia da única base editável: a permuta física passava a ignorá-lo e
+// o % financeiro incidia só sobre o VGV residencial remanescente. Dedução
+// subestimada, sem nada na tela dizendo por quê.
+test('rev1: no Loteamento, produto marcado "não residencial" continua na base das duas permutas', () => {
+  const p = calcularProforma({
+    ...LOT,
+    // Área do catálogo (45.000 m²) DIFERENTE da ALV da cascata (75.000 m²), de
+    // propósito: assim a asserção da base não fica ambígua entre as duas fontes.
+    produtos: [
+      { area_media_m2: 300, preco_venda_m2: 1_000, unidades: 100 },  // 30.000 m², 30M
+      // Marcado NR no grid. No Loteamento isso não pode mudar conta nenhuma.
+      { area_media_m2: 300, preco_venda_m2: 1_000, unidades: 50, tipo: 'nao_residencial' }, // 15.000 m², 15M
+    ],
+    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 10,
+    permuta_financeira_residencial_pct: 10,
+  });
+  // 1. O VGV inteiro fica no bucket residencial — o único que a tela edita.
+  assert.ok(perto(p.vgvResidencial + p.vgvPermutaResidencial, 45_000_000), `brutoR=${p.vgvResidencial}`);
+  assert.equal(p.vgvNaoResidencial, 0, 'Loteamento não tem categoria NR');
+  assert.equal(p.vgvPermutaNaoResidencial, 0);
+  // 2. A base da ÁREA é a ALV da cascata (#574), não a área do catálogo.
+  assert.ok(perto(p.areaBasePermutaResidencial, 75_000), `base=${p.areaBasePermutaResidencial}`);
+  assert.ok(perto(p.areaPermutaResidencial, 7_500), `área=${p.areaPermutaResidencial}`);
+  // 3. O PREÇO é o médio do catálogo INTEIRO (45M ÷ 45.000 = 1.000), não o das
+  //    linhas residenciais só. 7.500 × 1.000 = 7,5M.
+  assert.ok(perto(p.vgvPermutaResidencial, 7_500_000), `permuta=${p.vgvPermutaResidencial}`);
+  // 4. E o % financeiro incide sobre o VGV inteiro, líquido da permuta:
+  //    10% de (45M − 7,5M). Sem a normalização seriam 10% de (30M − 7,5M).
+  assert.ok(perto(p.vgv, 37_500_000), `vgv=${p.vgv}`);
+  assert.ok(perto(p.permutaFinResidencial, 3_750_000), `finR=${p.permutaFinResidencial}`);
+  // 5. E a contagem de unidades não se parte em duas.
+  assert.equal(p.numUnidades, 150);
+});
+
+test('rev1: a normalização é SÓ do Loteamento — a Incorporação continua separando R de NR', () => {
+  const produtos = [
+    { area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10 },  // R: 1.000 m², 10M
+    { area_media_m2: 100, preco_venda_m2: 5_000, unidades: 4, tipo: 'nao_residencial' }, // NR: 400 m², 2M
+  ];
+  const inc = calcularProforma({ tipo_empreendimento: 'incorporacao', produtos });
+  assert.ok(perto(inc.vgvResidencial, 10_000_000), `incR=${inc.vgvResidencial}`);
+  assert.ok(perto(inc.vgvNaoResidencial, 2_000_000), `incNR=${inc.vgvNaoResidencial}`);
+  assert.equal(inc.numUnidadesNaoResidencial, 4);
+  // O mesmo catálogo num Loteamento: um bucket só.
+  const lot = calcularProforma({ ...LOT, produtos });
+  assert.ok(perto(lot.vgvResidencial, 12_000_000), `lotR=${lot.vgvResidencial}`);
+  assert.equal(lot.vgvNaoResidencial, 0);
 });

@@ -77,6 +77,36 @@ ponto de encontro (`porTipo` calculado sobre o catálogo SEM fator): **8 vermelh
 teste novo mais cinco da própria #568, que é o sinal de que as invariantes das duas issues passaram
 a se sustentar na mesma linha.
 
+**Conserto da rodada 1 de revisão (P1) — o Loteamento não tem categoria NR.** A separação nova
+movia para o bucket NR o produto que alguém marcasse "Não Residencial" no grid, mas a tela de
+Permutas do Loteamento só expõe os controles **residenciais** e `areaBasePermutaNaoResidencial` é
+zero por construção lá: o produto saía da única base editável, a permuta física passava a
+ignorá-lo e o `%` financeiro incidia só sobre o resto — dedução subestimada em silêncio. Consertado
+nas **duas pontas**, para UI e motor andarem juntos: o motor normaliza o catálogo do Loteamento
+para o bucket residencial antes de separar, e o grid de Produtos deixa de desenhar a coluna "Tipo"
+quando o estudo é Loteamento (controle cuja escolha o cálculo ignora não pode ficar editável). O
+campo continua no schema e no backend — só não é editável nem exibido ali.
+
+As colunas do grid viraram `colunasProduto(lot)`, exportada, e dela saem `colgroup`, cabeçalho,
+corpo e linha de Total — a contagem de células não desalinha por esquecimento de um dos quatro. A
+**ausência** de coluna não é provável pelo harness de render (ele só sabe exigir presença), então a
+prova mora em teste de unidade sobre a lista, como a #566 fez com `opcoes`. `lot` e `colunas` são
+parâmetros **obrigatórios**: apagar o argumento dá `TS2554` (medido).
+
+**Interação com a auditoria do Loteamento (#574), medida na `main` sem este diff.** Lá a permuta
+física do Loteamento é valorada por `precoLot = n(e.preco_venda_m2)`, e `estudos.preco_venda_m2`
+não tem campo em tela nenhuma nem `padrao` no schema — Loteamento novo tinha permuta que reduzia
+área e **não** reduzia VGV. Com catálogo, este diff conserta isso: o preço passa a ser o médio do
+catálogo. Teste novo com o campo legado **ausente** do fixture (o `LOT` declara `preco_venda_m2:
+1000`, e foi por isso que o defeito atravessou as suítes). Sem catálogo o comportamento continua o
+da `main`, sem fallback — o residual é issue própria.
+
+**E a base da ÁREA no Loteamento voltou a ser a ALV da cascata.** A troca de base para o catálogo é
+semântica da **Incorporação** (critério 2 da #570): no Loteamento o `%` sempre incidiu sobre a área
+loteável, que é grandeza do terreno. As duas fontes convivem lá de propósito — **área** da cascata,
+**preço** do catálogo —, e há teste com catálogo de área diferente da ALV para a asserção não ficar
+ambígua.
+
 **Sem backend, sem schema, sem migração** — a coluna `tipo` já existia (#565), então a `versao` do
 manifesto não bumpa. ⚠️ Fica um comentário obsoleto em `backend/rotas/preliminar-produtos.ts:19-21`
 ("o motor da Proforma ainda não lê este campo"): não foi tocado porque o escopo da issue exclui

@@ -142,6 +142,38 @@ export const PERMUTA_FIS_NR: CustoUnidade = {
   ],
 };
 
+/**
+ * Colunas do grid de Produtos, na ordem em que a tela as desenha (#570).
+ *
+ * Existe como função pura e exportada porque a AUSÊNCIA de uma coluna não é
+ * provável pelo harness de render — ele só sabe exigir presença (`exigir`/
+ * `minimo`), nunca contar nem negar. É o mesmo recurso que a #566 usou para
+ * provar que a Permuta física parou de oferecer "Unidade": a prova mora no
+ * array, testável direto.
+ *
+ * ⚠️ **"Tipo" (Residencial/Não Residencial) só existe na Incorporação.** No
+ * Loteamento a tela de Permutas expõe apenas os controles residenciais, e o
+ * motor normaliza o catálogo inteiro para o bucket residencial
+ * (`calcularProforma`): um seletor editável cuja escolha o cálculo ignora é
+ * exatamente o "endpoint sem controle na UI" ao contrário — controle sem
+ * efeito. O campo continua no schema e no backend; ele só não é editável nem
+ * exibido aqui.
+ *
+ * O `<colgroup>`, o `<thead>` e a linha de Total saem TODOS desta lista, então
+ * a contagem de células nunca desalinha por esquecimento de um dos três.
+ */
+export interface ColunaProduto { chave: string; rotulo: string; classe: string; num?: boolean }
+export function colunasProduto(lot: boolean): ColunaProduto[] {
+  return [
+    { chave: 'nome', rotulo: 'Nome', classe: 'p-nome' },
+    ...(lot ? [] : [{ chave: 'tipo', rotulo: 'Tipo', classe: 'p-tipo' }]),
+    { chave: 'area', rotulo: 'Área média do lote', classe: 'p-area', num: true },
+    { chave: 'preco', rotulo: 'Preço de venda', classe: 'p-preco', num: true },
+    { chave: 'unidades', rotulo: 'Unidades', classe: 'p-un', num: true },
+    { chave: 'vgv', rotulo: 'VGV', classe: 'p-vgv', num: true },
+  ];
+}
+
 // Permuta financeira R e NR (#5): cada uma alterna entre % do VGV do tipo e um
 // valor absoluto em R$. Renderizadas na seção Deduções.
 const PERMUTA_FIN_R: CustoUnidade = {
@@ -597,7 +629,7 @@ export class ViabTelaPremissas extends LitElement {
         <urbi-card titulo="Produtos">
           <div class="secao grupo grupo-a">
             <h4>Produtos</h4>
-            ${this._renderTabelaProdutos(dis)}
+            ${this._renderTabelaProdutos(dis, lot)}
           </div>
 
           ${this._renderRodapeForm()}
@@ -707,7 +739,10 @@ export class ViabTelaPremissas extends LitElement {
 
   // ── Catálogo de Produtos (#315) — tabela add/remove, CRUD à parte do form ──
 
-  private _renderTabelaProdutos(dis: boolean): TemplateResult {
+  // `lot` é OBRIGATÓRIO (sem default): é ele que decide se a coluna "Tipo"
+  // existe, e um default silencioso reintroduziria o seletor no Loteamento sem
+  // nada ficar vermelho. Apagar o argumento na chamada vira `TS2554`.
+  private _renderTabelaProdutos(dis: boolean, lot: boolean): TemplateResult {
     if (this.produtos.length === 0) {
       return html`
         <div class="prod-vazio">
@@ -723,25 +758,28 @@ export class ViabTelaPremissas extends LitElement {
       `;
     }
     const { vgv, unidades } = totalProdutos(this.produtos);
+    // Uma lista só governa colgroup, cabeçalho, corpo e total — ver `colunasProduto`.
+    const colunas = colunasProduto(lot);
     return html`
       <table class="prod">
         <colgroup>
-          <col class="p-nome"><col class="p-tipo"><col class="p-area"><col class="p-preco"><col class="p-un"><col class="p-vgv">
+          ${colunas.map((c) => html`<col class=${c.classe}>`)}
           ${dis ? nothing : html`<col class="p-acao">`}
         </colgroup>
         <thead>
           <tr>
-            <th>Nome</th><th>Tipo</th><th class="num">Área média do lote</th><th class="num">Preço de venda</th>
-            <th class="num">Unidades</th><th class="num">VGV</th>
+            ${colunas.map((c) => html`<th class=${c.num ? 'num' : nothing}>${c.rotulo}</th>`)}
             ${dis ? nothing : html`<th></th>`}
           </tr>
         </thead>
         <tbody>
-          ${this.produtos.map((p) => this._linhaProduto(p, dis))}
+          ${this.produtos.map((p) => this._linhaProduto(p, dis, colunas))}
           <tr class="total">
-            <td>Total</td><td></td><td></td><td></td>
-            <td class="num">${fmtNum(unidades, 0)}</td>
-            <td class="num">${fmtR$(vgv)}</td>
+            ${colunas.map((c) => (
+              c.chave === 'nome' ? html`<td>Total</td>`
+                : c.chave === 'unidades' ? html`<td class="num">${fmtNum(unidades, 0)}</td>`
+                : c.chave === 'vgv' ? html`<td class="num">${fmtR$(vgv)}</td>`
+                : html`<td></td>`))}
             ${dis ? nothing : html`<td></td>`}
           </tr>
         </tbody>
@@ -755,7 +793,12 @@ export class ViabTelaPremissas extends LitElement {
     `;
   }
 
-  private _linhaProduto(p: any, dis: boolean): TemplateResult {
+  // `colunas` é OBRIGATÓRIO (sem default) de propósito: é ele que decide se a
+  // célula do seletor de Tipo existe, e a mesma lista já desenhou o cabeçalho e
+  // a linha de Total. Sem o parâmetro, corpo e cabeçalho poderiam divergir em
+  // silêncio — a classe de defeito que a auditoria da Rodada 9 cobrou.
+  private _linhaProduto(p: any, dis: boolean, colunas: ColunaProduto[]): TemplateResult {
+    const temTipo = colunas.some((c) => c.chave === 'tipo');
     return html`
       <tr>
         <td class="nome">
@@ -763,6 +806,7 @@ export class ViabTelaPremissas extends LitElement {
             @urbi:input-change=${(e: CustomEvent) => this._salvarProduto(p, { nome: e.detail.valor })}
           ></urbi-input>
         </td>
+        ${temTipo ? html`
         <td class="tipo">
           <urbi-select ?desabilitado=${dis}
             .valor=${tipoProdutoEfetivo(p)}
@@ -772,7 +816,7 @@ export class ViabTelaPremissas extends LitElement {
             ]}
             @urbi:select-change=${(e: CustomEvent) => this._salvarProduto(p, { tipo: e.detail.valor })}
           ></urbi-select>
-        </td>
+        </td>` : nothing}
         <td class="num">
           <viab-num sufixo="m²" ?desabilitado=${dis}
             .valor=${p.area_media_m2 !== null && p.area_media_m2 !== undefined ? Number(p.area_media_m2) : null}
