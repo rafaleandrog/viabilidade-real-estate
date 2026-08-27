@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calcularCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO, type EstadoLinha } from './areas-cascata.js';
+import {
+  calcularCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO,
+  estadosCascataLoteamentoDoEstudo, itensAlocacaoGleba, modoMestreDoSchema,
+  type EstadoLinha,
+} from './areas-cascata.js';
+import { calcularProforma } from './proforma.js';
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 
@@ -132,4 +137,72 @@ test('Incorporação — layout proposto: Privativa Total soma as 4 componentes;
   assert.ok(perto(porId.privativa_total.pctAncora2!, (6700 / 7500) * 100));
   // Terreno é a âncora 1 — % Terreno de cada componente.
   assert.ok(perto(porId.pvt_r_fechada.pctAncora1, (5000 / 20000) * 100));
+});
+
+// ── #574: a cascata lida a partir das colunas de `estudos` ─────────────────
+//
+// O que estes casos travam é a PONTE entre o schema e o motor genérico —
+// exatamente onde a aba Gráficos errava: ela montava a composição da gleba a
+// partir dos 7 campos "% da gleba" que a migração `020` aposentou, em vez das
+// colunas `area_*_modo`/`area_*_valor` que a cascata de fato usa.
+
+const ESTUDO_LOT_MACEDO = {
+  area_app_modo: 'm2', area_app_valor: 8613.82,
+  area_elup_epu_modo: 'm2', area_elup_epu_valor: 8219.72,
+  area_epc_modo: 'm2', area_epc_valor: 4841.44,
+  area_viario_publico_modo: 'm2', area_viario_publico_valor: 6404.00,
+  area_viario_privado_modo: 'm2', area_viario_privado_valor: 11534.12,
+  area_comuns_privadas_modo: 'm2', area_comuns_privadas_valor: 0,
+  area_verdes_modo: 'm2', area_verdes_valor: 0,
+  // Os 7 campos APOSENTADOS pela `020`, preenchidos com valores que NÃO
+  // correspondem à cascata acima: se alguma leitura voltar a eles, os números
+  // conferidos abaixo mudam.
+  app_pct: 50, faixas_nao_edificaveis_pct: 10, sistema_viario_pct: 25,
+  elup_pct: 5, epc_pct: 4, epu_pct: 3, areas_privativas_nao_vendaveis_pct: 2,
+};
+
+test('#574: estadosCascataLoteamentoDoEstudo traduz os modos do schema para os do motor', () => {
+  const e = {
+    area_app_modo: 'pct_poligonal', area_app_valor: 10,
+    area_elup_epu_modo: 'pct_parcelavel', area_elup_epu_valor: 5,
+    area_epc_valor: 100, // sem `_modo` — cai em m², o padrão da coluna
+  };
+  const estados = estadosCascataLoteamentoDoEstudo(e);
+  assert.deepEqual(estados.app, { modo: 'pct_ancora1', valor: 10 });
+  assert.deepEqual(estados.elup_epu, { modo: 'pct_ancora2', valor: 5 });
+  assert.deepEqual(estados.epc, { modo: 'm2', valor: 100 });
+  // Linha sem nenhuma das duas colunas: m² e zero, nunca `undefined`/NaN.
+  assert.deepEqual(estados.verdes, { modo: 'm2', valor: 0 });
+  // Estudo inteiro ausente não estoura — as 7 linhas saem neutras.
+  assert.equal(Object.keys(estadosCascataLoteamentoDoEstudo(null)).length, 7);
+});
+
+test('#574: modoMestreDoSchema — só os dois nomes de domínio saem de m²', () => {
+  assert.equal(modoMestreDoSchema('pct_poligonal'), 'pct_ancora1');
+  assert.equal(modoMestreDoSchema('pct_parcelavel'), 'pct_ancora2');
+  assert.equal(modoMestreDoSchema('m2'), 'm2');
+  assert.equal(modoMestreDoSchema(undefined), 'm2');
+  assert.equal(modoMestreDoSchema('unidade'), 'm2'); // valor desconhecido não indexa fora
+});
+
+test('#574: itensAlocacaoGleba devolve as 7 deduções + ALV, e elas fecham na poligonal', () => {
+  const itens = itensAlocacaoGleba(ESTUDO_LOT_MACEDO, 90402.31);
+  assert.equal(itens.length, 8, 'sete deduções editáveis + a ALV');
+  const porRotulo = Object.fromEntries(itens.map((i) => [i.l, i.v]));
+  assert.ok(perto(porRotulo['APP'], 8613.82));
+  assert.ok(perto(porRotulo['Sistema viário público'], 6404.00));
+  assert.ok(perto(porRotulo['Área Líquida de Venda (ALV)'], 50789.21));
+  // A prova de que os campos aposentados não voltaram: com eles somando 99%
+  // da gleba, uma leitura por ali daria APP = 45.201,16 m² em vez de 8.613,82.
+  assert.ok(!perto(porRotulo['APP'], 90402.31 * 0.5, 1));
+  // Fecho: as 8 fatias reconstroem a poligonal, sem contar duas vezes as
+  // linhas computadas intermediárias (parcelável e líquida ficam de fora).
+  assert.ok(perto(itens.reduce((s, i) => s + i.v, 0), 90402.31));
+});
+
+test('#574: itensAlocacaoGleba concorda com a área vendável do motor (ALV = area vendável)', () => {
+  const p = calcularProforma({ ...ESTUDO_LOT_MACEDO, tipo_empreendimento: 'loteamento', terreno_manual_area: 90402.31 } as any);
+  const alv = itensAlocacaoGleba(ESTUDO_LOT_MACEDO, p.areaTerreno)
+    .find((i) => i.l === 'Área Líquida de Venda (ALV)')!;
+  assert.ok(perto(alv.v, p.areaVendavel), `alv=${alv.v} areaVendavel=${p.areaVendavel}`);
 });
