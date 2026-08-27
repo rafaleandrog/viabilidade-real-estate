@@ -175,9 +175,9 @@ esse produto de propósito — ele é o único que **não** segue a planilha nov
 >
 > **As quatro viraram #413, #414, #415 e #416, e todas fecharam com diff no commit `ba06add`
 > (PR #417, 2026-08-17).** Evidência hoje: `docs/viabilidade/fluxo-investidor-formulas.md` existe;
-> D14 está em `frontend/fluxo-invariantes.ts:376-387`
+> D14 está em `frontend/fluxo-invariantes.ts:633-642`
 > (`CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING`, severidade `alerta`); o aviso regulatório, em
-> `frontend/tela-funding.ts:615-619`.
+> `frontend/tela-funding.ts:662-666`.
 >
 > A lição é a de sempre, com uma volta a mais: **"a issue fechou" não é evidência de entrega, e o
 > plano publicado na issue também não** — só o diff é. Quando um plano tem passo de documentação ou
@@ -212,8 +212,8 @@ critério de aceite não é código:
 > O maior buraco daquela triagem — nove issues da cadeia EVI de recebíveis (#230, #232–#237, #240,
 > #241) com a matemática pronta mas **não ligada a `calcularFluxo`** — **foi fechado pela #283**:
 > `recebimentoBrutoMensal` consulta o contrato canônico em
-> `frontend/fluxo-caixa-motor.ts:1340-1341` e `calcularFluxo` agrega juros, principal, carteira e
-> repasse em `:2025-2053` (teste `frontend/fluxo-caixa-motor.test.ts:1762-1787`). A porta é
+> `frontend/fluxo-caixa-motor.ts:1749-1750` e `calcularFluxo` agrega juros, principal, carteira e
+> repasse em `:2593-2634` (teste `frontend/fluxo-caixa-motor.test.ts:2365-2390`). A porta é
 > `fluxo_pagamento.componentes`, que `fluxoPagamentoParaSalvar` grava em toda escrita.
 > **O que continua faltando não é a integração, é o INPUT de taxa e de sinal no modal (#428):** há
 > linha em produção com `taxaMensal: 0.0098636` (R$ 1.259.273,59 de juros). Abrir o modal e clicar
@@ -801,14 +801,15 @@ Git Bash — ver PROGRESSO).
   em 2026-08-01; é o contrato que fecha a #259 e dá regra às #260 e #281.
   > ✅ **Resolvido em todo o app — a #449 fechou o que faltava (2026-08-24).**
   > `frontend/viab-format.ts:11-23` usa 2 casas com mínimo e máximo; o Orçamento de Custos em `rs`
-  > também (`frontend/tela-fluxo-custos.ts:673,933`); `frontend/exportar.ts:16` importa `fmtR$` em
+  > também, via `casas-decimais`/`casas-minimas=${CASAS_DECIMAIS_MONETARIAS}`
+  > (`frontend/tela-fluxo-custos.ts:770-772`); `frontend/exportar.ts:16` importa `fmtR$` em
   > vez de definir formatador próprio; a tabela de sensibilidade da proforma usa `fmtR$(v, false)`
-  > (`frontend/tela-proforma.ts:458`, #492). A #449 unificou a célula do Fluxo de Caixa: `celula`
-  > (`frontend/fluxo-tabela.ts:40`) e `celulaFx` (`frontend/exportar.ts:171`, CSV/PDF) chamam a
+  > (`frontend/tela-proforma.ts:503`, #492). A #449 unificou a célula do Fluxo de Caixa: `celula`
+  > (`frontend/fluxo-tabela.ts:40`) e `celulaFx` (`frontend/exportar.ts:229`, CSV/PDF) chamam a
   > mesma função (`celula` de `frontend/viab-format.ts`) — 2 casas, limiar de célula vazia
   > `< R$ 0,005`, mesma representação de negativo — e `_fmtContabil`
-  > (`frontend/tela-proforma.ts:313`) e `precoUnit`/`precoTotal`
-  > (`frontend/tela-fluxo-receitas.ts:416-417`) trocaram `fmtNum` sem 2º argumento por
+  > (`frontend/tela-proforma.ts:358`) e `precoUnit`/`precoTotal`
+  > (`frontend/tela-fluxo-receitas.ts:452-453`) trocaram `fmtNum` sem 2º argumento por
   > `fmtR$(v, false)`. A #281 está fechada — a tabela de conformidade completa é
   > `docs/viabilidade/formulas.md` §"Estado de conformidade".
 - Rotas relativas; shell prefixa `/api/viabilidade/`

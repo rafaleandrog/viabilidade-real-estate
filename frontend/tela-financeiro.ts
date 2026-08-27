@@ -29,7 +29,7 @@ import './viab-num.js';
 // inertes NESTE nível — `regime_tributario`, os 5 `aliquota_*_pct` (o
 // parágrafo acima dizia que eram "escopo da #228" e ficavam; não ficam mais),
 // `imposto_sobre_permuta_fisica` e `sujeito_ret` só tinham leitor na proforma
-// do Preliminar (o `sujeito_ret` de `frontend/proforma.ts:344`). Todos saíram
+// do Preliminar (o `sujeito_ret` de `frontend/proforma.ts:354`). Todos saíram
 // do render e de `CAMPOS_NUM` — ver o bloco de comentário acima de
 // `CAMPOS_NUM` para o destino de cada um.
 //

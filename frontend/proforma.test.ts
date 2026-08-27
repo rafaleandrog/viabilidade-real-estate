@@ -175,6 +175,89 @@ test('incorporação: o VGV vem do catálogo; as áreas continuam vindo dos camp
   assert.ok(perto(p.areaConstruida, 1700));
 });
 
+// #569 — indicador de aproveitamento do coeficiente máximo. `usada` é
+// `areaPrivativa` (soma das 4 parcelas PVT, a MESMA que a cascata da
+// Incorporação chama `privativa_total` — ver `areas-cascata.ts`).
+test('#569: aproveitamento do coeficiente — teto = área do terreno × coef. máximo, % = usada / teto', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual', terreno_manual_area: 4_000,
+    coef_aproveitamento_maximo: 2,
+    area_pvt_r_fechada: 6_000, area_pvt_nr_fechada: 1_000, // usada = 7.000
+  });
+  // teto = 4.000 × 2 = 8.000; pct = 7.000 / 8.000 × 100 = 87,5%.
+  assert.equal(p.tetoAproveitamentoM2, 8_000);
+  assert.ok(perto(p.areaPrivativa, 7_000));
+  assert.ok(perto(p.pctAproveitamentoCoef!, 87.5));
+  assert.equal(p.aproveitamentoExcedido, false);
+});
+
+test('#569: usada > teto → aproveitamentoExcedido true (o aviso é responsabilidade da tela)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual', terreno_manual_area: 4_000,
+    coef_aproveitamento_maximo: 1, // teto = 4.000
+    area_pvt_r_fechada: 5_000, // usada = 5.000 > 4.000
+  });
+  assert.equal(p.tetoAproveitamentoM2, 4_000);
+  assert.ok(perto(p.pctAproveitamentoCoef!, 125));
+  assert.equal(p.aproveitamentoExcedido, true);
+});
+
+test('#569: usada exatamente igual ao teto não é excedente (fronteira, não ">=")', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual', terreno_manual_area: 4_000,
+    coef_aproveitamento_maximo: 1,
+    area_pvt_r_fechada: 4_000, // usada == teto
+  });
+  assert.ok(perto(p.pctAproveitamentoCoef!, 100));
+  assert.equal(p.aproveitamentoExcedido, false);
+});
+
+test('#569: coeficiente 0/vazio/negativo → indicador não se aplica (null, sem divisão por zero, sem falso alarme)', () => {
+  const semCoef = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual', terreno_manual_area: 4_000,
+    area_pvt_r_fechada: 50_000, // usada gigante — não pode virar "excedeu" sem teto
+  });
+  assert.equal(semCoef.tetoAproveitamentoM2, null);
+  assert.equal(semCoef.pctAproveitamentoCoef, null);
+  assert.equal(semCoef.aproveitamentoExcedido, false);
+
+  const coefZero = calcularProforma({
+    tipo_empreendimento: 'incorporacao', terreno_manual_area: 4_000, coef_aproveitamento_maximo: 0,
+  });
+  assert.equal(coefZero.tetoAproveitamentoM2, null);
+
+  const coefNegativo = calcularProforma({
+    tipo_empreendimento: 'incorporacao', terreno_manual_area: 4_000, coef_aproveitamento_maximo: -1,
+  });
+  assert.equal(coefNegativo.tetoAproveitamentoM2, null);
+});
+
+test('#569: loteamento nunca preenche o coeficiente — indicador sempre null, por construção', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'loteamento',
+    terreno_manual_area: 90_000, area_media_lote_m2: 300, preco_venda_m2: 1_000,
+    produtos: [{ area_media_m2: 300, preco_venda_m2: 1_000, unidades: 250 }],
+  });
+  assert.equal(p.tetoAproveitamentoM2, null);
+  assert.equal(p.pctAproveitamentoCoef, null);
+  assert.equal(p.aproveitamentoExcedido, false);
+});
+
+test('#569: área do terreno zerada com coeficiente preenchido — teto 0, sem NaN/Infinity', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual', terreno_manual_area: 0,
+    coef_aproveitamento_maximo: 2, area_pvt_r_fechada: 100,
+  });
+  assert.equal(p.tetoAproveitamentoM2, 0);
+  assert.equal(p.pctAproveitamentoCoef, null); // teto <= 0: "% de zero" não se exibe como número
+  assert.equal(p.aproveitamentoExcedido, false); // sem teto positivo, não há "excedente" a acusar
+});
+
 // O MESMO estudo sem catálogo: os preços legados por m² não têm campo em tela
 // nenhuma e deixaram de gerar receita. As áreas continuam, porque elas têm
 // campo próprio em Premissas → Terreno & Áreas.

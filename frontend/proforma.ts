@@ -210,6 +210,16 @@ export interface Proforma {
   // Detalhe por tipo (Incorporação — #7). Loteamento não separa R/NR: ficam 0.
   numUnidadesResidencial: number; numUnidadesNaoResidencial: number;
   precoMedioUnidadeResidencial: number; precoMedioUnidadeNaoResidencial: number;
+  // Aproveitamento do coeficiente máximo (#569, só Incorporação): teto de área
+  // privativa vendável construível (`areaTerreno × coef_aproveitamento_maximo`)
+  // contra o que a cascata de áreas já usa (`areaPrivativa` — soma das 4
+  // parcelas PVT). `tetoAproveitamentoM2`/`pctAproveitamentoCoef` ficam `null`
+  // sem coeficiente preenchido (0/vazio) OU sem teto positivo — não é "0% de
+  // aproveitamento", é "indicador não se aplica" (sem divisão por zero, sem
+  // falso alarme). Loteamento não tem coeficiente no schema: os dois saem
+  // `null` por construção, sempre.
+  tetoAproveitamentoM2: number | null; pctAproveitamentoCoef: number | null;
+  aproveitamentoExcedido: boolean;
 }
 
 const n = (v: any): number => Number(v) || 0;
@@ -429,6 +439,19 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const precoMedioUnidadeResidencial = numUnidadesResidencial > 0 ? vgvResidencial / numUnidadesResidencial : 0;
   const precoMedioUnidadeNaoResidencial = numUnidadesNaoResidencial > 0 ? vgvNaoResidencial / numUnidadesNaoResidencial : 0;
 
+  // Aproveitamento do coeficiente máximo (#569): o teto só existe com
+  // coeficiente > 0 — Loteamento nunca preenche o campo, então `coefMax` fica
+  // 0 e o par sai `null` por construção, sem ramo `lot` explícito. `usada` é
+  // `areaPrivativa`, a MESMA soma das 4 parcelas PVT que a cascata da
+  // Incorporação calcula em `privativa_total` (`areas-cascata.ts`) — decisão
+  // registrada no corpo do PR #569.
+  const coefMax = n(e.coef_aproveitamento_maximo);
+  const tetoAproveitamentoM2 = coefMax > 0 ? areaTerreno * coefMax : null;
+  const pctAproveitamentoCoef = tetoAproveitamentoM2 !== null && tetoAproveitamentoM2 > 0
+    ? (areaPrivativa / tetoAproveitamentoM2) * 100 : null;
+  const aproveitamentoExcedido = tetoAproveitamentoM2 !== null && tetoAproveitamentoM2 > 0
+    && areaPrivativa > tetoAproveitamentoM2;
+
   const resultadoProforma: Proforma = {
     areaTerreno, areaVendavel, areaPermutaFisica, areaVendavelLiquida, areaPrivativa, areaConstruida,
     areaPermutaResidencial, areaPermutaNaoResidencial, vgvPermutaResidencial, vgvPermutaNaoResidencial,
@@ -444,6 +467,7 @@ export function calcularProforma(e: ProformaInput): Proforma {
     numUnidades, precoMedioUnidade,
     numUnidadesResidencial, numUnidadesNaoResidencial,
     precoMedioUnidadeResidencial, precoMedioUnidadeNaoResidencial,
+    tetoAproveitamentoM2, pctAproveitamentoCoef, aproveitamentoExcedido,
   };
   // #260/C7: toda saída monetária da Proforma é canônica a duas casas. As
   // métricas de área, quantidade e percentuais preservam sua própria precisão.

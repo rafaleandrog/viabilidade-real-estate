@@ -6,6 +6,12 @@
 // `viab-tela-premissas`, e a prova de que a tela renderiza a cascata (e não o
 // grid plano antigo de 5 campos) só existe aqui: nenhum teste de lógica pura
 // vê o DOM.
+//
+// #569 estendeu este mesmo caso com o indicador de aproveitamento do
+// coeficiente máximo — coeficiente 4, terreno 4.800 m² → teto 19.200 m² contra
+// 5.580 m² usados (29,1%): sob o teto, então só o indicador aparece, SEM o
+// aviso de excedente. O estado de estouro (usada > teto, com o aviso) é o caso
+// irmão `aproveitamento-coeficiente-excedido.ts`.
 
 import '../../tela-premissas.js';
 import { ESTUDO, forcarEstado } from './dados.js';
@@ -38,6 +44,11 @@ export const caso = {
     // As 5 linhas EDITÁVEIS da cascata (as 4 áreas privativas + comum) — sem
     // badge de unidade (critério 2 da #564): só o `viab-num` da própria célula.
     { seletor: 'table.areas viab-num.area-valor', minimo: 5 },
+    // #569: o indicador de aproveitamento (3 `urbi-kpi` — usada, teto, %) logo
+    // abaixo da cascata. SEM o banner de excedente aqui — este fixture fica
+    // sob o teto (ver nota acima); o estouro é o caso irmão.
+    { seletor: '.kpis.aproveitamento', minimo: 1 },
+    { seletor: '.kpis.aproveitamento urbi-kpi', minimo: 3 },
   ],
   // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a
   // uma. Não é isenção: é o registro do que a medida deste caso NÃO cobre. O
@@ -56,6 +67,9 @@ export const caso = {
     // Botão "Salvar premissas" do rodapé do form — mesma natureza de
     // `modal-pagamento.ts`/`grupo-badge-legado.ts`: o stub não pinta variante.
     'urbi-botao.variante',
+    // #569: os 3 `urbi-kpi` do indicador de aproveitamento ligam `variante`
+    // (vazio neste fixture, sob o teto) — mesma natureza de `kpis-proforma.ts`.
+    'urbi-kpi.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-tela-premissas');

@@ -411,7 +411,7 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 > ⚠️ **Se um caminho de promoção for criado**, ele passa a precisar converter
 > `pct_area_venda → area_m2` — e a família `permuta_fisica_nr_*` junto, que a #486 não mencionava.
 > **Atenção à grandeza de ligação, que difere por tipo:** na **Incorporação** ela é
-> `area_pvt_r_fechada` / `area_pvt_nr_fechada` (`frontend/proforma.ts:268`), convertida por
+> `area_pvt_r_fechada` / `area_pvt_nr_fechada` (`frontend/proforma.ts:278`), convertida por
 > `converterUnidade`/`paraBase` (`frontend/premissas-conversao.ts`); a ALV da cascata
 > (`CASCATA_LOTEAMENTO`) só existe no **Loteamento** (`frontend/proforma.ts:186`, dentro do
 > `if (lot)`). Desde a **#564**, `CASCATA_INCORPORACAO` (`frontend/areas-cascata.ts:139-144`) **é
@@ -3082,6 +3082,7 @@ com os do estudo.
 | **C5** | **Permuta física não entra no fluxo** — reduz a área/VGV vendável do incorporador. **Permuta financeira é dedução da receita**, % do VGV residencial/não residencial (ou valor fixo). | `proforma.ts`, `formulas.md` |
 | **C6** | **O imposto NÃO segue `regime_tributario`** — a redação anterior desta convenção dizia que sim, e é falso. **Preliminar:** `frontend/proforma.ts:245` escolhe pelo booleano `sujeito_ret` (`aliquota_ret_pct`, default 4) ou, se falso, `imposto_percentual`; o campo `regime_tributario` **não é consultado**. **Avançado:** usa o par global `considerar_ret`/`ret_pct` e ignora os três (§17). Corretagem, marketing e permutas financeiras são deduções da receita antes dos custos. | `formulas.md`, `proforma.ts:245`, schema |
 | **C7** | **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e no motor. O **valor canônico** de uma premissa multiunidade é o monetário; `% do VGV` e `R$/m²` são representações **derivadas**, que carregam precisão plena internamente e arredondam só para exibir. Contrato do autor, 2026-08-01. **Estado:** `fmtR$` (`viab-format.ts:11-23`) usa 2 casas, a exportação passou a importá-lo em vez de definir formatador próprio (`exportar.ts:10`) e a sensibilidade da Proforma migrou (`tela-proforma.ts:458`, #492). **Três fontes ainda divergem** e mantêm a #281 aberta: `fluxo-tabela.ts:34` (`celula`, arredonda para 0 casas e esconde valor abaixo de R$ 0,50), `tela-proforma.ts:358` (`_fmtContabil`) e `tela-fluxo-receitas.ts:382-383` (`precoUnit`/`precoTotal`) — as duas últimas chamam `fmtNum` sem casas. Tabela completa em `formulas.md`. | `formulas.md`, `viab-format.ts`, `premissas-conversao.ts` |
+| **C8** | **Teto de aproveitamento é DERIVADO, sem coluna própria** (#569). `areaTerreno × coef_aproveitamento_maximo` é a área privativa vendável máxima; comparada contra a área privativa **TOTAL** (`areaPrivativa` — as 4 parcelas PVT, a MESMA soma que a cascata da Incorporação chama `privativa_total`, `areas-cascata.ts`), **não** contra a área fechada que forma o VGV (C1/A2). Sem coeficiente preenchido (0/vazio) o indicador não se aplica — sai `null`, nunca "0% de aproveitamento". | `proforma.ts` (`calcularProforma`), `tela-premissas.ts` |
 
 ## Anexo B — Dicionário de premissas (campos reais)
 
@@ -3224,12 +3225,20 @@ supuser que existe promoção vai procurar um bug de conversão que não existe 
 `permuta_fisica_modo: 'area_m2'` com nulos é **indistinguível do padrão de criação**
 (`schema.json:116,121`), e como não há promoção, a hipótese de resíduo de conversão cai
 independentemente de qual seja a proveniência. E quem **criar** o caminho de promoção precisa saber que a grandeza de ligação difere: na
-Incorporação é `area_pvt_r_fechada`/`area_pvt_nr_fechada` (`frontend/proforma.ts:268`); a ALV da
+Incorporação é `area_pvt_r_fechada`/`area_pvt_nr_fechada` (`frontend/proforma.ts:278`); a ALV da
 cascata só existe no Loteamento. Desde a **#564** `CASCATA_INCORPORACAO` é renderizada pela tabela de
 Áreas da Incorporação (`frontend/tela-premissas.ts`), mas segue sem ser a grandeza de ligação: o
 motor citado acima lê os campos direto do formulário, não pela cascata
 (`frontend/areas-cascata.ts:139-144`). A família `permuta_fisica_nr_*` vai junto.
 → registro completo na **§4.3**; a reconciliação entre as camadas é a **#441**.
+
+**A15 — Teto de aproveitamento usa a área privativa TOTAL, não a fechada do VGV (#569).** O
+indicador de aproveitamento do coeficiente máximo (**C8**) compara o teto contra `areaPrivativa` —
+as 4 parcelas PVT (abertas **e** fechadas). O VGV (**C1**/**A2**) só soma as fechadas. Um projeto com
+bastante área aberta pode aparecer **sob o teto para o VGV** e **estourando o aproveitamento** ao
+mesmo tempo — não é contradição, são duas grandezas diferentes medindo coisas diferentes; tratá-las
+como a mesma área leva a "consertar" um dos dois cálculos para bater com o outro, quando os dois
+já estão certos.
 
 ## Anexo E — API
 
