@@ -7,9 +7,15 @@
 // defeito que a correção do cap não resolve sozinha. O `exigir` de
 // `urbi-banner.aviso-permuta` é a prova de que o aviso está na tela.
 //
-// O estudo tem catálogo pequeno e permuta física de 100% da área residencial:
-// a permuta pedida vale mais que a base, o motor capa o excedente e o VGV para
-// em zero.
+// O estudo tem catálogo pequeno e uma permuta física em m² ABSOLUTOS, muito
+// maior que a área do catálogo: a permuta pedida vale mais que a base, o motor
+// capa o excedente e o VGV residencial para em zero.
+//
+// ⚠️ O modo tem que ser `area_m2`. Desde a #570 o modo "% área venda" incide
+// sobre a área do catálogo da categoria e é valorado pelo preço médio dela, de
+// modo que 100% vale exatamente o VGV bruto da categoria — nunca mais que ele.
+// Um caso em `pct_area_venda: 100` deixaria de capar, o banner sumiria e o
+// `exigir` abaixo reprovaria por um motivo que não é o que se quer medir aqui.
 
 import '../../tela-proforma.js';
 import { ESTUDO, forcarEstado } from './dados.js';
@@ -23,8 +29,8 @@ const PRODUTOS_PEQUENOS = [
 
 const ESTUDO_COM_PERMUTA = {
   ...ESTUDO,
-  permuta_fisica_modo: 'pct_area_venda',
-  permuta_fisica_pct: 100,
+  permuta_fisica_modo: 'area_m2',
+  permuta_fisica_area_m2: 4_960, // 8× os 620 m² do catálogo
 };
 
 export const caso = {

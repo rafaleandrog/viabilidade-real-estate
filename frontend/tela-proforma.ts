@@ -307,8 +307,9 @@ export class ViabTelaProforma extends LitElement {
   }
 
   // Aviso do corte de permuta física. `permutaCapada` só é verdade quando a
-  // permuta pedida vale mais que a base — e nesse caso o VGV vai a zero, o que
-  // sem aviso pareceria erro de digitação em vez de excedente.
+  // permuta pedida vale mais que a base de alguma das duas categorias (#570) —
+  // e nesse caso o VGV daquela categoria vai a zero, o que sem aviso pareceria
+  // erro de digitação em vez de excedente.
   //
   // A frase vem de `avisoPermutaCapada`, a MESMA que o CSV e o PDF imprimem:
   // banner e exportação divergirem sobre o corte foi o defeito que a revisão
