@@ -65,7 +65,7 @@ export interface OpcoesCelula {
   /** #567: quando true, NÃO some com o valor abaixo de R$ 0,005 — mostra
    * "0,00"/"(0,00)" em vez de célula vazia. O Fluxo de Caixa usa célula vazia
    * de propósito (mês sem movimento); a Proforma (`celulaProforma`,
-   * `frontend/tela-proforma.ts`) controla visibilidade por LINHA
+   * `frontend/exportar.ts` — a tela a reexporta) controla visibilidade por LINHA
    * (`ocultarSeZero`), não por célula, e uma linha-total que fecha em zero
    * precisa continuar mostrando "0,00", não sumir. */
   sempreExibir?: boolean;
