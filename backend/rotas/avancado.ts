@@ -1682,10 +1682,22 @@ export const CAMPOS_OPERACAO = [
  * operação da cópia somar linhas de custo de OUTRO estudo — que é o defeito
  * que este remapeamento existe para evitar, na sua forma mais silenciosa (o
  * motor leria a base de financiamento de um projeto alheio sem erro nenhum).
+ * (Órfão aqui é sempre linha APAGADA do original: `mapaCusto` cobre toda linha
+ * que existe, porque toda linha existente é copiada.)
+ *
+ * ⚠️ EXCETO quando TODOS os ids são órfãos: devolver `[]` mudaria o
+ * comportamento da cópia, porque o motor trata lista VAZIA como "sem seleção,
+ * use a base padrão" (`frontend/funding-motor.ts:927`, o ternário de
+ * `custo_linha_ids`) — a cópia passaria a financiar a base padrão inteira
+ * enquanto o original, com a lista não-vazia de ids mortos, não casa com linha
+ * nenhuma e não financia nada. Nesse caso a lista volta como veio (normalizada
+ * a número): ids de linhas apagadas continuam não casando com nada na cópia —
+ * o MESMO comportamento observável do original — e nenhum deles alcança linha
+ * de outro estudo, porque apontam para linhas que não existem mais.
+ * (Achado do App de revisão na rodada 1 do PR da #609.)
  *
  * Valor que não é lista volta como veio (`null`/`undefined`): a coluna é
- * opcional, e `[]` significa "nenhuma linha", que é diferente de "sem seleção,
- * use a base padrão" (`funding-motor.ts`, `custo_linha_ids`).
+ * opcional e o motor cai na base padrão — comportamento igual nos dois lados.
  */
 export function remapearCustoLinhaIds(valor: unknown, mapa: Map<number, number>): unknown {
   if (!Array.isArray(valor)) return valor;
@@ -1694,6 +1706,7 @@ export function remapearCustoLinhaIds(valor: unknown, mapa: Map<number, number>)
     const novo = mapa.get(Number(id));
     if (novo !== undefined) novos.push(novo);
   }
+  if (novos.length === 0 && valor.length > 0) return valor.map(Number);
   return novos;
 }
 

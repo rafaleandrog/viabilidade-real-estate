@@ -86,8 +86,11 @@ menos as geradas pelo shell) e depois copia as **estruturas filhas**. Tudo dentr
 reapontada para a linha correspondente da cópia: `fase_ancora_id` (custos e operações de funding),
 `tipologia_id` das alocações, `permuta_tipologia_id` das linhas de custo e a lista
 `custo_linha_ids` das operações de funding (`remapearCustoLinhaIds`). Id sem correspondência é
-**descartado**, nunca mantido — manter faria a cópia somar linhas de outro estudo, e o motor leria
-isso sem erro nenhum. Duas exceções declaradas: `curva_id` copia direto porque curvas são
+**descartado** enquanto sobrar id vivo — manter faria a cópia somar linhas de outro estudo, e o
+motor leria isso sem erro nenhum. A exceção é a lista **toda** órfã: ela volta como veio, porque
+devolver `[]` ativaria a base padrão do motor (`frontend/funding-motor.ts:927` exige `length` para
+usar a seleção) e a cópia financiaria o que o original não financia; ids órfãos são sempre de
+linhas **apagadas** (o mapa cobre toda linha existente), então mantê-los não alcança estudo nenhum. Duas exceções declaradas: `curva_id` copia direto porque curvas são
 **globais da instância**, não do estudo; e `estudos.permuta_fisica_produto_id` /
 `permuta_fisica_nr_produto_id` **viajam cru** — são colunas **inertes** desde a #566 (a permuta
 por unidade saiu do app; nenhum leitor fora de `schema.json` e migrações), então o id do produto

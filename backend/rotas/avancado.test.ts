@@ -641,13 +641,24 @@ test('#609 remapearCustoLinhaIds troca cada id pelo da linha correspondente na c
   assert.deepEqual(remapearCustoLinhaIds([12, 11, 10], mapa), [112, 111, 110], 'a ordem é preservada');
 });
 
-test('#609 id sem correspondência é DESCARTADO, nunca mantido', () => {
+test('#609 id sem correspondência é DESCARTADO enquanto sobrar id vivo', () => {
   // Manter o id antigo faria a operação da cópia somar linhas de custo de
   // OUTRO estudo — o motor leria a base de financiamento de um projeto alheio
   // sem erro nenhum. Descartar deixa a operação com base menor, que é visível.
   const mapa = new Map([[10, 110]]);
   assert.deepEqual(remapearCustoLinhaIds([10, 999], mapa), [110]);
-  assert.deepEqual(remapearCustoLinhaIds([999], mapa), []);
+});
+
+test('#609 lista TODA órfã volta como veio — devolver [] ativaria a base padrão do motor', () => {
+  // `frontend/funding-motor.ts:927`: lista VAZIA cai em `linhasFinanciaveisPadrao`
+  // — a cópia passaria a financiar a base padrão inteira enquanto o original,
+  // com a lista não-vazia de ids mortos, não casa com linha nenhuma e não
+  // financia nada. Ids órfãos são sempre de linhas APAGADAS (o mapa cobre toda
+  // linha existente), então mantê-los não alcança estudo nenhum — é o mesmo
+  // "não casa com nada" do original. Achado do App de revisão (rodada 1).
+  const mapa = new Map([[10, 110]]);
+  assert.deepEqual(remapearCustoLinhaIds([999], mapa), [999]);
+  assert.deepEqual(remapearCustoLinhaIds(['999', 998], mapa), [999, 998], 'normalizada a número');
 });
 
 test('#609 id que chega como string (vinda do banco) ainda casa', () => {
@@ -655,10 +666,11 @@ test('#609 id que chega como string (vinda do banco) ainda casa', () => {
   assert.deepEqual(remapearCustoLinhaIds(['10'], mapa), [110]);
 });
 
-test('#609 valor que não é lista volta como veio — [] e null significam coisas diferentes', () => {
-  // `[]` = "nenhuma linha selecionada"; `null`/ausente = "sem seleção, use a
-  // base padrão" (`frontend/funding-motor.ts`). Converter um no outro mudaria
-  // a base do financiamento da cópia em silêncio.
+test('#609 valor sem seleção volta como veio — null, undefined e [] atravessam intactos', () => {
+  // Para o motor, `null`/ausente E lista vazia caem na base padrão
+  // (`frontend/funding-motor.ts:927` exige `length` para usar a seleção) —
+  // o que importa aqui é que a CÓPIA carregue exatamente o estado do
+  // original, sem o remapeamento converter um estado no outro.
   const mapa = new Map([[10, 110]]);
   assert.equal(remapearCustoLinhaIds(null, mapa), null);
   assert.equal(remapearCustoLinhaIds(undefined, mapa), undefined);
