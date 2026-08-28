@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resumoListagem, type ResumoListagem } from './tela-dashboard.js';
+import { resumoListagem, nivelExibicao, type ResumoListagem } from './tela-dashboard.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #406: a listagem de Estudos mostrava "—" em VGV/Resultado/Margem para todo
@@ -152,4 +152,42 @@ test('Painel: ROI do Avançado é resultado/investimento — a MESMA conta do Pr
 
 test('Painel: Avançado indisponível continua "—", sem inventar área nem ROI', () => {
   assert.equal(resumoListagem({ id: 5, nivel_analise: 'avancado' }, { 5: 'indisponivel' }), null);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #577: coluna "Nível" da tabela de Estudos — `nivelExibicao` é a decisão
+// pura por trás do badge (Preliminar/Avançado). O ponto que a issue marca
+// como critério de aceite 3 é o segundo teste: um estudo já persistido ANTES
+// desta coluna existir não tem `nivel_analise` explícito no objeto que a
+// listagem devolve — `padrao: "preliminar"` no schema.json cobre o valor em
+// repouso, mas a FUNÇÃO precisa concordar com esse default sem depender de
+// nenhuma migração/backfill (a issue é só apresentação).
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#577: nivel_analise "avancado" explícito lê Avançado', () => {
+  assert.equal(nivelExibicao({ id: 1, nivel_analise: 'avancado' }), 'avancado');
+});
+
+test('#577: nivel_analise "preliminar" explícito lê Preliminar', () => {
+  assert.equal(nivelExibicao({ id: 2, nivel_analise: 'preliminar' }), 'preliminar');
+});
+
+test('#577: estudo pré-existente sem nivel_analise (campo ausente do objeto) lê Preliminar — o default do schema, não um "—"', () => {
+  assert.equal(nivelExibicao({ id: 3, nome: 'Estudo antigo' }), 'preliminar');
+});
+
+test('#577: nivel_analise null/vazio (linha antiga do banco antes do default aplicar) também lê Preliminar', () => {
+  assert.equal(nivelExibicao({ id: 4, nivel_analise: null }), 'preliminar');
+  assert.equal(nivelExibicao({ id: 5, nivel_analise: '' }), 'preliminar');
+});
+
+test('#577: valor desconhecido (nem "preliminar" nem "avancado") cai no default seguro Preliminar, não quebra', () => {
+  assert.equal(nivelExibicao({ id: 6, nivel_analise: 'lixo-inesperado' }), 'preliminar');
+});
+
+test('#577: paridade Loteamento×Incorporação — a função é ortogonal a tipo_empreendimento, as 4 combinações resolvem certo', () => {
+  assert.equal(nivelExibicao({ tipo_empreendimento: 'loteamento', nivel_analise: 'preliminar' }), 'preliminar');
+  assert.equal(nivelExibicao({ tipo_empreendimento: 'loteamento', nivel_analise: 'avancado' }), 'avancado');
+  assert.equal(nivelExibicao({ tipo_empreendimento: 'incorporacao', nivel_analise: 'preliminar' }), 'preliminar');
+  assert.equal(nivelExibicao({ tipo_empreendimento: 'incorporacao', nivel_analise: 'avancado' }), 'avancado');
 });

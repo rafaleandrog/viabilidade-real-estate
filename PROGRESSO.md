@@ -4,6 +4,281 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #572 · ordem das linhas de permuta unificada entre tela e exportação (2026-08-27)
+
+Item 8 da lista de bugs da Rodada 10. Diagnóstico: a tela mostrava "Receita bruta (VGV)" ANTES do
+bloco de permuta física ("VGV sem permuta física" + as duas deduções), enquanto a exportação
+(CSV/PDF, `frontend/exportar.ts`) já mostrava o bloco de permuta ANTES — lida de cima para baixo,
+só a ordem da exportação fecha a identidade real: `VGV sem permuta física − permuta física (R+NR) =
+Receita bruta (VGV)`.
+
+**Conserto: a tela passou a seguir a ordem que a exportação já usava** (a exportação não mudou de
+ordem — só ganhou o rótulo do achado 7, abaixo). `_linhas` (privado, `frontend/tela-proforma.ts`)
+virou uma função pura e exportada, `montarLinhasProforma`, com o bloco de permuta movido para ANTES
+do push de "Receita bruta (VGV)". `linhasProformaVisiveis` (nova, exportada) aplica o mesmo filtro
+`soLot`/`soInc`/`ocultarSeZero` que `linhasProforma` (exportar.ts) já aplicava internamente —
+extraído para não reimplementar o predicado numa terceira cópia; `_renderTabela` chama as duas.
+
+**Nota da auditoria #574, achado 7 — resolvido junto (dentro do escopo desta issue):** a exportação
+usava sempre "(-) Permuta física residencial", inclusive no Loteamento, onde a tela já usa
+"(-) Permuta física" (sem "residencial") desde a #570. `linhasProforma` (exportar.ts:81-84) ganhou o
+mesmo `lot ? … : …` que a tela já tinha — não é rótulo novo, é a exportação parar de divergir.
+
+**Achado 10 da mesma auditoria (notação de sinal da #567 não alcança CSV/PDF, `fmtR$` cru em
+`frontend/exportar.ts:137,163`) FICOU DE FORA desta issue** — é consistência de FORMATAÇÃO/sinal, não de
+ORDEM, os 4 critérios de aceite da #572 não cobrem isso, e é uma mudança de superfície maior
+(toda célula monetária das duas exportações, não só o bloco de permuta). Registrado como
+`Sem-fechamento: #574 <achado 10, formatação de sinal fmtR$ cru na exportação — fora do escopo de
+ordem da #572>` no corpo do PR; o autor decide se vira issue própria.
+
+**Testes** (`frontend/proforma-ordem-linhas.test.ts`, novo): paridade estrutural tela×exportação
+(Incorporação com/sem permuta, Loteamento com permuta) por `assert.deepEqual` da lista de rótulos;
+um teste de ORDEM explícito (índice de "VGV sem permuta física" < índice de "Receita bruta (VGV)",
+nos dois lados) que é o que pega mutação de reordenação sem depender de mais nada mudar; e a cadeia
+aritmética (VGV sem permuta → Receita bruta → Receita líquida → Receita operacional → Resultado)
+lida **das próprias linhas** (por rótulo), nos dois lados — não dos campos brutos de `Proforma`.
+Mutação verificada manualmente (reverter a ordem em `montarLinhasProforma`): 3 dos 7 testes novos
+caem para vermelho (as 2 paridades estruturais com permuta e o teste de índice); os 4 verdes são
+os 2 de identidade aritmética (lookup por rótulo, indiferentes a posição), a paridade da fixture
+sem permuta (a mutação não a alcança) e o "só filtra, não reordena" — confirma que o teste de
+índice é o que prova a fiação da ordem especificamente.
+## #573 · indicador de área privativa alocada — produtos × Terreno & Áreas (2026-08-27)
+
+Item 6 da lista de bugs da Rodada 10, aba Produtos. `frontend/proforma.ts` ganha 3 campos
+derivados, sempre null-safe: `areaProdutosAlocada` (Σ área média × unidades do catálogo EFETIVO,
+Residencial + Não Residencial somados — a mesma soma independente de bucket que
+`resumoCatalogoProdutos` usa), `diferencaAreaAlocada` (`alocada − registrada`, SEMPRE definida —
+é subtração, não razão) e `pctAreaAlocada` (`null` sem área registrada, nunca "0%" falso — mesmo
+padrão de `pctAproveitamentoCoef`, #569). "Registrada" é `areaPrivativa`, a mesma grandeza que o
+teto de aproveitamento já usa como "usada" (ALV da cascata no Loteamento; soma das 4 parcelas PVT
+na Incorporação) — nenhum campo novo no schema.
+
+`frontend/tela-premissas.ts:_renderAreaAlocada` desenha 3 `urbi-kpi` (alocada / registrada /
+diferença) logo abaixo da tabela de Produtos — o KPI de área alocada carrega junto o percentual
+(`pctAreaAlocada`) quando há denominador, para o campo derivado ter consumidor de UI (achado da
+revisão do PR 616) — com `variante` ecoando o sinal da diferença — em
+branco quando tudo alocado, `alerta` quando sobra por alocar, `erro` quando o catálogo excede — e
+um `urbi-banner` condicional nos dois estados não neutros. Some da tela só quando os dois lados
+estão em zero (estudo recém-criado, nada para comparar ainda); qualquer outro caso — inclusive só
+um lado preenchido — desenha.
+
+**Adaptação Loteamento (decisão desta issue, não do corpo original — ele não distinguia os dois
+tipos).** A soma R+NR é agnóstica a quantas categorias existem por construção, então nenhum ramo
+`lot` foi necessário no motor: o catálogo do Loteamento (bucket único residencial desde o PR 607)
+soma do mesmo jeito. Na tela, o rótulo da área registrada ficou genérico ("Área registrada em
+Terreno & Áreas", não "privativa de venda") porque o termo "privativa" é da Incorporação — o
+Loteamento chama a mesma grandeza de ALV/área vendável. O indicador aparece nos dois tipos.
+
+**Prova de mutação.** Apagar a chamada de `_renderAreaAlocada()` no template: os 3 `urbi-kpi` e o
+`urbi-banner` somem do DOM — o caso de render novo (`area-alocada-excedente`) vira vermelho por
+seletor ausente, e o caso `catalogo-produtos-tipo` (#565, cujo fixture também fecha em excesso
+desde este PR) vira vermelho por "declaração ociosa em `aceitaNaoReproduzido`" — a mesma classe de
+prova que `aproveitamento-coeficiente-excedido` usa para o indicador irmão (#569). Nenhum teste de
+lógica pura vê o DOM, então a suíte pura sozinha ficaria toda verde com a chamada apagada.
+
+Testes de lógica pura em `frontend/proforma.test.ts` (`#573: ...`): alocada == registrada
+(diferença zero, 100%), excesso (diferença positiva), sobra (diferença negativa), sem NADA
+registrado (percentual `null`, diferença ainda definida), catálogo e registro ambos zerados
+(diferença zero, percentual `null`), e o caso Loteamento (ALV × catálogo bucket único).
+
+**Efeito colateral em teste existente.** O fixture do caso de render `catalogo-produtos-tipo`
+(#565) aloca 7.160 m² contra 4.960 m² registrados no `ESTUDO` base — excesso não intencional pelo
+próprio propósito daquele caso, mas real: o `urbi-banner.aviso-area-alocada` passou a aparecer ali
+também, e a lista `aceitaNaoReproduzido` ganhou `urbi-banner.variante` para não falsear o veredito.
+
+## #577 · A listagem de Estudos mostra Preliminar/Avançado (2026-08-27)
+
+Item 1 da leva Avançado da Rodada 10. A tabela do Painel já **sabia** o `nivel_analise` de cada
+linha — usava para escolher a fórmula de VGV/Margem (`numeroTitulo`, `frontend/tela-dashboard.ts`)
+— mas só expunha isso via `title` (tooltip nativo), invisível sem passar o mouse. Coluna nova
+"Nível" entre `status` e `area_terreno`, badge `Preliminar`/`Avançado` (mesmo padrão de badge da
+coluna `status`), sem `largura` fixa — segue o mesmo auto-dimensionamento das outras colunas de
+badge/texto da tabela (só `imagem` fixa largura, por ser miniatura quadrada).
+
+**Critério 2 (ambiguidade de nome) — decisão tomada, não deixada em aberto:** a issue propunha duas
+saídas e pedia confirmação do autor; escolhi a proposta principal dela mesma, por ser a menos
+invasiva e a que o próprio diagnóstico já defendia — coluna nova = "Nível", filtro existente
+(que filtra `tipo_empreendimento`, não `nivel_analise`) renomeado de "Tipo de estudo" para "Tipo de
+empreendimento" (`frontend/tela-dashboard.ts`, `_renderEstudos`). Os dois deixam de ser homônimos.
+
+**Critério 3 (estudos existentes):** sem migração — `nivel_analise` já tem `padrao: "preliminar"`
+no schema, e uma linha antiga sem o campo explícito lê "Preliminar" pela nova função pura exportada
+`nivelExibicao(l)`, o mesmo default que `resumoListagem` já assumia para escolher o motor. `versao`
+do manifesto **não bumpa** (sem migração, como a issue previa).
+
+**Critério 4 (paridade):** a coluna é sobre `nivel_analise`, ortogonal a `tipo_empreendimento` — é
+a MESMA `_colunas()`/tabela para Loteamento e Incorporação, então as 4 combinações resolvem pela
+mesma função. Teste dedicado cobre as 4 (`frontend/tela-dashboard.test.ts`).
+
+**Critério 5 (render case) — declarado, não entregue, com motivo estrutural:** `urbi-tabela` recebe
+`colunas`/`linhas` por *binding de propriedade* (`so_propriedade: true`, sem atributo —
+`docs/ui-urbiverso/primitivos.json`); o harness de render só desenha texto para props `rotulo`/
+`valor` (`scripts/render-check.mjs:216`) e filtra fora qualquer prop sem atributo antes mesmo de
+gerar o stub (`:294`, `p.props.filter((x) => x.atributo)`). Um caso de render aqui montaria um
+`<urbi-tabela>` de caixa vazia — não desenha nenhuma célula, badge ou coluna — provando zero sobre
+overflow de largura. **Nenhum caso hoje exercita `urbi-tabela`** (`tabela-fluxo.ts` mede
+`viab-fluxo-ver`, que usa `<table>` HTML crua, não o primitivo); criar esse suporte no harness é
+mudança de infraestrutura de teste, fora do escopo de uma coluna nova (R3). Mitigação: sem
+`largura` fixa (mesmo padrão das outras colunas de texto/badge da tabela — nenhuma delas tem caso
+de render hoje).
+
+**Prova de mutação, nos dois sentidos:**
+- Lógica: invertendo o `? :` de `nivelExibicao`, **6 dos 19 testes de `tela-dashboard.test.ts`**
+  ficam vermelhos.
+- Fiação: apagando o bloco da coluna nova dentro de `_colunas()` (privado, só alcançável com o
+  componente montado em DOM — que os testes deste arquivo, por convenção do próprio arquivo
+  (`resumoListagem` já é assim), nunca fazem), a suíte inteira continua com os **19 verdes** — é a
+  classe 1 de defeito que o `CLAUDE.md` nomeia, e a defesa aqui não existe além da revisão visual do
+  diff (2 linhas de mudança, adjacentes ao ponto testado): a issue #577 não cria nenhum mecanismo
+  novo de wiring que caiba num parâmetro obrigatório, e o caso de render que pegaria isso não
+  fecha, pelo motivo do critério 5.
+
+`bash scripts/validar-frontend.sh` verde (controle e final). Sem migração, sem toque em backend —
+`validar-backend.sh` não roda. `frontend/proforma.ts`, `tela-proforma.ts`, `tela-premissas.ts` e
+`exportar.ts` (fila de merges do Preliminar) não foram tocados — nenhum critério desta issue
+exigia.
+
+## #597 · A corrida de carregamento em Proforma e Premissas (2026-08-27)
+
+Achado colateral da revisão do PR 580 (#563): `tela-proforma.ts:_init()` e
+`tela-premissas.ts:_init()` marcavam `_idCarregado` **antes** do `await` e gravavam
+`benchmarks`/`aliquotaRet`/`produtos` sem reconferir o id ao voltar — mesma classe de defeito que
+`tela-graficos.ts` teve. Navegar do estudo A para o B antes de A responder deixava a resposta
+atrasada de A sobrescrever o estado de B em silêncio; em Premissas era pior, porque a tela é
+editável e um Salvar em cima do estado misturado grava o catálogo errado.
+
+Conserto: reuso de `respostaAindaVale` (`frontend/viab-imagem-principal.ts:41`), o mesmo padrão que
+`tela-graficos.ts` já usa — importada, não recopiada. Guarda nos dois pontos de escrita (sucesso e
+`catch`, seguindo os três pontos de `viab-imagem-principal.ts:_carregar()`) e `produtos` limpo na
+troca de estudo, para o catálogo de A não continuar na tela durante o carregamento de B.
+
+**Varredura do padrão (critério 6 da issue):** as 4 telas com `_idCarregado` no repo são
+`tela-graficos.ts` (já corrigida, PR 580), `tela-financeiro.ts` (`_init()` **síncrono**, sem fetch —
+sem risco de corrida) e as duas corrigidas aqui. Nenhuma outra tela usa `_idCarregado`.
+
+**Teste da corrida** (`frontend/carregamento-corrida.test.ts`, novo): sem harness de DOM neste repo,
+o teste chama `_init()` diretamente nas duas classes reais (`ViabTelaProforma` incorporação,
+`ViabTelaPremissas` loteamento — um estudo de cada tipo, critério 8), com `urbiVerso.api` mockado
+por promises controláveis. Resolve o estudo B primeiro, depois A com valores diferentes, e confirma
+que `produtos`/`benchmarks`/`aliquotaRet` continuam os de B. Mais um par de testes por tela cobrindo
+o `catch` guardado. **Prova de mutação (critério 5):** removida cada uma das 4 guardas (sucesso e
+catch, nas duas telas) manualmente, uma de cada vez — as 4 mutações deixaram exatamente o teste
+correspondente vermelho, suíte restaurada e reconferida verde depois. `docs/viabilidade/formulas.md`
+e `frontend/premissas-conversao.ts` tiveram citações `arquivo:linha` corrigidas (deslocadas pelo
+diff, acusadas pelo `guard-enderecos-doc`).
+
+Sem mudança de schema/migração — `versao` não bumpou.
+
+## #570 · permutas Física e Financeira sobre o total de CADA categoria (2026-08-27)
+
+Item 3 da lista de bugs da Rodada 10, e o fim do interim que a #315 deixou aberto. Com a
+classificação R/NR da #565 no lugar, `frontend/proforma.ts` passou a ler o catálogo **por
+categoria** (`totaisPorTipoProdutos`, exportada e testada): VGV, área total, preço médio ponderado
+(`Σ VGV ÷ Σ área`) e nº de unidades de cada `tipo`. Sobre esses totais incidem as três coisas que
+antes olhavam para a fonte errada:
+
+- **VGV** — `vgvNaoResidencial` era **0 por construção**; agora é o VGV das linhas
+  `nao_residencial`, líquido da permuta física delas. `numUnidadesNaoResidencial` idem (o preço
+  médio NR aparecia zerado ao lado de um VGV NR que existia).
+- **Permuta física** — `% área venda` converte sobre a área do catálogo da categoria (era
+  `area_pvt_*_fechada`), e os m² entregues são valorados pelo **preço médio da categoria** (era
+  `preco_venda_m2_*`, campos sem tela desde a reestruturação do Preliminar).
+- **Permuta financeira** — o `%` NR incidia sobre zero: campo aceitava valor e não deduzia nada.
+  É o defeito nominal do item 3.
+
+**Decisão registrada: o cap da permuta física é POR CATEGORIA.** Cada uma capa no VGV bruto da
+própria categoria, sem corte proporcional entre as duas — o corte proporcional da #563 existia
+porque o cap era global sobre um bucket único, e mantê-lo deixaria o excedente de uma categoria
+comendo o VGV da outra, destruindo a base que a permuta financeira daquele tipo precisa. Cada VGV
+é o resíduo da sua base quantizada menos a sua permuta quantizada, então as duas identidades por
+categoria fecham ao centavo por construção (a invariante da #563, agora em dobro).
+
+Consequência intencional de leitura: no modo `% área venda` o cap deixou de ser alcançável abaixo
+de 100%, porque o `%` incide sobre a mesma área que dá o preço médio. O cap segue guardando o modo
+m² absoluto, o canônico e o fator de sensibilidade.
+
+**Fonte legada intacta.** Sem catálogo efetivo (`semProdutos`) nada muda: bases e preços legados
+como estavam, sem fallback em nenhum dos dois sentidos — a mesma decisão da #315.
+
+**Fiação da tela (critério 5).** `_ctxConversao` de `frontend/tela-premissas.ts` montava o ctx à
+mão e lia os campos legados nas duas bases de área — a badge convertia sobre uma base e o motor
+calculava com outra. A tradução virou `ctxConversaoPreliminar(p)`
+(`frontend/premissas-conversao.ts`), pura, alimentada por duas saídas novas do motor
+(`areaBasePermutaResidencial`/`areaBasePermutaNaoResidencial`).
+
+`avisoPermutaCapada` (`frontend/exportar.ts`) foi reescrito: a frase dizia "a receita bruta do
+catálogo é X" com X = permuta efetiva, o que só era verdade sob o cap global. Com uma categoria
+capando e a outra não, X é menor que o bruto — a frase passou a dizer "a permuta considerada é X"
+e a declarar a regra do cap por categoria.
+
+**Prova de mutação.** Controle pós-reconciliação: **771/771 + 39/39 render**. As cinco medidas
+abaixo são anteriores ao merge da #568, sobre o glob de então (`frontend/*.test.ts`, 729 testes) e
+o controle de então (756/756 + 37/37); a sexta, do ponto de encontro, está no parágrafo acima: neutralizar a separação por categoria → **17 vermelhos**; preço da permuta de volta
+ao campo legado → **10**; base de área de volta ao campo legado → **5**; cap de volta a global →
+**4**. A quinta é a que só a fiação pega: reverter `_ctxConversao` para o objeto literal deixa
+**728 verdes e 1 vermelho** — o teste de fonte de `frontend/premissas-conversao.test.ts`, a única
+camada que enxerga "a tela parou de chamar".
+
+**Reconciliação com a #568** (PR 606, mergeado enquanto esta branch estava aberta). Os dois PRs
+reescrevem o mesmo trecho do motor, e o acordo é a ORDEM das operações:
+`catalogoEfetivo` → `aplicarFatorPreco` (fator clampado em 0 **na fonte**, invariante da #563) →
+`totaisPorTipoProdutos` → permutas e cap por categoria. Duas consequências, e as duas viraram
+código:
+
+1. `totaisPorTipoProdutos` **deixou de filtrar** — passou a ter o contrato de `totalProdutos`, e
+   quem filtra é `calcularProforma`, uma vez, ANTES de reprecificar. Refiltrar depois faria um
+   fator 0 zerar os preços, derrubar as linhas no filtro e a categoria perder suas unidades só
+   naquele cenário, enquanto `numUnidades` continuaria certo.
+2. `precoPermuta*` **NÃO reaplica** `fatorSens('preco')`: `precoMedioM2` sai do catálogo já
+   reprecificado, e reaplicar elevaria o fator ao QUADRADO — a permuta escalaria mais rápido que a
+   própria base e o cap quebraria. Pela fonte legada (`semProdutos`) o fator entra em
+   `precoR`/`precoNR`, como a #568 deixou.
+
+Um teste novo mede só a interação (`#568×#570`, cenário Bear sobre catálogo misto com permuta nas
+duas categorias): os dois VGV brutos por categoria escalam pelo fator, a permuta de cada uma escala
+**uma vez só**, as duas identidades de cap fecham ao centavo dentro do cenário, a proporção
+permuta ÷ base não muda de cenário, e com fator 0 a contagem por categoria sobrevive. Mutação no
+ponto de encontro (`porTipo` calculado sobre o catálogo SEM fator): **8 vermelhos em 744** — o
+teste novo mais cinco da própria #568, que é o sinal de que as invariantes das duas issues passaram
+a se sustentar na mesma linha.
+
+**Conserto da rodada 1 de revisão (P1) — o Loteamento não tem categoria NR.** A separação nova
+movia para o bucket NR o produto que alguém marcasse "Não Residencial" no grid, mas a tela de
+Permutas do Loteamento só expõe os controles **residenciais** e `areaBasePermutaNaoResidencial` é
+zero por construção lá: o produto saía da única base editável, a permuta física passava a
+ignorá-lo e o `%` financeiro incidia só sobre o resto — dedução subestimada em silêncio. Consertado
+nas **duas pontas**, para UI e motor andarem juntos: o motor normaliza o catálogo do Loteamento
+para o bucket residencial antes de separar, e o grid de Produtos deixa de desenhar a coluna "Tipo"
+quando o estudo é Loteamento (controle cuja escolha o cálculo ignora não pode ficar editável). O
+campo continua no schema e no backend — só não é editável nem exibido ali.
+
+As colunas do grid viraram `colunasProduto(lot)`, exportada, e dela saem `colgroup`, cabeçalho,
+corpo e linha de Total — a contagem de células não desalinha por esquecimento de um dos quatro. A
+**ausência** de coluna não é provável pelo harness de render (ele só sabe exigir presença), então a
+prova mora em teste de unidade sobre a lista, como a #566 fez com `opcoes`. `lot` e `colunas` são
+parâmetros **obrigatórios**: apagar o argumento dá `TS2554` (medido).
+
+**Interação com a auditoria do Loteamento (#574), medida na `main` sem este diff.** Lá a permuta
+física do Loteamento é valorada por `precoLot = n(e.preco_venda_m2)`, e `estudos.preco_venda_m2`
+não tem campo em tela nenhuma nem `padrao` no schema — Loteamento novo tinha permuta que reduzia
+área e **não** reduzia VGV. Com catálogo, este diff conserta isso: o preço passa a ser o médio do
+catálogo. Teste novo com o campo legado **ausente** do fixture (o `LOT` declara `preco_venda_m2:
+1000`, e foi por isso que o defeito atravessou as suítes). Sem catálogo o comportamento continua o
+da `main`, sem fallback — o residual é issue própria.
+
+**E a base da ÁREA no Loteamento voltou a ser a ALV da cascata.** A troca de base para o catálogo é
+semântica da **Incorporação** (critério 2 da #570): no Loteamento o `%` sempre incidiu sobre a área
+loteável, que é grandeza do terreno. As duas fontes convivem lá de propósito — **área** da cascata,
+**preço** do catálogo —, e há teste com catálogo de área diferente da ALV para a asserção não ficar
+ambígua.
+
+**Sem backend, sem schema, sem migração** — a coluna `tipo` já existia (#565), então a `versao` do
+manifesto não bumpa. ⚠️ Fica um comentário obsoleto em `backend/rotas/preliminar-produtos.ts:19-21`
+("o motor da Proforma ainda não lê este campo"): não foi tocado porque o escopo da issue exclui
+`backend/`, e mexer ali arrastaria a validação de backend, que não roda nesta sessão (SDK 401).
+
+---
+
 ## #568 · A sensibilidade alcança o catálogo de Produtos (2026-08-27)
 
 Quarta issue do Trilho A da Rodada 10. `fatorSens('preco')` escalava só os campos legados

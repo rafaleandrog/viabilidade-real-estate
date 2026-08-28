@@ -74,15 +74,43 @@ test('PDF: a nota sai por inteiro, numa célula que atravessa as três colunas',
     'a nota tem que ser uma célula única, sem colunas numéricas vazias ao lado');
 });
 
-test('a frase declara as três grandezas do corte: m² informados, valor pedido e base', () => {
+test('a frase declara as três grandezas do corte: m² informados, valor pedido e valor considerado', () => {
   const p = calcularProforma(CAPADO);
   const frase = avisoPermutaCapada(p);
-  const entregue = p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
+  const considerada = p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
   // Os m² são os INFORMADOS — as áreas não são capadas, e sem esse número o
   // leitor veria uma área grande ao lado de um VGV zerado sem ligar as duas.
   assert.ok(frase.includes('600') && frase.includes('m²'), `sem os m² informados: ${frase}`);
-  assert.ok(frase.includes('3.000.000'), `sem a base do catálogo (${entregue}): ${frase}`);
+  assert.ok(frase.includes('3.000.000'), `sem a permuta considerada (${considerada}): ${frase}`);
   assert.ok(frase.includes('6.000.000'), `sem o valor pedido (${p.vgvPermutaSolicitada}): ${frase}`);
+  // #570: a frase declara a REGRA do corte, que é por categoria. Sem isso, o
+  // leitor de um estudo em que só uma categoria capou não tem como entender
+  // por que a outra permuta saiu inteira.
+  assert.ok(frase.includes('cada categoria é capada no VGV bruto da própria categoria'),
+    `a frase não diz que o cap é por categoria: ${frase}`);
+});
+
+// A frase precisa continuar verdadeira quando SÓ UMA categoria capa — o caso
+// que o cap global não produzia. Aqui a permuta considerada (4M de R + 1M de
+// NR) é menor que o bruto do catálogo (4M + 1,6M): a redação antiga, que
+// chamava esse número de "a receita bruta do catálogo", passaria a mentir.
+test('#570: com uma só categoria capada, a frase mostra a permuta CONSIDERADA, não o bruto do catálogo', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    produtos: [
+      { area_media_m2: 100, preco_venda_m2: 10_000, unidades: 4 },  // R: 400 m², 4M
+      { area_media_m2: 100, preco_venda_m2: 8_000, unidades: 2, tipo: 'nao_residencial' }, // NR: 200 m², 1,6M
+    ],
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 500,        // R: 5M, excede
+    permuta_fisica_nr_modo: 'area_m2', permuta_fisica_nr_area_m2: 125,  // NR: 1M, cabe
+  });
+  assert.equal(p.permutaCapada, true, 'o fixture precisa ter exatamente uma categoria capada');
+  assert.equal(p.vgvNaoResidencial > 0, true, 'a categoria NR tem que ter sobrado VGV');
+  const frase = avisoPermutaCapada(p);
+  assert.ok(frase.includes('5.000.000'), `sem a permuta considerada (4M + 1M): ${frase}`);
+  assert.ok(frase.includes('6.000.000'), `sem o valor pedido (5M + 1M): ${frase}`);
+  assert.ok(!frase.includes('receita bruta do catálogo'),
+    `a frase voltou a chamar a permuta considerada de "receita bruta do catálogo": ${frase}`);
 });
 
 // A tela não pode ser conferida por render aqui (não há DOM), mas PODE ser

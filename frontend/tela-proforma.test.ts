@@ -136,8 +136,8 @@ test('#567: a cadeia Receita líquida → Custo direto → Receita operacional �
 test('#567: Receita operacional e Resultado negativos aparecem com parênteses e o SINAL REAL — nunca em módulo (o bug original)', () => {
   const p = calcularProforma(DEFICIT);
 
-  // As mesmas linhas que `_linhas()` (frontend/tela-proforma.ts) monta para
-  // "= Receita operacional" e "= Resultado".
+  // As mesmas linhas que `montarLinhasProforma` (frontend/tela-proforma.ts)
+  // monta para "= Receita operacional" e "= Resultado".
   const receitaOperacional: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: p.receitaOperacional, tipo: 'consolidado', natureza: 'receita' };
   const resultado: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: p.resultado, tipo: 'resultado' };
 
