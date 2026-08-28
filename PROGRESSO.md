@@ -4,6 +4,74 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Notação de sinal da Proforma unificada entre tela, CSV e PDF (2026-08-28)
+
+Registro dos PRs 617/618 — achado 10 da auditoria #574, sem issue própria. **Decisão do autor
+(2026-08-28), verbatim:** *"se for fácil, implemente isso. Se não, anote e aguarde nova versão"*.
+**Veredito: fácil**, e o motivo está abaixo.
+
+A tela decidia parênteses × sinal por `celulaProforma`; o CSV e o PDF formatavam com `fmtR$` **cru**.
+Uma Receita operacional negativa saía `-R$ …` no arquivo e `(…)` na tela, **sobre o mesmo número**.
+Junto veio um segundo desvio do mesmo eixo, que a auditoria não tinha separado: a coluna **% VGV**
+da exportação usava `Math.abs` em **todas** as linhas, inclusive no Resultado — uma margem negativa
+aparecia **positiva** no arquivo e negativa na tela.
+
+**Por que era fácil, e por que quase não era.** A dificuldade real não era formatação, era a
+**direção do grafo de imports**: `tela-proforma.ts` importa `exportar.ts` (pelos botões de
+exportar), então a exportação não podia importar a notação da tela sem fechar um **ciclo de
+módulos**. A saída já estava escrita no próprio repositório — `avisoPermutaCapada` mora em
+`exportar.ts` exatamente por isso, com o motivo comentado ao lado. `ehLinhaReceitaOuResultado` e
+`celulaProforma` **mudaram para `exportar.ts`** e a tela as **reexporta**, então nada que as
+importava de lá precisou mudar. Sem esse precedente, o caminho seria criar um módulo novo e mover
+mais de cem linhas — e aí a resposta teria sido "anote e aguarde".
+
+**Como ficou.** `LinhaPf` (exportação) passou a carregar `tipo`/`natureza` — os MESMOS campos da
+`Linha` da tela, porque são eles que decidem a notação —, e as duas colunas monetárias saem por
+`celulaProforma`. A coluna % VGV saiu por `pctVgvProforma`, com a regra da tela (sinal no
+Resultado, magnitude nas demais). O símbolo **"R$" saiu das células** do PDF: o cabeçalho da coluna
+já o informa, e é o que a tela sempre fez. Os KPIs do topo do PDF mantêm o símbolo — ali não há
+cabeçalho que o diga.
+
+**A defesa contra a divergência voltar não compara com um formato escrito à mão.** O teste de
+paridade (`frontend/proforma-ordem-linhas.test.ts`) confronta os **dois lados entre si**, célula a
+célula, em **quatro** fixtures — mais a classificação `tipo`/`natureza` linha a linha. Comparar
+contra uma constante deixaria passar exatamente o defeito que se quer barrar, porque a constante
+teria de ser copiada de um dos dois lados.
+
+> **O quarto fixture existe por uma medição, não por simetria.** Os três primeiros (Incorporação
+> com e sem permuta, Loteamento) fecham **no azul**, e num estudo lucrativo `Math.abs(v)` é a
+> **identidade** — a asserção de % VGV passava sem nunca exercer a única linha em que o sinal
+> importa. Medido: com `pctVgvProforma` revertida para `Math.abs` em todas as linhas, os três
+> continuavam **verdes**; só o teste direto de notação acusava. Entrou então `INC_DEFICITARIO`
+> (terreno de R$ 40M contra VGV de R$ 26,4M), e com ele a mesma mutação passou a derrubar também a
+> paridade. A sentinela `notação: o fixture deficitário É deficitário` guarda essa propriedade: se
+> um ajuste futuro devolver o estudo ao azul, ela fica vermelha em vez de os dois casos voltarem a
+> passar por vacuidade.
+>
+> É a classe 1 do `CLAUDE.md` com uma volta a mais — o teste **chamava** a função certa, com o
+> argumento certo, e ainda assim não media nada: o **fixture** é que não continha o caso.
+
+**Verificação.** `scripts/validar-frontend.sh` verde nas 8 etapas: **856** testes de lógica pura
+(baseline da `main` em `c82239e`, medido trocando os dois arquivos de teste pelos da `main`: **842**)
+e **56** casos de render. Sem caso de render novo porque **a tela não muda** — a mudança é do
+arquivo exportado, que o harness não desenha; quem cobre a tela são os casos
+`proforma-deficitaria` que já existiam.
+
+Mutações, todas com **controle verde antes e depois** (29 testes nos dois arquivos): CSV de volta
+ao `fmtR$` cru → **2 vermelhos**; PDF de volta → **2**; % VGV de volta ao `Math.abs` → **2**;
+"Receita líquida" perder `natureza: 'receita'` → **5**; "Resultado" perder `tipo: 'resultado'` →
+**6**.
+
+O merge da `main` também deslocou `_renderKpis` em `tela-proforma.ts` (a saída das duas funções
+encurtou o arquivo em 13 linhas), e o `guard-enderecos-doc` **reprovou** a citação
+`tela-proforma.ts:477-495` em `frontend/render/casos/kpis-proforma-longos.ts` — corrigida para
+`:464-482`. Duas outras citações mudaram de **arquivo**, não só de linha, e o guard não as pega
+porque uma não tem número (`frontend/viab-format.ts`) e a outra o tinha errado desde antes
+(`padrao-incorporacao.md`): as duas apontavam `celulaProforma` para `tela-proforma.ts`, e agora
+apontam para `exportar.ts:69`.
+
+---
+
 ## #609 · duplicar um estudo copia absolutamente tudo (2026-08-28)
 
 Achado 2 da auditoria #574, **P1**. `POST /estudos/:id/duplicar` copiava as colunas de `estudos`,
