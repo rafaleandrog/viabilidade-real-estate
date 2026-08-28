@@ -2,7 +2,7 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
-import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
+import { calcularProforma, roiParaFaixa, type Proforma, type ProformaInput } from './proforma.js';
 import { itensAlocacaoGleba } from './areas-cascata.js';
 import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
@@ -252,7 +252,11 @@ export class ViabTelaGraficos extends LitElement {
       custo_obras_vgv: p.custoObrasVgvPct,
       margem_liquida: p.margemLiquidaPct,
       resultado_final: p.margemLiquidaPct,
-      roi: p.roiPct,
+      // #611: sem investimento não há denominador, `roiPct` cai em 0 e o
+      // medidor desenhava o ponteiro na banda vermelha do benchmark — falso
+      // alarme sobre grandeza não medida. `montarMedidor` é null-seguro desde
+      // a #571 e simplesmente não desenha o medidor.
+      roi: roiParaFaixa(p),
     });
     const medidores = exibiveis
       .map(({ benchmark, rotulo, valor }) => {

@@ -6,7 +6,7 @@ import {
   urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig,
   listarProdutosPreliminar, criarProdutoPreliminar, atualizarProdutoPreliminar, removerProdutoPreliminar,
 } from './viabilidade-api.js';
-import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, type ProformaInput, type Proforma } from './proforma.js';
+import { calcularProforma, eficienciaParaFaixa, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, type ProformaInput, type Proforma } from './proforma.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, ctxConversaoPreliminar, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
@@ -1243,7 +1243,11 @@ export class ViabTelaPremissas extends LitElement {
       kpis.push(
         { rot: 'Área da gleba', val: `${fmtNum(p.areaTerreno)} m²`, variante: '' },
         { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²`, variante: '' },
-        { rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: varianteFaixa(ef, p.eficienciaPct) },
+        // #611: a COR sai por `eficienciaParaFaixa` — sem área de gleba não há
+        // base para julgar o indicador, e o vermelho do benchmark sobre um
+        // 0,0% não medido era falso alarme. O VALOR segue `fmtPct` (o "—" do
+        // padrão da #571 é o restante da issue, adiado pelo autor).
+        { rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: varianteFaixa(ef, eficienciaParaFaixa(p)) },
         { rot: 'VGV', val: fmtR$(p.vgv), variante: '' },
         { rot: 'Nº de lotes', val: fmtNum(p.numUnidades), variante: '' },
         // #571: VGV ≤ 0 vem `null` do motor — "—", nunca "0,0%".
