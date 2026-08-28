@@ -1654,6 +1654,62 @@ rotasAvancado.patch('/estudos/:id/avancado/custos/:cid', async (req: Request, re
 // (chamada por POST /estudos/:id/duplicar quando o estudo é avançado)
 // ─────────────────────────────────────────────────────────────────
 
+// #609 — os campos de `avancado_funding_operacoes` que a rota de Funding grava
+// E que a duplicação copia. Mora AQUI (e não em `./funding.ts`, dono das
+// rotas) porque `duplicarDadosAvancado`, logo abaixo, precisa dela e
+// `funding.ts` já importa deste arquivo: declarar lá e importar aqui fecharia
+// um ciclo de módulos. Lista única — as duas pontas não podem divergir quando
+// uma coluna nova entrar.
+export const CAMPOS_OPERACAO = [
+  'tipo', 'nome', 'ordem', 'valor',
+  'cronograma_evento', 'fase_ancora_id', 'inicio_mes',
+  'distribuir_aporte', 'aporte_meses', 'taxa_anual',
+  'periodo_amortizacao_meses', 'periodo_carencia_meses',
+  'modo_retorno', 'pct_retorno',
+  // ── financiamento_producao (§4.3, planilha `Incorp Individual`) ──
+  'exposicao_minima', 'percentual_financiavel', 'amortizar_com_caixa_disponivel', 'custo_linha_ids',
+  // #478: tarifas/estruturação/encargos — só `divida` (motor ignora nas
+  // outras duas). Whitelisted igual às demais: sem isso a tela grava no vazio.
+  'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
+];
+
+/**
+ * #609 — reaponta uma lista de ids gravada em JSON (`custo_linha_ids` de uma
+ * operação de funding) para os ids das linhas CORRESPONDENTES no estudo novo.
+ * Parte PURA da duplicação, separada para ter teste.
+ *
+ * Id sem correspondência é DESCARTADO, não copiado: manter o id antigo faria a
+ * operação da cópia somar linhas de custo de OUTRO estudo — que é o defeito
+ * que este remapeamento existe para evitar, na sua forma mais silenciosa (o
+ * motor leria a base de financiamento de um projeto alheio sem erro nenhum).
+ * (Órfão aqui é sempre linha APAGADA do original: `mapaCusto` cobre toda linha
+ * que existe, porque toda linha existente é copiada.)
+ *
+ * ⚠️ EXCETO quando TODOS os ids são órfãos: devolver `[]` mudaria o
+ * comportamento da cópia, porque o motor trata lista VAZIA como "sem seleção,
+ * use a base padrão" (`frontend/funding-motor.ts:927`, o ternário de
+ * `custo_linha_ids`) — a cópia passaria a financiar a base padrão inteira
+ * enquanto o original, com a lista não-vazia de ids mortos, não casa com linha
+ * nenhuma e não financia nada. Nesse caso a lista volta como veio (normalizada
+ * a número): ids de linhas apagadas continuam não casando com nada na cópia —
+ * o MESMO comportamento observável do original — e nenhum deles alcança linha
+ * de outro estudo, porque apontam para linhas que não existem mais.
+ * (Achado do App de revisão na rodada 1 do PR da #609.)
+ *
+ * Valor que não é lista volta como veio (`null`/`undefined`): a coluna é
+ * opcional e o motor cai na base padrão — comportamento igual nos dois lados.
+ */
+export function remapearCustoLinhaIds(valor: unknown, mapa: Map<number, number>): unknown {
+  if (!Array.isArray(valor)) return valor;
+  const novos: number[] = [];
+  for (const id of valor) {
+    const novo = mapa.get(Number(id));
+    if (novo !== undefined) novos.push(novo);
+  }
+  if (novos.length === 0 && valor.length > 0) return valor.map(Number);
+  return novos;
+}
+
 const CAMPOS_CRONOGRAMA = ['evento', 'inicio_mes', 'duracao_meses', 'travado_inicio', 'travado_duracao'];
 const CAMPOS_FASE_COPIA = ['tipo', 'nome', 'ordem', 'inicio_mes', 'duracao_meses', 'absorcao', 'fluxo_pagamento'];
 const CAMPOS_ALOCACAO_COPIA = ['unidades', 'preco_m2', 'ordem'];
@@ -1709,12 +1765,43 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   const custos = await req.dados!.listar('avancado_linhas_custo', {
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
   });
+  const mapaCusto = new Map<number, number>();
   for (const custo of custos.dados) {
     const copia: Record<string, any> = { estudo_id: novoId, ...extrairCampos(custo, CAMPOS_CUSTO) };
     if (custo.fase_ancora_id !== null && custo.fase_ancora_id !== undefined) {
       copia.fase_ancora_id = mapaFase.get(Number(custo.fase_ancora_id)) ?? null;
     }
-    await req.dados!.criar('avancado_linhas_custo', copia);
+    // #609: `permuta_tipologia_id` estava em CAMPOS_CUSTO e viajava CRU — a
+    // linha de permuta física da cópia apontava para uma tipologia do estudo
+    // ORIGINAL. Mesma classe do `fase_ancora_id` logo acima (#167), e igual de
+    // silenciosa: o motor lê a tipologia alheia sem erro nenhum
+    // (`frontend/fluxo-caixa-motor.ts`, `permuta_tipologia_id`).
+    if (custo.permuta_tipologia_id !== null && custo.permuta_tipologia_id !== undefined) {
+      copia.permuta_tipologia_id = mapaTipologia.get(Number(custo.permuta_tipologia_id)) ?? null;
+    }
+    const nova = await req.dados!.criar('avancado_linhas_custo', copia);
+    mapaCusto.set(Number(custo.id), Number(nova.id));
+  }
+
+  // #609 — Operações de funding (`avancado_funding_operacoes`, #355). NÃO eram
+  // copiadas: um Avançado duplicado perdia a estrutura de capital inteira e o
+  // fluxo alavancado da cópia nascia diferente do original, sem aviso.
+  //
+  // Dois remapeamentos, pelo mesmo motivo dos de cima: `fase_ancora_id` (a
+  // fase que ancora o aporte) e `custo_linha_ids` (a base do financiamento à
+  // produção, uma lista de ids em JSON).
+  const operacoes = await req.dados!.listar('avancado_funding_operacoes', {
+    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 200,
+  });
+  for (const op of operacoes.dados) {
+    const copia: Record<string, any> = { estudo_id: novoId, ...extrairCampos(op, CAMPOS_OPERACAO) };
+    if (op.fase_ancora_id !== null && op.fase_ancora_id !== undefined) {
+      copia.fase_ancora_id = mapaFase.get(Number(op.fase_ancora_id)) ?? null;
+    }
+    if (op.custo_linha_ids !== null && op.custo_linha_ids !== undefined) {
+      copia.custo_linha_ids = remapearCustoLinhaIds(op.custo_linha_ids, mapaCusto);
+    }
+    await req.dados!.criar('avancado_funding_operacoes', copia);
   }
 
   // Cenários salvos (Etapa 8 · #56) — deltas percentuais, sem dado derivado.
