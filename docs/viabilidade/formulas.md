@@ -16,7 +16,7 @@ As fórmulas rodam no **frontend em tempo real** (engine `frontend/proforma.ts`,
 
 - **Loteamento:** a área vendável é a **Área Líquida de Venda (ALV)** de uma tabela em **cascata**,
   não uma soma plana de percentuais. A cascata tem 11 linhas
-  (`CASCATA_LOTEAMENTO`, `frontend/areas-cascata.ts:173`) e subtrai em três degraus:
+  (`CASCATA_LOTEAMENTO`, `frontend/areas-cascata.ts:183`) e subtrai em três degraus:
 
   ```text
   Poligonal − APP                                              = Área Parcelável   (âncora 2)

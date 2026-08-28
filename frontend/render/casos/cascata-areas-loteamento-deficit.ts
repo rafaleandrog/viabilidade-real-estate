@@ -21,7 +21,7 @@ import { forcarEstado } from './dados.js';
 
 // Gleba de 10.000 m² com 26.000 m² de deduções — os mesmos números do teste de
 // lógica pura da #612, para as duas camadas descreverem o mesmo estudo. Sem
-// piso, Parcelável = −2.000, Líquida = −11.000 e ALV = −26.000 m²; com piso,
+// piso, Parcelável = −2.000, Líquida = −11.000 e ALV = −16.000 m²; com piso,
 // as três ficam em 0 e as três acusam corte.
 const ESTUDO_LOT_ESTOURADO: Record<string, any> = {
   id: 22,

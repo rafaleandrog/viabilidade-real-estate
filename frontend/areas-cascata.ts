@@ -165,7 +165,17 @@ export function calcularCascata(
  * aparece sozinho é pior que nenhum, porque ensina o usuário a ignorá-lo.
  */
 export function deficitsDaCascata(linhas: LinhaResolvida[]): LinhaResolvida[] {
-  return linhas.filter((l) => l.deficitM2 >= 0.005);
+  return linhas.filter(linhaCortada);
+}
+
+/**
+ * O predicado de "esta linha foi cortada pelo piso" — o MESMO que
+ * `deficitsDaCascata` usa. Exportado (rodada 1 de revisão do PR 620) para a
+ * tela marcar `tr.deficit` sem duplicar o limiar inline: se o limiar mudar
+ * aqui, banner e linha vermelha mudam juntos.
+ */
+export function linhaCortada(l: LinhaResolvida): boolean {
+  return l.deficitM2 >= 0.005;
 }
 
 // ── Cascata do Loteamento — as 10 linhas de `padrao_areas.png` ────────────

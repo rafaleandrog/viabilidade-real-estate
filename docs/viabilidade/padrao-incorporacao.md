@@ -419,7 +419,7 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 > **sem** catálogo efetivo continua usando as bases legadas — `area_pvt_r_fechada` /
 > `area_pvt_nr_fechada` na Incorporação, e a ALV da cascata (`CASCATA_LOTEAMENTO`) no
 > **Loteamento**, que segue sendo a única cascata que alimenta base de permuta. Desde a **#564**,
-> `CASCATA_INCORPORACAO` (`frontend/areas-cascata.ts:201-206`) **é renderizada** pela aba Terreno &
+> `CASCATA_INCORPORACAO` (`frontend/areas-cascata.ts:211-216`) **é renderizada** pela aba Terreno &
 > Áreas do Preliminar de Incorporação (`frontend/tela-premissas.ts`, tabela de Áreas) — mas continua
 > **não sendo fonte da grandeza de ligação** em nenhuma das duas fontes. Sem isso, o bug que a #486
 > procurou passa a existir de verdade.

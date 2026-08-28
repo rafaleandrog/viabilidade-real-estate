@@ -215,7 +215,7 @@ test('#574: itensAlocacaoGleba concorda com a área vendável do motor (ALV = ar
 
 /**
  * Gleba de 10.000 m² com deduções somando 26.000 m² — a Área Parcelável já
- * ficaria em −2.000, a Líquida em −11.000 e a ALV em −26.000 se a cascata
+ * ficaria em −2.000, a Líquida em −11.000 e a ALV em −16.000 se a cascata
  * subtraísse sem piso. Números redondos e folgados de propósito: o corte não
  * pode depender de arredondamento.
  */

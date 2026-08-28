@@ -27,8 +27,12 @@ limiar de meio centésimo de m², para resíduo de ponto flutuante não virar ba
 **O aviso** é `urbi-banner.aviso-area-negativa` em Premissas → Terreno & Áreas
 (`_renderAvisoAreaNegativa`, `frontend/tela-premissas.ts`), a tela onde se corrige — critério 2 da
 issue —, e a linha cortada ganha `tr.deficit` na tabela, para o `0,00 m²` de corte não se confundir
-com o de cadastro em branco. Só o Loteamento chama: `CASCATA_INCORPORACAO` só tem linhas de `soma`,
-que não descem de zero.
+com o de cadastro em branco. **Rodada 1 de revisão (App do Codex + lente):** o aviso passou a ser
+das DUAS cascatas — a da Incorporação tem cinco linhas editáveis, e um negativo digitado nelas
+também é cortado pelo piso; e o motor (`calcularProforma`) passou a ler as áreas digitadas da
+Incorporação pelo MESMO piso (`areaM2`), para tabela e cálculo nunca divergirem. O limiar de corte
+virou predicado exportado (`linhaCortada`), usado pelo banner e pela linha `tr.deficit` sem
+duplicação.
 
 **Verificação.** 813 testes de lógica pura (+6) e 44 casos de render (+2), todos verdes. Mutações
 medidas: apagar `Math.max(0, bruto)` → **5 vermelhos**; apagar `deficitM2` do objeto devolvido →

@@ -10,7 +10,7 @@ import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdu
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, ctxConversaoPreliminar, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
-import { calcularCascata, deficitsDaCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
+import { calcularCascata, deficitsDaCascata, linhaCortada, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
 // do seu `_carregar()`, e que `tela-graficos.ts` reusa (PR 580/#597). Reusada,
 // e não recopiada: a cópia inline divergiria da função que o teste exercita.
@@ -1045,7 +1045,7 @@ export class ViabTelaPremissas extends LitElement {
           </thead>
           <tbody>
             ${linhas.map((l) => html`
-              <tr class="${l.papel.tipo !== 'editavel' ? 'computada' : ''}${l.deficitM2 >= 0.005 ? ' deficit' : ''}">
+              <tr class="${l.papel.tipo !== 'editavel' ? 'computada' : ''}${linhaCortada(l) ? ' deficit' : ''}">
                 <td>${l.label}</td>
                 <td>${this._renderSeletorArea(l, dis, ancora1, ancora2)}</td>
                 <td class="num">${fmtNum(l.m2, 2)}</td>
@@ -1072,9 +1072,13 @@ export class ViabTelaPremissas extends LitElement {
    * sem nenhuma pista de que digitou deduções maiores que a gleba. É a mesma
    * razão pela qual a #563 capou o VGV da permuta E pôs um aviso ao lado.
    *
-   * Só o Loteamento chama: `CASCATA_INCORPORACAO` só tem linhas de `soma`, que
-   * não descem de zero (`areas-cascata.ts`). A função em si é agnóstica — se
-   * um dia entrar uma subtração lá, basta chamá-la.
+   * As DUAS cascatas chamam (rodada 1 de revisão do PR 620): as linhas de
+   * `soma` da `CASCATA_INCORPORACAO` não descem de zero por subtração, mas o
+   * piso genérico também corta um negativo DIGITADO numa linha editável — e a
+   * Incorporação tem cinco. Sem o aviso aqui, a tabela mostraria 0 no lugar do
+   * negativo digitado sem nenhuma pista, exatamente o silêncio que este banner
+   * existe para impedir. O motor lê os mesmos campos pelo mesmo piso
+   * (`areaM2`, `frontend/proforma.ts`) — tabela e cálculo nunca divergem.
    */
   private _renderAvisoAreaNegativa(linhas: LinhaResolvida[]): TemplateResult {
     const cortadas = deficitsDaCascata(linhas);
@@ -1146,7 +1150,7 @@ export class ViabTelaPremissas extends LitElement {
           </thead>
           <tbody>
             ${linhas.map((l) => html`
-              <tr class=${l.papel.tipo !== 'editavel' ? 'computada' : ''}>
+              <tr class="${l.papel.tipo !== 'editavel' ? 'computada' : ''}${linhaCortada(l) ? ' deficit' : ''}">
                 <td>${l.label}</td>
                 <td>${this._renderCampoAreaInc(l, dis)}</td>
                 <td class="num">${fmtNum(l.m2, 2)}</td>
@@ -1157,6 +1161,7 @@ export class ViabTelaPremissas extends LitElement {
           </tbody>
         </table>
       </div>
+      ${this._renderAvisoAreaNegativa(linhas)}
     `;
   }
 
