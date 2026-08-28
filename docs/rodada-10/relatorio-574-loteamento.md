@@ -10,7 +10,9 @@
 
 ## Veredito geral
 
-**35 conferências · 24 ✅ · 11 achados** (2 P1, 5 P2, 2 P3, 2 registros).
+**37 conferências (35 linhas da tabela + 2 transversais) · 27 linhas ✅ · 11 achados**
+(2 P1, 5 P2, 2 P3, 2 registros — 9 vindos de 8 linhas da tabela, a linha 29 carrega dois,
+e 2 das conferências transversais).
 Três achados já estão **consertados neste PR** (4, 9 e 11); os outros oito viram issue ou nota.
 
 O padrão que os achados desenham não é "o Loteamento calcula errado" — o motor dele está correto
@@ -149,8 +151,9 @@ Loteamento** antes de a #570 fechar, e é isso que este achado pede:
 `POST /estudos/:id/duplicar` copia as colunas de `estudos` (`montarCopiaEstudo`,
 `backend/rotas/estudos.ts:117`), os imóveis vinculados e — só no Avançado — toda a estrutura de
 cronograma/receitas/custos (`backend/rotas/estudos.ts:436-450`). **Nada copia
-`preliminar_produtos`**: nenhuma outra referência à tabela existe no backend fora do CRUD e do
-`anexarProdutos` da listagem.
+`preliminar_produtos`**: fora do CRUD e do `anexarProdutos` da listagem, a única outra
+referência viva no backend é a leitura do Apelo Comercial (`backend/rotas/apelo-comercial.ts:153`,
+linha 33 desta tabela) — nenhuma delas copia.
 
 Antes da #563 isso passava despercebido, porque o VGV caía no fallback dos pares legados de área ×
 preço, que `montarCopiaEstudo` **copia**. Depois da #563 o fallback acabou: a cópia nasce em
@@ -174,8 +177,11 @@ inteiras, todas zeradas, com os dois indicadores em "—". É exatamente o que a
 `faixas_nao_edificaveis_pct`, `sistema_viario_pct`, `elup_pct`, `epc_pct`, `epu_pct` e
 `areas_privativas_nao_vendaveis_pct`. A migração `020_areas_cascata_loteamento.js` migrou esses
 campos para as colunas `area_*_modo`/`area_*_valor` em 2026-08-03; desde então **nenhuma tela os
-escreve** e `frontend/proforma.ts` **não os lê** (declarado em `frontend/proforma.ts:22-26`). Eram os
-únicos consumidores vivos no repositório.
+escreve por UI** e `frontend/proforma.ts` **não os lê** (declarado em
+`frontend/proforma.ts:22-26`). Eram os únicos **leitores** vivos no repositório; resta um
+pass-through de escrita — `AREAS_LOT` alimenta `TODOS_NUM` em `frontend/tela-premissas.ts` e o
+Salvar regrava as 7 colunas em todo save, sem UI e sem leitor — mesmo estado residual que o
+ACHADO 1 registra para `PRODUTOS_LOT`.
 
 Consequência num loteamento criado depois daquela data: as 7 deduções saem **zero**, `_pizzaAreas`
 filtra fatia por `v > 0.005`, e a pizza fica com **uma fatia só** — "a gleba inteira é vendável",
@@ -184,7 +190,7 @@ mostrando a composição de antes da migração, congelada, enquanto Premissas e
 cascata editada depois.
 
 **Conserto:** a composição passa a sair da mesma cascata que Premissas edita e que o motor usa,
-via `itensAlocacaoGleba` (`frontend/areas-cascata.ts:218`) — as 7 deduções editáveis mais a ALV,
+via `itensAlocacaoGleba` (`frontend/areas-cascata.ts:227`) — as 7 deduções editáveis mais a ALV,
 que fecham na poligonal por construção.
 
 ### ACHADO 5 · [P2] A #571 não alcançou `eficienciaPct` nem `roiPct`

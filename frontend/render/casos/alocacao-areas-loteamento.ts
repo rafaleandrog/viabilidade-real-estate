@@ -70,8 +70,9 @@ export const caso = {
   exigir: [
     // Composição dos custos · Receita × Custos · Alocação de áreas da gleba.
     // O Loteamento tem UM card de alocação (a Incorporação tem dois: geral e
-    // macro) — 3 cards é o número certo desta tela, e 4 denunciaria o ramo
-    // errado montado.
+    // macro). `exigir` só tem piso, então 4 cards ainda passariam aqui; quem
+    // denuncia o ramo de Incorporação montado é o `urbi-grafico-pizza` abaixo
+    // (o ramo errado desenha 1 pizza, não 2).
     { seletor: 'urbi-card', minimo: 3 },
     // Pizza de custos + pizza da gleba. Um `urbi-estado-vazio` no lugar de
     // qualquer uma delas derruba a contagem — é o que pega a tela montada com

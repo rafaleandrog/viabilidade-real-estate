@@ -27,7 +27,7 @@ As fórmulas rodam no **frontend em tempo real** (engine `frontend/proforma.ts`,
   Cada uma das **7 linhas editáveis** é digitada em **m²**, **% da Poligonal** ou **% da
   Parcelável** (a última só para as linhas posteriores à âncora 2 — regra de não-circularidade),
   no par de colunas `area_<x>_modo`/`area_<x>_valor`. A ALV é lida em
-  `frontend/proforma.ts:341-342`. Após permuta física → **área vendável líquida**.
+  `frontend/proforma.ts:429-430`. Após permuta física → **área vendável líquida**.
 
   > ⚠️ Os 7 campos antigos de "% da gleba" (`app_pct`, `faixas_nao_edificaveis_pct`,
   > `sistema_viario_pct`, `elup_pct`, `epc_pct`, `epu_pct`,

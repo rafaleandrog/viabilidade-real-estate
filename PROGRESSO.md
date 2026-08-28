@@ -6,7 +6,7 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ## #574 · auditoria do Preliminar de Loteamento (2026-08-28)
 
-Item 9 da lista de bugs da Rodada 10 — 35 conferências tela a tela e fórmula a fórmula contra
+Item 9 da lista de bugs da Rodada 10 — 37 conferências tela a tela e fórmula a fórmula contra
 `docs/viabilidade/formulas.md`, com evidência `arquivo:linha` por linha conferida em
 `docs/rodada-10/relatorio-574-loteamento.md`. Veredito: **o motor do Loteamento está correto
 linha a linha**; o que a auditoria achou é superfície de verificação menor que a da Incorporação
