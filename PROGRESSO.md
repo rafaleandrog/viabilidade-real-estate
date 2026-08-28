@@ -53,6 +53,54 @@ vermelho**; apagar as flags do objeto devolvido → `TS2739`; fazer a flag menti
 (`resolverIndicadoresBenchmark`/`montarMedidor`), que sem custo medido desenha o ponteiro em 0 na
 banda **vermelha** — o mecanismo idêntico ao que este conserto apaga em `tela-graficos.ts`. Não
 tocado por ser fora do escopo da decisão (grandeza do Avançado; a #611 é do motor Preliminar).
+## #615 · o Loteamento não tem mais fonte legada de preço (2026-08-28)
+
+Residual do achado 1 da auditoria #574, depois de o PR 607 (#570) resolver o caso **com** catálogo.
+`estudos.preco_venda_m2` valorava a permuta física do Loteamento pela fonte legada, e o campo **não
+tem entrada em tela nenhuma** — o array `PRODUTOS_LOT` que o declarava sobrevive só dentro de
+`TODOS_NUM`, para o tipo numérico do Salvar — **nem `padrao` no schema**. Consequência: estudo
+criado depois da reestruturação do Preliminar tinha a coluna vazia, a permuta deduzia **área** e não
+deduzia **VGV**; estudo antigo, com a coluna preenchida, deduzia. Mesma premissa, resultados
+diferentes, sem nada na tela dizendo por quê.
+
+**Decisão do autor (2026-08-28), verbatim:** *"retire isso então"*. Das duas saídas que a issue
+listava (dar entrada/`padrao` ao campo, ou declarar a permuta indefinida com aviso), o autor
+escolheu uma terceira: retirar o caminho.
+
+**Como ficou.** `precoLot` deixou de existir; `precoR`/`precoNR` são `0` no Loteamento e seguem
+legados só na Incorporação. `precoMedioM2` perdeu o ramo `lot` — as duas famílias usam agora
+`vgv / areaVendavelLiquida`, e com isso o memo `valorPermutaFisica` e a dedução do VGV passam a
+falar o mesmo número (critério 4). `precoSugeridoM2` parou de escrever o campo no override do
+Loteamento, que virava movimento de um valor que ninguém lê.
+
+**O campo saiu do `ProformaInput`, e não só do cálculo** — é a defesa que faz a remoção durar:
+voltar a lê-lo no motor é `TS2339`, não uma linha que passa na revisão. A coluna continua no
+`schema.json` (removê-la é mudança de schema, logo outro escopo) e continua chegando no payload,
+inerte.
+
+**Por que zero aqui não é "dedução zerada em silêncio"** (o que o critério 1 proíbe): sem catálogo
+efetivo o estudo não tem receita modelada, e desde a #563 a Proforma inteira é estado vazio — sem
+VGV, sem tabela e sem o KPI de área permutada ao lado. É a mesma filosofia, no eixo do preço: sem
+fonte visível, nenhum número-fantasma. A consequência que sobra — **`permutaCapada` inalcançável
+pela fonte legada do Loteamento, por construção** — está **declarada** em
+`docs/viabilidade/formulas.md`, que é a saída que o critério 3 oferece.
+
+**Verificação.** 818 testes de lógica pura (baseline da `main`: 815), 42 casos de render, todos
+verdes. Mutações medidas: voltar a ler o campo no motor → `TS2339`; restaurar `precoLot` em
+`precoR` → **2 vermelhos**; restaurar o ramo `lot` de `precoMedioM2` → **3 vermelhos**.
+
+> ⚠️ **A primeira rodada de mutação deste PR saiu VERDE, e o erro era do teste, não do motor.**
+> Restaurar `precoLot` não movia nada porque os casos novos herdavam o fixture `LOT` **sem** a
+> coluna legada e **sem permuta física**: `precoLot` dava zero por ausência de DADO, não por
+> ausência de CAMINHO. Os testes passaram a injetar a coluna por `as any` — o payload real de um
+> estudo antigo — **e** a permuta, que é o multiplicando sem o qual qualquer preço dá zero. É a
+> lição da Rodada 9 ("medir o ponto certo") reencontrada pelo avesso: uma medição verdadeira sobre a
+> pergunta errada é indistinguível de uma verificação boa.
+
+**Fora de escopo, registrado:** a Incorporação tem a MESMA classe de defeito —
+`preco_venda_m2_residencial`/`_nao_residencial` também só sobrevivem em `TODOS_NUM`, sem campo
+renderizado —, e lá a fonte legada continua valendo. A assimetria é deliberada (o escopo da #615 é
+o Loteamento) e precisa de decisão do autor para ser fechada.
 
 ## #612 · piso em zero na cascata de áreas do Loteamento (2026-08-28)
 

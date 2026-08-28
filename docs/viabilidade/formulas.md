@@ -27,7 +27,7 @@ As fórmulas rodam no **frontend em tempo real** (engine `frontend/proforma.ts`,
   Cada uma das **7 linhas editáveis** é digitada em **m²**, **% da Poligonal** ou **% da
   Parcelável** (a última só para as linhas posteriores à âncora 2 — regra de não-circularidade),
   no par de colunas `area_<x>_modo`/`area_<x>_valor`. A ALV é lida em
-  `frontend/proforma.ts:429-430`. Após permuta física → **área vendável líquida**.
+  `frontend/proforma.ts:464`. Após permuta física → **área vendável líquida**.
 
   > **Piso em zero (#612).** Nenhuma linha da cascata sai negativa — decisão do autor em
   > 2026-08-28, verbatim: *"Nunca pode ser negativo, não faz sentido ser menor que zero em nenhum
@@ -90,6 +90,25 @@ Nada disso vale para o estudo **sem catálogo efetivo**: ali não há receita mo
 permutas continuam sendo as legadas (área vendável no Loteamento, `area_pvt_*_fechada` e
 `preco_venda_m2_*` na Incorporação). Não há fallback de uma fonte para a outra, em nenhum dos dois
 sentidos.
+
+> **O Loteamento não tem fonte legada de PREÇO — #615.** Decisão do autor em 2026-08-28, verbatim:
+> *"retire isso então"*. Até ali, a permuta física do Loteamento sem catálogo era valorada por
+> `estudos.preco_venda_m2`, um campo que **não tem entrada em tela nenhuma** (o array `PRODUTOS_LOT`
+> que o declarava sobrevive só dentro de `TODOS_NUM`, para o tipo numérico do Salvar) **nem `padrao`
+> no schema** — então um estudo criado depois da reestruturação do Preliminar tinha a coluna vazia,
+> a permuta deduzia **área** e não deduzia **VGV**, e um estudo antigo com a coluna preenchida
+> deduzia. O motor não lê mais a coluna, e o campo saiu do `ProformaInput`: os dois estudos agora
+> calculam igual.
+>
+> **Consequência que esta spec declara em vez de esconder:** no Loteamento **sem catálogo efetivo**,
+> a permuta física vale **zero** e o cap (`permutaCapada`) é **inalcançável por construção** — a
+> permuta pedida e a base do cap são as duas zero, e `>` nunca é verdade. Não é dedução zerada em
+> silêncio: `semProdutos` manda a Proforma inteira para o estado vazio da #563 — sem VGV, sem
+> tabela e sem o KPI de área permutada ao lado. **Com** catálogo o cap é normalmente alcançável,
+> pelo preço médio do catálogo (é o caminho que o PR 607 entregou).
+>
+> A **Incorporação** mantém a fonte legada (`preco_venda_m2_residencial`/`_nao_residencial`), e lá o
+> cap continua alcançável por ela. A assimetria é deliberada: o escopo da #615 é o Loteamento.
 
 ## Deduções da receita
 
