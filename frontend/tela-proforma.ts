@@ -4,7 +4,17 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
-import { exportarPDF, exportarExcel, avisoPermutaCapada } from './exportar.js';
+// ⚠️ `ehLinhaReceitaOuResultado`/`celulaProforma` MUDARAM DE ARQUIVO na
+// unificação da notação de sinal (registro dos PRs 617/618, achado 10 da
+// auditoria #574): moram em `./exportar.ts`, e são REEXPORTADAS logo abaixo.
+// O motivo é a direção do grafo de imports — esta tela já importa aquele
+// módulo, então a exportação não pode importar esta tela sem fechar um ciclo.
+// É a mesma decisão, escrita no mesmo lugar, que `avisoPermutaCapada` tomou.
+import {
+  exportarPDF, exportarExcel, avisoPermutaCapada,
+  ehLinhaReceitaOuResultado, celulaProforma,
+} from './exportar.js';
+export { ehLinhaReceitaOuResultado, celulaProforma };
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
 // do seu `_carregar()`, e que `tela-graficos.ts` reusa (PR 580/#597). Reusada,
@@ -26,29 +36,6 @@ export interface Linha {
   semPermuta?: boolean;   // #10: linha "VGV sem permuta" (itálico, sub-linha de contexto)
   memo?: string;          // #8: descrição da conta, na 2ª coluna (menor, itálico)
   soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean;
-}
-
-// #567: receita (VGV, sub-linhas de produto, consolidados marcados
-// `natureza: 'receita'`) e resultado mostram o SINAL REAL — negativo entre
-// parênteses, positivo sem marca nenhuma. Toda outra linha (custo/dedução,
-// inclusive os headers `tipo: 'consolidado'` sem `natureza`, como "Custo
-// direto total") é notação contábil pura: SEMPRE entre parênteses,
-// independente do sinal — a app grava custo como valor positivo. Pura e
-// exportada para ser testável: era decidido inline dentro de dois métodos
-// privados que nenhum teste tocava.
-export function ehLinhaReceitaOuResultado(r: Pick<Linha, 'tipo' | 'natureza'>): boolean {
-  return r.tipo === 'receita' || r.natureza === 'receita' || r.tipo === 'resultado';
-}
-
-// Coluna R$ da Proforma: delega para `celula` (frontend/viab-format.ts) —
-// fonte única de 2 casas decimais (C7) e da regra de parênteses
-// (`negativoContabil`), a mesma que o Fluxo de Caixa usa. `sempreExibir`
-// porque a Proforma controla visibilidade por LINHA (`ocultarSeZero` no
-// `Linha`), não por célula perto de zero como o Fluxo de Caixa — um header
-// como "Custo indireto total" que fecha em zero precisa mostrar "(0,00)",
-// não sumir.
-export function celulaProforma(r: Pick<Linha, 'v' | 'tipo' | 'natureza'>): string {
-  return celula(r.v, { comParenteses: true, custo: !ehLinhaReceitaOuResultado(r), sempreExibir: true });
 }
 
 // Coluna R$/m²: mesma decisão de sinal (`negativoContabil`) que `celula`
