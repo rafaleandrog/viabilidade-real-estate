@@ -37,7 +37,7 @@ export function relato(a: Achados): string {
 /** Total de achados de uma lente, somado em todas as larguras medidas. */
 export function contar(
   a: Achados,
-  lente: 'transbordoDeCaixa' | 'transbordoDeTexto' | 'corte' | 'sobreposicao',
+  lente: 'transbordoDeCaixa' | 'transbordoDeTexto' | 'corte' | 'sobreposicao' | 'sobreposicaoTexto',
 ): number {
   return Object.values(a.larguras).reduce((s, m) => s + m[lente].length, 0);
 }
