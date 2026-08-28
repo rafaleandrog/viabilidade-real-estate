@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtPct } from './viab-format.js';
+import { fmtR$, fmtR$Kpi, fmtPct } from './viab-format.js';
 import {
   type EventoCrono, type PeriodoAgregado, periodosAnuais, rotuloMesRelativo, mesRepasse,
 } from './fluxo-shared.js';
@@ -375,7 +375,7 @@ export class ViabTelaCenarios extends LitElement {
     if (resultado === null) return html`${nothing}`;
     return html`
       <div class="fx-kpis">
-        <urbi-kpi rotulo="Resultado após custo financeiro" .valor=${fmtR$(resultado)}
+        <urbi-kpi rotulo="Resultado após custo financeiro" .valor=${fmtR$Kpi(resultado)}
           variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
       </div>
     `;

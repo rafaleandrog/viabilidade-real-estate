@@ -812,6 +812,16 @@ Git Bash — ver PROGRESSO).
   > (`frontend/tela-fluxo-receitas.ts:452-453`) trocaram `fmtNum` sem 2º argumento por
   > `fmtR$(v, false)`. A #281 está fechada — a tabela de conformidade completa é
   > `docs/viabilidade/formulas.md` §"Estado de conformidade".
+  > ⚠️ **UMA exceção, declarada pelo autor em 2026-08-26** (leva Avançado, item 4 — issue #581):
+  > **o valor em R$ exibido em CARD DE KPI sai sem casas decimais**, e o percentual em card sai com
+  > **uma** casa. (a) A exceção existe e é decisão de desenho, não bug. (b) Ela vale **só** para o
+  > valor exibido no card de KPI — a figura que o card publica. (c) **Persistência, entrada, motor,
+  > tabelas, Proforma, Fluxo de Caixa e exportação continuam em 2 casas, sem exceção**: é
+  > arredondamento de EXIBIÇÃO, nada persistido muda, e `R$ 171.448.400` num card é o mesmo número
+  > que `R$ 171.448.400,00` numa linha de tabela. Quem a implementa é `fmtR$Kpi`
+  > (`frontend/viab-format.ts:48`) — símbolo próprio, e não um parâmetro de `fmtR$`, para a exceção
+  > ser **greppável**; o inventário de call sites é travado por contagem exata em
+  > `frontend/kpi-casas-decimais.test.ts`. `fmtR$` não mudou.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa

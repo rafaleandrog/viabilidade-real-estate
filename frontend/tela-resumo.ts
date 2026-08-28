@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtPct, fmtPctOuIndef } from './viab-format.js';
+import { fmtR$Kpi, fmtPct, fmtPctOuIndef } from './viab-format.js';
 import { type EventoCrono } from './fluxo-shared.js';
 import { calcularFluxo, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { graficoFluxoMensal, graficoFluxoAcumulado } from './fluxo-graficos.js';
@@ -214,13 +214,13 @@ export class ViabTelaResumo extends LitElement {
     const tirVar = c.tir === null ? '' : (c.tir > 0 ? 'sucesso' : 'erro');
     return html`
       <div class="kpis">
-        <urbi-kpi rotulo="VPL" .valor=${fmtR$(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="VPL" .valor=${fmtR$Kpi(c.vpl)} variante=${c.vpl >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
         <urbi-kpi rotulo="TIR" .valor=${tirTxt} variante=${tirVar}></urbi-kpi>
         <!-- #353: exibida como magnitude (módulo) — sem cenário base para
              comparar aqui, a variante fica fixa em "erro" (é sempre risco). -->
-        <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$(Math.abs(c.exposicaoMaxima))} variante="erro"></urbi-kpi>
-        <urbi-kpi rotulo="VGV potencial" .valor=${fmtR$(k.vgv)}></urbi-kpi>
-        <urbi-kpi rotulo="Resultado" .valor=${fmtR$(k.resultado)} variante=${k.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="Exposição máxima" .valor=${fmtR$Kpi(Math.abs(c.exposicaoMaxima))} variante="erro"></urbi-kpi>
+        <urbi-kpi rotulo="VGV potencial" .valor=${fmtR$Kpi(k.vgv)}></urbi-kpi>
+        <urbi-kpi rotulo="Resultado" .valor=${fmtR$Kpi(k.resultado)} variante=${k.resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
         <urbi-kpi rotulo="Margem de caixa" .valor=${fmtPctOuIndef(k.margemLiquidaPct)}
           variante=${k.margemLiquidaPct === null ? '' : (k.margemLiquidaPct >= 0 ? 'sucesso' : 'erro')}></urbi-kpi>
         <urbi-kpi rotulo="ROI sobre custo total" .valor=${fmtPct(k.roiPct)} variante=${k.roiPct >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>

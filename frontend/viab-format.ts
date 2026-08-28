@@ -21,6 +21,39 @@ export function fmtR$(v: number, comSimbolo = true): string {
   }
   return new Intl.NumberFormat('pt-BR', opcoes).format(v || 0);
 }
+/**
+ * #581 — EXCEÇÃO DECLARADA ao contrato C7, e a única que existe.
+ *
+ * Decisão do autor em 2026-08-26 (leva Avançado, item 4): "ajustar valores em
+ * R$ nos urbi-kpis para não terem casas decimais". Ela vale **só para o valor
+ * exibido no card de KPI** — a figura grande que o card publica. Persistência,
+ * entrada, motor, tabelas, Proforma, Fluxo de Caixa e exportação continuam em
+ * 2 casas, sem exceção: `R$ 171.448.400` num card e `R$ 171.448.400,00` numa
+ * linha de tabela são O MESMO número, e a diferença é tipográfica.
+ *
+ * ⚠️ É uma função PRÓPRIA, e não um segundo parâmetro de `fmtR$`, de propósito.
+ * Parâmetro opcional espalharia a exceção por um argumento que qualquer
+ * chamador pode passar por engano — a classe de defeito que a #449 apagou.
+ * Símbolo próprio torna a exceção GREPPÁVEL: `grep -rn 'fmtR\$Kpi'` devolve
+ * exatamente onde ela vale, e `frontend/kpi-casas-decimais.test.ts` trava esse
+ * inventário por contagem exata, nos dois sentidos.
+ *
+ * Fora do escopo, de propósito e por decisão registrada no PR da #581:
+ *   · o `title` do card "VGV Vendável" (`frontend/fluxo-tabela.ts`), que é uma
+ *     LISTA de 6 grandezas de detalhe — leitura precisa, não figura de card;
+ *   · os cards de comparação de `frontend/tela-analise-mercado.ts`, que
+ *     publicam R$/m² (derivada não monetária, fora do C7) e não estão no
+ *     inventário da issue.
+ */
+export function fmtR$Kpi(v: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(v || 0);
+}
+
 export const fmtNum = (v: number, d = 0) =>
   new Intl.NumberFormat('pt-BR', { maximumFractionDigits: d }).format(v || 0);
 

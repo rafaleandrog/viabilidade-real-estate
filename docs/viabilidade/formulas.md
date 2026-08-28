@@ -361,6 +361,22 @@ canônico (R$, 2 casas)  ──derivação exata──▶  % do VGV, R$/m²   (e
 com precisão plena até a apresentação. Assim, R$ 10.000.000 pode atravessar uma porcentagem com
 dízima e retornar exatamente ao mesmo canônico.
 
+> ⚠️ **A única exceção ao C7, declarada pelo autor em 2026-08-26** (leva Avançado, item 4 —
+> issue #581). **(a)** A exceção existe: valor em R$ exibido em **card de KPI** sai **sem casas
+> decimais**, e percentual em card sai com **uma** casa. **(b)** Ela vale **só** para o valor
+> exibido no card — a figura grande que o card publica; o `title` de detalhe de um card e os cards
+> de comparação de R$/m² da Análise de mercado ficam de fora. **(c)** **Persistência, entrada,
+> motor, tabelas, Proforma, Fluxo de Caixa e exportação continuam em 2 casas, sem exceção.**
+>
+> É arredondamento **de exibição**: nada persistido muda, nenhuma migração, e um estudo antigo passa
+> a exibir sem centavos sem ser reeditado. `R$ 171.448.400` num card e `R$ 171.448.400,00` numa
+> linha de tabela são **o mesmo número**. Quem implementa é `fmtR$Kpi`
+> (`frontend/viab-format.ts:48`) — função própria, e não um parâmetro de `fmtR$`, para a exceção ser
+> **greppável** por um símbolo só; `frontend/kpi-casas-decimais.test.ts` trava o inventário de call
+> sites por contagem exata, nos dois sentidos, e reprova tanto o card que voltou a exibir centavos
+> quanto o vazamento da exceção para tabela ou exportação. **A tabela abaixo segue valendo
+> integralmente** — nenhuma linha dela é card de KPI.
+
 **Estado de conformidade, conferido em 2026-08-23:**
 
 | Ponto | Casas hoje | Conforme? |
