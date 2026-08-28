@@ -4,6 +4,53 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #582 · rótulos de marco escalonados no gráfico de Fluxo de Caixa (2026-08-28)
+
+Item 5 da leva Avançado da Rodada 10. Pedido do autor, literal: "Sobreposição de palavras no
+gráfico de área em Resumo em Fluxo de Caixa Acumulado. Arrumar para nao acontecer em nenhum
+campo". `graficoFluxoAcumulado` (`frontend/fluxo-graficos.ts`) não tinha NENHUMA detecção de
+colisão para os rótulos de marco do cronograma (Lançamento, Início/Fim Obra), Payback e Exposição
+Máx. — as quatro famílias disputavam a mesma faixa superior do SVG com `y` **constante**, e dois
+marcos a poucos meses um do outro imprimiam o texto em cima um do outro. `graficoFluxoMensal` já
+tinha uma tentativa (`(idx % 2) * 10`), mas só alterna DOIS níveis por paridade de índice — três
+marcos próximos ainda colidem dois a dois na mesma paridade, e ela nunca soube da existência do
+Payback nem da Exposição Máx.
+
+**Como ficou.** Função pura nova, `resolverColisoesRotulos` (`frontend/fluxo-graficos.ts`):
+recebe uma lista de rótulos `{x, y, texto, cor}`, ordena por `x` (desempate por `y`, depois por
+`texto` — sem isso o resultado dependia da ORDEM de entrada para itens com `x`/`y` idênticos, o
+caso extremo de três marcos no mesmo mês) e escalona verticalmente quem colidiria com um rótulo já
+posicionado, com uma estimativa de largura de glifo deliberadamente generosa (a decisão real de
+pixel é do Chromium, medida pelo harness). `graficoFluxoAcumulado` agora resolve marcos + Payback +
+Exposição Máx. no MESMO pool — é o que impede um marco de colidir com o Payback, não só com outro
+marco; `graficoFluxoMensal` trocou o `(idx % 2) * 10` pela mesma função. As linhas verticais
+tracejadas (marco/Payback) e o círculo da Exposição Máx. continuam na posição original — só o
+TEXTO escalona.
+
+**`frontend/exportar.ts` (a versão do PDF) foi conferida e NÃO precisou de mudança:**
+`svgFluxoMensal`/`svgFluxoAcumulado` nunca desenharam rótulo de marco nenhum (só barras/linha +
+eixo de meses + o texto de Payback, isolado verticalmente do eixo) — o defeito deste issue não
+existe ali. Vale para estudos existentes: mudança só de apresentação, nada persistido muda, sem
+migração — `versao` não bumpa.
+
+**Verificação por render, camada nova.** `scripts/render-check.mjs` ganhou a lente
+`sobreposicaoTexto`: compara só `<text>` × `<text>` por `getBoundingClientRect`, complementar à
+`sobreposicao` de "caixas pintadas" que já existia (e que exclui toda forma de SVG de propósito —
+path cruza text por projeto). Caso novo `frontend/render/casos/marcos-fluxo-colados.ts` monta DUAS
+instâncias de `viab-tela-resumo` — cronograma de Incorporação com Lançamento/Início Obra a exatos 2
+meses (o limite do critério 1) e cronograma de Loteamento com os TRÊS marcos no mesmo mês (o
+extremo do critério 2); `marcos()` lê `EventoCrono` sem ramificar por `tipo_empreendimento`, então
+as duas instâncias provam paridade por construção.
+
+**Mutação medida:** 8 testes de lógica pura novos (`frontend/fluxo-graficos.test.ts`) cobrem a
+função isolada; apagar a chamada de `resolverColisoesRotulos` nos dois gráficos (voltando ao `y`
+constante / `(idx % 2) * 10` originais) deixa a lógica pura 832/832 verde — a função continua
+correta, só não é chamada — e o caso de render vermelho de verdade: **24 sobreposições de texto
+medidas pelo Chromium real** (8 por largura × 3 larguras). É a classe 1 do CLAUDE.md (o defeito
+mora na fiação) de novo.
+
+---
+
 ## #612 · piso em zero na cascata de áreas do Loteamento (2026-08-28)
 
 Achado 6 da auditoria #574. `calcularCascata` (`frontend/areas-cascata.ts`) subtraía **sem piso**:
