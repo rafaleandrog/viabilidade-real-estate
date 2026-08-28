@@ -28,7 +28,17 @@ import { fmtR$, fmtR$Kpi } from './viab-format.js';
 // violação nova entrar de carona na entrada antiga.
 
 const fonte = (arquivo: string) => readFileSync(new URL(`./${arquivo}`, import.meta.url), 'utf8');
-const ocorrencias = (texto: string, alvo: string) => texto.split(alvo).length - 1;
+// A contagem ignora COMENTÁRIOS (//, /* */ e <!-- --> de template) de propósito:
+// contar substring crua deixaria um comentário citando `fmtR$Kpi(` compensar a
+// reversão de um call site real — a contagem exata viraria decoração (achado da
+// lente na rodada 1 do PR). Simplista quanto a string literal contendo "//",
+// e suficiente: nenhum arquivo do inventário embute o símbolo em string.
+const semComentarios = (texto: string) => texto
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/^[ \t]*\/\/.*$/gm, '')
+  .replace(/([^:'"`])\/\/.*$/gm, '$1');
+const ocorrencias = (texto: string, alvo: string) => semComentarios(texto).split(alvo).length - 1;
 
 /** Cada arquivo que exibe card de KPI monetário, com quantos cards e quais. */
 const CARDS: { arquivo: string; chamadas: number; quais: string }[] = [
@@ -102,9 +112,15 @@ test('#581 critério 4: em viab-format.ts fmtR$Kpi é só declarada — celula n
 
 test('#581 critério 3: nenhum consumidor fora do inventário conhece fmtR$Kpi', () => {
   const declarados = new Set([...CARDS.map((c) => c.arquivo), 'viab-format.ts']);
-  const inesperados = readdirSync(new URL('.', import.meta.url))
-    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !declarados.has(f))
-    .filter((f) => fonte(f).includes('fmtR$Kpi'));
+  // Cobre também os subdiretórios de frontend/ (fixtures, render, render/casos)
+  // — o glob raso deixava caso de render citar o símbolo sem reprovar.
+  const dirs = ['.', 'fixtures', 'render', 'render/casos'];
+  const inesperados = dirs.flatMap((d) =>
+    readdirSync(new URL(`./${d}/`, import.meta.url))
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+      .map((f) => (d === '.' ? f : `${d}/${f}`)))
+    .filter((f) => !declarados.has(f))
+    .filter((f) => semComentarios(fonte(f)).includes('fmtR$Kpi'));
   assert.deepEqual(
     inesperados, [],
     'arquivo fora do inventário da #581 passou a usar fmtR$Kpi. A exceção é greppável de propósito: '
@@ -124,7 +140,7 @@ const PCT_ENTRADA: { arquivo: string; chamadas: number; motivo: string }[] = [
   },
   {
     arquivo: 'tela-fluxo-receitas.ts', chamadas: 2,
-    motivo: 'as duas células derivadas de % digitada (pós-obra e repasse), em <td> — não é card',
+    motivo: 'as duas derivadas de % DIGITADA: pós-obra numa <td> (:700) e o repasse dentro de div.repasse-box (:1043) — uma caixa com forma de card exibindo derivada de valor digitado. Se ela conta como card de KPI é decisão do autor (registrada no PR da #581); enquanto não decidida, mantém as 2 casas do valor digitado',
   },
 ];
 

@@ -43,7 +43,11 @@ export function fmtR$(v: number, comSimbolo = true): string {
  *     LISTA de 6 grandezas de detalhe — leitura precisa, não figura de card;
  *   · os cards de comparação de `frontend/tela-analise-mercado.ts`, que
  *     publicam R$/m² (derivada não monetária, fora do C7) e não estão no
- *     inventário da issue.
+ *     inventário da issue;
+ *   · a linha de detalhe `_unidadesTipo` de `frontend/tela-premissas.ts`
+ *     ("37 un · R$ 8.513,29/un"), texto corrido SEM caixa dentro do card
+ *     Resumo — fica em 2 casas ao lado do card sem centavos, e mudar isso
+ *     é decisão do autor (registrada no PR da #581).
  */
 export function fmtR$Kpi(v: number): string {
   // Sinal normalizado APÓS o arredondamento: entre -R$ 0,50 e R$ 0 o Intl
