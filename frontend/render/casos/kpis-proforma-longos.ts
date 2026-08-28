@@ -9,7 +9,7 @@
 // valor monetário nesta faixa — só m²/un/% (Área vendável, Nº de unidades,
 // [Área permutada], Custo obras / VGV, Margem sobre VGV). O lever é "Área
 // vendável" (`fmtM2`, 2 casas + sufixo " m²"): `area_pvt_r_fechada`
-// (`frontend/proforma.ts:471`, `areaVendavel = rFech + nrFech`) é o campo
+// (`frontend/proforma.ts:482`, `areaVendavel = rFech + nrFech`) é o campo
 // do ESTUDO, não do catálogo — a fixture de produtos aqui só existe para o
 // VGV não ficar zerado.
 //

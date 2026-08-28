@@ -7,7 +7,7 @@
 // três modificadores só ajustam `margin-top`, a track é uma regra só, e este
 // caso prova a track para os três de uma vez.
 //
-// `precoMedioUnidade = vgv / numUnidades` (`frontend/proforma.ts:710-711`)
+// `precoMedioUnidade = vgv / numUnidades` (`frontend/proforma.ts:725-726`)
 // e `vgv = área_média_m2 × preço_m2 × unidades` por produto — o `unidades`
 // se CANCELA na divisão, então `precoMedioUnidade = area_media_m2 ×
 // preco_venda_m2`, independente de quantas unidades o catálogo tiver. Por
