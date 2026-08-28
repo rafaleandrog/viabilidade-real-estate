@@ -76,8 +76,9 @@ existentes" — é mudança só de CSS, nenhum valor persistido muda, sem migra�
 tipo de empreendimento; os casos de Premissas/Resumo cobrem o ramo Incorporação (o de Loteamento
 usa a mesma `.kpis`, mesmo CSS, sem branch de tipo no template).
 
-**Validação:** `bash scripts/validar-frontend.sh` verde — 807 testes de lógica + 49 casos de
-render, guards 1-6 e 8 ok, typecheck ok, build ok. Sem migração → `versao` não bumpou.
+**Validação:** `bash scripts/validar-frontend.sh` verde — 815 testes de lógica + 49 casos de
+render (medido após o segundo merge de `origin/main`, que trouxe a #578/#619 com 8 testes novos),
+guards 1-6 e 8 ok, typecheck ok, build ok. Sem migração → `versao` não bumpou.
 
 **Colisão com #578 verificada:** a #578 (listagem de estudos, worktree própria) mexe em
 `tela-dashboard.ts`; esta issue não toca esse arquivo — sem overlap de blocos. (#578 mergeou como
