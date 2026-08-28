@@ -14,7 +14,28 @@ As fórmulas rodam no **frontend em tempo real** (engine `frontend/proforma.ts`,
 
 **Áreas** (por tipo de empreendimento):
 
-- **Loteamento:** `área vendável = área da gleba × (1 − Σ percentuais de dedução)` (APP, faixas, viário, ELUP, EPC, EPU, priv. não vendáveis, todos % da gleba). Após permuta física → **área vendável líquida**.
+- **Loteamento:** a área vendável é a **Área Líquida de Venda (ALV)** de uma tabela em **cascata**,
+  não uma soma plana de percentuais. A cascata tem 11 linhas
+  (`CASCATA_LOTEAMENTO`, `frontend/areas-cascata.ts:116`) e subtrai em três degraus:
+
+  ```text
+  Poligonal − APP                                              = Área Parcelável   (âncora 2)
+  Parcelável − (ELUP/EPU + EPC + viário público)               = Área Líquida
+  Líquida − (viário privado + comuns privadas + áreas verdes)  = ALV  ← área vendável
+  ```
+
+  Cada uma das **7 linhas editáveis** é digitada em **m²**, **% da Poligonal** ou **% da
+  Parcelável** (a última só para as linhas posteriores à âncora 2 — regra de não-circularidade),
+  no par de colunas `area_<x>_modo`/`area_<x>_valor`. A ALV é lida em
+  `frontend/proforma.ts:429-430`. Após permuta física → **área vendável líquida**.
+
+  > ⚠️ Os 7 campos antigos de "% da gleba" (`app_pct`, `faixas_nao_edificaveis_pct`,
+  > `sistema_viario_pct`, `elup_pct`, `epc_pct`, `epu_pct`,
+  > `areas_privativas_nao_vendaveis_pct`) que esta seção descrevia até 2026-08-27 estão
+  > **aposentados** desde a migração `020_areas_cascata_loteamento.js` (2026-08-03): continuam no
+  > schema, **sem escritor em tela nenhuma**, e nenhuma fórmula os lê. Ler um deles hoje devolve
+  > zero em todo estudo criado depois daquela data — foi assim que a pizza "Alocação de áreas da
+  > gleba" passou a mostrar uma fatia só (#574).
 - **Incorporação:** `área vendável = Área PVT R Fechada + Área PVT NR Fechada` (as **áreas fechadas**); `área privativa` soma também as abertas, e `área construída` soma a área comum.
 
 **VGV — fonte única: o catálogo de Produtos** (`preliminar_produtos`), nos dois tipos:
@@ -64,7 +85,12 @@ Imposto (`4%` se sujeito a RET, senão `imposto_percentual`), corretagem, market
 
 ## Custos diretos
 
-Terreno (`custo/m² × área do terreno`, zerável pelo checkbox “considerar”), projetos, manutenção, contingências (% VGV) e, por tipo: **Loteamento** → infraestrutura (toggle R$/m² ou % VGV); **Incorporação** → construção, decoração, gestão da construção, outorga, incorporação e registro.
+Terreno (`custo/m² × área do terreno`, zerável pelo checkbox “considerar”), projetos, manutenção, contingências (% VGV) e, por tipo: **Loteamento** → infraestrutura (**três** unidades — `% VGV`, `R$` fixo ou `R$/m² × área vendável BRUTA`, antes da permuta física); **Incorporação** → construção, decoração, gestão da construção, outorga, incorporação e registro.
+
+No Loteamento a "gestão da construção" (`taxa_gestao_pct`) **não incide**: o produto de obra ali é a
+infraestrutura, e `gestaoConstrucao` sai zerado — assim como construção, decoração, outorga e
+incorporação/registro. O **custo de obras** do Loteamento (o numerador de `Custo obras / VGV`) é,
+portanto, a infraestrutura sozinha.
 
 ## Custos indiretos
 

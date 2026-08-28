@@ -3,6 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtR$ } from './viab-format.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
+import { itensAlocacaoGleba } from './areas-cascata.js';
 import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
 // do seu `_carregar()`. Reusada, e não recopiada: a cópia inline divergiria da
@@ -177,23 +178,24 @@ export class ViabTelaGraficos extends LitElement {
   // #14: pizza(s) de alocação de áreas. Loteamento: composição da gleba. Incorporação:
   // dois subgrupos — "geral" (áreas detalhadas) e "macro" (privativa R + privativa NR +
   // áreas comuns = 100%).
+  //
+  // ⚠️ #574: até 2026-08-27 a pizza do Loteamento era montada a partir dos 7
+  // campos "% da gleba" que a migração `020_areas_cascata_loteamento.js`
+  // APOSENTOU (`app_pct`, `faixas_nao_edificaveis_pct`, `sistema_viario_pct`,
+  // `elup_pct`, `epc_pct`, `epu_pct`,
+  // `areas_privativas_nao_vendaveis_pct`). Nenhuma tela os escreve desde a
+  // reestruturação do Preliminar — `frontend/proforma.ts` deixou de lê-los na
+  // mesma data —, então num loteamento criado depois dela as 7 deduções saíam
+  // ZERO e a pizza mostrava uma fatia só: "a gleba inteira é vendável". A
+  // composição agora sai da MESMA cascata que Premissas edita e que o motor
+  // usa para a área vendável (`itensAlocacaoGleba`, `frontend/areas-cascata.ts`).
   private _renderAlocacaoAreas(p: Proforma, lot: boolean): TemplateResult {
     const e = this.estudo;
     if (lot) {
-      const g = p.areaTerreno;
-      const ded = (k: string) => n(e[k]) / 100 * g;
-      const itens = [
-        { l: 'APP', v: ded('app_pct') },
-        { l: 'Faixas não edificáveis', v: ded('faixas_nao_edificaveis_pct') },
-        { l: 'Sistema viário', v: ded('sistema_viario_pct') },
-        { l: 'ELUP', v: ded('elup_pct') },
-        { l: 'EPC', v: ded('epc_pct') },
-        { l: 'EPU', v: ded('epu_pct') },
-        { l: 'Priv. não vendáveis', v: ded('areas_privativas_nao_vendaveis_pct') },
-        { l: 'Área vendável (lotes)', v: p.areaVendavel },
-      ];
       return html`<div class="graficos">
-        <urbi-card titulo="Alocação de áreas da gleba">${this._pizzaAreas(itens)}</urbi-card>
+        <urbi-card titulo="Alocação de áreas da gleba">
+          ${this._pizzaAreas(itensAlocacaoGleba(e, p.areaTerreno))}
+        </urbi-card>
       </div>`;
     }
     const rF = n(e.area_pvt_r_fechada), rA = n(e.area_pvt_r_aberta);

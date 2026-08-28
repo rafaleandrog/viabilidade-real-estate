@@ -4,6 +4,29 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #574 · auditoria do Preliminar de Loteamento (2026-08-28)
+
+Item 9 da lista de bugs da Rodada 10 — 37 conferências tela a tela e fórmula a fórmula contra
+`docs/viabilidade/formulas.md`, com evidência `arquivo:linha` por linha conferida em
+`docs/rodada-10/relatorio-574-loteamento.md`. Veredito: **o motor do Loteamento está correto
+linha a linha**; o que a auditoria achou é superfície de verificação menor que a da Incorporação
+(zero casos de render de Loteamento até este PR) e 11 achados: 2 P1, 5 P2, 2 P3 e 2 registros.
+
+**Consertado no próprio PR:** a pizza "Alocação de áreas da gleba" (`tela-graficos.ts`, ramo
+`lot`) lia os 7 campos de "% da gleba" **aposentados pela migração `020`** — estudo novo mostrava
+uma fatia só ("gleba 100% vendável"), estudo migrado mostrava a composição congelada de antes da
+migração. Agora a composição sai da mesma cascata que Premissas edita, via `itensAlocacaoGleba`
+(`areas-cascata.ts`, com `areaTerrenoM2` obrigatório — mutação vira `TS2554`). Junto: a spec de
+área do Loteamento em `formulas.md` descrevia a fórmula revogada pela `020` (corrigida) e nasceu
+o primeiro caso de render de Loteamento (`alocacao-areas-loteamento`).
+
+**Destinos dos demais achados:** 1 → entregue no PR 607 (#570) com residual na #615; 2 → #609
+(duplicar não copia produtos, P1); 3 → #610 (Cenários sem estado vazio); 5 → #611 (eficienciaPct/
+roiPct em 0,0% vermelho); 6 → #612 (ALV negativa, exige decisão); 7 → entregue no PR 617 (#572);
+8 → #613 (benchmark de eficiência sem medidor); 10 → registro (sinal na exportação, decisão do
+autor). A #574 fica aberta de propósito: o critério 3 dela (encerramento da Rodada 10 no mesmo
+diff) pertence ao último PR da rodada, com a leva Avançado ainda em execução.
+
 ## #572 · ordem das linhas de permuta unificada entre tela e exportação (2026-08-27)
 
 Item 8 da lista de bugs da Rodada 10. Diagnóstico: a tela mostrava "Receita bruta (VGV)" ANTES do
