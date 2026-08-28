@@ -259,10 +259,24 @@ function paresDeLinha(e: ProformaInput) {
   return { p, pares: tela.map((t, i) => ({ tela: t, exportacao: exportacao[i] })) };
 }
 
+/**
+ * Quarto fixture, e ele NÃO é redundante: os três acima fecham no azul, e num
+ * estudo lucrativo `Math.abs(v)` é a identidade — a asserção de % VGV passa
+ * sem exercer a única linha em que o sinal importa (o Resultado). Medido: com
+ * `pctVgvProforma` revertida para `Math.abs` em TODAS as linhas, os três
+ * primeiros continuavam verdes. Aqui o terreno engole a receita, então
+ * Resultado e Receita operacional ficam negativos e a distinção vira visível.
+ */
+const INC_DEFICITARIO: ProformaInput = {
+  ...INC_COM_PERMUTA,
+  custo_terreno_m2: 20_000, terreno_manual_area: 2_000, // 40M contra VGV de 26,4M
+};
+
 for (const [nome, entrada] of [
   ['Incorporação com permuta', INC_COM_PERMUTA],
   ['Incorporação sem permuta', INC_SEM_PERMUTA],
   ['Loteamento com permuta', LOT_COM_PERMUTA],
+  ['Incorporação deficitária', INC_DEFICITARIO],
 ] as const) {
   test(`notação: ${nome} — a célula R$ da exportação é IDÊNTICA à da tela, linha a linha`, () => {
     const { pares } = paresDeLinha(entrada);
@@ -288,6 +302,18 @@ for (const [nome, entrada] of [
     }
   });
 }
+
+test('notação: o fixture deficitário É deficitário — sem isto a asserção de sinal fica vazia', () => {
+  // Sentinela do fixture, não do código: `Math.abs` só se distingue da
+  // identidade quando existe valor negativo. Se um ajuste futuro de fórmula
+  // (ou de custo) devolver este estudo ao azul, os dois casos acima param de
+  // exercer a regra do Resultado e ficam verdes por vacuidade — que é
+  // exatamente o modo de falha que este teste torna barulhento.
+  const p = calcularProforma(INC_DEFICITARIO);
+  assert.ok(p.vgv > 0, `o VGV precisa ser positivo para a % VGV existir: ${p.vgv}`);
+  assert.ok(p.resultado < 0, `Resultado deixou de ser negativo: ${p.resultado}`);
+  assert.ok(p.receitaOperacional < 0, `Receita operacional deixou de ser negativa: ${p.receitaOperacional}`);
+});
 
 test('notação: a classificação (tipo/natureza) de cada linha é a MESMA nos dois lados', () => {
   // A célula é derivada da classificação; conferir só a string deixaria passar
