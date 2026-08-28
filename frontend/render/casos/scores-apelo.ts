@@ -16,7 +16,12 @@ import '../../tela-apelo.js';
 import { forcarEstado } from './dados.js';
 
 const FATORES = [
-  { nome: 'Localização', nota_consolidada: '-R$ 12.345.678,90' },
+  // Critério 1 da #579: "um valor negativo entre parênteses". A notação
+  // contábil real do app (`celula`, `viab-format.ts`) só aparece em células
+  // de tabela — os cards usam `fmtR$` (sinal de menos) —, mas este campo é
+  // passthrough (string exibida como veio), então dá para exercer aqui a
+  // forma entre parênteses, que é 1 caractere MAIS LARGA que a de menos.
+  { nome: 'Localização', nota_consolidada: '(R$ 12.345.678,90)' },
   { nome: 'Infraestrutura', nota_consolidada: 4.2 },
   { nome: 'Vetor de crescimento', nota_consolidada: 3.8 },
   { nome: 'Concorrência', nota_consolidada: 2.5 },

@@ -76,8 +76,8 @@ existentes" — é mudança só de CSS, nenhum valor persistido muda, sem migra�
 tipo de empreendimento; os casos de Premissas/Resumo cobrem o ramo Incorporação (o de Loteamento
 usa a mesma `.kpis`, mesmo CSS, sem branch de tipo no template).
 
-**Validação:** `bash scripts/validar-frontend.sh` verde — 815 testes de lógica + 49 casos de
-render (medido após o segundo merge de `origin/main`, que trouxe a #578/#619 com 8 testes novos),
+**Validação:** `bash scripts/validar-frontend.sh` verde — 824 testes de lógica + 53 casos de
+render (medido no head do PR, após o merge da `main` que trouxe o PR 620 e seus casos novos),
 guards 1-6 e 8 ok, typecheck ok, build ok. Sem migração → `versao` não bumpou.
 
 **Colisão com #578 verificada:** a #578 (listagem de estudos, worktree própria) mexe em
