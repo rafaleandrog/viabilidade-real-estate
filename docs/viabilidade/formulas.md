@@ -104,7 +104,10 @@ sentidos.
 > a permuta física vale **zero** e o cap (`permutaCapada`) é **inalcançável por construção** — a
 > permuta pedida e a base do cap são as duas zero, e `>` nunca é verdade. Não é dedução zerada em
 > silêncio: `semProdutos` manda a Proforma inteira para o estado vazio da #563 — sem VGV, sem
-> tabela e sem o KPI de área permutada ao lado. **Com** catálogo o cap é normalmente alcançável,
+> tabela e sem o KPI de área permutada ao lado. **"Inteira" passou a ser literal com a #610**: até
+> ela o gate valia só para a tabela principal, e a sub-aba **Cenários** ao lado seguia desenhando
+> Bear/Base/Bull a partir da mesma fonte legada, ±10%. Hoje as duas sub-abas mostram o mesmo estado
+> vazio (`_renderSemProdutos`, `frontend/tela-proforma.ts`). **Com** catálogo o cap é normalmente alcançável,
 > pelo preço médio do catálogo (é o caminho que o PR 607 entregou).
 >
 > A **Incorporação** mantém a fonte legada (`preco_venda_m2_residencial`/`_nao_residencial`), e lá o
