@@ -63,6 +63,52 @@ componentes (#283).
 
 Integridade (Lote 6 · #19): excluir uma tipologia do catálogo com alocações é **bloqueado** (422 `TIPOLOGIA_EM_USO`); editar nome/área reflete ao vivo nas alocações (a alocação guarda só unidades + preço). E, desde a #433, **reduzir a `quantidade` do catálogo abaixo do que já está comprometido** — alocações de venda **mais** permuta física — é recusado com 422 `SALDO_EXCEDIDO`: era a quarta porta do saldo, e a única que não validava nada. `PATCH` parcial sem o campo `quantidade` não é assunto da regra.
 
+## O que a duplicação de estudo copia (#609)
+
+`POST /estudos/:id/duplicar` cria o estudo novo com `montarCopiaEstudo` (colunas de `estudos`,
+menos as geradas pelo shell) e depois copia as **estruturas filhas**. Tudo dentro de um
+`try`/`catch` que **remove o estudo recém-criado** se qualquer filha falhar — não há transação em
+`req.dados`, e um clone pela metade é pior que nenhum.
+
+| Estrutura | Copiada | Como |
+|---|---|---|
+| `estudo_imoveis` | ✅ | vínculo com o imóvel do Núcleo |
+| `preliminar_produtos` | ✅ | `FILHAS_SIMPLES` — **a única fonte de VGV** desde a #563 |
+| `analise_mercado` | ✅ | `FILHAS_SIMPLES` |
+| `apelo_comercial` | ✅ | `FILHAS_SIMPLES` (os scores e o laudo; ver a ressalva abaixo) |
+| `avancado_cronograma`, `avancado_tipologias`, `avancado_fases`, `avancado_alocacoes`, `avancado_linhas_custo`, `avancado_cenarios` | ✅ | `duplicarDadosAvancado`, só quando `nivel_analise === 'avancado'` |
+| `avancado_funding_operacoes` | ✅ | idem — entrou na #609 |
+| `estudo_documentos`, `apelo_comercial_documentos` | ❌ | **decisão pendente** — ver abaixo |
+| `estudo_membros` | ❌ | **decisão pendente** — o criador da cópia entra como editor |
+| `avancado_linhas_receita`, `avancado_capital_instrumentos` | ❌ | tabelas de modelos **apagados**; copiá-las propagaria dado morto |
+
+**Nenhuma referência VIVA aponta para o original.** Toda referência interna com leitor é
+reapontada para a linha correspondente da cópia: `fase_ancora_id` (custos e operações de funding),
+`tipologia_id` das alocações, `permuta_tipologia_id` das linhas de custo e a lista
+`custo_linha_ids` das operações de funding (`remapearCustoLinhaIds`). Id sem correspondência é
+**descartado** enquanto sobrar id vivo — manter faria a cópia somar linhas de outro estudo, e o
+motor leria isso sem erro nenhum. A exceção é a lista **toda** órfã: ela volta como veio, porque
+devolver `[]` ativaria a base padrão do motor (`frontend/funding-motor.ts:927` exige `length` para
+usar a seleção) e a cópia financiaria o que o original não financia; ids órfãos são sempre de
+linhas **apagadas** (o mapa cobre toda linha existente), então mantê-los não alcança estudo nenhum. Duas exceções declaradas: `curva_id` copia direto porque curvas são
+**globais da instância**, não do estudo; e `estudos.permuta_fisica_produto_id` /
+`permuta_fisica_nr_produto_id` **viajam cru** — são colunas **inertes** desde a #566 (a permuta
+por unidade saiu do app; nenhum leitor fora de `schema.json` e migrações), então o id do produto
+original que sobreviver nelas não alimenta cálculo nenhum. Se um dia essas colunas voltarem a ter
+leitor, o remapeamento delas entra junto.
+
+> ⚠️ **Duas ausências que esperam decisão do autor, e o motivo de cada uma.**
+>
+> · **Arquivos** (`estudo_documentos`, `apelo_comercial_documentos`): a coluna `documento` é do
+> tipo `arquivo`, e o binário pertence ao **shell**. Copiar a linha com o mesmo id deixa dois
+> registros sobre o mesmo arquivo — apagar uma das cópias pode levar o arquivo da outra junto —, e
+> duplicar o binário de verdade exige um verbo do SDK que a sessão de nuvem **não consegue
+> conferir** (pacote privado, 401). Consequência hoje: a cópia leva o **apelo comercial** (scores e
+> laudo) sem os documentos que o geraram.
+>
+> · **Membros** (`estudo_membros`): é ACL, não dado do estudo. Copiar a lista concederia acesso a
+> terceiros a um estudo que eles não sabem que existe, e dispara notificação.
+
 ## Referências lógicas — colunas de id sem FK
 
 Três colunas guardam id de outra linha **sem** chave estrangeira no banco. Não é descuido; cada
