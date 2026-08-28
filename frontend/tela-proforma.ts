@@ -228,9 +228,17 @@ export class ViabTelaProforma extends LitElement {
   static styles = [estiloConteudo, css`
     /* BUG7-09: com o KPI de Preço médio/unid. removido, sobram 3-5 cards —
        minmax(180px, 1fr) os esticava até preencher a linha toda numa tela
-       larga. Teto em 220px: cada card fica compacto e o espaço sobrando
-       após o último vira respiro em vez de alargar os existentes. */
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 220px)); gap: 12px; margin-bottom: 16px; }
+       larga. Teto: cada card fica compacto e o espaço sobrando após o
+       último vira respiro em vez de alargar os existentes.
+       #579: piso e teto SUBIRAM de 180/220 para 230/260 — 220px era, ao pé
+       da letra, o PIOR caso do app (a issue cita esta linha nominalmente):
+       teto MENOR que o piso de 230px usado no Resumo (tela-resumo.ts) trava
+       o card abaixo do que um valor de 9 dígitos precisa, e nenhum teto
+       consegue ficar abaixo do próprio piso (senão o minmax() é inválido).
+       Mesma folga, mesmo motivo (urbi-kpi não declara quebra e o :host soma
+       padding sem box-sizing: border-box) — ver o comentário em
+       tela-resumo.ts. */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 260px)); gap: 12px; margin-bottom: 16px; }
     .kpis urbi-kpi { min-width: 0; }
     /* Aviso do excedente de permuta: acima da tabela, dentro do card. */
     urbi-banner.aviso-permuta { display: block; margin-bottom: 14px; }

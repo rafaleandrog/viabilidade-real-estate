@@ -8,7 +8,7 @@
 // com uma única tipologia, a média pondera para o próprio `preco_m2` — por
 // isso a tipologia abaixo usa o valor grande DIRETO, sem precisar reconstruir
 // a fórmula. O lado MERCADO vem de `this.analise.preco_medio_m2` (a coluna
-// que `lerIndicador` lê, `frontend/analise-mercado.ts:154`), sem precisar de
+// que `lerIndicador` lê, `frontend/analise-mercado.ts:149`), sem precisar de
 // API: como o Preliminar/`medidores-graficos`, o estado entra por
 // `forcarEstado`, não por fetch — `estudo: null` impede o `updated()` de
 // disparar `_carregar()`.

@@ -54,6 +54,19 @@ test('KPIs do Fluxo de Caixa: os 9 cards (#456) cabem em 1280px e 768px', { skip
 // shadow DOM) — a defesa (`overflow-wrap: anywhere`, `frontend/fluxo-tabela.ts`)
 // funciona de verdade aqui, ao contrário do `urbi-kpi` da #579 em
 // `tela-resumo.ts` (ver a nota daquele arquivo).
+//
+// ⚠️ MUTAÇÃO, medida (#579 critério 3): as DUAS defesas desta issue neste
+// arquivo — a track 180→210px e o `overflow-wrap`/`word-break` em
+// `.kpi-card .valor` — são REDUNDANTES entre si para o valor de 9 dígitos
+// usado aqui: apagar UMA das duas, sozinha, não deixa este teste vermelho
+// (a outra já cobre). Apagar as DUAS ao mesmo tempo deixa — 36 achados,
+// nas 3 larguras. Isso não é decoração: é defesa em profundidade genuína
+// contra duas causas distintas (caixa estreita × token que não quebra), e
+// cada mutação SOZINHA continuou vermelha em pelo menos um outro caso deste
+// inventário: `kpis-resumo.render.test.ts` prova a track sozinha (#488/#579,
+// `tela-resumo.ts` não tem a defesa de `overflow-wrap`); `ind-funding.render.test.ts`
+// prova o `overflow-wrap` sozinho (`tela-funding.ts` `.ind` nem chega a alargar
+// a track — fica em 150px — e a mutação ainda assim fecha vermelha).
 test('KPIs do Fluxo de Caixa: um valor de 9 dígitos não salta da caixa (#579)', { skip: pular ?? false }, async () => {
   const a = await verificarRender({ caso: 'kpis-fluxo-longos' });
 
