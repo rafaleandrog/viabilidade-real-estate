@@ -34,6 +34,17 @@ destinos. Os KPIs do topo do PDF continuam com o símbolo, porque ali não há c
 > Quem impede as duas de divergirem de novo é o teste de paridade célula a célula em
 > `frontend/proforma-ordem-linhas.test.ts`, que não compara contra um formato escrito à mão: compara
 > os dois lados entre si.
+>
+> Desde o conserto da rodada 1 de revisão dessa unificação, a paridade vale nas DUAS colunas de
+> verdade: a % VGV da tela (`_pctVgv`) DELEGA para `pctVgvProforma` — antes era uma cópia da regra,
+> e o teste só protegia o lado da exportação.
+>
+> ⚠️ Efeito colateral **semântico** no CSV, deliberado e registrado: a notação contábil grava
+> custo como `(1.234,56)`, e o Excel pt-BR importa parêntese como número **negativo** — antes
+> (`fmtR$` cru) as linhas de custo entravam positivas na planilha. Não há risco de parsing (o CSV
+> usa `;` e nenhum valor novo contém `;`, aspas ou quebra de linha); o que muda é o sinal que uma
+> fórmula do usuário enxerga. Se o autor preferir o comportamento antigo no CSV, é uma troca de
+> `comParenteses` num único call site.
 
 ## Decisão de implementação
 

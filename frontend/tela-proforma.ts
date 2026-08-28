@@ -12,7 +12,7 @@ import { calcularProforma, vgvProduto, type Proforma, type ProformaInput, type V
 // É a mesma decisão, escrita no mesmo lugar, que `avisoPermutaCapada` tomou.
 import {
   exportarPDF, exportarExcel, avisoPermutaCapada,
-  ehLinhaReceitaOuResultado, celulaProforma,
+  ehLinhaReceitaOuResultado, celulaProforma, pctVgvProforma,
 } from './exportar.js';
 export { ehLinhaReceitaOuResultado, celulaProforma };
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
@@ -487,11 +487,14 @@ export class ViabTelaProforma extends LitElement {
 
   // % VGV: no Resultado é a margem (com sinal); nas demais (inclusive "VGV sem
   // permuta" do #8), magnitude sobre o VGV da Receita bruta — nunca sobre si.
+  // DELEGA para `pctVgvProforma` (`frontend/exportar.ts`) — a MESMA função dos
+  // três destinos (tela, CSV, PDF), como `celulaProforma`. Manter uma cópia
+  // aqui deixaria a paridade da % VGV unidirecional: o teste confrontaria a
+  // exportação contra uma regra reescrita à mão, e a tela poderia divergir em
+  // silêncio (achado da lente na rodada 1 do PR desta unificação). Sem ciclo:
+  // este arquivo já importa `./exportar.js`.
   private _pctVgv(r: Linha, p: Proforma): string {
-    if (p.vgv <= 0) return '—';
-    return r.tipo === 'resultado'
-      ? fmtPct(r.v / p.vgv * 100)
-      : fmtPct(Math.abs(r.v) / p.vgv * 100);
+    return pctVgvProforma(r, p);
   }
 
   private _renderTabela(p: Proforma, lot: boolean, vgvBruto: number): TemplateResult {
