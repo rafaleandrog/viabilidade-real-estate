@@ -8,6 +8,25 @@
 >
 > Este documento é fotografia do planejamento. O placar vivo está nas issues e nos PRs.
 
+## Placar das etapas concluídas (fatos encerrados; o que resta vive nas issues)
+
+- **Etapa 1** (2026-08-26/27) — abertura da rodada (PR 575) e os dois primeiros trilhos: PR 576
+  (#564, cascata de Incorporação) e PR 580 (#563, fonte do VGV). Leva Avançado registrada em
+  issues (#577–#596).
+- **Etapa 2** (2026-08-27) — o Preliminar de Incorporação inteiro: PRs 598–603, 605–608, 614,
+  616 e 617; issues #565–#573, #588 e #597 fechadas (+#577, antecipada da leva Avançado). A
+  `main` fechou a etapa em versão `0.1.35`, migrações `030 → 036`.
+- **Etapa 3** (2026-08-28) — auditoria do Preliminar de Loteamento (#574, este PR):
+  `docs/rodada-10/relatorio-574-loteamento.md`, conserto da pizza da gleba e o primeiro caso de
+  render de Loteamento; achados grandes viraram #609–#613 e #615.
+
+**Política de revisão da rodada, nas palavras em que foi decidida:** de 2026-08-27 a 2026-08-28
+valeu o **Codex seletivo** — o App do Codex só nos PRs que fechavam #563, #568, #570 ou #592
+(as 4 issues de motor mais arriscadas); os demais fecharam com uma rodada de lente nativa,
+declarada no relatório de cada PR. Em **2026-08-28 o autor reativou o App para todos os PRs**,
+com teto de interações por PR (um acionamento por head com mudança de lógica; reacionamento só
+quando o conserto toca lógica de motor; delta trivial fecha por verificação do orquestrador).
+
 ## Mapa item → issue
 
 | Item | Seção / Aba | Pedido (resumo) | Issue(s) |
