@@ -4,6 +4,62 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #609 · duplicar um estudo copia absolutamente tudo (2026-08-28)
+
+Achado 2 da auditoria #574, **P1**. `POST /estudos/:id/duplicar` copiava as colunas de `estudos`,
+`estudo_imoveis` e — só no Avançado — cronograma/tipologias/fases/alocações/custos/cenários.
+**Nada copiava `preliminar_produtos`.** Antes da #563 o fallback dos pares legados mascarava;
+depois dela a cópia nascia em **estado vazio** — sem VGV, sem Proforma, sem KPIs — carregando todas
+as premissas do original.
+
+**Decisão do autor (2026-08-28), verbatim:** *"o correto é copiar absolutamente tudo, se for
+difícil fazer isso me avise"*. Então o escopo passou a ser o inventário INTEIRO das estruturas
+filhas, não só o catálogo. O que a varredura achou, além do achado original:
+
+- **`avancado_funding_operacoes` também não era copiada** (tabela viva desde a #355): um Avançado
+  duplicado perdia a estrutura de capital inteira, e o fluxo alavancado da cópia nascia diferente
+  do original sem aviso;
+- **`permuta_tipologia_id` viajava CRU** em `avancado_linhas_custo` — a linha de permuta física da
+  cópia apontava para uma **tipologia do estudo original**. Mesma classe do `fase_ancora_id` que a
+  #167 já tinha consertado ao lado, e igual de silenciosa: o motor lê a tipologia alheia sem erro;
+- **`analise_mercado` e `apelo_comercial`** (uma linha por estudo, dado do estudo) não eram
+  copiadas.
+
+**Como ficou.** `FILHAS_SIMPLES` (`backend/rotas/estudos.ts`) declara as filhas de remapeamento
+simples com os campos que viajam em cada uma, e `montarCopiasFilhas` — função **pura**, testada —
+monta as linhas. `duplicarDadosAvancado` ganhou o mapa `id antigo → id novo` das linhas de custo,
+o remapeamento de `permuta_tipologia_id` e a cópia das operações de funding, com `fase_ancora_id` e
+`custo_linha_ids` (lista de ids em JSON, `remapearCustoLinhaIds`) reapontados. **Nada na cópia
+aponta para o original**; id sem correspondência é descartado, nunca mantido.
+
+`CAMPOS_OPERACAO` **mudou de arquivo** (`funding.ts` → `avancado.ts`, exportada): a duplicação
+precisa da mesma lista que a rota grava, e `funding.ts` já importa de `avancado.ts` — declarar lá e
+importar de volta fecharia um **ciclo de módulos** por uma lista de strings.
+
+> ⚠️ **DUAS AUSÊNCIAS ESPERAM DECISÃO DO AUTOR — é o "me avise" da decisão.**
+>
+> · **Arquivos** (`estudo_documentos`, `apelo_comercial_documentos`): a coluna `documento` é do tipo
+> `arquivo` e o binário é do **shell**. Copiar a linha com o mesmo id deixa dois registros sobre o
+> mesmo arquivo (apagar um pode levar o do outro), e duplicar o binário exige um verbo do SDK que
+> **não dá para conferir nesta sessão** (pacote privado, 401). Consequência declarada: a cópia leva
+> o apelo comercial sem os documentos que o geraram.
+>
+> · **Membros** (`estudo_membros`): é ACL, não dado do estudo — copiar concederia acesso a
+> terceiros a um estudo que eles não sabem que existe, e dispara notificação. O criador da cópia já
+> entra como editor.
+
+**Verificação.** 156 testes de backend (baseline da `main`: 144 — +12), todos verdes; frontend
+intocado e verde (824 + 46). Mutações: apagar o laço da rota → **1 vermelho** (e as funções puras
+todas verdes — classe 1); tirar `preliminar_produtos` de `FILHAS_SIMPLES` → **2**; não copiar
+funding → **1**; `permuta_tipologia_id` cru de novo → **1**; `remapearCustoLinhaIds` mantendo id
+órfão → **1**.
+
+> ⚠️ **O typecheck do backend NÃO roda nesta sessão, e o que dá para medir foi medido.** Sem o SDK
+> no disco, a augmentação de `Request` não existe e todo `req.dados`/`req.contexto` vira `TS2339`:
+> **208 erros na `main`, 212 nesta branch**. O delta é **+4, todos da MESMA classe** (os 4
+> `req.dados!` novos) — **nenhuma classe de erro nova**. "Não deu para rodar" não é "passou": a
+> validação de backend continua sendo do autor, no ambiente autenticado.
+
 ## #612 · piso em zero na cascata de áreas do Loteamento (2026-08-28)
 
 Achado 6 da auditoria #574. `calcularCascata` (`frontend/areas-cascata.ts`) subtraía **sem piso**:

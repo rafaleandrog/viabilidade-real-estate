@@ -14,6 +14,7 @@ import {
 } from '../eventos-viabilidade.js';
 import { gerarIdentificacao } from '../identificacao.js';
 import { duplicarDadosAvancado } from './avancado.js';
+import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
 
 export const rotasEstudos: ReturnType<typeof Router> = Router();
 
@@ -174,6 +175,78 @@ export function agruparProdutosPorEstudo(
   }
   return porEstudo;
 }
+
+/**
+ * #609 — as linhas de uma estrutura FILHA de estudo, prontas para `criar` no
+ * estudo novo. Parte PURA da duplicação: escolhe os campos que viajam e
+ * reaponta `estudo_id`, sem I/O.
+ *
+ * `campos` é sempre uma lista EXPLÍCITA, e não "tudo menos o id": uma coluna
+ * nova entra na cópia só quando alguém a declara aqui, e é isso que impede um
+ * `criado_em`/`id` de viajar junto e o `criar` recusar. Campo ausente na linha
+ * de origem é OMITIDO (não vira `null`), para cair no `padrao` da coluna —
+ * mesma regra de `montarCopiaEstudo`.
+ */
+export function montarCopiasFilhas(
+  linhas: any[],
+  novoEstudoId: number,
+  campos: string[],
+): Record<string, any>[] {
+  return (linhas ?? []).map((linha) => {
+    const copia: Record<string, any> = { estudo_id: novoEstudoId };
+    for (const campo of campos) {
+      const v = linha?.[campo];
+      if (v === undefined) continue;
+      copia[campo] = v;
+    }
+    return copia;
+  });
+}
+
+// #609 — as estruturas filhas de `estudos` que a duplicação copia por simples
+// remapeamento de `estudo_id`, com os campos que viajam em cada uma.
+//
+// ⚠️ NÃO estão aqui, e cada ausência é uma decisão:
+//   · `estudo_imoveis` e as tabelas do Avançado — copiadas logo abaixo /  em
+//     `duplicarDadosAvancado`, porque precisam de remapeamento de ids, não de
+//     um `estudo_id` novo e mais nada;
+//   · `estudo_documentos` e `apelo_comercial_documentos` — colunas do tipo
+//     `arquivo`. Copiar a linha copiando o MESMO id de arquivo deixa dois
+//     registros apontando para o mesmo binário do shell, e o ciclo de vida
+//     desse binário é do shell, não desta app: apagar uma das duas cópias pode
+//     levar o arquivo da outra junto. Duplicar o binário de verdade exige um
+//     verbo do SDK que esta sessão NÃO consegue conferir (o pacote é privado e
+//     dá 401 aqui). Fica para decisão do autor, com o obstáculo declarado;
+//   · `estudo_membros` — é ACL, não dado do estudo. Copiar a lista concederia
+//     acesso a terceiros a um estudo que eles não sabem que existe, e dispara
+//     notificação. O criador da cópia já entra como editor logo abaixo
+//     (`garantirMembro`). Também é decisão do autor;
+//   · `avancado_linhas_receita` e `avancado_capital_instrumentos` — tabelas de
+//     modelos APAGADOS (nenhum `req.dados` no repositório as toca). Copiá-las
+//     seria propagar dado morto.
+export const FILHAS_SIMPLES: { tabela: string; campos: string[]; porPagina: number }[] = [
+  // O catálogo de Produtos é a ÚNICA fonte de VGV desde a #563: sem ele a
+  // cópia nasce em ESTADO VAZIO carregando todas as premissas do original —
+  // o P1 que abriu esta issue.
+  { tabela: 'preliminar_produtos', campos: CAMPOS_PRODUTO, porPagina: 500 },
+  // Análise de mercado e apelo comercial: uma linha por estudo, toda ela dado
+  // do estudo (premissas de mercado coletadas e os scores/laudo).
+  {
+    tabela: 'analise_mercado', porPagina: 5,
+    campos: [
+      'abrangencia', 'localidade', 'preco_medio_m2', 'custo_obra_m2', 'vso_pct',
+      'ipca_pct', 'selic_pct', 'incc_pct', 'focus_ipca_pct', 'focus_selic_pct',
+      'riscos', 'resultado', 'origem', 'data_referencia', 'gerado_em', 'modelo',
+    ],
+  },
+  {
+    tabela: 'apelo_comercial', porPagina: 5,
+    campos: [
+      'resultado', 'score_localizacao', 'score_infraestrutura', 'score_vetor_crescimento',
+      'score_concorrencia', 'score_demanda', 'score_seguranca_juridica', 'score_geral',
+    ],
+  },
+];
 
 /**
  * Anexa `produtos` (catálogo do Preliminar, #315) a cada estudo da lista.
@@ -444,7 +517,22 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
         });
       }
 
-      // Estudo Avançado: copiar cronograma, receitas + tipologias e custos.
+      // #609 — as estruturas filhas de remapeamento simples (catálogo de
+      // Produtos, análise de mercado, apelo comercial). Ver `FILHAS_SIMPLES`
+      // para a lista, os campos de cada uma e o que ficou de fora, com o
+      // motivo. Dentro do try/catch de propósito: falhar aqui remove o estudo
+      // recém-criado, em vez de deixar um clone pela metade.
+      for (const { tabela, campos, porPagina } of FILHAS_SIMPLES) {
+        const linhas = await req.dados!.listar(tabela, {
+          filtros: { estudo_id: estudoId }, por_pagina: porPagina,
+        });
+        for (const copia of montarCopiasFilhas(linhas.dados, Number(novo.id), campos)) {
+          await req.dados!.criar(tabela, copia);
+        }
+      }
+
+      // Estudo Avançado: cronograma, tipologias, fases + alocações, custos,
+      // cenários e (desde a #609) as operações de funding.
       if (novo.nivel_analise === 'avancado') {
         await duplicarDadosAvancado(req, estudoId, Number(novo.id));
       }

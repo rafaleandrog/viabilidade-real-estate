@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  remapearCustoLinhaIds,
+  CAMPOS_OPERACAO,
   cronogramaPadrao,
   recalcularTravados,
   ancorarLinhaCusto,
@@ -623,4 +625,54 @@ test('#433 o 400 novo não engoliu o que já era aceito', async () => {
     { dados: { nome: 'Studio' } },
   );
   assert.equal(consultas, 0);
+});
+
+// ── #609: a cópia do Avançado não pode apontar para linhas do ORIGINAL ─────
+//
+// `remapearCustoLinhaIds` é a parte pura do remapeamento de `custo_linha_ids`
+// (a base do financiamento à produção, uma lista de ids em JSON). Os outros
+// dois remapeamentos desta issue — `fase_ancora_id` e `permuta_tipologia_id` —
+// são I/O dentro de `duplicarDadosAvancado` e ficam com o autor no ambiente
+// autenticado (SDK 401 aqui).
+
+test('#609 remapearCustoLinhaIds troca cada id pelo da linha correspondente na cópia', () => {
+  const mapa = new Map([[10, 110], [11, 111], [12, 112]]);
+  assert.deepEqual(remapearCustoLinhaIds([10, 12], mapa), [110, 112]);
+  assert.deepEqual(remapearCustoLinhaIds([12, 11, 10], mapa), [112, 111, 110], 'a ordem é preservada');
+});
+
+test('#609 id sem correspondência é DESCARTADO, nunca mantido', () => {
+  // Manter o id antigo faria a operação da cópia somar linhas de custo de
+  // OUTRO estudo — o motor leria a base de financiamento de um projeto alheio
+  // sem erro nenhum. Descartar deixa a operação com base menor, que é visível.
+  const mapa = new Map([[10, 110]]);
+  assert.deepEqual(remapearCustoLinhaIds([10, 999], mapa), [110]);
+  assert.deepEqual(remapearCustoLinhaIds([999], mapa), []);
+});
+
+test('#609 id que chega como string (vinda do banco) ainda casa', () => {
+  const mapa = new Map([[10, 110]]);
+  assert.deepEqual(remapearCustoLinhaIds(['10'], mapa), [110]);
+});
+
+test('#609 valor que não é lista volta como veio — [] e null significam coisas diferentes', () => {
+  // `[]` = "nenhuma linha selecionada"; `null`/ausente = "sem seleção, use a
+  // base padrão" (`frontend/funding-motor.ts`). Converter um no outro mudaria
+  // a base do financiamento da cópia em silêncio.
+  const mapa = new Map([[10, 110]]);
+  assert.equal(remapearCustoLinhaIds(null, mapa), null);
+  assert.equal(remapearCustoLinhaIds(undefined, mapa), undefined);
+  assert.deepEqual(remapearCustoLinhaIds([], mapa), []);
+});
+
+test('#609 CAMPOS_OPERACAO cobre os dois campos que a cópia precisa remapear', () => {
+  // Se um deles sair da lista, `extrairCampos` para de trazê-lo e o
+  // remapeamento passa a sobrescrever um campo que não existia — a operação
+  // copiada perderia a âncora ou a base, sem nada ficar vermelho.
+  assert.ok(CAMPOS_OPERACAO.includes('fase_ancora_id'));
+  assert.ok(CAMPOS_OPERACAO.includes('custo_linha_ids'));
+  // E não pode carregar campos gerados pelo shell.
+  for (const gerado of ['id', 'estudo_id', 'criado_em', 'atualizado_em']) {
+    assert.equal(CAMPOS_OPERACAO.includes(gerado), false, `${gerado} não pode viajar na cópia`);
+  }
 });

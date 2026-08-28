@@ -1,6 +1,12 @@
 import { Router, type Request, type Response } from 'express';
 import { exigirMembro, exigirEditor, exigirAprovador } from '../permissoes-estudo.js';
-import { ancorarLinhaCusto, ancorarLinhaCustoEmFase, lerCronograma } from './avancado.js';
+// ⚠️ `CAMPOS_OPERACAO` mora em `./avancado.ts`, e a direção do import é essa de
+// propósito: `duplicarDadosAvancado` (lá) precisa da mesma lista para copiar as
+// operações (#609), e este arquivo JÁ importa daquele — declarar a constante
+// aqui e importá-la de lá fecharia um CICLO de módulos por uma lista de strings.
+import {
+  ancorarLinhaCusto, ancorarLinhaCustoEmFase, lerCronograma, CAMPOS_OPERACAO,
+} from './avancado.js';
 
 // Rotas de Funding (#355, item 48 da Rodada 7) — CRUD de
 // `avancado_funding_operacoes`, as OPERAÇÕES de captação do estudo Avançado.
@@ -44,18 +50,6 @@ const TIPOS_OPERACAO = ['financiamento_producao', 'divida', 'equity'];
 const MODOS_RETORNO = ['permuta_financeira', 'resultado_final'];
 const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado'];
 
-const CAMPOS_OPERACAO = [
-  'tipo', 'nome', 'ordem', 'valor',
-  'cronograma_evento', 'fase_ancora_id', 'inicio_mes',
-  'distribuir_aporte', 'aporte_meses', 'taxa_anual',
-  'periodo_amortizacao_meses', 'periodo_carencia_meses',
-  'modo_retorno', 'pct_retorno',
-  // ── financiamento_producao (§4.3, planilha `Incorp Individual`) ──
-  'exposicao_minima', 'percentual_financiavel', 'amortizar_com_caixa_disponivel', 'custo_linha_ids',
-  // #478: tarifas/estruturação/encargos — só `divida` (motor ignora nas
-  // outras duas). Whitelisted igual às demais: sem isso a tela grava no vazio.
-  'taxa_estruturacao_pct', 'taxa_administracao_mensal', 'outros_encargos_iniciais',
-];
 
 /** Campos numéricos que não fazem sentido negativos. */
 const CAMPOS_NAO_NEGATIVOS = [

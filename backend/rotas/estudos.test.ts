@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gateTransicao, montarCopiaEstudo, montarPatchEstudo, agruparProdutosPorEstudo } from './estudos.js';
+import {
+  gateTransicao, montarCopiaEstudo, montarPatchEstudo, agruparProdutosPorEstudo,
+  montarCopiasFilhas, FILHAS_SIMPLES,
+} from './estudos.js';
+import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
+import { readFileSync } from 'node:fs';
 
 // Ciclo de vida do estudo (spec §3):
 //   rascunho → em_analise (editor)
@@ -245,4 +250,169 @@ test('PATCH: campo so-do-Avancado e filtrado em estudo Preliminar', () => {
   // Sem isso o shell devolve "Campo X deve ser um numero" ao salvar Premissas.
   assert.equal('codigo' in montarPatchEstudo({ taxa_desconto_aa: null }, PRELIMINAR), true);
   assert.deepEqual(montarPatchEstudo({ taxa_desconto_aa: 12 }, AVANCADO), { dados: { taxa_desconto_aa: 12 } });
+});
+
+// ── #609: duplicar copia absolutamente tudo ────────────────────────────────
+//
+// Decisão do autor (2026-08-28), verbatim: "o correto é copiar absolutamente
+// tudo, se for difícil fazer isso me avise". A parte PURA da cópia é
+// `montarCopiasFilhas` — o resto é I/O e fica com o autor no ambiente
+// autenticado (SDK 401 aqui). Molde de `agruparProdutosPorEstudo`, acima.
+
+test('#609 montarCopiasFilhas reaponta estudo_id e leva só os campos declarados', () => {
+  const produtos = [
+    { id: 7, estudo_id: 1, nome: 'Lote padrão', tipo: 'residencial', area_media_m2: 300, preco_venda_m2: 1000, unidades: 130, ordem: 0, criado_em: '2026-01-01' },
+    { id: 8, estudo_id: 1, nome: 'Lote esquina', tipo: 'residencial', area_media_m2: 450, preco_venda_m2: 1200, unidades: 20, ordem: 1, criado_em: '2026-01-02' },
+  ];
+  const copias = montarCopiasFilhas(produtos, 99, CAMPOS_PRODUTO);
+  assert.equal(copias.length, 2);
+  assert.deepEqual(copias[0], {
+    estudo_id: 99, nome: 'Lote padrão', tipo: 'residencial',
+    area_media_m2: 300, preco_venda_m2: 1000, unidades: 130, ordem: 0,
+  });
+  // O que NÃO viaja é o ponto: `id` e `criado_em` são do shell, e mandá-los no
+  // `criar` é erro de gravação, não uma cópia mais fiel.
+  for (const c of copias) {
+    assert.equal('id' in c, false);
+    assert.equal('criado_em' in c, false);
+    assert.equal(c.estudo_id, 99, 'toda linha aponta para o estudo NOVO');
+  }
+});
+
+test('#609 campo ausente é OMITIDO (cai no padrão da coluna), não vira null', () => {
+  // Produto criado por "Adicionar produto": só `nome` e `ordem`; `tipo` cai no
+  // padrão `residencial` da coluna, e `unidades`/`ordem` nos seus. Mandar
+  // `undefined` explícito faria o validador do shell recusar — mesma razão de
+  // `montarCopiaEstudo` omitir nulos.
+  const [copia] = montarCopiasFilhas([{ id: 1, estudo_id: 3, nome: '', ordem: 0 }], 5, CAMPOS_PRODUTO);
+  assert.deepEqual(copia, { estudo_id: 5, nome: '', ordem: 0 });
+  assert.equal('tipo' in copia, false);
+  assert.equal('area_media_m2' in copia, false);
+});
+
+test('#609 valor NULO viaja (é dado), diferente de campo ausente', () => {
+  // Distinção que a omissão acima não pode engolir: `preco_venda_m2: null` é
+  // "o usuário apagou o preço", e a cópia precisa nascer igual — não com o
+  // padrão da coluna.
+  const [copia] = montarCopiasFilhas(
+    [{ id: 1, estudo_id: 3, nome: 'X', tipo: 'nao_residencial', area_media_m2: 100, preco_venda_m2: null, unidades: 0, ordem: 2 }],
+    5, CAMPOS_PRODUTO,
+  );
+  assert.equal(copia.preco_venda_m2, null);
+  assert.equal(copia.tipo, 'nao_residencial');
+});
+
+test('#609 lista vazia, nula ou indefinida devolve lista vazia', () => {
+  assert.deepEqual(montarCopiasFilhas([], 1, CAMPOS_PRODUTO), []);
+  assert.deepEqual(montarCopiasFilhas(null as any, 1, CAMPOS_PRODUTO), []);
+  assert.deepEqual(montarCopiasFilhas(undefined as any, 1, CAMPOS_PRODUTO), []);
+});
+
+test('#609 o catálogo de Produtos está entre as filhas copiadas, com os campos da rota', () => {
+  // A fiação: a tabela existir não basta — ela precisa estar na LISTA que o
+  // `duplicar` percorre, e com a mesma lista de campos que a rota de Produtos
+  // grava. Sem esta asserção, apagar a entrada deixaria a suíte verde.
+  const produtos = FILHAS_SIMPLES.find((f) => f.tabela === 'preliminar_produtos');
+  assert.ok(produtos, 'preliminar_produtos saiu de FILHAS_SIMPLES — é o P1 desta issue');
+  assert.deepEqual(produtos!.campos, CAMPOS_PRODUTO,
+    'os campos da cópia divergiram dos que a rota de Produtos grava');
+});
+
+test('#609 as três filhas de remapeamento simples estão declaradas, e nenhuma tabela MORTA entrou', () => {
+  assert.deepEqual(
+    FILHAS_SIMPLES.map((f) => f.tabela),
+    ['preliminar_produtos', 'analise_mercado', 'apelo_comercial'],
+  );
+  // As duas tabelas de modelos apagados não podem voltar por aqui — copiá-las
+  // propagaria dado morto para todo estudo duplicado.
+  for (const morta of ['avancado_linhas_receita', 'avancado_capital_instrumentos']) {
+    assert.equal(FILHAS_SIMPLES.some((f) => f.tabela === morta), false, `${morta} é tabela de modelo apagado`);
+  }
+  // E nenhuma das que dependem de remapeamento de id pode estar aqui: elas
+  // precisam de mais que um `estudo_id` novo.
+  for (const comRemap of ['estudo_imoveis', 'avancado_fases', 'avancado_linhas_custo', 'avancado_funding_operacoes']) {
+    assert.equal(FILHAS_SIMPLES.some((f) => f.tabela === comRemap), false, `${comRemap} exige remapeamento`);
+  }
+});
+
+test('#609 toda filha declara `por_pagina` acima de 1 — sem truncamento silencioso', () => {
+  // Um `por_pagina: 1` aqui copiaria UMA linha do catálogo e nada acusaria: a
+  // cópia teria produtos, só que menos. É o mesmo cuidado do `anexarProdutos`.
+  for (const f of FILHAS_SIMPLES) {
+    assert.ok(f.porPagina > 1, `${f.tabela} com por_pagina=${f.porPagina}`);
+    assert.ok(f.campos.length > 0, `${f.tabela} sem campos declarados`);
+  }
+});
+
+// ── #609: a FIAÇÃO da duplicação ───────────────────────────────────────────
+//
+// ⚠️ POR QUE LER O FONTE. `FILHAS_SIMPLES` e `montarCopiasFilhas` são dados e
+// função pura: apagar o LAÇO que percorre a lista dentro de
+// `POST /estudos/:id/duplicar` deixa **todos** os testes acima verdes, e a
+// duplicação volta a não copiar nada — que é exatamente o defeito desta issue.
+// Subir servidor e banco para provar isto não é possível nesta sessão (o SDK é
+// privado e dá 401), então a camada que resta é a leitura do código-fonte.
+// Mesma técnica de `frontend/tela-graficos.test.ts`, e pela mesma razão.
+//
+// Os comentários são removidos antes do casamento porque este próprio arquivo
+// e o de rotas CITAM os nomes na prosa: um `includes()` ingênuo continuaria
+// achando `montarCopiasFilhas` depois de alguém apagar a chamada.
+function semComentarios(conteudo: string): string {
+  return conteudo
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((linha) => { const i = linha.indexOf('//'); return i === -1 ? linha : linha.slice(0, i); })
+    .join('\n');
+}
+
+const FONTE_ESTUDOS = semComentarios(
+  readFileSync(new URL('./estudos.ts', import.meta.url), 'utf8'),
+);
+
+test('#609 a rota de duplicar PERCORRE FILHAS_SIMPLES e chama montarCopiasFilhas', () => {
+  assert.ok(
+    /for \(const \{[^}]*\} of FILHAS_SIMPLES\)/.test(FONTE_ESTUDOS),
+    'o laço sobre FILHAS_SIMPLES sumiu de estudos.ts — sem ele a lista existe e ninguém a usa, ' +
+    'e a duplicação volta a não copiar o catálogo de Produtos (o P1 da #609).',
+  );
+  assert.ok(
+    /montarCopiasFilhas\(/.test(FONTE_ESTUDOS),
+    'estudos.ts declara montarCopiasFilhas mas não a CHAMA.',
+  );
+  // A cópia tem que ficar DENTRO do try/catch compensatório (critério 2 da
+  // issue): o laço aparece depois do `try {` e antes do `catch (falha)`.
+  // Âncoras que sobrevivem à remoção dos comentários: a criação do estudo novo
+  // (última linha ANTES do try) e o `catch (falha)` que o compensa.
+  const posCriarEstudo = FONTE_ESTUDOS.indexOf("criar('estudos', copia)");
+  const posCatch = FONTE_ESTUDOS.indexOf('catch (falha)');
+  const posLaco = FONTE_ESTUDOS.search(/for \(const \{[^}]*\} of FILHAS_SIMPLES\)/);
+  assert.ok(posCriarEstudo !== -1 && posCatch !== -1, 'as âncoras do try/catch mudaram de forma');
+  assert.ok(posLaco > posCriarEstudo && posLaco < posCatch,
+    'a cópia das filhas saiu do try/catch que remove o estudo novo quando uma estrutura filha falha');
+});
+
+const FONTE_AVANCADO = semComentarios(
+  readFileSync(new URL('./avancado.ts', import.meta.url), 'utf8'),
+);
+
+test('#609 duplicarDadosAvancado copia as operações de funding, com os dois remapeamentos', () => {
+  assert.ok(
+    /criar\('avancado_funding_operacoes'/.test(FONTE_AVANCADO),
+    'duplicarDadosAvancado parou de criar avancado_funding_operacoes — um Avançado duplicado ' +
+    'perde a estrutura de capital inteira, e o fluxo alavancado da cópia nasce diferente.',
+  );
+  assert.ok(
+    /remapearCustoLinhaIds\(/.test(FONTE_AVANCADO),
+    'custo_linha_ids voltou a ser copiado CRU — a base do financiamento da cópia passaria a ' +
+    'apontar para linhas de custo do estudo original.',
+  );
+  assert.ok(
+    /mapaCusto\.set\(/.test(FONTE_AVANCADO),
+    'o mapa id-antigo → id-novo das linhas de custo sumiu; sem ele não há como remapear.',
+  );
+  assert.ok(
+    /copia\.permuta_tipologia_id = mapaTipologia\.get\(/.test(FONTE_AVANCADO),
+    'permuta_tipologia_id voltou a viajar cru — a linha de permuta física da cópia apontaria ' +
+    'para uma tipologia do estudo ORIGINAL.',
+  );
 });
