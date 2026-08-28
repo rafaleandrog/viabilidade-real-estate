@@ -55,7 +55,14 @@ export const estiloFluxoTabela = css`
   .reconciliacao-lista li.erro { color: var(--cor-erro, #d45a3a); }
   .reconciliacao-lista strong { color: inherit; }
 
-  .fx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  /* #579: track alargada de 180 para 210px. Os 9 .kpi-card são markup
+     próprio (sem shadow DOM) — a defesa real contra o VALOR transbordando
+     é o overflow-wrap em .kpi-card .valor, abaixo; a track só dá folga.
+     urbi-kpi também mora nesta grade (o extra de tela-cenarios.ts,
+     "Resultado após custo financeiro"), por isso o min-width dele precisa
+     de override aqui — sem grid própria para carregar essa regra. */
+  .fx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .fx-kpis urbi-kpi { min-width: 0; }
 
   /* #352 (BUG7-44): a variação % (#132) precisa ficar DENTRO da mesma moldura
      do KPI, mas urbi-kpi (ui/src/urbi-kpi.ts, no monorepo) só declara 4 props
@@ -81,6 +88,14 @@ export const estiloFluxoTabela = css`
     font-size: 1.4rem; font-weight: 700;
     color: var(--cor-texto-forte, rgba(255,255,255,0.95));
     margin-top: 4px;
+    /* #579: fmtR$ intercala R$ e o número com um ESPAÇO NÃO-QUEBRÁVEL
+       (Intl.NumberFormat pt-BR/BRL — U+00A0), então "R$ 171.448.400,00" é UM
+       token para o navegador sem overflow-wrap: nada nele quebra sozinho,
+       mesmo com white-space normal (default aqui). Markup próprio, sem
+       shadow DOM — ao contrário do urbi-kpi, esta quebra funciona de
+       verdade (medido, não presumido: frontend/render/kpis-fluxo.render.test.ts). */
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   .kpi-card.erro .valor { color: var(--cor-erro, #D45A3A); }
   .kpi-card.alerta .valor { color: var(--cor-alerta, #F7A111); }

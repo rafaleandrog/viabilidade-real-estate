@@ -65,7 +65,20 @@ export class ViabTelaResumo extends LitElement {
   private carregado = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    /* #579: track alargada de 180 para 230px — o VALOR de um KPI de 9 dígitos
+       (R$ 171.448.400,00, o exemplo literal da issue) não cabe nos 180px
+       herdados da #488, que resolveu a CAIXA (contra a track), não o VALOR
+       (contra a caixa). urbi-kpi não declara prop de quebra/tamanho de fonte
+       (docs/ui-urbiverso/primitivos.json), e o :host dele soma padding:
+       14px 16px ao conteúdo — folga real de ~198px, medida contra o caso de
+       render kpis-resumo (frontend/render/kpis-resumo.render.test.ts).
+       NÃO é herança de overflow-wrap/word-break pelo shadow boundary: medi
+       (não presumi, ver critério 2 da #579) que essas propriedades atravessam
+       o boundary mas NÃO revertem um white-space: nowrap interno do primitivo
+       real — é o mesmo mecanismo que o stub do harness reproduz
+       (scripts/render-check.mjs:304-308). Alargar a track é a única defesa
+       que não depende de markup interno que este repo não enxerga. */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-bottom: 20px; }
     /* ⚠️ NÃO volte a impor largura ao urbi-kpi daqui de fora. O :host dele soma
        padding: 14px 16px + border: 1px e não declara box-sizing: border-box,
        então width: 100% é largura de CONTEÚDO: a caixa mede 34px a mais que a

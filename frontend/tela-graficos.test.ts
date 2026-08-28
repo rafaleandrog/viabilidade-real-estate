@@ -67,3 +67,27 @@ test('#574: a aba Gráficos CHAMA itensAlocacaoGleba (fiação, não só import)
     'à leitura dos campos aposentados deixaria a suíte inteira verde sem este teste.',
   );
 });
+
+// ── #611: o ROI do medidor passa pelo filtro de "grandeza medida" ──────────
+//
+// Decisão do autor (2026-08-28): "por enquanto deixe sem cor então". Sem
+// investimento, `roiPct` cai em 0 e `montarMedidor` desenhava o ponteiro na
+// banda vermelha do benchmark — falso alarme sobre grandeza que ninguém mediu.
+//
+// ⚠️ ESTE TESTE LÊ O FONTE, e a razão é a mesma dos dois acima: a correção é
+// FIAÇÃO. O valor de `roiParaFaixa` está testado como função pura em
+// `proforma.test.ts`; trocar a chamada de volta por `p.roiPct` aqui não
+// derruba nenhum teste de função pura, e o harness de render não consegue
+// provar a AUSÊNCIA de um medidor (`exigir` só tem piso). É a camada que resta
+// para esta ponta.
+test('#611: o medidor de ROI recebe roiParaFaixa(p), não p.roiPct cru', () => {
+  assert.ok(
+    /roiParaFaixa\(/.test(FONTE),
+    'tela-graficos.ts parou de chamar roiParaFaixa — sem ela, um estudo sem investimento volta a ' +
+    'desenhar o medidor de ROI com o ponteiro em zero, pintado pela faixa do benchmark.',
+  );
+  assert.ok(
+    !/\broi:\s*p\.roiPct\b/.test(FONTE),
+    'tela-graficos.ts voltou a passar p.roiPct cru ao mapa de indicadores do benchmark.',
+  );
+});
