@@ -80,7 +80,59 @@ usa a mesma `.kpis`, mesmo CSS, sem branch de tipo no template).
 render, guards 1-6 e 8 ok, typecheck ok, build ok. Sem migração → `versao` não bumpou.
 
 **Colisão com #578 verificada:** a #578 (listagem de estudos, worktree própria) mexe em
-`tela-dashboard.ts`; esta issue não toca esse arquivo — sem overlap de blocos.
+`tela-dashboard.ts`; esta issue não toca esse arquivo — sem overlap de blocos. (#578 mergeou como
+#619 enquanto esta sessão estava em andamento — ver a entrada abaixo.)
+
+## #578 · remover a segmentação "Meus estudos / Equipe" da listagem (2026-08-28)
+
+Item 2 da leva Avançado da Rodada 10. Pedido do autor, literal: "Divisão em Estudos de Meus
+estudos e Equipe não faz sentido. Tirar isso e deixar como estava antes, sempre mostra a tabela
+com os estudos direto". Os dois chips (`frontend/tela-dashboard.ts`, `_renderEstudos`) escondiam
+estudo de outro autor atrás do padrão "Meus estudos" ao abrir a aba — uma peneira só do CLIENTE por
+cima do que `GET /estudos` (`backend/rotas/estudos.ts:263-282`) já filtra por membership. Saíram: o
+estado `escopo`, o bloco `<urbi-chips-atalho>` e a cláusula `Number(e.autor_id) === Number(eu)` de
+`_linhasFiltradas`.
+
+**Regra transversal da leva (autor):** vale para estudo já persistido, não só novo. Como não há
+coluna/campo novo envolvido (o filtro era só de apresentação, sem contraparte no schema), não há
+migração nem `versao` bumpada — todo estudo antigo já volta a aparecer assim que o filtro de autor
+sai, porque o backend sempre devolveu a linha; era o cliente que a escondia.
+
+**Paridade Loteamento↔Incorporação:** a função é ortogonal a `tipo_empreendimento` — mesma tabela,
+mesmo filtro para os dois tipos; teste dedicado cobre as 4 combinações de autor × tipo.
+
+**Refatoração de testabilidade:** `_linhasFiltradas` (privado) virou wrapper de
+`linhasEstudosFiltradas` (nova, pura e exportada, mesmo padrão de `resumoListagem`/`nivelExibicao`
+já estabelecido pela #577) — só assim a remoção do filtro de autor fica testável sem montar o
+componente Lit.
+
+**Prova de mutação, controle antes (`frontend/tela-dashboard.test.ts`, 27 testes no arquivo — 8 do
+#578 — todos verdes no controle):**
+
+- **Mutação 1 (regra de negócio volta):** reintroduzida a cláusula de autor dentro da função pura
+  (parâmetros extras com default, para não quebrar a assinatura da chamada). Resultado medido:
+  **20 pass / 7 fail** — os 6 testes de comportamento de `linhasEstudosFiltradas` (segmentação,
+  regra transversal, tipo, status, arquivado, paridade) mais 1 acerto incidental do teste de fonte
+  (a string `escopo` reapareceu no arquivo pela própria mutação).
+- **Mutação 2 (só a FIAÇÃO regride — classe 1 do CLAUDE.md, "o defeito mora na fiação, não no
+  cálculo"):** o chip `<urbi-chips-atalho>` com "Meus estudos"/"Equipe" volta ao template, mas
+  **sem** tocar `linhasEstudosFiltradas` nem `_linhasFiltradas` (classe UI pura, indistinguível de
+  código morto para quem só olha o motor). Resultado medido: **26 pass / 1 fail** — os 6 testes de
+  comportamento continuam verdes (a função pura nunca mudou), e só o teste de leitura de fonte
+  (`FONTE_DASHBOARD.includes('chips-atalho'/'Meus estudos')`) acusa. Prova que a suíte de função
+  pura sozinha NÃO pegaria essa classe de regressão — motivo de ter incluído o teste de fonte
+  (técnica de `tela-graficos.test.ts`, comentários removidos antes do `includes`).
+
+Depois de cada mutação, arquivo restaurado do backup (`cp`) e conferido `diff -q` antes de seguir —
+controle final: **815 testes de lógica pura + 42 casos de render, 0 falhas**
+(`bash scripts/validar-frontend.sh`).
+
+**Caso de render:** não entregue, mesmo motivo estrutural da #577 (critério 5 dela) —
+`urbi-tabela`/`urbi-chips-atalho` recebem `colunas`/`linhas`/`opções` por *binding de propriedade*
+(`so_propriedade: true`, sem atributo), e o harness de render filtra fora qualquer prop sem
+atributo antes de montar o stub (`scripts/render-check.mjs:294`). Como este PR REMOVE conteúdo em
+vez de adicionar, um caso de render não teria seletor novo para exigir de qualquer forma — a prova
+de "o chip sumiu" é a leitura de fonte acima, não render.
 
 ## #574 · auditoria do Preliminar de Loteamento (2026-08-28)
 
