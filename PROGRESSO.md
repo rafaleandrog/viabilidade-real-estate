@@ -4,6 +4,55 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #611 · eficiência e ROI sem cor quando a grandeza não é medida (2026-08-28)
+
+Achado 5 da auditoria #574. A #571 tornou `margemLiquidaPct`/`custoObrasVgvPct`/
+`receitaLiquidaSobreVgvPct` `number | null`; **`eficienciaPct` e `roiPct` ficaram de fora** e
+continuam caindo em `0`. `eficienciaPct` é o indicador exclusivo do Loteamento: sem área de gleba o
+Resumo mostrava `Vendável / gleba = 0,0%` **pintado de vermelho** por `varianteFaixa`, um falso
+alarme de benchmark estourado sobre grandeza que ninguém mediu — ao lado de uma margem que já
+mostrava "—".
+
+**Decisão do autor (2026-08-28), verbatim:** *"por enquanto deixe sem cor então"*. Só a COR sai
+nesta entrega; **o resto da issue continua pendente**, e o PR usa `Sem-fechamento: #611` em vez de
+`Closes` — os critérios 1, 2 e 3 pedem `number | null` no motor, `fmtPctOuIndef` nos consumidores e
+o "—" no Painel e no PDF, e nada disso foi feito.
+
+**Como ficou.** O motor ganhou duas flags, `eficienciaMedida` e `roiMedido`, **nomeadas ao lado da
+própria divisão** e reusadas por ela — assim o predicado ("há denominador") e a conta não podem
+divergir. Dois helpers exportados, `eficienciaParaFaixa`/`roiParaFaixa`, devolvem `null` quando a
+grandeza não foi medida, e as duas pontas que colorem passaram a chamá-los:
+Premissas → Produtos (`varianteFaixa`) e o medidor de ROI da aba Gráficos (`montarMedidor`). As
+duas funções já eram null-safes desde a #571 — o conserto é passar o `null`, não mexer nas faixas.
+
+**O valor exibido NÃO muda**, e a separação é deliberada: a tela continua imprimindo `0,0%`. O que
+passou a existir é a distinção entre *quanto* o indicador vale (sempre `number`) e se há base para
+*julgá-lo*.
+
+**Verificação.** 830 testes de lógica pura (baseline da `main`: 824) e 48 casos de render (baseline:
+46), todos verdes. Mutações: reverter a fiação de Premissas → lógica pura **830/830 VERDE**, render
+**2/2 VERMELHO** (`achou 5` dos 6 KPIs sem cor); reverter a fiação do medidor de ROI → **1
+vermelho**; apagar as flags do objeto devolvido → `TS2739`; fazer a flag mentir
+(`eficienciaMedida = true`) → **2 vermelhos**.
+
+> ⚠️ **O caso de render nasceu VERDE sob mutação, e a causa vale registrar.** `viab-tela-premissas`
+> tem `estudo` como `@property`: atribuí-lo dispara `_init()`, que refaz o fetch e **sobrescreve**
+> `this.benchmarks` com `bm?.dados || []`. O benchmark posto por `forcarEstado` sobrevivia só até o
+> `Promise.all` resolver; depois dele `varianteFaixa` não achava medidor e devolvia `''` com e sem o
+> conserto. Os outros casos de `viab-tela-premissas` não tropeçam nisso porque declaram
+> `benchmarks: []` — o mesmo valor que o fetch devolve. O caso agora **stuba `urbiVerso.api`** e
+> espera um segundo ciclo de render. É a segunda vez nesta leva que uma mutação verde revelou teste
+> medindo o ponto errado, e a forma é a mesma: o fixture deixava de fornecer a condição que o
+> defeito precisa para aparecer.
+
+**Fica pendente, e está dito no PR:** o padrão `number | null` da #571 para os dois indicadores; o
+"—" em `frontend/exportar.ts` (PDF) e na coluna ROI de `frontend/tela-dashboard.ts`; e o ROI do
+**Avançado** em `frontend/tela-resumo.ts`, que tem a mesma classe de defeito noutra grandeza e por
+**dois mecanismos**: o KPI é colorido por sinal (`custoTotal > 0 ? … : 0`, `roiPct >= 0` → fica
+**verde** quando não medido), e o MESMO `roiPct` alimenta o medidor de benchmark
+(`resolverIndicadoresBenchmark`/`montarMedidor`), que sem custo medido desenha o ponteiro em 0 na
+banda **vermelha** — o mecanismo idêntico ao que este conserto apaga em `tela-graficos.ts`. Não
+tocado por ser fora do escopo da decisão (grandeza do Avançado; a #611 é do motor Preliminar).
 ## #579 · o VALOR do KPI para de saltar da caixa, nas 9 telas do inventário (2026-08-28)
 
 Item A10-03 da leva Avançado (2026-08-26), rodada 10 — o defeito IRMÃO da #488: aquela consertou a
