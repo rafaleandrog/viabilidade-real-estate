@@ -526,8 +526,8 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
         const linhas = await req.dados!.listar(tabela, {
           filtros: { estudo_id: estudoId }, por_pagina: porPagina,
         });
-        for (const copia of montarCopiasFilhas(linhas.dados, Number(novo.id), campos)) {
-          await req.dados!.criar(tabela, copia);
+        for (const copiaFilha of montarCopiasFilhas(linhas.dados, Number(novo.id), campos)) {
+          await req.dados!.criar(tabela, copiaFilha);
         }
       }
 
