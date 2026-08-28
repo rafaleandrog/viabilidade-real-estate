@@ -323,11 +323,13 @@ test('#609 as três filhas de remapeamento simples estão declaradas, e nenhuma 
     FILHAS_SIMPLES.map((f) => f.tabela),
     ['preliminar_produtos', 'analise_mercado', 'apelo_comercial'],
   );
-  // As duas tabelas de modelos apagados não podem voltar por aqui — copiá-las
-  // propagaria dado morto para todo estudo duplicado.
-  for (const morta of ['avancado_linhas_receita', 'avancado_capital_instrumentos']) {
-    assert.equal(FILHAS_SIMPLES.some((f) => f.tabela === morta), false, `${morta} é tabela de modelo apagado`);
-  }
+  // O `deepEqual` acima é a trava contra as tabelas de modelos APAGADOS
+  // (avancado_linhas_receita e a aposentada avancado_capital_instrumentos, do
+  // Capital Stack da #355): a lista é comparada por CONTAGEM EXATA, então
+  // qualquer entrada a mais — morta ou viva — fica vermelha. Os nomes ficam
+  // neste comentário de propósito: `guard-tabelas-obsoletas` barra menção de
+  // tabela aposentada em CÓDIGO fora dos caminhos permitidos, e comentário é
+  // a forma dispensada. Copiá-las propagaria dado morto a todo estudo duplicado.
   // E nenhuma das que dependem de remapeamento de id pode estar aqui: elas
   // precisam de mais que um `estudo_id` novo.
   for (const comRemap of ['estudo_imoveis', 'avancado_fases', 'avancado_linhas_custo', 'avancado_funding_operacoes']) {
