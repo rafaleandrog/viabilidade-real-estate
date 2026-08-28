@@ -677,13 +677,19 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // já reduziu o VGV — ambas, portanto, reduzem o resultado (#14). `valorPermutaFisica`
   // é memo: o valor de mercado da área entregue em permuta.
   const resultado = receitaOperacional - custoIndiretoTotal;
-  // #615 — a MESMA fórmula nos dois tipos. O Loteamento tinha um ramo próprio,
-  // `lot ? precoLot : …`, e era ele que sobrevivia à #570: mesmo COM catálogo,
-  // o memo do valor da permuta do Loteamento saía de `estudos.preco_venda_m2`,
-  // enquanto a dedução do VGV já vinha do catálogo — duas valorações da mesma
-  // área, discordando entre si. Agora as duas descem do VGV, que desce do
-  // catálogo (critério 4 da issue).
-  const precoMedioM2 = areaVendavelLiquida > 0 ? vgv / areaVendavelLiquida : 0;
+  // #615 — o memo do Loteamento usa o MESMO preço da dedução. O ramo antigo
+  // (`lot ? precoLot : …`) valorava por `estudos.preco_venda_m2` enquanto a
+  // dedução já vinha do catálogo — duas valorações da mesma área, discordando.
+  // A primeira versão deste conserto usou `vgv / areaVendavelLiquida` nos dois
+  // tipos, e a rodada 1 de revisão mostrou que isso só coincide com a dedução
+  // quando a área do catálogo == ALV — caso a área do catálogo divergir (o que
+  // a #570 suporta: a base da permuta é a ALV, o preço é do catálogo), a média
+  // residual NÃO recupera o preço do catálogo. Então o Loteamento usa
+  // `precoPermutaR` — literalmente a variável da dedução (:558) — e a
+  // Incorporação mantém a média residual que sempre teve (critério 4).
+  const precoMedioM2 = lot
+    ? precoPermutaR
+    : (areaVendavelLiquida > 0 ? vgv / areaVendavelLiquida : 0);
   const valorPermutaFisica = areaPermutaFisica * precoMedioM2;
   // #571: `null`, não 0 — vgv ≤ 0 é "sem base para medir", e um estudo
   // deficitário de verdade (margem negativa) precisa continuar distinguível

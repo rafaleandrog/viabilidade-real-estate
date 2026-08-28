@@ -1738,9 +1738,11 @@ test('#615: um estudo ANTIGO com a coluna legada preenchida calcula igual a um n
 test('#615: valorPermutaFisica do Loteamento sai do catálogo, como na Incorporação (critério 4)', () => {
   // Antes, `precoMedioM2` tinha um ramo `lot` lendo `preco_venda_m2`: mesmo COM
   // catálogo, o memo do valor da permuta discordava da dedução do VGV, que já
-  // vinha do catálogo desde o PR 607. Agora é a MESMA fórmula nos dois tipos.
-  // A coluna legada entra com um valor ABSURDO e diferente do catálogo: se o
-  // ramo `lot` de `precoMedioM2` voltar, `valorPermutaFisica` sai errado.
+  // vinha do catálogo desde o PR 607. Agora o ramo `lot` usa `precoPermutaR` —
+  // a MESMA variável da dedução (ver o teste seguinte para o caso em que a
+  // média residual NÃO serviria). A coluna legada entra com um valor ABSURDO e
+  // diferente do catálogo: se um ramo lendo o campo legado voltar,
+  // `valorPermutaFisica` sai errado.
   const p = calcularProforma({
     ...LOT, preco_venda_m2: 1,
     produtos: [{ area_media_m2: 300, preco_venda_m2: 1_200, unidades: 250 }], // 75.000 m², 90M
@@ -1752,6 +1754,27 @@ test('#615: valorPermutaFisica do Loteamento sai do catálogo, como na Incorpora
   assert.ok(perto(p.areaVendavelLiquida, 67_500));
   assert.ok(perto(p.valorPermutaFisica, 9_000_000), `valorPermutaFisica=${p.valorPermutaFisica}`);
   // A coerência que o critério 4 pede: o memo e a dedução falam o mesmo número.
+  assert.ok(perto(p.valorPermutaFisica, p.vgvPermutaSolicitada),
+    `memo=${p.valorPermutaFisica} dedução=${p.vgvPermutaSolicitada}`);
+});
+
+test('#615: memo do Loteamento coincide com a dedução MESMO quando a área do catálogo diverge da ALV (rodada 1 de revisão)', () => {
+  // O achado da revisão do PR 622: a primeira versão usava
+  // `vgv / areaVendavelLiquida` nos dois tipos, e isso só coincide com a
+  // dedução quando área do catálogo == ALV (o caso do teste acima, 75.000 ==
+  // 75.000). Aqui o catálogo tem 50.000 m² sobre uma ALV de 75.000: a dedução
+  // usa o preço do bucket (60M / 50.000 = R$ 1.200/m² → 7.500 × 1.200 = 9M), e
+  // a média residual daria 51M / 67.500 ≈ R$ 755,56/m² → memo de ~5,67M,
+  // divergindo da dedução em R$ 3,33M. O memo tem que usar `precoPermutaR`.
+  const p = calcularProforma({
+    ...LOT,
+    produtos: [{ area_media_m2: 250, preco_venda_m2: 1_200, unidades: 200 }], // 50.000 m², 60M
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 7_500,
+  } as any);
+  assert.ok(perto(p.vgv, 51_000_000), `vgv=${p.vgv}`);
+  assert.ok(perto(p.areaVendavelLiquida, 67_500));
+  assert.ok(perto(p.vgvPermutaSolicitada, 9_000_000), `dedução=${p.vgvPermutaSolicitada}`);
+  assert.ok(perto(p.valorPermutaFisica, 9_000_000), `memo=${p.valorPermutaFisica}`);
   assert.ok(perto(p.valorPermutaFisica, p.vgvPermutaSolicitada),
     `memo=${p.valorPermutaFisica} dedução=${p.vgvPermutaSolicitada}`);
 });
