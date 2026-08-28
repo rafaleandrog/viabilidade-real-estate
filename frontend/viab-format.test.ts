@@ -42,6 +42,21 @@ test('#581 fmtR$Kpi: card de KPI sem casas decimais, mínimo E máximo', () => {
   assert.equal(fmtR$Kpi(-2_500.789), '-R$ 2.501');
 });
 
+test('#581: valor que arredonda a zero perde o sinal — "-R$ 0" não é um KPI', () => {
+  // Entre -R$ 0,50 e R$ 0 o Intl arredonda a fração fora mas preserva o
+  // sinal (achado do App de revisão no PR): -0.01 e -0.49 publicariam
+  // "-R$ 0". O mesmo vale para -0 literal e para o positivo que arredonda
+  // a zero — todos saem "R$ 0".
+  assert.equal(fmtR$Kpi(-0.01), 'R$ 0');
+  assert.equal(fmtR$Kpi(-0.49), 'R$ 0');
+  assert.equal(fmtR$Kpi(-0), 'R$ 0');
+  assert.equal(fmtR$Kpi(0.49), 'R$ 0');
+  // -0.5 arredonda para -0 pelo Math.round (half-up rumo a +Infinito): zero limpo.
+  assert.equal(fmtR$Kpi(-0.5), 'R$ 0');
+  // Mas -0.51 é -R$ 1 de verdade — o sinal legítimo não é suprimido.
+  assert.equal(fmtR$Kpi(-0.51), '-R$ 1');
+});
+
 test('#581: o card arredonda só para exibir — fmtR$ segue em 2 casas sobre o mesmo número', () => {
   const v = 171_448_399.514;
   assert.equal(fmtR$Kpi(v), 'R$ 171.448.400');
