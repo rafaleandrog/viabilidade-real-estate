@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import {
   calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, catalogoEfetivo, produtoCompoeCatalogo,
   resumoCatalogoProdutos, tipoProdutoEfetivo, aplicarFatorPreco,
-  totaisPorTipoProdutos, areaTotalProdutos,
+  totaisPorTipoProdutos, areaTotalProdutos, eficienciaParaFaixa, roiParaFaixa,
   type ProformaInput,
 } from './proforma.js';
+import { varianteFaixa, montarMedidor } from './medidor-faixas.js';
 import {
   ESTUDO_SENSIBILIDADE, PRODUTOS_SENSIBILIDADE,
   FATOR_BEAR, FATOR_BULL, VGV_BASE, VGV_BEAR, VGV_BULL,
@@ -133,6 +134,108 @@ test('#453: vgv === 0 → receitaLiquidaSobreVgvPct = null (indefinido, não "me
   assert.equal(p.receitaLiquidaSobreVgvPct, null);
   assert.equal(p.margemLiquidaPct, null);
   assert.equal(p.custoObrasVgvPct, null);
+});
+
+// ── #611: 0% REAL × grandeza não medida, no eixo da COR ────────────────────
+//
+// Decisão do autor (2026-08-28), verbatim: "por enquanto deixe sem cor então".
+// O molde é o do #453 acima, com uma diferença que é o ponto da decisão: aqui o
+// VALOR continua `number` e continua saindo "0,0%" na tela — o que passa a
+// distinguir os dois estados é só se há base para JULGAR o indicador.
+//
+// Benchmark de eficiência com as 4 âncoras configuradas (40 · 50 · 60 · 80,
+// "atingir ou superar"): um valor 0 cai na primeira faixa, que nesta regra é a
+// VERMELHA. É exatamente o falso alarme que a auditoria #574 achou.
+const BM_EFICIENCIA = {
+  campo: 'eficiencia_aproveitamento', regra_comparacao: 'atingir_ou_superar',
+  valor: 55, medidor_min: 40, medidor_faixa1_ate: 50, medidor_faixa2_ate: 60, medidor_max: 80,
+};
+const BM_ROI = {
+  campo: 'roi', regra_comparacao: 'atingir_ou_superar',
+  valor: 30, medidor_min: 10, medidor_faixa1_ate: 20, medidor_faixa2_ate: 40, medidor_max: 60,
+};
+
+test('#611: sem área de gleba, a eficiência não é medida — e por isso não é colorida', () => {
+  const p = calcularProforma({ tipo_empreendimento: 'loteamento' } as ProformaInput);
+  assert.equal(p.areaTerreno, 0);
+  assert.equal(p.eficienciaPct, 0, 'o VALOR continua 0 — trocá-lo por null é o resto da issue');
+  assert.equal(p.eficienciaMedida, false);
+  assert.equal(eficienciaParaFaixa(p), null);
+  // O desfecho que a decisão pede, medido na ponta que pinta:
+  assert.equal(varianteFaixa(BM_EFICIENCIA, eficienciaParaFaixa(p)), '');
+  // E a prova de que o benchmark PINTARIA — sem ela o teste acima passaria
+  // mesmo com um benchmark inerte, e não mediria nada.
+  assert.equal(varianteFaixa(BM_EFICIENCIA, p.eficienciaPct), 'erro',
+    'o fixture precisa ser um benchmark que de fato pinta o zero de vermelho');
+});
+
+test('#611: 0% REAL de eficiência (gleba medida, nada vendável) CONTINUA colorido', () => {
+  // Gleba de 100.000 m² inteiramente deduzida: a área vendável é zero de
+  // verdade, e o indicador vale zero de verdade. Este é o estado que NÃO pode
+  // perder a cor — senão o conserto viraria "nunca pinta", que é outra coisa.
+  const p = calcularProforma({
+    tipo_empreendimento: 'loteamento', terreno_manual_area: 100_000,
+    area_app_modo: 'm2', area_app_valor: 100_000,
+  } as ProformaInput);
+  assert.equal(p.areaTerreno, 100_000);
+  assert.equal(p.areaVendavel, 0);
+  assert.equal(p.eficienciaPct, 0);
+  assert.equal(p.eficienciaMedida, true, 'há gleba: a razão está definida, e vale zero');
+  assert.equal(eficienciaParaFaixa(p), 0);
+  assert.equal(varianteFaixa(BM_EFICIENCIA, eficienciaParaFaixa(p)), 'erro');
+});
+
+test('#611: sem investimento, o ROI não é medido — nem colorido, nem desenhado no medidor', () => {
+  const p = calcularProforma({ tipo_empreendimento: 'loteamento' } as ProformaInput);
+  assert.equal(p.investimentoTotal, 0);
+  assert.equal(p.roiPct, 0);
+  assert.equal(p.roiMedido, false);
+  assert.equal(roiParaFaixa(p), null);
+  // A ponta que consome o ROI é o MEDIDOR da aba Gráficos, não um `urbi-kpi`:
+  // `montarMedidor` devolve `null` e o ponteiro simplesmente não é desenhado.
+  assert.equal(montarMedidor(BM_ROI, roiParaFaixa(p)), null);
+  assert.notEqual(montarMedidor(BM_ROI, p.roiPct), null,
+    'o fixture precisa ser um benchmark que de fato desenharia o medidor no zero');
+});
+
+test('#611: ROI 0% REAL (houve investimento, resultado zero) continua medido e desenhado', () => {
+  // Investimento real com resultado exatamente zero é um estado legítimo, e
+  // continua tendo medidor — é o par simétrico do teste anterior: o MESMO
+  // valor 0 do estado "não medido", distinguido só pela flag. A receita vem
+  // do catálogo (1 lote de 100 m² a R$ 1.000/m² = R$ 100.000, sem imposto/
+  // corretagem/marketing) e iguala exatamente o custo do terreno
+  // (1.000 m² × R$ 100), zerando o resultado.
+  const p = calcularProforma({
+    tipo_empreendimento: 'loteamento', terreno_manual_area: 1_000,
+    considerar_custo_terreno: true, custo_terreno_m2: 100,
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 1_000, unidades: 1 }],
+  } as ProformaInput);
+  assert.ok(p.investimentoTotal > 0, `investimentoTotal=${p.investimentoTotal}`);
+  assert.equal(p.resultado, 0, `resultado=${p.resultado}`);
+  assert.equal(p.roiPct, 0, `roiPct=${p.roiPct}`);
+  assert.equal(p.roiMedido, true);
+  assert.equal(roiParaFaixa(p), 0);
+  assert.notEqual(montarMedidor(BM_ROI, roiParaFaixa(p)), null);
+});
+
+test('#611: as flags nascem do MESMO predicado da divisão — nunca "medido" com valor do ramo zero', () => {
+  // O que este caso trava é a divergência que a estrutura evita: se alguém
+  // mudar o guard de uma das duas divisões sem mudar a flag, a tela passa a
+  // colorir (ou a esconder) o indicador errado, e nada mais fica vermelho.
+  const casos: ProformaInput[] = [
+    { tipo_empreendimento: 'loteamento' } as ProformaInput,
+    { tipo_empreendimento: 'loteamento', terreno_manual_area: 100_000 } as ProformaInput,
+    { tipo_empreendimento: 'incorporacao', terreno_manual_area: 5_000, area_pvt_r_fechada: 1_000,
+      considerar_custo_terreno: true, custo_terreno_m2: 100 } as ProformaInput,
+    { ...LOT },
+  ];
+  for (const entrada of casos) {
+    const p = calcularProforma(entrada);
+    assert.equal(p.eficienciaMedida, p.areaTerreno > 0, `eficienciaMedida × areaTerreno=${p.areaTerreno}`);
+    assert.equal(p.roiMedido, p.investimentoTotal > 0, `roiMedido × investimentoTotal=${p.investimentoTotal}`);
+    if (!p.eficienciaMedida) assert.equal(p.eficienciaPct, 0);
+    if (!p.roiMedido) assert.equal(p.roiPct, 0);
+  }
 });
 
 test('custo do terreno desconsiderado zera a linha', () => {
