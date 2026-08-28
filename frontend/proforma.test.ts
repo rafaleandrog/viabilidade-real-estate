@@ -194,14 +194,21 @@ test('#611: sem investimento, o ROI não é medido — nem colorido, nem desenha
 
 test('#611: ROI 0% REAL (houve investimento, resultado zero) continua medido e desenhado', () => {
   // Investimento real com resultado exatamente zero é um estado legítimo, e
-  // continua tendo medidor — é o par simétrico do teste anterior.
+  // continua tendo medidor — é o par simétrico do teste anterior: o MESMO
+  // valor 0 do estado "não medido", distinguido só pela flag. A receita vem
+  // do catálogo (1 lote de 100 m² a R$ 1.000/m² = R$ 100.000, sem imposto/
+  // corretagem/marketing) e iguala exatamente o custo do terreno
+  // (1.000 m² × R$ 100), zerando o resultado.
   const p = calcularProforma({
     tipo_empreendimento: 'loteamento', terreno_manual_area: 1_000,
     considerar_custo_terreno: true, custo_terreno_m2: 100,
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 1_000, unidades: 1 }],
   } as ProformaInput);
   assert.ok(p.investimentoTotal > 0, `investimentoTotal=${p.investimentoTotal}`);
+  assert.equal(p.resultado, 0, `resultado=${p.resultado}`);
+  assert.equal(p.roiPct, 0, `roiPct=${p.roiPct}`);
   assert.equal(p.roiMedido, true);
-  assert.equal(roiParaFaixa(p), p.roiPct);
+  assert.equal(roiParaFaixa(p), 0);
   assert.notEqual(montarMedidor(BM_ROI, roiParaFaixa(p)), null);
 });
 

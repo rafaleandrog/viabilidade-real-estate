@@ -47,9 +47,12 @@ vermelho**; apagar as flags do objeto devolvido → `TS2739`; fazer a flag menti
 
 **Fica pendente, e está dito no PR:** o padrão `number | null` da #571 para os dois indicadores; o
 "—" em `frontend/exportar.ts` (PDF) e na coluna ROI de `frontend/tela-dashboard.ts`; e o ROI do
-**Avançado** em `frontend/tela-resumo.ts`, que tem a mesma classe de defeito noutra grandeza
-(`custoTotal > 0 ? … : 0`, colorido por sinal — fica **verde** quando não medido) e não foi tocado
-por ser fora do escopo da decisão.
+**Avançado** em `frontend/tela-resumo.ts`, que tem a mesma classe de defeito noutra grandeza e por
+**dois mecanismos**: o KPI é colorido por sinal (`custoTotal > 0 ? … : 0`, `roiPct >= 0` → fica
+**verde** quando não medido), e o MESMO `roiPct` alimenta o medidor de benchmark
+(`resolverIndicadoresBenchmark`/`montarMedidor`), que sem custo medido desenha o ponteiro em 0 na
+banda **vermelha** — o mecanismo idêntico ao que este conserto apaga em `tela-graficos.ts`. Não
+tocado por ser fora do escopo da decisão (grandeza do Avançado; a #611 é do motor Preliminar).
 
 ## #612 · piso em zero na cascata de áreas do Loteamento (2026-08-28)
 
