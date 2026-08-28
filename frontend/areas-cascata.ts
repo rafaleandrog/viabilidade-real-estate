@@ -157,3 +157,78 @@ export const CASCATA_INCORPORACAO: DefinicaoLinha[] = [
     papel: { tipo: 'computada', operacao: 'soma', termos: ['privativa_total', 'comum'], ehAncora2: true },
   },
 ];
+
+// ── A cascata do Loteamento a partir das colunas de `estudos` (#574) ───────
+//
+// As 7 linhas EDITÁVEIS moram em `estudos` como um par de colunas por linha
+// (`area_<x>_modo` / `area_<x>_valor`), criado pela migração
+// `020_areas_cascata_loteamento.js`. Quem precisa da cascata FORA de
+// `proforma.ts` — a aba Gráficos é o caso — precisa deste mapa; sem ele a
+// única alternativa é ler os 7 campos "% da gleba" que a `020` APOSENTOU
+// (`app_pct`, `sistema_viario_pct`, `elup_pct`, …), que nenhuma tela escreve
+// desde a reestruturação do Preliminar e que ficam zerados em todo estudo
+// criado depois dela.
+//
+// ⚠️ HOJE ESTA PONTE EXISTE TRÊS VEZES, e o nome longo é para não esconder
+// isso: `proforma.ts` tem a sua (`estadosCascataLoteamento`, privada, sobre
+// `ProformaInput`) e `tela-premissas.ts` tem a sua
+// (`_estadosCascataAreasLot`, privada, sobre o `form` da tela). As três fazem
+// a mesma tradução. Convergir as outras duas para cá é o passo seguinte —
+// ficou de fora deste diff porque os dois arquivos estavam com PR em voo na
+// fila da Rodada 10 (regra R3, um assunto por PR), e não porque a duplicação
+// seja desejável.
+
+/** id da linha editável da cascata do Loteamento → prefixo da coluna em `estudos`. */
+export const CAMPO_POR_LINHA_LOTEAMENTO: Record<string, string> = {
+  app: 'area_app', elup_epu: 'area_elup_epu', epc: 'area_epc',
+  viario_publico: 'area_viario_publico', viario_privado: 'area_viario_privado',
+  comuns_privadas: 'area_comuns_privadas', verdes: 'area_verdes',
+};
+
+/**
+ * `area_<x>_modo` (nomes de domínio do schema) → `UnidadeMestre` (nomes
+ * genéricos do motor). Qualquer valor desconhecido — inclusive `null` de
+ * estudo nunca migrado — cai em `m2`, que é o padrão da coluna.
+ */
+export function modoMestreDoSchema(v: unknown): UnidadeMestre {
+  if (v === 'pct_poligonal') return 'pct_ancora1';
+  if (v === 'pct_parcelavel') return 'pct_ancora2';
+  return 'm2';
+}
+
+/** Estados das 7 linhas editáveis da cascata do Loteamento, lidos de um estudo. */
+export function estadosCascataLoteamentoDoEstudo(estudo: Record<string, any> | null | undefined): Record<string, EstadoLinha> {
+  const estados: Record<string, EstadoLinha> = {};
+  for (const [linhaId, campo] of Object.entries(CAMPO_POR_LINHA_LOTEAMENTO)) {
+    estados[linhaId] = {
+      modo: modoMestreDoSchema(estudo?.[`${campo}_modo`]),
+      valor: n(estudo?.[`${campo}_valor`]),
+    };
+  }
+  return estados;
+}
+
+/**
+ * Composição da gleba de um Loteamento, pronta para uma pizza de áreas: as 7
+ * deduções editáveis mais a Área Líquida de Venda.
+ *
+ * As 8 fatias fecham na poligonal POR CONSTRUÇÃO, e não por coincidência de
+ * arredondamento: a cascata é `poligonal − app = parcelável`,
+ * `parcelável − (elup_epu + epc + viário público) = líquida` e
+ * `líquida − (viário privado + comuns privadas + verdes) = ALV`, então
+ * `poligonal = as 7 deduções + ALV`. As linhas COMPUTADAS intermediárias
+ * (parcelável, líquida) ficam de fora justamente porque contá-las junto
+ * somaria a mesma área duas vezes.
+ *
+ * `areaTerrenoM2` é OBRIGATÓRIO de propósito (sem valor default): esquecer o
+ * argumento vira erro de compilação em vez de uma pizza silenciosamente
+ * calculada sobre uma gleba de zero.
+ */
+export function itensAlocacaoGleba(
+  estudo: Record<string, any> | null | undefined,
+  areaTerrenoM2: number,
+): { l: string; v: number }[] {
+  return calcularCascata(CASCATA_LOTEAMENTO, estadosCascataLoteamentoDoEstudo(estudo), areaTerrenoM2)
+    .filter((l) => l.papel.tipo === 'editavel' || l.id === 'alv')
+    .map((l) => ({ l: l.label, v: l.m2 }));
+}

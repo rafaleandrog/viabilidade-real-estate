@@ -8,6 +8,15 @@
 // o `exigir` abaixo é a única prova de que o `urbi-select` está entre Nome e
 // Área média, na tela de verdade.
 //
+// ⚠️ O estudo é **Incorporação**, e desde a rodada 1 de revisão do #570 isso
+// deixou de ser detalhe: no Loteamento a coluna "Tipo" não é desenhada (o motor
+// normaliza o catálogo para um bucket só, porque a tela de Permutas de lá só
+// tem controles residenciais). O tipo entra explícito abaixo para o caso não
+// mudar de veredito por uma edição em `ESTUDO`. A ausência da coluna no
+// Loteamento NÃO é provável aqui — o harness só sabe exigir presença —, e por
+// isso ela é provada em `frontend/tela-premissas.test.ts`, sobre a lista
+// `colunasProduto`.
+//
 // Duas linhas de propósito: a primeira tem `tipo: 'nao_residencial'`
 // EXPLÍCITO (prova que o valor persistido chega ao `.valor` do select); a
 // segunda OMITE `tipo` — é a forma exata de um produto LEGADO, gravado antes
@@ -56,6 +65,13 @@ export const caso = {
     // Os 3 `urbi-kpi` do `_renderResumo` (KPIs de VGV/margem etc. abaixo do
     // catálogo) ligam `variante` — mesma natureza de `cascata-areas-incorporacao.ts`.
     'urbi-kpi.variante',
+    // #573: as 2 linhas somam 7.160 m² alocados contra os 4.960 m²
+    // registrados do `ESTUDO` base — excesso, então o indicador de área
+    // alocada desenha o `urbi-banner` do aviso, que liga `variante="erro"`.
+    // Efeito colateral esperado de o indicador ler o MESMO estudo/catálogo
+    // que este caso já montava para outro propósito (#565) — mesma natureza
+    // de `urbi-kpi.variante` acima.
+    'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     // `_init()` roda no `connectedCallback`, é assíncrono e escreve por cima do
@@ -68,7 +84,7 @@ export const caso = {
     };
     const el = document.createElement('viab-tela-premissas');
     forcarEstado(el, {
-      estudo: ESTUDO,
+      estudo: { ...ESTUDO, tipo_empreendimento: 'incorporacao' },
       secao: 'produtos',
       editavel: true,
       benchmarks: [],

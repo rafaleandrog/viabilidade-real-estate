@@ -8,9 +8,13 @@ import {
 } from './viabilidade-api.js';
 import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, type ProformaInput, type Proforma } from './proforma.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
-import { converterUnidade, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
+import { converterUnidade, ctxConversaoPreliminar, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
 import { calcularCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
+// A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
+// do seu `_carregar()`, e que `tela-graficos.ts` reusa (PR 580/#597). Reusada,
+// e não recopiada: a cópia inline divergiria da função que o teste exercita.
+import { respostaAindaVale } from './viab-imagem-principal.js';
 import './tela-terreno-nucleo.js';
 import './viab-num.js';
 import './viab-imagem-principal.js';
@@ -141,6 +145,38 @@ export const PERMUTA_FIS_NR: CustoUnidade = {
     { valor: 'pct_area_venda', rotulo: '% área venda', campo: 'permuta_fisica_nr_pct', sufixo: '%', conv: { tipo: 'pct', link: 'areaVendavelNR' } },
   ],
 };
+
+/**
+ * Colunas do grid de Produtos, na ordem em que a tela as desenha (#570).
+ *
+ * Existe como função pura e exportada porque a AUSÊNCIA de uma coluna não é
+ * provável pelo harness de render — ele só sabe exigir presença (`exigir`/
+ * `minimo`), nunca contar nem negar. É o mesmo recurso que a #566 usou para
+ * provar que a Permuta física parou de oferecer "Unidade": a prova mora no
+ * array, testável direto.
+ *
+ * ⚠️ **"Tipo" (Residencial/Não Residencial) só existe na Incorporação.** No
+ * Loteamento a tela de Permutas expõe apenas os controles residenciais, e o
+ * motor normaliza o catálogo inteiro para o bucket residencial
+ * (`calcularProforma`): um seletor editável cuja escolha o cálculo ignora é
+ * exatamente o "endpoint sem controle na UI" ao contrário — controle sem
+ * efeito. O campo continua no schema e no backend; ele só não é editável nem
+ * exibido aqui.
+ *
+ * O `<colgroup>`, o `<thead>` e a linha de Total saem TODOS desta lista, então
+ * a contagem de células nunca desalinha por esquecimento de um dos três.
+ */
+export interface ColunaProduto { chave: string; rotulo: string; classe: string; num?: boolean }
+export function colunasProduto(lot: boolean): ColunaProduto[] {
+  return [
+    { chave: 'nome', rotulo: 'Nome', classe: 'p-nome' },
+    ...(lot ? [] : [{ chave: 'tipo', rotulo: 'Tipo', classe: 'p-tipo' }]),
+    { chave: 'area', rotulo: 'Área média do lote', classe: 'p-area', num: true },
+    { chave: 'preco', rotulo: 'Preço de venda', classe: 'p-preco', num: true },
+    { chave: 'unidades', rotulo: 'Unidades', classe: 'p-un', num: true },
+    { chave: 'vgv', rotulo: 'VGV', classe: 'p-vgv', num: true },
+  ];
+}
 
 // Permuta financeira R e NR (#5): cada uma alterna entre % do VGV do tipo e um
 // valor absoluto em R$. Renderizadas na seção Deduções.
@@ -360,6 +396,10 @@ export class ViabTelaPremissas extends LitElement {
        de KPIs do Resumo (.kpis), logo abaixo da cascata da Incorporação. */
     .kpis.aproveitamento { margin-top: 14px; }
     urbi-banner.aviso-aproveitamento { display: block; margin-top: 12px; }
+    /* Indicador de área privativa alocada (#573) — mesmo padrão de faixa de
+       KPIs do indicador de aproveitamento, logo abaixo da tabela de Produtos. */
+    .kpis.area-alocada { margin-top: 14px; }
+    urbi-banner.aviso-area-alocada { display: block; margin-top: 12px; }
 
     /* Catálogo de Produtos (#315) — mesmo padrão de tabela dinâmica de
        tela-empreendimento-tipologias.ts: colgroup de larguras fixas, edição
@@ -395,23 +435,47 @@ export class ViabTelaPremissas extends LitElement {
     if (ch.has('estudo') && this.estudo?.id !== this._idCarregado) this._init();
   }
 
+  /**
+   * #597 — mesma corrida que `tela-graficos.ts` teve (PR 580): navegar do
+   * estudo A para o B dispara uma 2ª `_init()` antes de a 1ª responder, e não
+   * há ordem garantida entre duas fetches HTTP. Sem guarda, a resposta de A
+   * podia chegar por último e sobrescrever `produtos`/`benchmarks`/
+   * `aliquotaRet` com o catálogo errado — silenciosamente, porque
+   * `_idCarregado` já tinha sido marcado para B e nada disparava recarga.
+   * Aqui o dano é maior que em `tela-graficos.ts`: a tela é editável, e um
+   * Salvar em cima do estado misturado grava o catálogo errado.
+   *
+   * `form`/`_snapshot`/`_dirty`/`erros`/`erroGeral` são atribuídos ANTES do
+   * `await` — síncronos, sempre do `estudo` corrente na hora da chamada, sem
+   * corrida possível. `produtos` é LIMPO na troca de estudo (mesmo padrão de
+   * `tela-graficos.ts`) para o catálogo de A não continuar na tela durante o
+   * carregamento de B. O `id` é capturado antes das chamadas e conferido
+   * depois (inclusive no `catch`), e a resposta que ficou para trás é
+   * descartada em silêncio — quem atualiza a tela é a chamada mais nova.
+   */
   private async _init() {
     if (!this.estudo) return;
-    this._idCarregado = this.estudo.id ?? null;
+    const id = this.estudo.id;
+    this._idCarregado = id ?? null;
     this.form = { ...this.estudo };
     this._snapshot = { ...this.estudo };
     this._dirty = false;
     this.erros = {};
     this.erroGeral = '';
+    this.produtos = [];
     try {
       const [bm, cfg, prod] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
         listarProdutosPreliminar(this.estudo.id),
       ]);
+      if (!respostaAindaVale(id, this.estudo?.id)) return; // o estudo mudou enquanto isto estava em voo
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
       this.produtos = prod?.dados || [];
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      if (!respostaAindaVale(id, this.estudo?.id)) return;
+      console.error(e);
+    }
   }
 
   private _entradaProforma(): ProformaInput {
@@ -452,20 +516,14 @@ export class ViabTelaPremissas extends LitElement {
 
   // Grandezas de ligação para a conversão de unidades (Parte 2), do estado atual.
   // O VGV e as áreas não dependem dos campos de custo/permuta, então não há
-  // circularidade. areaVendavelR/NR = área de venda de cada tipo (loteamento é
-  // produto único ⇒ R = área vendável, NR = 0).
+  // circularidade.
+  //
+  // #570: a tradução Proforma → ctx mora em `ctxConversaoPreliminar`, e a tela
+  // não monta mais o objeto à mão. As duas bases de área da permuta física
+  // eram lidas AQUI dos campos legados enquanto o motor já usava o catálogo —
+  // a badge "% área venda" convertia sobre uma base e o cálculo usava outra.
   private _ctxConversao(): CtxConversao {
-    const p = calcularProforma(this._entradaProforma());
-    const lot = this.estudo.tipo_empreendimento === 'loteamento';
-    return {
-      vgv: p.vgv,
-      vgvResidencial: p.vgvResidencial,
-      vgvNaoResidencial: p.vgvNaoResidencial,
-      areaVendavel: p.areaVendavel,
-      areaVendavelR: lot ? p.areaVendavel : (Number(this.form.area_pvt_r_fechada) || 0),
-      areaVendavelNR: lot ? 0 : (Number(this.form.area_pvt_nr_fechada) || 0),
-      areaPrivativa: p.areaPrivativa,
-    };
+    return ctxConversaoPreliminar(calcularProforma(this._entradaProforma()));
   }
 
   // Troca a unidade de um campo (Parte 2): converte o valor atual para a unidade
@@ -603,8 +661,9 @@ export class ViabTelaPremissas extends LitElement {
         <urbi-card titulo="Produtos">
           <div class="secao grupo grupo-a">
             <h4>Produtos</h4>
-            ${this._renderTabelaProdutos(dis)}
+            ${this._renderTabelaProdutos(dis, lot)}
           </div>
+          ${this._renderAreaAlocada()}
 
           ${this._renderRodapeForm()}
         </urbi-card>
@@ -713,7 +772,10 @@ export class ViabTelaPremissas extends LitElement {
 
   // ── Catálogo de Produtos (#315) — tabela add/remove, CRUD à parte do form ──
 
-  private _renderTabelaProdutos(dis: boolean): TemplateResult {
+  // `lot` é OBRIGATÓRIO (sem default): é ele que decide se a coluna "Tipo"
+  // existe, e um default silencioso reintroduziria o seletor no Loteamento sem
+  // nada ficar vermelho. Apagar o argumento na chamada vira `TS2554`.
+  private _renderTabelaProdutos(dis: boolean, lot: boolean): TemplateResult {
     if (this.produtos.length === 0) {
       return html`
         <div class="prod-vazio">
@@ -729,25 +791,28 @@ export class ViabTelaPremissas extends LitElement {
       `;
     }
     const { vgv, unidades } = totalProdutos(this.produtos);
+    // Uma lista só governa colgroup, cabeçalho, corpo e total — ver `colunasProduto`.
+    const colunas = colunasProduto(lot);
     return html`
       <table class="prod">
         <colgroup>
-          <col class="p-nome"><col class="p-tipo"><col class="p-area"><col class="p-preco"><col class="p-un"><col class="p-vgv">
+          ${colunas.map((c) => html`<col class=${c.classe}>`)}
           ${dis ? nothing : html`<col class="p-acao">`}
         </colgroup>
         <thead>
           <tr>
-            <th>Nome</th><th>Tipo</th><th class="num">Área média do lote</th><th class="num">Preço de venda</th>
-            <th class="num">Unidades</th><th class="num">VGV</th>
+            ${colunas.map((c) => html`<th class=${c.num ? 'num' : nothing}>${c.rotulo}</th>`)}
             ${dis ? nothing : html`<th></th>`}
           </tr>
         </thead>
         <tbody>
-          ${this.produtos.map((p) => this._linhaProduto(p, dis))}
+          ${this.produtos.map((p) => this._linhaProduto(p, dis, colunas))}
           <tr class="total">
-            <td>Total</td><td></td><td></td><td></td>
-            <td class="num">${fmtNum(unidades, 0)}</td>
-            <td class="num">${fmtR$(vgv)}</td>
+            ${colunas.map((c) => (
+              c.chave === 'nome' ? html`<td>Total</td>`
+                : c.chave === 'unidades' ? html`<td class="num">${fmtNum(unidades, 0)}</td>`
+                : c.chave === 'vgv' ? html`<td class="num">${fmtR$(vgv)}</td>`
+                : html`<td></td>`))}
             ${dis ? nothing : html`<td></td>`}
           </tr>
         </tbody>
@@ -761,7 +826,12 @@ export class ViabTelaPremissas extends LitElement {
     `;
   }
 
-  private _linhaProduto(p: any, dis: boolean): TemplateResult {
+  // `colunas` é OBRIGATÓRIO (sem default) de propósito: é ele que decide se a
+  // célula do seletor de Tipo existe, e a mesma lista já desenhou o cabeçalho e
+  // a linha de Total. Sem o parâmetro, corpo e cabeçalho poderiam divergir em
+  // silêncio — a classe de defeito que a auditoria da Rodada 9 cobrou.
+  private _linhaProduto(p: any, dis: boolean, colunas: ColunaProduto[]): TemplateResult {
+    const temTipo = colunas.some((c) => c.chave === 'tipo');
     return html`
       <tr>
         <td class="nome">
@@ -769,6 +839,7 @@ export class ViabTelaPremissas extends LitElement {
             @urbi:input-change=${(e: CustomEvent) => this._salvarProduto(p, { nome: e.detail.valor })}
           ></urbi-input>
         </td>
+        ${temTipo ? html`
         <td class="tipo">
           <urbi-select ?desabilitado=${dis}
             .valor=${tipoProdutoEfetivo(p)}
@@ -778,7 +849,7 @@ export class ViabTelaPremissas extends LitElement {
             ]}
             @urbi:select-change=${(e: CustomEvent) => this._salvarProduto(p, { tipo: e.detail.valor })}
           ></urbi-select>
-        </td>
+        </td>` : nothing}
         <td class="num">
           <viab-num sufixo="m²" ?desabilitado=${dis}
             .valor=${p.area_media_m2 !== null && p.area_media_m2 !== undefined ? Number(p.area_media_m2) : null}
@@ -851,6 +922,62 @@ export class ViabTelaPremissas extends LitElement {
       urbiVerso.notificar(e?.message || 'Erro ao remover produto', 'erro');
     }
   };
+
+  /**
+   * §Indicador de área privativa alocada (#573, aba Produtos).
+   *
+   * Compara o que o catálogo aloca (Residencial + Não Residencial somados —
+   * `p.areaProdutosAlocada`, calculado em `proforma.ts:calcularProforma`)
+   * contra a área privativa de venda REGISTRADA em Terreno & Áreas
+   * (`p.areaPrivativa` — a mesma grandeza que `_renderAproveitamentoCoeficiente`
+   * usa como "usada"). Vale para os dois tipos de empreendimento: no
+   * Loteamento `areaPrivativa` é a ALV da cascata, e o catálogo — bucket único
+   * residencial ali (comentário em `porTipo`, `proforma.ts`) — entra na mesma
+   * soma sem precisar de ramo `lot` aqui, porque a soma é agnóstica a quantas
+   * categorias existem.
+   *
+   * Sem NADA registrado e NADA alocado (estudo recém-criado, catálogo vazio,
+   * Terreno & Áreas ainda em branco) o indicador não desenha nada — mesmo
+   * espírito null-safe da #569, mas aqui a condição é "nada para comparar",
+   * não "razão sem denominador": a subtração continua definida com os dois
+   * lados em zero, só que mostrá-la seria ruído num estudo que ainda não
+   * começou. Qualquer outro caso — inclusive só um dos dois lados preenchido —
+   * desenha os 3 KPIs, porque já há algo concreto para comparar.
+   *
+   * `variante` ecoa o sinal de `p.diferencaAreaAlocada`: em branco quando
+   * tudo alocado (`=== 0`), "alerta" quando sobra por alocar (`< 0`, falta
+   * produto para a área toda) e "erro" quando o catálogo excede a área
+   * registrada (`> 0`) — os três estados do critério 2 da #573. O aviso abaixo
+   * só aparece nos dois estados não neutros, com o texto que diz qual lado
+   * está maior.
+   */
+  private _renderAreaAlocada(): TemplateResult {
+    const p = calcularProforma(this._entradaProforma());
+    if (p.areaPrivativa <= 0 && p.areaProdutosAlocada <= 0) return html``;
+    const excesso = p.diferencaAreaAlocada > 0;
+    const sobra = p.diferencaAreaAlocada < 0;
+    const variante = excesso ? 'erro' : sobra ? 'alerta' : '';
+    return html`
+      <div class="kpis area-alocada">
+        <urbi-kpi rotulo="Área alocada nos produtos" .valor=${p.pctAreaAlocada === null
+          ? fmtM2(p.areaProdutosAlocada)
+          : `${fmtM2(p.areaProdutosAlocada)} (${fmtPct(p.pctAreaAlocada)})`}></urbi-kpi>
+        <urbi-kpi rotulo="Área registrada em Terreno & Áreas" .valor=${fmtM2(p.areaPrivativa)}></urbi-kpi>
+        <urbi-kpi rotulo="Diferença" .valor=${fmtM2(p.diferencaAreaAlocada)} variante=${variante}></urbi-kpi>
+      </div>
+      ${excesso ? html`
+        <urbi-banner class="aviso-area-alocada" variante="erro">
+          A soma dos produtos (${fmtM2(p.areaProdutosAlocada)}) ultrapassa a área registrada em
+          Terreno & Áreas (${fmtM2(p.areaPrivativa)}) — reveja o catálogo ou as áreas registradas.
+        </urbi-banner>` : nothing}
+      ${sobra ? html`
+        <urbi-banner class="aviso-area-alocada" variante="alerta">
+          Ainda faltam ${fmtM2(Math.abs(p.diferencaAreaAlocada))} para alocar — a área registrada em
+          Terreno & Áreas (${fmtM2(p.areaPrivativa)}) é maior que a soma dos produtos
+          (${fmtM2(p.areaProdutosAlocada)}).
+        </urbi-banner>` : nothing}
+    `;
+  }
 
   // Área do terreno (mesma regra de proforma.ts/premissas-conversao.ts): do
   // Núcleo (soma das glebas) quando a origem é Núcleo, senão a manual.
