@@ -20,6 +20,15 @@
 // reintroduzir a imposição de largura, ESTE teste quebra, e o
 // `guard-box-model-urbi` acusa o padrão no CSS antes mesmo de rodar o navegador.
 // As duas pontas, uma estática e uma em pixel.
+//
+// #579 ("o VALOR salta para fora do quadro do KPI") — defeito IRMÃO deste,
+// não duplicata: aquele era a CAIXA×TRACK, este é o VALOR×CAIXA. O caso
+// (`frontend/render/casos/kpis-resumo.ts`) passou a montar com
+// `fluxoValoresLongos()` (VPL/Exposição negativos de 9 dígitos, VGV/Resultado
+// positivos de 9 dígitos) em vez de `fluxo()`, e a asserção abaixo de
+// `transbordoDeTexto === 0` é NOVA — antes deste conserto ela ficava vermelha
+// nas 3 larguras (mutação: reverter `tela-resumo.ts` para `minmax(180px,
+// 1fr)` reproduz o vermelho).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,6 +49,15 @@ test('KPIs do Resumo: nenhum urbi-kpi estoura a track nem pinta sobre o vizinho 
   assert.equal(
     contar(a, 'sobreposicao'), 0,
     'Dois cards de KPI voltaram a se sobrepor — mesma causa da #488.' + relato(a),
+  );
+  // #579: o VALOR (não a caixa) transbordando. `fluxoValoresLongos()` monta
+  // este caso com VPL/Exposição de 9 dígitos negativos e VGV/Resultado de 9
+  // dígitos positivos — exatamente o exemplo literal da issue
+  // (`R$ 171.448.400,00`). Zero, não "reportado": o critério 1 da #579 exige
+  // que o valor não ultrapasse a caixa nas 3 larguras.
+  assert.equal(
+    contar(a, 'transbordoDeTexto'), 0,
+    'Um valor de KPI (9 dígitos) saltou para fora do quadro — #579.' + relato(a),
   );
   for (const [largura, m] of Object.entries(a.larguras)) {
     // `overflowDocumento` é um OBJETO quando há overflow e `undefined` quando não

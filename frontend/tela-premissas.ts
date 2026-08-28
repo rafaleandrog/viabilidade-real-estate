@@ -6,7 +6,7 @@ import {
   urbiVerso, atualizarEstudo, listarBenchmarks, buscarConfig,
   listarProdutosPreliminar, criarProdutoPreliminar, atualizarProdutoPreliminar, removerProdutoPreliminar,
 } from './viabilidade-api.js';
-import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, type ProformaInput, type Proforma } from './proforma.js';
+import { calcularProforma, eficienciaParaFaixa, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, type ProformaInput, type Proforma } from './proforma.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, ctxConversaoPreliminar, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
@@ -347,7 +347,16 @@ export class ViabTelaPremissas extends LitElement {
     .grupo { margin-bottom: 0; padding: 16px 14px; border-top: 1px solid var(--cor-borda, rgba(255,255,255,0.08)); }
     .grupo-a { background: var(--cor-superficie-sutil, rgba(255,255,255,0.02)); }
     .grupo-b { background: var(--cor-superficie, rgba(255,255,255,0.04)); }
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    /* #579: track alargada de 180 para 230px — mesma folga, mesmo motivo de
+       tela-resumo.ts: um KPI de 9 dígitos (VGV, Preço médio/unid.) não
+       cabe em 180px, e urbi-kpi (shadow DOM) não declara prop de quebra.
+       As TRÊS grades desta tela usam esta única regra — o Resumo
+       (.kpis, sem modificador), o indicador de aproveitamento
+       (.kpis.aproveitamento, #569) e o de área alocada
+       (.kpis.area-alocada, #573): os modificadores só ajustam
+       margin-top, a track é compartilhada, então o conserto cobre as
+       três de uma vez. */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
     .kpis urbi-kpi { min-width: 0; }
     /* #7: nº e preço médio por unidade, Residencial / Não residencial. */
     .unid-tipo { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 14px; }
@@ -1243,7 +1252,11 @@ export class ViabTelaPremissas extends LitElement {
       kpis.push(
         { rot: 'Área da gleba', val: `${fmtNum(p.areaTerreno)} m²`, variante: '' },
         { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²`, variante: '' },
-        { rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: varianteFaixa(ef, p.eficienciaPct) },
+        // #611: a COR sai por `eficienciaParaFaixa` — sem área de gleba não há
+        // base para julgar o indicador, e o vermelho do benchmark sobre um
+        // 0,0% não medido era falso alarme. O VALOR segue `fmtPct` (o "—" do
+        // padrão da #571 é o restante da issue, adiado pelo autor).
+        { rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: varianteFaixa(ef, eficienciaParaFaixa(p)) },
         { rot: 'VGV', val: fmtR$(p.vgv), variante: '' },
         { rot: 'Nº de lotes', val: fmtNum(p.numUnidades), variante: '' },
         // #571: VGV ≤ 0 vem `null` do motor — "—", nunca "0,0%".

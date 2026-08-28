@@ -59,6 +59,182 @@ funding → **1**; `permuta_tipologia_id` cru de novo → **1**; `remapearCustoL
 > **208 erros na `main`, 212 nesta branch**. O delta é **+4, todos da MESMA classe** (os 4
 > `req.dados!` novos) — **nenhuma classe de erro nova**. "Não deu para rodar" não é "passou": a
 > validação de backend continua sendo do autor, no ambiente autenticado.
+## #611 · eficiência e ROI sem cor quando a grandeza não é medida (2026-08-28)
+
+Achado 5 da auditoria #574. A #571 tornou `margemLiquidaPct`/`custoObrasVgvPct`/
+`receitaLiquidaSobreVgvPct` `number | null`; **`eficienciaPct` e `roiPct` ficaram de fora** e
+continuam caindo em `0`. `eficienciaPct` é o indicador exclusivo do Loteamento: sem área de gleba o
+Resumo mostrava `Vendável / gleba = 0,0%` **pintado de vermelho** por `varianteFaixa`, um falso
+alarme de benchmark estourado sobre grandeza que ninguém mediu — ao lado de uma margem que já
+mostrava "—".
+
+**Decisão do autor (2026-08-28), verbatim:** *"por enquanto deixe sem cor então"*. Só a COR sai
+nesta entrega; **o resto da issue continua pendente**, e o PR usa `Sem-fechamento: #611` em vez de
+`Closes` — os critérios 1, 2 e 3 pedem `number | null` no motor, `fmtPctOuIndef` nos consumidores e
+o "—" no Painel e no PDF, e nada disso foi feito.
+
+**Como ficou.** O motor ganhou duas flags, `eficienciaMedida` e `roiMedido`, **nomeadas ao lado da
+própria divisão** e reusadas por ela — assim o predicado ("há denominador") e a conta não podem
+divergir. Dois helpers exportados, `eficienciaParaFaixa`/`roiParaFaixa`, devolvem `null` quando a
+grandeza não foi medida, e as duas pontas que colorem passaram a chamá-los:
+Premissas → Produtos (`varianteFaixa`) e o medidor de ROI da aba Gráficos (`montarMedidor`). As
+duas funções já eram null-safes desde a #571 — o conserto é passar o `null`, não mexer nas faixas.
+
+**O valor exibido NÃO muda**, e a separação é deliberada: a tela continua imprimindo `0,0%`. O que
+passou a existir é a distinção entre *quanto* o indicador vale (sempre `number`) e se há base para
+*julgá-lo*.
+
+**Verificação.** 830 testes de lógica pura (baseline da `main`: 824) e 48 casos de render (baseline:
+46), todos verdes. Mutações: reverter a fiação de Premissas → lógica pura **830/830 VERDE**, render
+**2/2 VERMELHO** (`achou 5` dos 6 KPIs sem cor); reverter a fiação do medidor de ROI → **1
+vermelho**; apagar as flags do objeto devolvido → `TS2739`; fazer a flag mentir
+(`eficienciaMedida = true`) → **2 vermelhos**.
+
+> ⚠️ **O caso de render nasceu VERDE sob mutação, e a causa vale registrar.** `viab-tela-premissas`
+> tem `estudo` como `@property`: atribuí-lo dispara `_init()`, que refaz o fetch e **sobrescreve**
+> `this.benchmarks` com `bm?.dados || []`. O benchmark posto por `forcarEstado` sobrevivia só até o
+> `Promise.all` resolver; depois dele `varianteFaixa` não achava medidor e devolvia `''` com e sem o
+> conserto. Os outros casos de `viab-tela-premissas` não tropeçam nisso porque declaram
+> `benchmarks: []` — o mesmo valor que o fetch devolve. O caso agora **stuba `urbiVerso.api`** e
+> espera um segundo ciclo de render. É a segunda vez nesta leva que uma mutação verde revelou teste
+> medindo o ponto errado, e a forma é a mesma: o fixture deixava de fornecer a condição que o
+> defeito precisa para aparecer.
+
+**Fica pendente, e está dito no PR:** o padrão `number | null` da #571 para os dois indicadores; o
+"—" em `frontend/exportar.ts` (PDF) e na coluna ROI de `frontend/tela-dashboard.ts`; e o ROI do
+**Avançado** em `frontend/tela-resumo.ts`, que tem a mesma classe de defeito noutra grandeza e por
+**dois mecanismos**: o KPI é colorido por sinal (`custoTotal > 0 ? … : 0`, `roiPct >= 0` → fica
+**verde** quando não medido), e o MESMO `roiPct` alimenta o medidor de benchmark
+(`resolverIndicadoresBenchmark`/`montarMedidor`), que sem custo medido desenha o ponteiro em 0 na
+banda **vermelha** — o mecanismo idêntico ao que este conserto apaga em `tela-graficos.ts`. Não
+tocado por ser fora do escopo da decisão (grandeza do Avançado; a #611 é do motor Preliminar).
+## #579 · o VALOR do KPI para de saltar da caixa, nas 9 telas do inventário (2026-08-28)
+
+Item A10-03 da leva Avançado (2026-08-26), rodada 10 — o defeito IRMÃO da #488: aquela consertou a
+CAIXA transbordando a TRACK (`width` imposto de fora a um `urbi-kpi`); esta conserta o VALOR
+transbordando a CAIXA (`R$ 171.448.400,00`, 9 dígitos, não cabe na track). Retomada de um WIP
+parcial e não validado (commit `427fced`) — o WIP já cobria 7 das 9 linhas do inventário da issue
+(as duas de Cenários — o `urbi-kpi` avulso de "Resultado após custo financeiro" e os 9
+`.kpi-card` do Fluxo de Caixa — somam UM conserto só, `fluxo-tabela.ts`, contado como 1 lugar na
+tabela abaixo); esta sessão completou as **2 linhas que faltavam, as duas do Preliminar**
+(**Proforma** e **Premissas**) e consertou um bug de fiação no caso de render de Funding que fazia
+o teste montar um elemento inexistente.
+
+**Os 9 lugares, o conserto e o `arquivo:linha` de cada `.kpis`/grade:**
+
+| Onde | Track antes → depois | `arquivo:linha` |
+|---|---|---|
+| Resumo (Avançado) | `minmax(180px,1fr)` → `minmax(230px,1fr)` | `frontend/tela-resumo.ts:81` |
+| Proforma (Preliminar) | `minmax(180px,220px)` → `minmax(230px,260px)` | `frontend/tela-proforma.ts:241` |
+| Premissas (Preliminar) — 3 grades (Resumo/aproveitamento #569/área alocada #573) | `minmax(180px,1fr)` → `minmax(230px,1fr)` | `frontend/tela-premissas.ts:359` |
+| Fluxo de Caixa / Cenários — `.kpi-card` | `minmax(180px,1fr)` → `minmax(210px,1fr)` + `overflow-wrap`/`word-break` em `.valor` | `frontend/fluxo-tabela.ts:64,97-98` |
+| Apelo Comercial | `minmax(170px,1fr)` → `minmax(210px,1fr)` | `frontend/tela-apelo.ts:34` |
+| Funding — `.ind-card` | `overflow-wrap`/`word-break` em `.val` (track ficou em 150px, não mudou) | `frontend/tela-funding.ts:159-160` |
+| Análise de mercado — `.comp` | `min-width:0`+`overflow-wrap`/`word-break` em `.comp-linha .val` | `frontend/tela-analise-mercado.ts:110` |
+| Gráficos — "Resultado" | sem conserto — a track (`minmax(300px,1fr)`, filho solto) já tinha folga | `frontend/tela-graficos.ts:172` |
+
+**Prova de fiação (critério 2 e 3 da issue) — 8 casos novos/estendidos em `frontend/render/casos/`
+e 8 testes `#579` em `frontend/render/*.render.test.ts`**, cada um com um valor de 9 dígitos (o
+exemplo literal `R$ 171.448.400,00`, ou o equivalente do mesmo comprimento quando a célula não é
+R$). Mutação MEDIDA (reverter o conserto e rodar o teste isolado), não presumida:
+
+- **Track sozinha prova** — `kpis-resumo` (rótulo "ROI sobre custo total" estoura em 600px no
+  piso antigo de 180px) e `kpis-premissas-resumo` (Preço médio/unid., escopado ao card Resumo —
+  o resto da sub-aba tem transbordo de texto PRÉ-EXISTENTE, medido igual nos dois pisos de track,
+  documentado e reportado em vez de assegurado).
+- **Track sozinha prova, isolada** — `scores-apelo` (`urbi-kpi`, sem `overflow-wrap` possível pelo
+  shadow boundary): reverter só a track a 170px reabre o defeito — o rótulo "Segurança jurídica"
+  estoura em 600px.
+- **`overflow-wrap` sozinho prova** — `ind-funding`: a track do `.ind` nunca mudou (fica em
+  150px, `urbi-kpi` não é usado aqui, é markup próprio); apagar só o `overflow-wrap` de
+  `.ind-card .val` já reabre o defeito sozinho (2 achados em 900px).
+- **Redundantes entre si** — `kpis-fluxo-longos`: track E `overflow-wrap` sozinhas continuam
+  verdes (uma cobre a outra); só apagar as DUAS ao mesmo tempo reabre (36 achados, 3 larguras).
+  Defesa em profundidade genuína, não decoração.
+- **Não fecha vermelho, documentado com o número medido** — `comp-analise-mercado` (a track de
+  260px já dava folga antes do conserto: nota já deixada pelo WIP, conferida de novo aqui) e
+  `kpis-proforma-longos` (a faixa da Proforma tem só 4 cards de rótulo curto e sem R$ — nem "Nº de
+  unidades" em até 12 dígitos sem casas decimais, nem "Área vendável" nos mesmos 9 dígitos do
+  exemplo da issue estouram o teto antigo de 220px; só ultrapassei forçando a área a 18 dígitos,
+  bem além de qualquer estudo real). Track sobe mesmo assim pelo motivo estrutural que a issue cita
+  nominalmente: um teto MENOR que o piso do resto do app.
+
+**Bug de fiação achado e consertado nesta sessão:** `frontend/render/casos/ind-funding.ts` criava
+`document.createElement('viab-tela-funding')` — tag que não existe (o componente real é
+`@customElement('viab-funding')`, `frontend/tela-funding.ts:93`). Um elemento não-registrado não
+tem shadow DOM: o caso "montava" um nó vazio (1 nó, 0 visíveis), e o harness reprovava por
+`exigir` não satisfeito — nunca chegou a medir nada. Corrigido para `viab-funding`; o
+`aceitaNaoReproduzido` do caso também precisou ser recalibrado (a montagem real, ao contrário do
+elemento vazio, renderiza o banner regulatório §17, o checkbox "Distribuir aporte" e o select
+"Mês do aporte" — nenhum dos três estava declarado — e não usa `urbi-badge.cor`/os 4
+`urbi-botao` de edição, que o WIP tinha declarado sem uso real).
+
+**Endereços `arquivo:linha` reconciliados** (3 citações que a `main` andando desde o WIP tinha
+deslocado — `frontend/premissas-conversao.ts`, `frontend/render/casos/ind-funding.ts`,
+`frontend/render/casos/comp-analise-mercado.ts`) — achados pelo `guard-enderecos-doc` na
+etapa 5/8, não à mão.
+
+**Regras transversais da leva (autor, 2026-08-26), como se cumprem:** "vale para estudos
+existentes" — é mudança só de CSS, nenhum valor persistido muda, sem migração, sem bump de
+`versao`. "Paridade Loteamento↔Incorporação exceto custos" — nenhuma das 9 grades ramifica por
+tipo de empreendimento; os casos de Premissas/Resumo cobrem o ramo Incorporação (o de Loteamento
+usa a mesma `.kpis`, mesmo CSS, sem branch de tipo no template).
+
+**Validação:** `bash scripts/validar-frontend.sh` verde — 824 testes de lógica + 53 casos de
+render (medido no head do PR, após o merge da `main` que trouxe o PR 620 e seus casos novos),
+guards 1-6 e 8 ok, typecheck ok, build ok. Sem migração → `versao` não bumpou.
+
+**Colisão com #578 verificada:** a #578 (listagem de estudos, worktree própria) mexe em
+`tela-dashboard.ts`; esta issue não toca esse arquivo — sem overlap de blocos. (#578 mergeou como
+#619 enquanto esta sessão estava em andamento — ver a entrada abaixo.)
+## #615 · o Loteamento não tem mais fonte legada de preço (2026-08-28)
+
+Residual do achado 1 da auditoria #574, depois de o PR 607 (#570) resolver o caso **com** catálogo.
+`estudos.preco_venda_m2` valorava a permuta física do Loteamento pela fonte legada, e o campo **não
+tem entrada em tela nenhuma** — o array `PRODUTOS_LOT` que o declarava sobrevive só dentro de
+`TODOS_NUM`, para o tipo numérico do Salvar — **nem `padrao` no schema**. Consequência: estudo
+criado depois da reestruturação do Preliminar tinha a coluna vazia, a permuta deduzia **área** e não
+deduzia **VGV**; estudo antigo, com a coluna preenchida, deduzia. Mesma premissa, resultados
+diferentes, sem nada na tela dizendo por quê.
+
+**Decisão do autor (2026-08-28), verbatim:** *"retire isso então"*. Das duas saídas que a issue
+listava (dar entrada/`padrao` ao campo, ou declarar a permuta indefinida com aviso), o autor
+escolheu uma terceira: retirar o caminho.
+
+**Como ficou.** `precoLot` deixou de existir; `precoR`/`precoNR` são `0` no Loteamento e seguem
+legados só na Incorporação. `precoMedioM2` perdeu o ramo `lot` — as duas famílias usam agora
+`vgv / areaVendavelLiquida`, e com isso o memo `valorPermutaFisica` e a dedução do VGV passam a
+falar o mesmo número (critério 4). `precoSugeridoM2` parou de escrever o campo no override do
+Loteamento, que virava movimento de um valor que ninguém lê.
+
+**O campo saiu do `ProformaInput`, e não só do cálculo** — é a defesa que faz a remoção durar:
+voltar a lê-lo no motor é `TS2339`, não uma linha que passa na revisão. A coluna continua no
+`schema.json` (removê-la é mudança de schema, logo outro escopo) e continua chegando no payload,
+inerte.
+
+**Por que zero aqui não é "dedução zerada em silêncio"** (o que o critério 1 proíbe): sem catálogo
+efetivo o estudo não tem receita modelada, e desde a #563 a Proforma inteira é estado vazio — sem
+VGV, sem tabela e sem o KPI de área permutada ao lado. É a mesma filosofia, no eixo do preço: sem
+fonte visível, nenhum número-fantasma. A consequência que sobra — **`permutaCapada` inalcançável
+pela fonte legada do Loteamento, por construção** — está **declarada** em
+`docs/viabilidade/formulas.md`, que é a saída que o critério 3 oferece.
+
+**Verificação.** 818 testes de lógica pura (baseline da `main`: 815), 42 casos de render, todos
+verdes. Mutações medidas: voltar a ler o campo no motor → `TS2339`; restaurar `precoLot` em
+`precoR` → **2 vermelhos**; restaurar o ramo `lot` de `precoMedioM2` → **3 vermelhos**.
+
+> ⚠️ **A primeira rodada de mutação deste PR saiu VERDE, e o erro era do teste, não do motor.**
+> Restaurar `precoLot` não movia nada porque os casos novos herdavam o fixture `LOT` **sem** a
+> coluna legada e **sem permuta física**: `precoLot` dava zero por ausência de DADO, não por
+> ausência de CAMINHO. Os testes passaram a injetar a coluna por `as any` — o payload real de um
+> estudo antigo — **e** a permuta, que é o multiplicando sem o qual qualquer preço dá zero. É a
+> lição da Rodada 9 ("medir o ponto certo") reencontrada pelo avesso: uma medição verdadeira sobre a
+> pergunta errada é indistinguível de uma verificação boa.
+
+**Fora de escopo, registrado:** a Incorporação tem a MESMA classe de defeito —
+`preco_venda_m2_residencial`/`_nao_residencial` também só sobrevivem em `TODOS_NUM`, sem campo
+renderizado —, e lá a fonte legada continua valendo. A assimetria é deliberada (o escopo da #615 é
+o Loteamento) e precisa de decisão do autor para ser fechada.
 
 ## #612 · piso em zero na cascata de áreas do Loteamento (2026-08-28)
 
