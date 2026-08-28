@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resumoListagem, nivelExibicao, type ResumoListagem } from './tela-dashboard.js';
+import { readFileSync } from 'node:fs';
+import { resumoListagem, nivelExibicao, linhasEstudosFiltradas, type ResumoListagem } from './tela-dashboard.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #406: a listagem de Estudos mostrava "—" em VGV/Resultado/Margem para todo
@@ -190,4 +191,104 @@ test('#577: paridade Loteamento×Incorporação — a função é ortogonal a ti
   assert.equal(nivelExibicao({ tipo_empreendimento: 'loteamento', nivel_analise: 'avancado' }), 'avancado');
   assert.equal(nivelExibicao({ tipo_empreendimento: 'incorporacao', nivel_analise: 'preliminar' }), 'preliminar');
   assert.equal(nivelExibicao({ tipo_empreendimento: 'incorporacao', nivel_analise: 'avancado' }), 'avancado');
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #578: remover a segmentação "Meus estudos / Equipe" — a listagem volta a
+// mostrar TODOS os estudos que o backend devolveu, sem peneira extra por
+// autor. `linhasEstudosFiltradas` é a decisão pura que ficava atrás do chip
+// "Meus estudos" (o padrão ao abrir a aba, que escondia estudo de outro
+// autor até alguém clicar em "Equipe"); estes testes provam que autor_id
+// deixou de entrar na conta, mantendo os outros dois filtros (tipo, status)
+// e a regra de "arquivado some por padrão" intactos.
+// ─────────────────────────────────────────────────────────────────────────
+
+const AUTOR_1 = { id: 1, autor_id: 1, tipo_empreendimento: 'incorporacao', status: 'rascunho' };
+const AUTOR_2 = { id: 2, autor_id: 2, tipo_empreendimento: 'incorporacao', status: 'rascunho' };
+const AUTOR_SEM_ID = { id: 3, tipo_empreendimento: 'incorporacao', status: 'rascunho' };
+
+test('#578: sem filtro, TODOS os autor_id aparecem juntos — nenhuma segmentação por autor', () => {
+  const r = linhasEstudosFiltradas([AUTOR_1, AUTOR_2, AUTOR_SEM_ID], {}, false);
+  assert.deepEqual(r.map((e) => e.id), [1, 2, 3]);
+});
+
+test('#578: regra transversal da leva — estudo já persistido (autor_id de outrem, ou ausente) também aparece, sem migração nem campo novo', () => {
+  // Nenhum dos três precisou de nivel_analise/campo novo para ficar visível:
+  // é o mesmo filtro de sempre, só sem a cláusula de autor.
+  const r = linhasEstudosFiltradas([AUTOR_2, AUTOR_SEM_ID], {}, false);
+  assert.equal(r.length, 2);
+});
+
+test('#578: filtro de tipo continua funcionando, indiferente a autor_id', () => {
+  const lot = { id: 4, autor_id: 9, tipo_empreendimento: 'loteamento', status: 'rascunho' };
+  const r = linhasEstudosFiltradas([AUTOR_1, AUTOR_2, lot], { tipo: 'loteamento' }, false);
+  assert.deepEqual(r.map((e) => e.id), [4]);
+});
+
+test('#578: filtro de status continua funcionando, indiferente a autor_id', () => {
+  const aprovado = { id: 5, autor_id: 9, tipo_empreendimento: 'incorporacao', status: 'aprovado' };
+  const r = linhasEstudosFiltradas([AUTOR_1, AUTOR_2, aprovado], { status: 'aprovado' }, false);
+  assert.deepEqual(r.map((e) => e.id), [5]);
+});
+
+test('#578: arquivado some por padrão (mostrarArquivados=false), volta com o toggle — igual antes, sem relação com autor', () => {
+  const arquivado = { id: 6, autor_id: 9, tipo_empreendimento: 'incorporacao', status: 'arquivado' };
+  const semToggle = linhasEstudosFiltradas([AUTOR_1, arquivado], {}, false);
+  assert.deepEqual(semToggle.map((e) => e.id), [1]);
+  const comToggle = linhasEstudosFiltradas([AUTOR_1, arquivado], {}, true);
+  assert.deepEqual(comToggle.map((e) => e.id), [1, 6]);
+  const filtroStatusArquivado = linhasEstudosFiltradas([AUTOR_1, arquivado], { status: 'arquivado' }, false);
+  assert.deepEqual(filtroStatusArquivado.map((e) => e.id), [6]);
+});
+
+test('#578: paridade Loteamento×Incorporação — os dois tipos passam pelo MESMO filtro, nenhum ramo por tipo', () => {
+  const lot1 = { id: 7, autor_id: 1, tipo_empreendimento: 'loteamento', status: 'rascunho' };
+  const lot2 = { id: 8, autor_id: 2, tipo_empreendimento: 'loteamento', status: 'rascunho' };
+  const inc1 = { id: 9, autor_id: 1, tipo_empreendimento: 'incorporacao', status: 'rascunho' };
+  const inc2 = { id: 10, autor_id: 2, tipo_empreendimento: 'incorporacao', status: 'rascunho' };
+  assert.deepEqual(linhasEstudosFiltradas([lot1, lot2, inc1, inc2], {}, false).map((e) => e.id), [7, 8, 9, 10]);
+});
+
+// ── Prova de fiação: a UI de segmentação em si saiu do template ───────────
+//
+// Os testes acima provam a FUNÇÃO pura. Eles não provam, sozinhos, que a
+// tela deixou de desenhar o chip "Meus estudos / Equipe" — `_renderEstudos`
+// nunca é chamado por um teste de lógica pura, e um componente poderia
+// reintroduzir o chip (ligado a um estado só seu, sem tocar
+// `linhasEstudosFiltradas`) sem que nada acima acusasse. Como `urbi-tabela`
+// e `urbi-chips-atalho` recebem props por *binding de propriedade*
+// (`docs/ui-urbiverso/primitivos.json`), o harness de render não desenha
+// esse conteúdo (mesma limitação registrada na #577) — então a prova
+// possível aqui é ler o FONTE, como `tela-graficos.test.ts` já faz para a
+// pizza de área. Comentários são removidos antes: o parágrafo do JSDoc de
+// `linhasEstudosFiltradas`, acima, CITA "Meus estudos"/"escopo" para
+// explicar o que saiu, e um `includes()` ingênuo acharia prosa em vez do
+// código que reverteu.
+function semComentarios(conteudo: string): string {
+  return conteudo
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((linha) => {
+      const i = linha.indexOf('//');
+      return i === -1 ? linha : linha.slice(0, i);
+    })
+    .join('\n');
+}
+
+const FONTE_DASHBOARD = semComentarios(
+  readFileSync(new URL('./tela-dashboard.ts', import.meta.url), 'utf8'),
+);
+
+test('#578: o componente não declara mais estado de escopo, nem desenha o chip "Meus estudos / Equipe"', () => {
+  assert.ok(!FONTE_DASHBOARD.includes('escopo'), 'nenhum estado/classe/variável de escopo deve sobrar no fonte');
+  assert.ok(!FONTE_DASHBOARD.includes('chips-atalho'), 'o primitivo do chip de segmentação não deve mais ser usado');
+  assert.ok(!FONTE_DASHBOARD.includes('Meus estudos'), 'o rótulo do chip não deve mais existir');
+  assert.ok(!FONTE_DASHBOARD.includes("'Equipe'"), 'o rótulo do chip não deve mais existir');
+});
+
+test('#578: _linhasFiltradas (o método do componente) delega para a função pura, sem reimplementar filtro de autor por dentro', () => {
+  assert.ok(
+    FONTE_DASHBOARD.includes('linhasEstudosFiltradas(this.estudos, this.filtros, this.mostrarArquivados)'),
+    'o wrapper do componente precisa chamar a função pura testada acima — senão os testes de linhasEstudosFiltradas provam uma função que a tela não usa',
+  );
 });
