@@ -375,9 +375,13 @@ test('#609 a rota de duplicar PERCORRE FILHAS_SIMPLES e chama montarCopiasFilhas
     'o laço sobre FILHAS_SIMPLES sumiu de estudos.ts — sem ele a lista existe e ninguém a usa, ' +
     'e a duplicação volta a não copiar o catálogo de Produtos (o P1 da #609).',
   );
+  // Âncora na forma de CHAMADA (`of montarCopiasFilhas(`), nunca no identificador
+  // solto: /montarCopiasFilhas\(/ casaria com a própria DECLARAÇÃO da função, que
+  // sobrevive a qualquer mutação do sítio de chamada — defesa declarada e
+  // inexistente, a classe do #491/PR 557 (achado da lente na rodada 1 deste PR).
   assert.ok(
-    /montarCopiasFilhas\(/.test(FONTE_ESTUDOS),
-    'estudos.ts declara montarCopiasFilhas mas não a CHAMA.',
+    /of montarCopiasFilhas\(/.test(FONTE_ESTUDOS),
+    'estudos.ts declara montarCopiasFilhas mas não a CHAMA no laço das filhas.',
   );
   // A cópia tem que ficar DENTRO do try/catch compensatório (critério 2 da
   // issue): o laço aparece depois do `try {` e antes do `catch (falha)`.
@@ -401,10 +405,20 @@ test('#609 duplicarDadosAvancado copia as operações de funding, com os dois re
     'duplicarDadosAvancado parou de criar avancado_funding_operacoes — um Avançado duplicado ' +
     'perde a estrutura de capital inteira, e o fluxo alavancado da cópia nasce diferente.',
   );
+  // Âncora na forma de CHAMADA com o argumento real (`= remapearCustoLinhaIds(op.`),
+  // nunca no identificador solto: /remapearCustoLinhaIds\(/ casaria com a própria
+  // DECLARAÇÃO da função em avancado.ts, e a mutação "copiar cru" — exatamente o
+  // defeito que este PR conserta — ficava verde (medido: 156/156 com a chamada
+  // apagada). Achado da lente na rodada 1 deste PR.
   assert.ok(
-    /remapearCustoLinhaIds\(/.test(FONTE_AVANCADO),
+    /custo_linha_ids = remapearCustoLinhaIds\(op\./.test(FONTE_AVANCADO),
     'custo_linha_ids voltou a ser copiado CRU — a base do financiamento da cópia passaria a ' +
     'apontar para linhas de custo do estudo original.',
+  );
+  assert.ok(
+    /fase_ancora_id = mapaFase\.get\(Number\(op\./.test(FONTE_AVANCADO),
+    'fase_ancora_id da OPERAÇÃO de funding voltou a viajar cru — a âncora `Number(op.` ' +
+    'distingue este remapeamento do das linhas de custo (`Number(custo.`).',
   );
   assert.ok(
     /mapaCusto\.set\(/.test(FONTE_AVANCADO),

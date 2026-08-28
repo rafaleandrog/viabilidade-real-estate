@@ -82,12 +82,17 @@ menos as geradas pelo shell) e depois copia as **estruturas filhas**. Tudo dentr
 | `estudo_membros` | ❌ | **decisão pendente** — o criador da cópia entra como editor |
 | `avancado_linhas_receita`, `avancado_capital_instrumentos` | ❌ | tabelas de modelos **apagados**; copiá-las propagaria dado morto |
 
-**Nada aponta para o original.** Toda referência interna é reapontada para a linha correspondente
-da cópia: `fase_ancora_id` (custos e operações de funding), `tipologia_id` das alocações,
-`permuta_tipologia_id` das linhas de custo e a lista `custo_linha_ids` das operações de funding
-(`remapearCustoLinhaIds`). Id sem correspondência é **descartado**, nunca mantido — manter faria a
-cópia somar linhas de outro estudo, e o motor leria isso sem erro nenhum. `curva_id` é a exceção
-que confirma a regra: curvas são **globais da instância**, não do estudo, e copiam direto.
+**Nenhuma referência VIVA aponta para o original.** Toda referência interna com leitor é
+reapontada para a linha correspondente da cópia: `fase_ancora_id` (custos e operações de funding),
+`tipologia_id` das alocações, `permuta_tipologia_id` das linhas de custo e a lista
+`custo_linha_ids` das operações de funding (`remapearCustoLinhaIds`). Id sem correspondência é
+**descartado**, nunca mantido — manter faria a cópia somar linhas de outro estudo, e o motor leria
+isso sem erro nenhum. Duas exceções declaradas: `curva_id` copia direto porque curvas são
+**globais da instância**, não do estudo; e `estudos.permuta_fisica_produto_id` /
+`permuta_fisica_nr_produto_id` **viajam cru** — são colunas **inertes** desde a #566 (a permuta
+por unidade saiu do app; nenhum leitor fora de `schema.json` e migrações), então o id do produto
+original que sobreviver nelas não alimenta cálculo nenhum. Se um dia essas colunas voltarem a ter
+leitor, o remapeamento delas entra junto.
 
 > ⚠️ **Duas ausências que esperam decisão do autor, e o motivo de cada uma.**
 >
