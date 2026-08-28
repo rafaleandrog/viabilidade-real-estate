@@ -235,6 +235,18 @@ test('#612: área digitada NEGATIVA na Incorporação entra no motor pelo mesmo 
   assert.ok(perto(p.areaVendavel, 3_500)); // fechadas: 3.000 + 500
 });
 
+test('#612: área do terreno NEGATIVA também entra pelo piso — custo do terreno nunca vira crédito', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual', terreno_manual_area: -4_000,
+    considerar_custo_terreno: true, custo_terreno_m2: 500,
+    coef_aproveitamento_maximo: 2,
+  });
+  assert.equal(p.areaTerreno, 0); // a cascata mostra a âncora em 0; o motor lê o mesmo 0
+  assert.equal(p.custoTerreno, 0); // −4.000 × 500 seria um crédito de R$ 2M inflando o resultado
+  assert.equal(p.tetoAproveitamentoM2, 0); // teto = 0 × coef, nunca negativo
+});
+
 test('#612: base da permuta física pela fonte legada (semProdutos) também é capada — permuta nunca negativa', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',

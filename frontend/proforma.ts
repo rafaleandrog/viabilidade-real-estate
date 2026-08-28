@@ -399,10 +399,12 @@ function estadosCascataLoteamento(e: ProformaInput): Record<string, EstadoLinha>
 export function calcularProforma(e: ProformaInput): Proforma {
   const lot = e.tipo_empreendimento === 'loteamento';
   // Área do terreno: do Núcleo (soma das glebas/lotes vinculados) quando a
-  // origem é Núcleo; senão, a área informada manualmente no estudo.
+  // origem é Núcleo; senão, a área informada manualmente no estudo. Pelo
+  // MESMO piso das demais áreas (#612, rodada 2 de revisão): a cascata mostra
+  // a âncora cortada em 0, e custoTerreno/outorga/teto leem o mesmo 0.
   const areaTerreno = e.origem_terreno === 'nucleo'
-    ? n(e.area_terreno_nucleo)
-    : n(e.terreno_manual_area);
+    ? areaM2(e.area_terreno_nucleo)
+    : areaM2(e.terreno_manual_area);
 
   // BUG7-08: fator de sensibilidade — 1 quando a variável estressada não é a
   // que este cálculo está resolvendo, senão o fator do estudo (Bear/Bull).
