@@ -54,6 +54,35 @@ export function nivelExibicao(l: any): 'preliminar' | 'avancado' {
 }
 
 /**
+ * #578: filtro da listagem de Estudos, SEM segmentação por autor. Até este PR
+ * a tabela escondia estudo de outros membros da equipe atrás do chip "Meus
+ * estudos" (o padrão ao abrir a aba); o pedido do autor foi literal — "Tirar
+ * isso e deixar como estava antes, sempre mostra a tabela com os estudos
+ * direto". `GET /estudos` (`backend/rotas/estudos.ts:263-282`) já resolve
+ * QUEM enxerga cada linha por membership; o recorte por autor era uma
+ * segunda peneira só do cliente, por cima disso — removê-la não expõe nada
+ * que o backend não tivesse mandado, só para de esconder o que ele mandou.
+ * A regra transversal da leva (Rodada 10, 2026-08-26) é que a mudança vale
+ * para estudo JÁ PERSISTIDO: não há coluna nova nem migração aqui, então todo
+ * estudo existente já sai visível assim que este filtro deixa de aplicar
+ * `autor_id`. Pura e exportada pelo mesmo motivo de `resumoListagem`/
+ * `nivelExibicao`: prova de mutação sem montar o componente Lit.
+ */
+export function linhasEstudosFiltradas(
+  estudos: any[],
+  filtros: { tipo?: string; status?: string },
+  mostrarArquivados: boolean,
+): any[] {
+  return estudos.filter((e) =>
+    (!filtros.tipo || e.tipo_empreendimento === filtros.tipo) &&
+    (!filtros.status || e.status === filtros.status) &&
+    // Arquivado é o estado "fora do radar": some da lista a menos que o botão
+    // de arquivados esteja ligado. Filtrar por status "Arquivado" no seletor
+    // continua funcionando — quem pediu explicitamente quer ver.
+    (mostrarArquivados || filtros.status === 'arquivado' || e.status !== 'arquivado'));
+}
+
+/**
  * #406: um estudo Avançado não tem os campos fixos que `calcularProforma`
  * (motor do Preliminar) lê — por isso a listagem mostrava "—" em VGV,
  * Resultado e Margem para todo estudo Avançado, mesmo com os números prontos
@@ -116,8 +145,6 @@ export class ViabTelaDashboard extends LitElement {
   @state() private calculosAvancado: Record<number, ResumoListagem | 'indisponivel'> = {};
   @state() private carregando = true;
   @state() private filtros: Record<string, string> = {};
-  /** Escopo do Painel: só os estudos que eu criei, ou os da equipe a que tenho acesso. */
-  @state() private escopo: 'meus' | 'equipe' = 'meus';
   /** Arquivado sai da lista por padrão — é o estado "fora do radar". */
   @state() private mostrarArquivados = false;
   @state() private statusEmCurso: number | null = null;
@@ -139,7 +166,6 @@ export class ViabTelaDashboard extends LitElement {
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
     .acoes-linha { display: inline-flex; gap: 6px; }
-    .escopo-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .cel-nome { font-weight: 600; }
     .cel-criador { display: inline-flex; align-items: center; }
     /* #475: o token que estava aqui nunca existiu — nem em compartilhado/tokens.css
@@ -555,35 +581,11 @@ export class ViabTelaDashboard extends LitElement {
   }
 
   private _linhasFiltradas() {
-    const eu = urbiVerso.usuario?.()?.id;
-    return this.estudos.filter((e) =>
-      (!this.filtros.tipo || e.tipo_empreendimento === this.filtros.tipo) &&
-      (!this.filtros.status || e.status === this.filtros.status) &&
-      // Arquivado é o estado "fora do radar": some da lista a menos que o botão
-      // de arquivados esteja ligado. Filtrar por status "Arquivado" no seletor
-      // continua funcionando — quem pediu explicitamente quer ver.
-      (this.mostrarArquivados || this.filtros.status === 'arquivado' || e.status !== 'arquivado') &&
-      // "Meus" = eu criei. "Equipe" = tudo que eu enxergo, que já é o que o
-      // backend devolve (ele filtra por membership). Sem id de usuário — o que
-      // não deve acontecer com o shell montado — não escondemos nada.
-      (this.escopo === 'equipe' || eu == null || Number(e.autor_id) === Number(eu)));
+    return linhasEstudosFiltradas(this.estudos, this.filtros, this.mostrarArquivados);
   }
 
   private _renderEstudos(): TemplateResult {
     return html`
-      <div class="escopo-bar">
-        <urbi-chips-atalho
-          .opcoes=${[
-            { id: 'meus', rotulo: 'Meus estudos' },
-            { id: 'equipe', rotulo: 'Equipe' },
-          ]}
-          ativo=${this.escopo}
-          @urbi:chip-atalho:click=${(e: CustomEvent) => {
-            const id = e.detail?.id;
-            if (id === 'meus' || id === 'equipe') this.escopo = id;
-          }}
-        ></urbi-chips-atalho>
-      </div>
       <div class="filtros-bar">
         <urbi-select
           label="Tipo de empreendimento"
