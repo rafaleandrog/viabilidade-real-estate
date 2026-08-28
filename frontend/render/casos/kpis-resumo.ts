@@ -15,9 +15,15 @@
 // Reportado quatro vezes antes (#176, #262, #326, #352) e fechado quatro sem
 // nada ficar vermelho em lugar nenhum. Agora fica: se o `width` voltar, a
 // asserção de zero sobreposição neste caso quebra.
+//
+// #579: passou a usar `fluxoValoresLongos()` em vez de `fluxo()` — VPL e
+// Exposição máxima negativos de 9 dígitos, VGV potencial e Resultado
+// positivos de 9 dígitos. É o defeito IRMÃO da #488 (a CAIXA×TRACK): aqui é
+// o VALOR×CAIXA, e só aparece com um número deste tamanho — os valores
+// pequenos de `fluxo()` sempre couberam, mesmo antes do conserto.
 
 import '../../tela-resumo.js';
-import { CRONO, DATA_INICIO, fluxo, forcarEstado } from './dados.js';
+import { CRONO, DATA_INICIO, fluxoValoresLongos, forcarEstado } from './dados.js';
 
 export const caso = {
   nome: 'kpis-resumo',
@@ -54,7 +60,7 @@ export const caso = {
     // o carregamento por API. O estado já carregado entra logo abaixo.
     forcarEstado(el, {
       carregando: false,
-      calc: fluxo(),
+      calc: fluxoValoresLongos(),
       benchmarks: [],
       dados: { crono: CRONO, dataInicio: DATA_INICIO },
       carregado: true,

@@ -25,7 +25,13 @@ export class ViabTelaApelo extends LitElement {
     .doc { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); }
     .upload-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
     .upload-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
-    .scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 8px 0 16px; }
+    /* #579: 170 -> 210px. Este card usa urbi-kpi (shadow DOM) igual ao
+       Resumo — mesma defesa (largura de track), pelo mesmo motivo (não dá
+       para confiar em CSS herdado contra um white-space: nowrap interno que
+       este repo não enxerga). Os valores aqui são scores curtos hoje, mas o
+       ROTULO (nome do fator, ex.: "Segurança jurídica") também mora nesta
+       caixa e também precisa da folga — ver frontend/render/casos/scores-apelo.ts. */
+    .scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 8px 0 16px; }
     .scores urbi-kpi { min-width: 0; }
     .fator-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
     .perg { font-size: var(--texto-corpo, 0.8125rem); margin: 8px 0; }

@@ -90,9 +90,25 @@ export class ViabTelaAnaliseMercado extends LitElement {
       font-size: var(--texto-rotulo, 0.75rem); text-transform: uppercase; letter-spacing: 0.04em;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 700;
     }
+    /* #579: min-width:0 (o item flex do .comp-linha por padrão recusa
+       encolher abaixo do conteúdo) + overflow-wrap (a defesa que funciona de
+       verdade em markup próprio — mesmo mecanismo de fluxo-tabela.ts
+       .kpi-card .valor, contra o ESPAÇO NÃO-QUEBRÁVEL que fmtR$ intercala
+       entre R$ e o número, Intl.NumberFormat pt-BR/BRL U+00A0).
+       ⚠️ MEDIDO (frontend/render/comp-analise-mercado.render.test.ts,
+       #579): ao contrário de fluxo-tabela.ts/tela-funding.ts, aqui a
+       track de 260px (.cards) já dá folga suficiente para um R$/m² de 9
+       dígitos mesmo SEM esta regra — a mutação que apaga estas duas linhas
+       não deixa o teste vermelho. Fica por consistência com o resto do
+       inventário da #579 e como defesa se a track encolher no futuro; a
+       nota está aqui para não virar defesa fantasma citada como prova do
+       que ela não prova (classe de defeito nº 1 do CLAUDE.md). */
     .comp-linha { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 8px; }
     .comp-linha .lado { font-size: 0.72rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); text-transform: uppercase; letter-spacing: 0.04em; }
-    .comp-linha .val { font-variant-numeric: tabular-nums; font-weight: 700; }
+    .comp-linha .val {
+      font-variant-numeric: tabular-nums; font-weight: 700;
+      min-width: 0; overflow-wrap: anywhere; word-break: break-word;
+    }
     .comp-linha .val.projeto { font-size: 1.15rem; }
     .comp-delta { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.08)); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
     .comp-delta.acima { color: var(--cor-alerta, #e0a82a); }

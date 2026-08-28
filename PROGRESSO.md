@@ -53,6 +53,85 @@ vermelho**; apagar as flags do objeto devolvido → `TS2739`; fazer a flag menti
 (`resolverIndicadoresBenchmark`/`montarMedidor`), que sem custo medido desenha o ponteiro em 0 na
 banda **vermelha** — o mecanismo idêntico ao que este conserto apaga em `tela-graficos.ts`. Não
 tocado por ser fora do escopo da decisão (grandeza do Avançado; a #611 é do motor Preliminar).
+## #579 · o VALOR do KPI para de saltar da caixa, nas 9 telas do inventário (2026-08-28)
+
+Item A10-03 da leva Avançado (2026-08-26), rodada 10 — o defeito IRMÃO da #488: aquela consertou a
+CAIXA transbordando a TRACK (`width` imposto de fora a um `urbi-kpi`); esta conserta o VALOR
+transbordando a CAIXA (`R$ 171.448.400,00`, 9 dígitos, não cabe na track). Retomada de um WIP
+parcial e não validado (commit `427fced`) — o WIP já cobria 7 das 9 linhas do inventário da issue
+(as duas de Cenários — o `urbi-kpi` avulso de "Resultado após custo financeiro" e os 9
+`.kpi-card` do Fluxo de Caixa — somam UM conserto só, `fluxo-tabela.ts`, contado como 1 lugar na
+tabela abaixo); esta sessão completou as **2 linhas que faltavam, as duas do Preliminar**
+(**Proforma** e **Premissas**) e consertou um bug de fiação no caso de render de Funding que fazia
+o teste montar um elemento inexistente.
+
+**Os 9 lugares, o conserto e o `arquivo:linha` de cada `.kpis`/grade:**
+
+| Onde | Track antes → depois | `arquivo:linha` |
+|---|---|---|
+| Resumo (Avançado) | `minmax(180px,1fr)` → `minmax(230px,1fr)` | `frontend/tela-resumo.ts:81` |
+| Proforma (Preliminar) | `minmax(180px,220px)` → `minmax(230px,260px)` | `frontend/tela-proforma.ts:241` |
+| Premissas (Preliminar) — 3 grades (Resumo/aproveitamento #569/área alocada #573) | `minmax(180px,1fr)` → `minmax(230px,1fr)` | `frontend/tela-premissas.ts:359` |
+| Fluxo de Caixa / Cenários — `.kpi-card` | `minmax(180px,1fr)` → `minmax(210px,1fr)` + `overflow-wrap`/`word-break` em `.valor` | `frontend/fluxo-tabela.ts:64,97-98` |
+| Apelo Comercial | `minmax(170px,1fr)` → `minmax(210px,1fr)` | `frontend/tela-apelo.ts:34` |
+| Funding — `.ind-card` | `overflow-wrap`/`word-break` em `.val` (track ficou em 150px, não mudou) | `frontend/tela-funding.ts:159-160` |
+| Análise de mercado — `.comp` | `min-width:0`+`overflow-wrap`/`word-break` em `.comp-linha .val` | `frontend/tela-analise-mercado.ts:110` |
+| Gráficos — "Resultado" | sem conserto — a track (`minmax(300px,1fr)`, filho solto) já tinha folga | `frontend/tela-graficos.ts:172` |
+
+**Prova de fiação (critério 2 e 3 da issue) — 8 casos novos/estendidos em `frontend/render/casos/`
+e 8 testes `#579` em `frontend/render/*.render.test.ts`**, cada um com um valor de 9 dígitos (o
+exemplo literal `R$ 171.448.400,00`, ou o equivalente do mesmo comprimento quando a célula não é
+R$). Mutação MEDIDA (reverter o conserto e rodar o teste isolado), não presumida:
+
+- **Track sozinha prova** — `kpis-resumo` (rótulo "ROI sobre custo total" estoura em 600px no
+  piso antigo de 180px) e `kpis-premissas-resumo` (Preço médio/unid., escopado ao card Resumo —
+  o resto da sub-aba tem transbordo de texto PRÉ-EXISTENTE, medido igual nos dois pisos de track,
+  documentado e reportado em vez de assegurado).
+- **Track sozinha prova, isolada** — `scores-apelo` (`urbi-kpi`, sem `overflow-wrap` possível pelo
+  shadow boundary): reverter só a track a 170px reabre o defeito — o rótulo "Segurança jurídica"
+  estoura em 600px.
+- **`overflow-wrap` sozinho prova** — `ind-funding`: a track do `.ind` nunca mudou (fica em
+  150px, `urbi-kpi` não é usado aqui, é markup próprio); apagar só o `overflow-wrap` de
+  `.ind-card .val` já reabre o defeito sozinho (2 achados em 900px).
+- **Redundantes entre si** — `kpis-fluxo-longos`: track E `overflow-wrap` sozinhas continuam
+  verdes (uma cobre a outra); só apagar as DUAS ao mesmo tempo reabre (36 achados, 3 larguras).
+  Defesa em profundidade genuína, não decoração.
+- **Não fecha vermelho, documentado com o número medido** — `comp-analise-mercado` (a track de
+  260px já dava folga antes do conserto: nota já deixada pelo WIP, conferida de novo aqui) e
+  `kpis-proforma-longos` (a faixa da Proforma tem só 4 cards de rótulo curto e sem R$ — nem "Nº de
+  unidades" em até 12 dígitos sem casas decimais, nem "Área vendável" nos mesmos 9 dígitos do
+  exemplo da issue estouram o teto antigo de 220px; só ultrapassei forçando a área a 18 dígitos,
+  bem além de qualquer estudo real). Track sobe mesmo assim pelo motivo estrutural que a issue cita
+  nominalmente: um teto MENOR que o piso do resto do app.
+
+**Bug de fiação achado e consertado nesta sessão:** `frontend/render/casos/ind-funding.ts` criava
+`document.createElement('viab-tela-funding')` — tag que não existe (o componente real é
+`@customElement('viab-funding')`, `frontend/tela-funding.ts:93`). Um elemento não-registrado não
+tem shadow DOM: o caso "montava" um nó vazio (1 nó, 0 visíveis), e o harness reprovava por
+`exigir` não satisfeito — nunca chegou a medir nada. Corrigido para `viab-funding`; o
+`aceitaNaoReproduzido` do caso também precisou ser recalibrado (a montagem real, ao contrário do
+elemento vazio, renderiza o banner regulatório §17, o checkbox "Distribuir aporte" e o select
+"Mês do aporte" — nenhum dos três estava declarado — e não usa `urbi-badge.cor`/os 4
+`urbi-botao` de edição, que o WIP tinha declarado sem uso real).
+
+**Endereços `arquivo:linha` reconciliados** (3 citações que a `main` andando desde o WIP tinha
+deslocado — `frontend/premissas-conversao.ts`, `frontend/render/casos/ind-funding.ts`,
+`frontend/render/casos/comp-analise-mercado.ts`) — achados pelo `guard-enderecos-doc` na
+etapa 5/8, não à mão.
+
+**Regras transversais da leva (autor, 2026-08-26), como se cumprem:** "vale para estudos
+existentes" — é mudança só de CSS, nenhum valor persistido muda, sem migração, sem bump de
+`versao`. "Paridade Loteamento↔Incorporação exceto custos" — nenhuma das 9 grades ramifica por
+tipo de empreendimento; os casos de Premissas/Resumo cobrem o ramo Incorporação (o de Loteamento
+usa a mesma `.kpis`, mesmo CSS, sem branch de tipo no template).
+
+**Validação:** `bash scripts/validar-frontend.sh` verde — 824 testes de lógica + 53 casos de
+render (medido no head do PR, após o merge da `main` que trouxe o PR 620 e seus casos novos),
+guards 1-6 e 8 ok, typecheck ok, build ok. Sem migração → `versao` não bumpou.
+
+**Colisão com #578 verificada:** a #578 (listagem de estudos, worktree própria) mexe em
+`tela-dashboard.ts`; esta issue não toca esse arquivo — sem overlap de blocos. (#578 mergeou como
+#619 enquanto esta sessão estava em andamento — ver a entrada abaixo.)
 ## #615 · o Loteamento não tem mais fonte legada de preço (2026-08-28)
 
 Residual do achado 1 da auditoria #574, depois de o PR 607 (#570) resolver o caso **com** catálogo.
