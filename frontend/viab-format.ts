@@ -50,18 +50,20 @@ export function fmtR$(v: number, comSimbolo = true): string {
  *     é decisão do autor (registrada no PR da #581).
  */
 export function fmtR$Kpi(v: number): string {
-  // Sinal normalizado APÓS o arredondamento: entre -R$ 0,50 e R$ 0 o Intl
-  // arredonda a fração fora mas preserva o sinal, e o card publicaria
-  // "-R$ 0" — zero negativo não é um valor de KPI. `Math.round` de um
-  // negativo pequeno devolve -0; o `=== 0` não distingue sinal, e é isso
-  // que zera as duas formas. (Achado do App de revisão no PR da #581.)
-  const arredondado = Math.round(v || 0);
+  // Sinal normalizado APÓS o arredondamento: entre -R$ 0,50 (exclusivo) e
+  // R$ 0 o Intl arredonda a fração fora mas preserva o sinal, e o card
+  // publicaria "-R$ 0" — zero negativo não é um valor de KPI. O critério de
+  // "arredonda a zero" é o DO PRÓPRIO Intl (half away from zero): |v| < 0,5.
+  // `Math.round` não serve de proxy — `Math.round(-0.5)` é -0 (half toward
+  // +∞) e engoliria o "-R$ 1" legítimo da fronteira exata -0,50.
+  // (Achados do App de revisão no PR da #581, rodadas 1 e 2.)
+  const valor = v || 0;
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(arredondado === 0 ? 0 : v || 0);
+  }).format(Math.abs(valor) < 0.5 ? 0 : valor);
 }
 
 export const fmtNum = (v: number, d = 0) =>

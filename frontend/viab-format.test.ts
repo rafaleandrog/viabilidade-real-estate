@@ -51,9 +51,13 @@ test('#581: valor que arredonda a zero perde o sinal — "-R$ 0" não é um KPI'
   assert.equal(fmtR$Kpi(-0.49), 'R$ 0');
   assert.equal(fmtR$Kpi(-0), 'R$ 0');
   assert.equal(fmtR$Kpi(0.49), 'R$ 0');
-  // -0.5 arredonda para -0 pelo Math.round (half-up rumo a +Infinito): zero limpo.
-  assert.equal(fmtR$Kpi(-0.5), 'R$ 0');
-  // Mas -0.51 é -R$ 1 de verdade — o sinal legítimo não é suprimido.
+  // A fronteira exata -0,50 arredonda para LONGE do zero no Intl (half away
+  // from zero) — é "-R$ 1" legítimo, não zero. O critério do teste é o mesmo
+  // da função: |v| < 0,5 zera; |v| >= 0,5 preserva sinal e valor (achado da
+  // rodada 2 do App: Math.round(-0.5) = -0 engoliria este caso).
+  assert.equal(fmtR$Kpi(-0.5), '-R$ 1');
+  assert.equal(fmtR$Kpi(0.5), 'R$ 1');
+  // E -0.51 é -R$ 1 de verdade — o sinal legítimo não é suprimido.
   assert.equal(fmtR$Kpi(-0.51), '-R$ 1');
 });
 
