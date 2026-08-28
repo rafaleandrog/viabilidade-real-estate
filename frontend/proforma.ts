@@ -31,7 +31,15 @@ export interface ProformaInput {
   area_viario_privado_modo?: string; area_viario_privado_valor?: number | string;
   area_comuns_privadas_modo?: string; area_comuns_privadas_valor?: number | string;
   area_verdes_modo?: string; area_verdes_valor?: number | string;
-  area_media_lote_m2?: number | string; preco_venda_m2?: number | string;
+  // ⚠️ `preco_venda_m2` NÃO está aqui, e a ausência é a #615. Ele era o preço
+  // da permuta física do Loteamento pela fonte legada, e não tem campo em tela
+  // nenhuma (o array `PRODUTOS_LOT` que o declarava sobrevive só dentro de
+  // `TODOS_NUM`, para o tipo numérico do Salvar) nem `padrao` no schema. Fora
+  // do TIPO, e não só do cálculo, de propósito: assim voltar a lê-lo é erro de
+  // compilação (`TS2339`), e não uma linha que passa despercebida na revisão.
+  // A coluna continua no `schema.json` — apagá-la é mudança de schema, e
+  // portanto outro escopo.
+  area_media_lote_m2?: number | string;
   // incorporação — áreas e coeficientes
   coef_aproveitamento_basico?: number | string; coef_aproveitamento_maximo?: number | string;
   area_pvt_r_fechada?: number | string; area_pvt_nr_fechada?: number | string;
@@ -66,12 +74,16 @@ export interface ProformaInput {
   aliquota_ret_pct?: number; // parâmetro da app (default 4)
   // Catálogo de Produtos (tabela `preliminar_produtos`) — a ÚNICA fonte de VGV,
   // de área e de nº de unidades, e desde a #570 também das bases das duas
-  // permutas, separadas por categoria. Os pares legados
-  // (area_media_lote_m2/preco_venda_m2 no Loteamento;
-  // area_pvt_*_fechada/preco_venda_m2_*/num_unidades_* na Incorporação)
-  // continuam no schema e no tipo, mas só governam o estudo SEM catálogo
-  // efetivo — que, por não ter receita modelada (`semProdutos`), fecha em zero
-  // de qualquer forma. Não há fallback de um para o outro.
+  // permutas, separadas por categoria. Os campos legados da INCORPORAÇÃO
+  // (area_pvt_*_fechada/preco_venda_m2_*/num_unidades_*) continuam no schema e
+  // no tipo, mas só governam o estudo SEM catálogo efetivo — que, por não ter
+  // receita modelada (`semProdutos`), fecha em zero de qualquer forma. Não há
+  // fallback de um para o outro.
+  //
+  // O par legado do LOTEAMENTO não governa mais nada: `preco_venda_m2` saiu do
+  // tipo na #615 (a permuta física dele era o último leitor) e
+  // `area_media_lote_m2` já não tinha leitor desde que o nº de unidades passou
+  // a sair só do catálogo.
   produtos?: ProdutoPreliminar[];
   // BUG7-08: fator de stress da análise de sensibilidade (Bear/Base/Bull).
   // Escala o valor JÁ RESOLVIDO (canônico se houver, senão o legado) de uma
@@ -413,14 +425,29 @@ export function calcularProforma(e: ProformaInput): Proforma {
     e.sensibilidade?.variavel === variavel ? Math.max(0, e.sensibilidade.fator) : 1;
 
   // ── Áreas + VGV ──
-  // Os três preços abaixo são hoje o preço da PERMUTA FÍSICA (interim do #315:
-  // ela ainda é valorada pelo campo legado do tipo, não pelo catálogo). Levam o
-  // MESMO `fatorSens('preco')` que o catálogo recebe logo abaixo — é o que
-  // mantém o cenário coerente: base e permuta escalam juntas, e a proporção que
-  // o cap do excedente (#563) mede não muda de cenário para cenário.
+  // Os dois preços abaixo são hoje o preço da PERMUTA FÍSICA da INCORPORAÇÃO
+  // pela fonte legada (interim do #315: sem catálogo efetivo ela é valorada
+  // pelo campo legado do tipo). Levam o MESMO `fatorSens('preco')` que o
+  // catálogo recebe logo abaixo — é o que mantém o cenário coerente: base e
+  // permuta escalam juntas, e a proporção que o cap do excedente (#563) mede
+  // não muda de cenário para cenário.
+  //
+  // ⚠️ **O LOTEAMENTO NÃO TEM FONTE LEGADA DE PREÇO — #615.** Decisão do autor
+  // em 2026-08-28, verbatim: *"retire isso então"*. Até aqui, `precoLot` era
+  // `n(e.preco_venda_m2)`, e `estudos.preco_venda_m2` não tem campo em tela
+  // nenhuma nem `padrao` no schema. A consequência era a que a auditoria #574
+  // achou: num Loteamento sem catálogo, a coluna vazia deixava a permuta
+  // deduzir ÁREA sem deduzir VGV — e um estudo antigo, com a coluna
+  // preenchida, deduzia. Mesma premissa, resultados diferentes, sem nada na
+  // tela dizendo por quê.
+  //
+  // Zero aqui não é "dedução silenciosamente zerada": sem catálogo efetivo o
+  // estudo não tem receita modelada (`semProdutos`), e desde a #563 a Proforma
+  // inteira vira estado vazio — não há VGV, não há tabela e não há o KPI de
+  // área permutada ao lado. É a mesma filosofia, no eixo do preço: sem fonte
+  // visível, nenhum número-fantasma.
   let areaVendavel = 0, areaPrivativa = 0, areaConstruida = 0;
-  const precoLot = n(e.preco_venda_m2) * fatorSens('preco');
-  const precoR = lot ? precoLot : n(e.preco_venda_m2_residencial) * fatorSens('preco');
+  const precoR = lot ? 0 : n(e.preco_venda_m2_residencial) * fatorSens('preco');
   const precoNR = lot ? 0 : n(e.preco_venda_m2_nao_residencial) * fatorSens('preco');
 
   if (lot) {
@@ -643,8 +670,13 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // já reduziu o VGV — ambas, portanto, reduzem o resultado (#14). `valorPermutaFisica`
   // é memo: o valor de mercado da área entregue em permuta.
   const resultado = receitaOperacional - custoIndiretoTotal;
-  const precoMedioM2 = lot ? precoLot
-    : (areaVendavelLiquida > 0 ? vgv / areaVendavelLiquida : 0);
+  // #615 — a MESMA fórmula nos dois tipos. O Loteamento tinha um ramo próprio,
+  // `lot ? precoLot : …`, e era ele que sobrevivia à #570: mesmo COM catálogo,
+  // o memo do valor da permuta do Loteamento saía de `estudos.preco_venda_m2`,
+  // enquanto a dedução do VGV já vinha do catálogo — duas valorações da mesma
+  // área, discordando entre si. Agora as duas descem do VGV, que desce do
+  // catálogo (critério 4 da issue).
+  const precoMedioM2 = areaVendavelLiquida > 0 ? vgv / areaVendavelLiquida : 0;
   const valorPermutaFisica = areaPermutaFisica * precoMedioM2;
   // #571: `null`, não 0 — vgv ≤ 0 é "sem base para medir", e um estudo
   // deficitário de verdade (margem negativa) precisa continuar distinguível
@@ -742,13 +774,18 @@ export function precoSugeridoM2(e: ProformaInput, pisoResultadoPct: number): num
   // O preço testado tem que chegar ao CATÁLOGO: ele é a fonte do VGV, e mexer
   // só nos campos legados deixaria a margem constante — a bisseção não teria
   // nada para procurar e devolveria sempre o mesmo extremo. Os campos legados
-  // seguem no override para o estudo SEM catálogo, onde a permuta física ainda
-  // lê o preço deles (#570); com catálogo, o preço da permuta é o médio da
-  // categoria, e o override do catálogo já o move junto.
+  // seguem no override da INCORPORAÇÃO para o estudo SEM catálogo, onde a
+  // permuta física ainda lê o preço deles (#570); com catálogo, o preço da
+  // permuta é o médio da categoria, e o override do catálogo já o move junto.
+  //
+  // #615: o Loteamento perdeu o override do campo legado junto com a leitura
+  // dele — `preco_venda_m2` saiu do `ProformaInput`. Escrevê-lo aqui seria
+  // mover um campo que ninguém mais lê, o que faria a bisseção parecer estar
+  // testando algo que não testa.
   const margemNoPreco = (p: number): number => {
     const produtos = e.produtos?.map((x) => ({ ...x, preco_venda_m2: p }));
     const teste: ProformaInput = lot
-      ? { ...e, preco_venda_m2: p, produtos }
+      ? { ...e, produtos }
       : { ...e, preco_venda_m2_residencial: p, preco_venda_m2_nao_residencial: p, produtos };
     // #571: `margemLiquidaPct` agora é `number | null` (indefinido quando
     // `vgv` fica ≤ 0). Aqui é busca numérica interna, não exibição — sem

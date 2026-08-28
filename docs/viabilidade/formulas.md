@@ -79,6 +79,25 @@ permutas continuam sendo as legadas (área vendável no Loteamento, `area_pvt_*_
 `preco_venda_m2_*` na Incorporação). Não há fallback de uma fonte para a outra, em nenhum dos dois
 sentidos.
 
+> **O Loteamento não tem fonte legada de PREÇO — #615.** Decisão do autor em 2026-08-28, verbatim:
+> *"retire isso então"*. Até ali, a permuta física do Loteamento sem catálogo era valorada por
+> `estudos.preco_venda_m2`, um campo que **não tem entrada em tela nenhuma** (o array `PRODUTOS_LOT`
+> que o declarava sobrevive só dentro de `TODOS_NUM`, para o tipo numérico do Salvar) **nem `padrao`
+> no schema** — então um estudo criado depois da reestruturação do Preliminar tinha a coluna vazia,
+> a permuta deduzia **área** e não deduzia **VGV**, e um estudo antigo com a coluna preenchida
+> deduzia. O motor não lê mais a coluna, e o campo saiu do `ProformaInput`: os dois estudos agora
+> calculam igual.
+>
+> **Consequência que esta spec declara em vez de esconder:** no Loteamento **sem catálogo efetivo**,
+> a permuta física vale **zero** e o cap (`permutaCapada`) é **inalcançável por construção** — a
+> permuta pedida e a base do cap são as duas zero, e `>` nunca é verdade. Não é dedução zerada em
+> silêncio: `semProdutos` manda a Proforma inteira para o estado vazio da #563 — sem VGV, sem
+> tabela e sem o KPI de área permutada ao lado. **Com** catálogo o cap é normalmente alcançável,
+> pelo preço médio do catálogo (é o caminho que o PR 607 entregou).
+>
+> A **Incorporação** mantém a fonte legada (`preco_venda_m2_residencial`/`_nao_residencial`), e lá o
+> cap continua alcançável por ela. A assimetria é deliberada: o escopo da #615 é o Loteamento.
+
 ## Deduções da receita
 
 Imposto (`4%` se sujeito a RET, senão `imposto_percentual`), corretagem, marketing e permutas financeiras (% do VGV residencial/não residencial — cada uma sobre o VGV da **sua** categoria na Incorporação; no Loteamento só a residencial existe, sobre o bucket único, #570). `Receita líquida = VGV − deduções`.

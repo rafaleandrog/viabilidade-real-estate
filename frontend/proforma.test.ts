@@ -21,16 +21,22 @@ const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 // R$ 1.000 × 250 lotes = R$ 75.000.000, com 250 unidades. Todos os números
 // conferidos à mão abaixo continuam valendo sem alteração.
 //
-// `area_media_lote_m2` e `preco_venda_m2` ficam no fixture porque governam o
-// estudo SEM catálogo (a permuta física lê o preço legado ali, #570) — não
-// porque alimentem receita quando há catálogo.
+// ⚠️ **O fixture NÃO declara `preco_venda_m2`, e a ausência é a #615**
+// (critério 2). Ele o declarava porque o campo governava a permuta física do
+// estudo SEM catálogo — e foi exatamente por isso que o defeito da auditoria
+// #574 atravessou a suíte inteira: todo teste de Loteamento recebia de graça um
+// número que a tela não tem como fornecer. O campo saiu do `ProformaInput` na
+// #615, então re-declará-lo aqui é erro de compilação, e não uma linha que
+// volta despercebida.
+//
+// `area_media_lote_m2` sai junto: a única razão escrita para ele estar aqui era
+// a mesma, e ele já não tinha leitor desde que o nº de unidades passou a sair
+// só do catálogo.
 const LOT: ProformaInput = {
   tipo_empreendimento: 'loteamento',
   terreno_manual_area: 100000,
   area_viario_publico_modo: 'pct_poligonal',
   area_viario_publico_valor: 25,
-  area_media_lote_m2: 300,
-  preco_venda_m2: 1000,
   produtos: [{ area_media_m2: 300, preco_venda_m2: 1000, unidades: 250 }],
   imposto_percentual: 7,
   corretagem_percentual: 5,
@@ -256,7 +262,7 @@ test('#569: coeficiente 0/vazio/negativo → indicador não se aplica (null, sem
 test('#569: loteamento nunca preenche o coeficiente — indicador sempre null, por construção', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'loteamento',
-    terreno_manual_area: 90_000, area_media_lote_m2: 300, preco_venda_m2: 1_000,
+    terreno_manual_area: 90_000,
     produtos: [{ area_media_m2: 300, preco_venda_m2: 1_000, unidades: 250 }],
   });
   assert.equal(p.tetoAproveitamentoM2, null);
@@ -343,7 +349,6 @@ test('#573: loteamento — registrada é a ALV da cascata, alocada é o catálog
     tipo_empreendimento: 'loteamento',
     terreno_manual_area: 100_000,
     area_viario_publico_modo: 'pct_poligonal', area_viario_publico_valor: 25, // ALV = 75.000
-    area_media_lote_m2: 300, preco_venda_m2: 1_000,
     produtos: [{ area_media_m2: 300, preco_venda_m2: 1_000, unidades: 200 }], // 60.000 alocado
   });
   assert.ok(perto(p.areaPrivativa, 75_000));
@@ -602,10 +607,10 @@ test('totalProdutos: soma VGV e unidades de várias linhas', () => {
 test('#315: catálogo de Produtos é a fonte do VGV — os campos fixos legados não influenciam (loteamento)', () => {
   const p = calcularProforma({
     ...LOT,
-    // Campos legados propositalmente diferentes — o VGV não pode senti-los.
-    // (`preco_venda_m2` continua sendo o preço da permuta física, e aqui não há
-    // permuta, então nada além do catálogo entra na conta.)
-    area_media_lote_m2: 999, preco_venda_m2: 1,
+    // Campo legado propositalmente diferente — o VGV não pode senti-lo.
+    // (`preco_venda_m2`, que era o preço da permuta física do Loteamento, não
+    // existe mais no `ProformaInput` desde a #615.)
+    area_media_lote_m2: 999,
   });
   assert.ok(perto(p.vgv, 75_000_000), `vgv=${p.vgv}`);
   assert.equal(p.numUnidades, 250);
@@ -745,7 +750,7 @@ test('#315: permuta física continua deduzindo o VGV quando produtos está prese
   const p = calcularProforma({
     tipo_empreendimento: 'loteamento',
     terreno_manual_area: 100000,
-    preco_venda_m2: 1000, // legado: idêntico ao preço médio do catálogo abaixo
+    // #615: sem campo legado nenhum — o preço da permuta é o médio do catálogo.
     produtos: [{ area_media_m2: 300, preco_venda_m2: 1000, unidades: 250 }], // VGV bruto 75.000.000
     permuta_fisica_area_m2: 3000, // 3.000 m² × 1000 R$/m² = 3.000.000
   });
@@ -1043,7 +1048,6 @@ test('preço sugerido: atinge o piso do benchmark', () => {
   // no campo legado deixaria a margem parada em 38,4%.
   const margem = calcularProforma({
     ...LOT,
-    preco_venda_m2: preco!,
     produtos: LOT.produtos!.map((x) => ({ ...x, preco_venda_m2: preco! })),
   }).margemLiquidaPct;
   // #571: preço/catálogo positivos aqui — margem nunca é `null` neste caso.
@@ -1227,7 +1231,7 @@ test('loteamento também é capado — o estado vazio e o cap valem nos dois pad
   const semCatalogo = calcularProforma({
     tipo_empreendimento: 'loteamento',
     terreno_manual_area: 100000,
-    area_media_lote_m2: 300, preco_venda_m2: 1000,   // par legado, sem UI
+    area_media_lote_m2: 300,   // legado sem UI; `preco_venda_m2` saiu do tipo na #615
     imposto_percentual: 7, corretagem_percentual: 5,
     infra_modo: 'pct_vgv', infra_pct: 30,
   });
@@ -1579,10 +1583,19 @@ test('#570: estudo SEM catálogo mantém as bases legadas, intocadas', () => {
 
   const lot = calcularProforma({ ...LOT, produtos: [], permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 3000 });
   assert.equal(lot.semProdutos, true);
-  // Loteamento sem catálogo: a base é a área vendável da cascata, como sempre.
+  // Loteamento sem catálogo: a base de ÁREA é a área vendável da cascata, como
+  // sempre — ela tem campo próprio em Premissas → Terreno & Áreas.
   assert.ok(perto(lot.areaBasePermutaResidencial, 75_000), `lot.base=${lot.areaBasePermutaResidencial}`);
   assert.equal(lot.areaBasePermutaNaoResidencial, 0, 'Loteamento não tem categoria NR');
-  assert.ok(perto(lot.vgvPermutaSolicitada, 3_000_000), '3.000 m² × R$ 1.000 legado');
+  // ⚠️ **Aqui a #615 mudou o número, e é a mudança que ela existe para fazer.**
+  // Este assert dizia "3.000 m² × R$ 1.000 legado" — o preço vinha de
+  // `estudos.preco_venda_m2`, que não tem campo em tela nenhuma. Retirado o
+  // caminho legado, o PREÇO do Loteamento só vem do catálogo, e sem catálogo
+  // não há preço: a permuta pedida vale zero. O que impede isso de virar
+  // "dedução zerada com área ao lado" é o estado vazio da #563 —
+  // `semProdutos` manda a Proforma inteira para `urbi-estado-vazio`, sem VGV,
+  // sem tabela e sem o KPI de área permutada.
+  assert.equal(lot.vgvPermutaSolicitada, 0, 'sem catálogo, o Loteamento não tem de onde tirar preço (#615)');
 });
 
 // ⚠️ No Loteamento as duas bases vêm de fontes DIFERENTES, e é de propósito
@@ -1608,34 +1621,101 @@ test('#570/#574: Loteamento — a base da ÁREA é a ALV da cascata; o PREÇO é
   assert.ok(perto(p.areaVendavel, 75_000), `areaVendavel=${p.areaVendavel}`);
 });
 
-// #574 (auditoria do Loteamento, medida na `main` SEM este diff): lá a permuta
-// física do Loteamento é valorada por `precoLot = n(e.preco_venda_m2)`, e
-// `estudos.preco_venda_m2` NÃO tem campo em tela nenhuma nem `padrao` no
-// schema — então em Loteamento NOVO a permuta reduzia a área e **não** reduzia
-// o VGV. O fixture `LOT` declara `preco_venda_m2: 1000`, e foi exatamente por
-// isso que o defeito atravessou as suítes: nenhum caso exercia a ausência.
+// #574 (auditoria do Loteamento): a permuta física do Loteamento era valorada
+// por `precoLot = n(e.preco_venda_m2)`, e `estudos.preco_venda_m2` não tem
+// campo em tela nenhuma nem `padrao` no schema — então em Loteamento NOVO a
+// permuta reduzia a área e **não** reduzia o VGV. O PR 607 (#570) resolveu o
+// caso COM catálogo; a #615 retirou o caminho legado, e é por isso que o
+// fixture `LOT` acima já não declara o campo (critério 2 da issue).
 test('#574: Loteamento com catálogo e SEM `preco_venda_m2` — a permuta física deduz do VGV', () => {
-  const { preco_venda_m2: _semPrecoLegado, ...semPreco } = LOT;
-  assert.equal((semPreco as ProformaInput).preco_venda_m2, undefined,
-    'o fixture deste teste precisa NÃO ter o campo legado');
   const p = calcularProforma({
-    ...(semPreco as ProformaInput),
+    ...LOT,
     produtos: [{ area_media_m2: 300, preco_venda_m2: 1_000, unidades: 250 }], // 75.000 m², 75M
     permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 7_500,
   });
-  // Na `main` isto daria permuta ZERO (7.500 × preço legado ausente = 0) e o
-  // VGV sairia inteiro, com a área permutada reduzindo só a área líquida.
+  // Antes do PR 607 isto daria permuta ZERO (7.500 × preço legado ausente = 0)
+  // e o VGV sairia inteiro, com a área permutada reduzindo só a área líquida.
   assert.ok(perto(p.vgvPermutaResidencial, 7_500_000), `permuta=${p.vgvPermutaResidencial}`);
   assert.ok(perto(p.vgvResidencial, 67_500_000), `vgvR=${p.vgvResidencial}`);
   assert.ok(perto(p.vgv, 67_500_000), `vgv=${p.vgv}`);
   assert.ok(perto(p.areaVendavelLiquida, 67_500), `liq=${p.areaVendavelLiquida}`);
-  // Sem catálogo o comportamento continua o da `main` (sem fallback): o
-  // residual do achado é issue própria, não deste PR.
-  const semCatalogo = calcularProforma({ ...(semPreco as ProformaInput), produtos: [],
-    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 7_500 });
-  assert.equal(semCatalogo.semProdutos, true);
-  assert.equal(semCatalogo.vgvPermutaSolicitada, 0, 'sem catálogo, o preço legado ausente segue valendo zero');
+});
+
+// ── #615: o Loteamento não tem mais fonte legada de preço ──────────────────
+//
+// Decisão do autor (2026-08-28), verbatim: "retire isso então". O que estes
+// casos travam é a AUSÊNCIA de um caminho — a classe de defeito que nenhuma
+// asserção positiva pega, porque um fallback que volta não quebra nada: ele
+// só devolve um número a mais.
+
+test('#615: Loteamento SEM catálogo — a permuta física não vale nada, mesmo com a coluna legada CHEIA', () => {
+  // ⚠️ A coluna legada entra PREENCHIDA de propósito, por `as any` (o campo
+  // saiu do `ProformaInput`). Sem ela o teste não mediria nada: `precoLot`
+  // daria zero por ausência de dado, e não por ausência de CAMINHO — e
+  // reintroduzir a leitura no motor passaria despercebido. Este é o payload
+  // real de um estudo antigo, que o backend continua devolvendo com a coluna.
+  const semCatalogo = calcularProforma({
+    ...LOT, produtos: [], preco_venda_m2: 1_000,
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 7_500,
+  } as any);
+  assert.equal(semCatalogo.semProdutos, true, 'é ele quem manda a Proforma inteira para o estado vazio (#563)');
   assert.equal(semCatalogo.vgv, 0);
+  assert.equal(semCatalogo.vgvPermutaSolicitada, 0);
+  assert.equal(semCatalogo.vgvPermutaResidencial, 0);
+  // O memo do valor da permuta acompanha: sem VGV não há preço médio de onde
+  // tirá-lo — antes ele saía do campo legado, que ninguém consegue ver.
+  assert.equal(semCatalogo.valorPermutaFisica, 0);
+  // E o cap é inalcançável por este caminho, por construção: a base é zero e a
+  // permuta pedida também. Declarado em `docs/viabilidade/formulas.md`
+  // (critério 3 da issue), que é a saída que a própria issue oferece.
+  assert.equal(semCatalogo.permutaCapada, false);
+});
+
+test('#615: um estudo ANTIGO com a coluna legada preenchida calcula igual a um novo', () => {
+  // A assimetria que o achado 1 da auditoria descreve — "estudo antigo deduz,
+  // estudo novo não" — deixa de existir porque o motor não lê mais a coluna.
+  // `as any` é deliberado: o campo saiu do `ProformaInput`, e este teste
+  // representa o payload REAL que o backend devolve, que ainda o traz.
+  // ⚠️ A PERMUTA é obrigatória neste teste: sem ela, `precoLot` multiplicaria
+  // uma área zero e a comparação daria igual mesmo com o caminho legado de
+  // volta — mediria a ausência do dado em vez da ausência do caminho.
+  const permuta = { permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 3_000 };
+  const comColunaLegada = calcularProforma({ ...LOT, ...permuta, produtos: [], preco_venda_m2: 1_000 } as any);
+  const semColunaLegada = calcularProforma({ ...LOT, ...permuta, produtos: [] });
+  assert.deepEqual(comColunaLegada, semColunaLegada,
+    'a coluna legada não pode mover NENHUM campo da Proforma do Loteamento');
+  assert.equal(comColunaLegada.vgvPermutaSolicitada, 0,
+    '3.000 m² × R$ 1.000 na coluna legada não pode voltar a valer 3M');
+
+  // E com catálogo, idem: o preço vem dele, e a coluna legada é inerte —
+  // inclusive no memo `valorPermutaFisica`, que era o último ramo `lot` a ler
+  // o campo.
+  const catalogo = [{ area_media_m2: 300, preco_venda_m2: 1_000, unidades: 250 }];
+  const comLegadoAbsurdo = calcularProforma({ ...LOT, ...permuta, produtos: catalogo, preco_venda_m2: 99_999 } as any);
+  assert.deepEqual(comLegadoAbsurdo, calcularProforma({ ...LOT, ...permuta, produtos: catalogo }));
+  assert.ok(perto(comLegadoAbsurdo.valorPermutaFisica, 3_000_000),
+    `valorPermutaFisica=${comLegadoAbsurdo.valorPermutaFisica} — R$ 99.999 legados não podem entrar`);
+});
+
+test('#615: valorPermutaFisica do Loteamento sai do catálogo, como na Incorporação (critério 4)', () => {
+  // Antes, `precoMedioM2` tinha um ramo `lot` lendo `preco_venda_m2`: mesmo COM
+  // catálogo, o memo do valor da permuta discordava da dedução do VGV, que já
+  // vinha do catálogo desde o PR 607. Agora é a MESMA fórmula nos dois tipos.
+  // A coluna legada entra com um valor ABSURDO e diferente do catálogo: se o
+  // ramo `lot` de `precoMedioM2` voltar, `valorPermutaFisica` sai errado.
+  const p = calcularProforma({
+    ...LOT, preco_venda_m2: 1,
+    produtos: [{ area_media_m2: 300, preco_venda_m2: 1_200, unidades: 250 }], // 75.000 m², 90M
+    permuta_fisica_modo: 'area_m2', permuta_fisica_area_m2: 7_500,
+  } as any);
+  // VGV bruto 90M − permuta (7.500 × 1.200 = 9M) = 81M sobre 67.500 m² líquidos
+  // → preço médio 1.200 R$/m², e o memo dos 7.500 m² entregues vale 9M.
+  assert.ok(perto(p.vgv, 81_000_000), `vgv=${p.vgv}`);
+  assert.ok(perto(p.areaVendavelLiquida, 67_500));
+  assert.ok(perto(p.valorPermutaFisica, 9_000_000), `valorPermutaFisica=${p.valorPermutaFisica}`);
+  // A coerência que o critério 4 pede: o memo e a dedução falam o mesmo número.
+  assert.ok(perto(p.valorPermutaFisica, p.vgvPermutaSolicitada),
+    `memo=${p.valorPermutaFisica} dedução=${p.vgvPermutaSolicitada}`);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
