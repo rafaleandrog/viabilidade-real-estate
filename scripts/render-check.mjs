@@ -731,6 +731,33 @@ function sonda(tol) {
     }
   }
 
+  // ── sobreposição entre RÓTULOS DE TEXTO SVG ──────────────────────────────
+  // Complementar à lente de CAIXAS PINTADAS acima, que EXCLUI toda forma de
+  // SVG de propósito (path cruza text por projeto — comentário acima, "20
+  // achados falsos por largura"). Mas dois `<text>` que colidem ENTRE SI não
+  // é projeto nenhum: é rótulo empilhado e ilegível — #582 (marcos do
+  // cronograma sobrepostos no gráfico de Fluxo de Caixa Acumulado, todos com
+  // `y` constante). Compara só `<text>` com `<text>`: não reabre o ruído
+  // texto×path que a lente de caixas pintadas já decidiu ignorar, e não
+  // precisa do filtro de ancestralidade de lá — dois `<text>` nunca se
+  // contêm.
+  const textos = elementos.filter((el) => el.tagName === 'text' && visivel(el));
+  const sobreposicaoTexto = [];
+  for (let i = 0; i < textos.length; i++) {
+    for (let j = i + 1; j < textos.length; j++) {
+      const a = textos[i].getBoundingClientRect();
+      const b = textos[j].getBoundingClientRect();
+      const dx = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const dy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (dx > tol && dy > tol) {
+        sobreposicaoTexto.push({
+          a: caminho(textos[i]), b: caminho(textos[j]),
+          px: Math.round(dx * 10) / 10, py: Math.round(dy * 10) / 10,
+        });
+      }
+    }
+  }
+
   // ── fingerprint de fonte ─────────────────────────────────────────────────
   // A única variável que este harness NÃO consegue fixar. Medida aqui para que
   // uma divergência de veredito entre máquinas apareça com nome.
@@ -744,7 +771,10 @@ function sonda(tol) {
   };
   sonda_.remove();
 
-  return { overflowDocumento, transbordoDeCaixa, transbordoDeTexto, corte, sobreposicao, fingerprint };
+  return {
+    overflowDocumento, transbordoDeCaixa, transbordoDeTexto, corte, sobreposicao, sobreposicaoTexto,
+    fingerprint,
+  };
 }
 
 /**
@@ -1231,6 +1261,7 @@ export function descrever(achados, teto = 4) {
     p.push(...corta(r.transbordoDeTexto.map((t) => `transbordo de TEXTO em ${t.onde} (${t.scrollWidth} > ${t.clientWidth}) — depende da fonte`)));
     p.push(...corta(r.corte.map((t) => `CORTE silencioso em ${t.onde} (${t.scrollWidth} > ${t.clientWidth}, overflow oculto)`)));
     p.push(...corta(r.sobreposicao.map((s) => `sobreposição ${s.px}x${s.py}px entre ${s.a} e ${s.b}`)));
+    p.push(...corta(r.sobreposicaoTexto.map((s) => `sobreposição de TEXTO ${s.px}x${s.py}px entre ${s.a} e ${s.b}`)));
     if (p.length) {
       linhas.push(`  ${largura}px:`);
       for (const x of p) linhas.push(`    · ${x}`);

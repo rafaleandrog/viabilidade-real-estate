@@ -56,6 +56,82 @@ export function marcos(crono: EventoCrono[]): { mes: number; rotulo: string }[] 
   return out;
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// #582: escalonamento de rótulos de texto no topo dos gráficos de fluxo.
+//
+// Quatro famílias de texto disputavam a mesma faixa superior com `y`
+// CONSTANTE (marcos do cronograma, Payback, Exposição Máx.) — quando dois
+// marcos do cronograma caem a poucos meses um do outro (Lançamento e Início
+// da Obra, tipicamente), os textos imprimiam em cima um do outro. O
+// `graficoFluxoMensal` já tinha uma tentativa (`(idx % 2) * 10`), mas ela só
+// alterna DOIS níveis por paridade de índice — três marcos próximos ainda
+// colidem dois a dois na mesma paridade, e ela não enxergava o Payback nem a
+// Exposição Máx. porque nunca soube da existência deles.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Um rótulo de texto posicionável no topo do gráfico, antes de resolver colisão. */
+export interface RotuloTopo {
+  /** Posição X onde o texto começa (`text-anchor` default = `start`). */
+  x: number;
+  /** Posição Y preferida (linha de base) — usada se não colidir com nada. */
+  y: number;
+  texto: string;
+  /** Cor do texto — carregada através da resolução para a chamada renderizar direto. */
+  cor: string;
+}
+
+// Passo vertical entre linhas escalonadas. Maior que ALTURA_CAIXA_ROTULO de
+// propósito: garante que UM bump já limpa a colisão vertical com a caixa
+// imediatamente anterior, sem precisar de vários saltos para o mesmo par.
+const ALTURA_LINHA_ROTULO = 11;
+// Altura estimada da caixa do texto acima da linha de base, para font-size 9.
+const ALTURA_CAIXA_ROTULO = 9;
+// Largura média de glifo (px) para font-size 9 na fonte do design system —
+// aproximação deliberada: o objetivo aqui é decidir "colide ou não colide",
+// não medir pixel exato. Generosa de propósito (glifo real costuma ser mais
+// estreito) para não deixar passar, na estimativa, uma colisão que o
+// Chromium real ainda enxerga — quem mede o pixel de verdade é o harness de
+// render (`frontend/render/casos/`), que usa `getBoundingClientRect` no
+// `<text>` renderizado.
+const LARGURA_MEDIA_GLIFO = 5.4;
+
+/**
+ * Escalona verticalmente rótulos que colidiriam no eixo X, dentro da mesma
+ * faixa superior do gráfico. Determinístico: ordena por `x` crescente
+ * (desempate por `y` preferido) e, para cada rótulo, sobe uma linha
+ * (`ALTURA_LINHA_ROTULO`) enquanto a caixa estimada colidir com algum rótulo
+ * já posicionado — até um teto de tentativas, para nunca fugir
+ * indefinidamente do gráfico com um cronograma patológico.
+ *
+ * Cobre o caso extremo do critério de aceite #582 (três marcos no mesmo mês)
+ * por construção: cada um colide com o anterior no mesmo `x` e recebe sua
+ * própria linha, sem tratamento especial para "3".
+ */
+export function resolverColisoesRotulos<T extends RotuloTopo>(itens: readonly T[]): T[] {
+  // Desempate final por `texto` (comparação simples, sem `localeCompare`: o
+  // resultado não pode depender do locale ICU da máquina que roda o
+  // harness) — sem ele, dois itens com `x`/`y` preferidos IDÊNTICOS (o caso
+  // extremo #582.2, três marcos no mesmo mês) ficam ordenados pela posição no
+  // array de entrada, e o mesmo cronograma pode escalonar diferente conforme
+  // a ORDEM em que o chamador construiu a lista — mesmo sem mudar dado nenhum.
+  const ordenados = [...itens].sort((a, b) =>
+    a.x - b.x || a.y - b.y || (a.texto < b.texto ? -1 : a.texto > b.texto ? 1 : 0));
+  const posicionados: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  const TETO_TENTATIVAS = 10;
+  return ordenados.map((item) => {
+    const largura = Math.max(1, item.texto.length) * LARGURA_MEDIA_GLIFO;
+    let y = item.y;
+    for (let tentativa = 0; ; tentativa++) {
+      const caixa = { x0: item.x, x1: item.x + largura, y0: y - ALTURA_CAIXA_ROTULO, y1: y };
+      const colide = posicionados.some((p) =>
+        caixa.x0 < p.x1 && caixa.x1 > p.x0 && caixa.y0 < p.y1 && caixa.y1 > p.y0);
+      if (!colide || tentativa >= TETO_TENTATIVAS) { posicionados.push(caixa); break; }
+      y += ALTURA_LINHA_ROTULO;
+    }
+    return { ...item, y };
+  });
+}
+
 /**
  * Converte um MÊS relativo na posição (índice de coluna, fracionário) do eixo X.
  * Na view mensal é a identidade; na view agregada por período (#127) devolve o
@@ -95,6 +171,13 @@ export function graficoFluxoMensal(
   const passo = Math.max(3, Math.ceil(c.prazo / 10 / 3) * 3);
   const ticks: number[] = [];
   for (let m = 0; m < c.prazo; m += passo) ticks.push(m);
+  const marcosGrafico = marcos(crono);
+  // #582: rótulo escalonado por colisão real, não por paridade de índice —
+  // ver o bloco de comentário acima de `resolverColisoesRotulos`.
+  const rotulosMarcos = resolverColisoesRotulos(marcosGrafico.map((m) => ({
+    x: x(col(m.mes)) + 3, y: padT + 8, cor: corTexto,
+    texto: `${m.rotulo} · ${rotuloMesRelativo(dataInicio, m.mes)} · M+${m.mes}`,
+  })));
   return html`
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Fluxo de caixa mensal">
       ${[-maxAbs, -maxAbs / 2, 0, maxAbs / 2, maxAbs].map((v) => svg`
@@ -105,12 +188,11 @@ export function graficoFluxoMensal(
       ${c.fluxoMensal.map((v, i) => svg`
         <rect x=${x(i)} y=${Math.min(y(v), y0)} width=${bw} height=${Math.max(Math.abs(y(v) - y0), 0.5)}
           fill=${v >= 0 ? 'var(--cor-sucesso, #13a98d)' : 'var(--cor-erro, #d45a3a)'} opacity="0.9" />`)}
-      ${marcos(crono).map((m, idx) => svg`
+      ${marcosGrafico.map((m) => svg`
         <line x1=${x(col(m.mes))} y1=${padT - 4} x2=${x(col(m.mes))} y2=${H - padB}
-          stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.7" />
-        <text x=${x(col(m.mes)) + 3} y=${padT + 8 + (idx % 2) * 10} font-size="9" fill=${corTexto}>
-          ${m.rotulo} · ${rotuloMesRelativo(dataInicio, m.mes)} · M+${m.mes}
-        </text>`)}
+          stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.7" />`)}
+      ${rotulosMarcos.map((r) => svg`
+        <text x=${r.x} y=${r.y} font-size="9" fill=${r.cor}>${r.texto}</text>`)}
     </svg>
   `;
 }
@@ -146,6 +228,23 @@ export function graficoFluxoAcumulado(
   const passo = Math.max(3, Math.ceil(c.prazo / 10 / 3) * 3);
   const ticks: number[] = [];
   for (let m = 0; m < c.prazo; m += passo) ticks.push(m);
+  const marcosGrafico = marcos(crono);
+  // #582: as TRÊS famílias que disputam a faixa superior (marcos, Payback,
+  // Exposição Máx.) entram no MESMO pool de colisão — é o que faz o rótulo de
+  // um marco escalonar para não colidir com o de Payback, e não só entre si.
+  const rotulosTopo = resolverColisoesRotulos([
+    ...marcosGrafico.map((m) => ({ x: x(col(m.mes)) + 3, y: padT + 8, texto: m.rotulo, cor: corTexto })),
+    ...(c.paybackMes !== null ? [{
+      x: x(col(c.paybackMes)) + 3, y: padT + 20,
+      texto: `Payback: ${c.paybackData} · M+${c.paybackMes}`,
+      cor: 'var(--cor-sucesso, #13a98d)',
+    }] : []),
+    ...(iExp >= 0 ? [{
+      x: x(iExp) + 6, y: y(c.exposicaoMaxima) - 4,
+      texto: `Exposição Máx.: ${abrevR$(c.exposicaoMaxima)}`,
+      cor: 'var(--cor-erro, #d45a3a)',
+    }] : []),
+  ]);
   return html`
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Fluxo de caixa acumulado">
       <defs>
@@ -160,21 +259,16 @@ export function graficoFluxoAcumulado(
       <path d=${area} fill="var(--cor-erro, #d45a3a)" opacity="0.15" clip-path="url(#abaixo)" />
       <line x1=${padL} y1=${y0} x2=${W - padR} y2=${y0} stroke=${corTexto} stroke-dasharray="4,3" opacity="0.6" />
       <path d=${linha} fill="none" stroke="var(--cor-texto-forte, #e8e8ea)" stroke-width="2" />
-      ${marcos(crono).map((m) => svg`
+      ${marcosGrafico.map((m) => svg`
         <line x1=${x(col(m.mes))} y1=${padT - 4} x2=${x(col(m.mes))} y2=${H - padB}
-          stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.5" />
-        <text x=${x(col(m.mes)) + 3} y=${padT + 8} font-size="9" fill=${corTexto}>${m.rotulo}</text>`)}
+          stroke=${corTexto} stroke-width="1" stroke-dasharray="4,3" opacity="0.5" />`)}
       ${c.paybackMes !== null ? svg`
         <line x1=${x(col(c.paybackMes))} y1=${padT} x2=${x(col(c.paybackMes))} y2=${H - padB}
-          stroke="var(--cor-sucesso, #13a98d)" stroke-width="1.5" stroke-dasharray="2,2" />
-        <text x=${x(col(c.paybackMes)) + 3} y=${padT + 20} font-size="9" fill="var(--cor-sucesso, #13a98d)">
-          Payback: ${c.paybackData} · M+${c.paybackMes}
-        </text>` : nothing}
+          stroke="var(--cor-sucesso, #13a98d)" stroke-width="1.5" stroke-dasharray="2,2" />` : nothing}
       ${iExp >= 0 ? svg`
-        <circle cx=${x(iExp)} cy=${y(c.exposicaoMaxima)} r="4" fill="var(--cor-erro, #d45a3a)" />
-        <text x=${x(iExp) + 6} y=${y(c.exposicaoMaxima) - 4} font-size="9" fill="var(--cor-erro, #d45a3a)">
-          Exposição Máx.: ${abrevR$(c.exposicaoMaxima)}
-        </text>` : nothing}
+        <circle cx=${x(iExp)} cy=${y(c.exposicaoMaxima)} r="4" fill="var(--cor-erro, #d45a3a)" />` : nothing}
+      ${rotulosTopo.map((r) => svg`
+        <text x=${r.x} y=${r.y} font-size="9" fill=${r.cor}>${r.texto}</text>`)}
     </svg>
   `;
 }

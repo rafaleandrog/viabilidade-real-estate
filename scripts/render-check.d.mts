@@ -15,6 +15,9 @@ export interface MedidaDeLargura {
   transbordoDeTexto: AchadoTransbordo[];
   corte: AchadoTransbordo[];
   sobreposicao: AchadoSobreposicao[];
+  /** Sobreposição entre `<text>` SVG — complementar a `sobreposicao`, que
+   * exclui toda forma de SVG de propósito (ver o comentário no `.mjs`). #582. */
+  sobreposicaoTexto: AchadoSobreposicao[];
   fingerprint: { largura: number; familia: string };
 }
 
