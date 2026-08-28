@@ -27,10 +27,60 @@ function baixar(nome: string, conteudo: string, mime: string) {
 }
 
 /**
+ * O que a NOTAÇÃO de uma linha da Proforma precisa saber sobre ela. Estrutural
+ * de propósito: a `Linha` da tela (`frontend/tela-proforma.ts`) é assinável a
+ * este tipo sem conversão, e é o que permite a tela e a exportação passarem
+ * pela mesma função.
+ */
+export interface NotacaoLinha {
+  v: number;
+  tipo?: 'receita' | 'consolidado' | 'resultado';
+  natureza?: 'receita';
+}
+
+// #567: receita (VGV, sub-linhas de produto, consolidados marcados
+// `natureza: 'receita'`) e resultado mostram o SINAL REAL — negativo entre
+// parênteses, positivo sem marca nenhuma. Toda outra linha (custo/dedução,
+// inclusive os headers `tipo: 'consolidado'` sem `natureza`, como "Custo
+// direto total") é notação contábil pura: SEMPRE entre parênteses,
+// independente do sinal — a app grava custo como valor positivo.
+//
+// ⚠️ ESTAS DUAS FUNÇÕES MORAM AQUI, e não em `tela-proforma.ts`, pela mesma
+// razão de `avisoPermutaCapada` logo abaixo: **a direção que o grafo de
+// imports já tem**. A tela importa este módulo (`exportarPDF`/`exportarExcel`);
+// se a notação ficasse lá, a exportação teria de importar a tela e o ciclo se
+// fecharia. A tela as reexporta, para quem já as importava de lá continuar
+// funcionando.
+export function ehLinhaReceitaOuResultado(r: Pick<NotacaoLinha, 'tipo' | 'natureza'>): boolean {
+  return r.tipo === 'receita' || r.natureza === 'receita' || r.tipo === 'resultado';
+}
+
+/**
+ * Célula monetária da Proforma — TELA, CSV e PDF. Delega para `celula`
+ * (`frontend/viab-format.ts`), a mesma fonte única de 2 casas decimais (C7) e
+ * da regra de parênteses que o Fluxo de Caixa usa desde a #449.
+ *
+ * `sempreExibir` porque a Proforma controla visibilidade por LINHA
+ * (`ocultarSeZero`), não por célula perto de zero: um header como "Custo
+ * indireto total" que fecha em zero precisa mostrar "(0,00)", não sumir.
+ *
+ * Sem símbolo "R$" — o cabeçalho da coluna já o informa, nos três destinos.
+ */
+export function celulaProforma(r: NotacaoLinha): string {
+  return celulaCompartilhada(r.v, { comParenteses: true, custo: !ehLinhaReceitaOuResultado(r), sempreExibir: true });
+}
+
+/**
  * Uma linha do relatório da Proforma. `nota: true` marca a linha de TEXTO — o
  * rótulo carrega a mensagem inteira e não há número nas colunas R$/% VGV.
+ *
+ * `tipo`/`natureza` são os MESMOS campos da `Linha` da tela, e existem aqui
+ * pelo mesmo motivo: são eles que decidem a notação de sinal da célula. Sem
+ * eles, o CSV e o PDF formatavam com `fmtR$` cru — uma Receita operacional
+ * negativa saía `-R$ …` no arquivo e `(…)` na tela, sobre o mesmo número
+ * (achado 10 da auditoria #574).
  */
-interface LinhaPf { l: string; v: number; nota?: boolean; }
+interface LinhaPf extends NotacaoLinha { l: string; nota?: boolean; }
 
 /**
  * A frase do excedente de permuta física, ÚNICA para a tela e para as duas
@@ -64,10 +114,36 @@ export function avisoPermutaCapada(p: Proforma): string {
     + 'as áreas exibidas seguem as informadas.';
 }
 
+/**
+ * Coluna "% VGV" de uma linha da Proforma — a MESMA regra da tela
+ * (`_pctVgv`, `frontend/tela-proforma.ts`): no **Resultado** a fração leva o
+ * SINAL (é a margem, e uma margem negativa não pode aparecer como positiva);
+ * em toda outra linha é a MAGNITUDE sobre o VGV. Sem VGV, "—" nos três
+ * destinos (#571).
+ *
+ * Antes da unificação a exportação usava `Math.abs` em TODAS as linhas: um
+ * Resultado negativo saía com % positiva no CSV e no PDF, e negativa na tela.
+ */
+export function pctVgvProforma(r: NotacaoLinha, p: Proforma): string {
+  if (p.vgv <= 0) return '—';
+  return r.tipo === 'resultado'
+    ? fmtPct(r.v / p.vgv * 100)
+    : fmtPct(Math.abs(r.v) / p.vgv * 100);
+}
+
 export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
   // Espelha a estrutura da tabela da Proforma (#8/#9/#10/#13): totais consolidados
   // como header do grupo, "Deduções sobre VGV", permuta física R/NR e sem o memo
   // "Permuta física entregue".
+  //
+  // ⚠️ `tipo`/`natureza` de cada linha são os MESMOS de `montarLinhasProforma`
+  // (`frontend/tela-proforma.ts`) — não é decoração, é o que decide a NOTAÇÃO
+  // de sinal da célula. Uma linha que ganhar classificação diferente aqui passa
+  // a sair do arquivo com sinal diferente do da tela, sobre o mesmo número;
+  // o teste de paridade de `frontend/proforma-ordem-linhas.test.ts` compara as
+  // duas listas célula a célula justamente por isso. Linha sem `tipo` nem
+  // `natureza` é custo/dedução, e sai entre parênteses — inclusive
+  // "VGV sem permuta física" e as duas de permuta física, como na tela.
   const temPermuta = p.areaPermutaFisica > 0.005;
   const deducoesVgv = p.imposto + p.corretagem + p.marketing + p.permutaFinResidencial + p.permutaFinNaoResidencial;
   const linhas: (LinhaPf & { soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean })[] = [
@@ -84,15 +160,15 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
       { l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true },
       { l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true },
     ] : []),
-    { l: 'Receita bruta (VGV)', v: p.vgv },
-    { l: '= Deduções sobre VGV', v: deducoesVgv },
+    { l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita' },
+    { l: '= Deduções sobre VGV', v: deducoesVgv, tipo: 'consolidado' },
     { l: '(-) Imposto', v: p.imposto, ocultarSeZero: true },
     { l: '(-) Corretagem', v: p.corretagem, ocultarSeZero: true },
     { l: '(-) Marketing', v: p.marketing, ocultarSeZero: true },
     { l: '(-) Permuta financeira residencial', v: p.permutaFinResidencial, ocultarSeZero: true },
     { l: '(-) Permuta financeira não residencial', v: p.permutaFinNaoResidencial, ocultarSeZero: true },
-    { l: '= Receita líquida', v: p.receitaLiquida },
-    { l: '= Custo direto total', v: p.custoDiretoTotal },
+    { l: '= Receita líquida', v: p.receitaLiquida, tipo: 'consolidado', natureza: 'receita' },
+    { l: '= Custo direto total', v: p.custoDiretoTotal, tipo: 'consolidado' },
     { l: '(-) Terreno', v: p.custoTerreno, ocultarSeZero: true },
     { l: '(-) Projetos e aprovação', v: p.projetos, ocultarSeZero: true },
     { l: '(-) Infraestrutura', v: p.infraestrutura, soLot: true, ocultarSeZero: true },
@@ -103,11 +179,11 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     { l: '(-) Decoração', v: p.decoracao, soInc: true, ocultarSeZero: true },
     { l: '(-) Manutenção pós-obra', v: p.manutencao, ocultarSeZero: true },
     { l: '(-) Contingências', v: p.contingencias, ocultarSeZero: true },
-    { l: '= Receita operacional', v: p.receitaOperacional },
-    { l: '= Custo indireto total', v: p.custoIndiretoTotal },
+    { l: '= Receita operacional', v: p.receitaOperacional, tipo: 'consolidado', natureza: 'receita' },
+    { l: '= Custo indireto total', v: p.custoIndiretoTotal, tipo: 'consolidado' },
     { l: '(-) Marketing global e estrutura', v: p.marketingGlobal, ocultarSeZero: true },
     { l: '(-) Gestão e outros custos indiretos', v: p.gestaoIndiretos, ocultarSeZero: true },
-    { l: '= Resultado', v: p.resultado },
+    { l: '= Resultado', v: p.resultado, tipo: 'resultado' },
   ];
   return linhas.filter((r) =>
     !(r.soLot && !lot) && !(r.soInc && lot) && !(r.ocultarSeZero && Math.abs(r.v) < 0.005));
@@ -133,8 +209,7 @@ export function csvProforma(estudo: any, p: Proforma, lot: boolean): string {
     // #571: "—", igual à tela (`_pctVgv`, tela-proforma.ts) e ao PDF logo
     // abaixo — antes saía vazio aqui, e vazio não é a mesma coisa que
     // indefinido para quem lê o CSV.
-    const pct = p.vgv > 0 ? fmtPct(Math.abs(r.v) / p.vgv * 100) : '—';
-    rows.push(`${r.l};${fmtR$(r.v, false)};${pct}`);
+    rows.push(`${r.l};${celulaProforma(r)};${pctVgvProforma(r, p)}`);
   }
   rows.push('');
   rows.push(`Margem sobre VGV;${fmtPctOuIndef(p.margemLiquidaPct)}`);
@@ -159,8 +234,7 @@ export function htmlProforma(estudo: any, p: Proforma, lot: boolean): string {
     // número para alinhar à direita.
     if (r.nota) return `<tr class="nota"><td colspan="3">${r.l}</td></tr>`;
     const sub = r.l.startsWith('=');
-    const pct = p.vgv > 0 ? fmtPct(Math.abs(r.v) / p.vgv * 100) : '—';
-    return `<tr class="${sub ? 'sub' : ''}"><td>${r.l}</td><td class="v">${fmtR$(r.v)}</td><td class="v">${pct}</td></tr>`;
+    return `<tr class="${sub ? 'sub' : ''}"><td>${r.l}</td><td class="v">${celulaProforma(r)}</td><td class="v">${pctVgvProforma(r, p)}</td></tr>`;
   }).join('');
 
   // #571: VGV ≤ 0 → "—", não "0,0%" (mesmo padrão do CSV e da tela).
