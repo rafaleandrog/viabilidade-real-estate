@@ -84,6 +84,48 @@ guards 1-6 e 8 ok, typecheck ok, build ok. Sem migração → `versao` não bump
 `tela-dashboard.ts`; esta issue não toca esse arquivo — sem overlap de blocos. (#578 mergeou como
 #619 enquanto esta sessão estava em andamento — ver a entrada abaixo.)
 
+## #612 · piso em zero na cascata de áreas do Loteamento (2026-08-28)
+
+Achado 6 da auditoria #574. `calcularCascata` (`frontend/areas-cascata.ts`) subtraía **sem piso**:
+deduções somando mais que a poligonal davam Área Líquida de Venda **negativa**, e dela saíam
+eficiência negativa, um KPI "Área vendável" em m² negativos e — o pior — infraestrutura no modo
+`R$/m²` como **custo negativo**, que reduzia o custo direto e **inflava o resultado**.
+
+**Decisão do autor (2026-08-28), verbatim:** *"Nunca pode ser negativo, não faz sentido ser menor
+que zero em nenhum caso."* Das duas alternativas que a issue colocava (piso com aviso × banner de
+validação impedindo salvar), o autor escolheu a primeira — a mesma filosofia do cap do VGV da
+permuta na #563: **capar e avisar**, com o número honesto na tela.
+
+**Como ficou.** O piso é aplicado na **passada 1** de `calcularCascata`, antes de a linha entrar em
+`resolvidosM2` — então é o valor cortado que as linhas seguintes e a âncora 2 enxergam, e o piso
+não pode ser contornado por composição. Vale para **todas** as linhas, não só as computadas: um
+negativo digitado numa editável também deixa de **inflar** a linha computada seguinte
+(`base − (−500)` = `base + 500`, o mesmo defeito pelo avesso). Cada linha devolve em `deficitM2`
+(campo **obrigatório** de `LinhaResolvida`) o tamanho do corte; `deficitsDaCascata` filtra pelo
+limiar de meio centésimo de m², para resíduo de ponto flutuante não virar banner.
+
+**O aviso** é `urbi-banner.aviso-area-negativa` em Premissas → Terreno & Áreas
+(`_renderAvisoAreaNegativa`, `frontend/tela-premissas.ts`), a tela onde se corrige — critério 2 da
+issue —, e a linha cortada ganha `tr.deficit` na tabela, para o `0,00 m²` de corte não se confundir
+com o de cadastro em branco. **Rodada 1 de revisão (App do Codex + lente):** o aviso passou a ser
+das DUAS cascatas — a da Incorporação tem cinco linhas editáveis, e um negativo digitado nelas
+também é cortado pelo piso; e o motor (`calcularProforma`) passou a ler as áreas digitadas da
+Incorporação pelo MESMO piso (`areaM2`), para tabela e cálculo nunca divergirem. O limiar de corte
+virou predicado exportado (`linhaCortada`), usado pelo banner e pela linha `tr.deficit` sem
+duplicação.
+
+**Verificação.** 813 testes de lógica pura (+6) e 44 casos de render (+2), todos verdes. Mutações
+medidas: apagar `Math.max(0, bruto)` → **5 vermelhos**; apagar `deficitM2` do objeto devolvido →
+`TS2322` no typecheck; apagar `${this._renderAvisoAreaNegativa(linhas)}` do template → **813/813
+verdes** na lógica pura e **2/2 vermelhos** no render; apagar a classe `deficit` da `<tr>` → o mesmo
+placar. É a classe 1 do `CLAUDE.md` (o defeito mora na fiação) exercitada de propósito.
+
+**Achado colateral, NÃO consertado aqui (regra R3).** Este é o primeiro caso de render de
+`viab-tela-premissas` montado sobre um **Loteamento**, e ele expôs um defeito de layout que nunca
+tinha ido a DOM: `div.area-seletor` (3 badges + `viab-num` de 130px) mede **251px** contra células
+de **219px a 600px** e **245px a 900px** — 6 transbordos de caixa e 6 sobreposições do input sobre
+a coluna "Área (m²)". A 1280px a tela é limpa. Não é regressão do diff (o piso não move largura
+nenhuma) e está declarado no caso de render, com os números medidos. **Vira issue própria.**
 ## #578 · remover a segmentação "Meus estudos / Equipe" da listagem (2026-08-28)
 
 Item 2 da leva Avançado da Rodada 10. Pedido do autor, literal: "Divisão em Estudos de Meus

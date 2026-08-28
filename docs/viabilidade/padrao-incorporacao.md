@@ -419,7 +419,7 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 > **sem** catálogo efetivo continua usando as bases legadas — `area_pvt_r_fechada` /
 > `area_pvt_nr_fechada` na Incorporação, e a ALV da cascata (`CASCATA_LOTEAMENTO`) no
 > **Loteamento**, que segue sendo a única cascata que alimenta base de permuta. Desde a **#564**,
-> `CASCATA_INCORPORACAO` (`frontend/areas-cascata.ts:139-144`) **é renderizada** pela aba Terreno &
+> `CASCATA_INCORPORACAO` (`frontend/areas-cascata.ts:211-216`) **é renderizada** pela aba Terreno &
 > Áreas do Preliminar de Incorporação (`frontend/tela-premissas.ts`, tabela de Áreas) — mas continua
 > **não sendo fonte da grandeza de ligação** em nenhuma das duas fontes. Sem isso, o bug que a #486
 > procurou passa a existir de verdade.
@@ -3235,7 +3235,7 @@ por tipo: com catálogo efetivo é a **área do catálogo da categoria**
 legados `area_pvt_r_fechada`/`area_pvt_nr_fechada` na Incorporação e a ALV da cascata no
 Loteamento. Desde a **#564** `CASCATA_INCORPORACAO` é renderizada pela tabela de Áreas da
 Incorporação (`frontend/tela-premissas.ts`), mas segue sem ser a grandeza de ligação
-(`frontend/areas-cascata.ts:139-144`). A família `permuta_fisica_nr_*` vai junto.
+(`frontend/areas-cascata.ts:201-206`). A família `permuta_fisica_nr_*` vai junto.
 → registro completo na **§4.3**; a reconciliação entre as camadas é a **#441**.
 
 **A15 — Teto de aproveitamento usa a área privativa TOTAL, não a fechada do VGV (#569).** O

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  calcularCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO,
+  calcularCascata, deficitsDaCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO,
   estadosCascataLoteamentoDoEstudo, itensAlocacaoGleba, modoMestreDoSchema,
   type EstadoLinha,
 } from './areas-cascata.js';
@@ -205,4 +205,116 @@ test('#574: itensAlocacaoGleba concorda com a área vendável do motor (ALV = ar
   const alv = itensAlocacaoGleba(ESTUDO_LOT_MACEDO, p.areaTerreno)
     .find((i) => i.l === 'Área Líquida de Venda (ALV)')!;
   assert.ok(perto(alv.v, p.areaVendavel), `alv=${alv.v} areaVendavel=${p.areaVendavel}`);
+});
+
+// ── #612: o piso em zero da cascata ───────────────────────────────────────
+//
+// Decisão do autor (2026-08-28), verbatim: "Nunca pode ser negativo, não faz
+// sentido ser menor que zero em nenhum caso." O critério 3 da issue pede
+// exatamente o caso destes testes: deduções somando MAIS que a poligonal.
+
+/**
+ * Gleba de 10.000 m² com deduções somando 26.000 m² — a Área Parcelável já
+ * ficaria em −2.000, a Líquida em −11.000 e a ALV em −16.000 se a cascata
+ * subtraísse sem piso. Números redondos e folgados de propósito: o corte não
+ * pode depender de arredondamento.
+ */
+const ESTADOS_ESTOURADOS: Record<string, EstadoLinha> = {
+  app: { modo: 'm2', valor: 12_000 },
+  elup_epu: { modo: 'm2', valor: 4_000 },
+  epc: { modo: 'm2', valor: 3_000 },
+  viario_publico: { modo: 'm2', valor: 2_000 },
+  viario_privado: { modo: 'm2', valor: 3_000 },
+  comuns_privadas: { modo: 'm2', valor: 1_000 },
+  verdes: { modo: 'm2', valor: 1_000 },
+};
+
+test('#612: deduções maiores que a poligonal — NENHUMA linha da cascata sai negativa', () => {
+  const linhas = calcularCascata(CASCATA_LOTEAMENTO, ESTADOS_ESTOURADOS, 10_000);
+  for (const l of linhas) {
+    assert.ok(l.m2 >= 0, `${l.id} saiu negativa: ${l.m2} m²`);
+    assert.ok(l.ha >= 0, `${l.id} saiu com ha negativo: ${l.ha}`);
+    assert.ok(l.pctAncora1 >= 0, `${l.id} saiu com % Poligonal negativa: ${l.pctAncora1}`);
+    assert.ok(l.pctAncora2 === null || l.pctAncora2 >= 0, `${l.id} saiu com % Parcelável negativa`);
+  }
+  const porId = Object.fromEntries(linhas.map((l) => [l.id, l]));
+  assert.equal(porId.alv.m2, 0, 'a ALV é a linha que o bug produzia negativa');
+  assert.equal(porId.parcelavel.m2, 0);
+  assert.equal(porId.liquida.m2, 0);
+});
+
+test('#612: o piso é aplicado EM CASCATA — a linha cortada entra em zero nas seguintes, não com o valor bruto', () => {
+  // Poligonal 10.000, APP 12.000: Parcelável bruta = −2.000, cortada em 0.
+  // ELUP/EPU 500 sai da Parcelável JÁ CORTADA, então a Líquida bruta é −500
+  // (e não −2.500, que é o que sairia se o piso só fosse aplicado na exibição).
+  const linhas = calcularCascata(CASCATA_LOTEAMENTO, {
+    app: { modo: 'm2', valor: 12_000 },
+    elup_epu: { modo: 'm2', valor: 500 },
+  }, 10_000);
+  const porId = Object.fromEntries(linhas.map((l) => [l.id, l]));
+  assert.equal(porId.parcelavel.m2, 0);
+  assert.equal(porId.parcelavel.deficitM2, 2_000, 'a Parcelável foi cortada em 2.000 m²');
+  assert.equal(porId.liquida.deficitM2, 500, 'a Líquida parte da Parcelável JÁ cortada (0 − 500)');
+});
+
+test('#612: o piso vale também para a linha EDITÁVEL — negativo digitado não vira, e não infla a seguinte', () => {
+  // APP = −5.000: sem piso, Parcelável = 10.000 − (−5.000) = 15.000 m², uma
+  // gleba maior que a poligonal. Com piso, APP = 0 e Parcelável = 10.000.
+  const linhas = calcularCascata(CASCATA_LOTEAMENTO, { app: { modo: 'm2', valor: -5_000 } }, 10_000);
+  const porId = Object.fromEntries(linhas.map((l) => [l.id, l]));
+  assert.equal(porId.app.m2, 0);
+  assert.equal(porId.app.deficitM2, 5_000);
+  assert.equal(porId.parcelavel.m2, 10_000, 'a Parcelável não pode passar da poligonal');
+  assert.equal(porId.parcelavel.deficitM2, 0);
+});
+
+test('#612: cascata coerente não acusa corte — deficitM2 zerado nas 11 linhas do golden case', () => {
+  const linhas = calcularCascata(CASCATA_LOTEAMENTO, ESTADOS_MACEDO, 90402.31);
+  assert.deepEqual(deficitsDaCascata(linhas), [], 'MACEDO REV 10 fecha na gleba — nada a cortar');
+  for (const l of linhas) assert.equal(l.deficitM2, 0, `${l.id} acusou corte sem haver`);
+});
+
+test('#612: deficitsDaCascata usa limiar de meio centésimo de m² — resíduo de ponto flutuante não vira banner', () => {
+  // Deduções que somam exatamente a base, mas por um caminho que deixa
+  // resíduo binário: 0,1 + 0,2 !== 0,3 em ponto flutuante.
+  const linhas = calcularCascata(CASCATA_LOTEAMENTO, {
+    app: { modo: 'm2', valor: 0.1 },
+    elup_epu: { modo: 'm2', valor: 0.2 },
+    epc: { modo: 'm2', valor: 0.7 },
+  }, 1);
+  assert.deepEqual(deficitsDaCascata(linhas).map((l) => l.id), [], 'resíduo de fração de m² não é corte');
+  // E um corte de verdade (≥ meio centésimo) aparece. Só a Parcelável entra na
+  // lista: cortada em 0, ela é a base da Líquida, que sem deduções fica em 0
+  // sem precisar de corte — o piso não se propaga como "corte", só o zero se
+  // propaga como valor.
+  const cortada = calcularCascata(CASCATA_LOTEAMENTO, { app: { modo: 'm2', valor: 1.5 } }, 1);
+  assert.deepEqual(deficitsDaCascata(cortada).map((l) => l.id), ['parcelavel']);
+});
+
+test('#612: nenhum caminho do motor consome área vendável negativa (critério 1 da issue)', () => {
+  // O mesmo estudo estourado, agora pela porta de `estudos`: infraestrutura no
+  // modo R$/m² é o caminho que transformava ALV negativa em CUSTO NEGATIVO,
+  // reduzindo o custo direto e INFLANDO o resultado.
+  const estudoEstourado = {
+    tipo_empreendimento: 'loteamento', nivel_analise: 'preliminar',
+    origem_terreno: 'manual', terreno_manual_area: 10_000,
+    area_app_modo: 'm2', area_app_valor: 12_000,
+    area_elup_epu_modo: 'm2', area_elup_epu_valor: 4_000,
+    area_epc_modo: 'm2', area_epc_valor: 3_000,
+    area_viario_publico_modo: 'm2', area_viario_publico_valor: 2_000,
+    area_viario_privado_modo: 'm2', area_viario_privado_valor: 3_000,
+    area_comuns_privadas_modo: 'm2', area_comuns_privadas_valor: 1_000,
+    area_verdes_modo: 'm2', area_verdes_valor: 1_000,
+    infra_modo: 'valor_m2', custo_infra_m2: 400,
+    produtos: [{ id: 1, nome: 'Lote', area_media_m2: 300, preco_venda_m2: 1_000, unidades: 20 }],
+  };
+  const p = calcularProforma(estudoEstourado as any);
+  assert.equal(p.areaVendavel, 0, 'a área vendável do Loteamento é a ALV, e ela não desce de zero');
+  assert.equal(p.areaPrivativa, 0);
+  assert.ok(p.infraestrutura >= 0, `infraestrutura saiu como custo negativo: ${p.infraestrutura}`);
+  assert.ok(p.custoDiretoTotal >= 0, `custo direto total negativo: ${p.custoDiretoTotal}`);
+  // E a pizza da gleba (aba Gráficos) não recebe fatia negativa.
+  for (const i of itensAlocacaoGleba(estudoEstourado, 10_000)) {
+    assert.ok(i.v >= 0, `fatia "${i.l}" negativa: ${i.v}`);
+  }
 });
