@@ -16,7 +16,7 @@ As fórmulas rodam no **frontend em tempo real** (engine `frontend/proforma.ts`,
 
 - **Loteamento:** a área vendável é a **Área Líquida de Venda (ALV)** de uma tabela em **cascata**,
   não uma soma plana de percentuais. A cascata tem 11 linhas
-  (`CASCATA_LOTEAMENTO`, `frontend/areas-cascata.ts:116`) e subtrai em três degraus:
+  (`CASCATA_LOTEAMENTO`, `frontend/areas-cascata.ts:173`) e subtrai em três degraus:
 
   ```text
   Poligonal − APP                                              = Área Parcelável   (âncora 2)
@@ -28,6 +28,18 @@ As fórmulas rodam no **frontend em tempo real** (engine `frontend/proforma.ts`,
   Parcelável** (a última só para as linhas posteriores à âncora 2 — regra de não-circularidade),
   no par de colunas `area_<x>_modo`/`area_<x>_valor`. A ALV é lida em
   `frontend/proforma.ts:429-430`. Após permuta física → **área vendável líquida**.
+
+  > **Piso em zero (#612).** Nenhuma linha da cascata sai negativa — decisão do autor em
+  > 2026-08-28, verbatim: *"Nunca pode ser negativo, não faz sentido ser menor que zero em nenhum
+  > caso."* O piso é aplicado **na passada 1** de `calcularCascata`, antes de a linha ser guardada,
+  > então o valor cortado é o que as linhas seguintes e a âncora 2 enxergam. Ele vale para as três
+  > subtrações **e** para a linha editável (negativo digitado vira 0, e por isso deixa de inflar a
+  > linha computada seguinte).
+  >
+  > Cada linha devolve em `deficitM2` o tamanho do corte, e Premissas → Terreno & Áreas mostra o
+  > banner `urbi-banner.aviso-area-negativa` quando ele atuou — capar e avisar, a mesma decisão que
+  > a #563 tomou no VGV da permuta. Enquanto o piso atua, as 8 fatias da pizza da gleba deixam de
+  > fechar na poligonal: a soma passa dela, e é o número honesto ali (ver `itensAlocacaoGleba`).
 
   > ⚠️ Os 7 campos antigos de "% da gleba" (`app_pct`, `faixas_nao_edificaveis_pct`,
   > `sistema_viario_pct`, `elup_pct`, `epc_pct`, `epu_pct`,

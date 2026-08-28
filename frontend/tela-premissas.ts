@@ -10,7 +10,7 @@ import { calcularProforma, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdu
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
 import { converterUnidade, ctxConversaoPreliminar, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
-import { calcularCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
+import { calcularCascata, deficitsDaCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
 // do seu `_carregar()`, e que `tela-graficos.ts` reusa (PR 580/#597). Reusada,
 // e não recopiada: a cópia inline divergiria da função que o teste exercita.
@@ -389,6 +389,14 @@ export class ViabTelaPremissas extends LitElement {
     table.areas th { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
     table.areas td.num, table.areas th.num { text-align: right; }
     table.areas tr.computada td { font-weight: 700; background: var(--cor-superficie-sutil, rgba(255,255,255,0.03)); }
+    /* #612 — a linha que o piso em zero cortou. O 0,00 m² dela é resultado de
+       um corte, não de um cadastro em branco, e sem marca as duas leituras
+       ficam idênticas na tabela. A cor é a de erro do design system (a mesma
+       do banner logo abaixo), e o texto continua sobre o fundo normal da
+       linha — o par cor-de-texto × fundo-da-tabela é o que as lentes de
+       contraste do harness medem. */
+    table.areas tr.deficit td { color: var(--cor-erro, #d45a3a); }
+    urbi-banner.aviso-area-negativa { display: block; margin-top: 12px; }
     .area-seletor { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
     .area-seletor urbi-badge { cursor: pointer; flex: 0 0 auto; }
     .area-valor { width: 130px; }
@@ -1037,7 +1045,7 @@ export class ViabTelaPremissas extends LitElement {
           </thead>
           <tbody>
             ${linhas.map((l) => html`
-              <tr class=${l.papel.tipo !== 'editavel' ? 'computada' : ''}>
+              <tr class="${l.papel.tipo !== 'editavel' ? 'computada' : ''}${l.deficitM2 >= 0.005 ? ' deficit' : ''}">
                 <td>${l.label}</td>
                 <td>${this._renderSeletorArea(l, dis, ancora1, ancora2)}</td>
                 <td class="num">${fmtNum(l.m2, 2)}</td>
@@ -1048,6 +1056,37 @@ export class ViabTelaPremissas extends LitElement {
           </tbody>
         </table>
       </div>
+      ${this._renderAvisoAreaNegativa(linhas)}
+    `;
+  }
+
+  /**
+   * §Aviso do piso em zero da cascata (#612) — a metade "avisar" da decisão do
+   * autor de 2026-08-28 ("Nunca pode ser negativo"). O piso mora no motor
+   * (`calcularCascata`, `frontend/areas-cascata.ts`); aqui é onde o usuário
+   * descobre que ele atuou, e é a MESMA tela em que se corrige (as deduções
+   * estão logo acima) — critério 2 da issue.
+   *
+   * Sem este banner o conserto seria uma troca de um número errado por outro:
+   * a ALV negativa some, mas em silêncio, e o usuário vê 0 m² de área vendável
+   * sem nenhuma pista de que digitou deduções maiores que a gleba. É a mesma
+   * razão pela qual a #563 capou o VGV da permuta E pôs um aviso ao lado.
+   *
+   * Só o Loteamento chama: `CASCATA_INCORPORACAO` só tem linhas de `soma`, que
+   * não descem de zero (`areas-cascata.ts`). A função em si é agnóstica — se
+   * um dia entrar uma subtração lá, basta chamá-la.
+   */
+  private _renderAvisoAreaNegativa(linhas: LinhaResolvida[]): TemplateResult {
+    const cortadas = deficitsDaCascata(linhas);
+    if (cortadas.length === 0) return html``;
+    return html`
+      <urbi-banner class="aviso-area-negativa" variante="erro">
+        Área negativa cortada em zero:
+        ${cortadas.map((l) => `“${l.label}” chegaria a −${fmtM2(l.deficitM2)}`).join('; ')}.
+        O cálculo usa 0 m² nessas linhas — a Proforma, os gráficos e os indicadores derivados dela
+        também. Reveja as áreas acima: nenhuma dedução pode ser negativa, e a soma delas não pode
+        ultrapassar a base da linha.
+      </urbi-banner>
     `;
   }
 

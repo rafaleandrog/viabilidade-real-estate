@@ -4,6 +4,45 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #612 · piso em zero na cascata de áreas do Loteamento (2026-08-28)
+
+Achado 6 da auditoria #574. `calcularCascata` (`frontend/areas-cascata.ts`) subtraía **sem piso**:
+deduções somando mais que a poligonal davam Área Líquida de Venda **negativa**, e dela saíam
+eficiência negativa, um KPI "Área vendável" em m² negativos e — o pior — infraestrutura no modo
+`R$/m²` como **custo negativo**, que reduzia o custo direto e **inflava o resultado**.
+
+**Decisão do autor (2026-08-28), verbatim:** *"Nunca pode ser negativo, não faz sentido ser menor
+que zero em nenhum caso."* Das duas alternativas que a issue colocava (piso com aviso × banner de
+validação impedindo salvar), o autor escolheu a primeira — a mesma filosofia do cap do VGV da
+permuta na #563: **capar e avisar**, com o número honesto na tela.
+
+**Como ficou.** O piso é aplicado na **passada 1** de `calcularCascata`, antes de a linha entrar em
+`resolvidosM2` — então é o valor cortado que as linhas seguintes e a âncora 2 enxergam, e o piso
+não pode ser contornado por composição. Vale para **todas** as linhas, não só as computadas: um
+negativo digitado numa editável também deixa de **inflar** a linha computada seguinte
+(`base − (−500)` = `base + 500`, o mesmo defeito pelo avesso). Cada linha devolve em `deficitM2`
+(campo **obrigatório** de `LinhaResolvida`) o tamanho do corte; `deficitsDaCascata` filtra pelo
+limiar de meio centésimo de m², para resíduo de ponto flutuante não virar banner.
+
+**O aviso** é `urbi-banner.aviso-area-negativa` em Premissas → Terreno & Áreas
+(`_renderAvisoAreaNegativa`, `frontend/tela-premissas.ts`), a tela onde se corrige — critério 2 da
+issue —, e a linha cortada ganha `tr.deficit` na tabela, para o `0,00 m²` de corte não se confundir
+com o de cadastro em branco. Só o Loteamento chama: `CASCATA_INCORPORACAO` só tem linhas de `soma`,
+que não descem de zero.
+
+**Verificação.** 813 testes de lógica pura (+6) e 44 casos de render (+2), todos verdes. Mutações
+medidas: apagar `Math.max(0, bruto)` → **5 vermelhos**; apagar `deficitM2` do objeto devolvido →
+`TS2322` no typecheck; apagar `${this._renderAvisoAreaNegativa(linhas)}` do template → **813/813
+verdes** na lógica pura e **2/2 vermelhos** no render; apagar a classe `deficit` da `<tr>` → o mesmo
+placar. É a classe 1 do `CLAUDE.md` (o defeito mora na fiação) exercitada de propósito.
+
+**Achado colateral, NÃO consertado aqui (regra R3).** Este é o primeiro caso de render de
+`viab-tela-premissas` montado sobre um **Loteamento**, e ele expôs um defeito de layout que nunca
+tinha ido a DOM: `div.area-seletor` (3 badges + `viab-num` de 130px) mede **251px** contra células
+de **219px a 600px** e **245px a 900px** — 6 transbordos de caixa e 6 sobreposições do input sobre
+a coluna "Área (m²)". A 1280px a tela é limpa. Não é regressão do diff (o piso não move largura
+nenhuma) e está declarado no caso de render, com os números medidos. **Vira issue própria.**
+
 ## #574 · auditoria do Preliminar de Loteamento (2026-08-28)
 
 Item 9 da lista de bugs da Rodada 10 — 37 conferências tela a tela e fórmula a fórmula contra
