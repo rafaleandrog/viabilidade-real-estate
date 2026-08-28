@@ -111,7 +111,11 @@ export class ViabTelaCenarios extends LitElement {
        o typecheck acusa longe daqui, na linha do "static styles".) */
     .graf urbi-grafico-linha {
       --urbi-grafico-cor-1: var(--cor-texto-forte, #e8e8ea);
-      --urbi-grafico-cor-2: var(--cor-primaria, #7c5cff);
+      /* --cor-primaria e um GRADIENTE nas 4 variantes de tema do espelho —
+         gradiente e invalido em contexto de cor de serie (IACVT / atributo
+         descartado), a mesma falha silenciosa que esta issue diagnostica.
+         A variante solida existe exatamente para contexto de cor. */
+      --urbi-grafico-cor-2: var(--cor-primaria-solida, #7c5cff);
     }
     /* #185: marcos do cronograma + Payback/Exposicao em texto — a migracao para
        urbi-grafico-linha abriu mao da linha tracejada e dos marcadores verticais
