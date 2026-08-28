@@ -39,11 +39,24 @@ export interface LinhaResolvida {
   id: string;
   label: string;
   papel: Papel;
+  /** Sempre ≥ 0 — ver o piso da cascata em `calcularCascata` (#612). */
   m2: number;
   ha: number;
   pctAncora1: number;
   /** `null` = célula em branco (linha antes da âncora 2 existir, ou linha que não a compõe por regra de não-circularidade não aplicável aqui — ver `permiteAncora2`). */
   pctAncora2: number | null;
+  /**
+   * #612 — quanto o piso em zero CORTOU desta linha, em m² (0 quando não
+   * cortou nada). É o valor absoluto do que a linha daria se a cascata
+   * subtraísse sem piso: `deficitM2 = 5.000` significa "esta linha chegaria a
+   * −5.000 m² e está entrando no cálculo como 0".
+   *
+   * Existe porque o piso sozinho seria uma mentira silenciosa — a mesma
+   * decisão do cap de permuta da #563: capar E avisar. Quem lê este campo é o
+   * banner de `_renderTabelaAreasLoteamento` (`frontend/tela-premissas.ts`),
+   * na tela onde o usuário corrige.
+   */
+  deficitM2: number;
 }
 
 const n = (v: any): number => Number(v) || 0;
@@ -53,6 +66,28 @@ const n = (v: any): number => Number(v) || 0;
  * ANTERIORES no array `definicao` (garantido por construção, não verificado
  * em runtime). Precisão plena internamente (contrato C7); quem exibe é que
  * arredonda (m²/ha com `fmtNum`, % com `fmtPct`).
+ *
+ * ⚠️ **PISO EM ZERO (#612).** Nenhuma linha sai com m² negativo — decisão do
+ * autor em 2026-08-28, verbatim: *"Nunca pode ser negativo, não faz sentido
+ * ser menor que zero em nenhum caso."* Antes disso a subtração era feita sem
+ * piso, e deduções somando mais que a poligonal produziam Área Líquida de
+ * Venda **negativa**; dela saíam eficiência negativa, um KPI de área vendável
+ * em m² negativos e — pior — infraestrutura no modo `R$/m²` como **custo
+ * negativo**, que reduzia o custo direto e INFLAVA o resultado
+ * (`frontend/proforma.ts`, `infraestruturaLegada`).
+ *
+ * O piso vale para TODAS as linhas, não só as computadas: um valor negativo
+ * digitado numa editável não fica negativo nela, e também deixa de INFLAR a
+ * linha computada seguinte (`base − (−500)` = `base + 500`), que é o mesmo
+ * defeito pelo avesso.
+ *
+ * Ele é aplicado DENTRO da passada 1, antes de a linha ser guardada em
+ * `resolvidosM2` — então o valor cortado é o que as linhas seguintes e a
+ * âncora 2 enxergam, e o piso não pode ser contornado por composição.
+ *
+ * Capar em silêncio seria trocar um número errado por outro: cada linha
+ * devolve em `deficitM2` o tamanho do corte, e a tela onde se corrige avisa
+ * (mesma filosofia do cap de permuta da #563).
  */
 export function calcularCascata(
   definicao: DefinicaoLinha[],
@@ -60,6 +95,7 @@ export function calcularCascata(
   ancora1M2: number,
 ): LinhaResolvida[] {
   const resolvidosM2: Record<string, number> = {};
+  const deficits: Record<string, number> = {};
   let ancora1 = 0;
   let ancora2Provisorio: number | null = null;
 
@@ -69,24 +105,28 @@ export function calcularCascata(
   // (regra de não-circularidade); se a linha que a usa vier antes da âncora
   // existir na cascata, é erro de definição, não de execução — cai em 0.
   for (const def of definicao) {
-    let m2: number;
+    let bruto: number;
     if (def.papel.tipo === 'ancora1') {
-      m2 = n(ancora1M2);
-      ancora1 = m2;
+      bruto = n(ancora1M2);
     } else if (def.papel.tipo === 'editavel') {
       const estado = estados[def.id];
       const modo = estado?.modo ?? 'm2';
       const valor = n(estado?.valor);
-      if (modo === 'm2') m2 = valor;
-      else if (modo === 'pct_ancora1') m2 = ancora1 * (valor / 100);
-      else m2 = ancora2Provisorio != null ? ancora2Provisorio * (valor / 100) : 0;
+      if (modo === 'm2') bruto = valor;
+      else if (modo === 'pct_ancora1') bruto = ancora1 * (valor / 100);
+      else bruto = ancora2Provisorio != null ? ancora2Provisorio * (valor / 100) : 0;
     } else {
       const termosSoma = def.papel.termos.reduce((s, id) => s + (resolvidosM2[id] ?? 0), 0);
-      m2 = def.papel.operacao === 'soma'
+      bruto = def.papel.operacao === 'soma'
         ? termosSoma
         : (resolvidosM2[def.papel.base!] ?? 0) - termosSoma;
-      if (def.papel.ehAncora2) ancora2Provisorio = m2;
     }
+    // #612 — o piso. `m2` é o que TODO o resto enxerga: as linhas seguintes
+    // (por `resolvidosM2`), a âncora 1, a âncora 2 e as duas colunas de %.
+    const m2 = Math.max(0, bruto);
+    deficits[def.id] = m2 - bruto;
+    if (def.papel.tipo === 'ancora1') ancora1 = m2;
+    if (def.papel.tipo === 'computada' && def.papel.ehAncora2) ancora2Provisorio = m2;
     resolvidosM2[def.id] = m2;
   }
 
@@ -107,8 +147,35 @@ export function calcularCascata(
       ha: m2 / 10_000,
       pctAncora1: ancora1 > 0 ? (m2 / ancora1) * 100 : 0,
       pctAncora2: def.mostraPctAncora2 && ancora2 != null && ancora2 > 0 ? (m2 / ancora2) * 100 : null,
+      deficitM2: deficits[def.id] ?? 0,
     };
   });
+}
+
+/**
+ * #612 — as linhas que o piso em zero cortou, na ordem da cascata. Lista
+ * vazia = cascata coerente (nenhuma dedução ultrapassou a sua base, nenhum
+ * valor negativo digitado).
+ *
+ * Função separada, e não um `.filter` inline na tela, porque é ela que define
+ * o que conta como corte: a comparação é em **m² cheios** (`>= 0.005`, o
+ * mesmo limiar de meio centésimo que o resto do app usa para "célula vazia"),
+ * e não `> 0`. Sem isso, uma cascata que fecha exatamente na base acusaria
+ * corte por causa de um resíduo de ponto flutuante — um banner de erro que
+ * aparece sozinho é pior que nenhum, porque ensina o usuário a ignorá-lo.
+ */
+export function deficitsDaCascata(linhas: LinhaResolvida[]): LinhaResolvida[] {
+  return linhas.filter(linhaCortada);
+}
+
+/**
+ * O predicado de "esta linha foi cortada pelo piso" — o MESMO que
+ * `deficitsDaCascata` usa. Exportado (rodada 1 de revisão do PR 620) para a
+ * tela marcar `tr.deficit` sem duplicar o limiar inline: se o limiar mudar
+ * aqui, banner e linha vermelha mudam juntos.
+ */
+export function linhaCortada(l: LinhaResolvida): boolean {
+  return l.deficitM2 >= 0.005;
 }
 
 // ── Cascata do Loteamento — as 10 linhas de `padrao_areas.png` ────────────
@@ -219,6 +286,14 @@ export function estadosCascataLoteamentoDoEstudo(estudo: Record<string, any> | n
  * `poligonal = as 7 deduções + ALV`. As linhas COMPUTADAS intermediárias
  * (parcelável, líquida) ficam de fora justamente porque contá-las junto
  * somaria a mesma área duas vezes.
+ *
+ * ⚠️ **A identidade vale enquanto o piso da #612 não atua.** Quando as
+ * deduções somam MAIS que a base, a linha computada é cortada em zero
+ * (`deficitM2 > 0`) e as 8 fatias passam a somar mais que a poligonal — a
+ * pizza fica desproporcional, e é assim que tem que ser: o número honesto
+ * ali é "as deduções não cabem", não uma ALV negativa mordendo a gleba de
+ * volta. Quem avisa é o banner de Premissas → Terreno & Áreas, na tela onde
+ * se corrige.
  *
  * `areaTerrenoM2` é OBRIGATÓRIO de propósito (sem valor default): esquecer o
  * argumento vira erro de compilação em vez de uma pizza silenciosamente

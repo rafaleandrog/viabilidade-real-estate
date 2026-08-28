@@ -377,6 +377,11 @@ export interface Proforma {
 }
 
 const n = (v: any): number => Number(v) || 0;
+// #612 (rodada 1 de revisão): as áreas digitadas da Incorporação entram no
+// motor pelo MESMO piso em zero que `calcularCascata` aplica na tabela — sem
+// isto, um negativo digitado mostraria 0 na cascata e seguiria negativo no
+// cálculo (área, custo e KPIs divergindo da tela).
+const areaM2 = (v: any): number => Math.max(0, n(v));
 const moeda = (v: number): number => Math.round(v * 100) / 100;
 const canonico = (v: any, legado: number): number => v === null || v === undefined ? legado : n(v);
 
@@ -406,10 +411,12 @@ function estadosCascataLoteamento(e: ProformaInput): Record<string, EstadoLinha>
 export function calcularProforma(e: ProformaInput): Proforma {
   const lot = e.tipo_empreendimento === 'loteamento';
   // Área do terreno: do Núcleo (soma das glebas/lotes vinculados) quando a
-  // origem é Núcleo; senão, a área informada manualmente no estudo.
+  // origem é Núcleo; senão, a área informada manualmente no estudo. Pelo
+  // MESMO piso das demais áreas (#612, rodada 2 de revisão): a cascata mostra
+  // a âncora cortada em 0, e custoTerreno/outorga/teto leem o mesmo 0.
   const areaTerreno = e.origem_terreno === 'nucleo'
-    ? n(e.area_terreno_nucleo)
-    : n(e.terreno_manual_area);
+    ? areaM2(e.area_terreno_nucleo)
+    : areaM2(e.terreno_manual_area);
 
   // BUG7-08: fator de sensibilidade — 1 quando a variável estressada não é a
   // que este cálculo está resolvendo, senão o fator do estudo (Bear/Bull).
@@ -457,10 +464,10 @@ export function calcularProforma(e: ProformaInput): Proforma {
     areaVendavel = cascata.find((l) => l.id === 'alv')!.m2;
     areaPrivativa = areaVendavel; // lotes vendáveis
   } else {
-    const rFech = n(e.area_pvt_r_fechada), nrFech = n(e.area_pvt_nr_fechada);
-    const rAb = n(e.area_pvt_r_aberta), nrAb = n(e.area_pvt_nr_aberta);
+    const rFech = areaM2(e.area_pvt_r_fechada), nrFech = areaM2(e.area_pvt_nr_fechada);
+    const rAb = areaM2(e.area_pvt_r_aberta), nrAb = areaM2(e.area_pvt_nr_aberta);
     areaPrivativa = rFech + nrFech + rAb + nrAb;
-    areaConstruida = areaPrivativa + n(e.area_comum_total);
+    areaConstruida = areaPrivativa + areaM2(e.area_comum_total);
     areaVendavel = rFech + nrFech; // área privativa vendável (áreas fechadas)
   }
 
@@ -537,9 +544,9 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // permuta que reduzia área sem reduzir VGV, porque `preco_venda_m2` não tem
   // campo em tela nenhuma nem `padrao` no schema.
   const areaBasePermutaResidencial = lot ? areaVendavel
-    : (semProdutos ? n(e.area_pvt_r_fechada) : porTipo.residencial.areaTotalM2);
+    : (semProdutos ? areaM2(e.area_pvt_r_fechada) : porTipo.residencial.areaTotalM2);
   const areaBasePermutaNaoResidencial = lot ? 0
-    : (semProdutos ? n(e.area_pvt_nr_fechada) : porTipo.nao_residencial.areaTotalM2);
+    : (semProdutos ? areaM2(e.area_pvt_nr_fechada) : porTipo.nao_residencial.areaTotalM2);
   // ⚠️ O fator de sensibilidade de preço NÃO aparece nesta linha, e a ausência
   // é a reconciliação com a #568: pelo caminho do catálogo ele já entrou em
   // `catalogoEstressado`, e `precoMedioM2` sai de lá — reaplicá-lo aqui o

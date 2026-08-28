@@ -227,6 +227,44 @@ test('#569: usada > teto → aproveitamentoExcedido true (o aviso é responsabil
   assert.equal(p.aproveitamentoExcedido, true);
 });
 
+test('#612: área digitada NEGATIVA na Incorporação entra no motor pelo mesmo piso da tabela (por campo)', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual', terreno_manual_area: 4_000,
+    area_pvt_r_fechada: 3_000,
+    area_pvt_r_aberta: -620, // cortada para 0 — a cascata da tela mostra 0, o motor tem que ler 0
+    area_pvt_nr_fechada: 500,
+    area_comum_total: -1_000, // idem — não pode DIMINUIR a área construída
+  });
+  assert.ok(perto(p.areaPrivativa, 3_500)); // 3.000 + 0 + 500 (o −620 não subtrai)
+  assert.ok(perto(p.areaConstruida, 3_500)); // comum negativa vira 0, nunca reduz
+  assert.ok(perto(p.areaVendavel, 3_500)); // fechadas: 3.000 + 500
+});
+
+test('#612: área do terreno NEGATIVA também entra pelo piso — custo do terreno nunca vira crédito', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual', terreno_manual_area: -4_000,
+    considerar_custo_terreno: true, custo_terreno_m2: 500,
+    coef_aproveitamento_maximo: 2,
+  });
+  assert.equal(p.areaTerreno, 0); // a cascata mostra a âncora em 0; o motor lê o mesmo 0
+  assert.equal(p.custoTerreno, 0); // −4.000 × 500 seria um crédito de R$ 2M inflando o resultado
+  assert.equal(p.tetoAproveitamentoM2, 0); // teto = 0 × coef, nunca negativo
+});
+
+test('#612: base da permuta física pela fonte legada (semProdutos) também é capada — permuta nunca negativa', () => {
+  const p = calcularProforma({
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual', terreno_manual_area: 4_000,
+    area_pvt_r_fechada: -1_000, // sem catálogo, esta é a base da permuta física R
+    permuta_fisica_modo: 'pct_area_venda', permuta_fisica_pct: 20,
+  });
+  assert.equal(p.areaPermutaFisica, 0); // 20% de uma base capada em 0
+  assert.ok(p.areaVendavelLiquida >= 0);
+  assert.ok(p.vgvPermutaResidencial >= 0);
+});
+
 test('#569: usada exatamente igual ao teto não é excedente (fronteira, não ">=")', () => {
   const p = calcularProforma({
     tipo_empreendimento: 'incorporacao',
