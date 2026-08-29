@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$ } from './viab-format.js';
+import { fmtR$Kpi } from './viab-format.js';
 import { calcularProforma, roiParaFaixa, type Proforma, type ProformaInput } from './proforma.js';
 import { itensAlocacaoGleba } from './areas-cascata.js';
 import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
@@ -170,7 +170,7 @@ export class ViabTelaGraficos extends LitElement {
         .series=${series}
       ></urbi-grafico-colunas>
       <div class="resultado">
-        <urbi-kpi rotulo="Resultado" .valor=${fmtR$(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
+        <urbi-kpi rotulo="Resultado" .valor=${fmtR$Kpi(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
       </div>
     `;
   }

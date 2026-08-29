@@ -75,8 +75,9 @@ export const CUSTOS = LINHAS_CUSTO;
 export function fluxoValoresLongos(): FluxoCalc {
   const c = fluxo();
   const grande = 171_448_400.00;   // 9 dígitos, 2 casas — o exemplo literal da #579
-  const negativo = -12_345_678.90; // negativo — nos cards vira "-R$ …" (fmtR$);
-                                   // a forma entre parênteses é exercida em
+  const negativo = -12_345_678.90; // negativo — nos cards vira "-R$ …" sem
+                                   // centavos (fmtR$Kpi, exceção da #581); a
+                                   // forma entre parênteses é exercida em
                                    // `scores-apelo.ts` (campo passthrough)
   return {
     ...c,

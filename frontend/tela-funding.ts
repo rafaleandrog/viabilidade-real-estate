@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtPct } from './viab-format.js';
+import { fmtR$, fmtR$Kpi, fmtPct } from './viab-format.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
@@ -529,14 +529,14 @@ export class ViabFunding extends LitElement {
       <div class="secao">
         <h4>Visão do investidor</h4>
         <div class="ind">
-          ${card('Investimento', fmtR$(ind.investimentoTotal), 'neg')}
-          ${card('Retorno total', fmtR$(ind.retornoTotal), 'pos')}
-          ${card('Lucro', fmtR$(ind.lucro), ind.lucro >= 0 ? 'pos' : 'neg')}
+          ${card('Investimento', fmtR$Kpi(ind.investimentoTotal), 'neg')}
+          ${card('Retorno total', fmtR$Kpi(ind.retornoTotal), 'pos')}
+          ${card('Lucro', fmtR$Kpi(ind.lucro), ind.lucro >= 0 ? 'pos' : 'neg')}
           ${card('TIR', ind.tirAnual === null ? '—' : `${fmtPct(ind.tirAnual * 100)} a.a.`)}
-          ${card('VPL', fmtR$(ind.vpl), ind.vpl >= 0 ? 'pos' : 'neg')}
+          ${card('VPL', fmtR$Kpi(ind.vpl), ind.vpl >= 0 ? 'pos' : 'neg')}
           ${card('Payback', ind.paybackMes === null ? '—' : rotuloMesRelativo(this.dataInicio, ind.paybackMes))}
-          ${eDivida(o.tipo) ? card('Juros pagos', fmtR$(ind.jurosPagos)) : nothing}
-          ${eDivida(o.tipo) ? card('Saldo final', fmtR$(ind.saldoFinal), Math.abs(ind.saldoFinal) < 0.01 ? '' : 'neg') : nothing}
+          ${eDivida(o.tipo) ? card('Juros pagos', fmtR$Kpi(ind.jurosPagos)) : nothing}
+          ${eDivida(o.tipo) ? card('Saldo final', fmtR$Kpi(ind.saldoFinal), Math.abs(ind.saldoFinal) < 0.01 ? '' : 'neg') : nothing}
         </div>
         ${eDivida(o.tipo) && Math.abs(ind.saldoFinal) >= 0.01
           ? html`<p class="nota">⚠️ A dívida não zera: no mês da quitação contratual ainda resta
@@ -559,17 +559,17 @@ export class ViabFunding extends LitElement {
       <div class="secao">
         <h4>Financiamento à produção — resumo</h4>
         <div class="ind">
-          <div class="ind-card"><div class="rot">Custo financiável total</div><div class="val">${fmtR$(ind.custoFinanciavelTotal)}</div></div>
+          <div class="ind-card"><div class="rot">Custo financiável total</div><div class="val">${fmtR$Kpi(ind.custoFinanciavelTotal)}</div></div>
           <div class="ind-card"><div class="rot">% financiado</div><div class="val">${fmtPct(ind.percentualFinanciado * 100)}</div></div>
-          <div class="ind-card"><div class="rot">Principal máximo previsto</div><div class="val">${fmtR$(ind.principalMaximoPrevisto)}</div></div>
+          <div class="ind-card"><div class="rot">Principal máximo previsto</div><div class="val">${fmtR$Kpi(ind.principalMaximoPrevisto)}</div></div>
           <div class="ind-card"><div class="rot">1º mês de liberação</div><div class="val">${mes(ind.primeiroMesLiberacao)}</div></div>
-          <div class="ind-card"><div class="rot">1ª liberação (catch-up)</div><div class="val">${fmtR$(ind.primeiraLiberacao)}</div></div>
-          <div class="ind-card"><div class="rot">Total liberado</div><div class="val">${fmtR$(ind.totalLiberado)}</div></div>
-          <div class="ind-card"><div class="rot">Total de juros</div><div class="val">${fmtR$(ind.totalJuros)}</div></div>
-          <div class="ind-card"><div class="rot">Pico do saldo devedor</div><div class="val">${fmtR$(ind.picoSaldoDevedor)} (${mes(ind.mesPicoSaldoDevedor)})</div></div>
+          <div class="ind-card"><div class="rot">1ª liberação (catch-up)</div><div class="val">${fmtR$Kpi(ind.primeiraLiberacao)}</div></div>
+          <div class="ind-card"><div class="rot">Total liberado</div><div class="val">${fmtR$Kpi(ind.totalLiberado)}</div></div>
+          <div class="ind-card"><div class="rot">Total de juros</div><div class="val">${fmtR$Kpi(ind.totalJuros)}</div></div>
+          <div class="ind-card"><div class="rot">Pico do saldo devedor</div><div class="val">${fmtR$Kpi(ind.picoSaldoDevedor)} (${mes(ind.mesPicoSaldoDevedor)})</div></div>
           <div class="ind-card"><div class="rot">1º mês de amortização</div><div class="val">${mes(ind.primeiroMesAmortizacao)}</div></div>
           <div class="ind-card"><div class="rot">Último mês com dívida</div><div class="val">${mes(ind.ultimoMesComDivida)}</div></div>
-          <div class="ind-card"><div class="rot">Total amortizado</div><div class="val">${fmtR$(ind.totalAmortizado)}</div></div>
+          <div class="ind-card"><div class="rot">Total amortizado</div><div class="val">${fmtR$Kpi(ind.totalAmortizado)}</div></div>
         </div>
         ${this._renderGraficoFinanciamentoProducao(serie)}
       </div>

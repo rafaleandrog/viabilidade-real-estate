@@ -38,6 +38,56 @@ entrega o Avançado e deixa a pergunta registrada.
 
 ---
 
+## #581 · R$ sem centavos no card de KPI — a única exceção declarada ao C7 (2026-08-28)
+
+Item 4 da leva Avançado da Rodada 10. Pedido do autor, literal: "Ajustar valores em R$ nos
+urbi-kpis para não terem casas decimais e quando % para ter uma casa decimal". **Não é bug — é
+decisão do autor que abre exceção a um contrato vigente**, e o app estava integralmente conforme ao
+C7 antes deste PR (a #449/#281 fecharam justamente essa unificação). Por isso a exceção entra
+redigida no `CLAUDE.md` § Contratos inegociáveis, em `docs/viabilidade/formulas.md`
+§ Precisão de resultado e na linha C7 do anexo A de `padrao-incorporacao.md` **no mesmo diff** —
+senão o próximo revisor acusa o diff como violação do C7, com razão, e o conserto seguinte reverte
+o que o autor pediu.
+
+**A metade "%" do pedido já estava atendida e o que faltava era travar.** `fmtPct` é 1 casa com
+mínimo e máximo e é o que todo card de percentual chama; `fmtPctEntrada` (2 casas, valor DIGITADO)
+tem 3 call sites, nenhum deles card — um banner em `tela-premissas.ts` e duas células `<td>` em
+`tela-fluxo-receitas.ts`.
+
+**A metade "R$" é a que mudou.** Função nova `fmtR$Kpi` (`frontend/viab-format.ts`), com
+`minimumFractionDigits` E `maximumFractionDigits` em 0 — os dois, pelo mesmo motivo que a #492 fixou
+os dois em `fmtR$`: só o máximo entregaria "até 0 casas". **Função própria, não um segundo parâmetro
+de `fmtR$`:** parâmetro opcional espalharia a exceção por um argumento que qualquer chamador passa
+por engano, que é a classe de defeito que a #449 apagou. Símbolo próprio torna a exceção greppável.
+
+28 call sites, nas 6 telas do inventário da issue: `tela-resumo.ts` (4), `fluxo-tabela.ts` (7, os
+`div.kpi-card` monetários de `kpisFluxo`), `tela-cenarios.ts` (1), `tela-graficos.ts` (1),
+`tela-premissas.ts` (2 — VGV no ramo Loteamento e Preço médio/unid. no ramo Incorporação, que é a
+paridade do critério 8) e `tela-funding.ts` (13 — os `.ind-card` da Visão do investidor mais o
+resumo de Financiamento à produção).
+
+**Fora do escopo, por decisão registrada:** o `title` do card "VGV Vendável" (`fluxo-tabela.ts`),
+que é uma LISTA de 6 grandezas de detalhe e não a figura do card; e os cards de comparação de
+`tela-analise-mercado.ts`, que publicam R$/m² — derivada não monetária, fora do C7, e ausente do
+inventário da issue.
+
+**A trava é `frontend/kpi-casas-decimais.test.ts`, e ela lê o FONTE de propósito.** O que a issue
+pede é propriedade do INVENTÁRIO (a exceção em todos os cards e em nenhum outro lugar), e isso é
+fiação — a classe de defeito nº 1 do `CLAUDE.md`: apagar a chamada no componente deixa a suíte
+inteira verde. A lista fecha nos dois sentidos por CONTAGEM EXATA (a menos = card voltou a exibir
+centavos; a mais = a exceção vazou), com o motivo escrito por entrada, mais três zeros: `exportar.ts`,
+`tela-proforma.ts`, `tela-fluxo-custos.ts`, `tela-fluxo-receitas.ts`, `tela-fluxo-ver.ts` e
+`tela-dashboard.ts` não podem conhecer `fmtR$Kpi`, e em `viab-format.ts` a contagem esperada é 1 — a
+declaração —, porque 2 significaria que `celula` passou a chamá-la e a exceção entraria em toda
+célula de tabela e em todo CSV/PDF.
+
+Vale para estudos existentes: mudança só de apresentação, nada persistido muda, sem migração —
+O critério 8 (paridade) ganhou asserção de VALOR além da de inventário: um estudo de Loteamento e
+um de Incorporação passam por `calcularProforma`, e o mesmo número sai do card sem centavos e da
+tabela com centavos — é o que prova que o arredondamento é de exibição, não de dado.
+
+`versao` não bumpa. Validação: `bash scripts/validar-frontend.sh` verde (850 testes, 56 casos de
+render).
 ## Notação de sinal da Proforma unificada entre tela, CSV e PDF (2026-08-28)
 
 Registro dos PRs 617/618 — achado 10 da auditoria #574, sem issue própria. **Decisão do autor
