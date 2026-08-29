@@ -106,6 +106,24 @@ export class ViabFluxoVer extends LitElement {
   // #349: o funding projetado nas categorias da tabela principal — substitui a
   // tabela separada "Programa Financeiro (Capital Stack)", removida.
   @state() private funding: FundingNoFluxo | null = null;
+  /**
+   * #594 — o MESMO par (fluxo, funding), porém SEMPRE sobre o projeto inteiro:
+   * sem o filtro de fase que `_recalcular` aplica a `calc`/`fundingCalc`.
+   *
+   * ⚠️ Ele existe por um achado P1 do App de revisão, e o defeito é sutil: o
+   * filtro de fase recorta as linhas de RECEITA e mantém TODOS os custos
+   * (`_recalcular`, abaixo). Isso é o certo para a tabela e os gráficos, que
+   * mostram a fase escolhida — e é ruína para um indicador que se anuncia como
+   * "do projeto": com uma fase selecionada, o ROI da Análise Financeira
+   * deixaria de bater com a coluna ROI do Painel de estudos (critério de
+   * aceite 1 da issue), e as tranches e o resíduo do incorporador mudariam de
+   * valor só porque alguém mexeu num filtro de exibição.
+   *
+   * Sem filtro os dois pares são o MESMO objeto — nenhum cálculo a mais no
+   * caminho comum. Com filtro, roda-se `calcularFluxo` uma segunda vez.
+   */
+  @state() private calcProjeto: FluxoCalc | null = null;
+  @state() private fundingCalcProjeto: FundingCalc | null = null;
   @state() private divergencias: Divergencia[] = [];
   @state() private permutaFisica: PermutaFisicaTipologia[] = [];
   private dados: {
@@ -238,13 +256,17 @@ export class ViabFluxoVer extends LitElement {
     this.carregando = false;
   }
 
-  private _recalcular() {
-    if (!this.dados) return;
-    const d = this.dados;
-    const receitas = this.faseFiltro
-      ? d.receitas.filter((l) => (l.fase_label || '') === this.faseFiltro)
-      : d.receitas;
-    const config: FluxoConfig = {
+  /**
+   * #594 — o `FluxoConfig` do estudo para um conjunto de linhas de receita.
+   * Extraído de `_recalcular` porque a aba Análise Financeira precisa rodar o
+   * MESMO cálculo com as receitas do projeto INTEIRO quando há filtro de fase
+   * (ver `calcProjeto`). Duplicar o config em vez de extraí-lo faria os dois
+   * caminhos divergirem no primeiro campo novo que alguém acrescentasse a um
+   * e esquecesse no outro.
+   */
+  private _configFluxo(receitas: any[]): FluxoConfig {
+    const d = this.dados!;
+    return {
       dataInicio: d.dataInicio,
       taxaDescontoAa: d.taxa,
       cronograma: d.crono,
@@ -261,7 +283,34 @@ export class ViabFluxoVer extends LitElement {
       // série é cortada e `saldoFinal` exibe um saldo truncado.
       operacoesFunding: this.operacoes,
     };
-    this.calc = calcularFluxo(config);
+  }
+
+  /**
+   * #594 — a montagem `resultadoFinal → fundingDoEstudo` para UM `FluxoCalc`.
+   * Extraída pelo mesmo motivo de `_configFluxo`: ela roda duas vezes quando
+   * há filtro de fase, e duas cópias divergiriam. Continua sendo a montagem
+   * LOCAL de que fala a nota #474 abaixo — extrair para um método privado
+   * deste arquivo não a torna a fonte única que o autor recusou.
+   */
+  private _fundingDe(calc: FluxoCalc, receitaLiquida: number[]): FundingCalc | null {
+    const d = this.dados!;
+    const resultadoFinal = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0;
+    // D8: receita líquida, resultado final e mês do repasse vêm do ESTUDO,
+    // não de campos redigitados na aba de Funding — é o que impede a aba de
+    // contar uma história diferente da tabela de Resultados.
+    return fundingDoEstudo(
+      this.operacoes, calc.fluxoMensal, receitaLiquida, resultadoFinal, mesRepasse(d.crono), d.taxa,
+      { custosRaw: d.custos, linhasCusto: calc.linhasCusto, cronograma: d.crono },
+    );
+  }
+
+  private _recalcular() {
+    if (!this.dados) return;
+    const d = this.dados;
+    const receitas = this.faseFiltro
+      ? d.receitas.filter((l) => (l.fase_label || '') === this.faseFiltro)
+      : d.receitas;
+    this.calc = calcularFluxo(this._configFluxo(receitas));
     this.fundingCalc = null;
     this.funding = null;
     const deflatorPct = Number(this.estudo?.deflator_area_aberta_pct) || 0;
@@ -287,15 +336,25 @@ export class ViabFluxoVer extends LitElement {
     let receitaLiquida: number[] | undefined;
     if (this.operacoes.length > 0) {
       receitaLiquida = receitaLiquidaComCorretagemMensal(this.calc.receitaMensal, this.calc.linhasCusto, d.custos);
-      const resultadoFinal = this.calc.fluxoAcumulado[this.calc.fluxoAcumulado.length - 1] ?? 0;
-      // D8: receita líquida, resultado final e mês do repasse vêm do ESTUDO,
-      // não de campos redigitados na aba de Funding — é o que impede a aba de
-      // contar uma história diferente da tabela de Resultados.
-      this.fundingCalc = fundingDoEstudo(
-        this.operacoes, this.calc.fluxoMensal, receitaLiquida, resultadoFinal, mesRepasse(d.crono), d.taxa,
-        { custosRaw: d.custos, linhasCusto: this.calc.linhasCusto, cronograma: d.crono },
-      );
+      this.fundingCalc = this._fundingDe(this.calc, receitaLiquida);
       this.funding = this.fundingCalc?.noFluxo ?? null;
+    }
+    // #594 — o par do PROJETO INTEIRO, que a Análise Financeira consome. Sem
+    // filtro de fase ele É o par de exibição (mesmo objeto, zero cálculo a
+    // mais); com filtro, roda de novo sobre `d.receitas` inteiras. Ver o
+    // comentário de `calcProjeto` para o defeito que isto impede.
+    if (this.faseFiltro) {
+      const cProjeto = calcularFluxo(this._configFluxo(d.receitas));
+      this.calcProjeto = cProjeto;
+      this.fundingCalcProjeto = this.operacoes.length > 0
+        ? this._fundingDe(
+            cProjeto,
+            receitaLiquidaComCorretagemMensal(cProjeto.receitaMensal, cProjeto.linhasCusto, d.custos),
+          )
+        : null;
+    } else {
+      this.calcProjeto = this.calc;
+      this.fundingCalcProjeto = this.fundingCalc;
     }
     this.divergencias = [
       ...validarProduto(d.receitas, d.custos, d.tipologias, d.crono, this.calc.prazo),
@@ -484,7 +543,7 @@ export class ViabFluxoVer extends LitElement {
     const sinalReal = sinalLinhaProformaAv({ tipo: 'resultado', valor: real });
     return html`
       ${kpisFluxo(c)}
-      ${this._renderRoiProjeto(c)}
+      ${this._renderRoiProjeto(this.calcProjeto ?? c)}
       <urbi-card titulo="Fluxo de Caixa Livre × Fluxo de Caixa">
         <table class="proforma">
           <tbody>
@@ -508,7 +567,7 @@ export class ViabFluxoVer extends LitElement {
           : html`Este estudo não tem operações de Funding: sem funding, o Fluxo de Caixa é
               igual ao Livre.`}</p>
       </urbi-card>
-      ${this._renderRetornoPorParte(real)}
+      ${this._renderRetornoPorParte()}
       ${this._renderControles()}
       <div class="graficos">
         <urbi-card titulo="Contratação, Receita Bruta, Carteira e Repasse — ${titulo}">
@@ -547,10 +606,14 @@ export class ViabFluxoVer extends LitElement {
    * "18,4%" vê de que resultado e de que investimento ele saiu, sem precisar
    * abrir a Proforma.
    */
-  private _renderRoiProjeto(c: FluxoCalc): TemplateResult {
+  private _renderRoiProjeto(cProjeto: FluxoCalc): TemplateResult {
+    // ⚠️ `cProjeto` é `calcProjeto` — o fluxo SEM filtro de fase —, e a área
+    // privativa também sai de `dados.receitas` INTEIRAS. As duas pontas têm de
+    // ser do mesmo recorte: um ROI de projeto calculado sobre a receita de uma
+    // fase e o custo de todas não é o ROI de nada. Ver `calcProjeto`.
     const area = areaPrivativaTotalLinhas(this.dados?.receitas ?? []);
-    const p = proformaAvancado(c, area);
-    const roi = roiProjetoAnalise(c, area);
+    const p = proformaAvancado(cProjeto, area);
+    const roi = roiProjetoAnalise(cProjeto, area);
     // `investimentoTotal <= 0` é estudo sem custo direto nem indireto
     // modelado. `proformaAvancado` já devolve 0 nesse caso (nunca NaN nem
     // Infinity), mas publicar "0,0%" seria afirmar que o ROI é zero, e não
@@ -572,7 +635,11 @@ export class ViabFluxoVer extends LitElement {
           ? html`Mesma fórmula da coluna <strong>ROI</strong> do Painel de estudos — resultado sobre
               custo direto + indireto. Os dois números são o mesmo para este estudo, de propósito.`
           : html`Sem custo direto ou indireto modelado não há denominador: o ROI não é exibido em vez
-              de sair como 0,0%.`}</p>
+              de sair como 0,0%.`}
+          ${this.faseFiltro
+            ? html` O filtro de fase <strong>${this.faseFiltro}</strong> não afeta este card: ele é
+                sempre do projeto inteiro.`
+            : nothing}</p>
       </urbi-card>
     `;
   }
@@ -593,17 +660,28 @@ export class ViabFluxoVer extends LitElement {
    *    dele já está dentro do resíduo do incorporador, que é o parágrafo
    *    seguinte.
    * 3. **O incorporador sai SEM ROI, e a tela diz por quê.** Ele é o resíduo:
-   *    `retornoIncorporador` é o total do Fluxo de Caixa alavancado — o mesmo
-   *    número da linha "= Fluxo de Caixa" do card acima, recebido por
-   *    parâmetro justamente para não haver duas contas. Para virar ROI
+   *    o total do Fluxo de Caixa alavancado DO PROJETO INTEIRO — o mesmo
+   *    número da linha "= Fluxo de Caixa" do card acima quando não há filtro
+   *    de fase (com filtro, aquele card mostra a fase e este continua
+   *    mostrando o projeto; a nota do card avisa). Para virar ROI
    *    faltaria o denominador, e o app **não modela** capital próprio do
    *    incorporador; inventar um (a exposição máxima, por exemplo) seria
    *    escolha, não dedução. Publicar "0,0%" ali seria pior que a ausência.
    *    A issue registra isso como saída (a), e as saídas (b)/(c) dependem de
    *    decisão do autor.
    */
-  private _renderRetornoPorParte(retornoIncorporador: number): TemplateResult {
-    const tranches = tranchesDeInvestimento(this.fundingCalc);
+  private _renderRetornoPorParte(): TemplateResult {
+    // ⚠️ `calcProjeto`/`fundingCalcProjeto`, NUNCA `calc`/`fundingCalc`: com
+    // filtro de fase os segundos descrevem a fase escolhida (receita recortada,
+    // custo inteiro), e publicar isso como "retorno por parte" faria o resíduo
+    // do incorporador e os indicadores de cada tranche mudarem porque alguém
+    // mexeu num controle de exibição. Achado P1 do App de revisão; ver o
+    // comentário de `calcProjeto`.
+    const fundingProjeto = this.fundingCalcProjeto;
+    const tranches = tranchesDeInvestimento(fundingProjeto);
+    const retornoIncorporador = fundingProjeto
+      ? fundingProjeto.noFluxo.fluxoMensal.reduce((s, v) => s + v, 0)
+      : (this.calcProjeto ?? this.calc)?.fluxoMensal.reduce((s, v) => s + v, 0) ?? 0;
     const taxa = this.dados?.taxa ?? 0;
     const dataInicio = this.dados?.dataInicio ?? null;
     const vazio = html`<td class="num vazio">—</td>`;
@@ -641,7 +719,12 @@ export class ViabFluxoVer extends LitElement {
           aportado por ele, então não existe denominador; "0,0%" ali seria um número inventado.
           <strong>MOIC</strong> é múltiplo sobre o capital investido (retorno ÷ investimento:
           1,00× é empatar), e não ROI — a diferença entre os dois é exatamente 1.
-          ${this.fundingCalc && tranches.length === 0
+          ${this.faseFiltro
+            ? html`O filtro de fase <strong>${this.faseFiltro}</strong> está ligado e <strong>não afeta
+                este card</strong>: ele é sempre do projeto inteiro. A tabela, os gráficos e o card
+                "Fluxo de Caixa Livre × Fluxo de Caixa" acima seguem o filtro.`
+            : nothing}
+          ${fundingProjeto && tranches.length === 0
             ? html`As operações de <strong>Financiamento à produção</strong> deste estudo não
                 aparecem aqui: são crédito bancário atrelado à obra, não uma parte que divide o
                 resultado — o custo delas já está dentro do resíduo do incorporador.`

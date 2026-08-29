@@ -28,7 +28,7 @@ import {
   fundingDoEstudo, indicadoresOperacao, tranchesDeInvestimento,
   type FundingCalc, type OperacaoFunding,
 } from './funding-motor.js';
-import { roiProjetoAnalise } from './tela-fluxo-ver.js';
+import { roiProjetoAnalise, ViabFluxoVer } from './tela-fluxo-ver.js';
 
 const CRONO: EventoCrono[] = [
   { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6 },
@@ -266,7 +266,7 @@ test('#594 critério 4: a Análise Financeira NÃO recalcula os indicadores por 
     'a tela parou de ler `indicadoresOperacao` — os indicadores por tranche passaram a ter uma segunda fonte de verdade',
   );
   assert.ok(
-    semComentarios.includes('tranchesDeInvestimento(this.fundingCalc)'),
+    semComentarios.includes('tranchesDeInvestimento(fundingProjeto)'),
     'a tela parou de filtrar as operações por `tranchesDeInvestimento` — o financiamento à produção volta à abertura',
   );
   // Nenhuma aritmética de indicador de investidor no arquivo: TIR, MOIC e VPL
@@ -280,7 +280,7 @@ test('#594 critério 4: a Análise Financeira NÃO recalcula os indicadores por 
 });
 
 test('#594 critério 1: o ROI da tela sai de `roiProjetoAnalise`, e não de uma divisão local', () => {
-  assert.ok(semComentarios.includes('roiProjetoAnalise(c, area)'), 'a tela parou de chamar `roiProjetoAnalise`');
+  assert.ok(semComentarios.includes('roiProjetoAnalise(cProjeto, area)'), 'a tela parou de chamar `roiProjetoAnalise`');
   // `investimentoTotal` só pode aparecer como LEITURA (`p.investimentoTotal`),
   // nunca como denominador de uma conta escrita aqui.
   assert.ok(
@@ -302,5 +302,111 @@ test('#594 critério 9: a Análise Financeira não ramifica por padrão (Loteame
   assert.ok(
     !semComentarios.includes('tipo_empreendimento'),
     '`tela-fluxo-ver.ts` passou a ramificar por `tipo_empreendimento` — a aba deixaria de ser a mesma nos dois padrões',
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Achado P1 do App de revisão (PR 650) — o filtro de fase NÃO move o projeto
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// ⚠️ O defeito que estes testes barram é o mais caro deste PR, e ele não estava
+// no cálculo nem na fiação: estava na ESCOLHA DO INSUMO. `_recalcular` recorta
+// as linhas de RECEITA pela fase selecionada e mantém TODOS os custos — o que é
+// correto para a tabela e os gráficos, que mostram a fase, e é ruína para um
+// card que se anuncia como "do projeto". Com uma fase selecionada, o ROI da
+// Análise Financeira deixaria de bater com a coluna do Painel de estudos
+// (critério de aceite 1) e as tranches mudariam de valor porque alguém mexeu
+// num controle de EXIBIÇÃO.
+//
+// Estes testes chamam `_recalcular()` na classe REAL — o mesmo método privado
+// que `_carregar()` e o seletor de fase disparam —, no molde de
+// `frontend/carregamento-corrida.test.ts`: `LitElement` se instancia em Node
+// sem `customElements` nem `document` porque `_recalcular` não toca o DOM (só
+// lê `this.dados` e escreve `@state()`).
+
+const RECEITAS_DUAS_FASES = [
+  { ...RECEITAS_INCORPORACAO[0], id: 1, nome: 'Torre A', fase_label: 'lancamento' },
+  {
+    id: 2, nome: 'Torre B', fase_label: 'fase 2',
+    tipologias: [{ id: 2, quantidade: 60, area_privativa_m2: 70, preco_m2: 12_000 }],
+    absorcao: { modo: 'linear' },
+    fluxo_pagamento: PAGAMENTO,
+  },
+];
+
+function telaComDuasFases(faseFiltro: string) {
+  const el: any = new ViabFluxoVer();
+  el.estudo = { id: 1, nivel_analise: 'avancado' };
+  el.operacoes = TRES_OPERACOES;
+  el.faseFiltro = faseFiltro;
+  el.dados = {
+    receitas: RECEITAS_DUAS_FASES, custos: CUSTOS, curvas: [], tipologias: [],
+    crono: CRONO, dataInicio: 'jan/2027', taxa: 12, ret: { ativo: true, pct: 4 },
+  };
+  el._recalcular();
+  return el;
+}
+
+test('#594 P1: o filtro de fase move `calc`, e NÃO move `calcProjeto`', () => {
+  const semFiltro = telaComDuasFases('');
+  const comFiltro = telaComDuasFases('lancamento');
+
+  const area = areaPrivativaTotalLinhas(RECEITAS_DUAS_FASES);
+  const roiPainel = proformaAvancado(semFiltro.calcProjeto, area).roiPct;
+
+  // O filtro precisa MESMO mudar a exibição, senão o teste não exercita nada.
+  assert.notEqual(
+    roiProjetoAnalise(comFiltro.calc, area), roiProjetoAnalise(semFiltro.calc, area),
+    'o filtro de fase não mudou `calc` — a fixture não exercita o defeito',
+  );
+
+  // …e não pode mudar o insumo dos cards do projeto.
+  assert.equal(roiProjetoAnalise(comFiltro.calcProjeto, area), roiPainel);
+  assert.equal(roiProjetoAnalise(semFiltro.calcProjeto, area), roiPainel);
+});
+
+test('#594 P1: o filtro de fase não move as tranches nem o resíduo do incorporador', () => {
+  const semFiltro = telaComDuasFases('');
+  const comFiltro = telaComDuasFases('lancamento');
+
+  const soma = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
+  const residuo = (el: any) => soma(el.fundingCalcProjeto.noFluxo.fluxoMensal);
+  const perfil = (el: any) => tranchesDeInvestimento(el.fundingCalcProjeto)
+    .map((s) => JSON.stringify(indicadoresOperacao(s, 12)));
+
+  // Controle: o par de EXIBIÇÃO muda mesmo — é o que torna o defeito possível.
+  assert.notEqual(
+    soma(comFiltro.fundingCalc.noFluxo.fluxoMensal),
+    soma(semFiltro.fundingCalc.noFluxo.fluxoMensal),
+    'o filtro não mudou `fundingCalc` — a fixture não exercita o defeito',
+  );
+
+  assert.equal(residuo(comFiltro), residuo(semFiltro));
+  assert.deepEqual(perfil(comFiltro), perfil(semFiltro));
+  assert.equal(perfil(semFiltro).length, 2, 'a fixture perdeu as duas tranches');
+});
+
+test('#594 P1: sem filtro, o par do projeto é o MESMO objeto do par de exibição', () => {
+  // Identidade referencial, e não igualdade de valor: prova que o caminho comum
+  // não paga um segundo `calcularFluxo`. Se alguém trocar por uma cópia, o
+  // custo dobra em toda tela de Resultados sem nada ficar vermelho — por isso a
+  // asserção é de identidade.
+  const el = telaComDuasFases('');
+  assert.equal(el.calcProjeto, el.calc);
+  assert.equal(el.fundingCalcProjeto, el.fundingCalc);
+});
+
+test('#594 P1: a Análise Financeira lê `calcProjeto`/`fundingCalcProjeto`, não os filtrados', () => {
+  assert.ok(
+    semComentarios.includes('this._renderRoiProjeto(this.calcProjeto ?? c)'),
+    'o card de ROI voltou a receber o `FluxoCalc` filtrado pela fase',
+  );
+  assert.ok(
+    semComentarios.includes('const fundingProjeto = this.fundingCalcProjeto;'),
+    'a abertura por parte voltou a ler `fundingCalc` (filtrado) em vez de `fundingCalcProjeto`',
+  );
+  assert.ok(
+    semComentarios.includes('tranchesDeInvestimento(fundingProjeto)'),
+    'as tranches deixaram de sair do funding do projeto inteiro',
   );
 });

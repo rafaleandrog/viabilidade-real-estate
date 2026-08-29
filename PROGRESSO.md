@@ -53,6 +53,23 @@ prova ligação — classe de defeito nº 1 do `CLAUDE.md`.
 > aqui é o desfecho certo: a tela publica "—" no MOIC em vez de "0,00×", que afirmaria que o
 > investidor perdeu tudo.
 
+> 🔴 **O achado P1 do App de revisão, e ele não era do cálculo nem da fiação — era da ESCOLHA DO
+> INSUMO.** `_recalcular` recorta as linhas de **receita** pela fase selecionada e mantém **todos**
+> os custos. Isso é correto para a tabela e os gráficos, que mostram a fase — e é ruína para um card
+> que se anuncia como "do projeto": com uma fase ligada, o ROI da Análise Financeira **deixaria de
+> bater com a coluna do Painel de estudos** (o critério 1 que este PR existe para cumprir), e as
+> tranches e o resíduo do incorporador mudariam de valor porque alguém mexeu num **controle de
+> exibição**. Medido na fixture do caso de render: **29,1% da fase contra 148,3% do projeto**.
+>
+> O conserto é um segundo par `calcProjeto`/`fundingCalcProjeto`, sempre sem filtro — e **sem filtro
+> ele é o MESMO objeto** do par de exibição, então o caminho comum não paga cálculo nenhum a mais
+> (asserção de **identidade referencial**, não de igualdade). Os dois cards leem só esse par, e a
+> tela **avisa** que o filtro não os afeta.
+>
+> A lição, que vale além desta issue: um indicador não é definido só pela fórmula. **O insumo é
+> metade da definição**, e é a metade que nenhum teste de função pura enxerga — a função estava
+> certa nos dois casos.
+
 **Fora de escopo, e declarado:** as saídas (b) exposição máxima como proxy de capital próprio e (c)
 campo de aporte próprio do incorporador dependem de decisão do autor — a issue as registra como tal.
 
