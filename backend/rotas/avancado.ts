@@ -1724,7 +1724,9 @@ const CAMPOS_FASE_COPIA = ['tipo', 'nome', 'ordem', 'inicio_mes', 'duracao_meses
 const CAMPOS_ALOCACAO_COPIA = ['unidades', 'preco_m2', 'ordem'];
 
 export async function duplicarDadosAvancado(req: Request, origId: number, novoId: number): Promise<void> {
-  // Cronograma (5 eventos).
+  // Cronograma (5 eventos FIXOS por estudo — `avancado_cronograma` nunca tem
+  // mais linhas que isso, então `por_pagina: 10` não é o defeito da #634:
+  // não há "página 2" possível aqui).
   const crono = await req.dados!.listar('avancado_cronograma', {
     filtros: { estudo_id: origId }, por_pagina: 10,
   });
@@ -1734,12 +1736,21 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     });
   }
 
+  // #634: as cinco leituras abaixo (tipologias, fases, alocações, linhas de
+  // custo, operações de funding, cenários) usavam `listar(..., por_pagina: N)`
+  // com N fixo — a mesma armadilha em cada uma: um estudo com MAIS linhas que
+  // o `por_pagina` escrito perde, em silêncio, tudo que está além da página 1.
+  // O verbo da plataforma para "todas as linhas, custe o que custar o tamanho
+  // da tabela" é `varrerTudo` (shell ≥ 0.53.8 — já é o piso deste app), não um
+  // `por_pagina` grande o bastante para caber "por enquanto"
+  // (`docs/shell/banco-de-dados.md` § "varrerTudo", no monorepo).
+  //
   // Catálogo de tipologias (nível estudo) — mapeando id antigo → novo.
-  const tipologias = await req.dados!.listar('avancado_tipologias', {
-    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
+  const tipologias = await req.dados!.varrerTudo('avancado_tipologias', {
+    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   const mapaTipologia = new Map<number, number>();
-  for (const tip of tipologias.dados) {
+  for (const tip of tipologias) {
     const nova = await req.dados!.criar('avancado_tipologias', {
       estudo_id: novoId, ...extrairCampos(tip, CAMPOS_TIPOLOGIA),
     });
@@ -1748,16 +1759,16 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
 
   // Fases + alocações (mapeando fase antiga → nova e tipologia antiga → nova).
   const [fases, alocacoes] = await Promise.all([
-    req.dados!.listar('avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
-    req.dados!.listar('avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 1000 }),
+    req.dados!.varrerTudo('avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
+    req.dados!.varrerTudo('avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
   ]);
   const mapaFase = new Map<number, number>();
-  for (const fase of fases.dados) {
+  for (const fase of fases) {
     const nova = await req.dados!.criar('avancado_fases', {
       estudo_id: novoId, ...extrairCampos(fase, CAMPOS_FASE_COPIA),
     });
     mapaFase.set(Number(fase.id), Number(nova.id));
-    for (const aloc of alocacoes.dados) {
+    for (const aloc of alocacoes) {
       if (Number(aloc.fase_id) !== Number(fase.id)) continue;
       const novaTipologia = mapaTipologia.get(Number(aloc.tipologia_id));
       if (!novaTipologia) continue; // tipologia órfã (não deveria ocorrer)
@@ -1771,11 +1782,18 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   // Linhas de custo (curva_id copia direto — curvas são globais da instância;
   // fase_ancora_id remapeia para a fase NOVA, #167 — copiar o id antigo
   // apontaria para uma fase de outro estudo).
-  const custos = await req.dados!.listar('avancado_linhas_custo', {
-    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 500,
+  //
+  // #634 — ERA `listar(..., por_pagina: 500)`: um estudo com mais de 500
+  // linhas de custo perdia, em silêncio, tudo além da 500ª — e `mapaCusto`
+  // (usado logo abaixo para remapear `custo_linha_ids` do funding) cobria só
+  // as 500 lidas, então uma operação de funding cujo `custo_linha_ids`
+  // incluísse uma linha além da página 1 tratava esse id como órfão e o
+  // descartava, mesmo a linha existindo no original.
+  const custos = await req.dados!.varrerTudo('avancado_linhas_custo', {
+    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   const mapaCusto = new Map<number, number>();
-  for (const custo of custos.dados) {
+  for (const custo of custos) {
     const copia: Record<string, any> = { estudo_id: novoId, ...extrairCampos(custo, CAMPOS_CUSTO) };
     if (custo.fase_ancora_id !== null && custo.fase_ancora_id !== undefined) {
       copia.fase_ancora_id = mapaFase.get(Number(custo.fase_ancora_id)) ?? null;
@@ -1799,10 +1817,10 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   // Dois remapeamentos, pelo mesmo motivo dos de cima: `fase_ancora_id` (a
   // fase que ancora o aporte) e `custo_linha_ids` (a base do financiamento à
   // produção, uma lista de ids em JSON).
-  const operacoes = await req.dados!.listar('avancado_funding_operacoes', {
-    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 200,
+  const operacoes = await req.dados!.varrerTudo('avancado_funding_operacoes', {
+    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
-  for (const op of operacoes.dados) {
+  for (const op of operacoes) {
     const copia: Record<string, any> = { estudo_id: novoId, ...extrairCampos(op, CAMPOS_OPERACAO) };
     if (op.fase_ancora_id !== null && op.fase_ancora_id !== undefined) {
       copia.fase_ancora_id = mapaFase.get(Number(op.fase_ancora_id)) ?? null;
@@ -1814,10 +1832,10 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   }
 
   // Cenários salvos (Etapa 8 · #56) — deltas percentuais, sem dado derivado.
-  const cenarios = await req.dados!.listar('avancado_cenarios', {
-    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc', por_pagina: 200,
+  const cenarios = await req.dados!.varrerTudo('avancado_cenarios', {
+    filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
-  for (const cen of cenarios.dados) {
+  for (const cen of cenarios) {
     await req.dados!.criar('avancado_cenarios', {
       estudo_id: novoId, ...extrairCampos(cen, CAMPOS_CENARIO),
     });
