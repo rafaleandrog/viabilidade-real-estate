@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { varrerTudo } from './varrer-tudo.js';
 import { exigirMembro, exigirEditor, exigirAprovador } from '../permissoes-estudo.js';
 
 // Rotas do nível AVANÇADO (fluxo de caixa temporal). Todo o conjunto só opera
@@ -1740,13 +1741,19 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   // custo, operações de funding, cenários) usavam `listar(..., por_pagina: N)`
   // com N fixo — a mesma armadilha em cada uma: um estudo com MAIS linhas que
   // o `por_pagina` escrito perde, em silêncio, tudo que está além da página 1.
-  // O verbo da plataforma para "todas as linhas, custe o que custar o tamanho
-  // da tabela" é `varrerTudo` (shell ≥ 0.53.8 — já é o piso deste app), não um
-  // `por_pagina` grande o bastante para caber "por enquanto"
-  // (`docs/shell/banco-de-dados.md` § "varrerTudo", no monorepo).
+  // A resposta é varrer TODAS as páginas, não escolher um `por_pagina` grande o
+  // bastante para caber "por enquanto" — o helper local `varrerTudo`
+  // (`backend/rotas/varrer-tudo.ts`), que documenta por que a varredura é da
+  // app e não do `dados` do shell.
+  //
+  // ⚠️ A redação anterior deste comentário citava `docs/shell/banco-de-dados.md`
+  // "no monorepo", e essa citação FOI a causa do defeito: o `main` do monorepo
+  // não é o contrato desta app — o SDK publicado é, e o que ela fixa (0.50.3)
+  // não declara `dados.varrerTudo`. Escrever contra o `main` é o vetor de
+  // contaminação que o CI acusou com seis `TS2339`.
   //
   // Catálogo de tipologias (nível estudo) — mapeando id antigo → novo.
-  const tipologias = await req.dados!.varrerTudo('avancado_tipologias', {
+  const tipologias = await varrerTudo(req.dados!, 'avancado_tipologias', {
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   const mapaTipologia = new Map<number, number>();
@@ -1759,8 +1766,8 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
 
   // Fases + alocações (mapeando fase antiga → nova e tipologia antiga → nova).
   const [fases, alocacoes] = await Promise.all([
-    req.dados!.varrerTudo('avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
-    req.dados!.varrerTudo('avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
+    varrerTudo(req.dados!, 'avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
+    varrerTudo(req.dados!, 'avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
   ]);
   const mapaFase = new Map<number, number>();
   for (const fase of fases) {
@@ -1789,7 +1796,7 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   // as 500 lidas, então uma operação de funding cujo `custo_linha_ids`
   // incluísse uma linha além da página 1 tratava esse id como órfão e o
   // descartava, mesmo a linha existindo no original.
-  const custos = await req.dados!.varrerTudo('avancado_linhas_custo', {
+  const custos = await varrerTudo(req.dados!, 'avancado_linhas_custo', {
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   const mapaCusto = new Map<number, number>();
@@ -1817,7 +1824,7 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   // Dois remapeamentos, pelo mesmo motivo dos de cima: `fase_ancora_id` (a
   // fase que ancora o aporte) e `custo_linha_ids` (a base do financiamento à
   // produção, uma lista de ids em JSON).
-  const operacoes = await req.dados!.varrerTudo('avancado_funding_operacoes', {
+  const operacoes = await varrerTudo(req.dados!, 'avancado_funding_operacoes', {
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   for (const op of operacoes) {
@@ -1832,7 +1839,7 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   }
 
   // Cenários salvos (Etapa 8 · #56) — deltas percentuais, sem dado derivado.
-  const cenarios = await req.dados!.varrerTudo('avancado_cenarios', {
+  const cenarios = await varrerTudo(req.dados!, 'avancado_cenarios', {
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   for (const cen of cenarios) {
