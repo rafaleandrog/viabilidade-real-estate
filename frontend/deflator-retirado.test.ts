@@ -95,12 +95,19 @@ function inventario(alvo: string): Record<string, number> {
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. A COLUNA: declarada uma vez no schema, lida em lugar nenhum.
 // ─────────────────────────────────────────────────────────────────────────────
-test('#584 caminho A: `deflator_area_aberta_pct` só existe na declaração do schema — nenhum leitor', () => {
+test('#584 caminho A: `deflator_area_aberta_pct` não tem LEITOR — só a declaração e o filtro', () => {
   assert.deepEqual(inventario('deflator_area_aberta_pct'), {
     // A coluna INERTE. Sai daqui só por migração com `dados.limparColuna`, que
     // é mudança de schema (migração nova + bump de `versao`) e por isso ficou
     // fora do escopo desta issue — está declarada como issue futura no PR.
     'schema.json': 1,
+    // ⚠️ NÃO é leitor: é o FILTRO que impede o campo de alcançar o validador
+    // do shell num PATCH de estudo Preliminar. `tela-premissas.ts:477` monta o
+    // form com `{ ...this.estudo }` e `:1313-1320` reenvia o registro inteiro,
+    // então o campo VIAJA no payload mesmo sem nenhuma tela para editá-lo.
+    // Enquanto a coluna existir, esta entrada tem de existir — o valor nunca é
+    // lido, apenas descartado. Ela morre junto com a coluna, não antes.
+    'backend/rotas/estudos.ts': 1,
   });
 });
 
@@ -110,12 +117,37 @@ test('#584 caminho A: `deflator_area_aberta_pct` só existe na declaração do s
 //
 // A #462 tornou `deflatorPct` OBRIGATÓRIO justamente para que apagá-lo virasse
 // `TS2554` em vez de silêncio. Retirado o deflator, a defesa equivalente é esta:
-// o identificador não pode reaparecer em canto nenhum do código — nem como
-// parâmetro opcional com default, que é a armadilha nomeada pela issue.
-test('#584 critério 2: nenhum identificador de deflator sobrou no código', () => {
-  for (const alvo of ['deflatorPct', 'deflatorAreaAbertaPct', 'draftDeflator', 'salvandoDeflator']) {
-    assert.deepEqual(inventario(alvo), {}, `identificador "${alvo}" ainda existe no código`);
+// o identificador não pode reaparecer em canto nenhum do código de produção —
+// nem como parâmetro opcional com default, que é a armadilha nomeada pela issue.
+//
+// A conta é por CONTAGEM EXATA por arquivo, não por ausência: o único
+// sobrevivente legítimo é o ORÁCULO da fórmula antiga, e ele precisa continuar
+// existindo (é o que prova o critério 3). Chavear por presença deixaria um
+// consumidor novo entrar de carona nessa exceção; chavear o arquivo inteiro
+// como dispensado cegaria a conferência dele para sempre.
+const IDENTIFICADORES: { alvo: string; esperado: Record<string, number>; motivo: string }[] = [
+  {
+    alvo: 'deflatorPct',
+    esperado: { 'frontend/fluxo-shared.test.ts': 2 },
+    motivo: 'o oráculo `antiga(t, deflatorPct)` do teste `#584 critério 3` — transcrição literal '
+      + 'da fórmula da #462, que é contra o que a fórmula nova é conferida. Sem ele o critério 3 '
+      + 'volta a ser uma fixture só. Duas ocorrências: o parâmetro e a leitura dele.',
+  },
+  { alvo: 'deflatorAreaAbertaPct', esperado: {}, motivo: 'campo de FluxoConfig/ContextoCusto — extinto' },
+  { alvo: 'draftDeflator', esperado: {}, motivo: 'estado da UI de Receitas — extinto' },
+  { alvo: 'salvandoDeflator', esperado: {}, motivo: 'estado da UI de Receitas — extinto' },
+];
+
+test('#584 critério 2: nenhum identificador de deflator sobrou no código de produção', () => {
+  for (const { alvo, esperado, motivo } of IDENTIFICADORES) {
+    assert.deepEqual(inventario(alvo), esperado, `"${alvo}" divergiu do inventário — ${motivo}`);
   }
+  // O oráculo do critério 3 tem de continuar EXISTINDO: se ele sumir, o
+  // critério 3 perde a única prova de que nenhum número mudou.
+  assert.ok(
+    IDENTIFICADORES[0].esperado['frontend/fluxo-shared.test.ts'] > 0,
+    'o oráculo da fórmula antiga foi removido do inventário',
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

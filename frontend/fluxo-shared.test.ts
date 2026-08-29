@@ -97,15 +97,63 @@ test('#584 regressão: área aberta 0/ausente não muda o VGV', () => {
 });
 
 // #584 critério 3: o estudo com `deflator_area_aberta_pct = 0` — o PADRÃO do
-// schema, e portanto a esmagadora maioria — NÃO muda de número. Prova direta:
-// a fórmula antiga com deflator 0 era `fechada×preço + aberta×preço×(1−0)`, e
-// é exatamente o que a fórmula nova calcula, COM área aberta > 0.
-test('#584 critério 3: com deflator 0 o VGV é idêntico ao de antes, mesmo com área aberta > 0', () => {
-  const t = { quantidade: 10, area_privativa_m2: 70, area_privativa_aberta_m2: 12, preco_m2: 10000 };
-  // Oráculo escrito à mão com a fórmula ANTIGA e deflatorPct = 0:
-  //   10 × (70×10.000 + 12×10.000×(1 − 0/100)) = 10 × 820.000 = 8.200.000
-  assert.equal(vgvTipologia(t), 8_200_000);
-  assert.equal(vgvLinha([t]), 8_200_000);
+// schema, e portanto a esmagadora maioria — NÃO muda de número.
+//
+// ⚠️ **UMA FIXTURE NÃO PROVA ISTO, e a primeira versão deste teste era uma só.**
+// A fórmula antiga com deflator 0 é `fechada×preço + aberta×preço×(1−0)`. Ela e
+// a forma FATORADA `(fechada + aberta) × preço` são algebricamente iguais e
+// **numericamente diferentes**: reassociar a soma muda o último bit. Medido em
+// 400.000 insumos plausíveis (áreas e preço em `decimal(…,2)`, quantidade
+// inteira), 31% divergem em float e **0,6% ainda divergem R$ 0,01 depois do
+// `round2`** — o suficiente para violar este próprio critério, em silêncio, num
+// estudo real. A fixture 70/12/10.000 que estava aqui é justamente uma das que
+// NÃO divergem: ela teria deixado o defeito passar verde.
+//
+// Por isso a trava é uma VARREDURA contra a fórmula antiga LITERAL, não um
+// oráculo escrito à mão. Ela reprova qualquer reassociação futura de
+// `vgvUnitarioTipologia`.
+test('#584 critério 3: com deflator 0 o VGV é bit a bit idêntico ao de antes — varredura, não fixture', () => {
+  // A fórmula ANTIGA, transcrita literal de `git show 3d0fc57:frontend/fluxo-shared.ts`,
+  // com o deflator fixado em 0. É o oráculo.
+  const antiga = (t: any, deflatorPct: number) => {
+    const preco = Number(t?.preco_m2) || 0;
+    const deflator = (Number(deflatorPct) || 0) / 100;
+    return (Number(t?.quantidade) || 0)
+      * ((Number(t?.area_privativa_m2) || 0) * preco
+        + (Number(t?.area_privativa_aberta_m2) || 0) * preco * (1 - deflator));
+  };
+
+  // Varredura determinista (LCG semeado) — mesma sequência em toda máquina.
+  let s = 12345;
+  const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  const c2 = (v: number) => Math.round(v * 100) / 100; // o que decimal(…,2) guarda
+  let conferidos = 0;
+  for (let i = 0; i < 20_000; i++) {
+    const t = {
+      area_privativa_m2: c2(rnd() * 20_000),
+      area_privativa_aberta_m2: c2(rnd() * 2_000),
+      preco_m2: c2(rnd() * 30_000),
+      quantidade: 1 + Math.floor(rnd() * 500),
+    };
+    // IGUALDADE ESTRITA, não `perto`: o critério é "nenhum número muda", e um
+    // épsilon aqui esconderia exatamente o centavo que este teste caça.
+    assert.equal(vgvTipologia(t), antiga(t, 0), `divergiu em ${JSON.stringify(t)}`);
+    conferidos += 1;
+  }
+  assert.equal(conferidos, 20_000);
+
+  // E o caso concreto que a forma fatorada errava por R$ 0,01 depois do round2:
+  const armadilha = {
+    quantidade: 485, area_privativa_m2: 904.09, area_privativa_aberta_m2: 1522.1, preco_m2: 6266.9,
+  };
+  assert.equal(round2(vgvTipologia(armadilha)), 7_374_274_703.83);
+  assert.notEqual(round2(vgvTipologia(armadilha)), 7_374_274_703.84); // o que `(f+a)×p` daria
+
+  // A fixture original continua, como leitura humana do que a fórmula faz:
+  //   10 × (70×10.000 + 12×10.000) = 10 × 820.000 = 8.200.000
+  const simples = { quantidade: 10, area_privativa_m2: 70, area_privativa_aberta_m2: 12, preco_m2: 10000 };
+  assert.equal(vgvTipologia(simples), 8_200_000);
+  assert.equal(vgvLinha([simples]), 8_200_000);
 });
 
 // #462: dois testes de precisão que provam coisas DIFERENTES (decisão 4 do

@@ -162,7 +162,7 @@ const n = (v: any): number => Number(v) || 0;
 
 /**
  * Preço efetivo (R$/unidade) de uma tipologia: a área FECHADA e a área ABERTA
- * valem as duas o preço CHEIO — `(fechada + aberta) × preço`.
+ * valem as duas o preço CHEIO — `fechada × preço + aberta × preço`.
  *
  * #584 (decisão do autor): o deflator de preço da área aberta, introduzido
  * pela #462 (`estudos.deflator_area_aberta_pct`), foi RETIRADO. Não ficou
@@ -170,10 +170,23 @@ const n = (v: any): number => Number(v) || 0;
  * deflator, e a coluna sobrevive apenas no `schema.json`, sem leitor
  * (caminho A da #584). Área aberta ausente/0 continua reproduzindo
  * exatamente `area_privativa_m2 × preco_m2`.
+ *
+ * ⚠️ **A ASSOCIAÇÃO É DELIBERADA — não "simplifique" para `(fechada + aberta) × preço`.**
+ * A forma antiga era `fechada × preço + aberta × preço × (1 − deflator)`, e com
+ * `deflator = 0` (o padrão do schema, e a esmagadora maioria dos estudos) ela é
+ * `fechada × preço + aberta × preço` — **bit a bit**, porque `1 − 0 === 1` e
+ * `x * 1 === x` são exatos em IEEE-754. Fatorar o preço **reassocia** a soma e
+ * muda o último bit: medido em 400.000 insumos plausíveis, 31% divergem em
+ * float e **0,6% ainda divergem R$ 0,01 DEPOIS do `round2`** (ex.: fechada
+ * 904,09 m², aberta 1.522,10 m², R$ 6.266,90/m², 485 un. → 7.374.274.703,83
+ * pela forma preservada, 7.374.274.703,84 pela fatorada). Isso violaria o
+ * critério 3 da #584 — "nenhum número muda em estudo com deflator 0". A trava
+ * é `#584 critério 3` em `frontend/fluxo-shared.test.ts`, que compara contra a
+ * fórmula ANTIGA literal ao longo de uma varredura, não contra uma fixture só.
  */
 function vgvUnitarioTipologia(t: any): number {
   const preco = n(t?.preco_m2);
-  return (n(t?.area_privativa_m2) + n(t?.area_privativa_aberta_m2)) * preco;
+  return n(t?.area_privativa_m2) * preco + n(t?.area_privativa_aberta_m2) * preco;
 }
 
 /** VGV de uma tipologia: quantidade × preço efetivo (fechada + aberta, as
