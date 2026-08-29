@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { join, relative, sep } from 'node:path';
+import { join } from 'node:path';
 import { vgvTipologia, vgvLinha, vgvVendavelLinha } from './fluxo-shared.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,18 +63,33 @@ const semComentarios = (texto: string) => texto
 
 const ocorrencias = (texto: string, alvo: string) => texto.split(alvo).length - 1;
 
-function* fontes(dir: string = RAIZ): Generator<string> {
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const abs = join(dir, e.name);
-    if (e.isDirectory()) {
-      if (PULAR_DIR.has(e.name)) continue;
-      yield* fontes(abs);
-      continue;
-    }
-    if (!e.isFile()) continue;
-    const ponto = e.name.lastIndexOf('.');
-    if (ponto < 0 || !EXT.has(e.name.slice(ponto).toLowerCase())) continue;
-    yield relative(RAIZ, abs).split(sep).join('/');
+// A varredura enumera FONTE VERSIONADA (`git ls-files`), e não o que estiver no
+// disco. O eixo é esse de propósito: "é fonte do repositório" é a propriedade
+// que a regra fala, enquanto "tem um nome que alguém lembrou de pular" é uma
+// lista que envelhece calada.
+//
+// ⚠️ Foi exatamente essa diferença que reprovou este teste SÓ NO CI. O passo
+// `Build` do `validation.yml` roda antes dos testes e gera `backend/rotas.js`
+// (bundle self-contained, ignorado pelo git — ver `.gitignore:5`). A varredura
+// de disco enxergava o bundle no runner e não o enxergava na árvore local, e o
+// inventário vinha com uma entrada a mais: `'backend/rotas.js': 1`. Verde
+// localmente, vermelho no CI, sem nada de errado no produto.
+//
+// Com `git ls-files` qualquer artefato de build FUTURO fica de fora sozinho,
+// sem entrada nova em lista nenhuma — que é a diferença entre consertar o eixo
+// e remendar o sintoma.
+function* fontes(): Generator<string> {
+  const saida = execFileSync('git', ['ls-files', '-z'], {
+    cwd: RAIZ,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  for (const rel of saida.split('\0')) {
+    if (!rel) continue;
+    if (rel.split('/').some((seg) => PULAR_DIR.has(seg))) continue;
+    const ponto = rel.lastIndexOf('.');
+    if (ponto < 0 || !EXT.has(rel.slice(ponto).toLowerCase())) continue;
+    yield rel;
   }
 }
 
