@@ -1797,7 +1797,7 @@ A permuta física:
 > calcula o KPI como `quantidade × area_privativa_m2 × preco_m2` da tipologia alocada
 > (`frontend/fluxo-caixa-motor.ts:85`), **sem ler `orcamento_valor`**. Quem procurar uma entrada de
 > valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
-> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:770`, #253); a coluna permanece no
+> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:779`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
 > (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1811`) e a projeta de volta nas tipologias uma
 > única vez (`:1821-1828`), para que toda função que já lia `t.unidades_permutadas` fique correta

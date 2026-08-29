@@ -4,6 +4,66 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #590 + #514 · badge "% Obra" tomava 400 e, se só isso fosse consertado, gravaria o número errado (2026-08-29)
+
+Trilho P1 da Rodada 10 — as duas issues descrevem a MESMA badge (`Custos → Obras`, categoria
+`Gestão da obra`) e saem juntas porque consertar uma sem a outra embarca um bug: só #590 faz o
+`PATCH` passar, mas grava `canonico / vgv × 100`; só #514 acerta a conta, mas o `PATCH` continua
+tomando `400`.
+
+**#590 — o backend recusava `orcamento_unidade: 'pct_obra'`.** `schema.json`, a tela e o motor
+(`fluxo-shared.ts`, `case 'pct_obra'`) já concordavam; só `UNIDADES_ORCAMENTO`
+(`backend/rotas/avancado.ts`) estava sem a entrada — três listas escritas à mão descrevendo o mesmo
+enum, uma delas divergindo em silêncio. Clicar na badge (a ÚNICA percentual que `Gestão da obra`
+oferece) disparava `400 UNIDADE_INVALIDA`.
+
+**Conserto:** `pct_obra` entrou em `UNIDADES_ORCAMENTO`. Para a divergência não voltar a nascer em
+silêncio, `UNIDADES_ORCAMENTO`/`GRUPOS_CUSTO`/`EVENTOS_ANCORA`/`MODOS_DISTRIBUICAO` (avancado.ts) e
+`TIPOS_OPERACAO`/`MODOS_RETORNO`/`EVENTOS_ANCORA` (funding.ts) viraram exportadas e ganharam teste de
+**igualdade exata de conjunto** contra os `opcoes` do `schema.json`
+(`backend/rotas/avancado-schema-enums.test.ts`) — reprova entrada a mais OU a menos, testado nos
+dois sentidos. **Varredura dos vizinhos (critério 4 da issue): zero divergências** — só
+`orcamento_unidade` estava fora de sincronia; as outras seis listas já batiam, e agora têm guarda de
+regressão.
+
+**Prova de fiação de ponta a ponta** (`backend/rotas/avancado-custos-rota.test.ts`): Express real,
+`rotasAvancado` montada como o shell monta, `PATCH` HTTP de verdade — não chamada de função pura.
+Confirmado por mutação: revertendo o conserto, o teste de `200` e o controle negativo ficam
+vermelhos.
+
+**#514 — a badge convertia sobre a base errada.** `CONV_UNIDADE.pct_obra`
+(`frontend/tela-fluxo-custos.ts`) usava `link: 'vgv'` enquanto o motor aplica `ctx.totalObra`; erro
+de 3,4× no exemplo do autor (Obra R$ 50M, VGV R$ 171,4M — digitar 10% devia gravar R$ 5M, gravava
+R$ 17,1M). `LinkKey` (`frontend/premissas-conversao.ts`) nem tinha chave `obra`.
+
+**Conserto:** `LinkKey` ganhou `obra`; `_ctxConversao()` passa a fornecer `obra: this._totalObra`
+(o getter já existia, só não alimentava a conversão); `CONV_UNIDADE.pct_obra` passa a usar
+`link: 'obra'`. ⚠️ Muda o número EXIBIDO em estudo existente na badge "% Obra" — o canônico não
+muda (o motor sempre usou `totalObra`), só o rótulo passa a dizer a verdade.
+
+**Testes** (`frontend/premissas-conversao.test.ts`): `daBase(pct_obra,…)` com o exemplo do autor
+devolve `10`, não `2,9163…`; ida e volta grava/lê R$ 5.000.000; `totalObra` ausente/zero não grava
+número nem troca a unidade; o invariante dos SEIS destinos (que antes era vácuo para `pct_obra`,
+porque `ctx.vgv` sempre existia e mascarava a ausência de `ctx.obra`) agora exerce a conta de
+verdade; teste de regressão lendo `tela-fluxo-custos.ts` confirma que `link: 'vgv'` não aparece mais
+na declaração. Confirmado por mutação: revertendo para `link: 'vgv'`, esse último teste fica
+vermelho.
+
+Sem migração nas duas → a `versao` não bumpa. `validar-backend.sh` não roda nesta sessão (401 do
+SDK, etapa 1/5) — testes de backend executados diretamente via `tsx` (módulos tocados não importam
+o SDK); typecheck do backend fica pendente do autor no ambiente autenticado.
+
+**Rodada de revisão (Codex, PR #643) achou um P2 real, e ele foi consertado na mesma rodada.**
+`_totalObra` contava a PRÓPRIA linha na base ao converter uma linha de Obra (em `rs` ou outra
+unidade) para `pct_obra` — ela só sai do filtro por unidade depois que o `PATCH` volta e
+`this.custos` é atualizado. Exemplo: Construção R$50M + Gestão R$5M (ambas `rs`); converter Gestão
+para `% Obra` gravava `5/(50+5)×100 = 9,09%`, e a tela passava a mostrar `10%` assim que a resposta
+chegasse — `orcamento_valor` persistido divergindo do que a tela exibe, o invariante que a #442
+existe para proteger. O canônico (R$5M) não era afetado, então o motor de Fluxo de Caixa continuava
+correto; o dano ficava contido ao rótulo percentual, numa janela estreita. **Conserto:** `_totalObra`
+virou método com `excluirId` opcional; `_ctxConversao` propaga `c.id` nos 5 call sites. Guarda de
+regressão por leitura de fonte em `frontend/premissas-conversao.test.ts` (nenhum teste importa o
+componente Lit), confirmada por mutação nos 5 pontos.
 ## A linha de deduções deixa de ser pintada como receita no Fluxo de Caixa — #591 (2026-08-29)
 
 Rodada 10, item A10-12. Pedido do autor, literal: *"Arrumar linha no fluxo de Impostos que aparece
