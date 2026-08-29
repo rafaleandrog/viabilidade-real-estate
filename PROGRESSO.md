@@ -65,10 +65,10 @@ O conserto é a mesma função nas três células, com o mesmo mapeamento do Pre
 `livre` como `receita`, `real` como `resultado`, e a linha do efeito do funding como `custo`, isto
 é, **sem sinal de propósito** — ali o negativo é o estado normal.
 
-**A causa raiz não era o cálculo, era a AUSÊNCIA de caso de render.** Nenhum dos 57 casos da `main`
-(nem os 2 que este PR acrescentou) exercitava `vista: 'analise'` — só `'proforma'` e
-`'fluxo-caixa'`. Enquanto a aba não for montada por algum caso, defeito de fiação nela é invisível
-para a suíte inteira. Daí a defesa ser um caso novo,
+**A causa raiz não era o cálculo, era a AUSÊNCIA de caso de render.** Na base deste PR, `vista:
+'analise'` não aparecia em caso NENHUM — os três que fixam a prop fixavam `'proforma'` ou
+`'fluxo-caixa'` (`git grep -n "vista:" <base> -- frontend/render/casos/`). Enquanto a aba não for
+montada por algum caso, defeito de fiação nela é invisível para a suíte inteira. Daí a defesa ser um caso novo,
 `frontend/render/casos/analise-financeira-sinal.ts` (estudo deficitário **com** funding, para que
 `livre` e `real` saiam os dois negativos), e não mais um teste de `sinalLinhaProformaAv` — a função
 já estava correta e verde o tempo todo, com a chamada ausente.
