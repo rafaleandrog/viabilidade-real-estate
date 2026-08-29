@@ -49,11 +49,17 @@ type AbaTopo = 'resumo' | 'empreendimento' | 'viabilidade' | 'obra' | 'fluxo' | 
 
 // Páginas (nível 1) — ordem da lista lateral (urbi-nav). O id 'obra' é
 // preservado como slug de rota; só o rótulo virou "Custos" (#40).
+// #589: Custos vem ANTES de Viabilidade, por pedido do autor. É ordem de
+// APRESENTAÇÃO e nada mais: o id da página de Custos continua 'obra' (#40), os
+// slugs públicos continuam vindo de SLUG_POR_ID/ID_POR_SLUG (#250/#350, mapas
+// por chave — indiferentes a posição) e a aba default continua 'resumo', fixada
+// no fallback do setter e no `_aba` inicial, não pela 1ª posição deste array.
+// Quem for "arrumar" esta lista: a inversão é o pedido, não um descuido.
 const PAGINAS: { id: AbaTopo; label: string }[] = [
   { id: 'resumo',         label: 'Resumo' },
   { id: 'empreendimento', label: 'Empreendimento' },
-  { id: 'viabilidade',    label: 'Viabilidade' },
   { id: 'obra',           label: 'Custos' },
+  { id: 'viabilidade',    label: 'Viabilidade' },
   { id: 'fluxo',          label: 'Resultados' },
   { id: 'cenarios',       label: 'Cenários' },
   { id: 'mercado',        label: 'Análise de mercado' },
