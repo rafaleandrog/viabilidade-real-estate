@@ -33,6 +33,25 @@ import {
   listarFundingOperacoes, listarTipologiasCatalogo,
 } from './viabilidade-api.js';
 
+/**
+ * #593 — sinal (`pos`/`neg`) da célula numérica da Proforma do Avançado.
+ *
+ * É o espelho de `sinalSensibilidade`/`ehLinhaReceitaOuResultado` do
+ * Preliminar (`frontend/tela-proforma.ts`, decisão da #567): só linha de
+ * RECEITA ou de RESULTADO ganha a classe; custo e informativo ficam sem
+ * nenhuma, porque ali o negativo é o estado normal — marcar "neg" numa linha
+ * de custo diria que algo está errado quando não está.
+ *
+ * Existe como função exportada, e não inline no template, por dois motivos:
+ * o mapeamento fica aferível sem montar a tela, e apagar a CHAMADA
+ * (`class="num ${sinal}"`) deixa o caso de render vermelho — que é onde a
+ * fiação é medida.
+ */
+export function sinalLinhaProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>): '' | 'pos' | 'neg' {
+  if (l.tipo !== 'receita' && l.tipo !== 'resultado') return '';
+  return l.valor < 0 ? 'neg' : 'pos';
+}
+
 // Sub-tela "Ver Fluxo" (nível Avançado): KPIs, tabela mensal com colunas fixas
 // (sticky) + scroll horizontal, e gráficos SVG de fluxo mensal e acumulado.
 // Todo o cálculo vem do motor puro (fluxo-caixa-motor). A tabela e os KPIs são
@@ -90,7 +109,43 @@ export class ViabFluxoVer extends LitElement {
     table.proforma th { color: var(--cor-texto-sec, rgba(255,255,255,0.55)); font-weight: 600; }
     table.proforma tr.n1 td:first-child { padding-left: 26px; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
     table.proforma tr.n0 td { font-weight: 700; border-top: 1px solid var(--cor-borda, rgba(255,255,255,0.14)); }
-    table.proforma tr.resultado td { border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.2)); }
+
+    /* #593 — cor por natureza de linha, o mesmo princípio que o Preliminar já
+       usa. As classes (receita / custo / resultado / informativo, mais n0/n1)
+       já chegavam ao DOM desde sempre; o que faltava eram as REGRAS.
+
+       As declarações abaixo são CÓPIA LITERAL das do Preliminar
+       (frontend/tela-proforma.ts) — mesmos tokens, mesmas proporções de
+       color-mix, mesmos fallbacks. Isso é critério de aceite da #593 (o
+       usuário que alterna entre os dois estudos lê a mesma convenção), e
+       frontend/proforma-cores.test.ts confronta os DOIS arquivos entre si:
+       mudar uma proporção aqui sem mudar lá (ou vice-versa) fica vermelho.
+       Não "ajuste" um valor isolado — a origem é o Preliminar.
+
+       Estas regras vêm DEPOIS de tr.n0 td de propósito: tr.receita td tem a
+       mesma especificidade, então quem decide é a ordem do arquivo. */
+    table.proforma tr.n1.custo { background: color-mix(in srgb, var(--cor-erro) 8%, transparent); }
+    table.proforma tr.n0.custo td {
+      font-weight: 700; background: var(--cor-superficie-hover, rgba(255,255,255,0.08));
+      color: var(--cor-texto-forte, rgba(255,255,255,0.95));
+    }
+    table.proforma tr.receita td {
+      background: color-mix(in srgb, var(--cor-sucesso) 14%, transparent);
+      color: var(--cor-sucesso);
+    }
+    /* #567 (herdada do Preliminar): receita NEGATIVA num estudo deficitário —
+       o verde fixo acima mentiria que é receita "boa". Precisa vir DEPOIS. */
+    table.proforma tr.receita td.neg {
+      background: color-mix(in srgb, var(--cor-erro) 14%, transparent);
+      color: var(--cor-erro);
+    }
+    table.proforma tr.resultado td {
+      font-weight: 800; font-size: 1.05rem; background: var(--cor-primaria-fundo, rgba(42,169,224,0.12));
+      color: var(--cor-texto-forte, rgba(255,255,255,0.95));
+      padding-top: 14px; border-top: 2px solid var(--cor-borda, rgba(255,255,255,0.12));
+    }
+    table.proforma tr.resultado td.pos { color: var(--cor-sucesso, #13A98D); }
+    table.proforma tr.resultado td.neg { color: var(--cor-erro, #D45A3A); }
     /* #447: linha informativa do funding — nunca somada, por isso o itálico
        e a borda tracejada (não é uma linha da hierarquia de totais acima). */
     table.proforma tr.informativo td {
@@ -307,13 +362,19 @@ export class ViabFluxoVer extends LitElement {
             <tr><th>Linha</th><th class="num">R$</th><th class="num">R$/m²</th><th class="num">% VGV</th></tr>
           </thead>
           <tbody>
-            ${linhas.map((l) => html`
+            ${linhas.map((l) => {
+              // #593 — mesma decisão do Preliminar (#567): o sinal vai nas TRÊS
+              // colunas numéricas, não só na de R$, para que o negativo de uma
+              // receita/resultado se leia igual em R$, R$/m² e % VGV.
+              const sinal = sinalLinhaProformaAv(l);
+              return html`
               <tr class=${`n${l.nivel} ${l.tipo}`}>
                 <td>${l.nome}${l.notaBase ? html` <span class="nota-base">(${l.notaBase})</span>` : ''}</td>
-                <td class="num">${fmtR$(l.valor)}</td>
-                <td class="num">${fmtNum(porM2(l.valor))}</td>
-                <td class="num">${fmtPct(l.pctOverride ?? pctVgv(l.valor))}</td>
-              </tr>`)}
+                <td class="num ${sinal}">${fmtR$(l.valor)}</td>
+                <td class="num ${sinal}">${fmtNum(porM2(l.valor))}</td>
+                <td class="num ${sinal}">${fmtPct(l.pctOverride ?? pctVgv(l.valor))}</td>
+              </tr>`;
+            })}
           </tbody>
         </table>
         <p class="sec">Área privativa: ${fmtNum(p.areaPrivativa)} m² · Margem sobre Receita Bruta: ${fmtPct(p.margemPct)}.

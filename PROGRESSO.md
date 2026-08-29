@@ -4,6 +4,51 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #593 · cor por natureza de linha na Proforma do Avançado (2026-08-29)
+
+Item 14 da leva Avançado da Rodada 10. Pedido do autor, literal: *"Modificar tela do proforma para
+deixar com as cores que diferenciam os itens de cada linha — mesmo princípio que já acontece no
+estudo Preliminar"*.
+
+**O diagnóstico da issue estava certo, e é o tipo de defeito que não fica vermelho em lugar
+nenhum:** as classes de natureza (`receita`, `custo`, `resultado`, `informativo`, mais `n0`/`n1`)
+**já chegavam ao DOM** — `tela-fluxo-ver.ts` sempre montou `<tr class="n${nivel} ${tipo}">`. O que
+não existia eram as REGRAS: no bloco `table.proforma` não havia `tr.receita` nem `tr.custo`, as duas
+classes mais numerosas da tabela. Elas chegavam e não pintavam nada.
+
+**A cópia é literal, e isso é a defesa.** As declarações novas são as MESMAS de
+`frontend/tela-proforma.ts` (o Preliminar) — mesmos tokens, mesmas proporções de `color-mix`,
+mesmos fallbacks —, e `frontend/proforma-cores.test.ts` **confronta os dois arquivos entre si**, par
+de regras a par de regras. Comparar contra uma constante escrita no teste deixaria passar
+exatamente o defeito que se quer barrar: a constante teria de ser copiada de um dos lados, e a
+partir daí os três podem divergir sem nada acusar. É a mesma razão de `proforma-ordem-linhas.test.ts`
+comparar tela × exportação.
+
+**A única lógica nova é o sinal.** `sinalLinhaProformaAv` (`frontend/tela-fluxo-ver.ts`) espelha
+`sinalSensibilidade`/`ehLinhaReceitaOuResultado` do Preliminar (decisão da #567): só receita e
+resultado ganham `pos`/`neg`; custo e informativo, nunca — na Proforma do Avançado o custo é
+negativo por construção, e marcá-lo de vermelho diria que o estado normal está errado. O teste
+confronta as duas funções valor a valor, em vez de reafirmar a regra.
+
+**As duas camadas de verificação são complementares, e nenhuma sozinha basta.** Apagar o CSS deixa o
+teste de comparação vermelho e o caso de render VERDE; apagar a fiação (`class="num ${sinal}"`)
+deixa o caso de render vermelho e o teste de comparação VERDE. O caso
+`frontend/render/casos/proforma-avancada-cores.ts` é deficitário de propósito, para que `pos` e
+`neg` apareçam no mesmo caso — receita positiva, resultado negativo, como o
+`proforma-deficitaria.ts` do Preliminar.
+
+**Duas decisões de desenho ficaram declaradas no PR, não escondidas:** o `tipo` do Avançado não
+distingue "receita bruta" de "receita consolidada" (o Preliminar pinta a primeira de azul e a
+segunda de verde), então as duas linhas de receita saem verdes — separar exigiria um campo novo em
+`proforma-avancado.ts`, que o critério 4 proíbe tocar; e o fundo vermelho a 8% das linhas `(-)` vem
+da tabela de sensibilidade do Preliminar, porque a tabela PRINCIPAL dele não tinta despesa —
+não havia um "mesmo" a copiar, e o mapeamento da issue escolheu essa origem.
+
+Sem migração, `versao` não bumpa: é CSS mais uma classe de apresentação. Nenhum número muda —
+`proforma-avancado.ts` não foi tocado.
+
+---
+
 ## #595 · a série do cenário simulado no card de comparação (2026-08-28)
 
 Item 16 da leva Avançado da Rodada 10, **P1**, com screenshot. Pedido do autor, literal: "Visual do
