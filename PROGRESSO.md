@@ -81,6 +81,31 @@ nº 2) e foram corrigidas na mesma alteração, apontadas pelo `guard-enderecos-
 **Validação de backend PENDENTE DO AUTOR** — o PR toca `backend/rotas/estudos.ts` e lê o
 `schema.json` sem alterá-lo; o `validar-backend.sh` aborta no portão do SDK. "Não deu para rodar"
 nunca é "passou".
+## A Proforma do Avançado exibe "—", não 0,0%, quando o VGV zera — #604 (2026-08-29)
+
+Item da leva Avançado. Mesmo padrão que a #571 já tinha consertado no Preliminar: `0,0%` afirma uma
+grandeza medida que vale zero, quando o certo é dizer que ela **não foi medida**. Com `vgv = 0` a
+coluna "% VGV" da Proforma do Avançado imprimia `0,0%` em vez de `—`.
+
+**A suíte não era cega ao defeito — ela o PROTEGIA.** `frontend/fluxo-apresentacao.test.ts` tinha uma
+asserção da #351 exigindo `pv.margemPct === 0` justamente no caso de VGV zerado. Inverter essa
+asserção é o conserto, não afrouxamento: o comportamento que a issue pede é `—`, e a asserção antiga
+travava o `0,0%`. O `validar-frontend.sh` e o App do Codex chegaram nela por caminhos independentes —
+o Codex publicou como P1.
+
+⚠️ **Uma parte do diff é GUARDA, não conserto de defeito vivo, e isso está declarado porque a prova
+de mutação sobreviveu.** A troca de `??` por `!== undefined` na leitura de `pctOverride` **não muda
+comportamento em nenhum estado alcançável**: as três bases de `pctOverride` derivam de
+`receitaBruta`, e `p.vgv` **é** `receitaBruta`, então `pctOverride === null` implica
+`pctVgv === null` e os dois operadores empatam sempre. Reverter deixa 9/9 verdes. O código fica — é o
+contrato de três estados que torna seguro existir `pctOverride: null` —, mas **não é contado como
+entrega**. Afirmar que era conserto seria a mesma classe de "defesa declarada e inexistente" que a
+auditoria da Rodada 9 registra.
+
+Validação: 925 testes de lógica pura + 66 casos de render. Sem migração, a `versao` não bumpa.
+
+---
+
 ## Cenários herda a reestrutura do Fluxo de Caixa — #596 (2026-08-29)
 
 Rodada 10, item A10-17. O pedido do autor: *"a mesma mudança que for feita na tabela de Fluxo de Caixa
