@@ -469,10 +469,19 @@ function linhaTabela(
   `;
 }
 
-function linhaResultado(nome: string, valores: number[], vpl: number): TemplateResult {
+function linhaResultado(
+  nome: string,
+  valores: number[],
+  vpl: number,
+  // #592: mesma âncora de DOM da #591, aqui pelo mesmo motivo — seletor CSS
+  // não casa por texto, e as quatro linhas de fecho (Livre × Fluxo de Caixa,
+  // mensal × acumulado) são todas `tr.resultado`. Sem ela o caso de render
+  // não consegue exigir UMA delas, nem a ORDEM entre elas. Sem efeito visual.
+  dataLinha = '',
+): TemplateResult {
   const total = nome.includes('Acumulado') ? valores[valores.length - 1] : valores.reduce((s, v) => s + v, 0);
   return html`
-    <tr class="resultado">
+    <tr class="resultado" data-linha=${dataLinha || nothing}>
       <td class="c1">${nome}</td>
       <td class="c2"></td><td class="c3"></td>
       <td class="c4 num ${total >= 0 ? 'pos' : 'neg'}">${celula(total, false)}</td>
@@ -503,9 +512,25 @@ function linhaResultado(nome: string, valores: number[], vpl: number): TemplateR
  * duas grandezas são a mesma e as linhas seriam ruído.
  *
  * `funding` (#349) substitui a tabela separada "Programa Financeiro (Capital
- * Stack)", removida: entradas viram um bloco de receita e saídas entram
- * dentro de "Custos Financeiros", que já era uma das 5 categorias. Com
- * `null` (estudo sem camadas) a tabela renderiza exatamente como sem funding.
+ * Stack)", removida. **#592 mudou ONDE as duas pontas dele aparecem**, e é a
+ * estrutura da planilha de referência do autor (`Caixa Livre` → fluxos de
+ * funding → `Caixa`): nada de funding entra antes do fecho do desalavancado.
+ * A tabela termina assim, com funding:
+ *
+ *     = Fluxo de Caixa Livre Mensal / Acumulado     (desalavancado, VPL = c.vpl)
+ *     Funding — Capital (entradas)  + linhas
+ *     Funding — Serviço (saídas)    + linhas
+ *     = Fluxo de Caixa Mensal / Acumulado           (alavancado, VPL = c.vpl + vplLiquido)
+ *
+ * e a identidade que ela passa a AFIRMAR, mês a mês e no total, é
+ * `Fluxo de Caixa = Fluxo de Caixa Livre + entradas − saídas` — a mesma do
+ * card da aba Análise Financeira e a mesma da planilha.
+ *
+ * Com `null` (estudo sem funding) a tabela renderiza **exatamente** como
+ * antes: uma seção de fecho só, com os rótulos `Fluxo de Caixa Mensal` /
+ * `Fluxo de Caixa Acumulado` e o VPL desalavancado. Mostrar as duas seções
+ * ali seria a mesma linha duas vezes, porque sem funding Livre e Fluxo de
+ * Caixa são o mesmo número.
  */
 export function tabelaFluxo(
   c: FluxoCalc,
@@ -521,22 +546,19 @@ export function tabelaFluxo(
   };
   const custosPorGrupo = (g: string) => c.linhasCusto.filter((x) => x.grupo === g);
   // Ordem das 5 abas de Custos (#125): Terreno · Obra · Diretos · Indiretos · Financeiro.
-  // #349: `financeiro` também aparece quando o estudo não tem linha de custo
-  // financeiro própria mas TEM funding — é lá que as saídas de funding moram.
-  const grupos = GRUPOS_CUSTO.filter((g) =>
-    custosPorGrupo(g).length > 0 || (g === 'financeiro' && funding !== null));
+  // #592 (O1): `financeiro` voltou a aparecer SÓ quando o usuário classificou
+  // alguma linha nesse grupo. Ele deixou de ser o depósito das saídas de
+  // funding — elas agora têm bloco próprio, ao fim da tabela.
+  const grupos = GRUPOS_CUSTO.filter((g) => custosPorGrupo(g).length > 0);
   // VPL é linear no fluxo mensal, então o VPL de um agregado = Σ VPL das suas linhas (#126).
   const somaVpl = (linhas: LinhaCalc[]): number => linhas.reduce((s, l) => s + l.vpl, 0);
   const totalSerie = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
 
-  // #349: linhas de funding que entram no grupo `financeiro`, e o quanto elas
-  // acrescentam ao total daquele grupo e ao Custo Total — sem isso os
-  // subtotais não bateriam com as linhas listadas abaixo deles.
-  const saidasFunding = funding?.linhasSaida ?? [];
-  const saidasFundingMensal = funding?.saidas ?? new Array<number>(c.prazo).fill(0);
-  const custoMensalComFunding = c.custoMensal.map((v, i) => v + (saidasFundingMensal[i] ?? 0));
-  const vplSaidasFunding = saidasFunding.reduce((s, l) => s + l.vpl, 0);
-  const totalSaidasFunding = saidasFunding.reduce((s, l) => s + l.total, 0);
+  // #592 (O1): o Custo Total volta a ser o custo do PROJETO, puro. As saídas de
+  // funding saíram daqui — `custoMensalComFunding`, `vplSaidasFunding` e
+  // `totalSaidasFunding` deixaram de existir, e com eles a razão de o grupo
+  // `financeiro` aparecer sem linha do usuário. O serviço da dívida passa a ter
+  // bloco próprio, depois do fecho do Fluxo de Caixa Livre.
 
   // A receita que alimenta o Fluxo é a LÍQUIDA; a bruta é o VGV recebido. A
   // diferença (RET + permuta financeira) vira uma linha-ponte, e só existe
@@ -553,12 +575,24 @@ export function tabelaFluxo(
   // ordem das duas não muda — é ela que faz a leitura aritmética de cima para
   // baixo fechar (ver o comentário do cabeçalho desta função).
 
-  // Rodapé: com funding, o Fluxo passa a ser o ALAVANCADO (o que o autor pediu
-  // ao mandar refletir o funding na tabela principal) e o livre — que é o que
-  // TIR/VPL/Payback continuam usando, §8.1 — fica visível na linha de cima.
+  // #592 (O3/O6) — a tabela fecha em DUAS seções, na ordem da planilha do autor
+  // (`Caixa Livre` → fluxos de funding → `Caixa`):
+  //
+  //   · o Fluxo de Caixa LIVRE é o desalavancado do motor (`c.fluxoMensal`),
+  //     com o VPL desalavancado (`c.vpl`) — é ele que TIR/VPL/Payback dos KPIs
+  //     leem, por §8.1, e esta issue NÃO realavanca indicador nenhum;
+  //   · o Fluxo de Caixa é o alavancado (`funding.fluxoMensal`), com
+  //     `c.vpl + funding.vplLiquido`.
+  //
+  // SEM funding as duas seções seriam a mesma linha duas vezes, então a tabela
+  // mostra só a de baixo — com os rótulos de hoje (`Fluxo de Caixa Mensal` /
+  // `Fluxo de Caixa Acumulado`) e o VPL de hoje (`c.vpl`), que é o contrato de
+  // "renderiza exatamente como antes" declarado no cabeçalho desta função.
+  const vplLivre = c.vpl;
+  const vplAlavancado = c.vpl + (funding?.vplLiquido ?? 0);
   const fluxoMensalExib = funding?.fluxoMensal ?? c.fluxoMensal;
   const fluxoAcumuladoExib = funding?.fluxoAcumulado ?? c.fluxoAcumulado;
-  const vplExib = c.vpl + (funding?.vplLiquido ?? 0);
+  const divisoria = html`<tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${c.meses.map(() => html`<td></td>`)}</tr>`;
 
   return html`
     <div class="fx-wrap">
@@ -595,55 +629,55 @@ export function tabelaFluxo(
               dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
           ` : nothing}
 
+          ${linhaTabela('grupo', '', 'Custo Total',
+            { mensal: c.custoMensal, total: totalSerie(c.custoMensal), vpl: somaVpl(c.linhasCusto) }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv, false, false)}
+          ${grupos.map((g) => {
+            const doGrupo = custosPorGrupo(g);
+            // #592 (O1) — "Custos Financeiros" volta a valer SÓ as linhas que o
+            // usuário classificou nesse grupo. O serviço da dívida saiu daqui.
+            //
+            // ⚠️ O que a #426 registrava continua verdadeiro, e agora fica MAIS
+            // fácil de ler, não menos: esta aba é visão de CAIXA e as DUAS
+            // pontas do funding aparecem — só que agora as duas aparecem
+            // JUNTAS, no bloco próprio ao fim da tabela, em vez de uma no meio
+            // das receitas e a outra escondida num subtotal de custo. O
+            // principal devolvido cancela o principal liberado; os juros e o
+            // saldo devedor remanescente, não — as pontas NÃO se anulam, e é
+            // por isso que o Fluxo de Caixa difere do Livre.
+            // A proforma (`proforma-avancado.ts`) segue ECONÔMICA e sem
+            // nenhuma ponta; esta issue não a toca.
+            return html`
+            ${linhaTabela('subgrupo', `custo-${g}`, GRUPO_CUSTO_LABEL[g],
+              { mensal: somaLinhas(doGrupo), total: doGrupo.reduce((s, x) => s + x.total, 0), vpl: somaVpl(doGrupo) },
+              dataInicio, colapso, toggle, true, c.receitaBrutaVgv)}
+            ${!colapso[`custo-${g}`]
+              ? doGrupo.map((x) => linhaTabela('item', '', x.nome, x, dataInicio, colapso, toggle, true, c.receitaBrutaVgv))
+              : nothing}
+          `;})}
+
           ${funding ? html`
+            ${divisoria}
+            ${linhaResultado('Fluxo de Caixa Livre Mensal', c.fluxoMensal, vplLivre, 'fcl-mensal')}
+            ${linhaResultado('Fluxo de Caixa Livre Acumulado', c.fluxoAcumulado, vplLivre, 'fcl-acumulado')}
+
+            ${divisoria}
             ${linhaTabela('grupo', 'funding-capital', 'Funding — Capital (entradas)',
               { mensal: funding.entradas, total: totalSerie(funding.entradas),
                 vpl: funding.linhasEntrada.reduce((s, l) => s + l.vpl, 0) },
-              dataInicio, colapso, toggle, false, c.vgvVendavel, true)}
+              dataInicio, colapso, toggle, false, c.vgvVendavel, true, true, 'funding-entradas')}
             ${!colapso['funding-capital'] ? funding.linhasEntrada.map((l) =>
               linhaTabela('subgrupo', '', l.nome, l, dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)) : nothing}
+            ${linhaTabela('grupo', 'funding-servico', 'Funding — Serviço (saídas)',
+              { mensal: funding.saidas, total: totalSerie(funding.saidas),
+                vpl: funding.linhasSaida.reduce((s, l) => s + l.vpl, 0) },
+              dataInicio, colapso, toggle, true, c.receitaBrutaVgv, true, true, 'funding-saidas')}
+            ${!colapso['funding-servico'] ? funding.linhasSaida.map((l) =>
+              linhaTabela('subgrupo', '', l.nome, l, dataInicio, colapso, toggle, true, c.receitaBrutaVgv, true, false)) : nothing}
           ` : nothing}
 
-          ${linhaTabela('grupo', '', 'Custo Total',
-            { mensal: custoMensalComFunding, total: totalSerie(custoMensalComFunding), vpl: somaVpl(c.linhasCusto) + vplSaidasFunding }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv, false, false)}
-          ${grupos.map((g) => {
-            const doGrupo = custosPorGrupo(g);
-            // #349: as saídas de funding pertencem a "Custos Financeiros" — o
-            // subtotal do grupo tem que somá-las, senão não bate com as linhas.
-            //
-            // ⚠️ #426 — "Custos Financeiros" NÃO significa o mesmo aqui e na
-            // aba Resultados, e a diferença é de propósito:
-            //   · aqui (aba Fluxo de Caixa) a visão é de CAIXA, e por isso as
-            //     DUAS pontas do funding aparecem: a liberação no bloco
-            //     "Funding — Capital (entradas)" logo acima, e o serviço da
-            //     dívida neste subtotal. O principal devolvido cancela o
-            //     principal liberado; os juros e o saldo devedor remanescente,
-            //     não — as duas pontas NÃO se anulam;
-            //   · na proforma (`proforma-avancado.ts`) a visão é ECONÔMICA,
-            //     antes de decidir como o projeto é capitalizado, e NENHUMA
-            //     ponta entra: lá o rótulo vale só as linhas de custo que o
-            //     usuário classificou no grupo `financeiro`.
-            // Quem quiser ler o efeito do funding lê esta aba, não aquela.
-            // Esta tabela NÃO muda com a #426.
-            const ehFinanceiroComFunding = g === 'financeiro' && saidasFunding.length > 0;
-            const mensalGrupo = ehFinanceiroComFunding
-              ? somaLinhas(doGrupo).map((v, i) => v + (saidasFundingMensal[i] ?? 0))
-              : somaLinhas(doGrupo);
-            const totalGrupo = doGrupo.reduce((s, x) => s + x.total, 0) + (ehFinanceiroComFunding ? totalSaidasFunding : 0);
-            const vplGrupo = somaVpl(doGrupo) + (ehFinanceiroComFunding ? vplSaidasFunding : 0);
-            return html`
-            ${linhaTabela('subgrupo', `custo-${g}`, GRUPO_CUSTO_LABEL[g],
-              { mensal: mensalGrupo, total: totalGrupo, vpl: vplGrupo }, dataInicio, colapso, toggle, true, c.receitaBrutaVgv)}
-            ${!colapso[`custo-${g}`] ? html`
-              ${doGrupo.map((x) => linhaTabela('item', '', x.nome, x, dataInicio, colapso, toggle, true, c.receitaBrutaVgv))}
-              ${ehFinanceiroComFunding ? saidasFunding.map((l) =>
-                linhaTabela('item', '', l.nome, l, dataInicio, colapso, toggle, true, c.receitaBrutaVgv)) : nothing}
-            ` : nothing}
-          `;})}
-
-          <tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${c.meses.map(() => html`<td></td>`)}</tr>
-          ${linhaResultado('Fluxo de Caixa Mensal', fluxoMensalExib, vplExib)}
-          ${linhaResultado('Fluxo de Caixa Acumulado', fluxoAcumuladoExib, vplExib)}
+          ${divisoria}
+          ${linhaResultado('Fluxo de Caixa Mensal', fluxoMensalExib, vplAlavancado, 'fc-mensal')}
+          ${linhaResultado('Fluxo de Caixa Acumulado', fluxoAcumuladoExib, vplAlavancado, 'fc-acumulado')}
         </tbody>
       </table>
     </div>
@@ -667,7 +701,10 @@ function chavesColapsoBase(c: FluxoCalc): string[] {
   // e os `vc*` junto com os blocos que a tabela deixou de ter; entrou
   // `funding-capital`, que substitui as 3 chaves da tabela separada de
   // Capital Stack (`CHAVES_COLAPSO_CAPITAL_STACK`, removida com ela).
-  return ['receita-bruta', 'funding-capital',
+  // #592: `funding-servico` entrou junto com o bloco novo "Funding — Serviço
+  // (saídas)". Sem ela, "recolher/expandir tudo" ignora o bloco — e as saídas
+  // não têm mais o `custo-financeiro` para carregá-las, porque saíram de lá.
+  return ['receita-bruta', 'funding-capital', 'funding-servico',
     'custo-terreno', 'custo-obra', 'custo-diretos', 'custo-indireto', 'custo-financeiro',
     ...c.linhasReceitaBruta.map((l) => `rb${l.id}`)];
 }

@@ -11,6 +11,7 @@
 
 import { type EventoCrono } from '../../fluxo-shared.js';
 import { calcularFluxo, type FluxoCalc } from '../../fluxo-caixa-motor.js';
+import { fundingDoEstudo } from '../../funding-motor.js';
 
 export const DATA_INICIO = 'jan/2027';
 
@@ -163,4 +164,37 @@ export const PRODUTOS_VALORES_LONGOS: Record<string, any>[] = [
  */
 export function forcarEstado(el: HTMLElement, estado: Record<string, unknown>): void {
   Object.assign(el as any, estado);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// #592 — funding para o caso de render da tabela em duas seções
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * As TRÊS naturezas de operação, para o caso `tabela-fluxo-funding` ter as
+ * duas pontas do funding com valor de verdade. Mesma ressalva do topo deste
+ * arquivo: não é fixture de número — nenhum caso de render compara valor. O
+ * que importa aqui é que `entradas` e `saidas` sejam não nulas, senão os
+ * blocos novos não são montados e o `exigir` do caso mediria o vazio.
+ */
+export const OPERACOES_FUNDING = [
+  {
+    tipo: 'financiamento_producao', nome: 'Banco X', valor: 0, inicio_mes: 0,
+    taxa_anual: 12, exposicao_minima: 5, percentual_financiavel: 80, custo_linha_ids: [2],
+    amortizar_com_caixa_disponivel: true,
+  },
+  { tipo: 'divida', nome: 'Capital de giro', valor: 5_000_000, inicio_mes: 0,
+    taxa_anual: 14, periodo_amortizacao_meses: 36, periodo_carencia_meses: 6 },
+  { tipo: 'equity', nome: 'Investidor', valor: 8_000_000, inicio_mes: 2,
+    modo_retorno: 'resultado_final', pct_retorno: 20 },
+] as any[];
+
+/** `FundingCalc` de verdade, saído do motor de verdade, sobre `fluxo()`. */
+export function fundingDeFluxo() {
+  const c = fluxo();
+  const resultadoFinal = c.fluxoMensal.reduce((s, v) => s + v, 0);
+  return fundingDoEstudo(
+    OPERACOES_FUNDING, c.fluxoMensal, c.receitaMensal, resultadoFinal, 42, 12,
+    { custosRaw: c.linhasCusto, linhasCusto: c.linhasCusto, cronograma: CRONO },
+  );
 }
