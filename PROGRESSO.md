@@ -4,6 +4,50 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## A linha de deduções deixa de ser pintada como receita no Fluxo de Caixa — #591 (2026-08-29)
+
+Rodada 10, item A10-12. Pedido do autor, literal: *"Arrumar linha no fluxo de Impostos que aparece
+na parte de receitas hoje"*. A linha `(-) Impostos e deduções sobre a receita` saía com a classe
+`receita` no `<tr>` e o CSS a pintava com o token de **sucesso**, na mesma faixa verde dos grupos de
+VGV logo acima — uma dedução com a cor de receita.
+
+**A saída escolhida foi a D2 da issue (marcar como custo), e a razão não é "é a mais barata": é que
+a Proforma do Avançado já classifica ESTA MESMA linha como `custo`.** O Fluxo de Caixa era o lado
+divergente. Uniformizar na outra direção teria mudado a Proforma, que estava certa.
+
+**O efeito colateral que a issue previa para a D2 não se materializa, e isso está medido, não
+suposto.** A D2 muda cor **e** notação contábil, porque `ehCusto` governa as duas — mas a série de
+deduções é `líquida − bruta`, logo ≤ 0, e `negativoContabil` já põe valor negativo entre parênteses
+com ou sem `custo`. O teste assere exatamente isso, mês a mês: `celula(v, true) === celula(v,
+false)` para os valores reais da linha. O que muda é a cor; o número sai escrito igual.
+
+**Tela e exportação leem a MESMA constante.** `DEDUCOES_RECEITA_EH_CUSTO` mora em
+`frontend/fluxo-shared.ts` — **um** dos cinco módulos que `fluxo-tabela.ts` e `exportar.ts` já
+importavam, de modo que a constante não cria aresta nova no grafo de imports (o cabeçalho de
+`exportar.ts` explica por que a direção dele importa). ⚠️ A primeira redação desta entrada dizia "o
+**único** módulo", e era **falsa**: `viab-format.ts` — dono de `celula` e `negativoContabil` — é
+igualmente compartilhado e serviria de lar. A escolha é por **assunto** (a constante diz o que a
+linha é no fluxo, não como se formata), não por exclusividade. A paridade da #449 passa a ser **estrutural**: não há como mover
+uma ponta sem a outra.
+
+**A prova da tela é render, e ela tem dois qualificadores por necessidade.** O caso
+`frontend/render/casos/tabela-fluxo.ts` exige `tr.subgrupo.custo[data-linha="deducoes"]`. Sem o
+`data-linha` — atributo novo, sem efeito visual, nenhuma regra do CSS o seleciona — o seletor
+`tr.subgrupo.custo` sozinho já casa com os subgrupos de custo (Terreno, Obra, …) e **ficaria verde
+com o defeito de volta**; sem a classe, o `data-linha` não diz nada sobre cor. Nenhuma camada de
+lógica pura deste repositório lê classe de CSS chegando ao DOM.
+
+**A linha irmã `= Receita Líquida do Projeto` continua receita, de propósito** (critério 4): ela é o
+total de receita a que a dedução chega, não uma redução. A ordem das duas não muda — é ela que faz
+a leitura aritmética de cima para baixo fechar.
+
+**Sem migração e sem bump de `versao`**: é apresentação, nada persistido muda, e estudo antigo com
+RET ou permuta financeira passa a exibir certo sem ser reeditado. Paridade Loteamento ×
+Incorporação coberta por fixture de cada padrão — `tabelaFluxo`/`linhasFluxo` não ramificam por
+padrão hoje, e o segundo fixture é a trava contra alguém introduzir a ramificação depois.
+
+---
+
 ## #621 · tabela de Terreno & Áreas do Loteamento transborda abaixo de ~1280px (2026-08-29)
 
 Etapa 5 da Rodada 10, achado colateral do PR 620 (#612): o primeiro caso de render de

@@ -12,7 +12,7 @@ import type { Proforma } from './proforma.js';
 // …" e Carteira, que a exportação deixou de listar para espelhar a tabela.
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
-import { rotuloMesRelativo } from './fluxo-shared.js';
+import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada } from './viab-format.js';
 import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
@@ -371,7 +371,11 @@ export function linhasFluxo(c: FluxoCalc, funding: FundingNoFluxo | null = null)
   const totalDeducoes = totalSerie(deducoesMensal);
   if (Math.abs(totalDeducoes) > 0.005) {
     linhas.push(
-      { nivel: 1, nome: '(-) Impostos e deduções sobre a receita', custo: false, total: totalDeducoes, mensal: deducoesMensal },
+      // #591: `custo` é o espelho do `ehCusto` da tela — a mesma constante
+      // compartilhada, para CSV/PDF não poderem divergir da tabela (#449). A
+      // linha "= Receita Líquida do Projeto" continua `custo: false`: é um
+      // total de receita, não uma redução.
+      { nivel: 1, nome: '(-) Impostos e deduções sobre a receita', custo: DEDUCOES_RECEITA_EH_CUSTO, total: totalDeducoes, mensal: deducoesMensal },
       { nivel: 1, nome: '= Receita Líquida do Projeto', custo: false, total: totalSerie(c.receitaMensal), vpl: somaVpl(c.linhasReceita), mensal: c.receitaMensal },
     );
   }
