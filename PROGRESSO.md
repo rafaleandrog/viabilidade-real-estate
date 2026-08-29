@@ -4,6 +4,41 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #621 · tabela de Terreno & Áreas do Loteamento transborda abaixo de ~1280px (2026-08-29)
+
+Etapa 5 da Rodada 10, achado colateral do PR 620 (#612): o primeiro caso de render de
+`viab-tela-premissas` montado sobre um Loteamento expôs um defeito de layout pré-existente que nunca
+tinha ido a DOM.
+
+**Medido antes do conserto** (Chromium, harness `scripts/render-check.mjs`, busca binária): a 600px
+de viewport, `div.area-seletor` (3 badges de unidade + `viab-num` de 130px, `flex-wrap: nowrap`) mede
+251px contra uma célula de 219px — 6 transbordos de caixa; a 900px a célula mede 245px — mesmos 6
+transbordos, mais 6 sobreposições do input sobre a coluna "Área (m²)" ao lado. A 1280px a tela já era
+limpa. `table.areas { width: 100% }` deixava o auto-layout espremer a coluna abaixo do conteúdo
+mínimo dela em vez de crescer a tabela.
+
+**Conserto:** `min-width` em `table.areas` (`frontend/tela-premissas.ts`), forçando o auto-layout a
+respeitar o conteúdo mínimo das colunas antes de espremer; o excedente rola dentro do
+`.areas-wrap`, que já tinha `overflow-x: auto` — mesma solução de `.tabela-wrap table.crono`
+(Cronograma). Piso varrido por busca binária: limpo a partir de 874px (600px de viewport); 900px é
+esse piso com folga, mesma margem que `cronograma-sufixo-mes.render.test.ts` usa (18ch→21ch).
+
+**Paridade (critério 3 da issue):** `table.areas` é o MESMO seletor usado por
+`_renderTabelaAreasIncorporacao` — o conserto vale para as duas cascatas. Reconferido em Chromium:
+`cascata-areas-incorporacao`, `cascata-areas-incorporacao-deficit` e `alocacao-areas-loteamento`
+seguem limpos nas três larguras.
+
+**A restrição `larguras: [1280]`** de `cascata-areas-loteamento-deficit.render.test.ts` (posta pelo
+PR 620 exatamente para este defeito alheio não falsear a lente) foi retirada do teste de layout —
+volta a rodar 1280/900/600, critério 2 da issue. O teste de cores mantém `larguras: [1280]`, mesma
+convenção de `cronograma-sufixo-mes.render.test.ts` (cor não depende de viewport).
+
+**Prova de mutação:** apagar o `min-width` (voltando a `width: 100%` sozinho) deixa
+`cascata-areas-loteamento-deficit.render.test.ts` VERMELHO — 12 achados de `transbordoDeCaixa`
+(6 a 600px, 6 a 900px) — confirmando que a lente enxerga a regressão.
+
+---
+
 ## Custos antes de Viabilidade na lista lateral do Avançado — #589 (2026-08-29)
 
 Rodada 10, item A10-10. O pedido do autor é de uma linha: *"Inverter a ordem entre as seções
