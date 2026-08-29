@@ -23,10 +23,10 @@ const n = (v: any): number => Number(v) || 0;
  * média aritmética dos `preco_m2` das tipologias, que daria peso igual a uma
  * cobertura e a um studio.
  */
-export function precoMedioM2Projeto(linhasReceita: any[], deflatorPct: number): number | null {
+export function precoMedioM2Projeto(linhasReceita: any[]): number | null {
   const area = areaPrivativaTotalLinhas(linhasReceita);
   if (area <= 0) return null;
-  const vgv = (linhasReceita ?? []).reduce((s, l) => s + vgvLinha(l?.tipologias ?? [], deflatorPct), 0);
+  const vgv = (linhasReceita ?? []).reduce((s, l) => s + vgvLinha(l?.tipologias ?? []), 0);
   if (vgv <= 0) return null;
   return vgv / area;
 }
@@ -62,11 +62,11 @@ export function custoObraM2Projeto(
  * responde por 80% do VGV manda 80% do resultado. Meses com absorção zero (a
  * absorção pode ser personalizada e ter buracos) não contam como venda.
  */
-export function vsoProjetoPct(linhasReceita: any[], crono: EventoCrono[], deflatorPct: number): number | null {
+export function vsoProjetoPct(linhasReceita: any[], crono: EventoCrono[]): number | null {
   let somaPesos = 0;
   let somaPonderada = 0;
   for (const l of linhasReceita ?? []) {
-    const vgv = vgvLinha(l?.tipologias ?? [], deflatorPct);
+    const vgv = vgvLinha(l?.tipologias ?? []);
     if (vgv <= 0) continue;
     const abs = absorcaoMensal(l?.absorcao ?? { modo: 'linear' }, crono);
     if (!abs) continue;

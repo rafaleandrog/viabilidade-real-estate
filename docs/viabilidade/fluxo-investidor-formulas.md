@@ -251,14 +251,14 @@ retorno.
 > **Decisão do autor, 2026-08-22.** Não é restauração do clamp que existia em
 > `capital-stack-motor.ts` antes da #355 — aquele era um `Math.max(0, …)` seco, **sem memória de
 > déficit**, e teria produzido um total pago maior. O precedente interno do clamp (sem a memória) é
-> `frontend/fluxo-caixa-motor.ts:2027`, em `permutaFinanceiraLiquidaMensal` (`:1576-1587`). Implementação:
+> `frontend/fluxo-caixa-motor.ts:2010`, em `permutaFinanceiraLiquidaMensal` (`:1576-1587`). Implementação:
 > `simularEquity` (`funding-motor.ts:516`).
 
 **Decisão D8 — as premissas do projeto não são redigitadas.** A aba `equity` da planilha pede de
 novo VGV, % entrada/parcelas/repasse, corretagem, marketing, impostos, duração da obra e mês do
 repasse (`C4`–`C19`). O app **deriva tudo do próprio estudo**: `receitaLiquidaMensal`,
 `resultadoFinal` e `mesRepasseValor` chegam prontos a `simularEquity` por
-`fundingDoEstudo` (`funding-motor.ts:838`). Redigitar criaria uma segunda fonte de verdade,
+`fundingDoEstudo` (`funding-motor.ts:861`). Redigitar criaria uma segunda fonte de verdade,
 divergindo em silêncio da aba Resultados — exatamente o que as #349/#351 eliminaram.
 
 O invariante da curva vale como conferência: `Σ receita bruta = VGV`.
@@ -361,7 +361,7 @@ meses, lançamento no mês 2, obra 30, repasse no 32, 20% entrada / 30% parcelas
 
 ## 7. Como o funding entra na tabela de Resultados
 
-A costura é `FundingNoFluxo` (`funding-motor.ts:783`), criada pela #349 e preservada de propósito
+A costura é `FundingNoFluxo` (`funding-motor.ts:806`), criada pela #349 e preservada de propósito
 pela reescrita: as liberações/aportes entram como categoria de receita e as parcelas/retornos como
 categoria de custo, dentro da tabela principal — não há segunda tabela.
 

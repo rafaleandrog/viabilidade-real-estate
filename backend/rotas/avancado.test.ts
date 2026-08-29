@@ -650,7 +650,7 @@ test('#609 id sem correspondência é DESCARTADO enquanto sobrar id vivo', () =>
 });
 
 test('#609 lista TODA órfã volta como veio — devolver [] ativaria a base padrão do motor', () => {
-  // `frontend/funding-motor.ts:927`: lista VAZIA cai em `linhasFinanciaveisPadrao`
+  // `frontend/funding-motor.ts:952`: lista VAZIA cai em `linhasFinanciaveisPadrao`
   // — a cópia passaria a financiar a base padrão inteira enquanto o original,
   // com a lista não-vazia de ids mortos, não casa com linha nenhuma e não
   // financia nada. Ids órfãos são sempre de linhas APAGADAS (o mapa cobre toda
