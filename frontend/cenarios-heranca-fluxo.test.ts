@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { calcularFluxo, type FluxoConfig, type FluxoCalc } from './fluxo-caixa-motor.js';
 import { fundingDoEstudo, type OperacaoFunding } from './funding-motor.js';
-import { chavesColapso } from './fluxo-tabela.js';
+import { chavesColapso, tabelaFluxo } from './fluxo-tabela.js';
 import { receitaLiquidaComCorretagemMensal } from './funding-motor.js';
 import { mesRepasse } from './fluxo-shared.js';
 
@@ -193,6 +193,34 @@ const FECHO = [
   'Fluxo de Caixa Acumulado',
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// A PREMISSA do critério 2, aferida antes de ser usada
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// O critério 2 abaixo compara `A.strings === B.strings` — identidade
+// REFERENCIAL — e isso só prova alguma coisa se o Lit de fato reusar esse array
+// por sítio de template literal. Se um dia ele parar de reusar, a asserção vira
+// FALSO NEGATIVO ruidoso (reprova sempre); se passar a reusar entre sítios
+// diferentes, vira FALSO POSITIVO silencioso — que é pior, e é exatamente a
+// classe "tautologia" que o revisor pegou no PR 644.
+//
+// Este teste é o auto-check da premissa, nos DOIS sentidos. Ele não depende de
+// nada deste PR: se reprovar, é o Lit que mudou, e o critério 2 precisa de
+// outra âncora.
+test('#596 premissa: `strings` de TemplateResult é reusado por sítio, e só por ele', async () => {
+  const { html } = await import('lit');
+  const mesmoSitio = (n: number) => html`<i>${n}</i>`;
+  assert.equal(
+    (mesmoSitio(1) as any).strings, (mesmoSitio(2) as any).strings,
+    'o Lit deixou de reusar `strings` por sítio — o critério 2 perdeu a âncora',
+  );
+  const outroSitio = html`<i>${1}</i>`;
+  assert.notEqual(
+    (outroSitio as any).strings, (mesmoSitio(1) as any).strings,
+    'dois sítios diferentes compartilharam `strings` — a identidade deixou de discriminar',
+  );
+});
+
 for (const [padrao, cfg] of PADROES) {
   // ───────────────────────────────────────────────────────────────────────
   // Critério 3 — FIAÇÃO. Sem isto, tudo abaixo é decoração.
@@ -254,15 +282,39 @@ for (const [padrao, cfg] of PADROES) {
   // roda o motor sobre uma configuração DIFERENTE (preço e custo deslocados), e
   // o funding é recalculado sobre esse fluxo. A identidade tem de fechar ali
   // também, não só no cenário real.
+  // ⚠️ ESTE TESTE OBSERVA O `render()`, e não `_calc`/`_fundingDe` direto.
+  // A primeira versão chamava os dois métodos e conferia a identidade sobre o
+  // resultado — o que só reafirmava o motor de funding. Um `render()` que
+  // passasse `base` no lugar de `cenario` para `_fundingDe`/`tabelaFluxo`
+  // deixaria aquele teste VERDE, e os outros também, porque todos os demais
+  // usam sliders em zero (onde base e cenário coincidem por construção).
+  // Achado P2 do revisor, e é a mesma lição de fiação que este arquivo aplica
+  // às telas — desta vez aplicada a ele mesmo.
   test(`#596 [${padrao}] critério 4: a identidade fecha no cenário SIMULADO (sliders fora do zero)`, () => {
     const tela = telaCenarios(cfg, 8, -5);
     assert.equal((tela as any)._alterado, true, 'a fixture precisa estar com os sliders fora do zero');
 
-    // O mesmo caminho que a tela percorre: `_calc` com os deltas, e o funding
-    // recalculado sobre ESSE fluxo.
     const cenario: FluxoCalc = (tela as any)._calc({ precoVendaPct: 8, custoObraPct: -5 });
+    const base: FluxoCalc = (tela as any)._calc({ precoVendaPct: 0, custoObraPct: 0 });
     const f = (tela as any)._fundingDe(cenario, null);
     assert.ok(f, 'o cenário simulado tem de produzir funding');
+
+    // ── A tabela que o render() DE FATO montou, com os sliders fora do zero ──
+    const renderizada = textosDoTemplate(tabelaDoRender(tela.render()));
+    const doCenario = textosDoTemplate(tabelaFluxo(cenario, cfg.dataInicio ?? null, {}, () => {}, f));
+    const daBase = textosDoTemplate(
+      tabelaFluxo(base, cfg.dataInicio ?? null, {}, () => {}, (tela as any)._fundingDe(base, null)),
+    );
+
+    // (a) As duas candidatas são DISTINGUÍVEIS — senão a asserção (b) seria
+    // vácua e passaria com a tela montando qualquer uma das duas.
+    assert.notDeepEqual(doCenario, daBase, 'base e cenário produzem a mesma tabela — a fixture não discrimina');
+    // (b) E a tela montou a DO CENÁRIO. Trocar `cenario` por `base` no render
+    // reprova aqui.
+    assert.deepEqual(
+      renderizada, doCenario,
+      'com os sliders fora do zero, a tela montou a tabela da BASE em vez da do cenário',
+    );
 
     const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
     for (let i = 0; i < cenario.prazo; i++) {
@@ -279,9 +331,8 @@ for (const [padrao, cfg] of PADROES) {
       'no total a identidade não fecha no cenário simulado',
     );
 
-    // E o cenário simulado é MESMO outro fluxo — senão o teste acima estaria
+    // E o cenário simulado é MESMO outro fluxo — senão tudo acima estaria
     // reprovando a base disfarçada de cenário.
-    const base: FluxoCalc = (tela as any)._calc({ precoVendaPct: 0, custoObraPct: 0 });
     assert.notDeepEqual(cenario.fluxoMensal, base.fluxoMensal, 'os sliders não mudaram o fluxo');
   });
 
