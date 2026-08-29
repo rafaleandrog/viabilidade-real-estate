@@ -4,6 +4,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Cor de série sai do dado, entra em CSS — gráfico econômico do Fluxo de Caixa — #632 (2026-08-29)
+
+Rodada 10. Mesmo diagnóstico da #595 (relatório de encerramento da revisão do PR 629): a #595
+consertou só o card "Fluxo acumulado — cenário real × cenário simulado" (aba Cenários,
+`comparacaoCenario`), deixando `seriesEconomicasFluxo` (o gráfico "Contratação, Receita Bruta,
+Carteira e Repasse" da aba Fluxo de Caixa) no padrão antigo — `cor` como STRING dentro de cada item
+de `series`, sem garantia de que o primitivo a honra, e a 1ª série usando `--cor-primaria`
+(gradiente nas 4 variantes de tema, inválido em contexto de cor).
+
+`SerieEconomicaFluxo` perdeu o campo `cor`; as 4 cores saem por `--urbi-grafico-cor-1..4` no CSS do
+host que renderiza o gráfico (`frontend/tela-fluxo-ver.ts`, seletor `.graf urbi-grafico-linha`), na
+mesma ordem das séries, com `--cor-primaria-solida` no lugar de `--cor-primaria`. Teste de fonte
+novo (`frontend/fluxo-economico-series.test.ts`), no molde de `fluxo-cenario-series.test.ts`:
+contagem de `cor:` no bloco-fonte de `seriesEconomicasFluxo` (zero) + fiação (o `urbi-grafico-linha`
+chama `seriesEconomicasFluxo` e as 4 custom properties existem no CSS) + guard contra
+`--cor-primaria` sem o sufixo `-solida`.
+
+Mutação: reintroduzir `cor:` no motor derruba o 1º teste; apagar o bloco CSS derruba os outros
+dois. Os dois casos de render existentes que cobrem `tela-fluxo-ver.ts` seguem verdes (68/68).
+
+Validação: `bash scripts/validar-frontend.sh` verde — 955 testes, 68 casos de render.
+
+---
+
 ## A Proforma do Avançado exibe "—", não 0,0%, quando o VGV zera — #604 (2026-08-29)
 
 Item da leva Avançado. Mesmo padrão que a #571 já tinha consertado no Preliminar: `0,0%` afirma uma
