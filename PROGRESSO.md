@@ -81,6 +81,63 @@ nº 2) e foram corrigidas na mesma alteração, apontadas pelo `guard-enderecos-
 **Validação de backend PENDENTE DO AUTOR** — o PR toca `backend/rotas/estudos.ts` e lê o
 `schema.json` sem alterá-lo; o `validar-backend.sh` aborta no portão do SDK. "Não deu para rodar"
 nunca é "passou".
+## Cenários herda a reestrutura do Fluxo de Caixa — #596 (2026-08-29)
+
+Rodada 10, item A10-17. O pedido do autor: *"a mesma mudança que for feita na tabela de Fluxo de Caixa
+em Resultados também deve ocorrer no mesmo tipo de tabela que está em Cenários"*.
+
+**A hipótese da issue estava certa, e o trabalho virou PROVAR em vez de implementar.** As duas telas
+chamam a mesma função pura `tabelaFluxo`, e a #592 se resolveu inteiramente dentro dela. **Diff de
+produção: zero linhas** — o único arquivo não-teste tocado é `frontend/proforma-avancado.ts`, e só em
+comentário.
+
+> ⚠️ **Por que o teste da #592 não bastava, com o número que decide.**
+> `fluxo-secoes-funding.test.ts` chama `tabelaFluxo` **diretamente**: prova certa para a função,
+> **nenhuma prova para as telas**. Medido: apagando a chamada de `tela-cenarios.ts`, ele fica
+> **10/10 verde** enquanto o arquivo novo vai a **7 vermelhos**. É a classe de defeito nº 1 do
+> `CLAUDE.md` — e é o motivo de a issue existir separada em vez de o PR da #592 ter fechado as duas.
+
+**O truque que prova "é o mesmo componente" sem comparar strings à mão:** o Lit reusa o array
+`strings` de um `TemplateResult` **por sítio de template literal**. Então `A.strings === B.strings` —
+identidade referencial — prova que as duas telas montaram a tabela a partir do **mesmo** `html\`…\``.
+Uma segunda implementação, ainda que idêntica caractere a caractere, teria outro array e reprovaria.
+Identidade de sítio prova a **origem**; a igualdade do conteúdo com o mesmo insumo, que é asserida em
+seguida, prova os **argumentos**. As duas juntas é que fecham o critério 2.
+
+**O caso que a coordenação mandou medir — "base com funding, cenário sem" — NÃO EXISTE.**
+`_fundingCalcDe` decide por `this.operacoes.length === 0`, o **mesmo campo** para as duas leituras da
+tela: o que muda entre base e cenário é o **fluxo** simulado, nunca a existência do funding. Virou
+**teste**, não parágrafo — se alguém introduzir fonte de operações por cenário, ele reprova e a
+análise precisa ser refeita, em vez de a conclusão envelhecer calada.
+
+> 🔴 **O caso de render novo descobriu um defeito PRÉ-EXISTENTE, e ele não é desta issue.** Ao medir
+> a tela de Cenários pela primeira vez em Chromium, apareceu transbordo de caixa nos sliders de
+> parâmetros: **`div.slider`, 572 > 568 em 600px**. Nenhum caso de render media esta tela até agora —
+> é por isso que ninguém sabia. **Não consertei** (R3, outro assunto), e as asserções de geometria do
+> caso novo ficam **escopadas à `table.fx`**, declarado no teste como *escopo, não isenção*: o filtro
+> não perdoa nada dentro da tabela, que é o objeto da issue.
+
+**O critério 7 era maior do que a issue supunha.** Ela pedia para corrigir números de linha em
+`proforma-avancado.ts`; ao abrir, a tabela de desambiguação afirmava que o serviço da dívida vive
+*"dentro do subtotal do grupo `financeiro`"* — **verdade até a #592, falsa depois dela**. Doc que
+descreve estrutura antiga é pior que doc ausente: manda o próximo leitor procurar no lugar errado e
+concluir que sumiu. Corrigido, com os endereços e uma **quarta linha** para a tabela de Cenários.
+
+> **E a resposta à pergunta do critério 7, que vale para outras 138 citações:** o
+> `guard-enderecos-doc` **não cobre** endereço sem arquivo (`:363`, continuação de citação anterior).
+> Não é falha dele — está **declarado no cabeçalho** como fora de escopo, `CONSERVADOR`, com o motivo
+> escrito: *"o arquivo que eles herdam costuma estar num cabeçalho de tabela LINHAS acima — resolver
+> isso é adivinhação, e adivinhação errada acusa prosa correta"*. Não passou por baixo do guard;
+> passou por uma exceção documentada.
+
+**Ficou pendente de decisão do autor** o critério 5: depois da #592, Cenários exibe **três** grandezas
+próximas e legítimas — `Fluxo de Caixa Livre (acumulado)`, `Fluxo de Caixa (acumulado)` e o KPI
+`Resultado após custo financeiro` (que subtrai juros + retorno de equity, **nunca o principal**). O
+KPI **não é redundante**, mas o rótulo ficou ambíguo ao lado das linhas novas. O PR usa
+`Sem-fechamento:` e não muda o KPI.
+
+---
+
 ## A tabela mensal fecha em Fluxo de Caixa Livre e só depois em Fluxo de Caixa — #592 (2026-08-29)
 
 Rodada 10, item A10-13 — a issue mais pesada da leva, com ordens de implementação O0 a O7 e a
