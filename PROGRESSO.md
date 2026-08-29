@@ -53,6 +53,18 @@ Sem migração nas duas → a `versao` não bumpa. `validar-backend.sh` não rod
 SDK, etapa 1/5) — testes de backend executados diretamente via `tsx` (módulos tocados não importam
 o SDK); typecheck do backend fica pendente do autor no ambiente autenticado.
 
+**Rodada de revisão (Codex, PR #643) achou um P2 real, e ele foi consertado na mesma rodada.**
+`_totalObra` contava a PRÓPRIA linha na base ao converter uma linha de Obra (em `rs` ou outra
+unidade) para `pct_obra` — ela só sai do filtro por unidade depois que o `PATCH` volta e
+`this.custos` é atualizado. Exemplo: Construção R$50M + Gestão R$5M (ambas `rs`); converter Gestão
+para `% Obra` gravava `5/(50+5)×100 = 9,09%`, e a tela passava a mostrar `10%` assim que a resposta
+chegasse — `orcamento_valor` persistido divergindo do que a tela exibe, o invariante que a #442
+existe para proteger. O canônico (R$5M) não era afetado, então o motor de Fluxo de Caixa continuava
+correto; o dano ficava contido ao rótulo percentual, numa janela estreita. **Conserto:** `_totalObra`
+virou método com `excluirId` opcional; `_ctxConversao` propaga `c.id` nos 5 call sites. Guarda de
+regressão por leitura de fonte em `frontend/premissas-conversao.test.ts` (nenhum teste importa o
+componente Lit), confirmada por mutação nos 5 pontos.
+
 ---
 
 ## #621 · tabela de Terreno & Áreas do Loteamento transborda abaixo de ~1280px (2026-08-29)
