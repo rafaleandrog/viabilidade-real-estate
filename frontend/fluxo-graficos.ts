@@ -7,21 +7,30 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 export interface SerieEconomicaFluxo {
   rotulo: string;
   valores: number[];
-  cor: string;
 }
 
-/** #241: séries comerciais exibidas no gráfico e derivadas diretamente do
- * mesmo FluxoCalc usado pela tabela/CSV/PDF. */
+/**
+ * #241: séries comerciais exibidas no gráfico e derivadas diretamente do
+ * mesmo FluxoCalc usado pela tabela/CSV/PDF.
+ *
+ * ⚠️ **Nenhuma série carrega `cor`, e isso é decisão da #632** (mesmo
+ * diagnóstico da #595, aplicado a este gráfico). O espelho
+ * `docs/ui-urbiverso/primitivos.json` declara `series` como `Array` e **não
+ * declara a forma dos itens** — o repositório não tem como afirmar que um
+ * item honra a chave `cor`. O que o espelho DECLARA são as custom properties
+ * `--urbi-grafico-cor-1..8` no `:host` de `UrbiGraficoBase`; a cor das quatro
+ * séries é definida em CSS, pelo app, em `frontend/tela-fluxo-ver.ts` — onde
+ * `var()` de fato resolve, ao contrário de uma string `'var(--x, #hex)'`
+ * entregue como dado, que só resolve se o primitivo a injetar num valor de
+ * propriedade CSS e é **inválida** se ele a injetar num atributo de
+ * apresentação SVG. Ver `comparacaoCenario`, abaixo, para o mesmo padrão.
+ */
 export function seriesEconomicasFluxo(c: FluxoCalc): SerieEconomicaFluxo[] {
   return [
-    { rotulo: 'Venda líquida contratada', valores: c.vendaLiquidaContratadaMensal,
-      cor: 'var(--cor-primaria, #7c5cff)' },
-    { rotulo: 'Receita Bruta — VGV', valores: c.receitaBrutaMensal,
-      cor: 'var(--cor-sucesso, #13a98d)' },
-    { rotulo: 'Carteira de clientes', valores: c.carteiraClientesMensal,
-      cor: 'var(--cor-info, #3b82f6)' },
-    { rotulo: 'Repasse', valores: c.repasseMensal,
-      cor: 'var(--cor-alerta, #d59b2d)' },
+    { rotulo: 'Venda líquida contratada', valores: c.vendaLiquidaContratadaMensal },
+    { rotulo: 'Receita Bruta — VGV', valores: c.receitaBrutaMensal },
+    { rotulo: 'Carteira de clientes', valores: c.carteiraClientesMensal },
+    { rotulo: 'Repasse', valores: c.repasseMensal },
   ];
 }
 // ─────────────────────────────────────────────────────────────────────────
