@@ -4,6 +4,56 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## A tabela mensal fecha em Fluxo de Caixa Livre e só depois em Fluxo de Caixa — #592 (2026-08-29)
+
+Rodada 10, item A10-13 — a issue mais pesada da leva, com ordens de implementação O0 a O7 e a
+planilha de referência do autor. As duas pontas do funding saíram do meio da tabela (entradas logo
+após a Receita Líquida, saídas dentro de `Custos Financeiros`) e foram para o fim, entre dois
+fechos, na ordem da planilha: `Caixa Livre` → fluxos de funding → `Caixa`.
+
+**O motor não foi tocado, e o O0 estava certo ao pedir isso.** `FundingNoFluxo` já expunha
+`entradas`, `saidas`, `linhasEntrada`, `linhasSaida`, `fluxoMensal`, `fluxoAcumulado` e
+`vplLiquido`; `FluxoCalc` já expunha os desalavancados. O diff inteiro é de apresentação.
+
+**A identidade do O4 fecha com resíduo ZERO, e isso é consequência, não sorte.** O motor compõe o
+alavancado com `round2` por mês (`fluxoMensal = fluxoLivreMensal.map((v, t) => round2(v +
+entradas[t] - saidas[t]))`), então a tabela publica exatamente a aritmética que o motor executa.
+Medido sobre as linhas publicadas — não sobre as séries do motor, que sempre fecharam: pior resíduo
+mensal **R$ 0,000000** em 77 meses, total **R$ 0,000000**, e zero também nos meses de borda
+(primeiro com liberação, último com amortização). Os testes ainda asseveram com tolerância
+(`≤ R$ 0,01` por mês), porque travar em zero exato travaria um detalhe do arredondamento.
+
+**A armadilha de fixture que quase passou.** Sem `pct_retorno`, o equity tem retorno de 0% e **não
+produz linha de saída nenhuma**; sem `resultadoFinal` real, idem. A fixture teria as três naturezas
+só na ponta das entradas, e a identidade fecharia sobre série zerada justamente na natureza que o
+pedido mais destaca. Hoje são 3 linhas de entrada e 3 de saída, e os dois campos estão comentados
+com o motivo — é o tipo de omissão que deixa o teste verde medindo o vazio.
+
+**Decisão do O5, declarada:** sem funding, **uma** seção de fecho só, com os rótulos e o VPL de
+hoje. Livre e Fluxo de Caixa seriam o mesmo número, e publicar as duas seria a mesma linha duas
+vezes — o critério 4 pede que o estudo sem funding renderize *exatamente* como antes.
+
+**Renomeação do critério 7 aplicada** (decisão do orquestrador, reversível em uma linha):
+`Fluxo de Caixa (resultado real)` → `Fluxo de Caixa` em `tela-fluxo-ver.ts` e `tela-funding.ts`.
+`grep -rn "Fluxo de Caixa real\|resultado real" frontend/` devolve vazio.
+
+**A verificação por render é um caso NOVO** (`tabela-fluxo-funding`), e não o `tabela-fluxo`
+existente: as seções só são montadas quando há funding, então no caso antigo nenhum seletor casaria
+e a medida seria do vazio. O `exigir` afirma **ordem**, não só presença, pelo combinador de irmão
+geral (`A ~ B` só casa se B vem depois de A no mesmo `<tbody>`) — sobre as âncoras `data-linha` que
+a #591 introduziu, agora também em `linhaResultado`, porque as quatro linhas de fecho são todas
+`tr.resultado` e seletor CSS não casa por texto.
+
+**Três testes existentes mudaram de expectativa, e nenhum afrouxou:** o que exigia as saídas dentro
+de `Custos Financeiros` passou a exigir o oposto; a lista de nível 0 da #472 ganhou as quatro
+linhas novas na ordem nova; e a #447 trocou de endereço — o grupo que existia só por causa do
+funding agora não existe, e a asserção cobra o bloco `Funding — Serviço (saídas)`.
+
+**Sem migração e sem bump de `versao`.** Paridade Loteamento × Incorporação com fixture de cada
+padrão, os dois com funding e com as três naturezas.
+
+---
+
 ## #590 + #514 · badge "% Obra" tomava 400 e, se só isso fosse consertado, gravaria o número errado (2026-08-29)
 
 Trilho P1 da Rodada 10 — as duas issues descrevem a MESMA badge (`Custos → Obras`, categoria

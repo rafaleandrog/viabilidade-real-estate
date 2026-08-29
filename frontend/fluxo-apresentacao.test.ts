@@ -219,7 +219,7 @@ test('#349 os 5 grupos de custo somam o Custo Total', () => {
   }
 });
 
-test('#349 com funding: entradas viram receita, saídas entram em Custos Financeiros e o rodapé alavanca', () => {
+test('#592 com funding: as duas pontas saem do meio e a tabela fecha em Livre → funding → Fluxo de Caixa', () => {
   const c = calcularFluxo(CONFIG_COMPLETA);
   // Financiamento à produção elegível sobre a linha de Obra, cobrindo a
   // necessidade de caixa — gera liberação (entrada) e juros/amortização (saída).
@@ -244,35 +244,42 @@ test('#349 com funding: entradas viram receita, saídas entram em Custos Finance
   assert.ok(nome('Fin produção — liberações'));
   assert.equal(capital.custo, false);
 
-  // Saídas: dentro de "Custos Financeiros", que já era uma das 5 categorias —
-  // e o subtotal do grupo tem que somá-las junto com a linha do usuário.
+  // #592 (O1) — Saídas NÃO estão mais dentro de "Custos Financeiros". O grupo
+  // volta a valer só a linha que o usuário classificou ali, e o serviço da
+  // dívida ganhou bloco próprio, depois do fecho do Livre.
   const financeiro = nome('Custos Financeiros');
-  const jurosFunding = nome('Funding · Fin produção — parcelas');
-  assert.ok(jurosFunding, 'saídas de funding têm que entrar em Custos Financeiros');
   const linhaUsuario = nome('Taxas bancárias');
   for (let m = 0; m < c.prazo; m++) {
-    const somaFilhas = linhaUsuario.mensal[m]
-      + soma(funding.linhasSaida.map((l) => l.mensal[m]));
-    assert.ok(Math.abs(somaFilhas - financeiro.mensal[m]) <= 0.01, `custos financeiros mês ${m}`);
+    assert.ok(Math.abs(linhaUsuario.mensal[m] - financeiro.mensal[m]) <= 0.01,
+      `Custos Financeiros tem que valer SÓ a linha do usuário no mês ${m}`);
   }
+  const servico = nome('Funding — Serviço (saídas)');
+  assert.ok(servico, 'as saídas de funding têm bloco próprio');
+  assert.equal(servico.custo, true);
+  assert.ok(nome('Funding · Fin produção — parcelas'), 'a linha da operação continua detalhada');
+  assert.deepEqual(servico.mensal, funding.saidas);
 
-  // Rodapé: a linha de rodapé "Fluxo de Caixa Livre (antes do funding)" saiu
-  // da tabela principal (#472, decisão D12) — a comparação livre × real é o
-  // card da aba Análise Financeira. Aqui só sobra o alavancado, e ele
-  // continua sendo livre + entradas − saídas.
-  assert.equal(linhas.find((l) => l.nome === 'Fluxo de Caixa Livre (antes do funding)'), undefined);
-  const fluxo = nome('Fluxo de Caixa Mensal');
-  for (let m = 0; m < c.prazo; m++) {
-    assert.ok(Math.abs((c.fluxoMensal[m] + funding.entradas[m] - funding.saidas[m]) - fluxo.mensal[m]) <= 0.01,
-      `alavancado mês ${m}`);
-  }
-
-  // E a tabela inteira fecha: receita líquida + capital − custo total = fluxo.
-  const liquida = nome('= Receita Líquida do Projeto');
+  // #592 (O1) — Custo Total é o custo do PROJETO, puro: não soma mais o
+  // serviço da dívida. Prova pelo lado que o defeito atacaria: se as saídas
+  // tivessem voltado para dentro, esta igualdade quebraria.
   const custo = nome('Custo Total');
+  assert.deepEqual(custo.mensal, c.custoMensal);
+
+  // #592 (O4) — A IDENTIDADE, mês a mês. É a afirmação central da tabela nova.
+  const livre = nome('Fluxo de Caixa Livre Mensal');
+  const fluxo = nome('Fluxo de Caixa Mensal');
+  assert.deepEqual(livre.mensal, c.fluxoMensal, 'o Livre é o desalavancado do motor, sem retoque');
   for (let m = 0; m < c.prazo; m++) {
-    const esperado = liquida.mensal[m] + capital.mensal[m] - custo.mensal[m];
-    assert.ok(Math.abs(esperado - fluxo.mensal[m]) <= 0.01, `conservação mês ${m}`);
+    assert.ok(Math.abs((livre.mensal[m] + capital.mensal[m] - servico.mensal[m]) - fluxo.mensal[m]) <= 0.01,
+      `identidade O4 no mês ${m}`);
+  }
+
+  // E o Livre continua sendo receita líquida − custo do projeto: é o que
+  // torna o encadeamento de cima para baixo legível.
+  const liquida = nome('= Receita Líquida do Projeto');
+  for (let m = 0; m < c.prazo; m++) {
+    assert.ok(Math.abs((liquida.mensal[m] - custo.mensal[m]) - livre.mensal[m]) <= 0.01,
+      `Livre = líquida − custo no mês ${m}`);
   }
 });
 
@@ -304,10 +311,14 @@ test('#472 com financiamento à produção: sem bloco de detalhamento na tabela,
 
   // Critério 3: a lista de nomes de NÍVEL 0, na ordem, sem nenhuma outra linha.
   const nomesNivel0 = linhas.filter((l) => l.nivel === 0).map((l) => l.nome);
+  // #592: a ordem mudou — nada de funding antes do fecho do Livre.
   assert.deepEqual(nomesNivel0, [
     'Receita Bruta — VGV',
-    'Funding — Capital (entradas)',
     'Custo Total',
+    'Fluxo de Caixa Livre Mensal',
+    'Fluxo de Caixa Livre Acumulado',
+    'Funding — Capital (entradas)',
+    'Funding — Serviço (saídas)',
     'Fluxo de Caixa Mensal',
     'Fluxo de Caixa Acumulado',
   ]);
@@ -485,13 +496,22 @@ test('#447 linha informativa do funding aparece sem linha de custo financeira pr
   assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01,
     `Resultado ${p.resultado} != Σ fluxoMensal ${soma(c.fluxoMensal)}`);
 
-  // Na aba Fluxo de Caixa (outra superfície, de CAIXA), o mesmo funding
-  // aparece DENTRO do subtotal "Custos Financeiros" — conteúdo declaradamente
-  // diferente do da proforma (lá é exibido, nunca somado; aqui é somado).
+  // ⚠️ #592 MUDOU O ENDEREÇO, e a distinção de conteúdo continua de pé.
+  // Antes, na aba Fluxo de Caixa o serviço da dívida aparecia DENTRO do
+  // subtotal "Custos Financeiros" — e este fixture não tem linha própria nesse
+  // grupo, então o grupo existia SÓ por causa do funding. Agora ele não
+  // existe: o serviço da dívida tem bloco próprio ao fim da tabela.
+  //
+  // O que a #447 afirma segue valendo, e é sobre as DUAS superfícies: na
+  // proforma o efeito do funding é EXIBIDO e nunca somado; na aba Fluxo de
+  // Caixa ele é SOMADO — só que agora entre o Fluxo de Caixa Livre e o Fluxo
+  // de Caixa, que é onde o autor o quer.
   const linhasFx = linhasFluxo(c, funding);
-  const financeiroFx = linhasFx.find((l) => l.nome === 'Custos Financeiros')!;
-  assert.ok(financeiroFx, 'sem linha própria, o grupo só existe na aba Fluxo por causa do funding');
-  assert.ok(Math.abs(financeiroFx.total - totalSaidas) <= 0.01);
+  assert.equal(linhasFx.find((l) => l.nome === 'Custos Financeiros'), undefined,
+    'sem linha própria do usuário, o grupo não existe mais — o funding saiu de dentro dele');
+  const servicoFx = linhasFx.find((l) => l.nome === 'Funding — Serviço (saídas)')!;
+  assert.ok(servicoFx, 'o serviço da dívida tem bloco próprio');
+  assert.ok(Math.abs(servicoFx.total - totalSaidas) <= 0.01);
 });
 
 test('#447 sem funding (ou sem serviço de dívida), a linha informativa não existe', () => {
