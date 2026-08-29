@@ -39,6 +39,31 @@ render, Chromium). Backend/schema não tocados.
 
 ---
 
+## A Proforma do Avançado exibe "—", não 0,0%, quando o VGV zera — #604 (2026-08-29)
+
+Item da leva Avançado. Mesmo padrão que a #571 já tinha consertado no Preliminar: `0,0%` afirma uma
+grandeza medida que vale zero, quando o certo é dizer que ela **não foi medida**. Com `vgv = 0` a
+coluna "% VGV" da Proforma do Avançado imprimia `0,0%` em vez de `—`.
+
+**A suíte não era cega ao defeito — ela o PROTEGIA.** `frontend/fluxo-apresentacao.test.ts` tinha uma
+asserção da #351 exigindo `pv.margemPct === 0` justamente no caso de VGV zerado. Inverter essa
+asserção é o conserto, não afrouxamento: o comportamento que a issue pede é `—`, e a asserção antiga
+travava o `0,0%`. O `validar-frontend.sh` e o App do Codex chegaram nela por caminhos independentes —
+o Codex publicou como P1.
+
+⚠️ **Uma parte do diff é GUARDA, não conserto de defeito vivo, e isso está declarado porque a prova
+de mutação sobreviveu.** A troca de `??` por `!== undefined` na leitura de `pctOverride` **não muda
+comportamento em nenhum estado alcançável**: as três bases de `pctOverride` derivam de
+`receitaBruta`, e `p.vgv` **é** `receitaBruta`, então `pctOverride === null` implica
+`pctVgv === null` e os dois operadores empatam sempre. Reverter deixa 9/9 verdes. O código fica — é o
+contrato de três estados que torna seguro existir `pctOverride: null` —, mas **não é contado como
+entrega**. Afirmar que era conserto seria a mesma classe de "defesa declarada e inexistente" que a
+auditoria da Rodada 9 registra.
+
+Validação: 925 testes de lógica pura + 66 casos de render. Sem migração, a `versao` não bumpa.
+
+---
+
 ## Cenários herda a reestrutura do Fluxo de Caixa — #596 (2026-08-29)
 
 Rodada 10, item A10-17. O pedido do autor: *"a mesma mudança que for feita na tabela de Fluxo de Caixa
@@ -282,6 +307,69 @@ convenção de `cronograma-sufixo-mes.render.test.ts` (cor não depende de viewp
 **Prova de mutação:** apagar o `min-width` (voltando a `width: 100%` sozinho) deixa
 `cascata-areas-loteamento-deficit.render.test.ts` VERMELHO — 12 achados de `transbordoDeCaixa`
 (6 a 600px, 6 a 900px) — confirmando que a lente enxerga a regressão.
+
+---
+
+## Funding em `urbi-abas` — #586 (2026-08-29)
+
+Rodada 10, item A10-09a. A tela de Funding tinha três botões no topo que **adicionavam** operações a
+um feed único de cards; agora tem **quatro abas** — Operações · Financiamento à produção · Dívida ·
+Equity —, com os nomes literais do pedido do autor.
+
+**É chassi, não reescrita, e isso é verificável no diff.** A separação por tipo **já existia** na
+camada de campos; o que não existia era na navegação. Os três `_renderCampos*` foram para dentro das
+abas **inteiros** — eles não aparecem no diff, e é por isso que o critério 4 (*"nenhum campo é
+perdido no caminho"*) se confere por leitura direta dele, não por inventário à mão.
+
+**Sem schema, sem migração → a `versao` não bumpa.** Estudo com operações já criadas abre com todas
+distribuídas nas abas certas: a distribuição é `o.tipo`, que sempre existiu na tabela.
+
+**A reordenação passou a ser POR TIPO, e a issue mandava o PR decidir.** Continuar global produziria
+defeito visível: com um Financiamento à produção entre duas Dívidas na ordem global, clicar ↑ na 2ª
+Dívida trocaria a Dívida com o Financiamento — e a aba Dívida, que **não mostra** o Financiamento,
+não mudaria nada na tela. O usuário clica e não acontece nada. Reusar `reordenarCamadas` com o
+**subconjunto** do tipo também não serve: ela renumera `ordem` de 0…n−1 sobre a lista que recebe,
+então o subconjunto colidiria com as `ordem` dos outros tipos. Entrou `reordenarDentroDoTipo`, que
+**troca** a `ordem` entre os dois vizinhos do mesmo tipo — a sequência global continua sendo uma
+permutação dos mesmos valores, com teste que afirma exatamente isso.
+
+**A classe `.barra` saiu junto com a barra.** O critério 3 é literal e greppável
+(`grep 'class="barra"'` não pode casar). Reusá-la para o botão de dentro da aba faria o grep casar
+**e** descreveria errado o que a regra faz — virou `.acao-aba`, e a regra morta `.barra .espaco`
+foi removida (o único `span.espaco` desta tela vive em `.op-cab`).
+
+> ⚠️ **Armadilha de linguagem que custou uma rodada inteira de validação, e é fácil repetir:**
+> **crase dentro de template literal FECHA o template.** Escrevi comentários com `` `.barra` `` e
+> `` `urbi-abas` `` dentro de `` css` `` e de `` html` ``; o arquivo virou 4 erros de sintaxe. Quem
+> acusou foi o **guard de UI** — *"o TypeScript nao parseia este arquivo"* —, não o typecheck, que
+> nem chegou a rodar naquela ordem. Os comentários foram reescritos sem crase, **com a razão anotada
+> dentro deles** para ninguém "melhorar" de volta.
+
+> ⚠️ **E a classe de defeito nº 2 apareceu de novo, com sete citações de uma vez.** O diff empurrou
+> as linhas de `tela-funding.ts` e sete endereços `arquivo:linha` — em `render/casos/ind-funding.ts`,
+> `tela-resumo.ts`, `tela-fluxo-ver.ts`, `tela-cenarios.ts`, `scripts/conferir-estudo.ts`, neste
+> arquivo e no `CLAUDE.md` — deixaram de resolver. Quem pegou foi o `guard-enderecos-doc`, na
+> execução do `validar-frontend.sh`. **Conferência à mão não teria pegado**: ela é feita antes do
+> último conserto e envelhece nele. (O `CLAUDE.md` fica **fora** do guard da R1 de propósito — o
+> próprio `guard-pr-escopo-processo.mjs` o declara —, então a correção de endereço lá não é mudança
+> de processo dentro de PR sob revisão.)
+
+**A prova de fiação é de RENDER, e tinha de ser.** `frontend/funding-abas.test.ts` prova a
+reordenação (função pura) e o particionamento (a aba Operações é a união exata das outras três,
+por id e não só por contagem; e todo tipo de `TIPOS` tem aba, senão um tipo novo sumiria da UI). Mas
+**nenhum dos dois enxerga se a tela monta as abas** — apagar o `<urbi-abas>` do `render()` deixa
+aquele arquivo verde. Só `frontend/render/casos/funding-abas.ts`, com `exigir` sobre `urbi-abas`,
+quatro `urbi-hospedeiro` e `urbi-tabela`, enxerga. É a classe de defeito nº 1.
+
+> **Um detalhe do teste que quase virou falso positivo:** o regex que lia os tipos da fonte era
+> `{ valor: 'x', rotulo:` solto sobre o arquivo inteiro — e essa é a forma de **mais três arrays**
+> do mesmo arquivo (`MODOS_RETORNO`, `EVENTOS_ANCORA`). Ele devolvia 11 valores e reprovava com
+> *"TIPOS mudou"* sobre um `TIPOS` intacto. O conserto foi recortar o **bloco da declaração** antes
+> de casar.
+
+**Colisão declarada com a #592**, em execução em paralelo: ela varre a frase *"O Fluxo de Caixa real
+é igual ao Livre"*, e este PR **move** essa linha para dentro da aba Operações. A string ficou byte
+a byte idêntica; o merge pode exigir resolução manual, e está dito no corpo do PR.
 
 ---
 
@@ -913,7 +1001,7 @@ o teste montar um elemento inexistente.
 | Premissas (Preliminar) — 3 grades (Resumo/aproveitamento #569/área alocada #573) | `minmax(180px,1fr)` → `minmax(230px,1fr)` | `frontend/tela-premissas.ts:359` |
 | Fluxo de Caixa / Cenários — `.kpi-card` | `minmax(180px,1fr)` → `minmax(210px,1fr)` + `overflow-wrap`/`word-break` em `.valor` | `frontend/fluxo-tabela.ts:64,97-98` |
 | Apelo Comercial | `minmax(170px,1fr)` → `minmax(210px,1fr)` | `frontend/tela-apelo.ts:34` |
-| Funding — `.ind-card` | `overflow-wrap`/`word-break` em `.val` (track ficou em 150px, não mudou) | `frontend/tela-funding.ts:159-160` |
+| Funding — `.ind-card` | `overflow-wrap`/`word-break` em `.val` (track ficou em 150px, não mudou) | `frontend/tela-funding.ts:182-183` |
 | Análise de mercado — `.comp` | `min-width:0`+`overflow-wrap`/`word-break` em `.comp-linha .val` | `frontend/tela-analise-mercado.ts:110` |
 | Gráficos — "Resultado" | sem conserto — a track (`minmax(300px,1fr)`, filho solto) já tinha folga | `frontend/tela-graficos.ts:172` |
 
@@ -945,7 +1033,7 @@ R$). Mutação MEDIDA (reverter o conserto e rodar o teste isolado), não presum
 
 **Bug de fiação achado e consertado nesta sessão:** `frontend/render/casos/ind-funding.ts` criava
 `document.createElement('viab-tela-funding')` — tag que não existe (o componente real é
-`@customElement('viab-funding')`, `frontend/tela-funding.ts:93`). Um elemento não-registrado não
+`@customElement('viab-funding')`, `frontend/tela-funding.ts:108`). Um elemento não-registrado não
 tem shadow DOM: o caso "montava" um nó vazio (1 nó, 0 visíveis), e o harness reprovava por
 `exigir` não satisfeito — nunca chegou a medir nada. Corrigido para `viab-funding`; o
 `aceitaNaoReproduzido` do caso também precisou ser recalibrado (a montagem real, ao contrário do

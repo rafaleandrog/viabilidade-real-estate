@@ -553,16 +553,28 @@ test('#351 proforma: R$/m² e % VGV têm base declarada e sobrevivem a área/VGV
   const p = proformaAvancado(c, 2000);
   assert.equal(p.areaPrivativa, 2000);
   assert.equal(p.vgv, c.receitaBruta);
-  assert.ok(Math.abs(p.margemPct - (p.resultado / p.vgv) * 100) <= 1e-9);
+  // #604: com VGV > 0 a margem tem de estar DEFINIDA — `null` aqui seria o
+  // conserto vazando para o caso normal, que é o risco desta issue.
+  assert.notEqual(p.margemPct, null, 'com VGV > 0 a margem não pode ser indefinida');
+  assert.ok(Math.abs(p.margemPct! - (p.resultado / p.vgv) * 100) <= 1e-9);
   // #611: com investimento > 0 (CONFIG_COMPLETA tem linhas de custo) o ROI
   // tem que estar DEFINIDO — `null` aqui seria o conserto vazando para o
   // caso normal, que é o risco desta issue.
   assert.notEqual(p.roiPct, null, 'com investimento > 0 o ROI não pode ser indefinido');
   assert.ok(Math.abs(p.roiPct! - (p.resultado / p.investimentoTotal) * 100) <= 1e-9);
   // Estudo vazio: sem divisão por zero e sem NaN vazando para a tela.
+  //
+  // ⚠️ #604 INVERTEU esta asserção, e a inversão é o ponto da issue. Ela
+  // cobrava `pv.margemPct === 0` — ou seja, TRAVAVA o defeito: um percentual
+  // sem denominador publicado como "zero medido". Agora cobra `null`, que é o
+  // que distingue "mediu zero" de "não há base para medir".
+  //
+  // O que a #351 realmente queria daqui **continua valendo e continua aqui**:
+  // nada de divisão por zero, nada de NaN vazando para a tela. É a linha do
+  // `Number.isFinite` abaixo, que não mudou.
   const vazio = calcularFluxo({ ...CONFIG, linhasReceita: [], linhasCusto: [] });
   const pv = proformaAvancado(vazio, 0);
-  assert.equal(pv.margemPct, 0);
+  assert.equal(pv.margemPct, null);
   // #611: sem NENHUMA linha de custo, `investimentoTotal = 0` — o ROI é
   // indefinido (não há denominador), nunca "mediu zero". Mutação: trocar o
   // `null` de volta para 0 em `proforma-avancado.ts` faz esta asserção falhar.
@@ -606,10 +618,14 @@ test('#427 proforma fecha com três leituras, cada uma com sua própria base', (
   assert.ok(Math.abs(p.resultadoMaisPermutas - (p.resultadoMaisPermutaFinanceira + c.vgvPermutaFisica)) <= 0.01);
 
   // Os três percentuais, cada um com a base declarada na issue.
-  assert.ok(Math.abs(p.margemPct - (p.resultado / p.vgv) * 100) <= 1e-9);
-  assert.ok(Math.abs(p.pctResultadoMaisPermutaFinanceira - (p.resultadoMaisPermutaFinanceira / p.vgv) * 100) <= 1e-9);
+  // #604: os três definidos, porque este estudo tem VGV > 0.
+  assert.notEqual(p.margemPct, null);
+  assert.notEqual(p.pctResultadoMaisPermutaFinanceira, null);
+  assert.notEqual(p.pctResultadoMaisPermutas, null);
+  assert.ok(Math.abs(p.margemPct! - (p.resultado / p.vgv) * 100) <= 1e-9);
+  assert.ok(Math.abs(p.pctResultadoMaisPermutaFinanceira! - (p.resultadoMaisPermutaFinanceira / p.vgv) * 100) <= 1e-9);
   assert.ok(Math.abs(
-    p.pctResultadoMaisPermutas - (p.resultadoMaisPermutas / (p.vgv + c.vgvPermutaFisica)) * 100,
+    p.pctResultadoMaisPermutas! - (p.resultadoMaisPermutas / (p.vgv + c.vgvPermutaFisica)) * 100,
   ) <= 1e-9);
 
   // ⚠️ Asserção NEGATIVA — a que distingue: se alguém "unificar" os
@@ -635,8 +651,9 @@ test('#427 degenerescência: sem permutas as três linhas coincidem, sem rótulo
   const p = proformaAvancado(c, 1000);
   assert.ok(Math.abs(p.resultado - p.resultadoMaisPermutaFinanceira) <= 0.01);
   assert.ok(Math.abs(p.resultado - p.resultadoMaisPermutas) <= 0.01);
-  assert.ok(Math.abs(p.margemPct - p.pctResultadoMaisPermutaFinanceira) <= 1e-9);
-  assert.ok(Math.abs(p.margemPct - p.pctResultadoMaisPermutas) <= 1e-9);
+  assert.notEqual(p.margemPct, null);
+  assert.ok(Math.abs(p.margemPct! - p.pctResultadoMaisPermutaFinanceira!) <= 1e-9);
+  assert.ok(Math.abs(p.margemPct! - p.pctResultadoMaisPermutas!) <= 1e-9);
 
   const linhasResultado = p.linhas.filter((l) => l.tipo === 'resultado');
   assert.equal(linhasResultado.length, 3);

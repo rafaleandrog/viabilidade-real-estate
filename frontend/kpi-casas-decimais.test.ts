@@ -142,6 +142,11 @@ const PCT_ENTRADA: { arquivo: string; chamadas: number; motivo: string }[] = [
     arquivo: 'tela-fluxo-receitas.ts', chamadas: 2,
     motivo: 'as duas derivadas de % DIGITADA: pós-obra numa <td> (:700) e o repasse dentro de div.repasse-box (:1043) — uma caixa com forma de card exibindo derivada de valor digitado. Se ela conta como card de KPI é decisão do autor (registrada no PR da #581); enquanto não decidida, mantém as 2 casas do valor digitado',
   },
+  {
+    // #586: entrou com a tabela compilada da aba Operações do Funding.
+    arquivo: 'tela-funding.ts', chamadas: 2,
+    motivo: 'a coluna "Taxa / retorno" da urbi-tabela da aba Operações — CÉLULA DE TABELA, não card. As duas chamadas são os dois ramos da mesma célula: `taxa_anual` (Dívida e Financiamento à produção) e `pct_retorno` (Equity), ambos % DIGITADA pelo usuário e por isso em 2 casas. O contrato do CLAUDE.md manda o oposto do card justamente aqui: tabela mantém a precisão de entrada',
+  },
 ];
 
 test('#581 critério 2: fmtPctEntrada só nos consumidores declarados, nenhum deles card de KPI', () => {
