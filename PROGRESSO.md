@@ -4,6 +4,29 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Varredura de `--cor-primaria` (gradiente) em contexto de cor — #633 (2026-08-29)
+
+Rodada 10. Mesma revisão do PR 629 que originou a #632: `--cor-primaria` é `linear-gradient(...)`
+nas 4 variantes de tema, inválido em propriedade de cor (`color`/`accent-color`/`border*`/`fill`/
+`stroke` — invalid-at-computed-value-time), e `--cor-primaria-solida` é a variante sólida pensada
+para isto. O inventário completo do repositório (grep por `var(--cor-primaria[,)]`, excluindo os
+sufixos `-solida`/`-fundo`/`-borda`) tinha só 4 ocorrências: 3 em CSS de verdade
+(`frontend/tela-cenarios.ts:141,142`, `frontend/tela-analise-mercado.ts:139`) mais uma em contexto
+de DADO de gráfico (`frontend/fluxo-graficos.ts:18`, coberta à parte pela #632). Este PR troca as 3
+por `--cor-primaria-solida`, mantendo o fallback hex já usado em cada arquivo.
+
+**Critério 3 (avaliar um guard estático) foi avaliado e recusado, com o motivo registrado no PR:**
+um guard geral precisaria (a) um parser real de propriedade CSS — `scripts/guard-tokens-css.mjs` já
+resolve EXISTÊNCIA de token, não "esta declaração é uma propriedade de cor" — e (b) inspecionar as
+4 variantes de tema de cada token para decidir se ele é gradiente. Trabalho real para um problema
+medido em 4 ocorrências. No lugar: `frontend/cor-primaria-contexto-cor.test.ts`, teste de fonte que
+varre `frontend/` inteiro (regex sobre propriedade CSS + `var()`, mesma técnica de
+`fluxo-cenario-series.test.ts`) e trava a volta do padrão em qualquer arquivo, não só nos 2 que este
+PR toca.
+
+Mutação: reverter qualquer uma das 3 correções (`-solida` → sem sufixo) derruba o teste novo.
+
+Validação: `bash scripts/validar-frontend.sh` verde — 956 testes, 68 casos de render.
 ## Cor de série sai do dado, entra em CSS — gráfico econômico do Fluxo de Caixa — #632 (2026-08-29)
 
 Rodada 10. Mesmo diagnóstico da #595 (relatório de encerramento da revisão do PR 629): a #595
