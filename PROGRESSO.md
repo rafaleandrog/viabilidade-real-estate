@@ -39,7 +39,7 @@ não existia: o ROI geral e a linha do incorporador. **Nenhuma fórmula nova nas
 Chromium com FàP + dívida + equity e exige as linhas na tela; o **teto** do critério 3 ("duas
 tranches, não três") é assertado dentro do próprio `montar`, porque `exigir` do harness só tem piso.
 Medido: apagando `${this._renderRetornoPorParte(real)}` de `_renderAnaliseFinanceira`, os testes de
-lógica pura seguem **943/943 verdes** e só o caso de render fica vermelho (2/2). Teste de função pura não
+lógica pura seguem **963/963 verdes** e só o caso de render fica vermelho (2/2). Teste de função pura não
 prova ligação — classe de defeito nº 1 do `CLAUDE.md`.
 
 > ⚠️ **Duas armadilhas de crase, e as duas custaram uma rodada de typecheck cada.** Prosa dentro do
