@@ -1051,6 +1051,51 @@ export function reordenarCamadas<T extends { id: any; ordem?: number }>(
   return lista.map((c, idx) => ({ ...c, ordem: idx }));
 }
 
+/**
+ * #586: reordena uma operação DENTRO DO SEU TIPO, preservando a numeração
+ * global de `ordem`.
+ *
+ * Por que existe, em vez de reusar `reordenarCamadas` acima. Com a tela de
+ * Funding em `urbi-abas`, cada aba mostra só as operações de UM tipo — e as
+ * setas ↑↓ de um card passaram a significar "mova entre os IRMÃOS DO MESMO
+ * TIPO", não "mova na lista global". Reusar `reordenarCamadas` produziria um
+ * defeito visível: com um Financiamento à produção entre duas Dívidas na ordem
+ * global, clicar ↑ na 2ª Dívida trocaria a Dívida com o Financiamento — e a
+ * aba Dívida, que não mostra o Financiamento, **não mudaria nada na tela**. O
+ * usuário clica e não acontece nada.
+ *
+ * Chamá-la com o SUBCONJUNTO do tipo também não serve: `reordenarCamadas`
+ * renumera 0…n−1 sobre a lista que recebe, então o subconjunto colidiria com
+ * as `ordem` dos outros tipos e a ordenação global viraria empate arbitrário.
+ *
+ * A operação aqui é uma TROCA de `ordem` entre os dois vizinhos do mesmo tipo:
+ * as demais operações não são tocadas, e a sequência global continua sendo uma
+ * permutação dos mesmos valores. Devolve a lista INTEIRA (ordenada por
+ * `ordem`), para o chamador continuar usando `camadasComOrdemAlterada` e
+ * persistir só o que mudou — são sempre 2 registros, ou 0 na ponta.
+ */
+export function reordenarDentroDoTipo<T extends { id: any; tipo?: string; ordem?: number }>(
+  operacoes: T[], id: any, direcao: 'cima' | 'baixo',
+): T[] {
+  const lista = [...operacoes].sort((a, b) => n(a.ordem) - n(b.ordem));
+  const alvo = lista.find((o) => String(o.id) === String(id));
+  if (!alvo) return lista;
+  const irmaos = lista.filter((o) => o.tipo === alvo.tipo);
+  const i = irmaos.findIndex((o) => String(o.id) === String(id));
+  const j = direcao === 'cima' ? i - 1 : i + 1;
+  if (j < 0 || j >= irmaos.length) return lista; // já é o primeiro/último do tipo
+  const vizinho = irmaos[j];
+  const ordemAlvo = n(alvo.ordem);
+  const ordemVizinho = n(vizinho.ordem);
+  return lista
+    .map((o) => {
+      if (String(o.id) === String(alvo.id)) return { ...o, ordem: ordemVizinho };
+      if (String(o.id) === String(vizinho.id)) return { ...o, ordem: ordemAlvo };
+      return o;
+    })
+    .sort((a, b) => n(a.ordem) - n(b.ordem));
+}
+
 export function camadasComOrdemAlterada<T extends { id: any; ordem?: number }>(
   antes: T[], depois: T[],
 ): T[] {

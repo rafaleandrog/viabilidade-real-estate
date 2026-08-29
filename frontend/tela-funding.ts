@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtR$Kpi, fmtPct } from './viab-format.js';
+import { fmtR$, fmtR$Kpi, fmtPct, fmtPctEntrada } from './viab-format.js';
 import {
   urbiVerso,
   buscarParametrosAvancado, buscarCronogramaAvancado,
@@ -13,7 +13,7 @@ import { dinheiroParaRotulo, mesRepasse, rotuloMesRelativo, type EventoCrono } f
 import {
   fundingDoEstudo, indicadoresOperacao, indicadoresFinanciamentoProducao,
   receitaLiquidaComCorretagemMensal, linhasFinanciaveisPadrao,
-  reordenarCamadas, camadasComOrdemAlterada, eDivida, riscoTarifaDuplicada,
+  reordenarDentroDoTipo, camadasComOrdemAlterada, eDivida, riscoTarifaDuplicada,
   PADRAO_EXPOSICAO_MINIMA, PADRAO_PERCENTUAL_FINANCIAVEL, PADRAO_AMORTIZAR_COM_CAIXA,
   type FundingCalc, type OperacaoFunding, type TipoOperacao, type SerieOperacao,
 } from './funding-motor.js';
@@ -69,6 +69,21 @@ const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
   { valor: 'equity', rotulo: 'Equity', icone: 'fa-solid fa-handshake' },
 ];
 
+// #586: as QUATRO abas da tela, com os nomes LITERAIS do pedido do autor
+// (2026-08-26, item 9) e nesta ordem. `Dívida` aqui é só "Dívida" — o rótulo do
+// TIPO continua "Dívida / Capital de giro" (`TIPOS` acima), que é o que aparece
+// no badge do card e na coluna Tipo da tabela de Operações. Os dois textos
+// coexistem de propósito: o do autor nomeia a aba, o do app nomeia o produto.
+//
+// `operacoes` não é um tipo — é a visão compilada, de leitura. As outras três
+// têm `tipo`, e é por ele que a aba filtra e que a tabela navega.
+const ABAS: { id: string; label: string; icone: string; tipo?: TipoOperacao }[] = [
+  { id: 'operacoes', label: 'Operações', icone: 'fa-solid fa-table-list' },
+  { id: 'financiamento_producao', label: 'Financiamento à produção', icone: 'fa-solid fa-building-columns', tipo: 'financiamento_producao' },
+  { id: 'divida', label: 'Dívida', icone: 'fa-solid fa-file-invoice-dollar', tipo: 'divida' },
+  { id: 'equity', label: 'Equity', icone: 'fa-solid fa-handshake', tipo: 'equity' },
+];
+
 const MODOS_RETORNO: { valor: string; rotulo: string }[] = [
   { valor: 'permuta_financeira', rotulo: 'Permuta financeira (% da receita líquida, mês a mês)' },
   { valor: 'resultado_final', rotulo: '% do resultado final (pago no repasse)' },
@@ -104,6 +119,10 @@ export class ViabFunding extends LitElement {
   @state() private criando = false;
   @state() private calc: FluxoCalc | null = null;
   @state() private funding: FundingCalc | null = null;
+  // #586: aba ativa — estado INTERNO, não vai para a URL. É a convenção do
+  // nível 2 declarada em `frontend/tela-avancado.ts:26-27`; esta tela é nível 3
+  // (uma subaba de Viabilidade), então com mais razão ainda.
+  @state() private abaAtiva: string = 'operacoes';
 
   private carregado = false;
   private crono: EventoCrono[] = [];
@@ -117,8 +136,13 @@ export class ViabFunding extends LitElement {
   static styles = [estiloPrimitivo, estiloConteudo, css`
     /* §17: aviso regulatório permanente, acima de tudo na aba. */
     urbi-banner.aviso-regulatorio { display: block; margin-bottom: 16px; }
-    .barra { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
-    .barra .espaco { flex: 1; }
+    /* #586: esta regra era .barra, a faixa dos TRÊS botões de criar no topo da
+       tela. Com as abas, cada tipo tem o seu botão dentro da própria aba — um
+       só —, então o nome mudou junto com o papel. A regra .barra .espaco morreu
+       com ela: o único span.espaco desta tela vive em .op-cab.
+       (Sem crase neste comentário: ele mora dentro de um template literal, e
+       uma crase aqui FECHA o css e quebra o arquivo — foi o que aconteceu.) */
+    .acao-aba { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
     .ops { display: flex; flex-direction: column; gap: 14px; }
     .op-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .op-cab .espaco { flex: 1; }
@@ -330,7 +354,9 @@ export class ViabFunding extends LitElement {
     if (this.movendoId) return;
     this.movendoId = id;
     try {
-      const nova = reordenarCamadas(this.operacoes, id, direcao);
+      // #586: dentro do TIPO, não na lista global — cada aba mostra um tipo só,
+      // e trocar com um vizinho de outro tipo não mudaria nada na tela.
+      const nova = reordenarDentroDoTipo(this.operacoes, id, direcao);
       const mudaram = camadasComOrdemAlterada(this.operacoes, nova);
       if (mudaram.length === 0) return;
       this.operacoes = nova;
@@ -617,7 +643,13 @@ export class ViabFunding extends LitElement {
     `;
   }
 
-  private _renderOperacao(o: any, i: number): TemplateResult {
+  /** #586: as operações de UM tipo, na ordem global — é o que cada aba de tipo
+   * mostra, e é a lista contra a qual as setas ↑↓ daquele card se posicionam. */
+  private _operacoesDoTipo(tipo: TipoOperacao): any[] {
+    return this.operacoes.filter((o) => o.tipo === tipo);
+  }
+
+  private _renderOperacao(o: any, i: number, irmaos: any[]): TemplateResult {
     const temDraft = !!this.draft[o.id];
     const serie = this.funding?.operacoes.find((s) => String(s.operacao.id) === String(o.id));
     return html`
@@ -633,7 +665,7 @@ export class ViabFunding extends LitElement {
             <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-arrow-up"
               ?desabilitado=${i === 0 || !!this.movendoId} @click=${() => this._mover(o.id, 'cima')}></urbi-botao>
             <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-arrow-down"
-              ?desabilitado=${i === this.operacoes.length - 1 || !!this.movendoId}
+              ?desabilitado=${i === irmaos.length - 1 || !!this.movendoId}
               @click=${() => this._mover(o.id, 'baixo')}></urbi-botao>
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
               @click=${() => { this.removerId = o.id; }}></urbi-botao>` : nothing}
@@ -652,6 +684,115 @@ export class ViabFunding extends LitElement {
               @click=${() => this._salvar(o)}>Salvar</urbi-botao>
           </div>` : nothing}
       </urbi-card>
+    `;
+  }
+
+  /**
+   * #586, aba 1 — a tabela COMPILADA: todas as operações do estudo, dos três
+   * tipos, numa lista só. É de LEITURA; a edição continua na aba do tipo, e
+   * clicar numa linha leva para lá.
+   *
+   * ⚠️ Interpretação declarada: o pedido do autor diz "tabela compilando as
+   * operações", e não diz se ela edita. Assumi leitura + navegação — está no
+   * corpo do PR para ele confirmar.
+   */
+  private _renderAbaOperacoes(): TemplateResult {
+    if (this.operacoes.length === 0) {
+      return html`<urbi-estado-vazio icone="fa-solid fa-coins"
+            mensagem="Nenhuma operação de funding. O Fluxo de Caixa real é igual ao Livre."></urbi-estado-vazio>`;
+    }
+    return html`
+      <urbi-tabela
+        clicavel
+        .colunas=${this._colunasOperacoes()}
+        .linhas=${this.operacoes}
+        mensagem-vazio="Nenhuma operação de funding."
+        @urbi:tabela-click=${(e: CustomEvent) => {
+          const t = e.detail?.linha?.tipo;
+          if (t) this.abaAtiva = t;
+        }}
+      ></urbi-tabela>
+    `;
+  }
+
+  /** Rótulo da coluna "Início" na tabela compilada — mesma leitura que
+   * `_renderAncora` faz no card: âncora de evento quando há uma, mês relativo
+   * quando o usuário escolheu "Mês específico". Espelha o card de propósito;
+   * duas leituras diferentes da mesma coluna divergiriam com o tempo. */
+  private _rotuloInicio(l: any): string {
+    const evento = String(l?.cronograma_evento ?? 'customizado');
+    if (evento !== 'customizado') {
+      return EVENTOS_ANCORA.find((e) => e.valor === evento)?.rotulo ?? evento;
+    }
+    return rotuloMesRelativo(this.dataInicio, n(l?.inicio_mes));
+  }
+
+  /** Colunas da tabela compilada. `Taxa` e `Retorno` são a mesma célula em
+   * significados diferentes por tipo: Dívida e Financiamento à produção têm
+   * taxa de juros; Equity não tem taxa, tem modo e % de retorno. Uma coluna com
+   * dois significados precisa dizer qual é qual — mesmo tratamento que a #443
+   * deu às colunas VGV/Margem do Painel, com `title` por linha. */
+  private _colunasOperacoes() {
+    return [
+      {
+        id: 'tipo', label: 'Tipo',
+        render: (l: any) => html`<urbi-badge>${rotuloTipo(l.tipo)}</urbi-badge>`,
+      },
+      { id: 'nome', label: 'Nome', valor: (l: any) => l.nome || '—' },
+      {
+        id: 'valor', label: 'Valor', alinhamento: 'direita',
+        valor: (l: any) => (l.tipo === 'financiamento_producao'
+          // O FàP não tem `valor` digitado: o principal sai do custo financiável
+          // pelo `percentual_financiavel` (§4.3). Mostrar 0 seria mentira.
+          ? `${n(l.percentual_financiavel)}% do custo`
+          : (n(l.valor) > 0 ? fmtR$(n(l.valor)) : '—')),
+      },
+      {
+        id: 'inicio', label: 'Início', alinhamento: 'centro',
+        valor: (l: any) => (l.tipo === 'financiamento_producao'
+          // A janela do FàP vem do Cronograma (marcosObra), não de `inicio_mes`.
+          ? 'Obra (cronograma)'
+          : this._rotuloInicio(l)),
+      },
+      {
+        id: 'taxa', label: 'Taxa / retorno', alinhamento: 'direita',
+        render: (l: any) => {
+          // % DIGITADA pelo usuário → `fmtPctEntrada` (2 casas), nunca `fmtPct`
+          // (1 casa, que é para % CALCULADO). Contrato de precisão do CLAUDE.md.
+          const texto = l.tipo === 'equity'
+            ? (n(l.pct_retorno) > 0 ? fmtPctEntrada(n(l.pct_retorno)) : '—')
+            : (n(l.taxa_anual) > 0 ? `${fmtPctEntrada(n(l.taxa_anual))} a.a.` : '—');
+          const titulo = l.tipo === 'equity'
+            ? `Equity — ${MODOS_RETORNO.find((m) => m.valor === l.modo_retorno)?.rotulo ?? 'retorno'}`
+            : 'Juros nominais da operação, ao ano';
+          return html`<span title=${titulo}>${texto}</span>`;
+        },
+      },
+    ];
+  }
+
+  /** #586, abas 2 a 4 — o botão de criar do tipo e os cards DAQUELE tipo. Os
+   * `_renderCampos*` vêm inteiros, sem reescrita: a separação por tipo já
+   * existia na camada de campos, o que faltava era na navegação. */
+  private _renderAbaTipo(tipo: TipoOperacao): TemplateResult {
+    const lista = this._operacoesDoTipo(tipo);
+    const t = TIPOS.find((x) => x.valor === tipo)!;
+    const bloqueado = tipo === 'financiamento_producao' && this._temFinanciamento();
+    return html`
+      ${this.editavel ? html`
+        <div class="acao-aba">
+          <urbi-botao variante="secundario" pequeno icone=${t.icone}
+            ?desabilitado=${this.criando || bloqueado}
+            title=${bloqueado
+              ? 'Só pode haver um Financiamento à produção por estudo'
+              : `Adicionar ${t.rotulo}`}
+            @click=${() => this._adicionar(tipo)}>Adicionar ${t.rotulo}</urbi-botao>
+        </div>` : nothing}
+
+      ${lista.length === 0
+        ? html`<urbi-estado-vazio icone=${t.icone}
+            mensagem=${`Nenhuma operação de ${t.rotulo}.`}></urbi-estado-vazio>`
+        : html`<div class="ops">${lista.map((o, i) => this._renderOperacao(o, i, lista))}</div>`}
     `;
   }
 
@@ -687,21 +828,22 @@ export class ViabFunding extends LitElement {
         </urbi-banner>
       ` : nothing}
 
-      ${this.editavel ? html`
-        <div class="barra">
-          ${TIPOS.map((t) => html`
-            <urbi-botao variante="secundario" pequeno icone=${t.icone}
-              ?desabilitado=${this.criando || (t.valor === 'financiamento_producao' && this._temFinanciamento())}
-              title=${t.valor === 'financiamento_producao' && this._temFinanciamento()
-                ? 'Só pode haver um Financiamento à produção por estudo'
-                : `Adicionar ${t.rotulo}`}
-              @click=${() => this._adicionar(t.valor)}>${t.rotulo}</urbi-botao>`)}
-        </div>` : nothing}
-
-      ${this.operacoes.length === 0
-        ? html`<urbi-estado-vazio icone="fa-solid fa-coins"
-            mensagem="Nenhuma operação de funding. O Fluxo de Caixa real é igual ao Livre."></urbi-estado-vazio>`
-        : html`<div class="ops">${this.operacoes.map((o, i) => this._renderOperacao(o, i))}</div>`}
+      <!-- #586: a barra de 3 urbi-botao que ficava aqui SAIU. Cada tipo passou a
+           ter o seu botão de criar dentro da própria aba, e a navegação virou
+           urbi-abas. Os dois avisos acima ficam FORA das abas de propósito: o
+           regulatório é sobre a ferramenta, não sobre o dado, e o de tarifa
+           duplicada cruza Dívida com linhas de custo — não pertence a uma aba
+           isolada. (Sem crase: comentário dentro de template literal.) -->
+      <urbi-abas
+        .abas=${ABAS.map((a) => ({ id: a.id, label: a.label, icone: a.icone }))}
+        .ativa=${this.abaAtiva}
+        @urbi:aba-selecionar=${(e: CustomEvent) => { this.abaAtiva = e.detail?.id || 'operacoes'; }}
+      >
+        ${ABAS.map((a) => html`
+          <urbi-hospedeiro slot=${a.id}>
+            ${a.tipo ? this._renderAbaTipo(a.tipo) : this._renderAbaOperacoes()}
+          </urbi-hospedeiro>`)}
+      </urbi-abas>
 
       ${this.removerId !== null ? html`
         <urbi-modal title="Remover operação" maxWidth="420px"
