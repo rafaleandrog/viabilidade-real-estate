@@ -43,9 +43,37 @@ for finalmente removida sem atualizar o teste. Foi escolhido teste-que-lê-fonte
 de função pura, porque o critério é uma propriedade do **inventário**: os sete consumidores podiam
 voltar um a um sem deixar nada vermelho — a classe de defeito nº 1 do `CLAUDE.md`.
 
+**A revisão do próprio PR achou DOIS bloqueantes, e os dois eram invisíveis para a suíte.**
+
+1. **Reassociar a fórmula muda número.** A primeira versão escreveu
+   `(fechada + aberta) × preço`. É algebricamente igual à antiga com deflator 0 e **numericamente
+   diferente**: reassociar a soma mexe no último bit. Medido em 400.000 insumos plausíveis —
+   **31% divergem em float e 0,6% ainda divergem R$ 0,01 DEPOIS do `round2`** (fechada 904,09 m²,
+   aberta 1.522,10 m², R$ 6.266,90/m², 485 un. → 7.374.274.703,83 contra ,84). Violaria em silêncio
+   o critério 3 da própria issue. **A fixture que estava no teste — 70/12/10.000 — é justamente uma
+   das que NÃO divergem**, então ela passou verde sobre o defeito. Conserto:
+   `fechada × preço + aberta × preço`, bit a bit idêntica à antiga com deflator 0 (`1 − 0 === 1` e
+   `x * 1 === x` são exatos em IEEE-754), e a trava virou **varredura de 20.000 insumos contra a
+   fórmula antiga literal, com igualdade ESTRITA**.
+2. **`CAMPOS_SOMENTE_AVANCADO` não é lista de leitores, é FILTRO.** Tirar
+   `deflator_area_aberta_pct` de lá reabriria uma regressão em tela alheia:
+   `frontend/tela-premissas.ts:477` monta o form com `{ ...this.estudo }` e `:1313-1320` reenvia o
+   **registro inteiro**, então o campo viaja no payload mesmo sem tela para editá-lo — e num
+   Preliminar voltaria a alcançar o validador do shell, o *"Campo X deve ser um número"* que é a
+   razão de ser daquela lista. Não dá para medir daqui se o sincronizador do SDK preenche as linhas
+   antigas: é a lacuna `contratos=nao-executados`. **A entrada ficou**, com o motivo escrito, e
+   morre junto com a coluna. Consequência honesta: **o critério 5 da #584 não está cumprido ao pé
+   da letra**, e por isso o PR usa `Sem-fechamento:` em vez de `Closes` — a decisão é do autor.
+
 > ⚠️ **Lição de ferramenta, pequena e cara:** `round2(a) - round2(b)` **não** é um valor de 2 casas.
 > O teste do degrau reprovou com `4310464.099999994` contra `4310464.10`. O `round2` tem de envolver
 > a SUBTRAÇÃO, não só as parcelas.
+
+> ⚠️ **E a lição grande, que é a mesma da auditoria da Rodada 9 com um caso novo:** as duas
+> descobertas vieram de **medir o ponto certo**, não de medir mais. A suíte tinha 900 testes verdes
+> sobre as duas. O teste do critério 3 era **verdadeiro** — e respondia à pergunta errada, porque
+> uma fixture não decide uma propriedade que vale para todo insumo. Foi preciso trocar a fixture por
+> uma varredura contra o oráculo antigo para a pergunta e a medição coincidirem.
 
 Três citações `arquivo:linha` deixaram de resolver por causa do próprio diff (a classe de defeito
 nº 2) e foram corrigidas na mesma alteração, apontadas pelo `guard-enderecos-doc`.
