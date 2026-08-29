@@ -73,14 +73,25 @@ montada por algum caso, defeito de fiação nela é invisível para a suíte int
 `livre` e `real` saiam os dois negativos), e não mais um teste de `sinalLinhaProformaAv` — a função
 já estava correta e verde o tempo todo, com a chamada ausente.
 
-**Verificação.** `scripts/validar-frontend.sh` verde nas 8 etapas: **884** testes de lógica pura e
-**61** casos de render. O número de testes de lógica pura **não mudou**, e isso está certo pelo
-mesmo motivo de sempre: o defeito morava na fiação.
+**Verificação.** `scripts/validar-frontend.sh` verde nas 8 etapas, medido **depois** do merge de
+sincronização com a `main`: **890** testes de lógica pura e **65** casos de render. Este PR não
+acrescentou teste de lógica pura nenhum ao conserto, e isso está certo pelo mesmo motivo de sempre:
+o defeito morava na fiação, e teste de função pura não a alcança.
 
 **Prova de mutação, com controle verde antes e depois:** apagar `${sinal…}` das três células novas
-de `_renderAnaliseFinanceira` (voltando a `class="num"`) → o caso `analise-financeira-sinal` fica
-**vermelho**, rejeitado pelo `exigir` em `tr.n0.receita td.neg` e `tr.n0.resultado td.neg`; os
-demais 60 casos seguem verdes, o que confirma que a medição é deste caso e não de carona em outro.
+de `_renderAnaliseFinanceira` (voltando a `class="num"`) → **os dois testes do caso
+`analise-financeira-sinal` ficam vermelhos e nenhum outro**, rejeitados pelo `exigir` em
+`tr.n0.receita td.neg` e `tr.n0.resultado td.neg`. É essa segunda metade — nenhum outro caso muda de
+cor — que mostra que a medição é DESTE caso, e não de carona num vizinho.
+
+Duas honestidades sobre o alcance dela. **A célula do funding não é medida por essa mutação**, e não
+tem como ser: `sinalLinhaProformaAv({ tipo: 'custo', … })` devolve `''` sempre, então apagar
+`${sinalFunding}` produz exatamente o mesmo DOM. Ela está ali para o mapeamento ficar explícito e
+greppável junto das outras duas, não porque um teste a segure — e o desfecho correto daquela linha é
+justamente *não* ter classe. E a aritmética das três linhas foi conferida à parte, porque agora ela
+é o que a cor afirma: na fixture do caso, `livre` = −219.202.399,98, `−custoFunding` = −1.053.567,77
+e `real` = −220.255.967,75, com `livre − custoFunding == real`. Os dois `td.neg` são exercitados por
+valores de verdade, não por um caso de borda de arredondamento.
 
 ---
 ## Eficiência de aproveitamento vira indicador: medidor no benchmark e métrica na Proforma (2026-08-29)
