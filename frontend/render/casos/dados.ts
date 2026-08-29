@@ -11,6 +11,7 @@
 
 import { type EventoCrono } from '../../fluxo-shared.js';
 import { calcularFluxo, type FluxoCalc } from '../../fluxo-caixa-motor.js';
+import { fundingDoEstudo } from '../../funding-motor.js';
 
 export const DATA_INICIO = 'jan/2027';
 
@@ -163,4 +164,61 @@ export const PRODUTOS_VALORES_LONGOS: Record<string, any>[] = [
  */
 export function forcarEstado(el: HTMLElement, estado: Record<string, unknown>): void {
   Object.assign(el as any, estado);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// #592 — funding para o caso de render da tabela em duas seções
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * As TRÊS naturezas de operação, para o caso `tabela-fluxo-funding` ter as
+ * duas pontas do funding com valor de verdade. Mesma ressalva do topo deste
+ * arquivo: não é fixture de número — nenhum caso de render compara valor. O
+ * que importa aqui é que `entradas` e `saidas` sejam não nulas, senão os
+ * blocos novos não são montados e o `exigir` do caso mediria o vazio.
+ */
+export const OPERACOES_FUNDING = [
+  {
+    tipo: 'financiamento_producao', nome: 'Banco X', valor: 0, inicio_mes: 0,
+    taxa_anual: 12, exposicao_minima: 5, percentual_financiavel: 80, custo_linha_ids: [2],
+    amortizar_com_caixa_disponivel: true,
+  },
+  { tipo: 'divida', nome: 'Capital de giro', valor: 5_000_000, inicio_mes: 0,
+    taxa_anual: 14, periodo_amortizacao_meses: 36, periodo_carencia_meses: 6 },
+  { tipo: 'equity', nome: 'Investidor', valor: 8_000_000, inicio_mes: 2,
+    modo_retorno: 'resultado_final', pct_retorno: 20 },
+] as any[];
+
+/**
+ * `FluxoCalc` para o caso COM funding. ⚠️ Não é `fluxo()`: o horizonte precisa
+ * cobrir a quitação das operações, e quem estica o prazo é `operacoesFunding`
+ * no `FluxoConfig` (#446). Sem ele a série é cortada e o saldo final sai
+ * truncado — sem erro em lugar nenhum, que é o que o
+ * `scripts/guard-fiacao-funding.mjs` existe para barrar.
+ */
+export function fluxoComFunding(): FluxoCalc {
+  return calcularFluxo({
+    dataInicio: DATA_INICIO,
+    taxaDescontoAa: 12,
+    cronograma: CRONO,
+    linhasReceita: [LINHA_RECEITA],
+    linhasCusto: LINHAS_CUSTO,
+    curvas: [],
+    areaTerreno: 4_800,
+    ret: { ativo: true, pct: 4 },
+    operacoesFunding: OPERACOES_FUNDING,
+  });
+}
+
+/** `FundingCalc` de verdade, saído do motor de verdade, sobre o calc acima. */
+export function fundingDeFluxo() {
+  const c = fluxoComFunding();
+  // ⚠️ Endpoint do ACUMULADO, como a produção faz (`tela-fluxo-ver.ts` e
+  // `tela-cenarios.ts`) — não a soma crua dos mensais, que diverge dele quando
+  // o arredondamento por centavo acumulado difere da soma em ponto flutuante.
+  const resultadoFinal = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] ?? 0;
+  return fundingDoEstudo(
+    OPERACOES_FUNDING, c.fluxoMensal, c.receitaMensal, resultadoFinal, 42, 12,
+    { custosRaw: c.linhasCusto, linhasCusto: c.linhasCusto, cronograma: CRONO },
+  );
 }

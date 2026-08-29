@@ -163,11 +163,11 @@ test('#442 o valor gravado é o MESMO que a tela exibe — nos SEIS destinos', (
   // faz `converterUnidade(rs → destino, canonico)`, que é `daBase` sem
   // arredondar em destino derivado — a mesma conta.
   //
-  // ⚠️ Os seis, não três. `pct_obra` em particular: é ele que sustenta adiar a
-  // #514 ("o gravado é o que a tela exibe, mesmo estando errado por outro
-  // motivo"), e era justamente o que não tinha teste.
+  // ⚠️ Os seis, não três. `pct_obra` (#514, fechada) é o único cuja grandeza
+  // de ligação é o total do grupo Obra, não o VGV — por isso `ctx` precisa de
+  // `obra` além de `receita` para os seis destinos serem exercidos de verdade.
   const TODOS = { ...CONV_TELA };
-  const ctx = { ...CTX_442, receita: 150_000_000 };
+  const ctx = { ...CTX_442, receita: 150_000_000, obra: 50_000_000 };
   for (const [nome, destino] of Object.entries(TODOS)) {
     const r = camposDaTrocaDeUnidade(0.24, 411_476.16, PCT_VGV, destino as any, ctx);
     assert.equal(
@@ -316,8 +316,88 @@ const CONV_TELA = {
   rs_m2_terreno: { tipo: 'por_area', link: 'areaTerreno' },
   pct_vgv: { tipo: 'pct', link: 'vgv' },
   pct_receita: { tipo: 'pct', link: 'receita' },
-  pct_obra: { tipo: 'pct', link: 'vgv' },
+  pct_obra: { tipo: 'pct', link: 'obra' }, // #514: base é o total do grupo Obra, não o VGV
 } as const;
+
+// ── #514: "% Obra" convertia sobre o VGV, não sobre o total do grupo Obra ──
+//
+// Exemplo do autor: Obra R$ 50.000.000, VGV R$ 171.448.400. Digitar 10 sob
+// "% Obra" deveria gravar R$ 5.000.000 (10% de 50M); o `link: 'vgv'` gravava
+// R$ 17.144.840 (10% de 171,4M) — erro de 3,4×.
+
+const PCT_OBRA = { tipo: 'pct', link: 'obra' } as const;
+
+test('#514 daBase(pct_obra): canônico R$ 5.000.000 com totalObra R$ 50.000.000 → 10, não 2,9163…', () => {
+  const ctx = { obra: 50_000_000 };
+  const r = converterUnidade(RS, PCT_OBRA, 5_000_000, ctx);
+  assert.equal(r, 10);
+  // O erro antigo (link: 'vgv') teria dado (5.000.000 / 171.448.400) × 100.
+  assert.notEqual(r, (5_000_000 / 171_448_400) * 100);
+});
+
+test('#514 ida e volta: digitar 10 sob "% Obra" grava R$ 5.000.000, e resolverCustoTotal com o mesmo totalObra devolve R$ 5.000.000', () => {
+  const ctx = { obra: 50_000_000 };
+  const patch = dadosDaTrocaDeUnidade({ orcamento_unidade: 'rs' }, 'pct_obra', CONV_TELA as any, ctx);
+  assert.equal(patch?.orcamento_unidade, 'pct_obra');
+  // Simula o usuário digitando 10 na badge nova — mesma conta de `_editarOrcamento`.
+  const canonico = converterUnidade(PCT_OBRA, RS, 10, ctx);
+  assert.equal(canonico, 5_000_000);
+  const total = resolverCustoTotal(
+    { orcamento_unidade: 'pct_obra', orcamento_valor: 10, orcamento_valor_canonico: canonico },
+    { areaPrivativaTotal: 0, areaTerreno: 0, vgvTotal: 0, totalObra: 50_000_000 },
+  );
+  assert.equal(total, 5_000_000);
+});
+
+test('#514 totalObra ausente/zero: não grava número, e a unidade nem troca', () => {
+  // Sem a grandeza, `daBase` devolve null — e desde o #442/#516,
+  // `dadosDaTrocaDeUnidade` também não troca a unidade quando o destino é
+  // irrepresentável (mesma regra do teste "destino irrepresentável" acima).
+  const linha = { orcamento_unidade: 'rs', orcamento_valor: 9_000_000, orcamento_valor_canonico: 9_000_000 };
+  assert.equal(dadosDaTrocaDeUnidade(linha, 'pct_obra', CONV_TELA as any, {}), null);
+  assert.equal(dadosDaTrocaDeUnidade(linha, 'pct_obra', CONV_TELA as any, { obra: 0 }), null);
+});
+
+test('#514 orcamento_valor gravado pela badge "% Obra" é canonico / totalObra × 100 — não canonico / vgv × 100', () => {
+  const ctx = { vgv: 171_448_400, obra: 50_000_000 };
+  const r = camposDaTrocaDeUnidade(0.24, 5_000_000, RS, PCT_OBRA, ctx);
+  assert.equal(r.orcamento_valor, 10); // 5M / 50M × 100
+  assert.notEqual(r.orcamento_valor, (5_000_000 / 171_448_400) * 100); // o número que o apelido 'vgv' gravava
+});
+
+test('#514 `link: \'vgv\'` não aparece mais em pct_obra', () => {
+  const src = readFileSync(new URL('./tela-fluxo-custos.ts', import.meta.url), 'utf8');
+  const linhaPctObra = src.split('\n').find((l) => l.includes('pct_obra:') && l.includes('tipo:'));
+  assert.ok(linhaPctObra, 'declaração de pct_obra em CONV_UNIDADE não encontrada');
+  assert.match(linhaPctObra!, /link:\s*'obra'/);
+});
+
+// Achado de revisão do Codex no PR #643 (P2): converter a PRÓPRIA linha para
+// `pct_obra` contava essa linha na base de `_totalObra`, porque ela só sai do
+// filtro por unidade DEPOIS que o PATCH volta — no momento da conversão ela
+// ainda está com a unidade antiga em `this.custos`. Exemplo: Construção
+// R$ 50.000.000 e Gestão R$ 5.000.000 (ambas `rs`); converter Gestão para
+// `% Obra` gravava 5/(50+5)×100 = 9,09%, e a tela — assim que a resposta
+// chega e o filtro passa a excluir a própria linha — mostra 5/50×100 = 10%.
+// `orcamento_valor` persistido divergindo do que a tela exibe é exatamente o
+// invariante que a #442 existe para proteger.
+//
+// Como `tela-fluxo-custos.ts` é um componente Lit e nenhum arquivo de teste o
+// importa (mesma razão de sempre — ver a nota de `dadosDaTrocaDeUnidade`
+// acima), a prova é por leitura de fonte: toda chamada de `_ctxConversao()`
+// precisa passar `excluirId` (`c.id`), para `_totalObra` excluir a linha
+// sendo lida/convertida independente da unidade que ela tem AGORA.
+test('#514/#590 (achado de revisão, PR #643): toda chamada de _ctxConversao() passa excluirId', () => {
+  const src = readFileSync(new URL('./tela-fluxo-custos.ts', import.meta.url), 'utf8');
+  const chamadas = src.match(/this\._ctxConversao\([^)]*\)/g) ?? [];
+  assert.ok(chamadas.length > 0, 'nenhuma chamada de _ctxConversao() encontrada — o método mudou de nome?');
+  for (const chamada of chamadas) {
+    assert.notEqual(
+      chamada, 'this._ctxConversao()',
+      'chamada sem excluirId reintroduz o achado do Codex: a linha entraria na própria base ao converter para pct_obra',
+    );
+  }
+});
 
 // ── o rótulo do Funding (#442) ──────────────────────────────────────────────
 

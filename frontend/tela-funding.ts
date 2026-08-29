@@ -699,7 +699,7 @@ export class ViabFunding extends LitElement {
   private _renderAbaOperacoes(): TemplateResult {
     if (this.operacoes.length === 0) {
       return html`<urbi-estado-vazio icone="fa-solid fa-coins"
-            mensagem="Nenhuma operação de funding. O Fluxo de Caixa real é igual ao Livre."></urbi-estado-vazio>`;
+            mensagem="Nenhuma operação de funding. O Fluxo de Caixa é igual ao Livre."></urbi-estado-vazio>`;
     }
     return html`
       <urbi-tabela
