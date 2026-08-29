@@ -4,6 +4,58 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Retirada do deflator de preço da área aberta — #584 (2026-08-29)
+
+Rodada 10, item A10-07. O autor pediu para tirar o campo *"deflator de preço"*, com a ressalva que é
+o que dá trabalho: *"se está sendo [usado], mudar para excluir isso sem gerar erros em formulas"*.
+Ele **estava** — entrou pela #462 três dias antes, fiado no motor, com `deflatorPct` **obrigatório**
+de propósito para que apagá-lo virasse `TS2554` em vez de silêncio.
+
+**Caminho A da issue: coluna INERTE.** A UI e a fiação saem;
+`estudos.deflator_area_aberta_pct` fica declarada no `schema.json` **sem leitor**; **não há
+migração**, e portanto a `versao` **não bumpa**. O caminho B (`dados.limparColuna`) exigiria migração
+que o `validar-backend.sh` **não roda nesta sessão** — o SDK é GitHub Packages privado, o
+`pnpm install` dá 401 e o script aborta na etapa 1/5. Entregar migração não validada empurra risco
+para o autor. É o mesmo raciocínio que o `CLAUDE.md` registra para a `avancado_capital_instrumentos`:
+remover coluna é **escopo**, não falta de mecanismo. A remoção canônica ficou como issue futura.
+
+**O parâmetro SUMIU, não virou opcional com default** — que é exatamente a armadilha que a #462
+fechou e que a issue proíbe por escrito. Saiu das 10 funções de `fluxo-shared.ts`, das 12 de
+`fluxo-caixa-motor.ts` (incluindo o campo `FluxoConfig.deflatorAreaAbertaPct` e o
+`ContextoCusto.deflatorAreaAbertaPct`), das 2 de `fluxo-invariantes.ts` e das 2 de
+`analise-mercado.ts`. Os sete consumidores do inventário pararam de ler o campo, e ele saiu de
+`CAMPOS_SOMENTE_AVANCADO` (`backend/rotas/estudos.ts`).
+
+**A mudança de número está medida, não estimada, e é PARA CIMA.** No insumo real da EVI Urbitá
+(fechada 17.530,94390649873 m², aberta 907,466126361201 m², R$ 9.500/m², deflator 50%): o VGV vai de
+**R$ 170.854.431,21** (`Areas e Precos!F20`) para **R$ 175.164.895,31** — **+R$ 4.310.464,10
+(+2,5229%)** — e o preço médio ponderado **colapsa no preço de tabela** (era 9.266,223655264535,
+`!F6`; agora 9.500 exatos, porque as duas áreas valem o mesmo por m²). O efeito **não fica preso no
+VGV**: as três séries de recebível sobem **+20%** onde com o deflator de 50% subiam +10% — o degrau
+dobra. **Consequência declarada: a app deixa de reproduzir `F20`**, e isso é decisão do autor, não
+erro de conta. Estudo com `deflator = 0` — o padrão do schema — **não muda nada**, com teste de
+regressão cujo oráculo foi escrito à mão pela fórmula ANTIGA com deflator 0.
+
+**O critério 5 virou trava mecânica.** `frontend/deflator-retirado.test.ts` lê o fonte e fecha nos
+DOIS sentidos por contagem exata: leitor novo da coluna reprova, e o sumiço da declaração no
+`schema.json` também — o segundo é o que impede a trava de virar decoração no dia em que a coluna
+for finalmente removida sem atualizar o teste. Foi escolhido teste-que-lê-fonte, e não mais um teste
+de função pura, porque o critério é uma propriedade do **inventário**: os sete consumidores podiam
+voltar um a um sem deixar nada vermelho — a classe de defeito nº 1 do `CLAUDE.md`.
+
+> ⚠️ **Lição de ferramenta, pequena e cara:** `round2(a) - round2(b)` **não** é um valor de 2 casas.
+> O teste do degrau reprovou com `4310464.099999994` contra `4310464.10`. O `round2` tem de envolver
+> a SUBTRAÇÃO, não só as parcelas.
+
+Três citações `arquivo:linha` deixaram de resolver por causa do próprio diff (a classe de defeito
+nº 2) e foram corrigidas na mesma alteração, apontadas pelo `guard-enderecos-doc`.
+
+**Validação de backend PENDENTE DO AUTOR** — o PR toca `backend/rotas/estudos.ts` e lê o
+`schema.json` sem alterá-lo; o `validar-backend.sh` aborta no portão do SDK. "Não deu para rodar"
+nunca é "passou".
+
+---
+
 ## Custos antes de Viabilidade na lista lateral do Avançado — #589 (2026-08-29)
 
 Rodada 10, item A10-10. O pedido do autor é de uma linha: *"Inverter a ordem entre as seções
