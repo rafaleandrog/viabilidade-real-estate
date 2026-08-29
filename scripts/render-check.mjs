@@ -352,6 +352,33 @@ for (const { tag, regras, props, dimensiona } of DEFS) {
         this._corpo.appendChild(d);
       }
       this._corpo.appendChild(document.createElement('slot'));
+      // #586: SLOT NOMEADO. O stub so tinha o slot DEFAULT, e filho com
+      // atributo slot="x" no light DOM nao casa com ele — fica no DOM e
+      // INVISIVEL. Enquanto nenhum caso media uma tela que usasse slot nomeado
+      // por dentro, isso nao aparecia; urbi-abas (que recebe urbi-hospedeiro
+      // com slot=) fez aparecer, e derrubou junto o caso ind-funding, que ja
+      // era verde — a tela inteira sumiu da medicao, nao so as abas.
+      //
+      // O stub mostra TODAS as secoes, e o urbi-abas real mostra so a ativa. A
+      // diferenca e deliberada e a favor da medicao: o que se quer aferir e que
+      // cada aba MONTA e que o conteudo dela nao transborda; esconder as
+      // inativas devolveria "limpo" sobre subarvore que ninguem mediu — que e
+      // exatamente o modo de falha que o exigir existe para barrar.
+      //
+      // NOTA DE LINGUAGEM: este bloco vive dentro de um template literal (o
+      // fonte do stub e uma string). Crase aqui FECHA o template e quebra o
+      // arquivo — aconteceu, e o erro sai como SyntaxError em TODO caso de
+      // render de uma vez. Nao use crase neste comentario.
+      const nomes = new Set();
+      for (const filho of this.children) {
+        const nome = filho.getAttribute && filho.getAttribute('slot');
+        if (nome) nomes.add(nome);
+      }
+      for (const nome of nomes) {
+        const s = document.createElement('slot');
+        s.setAttribute('name', nome);
+        this._corpo.appendChild(s);
+      }
     }
     attributeChangedCallback() { this._pintar(); }
     connectedCallback() { this._pintar(); }
