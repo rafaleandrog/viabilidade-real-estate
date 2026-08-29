@@ -24,6 +24,110 @@ export function seriesEconomicasFluxo(c: FluxoCalc): SerieEconomicaFluxo[] {
       cor: 'var(--cor-alerta, #d59b2d)' },
   ];
 }
+// ─────────────────────────────────────────────────────────────────────────
+// #595 — as DUAS séries do card "Fluxo acumulado — cenário real × cenário
+// simulado" (aba Cenários), montadas fora do template.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Uma série do gráfico de comparação. **Sem `cor`** — ver a nota de `comparacaoCenario`. */
+export interface SerieComparacaoCenario {
+  rotulo: string;
+  valores: number[];
+}
+
+export interface ComparacaoCenario {
+  categorias: string[];
+  series: SerieComparacaoCenario[];
+}
+
+/**
+ * #595 — alinha uma série ACUMULADA a `n` colunas.
+ *
+ * O gráfico consome `categorias` (eixo X) e `series[].valores` em paralelo, por
+ * índice: uma série mais curta que o eixo entrega `undefined` na cauda, e uma
+ * coordenada `NaN` **quebra o `path` inteiro** — o traço some e sobram só os
+ * marcadores, que é exatamente o sintoma que a #595 relata ("hoje são só
+ * pontos"). Como nada pode garantir isso do lado do primitivo, a garantia é do
+ * app: o que ele entrega tem sempre o comprimento do eixo.
+ *
+ * ⚠️ **Repetir o último valor não é inventar dado — é a semântica de uma série
+ * ACUMULADA.** Depois do último mês em que algo entra ou sai (#446), o saldo
+ * acumulado permanece onde estava; a curva plana é a leitura correta, e é o que
+ * o eixo mostraria se o horizonte daquele cenário fosse maior. Valor não finito
+ * no meio da série cai na mesma regra (repete o último válido) em vez de
+ * derrubar o desenho.
+ *
+ * Hoje o reparo é NO-OP: `frontend/fluxo-cenario-series.test.ts` assere que as
+ * duas séries já chegam alinhadas e finitas. Ele existe para o dia em que o
+ * horizonte voltar a mudar — a #446 já o mudou uma vez.
+ */
+function alinharAcumulado(valores: readonly number[], n: number): number[] {
+  const saida: number[] = [];
+  let ultimo = 0;
+  for (let i = 0; i < n; i++) {
+    const v = valores[i];
+    if (Number.isFinite(v)) ultimo = v as number;
+    saida.push(ultimo);
+  }
+  return saida;
+}
+
+/**
+ * #595 — monta eixo e séries do card de comparação da aba Cenários.
+ *
+ * O eixo é o do cenário **mais longo** dos dois, não o da base: truncar pelo
+ * eixo da base esconderia meses de um cenário que estique o horizonte, e é o
+ * mesmo motivo pelo qual `tela-cenarios.ts` já calcula os períodos da view
+ * Anual com `Math.max(base.prazo, cenario.prazo)`.
+ *
+ * ⚠️ **Nenhuma série carrega `cor`, e isso é decisão da #595.** O espelho
+ * `docs/ui-urbiverso/primitivos.json` declara `series` como `Array` e **não
+ * declara a forma dos itens** — ou seja, o repositório **não tem como afirmar**
+ * que um item honra a chave `cor`. O que o espelho DECLARA são as custom
+ * properties `--urbi-grafico-cor-1..8` no `:host` de `UrbiGraficoBase`, que o
+ * próprio `scripts/guard-tokens-css.mjs` reconhece como ponto de customização
+ * legítimo. Então a cor das duas séries é definida em CSS, pelo app, em
+ * `frontend/tela-cenarios.ts` — onde `var()` de fato resolve, ao contrário de
+ * uma string `'var(--x, #hex)'` entregue como dado, que só resolve se o
+ * primitivo a injetar num valor de propriedade CSS e é **inválida** se ele a
+ * injetar num atributo de apresentação SVG.
+ */
+export function comparacaoCenario(
+  base: FluxoCalc,
+  cenario: FluxoCalc,
+  rotuloCenario: string,
+  periodos: PeriodoAgregado[] | null = null,
+): ComparacaoCenario {
+  // View ANUAL: recebe os cálculos MENSAIS + a lista de períodos, e o
+  // alinhamento acontece ANTES da amostragem de fim de período. A ordem
+  // importa (achado do App de revisão no PR da #595): agregar primeiro, com
+  // `agregarFluxoPorPeriodos`, preencheria os períodos além da série mais
+  // curta com `serie[p.fim] ?? 0` — as duas séries chegariam aqui do mesmo
+  // comprimento, finitas, e a curva mais curta DESABARIA a zero em vez de
+  // ficar plana no último saldo.
+  if (periodos && periodos.length > 0) {
+    const n = periodos[periodos.length - 1].fim + 1;
+    const baseAl = alinharAcumulado(base.fluxoAcumulado, n);
+    const cenarioAl = alinharAcumulado(cenario.fluxoAcumulado, n);
+    return {
+      categorias: periodos.map((p) => p.rotulo),
+      series: [
+        { rotulo: 'Cenário real', valores: periodos.map((p) => baseAl[p.fim]) },
+        { rotulo: rotuloCenario, valores: periodos.map((p) => cenarioAl[p.fim]) },
+      ],
+    };
+  }
+  const categorias = cenario.meses.length > base.meses.length ? cenario.meses : base.meses;
+  const n = categorias.length;
+  return {
+    categorias,
+    series: [
+      { rotulo: 'Cenário real', valores: alinharAcumulado(base.fluxoAcumulado, n) },
+      { rotulo: rotuloCenario, valores: alinharAcumulado(cenario.fluxoAcumulado, n) },
+    ],
+  };
+}
+
 // Gráficos SVG autocontidos do Fluxo de Caixa (mensal + acumulado).
 //
 // Extraídos de tela-fluxo-ver.ts (Lote 8 · #23) para serem reusados pela aba

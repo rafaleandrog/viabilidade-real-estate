@@ -52,6 +52,223 @@ volta verde ao desfazer. Sem migração → **a `versao` não bumpa**.
 > antes e depois do conserto. Por isso o teste assevera zero em `transbordoDeCaixa` (a lente
 > determinística, que é a forma deste bug) e restringe a asserção de texto aos campos de mês, em vez
 > de zerar uma lente dependente de fonte sobre uma região que este PR não toca.
+## #610 · a sub-aba Cenários ganha o estado vazio da Proforma sem catálogo (2026-08-28)
+
+Achado da auditoria #574, aprovado pelo autor. A **#563** mandou a Proforma para o estado vazio
+quando não há catálogo efetivo, mas gateou **só a tabela principal**. O resultado era o mesmo estudo
+respondendo coisas opostas em duas abas vizinhas: "não há receita modelada" na Proforma, e
+**Bear/Base/Bull inteiros** em Cenários — com os números vindos exatamente da fonte que a #563
+tinha acabado de recusar (os pares legados de área × preço, sem campo em tela nenhuma), agora
+multiplicados por ±10% em três colunas. **Um número-fantasma estressado continua fantasma.**
+
+**Como ficou.** `_renderSemProdutos` passou a receber o **título do card** e é chamada pelas duas
+sub-abas: `'Proforma'` numa, `'Análise de sensibilidade'` na outra. Ícone, mensagem e submensagem
+são os MESMOS — é o pedido literal da issue, e a submensagem já nomeia o que falta ver ("VGV,
+custos e resultado"), que é o conteúdo das duas tabelas da sensibilidade também. Duplicar o texto
+para "adaptá-lo" criaria duas cópias para divergirem.
+
+**O parâmetro é obrigatório de propósito.** Um default deixaria um chamador novo herdar "Proforma"
+dentro da aba errada, em silêncio. Sem default, esquecê-lo é `TS2554` — medido: apagar o argumento
+das duas chamadas dá erro de compilação nas duas linhas.
+
+**A verificação vem em ordem invertida, e é o que dá valor a ela.** O caso de render
+`cenarios-sem-produtos` foi escrito e rodado **ANTES** do conserto, e falhou **pelo motivo certo**:
+`faltou "div.pf-vazio": exigia 1 visível(is), achou 0`, com 144 nós já montados — as tabelas da
+sensibilidade desenhadas sobre um estudo sem catálogo, em Chromium. Não é dedução a partir do
+código: é a tela medida no estado do defeito.
+
+> **A ausência precisava de prova, e o harness não tem asserção de ausência.** `exigir` só sabe
+> exigir presença — um ramo que desenhasse o estado vazio **e** as tabelas passaria por ele. A
+> tentação era declarar um `seletoresAusentes` no caso; isso teria sido **pior que nada**, porque o
+> harness ignora campo que não conhece **em silêncio**, exatamente como a prop inexistente de
+> primitivo `urbi-*` que o `CLAUDE.md` descreve. Conferi a superfície real em
+> `scripts/render-check.d.mts` antes de confiar: o campo não existe.
+>
+> A prova saiu do mecanismo que já existe, pelo avesso: o caso **não declara**
+> `urbi-select.label`/`.opcoes` em `aceitaNaoReproduzido`. Se a sensibilidade voltar a renderizar
+> nesta condição, o `urbi-select` aparece, as duas props entram em uso sem declaração e o
+> `naoDeclaradas` fica vermelho. **Medido**, não presumido: com um ramo que desenha as duas coisas,
+> o teste reprova com `props NÃO reproduzidas e NÃO declaradas: urbi-badge.cor, urbi-select.label,
+> urbi-select.opcoes`.
+
+**Verificação.** `scripts/validar-frontend.sh` verde nas 8 etapas: **842** testes de lógica pura e
+**57** casos de render (baseline da `main` em `4ab2b88`: 842 e 56). O teste de lógica pura **não
+mudou de número, e isso está certo** — `semProdutos` já é coberto por `frontend/proforma.test.ts`, e
+o que faltava não era cálculo, era fiação. Acrescentar teste de função pura aqui seria decoração:
+nenhum deles monta a tela, e o gate ausente os deixava todos verdes.
+
+Mutações, com controle verde antes e depois: apagar o gate do ramo `cenarios` (volta ao
+comportamento da `main`) → **1 vermelho**; ramo que desenha estado vazio **e** sensibilidade →
+**1 vermelho** (pelo `naoDeclaradas`, como acima); apagar o argumento `titulo` → **2 erros TS2554**.
+O caso `cenarios-sensibilidade` (COM catálogo) segue verde — o caminho normal não foi tocado.
+
+`docs/viabilidade/formulas.md` dizia que `semProdutos` manda "a Proforma inteira" para o estado
+vazio. Era a descrição do que a #563 pretendia, não do que ela entregou; **com esta issue a frase
+passou a ser literal**, e o doc agora diz desde quando.
+
+## #595 · a série do cenário simulado no card de comparação (2026-08-28)
+
+Item 16 da leva Avançado da Rodada 10, **P1**, com screenshot. Pedido do autor, literal: "Visual do
+gráfico de linha ainda continua errado mesmo após tantas tentativas de arrumar (…) ajuste para que a
+linha que se sobressai nessa imagem apareça de fato e com outra cor (hoje são só pontos)".
+
+**O1 — a hipótese de DADOS foi descartada, e com mecanismo, não só medição.** A issue manda checar
+primeiro se as duas séries divergem em comprimento ou trazem valor não finito: seria a única causa
+que é defeito **deste** repositório, porque coordenada inválida derruba o `path` inteiro e deixa só
+os marcadores — exatamente o sintoma. Medido nos dois níveis, nas duas views e em 4 pares de deltas
+(inclusive ±30%): **nunca divergem**. E não é coincidência — o horizonte deriva SÓ de tempo
+(cronograma, custos, recebíveis, funding, em `calcularFluxo`) enquanto `aplicarCenario` escala SÓ
+valores (`preco_m2`, `orcamento_valor`), então `base.prazo === cenario.prazo` por construção.
+
+**O que ERA defeito deste repositório: a crença sem fonte de que a cor viaja no dado.** A tela
+entregava `cor: 'var(--cor-primaria, #7c5cff)'` dentro de cada item de `series`. O espelho
+`docs/ui-urbiverso/primitivos.json` declara `series` como `Array` e **não declara a forma dos
+itens** — não há como afirmar que `cor` é honrada. Pior: `var()` só resolve em **valor de
+propriedade CSS**; num **atributo de apresentação SVG** (`stroke="var(...)"`) o valor é inválido, o
+agente de usuário descarta o atributo, o traço cai para o inicial (`none` — some a linha) e o
+marcador para o `fill` inicial. O comentário de `tela-cenarios.ts` que afirmava
+"SerieGrafico só declara { rotulo, valores, cor }" (herdado da #185) era a origem da crença, e foi
+**corrigido no mesmo diff** (critério 6): a parte que continua verdadeira — o primitivo não declara
+prop de dasharray nem de anotação — segue escrita, com a fonte que a sustenta.
+
+**A saída, sem inventar prop.** O espelho declara, no `:host` de `UrbiGraficoBase`, as custom
+properties `--urbi-grafico-cor-1..8`, e o próprio `scripts/guard-tokens-css.mjs` as reconhece como
+ponto de customização legítimo. As duas primeiras passam a ser definidas no CSS de
+`tela-cenarios.ts`, com tokens do app. É CSS de verdade, onde `var()` resolve, e vale **qualquer que
+seja** o tratamento que o primitivo dê a `serie.cor` — por isso `cor` saiu do dado em vez de
+conviver: mantê-la só preservaria o único valor que pode ser inválido.
+
+**Função pura nova `comparacaoCenario` (`frontend/fluxo-graficos.ts`)**, que monta eixo e as duas
+séries fora do template. O eixo passa a ser o do cenário **mais longo** dos dois (truncar pelo da
+base esconderia meses de um cenário que estique o horizonte) e `alinharAcumulado` garante uma
+entrada por coluna. Repetir o último valor **não é inventar dado**: numa série ACUMULADA, depois do
+último mês em que algo entra ou sai o saldo permanece onde estava. Hoje o reparo é NO-OP — e o teste
+assere as duas coisas separadamente, porque "não há divergência hoje" e "o gráfico sobrevive se
+houver" são afirmações diferentes.
+
+**O que ficou NÃO EXECUTADO, declarado (critério 4):** se o primitivo desenha as duas séries como
+linha é comportamento do markup interno dele. O harness de render usa **stub** gerado do espelho e
+não reproduz esse markup; o `dist/index.d.ts` do SDK, que responderia, não existe neste ambiente
+(GitHub Packages privado, 401). **Quem confirma é o autor, na instância intermediária (Pinguim)** —
+mesma sessão em que ele pode fechar a #264. Por isso o PR **não** declara `Closes #595`.
+
+Validação: `bash scripts/validar-frontend.sh` verde (847 testes, 56 casos de render). Sem migração —
+`versao` não bumpa.
+## #581 · R$ sem centavos no card de KPI — a única exceção declarada ao C7 (2026-08-28)
+
+Item 4 da leva Avançado da Rodada 10. Pedido do autor, literal: "Ajustar valores em R$ nos
+urbi-kpis para não terem casas decimais e quando % para ter uma casa decimal". **Não é bug — é
+decisão do autor que abre exceção a um contrato vigente**, e o app estava integralmente conforme ao
+C7 antes deste PR (a #449/#281 fecharam justamente essa unificação). Por isso a exceção entra
+redigida no `CLAUDE.md` § Contratos inegociáveis, em `docs/viabilidade/formulas.md`
+§ Precisão de resultado e na linha C7 do anexo A de `padrao-incorporacao.md` **no mesmo diff** —
+senão o próximo revisor acusa o diff como violação do C7, com razão, e o conserto seguinte reverte
+o que o autor pediu.
+
+**A metade "%" do pedido já estava atendida e o que faltava era travar.** `fmtPct` é 1 casa com
+mínimo e máximo e é o que todo card de percentual chama; `fmtPctEntrada` (2 casas, valor DIGITADO)
+tem 3 call sites, nenhum deles card — um banner em `tela-premissas.ts` e duas células `<td>` em
+`tela-fluxo-receitas.ts`.
+
+**A metade "R$" é a que mudou.** Função nova `fmtR$Kpi` (`frontend/viab-format.ts`), com
+`minimumFractionDigits` E `maximumFractionDigits` em 0 — os dois, pelo mesmo motivo que a #492 fixou
+os dois em `fmtR$`: só o máximo entregaria "até 0 casas". **Função própria, não um segundo parâmetro
+de `fmtR$`:** parâmetro opcional espalharia a exceção por um argumento que qualquer chamador passa
+por engano, que é a classe de defeito que a #449 apagou. Símbolo próprio torna a exceção greppável.
+
+28 call sites, nas 6 telas do inventário da issue: `tela-resumo.ts` (4), `fluxo-tabela.ts` (7, os
+`div.kpi-card` monetários de `kpisFluxo`), `tela-cenarios.ts` (1), `tela-graficos.ts` (1),
+`tela-premissas.ts` (2 — VGV no ramo Loteamento e Preço médio/unid. no ramo Incorporação, que é a
+paridade do critério 8) e `tela-funding.ts` (13 — os `.ind-card` da Visão do investidor mais o
+resumo de Financiamento à produção).
+
+**Fora do escopo, por decisão registrada:** o `title` do card "VGV Vendável" (`fluxo-tabela.ts`),
+que é uma LISTA de 6 grandezas de detalhe e não a figura do card; e os cards de comparação de
+`tela-analise-mercado.ts`, que publicam R$/m² — derivada não monetária, fora do C7, e ausente do
+inventário da issue.
+
+**A trava é `frontend/kpi-casas-decimais.test.ts`, e ela lê o FONTE de propósito.** O que a issue
+pede é propriedade do INVENTÁRIO (a exceção em todos os cards e em nenhum outro lugar), e isso é
+fiação — a classe de defeito nº 1 do `CLAUDE.md`: apagar a chamada no componente deixa a suíte
+inteira verde. A lista fecha nos dois sentidos por CONTAGEM EXATA (a menos = card voltou a exibir
+centavos; a mais = a exceção vazou), com o motivo escrito por entrada, mais três zeros: `exportar.ts`,
+`tela-proforma.ts`, `tela-fluxo-custos.ts`, `tela-fluxo-receitas.ts`, `tela-fluxo-ver.ts` e
+`tela-dashboard.ts` não podem conhecer `fmtR$Kpi`, e em `viab-format.ts` a contagem esperada é 1 — a
+declaração —, porque 2 significaria que `celula` passou a chamá-la e a exceção entraria em toda
+célula de tabela e em todo CSV/PDF.
+
+Vale para estudos existentes: mudança só de apresentação, nada persistido muda, sem migração —
+O critério 8 (paridade) ganhou asserção de VALOR além da de inventário: um estudo de Loteamento e
+um de Incorporação passam por `calcularProforma`, e o mesmo número sai do card sem centavos e da
+tabela com centavos — é o que prova que o arredondamento é de exibição, não de dado.
+
+`versao` não bumpa. Validação: `bash scripts/validar-frontend.sh` verde (850 testes, 56 casos de
+render).
+## Notação de sinal da Proforma unificada entre tela, CSV e PDF (2026-08-28)
+
+Registro dos PRs 617/618 — achado 10 da auditoria #574, sem issue própria. **Decisão do autor
+(2026-08-28), verbatim:** *"se for fácil, implemente isso. Se não, anote e aguarde nova versão"*.
+**Veredito: fácil**, e o motivo está abaixo.
+
+A tela decidia parênteses × sinal por `celulaProforma`; o CSV e o PDF formatavam com `fmtR$` **cru**.
+Uma Receita operacional negativa saía `-R$ …` no arquivo e `(…)` na tela, **sobre o mesmo número**.
+Junto veio um segundo desvio do mesmo eixo, que a auditoria não tinha separado: a coluna **% VGV**
+da exportação usava `Math.abs` em **todas** as linhas, inclusive no Resultado — uma margem negativa
+aparecia **positiva** no arquivo e negativa na tela.
+
+**Por que era fácil, e por que quase não era.** A dificuldade real não era formatação, era a
+**direção do grafo de imports**: `tela-proforma.ts` importa `exportar.ts` (pelos botões de
+exportar), então a exportação não podia importar a notação da tela sem fechar um **ciclo de
+módulos**. A saída já estava escrita no próprio repositório — `avisoPermutaCapada` mora em
+`exportar.ts` exatamente por isso, com o motivo comentado ao lado. `ehLinhaReceitaOuResultado` e
+`celulaProforma` **mudaram para `exportar.ts`** e a tela as **reexporta**, então nada que as
+importava de lá precisou mudar. Sem esse precedente, o caminho seria criar um módulo novo e mover
+mais de cem linhas — e aí a resposta teria sido "anote e aguarde".
+
+**Como ficou.** `LinhaPf` (exportação) passou a carregar `tipo`/`natureza` — os MESMOS campos da
+`Linha` da tela, porque são eles que decidem a notação —, e as duas colunas monetárias saem por
+`celulaProforma`. A coluna % VGV saiu por `pctVgvProforma`, com a regra da tela (sinal no
+Resultado, magnitude nas demais). O símbolo **"R$" saiu das células** do PDF: o cabeçalho da coluna
+já o informa, e é o que a tela sempre fez. Os KPIs do topo do PDF mantêm o símbolo — ali não há
+cabeçalho que o diga.
+
+**A defesa contra a divergência voltar não compara com um formato escrito à mão.** O teste de
+paridade (`frontend/proforma-ordem-linhas.test.ts`) confronta os **dois lados entre si**, célula a
+célula, em **quatro** fixtures — mais a classificação `tipo`/`natureza` linha a linha. Comparar
+contra uma constante deixaria passar exatamente o defeito que se quer barrar, porque a constante
+teria de ser copiada de um dos dois lados.
+
+> **O quarto fixture existe por uma medição, não por simetria.** Os três primeiros (Incorporação
+> com e sem permuta, Loteamento) fecham **no azul**, e num estudo lucrativo `Math.abs(v)` é a
+> **identidade** — a asserção de % VGV passava sem nunca exercer a única linha em que o sinal
+> importa. Medido: com `pctVgvProforma` revertida para `Math.abs` em todas as linhas, os três
+> continuavam **verdes**; só o teste direto de notação acusava. Entrou então `INC_DEFICITARIO`
+> (terreno de R$ 40M contra VGV de R$ 26,4M), e com ele a mesma mutação passou a derrubar também a
+> paridade. A sentinela `notação: o fixture deficitário É deficitário` guarda essa propriedade: se
+> um ajuste futuro devolver o estudo ao azul, ela fica vermelha em vez de os dois casos voltarem a
+> passar por vacuidade.
+>
+> É a classe 1 do `CLAUDE.md` com uma volta a mais — o teste **chamava** a função certa, com o
+> argumento certo, e ainda assim não media nada: o **fixture** é que não continha o caso.
+
+**Verificação.** `scripts/validar-frontend.sh` verde nas 8 etapas: **856** testes de lógica pura
+(baseline da `main` em `c82239e`, medido trocando os dois arquivos de teste pelos da `main`: **842**)
+e **56** casos de render. Sem caso de render novo porque **a tela não muda** — a mudança é do
+arquivo exportado, que o harness não desenha; quem cobre a tela são os casos
+`proforma-deficitaria` que já existiam.
+
+Mutações, todas com **controle verde antes e depois** (29 testes nos dois arquivos): CSV de volta
+ao `fmtR$` cru → **2 vermelhos**; PDF de volta → **2**; % VGV de volta ao `Math.abs` → **2**;
+"Receita líquida" perder `natureza: 'receita'` → **5**; "Resultado" perder `tipo: 'resultado'` →
+**6**.
+
+O merge da `main` também deslocou `_renderKpis` em `tela-proforma.ts` (a saída das duas funções
+encurtou o arquivo em 13 linhas), e o `guard-enderecos-doc` **reprovou** a citação
+`tela-proforma.ts:477-495` em `frontend/render/casos/kpis-proforma-longos.ts` — corrigida para
+`:464-482`. Duas outras citações mudaram de **arquivo**, não só de linha, e o guard não as pega
+porque uma não tem número (`frontend/viab-format.ts`) e a outra o tinha errado desde antes
+(`padrao-incorporacao.md`): as duas apontavam `celulaProforma` para `tela-proforma.ts`, e agora
+apontam para `exportar.ts:69`.
 
 ---
 

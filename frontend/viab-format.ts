@@ -21,6 +21,51 @@ export function fmtR$(v: number, comSimbolo = true): string {
   }
   return new Intl.NumberFormat('pt-BR', opcoes).format(v || 0);
 }
+/**
+ * #581 — EXCEÇÃO DECLARADA ao contrato C7, e a única que existe.
+ *
+ * Decisão do autor em 2026-08-26 (leva Avançado, item 4): "ajustar valores em
+ * R$ nos urbi-kpis para não terem casas decimais". Ela vale **só para o valor
+ * exibido no card de KPI** — a figura grande que o card publica. Persistência,
+ * entrada, motor, tabelas, Proforma, Fluxo de Caixa e exportação continuam em
+ * 2 casas, sem exceção: `R$ 171.448.400` num card e `R$ 171.448.400,00` numa
+ * linha de tabela são O MESMO número, e a diferença é tipográfica.
+ *
+ * ⚠️ É uma função PRÓPRIA, e não um segundo parâmetro de `fmtR$`, de propósito.
+ * Parâmetro opcional espalharia a exceção por um argumento que qualquer
+ * chamador pode passar por engano — a classe de defeito que a #449 apagou.
+ * Símbolo próprio torna a exceção GREPPÁVEL: `grep -rn 'fmtR\$Kpi'` devolve
+ * exatamente onde ela vale, e `frontend/kpi-casas-decimais.test.ts` trava esse
+ * inventário por contagem exata, nos dois sentidos.
+ *
+ * Fora do escopo, de propósito e por decisão registrada no PR da #581:
+ *   · o `title` do card "VGV Vendável" (`frontend/fluxo-tabela.ts`), que é uma
+ *     LISTA de 6 grandezas de detalhe — leitura precisa, não figura de card;
+ *   · os cards de comparação de `frontend/tela-analise-mercado.ts`, que
+ *     publicam R$/m² (derivada não monetária, fora do C7) e não estão no
+ *     inventário da issue;
+ *   · a linha de detalhe `_unidadesTipo` de `frontend/tela-premissas.ts`
+ *     ("37 un · R$ 8.513,29/un"), texto corrido SEM caixa dentro do card
+ *     Resumo — fica em 2 casas ao lado do card sem centavos, e mudar isso
+ *     é decisão do autor (registrada no PR da #581).
+ */
+export function fmtR$Kpi(v: number): string {
+  // Sinal normalizado APÓS o arredondamento: entre -R$ 0,50 (exclusivo) e
+  // R$ 0 o Intl arredonda a fração fora mas preserva o sinal, e o card
+  // publicaria "-R$ 0" — zero negativo não é um valor de KPI. O critério de
+  // "arredonda a zero" é o DO PRÓPRIO Intl (half away from zero): |v| < 0,5.
+  // `Math.round` não serve de proxy — `Math.round(-0.5)` é -0 (half toward
+  // +∞) e engoliria o "-R$ 1" legítimo da fronteira exata -0,50.
+  // (Achados do App de revisão no PR da #581, rodadas 1 e 2.)
+  const valor = v || 0;
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.abs(valor) < 0.5 ? 0 : valor);
+}
+
 export const fmtNum = (v: number, d = 0) =>
   new Intl.NumberFormat('pt-BR', { maximumFractionDigits: d }).format(v || 0);
 
@@ -65,7 +110,7 @@ export interface OpcoesCelula {
   /** #567: quando true, NÃO some com o valor abaixo de R$ 0,005 — mostra
    * "0,00"/"(0,00)" em vez de célula vazia. O Fluxo de Caixa usa célula vazia
    * de propósito (mês sem movimento); a Proforma (`celulaProforma`,
-   * `frontend/tela-proforma.ts`) controla visibilidade por LINHA
+   * `frontend/exportar.ts` — a tela a reexporta) controla visibilidade por LINHA
    * (`ocultarSeZero`), não por célula, e uma linha-total que fecha em zero
    * precisa continuar mostrando "0,00", não sumir. */
   sempreExibir?: boolean;

@@ -4,7 +4,17 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
-import { exportarPDF, exportarExcel, avisoPermutaCapada } from './exportar.js';
+// ⚠️ `ehLinhaReceitaOuResultado`/`celulaProforma` MUDARAM DE ARQUIVO na
+// unificação da notação de sinal (registro dos PRs 617/618, achado 10 da
+// auditoria #574): moram em `./exportar.ts`, e são REEXPORTADAS logo abaixo.
+// O motivo é a direção do grafo de imports — esta tela já importa aquele
+// módulo, então a exportação não pode importar esta tela sem fechar um ciclo.
+// É a mesma decisão, escrita no mesmo lugar, que `avisoPermutaCapada` tomou.
+import {
+  exportarPDF, exportarExcel, avisoPermutaCapada,
+  ehLinhaReceitaOuResultado, celulaProforma, pctVgvProforma,
+} from './exportar.js';
+export { ehLinhaReceitaOuResultado, celulaProforma };
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
 // do seu `_carregar()`, e que `tela-graficos.ts` reusa (PR 580/#597). Reusada,
@@ -26,29 +36,6 @@ export interface Linha {
   semPermuta?: boolean;   // #10: linha "VGV sem permuta" (itálico, sub-linha de contexto)
   memo?: string;          // #8: descrição da conta, na 2ª coluna (menor, itálico)
   soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean;
-}
-
-// #567: receita (VGV, sub-linhas de produto, consolidados marcados
-// `natureza: 'receita'`) e resultado mostram o SINAL REAL — negativo entre
-// parênteses, positivo sem marca nenhuma. Toda outra linha (custo/dedução,
-// inclusive os headers `tipo: 'consolidado'` sem `natureza`, como "Custo
-// direto total") é notação contábil pura: SEMPRE entre parênteses,
-// independente do sinal — a app grava custo como valor positivo. Pura e
-// exportada para ser testável: era decidido inline dentro de dois métodos
-// privados que nenhum teste tocava.
-export function ehLinhaReceitaOuResultado(r: Pick<Linha, 'tipo' | 'natureza'>): boolean {
-  return r.tipo === 'receita' || r.natureza === 'receita' || r.tipo === 'resultado';
-}
-
-// Coluna R$ da Proforma: delega para `celula` (frontend/viab-format.ts) —
-// fonte única de 2 casas decimais (C7) e da regra de parênteses
-// (`negativoContabil`), a mesma que o Fluxo de Caixa usa. `sempreExibir`
-// porque a Proforma controla visibilidade por LINHA (`ocultarSeZero` no
-// `Linha`), não por célula perto de zero como o Fluxo de Caixa — um header
-// como "Custo indireto total" que fecha em zero precisa mostrar "(0,00)",
-// não sumir.
-export function celulaProforma(r: Pick<Linha, 'v' | 'tipo' | 'natureza'>): string {
-  return celula(r.v, { comParenteses: true, custo: !ehLinhaReceitaOuResultado(r), sempreExibir: true });
 }
 
 // Coluna R$/m²: mesma decisão de sinal (`negativoContabil`) que `celula`
@@ -420,7 +407,7 @@ export class ViabTelaProforma extends LitElement {
     const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
     return html`
       ${this.secao === 'proforma'
-        ? (p.semProdutos ? this._renderSemProdutos() : html`
+        ? (p.semProdutos ? this._renderSemProdutos('Proforma') : html`
         ${this._renderKpis(p)}
         ${!lot ? this._renderUnidadesTipo(p) : nothing}
         <urbi-card titulo="Proforma">
@@ -433,7 +420,9 @@ export class ViabTelaProforma extends LitElement {
         </urbi-card>
       `)
         : nothing}
-      ${this.secao === 'cenarios' ? this._renderSensibilidade(lot) : nothing}
+      ${this.secao === 'cenarios'
+        ? (p.semProdutos ? this._renderSemProdutos('Análise de sensibilidade') : this._renderSensibilidade(lot))
+        : nothing}
     `;
   }
 
@@ -442,8 +431,27 @@ export class ViabTelaProforma extends LitElement {
   // tabela nessa condição era pior que nada — ela vinha preenchida a partir dos
   // pares legados de área × preço, que não têm campo em tela nenhuma e por isso
   // ninguém consegue conferir nem corrigir.
-  private _renderSemProdutos(): TemplateResult {
-    return html`<urbi-card titulo="Proforma">
+  //
+  // #610: as DUAS sub-abas usam este mesmo estado vazio. A #563 gateou só a
+  // tabela principal, e o resultado era o mesmo estudo respondendo coisas
+  // opostas em duas abas vizinhas: "não há receita modelada" na Proforma, e
+  // Bear/Base/Bull inteiros em Cenários — com os números da mesma fonte legada
+  // que a #563 tinha acabado de recusar, agora multiplicados por ±10% em três
+  // colunas. Um número-fantasma estressado continua fantasma.
+  //
+  // ⚠️ `titulo` é OBRIGATÓRIO de propósito. É a única coisa que difere entre as
+  // duas chamadas (o card de cada sub-aba tem o seu), e um default aqui deixaria
+  // um chamador novo herdar "Proforma" em silêncio, dentro da aba errada. Sem
+  // default, esquecê-lo é erro de compilação (TS2554), não um rótulo errado na
+  // tela — a defesa que o CLAUDE.md prescreve para a classe 1.
+  //
+  // A mensagem e a submensagem são as MESMAS nas duas, e é o pedido literal da
+  // #610 ("o mesmo estado vazio"): a causa é uma só, e a submensagem já nomeia
+  // o que falta ver — "VGV, custos e resultado" —, que é exatamente o conteúdo
+  // das duas tabelas da sensibilidade também. Duplicar o texto para "adaptá-lo"
+  // criaria duas cópias para divergirem.
+  private _renderSemProdutos(titulo: string): TemplateResult {
+    return html`<urbi-card titulo=${titulo}>
       <div class="pf-vazio">
         <urbi-estado-vazio icone="fa-solid fa-boxes-stacked"
           mensagem="Nenhum produto com área, preço e unidades cadastrado."
@@ -500,11 +508,14 @@ export class ViabTelaProforma extends LitElement {
 
   // % VGV: no Resultado é a margem (com sinal); nas demais (inclusive "VGV sem
   // permuta" do #8), magnitude sobre o VGV da Receita bruta — nunca sobre si.
+  // DELEGA para `pctVgvProforma` (`frontend/exportar.ts`) — a MESMA função dos
+  // três destinos (tela, CSV, PDF), como `celulaProforma`. Manter uma cópia
+  // aqui deixaria a paridade da % VGV unidirecional: o teste confrontaria a
+  // exportação contra uma regra reescrita à mão, e a tela poderia divergir em
+  // silêncio (achado da lente na rodada 1 do PR desta unificação). Sem ciclo:
+  // este arquivo já importa `./exportar.js`.
   private _pctVgv(r: Linha, p: Proforma): string {
-    if (p.vgv <= 0) return '—';
-    return r.tipo === 'resultado'
-      ? fmtPct(r.v / p.vgv * 100)
-      : fmtPct(Math.abs(r.v) / p.vgv * 100);
+    return pctVgvProforma(r, p);
   }
 
   private _renderTabela(p: Proforma, lot: boolean, vgvBruto: number): TemplateResult {

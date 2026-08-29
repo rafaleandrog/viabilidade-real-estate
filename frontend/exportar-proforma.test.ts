@@ -146,3 +146,72 @@ test('#571: CSV e PDF mostram "—" na % VGV e em "Margem sobre VGV" quando vgv 
     `KPI "Margem sobre VGV" não saiu "—" no PDF:\n${html}`);
   assert.ok(!html.includes('0,0%'), `PDF mostrou "0,0%" com VGV indefinido:\n${html}`);
 });
+
+// ── Notação de sinal no arquivo (registro dos PRs 617/618) ─────────────────
+//
+// O que estes casos conferem é o TEXTO QUE VAI PARA O ARQUIVO — a paridade
+// linha a linha contra a tela está em `frontend/proforma-ordem-linhas.test.ts`.
+// Os dois níveis são necessários: a paridade impede as duas de divergirem, e
+// estes impedem que as duas concordem no formato errado.
+
+/** Estudo deficitário: custo direto maior que a receita líquida. */
+const DEFICITARIO: ProformaInput = {
+  tipo_empreendimento: 'incorporacao',
+  produtos: [{ area_media_m2: 100, preco_venda_m2: 10_000, unidades: 10 }], // VGV 10M
+  imposto_percentual: 6, corretagem_percentual: 5,
+  considerar_custo_terreno: true, custo_terreno_m2: 5_000, terreno_manual_area: 3_000, // 15M de terreno
+};
+
+test('notação: custo/dedução SEMPRE entre parênteses no CSV — nunca "-R$" nem número pelado', () => {
+  const p = calcularProforma(DEFICITARIO);
+  const csv = csvProforma(ESTUDO, p, false);
+  assert.ok(csv.includes('(-) Terreno;(15.000.000,00);'), `linha do Terreno sem parênteses:\n${csv}`);
+  assert.ok(csv.includes('= Custo direto total;(15.000.000,00);'), `consolidado de custo sem parênteses:\n${csv}`);
+  // A receita, positiva, sai PLANA — o conserto não pode virar "tudo entre parênteses".
+  assert.ok(csv.includes('Receita bruta (VGV);10.000.000,00;'), `a receita positiva ganhou marca:\n${csv}`);
+});
+
+test('notação: valor negativo sai entre parênteses, não com sinal de menos (CSV e PDF)', () => {
+  const p = calcularProforma(DEFICITARIO);
+  assert.ok(p.receitaOperacional < 0, `o fixture precisa ser deficitário: ${p.receitaOperacional}`);
+  assert.ok(p.resultado < 0);
+
+  const csv = csvProforma(ESTUDO, p, false);
+  const html = htmlProforma(ESTUDO, p, false);
+  // A marca do defeito: `fmtR$` cru punha o sinal de menos ANTES do número.
+  for (const [onde, texto] of [['CSV', csv], ['PDF', html]] as const) {
+    assert.ok(!/-\s?[\d.]+,\d\d/.test(texto.replace(/-\) /g, '')), `${onde} ainda tem número com sinal de menos:\n${texto}`);
+    assert.ok(!texto.includes('-R$'), `${onde} ainda tem "-R$":\n${texto}`);
+  }
+  assert.ok(csv.includes('= Receita operacional;('), `Receita operacional negativa sem parênteses no CSV:\n${csv}`);
+  assert.ok(html.includes('<td class="v">(') , `nenhuma célula entre parênteses no PDF:\n${html}`);
+});
+
+test('notação: a % VGV do Resultado leva o SINAL; as demais são magnitude', () => {
+  const p = calcularProforma(DEFICITARIO);
+  const csv = csvProforma(ESTUDO, p, false);
+  const linhaResultado = csv.split('\n').find((l) => l.startsWith('= Resultado;'))!;
+  assert.ok(linhaResultado.endsWith('%'), `linha do Resultado sem %: ${linhaResultado}`);
+  assert.ok(linhaResultado.split(';')[2].startsWith('-'),
+    `a margem negativa saiu POSITIVA na % VGV — o defeito do Math.abs: ${linhaResultado}`);
+  // Uma linha de custo continua em magnitude (positiva), como na tela.
+  const linhaTerreno = csv.split('\n').find((l) => l.startsWith('(-) Terreno;'))!;
+  assert.ok(!linhaTerreno.split(';')[2].startsWith('-'), `custo ganhou % negativa: ${linhaTerreno}`);
+});
+
+test('notação: o símbolo "R$" não aparece nas células — o cabeçalho da coluna já o informa', () => {
+  const p = calcularProforma(DEFICITARIO);
+  const csv = csvProforma(ESTUDO, p, false);
+  const html = htmlProforma(ESTUDO, p, false);
+  // No CSV o cabeçalho é `Linha;R$;% VGV`; no PDF é a coluna `<td class="v">R$</td>`.
+  assert.ok(csv.includes('Linha;R$;% VGV'));
+  assert.equal(csv.split('R$').length - 1, 1, `"R$" aparece mais de uma vez no CSV:\n${csv}`);
+  // No PDF o símbolo segue nos KPIs do topo (VGV), que não são células da
+  // tabela — a asserção é sobre as células.
+  const celulas = (html.match(/<td class="v">[^<]*<\/td>/g) ?? [])
+    .filter((c) => c !== '<td class="v">R$</td>'); // o cabeçalho da coluna, que É o "R$"
+  assert.ok(celulas.length > 5, 'o PDF precisa ter células de valor para o teste significar algo');
+  for (const celula of celulas) {
+    assert.ok(!celula.includes('R$'), `célula do PDF com "R$": ${celula}`);
+  }
+});
