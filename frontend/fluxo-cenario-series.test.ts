@@ -197,6 +197,34 @@ test('#595: eixo e séries sobrevivem a cenário mais longo, mais curto e com bu
   for (const s of comBuraco.series) assert.ok(finito(s.valores));
 });
 
+// A view ANUAL era a brecha da defesa (achado do App de revisão): agregar
+// ANTES de alinhar preenchia a cauda da série mais curta com zeros
+// (`agregarFluxoPorPeriodos` faz `serie[p.fim] ?? 0`), as duas chegavam do
+// mesmo comprimento e finitas — e a curva mais curta DESABAVA a zero em vez de
+// ficar plana. `comparacaoCenario` agora recebe os cálculos MENSAIS + a lista
+// de períodos e amostra o acumulado JÁ alinhado.
+test('#595: na view Anual a cauda da série mais curta fica PLANA no último saldo — não desaba a zero', () => {
+  const eixo = (n: number) => Array.from({ length: n }, (_, i) => `M${i + 1}`);
+  const calc = (meses: string[], acum: number[]): FluxoCalc =>
+    ({ meses, fluxoAcumulado: acum, prazo: meses.length } as unknown as FluxoCalc);
+  // 24 meses de base × 12 do cenário, períodos anuais COMPARTILHADOS sobre o
+  // horizonte mais longo — exatamente o que a tela monta com Math.max.
+  const periodos = [
+    { rotulo: 'Ano 1', inicio: 0, fim: 11 },
+    { rotulo: 'Ano 2', inicio: 12, fim: 23 },
+  ];
+  const base = calc(eixo(24), Array.from({ length: 24 }, (_, i) => (i + 1) * 10));
+  const cenario = calc(eixo(12), Array.from({ length: 12 }, (_, i) => (i + 1) * 7));
+
+  const g = comparacaoCenario(base, cenario, 'Cenário', periodos);
+  assert.deepEqual(g.categorias, ['Ano 1', 'Ano 2']);
+  assert.deepEqual(g.series[0].valores, [120, 240]);
+  // O cenário terminou no mês 12 com saldo 84 — no Ano 2 a curva fica NO 84.
+  // Antes do conserto este valor saía 0 (o zero de preenchimento da agregação).
+  assert.deepEqual(g.series[1].valores, [84, 84]);
+  for (const s of g.series) assert.ok(finito(s.valores));
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // FIAÇÃO — a metade que teste de função pura não alcança
 // ─────────────────────────────────────────────────────────────────────────────
@@ -237,6 +265,16 @@ test('#595 fiação: a aba Cenários monta o card por comparacaoCenario', () => 
     TELA.includes('.categorias=${comparacao.categorias}') && TELA.includes('.series=${comparacao.series}'),
     'o urbi-grafico-linha da aba Cenários deixou de consumir o resultado de comparacaoCenario — '
     + 'eixo e séries precisam sair da MESMA montagem, senão voltam a poder divergir.',
+  );
+  // A chamada tem que receber os cálculos MENSAIS + a lista de períodos — na
+  // CHAMADA, não na declaração. Reverter para os agregados (exibBase/exibCenario,
+  // sem periodos) reintroduz a queda a zero da view Anual que o teste acima mede
+  // na função pura, mas que a fiação sozinha deixaria passar calada.
+  assert.match(
+    TELA,
+    /comparacaoCenario\(\s*base,\s*cenario,[\s\S]{0,120}?periodos,?\s*\)/,
+    'a tela deixou de passar os cálculos mensais + periodos a comparacaoCenario — '
+    + 'na view Anual o alinhamento tem que acontecer ANTES da amostragem de período.',
   );
 });
 

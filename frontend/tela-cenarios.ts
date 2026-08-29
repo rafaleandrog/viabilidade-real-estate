@@ -370,8 +370,13 @@ export class ViabTelaCenarios extends LitElement {
     // alinhamento das duas séries ao eixo vira coisa testável (era ele que
     // podia quebrar o `path` e deixar só os pontos), e a cor deixa de viajar
     // como dado — ver a nota da função e o bloco CSS de `.graf urbi-grafico-linha`.
+    // Ela recebe os cálculos MENSAIS (não `exibBase`/`exibCenario`): na view
+    // Anual o alinhamento tem que acontecer ANTES da amostragem de período,
+    // porque `agregarFluxoPorPeriodos` preenche a cauda da série mais curta
+    // com zeros (`serie[p.fim] ?? 0`) e a curva desabaria em vez de ficar
+    // plana — ver a nota da função.
     const comparacao = comparacaoCenario(
-      exibBase, exibCenario, alterado ? this._rotuloCenario() : 'Cenário simulado',
+      base, cenario, alterado ? this._rotuloCenario() : 'Cenário simulado', periodos,
     );
     return html`
       <div class="topo">

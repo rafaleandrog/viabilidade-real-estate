@@ -96,7 +96,27 @@ export function comparacaoCenario(
   base: FluxoCalc,
   cenario: FluxoCalc,
   rotuloCenario: string,
+  periodos: PeriodoAgregado[] | null = null,
 ): ComparacaoCenario {
+  // View ANUAL: recebe os cálculos MENSAIS + a lista de períodos, e o
+  // alinhamento acontece ANTES da amostragem de fim de período. A ordem
+  // importa (achado do App de revisão no PR da #595): agregar primeiro, com
+  // `agregarFluxoPorPeriodos`, preencheria os períodos além da série mais
+  // curta com `serie[p.fim] ?? 0` — as duas séries chegariam aqui do mesmo
+  // comprimento, finitas, e a curva mais curta DESABARIA a zero em vez de
+  // ficar plana no último saldo.
+  if (periodos && periodos.length > 0) {
+    const n = periodos[periodos.length - 1].fim + 1;
+    const baseAl = alinharAcumulado(base.fluxoAcumulado, n);
+    const cenarioAl = alinharAcumulado(cenario.fluxoAcumulado, n);
+    return {
+      categorias: periodos.map((p) => p.rotulo),
+      series: [
+        { rotulo: 'Cenário real', valores: periodos.map((p) => baseAl[p.fim]) },
+        { rotulo: rotuloCenario, valores: periodos.map((p) => cenarioAl[p.fim]) },
+      ],
+    };
+  }
   const categorias = cenario.meses.length > base.meses.length ? cenario.meses : base.meses;
   const n = categorias.length;
   return {
