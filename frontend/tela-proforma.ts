@@ -408,7 +408,7 @@ export class ViabTelaProforma extends LitElement {
     return html`
       ${this.secao === 'proforma'
         ? (p.semProdutos ? this._renderSemProdutos() : html`
-        ${this._renderKpis(p)}
+        ${this._renderKpis(p, lot)}
         ${!lot ? this._renderUnidadesTipo(p) : nothing}
         <urbi-card titulo="Proforma">
           ${this._renderAvisoPermuta(p)}
@@ -461,7 +461,16 @@ export class ViabTelaProforma extends LitElement {
       </urbi-banner>`;
   }
 
-  private _renderKpis(p: Proforma): TemplateResult {
+  /**
+   * As MÉTRICAS da Proforma do Preliminar.
+   *
+   * ⚠️ `lot` é OBRIGATÓRIO, e a obrigatoriedade é a defesa (#613). O KPI
+   * "Vendável / gleba" só existe no ramo do Loteamento; com um `lot = false`
+   * default, apagar o argumento na chamada de `render()` compilaria limpo e
+   * sumiria com a métrica em silêncio — a classe 1 do `CLAUDE.md`, o defeito
+   * na fiação. Sem default, a mesma mutação vira `TS2554` no typecheck.
+   */
+  private _renderKpis(p: Proforma, lot: boolean): TemplateResult {
     const co = this._bm('custo_obras_vgv');
     const ml = this._bm('margem_liquida');
     const temPermuta = p.areaPermutaFisica > 0 || p.permutaFinResidencial > 0 || p.permutaFinNaoResidencial > 0;
@@ -469,6 +478,23 @@ export class ViabTelaProforma extends LitElement {
       { rot: 'Área vendável', val: `${fmtNum(p.areaVendavel)} m²`, variante: '' },
       { rot: 'Nº de unidades', val: fmtNum(p.numUnidades), variante: '' },
     ];
+    // #613 — a eficiência de aproveitamento entra nas métricas do estudo, e não
+    // só na régua do benchmark (decisão do autor, 2026-08-28: "indicadores no
+    // benchmark e as métricas"). Antes ela aparecia no Resumo de Premissas e no
+    // PDF, mas não na Proforma, que é a tela de métricas do Preliminar.
+    //
+    // Só no ramo do Loteamento, pelo MESMO critério que o Resumo de Premissas e
+    // a exportação já aplicam: a razão é `areaVendavel / areaTerreno`, definida
+    // como exclusiva do Loteamento (a semente de benchmark só a cria lá). Não é
+    // assimetria introduzida aqui — é a que o indicador já tinha nas outras
+    // duas superfícies, agora seguida também nesta.
+    //
+    // ⚠️ SEM `varianteFaixa`, e isso é deliberado: a #611 deixou este KPI sem
+    // cor por decisão do autor, e o escopo da #613 é o indicador APARECER, não
+    // recolorir card. O valor segue `fmtPct` — a troca por "—" quando a gleba
+    // não foi informada depende de `eficienciaPct: number | null` (o padrão da
+    // #571), que é o resto da #611 e continua adiado.
+    if (lot) kpis.push({ rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: '' });
     if (temPermuta) kpis.push({ rot: 'Área permutada', val: `${fmtNum(p.areaPermutaFisica)} m²`, variante: '' });
     // Texto colorido nos 3 níveis do velocímetro do benchmark (sem emoji; a bola
     // fica só nos badges da análise de sensibilidade).
