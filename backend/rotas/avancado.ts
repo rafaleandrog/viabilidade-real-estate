@@ -1769,14 +1769,30 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     varrerTudo(req.dados!, 'avancado_fases', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
     varrerTudo(req.dados!, 'avancado_alocacoes', { filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc' }),
   ]);
+  // Alocações indexadas por fase ANTES do laço — o mesmo padrão que o GET de
+  // fases já usa neste arquivo. Sem o índice, o laço interno varre TODAS as
+  // alocações uma vez por fase, e a duplicação é O(fases × alocações).
+  //
+  // ⚠️ Isso não era visível enquanto a leitura era paginada: o `por_pagina`
+  // fixo limitava o tamanho de `alocacoes` e, portanto, o trabalho. Ao passar a
+  // ler a tabela inteira — que é o conserto desta issue — o teto sumiu junto, e
+  // um estudo grande e LEGÍTIMO passa a poder estourar CPU ou tempo. O custo
+  // quadrático estava latente; a varredura o soltou.
+  const alocacoesPorFase = new Map<number, Record<string, unknown>[]>();
+  for (const aloc of alocacoes) {
+    const fid = Number(aloc.fase_id);
+    const lista = alocacoesPorFase.get(fid);
+    if (lista) lista.push(aloc);
+    else alocacoesPorFase.set(fid, [aloc]);
+  }
+
   const mapaFase = new Map<number, number>();
   for (const fase of fases) {
     const nova = await req.dados!.criar('avancado_fases', {
       estudo_id: novoId, ...extrairCampos(fase, CAMPOS_FASE_COPIA),
     });
     mapaFase.set(Number(fase.id), Number(nova.id));
-    for (const aloc of alocacoes) {
-      if (Number(aloc.fase_id) !== Number(fase.id)) continue;
+    for (const aloc of alocacoesPorFase.get(Number(fase.id)) ?? []) {
       const novaTipologia = mapaTipologia.get(Number(aloc.tipologia_id));
       if (!novaTipologia) continue; // tipologia órfã (não deveria ocorrer)
       await req.dados!.criar('avancado_alocacoes', {
