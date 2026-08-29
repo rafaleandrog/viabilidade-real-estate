@@ -4,7 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef } from './viab-format.js';
 import {
   proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi,
   type LinhaProformaAv,
@@ -354,7 +354,11 @@ export class ViabFluxoVer extends LitElement {
     // #427 — % VGV de toda linha usa o VGV puro, EXCETO os fechos cujo
     // `pctOverride` já veio calculado com a base própria (`= Resultado +
     // Permutas` soma a permuta física ao denominador — ver proforma-avancado.ts).
-    const pctVgv = (v: number) => (p.vgv > 0 ? (v / p.vgv) * 100 : 0);
+    //
+    // #604 — com VGV ≤ 0 devolve `null`, não 0: a coluna imprime "—" via
+    // `fmtPctOuIndef`, porque um percentual sem denominador não foi medido.
+    // Mesmo mecanismo que a #571 levou ao Preliminar.
+    const pctVgv = (v: number): number | null => (p.vgv > 0 ? (v / p.vgv) * 100 : null);
     return html`
       <urbi-card titulo="Proforma">
         <table class="proforma">
@@ -372,12 +376,18 @@ export class ViabFluxoVer extends LitElement {
                 <td>${l.nome}${l.notaBase ? html` <span class="nota-base">(${l.notaBase})</span>` : ''}</td>
                 <td class="num ${sinal}">${fmtR$(l.valor)}</td>
                 <td class="num ${sinal}">${fmtNum(porM2(l.valor))}</td>
-                <td class="num ${sinal}">${fmtPct(l.pctOverride ?? pctVgv(l.valor))}</td>
+                <td class="num ${sinal}">${fmtPctOuIndef(
+                  // ⚠️ #604 — `!== undefined`, JAMAIS `??`. A linha pode trazer
+                  // `pctOverride: null` (base própria inválida), e `??` leria
+                  // isso como "sem override" e cairia no VGV puro — publicando
+                  // um número com o denominador ERRADO em vez de "—".
+                  l.pctOverride !== undefined ? l.pctOverride : pctVgv(l.valor),
+                )}</td>
               </tr>`;
             })}
           </tbody>
         </table>
-        <p class="sec">Área privativa: ${fmtNum(p.areaPrivativa)} m² · Margem sobre Receita Bruta: ${fmtPct(p.margemPct)}.
+        <p class="sec">Área privativa: ${fmtNum(p.areaPrivativa)} m² · Margem sobre Receita Bruta: ${fmtPctOuIndef(p.margemPct)}.
           A coluna "Margem" do Painel de estudos usa esta mesma linha — "= Resultado", sem permutas
           (para a linha do Avançado; ver o atributo "title" da célula no Painel — #443).
           Esta proforma é desalavancada: nenhuma ponta do funding entra aqui — nem liberações e aportes
