@@ -640,6 +640,29 @@ export function indicadoresOperacao(s: SerieOperacao, taxaDescontoAa: number): I
   };
 }
 
+/**
+ * #594 — as operações que são TRANCHE DE INVESTIMENTO, isto é, aquelas cuja
+ * contraparte é um investidor: `divida` e `equity`.
+ *
+ * `financiamento_producao` fica DE FORA, e não é simplificação: ele é uma linha
+ * de crédito bancária atrelada à medição da obra (§4.3 de
+ * `docs/viabilidade/funding-capital-stack.md`), não um investidor do projeto —
+ * por isso a tela de Funding já lhe dá um painel próprio e diferente
+ * (`indicadoresFinanciamentoProducao`, abaixo, em vez de
+ * `indicadoresOperacao`). O custo dele é custo do projeto, e portanto do
+ * incorporador; ele não divide o resultado com ninguém.
+ *
+ * ⚠️ O filtro é uma ALLOWLIST (`'divida' | 'equity'`), não `!== 'financiamento_
+ * producao'`. `TipoOperacao` é união fechada hoje, mas se um quarto tipo
+ * nascer, a allowlist o deixa de fora até alguém decidir — a negação o
+ * promoveria a "investidor" em silêncio, que é o modo de falha caro aqui
+ * (dividir resultado com quem não é parte).
+ */
+export function tranchesDeInvestimento(f: FundingCalc | null | undefined): SerieOperacao[] {
+  if (!f) return [];
+  return f.operacoes.filter((s) => s.operacao.tipo === 'divida' || s.operacao.tipo === 'equity');
+}
+
 export interface IndicadoresFinanciamentoProducao {
   custoFinanciavelTotal: number;
   percentualFinanciado: number;
