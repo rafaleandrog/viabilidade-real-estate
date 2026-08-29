@@ -12,23 +12,40 @@
 // `.filter((m) => m !== null)` que não distingue "sem indicador" de "campo
 // desconhecido".
 
-/** Os 4 campos com indicador de RESULTADO calculado pelo app hoje. */
-export const INDICADORES_SUPORTADOS = ['custo_obras_vgv', 'margem_liquida', 'resultado_final', 'roi'] as const;
+/**
+ * Os 5 campos com indicador de RESULTADO calculado pelo app hoje.
+ *
+ * ⚠️ "Suportado" é uma propriedade do CAMPO, não da tela. `eficiencia_aproveitamento`
+ * (#613) entrou aqui porque o app calcula o número (`eficienciaPct`,
+ * `frontend/proforma.ts`), e é o Preliminar (`tela-graficos.ts`) quem o
+ * fornece; o Avançado (`tela-resumo.ts`) não tem essa grandeza no
+ * `_kpisAvancado` e simplesmente não passa o valor. Quem separa os dois casos
+ * é `resolverIndicadoresBenchmark`, no motivo do descarte — ver
+ * `SEM_VALOR_NESTA_TELA_MOTIVO`.
+ */
+export const INDICADORES_SUPORTADOS = [
+  'custo_obras_vgv', 'margem_liquida', 'resultado_final', 'roi', 'eficiencia_aproveitamento',
+] as const;
 export type IndicadorSuportado = typeof INDICADORES_SUPORTADOS[number];
 
 /**
  * Rótulo de tela.
  *
- * ⚠️ #443 (mergeado depois desta tabela existir, resolvido no merge): esta
- * tabela hoje só alimenta `tela-graficos.ts` (o medidor do Preliminar) — a
- * doc-string original dizia "mesmo texto nas duas telas", mas
- * `tela-resumo.ts` (o medidor do Avançado) NÃO importa este módulo; ele
- * mantém seu próprio mapa local, com "Margem de caixa" em vez de
- * "Margem sobre VGV" — são fórmulas diferentes (`resultado/vgv` aqui,
- * `fluxoAcumulado[último]/vgvTotal` lá) e não podem compartilhar rótulo. Se
- * um dia `tela-resumo.ts` passar a importar este módulo, ele PRECISA parar
- * de usar `margem_liquida` daqui — o par (rótulo, fonte) tem que continuar
- * único, ver `frontend/rotulos-indicador.ts`.
+ * ⚠️ #443: o par (rótulo, fórmula-fonte) tem que ser único no app inteiro —
+ * o inventário é `frontend/rotulos-indicador.ts`, conferido por teste. As
+ * DUAS telas de medidor importam esta tabela (`tela-graficos.ts`, o
+ * Preliminar; `tela-resumo.ts`, o Avançado), mas ela é de NOMES, não de
+ * VALORES: cada uma resolve o número na sua própria fonte (`Proforma` lá,
+ * `_kpisAvancado`/`FluxoCalc` cá). Unificar os valores é a alternativa (a)
+ * recusada pela D-Q03 (#443).
+ *
+ * Consequência viva disso: `tela-resumo.ts` NÃO usa os rótulos de
+ * `margem_liquida` e `roi` daqui — as fórmulas do Avançado são outras
+ * ("Margem de caixa" = `fluxoAcumulado[último]/vgvTotal`; "ROI sobre custo
+ * total" = `resultado/custoTotal`), e reusar o texto do Preliminar reabriria
+ * a colisão que a #443 fechou. Ele sobrescreve os dois no seu
+ * `ROTULO_OVERRIDE` local. Rótulo novo que entre aqui e já exista no Avançado
+ * com outra fórmula precisa do mesmo tratamento.
  */
 export const ROTULOS_INDICADOR: Record<IndicadorSuportado, string> = {
   // "Custo obras / VGV" (plural) — mesmo rótulo usado em exportar.ts, tela-premissas.ts e tela-proforma.ts (#183).
@@ -40,6 +57,18 @@ export const ROTULOS_INDICADOR: Record<IndicadorSuportado, string> = {
   margem_liquida: 'Margem sobre VGV',
   resultado_final: 'Resultado final',
   roi: 'ROI',
+  // #613 — o rótulo ÚNICO da eficiência de aproveitamento, o indicador
+  // exclusivo do Loteamento (`areaVendavel / areaTerreno`). Antes o mesmo
+  // número tinha dois nomes: "Vendável / gleba" no Resumo de Premissas e
+  // "Eficiência" no PDF/CSV; a exportação passou a dizer o mesmo que a tela.
+  //
+  // Por que "Vendável / gleba" e não "Eficiência": o texto nomeia a fórmula, e
+  // "Eficiência" sozinho já designa OUTRA razão na especificação (área
+  // privativa / área construída, a eficiência de projeto da Incorporação —
+  // `docs/spec/estudo-de-viabilidade-spec.md`). Adotá-lo aqui plantaria a
+  // colisão rótulo↔fórmula que `frontend/rotulos-indicador.ts` existe para
+  // impedir, no dia em que a Incorporação ganhar a dela.
+  eficiencia_aproveitamento: 'Vendável / gleba',
 };
 
 // backend/rotas/benchmarks.ts:34-37 declara estes 4 como indicadores de
@@ -55,6 +84,17 @@ const CAMPOS_SENSIBILIDADE = new Set(['custo_obras', 'preco', 'permuta_fisica', 
 const MARGEM_BRUTA_SEM_FONTE_MOTIVO = 'sem indicador correspondente até existir margem bruta de verdade (#453)';
 const SENSIBILIDADE_MOTIVO = 'indicador de sensibilidade, sem meta';
 const SEM_INDICADOR_MOTIVO = 'sem indicador correspondente';
+// #613: o campo É suportado (está em `INDICADORES_SUPORTADOS`), mas a tela da
+// vez não passou valor para ele. É o caso de `eficiencia_aproveitamento` no
+// Resumo do Avançado: a grandeza existe no app, só não no `_kpisAvancado`.
+//
+// ⚠️ Antes da #613 este ramo era INALCANÇÁVEL — as duas telas de medidor
+// passavam os 4 campos suportados, então "suportado sem valor" nunca
+// acontecia e cair no motivo genérico não custava nada. Com um 5º campo que
+// só o Preliminar fornece, ele passa a acontecer toda vez que um Loteamento
+// Avançado tem o benchmark configurado, e "sem indicador correspondente"
+// viraria mentira no `console.warn`: manda procurar um indicador que existe.
+export const SEM_VALOR_NESTA_TELA_MOTIVO = 'indicador existe, mas esta tela não calcula o valor';
 
 export interface BenchmarkCampo { campo: string; [k: string]: unknown; }
 export interface DescartadoBenchmark { campo: string; motivo: string; }
@@ -96,6 +136,7 @@ export function resolverIndicadoresBenchmark<B extends BenchmarkCampo>(
     let motivo = SEM_INDICADOR_MOTIVO;
     if (campo === 'margem_bruta') motivo = MARGEM_BRUTA_SEM_FONTE_MOTIVO;
     else if (CAMPOS_SENSIBILIDADE.has(campo)) motivo = SENSIBILIDADE_MOTIVO;
+    else if ((INDICADORES_SUPORTADOS as readonly string[]).includes(campo)) motivo = SEM_VALOR_NESTA_TELA_MOTIVO;
     descartados.push({ campo, motivo });
     if (typeof console !== 'undefined' && console.warn) {
       console.warn(`[benchmarks] "${campo}" descartado do medidor: ${motivo}`);
