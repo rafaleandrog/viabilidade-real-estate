@@ -2,7 +2,8 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import {
-  periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, type EventoCrono, type PeriodoAgregado,
+  periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, rotuloMesRelativo,
+  type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
 import {
@@ -19,7 +20,8 @@ import {
 import { exportarFluxoCSV, exportarFluxoPDF } from './exportar.js';
 import {
   fundingDoEstudo, receitaLiquidaComCorretagemMensal, agregarFundingPorPeriodos,
-  type FundingCalc, type FundingNoFluxo, type OperacaoFunding,
+  indicadoresOperacao, tranchesDeInvestimento, eDivida,
+  type FundingCalc, type FundingNoFluxo, type OperacaoFunding, type SerieOperacao,
 } from './funding-motor.js';
 import {
   validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita, validarReconciliacaoCamadas,
@@ -50,6 +52,26 @@ import {
 export function sinalLinhaProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>): '' | 'pos' | 'neg' {
   if (l.tipo !== 'receita' && l.tipo !== 'resultado') return '';
   return l.valor < 0 ? 'neg' : 'pos';
+}
+
+/**
+ * #594 · P1 — o ROI GERAL do projeto exibido na aba Análise Financeira.
+ *
+ * ⚠️ Ela é um ALIAS de propósito, e o alias é a defesa. O corpo é uma linha só
+ * (`proformaAvancado(c, area).roiPct`) porque a issue proíbe um segundo ROI:
+ * a coluna ROI do Painel de estudos publica esse MESMO `roiPct`
+ * (`frontend/tela-dashboard.ts`, `_calcularUmAvancado`), e dois ROIs
+ * divergentes para o mesmo estudo é a classe de defeito que a #443 registrou
+ * em VGV e Margem.
+ *
+ * Existir como símbolo exportado dá ao critério de aceite 1 um lugar onde
+ * comparar os DOIS caminhos sem montar componente Lit
+ * (`frontend/retorno-por-parte.test.ts`). Se alguém trocar o corpo por uma
+ * conta própria, a comparação fica vermelha aqui — é o ponto de a função
+ * existir, e não de ela ser esperta.
+ */
+export function roiProjetoAnalise(c: FluxoCalc, areaPrivativa: number): number {
+  return proformaAvancado(c, areaPrivativa).roiPct;
 }
 
 // Sub-tela "Ver Fluxo" (nível Avançado): KPIs, tabela mensal com colunas fixas
@@ -156,6 +178,26 @@ export class ViabFluxoVer extends LitElement {
        exibida quando a base difere do VGV (molde de Premissas e
        Resultados K36 da EVI: a nota é gerada e some quando não se aplica). */
     table.proforma .nota-base { font-size: 0.72rem; font-weight: 400; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
+
+    /* #594 — a abertura por parte tem 8 colunas, contra as 2 das tabelas
+       acima. A classe .tabela-wrap é o MESMO padrão declarado do Cronograma
+       (frontend/tela-fluxo-cronograma.ts): scroller com overflow-x auto, que a
+       sonda de render reconhece como intenção do autor e não acusa como
+       transbordo. Sem ele, a tabela empurraria a rolagem horizontal do
+       DOCUMENTO inteiro numa largura estreita — que é o único transbordo que
+       aquela sonda trata como defeito.
+       As regras ficam DEPOIS de todo o bloco da #593 de propósito: nenhuma
+       delas casa os seletores que frontend/proforma-cores.test.ts confronta
+       com o Preliminar, e vir por último garante que também não os sombreia.
+       ⚠️ Sem crase nesta prosa: o bloco inteiro mora dentro do template
+       literal da tag css, e uma crase aqui FECHA o template — o arquivo
+       deixa de parsear. */
+    .tabela-wrap { overflow-x: auto; }
+    .tabela-wrap table.partes { min-width: 720px; }
+    table.proforma tr.parte-incorporador td { font-weight: 700; }
+    table.proforma td.vazio { color: var(--cor-texto-sec, rgba(255,255,255,0.45)); }
+    table.proforma td.pos { color: var(--cor-sucesso, #13A98D); }
+    table.proforma td.neg { color: var(--cor-erro, #D45A3A); }
   `];
 
   updated() {
@@ -416,6 +458,7 @@ export class ViabFluxoVer extends LitElement {
     const sinalReal = sinalLinhaProformaAv({ tipo: 'resultado', valor: real });
     return html`
       ${kpisFluxo(c)}
+      ${this._renderRoiProjeto(c)}
       <urbi-card titulo="Fluxo de Caixa Livre × Fluxo de Caixa">
         <table class="proforma">
           <tbody>
@@ -439,6 +482,7 @@ export class ViabFluxoVer extends LitElement {
           : html`Este estudo não tem operações de Funding: sem funding, o Fluxo de Caixa é
               igual ao Livre.`}</p>
       </urbi-card>
+      ${this._renderRetornoPorParte(real)}
       ${this._renderControles()}
       <div class="graficos">
         <urbi-card titulo="Contratação, Receita Bruta, Carteira e Repasse — ${titulo}">
@@ -458,6 +502,159 @@ export class ViabFluxoVer extends LitElement {
           <div class="graf-wrap"><div class="graf">${graficoFluxoAcumulado(exib, this.dados?.dataInicio ?? null, this.dados?.crono ?? [], periodos ?? undefined)}</div></div>
         </urbi-card>
       </div>
+    `;
+  }
+
+  /**
+   * #594 · P1 — ROI GERAL do projeto na Análise Financeira.
+   *
+   * ⚠️ Nenhuma fórmula nasce aqui: o número é `roiProjetoAnalise`, que devolve
+   * o `roiPct` de `proformaAvancado` — LITERALMENTE o mesmo valor que a coluna
+   * ROI do Painel de estudos publica para este estudo (o caminho de lá está em
+   * `frontend/tela-dashboard.ts`, `_calcularUmAvancado`, que também lê
+   * `p.roiPct`). Um segundo ROI, calculado aqui com denominador próprio, seria
+   * exatamente a divergência entre listagem e tela que a #443 documentou para
+   * VGV e Margem — e é o que o critério de aceite 1 da issue existe para
+   * impedir. `frontend/retorno-por-parte.test.ts` compara os dois caminhos.
+   *
+   * As duas linhas de cima existem para o ROI ser AUDITÁVEL na tela: quem lê
+   * "18,4%" vê de que resultado e de que investimento ele saiu, sem precisar
+   * abrir a Proforma.
+   */
+  private _renderRoiProjeto(c: FluxoCalc): TemplateResult {
+    const area = areaPrivativaTotalLinhas(this.dados?.receitas ?? []);
+    const p = proformaAvancado(c, area);
+    const roi = roiProjetoAnalise(c, area);
+    // `investimentoTotal <= 0` é estudo sem custo direto nem indireto
+    // modelado. `proformaAvancado` já devolve 0 nesse caso (nunca NaN nem
+    // Infinity), mas publicar "0,0%" seria afirmar que o ROI é zero, e não
+    // que ele não tem denominador — a distinção que o critério 5 pede.
+    const medido = p.investimentoTotal > 0;
+    return html`
+      <urbi-card titulo="ROI do projeto">
+        <table class="proforma">
+          <tbody>
+            <tr class="n1"><td>Resultado</td><td class="num">${fmtR$(p.resultado)}</td></tr>
+            <tr class="n1"><td>Investimento (custo direto + indireto)</td><td class="num">${fmtR$(p.investimentoTotal)}</td></tr>
+            <tr class="n0 resultado">
+              <td>= ROI</td>
+              <td class="num roi-projeto ${medido ? (roi >= 0 ? 'pos' : 'neg') : 'vazio'}">${medido ? fmtPct(roi) : '—'}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="sec">${medido
+          ? html`Mesma fórmula da coluna <strong>ROI</strong> do Painel de estudos — resultado sobre
+              custo direto + indireto. Os dois números são o mesmo para este estudo, de propósito.`
+          : html`Sem custo direto ou indireto modelado não há denominador: o ROI não é exibido em vez
+              de sair como 0,0%.`}</p>
+      </urbi-card>
+    `;
+  }
+
+  /**
+   * #594 · P2 e P3 — a ABERTURA POR PARTE: o incorporador e cada tranche de
+   * investimento (`divida` e `equity`) criada no Funding.
+   *
+   * ⚠️ Três decisões que valem mais que o código:
+   *
+   * 1. **Nenhum indicador de tranche é calculado aqui.** Todos vêm de
+   *    `indicadoresOperacao` (`frontend/funding-motor.ts`), a mesma função
+   *    que a tela de Funding usa no painel "Visão do investidor" — é a fonte
+   *    única e testada, e recalcular aqui criaria a segunda fonte de verdade
+   *    (critério de aceite 4).
+   * 2. **`financiamento_producao` NÃO é uma parte.** Quem filtra é
+   *    `tranchesDeInvestimento`; o porquê está no comentário dela. O custo
+   *    dele já está dentro do resíduo do incorporador, que é o parágrafo
+   *    seguinte.
+   * 3. **O incorporador sai SEM ROI, e a tela diz por quê.** Ele é o resíduo:
+   *    `retornoIncorporador` é o total do Fluxo de Caixa alavancado — o mesmo
+   *    número da linha "= Fluxo de Caixa" do card acima, recebido por
+   *    parâmetro justamente para não haver duas contas. Para virar ROI
+   *    faltaria o denominador, e o app **não modela** capital próprio do
+   *    incorporador; inventar um (a exposição máxima, por exemplo) seria
+   *    escolha, não dedução. Publicar "0,0%" ali seria pior que a ausência.
+   *    A issue registra isso como saída (a), e as saídas (b)/(c) dependem de
+   *    decisão do autor.
+   */
+  private _renderRetornoPorParte(retornoIncorporador: number): TemplateResult {
+    const tranches = tranchesDeInvestimento(this.fundingCalc);
+    const taxa = this.dados?.taxa ?? 0;
+    const dataInicio = this.dados?.dataInicio ?? null;
+    const vazio = html`<td class="num vazio">—</td>`;
+    return html`
+      <urbi-card titulo="Retorno por parte">
+        <div class="tabela-wrap">
+          <table class="proforma partes">
+            <thead>
+              <tr>
+                <th>Parte</th>
+                <th class="num">Investimento</th>
+                <th class="num">Retorno total</th>
+                <th class="num">Lucro</th>
+                <th class="num">MOIC</th>
+                <th class="num">TIR a.a.</th>
+                <th class="num">VPL</th>
+                <th class="num">Payback</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="n0 parte-incorporador">
+                <td>Incorporador — resíduo de caixa</td>
+                ${vazio}
+                <td class="num ${retornoIncorporador >= 0 ? 'pos' : 'neg'}">${fmtR$(retornoIncorporador)}</td>
+                ${vazio}${vazio}${vazio}${vazio}${vazio}
+              </tr>
+              ${tranches.map((s) => this._linhaTranche(s, taxa, dataInicio))}
+            </tbody>
+          </table>
+        </div>
+        <p class="sec">
+          O <strong>incorporador</strong> fica com o resíduo: é o total do Fluxo de Caixa
+          alavancado (a linha "= Fluxo de Caixa" acima), depois de servir todo o funding.
+          Ele sai <strong>sem ROI</strong> de propósito — o app não modela o capital próprio
+          aportado por ele, então não existe denominador; "0,0%" ali seria um número inventado.
+          <strong>MOIC</strong> é múltiplo sobre o capital investido (retorno ÷ investimento:
+          1,00× é empatar), e não ROI — a diferença entre os dois é exatamente 1.
+          ${this.fundingCalc && tranches.length === 0
+            ? html`As operações de <strong>Financiamento à produção</strong> deste estudo não
+                aparecem aqui: são crédito bancário atrelado à obra, não uma parte que divide o
+                resultado — o custo delas já está dentro do resíduo do incorporador.`
+            : nothing}
+          ${tranches.length === 0
+            ? html`Este estudo não tem tranche de investimento (dívida ou equity):
+                o resultado é <strong>100% do incorporador</strong>.`
+            : nothing}
+        </p>
+      </urbi-card>
+    `;
+  }
+
+  /**
+   * #594 — uma linha da abertura por parte. Toda célula é leitura direta de
+   * `indicadoresOperacao`; a única decisão local é QUANDO exibir "—" em vez de
+   * um número, e ela existe pelo critério de aceite 7: operação criada e não
+   * configurada é caso real, com `investimentoTotal = 0`.
+   *
+   * `moic` já devolve 0 sem aporte (`funding-motor.ts`, `aportes > 0 ? … : 0`),
+   * então não há divisão por zero em lugar nenhum — mas "0,00×" afirmaria que o
+   * investidor perdeu tudo, quando o que houve foi não haver investimento.
+   */
+  private _linhaTranche(s: SerieOperacao, taxa: number, dataInicio: string | null): TemplateResult {
+    const ind = indicadoresOperacao(s, taxa);
+    const investiu = ind.investimentoTotal < 0;
+    const nome = s.operacao.nome || (eDivida(s.operacao.tipo) ? 'Dívida' : 'Equity');
+    const rotulo = eDivida(s.operacao.tipo) ? 'Dívida' : 'Equity';
+    return html`
+      <tr class="n1 parte-tranche">
+        <td>${nome} <span class="nota-base">(${rotulo})</span></td>
+        <td class="num">${fmtR$(ind.investimentoTotal)}</td>
+        <td class="num">${fmtR$(ind.retornoTotal)}</td>
+        <td class="num ${ind.lucro >= 0 ? 'pos' : 'neg'}">${fmtR$(ind.lucro)}</td>
+        <td class="num ${investiu ? '' : 'vazio'}">${investiu ? `${fmtNum(ind.moic, 2)}×` : '—'}</td>
+        <td class="num ${ind.tirAnual === null ? 'vazio' : ''}">${ind.tirAnual === null ? '—' : fmtPct(ind.tirAnual * 100)}</td>
+        <td class="num ${ind.vpl >= 0 ? 'pos' : 'neg'}">${fmtR$(ind.vpl)}</td>
+        <td class="num ${ind.paybackMes === null ? 'vazio' : ''}">${ind.paybackMes === null ? '—' : rotuloMesRelativo(dataInicio, ind.paybackMes)}</td>
+      </tr>
     `;
   }
 

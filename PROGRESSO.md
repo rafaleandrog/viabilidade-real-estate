@@ -4,6 +4,60 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## ROI geral + retorno por parte na Análise Financeira — #594 (2026-08-29)
+
+Rodada 10, item A10-15. O pedido do autor: *"Acrescentar em Análise Financeira ROI e divisão para ver
+o retorno tanto do incorporador quanto para cada tranche de investimento criada, seja dívida ou
+equity (menos financiamento à produção)"*.
+
+**O diagnóstico da issue estava certo: metade do cálculo já existia, na tela errada.**
+`indicadoresOperacao` (`frontend/funding-motor.ts`) já entregava investimento, retorno, lucro, MOIC,
+TIR, VPL e payback **por operação** — só que apenas a tela de Funding os exibia. O que este PR faz é
+(a) trazer isso para a Análise Financeira, (b) filtrar o financiamento à produção e (c) criar o que
+não existia: o ROI geral e a linha do incorporador. **Nenhuma fórmula nova nasceu.**
+
+**Três decisões, e as três são de rótulo antes de serem de conta:**
+
+1. **O ROI geral é o MESMO da coluna do Painel de estudos.** `roiProjetoAnalise`
+   (`frontend/tela-fluxo-ver.ts`) é um alias de `proformaAvancado(c, area).roiPct` — o mesmo valor
+   que `tela-dashboard.ts` publica. Um segundo ROI com denominador próprio seria a divergência entre
+   listagem e tela que a #443 registrou em VGV e Margem.
+2. **O incorporador sai SEM ROI, e a tela diz por quê.** Ele é o resíduo: o total do Fluxo de Caixa
+   alavancado, o mesmo número da linha "= Fluxo de Caixa" do card acima (recebido por parâmetro, para
+   não haver duas contas). ROI exigiria denominador, e o app **não modela** capital próprio do
+   incorporador — a saída (a) da issue. "0,0%" ali seria número inventado.
+3. **MOIC é rotulado MOIC.** MOIC = retorno ÷ investimento (1,00× empata); ROI = lucro ÷
+   investimento (0 empata). A diferença é exatamente 1, e exibir um chamando o outro é erro de
+   rótulo com cara de erro de conta.
+
+> ⚠️ **O filtro do financiamento à produção é ALLOWLIST, não negação.** `tranchesDeInvestimento`
+> aceita `'divida' | 'equity'` em vez de recusar `'financiamento_producao'`. `TipoOperacao` é união
+> fechada hoje, mas um quarto tipo entraria em silêncio como "investidor" pela negação — e o modo de
+> falha caro aqui é dividir resultado com quem não é parte.
+
+**A prova de fiação, com o número medido.** O caso de render `retorno-por-parte` monta a aba em
+Chromium com FàP + dívida + equity e exige as linhas na tela; o **teto** do critério 3 ("duas
+tranches, não três") é assertado dentro do próprio `montar`, porque `exigir` do harness só tem piso.
+Medido: apagando `${this._renderRetornoPorParte(real)}` de `_renderAnaliseFinanceira`, os testes de
+lógica pura seguem **943/943 verdes** e só o caso de render fica vermelho (2/2). Teste de função pura não
+prova ligação — classe de defeito nº 1 do `CLAUDE.md`.
+
+> ⚠️ **Duas armadilhas de crase, e as duas custaram uma rodada de typecheck cada.** Prosa dentro do
+> bloco `css` de um componente Lit **não pode conter crase**: um `` `overflow-x: auto` `` num
+> comentário CSS FECHA o template literal, e o arquivo deixa de parsear com `TS1005` a dezenas de
+> linhas de distância. O guard de UI acusa como "comentário CSS `/*` sem `*/`", que aponta para o
+> lugar errado.
+
+> ⚠️ **`investimentoTotal` de operação não configurada é `-0`, não `0`.** Ele é
+> `-round2(Σ entradas)`. `assert.equal(x, 0)` (Object.is) **reprova**, e `-0 < 0` é **falso** — o que
+> aqui é o desfecho certo: a tela publica "—" no MOIC em vez de "0,00×", que afirmaria que o
+> investidor perdeu tudo.
+
+**Fora de escopo, e declarado:** as saídas (b) exposição máxima como proxy de capital próprio e (c)
+campo de aporte próprio do incorporador dependem de decisão do autor — a issue as registra como tal.
+
+---
+
 ## Cenários herda a reestrutura do Fluxo de Caixa — #596 (2026-08-29)
 
 Rodada 10, item A10-17. O pedido do autor: *"a mesma mudança que for feita na tabela de Fluxo de Caixa
