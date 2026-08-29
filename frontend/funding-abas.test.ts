@@ -92,23 +92,32 @@ test('#586 critério 3: a barra de 3 botões do topo deixou de existir', () => {
 // com um vizinho de OUTRO tipo não muda nada na tela — o usuário clica ↑ e não
 // acontece nada, porque a aba não mostra o vizinho.
 
+// ⚠️ A `ordem` desta fixture é NÃO CONTÍGUA de propósito (10/20/30/40, não
+// 0/1/2/3), e isso não é enfeite — é o que dá poder ao teste da permutação.
+// Medido: com `ordem` 0…3, acrescentar um `.map((o, idx) => ({ ...o, ordem: idx }))`
+// ao fim de `reordenarDentroDoTipo` — ou seja, RENUMERAR como
+// `reordenarCamadas` faz, que é exatamente o defeito que a função existe para
+// não cometer — deixava os 7 testes deste arquivo VERDES, porque renumerar
+// 0…3 uma lista que já vale 0…3 devolve a mesma coisa. Com valores espaçados,
+// a renumeração muda os números e a asserção da permutação reprova.
 const OPS = () => [
-  { id: 1, tipo: 'divida', ordem: 0 },
-  { id: 2, tipo: 'financiamento_producao', ordem: 1 },
-  { id: 3, tipo: 'divida', ordem: 2 },
-  { id: 4, tipo: 'equity', ordem: 3 },
+  { id: 1, tipo: 'divida', ordem: 10 },
+  { id: 2, tipo: 'financiamento_producao', ordem: 20 },
+  { id: 3, tipo: 'divida', ordem: 30 },
+  { id: 4, tipo: 'equity', ordem: 40 },
 ];
 
 test('#586: ↑ numa Dívida troca com a Dívida anterior, PULANDO o tipo do meio', () => {
   const r = reordenarDentroDoTipo(OPS(), 3, 'cima');
   const ordemPorId = new Map(r.map((o) => [o.id, o.ordem]));
-  // As duas Dívidas trocaram de `ordem` entre si: 0 ↔ 2.
-  assert.equal(ordemPorId.get(3), 0);
-  assert.equal(ordemPorId.get(1), 2);
+  // As duas Dívidas trocaram de `ordem` entre si: 10 ↔ 30.
+  assert.equal(ordemPorId.get(3), 10);
+  assert.equal(ordemPorId.get(1), 30);
   // E o Financiamento à produção, que está ENTRE elas na ordem global, não se
-  // moveu — é justamente o que `reordenarCamadas` faria de errado aqui.
-  assert.equal(ordemPorId.get(2), 1);
-  assert.equal(ordemPorId.get(4), 3);
+  // moveu — é justamente o que `reordenarCamadas` faria de errado aqui. Os
+  // valores 20 e 40 provam junto que NÃO houve renumeração.
+  assert.equal(ordemPorId.get(2), 20);
+  assert.equal(ordemPorId.get(4), 40);
   // A lista volta ordenada por `ordem`.
   assert.deepEqual(r.map((o) => o.id), [3, 2, 1, 4]);
 });
@@ -118,7 +127,7 @@ test('#586: na ponta do TIPO, não mexe em nada — mesmo havendo vizinho global
   // caso interessante é a 2ª: `id: 3` é a última Dívida, e há um Equity depois
   // dela na ordem global. Descer não pode roubar a posição do Equity.
   const r = reordenarDentroDoTipo(OPS(), 3, 'baixo');
-  assert.deepEqual(r.map((o) => o.ordem), [0, 1, 2, 3]);
+  assert.deepEqual(r.map((o) => o.ordem), [10, 20, 30, 40]);
   assert.deepEqual(r.map((o) => o.id), [1, 2, 3, 4]);
   // E o tipo com UMA só operação nunca se move.
   const so = reordenarDentroDoTipo(OPS(), 4, 'cima');
@@ -135,6 +144,36 @@ test('#586: a `ordem` global continua sendo uma permutação dos mesmos valores'
     antes.map((o) => o.ordem).sort((a, b) => a - b),
   );
   assert.equal(new Set(depois.map((o) => o.ordem)).size, antes.length);
+});
+
+// ⚠️ FIAÇÃO, não cálculo — a classe de defeito nº 1 do `CLAUDE.md`.
+// MEDIDO: trocar `reordenarDentroDoTipo` por `reordenarCamadas` de volta em
+// `_mover` **compila limpo** (as duas têm assinatura compatível) e não deixa
+// NADA vermelho — os testes acima continuam provando a função pura, que segue
+// existindo e correta, enquanto a tela deixou de chamá-la. É o cenário exato
+// que a Rodada 9 pagou sete vezes.
+//
+// Não dá para fazer a mutação virar erro de compilação aqui (o remédio da #491,
+// tornar o parâmetro obrigatório) porque o problema não é um parâmetro que
+// falta — é a função ERRADA, com a mesma forma. Então a trava é a fonte, e ela
+// fecha nos DOIS sentidos: a chamada certa tem de estar lá, e a errada não pode
+// voltar nem pelo import.
+test('#586 fiação: `_mover` chama reordenarDentroDoTipo, e reordenarCamadas não voltou', () => {
+  assert.ok(
+    fonte.includes('reordenarDentroDoTipo(this.operacoes, id, direcao)'),
+    '`_mover` deixou de chamar reordenarDentroDoTipo — a reordenação por tipo foi desfeita',
+  );
+  assert.equal(
+    fonte.includes('reordenarCamadas'), false,
+    'reordenarCamadas voltou a esta tela: com abas, ela troca com vizinho de outro tipo e a aba não muda',
+  );
+  // E o índice do card é o do TIPO, não o global: as setas ↑↓ desabilitam
+  // contra `irmaos`, a lista da aba. `this.operacoes.length - 1` aqui seria o
+  // índice global e desabilitaria a seta na operação errada.
+  assert.ok(
+    fonte.includes('i === irmaos.length - 1'),
+    'a seta ↓ voltou a se posicionar contra a lista global',
+  );
 });
 
 test('#586: id inexistente não altera nada (e não lança)', () => {
