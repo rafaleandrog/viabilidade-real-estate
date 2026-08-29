@@ -426,14 +426,12 @@ export class ViabFluxoCustos extends LitElement {
       // coluna Resultado de linhas em `% Receita` bata exatamente com o que o
       // motor computa (antes, sem `receitaTotal`, o cálculo caía no fallback
       // VGV e divergia do fluxo de caixa — issue #118).
-      const deflatorPct = Number(this.estudo?.deflator_area_aberta_pct) || 0;
       this.ctxCusto = {
         areaPrivativaTotal: areaPrivativaTotalLinhas(linhas),
         areaTerreno: Number(this.estudo?.terreno_manual_area) || Number(this.estudo?.area_terreno_nucleo) || 0,
-        vgvTotal: linhas.reduce((s: number, l: any) => s + vgvLinha(l.tipologias, deflatorPct), 0),
+        vgvTotal: linhas.reduce((s: number, l: any) => s + vgvLinha(l.tipologias), 0),
         receitaTotal: linhas.reduce(
-          (s: number, l: any) => s + receitaLiquidaLinha(vgvLinha(l.tipologias, deflatorPct), this.ret), 0),
-        deflatorAreaAbertaPct: deflatorPct,
+          (s: number, l: any) => s + receitaLiquidaLinha(vgvLinha(l.tipologias), this.ret), 0),
       };
       // Alinha a linha Construção ao cronograma (evento Obra) — depende de crono +
       // custos já carregados. Editável apenas (#120).

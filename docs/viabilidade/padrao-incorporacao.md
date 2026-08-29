@@ -977,7 +977,8 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > Pré-lançamento que desative a fase passa a vender 80%.
 >
 > ✅ **Desde a #429, "e ninguém é avisado" deixou de valer.** O percentual da faixa vazia entra em
-> `pctDescartado` (`frontend/fluxo-shared.ts:480`) e o painel de Reconciliação acusa
+> `pctDescartado` (`frontend/fluxo-shared.ts:579`, o incremento dentro de `espalhar`) e o
+> painel de Reconciliação acusa
 > `ABSORCAO_NAO_FECHA`. O comportamento **não** mudou: o percentual continua não sendo computado e
 > continua não sendo redistribuído — a camada denuncia, não corrige.
 >
@@ -2203,7 +2204,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2296`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2279`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`
