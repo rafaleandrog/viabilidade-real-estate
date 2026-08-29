@@ -4,6 +4,47 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Custos antes de Viabilidade na lista lateral do Avançado — #589 (2026-08-29)
+
+Rodada 10, item A10-10. O pedido do autor é de uma linha: *"Inverter a ordem entre as seções
+Viabilidade e Custos"*. O diff de produção **são duas linhas trocadas** em `PAGINAS`
+(`frontend/tela-avancado.ts`), e o resto do PR existe para provar que **nada mais andou junto** —
+as três armadilhas que a issue nomeia (id interno `'obra'` preservado pela #40, slugs públicos
+`custos`/`resultados` com os aliases antigos das #250/#350, e a aba default `'resumo'`, que no
+código de produção é um LITERAL, não `PAGINAS[0]`).
+
+**Uma das três armadilhas não é aferível por teste, e isso está medido.** A independência entre a
+aba default e a ordem do array **não tem como ser provada de caixa-preta enquanto `resumo` for a 1ª
+página**: trocar as duas origens do default (`_aba` inicial e o fallback do setter) por
+`PAGINAS[0].id` deixa a suíte inteira verde. O teste mede o que dá para medir — sem URL e com slug
+desconhecido a aba resolvida é `resumo` — e o arquivo diz esse limite com todas as letras, em vez
+de anunciar uma defesa que não existe.
+
+**A prova ancora na CHAMADA, não na constante.** `PAGINAS` é privada do módulo; testá-la seria
+testar a declaração. `frontend/nav-avancado.test.ts` roda o `render()` real de `ViabTelaAvancado` e
+lê o valor que o binding `.secoes` de `<urbi-nav>` recebe de fato — quem trocar `PAGINAS` por um
+literal escrito à mão no template continua sendo aferido. Localiza o binding pelo **texto estático
+que o precede** (`strings`/`values` do `TemplateResult`), não por índice posicional, que qualquer
+edição vizinha deslocaria em silêncio. Roda sem DOM porque `render()` só constrói `TemplateResult`s
+— mesma constatação de `carregamento-corrida.test.ts:15-17`.
+
+**Por que não é caso de render.** O stub de `scripts/render-check.mjs` não reproduz `.secoes`
+(binding de propriedade — o Lit nem escreve atributo): o `<urbi-nav>` sobe sem item nenhum e a
+ordem da lista simplesmente **não existe** no DOM medido. Nenhuma camada em Chromium deste
+repositório enxerga este requisito.
+
+**Sem migração e sem bump de `versao`** — é ordem de apresentação, nenhum dado persistido muda, e
+estudo antigo abre com o menu novo. Paridade Loteamento × Incorporação é estrutural (o Avançado não
+ramifica o menu por padrão de estudo) e tem teste que barra a introdução da ramificação.
+
+**Ficou pendente de decisão do autor** o critério 6 da issue: se a inversão equivalente deve
+alcançar o Preliminar. Ela não tem tradução literal lá — `frontend/tela-preliminar.ts:35-41` não
+tem página "Viabilidade" nem página "Custos" no nível 1 (só Premissas, Resultado, Gráficos e
+Análise de Mercado; "Custos" existe como **sub-aba** de Premissas, sem par a inverter). O PR
+entrega o Avançado e deixa a pergunta registrada.
+
+---
+
 ## #593 · cor por natureza de linha na Proforma do Avançado (2026-08-29)
 
 Item 14 da leva Avançado da Rodada 10. Pedido do autor, literal: *"Modificar tela do proforma para
