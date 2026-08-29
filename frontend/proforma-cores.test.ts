@@ -104,6 +104,38 @@ for (const par of PARES) {
   });
 }
 
+test('#593: a ORDEM das regras sustenta a especificidade que o comentário promete', () => {
+  // ⚠️ Este teste existe porque o bloco novo traz um comentário afirmando que
+  // certas regras "precisam vir depois" — e comentário não é defesa. Duas
+  // dessas ordens são a diferença entre pintar e não pintar, e nenhuma outra
+  // camada as enxerga: trocar a ordem compila, passa nos testes de lógica pura
+  // e passa no caso de render (que mede presença de classe, não estilo
+  // computado). É exatamente a classe "defesa declarada e inexistente".
+  const pos = (seletor: string) => {
+    const i = AVANCADO.indexOf(`\n    ${seletor} {`);
+    assert.notEqual(i, -1, `regra \`${seletor}\` não existe`);
+    return i;
+  };
+  // `tr.receita td` e `tr.n0 td` têm a MESMA especificidade (1 classe + 3
+  // tipos). Quem vier por último vence, e as duas casam as linhas de receita.
+  assert.ok(
+    pos('table.proforma tr.receita td') > pos('table.proforma tr.n0 td'),
+    'tr.receita td precisa vir DEPOIS de tr.n0 td, senão o fundo verde nunca aparece',
+  );
+  // O override de receita negativa (#567) sobre o verde fixo.
+  assert.ok(
+    pos('table.proforma tr.receita td.neg') > pos('table.proforma tr.receita td'),
+    'tr.receita td.neg precisa vir DEPOIS de tr.receita td',
+  );
+  // O `informativo` mantém tratamento próprio e não pode ser abafado pelas
+  // regras novas (é `n1`, mas nunca `custo` — a garantia é o seletor, e a
+  // ordem confirma).
+  assert.ok(
+    pos('table.proforma tr.informativo td') > pos('table.proforma tr.n1.custo'),
+    'tr.informativo td precisa vir DEPOIS das regras de natureza',
+  );
+});
+
 test('#593: nenhuma cor literal entrou junto — só token do design system', () => {
   // O contrato do CLAUDE.md permite cor literal apenas como FALLBACK de
   // `var(--token, …)`, e só isso: um `#hex` ou `rgb()` solto numa declaração de
