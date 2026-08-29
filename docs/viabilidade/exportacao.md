@@ -15,6 +15,37 @@ Disponível na aba **Proforma** a partir do status **Em análise**.
 - **PDF** — abre uma página formatada com os **mesmos estilos/tokens do app** (cabeçalho do estudo, KPIs e a Proforma linha a linha) e aciona a impressão do navegador (“Salvar como PDF”). Mantém a identidade visual do UrbiVerso sem depender de biblioteca externa no backend.
 - **Excel** — gera um **CSV** (UTF-8 com BOM, separador `;`, decimais em vírgula) que o Excel abre diretamente, com todas as linhas da Proforma e o percentual sobre o VGV.
 
+## Notação de sinal — a mesma da tela
+
+A coluna **R$** do CSV e do PDF da Proforma usa **`celulaProforma`**, a mesma função que a tabela
+da tela usa: **receita e resultado com o sinal REAL** (negativo entre parênteses, positivo sem
+marca) e **custo/dedução SEMPRE entre parênteses**, independente do sinal — a app grava custo como
+valor positivo. A coluna **% VGV** segue a mesma regra da tela: no **Resultado** a fração leva o
+sinal (é a margem); nas demais é a magnitude.
+
+Nenhuma célula da tabela traz o símbolo "R$" — o **cabeçalho da coluna** já o informa, nos três
+destinos. Os KPIs do topo do PDF continuam com o símbolo, porque ali não há cabeçalho que o diga.
+
+> **Por que isto está escrito aqui.** Até 2026-08-28 o CSV e o PDF formatavam com `fmtR$` cru: uma
+> Receita operacional negativa saía `-R$ …` no arquivo e `(…)` na tela, sobre o mesmo número, e a
+> % VGV do Resultado saía positiva no arquivo e negativa na tela (achado 10 da auditoria #574). A
+> função de notação mora em `frontend/exportar.ts` — e não na tela — porque a tela já importa a
+> exportação (pelos botões), e o contrário fecharia um ciclo de módulos; a tela a **reexporta**.
+> Quem impede as duas de divergirem de novo é o teste de paridade célula a célula em
+> `frontend/proforma-ordem-linhas.test.ts`, que não compara contra um formato escrito à mão: compara
+> os dois lados entre si.
+>
+> Desde o conserto da rodada 1 de revisão dessa unificação, a paridade vale nas DUAS colunas de
+> verdade: a % VGV da tela (`_pctVgv`) DELEGA para `pctVgvProforma` — antes era uma cópia da regra,
+> e o teste só protegia o lado da exportação.
+>
+> ⚠️ Efeito colateral **semântico** no CSV, deliberado e registrado: a notação contábil grava
+> custo como `(1.234,56)`, e o Excel pt-BR importa parêntese como número **negativo** — antes
+> (`fmtR$` cru) as linhas de custo entravam positivas na planilha. Não há risco de parsing (o CSV
+> usa `;` e nenhum valor novo contém `;`, aspas ou quebra de linha); o que muda é o sinal que uma
+> fórmula do usuário enxerga. Se o autor preferir o comportamento antigo no CSV, é uma troca de
+> `comParenteses` num único call site.
+
 ## Decisão de implementação
 
 A Proforma é calculada no **frontend** (ver [Fórmulas](formulas)); por isso a exportação também é gerada no frontend, a partir dos valores já computados na tela. Isso garante fidelidade ao que o usuário vê e reaproveita a formatação existente.

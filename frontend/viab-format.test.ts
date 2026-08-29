@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtPct, fmtPctOuIndef, fmtPctEntrada, fmtM2, parseNumeroBR, celula, negativoContabil,
+  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtR$Kpi, fmtPct, fmtPctOuIndef, fmtPctEntrada, fmtM2, parseNumeroBR, celula, negativoContabil,
 } from './viab-format.js';
 
 test('#281: fmtR$ é a fonte única de valores monetários com 2 casas', () => {
@@ -23,6 +23,50 @@ test('#492: fmtR$ sem símbolo fixa 2 casas decimais, não "até 2"', () => {
   assert.equal(fmtR$(1_500_000.5, false), '1.500.000,50');
   assert.equal(fmtR$(1_500_000.55, false), '1.500.000,55');
   assert.equal(fmtR$(21_230_000, false), '21.230.000,00');
+});
+
+// #581: a exceção declarada ao C7 — card de KPI exibe R$ sem centavos. Mínimo E
+// máximo em 0, pelo mesmo motivo que `fmtR$` fixa os dois (#492): só
+// `maximumFractionDigits` entregaria "até 0 casas", e a coluna de cards
+// desalinharia entre um valor redondo e outro com fração.
+//
+// ⚠️ O ARREDONDAMENTO É DE EXIBIÇÃO, e a última asserção é o que prova isso: o
+// mesmo número que o card mostra como R$ 171.448.400 sai da tabela como
+// R$ 171.448.399,51. Nada persistido muda, nada no motor muda — se estas duas
+// deixarem de conviver, a exceção virou perda de dado.
+test('#581 fmtR$Kpi: card de KPI sem casas decimais, mínimo E máximo', () => {
+  assert.equal(fmtR$Kpi(171_448_400), 'R$ 171.448.400');
+  assert.equal(fmtR$Kpi(1234.5), 'R$ 1.235');
+  assert.equal(fmtR$Kpi(1234.4), 'R$ 1.234');
+  assert.equal(fmtR$Kpi(0), 'R$ 0');
+  assert.equal(fmtR$Kpi(-2_500.789), '-R$ 2.501');
+});
+
+test('#581: valor que arredonda a zero perde o sinal — "-R$ 0" não é um KPI', () => {
+  // Entre -R$ 0,50 e R$ 0 o Intl arredonda a fração fora mas preserva o
+  // sinal (achado do App de revisão no PR): -0.01 e -0.49 publicariam
+  // "-R$ 0". O mesmo vale para -0 literal e para o positivo que arredonda
+  // a zero — todos saem "R$ 0".
+  assert.equal(fmtR$Kpi(-0.01), 'R$ 0');
+  assert.equal(fmtR$Kpi(-0.49), 'R$ 0');
+  assert.equal(fmtR$Kpi(-0), 'R$ 0');
+  assert.equal(fmtR$Kpi(0.49), 'R$ 0');
+  // A fronteira exata -0,50 arredonda para LONGE do zero no Intl (half away
+  // from zero) — é "-R$ 1" legítimo, não zero. O critério do teste é o mesmo
+  // da função: |v| < 0,5 zera; |v| >= 0,5 preserva sinal e valor (achado da
+  // rodada 2 do App: Math.round(-0.5) = -0 engoliria este caso).
+  assert.equal(fmtR$Kpi(-0.5), '-R$ 1');
+  assert.equal(fmtR$Kpi(0.5), 'R$ 1');
+  // E -0.51 é -R$ 1 de verdade — o sinal legítimo não é suprimido.
+  assert.equal(fmtR$Kpi(-0.51), '-R$ 1');
+});
+
+test('#581: o card arredonda só para exibir — fmtR$ segue em 2 casas sobre o mesmo número', () => {
+  const v = 171_448_399.514;
+  assert.equal(fmtR$Kpi(v), 'R$ 171.448.400');
+  assert.equal(fmtR$(v), 'R$ 171.448.399,51');
+  assert.equal(fmtR$(v, false), '171.448.399,51');
+  assert.equal(CASAS_DECIMAIS_MONETARIAS, 2);
 });
 
 test('fmtPct: valor calculado usa 1 casa decimal com vírgula', () => {

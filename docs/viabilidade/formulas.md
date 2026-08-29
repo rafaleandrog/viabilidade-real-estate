@@ -364,21 +364,38 @@ canônico (R$, 2 casas)  ──derivação exata──▶  % do VGV, R$/m²   (e
 com precisão plena até a apresentação. Assim, R$ 10.000.000 pode atravessar uma porcentagem com
 dízima e retornar exatamente ao mesmo canônico.
 
+> ⚠️ **A única exceção ao C7, declarada pelo autor em 2026-08-26** (leva Avançado, item 4 —
+> issue #581). **(a)** A exceção existe: valor em R$ exibido em **card de KPI** sai **sem casas
+> decimais**, e percentual em card sai com **uma** casa. **(b)** Ela vale **só** para o valor
+> exibido no card — a figura grande que o card publica; o `title` de detalhe de um card e os cards
+> de comparação de R$/m² da Análise de mercado ficam de fora. **(c)** **Persistência, entrada,
+> motor, tabelas, Proforma, Fluxo de Caixa e exportação continuam em 2 casas, sem exceção.**
+>
+> É arredondamento **de exibição**: nada persistido muda, nenhuma migração, e um estudo antigo passa
+> a exibir sem centavos sem ser reeditado. `R$ 171.448.400` num card e `R$ 171.448.400,00` numa
+> linha de tabela são **o mesmo número**. Quem implementa é `fmtR$Kpi`
+> (`frontend/viab-format.ts:52`) — função própria, e não um parâmetro de `fmtR$`, para a exceção ser
+> **greppável** por um símbolo só; `frontend/kpi-casas-decimais.test.ts` trava o inventário de call
+> sites por contagem exata, nos dois sentidos, e reprova tanto o card que voltou a exibir centavos
+> quanto o vazamento da exceção para tabela ou exportação. **A tabela abaixo segue valendo
+> integralmente** — nenhuma linha dela é card de KPI.
+
 **Estado de conformidade, conferido em 2026-08-23:**
 
 | Ponto | Casas hoje | Conforme? |
 |---|---|---|
 | `frontend/viab-format.ts:11-23` — `fmtR$` (`CASAS_DECIMAIS_MONETARIAS = 2`) | 2 | ✅ |
 | `frontend/exportar.ts:16` — importa `fmtR$`, sem formatador próprio | 2 | ✅ |
-| `frontend/exportar.ts:242` — `celulaFx` (CSV e PDF), desde a #449 delega para `celula` de `viab-format.ts` — fonte única com a tela | 2 | ✅ corte em R$ 0,005 |
+| `frontend/exportar.ts` — `celulaProforma` (CSV e PDF da Proforma), desde 2026-08-28 a MESMA função da tela, com a notação de sinal junto | 2 | ✅ fonte única com a tabela da Proforma |
+| `frontend/exportar.ts:319` — `celulaFx` (CSV e PDF), desde a #449 delega para `celula` de `viab-format.ts` — fonte única com a tela | 2 | ✅ corte em R$ 0,005 |
 | `frontend/tela-financeiro.ts:154` — `_n` (`casas-decimais="2"`) | 2 | ✅ |
 | `frontend/tela-empreendimento-tipologias.ts:178` | 2 (default) | ✅ |
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
-| `frontend/tela-proforma.ts:83` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
+| `frontend/tela-proforma.ts:70` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
 | `frontend/fluxo-caixa-motor.ts:2125-2133` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
-| `frontend/tela-proforma.ts:50` — `celulaProforma`, a coluna R$ da Proforma | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado (`_fmtContabil`) para função pura testável pela #567 |
+| `frontend/exportar.ts:69` — `celulaProforma`, a coluna R$ da Proforma na tela, no CSV e no PDF | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado para função pura pela #567, e movida de `tela-proforma.ts` para cá em 2026-08-28, quando a exportação passou a usá-la (a tela a reexporta) |
 | `frontend/tela-fluxo-receitas.ts:485,486` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
 
 > 🟡 **O motor não é integralmente conforme ao C7, e marcar a linha inteira ✅ escondia isso.** As
@@ -401,7 +418,7 @@ dízima e retornar exatamente ao mesmo canônico.
 > `fmtR$(v, false)`, que fixa 2 casas sempre (`fmtNum` declara só `maximumFractionDigits`, então
 > "até 2" podia sair "0"). `fmtNum` em si **não mudou de assinatura** — continua servindo m²,
 > hectare, unidades e percentual, grandezas **não monetárias** que carregam precisão plena e
-> arredondam só para exibir; `celulaProformaM2` (`frontend/tela-proforma.ts:57`, R$/m²) é da mesma
+> arredondam só para exibir; `celulaProformaM2` (`frontend/tela-proforma.ts:44`, R$/m²) é da mesma
 > família e continua fora do escopo do C7 monetário.
 >
 > ✅ **A #567 (2026-08-27) extraiu `_fmtContabil`/`_fmtContabilM2` — métodos privados de
