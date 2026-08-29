@@ -1,6 +1,6 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { fmtR$, fmtR$Kpi, fmtPct, fmtNum, celula as celulaCompartilhada } from './viab-format.js';
-import { rotuloMesRelativo } from './fluxo-shared.js';
+import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import { type FluxoCalc, type LinhaCalc, pctDeReceitaBruta } from './fluxo-caixa-motor.js';
 import { type FundingNoFluxo } from './funding-motor.js';
@@ -442,11 +442,17 @@ function linhaTabela(
   vgv: number,
   ocultarPct = false,
   expansivel = true,
+  // #591: identidade ESTÁVEL da linha no DOM, para o caso de render poder
+  // apontar para uma linha específica. Um seletor CSS não casa por texto, e
+  // `tr.subgrupo.custo` sozinho também casa com os subgrupos de custo — sem
+  // esta âncora, apagar o conserto da linha de deduções deixaria o caso VERDE.
+  // Não tem efeito visual: nenhuma regra do CSS acima seleciona por ela.
+  dataLinha = '',
 ): TemplateResult {
   const podeToggle = chaveToggle && expansivel;
   const recolhido = estaColapsado(colapso, chaveToggle);
   return html`
-    <tr class=${`${classe} ${ehCusto ? 'custo' : 'receita'}`}>
+    <tr class=${`${classe} ${ehCusto ? 'custo' : 'receita'}`} data-linha=${dataLinha || nothing}>
       <td class="c1">
         ${podeToggle ? html`
           <button class="toggle" @click=${() => toggle(chaveToggle)} aria-expanded=${!recolhido}>
@@ -539,6 +545,13 @@ export function tabelaFluxo(
   const deducoesMensal = receitaLiquidaMensal.map((v, i) => v - (c.receitaBrutaMensal[i] ?? 0));
   const totalDeducoes = totalSerie(deducoesMensal);
   const temDeducoes = Math.abs(totalDeducoes) > 0.005;
+  // #591: a linha de deduções sai como CUSTO (`DEDUCOES_RECEITA_EH_CUSTO`) —
+  // ela vinha com a classe `receita` e o CSS a pintava com o token de sucesso,
+  // na mesma faixa verde dos grupos de VGV logo acima. A linha irmã
+  // "= Receita Líquida do Projeto" CONTINUA receita, e de propósito: ela é o
+  // total de receita ao qual a dedução acabou de chegar, não uma redução. A
+  // ordem das duas não muda — é ela que faz a leitura aritmética de cima para
+  // baixo fechar (ver o comentário do cabeçalho desta função).
 
   // Rodapé: com funding, o Fluxo passa a ser o ALAVANCADO (o que o autor pediu
   // ao mandar refletir o funding na tabela principal) e o livre — que é o que
@@ -576,7 +589,7 @@ export function tabelaFluxo(
           ${temDeducoes ? html`
             ${linhaTabela('subgrupo', '', '(-) Impostos e deduções sobre a receita',
               { mensal: deducoesMensal, total: totalDeducoes },
-              dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}
+              dataInicio, colapso, toggle, DEDUCOES_RECEITA_EH_CUSTO, c.vgvVendavel, true, false, 'deducoes')}
             ${linhaTabela('subgrupo', '', '= Receita Líquida do Projeto',
               { mensal: receitaLiquidaMensal, total: totalSerie(receitaLiquidaMensal), vpl: somaVpl(c.linhasReceita) },
               dataInicio, colapso, toggle, false, c.vgvVendavel, true, false)}

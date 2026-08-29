@@ -22,6 +22,16 @@ export const caso = {
     { seletor: 'div.kpi-card', minimo: 9 },
     { seletor: 'table.fx', minimo: 1 },
     { seletor: 'table.fx tbody tr', minimo: 4 },
+    // #591: a linha-ponte de deduções tem de sair como CUSTO, não como
+    // receita. O fixture tem `ret: { ativo: true, pct: 4 }`, então ela existe.
+    //
+    // ⚠️ Os dois qualificadores são necessários e nenhum é decoração:
+    // `tr.subgrupo.custo` sozinho já casa com os subgrupos de custo (Terreno,
+    // Obra, …) e ficaria verde com o defeito de volta; `[data-linha="deducoes"]`
+    // sozinho não diz NADA sobre a classe. Juntos, reverter o `ehCusto` da
+    // chamada em `tabelaFluxo` deixa este caso VERMELHO — que é o critério 5
+    // da issue, e a única camada que enxerga classe de CSS chegando ao DOM.
+    { seletor: 'table.fx tbody tr.subgrupo.custo[data-linha="deducoes"]', minimo: 1 },
   ],
   // Props que o stub NÃO reproduz e este caso usa mesmo assim — revisadas uma a
   // uma. Não é isenção: é o registro do que a medida deste caso NÃO cobre. O
