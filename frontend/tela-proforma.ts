@@ -407,7 +407,7 @@ export class ViabTelaProforma extends LitElement {
     const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
     return html`
       ${this.secao === 'proforma'
-        ? (p.semProdutos ? this._renderSemProdutos() : html`
+        ? (p.semProdutos ? this._renderSemProdutos('Proforma') : html`
         ${this._renderKpis(p, lot)}
         ${!lot ? this._renderUnidadesTipo(p) : nothing}
         <urbi-card titulo="Proforma">
@@ -420,7 +420,9 @@ export class ViabTelaProforma extends LitElement {
         </urbi-card>
       `)
         : nothing}
-      ${this.secao === 'cenarios' ? this._renderSensibilidade(lot) : nothing}
+      ${this.secao === 'cenarios'
+        ? (p.semProdutos ? this._renderSemProdutos('Análise de sensibilidade') : this._renderSensibilidade(lot))
+        : nothing}
     `;
   }
 
@@ -429,8 +431,27 @@ export class ViabTelaProforma extends LitElement {
   // tabela nessa condição era pior que nada — ela vinha preenchida a partir dos
   // pares legados de área × preço, que não têm campo em tela nenhuma e por isso
   // ninguém consegue conferir nem corrigir.
-  private _renderSemProdutos(): TemplateResult {
-    return html`<urbi-card titulo="Proforma">
+  //
+  // #610: as DUAS sub-abas usam este mesmo estado vazio. A #563 gateou só a
+  // tabela principal, e o resultado era o mesmo estudo respondendo coisas
+  // opostas em duas abas vizinhas: "não há receita modelada" na Proforma, e
+  // Bear/Base/Bull inteiros em Cenários — com os números da mesma fonte legada
+  // que a #563 tinha acabado de recusar, agora multiplicados por ±10% em três
+  // colunas. Um número-fantasma estressado continua fantasma.
+  //
+  // ⚠️ `titulo` é OBRIGATÓRIO de propósito. É a única coisa que difere entre as
+  // duas chamadas (o card de cada sub-aba tem o seu), e um default aqui deixaria
+  // um chamador novo herdar "Proforma" em silêncio, dentro da aba errada. Sem
+  // default, esquecê-lo é erro de compilação (TS2554), não um rótulo errado na
+  // tela — a defesa que o CLAUDE.md prescreve para a classe 1.
+  //
+  // A mensagem e a submensagem são as MESMAS nas duas, e é o pedido literal da
+  // #610 ("o mesmo estado vazio"): a causa é uma só, e a submensagem já nomeia
+  // o que falta ver — "VGV, custos e resultado" —, que é exatamente o conteúdo
+  // das duas tabelas da sensibilidade também. Duplicar o texto para "adaptá-lo"
+  // criaria duas cópias para divergirem.
+  private _renderSemProdutos(titulo: string): TemplateResult {
+    return html`<urbi-card titulo=${titulo}>
       <div class="pf-vazio">
         <urbi-estado-vazio icone="fa-solid fa-boxes-stacked"
           mensagem="Nenhum produto com área, preço e unidades cadastrado."
