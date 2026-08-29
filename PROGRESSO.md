@@ -36,6 +36,94 @@ molde da #604).
 
 Validação: `bash scripts/validar-frontend.sh` verde (typecheck + testes + build + 67 casos de
 render, Chromium). Backend/schema não tocados.
+## ROI geral + retorno por parte na Análise Financeira — #594 (2026-08-29)
+
+Rodada 10, item A10-15. O pedido do autor: *"Acrescentar em Análise Financeira ROI e divisão para ver
+o retorno tanto do incorporador quanto para cada tranche de investimento criada, seja dívida ou
+equity (menos financiamento à produção)"*.
+
+**O diagnóstico da issue estava certo: metade do cálculo já existia, na tela errada.**
+`indicadoresOperacao` (`frontend/funding-motor.ts`) já entregava investimento, retorno, lucro, MOIC,
+TIR, VPL e payback **por operação** — só que apenas a tela de Funding os exibia. O que este PR faz é
+(a) trazer isso para a Análise Financeira, (b) filtrar o financiamento à produção e (c) criar o que
+não existia: o ROI geral e a linha do incorporador. **Nenhuma fórmula nova nasceu.**
+
+**Três decisões, e as três são de rótulo antes de serem de conta:**
+
+1. **O ROI geral é o MESMO da coluna do Painel de estudos.** `roiProjetoAnalise`
+   (`frontend/tela-fluxo-ver.ts`) é um alias de `proformaAvancado(c, area).roiPct` — o mesmo valor
+   que `tela-dashboard.ts` publica. Um segundo ROI com denominador próprio seria a divergência entre
+   listagem e tela que a #443 registrou em VGV e Margem.
+2. **O incorporador sai SEM ROI, e a tela diz por quê.** Ele é o resíduo: o total do Fluxo de Caixa
+   alavancado, o mesmo número da linha "= Fluxo de Caixa" do card acima (recebido por parâmetro, para
+   não haver duas contas). ROI exigiria denominador, e o app **não modela** capital próprio do
+   incorporador — a saída (a) da issue. "0,0%" ali seria número inventado.
+3. **MOIC é rotulado MOIC.** MOIC = retorno ÷ investimento (1,00× empata); ROI = lucro ÷
+   investimento (0 empata). A diferença é exatamente 1, e exibir um chamando o outro é erro de
+   rótulo com cara de erro de conta.
+
+> ⚠️ **O filtro do financiamento à produção é ALLOWLIST, não negação.** `tranchesDeInvestimento`
+> aceita `'divida' | 'equity'` em vez de recusar `'financiamento_producao'`. `TipoOperacao` é união
+> fechada hoje, mas um quarto tipo entraria em silêncio como "investidor" pela negação — e o modo de
+> falha caro aqui é dividir resultado com quem não é parte.
+
+**A prova de fiação, com o número medido.** O caso de render `retorno-por-parte` monta a aba em
+Chromium com FàP + dívida + equity e exige as linhas na tela; o **teto** do critério 3 ("duas
+tranches, não três") é assertado dentro do próprio `montar`, porque `exigir` do harness só tem piso.
+Medido: apagando `${this._renderRetornoPorParte(real)}` de `_renderAnaliseFinanceira`, os testes de
+lógica pura seguem **963/963 verdes** e só o caso de render fica vermelho (2/2). Teste de função pura não
+prova ligação — classe de defeito nº 1 do `CLAUDE.md`.
+
+> ⚠️ **Duas armadilhas de crase, e as duas custaram uma rodada de typecheck cada.** Prosa dentro do
+> bloco `css` de um componente Lit **não pode conter crase**: um `` `overflow-x: auto` `` num
+> comentário CSS FECHA o template literal, e o arquivo deixa de parsear com `TS1005` a dezenas de
+> linhas de distância. O guard de UI acusa como "comentário CSS `/*` sem `*/`", que aponta para o
+> lugar errado.
+
+> ⚠️ **`investimentoTotal` de operação não configurada é `-0`, não `0`.** Ele é
+> `-round2(Σ entradas)`. `assert.equal(x, 0)` (Object.is) **reprova**, e `-0 < 0` é **falso** — o que
+> aqui é o desfecho certo: a tela publica "—" no MOIC em vez de "0,00×", que afirmaria que o
+> investidor perdeu tudo.
+
+> 🔴 **O achado P1 do App de revisão, e ele não era do cálculo nem da fiação — era da ESCOLHA DO
+> INSUMO.** `_recalcular` recorta as linhas de **receita** pela fase selecionada e mantém **todos**
+> os custos. Isso é correto para a tabela e os gráficos, que mostram a fase — e é ruína para um card
+> que se anuncia como "do projeto": com uma fase ligada, o ROI da Análise Financeira **deixaria de
+> bater com a coluna do Painel de estudos** (o critério 1 que este PR existe para cumprir), e as
+> tranches e o resíduo do incorporador mudariam de valor porque alguém mexeu num **controle de
+> exibição**. Medido na fixture do caso de render: **29,1% da fase contra 148,3% do projeto**.
+>
+> O conserto é um segundo par `calcProjeto`/`fundingCalcProjeto`, sempre sem filtro — e **sem filtro
+> ele é o MESMO objeto** do par de exibição, então o caminho comum não paga cálculo nenhum a mais
+> (asserção de **identidade referencial**, não de igualdade). Os dois cards leem só esse par, e a
+> tela **avisa** que o filtro não os afeta.
+>
+> A lição, que vale além desta issue: um indicador não é definido só pela fórmula. **O insumo é
+> metade da definição**, e é a metade que nenhum teste de função pura enxerga — a função estava
+> certa nos dois casos.
+
+> 🔴 **O SEGUNDO P1, na rodada 2 — real quando foi achado, e MORTO pelo merge da `main`.** O App
+> apontou que `_configFluxo` passava `deflatorAreaAbertaPct` (#462) ao motor e o caminho do Painel
+> de estudos (`tela-dashboard.ts`, `_calcularUmAvancado`) **não passava** — logo, num estudo com
+> deflator e área privativa aberta, os dois ROIs divergiriam, quebrando o critério 1. O achado
+> **procedia** contra a base daquele momento, e o conserto (uma linha no Painel) chegou a ser
+> escrito e provado.
+>
+> **Então a `main` andou:** a **#584** (item A10-07, decisão do autor — *"tirar campo deflator de
+> preço"*) **retirou o deflator inteiro**, e `deflatorAreaAbertaPct` deixou de existir no
+> `FluxoConfig`. Com isso os dois caminhos passaram a concordar **por construção**, e o conserto
+> virou código que **não compila** (campo inexistente) e que `frontend/deflator-retirado.test.ts`
+> reprovaria como leitor novo da coluna aposentada. Foi **desfeito** — o diff final deste PR **não
+> toca** `tela-dashboard.ts`.
+>
+> **A lição é sobre PROCESSO, não sobre o defeito:** achado de revisão tem **prazo de validade**, e
+> o prazo é o próximo merge da base. Conferir o achado contra a base **de agora** — e não contra a
+> que estava no disco quando o revisor leu — é parte de verificá-lo. O mesmo raciocínio da classe
+> nº 3 do `CLAUDE.md` ("CI verde sobre base vencida"), pelo avesso: aqui era o **achado** que estava
+> sobre base vencida.
+
+**Fora de escopo, e declarado:** as saídas (b) exposição máxima como proxy de capital próprio e (c)
+campo de aporte próprio do incorporador dependem de decisão do autor — a issue as registra como tal.
 
 ---
 
@@ -123,6 +211,9 @@ nº 2) e foram corrigidas na mesma alteração, apontadas pelo `guard-enderecos-
 **Validação de backend PENDENTE DO AUTOR** — o PR toca `backend/rotas/estudos.ts` e lê o
 `schema.json` sem alterá-lo; o `validar-backend.sh` aborta no portão do SDK. "Não deu para rodar"
 nunca é "passou".
+
+---
+
 ## A Proforma do Avançado exibe "—", não 0,0%, quando o VGV zera — #604 (2026-08-29)
 
 Item da leva Avançado. Mesmo padrão que a #571 já tinha consertado no Preliminar: `0,0%` afirma uma
