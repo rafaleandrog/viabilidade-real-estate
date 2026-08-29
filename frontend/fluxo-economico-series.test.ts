@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // #632 — cor de série entregue DENTRO do dado em seriesEconomicasFluxo, o
@@ -80,7 +80,7 @@ test('#632 fiação: a cor das 4 séries do gráfico econômico vem do CSS, não
   }
 });
 
-test('#632: nenhuma das quatro custom properties usa --cor-primaria (gradiente) sem o sufixo -solida', () => {
+test('#632: nenhuma das quatro custom properties usa --cor-primaria (gradiente)', () => {
   // A 1ª série usava var(--cor-primaria, #7c5cff) — --cor-primaria é um
   // linear-gradient(...) nas 4 variantes de tema, inválido em contexto de
   // cor (invalid-at-computed-value-time); o fallback hex do var() NÃO se
@@ -92,6 +92,47 @@ test('#632: nenhuma das quatro custom properties usa --cor-primaria (gradiente) 
   assert.ok(bloco.length > 0, 'bloco das 4 custom properties não encontrado em tela-fluxo-ver.ts');
   assert.ok(
     !/var\(--cor-primaria\s*[,)]/.test(bloco),
-    'uma das 4 custom properties usa --cor-primaria (o token-gradiente) em vez de --cor-primaria-solida.',
+    'uma das 4 custom properties usa --cor-primaria (o token-gradiente) em vez de uma variante sólida.',
   );
+});
+
+// ── #632, achado do Codex (rodada 1, PR 651) ────────────────────────────────
+//
+// A escolha inicial (--cor-primaria-solida para a 1ª série) resolvia para o
+// MESMO hex que --cor-info (a 3ª série) nas 3 primeiras variantes de tema do
+// espelho — 2AA9E0/0D75A9/14688F — deixando "Venda líquida contratada" e
+// "Carteira de clientes" com a MESMA cor em 3 dos 4 temas. Nenhum teste de
+// FONTE (os de cima) pega isso: os dois eram tokens "corretos" e distintos
+// por NOME, só coincidiam por VALOR. Este teste lê o espelho de tokens —
+// `docs/ui-urbiverso/tokens.json`, a mesma fonte que `scripts/guard-tokens-css.mjs`
+// usa — e resolve os 4 tokens escolhidos em cada uma das 4 variantes, travando
+// que as 4 séries continuem visualmente distintas em TODO tema.
+test('#632: as 4 cores do gráfico econômico resolvem para hex DISTINTOS em toda variante de tema', () => {
+  const caminhoTokens = new URL('../docs/ui-urbiverso/tokens.json', import.meta.url);
+  assert.ok(existsSync(caminhoTokens), 'docs/ui-urbiverso/tokens.json não existe — espelho ausente');
+  const espelho = JSON.parse(readFileSync(caminhoTokens, 'utf8'));
+  const tokens = espelho.tokens as Record<string, string[]>;
+
+  // Extrai "var(--x, fallback)" → "--x" para cada --urbi-grafico-cor-N, na
+  // ORDEM declarada — o mesmo bloco que o teste anterior já isola.
+  const bloco = TELA.slice(
+    TELA.indexOf('--urbi-grafico-cor-1'),
+    TELA.indexOf('--urbi-grafico-cor-4') + '--urbi-grafico-cor-4'.length + 60,
+  );
+  const nomes = [...bloco.matchAll(/--urbi-grafico-cor-\d:\s*var\(\s*(--[a-z0-9-]+)/g)].map((m) => m[1]);
+  assert.equal(nomes.length, 4, `esperava 4 custom properties, achei ${nomes.length}: ${nomes.join(', ')}`);
+
+  for (const nome of nomes) {
+    assert.ok(tokens[nome], `token ${nome} não existe no espelho — confira o nome`);
+  }
+
+  const variantes = tokens[nomes[0]].length;
+  for (let v = 0; v < variantes; v++) {
+    const cores = nomes.map((n) => tokens[n][v]);
+    const distintas = new Set(cores);
+    assert.equal(
+      distintas.size, cores.length,
+      `variante ${v}: duas ou mais séries resolvem para a MESMA cor (${nomes.map((n, i) => `${n}=${cores[i]}`).join(', ')})`,
+    );
+  }
 });

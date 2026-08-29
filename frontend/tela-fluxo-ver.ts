@@ -107,10 +107,17 @@ export class ViabFluxoVer extends LitElement {
        assim por diante.
        --cor-primaria é um GRADIENTE nas 4 variantes de tema do espelho —
        inválido em contexto de cor de série (IACVT / atributo descartado), a
-       mesma falha silenciosa que esta issue diagnostica. A variante sólida
-       existe exatamente para contexto de cor. */
+       mesma falha silenciosa que esta issue diagnostica.
+       ⚠️ achado do Codex (rodada 1, PR 651): a variante SÓLIDA
+       (--cor-primaria-solida) resolve para o MESMO hex que --cor-info nas 3
+       primeiras variantes de tema (#2AA9E0/#0D75A9/#14688F) — a 1ª e a 3ª
+       série ficariam com a mesma cor em 3 dos 4 temas. --cor-categoria-1 é um
+       dos 8 tokens que o espelho já expõe para series de gráfico (é o próprio
+       DEFAULT de --urbi-grafico-cor-1 no :host de UrbiGraficoBase), e não
+       colide com --cor-sucesso/--cor-info/--cor-alerta em NENHUMA variante —
+       ver o teste de distinção em frontend/fluxo-economico-series.test.ts. */
     .graf urbi-grafico-linha {
-      --urbi-grafico-cor-1: var(--cor-primaria-solida, #7c5cff);
+      --urbi-grafico-cor-1: var(--cor-categoria-1, #6ca1ff);
       --urbi-grafico-cor-2: var(--cor-sucesso, #13a98d);
       --urbi-grafico-cor-3: var(--cor-info, #3b82f6);
       --urbi-grafico-cor-4: var(--cor-alerta, #d59b2d);
