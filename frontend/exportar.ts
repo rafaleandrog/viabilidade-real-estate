@@ -239,7 +239,10 @@ export function htmlProforma(estudo: any, p: Proforma, lot: boolean): string {
 
   // #571: VGV ≤ 0 → "—", não "0,0%" (mesmo padrão do CSV e da tela).
   const kpis = lot
-    ? [['Área vendável', `${fmtNum(p.areaVendavel)} m²`], ['VGV', fmtR$(p.vgv)], ['Eficiência', fmtPct(p.eficienciaPct)], ['Margem sobre VGV', fmtPctOuIndef(p.margemLiquidaPct)]]
+    // #613: era 'Eficiência' aqui e 'Vendável / gleba' na tela — o MESMO número
+    // com dois nomes. O rótulo único é o da tela, e o inventário
+    // `frontend/rotulos-indicador.ts` passou a travar o par (rótulo, fórmula).
+    ? [['Área vendável', `${fmtNum(p.areaVendavel)} m²`], ['VGV', fmtR$(p.vgv)], ['Vendável / gleba', fmtPct(p.eficienciaPct)], ['Margem sobre VGV', fmtPctOuIndef(p.margemLiquidaPct)]]
     : [['Área privativa', `${fmtNum(p.areaPrivativa)} m²`], ['VGV', fmtR$(p.vgv)], ['Custo obras/VGV', fmtPctOuIndef(p.custoObrasVgvPct)], ['Margem sobre VGV', fmtPctOuIndef(p.margemLiquidaPct)]];
 
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${estudo.nome_exibicao || estudo.nome}</title>

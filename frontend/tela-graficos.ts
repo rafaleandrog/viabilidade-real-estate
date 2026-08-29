@@ -2,7 +2,7 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtR$Kpi } from './viab-format.js';
-import { calcularProforma, roiParaFaixa, type Proforma, type ProformaInput } from './proforma.js';
+import { calcularProforma, eficienciaParaFaixa, roiParaFaixa, type Proforma, type ProformaInput } from './proforma.js';
 import { itensAlocacaoGleba } from './areas-cascata.js';
 import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
@@ -257,6 +257,18 @@ export class ViabTelaGraficos extends LitElement {
       // alarme sobre grandeza não medida. `montarMedidor` é null-seguro desde
       // a #571 e simplesmente não desenha o medidor.
       roi: roiParaFaixa(p),
+      // #613: o único benchmark exclusivo do Loteamento
+      // (`backend/rotas/benchmarks.ts`, `benchmarksPadrao`) finalmente tem
+      // medidor. Ele NÃO é gateado por `lot` aqui de propósito: quem decide se
+      // o medidor aparece é o benchmark estar CONFIGURADO no estudo, e a
+      // semente só o cria para Loteamento. Uma Incorporação que ganhe o campo
+      // à mão vê a mesma razão desenhada, com a mesma fórmula.
+      //
+      // `eficienciaParaFaixa` (não `p.eficienciaPct` cru) pela razão da #611:
+      // sem área de gleba o número cai em 0 e `montarMedidor` pousava o
+      // ponteiro na banda vermelha do benchmark — falso alarme sobre grandeza
+      // que ninguém mediu. `null` = não desenha o medidor.
+      eficiencia_aproveitamento: eficienciaParaFaixa(p),
     });
     const medidores = exibiveis
       .map(({ benchmark, rotulo, valor }) => {

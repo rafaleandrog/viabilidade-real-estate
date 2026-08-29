@@ -83,6 +83,111 @@ de `_renderAnaliseFinanceira` (voltando a `class="num"`) → o caso `analise-fin
 demais 60 casos seguem verdes, o que confirma que a medição é deste caso e não de carona em outro.
 
 ---
+## Eficiência de aproveitamento vira indicador: medidor no benchmark e métrica na Proforma (2026-08-29)
+
+Issue **#613** (Rodada 10, achado 8 da auditoria #574). **Decisão do autor (2026-08-28), verbatim:**
+*"Deveria ter. indicadores no benchmark e as métricas"* — as duas metades, e elas são superfícies
+diferentes.
+
+`INDICADORES_SUPORTADOS` tinha 4 campos e nenhum era `eficiencia_aproveitamento`, o **único
+benchmark exclusivo do Loteamento** (`backend/rotas/benchmarks.ts`, `benchmarksPadrao`). O número
+existia (`p.eficienciaPct`) e já era comparado ao benchmark no Resumo de Premissas, mas na aba
+Gráficos caía em `descartados` com motivo genérico e um `console.warn`: a Incorporação desenhava 4
+medidores e o Loteamento também 4, faltando exatamente o dele.
+
+**As duas metades entregues.** *Benchmark:* o campo entrou na tabela compartilhada e
+`tela-graficos.ts` passa `eficienciaParaFaixa(p)` ao resolvedor — não `p.eficienciaPct` cru, pela
+razão da #611 (sem gleba o valor cai em 0 e o ponteiro pousava na banda vermelha, falso alarme sobre
+grandeza não medida). *Métricas:* o KPI "Vendável / gleba" entrou nas métricas da **Proforma**, que
+é a tela de métricas do Preliminar e era a única superfície do indicador que não o mostrava
+(Premissas e PDF já mostravam).
+
+**O rótulo foi unificado, e a escolha tem um motivo além do gosto.** O mesmo número tinha dois nomes
+— "Vendável / gleba" na tela, "Eficiência" no PDF. Ficou o da tela **em todo o app**, porque
+"Eficiência" sozinho já designa OUTRA razão na especificação (área privativa / área construída, a
+eficiência de projeto da Incorporação): adotá-lo plantaria a colisão rótulo↔fórmula que
+`frontend/rotulos-indicador.ts` existe para acusar, no dia em que a Incorporação ganhar a dela. O par
+está registrado no inventário, cujo teste de wiring confere o texto no fonte de cada arquivo citado.
+
+> **Um efeito colateral que só aparece lendo o resolvedor.** `tela-resumo.ts` (o medidor do
+> Avançado) importa a MESMA tabela, mas não calcula eficiência — ele não passa valor para o campo
+> novo. Antes da #613 esse ramo era **inalcançável** (as duas telas passavam os 4 campos suportados),
+> e o descarte caía no motivo genérico sem custo. Com um 5º campo que só o Preliminar fornece, "sem
+> indicador correspondente" viraria **mentira** no `console.warn` — manda procurar um indicador que
+> existe. Entrou `SEM_VALOR_NESTA_TELA_MOTIVO` para separar "o app não tem esse indicador" de "esta
+> tela não calcula o valor". Não é polimento: é a consequência direta da mudança, e ela não tinha
+> quem a acusasse.
+
+**Verificação.** `scripts/validar-frontend.sh` verde nas 8 etapas: **862** testes de lógica pura
+(baseline da base **829** medido antes do diff, pelo glob `frontend/*.test.ts`) e **58** casos de
+render (baseline **56**) — o caso novo é `medidor-eficiencia-loteamento`, o segundo Loteamento do
+harness.
+
+Mutações, **todas com controle verde antes e depois**: apagar `eficiencia_aproveitamento:` de
+`_renderMedidores` derruba o caso de render (5 medidores viram 4) e o teste de fiação de
+`tela-graficos.test.ts`; trocar `eficienciaParaFaixa(p)` por `p.eficienciaPct` cru derruba o mesmo
+teste; apagar o `kpis.push` do ramo do Loteamento derruba `tela-proforma.test.ts`; e apagar o
+argumento `lot` da chamada de `_renderKpis` vira **`TS2554` no typecheck** — o parâmetro é
+obrigatório de propósito, para a mutação ser erro de compilação em vez de silêncio.
+
+**O que NÃO mudou, e é decisão registrada:** o KPI novo sai **sem cor** (`variante: ''`). A #611
+deixou a eficiência sem cor por decisão do autor, e o escopo da #613 é o indicador **aparecer**, não
+recolorir card. Trocar o `0,0%` por "—" quando a gleba não foi informada continua dependendo de
+`eficienciaPct: number | null` (o padrão da #571) — é o resto da #611, ainda adiado.
+
+---
+
+## #583 · o sufixo de mês não salta mais da caixa do campo no Cronograma (2026-08-28)
+
+Item 6 da leva do Avançado de 2026-08-26 (com screenshot), **P2**. Nos campos Início e Duração da
+tela de Cronograma, `jan/27` / `dez/27` eram **pintados por fora da borda arredondada** do campo.
+
+**A causa, medida.** O `.input-wrap` do `viab-num` é um flex de **uma linha** com quatro filhos que
+não cedem: o `input` (piso de `min-width: 4ch`, posto pela #245), o `.stepper` e os **dois**
+`.afixo` (`sufixo` = a unidade, `sufixo-mes` = o mês). A soma mínima deles dá **139–148px** — e o
+teto do campo era `max-width: 18ch`, que na fonte real da tabela (`td` em `0.8125rem`) vale
+**128px**. Como o `.input-wrap` não declara `overflow`, `flex-wrap` nem `text-overflow`, o
+excedente não é cortado nem quebrado: ele vaza para fora da borda. 11 a 20px por campo.
+
+**É o eixo que a #245 não mediu.** Aquela issue mediu **truncamento** (`scrollWidth > clientWidth`
+do input e de cada afixo) e acertou: o número parou de ser cortado. Só que ele parou de ser cortado
+**porque os afixos deixaram de ceder**, e o preço foi empurrá-los para fora da caixa — outro eixo,
+sem lente nenhuma.
+
+**Como ficou.** O teto de `.campo-mes viab-num` sobe de `18ch` para **`24ch`**. Não se fez os afixos
+encolherem (`min-width: 0` + `ellipsis`) porque isso trocaria o transbordo por um mês **amputado**
+(`jan/2…`) — perder o dado em silêncio é a mesma classe de defeito que a #245 corrigiu no número.
+O piso foi **medido no harness**: com 20ch ainda há campo transbordando; **21ch já sai limpo**;
+24ch é esse piso com folga. E continua **abaixo** do `max-content` do `.input-wrap` (~280px), o que
+importa porque é o **teto**, e não o conteúdo, que iguala a largura de Início e Duração — "º mês" e
+"meses" rendem diferente, e só o teto mordendo os dois mantém o critério da #245.
+`.params viab-num` fica em 18ch: nenhum `viab-num` é montado dentro de `.params` hoje.
+
+**A rede nova.** `frontend/render/casos/cronograma-sufixo-mes.ts` + o teste ao lado montam a tela
+com valores de 1 a 3 dígitos, linhas travadas e editáveis, fases fixas e customizadas, em
+1280/900/600px. `viab-num` é componente **deste** repositório: o harness mede o markup real do
+shadow DOM, não um stub.
+
+**As duas lacunas de `scripts/render-check-cronograma.mjs`, e por que ele passava.** A rede manual
+da #245 (1) só tinha a lente de **truncamento**, e (2) copiava a tela **sem o `font-size` do `td`**
+— então o `ch` do `max-width` resolvia contra os 16px do root e o campo nascia com **183px** ali
+contra 128px na tela: largo demais para o defeito caber. As duas foram fechadas: a sonda ganhou a
+lente de **transbordo do `.input-wrap`**, e o `td` do fixture ganhou o `font-size` da tela. Com isso
+o script passou a **enxergar** o bug (`--largura …max-width:18ch` ⇒ 4 campos, 12px por fora) e a
+passar limpo com o conserto.
+
+**Verificação.** `bash scripts/validar-frontend.sh` verde — 871 testes de frontend e **59** casos de
+render (baseline da `main` em `3c0a1a9`: 871 e 57; o PR não acrescenta teste unitário, só render).
+Mutação com controle antes e depois: `24ch` → `18ch` deixa o caso novo **vermelho com 66 achados**
+de `transbordoDeCaixa` (22 por largura, 3 larguras; `scrollWidth` 139–148px contra `clientWidth`
+128px), e o controle volta verde ao desfazer. O **piso foi varrido**, não estimado: 18ch e 20ch
+vermelhos, 21ch e 22ch limpos. Sem migração → **a `versao` não bumpa**.
+
+> ⚠️ **O `transbordoDeTexto` de um `<text>` do gantt em 1280px é ANTERIOR e alheio** — medido igual
+> antes e depois do conserto. Por isso o teste assevera zero em `transbordoDeCaixa` (a lente
+> determinística, que é a forma deste bug) e restringe a asserção de texto aos campos de mês, em vez
+> de zerar uma lente dependente de fonte sobre uma região que este PR não toca.
+
 ## #610 · a sub-aba Cenários ganha o estado vazio da Proforma sem catálogo (2026-08-28)
 
 Achado da auditoria #574, aprovado pelo autor. A **#563** mandou a Proforma para o estado vazio
