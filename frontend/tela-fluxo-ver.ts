@@ -403,6 +403,17 @@ export class ViabFluxoVer extends LitElement {
     const custoFunding = this.funding
       ? this.funding.linhasSaida.reduce((s, l) => s + l.total, 0) - this.funding.entradas.reduce((s, v) => s + v, 0)
       : 0;
+    // #593 — esta tabela é a SEGUNDA `<table class="proforma">` do arquivo, e o
+    // seletor das regras de cor é `table.proforma …`: as regras alcançam as duas
+    // desde o primeiro commit desta issue, mas o sinal só estava fiado em
+    // `_renderProforma`. Sem estas três chamadas, um estudo com Fluxo de Caixa
+    // Livre NEGATIVO era pintado de VERDE aqui — `tr.receita td` casa e o
+    // override `td.neg` nunca aparecia. Mesma função, mesma decisão do
+    // Preliminar (#567): a linha de custo fica sem sinal de propósito, porque
+    // ali o negativo é o estado normal.
+    const sinalLivre = sinalLinhaProformaAv({ tipo: 'receita', valor: livre });
+    const sinalFunding = sinalLinhaProformaAv({ tipo: 'custo', valor: -custoFunding });
+    const sinalReal = sinalLinhaProformaAv({ tipo: 'resultado', valor: real });
     return html`
       ${kpisFluxo(c)}
       <urbi-card titulo="Fluxo de Caixa Livre × Fluxo de Caixa real">
@@ -410,15 +421,15 @@ export class ViabFluxoVer extends LitElement {
           <tbody>
             <tr class="n0 receita">
               <td>Fluxo de Caixa Livre (sem despesas financeiras)</td>
-              <td class="num">${fmtR$(livre)}</td>
+              <td class="num ${sinalLivre}">${fmtR$(livre)}</td>
             </tr>
             <tr class="n1 custo">
               <td>(-) Efeito líquido do funding (saídas − entradas)</td>
-              <td class="num">${fmtR$(-custoFunding)}</td>
+              <td class="num ${sinalFunding}">${fmtR$(-custoFunding)}</td>
             </tr>
             <tr class="n0 resultado">
               <td>= Fluxo de Caixa (resultado real)</td>
-              <td class="num">${fmtR$(real)}</td>
+              <td class="num ${sinalReal}">${fmtR$(real)}</td>
             </tr>
           </tbody>
         </table>

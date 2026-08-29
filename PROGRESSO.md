@@ -47,6 +47,41 @@ não havia um "mesmo" a copiar, e o mapeamento da issue escolheu essa origem.
 Sem migração, `versao` não bumpa: é CSS mais uma classe de apresentação. Nenhum número muda —
 `proforma-avancado.ts` não foi tocado.
 
+### Rodada 2 da revisão — a SEGUNDA `table.proforma` estava sem sinal (achado P2 do Codex)
+
+O motor adversarial achou o que a rodada 1 não tinha como achar: `tela-fluxo-ver.ts` tem **duas**
+`<table class="proforma">`, e as regras novas foram escritas com o seletor `table.proforma …`, que
+alcança as duas. A fiação (`class="num ${sinal}"`), porém, entrou só em `_renderProforma`. A
+segunda tabela — a da aba **Análise Financeira** (`_renderAnaliseFinanceira`, `vista: 'analise'`) —
+tinha as três células como `<td class="num">`, sem classe de sinal.
+
+**Consequência, e ela é regressão introduzida por este diff:** num estudo com Fluxo de Caixa Livre
+**negativo**, a linha "Fluxo de Caixa Livre" passava a ser pintada de **verde**, porque
+`table.proforma tr.receita td` casa e o override `td.neg` nunca era aplicado. Antes deste PR não
+havia regra nenhuma alcançando aquela tabela; depois dele, havia — e a metade `neg` do par ficou
+para trás.
+
+O conserto é a mesma função nas três células, com o mesmo mapeamento do Preliminar (#567):
+`livre` como `receita`, `real` como `resultado`, e a linha do efeito do funding como `custo`, isto
+é, **sem sinal de propósito** — ali o negativo é o estado normal.
+
+**A causa raiz não era o cálculo, era a AUSÊNCIA de caso de render.** Nenhum dos 57 casos da `main`
+(nem os 2 que este PR acrescentou) exercitava `vista: 'analise'` — só `'proforma'` e
+`'fluxo-caixa'`. Enquanto a aba não for montada por algum caso, defeito de fiação nela é invisível
+para a suíte inteira. Daí a defesa ser um caso novo,
+`frontend/render/casos/analise-financeira-sinal.ts` (estudo deficitário **com** funding, para que
+`livre` e `real` saiam os dois negativos), e não mais um teste de `sinalLinhaProformaAv` — a função
+já estava correta e verde o tempo todo, com a chamada ausente.
+
+**Verificação.** `scripts/validar-frontend.sh` verde nas 8 etapas: **884** testes de lógica pura e
+**61** casos de render. O número de testes de lógica pura **não mudou**, e isso está certo pelo
+mesmo motivo de sempre: o defeito morava na fiação.
+
+**Prova de mutação, com controle verde antes e depois:** apagar `${sinal…}` das três células novas
+de `_renderAnaliseFinanceira` (voltando a `class="num"`) → o caso `analise-financeira-sinal` fica
+**vermelho**, rejeitado pelo `exigir` em `tr.n0.receita td.neg` e `tr.n0.resultado td.neg`; os
+demais 60 casos seguem verdes, o que confirma que a medição é deste caso e não de carona em outro.
+
 ---
 ## #610 · a sub-aba Cenários ganha o estado vazio da Proforma sem catálogo (2026-08-28)
 
