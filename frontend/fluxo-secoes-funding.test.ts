@@ -105,7 +105,11 @@ const TRES_OPERACOES: OperacaoFunding[] = [
 ];
 
 function comFunding(cfg: FluxoConfig): { c: FluxoCalc; funding: FundingNoFluxo } {
-  const c = calcularFluxo(cfg);
+  // ⚠️ `operacoesFunding` no config NÃO é decoração (#446): é ele que estica o
+  // horizonte até a quitação das operações. Sem ele a série é cortada e o
+  // saldo final sai truncado, sem erro em lugar nenhum — e a identidade seria
+  // medida sobre um fluxo que termina no meio da amortização.
+  const c = calcularFluxo({ ...cfg, operacoesFunding: TRES_OPERACOES });
   // `resultadoFinal` real (não 0): é a base do retorno do equity no modo
   // `resultado_final`. Com 0, aquela ponta some e a fixture mente por omissão.
   const resultadoFinal = c.fluxoMensal.reduce((s, v) => s + v, 0);
@@ -269,7 +273,7 @@ for (const [padrao, cfg] of PADROES) {
     // Os KPIs (`kpisFluxo`) leem `FluxoCalc`, que o funding não toca: TIR, VPL
     // e Payback são os desalavancados por §8.1. A prova de que esta issue não
     // os realavancou é que o cartão continua publicando os valores de `c`.
-    const semFunding = calcularFluxo(cfg);
+    const semFunding = calcularFluxo({ ...cfg, operacoesFunding: TRES_OPERACOES });
     assert.equal(semFunding.vpl, c.vpl, 'VPL do motor não depende de funding');
     assert.equal(semFunding.tir, c.tir, 'TIR do motor não depende de funding');
     assert.equal(semFunding.paybackMes, c.paybackMes, 'Payback do motor não depende de funding');

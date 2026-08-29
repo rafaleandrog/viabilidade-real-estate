@@ -13,7 +13,7 @@
 // dentro do mesmo pai, que aqui é o `<tbody>`.
 
 import '../../tela-fluxo-ver.js';
-import { CRONO, CUSTOS, DATA_INICIO, RECEITAS, fluxo, fundingDeFluxo, OPERACOES_FUNDING, forcarEstado } from './dados.js';
+import { CRONO, CUSTOS, DATA_INICIO, RECEITAS, fluxoComFunding, fundingDeFluxo, OPERACOES_FUNDING, forcarEstado } from './dados.js';
 
 export const caso = {
   nome: 'tabela-fluxo-funding',
@@ -49,7 +49,7 @@ export const caso = {
     forcarEstado(el, {
       carregando: false,
       carregado: true,
-      calc: fluxo(),
+      calc: fluxoComFunding(),
       vista: 'fluxo-caixa',
       visao: 'mensal',
       colapso: {},

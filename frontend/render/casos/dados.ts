@@ -189,9 +189,30 @@ export const OPERACOES_FUNDING = [
     modo_retorno: 'resultado_final', pct_retorno: 20 },
 ] as any[];
 
-/** `FundingCalc` de verdade, saído do motor de verdade, sobre `fluxo()`. */
+/**
+ * `FluxoCalc` para o caso COM funding. ⚠️ Não é `fluxo()`: o horizonte precisa
+ * cobrir a quitação das operações, e quem estica o prazo é `operacoesFunding`
+ * no `FluxoConfig` (#446). Sem ele a série é cortada e o saldo final sai
+ * truncado — sem erro em lugar nenhum, que é o que o
+ * `scripts/guard-fiacao-funding.mjs` existe para barrar.
+ */
+export function fluxoComFunding(): FluxoCalc {
+  return calcularFluxo({
+    dataInicio: DATA_INICIO,
+    taxaDescontoAa: 12,
+    cronograma: CRONO,
+    linhasReceita: [LINHA_RECEITA],
+    linhasCusto: LINHAS_CUSTO,
+    curvas: [],
+    areaTerreno: 4_800,
+    ret: { ativo: true, pct: 4 },
+    operacoesFunding: OPERACOES_FUNDING,
+  });
+}
+
+/** `FundingCalc` de verdade, saído do motor de verdade, sobre o calc acima. */
 export function fundingDeFluxo() {
-  const c = fluxo();
+  const c = fluxoComFunding();
   const resultadoFinal = c.fluxoMensal.reduce((s, v) => s + v, 0);
   return fundingDoEstudo(
     OPERACOES_FUNDING, c.fluxoMensal, c.receitaMensal, resultadoFinal, 42, 12,
