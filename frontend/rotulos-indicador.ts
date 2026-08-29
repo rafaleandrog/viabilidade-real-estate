@@ -77,6 +77,32 @@ export const INVENTARIO_ROTULOS_INDICADOR: RotuloIndicador[] = [
     fonte: 'resultado / vgv — proforma.ts:margemLiquidaPct (Preliminar)',
   },
 
+  // ── Eficiência de aproveitamento — exclusiva do Loteamento (#613) ──────
+  //
+  // O rótulo unificado. Até a #613 o mesmo número saía como "Vendável / gleba"
+  // no Resumo de Premissas e como "Eficiência" no PDF/CSV; a exportação passou
+  // a dizer o que a tela diz, e a entrada abaixo é o que impede a divergência
+  // de voltar em silêncio (o teste de wiring confere o texto no fonte de CADA
+  // arquivo citado).
+  //
+  // "Eficiência" bare NÃO foi o escolhido de propósito: a especificação já usa
+  // esse nome para a razão área privativa / área construída da Incorporação
+  // (`docs/spec/estudo-de-viabilidade-spec.md`), fórmula diferente. Adotá-lo
+  // aqui criaria a colisão que esta tabela existe para acusar.
+  {
+    rotulo: 'Vendável / gleba',
+    arquivos: [
+      // Onde o literal mora no código-fonte: a tabela de rótulos de benchmark
+      // (que alimenta o medidor da aba Gráficos), a exportação, o Resumo de
+      // Premissas e as métricas da Proforma.
+      'frontend/benchmarks-indicadores.ts',
+      'frontend/exportar.ts',
+      'frontend/tela-premissas.ts',
+      'frontend/tela-proforma.ts',
+    ],
+    fonte: 'areaVendavel / areaTerreno — proforma.ts:eficienciaPct (Loteamento; 0 quando a gleba não foi informada, ver eficienciaParaFaixa)',
+  },
+
   // ── Painel de estudos (frontend/tela-dashboard.ts) ──────────────────────
   {
     rotulo: 'ROI',

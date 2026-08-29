@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   ehLinhaReceitaOuResultado, celulaProforma, celulaProformaM2,
   celulaSensibilidade, sinalSensibilidade, type Linha,
@@ -235,4 +236,66 @@ test('#568: as linhas de CUSTO da tabela de cenários seguem entre parênteses n
     assert.equal(celulaSensibilidade(p.custoDiretoTotal, 'despesa'), `(${fmtR$(p.custoDiretoTotal, false)})`);
     assert.equal(celulaSensibilidade(p.custoIndiretoTotal, 'despesa'), `(${fmtR$(p.custoIndiretoTotal, false)})`);
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #613 — a eficiência de aproveitamento entra nas MÉTRICAS da Proforma.
+//
+// Decisão do autor (2026-08-28): "indicadores no benchmark e as métricas". O
+// número já aparecia no Resumo de Premissas e no PDF; a Proforma, que é a tela
+// de métricas do Preliminar, não o mostrava.
+//
+// ⚠️ ESTE ARQUIVO LÊ O CÓDIGO-FONTE, e a razão é a de sempre: `_renderKpis` é
+// um método PRIVADO de um componente Lit, e nenhum teste deste repositório
+// monta `viab-tela-proforma` fora do harness de render. Apagar o `kpis.push`
+// do ramo do Loteamento não derruba um único teste de função pura — o KPI
+// simplesmente some da tela.
+//
+// A outra metade da defesa não está aqui, e sim no TIPO: `_renderKpis(p, lot)`
+// tem `lot` obrigatório, então apagar o argumento na chamada de `render()` é
+// `TS2554` no typecheck, não silêncio. As duas cobrem mutações diferentes —
+// apagar a LINHA (aqui) e apagar o ARGUMENTO (typecheck).
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Remove comentários antes de procurar código — mesma técnica, e mesma razão,
+ * de `rotulos-indicador.test.ts` e `tela-graficos.test.ts`: os comentários que
+ * este PR acrescentou CITAM o rótulo e o nome do campo para explicar a decisão,
+ * então um `includes()` ingênuo continuaria casando depois de a linha de código
+ * ser revertida.
+ */
+function semComentariosProforma(conteudo: string): string {
+  return conteudo
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((linha) => {
+      const i = linha.indexOf('//');
+      return i === -1 ? linha : linha.slice(0, i);
+    })
+    .join('\n');
+}
+
+const FONTE_PROFORMA = semComentariosProforma(
+  readFileSync(new URL('./tela-proforma.ts', import.meta.url), 'utf8'),
+);
+
+test('#613: as métricas da Proforma mostram "Vendável / gleba" no ramo do Loteamento', () => {
+  assert.ok(
+    /if\s*\(lot\)\s*kpis\.push\(\{\s*rot:\s*'Vendável \/ gleba'/.test(FONTE_PROFORMA),
+    'tela-proforma.ts parou de acrescentar o KPI "Vendável / gleba" às métricas do Loteamento — ' +
+    'a métrica some da tela sem derrubar nenhum teste de função pura.',
+  );
+});
+
+test('#613: _renderKpis recebe `lot` como parâmetro OBRIGATÓRIO (a mutação vira erro de compilação)', () => {
+  assert.ok(
+    /_renderKpis\(p:\s*Proforma,\s*lot:\s*boolean\)/.test(FONTE_PROFORMA),
+    'a assinatura de _renderKpis mudou. Se `lot` ganhou um default (`lot = false`), apagar o argumento ' +
+    'na chamada passa a compilar limpo e o KPI do Loteamento some em silêncio — era exatamente esse o ' +
+    'buraco que a obrigatoriedade fecha.',
+  );
+  assert.ok(
+    /this\._renderKpis\(p,\s*lot\)/.test(FONTE_PROFORMA),
+    'o template deixou de passar `lot` para _renderKpis.',
+  );
 });
