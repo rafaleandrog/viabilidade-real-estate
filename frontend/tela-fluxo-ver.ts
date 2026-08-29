@@ -377,10 +377,26 @@ export class ViabFluxoVer extends LitElement {
                 <td class="num ${sinal}">${fmtR$(l.valor)}</td>
                 <td class="num ${sinal}">${fmtNum(porM2(l.valor))}</td>
                 <td class="num ${sinal}">${fmtPctOuIndef(
-                  // ⚠️ #604 — `!== undefined`, JAMAIS `??`. A linha pode trazer
-                  // `pctOverride: null` (base própria inválida), e `??` leria
-                  // isso como "sem override" e cairia no VGV puro — publicando
-                  // um número com o denominador ERRADO em vez de "—".
+                  // ⚠️ #604 — `!== undefined`, e NÃO `??`, porque `null` aqui
+                  // significa "base própria inválida", não "sem override": o
+                  // `??` cairia no VGV puro e publicaria um número com o
+                  // denominador errado.
+                  //
+                  // ⚠️ E A HONESTIDADE SOBRE O ALCANCE: hoje essa troca é
+                  // **inobservável**, e isso está MEDIDO — reverter para `??`
+                  // deixa a suíte inteira verde. O motivo é estrutural: as três
+                  // bases de `pctOverride` derivam de `receitaBruta`
+                  // (`baseComPermutaFisica = receitaBruta + vgvPermutaFisica`,
+                  // com a permuta ≥ 0) e `p.vgv` É `receitaBruta` — então
+                  // `pctOverride === null` IMPLICA `pctVgv(...) === null`, e os
+                  // dois operadores dão o mesmo resultado.
+                  //
+                  // Fica assim mesmo: é o contrato de três estados que torna
+                  // seguro existir `pctOverride: null`, e ele passa a morder no
+                  // dia em que alguma linha ganhar base própria independente do
+                  // VGV. Trocar de volta seria escrever uma armadilha para essa
+                  // linha futura. Não é conserto de defeito vivo — é guarda, e
+                  // está declarada como tal em vez de contada como entrega.
                   l.pctOverride !== undefined ? l.pctOverride : pctVgv(l.valor),
                 )}</td>
               </tr>`;
