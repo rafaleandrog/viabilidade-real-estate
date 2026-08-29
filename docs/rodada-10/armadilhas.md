@@ -84,8 +84,13 @@ citação nunca passa pelo preflight.
 **Sintoma:** PR sem nenhum check run, interpretado como CI lenta.
 **Causa:** o GitHub roda os workflows de `pull_request` contra o **merge ref**; num PR conflitado
 (`mergeable_state: dirty`) esse ref não pode ser construído, então **nenhum check run é criado**.
-**Defesa:** `total_count: 0` significa **conflitado**, não "rodando". Sincronize.
+**Defesa:** `total_count: 0` é **sinal de alerta, não prova** de conflito — zero check runs também
+acontece com Actions desligadas ou nenhum workflow casando o evento que dispararia o PR. Confirme
+`mergeable_state == dirty` diretamente antes de concluir "conflitado" e sincronizar; não infira só
+do `total_count`.
 **Custo:** confundido três vezes hoje (637, 643, 648).
+**Achado da revisão (Codex, PR 654):** a formulação original ("`total_count: 0` significa
+conflitado") superclaimava a implicação inversa — corrigida acima.
 
 ## 8 · Achado de revisão tem PRAZO DE VALIDADE
 
@@ -99,12 +104,16 @@ empurrar. Ver PR 650, "Rodada 2 da revisão".
 
 ## 9 · O guard de endereços não distingue "o tipo" do "o comportamento"
 
-**Sintoma:** dois endereços `arquivo:linha` **errados** passando em verde.
-**Causa:** `guard-enderecos-doc` confere o símbolo a **±3 linhas**. `pctDescartado` aparece tanto na
-declaração da interface (`:507`) quanto no incremento que implementa o comportamento (`:579`) — a
-frase falava do comportamento e apontava para o tipo.
+**Sintoma:** um endereço `arquivo:linha` **errado** passando em verde.
+**Causa:** `guard-enderecos-doc` confere o símbolo a **±3 linhas do endereço citado na prosa** — não
+qual das ocorrências do símbolo, no arquivo inteiro, é a semanticamente certa. `pctDescartado`
+aparece tanto na declaração da interface (`frontend/fluxo-shared.ts:507`) quanto no incremento que
+implementa o comportamento (`:579`) — **72 linhas de distância**. A prosa descrevia o comportamento
+mas citava `:507`; como `pctDescartado` está *ali*, a ±3 linhas de 507 (é a própria declaração), o
+guard aprova — sem saber que a ocorrência relevante para a frase é a outra, distante.
 **Defesa:** o guard pega endereço que saiu do arquivo; **não pega endereço que aponta para o membro
-errado**. Isso é trabalho de revisão, não de guard — foi o Codex que achou, em PR 641.
+errado quando o símbolo tem mais de uma ocorrência**. Isso é trabalho de revisão, não de guard — foi
+o Codex que achou, em PR 641.
 
 ## 10 · O laço estrutural do `PROGRESSO.md`
 

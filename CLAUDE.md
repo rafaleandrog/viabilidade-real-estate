@@ -560,16 +560,18 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
    rode `git log <base>..HEAD --format=%B | grep -oE '#[0-9]+'` e declare cada um.
 7. **`total_count: 0` de check runs ≠ "CI rodando".** Confundido três vezes (PRs 637, 643, 648) — um
    PR conflitado (`mergeable_state: dirty`) não gera check run nenhum, porque o merge ref não pode
-   ser construído. Defesa: `total_count: 0` significa **conflitado**, não lento — sincronize com a
-   `main` antes de esperar CI aparecer.
+   ser construído. Defesa: `total_count: 0` é **sinal de alerta, não prova** — zero também acontece
+   com Actions desligadas ou nenhum workflow casando o evento; confirme `mergeable_state == dirty`
+   antes de concluir conflito e sincronizar.
 8. **Achado de revisão tem prazo de validade.** Um P1 do Codex verificado e com conserto escrito
    deixou de compilar porque a `main` mergeou embaixo dele no intervalo. Defesa: antes de empurrar o
    conserto de um achado, reconfirme que ele **ainda existe na base atual** — o prazo de validade é
    o próximo merge da base, não o momento em que foi lido.
-9. **O guard de endereços não distingue "o tipo" do "o comportamento".** Dois endereços `arquivo:linha`
-   passaram em verde apontando para a **declaração** de um campo quando a frase descrevia o
-   **incremento** que o implementa, treze linhas adiante — dentro da mesma janela de ±3 do guard.
-   Isto é trabalho de revisão humana, não algo que o guard resolve sozinho.
+9. **O guard de endereços não distingue "o tipo" do "o comportamento".** Um endereço `arquivo:linha`
+   passou em verde citando a **declaração** de um campo (`pctDescartado`, interface) quando a frase
+   descrevia o **incremento** que implementa o comportamento, 72 linhas adiante — o guard confere se
+   o símbolo aparece perto do endereço **citado**, não qual das duas ocorrências é a certa. Isto é
+   trabalho de revisão humana, não algo que o guard resolve sozinho.
 10. **O laço estrutural do `PROGRESSO.md`.** Com 5 PRs abertos, cada merge suja os outros 4 — todo
     PR prepende seção no topo do mesmo arquivo. Defesa imediata: fila **estritamente serial**,
     sincronize só o próximo PR da vez, nunca todos de uma vez; a defesa estrutural
