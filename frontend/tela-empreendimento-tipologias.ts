@@ -231,7 +231,7 @@ export class ViabEmpreendimentoTipologias extends LitElement {
             <th>Nome</th>
             ${lote ? nothing : html`<th>Tipo</th>`}
             <th class="num">Área privativa</th>
-            <th class="num" title="Varanda, terraço, quintal — ponderada pelo deflator de preço do estudo (#462)">Área aberta</th>
+            <th class="num" title="Varanda, terraço, quintal — soma à área fechada no VGV, ao mesmo preço/m² (#584)">Área aberta</th>
             ${lote ? nothing : html`<th class="num">Dormitórios</th><th class="num">Vagas</th>`}
             <th class="num">Unidades</th>
             <th class="num">Área total</th>
