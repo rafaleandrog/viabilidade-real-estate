@@ -51,11 +51,18 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 //
 //   | Superfície              | Visão       | Funding                       |
 //   |-------------------------|-------------|-------------------------------|
-//   | aba Fluxo de Caixa      | CAIXA       | AS DUAS PONTAS: a liberação   |
-//   | (`fluxo-tabela.ts`,     |             | no bloco "Funding — Capital   |
-//   |  bloco `funding-capital`|             | (entradas)" e o serviço da    |
-//   |  + subtotal do grupo    |             | dívida dentro do subtotal do  |
-//   |  `financeiro`)          |             | grupo `financeiro`            |
+//   | aba Fluxo de Caixa      | CAIXA       | AS DUAS PONTAS, e desde a     |
+//   | (`fluxo-tabela.ts`,     |             | #592 as duas em BLOCO         |
+//   |  blocos `funding-capital`|            | PRÓPRIO: a liberação em       |
+//   |  e `funding-servico`)   |             | "Funding — Capital (entradas)"|
+//   |                         |             | e o serviço em "Funding —     |
+//   |                         |             | Serviço (saídas)", entre o    |
+//   |                         |             | fecho do Fluxo de Caixa Livre |
+//   |                         |             | e o do Fluxo de Caixa         |
+//   | **aba Cenários,**       | CAIXA       | IDEM — é a MESMA função       |
+//   | **tabela de fluxo**     |             | `tabelaFluxo`, provado por    |
+//   | (`tela-cenarios.ts`     |             | `cenarios-heranca-fluxo.test.ts`|
+//   |  `:403`)                |             | (#596)                        |
 //   | aba Resultados / Painel | ECONÔMICA,  | NENHUMA PONTA                 |
 //   | (esta função)           | antes de    |                               |
 //   |                         | capitalizar |                               |
@@ -63,11 +70,21 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 //   | "Resultado após custo   | menos o     | toda dívida + retorno de      |
 //   | financeiro"             | custo de    | equity do resultado DESTA     |
 //   | (`tela-cenarios.ts`     | capital     | função — nunca o principal    |
-//   |  `:256-265`, `:363`)    |             |                               |
+//   |  `:306-315`, `:416-425`)|             |                               |
 //
-// A terceira linha é a que confunde: ela NÃO é uma variante desta função, é uma
-// subtração feita depois, na tela de Cenários. Quem for reabrir o rótulo (#447)
-// precisa das três, não das duas primeiras.
+// ⚠️ A #592 mudou a PRIMEIRA linha desta tabela, e a correção veio junto com a
+// #596. Antes ela dizia que o serviço da dívida vivia "dentro do subtotal do
+// grupo `financeiro`" — verdade até a #592, falsa depois dela: o grupo
+// `financeiro` voltou a valer só as linhas que o USUÁRIO classificou ali, e o
+// serviço ganhou bloco próprio. Doc que descreve estrutura antiga é pior que
+// doc ausente: manda o próximo leitor procurar no lugar errado e concluir que
+// sumiu.
+//
+// A ÚLTIMA linha é a que confunde: ela NÃO é uma variante desta função, é uma
+// subtração feita depois, na tela de Cenários — e continua sendo um TERCEIRO
+// número, diferente tanto do Fluxo de Caixa Livre quanto do Fluxo de Caixa,
+// porque não desconta o principal. Quem for reabrir o rótulo (#447) precisa das
+// quatro leituras, não das duas primeiras.
 //
 // ⚠️ Note que "as duas pontas" NÃO quer dizer que elas se anulam: o principal
 // devolvido cancela o principal liberado, mas os juros e qualquer saldo
