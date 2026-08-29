@@ -149,8 +149,6 @@ export async function conferir(id: number): Promise<Conferencia> {
     ret: d.ret,
     // #473: default true preserva o comportamento histórico (VGV bruto).
     corretagemSobrePermutaFisica: estudo?.corretagem_sobre_permuta_fisica !== false,
-    // #462: deflator de preço da área aberta — ausente/0 reproduz o VGV anterior.
-    deflatorAreaAbertaPct: Number(estudo?.deflator_area_aberta_pct) || 0,
     // #446: o horizonte precisa cobrir a quitação das operações, senão a série
     // é cortada e `saldoFinal` exibe um saldo truncado.
     operacoesFunding: ops,
@@ -170,13 +168,12 @@ export async function conferir(id: number): Promise<Conferencia> {
     );
   }
 
-  const deflatorPct = Number(estudo?.deflator_area_aberta_pct) || 0;
   out.divergencias = [
     ...validarProduto(d.receitas, d.custos, d.tipologias, d.crono, calc.prazo),
     ...validarPermutaFisica(d.custos, d.tipologias),
     ...validarCustosDuplicados(d.custos),
-    ...validarContratacao(d.receitas, d.crono, calc.prazo, calc.vendaBrutaContratada, undefined, d.custos, deflatorPct),
-    ...validarSafrasReceita(d.receitas, d.crono, calc.prazo, undefined, d.custos, deflatorPct),
+    ...validarContratacao(d.receitas, d.crono, calc.prazo, calc.vendaBrutaContratada, undefined, d.custos),
+    ...validarSafrasReceita(d.receitas, d.crono, calc.prazo, undefined, d.custos),
     ...validarFluxoCalc(calc),
     ...(out.funding ? validarFunding(out.funding, calc.fluxoMensal, undefined, receitaLiquida) : []),
     // #441: reconciliação Catálogo × Premissas.

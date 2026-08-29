@@ -44,9 +44,17 @@ const CAMPOS_SOMENTE_AVANCADO = new Set([
   'financiamento_carencia_meses',
   'investidor_aporte_valor', 'investidor_retorno_tipo',
   'investidor_juros_aa', 'investidor_carencia_meses', 'investidor_parcelas',
-  // #462: o deflator de preço da área aberta é exclusivo do Avançado — o
-  // Preliminar não muda neste PR e continua com o deflator implícito de
-  // 100% que `frontend/proforma.ts` já implementa para `area_pvt_*`.
+  // #584: o DEFLATOR foi retirado do app — nenhum código lê mais este valor.
+  // A entrada FICA nesta lista mesmo assim, e não é resíduo: ela não é um
+  // leitor, é um FILTRO. `estudos.deflator_area_aberta_pct` continua sendo
+  // coluna declarada e exclusiva do Avançado (caminho A da #584 mantém a
+  // coluna inerte no `schema.json`), e `tela-premissas.ts` monta o PATCH a
+  // partir do registro INTEIRO (`this.form = { ...this.estudo }`, `:477`,
+  // reenviado em `:1313-1320`). Tirar a entrada faria o campo voltar a
+  // alcançar o validador do shell num estudo Preliminar — o "Campo X deve ser
+  // um número" que é a razão de ser desta lista, descrita no comentário do
+  // topo. Se a coluna sair do schema pelo caminho canônico
+  // (`dados.limparColuna`), esta linha sai junto, e só então.
   'deflator_area_aberta_pct',
 ]);
 

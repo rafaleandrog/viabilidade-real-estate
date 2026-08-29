@@ -69,11 +69,11 @@ export function chaveTipologiaLinha(linha: any, linhaIndex: number, tipologia: a
  * tipologia. A quantidade é consumida uma única vez, mesmo quando a tipologia
  * aparece em vários Grupos; o preço/m² da alocação correspondente é usado só
  * para medir o VGV informativo. Nenhuma parcela desta reserva entra no caixa.
- * #462: o VGV informativo usa o mesmo preço efetivo ponderado (fechada +
- * aberta com deflator) que `vgvTipologia` — é o que a EVI faz para a permuta
- * física (`F26 = F18 × PrecoMedioResidencial`).
+ * O VGV informativo usa o mesmo preço efetivo (fechada + aberta, as duas a
+ * preço cheio) que `vgvTipologia` — é o que a EVI faz para a permuta física
+ * (`F26 = F18 × PrecoMedioResidencial`).
  */
-export function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[], deflatorPct: number): ReservaPermutaFisica {
+export function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]): ReservaPermutaFisica {
   const custos = (linhasCusto ?? []).filter(ePermutaFisica);
   const usaFonteNova = custos.length > 0;
   const reservas = new Map<number, number>();
@@ -100,7 +100,7 @@ export function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]
         const usada = Math.min(restante, disponivel);
         if (usada <= 0) continue;
         porTipologia.set(chave, usada);
-        vgv += vgvTipologia({ ...t, quantidade: usada }, deflatorPct);
+        vgv += vgvTipologia({ ...t, quantidade: usada });
         restante -= usada;
       }
     }
@@ -116,8 +116,8 @@ export function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]
  * recebem as linhas CRUAS do banco e precisam da mesma fonte de permuta que
  * o motor usa, senão nunca reconciliam num estudo com permuta física.
  */
-export function linhasReceitaComPermutaReservada(linhasReceita: any[], linhasCusto: any[], deflatorPct: number): any[] {
-  const reservas = reservarPermutasFisicas(linhasReceita, linhasCusto, deflatorPct);
+export function linhasReceitaComPermutaReservada(linhasReceita: any[], linhasCusto: any[]): any[] {
+  const reservas = reservarPermutasFisicas(linhasReceita, linhasCusto);
   if (!reservas.usaFonteNova) return linhasReceita;
   return linhasReceita.map((l: any, li: number) => ({
     ...l,
@@ -219,14 +219,6 @@ export interface FluxoConfig {
    * física inclusa; `false` = VGV vendável, exclui a permuta física.
    */
   corretagemSobrePermutaFisica?: boolean;
-  /**
-   * #462: deflator de preço da área aberta (`estudos.deflator_area_aberta_pct`,
-   * % inteiro digitado), só no Avançado. Preço efetivo da tipologia =
-   * `(fechada × preço + aberta × preço × (1 − deflator))`. Ausente/0
-   * reproduz exatamente o VGV anterior a esta mudança — nenhum estudo
-   * pré-existente muda de número.
-   */
-  deflatorAreaAbertaPct?: number;
   // #446: as operações de Funding, lidas SÓ para derivar o horizonte — o
   // motor de caixa não as simula (quem simula é `fundingDoEstudo`, depois).
   // Sem elas, uma operação que amortiza além do último evento operacional é
@@ -508,10 +500,9 @@ export function vendaBrutaContratadaMensal(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
 ): number[] {
   const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
-  const vgv = vgvVendavelLinha(linha?.tipologias ?? [], deflatorPct);
+  const vgv = vgvVendavelLinha(linha?.tipologias ?? []);
   if (vgv <= 0) return saida;
   const abs = absorcaoMensal(linha?.absorcao ?? { modo: 'linear' }, cronograma);
   if (!abs) return saida;
@@ -659,9 +650,8 @@ export function descontoComercialMensal(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
 ): number[] {
-  const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal, deflatorPct);
+  const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
   const saida = new Array<number>(bruto.length).fill(0);
   if (Array.isArray(linha?.fluxo_pagamento?.componentes)) {
     const obra = cronograma.find((e) => e.evento === 'obra');
@@ -699,10 +689,9 @@ export function vendaLiquidaContratadaMensal(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
 ): number[] {
-  const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal, deflatorPct);
-  const desconto = descontoComercialMensal(linha, cronograma, prazoTotal, deflatorPct);
+  const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
+  const desconto = descontoComercialMensal(linha, cronograma, prazoTotal);
   return bruto.map((v, i) => round2(v - desconto[i])); // #260 — C7
 }
 
@@ -1570,10 +1559,9 @@ function recebiveisComponentesLinha(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
 ): RecebiveisComponentesCalc | null {
   if (!Array.isArray(linha?.fluxo_pagamento?.componentes)) return null;
-  const contratada = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal, deflatorPct);
+  const contratada = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
   const contratacoes = contratada
     .map((valorContratado, safra) => ({ safra, valorContratado }))
     .filter((c) => c.valorContratado > 0);
@@ -1744,13 +1732,12 @@ export function recebimentoBrutoMensal(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
 ): number[] {
-  const canonico = recebiveisComponentesLinha(linha, cronograma, prazoTotal, deflatorPct);
+  const canonico = recebiveisComponentesLinha(linha, cronograma, prazoTotal);
   if (canonico) return canonico.recebimentoBrutoMensal;
   const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
-  const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal, deflatorPct);
-  const vgv = vgvVendavelLinha(linha?.tipologias ?? [], deflatorPct);
+  const bruto = vendaBrutaContratadaMensal(linha, cronograma, prazoTotal);
+  const vgv = vgvVendavelLinha(linha?.tipologias ?? []);
   if (vgv <= 0) return saida;
 
   const fp = linha?.fluxo_pagamento ?? null;
@@ -1845,10 +1832,9 @@ export function impostoMensal(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
   ret?: { ativo: boolean; pct: number } | null,
 ): number[] {
-  const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal, deflatorPct);
+  const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal);
   if (!ret?.ativo) return bruto.map(() => 0);
   const pct = n(ret.pct) / 100;
   return bruto.map((v) => round2(v * pct)); // #260 — C7
@@ -1866,11 +1852,10 @@ export function recebimentoLiquidoMensal(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
   ret?: { ativo: boolean; pct: number } | null,
 ): number[] {
-  const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal, deflatorPct);
-  const imposto = impostoMensal(linha, cronograma, prazoTotal, deflatorPct, ret);
+  const bruto = recebimentoBrutoMensal(linha, cronograma, prazoTotal);
+  const imposto = impostoMensal(linha, cronograma, prazoTotal, ret);
   return bruto.map((v, i) => round2(v - imposto[i])); // #260 — C7
 }
 
@@ -1883,10 +1868,9 @@ export function receitaMensalLinha(
   linha: any,
   cronograma: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
   ret?: { ativo: boolean; pct: number } | null,
 ): number[] {
-  return recebimentoLiquidoMensal(linha, cronograma, prazoTotal, deflatorPct, ret);
+  return recebimentoLiquidoMensal(linha, cronograma, prazoTotal, ret);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1927,10 +1911,9 @@ export function corretagemMensal(
   ctx: ContextoCusto,
 ): number[] {
   const vgvBrutoNaCorretagem = ctx.corretagemSobrePermutaFisica !== false;
-  const deflatorPct = n(ctx.deflatorAreaAbertaPct);
   const vendas = vgvBrutoNaCorretagem
-    ? vgvVendidoBrutoMensal(linhasReceita, cronograma, prazoTotal, deflatorPct)
-    : vgvVendidoVendavelMensal(linhasReceita, cronograma, prazoTotal, deflatorPct);
+    ? vgvVendidoBrutoMensal(linhasReceita, cronograma, prazoTotal)
+    : vgvVendidoVendavelMensal(linhasReceita, cronograma, prazoTotal);
   const somaVendas = vendas.reduce((s, v) => s + v, 0);
   if (somaVendas <= 0) return new Array<number>(Math.max(prazoTotal, 0)).fill(0);
 
@@ -2294,9 +2277,6 @@ function avisarAbsorcaoDescartada(linhasReceita: any[], crono: EventoCrono[]): v
 }
 
 export function calcularFluxo(config: FluxoConfig): FluxoCalc {
-  // #462: deflator de preço da área aberta — escolha do estudo, só no
-  // Avançado. Ausente/0 reproduz exatamente o cálculo de VGV anterior.
-  const deflatorPct = n(config.deflatorAreaAbertaPct);
   const crono = config.cronograma ?? [];
   const linhasReceitaOriginal = config.linhasReceita ?? [];
   // #429: antes de qualquer conta — a absorção que não fecha deixa rastro.
@@ -2331,7 +2311,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   // que preenchesse o campo.
   const prazo = Math.max(prazoDerivado, Math.round(n(config.prazoMeses) || 0), 1);
 
-  const reservasPermuta = reservarPermutasFisicas(linhasReceitaOriginal, linhasCusto, deflatorPct);
+  const reservasPermuta = reservarPermutasFisicas(linhasReceitaOriginal, linhasCusto);
   const usaFonteNovaPermuta = reservasPermuta.usaFonteNova;
 
   // #268 (correção pós-CI): as séries mensais de caixa (`vendaBrutaContratadaMensal`,
@@ -2356,15 +2336,14 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     (linha.tipologias ?? []).reduce((total: number, t: any, tipologiaIndex: number) => {
       const chave = chaveTipologiaLinha(linha, linhaIndex, t, tipologiaIndex);
       const unidades = usaFonteNovaPermuta ? (reservasPermuta.porTipologia.get(chave) ?? 0) : undefined;
-      return total + vgvVendavelTipologia(t, deflatorPct, unidades);
+      return total + vgvVendavelTipologia(t, unidades);
     }, 0);
 
   const ctxCusto: ContextoCusto = {
     areaPrivativaTotal: areaPrivativaTotalLinhas(linhasReceita),
     areaTerreno: n(config.areaTerreno),
-    vgvTotal: linhasReceita.reduce((s, l) => s + vgvLinha(l.tipologias, deflatorPct), 0),
+    vgvTotal: linhasReceita.reduce((s, l) => s + vgvLinha(l.tipologias), 0),
     corretagemSobrePermutaFisica: config.corretagemSobrePermutaFisica,
-    deflatorAreaAbertaPct: deflatorPct,
   };
   ctxCusto.receitaTotal = linhasReceita.reduce(
     (s, l, i) => s + receitaLiquidaLinha(vgvVendavelLinhaMotor(l, i), config.ret), 0);
@@ -2385,7 +2364,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     const itens: LinhaCalc[] = (l.tipologias ?? []).map((t: any, tipologiaIndex: number) => {
       const chave = chaveTipologiaLinha(l, linhasReceita.indexOf(l), t, tipologiaIndex);
       const unidades = usaFonteNovaPermuta ? (reservasPermuta.porTipologia.get(chave) ?? 0) : undefined;
-      const propor = vgvVendavelL > 0 ? vgvVendavelTipologia(t, deflatorPct, unidades) / vgvVendavelL : 0;
+      const propor = vgvVendavelL > 0 ? vgvVendavelTipologia(t, unidades) / vgvVendavelL : 0;
       const mensalTip = mensal.map((v) => v * propor);
       const rt = recorte(mensalTip);
       return {
@@ -2405,11 +2384,11 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
       mensal, itens,
     };
   }).map((linha) => quantizarLinhaMonetaria(linha, taxa));
-  const calcReceitasBrutas = montarLinhasReceita((l, c, p) => recebimentoBrutoMensal(l, c, p, deflatorPct));
-  const calcVendasContratadas = montarLinhasReceita((l, c, p) => vendaBrutaContratadaMensal(l, c, p, deflatorPct));
+  const calcReceitasBrutas = montarLinhasReceita((l, c, p) => recebimentoBrutoMensal(l, c, p));
+  const calcVendasContratadas = montarLinhasReceita((l, c, p) => vendaBrutaContratadaMensal(l, c, p));
   // #346: RET é global (config.ret) — a série líquida de cada linha usa o
   // mesmo valor para todas, em vez de ler `linha.fluxo_pagamento.ret`.
-  const calcReceitas = montarLinhasReceita((l, c, p) => receitaMensalLinha(l, c, p, deflatorPct, config.ret));
+  const calcReceitas = montarLinhasReceita((l, c, p) => receitaMensalLinha(l, c, p, config.ret));
 
   // Receita mensal SÓ das vendas (caixa efetivo: entrada + parcelas + repasse
   // na entrega) — calculada aqui, antes dos custos, porque o modo
@@ -2463,7 +2442,7 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     // abaixo, igual às demais linhas de Terreno.
     if (ePrecoTerreno(c) && (c.distribuicao_modo === 'unit_delivery' || c.distribuicao_modo === 'sales_revenue')) {
       const pesos = c.distribuicao_modo === 'sales_revenue'
-        ? vgvVendidoBrutoMensal(linhasReceita, crono, prazo, deflatorPct)
+        ? vgvVendidoBrutoMensal(linhasReceita, crono, prazo)
         : receitaMensalVendas;
       const mensal = distribuirProporcional(c, pesos, ctxCusto);
       const r = recorte(mensal);
@@ -2505,8 +2484,8 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const receitaCaixaBrutaMensal = new Array<number>(prazo).fill(0);
   const impostoTotalMensal = new Array<number>(prazo).fill(0);
   for (const l of linhasReceita) {
-    const bruto = recebimentoBrutoMensal(l, crono, prazo, deflatorPct);
-    const imp = impostoMensal(l, crono, prazo, deflatorPct, config.ret);
+    const bruto = recebimentoBrutoMensal(l, crono, prazo);
+    const imp = impostoMensal(l, crono, prazo, config.ret);
     for (let i = 0; i < prazo; i++) {
       receitaCaixaBrutaMensal[i] += bruto[i] ?? 0;
       impostoTotalMensal[i] += imp[i] ?? 0;
@@ -2607,8 +2586,8 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     tabelaCurta: vazia(), tabelaLongaObra: vazia(), saldoARepassar: vazia(),
   };
   for (const linha of linhasReceita) {
-    const brutoLinha = recebimentoBrutoMensal(linha, crono, prazo, deflatorPct);
-    const detalhe = recebiveisComponentesLinha(linha, crono, prazo, deflatorPct);
+    const brutoLinha = recebimentoBrutoMensal(linha, crono, prazo);
+    const detalhe = recebiveisComponentesLinha(linha, crono, prazo);
     for (let mes = 0; mes < prazo; mes++) {
       receitaBrutaMensal[mes] = round2(receitaBrutaMensal[mes] + (brutoLinha[mes] ?? 0));
       principalRecebidoMensal[mes] = round2(principalRecebidoMensal[mes]
@@ -2650,12 +2629,12 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     }
     return out;
   };
-  const vendaBrutaContratadaSerie = agregarSerie((l, c, p) => vendaBrutaContratadaMensal(l, c, p, deflatorPct));
-  const descontoComercialSerie = agregarSerie((l, c, p) => descontoComercialMensal(l, c, p, deflatorPct));
+  const vendaBrutaContratadaSerie = agregarSerie((l, c, p) => vendaBrutaContratadaMensal(l, c, p));
+  const descontoComercialSerie = agregarSerie((l, c, p) => descontoComercialMensal(l, c, p));
   const vendaLiquidaContratadaSerie = vendaBrutaContratadaSerie.map((v, mes) =>
     round2(v - (descontoComercialSerie[mes] ?? 0)));
-  const vendaBrutaContratada = round2(somaMensal((l, c, p) => vendaBrutaContratadaMensal(l, c, p, deflatorPct))); // #260 — C7
-  const descontoComercial = round2(somaMensal((l, c, p) => descontoComercialMensal(l, c, p, deflatorPct)));
+  const vendaBrutaContratada = round2(somaMensal((l, c, p) => vendaBrutaContratadaMensal(l, c, p))); // #260 — C7
+  const descontoComercial = round2(somaMensal((l, c, p) => descontoComercialMensal(l, c, p)));
   const vendaLiquidaContratada = round2(vendaBrutaContratada - descontoComercial);
   const receitaBruta = round2(receitaBrutaMensal.reduce((s, v) => s + v, 0));
 

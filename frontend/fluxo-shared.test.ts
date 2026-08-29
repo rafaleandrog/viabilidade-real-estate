@@ -80,23 +80,80 @@ test('rotuloPeriodo formata intervalo com duração (0-based)', () => {
 test('vgv de tipologia e de linha', () => {
   const t1 = { quantidade: 10, area_privativa_m2: 70, preco_m2: 10000 }; // 7.000.000
   const t2 = { quantidade: 2, area_privativa_m2: 280, preco_m2: 12000 }; // 6.720.000
-  assert.equal(vgvTipologia(t1, 0), 7_000_000);
-  assert.equal(vgvLinha([t1, t2], 0), 13_720_000);
+  assert.equal(vgvTipologia(t1), 7_000_000);
+  assert.equal(vgvLinha([t1, t2]), 13_720_000);
 });
 
-// #462: área aberta 0 (o default) reproduz EXATAMENTE o cálculo anterior —
-// nenhum estudo pré-existente muda de VGV. `area_privativa_aberta_m2`
-// ausente do objeto (campo novo, dado legado) tem de se comportar como 0.
-test('#462 regressão: área aberta 0/ausente não muda o VGV, com qualquer deflator', () => {
+// #584 (era #462): área aberta 0/ausente reproduz EXATAMENTE o cálculo
+// anterior à #462 — nenhum estudo pré-existente muda de VGV pela RETIRADA do
+// deflator. `area_privativa_aberta_m2` ausente do objeto (dado legado) tem de
+// se comportar como 0.
+test('#584 regressão: área aberta 0/ausente não muda o VGV', () => {
   const t = { quantidade: 10, area_privativa_m2: 70, preco_m2: 10000 };
   const semCampo = { ...t }; // dado legado — nunca teve a coluna
   const comZero = { ...t, area_privativa_aberta_m2: 0 };
-  assert.equal(vgvTipologia(semCampo, 0), 7_000_000);
-  assert.equal(vgvTipologia(comZero, 0), 7_000_000);
-  // O deflator não tem NENHUM efeito sem área aberta — a variação só entra
-  // pela área, nunca pelo % sozinho.
-  assert.equal(vgvTipologia(semCampo, 50), 7_000_000);
-  assert.equal(vgvTipologia(comZero, 100), 7_000_000);
+  assert.equal(vgvTipologia(semCampo), 7_000_000);
+  assert.equal(vgvTipologia(comZero), 7_000_000);
+});
+
+// #584 critério 3: o estudo com `deflator_area_aberta_pct = 0` — o PADRÃO do
+// schema, e portanto a esmagadora maioria — NÃO muda de número.
+//
+// ⚠️ **UMA FIXTURE NÃO PROVA ISTO, e a primeira versão deste teste era uma só.**
+// A fórmula antiga com deflator 0 é `fechada×preço + aberta×preço×(1−0)`. Ela e
+// a forma FATORADA `(fechada + aberta) × preço` são algebricamente iguais e
+// **numericamente diferentes**: reassociar a soma muda o último bit. Medido em
+// 400.000 insumos plausíveis (áreas e preço em `decimal(…,2)`, quantidade
+// inteira), 31% divergem em float e **0,6% ainda divergem R$ 0,01 depois do
+// `round2`** — o suficiente para violar este próprio critério, em silêncio, num
+// estudo real. A fixture 70/12/10.000 que estava aqui é justamente uma das que
+// NÃO divergem: ela teria deixado o defeito passar verde.
+//
+// Por isso a trava é uma VARREDURA contra a fórmula antiga LITERAL, não um
+// oráculo escrito à mão. Ela reprova qualquer reassociação futura de
+// `vgvUnitarioTipologia`.
+test('#584 critério 3: com deflator 0 o VGV é bit a bit idêntico ao de antes — varredura, não fixture', () => {
+  // A fórmula ANTIGA, transcrita literal de `git show 3d0fc57:frontend/fluxo-shared.ts`,
+  // com o deflator fixado em 0. É o oráculo.
+  const antiga = (t: any, deflatorPct: number) => {
+    const preco = Number(t?.preco_m2) || 0;
+    const deflator = (Number(deflatorPct) || 0) / 100;
+    return (Number(t?.quantidade) || 0)
+      * ((Number(t?.area_privativa_m2) || 0) * preco
+        + (Number(t?.area_privativa_aberta_m2) || 0) * preco * (1 - deflator));
+  };
+
+  // Varredura determinista (LCG semeado) — mesma sequência em toda máquina.
+  let s = 12345;
+  const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  const c2 = (v: number) => Math.round(v * 100) / 100; // o que decimal(…,2) guarda
+  let conferidos = 0;
+  for (let i = 0; i < 20_000; i++) {
+    const t = {
+      area_privativa_m2: c2(rnd() * 20_000),
+      area_privativa_aberta_m2: c2(rnd() * 2_000),
+      preco_m2: c2(rnd() * 30_000),
+      quantidade: 1 + Math.floor(rnd() * 500),
+    };
+    // IGUALDADE ESTRITA, não `perto`: o critério é "nenhum número muda", e um
+    // épsilon aqui esconderia exatamente o centavo que este teste caça.
+    assert.equal(vgvTipologia(t), antiga(t, 0), `divergiu em ${JSON.stringify(t)}`);
+    conferidos += 1;
+  }
+  assert.equal(conferidos, 20_000);
+
+  // E o caso concreto que a forma fatorada errava por R$ 0,01 depois do round2:
+  const armadilha = {
+    quantidade: 485, area_privativa_m2: 904.09, area_privativa_aberta_m2: 1522.1, preco_m2: 6266.9,
+  };
+  assert.equal(round2(vgvTipologia(armadilha)), 7_374_274_703.83);
+  assert.notEqual(round2(vgvTipologia(armadilha)), 7_374_274_703.84); // o que `(f+a)×p` daria
+
+  // A fixture original continua, como leitura humana do que a fórmula faz:
+  //   10 × (70×10.000 + 12×10.000) = 10 × 820.000 = 8.200.000
+  const simples = { quantidade: 10, area_privativa_m2: 70, area_privativa_aberta_m2: 12, preco_m2: 10000 };
+  assert.equal(vgvTipologia(simples), 8_200_000);
+  assert.equal(vgvLinha([simples]), 8_200_000);
 });
 
 // #462: dois testes de precisão que provam coisas DIFERENTES (decisão 4 do
@@ -112,35 +169,45 @@ test('#462 regressão: área aberta 0/ausente não muda o VGV, com qualquer defl
 //    valores são exatos nas próprias entradas.
 const round2 = (v: number): number => Math.round((v + Number.EPSILON) * 100) / 100;
 
-test('#462 preço efetivo/VGV — formula: áreas cheias da EVI reproduzem F6/F20', () => {
+test('#584 preço efetivo/VGV — formula: áreas cheias da EVI, agora SEM o deflator (diverge de F20 de propósito)', () => {
   const t = {
     quantidade: 1,
     area_privativa_m2: 17530.94390649873,       // fechada — infoAreaPrivativaResidencialFechada
     area_privativa_aberta_m2: 907.466126361201, // aberta — infoAreaPrivativaResidencialAberta
     preco_m2: 9500,                             // PrecoTabelaResidencial
   };
-  const deflatorPct = 50; // PrecoAreasAbertasDeflator
-  const vgv = vgvTipologia(t, deflatorPct);
-  assert.equal(round2(vgv), 170854431.21); // Areas e Precos!F20
+  const vgv = vgvTipologia(t);
+  // ⚠️ DIVERGÊNCIA DELIBERADA da EVI, e ela é o pedido da #584. Com o
+  // `PrecoAreasAbertasDeflator = 50%` da planilha, o app dava 170.854.431,21
+  // (`Areas e Precos!F20`). Retirado o deflator, a área aberta vale preço
+  // cheio e o mesmo insumo dá 175.164.895,31 — R$ 4.310.464,10 acima de F20
+  // (+2,5229%). O oráculo F20 deixa de valer para esta fórmula; o que este
+  // teste trava agora é a fórmula NOVA sobre o MESMO insumo da EVI.
+  assert.equal(round2(vgv), 175164895.31);
+  // `round2` na SUBTRAÇÃO, não só nas parcelas: a diferença de dois valores
+  // já arredondados ainda carrega resíduo binário (4310464.099999994).
+  assert.equal(round2(round2(vgv) - 170854431.21), 4310464.10); // o degrau, com número
   const precoMedio = vgv / (t.area_privativa_m2 + t.area_privativa_aberta_m2);
-  // Preço médio: representação derivada não monetária (R$/m²) — precisão
-  // plena, arredonda só para exibir (contrato do CLAUDE.md § Contratos).
-  assert.equal(precoMedio, 9266.223655264535); // Areas e Precos!F6
+  // Sem deflator, o preço médio ponderado COLAPSA no preço de tabela: as duas
+  // áreas valem o mesmo por m². Era 9.266,223655264535 (`Areas e Precos!F6`).
+  assert.equal(precoMedio, 9500);
 });
 
-test('#462 preço efetivo/VGV — persistivel: na precisão de decimal(…,2), R$ 18,71 abaixo da planilha', () => {
+test('#584 preço efetivo/VGV — persistivel: na precisão de decimal(…,2), R$ 0,31 abaixo da fórmula', () => {
   const t = {
     quantidade: 1,
     area_privativa_m2: 17530.94,       // o que decimal(10,2) guarda de 17.530,94390649873
     area_privativa_aberta_m2: 907.47,  // o que decimal(10,2) guarda de 907,466126361201
     preco_m2: 9500,
   };
-  const vgv = vgvTipologia(t, 50);
-  assert.equal(round2(vgv), 170854412.50);
-  // O delta é EXATAMENTE R$ 18,71 (o corpo da issue #462 dizia "R$ 19"; o
-  // valor conferido é 18,71) — arredondamento das áreas, não folga de
-  // tolerância. As duas entradas são exatas; nada de épsilon largo.
-  assert.equal(round2(170854431.21 - round2(vgv)), 18.71);
+  const vgv = vgvTipologia(t);
+  assert.equal(round2(vgv), 175164895.00);
+  // O delta contra a fórmula em precisão plena (175.164.895,31) é EXATAMENTE
+  // R$ 0,31 — arredondamento das áreas por `decimal(…,2)`, não folga de
+  // tolerância. As duas entradas são exatas; nada de épsilon largo. Era
+  // R$ 18,71 quando o deflator existia: metade do degrau da área aberta ia
+  // embora junto com ele.
+  assert.equal(round2(175164895.31 - round2(vgv)), 0.31);
 });
 
 // #228/#346: receitaLiquidaLinha substitui vglLinha — RET é o único imposto
@@ -339,7 +406,7 @@ test('vgvVendidoBrutoMensal reparte o VGV de cada linha pela sua absorção (#12
       absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 50 }, { mes: 20, pct: 50 }] },
     },
   ];
-  const r = vgvVendidoBrutoMensal(linhas, CRONO, 60, 0);
+  const r = vgvVendidoBrutoMensal(linhas, CRONO, 60);
   assert.equal(r.length, 60);
   assert.ok(perto(r.reduce((s, x) => s + x, 0), 70_000_000));
   assert.ok(perto(r[12], 50_000_000 + 10_000_000));
@@ -360,8 +427,8 @@ test('vgvVendidoVendavelMensal exclui a fatia de permuta física (#473)', () => 
       absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 50 }, { mes: 20, pct: 50 }] },
     },
   ];
-  const bruto = vgvVendidoBrutoMensal(linhas, CRONO, 60, 0);
-  const vendavel = vgvVendidoVendavelMensal(linhas, CRONO, 60, 0);
+  const bruto = vgvVendidoBrutoMensal(linhas, CRONO, 60);
+  const vendavel = vgvVendidoVendavelMensal(linhas, CRONO, 60);
   assert.ok(perto(bruto.reduce((s, x) => s + x, 0), 70_000_000));
   assert.ok(perto(vendavel.reduce((s, x) => s + x, 0), 55_000_000)); // 35M + 20M
   // Mutação: a diferença entre as duas é EXATAMENTE o VGV permutado (15M),

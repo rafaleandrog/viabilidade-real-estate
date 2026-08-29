@@ -195,51 +195,63 @@ export interface EventoCrono {
 const n = (v: any): number => Number(v) || 0;
 
 /**
- * #462: preço efetivo (R$/unidade) de uma tipologia, ponderando a área
- * FECHADA (preço cheio) e a área ABERTA (preço cheio × (1 − deflator)) —
- * `(fechada × preço + aberta × preço × (1 − deflator))`, a mesma fórmula da
- * EVI (`Areas e Precos!F20`, antes da divisão por `F14`). `deflatorPct` é o
- * `estudos.deflator_area_aberta_pct` (% inteiro digitado); área aberta
- * ausente/0 reproduz exatamente `area_privativa_m2 × preco_m2` — nenhum
- * estudo pré-existente muda de VGV.
+ * Preço efetivo (R$/unidade) de uma tipologia: a área FECHADA e a área ABERTA
+ * valem as duas o preço CHEIO — `fechada × preço + aberta × preço`.
+ *
+ * #584 (decisão do autor): o deflator de preço da área aberta, introduzido
+ * pela #462 (`estudos.deflator_area_aberta_pct`), foi RETIRADO. Não ficou
+ * parâmetro fantasma nesta cadeia — nenhuma função abaixo recebe mais um
+ * deflator, e a coluna sobrevive apenas no `schema.json`, sem leitor
+ * (caminho A da #584). Área aberta ausente/0 continua reproduzindo
+ * exatamente `area_privativa_m2 × preco_m2`.
+ *
+ * ⚠️ **A ASSOCIAÇÃO É DELIBERADA — não "simplifique" para `(fechada + aberta) × preço`.**
+ * A forma antiga era `fechada × preço + aberta × preço × (1 − deflator)`, e com
+ * `deflator = 0` (o padrão do schema, e a esmagadora maioria dos estudos) ela é
+ * `fechada × preço + aberta × preço` — **bit a bit**, porque `1 − 0 === 1` e
+ * `x * 1 === x` são exatos em IEEE-754. Fatorar o preço **reassocia** a soma e
+ * muda o último bit: medido em 400.000 insumos plausíveis, 31% divergem em
+ * float e **0,6% ainda divergem R$ 0,01 DEPOIS do `round2`** (ex.: fechada
+ * 904,09 m², aberta 1.522,10 m², R$ 6.266,90/m², 485 un. → 7.374.274.703,83
+ * pela forma preservada, 7.374.274.703,84 pela fatorada). Isso violaria o
+ * critério 3 da #584 — "nenhum número muda em estudo com deflator 0". A trava
+ * é `#584 critério 3` em `frontend/fluxo-shared.test.ts`, que compara contra a
+ * fórmula ANTIGA literal ao longo de uma varredura, não contra uma fixture só.
  */
-function vgvUnitarioTipologia(t: any, deflatorPct: number): number {
+function vgvUnitarioTipologia(t: any): number {
   const preco = n(t?.preco_m2);
-  const deflator = n(deflatorPct) / 100;
-  return n(t?.area_privativa_m2) * preco + n(t?.area_privativa_aberta_m2) * preco * (1 - deflator);
+  return n(t?.area_privativa_m2) * preco + n(t?.area_privativa_aberta_m2) * preco;
 }
 
-/** VGV de uma tipologia: quantidade × preço efetivo (fechada + aberta com
- * deflator, #462). `deflatorPct` é OBRIGATÓRIO — omiti-lo vira TS2554, não
- * silêncio (a mutação de fiação provou que um parâmetro opcional aqui deixa
- * a suíte inteira verde mesmo sem o wiring do deflator). */
-export function vgvTipologia(t: any, deflatorPct: number): number {
-  return n(t?.quantidade) * vgvUnitarioTipologia(t, deflatorPct);
+/** VGV de uma tipologia: quantidade × preço efetivo (fechada + aberta, as
+ * duas a preço cheio — #584 retirou o deflator da #462). */
+export function vgvTipologia(t: any): number {
+  return n(t?.quantidade) * vgvUnitarioTipologia(t);
 }
 
 /** VGV de uma linha de receita (soma das tipologias). */
-export function vgvLinha(tipologias: any[], deflatorPct: number): number {
-  return (tipologias ?? []).reduce((s, t) => s + vgvTipologia(t, deflatorPct), 0);
+export function vgvLinha(tipologias: any[]): number {
+  return (tipologias ?? []).reduce((s, t) => s + vgvTipologia(t), 0);
 }
 
 /**
  * VGV atribuído às unidades permutadas (fisicamente) de uma tipologia — #188.
  * `unidades_permutadas` é um SUBCONJUNTO de `quantidade` (não soma além dela);
- * daí o `Math.min`. #462: valorada ao mesmo preço efetivo ponderado que
- * `vgvTipologia` — é o que a EVI faz (`F26 = F18 × PrecoMedioResidencial`).
+ * daí o `Math.min`. Valorada ao mesmo preço efetivo que `vgvTipologia` — é o
+ * que a EVI faz (`F26 = F18 × PrecoMedioResidencial`).
  */
-export function vgvPermutaFisicaTipologia(t: any, deflatorPct: number, unidadesPermutadas?: number): number {
+export function vgvPermutaFisicaTipologia(t: any, unidadesPermutadas?: number): number {
   const qtd = n(t?.quantidade);
   // A fonte nova é a reserva da linha de Custos (#266/#268). O campo legado
   // permanece como fallback apenas para consumidores antigos desta função.
   const solicitadas = unidadesPermutadas === undefined ? n(t?.unidades_permutadas) : n(unidadesPermutadas);
   const permutadas = Math.min(Math.max(0, solicitadas), qtd);
-  return permutadas * vgvUnitarioTipologia(t, deflatorPct);
+  return permutadas * vgvUnitarioTipologia(t);
 }
 
 /** VGV de permuta física de uma linha de receita (soma das tipologias). */
-export function vgvPermutaFisicaLinha(tipologias: any[], deflatorPct: number): number {
-  return (tipologias ?? []).reduce((s, t) => s + vgvPermutaFisicaTipologia(t, deflatorPct), 0);
+export function vgvPermutaFisicaLinha(tipologias: any[]): number {
+  return (tipologias ?? []).reduce((s, t) => s + vgvPermutaFisicaTipologia(t), 0);
 }
 
 /**
@@ -249,13 +261,13 @@ export function vgvPermutaFisicaLinha(tipologias: any[], deflatorPct: number): n
  * a base usada por `receitaMensalLinha` para a absorção de vendas — `vgvTotal`
  * (KPI informativo, #188) continua contando a tipologia inteira.
  */
-export function vgvVendavelTipologia(t: any, deflatorPct: number, unidadesPermutadas?: number): number {
-  return vgvTipologia(t, deflatorPct) - vgvPermutaFisicaTipologia(t, deflatorPct, unidadesPermutadas);
+export function vgvVendavelTipologia(t: any, unidadesPermutadas?: number): number {
+  return vgvTipologia(t) - vgvPermutaFisicaTipologia(t, unidadesPermutadas);
 }
 
 /** VGV vendável de uma linha de receita (soma das tipologias). */
-export function vgvVendavelLinha(tipologias: any[], deflatorPct: number): number {
-  return (tipologias ?? []).reduce((s, t) => s + vgvVendavelTipologia(t, deflatorPct), 0);
+export function vgvVendavelLinha(tipologias: any[]): number {
+  return (tipologias ?? []).reduce((s, t) => s + vgvVendavelTipologia(t), 0);
 }
 
 // #457: livro de estoque em m²/unidades — espelham EXATAMENTE o padrão dos
@@ -625,10 +637,6 @@ export interface ContextoCusto {
    * estudo (`estudos.corretagem_sobre_permuta_fisica`), só no Avançado.
    */
   corretagemSobrePermutaFisica?: boolean;
-  /** #462: deflator de preço da área aberta — mesmo valor de
-   * `FluxoConfig.deflatorAreaAbertaPct`, aqui só para `corretagemMensal`
-   * não precisar de um parâmetro novo (já recebe `ctx` inteiro). */
-  deflatorAreaAbertaPct?: number;
 }
 
 /** Área privativa total ((área fechada + área aberta) × quantidade) de todas
@@ -1005,12 +1013,11 @@ function vgvVendidoMensalPor(
   linhasReceita: any[],
   crono: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
-  vgvDaLinha: (tipologias: any[], deflatorPct: number) => number,
+  vgvDaLinha: (tipologias: any[]) => number,
 ): number[] {
   const saida = new Array<number>(Math.max(prazoTotal, 0)).fill(0);
   for (const l of linhasReceita ?? []) {
-    const vgv = vgvDaLinha(l?.tipologias ?? [], deflatorPct);
+    const vgv = vgvDaLinha(l?.tipologias ?? []);
     if (vgv <= 0) continue;
     const abs = absorcaoMensal(l?.absorcao ?? { modo: 'linear' }, crono);
     if (!abs) continue;
@@ -1032,9 +1039,8 @@ export function vgvVendidoBrutoMensal(
   linhasReceita: any[],
   crono: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
 ): number[] {
-  return vgvVendidoMensalPor(linhasReceita, crono, prazoTotal, deflatorPct, vgvLinha);
+  return vgvVendidoMensalPor(linhasReceita, crono, prazoTotal, vgvLinha);
 }
 
 /**
@@ -1047,9 +1053,8 @@ export function vgvVendidoVendavelMensal(
   linhasReceita: any[],
   crono: EventoCrono[],
   prazoTotal: number,
-  deflatorPct: number,
 ): number[] {
-  return vgvVendidoMensalPor(linhasReceita, crono, prazoTotal, deflatorPct, vgvVendavelLinha);
+  return vgvVendidoMensalPor(linhasReceita, crono, prazoTotal, vgvVendavelLinha);
 }
 
 /**

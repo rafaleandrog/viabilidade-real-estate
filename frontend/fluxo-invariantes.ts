@@ -157,14 +157,13 @@ export function validarContratacao(
   vendaBrutaEncontrada: number,
   tol: number = TOLERANCIA_PADRAO,
   linhasCusto: any[], // #444: OBRIGATÓRIO — omitir vira TS2554, não silêncio (a mutação de fiação provou que um parâmetro opcional aqui deixa a suíte inteira verde mesmo sem o wiring)
-  deflatorPct: number, // #462: OBRIGATÓRIO, mesma razão do parâmetro acima — omiti-lo vira TS2554
 ): Divergencia[] {
   const linhas = linhasCusto.length > 0
-    ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto, deflatorPct)
+    ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto)
     : linhasReceita;
   let esperado = 0;
   for (const linha of linhas) {
-    const vgv = vgvVendavelLinha(linha.tipologias ?? [], deflatorPct);
+    const vgv = vgvVendavelLinha(linha.tipologias ?? []);
     const abs = absorcaoMensal(linha.absorcao ?? { modo: 'linear' }, cronograma);
     if (!abs) continue;
     const pctNoHorizonte = abs.pcts.reduce((s, pct, i) => {
@@ -190,17 +189,16 @@ export function validarSafrasReceita(
   prazo: number,
   tol: number = TOLERANCIA_PADRAO,
   linhasCusto: any[], // #444: OBRIGATÓRIO — omitir vira TS2554, não silêncio (a mutação de fiação provou que um parâmetro opcional aqui deixa a suíte inteira verde mesmo sem o wiring)
-  deflatorPct: number, // #462: OBRIGATÓRIO, mesma razão do parâmetro acima — omiti-lo vira TS2554
 ): Divergencia[] {
   const out: Divergencia[] = [];
   const linhas = linhasCusto.length > 0
-    ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto, deflatorPct)
+    ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto)
     : linhasReceita;
   const obra = cronograma.find((e) => e.evento === 'obra');
   const mesEntrega = obra ? Number(obra.inicio_mes) + Number(obra.duracao_meses) - 1 : 0;
   for (const linha of linhas) {
     const componentes = componentesPagamento(linha.fluxo_pagamento, cronograma);
-    const contratacoes = vendaLiquidaContratadaMensal(linha, cronograma, prazo, deflatorPct);
+    const contratacoes = vendaLiquidaContratadaMensal(linha, cronograma, prazo);
     // #444: mesma regra do motor para o `ate_marco` degenerado (N_s ≤ 0) —
     // `componentesIntegradosSafra` converte para `imediato`, exatamente como
     // `calcularFluxo` faz (`residuoAteMarco` vive em
