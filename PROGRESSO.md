@@ -27,6 +27,44 @@ PR toca.
 Mutação: reverter qualquer uma das 3 correções (`-solida` → sem sufixo) derruba o teste novo.
 
 Validação: `bash scripts/validar-frontend.sh` verde — 956 testes, 68 casos de render.
+## #634 · paginação de linhas de custo >500 truncava a duplicação de estudo em silêncio (2026-08-29)
+
+`duplicarDadosAvancado` (`backend/rotas/avancado.ts`) lia `avancado_linhas_custo` com
+`listar(..., por_pagina: 500)` — pelo backend, `por_pagina` é obedecido como escrito, sem teto de
+framework. Um estudo com mais de 500 linhas de custo tinha só as 500 primeiras copiadas na
+duplicação, em silêncio: o Orçamento de Custos da cópia nascia incompleto, e `mapaCusto` (que
+remapeia `custo_linha_ids` das operações de funding) cobria só as 500 lidas — uma operação cujo
+`custo_linha_ids` incluísse uma linha além da página 1 a tratava como órfã e a descartava, mesmo a
+linha existindo no original.
+
+**Conserto:** as seis leituras de `duplicarDadosAvancado` sujeitas ao mesmo teto implícito
+(tipologias, fases, alocações, linhas de custo, operações de funding, cenários) trocaram
+`listar(..., por_pagina: N)` por `varrerTudo(...)` — o verbo da plataforma para "todas as linhas,
+custe o que custar o tamanho da tabela" (`docs/shell/banco-de-dados.md` § "varrerTudo", disponível
+desde shell 0.53.8, que já era o `shell_min` deste app — nenhum bump de piso, sem migração,
+`versao` não bumpa). `avancado_cronograma` (sempre 5 eventos fixos) ficou como `listar` — não é
+vulnerável, não há "página 2" possível.
+
+**Varredura do padrão:** `estudo_imoveis` e `preliminar_produtos` (copiados por
+`POST /estudos/:id/duplicar` em `estudos.ts`) têm a MESMA classe de defeito (`por_pagina` fixo,
+100 e 500 respectivamente) mas baixa probabilidade prática, e tocar `FILHAS_SIMPLES` intersecta
+testes estruturais já existentes (`estudos.test.ts`) — declarado como fora de escopo desta issue,
+não escondido. `estudo_documentos`/`apelo_comercial_documentos` e `estudo_membros` NÃO são o mesmo
+defeito: já são deliberadamente excluídos da cópia, com o motivo documentado no próprio código
+(`estudos.ts:213-223`) — decisões do autor, não bugs.
+
+**Prova de fiação de ponta a ponta** (`backend/rotas/estudos-duplicar-rota.test.ts`): Express real,
+`rotasEstudos` montada como o shell monta, `POST /estudos/:id/duplicar` HTTP de verdade contra um
+fake de `req.dados` cujo `varrerTudo` é um laço GENUÍNO de páginas sobre `listar` (que por sua vez
+obedece `por_pagina` como o backend real) — 501 linhas de custo seedadas em memória (sem I/O de
+rede), provando (a) a cópia tem as 501 linhas e (b) a operação de funding preserva `custo_linha_ids`
+remapeado para a linha 501ª. Confirmado por mutação: revertendo os 6 `varrerTudo` para
+`listar(..., por_pagina: N)`, o teste de 501 linhas fica vermelho; um teste de controle com 3
+linhas confirma que a duplicação pequena sempre funcionou.
+
+Sem migração → a `versao` não bumpa. `validar-backend.sh` não roda nesta sessão (401 do SDK, etapa
+1/5) — testes de backend executados diretamente via `tsx` (170/170 verdes); typecheck do backend
+fica pendente do autor no ambiente autenticado.
 ## ROI geral + retorno por parte na Análise Financeira — #594 (2026-08-29)
 
 Rodada 10, item A10-15. O pedido do autor: *"Acrescentar em Análise Financeira ROI e divisão para ver
