@@ -43,10 +43,12 @@ lente de **transbordo do `.input-wrap`**, e o `td` do fixture ganhou o `font-siz
 o script passou a **enxergar** o bug (`--largura …max-width:18ch` ⇒ 4 campos, 12px por fora) e a
 passar limpo com o conserto.
 
-**Verificação.** `bash scripts/validar-frontend.sh` verde — 842 testes de frontend e **58** casos de
-render (baseline da `main`: 56). Mutação com controle antes e depois: `24ch` → `18ch` deixa o caso
-novo **vermelho com 66 achados** de `transbordoDeCaixa` (22 por largura, 3 larguras), e o controle
-volta verde ao desfazer. Sem migração → **a `versao` não bumpa**.
+**Verificação.** `bash scripts/validar-frontend.sh` verde — 871 testes de frontend e **59** casos de
+render (baseline da `main` em `3c0a1a9`: 871 e 57; o PR não acrescenta teste unitário, só render).
+Mutação com controle antes e depois: `24ch` → `18ch` deixa o caso novo **vermelho com 66 achados**
+de `transbordoDeCaixa` (22 por largura, 3 larguras; `scrollWidth` 139–148px contra `clientWidth`
+128px), e o controle volta verde ao desfazer. O **piso foi varrido**, não estimado: 18ch e 20ch
+vermelhos, 21ch e 22ch limpos. Sem migração → **a `versao` não bumpa**.
 
 > ⚠️ **O `transbordoDeTexto` de um `<text>` do gantt em 1280px é ANTERIOR e alheio** — medido igual
 > antes e depois do conserto. Por isso o teste assevera zero em `transbordoDeCaixa` (a lente
