@@ -92,7 +92,6 @@ export class ViabFluxoReceitas extends LitElement {
   private _avisadoRamoLegado = new Set<any>();
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
-    .ret-box { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .cards { display: flex; flex-direction: column; gap: 16px; }
     .card-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
     .card-cab urbi-input.nome { width: 200px; }
