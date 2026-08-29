@@ -137,6 +137,31 @@ export class ViabFluxoVer extends LitElement {
     .graficos { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
     .graf svg { display: block; width: 100%; height: auto; min-width: 560px; }
     .graf-wrap { overflow-x: auto; }
+    /* #632 — mesmo diagnóstico da #595 (frontend/tela-cenarios.ts): a cor de
+       cada série do gráfico "Contratação, Receita Bruta, Carteira e Repasse"
+       sai DAQUI, e não de uma chave "cor" dentro do dado (ver o comentário de
+       seriesEconomicasFluxo, frontend/fluxo-graficos.ts). As quatro custom
+       properties abaixo são as que o espelho declara no :host de
+       UrbiGraficoBase, na mesma ORDEM em que seriesEconomicasFluxo devolve as
+       séries — --urbi-grafico-cor-1 é a 1ª ("Venda líquida contratada"), e
+       assim por diante.
+       --cor-primaria é um GRADIENTE nas 4 variantes de tema do espelho —
+       inválido em contexto de cor de série (IACVT / atributo descartado), a
+       mesma falha silenciosa que esta issue diagnostica.
+       ⚠️ achado do Codex (rodada 1, PR 651): a variante SÓLIDA
+       (--cor-primaria-solida) resolve para o MESMO hex que --cor-info nas 3
+       primeiras variantes de tema (#2AA9E0/#0D75A9/#14688F) — a 1ª e a 3ª
+       série ficariam com a mesma cor em 3 dos 4 temas. --cor-categoria-1 é um
+       dos 8 tokens que o espelho já expõe para series de gráfico (é o próprio
+       DEFAULT de --urbi-grafico-cor-1 no :host de UrbiGraficoBase), e não
+       colide com --cor-sucesso/--cor-info/--cor-alerta em NENHUMA variante —
+       ver o teste de distinção em frontend/fluxo-economico-series.test.ts. */
+    .graf urbi-grafico-linha {
+      --urbi-grafico-cor-1: var(--cor-categoria-1, #6ca1ff);
+      --urbi-grafico-cor-2: var(--cor-sucesso, #13a98d);
+      --urbi-grafico-cor-3: var(--cor-info, #3b82f6);
+      --urbi-grafico-cor-4: var(--cor-alerta, #d59b2d);
+    }
 
     /* #351: tabela da Proforma e do quadro Livre × real — poucas linhas, sem
        sticky nem scroll horizontal (não é a tabela mensal do fluxo). */
