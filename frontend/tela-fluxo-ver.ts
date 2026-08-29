@@ -4,7 +4,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef } from './viab-format.js';
 import {
   proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi,
   type LinhaProformaAv,
@@ -354,7 +354,11 @@ export class ViabFluxoVer extends LitElement {
     // #427 — % VGV de toda linha usa o VGV puro, EXCETO os fechos cujo
     // `pctOverride` já veio calculado com a base própria (`= Resultado +
     // Permutas` soma a permuta física ao denominador — ver proforma-avancado.ts).
-    const pctVgv = (v: number) => (p.vgv > 0 ? (v / p.vgv) * 100 : 0);
+    //
+    // #604 — com VGV ≤ 0 devolve `null`, não 0: a coluna imprime "—" via
+    // `fmtPctOuIndef`, porque um percentual sem denominador não foi medido.
+    // Mesmo mecanismo que a #571 levou ao Preliminar.
+    const pctVgv = (v: number): number | null => (p.vgv > 0 ? (v / p.vgv) * 100 : null);
     return html`
       <urbi-card titulo="Proforma">
         <table class="proforma">
@@ -372,12 +376,34 @@ export class ViabFluxoVer extends LitElement {
                 <td>${l.nome}${l.notaBase ? html` <span class="nota-base">(${l.notaBase})</span>` : ''}</td>
                 <td class="num ${sinal}">${fmtR$(l.valor)}</td>
                 <td class="num ${sinal}">${fmtNum(porM2(l.valor))}</td>
-                <td class="num ${sinal}">${fmtPct(l.pctOverride ?? pctVgv(l.valor))}</td>
+                <td class="num ${sinal}">${fmtPctOuIndef(
+                  // ⚠️ #604 — `!== undefined`, e NÃO `??`, porque `null` aqui
+                  // significa "base própria inválida", não "sem override": o
+                  // `??` cairia no VGV puro e publicaria um número com o
+                  // denominador errado.
+                  //
+                  // ⚠️ E A HONESTIDADE SOBRE O ALCANCE: hoje essa troca é
+                  // **inobservável**, e isso está MEDIDO — reverter para `??`
+                  // deixa a suíte inteira verde. O motivo é estrutural: as três
+                  // bases de `pctOverride` derivam de `receitaBruta`
+                  // (`baseComPermutaFisica = receitaBruta + vgvPermutaFisica`,
+                  // com a permuta ≥ 0) e `p.vgv` É `receitaBruta` — então
+                  // `pctOverride === null` IMPLICA `pctVgv(...) === null`, e os
+                  // dois operadores dão o mesmo resultado.
+                  //
+                  // Fica assim mesmo: é o contrato de três estados que torna
+                  // seguro existir `pctOverride: null`, e ele passa a morder no
+                  // dia em que alguma linha ganhar base própria independente do
+                  // VGV. Trocar de volta seria escrever uma armadilha para essa
+                  // linha futura. Não é conserto de defeito vivo — é guarda, e
+                  // está declarada como tal em vez de contada como entrega.
+                  l.pctOverride !== undefined ? l.pctOverride : pctVgv(l.valor),
+                )}</td>
               </tr>`;
             })}
           </tbody>
         </table>
-        <p class="sec">Área privativa: ${fmtNum(p.areaPrivativa)} m² · Margem sobre Receita Bruta: ${fmtPct(p.margemPct)}.
+        <p class="sec">Área privativa: ${fmtNum(p.areaPrivativa)} m² · Margem sobre Receita Bruta: ${fmtPctOuIndef(p.margemPct)}.
           A coluna "Margem" do Painel de estudos usa esta mesma linha — "= Resultado", sem permutas
           (para a linha do Avançado; ver o atributo "title" da célula no Painel — #443).
           Esta proforma é desalavancada: nenhuma ponta do funding entra aqui — nem liberações e aportes
