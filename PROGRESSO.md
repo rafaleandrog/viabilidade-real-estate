@@ -4,6 +4,96 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #593 · cor por natureza de linha na Proforma do Avançado (2026-08-29)
+
+Item 14 da leva Avançado da Rodada 10. Pedido do autor, literal: *"Modificar tela do proforma para
+deixar com as cores que diferenciam os itens de cada linha — mesmo princípio que já acontece no
+estudo Preliminar"*.
+
+**O diagnóstico da issue estava certo, e é o tipo de defeito que não fica vermelho em lugar
+nenhum:** as classes de natureza (`receita`, `custo`, `resultado`, `informativo`, mais `n0`/`n1`)
+**já chegavam ao DOM** — `tela-fluxo-ver.ts` sempre montou `<tr class="n${nivel} ${tipo}">`. O que
+não existia eram as REGRAS: no bloco `table.proforma` não havia `tr.receita` nem `tr.custo`, as duas
+classes mais numerosas da tabela. Elas chegavam e não pintavam nada.
+
+**A cópia é literal, e isso é a defesa.** As declarações novas são as MESMAS de
+`frontend/tela-proforma.ts` (o Preliminar) — mesmos tokens, mesmas proporções de `color-mix`,
+mesmos fallbacks —, e `frontend/proforma-cores.test.ts` **confronta os dois arquivos entre si**, par
+de regras a par de regras. Comparar contra uma constante escrita no teste deixaria passar
+exatamente o defeito que se quer barrar: a constante teria de ser copiada de um dos lados, e a
+partir daí os três podem divergir sem nada acusar. É a mesma razão de `proforma-ordem-linhas.test.ts`
+comparar tela × exportação.
+
+**A única lógica nova é o sinal.** `sinalLinhaProformaAv` (`frontend/tela-fluxo-ver.ts`) espelha
+`sinalSensibilidade`/`ehLinhaReceitaOuResultado` do Preliminar (decisão da #567): só receita e
+resultado ganham `pos`/`neg`; custo e informativo, nunca — na Proforma do Avançado o custo é
+negativo por construção, e marcá-lo de vermelho diria que o estado normal está errado. O teste
+confronta as duas funções valor a valor, em vez de reafirmar a regra.
+
+**As duas camadas de verificação são complementares, e nenhuma sozinha basta.** Apagar o CSS deixa o
+teste de comparação vermelho e o caso de render VERDE; apagar a fiação (`class="num ${sinal}"`)
+deixa o caso de render vermelho e o teste de comparação VERDE. O caso
+`frontend/render/casos/proforma-avancada-cores.ts` é deficitário de propósito, para que `pos` e
+`neg` apareçam no mesmo caso — receita positiva, resultado negativo, como o
+`proforma-deficitaria.ts` do Preliminar.
+
+**Duas decisões de desenho ficaram declaradas no PR, não escondidas:** o `tipo` do Avançado não
+distingue "receita bruta" de "receita consolidada" (o Preliminar pinta a primeira de azul e a
+segunda de verde), então as duas linhas de receita saem verdes — separar exigiria um campo novo em
+`proforma-avancado.ts`, que o critério 4 proíbe tocar; e o fundo vermelho a 8% das linhas `(-)` vem
+da tabela de sensibilidade do Preliminar, porque a tabela PRINCIPAL dele não tinta despesa —
+não havia um "mesmo" a copiar, e o mapeamento da issue escolheu essa origem.
+
+Sem migração, `versao` não bumpa: é CSS mais uma classe de apresentação. Nenhum número muda —
+`proforma-avancado.ts` não foi tocado.
+
+### Rodada 2 da revisão — a SEGUNDA `table.proforma` estava sem sinal (achado P2 do Codex)
+
+O motor adversarial achou o que a rodada 1 não tinha como achar: `tela-fluxo-ver.ts` tem **duas**
+`<table class="proforma">`, e as regras novas foram escritas com o seletor `table.proforma …`, que
+alcança as duas. A fiação (`class="num ${sinal}"`), porém, entrou só em `_renderProforma`. A
+segunda tabela — a da aba **Análise Financeira** (`_renderAnaliseFinanceira`, `vista: 'analise'`) —
+tinha as três células como `<td class="num">`, sem classe de sinal.
+
+**Consequência, e ela é regressão introduzida por este diff:** num estudo com Fluxo de Caixa Livre
+**negativo**, a linha "Fluxo de Caixa Livre" passava a ser pintada de **verde**, porque
+`table.proforma tr.receita td` casa e o override `td.neg` nunca era aplicado. Antes deste PR não
+havia regra nenhuma alcançando aquela tabela; depois dele, havia — e a metade `neg` do par ficou
+para trás.
+
+O conserto é a mesma função nas três células, com o mesmo mapeamento do Preliminar (#567):
+`livre` como `receita`, `real` como `resultado`, e a linha do efeito do funding como `custo`, isto
+é, **sem sinal de propósito** — ali o negativo é o estado normal.
+
+**A causa raiz não era o cálculo, era a AUSÊNCIA de caso de render.** Na base deste PR, `vista:
+'analise'` não aparecia em caso NENHUM — os três que fixam a prop fixavam `'proforma'` ou
+`'fluxo-caixa'` (`git grep -n "vista:" <base> -- frontend/render/casos/`). Enquanto a aba não for
+montada por algum caso, defeito de fiação nela é invisível para a suíte inteira. Daí a defesa ser um caso novo,
+`frontend/render/casos/analise-financeira-sinal.ts` (estudo deficitário **com** funding, para que
+`livre` e `real` saiam os dois negativos), e não mais um teste de `sinalLinhaProformaAv` — a função
+já estava correta e verde o tempo todo, com a chamada ausente.
+
+**Verificação.** `scripts/validar-frontend.sh` verde nas 8 etapas, medido **depois** do merge de
+sincronização com a `main`: **890** testes de lógica pura e **65** casos de render. Este PR não
+acrescentou teste de lógica pura nenhum ao conserto, e isso está certo pelo mesmo motivo de sempre:
+o defeito morava na fiação, e teste de função pura não a alcança.
+
+**Prova de mutação, com controle verde antes e depois:** apagar `${sinal…}` das três células novas
+de `_renderAnaliseFinanceira` (voltando a `class="num"`) → **os dois testes do caso
+`analise-financeira-sinal` ficam vermelhos e nenhum outro**, rejeitados pelo `exigir` em
+`tr.n0.receita td.neg` e `tr.n0.resultado td.neg`. É essa segunda metade — nenhum outro caso muda de
+cor — que mostra que a medição é DESTE caso, e não de carona num vizinho.
+
+Duas honestidades sobre o alcance dela. **A célula do funding não é medida por essa mutação**, e não
+tem como ser: `sinalLinhaProformaAv({ tipo: 'custo', … })` devolve `''` sempre, então apagar
+`${sinalFunding}` produz exatamente o mesmo DOM. Ela está ali para o mapeamento ficar explícito e
+greppável junto das outras duas, não porque um teste a segure — e o desfecho correto daquela linha é
+justamente *não* ter classe. E a aritmética das três linhas foi conferida à parte, porque agora ela
+é o que a cor afirma: na fixture do caso, `livre` = −219.202.399,98, `−custoFunding` = −1.053.567,77
+e `real` = −220.255.967,75, com `livre − custoFunding == real`. Os dois `td.neg` são exercitados por
+valores de verdade, não por um caso de borda de arredondamento.
+
+---
 ## Eficiência de aproveitamento vira indicador: medidor no benchmark e métrica na Proforma (2026-08-29)
 
 Issue **#613** (Rodada 10, achado 8 da auditoria #574). **Decisão do autor (2026-08-28), verbatim:**
