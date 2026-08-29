@@ -119,10 +119,21 @@ test('#589: selecionar Custos no menu leva o SLUG público para a URL, não o id
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// Critério 3 — a aba default não vira a 1ª posição do array por acidente
+// Critério 3 — a aba default continua `resumo`, inclusive para slug desconhecido
 // ─────────────────────────────────────────────────────────────────────────
 
-test('#589: a aba default continua `resumo`, e não a 1ª posição de PAGINAS', () => {
+// ⚠️ O LIMITE DESTE TESTE, MEDIDO — e ele não cobre o que o título anterior
+// prometia. Este bloco já se chamou "a aba default não vira a 1ª posição do
+// array por acidente", e essa defesa NÃO EXISTE: `resumo` É `PAGINAS[0]`, então
+// nenhuma asserção de caixa-preta distingue o literal `'resumo'` de um
+// `PAGINAS[0].id`. Medido em 2026-08-29: trocar as DUAS origens do default
+// (`_aba` inicial e o fallback do setter, frontend/tela-avancado.ts) por
+// `PAGINAS[0].id` deixa 877/877 testes e 56/56 casos de render VERDES.
+// O que este teste de fato mede — e mede de verdade — é o comportamento: sem
+// URL, e com slug desconhecido, a aba resolvida é `resumo`. A independência
+// entre o default e a ordem do array é sustentada pelo LITERAL no código de
+// produção, não por este arquivo.
+test('#589: a aba default continua `resumo`, inclusive para slug desconhecido', () => {
   // Sem nada vindo da URL.
   assert.equal(telaAvancado().aba, 'resumo');
 

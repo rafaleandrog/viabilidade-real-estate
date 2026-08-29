@@ -10,8 +10,15 @@ Rodada 10, item A10-10. O pedido do autor é de uma linha: *"Inverter a ordem en
 Viabilidade e Custos"*. O diff de produção **são duas linhas trocadas** em `PAGINAS`
 (`frontend/tela-avancado.ts`), e o resto do PR existe para provar que **nada mais andou junto** —
 as três armadilhas que a issue nomeia (id interno `'obra'` preservado pela #40, slugs públicos
-`custos`/`resultados` com os aliases antigos das #250/#350, e a aba default `'resumo'`, que não é
-default por ser a 1ª do array).
+`custos`/`resultados` com os aliases antigos das #250/#350, e a aba default `'resumo'`, que no
+código de produção é um LITERAL, não `PAGINAS[0]`).
+
+**Uma das três armadilhas não é aferível por teste, e isso está medido.** A independência entre a
+aba default e a ordem do array **não tem como ser provada de caixa-preta enquanto `resumo` for a 1ª
+página**: trocar as duas origens do default (`_aba` inicial e o fallback do setter) por
+`PAGINAS[0].id` deixa a suíte inteira verde. O teste mede o que dá para medir — sem URL e com slug
+desconhecido a aba resolvida é `resumo` — e o arquivo diz esse limite com todas as letras, em vez
+de anunciar uma defesa que não existe.
 
 **A prova ancora na CHAMADA, não na constante.** `PAGINAS` é privada do módulo; testá-la seria
 testar a declaração. `frontend/nav-avancado.test.ts` roda o `render()` real de `ViabTelaAvancado` e
