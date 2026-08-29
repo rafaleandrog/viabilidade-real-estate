@@ -164,10 +164,14 @@ export function corFaseExtra(idx: number): string {
  * (`tabelaFluxo`, `frontend/fluxo-tabela.ts`) e exportação (`linhasFluxo`,
  * `frontend/exportar.ts`) têm de representar a linha da MESMA forma — o
  * contrato que a #449 fechou. Com um símbolo único a paridade é estrutural em
- * vez de uma asserção que envelhece, e `fluxo-shared.ts` é o único módulo que
- * as duas já importam (pôr a constante numa delas criaria aresta nova no grafo
- * de imports, e o cabeçalho de `exportar.ts` explica por que a direção dele
- * importa).
+ * vez de uma asserção que envelhece. `fluxo-shared.ts` é UM dos módulos que as
+ * duas já importam — não o único: elas compartilham cinco, e `viab-format.ts`
+ * (dono de `celula` e `negativoContabil`) serviria igualmente bem. A escolha é
+ * por assunto, não por exclusividade: a constante diz o que a linha É no fluxo,
+ * e não como ela é formatada. O que importa para o grafo de imports é que
+ * qualquer um dos compartilhados evita aresta nova; pôr a constante em UMA DAS
+ * PONTAS é que criaria (o cabeçalho de `exportar.ts` explica por que a direção
+ * dele importa).
  *
  * ⚠️ Isto NÃO muda a aritmética nem, na prática, o texto da célula. A série de
  * deduções é `líquida − bruta`, logo ≤ 0, e `negativoContabil`

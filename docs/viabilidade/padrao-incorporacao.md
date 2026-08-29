@@ -977,7 +977,7 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > Pré-lançamento que desative a fase passa a vender 80%.
 >
 > ✅ **Desde a #429, "e ninguém é avisado" deixou de valer.** O percentual da faixa vazia entra em
-> `pctDescartado` (`frontend/fluxo-shared.ts:476`) e o painel de Reconciliação acusa
+> `pctDescartado` (`frontend/fluxo-shared.ts:480`) e o painel de Reconciliação acusa
 > `ABSORCAO_NAO_FECHA`. O comportamento **não** mudou: o percentual continua não sendo computado e
 > continua não sendo redistribuído — a camada denuncia, não corrige.
 >

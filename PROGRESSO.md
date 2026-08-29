@@ -22,9 +22,12 @@ com ou sem `custo`. O teste assere exatamente isso, mês a mês: `celula(v, true
 false)` para os valores reais da linha. O que muda é a cor; o número sai escrito igual.
 
 **Tela e exportação leem a MESMA constante.** `DEDUCOES_RECEITA_EH_CUSTO` mora em
-`frontend/fluxo-shared.ts` — o único módulo que `fluxo-tabela.ts` e `exportar.ts` já importavam, de
-modo que a constante não cria aresta nova no grafo de imports (o cabeçalho de `exportar.ts` explica
-por que a direção dele importa). A paridade da #449 passa a ser **estrutural**: não há como mover
+`frontend/fluxo-shared.ts` — **um** dos cinco módulos que `fluxo-tabela.ts` e `exportar.ts` já
+importavam, de modo que a constante não cria aresta nova no grafo de imports (o cabeçalho de
+`exportar.ts` explica por que a direção dele importa). ⚠️ A primeira redação desta entrada dizia "o
+**único** módulo", e era **falsa**: `viab-format.ts` — dono de `celula` e `negativoContabil` — é
+igualmente compartilhado e serviria de lar. A escolha é por **assunto** (a constante diz o que a
+linha é no fluxo, não como se formata), não por exclusividade. A paridade da #449 passa a ser **estrutural**: não há como mover
 uma ponta sem a outra.
 
 **A prova da tela é render, e ela tem dois qualificadores por necessidade.** O caso
