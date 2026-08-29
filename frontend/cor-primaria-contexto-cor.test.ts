@@ -51,9 +51,17 @@ function arquivosTs(dir: string): string[] {
 }
 
 // As cinco propriedades de cor citadas no critério 2 da #633. `border`
-// sozinho (shorthand) TAMBÉM carrega cor — por isso o sufixo opcional
-// `(?:-[a-z]+)*` alcança `border`, `border-color`, `border-left-color` etc.
-const PROPRIEDADE_DE_COR = /^(color|accent-color|border(?:-[a-z]+)*|fill|stroke)$/;
+// sozinho (shorthand) TAMBÉM carrega cor — por isso a alternativa explícita
+// `border(-top|-right|-bottom|-left)?-color` alcança `border-color` e as 4
+// variantes por lado, além do `border` puro.
+//
+// ⚠️ achado do Codex (rodada 2, PR 652): a versão anterior era
+// `border(?:-[a-z]+)*`, que TAMBÉM casava `border-image`/`border-image-source`
+// — propriedades que aceitam gradiente VALIDAMENTE (`border-image-source:
+// var(--cor-primaria)` é uso correto, não o defeito desta issue). Trocar por
+// `-solida` ali mudaria o efeito pretendido. A lista abaixo é FECHADA: só as
+// propriedades que tomam <color>, nunca <image>.
+const PROPRIEDADE_DE_COR = /^(color|accent-color|border|border-(?:top|right|bottom|left)-color|border-color|fill|stroke)$/;
 
 const RAIZ_FRONTEND = join(dirname(fileURLToPath(import.meta.url)));
 
