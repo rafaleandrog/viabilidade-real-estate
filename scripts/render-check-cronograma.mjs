@@ -8,9 +8,22 @@
 //
 // O que mede, no Chromium de verdade, no shadow DOM do `viab-num`:
 //   · truncamento REAL (scrollWidth > clientWidth) do número e dos afixos;
+//   · TRANSBORDO do conjunto para fora do `.input-wrap` (#583 — ver abaixo);
 //   · largura de cada campo — Início e Duração têm que coincidir;
 //   · alinhamento horizontal das colunas (mesmo x) entre linha travada e editável;
 //   · overflow horizontal do documento.
+//
+// ⚠️ #583 — DUAS LACUNAS DESTE SCRIPT, E COMO ELAS DEIXARAM O DEFEITO PASSAR.
+// A #245 mediu TRUNCAMENTO (`scrollWidth > clientWidth` do input e de cada
+// afixo) e concluiu, com razão, que o número tinha parado de ser cortado. Mas
+// o custo daquele conserto foi os afixos deixarem de ceder, e o conjunto passar
+// a ser PINTADO POR FORA da borda do `.input-wrap` — que é outro eixo, e não
+// tinha lente. Pior: a folha de estilo abaixo copiava a tela SEM o
+// `font-size` do `td` (`var(--texto-corpo, 0.8125rem)`), então o `ch` do
+// `max-width` resolvia contra os 16px do root, e não contra os 13px reais. O
+// campo media 183px aqui e 128px na tela — largo demais para o defeito caber.
+// As duas foram corrigidas: a lente de transbordo entrou na sonda, e o `td`
+// ganhou o `font-size` da tela.
 //
 // ⚠️ ESTE ARQUIVO FOI GENERALIZADO. `scripts/render-check.mjs` faz o mesmo para
 // qualquer tela, roda no `validar-frontend.sh` (etapa 7/7) e no job `render` do
@@ -38,7 +51,7 @@ import { fileURLToPath } from 'node:url';
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argLargura = process.argv.includes('--largura')
   ? process.argv[process.argv.indexOf('--largura') + 1]
-  : 'width:auto;min-width:10ch;max-width:18ch';
+  : 'width:auto;min-width:10ch;max-width:24ch';
 
 // Playwright vem do ambiente, não do projeto (ver cabeçalho).
 let chromium;
@@ -75,6 +88,11 @@ writeFileSync(join(dir, 'p.html'), `<!doctype html><meta charset="utf-8">
   body{background:#14161a;color:#e8e8ea;font-family:system-ui,sans-serif;margin:0;padding:12px}
   .tabela-wrap{overflow-x:auto} .tabela-wrap table.crono{min-width:520px}
   table{width:100%;border-collapse:collapse} td{padding:6px 10px} td.evento{white-space:nowrap}
+  /* #583: a tela declara este font-size no td (\`var(--texto-corpo, 0.8125rem)\`),
+     e é ele que define o \`ch\` do max-width do campo. Sem esta linha o \`ch\`
+     resolvia contra os 16px do root e o campo nascia 43% mais largo do que é
+     de verdade — larga o bastante para o transbordo nunca aparecer aqui. */
+  table.crono td{font-size:0.8125rem}
   .campo-mes{display:inline-flex;align-items:center;gap:6px}
   .campo-mes viab-num{${argLargura}}
 </style>
@@ -123,8 +141,16 @@ for (const largura of [1280, 900, 600]) {
       const cx = n.getBoundingClientRect();
       const input = n.shadowRoot.querySelector('input');
       const afixos = [...n.shadowRoot.querySelectorAll('.afixo')];
+      // #583: o eixo que faltava. `trunca` pergunta se ALGUM FILHO foi cortado
+      // dentro da própria caixa; `transborda` pergunta se o CONJUNTO não coube
+      // na caixa do `.input-wrap` — que, sem `overflow` nem `flex-wrap`, é o
+      // mesmo que "pintou por fora da borda". Um pode estar limpo com o outro
+      // vermelho, e foi exatamente o que aconteceu depois da #245.
+      const wrap = n.shadowRoot.querySelector('.input-wrap');
       return {
         w: Math.round(cx.width), x: Math.round(cx.left), travado: n.desabilitado === true,
+        transborda: wrap.scrollWidth > wrap.clientWidth + 1,
+        transbordoPx: wrap.scrollWidth - wrap.clientWidth,
         trunca: input.scrollWidth > input.clientWidth + 1
           || afixos.some((a) => a.scrollWidth > a.clientWidth + 1),
         fonteNum: parseFloat(getComputedStyle(input).fontSize),
@@ -144,15 +170,23 @@ for (const largura of [1280, 900, 600]) {
   const hierarquia = r.campos[0].fonteAfixo < r.campos[0].fonteNum;
   const desalinhada = colunas.some((xs) => xs.length > 1);
 
+  const transbordados = r.campos.filter((c) => c.transborda);
+
   const problemas = [];
   if (truncados) problemas.push(`${truncados} campo(s) truncando`);
+  if (transbordados.length) {
+    problemas.push(
+      `${transbordados.length} campo(s) transbordando o .input-wrap ` +
+      `(até ${Math.max(...transbordados.map((c) => c.transbordoPx))}px por fora da borda)`,
+    );
+  }
   if (larguras.length > 1) problemas.push(`larguras divergentes: ${larguras.join('/')}`);
   if (desalinhada) problemas.push('colunas desalinhadas entre travado e editável');
   if (!hierarquia) problemas.push(`afixo (${r.campos[0].fonteAfixo}px) não é menor que o número (${r.campos[0].fonteNum}px)`);
   if (r.overflowX) problemas.push('overflow horizontal do documento');
 
   if (problemas.length) { falhas++; console.error(`✖ ${largura}px — ${problemas.join(' · ')}`); }
-  else console.log(`  ok: ${largura}px — largura ${larguras[0]}px, sem truncar, colunas alinhadas, sem overflow`);
+  else console.log(`  ok: ${largura}px — largura ${larguras[0]}px, sem truncar, sem transbordar, colunas alinhadas, sem overflow`);
 }
 await navegador.close();
 srv.close();

@@ -96,11 +96,36 @@ export class ViabFluxoCronograma extends LitElement {
     }
     .evento-label { display: inline-flex; align-items: center; }
     .campo-mes { display: inline-flex; align-items: center; gap: 6px; }
-    /* #245: mesma regra de .params viab-num — Início e Duração compartilham o
-       intervalo, que é o que garante a MESMA largura para os dois campos
-       (critério de aceite), inclusive entre eventos fixos e fases customizadas,
-       que usam este mesmo seletor. */
-    .campo-mes viab-num { width: auto; min-width: 10ch; max-width: 18ch; }
+    /* #245: Início e Duração compartilham este intervalo, e é ele que garante
+       a MESMA largura para os dois campos (critério de aceite da #245),
+       inclusive entre eventos fixos e fases customizadas, que usam este mesmo
+       seletor.
+
+       #583: o teto era 18ch e NÃO cabia o conteúdo. O ".input-wrap" do
+       "viab-num" é um flex de UMA linha com quatro filhos indeformáveis na
+       prática — input (piso de 4ch), stepper, o ".afixo" da unidade e o
+       ".afixo" do mês —, e o mínimo deles soma MAIS que 18ch. Como o
+       ".input-wrap" não declara "overflow" nem "flex-wrap", o excedente não
+       era cortado: era pintado por fora da borda arredondada, que é o
+       "jan/27 saltando do campo" do screenshot.
+
+       O teto sobe para 24ch em vez de os afixos passarem a encolher:
+       "min-width: 0" + "text-overflow: ellipsis" no ".afixo" trocaria o
+       transbordo por um mês AMPUTADO ("jan/2…"), que é perder o dado em
+       silêncio — a mesma classe de defeito que a #245 corrigiu no número. O
+       piso foi MEDIDO no harness (o caso cronograma-sufixo-mes), com valores
+       de 1 a 3 dígitos em 1280/900/600px: com 20ch ainda há campo transbordando,
+       com 21ch já sai limpo. 24ch é esse piso com folga, e continua ABAIXO do
+       "max-content" do ".input-wrap" (~280px) — o que importa porque é o teto,
+       e não o conteúdo, que fixa a largura dos dois campos: enquanto ele
+       morder, Início e Duração medem igual, apesar de "º mês" e "meses"
+       renderem diferente.
+
+       O ".params viab-num" acima NÃO acompanha: nenhum "viab-num" é montado
+       dentro de ".params" hoje (a fileira do topo tem urbi-input-data,
+       urbi-checkbox e urbi-botao), então aquela regra não pinta nada e alargá-la
+       junto seria mexer no que não se mede. */
+    .campo-mes viab-num { width: auto; min-width: 10ch; max-width: 24ch; }
     .cadeado { opacity: 0.7; font-size: 0.75rem; }
     td.periodo { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); white-space: nowrap; }
 
