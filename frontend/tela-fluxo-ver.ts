@@ -70,7 +70,7 @@ export function sinalLinhaProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>)
  * conta própria, a comparação fica vermelha aqui — é o ponto de a função
  * existir, e não de ela ser esperta.
  */
-export function roiProjetoAnalise(c: FluxoCalc, areaPrivativa: number): number {
+export function roiProjetoAnalise(c: FluxoCalc, areaPrivativa: number): number | null {
   return proformaAvancado(c, areaPrivativa).roiPct;
 }
 
@@ -611,9 +611,12 @@ export class ViabFluxoVer extends LitElement {
     const p = proformaAvancado(cProjeto, area);
     const roi = roiProjetoAnalise(cProjeto, area);
     // `investimentoTotal <= 0` é estudo sem custo direto nem indireto
-    // modelado. `proformaAvancado` já devolve 0 nesse caso (nunca NaN nem
-    // Infinity), mas publicar "0,0%" seria afirmar que o ROI é zero, e não
-    // que ele não tem denominador — a distinção que o critério 5 pede.
+    // modelado. Desde a #611, `proformaAvancado`/`roiProjetoAnalise` já
+    // devolvem `null` nesse caso (nunca 0 inventado, nunca NaN, nunca
+    // Infinity) — `medido` continua o MESMO predicado da divisão
+    // (`investimentoTotal > 0`), e por isso é sempre `roi !== null` quando
+    // `medido` é verdadeiro; os `!` abaixo dizem exatamente isso ao
+    // typechecker, não abrem uma exceção nova.
     const medido = p.investimentoTotal > 0;
     return html`
       <urbi-card titulo="ROI do projeto">
@@ -623,7 +626,7 @@ export class ViabFluxoVer extends LitElement {
             <tr class="n1"><td>Investimento (custo direto + indireto)</td><td class="num">${fmtR$(p.investimentoTotal)}</td></tr>
             <tr class="n0 resultado">
               <td>= ROI</td>
-              <td class="num roi-projeto ${medido ? (roi >= 0 ? 'pos' : 'neg') : 'vazio'}">${medido ? fmtPct(roi) : '—'}</td>
+              <td class="num roi-projeto ${medido ? (roi! >= 0 ? 'pos' : 'neg') : 'vazio'}">${medido ? fmtPct(roi!) : '—'}</td>
             </tr>
           </tbody>
         </table>
