@@ -103,7 +103,11 @@ const CONV_UNIDADE: Record<string, ConvUnidade> = {
   rs_m2_terreno: { tipo: 'por_area', link: 'areaTerreno' },
   pct_vgv: { tipo: 'pct', link: 'vgv' },
   pct_receita: { tipo: 'pct', link: 'receita' },
-  pct_obra: { tipo: 'pct', link: 'vgv' }, // link=vgv usado só na conversão de display; motor usa totalObra
+  // #514: link=obra — mesma grandeza que o motor aplica (resolverCustoTotal/
+  // fluxo-shared.ts, case 'pct_obra'). Era 'vgv' (apelido de display, mas
+  // também usado na ESCRITA por `_editarOrcamento`/`dadosDaTrocaDeUnidade`),
+  // erro de 3,4× no valor calculado.
+  pct_obra: { tipo: 'pct', link: 'obra' },
 };
 
 const UNIDADES = [
@@ -1074,6 +1078,10 @@ export class ViabFluxoCustos extends LitElement {
       areaTerreno: this.ctxCusto.areaTerreno,
       vgv: this.ctxCusto.vgvTotal,
       receita: this.ctxCusto.receitaTotal ?? this.ctxCusto.vgvTotal,
+      // #514: mesma base que o motor usa para `pct_obra` (`_totalObra`, que já
+      // exclui as próprias linhas `pct_obra` — sem isso a conversão por badge
+      // reintroduziria a divergência que esta issue fecha).
+      obra: this._totalObra,
     };
   }
 

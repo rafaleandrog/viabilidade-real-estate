@@ -322,12 +322,21 @@ export function fluxoPagamentoComDefaultJuros(jurosTabelaAaPadrao: unknown): Rec
   return { ...base, juros_tabela_aa: v };
 }
 
-const GRUPOS_CUSTO = ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'];
-const UNIDADES_ORCAMENTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita'];
-const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado']; // #339
+// #590/#514: as quatro listas abaixo são allowlists de validação de PATCH,
+// escritas à mão em paralelo aos `opcoes` do `schema.json` — e nada acusava
+// as duas divergindo. `pct_obra` estava no schema, na tela e no motor, mas
+// FALTAVA aqui: PATCH `orcamento_unidade: 'pct_obra'` tomava 400
+// UNIDADE_INVALIDA (a única badge percentual que a linha `Gestão da obra`
+// oferece — sem esta entrada não havia alternativa). Exportadas para que
+// `avancado-schema-enums.test.ts` compare cada uma contra `schema.json` por
+// IGUALDADE EXATA (entrada a mais ou a menos reprova) — não é comentário
+// pedindo sincronia, é teste que reprova quando ela quebra.
+export const GRUPOS_CUSTO = ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'];
+export const UNIDADES_ORCAMENTO = ['rs', 'rs_m2_priv', 'rs_m2_terreno', 'pct_vgv', 'pct_receita', 'pct_obra'];
+export const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado']; // #339
 // `unit_delivery`/`sales_revenue` (#194): só a linha de Preço do Terreno usa —
 // o motor (fluxo-caixa-motor.ts) ignora o campo em qualquer outra linha.
-const MODOS_DISTRIBUICAO = ['fixo', 'unit_delivery', 'sales_revenue'];
+export const MODOS_DISTRIBUICAO = ['fixo', 'unit_delivery', 'sales_revenue'];
 
 // #335: reverte a #179/#256 — categoria de custo não trava mais renomeação,
 // remoção nem some do combo. `avancado_linhas_custo.obrigatoria` continua no

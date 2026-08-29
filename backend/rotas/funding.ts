@@ -46,9 +46,14 @@ import {
 
 export const rotasFunding: ReturnType<typeof Router> = Router();
 
-const TIPOS_OPERACAO = ['financiamento_producao', 'divida', 'equity'];
-const MODOS_RETORNO = ['permuta_financeira', 'resultado_final'];
-const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado'];
+// #590: exportadas para o mesmo teste de igualdade exata contra `schema.json`
+// que fechou a divergência de `UNIDADES_ORCAMENTO` em avancado.ts (item 4 do
+// critério de aceite — varredura de vizinhos). As três já batiam com
+// `avancado_funding_operacoes` no schema; a exportação é o que torna essa
+// conferência automática em vez de manual.
+export const TIPOS_OPERACAO = ['financiamento_producao', 'divida', 'equity'];
+export const MODOS_RETORNO = ['permuta_financeira', 'resultado_final'];
+export const EVENTOS_ANCORA = ['planejamento', 'pre_lancamento', 'lancamento', 'obra', 'pos_obra', 'customizado'];
 
 
 /** Campos numéricos que não fazem sentido negativos. */
