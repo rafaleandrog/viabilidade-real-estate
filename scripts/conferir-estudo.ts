@@ -260,7 +260,10 @@ function imprimir(c: Conferencia) {
     console.log(`  Investimento total ... ${R$(p.investimentoTotal)}`);
     console.log(`  Resultado ............ ${R$(p.resultado)}`);
     console.log(`  Margem líquida ....... ${(p.margemLiquidaPct ?? 0).toFixed(2)}%`);
-    console.log(`  ROI .................. ${(p.roiPct ?? 0).toFixed(2)}%`);
+    // #611 (achado do Codex, rodada 1): `roiPct` virou `number | null` — o
+    // `?? 0` antigo imprimia "0.00%" inventado para um ROI indefinido,
+    // inconsistente com a linha do Avançado (:291), que já mostra "—".
+    console.log(`  ROI .................. ${p.roiPct === null ? '—' : `${p.roiPct.toFixed(2)}%`}`);
   }
 
   if (c.calc) {
