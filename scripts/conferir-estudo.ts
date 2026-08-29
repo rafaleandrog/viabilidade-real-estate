@@ -26,7 +26,7 @@
  * consumidor remonta à mão e pode divergir (R-A36); fonte única foi
  * CONSIDERADA E RECUSADA pelo autor — ver
  * `docs/viabilidade/fluxo-investidor-formulas.md` §9. Os outros quatro:
- * frontend/tela-fluxo-ver.ts:179 · frontend/tela-funding.ts:216 ·
+ * frontend/tela-fluxo-ver.ts:179 · frontend/tela-funding.ts:239 ·
  * frontend/tela-cenarios.ts:240 · frontend/tela-resumo.ts:182 (só remonta
  * resultadoFinal, não chama fundingDoEstudo).
  */
@@ -288,7 +288,7 @@ function imprimir(c: Conferencia) {
     console.log(`  Juros de clientes .... ${R$(k.jurosClientes)}`);
     console.log(`  Carteira máxima ...... ${R$(k.carteiraClientesMaxima)} (mês ${k.mesCarteiraClientesMaxima === null ? '—' : k.mesCarteiraClientesMaxima + 1})`);
     console.log(`  Repasse Σ ............ ${R$(k.repasseMensal.reduce((a, b) => a + b, 0))}`);
-    console.log(`  [proformaAvancado] resultado ${R$(pa.resultado)} · margem ${pa.margemPct.toFixed(2)}% · ROI ${pa.roiPct.toFixed(2)}%`);
+    console.log(`  [proformaAvancado] resultado ${R$(pa.resultado)} · margem ${pa.margemPct === null ? '—' : `${pa.margemPct.toFixed(2)}%`} · ROI ${pa.roiPct.toFixed(2)}%`);
   }
 
   if (c.funding) {

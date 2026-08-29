@@ -336,7 +336,15 @@ export class ViabTelaDashboard extends LitElement {
         [estudo.id]: {
           vgv: p.vgv,
           resultado: p.resultado,
-          margemPct: p.margemPct,
+          // #604: `margemPct` virou `number | null` (indefinido com Receita
+          // Bruta ≤ 0). O `?? 0` aqui é a MESMA convenção que o Preliminar já
+          // usa em `resumoListagem` acima, e pelo mesmo motivo: `resumoListagem`
+          // devolve `null` — some do Painel — quando `calc.vgv <= 0`, então
+          // esta linha nunca chega à tela com a base inválida. **O Painel não
+          // muda de comportamento com esta issue.** Trocá-lo por "—" é decisão
+          // de desenho de uma tabela compacta, e vale igualmente para o
+          // Preliminar: fica fora desta issue, de propósito.
+          margemPct: p.margemPct ?? 0,
           areaPrivativa: p.areaPrivativa,
           areaConstruida: p.areaPrivativa + areaComum,
           roiPct: p.roiPct,
