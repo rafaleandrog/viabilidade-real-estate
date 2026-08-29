@@ -208,6 +208,15 @@ export function kpisDoCaso(config: FluxoConfig, operacoes: OperacaoFunding[]): K
   // saem dele — é justamente o que impede a catraca de cegar com este conserto.
   const p = proformaAvancado(c, areaPrivativa);
   const soma = (xs: number[] | undefined) => (xs ?? []).reduce((t, v) => t + v, 0);
+  // #611: `roiPct` virou `number | null`. Aqui não se usa `?? 0`, pelo mesmo
+  // motivo do guard de `margemPct` (#604): um baseline de catraca com ROI
+  // INDEFINIDO não é um baseline — seria uma linha comparando 0 contra 0 e
+  // passando para sempre. Todo estudo desta fixture tem investimento > 0; se
+  // algum dia deixar de ter, é para explodir ruidosamente aqui, não para
+  // virar zero em silêncio.
+  if (p.roiPct === null) {
+    throw new Error('baseline sem investimento: o ROI é indefinido e a catraca perderia o sentido');
+  }
   return {
     resultado: p.resultado, margemPct: p.margemPct, roiPct: p.roiPct, tir: c.tir,
     caixaFinalAlavancado: funding ? (funding.fluxoAcumulado[funding.fluxoAcumulado.length - 1] ?? 0) : null,

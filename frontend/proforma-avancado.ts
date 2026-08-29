@@ -175,8 +175,14 @@ export interface ProformaAvancado {
    * `resultado / investimentoTotal * 100` — de novo, literalmente a fórmula do
    * Preliminar. Não é indicador novo: é o mesmo indicador, calculado a partir das
    * séries do Avançado em vez dos campos fixos que ele não tem.
+   *
+   * #611 — `null` quando `investimentoTotal <= 0`: mesmo padrão que a #571
+   * levou a `margemLiquidaPct`/`custoObrasVgvPct` no Preliminar, e que
+   * `proforma.ts` já aplica ao `roiPct` gêmeo. A #604 (PR 647) deliberadamente
+   * não tocou este campo — via um teste nomeado atribuindo-o a esta issue —
+   * porque o denominador aqui é o investimento, não o VGV.
    */
-  roiPct: number;
+  roiPct: number | null;
 }
 
 const soma = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
@@ -357,6 +363,8 @@ export function proformaAvancado(
     resultadoMaisPermutas,
     pctResultadoMaisPermutas,
     investimentoTotal,
-    roiPct: investimentoTotal > 0 ? (resultado / investimentoTotal) * 100 : 0,
+    // #611: denominador inválido devolve `null`, nunca 0 — mesmo mecanismo do
+    // `roiPct` gêmeo em proforma.ts.
+    roiPct: investimentoTotal > 0 ? (resultado / investimentoTotal) * 100 : null,
   };
 }

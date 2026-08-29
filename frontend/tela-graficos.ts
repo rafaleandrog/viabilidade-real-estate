@@ -252,10 +252,10 @@ export class ViabTelaGraficos extends LitElement {
       custo_obras_vgv: p.custoObrasVgvPct,
       margem_liquida: p.margemLiquidaPct,
       resultado_final: p.margemLiquidaPct,
-      // #611: sem investimento não há denominador, `roiPct` cai em 0 e o
-      // medidor desenhava o ponteiro na banda vermelha do benchmark — falso
-      // alarme sobre grandeza não medida. `montarMedidor` é null-seguro desde
-      // a #571 e simplesmente não desenha o medidor.
+      // #611: sem investimento não há denominador — `roiPct` já vem `null`
+      // do motor desde a fase 2 da issue, e `roiParaFaixa` é hoje um alias
+      // dele (mantido pelo call site continuar nomeado). `montarMedidor` é
+      // null-seguro desde a #571 e simplesmente não desenha o medidor.
       roi: roiParaFaixa(p),
       // #613: o único benchmark exclusivo do Loteamento
       // (`backend/rotas/benchmarks.ts`, `benchmarksPadrao`) finalmente tem
@@ -264,10 +264,9 @@ export class ViabTelaGraficos extends LitElement {
       // semente só o cria para Loteamento. Uma Incorporação que ganhe o campo
       // à mão vê a mesma razão desenhada, com a mesma fórmula.
       //
-      // `eficienciaParaFaixa` (não `p.eficienciaPct` cru) pela razão da #611:
-      // sem área de gleba o número cai em 0 e `montarMedidor` pousava o
-      // ponteiro na banda vermelha do benchmark — falso alarme sobre grandeza
-      // que ninguém mediu. `null` = não desenha o medidor.
+      // `eficienciaParaFaixa` pela razão da #611: sem área de gleba
+      // `eficienciaPct` já vem `null` do motor desde a fase 2 da issue, e
+      // `null` = `montarMedidor` não desenha o medidor.
       eficiencia_aproveitamento: eficienciaParaFaixa(p),
     });
     const medidores = exibiveis

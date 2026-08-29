@@ -554,10 +554,20 @@ test('#351 proforma: R$/m² e % VGV têm base declarada e sobrevivem a área/VGV
   assert.equal(p.areaPrivativa, 2000);
   assert.equal(p.vgv, c.receitaBruta);
   assert.ok(Math.abs(p.margemPct - (p.resultado / p.vgv) * 100) <= 1e-9);
+  // #611: com investimento > 0 (CONFIG_COMPLETA tem linhas de custo) o ROI
+  // tem que estar DEFINIDO — `null` aqui seria o conserto vazando para o
+  // caso normal, que é o risco desta issue.
+  assert.notEqual(p.roiPct, null, 'com investimento > 0 o ROI não pode ser indefinido');
+  assert.ok(Math.abs(p.roiPct! - (p.resultado / p.investimentoTotal) * 100) <= 1e-9);
   // Estudo vazio: sem divisão por zero e sem NaN vazando para a tela.
   const vazio = calcularFluxo({ ...CONFIG, linhasReceita: [], linhasCusto: [] });
   const pv = proformaAvancado(vazio, 0);
   assert.equal(pv.margemPct, 0);
+  // #611: sem NENHUMA linha de custo, `investimentoTotal = 0` — o ROI é
+  // indefinido (não há denominador), nunca "mediu zero". Mutação: trocar o
+  // `null` de volta para 0 em `proforma-avancado.ts` faz esta asserção falhar.
+  assert.equal(pv.investimentoTotal, 0, 'a fixture precisa MESMO zerar o investimento, senão o teste não prova nada');
+  assert.equal(pv.roiPct, null);
   assert.ok(pv.linhas.every((l) => Number.isFinite(l.valor)));
 });
 

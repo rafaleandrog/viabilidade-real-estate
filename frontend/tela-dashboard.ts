@@ -125,7 +125,12 @@ export function resumoListagem(
         // exibir "0,00 m²" ao lado de uma área privativa real seria mentira. A
         // área construída de um loteamento É a privativa (os lotes).
         areaConstruida: p.areaConstruida > 0 ? p.areaConstruida : p.areaPrivativa,
-        roiPct: p.roiPct,
+        // #611: `roiPct` virou `number | null` (indefinido com
+        // `investimentoTotal <= 0`). O `?? 0` é a MESMA convenção que
+        // `margemPct` já usa acima (`p.margemLiquidaPct ?? 0`): o Painel não
+        // muda de comportamento com esta issue — trocá-lo por "—" é decisão
+        // de desenho de uma tabela compacta, fora de escopo aqui.
+        roiPct: p.roiPct ?? 0,
       }
     : null;
 }
@@ -339,7 +344,10 @@ export class ViabTelaDashboard extends LitElement {
           margemPct: p.margemPct,
           areaPrivativa: p.areaPrivativa,
           areaConstruida: p.areaPrivativa + areaComum,
-          roiPct: p.roiPct,
+          // #611: `proforma-avancado.ts:roiPct` também virou `number | null`
+          // (indefinido com `investimentoTotal <= 0`). Mesma convenção do
+          // ramo Preliminar acima — `?? 0`, Painel sem mudança de desenho.
+          roiPct: p.roiPct ?? 0,
         },
       };
     } catch (e) {

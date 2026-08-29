@@ -334,17 +334,17 @@ export interface Proforma {
   // numerador, e não há. A fórmula é "1 − deduções" (receita líquida / VGV, a
   // coluna "% VGV" da linha Receita líquida na EVI Urbitá). Renome puro,
   // fórmula intacta — nenhum número muda.
-  receitaLiquidaSobreVgvPct: number | null; roiPct: number; eficienciaPct: number;
-  // #611 — a grandeza foi MEDIDA? Os dois indicadores acima continuam `number`
-  // (a #571 não os alcançou, e transformá-los em `number | null` é o resto da
-  // issue, que o autor adiou em 2026-08-28: *"por enquanto deixe sem cor
-  // então"*). O que muda agora é só a COR: um denominador ausente devolve `0`,
-  // e `0` pintado pela faixa do benchmark é falso alarme sobre grandeza que
-  // ninguém mediu.
-  //
+  // #611 — fase 2 (fase 1 foi a #624, "sem cor"). O VALOR em si vira
+  // `number | null`, mesmo padrão do #571 acima: denominador ausente é
+  // "não medido", nunca "mediu zero". `eficienciaPct` é `null` com
+  // `areaTerreno <= 0`; `roiPct` é `null` com `investimentoTotal <= 0`.
+  receitaLiquidaSobreVgvPct: number | null; roiPct: number | null; eficienciaPct: number | null;
   // As duas flags nascem ao LADO da própria divisão, e não recalculadas na
   // tela: assim o predicado ("há denominador") e a divisão não podem divergir.
-  // Quem colore chama `eficienciaParaFaixa`/`roiParaFaixa`, abaixo.
+  // Desde a fase 2 elas são redundantes com `eficienciaPct`/`roiPct !== null`
+  // — mantidas porque `eficienciaParaFaixa`/`roiParaFaixa` (abaixo) e vários
+  // call sites já as leem, e o predicado nomeado continua mais legível que
+  // `!== null` espalhado pela tela.
   eficienciaMedida: boolean; roiMedido: boolean;
   numUnidades: number; precoMedioUnidade: number;
   // Detalhe por tipo (Incorporação — #7). Loteamento não separa R/NR: ficam 0.
@@ -713,11 +713,13 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const custoObrasVgvPct = vgv > 0 ? custoObras / vgv * 100 : null;
   const receitaLiquidaSobreVgvPct = vgv > 0 ? receitaLiquida / vgv * 100 : null;
   // #611: o predicado do denominador é NOMEADO e reusado pela própria divisão
-  // — não há como a flag dizer "medido" e a conta cair no ramo do zero.
+  // — não há como a flag dizer "medido" e a conta cair no ramo do zero. Desde
+  // a fase 2 da issue o ramo "não medido" devolve `null`, não 0 — mesmo
+  // padrão de `margemLiquidaPct`/`custoObrasVgvPct` (#571) acima.
   const roiMedido = investimentoTotal > 0;
-  const roiPct = roiMedido ? resultado / investimentoTotal * 100 : 0;
+  const roiPct = roiMedido ? resultado / investimentoTotal * 100 : null;
   const eficienciaMedida = areaTerreno > 0;
-  const eficienciaPct = eficienciaMedida ? areaVendavel / areaTerreno * 100 : 0;
+  const eficienciaPct = eficienciaMedida ? areaVendavel / areaTerreno * 100 : null;
   // Nº de unidades: também só do catálogo. Os campos legados que o alimentavam
   // (num_unidades_*, e a divisão da área vendável por area_media_lote_m2 no
   // Loteamento) saíram junto com o fallback de VGV — mantê-los daria contagem
@@ -797,22 +799,19 @@ export function calcularProforma(e: ProformaInput): Proforma {
  * #611 — o valor de `eficienciaPct` **para COLORIR**, ou `null` quando a área do
  * terreno não foi informada.
  *
- * Decisão do autor em 2026-08-28, verbatim: *"por enquanto deixe sem cor
- * então"*. `eficienciaPct` é o indicador exclusivo do Loteamento ("Vendável /
- * gleba"): sem área de terreno ele cai em `0`, e `varianteFaixa` recebia esse
- * `0` — que numa faixa `atingir_ou_superar` fica na banda vermelha. O KPI
- * aparecia **em vermelho** anunciando um benchmark estourado sobre uma
- * grandeza que ninguém mediu, ao lado de uma margem que já mostrava "—".
+ * Entregue em duas fases. A #624 (2026-08-28) tirou só a COR — decisão do
+ * autor, verbatim: *"por enquanto deixe sem cor então"* —, com `eficienciaPct`
+ * ainda `number` (caindo em `0` sem gleba) e esta função separando *quanto* o
+ * indicador vale de *se há base para julgá-lo*. Esta issue fechou a fase 2:
+ * `eficienciaPct` agora já é `null` na origem (`calcularProforma`, acima)
+ * quando `eficienciaMedida` é falso, então `p.eficienciaMedida ?
+ * p.eficienciaPct : null` é hoje equivalente a `p.eficienciaPct` puro e simples.
  *
- * ⚠️ **O VALOR EXIBIDO não muda, e a diferença é deliberada.** A tela continua
- * imprimindo `0,0%` — trocá-lo por "—" exige `eficienciaPct: number | null`, o
- * padrão da #571, e é o restante desta issue, que o "por enquanto" do autor
- * adiou. Esta função existe para separar as duas coisas: *quanto* o indicador
- * vale (sempre `number`) e se há base para *julgá-lo* (`null` = não julgue).
- *
- * `varianteFaixa`, `bolaFaixa` e `montarMedidor` já aceitam `null` desde a
- * #571 e devolvem "sem cor" / "sem medidor" — por isso o conserto é passar o
- * `null`, e não mexer nas faixas.
+ * A função continua existindo, e não vira um alias apagado, porque os call
+ * sites (`tela-graficos.ts`, `tela-premissas.ts`) e os testes de fiação que os
+ * guardam já a nomeiam — trocar por acesso cru economizaria uma indireção às
+ * custas de reabrir todos esses call sites sem necessidade. `varianteFaixa`,
+ * `bolaFaixa` e `montarMedidor` aceitam `null` desde a #571.
  */
 export function eficienciaParaFaixa(p: Proforma): number | null {
   return p.eficienciaMedida ? p.eficienciaPct : null;
@@ -820,8 +819,9 @@ export function eficienciaParaFaixa(p: Proforma): number | null {
 
 /**
  * #611 — o mesmo, para `roiPct`: `null` quando não houve investimento
- * (`investimentoTotal <= 0`). Sem denominador, o ROI cai em `0` e o medidor de
- * benchmark da aba Gráficos desenhava o ponteiro no fim vermelho da escala.
+ * (`investimentoTotal <= 0`). Desde a fase 2 desta issue, `roiPct` já nasce
+ * `null` nesse caso (ver acima) — a função é a mesma explicada em
+ * `eficienciaParaFaixa`, mantida pelo mesmo motivo.
  */
 export function roiParaFaixa(p: Proforma): number | null {
   return p.roiMedido ? p.roiPct : null;

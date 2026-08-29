@@ -4,6 +4,41 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## `eficienciaPct`/`roiPct` viram `number | null` — #611 (2026-08-29)
+
+Rodada 10. Fase 2 da issue — a fase 1 foi a #624 (2026-08-28), que só tirou a COR de um
+denominador ausente (o autor pediu "por enquanto deixe sem cor então"), deixando o VALOR em `0`.
+Esta issue fecha o resto: `eficienciaPct` (Loteamento, `areaVendavel / areaTerreno`) e `roiPct`
+(`resultado / investimentoTotal`, nos dois níveis) agora nascem `null` quando o denominador é
+`≤ 0` — mesmo padrão que a #571 levou a `margemLiquidaPct`/`custoObrasVgvPct`/
+`receitaLiquidaSobreVgvPct`.
+
+**Alcance: os dois motores.** `frontend/proforma.ts` (Preliminar) tem os dois campos;
+`frontend/proforma-avancado.ts` (Avançado) só tem `roiPct` — `eficienciaPct` é exclusivo do
+Loteamento preliminar. A #604/PR 647 (mergeado antes desta issue) já havia convertido a família
+`margemPct`/`pctResultadoMaisPermutaFinanceira`/`pctResultadoMaisPermutas` do Avançado, e
+deliberadamente não tocou `roiPct` — deixando um teste nomeado (`frontend/proforma-avancado-vgv-zero.test.ts`,
+`'#604 não toca roiPct — ele pertence à #611...'`) atribuindo-o a esta issue. Esse teste foi
+reescrito para provar o novo comportamento, não mais a ausência dele.
+
+Consumidores atualizados para `fmtPctOuIndef` (trocam "0,0%" por "—" quando indefinido):
+`tela-premissas.ts` (Resumo do Loteamento), `tela-proforma.ts` (KPI "Vendável / gleba"),
+`exportar.ts` (PDF). `tela-dashboard.ts` (Painel de estudos, coluna ROI) mantém `?? 0` — mesma
+convenção que `margemPct` já usa ali (decisão de desenho de tabela compacta, fora de escopo).
+`eficienciaParaFaixa`/`roiParaFaixa` (helpers da #611 fase 1, que separavam VALOR de "há base para
+colorir") viram aliases do campo cru — mantidos porque os call sites e os testes de fiação que os
+guardam já os nomeiam.
+
+Mutação verificada nos dois motores: reverter `null` para `0` em `proforma.ts` derruba 3 testes de
+`proforma.test.ts`; o mesmo em `proforma-avancado.ts` derruba o teste `#351` de
+`fluxo-apresentacao.test.ts` (adicionado o par "com investimento" / "sem investimento", igual ao
+molde da #604).
+
+Validação: `bash scripts/validar-frontend.sh` verde (typecheck + testes + build + 67 casos de
+render, Chromium). Backend/schema não tocados.
+
+---
+
 ## Cenários herda a reestrutura do Fluxo de Caixa — #596 (2026-08-29)
 
 Rodada 10, item A10-17. O pedido do autor: *"a mesma mudança que for feita na tabela de Fluxo de Caixa
