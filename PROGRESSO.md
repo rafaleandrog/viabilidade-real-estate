@@ -57,6 +57,7 @@ O caso `cenarios-sensibilidade` (COM catálogo) segue verde — o caminho normal
 `docs/viabilidade/formulas.md` dizia que `semProdutos` manda "a Proforma inteira" para o estado
 vazio. Era a descrição do que a #563 pretendia, não do que ela entregou; **com esta issue a frase
 passou a ser literal**, e o doc agora diz desde quando.
+
 ## #581 · R$ sem centavos no card de KPI — a única exceção declarada ao C7 (2026-08-28)
 
 Item 4 da leva Avançado da Rodada 10. Pedido do autor, literal: "Ajustar valores em R$ nos
