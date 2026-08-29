@@ -23,8 +23,15 @@ remover coluna é **escopo**, não falta de mecanismo. A remoção canônica fic
 fechou e que a issue proíbe por escrito. Saiu das 10 funções de `fluxo-shared.ts`, das 12 de
 `fluxo-caixa-motor.ts` (incluindo o campo `FluxoConfig.deflatorAreaAbertaPct` e o
 `ContextoCusto.deflatorAreaAbertaPct`), das 2 de `fluxo-invariantes.ts` e das 2 de
-`analise-mercado.ts`. Os sete consumidores do inventário pararam de ler o campo, e ele saiu de
-`CAMPOS_SOMENTE_AVANCADO` (`backend/rotas/estudos.ts`).
+`analise-mercado.ts`. Os sete consumidores do inventário pararam de ler o campo.
+
+⚠️ **`CAMPOS_SOMENTE_AVANCADO` CONTINUA listando `deflator_area_aberta_pct`**
+(`backend/rotas/estudos.ts:58`), e isso é deliberado — não é resto de conserto pela metade.
+Aquela entrada nunca foi leitor: é o FILTRO que impede o campo de alcançar o validador do
+shell num PATCH de estudo Preliminar, porque a tela reenvia o registro inteiro e o campo
+viaja no payload mesmo sem nenhuma tela para editá-lo. Enquanto a coluna existir no
+`schema.json`, a linha tem de existir; ela sai junto com a coluna, por migração com
+`dados.limparColuna`, e só então. Quem apagá-la antes disso quebra o PATCH do Preliminar.
 
 **A mudança de número está medida, não estimada, e é PARA CIMA.** No insumo real da EVI Urbitá
 (fechada 17.530,94390649873 m², aberta 907,466126361201 m², R$ 9.500/m², deflator 50%): o VGV vai de
