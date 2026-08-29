@@ -558,9 +558,18 @@ test('#351 proforma: R$/m² e % VGV têm base declarada e sobrevivem a área/VGV
   assert.notEqual(p.margemPct, null, 'com VGV > 0 a margem não pode ser indefinida');
   assert.ok(Math.abs(p.margemPct! - (p.resultado / p.vgv) * 100) <= 1e-9);
   // Estudo vazio: sem divisão por zero e sem NaN vazando para a tela.
+  //
+  // ⚠️ #604 INVERTEU esta asserção, e a inversão é o ponto da issue. Ela
+  // cobrava `pv.margemPct === 0` — ou seja, TRAVAVA o defeito: um percentual
+  // sem denominador publicado como "zero medido". Agora cobra `null`, que é o
+  // que distingue "mediu zero" de "não há base para medir".
+  //
+  // O que a #351 realmente queria daqui **continua valendo e continua aqui**:
+  // nada de divisão por zero, nada de NaN vazando para a tela. É a linha do
+  // `Number.isFinite` abaixo, que não mudou.
   const vazio = calcularFluxo({ ...CONFIG, linhasReceita: [], linhasCusto: [] });
   const pv = proformaAvancado(vazio, 0);
-  assert.equal(pv.margemPct, 0);
+  assert.equal(pv.margemPct, null);
   assert.ok(pv.linhas.every((l) => Number.isFinite(l.valor)));
 });
 
