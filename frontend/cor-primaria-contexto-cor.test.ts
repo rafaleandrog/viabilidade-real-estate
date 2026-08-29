@@ -69,7 +69,14 @@ test('#633: nenhuma propriedade CSS de cor usa --cor-primaria sem o sufixo -soli
     const fonte = semComentarios(readFileSync(arq, 'utf8'));
     // "<propriedade>: ...var(--cor-primaria" — a negative lookahead `(?!-)`
     // é o que distingue de `--cor-primaria-solida`/`-fundo`/`-borda`.
-    const re = /([a-z-]+)\s*:\s*[^;{}\n]*?var\(\s*--cor-primaria\b(?!-)/g;
+    //
+    // ⚠️ achado do Codex (rodada 1, PR 652): `[^;{}\n]` excluía QUEBRA DE
+    // LINHA do valor da declaração — uma declaração que quebra a linha antes
+    // do `var(...)` (`border: 1px solid\n  var(--cor-primaria)`, CSS
+    // multilinha válido) escapava da varredura em silêncio. `[^;{}]` (sem o
+    // `\n`) já casa quebra de linha por ser classe NEGADA — nenhuma flag `s`
+    // necessária —, e continua parando no `;`/`{`/`}` que fecha a declaração.
+    const re = /([a-z-]+)\s*:\s*[^;{}]*?var\(\s*--cor-primaria\b(?!-)/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(fonte))) {
       if (PROPRIEDADE_DE_COR.test(m[1])) {
