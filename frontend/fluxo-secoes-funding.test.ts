@@ -112,7 +112,15 @@ function comFunding(cfg: FluxoConfig): { c: FluxoCalc; funding: FundingNoFluxo }
   const c = calcularFluxo({ ...cfg, operacoesFunding: TRES_OPERACOES });
   // `resultadoFinal` real (não 0): é a base do retorno do equity no modo
   // `resultado_final`. Com 0, aquela ponta some e a fixture mente por omissão.
-  const resultadoFinal = c.fluxoMensal.reduce((s, v) => s + v, 0);
+  //
+  // ⚠️ E ele é o ENDPOINT DO ACUMULADO, não a soma crua dos mensais — porque é
+  // isso que a produção passa (`tela-fluxo-ver.ts` e `tela-cenarios.ts`, as
+  // duas: `calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] ?? 0`). Os dois
+  // números divergem quando o arredondamento por centavo acumulado difere da
+  // soma em ponto flutuante, e aí o retorno do equity nasce de uma base
+  // ARTIFICIAL — a identidade continuaria fechando internamente, sobre um
+  // número que nenhuma tela produz. Achado P2 do App de revisão.
+  const resultadoFinal = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] ?? 0;
   const fundingCalc = fundingDoEstudo(
     TRES_OPERACOES, c.fluxoMensal, c.receitaMensal, resultadoFinal, 42, cfg.taxaDescontoAa,
     { custosRaw: c.linhasCusto, linhasCusto: c.linhasCusto, cronograma: cfg.cronograma },
@@ -184,9 +192,41 @@ for (const [padrao, cfg] of PADROES) {
     assert.ok(restoTotal <= 0.005 * c.prazo + 0.01,
       `identidade no total: resíduo R$ ${restoTotal.toFixed(4)} em ${c.prazo} meses`);
 
-    // O acumulado também fecha: último do Livre + Σ entradas − Σ saídas.
+    // ── O ACUMULADO, PERÍODO A PERÍODO — e não só nos dois totais terminais.
+    //
+    // ⚠️ Comparar apenas os endpoints deixa passar exatamente o defeito que
+    // importa aqui: se uma célula INTERMEDIÁRIA do acumulado deixar de usar o
+    // `round2` iterado e a última continuar certa, a asserção terminal passa —
+    // ainda mais com uma tolerância grande o bastante para absorver o
+    // arredondamento por período. E a identidade mensal acima não cobre isto,
+    // porque ela olha só as linhas NÃO acumuladas. Achado P2 do App de revisão.
     const acumulado = nome('Fluxo de Caixa Acumulado');
     const livreAcum = nome('Fluxo de Caixa Livre Acumulado');
+
+    // Reconstrói o saldo corrente com a MESMA regra do motor (`round2` a cada
+    // passo, não soma crua) e confronta as duas linhas acumuladas inteiras.
+    const round2 = (v: number) => Math.round(v * 100) / 100;
+    const correndo = (serie: number[]): number[] => {
+      const out: number[] = [];
+      let acc = 0;
+      for (const v of serie) { acc = round2(acc + v); out.push(acc); }
+      return out;
+    };
+    const livreEsperado = correndo(livre.mensal);
+    const caixaEsperado = correndo(caixa.mensal);
+    for (let m = 0; m < c.prazo; m++) {
+      assert.ok(Math.abs(livreAcum.mensal[m] - livreEsperado[m]) <= 0.01,
+        `Livre Acumulado divergiu do saldo corrente no mês ${m}`);
+      assert.ok(Math.abs(acumulado.mensal[m] - caixaEsperado[m]) <= 0.01,
+        `Fluxo de Caixa Acumulado divergiu do saldo corrente no mês ${m}`);
+      // E a identidade vale no acumulado também, período a período.
+      const entAte = entradas.mensal.slice(0, m + 1).reduce((s, v) => s + v, 0);
+      const saiAte = saidas.mensal.slice(0, m + 1).reduce((s, v) => s + v, 0);
+      assert.ok(Math.abs((livreAcum.mensal[m] + entAte - saiAte) - acumulado.mensal[m]) <= 0.01,
+        `identidade no ACUMULADO quebrou no mês ${m}`);
+    }
+
+    // Só então os totais terminais, que é o que o rodapé publica.
     const restoAcum = Math.abs((livreAcum.total + entradas.total - saidas.total) - acumulado.total);
     assert.ok(restoAcum <= 0.005 * c.prazo + 0.01, `acumulado: resíduo R$ ${restoAcum.toFixed(4)}`);
   });
@@ -271,12 +311,26 @@ for (const [padrao, cfg] of PADROES) {
     assert.equal(nome('Fluxo de Caixa Acumulado').vpl, c.vpl + funding.vplLiquido);
 
     // Os KPIs (`kpisFluxo`) leem `FluxoCalc`, que o funding não toca: TIR, VPL
-    // e Payback são os desalavancados por §8.1. A prova de que esta issue não
-    // os realavancou é que o cartão continua publicando os valores de `c`.
-    const semFunding = calcularFluxo({ ...cfg, operacoesFunding: TRES_OPERACOES });
-    assert.equal(semFunding.vpl, c.vpl, 'VPL do motor não depende de funding');
-    assert.equal(semFunding.tir, c.tir, 'TIR do motor não depende de funding');
-    assert.equal(semFunding.paybackMes, c.paybackMes, 'Payback do motor não depende de funding');
+    // e Payback são os desalavancados por §8.1.
+    //
+    // ⚠️ A comparação é contra um `calcularFluxo(cfg)` SEM `operacoesFunding` —
+    // e a distinção não é cosmética. Comparar contra `{ ...cfg,
+    // operacoesFunding }` seria refazer o MESMO cálculo de `c`, e as três
+    // igualdades abaixo virariam tautologias incapazes de detectar metadado de
+    // funding vazando para VPL/TIR/Payback. Achado P2 do App de revisão.
+    //
+    // `operacoesFunding` pode legitimamente mudar UMA coisa: o `prazo` (é o
+    // horizonte, #446). Nesta fixture as operações quitam dentro do horizonte
+    // operacional, então os prazos coincidem — e aí qualquer diferença nos
+    // indicadores seria vazamento. A asserção de prazo é o que mantém a
+    // comparação honesta: se um dia divergir, ela falha e obriga a rever o
+    // teste em vez de deixá-lo comparar maçã com laranja.
+    const semOperacoes = calcularFluxo(cfg);
+    assert.equal(semOperacoes.prazo, c.prazo,
+      'nesta fixture as operações quitam dentro do horizonte — se isso mudar, a comparação abaixo perde o sentido');
+    assert.equal(semOperacoes.vpl, c.vpl, 'VPL do motor não depende de funding');
+    assert.equal(semOperacoes.tir, c.tir, 'TIR do motor não depende de funding');
+    assert.equal(semOperacoes.paybackMes, c.paybackMes, 'Payback do motor não depende de funding');
     const textosKpi = textosDoTemplate(kpisFluxo(c));
     assert.ok(textosKpi.length > 0, 'kpisFluxo tem que produzir conteúdo');
   });

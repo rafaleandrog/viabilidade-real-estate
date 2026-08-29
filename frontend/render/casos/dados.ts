@@ -213,7 +213,10 @@ export function fluxoComFunding(): FluxoCalc {
 /** `FundingCalc` de verdade, saído do motor de verdade, sobre o calc acima. */
 export function fundingDeFluxo() {
   const c = fluxoComFunding();
-  const resultadoFinal = c.fluxoMensal.reduce((s, v) => s + v, 0);
+  // ⚠️ Endpoint do ACUMULADO, como a produção faz (`tela-fluxo-ver.ts` e
+  // `tela-cenarios.ts`) — não a soma crua dos mensais, que diverge dele quando
+  // o arredondamento por centavo acumulado difere da soma em ponto flutuante.
+  const resultadoFinal = c.fluxoAcumulado[c.fluxoAcumulado.length - 1] ?? 0;
   return fundingDoEstudo(
     OPERACOES_FUNDING, c.fluxoMensal, c.receitaMensal, resultadoFinal, 42, 12,
     { custosRaw: c.linhasCusto, linhasCusto: c.linhasCusto, cronograma: CRONO },
