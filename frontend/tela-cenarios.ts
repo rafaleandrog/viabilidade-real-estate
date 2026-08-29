@@ -138,8 +138,12 @@ export class ViabTelaCenarios extends LitElement {
     .slider { margin: 14px 0; }
     .slider-topo { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
     .slider-topo .rot { font-weight: 600; }
-    .slider-topo .val { font-variant-numeric: tabular-nums; color: var(--cor-primaria, #7c5cff); font-weight: 700; }
-    .slider input[type="range"] { width: 100%; accent-color: var(--cor-primaria, #7c5cff); }
+    /* #633 — mesmo diagnóstico do bloco --urbi-grafico-cor-2 acima (#595): */
+    /* --cor-primaria é um GRADIENTE nas 4 variantes de tema, inválido em */
+    /* contexto de cor (color/accent-color) — invalid-at-computed-value-time. */
+    /* --cor-primaria-solida é a variante pensada para isto. */
+    .slider-topo .val { font-variant-numeric: tabular-nums; color: var(--cor-primaria-solida, #7c5cff); font-weight: 700; }
+    .slider input[type="range"] { width: 100%; accent-color: var(--cor-primaria-solida, #7c5cff); }
     .slider-lim { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-top: 2px; }
     .salvar { display: flex; gap: 8px; align-items: flex-end; margin-top: 18px; flex-wrap: wrap; }
     .salvar urbi-input { flex: 1; min-width: 140px; }

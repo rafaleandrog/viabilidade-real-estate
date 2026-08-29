@@ -136,7 +136,10 @@ export class ViabTelaAnaliseMercado extends LitElement {
     .risco.sev-baixa { border-left-color: var(--cor-info, #2aa9e0); }
     .risco-cab, .coleta-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
     .risco p, .coleta p { margin: 4px 0 0; font-size: 0.85rem; }
-    .coleta a { color: var(--cor-primaria, #2aa9e0); }
+    /* #633 — --cor-primaria é um GRADIENTE nas 4 variantes de tema do */
+    /* espelho, inválido em contexto de cor (invalid-at-computed-value-time). */
+    /* --cor-primaria-solida é a variante pensada para isto. */
+    .coleta a { color: var(--cor-primaria-solida, #2aa9e0); }
 
     /* #201 — cabeçalho com a localidade, procedência por indicador e insight. */
     .cabecalho { margin-bottom: 10px; }
