@@ -142,7 +142,13 @@ test('#589: a aba default continua `resumo`, e não a 1ª posição de PAGINAS',
 test('#589: a lista lateral é a MESMA para Loteamento e Incorporação', () => {
   const listaDe = (padrao: string) => {
     const el = telaAvancado();
-    el.estudo = { id: 1, padrao, tipo: padrao };
+    // `tipo_empreendimento` é o campo CANÔNICO do estudo (frontend/tela-estudo.ts,
+    // `this.estudo.tipo_empreendimento`); `padrao`/`tipo` não existem no modelo e
+    // ficam aqui só como ruído inerte. Sem o canônico as duas chamadas
+    // entregariam `undefined` e exercitariam o MESMO caminho — o deepEqual
+    // passaria por construção, inclusive depois de alguém introduzir a
+    // ramificação que este teste diz barrar.
+    el.estudo = { id: 1, tipo_empreendimento: padrao, padrao, tipo: padrao };
     const secoes = bindingPorSufixo(el.render(), '.secoes=') as { itens: { id: string; label: string }[] }[];
     return secoes[0].itens.map((p) => `${p.id}:${p.label}`);
   };
