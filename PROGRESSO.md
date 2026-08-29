@@ -58,6 +58,57 @@ recolorir card. Trocar o `0,0%` por "—" quando a gleba não foi informada cont
 
 ---
 
+## #583 · o sufixo de mês não salta mais da caixa do campo no Cronograma (2026-08-28)
+
+Item 6 da leva do Avançado de 2026-08-26 (com screenshot), **P2**. Nos campos Início e Duração da
+tela de Cronograma, `jan/27` / `dez/27` eram **pintados por fora da borda arredondada** do campo.
+
+**A causa, medida.** O `.input-wrap` do `viab-num` é um flex de **uma linha** com quatro filhos que
+não cedem: o `input` (piso de `min-width: 4ch`, posto pela #245), o `.stepper` e os **dois**
+`.afixo` (`sufixo` = a unidade, `sufixo-mes` = o mês). A soma mínima deles dá **139–148px** — e o
+teto do campo era `max-width: 18ch`, que na fonte real da tabela (`td` em `0.8125rem`) vale
+**128px**. Como o `.input-wrap` não declara `overflow`, `flex-wrap` nem `text-overflow`, o
+excedente não é cortado nem quebrado: ele vaza para fora da borda. 11 a 20px por campo.
+
+**É o eixo que a #245 não mediu.** Aquela issue mediu **truncamento** (`scrollWidth > clientWidth`
+do input e de cada afixo) e acertou: o número parou de ser cortado. Só que ele parou de ser cortado
+**porque os afixos deixaram de ceder**, e o preço foi empurrá-los para fora da caixa — outro eixo,
+sem lente nenhuma.
+
+**Como ficou.** O teto de `.campo-mes viab-num` sobe de `18ch` para **`24ch`**. Não se fez os afixos
+encolherem (`min-width: 0` + `ellipsis`) porque isso trocaria o transbordo por um mês **amputado**
+(`jan/2…`) — perder o dado em silêncio é a mesma classe de defeito que a #245 corrigiu no número.
+O piso foi **medido no harness**: com 20ch ainda há campo transbordando; **21ch já sai limpo**;
+24ch é esse piso com folga. E continua **abaixo** do `max-content` do `.input-wrap` (~280px), o que
+importa porque é o **teto**, e não o conteúdo, que iguala a largura de Início e Duração — "º mês" e
+"meses" rendem diferente, e só o teto mordendo os dois mantém o critério da #245.
+`.params viab-num` fica em 18ch: nenhum `viab-num` é montado dentro de `.params` hoje.
+
+**A rede nova.** `frontend/render/casos/cronograma-sufixo-mes.ts` + o teste ao lado montam a tela
+com valores de 1 a 3 dígitos, linhas travadas e editáveis, fases fixas e customizadas, em
+1280/900/600px. `viab-num` é componente **deste** repositório: o harness mede o markup real do
+shadow DOM, não um stub.
+
+**As duas lacunas de `scripts/render-check-cronograma.mjs`, e por que ele passava.** A rede manual
+da #245 (1) só tinha a lente de **truncamento**, e (2) copiava a tela **sem o `font-size` do `td`**
+— então o `ch` do `max-width` resolvia contra os 16px do root e o campo nascia com **183px** ali
+contra 128px na tela: largo demais para o defeito caber. As duas foram fechadas: a sonda ganhou a
+lente de **transbordo do `.input-wrap`**, e o `td` do fixture ganhou o `font-size` da tela. Com isso
+o script passou a **enxergar** o bug (`--largura …max-width:18ch` ⇒ 4 campos, 12px por fora) e a
+passar limpo com o conserto.
+
+**Verificação.** `bash scripts/validar-frontend.sh` verde — 871 testes de frontend e **59** casos de
+render (baseline da `main` em `3c0a1a9`: 871 e 57; o PR não acrescenta teste unitário, só render).
+Mutação com controle antes e depois: `24ch` → `18ch` deixa o caso novo **vermelho com 66 achados**
+de `transbordoDeCaixa` (22 por largura, 3 larguras; `scrollWidth` 139–148px contra `clientWidth`
+128px), e o controle volta verde ao desfazer. O **piso foi varrido**, não estimado: 18ch e 20ch
+vermelhos, 21ch e 22ch limpos. Sem migração → **a `versao` não bumpa**.
+
+> ⚠️ **O `transbordoDeTexto` de um `<text>` do gantt em 1280px é ANTERIOR e alheio** — medido igual
+> antes e depois do conserto. Por isso o teste assevera zero em `transbordoDeCaixa` (a lente
+> determinística, que é a forma deste bug) e restringe a asserção de texto aos campos de mês, em vez
+> de zerar uma lente dependente de fonte sobre uma região que este PR não toca.
+
 ## #610 · a sub-aba Cenários ganha o estado vazio da Proforma sem catálogo (2026-08-28)
 
 Achado da auditoria #574, aprovado pelo autor. A **#563** mandou a Proforma para o estado vazio
