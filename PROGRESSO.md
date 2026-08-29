@@ -48,6 +48,59 @@ Sem migração, `versao` não bumpa: é CSS mais uma classe de apresentação. N
 `proforma-avancado.ts` não foi tocado.
 
 ---
+## #610 · a sub-aba Cenários ganha o estado vazio da Proforma sem catálogo (2026-08-28)
+
+Achado da auditoria #574, aprovado pelo autor. A **#563** mandou a Proforma para o estado vazio
+quando não há catálogo efetivo, mas gateou **só a tabela principal**. O resultado era o mesmo estudo
+respondendo coisas opostas em duas abas vizinhas: "não há receita modelada" na Proforma, e
+**Bear/Base/Bull inteiros** em Cenários — com os números vindos exatamente da fonte que a #563
+tinha acabado de recusar (os pares legados de área × preço, sem campo em tela nenhuma), agora
+multiplicados por ±10% em três colunas. **Um número-fantasma estressado continua fantasma.**
+
+**Como ficou.** `_renderSemProdutos` passou a receber o **título do card** e é chamada pelas duas
+sub-abas: `'Proforma'` numa, `'Análise de sensibilidade'` na outra. Ícone, mensagem e submensagem
+são os MESMOS — é o pedido literal da issue, e a submensagem já nomeia o que falta ver ("VGV,
+custos e resultado"), que é o conteúdo das duas tabelas da sensibilidade também. Duplicar o texto
+para "adaptá-lo" criaria duas cópias para divergirem.
+
+**O parâmetro é obrigatório de propósito.** Um default deixaria um chamador novo herdar "Proforma"
+dentro da aba errada, em silêncio. Sem default, esquecê-lo é `TS2554` — medido: apagar o argumento
+das duas chamadas dá erro de compilação nas duas linhas.
+
+**A verificação vem em ordem invertida, e é o que dá valor a ela.** O caso de render
+`cenarios-sem-produtos` foi escrito e rodado **ANTES** do conserto, e falhou **pelo motivo certo**:
+`faltou "div.pf-vazio": exigia 1 visível(is), achou 0`, com 144 nós já montados — as tabelas da
+sensibilidade desenhadas sobre um estudo sem catálogo, em Chromium. Não é dedução a partir do
+código: é a tela medida no estado do defeito.
+
+> **A ausência precisava de prova, e o harness não tem asserção de ausência.** `exigir` só sabe
+> exigir presença — um ramo que desenhasse o estado vazio **e** as tabelas passaria por ele. A
+> tentação era declarar um `seletoresAusentes` no caso; isso teria sido **pior que nada**, porque o
+> harness ignora campo que não conhece **em silêncio**, exatamente como a prop inexistente de
+> primitivo `urbi-*` que o `CLAUDE.md` descreve. Conferi a superfície real em
+> `scripts/render-check.d.mts` antes de confiar: o campo não existe.
+>
+> A prova saiu do mecanismo que já existe, pelo avesso: o caso **não declara**
+> `urbi-select.label`/`.opcoes` em `aceitaNaoReproduzido`. Se a sensibilidade voltar a renderizar
+> nesta condição, o `urbi-select` aparece, as duas props entram em uso sem declaração e o
+> `naoDeclaradas` fica vermelho. **Medido**, não presumido: com um ramo que desenha as duas coisas,
+> o teste reprova com `props NÃO reproduzidas e NÃO declaradas: urbi-badge.cor, urbi-select.label,
+> urbi-select.opcoes`.
+
+**Verificação.** `scripts/validar-frontend.sh` verde nas 8 etapas: **842** testes de lógica pura e
+**57** casos de render (baseline da `main` em `4ab2b88`: 842 e 56). O teste de lógica pura **não
+mudou de número, e isso está certo** — `semProdutos` já é coberto por `frontend/proforma.test.ts`, e
+o que faltava não era cálculo, era fiação. Acrescentar teste de função pura aqui seria decoração:
+nenhum deles monta a tela, e o gate ausente os deixava todos verdes.
+
+Mutações, com controle verde antes e depois: apagar o gate do ramo `cenarios` (volta ao
+comportamento da `main`) → **1 vermelho**; ramo que desenha estado vazio **e** sensibilidade →
+**1 vermelho** (pelo `naoDeclaradas`, como acima); apagar o argumento `titulo` → **2 erros TS2554**.
+O caso `cenarios-sensibilidade` (COM catálogo) segue verde — o caminho normal não foi tocado.
+
+`docs/viabilidade/formulas.md` dizia que `semProdutos` manda "a Proforma inteira" para o estado
+vazio. Era a descrição do que a #563 pretendia, não do que ela entregou; **com esta issue a frase
+passou a ser literal**, e o doc agora diz desde quando.
 
 ## #595 · a série do cenário simulado no card de comparação (2026-08-28)
 
