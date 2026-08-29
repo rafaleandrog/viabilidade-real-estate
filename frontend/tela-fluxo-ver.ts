@@ -213,8 +213,6 @@ export class ViabFluxoVer extends LitElement {
       ret: d.ret,
       // #473: default true preserva o comportamento histórico (VGV bruto).
       corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
-      // #462: deflator de preço da área aberta — ausente/0 reproduz o VGV anterior.
-      deflatorAreaAbertaPct: Number(this.estudo?.deflator_area_aberta_pct) || 0,
       // #446: o horizonte precisa cobrir a quitação das operações, senão a
       // série é cortada e `saldoFinal` exibe um saldo truncado.
       operacoesFunding: this.operacoes,
@@ -222,8 +220,6 @@ export class ViabFluxoVer extends LitElement {
     this.calc = calcularFluxo(config);
     this.fundingCalc = null;
     this.funding = null;
-    const deflatorPct = Number(this.estudo?.deflator_area_aberta_pct) || 0;
-
     // #474 (Passos 23–25, D-Q03 2026-08-22): esta montagem
     // (resultadoFinal → fundingDoEstudo) é LOCAL. O app não tem uma função
     // única para essa sequência (`docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`)
@@ -265,8 +261,8 @@ export class ViabFluxoVer extends LitElement {
       // #335: categoria de custo repetida no mesmo grupo — reversão da #179
       // deixou de bloquear, agora é alerta visível na Reconciliação.
       ...validarCustosDuplicados(d.custos),
-      ...validarContratacao(receitas, d.crono, this.calc.prazo, this.calc.vendaBrutaContratada, TOLERANCIA_PADRAO, d.custos, deflatorPct),
-      ...validarSafrasReceita(receitas, d.crono, this.calc.prazo, TOLERANCIA_PADRAO, d.custos, deflatorPct),
+      ...validarContratacao(receitas, d.crono, this.calc.prazo, this.calc.vendaBrutaContratada, TOLERANCIA_PADRAO, d.custos),
+      ...validarSafrasReceita(receitas, d.crono, this.calc.prazo, TOLERANCIA_PADRAO, d.custos),
       ...validarFluxoCalc(this.calc),
       // #441: reconciliação Catálogo × Premissas — só emite algo em estudo
       // `nivel_analise === 'avancado'`.
