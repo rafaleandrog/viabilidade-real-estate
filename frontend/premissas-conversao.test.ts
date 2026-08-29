@@ -372,6 +372,33 @@ test('#514 `link: \'vgv\'` não aparece mais em pct_obra', () => {
   assert.match(linhaPctObra!, /link:\s*'obra'/);
 });
 
+// Achado de revisão do Codex no PR #643 (P2): converter a PRÓPRIA linha para
+// `pct_obra` contava essa linha na base de `_totalObra`, porque ela só sai do
+// filtro por unidade DEPOIS que o PATCH volta — no momento da conversão ela
+// ainda está com a unidade antiga em `this.custos`. Exemplo: Construção
+// R$ 50.000.000 e Gestão R$ 5.000.000 (ambas `rs`); converter Gestão para
+// `% Obra` gravava 5/(50+5)×100 = 9,09%, e a tela — assim que a resposta
+// chega e o filtro passa a excluir a própria linha — mostra 5/50×100 = 10%.
+// `orcamento_valor` persistido divergindo do que a tela exibe é exatamente o
+// invariante que a #442 existe para proteger.
+//
+// Como `tela-fluxo-custos.ts` é um componente Lit e nenhum arquivo de teste o
+// importa (mesma razão de sempre — ver a nota de `dadosDaTrocaDeUnidade`
+// acima), a prova é por leitura de fonte: toda chamada de `_ctxConversao()`
+// precisa passar `excluirId` (`c.id`), para `_totalObra` excluir a linha
+// sendo lida/convertida independente da unidade que ela tem AGORA.
+test('#514/#590 (achado de revisão, PR #643): toda chamada de _ctxConversao() passa excluirId', () => {
+  const src = readFileSync(new URL('./tela-fluxo-custos.ts', import.meta.url), 'utf8');
+  const chamadas = src.match(/this\._ctxConversao\([^)]*\)/g) ?? [];
+  assert.ok(chamadas.length > 0, 'nenhuma chamada de _ctxConversao() encontrada — o método mudou de nome?');
+  for (const chamada of chamadas) {
+    assert.notEqual(
+      chamada, 'this._ctxConversao()',
+      'chamada sem excluirId reintroduz o achado do Codex: a linha entraria na própria base ao converter para pct_obra',
+    );
+  }
+});
+
 // ── o rótulo do Funding (#442) ──────────────────────────────────────────────
 
 test('#442 rótulo: prefere o total do motor', () => {
