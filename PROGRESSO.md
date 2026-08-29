@@ -27,6 +27,27 @@ PR toca.
 Mutação: reverter qualquer uma das 3 correções (`-solida` → sem sufixo) derruba o teste novo.
 
 Validação: `bash scripts/validar-frontend.sh` verde — 956 testes, 68 casos de render.
+## Cor de série sai do dado, entra em CSS — gráfico econômico do Fluxo de Caixa — #632 (2026-08-29)
+
+Rodada 10. Mesmo diagnóstico da #595 (relatório de encerramento da revisão do PR 629): a #595
+consertou só o card "Fluxo acumulado — cenário real × cenário simulado" (aba Cenários,
+`comparacaoCenario`), deixando `seriesEconomicasFluxo` (o gráfico "Contratação, Receita Bruta,
+Carteira e Repasse" da aba Fluxo de Caixa) no padrão antigo — `cor` como STRING dentro de cada item
+de `series`, sem garantia de que o primitivo a honra, e a 1ª série usando `--cor-primaria`
+(gradiente nas 4 variantes de tema, inválido em contexto de cor).
+
+`SerieEconomicaFluxo` perdeu o campo `cor`; as 4 cores saem por `--urbi-grafico-cor-1..4` no CSS do
+host que renderiza o gráfico (`frontend/tela-fluxo-ver.ts`, seletor `.graf urbi-grafico-linha`), na
+mesma ordem das séries, com `--cor-primaria-solida` no lugar de `--cor-primaria`. Teste de fonte
+novo (`frontend/fluxo-economico-series.test.ts`), no molde de `fluxo-cenario-series.test.ts`:
+contagem de `cor:` no bloco-fonte de `seriesEconomicasFluxo` (zero) + fiação (o `urbi-grafico-linha`
+chama `seriesEconomicasFluxo` e as 4 custom properties existem no CSS) + guard contra
+`--cor-primaria` sem o sufixo `-solida`.
+
+Mutação: reintroduzir `cor:` no motor derruba o 1º teste; apagar o bloco CSS derruba os outros
+dois. Os dois casos de render existentes que cobrem `tela-fluxo-ver.ts` seguem verdes (68/68).
+
+Validação: `bash scripts/validar-frontend.sh` verde — 955 testes, 68 casos de render.
 ## #634 · paginação de linhas de custo >500 truncava a duplicação de estudo em silêncio (2026-08-29)
 
 `duplicarDadosAvancado` (`backend/rotas/avancado.ts`) lia `avancado_linhas_custo` com
