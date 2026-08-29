@@ -1,9 +1,9 @@
 // Caso de render: o "Painel do investidor" do Funding (`.ind-card`,
-// `frontend/tela-funding.ts:144`) com uma operação de 9 DÍGITOS (#579 —
+// `frontend/tela-funding.ts:168`) com uma operação de 9 DÍGITOS (#579 —
 // "o VALOR salta para fora do quadro do KPI"). Markup próprio (sem shadow
 // DOM), mesma família de defeito/defesa de `fluxo-tabela.ts` .kpi-card.
 //
-// `_renderIndicadores(o)` (frontend/tela-funding.ts:522) lê
+// `_renderIndicadores(o)` (frontend/tela-funding.ts:559) lê
 // `this.funding.operacoes` — não basta forçar `this.operacoes`, o `FundingCalc`
 // precisa ser real (`fundingDoEstudo`, a mesma função que a tela chama em
 // `_recalcular`). A dívida-exemplo é `DIVIDA_GOLDEN`
@@ -13,7 +13,7 @@
 //
 // ⚠️ MEDIDO (#579 critério 3): ao contrário de `fluxo-tabela.ts` (onde a
 // track alargada e o `overflow-wrap` são REDUNDANTES — apagar um só não
-// derruba o teste), `.ind` (`frontend/tela-funding.ts:143`) NUNCA teve a
+// derruba o teste), `.ind` (`frontend/tela-funding.ts:167`) NUNCA teve a
 // track alargada — continua em `minmax(150px, 1fr)`, mais estreita que o
 // piso 180px do resto do inventário. Apagar só o `overflow-wrap` de
 // `.ind-card .val` já deixa este teste vermelho sozinho (2 achados, 900px)
@@ -47,15 +47,15 @@ export const caso = {
     // Banner regulatório (§17/#277) — sempre presente, fora do escopo deste
     // indicador, mas na mesma tela.
     'urbi-banner.variante',
-    // "Distribuir aporte" (`_renderCamposDivida`) — o `<urbi-checkbox>` do
-    // formulário de Dívida acima do painel medido.
-    'urbi-checkbox.desabilitado',
-    'urbi-checkbox.label',
-    'urbi-checkbox.marcado',
-    // "Mês do aporte" (`_renderAncora`) — mesmo formulário.
+    // #586: a tela passou a montar `urbi-abas`, e o painel medido vive dentro
+    // da aba Dívida. As duas props do primitivo de abas não são reproduzidas
+    // pelo stub (`abas` é só-propriedade; `ativa` não dimensiona nada).
+    'urbi-abas.abas',
+    'urbi-abas.ativa',
+    // "Mês do aporte" (`_renderAncora`) — o formulário de Dívida acima do
+    // painel medido.
     'urbi-select.desabilitado',
     'urbi-select.opcoes',
-    'urbi-icone.classe',
     'urbi-input.desabilitado',
     // `urbi-badge`/`urbi-botao` NÃO entram: `editavel: false` (o caso mede
     // só a leitura) esconde os 4 `urbi-botao` de edição, e `<urbi-badge>`

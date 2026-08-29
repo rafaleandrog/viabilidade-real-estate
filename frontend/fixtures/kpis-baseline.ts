@@ -208,6 +208,14 @@ export function kpisDoCaso(config: FluxoConfig, operacoes: OperacaoFunding[]): K
   // saem dele — é justamente o que impede a catraca de cegar com este conserto.
   const p = proformaAvancado(c, areaPrivativa);
   const soma = (xs: number[] | undefined) => (xs ?? []).reduce((t, v) => t + v, 0);
+  // #604: `margemPct` virou `number | null`. Aqui não se usa `?? 0`: um
+  // baseline de catraca com margem INDEFINIDA não é um baseline — seria uma
+  // linha comparando 0 contra 0 e passando para sempre. Todo estudo desta
+  // fixture tem Receita Bruta > 0; se algum dia deixar de ter, é para explodir
+  // ruidosamente aqui, não para virar zero em silêncio.
+  if (p.margemPct === null) {
+    throw new Error('baseline com Receita Bruta ≤ 0: a margem é indefinida e a catraca perderia o sentido');
+  }
   return {
     resultado: p.resultado, margemPct: p.margemPct, roiPct: p.roiPct, tir: c.tir,
     caixaFinalAlavancado: funding ? (funding.fluxoAcumulado[funding.fluxoAcumulado.length - 1] ?? 0) : null,

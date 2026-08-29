@@ -51,11 +51,18 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 //
 //   | Superfície              | Visão       | Funding                       |
 //   |-------------------------|-------------|-------------------------------|
-//   | aba Fluxo de Caixa      | CAIXA       | AS DUAS PONTAS: a liberação   |
-//   | (`fluxo-tabela.ts`,     |             | no bloco "Funding — Capital   |
-//   |  bloco `funding-capital`|             | (entradas)" e o serviço da    |
-//   |  + subtotal do grupo    |             | dívida dentro do subtotal do  |
-//   |  `financeiro`)          |             | grupo `financeiro`            |
+//   | aba Fluxo de Caixa      | CAIXA       | AS DUAS PONTAS, e desde a     |
+//   | (`fluxo-tabela.ts`,     |             | #592 as duas em BLOCO         |
+//   |  blocos `funding-capital`|            | PRÓPRIO: a liberação em       |
+//   |  e `funding-servico`)   |             | "Funding — Capital (entradas)"|
+//   |                         |             | e o serviço em "Funding —     |
+//   |                         |             | Serviço (saídas)", entre o    |
+//   |                         |             | fecho do Fluxo de Caixa Livre |
+//   |                         |             | e o do Fluxo de Caixa         |
+//   | **aba Cenários,**       | CAIXA       | IDEM — é a MESMA função       |
+//   | **tabela de fluxo**     |             | `tabelaFluxo`, provado por    |
+//   | (`tela-cenarios.ts`     |             | `cenarios-heranca-fluxo.test.ts`|
+//   |  `:403`)                |             | (#596)                        |
 //   | aba Resultados / Painel | ECONÔMICA,  | NENHUMA PONTA                 |
 //   | (esta função)           | antes de    |                               |
 //   |                         | capitalizar |                               |
@@ -63,11 +70,21 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 //   | "Resultado após custo   | menos o     | toda dívida + retorno de      |
 //   | financeiro"             | custo de    | equity do resultado DESTA     |
 //   | (`tela-cenarios.ts`     | capital     | função — nunca o principal    |
-//   |  `:256-265`, `:363`)    |             |                               |
+//   |  `:306-315`, `:416-425`)|             |                               |
 //
-// A terceira linha é a que confunde: ela NÃO é uma variante desta função, é uma
-// subtração feita depois, na tela de Cenários. Quem for reabrir o rótulo (#447)
-// precisa das três, não das duas primeiras.
+// ⚠️ A #592 mudou a PRIMEIRA linha desta tabela, e a correção veio junto com a
+// #596. Antes ela dizia que o serviço da dívida vivia "dentro do subtotal do
+// grupo `financeiro`" — verdade até a #592, falsa depois dela: o grupo
+// `financeiro` voltou a valer só as linhas que o USUÁRIO classificou ali, e o
+// serviço ganhou bloco próprio. Doc que descreve estrutura antiga é pior que
+// doc ausente: manda o próximo leitor procurar no lugar errado e concluir que
+// sumiu.
+//
+// A ÚLTIMA linha é a que confunde: ela NÃO é uma variante desta função, é uma
+// subtração feita depois, na tela de Cenários — e continua sendo um TERCEIRO
+// número, diferente tanto do Fluxo de Caixa Livre quanto do Fluxo de Caixa,
+// porque não desconta o principal. Quem for reabrir o rótulo (#447) precisa das
+// quatro leituras, não das duas primeiras.
 //
 // ⚠️ Note que "as duas pontas" NÃO quer dizer que elas se anulam: o principal
 // devolvido cancela o principal liberado, mas os juros e qualquer saldo
@@ -111,8 +128,18 @@ export interface LinhaProformaAv {
    * fecho cujo denominador não é o VGV puro (`Resultado + Permutas` usa
    * `VGV + permutas físicas`). Quando ausente, a tela calcula `valor / vgv`
    * como faz para todas as outras linhas.
+   *
+   * ⚠️ #604 — SÃO TRÊS ESTADOS, e confundir dois deles é o defeito.
+   *   · `undefined` — a linha não tem base própria: a tela usa `valor / vgv`;
+   *   · `number`    — a base própria mediu;
+   *   · `null`      — a base própria é INVÁLIDA (≤ 0) e o percentual **não
+   *                   existe**. Não é zero, e não é "use a outra base".
+   *
+   * Por isso quem consome NÃO pode escrever `pctOverride ?? pctVgv(valor)`:
+   * `??` trata `null` como ausência e cairia no VGV puro, publicando um número
+   * com o denominador errado. O teste discriminante é `!== undefined`.
    */
-  pctOverride?: number;
+  pctOverride?: number | null;
   /**
    * #427 — nota do denominador usado (ex.: "1 / (VGV + Permutas Físicas)"),
    * no molde de `Premissas e Resultados!K36` da EVI: só presente quando a
@@ -128,7 +155,14 @@ export interface ProformaAvancado {
   vgv: number;
   areaPrivativa: number;
   resultado: number;
-  margemPct: number;
+  /**
+   * #604 — `null` quando a Receita Bruta é ≤ 0: a margem não foi medida, e
+   * "0,0%" ali seria um número inventado. É literalmente o mesmo valor de
+   * `pctResultado` (o `pctOverride` da linha "= Resultado"), então tinha de
+   * virar `null` junto — senão a MESMA grandeza sairia "—" na tabela e "0,0%"
+   * no rodapé do mesmo card, a dois centímetros de distância.
+   */
+  margemPct: number | null;
   /**
    * #427 — segunda leitura da EVI (`Premissas e Resultados!P37/R37`):
    * `resultado` com a permuta financeira ESTORNADA de volta (ela havia sido
@@ -136,8 +170,9 @@ export interface ProformaAvancado {
    * permuta financeira já mora dentro dele, não muda o denominador.
    */
   resultadoMaisPermutaFinanceira: number;
-  /** `resultadoMaisPermutaFinanceira / vgv * 100` — precisão plena (C7). */
-  pctResultadoMaisPermutaFinanceira: number;
+  /** `resultadoMaisPermutaFinanceira / vgv * 100` — precisão plena (C7).
+   * #604: `null` com VGV ≤ 0 — mesma base de `margemPct`, mesmo desfecho. */
+  pctResultadoMaisPermutaFinanceira: number | null;
   /**
    * #427 — terceira leitura da EVI (`Premissas e Resultados!P35/R35`):
    * `resultadoMaisPermutaFinanceira` mais a permuta física (que nunca passou
@@ -145,8 +180,10 @@ export interface ProformaAvancado {
    * permuta física, porque ela também não estava no VGV.
    */
   resultadoMaisPermutas: number;
-  /** `resultadoMaisPermutas / (vgv + permuta física) * 100` — precisão plena. */
-  pctResultadoMaisPermutas: number;
+  /** `resultadoMaisPermutas / (vgv + permuta física) * 100` — precisão plena.
+   * #604: `null` quando a base própria (`vgv + permuta física`) é ≤ 0. É uma
+   * base DIFERENTE das outras duas: pode existir com o VGV zerado. */
+  pctResultadoMaisPermutas: number | null;
   /**
    * Custo direto + custo indireto — a MESMA definição do Preliminar
    * (`proforma.ts`, `investimentoTotal = custoDiretoTotal + custoIndiretoTotal`).
@@ -297,11 +334,17 @@ export function proformaAvancado(
   const resultadoMaisPermutas = round2(resultadoMaisPermutaFinanceira + c.vgvPermutaFisica);
   const baseComPermutaFisica = receitaBruta + c.vgvPermutaFisica;
 
-  const pctResultado = receitaBruta > 0 ? (resultado / receitaBruta) * 100 : 0;
+  // #604 — denominador inválido devolve `null`, nunca 0. Mesmo mecanismo que a
+  // #571 usou no Preliminar (`margemLiquidaPct`/`custoObrasVgvPct`/
+  // `receitaLiquidaSobreVgvPct`): o motor distingue "mediu zero" de "não há
+  // base para medir", e `fmtPctOuIndef` imprime "—". As três bases são
+  // INDEPENDENTES — `baseComPermutaFisica` pode ser > 0 com a Receita Bruta
+  // zerada, se houver permuta física —, então cada uma decide sozinha.
+  const pctResultado = receitaBruta > 0 ? (resultado / receitaBruta) * 100 : null;
   const pctResultadoMaisPermutaFinanceira = receitaBruta > 0
-    ? (resultadoMaisPermutaFinanceira / receitaBruta) * 100 : 0;
+    ? (resultadoMaisPermutaFinanceira / receitaBruta) * 100 : null;
   const pctResultadoMaisPermutas = baseComPermutaFisica > 0
-    ? (resultadoMaisPermutas / baseComPermutaFisica) * 100 : 0;
+    ? (resultadoMaisPermutas / baseComPermutaFisica) * 100 : null;
 
   // O rótulo/nota extra só aparece quando há permuta física — molde de
   // `K35` (rótulo condicional: "Resultado" & IF(OR(permutas≠0); " + Permutas"; ""))
@@ -340,6 +383,11 @@ export function proformaAvancado(
     resultadoMaisPermutas,
     pctResultadoMaisPermutas,
     investimentoTotal,
+    // ⚠️ #604 NÃO toca `roiPct`, de propósito: ele tem o mesmo padrão (`: 0`
+    // com denominador inválido) mas pertence à #611, que trata a família
+    // `eficienciaPct`/`roiPct` e continua ABERTA. Mudá-lo aqui fecharia parte
+    // dela por acidente, sem o teste e sem a varredura de consumidores que ela
+    // pede. O denominador aqui também é outro — investimento, não VGV.
     roiPct: investimentoTotal > 0 ? (resultado / investimentoTotal) * 100 : 0,
   };
 }
