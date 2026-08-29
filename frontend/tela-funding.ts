@@ -298,6 +298,12 @@ export class ViabFunding extends LitElement {
     return `${proximo}º ${rotulo}`;
   }
 
+  /** Próxima `ordem` livre: MAX + 1, nunca `length` — ver o comentário em
+   * `_adicionar`. Lista vazia começa em 0. */
+  private _proximaOrdem(): number {
+    return this.operacoes.reduce((m, o) => Math.max(m, Number(o?.ordem) || 0), -1) + 1;
+  }
+
   private _temFinanciamento(): boolean {
     return this.operacoes.some((o) => o.tipo === 'financiamento_producao');
   }
@@ -318,7 +324,12 @@ export class ViabFunding extends LitElement {
           ? { taxa_anual: 12, periodo_amortizacao_meses: 36, periodo_carencia_meses: 12, aporte_meses: 1 }
           : { modo_retorno: 'permuta_financeira', pct_retorno: 0 };
       const r = await criarFundingOperacao(this.estudo.id, {
-        tipo, nome: this._nomePadrao(tipo), ordem: this.operacoes.length, ...defaults,
+        // #586 (P2 do revisor): `ordem` é MAX + 1, não `length`. Com `length`,
+        // apagar uma operação do MEIO fazia a próxima nascer com uma `ordem`
+        // que já existia — e duas irmãs do mesmo tipo empatadas deixavam as
+        // setas ↑↓ mudas. `reordenarDentroDoTipo` passou a ser imune ao empate
+        // e ainda o repara, mas parar de CRIAR duplicata é a defesa na origem.
+        tipo, nome: this._nomePadrao(tipo), ordem: this._proximaOrdem(), ...defaults,
       });
       if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível criar a operação.', 'erro'); return; }
       await this._carregar();

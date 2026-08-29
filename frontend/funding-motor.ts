@@ -1068,32 +1068,56 @@ export function reordenarCamadas<T extends { id: any; ordem?: number }>(
  * renumera 0…n−1 sobre a lista que recebe, então o subconjunto colidiria com
  * as `ordem` dos outros tipos e a ordenação global viraria empate arbitrário.
  *
- * A operação aqui é uma TROCA de `ordem` entre os dois vizinhos do mesmo tipo:
- * as demais operações não são tocadas, e a sequência global continua sendo uma
- * permutação dos mesmos valores. Devolve a lista INTEIRA (ordenada por
- * `ordem`), para o chamador continuar usando `camadasComOrdemAlterada` e
- * persistir só o que mudou — são sempre 2 registros, ou 0 na ponta.
+ * A operação é uma troca de POSIÇÃO entre os dois vizinhos do mesmo tipo dentro
+ * da lista COMPLETA, seguida de renumeração `0…n−1` da lista inteira. Devolve a
+ * lista toda (já ordenada), para o chamador seguir usando
+ * `camadasComOrdemAlterada` e persistir só o que mudou.
+ *
+ * ⚠️ **POR QUE POSIÇÃO, E NÃO TROCA DE VALOR — e por que a renumeração é do
+ * conjunto INTEIRO.** A primeira versão trocava os VALORES de `ordem` entre os
+ * dois irmãos e não tocava em mais nada, para a sequência global continuar uma
+ * permutação dos mesmos valores. Isso quebra com `ordem` DUPLICADA, e duplicada
+ * é um estado alcançável de verdade:
+ *
+ *   · `_adicionar` (`frontend/tela-funding.ts`) gravava `ordem: operacoes.length`;
+ *   · apague uma operação do MEIO e a próxima criada nasce com uma `ordem` que
+ *     já existe — três dívidas (0,1,2), apaga a do meio (0,2), cria a quarta
+ *     com `length` = 2 → **duas com `ordem` 2**;
+ *   · se as duas empatadas forem do MESMO tipo, elas são irmãs adjacentes, e
+ *     trocar os valores atribui a cada uma o valor que ela já tinha. O
+ *     resultado é idêntico à entrada, `camadasComOrdemAlterada` devolve lista
+ *     vazia, `_mover` sai pelo `if (mudaram.length === 0) return;` e **o botão
+ *     não faz nada, em silêncio** — a pior forma de regressão.
+ *
+ * Trocar POSIÇÃO é imune ao empate por construção: não depende dos valores. E
+ * renumerar `0…n−1` no fim **repara** o dado — o estudo que já tinha duplicata
+ * sai consertado no primeiro uso das setas, sem migração. É por isso que a
+ * renumeração aqui é do conjunto inteiro e não do subconjunto: aplicada à lista
+ * COMPLETA ela é uma compactação que preserva a ordem relativa de todos os
+ * outros; era só sobre o subconjunto que ela colidia.
+ *
+ * O preço é escrever mais de 2 registros quando a numeração estava irregular —
+ * e isso é o conserto, não um efeito colateral. Com a numeração já em `0…n−1`,
+ * continuam sendo exatamente 2. Achado P2 do revisor no PR 645.
  */
 export function reordenarDentroDoTipo<T extends { id: any; tipo?: string; ordem?: number }>(
   operacoes: T[], id: any, direcao: 'cima' | 'baixo',
 ): T[] {
   const lista = [...operacoes].sort((a, b) => n(a.ordem) - n(b.ordem));
   const alvo = lista.find((o) => String(o.id) === String(id));
-  if (!alvo) return lista;
+  if (!alvo) return lista.map((o, idx) => ({ ...o, ordem: idx }));
   const irmaos = lista.filter((o) => o.tipo === alvo.tipo);
   const i = irmaos.findIndex((o) => String(o.id) === String(id));
   const j = direcao === 'cima' ? i - 1 : i + 1;
-  if (j < 0 || j >= irmaos.length) return lista; // já é o primeiro/último do tipo
+  // Já é o primeiro/último do tipo: nada se move — mas a renumeração vai junto,
+  // senão o caso de ponta seria o único que deixaria a duplicata de pé.
+  if (j < 0 || j >= irmaos.length) return lista.map((o, idx) => ({ ...o, ordem: idx }));
   const vizinho = irmaos[j];
-  const ordemAlvo = n(alvo.ordem);
-  const ordemVizinho = n(vizinho.ordem);
-  return lista
-    .map((o) => {
-      if (String(o.id) === String(alvo.id)) return { ...o, ordem: ordemVizinho };
-      if (String(o.id) === String(vizinho.id)) return { ...o, ordem: ordemAlvo };
-      return o;
-    })
-    .sort((a, b) => n(a.ordem) - n(b.ordem));
+  const pAlvo = lista.indexOf(alvo);
+  const pVizinho = lista.indexOf(vizinho);
+  const nova = [...lista];
+  [nova[pAlvo], nova[pVizinho]] = [nova[pVizinho], nova[pAlvo]];
+  return nova.map((o, idx) => ({ ...o, ordem: idx }));
 }
 
 export function camadasComOrdemAlterada<T extends { id: any; ordem?: number }>(

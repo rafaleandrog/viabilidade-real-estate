@@ -177,7 +177,7 @@ esse produto de propósito — ele é o único que **não** segue a planilha nov
 > (PR #417, 2026-08-17).** Evidência hoje: `docs/viabilidade/fluxo-investidor-formulas.md` existe;
 > D14 está em `frontend/fluxo-invariantes.ts:633-642`
 > (`CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING`, severidade `alerta`); o aviso regulatório, em
-> `frontend/tela-funding.ts:811-817`.
+> `frontend/tela-funding.ts:822-828`.
 >
 > A lição é a de sempre, com uma volta a mais: **"a issue fechou" não é evidência de entrega, e o
 > plano publicado na issue também não** — só o diff é. Quando um plano tem passo de documentação ou

@@ -3,7 +3,7 @@
 // "o VALOR salta para fora do quadro do KPI"). Markup próprio (sem shadow
 // DOM), mesma família de defeito/defesa de `fluxo-tabela.ts` .kpi-card.
 //
-// `_renderIndicadores(o)` (frontend/tela-funding.ts:548) lê
+// `_renderIndicadores(o)` (frontend/tela-funding.ts:559) lê
 // `this.funding.operacoes` — não basta forçar `this.operacoes`, o `FundingCalc`
 // precisa ser real (`fundingDoEstudo`, a mesma função que a tela chama em
 // `_recalcular`). A dívida-exemplo é `DIVIDA_GOLDEN`

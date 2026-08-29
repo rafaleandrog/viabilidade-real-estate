@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { reordenarDentroDoTipo } from './funding-motor.js';
+import { reordenarDentroDoTipo, camadasComOrdemAlterada } from './funding-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // #586 — a tela de Funding em `urbi-abas`: Operações · FàP · Dívida · Equity
@@ -93,13 +93,9 @@ test('#586 critério 3: a barra de 3 botões do topo deixou de existir', () => {
 // acontece nada, porque a aba não mostra o vizinho.
 
 // ⚠️ A `ordem` desta fixture é NÃO CONTÍGUA de propósito (10/20/30/40, não
-// 0/1/2/3), e isso não é enfeite — é o que dá poder ao teste da permutação.
-// Medido: com `ordem` 0…3, acrescentar um `.map((o, idx) => ({ ...o, ordem: idx }))`
-// ao fim de `reordenarDentroDoTipo` — ou seja, RENUMERAR como
-// `reordenarCamadas` faz, que é exatamente o defeito que a função existe para
-// não cometer — deixava os 7 testes deste arquivo VERDES, porque renumerar
-// 0…3 uma lista que já vale 0…3 devolve a mesma coisa. Com valores espaçados,
-// a renumeração muda os números e a asserção da permutação reprova.
+// 0/1/2/3): é o que faz a RENUMERAÇÃO ser visível nas asserções abaixo, em vez
+// de indistinguível de "não fez nada". Com 0…3, renumerar 0…3 devolve a mesma
+// coisa e nenhuma asserção discrimina.
 const OPS = () => [
   { id: 1, tipo: 'divida', ordem: 10 },
   { id: 2, tipo: 'financiamento_producao', ordem: 20 },
@@ -107,43 +103,107 @@ const OPS = () => [
   { id: 4, tipo: 'equity', ordem: 40 },
 ];
 
+/** A ordem relativa dos ids, que é o que a tela mostra. */
+// `id` genérico de propósito: a fixture do empate usa ids de string ('D1'…),
+// que é o formato do achado do revisor, e a das setas usa números.
+const idsEmOrdem = <T extends { id: unknown; ordem?: number }>(l: T[]): unknown[] =>
+  [...l].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0)).map((o) => o.id);
+
 test('#586: ↑ numa Dívida troca com a Dívida anterior, PULANDO o tipo do meio', () => {
   const r = reordenarDentroDoTipo(OPS(), 3, 'cima');
-  const ordemPorId = new Map(r.map((o) => [o.id, o.ordem]));
-  // As duas Dívidas trocaram de `ordem` entre si: 10 ↔ 30.
-  assert.equal(ordemPorId.get(3), 10);
-  assert.equal(ordemPorId.get(1), 30);
-  // E o Financiamento à produção, que está ENTRE elas na ordem global, não se
-  // moveu — é justamente o que `reordenarCamadas` faria de errado aqui. Os
-  // valores 20 e 40 provam junto que NÃO houve renumeração.
-  assert.equal(ordemPorId.get(2), 20);
-  assert.equal(ordemPorId.get(4), 40);
-  // A lista volta ordenada por `ordem`.
-  assert.deepEqual(r.map((o) => o.id), [3, 2, 1, 4]);
+  // O que importa é a ORDEM RELATIVA, que é o que a tela mostra: as duas
+  // Dívidas trocaram entre si e mais nada se moveu. O Financiamento à produção
+  // continua ENTRE elas — é justamente o que `reordenarCamadas` faria errado.
+  assert.deepEqual(idsEmOrdem(r), [3, 2, 1, 4]);
+  // A numeração sai compactada em 0…n−1 (ver o cabeçalho da função: é o que
+  // repara `ordem` duplicada sem migração).
+  assert.deepEqual(r.map((o) => o.ordem), [0, 1, 2, 3]);
 });
 
-test('#586: na ponta do TIPO, não mexe em nada — mesmo havendo vizinho global', () => {
-  // A operação 1 é a 1ª Dívida, mas NÃO é a 1ª da lista global? É — então o
-  // caso interessante é a 2ª: `id: 3` é a última Dívida, e há um Equity depois
-  // dela na ordem global. Descer não pode roubar a posição do Equity.
+test('#586: na ponta do TIPO, a posição não muda — mesmo havendo vizinho global', () => {
+  // `id: 3` é a última Dívida, e há um Equity DEPOIS dela na ordem global.
+  // Descer não pode roubar a posição do Equity.
   const r = reordenarDentroDoTipo(OPS(), 3, 'baixo');
-  assert.deepEqual(r.map((o) => o.ordem), [10, 20, 30, 40]);
-  assert.deepEqual(r.map((o) => o.id), [1, 2, 3, 4]);
+  assert.deepEqual(idsEmOrdem(r), [1, 2, 3, 4]);
   // E o tipo com UMA só operação nunca se move.
-  const so = reordenarDentroDoTipo(OPS(), 4, 'cima');
-  assert.deepEqual(so.map((o) => o.id), [1, 2, 3, 4]);
+  assert.deepEqual(idsEmOrdem(reordenarDentroDoTipo(OPS(), 4, 'cima')), [1, 2, 3, 4]);
 });
 
-test('#586: a `ordem` global continua sendo uma permutação dos mesmos valores', () => {
-  // É o que garante que a troca por tipo não corrompe a ordenação global —
-  // nenhum valor novo, nenhum duplicado, nenhum buraco.
-  const antes = OPS();
-  const depois = reordenarDentroDoTipo(antes, 3, 'cima');
-  assert.deepEqual(
-    depois.map((o) => o.ordem).sort((a, b) => a - b),
-    antes.map((o) => o.ordem).sort((a, b) => a - b),
+test('#586: a `ordem` resultante é sempre única e contígua — sem empate, sem buraco', () => {
+  // É o que garante que a reordenação por tipo não corrompe a ordenação global
+  // E que ela não deixa passar duplicata (ver o teste do empate abaixo).
+  for (const [id, dir] of [[3, 'cima'], [1, 'baixo'], [4, 'cima'], [2, 'baixo']] as const) {
+    const depois = reordenarDentroDoTipo(OPS(), id, dir);
+    const ordens = depois.map((o) => o.ordem);
+    assert.equal(new Set(ordens).size, ordens.length, `empate ao mover ${id} para ${dir}`);
+    assert.deepEqual(ordens, [0, 1, 2, 3], `numeração com buraco ao mover ${id} para ${dir}`);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #586 · P2 do revisor — `ordem` DUPLICADA deixava o botão MUDO, em silêncio
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// A sequência é alcançável com dois cliques na tela, e a fixture abaixo é ela
+// literalmente: `_adicionar` gravava `ordem: operacoes.length`, então apagar
+// uma operação do MEIO fazia a próxima nascer com uma `ordem` que já existia.
+// Sendo as duas empatadas do MESMO tipo, elas viram irmãs adjacentes — e a
+// versão antiga, que trocava VALORES, atribuía a cada uma o valor que ela já
+// tinha. `camadasComOrdemAlterada` devolvia [], `_mover` saía pelo early return
+// e o usuário clicava sem nada acontecer.
+//
+// MEDIDO na versão antiga: `camadasComOrdemAlterada` devolvia `[]` e a lista
+// voltava idêntica (`D1#0 D3#2 D4#2`).
+test('#586 (P2): com `ordem` DUPLICADA as setas continuam funcionando', () => {
+  // Três dívidas (0,1,2) → apaga a do meio → cria a quarta com `length` = 2.
+  const comEmpate = [
+    { id: 'D1', tipo: 'divida', ordem: 0 },
+    { id: 'D3', tipo: 'divida', ordem: 2 },
+    { id: 'D4', tipo: 'divida', ordem: 2 }, // ← colide com D3
+  ];
+  const ordensAntes = comEmpate.map((o) => o.ordem);
+  assert.notEqual(new Set(ordensAntes).size, ordensAntes.length, 'a fixture precisa TER o empate');
+
+  const r = reordenarDentroDoTipo(comEmpate, 'D4', 'cima');
+  // (a) A operação REALMENTE se moveu — é o que a versão antiga não fazia.
+  assert.deepEqual(idsEmOrdem(r), ['D1', 'D4', 'D3']);
+  // (b) E há registro a persistir: lista vazia aqui é exatamente o no-op
+  //     silencioso que o revisor descreveu.
+  const mudaram = camadasComOrdemAlterada(comEmpate, r);
+  assert.notEqual(mudaram.length, 0, 'nada a persistir — o botão voltou a ser mudo');
+  // (c) O empate foi REPARADO de passagem, sem migração.
+  const ordens = r.map((o) => o.ordem);
+  assert.equal(new Set(ordens).size, ordens.length, 'a duplicata sobreviveu ao conserto');
+  assert.deepEqual(ordens, [0, 1, 2]);
+});
+
+test('#586 (P2): na PONTA, o empate também é reparado', () => {
+  // O caso de ponta tem early return. Se ele devolvesse a lista crua, seria o
+  // único caminho que deixaria a duplicata de pé — e o próximo clique, agora
+  // não-ponta, voltaria a ser mudo.
+  const comEmpate = [
+    { id: 'D1', tipo: 'divida', ordem: 0 },
+    { id: 'D3', tipo: 'divida', ordem: 2 },
+    { id: 'D4', tipo: 'divida', ordem: 2 },
+  ];
+  const r = reordenarDentroDoTipo(comEmpate, 'D1', 'cima'); // já é o primeiro
+  assert.deepEqual(idsEmOrdem(r), ['D1', 'D3', 'D4'], 'a ponta não pode mover nada');
+  const ordens = r.map((o) => o.ordem);
+  assert.equal(new Set(ordens).size, ordens.length, 'a ponta deixou a duplicata de pé');
+});
+
+// A defesa na ORIGEM: a tela para de CRIAR duplicata.
+test('#586 (P2): `_adicionar` usa MAX + 1, não `length`', () => {
+  const bloco = fonte.slice(fonte.indexOf('private _proximaOrdem()'), fonte.indexOf('private _temFinanciamento'));
+  assert.ok(bloco.includes('Math.max'), '`_proximaOrdem` deixou de usar MAX');
+  assert.ok(
+    fonte.includes('ordem: this._proximaOrdem()'),
+    '`_adicionar` voltou a gravar `ordem` sem passar por `_proximaOrdem`',
   );
-  assert.equal(new Set(depois.map((o) => o.ordem)).size, antes.length);
+  assert.equal(
+    fonte.includes('ordem: this.operacoes.length'), false,
+    '`ordem: this.operacoes.length` voltou — é ele que cria a duplicata',
+  );
 });
 
 // ⚠️ FIAÇÃO, não cálculo — a classe de defeito nº 1 do `CLAUDE.md`.
