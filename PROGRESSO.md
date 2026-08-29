@@ -83,6 +83,69 @@ convenção de `cronograma-sufixo-mes.render.test.ts` (cor não depende de viewp
 
 ---
 
+## Funding em `urbi-abas` — #586 (2026-08-29)
+
+Rodada 10, item A10-09a. A tela de Funding tinha três botões no topo que **adicionavam** operações a
+um feed único de cards; agora tem **quatro abas** — Operações · Financiamento à produção · Dívida ·
+Equity —, com os nomes literais do pedido do autor.
+
+**É chassi, não reescrita, e isso é verificável no diff.** A separação por tipo **já existia** na
+camada de campos; o que não existia era na navegação. Os três `_renderCampos*` foram para dentro das
+abas **inteiros** — eles não aparecem no diff, e é por isso que o critério 4 (*"nenhum campo é
+perdido no caminho"*) se confere por leitura direta dele, não por inventário à mão.
+
+**Sem schema, sem migração → a `versao` não bumpa.** Estudo com operações já criadas abre com todas
+distribuídas nas abas certas: a distribuição é `o.tipo`, que sempre existiu na tabela.
+
+**A reordenação passou a ser POR TIPO, e a issue mandava o PR decidir.** Continuar global produziria
+defeito visível: com um Financiamento à produção entre duas Dívidas na ordem global, clicar ↑ na 2ª
+Dívida trocaria a Dívida com o Financiamento — e a aba Dívida, que **não mostra** o Financiamento,
+não mudaria nada na tela. O usuário clica e não acontece nada. Reusar `reordenarCamadas` com o
+**subconjunto** do tipo também não serve: ela renumera `ordem` de 0…n−1 sobre a lista que recebe,
+então o subconjunto colidiria com as `ordem` dos outros tipos. Entrou `reordenarDentroDoTipo`, que
+**troca** a `ordem` entre os dois vizinhos do mesmo tipo — a sequência global continua sendo uma
+permutação dos mesmos valores, com teste que afirma exatamente isso.
+
+**A classe `.barra` saiu junto com a barra.** O critério 3 é literal e greppável
+(`grep 'class="barra"'` não pode casar). Reusá-la para o botão de dentro da aba faria o grep casar
+**e** descreveria errado o que a regra faz — virou `.acao-aba`, e a regra morta `.barra .espaco`
+foi removida (o único `span.espaco` desta tela vive em `.op-cab`).
+
+> ⚠️ **Armadilha de linguagem que custou uma rodada inteira de validação, e é fácil repetir:**
+> **crase dentro de template literal FECHA o template.** Escrevi comentários com `` `.barra` `` e
+> `` `urbi-abas` `` dentro de `` css` `` e de `` html` ``; o arquivo virou 4 erros de sintaxe. Quem
+> acusou foi o **guard de UI** — *"o TypeScript nao parseia este arquivo"* —, não o typecheck, que
+> nem chegou a rodar naquela ordem. Os comentários foram reescritos sem crase, **com a razão anotada
+> dentro deles** para ninguém "melhorar" de volta.
+
+> ⚠️ **E a classe de defeito nº 2 apareceu de novo, com sete citações de uma vez.** O diff empurrou
+> as linhas de `tela-funding.ts` e sete endereços `arquivo:linha` — em `render/casos/ind-funding.ts`,
+> `tela-resumo.ts`, `tela-fluxo-ver.ts`, `tela-cenarios.ts`, `scripts/conferir-estudo.ts`, neste
+> arquivo e no `CLAUDE.md` — deixaram de resolver. Quem pegou foi o `guard-enderecos-doc`, na
+> execução do `validar-frontend.sh`. **Conferência à mão não teria pegado**: ela é feita antes do
+> último conserto e envelhece nele. (O `CLAUDE.md` fica **fora** do guard da R1 de propósito — o
+> próprio `guard-pr-escopo-processo.mjs` o declara —, então a correção de endereço lá não é mudança
+> de processo dentro de PR sob revisão.)
+
+**A prova de fiação é de RENDER, e tinha de ser.** `frontend/funding-abas.test.ts` prova a
+reordenação (função pura) e o particionamento (a aba Operações é a união exata das outras três,
+por id e não só por contagem; e todo tipo de `TIPOS` tem aba, senão um tipo novo sumiria da UI). Mas
+**nenhum dos dois enxerga se a tela monta as abas** — apagar o `<urbi-abas>` do `render()` deixa
+aquele arquivo verde. Só `frontend/render/casos/funding-abas.ts`, com `exigir` sobre `urbi-abas`,
+quatro `urbi-hospedeiro` e `urbi-tabela`, enxerga. É a classe de defeito nº 1.
+
+> **Um detalhe do teste que quase virou falso positivo:** o regex que lia os tipos da fonte era
+> `{ valor: 'x', rotulo:` solto sobre o arquivo inteiro — e essa é a forma de **mais três arrays**
+> do mesmo arquivo (`MODOS_RETORNO`, `EVENTOS_ANCORA`). Ele devolvia 11 valores e reprovava com
+> *"TIPOS mudou"* sobre um `TIPOS` intacto. O conserto foi recortar o **bloco da declaração** antes
+> de casar.
+
+**Colisão declarada com a #592**, em execução em paralelo: ela varre a frase *"O Fluxo de Caixa real
+é igual ao Livre"*, e este PR **move** essa linha para dentro da aba Operações. A string ficou byte
+a byte idêntica; o merge pode exigir resolução manual, e está dito no corpo do PR.
+
+---
+
 ## Custos antes de Viabilidade na lista lateral do Avançado — #589 (2026-08-29)
 
 Rodada 10, item A10-10. O pedido do autor é de uma linha: *"Inverter a ordem entre as seções
@@ -711,7 +774,7 @@ o teste montar um elemento inexistente.
 | Premissas (Preliminar) — 3 grades (Resumo/aproveitamento #569/área alocada #573) | `minmax(180px,1fr)` → `minmax(230px,1fr)` | `frontend/tela-premissas.ts:359` |
 | Fluxo de Caixa / Cenários — `.kpi-card` | `minmax(180px,1fr)` → `minmax(210px,1fr)` + `overflow-wrap`/`word-break` em `.valor` | `frontend/fluxo-tabela.ts:64,97-98` |
 | Apelo Comercial | `minmax(170px,1fr)` → `minmax(210px,1fr)` | `frontend/tela-apelo.ts:34` |
-| Funding — `.ind-card` | `overflow-wrap`/`word-break` em `.val` (track ficou em 150px, não mudou) | `frontend/tela-funding.ts:159-160` |
+| Funding — `.ind-card` | `overflow-wrap`/`word-break` em `.val` (track ficou em 150px, não mudou) | `frontend/tela-funding.ts:182-183` |
 | Análise de mercado — `.comp` | `min-width:0`+`overflow-wrap`/`word-break` em `.comp-linha .val` | `frontend/tela-analise-mercado.ts:110` |
 | Gráficos — "Resultado" | sem conserto — a track (`minmax(300px,1fr)`, filho solto) já tinha folga | `frontend/tela-graficos.ts:172` |
 
@@ -743,7 +806,7 @@ R$). Mutação MEDIDA (reverter o conserto e rodar o teste isolado), não presum
 
 **Bug de fiação achado e consertado nesta sessão:** `frontend/render/casos/ind-funding.ts` criava
 `document.createElement('viab-tela-funding')` — tag que não existe (o componente real é
-`@customElement('viab-funding')`, `frontend/tela-funding.ts:93`). Um elemento não-registrado não
+`@customElement('viab-funding')`, `frontend/tela-funding.ts:108`). Um elemento não-registrado não
 tem shadow DOM: o caso "montava" um nó vazio (1 nó, 0 visíveis), e o harness reprovava por
 `exigir` não satisfeito — nunca chegou a medir nada. Corrigido para `viab-funding`; o
 `aceitaNaoReproduzido` do caso também precisou ser recalibrado (a montagem real, ao contrário do
