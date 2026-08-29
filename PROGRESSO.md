@@ -58,6 +58,104 @@ recolorir card. Trocar o `0,0%` por "—" quando a gleba não foi informada cont
 
 ---
 
+## #595 · a série do cenário simulado no card de comparação (2026-08-28)
+
+Item 16 da leva Avançado da Rodada 10, **P1**, com screenshot. Pedido do autor, literal: "Visual do
+gráfico de linha ainda continua errado mesmo após tantas tentativas de arrumar (…) ajuste para que a
+linha que se sobressai nessa imagem apareça de fato e com outra cor (hoje são só pontos)".
+
+**O1 — a hipótese de DADOS foi descartada, e com mecanismo, não só medição.** A issue manda checar
+primeiro se as duas séries divergem em comprimento ou trazem valor não finito: seria a única causa
+que é defeito **deste** repositório, porque coordenada inválida derruba o `path` inteiro e deixa só
+os marcadores — exatamente o sintoma. Medido nos dois níveis, nas duas views e em 4 pares de deltas
+(inclusive ±30%): **nunca divergem**. E não é coincidência — o horizonte deriva SÓ de tempo
+(cronograma, custos, recebíveis, funding, em `calcularFluxo`) enquanto `aplicarCenario` escala SÓ
+valores (`preco_m2`, `orcamento_valor`), então `base.prazo === cenario.prazo` por construção.
+
+**O que ERA defeito deste repositório: a crença sem fonte de que a cor viaja no dado.** A tela
+entregava `cor: 'var(--cor-primaria, #7c5cff)'` dentro de cada item de `series`. O espelho
+`docs/ui-urbiverso/primitivos.json` declara `series` como `Array` e **não declara a forma dos
+itens** — não há como afirmar que `cor` é honrada. Pior: `var()` só resolve em **valor de
+propriedade CSS**; num **atributo de apresentação SVG** (`stroke="var(...)"`) o valor é inválido, o
+agente de usuário descarta o atributo, o traço cai para o inicial (`none` — some a linha) e o
+marcador para o `fill` inicial. O comentário de `tela-cenarios.ts` que afirmava
+"SerieGrafico só declara { rotulo, valores, cor }" (herdado da #185) era a origem da crença, e foi
+**corrigido no mesmo diff** (critério 6): a parte que continua verdadeira — o primitivo não declara
+prop de dasharray nem de anotação — segue escrita, com a fonte que a sustenta.
+
+**A saída, sem inventar prop.** O espelho declara, no `:host` de `UrbiGraficoBase`, as custom
+properties `--urbi-grafico-cor-1..8`, e o próprio `scripts/guard-tokens-css.mjs` as reconhece como
+ponto de customização legítimo. As duas primeiras passam a ser definidas no CSS de
+`tela-cenarios.ts`, com tokens do app. É CSS de verdade, onde `var()` resolve, e vale **qualquer que
+seja** o tratamento que o primitivo dê a `serie.cor` — por isso `cor` saiu do dado em vez de
+conviver: mantê-la só preservaria o único valor que pode ser inválido.
+
+**Função pura nova `comparacaoCenario` (`frontend/fluxo-graficos.ts`)**, que monta eixo e as duas
+séries fora do template. O eixo passa a ser o do cenário **mais longo** dos dois (truncar pelo da
+base esconderia meses de um cenário que estique o horizonte) e `alinharAcumulado` garante uma
+entrada por coluna. Repetir o último valor **não é inventar dado**: numa série ACUMULADA, depois do
+último mês em que algo entra ou sai o saldo permanece onde estava. Hoje o reparo é NO-OP — e o teste
+assere as duas coisas separadamente, porque "não há divergência hoje" e "o gráfico sobrevive se
+houver" são afirmações diferentes.
+
+**O que ficou NÃO EXECUTADO, declarado (critério 4):** se o primitivo desenha as duas séries como
+linha é comportamento do markup interno dele. O harness de render usa **stub** gerado do espelho e
+não reproduz esse markup; o `dist/index.d.ts` do SDK, que responderia, não existe neste ambiente
+(GitHub Packages privado, 401). **Quem confirma é o autor, na instância intermediária (Pinguim)** —
+mesma sessão em que ele pode fechar a #264. Por isso o PR **não** declara `Closes #595`.
+
+Validação: `bash scripts/validar-frontend.sh` verde (847 testes, 56 casos de render). Sem migração —
+`versao` não bumpa.
+## #581 · R$ sem centavos no card de KPI — a única exceção declarada ao C7 (2026-08-28)
+
+Item 4 da leva Avançado da Rodada 10. Pedido do autor, literal: "Ajustar valores em R$ nos
+urbi-kpis para não terem casas decimais e quando % para ter uma casa decimal". **Não é bug — é
+decisão do autor que abre exceção a um contrato vigente**, e o app estava integralmente conforme ao
+C7 antes deste PR (a #449/#281 fecharam justamente essa unificação). Por isso a exceção entra
+redigida no `CLAUDE.md` § Contratos inegociáveis, em `docs/viabilidade/formulas.md`
+§ Precisão de resultado e na linha C7 do anexo A de `padrao-incorporacao.md` **no mesmo diff** —
+senão o próximo revisor acusa o diff como violação do C7, com razão, e o conserto seguinte reverte
+o que o autor pediu.
+
+**A metade "%" do pedido já estava atendida e o que faltava era travar.** `fmtPct` é 1 casa com
+mínimo e máximo e é o que todo card de percentual chama; `fmtPctEntrada` (2 casas, valor DIGITADO)
+tem 3 call sites, nenhum deles card — um banner em `tela-premissas.ts` e duas células `<td>` em
+`tela-fluxo-receitas.ts`.
+
+**A metade "R$" é a que mudou.** Função nova `fmtR$Kpi` (`frontend/viab-format.ts`), com
+`minimumFractionDigits` E `maximumFractionDigits` em 0 — os dois, pelo mesmo motivo que a #492 fixou
+os dois em `fmtR$`: só o máximo entregaria "até 0 casas". **Função própria, não um segundo parâmetro
+de `fmtR$`:** parâmetro opcional espalharia a exceção por um argumento que qualquer chamador passa
+por engano, que é a classe de defeito que a #449 apagou. Símbolo próprio torna a exceção greppável.
+
+28 call sites, nas 6 telas do inventário da issue: `tela-resumo.ts` (4), `fluxo-tabela.ts` (7, os
+`div.kpi-card` monetários de `kpisFluxo`), `tela-cenarios.ts` (1), `tela-graficos.ts` (1),
+`tela-premissas.ts` (2 — VGV no ramo Loteamento e Preço médio/unid. no ramo Incorporação, que é a
+paridade do critério 8) e `tela-funding.ts` (13 — os `.ind-card` da Visão do investidor mais o
+resumo de Financiamento à produção).
+
+**Fora do escopo, por decisão registrada:** o `title` do card "VGV Vendável" (`fluxo-tabela.ts`),
+que é uma LISTA de 6 grandezas de detalhe e não a figura do card; e os cards de comparação de
+`tela-analise-mercado.ts`, que publicam R$/m² — derivada não monetária, fora do C7, e ausente do
+inventário da issue.
+
+**A trava é `frontend/kpi-casas-decimais.test.ts`, e ela lê o FONTE de propósito.** O que a issue
+pede é propriedade do INVENTÁRIO (a exceção em todos os cards e em nenhum outro lugar), e isso é
+fiação — a classe de defeito nº 1 do `CLAUDE.md`: apagar a chamada no componente deixa a suíte
+inteira verde. A lista fecha nos dois sentidos por CONTAGEM EXATA (a menos = card voltou a exibir
+centavos; a mais = a exceção vazou), com o motivo escrito por entrada, mais três zeros: `exportar.ts`,
+`tela-proforma.ts`, `tela-fluxo-custos.ts`, `tela-fluxo-receitas.ts`, `tela-fluxo-ver.ts` e
+`tela-dashboard.ts` não podem conhecer `fmtR$Kpi`, e em `viab-format.ts` a contagem esperada é 1 — a
+declaração —, porque 2 significaria que `celula` passou a chamá-la e a exceção entraria em toda
+célula de tabela e em todo CSV/PDF.
+
+Vale para estudos existentes: mudança só de apresentação, nada persistido muda, sem migração —
+O critério 8 (paridade) ganhou asserção de VALOR além da de inventário: um estudo de Loteamento e
+um de Incorporação passam por `calcularProforma`, e o mesmo número sai do card sem centavos e da
+tabela com centavos — é o que prova que o arredondamento é de exibição, não de dado.
+
+`versao` não bumpa. Validação: `bash scripts/validar-frontend.sh` verde (850 testes, 56 casos de
+render).
 ## Notação de sinal da Proforma unificada entre tela, CSV e PDF (2026-08-28)
 
 Registro dos PRs 617/618 — achado 10 da auditoria #574, sem issue própria. **Decisão do autor

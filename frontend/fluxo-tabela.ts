@@ -1,5 +1,5 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
-import { fmtR$, fmtPct, fmtNum, celula as celulaCompartilhada } from './viab-format.js';
+import { fmtR$, fmtR$Kpi, fmtPct, fmtNum, celula as celulaCompartilhada } from './viab-format.js';
 import { rotuloMesRelativo } from './fluxo-shared.js';
 import { calcularVariacao } from './cenario-variacao.js';
 import { type FluxoCalc, type LinhaCalc, pctDeReceitaBruta } from './fluxo-caixa-motor.js';
@@ -292,7 +292,7 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
     <div class="fx-kpis">
       <div class="kpi-card ${resultado >= 0 ? 'sucesso' : 'erro'}">
         <div class="rotulo">Resultado</div>
-        <div class="valor">${fmtR$(resultado)}</div>
+        <div class="valor">${fmtR$Kpi(resultado)}</div>
         ${varKpi(resultado, base ? resultadoDe(base) : undefined, true)}
       </div>
       <div class="kpi-card ${tirVar}">
@@ -302,7 +302,7 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
       </div>
       <div class="kpi-card ${c.vpl >= 0 ? 'sucesso' : 'erro'}">
         <div class="rotulo">VPL</div>
-        <div class="valor">${fmtR$(c.vpl)}</div>
+        <div class="valor">${fmtR$Kpi(c.vpl)}</div>
         ${varKpi(c.vpl, base ? base.vpl : undefined, true)}
       </div>
       <div class="kpi-card">
@@ -315,23 +315,23 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
              declaração, um estudo com Capital Stack leria "exposição" e
              suporia que já é pós-financiamento. -->
         <div class="rotulo">Exposição máxima (fluxo livre)</div>
-        <div class="valor">${fmtR$(expMag)}</div>
+        <div class="valor">${fmtR$Kpi(expMag)}</div>
         ${varKpi(expMag, expBaseMag, false)}
         <div class="kpi-info">${fmtPct(pctExp)} do VGV${mesTxt(c.mesExposicaoMaxima)}</div>
       </div>
       <div class="kpi-card">
         <div class="rotulo">Juros de clientes</div>
-        <div class="valor">${fmtR$(c.jurosClientes)}</div>
+        <div class="valor">${fmtR$Kpi(c.jurosClientes)}</div>
         <div class="kpi-info">${fmtPct(pctJuros)} da Receita Bruta</div>
       </div>
       <div class="kpi-card">
         <div class="rotulo">Carteira máxima de clientes</div>
-        <div class="valor">${fmtR$(c.carteiraClientesMaxima)}</div>
+        <div class="valor">${fmtR$Kpi(c.carteiraClientesMaxima)}</div>
         <div class="kpi-info">${fmtPct(pctCarteira)} do VGV${mesTxt(c.mesCarteiraClientesMaxima)}</div>
       </div>
       <div class="kpi-card">
         <div class="rotulo">Receita Bruta — VGV</div>
-        <div class="valor">${fmtR$(c.receitaBruta)}</div>
+        <div class="valor">${fmtR$Kpi(c.receitaBruta)}</div>
         ${varKpi(c.receitaBruta, base ? base.receitaBruta : undefined, true)}
       </div>
       <div class="kpi-card"
@@ -348,7 +348,7 @@ export function kpisFluxo(c: FluxoCalc, base?: FluxoCalc | null): TemplateResult
              permuta física), não "Receita Bruta" no sentido de recebimento em
              caixa (#228); "Receita Bruta (VGV)" confundia as duas grandezas. -->
         <div class="rotulo">VGV Vendável</div>
-        <div class="valor">${fmtR$(c.vgvVendavel)}</div>
+        <div class="valor">${fmtR$Kpi(c.vgvVendavel)}</div>
         ${varKpi(c.vgvVendavel, base ? base.vgvVendavel : undefined, true)}
       </div>
     </div>
