@@ -91,3 +91,36 @@ test('#611: o medidor de ROI recebe roiParaFaixa(p), não p.roiPct cru', () => {
     'tela-graficos.ts voltou a passar p.roiPct cru ao mapa de indicadores do benchmark.',
   );
 });
+
+// ── #613: a eficiência de aproveitamento chega ao mapa de indicadores ──────
+//
+// Decisão do autor (2026-08-28): "indicadores no benchmark e as métricas". O
+// benchmark `eficiencia_aproveitamento` é o único exclusivo do Loteamento
+// (`backend/rotas/benchmarks.ts`, `benchmarksPadrao`) e caía em `descartados`.
+//
+// ⚠️ POR QUE ESTE TESTE LÊ O FONTE, e não basta o de `benchmarks-indicadores`.
+// Aquele prova que o RESOLVEDOR reconhece o campo — uma função pura, testada
+// com um objeto de valores montado à mão pelo próprio teste. Ele fica verde
+// mesmo que `tela-graficos.ts` nunca ponha `eficiencia_aproveitamento` no
+// objeto que passa para ela: o campo é opcional (`Partial<Record<…>>`), então
+// omiti-lo nem sequer é erro de tipo. É a classe 1 do `CLAUDE.md`, o defeito na
+// fiação — e a camada que a pega no DOM é
+// `frontend/render/casos/medidor-eficiencia-loteamento.ts`, que exige o
+// medidor na tela. Este teste é o par barato dela.
+//
+// A âncora é a CHAMADA (`eficiencia_aproveitamento:` dentro do objeto de
+// valores), não o import: importar sem usar é exatamente a mutação que
+// interessa pegar, e ela deixaria um teste de import verde.
+test('#613: a aba Gráficos PASSA eficiencia_aproveitamento ao resolvedor de benchmarks', () => {
+  assert.ok(
+    /eficiencia_aproveitamento:\s*eficienciaParaFaixa\(p\)/.test(FONTE),
+    'tela-graficos.ts parou de passar `eficiencia_aproveitamento: eficienciaParaFaixa(p)` ao mapa de ' +
+    'indicadores — sem essa linha o benchmark exclusivo do Loteamento volta a cair em `descartados` e ' +
+    'o medidor some da tela, com a suíte de função pura inteira verde.',
+  );
+  assert.ok(
+    !/eficiencia_aproveitamento:\s*p\.eficienciaPct\b/.test(FONTE),
+    'tela-graficos.ts passou p.eficienciaPct cru: num Loteamento sem área de gleba o valor cai em 0 e o ' +
+    'medidor desenha o ponteiro na banda vermelha do benchmark — o falso alarme que a #611 removeu.',
+  );
+});
