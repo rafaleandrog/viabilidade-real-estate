@@ -58,6 +58,54 @@ O caso `cenarios-sensibilidade` (COM catálogo) segue verde — o caminho normal
 vazio. Era a descrição do que a #563 pretendia, não do que ela entregou; **com esta issue a frase
 passou a ser literal**, e o doc agora diz desde quando.
 
+## #595 · a série do cenário simulado no card de comparação (2026-08-28)
+
+Item 16 da leva Avançado da Rodada 10, **P1**, com screenshot. Pedido do autor, literal: "Visual do
+gráfico de linha ainda continua errado mesmo após tantas tentativas de arrumar (…) ajuste para que a
+linha que se sobressai nessa imagem apareça de fato e com outra cor (hoje são só pontos)".
+
+**O1 — a hipótese de DADOS foi descartada, e com mecanismo, não só medição.** A issue manda checar
+primeiro se as duas séries divergem em comprimento ou trazem valor não finito: seria a única causa
+que é defeito **deste** repositório, porque coordenada inválida derruba o `path` inteiro e deixa só
+os marcadores — exatamente o sintoma. Medido nos dois níveis, nas duas views e em 4 pares de deltas
+(inclusive ±30%): **nunca divergem**. E não é coincidência — o horizonte deriva SÓ de tempo
+(cronograma, custos, recebíveis, funding, em `calcularFluxo`) enquanto `aplicarCenario` escala SÓ
+valores (`preco_m2`, `orcamento_valor`), então `base.prazo === cenario.prazo` por construção.
+
+**O que ERA defeito deste repositório: a crença sem fonte de que a cor viaja no dado.** A tela
+entregava `cor: 'var(--cor-primaria, #7c5cff)'` dentro de cada item de `series`. O espelho
+`docs/ui-urbiverso/primitivos.json` declara `series` como `Array` e **não declara a forma dos
+itens** — não há como afirmar que `cor` é honrada. Pior: `var()` só resolve em **valor de
+propriedade CSS**; num **atributo de apresentação SVG** (`stroke="var(...)"`) o valor é inválido, o
+agente de usuário descarta o atributo, o traço cai para o inicial (`none` — some a linha) e o
+marcador para o `fill` inicial. O comentário de `tela-cenarios.ts` que afirmava
+"SerieGrafico só declara { rotulo, valores, cor }" (herdado da #185) era a origem da crença, e foi
+**corrigido no mesmo diff** (critério 6): a parte que continua verdadeira — o primitivo não declara
+prop de dasharray nem de anotação — segue escrita, com a fonte que a sustenta.
+
+**A saída, sem inventar prop.** O espelho declara, no `:host` de `UrbiGraficoBase`, as custom
+properties `--urbi-grafico-cor-1..8`, e o próprio `scripts/guard-tokens-css.mjs` as reconhece como
+ponto de customização legítimo. As duas primeiras passam a ser definidas no CSS de
+`tela-cenarios.ts`, com tokens do app. É CSS de verdade, onde `var()` resolve, e vale **qualquer que
+seja** o tratamento que o primitivo dê a `serie.cor` — por isso `cor` saiu do dado em vez de
+conviver: mantê-la só preservaria o único valor que pode ser inválido.
+
+**Função pura nova `comparacaoCenario` (`frontend/fluxo-graficos.ts`)**, que monta eixo e as duas
+séries fora do template. O eixo passa a ser o do cenário **mais longo** dos dois (truncar pelo da
+base esconderia meses de um cenário que estique o horizonte) e `alinharAcumulado` garante uma
+entrada por coluna. Repetir o último valor **não é inventar dado**: numa série ACUMULADA, depois do
+último mês em que algo entra ou sai o saldo permanece onde estava. Hoje o reparo é NO-OP — e o teste
+assere as duas coisas separadamente, porque "não há divergência hoje" e "o gráfico sobrevive se
+houver" são afirmações diferentes.
+
+**O que ficou NÃO EXECUTADO, declarado (critério 4):** se o primitivo desenha as duas séries como
+linha é comportamento do markup interno dele. O harness de render usa **stub** gerado do espelho e
+não reproduz esse markup; o `dist/index.d.ts` do SDK, que responderia, não existe neste ambiente
+(GitHub Packages privado, 401). **Quem confirma é o autor, na instância intermediária (Pinguim)** —
+mesma sessão em que ele pode fechar a #264. Por isso o PR **não** declara `Closes #595`.
+
+Validação: `bash scripts/validar-frontend.sh` verde (847 testes, 56 casos de render). Sem migração —
+`versao` não bumpa.
 ## #581 · R$ sem centavos no card de KPI — a única exceção declarada ao C7 (2026-08-28)
 
 Item 4 da leva Avançado da Rodada 10. Pedido do autor, literal: "Ajustar valores em R$ nos
