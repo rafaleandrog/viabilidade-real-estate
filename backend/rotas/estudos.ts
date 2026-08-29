@@ -44,10 +44,6 @@ const CAMPOS_SOMENTE_AVANCADO = new Set([
   'financiamento_carencia_meses',
   'investidor_aporte_valor', 'investidor_retorno_tipo',
   'investidor_juros_aa', 'investidor_carencia_meses', 'investidor_parcelas',
-  // #462: o deflator de preço da área aberta é exclusivo do Avançado — o
-  // Preliminar não muda neste PR e continua com o deflator implícito de
-  // 100% que `frontend/proforma.ts` já implementa para `area_pvt_*`.
-  'deflator_area_aberta_pct',
 ]);
 
 // Nunca via PATCH: identidade/estado/autor gerados, colunas de soft-delete
