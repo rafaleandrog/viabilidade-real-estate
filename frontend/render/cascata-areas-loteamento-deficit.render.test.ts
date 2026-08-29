@@ -5,23 +5,17 @@
 // AVISO do piso em zero na tela — o piso em si é do motor, e o motor está
 // coberto por `frontend/areas-cascata.test.ts`.
 //
-// ⚠️ **POR QUE `larguras: [1280]` E NÃO A LISTA PADRÃO (1280/900/600).** Montar
-// esta tela pela primeira vez expôs um defeito de layout que NÃO é desta issue
-// e que ninguém tinha visto porque o ramo `if (lot)` de `tela-premissas.ts`
-// nunca tinha ido a DOM nenhum: `div.area-seletor` (os 3 badges de unidade +
-// o `viab-num` de 130px das 7 linhas editáveis) tem `flex-wrap: nowrap` e mede
-// **251px**, enquanto a célula que o contém mede 219px a 600px e 245px a 900px
-// — 6 transbordos de caixa e 6 sobreposições do input sobre a coluna "Área
-// (m²)" ao lado, medidos nesta branch. A 1280px a tela é **limpa** (0 achados
-// em todas as lentes).
-//
-// Não é conserto desta issue (regra R3: um assunto por PR) e não é regressão
-// do diff — o piso em zero não move largura nenhuma. A largura está declarada
-// aqui, com o número medido, em vez de a lente ficar vermelha por um defeito
-// alheio; a mesma escolha explícita que `kpis-fluxo.render.test.ts` faz. O
-// achado está no corpo do PR para virar issue própria — a correção provável é
-// o `table.areas` deixar de ser espremido em `width: 100%` e passar a rolar
-// dentro do `.areas-wrap`, que já tem `overflow-x: auto` para isso.
+// #621 — este caso rodava só a 1280px (`larguras: [1280]`), porque montar esta
+// tela pela primeira vez tinha exposto um defeito de layout alheio ao #612: o
+// ramo `if (lot)` de `tela-premissas.ts` nunca tinha ido a DOM, e `.area-seletor`
+// (3 badges + `viab-num` de 130px, `flex-wrap: nowrap`) media 251px contra
+// células de 219px (600px de viewport) e 245px (900px) — 6 transbordos de
+// caixa + 6 sobreposições nas duas larguras. Consertado em `table.areas`
+// (`frontend/tela-premissas.ts`, ver o comentário lá) com `min-width`, que
+// força o auto-layout a respeitar o conteúdo mínimo das colunas antes de
+// espremer, rolando o excedente dentro do `.areas-wrap` já existente. A
+// restrição de largura não é mais necessária — a lista padrão do harness
+// (1280/900/600) roda limpa.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,7 +28,7 @@ import {
 const pular = await motivoParaPular();
 
 test('Terreno & Áreas (Loteamento): a cascata monta com as 11 linhas e o aviso de área negativa', { skip: pular ?? false }, async () => {
-  const a = await verificarRender({ caso: 'cascata-areas-loteamento-deficit', larguras: [1280] });
+  const a = await verificarRender({ caso: 'cascata-areas-loteamento-deficit' });
 
   assert.equal(contar(a, 'transbordoDeCaixa'), 0, 'alguma caixa filha ultrapassou o pai' + relato(a));
   assert.equal(contar(a, 'sobreposicao'), 0, 'caixas pintadas se sobrepuseram' + relato(a));

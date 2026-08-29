@@ -12,7 +12,7 @@ import type { Proforma } from './proforma.js';
 // …" e Carteira, que a exportação deixou de listar para espelhar a tabela.
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
-import { rotuloMesRelativo } from './fluxo-shared.js';
+import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada } from './viab-format.js';
 import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
@@ -371,12 +371,60 @@ export function linhasFluxo(c: FluxoCalc, funding: FundingNoFluxo | null = null)
   const totalDeducoes = totalSerie(deducoesMensal);
   if (Math.abs(totalDeducoes) > 0.005) {
     linhas.push(
-      { nivel: 1, nome: '(-) Impostos e deduções sobre a receita', custo: false, total: totalDeducoes, mensal: deducoesMensal },
+      // #591: `custo` é o espelho do `ehCusto` da tela — a mesma constante
+      // compartilhada, para CSV/PDF não poderem divergir da tabela (#449). A
+      // linha "= Receita Líquida do Projeto" continua `custo: false`: é um
+      // total de receita, não uma redução.
+      { nivel: 1, nome: '(-) Impostos e deduções sobre a receita', custo: DEDUCOES_RECEITA_EH_CUSTO, total: totalDeducoes, mensal: deducoesMensal },
       { nivel: 1, nome: '= Receita Líquida do Projeto', custo: false, total: totalSerie(c.receitaMensal), vpl: somaVpl(c.linhasReceita), mensal: c.receitaMensal },
     );
   }
 
+  // #592 (O1/O2): as duas pontas do funding saíram do meio do relatório — as
+  // entradas não vêm mais logo depois da Receita Líquida, e as saídas não
+  // moram mais dentro de Custos Financeiros. As duas foram para o fim, entre
+  // o Fluxo de Caixa Livre e o Fluxo de Caixa, exatamente como na tela
+  // (`tabelaFluxo`, `frontend/fluxo-tabela.ts`).
+  linhas.push({
+    nivel: 0, nome: 'Custo Total', custo: true, separadorAntes: true,
+    total: totalSerie(c.custoMensal), vpl: somaVpl(c.linhasCusto),
+    mensal: c.custoMensal, pctVgv: pct(totalSerie(c.custoMensal)),
+  });
+  for (const g of ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'] as const) {
+    const itens = c.linhasCusto.filter((x) => x.grupo === g);
+    // #592 (O1): sem linha do usuário, o grupo não aparece — nem `financeiro`,
+    // que antes existia só para receber o serviço da dívida.
+    if (itens.length === 0) continue;
+    const totalGrupo = itens.reduce((s, x) => s + x.total, 0);
+    linhas.push({
+      nivel: 1, nome: GRUPO_CUSTO_ROTULO[g], custo: true,
+      total: totalGrupo, vpl: somaVpl(itens), mensal: soma(itens), pctVgv: pct(totalGrupo),
+    });
+    for (const x of itens) {
+      linhas.push({ nivel: 2, nome: x.nome, custo: true, inicio: x.inicio, duracao: x.duracao, total: x.total, vpl: x.vpl, mensal: x.mensal, pctVgv: pct(x.total) });
+    }
+  }
+
+  // #472 (D12): o bloco de detalhamento de financiamento à produção saiu da
+  // tabela principal (`fluxo-tabela.ts`) — a exportação acompanha, para não
+  // divergir tela × arquivo (#449).
+
+  // #592 (O3/O6) — o fecho em duas seções, ESPELHANDO `tabelaFluxo` linha a
+  // linha. O Livre volta a aparecer aqui, com o VPL DESALAVANCADO (`c.vpl`),
+  // que é o que TIR/VPL/Payback leem por §8.1; o Fluxo de Caixa carrega
+  // `c.vpl + vplLiquido`. Sem funding sai só a segunda seção, com os rótulos e
+  // o VPL de sempre — o relatório de um estudo sem funding não muda em nada.
+  const vplLivre = c.vpl;
+  const vplAlavancado = c.vpl + (funding?.vplLiquido ?? 0);
   if (funding) {
+    linhas.push({
+      nivel: 0, nome: 'Fluxo de Caixa Livre Mensal', custo: false, separadorAntes: true,
+      total: totalSerie(c.fluxoMensal), vpl: vplLivre, mensal: c.fluxoMensal,
+    });
+    linhas.push({
+      nivel: 0, nome: 'Fluxo de Caixa Livre Acumulado', custo: false,
+      total: c.fluxoAcumulado[c.fluxoAcumulado.length - 1] ?? 0, vpl: vplLivre, mensal: c.fluxoAcumulado,
+    });
     linhas.push({
       nivel: 0, nome: 'Funding — Capital (entradas)', custo: false, separadorAntes: true,
       total: totalSerie(funding.entradas), vpl: funding.linhasEntrada.reduce((s, l) => s + l.vpl, 0),
@@ -385,63 +433,24 @@ export function linhasFluxo(c: FluxoCalc, funding: FundingNoFluxo | null = null)
     for (const l of funding.linhasEntrada) {
       linhas.push({ nivel: 1, nome: l.nome, custo: false, total: l.total, vpl: l.vpl, mensal: l.mensal });
     }
-  }
-
-  const saidasFunding = funding?.linhasSaida ?? [];
-  const saidasMensal = funding?.saidas ?? new Array<number>(c.prazo).fill(0);
-  const totalSaidasFunding = saidasFunding.reduce((s, l) => s + l.total, 0);
-  const vplSaidasFunding = saidasFunding.reduce((s, l) => s + l.vpl, 0);
-  const custoMensalComFunding = c.custoMensal.map((v, i) => v + (saidasMensal[i] ?? 0));
-  linhas.push({
-    nivel: 0, nome: 'Custo Total', custo: true, separadorAntes: true,
-    total: totalSerie(custoMensalComFunding), vpl: somaVpl(c.linhasCusto) + vplSaidasFunding,
-    mensal: custoMensalComFunding, pctVgv: pct(totalSerie(custoMensalComFunding)),
-  });
-  for (const g of ['terreno', 'obra', 'diretos', 'indireto', 'financeiro'] as const) {
-    const itens = c.linhasCusto.filter((x) => x.grupo === g);
-    // #349: as saídas de funding entram em Custos Financeiros — o grupo aparece
-    // mesmo sem linha própria do usuário, e o subtotal soma as duas origens.
-    const ehFinanceiroComFunding = g === 'financeiro' && saidasFunding.length > 0;
-    if (itens.length === 0 && !ehFinanceiroComFunding) continue;
-    const totalGrupo = itens.reduce((s, x) => s + x.total, 0) + (ehFinanceiroComFunding ? totalSaidasFunding : 0);
-    const mensalGrupo = ehFinanceiroComFunding
-      ? soma(itens).map((v, i) => v + (saidasMensal[i] ?? 0))
-      : soma(itens);
     linhas.push({
-      nivel: 1, nome: GRUPO_CUSTO_ROTULO[g], custo: true,
-      total: totalGrupo, vpl: somaVpl(itens) + (ehFinanceiroComFunding ? vplSaidasFunding : 0),
-      mensal: mensalGrupo, pctVgv: pct(totalGrupo),
+      nivel: 0, nome: 'Funding — Serviço (saídas)', custo: true,
+      total: totalSerie(funding.saidas), vpl: funding.linhasSaida.reduce((s, l) => s + l.vpl, 0),
+      mensal: funding.saidas,
     });
-    for (const x of itens) {
-      linhas.push({ nivel: 2, nome: x.nome, custo: true, inicio: x.inicio, duracao: x.duracao, total: x.total, vpl: x.vpl, mensal: x.mensal, pctVgv: pct(x.total) });
-    }
-    if (ehFinanceiroComFunding) {
-      for (const l of saidasFunding) {
-        linhas.push({ nivel: 2, nome: l.nome, custo: true, total: l.total, vpl: l.vpl, mensal: l.mensal, pctVgv: pct(l.total) });
-      }
+    for (const l of funding.linhasSaida) {
+      linhas.push({ nivel: 1, nome: l.nome, custo: true, total: l.total, vpl: l.vpl, mensal: l.mensal });
     }
   }
-
-  // #472 (D12): o bloco de detalhamento de financiamento à produção e a
-  // linha de rodapé "Fluxo de Caixa Livre (antes do funding)" saíram da
-  // tabela principal (`fluxo-tabela.ts`) — a exportação acompanha, para não
-  // divergir tela × arquivo (#449). As liberações, juros e amortizações
-  // continuam no relatório pelas linhas de funding dentro de Custos
-  // Financeiros, acima.
-
-  // Com funding, o Fluxo do rodapé é o ALAVANCADO; o livre — base de TIR/VPL,
-  // que §8.1 mantém desalavancados — não aparece mais aqui: a comparação
-  // FCL × FC real é o card da aba Análise Financeira.
   const fluxoMensal = funding?.fluxoMensal ?? c.fluxoMensal;
   const fluxoAcumulado = funding?.fluxoAcumulado ?? c.fluxoAcumulado;
-  const vplFluxoExib = c.vpl + (funding?.vplLiquido ?? 0);
   linhas.push({
     nivel: 0, nome: 'Fluxo de Caixa Mensal', custo: false, separadorAntes: true,
-    total: totalSerie(fluxoMensal), vpl: vplFluxoExib, mensal: fluxoMensal,
+    total: totalSerie(fluxoMensal), vpl: vplAlavancado, mensal: fluxoMensal,
   });
   linhas.push({
     nivel: 0, nome: 'Fluxo de Caixa Acumulado', custo: false,
-    total: fluxoAcumulado[fluxoAcumulado.length - 1] ?? 0, vpl: vplFluxoExib, mensal: fluxoAcumulado,
+    total: fluxoAcumulado[fluxoAcumulado.length - 1] ?? 0, vpl: vplAlavancado, mensal: fluxoAcumulado,
   });
   return linhas;
 }

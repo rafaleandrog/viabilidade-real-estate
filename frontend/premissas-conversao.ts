@@ -11,8 +11,9 @@ export type LinkKey =
   | 'vgv' | 'vgvResidencial' | 'vgvNaoResidencial'
   | 'areaVendavel' | 'areaVendavelR' | 'areaVendavelNR' | 'areaPrivativa'
   // Grandezas adicionais usadas pelos custos do Avançado (tela-fluxo-custos):
-  // R$/m² de terreno e % da receita. As de cima seguem servindo o Preliminar.
-  | 'areaTerreno' | 'receita';
+  // R$/m² de terreno, % da receita e % do total do grupo Obra. As de cima
+  // seguem servindo o Preliminar.
+  | 'areaTerreno' | 'receita' | 'obra';
 
 // identidade: o valor já é a base (R$ fixo, R$ total, m²).
 // pct: o valor é % da grandeza de ligação (ex.: % do VGV, % da área de venda).
@@ -135,10 +136,10 @@ export function numeroDaColuna(v: unknown): number | null {
 //
 // ELA ESTABELECE: o canônico é o número de registro, a badge troca só a
 // representação, e o valor mostrado em cada unidade é derivado do canônico
-// (`_valorUnidade`, `tela-premissas.ts:565-569`).
+// (`_valorUnidade`, `tela-premissas.ts:577-581`).
 //
 // ELA NÃO ESTABELECE que se deva escrever a coluna por unidade — ao contrário:
-// `_trocarUnidade` (`tela-premissas.ts:550-563`) **não escreve coluna nenhuma**,
+// `_trocarUnidade` (`tela-premissas.ts:562-575`) **não escreve coluna nenhuma**,
 // nem a de destino nem a de origem. O único `_set(op.campo, …)` do arquivo está
 // em `_editarCustoUnidade:571`, quando o usuário DIGITA. A coluna por unidade lá
 // não é espelho: é valor histórico congelado que só o teclado atualiza.
@@ -158,12 +159,10 @@ export function numeroDaColuna(v: unknown): number | null {
 // pela #260. Gravar a derivada arredondada em `orcamento_valor` (`decimal(15,2)`)
 // é o preço conhecido dessa coluna, não perda de informação.
 //
-// ⚠️ `pct_obra` grava número errado, porque `CONV_UNIDADE.pct_obra` usa
-// `link: 'vgv'` (`tela-fluxo-custos.ts:105`) enquanto o motor aplica `totalObra`.
-// Não é exceção de propósito: o gravado passa a ser EXATAMENTE o que a tela
-// exibe naquela badge, que é o invariante desta regra, e nenhum cálculo consome
-// esse número (o motor só lê a coluna crua quando falta o canônico, o que esta
-// função torna impossível). A #514 conserta os dois de uma vez.
+// ✅ #514 (fechada): `pct_obra` já grava o número certo — `CONV_UNIDADE.pct_obra`
+// usa `link: 'obra'` (`tela-fluxo-custos.ts`), a mesma grandeza que o motor
+// aplica (`totalObra`, `fluxo-shared.ts`). O gravado é exatamente o que a tela
+// exibe naquela badge, que é o invariante desta regra.
 
 // `canonicoPersistido` é o valor da coluna `orcamento_valor_canonico` como ela
 // está ANTES da troca (`null` em linha legada). Ausência da chave

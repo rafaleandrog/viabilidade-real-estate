@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { calcularFluxo, agregarFluxoPorPeriodos, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { periodosAnuais } from './fluxo-shared.js';
+import { periodosAnuais, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
 import { linhasFluxo, celulaFx } from './exportar.js';
 import { chavesColapso, GRUPO_CUSTO_LABEL, celula as celulaTela } from './fluxo-tabela.js';
 import { seriesEconomicasFluxo } from './fluxo-graficos.js';
@@ -219,7 +219,7 @@ test('#349 os 5 grupos de custo somam o Custo Total', () => {
   }
 });
 
-test('#349 com funding: entradas viram receita, saídas entram em Custos Financeiros e o rodapé alavanca', () => {
+test('#592 com funding: as duas pontas saem do meio e a tabela fecha em Livre → funding → Fluxo de Caixa', () => {
   const c = calcularFluxo(CONFIG_COMPLETA);
   // Financiamento à produção elegível sobre a linha de Obra, cobrindo a
   // necessidade de caixa — gera liberação (entrada) e juros/amortização (saída).
@@ -244,35 +244,42 @@ test('#349 com funding: entradas viram receita, saídas entram em Custos Finance
   assert.ok(nome('Fin produção — liberações'));
   assert.equal(capital.custo, false);
 
-  // Saídas: dentro de "Custos Financeiros", que já era uma das 5 categorias —
-  // e o subtotal do grupo tem que somá-las junto com a linha do usuário.
+  // #592 (O1) — Saídas NÃO estão mais dentro de "Custos Financeiros". O grupo
+  // volta a valer só a linha que o usuário classificou ali, e o serviço da
+  // dívida ganhou bloco próprio, depois do fecho do Livre.
   const financeiro = nome('Custos Financeiros');
-  const jurosFunding = nome('Funding · Fin produção — parcelas');
-  assert.ok(jurosFunding, 'saídas de funding têm que entrar em Custos Financeiros');
   const linhaUsuario = nome('Taxas bancárias');
   for (let m = 0; m < c.prazo; m++) {
-    const somaFilhas = linhaUsuario.mensal[m]
-      + soma(funding.linhasSaida.map((l) => l.mensal[m]));
-    assert.ok(Math.abs(somaFilhas - financeiro.mensal[m]) <= 0.01, `custos financeiros mês ${m}`);
+    assert.ok(Math.abs(linhaUsuario.mensal[m] - financeiro.mensal[m]) <= 0.01,
+      `Custos Financeiros tem que valer SÓ a linha do usuário no mês ${m}`);
   }
+  const servico = nome('Funding — Serviço (saídas)');
+  assert.ok(servico, 'as saídas de funding têm bloco próprio');
+  assert.equal(servico.custo, true);
+  assert.ok(nome('Funding · Fin produção — parcelas'), 'a linha da operação continua detalhada');
+  assert.deepEqual(servico.mensal, funding.saidas);
 
-  // Rodapé: a linha de rodapé "Fluxo de Caixa Livre (antes do funding)" saiu
-  // da tabela principal (#472, decisão D12) — a comparação livre × real é o
-  // card da aba Análise Financeira. Aqui só sobra o alavancado, e ele
-  // continua sendo livre + entradas − saídas.
-  assert.equal(linhas.find((l) => l.nome === 'Fluxo de Caixa Livre (antes do funding)'), undefined);
-  const fluxo = nome('Fluxo de Caixa Mensal');
-  for (let m = 0; m < c.prazo; m++) {
-    assert.ok(Math.abs((c.fluxoMensal[m] + funding.entradas[m] - funding.saidas[m]) - fluxo.mensal[m]) <= 0.01,
-      `alavancado mês ${m}`);
-  }
-
-  // E a tabela inteira fecha: receita líquida + capital − custo total = fluxo.
-  const liquida = nome('= Receita Líquida do Projeto');
+  // #592 (O1) — Custo Total é o custo do PROJETO, puro: não soma mais o
+  // serviço da dívida. Prova pelo lado que o defeito atacaria: se as saídas
+  // tivessem voltado para dentro, esta igualdade quebraria.
   const custo = nome('Custo Total');
+  assert.deepEqual(custo.mensal, c.custoMensal);
+
+  // #592 (O4) — A IDENTIDADE, mês a mês. É a afirmação central da tabela nova.
+  const livre = nome('Fluxo de Caixa Livre Mensal');
+  const fluxo = nome('Fluxo de Caixa Mensal');
+  assert.deepEqual(livre.mensal, c.fluxoMensal, 'o Livre é o desalavancado do motor, sem retoque');
   for (let m = 0; m < c.prazo; m++) {
-    const esperado = liquida.mensal[m] + capital.mensal[m] - custo.mensal[m];
-    assert.ok(Math.abs(esperado - fluxo.mensal[m]) <= 0.01, `conservação mês ${m}`);
+    assert.ok(Math.abs((livre.mensal[m] + capital.mensal[m] - servico.mensal[m]) - fluxo.mensal[m]) <= 0.01,
+      `identidade O4 no mês ${m}`);
+  }
+
+  // E o Livre continua sendo receita líquida − custo do projeto: é o que
+  // torna o encadeamento de cima para baixo legível.
+  const liquida = nome('= Receita Líquida do Projeto');
+  for (let m = 0; m < c.prazo; m++) {
+    assert.ok(Math.abs((liquida.mensal[m] - custo.mensal[m]) - livre.mensal[m]) <= 0.01,
+      `Livre = líquida − custo no mês ${m}`);
   }
 });
 
@@ -304,10 +311,14 @@ test('#472 com financiamento à produção: sem bloco de detalhamento na tabela,
 
   // Critério 3: a lista de nomes de NÍVEL 0, na ordem, sem nenhuma outra linha.
   const nomesNivel0 = linhas.filter((l) => l.nivel === 0).map((l) => l.nome);
+  // #592: a ordem mudou — nada de funding antes do fecho do Livre.
   assert.deepEqual(nomesNivel0, [
     'Receita Bruta — VGV',
-    'Funding — Capital (entradas)',
     'Custo Total',
+    'Fluxo de Caixa Livre Mensal',
+    'Fluxo de Caixa Livre Acumulado',
+    'Funding — Capital (entradas)',
+    'Funding — Serviço (saídas)',
     'Fluxo de Caixa Mensal',
     'Fluxo de Caixa Acumulado',
   ]);
@@ -485,13 +496,22 @@ test('#447 linha informativa do funding aparece sem linha de custo financeira pr
   assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01,
     `Resultado ${p.resultado} != Σ fluxoMensal ${soma(c.fluxoMensal)}`);
 
-  // Na aba Fluxo de Caixa (outra superfície, de CAIXA), o mesmo funding
-  // aparece DENTRO do subtotal "Custos Financeiros" — conteúdo declaradamente
-  // diferente do da proforma (lá é exibido, nunca somado; aqui é somado).
+  // ⚠️ #592 MUDOU O ENDEREÇO, e a distinção de conteúdo continua de pé.
+  // Antes, na aba Fluxo de Caixa o serviço da dívida aparecia DENTRO do
+  // subtotal "Custos Financeiros" — e este fixture não tem linha própria nesse
+  // grupo, então o grupo existia SÓ por causa do funding. Agora ele não
+  // existe: o serviço da dívida tem bloco próprio ao fim da tabela.
+  //
+  // O que a #447 afirma segue valendo, e é sobre as DUAS superfícies: na
+  // proforma o efeito do funding é EXIBIDO e nunca somado; na aba Fluxo de
+  // Caixa ele é SOMADO — só que agora entre o Fluxo de Caixa Livre e o Fluxo
+  // de Caixa, que é onde o autor o quer.
   const linhasFx = linhasFluxo(c, funding);
-  const financeiroFx = linhasFx.find((l) => l.nome === 'Custos Financeiros')!;
-  assert.ok(financeiroFx, 'sem linha própria, o grupo só existe na aba Fluxo por causa do funding');
-  assert.ok(Math.abs(financeiroFx.total - totalSaidas) <= 0.01);
+  assert.equal(linhasFx.find((l) => l.nome === 'Custos Financeiros'), undefined,
+    'sem linha própria do usuário, o grupo não existe mais — o funding saiu de dentro dele');
+  const servicoFx = linhasFx.find((l) => l.nome === 'Funding — Serviço (saídas)')!;
+  assert.ok(servicoFx, 'o serviço da dívida tem bloco próprio');
+  assert.ok(Math.abs(servicoFx.total - totalSaidas) <= 0.01);
 });
 
 test('#447 sem funding (ou sem serviço de dívida), a linha informativa não existe', () => {
@@ -625,3 +645,119 @@ test('#427 não-regressão: o campo `resultado` de #351/#426 não muda de valor 
   const p = proformaAvancado(c, 1000);
   assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01);
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #591 — a dedução sobre a receita é CUSTO, e as três vistas concordam.
+//
+// O defeito relatado era de APRESENTAÇÃO: a linha "(-) Impostos e deduções
+// sobre a receita" saía com a classe `receita` na tabela do Fluxo de Caixa e
+// o CSS a pintava com o token de sucesso, na mesma faixa verde dos grupos de
+// VGV logo acima. A Proforma do Avançado, com a MESMA linha, sempre a
+// classificou como `custo`.
+//
+// ⚠️ O QUE ESTE BLOCO MEDE, E O QUE ELE NÃO MEDE — a distinção importa.
+// Ele confronta duas IMPLEMENTAÇÕES REAIS entre si (a exportação e a Proforma
+// do Avançado), em vez de comparar cada uma com um literal escrito aqui: um
+// literal teria de ser copiado de um dos dois lados, e a partir daí os três
+// poderiam divergir sem nada ficar vermelho. É o mesmo desenho de
+// `frontend/proforma-cores.test.ts` e de `frontend/proforma-ordem-linhas.test.ts`.
+//
+// O que ele NÃO alcança é a TELA: `tabelaFluxo` devolve um `TemplateResult`, e
+// nenhuma etapa de lógica pura lê classe de CSS chegando ao DOM. Quem prova
+// aquela ponta é o caso de render `frontend/render/casos/tabela-fluxo.ts`, que
+// exige `tr.subgrupo.custo[data-linha="deducoes"]` na tela montada em Chromium.
+// As duas pontas se movem juntas porque leem a MESMA constante
+// (`DEDUCOES_RECEITA_EH_CUSTO`, `frontend/fluxo-shared.ts`).
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fixture de LOTEAMENTO com RET ativo — critério 7 da issue (paridade
+ * Loteamento × Incorporação). `tabelaFluxo`/`linhasFluxo` não ramificam por
+ * padrão de empreendimento hoje, então este fixture não exercita um segundo
+ * CAMINHO de código: ele é a trava contra alguém introduzir a ramificação
+ * depois e a paridade se perder em silêncio.
+ */
+const CONFIG_LOTEAMENTO: FluxoConfig = {
+  dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+  ret: { ativo: true, pct: 4 },
+  linhasReceita: [{
+    id: 1, nome: 'Quadra A', fase_label: 'Lotes',
+    tipologias: [{ id: 21, nome: 'Lote padrão', quantidade: 120, area_privativa_m2: 250, preco_m2: 900 }],
+    absorcao: { modo: 'linear' },
+    fluxo_pagamento: {
+      entrada: [{ pct: 20, parcelas: 3, descontoPct: 0 }],
+      parcelas: [{ pct: 80, parcelas: 36, periodicidade: 'mensal' }],
+    },
+  }],
+  linhasCusto: [
+    { id: 1, grupo: 'terreno', categoria: 'Gleba', orcamento_valor: 4_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    { id: 2, grupo: 'obra', categoria: 'Infraestrutura', orcamento_valor: 9_000_000, orcamento_unidade: 'rs', inicio_mes: 17, duracao_meses: 24 },
+  ],
+  areaTerreno: 60_000,
+};
+
+for (const [padrao, cfg] of [
+  ['Incorporação', CONFIG_COMPLETA],
+  ['Loteamento', CONFIG_LOTEAMENTO],
+] as [string, FluxoConfig][]) {
+  test(`#591 (${padrao}) a dedução sai como CUSTO na exportação, igual à Proforma do Avançado`, () => {
+    const c = calcularFluxo(cfg);
+    const linhas = linhasFluxo(c);
+    const deducaoFx = linhas.find((l) => l.nome === '(-) Impostos e deduções sobre a receita')!;
+    const liquidaFx = linhas.find((l) => l.nome === '= Receita Líquida do Projeto')!;
+    assert.ok(deducaoFx, 'com RET ativo a linha-ponte de deduções tem que existir');
+    assert.ok(deducaoFx.total < 0, 'a dedução é negativa (líquida − bruta)');
+
+    // A MESMA linha, na Proforma do Avançado. `tipo: 'custo'` lá é o lado que
+    // sempre esteve certo — é contra ele que a exportação é confrontada.
+    const pf = proformaAvancado(c, 1000);
+    const deducaoPf = pf.linhas.find((l) => l.nome === '(-) Impostos e deduções sobre a receita')!;
+    assert.ok(deducaoPf, 'a Proforma do Avançado também lista a dedução');
+    assert.equal(deducaoPf.tipo, 'custo');
+
+    assert.equal(
+      deducaoFx.custo, deducaoPf.tipo === 'custo',
+      'a dedução tem que ter a MESMA natureza no Fluxo de Caixa e na Proforma do Avançado',
+    );
+    assert.equal(deducaoFx.custo, DEDUCOES_RECEITA_EH_CUSTO);
+    assert.equal(DEDUCOES_RECEITA_EH_CUSTO, true);
+
+    // Critério 4: a linha irmã continua sendo RECEITA — ela é o total de
+    // receita a que a dedução chega, não uma redução.
+    assert.equal(liquidaFx.custo, false);
+  });
+
+  test(`#591 (${padrao}) a aritmética da ponte não muda, e o texto da célula também não`, () => {
+    const c = calcularFluxo(cfg);
+    const linhas = linhasFluxo(c);
+    const nome = (n: string) => linhas.find((l) => l.nome === n)!;
+    const bruta = nome('Receita Bruta — VGV');
+    const deducao = nome('(-) Impostos e deduções sobre a receita');
+    const liquida = nome('= Receita Líquida do Projeto');
+
+    for (let m = 0; m < c.prazo; m++) {
+      // Critério 3: bruta + deduções = líquida, mês a mês, sem afrouxamento.
+      assert.ok(
+        Math.abs((bruta.mensal[m] + deducao.mensal[m]) - liquida.mensal[m]) <= 0.01,
+        `ponte mês ${m}`,
+      );
+      // Critério 2: tela e exportação escrevem a MESMA célula. `celulaTela`
+      // recebe o mesmo `ehCusto` que a linha exportada declara — é a paridade
+      // que a #449 fechou, agora sobre a natureza nova.
+      assert.equal(
+        celulaTela(deducao.mensal[m], deducao.custo),
+        celulaFx(deducao.mensal[m], deducao, true),
+        `célula divergente no mês ${m}`,
+      );
+      // E o texto NÃO muda por causa desta issue: a série é ≤ 0, e
+      // `negativoContabil` já põe negativo entre parênteses com ou sem
+      // `custo`. É a evidência de que trocar a natureza acerta a COR sem
+      // mexer na notação — o efeito colateral que a issue listava em D2.
+      assert.equal(
+        celulaTela(deducao.mensal[m], true),
+        celulaTela(deducao.mensal[m], false),
+        `a notação da dedução mudou no mês ${m}`,
+      );
+    }
+  });
+}

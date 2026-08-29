@@ -81,6 +81,192 @@ nº 2) e foram corrigidas na mesma alteração, apontadas pelo `guard-enderecos-
 **Validação de backend PENDENTE DO AUTOR** — o PR toca `backend/rotas/estudos.ts` e lê o
 `schema.json` sem alterá-lo; o `validar-backend.sh` aborta no portão do SDK. "Não deu para rodar"
 nunca é "passou".
+## A tabela mensal fecha em Fluxo de Caixa Livre e só depois em Fluxo de Caixa — #592 (2026-08-29)
+
+Rodada 10, item A10-13 — a issue mais pesada da leva, com ordens de implementação O0 a O7 e a
+planilha de referência do autor. As duas pontas do funding saíram do meio da tabela (entradas logo
+após a Receita Líquida, saídas dentro de `Custos Financeiros`) e foram para o fim, entre dois
+fechos, na ordem da planilha: `Caixa Livre` → fluxos de funding → `Caixa`.
+
+**O motor não foi tocado, e o O0 estava certo ao pedir isso.** `FundingNoFluxo` já expunha
+`entradas`, `saidas`, `linhasEntrada`, `linhasSaida`, `fluxoMensal`, `fluxoAcumulado` e
+`vplLiquido`; `FluxoCalc` já expunha os desalavancados. O diff inteiro é de apresentação.
+
+**A identidade do O4 fecha com resíduo ZERO, e isso é consequência, não sorte.** O motor compõe o
+alavancado com `round2` por mês (`fluxoMensal = fluxoLivreMensal.map((v, t) => round2(v +
+entradas[t] - saidas[t]))`), então a tabela publica exatamente a aritmética que o motor executa.
+Medido sobre as linhas publicadas — não sobre as séries do motor, que sempre fecharam: pior resíduo
+mensal **R$ 0,000000** em 77 meses, total **R$ 0,000000**, e zero também nos meses de borda
+(primeiro com liberação, último com amortização). Os testes ainda asseveram com tolerância
+(`≤ R$ 0,01` por mês), porque travar em zero exato travaria um detalhe do arredondamento.
+
+**A armadilha de fixture que quase passou.** Sem `pct_retorno`, o equity tem retorno de 0% e **não
+produz linha de saída nenhuma**; sem `resultadoFinal` real, idem. A fixture teria as três naturezas
+só na ponta das entradas, e a identidade fecharia sobre série zerada justamente na natureza que o
+pedido mais destaca. Hoje são 3 linhas de entrada e 3 de saída, e os dois campos estão comentados
+com o motivo — é o tipo de omissão que deixa o teste verde medindo o vazio.
+
+**Decisão do O5, declarada:** sem funding, **uma** seção de fecho só, com os rótulos e o VPL de
+hoje. Livre e Fluxo de Caixa seriam o mesmo número, e publicar as duas seria a mesma linha duas
+vezes — o critério 4 pede que o estudo sem funding renderize *exatamente* como antes.
+
+**Renomeação do critério 7 aplicada** (decisão do orquestrador, reversível em uma linha):
+`Fluxo de Caixa (resultado real)` → `Fluxo de Caixa` em `tela-fluxo-ver.ts` e `tela-funding.ts`.
+`grep -rn "Fluxo de Caixa real\|resultado real" frontend/` devolve vazio.
+
+**A verificação por render é um caso NOVO** (`tabela-fluxo-funding`), e não o `tabela-fluxo`
+existente: as seções só são montadas quando há funding, então no caso antigo nenhum seletor casaria
+e a medida seria do vazio. O `exigir` afirma **ordem**, não só presença, pelo combinador de irmão
+geral (`A ~ B` só casa se B vem depois de A no mesmo `<tbody>`) — sobre as âncoras `data-linha` que
+a #591 introduziu, agora também em `linhaResultado`, porque as quatro linhas de fecho são todas
+`tr.resultado` e seletor CSS não casa por texto.
+
+**Três testes existentes mudaram de expectativa, e nenhum afrouxou:** o que exigia as saídas dentro
+de `Custos Financeiros` passou a exigir o oposto; a lista de nível 0 da #472 ganhou as quatro
+linhas novas na ordem nova; e a #447 trocou de endereço — o grupo que existia só por causa do
+funding agora não existe, e a asserção cobra o bloco `Funding — Serviço (saídas)`.
+
+**Sem migração e sem bump de `versao`.** Paridade Loteamento × Incorporação com fixture de cada
+padrão, os dois com funding e com as três naturezas.
+
+---
+
+## #590 + #514 · badge "% Obra" tomava 400 e, se só isso fosse consertado, gravaria o número errado (2026-08-29)
+
+Trilho P1 da Rodada 10 — as duas issues descrevem a MESMA badge (`Custos → Obras`, categoria
+`Gestão da obra`) e saem juntas porque consertar uma sem a outra embarca um bug: só #590 faz o
+`PATCH` passar, mas grava `canonico / vgv × 100`; só #514 acerta a conta, mas o `PATCH` continua
+tomando `400`.
+
+**#590 — o backend recusava `orcamento_unidade: 'pct_obra'`.** `schema.json`, a tela e o motor
+(`fluxo-shared.ts`, `case 'pct_obra'`) já concordavam; só `UNIDADES_ORCAMENTO`
+(`backend/rotas/avancado.ts`) estava sem a entrada — três listas escritas à mão descrevendo o mesmo
+enum, uma delas divergindo em silêncio. Clicar na badge (a ÚNICA percentual que `Gestão da obra`
+oferece) disparava `400 UNIDADE_INVALIDA`.
+
+**Conserto:** `pct_obra` entrou em `UNIDADES_ORCAMENTO`. Para a divergência não voltar a nascer em
+silêncio, `UNIDADES_ORCAMENTO`/`GRUPOS_CUSTO`/`EVENTOS_ANCORA`/`MODOS_DISTRIBUICAO` (avancado.ts) e
+`TIPOS_OPERACAO`/`MODOS_RETORNO`/`EVENTOS_ANCORA` (funding.ts) viraram exportadas e ganharam teste de
+**igualdade exata de conjunto** contra os `opcoes` do `schema.json`
+(`backend/rotas/avancado-schema-enums.test.ts`) — reprova entrada a mais OU a menos, testado nos
+dois sentidos. **Varredura dos vizinhos (critério 4 da issue): zero divergências** — só
+`orcamento_unidade` estava fora de sincronia; as outras seis listas já batiam, e agora têm guarda de
+regressão.
+
+**Prova de fiação de ponta a ponta** (`backend/rotas/avancado-custos-rota.test.ts`): Express real,
+`rotasAvancado` montada como o shell monta, `PATCH` HTTP de verdade — não chamada de função pura.
+Confirmado por mutação: revertendo o conserto, o teste de `200` e o controle negativo ficam
+vermelhos.
+
+**#514 — a badge convertia sobre a base errada.** `CONV_UNIDADE.pct_obra`
+(`frontend/tela-fluxo-custos.ts`) usava `link: 'vgv'` enquanto o motor aplica `ctx.totalObra`; erro
+de 3,4× no exemplo do autor (Obra R$ 50M, VGV R$ 171,4M — digitar 10% devia gravar R$ 5M, gravava
+R$ 17,1M). `LinkKey` (`frontend/premissas-conversao.ts`) nem tinha chave `obra`.
+
+**Conserto:** `LinkKey` ganhou `obra`; `_ctxConversao()` passa a fornecer `obra: this._totalObra`
+(o getter já existia, só não alimentava a conversão); `CONV_UNIDADE.pct_obra` passa a usar
+`link: 'obra'`. ⚠️ Muda o número EXIBIDO em estudo existente na badge "% Obra" — o canônico não
+muda (o motor sempre usou `totalObra`), só o rótulo passa a dizer a verdade.
+
+**Testes** (`frontend/premissas-conversao.test.ts`): `daBase(pct_obra,…)` com o exemplo do autor
+devolve `10`, não `2,9163…`; ida e volta grava/lê R$ 5.000.000; `totalObra` ausente/zero não grava
+número nem troca a unidade; o invariante dos SEIS destinos (que antes era vácuo para `pct_obra`,
+porque `ctx.vgv` sempre existia e mascarava a ausência de `ctx.obra`) agora exerce a conta de
+verdade; teste de regressão lendo `tela-fluxo-custos.ts` confirma que `link: 'vgv'` não aparece mais
+na declaração. Confirmado por mutação: revertendo para `link: 'vgv'`, esse último teste fica
+vermelho.
+
+Sem migração nas duas → a `versao` não bumpa. `validar-backend.sh` não roda nesta sessão (401 do
+SDK, etapa 1/5) — testes de backend executados diretamente via `tsx` (módulos tocados não importam
+o SDK); typecheck do backend fica pendente do autor no ambiente autenticado.
+
+**Rodada de revisão (Codex, PR #643) achou um P2 real, e ele foi consertado na mesma rodada.**
+`_totalObra` contava a PRÓPRIA linha na base ao converter uma linha de Obra (em `rs` ou outra
+unidade) para `pct_obra` — ela só sai do filtro por unidade depois que o `PATCH` volta e
+`this.custos` é atualizado. Exemplo: Construção R$50M + Gestão R$5M (ambas `rs`); converter Gestão
+para `% Obra` gravava `5/(50+5)×100 = 9,09%`, e a tela passava a mostrar `10%` assim que a resposta
+chegasse — `orcamento_valor` persistido divergindo do que a tela exibe, o invariante que a #442
+existe para proteger. O canônico (R$5M) não era afetado, então o motor de Fluxo de Caixa continuava
+correto; o dano ficava contido ao rótulo percentual, numa janela estreita. **Conserto:** `_totalObra`
+virou método com `excluirId` opcional; `_ctxConversao` propaga `c.id` nos 5 call sites. Guarda de
+regressão por leitura de fonte em `frontend/premissas-conversao.test.ts` (nenhum teste importa o
+componente Lit), confirmada por mutação nos 5 pontos.
+## A linha de deduções deixa de ser pintada como receita no Fluxo de Caixa — #591 (2026-08-29)
+
+Rodada 10, item A10-12. Pedido do autor, literal: *"Arrumar linha no fluxo de Impostos que aparece
+na parte de receitas hoje"*. A linha `(-) Impostos e deduções sobre a receita` saía com a classe
+`receita` no `<tr>` e o CSS a pintava com o token de **sucesso**, na mesma faixa verde dos grupos de
+VGV logo acima — uma dedução com a cor de receita.
+
+**A saída escolhida foi a D2 da issue (marcar como custo), e a razão não é "é a mais barata": é que
+a Proforma do Avançado já classifica ESTA MESMA linha como `custo`.** O Fluxo de Caixa era o lado
+divergente. Uniformizar na outra direção teria mudado a Proforma, que estava certa.
+
+**O efeito colateral que a issue previa para a D2 não se materializa, e isso está medido, não
+suposto.** A D2 muda cor **e** notação contábil, porque `ehCusto` governa as duas — mas a série de
+deduções é `líquida − bruta`, logo ≤ 0, e `negativoContabil` já põe valor negativo entre parênteses
+com ou sem `custo`. O teste assere exatamente isso, mês a mês: `celula(v, true) === celula(v,
+false)` para os valores reais da linha. O que muda é a cor; o número sai escrito igual.
+
+**Tela e exportação leem a MESMA constante.** `DEDUCOES_RECEITA_EH_CUSTO` mora em
+`frontend/fluxo-shared.ts` — **um** dos cinco módulos que `fluxo-tabela.ts` e `exportar.ts` já
+importavam, de modo que a constante não cria aresta nova no grafo de imports (o cabeçalho de
+`exportar.ts` explica por que a direção dele importa). ⚠️ A primeira redação desta entrada dizia "o
+**único** módulo", e era **falsa**: `viab-format.ts` — dono de `celula` e `negativoContabil` — é
+igualmente compartilhado e serviria de lar. A escolha é por **assunto** (a constante diz o que a
+linha é no fluxo, não como se formata), não por exclusividade. A paridade da #449 passa a ser **estrutural**: não há como mover
+uma ponta sem a outra.
+
+**A prova da tela é render, e ela tem dois qualificadores por necessidade.** O caso
+`frontend/render/casos/tabela-fluxo.ts` exige `tr.subgrupo.custo[data-linha="deducoes"]`. Sem o
+`data-linha` — atributo novo, sem efeito visual, nenhuma regra do CSS o seleciona — o seletor
+`tr.subgrupo.custo` sozinho já casa com os subgrupos de custo (Terreno, Obra, …) e **ficaria verde
+com o defeito de volta**; sem a classe, o `data-linha` não diz nada sobre cor. Nenhuma camada de
+lógica pura deste repositório lê classe de CSS chegando ao DOM.
+
+**A linha irmã `= Receita Líquida do Projeto` continua receita, de propósito** (critério 4): ela é o
+total de receita a que a dedução chega, não uma redução. A ordem das duas não muda — é ela que faz
+a leitura aritmética de cima para baixo fechar.
+
+**Sem migração e sem bump de `versao`**: é apresentação, nada persistido muda, e estudo antigo com
+RET ou permuta financeira passa a exibir certo sem ser reeditado. Paridade Loteamento ×
+Incorporação coberta por fixture de cada padrão — `tabelaFluxo`/`linhasFluxo` não ramificam por
+padrão hoje, e o segundo fixture é a trava contra alguém introduzir a ramificação depois.
+
+---
+
+## #621 · tabela de Terreno & Áreas do Loteamento transborda abaixo de ~1280px (2026-08-29)
+
+Etapa 5 da Rodada 10, achado colateral do PR 620 (#612): o primeiro caso de render de
+`viab-tela-premissas` montado sobre um Loteamento expôs um defeito de layout pré-existente que nunca
+tinha ido a DOM.
+
+**Medido antes do conserto** (Chromium, harness `scripts/render-check.mjs`, busca binária): a 600px
+de viewport, `div.area-seletor` (3 badges de unidade + `viab-num` de 130px, `flex-wrap: nowrap`) mede
+251px contra uma célula de 219px — 6 transbordos de caixa; a 900px a célula mede 245px — mesmos 6
+transbordos, mais 6 sobreposições do input sobre a coluna "Área (m²)" ao lado. A 1280px a tela já era
+limpa. `table.areas { width: 100% }` deixava o auto-layout espremer a coluna abaixo do conteúdo
+mínimo dela em vez de crescer a tabela.
+
+**Conserto:** `min-width` em `table.areas` (`frontend/tela-premissas.ts`), forçando o auto-layout a
+respeitar o conteúdo mínimo das colunas antes de espremer; o excedente rola dentro do
+`.areas-wrap`, que já tinha `overflow-x: auto` — mesma solução de `.tabela-wrap table.crono`
+(Cronograma). Piso varrido por busca binária: limpo a partir de 874px (600px de viewport); 900px é
+esse piso com folga, mesma margem que `cronograma-sufixo-mes.render.test.ts` usa (18ch→21ch).
+
+**Paridade (critério 3 da issue):** `table.areas` é o MESMO seletor usado por
+`_renderTabelaAreasIncorporacao` — o conserto vale para as duas cascatas. Reconferido em Chromium:
+`cascata-areas-incorporacao`, `cascata-areas-incorporacao-deficit` e `alocacao-areas-loteamento`
+seguem limpos nas três larguras.
+
+**A restrição `larguras: [1280]`** de `cascata-areas-loteamento-deficit.render.test.ts` (posta pelo
+PR 620 exatamente para este defeito alheio não falsear a lente) foi retirada do teste de layout —
+volta a rodar 1280/900/600, critério 2 da issue. O teste de cores mantém `larguras: [1280]`, mesma
+convenção de `cronograma-sufixo-mes.render.test.ts` (cor não depende de viewport).
+
+**Prova de mutação:** apagar o `min-width` (voltando a `width: 100%` sozinho) deixa
+`cascata-areas-loteamento-deficit.render.test.ts` VERMELHO — 12 achados de `transbordoDeCaixa`
+(6 a 600px, 6 a 900px) — confirmando que a lente enxerga a regressão.
 
 ---
 

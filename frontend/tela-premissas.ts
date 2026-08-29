@@ -393,7 +393,19 @@ export class ViabTelaPremissas extends LitElement {
        negrito/fundo claro para as linhas COMPUTADAS (âncoras/subtotais),
        espelhando a imagem de referência padrao_areas.png. */
     .areas-wrap { overflow-x: auto; }
-    table.areas { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+    /* #621 — width: 100% sozinho deixava o auto-layout da tabela espremer a
+       coluna do .area-seletor (3 badges + viab-num de 130px, nowrap) abaixo
+       do conteúdo mínimo dela, e o excedente pintava por fora da célula em vez
+       de crescer a tabela — MEDIDO: 251px de conteúdo contra 219px (600px de
+       viewport) e 245px (900px), 6 transbordos de caixa + 6 sobreposições nas
+       duas larguras. min-width no elemento força o auto-layout a respeitar o
+       conteúdo mínimo das colunas antes de espremer, e o .areas-wrap acima já
+       tinha overflow-x: auto para rolar o excedente — mesma solução das
+       outras tabelas largas do app (.tabela-wrap table.crono, Cronograma).
+       Piso varrido por busca binária em scripts/render-check.mjs: limpo a
+       partir de 874px (600px de viewport); 900px é esse piso com folga, mesma
+       margem que cronograma-sufixo-mes.render.test.ts usa para 18ch→21ch. */
+    table.areas { width: 100%; min-width: 900px; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
     table.areas th, table.areas td { padding: 6px 10px; border-bottom: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.06)); text-align: left; }
     table.areas th { color: var(--cor-texto-sec, rgba(255,255,255,0.5)); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
     table.areas td.num, table.areas th.num { text-align: right; }

@@ -149,6 +149,40 @@ export function corFaseExtra(idx: number): string {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// #591 — natureza da linha-ponte de deduções sobre a receita
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * A linha "(-) Impostos e deduções sobre a receita" (RET + permuta financeira)
+ * é uma REDUÇÃO de receita, não uma receita. A Proforma do Avançado já a
+ * classifica assim (`proformaAvancado`, `frontend/proforma-avancado.ts`, a
+ * empurra com `tipo: 'custo'`); a tabela do Fluxo de Caixa a marcava como
+ * receita e o CSS a pintava com o token de SUCESSO, na mesma faixa verde dos
+ * grupos de VGV logo acima — que é o defeito relatado.
+ *
+ * A constante mora AQUI, e não em cada uma das duas pontas, porque tela
+ * (`tabelaFluxo`, `frontend/fluxo-tabela.ts`) e exportação (`linhasFluxo`,
+ * `frontend/exportar.ts`) têm de representar a linha da MESMA forma — o
+ * contrato que a #449 fechou. Com um símbolo único a paridade é estrutural em
+ * vez de uma asserção que envelhece. `fluxo-shared.ts` é UM dos módulos que as
+ * duas já importam — não o único: elas compartilham cinco, e `viab-format.ts`
+ * (dono de `celula` e `negativoContabil`) serviria igualmente bem. A escolha é
+ * por assunto, não por exclusividade: a constante diz o que a linha É no fluxo,
+ * e não como ela é formatada. O que importa para o grafo de imports é que
+ * qualquer um dos compartilhados evita aresta nova; pôr a constante em UMA DAS
+ * PONTAS é que criaria (o cabeçalho de `exportar.ts` explica por que a direção
+ * dele importa).
+ *
+ * ⚠️ Isto NÃO muda a aritmética nem, na prática, o texto da célula. A série de
+ * deduções é `líquida − bruta`, logo ≤ 0, e `negativoContabil`
+ * (`frontend/viab-format.ts`) já põe valor negativo entre parênteses com ou sem
+ * `custo` — o que muda é a CLASSE do `<tr>` na tela e o `custo` da linha
+ * exportada. (Num mês em que a dedução saísse positiva, a notação de custo
+ * passa a valer, e é a correta para uma linha de dedução.)
+ */
+export const DEDUCOES_RECEITA_EH_CUSTO = true;
+
+// ─────────────────────────────────────────────────────────────────
 // Absorção de vendas e VGV (puros — reutilizados pelo motor do fluxo)
 // ─────────────────────────────────────────────────────────────────
 

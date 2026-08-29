@@ -700,7 +700,7 @@ export class ViabFunding extends LitElement {
 
       ${this.operacoes.length === 0
         ? html`<urbi-estado-vazio icone="fa-solid fa-coins"
-            mensagem="Nenhuma operação de funding. O Fluxo de Caixa real é igual ao Livre."></urbi-estado-vazio>`
+            mensagem="Nenhuma operação de funding. O Fluxo de Caixa é igual ao Livre."></urbi-estado-vazio>`
         : html`<div class="ops">${this.operacoes.map((o, i) => this._renderOperacao(o, i))}</div>`}
 
       ${this.removerId !== null ? html`

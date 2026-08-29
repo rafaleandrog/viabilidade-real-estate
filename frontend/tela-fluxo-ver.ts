@@ -387,7 +387,7 @@ export class ViabFluxoVer extends LitElement {
   /**
    * #351 · aba Análise Financeira — indicadores principais, a diferença
    * explícita entre Fluxo de Caixa Livre (desalavancado, base de TIR/VPL por
-   * §8.1) e o Fluxo de Caixa real (pós-funding), e os gráficos que antes
+   * §8.1) e o Fluxo de Caixa (pós-funding), e os gráficos que antes
    * ficavam empilhados embaixo da tabela.
    */
   private _renderAnaliseFinanceira(
@@ -412,7 +412,7 @@ export class ViabFluxoVer extends LitElement {
     const sinalReal = sinalLinhaProformaAv({ tipo: 'resultado', valor: real });
     return html`
       ${kpisFluxo(c)}
-      <urbi-card titulo="Fluxo de Caixa Livre × Fluxo de Caixa real">
+      <urbi-card titulo="Fluxo de Caixa Livre × Fluxo de Caixa">
         <table class="proforma">
           <tbody>
             <tr class="n0 receita">
@@ -424,7 +424,7 @@ export class ViabFluxoVer extends LitElement {
               <td class="num ${sinalFunding}">${fmtR$(-custoFunding)}</td>
             </tr>
             <tr class="n0 resultado">
-              <td>= Fluxo de Caixa (resultado real)</td>
+              <td>= Fluxo de Caixa</td>
               <td class="num ${sinalReal}">${fmtR$(real)}</td>
             </tr>
           </tbody>
@@ -432,7 +432,7 @@ export class ViabFluxoVer extends LitElement {
         <p class="sec">${this.funding
           ? html`TIR, VPL e Payback continuam <strong>desalavancados</strong> — leem o Fluxo de Caixa Livre,
               para manter comparabilidade entre estruturas de capital.`
-          : html`Este estudo não tem operações de Funding: sem funding, o Fluxo de Caixa real é
+          : html`Este estudo não tem operações de Funding: sem funding, o Fluxo de Caixa é
               igual ao Livre.`}</p>
       </urbi-card>
       ${this._renderControles()}

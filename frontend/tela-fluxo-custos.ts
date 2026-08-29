@@ -103,7 +103,11 @@ const CONV_UNIDADE: Record<string, ConvUnidade> = {
   rs_m2_terreno: { tipo: 'por_area', link: 'areaTerreno' },
   pct_vgv: { tipo: 'pct', link: 'vgv' },
   pct_receita: { tipo: 'pct', link: 'receita' },
-  pct_obra: { tipo: 'pct', link: 'vgv' }, // link=vgv usado só na conversão de display; motor usa totalObra
+  // #514: link=obra — mesma grandeza que o motor aplica (resolverCustoTotal/
+  // fluxo-shared.ts, case 'pct_obra'). Era 'vgv' (apelido de display, mas
+  // também usado na ESCRITA por `_editarOrcamento`/`dadosDaTrocaDeUnidade`),
+  // erro de 3,4× no valor calculado.
+  pct_obra: { tipo: 'pct', link: 'obra' },
 };
 
 const UNIDADES = [
@@ -278,15 +282,22 @@ export class ViabFluxoCustos extends LitElement {
   }
 
   // Total do grupo Obra excluindo linhas com pct_obra (base para % Obra).
-  private get _totalObra(): number {
+  // `excluirId`: durante a CONVERSÃO de uma linha PARA pct_obra ela ainda está
+  // com a unidade ANTIGA em `this.custos` no momento do cálculo (o estado só
+  // atualiza depois que o PATCH volta) — sem excluí-la explicitamente por id,
+  // ela entraria na própria base, e o % gravado divergiria do que a tela
+  // mostra assim que a resposta chega e o filtro por unidade passa a excluí-la
+  // (achado de revisão do PR #643, #514/#590).
+  private _totalObra(excluirId?: number): number {
     return this.custos
-      .filter((c) => c.grupo === 'obra' && (c.orcamento_unidade || 'rs') !== 'pct_obra')
+      .filter((c) => c.grupo === 'obra' && c.id !== excluirId && (c.orcamento_unidade || 'rs') !== 'pct_obra')
       .reduce((s, c) => s + resolverCustoTotal(c, this.ctxCusto), 0);
   }
 
-  // Contexto completo incluindo totalObra (usado no render/cálculos).
+  // Contexto completo incluindo totalObra (usado no render/cálculos — nenhuma
+  // linha específica sendo convertida, então sem exclusão).
   private _ctx(): ContextoCusto {
-    return { ...this.ctxCusto, totalObra: this._totalObra };
+    return { ...this.ctxCusto, totalObra: this._totalObra() };
   }
 
   // Unidades permitidas para o combo grupo+categoria. Sem categoria → todas.
@@ -1066,12 +1077,19 @@ export class ViabFluxoCustos extends LitElement {
   // receita líquida real (VGL) — a mesma base que `resolverCustoTotal` aplica para
   // `pct_receita` —, então a conversão por badge e o Resultado ficam coerentes
   // entre si (#118). Sem receita definida, cai no VGV (fallback do motor).
-  private _ctxConversao(): CtxConversao {
+  // `excluirId`: passe o id da linha sendo lida/convertida — sem isso, converter
+  // ESSA MESMA linha PARA `pct_obra` a conta na própria base (ela só some do
+  // filtro por unidade depois que o PATCH volta), e o % gravado diverge do que
+  // a tela mostra a seguir. Todo chamador abaixo tem a linha `c` em mãos, então
+  // passa `c.id` sempre — não há caso de conversão sem uma linha de origem.
+  private _ctxConversao(excluirId?: number): CtxConversao {
     return {
       areaPrivativa: this.ctxCusto.areaPrivativaTotal,
       areaTerreno: this.ctxCusto.areaTerreno,
       vgv: this.ctxCusto.vgvTotal,
       receita: this.ctxCusto.receitaTotal ?? this.ctxCusto.vgvTotal,
+      // #514: mesma base que o motor usa para `pct_obra`.
+      obra: this._totalObra(excluirId),
     };
   }
 
@@ -1087,7 +1105,7 @@ export class ViabFluxoCustos extends LitElement {
     // `pct_vgv`, e os 300.000 viravam "300.000 %". Mesma decisão, mesmo caminho.
     if (!perm.includes(unidAtual)) {
       Object.assign(dados,
-        dadosDaTrocaDeUnidade(c, perm[0] ?? 'rs', CONV_UNIDADE, this._ctxConversao())
+        dadosDaTrocaDeUnidade(c, perm[0] ?? 'rs', CONV_UNIDADE, this._ctxConversao(c.id))
         ?? { orcamento_unidade: perm[0] ?? 'rs' });
     }
     this._salvar(c, dados);
@@ -1101,19 +1119,19 @@ export class ViabFluxoCustos extends LitElement {
     if (salvo !== null) return salvo;
     const valor = numeroDaColuna(c.orcamento_valor);
     if (valor === null) return null;
-    return converterUnidade(CONV_UNIDADE[c.orcamento_unidade || 'rs'], CONV_UNIDADE.rs, valor, this._ctxConversao());
+    return converterUnidade(CONV_UNIDADE[c.orcamento_unidade || 'rs'], CONV_UNIDADE.rs, valor, this._ctxConversao(c.id));
   }
 
   private _valorExibido(c: any): number | null {
     const canonico = this._valorCanonico(c);
     if (canonico === null) return null;
-    return converterUnidade(CONV_UNIDADE.rs, CONV_UNIDADE[c.orcamento_unidade || 'rs'], canonico, this._ctxConversao());
+    return converterUnidade(CONV_UNIDADE.rs, CONV_UNIDADE[c.orcamento_unidade || 'rs'], canonico, this._ctxConversao(c.id));
   }
 
   private _editarOrcamento(c: any, valor: number | null) {
     const unidade = c.orcamento_unidade || 'rs';
     const canonico = valor === null ? null
-      : converterUnidade(CONV_UNIDADE[unidade], CONV_UNIDADE.rs, Number(valor), this._ctxConversao());
+      : converterUnidade(CONV_UNIDADE[unidade], CONV_UNIDADE.rs, Number(valor), this._ctxConversao(c.id));
     // Edição consciente: o campo antigo recebe exatamente o que foi digitado, na
     // unidade ativa. A badge tem regra própria — ver `_trocarUnidade`.
     this._salvar(c, { orcamento_valor: valor, orcamento_valor_canonico: canonico });
@@ -1124,7 +1142,7 @@ export class ViabFluxoCustos extends LitElement {
   // em `dadosDaTrocaDeUnidade`, pura e testada; aqui só se despacha.
   private _trocarUnidade(c: any, nova: string) {
     if (!this.editavel) return;
-    const dados = dadosDaTrocaDeUnidade(c, nova, CONV_UNIDADE, this._ctxConversao());
+    const dados = dadosDaTrocaDeUnidade(c, nova, CONV_UNIDADE, this._ctxConversao(c.id));
     if (dados) this._salvar(c, dados);
   }
 
