@@ -371,7 +371,7 @@ dízima e retornar exatamente ao mesmo canônico.
 > É arredondamento **de exibição**: nada persistido muda, nenhuma migração, e um estudo antigo passa
 > a exibir sem centavos sem ser reeditado. `R$ 171.448.400` num card e `R$ 171.448.400,00` numa
 > linha de tabela são **o mesmo número**. Quem implementa é `fmtR$Kpi`
-> (`frontend/viab-format.ts:48`) — função própria, e não um parâmetro de `fmtR$`, para a exceção ser
+> (`frontend/viab-format.ts:52`) — função própria, e não um parâmetro de `fmtR$`, para a exceção ser
 > **greppável** por um símbolo só; `frontend/kpi-casas-decimais.test.ts` trava o inventário de call
 > sites por contagem exata, nos dois sentidos, e reprova tanto o card que voltou a exibir centavos
 > quanto o vazamento da exceção para tabela ou exportação. **A tabela abaixo segue valendo

@@ -819,7 +819,7 @@ Git Bash — ver PROGRESSO).
   > tabelas, Proforma, Fluxo de Caixa e exportação continuam em 2 casas, sem exceção**: é
   > arredondamento de EXIBIÇÃO, nada persistido muda, e `R$ 171.448.400` num card é o mesmo número
   > que `R$ 171.448.400,00` numa linha de tabela. Quem a implementa é `fmtR$Kpi`
-  > (`frontend/viab-format.ts:48`) — símbolo próprio, e não um parâmetro de `fmtR$`, para a exceção
+  > (`frontend/viab-format.ts:52`) — símbolo próprio, e não um parâmetro de `fmtR$`, para a exceção
   > ser **greppável**; o inventário de call sites é travado por contagem exata em
   > `frontend/kpi-casas-decimais.test.ts`. `fmtR$` não mudou.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
