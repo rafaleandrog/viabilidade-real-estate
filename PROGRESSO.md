@@ -70,24 +70,25 @@ prova ligação — classe de defeito nº 1 do `CLAUDE.md`.
 > metade da definição**, e é a metade que nenhum teste de função pura enxerga — a função estava
 > certa nos dois casos.
 
-> 🔴 **O SEGUNDO P1, na rodada 2, e ele é do mesmo gênero: o insumo, de novo.** `_configFluxo`
-> passava `deflatorAreaAbertaPct` (#462) ao motor; o caminho do Painel de estudos
-> (`frontend/tela-dashboard.ts`, `_calcularUmAvancado`) **não passava** — e só ele. Num estudo com
-> `deflator_area_aberta_pct` diferente de zero e produto com **área privativa aberta**, a listagem
-> calculava VGV, Resultado, Margem e ROI sobre o preço **cheio** da área aberta, enquanto a sub-aba
-> Proforma do **mesmo** estudo calculava sobre o **deflacionado**.
+> 🔴 **O SEGUNDO P1, na rodada 2 — real quando foi achado, e MORTO pelo merge da `main`.** O App
+> apontou que `_configFluxo` passava `deflatorAreaAbertaPct` (#462) ao motor e o caminho do Painel
+> de estudos (`tela-dashboard.ts`, `_calcularUmAvancado`) **não passava** — logo, num estudo com
+> deflator e área privativa aberta, os dois ROIs divergiriam, quebrando o critério 1. O achado
+> **procedia** contra a base daquele momento, e o conserto (uma linha no Painel) chegou a ser
+> escrito e provado.
 >
-> **O conserto é do lado do Painel, porque ele é que estava errado** — a listagem passa a coincidir
-> com a tela do estudo. ⚠️ **Consequência declarada:** para esses estudos as **quatro** colunas
-> mudam de valor na listagem. Estudo sem deflator não muda (ausente ou 0 reproduz o número
-> anterior).
+> **Então a `main` andou:** a **#584** (item A10-07, decisão do autor — *"tirar campo deflator de
+> preço"*) **retirou o deflator inteiro**, e `deflatorAreaAbertaPct` deixou de existir no
+> `FluxoConfig`. Com isso os dois caminhos passaram a concordar **por construção**, e o conserto
+> virou código que **não compila** (campo inexistente) e que `frontend/deflator-retirado.test.ts`
+> reprovaria como leitor novo da coluna aposentada. Foi **desfeito** — o diff final deste PR **não
+> toca** `tela-dashboard.ts`.
 >
-> ⚠️ **O que a prova alcança, e o que não alcança.** O teste numérico compara o par contra uma
-> **transcrição** do config do Painel — o método real é privado e assíncrono, com quatro chamadas de
-> API. Quem trava o arquivo real é o **teste de fonte** por contagem exata, no molde de
-> `kpi-casas-decimais.test.ts`. Medido: apagar o campo do `tela-dashboard.ts` deixa **19 de 20**
-> verdes — só o teste de fonte cai. Está dito assim de propósito: o modo de falha aqui é a
-> **ausência** de um campo, e ausência não fica vermelha em teste de valor.
+> **A lição é sobre PROCESSO, não sobre o defeito:** achado de revisão tem **prazo de validade**, e
+> o prazo é o próximo merge da base. Conferir o achado contra a base **de agora** — e não contra a
+> que estava no disco quando o revisor leu — é parte de verificá-lo. O mesmo raciocínio da classe
+> nº 3 do `CLAUDE.md` ("CI verde sobre base vencida"), pelo avesso: aqui era o **achado** que estava
+> sobre base vencida.
 
 **Fora de escopo, e declarado:** as saídas (b) exposição máxima como proxy de capital próprio e (c)
 campo de aporte próprio do incorporador dependem de decisão do autor — a issue as registra como tal.

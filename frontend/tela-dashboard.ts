@@ -306,21 +306,6 @@ export class ViabTelaDashboard extends LitElement {
         ret: params?.erro ? undefined : { ativo: params.considerar_ret === true, pct: Number(params.ret_pct ?? 4) },
         // #473: default true preserva o comportamento histórico (VGV bruto).
         corretagemSobrePermutaFisica: estudo?.corretagem_sobre_permuta_fisica !== false,
-        // #594 (achado P1 do App de revisão, rodada 2) — o deflator de preço da
-        // área aberta (#462) FALTAVA aqui, e só aqui. `tela-fluxo-ver.ts` já o
-        // passava, então num estudo com `deflator_area_aberta_pct` diferente de
-        // zero e produto com área privativa aberta esta listagem calculava VGV,
-        // Resultado, Margem e ROI sobre o preço CHEIO da área aberta, enquanto a
-        // sub-aba Proforma do mesmo estudo calculava sobre o preço deflacionado.
-        // Duas leituras do mesmo estudo, dois números — exatamente a classe de
-        // defeito que a #443 registrou para VGV e Margem.
-        //
-        // ⚠️ CONSEQUÊNCIA DECLARADA: para esses estudos as quatro colunas mudam
-        // de valor nesta listagem. Elas passam a coincidir com a tela do estudo,
-        // que é o comportamento correto — mas não é uma mudança invisível.
-        // Ausente ou 0 reproduz exatamente o número anterior, então o estudo sem
-        // deflator não muda.
-        deflatorAreaAbertaPct: Number(estudo?.deflator_area_aberta_pct) || 0,
       };
       const c = calcularFluxo(config);
 
