@@ -47,15 +47,15 @@ export const caso = {
     // Banner regulatório (§17/#277) — sempre presente, fora do escopo deste
     // indicador, mas na mesma tela.
     'urbi-banner.variante',
-    // "Distribuir aporte" (`_renderCamposDivida`) — o `<urbi-checkbox>` do
-    // formulário de Dívida acima do painel medido.
-    'urbi-checkbox.desabilitado',
-    'urbi-checkbox.label',
-    'urbi-checkbox.marcado',
-    // "Mês do aporte" (`_renderAncora`) — mesmo formulário.
+    // #586: a tela passou a montar `urbi-abas`, e o painel medido vive dentro
+    // da aba Dívida. As duas props do primitivo de abas não são reproduzidas
+    // pelo stub (`abas` é só-propriedade; `ativa` não dimensiona nada).
+    'urbi-abas.abas',
+    'urbi-abas.ativa',
+    // "Mês do aporte" (`_renderAncora`) — o formulário de Dívida acima do
+    // painel medido.
     'urbi-select.desabilitado',
     'urbi-select.opcoes',
-    'urbi-icone.classe',
     'urbi-input.desabilitado',
     // `urbi-badge`/`urbi-botao` NÃO entram: `editavel: false` (o caso mede
     // só a leitura) esconde os 4 `urbi-botao` de edição, e `<urbi-badge>`

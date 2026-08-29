@@ -10,7 +10,7 @@ import {
 
 const pular = await motivoParaPular();
 
-test('Funding: as quatro abas e a tabela compilada montam (#586)', { skip: pular ?? false }, async () => {
+test('Funding: as três abas de tipo montam dentro do urbi-abas (#586)', { skip: pular ?? false }, async () => {
   // O `exigir` do caso já reprova a montagem ausente ANTES de medir pixel — é
   // ele que carrega o critério 5 da issue. As asserções abaixo cobrem o resto.
   const a = await verificarRender({ caso: 'funding-abas' });

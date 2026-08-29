@@ -44,30 +44,36 @@ export const caso = {
   // não renderiza nada passaria por TODAS as lentes com "limpo".
   exigir: [
     { seletor: 'urbi-abas', minimo: 1 },
-    // As quatro abas — Operações, Financiamento à produção, Dívida e Equity.
-    // Apagar a montagem de UMA deixa este caso vermelho, que é o critério 5.
-    { seletor: 'urbi-hospedeiro', minimo: 4 },
-    // A tabela compilada da aba Operações (ativa por padrão).
-    { seletor: 'urbi-tabela', minimo: 1 },
+    // As TRÊS abas de tipo — Financiamento à produção, Dívida e Equity.
+    // Apagar a montagem de uma delas deixa este caso vermelho (critério 5).
+    { seletor: 'urbi-hospedeiro', minimo: 3 },
   ],
+  // ⚠️ O QUE ESTE CASO NÃO MEDE, e por quê — o limite é do harness, não do
+  // código, e declará-lo é obrigatório: um caso que se cala sobre a própria
+  // cobertura é indistinguível de um que cobriu tudo.
+  //
+  // A aba **Operações** e a `urbi-tabela` dentro dela **não são aferíveis
+  // aqui**. O stub recebe `colunas` e `linhas` por PROPRIEDADE (o espelho as
+  // declara `so_propriedade: true`) e não sabe desenhar tabela nenhuma — a
+  // caixa sai com altura ZERO, e caixa de área zero conta como invisível, que
+  // é o que o `exigir` mede. Medido: pedir `urbi-tabela` visível reprova
+  // sempre, inclusive com a tabela montada e correta.
+  //
+  // Consequência honesta: **apagar a aba Operações NÃO fica vermelho aqui.**
+  // Quem cobre esse flanco é `frontend/funding-abas.test.ts`, lendo a fonte —
+  // o teste dos rótulos literais das quatro abas e o do particionamento
+  // (`TIPOS` × `ABAS`). É cobertura mais fraca que render, e está dito assim
+  // em vez de anunciada como equivalente.
   aceitaNaoReproduzido: [
-    // Banner regulatório (§17/#277) e o de tarifa duplicada (#478) — os dois
-    // ficam FORA das abas, no topo, e são parte da tela sob medição.
+    // Banner regulatório (§17/#277) — fica FORA das abas, no topo, e é parte
+    // da tela sob medição.
     'urbi-banner.variante',
-    // Cards das abas de tipo: todas as três estão montadas (urbi-abas mantém
-    // no DOM), então os campos dos três formulários entram na medição.
-    'urbi-checkbox.desabilitado',
-    'urbi-checkbox.label',
-    'urbi-checkbox.marcado',
+    // Campos dos formulários das abas de tipo (todas montadas).
     'urbi-select.desabilitado',
     'urbi-select.opcoes',
-    'urbi-icone.classe',
     'urbi-input.desabilitado',
-    // `urbi-tabela` recebe colunas/linhas por PROPRIEDADE (o espelho declara
-    // `so_propriedade: true` para as duas) — o stub não as reproduz.
-    'urbi-tabela.clicavel',
-    'urbi-tabela.mensagem-vazio',
-    // `urbi-abas` idem: `abas` é só-propriedade, `ativa` tem atributo.
+    // O primitivo de abas: `abas` é só-propriedade, `ativa` não dimensiona.
+    'urbi-abas.abas',
     'urbi-abas.ativa',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
