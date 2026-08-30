@@ -4,6 +4,52 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Sai o KPI "Resultado após custo financeiro" de Cenários — #596 (2026-08-30)
+
+Decisão do autor: **"deve sair"**. Era o critério de aceite 5 da #596, e o único que o
+implementador não podia decidir.
+
+**O número não estava errado** — era leitura legítima, e é por isso que a decisão precisava ser do
+autor. O problema é que, depois da #592, a MESMA tela passou a exibir três grandezas próximas:
+
+| Grandeza | Fórmula |
+|---|---|
+| Fluxo de Caixa Livre (acum.) | `c.fluxoAcumulado[último]` |
+| Fluxo de Caixa (acum.) | Livre + entradas − saídas (saídas = principal **+** juros) |
+| ~~Resultado após custo financ.~~ | Livre − (juros + retorno de equity) — **nunca o principal** |
+
+A terceira **não** era redundante, e é exatamente por isso que a distinção era invisível: quem
+lesse os três rótulos lado a lado não teria como saber que só uma delas ignora o principal.
+
+**Alcance: as DUAS superfícies.** A issue nomeia o card, mas a mesma grandeza vivia também numa
+coluna da tabela de cenários ("Resultado após custo financ."), com rótulo abreviado. Remover só o
+card deixaria o mesmo número ambíguo na tela e anularia a decisão.
+
+**O que saiu junto, e por que cada um:**
+
+- `_resultadoAposCustoFinanceiro` — único produtor da grandeza;
+- o parâmetro `comFunding` de `_linhaReal`/`_linhaCenario` — ficou passado e nunca lido; parâmetro
+  morto aparenta significar algo;
+- a regra CSS `.fx-kpis urbi-kpi { min-width: 0 }` em `frontend/fluxo-tabela.ts` — o KPI removido
+  era o **único** `urbi-kpi` que alcançava `.fx-kpis`, conferido por grep antes de remover;
+- a entrada de `tela-cenarios.ts` no inventário de `fmtR$Kpi` — foi a zero chamadas, e entrada com
+  `chamadas: 0` seria exceção morta;
+- `'urbi-kpi.variante'` do `aceitaNaoReproduzido` do caso de render — **o harness reprovou por
+  declaração ociosa**, que é a defesa contra exceção que deixou de ser necessária.
+
+A tabela de leituras de `frontend/proforma-avancado.ts` foi atualizada no mesmo diff, como o
+critério 5 manda: ela registra que existiu uma quarta leitura e que ela **saiu de propósito** — para
+a pergunta "sumiu o custo financeiro de Cenários?" ter resposta, em vez de parecer regressão.
+
+**Prova de mutação, as duas acusadas:** reintroduzir a entrada no inventário derruba o teste da
+#581; devolver a declaração ociosa ao caso de render derruba o caso em Chromium.
+
+⚠️ **Duas armadilhas pagas neste PR, as duas com CRASE.** Escrevi o comentário do CSS com crases
+(`` `urbi-kpi` ``) dentro do template literal de `css` — o backtick **fecha o template**, e o guard
+acusa *"comentário CSS sem fechar"*, apontando para o lugar errado. Aconteceu **duas vezes**: a
+segunda na própria frase que descrevia a armadilha.
+
+
 ## `eficienciaPct`/`roiPct` viram `number | null` — #611 (2026-08-29)
 
 Rodada 10. Fase 2 da issue — a fase 1 foi a #624 (2026-08-28), que só tirou a COR de um

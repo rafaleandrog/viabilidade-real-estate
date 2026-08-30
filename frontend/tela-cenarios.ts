@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtR$Kpi, fmtPct } from './viab-format.js';
+import { fmtR$, fmtPct } from './viab-format.js';
 import {
   type EventoCrono, type PeriodoAgregado, periodosAnuais, rotuloMesRelativo, mesRepasse,
 } from './fluxo-shared.js';
@@ -301,22 +301,28 @@ export class ViabTelaCenarios extends LitElement {
     return periodos ? agregarFundingPorPeriodos(f, periodos) : f;
   }
 
-  /**
-   * Resultado desalavancado − custo financeiro total do cenário: juros de
-   * TODA operação dívida-like (`divida`/`financiamento_producao`) mais o
-   * retorno pago pelas operações `equity` — a mesma grandeza que
-   * `r.jurosPorInstrumento` + `r.remuneracaoPagaPE` somavam no modelo antigo.
-   */
-  private _resultadoAposCustoFinanceiro(calc: FluxoCalc, fc: FundingCalc | null): number | null {
-    if (!fc) return null;
-    const custoFinanceiro = fc.operacoes.reduce((soma, s) => {
-      const juros = s.juros.reduce((a, b) => a + b, 0);
-      const retornoEquity = s.operacao.tipo === 'equity' ? s.saidas.reduce((a, b) => a + b, 0) : 0;
-      return soma + juros + retornoEquity;
-    }, 0);
-    const resultadoDesalavancado = calc.fluxoAcumulado[calc.fluxoAcumulado.length - 1] || 0;
-    return resultadoDesalavancado - custoFinanceiro;
-  }
+  // ─────────────────────────────────────────────────────────────────────
+  // #596: o KPI e a coluna "Resultado após custo financeiro" SAÍRAM — decisão
+  // do autor, e junto saiu `_resultadoAposCustoFinanceiro`, que era o único
+  // produtor da grandeza.
+  //
+  // O motivo não é que o número estivesse errado — ele estava certo, e era uma
+  // leitura legítima. É que depois da #592 esta MESMA tela passou a exibir três
+  // grandezas próximas e diferentes, e a terceira competia com o vocabulário
+  // novo sem que o rótulo dissesse em quê:
+  //
+  //   Fluxo de Caixa Livre (acum.) = c.fluxoAcumulado[último]
+  //   Fluxo de Caixa (acum.)       = Livre + entradas − saídas   (saídas = principal + juros)
+  //   Resultado após custo financ. = Livre − (juros + retorno de equity)   ← saiu
+  //
+  // A que saiu não descontava o PRINCIPAL — era por isso que ela não era
+  // redundante, e é por isso que a distinção era invisível para quem lesse os
+  // três rótulos lado a lado.
+  //
+  // ⚠️ Quem for reintroduzi-la: o problema não era a conta, era exibi-la sem
+  // dizer que ela ignora o principal. A tabela de leituras de
+  // `frontend/proforma-avancado.ts` registra as que sobraram.
+  // ─────────────────────────────────────────────────────────────────────
 
   /** Sliders fora do zero — há um cenário alternativo a comparar com a base. */
   private get _alterado(): boolean {
@@ -402,31 +408,11 @@ export class ViabTelaCenarios extends LitElement {
       <section class="secao-fluxo">
         <h3>${alterado ? 'Fluxo de caixa do cenário' : 'Fluxo de caixa do cenário real'}</h3>
         ${kpisFluxo(cenario, alterado ? base : null)}
-        ${this._renderResultadoAposFunding(cenario)}
         ${this._renderControlesFluxo()}
         ${tabelaFluxo(exibCenario, this.dataInicio, this.colapso, (ch) => this._t(ch), this._fundingDe(cenario, periodos))}
       </section>
 
       ${this._renderCenariosSalvos(base)}
-    `;
-  }
-
-  /**
-   * Item 5: KPI adicional só quando há operação de Funding — "Resultado
-   * após custo financeiro" do cenário em exibição. NÃO altera TIR/VPL (§8.1:
-   * "permanecem desalavancados, para manter comparabilidade entre estruturas
-   * de capital") — só soma a informação que faltava, ao lado.
-   */
-  private _renderResultadoAposFunding(calc: FluxoCalc): TemplateResult {
-    const r = this._fundingCalcDe(calc);
-    if (!r) return html`${nothing}`;
-    const resultado = this._resultadoAposCustoFinanceiro(calc, r);
-    if (resultado === null) return html`${nothing}`;
-    return html`
-      <div class="fx-kpis">
-        <urbi-kpi rotulo="Resultado após custo financeiro" .valor=${fmtR$Kpi(resultado)}
-          variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-      </div>
     `;
   }
 
@@ -532,7 +518,6 @@ export class ViabTelaCenarios extends LitElement {
   private _renderCenariosSalvos(base: FluxoCalc): TemplateResult {
     // Item 5: coluna extra só quando há operação de Funding — sem
     // nenhuma, a tabela fica idêntica à de antes desta rodada.
-    const comFunding = this.operacoes.length > 0;
     return html`
       <section class="secao-cenarios">
         <h3>Cenários salvos</h3>
@@ -550,13 +535,12 @@ export class ViabTelaCenarios extends LitElement {
                 <th>Payback</th>
                 <th>Exposição máx.</th>
                 <th class="cen-var" aria-label="Variação de Exposição máxima vs. cenário real" scope="col"></th>
-                ${comFunding ? html`<th>Resultado após custo financ.</th>` : nothing}
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              ${this._linhaReal(base, comFunding)}
-              ${this.cenarios.map((c) => this._linhaCenario(c, base, comFunding))}
+              ${this._linhaReal(base)}
+              ${this.cenarios.map((c) => this._linhaCenario(c, base))}
             </tbody>
           </table>
         </div>
@@ -571,9 +555,8 @@ export class ViabTelaCenarios extends LitElement {
 
   // Linha travada, sempre primeira: o cenário real (sem alterações dos sliders),
   // referência de comparação para os cenários salvos pelo usuário.
-  private _linhaReal(base: FluxoCalc, comFunding: boolean): TemplateResult {
+  private _linhaReal(base: FluxoCalc): TemplateResult {
     const tir = base.tir === null ? '—' : fmtPct(base.tir);
-    const resultado = comFunding ? this._resultadoAposCustoFinanceiro(base, this._fundingCalcDe(base)) : null;
     return html`
       <tr class="linha-real">
         <td><urbi-icone classe="fa-solid fa-lock"></urbi-icone>Cenário real</td>
@@ -586,7 +569,6 @@ export class ViabTelaCenarios extends LitElement {
         <td>${base.paybackData ?? '—'}</td>
         <td class="neg">${fmtR$(Math.abs(base.exposicaoMaxima))}</td>
         <td class="cen-var"></td>
-        ${comFunding ? html`<td class=${resultado !== null && resultado >= 0 ? 'pos' : 'neg'}>${resultado === null ? '—' : fmtR$(resultado)}</td>` : nothing}
         <td></td>
       </tr>
     `;
@@ -617,11 +599,10 @@ export class ViabTelaCenarios extends LitElement {
     return html`<urbi-badge cor=${v.melhor ? 'sucesso' : 'perigo'}>${v.texto}</urbi-badge>`;
   }
 
-  private _linhaCenario(c: any, base: FluxoCalc, comFunding: boolean): TemplateResult {
+  private _linhaCenario(c: any, base: FluxoCalc): TemplateResult {
     const calc = this._calc({ precoVendaPct: n(c.preco_venda_pct), custoObraPct: n(c.custo_obra_pct) });
     const pctTxt = (v: number) => `${v > 0 ? '+' : ''}${v}%`;
     const tir = calc.tir === null ? '—' : `${fmtPct(calc.tir)}`;
-    const resultado = comFunding ? this._resultadoAposCustoFinanceiro(calc, this._fundingCalcDe(calc)) : null;
     return html`
       <tr>
         <td>${c.nome || 'Cenário'}</td>
@@ -634,7 +615,6 @@ export class ViabTelaCenarios extends LitElement {
         <td>${calc.paybackData ?? '—'}</td>
         <td class="neg">${fmtR$(Math.abs(calc.exposicaoMaxima))}</td>
         <td class="cen-var">${this._badgeVar(Math.abs(calc.exposicaoMaxima), Math.abs(base.exposicaoMaxima), false)}</td>
-        ${comFunding ? html`<td class=${resultado !== null && resultado >= 0 ? 'pos' : 'neg'}>${resultado === null ? '—' : fmtR$(resultado)}</td>` : nothing}
         <td>
           <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash" title="Remover"
             @click=${() => this.removerId = Number(c.id)}></urbi-botao>

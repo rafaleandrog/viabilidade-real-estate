@@ -49,7 +49,6 @@ const CARDS: { arquivo: string; chamadas: number; quais: string }[] = [
       + 'Juros de clientes, Carteira máxima, Receita Bruta e VGV Vendável '
       + '(Payback e TIR não são monetários)',
   },
-  { arquivo: 'tela-cenarios.ts', chamadas: 1, quais: 'o urbi-kpi "Resultado após custo financeiro"' },
   { arquivo: 'tela-graficos.ts', chamadas: 1, quais: 'o urbi-kpi "Resultado"' },
   {
     arquivo: 'tela-premissas.ts', chamadas: 2,
