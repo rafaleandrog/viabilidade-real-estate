@@ -66,11 +66,19 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 //   | aba Resultados / Painel | ECONÔMICA,  | NENHUMA PONTA                 |
 //   | (esta função)           | antes de    |                               |
 //   |                         | capitalizar |                               |
-//   | aba Cenários, KPI       | ECONÔMICA   | SÓ O CUSTO: subtrai juros de  |
-//   | "Resultado após custo   | menos o     | toda dívida + retorno de      |
-//   | financeiro"             | custo de    | equity do resultado DESTA     |
-//   | (`tela-cenarios.ts`     | capital     | função — nunca o principal    |
-//   |  `:306-315`, `:416-425`)|             |                               |
+//
+// ⚠️ **A #596 APAGOU a quarta leitura**, por decisão do autor. Era o KPI (e a
+// coluna homônima da tabela de cenários) "Resultado após custo financeiro":
+// visão ECONÔMICA menos o custo de capital — subtraía juros de toda dívida
+// mais o retorno de equity do resultado DESTA função, **nunca o principal**.
+//
+// Ela não era redundante, e é exatamente por isso que saiu: depois da #592 a
+// tela de Cenários passou a exibir três grandezas próximas, e essa terceira
+// competia com o vocabulário novo sem que o rótulo dissesse que ela ignora o
+// principal. A distinção era invisível para quem lesse os rótulos lado a lado.
+//
+// Quem for reintroduzi-la: o problema nunca foi a conta — era publicá-la sem
+// dizer o que ela deixa de fora.
 //
 // ⚠️ A #592 mudou a PRIMEIRA linha desta tabela, e a correção veio junto com a
 // #596. Antes ela dizia que o serviço da dívida vivia "dentro do subtotal do
@@ -80,11 +88,10 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 // doc ausente: manda o próximo leitor procurar no lugar errado e concluir que
 // sumiu.
 //
-// A ÚLTIMA linha é a que confunde: ela NÃO é uma variante desta função, é uma
-// subtração feita depois, na tela de Cenários — e continua sendo um TERCEIRO
-// número, diferente tanto do Fluxo de Caixa Livre quanto do Fluxo de Caixa,
-// porque não desconta o principal. Quem for reabrir o rótulo (#447) precisa das
-// quatro leituras, não das duas primeiras.
+// Quem for reabrir o rótulo (#447) precisa das TRÊS leituras que sobraram — e
+// de saber que existiu uma quarta, apagada pela #596 (o bloco acima), porque a
+// pergunta "sumiu o custo financeiro de Cenários?" tem resposta, e ela é "saiu
+// de propósito", não "regrediu".
 //
 // ⚠️ Note que "as duas pontas" NÃO quer dizer que elas se anulam: o principal
 // devolvido cancela o principal liberado, mas os juros e qualquer saldo

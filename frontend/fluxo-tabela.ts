@@ -58,11 +58,17 @@ export const estiloFluxoTabela = css`
   /* #579: track alargada de 180 para 210px. Os 9 .kpi-card são markup
      próprio (sem shadow DOM) — a defesa real contra o VALOR transbordando
      é o overflow-wrap em .kpi-card .valor, abaixo; a track só dá folga.
-     urbi-kpi também mora nesta grade (o extra de tela-cenarios.ts,
-     "Resultado após custo financeiro"), por isso o min-width dele precisa
-     de override aqui — sem grid própria para carregar essa regra. */
+     ATENCAO #596: havia aqui um override de min-width para urbi-kpi, porque o
+     KPI extra de tela-cenarios.ts ("Resultado apos custo financeiro") morava
+     nesta mesma grade. Aquele KPI saiu, e com ele o UNICO urbi-kpi que
+     alcancava .fx-kpis — conferido por grep antes de remover. A regra saiu
+     junto: seletor sem consumidor nao protege nada e ainda da a impressao de
+     que alguem depende dele.
+     (Sem CRASE neste bloco, de proposito: uma crase dentro do template literal
+     de css FECHA o template, e o guard acusa "comentario CSS sem fechar" —
+     apontando para o lugar errado. Aconteceu duas vezes ao escrever este
+     proprio comentario, a segunda na frase que descrevia a armadilha.) */
   .fx-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 16px; }
-  .fx-kpis urbi-kpi { min-width: 0; }
 
   /* #352 (BUG7-44): a variação % (#132) precisa ficar DENTRO da mesma moldura
      do KPI, mas urbi-kpi (ui/src/urbi-kpi.ts, no monorepo) só declara 4 props

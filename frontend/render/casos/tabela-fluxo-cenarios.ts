@@ -54,7 +54,6 @@ export const caso = {
     'urbi-grafico-linha.legenda',
     'urbi-grafico-linha.marcadores',
     'urbi-grafico-linha.series',
-    'urbi-kpi.variante',
     'urbi-botao.desabilitado',
     'urbi-estado-vazio.icone',
     'urbi-estado-vazio.mensagem',
