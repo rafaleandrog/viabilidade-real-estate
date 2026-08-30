@@ -38,7 +38,7 @@ import { calcularFluxo } from '../../fluxo-caixa-motor.js';
 import { fundingDoEstudo, type OperacaoFunding } from '../../funding-motor.js';
 import { areaPrivativaTotalLinhas } from '../../fluxo-shared.js';
 import { roiProjetoAnalise } from '../../tela-fluxo-ver.js';
-import { fmtPct } from '../../viab-format.js';
+import { fmtPctOuIndef } from '../../viab-format.js';
 
 const FUNDING: OperacaoFunding[] = [
   {
@@ -165,9 +165,15 @@ export const caso = {
     // (2) O ROI publicado é o do PROJETO, não o da fase filtrada. Os dois
     // números são diferentes de propósito nesta montagem — se coincidissem, a
     // asserção passaria sem medir nada, e é isso que a segunda checagem barra.
+    //
+    // #611: `roiProjetoAnalise` virou `number | null` — `fmtPctOuIndef` é o
+    // MESMO ternário que `_renderRoiProjeto` usa na tela (`medido ? fmtPct
+    // (roi!) : '—'` é exatamente `fmtPctOuIndef(roi)`, já que `medido` é o
+    // mesmo predicado `roi !== null`), então "esperado" continua batendo
+    // caractere a caractere com o que a célula publica.
     const area = areaPrivativaTotalLinhas(RECEITAS_PROJETO);
-    const esperado = fmtPct(roiProjetoAnalise(cProjeto, area));
-    const daFase = fmtPct(roiProjetoAnalise(cFase, area));
+    const esperado = fmtPctOuIndef(roiProjetoAnalise(cProjeto, area));
+    const daFase = fmtPctOuIndef(roiProjetoAnalise(cFase, area));
     if (esperado === daFase) {
       throw new Error(
         'a fixture deixou de exercitar o filtro de fase: o ROI do projeto e o da fase coincidem '

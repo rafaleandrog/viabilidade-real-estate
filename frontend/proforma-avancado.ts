@@ -195,8 +195,14 @@ export interface ProformaAvancado {
    * `resultado / investimentoTotal * 100` — de novo, literalmente a fórmula do
    * Preliminar. Não é indicador novo: é o mesmo indicador, calculado a partir das
    * séries do Avançado em vez dos campos fixos que ele não tem.
+   *
+   * #611 — `null` quando `investimentoTotal <= 0`: mesmo padrão que a #571
+   * levou a `margemLiquidaPct`/`custoObrasVgvPct` no Preliminar, e que
+   * `proforma.ts` já aplica ao `roiPct` gêmeo. A #604 (PR 647) deliberadamente
+   * não tocou este campo — via um teste nomeado atribuindo-o a esta issue —
+   * porque o denominador aqui é o investimento, não o VGV.
    */
-  roiPct: number;
+  roiPct: number | null;
 }
 
 const soma = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
@@ -383,11 +389,10 @@ export function proformaAvancado(
     resultadoMaisPermutas,
     pctResultadoMaisPermutas,
     investimentoTotal,
-    // ⚠️ #604 NÃO toca `roiPct`, de propósito: ele tem o mesmo padrão (`: 0`
-    // com denominador inválido) mas pertence à #611, que trata a família
-    // `eficienciaPct`/`roiPct` e continua ABERTA. Mudá-lo aqui fecharia parte
-    // dela por acidente, sem o teste e sem a varredura de consumidores que ela
-    // pede. O denominador aqui também é outro — investimento, não VGV.
-    roiPct: investimentoTotal > 0 ? (resultado / investimentoTotal) * 100 : 0,
+    // #611: denominador inválido devolve `null`, nunca 0 — mesmo mecanismo do
+    // `roiPct` gêmeo em proforma.ts. A #604 (PR 647) deliberadamente não
+    // tocou este campo, deixando-o para esta issue — ver o teste nomeado em
+    // `frontend/proforma-avancado-vgv-zero.test.ts`, reescrito abaixo.
+    roiPct: investimentoTotal > 0 ? (resultado / investimentoTotal) * 100 : null,
   };
 }

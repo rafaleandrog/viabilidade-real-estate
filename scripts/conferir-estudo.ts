@@ -257,7 +257,10 @@ function imprimir(c: Conferencia) {
     console.log(`  Investimento total ... ${R$(p.investimentoTotal)}`);
     console.log(`  Resultado ............ ${R$(p.resultado)}`);
     console.log(`  Margem líquida ....... ${(p.margemLiquidaPct ?? 0).toFixed(2)}%`);
-    console.log(`  ROI .................. ${(p.roiPct ?? 0).toFixed(2)}%`);
+    // #611 (achado do Codex, rodada 1): `roiPct` virou `number | null` — o
+    // `?? 0` antigo imprimia "0.00%" inventado para um ROI indefinido,
+    // inconsistente com a linha do Avançado (:291), que já mostra "—".
+    console.log(`  ROI .................. ${p.roiPct === null ? '—' : `${p.roiPct.toFixed(2)}%`}`);
   }
 
   if (c.calc) {
@@ -285,7 +288,7 @@ function imprimir(c: Conferencia) {
     console.log(`  Juros de clientes .... ${R$(k.jurosClientes)}`);
     console.log(`  Carteira máxima ...... ${R$(k.carteiraClientesMaxima)} (mês ${k.mesCarteiraClientesMaxima === null ? '—' : k.mesCarteiraClientesMaxima + 1})`);
     console.log(`  Repasse Σ ............ ${R$(k.repasseMensal.reduce((a, b) => a + b, 0))}`);
-    console.log(`  [proformaAvancado] resultado ${R$(pa.resultado)} · margem ${pa.margemPct === null ? '—' : `${pa.margemPct.toFixed(2)}%`} · ROI ${pa.roiPct.toFixed(2)}%`);
+    console.log(`  [proformaAvancado] resultado ${R$(pa.resultado)} · margem ${pa.margemPct === null ? '—' : `${pa.margemPct.toFixed(2)}%`} · ROI ${pa.roiPct === null ? '—' : `${pa.roiPct.toFixed(2)}%`}`);
   }
 
   if (c.funding) {

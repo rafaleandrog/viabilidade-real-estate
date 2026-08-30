@@ -2,7 +2,7 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, state, property } from 'lit/decorators.js';
 import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, formatarData } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { fmtR$, fmtPct, fmtNum, fmtM2 } from './viab-format.js';
+import { fmtR$, fmtPct, fmtPctOuIndef, fmtNum, fmtM2 } from './viab-format.js';
 import { calcularProforma } from './proforma.js';
 import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { areaPrivativaTotalLinhas } from './fluxo-shared.js';
@@ -36,7 +36,12 @@ export interface ResumoListagem {
   margemPct: number;
   areaPrivativa: number;
   areaConstruida: number;
-  roiPct: number;
+  /**
+   * #611: `null` quando o denominador não existe (`investimentoTotal <= 0`).
+   * NÃO é `number` com fallback: ver o comentário do call site em
+   * `resumoListagem`, que explica por que o `?? 0` daqui foi um defeito.
+   */
+  roiPct: number | null;
 }
 
 /**
@@ -125,6 +130,23 @@ export function resumoListagem(
         // exibir "0,00 m²" ao lado de uma área privativa real seria mentira. A
         // área construída de um loteamento É a privativa (os lotes).
         areaConstruida: p.areaConstruida > 0 ? p.areaConstruida : p.areaPrivativa,
+        // #611: `roiPct` é `null` quando `investimentoTotal <= 0`, e aqui ele
+        // PASSA DIRETO — sem `?? 0`.
+        //
+        // ⚠️ Este call site já teve `p.roiPct ?? 0`, justificado como "a MESMA
+        // convenção que `margemPct` usa acima". A justificativa era FALSA, e a
+        // diferença é o PREDICADO, não a forma do código: o `? :` desta função
+        // testa `p.vgv > 0`, que é exatamente a condição de `margemLiquidaPct`
+        // (daí o `?? 0` dela nunca disparar) — mas NÃO diz nada sobre
+        // `investimentoTotal`, que é o denominador do ROI e grandeza ortogonal
+        // ao VGV.
+        //
+        // Medido: catálogo precificado e nenhum campo de custo preenchido — o
+        // estado default de um estudo recém-criado, porque a receita entra
+        // antes do orçamento — dá `vgv = 10.000.000` e `investimentoTotal = 0`.
+        // A linha passava a guarda e o Painel publicava `0,0%`: um ROI medido
+        // que não foi medido, justamente nos estudos novos, que aparecem no
+        // topo da lista.
         roiPct: p.roiPct,
       }
     : null;
@@ -347,6 +369,15 @@ export class ViabTelaDashboard extends LitElement {
           margemPct: p.margemPct ?? 0,
           areaPrivativa: p.areaPrivativa,
           areaConstruida: p.areaPrivativa + areaComum,
+          // #611: idem para o Avançado — `roiPct` passa DIRETO, sem `?? 0`,
+          // pelo mesmo motivo do ramo Preliminar: a guarda `calc.vgv > 0` de
+          // `resumoListagem` não diz nada sobre `investimentoTotal`.
+          //
+          // ⚠️ Note o CONTRASTE com `margemPct` logo acima, que MANTÉM o
+          // `?? 0` e está certo em mantê-lo: o denominador dela é a Receita
+          // Bruta, que a guarda de VGV de fato cobre. Dois campos vizinhos, a
+          // mesma forma de código, garantias OPOSTAS — é por isso que "mesma
+          // convenção" tem de ser conferida pelo predicado, nunca pela forma.
           roiPct: p.roiPct,
         },
       };
@@ -513,7 +544,7 @@ export class ViabTelaDashboard extends LitElement {
       },
       // ROI já é uma fórmula só nos dois níveis (resultado / investimentoTotal
       // — ver comentário de `ResumoListagem` acima), então não precisa de title.
-      { id: 'roi', label: 'ROI', alinhamento: 'direita', valor: numero((p) => fmtPct(p.roiPct)) },
+      { id: 'roi', label: 'ROI', alinhamento: 'direita', valor: numero((p) => fmtPctOuIndef(p.roiPct)) },
       {
         id: 'criador', label: 'Criador', alinhamento: 'centro',
         // `autor_nome`/`autor_avatar_url` já vinham na listagem (junção declarada

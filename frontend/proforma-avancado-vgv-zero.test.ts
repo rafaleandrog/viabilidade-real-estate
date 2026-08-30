@@ -149,19 +149,36 @@ for (const { padrao, vgvZero, cfg } of CENARIOS) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// O que esta issue deliberadamente NÃO conserta — registrado como teste para
-// não fechar a #611 por acidente, e para que reverter esta decisão seja uma
-// mudança VISÍVEL em vez de um efeito colateral.
+// `roiPct` tem denominador PRÓPRIO (investimento, não VGV) — #611.
+//
+// A #604 (este arquivo) deliberadamente não tocou `roiPct`, e um teste
+// nomeado aqui atribuía o campo à #611, "que continua aberta". A #611 fechou
+// esse resto: `roiPct` agora nasce `null` com `investimentoTotal <= 0`, no
+// motor (`proforma-avancado.ts`) — mesmo mecanismo de `margemPct` acima, com
+// denominador diferente. Os dois casos abaixo são o PAR que prova isso: VGV
+// zerado com investimento (ROI definido, e diferente de "sem VGV") e VGV
+// zerado SEM investimento nenhum (ROI indefinido).
 // ─────────────────────────────────────────────────────────────────────────
 
-test('#604 não toca `roiPct` — ele pertence à #611, e o denominador dele é outro', () => {
+test('#611: VGV zerado mas investimento > 0 — roiPct está DEFINIDO (denominador é outro)', () => {
   const c = calcularFluxo({ ...base(CUSTOS_INCORPORACAO), linhasReceita: [] });
   const p = proformaAvancado(c, 0);
 
   // Com VGV zerado mas investimento > 0, `roiPct` está DEFINIDO: mede
-  // −100% (perdeu tudo o que investiu). Não é o mesmo defeito — o
-  // denominador dele é o investimento, não o VGV, e aqui ele existe.
+  // −100% (perdeu tudo o que investiu). Não é o mesmo defeito de `margemPct`
+  // acima — o denominador dele é o investimento, não o VGV, e aqui ele existe.
   assert.ok(p.investimentoTotal > 0);
-  assert.equal(typeof p.roiPct, 'number');
-  assert.ok(Math.abs(p.roiPct - (p.resultado / p.investimentoTotal) * 100) <= 1e-9);
+  assert.notEqual(p.roiPct, null);
+  assert.ok(Math.abs(p.roiPct! - (p.resultado / p.investimentoTotal) * 100) <= 1e-9);
+});
+
+test('#611: sem receita e sem NENHUM custo — roiPct é null (indefinido, não "mediu zero")', () => {
+  // `linhasCusto: []` zera `investimentoTotal` de verdade — o par que dá
+  // sentido ao teste anterior. Mutação: trocar o `null` de volta para 0 em
+  // `proforma-avancado.ts` (`roiPct`) faz esta asserção falhar.
+  const c = calcularFluxo({ ...base([]), linhasReceita: [] });
+  const p = proformaAvancado(c, 0);
+
+  assert.equal(p.investimentoTotal, 0, 'a fixture precisa MESMO zerar o investimento, senão o teste não prova nada');
+  assert.equal(p.roiPct, null);
 });

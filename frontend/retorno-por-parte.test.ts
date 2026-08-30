@@ -133,11 +133,16 @@ for (const [padrao, receitas] of [
     assert.equal(roiAnalise, roiPainel);
     // Sem esta linha o teste passaria com os dois em zero — e zero é
     // exatamente o valor que um ROI quebrado produziria nos dois lados.
-    assert.ok(Math.abs(roiPainel) > 1, `ROI degenerado (${roiPainel}): o estudo do teste não exercita o denominador`);
+    //
+    // #611: `roiPainel`/`roiAnalise` viraram `number | null` — o estudo do
+    // teste tem investimento real, então o valor tem de estar DEFINIDO antes
+    // de medir a magnitude.
+    assert.notEqual(roiPainel, null, `ROI indefinido: o estudo do teste não exercita o denominador`);
+    assert.ok(Math.abs(roiPainel!) > 1, `ROI degenerado (${roiPainel}): o estudo do teste não exercita o denominador`);
   });
 }
 
-test('#594 critério 1: sem investimento não há ROI — nem NaN, nem Infinity, nem zero inventado', () => {
+test('#594 critério 1 / #611: sem investimento não há ROI — null, nunca zero inventado, NaN ou Infinity', () => {
   // Estudo com receita e SEM nenhuma linha de custo direto/indireto:
   // `investimentoTotal` = 0, o denominador não existe.
   const c = calcularFluxo({
@@ -148,10 +153,16 @@ test('#594 critério 1: sem investimento não há ROI — nem NaN, nem Infinity,
   const p = proformaAvancado(c, areaPrivativaTotalLinhas(RECEITAS_INCORPORACAO));
   assert.equal(p.investimentoTotal, 0);
   const roi = roiProjetoAnalise(c, areaPrivativaTotalLinhas(RECEITAS_INCORPORACAO));
-  assert.ok(Number.isFinite(roi), 'o ROI virou NaN/Infinity sem denominador');
-  // A tela NÃO publica este 0: `_renderRoiProjeto` troca por "—" quando
-  // `investimentoTotal <= 0` (critério de aceite 5).
-  assert.equal(roi, 0);
+  // #611: desde que `proformaAvancado`/`roiProjetoAnalise` passaram a devolver
+  // `null` com denominador ausente (em vez de 0), esta é a MESMA garantia que
+  // o título já prometia — só que o valor mudou de "0 seguro" para "null
+  // seguro". `Number.isFinite(null)` é `false`, então a checagem de
+  // NaN/Infinity agora é "é null, ou é finito" — nunca as duas coisas erradas.
+  assert.ok(roi === null || Number.isFinite(roi), 'o ROI virou NaN/Infinity sem denominador');
+  // A tela NÃO publica "0,0%" aqui, e agora o VALOR já reflete isso:
+  // `_renderRoiProjeto` troca por "—" quando `medido` é falso (critério de
+  // aceite 5), e `medido` é exatamente `roi !== null`.
+  assert.equal(roi, null);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -100,7 +100,7 @@ export const INVENTARIO_ROTULOS_INDICADOR: RotuloIndicador[] = [
       'frontend/tela-premissas.ts',
       'frontend/tela-proforma.ts',
     ],
-    fonte: 'areaVendavel / areaTerreno — proforma.ts:eficienciaPct (Loteamento; 0 quando a gleba não foi informada, ver eficienciaParaFaixa)',
+    fonte: 'areaVendavel / areaTerreno — proforma.ts:eficienciaPct (Loteamento; null quando a gleba não foi informada, ver eficienciaParaFaixa)',
   },
 
   // ── Painel de estudos (frontend/tela-dashboard.ts) ──────────────────────

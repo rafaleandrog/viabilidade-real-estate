@@ -511,11 +511,11 @@ export class ViabTelaProforma extends LitElement {
     // duas superfícies, agora seguida também nesta.
     //
     // ⚠️ SEM `varianteFaixa`, e isso é deliberado: a #611 deixou este KPI sem
-    // cor por decisão do autor, e o escopo da #613 é o indicador APARECER, não
-    // recolorir card. O valor segue `fmtPct` — a troca por "—" quando a gleba
-    // não foi informada depende de `eficienciaPct: number | null` (o padrão da
-    // #571), que é o resto da #611 e continua adiado.
-    if (lot) kpis.push({ rot: 'Vendável / gleba', val: fmtPct(p.eficienciaPct), variante: '' });
+    // cor por decisão do autor, e o escopo da #613 era o indicador APARECER,
+    // não recolorir card. O VALOR segue `fmtPctOuIndef` desde a fase 2 da
+    // #611: sem área de gleba `eficienciaPct` já vem `null` do motor, e a
+    // troca por "—" não depende de cor nenhuma.
+    if (lot) kpis.push({ rot: 'Vendável / gleba', val: fmtPctOuIndef(p.eficienciaPct), variante: '' });
     if (temPermuta) kpis.push({ rot: 'Área permutada', val: `${fmtNum(p.areaPermutaFisica)} m²`, variante: '' });
     // Texto colorido nos 3 níveis do velocímetro do benchmark (sem emoji; a bola
     // fica só nos badges da análise de sensibilidade).

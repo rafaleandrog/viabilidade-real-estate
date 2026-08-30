@@ -23,7 +23,7 @@ import '../../tela-premissas.js';
 import { forcarEstado } from './dados.js';
 
 // Loteamento recém-criado: sem área de terreno informada. `areaTerreno = 0`
-// → `eficienciaPct = 0` e `eficienciaMedida = false`.
+// → `eficienciaPct = null` e `eficienciaMedida = false`.
 const ESTUDO_LOT_SEM_GLEBA: Record<string, any> = {
   id: 23,
   nome: 'Render Check — Loteamento sem gleba',

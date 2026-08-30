@@ -70,9 +70,12 @@ test('#574: a aba Gráficos CHAMA itensAlocacaoGleba (fiação, não só import)
 
 // ── #611: o ROI do medidor passa pelo filtro de "grandeza medida" ──────────
 //
-// Decisão do autor (2026-08-28): "por enquanto deixe sem cor então". Sem
-// investimento, `roiPct` cai em 0 e `montarMedidor` desenhava o ponteiro na
-// banda vermelha do benchmark — falso alarme sobre grandeza que ninguém mediu.
+// Fase 1 (#624, decisão do autor de 2026-08-28: "por enquanto deixe sem cor
+// então") tirou a COR sem investimento — sem ela, `montarMedidor` desenhava o
+// ponteiro na banda vermelha do benchmark, falso alarme sobre grandeza que
+// ninguém mediu. A fase 2 (esta issue) fez `roiPct` nascer `null` na origem, o
+// que torna `roiParaFaixa` um alias — mas o call site continua nomeado, e
+// este teste continua a travar o nome.
 //
 // ⚠️ ESTE TESTE LÊ O FONTE, e a razão é a mesma dos dois acima: a correção é
 // FIAÇÃO. O valor de `roiParaFaixa` está testado como função pura em
