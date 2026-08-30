@@ -34,7 +34,7 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
-| **10 — lista de bugs dos Preliminares** | `lista_bugs_20260826.xlsx`, 9 itens (Incorporação: Premissas/Proforma/Cenários; Loteamento: conferência geral). Plano, diagnóstico e fila de PRs em `docs/rodada-10/planejamento.md` | **#563–#574** (12) | 🔄 **em execução desde 2026-08-26** — merges autorizados pelo autor por PR revisado com zero bloqueantes |
+| **10 — lista de bugs dos Preliminares** | `lista_bugs_20260826.xlsx`, 9 itens (Incorporação: Premissas/Proforma/Cenários; Loteamento: conferência geral). Plano, diagnóstico e fila de PRs em `docs/rodada-10/planejamento.md` | **#563–#574** (12) | 🔄 **em execução desde 2026-08-26** — **11 de 12 fechadas (conferido em 2026-08-29)**; resta **#574** (Loteamento, o PR de fecho que depende das demais) — merges autorizados pelo autor por PR revisado com zero bloqueantes |
 | **9 — execução da Rodada 8** | Ondas de PRs que entregam as issues #426–#493, na ordem de dependência | **#426–#493** | ✅ **concluída em 2026-08-24** — as 59 issues fechadas |
 | **8 — auditoria cruzada** | Reverificação da `lista bugs 20260807.xlsx` + regras derivadas das 3 planilhas (EVI Urbitá, fluxo do investidor) + conferência numérica em Pinguim + auditoria de UI | **#426–#493** (61 abertas; #461 e #480 fecharam por decisão) | ✅ **auditoria concluída em 2026-08-22** — o saldo de **59 issues** é executado pela Rodada 9 |
 | **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | ✅ **concluída em 2026-08-12** |
@@ -139,6 +139,16 @@ Consequência a não esquecer: **toda revisão desta rodada é autoatestação**
 ou por agentes da mesma família de modelo. Está declarado em cada relatório, inclusive o desvio de
 publicar `bloqueantes=0` onde a regra manda `bloqueantes=1` quando o App não responde. **Restaurar o
 ambiente do Codex é pré-requisito para a próxima rodada ter revisão independente de verdade.**
+
+> ⚠️ **Isto era verdade na Rodada 9 e deixou de ser — corrigido em 2026-08-29 (Rodada 10), porque o
+> parágrafo acima seguia lido como estado atual.** O App voltou a responder: `docs/rodada-10/planejamento.md`
+> registra "Codex seletivo" de 2026-08-27 a 2026-08-28 (só nas 4 issues de motor mais arriscadas) e
+> reativação para **todos** os PRs a partir de 2026-08-28. Não é só resposta — são achados reais,
+> verificados: PR 641 devolveu 3 threads em `get_review_comments` (dois P2, um P3); PR 650 devolveu
+> um P1 **por rodada em duas rodadas**, o segundo desfeito não por ser falso, mas porque a `main`
+> mergeou embaixo dele antes do conserto (armadilha #8 de `docs/rodada-10/armadilhas.md`). **Não
+> presuma que esta correção continua valendo**: se uma sessão futura achar o App mudo de novo, é
+> fato novo para apurar e registrar aqui, não continuação deste parágrafo.
 
 > ⚠️ **Quem abrir a Rodada 10 atualiza esta tabela junto, e quem a encerrar faz o mesmo, na MESMA
 > alteração que fechar a última issue.** Não delegue para "depois": foi exatamente assim que a #416
@@ -515,6 +525,76 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
 > **O sinal de que isto está acontecendo não é o agente parecer parado — é o DIFF parado.** Um
 > agente `running` com `git diff --stat` congelado por minutos está preso, não pensando. Compare o
 > `--stat` com o de alguns minutos antes antes de concluir que "está trabalhando".
+
+#### As doze armadilhas que a Rodada 10 pagou (2026-08-29/30)
+
+> Numeração própria, não continuação da lista acima — a lista acima já é citada por número
+> (`classe de defeito nº 1`, `nº 2`) em ~15 arquivos de código; renumerar quebraria essa referência.
+> Cada uma aqui tem sintoma, causa, defesa executável e custo medido; o detalhe completo, com os PRs
+> que pagaram cada uma, está em `docs/rodada-10/armadilhas.md` — aqui só o número medido e o passo
+> que previne.
+
+1. **Teste de inventário que varre o disco enxerga artefato de build.** 1 falha de 953 no CI, verde
+   local em três execuções — o passo `Build` do `validation.yml` gera `backend/rotas.js` (ignorado
+   pelo git) **antes** dos testes, e só o runner o enxerga. Defesa: enumere **fonte versionada**
+   (`git ls-files`), nunca varra o disco.
+2. **Escrever contra o `main` do monorepo em vez do SDK publicado.** Seis `TS2339` no CI por um
+   método que existe no `main` do monorepo (e no runtime `shell_min`) mas não no SDK que a app fixa
+   — agravado porque o 401 do SDK nesta sessão camufla o erro no ruído esperado. Defesa: a
+   autoridade é o **bundle do SDK instalado**; se a resposta não está ali, ela não existe para a
+   app.
+3. **Atestar `bloqueantes=0` lendo só um canal do Codex.** Três achados reais parados 5 horas — o
+   Codex publicou só em `get_review_comments`, e quem leu só `get_comments` viu silêncio. Defesa:
+   **sempre os dois canais, na mesma passada** — silêncio num não é ausência de achado no outro.
+4. **`head=` da atestação escrito de memória.** Três atestações rejeitadas pelo 8º caractere (o job
+   compara 8 exatos). Defesa: `git rev-parse HEAD | cut -c1-8` — nunca digitar de memória.
+5. **Medir tempo pelos próprios turnos, não pelo relógio.** "Quatro esperas" que somaram 1 minuto de
+   relógio real produziram um falso diagnóstico de travamento, publicado e depois retratado — um
+   subagente caiu na mesma armadilha na mesma sessão. Defesa: leia `date -u` antes de concluir que
+   algo está lento ou travado; para esperar de verdade, laço `until` com deadline em segundos, não
+   contagem de idas e vindas.
+6. **`#N` de carona na mensagem do commit de sincronização.** 6 falhas do guard de citação de issue
+   num único dia — a classe dominante. O guard lê corpo do PR **e** mensagens de commit, e trata todo
+   `#N` como citação, inclusive referência causal em prosa. Defesa: commit de sync **nunca** cita
+   número (escreva "sincroniza com origin/main"); depois de todo merge com a `main` e antes do push,
+   rode `git log <base>..HEAD --format=%B | grep -oE '#[0-9]+'` e declare cada um.
+7. **`total_count: 0` de check runs ≠ "CI rodando".** Confundido três vezes (PRs 637, 643, 648) — um
+   PR conflitado (`mergeable_state: dirty`) não gera check run nenhum, porque o merge ref não pode
+   ser construído. Defesa: `total_count: 0` é **sinal de alerta, não prova** — zero também acontece
+   com Actions desligadas ou nenhum workflow casando o evento; confirme `mergeable_state == dirty`
+   antes de concluir conflito e sincronizar.
+8. **Achado de revisão tem prazo de validade.** Um P1 do Codex verificado e com conserto escrito
+   deixou de compilar porque a `main` mergeou embaixo dele no intervalo. Defesa: antes de empurrar o
+   conserto de um achado, reconfirme que ele **ainda existe na base atual** — o prazo de validade é
+   o próximo merge da base, não o momento em que foi lido.
+9. **O guard de endereços não distingue "o tipo" do "o comportamento".** Um endereço `arquivo:linha`
+   passou em verde citando a **declaração** de um campo (`pctDescartado`, interface) quando a frase
+   descrevia o **incremento** que implementa o comportamento, 72 linhas adiante — o guard confere se
+   o símbolo aparece perto do endereço **citado**, não qual das duas ocorrências é a certa. Isto é
+   trabalho de revisão humana, não algo que o guard resolve sozinho.
+10. **O laço estrutural do `PROGRESSO.md`.** Com 5 PRs abertos, cada merge suja os outros 4 — todo
+    PR prepende seção no topo do mesmo arquivo. Defesa imediata: fila **estritamente serial**,
+    sincronize só o próximo PR da vez, nunca todos de uma vez; a defesa estrutural
+    (`merge=union` no `.gitattributes`) **está na `main` desde 2026-08-30**, e a conferência do
+    merge é sempre pelas três medidas — seções da base +1, zero títulos duplicados, zero marcadores
+    residuais. ⚠️ O `union` troca falha **ruidosa** por falha **calada**: no pior caso, duas branches
+    editando a mesma região produzem duas linhas contraditórias sem aviso.
+11. **Justificativa que afirma uma equivalência FALSA.** Um `?? 0` mantido de propósito, com o
+    comentário dizendo ser *"a MESMA convenção que `margemPct`"* — e **duas atestações passaram por
+    cima**, porque a frase é plausível. Não era a mesma: a guarda testa `vgv`, mas o denominador de
+    `roiPct` é `investimentoTotal`, ortogonal. Medido executando o motor: catálogo precificado sem
+    custo lançado (o estado *default* de estudo novo) → `vgv = 10.000.000`, `investimentoTotal = 0`,
+    passa a guarda, e o Painel publica **ROI 0,0%** (achado no PR 649, ainda aberto). Defesa: quando um comentário disser "mesma
+    convenção que X", **confira que o PREDICADO é o mesmo**, não que a forma do código é. Dois
+    `?? 0` idênticos podem ter garantias opostas — e a frase falsa é **pior que a ausência dela**,
+    porque sem comentário alguém investiga.
+12. **"Declarei que não medi" não é o mesmo que medir.** Atestei `bloqueantes=0` **duas vezes** no
+    mesmo PR registrando com honestidade que a premissa era *"herdada, não medida"* — e a honestidade
+    da declaração criou aparência de rigor enquanto o defeito passava. Um portão com uma nota anexada
+    continua sendo um portão aberto. Defesa: premissa não medida **sobre o caminho que o PR está
+    mudando** é bloqueante até ser medida, não observação; se dá para escrever *"isto eu não
+    exercitei"*, dá para escrever o teste — aqui foram **12 linhas**. O que fechou foi invocar a
+    skill `revisar-pr-apps` **de verdade**, em vez de reproduzir de memória o que ela prescreve.
 
 #### As peças, e o que cada uma garante
 
