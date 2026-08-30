@@ -1,7 +1,7 @@
-# Armadilhas medidas na Rodada 10 — 2026-08-29
+# Armadilhas medidas na Rodada 10 — 2026-08-29/30
 
-> Detalhe completo das dez armadilhas resumidas em `CLAUDE.md` § *As dez armadilhas que a Rodada 10
-> pagou*. Cada uma tem: o **sintoma** (como ela se apresenta), a **causa**, a **defesa** (passo, não
+> Detalhe completo das doze armadilhas resumidas em `CLAUDE.md` § *As doze armadilhas que a Rodada
+> 10 pagou*. Cada uma tem: o **sintoma** (como ela se apresenta), a **causa**, a **defesa** (passo, não
 > intenção) e o **custo medido**. Nenhuma é conselho geral — todas foram pagas hoje, na Rodada 10
 > (`docs/rodada-10/planejamento.md`).
 
@@ -120,8 +120,65 @@ o Codex que achou, em PR 641.
 **Sintoma:** cada merge conflita **todos** os outros PRs abertos; com 5 abertos, cada merge suja 4.
 **Causa:** todo PR prepende uma seção no topo do mesmo arquivo.
 **Defesa imediata:** fila **estritamente serial** — sincronizar só o próximo, nunca todos.
-**Defesa estrutural (PR em andamento):** `PROGRESSO.md merge=union` no `.gitattributes`. Risco a
-provar antes de mergear: união errada é **calada**, conflito é ruidoso.
+**Defesa estrutural (na `main` desde 2026-08-30, PR 653):** `PROGRESSO.md merge=union` no
+`.gitattributes`. A premissa foi medida em 40 commits não-merge que tocam o arquivo — **33 são
+prepend puro** (1 hunk, zero deleções). O risco foi provado antes de mergear, num repositório de
+brinquedo: no pior caso (duas branches editando a mesma região) o `union` produz **duas linhas
+contraditórias sem aviso**. É troca deliberada de falha **ruidosa** por falha **calada**, aceitável
+porque o arquivo é narrativa append-only. **Não é retroativa:** PR já conflitado precisa sincronizar
+com a `main` para herdar o atributo.
 **Conferência do merge, sempre pelas TRÊS medidas:** seções = as da base **+1**, **zero** títulos
 duplicados, **zero** marcadores residuais. Contagem sozinha não distingue "as duas entraram" de "uma
 entrou duas vezes".
+**Conferência do merge, sempre pelas TRÊS medidas:** seções = as da base **+1**, **zero** títulos
+duplicados, **zero** marcadores residuais. Contagem sozinha não distingue "as duas entraram" de "uma
+entrou duas vezes".
+
+## 11 · Justificativa que afirma uma equivalência FALSA
+
+**Sintoma:** um `?? 0` mantido de propósito, com comentário dizendo ser *"a MESMA convenção que
+`margemPct` já usa"* — e **duas atestações minhas passaram por cima dele**, porque a frase é
+plausível e o código tem a mesma forma.
+**Causa:** as duas grandezas têm **denominadores diferentes**. As duas guardas de
+`resumoListagem` (`frontend/tela-dashboard.ts`) testam **`vgv`**. `margemLiquidaPct` é `null` sse
+`vgv <= 0` — **mesmo predicado da guarda**, então ali o `?? 0` de fato nunca dispara e o comentário
+está certo. Mas `roiPct` é `null` sse `investimentoTotal <= 0`, e `investimentoTotal =
+custoDiretoTotal + custoIndiretoTotal` (`frontend/proforma.ts`) — grandeza **ortogonal** ao VGV, que
+vem do catálogo de produtos.
+
+> ℹ️ **Citações por SÍMBOLO, não por linha, e isto é a armadilha nº 2 aplicada a este próprio
+> documento.** Ao escrever esta entrada eu carreguei números de linha da worktree do PR 649 — onde
+> `roiPct` já nasce `null` — e **quatro dos oito endereços não resolviam** no arquivo da `main`,
+> onde ele ainda devolve `0` porque aquele PR não mergeou. Registro de lição não deve fixar linha de
+> código que ainda está em movimento.
+**Medido, executando o motor** (Preliminar com catálogo precificado e nenhum custo lançado — o
+estado *default* de um estudo recém-criado, porque a receita entra antes do orçamento):
+
+```
+vgv = 10.000.000   investimentoTotal = 0   roiPct = null
+guarda do Painel (vgv > 0) = true  →  a linha APARECE  →  `p.roiPct ?? 0` publica 0
+```
+
+A coluna ROI mostra **`0,0%`** — o número inventado que a issue existia para apagar, e justamente
+nos estudos novos, que aparecem no topo do Painel.
+**Defesa:** quando um comentário disser *"mesma convenção que X"*, **confira que o PREDICADO é o
+mesmo**, não que a forma do código é a mesma. Dois `?? 0` idênticos podem ter garantias opostas.
+**Por que é pior que ausência de justificativa:** a frase falsa **esconde** o defeito de quem ler
+depois. Sem comentário, alguém investiga; com ele, todo mundo confia.
+**Custo:** duas rodadas de atestação com `bloqueantes=0` sobre um defeito vivo. **PR 649**,
+que na data deste registro segue aberto — o conserto é exibir `—` no Painel, por decisão do autor.
+
+## 12 · "Declarei que não medi" não é o mesmo que medir
+
+**Sintoma:** atestei `bloqueantes=0` **duas vezes** no mesmo PR, registrando com honestidade que a
+premissa do `?? 0` era *"herdada, não medida"*. A honestidade da declaração criou **aparência de
+rigor** — e o defeito passou assim mesmo.
+**Causa:** declarar uma lacuna a torna **visível**, mas não a **fecha**. Um portão com uma nota
+anexada continua sendo um portão aberto.
+**Defesa:** premissa não medida **sobre o caminho que o PR está mudando** é **bloqueante** até ser
+medida, não observação. Se dá para escrever a frase *"isto eu não exercitei"*, dá para escrever o
+teste — neste caso foram **12 linhas** num arquivo temporário.
+**O que de fato fechou:** invocar a skill `revisar-pr-apps` **de verdade**, em vez de reproduzir à
+mão o que ela prescreve. A lente L3 (rastreador entre arquivos) achou o mesmo defeito de forma
+independente, com `arquivo:linha`, no primeiro passe. **Executar o procedimento não é o mesmo que
+segui-lo de memória** — e a diferença aqui foi um defeito que teria ido para a `main`.

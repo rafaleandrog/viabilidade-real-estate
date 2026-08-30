@@ -526,7 +526,7 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
 > agente `running` com `git diff --stat` congelado por minutos está preso, não pensando. Compare o
 > `--stat` com o de alguns minutos antes antes de concluir que "está trabalhando".
 
-#### As dez armadilhas que a Rodada 10 pagou (2026-08-29)
+#### As doze armadilhas que a Rodada 10 pagou (2026-08-29/30)
 
 > Numeração própria, não continuação da lista acima — a lista acima já é citada por número
 > (`classe de defeito nº 1`, `nº 2`) em ~15 arquivos de código; renumerar quebraria essa referência.
@@ -575,8 +575,26 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
 10. **O laço estrutural do `PROGRESSO.md`.** Com 5 PRs abertos, cada merge suja os outros 4 — todo
     PR prepende seção no topo do mesmo arquivo. Defesa imediata: fila **estritamente serial**,
     sincronize só o próximo PR da vez, nunca todos de uma vez; a defesa estrutural
-    (`merge=union` no `.gitattributes`) está em PR à parte, e a conferência do merge é sempre pelas
-    três medidas — seções da base +1, zero títulos duplicados, zero marcadores residuais.
+    (`merge=union` no `.gitattributes`) **está na `main` desde 2026-08-30**, e a conferência do
+    merge é sempre pelas três medidas — seções da base +1, zero títulos duplicados, zero marcadores
+    residuais. ⚠️ O `union` troca falha **ruidosa** por falha **calada**: no pior caso, duas branches
+    editando a mesma região produzem duas linhas contraditórias sem aviso.
+11. **Justificativa que afirma uma equivalência FALSA.** Um `?? 0` mantido de propósito, com o
+    comentário dizendo ser *"a MESMA convenção que `margemPct`"* — e **duas atestações passaram por
+    cima**, porque a frase é plausível. Não era a mesma: a guarda testa `vgv`, mas o denominador de
+    `roiPct` é `investimentoTotal`, ortogonal. Medido executando o motor: catálogo precificado sem
+    custo lançado (o estado *default* de estudo novo) → `vgv = 10.000.000`, `investimentoTotal = 0`,
+    passa a guarda, e o Painel publica **ROI 0,0%** (achado no PR 649, ainda aberto). Defesa: quando um comentário disser "mesma
+    convenção que X", **confira que o PREDICADO é o mesmo**, não que a forma do código é. Dois
+    `?? 0` idênticos podem ter garantias opostas — e a frase falsa é **pior que a ausência dela**,
+    porque sem comentário alguém investiga.
+12. **"Declarei que não medi" não é o mesmo que medir.** Atestei `bloqueantes=0` **duas vezes** no
+    mesmo PR registrando com honestidade que a premissa era *"herdada, não medida"* — e a honestidade
+    da declaração criou aparência de rigor enquanto o defeito passava. Um portão com uma nota anexada
+    continua sendo um portão aberto. Defesa: premissa não medida **sobre o caminho que o PR está
+    mudando** é bloqueante até ser medida, não observação; se dá para escrever *"isto eu não
+    exercitei"*, dá para escrever o teste — aqui foram **12 linhas**. O que fechou foi invocar a
+    skill `revisar-pr-apps` **de verdade**, em vez de reproduzir de memória o que ela prescreve.
 
 #### As peças, e o que cada uma garante
 
