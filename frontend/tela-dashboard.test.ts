@@ -292,3 +292,43 @@ test('#578: _linhasFiltradas (o método do componente) delega para a função pu
     'o wrapper do componente precisa chamar a função pura testada acima — senão os testes de linhasEstudosFiltradas provam uma função que a tela não usa',
   );
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #611 — o Painel NÃO pode publicar ROI inventado.
+//
+// Este par existe porque o defeito anterior era invisível: `roiPct: p.roiPct ?? 0`
+// tinha a MESMA FORMA do `?? 0` de `margemPct` logo ao lado, e um comentário
+// afirmando ser "a mesma convenção". A forma era a mesma; a garantia, oposta.
+//
+// A guarda de `resumoListagem` é `p.vgv > 0`. Isso É o predicado de
+// `margemLiquidaPct` (denominador = VGV), então o `?? 0` dela de fato nunca
+// dispara. Mas `roiPct` tem denominador `investimentoTotal` — ortogonal ao VGV —,
+// e a guarda não diz nada sobre ele.
+//
+// O 1º teste é o caso REAL que passava despercebido; o 2º é o controle que
+// impede o conserto de virar "sempre null", que passaria o 1º sem medir nada.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Catálogo precificado e NENHUM campo de custo — o estado default de um estudo novo. */
+const SEM_CUSTO = {
+  id: 611, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
+  terreno_manual_area: 1000,
+  produtos: [{ area_media_m2: 100, preco_venda_m2: 10000, unidades: 10 }],
+};
+
+test('#611: VGV > 0 com investimento ZERO — a linha aparece, e o ROI é null (nunca 0)', () => {
+  const r = resumoListagem(SEM_CUSTO, {}) as ResumoListagem;
+  // A linha PASSA a guarda: é justamente por isso que o `?? 0` era alcançável.
+  assert.notEqual(r, null, 'a guarda é vgv > 0, e o VGV existe — a linha tem de aparecer');
+  assert.ok(r.vgv > 0, 'sem VGV o teste mediria outra coisa');
+  // O que trava a regressão: `?? 0` de volta faz isto virar 0 e o teste cai.
+  assert.equal(r.roiPct, null, 'ROI sem denominador é indefinido, não zero');
+  // E o contraste que dá o nome à armadilha: a vizinha continua number, e certo.
+  assert.equal(typeof r.margemPct, 'number', 'margemPct tem denominador (VGV) e a guarda o cobre');
+});
+
+test('#611 controle: com investimento REAL o ROI é número — o conserto não virou "sempre null"', () => {
+  const r = resumoListagem({ ...SEM_CUSTO, considerar_custo_terreno: true, custo_terreno_m2: 500 }, {}) as ResumoListagem;
+  assert.notEqual(r, null);
+  assert.equal(typeof r.roiPct, 'number', 'com custo lançado há denominador, e o ROI é medido');
+});
