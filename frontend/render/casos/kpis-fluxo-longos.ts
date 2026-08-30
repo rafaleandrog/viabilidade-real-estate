@@ -7,8 +7,12 @@
 // aquele caso alimenta as outras ~30 asserções de `tabela-fluxo.render.test.ts`
 // (células da tabela, sensibilidade, cores…), e trocar o `calc` ali mudaria o
 // que elas medem sem relação com esta issue. Este caso mede só a faixa de
-// KPIs (`.fx-kpis`), reusada também por `tela-cenarios.ts`
-// ("Resultado após custo financeiro").
+// KPIs (`.fx-kpis`).
+//
+// ⚠️ #596: esta grade já era reusada por `tela-cenarios.ts`, que tinha ali o
+// urbi-kpi "Resultado após custo financeiro". Aquele KPI saiu, e com ele o
+// único `urbi-kpi` que alcançava `.fx-kpis` — hoje a grade só carrega os
+// `.kpi-card` de markup próprio.
 
 import '../../tela-fluxo-ver.js';
 import { CRONO, CUSTOS, DATA_INICIO, RECEITAS, fluxoValoresLongos, forcarEstado } from './dados.js';

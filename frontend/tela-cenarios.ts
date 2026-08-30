@@ -68,9 +68,11 @@ export class ViabTelaCenarios extends LitElement {
   // tela-fluxo-ver.ts, sobre o `FluxoCalc` do cenário em vez do real.
   // #349: o funding passou a ser lido dentro da tabela principal (a separada
   // foi apagada) e acompanha as duas views — a antiga restrição "só na
-  // Mensal" caiu com `agregarFundingPorPeriodos`. A coluna "Resultado após
-  // custo financ." da tabela de cenários salvos nunca dependeu da view: ela
-  // aparece sempre que há operação de Funding.
+  // Mensal" caiu com `agregarFundingPorPeriodos`.
+  //
+  // ⚠️ #596: aqui havia a nota de que a coluna "Resultado após custo financ."
+  // da tabela de cenários salvos nunca dependeu da view. Essa coluna SAIU — a
+  // nota foi junto, senão descreveria UI que não existe mais.
   @state() private operacoes: OperacaoFunding[] = [];
 
   private baseConfig: FluxoConfig | null = null;
@@ -516,8 +518,9 @@ export class ViabTelaCenarios extends LitElement {
   };
 
   private _renderCenariosSalvos(base: FluxoCalc): TemplateResult {
-    // Item 5: coluna extra só quando há operação de Funding — sem
-    // nenhuma, a tabela fica idêntica à de antes desta rodada.
+    // ⚠️ #596: esta tabela já teve uma coluna extra condicional ("Resultado
+    // após custo financ.", só com operação de Funding). Ela saiu — a tabela
+    // não ramifica mais por presença de funding.
     return html`
       <section class="secao-cenarios">
         <h3>Cenários salvos</h3>
