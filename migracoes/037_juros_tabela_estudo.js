@@ -75,57 +75,69 @@
 // de cada linha. Apagá-las aqui seria escrita em massa sem ganho — nada as lê.
 
 /**
- * % a.a. de uma linha, na precedência da #428. `null` = **a linha não tem voto**
- * — porque não declara taxa, ou porque o que ela declara não é um percentual
- * que possa virar decisão.
+ * O ÚNICO parser de número desta migração. Devolve `null` para tudo que não
+ * seja, inequivocamente, um número escrito como número.
  *
- * ⚠️ **Taxa NEGATIVA não vota, e essa escolha é o conserto de um defeito que a
- * primeira versão desta migração tinha.** Antes, ela era achatada em `0` por um
- * clamp no fim; combinada com a regra de que `0` é voto legítimo e definitivo,
- * o resultado era **dado sujo virando "0% intencional" permanente e
- * indistinguível de escolha do autor** — e imune a reexecução, porque o filtro
- * de idempotência só olha `null`. Medido: linha com `juros_tabela_aa: -5`
- * gravava `0` na coluna e a reexecução não voltava atrás.
+ * ⚠️ **Ele existe porque enumerar entradas sujas uma a uma não converge.** Ao
+ * longo da revisão desta issue a mesma classe de defeito voltou CINCO vezes,
+ * sempre igual: um valor que não é percentual atravessa `Number()`, vira voto
+ * plausível, e a migração o grava permanentemente — porque o filtro de
+ * idempotência só reprocessa coluna `null`. As cinco portas foram: taxa
+ * negativa; `Number('')` valendo `0`; `taxaMensal <= -2`, onde o expoente par
+ * de `(1 + m)^12` devolve `0` ou um positivo enorme; `'0x10'` valendo `16`; e
+ * `'1e3'` valendo `1000`. Cada conserto pontual fechava uma porta e deixava a
+ * seguinte aberta — e nos DOIS ramos, que divergiam entre si.
  *
- * Nunca houve validação de domínio para essa chave (a da #428 vivia na tela, e
- * a do backend só chegou com a #585), então taxa negativa em dado legado ou
- * gravada por API é possível. (`-0` **vota**, e está certo: ele é zero, não um
- * número negativo — `-0 >= 0` é `true` em JS, e o valor gravado é `0`.) Ignorá-la deixa a coluna nula quando ela é a
- * única fonte — e nulo é o estado "nunca configurado", que o autor VÊ na tela e
- * pode corrigir. É o oposto de gravar um número plausível e errado.
+ * A saída não é uma sexta guarda: é **inverter para fail-closed e ter um lugar
+ * só**. Aceita `number` finito, ou string que seja exatamente um decimal (sinal
+ * opcional, espaços em volta). Todo o resto — booleano, array, objeto, `'0x10'`,
+ * `'1e3'`, `'12,5'`, `''`, `'abc'` — não vota.
+ *
+ * `'12,5'` (vírgula, o separador brasileiro) é rejeitado de propósito: aqui não
+ * há usuário digitando, é dado já persistido, e adivinhar o separador de um
+ * JSON é a mesma classe de suposição que este parser existe para não fazer.
+ */
+function numeroLimpo(bruto) {
+  if (typeof bruto === 'number') return Number.isFinite(bruto) ? bruto : null;
+  if (typeof bruto !== 'string') return null;
+  if (!/^\s*-?\d+(\.\d+)?\s*$/.test(bruto)) return null;
+  const n = Number(bruto);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * % a.a. de uma linha, na precedência da #428. `null` = **a linha não tem
+ * voto** — porque não declara taxa, ou porque o que ela declara não é um
+ * percentual que possa virar decisão.
+ *
+ * Duas fontes, na ordem que o motor usava antes da #585:
+ *  1. `fluxo_pagamento.juros_tabela_aa`, o dígito que o usuário escreveu;
+ *  2. na falta dela, a primeira `taxaMensal` não nula dos componentes, por
+ *     `(1 + i_m)^12 − 1`.
+ *
+ * **Taxa negativa não vota, nas duas fontes.** Nunca houve validação de domínio
+ * para elas (a da #428 vivia na tela; a do backend só chegou com a #585), então
+ * negativo em dado legado ou gravado por API é possível — e gravá-lo como `0`,
+ * que era o efeito de um clamp que existiu aqui, produz "0% intencional"
+ * permanente e indistinguível de escolha do autor. Ignorar deixa a coluna nula:
+ * o estado "nunca configurado", que o autor VÊ na tela e pode corrigir.
+ *
+ * ⚠️ **No ramo derivado o sinal é conferido em `m`, ANTES da potência.** O
+ * expoente é 12, par: `(1 − 2)^12` é `1` (logo `0%`) e `(1 − 3)^12` é `4096`
+ * (logo `409.500%`). Conferir só o resultado deixava passar o dado mais sujo.
+ *
+ * (`-0` **vota**, e está certo: é zero, não um negativo — `-0 >= 0` é `true`.)
  */
 function jurosAaDaLinha(fluxoPagamento) {
   const fp = fluxoPagamento ?? {};
   if (fp.juros_tabela_aa !== undefined && fp.juros_tabela_aa !== null) {
-    const bruto = fp.juros_tabela_aa;
-    // ⚠️ String vazia (ou só espaços) NÃO é zero. `Number('')` devolve `0`, e
-    // sem esta linha um `juros_tabela_aa: ''` — shape que a validação antiga da
-    // API deixava passar dentro do `fluxo_pagamento` — virava voto de "0%
-    // explícito" e gravava a coluna permanentemente. É a mesma lavagem de dado
-    // sujo que a guarda de negativo existe para impedir, por outra porta.
-    // Achado do revisor externo.
-    // Só `number`, ou string que SEJA um decimal — não o que `Number()` aceita.
-    // `Number('0x10')` é `16` e `Number('1e3')` é `1000`: hexadecimal e notação
-    // científica passam por "string numérica" e viram voto. Nenhum dos dois é
-    // percentual que alguém tenha digitado; são dado sujo com aparência de
-    // resposta, a mesma classe que as guardas de negativo e de string vazia
-    // fecham por outras portas. `Number('')` também é `0`, e o padrão abaixo
-    // exige ao menos um dígito.
-    if (typeof bruto !== 'number' && typeof bruto !== 'string') return null;
-    if (typeof bruto === 'string' && !/^\s*-?\d+(\.\d+)?\s*$/.test(bruto)) return null;
-    const aa = Number(bruto);
-    return Number.isFinite(aa) && aa >= 0 ? aa : null;
+    const aa = numeroLimpo(fp.juros_tabela_aa);
+    return aa !== null && aa >= 0 ? aa : null;
   }
   const comps = Array.isArray(fp.componentes) ? fp.componentes : [];
   for (const c of comps) {
-    const m = Number(c?.taxaMensal);
-    if (!Number.isFinite(m) || m === 0) continue;
-    // ⚠️ O SINAL é conferido em `m`, ANTES da potência — e não no `aa` que sai
-    // dela. O expoente é 12, par: `(1 + m)^12` com `m = -2` devolve `1`, ou
-    // seja `aa = 0`, e com `m = -3` devolve `4096`, ou seja `aa = 409.500%`.
-    // Conferir só o derivado deixava passar exatamente o dado mais sujo — um
-    // vira voto de "0% intencional", o outro é limitado ao teto e gravado como
-    // taxa válida. Achado do revisor externo.
+    const m = numeroLimpo(c?.taxaMensal);
+    if (m === null || m === 0) continue;
     if (m < 0) return null;
     return (Math.pow(1 + m, 12) - 1) * 100;
   }

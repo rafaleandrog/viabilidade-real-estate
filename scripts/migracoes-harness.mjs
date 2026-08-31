@@ -60,6 +60,7 @@ const SEED = {
     { id: 12, nome: 'Estudo L', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
     { id: 13, nome: 'Estudo M', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
     { id: 14, nome: 'Estudo N', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 15, nome: 'Estudo O', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
   ],
   avancado_cronograma: [
     { id: 1, estudo_id: 1, evento: 'planejamento', inicio_mes: 1, duracao_meses: 6 },
@@ -166,6 +167,15 @@ const SEED = {
       fluxo_pagamento: { juros_tabela_aa: '0x10' } },
     { id: 47, estudo_id: 14, tipo: 'receita', nome: 'R-A', ordem: 0,
       fluxo_pagamento: { juros_tabela_aa: '1e1' } },
+    // Estudo 15 — a MESMA sujeira, no RAMO DERIVADO. Os estudos 13/14 cobrem a
+    // chave explícita; este cobre `taxaMensal` como string hexadecimal, que os
+    // consertos pontuais das rodadas anteriores fechavam num ramo e deixavam
+    // aberta no outro. `Number('0x10')` é `16`, e `(1 + 16)^12` deriva
+    // 58 quatrilhões por cento — que o teto gravava como 999,99.
+    { id: 48, estudo_id: 15, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { componentes: [
+        { tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 12, taxaMensal: '0x10' },
+      ] } },
     // Estudo 4 — EMPATE em frequência (uma linha cada), resolvido pela de
     // menor `ordem`; e a 3ª linha exercita a DERIVAÇÃO a partir de
     // `componentes[].taxaMensal`, sem a chave `juros_tabela_aa`. A 4ª e a 5ª
@@ -215,6 +225,7 @@ const SEED = {
     { id: 45, fase_id: 45, tipologia_id: 1, quantidade: 1 },
     { id: 46, fase_id: 46, tipologia_id: 1, quantidade: 1 },
     { id: 47, fase_id: 47, tipologia_id: 1, quantidade: 1 },
+    { id: 48, fase_id: 48, tipologia_id: 1, quantidade: 1 },
   ],
   // Camada com o shape que a migração `019` produzia (config de Price vinda do
   // Bloco G legado) — é o caminho de transformação da `028`. Sem esta linha a
@@ -434,6 +445,8 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
         // Hexadecimal e notação científica em string: `Number('0x10')` é `16`.
         [13, null, 'string hexadecimal não pode virar voto'],
         [14, null, 'string em notação científica não pode virar voto'],
+        // A mesma sujeira no OUTRO ramo — é o que o parser único fecha de uma vez.
+        [15, null, 'taxaMensal como string hexadecimal não pode virar voto'],
         // Empate de frequência resolvido pela linha de menor `ordem` — e é este
         // caso, e só ele, que dá dente ao `.sort()`.
         [9, 4, 'empate de frequência tem de ser resolvido pela linha de menor ordem'],
