@@ -79,6 +79,47 @@ const CAMPOS_BLOQUEADOS_PATCH = new Set([
  * Devolve `{ dados }` quando o PATCH pode prosseguir, ou
  * `{ http, codigo, mensagem }` quando deve ser recusado.
  */
+/**
+ * #585 — um percentual, e só um percentual.
+ *
+ * ⚠️ **Não é `Number(v)`, e a diferença foi medida.** `Number()` aceita
+ * hexadecimal (`'0x10'` → `16`), notação científica (`'1e3'` → `1000`), espaços
+ * (`'  '` → `0`), booleano (`true` → `1`) e array vazio (`[]` → `0`). Nenhum
+ * deles é percentual que alguém tenha digitado, e todos viravam valor gravado
+ * na coluna que governa os juros de TODAS as linhas de receita do estudo.
+ *
+ * A mesma classe de defeito reapareceu seis vezes na revisão da #585, sempre
+ * assim: um valor que não é percentual atravessa `Number()` e vira um número
+ * plausível. A migração `037` foi invertida para fail-closed (`numeroLimpo`);
+ * este é o mesmo predicado, no lugar que de fato é fronteira — a tela é
+ * feedback, o PATCH é o portão.
+ *
+ * ⚠️ **A gramática aceita `'+12.5'`, `'.5'` e `'12.'`** — decimais inequívocos
+ * que o leitor antigo baseado em `Number` lia e que a API podia ter gravado.
+ * Fail-closed apertado demais destrói sinal: rejeitá-los tirava o voto de uma
+ * linha que TEM juros e a coluna ficava nula, com o motor usando 0% no lugar.
+ * O que continua fora é hexadecimal, notação científica e vírgula.
+ *
+ * ⚠️ **São TRÊS validadores para esta coluna, e eles não compartilham código**
+ * porque não podem: `migracoes/037_juros_tabela_estudo.js` roda no runner de
+ * migração (JS puro, sem imports do app) e `frontend/tela-financeiro.ts` roda no
+ * navegador. O que os mantém alinhados é a tabela de entradas exercitada nos
+ * três: aqui em `estudos.test.ts`, na migração pelo harness
+ * (`scripts/migracoes-harness.mjs`), e na tela em `tela-financeiro.test.ts`.
+ * Divergiu um, a tabela acusa.
+ */
+/** #585: teto do domínio — `decimal(5,2)` no `schema.json`. Ver a nota gêmea em
+ * `frontend/tela-financeiro.ts` e `TETO_COLUNA_AA` na migração `037`. */
+export const TETO_JUROS_TABELA_AA = 999.99;
+
+export function percentualEstrito(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v !== 'string') return null;
+  if (!/^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/.test(v)) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function montarPatchEstudo(
   body: Record<string, any>,
   estudo: { nivel_analise?: string; status?: string },
@@ -100,6 +141,29 @@ export function montarPatchEstudo(
         return { http: 422, codigo: 'NIVEL_IMUTAVEL', mensagem: 'nivel_analise não pode ser alterado após a criação do estudo' };
       }
       continue;
+    }
+    // #585: `juros_tabela_aa_padrao` deixou de ser um default de linhas novas e
+    // passou a governar o cálculo de TODAS as linhas de receita do estudo. Uma
+    // taxa negativa aqui não é um campo estranho numa tela — é o fluxo de caixa
+    // inteiro invertido, e o motor não a rejeita (`taxaMensalDeAnual` só clampa
+    // `aa <= -100`, para impedir `NaN`; `-5` produz uma mensal negativa
+    // perfeitamente "válida").
+    //
+    // A tela barra em `erroJurosTabelaEstudo`, mas tela é feedback, não
+    // fronteira: `PATCH /estudos/:id` é chamável direto, e qualquer tela futura
+    // que reuse `atualizarEstudo` passa por aqui sem passar por lá.
+    if (k === 'juros_tabela_aa_padrao' && v !== null && v !== undefined && v !== '') {
+      const aa = percentualEstrito(v);
+      // #585 (revisor externo, rodada 6): o teto é domínio tanto quanto o piso.
+      // `decimal(5,2)` no `schema.json` → 999,99. Sem ele, `1000` atravessava o
+      // PATCH e estourava no INSERT, virando 500 em vez de `TAXA_INVALIDA`.
+      if (aa === null || aa < 0 || aa > TETO_JUROS_TABELA_AA) {
+        return {
+          http: 400,
+          codigo: 'TAXA_INVALIDA',
+          mensagem: `juros_tabela_aa_padrao deve ser um percentual ao ano entre 0 e ${TETO_JUROS_TABELA_AA}`,
+        };
+      }
     }
     dados[k] = v;
   }

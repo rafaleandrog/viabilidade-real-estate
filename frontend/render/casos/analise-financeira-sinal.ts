@@ -85,6 +85,7 @@ export const caso = {
     const c = calcularFluxo({
       dataInicio: DATA_INICIO,
       taxaDescontoAa: 12,
+      jurosTabelaAaEstudo: 0,
       cronograma: CRONO,
       linhasReceita: RECEITAS,
       linhasCusto: CUSTOS_DEFICITARIOS,

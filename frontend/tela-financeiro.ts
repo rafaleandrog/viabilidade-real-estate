@@ -76,6 +76,60 @@ export function camposVisiveisFinanceiro(nivel: string): string[] {
   return ['taxa_desconto_aa', 'imposto_percentual'];
 }
 
+/**
+ * #585 — a taxa de tabela do estudo é válida?
+ *
+ * ⚠️ **Esta função existe porque a #585 REMOVEU uma validação e precisava
+ * devolvê-la.** Enquanto a taxa era do plano, quem barrava taxa negativa era
+ * `erroFormularioPagamento` (*"Revisao da #428, B2 — a taxa alimenta TODO
+ * componente financiado do plano, e ate aqui nada a validava"*). O campo saiu do
+ * modal e a validação saiu junto; sem ela, digitar `-5` aqui aplicava juros
+ * NEGATIVOS a todo componente financiado de todo o estudo, sem erro nenhum.
+ * Medido pelo caminho real: `parseNumeroBR('-5')` devolve `-5` (o regex de
+ * `viab-format.ts` preserva o sinal), `viab-num` não tem piso, e
+ * `taxaMensalDeAnual(-5)` devolve `-0,004265…`.
+ *
+ * A defesa de domínio do motor (`taxaMensalDeAnual`, que devolve `0` para
+ * `aa <= -100` em vez de `NaN`) continua onde estava e cobre outra coisa: ela
+ * impede o `NaN` de virar `null` no JSON. Ela **não** cobre a faixa
+ * `-100 < aa < 0`, que é justamente a que um usuário digita sem querer.
+ *
+ * `null`/vazio é válido — significa "não configurado", e o motor lê 0.
+ */
+/**
+ * #585: teto do domínio da coluna `estudos.juros_tabela_aa_padrao` —
+ * `decimal(5,2)` no `schema.json`, logo 999,99. O mesmo número vive em
+ * `TETO_COLUNA_AA` na migração `037` e na guarda do PATCH; os três não
+ * compartilham código porque rodam em runtimes diferentes.
+ */
+export const TETO_JUROS_TABELA_AA = 999.99;
+
+export function erroJurosTabelaEstudo(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  // ⚠️ Não é `Number(v)`. Ele aceita `'0x10'` (→ 16), `'1e3'` (→ 1000), `'  '`
+  // (→ 0), `true` (→ 1) e `[]` (→ 0) — nenhum é percentual digitado, e todos
+  // acabariam na coluna que governa os juros de todas as linhas. É o mesmo
+  // predicado de `percentualEstrito` (backend) e `numeroLimpo` (migração
+  // `037`); os três não compartilham código porque rodam em runtimes
+  // diferentes, e o que os mantém alinhados é a tabela de entradas exercitada
+  // nos três — ver o teste `#585 os três validadores da coluna concordam`.
+  if (typeof v === 'number' ? !Number.isFinite(v)
+    : typeof v !== 'string' || !/^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/.test(v)) {
+    return `Os juros de tabela devem ser um percentual ao ano entre 0 e ${TETO_JUROS_TABELA_AA}.`;
+  }
+  // #585 (revisor externo, rodada 6): o TETO também é domínio. A coluna é
+  // `decimal(5,2)` no `schema.json`, cujo máximo é 999,99 — e a migração `037`
+  // já rejeita voto fora dessa faixa. Sem esta linha, `1000` passava pela tela e
+  // pelo PATCH e só estourava no INSERT do Postgres: o usuário via um 500 em vez
+  // de "taxa inválida", e o erro chegava sem nome. Validar só o piso é validar
+  // metade do domínio.
+  const num = Number(v);
+  if (num < 0 || num > TETO_JUROS_TABELA_AA) {
+    return `Os juros de tabela devem ser um percentual ao ano entre 0 e ${TETO_JUROS_TABELA_AA}.`;
+  }
+  return null;
+}
+
 /** #450 (D-Q08): `sujeito_ret` é condição de RENDER, não um campo desabilitado
  * — só aparece fora do Avançado. */
 export function sujeitoRetVisivelFinanceiro(nivel: string): boolean {
@@ -166,6 +220,8 @@ export class ViabTelaFinanceiro extends LitElement {
     if (nivel !== 'avancado') return html`${nothing}`;
     const dis = !this.editavel;
     const visiveis = camposVisiveisFinanceiro(nivel);
+    // #585: recalculado a cada render, então acompanha a digitação.
+    const erroJuros = erroJurosTabelaEstudo(this.form['juros_tabela_aa_padrao']);
 
     return html`
       <urbi-banner variante="info">
@@ -181,19 +237,29 @@ export class ViabTelaFinanceiro extends LitElement {
         </div>
       </urbi-card>
 
-      <urbi-card titulo="Regime comercial das linhas de receita">
-        <!-- #477: cada linha de receita (Grupo, em Receitas) já é a unidade de
-             regime comercial — tem sua própria absorção, plano de pagamento e
-             juros de tabela. Este default só se aplica a linhas NOVAS, na
-             criação; nunca sobrescreve uma linha já gravada. -->
+      <urbi-card titulo="Juros de tabela">
+        <!-- #585 (decisão do autor, 2026-08-26): "campo juros de tabela funciona
+             para todos os imóveis igualmente e o valor não é inserido aqui. será
+             na aba financeiro". A taxa deixou de ser por Grupo (D-Q02 da #428) e
+             de ser default de criação (#477): é UM valor do estudo, e muda o
+             cálculo de TODAS as linhas de receita, as já criadas inclusive.
+             Quem for "arrumar" isto de volta para uma taxa por linha: a taxa
+             única é o pedido, não um descuido. -->
         <p class="dica">
-          Cada linha de receita (Grupo, na aba Receitas) tem seu próprio regime — absorção, plano de
-          pagamento e juros de tabela. Para dois regimes diferentes (ex.: Residencial × Não
-          residencial), crie duas linhas. O valor abaixo é só o <strong>default de linhas novas</strong>
-          — editá-lo não muda nenhuma linha já criada.
+          Juros da tabela de venda a prazo, em % ao ano, <strong>para o estudo inteiro</strong> —
+          entrada parcelada, parcelamento e repasse de <strong>todas</strong> as linhas de receita.
+          Convertidos para a taxa mensal equivalente pela composição (1 + i)^(1/12) − 1, nunca por
+          i/12. Editar este campo <strong>muda o cálculo de todas as linhas já criadas</strong>;
+          0% é venda sem juros.
+        </p>
+        <p class="dica">
+          Cada linha de receita (Grupo, na aba Receitas) continua sendo a unidade de regime
+          comercial — absorção e plano de pagamento são dela. Os <strong>juros</strong>, não: eles
+          são um só para o estudo. Regimes com taxas diferentes (ex.: Residencial × Não residencial)
+          não são representáveis nesta versão.
         </p>
         <div class="grid">
-          ${this._n('juros_tabela_aa_padrao', 'Juros de tabela padrão (linhas novas)', '% a.a.', dis)}
+          ${this._n('juros_tabela_aa_padrao', 'Juros de tabela', '% a.a.', dis)}
         </div>
       </urbi-card>
 
@@ -212,14 +278,33 @@ export class ViabTelaFinanceiro extends LitElement {
             <urbi-banner variante="alerta">
               As alterações não são salvas automaticamente — clique em “Salvar financeiro” antes de sair desta página.
             </urbi-banner>
+            ${erroJuros ? html`
+              <urbi-banner variante="erro">${erroJuros}</urbi-banner>` : nothing}
             <div class="form-acoes">
-              <urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar financeiro</urbi-botao>
+              <!-- #585 (rodada 2): o botão trava ENQUANTO o valor é inválido, e
+                   não só ao clicar. É o padrão que o modal irmão já usa em
+                   tela-fluxo-receitas.ts, onde o "Aplicar" recebe desabilitado
+                   a partir de erroFormularioPagamento: o usuário vê o erro no
+                   ato de digitar, com a mensagem visível na tela, em vez de
+                   descobri-lo por um toast que some e sem saber qual campo o
+                   causou. A checagem dentro de _salvar FICA — botão é
+                   affordance, não fronteira.
+                   (Sem cifrão-chaves neste comentário de propósito: dentro de um
+                   template do lit ele é uma INTERPOLAÇÃO mesmo dentro de
+                   comentário HTML, e o guard acusa o erro na linha errada.) -->
+              <urbi-botao variante="primario" ?carregando=${this.salvando}
+                ?desabilitado=${Boolean(erroJuros)} @click=${this._salvar}>Salvar financeiro</urbi-botao>
             </div>`
         : html`<p class="sec">Somente leitura neste status/função.</p>`}
     `;
   }
 
   private _salvar = async () => {
+    // #585/B1: a taxa de tabela do estudo alimenta TODA linha de receita — uma
+    // taxa negativa aqui não é um campo estranho numa tela, é o cálculo do
+    // estudo inteiro invertido. Barra antes de persistir.
+    const invalido = erroJurosTabelaEstudo(this.form['juros_tabela_aa_padrao']);
+    if (invalido) { urbiVerso.notificar(invalido, 'erro'); return; }
     this.salvando = true;
     try {
       const dados: Record<string, any> = {};
@@ -231,6 +316,25 @@ export class ViabTelaFinanceiro extends LitElement {
       }
       const res = await atualizarEstudo(this.estudo.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      // #585/B3: PROPAGA o valor salvo para as outras abas.
+      //
+      // Sem esta linha o PATCH grava e a tela notifica, mas `tela-avancado`
+      // continua distribuindo o `estudo` ANTIGO para Receitas, Resumo, Fluxo,
+      // Cenários e Funding — que é de onde cada uma tira
+      // `jurosTabelaAaEstudo`. O usuário salvaria 12,5%, navegaria sem
+      // recarregar a página e veria o cálculo da taxa velha, sem erro nenhum.
+      //
+      // Enquanto a coluna era default de linhas novas (#477) a defasagem era
+      // inofensiva: quem a aplicava era o backend, na criação. Desde a #585 ela
+      // manda no cálculo de tudo, e a promessa do critério 2 — "editar este
+      // campo muda todas as linhas" — passa a depender desta propagação.
+      //
+      // `viab:premissas-change` é o canal que já existe: `tela-premissas` o
+      // emite e `tela-estudo` o escuta no `urbi-shell-page` que contém
+      // `viab-tela-avancado`, refazendo `this.estudo` e reenviando-o para baixo.
+      this.dispatchEvent(new CustomEvent('viab:premissas-change', {
+        detail: { dados }, bubbles: true, composed: true,
+      }));
       urbiVerso.notificar('Financeiro salvo.', 'sucesso');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');

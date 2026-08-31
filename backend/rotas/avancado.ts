@@ -305,23 +305,16 @@ export function fluxoPagamentoPadrao(): Record<string, any> {
   };
 }
 
-/**
- * #477: fluxo_pagamento inicial de uma linha de receita NOVA, aplicando o
- * default herdado do estudo (`estudos.juros_tabela_aa_padrao`, painel de
- * premissas → aba Financeiro) quando ele estiver configurado.
- *
- * Só a CRIAÇÃO usa isto — nenhuma linha já gravada é tocada, e editar o
- * default depois não altera nada que já existe (o motor só lê
- * `juros_tabela_aa` de DENTRO do `fluxo_pagamento` de cada linha; o default
- * do estudo não é consultado de novo depois deste momento).
- */
-export function fluxoPagamentoComDefaultJuros(jurosTabelaAaPadrao: unknown): Record<string, any> {
-  const base = fluxoPagamentoPadrao();
-  if (jurosTabelaAaPadrao === null || jurosTabelaAaPadrao === undefined) return base;
-  const v = Number(jurosTabelaAaPadrao);
-  if (!Number.isFinite(v)) return base;
-  return { ...base, juros_tabela_aa: v };
-}
+// #585: `fluxoPagamentoComDefaultJuros` FOI REMOVIDA. Ela semeava
+// `juros_tabela_aa` no `fluxo_pagamento` de cada linha nova, a partir de
+// `estudos.juros_tabela_aa_padrao` — o modelo da #477, em que a coluna do
+// estudo era DEFAULT DE CRIAÇÃO e a taxa vigente morava na linha.
+//
+// Desde a #585 a coluna do estudo É a taxa vigente, e o motor a lê a cada
+// cálculo (`componentesPagamento`, 3º argumento obrigatório). Semear a chave na
+// linha passaria a gravar um dado que ninguém lê — a definição de feature
+// invisível do `CLAUDE.md`. Linha nova nasce com `fluxoPagamentoPadrao()` e
+// pronto; a taxa vem do estudo, na hora do cálculo.
 
 // #590/#514: as quatro listas abaixo são allowlists de validação de PATCH,
 // escritas à mão em paralelo aos `opcoes` do `schema.json` — e nada acusava
@@ -1096,8 +1089,9 @@ rotasAvancado.post('/estudos/:id/avancado/fases', async (req: Request, res: Resp
     // Cronograma nunca lê/edita esses campos.
     if (tipo === 'receita') {
       dados.absorcao = absorcaoPadrao(estudo.tem_pre_lancamento !== false);
-      // #477: herda juros_tabela_aa_padrao do estudo, se configurado.
-      dados.fluxo_pagamento = fluxoPagamentoComDefaultJuros(estudo.juros_tabela_aa_padrao);
+      // #585: sem semear juros na linha — a taxa é do estudo e o motor a lê de
+      // lá. Ver a nota em `fluxoPagamentoPadrao`.
+      dados.fluxo_pagamento = fluxoPagamentoPadrao();
     }
     const criada = await req.dados!.criar('avancado_fases', dados);
     res.status(201).json({ ...criada, alocacoes: [] });

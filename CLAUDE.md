@@ -526,7 +526,7 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
 > agente `running` com `git diff --stat` congelado por minutos está preso, não pensando. Compare o
 > `--stat` com o de alguns minutos antes antes de concluir que "está trabalhando".
 
-#### As doze armadilhas que a Rodada 10 pagou (2026-08-29/30)
+#### As quatorze armadilhas que a Rodada 10 pagou (2026-08-29/31)
 
 > Numeração própria, não continuação da lista acima — a lista acima já é citada por número
 > (`classe de defeito nº 1`, `nº 2`) em ~15 arquivos de código; renumerar quebraria essa referência.
@@ -595,6 +595,25 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
     mudando** é bloqueante até ser medida, não observação; se dá para escrever *"isto eu não
     exercitei"*, dá para escrever o teste — aqui foram **12 linhas**. O que fechou foi invocar a
     skill `revisar-pr-apps` **de verdade**, em vez de reproduzir de memória o que ela prescreve.
+13. **Contagem escrita de aritmética, não de medição.** Escrevi "978 testes" quando eram 976 e, duas
+    rodadas depois, "979" quando eram 977 — nas duas o número saiu de conta mental, não de rodar a
+    suíte, e nas duas a conta estava certa e a **premissa** errada (uma vez eu tinha acrescentado
+    asserções a um teste existente, não um teste; outra, os testes novos eram de backend, fora do
+    glob do frontend). Defesa mecânica: **nenhum número entra em commit, PR ou doc sem ter saído de
+    um comando rodado na mesma sequência** — `node --test … | grep '^# tests'`. E o corolário:
+    contagem que muda a cada rodada não deveria estar num artefato versionado, pelo mesmo motivo
+    que o § Processo já proíbe contador do estado da revisão.
+14. **Enumerar entrada suja não converge — inverta para fail-closed.** A mesma classe voltou **seis
+    vezes** no PR 656: um valor que não é percentual atravessa `Number()`, vira número plausível e a
+    migração o grava para sempre (o filtro de idempotência só reprocessa coluna nula). As portas
+    foram taxa negativa, `Number('')` valendo `0`, `taxaMensal <= -2` (o expoente **par** de
+    `(1 + m)^12` devolve `0` ou um positivo enorme), `'0x10'` valendo `16`, `'1e3'` valendo `1000`,
+    e o ramo **derivado** ainda com `Number()` cru depois de os outros cinco terem sido consertados
+    no ramo da chave. Defesa: na **segunda** entrada suja da mesma classe, pare de acrescentar
+    guarda e **inverta** — um parser único, fail-closed, usado por todos os ramos. A inversão fechou
+    as cinco portas conhecidas e **expôs a sexta**. Corolário, o achado mais caro: **conte quantos
+    validadores existem para o mesmo campo**. Esta coluna tinha três — tela, PATCH e migração — com
+    regras diferentes, e o PATCH, a única fronteira real, aceitava o que a migração rejeitava.
 
 #### As peças, e o que cada uma garante
 

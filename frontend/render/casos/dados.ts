@@ -48,6 +48,7 @@ export function fluxo(): FluxoCalc {
   return calcularFluxo({
     dataInicio: DATA_INICIO,
     taxaDescontoAa: 12,
+    jurosTabelaAaEstudo: 0,
     cronograma: CRONO,
     linhasReceita: [LINHA_RECEITA],
     linhasCusto: LINHAS_CUSTO,
@@ -200,6 +201,7 @@ export function fluxoComFunding(): FluxoCalc {
   return calcularFluxo({
     dataInicio: DATA_INICIO,
     taxaDescontoAa: 12,
+    jurosTabelaAaEstudo: 0,
     cronograma: CRONO,
     linhasReceita: [LINHA_RECEITA],
     linhasCusto: LINHAS_CUSTO,

@@ -40,7 +40,7 @@ ordem: 8
 > vier depois a nem tentar.
 >
 > **O mecanismo existe e é o suportado hoje:** tirar a tabela do `schema.json` e esvaziá-la com
-> `dados.limparTabela` (`scripts/migracoes-harness.mjs:160-165`), deixando a **poda do
+> `dados.limparTabela` (`scripts/migracoes-harness.mjs:322-330`), deixando a **poda do
 > reconciliador** derrubar a estrutura vazia no mesmo boot. É literalmente o que o job
 > `migracao-declarativa` deste repositório manda fazer (`.github/workflows/pr-guards.yml:216`), e o
 > `shell_min` do manifesto já está em **`0.53.8`**, acima dos pisos que esse fluxo exige.

@@ -1,5 +1,5 @@
 import {
-  componentesDoLegado, taxaMensalDoPlano,
+  componentesDoLegado, taxaMensalDoEstudo, TIPOS_FINANCIADOS,
   type ComponentePagamento, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import type { EventoCrono } from './fluxo-shared.js';
@@ -31,22 +31,14 @@ export interface FormularioPagamento {
    * espelho legado é a única fonte e a regeneração é integral.
    */
   componentes: ComponentePagamento[] | null;
-  /**
-   * #428 — juros de tabela do plano, em % a.a. UMA taxa por Grupo (D-Q02): a
-   * mesma vai para todos os componentes financiados.
-   *
-   * ⚠️ OPCIONAL de propósito, e isto é contrato, não descuido. A chave só
-   * existe no formulário quando existe no dado persistido ou quando o usuário
-   * digita — `fluxoPagamentoParaSalvar` faz `{ ...form }`, então uma chave
-   * sempre presente apareceria no JSON gravado de TODA linha, e um "Aplicar"
-   * sem edição deixaria de ser byte-idêntico ao que estava lá (a regra de
-   * classe da #431, `modais-json-regra-classe.test.ts`).
-   *
-   * Para LER a taxa efetiva — a chave se houver, senão a derivada dos
-   * componentes persistidos — use `jurosTabelaAnualPct(form)`, nunca
-   * `form.juros_tabela_aa` cru.
-   */
-  juros_tabela_aa?: number;
+  // #585 — a chave `juros_tabela_aa` SAIU deste tipo. Ela era a taxa por
+  // Grupo da #428 (D-Q02), e a decisão do autor de 2026-08-26 tornou a taxa
+  // um valor do ESTUDO (`estudos.juros_tabela_aa_padrao`, aba Viabilidade →
+  // Financeiro). O modal não a edita mais, e o formulário não a carrega:
+  // tirá-la só da leitura não bastaria — `fluxoPagamentoParaSalvar` faz
+  // `{ ...form }`, e o campo tinha de sumir do TIPO para o spread parar de
+  // reproduzi-lo. É a mesma lição que o `ret` de linha ensinou na #452, logo
+  // acima.
   /**
    * #460 — destino do resíduo de um `ate_marco` sem prazo (venda contratada
    * no mês do marco ou depois, `N_s ≤ 0`): rolar para o `concentrado` da
@@ -107,13 +99,6 @@ export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
       : [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, pct: 15 }],
     repasse: { apos_entrega_meses: n(fp.repasse?.apos_entrega_meses) },
     componentes,
-    // #428: só propaga a chave quando ela EXISTE no persistido. Ausente aqui,
-    // o campo do modal mostra a taxa derivada dos componentes
-    // (`jurosTabelaAnualPct`) e nada de novo entra no JSON até o usuário
-    // digitar. Ver a nota de contrato em `FormularioPagamento`.
-    ...(fp.juros_tabela_aa !== undefined && fp.juros_tabela_aa !== null
-      ? { juros_tabela_aa: Number(fp.juros_tabela_aa) || 0 }
-      : {}),
     // #460: mesmo padrão — a chave só nasce no formulário se já existia no
     // persistido. Ver a nota de contrato em `FormularioPagamento`.
     ...(fp.residuoAteMarco === 'concentrado' || fp.residuoAteMarco === 'imediato'
@@ -136,12 +121,16 @@ export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
 // deles. Regenerar tudo pelo espelho, que era o comportamento até a #431,
 // apagava-os em toda escrita.
 //
-// #428 mudou o quarto da lista: `taxaMensal` GANHOU campo na tela. Ele não
-// saiu da preservação — passou a ter um eixo. Enquanto o usuário não mexe no
-// campo de juros, `taxaMensal` continua só-canônica e é transplantada
-// componente a componente; no instante em que ele mexe, ela vira o que o
-// formulário está dizendo e o valor digitado manda em todo o plano (D-Q02).
-// Ver `camposSoCanonicos` e `taxaFoiEditada`.
+// #428 tinha dado a `taxaMensal` um EIXO — "o usuário mexeu no campo de juros
+// nesta sessão de modal?" —, e enquanto ele não mexia ela seguia só-canônica,
+// transplantada componente a componente.
+//
+// #585 apagou esse eixo junto com o campo: a taxa é do ESTUDO agora, e
+// `taxaMensal` deixou de ser dado da linha para virar projeção dele. Ela é
+// **sempre** regenerada, nunca transplantada — ver `camposSoCanonicos`. A
+// função `taxaFoiEditada`, que decidia o eixo, não existe mais (a nota de
+// remoção está logo abaixo). Os outros três — `sinalPct`,
+// `jurosNoMesDaContratacao`, `rotulo` — seguem preservados como sempre.
 
 /**
  * Os campos que o espelho legado (`entrada`/`parcelas`/`repasse`) SABE dizer.
@@ -180,66 +169,27 @@ const CAMPOS_DO_ESPELHO = [
  * nenhum teste ficar vermelho — exatamente o defeito que esta issue conserta,
  * de volta por outra porta.
  */
-function camposSoCanonicos(doador: any, taxaEditada: boolean): string[] {
-  // #428 — a consequência direta de a taxa virar EDITÁVEL: no momento em que o
-  // usuário mexe no campo, `taxaMensal` deixa de ser "o que o formulário não
-  // sabe dizer" e passa a ser exatamente o que ele está dizendo. Continuar
-  // transplantando-a do persistido faria o campo novo parecer funcionar e não
-  // funcionar — o valor digitado seria sobrescrito pelo velho na volta.
+function camposSoCanonicos(doador: any): string[] {
+  // #585 — `taxaMensal` deixou de ser só-canônica, SEMPRE, e não mais só
+  // quando o usuário mexia no campo. Ela não é dado da linha: é projeção da
+  // taxa do ESTUDO, e `componentesDoLegado` a regenera em todo componente
+  // financiado a partir do 3º argumento. Transplantá-la do persistido
+  // reintroduziria a taxa antiga por cima da nova — o campo da aba Financeiro
+  // pareceria funcionar e não funcionaria.
   //
-  // O eixo é o CAMPO TER SIDO EDITADO, não o campo existir. Com a taxa
-  // intocada, `taxaMensal` segue só-canônica e o transplante a preserva
-  // componente a componente — que é o que mantém de pé um plano com taxas
-  // heterogêneas (residencial × não residencial da EVI) e o no-op da #431.
-  const espelho: readonly string[] = taxaEditada
-    ? [...CAMPOS_DO_ESPELHO, 'taxaMensal']
-    : CAMPOS_DO_ESPELHO;
+  // ⚠️ O eixo anterior (#428) era "o campo foi editado nesta sessão de modal",
+  // e ele mantinha de pé um plano com taxas heterogêneas (residencial × não
+  // residencial da EVI). Esse cenário deixou de ser representável por decisão
+  // do autor — ver a nota em `taxaMensalDoEstudo`.
+  const espelho: readonly string[] = [...CAMPOS_DO_ESPELHO, 'taxaMensal'];
   return Object.keys(doador ?? {}).filter((k) => !espelho.includes(k));
 }
 
-/**
- * #428 — o usuário mexeu no campo de juros de tabela?
- *
- * Compara a taxa MENSAL que o formulário produz com a que o plano persistido
- * carrega, as duas por `taxaMensalDoPlano`, para que "não mexeu" seja
- * exatamente igual e não quase igual.
- *
- * A tolerância é rede: `taxaMensalDoPlano` foi escrita justamente para NÃO
- * fazer a ida e volta `mensal → % a.a. → mensal`, que devolve
- * `0,009863600000000083` no lugar de `0,0098636` e faria abrir-e-aplicar um
- * estudo legado ser lido como edição — achatando o plano inteiro na taxa do
- * primeiro componente e matando o no-op da #431 por arredondamento. Hoje os
- * dois lados são o mesmo número; 1e-12 garante que continue verdade se alguém
- * reintroduzir uma conversão no caminho. É folgado contra o float e apertado
- * contra usuário: 0,0001 ponto percentual ao ano já move a mensal em ~8e-9.
- */
-const EPS_TAXA_MENSAL = 1e-12;
-function taxaFoiEditada(form: FormularioPagamento, persistidos: ComponentePagamento[]): boolean {
-  // Revisao da #428, B1 — porta 1: a AUSENCIA da chave e o sinal de "nao
-  // tocou". `_setJurosTabela` e o unico caminho que a escreve, e
-  // `formularioPagamento` so a propaga quando ela ja estava no persistido —
-  // entao chave ausente significa, com certeza, que o campo nao foi mexido
-  // nesta sessao de modal. E ela que mantem de pe o no-op byte-identico da
-  // #431 num plano de taxas heterogeneas.
-  if (form.juros_tabela_aa === undefined || form.juros_tabela_aa === null) return false;
-
-  // Porta 2: com a chave presente, "editado" e o plano AINDA NAO ESTAR todo na
-  // taxa do campo. A versao anterior comparava so com a PRIMEIRA taxa
-  // persistida, e por isso ficava inerte no caso que mais importa: num plano
-  // heterogeneo (residencial 12,5% x nao residencial 13% da EVI) quem digitava
-  // 12,5 justamente para UNIFORMIZAR o plano batia com o primeiro componente,
-  // era lido como "nao editou", caia no no-op — e gravava
-  // `juros_tabela_aa: 12.5` sobre componentes que seguiam em 13%. A chave
-  // passava a contradizer o dado, e digitar 12,5 de novo nunca consertava.
-  const doForm = taxaMensalDoPlano(form);
-  return persistidos.some((c: any) => {
-    if (!c || !('taxaMensal' in c)) return false;   // `imediato` nao tem taxa, e nao deve ter
-    const t = Number(c.taxaMensal);
-    // Taxa persistida ilegivel conta como divergencia: e melhor reescrever com
-    // o que o usuario digitou do que preservar lixo em silencio.
-    return !Number.isFinite(t) || Math.abs(t - doForm) > EPS_TAXA_MENSAL;
-  });
-}
+// #585 — `taxaFoiEditada` FOI REMOVIDA junto com o campo do modal. Ela
+// respondia "o usuário mexeu no campo de juros de tabela?", e o campo não
+// existe mais: a taxa é do estudo, entra por `componentesDoLegado` e vale para
+// toda linha. Com ela sai também a constante `EPS_TAXA_MENSAL`, que existia só
+// para essa comparação.
 
 /** Assinatura de um componente restrita ao que o espelho legado enxerga. */
 function projecaoDoEspelho(c: any): string {
@@ -317,39 +267,43 @@ function semelhancaDeEspelho(a: any, b: any): number {
 export function componentesParaSalvar(
   form: FormularioPagamento,
   cronograma: EventoCrono[],
+  // #585: OBRIGATÓRIO — a taxa de tabela do estudo. Omitir vira TS2554.
+  jurosTabelaAaEstudo: number,
 ): ComponentePagamento[] {
-  const regenerados = componentesDoLegado(form, cronograma);
+  const regenerados = componentesDoLegado(form, cronograma, jurosTabelaAaEstudo);
   const persistidos = Array.isArray(form.componentes) && form.componentes.length > 0
     ? form.componentes
     : null;
   if (!persistidos) return regenerados;                                   // caso 1
 
   const copia = (c: any): ComponentePagamento => ({ ...c }) as ComponentePagamento;
-  const taxaEditada = taxaFoiEditada(form, persistidos);
+  // #585: a taxa do ESTUDO é aplicada em toda saída, inclusive nos caminhos
+  // que preservam o persistido verbatim. Sem isto, o array gravado ficaria
+  // com a taxa antiga enquanto o motor calcula com a nova — dado
+  // contradizendo cálculo, que é pior que qualquer um dos dois.
+  const taxaMensal = taxaMensalDoEstudo(jurosTabelaAaEstudo);
+  // #585 (rodada 2): por TIPO, não por presença da chave — mesma correção que
+  // `componentesPagamento` recebeu, e pelo mesmo motivo. O backend aceita
+  // componente financiado sem `taxaMensal`; testar a chave deixava essa linha
+  // sem a taxa do estudo, no dado gravado e no cálculo.
+  const comTaxaDoEstudo = (c: any): ComponentePagamento => {
+    const saida = copia(c) as any;
+    if (TIPOS_FINANCIADOS.has(saida?.tipo)) saida.taxaMensal = taxaMensal;
+    return saida as ComponentePagamento;
+  };
 
   // Guarda: sem espelho legado nenhum, não há edição a interpretar.
   if (form.entrada.length === 0 && form.parcelas.length === 0) {
-    if (!taxaEditada) return persistidos.map(copia);
-    // #428: não há espelho de onde regenerar, mas a taxa é campo do PLANO e o
-    // usuário mexeu nela. Aplicá-la onde ela cabe é o mínimo — devolver o
-    // persistido verbatim deixaria o campo inerte justamente na linha
-    // "Tabela longa" do estudo 5, que é `entrada: []` com repasse derivado.
-    const nova = taxaMensalDoPlano(form);
-    return persistidos.map((c) => {
-      const saida = copia(c) as any;
-      if ('taxaMensal' in saida) saida.taxaMensal = nova;  // `imediato` não tem, e não deve ter
-      return saida as ComponentePagamento;
-    });
+    return persistidos.map(comTaxaDoEstudo);
   }
 
   const mesmaEstrutura = regenerados.length === persistidos.length
     && regenerados.every((r, i) => projecaoDoEspelho(r) === projecaoDoEspelho(persistidos[i]));
   // #428: `projecaoDoEspelho` NÃO inclui `taxaMensal` de propósito — ela é o
   // pareamento por identidade, e parear por taxa faria uma troca de juros
-  // desalinhar componente com componente. Quem tira a taxa do no-op é este
-  // `&& !taxaEditada`: sem ele, digitar 13% num plano cuja estrutura não mudou
-  // cairia no caso 2, devolveria o persistido verbatim e o campo seria inerte.
-  if (mesmaEstrutura && !taxaEditada) return persistidos.map(copia);      // caso 2
+  // desalinhar componente com componente.
+  // #585: o caso 2 preserva o persistido, MENOS a taxa — ver `comTaxaDoEstudo`.
+  if (mesmaEstrutura) return persistidos.map(comTaxaDoEstudo);            // caso 2
 
   // caso 3 — regenera e transplanta por identidade
   const doadores = persistidos.map((c) => ({ c: c as any, usado: false }));
@@ -377,7 +331,7 @@ export function componentesParaSalvar(
     const doador = parDe[i];
     if (!doador) return r;
     const saida: any = { ...r };
-    for (const campo of camposSoCanonicos(doador, taxaEditada)) {
+    for (const campo of camposSoCanonicos(doador)) {
       if (doador[campo] !== undefined) saida[campo] = doador[campo];
     }
     return saida as ComponentePagamento;
@@ -403,18 +357,10 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
       return 'O prazo fixo deve ter ao menos uma parcela mensal.';
     }
   }
-  // Revisao da #428, B2 — a taxa alimenta TODO componente financiado do plano,
-  // e ate aqui nada a validava: `viab-num` aceita o sinal de menos
-  // (`parseNumeroBR` preserva `-`), e `-150` produzia `NaN` que virava `null`
-  // no JSON, apagando a taxa persistida. Bloquear no formulario e o que
-  // desabilita o "Aplicar"; o motor tem a sua propria defesa em
-  // `taxaMensalDeAnual`.
-  if (form.juros_tabela_aa !== undefined && form.juros_tabela_aa !== null) {
-    const aa = Number(form.juros_tabela_aa);
-    if (!Number.isFinite(aa) || aa < 0) {
-      return 'Os juros de tabela devem ser um percentual ao ano maior ou igual a zero.';
-    }
-  }
+  // #585: a validacao da taxa saiu daqui junto com o campo — ela e do ESTUDO
+  // agora, e quem a valida e a aba Financeiro. A defesa de dominio do motor
+  // (`taxaMensalDeAnual`, que devolve 0 para aa <= -100 em vez de NaN)
+  // continua onde estava, e e ela que impede o NaN de virar `null` no JSON.
   const somaInformada = [...form.entrada, ...form.parcelas].reduce((s, item) => s + n(item.pct), 0);
   if (somaInformada > 100.01) {
     return `Entrada e parcelamento somam ${somaInformada.toFixed(2)}%; o total não pode superar 100%.`;
@@ -423,7 +369,7 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
   // Enquanto `fluxoPagamentoParaSalvar` regenerava tudo pelo espelho, chamar
   // `componentesDoLegado` aqui era coincidentemente certo; depois do conserto,
   // deixá-lo faria o modal aprovar um array e persistir outro.
-  const componentes = componentesParaSalvar(form, cronograma);
+  const componentes = componentesParaSalvar(form, cronograma, 0);
   const somaComponentes = componentes.reduce((s, c) => s + n(c.participacaoPct), 0);
   if (Math.abs(somaComponentes - 100) > 0.01) {
     return `A soma dos componentes deve ser 100% (atual: ${somaComponentes.toFixed(2)}%).`;
@@ -442,15 +388,24 @@ export function erroFormularioPagamento(form: FormularioPagamento, cronograma: E
 export function fluxoPagamentoParaSalvar(
   form: FormularioPagamento,
   cronograma: EventoCrono[],
+  // #585: OBRIGATÓRIO — a taxa de tabela do estudo. Omitir vira TS2554.
+  jurosTabelaAaEstudo: number,
 ): Omit<FormularioPagamento, 'componentes'> & { componentes: ComponentePagamento[]; aplicado: true } {
+  // #585: `juros_tabela_aa` saiu de `FormularioPagamento`, então este spread
+  // já não a reproduz; o `delete` abaixo é para o dado LEGADO, que continua
+  // nos JSONs gravados antes desta versão e é inerte desde ela. A primeira
+  // escrita de cada linha o remove — nenhuma migração precisa varrer os JSONs
+  // para isso.
+  const semChaveLegada: any = { ...form };
+  delete semChaveLegada.juros_tabela_aa;
   return {
-    ...form,
+    ...semChaveLegada,
     entrada: form.entrada.map((e) => ({ ...e })),
     parcelas: form.parcelas.map((p) => ({ ...p, periodicidade: p.periodicidade || 'mensal' })),
     repasse: { ...form.repasse },
     // #431: `componentesParaSalvar`, não `componentesDoLegado` — é esta linha
     // que faz "Aplicar" parar de apagar os juros de tabela.
-    componentes: componentesParaSalvar(form, cronograma),
+    componentes: componentesParaSalvar(form, cronograma, jurosTabelaAaEstudo),
     aplicado: true,
   };
 }
@@ -486,42 +441,13 @@ export interface JurosDeTabela {
  * duas taxas que só divergem além da casa exibida aparecem como uma linha só,
  * que é o que a tela pode honestamente distinguir.
  */
-/**
- * #428 (revisao, B3) — as taxas de tabela DISTINTAS do plano, **contando o
- * zero**, entre os componentes que tem `taxaMensal` (os financiados).
- *
- * Irma de `jurosDeTabelaConfigurados` e deliberadamente diferente dela numa
- * coisa so: aquela existe para o bloco somente-leitura da #436 — "revelar
- * juros que EXISTEM" — e por isso descarta taxa zero, o que esta certo la.
- * Como gatilho do aviso do campo unico, esse mesmo filtro erra, e erra no caso
- * de maior dinheiro: a linha "Tabela longa" do estudo 5 tem 12,5% no
- * `ate_marco` (30% do plano) e **0% no Repasse** (70%). Com o zero descartado
- * o aviso nao aparecia, e quem mexesse a taxa de 12,5 para 13 ligava juros em
- * 70% do plano que estavam desligados — sem ver nada. O saldo a repassar
- * capitalizado e o maior item de juros da EVI.
- *
- * O agrupamento usa a mesma chave de 1 casa de `jurosDeTabelaConfigurados`:
- * duas taxas que so divergem alem da casa exibida nao sao "diferentes" para
- * quem le a tela, e prometer o contrario seria aviso que nao se pode honrar.
- */
-export function taxasDistintasDoPlano(fluxoPagamento: any): JurosDeTabela[] {
-  const comps = Array.isArray(fluxoPagamento?.componentes) ? fluxoPagamento.componentes : [];
-  const porTaxa = new Map<number, JurosDeTabela>();
-  for (const c of comps) {
-    // Componente sem `taxaMensal` (`imediato`) nao entra: ele nao tem taxa a
-    // divergir, e conta-lo faria todo plano com pagamento no ato parecer
-    // heterogeneo.
-    if (!c || !('taxaMensal' in c)) continue;
-    const mensal = Number(c.taxaMensal);
-    const anualPct = Number.isFinite(mensal) && mensal !== 0 ? (Math.pow(1 + mensal, 12) - 1) * 100 : 0;
-    const chave = Math.round(anualPct * 10) / 10;
-    const rotulo = typeof c?.rotulo === 'string' && c.rotulo.trim() !== '' ? c.rotulo : String(c?.tipo ?? 'componente');
-    const ja = porTaxa.get(chave);
-    if (ja) ja.rotulos.push(rotulo);
-    else porTaxa.set(chave, { anualPct, rotulos: [rotulo] });
-  }
-  return [...porTaxa.values()];
-}
+// #585: `taxasDistintasDoPlano` FOI REMOVIDA. Ela respondia "este plano tem
+// mais de uma taxa gravada?", e existia para UM consumidor: o aviso do modal de
+// Fluxo de pagamento, que saiu junto com o campo de juros. Com uma taxa por
+// ESTUDO não há plano heterogêneo a anunciar — a pergunta deixou de existir.
+//
+// A irmã `jurosDeTabelaConfigurados` (#436) fica: ela é anterior a este eixo e
+// sua remoção não é escopo desta issue.
 
 export function jurosDeTabelaConfigurados(fluxoPagamento: any): JurosDeTabela[] {
   const comps = Array.isArray(fluxoPagamento?.componentes) ? fluxoPagamento.componentes : [];

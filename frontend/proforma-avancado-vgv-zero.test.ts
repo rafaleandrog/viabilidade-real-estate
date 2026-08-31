@@ -51,6 +51,7 @@ const receita = (nome: string, id: number, area: number, preco: number, qtd: num
 
 const base = (custos: any[]): Omit<FluxoConfig, 'linhasReceita'> => ({
   dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+  jurosTabelaAaEstudo: 0,
   linhasCusto: custos, areaTerreno: 5_000,
 });
 

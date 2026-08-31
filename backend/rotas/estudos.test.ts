@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   gateTransicao, montarCopiaEstudo, montarPatchEstudo, agruparProdutosPorEstudo,
+  percentualEstrito,
   montarCopiasFilhas, FILHAS_SIMPLES,
 } from './estudos.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
@@ -431,4 +432,91 @@ test('#609 duplicarDadosAvancado copia as operações de funding, com os dois re
     'permuta_tipologia_id voltou a viajar cru — a linha de permuta física da cópia apontaria ' +
     'para uma tipologia do estudo ORIGINAL.',
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #585 — o domínio de `juros_tabela_aa_padrao` no PATCH
+// ─────────────────────────────────────────────────────────────────────────
+//
+// A coluna deixou de ser default de linhas novas e passou a governar o cálculo
+// de TODAS as linhas de receita. A tela barra em `erroJurosTabelaEstudo`, mas
+// tela é feedback, não fronteira — `PATCH /estudos/:id` é chamável direto.
+//
+// ⚠️ Este arquivo NÃO roda no ambiente Claude Code (o `express` não instala pelo
+// 401 do SDK). A execução é do autor, no ambiente autenticado.
+
+test('#585 PATCH recusa juros_tabela_aa_padrao negativo', () => {
+  const r = montarPatchEstudo({ juros_tabela_aa_padrao: -5 }, AVANCADO);
+  assert.ok('codigo' in r, 'taxa negativa passou pelo PATCH');
+  assert.equal((r as any).codigo, 'TAXA_INVALIDA');
+  assert.equal((r as any).http, 400);
+  // A faixa que o motor NÃO defende: ele só clampa `aa <= -100`.
+  assert.ok('codigo' in montarPatchEstudo({ juros_tabela_aa_padrao: -0.01 }, AVANCADO));
+  assert.ok('codigo' in montarPatchEstudo({ juros_tabela_aa_padrao: 'abc' }, AVANCADO));
+});
+
+test('#585 PATCH aceita 0, valor positivo e limpeza da taxa', () => {
+  // `0` é "venda sem juros", escolha explícita — nunca pode virar erro.
+  assert.ok('dados' in montarPatchEstudo({ juros_tabela_aa_padrao: 0 }, AVANCADO));
+  assert.ok('dados' in montarPatchEstudo({ juros_tabela_aa_padrao: 12.5 }, AVANCADO));
+  // `null` é "não configurado" e continua sendo gravável — é como o usuário
+  // esvazia o campo.
+  assert.ok('dados' in montarPatchEstudo({ juros_tabela_aa_padrao: null }, AVANCADO));
+});
+
+// A MESMA tabela de `frontend/tela-financeiro.test.ts`. Ela existe porque
+// `estudos.juros_tabela_aa_padrao` é validada em três runtimes que não podem
+// compartilhar código — tela, PATCH e a migração `037` —, e três regras para um
+// campo é exatamente como a classe de defeito da #585 começa.
+//
+// Medido antes do conserto: a migração rejeitava `'0x10'`, `'1e3'`, `'  '`,
+// `true` e `[]`, e o PATCH os aceitava como 16, 1000, 0, 1 e 0.
+//
+// ⚠️ Este arquivo NÃO roda no ambiente Claude Code (o `express` não instala
+// pelo 401 do SDK). A execução é do autor.
+const ENTRADAS_DA_COLUNA: Array<[unknown, boolean, string]> = [
+  [12.5,     true,  'número decimal, o caso normal'],
+  [0,        true,  '0% é venda sem juros — escolha explícita'],
+  ['12.5',   true,  'string decimal é aceitável: vem do JSON/PATCH'],
+  [-5,       false, 'negativo inverte o fluxo de caixa do estudo'],
+  [-0.01,    false, 'a faixa que o motor NÃO defende'],
+  ['0x10',   false, "Number('0x10') é 16"],
+  ['1e3',    false, "Number('1e3') é 1000"],
+  ['  ',     false, "Number('  ') é 0"],
+  ['12,5',   false, 'vírgula: é dado persistido, não digitação'],
+  ['abc',    false, 'lixo'],
+  [true,     false, 'Number(true) é 1'],
+  [[],       false, 'Number([]) é 0'],
+  [[12.5],   false, 'Number([12.5]) é 12.5 — array não é número'],
+  [{},       false, 'objeto'],
+  ['+12.5', true,  'sinal positivo: decimal inequívoco que o leitor antigo lia'],
+  ['.5',    true,  'ponto inicial: idem'],
+  ['12.',   true,  'ponto final: idem'],
+  [999.99, true, 'o teto exato da coluna `decimal(5,2)` — dentro do domínio'],
+  [1000, false, 'acima do teto: `decimal(5,2)` estoura no INSERT, não na tela (rodada 6)'],
+  ['1000.00', false, 'idem, em string — a sintaxe é válida, o domínio não'],
+  [Infinity, false, 'não finito'],
+  [NaN,      false, 'não finito'],
+];
+
+test('#585 o PATCH usa a MESMA tabela de entradas que a tela', () => {
+  for (const [valor, aceita, motivo] of ENTRADAS_DA_COLUNA) {
+    const r = montarPatchEstudo({ juros_tabela_aa_padrao: valor }, AVANCADO);
+    const passou = 'dados' in r;
+    assert.equal(passou, aceita,
+      `${JSON.stringify(valor)} deveria ser ${aceita ? 'aceito' : 'recusado'} pelo PATCH — ${motivo}`);
+    if (!passou) assert.equal((r as any).codigo, 'TAXA_INVALIDA');
+  }
+});
+
+test('#585 percentualEstrito não é Number(): rejeita hex, científica e espaço', () => {
+  // O predicado sozinho, para o erro apontar a função e não a rota.
+  assert.equal(percentualEstrito('0x10'), null);
+  assert.equal(percentualEstrito('1e3'), null);
+  assert.equal(percentualEstrito('  '), null);
+  assert.equal(percentualEstrito(true), null);
+  assert.equal(percentualEstrito([] as unknown), null);
+  assert.equal(percentualEstrito(12.5), 12.5);
+  assert.equal(percentualEstrito('12.5'), 12.5);
+  assert.equal(percentualEstrito(' -3 '), -3, 'o sinal é lido; quem recusa negativo é o chamador');
 });

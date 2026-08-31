@@ -4,6 +4,240 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Juros de tabela viram valor GLOBAL do estudo — #585 (2026-08-31)
+
+Decisão do autor de 2026-08-26: *"campo juros de tabela funciona para todos os imóveis igualmente e
+o valor não é inserido aqui. será na aba financeiro"*. A taxa deixou de ser do **Grupo** (uma por
+linha de receita, D-Q02 da #428) e passou a ser do **estudo** — uma só, digitada em Viabilidade →
+Financeiro, valendo para todas as linhas, **as já gravadas inclusive**.
+
+**O ponto onde a taxa entra é UM, e é o que faz a issue valer para estudo existente.**
+`componentesPagamento` aplica a taxa do estudo sobre todo componente que declara `taxaMensal` —
+inclusive quando o array vem PERSISTIDO da linha. Sem esse override, editar o campo não mudaria
+nada em nenhuma linha já editada desde a #248: aquele ramo devolvia o persistido verbatim.
+`imediato` não tem `taxaMensal` e continua sem ter.
+
+**A defesa de fiação é o parâmetro obrigatório** (o padrão que a #444 fixou e a #491 provou
+necessário): `jurosTabelaAaEstudo` é campo **obrigatório** de `FluxoConfig` e 3º/4º argumento
+obrigatório de `componentesPagamento`, `componentesDoLegado`, `recebimentoBrutoMensal`,
+`impostoMensal`, `recebimentoLiquidoMensal`, `receitaMensalLinha`, `descontoComercialMensal`,
+`vendaLiquidaContratadaMensal`, `ultimoMesRecebivelLinha`, `validarSafrasReceita`,
+`componentesParaSalvar` e `fluxoPagamentoParaSalvar`. **Medido, com o controle antes:** apagar
+`jurosTabelaAaEstudo` do `FluxoConfig` do Painel vira `TS2741`; apagar o override em
+`componentesPagamento` derruba 4 testes.
+
+**O que SAIU:**
+
+| Peça | Por quê |
+|---|---|
+| a seção "Juros de tabela" do modal de Fluxo de pagamento | a entrada é a aba Financeiro agora |
+| `_setJurosTabela` | não há campo a gravar |
+| o aviso "este plano tem N taxas diferentes gravadas" | com uma taxa por estudo não há o que avisar |
+| `.aviso-juros` (CSS) e o `p.aviso-juros` do caso de render | órfãos do aviso |
+| `taxasDistintasDoPlano` | existia só para esse aviso |
+| `jurosTabelaAnualPct` / `taxaMensalDoPlano` | eram as duas leituras POR LINHA; viraram `taxaMensalDoEstudo` |
+| `juros_tabela_aa` de `FormularioPagamento` | tirar só a leitura não bastaria — o spread de `fluxoPagamentoParaSalvar` a reproduziria (a lição do `ret` na #452) |
+| `taxaFoiEditada` e `EPS_TAXA_MENSAL` | respondiam "o usuário mexeu no campo?"; o campo não existe |
+| `fluxoPagamentoComDefaultJuros` (backend) | semeava na linha um dado que ninguém lê mais |
+
+**Migração `037`, `versao` `0.1.35` → `0.1.36`.** Backfill **T1** — a taxa mais frequente entre as
+linhas do estudo, desempate pela linha de menor `ordem`. **T2** (a da linha de maior VGV) não é
+implementável numa migração sem reimplementar `vgvVendavelLinha`; **T3** (deixar em branco e
+exigir decisão) deixaria o estudo em 0% de juros até alguém abrir a tela, que é a mudança de número
+mais violenta das três. Só toca estudo com a coluna nula — quem já digitou nunca é sobrescrito.
+
+**O custo, declarado e aceito:** a EVI Urbitá pratica taxas diferentes para Residencial × Não
+Residencial, e **esse cenário deixou de ser representável**. E num estudo com taxas divergentes por
+linha, as minoritárias mudam de taxa sem ninguém confirmar — é a objeção que a própria issue levanta
+contra T1, e ela procede.
+
+**Duas reescritas de teste que o diff registra, e são consequência, não conserto de conveniência:**
+
+- as asserções de identidade da #431 usavam `taxaMensal` como **marcador** de qual componente é
+  qual. Ela é uniforme agora e não discrimina mais — o marcador passou a ser `rotulo`/`prazoMeses`,
+  que continuam só-canônicos. O que os testes provam é o mesmo: o pareamento é por identidade, não
+  por posição;
+- a baseline `D` de `kpis-baseline.ts` **move os quatro KPIs**, e a causa é uma só: o `Repasse` —
+  50% do plano — carregava `taxaMensal: 0` e passa a carregar a taxa do estudo.
+  `resultado 3.791.222,83 → 5.106.030,69`. Não é regressão: é o pedido.
+
+**O no-op da #431 perde UMA garantia, e só uma.** A `taxaMensal` persistida passa a ser recalculada
+da taxa anual em toda escrita, então uma linha legada com a mensal arredondada (`0.0098636`, o
+estudo 5) é reescrita como `0.00986358055321146` na primeira gravação — 8e-9 ao mês. Tudo o mais
+continua byte-idêntico.
+
+### O que a rodada 1 de revisão achou — seis bloqueantes, todos meus
+
+Vale registrar porque **nenhum estava no cálculo**, e dois vieram do motor externo:
+
+1. **Taxa negativa deixou de ser barrada.** Eu apaguei a validação de `erroFormularioPagamento`
+   junto com o campo do modal e não a restabeleci. Provado por execução:
+   `parseNumeroBR('-5') = -5` → `taxaMensalDeAnual(-5) = -0,004265…` → juros **negativos** em todo
+   componente financiado. Conserto: `erroJurosTabelaEstudo`, chamada por `_salvar`.
+2. **A votação T1 descartava 0% explícito** (achado P1 do Codex). Num estudo com três linhas em 0%
+   e uma em 12,5%, o backfill elegia 12,5% e ligava juros na **maioria** das linhas — o oposto do
+   que "a taxa mais frequente" promete. Só `null` é ausência; `0` é resposta.
+3. **`_salvar` não propagava o valor** (achado P1 do Codex). PATCH + notificação, sem atualizar
+   `this.estudo` nem emitir evento — salvar a taxa e navegar sem recarregar calculava com o valor
+   antigo. É a classe de defeito nº 1 na forma mais escorregadia: **o parâmetro obrigatório prova
+   que a tela PASSA o valor, nunca que ele está FRESCO.**
+4. **`listar` com `por_pagina: 100000`** onde `003:35` manda `varrerTudo` — e aqui a varredura é de
+   `avancado_fases` sem filtro, a tabela grande. Truncamento silencioso = backfill parcial.
+5. **A guarda `aa <= -100` de `taxaMensalDeAnual` ficou sem cobertura.** A única asserção morava no
+   bloco #428 que apaguei. Medido: sem ela, remover a guarda deixava a suíte **970/970 verde**.
+6. **A migração `037` não tinha teste de lógica nenhum.** O harness media só contrato genérico, com
+   fixture sem taxas heterogêneas. É por isso que o bloqueante 2 passou: a heurística inteira era
+   código não exercitado, num arquivo que roda uma vez por instância e não tem volta.
+
+Agora o harness semeia dois estudos que exercitam a votação, e as duas mutações que importam ficam
+vermelhas: reintroduzir o descarte do 0% derruba o estudo 3; apagar o `.sort()` derruba o estudo 4.
+
+> **A lição, e ela é sobre o limite da própria defesa que este PR usa como argumento.** O parâmetro
+> obrigatório (`TS2741`/`TS2554`) é uma boa trava e pegou o que se propunha a pegar. Mas ele mede
+> **presença do argumento**, não **frescor do valor** nem **correção da heurística que o produz** —
+> e os três bloqueantes mais caros desta rodada moravam exatamente nesses dois pontos cegos. Trava
+> de tipo não substitui teste de comportamento no caminho que o PR está mudando.
+
+### E a rodada 2 achou mais seis — cinco deles CRIADOS pelo conserto da rodada 1
+
+Não é giro em falso: são defeitos distintos, e a maioria é a **mesma classe** que a rodada 1
+consertou — defesa escrita e não exercitada. Três vieram do motor externo.
+
+1. **O conserto do 0% criou uma lavanderia de dado sujo.** Com `0` virando voto legítimo e
+   definitivo, o clamp `Math.max(bruto, 0)` — que eu tinha posto sem comentário — passou a
+   converter taxa negativa de dado legado em **"0% intencional" permanente**, imune a reexecução e
+   indistinguível de escolha do autor. Medido: linha com `-5` gravava `0`. Agora **taxa negativa
+   não vota**, e a coluna fica nula, que é o estado visível.
+2. **A chave de votação estava em 1 casa e a coluna é `decimal(5,2)`** (revisor externo). 12,51% e
+   12,54% caíam no mesmo grupo, e o gravado era a **primeira vista**, não a mais frequente.
+3. **O override testava presença de chave, não tipo** (revisor externo). `validarFluxoPagamento`
+   aceita `prazo_fixo` sem `taxaMensal`; nessa linha a taxa do estudo nunca era aplicada — a tela
+   diria 12,5% e as parcelas não renderiam nada.
+4. **O filtro `tipo === 'receita'` não era exercitado.** A fase de cronograma da fixture não tinha
+   `fluxo_pagamento`, então quem a excluía era a ausência de dado — e meu comentário afirmava que
+   era o filtro. Removê-lo deixava os testes verdes.
+5. **O teto `decimal(5,2)` nunca era exercitado** — nenhum valor da fixture chegava perto.
+6. **A linha somente-leitura que eu acrescentei ao modal não tinha cobertura**: apagá-la deixava os
+   dois casos de render verdes.
+
+Um achado do revisor foi **retirado por contestação com evidência**: ele afirmava que
+`tela-avancado` monta as subabas de Viabilidade simultaneamente, e é um `switch` que devolve um
+template só — `viab-funding` é destruído e recriado a cada troca de aba.
+
+E apareceu um **defeito latente, alheio a esta issue e agora travado por teste**: componente
+financiado sem `sinalPct` — shape que o backend aceita — faz `receitaBruta` virar **NaN**, com ou
+sem juros. Fica registrado com reprodução pronta, para issue própria.
+
+> **A lição desta rodada é sobre a fixture, não sobre o código.** Dar teste à migração foi o
+> conserto certo do bloqueante 6; mas a fixture nasceu passando sem exercitar **três** das defesas
+> que deveria travar, e o comentário dela dizia o contrário. Teste que passa não prova que mede —
+> só a mutação prova. Hoje cada uma das sete defesas do backfill tem a sua, e cada mutação é pega
+> pelo caso certo.
+
+### A rodada 3 achou quatro, e o mais instrutivo é sobre a fixture da rodada 2
+
+1. **O desempate por `ordem` ficou sem cobertura, e o comentário afirmava o contrário.** Ao
+   acrescentar duas linhas de 12,54% ao estudo 4 — para cobrir a precisão da chave, conserto da
+   rodada 2 — eu apaguei o único empate de frequência que a fixture tinha. As três mutações de
+   desempate (remover o `.sort()`, remover a cláusula `primeira`, trocar `>` por `>=`) passaram a
+   ficar **todas verdes**, enquanto o comentário do código dizia, literalmente, que *"apagar o
+   `.sort()` muda"*. Frase verdadeira quando escrita e falsa **no mesmo commit**.
+2. **O ramo DERIVADO da guarda de taxa negativa estava descoberto** — só a chave explícita tinha
+   caso. Removê-lo deixava tudo verde.
+3. **A negação `tipo !== 'imediato'` mudava comportamento em silêncio** — no MOTOR
+   (`frontend/fluxo-caixa-motor.ts`) e no EDITOR (`frontend/fluxo-pagamento-editor.ts`), não na
+   migração. Componente com `tipo` ausente, `null` ou desconhecido — dado que a validação barra
+   hoje, mas que pode estar persistido de antes dela — **não** recebia taxa sob a regra da presença
+   de chave e passou a receber. Virou `TIPOS_FINANCIADOS`, allowlist explícita, exportada do motor
+   e usada nos dois.
+   > ⚠️ Este item nomeava arquivo nenhum, e os outros três da lista são sobre a migração — uma
+   > lente da rodada 4 leu-o como sendo dela, foi procurar `TIPOS_FINANCIADOS` no `037`, não achou
+   > e reportou a afirmação como **falsa**. Ela é verdadeira; a prosa é que induzia ao erro. Fica
+   > como lembrete de que ambiguidade em lista numerada custa o mesmo que afirmação errada — quem
+   > lê gasta o mesmo tempo, e pode concluir o oposto.
+4. **`return` dentro de `for...of`.** Ao trocar `forEach` por `for...of` para tirar a cláusula
+   redundante, o `return` que pulava a iteração passou a **abortar a migração inteira** no primeiro
+   estudo sem taxa. O harness pegou na hora — 5 dos 9 casos vermelhos de uma vez.
+
+**A cláusula de desempate foi REMOVIDA em vez de coberta.** Ela era redundante com o `.sort()` e
+**intestável por construção**: nenhuma fixture consegue derrubá-la. Defesa que não pode ficar
+vermelha não é defesa — é decoração que dá a impressão de cobertura. O que protege o desempate hoje
+é o caso do estudo 9, que derruba a remoção do `.sort()`.
+
+### A rodada 4 — duas portas de lavagem que a guarda da rodada 3 não fechava
+
+O revisor externo achou as duas, e as duas são a **mesma guarda medida no ponto errado**:
+
+1. **`taxaMensal <= -2` escapava porque o expoente é PAR.** Eu conferia o sinal no valor
+   **derivado**: `(1 + m)^12` com `m = -2` devolve `1`, logo `aa = 0` — a sujeira mais grosseira
+   virava voto de "0% intencional". Com `m = -3` devolve `4096`, ou seja `409.500%`, que o teto
+   limitava a `999,99` e gravava como taxa válida. O sinal passou a ser conferido em `m`, **antes**
+   da potência.
+2. **`juros_tabela_aa: ''` virava voto de 0%**, porque `Number('')` é `0`. Shape que a validação
+   antiga da API deixava passar dentro do `fluxo_pagamento`.
+
+### A rodada 4 achou a MESMA classe pela terceira vez — e desta vez no caso que eu escrevi para provar
+
+O caso 5 do harness — *"a `037` não sobrescreve escolha do autor"* — **passava por ausência de
+dado**. O estudo 5 do SEED não tinha nenhuma linha de receita votável, então quem o protegia era
+`porTaxa.size === 0`, não o filtro `alvos`. Medido: **remover o filtro inteiro deixava os 11 casos
+verdes**. Com uma linha de 20% acrescentada, remover o filtro grava 20 por cima do 9,75 do autor.
+
+E duas entradas ainda viravam voto sem ser percentual: `Number('0x10')` é `16` e `Number('1e3')` é
+`1000`. A guarda de string vazia não bastava — `Number()` aceita hexadecimal e notação científica
+como "string numérica". Agora o padrão exige um decimal.
+
+> **A lição das quatro rodadas, e é uma só:** cada conserto meu criou o defeito seguinte na **mesma
+> classe** — defesa escrita e não exercitada. Rodada 1: três defesas sem teste. Rodada 2: a fixture
+> que eu criei para consertar isso nasceu sem exercitar três das suas próprias defesas. Rodada 3: o
+> conserto da fixture matou a cobertura de uma quarta, e o comentário envelheceu no mesmo commit
+> que o escreveu. **A única coisa que quebrou o ciclo foi rodar a mutação de cada defesa, uma por
+> uma, e exigir que cada uma caísse no caso certo** — não "a suíte passa", não "eu declarei o que
+> não medi".
+>
+> A rodada 4 acrescenta a variação mais desconfortável dela: **a guarda existia, era a certa, e
+> estava no ponto errado.** Conferir o sinal depois da potência de expoente par é uma verificação
+> que roda, passa, e não verifica — indistinguível de uma boa, exatamente como o `CLAUDE.md`
+> descreve em "medir o ponto certo".
+
+### A rodada 5 achou o caso que estava FORA do alcance da correção — e a resposta não foi consertar
+
+O revisor externo apontou que uma linha cujo `fluxo_pagamento` não tem `componentes` **não recebe a
+taxa do estudo**: o guard de shape em `recebiveisComponentesLinha` devolve `null` e o cálculo cai no
+motor legado, que soma entrada/parcelas/repasse sem juros. Todo Grupo recém-criado nasce assim.
+
+**Procede — e mesmo assim o conserto certo não era trocar de motor.** Três medições decidiram:
+
+1. `git show origin/main:frontend/fluxo-caixa-motor.ts` traz a **mesma** guarda (`fd7a9de`). Não é
+   regressão deste PR; o que o PR fez foi acrescentar uma frase de tela que a tornou VISÍVEL.
+2. Os dois motores **não são equivalentes nem a 0%** — o teste `#458` já mede a divergência de
+   *timing*. Rodei a mutação que rotearia o legado pelo adaptador: **7 vermelhos**, entre eles
+   `#283 estudo legado sem componentes mantém exatamente o caminho vigente`. Há asserção **explícita**
+   no repositório de que esse caminho não muda.
+3. O **critério 3** da própria #585 pede que a precedência da chave legada seja **declarada**, não
+   alterada.
+
+Então o caso ficou declarado em quatro peças que se sustentam: o aviso `p.plano-legado` no modal (com
+caso de render próprio), a badge "Plano não migrado" da #458 passando a dizer também que os juros não
+valem ali, um teste que **fixa** a precedência (linha legada: mesma série a 0% e a 12,5%, com
+contraprova na canônica) e a issue **#657**, que leva a decisão de desenho ao autor com o custo dos
+dois caminhos nomeado.
+
+> **A lição, e ela é nova em relação às quatro rodadas anteriores:** *achado que procede não implica
+> conserto dentro do mesmo PR.* As rodadas 1–4 ensinaram a medir o ponto certo; esta ensinou a medir
+> **o escopo**. A pergunta que faltava não era "o achado é real?" — era "consertá-lo aqui muda um
+> número que ninguém pediu?". A mutação respondeu: sim, sete testes, um deles escrito exatamente para
+> proibir essa mudança. Sem rodá-la, eu teria "consertado" o achado e quebrado um contrato do repo
+> com o corpo do PR afirmando que estava tudo verde.
+
+⚠️ **Pendente do autor, no ambiente autenticado:** `validar-backend.sh` **não roda nesta sessão**
+(aborta na etapa 1/5, portão do SDK, pelo 401). O typecheck do backend, a sincronização do
+`schema.json` e a execução real da `037` em Postgres são dele. O harness de migrações
+(`scripts/migracoes-harness.mjs`) rodou verde — contrato, banco vazio, reexecução e cadeia
+`001 → 037` —, mas harness não é Postgres. **"Não deu para rodar" nunca é "passou".**
+
+---
+
 ## Sai o KPI "Resultado após custo financeiro" de Cenários — #596 (2026-08-30)
 
 Decisão do autor: **"deve sair"**. Era o critério de aceite 5 da #596, e o único que o

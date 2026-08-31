@@ -37,6 +37,7 @@ const CRONO = [
 /** Incorporação: torre com tipologias e RET ativo. */
 const INCORPORACAO: FluxoConfig = {
   dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+  jurosTabelaAaEstudo: 0,
   ret: { ativo: true, pct: 4 },
   linhasReceita: [{
     id: 1, nome: 'Torre A', fase_label: 'lancamento',
@@ -60,6 +61,7 @@ const INCORPORACAO: FluxoConfig = {
 /** Loteamento: lotes e infraestrutura — critério 10 (paridade entre padrões). */
 const LOTEAMENTO: FluxoConfig = {
   dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+  jurosTabelaAaEstudo: 0,
   ret: { ativo: true, pct: 4 },
   linhasReceita: [{
     id: 1, nome: 'Quadra A', fase_label: 'Lotes',

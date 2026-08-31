@@ -302,6 +302,10 @@ export class ViabFluxoVer extends LitElement {
       ret: d.ret,
       // #473: default true preserva o comportamento histórico (VGV bruto).
       corretagemSobrePermutaFisica: this.estudo?.corretagem_sobre_permuta_fisica !== false,
+      // #585: a taxa de tabela e GLOBAL do estudo — a unica entrada e a aba
+      // Viabilidade → Financeiro (`estudos.juros_tabela_aa_padrao`). Campo
+      // OBRIGATORIO de `FluxoConfig`: parar de passa-lo vira TS2741, nao silencio.
+      jurosTabelaAaEstudo: Number(this.estudo?.juros_tabela_aa_padrao) || 0,
       // #446: o horizonte precisa cobrir a quitação das operações, senão a
       // série é cortada e `saldoFinal` exibe um saldo truncado.
       operacoesFunding: this.operacoes,
@@ -388,7 +392,12 @@ export class ViabFluxoVer extends LitElement {
       // deixou de bloquear, agora é alerta visível na Reconciliação.
       ...validarCustosDuplicados(d.custos),
       ...validarContratacao(receitas, d.crono, this.calc.prazo, this.calc.vendaBrutaContratada, TOLERANCIA_PADRAO, d.custos),
-      ...validarSafrasReceita(receitas, d.crono, this.calc.prazo, TOLERANCIA_PADRAO, d.custos),
+      // #585: a taxa de tabela do estudo — as invariantes têm de ver os MESMOS
+      // componentes que o motor viu ao produzir `this.calc`.
+      ...validarSafrasReceita(
+        receitas, d.crono, this.calc.prazo, TOLERANCIA_PADRAO, d.custos,
+        Number(this.estudo?.juros_tabela_aa_padrao) || 0,
+      ),
       ...validarFluxoCalc(this.calc),
       // #441: reconciliação Catálogo × Premissas — só emite algo em estudo
       // `nivel_analise === 'avancado'`.

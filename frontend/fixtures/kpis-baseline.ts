@@ -52,6 +52,7 @@ const CRONO: EventoCrono[] = [
 const BASE: FluxoConfig = {
   dataInicio: 'jan/2027',
   taxaDescontoAa: 12,
+  jurosTabelaAaEstudo: 0,
   cronograma: CRONO,
   areaTerreno: 0,
   linhasReceita: [{
@@ -158,6 +159,14 @@ const OPS_C: OperacaoFunding[] = [
  */
 const CONFIG_D: FluxoConfig = {
   ...BASE,
+  // #585: a taxa de tabela é do ESTUDO agora. Os `taxaMensal: 0.0098636` dos
+  // componentes abaixo viraram dado histórico inerte — quem produz os juros
+  // desta baseline é este campo. 12,5% a.a. é a taxa que eles representavam.
+  //
+  // ⚠️ E o Repasse (50% do plano), que carregava `taxaMensal: 0`, passa a
+  // carregar a taxa do estudo. É por isso que o esperado de D se move nesta
+  // issue: não é regressão, é o pedido — uma taxa para o plano inteiro.
+  jurosTabelaAaEstudo: 12.5,
   ret: { ativo: true, pct: 4 },
   linhasReceita: [{
     ...BASE.linhasReceita[0],
@@ -347,7 +356,19 @@ export const CASOS: CasoBaseline[] = [
       + '`calcularFluxo → fundingDoEstudo → proformaAvancado` que esta fixture percorre. '
       + 'E a #429 é diagnóstico por desenho — o item 4 dela diz "nenhum número muda".',
     config: CONFIG_D, operacoes: [],
-    esperado: { resultado: 3_791_222.83, margemPct: 36.79599561118192, roiPct: 62.15119393442623, tir: 38.75601784396314, caixaFinalAlavancado: null, vplLiquidoFunding: null, fundingSaidas: null },
+    // ⚠️ ATUALIZADO PELA #585 (a taxa de tabela virou valor do ESTUDO). Movem-se
+    // os quatro, e a causa é UMA: o componente `Repasse` — 50% do plano —
+    // carregava `taxaMensal: 0` e passa a carregar a taxa do estudo, porque não
+    // há mais taxa por componente. Os juros de clientes sobem, e com eles
+    // Receita Bruta, Resultado, margem, ROI e TIR:
+    //   resultado  3_791_222.83 → 5_106_030.69
+    //   margemPct  36.796…       → 43.742…
+    //   roiPct     62.151…       → 83.705…
+    //   tir        38.756…       → 47.040…
+    // Não é regressão: é exatamente o que a issue pede, e o custo de perder a
+    // taxa por Grupo. Quem conferir isto contra a instância: o número só bate
+    // depois de a migração `037` preencher `estudos.juros_tabela_aa_padrao`.
+    esperado: { resultado: 5_106_030.69, margemPct: 43.742424434385825, roiPct: 83.70542114754099, tir: 47.04036166911845, caixaFinalAlavancado: null, vplLiquidoFunding: null, fundingSaidas: null },
   },
   {
     id: 'E',

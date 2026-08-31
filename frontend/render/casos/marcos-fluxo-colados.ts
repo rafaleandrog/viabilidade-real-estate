@@ -61,6 +61,7 @@ const CRONO_LOTEAMENTO: EventoCrono[] = [
 function calc(cronograma: EventoCrono[]): FluxoCalc {
   return calcularFluxo({
     dataInicio: DATA_INICIO, taxaDescontoAa: 12, cronograma,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: RECEITAS, linhasCusto: CUSTOS, curvas: [],
     areaTerreno: 4_800, ret: { ativo: true, pct: 4 },
   });
