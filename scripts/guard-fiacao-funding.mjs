@@ -59,6 +59,38 @@ function contarVirgulasDeTopo(chamada) {
   return virgulas;
 }
 
+/**
+ * Corpo de cada método/função de classe que contém `marcador`, recortado por
+ * balanceamento de chaves a partir do `private`/`public` que o abre. Existe
+ * para as regras que precisam perguntar "a chamada está DENTRO desta função?"
+ * em vez de "aparece em algum lugar do arquivo?" — a diferença entre um guard
+ * que dispara na mutação e um que não dispara.
+ */
+function corpoDoMetodoQueContem(src, marcador) {
+  const corpos = [];
+  let busca = 0;
+  for (;;) {
+    const i = src.indexOf(marcador, busca);
+    if (i === -1) return corpos;
+    busca = i + marcador.length;
+    // recua até o início do membro de classe que contém a ocorrência
+    const antes = src.slice(0, i);
+    const ini = Math.max(antes.lastIndexOf('\n  private '), antes.lastIndexOf('\n  public '));
+    if (ini === -1) { corpos.push(src.slice(Math.max(0, i - 400), i + 1200)); continue; }
+    // avança até a primeira chave do corpo e balanceia
+    const abre = src.indexOf('{', ini);
+    if (abre === -1) continue;
+    let nivel = 0;
+    let fim = abre;
+    for (let k = abre; k < src.length; k++) {
+      const c = src[k];
+      if (c === '{') nivel++;
+      else if (c === '}') { nivel--; if (nivel === 0) { fim = k; break; } }
+    }
+    corpos.push(src.slice(abre, fim + 1));
+  }
+}
+
 const REGRAS = [
   {
     nome: 'operacoesFunding no horizonte (#446)',
@@ -102,6 +134,37 @@ const REGRAS = [
     },
     comoConsertar: 'Passe a receita líquida como 4º argumento de TODA chamada de `validarFunding(...)`.',
     dano: 'a checagem (b) — retorno de equity acima da receita do mês — simplesmente NÃO RODA, sem avisar',
+  },
+  {
+    nome: 'Grupo de receita nasce canônico (#657)',
+    // ⚠️ Por que guard, e não teste de unidade: a função `planoDeNascimento` é
+    // pura e TEM teste próprio — o que nenhum teste de unidade alcança é a
+    // CHAMADA dela no fluxo de criação. Medido em 2026-08-31: apagar
+    // `_nascerCanonico` de `_adicionarFase` deixa a suíte inteira verde, e o
+    // Grupo volta a nascer no espelho legado, com a badge "Plano não migrado"
+    // e sem os juros do estudo. Classe de defeito nº 1 do `CLAUDE.md`.
+    //
+    // ⚠️ E por que não um caso de render: o defeito só existe DEPOIS de um
+    // POST seguido de um PATCH. O harness monta estado, não exercita rede.
+    //
+    // A regra é: quem cria linha de RECEITA converte o plano no nascimento.
+    // Criação de fase de cronograma não tem `fluxo_pagamento` e fica de fora
+    // pelo próprio predicado.
+    consumidor: (src) => src.includes('criarFaseAvancado(') && src.includes("tipo: 'receita'"),
+    ignorar: (arq) => arq.endsWith('viabilidade-api.ts') || arq.includes('/fixtures/'),
+    // ⚠️ NÃO é `exige` (presença no arquivo). Medido em 2026-08-31: com um
+    // `exige: /planoDeNascimento\(/` a mutação que APAGA a chamada deixava o
+    // guard VERDE, porque o método `_nascerCanonico` continuava definido 32 mil
+    // caracteres abaixo e a regex o encontrava. Uma defesa acrescentada e não
+    // exercitada — a mesma classe que ela existe para barrar.
+    //
+    // A conferência é dentro do MÉTODO que cria a linha: recorta o corpo pelo
+    // balanceamento de chaves e exige a conversão ali. Apagar a chamada agora
+    // reprova.
+    conferir: (src) => corpoDoMetodoQueContem(src, 'criarFaseAvancado(')
+      .some((corpo) => /_nascerCanonico\(|planoDeNascimento\(/.test(corpo)),
+    comoConsertar: 'Converta o plano da linha recém-criada com `planoDeNascimento(...)` antes de exibi-la.',
+    dano: 'o Grupo nasce no espelho legado, cai no motor sem juros e ignora a taxa de tabela do estudo — com a badge "Plano nao migrado" numa linha criada agora',
   },
   {
     nome: 'validarReconciliacaoCamadas na lista de divergências (#441)',

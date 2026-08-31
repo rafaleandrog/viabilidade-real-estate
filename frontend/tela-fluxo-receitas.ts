@@ -11,7 +11,7 @@ import {
   pctRepasseDerivado, parcelasAoLongoObra, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import {
-  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento,
+  erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento, planoDeNascimento,
 } from './fluxo-pagamento-editor.js';
 // #431: a lógica do modal de Absorção mora fora do componente, como a do modal
 // de Pagamento — método privado de LitElement não é testável neste repo.
@@ -465,7 +465,8 @@ export class ViabFluxoReceitas extends LitElement {
     try {
       const res = await criarFaseAvancado(this.estudo.id, { tipo: 'receita' });
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao criar grupo', 'erro'); return; }
-      this.fases = [...this.fases, { ...res, alocacoes: res.alocacoes || [] }];
+      const criada = { ...res, alocacoes: res.alocacoes || [] };
+      this.fases = [...this.fases, await this._nascerCanonico(criada)];
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao criar grupo', 'erro');
     }
@@ -1031,6 +1032,41 @@ export class ViabFluxoReceitas extends LitElement {
         </div>
       </urbi-modal>
     `;
+  }
+
+  /**
+   * #657: converte o plano do Grupo recém-criado para o formato canônico, na
+   * hora em que ele nasce.
+   *
+   * O backend cria a linha com o espelho legado (`fluxoPagamentoPadrao`), e
+   * uma linha legada NÃO recebe a taxa de tabela do estudo — o motor a calcula
+   * pelo ramo legado, que não tem juros. Sem esta conversão, o Grupo que o
+   * usuário acabou de criar nasce com a badge "Plano não migrado" e um cálculo
+   * que ignora a taxa da aba Financeiro. Era o caso mais visível em que a
+   * promessa da #585 era falsa — e o que fazia a palavra "legado" descrever
+   * dado NOVO.
+   *
+   * ⚠️ Isto NÃO é uma segunda implementação de nada: `planoDeNascimento`
+   * delega a `fluxoPagamentoParaSalvar`, o mesmo caminho do botão Aplicar.
+   *
+   * ⚠️ Falha de rede aqui NÃO é silenciosa nem destrutiva: a linha fica no
+   * formato antigo, e é exatamente esse o caso que a badge "Plano não migrado"
+   * (#458) existe para mostrar. Degradar para o comportamento anterior, com o
+   * aviso na tela, é melhor do que abortar a criação do Grupo — o usuário
+   * pediu um Grupo, e ele existe.
+   */
+  private async _nascerCanonico(fase: any): Promise<any> {
+    if (Array.isArray(fase?.fluxo_pagamento?.componentes)) return fase;
+    try {
+      const fluxo = planoDeNascimento(
+        fase.fluxo_pagamento, this.crono, Number(this.estudo?.juros_tabela_aa_padrao) || 0,
+      );
+      const res = await atualizarFaseAvancado(this.estudo.id, fase.id, { fluxo_pagamento: fluxo });
+      if (res?.erro) return fase;
+      return { ...fase, fluxo_pagamento: fluxo };
+    } catch {
+      return fase;
+    }
   }
 
   private _aplicarPagamento = async () => {

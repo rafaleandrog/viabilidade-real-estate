@@ -410,6 +410,53 @@ export function fluxoPagamentoParaSalvar(
   };
 }
 
+/**
+ * #657: o plano com que um Grupo NASCE — já no formato canônico.
+ *
+ * ⚠️ POR QUE ISTO EXISTE, e é a correção de um absurdo, não uma otimização.
+ *
+ * O backend cria toda linha de receita com `fluxoPagamentoPadrao()`, que é o
+ * espelho LEGADO puro — sem a chave `componentes`. Consequência: um Grupo
+ * criado agora nascia marcado "Plano não migrado" (a badge da #458), e o motor
+ * o calculava pelo ramo legado, que não tem juros. A taxa do estudo — o
+ * coração da #585 — não valia para ele até alguém abrir o modal e clicar
+ * Aplicar.
+ *
+ * Duas coisas erradas nisso, e a segunda é a que o autor apontou:
+ *
+ *  1. a promessa da #585 ("a taxa vale para todas as linhas") era falsa
+ *     exatamente onde o usuário mais a veria — na linha que ele acabou de
+ *     criar;
+ *  2. **"legado" descrevia dado NOVO.** O inventário da #458 mediu que as 6
+ *     linhas dos 2 estudos de Pinguim estão TODAS no canônico: dado legado de
+ *     verdade não existe na instância. O único jeito de ver uma linha legada
+ *     era criar um Grupo — o que torna a palavra uma mentira e a badge um
+ *     ruído.
+ *
+ * A correção é nascer canônico. Não há matemática nova aqui: esta função
+ * delega a `fluxoPagamentoParaSalvar`, o MESMO caminho que o botão Aplicar
+ * usa. Nada é duplicado, nenhum motor muda, e nenhum número de linha já
+ * existente se move.
+ *
+ * ⚠️ `aplicado` é REMOVIDO de propósito. Ele responde "o usuário configurou
+ * este plano?", e é o que acende o ponto verde ao lado de "Fluxo de Pagamento"
+ * (`_aplicado` em `frontend/tela-fluxo-receitas.ts`). Nascer canônico é
+ * decisão do app, não do usuário — deixar `aplicado: true` aqui trocaria uma
+ * mentira por outra.
+ */
+export function planoDeNascimento(
+  fluxoPagamentoDoBackend: any,
+  cronograma: EventoCrono[],
+  // #585/#657: OBRIGATÓRIO. Omitir vira TS2554, não silêncio.
+  jurosTabelaAaEstudo: number,
+): Record<string, any> {
+  const canonico: any = fluxoPagamentoParaSalvar(
+    formularioPagamento(fluxoPagamentoDoBackend), cronograma, jurosTabelaAaEstudo,
+  );
+  delete canonico.aplicado;
+  return canonico;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // #436: juros de tabela já persistidos, em LEITURA
 // ─────────────────────────────────────────────────────────────────────────
