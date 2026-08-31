@@ -94,6 +94,12 @@ const CAMPOS_BLOQUEADOS_PATCH = new Set([
  * este é o mesmo predicado, no lugar que de fato é fronteira — a tela é
  * feedback, o PATCH é o portão.
  *
+ * ⚠️ **A gramática aceita `'+12.5'`, `'.5'` e `'12.'`** — decimais inequívocos
+ * que o leitor antigo baseado em `Number` lia e que a API podia ter gravado.
+ * Fail-closed apertado demais destrói sinal: rejeitá-los tirava o voto de uma
+ * linha que TEM juros e a coluna ficava nula, com o motor usando 0% no lugar.
+ * O que continua fora é hexadecimal, notação científica e vírgula.
+ *
  * ⚠️ **São TRÊS validadores para esta coluna, e eles não compartilham código**
  * porque não podem: `migracoes/037_juros_tabela_estudo.js` roda no runner de
  * migração (JS puro, sem imports do app) e `frontend/tela-financeiro.ts` roda no
@@ -105,7 +111,7 @@ const CAMPOS_BLOQUEADOS_PATCH = new Set([
 export function percentualEstrito(v: unknown): number | null {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
   if (typeof v !== 'string') return null;
-  if (!/^\s*-?\d+(\.\d+)?\s*$/.test(v)) return null;
+  if (!/^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/.test(v)) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }

@@ -90,8 +90,18 @@
  *
  * A saída não é uma sexta guarda: é **inverter para fail-closed e ter um lugar
  * só**. Aceita `number` finito, ou string que seja exatamente um decimal (sinal
- * opcional, espaços em volta). Todo o resto — booleano, array, objeto, `'0x10'`,
- * `'1e3'`, `'12,5'`, `''`, `'abc'` — não vota.
+ * opcional, parte inteira ou fracionária opcionais, espaços em volta). Todo o
+ * resto — booleano, array, objeto, `'0x10'`, `'1e3'`, `'12,5'`, `''`, `'abc'` —
+ * não vota.
+ *
+ * ⚠️ **Fail-closed apertado demais também destrói sinal, e isso foi medido.** A
+ * primeira gramática exigia `-?\d+(\.\d+)?` e rejeitava `'+12.5'`, `'.5'` e
+ * `'12.'` — decimais inequívocos, que o leitor antigo baseado em `Number` lia
+ * normalmente e que a API podia ter gravado. Rejeitá-los tirava o voto de uma
+ * linha que TEM juros, a coluna ficava nula e o motor passava a usar 0% no
+ * lugar deles. Errar a régua para o lado apertado é tão ruim quanto para o
+ * frouxo: os dois trocam o número do estudo por outro. Achado do revisor
+ * externo.
  *
  * `'12,5'` (vírgula, o separador brasileiro) é rejeitado de propósito: aqui não
  * há usuário digitando, é dado já persistido, e adivinhar o separador de um
@@ -100,7 +110,7 @@
 function numeroLimpo(bruto) {
   if (typeof bruto === 'number') return Number.isFinite(bruto) ? bruto : null;
   if (typeof bruto !== 'string') return null;
-  if (!/^\s*-?\d+(\.\d+)?\s*$/.test(bruto)) return null;
+  if (!/^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/.test(bruto)) return null;
   const n = Number(bruto);
   return Number.isFinite(n) ? n : null;
 }
@@ -131,17 +141,22 @@ function numeroLimpo(bruto) {
 function jurosAaDaLinha(fluxoPagamento) {
   const fp = fluxoPagamento ?? {};
   if (fp.juros_tabela_aa !== undefined && fp.juros_tabela_aa !== null) {
-    const aa = numeroLimpo(fp.juros_tabela_aa);
-    return aa !== null && aa >= 0 ? aa : null;
+    return naFaixa(numeroLimpo(fp.juros_tabela_aa));
   }
   const comps = Array.isArray(fp.componentes) ? fp.componentes : [];
   for (const c of comps) {
     const m = numeroLimpo(c?.taxaMensal);
     if (m === null || m === 0) continue;
     if (m < 0) return null;
-    return (Math.pow(1 + m, 12) - 1) * 100;
+    return naFaixa((Math.pow(1 + m, 12) - 1) * 100);
   }
   return null;
+}
+
+/** `null` para o que está fora do domínio da coluna — nem negativo, nem acima do teto. */
+function naFaixa(aa) {
+  if (aa === null || !Number.isFinite(aa)) return null;
+  return aa >= 0 && aa <= TETO_COLUNA_AA ? aa : null;
 }
 
 /**
@@ -163,11 +178,17 @@ function chave(aa) {
  * Teto da coluna `estudos.juros_tabela_aa_padrao`, que é `decimal(5,2)`
  * (`schema.json:137`) — cabe até `999.99`.
  *
- * Ele existe porque a taxa pode vir DERIVADA de uma `taxaMensal` persistida, e
- * `(1 + i_m)^12 − 1` com um `taxaMensal` sujo estoura qualquer ordem de
- * grandeza (`i_m = 1` já dá 409.500% a.a.). Sem o teto, `dados.atualizar`
- * falharia no meio da varredura e deixaria o backfill pela metade — pior que
- * gravar o teto, porque a falha é no meio e não tem volta.
+ * ⚠️ **Quem passa dele NÃO VOTA; ele não é um clamp.** Já foi: `Math.min(aa,
+ * TETO)` no momento de gravar. E achatar era a mesma lavagem de dado sujo que
+ * todas as outras guardas desta função existem para impedir — um
+ * `juros_tabela_aa: 1000`, ou uma mensal que derive 409.500%, virava
+ * silenciosamente "999,99%", um percentual plausível, gravado para sempre
+ * (o estudo sai de `alvos` e a reexecução não volta atrás). Achado do revisor
+ * externo.
+ *
+ * Sem voto, a coluna fica nula quando não sobra candidato — o estado "nunca
+ * configurado", que o autor vê na tela. É o mesmo desfecho da taxa negativa, e
+ * pelo mesmo motivo.
  */
 const TETO_COLUNA_AA = 999.99;
 
@@ -241,10 +262,9 @@ export default async function ({ dados }) {
       if (vencedora === null || cand.n > vencedora.n) vencedora = cand;
     }
 
-    // `vencedora.aa` já é a chave, portanto já está em 2 casas. Só o TETO
-    // continua necessário — o piso saiu junto com o clamp para `0`, que era o
-    // que lavava taxa negativa em "0% intencional" (ver `jurosAaDaLinha`).
-    const valor = Math.min(vencedora.aa, TETO_COLUNA_AA);
+    // Sem clamp nenhum: `vencedora.aa` já é a chave (2 casas) e já passou por
+    // `naFaixa`, que tira do jogo o que não cabe na coluna em vez de achatar.
+    const valor = vencedora.aa;
     await dados.atualizar('estudos', estudo.id, { juros_tabela_aa_padrao: valor });
   }
 }

@@ -106,7 +106,7 @@ export function erroJurosTabelaEstudo(v: unknown): string | null {
   // diferentes, e o que os mantém alinhados é a tabela de entradas exercitada
   // nos três — ver o teste `#585 os três validadores da coluna concordam`.
   if (typeof v === 'number' ? !Number.isFinite(v)
-    : typeof v !== 'string' || !/^\s*-?\d+(\.\d+)?\s*$/.test(v)) {
+    : typeof v !== 'string' || !/^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/.test(v)) {
     return 'Os juros de tabela devem ser um percentual ao ano maior ou igual a zero.';
   }
   if (Number(v) < 0) {

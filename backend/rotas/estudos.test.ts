@@ -489,6 +489,9 @@ const ENTRADAS_DA_COLUNA: Array<[unknown, boolean, string]> = [
   [[],       false, 'Number([]) é 0'],
   [[12.5],   false, 'Number([12.5]) é 12.5 — array não é número'],
   [{},       false, 'objeto'],
+  ['+12.5', true,  'sinal positivo: decimal inequívoco que o leitor antigo lia'],
+  ['.5',    true,  'ponto inicial: idem'],
+  ['12.',   true,  'ponto final: idem'],
   [Infinity, false, 'não finito'],
   [NaN,      false, 'não finito'],
 ];

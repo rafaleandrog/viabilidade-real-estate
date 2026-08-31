@@ -61,6 +61,10 @@ const SEED = {
     { id: 13, nome: 'Estudo M', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
     { id: 14, nome: 'Estudo N', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
     { id: 15, nome: 'Estudo O', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 16, nome: 'Estudo P', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 17, nome: 'Estudo Q', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 18, nome: 'Estudo R', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 19, nome: 'Estudo S', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
   ],
   avancado_cronograma: [
     { id: 1, estudo_id: 1, evento: 'planejamento', inicio_mes: 1, duracao_meses: 6 },
@@ -176,6 +180,34 @@ const SEED = {
       fluxo_pagamento: { componentes: [
         { tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 12, taxaMensal: '0x10' },
       ] } },
+    // Estudo 16 — taxa EXPLÍCITA acima do teto. Antes ela era achatada em
+    // 999,99 e gravada; agora não vota.
+    { id: 49, estudo_id: 16, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: 1000 } },
+    // Estudo 17 — o OUTRO lado do fail-closed: `'+12.5'`, `'.5'` e `'12.'` são
+    // decimais inequívocos que a primeira gramática rejeitava. Rejeitá-los
+    // tirava o voto de linhas que TÊM juros e deixava a coluna nula, com o
+    // motor usando 0% no lugar.
+    //
+    // ⚠️ **A composição é escolhida para DISCRIMINAR, e a primeira tentativa
+    // não discriminava.** Ela era `'+12.5'`, `'.5'` e `'0.50'`: com a gramática
+    // apertada só `'0.50'` votava, vencia com 0,5 — e o esperado também era
+    // 0,5, então a mutação ficava verde. Aqui `'+12.5'` aparece DUAS vezes e
+    // `'0.50'` uma: com a gramática larga vence 12,5 (dois votos); com a
+    // apertada, só `'0.50'` vota e o resultado seria 0,5.
+    { id: 50, estudo_id: 17, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: '+12.5' } },
+    { id: 51, estudo_id: 17, tipo: 'receita', nome: 'R-B', ordem: 1,
+      fluxo_pagamento: { juros_tabela_aa: '+12.5' } },
+    { id: 52, estudo_id: 17, tipo: 'receita', nome: 'R-C', ordem: 2,
+      fluxo_pagamento: { juros_tabela_aa: '0.50' } },
+    // Estudos 18 e 19 — as outras duas sintaxes, cada uma sozinha, para que a
+    // rejeição de qualquer uma delas deixe a coluna NULA em vez de mudar o
+    // vencedor de um estudo com várias linhas.
+    { id: 53, estudo_id: 18, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: '.5' } },
+    { id: 54, estudo_id: 19, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: '12.' } },
     // Estudo 4 — EMPATE em frequência (uma linha cada), resolvido pela de
     // menor `ordem`; e a 3ª linha exercita a DERIVAÇÃO a partir de
     // `componentes[].taxaMensal`, sem a chave `juros_tabela_aa`. A 4ª e a 5ª
@@ -226,6 +258,12 @@ const SEED = {
     { id: 46, fase_id: 46, tipologia_id: 1, quantidade: 1 },
     { id: 47, fase_id: 47, tipologia_id: 1, quantidade: 1 },
     { id: 48, fase_id: 48, tipologia_id: 1, quantidade: 1 },
+    { id: 49, fase_id: 49, tipologia_id: 1, quantidade: 1 },
+    { id: 50, fase_id: 50, tipologia_id: 1, quantidade: 1 },
+    { id: 51, fase_id: 51, tipologia_id: 1, quantidade: 1 },
+    { id: 52, fase_id: 52, tipologia_id: 1, quantidade: 1 },
+    { id: 53, fase_id: 53, tipologia_id: 1, quantidade: 1 },
+    { id: 54, fase_id: 54, tipologia_id: 1, quantidade: 1 },
   ],
   // Camada com o shape que a migração `019` produzia (config de Price vinda do
   // Bloco G legado) — é o caminho de transformação da `028`. Sem esta linha a
@@ -432,8 +470,10 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
         // O filtro `tipo === 'receita'`: a fase de cronograma declara 30% e não
         // pode votar. Sem o filtro ela empata e vence pela ordem menor.
         [6, 7.25, 'fase de cronograma não vota na taxa das linhas de receita'],
-        // O teto de `decimal(5,2)`: 409.500% a.a. derivados não cabem.
-        [7, 999.99, 'taxa derivada acima do teto da coluna tem de ser limitada'],
+        // Acima do teto de `decimal(5,2)` NÃO VOTA — achatar em 999,99 era a
+        // mesma lavagem: um valor fora do domínio virava percentual plausível e
+        // gravado para sempre.
+        [7, null, 'taxa derivada acima do teto não pode ser achatada em 999,99'],
         // Taxa negativa não vota: a coluna fica NULA, não `0`. O estudo 8 cobre
         // a chave explícita; o 10, o ramo derivado de `taxaMensal`.
         [8, null, 'taxa negativa explícita não pode virar "0% intencional"'],
@@ -447,6 +487,13 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
         [14, null, 'string em notação científica não pode virar voto'],
         // A mesma sujeira no OUTRO ramo — é o que o parser único fecha de uma vez.
         [15, null, 'taxaMensal como string hexadecimal não pode virar voto'],
+        [16, null, 'taxa explícita acima do teto não vota — não é achatada'],
+        // `'.5'` e `'0.50'` são o mesmo 0,5 e somam dois votos contra um de
+        // `'+12.5'`. Se a gramática rejeitasse qualquer um dos três, o valor
+        // gravado seria outro — ou nulo.
+        [17, 12.5, 'string com sinal positivo tem de votar — e vencer por frequência'],
+        [18, 0.5,  'string com ponto inicial (.5) tem de votar'],
+        [19, 12,   'string com ponto final (12.) tem de votar'],
         // Empate de frequência resolvido pela linha de menor `ordem` — e é este
         // caso, e só ele, que dá dente ao `.sort()`.
         [9, 4, 'empate de frequência tem de ser resolvido pela linha de menor ordem'],
