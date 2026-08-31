@@ -454,6 +454,20 @@ export function planoDeNascimento(
     formularioPagamento(fluxoPagamentoDoBackend), cronograma, jurosTabelaAaEstudo,
   );
   delete canonico.aplicado;
+  // #658: as âncoras de cronograma deste plano seguem VIVAS enquanto o usuário
+  // não confirmar o plano. Sem isto, um Grupo criado antes de o cronograma
+  // estar fechado — a ordem normal de trabalho — nasceria com `marcoMes` e
+  // `mesPagamento` do cronograma daquele instante e pagaria nos meses errados,
+  // calado. O ramo legado nunca teve esse defeito, porque deriva o fim da obra
+  // a cada cálculo; o marcador é o que devolve essa propriedade.
+  //
+  // ⚠️ Ele MORRE SOZINHO no primeiro Aplicar: `formularioPagamento` monta um
+  // objeto de chaves conhecidas, então a chave não sobrevive ao ciclo
+  // formulário → `fluxoPagamentoParaSalvar`. É de propósito — a partir do
+  // Aplicar o plano é do usuário, e as âncoras dele passam a mandar. Há teste
+  // nomeado para essa morte; se ela deixar de acontecer, um plano confirmado
+  // voltaria a ser reancorado por baixo.
+  canonico.ancorasVivas = true;
   return canonico;
 }
 

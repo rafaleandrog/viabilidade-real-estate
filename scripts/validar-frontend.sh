@@ -197,6 +197,17 @@ com_limite 120 bash scripts/testar-guard-enderecos-doc.sh >/dev/null || {
 }
 echo "  ok: bateria do guard de endereços verde"
 
+# #657/#658: a bateria do guard de FIAÇÃO. Ela mora aqui, e não só no CI, porque
+# o guard já falhou calado duas vezes no PR que o criou — primeiro conferindo
+# presença no arquivo em vez de escopo, depois contando chaves dentro de string
+# e comentário. Os dois modos de falha estão nos casos 3 e 4, e a bateria foi
+# conferida contra a versão ANTIGA do recorte: ela reprova.
+com_limite 120 bash scripts/testar-guard-fiacao.sh >/dev/null || {
+  echo "  bateria do guard de fiação FALHOU — rode: bash scripts/testar-guard-fiacao.sh" >&2
+  exit 1
+}
+echo "  ok: bateria do guard de fiação verde"
+
 echo "== 6/8 typecheck do frontend =="
 # ⚠️ `scripts/**/*.ts` entra aqui, e NÃO é enfeite. O `tsconfig.json` da raiz
 # inclui só `frontend/` e `backend/`, então nada typechecava os scripts — e eles

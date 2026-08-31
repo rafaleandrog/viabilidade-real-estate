@@ -1003,11 +1003,45 @@ export function componentesPagamento(
   //
   // Quem recebe é `TIPOS_FINANCIADOS` — allowlist, não a negação de `imediato`.
   // Ver a nota lá.
+  //
+  // #658 (revisor externo): as ÂNCORAS DE CRONOGRAMA — `marcoMes` do
+  // `ate_marco` e `mesPagamento` do `concentrado` — são o outro caso, e ele NÃO
+  // é igual ao da taxa. O ramo legado deriva o fim da obra a CADA cálculo, então
+  // sempre acompanhou o cronograma vigente; o array persistido congela a âncora
+  // no instante da gravação. Um Grupo criado antes de o cronograma existir
+  // nasceria pagando nos meses errados — e criar o Grupo antes de fechar a obra
+  // é a ordem normal de trabalho.
+  //
+  // ⚠️ Mas reancorar TODA linha canônica seria destruir configuração real, e
+  // isso está medido: a fixture de KPI da #468 grava `mesPagamento: 42` com a
+  // obra terminando no mês 40 — o derivado seria 41. Repasse dois meses após a
+  // entrega era configurável antes da #345, e esse dado existe. Reancoragem
+  // cega movia os quatro KPIs de cinco baselines e derrubava os dois testes de
+  // `ate_marco` degenerado da #444. Ou seja: `mesPagamento` NÃO é projeção pura,
+  // ao contrário de `taxaMensal`, e tratá-los igual foi um erro meu.
+  //
+  // Então a reancoragem é OPT-IN, por um marcador que só o nascimento põe:
+  // `ancorasVivas`. Ele diz "este plano foi derivado pelo app e o usuário nunca
+  // o confirmou" — e morre sozinho no primeiro Aplicar, porque
+  // `formularioPagamento` monta um objeto de chaves conhecidas e não o carrega
+  // adiante. A partir daí a linha é do usuário, e as âncoras dele mandam.
   const taxaMensal = taxaMensalDoEstudo(jurosTabelaAaEstudo);
+  const obra = cronograma.find((e) => e.evento === 'obra');
+  // Sem evento de obra, o persistido é PRESERVADO: derivar `fimObra = 0` de um
+  // cronograma vazio trocaria um dado velho por um dado errado.
+  const fimObra = fluxoPagamento?.ancorasVivas === true && obra
+    ? n(obra.inicio_mes) + n(obra.duracao_meses) - 1
+    : null;
   if (Array.isArray(fluxoPagamento?.componentes)) {
-    return fluxoPagamento.componentes.map((c: any) => (
-      c && TIPOS_FINANCIADOS.has(c.tipo) ? { ...c, taxaMensal } : { ...c }
-    )) as ComponentePagamento[];
+    return fluxoPagamento.componentes.map((c: any) => {
+      const saida: any = { ...c };
+      if (c && TIPOS_FINANCIADOS.has(c.tipo)) saida.taxaMensal = taxaMensal;
+      if (fimObra !== null) {
+        if (c?.tipo === 'ate_marco') saida.marcoMes = fimObra;
+        if (c?.tipo === 'concentrado') saida.mesPagamento = fimObra + REPASSE_MESES_APOS_ENTREGA;
+      }
+      return saida;
+    }) as ComponentePagamento[];
   }
   return componentesDoLegado(fluxoPagamento, cronograma, jurosTabelaAaEstudo);
 }

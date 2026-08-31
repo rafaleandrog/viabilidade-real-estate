@@ -71,6 +71,29 @@ test('#657 a taxa do estudo chega ao Grupo recém-criado — era o que faltava n
   }
 });
 
+test('#658 `ancorasVivas` nasce ligado e MORRE no primeiro Aplicar', () => {
+  // O marcador diz "este plano foi derivado pelo app e o usuário nunca o
+  // confirmou" — e é ele que autoriza `componentesPagamento` a reancorar
+  // `marcoMes`/`mesPagamento` no cronograma vigente. Se ele sobrevivesse ao
+  // Aplicar, um plano CONFIRMADO continuaria sendo reancorado por baixo, e a
+  // âncora escolhida pelo usuário seria sobrescrita a cada cálculo.
+  //
+  // A morte não é um `delete` explícito: `formularioPagamento` monta um objeto
+  // de chaves CONHECIDAS, então a chave não atravessa o ciclo
+  // formulário → `fluxoPagamentoParaSalvar`. Este teste é o que impede alguém
+  // de "consertar" esse ciclo para preservar chaves desconhecidas sem perceber
+  // o que quebra.
+  const nascido: any = planoDeNascimento(PLANO_DO_BACKEND, CRONO, AA_ESTUDO);
+  assert.equal(nascido.ancorasVivas, true, 'nasce com as âncoras vivas');
+
+  const depoisDoAplicar: any = fluxoPagamentoParaSalvar(
+    formularioPagamento(nascido), CRONO, AA_ESTUDO,
+  );
+  assert.equal('ancorasVivas' in depoisDoAplicar, false,
+    'o Aplicar entrega o plano ao usuário — as âncoras dele passam a mandar');
+  assert.equal(depoisDoAplicar.aplicado, true, 'e o Aplicar marca `aplicado`');
+});
+
 test('#657 nascer canônico NÃO é "o usuário configurou" — `aplicado` fica de fora', () => {
   // `aplicado` acende o ponto verde ao lado de "Fluxo de Pagamento" na tela.
   // Marcá-lo aqui diria ao usuário que ele já configurou um plano que nunca
