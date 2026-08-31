@@ -2045,7 +2045,7 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > saíram do render.** `regime_tributario`, os cinco `aliquota_*_pct` e
 > `imposto_sobre_permuta_fisica` foram removidos da aba `Viabilidade → Financeiro` (sem leitor em
 > nenhum nível — não havia o que preservar). `sujeito_ret` também saiu do render **dali**: é
-> condição de nível (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:120-122`) — a aba só
+> condição de nível (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:135-137`) — a aba só
 > existe para `nivel_analise === 'avancado'`, e nesse nível a Proforma não é consultada, então a
 > condição colapsa em "sempre oculto". `imposto_percentual` é o único que fica **visível**, mas
 > sempre **desabilitado** (`impostoPercentualEditavel`, `:87-89`) — o único editor de verdade é

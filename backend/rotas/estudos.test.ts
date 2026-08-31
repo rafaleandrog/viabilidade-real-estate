@@ -492,6 +492,9 @@ const ENTRADAS_DA_COLUNA: Array<[unknown, boolean, string]> = [
   ['+12.5', true,  'sinal positivo: decimal inequívoco que o leitor antigo lia'],
   ['.5',    true,  'ponto inicial: idem'],
   ['12.',   true,  'ponto final: idem'],
+  [999.99, true, 'o teto exato da coluna `decimal(5,2)` — dentro do domínio'],
+  [1000, false, 'acima do teto: `decimal(5,2)` estoura no INSERT, não na tela (rodada 6)'],
+  ['1000.00', false, 'idem, em string — a sintaxe é válida, o domínio não'],
   [Infinity, false, 'não finito'],
   [NaN,      false, 'não finito'],
 ];

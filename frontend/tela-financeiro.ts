@@ -96,6 +96,14 @@ export function camposVisiveisFinanceiro(nivel: string): string[] {
  *
  * `null`/vazio é válido — significa "não configurado", e o motor lê 0.
  */
+/**
+ * #585: teto do domínio da coluna `estudos.juros_tabela_aa_padrao` —
+ * `decimal(5,2)` no `schema.json`, logo 999,99. O mesmo número vive em
+ * `TETO_COLUNA_AA` na migração `037` e na guarda do PATCH; os três não
+ * compartilham código porque rodam em runtimes diferentes.
+ */
+export const TETO_JUROS_TABELA_AA = 999.99;
+
 export function erroJurosTabelaEstudo(v: unknown): string | null {
   if (v === null || v === undefined || v === '') return null;
   // ⚠️ Não é `Number(v)`. Ele aceita `'0x10'` (→ 16), `'1e3'` (→ 1000), `'  '`
@@ -107,10 +115,17 @@ export function erroJurosTabelaEstudo(v: unknown): string | null {
   // nos três — ver o teste `#585 os três validadores da coluna concordam`.
   if (typeof v === 'number' ? !Number.isFinite(v)
     : typeof v !== 'string' || !/^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/.test(v)) {
-    return 'Os juros de tabela devem ser um percentual ao ano maior ou igual a zero.';
+    return `Os juros de tabela devem ser um percentual ao ano entre 0 e ${TETO_JUROS_TABELA_AA}.`;
   }
-  if (Number(v) < 0) {
-    return 'Os juros de tabela devem ser um percentual ao ano maior ou igual a zero.';
+  // #585 (revisor externo, rodada 6): o TETO também é domínio. A coluna é
+  // `decimal(5,2)` no `schema.json`, cujo máximo é 999,99 — e a migração `037`
+  // já rejeita voto fora dessa faixa. Sem esta linha, `1000` passava pela tela e
+  // pelo PATCH e só estourava no INSERT do Postgres: o usuário via um 500 em vez
+  // de "taxa inválida", e o erro chegava sem nome. Validar só o piso é validar
+  // metade do domínio.
+  const num = Number(v);
+  if (num < 0 || num > TETO_JUROS_TABELA_AA) {
+    return `Os juros de tabela devem ser um percentual ao ano entre 0 e ${TETO_JUROS_TABELA_AA}.`;
   }
   return null;
 }

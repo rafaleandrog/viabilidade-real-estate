@@ -108,6 +108,10 @@ const CAMPOS_BLOQUEADOS_PATCH = new Set([
  * (`scripts/migracoes-harness.mjs`), e na tela em `tela-financeiro.test.ts`.
  * Divergiu um, a tabela acusa.
  */
+/** #585: teto do domínio — `decimal(5,2)` no `schema.json`. Ver a nota gêmea em
+ * `frontend/tela-financeiro.ts` e `TETO_COLUNA_AA` na migração `037`. */
+export const TETO_JUROS_TABELA_AA = 999.99;
+
 export function percentualEstrito(v: unknown): number | null {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
   if (typeof v !== 'string') return null;
@@ -150,11 +154,14 @@ export function montarPatchEstudo(
     // que reuse `atualizarEstudo` passa por aqui sem passar por lá.
     if (k === 'juros_tabela_aa_padrao' && v !== null && v !== undefined && v !== '') {
       const aa = percentualEstrito(v);
-      if (aa === null || aa < 0) {
+      // #585 (revisor externo, rodada 6): o teto é domínio tanto quanto o piso.
+      // `decimal(5,2)` no `schema.json` → 999,99. Sem ele, `1000` atravessava o
+      // PATCH e estourava no INSERT, virando 500 em vez de `TAXA_INVALIDA`.
+      if (aa === null || aa < 0 || aa > TETO_JUROS_TABELA_AA) {
         return {
           http: 400,
           codigo: 'TAXA_INVALIDA',
-          mensagem: 'juros_tabela_aa_padrao deve ser um percentual ao ano maior ou igual a zero',
+          mensagem: `juros_tabela_aa_padrao deve ser um percentual ao ano entre 0 e ${TETO_JUROS_TABELA_AA}`,
         };
       }
     }

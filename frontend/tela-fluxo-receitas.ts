@@ -288,13 +288,18 @@ export class ViabFluxoReceitas extends LitElement {
           <urbi-botao variante="secundario" icone="fa-solid fa-plus" @click=${this._adicionarFase}>
             Adicionar Grupo
           </urbi-botao>
-          <!-- #477: cada Grupo já é a unidade de regime comercial — absorção,
-               plano de pagamento e juros de tabela próprios. Precisa de dois
-               regimes (ex.: Residencial × Não residencial)? É dois Grupos. -->
+          <!-- #585 (revisor externo, rodada 6): esta nota é da #477 e dizia que
+               cada Grupo tem "juros de tabela próprios", recomendando dois
+               Grupos para Residencial × Não residencial. Deixou de ser verdade:
+               a taxa é UMA por estudo. Manter a frase mandaria o usuário criar
+               Grupos esperando taxas independentes que o cálculo não representa
+               mais — orientação que a própria aba Financeiro contradiz. O que
+               sobreviveu da #477 é o resto, que continua valendo. -->
           <span class="sec nota-regime-comercial">
-            Cada Grupo tem sua própria absorção, plano de pagamento e juros de tabela — para dois
-            regimes comerciais diferentes (ex.: Residencial × Não residencial), crie dois Grupos.
-            O default de juros para Grupos novos fica em Financeiro.
+            Cada Grupo tem sua própria absorção e plano de pagamento — para dois regimes comerciais
+            diferentes (ex.: Residencial × Não residencial), crie dois Grupos. Os
+            <strong>juros de tabela</strong>, porém, são um valor único do estudo, em
+            <strong>Financeiro</strong>: valem igual para todos os Grupos.
           </span>
         </div>` : nothing}
       ${this.modalAbs ? this._renderModalAbsorcao() : nothing}
