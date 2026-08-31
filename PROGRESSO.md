@@ -4,6 +4,76 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Juros de tabela viram valor GLOBAL do estudo — #585 (2026-08-31)
+
+Decisão do autor de 2026-08-26: *"campo juros de tabela funciona para todos os imóveis igualmente e
+o valor não é inserido aqui. será na aba financeiro"*. A taxa deixou de ser do **Grupo** (uma por
+linha de receita, D-Q02 da #428) e passou a ser do **estudo** — uma só, digitada em Viabilidade →
+Financeiro, valendo para todas as linhas, **as já gravadas inclusive**.
+
+**O ponto onde a taxa entra é UM, e é o que faz a issue valer para estudo existente.**
+`componentesPagamento` aplica a taxa do estudo sobre todo componente que declara `taxaMensal` —
+inclusive quando o array vem PERSISTIDO da linha. Sem esse override, editar o campo não mudaria
+nada em nenhuma linha já editada desde a #248: aquele ramo devolvia o persistido verbatim.
+`imediato` não tem `taxaMensal` e continua sem ter.
+
+**A defesa de fiação é o parâmetro obrigatório** (o padrão que a #444 fixou e a #491 provou
+necessário): `jurosTabelaAaEstudo` é campo **obrigatório** de `FluxoConfig` e 3º/4º argumento
+obrigatório de `componentesPagamento`, `componentesDoLegado`, `recebimentoBrutoMensal`,
+`impostoMensal`, `recebimentoLiquidoMensal`, `receitaMensalLinha`, `descontoComercialMensal`,
+`vendaLiquidaContratadaMensal`, `ultimoMesRecebivelLinha`, `validarSafrasReceita`,
+`componentesParaSalvar` e `fluxoPagamentoParaSalvar`. **Medido, com o controle antes:** apagar
+`jurosTabelaAaEstudo` do `FluxoConfig` do Painel vira `TS2741`; apagar o override em
+`componentesPagamento` derruba 4 testes (966/970).
+
+**O que SAIU:**
+
+| Peça | Por quê |
+|---|---|
+| a seção "Juros de tabela" do modal de Fluxo de pagamento | a entrada é a aba Financeiro agora |
+| `_setJurosTabela` | não há campo a gravar |
+| o aviso "este plano tem N taxas diferentes gravadas" | com uma taxa por estudo não há o que avisar |
+| `.aviso-juros` (CSS) e o `p.aviso-juros` do caso de render | órfãos do aviso |
+| `taxasDistintasDoPlano` | existia só para esse aviso |
+| `jurosTabelaAnualPct` / `taxaMensalDoPlano` | eram as duas leituras POR LINHA; viraram `taxaMensalDoEstudo` |
+| `juros_tabela_aa` de `FormularioPagamento` | tirar só a leitura não bastaria — o spread de `fluxoPagamentoParaSalvar` a reproduziria (a lição do `ret` na #452) |
+| `taxaFoiEditada` e `EPS_TAXA_MENSAL` | respondiam "o usuário mexeu no campo?"; o campo não existe |
+| `fluxoPagamentoComDefaultJuros` (backend) | semeava na linha um dado que ninguém lê mais |
+
+**Migração `037`, `versao` `0.1.35` → `0.1.36`.** Backfill **T1** — a taxa mais frequente entre as
+linhas do estudo, desempate pela linha de menor `ordem`. **T2** (a da linha de maior VGV) não é
+implementável numa migração sem reimplementar `vgvVendavelLinha`; **T3** (deixar em branco e
+exigir decisão) deixaria o estudo em 0% de juros até alguém abrir a tela, que é a mudança de número
+mais violenta das três. Só toca estudo com a coluna nula — quem já digitou nunca é sobrescrito.
+
+**O custo, declarado e aceito:** a EVI Urbitá pratica taxas diferentes para Residencial × Não
+Residencial, e **esse cenário deixou de ser representável**. E num estudo com taxas divergentes por
+linha, as minoritárias mudam de taxa sem ninguém confirmar — é a objeção que a própria issue levanta
+contra T1, e ela procede.
+
+**Duas reescritas de teste que o diff registra, e são consequência, não conserto de conveniência:**
+
+- as asserções de identidade da #431 usavam `taxaMensal` como **marcador** de qual componente é
+  qual. Ela é uniforme agora e não discrimina mais — o marcador passou a ser `rotulo`/`prazoMeses`,
+  que continuam só-canônicos. O que os testes provam é o mesmo: o pareamento é por identidade, não
+  por posição;
+- a baseline `D` de `kpis-baseline.ts` **move os quatro KPIs**, e a causa é uma só: o `Repasse` —
+  50% do plano — carregava `taxaMensal: 0` e passa a carregar a taxa do estudo.
+  `resultado 3.791.222,83 → 5.106.030,69`. Não é regressão: é o pedido.
+
+**O no-op da #431 perde UMA garantia, e só uma.** A `taxaMensal` persistida passa a ser recalculada
+da taxa anual em toda escrita, então uma linha legada com a mensal arredondada (`0.0098636`, o
+estudo 5) é reescrita como `0.00986358055321146` na primeira gravação — 8e-9 ao mês. Tudo o mais
+continua byte-idêntico.
+
+⚠️ **Pendente do autor, no ambiente autenticado:** `validar-backend.sh` **não roda nesta sessão**
+(aborta na etapa 1/5, portão do SDK, pelo 401). O typecheck do backend, a sincronização do
+`schema.json` e a execução real da `037` em Postgres são dele. O harness de migrações
+(`scripts/migracoes-harness.mjs`) rodou verde — contrato, banco vazio, reexecução e cadeia
+`001 → 037` —, mas harness não é Postgres. **"Não deu para rodar" nunca é "passou".**
+
+---
+
 ## Sai o KPI "Resultado após custo financeiro" de Cenários — #596 (2026-08-30)
 
 Decisão do autor: **"deve sair"**. Era o critério de aceite 5 da #596, e o único que o

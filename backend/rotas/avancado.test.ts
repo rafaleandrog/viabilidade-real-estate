@@ -21,7 +21,6 @@ import {
   erroQuantidadeTipologia,
   montarPatchTipologia,
   fluxoPagamentoPadrao,
-  fluxoPagamentoComDefaultJuros,
   type LinhaCronograma,
 } from './avancado.js';
 
@@ -232,31 +231,17 @@ test('aplicarDeltaEvento: lote com um evento inválido barra ANTES de mutar os v
   assert.deepEqual(linhas, cronogramaPadrao());
 });
 
-// ── Default herdado de juros de tabela por estudo (#477) ──
+// ── #585: a linha nova NÃO nasce mais com juros semeados ──
+//
+// Os quatro testes de `fluxoPagamentoComDefaultJuros` (#477) saíram junto com a
+// função. Ela existia porque a taxa vigente morava na linha e a coluna do
+// estudo era só default de criação; desde a #585 a coluna do estudo É a taxa
+// vigente, lida a cada cálculo. Semear a chave na linha gravaria dado que
+// ninguém lê.
 
-test('fluxoPagamentoComDefaultJuros: sem default (null/undefined), devolve o padrão sem chave juros_tabela_aa', () => {
-  assert.deepEqual(fluxoPagamentoComDefaultJuros(null), fluxoPagamentoPadrao());
-  assert.deepEqual(fluxoPagamentoComDefaultJuros(undefined), fluxoPagamentoPadrao());
-  assert.ok(!('juros_tabela_aa' in fluxoPagamentoComDefaultJuros(null)));
-});
-
-test('fluxoPagamentoComDefaultJuros: com default configurado, a linha nova nasce com juros_tabela_aa', () => {
-  const fp = fluxoPagamentoComDefaultJuros(12.5);
-  assert.equal(fp.juros_tabela_aa, 12.5);
-  // o resto do padrão continua idêntico — a herança só acrescenta a chave nova.
-  const { juros_tabela_aa, ...resto } = fp;
-  assert.deepEqual(resto, fluxoPagamentoPadrao());
-});
-
-test('fluxoPagamentoComDefaultJuros: 0 é um default válido (não confundir com "sem default")', () => {
-  // Number(0) é falsy, mas 0% a.a. é uma escolha explícita do usuário — a
-  // checagem tem que ser contra null/undefined, nunca contra falsy.
-  assert.equal(fluxoPagamentoComDefaultJuros(0).juros_tabela_aa, 0);
-});
-
-test('fluxoPagamentoComDefaultJuros: valor não numérico é ignorado, cai no padrão', () => {
-  assert.deepEqual(fluxoPagamentoComDefaultJuros('abc' as unknown), fluxoPagamentoPadrao());
-  assert.deepEqual(fluxoPagamentoComDefaultJuros(NaN), fluxoPagamentoPadrao());
+test('#585: fluxo_pagamento de linha nova não carrega juros_tabela_aa', () => {
+  assert.ok(!('juros_tabela_aa' in fluxoPagamentoPadrao()),
+    'a linha nova voltou a nascer com juros semeados — a taxa é do estudo desde a #585');
 });
 
 // ── Ancoragem de linhas de custo (spec §5C) ──

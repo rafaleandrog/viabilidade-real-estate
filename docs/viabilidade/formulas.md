@@ -282,7 +282,7 @@ Duas identidades que o motor mantém:
 fluxo_apos_funding_t = fluxo_livre_projeto_t + entradas_funding_t − saidas_funding_t
 ```
 
-fiscalizada por `validarFunding` (`frontend/fluxo-invariantes.ts:496`), que também acusa saldo
+fiscalizada por `validarFunding` (`frontend/fluxo-invariantes.ts:501`), que também acusa saldo
 de dívida negativo, dívida que não zera no horizonte, diagnóstico próprio de equity (#445) e —
 decisão **D14** — caixa acumulado negativo depois do funding (severidade `alerta`).
 
@@ -393,7 +393,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
 | `frontend/tela-proforma.ts:70` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
-| `frontend/fluxo-caixa-motor.ts:2125-2133` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
+| `frontend/fluxo-caixa-motor.ts:2159-2167` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
 | `frontend/exportar.ts:69` — `celulaProforma`, a coluna R$ da Proforma na tela, no CSV e no PDF | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado para função pura pela #567, e movida de `tela-proforma.ts` para cá em 2026-08-28, quando a exportação passou a usá-la (a tela a reexporta) |
 | `frontend/tela-fluxo-receitas.ts:441,442` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |

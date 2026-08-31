@@ -91,6 +91,7 @@ export const MES_LANCAMENTO = 6;
 const BASE: FluxoConfig = {
   dataInicio: 'jan/2027',
   taxaDescontoAa: 12,
+  jurosTabelaAaEstudo: 0,
   cronograma: CRONO,
   areaTerreno: 0,
   linhasReceita: [{

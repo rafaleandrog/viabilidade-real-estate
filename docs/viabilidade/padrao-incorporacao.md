@@ -913,23 +913,34 @@ Cada Grupo possui um perfil único de absorção, aplicado a todas as suas aloca
 
 A configuração informa quanto do estoque do Grupo será vendido em cada período global.
 
-> ✅ **Modelo funcional de referência, confirmado por escrito pela #477: o Grupo (linha de
-> receita) é a UNIDADE DE REGIME COMERCIAL do app.** Não é só a absorção — cada Grupo tem sua
-> própria absorção (§10.1 acima), seu próprio plano de pagamento (`fluxo_pagamento`, com
-> `entrada`/`parcelas`/`repasse`/`comissao`/`ret`) e sua própria taxa de juros de tabela
-> (`fluxo_pagamento.juros_tabela_aa`, `avancado_fases.fluxo_pagamento` — coluna `json`,
-> `schema.json:320`). Isso já é suficiente para representar dois regimes comerciais
-> diferentes dentro do mesmo estudo (ex.: Residencial a 12,5% a.a. × Não residencial a
-> 13% a.a., o par que a EVI trata via `VendasNaoResidDiferenciarCondicoes`,
-> `Premissas!H16`) — **basta criar dois Grupos**, um por regime. O app não replica o flag
-> global da planilha; a equivalência funcional é esta seção.
+> ✅ **Comportamento vigente: o Grupo (linha de receita) é a unidade de regime comercial —
+> menos nos JUROS DE TABELA, que a #585 tornou do ESTUDO.** Cada Grupo tem sua própria
+> absorção (§10.1 acima) e seu próprio plano de pagamento (`fluxo_pagamento`, com
+> `entrada`/`parcelas`/`repasse`/`comissao`).
 >
-> Cada Grupo participa do `jurosClientes` e do `receitaPorComponenteMensal` do estudo
-> independentemente, com sua própria carteira de safras — o motor nunca mistura a carteira de
-> um Grupo com a de outro (`frontend/fluxo-caixa-motor.ts:1094`: cada safra é isolada por linha).
-> `estudos.juros_tabela_aa_padrao` (painel de premissas → aba Financeiro) é só um **default
-> herdado**, aplicado somente à criação de um Grupo novo — nunca sobrescreve um Grupo já
-> existente, e editar o default não altera nenhum Grupo já gravado.
+> 🔴 **A taxa de juros de tabela NÃO é mais do Grupo.** Decisão do autor de 2026-08-26
+> (issue #585): *"campo juros de tabela funciona para todos os imóveis igualmente e o valor
+> não é inserido aqui. será na aba financeiro"*. A taxa é **uma só para o estudo inteiro**,
+> digitada em Viabilidade → Financeiro (`estudos.juros_tabela_aa_padrao`), e o motor a aplica
+> a todo componente financiado de todas as linhas — as já gravadas inclusive
+> (`componentesPagamento`, `frontend/fluxo-caixa-motor.ts`). A chave
+> `fluxo_pagamento.juros_tabela_aa` que a #428 gravava por linha continua nos JSONs antigos e
+> é **inerte**; a primeira gravação de cada linha a descarta.
+>
+> ⚠️ **O que isso retirou, e a issue o declara:** dois regimes comerciais com taxas diferentes
+> no mesmo estudo (Residencial a 12,5% a.a. × Não residencial a 13% a.a., o par que a EVI trata
+> via `VendasNaoResidDiferenciarCondicoes`, `Premissas!H16`) **deixaram de ser representáveis**.
+> Criar dois Grupos ainda separa absorção e plano de pagamento — não separa mais os juros.
+>
+> O que a #477 estabeleceu e **continua valendo**: cada Grupo participa do `jurosClientes` e do
+> `receitaPorComponenteMensal` do estudo independentemente, com sua própria carteira de safras —
+> o motor nunca mistura a carteira de um Grupo com a de outro
+> (`frontend/fluxo-caixa-motor.ts:1094`: cada safra é isolada por linha). O que mudou foi a
+> TAXA que entra nessas carteiras, não o isolamento delas.
+>
+> O papel de `estudos.juros_tabela_aa_padrao` também mudou: era **default de criação** (#477,
+> migração `033`) e passou a ser o **valor vigente** (#585, migração `037`, que faz o backfill
+> a partir das taxas das linhas — a mais frequente do estudo).
 >
 > Fora de escopo desta seção: "venda à vista num único mês" (a "NR diferenciada" da EVI,
 > `Premissas!M11`) não é um modo de absorção implementado — é modelo novo, sem demanda
@@ -967,7 +978,7 @@ A soma dos três percentuais informados não pode ultrapassar 100%.
 > (`frontend/fluxo-absorcao-editor.ts`) zera apenas o valor **do formulário**, ao abrir o modal — e
 > guarda o valor cru em `form.lido`, justamente para que esse zero conte como **edição** e não seja
 > engolido pelo no-op da #431. Salvar os parâmetros do Cronograma **não toca no JSON de absorção**
-> (`backend/rotas/avancado.ts:479-504`): o bloco `pre_lancamento` persistido continua lá, com o
+> (`backend/rotas/avancado.ts:473-495`): o bloco `pre_lancamento` persistido continua lá, com o
 > percentual antigo.
 >
 > Até alguém abrir o modal e clicar em **Aplicar**, `absorcaoMensal` segue lendo esse bloco e o
@@ -1798,7 +1809,7 @@ A permuta física:
 > calcula o KPI como `quantidade × area_privativa_m2 × preco_m2` da tipologia alocada
 > (`frontend/fluxo-caixa-motor.ts:85`), **sem ler `orcamento_valor`**. Quem procurar uma entrada de
 > valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
-> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:779`, #253); a coluna permanece no
+> escrever `unidades_permutadas` (`backend/rotas/avancado.ts:773`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
 > (`frontend/fluxo-caixa-motor.ts:58`, chamada em `:1811`) e a projeta de volta nas tipologias uma
 > única vez (`:1821-1828`), para que toda função que já lia `t.unidades_permutadas` fique correta
@@ -2204,7 +2215,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2279`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2249`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`

@@ -76,6 +76,7 @@ function fluxo(receitas: any[], operacoes: OperacaoFunding[] = []): FluxoCalc {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027',
     taxaDescontoAa: 12,
+    jurosTabelaAaEstudo: 0,
     cronograma: CRONO,
     linhasReceita: receitas,
     linhasCusto: CUSTOS,
@@ -147,6 +148,7 @@ test('#594 critério 1 / #611: sem investimento não há ROI — null, nunca zer
   // `investimentoTotal` = 0, o denominador não existe.
   const c = calcularFluxo({
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: RECEITAS_INCORPORACAO, linhasCusto: [], curvas: [],
     areaTerreno: 40_000, ret: { ativo: false, pct: 0 },
   });

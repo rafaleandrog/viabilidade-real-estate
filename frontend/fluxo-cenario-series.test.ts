@@ -61,6 +61,7 @@ const pagamento = {
 // os dois casos já estão aqui.
 const INCORPORACAO: FluxoConfig = {
   dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+  jurosTabelaAaEstudo: 0,
   linhasReceita: [{
     id: 1, nome: 'Torre A', fase_label: 'Torre A',
     tipologias: [
@@ -79,6 +80,7 @@ const INCORPORACAO: FluxoConfig = {
 
 const LOTEAMENTO: FluxoConfig = {
   dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+  jurosTabelaAaEstudo: 0,
   linhasReceita: [{
     id: 1, nome: 'Quadra 1', fase_label: 'Quadra 1',
     tipologias: [{ id: 21, nome: 'Lote padrão', quantidade: 250, area_privativa_m2: 300, preco_m2: 1_000 }],

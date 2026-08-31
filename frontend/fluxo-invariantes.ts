@@ -189,6 +189,11 @@ export function validarSafrasReceita(
   prazo: number,
   tol: number = TOLERANCIA_PADRAO,
   linhasCusto: any[], // #444: OBRIGATÓRIO — omitir vira TS2554, não silêncio (a mutação de fiação provou que um parâmetro opcional aqui deixa a suíte inteira verde mesmo sem o wiring)
+  // #585: OBRIGATÓRIO, mesma disciplina do #444 acima — a taxa de tabela do
+  // ESTUDO (`estudos.juros_tabela_aa_padrao`). As invariantes precisam ver os
+  // MESMOS componentes que o motor, e desde a #585 a `taxaMensal` deles vem do
+  // estudo, não da linha.
+  jurosTabelaAaEstudo: number,
 ): Divergencia[] {
   const out: Divergencia[] = [];
   const linhas = linhasCusto.length > 0
@@ -197,8 +202,8 @@ export function validarSafrasReceita(
   const obra = cronograma.find((e) => e.evento === 'obra');
   const mesEntrega = obra ? Number(obra.inicio_mes) + Number(obra.duracao_meses) - 1 : 0;
   for (const linha of linhas) {
-    const componentes = componentesPagamento(linha.fluxo_pagamento, cronograma);
-    const contratacoes = vendaLiquidaContratadaMensal(linha, cronograma, prazo);
+    const componentes = componentesPagamento(linha.fluxo_pagamento, cronograma, jurosTabelaAaEstudo);
+    const contratacoes = vendaLiquidaContratadaMensal(linha, cronograma, prazo, jurosTabelaAaEstudo);
     // #444: mesma regra do motor para o `ate_marco` degenerado (N_s ≤ 0) —
     // `componentesIntegradosSafra` converte para `imediato`, exatamente como
     // `calcularFluxo` faz (`residuoAteMarco` vive em

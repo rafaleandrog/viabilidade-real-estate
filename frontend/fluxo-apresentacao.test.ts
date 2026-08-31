@@ -18,6 +18,7 @@ const CRONO = [
 
 const CONFIG: FluxoConfig = {
   dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+  jurosTabelaAaEstudo: 0,
   linhasReceita: [{
     id: 1, nome: 'Grupo Residencial', fase_label: 'Torre A',
     tipologias: [
@@ -706,6 +707,7 @@ test('#427 não-regressão: o campo `resultado` de #351/#426 não muda de valor 
  */
 const CONFIG_LOTEAMENTO: FluxoConfig = {
   dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+  jurosTabelaAaEstudo: 0,
   ret: { ativo: true, pct: 4 },
   linhasReceita: [{
     id: 1, nome: 'Quadra A', fase_label: 'Lotes',

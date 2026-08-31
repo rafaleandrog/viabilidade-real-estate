@@ -8,11 +8,10 @@ import {
   type EventoCrono,
 } from './fluxo-shared.js';
 import {
-  pctRepasseDerivado, parcelasAoLongoObra, jurosTabelaAnualPct, type ResiduoAteMarco,
+  pctRepasseDerivado, parcelasAoLongoObra, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import {
   erroFormularioPagamento, fluxoPagamentoParaSalvar, formularioPagamento,
-  taxasDistintasDoPlano,
 } from './fluxo-pagamento-editor.js';
 // #431: a lógica do modal de Absorção mora fora do componente, como a do modal
 // de Pagamento — método privado de LitElement não é testável neste repo.
@@ -172,12 +171,12 @@ export class ViabFluxoReceitas extends LitElement {
        1ª faixa (auto-placement do CSS Grid); coluna única resolve. */
     .pag-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
     .pag-secao { margin-bottom: 14px; }
-    /* #436/#431: a nota sobre os juros precisa competir com o número que ela
-       qualifica, senão vira letra miúda ao lado de um destaque. O texto mudou
-       na #431 — "Aplicar apaga estes juros" virou "estes juros são
-       preservados; o que falta é onde criar taxa" —, mas o destaque continua
-       valendo: é a única linha da tela que fala do limite do formulário. */
-    .aviso-juros { color: var(--cor-alerta, #b45309); }
+    /* #585: a regra .aviso-juros FOI REMOVIDA junto com o aviso de "N taxas
+       diferentes gravadas" — ela era a unica consumidora da classe, e o aviso
+       saiu com o campo de juros do modal. Nao ha mais plano heterogeneo a
+       anunciar: a taxa e do estudo.
+       (Sem crase neste bloco de proposito: crase dentro do template literal de
+       CSS FECHA o template, e o guard acusa o erro na linha errada.) */
     .pag-secao h4 {
       margin: 0 0 8px; font-size: var(--texto-rotulo, 0.75rem); letter-spacing: 0.04em;
       color: var(--cor-texto-sec, rgba(255,255,255,0.5)); text-transform: uppercase;
@@ -789,19 +788,11 @@ export class ViabFluxoReceitas extends LitElement {
     this.modalPag = f;
   }
 
-  /**
-   * #428 — a taxa de juros de tabela do plano. É UM campo por Grupo (D-Q02),
-   * não um por componente: gravá-lo aqui faz `componentesDoLegado` escrever a
-   * mesma `taxaMensal` em todo componente financiado do plano.
-   *
-   * Escrever a chave `juros_tabela_aa` no formulário é o que marca "o usuário
-   * mexeu": enquanto ela não existir, `componentesParaSalvar` trata a taxa
-   * como só-canônica e preserva a que está persistida, componente a
-   * componente. Ver `fluxo-pagamento-editor.ts` § `taxaFoiEditada`.
-   */
-  private _setJurosTabela(valor: number) {
-    this.pagForm = { ...this.pagForm, juros_tabela_aa: valor };
-  }
+  // #585 — `_setJurosTabela` FOI REMOVIDO junto com o campo do modal. A taxa
+  // de tabela deixou de ser do PLANO (uma por Grupo, D-Q02 da #428) e passou a
+  // ser do ESTUDO: uma só, digitada em Viabilidade → Financeiro
+  // (`estudos.juros_tabela_aa_padrao`), aplicada a todas as linhas de receita,
+  // as existentes inclusive. Decisão do autor de 2026-08-26.
 
   /**
    * #460 — destino do resíduo de um Parcelamento "Ao longo da obra" sem prazo
@@ -860,60 +851,22 @@ export class ViabFluxoReceitas extends LitElement {
     const dis = !this.editavel;
     const repasse = pctRepasseDerivado(f);
     const erroPagamento = erroFormularioPagamento(f, this.crono);
-    // #436/#428: o bloco de juros. A #436 o criou somente-leitura, lendo o
-    // fluxo_pagamento PERSISTIDO; a #428 lhe deu o campo editável, e o campo lê
-    // `pagForm` — é ele que o "Aplicar" grava.
+    // #585: o bloco de juros SAIU deste modal — campo, texto e o aviso de
+    // "N taxas diferentes gravadas". Com uma taxa por ESTUDO não há mais o que
+    // avisar: a taxa da aba Financeiro vale para todos os componentes de todas
+    // as linhas, e `componentesPagamento` a aplica na leitura.
     //
-    // As duas leituras convivem de propósito e NÃO são redundantes:
-    //  - `jurosAA` é a taxa DO PLANO, uma só (D-Q02). Sai de `pagForm` pela
-    //    chave `juros_tabela_aa` se ela existir, senão derivada dos componentes
-    //    persistidos — sem esse segundo ramo, o estudo 5 (que recebeu a taxa
-    //    pela API, sem a chave) abriria em 0% e o primeiro Aplicar a apagaria;
-    //  - `taxasPlano` continua lendo o persistido para responder UMA pergunta
-    //    que o campo único não responde: o plano tem mais de uma taxa gravada?
-    //    Esse é o caso residencial × não residencial da EVI, e é a única
-    //    situação em que mexer no campo achata dado. O aviso abaixo só aparece
-    //    nela.
+    // ⚠️ O custo, declarado e aceito pelo autor: a EVI Urbitá pratica taxas
+    // diferentes para Residencial × Não Residencial, e esse cenário deixou de
+    // ser representável. O aviso removido existia exatamente para ele.
     //
-    // Os KPIs que se movem com a taxa são Receita Bruta, Resultado, margem, VPL
-    // e TIR — NÃO o "VGV Vendável", que sai de `vgvLinha(tipologias)` (área ×
-    // preço) e não conhece juros. Medido na Rodada 8 sobre o estudo 5:
-    // R$ 1.259.273,59 de juros, TIR 18,59% contra 17,53%, VPL -R$ 959.500,19.
-    // Revisao da #428, B3 — o gatilho do aviso NAO pode ser
-    // `jurosDeTabelaConfigurados`, que descarta taxa zero por contrato da #436:
-    // no plano canonico do estudo 5 (12,5% no `ate_marco`, 0% no Repasse de
-    // 70%) isso suprimia o aviso exatamente onde alterar o campo move mais
-    // dinheiro. `taxasDistintasDoPlano` conta o zero.
-    const taxasPlano = taxasDistintasDoPlano(this.modalPag?.fluxo_pagamento);
-    const jurosAA = jurosTabelaAnualPct(f);
+    // Os KPIs que se movem com a taxa continuam sendo Receita Bruta, Resultado,
+    // margem, VPL e TIR — NÃO o "VGV Vendável", que sai de
+    // `vgvLinha(tipologias)` (área × preço) e não conhece juros.
     return html`
       <urbi-modal title="Fluxo de pagamento" maxWidth="860px" @urbi-modal:close=${() => this.modalPag = null}>
         <div class="pag-grid">
           <div>
-            <div class="pag-secao">
-              <h4>Juros de tabela</h4>
-              <!-- #428: o campo editável, um por Grupo/plano (decisão D-Q02) e
-                   NÃO um por componente. A persistência grava a mesma taxa
-                   mensal equivalente em todo componente financiado do plano.
-                   O sinal (sinalPct, #455) é por LINHA de Parcelamento —
-                   ver o bloco "Parcelamento" abaixo. -->
-              <p class="sec">Juros da tabela de venda a prazo, em % ao ano. Valem para o plano
-                inteiro — entrada parcelada, parcelamento e repasse —, convertidos para a taxa
-                mensal equivalente pela composição (1 + i)^(1/12) - 1, nunca por i/12.
-                0% é venda sem juros, e é como fica todo plano em que ninguém digitar nada.</p>
-              <div class="pag-linha">
-                <viab-num label="Juros de tabela (% a.a.)" sufixo="%" casas-minimas="2"
-                  ?desabilitado=${dis} .valor=${jurosAA}
-                  @urbi:input-numero-change=${(ev: CustomEvent) => this._setJurosTabela(ev.detail.valor ?? 0)}></viab-num>
-              </div>
-              ${taxasPlano.length > 1 ? html`
-                <p class="sec aviso-juros">Este plano tem <strong>${taxasPlano.length} taxas
-                  diferentes</strong> gravadas (${taxasPlano.map((j) => fmtPct(j.anualPct) + ' a.a. em ' + j.rotulos.join(', ')).join(' · ')}),
-                  e este campo guarda <strong>uma</strong>. Enquanto você não mexer nele, as taxas
-                  dos componentes que sobrevivem à edição são preservadas como estão; ao
-                  alterá-lo, a taxa acima passa a valer para <strong>todos</strong> os componentes
-                  do plano — inclusive os que hoje estão em 0%.</p>` : nothing}
-            </div>
             <div class="pag-secao">
               <h4>Condições de entrada</h4>
               <p class="sec">Pagamento no ato — 1 parcela paga no mês da contratação; mais de uma
@@ -1042,7 +995,12 @@ export class ViabFluxoReceitas extends LitElement {
     try {
       // #248: `componentes` é o contrato canônico opt-in. O espelho legado
       // preserva o cálculo até a integração do motor na #283.
-      const fluxo = fluxoPagamentoParaSalvar(this.pagForm, this.crono);
+      // #585: a taxa de tabela do ESTUDO entra aqui, e é o que
+      // `componentesParaSalvar` grava em todo componente financiado — o dado
+      // persistido passa a bater com o que o motor calcula.
+      const fluxo = fluxoPagamentoParaSalvar(
+        this.pagForm, this.crono, Number(this.estudo?.juros_tabela_aa_padrao) || 0,
+      );
       const res = await atualizarFaseAvancado(this.estudo.id, this.modalPag.id, { fluxo_pagamento: fluxo });
       if (res?.erro) { this.modalErro = res.mensagem || 'Erro ao aplicar'; return; }
       this.fases = this.fases.map((x) => (x.id === this.modalPag.id ? { ...x, fluxo_pagamento: fluxo } : x));

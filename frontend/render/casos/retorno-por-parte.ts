@@ -68,6 +68,7 @@ function calcular(receitas: any[]) {
   return calcularFluxo({
     dataInicio: DATA_INICIO,
     taxaDescontoAa: 12,
+    jurosTabelaAaEstudo: 0,
     cronograma: CRONO,
     linhasReceita: receitas,
     linhasCusto: CUSTOS,

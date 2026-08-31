@@ -181,19 +181,29 @@ export class ViabTelaFinanceiro extends LitElement {
         </div>
       </urbi-card>
 
-      <urbi-card titulo="Regime comercial das linhas de receita">
-        <!-- #477: cada linha de receita (Grupo, em Receitas) já é a unidade de
-             regime comercial — tem sua própria absorção, plano de pagamento e
-             juros de tabela. Este default só se aplica a linhas NOVAS, na
-             criação; nunca sobrescreve uma linha já gravada. -->
+      <urbi-card titulo="Juros de tabela">
+        <!-- #585 (decisão do autor, 2026-08-26): "campo juros de tabela funciona
+             para todos os imóveis igualmente e o valor não é inserido aqui. será
+             na aba financeiro". A taxa deixou de ser por Grupo (D-Q02 da #428) e
+             de ser default de criação (#477): é UM valor do estudo, e muda o
+             cálculo de TODAS as linhas de receita, as já criadas inclusive.
+             Quem for "arrumar" isto de volta para uma taxa por linha: a taxa
+             única é o pedido, não um descuido. -->
         <p class="dica">
-          Cada linha de receita (Grupo, na aba Receitas) tem seu próprio regime — absorção, plano de
-          pagamento e juros de tabela. Para dois regimes diferentes (ex.: Residencial × Não
-          residencial), crie duas linhas. O valor abaixo é só o <strong>default de linhas novas</strong>
-          — editá-lo não muda nenhuma linha já criada.
+          Juros da tabela de venda a prazo, em % ao ano, <strong>para o estudo inteiro</strong> —
+          entrada parcelada, parcelamento e repasse de <strong>todas</strong> as linhas de receita.
+          Convertidos para a taxa mensal equivalente pela composição (1 + i)^(1/12) − 1, nunca por
+          i/12. Editar este campo <strong>muda o cálculo de todas as linhas já criadas</strong>;
+          0% é venda sem juros.
+        </p>
+        <p class="dica">
+          Cada linha de receita (Grupo, na aba Receitas) continua sendo a unidade de regime
+          comercial — absorção e plano de pagamento são dela. Os <strong>juros</strong>, não: eles
+          são um só para o estudo. Regimes com taxas diferentes (ex.: Residencial × Não residencial)
+          não são representáveis nesta versão.
         </p>
         <div class="grid">
-          ${this._n('juros_tabela_aa_padrao', 'Juros de tabela padrão (linhas novas)', '% a.a.', dis)}
+          ${this._n('juros_tabela_aa_padrao', 'Juros de tabela', '% a.a.', dis)}
         </div>
       </urbi-card>
 

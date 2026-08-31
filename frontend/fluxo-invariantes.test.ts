@@ -569,7 +569,7 @@ test('validarSafrasReceita: identifica linha e safra com componentes que não fe
     tipologias: [{ quantidade: 1, area_privativa_m2: 50, preco_m2: 10_000 }],
     fluxo_pagamento: { componentes: [{ tipo: 'imediato', participacaoPct: 90, descontoPct: 0 }] },
   }];
-  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [])[0];
+  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0)[0];
   assert.equal(div.codigo, 'SOMA_COMPONENTES_DIVERGE');
   assert.equal(div.linha, 'Torre A');
   assert.equal(div.safra, 1);
@@ -591,7 +591,7 @@ test('#444 validarSafrasReceita: ate_marco degenerado (N_s ≤ 0, mesmo mecanism
   }];
   // safra 1 (lançamento) == marcoMes 1 → N_s = 0 ≤ 0 — o motor converte para
   // `imediato`; o validador precisa fazer o mesmo, não lançar/capturar.
-  const r = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, []);
+  const r = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0);
   assert.deepEqual(r.filter((d) => d.codigo === 'COMPONENTE_INVALIDO'), []);
 
   // `calcularFluxo` roda sem exceção sobre a MESMA fixture e produz número —
@@ -599,6 +599,7 @@ test('#444 validarSafrasReceita: ate_marco degenerado (N_s ≤ 0, mesmo mecanism
   // recebida integralmente no mês 1 (safra 1 → imediato): 1×50×10.000.
   const calc = calcularFluxo({
     dataInicio: null, taxaDescontoAa: 10, cronograma: CRONO_PRODUTO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: linhas, linhasCusto: [], areaTerreno: 0,
   });
   assert.equal(calc.fluxoMensal[1], 500_000);
@@ -618,7 +619,7 @@ test('#444 validarSafrasReceita: componente GENUINAMENTE inválido (concentrado 
   // contratação na safra 1 (lançamento, inicio_mes 1); mesPagamento 0 < safra
   // 1 — `pagamentosConcentrado` lança (#234), independente da conversão do
   // `ate_marco` degenerado que esta issue introduziu.
-  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, []).find((d) => d.codigo === 'COMPONENTE_INVALIDO');
+  const div = validarSafrasReceita(linhas, CRONO_PRODUTO, 20, undefined, [], 0).find((d) => d.codigo === 'COMPONENTE_INVALIDO');
   assert.ok(div, 'componente genuinamente inválido deveria continuar sendo acusado');
 });
 

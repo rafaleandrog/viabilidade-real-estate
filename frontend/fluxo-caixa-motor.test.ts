@@ -5,7 +5,7 @@ import {
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
   recebimentoBrutoMensal, impostoMensal, recebimentoLiquidoMensal,
   componentesDoLegado, componentesPagamento, ultimoMesRecebivelLinha,
-  taxaMensalDeAnual, taxaAnualDeMensal, jurosTabelaAnualPct, taxaMensalDoPlano,
+  taxaMensalDeAnual, taxaAnualDeMensal, taxaMensalDoEstudo,
   pmt, pagamentosPrazoFixo, pagamentosAteMarco, pagamentosConcentrado,
   carteiraSaldoSafra, consolidarCarteiraClientes,
   calcularRecebiveisComponentes,
@@ -38,9 +38,9 @@ const CURVA_S = [2, 4, 7, 10, 13, 14, 14, 13, 10, 7, 4, 2].map((pct, i) => ({ me
 
 test('#230: contrato canônico é preferido sem alterar a leitura legada', () => {
   const fluxo = { componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }] };
-  assert.deepEqual(componentesPagamento(fluxo, CRONO), fluxo.componentes);
+  assert.deepEqual(componentesPagamento(fluxo, CRONO, 0), fluxo.componentes);
   const legado = { entrada: [{ pct: 15, parcelas: 1 }], parcelas: [], repasse: { apos_entrega_meses: 0 } };
-  assert.deepEqual(componentesPagamento(legado, CRONO), componentesDoLegado(legado, CRONO));
+  assert.deepEqual(componentesPagamento(legado, CRONO, 0), componentesDoLegado(legado, CRONO, 0));
 });
 
 // 1. Distribuição linear (mês 0-based: início 3 = índice 3)
@@ -93,7 +93,7 @@ test('descontoComercialMensal: zero sem entrada configurada — nenhum estudo ex
     absorcao: { modo: 'linear' },
     fluxo_pagamento: null,
   };
-  const r = descontoComercialMensal(linha, CRONO, 60);
+  const r = descontoComercialMensal(linha, CRONO, 60, 0);
   assert.ok(r.every((v) => v === 0));
 });
 
@@ -104,7 +104,7 @@ test('descontoComercialMensal: aplica só sobre a fração da entrada, não sobr
     fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] },
   };
   const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60);
-  const desconto = descontoComercialMensal(linha, CRONO, 60);
+  const desconto = descontoComercialMensal(linha, CRONO, 60, 0);
   // desconto = 5% de (20% da venda bruta do mês), não 5% da venda inteira.
   assert.ok(perto(desconto[12], bruto[12] * 0.20 * 0.05, 1));
   assert.ok(desconto[12] < bruto[12] * 0.05); // bem menor que 5% do total
@@ -117,8 +117,8 @@ test('vendaLiquidaContratadaMensal = bruta − desconto, mês a mês', () => {
     fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] },
   };
   const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60);
-  const desconto = descontoComercialMensal(linha, CRONO, 60);
-  const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60);
+  const desconto = descontoComercialMensal(linha, CRONO, 60, 0);
+  const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60, 0);
   for (let i = 0; i < liquido.length; i++) assert.ok(perto(liquido[i], bruto[i] - desconto[i], 1e-6));
 });
 
@@ -134,8 +134,8 @@ test('#260: vendaBrutaContratadaMensal/descontoComercialMensal/vendaLiquidaContr
   };
   const casas2 = (v: number) => Math.round(v * 100) / 100 === v;
   const bruto = vendaBrutaContratadaMensal(linha, CRONO, 60);
-  const desconto = descontoComercialMensal(linha, CRONO, 60);
-  const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60);
+  const desconto = descontoComercialMensal(linha, CRONO, 60, 0);
+  const liquido = vendaLiquidaContratadaMensal(linha, CRONO, 60, 0);
   assert.ok(bruto.every(casas2), 'venda bruta com resíduo além de 2 casas');
   assert.ok(desconto.every(casas2), 'desconto comercial com resíduo além de 2 casas');
   assert.ok(liquido.every(casas2), 'venda líquida com resíduo além de 2 casas');
@@ -274,6 +274,7 @@ test('#457: com Pré-lançamento, a permuta só baixa no mês do Lançamento —
 test('#260: rateio monetário fecha exatamente com o total da linha', () => {
   const r = calcularFluxo({
     dataInicio: 'jan/2027', prazoMeses: 3, taxaDescontoAa: 12, areaTerreno: 0, cronograma: [], linhasReceita: [],
+    jurosTabelaAaEstudo: 0,
     linhasCusto: [{ id: 1, grupo: 'indireto', categoria: 'Projetos', orcamento_valor: 100, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 3 }],
   });
   const linha = r.linhasCusto[0];
@@ -293,6 +294,7 @@ test('#260: rateio monetário fecha exatamente com o total da linha', () => {
 test('#260: custo canônico mantém o mesmo fluxo após troca de unidade', () => {
   const r = calcularFluxo({
     dataInicio: 'jan/2027', prazoMeses: 1, taxaDescontoAa: 12, areaTerreno: 0, cronograma: [], linhasReceita: [],
+    jurosTabelaAaEstudo: 0,
     linhasCusto: [{ id: 1, grupo: 'indireto', categoria: 'Projetos', orcamento_valor: 12.09, orcamento_unidade: 'pct_vgv', orcamento_valor_canonico: 10_000_000, inicio_mes: 0, duracao_meses: 1 }],
   });
   assert.equal(r.linhasCusto[0].total, 10_000_000);
@@ -309,9 +311,9 @@ test('#260: recebimentoBrutoMensal/impostoMensal/recebimentoLiquidoMensal têm 2
     },
   };
   const casas2 = (v: number) => Math.round(v * 100) / 100 === v;
-  const bruto = recebimentoBrutoMensal(linha, CRONO, 60);
-  const imposto = impostoMensal(linha, CRONO, 60);
-  const liquido = recebimentoLiquidoMensal(linha, CRONO, 60);
+  const bruto = recebimentoBrutoMensal(linha, CRONO, 60, 0);
+  const imposto = impostoMensal(linha, CRONO, 60, 0);
+  const liquido = recebimentoLiquidoMensal(linha, CRONO, 60, 0);
   assert.ok(bruto.every(casas2), 'recebimento bruto com resíduo além de 2 casas');
   assert.ok(imposto.every(casas2), 'imposto com resíduo além de 2 casas');
   assert.ok(liquido.every(casas2), 'recebimento líquido com resíduo além de 2 casas');
@@ -341,12 +343,12 @@ test('#584: área aberta muda recebimentoBruto/imposto/líquido — não só o V
     ...base,
     tipologias: [{ ...base.tipologias[0], area_privativa_aberta_m2: 20 }],
   };
-  const brutoBase = recebimentoBrutoMensal(base, CRONO, 60);
-  const brutoAberta = recebimentoBrutoMensal(comAberta, CRONO, 60);
-  const impostoBase = impostoMensal(base, CRONO, 60, base.fluxo_pagamento.ret);
-  const impostoAberta = impostoMensal(comAberta, CRONO, 60, comAberta.fluxo_pagamento.ret);
-  const liquidoBase = recebimentoLiquidoMensal(base, CRONO, 60, base.fluxo_pagamento.ret);
-  const liquidoAberta = recebimentoLiquidoMensal(comAberta, CRONO, 60, comAberta.fluxo_pagamento.ret);
+  const brutoBase = recebimentoBrutoMensal(base, CRONO, 60, 0);
+  const brutoAberta = recebimentoBrutoMensal(comAberta, CRONO, 60, 0);
+  const impostoBase = impostoMensal(base, CRONO, 60, 0, base.fluxo_pagamento.ret);
+  const impostoAberta = impostoMensal(comAberta, CRONO, 60, 0, comAberta.fluxo_pagamento.ret);
+  const liquidoBase = recebimentoLiquidoMensal(base, CRONO, 60, 0, base.fluxo_pagamento.ret);
+  const liquidoAberta = recebimentoLiquidoMensal(comAberta, CRONO, 60, 0, comAberta.fluxo_pagamento.ret);
 
   const somaBruto = brutoBase.reduce((s, v) => s + v, 0);
   const somaBrutoAberta = brutoAberta.reduce((s, v) => s + v, 0);
@@ -400,7 +402,7 @@ test('#227: desconto de entrada reproduz o à vista do mês 1 do cenário G.1 (C
   // prazoTotal folgado (140) para não estourar o horizonte do repasse derivado
   // (80% da venda, no fim da Obra do cenário = mês 132) — este teste só confere
   // o mês 1, mas #231 agora avisa (console.warn) se algo cair fora do array.
-  const r = receitaMensalLinha(linha, cronoG1, 140);
+  const r = receitaMensalLinha(linha, cronoG1, 140, 0);
   // Mês 1: só a fração de entrada cai no mês da venda (as demais modalidades —
   // curta/longa, #232+ — ainda não existem nesta fase); confere isoladamente o
   // valor da entrada com desconto.
@@ -422,7 +424,7 @@ test('absorção distribuída: vendas caem nos 4 períodos e somam o VGV', () =>
     },
     fluxo_pagamento: null, // sem config → recebe à vista no mês da venda
   };
-  const r = receitaMensalLinha(linha, CRONO, 60);
+  const r = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 50_000_000, 1));
   assert.ok(perto(r[6], (0.20 * 50_000_000) / 6, 1));   // pré-lançamento: 20% / 6 meses
   assert.ok(perto(r[12], (0.10 * 50_000_000) / 1, 1));  // lançamento: 10% em 1 mês
@@ -446,7 +448,7 @@ test('fluxo de pagamento distribui entrada, parcelas na obra e repasse na entreg
       repasse: { pct: 70, apos_entrega_meses: 2 }, // #345: ignorado — offset travado em 1
     },
   };
-  const r = receitaMensalLinha(linha, CRONO, 60);
+  const r = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 10_000_000, 1));                   // nada se perde
   assert.ok(perto(r[12], 1_500_000, 1));                      // entrada no mês 12
   // #190: parcelas ancoradas nos MESES DA OBRA (17..40 = 24 parcelas), não mais
@@ -487,7 +489,7 @@ test('#190 venda no meio da obra: 1ª parcela no 1º vencimento >= mês da venda
       repasse: { pct: 0, apos_entrega_meses: 0 },
     },
   };
-  const r = receitaMensalLinha(linha, CRONO, 60);
+  const r = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 10_000_000, 1));                   // conservação da receita
   assert.ok(perto(r[24], 0, 1));                              // antes da venda: nada
   assert.ok(perto(r[25], 10_000_000 / 16, 1));                // parcela maior, total igual
@@ -529,7 +531,7 @@ test('#191 semestral: receita se conserva e vence no intervalo certo', () => {
       repasse: { pct: 0, apos_entrega_meses: 0 },
     },
   };
-  const r = receitaMensalLinha(linha, CRONO, 60);
+  const r = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 10_000_000, 1));            // conservação da receita
   // 4 parcelas iguais nos meses 17, 23, 29 e 35 — e nada nos meses do meio.
   for (const mes of [17, 23, 29, 35]) assert.ok(perto(r[mes], 10_000_000 / 4, 1));
@@ -561,7 +563,7 @@ test('fluxo de pagamento: múltiplas entradas + repasse derivado (100 − entrad
       repasse: { apos_entrega_meses: 2 }, // #345: ignorado — pct derivado = 100 − 15 − 15 = 70
     },
   };
-  const r = receitaMensalLinha(linha, CRONO, 60);
+  const r = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(soma(r), 10_000_000, 1));       // nada se perde
   assert.ok(perto(r[12], 1_500_000, 1));          // 10% + 5% de entrada no mês 12
   // #190: parcelas ao longo da obra vencem nos MESES DA OBRA (17..40 = 24), não
@@ -578,6 +580,7 @@ test('fluxo de pagamento: múltiplas entradas + repasse derivado (100 − entrad
 test('#228: marcar comissão "Destacada" não muda mais o Resultado (fim da dupla dedução)', () => {
   const base = (tipo: 'embutida' | 'destacada'): FluxoConfig => ({
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
@@ -602,6 +605,7 @@ test('#228: marcar comissão "Destacada" não muda mais o Resultado (fim da dupl
 test('#228/#346: RET reduz o Resultado uma única vez (imposto), sem dobrar com a comissão', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
@@ -622,6 +626,7 @@ test('#228/#346: RET reduz o Resultado uma única vez (imposto), sem dobrar com 
 test('linha de custo em % VGV resolve sobre o VGV das tipologias', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Sales', tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
       absorcao: { modo: 'linear' }, fluxo_pagamento: null,
@@ -639,6 +644,7 @@ test('linha de custo em % VGV resolve sobre o VGV das tipologias', () => {
 test('nome da linha de custo inclui subcategoria só em Terreno (#173)', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [],
     linhasCusto: [
       { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta financeira', orcamento_valor: 1, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
@@ -657,6 +663,7 @@ test('nome da linha de custo inclui subcategoria só em Terreno (#173)', () => {
 test('corretagem de vendas cai no mês da venda, acompanhando a absorção', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
@@ -701,6 +708,7 @@ test('corretagem de vendas cai no mês da venda, acompanhando a absorção', () 
 test('#473: default (undefined) preserva o comportamento histórico — corretagem sobre o VGV BRUTO, permuta física inclusa', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
@@ -728,6 +736,7 @@ test('#473: default (undefined) preserva o comportamento histórico — corretag
 test('#473: corretagemSobrePermutaFisica=false usa o VGV VENDÁVEL, excluindo a permuta física', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
@@ -758,6 +767,7 @@ test('#473: corretagemSobrePermutaFisica=false usa o VGV VENDÁVEL, excluindo a 
 test('#473: com corretagemSobrePermutaFisica=true explícito, idêntico ao default (paridade)', () => {
   const base = (flag: boolean | undefined): FluxoConfig => ({
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
@@ -789,6 +799,7 @@ test('#473: com corretagemSobrePermutaFisica=true explícito, idêntico ao defau
 test('#473 com orcamento_valor_canonico persistido, o TOTAL da corretagem reage à base (não só o calendário)', () => {
   const base = (flag: boolean | undefined): FluxoConfig => ({
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, tipologia_id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
@@ -826,6 +837,7 @@ test('#473 com orcamento_valor_canonico persistido, o TOTAL da corretagem reage 
 test('corretagem sem linhas de receita não gera custo', () => {
   const config: FluxoConfig = {
     dataInicio: null, taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [],
     linhasCusto: [
       { id: 1, grupo: 'diretos', categoria: 'Corretagem de vendas', orcamento_valor: 4, orcamento_unidade: 'pct_vgv', inicio_mes: 0, duracao_meses: 1 },
@@ -843,6 +855,7 @@ test('corretagem sem linhas de receita não gera custo', () => {
 test('Preço do Terreno em sales_revenue acompanha o VGV vendido (#194)', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
@@ -879,6 +892,7 @@ test('Preço do Terreno em sales_revenue acompanha o VGV vendido (#194)', () => 
 test('Preço do Terreno em unit_delivery acompanha a receita em caixa, nao o VGV vendido (#194)', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
@@ -914,6 +928,7 @@ test('Preço do Terreno em unit_delivery acompanha a receita em caixa, nao o VGV
 test('Permuta financeira do Preço do Terreno deduz a receita, nao vira custo (#196)', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
@@ -956,6 +971,7 @@ test('Permuta financeira do Preço do Terreno deduz a receita, nao vira custo (#
 test('#238: permuta financeira bruta (default) não deduz imposto/corretagem da base', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
@@ -978,6 +994,7 @@ test('#238: permuta financeira bruta (default) não deduz imposto/corretagem da 
 test('#238: permuta financeira líquida deduz imposto e corretagem da base antes do %', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }], // VGV 100M
@@ -1004,6 +1021,7 @@ test('#238: permuta financeira líquida deduz imposto e corretagem da base antes
 test('#238: permuta financeira em valor fixo (rs) não distingue bruta/líquida', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
@@ -1030,6 +1048,7 @@ test('#238: permuta financeira em valor fixo (rs) não distingue bruta/líquida'
 test('#257: subcategoria "Permuta" (legada, pré-migração) NÃO é mais reconhecida como financeira', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [],
     linhasCusto: [
       { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta', orcamento_valor: 5_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
@@ -1051,6 +1070,7 @@ test('VPL a taxa zero é a soma simples do fluxo', () => {
 test('payback é o primeiro mês com acumulado ≥ 0 após investimento', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12,
+    jurosTabelaAaEstudo: 0,
     cronograma: [{ evento: 'lancamento', inicio_mes: 1, duracao_meses: 1 }, { evento: 'obra', inicio_mes: 1, duracao_meses: 2 }, { evento: 'pos_obra', inicio_mes: 3, duracao_meses: 2 }],
     linhasReceita: [{
       id: 1, nome: 'Sales', tipologias: [{ id: 1, quantidade: 1, area_privativa_m2: 100, preco_m2: 3_000 }], // 300k
@@ -1075,6 +1095,7 @@ test('TIR retorna null para fluxo sempre negativo', () => {
 test('fluxo completo: consolidação, acumulado, TIR e exposição coerentes', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Sales', fase_label: 'Fase 1',
       tipologias: [
@@ -1138,6 +1159,7 @@ test('fluxo completo: consolidação, acumulado, TIR e exposição coerentes', (
 test('permuta física usa tipologia/quantidade de Custos e reduz VGV vendável sem caixa', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Sales', fase_label: 'Fase 1',
       tipologias: [
@@ -1172,6 +1194,7 @@ test('permuta física usa tipologia/quantidade de Custos e reduz VGV vendável s
 test('#268: permuta física não duplica unidades quando a tipologia aparece em vários Grupos', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [
       { id: 1, tipologias: [{ id: 10, tipologia_id: 7, quantidade: 30, area_privativa_m2: 50, preco_m2: 10_000 }], absorcao: { modo: 'linear' }, fluxo_pagamento: null },
       { id: 2, tipologias: [{ id: 20, tipologia_id: 7, quantidade: 20, area_privativa_m2: 50, preco_m2: 11_000 }], absorcao: { modo: 'linear' }, fluxo_pagamento: null },
@@ -1191,6 +1214,7 @@ test('#268: permuta física não duplica unidades quando a tipologia aparece em 
 test('#229: taxonomia — bruto, desconto, líquido e Receita Bruta não colidem', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
@@ -1222,6 +1246,7 @@ test('#229: taxonomia — bruto, desconto, líquido e Receita Bruta não colidem
 test('tipologia 100% permutada nao gera receita em caixa (#195)', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [
@@ -1259,6 +1284,7 @@ test('tipologia 100% permutada nao gera receita em caixa (#195)', () => {
 test('#268: reserva sem tipologia correspondente em Receitas não pode ser precificada', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [],
     linhasCusto: [
       { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5, orcamento_valor: 2_000_000, orcamento_unidade: 'rs' },
@@ -1276,6 +1302,7 @@ test('#268: reserva sem tipologia correspondente em Receitas não pode ser preci
 test('#268: linha Permuta física com valor declarado em branco (migração #267) conta como 0, sem quebrar', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [],
     linhasCusto: [
       { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 5, orcamento_valor: null, orcamento_unidade: 'rs' },
@@ -1290,6 +1317,7 @@ test('#268: linha Permuta física com valor declarado em branco (migração #267
 test('aplicarCenario escala preço/m² das tipologias e orçamento de obra', () => {
   const base: FluxoConfig = {
     dataInicio: null, taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 10_000 }], // VGV 50M
@@ -1328,6 +1356,7 @@ test('aplicarCenario escala preço/m² das tipologias e orçamento de obra', () 
 test('agregarFluxoPorPeriodos: soma anual bate com a mensal em TODAS as linhas', () => {
   const config: FluxoConfig = {
     dataInicio: 'abr/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas', fase_label: 'Fase 1',
       tipologias: [
@@ -1406,6 +1435,7 @@ test('agregarFluxoPorPeriodos: soma anual bate com a mensal em TODAS as linhas',
 test('agregarFluxoPorPeriodos: acumulado é o saldo do ÚLTIMO mês do ano, não a soma', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, nome: 'Lote', quantidade: 100, area_privativa_m2: 250, preco_m2: 2_000 }],
@@ -1446,14 +1476,14 @@ test('agregarFluxoPorPeriodos: acumulado é o saldo do ÚLTIMO mês do ano, não
 // ─────────────────────────────────────────────────────────────────
 
 test('componentesDoLegado: sem fluxo_pagamento — um único imediato de 100%', () => {
-  const r = componentesDoLegado(null, CRONO);
+  const r = componentesDoLegado(null, CRONO, 0);
   assert.deepEqual(r, [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }]);
 });
 
 test('componentesDoLegado: entrada com 1 parcela → imediato, com desconto (#227)', () => {
   // 20% na entrada; o resto (80%) vira repasse derivado → concentrado.
   const fp = { entrada: [{ pct: 20, parcelas: 1, descontoPct: 5 }] };
-  const r = componentesDoLegado(fp, CRONO);
+  const r = componentesDoLegado(fp, CRONO, 0);
   assert.equal(r.length, 2); // imediato (entrada) + concentrado (repasse)
   assert.deepEqual(r[0], { tipo: 'imediato', participacaoPct: 20, descontoPct: 5 });
   assert.equal(r[1].tipo, 'concentrado');
@@ -1462,7 +1492,7 @@ test('componentesDoLegado: entrada com 1 parcela → imediato, com desconto (#22
 test('componentesDoLegado: entrada com várias parcelas → prazo_fixo com defasagem 0 (1ª no mês da venda, como hoje)', () => {
   // 30% na entrada; o resto (70%) vira repasse derivado → concentrado.
   const fp = { entrada: [{ pct: 30, parcelas: 4 }] };
-  const r = componentesDoLegado(fp, CRONO);
+  const r = componentesDoLegado(fp, CRONO, 0);
   assert.equal(r.length, 2); // prazo_fixo (entrada) + concentrado (repasse)
   assert.equal(r[0].tipo, 'prazo_fixo');
   const c = r[0] as any;
@@ -1475,7 +1505,7 @@ test('componentesDoLegado: entrada com várias parcelas → prazo_fixo com defas
 test('componentesDoLegado: parcelamento "ao longo da obra" → ate_marco no fim da Obra do cronograma', () => {
   // 40% ao longo da obra; o resto (60%) vira repasse derivado → concentrado.
   const fp = { parcelas: [{ pct: 40, ao_longo_obra: true, periodicidade: 'mensal' }] };
-  const r = componentesDoLegado(fp, CRONO);
+  const r = componentesDoLegado(fp, CRONO, 0);
   assert.equal(r.length, 2); // ate_marco (parcelas) + concentrado (repasse)
   assert.equal(r[0].tipo, 'ate_marco');
   const c = r[0] as any;
@@ -1488,7 +1518,7 @@ test('componentesDoLegado: parcelamento "ao longo da obra" → ate_marco no fim 
 test('componentesDoLegado: parcelamento sem "ao longo da obra" → prazo_fixo com defasagem = periodicidade', () => {
   // 25% em parcelamento; o resto (75%) vira repasse derivado → concentrado.
   const fp = { parcelas: [{ pct: 25, ao_longo_obra: false, periodicidade: 'trimestral', parcelas: 6 }] };
-  const r = componentesDoLegado(fp, CRONO);
+  const r = componentesDoLegado(fp, CRONO, 0);
   assert.equal(r.length, 2); // prazo_fixo (parcelas) + concentrado (repasse)
   assert.equal(r[0].tipo, 'prazo_fixo');
   const c = r[0] as any;
@@ -1503,7 +1533,7 @@ test('#455 componentesDoLegado: sinal do Parcelamento chega a sinalPct (ate_marc
       { pct: 25, ao_longo_obra: false, periodicidade: 'trimestral', parcelas: 6, sinalPct: 8.5 },
     ],
   };
-  const r = componentesDoLegado(fp, CRONO) as any[];
+  const r = componentesDoLegado(fp, CRONO, 0) as any[];
   const ateMarco = r.find((c) => c.tipo === 'ate_marco');
   const prazoFixo = r.find((c) => c.tipo === 'prazo_fixo');
   assert.equal(ateMarco.sinalPct, 15);
@@ -1511,7 +1541,7 @@ test('#455 componentesDoLegado: sinal do Parcelamento chega a sinalPct (ate_marc
 
   // Regressão: sem a chave (todo estudo anterior a esta issue), continua 0.
   const semSinal = componentesDoLegado(
-    { parcelas: [{ pct: 40, ao_longo_obra: true, periodicidade: 'mensal' }] }, CRONO,
+    { parcelas: [{ pct: 40, ao_longo_obra: true, periodicidade: 'mensal' }] }, CRONO, 0
   ) as any[];
   assert.equal(semSinal.find((c) => c.tipo === 'ate_marco').sinalPct, 0);
 });
@@ -1521,7 +1551,7 @@ test('#455 componentesDoLegado: Entrada parcelada NÃO ganha campo de sinal — 
   // `prazo_fixo`, mas fica sempre em 0 — mesmo que a chave exista no dado
   // persistido (ela não deveria existir ali, mas o motor não confia nisso).
   const fp = { entrada: [{ pct: 20, parcelas: 3, sinalPct: 99 } as any] };
-  const r = componentesDoLegado(fp, CRONO) as any[];
+  const r = componentesDoLegado(fp, CRONO, 0) as any[];
   assert.equal(r.find((c) => c.tipo === 'prazo_fixo').sinalPct, 0);
 });
 
@@ -1529,7 +1559,7 @@ test('#345 componentesDoLegado: repasse deriva concentrado no mês fixo (fim da 
   // `apos_entrega_meses: 2` é persistido mas IGNORADO — o offset é sempre 1,
   // inclusive para estudo legado com outro valor gravado.
   const fp = { entrada: [{ pct: 15, parcelas: 1 }], repasse: { apos_entrega_meses: 2 } };
-  const r = componentesDoLegado(fp, CRONO);
+  const r = componentesDoLegado(fp, CRONO, 0);
   const concentrado = r.find((c) => c.tipo === 'concentrado') as any;
   assert.ok(concentrado);
   assert.ok(perto(concentrado.participacaoPct, 85, 1e-6)); // 100 − 15 (derivado)
@@ -1543,7 +1573,7 @@ test('componentesDoLegado: participação total sempre fecha 100% (entrada+parce
     parcelas: [{ pct: 15, ao_longo_obra: true }, { pct: 10, ao_longo_obra: false, periodicidade: 'semestral', parcelas: 2 }],
     repasse: { apos_entrega_meses: 1 },
   };
-  const r = componentesDoLegado(fp, CRONO);
+  const r = componentesDoLegado(fp, CRONO, 0);
   const total = r.reduce((s, c: any) => s + c.participacaoPct, 0);
   assert.ok(perto(total, 100, 1e-6));
   assert.equal(r.length, 5); // 2 entradas + 2 parcelas + 1 repasse
@@ -1551,7 +1581,7 @@ test('componentesDoLegado: participação total sempre fecha 100% (entrada+parce
 
 test('componentesDoLegado: sem repasse (100% já coberto por entrada+parcelas) não cria concentrado', () => {
   const fp = { entrada: [{ pct: 100, parcelas: 1 }] };
-  const r = componentesDoLegado(fp, CRONO);
+  const r = componentesDoLegado(fp, CRONO, 0);
   assert.equal(r.length, 1);
   assert.ok(!r.some((c) => c.tipo === 'concentrado'));
 });
@@ -1562,14 +1592,14 @@ test('componentesDoLegado: sem repasse (100% já coberto por entrada+parcelas) n
 
 test('ultimoMesRecebivelLinha: sem fluxo_pagamento é o fim do Após-chaves (à vista no mês da venda)', () => {
   const linha = { fluxo_pagamento: null };
-  const r = ultimoMesRecebivelLinha(linha, CRONO);
+  const r = ultimoMesRecebivelLinha(linha, CRONO, 0);
   const pos = CRONO.find((e) => e.evento === 'pos_obra')!;
   assert.equal(r, pos.inicio_mes + pos.duracao_meses - 1);
 });
 
 test('ultimoMesRecebivelLinha: entrada com muitas parcelas estende além do fim do Após-chaves', () => {
   const linha = { fluxo_pagamento: { entrada: [{ pct: 100, parcelas: 60 }] } };
-  const r = ultimoMesRecebivelLinha(linha, CRONO);
+  const r = ultimoMesRecebivelLinha(linha, CRONO, 0);
   const pos = CRONO.find((e) => e.evento === 'pos_obra')!;
   const fimAposChaves = pos.inicio_mes + pos.duracao_meses - 1;
   assert.equal(r, fimAposChaves + 59); // última safra + 59 parcelas restantes
@@ -1578,7 +1608,7 @@ test('ultimoMesRecebivelLinha: entrada com muitas parcelas estende além do fim 
 
 test('ultimoMesRecebivelLinha: parcelamento por periodicidade (sem "ao longo da obra") considera intervalo × parcelas', () => {
   const linha = { fluxo_pagamento: { parcelas: [{ pct: 100, ao_longo_obra: false, periodicidade: 'semestral', parcelas: 8 }] } };
-  const r = ultimoMesRecebivelLinha(linha, CRONO);
+  const r = ultimoMesRecebivelLinha(linha, CRONO, 0);
   const pos = CRONO.find((e) => e.evento === 'pos_obra')!;
   const fimAposChaves = pos.inicio_mes + pos.duracao_meses - 1;
   assert.equal(r, fimAposChaves + 6 * 8); // semestral = intervalo 6
@@ -1586,7 +1616,7 @@ test('ultimoMesRecebivelLinha: parcelamento por periodicidade (sem "ao longo da 
 
 test('#345 ultimoMesRecebivelLinha: repasse legado com offset distante NÃO estende mais o horizonte (travado em 1)', () => {
   const linha = { fluxo_pagamento: { entrada: [{ pct: 20, parcelas: 1 }], repasse: { apos_entrega_meses: 36 } } };
-  const r = ultimoMesRecebivelLinha(linha, CRONO);
+  const r = ultimoMesRecebivelLinha(linha, CRONO, 0);
   const pos = CRONO.find((e) => e.evento === 'pos_obra')!;
   const fimAposChaves = pos.inicio_mes + pos.duracao_meses - 1;
   // Antes da #345, um `apos_entrega_meses` legado grande (36) estendia o
@@ -1603,6 +1633,7 @@ test('#345 ultimoMesRecebivelLinha: repasse legado com offset distante NÃO este
 test('#231: calcularFluxo não trunca nem empilha uma entrada de 60 parcelas no último mês', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }], // VGV 10M
@@ -2200,8 +2231,8 @@ test('#460 FIAÇÃO: `linha.fluxo_pagamento.residuoAteMarco` chega a `recebiment
     },
   });
 
-  const semCampo = recebimentoBrutoMensal(linha(), CRONO_460, 20);
-  const comCampo = recebimentoBrutoMensal(linha('concentrado'), CRONO_460, 20);
+  const semCampo = recebimentoBrutoMensal(linha(), CRONO_460, 20, 0);
+  const comCampo = recebimentoBrutoMensal(linha('concentrado'), CRONO_460, 20, 0);
 
   // Sem o campo: 20% (imediato) + 24% (ate_marco virado imediato) = 44% no mês 10.
   assert.equal(semCampo[10], 2_200_000);
@@ -2249,25 +2280,56 @@ test('#428 a conversão é COMPOSTA, nunca aa/12, e a volta desfaz a ida', () =>
   assert.equal(taxaAnualDeMensal(undefined as any), 0);
 });
 
-test('#428 a taxa do plano vem da chave digitada e, na falta dela, dos componentes', () => {
-  // 1) A chave que a #428 grava vence: é o dígito que o usuário escreveu.
-  assert.equal(taxaMensalDoPlano({ juros_tabela_aa: 12.5 }), taxaMensalDeAnual(12.5));
-  // 2) Estudo anterior à #428 (o caso do estudo 5, que recebeu a taxa pela
-  //    API): sem a chave, a taxa sai dos componentes — e CRUA, sem a ida e
-  //    volta em ponto flutuante que devolveria 0,009863600000000083.
-  assert.equal(taxaMensalDoPlano({ componentes: [{ tipo: 'ate_marco', taxaMensal: 0.0098636 }] }), 0.0098636);
-  assert.ok(perto(jurosTabelaAnualPct({ componentes: [{ taxaMensal: 0.0098636 }] }), 12.5, 0.001));
-  // 3) Chave presente e igual a 0 é RESPOSTA (o usuário desligou os juros),
-  //    não ausência: não pode cair na derivação e ressuscitar a taxa velha.
-  assert.equal(taxaMensalDoPlano({ juros_tabela_aa: 0, componentes: [{ taxaMensal: 0.0098636 }] }), 0);
-  // 4) Nada declarado é 0 — o default de todo estudo existente.
-  assert.equal(taxaMensalDoPlano({}), 0);
-  assert.equal(taxaMensalDoPlano(null), 0);
+test('#585 a taxa do plano vem do ESTUDO — a chave da linha e a derivação sumiram', () => {
+  // A #428 tinha duas fontes com precedência (`fluxo_pagamento.juros_tabela_aa`
+  // e, na falta dela, a primeira `taxaMensal` persistida). As duas eram
+  // leituras POR LINHA, e não há mais taxa por linha: a decisão do autor de
+  // 2026-08-26 tornou a taxa um valor do estudo.
+  assert.equal(taxaMensalDoEstudo(12.5), taxaMensalDeAnual(12.5));
+  assert.equal(taxaMensalDoEstudo(0), 0, 'estudo sem juros de tabela é 0, e 0 é resposta');
+  assert.equal(taxaMensalDoEstudo(NaN as any), 0, 'lixo não vira NaN dentro dos componentes');
+  assert.equal(taxaMensalDoEstudo(undefined as any), 0);
+
+  // E a chave legada da LINHA não tem mais efeito nenhum: um plano que a
+  // carrega calcula pela taxa do estudo, não por ela. É o que impede um estudo
+  // de continuar com o número antigo depois desta versão.
+  const fpLegado = {
+    juros_tabela_aa: 13,
+    parcelas: [{ pct: 30, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true }],
+  };
+  const comps = componentesDoLegado(fpLegado, CRONO, 12.5) as any[];
+  for (const c of comps.filter((x) => x.tipo !== 'imediato')) {
+    assert.equal(c.taxaMensal, taxaMensalDeAnual(12.5),
+      'a chave legada da linha voltou a mandar — ela é INERTE desde a #585');
+  }
 });
 
-test('#428 componentesDoLegado propaga a taxa do plano nos QUATRO caminhos', () => {
+test('#585 componentesPagamento aplica a taxa do estudo sobre o array PERSISTIDO', () => {
+  // O ponto único do override, e o coração da issue. Sem ele, toda linha
+  // editada desde a #248 (que persiste `componentes`) ignoraria o campo da aba
+  // Financeiro, porque este ramo devolvia o persistido verbatim.
+  const persistido = {
+    componentes: [
+      { tipo: 'imediato', participacaoPct: 20, descontoPct: 0 },
+      { tipo: 'ate_marco', participacaoPct: 30, marcoMes: 38, defasagemMeses: 1,
+        sinalPct: 0, taxaMensal: 0.0104, jurosNoMesDaContratacao: false, rotulo: 'Tabela longa' },
+      { tipo: 'concentrado', participacaoPct: 50, mesPagamento: 39, taxaMensal: 0, rotulo: 'Repasse' },
+    ],
+  };
+  const comps = componentesPagamento(persistido, CRONO, 12.5) as any[];
+  assert.equal('taxaMensal' in comps[0], false, 'imediato não pode ganhar taxa');
+  assert.equal(comps[1].taxaMensal, taxaMensalDeAnual(12.5));
+  assert.equal(comps[2].taxaMensal, taxaMensalDeAnual(12.5),
+    'o Repasse em 0% também passa a valer a taxa do estudo — é o caso de maior dinheiro da EVI');
+  // O resto do componente é preservado: o override toca UMA chave.
+  assert.equal(comps[1].rotulo, 'Tabela longa');
+  assert.equal(comps[1].participacaoPct, 30);
+  // E não muta o array de entrada.
+  assert.equal(persistido.componentes[1].taxaMensal, 0.0104);
+});
+
+test('#585 componentesDoLegado propaga a taxa do estudo nos QUATRO caminhos', () => {
   const fp = {
-    juros_tabela_aa: 12.5,
     entrada: [
       { pct: 10, parcelas: 1, descontoPct: 0 },   // imediato — não tem taxa, e não deve ter
       { pct: 10, parcelas: 3, descontoPct: 0 },   // prazo_fixo (entrada parcelada)
@@ -2277,20 +2339,18 @@ test('#428 componentesDoLegado propaga a taxa do plano nos QUATRO caminhos', () 
       { pct: 20, periodicidade: 'mensal', parcelas: 12 },                      // prazo_fixo
     ],
   };
-  const comps = componentesDoLegado(fp, CRONO) as any[];
+  const comps = componentesDoLegado(fp, CRONO, 12.5) as any[];
   const esperada = taxaMensalDeAnual(12.5);
   assert.deepEqual(comps.map((c) => c.tipo),
     ['imediato', 'prazo_fixo', 'ate_marco', 'prazo_fixo', 'concentrado']);
-  // Os quatro caminhos que gravavam `taxaMensal: 0` — entrada parcelada, ao
-  // longo da obra, prazo fixo e repasse — passam a gravar a MESMA taxa (D-Q02).
   for (const c of comps.filter((x) => x.tipo !== 'imediato')) {
-    assert.equal(c.taxaMensal, esperada, `${c.rotulo} ficou sem a taxa do plano`);
+    assert.equal(c.taxaMensal, esperada, `${c.rotulo} ficou sem a taxa do estudo`);
   }
   assert.equal('taxaMensal' in comps[0], false, 'imediato não tem juros: paga no mês da venda');
 
-  // Regressão: o MESMO plano sem a chave continua em 0 — nenhum estudo muda de
-  // número sem alguém digitar a taxa.
-  const semTaxa = componentesDoLegado({ ...fp, juros_tabela_aa: undefined }, CRONO) as any[];
+  // Regressão: estudo sem taxa continua em 0 — nenhum estudo muda de número
+  // enquanto o campo da aba Financeiro estiver zerado.
+  const semTaxa = componentesDoLegado(fp, CRONO, 0) as any[];
   for (const c of semTaxa.filter((x) => x.tipo !== 'imediato')) assert.equal(c.taxaMensal, 0);
 });
 
@@ -2371,6 +2431,10 @@ test('#428 golden EVI repasse: o saldo a repassar capitaliza, e os juros são s�
 test('#283 linha opt-in alimenta juros, principal e carteira no FluxoCalc', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    // #585: a taxa vem do ESTUDO. O `taxaMensal` do componente persistido
+    // abaixo é o dado histórico e ficou inerte — quem produz os juros é este
+    // campo.
+    jurosTabelaAaEstudo: 12.7,
     linhasReceita: [{
       id: 1, nome: 'Venda financiada',
       tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
@@ -2398,6 +2462,7 @@ test('#283 linha opt-in alimenta juros, principal e carteira no FluxoCalc', () =
 test('#237 Receita Bruta fecha por linha e tipologia sem deduzir RET ou corretagem destacada', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 7, nome: 'Grupo Residencial', fase_label: 'Fase 1',
       tipologias: [
@@ -2445,7 +2510,7 @@ test('#283 estudo legado sem componentes mantém exatamente o caminho vigente', 
       repasse: { apos_entrega_meses: 2 }, // #345: ignorado — offset travado em 1
     },
   };
-  const vigente = receitaMensalLinha(linha, CRONO, 60);
+  const vigente = receitaMensalLinha(linha, CRONO, 60, 0);
   assert.ok(perto(vigente[12], 1_500_000, 0.01));
   assert.ok(perto(vigente[17], 1_500_000 / 24, 0.01));
   assert.ok(perto(vigente[41], 7_000_000, 0.01));
@@ -2453,9 +2518,10 @@ test('#283 estudo legado sem componentes mantém exatamente o caminho vigente', 
 
   const consolidado = calcularFluxo({
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [linha], linhasCusto: [], areaTerreno: 0,
   });
-  assert.deepEqual(consolidado.receitaBrutaMensal, recebimentoBrutoMensal(linha, CRONO, consolidado.prazo));
+  assert.deepEqual(consolidado.receitaBrutaMensal, recebimentoBrutoMensal(linha, CRONO, consolidado.prazo, 0));
   assert.deepEqual(consolidado.principalRecebidoMensal, consolidado.receitaBrutaMensal);
   assert.equal(consolidado.jurosClientes, 0);
   assert.equal(consolidado.carteiraClientesMaxima, 0);
@@ -2488,7 +2554,7 @@ function linha458(mesVenda: number, comComponentes: boolean) {
     tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
     absorcao: { modo: 'personalizado', meses: [{ mes: mesVenda, pct: 100 }] },
     fluxo_pagamento: comComponentes
-      ? { componentes: componentesDoLegado(fluxoPagamentoLegado, CRONO) }
+      ? { componentes: componentesDoLegado(fluxoPagamentoLegado, CRONO, 0) }
       : fluxoPagamentoLegado,
   };
 }
@@ -2509,8 +2575,8 @@ test('#458: ramo legado × ramo canônico divergem no MESMO fluxo_pagamento — 
   const comps = (canonico.fluxo_pagamento as any).componentes;
   assert.ok(Array.isArray(comps) && comps.length > 0, 'pré-condição: a linha canônica tem componentes');
 
-  const brutoLegado = recebimentoBrutoMensal(legado, CRONO, 60);
-  const brutoCanonico = recebimentoBrutoMensal(canonico, CRONO, 60);
+  const brutoLegado = recebimentoBrutoMensal(legado, CRONO, 60, 0);
+  const brutoCanonico = recebimentoBrutoMensal(canonico, CRONO, 60, 0);
 
   assert.notDeepEqual(brutoCanonico, brutoLegado, 'os dois ramos têm de produzir séries diferentes');
   assert.ok(brutoLegado[mesVenda] > 0,
@@ -2527,7 +2593,7 @@ test('#458 caso negativo: com `componentes` presente nos DOIS Grupos, as séries
   const mesVenda = 20;
   const a = linha458(mesVenda, true);
   const b = linha458(mesVenda, true);
-  assert.deepEqual(recebimentoBrutoMensal(a, CRONO, 60), recebimentoBrutoMensal(b, CRONO, 60));
+  assert.deepEqual(recebimentoBrutoMensal(a, CRONO, 60, 0), recebimentoBrutoMensal(b, CRONO, 60, 0));
 });
 
 // ── #456: KPIs de tela — juros de clientes, carteira máxima, exposição máxima
@@ -2543,6 +2609,7 @@ test('#456 mesCarteiraClientesMaxima bate com Math.max/indexOf, e é null quando
   // Estudo com componente financiado → carteira > 0 em algum mês.
   const comCarteira: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Venda financiada',
       tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
@@ -2565,6 +2632,7 @@ test('#456 mesCarteiraClientesMaxima bate com Math.max/indexOf, e é null quando
   // sem este caso. É o comportamento que `:2352-2353` já implementa.
   const semCarteira: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Venda legada',
       tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
@@ -2580,6 +2648,7 @@ test('#456 mesCarteiraClientesMaxima bate com Math.max/indexOf, e é null quando
 test('#456 mesExposicaoMaxima bate com fluxoAcumulado.indexOf(exposicaoMaxima)', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Torre',
       tipologias: [{ id: 1, quantidade: 20, area_privativa_m2: 80, preco_m2: 9_000 }],
@@ -2607,6 +2676,7 @@ test('#456 agregarFluxoPorPeriodos recalcula mesExposicaoMaxima contra a série 
   // que era o comportamento de antes desta issue.
   const base: FluxoCalc = calcularFluxo({
     dataInicio: 'jan/2027', prazoMeses: 6, taxaDescontoAa: 12,
+    jurosTabelaAaEstudo: 0,
     cronograma: [], linhasReceita: [], linhasCusto: [], areaTerreno: 0,
   });
   // Mínimo verdadeiro (-100) cai no mês 2, que NÃO é fim de nenhum período —
@@ -2633,6 +2703,7 @@ test('#456 agregarFluxoPorPeriodos recalcula mesExposicaoMaxima contra a série 
 test('#456 agregarFluxoPorPeriodos: mesExposicaoMaxima vira null quando o mínimo não cai em fim de período', () => {
   const base: FluxoCalc = calcularFluxo({
     dataInicio: 'jan/2027', prazoMeses: 4, taxaDescontoAa: 12,
+    jurosTabelaAaEstudo: 0,
     cronograma: [], linhasReceita: [], linhasCusto: [], areaTerreno: 0,
   });
   // Mínimo único no mês 2; os períodos terminam nos meses 1 e 3 — o valor
@@ -2745,6 +2816,7 @@ test('#238 série ausente de imposto/corretagem é tratada como zero', () => {
 test('#459: as quatro combinações de deduzir_imposto × deduzir_corretagem', () => {
   const montar = (deduzirImposto: boolean, deduzirCorretagem: boolean): FluxoConfig => ({
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
@@ -2789,6 +2861,7 @@ test('#459 permutaAlternativa expõe a base OPOSTA (flags invertidos), para audi
   // Mesma fixture do teste acima. Escolhida = líquida (9,1M); oposta = bruta (10M).
   const montar = (deduzirImposto: boolean, deduzirCorretagem: boolean): FluxoConfig => ({
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
@@ -2834,6 +2907,7 @@ test('#459 permutaAlternativa expõe a base OPOSTA (flags invertidos), para audi
 test('#238 permuta em R$ não tem alternativa — as duas bases dão o mesmo valor', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 50, preco_m2: 20_000 }],
@@ -2853,6 +2927,7 @@ test('#238 permuta em R$ não tem alternativa — as duas bases dão o mesmo val
 test('#238 auditoria preserva o valor canônico quando o percentual visível está desatualizado', () => {
   const config: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    jurosTabelaAaEstudo: 0,
     linhasReceita: [{
       id: 1, nome: 'Vendas',
       tipologias: [{ id: 1, quantidade: 100, area_privativa_m2: 50, preco_m2: 20_000 }],
@@ -2949,6 +3024,7 @@ test('#429 o aviso NÃO corrige: a venda bruta contratada continua a truncada', 
 /** Estudo cujo último evento operacional é o mês 23 (obra 0..23). */
 const baseAte23 = (): FluxoConfig => ({
   dataInicio: 'jan/2027', taxaDescontoAa: 12, areaTerreno: 0,
+  jurosTabelaAaEstudo: 0,
   cronograma: [{ evento: 'obra', inicio_mes: 0, duracao_meses: 24 } as any],
   linhasReceita: [],
   linhasCusto: [{ id: 1, grupo: 'obra', categoria: 'Construção', orcamento_valor: 1_000_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 24 }],
@@ -2976,6 +3052,7 @@ test('#446: prazoMeses é PISO — um valor menor que o derivado não trunca nad
   // Derivado: obra 0..47 ⇒ 48.
   const cfg: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, areaTerreno: 0,
+    jurosTabelaAaEstudo: 0,
     cronograma: [{ evento: 'obra', inicio_mes: 0, duracao_meses: 48 } as any],
     linhasReceita: [], linhasCusto: [],
   };
@@ -2989,6 +3066,7 @@ test('#446: prazoMeses é PISO — um valor menor que o derivado não trunca nad
 test('#446: prazoMeses ainda ESTICA — piso não é o mesmo que ignorar', () => {
   const cfg: FluxoConfig = {
     dataInicio: 'jan/2027', taxaDescontoAa: 12, areaTerreno: 0,
+    jurosTabelaAaEstudo: 0,
     cronograma: [{ evento: 'obra', inicio_mes: 0, duracao_meses: 48 } as any],
     linhasReceita: [], linhasCusto: [],
   };

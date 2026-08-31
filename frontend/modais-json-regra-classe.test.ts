@@ -1,6 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fluxoPagamentoParaSalvar, formularioPagamento } from './fluxo-pagamento-editor.js';
+import { taxaMensalDeAnual } from './fluxo-caixa-motor.js';
+
+/**
+ * #585: a taxa de tabela do ESTUDO, e a mensal que ela projeta. A fixture
+ * trazia o literal `0.0098636` — a taxa que o estudo 5 recebeu pela API. Desde
+ * a #585 a `taxaMensal` persistida é PROJEÇÃO da taxa anual do estudo, então a
+ * fixture tem de declará-la assim para que "abrir e aplicar sem editar" siga
+ * byte-idêntico. **Consequência declarada da issue:** uma linha legada com a
+ * mensal arredondada é reescrita na primeira gravação (8e-9 ao mês de
+ * diferença); essa reescrita é a única coisa que a #585 tira da regra de
+ * classe da #431.
+ */
+const TAXA_ESTUDO_AA = 12.5;
+const TAXA_ESTUDO_MENSAL = taxaMensalDeAnual(TAXA_ESTUDO_AA);
 import { absorcaoParaSalvar, formularioAbsorcao } from './fluxo-absorcao-editor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -72,15 +86,15 @@ const PARES: ParDeModal[] = [
       componentes: [
         {
           tipo: 'ate_marco', rotulo: 'Tabela longa, juros 12,5% a.a.', marcoMes: 38,
-          sinalPct: 0, taxaMensal: 0.0098636, defasagemMeses: 1,
+          sinalPct: 0, taxaMensal: TAXA_ESTUDO_MENSAL, defasagemMeses: 1,
           participacaoPct: 30, jurosNoMesDaContratacao: false,
         },
-        { tipo: 'concentrado', rotulo: 'Repasse', mesPagamento: 39, taxaMensal: 0, participacaoPct: 70 },
+        { tipo: 'concentrado', rotulo: 'Repasse', mesPagamento: 39, taxaMensal: TAXA_ESTUDO_MENSAL, participacaoPct: 70 },
       ],
       aplicado: true,
     }),
     ler: (dado) => formularioPagamento(dado),
-    salvar: (form) => fluxoPagamentoParaSalvar(form, CRONO),
+    salvar: (form) => fluxoPagamentoParaSalvar(form, CRONO, TAXA_ESTUDO_AA),
     camposRemovidos: ['ret'],
   },
   {

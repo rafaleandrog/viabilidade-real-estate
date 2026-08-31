@@ -147,6 +147,8 @@ export async function conferir(id: number): Promise<Conferencia> {
     curvas: d.curvas,
     areaTerreno: Number(estudo?.terreno_manual_area) || Number(estudo?.area_terreno_nucleo) || 0,
     ret: d.ret,
+    // #585: a taxa de tabela é GLOBAL do estudo (aba Viabilidade → Financeiro).
+    jurosTabelaAaEstudo: Number(estudo?.juros_tabela_aa_padrao) || 0,
     // #473: default true preserva o comportamento histórico (VGV bruto).
     corretagemSobrePermutaFisica: estudo?.corretagem_sobre_permuta_fisica !== false,
     // #446: o horizonte precisa cobrir a quitação das operações, senão a série
@@ -173,7 +175,7 @@ export async function conferir(id: number): Promise<Conferencia> {
     ...validarPermutaFisica(d.custos, d.tipologias),
     ...validarCustosDuplicados(d.custos),
     ...validarContratacao(d.receitas, d.crono, calc.prazo, calc.vendaBrutaContratada, undefined, d.custos),
-    ...validarSafrasReceita(d.receitas, d.crono, calc.prazo, undefined, d.custos),
+    ...validarSafrasReceita(d.receitas, d.crono, calc.prazo, undefined, d.custos, Number(estudo?.juros_tabela_aa_padrao) || 0),
     ...validarFluxoCalc(calc),
     ...(out.funding ? validarFunding(out.funding, calc.fluxoMensal, undefined, receitaLiquida) : []),
     // #441: reconciliação Catálogo × Premissas.

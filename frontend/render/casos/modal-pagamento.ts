@@ -48,11 +48,12 @@ export const caso = {
     { seletor: 'urbi-modal', minimo: 1 },
     { seletor: 'div.pag-grid', minimo: 1 },
     // #455: 3 na Entrada (% do total, Nº parcelas, Desconto) + 3 no
-    // Parcelamento (% do total, Sinal, Nº parcelas) + 1 no bloco de Juros.
-    { seletor: 'viab-num', minimo: 7 },
-    // #436: o bloco de juros e o aviso de que "Aplicar" os apaga. Sem estas duas
-    // linhas o bloco novo não é medido por nada.
-    { seletor: 'p.aviso-juros', minimo: 1 },
+    // Parcelamento (% do total, Sinal, Nº parcelas).
+    // #585: eram 7 — o 7º era o campo do bloco "Juros de tabela", que SAIU deste
+    // modal para a aba Viabilidade → Financeiro. Junto com ele saiu o
+    // `p.aviso-juros` ("este plano tem N taxas diferentes gravadas"), que este
+    // caso exigia: com uma taxa por ESTUDO não há mais o que avisar.
+    { seletor: 'viab-num', minimo: 6 },
     // #460: o controle de destino do resíduo — primeiro `urbi-select` deste caso.
     { seletor: 'urbi-select', minimo: 1 },
   ],
