@@ -182,3 +182,58 @@ teste — neste caso foram **12 linhas** num arquivo temporário.
 mão o que ela prescreve. A lente L3 (rastreador entre arquivos) achou o mesmo defeito de forma
 independente, com `arquivo:linha`, no primeiro passe. **Executar o procedimento não é o mesmo que
 segui-lo de memória** — e a diferença aqui foi um defeito que teria ido para a `main`.
+
+## 13 · Contagem escrita de aritmética, não de medição
+
+**Sintoma:** escrevi *"978 testes"* na mensagem de um commit quando eram **976**, e duas rodadas
+depois escrevi *"979"* quando eram **977**. Nas duas vezes o número saiu de uma conta mental
+("acrescentei N testes, então é o anterior + N"), não de rodar a suíte.
+
+**Causa, e ela é específica:** a aritmética usa premissas que envelhecem sem avisar. Na primeira vez
+eu tinha acrescentado *asserções* a um teste existente, não um teste novo — o total não muda. Na
+segunda, os dois testes que escrevi eram de **backend**, que não entra no glob
+`frontend/*.test.ts frontend/fixtures/*.test.ts`. Nos dois casos a conta estava certa e a premissa
+errada.
+
+**Por que importa mais do que parece:** o número vai para a mensagem do commit e para o corpo do PR,
+onde vira o fato que a próxima sessão cita sem reconferir — e uma contagem errada faz uma prova de
+mutação futura parecer que mediu outra coisa. É a mesma família da armadilha 11: uma afirmação
+plausível e falsa custa mais que a ausência dela.
+
+**Defesa, mecânica:** **nenhum número entra em commit, PR ou doc sem ter saído de um comando rodado
+na mesma sequência de trabalho.** Concretamente, antes de escrever a mensagem:
+
+```
+node --test --test-timeout=60000 --import tsx frontend/*.test.ts frontend/fixtures/*.test.ts | grep '^# tests'
+```
+
+E o corolário: **contagem que muda a cada rodada não deveria estar num artefato versionado.** O
+`CLAUDE.md` já proíbe *"contador do estado corrente da revisão"* pelo mesmo motivo; contagem de
+suíte é o mesmo objeto, um degrau mais lento. Onde ela não for necessária, o certo é não escrevê-la.
+
+## 14 · Enumerar entrada suja não converge — inverta para fail-closed
+
+**Sintoma:** a mesma classe de defeito reapareceu **seis vezes** no PR 656, sempre igual: um valor
+que não é percentual atravessa `Number()`, vira número plausível, e a migração o grava
+permanentemente (o filtro de idempotência só reprocessa coluna nula). As portas, na ordem em que
+foram achadas: taxa negativa achatada em `0` por um clamp · `Number('')` valendo `0` ·
+`taxaMensal <= -2`, onde o expoente **par** de `(1 + m)^12` devolve `0` ou um positivo enorme ·
+`'0x10'` valendo `16` · `'1e3'` valendo `1000` · e o ramo **derivado** ainda usando `Number()` cru
+depois de os outros cinco terem sido consertados no ramo da chave.
+
+**Causa:** cada conserto era uma guarda a mais contra a entrada específica que tinha sido achada.
+Guarda por enumeração fecha a porta que você viu e deixa as outras; e como havia **dois ramos**, os
+consertos divergiam entre si — o ramo derivado ficou cinco rodadas atrás do explícito.
+
+**Defesa:** quando a **segunda** entrada suja da mesma classe aparecer, pare de acrescentar guarda e
+**inverta**: um parser único, fail-closed, que aceita a forma válida e devolve `null` para todo o
+resto, usado por todos os ramos. Aqui virou `numeroLimpo` — `number` finito, ou string que **seja**
+um decimal. A inversão fechou as cinco portas conhecidas **e expôs a sexta**, que ninguém tinha
+achado.
+
+**Corolário, e foi o achado mais caro:** contar quantos **validadores** existem para o mesmo campo.
+`estudos.juros_tabela_aa_padrao` tinha **três** — tela, PATCH e migração — com regras diferentes, e
+o PATCH (a única fronteira real) aceitava exatamente o que a migração rejeitava. Três regras para um
+campo é como esta classe começa. Quando não puderem compartilhar código (runtimes diferentes), o que
+os mantém alinhados é **uma tabela de entradas exercitada em cada um** — e o que ela NÃO cobrir
+precisa estar escrito, não arredondado.
