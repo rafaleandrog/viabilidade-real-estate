@@ -29,6 +29,7 @@
  * pego na primeira execução.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { compilador, disponivel as tsDisponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
 import { join } from 'node:path';
 
 // A raiz padrão é a do repositório; a bateria (`scripts/testar-guard-fiacao.sh`)
@@ -64,113 +65,78 @@ function contarVirgulasDeTopo(chamada) {
 }
 
 /**
- * Varre `src` e devolve, para cada posição, se ela é CÓDIGO — falso dentro de
- * comentário de linha, comentário de bloco, string simples/dupla e texto de
- * template literal. O interior de `${...}` num template É código e conta.
+ * `true` se, em `src`, TODA chamada real a `alvo` estiver dentro de um membro
+ * de classe que também contém uma chamada real a algum de `procurados`.
  *
- * ⚠️ POR QUE ISTO EXISTE, e é achado do revisor externo no PR 658: a primeira
- * versão do recorte contava `{` e `}` cegamente. Uma `}` solta dentro de uma
- * string encerrava o corpo cedo e o guard reprovava fiação CORRETA (falso
- * positivo — alguém desliga o guard e ele para de guardar). Pior, uma `{`
- * solta fazia o recorte avançar até o fim da classe, engolir a definição do
- * próprio método procurado, e o guard voltava a ficar VERDE depois da mutação
- * — que é exatamente o defeito que a regra existe para pegar.
+ * ⚠️ POR QUE ISTO USA O PARSER DO TYPESCRIPT, e não texto: a versão anterior
+ * recortava o corpo do método contando `{` e `}`, e o revisor externo derrubou
+ * duas gerações dela.
  *
- * Literal de regex NÃO é tratado. É limitação declarada: distinguir `/` de
- * divisão exige contexto de parsing, e nenhum arquivo varrido hoje tem regex
- * com chave desbalanceada. Se um dia tiver, a bateria é o lugar de registrar.
+ *  1. balanceamento CEGO — uma `}` numa string encerrava o corpo cedo (falso
+ *     positivo, e guard que atrapalha é desligado); uma `{` numa string
+ *     estendia o recorte até engolir a definição do próprio método procurado, e
+ *     o guard voltava a passar depois da mutação;
+ *  2. scanner à mão com máscara de string/comentário — melhor, e ainda furado
+ *     em DOIS pontos: chamada COMENTADA (`// await this._nascerCanonico(res)`)
+ *     era aceita como fiação ativa pela regex, e dentro de `${...}` o laço
+ *     voltava a contar chaves cegamente, sem reconhecer string, comentário ou
+ *     template aninhado.
+ *
+ * Os dois buracos são a mesma coisa: **eu estava escrevendo um lexer de
+ * TypeScript à mão.** Aqui a pergunta é de ÁRVORE ("esta chamada está dentro
+ * deste método?"), e a árvore responde de graça: comentário não é nó, string é
+ * literal, e o interior de `${...}` é expressão de verdade. As quatro classes
+ * somem por construção, não por mais um remendo.
+ *
+ * É a mesma autoridade que `guard-enderecos-doc` e os guards de UI já usam
+ * (`scripts/lib/fonte-ts.mjs`). Sem o pacote `typescript`, o guard RECUSA —
+ * "não deu para rodar" nunca é "passou".
  */
-function mapaDeCodigo(src) {
-  const ehCodigo = new Array(src.length).fill(true);
-  // pilha de templates abertos, para saber se `}` fecha um `${` ou é chave de bloco
-  const templates = [];
-  let i = 0;
-  while (i < src.length) {
-    const c = src[i], d = src[i + 1];
-    if (c === '/' && d === '/') {
-      while (i < src.length && src[i] !== '\n') { ehCodigo[i] = false; i++; }
-      continue;
-    }
-    if (c === '/' && d === '*') {
-      ehCodigo[i] = ehCodigo[i + 1] = false; i += 2;
-      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) { ehCodigo[i] = false; i++; }
-      if (i < src.length) { ehCodigo[i] = ehCodigo[i + 1] = false; i += 2; }
-      continue;
-    }
-    if (c === "'" || c === '"') {
-      const aspa = c;
-      ehCodigo[i] = false; i++;
-      while (i < src.length && src[i] !== aspa) {
-        if (src[i] === '\\') { ehCodigo[i] = false; i++; }
-        if (i < src.length) { ehCodigo[i] = false; i++; }
-      }
-      if (i < src.length) { ehCodigo[i] = false; i++; }
-      continue;
-    }
-    if (c === '`') {
-      ehCodigo[i] = false; i++;
-      templates.push(true);
-      while (i < src.length && templates.length > 0) {
-        if (src[i] === '\\') { ehCodigo[i] = false; ehCodigo[i + 1] = false; i += 2; continue; }
-        if (src[i] === '`') { ehCodigo[i] = false; i++; templates.pop(); continue; }
-        if (src[i] === '$' && src[i + 1] === '{') {
-          // interior de ${...} é CÓDIGO — balanceia e volta ao texto do template
-          ehCodigo[i] = false; ehCodigo[i + 1] = true; i += 2;
-          let nivel = 1;
-          while (i < src.length && nivel > 0) {
-            if (src[i] === '{') nivel++;
-            else if (src[i] === '}') { nivel--; if (nivel === 0) { i++; break; } }
-            i++;
-          }
-          continue;
-        }
-        ehCodigo[i] = false; i++;
-      }
-      continue;
-    }
-    i++;
-  }
-  return ehCodigo;
-}
+function chamadaSempreDentroDeMembroCom(src, alvo, procurados, nomeArquivo) {
+  const ts = compilador;
+  const sf = ts.createSourceFile(nomeArquivo, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 
-/**
- * Corpo de cada membro de classe que contém `marcador`, recortado por
- * balanceamento de chaves que conta SÓ as chaves em posição de código.
- *
- * Existe para as regras que precisam perguntar "a chamada está DENTRO desta
- * função?" em vez de "aparece em algum lugar do arquivo?" — a diferença entre
- * um guard que dispara na mutação e um que não dispara. Medido em 2026-08-31:
- * com a pergunta por arquivo, apagar a chamada deixava o guard verde, porque o
- * método continuava definido 32 mil caracteres abaixo.
- *
- * ⚠️ FAIL-CLOSED: ocorrência que não estiver dentro de um membro de classe
- * devolve `null`, e a regra a trata como não satisfeita. A versão anterior caía
- * numa janela de caracteres em volta — um palpite que escondia a falha em vez
- * de acusá-la.
- */
-function corpoDoMetodoQueContem(src, marcador) {
-  const ehCodigo = mapaDeCodigo(src);
-  const corpos = [];
-  let busca = 0;
-  for (;;) {
-    const i = src.indexOf(marcador, busca);
-    if (i === -1) return corpos;
-    busca = i + marcador.length;
-    if (!ehCodigo[i]) continue;                       // menção em comentário/string não conta
-    const antes = src.slice(0, i);
-    const ini = Math.max(antes.lastIndexOf('\n  private '), antes.lastIndexOf('\n  public '));
-    if (ini === -1) { corpos.push(null); continue; }  // fail-closed
-    let abre = -1;
-    for (let k = ini; k < i; k++) if (src[k] === '{' && ehCodigo[k]) { abre = k; break; }
-    if (abre === -1) { corpos.push(null); continue; }
-    let nivel = 0, fim = -1;
-    for (let k = abre; k < src.length; k++) {
-      if (!ehCodigo[k]) continue;
-      if (src[k] === '{') nivel++;
-      else if (src[k] === '}') { nivel--; if (nivel === 0) { fim = k; break; } }
+  /** Nome invocado numa CallExpression: `f(…)`, `this.f(…)`, `a.b.f(…)`. */
+  const nomeChamado = (no) => {
+    if (no.kind !== ts.SyntaxKind.CallExpression) return null;
+    const alvoCham = no.expression;
+    if (alvoCham.kind === ts.SyntaxKind.Identifier) return alvoCham.text;
+    if (alvoCham.kind === ts.SyntaxKind.PropertyAccessExpression) return alvoCham.name.text;
+    return null;
+  };
+
+  /** O membro de classe (ou função) que contém `no`, subindo pela árvore. */
+  const membroDe = (no) => {
+    for (let p = no.parent; p; p = p.parent) {
+      if (p.kind === ts.SyntaxKind.MethodDeclaration
+        || p.kind === ts.SyntaxKind.PropertyDeclaration
+        || p.kind === ts.SyntaxKind.Constructor
+        || p.kind === ts.SyntaxKind.FunctionDeclaration) return p;
     }
-    corpos.push(fim === -1 ? null : src.slice(abre, fim + 1));
-  }
+    return null;
+  };
+
+  const contem = (raiz, nomes) => {
+    let achou = false;
+    (function anda(no) {
+      if (achou) return;
+      const n = nomeChamado(no);
+      if (n && nomes.includes(n)) { achou = true; return; }
+      ts.forEachChild(no, anda);
+    })(raiz);
+    return achou;
+  };
+
+  const membros = [];
+  (function anda(no) {
+    if (nomeChamado(no) === alvo) membros.push(membroDe(no));
+    ts.forEachChild(no, anda);
+  })(sf);
+
+  // Nenhuma chamada REAL (só menção em comentário ou string) ⇒ não é consumidor.
+  if (membros.length === 0) return true;
+  // Chamada fora de membro de classe ⇒ fail-closed: o guard não sabe delimitar.
+  return membros.every((m) => m !== null && contem(m, procurados));
 }
 
 const REGRAS = [
@@ -243,14 +209,9 @@ const REGRAS = [
     // A conferência é dentro do MÉTODO que cria a linha: recorta o corpo pelo
     // balanceamento de chaves e exige a conversão ali. Apagar a chamada agora
     // reprova.
-    conferir: (src) => {
-      const corpos = corpoDoMetodoQueContem(src, 'criarFaseAvancado(');
-      // Nenhuma ocorrência EM CÓDIGO (só menção em comentário) não é consumo.
-      if (corpos.length === 0) return true;
-      // `null` = não foi possível delimitar o membro ⇒ fail-closed.
-      return corpos.every((corpo) => corpo !== null
-        && /_nascerCanonico\(|planoDeNascimento\(/.test(corpo));
-    },
+    conferir: (src, arq) => chamadaSempreDentroDeMembroCom(
+      src, 'criarFaseAvancado', ['_nascerCanonico', 'planoDeNascimento'], arq,
+    ),
     comoConsertar: 'Converta o plano da linha recém-criada com `planoDeNascimento(...)` antes de exibi-la.',
     dano: 'o Grupo nasce no espelho legado, cai no motor sem juros e ignora a taxa de tabela do estudo — com a badge "Plano nao migrado" numa linha criada agora',
   },
@@ -269,6 +230,15 @@ const REGRAS = [
   },
 ];
 
+// ⚠️ Sem o `typescript` o guard RECUSA (saída 2), nunca aprova. A regra do
+// nascimento canônico pergunta "a chamada está dentro deste método?", e essa
+// pergunta só tem resposta confiável na árvore. Aprovar sem poder perguntar
+// seria "não deu para rodar" virando "passou".
+if (!tsDisponivel) {
+  console.error('❌ guard-fiacao-funding: nao consegui analisar — ' + porqueIndisponivel);
+  process.exit(2);
+}
+
 const faltando = [];
 for (const raiz of RAIZ) {
   for (const arquivo of varrer(raiz)) {
@@ -276,7 +246,7 @@ for (const raiz of RAIZ) {
     for (const regra of REGRAS) {
       if (regra.ignorar(arquivo)) continue;
       if (!regra.consumidor(src)) continue;
-      const ok = regra.conferir ? regra.conferir(src) : regra.exige.test(src);
+      const ok = regra.conferir ? regra.conferir(src, arquivo) : regra.exige.test(src);
       if (!ok) faltando.push({ arquivo, regra });
     }
   }

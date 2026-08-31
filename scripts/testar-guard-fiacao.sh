@@ -66,6 +66,37 @@ CHAVE_ABRE_EM_COMENTARIO="  private _adicionarFase = async () => {
     this.fases = [...this.fases, res];
   };"
 
+# Achado do revisor externo na rodada 2: a chamada COMENTADA era aceita como
+# fiacao ativa pela regex, e o Grupo voltava a nascer no fluxo legado.
+CHAMADA_COMENTADA="  private _adicionarFase = async () => {
+    const res = await criarFaseAvancado(this.id, { tipo: 'receita' });
+    // await this._nascerCanonico(res)
+    this.fases = [...this.fases, res];
+  };"
+
+# Idem: dentro de \${...} o scanner a mao voltava a contar chaves cegamente.
+# Aqui a criacao ficava marcada como TEXTO, `corpos.length === 0` aceitava o
+# arquivo, e o guard passava mesmo com a conversao removida.
+TEMPLATE_ENGOLE="  private _adicionarFase = async () => {
+    const x = \`\${\`}\`}\`;
+    const res = await criarFaseAvancado(this.id, { tipo: 'receita' });
+    this.fases = [...this.fases, res];
+  };"
+
+# O sentido oposto do mesmo achado: \${'{'} fazia fiacao CORRETA reprovar.
+TEMPLATE_FALSO_POSITIVO="  private _adicionarFase = async () => {
+    const y = \`\${'{'}\`;
+    const res = await criarFaseAvancado(this.id, { tipo: 'receita' });
+    this.fases = [...this.fases, await this._nascerCanonico(res)];
+  };"
+
+# Menção em COMENTARIO nao e consumo: um arquivo que so cita o nome nao e
+# consumidor e nao pode ser acusado.
+SO_MENCAO="  private _outraCoisa() {
+    // aqui um dia houve criarFaseAvancado(this.id, { tipo: 'receita' })
+    return 1;
+  }"
+
 verificar() { # <nome> <raiz> <esperado: ok|reprova>
   local nome="$1" raiz="$2" esperado="$3"
   if node "$GUARD" "$raiz" >/dev/null 2>&1; then
@@ -80,9 +111,13 @@ verificar "1 base legítima: a conversão está no método"        "$(arvore c1 
 verificar "2 mutação: chamada apagada reprova"                 "$(arvore c2 "$MUTADO")"                 reprova
 verificar "3 falso positivo: '}' dentro de string não trunca"  "$(arvore c3 "$CHAVE_FECHA_EM_STRING")"  ok
 verificar "4 falso negativo: '{' em comentário não engole"     "$(arvore c4 "$CHAVE_ABRE_EM_COMENTARIO")" reprova
+verificar "5 chamada COMENTADA não conta como fiação"           "$(arvore c5 "$CHAMADA_COMENTADA")"        reprova
+verificar "6 template \${\`}\`} não faz o recorte engolir tudo"     "$(arvore c6 "$TEMPLATE_ENGOLE")"          reprova
+verificar "7 template \${'{'} não reprova fiação correta"       "$(arvore c7 "$TEMPLATE_FALSO_POSITIVO")"  ok
+verificar "8 só menção em comentário não é consumidor"         "$(arvore c8 "$SO_MENCAO")"                ok
 
 if [ "$FALHAS" -gt 0 ]; then
   echo "❌ bateria do guard de fiação: $FALHAS falha(s)." >&2
   exit 1
 fi
-echo "✅ bateria do guard de fiação: 4 casos, nos dois sentidos."
+echo "✅ bateria do guard de fiação: 8 casos, nos dois sentidos."
