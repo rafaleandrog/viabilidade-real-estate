@@ -24,7 +24,7 @@ obrigatório de `componentesPagamento`, `componentesDoLegado`, `recebimentoBruto
 `vendaLiquidaContratadaMensal`, `ultimoMesRecebivelLinha`, `validarSafrasReceita`,
 `componentesParaSalvar` e `fluxoPagamentoParaSalvar`. **Medido, com o controle antes:** apagar
 `jurosTabelaAaEstudo` do `FluxoConfig` do Painel vira `TS2741`; apagar o override em
-`componentesPagamento` derruba 4 testes (966/970).
+`componentesPagamento` derruba 4 testes.
 
 **O que SAIU:**
 
@@ -199,6 +199,36 @@ como "string numérica". Agora o padrão exige um decimal.
 > estava no ponto errado.** Conferir o sinal depois da potência de expoente par é uma verificação
 > que roda, passa, e não verifica — indistinguível de uma boa, exatamente como o `CLAUDE.md`
 > descreve em "medir o ponto certo".
+
+### A rodada 5 achou o caso que estava FORA do alcance da correção — e a resposta não foi consertar
+
+O revisor externo apontou que uma linha cujo `fluxo_pagamento` não tem `componentes` **não recebe a
+taxa do estudo**: o guard de shape em `recebiveisComponentesLinha` devolve `null` e o cálculo cai no
+motor legado, que soma entrada/parcelas/repasse sem juros. Todo Grupo recém-criado nasce assim.
+
+**Procede — e mesmo assim o conserto certo não era trocar de motor.** Três medições decidiram:
+
+1. `git show origin/main:frontend/fluxo-caixa-motor.ts` traz a **mesma** guarda (`fd7a9de`). Não é
+   regressão deste PR; o que o PR fez foi acrescentar uma frase de tela que a tornou VISÍVEL.
+2. Os dois motores **não são equivalentes nem a 0%** — o teste `#458` já mede a divergência de
+   *timing*. Rodei a mutação que rotearia o legado pelo adaptador: **7 vermelhos**, entre eles
+   `#283 estudo legado sem componentes mantém exatamente o caminho vigente`. Há asserção **explícita**
+   no repositório de que esse caminho não muda.
+3. O **critério 3** da própria #585 pede que a precedência da chave legada seja **declarada**, não
+   alterada.
+
+Então o caso ficou declarado em quatro peças que se sustentam: o aviso `p.plano-legado` no modal (com
+caso de render próprio), a badge "Plano não migrado" da #458 passando a dizer também que os juros não
+valem ali, um teste que **fixa** a precedência (linha legada: mesma série a 0% e a 12,5%, com
+contraprova na canônica) e a issue **#657**, que leva a decisão de desenho ao autor com o custo dos
+dois caminhos nomeado.
+
+> **A lição, e ela é nova em relação às quatro rodadas anteriores:** *achado que procede não implica
+> conserto dentro do mesmo PR.* As rodadas 1–4 ensinaram a medir o ponto certo; esta ensinou a medir
+> **o escopo**. A pergunta que faltava não era "o achado é real?" — era "consertá-lo aqui muda um
+> número que ninguém pediu?". A mutação respondeu: sim, sete testes, um deles escrito exatamente para
+> proibir essa mudança. Sem rodá-la, eu teria "consertado" o achado e quebrado um contrato do repo
+> com o corpo do PR afirmando que estava tudo verde.
 
 ⚠️ **Pendente do autor, no ambiente autenticado:** `validar-backend.sh` **não roda nesta sessão**
 (aborta na etapa 1/5, portão do SDK, pelo 401). O typecheck do backend, a sincronização do
