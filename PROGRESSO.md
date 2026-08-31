@@ -144,10 +144,17 @@ sem juros. Fica registrado com reprodução pronta, para issue própria.
    `.sort()` muda"*. Frase verdadeira quando escrita e falsa **no mesmo commit**.
 2. **O ramo DERIVADO da guarda de taxa negativa estava descoberto** — só a chave explícita tinha
    caso. Removê-lo deixava tudo verde.
-3. **A negação `tipo !== 'imediato'` mudava comportamento em silêncio.** Componente com `tipo`
-   ausente, `null` ou desconhecido — dado que a validação barra hoje, mas que pode estar
-   persistido de antes dela — **não** recebia taxa sob a regra da presença de chave e passou a
-   receber. Virou `TIPOS_FINANCIADOS`, allowlist explícita.
+3. **A negação `tipo !== 'imediato'` mudava comportamento em silêncio** — no MOTOR
+   (`frontend/fluxo-caixa-motor.ts`) e no EDITOR (`frontend/fluxo-pagamento-editor.ts`), não na
+   migração. Componente com `tipo` ausente, `null` ou desconhecido — dado que a validação barra
+   hoje, mas que pode estar persistido de antes dela — **não** recebia taxa sob a regra da presença
+   de chave e passou a receber. Virou `TIPOS_FINANCIADOS`, allowlist explícita, exportada do motor
+   e usada nos dois.
+   > ⚠️ Este item nomeava arquivo nenhum, e os outros três da lista são sobre a migração — uma
+   > lente da rodada 4 leu-o como sendo dela, foi procurar `TIPOS_FINANCIADOS` no `037`, não achou
+   > e reportou a afirmação como **falsa**. Ela é verdadeira; a prosa é que induzia ao erro. Fica
+   > como lembrete de que ambiguidade em lista numerada custa o mesmo que afirmação errada — quem
+   > lê gasta o mesmo tempo, e pode concluir o oposto.
 4. **`return` dentro de `for...of`.** Ao trocar `forEach` por `for...of` para tirar a cláusula
    redundante, o `return` que pulava a iteração passou a **abortar a migração inteira** no primeiro
    estudo sem taxa. O harness pegou na hora — 5 dos 9 casos vermelhos de uma vez.
@@ -168,6 +175,17 @@ O revisor externo achou as duas, e as duas são a **mesma guarda medida no ponto
    da potência.
 2. **`juros_tabela_aa: ''` virava voto de 0%**, porque `Number('')` é `0`. Shape que a validação
    antiga da API deixava passar dentro do `fluxo_pagamento`.
+
+### A rodada 4 achou a MESMA classe pela terceira vez — e desta vez no caso que eu escrevi para provar
+
+O caso 5 do harness — *"a `037` não sobrescreve escolha do autor"* — **passava por ausência de
+dado**. O estudo 5 do SEED não tinha nenhuma linha de receita votável, então quem o protegia era
+`porTaxa.size === 0`, não o filtro `alvos`. Medido: **remover o filtro inteiro deixava os 11 casos
+verdes**. Com uma linha de 20% acrescentada, remover o filtro grava 20 por cima do 9,75 do autor.
+
+E duas entradas ainda viravam voto sem ser percentual: `Number('0x10')` é `16` e `Number('1e3')` é
+`1000`. A guarda de string vazia não bastava — `Number()` aceita hexadecimal e notação científica
+como "string numérica". Agora o padrão exige um decimal.
 
 > **A lição das quatro rodadas, e é uma só:** cada conserto meu criou o defeito seguinte na **mesma
 > classe** — defesa escrita e não exercitada. Rodada 1: três defesas sem teste. Rodada 2: a fixture

@@ -58,6 +58,8 @@ const SEED = {
     // #585 (rodada 4): as duas portas de lavagem que o revisor externo achou.
     { id: 11, nome: 'Estudo K', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
     { id: 12, nome: 'Estudo L', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 13, nome: 'Estudo M', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 14, nome: 'Estudo N', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
   ],
   avancado_cronograma: [
     { id: 1, estudo_id: 1, evento: 'planejamento', inicio_mes: 1, duracao_meses: 6 },
@@ -150,6 +152,20 @@ const SEED = {
     // vazia virava voto de 0% e gravava a coluna para sempre.
     { id: 44, estudo_id: 12, tipo: 'receita', nome: 'R-A', ordem: 0,
       fluxo_pagamento: { juros_tabela_aa: '' } },
+    // ⚠️ O estudo 5 (coluna já preenchida com 9,75) PRECISA de uma linha
+    // votável, e por muito tempo não teve. Sem ela, quem o protegia era
+    // `porTaxa.size === 0` — ausência de dado —, não o filtro `alvos`: remover
+    // o filtro inteiro deixava os 11 casos verdes. Terceira vez que esta
+    // fixture passa por motivo diferente do que o comentário afirma; com 20%
+    // aqui, remover o filtro grava 20 por cima do 9,75 do autor.
+    { id: 45, estudo_id: 5, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: 20 } },
+    // Estudos 13 e 14 — `Number()` aceita hexadecimal e notação científica como
+    // string numérica; nenhum dos dois é percentual que alguém digitou.
+    { id: 46, estudo_id: 13, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: '0x10' } },
+    { id: 47, estudo_id: 14, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: '1e1' } },
     // Estudo 4 — EMPATE em frequência (uma linha cada), resolvido pela de
     // menor `ordem`; e a 3ª linha exercita a DERIVAÇÃO a partir de
     // `componentes[].taxaMensal`, sem a chave `juros_tabela_aa`. A 4ª e a 5ª
@@ -196,6 +212,9 @@ const SEED = {
     { id: 42, fase_id: 42, tipologia_id: 1, quantidade: 1 },
     { id: 43, fase_id: 43, tipologia_id: 1, quantidade: 1 },
     { id: 44, fase_id: 44, tipologia_id: 1, quantidade: 1 },
+    { id: 45, fase_id: 45, tipologia_id: 1, quantidade: 1 },
+    { id: 46, fase_id: 46, tipologia_id: 1, quantidade: 1 },
+    { id: 47, fase_id: 47, tipologia_id: 1, quantidade: 1 },
   ],
   // Camada com o shape que a migração `019` produzia (config de Price vinda do
   // Bloco G legado) — é o caminho de transformação da `028`. Sem esta linha a
@@ -412,6 +431,9 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
         [11, null, 'taxaMensal <= -2 deriva 0% ou positivo e não pode virar voto'],
         // `Number('')` é `0` — string vazia não é resposta.
         [12, null, 'juros_tabela_aa vazio não pode virar voto de 0% explícito'],
+        // Hexadecimal e notação científica em string: `Number('0x10')` é `16`.
+        [13, null, 'string hexadecimal não pode virar voto'],
+        [14, null, 'string em notação científica não pode virar voto'],
         // Empate de frequência resolvido pela linha de menor `ordem` — e é este
         // caso, e só ele, que dá dente ao `.sort()`.
         [9, 4, 'empate de frequência tem de ser resolvido pela linha de menor ordem'],

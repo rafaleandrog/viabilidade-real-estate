@@ -104,8 +104,15 @@ function jurosAaDaLinha(fluxoPagamento) {
     // explícito" e gravava a coluna permanentemente. É a mesma lavagem de dado
     // sujo que a guarda de negativo existe para impedir, por outra porta.
     // Achado do revisor externo.
-    if (typeof bruto === 'string' && bruto.trim() === '') return null;
+    // Só `number`, ou string que SEJA um decimal — não o que `Number()` aceita.
+    // `Number('0x10')` é `16` e `Number('1e3')` é `1000`: hexadecimal e notação
+    // científica passam por "string numérica" e viram voto. Nenhum dos dois é
+    // percentual que alguém tenha digitado; são dado sujo com aparência de
+    // resposta, a mesma classe que as guardas de negativo e de string vazia
+    // fecham por outras portas. `Number('')` também é `0`, e o padrão abaixo
+    // exige ao menos um dígito.
     if (typeof bruto !== 'number' && typeof bruto !== 'string') return null;
+    if (typeof bruto === 'string' && !/^\s*-?\d+(\.\d+)?\s*$/.test(bruto)) return null;
     const aa = Number(bruto);
     return Number.isFinite(aa) && aa >= 0 ? aa : null;
   }
