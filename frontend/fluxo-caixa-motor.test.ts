@@ -2665,6 +2665,84 @@ function linha458(mesVenda: number, comComponentes: boolean) {
   };
 }
 
+test('#658: `marcoMes`/`mesPagamento` reancoram no cronograma VIGENTE, como a taxa reancora no estudo', () => {
+  // Achado do revisor externo no PR 658. `componentesDoLegado` deriva o fim da
+  // obra A CADA cálculo — então o ramo legado sempre acompanhou o cronograma
+  // vigente. O ramo canônico lia as âncoras do array PERSISTIDO, congeladas no
+  // momento da gravação: mudar o início ou a duração da obra deixava a linha
+  // pagando nos meses do cronograma antigo, sem nada ficar vermelho.
+  //
+  // Que os dois campos são PROJEÇÃO e não dado da linha está provado em
+  // `CAMPOS_DO_ESPELHO` (`fluxo-pagamento-editor.ts`): estando lá, o
+  // transplante nunca os move do persistido. São ao cronograma o que
+  // `taxaMensal` é à taxa do estudo — e recebem o mesmo tratamento.
+  const OBRA_ANTIGA = CRONO;                        // obra 17→40 ⇒ fim 40, repasse 41
+  const OBRA_NOVA: EventoCrono[] = CRONO.map((e) => (
+    e.evento === 'obra' ? { ...e, duracao_meses: 12 } : e
+  ));                                               // obra 17→28 ⇒ fim 28, repasse 29
+
+  // A linha foi GRAVADA sob o cronograma antigo — é o caso real: o usuário
+  // aplicou o plano e depois mexeu na obra.
+  const legado = { entrada: [], parcelas: [], repasse: { apos_entrega_meses: 0 } };
+  const linha = {
+    id: 1, nome: 'Grupo #658',
+    tipologias: [{ quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
+    absorcao: { modo: 'personalizado', meses: [{ mes: 13, pct: 100 }] },
+    fluxo_pagamento: {
+      ...legado, ancorasVivas: true,
+      componentes: componentesDoLegado(legado, OBRA_ANTIGA, 0),
+    },
+  };
+  // Pré-condição: o array persistido carrega a âncora ANTIGA.
+  const persistido: any[] = (linha.fluxo_pagamento as any).componentes;
+  const repassePersistido = persistido.find((c) => c.tipo === 'concentrado');
+  assert.ok(repassePersistido, 'pré-condição: o plano tem um repasse concentrado');
+  assert.equal(repassePersistido.mesPagamento, 41, 'pré-condição: gravado sob a obra que terminava no mês 40');
+
+  // Lido sob o cronograma NOVO, o repasse tem de cair no mês 29.
+  const lido = componentesPagamento(linha.fluxo_pagamento, OBRA_NOVA, 0) as any[];
+  const repasseLido = lido.find((c) => c.tipo === 'concentrado');
+  assert.equal(repasseLido.mesPagamento, 29,
+    'o repasse tem de seguir a obra vigente (fim 28 + 1), não a âncora gravada');
+
+  // E o efeito no caixa é o que importa: o dinheiro muda de mês.
+  const serieNova = recebimentoBrutoMensal(linha, OBRA_NOVA, 60, 0);
+  assert.ok(serieNova[29] > 0, 'o repasse entra no mês 29 sob a obra nova');
+  assert.equal(serieNova[41], 0, 'e NÃO no mês 41, que era o da obra antiga');
+});
+
+test('#658 caso negativo: SEM `ancorasVivas`, a âncora persistida manda — mesmo divergindo do cronograma', () => {
+  // A reancoragem é opt-in de propósito, e este teste é a razão. Medido: com
+  // ela valendo para toda linha canônica, os quatro KPIs de CINCO baselines da
+  // #468 se moviam e os dois testes de `ate_marco` degenerado da #444 caíam.
+  // A fixture da #468 grava `mesPagamento: 42` com a obra terminando no mês 40
+  // — o derivado seria 41. Repasse dois meses após a entrega era configurável
+  // antes da #345, e esse dado existe. `mesPagamento` NÃO é projeção pura.
+  const fp = {
+    componentes: [
+      { tipo: 'imediato', participacaoPct: 50, descontoPct: 0 },
+      { tipo: 'concentrado', participacaoPct: 50, mesPagamento: 42, taxaMensal: 0, rotulo: 'Repasse' },
+    ],
+  };
+  const lido = componentesPagamento(fp, CRONO, 0) as any[];   // obra 17→40 ⇒ derivado seria 41
+  const repasse = lido.find((c) => c.tipo === 'concentrado');
+  assert.equal(repasse.mesPagamento, 42,
+    'sem o marcador, a âncora do usuário é preservada — 42, não 41');
+});
+
+test('#658 caso negativo: sem evento de obra, a âncora persistida é PRESERVADA', () => {
+  // Derivar `fimObra = 0` de um cronograma sem obra trocaria um dado velho por
+  // um dado errado — o repasse iria para o mês 1 em qualquer chamador que
+  // ainda não montou o cronograma. Este teste é o que impede esse conserto.
+  const legado = { entrada: [], parcelas: [], repasse: { apos_entrega_meses: 0 } };
+  const fp = { ...legado, ancorasVivas: true, componentes: componentesDoLegado(legado, CRONO, 0) };
+  const semObra: EventoCrono[] = CRONO.filter((e) => e.evento !== 'obra');
+
+  const lido = componentesPagamento(fp, semObra, 0) as any[];
+  const repasse = lido.find((c) => c.tipo === 'concentrado');
+  assert.equal(repasse.mesPagamento, 41, 'sem obra no cronograma, o persistido continua valendo');
+});
+
 test('#458: ramo legado × ramo canônico divergem no MESMO fluxo_pagamento — "ao longo da obra"', () => {
   // Venda no mês 20, DENTRO da janela de obra (17..40). Diferença NOMEADA da
   // tabela da issue: no ramo LEGADO, o vencimento é ancorado em

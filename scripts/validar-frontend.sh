@@ -100,12 +100,6 @@ node scripts/guard-json.mjs || exit 1
 # Ver o cabeçalho de scripts/guard-schema-ciclos.mjs.
 node scripts/guard-schema-ciclos.mjs || exit 1
 
-# #446 — a FIAÇÃO do horizonte de funding. Só `readFileSync` + regex, então
-# roda aqui, antes do `pnpm install`, junto dos guards mais baratos.
-# Medido: apagar `operacoesFunding` de `tela-funding.ts` deixou a suíte INTEIRA
-# verde. Nenhuma outra etapa deste script enxerga essa omissão.
-# Ver o cabeçalho de scripts/guard-fiacao-funding.mjs.
-node scripts/guard-fiacao-funding.mjs || exit 1
 echo "  ok: nenhuma aspa curva em atributo"
 
 # Os três guards de UI leem `docs/ui-urbiverso/` — o espelho versionado da
@@ -196,6 +190,32 @@ com_limite 120 bash scripts/testar-guard-enderecos-doc.sh >/dev/null || {
   exit 1
 }
 echo "  ok: bateria do guard de endereços verde"
+
+# #657/#658: a bateria do guard de FIAÇÃO. Ela mora aqui, e não só no CI, porque
+# o guard já falhou calado duas vezes no PR que o criou — primeiro conferindo
+# presença no arquivo em vez de escopo, depois contando chaves dentro de string
+# e comentário. Os dois modos de falha estão nos casos 3 e 4, e a bateria foi
+# conferida contra a versão ANTIGA do recorte: ela reprova.
+# #446 — a FIAÇÃO do horizonte de funding, mais a regra do nascimento canônico
+# (#657). Medido: apagar `operacoesFunding` de `tela-funding.ts` deixou a suíte
+# INTEIRA verde; nenhuma outra etapa deste script enxerga essa omissão.
+#
+# ⚠️ Ele rodava na etapa 1/8, junto dos guards baratos, quando era só
+# `readFileSync` + regex. SAIU DE LÁ e veio para cá — achado do revisor externo
+# no PR 658: a regra do nascimento canônico passou a decidir pelo PARSER do
+# typescript, e o parser só existe depois do link (etapa 3/8). Num clone limpo,
+# a chamada na etapa 1 saía 2 (fail-closed, como deve) e o validador abortava
+# ANTES de poder instalar a própria dependência. A minha árvore já tinha
+# `node_modules`, então eu nunca veria isso rodando aqui.
+#
+# É o mesmo motivo pelo qual `guard-enderecos-doc` mora nesta etapa, e está
+# escrito no cabeçalho dele.
+node scripts/guard-fiacao-funding.mjs || exit 1
+com_limite 120 bash scripts/testar-guard-fiacao.sh >/dev/null || {
+  echo "  bateria do guard de fiação FALHOU — rode: bash scripts/testar-guard-fiacao.sh" >&2
+  exit 1
+}
+echo "  ok: guard de fiação e bateria verdes"
 
 echo "== 6/8 typecheck do frontend =="
 # ⚠️ `scripts/**/*.ts` entra aqui, e NÃO é enfeite. O `tsconfig.json` da raiz

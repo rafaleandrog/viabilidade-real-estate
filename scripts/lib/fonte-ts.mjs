@@ -57,6 +57,10 @@ for (const alvo of [process.env.URBI_TYPESCRIPT, 'typescript']) {
   }
 }
 export const disponivel = ts !== null;
+// #658: o compilador cru, para o guard que precisa do AST e nao so das faixas
+// mascaradas. `guard-fiacao-funding` pergunta "esta chamada esta DENTRO deste
+// metodo?" — pergunta de arvore, nao de texto.
+export const compilador = ts;
 export const porqueIndisponivel =
   `o pacote \`typescript\` nao esta acessivel${motivoSemTs ? ` (${motivoSemTs})` : ''}.\n` +
   '      Rode `bash scripts/validar-frontend.sh`, que instala e linka os pacotes publicos,\n' +

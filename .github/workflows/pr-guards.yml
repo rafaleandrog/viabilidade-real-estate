@@ -287,12 +287,36 @@ jobs:
     name: Consumidor de funding passa operacoesFunding ao horizonte
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      URBI_TYPESCRIPT: ${{ github.workspace }}/.ts-guards/node_modules/typescript/lib/typescript.js
     steps:
       - uses: actions/checkout@v7
+      - name: Instalar só o typescript, isolado
+        run: |
+          set -uo pipefail
+          # ⚠️ Este passo entrou com a regra do nascimento canônico (#657/#658).
+          # Ela pergunta "a chamada está DENTRO deste método?", e duas gerações
+          # de resposta por TEXTO foram derrubadas pelo revisor externo:
+          # balanceamento cego de chaves, e depois um scanner de string/comentário
+          # à mão — que ainda aceitava chamada COMENTADA como fiação ativa e se
+          # perdia dentro de `${...}`. Pergunta de árvore se responde com a
+          # árvore. Sem o pacote, o guard sai 2 (recusa) e o job fica vermelho:
+          # "não deu para rodar" nunca é "passou".
+          #
+          # Mesmo padrão dos jobs `guards-ui` e `tabelas-obsoletas`: diretório
+          # PRÓPRIO com package.json próprio, nunca a raiz — `npm install` na raiz
+          # tentaria baixar o `@urbiverso/sdk`, que é privado (401).
+          mkdir -p .ts-guards
+          cd .ts-guards
+          echo '{"name":"ts-guards","private":true}' > package.json
+          npm install --no-audit --no-fund --loglevel=error typescript@5.9.3
+          node -e "console.log('typescript', require('./node_modules/typescript').version)"
+      - name: Bateria do guard de fiação (#657)
+        run: bash scripts/testar-guard-fiacao.sh
       - name: Guard de fiação do horizonte de funding (#446)
         run: |
           set -uo pipefail
-          # Só `readFileSync` + regex: sem typescript, sem SDK, sem credencial.
+          # Sem SDK e sem credencial — só `node` e o `typescript` público.
           #
           # Por que este job existe, medido em 2026-08-24: apagar
           # `operacoesFunding: this.operacoes` de `frontend/tela-funding.ts`

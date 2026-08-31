@@ -4,6 +4,79 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## O Grupo de receita nasce no formato canônico — #657 + #585 (2026-08-31)
+
+Reenquadramento do autor, e ele corrigiu o meu. Eu tratava o buraco da #585 como "o caso da linha
+legada"; ele perguntou o óbvio: **se o formato se chama LEGADO, por que uma linha nova cai nele?**
+
+Cai porque o backend cria toda linha de receita com `fluxoPagamentoPadrao()`, que é o espelho legado
+puro. Então o defeito não era dado antigo — era **dado novo nascendo velho**, com a badge "Plano não
+migrado" numa linha recém-criada e um cálculo que ignorava a aba Financeiro. O inventário registrado
+na #458 fecha o argumento: *"as 6 linhas dos 2 estudos de Pinguim estão todas no canônico"* — dado
+legado de verdade **não existe** na instância.
+
+Conserto: `planoDeNascimento` delega a `fluxoPagamentoParaSalvar`, o mesmo caminho do botão Aplicar.
+Zero matemática nova, zero mudança de motor, zero número existente movido. E remove uma
+descontinuidade que já existia: clicar Aplicar **sem mudar nada** mudava o resultado do Grupo, porque
+trocava o motor.
+
+### Cinco achados do revisor externo em quatro rodadas, todos reais, nenhum falso
+
+Melhor placar de revisão externa que este repositório registrou. O mérito é do enquadramento: a cada
+rodada eu pedi uma **pergunta específica** em vez de "revise o diff".
+
+| Rodada | Achado | Desfecho |
+|---|---|---|
+| 1 | âncora de cronograma congelada no nascimento (P1) | consertado — **na segunda tentativa** |
+| 1 | recorte do guard contava chaves cegamente | consertado |
+| 2 | chamada **comentada** aceita como fiação | consertado |
+| 2 | `${...}` voltava a contar chaves cegamente | consertado |
+| 3 | guard rodava **antes** do link, em clone limpo | consertado |
+
+### As três lições, e nenhuma é "teste mais"
+
+**1 · Achado que procede não implica conserto do jeito proposto — nem do jeito que eu propus.**
+O P1 me levou a reancorar `marcoMes`/`mesPagamento` em **toda** linha canônica, com um argumento que
+parecia sólido: os dois estão em `CAMPOS_DO_ESPELHO`, logo são projeção, como `taxaMensal`. **A suíte
+derrubou 7 testes** — os quatro KPIs de cinco baselines da #468 e os dois de `ate_marco` degenerado da
+#444. A fixture grava `mesPagamento: 42` com a obra terminando no mês 40; repasse dois meses após a
+entrega **era configurável antes da #345**. `mesPagamento` não é projeção pura. O conserto virou
+opt-in (`ancorasVivas`, marcador que só o nascimento põe e que morre no primeiro Aplicar), e os 7
+voltaram ao verde **sem editar fixture nenhuma** — que é a prova de que o escopo ficou certo.
+
+**2 · Três gerações de defesa furada, e a causa era sempre a mesma.**
+Presença no arquivo → balanceamento cego de chaves → scanner com máscara de string/comentário. Cada
+conserto meu produziu o buraco seguinte porque **eu estava escrevendo um lexer de TypeScript à mão**,
+quando a pergunta era de árvore: *"esta chamada está dentro deste método?"*. O revisor tinha dito isso
+na rodada 1 e eu ouvi pela metade. Com o parser (`scripts/lib/fonte-ts.mjs`, a mesma autoridade dos
+guards de UI), comentário não é nó, string é literal e `${...}` é expressão — as quatro classes somem
+por construção.
+
+**3 · O achado mais útil foi o que eu não conseguiria ver daqui.**
+Em **clone limpo**, `validar-frontend.sh` chamava o guard na etapa 1/8 e abortava por falta do pacote
+que instalaria na etapa 2 — e a mensagem de erro do guard mandava rodar exatamente o script que não
+conseguia rodar. Minha worktree já tinha `node_modules`; nenhuma execução minha mostraria isso. O
+guard foi para a etapa 5/8, ao lado de `guard-enderecos-doc`, que mora lá pelo mesmo motivo.
+
+### Duas armadilhas de medição, e as duas custaram
+
+- ⚠️ **`bash script > log; echo "EXIT=$?"` lê o código do `echo`, não do script.** Aconteceu duas
+  vezes neste dia, e na segunda mascarou uma falha real de 7 testes. A cura é escrever o `EXIT=` num
+  arquivo e lê-lo de lá — foi assim que todas as medições deste PR foram feitas.
+- ⚠️ **Uma isenção escrita como cuidado virou fail-open.** `corpos.length === 0 ⇒ aceita` parecia
+  "menção em comentário não é consumo"; combinada com um scanner furado, aceitava o arquivo inteiro.
+  Achado do revisor.
+
+### E uma armadilha de fechamento de issue, nova
+
+⚠️ **Rebaixar `Closes` para `Sem-fechamento:` no corpo do PR NÃO desfaz um `Closes` já escrito na
+mensagem de um commit da branch.** A #585 fechou sozinha no merge do PR 656, que saíra deliberadamente
+com `Sem-fechamento:` — porque o primeiro commit dizia `Closes #585`. Precisou ser reaberta à mão. A
+verificação é `git log <base>..HEAD --format=%B | grep -inE "clos(e|es|ed) #NNN"` **antes** do merge, e
+o sintoma é silencioso: merge limpo, corpo certo, issue fechada.
+
+---
+
 ## Juros de tabela viram valor GLOBAL do estudo — #585 (2026-08-31)
 
 Decisão do autor de 2026-08-26: *"campo juros de tabela funciona para todos os imóveis igualmente e

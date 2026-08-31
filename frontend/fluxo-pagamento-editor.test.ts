@@ -6,6 +6,7 @@ import {
   fluxoPagamentoParaSalvar,
   formularioPagamento,
   jurosDeTabelaConfigurados,
+  planoDeNascimento,
 } from './fluxo-pagamento-editor.js';
 import {
   calcularFluxo, taxaMensalDeAnual,
@@ -22,6 +23,89 @@ import {
 
 const CRONO = [{ evento: 'obra', inicio_mes: 12, duracao_meses: 24 }];
 const perto12 = (a: number, b: number, tol = 1e-4) => Math.abs(a - b) <= tol;
+
+// ── #657: o Grupo nasce canônico ───────────────────────────────────────────
+//
+// O `fluxo_pagamento` que o backend grava ao criar uma linha de receita
+// (`fluxoPagamentoPadrao`, em `backend/rotas/avancado.ts`). Copiado aqui
+// porque o backend não é importável desta suíte — o `express` não instala
+// neste ambiente (401 do SDK). O que esta fixture prova é o COMPORTAMENTO da
+// conversão sobre esse shape; que ele é o shape real é conferido pelo teste de
+// backend, que é do autor executar.
+const PLANO_DO_BACKEND = {
+  comissao: { ativo: true, tipo: 'embutida', pct: 6 },
+  ret: { ativo: false, pct: 4 },
+  entrada: [{ pct: 15, parcelas: 1 }],
+  parcelas: [{ periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true, juros: false, pct: 15 }],
+  repasse: { apos_entrega_meses: 1 },
+};
+
+test('#657 Grupo nasce CANÔNICO — o plano do backend sai com `componentes`', () => {
+  // A pré-condição é o defeito: o backend cria a linha SEM `componentes`, e é
+  // por isso que ela caía no motor legado, que não tem juros.
+  assert.equal(Array.isArray((PLANO_DO_BACKEND as any).componentes), false,
+    'pré-condição: o plano que o backend grava é o espelho legado puro');
+
+  const nascido = planoDeNascimento(PLANO_DO_BACKEND, CRONO, AA_ESTUDO);
+
+  assert.ok(Array.isArray(nascido.componentes) && nascido.componentes.length > 0,
+    'o plano de nascimento tem de trazer o contrato canônico');
+  assert.deepEqual(nascido.componentes.map((c: any) => c.tipo),
+    ['imediato', 'ate_marco', 'concentrado'],
+    'os três componentes do plano padrão, na ordem');
+
+  // O espelho legado continua ali — quem lê `entrada`/`parcelas`/`repasse`
+  // (a própria tela, o editor) não perde nada.
+  assert.equal(nascido.entrada[0].pct, 15);
+  assert.equal(nascido.parcelas[0].pct, 15);
+});
+
+test('#657 a taxa do estudo chega ao Grupo recém-criado — era o que faltava na #585', () => {
+  const nascido = planoDeNascimento(PLANO_DO_BACKEND, CRONO, AA_ESTUDO);
+  const financiados = nascido.componentes.filter((c: any) => c.tipo !== 'imediato');
+
+  assert.ok(financiados.length > 0, 'o plano padrão tem componente financiado');
+  for (const c of financiados) {
+    assert.ok(perto12(c.taxaMensal, taxaMensalDeAnual(AA_ESTUDO)),
+      `componente ${c.tipo} tem de nascer com a taxa do estudo, não com zero`);
+  }
+});
+
+test('#658 `ancorasVivas` nasce ligado e MORRE no primeiro Aplicar', () => {
+  // O marcador diz "este plano foi derivado pelo app e o usuário nunca o
+  // confirmou" — e é ele que autoriza `componentesPagamento` a reancorar
+  // `marcoMes`/`mesPagamento` no cronograma vigente. Se ele sobrevivesse ao
+  // Aplicar, um plano CONFIRMADO continuaria sendo reancorado por baixo, e a
+  // âncora escolhida pelo usuário seria sobrescrita a cada cálculo.
+  //
+  // A morte não é um `delete` explícito: `formularioPagamento` monta um objeto
+  // de chaves CONHECIDAS, então a chave não atravessa o ciclo
+  // formulário → `fluxoPagamentoParaSalvar`. Este teste é o que impede alguém
+  // de "consertar" esse ciclo para preservar chaves desconhecidas sem perceber
+  // o que quebra.
+  const nascido: any = planoDeNascimento(PLANO_DO_BACKEND, CRONO, AA_ESTUDO);
+  assert.equal(nascido.ancorasVivas, true, 'nasce com as âncoras vivas');
+
+  const depoisDoAplicar: any = fluxoPagamentoParaSalvar(
+    formularioPagamento(nascido), CRONO, AA_ESTUDO,
+  );
+  assert.equal('ancorasVivas' in depoisDoAplicar, false,
+    'o Aplicar entrega o plano ao usuário — as âncoras dele passam a mandar');
+  assert.equal(depoisDoAplicar.aplicado, true, 'e o Aplicar marca `aplicado`');
+});
+
+test('#657 nascer canônico NÃO é "o usuário configurou" — `aplicado` fica de fora', () => {
+  // `aplicado` acende o ponto verde ao lado de "Fluxo de Pagamento" na tela.
+  // Marcá-lo aqui diria ao usuário que ele já configurou um plano que nunca
+  // abriu — trocaria uma mentira por outra.
+  const nascido = planoDeNascimento(PLANO_DO_BACKEND, CRONO, AA_ESTUDO);
+  assert.equal('aplicado' in nascido, false, '`aplicado` não pode vir do nascimento');
+
+  // Contraprova: pelo caminho do botão Aplicar, ele VEM — a diferença entre os
+  // dois é só essa, e é deliberada.
+  const aplicado = fluxoPagamentoParaSalvar(formularioPagamento(PLANO_DO_BACKEND), CRONO, AA_ESTUDO);
+  assert.equal((aplicado as any).aplicado, true);
+});
 
 test('#248 configuração nova persiste contrato canônico e espelho legado', () => {
   const form = formularioPagamento(null);
