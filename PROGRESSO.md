@@ -98,6 +98,42 @@ vermelhas: reintroduzir o descarte do 0% derruba o estudo 3; apagar o `.sort()` 
 > e os três bloqueantes mais caros desta rodada moravam exatamente nesses dois pontos cegos. Trava
 > de tipo não substitui teste de comportamento no caminho que o PR está mudando.
 
+### E a rodada 2 achou mais seis — cinco deles CRIADOS pelo conserto da rodada 1
+
+Não é giro em falso: são defeitos distintos, e a maioria é a **mesma classe** que a rodada 1
+consertou — defesa escrita e não exercitada. Três vieram do motor externo.
+
+1. **O conserto do 0% criou uma lavanderia de dado sujo.** Com `0` virando voto legítimo e
+   definitivo, o clamp `Math.max(bruto, 0)` — que eu tinha posto sem comentário — passou a
+   converter taxa negativa de dado legado em **"0% intencional" permanente**, imune a reexecução e
+   indistinguível de escolha do autor. Medido: linha com `-5` gravava `0`. Agora **taxa negativa
+   não vota**, e a coluna fica nula, que é o estado visível.
+2. **A chave de votação estava em 1 casa e a coluna é `decimal(5,2)`** (revisor externo). 12,51% e
+   12,54% caíam no mesmo grupo, e o gravado era a **primeira vista**, não a mais frequente.
+3. **O override testava presença de chave, não tipo** (revisor externo). `validarFluxoPagamento`
+   aceita `prazo_fixo` sem `taxaMensal`; nessa linha a taxa do estudo nunca era aplicada — a tela
+   diria 12,5% e as parcelas não renderiam nada.
+4. **O filtro `tipo === 'receita'` não era exercitado.** A fase de cronograma da fixture não tinha
+   `fluxo_pagamento`, então quem a excluía era a ausência de dado — e meu comentário afirmava que
+   era o filtro. Removê-lo deixava os testes verdes.
+5. **O teto `decimal(5,2)` nunca era exercitado** — nenhum valor da fixture chegava perto.
+6. **A linha somente-leitura que eu acrescentei ao modal não tinha cobertura**: apagá-la deixava os
+   dois casos de render verdes.
+
+Um achado do revisor foi **retirado por contestação com evidência**: ele afirmava que
+`tela-avancado` monta as subabas de Viabilidade simultaneamente, e é um `switch` que devolve um
+template só — `viab-funding` é destruído e recriado a cada troca de aba.
+
+E apareceu um **defeito latente, alheio a esta issue e agora travado por teste**: componente
+financiado sem `sinalPct` — shape que o backend aceita — faz `receitaBruta` virar **NaN**, com ou
+sem juros. Fica registrado com reprodução pronta, para issue própria.
+
+> **A lição desta rodada é sobre a fixture, não sobre o código.** Dar teste à migração foi o
+> conserto certo do bloqueante 6; mas a fixture nasceu passando sem exercitar **três** das defesas
+> que deveria travar, e o comentário dela dizia o contrário. Teste que passa não prova que mede —
+> só a mutação prova. Hoje cada uma das sete defesas do backfill tem a sua, e cada mutação é pega
+> pelo caso certo.
+
 ⚠️ **Pendente do autor, no ambiente autenticado:** `validar-backend.sh` **não roda nesta sessão**
 (aborta na etapa 1/5, portão do SDK, pelo 401). O typecheck do backend, a sincronização do
 `schema.json` e a execução real da `037` em Postgres são dele. O harness de migrações

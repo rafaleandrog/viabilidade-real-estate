@@ -74,24 +74,55 @@
 // ficam inertes e `fluxoPagamentoParaSalvar` as descarta na primeira gravação
 // de cada linha. Apagá-las aqui seria escrita em massa sem ganho — nada as lê.
 
-/** % a.a. de uma linha, na precedência da #428. `null` = a linha não declara taxa. */
+/**
+ * % a.a. de uma linha, na precedência da #428. `null` = **a linha não tem voto**
+ * — porque não declara taxa, ou porque o que ela declara não é um percentual
+ * que possa virar decisão.
+ *
+ * ⚠️ **Taxa NEGATIVA não vota, e essa escolha é o conserto de um defeito que a
+ * primeira versão desta migração tinha.** Antes, ela era achatada em `0` por um
+ * clamp no fim; combinada com a regra de que `0` é voto legítimo e definitivo,
+ * o resultado era **dado sujo virando "0% intencional" permanente e
+ * indistinguível de escolha do autor** — e imune a reexecução, porque o filtro
+ * de idempotência só olha `null`. Medido: linha com `juros_tabela_aa: -5`
+ * gravava `0` na coluna e a reexecução não voltava atrás.
+ *
+ * Nunca houve validação de domínio para essa chave (a da #428 vivia na tela, e
+ * a do backend só chegou com a #585), então taxa negativa em dado legado ou
+ * gravada por API é possível. Ignorá-la deixa a coluna nula quando ela é a
+ * única fonte — e nulo é o estado "nunca configurado", que o autor VÊ na tela e
+ * pode corrigir. É o oposto de gravar um número plausível e errado.
+ */
 function jurosAaDaLinha(fluxoPagamento) {
   const fp = fluxoPagamento ?? {};
   if (fp.juros_tabela_aa !== undefined && fp.juros_tabela_aa !== null) {
     const aa = Number(fp.juros_tabela_aa);
-    return Number.isFinite(aa) ? aa : null;
+    return Number.isFinite(aa) && aa >= 0 ? aa : null;
   }
   const comps = Array.isArray(fp.componentes) ? fp.componentes : [];
   for (const c of comps) {
     const m = Number(c?.taxaMensal);
-    if (Number.isFinite(m) && m !== 0) return (Math.pow(1 + m, 12) - 1) * 100;
+    if (Number.isFinite(m) && m !== 0) {
+      const aa = (Math.pow(1 + m, 12) - 1) * 100;
+      return aa >= 0 ? aa : null;
+    }
   }
   return null;
 }
 
-/** Chave de agrupamento: 1 casa decimal, a mesma que a tela exibia. */
+/**
+ * Chave de agrupamento — **2 casas, a precisão em que a coluna persiste**
+ * (`decimal(5,2)`), e é o valor que de fato vai ser gravado.
+ *
+ * ⚠️ Já foi 1 casa, "a mesma que a tela exibia", e estava errado: taxas que
+ * diferem só na segunda casa caíam no mesmo grupo, e o candidato guardava a
+ * PRIMEIRA `aa` vista. Uma linha a 12,51% e dez a 12,54% viravam um grupo só
+ * cujo valor era 12,51% — a taxa menos frequente, gravada como se fosse a mais.
+ * Agrupar numa precisão mais grossa que a persistida é sempre isso: fundir
+ * candidatos que o destino sabe distinguir. Achado do revisor externo.
+ */
 function chave(aa) {
-  return Math.round(aa * 10) / 10;
+  return Math.round(aa * 100) / 100;
 }
 
 /**
@@ -143,7 +174,10 @@ export default async function ({ dados }) {
       const k = chave(aa);
       const ja = porTaxa.get(k);
       if (ja) ja.n += 1;
-      else porTaxa.set(k, { n: 1, primeira: posicao, aa });
+      // Guarda a CHAVE, não a primeira `aa` vista: são o mesmo número agora que
+      // a chave está na precisão persistida, e guardar a chave torna isso
+      // impossível de divergir de novo.
+      else porTaxa.set(k, { n: 1, primeira: posicao, aa: k });
     });
     // `size === 0` só acontece quando NENHUMA linha declara taxa — nem 0
     // explícito. Aí a coluna fica nula, que é o estado "nunca configurado".
@@ -167,9 +201,10 @@ export default async function ({ dados }) {
       }
     }
 
-    // `decimal(5,2)` — 2 casas e teto de 999,99, o que a coluna comporta.
-    const bruto = Math.round(vencedora.aa * 100) / 100;
-    const valor = Math.min(Math.max(bruto, 0), TETO_COLUNA_AA);
+    // `vencedora.aa` já é a chave, portanto já está em 2 casas. Só o TETO
+    // continua necessário — o piso saiu junto com o clamp para `0`, que era o
+    // que lavava taxa negativa em "0% intencional" (ver `jurosAaDaLinha`).
+    const valor = Math.min(vencedora.aa, TETO_COLUNA_AA);
     await dados.atualizar('estudos', estudo.id, { juros_tabela_aa_padrao: valor });
   }
 }

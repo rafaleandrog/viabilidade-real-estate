@@ -282,9 +282,13 @@ export function componentesParaSalvar(
   // com a taxa antiga enquanto o motor calcula com a nova — dado
   // contradizendo cálculo, que é pior que qualquer um dos dois.
   const taxaMensal = taxaMensalDoEstudo(jurosTabelaAaEstudo);
+  // #585 (rodada 2): por TIPO, não por presença da chave — mesma correção que
+  // `componentesPagamento` recebeu, e pelo mesmo motivo. O backend aceita
+  // componente financiado sem `taxaMensal`; testar a chave deixava essa linha
+  // sem a taxa do estudo, no dado gravado e no cálculo.
   const comTaxaDoEstudo = (c: any): ComponentePagamento => {
     const saida = copia(c) as any;
-    if ('taxaMensal' in saida) saida.taxaMensal = taxaMensal;  // `imediato` não tem, e não deve ter
+    if (saida?.tipo !== 'imediato') saida.taxaMensal = taxaMensal;  // `imediato` paga no mês da venda
     return saida as ComponentePagamento;
   };
 

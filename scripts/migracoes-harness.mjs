@@ -46,6 +46,12 @@ const SEED = {
       id: 5, nome: 'Estudo E', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao',
       juros_tabela_aa_padrao: 9.75,
     },
+    // #585 (rodada 2): três estudos que exercitam defesas que a fixture da
+    // rodada 1 tinha escrito e NÃO exercitava — medido por mutação, remover
+    // cada uma delas deixava os 4 casos verdes.
+    { id: 6, nome: 'Estudo F', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 7, nome: 'Estudo G', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 8, nome: 'Estudo H', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
   ],
   avancado_cronograma: [
     { id: 1, estudo_id: 1, evento: 'planejamento', inicio_mes: 1, duracao_meses: 6 },
@@ -80,9 +86,35 @@ const SEED = {
       fluxo_pagamento: { juros_tabela_aa: 12.5 } },
     // Fase de CRONOGRAMA no mesmo estudo: não é linha de receita e não vota.
     { id: 13, estudo_id: 3, tipo: 'cronograma', nome: 'Obra', ordem: 3 },
+    // Estudo 6 — o FILTRO `tipo === 'receita'` é carregado aqui, e só aqui.
+    //
+    // ⚠️ Na fixture da rodada 1 a fase de cronograma não tinha `fluxo_pagamento`
+    // nenhum, então quem a excluía da votação era a ausência de dado, não o
+    // filtro — e o comentário afirmava o contrário. Remover o filtro deixava os
+    // 4 casos verdes. Aqui a fase de cronograma DECLARA 30%: se o filtro sair,
+    // ela vota, empata com a de receita (uma cada) e vence pela `ordem` menor,
+    // gravando 30 em vez de 7,25.
+    { id: 30, estudo_id: 6, tipo: 'cronograma', nome: 'Obra', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: 30 } },
+    { id: 31, estudo_id: 6, tipo: 'receita', nome: 'R-A', ordem: 1,
+      fluxo_pagamento: { juros_tabela_aa: 7.25 } },
+    // Estudo 7 — o TETO da coluna `decimal(5,2)`. `taxaMensal: 1` ao mês
+    // deriva `(1+1)^12 − 1 = 409.500% a.a.`, que não cabe em `999.99`. Sem o
+    // teto, o `dados.atualizar` gravaria um valor que o Postgres recusa, e o
+    // backfill morreria no meio da varredura.
+    { id: 32, estudo_id: 7, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { componentes: [{ tipo: 'prazo_fixo', participacaoPct: 100, taxaMensal: 1 }] } },
+    // Estudo 8 — taxa NEGATIVA em dado legado. Ela não vota: a coluna fica
+    // NULA, e não `0`. Gravar `0` seria lavar dado sujo como "0% intencional",
+    // permanente e indistinguível de escolha do autor.
+    { id: 33, estudo_id: 8, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: -5 } },
     // Estudo 4 — EMPATE em frequência (uma linha cada), resolvido pela de
     // menor `ordem`; e a 3ª linha exercita a DERIVAÇÃO a partir de
-    // `componentes[].taxaMensal`, sem a chave `juros_tabela_aa`.
+    // `componentes[].taxaMensal`, sem a chave `juros_tabela_aa`. A 4ª e a 5ª
+    // exercitam a PRECISÃO da chave de votação: 12,54% aparece duas vezes e
+    // 12,51% uma. Com a chave em 1 casa as três caíam no mesmo grupo e o valor
+    // gravado era o da primeira vista (12,51%) — a menos frequente.
     { id: 20, estudo_id: 4, tipo: 'receita', nome: 'R-A', ordem: 1,
       fluxo_pagamento: { juros_tabela_aa: 13 } },
     { id: 21, estudo_id: 4, tipo: 'receita', nome: 'R-B', ordem: 0,
@@ -92,6 +124,10 @@ const SEED = {
         { tipo: 'imediato', participacaoPct: 20 },
         { tipo: 'ate_marco', participacaoPct: 80, taxaMensal: 0.0098636 },
       ] } },
+    { id: 23, estudo_id: 4, tipo: 'receita', nome: 'R-D', ordem: 3,
+      fluxo_pagamento: { juros_tabela_aa: 12.54 } },
+    { id: 24, estudo_id: 4, tipo: 'receita', nome: 'R-E', ordem: 4,
+      fluxo_pagamento: { juros_tabela_aa: 12.54 } },
   ],
   avancado_alocacoes: [
     { id: 1, fase_id: 1, tipologia_id: 1, quantidade: 10 },
@@ -106,6 +142,14 @@ const SEED = {
     { id: 20, fase_id: 20, tipologia_id: 1, quantidade: 1 },
     { id: 21, fase_id: 21, tipologia_id: 1, quantidade: 1 },
     { id: 22, fase_id: 22, tipologia_id: 1, quantidade: 1 },
+    { id: 23, fase_id: 23, tipologia_id: 1, quantidade: 1 },
+    { id: 24, fase_id: 24, tipologia_id: 1, quantidade: 1 },
+    // A fase 30 (cronograma do estudo 6) NÃO tem alocação, de propósito: é o
+    // que a `010` usa para classificá-la, e é o que faz o filtro de tipo da
+    // `037` ter algo que filtrar.
+    { id: 31, fase_id: 31, tipologia_id: 1, quantidade: 1 },
+    { id: 32, fase_id: 32, tipologia_id: 1, quantidade: 1 },
+    { id: 33, fase_id: 33, tipologia_id: 1, quantidade: 1 },
   ],
   // Camada com o shape que a migração `019` produzia (config de Price vinda do
   // Bloco G legado) — é o caminho de transformação da `028`. Sem esta linha a
@@ -305,9 +349,17 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
         // 3 votos: 0, 0, 12.5 → vence 0. Descartar o zero elegeria 12,5 e
         // ligaria juros na MAIORIA das linhas — o oposto de "a mais frequente".
         [3, 0, 'maioria em 0% explícito: 0% tem de vencer'],
-        // Empate 13 × 8 × 12,5 (uma cada) → vence a de menor `ordem`, que é a
-        // linha "R-B" (ordem 0), com 8%.
-        [4, 8, 'empate resolvido pela linha de menor ordem'],
+        // 12,54 aparece 2×; 13, 8 e ~12,5 uma vez cada → vence 12,54 por
+        // frequência. Com a chave em 1 casa, 12,54 e ~12,50 (a derivada)
+        // colapsariam e o valor gravado seria o da primeira vista.
+        [4, 12.54, 'a chave de votação tem de estar na precisão persistida (2 casas)'],
+        // O filtro `tipo === 'receita'`: a fase de cronograma declara 30% e não
+        // pode votar. Sem o filtro ela empata e vence pela ordem menor.
+        [6, 7.25, 'fase de cronograma não vota na taxa das linhas de receita'],
+        // O teto de `decimal(5,2)`: 409.500% a.a. derivados não cabem.
+        [7, 999.99, 'taxa derivada acima do teto da coluna tem de ser limitada'],
+        // Taxa negativa não vota: a coluna fica NULA, não `0`.
+        [8, null, 'taxa negativa em dado legado não pode virar "0% intencional"'],
         // Coluna já preenchida pelo autor: intocada.
         [5, 9.75, 'a 037 não pode sobrescrever escolha do autor'],
         // Estudo sem linha de receita nenhuma: fica nulo.
@@ -324,7 +376,7 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
           bom = false;
         }
       }
-      if (bom) ok('037: backfill T1 (mais frequente, desempate por ordem) confere nos 4 casos');
+      if (bom) ok(`037: backfill T1 confere nos ${casos.length} casos — frequência, desempate por ordem, precisão da chave, filtro de tipo, teto da coluna, taxa negativa, coluna já preenchida e estudo sem linha`);
     }
 
     // #566: a `036` converte `permuta_fisica_modo`/`_nr_modo` = 'unidade' para

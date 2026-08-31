@@ -975,13 +975,25 @@ export function componentesPagamento(
   // que a `taxaMensal` deixou de ser dado da linha e passou a ser projeção do
   // estudo, então lê-la do persistido seria ler um espelho vencido.
   //
-  // `imediato` não tem `taxaMensal` e não deve ter (paga no mês da venda); por
-  // isso o override só toca componente que já declara a chave, que é
-  // exatamente o conjunto dos financiados.
+  // ⚠️ Quem decide se o componente recebe a taxa é o **TIPO**, não a presença
+  // da chave — e a diferença não é estilo.
+  //
+  // O override testava `'taxaMensal' in c`, e o contrato do backend
+  // (`validarFluxoPagamento`, em `backend/rotas/avancado.ts`) **aceita**
+  // componente financiado sem a chave: um `prazo_fixo` só com
+  // `participacaoPct`/`prazoMeses` é shape válido, e há teste de backend que o
+  // exercita. Numa linha assim a taxa do estudo nunca era aplicada, e o motor
+  // seguia lendo `undefined` como zero — a tela mostraria 12,5% no estudo
+  // enquanto as parcelas dele não rendiam juros nenhum. Achado do revisor
+  // externo.
+  //
+  // `imediato` é o único que não tem taxa e não deve ter: paga no mês da venda.
+  // Os outros três (`prazo_fixo`, `ate_marco`, `concentrado`) são, por
+  // definição, os financiados.
   const taxaMensal = taxaMensalDoEstudo(jurosTabelaAaEstudo);
   if (Array.isArray(fluxoPagamento?.componentes)) {
     return fluxoPagamento.componentes.map((c: any) => (
-      c && 'taxaMensal' in c ? { ...c, taxaMensal } : { ...c }
+      c && c.tipo !== 'imediato' ? { ...c, taxaMensal } : { ...c }
     )) as ComponentePagamento[];
   }
   return componentesDoLegado(fluxoPagamento, cronograma, jurosTabelaAaEstudo);

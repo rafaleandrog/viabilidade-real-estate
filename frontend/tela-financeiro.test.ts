@@ -94,4 +94,11 @@ test('#585 FIAÇÃO: a tela BARRA antes de persistir e PROPAGA depois de salvar'
   // E o evento tem de ATRAVESSAR o shadow DOM até `tela-estudo`, senão ele
   // morre no próprio componente e a propagação é decorativa.
   assert.match(fonte, /bubbles: true, composed: true/);
+  // #585 (rodada 2): o botão trava ENQUANTO o valor é inválido, como o "Aplicar"
+  // do modal irmão — validar só no clique deixava o usuário com um toast que
+  // some e nenhum campo marcado.
+  assert.match(fonte, /\?desabilitado=\$\{Boolean\(erroJuros\)\}/,
+    'o botão Salvar voltou a aceitar clique com a taxa inválida');
+  assert.match(fonte, /const erroJuros = erroJurosTabelaEstudo\(this\.form\['juros_tabela_aa_padrao'\]\);/,
+    'o erro deixou de ser recalculado no render — o botão para de acompanhar a digitação');
 });

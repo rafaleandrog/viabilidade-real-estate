@@ -195,6 +195,8 @@ export class ViabTelaFinanceiro extends LitElement {
     if (nivel !== 'avancado') return html`${nothing}`;
     const dis = !this.editavel;
     const visiveis = camposVisiveisFinanceiro(nivel);
+    // #585: recalculado a cada render, então acompanha a digitação.
+    const erroJuros = erroJurosTabelaEstudo(this.form['juros_tabela_aa_padrao']);
 
     return html`
       <urbi-banner variante="info">
@@ -251,8 +253,22 @@ export class ViabTelaFinanceiro extends LitElement {
             <urbi-banner variante="alerta">
               As alterações não são salvas automaticamente — clique em “Salvar financeiro” antes de sair desta página.
             </urbi-banner>
+            ${erroJuros ? html`
+              <urbi-banner variante="erro">${erroJuros}</urbi-banner>` : nothing}
             <div class="form-acoes">
-              <urbi-botao variante="primario" ?carregando=${this.salvando} @click=${this._salvar}>Salvar financeiro</urbi-botao>
+              <!-- #585 (rodada 2): o botão trava ENQUANTO o valor é inválido, e
+                   não só ao clicar. É o padrão que o modal irmão já usa em
+                   tela-fluxo-receitas.ts, onde o "Aplicar" recebe desabilitado
+                   a partir de erroFormularioPagamento: o usuário vê o erro no
+                   ato de digitar, com a mensagem visível na tela, em vez de
+                   descobri-lo por um toast que some e sem saber qual campo o
+                   causou. A checagem dentro de _salvar FICA — botão é
+                   affordance, não fronteira.
+                   (Sem cifrão-chaves neste comentário de propósito: dentro de um
+                   template do lit ele é uma INTERPOLAÇÃO mesmo dentro de
+                   comentário HTML, e o guard acusa o erro na linha errada.) -->
+              <urbi-botao variante="primario" ?carregando=${this.salvando}
+                ?desabilitado=${Boolean(erroJuros)} @click=${this._salvar}>Salvar financeiro</urbi-botao>
             </div>`
         : html`<p class="sec">Somente leitura neste status/função.</p>`}
     `;

@@ -2350,6 +2350,74 @@ test('#585 componentesPagamento aplica a taxa do estudo sobre o array PERSISTIDO
   assert.equal(persistido.componentes[1].taxaMensal, 0.0104);
 });
 
+test('#585 componente FINANCIADO sem a chave taxaMensal também recebe a taxa do estudo', () => {
+  // ⚠️ O override testava `'taxaMensal' in c`, e o contrato do backend
+  // (`validarFluxoPagamento`) ACEITA componente financiado sem a chave — um
+  // `prazo_fixo` só com `participacaoPct`/`prazoMeses` é shape válido, gravável
+  // pela API. Nessa linha a taxa do estudo nunca era aplicada: a tela mostrava
+  // 12,5% e as parcelas não rendiam juros nenhum.
+  //
+  // Quem decide é o TIPO. `imediato` é o único sem taxa, e continua sem.
+  const semChave = componentesPagamento(
+    { componentes: [
+      { tipo: 'imediato', participacaoPct: 20, descontoPct: 0 },
+      { tipo: 'prazo_fixo', participacaoPct: 30, prazoMeses: 12, defasagemMeses: 1, sinalPct: 0 },
+      { tipo: 'ate_marco', participacaoPct: 20, marcoMes: 38, defasagemMeses: 1, sinalPct: 0 },
+      { tipo: 'concentrado', participacaoPct: 30, mesPagamento: 39 },
+    ] },
+    CRONO, 12.5,
+  ) as any[];
+  assert.equal('taxaMensal' in semChave[0], false, 'imediato não pode ganhar taxa');
+  for (const c of semChave.slice(1)) {
+    assert.equal(c.taxaMensal, taxaMensalDeAnual(12.5),
+      `${c.tipo} sem a chave persistida ficou sem a taxa do estudo`);
+  }
+  // E os juros aparecem de verdade no motor, não só no array de componentes —
+  // é a diferença entre "a função marca o campo" e "o número da tela muda".
+  const linha = {
+    id: 1, nome: 'Venda', tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
+    absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+    fluxo_pagamento: { componentes: [
+      { tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 12, defasagemMeses: 1, sinalPct: 0 },
+    ] },
+  };
+  const base = { dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [linha], linhasCusto: [], areaTerreno: 0 };
+  assert.equal(calcularFluxo({ ...base, jurosTabelaAaEstudo: 0 }).jurosClientes, 0);
+  assert.ok(calcularFluxo({ ...base, jurosTabelaAaEstudo: 12.5 }).jurosClientes > 0,
+    'a linha sem a chave persistida não produziu juros nenhum');
+});
+
+test('#585 LIMITE declarado: componente financiado sem `sinalPct` produz receita NaN — defeito PRÉ-EXISTENTE', () => {
+  // ⚠️ Achado colateral da rodada 2, e ele NÃO é desta issue — está aqui porque
+  // foi medido e some se ninguém o escrever.
+  //
+  // O teste acima precisou de `sinalPct: 0` para funcionar. Sem essa chave, um
+  // `prazo_fixo` canônico faz `receitaBruta` virar **NaN** — não zero, NaN — e o
+  // estudo inteiro passa a exibir números inválidos. A taxa do estudo não tem
+  // nada a ver: o NaN acontece com `jurosTabelaAaEstudo` em 0 igualmente, e
+  // acontecia antes da #585.
+  //
+  // O que torna isso relevante e não teórico: `validarFluxoPagamento`
+  // (`backend/rotas/avancado.ts`) **aceita** o shape sem `sinalPct`, então é
+  // gravável pela API. Consertar o motor para tolerá-lo alargaria este PR —
+  // fica registrado como issue própria, com a reprodução pronta.
+  const semSinal = {
+    id: 1, nome: 'Venda', tipologias: [{ id: 1, quantidade: 10, area_privativa_m2: 100, preco_m2: 10_000 }],
+    absorcao: { modo: 'personalizado', meses: [{ mes: 12, pct: 100 }] },
+    fluxo_pagamento: { componentes: [
+      { tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 12, defasagemMeses: 1 },
+    ] },
+  };
+  const r = calcularFluxo({
+    dataInicio: 'jan/2027', taxaDescontoAa: 12, cronograma: CRONO,
+    linhasReceita: [semSinal], linhasCusto: [], areaTerreno: 0, jurosTabelaAaEstudo: 0,
+  });
+  assert.ok(Number.isNaN(r.receitaBruta),
+    'o limite mudou — se `sinalPct` ausente deixou de produzir NaN, alguém consertou o motor '
+    + 'e esta nota (e a issue que ela pede) precisa ser reescrita');
+});
+
 test('#585 componentesDoLegado propaga a taxa do estudo nos QUATRO caminhos', () => {
   const fp = {
     entrada: [
