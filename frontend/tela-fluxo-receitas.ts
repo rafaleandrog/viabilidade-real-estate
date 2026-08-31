@@ -872,7 +872,7 @@ export class ViabFluxoReceitas extends LitElement {
       <urbi-modal title="Fluxo de pagamento" maxWidth="860px" @urbi-modal:close=${() => this.modalPag = null}>
         <div class="pag-grid">
           <div>
-            <p class="sec">Juros de tabela em vigor: <strong>${fmtPct(jurosEstudoAA)} a.a.</strong>
+            <p class="sec juros-vigente">Juros de tabela em vigor: <strong>${fmtPct(jurosEstudoAA)} a.a.</strong>
               — valor único do estudo, editado em <strong>Viabilidade → Financeiro</strong>. Vale
               para entrada parcelada, parcelamento e repasse de todas as linhas de receita.</p>
             <div class="pag-secao">

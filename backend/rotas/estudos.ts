@@ -101,6 +101,26 @@ export function montarPatchEstudo(
       }
       continue;
     }
+    // #585: `juros_tabela_aa_padrao` deixou de ser um default de linhas novas e
+    // passou a governar o cálculo de TODAS as linhas de receita do estudo. Uma
+    // taxa negativa aqui não é um campo estranho numa tela — é o fluxo de caixa
+    // inteiro invertido, e o motor não a rejeita (`taxaMensalDeAnual` só clampa
+    // `aa <= -100`, para impedir `NaN`; `-5` produz uma mensal negativa
+    // perfeitamente "válida").
+    //
+    // A tela barra em `erroJurosTabelaEstudo`, mas tela é feedback, não
+    // fronteira: `PATCH /estudos/:id` é chamável direto, e qualquer tela futura
+    // que reuse `atualizarEstudo` passa por aqui sem passar por lá.
+    if (k === 'juros_tabela_aa_padrao' && v !== null && v !== undefined && v !== '') {
+      const aa = Number(v);
+      if (!Number.isFinite(aa) || aa < 0) {
+        return {
+          http: 400,
+          codigo: 'TAXA_INVALIDA',
+          mensagem: 'juros_tabela_aa_padrao deve ser um percentual ao ano maior ou igual a zero',
+        };
+      }
+    }
     dados[k] = v;
   }
   if (Object.keys(dados).length === 0) {

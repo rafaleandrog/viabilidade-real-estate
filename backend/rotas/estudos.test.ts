@@ -432,3 +432,33 @@ test('#609 duplicarDadosAvancado copia as operações de funding, com os dois re
     'para uma tipologia do estudo ORIGINAL.',
   );
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #585 — o domínio de `juros_tabela_aa_padrao` no PATCH
+// ─────────────────────────────────────────────────────────────────────────
+//
+// A coluna deixou de ser default de linhas novas e passou a governar o cálculo
+// de TODAS as linhas de receita. A tela barra em `erroJurosTabelaEstudo`, mas
+// tela é feedback, não fronteira — `PATCH /estudos/:id` é chamável direto.
+//
+// ⚠️ Este arquivo NÃO roda no ambiente Claude Code (o `express` não instala pelo
+// 401 do SDK). A execução é do autor, no ambiente autenticado.
+
+test('#585 PATCH recusa juros_tabela_aa_padrao negativo', () => {
+  const r = montarPatchEstudo({ juros_tabela_aa_padrao: -5 }, AVANCADO);
+  assert.ok('codigo' in r, 'taxa negativa passou pelo PATCH');
+  assert.equal((r as any).codigo, 'TAXA_INVALIDA');
+  assert.equal((r as any).http, 400);
+  // A faixa que o motor NÃO defende: ele só clampa `aa <= -100`.
+  assert.ok('codigo' in montarPatchEstudo({ juros_tabela_aa_padrao: -0.01 }, AVANCADO));
+  assert.ok('codigo' in montarPatchEstudo({ juros_tabela_aa_padrao: 'abc' }, AVANCADO));
+});
+
+test('#585 PATCH aceita 0, valor positivo e limpeza da taxa', () => {
+  // `0` é "venda sem juros", escolha explícita — nunca pode virar erro.
+  assert.ok('dados' in montarPatchEstudo({ juros_tabela_aa_padrao: 0 }, AVANCADO));
+  assert.ok('dados' in montarPatchEstudo({ juros_tabela_aa_padrao: 12.5 }, AVANCADO));
+  // `null` é "não configurado" e continua sendo gravável — é como o usuário
+  // esvazia o campo.
+  assert.ok('dados' in montarPatchEstudo({ juros_tabela_aa_padrao: null }, AVANCADO));
+});

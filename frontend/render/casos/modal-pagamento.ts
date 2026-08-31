@@ -54,6 +54,13 @@ export const caso = {
     // `p.aviso-juros` ("este plano tem N taxas diferentes gravadas"), que este
     // caso exigia: com uma taxa por ESTUDO não há mais o que avisar.
     { seletor: 'viab-num', minimo: 6 },
+    // #585 (rodada 2): a linha somente-leitura com a taxa VIGENTE do estudo.
+    // Ela é a única coisa que diz ao usuário deste modal qual taxa está sendo
+    // aplicada — o campo saiu para a aba Financeiro. Sem este seletor, apagar o
+    // parágrafo deixava os dois testes de render VERDES (medido por mutação):
+    // uma defesa acrescentada e não exercitada, que é a mesma classe de defeito
+    // que a rodada 1 achou três vezes.
+    { seletor: 'p.juros-vigente', minimo: 1 },
     // #460: o controle de destino do resíduo — primeiro `urbi-select` deste caso.
     { seletor: 'urbi-select', minimo: 1 },
   ],
