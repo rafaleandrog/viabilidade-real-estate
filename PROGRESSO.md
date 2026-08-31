@@ -66,6 +66,38 @@ da taxa anual em toda escrita, então uma linha legada com a mensal arredondada 
 estudo 5) é reescrita como `0.00986358055321146` na primeira gravação — 8e-9 ao mês. Tudo o mais
 continua byte-idêntico.
 
+### O que a rodada 1 de revisão achou — seis bloqueantes, todos meus
+
+Vale registrar porque **nenhum estava no cálculo**, e dois vieram do motor externo:
+
+1. **Taxa negativa deixou de ser barrada.** Eu apaguei a validação de `erroFormularioPagamento`
+   junto com o campo do modal e não a restabeleci. Provado por execução:
+   `parseNumeroBR('-5') = -5` → `taxaMensalDeAnual(-5) = -0,004265…` → juros **negativos** em todo
+   componente financiado. Conserto: `erroJurosTabelaEstudo`, chamada por `_salvar`.
+2. **A votação T1 descartava 0% explícito** (achado P1 do Codex). Num estudo com três linhas em 0%
+   e uma em 12,5%, o backfill elegia 12,5% e ligava juros na **maioria** das linhas — o oposto do
+   que "a taxa mais frequente" promete. Só `null` é ausência; `0` é resposta.
+3. **`_salvar` não propagava o valor** (achado P1 do Codex). PATCH + notificação, sem atualizar
+   `this.estudo` nem emitir evento — salvar a taxa e navegar sem recarregar calculava com o valor
+   antigo. É a classe de defeito nº 1 na forma mais escorregadia: **o parâmetro obrigatório prova
+   que a tela PASSA o valor, nunca que ele está FRESCO.**
+4. **`listar` com `por_pagina: 100000`** onde `003:35` manda `varrerTudo` — e aqui a varredura é de
+   `avancado_fases` sem filtro, a tabela grande. Truncamento silencioso = backfill parcial.
+5. **A guarda `aa <= -100` de `taxaMensalDeAnual` ficou sem cobertura.** A única asserção morava no
+   bloco #428 que apaguei. Medido: sem ela, remover a guarda deixava a suíte **970/970 verde**.
+6. **A migração `037` não tinha teste de lógica nenhum.** O harness media só contrato genérico, com
+   fixture sem taxas heterogêneas. É por isso que o bloqueante 2 passou: a heurística inteira era
+   código não exercitado, num arquivo que roda uma vez por instância e não tem volta.
+
+Agora o harness semeia dois estudos que exercitam a votação, e as duas mutações que importam ficam
+vermelhas: reintroduzir o descarte do 0% derruba o estudo 3; apagar o `.sort()` derruba o estudo 4.
+
+> **A lição, e ela é sobre o limite da própria defesa que este PR usa como argumento.** O parâmetro
+> obrigatório (`TS2741`/`TS2554`) é uma boa trava e pegou o que se propunha a pegar. Mas ele mede
+> **presença do argumento**, não **frescor do valor** nem **correção da heurística que o produz** —
+> e os três bloqueantes mais caros desta rodada moravam exatamente nesses dois pontos cegos. Trava
+> de tipo não substitui teste de comportamento no caminho que o PR está mudando.
+
 ⚠️ **Pendente do autor, no ambiente autenticado:** `validar-backend.sh` **não roda nesta sessão**
 (aborta na etapa 1/5, portão do SDK, pelo 401). O typecheck do backend, a sincronização do
 `schema.json` e a execução real da `037` em Postgres são dele. O harness de migrações

@@ -863,10 +863,18 @@ export class ViabFluxoReceitas extends LitElement {
     // Os KPIs que se movem com a taxa continuam sendo Receita Bruta, Resultado,
     // margem, VPL e TIR — NÃO o "VGV Vendável", que sai de
     // `vgvLinha(tipologias)` (área × preço) e não conhece juros.
+    // #585: a taxa VIGENTE, em leitura. O campo saiu daqui, mas a grandeza
+    // continua entrando no cálculo deste modal — tirar o campo E o número
+    // deixaria o usuário editando um plano cujos juros ele não tem como
+    // conhecer sem trocar de aba. Somente leitura, e dizendo onde se edita.
+    const jurosEstudoAA = Number(this.estudo?.juros_tabela_aa_padrao) || 0;
     return html`
       <urbi-modal title="Fluxo de pagamento" maxWidth="860px" @urbi-modal:close=${() => this.modalPag = null}>
         <div class="pag-grid">
           <div>
+            <p class="sec">Juros de tabela em vigor: <strong>${fmtPct(jurosEstudoAA)} a.a.</strong>
+              — valor único do estudo, editado em <strong>Viabilidade → Financeiro</strong>. Vale
+              para entrada parcelada, parcelamento e repasse de todas as linhas de receita.</p>
             <div class="pag-secao">
               <h4>Condições de entrada</h4>
               <p class="sec">Pagamento no ato — 1 parcela paga no mês da contratação; mais de uma

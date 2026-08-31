@@ -121,12 +121,16 @@ export function formularioPagamento(fluxoPagamento: any): FormularioPagamento {
 // deles. Regenerar tudo pelo espelho, que era o comportamento até a #431,
 // apagava-os em toda escrita.
 //
-// #428 mudou o quarto da lista: `taxaMensal` GANHOU campo na tela. Ele não
-// saiu da preservação — passou a ter um eixo. Enquanto o usuário não mexe no
-// campo de juros, `taxaMensal` continua só-canônica e é transplantada
-// componente a componente; no instante em que ele mexe, ela vira o que o
-// formulário está dizendo e o valor digitado manda em todo o plano (D-Q02).
-// Ver `camposSoCanonicos` e `taxaFoiEditada`.
+// #428 tinha dado a `taxaMensal` um EIXO — "o usuário mexeu no campo de juros
+// nesta sessão de modal?" —, e enquanto ele não mexia ela seguia só-canônica,
+// transplantada componente a componente.
+//
+// #585 apagou esse eixo junto com o campo: a taxa é do ESTUDO agora, e
+// `taxaMensal` deixou de ser dado da linha para virar projeção dele. Ela é
+// **sempre** regenerada, nunca transplantada — ver `camposSoCanonicos`. A
+// função `taxaFoiEditada`, que decidia o eixo, não existe mais (a nota de
+// remoção está logo abaixo). Os outros três — `sinalPct`,
+// `jurosNoMesDaContratacao`, `rotulo` — seguem preservados como sempre.
 
 /**
  * Os campos que o espelho legado (`entrada`/`parcelas`/`repasse`) SABE dizer.

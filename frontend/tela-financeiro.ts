@@ -76,6 +76,35 @@ export function camposVisiveisFinanceiro(nivel: string): string[] {
   return ['taxa_desconto_aa', 'imposto_percentual'];
 }
 
+/**
+ * #585 — a taxa de tabela do estudo é válida?
+ *
+ * ⚠️ **Esta função existe porque a #585 REMOVEU uma validação e precisava
+ * devolvê-la.** Enquanto a taxa era do plano, quem barrava taxa negativa era
+ * `erroFormularioPagamento` (*"Revisao da #428, B2 — a taxa alimenta TODO
+ * componente financiado do plano, e ate aqui nada a validava"*). O campo saiu do
+ * modal e a validação saiu junto; sem ela, digitar `-5` aqui aplicava juros
+ * NEGATIVOS a todo componente financiado de todo o estudo, sem erro nenhum.
+ * Medido pelo caminho real: `parseNumeroBR('-5')` devolve `-5` (o regex de
+ * `viab-format.ts` preserva o sinal), `viab-num` não tem piso, e
+ * `taxaMensalDeAnual(-5)` devolve `-0,004265…`.
+ *
+ * A defesa de domínio do motor (`taxaMensalDeAnual`, que devolve `0` para
+ * `aa <= -100` em vez de `NaN`) continua onde estava e cobre outra coisa: ela
+ * impede o `NaN` de virar `null` no JSON. Ela **não** cobre a faixa
+ * `-100 < aa < 0`, que é justamente a que um usuário digita sem querer.
+ *
+ * `null`/vazio é válido — significa "não configurado", e o motor lê 0.
+ */
+export function erroJurosTabelaEstudo(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  const aa = Number(v);
+  if (!Number.isFinite(aa) || aa < 0) {
+    return 'Os juros de tabela devem ser um percentual ao ano maior ou igual a zero.';
+  }
+  return null;
+}
+
 /** #450 (D-Q08): `sujeito_ret` é condição de RENDER, não um campo desabilitado
  * — só aparece fora do Avançado. */
 export function sujeitoRetVisivelFinanceiro(nivel: string): boolean {
@@ -230,6 +259,11 @@ export class ViabTelaFinanceiro extends LitElement {
   }
 
   private _salvar = async () => {
+    // #585/B1: a taxa de tabela do estudo alimenta TODA linha de receita — uma
+    // taxa negativa aqui não é um campo estranho numa tela, é o cálculo do
+    // estudo inteiro invertido. Barra antes de persistir.
+    const invalido = erroJurosTabelaEstudo(this.form['juros_tabela_aa_padrao']);
+    if (invalido) { urbiVerso.notificar(invalido, 'erro'); return; }
     this.salvando = true;
     try {
       const dados: Record<string, any> = {};
@@ -241,6 +275,25 @@ export class ViabTelaFinanceiro extends LitElement {
       }
       const res = await atualizarEstudo(this.estudo.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      // #585/B3: PROPAGA o valor salvo para as outras abas.
+      //
+      // Sem esta linha o PATCH grava e a tela notifica, mas `tela-avancado`
+      // continua distribuindo o `estudo` ANTIGO para Receitas, Resumo, Fluxo,
+      // Cenários e Funding — que é de onde cada uma tira
+      // `jurosTabelaAaEstudo`. O usuário salvaria 12,5%, navegaria sem
+      // recarregar a página e veria o cálculo da taxa velha, sem erro nenhum.
+      //
+      // Enquanto a coluna era default de linhas novas (#477) a defasagem era
+      // inofensiva: quem a aplicava era o backend, na criação. Desde a #585 ela
+      // manda no cálculo de tudo, e a promessa do critério 2 — "editar este
+      // campo muda todas as linhas" — passa a depender desta propagação.
+      //
+      // `viab:premissas-change` é o canal que já existe: `tela-premissas` o
+      // emite e `tela-estudo` o escuta no `urbi-shell-page` que contém
+      // `viab-tela-avancado`, refazendo `this.estudo` e reenviando-o para baixo.
+      this.dispatchEvent(new CustomEvent('viab:premissas-change', {
+        detail: { dados }, bubbles: true, composed: true,
+      }));
       urbiVerso.notificar('Financeiro salvo.', 'sucesso');
     } catch (e: any) {
       urbiVerso.notificar(e?.message || 'Erro ao salvar', 'erro');

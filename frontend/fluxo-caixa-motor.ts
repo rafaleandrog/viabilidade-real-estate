@@ -957,8 +957,15 @@ export function componentesPagamento(
   // #585: OBRIGATÓRIO — ver a nota em `componentesDoLegado`.
   jurosTabelaAaEstudo: number,
 ): ComponentePagamento[] {
-  // #585: este é o PONTO ÚNICO em que a taxa do estudo entra no cálculo, e por
-  // isso ela vale para linha existente também — o coração da issue.
+  // #585: este é o ponto em que a taxa do estudo entra no caminho de LEITURA —
+  // e é por ele que ela vale para linha existente também, o coração da issue.
+  //
+  // ⚠️ Não é o único produtor de `taxaMensal`, e dizer que era seria falso:
+  // `componentesDoLegado` (logo acima) faz o mesmo bake-in e tem um chamador
+  // direto FORA daqui — `componentesParaSalvar`, em
+  // `frontend/fluxo-pagamento-editor.ts`, que é o caminho de ESCRITA. São dois
+  // produtores, coordenados só porque ambos recebem `jurosTabelaAaEstudo` em
+  // todo call site. Quem for acrescentar um terceiro precisa saber disso.
   //
   // Sem o override abaixo, editar o campo da aba Financeiro não mudaria nada
   // em nenhuma linha já gravada: desde a #248 toda linha editada persiste
@@ -998,13 +1005,18 @@ export function componentesPagamento(
 // (`frontend/fluxo-pagamento-editor.ts`) grava `componentes` em toda
 // escrita, todo Grupo já editado desde a #248 usa este caminho.
 //
-// ⚠️ A matemática de juros existe e é exercitada por estudo real; o que falta
-// é a ENTRADA. Há linha em produção com `taxaMensal` diferente de 0 (estudo 5
-// de Pinguim: 0.0098636 = 12,5% a.a., R$ 1.259.273,59). O modal continua sem
-// campo de taxa nem de sinal (é a #428), e `componentesDoLegado` continua
-// fixando `taxaMensal: 0` (`:591`, `:603`, `:610`, `:619`) e `sinalPct: 0`
-// (`:590`, `:602`, `:608` — o ramo `concentrado` de `:619` não emite
-// `sinalPct`), porque o espelho legado não tem onde guardar essas grandezas.
+// ⚠️ **Este parágrafo descrevia o estado de ANTES da #428 e ficou vencido em
+// duas ondas — está reescrito, não apagado, porque a linha de produção que ele
+// cita continua sendo o caso de teste real.** Há linha em produção com
+// `taxaMensal` diferente de 0 (estudo 5 de Pinguim: 0.0098636 = 12,5% a.a.,
+// R$ 1.259.273,59). O texto original dizia que faltava a ENTRADA e que
+// `componentesDoLegado` fixava `taxaMensal: 0` e `sinalPct: 0` em quatro
+// pontos, com os números de linha de cada um.
+//
+// Nada disso vale mais: a #428 deu campo à taxa, a #455 deu campo ao sinal, e a
+// #585 mudou a FONTE da taxa do plano para o ESTUDO. Os números de linha que a
+// nota carregava já apontavam para outro código antes da #585 e foram
+// retirados — endereço que não resolve é pior que endereço ausente.
 //
 // O que MUDOU na #431: quem grava não é mais este adaptador. Toda escrita do
 // modal passa por `componentesParaSalvar`

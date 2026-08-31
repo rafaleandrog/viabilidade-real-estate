@@ -37,6 +37,15 @@ const SEED = {
       permuta_fisica_modo: 'unidade', permuta_fisica_area_canonica: 123.456,
       permuta_fisica_nr_modo: 'unidade', permuta_fisica_nr_area_canonica: 67.891,
     },
+    // #585: dois estudos com a coluna NULA e linhas de receita com taxas — é o
+    // caminho de transformação da `037`. Ver `avancado_fases`, abaixo.
+    { id: 3, nome: 'Estudo C', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 4, nome: 'Estudo D', nivel_analise: 'avancado', tipo_empreendimento: 'loteamento' },
+    // Coluna JÁ preenchida: a `037` nunca sobrescreve escolha do autor.
+    {
+      id: 5, nome: 'Estudo E', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao',
+      juros_tabela_aa_padrao: 9.75,
+    },
   ],
   avancado_cronograma: [
     { id: 1, estudo_id: 1, evento: 'planejamento', inicio_mes: 1, duracao_meses: 6 },
@@ -56,9 +65,47 @@ const SEED = {
   ],
   avancado_fases: [
     { id: 1, estudo_id: 1, nome: 'Fase 1', ordem: 0, inicio_mes: 0, duracao_meses: 12 },
+    // #585: as linhas de receita dos estudos 3 e 4 — o caminho de
+    // TRANSFORMAÇÃO da `037`, sem o qual ela só exercitaria o early-return.
+    //
+    // Estudo 3 — MAIORIA EM 0% EXPLÍCITO. É o caso que reprovou a primeira
+    // versão da `037`: descartando os zeros da votação, 12,5% ganhava por 1
+    // voto contra 0, e o backfill ligava juros na maioria das linhas. Com o
+    // zero votando, vence `0`.
+    { id: 10, estudo_id: 3, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: 0 } },
+    { id: 11, estudo_id: 3, tipo: 'receita', nome: 'R-B', ordem: 1,
+      fluxo_pagamento: { juros_tabela_aa: 0 } },
+    { id: 12, estudo_id: 3, tipo: 'receita', nome: 'R-C', ordem: 2,
+      fluxo_pagamento: { juros_tabela_aa: 12.5 } },
+    // Fase de CRONOGRAMA no mesmo estudo: não é linha de receita e não vota.
+    { id: 13, estudo_id: 3, tipo: 'cronograma', nome: 'Obra', ordem: 3 },
+    // Estudo 4 — EMPATE em frequência (uma linha cada), resolvido pela de
+    // menor `ordem`; e a 3ª linha exercita a DERIVAÇÃO a partir de
+    // `componentes[].taxaMensal`, sem a chave `juros_tabela_aa`.
+    { id: 20, estudo_id: 4, tipo: 'receita', nome: 'R-A', ordem: 1,
+      fluxo_pagamento: { juros_tabela_aa: 13 } },
+    { id: 21, estudo_id: 4, tipo: 'receita', nome: 'R-B', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: 8 } },
+    { id: 22, estudo_id: 4, tipo: 'receita', nome: 'R-C', ordem: 2,
+      fluxo_pagamento: { componentes: [
+        { tipo: 'imediato', participacaoPct: 20 },
+        { tipo: 'ate_marco', participacaoPct: 80, taxaMensal: 0.0098636 },
+      ] } },
   ],
   avancado_alocacoes: [
     { id: 1, fase_id: 1, tipologia_id: 1, quantidade: 10 },
+    // #585: as fases de RECEITA dos estudos 3 e 4 precisam de alocação, senão a
+    // `010` as reclassifica como 'cronograma' no meio da cadeia (o backfill
+    // dela é "fase sem alocação veio do Cronograma") e a `037` deixa de vê-las.
+    // A fase 13, de propósito, NÃO tem alocação: ela é o marcador de gantt que
+    // não pode votar na taxa.
+    { id: 10, fase_id: 10, tipologia_id: 1, quantidade: 1 },
+    { id: 11, fase_id: 11, tipologia_id: 1, quantidade: 1 },
+    { id: 12, fase_id: 12, tipologia_id: 1, quantidade: 1 },
+    { id: 20, fase_id: 20, tipologia_id: 1, quantidade: 1 },
+    { id: 21, fase_id: 21, tipologia_id: 1, quantidade: 1 },
+    { id: 22, fase_id: 22, tipologia_id: 1, quantidade: 1 },
   ],
   // Camada com o shape que a migração `019` produzia (config de Price vinda do
   // Bloco G legado) — é o caminho de transformação da `028`. Sem esta linha a
@@ -243,6 +290,41 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
       );
     } else {
       ok('avancado_tipologias.linha_receita_id ficou vazia (poda derruba a estrutura no boot)');
+    }
+
+    // #585: a `037` faz o backfill de `estudos.juros_tabela_aa_padrao` a partir
+    // das taxas das linhas de receita (saída T1 — a mais frequente, desempate
+    // pela linha de menor `ordem`). Sem estas asserções a heurística inteira
+    // roda sem ser exercitada: o contrato genérico ("inócua em banco vazio",
+    // "reexecutável") passa com QUALQUER lógica de votação, inclusive uma
+    // errada. Foi assim que a primeira versão, que descartava 0% explícito da
+    // votação, atravessou a validação verde.
+    {
+      const porId = new Map((banco.db.get('estudos') ?? []).map((e) => [e.id, e]));
+      const casos = [
+        // 3 votos: 0, 0, 12.5 → vence 0. Descartar o zero elegeria 12,5 e
+        // ligaria juros na MAIORIA das linhas — o oposto de "a mais frequente".
+        [3, 0, 'maioria em 0% explícito: 0% tem de vencer'],
+        // Empate 13 × 8 × 12,5 (uma cada) → vence a de menor `ordem`, que é a
+        // linha "R-B" (ordem 0), com 8%.
+        [4, 8, 'empate resolvido pela linha de menor ordem'],
+        // Coluna já preenchida pelo autor: intocada.
+        [5, 9.75, 'a 037 não pode sobrescrever escolha do autor'],
+        // Estudo sem linha de receita nenhuma: fica nulo.
+        [1, null, 'estudo sem linha de receita fica com a coluna nula'],
+      ];
+      let bom = true;
+      for (const [id, esperado, motivo] of casos) {
+        const obtido = porId.get(id)?.juros_tabela_aa_padrao ?? null;
+        if (obtido !== esperado) {
+          erro(
+            `037: estudo ${id} ficou com juros_tabela_aa_padrao=${obtido}, esperado ${esperado} — ${motivo}`,
+            new Error('backfill T1 divergiu'),
+          );
+          bom = false;
+        }
+      }
+      if (bom) ok('037: backfill T1 (mais frequente, desempate por ordem) confere nos 4 casos');
     }
 
     // #566: a `036` converte `permuta_fisica_modo`/`_nr_modo` = 'unidade' para

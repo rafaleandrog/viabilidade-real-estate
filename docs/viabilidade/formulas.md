@@ -316,7 +316,7 @@ alimente o cash sweep.
 > ✅ **#450 (2026-08-24): não sobrou mais nada inerte na aba `Viabilidade → Financeiro`.**
 > `regime_tributario`, os cinco `aliquota_*_pct` e `imposto_sobre_permuta_fisica` saíram do render
 > (não tinham leitor em nível nenhum). `sujeito_ret` também saiu — é condição de nível
-> (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:81-83`): a aba só existe para
+> (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:110-112`): a aba só existe para
 > `nivel_analise === 'avancado'`, onde a Proforma não é consultada, então a condição colapsa em
 > "sempre oculto". `imposto_percentual` fica **visível, sempre desabilitado**
 > (`impostoPercentualEditavel`, `:87-89`) — o único editor de verdade continua sendo Premissas
@@ -393,7 +393,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
 | `frontend/tela-proforma.ts:70` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
-| `frontend/fluxo-caixa-motor.ts:2159-2167` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
+| `frontend/fluxo-caixa-motor.ts:2148-2156` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
 | `frontend/exportar.ts:69` — `celulaProforma`, a coluna R$ da Proforma na tela, no CSV e no PDF | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado para função pura pela #567, e movida de `tela-proforma.ts` para cá em 2026-08-28, quando a exportação passou a usá-la (a tela a reexporta) |
 | `frontend/tela-fluxo-receitas.ts:441,442` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |

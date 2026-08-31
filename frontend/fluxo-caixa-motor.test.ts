@@ -2280,6 +2280,28 @@ test('#428 a conversão é COMPOSTA, nunca aa/12, e a volta desfaz a ida', () =>
   assert.equal(taxaAnualDeMensal(undefined as any), 0);
 });
 
+test('#585 a guarda de domínio de taxaMensalDeAnual continua ligada', () => {
+  // ⚠️ Esta asserção existe porque a #585 APAGOU a única que cobria isto (era
+  // `#428 revisão B2`, junto com o campo do modal). Medido: sem ela, remover o
+  // `if (aa <= -100) return 0` do motor deixa a suíte inteira VERDE.
+  //
+  // A guarda importa porque `Math.pow` com base negativa e expoente fracionário
+  // devolve `NaN`, `JSON.stringify(NaN)` é `null`, e um único "Aplicar"
+  // gravaria `taxaMensal: null` em todo componente financiado — a classe de
+  // defeito da #431 de volta por outra porta.
+  assert.equal(taxaMensalDeAnual(-100), 0);
+  assert.equal(taxaMensalDeAnual(-150), 0);
+  assert.equal(taxaMensalDoEstudo(-150), 0, 'o wrapper do estudo herda a guarda');
+  // E o caminho todo: nem um componente sai com `taxaMensal` não finita.
+  const comps = componentesDoLegado(
+    { parcelas: [{ pct: 30, periodicidade: 'mensal', parcelas: 0, ao_longo_obra: true }] },
+    CRONO, -150,
+  ) as any[];
+  for (const c of comps.filter((x) => 'taxaMensal' in x)) {
+    assert.ok(Number.isFinite(c.taxaMensal), 'taxaMensal não finita vira `null` no JSON persistido');
+  }
+});
+
 test('#585 a taxa do plano vem do ESTUDO — a chave da linha e a derivação sumiram', () => {
   // A #428 tinha duas fontes com precedência (`fluxo_pagamento.juros_tabela_aa`
   // e, na falta dela, a primeira `taxaMensal` persistida). As duas eram

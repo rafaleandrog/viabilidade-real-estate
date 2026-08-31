@@ -58,6 +58,18 @@
 // ainda é nulo. Reexecutar não mexe em nada, e um estudo em que o autor já
 // digitou a taxa (inclusive 0) nunca é sobrescrito.
 //
+// ⚠️ **E é justamente por não sobrescrever que existe um SEGUNDO caminho de
+// mudança de número, que esta migração não vê e não pode ver.** Estudo cuja
+// coluna JÁ estava preenchida antes da #585 — a `033` a criou como default de
+// criação, e o backend a semeava em cada linha nova — e que depois teve uma
+// linha editada para outra taxa: a `037` pula esse estudo (coluna não é nula),
+// e mesmo assim a linha customizada passa a calcular pela taxa do estudo,
+// porque quem manda agora é `componentesPagamento`, não o dado da linha.
+//
+// Não é defeito do backfill: é a decisão da issue chegando pela porta do
+// código em vez da porta da migração. Fica escrito aqui porque é o caso que
+// não aparece em diff nenhum — nem a migração escreve, nem a tela avisa.
+//
 // As chaves `fluxo_pagamento.juros_tabela_aa` das linhas NÃO são apagadas:
 // ficam inertes e `fluxoPagamentoParaSalvar` as descarta na primeira gravação
 // de cada linha. Apagá-las aqui seria escrita em massa sem ganho — nada as lê.
@@ -82,14 +94,33 @@ function chave(aa) {
   return Math.round(aa * 10) / 10;
 }
 
+/**
+ * Teto da coluna `estudos.juros_tabela_aa_padrao`, que é `decimal(5,2)`
+ * (`schema.json:137`) — cabe até `999.99`.
+ *
+ * Ele existe porque a taxa pode vir DERIVADA de uma `taxaMensal` persistida, e
+ * `(1 + i_m)^12 − 1` com um `taxaMensal` sujo estoura qualquer ordem de
+ * grandeza (`i_m = 1` já dá 409.500% a.a.). Sem o teto, `dados.atualizar`
+ * falharia no meio da varredura e deixaria o backfill pela metade — pior que
+ * gravar o teto, porque a falha é no meio e não tem volta.
+ */
+const TETO_COLUNA_AA = 999.99;
+
 export default async function ({ dados }) {
-  const { dados: estudos } = await dados.listar('estudos', { por_pagina: 100000 });
+  // `varrerTudo`, nunca `listar` com `por_pagina` grande: é a convenção escrita
+  // em `003_receitas_fases_alocacoes.js` — *"o que não for copiado antes some
+  // sem erro e sem volta"*. Aqui o risco é maior que num backfill de `estudos`,
+  // porque `avancado_fases` guarda TODA linha de receita de TODO estudo da
+  // instância: um teto fixo truncaria a varredura em silêncio e deixaria parte
+  // dos estudos sem backfill, sem nada ficar vermelho. Exige shell 0.53.8, que
+  // é o `shell_min` vigente.
+  const estudos = await dados.varrerTudo('estudos');
   const alvos = estudos.filter(
     (e) => e.juros_tabela_aa_padrao === null || e.juros_tabela_aa_padrao === undefined,
   );
   if (alvos.length === 0) return;
 
-  const { dados: fases } = await dados.listar('avancado_fases', { por_pagina: 100000 });
+  const fases = await dados.varrerTudo('avancado_fases');
 
   for (const estudo of alvos) {
     const linhas = fases
@@ -101,14 +132,30 @@ export default async function ({ dados }) {
     const porTaxa = new Map();
     linhas.forEach((linha, posicao) => {
       const aa = jurosAaDaLinha(linha.fluxo_pagamento);
-      if (aa === null || chave(aa) === 0) return;   // linha sem juros não vota
+      // ⚠️ Só `null` é ausência. **0% explícito É voto**, e escrever o
+      // contrário inverte o resultado no caso que mais importa: num estudo com
+      // três linhas em 0% e uma em 12,5%, descartar os zeros elegia 12,5% e
+      // ligava juros na MAIORIA das linhas — o oposto do que "a taxa mais
+      // frequente" promete. É a mesma regra que o motor declarava antes da
+      // #585: *"chave presente e igual a 0 é RESPOSTA, não ausência — é o
+      // usuário tendo desligado os juros"*.
+      if (aa === null) return;
       const k = chave(aa);
       const ja = porTaxa.get(k);
       if (ja) ja.n += 1;
       else porTaxa.set(k, { n: 1, primeira: posicao, aa });
     });
-    if (porTaxa.size === 0) continue;               // nenhum juro no estudo: fica nulo
+    // `size === 0` só acontece quando NENHUMA linha declara taxa — nem 0
+    // explícito. Aí a coluna fica nula, que é o estado "nunca configurado".
+    // Estudo cujas linhas dizem 0% explicitamente cai no ramo de baixo e grava
+    // `0`: é diferente, e a diferença é registrada de propósito.
+    if (porTaxa.size === 0) continue;
 
+    // ⚠️ `primeira` é redundante com o `.sort()` acima — a ordem de inserção no
+    // `Map` já é a de `ordem` crescente, e medido por mutação: apagar a
+    // cláusula não muda nenhum resultado; apagar o `.sort()` muda. Ela fica
+    // porque torna o critério EXPLÍCITO no lugar onde se lê o desempate, e
+    // porque sobrevive a alguém trocar a estrutura de iteração.
     let vencedora = null;
     for (const cand of porTaxa.values()) {
       if (
@@ -120,8 +167,9 @@ export default async function ({ dados }) {
       }
     }
 
-    // `decimal(5,2)` — 2 casas, o mesmo que a coluna comporta.
-    const valor = Math.round(vencedora.aa * 100) / 100;
+    // `decimal(5,2)` — 2 casas e teto de 999,99, o que a coluna comporta.
+    const bruto = Math.round(vencedora.aa * 100) / 100;
+    const valor = Math.min(Math.max(bruto, 0), TETO_COLUNA_AA);
     await dados.atualizar('estudos', estudo.id, { juros_tabela_aa_padrao: valor });
   }
 }

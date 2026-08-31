@@ -1851,7 +1851,7 @@ base líquida
 > separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
 > `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:1996-2010`) **subtrai** cada
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2011-2025`) **subtrai** cada
 > série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
 > (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
 > que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
@@ -2045,7 +2045,7 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > saíram do render.** `regime_tributario`, os cinco `aliquota_*_pct` e
 > `imposto_sobre_permuta_fisica` foram removidos da aba `Viabilidade → Financeiro` (sem leitor em
 > nenhum nível — não havia o que preservar). `sujeito_ret` também saiu do render **dali**: é
-> condição de nível (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:81-83`) — a aba só
+> condição de nível (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:110-112`) — a aba só
 > existe para `nivel_analise === 'avancado'`, e nesse nível a Proforma não é consultada, então a
 > condição colapsa em "sempre oculto". `imposto_percentual` é o único que fica **visível**, mas
 > sempre **desabilitado** (`impostoPercentualEditavel`, `:87-89`) — o único editor de verdade é
@@ -2215,7 +2215,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2249`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2261`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`
