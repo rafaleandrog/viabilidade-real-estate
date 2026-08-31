@@ -157,13 +157,30 @@ sem juros. Fica registrado com reprodução pronta, para issue própria.
 vermelha não é defesa — é decoração que dá a impressão de cobertura. O que protege o desempate hoje
 é o caso do estudo 9, que derruba a remoção do `.sort()`.
 
-> **A lição das três rodadas, e é uma só:** cada conserto meu criou o defeito seguinte na **mesma
+### A rodada 4 — duas portas de lavagem que a guarda da rodada 3 não fechava
+
+O revisor externo achou as duas, e as duas são a **mesma guarda medida no ponto errado**:
+
+1. **`taxaMensal <= -2` escapava porque o expoente é PAR.** Eu conferia o sinal no valor
+   **derivado**: `(1 + m)^12` com `m = -2` devolve `1`, logo `aa = 0` — a sujeira mais grosseira
+   virava voto de "0% intencional". Com `m = -3` devolve `4096`, ou seja `409.500%`, que o teto
+   limitava a `999,99` e gravava como taxa válida. O sinal passou a ser conferido em `m`, **antes**
+   da potência.
+2. **`juros_tabela_aa: ''` virava voto de 0%**, porque `Number('')` é `0`. Shape que a validação
+   antiga da API deixava passar dentro do `fluxo_pagamento`.
+
+> **A lição das quatro rodadas, e é uma só:** cada conserto meu criou o defeito seguinte na **mesma
 > classe** — defesa escrita e não exercitada. Rodada 1: três defesas sem teste. Rodada 2: a fixture
 > que eu criei para consertar isso nasceu sem exercitar três das suas próprias defesas. Rodada 3: o
 > conserto da fixture matou a cobertura de uma quarta, e o comentário envelheceu no mesmo commit
 > que o escreveu. **A única coisa que quebrou o ciclo foi rodar a mutação de cada defesa, uma por
 > uma, e exigir que cada uma caísse no caso certo** — não "a suíte passa", não "eu declarei o que
 > não medi".
+>
+> A rodada 4 acrescenta a variação mais desconfortável dela: **a guarda existia, era a certa, e
+> estava no ponto errado.** Conferir o sinal depois da potência de expoente par é uma verificação
+> que roda, passa, e não verifica — indistinguível de uma boa, exatamente como o `CLAUDE.md`
+> descreve em "medir o ponto certo".
 
 ⚠️ **Pendente do autor, no ambiente autenticado:** `validar-backend.sh` **não roda nesta sessão**
 (aborta na etapa 1/5, portão do SDK, pelo 401). O typecheck do backend, a sincronização do

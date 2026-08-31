@@ -97,16 +97,30 @@
 function jurosAaDaLinha(fluxoPagamento) {
   const fp = fluxoPagamento ?? {};
   if (fp.juros_tabela_aa !== undefined && fp.juros_tabela_aa !== null) {
-    const aa = Number(fp.juros_tabela_aa);
+    const bruto = fp.juros_tabela_aa;
+    // ⚠️ String vazia (ou só espaços) NÃO é zero. `Number('')` devolve `0`, e
+    // sem esta linha um `juros_tabela_aa: ''` — shape que a validação antiga da
+    // API deixava passar dentro do `fluxo_pagamento` — virava voto de "0%
+    // explícito" e gravava a coluna permanentemente. É a mesma lavagem de dado
+    // sujo que a guarda de negativo existe para impedir, por outra porta.
+    // Achado do revisor externo.
+    if (typeof bruto === 'string' && bruto.trim() === '') return null;
+    if (typeof bruto !== 'number' && typeof bruto !== 'string') return null;
+    const aa = Number(bruto);
     return Number.isFinite(aa) && aa >= 0 ? aa : null;
   }
   const comps = Array.isArray(fp.componentes) ? fp.componentes : [];
   for (const c of comps) {
     const m = Number(c?.taxaMensal);
-    if (Number.isFinite(m) && m !== 0) {
-      const aa = (Math.pow(1 + m, 12) - 1) * 100;
-      return aa >= 0 ? aa : null;
-    }
+    if (!Number.isFinite(m) || m === 0) continue;
+    // ⚠️ O SINAL é conferido em `m`, ANTES da potência — e não no `aa` que sai
+    // dela. O expoente é 12, par: `(1 + m)^12` com `m = -2` devolve `1`, ou
+    // seja `aa = 0`, e com `m = -3` devolve `4096`, ou seja `aa = 409.500%`.
+    // Conferir só o derivado deixava passar exatamente o dado mais sujo — um
+    // vira voto de "0% intencional", o outro é limitado ao teto e gravado como
+    // taxa válida. Achado do revisor externo.
+    if (m < 0) return null;
+    return (Math.pow(1 + m, 12) - 1) * 100;
   }
   return null;
 }

@@ -55,6 +55,9 @@ const SEED = {
     // #585 (rodada 3): dois casos que a fixture da rodada 2 deixou descobertos.
     { id: 9, nome: 'Estudo I', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
     { id: 10, nome: 'Estudo J', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    // #585 (rodada 4): as duas portas de lavagem que o revisor externo achou.
+    { id: 11, nome: 'Estudo K', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 12, nome: 'Estudo L', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
   ],
   avancado_cronograma: [
     { id: 1, estudo_id: 1, evento: 'planejamento', inicio_mes: 1, duracao_meses: 6 },
@@ -136,6 +139,17 @@ const SEED = {
       fluxo_pagamento: { componentes: [
         { tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 12, taxaMensal: -0.004 },
       ] } },
+    // Estudo 11 — `taxaMensal: -2`. O EXPOENTE É PAR: `(1 − 2)^12 = 1`, logo o
+    // derivado é `0%`. Conferir o sinal só no valor derivado (como a rodada 3
+    // fazia) transformava a sujeira mais grosseira em voto de "0% intencional".
+    { id: 43, estudo_id: 11, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { componentes: [
+        { tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 12, taxaMensal: -2 },
+      ] } },
+    // Estudo 12 — `juros_tabela_aa: ''`. `Number('')` é `0`, então a string
+    // vazia virava voto de 0% e gravava a coluna para sempre.
+    { id: 44, estudo_id: 12, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: '' } },
     // Estudo 4 — EMPATE em frequência (uma linha cada), resolvido pela de
     // menor `ordem`; e a 3ª linha exercita a DERIVAÇÃO a partir de
     // `componentes[].taxaMensal`, sem a chave `juros_tabela_aa`. A 4ª e a 5ª
@@ -180,6 +194,8 @@ const SEED = {
     { id: 40, fase_id: 40, tipologia_id: 1, quantidade: 1 },
     { id: 41, fase_id: 41, tipologia_id: 1, quantidade: 1 },
     { id: 42, fase_id: 42, tipologia_id: 1, quantidade: 1 },
+    { id: 43, fase_id: 43, tipologia_id: 1, quantidade: 1 },
+    { id: 44, fase_id: 44, tipologia_id: 1, quantidade: 1 },
   ],
   // Camada com o shape que a migração `019` produzia (config de Price vinda do
   // Bloco G legado) — é o caminho de transformação da `028`. Sem esta linha a
@@ -392,6 +408,10 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
         // a chave explícita; o 10, o ramo derivado de `taxaMensal`.
         [8, null, 'taxa negativa explícita não pode virar "0% intencional"'],
         [10, null, 'taxa negativa DERIVADA de taxaMensal também não pode votar'],
+        // O expoente é PAR: o sinal tem de ser conferido em `m`, não no derivado.
+        [11, null, 'taxaMensal <= -2 deriva 0% ou positivo e não pode virar voto'],
+        // `Number('')` é `0` — string vazia não é resposta.
+        [12, null, 'juros_tabela_aa vazio não pode virar voto de 0% explícito'],
         // Empate de frequência resolvido pela linha de menor `ordem` — e é este
         // caso, e só ele, que dá dente ao `.sort()`.
         [9, 4, 'empate de frequência tem de ser resolvido pela linha de menor ordem'],
