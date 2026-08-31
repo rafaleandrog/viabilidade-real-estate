@@ -2692,6 +2692,46 @@ test('#458: ramo legado × ramo canônico divergem no MESMO fluxo_pagamento — 
   assert.ok(brutoCanonico[mesVenda + 1] > 0, 'canônico: a 1ª parcela cai em safra + 1');
 });
 
+test('#585: linha em shape LEGADO ignora a taxa do estudo — comportamento DECLARADO, não acidental', () => {
+  // O revisor externo (rodada 5) apontou que a taxa global do estudo não chega
+  // a uma linha cujo `fluxo_pagamento` não tem `componentes`: o guard de shape
+  // em `recebiveisComponentesLinha` devolve `null` e o cálculo cai no motor
+  // legado, que soma entrada/parcelas/repasse SEM juros.
+  //
+  // O achado procede, e a guarda é ANTERIOR a esta issue — idêntica na `main`
+  // (`fd7a9de`, mesma linha). Trocar de motor não é conserto de juros: os dois
+  // divergem no TIMING dos pagamentos, e a divergência está medida nos dois
+  // testes `#458` logo acima. Fazer a troca aqui mudaria, dentro de um PR sobre
+  // taxa de juros, um número que ninguém pediu para mudar.
+  //
+  // Então o caso fica DECLARADO em três lugares que se sustentam: este teste,
+  // o aviso `p.plano-legado` no modal (com caso de render próprio) e a badge
+  // "Plano não migrado" que a #458 já pôs no card do Grupo. Este teste é o que
+  // impede a declaração de apodrecer: quem rotear o legado pelo adaptador
+  // canônico derruba ESTE teste e tem de reescrever a declaração de propósito,
+  // em vez de mudar o comportamento em silêncio.
+  const mesVenda = 20;
+  const legado = linha458(mesVenda, false);
+  assert.equal(Array.isArray((legado.fluxo_pagamento as any).componentes), false,
+    'pré-condição: a linha é legada');
+
+  assert.deepEqual(
+    recebimentoBrutoMensal(legado, CRONO, 60, 12.5),
+    recebimentoBrutoMensal(legado, CRONO, 60, 0),
+    'linha legada: a taxa do estudo não muda nada — é o motor legado, sem juros',
+  );
+
+  // Contraprova, no MESMO plano: a linha canônica responde à taxa. Sem ela,
+  // este teste passaria também num app em que a taxa do estudo não chega a
+  // lugar nenhum — que é precisamente o defeito que a issue conserta.
+  const canonico = linha458(mesVenda, true);
+  assert.notDeepEqual(
+    recebimentoBrutoMensal(canonico, CRONO, 60, 12.5),
+    recebimentoBrutoMensal(canonico, CRONO, 60, 0),
+    'linha canônica: a taxa do estudo TEM de mudar a série',
+  );
+});
+
 test('#458 caso negativo: com `componentes` presente nos DOIS Grupos, as séries são iguais', () => {
   // Prova que a divergência acima vem do RAMO escolhido, não de uma diferença
   // escondida na fixture: quando os dois lados já são canônicos, o mesmo

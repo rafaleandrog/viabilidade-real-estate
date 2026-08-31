@@ -171,6 +171,12 @@ export class ViabFluxoReceitas extends LitElement {
        1ª faixa (auto-placement do CSS Grid); coluna única resolve. */
     .pag-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
     .pag-secao { margin-bottom: 14px; }
+    /* #585 rodada 5: aviso de linha que ainda nao passou pelo motor canonico.
+       (Sem crase neste bloco, pelo mesmo motivo declarado logo abaixo.) */
+    .plano-legado {
+      border-left: 2px solid var(--cor-alerta, #e0a82a);
+      padding-left: 10px; max-width: 70ch;
+    }
     /* #585: a regra .aviso-juros FOI REMOVIDA junto com o aviso de "N taxas
        diferentes gravadas" — ela era a unica consumidora da classe, e o aviso
        saiu com o campo de juros do modal. Nao ha mais plano heterogeneo a
@@ -331,7 +337,7 @@ export class ViabFluxoReceitas extends LitElement {
                (Array.isArray(fp?.componentes), o mesmo teste que
                recebimentoBrutoMensal faz em fluxo-caixa-motor.ts). -->
           ${ramoLegado ? html`
-            <urbi-badge cor="alerta" title="Plano não migrado: abra Fluxo de Pagamento e aplique para usar o modelo de safras.">
+            <urbi-badge cor="alerta" title="Plano não migrado: enquanto ele estiver assim, o cálculo usa o modelo antigo — sem os juros de tabela do estudo. Abra Fluxo de Pagamento e clique em Aplicar.">
               Plano não migrado
             </urbi-badge>` : nothing}
           ${!dis ? html`
@@ -868,6 +874,26 @@ export class ViabFluxoReceitas extends LitElement {
     // deixaria o usuário editando um plano cujos juros ele não tem como
     // conhecer sem trocar de aba. Somente leitura, e dizendo onde se edita.
     const jurosEstudoAA = Number(this.estudo?.juros_tabela_aa_padrao) || 0;
+    // #585, achado do revisor externo (rodada 5): a frase acima seria FALSA
+    // numa linha cujo `fluxo_pagamento` ainda nao tem `componentes`. Essa linha
+    // nao passa pelo motor canonico — `recebiveisComponentesLinha` devolve
+    // `null` no guard de shape e o calculo cai no motor legado, que soma
+    // entrada/parcelas/repasse SEM juros, qualquer que seja a taxa do estudo.
+    //
+    // ⚠️ A guarda é ANTERIOR a esta issue — idêntica na `main` (`fd7a9de`), na
+    // mesma linha — e trocar o motor legado pelo canonico mudaria o TIMING dos
+    // pagamentos, nao so os juros: a divergencia esta MEDIDA no teste `#458` de
+    // `frontend/fluxo-caixa-motor.test.ts` (o legado paga no proprio mes da
+    // venda; o canonico nunca paga antes de safra + 1). Fazer essa troca aqui
+    // seria mudar, dentro de um PR sobre juros, um numero que ninguem pediu.
+    //
+    // Entao o que esta issue faz é o que o criterio 3 dela pede: DECLARAR o
+    // caso e torna-lo VISIVEL, em vez de deixar na tela um numero que nenhum
+    // campo explica — a "feature invisivel" que o proprio corpo da #585 nomeia
+    // como saida inaceitavel. O fechamento do caso (persistir `componentes` na
+    // criacao, ou rotear o legado pelo adaptador) é decisao de desenho do
+    // autor, e esta em issue propria.
+    const planoLegado = !Array.isArray(this.modalPag?.fluxo_pagamento?.componentes);
     return html`
       <urbi-modal title="Fluxo de pagamento" maxWidth="860px" @urbi-modal:close=${() => this.modalPag = null}>
         <div class="pag-grid">
@@ -875,6 +901,13 @@ export class ViabFluxoReceitas extends LitElement {
             <p class="sec juros-vigente">Juros de tabela em vigor: <strong>${fmtPct(jurosEstudoAA)} a.a.</strong>
               — valor único do estudo, editado em <strong>Viabilidade → Financeiro</strong>. Vale
               para entrada parcelada, parcelamento e repasse de todas as linhas de receita.</p>
+            ${planoLegado ? html`
+              <p class="sec plano-legado">⚠️ <strong>Neste Grupo os juros ainda nao estao
+                valendo.</strong> O plano de pagamento dele nunca foi aplicado, entao o calculo
+                usa o formato antigo, que soma entrada, parcelamento e repasse
+                <strong>sem juros</strong> — qualquer que seja a taxa do estudo. Clicar em
+                <strong>Aplicar</strong>, aqui embaixo, grava o plano no formato atual e poe a
+                taxa do estudo em vigor nesta linha.</p>` : nothing}
             <div class="pag-secao">
               <h4>Condições de entrada</h4>
               <p class="sec">Pagamento no ato — 1 parcela paga no mês da contratação; mais de uma
