@@ -52,6 +52,9 @@ const SEED = {
     { id: 6, nome: 'Estudo F', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
     { id: 7, nome: 'Estudo G', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
     { id: 8, nome: 'Estudo H', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    // #585 (rodada 3): dois casos que a fixture da rodada 2 deixou descobertos.
+    { id: 9, nome: 'Estudo I', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    { id: 10, nome: 'Estudo J', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
   ],
   avancado_cronograma: [
     { id: 1, estudo_id: 1, evento: 'planejamento', inicio_mes: 1, duracao_meses: 6 },
@@ -109,6 +112,30 @@ const SEED = {
     // permanente e indistinguível de escolha do autor.
     { id: 33, estudo_id: 8, tipo: 'receita', nome: 'R-A', ordem: 0,
       fluxo_pagamento: { juros_tabela_aa: -5 } },
+    // Estudo 9 — o EMPATE de frequência, que é o que dá sentido ao `.sort()`.
+    //
+    // ⚠️ Ele existe porque a rodada 2 MATOU o empate que havia: ao acrescentar
+    // duas linhas de 12,54% ao estudo 4 (para cobrir a precisão da chave), a
+    // votação de lá passou a ter maioria, e as três mutações de desempate
+    // (apagar o `.sort()`, apagar a cláusula `primeira`, trocar `>` por `>=`)
+    // ficaram TODAS verdes. O comentário do código continuou afirmando que
+    // apagar o `.sort()` mudava o resultado — afirmação verdadeira quando foi
+    // escrita e falsa no mesmo dia.
+    //
+    // Uma taxa cada: empata em frequência, e vence a de menor `ordem` (4%).
+    // Os `id` estão em ordem INVERSA à `ordem` de propósito — `varrerTudo`
+    // devolve por `id`, então sem o `.sort()` vence 6%.
+    { id: 40, estudo_id: 9, tipo: 'receita', nome: 'R-A', ordem: 1,
+      fluxo_pagamento: { juros_tabela_aa: 6 } },
+    { id: 41, estudo_id: 9, tipo: 'receita', nome: 'R-B', ordem: 0,
+      fluxo_pagamento: { juros_tabela_aa: 4 } },
+    // Estudo 10 — o ramo DERIVADO da guarda de taxa negativa. O estudo 8 cobre
+    // a chave explícita; este cobre `(1 + i_m)^12 − 1` saindo negativo a partir
+    // de uma `taxaMensal` negativa persistida, que é o outro caminho de entrada.
+    { id: 42, estudo_id: 10, tipo: 'receita', nome: 'R-A', ordem: 0,
+      fluxo_pagamento: { componentes: [
+        { tipo: 'prazo_fixo', participacaoPct: 100, prazoMeses: 12, taxaMensal: -0.004 },
+      ] } },
     // Estudo 4 — EMPATE em frequência (uma linha cada), resolvido pela de
     // menor `ordem`; e a 3ª linha exercita a DERIVAÇÃO a partir de
     // `componentes[].taxaMensal`, sem a chave `juros_tabela_aa`. A 4ª e a 5ª
@@ -150,6 +177,9 @@ const SEED = {
     { id: 31, fase_id: 31, tipologia_id: 1, quantidade: 1 },
     { id: 32, fase_id: 32, tipologia_id: 1, quantidade: 1 },
     { id: 33, fase_id: 33, tipologia_id: 1, quantidade: 1 },
+    { id: 40, fase_id: 40, tipologia_id: 1, quantidade: 1 },
+    { id: 41, fase_id: 41, tipologia_id: 1, quantidade: 1 },
+    { id: 42, fase_id: 42, tipologia_id: 1, quantidade: 1 },
   ],
   // Camada com o shape que a migração `019` produzia (config de Price vinda do
   // Bloco G legado) — é o caminho de transformação da `028`. Sem esta linha a
@@ -358,8 +388,13 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
         [6, 7.25, 'fase de cronograma não vota na taxa das linhas de receita'],
         // O teto de `decimal(5,2)`: 409.500% a.a. derivados não cabem.
         [7, 999.99, 'taxa derivada acima do teto da coluna tem de ser limitada'],
-        // Taxa negativa não vota: a coluna fica NULA, não `0`.
-        [8, null, 'taxa negativa em dado legado não pode virar "0% intencional"'],
+        // Taxa negativa não vota: a coluna fica NULA, não `0`. O estudo 8 cobre
+        // a chave explícita; o 10, o ramo derivado de `taxaMensal`.
+        [8, null, 'taxa negativa explícita não pode virar "0% intencional"'],
+        [10, null, 'taxa negativa DERIVADA de taxaMensal também não pode votar'],
+        // Empate de frequência resolvido pela linha de menor `ordem` — e é este
+        // caso, e só ele, que dá dente ao `.sort()`.
+        [9, 4, 'empate de frequência tem de ser resolvido pela linha de menor ordem'],
         // Coluna já preenchida pelo autor: intocada.
         [5, 9.75, 'a 037 não pode sobrescrever escolha do autor'],
         // Estudo sem linha de receita nenhuma: fica nulo.

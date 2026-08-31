@@ -1,5 +1,5 @@
 import {
-  componentesDoLegado, taxaMensalDoEstudo,
+  componentesDoLegado, taxaMensalDoEstudo, TIPOS_FINANCIADOS,
   type ComponentePagamento, type ResiduoAteMarco,
 } from './fluxo-caixa-motor.js';
 import type { EventoCrono } from './fluxo-shared.js';
@@ -288,7 +288,7 @@ export function componentesParaSalvar(
   // sem a taxa do estudo, no dado gravado e no cálculo.
   const comTaxaDoEstudo = (c: any): ComponentePagamento => {
     const saida = copia(c) as any;
-    if (saida?.tipo !== 'imediato') saida.taxaMensal = taxaMensal;  // `imediato` paga no mês da venda
+    if (TIPOS_FINANCIADOS.has(saida?.tipo)) saida.taxaMensal = taxaMensal;
     return saida as ComponentePagamento;
   };
 

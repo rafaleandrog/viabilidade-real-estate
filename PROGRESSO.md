@@ -134,6 +134,37 @@ sem juros. Fica registrado com reprodução pronta, para issue própria.
 > só a mutação prova. Hoje cada uma das sete defesas do backfill tem a sua, e cada mutação é pega
 > pelo caso certo.
 
+### A rodada 3 achou quatro, e o mais instrutivo é sobre a fixture da rodada 2
+
+1. **O desempate por `ordem` ficou sem cobertura, e o comentário afirmava o contrário.** Ao
+   acrescentar duas linhas de 12,54% ao estudo 4 — para cobrir a precisão da chave, conserto da
+   rodada 2 — eu apaguei o único empate de frequência que a fixture tinha. As três mutações de
+   desempate (remover o `.sort()`, remover a cláusula `primeira`, trocar `>` por `>=`) passaram a
+   ficar **todas verdes**, enquanto o comentário do código dizia, literalmente, que *"apagar o
+   `.sort()` muda"*. Frase verdadeira quando escrita e falsa **no mesmo commit**.
+2. **O ramo DERIVADO da guarda de taxa negativa estava descoberto** — só a chave explícita tinha
+   caso. Removê-lo deixava tudo verde.
+3. **A negação `tipo !== 'imediato'` mudava comportamento em silêncio.** Componente com `tipo`
+   ausente, `null` ou desconhecido — dado que a validação barra hoje, mas que pode estar
+   persistido de antes dela — **não** recebia taxa sob a regra da presença de chave e passou a
+   receber. Virou `TIPOS_FINANCIADOS`, allowlist explícita.
+4. **`return` dentro de `for...of`.** Ao trocar `forEach` por `for...of` para tirar a cláusula
+   redundante, o `return` que pulava a iteração passou a **abortar a migração inteira** no primeiro
+   estudo sem taxa. O harness pegou na hora — 5 dos 9 casos vermelhos de uma vez.
+
+**A cláusula de desempate foi REMOVIDA em vez de coberta.** Ela era redundante com o `.sort()` e
+**intestável por construção**: nenhuma fixture consegue derrubá-la. Defesa que não pode ficar
+vermelha não é defesa — é decoração que dá a impressão de cobertura. O que protege o desempate hoje
+é o caso do estudo 9, que derruba a remoção do `.sort()`.
+
+> **A lição das três rodadas, e é uma só:** cada conserto meu criou o defeito seguinte na **mesma
+> classe** — defesa escrita e não exercitada. Rodada 1: três defesas sem teste. Rodada 2: a fixture
+> que eu criei para consertar isso nasceu sem exercitar três das suas próprias defesas. Rodada 3: o
+> conserto da fixture matou a cobertura de uma quarta, e o comentário envelheceu no mesmo commit
+> que o escreveu. **A única coisa que quebrou o ciclo foi rodar a mutação de cada defesa, uma por
+> uma, e exigir que cada uma caísse no caso certo** — não "a suíte passa", não "eu declarei o que
+> não medi".
+
 ⚠️ **Pendente do autor, no ambiente autenticado:** `validar-backend.sh` **não roda nesta sessão**
 (aborta na etapa 1/5, portão do SDK, pelo 401). O typecheck do backend, a sincronização do
 `schema.json` e a execução real da `037` em Postgres são dele. O harness de migrações

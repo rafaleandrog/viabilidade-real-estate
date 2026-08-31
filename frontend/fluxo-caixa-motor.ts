@@ -844,6 +844,20 @@ export function taxaAnualDeMensal(mensal: number): number {
  * Residencial × Não Residencial, e esse cenário **deixa de ser representável**
  * — era exatamente o que o aviso de múltiplas taxas do modal servia.
  */
+/**
+ * Os tipos de componente que CARREGAM taxa — os financiados. `imediato` fica
+ * de fora: paga no mês da venda e não tem juros a receber.
+ *
+ * ⚠️ É uma allowlist, e não `tipo !== 'imediato'`, de propósito. A negação
+ * dava taxa a componente com `tipo` ausente, `null` ou desconhecido — dado que
+ * `validarFluxoPagamento` barra hoje, mas que pode existir persistido de antes
+ * da validação. Sob a regra anterior (presença da chave `taxaMensal`) esse
+ * dado NÃO recebia taxa; a negação teria mudado isso em silêncio. A allowlist
+ * fecha nos dois sentidos: tipo conhecido e financiado recebe, todo o resto
+ * não.
+ */
+export const TIPOS_FINANCIADOS: ReadonlySet<string> = new Set(['prazo_fixo', 'ate_marco', 'concentrado']);
+
 export function taxaMensalDoEstudo(jurosTabelaAaEstudo: number): number {
   return taxaMensalDeAnual(Number(jurosTabelaAaEstudo) || 0);
 }
@@ -987,13 +1001,12 @@ export function componentesPagamento(
   // enquanto as parcelas dele não rendiam juros nenhum. Achado do revisor
   // externo.
   //
-  // `imediato` é o único que não tem taxa e não deve ter: paga no mês da venda.
-  // Os outros três (`prazo_fixo`, `ate_marco`, `concentrado`) são, por
-  // definição, os financiados.
+  // Quem recebe é `TIPOS_FINANCIADOS` — allowlist, não a negação de `imediato`.
+  // Ver a nota lá.
   const taxaMensal = taxaMensalDoEstudo(jurosTabelaAaEstudo);
   if (Array.isArray(fluxoPagamento?.componentes)) {
     return fluxoPagamento.componentes.map((c: any) => (
-      c && c.tipo !== 'imediato' ? { ...c, taxaMensal } : { ...c }
+      c && TIPOS_FINANCIADOS.has(c.tipo) ? { ...c, taxaMensal } : { ...c }
     )) as ComponentePagamento[];
   }
   return componentesDoLegado(fluxoPagamento, cronograma, jurosTabelaAaEstudo);

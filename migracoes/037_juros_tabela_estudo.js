@@ -89,7 +89,8 @@
  *
  * Nunca houve validação de domínio para essa chave (a da #428 vivia na tela, e
  * a do backend só chegou com a #585), então taxa negativa em dado legado ou
- * gravada por API é possível. Ignorá-la deixa a coluna nula quando ela é a
+ * gravada por API é possível. (`-0` **vota**, e está certo: ele é zero, não um
+ * número negativo — `-0 >= 0` é `true` em JS, e o valor gravado é `0`.) Ignorá-la deixa a coluna nula quando ela é a
  * única fonte — e nulo é o estado "nunca configurado", que o autor VÊ na tela e
  * pode corrigir. É o oposto de gravar um número plausível e errado.
  */
@@ -158,10 +159,10 @@ export default async function ({ dados }) {
       .filter((f) => String(f.estudo_id) === String(estudo.id) && f.tipo === 'receita')
       .sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0));
 
-    // Frequência por taxa, guardando a MENOR ordem em que ela apareceu — é o
-    // desempate.
+    // Frequência por taxa. A ordem de inserção é a de `ordem` crescente (o
+    // `.sort()` acima), e é ela que resolve o empate.
     const porTaxa = new Map();
-    linhas.forEach((linha, posicao) => {
+    for (const linha of linhas) {
       const aa = jurosAaDaLinha(linha.fluxo_pagamento);
       // ⚠️ Só `null` é ausência. **0% explícito É voto**, e escrever o
       // contrário inverte o resultado no caso que mais importa: num estudo com
@@ -170,35 +171,41 @@ export default async function ({ dados }) {
       // frequente" promete. É a mesma regra que o motor declarava antes da
       // #585: *"chave presente e igual a 0 é RESPOSTA, não ausência — é o
       // usuário tendo desligado os juros"*.
-      if (aa === null) return;
+      // `continue`, não `return`: este laço é `for...of` dentro do laço de
+      // estudos, e um `return` aqui abortaria a migração INTEIRA no primeiro
+      // estudo sem taxa. (Era `forEach` com `return`, onde a semântica é a de
+      // pular a iteração — a troca de laço mudou o significado da mesma
+      // palavra, e o harness pegou.)
+      if (aa === null) continue;
       const k = chave(aa);
       const ja = porTaxa.get(k);
       if (ja) ja.n += 1;
       // Guarda a CHAVE, não a primeira `aa` vista: são o mesmo número agora que
       // a chave está na precisão persistida, e guardar a chave torna isso
       // impossível de divergir de novo.
-      else porTaxa.set(k, { n: 1, primeira: posicao, aa: k });
-    });
+      else porTaxa.set(k, { n: 1, aa: k });
+    }
     // `size === 0` só acontece quando NENHUMA linha declara taxa — nem 0
     // explícito. Aí a coluna fica nula, que é o estado "nunca configurado".
     // Estudo cujas linhas dizem 0% explicitamente cai no ramo de baixo e grava
     // `0`: é diferente, e a diferença é registrada de propósito.
     if (porTaxa.size === 0) continue;
 
-    // ⚠️ `primeira` é redundante com o `.sort()` acima — a ordem de inserção no
-    // `Map` já é a de `ordem` crescente, e medido por mutação: apagar a
-    // cláusula não muda nenhum resultado; apagar o `.sort()` muda. Ela fica
-    // porque torna o critério EXPLÍCITO no lugar onde se lê o desempate, e
-    // porque sobrevive a alguém trocar a estrutura de iteração.
+    // O desempate por `ordem` é o `.sort()` lá em cima, e só ele: a ordem de
+    // inserção no `Map` já é a de `ordem` crescente, e `cand.n > vencedora.n`
+    // (estrito) preserva o primeiro candidato visto quando há empate.
+    //
+    // ⚠️ Houve aqui uma cláusula `cand.primeira < vencedora.primeira`, escrita
+    // para "tornar o critério explícito". Ela era **redundante e intestável**:
+    // apagá-la não mudava resultado nenhum, em fixture nenhuma. Pior, o
+    // comentário dela afirmava um resultado de mutação que deixou de valer no
+    // mesmo dia — a fixture perdeu o empate de frequência que o sustentava.
+    // Defesa que não pode ficar vermelha não é defesa; o que protege o
+    // desempate é o caso do estudo 9 no harness, que derruba a remoção do
+    // `.sort()`.
     let vencedora = null;
     for (const cand of porTaxa.values()) {
-      if (
-        vencedora === null
-        || cand.n > vencedora.n
-        || (cand.n === vencedora.n && cand.primeira < vencedora.primeira)
-      ) {
-        vencedora = cand;
-      }
+      if (vencedora === null || cand.n > vencedora.n) vencedora = cand;
     }
 
     // `vencedora.aa` já é a chave, portanto já está em 2 casas. Só o TETO

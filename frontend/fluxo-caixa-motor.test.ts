@@ -2368,6 +2368,22 @@ test('#585 componente FINANCIADO sem a chave taxaMensal também recebe a taxa do
     CRONO, 12.5,
   ) as any[];
   assert.equal('taxaMensal' in semChave[0], false, 'imediato não pode ganhar taxa');
+  // ⚠️ E a regra é uma ALLOWLIST, não "tudo menos imediato": componente com
+  // `tipo` ausente, `null` ou desconhecido — dado que a validação barra hoje mas
+  // que pode existir persistido de antes dela — continua SEM taxa, como estava
+  // sob a regra da presença de chave. A negação teria mudado isso em silêncio.
+  const estranhos = componentesPagamento(
+    { componentes: [
+      { participacaoPct: 10 },
+      { tipo: null, participacaoPct: 10 },
+      { tipo: 'tipo_que_nao_existe', participacaoPct: 10 },
+    ] },
+    CRONO, 12.5,
+  ) as any[];
+  for (const c of estranhos) {
+    assert.equal('taxaMensal' in c, false,
+      'componente de tipo desconhecido ganhou taxa — a regra virou negação em vez de allowlist');
+  }
   for (const c of semChave.slice(1)) {
     assert.equal(c.taxaMensal, taxaMensalDeAnual(12.5),
       `${c.tipo} sem a chave persistida ficou sem a taxa do estudo`);
