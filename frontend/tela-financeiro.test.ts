@@ -102,3 +102,64 @@ test('#585 FIAÇÃO: a tela BARRA antes de persistir e PROPAGA depois de salvar'
   assert.match(fonte, /const erroJuros = erroJurosTabelaEstudo\(this\.form\['juros_tabela_aa_padrao'\]\);/,
     'o erro deixou de ser recalculado no render — o botão para de acompanhar a digitação');
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #585 — a TABELA que mantém os três validadores da coluna alinhados
+// ─────────────────────────────────────────────────────────────────────────
+//
+// `estudos.juros_tabela_aa_padrao` é validada em TRÊS lugares, e eles não
+// compartilham código porque rodam em runtimes diferentes:
+//
+//   · `erroJurosTabelaEstudo`      — aqui, no navegador (feedback imediato);
+//   · `percentualEstrito`          — `backend/rotas/estudos.ts` (a fronteira);
+//   · `numeroLimpo`                — `migracoes/037_…` (runner de migração).
+//
+// ⚠️ **Três regras para um campo é exatamente como a classe de defeito desta
+// issue começa.** Medido antes deste conserto: a migração rejeitava `'0x10'`,
+// `'1e3'`, `'  '`, `true` e `[]`, e os outros dois os aceitavam como 16, 1000,
+// 0, 1 e 0 — na coluna que governa os juros de TODAS as linhas de receita.
+//
+// Esta tabela é exercitada **aqui** contra o validador da tela, e **em
+// `backend/rotas/estudos.test.ts`** contra o do PATCH — os dois com a mesma
+// lista, então divergirem um do outro fica vermelho.
+//
+// ⚠️ **A migração NÃO é coberta por esta tabela, e é preciso dizê-lo.**
+// `numeroLimpo` não é exportado (migração é módulo de runner, sem superfície de
+// import), então o que o harness prova é o COMPORTAMENTO em quatro entradas —
+// `''`, `'0x10'`, `'1e3'` e `taxaMensal: '0x10'`, nos estudos 12 a 15 — não a
+// tabela inteira. As doze restantes valem para dois dos três validadores.
+// Escrito assim de propósito: dizer "a mesma lista está nos três" seria a
+// afirmação plausível e falsa que esta issue passou seis rodadas caçando.
+
+const ENTRADAS_DA_COLUNA: Array<[unknown, boolean, string]> = [
+  // valor            aceita?  por quê
+  [12.5,              true,  'número decimal, o caso normal'],
+  [0,                 true,  '0% é venda sem juros — escolha explícita'],
+  ['12.5',            true,  'string decimal é aceitável: vem do JSON/PATCH'],
+  [-5,                false, 'negativo inverte o fluxo de caixa do estudo'],
+  [-0.01,             false, 'a faixa que o motor NÃO defende (ele só clampa <= -100)'],
+  ['0x10',            false, "Number('0x10') é 16 — hexadecimal não é percentual digitado"],
+  ['1e3',             false, "Number('1e3') é 1000 — notação científica idem"],
+  ['  ',              false, "Number('  ') é 0 — espaço em branco não é resposta"],
+  ['12,5',            false, 'vírgula: aqui não há usuário digitando, é dado persistido'],
+  ['abc',             false, 'lixo'],
+  [true,              false, 'Number(true) é 1'],
+  [[],                false, 'Number([]) é 0'],
+  [[12.5],            false, 'Number([12.5]) é 12.5 — array não é número'],
+  [{},                false, 'objeto'],
+  [Infinity,          false, 'não finito'],
+  [NaN,               false, 'não finito'],
+];
+
+test('#585 os três validadores da coluna concordam — tabela de entradas', () => {
+  for (const [valor, aceita, motivo] of ENTRADAS_DA_COLUNA) {
+    const erro = erroJurosTabelaEstudo(valor);
+    assert.equal(erro === null, aceita,
+      `${JSON.stringify(valor)} deveria ser ${aceita ? 'aceito' : 'recusado'} — ${motivo}`);
+  }
+  // `null`/`undefined`/`''` são "não configurado", e são aceitos: é como o
+  // usuário esvazia o campo. Ficam fora da tabela porque não são valores.
+  assert.equal(erroJurosTabelaEstudo(null), null);
+  assert.equal(erroJurosTabelaEstudo(undefined), null);
+  assert.equal(erroJurosTabelaEstudo(''), null);
+});

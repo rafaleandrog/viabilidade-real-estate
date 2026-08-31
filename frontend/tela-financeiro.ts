@@ -98,8 +98,18 @@ export function camposVisiveisFinanceiro(nivel: string): string[] {
  */
 export function erroJurosTabelaEstudo(v: unknown): string | null {
   if (v === null || v === undefined || v === '') return null;
-  const aa = Number(v);
-  if (!Number.isFinite(aa) || aa < 0) {
+  // ⚠️ Não é `Number(v)`. Ele aceita `'0x10'` (→ 16), `'1e3'` (→ 1000), `'  '`
+  // (→ 0), `true` (→ 1) e `[]` (→ 0) — nenhum é percentual digitado, e todos
+  // acabariam na coluna que governa os juros de todas as linhas. É o mesmo
+  // predicado de `percentualEstrito` (backend) e `numeroLimpo` (migração
+  // `037`); os três não compartilham código porque rodam em runtimes
+  // diferentes, e o que os mantém alinhados é a tabela de entradas exercitada
+  // nos três — ver o teste `#585 os três validadores da coluna concordam`.
+  if (typeof v === 'number' ? !Number.isFinite(v)
+    : typeof v !== 'string' || !/^\s*-?\d+(\.\d+)?\s*$/.test(v)) {
+    return 'Os juros de tabela devem ser um percentual ao ano maior ou igual a zero.';
+  }
+  if (Number(v) < 0) {
     return 'Os juros de tabela devem ser um percentual ao ano maior ou igual a zero.';
   }
   return null;

@@ -316,7 +316,7 @@ alimente o cash sweep.
 > ✅ **#450 (2026-08-24): não sobrou mais nada inerte na aba `Viabilidade → Financeiro`.**
 > `regime_tributario`, os cinco `aliquota_*_pct` e `imposto_sobre_permuta_fisica` saíram do render
 > (não tinham leitor em nível nenhum). `sujeito_ret` também saiu — é condição de nível
-> (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:110-112`): a aba só existe para
+> (`sujeitoRetVisivelFinanceiro`, `frontend/tela-financeiro.ts:120-122`): a aba só existe para
 > `nivel_analise === 'avancado'`, onde a Proforma não é consultada, então a condição colapsa em
 > "sempre oculto". `imposto_percentual` fica **visível, sempre desabilitado**
 > (`impostoPercentualEditavel`, `:87-89`) — o único editor de verdade continua sendo Premissas

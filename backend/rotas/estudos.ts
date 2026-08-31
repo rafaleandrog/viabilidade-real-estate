@@ -79,6 +79,37 @@ const CAMPOS_BLOQUEADOS_PATCH = new Set([
  * Devolve `{ dados }` quando o PATCH pode prosseguir, ou
  * `{ http, codigo, mensagem }` quando deve ser recusado.
  */
+/**
+ * #585 — um percentual, e só um percentual.
+ *
+ * ⚠️ **Não é `Number(v)`, e a diferença foi medida.** `Number()` aceita
+ * hexadecimal (`'0x10'` → `16`), notação científica (`'1e3'` → `1000`), espaços
+ * (`'  '` → `0`), booleano (`true` → `1`) e array vazio (`[]` → `0`). Nenhum
+ * deles é percentual que alguém tenha digitado, e todos viravam valor gravado
+ * na coluna que governa os juros de TODAS as linhas de receita do estudo.
+ *
+ * A mesma classe de defeito reapareceu seis vezes na revisão da #585, sempre
+ * assim: um valor que não é percentual atravessa `Number()` e vira um número
+ * plausível. A migração `037` foi invertida para fail-closed (`numeroLimpo`);
+ * este é o mesmo predicado, no lugar que de fato é fronteira — a tela é
+ * feedback, o PATCH é o portão.
+ *
+ * ⚠️ **São TRÊS validadores para esta coluna, e eles não compartilham código**
+ * porque não podem: `migracoes/037_juros_tabela_estudo.js` roda no runner de
+ * migração (JS puro, sem imports do app) e `frontend/tela-financeiro.ts` roda no
+ * navegador. O que os mantém alinhados é a tabela de entradas exercitada nos
+ * três: aqui em `estudos.test.ts`, na migração pelo harness
+ * (`scripts/migracoes-harness.mjs`), e na tela em `tela-financeiro.test.ts`.
+ * Divergiu um, a tabela acusa.
+ */
+export function percentualEstrito(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v !== 'string') return null;
+  if (!/^\s*-?\d+(\.\d+)?\s*$/.test(v)) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function montarPatchEstudo(
   body: Record<string, any>,
   estudo: { nivel_analise?: string; status?: string },
@@ -112,8 +143,8 @@ export function montarPatchEstudo(
     // fronteira: `PATCH /estudos/:id` é chamável direto, e qualquer tela futura
     // que reuse `atualizarEstudo` passa por aqui sem passar por lá.
     if (k === 'juros_tabela_aa_padrao' && v !== null && v !== undefined && v !== '') {
-      const aa = Number(v);
-      if (!Number.isFinite(aa) || aa < 0) {
+      const aa = percentualEstrito(v);
+      if (aa === null || aa < 0) {
         return {
           http: 400,
           codigo: 'TAXA_INVALIDA',
