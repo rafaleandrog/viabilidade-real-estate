@@ -831,3 +831,67 @@ test('#515 fiação: a tela passa o valor da coluna de DESTINO', () => {
     'sem isto a decisão não sabe o que há na coluna de destino, e volta a ativar histórico',
   );
 });
+
+// ── #515, rodada 5: a regra virou UMA invariante, e estes são os cantos ──
+//
+// A lista de casos não convergia — cinco rodadas, cinco entradas distintas no
+// ramo errado. A regra agora é: trocar é seguro sse (a) existe canônico depois
+// da troca, ou (b) as duas colunas são economicamente nulas para QUALQUER
+// grandeza de ligação. Os testes abaixo são os cantos dessa fronteira.
+
+test('#515: destino com histórico ZERO troca — 0 é economicamente nulo, como vazio', () => {
+  // Achado do revisor externo: `_editarCustoUnidade` limpa o campo ativo e o
+  // canônico, mas a coluna de destino pode ter ficado com 0. A Proforma lê 0
+  // antes e 0 depois, então não há mudança econômica a impedir — e bloquear
+  // deixava o usuário sem conseguir selecionar aquela badge para editar.
+  assert.deepEqual(
+    trocaBadgePremissas({ valorAtual: null, valorDestino: 0, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }),
+    { trocar: true },
+  );
+  // E o simétrico: ativo zero com destino histórico também troca, gravando o
+  // canônico 0 — cai no ramo (a), não no (b).
+  assert.deepEqual(
+    trocaBadgePremissas({ valorAtual: 0, valorDestino: 500_000, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }),
+    { trocar: true, canonico: 0 },
+  );
+});
+
+test('#515: a fronteira do ramo (b) — nulo/zero passa, qualquer outro valor barra', () => {
+  const casos: Array<[number | null, number | null, boolean]> = [
+    [null, null, true],
+    [null, 0, true],
+    [0, null, true],     // cai em (a): canônico 0
+    [0, 0, true],        // idem
+    [null, 500_000, false],
+    [null, -1, false],
+    [null, 0.01, false],
+  ];
+  for (const [ativo, destino, esperado] of casos) {
+    assert.equal(
+      trocaBadgePremissas({ valorAtual: ativo, valorDestino: destino, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
+      esperado,
+      `ativo=${ativo} destino=${destino}`,
+    );
+  }
+});
+
+test('#515: valor ativo NEGATIVO deriva canônico normalmente — não é caso especial', () => {
+  // Sinal nunca foi tratado à parte, e não deve ser: -10% de 10M é -1M, um
+  // canônico tão legítimo quanto qualquer outro. O que o barra é a ligação
+  // zerada, como qualquer valor não nulo.
+  assert.deepEqual(
+    trocaBadgePremissas({ valorAtual: -10, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }) }),
+    { trocar: true, canonico: -1_000_000 },
+  );
+  assert.equal(
+    trocaBadgePremissas({ valorAtual: -10, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
+    false,
+  );
+});
+
+test('#515: canônico persistido NEGATIVO manda igual — sinal não é predicado', () => {
+  assert.deepEqual(
+    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: -500, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }),
+    { trocar: true },
+  );
+});

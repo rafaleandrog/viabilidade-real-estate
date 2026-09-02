@@ -347,37 +347,53 @@ export interface EntradaTrocaBadge {
 export function trocaBadgePremissas(
   { valorAtual, valorDestino, canonicoPersistido, convAtual, ctx }: EntradaTrocaBadge,
 ): TrocaBadgePremissas {
-  // Já há canônico: a badge é pura apresentação daqui em diante.
+  // ⚠️ **A regra é UMA, e ela substituiu uma lista de casos que não convergia.**
+  //
+  // Cinco rodadas de revisão acharam cinco entradas distintas que caíam no ramo
+  // errado — linha vazia, valor ativo zero, destino com histórico, destino com
+  // histórico ZERO. Cada conserto abria a aresta seguinte, que é exatamente o
+  // sinal da armadilha 14 do `CLAUDE.md`: na segunda entrada da mesma classe,
+  // pare de acrescentar guarda e **inverta**.
+  //
+  // A invariante que a badge promete é uma frase só: **trocar de unidade não
+  // pode mudar o que a Proforma aplica** — nem agora, nem quando a grandeza de
+  // ligação mudar. Ela se sustenta em exatamente duas situações:
+  //
+  //   (a) **existe canônico depois da troca** — persistido, ou derivado agora.
+  //       O canônico CONGELA o valor econômico: `proforma.ts` o prefere ao
+  //       legado, então a coluna que a badge escolhe deixa de importar.
+  //
+  //   (b) **as duas colunas são economicamente nulas para QUALQUER ligação** —
+  //       isto é, vazias ou zero. Zero vezes qualquer link é zero, e coluna
+  //       vazia o motor lê como zero: as duas leituras são 0 hoje e continuam 0
+  //       com qualquer VGV futuro.
+  //
+  // Fora dessas duas, trocar deixa o valor econômico à mercê da coluna de
+  // destino — e é aí que mora o defeito da #515, nas suas várias formas.
+
+  // (a) canônico já persistido: a badge é pura apresentação daqui em diante.
   if (canonicoPersistido !== null && Number.isFinite(canonicoPersistido)) {
     return { trocar: true };
   }
-  // Linha legada: deriva o canônico do campo ativo, uma vez só.
-  //
-  // Campo ativo VAZIO. Aqui não há canônico a derivar, então a pergunta passa a
-  // ser sobre o DESTINO — e é a mesma pergunta de sempre, escrita direto:
-  // **a Proforma lê o mesmo número antes e depois?**
-  //
-  // Destino também vazio → lê 0 antes e 0 depois: troca. É o caso da linha nova
-  // (permuta física recém-criada não tem valor padrão), e bloqueá-lo deixava
-  // inertes todas as badges alternativas dela — como a tela só desenha o input
-  // da unidade ATIVA, o usuário teria de inventar um valor na unidade errada
-  // antes de poder escolher a certa.
-  //
-  // Destino COM histórico → o clique **ativaria** aquele número. Medido:
-  // `infra_pct = null`, canônico nulo, `infra_valor_fixo = 500000` → a Proforma
-  // vai de 0 para 500.000. Não troca.
-  if (valorAtual === null) return { trocar: valorDestino === null };
 
-  // ⚠️ **ZERO é canônico inequívoco, mesmo sem a grandeza de ligação.**
-  // `paraBase` recusa a conversão quando o link é 0 ou indefinido — ele testa a
-  // ligação ANTES de multiplicar. Mas `0 %` de qualquer VGV é R$ 0,00, e
-  // `0 R$/m²` sobre qualquer área é R$ 0,00: o valor do link não muda o produto
-  // quando o multiplicando é zero. Sem esta linha, uma infraestrutura legada de
-  // 0% ficava com a badge travada até existir VGV — bloqueio silencioso de um
-  // caso que não tem nada de ambíguo. Achado do revisor externo.
-  if (valorAtual === 0) return { trocar: true, canonico: 0 };
+  // (a) canônico derivável agora, do campo ativo.
+  //
+  // ZERO é derivável sem a grandeza de ligação, e por isso vem antes de
+  // `converterUnidade`: `paraBase` recusa quando o link é 0 ou indefinido —
+  // ele testa a ligação ANTES de multiplicar —, mas `0 %` de qualquer VGV é
+  // R$ 0,00 e `0 R$/m²` sobre qualquer área é R$ 0,00. O valor do link não
+  // muda o produto quando o multiplicando é zero.
+  const derivado = valorAtual === 0 ? 0
+    : valorAtual === null ? null
+    : converterUnidade(convAtual, { tipo: 'identidade' }, valorAtual, ctx);
+  if (derivado !== null) return { trocar: true, canonico: derivado };
 
-  const canonico = converterUnidade(convAtual, { tipo: 'identidade' }, valorAtual, ctx);
-  if (canonico === null) return { trocar: false };
-  return { trocar: true, canonico };
+  // (b) sem canônico possível: só é seguro se as duas colunas forem
+  // economicamente nulas. É o caso da linha NOVA — e bloqueá-lo deixava
+  // inertes todas as badges dela, porque a tela só desenha o input da unidade
+  // ativa e o usuário teria de inventar um valor na unidade errada para poder
+  // escolher a certa.
+  const nuloOuZero = (v: number | null): boolean => v === null || v === 0;
+  return { trocar: nuloOuZero(valorAtual) && nuloOuZero(valorDestino) };
 }
+
