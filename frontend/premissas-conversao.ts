@@ -340,14 +340,20 @@ export function trocaBadgePremissas(
   }
   // Linha legada: deriva o canônico do campo ativo, uma vez só.
   //
-  // ⚠️ Este `null` estreita o TIPO; ele não é a guarda de comportamento, e a
-  // distinção foi medida. Quem barra valor inválido é o `Number.isFinite` de
-  // `paraBase` (`frontend/premissas-conversao.ts:59`), então NaN, Infinity e o
-  // próprio nulo já sairiam barrados pela linha de baixo: apagar esta guarda
-  // deixa a suíte **verde**. Quem de fato decide é o `canonico === null` logo
-  // adiante. Escrever "guarda contra valor inválido" aqui seria a frase falsa
-  // que a armadilha 11 do CLAUDE.md descreve.
-  if (valorAtual === null) return { trocar: false };
+  // ⚠️ **LINHA VAZIA TROCA, e distinguir isso do legado é o ponto.**
+  //
+  // Sem canônico E sem valor na unidade ativa, não há nada representado — logo
+  // não há nada a corromper, que é a única coisa que a guarda existe para
+  // impedir. Bloquear aqui deixava **inertes todas as badges alternativas de
+  // uma linha nova** (o caso concreto: uma permuta física recém-criada, cujo
+  // `permuta_fisica_area_m2` não tem padrão): como a tela só renderiza o input
+  // da unidade ATIVA, o usuário não conseguia escolher "% área venda" para
+  // então preencher — teria de inventar um valor em m² primeiro. Achado do
+  // revisor externo, e era regressão introduzida por este próprio conserto.
+  //
+  // Trocar aqui é seguro e o motivo é verificável: com as duas colunas vazias,
+  // `proforma.ts` lê 0 antes e 0 depois.
+  if (valorAtual === null) return { trocar: true };
   const canonico = converterUnidade(convAtual, { tipo: 'identidade' }, valorAtual, ctx);
   if (canonico === null) return { trocar: false };
   return { trocar: true, canonico };

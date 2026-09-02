@@ -517,6 +517,26 @@ test('#570: a TELA usa `ctxConversaoPreliminar`, não monta o ctx à mão', () =
 // bloco das duas em `premissas-conversao.ts`.
 // ─────────────────────────────────────────────────────────────────────────
 
+/**
+ * Fonte sem comentários — de linha, de bloco e HTML.
+ *
+ * ⚠️ Sem isto, as asserções de fiação abaixo aceitam a linha **comentada**:
+ * `includes` acha o texto dentro de `// if (!decisao.trocar) return;`, a ordem
+ * dos índices se preserva, e `_set(cu.modoKey, …)` volta a executar sem guarda
+ * — restaurando exatamente a corrupção da #515. Achado do revisor externo.
+ *
+ * O `<!-- -->` entra porque é a forma nativa de comentar dentro de template do
+ * lit, e já foi o buraco de um helper igual em `tela-dashboard.test.ts`.
+ */
+function semComentarios(conteudo: string): string {
+  return conteudo
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((linha) => { const i = linha.indexOf('//'); return i === -1 ? linha : linha.slice(0, i); })
+    .join('\n');
+}
+
 const CONV_PCT_VGV = { tipo: 'pct', link: 'vgv' } as const;
 const CONV_IDENT = { tipo: 'identidade' } as const;
 
@@ -543,8 +563,33 @@ test('#515: com canônico JÁ persistido, a badge troca mesmo sem grandeza de li
   assert.equal(d.canonico, undefined, 'não regrava canônico que já existe');
 });
 
-test('#515: campo vazio na unidade ativa → não troca (não há o que representar)', () => {
-  assert.deepEqual(trocaBadgePremissas({ valorAtual: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }) }), { trocar: false });
+test('#515: linha VAZIA troca — não há nada representado, logo nada a corromper', () => {
+  // ⚠️ Este teste já afirmou o CONTRÁRIO, e estava errado. Bloquear a linha
+  // vazia deixava inertes todas as badges de uma linha nova (permuta física
+  // recém-criada não tem valor padrão), e como a tela só desenha o input da
+  // unidade ATIVA, o usuário não tinha como escolher outra unidade para então
+  // preencher. Com as duas colunas vazias a Proforma lê 0 antes e 0 depois:
+  // trocar é seguro. Achado do revisor externo.
+  assert.deepEqual(
+    trocaBadgePremissas({ valorAtual: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }) }),
+    { trocar: true },
+  );
+  // E vale também sem a grandeza de ligação — é o caso da linha nova num
+  // estudo ainda sem catálogo.
+  assert.deepEqual(
+    trocaBadgePremissas({ valorAtual: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }),
+    { trocar: true },
+  );
+});
+
+test('#515: o que continua BLOQUEADO é a linha com valor ativo NÃO conversível', () => {
+  // A distinção que o conserto acima preserva: vazio ≠ legado-com-valor. Só o
+  // segundo pode corromper, porque só ele tem número para a Proforma ler pela
+  // coluna errada.
+  assert.equal(
+    trocaBadgePremissas({ valorAtual: 30, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
+    false,
+  );
 });
 
 test('#515: valor não finito também não troca — mas quem barra é converterUnidade, não uma guarda daqui', () => {
@@ -632,7 +677,7 @@ test('#515 fiação: a TELA delega a decisão da badge, e o `_set` do modo é GU
   // deste método. Nenhum dos testes puros acima fica vermelho se a tela parar
   // de consultar a decisão, ou se trocar o modo antes de consultá-la. É a
   // classe de defeito nº 1 do CLAUDE.md, e este teste é a rede.
-  const fonte = readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8');
+  const fonte = semComentarios(readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'));
   assert.ok(
     fonte.includes('const decisao = trocaBadgePremissas('),
     '`_trocarUnidade` precisa consultar a função pura — senão os testes dela provam algo que a tela não usa',
@@ -692,7 +737,7 @@ test('#515: canônico DERIVADO zero é gravado — 0% de um VGV real é R$ 0,00,
 });
 
 test('#515 fiação: a tela grava o canônico ZERO — `if (decisao.canonico)` o descartaria', () => {
-  const fonte = readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8');
+  const fonte = semComentarios(readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'));
   assert.ok(
     fonte.includes('if (decisao.canonico !== undefined) this._set(cu.campoCanonico, decisao.canonico);'),
     'a tela precisa testar `!== undefined`, não truthiness — senão o canônico 0 é silenciosamente descartado',
