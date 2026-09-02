@@ -356,12 +356,12 @@ export function trocaBadgePremissas(
   // pare de acrescentar guarda e **inverta**.
   //
   // A invariante que a badge promete é uma frase só: **trocar de unidade não
-  // pode mudar o que a Proforma aplica** — nem agora, nem quando a grandeza de
-  // ligação mudar. Ela se sustenta em exatamente duas situações:
+  // pode mudar o que a Proforma aplica no momento da troca.** Ela se sustenta
+  // em exatamente duas situações:
   //
   //   (a) **existe canônico depois da troca** — persistido, ou derivado agora.
-  //       O canônico CONGELA o valor econômico: `proforma.ts` o prefere ao
-  //       legado, então a coluna que a badge escolhe deixa de importar.
+  //       O canônico é o que `proforma.ts` prefere ao legado, então a coluna
+  //       que a badge escolhe deixa de importar.
   //
   //   (b) **as duas colunas são economicamente nulas para QUALQUER ligação** —
   //       isto é, vazias ou zero. Zero vezes qualquer link é zero, e coluna
@@ -370,6 +370,22 @@ export function trocaBadgePremissas(
   //
   // Fora dessas duas, trocar deixa o valor econômico à mercê da coluna de
   // destino — e é aí que mora o defeito da #515, nas suas várias formas.
+  //
+  // ⚠️ **"No momento da troca" não é uma ressalva fraca — é o contrato da
+  // #259, e uma redação anterior deste bloco o exagerava.** Ela dizia "nem
+  // agora, nem quando a grandeza de ligação mudar", e isso é **falso** para o
+  // canônico DERIVADO: 30% de um VGV de R$ 10 mi vira canônico de R$ 3 mi, e
+  // se o catálogo depois levar o VGV a R$ 20 mi, a linha sem o clique aplicaria
+  // R$ 6 mi enquanto a linha com o clique segue em R$ 3 mi. Achado do revisor
+  // externo, e ele está certo sobre a frase.
+  //
+  // Mas o **comportamento** é o desejado, e é anterior a esta issue: derivar o
+  // canônico no primeiro clique já era o que `_trocarUnidade` fazia antes deste
+  // PR. É o desenho da #259 — *"fonte de verdade da quantidade econômica"* —,
+  // em que a badge deixa de ser relativa assim que o usuário fixa o valor.
+  // Quem quiser que a premissa continue seguindo o VGV simplesmente **não
+  // troca de unidade**. O que a #515 conserta é outra coisa: trocar sem
+  // estabelecer canônico nenhum, que faz o valor pular para a coluna de destino.
 
   // (a) canônico já persistido: a badge é pura apresentação daqui em diante.
   if (canonicoPersistido !== null && Number.isFinite(canonicoPersistido)) {

@@ -895,3 +895,30 @@ test('#515: canônico persistido NEGATIVO manda igual — sinal não é predicad
     { trocar: true },
   );
 });
+
+test('#515: o canônico derivado CONGELA a premissa — é a decisão da #259, não efeito colateral', () => {
+  // ⚠️ Este teste existe para que ninguém "conserte" o congelamento achando que
+  // é bug. O revisor externo apontou, com razão, que um canônico derivado de
+  // unidade relativa não acompanha o VGV depois: 30% de 10 mi vira R$ 3 mi, e
+  // se o VGV virar 20 mi a linha sem clique aplicaria 6 mi. Isso é o desenho —
+  // `campoCanonico` é a "fonte de verdade da quantidade econômica" (#259), e
+  // derivar no primeiro clique já era o comportamento ANTES da #515.
+  // Quem quer que a premissa siga o VGV não troca de unidade.
+  const d = trocaBadgePremissas({
+    valorAtual: 30, valorDestino: null, canonicoPersistido: null,
+    convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }),
+  });
+  assert.deepEqual(d, { trocar: true, canonico: 3_000_000 });
+
+  // O congelamento, medido no motor: com o canônico gravado, dobrar o VGV não
+  // move a infraestrutura; sem ele, move.
+  const comum = { tipo_empreendimento: 'loteamento', area_terreno: 100_000, infra_pct: 30, infra_modo: 'pct_vgv' };
+  const vgv10 = { produtos: [{ area_media_m2: 100, preco_venda_m2: 1_000, unidades: 100 }] };
+  const vgv20 = { produtos: [{ area_media_m2: 100, preco_venda_m2: 2_000, unidades: 100 }] };
+  const semCanonico10 = calcularProforma({ ...comum, ...vgv10, infra_valor_canonico: null } as never);
+  const semCanonico20 = calcularProforma({ ...comum, ...vgv20, infra_valor_canonico: null } as never);
+  const comCanonico20 = calcularProforma({ ...comum, ...vgv20, infra_valor_canonico: d.canonico } as never);
+
+  assert.ok(semCanonico20.infraestrutura > semCanonico10.infraestrutura, 'sem canônico a premissa segue o VGV');
+  assert.equal(comCanonico20.infraestrutura, semCanonico10.infraestrutura, 'com canônico ela fica congelada');
+});
