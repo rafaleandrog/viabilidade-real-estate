@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   distribuirLinha, reamostrarCurva, receitaMensalLinha,
   vendaBrutaContratadaMensal, descontoComercialMensal, vendaLiquidaContratadaMensal,
@@ -3333,4 +3334,112 @@ test('#446: esticar o horizonte NÃO move o resultado final desalavancado (#474)
   assert.notEqual(curto.prazo, longo.prazo, 'ancoragem: os horizontes têm de ser diferentes');
   const ultimo = (s: number[]) => s[s.length - 1];
   assert.equal(ultimo(longo.fluxoAcumulado), ultimo(curto.fluxoAcumulado));
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #512 — os quatro agregados escalares do `calcularFluxo` e o C7.
+//
+// As séries mensais sempre passaram por `round2`; estes quatro saíam com
+// precisão plena, contra o contrato "todo valor monetário resultado de fórmula
+// tem 2 casas decimais — na apresentação, na entrada e no motor".
+//
+// A fixture usa `33,33 m² × R$ 7.777,77` de propósito: área × preço é o
+// acumulador citado pela issue, e este par produz fração de centavo já na
+// primeira unidade. Não é caso de borda inventado — é o que qualquer tipologia
+// com metragem quebrada faz.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Casas decimais de um número, contadas na representação decimal. */
+function casas(v: number): number {
+  const s = String(v);
+  const i = s.indexOf('.');
+  if (i === -1) return 0;
+  // Notação científica (1e-7) não tem ponto útil: trata como "muitas casas".
+  if (s.includes('e') || s.includes('E')) return 99;
+  return s.length - i - 1;
+}
+
+const CFG_FRACIONARIO = (): FluxoConfig => ({
+  dataInicio: 'jan/2027', prazoMeses: 24, taxaDescontoAa: 12, areaTerreno: 0,
+  jurosTabelaAaEstudo: 0,
+  cronograma: [
+    { evento: 'lancamento', inicio_mes: 0, duracao_meses: 1 },
+    { evento: 'obra', inicio_mes: 1, duracao_meses: 12 },
+  ],
+  linhasReceita: [{
+    id: 1, nome: 'Vendas',
+    // 7 × 33,33 × 7.777,77 = 1.814.835,1887 — fração de centavo na origem.
+    tipologias: [{ id: 1, quantidade: 7, area_privativa_m2: 33.33, preco_m2: 7_777.77 }],
+    absorcao: { modo: 'personalizado', meses: [{ mes: 3, pct: 100 }] },
+    fluxo_pagamento: { componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }] },
+  }],
+  linhasCusto: [
+    { id: 1, grupo: 'diretos', categoria: 'Obra', orcamento_valor: 333_333.33, orcamento_unidade: 'rs', inicio_mes: 1, duracao_meses: 12 },
+  ],
+});
+
+test('#512 controle: a fixture PRODUZ fração de centavo na origem — senão o teste não mede nada', () => {
+  // Sem este controle, uma fixture que desse valor redondo faria o teste abaixo
+  // passar sem exercitar o arredondamento. É o mesmo erro de "medir a ponta
+  // errada" que o PR 661 pagou três vezes.
+  const bruto = 7 * 33.33 * 7_777.77;
+  assert.ok(casas(bruto) > 2, `a fixture precisa ter mais de 2 casas na origem, tem ${casas(bruto)}`);
+});
+
+test('#512: vgvTotal, vpl, vgvPermutaFisica e receitaBrutaVgv saem com no máximo 2 casas', () => {
+  const r = calcularFluxo(CFG_FRACIONARIO());
+  for (const campo of ['vgvTotal', 'vpl', 'vgvPermutaFisica', 'receitaBrutaVgv'] as const) {
+    const v = r[campo];
+    assert.equal(typeof v, 'number', `${campo} não é número`);
+    assert.ok(casas(v) <= 2, `${campo} saiu com ${casas(v)} casas: ${v}`);
+  }
+});
+
+test('#512: vgvVendavel — o ALIAS de receitaBrutaVgv — sai idêntico, não com outra casa', () => {
+  // Dois campos do mesmo retorno com o mesmo significado não podem discordar na
+  // segunda casa; seria pior que a divergência que a issue conserta.
+  const r = calcularFluxo(CFG_FRACIONARIO());
+  assert.equal(r.vgvVendavel, r.receitaBrutaVgv);
+  assert.ok(casas(r.vgvVendavel) <= 2);
+});
+
+test('#512: o valor não é só truncado — é o arredondamento correto do bruto', () => {
+  // Guarda contra um conserto que zerasse os campos ou os truncasse: o valor
+  // publicado tem de ser o bruto arredondado, com diferença abaixo de meio centavo.
+  const r = calcularFluxo(CFG_FRACIONARIO());
+  const vgvBruto = 7 * 33.33 * 7_777.77;
+  assert.ok(
+    Math.abs(r.vgvTotal - vgvBruto) < 0.005,
+    `vgvTotal ${r.vgvTotal} distante do bruto ${vgvBruto}`,
+  );
+  assert.ok(r.vgvTotal > 0, 'o conserto não pode ter zerado o campo');
+});
+
+/**
+ * #512 — a ORIGEM continua com precisão plena, e esta asserção é de FONTE, não
+ * de comportamento. O motivo é medido, não preguiça.
+ *
+ * ⚠️ **A primeira versão deste teste era comportamental e NÃO media nada.** Ela
+ * conferia que um custo em `pct_vgv` seguia o VGV bruto, com tolerância de
+ * R$ 0,01. Mutação aplicada — `round2` acrescentado ao acumulador de origem —
+ * e a suíte ficou **verde**: arredondar a origem move o VGV em menos de meio
+ * centavo, e 6% disso são R$ 0,0003, três ordens de grandeza abaixo da
+ * tolerância. Apertar a tolerância até detectar tornaria o teste refém de
+ * ruído de ponto flutuante.
+ *
+ * A conclusão honesta é que a propriedade **não é observável na fronteira
+ * pública** — é justamente por isso que a issue trata arredondar na origem como
+ * decisão de outra natureza ("muda o `vgvTotal` de estudos existentes e propaga
+ * para tudo que dele deriva"): o efeito é sub-centavo por operação e só aparece
+ * acumulado. O que É verificável, e o que de fato define o escopo desta issue,
+ * é que o acumulador de origem não passa por `round2`.
+ */
+const FONTE_MOTOR = readFileSync(new URL('./fluxo-caixa-motor.ts', import.meta.url), 'utf8');
+
+test('#512: o acumulador de ORIGEM do vgvTotal NÃO é arredondado — o escopo é a saída', () => {
+  assert.ok(
+    FONTE_MOTOR.includes('    vgvTotal: linhasReceita.reduce((s, l) => s + vgvLinha(l.tipologias), 0),'),
+    'o acumulador de `ctxCusto.vgvTotal` mudou de forma — se ganhou round2, isso é mudança de '
+    + 'comportamento de todo estudo existente, que a #512 declara FORA de escopo e é decisão do autor',
+  );
 });

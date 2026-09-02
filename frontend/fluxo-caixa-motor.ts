@@ -2747,17 +2747,41 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     prazo,
     meses: Array.from({ length: prazo }, (_, i) => rotuloMesRelativo(config.dataInicio, i)),
     receitaMensal, custoMensal, fluxoMensal, fluxoAcumulado,
-    vgvTotal: ctxCusto.vgvTotal,
-    vpl: vplFluxo(fluxoMensal, taxa),
+    // #512 — C7 na SAÍDA, e só na saída.
+    //
+    // As séries mensais já passam por `round2` a cada depósito; estes agregados
+    // escalares saíam com precisão plena, contra o contrato "todo valor
+    // monetário resultado de fórmula tem 2 casas decimais — na apresentação, na
+    // entrada e no motor". Não é caso de borda: `vgvTotal` acumula
+    // `usada × area_privativa_m2 × preco_m2` e o VPL divide por
+    // `(1 + tm)^(i+1)` — os dois produzem fração de centavo com facilidade.
+    //
+    // ⚠️ **Quantizado aqui, NÃO na origem, e a diferença é de escopo.**
+    // `ctxCusto.vgvTotal` continua com precisão plena e é o que alimenta os
+    // rateios internos (`receitaTotal`, `pct_receita`, os custos em `pct_vgv`):
+    // arredondar lá moveria o resultado de todo estudo existente, e isso é
+    // decisão do autor, não desta issue. É também o que o contrato manda —
+    // representações derivadas carregam precisão plena internamente e
+    // arredondam para publicar.
+    //
+    // Hoje o dano era contido por acidente, porque todo consumidor formata com
+    // `fmtR$`. Vira dano real no dia em que algo ler o campo direto: exportação,
+    // BI, uma rotina. É o mesmo formato de defeito da #442.
+    vgvTotal: round2(ctxCusto.vgvTotal),
+    vpl: round2(vplFluxo(fluxoMensal, taxa)),
     tir: tirFluxo(fluxoMensal),
     paybackMes: paybackMes >= 0 ? paybackMes : null,
     paybackData: paybackMes >= 0 ? mesRelativoCompleto(config.dataInicio, paybackMes) : null,
     exposicaoMaxima,
     mesExposicaoMaxima,
-    vgvPermutaFisica,
+    vgvPermutaFisica: round2(vgvPermutaFisica),
     permutaFinanceiraTotal,
-    receitaBrutaVgv,
-    vgvVendavel: receitaBrutaVgv,
+    receitaBrutaVgv: round2(receitaBrutaVgv),
+    // `vgvVendavel` é ALIAS de `receitaBrutaVgv` (mesmo valor, dois nomes por
+    // razões históricas). Quantizar um e não o outro faria dois campos do MESMO
+    // retorno discordarem na segunda casa — pior que a divergência que a #512
+    // conserta.
+    vgvVendavel: round2(receitaBrutaVgv),
     vendaBrutaContratada,
     descontoComercial,
     vendaLiquidaContratada,

@@ -393,23 +393,32 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
 | `frontend/tela-proforma.ts:70` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
-| `frontend/fluxo-caixa-motor.ts:2204-2212` — **agregados escalares** do `FluxoCalc` | plena | 🟡 **não quantizados** — ver a nota abaixo |
+| `frontend/fluxo-caixa-motor.ts:2770` — **agregados escalares** do `FluxoCalc` (`vgvTotal`, `vpl`, `vgvPermutaFisica`, `receitaBrutaVgv` e o alias `vgvVendavel`) | 2 | ✅ desde a #512 — quantizados na SAÍDA; a origem segue com precisão plena, ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
 | `frontend/exportar.ts:69` — `celulaProforma`, a coluna R$ da Proforma na tela, no CSV e no PDF | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado para função pura pela #567, e movida de `tela-proforma.ts` para cá em 2026-08-28, quando a exportação passou a usá-la (a tela a reexporta) |
 | `frontend/tela-fluxo-receitas.ts:451,452` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
 
-> 🟡 **O motor não é integralmente conforme ao C7, e marcar a linha inteira ✅ escondia isso.** As
-> **séries mensais** passam por `round2` a cada depósito. Mas quatro **agregados escalares** saem do
-> `calcularFluxo` com precisão plena: `vgvTotal` (vem direto de `ctxCusto.vgvTotal`, e o acumulador
-> é `usada × area_privativa_m2 × preco_m2` sem arredondar, `:85`), `vpl` (`vplFluxo` `:1594-1597` é
-> um `reduce` com divisão, sem `round2`), `vgvPermutaFisica` e `receitaBrutaVgv` (`:2050`, subtração
-> crua dos dois anteriores).
+> ✅ **O motor passou a ser conforme ao C7 também nos agregados escalares — #512.** As **séries
+> mensais** sempre passaram por `round2` a cada depósito. Os quatro agregados que saíam com precisão
+> plena hoje passam por `round2` no retorno, cada um no seu endereço:
+> `vgvTotal` (`frontend/fluxo-caixa-motor.ts:2770`),
+> `vpl` (`frontend/fluxo-caixa-motor.ts:2771`),
+> `vgvPermutaFisica` (`frontend/fluxo-caixa-motor.ts:2777`),
+> `receitaBrutaVgv` (`frontend/fluxo-caixa-motor.ts:2779`)
+> e o alias `vgvVendavel` (`frontend/fluxo-caixa-motor.ts:2784`), que carrega o mesmo valor de
+> `receitaBrutaVgv` e não podia discordar dele na segunda casa.
 >
-> Área × preço e desconto de VPL produzem fração de centavo com facilidade, então esses quatro
-> **podem** carregar mais de duas casas. Hoje o dano é contido porque quem os exibe formata com
-> `fmtR$`; vira dano real no dia em que alguém os consumir direto (export, BI, API). Quantizar é
-> mudança de motor e **não** cabe num PR de documentação — fica registrado aqui como divergência
-> conhecida, não como conformidade.
+> ⚠️ **A quantização é na SAÍDA, e a origem continua com precisão plena — de propósito.**
+> `ctxCusto.vgvTotal` alimenta os rateios internos (custos em `pct_vgv`, `pct_receita`,
+> `receitaTotal`); arredondar ali moveria o resultado de **todo estudo existente**, e isso é decisão
+> do autor, não da #512. É também o que o próprio contrato manda: representações derivadas carregam
+> precisão plena internamente e arredondam para publicar. O teste
+> `#512: a ORIGEM continua com precisão plena` é quem trava essa distinção — ele confere que um
+> custo em `pct_vgv` segue o VGV **bruto**, não o publicado.
+>
+> Antes da #512 o dano era contido **por acidente**: todo consumidor formatava com `fmtR$`. Viraria
+> dano real no dia em que algo lesse o campo direto — exportação, BI, uma rotina —, que é o mesmo
+> formato de defeito da #442.
 
 > ✅ **Resolvido pela #449 (2026-08-24).** A #492 fechou o primeiro ponto (`fmtNum(v, 2)` da
 > tabela de sensibilidade, `frontend/tela-proforma.ts:532` desde então); o problema de fundo — quem
