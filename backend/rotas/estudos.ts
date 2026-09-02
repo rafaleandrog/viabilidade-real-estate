@@ -12,7 +12,13 @@ import {
   payloadEstudoCriado,
   payloadStatusAlterado,
 } from '../eventos-viabilidade.js';
-import { gerarIdentificacao } from '../identificacao.js';
+import { gerarIdentificacao, montarNomeExibicao, siglaDoTipo } from '../identificacao.js';
+import {
+  gateTransicao,
+  nomeEstudoLimpo,
+  podeEditarEstudo,
+  LIMITE_NOME_ESTUDO,
+} from '../../frontend/estudo-status.js';
 import { duplicarDadosAvancado } from './avancado.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
 
@@ -122,7 +128,22 @@ export function percentualEstrito(v: unknown): number | null {
 
 export function montarPatchEstudo(
   body: Record<string, any>,
-  estudo: { nivel_analise?: string; status?: string },
+  estudo: {
+    nivel_analise?: string;
+    status?: string;
+    // #660: as partes que COMPÕEM `nome_exibicao`. Elas entram na assinatura
+    // porque a recomposição acontece AQUI, e não no handler: o comentário do
+    // topo desta função já registra que, enquanto a decisão morava inline,
+    // nenhum teste a alcançava. `nome_exibicao` derivado no handler teria
+    // exatamente esse destino.
+    tipo_empreendimento?: string;
+    uf?: string | null;
+    sequencia?: number | null;
+    // #660: o `nome` PERSISTIDO. Ele entra porque a recomposição dispara também
+    // quando só a UF ou só o tipo mudam — e nesses PATCHes o nome não vem no
+    // corpo. Sem ele, mudar a UF gravaria um nome de exibição SEM o nome.
+    nome?: string | null;
+  },
 ): { dados: Record<string, any> } | { http: number; codigo: string; mensagem: string } {
   const dados: Record<string, any> = {};
   for (const [k, v] of Object.entries(body ?? {})) {
@@ -152,6 +173,28 @@ export function montarPatchEstudo(
     // A tela barra em `erroJurosTabelaEstudo`, mas tela é feedback, não
     // fronteira: `PATCH /estudos/:id` é chamável direto, e qualquer tela futura
     // que reuse `atualizarEstudo` passa por aqui sem passar por lá.
+    // #660: `nome` deixou de ser escrito só na criação — o Painel de estudos
+    // agora o edita. `estudos.nome` é `obrigatorio: true` e `limite: 200` no
+    // `schema.json`, então nome vazio/em branco/longo demais não é "campo
+    // estranho numa tela": é INSERT que estoura no shell (500) ou linha gravada
+    // sem nome nenhum.
+    //
+    // Fail-closed pela armadilha 14 do CLAUDE.md — `nomeEstudoLimpo` aceita só o
+    // que É nome e recusa todo o resto, em vez de enumerar o que rejeitar. É o
+    // MESMO parser que a tela usa para desabilitar o botão Salvar, então tela e
+    // portão não podem divergir; e é aqui, não lá, que ele é fronteira.
+    if (k === 'nome') {
+      const limpo = nomeEstudoLimpo(v);
+      if (limpo === null) {
+        return {
+          http: 400,
+          codigo: 'NOME_INVALIDO',
+          mensagem: `nome deve ser um texto não vazio de até ${LIMITE_NOME_ESTUDO} caracteres`,
+        };
+      }
+      dados[k] = limpo;
+      continue;
+    }
     if (k === 'juros_tabela_aa_padrao' && v !== null && v !== undefined && v !== '') {
       const aa = percentualEstrito(v);
       // #585 (revisor externo, rodada 6): o teto é domínio tanto quanto o piso.
@@ -170,6 +213,56 @@ export function montarPatchEstudo(
   if (Object.keys(dados).length === 0) {
     return { http: 400, codigo: 'NENHUM_CAMPO', mensagem: 'Nenhum campo para atualizar' };
   }
+
+  // #660 — `nome_exibicao` é DERIVADO, e é ele que a tela mostra.
+  //
+  // A armadilha que esta issue esconde: o Painel exibe `nome_exibicao || nome`
+  // (`frontend/tela-dashboard.ts`), e `nome_exibicao` é montado UMA vez, na
+  // criação, por `gerarIdentificacao`. Gravar só o `nome` novo deixaria a tela
+  // exibindo o nome velho para sempre — o critério "recarregar a lista mostra o
+  // novo nome" falharia com o PATCH tendo respondido 200.
+  //
+  // `nome_exibicao` continua em CAMPOS_BLOQUEADOS_PATCH, e isso não é
+  // contradição: o cliente segue sem poder ESCREVER o campo (o laço acima
+  // descarta o que ele mandar); quem o escreve é o servidor, a partir das partes.
+  //
+  // ⚠️ `id_legivel` NÃO é recomposto de propósito. Ele é `unico: true` e é a
+  // identidade humana estável do estudo — recompô-lo poderia colidir com outro
+  // registro e quebraria toda referência externa já feita a ele. Renomear muda
+  // como o estudo se APRESENTA, não quem ele é.
+  //
+  // A `sequencia` usada é a que o estudo JÁ tem: `gerarIdentificacao` consulta o
+  // banco pela PRÓXIMA sequência e renumeraria o estudo se fosse chamada aqui.
+  //
+  // ⚠️ **Dispara quando QUALQUER parte componente muda, não só o `nome`.** A
+  // primeira versão condicionava a recomposição a `dados.nome !== undefined`, e
+  // isso reproduzia o próprio defeito da issue pelos outros dois eixos: um PATCH
+  // que mudasse só a UF, ou só o `tipo_empreendimento` (editável em rascunho),
+  // gravava a parte nova e deixava o `nome_exibicao` com a antiga — a tela
+  // exibindo o rótulo velho para sempre, que é exatamente o que a #660 conserta.
+  //
+  // Cada parte vem do CORPO quando ele a traz, e do registro persistido quando
+  // não. A tela de Premissas manda o registro inteiro, então os três chegam
+  // juntos por lá; mas o PATCH é chamável direto, com qualquer subconjunto.
+  const parteDoNomeMudou = dados.nome !== undefined
+    || dados.uf !== undefined
+    || dados.tipo_empreendimento !== undefined;
+  const tipoEfetivo = dados.tipo_empreendimento !== undefined
+    ? dados.tipo_empreendimento
+    : estudo?.tipo_empreendimento;
+  const nomeEfetivo = dados.nome !== undefined ? dados.nome : estudo?.nome;
+  // Sem tipo ou sem nome não há o que compor: recompor aqui produziria um rótulo
+  // pior que o gravado. `siglaDoTipo` faz `slice` — tipo não-string lançaria.
+  if (parteDoNomeMudou && typeof tipoEfetivo === 'string' && tipoEfetivo !== ''
+      && typeof nomeEfetivo === 'string' && nomeEfetivo.trim() !== '') {
+    dados.nome_exibicao = montarNomeExibicao({
+      sigla: siglaDoTipo(tipoEfetivo),
+      nome: nomeEfetivo,
+      uf: dados.uf !== undefined ? dados.uf : estudo?.uf,
+      sequencia: estudo?.sequencia,
+    });
+  }
+
   return { dados };
 }
 
@@ -510,16 +603,28 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
 
     const perm = await resolverPermissaoEstudo(req, estudoId);
     const podeAprovar = perm.ehAprovador || perm.ehAdminApp;
-    const podeEditor = perm.ehEditor || podeAprovar;
 
     // Aprovado/Reprovado/Arquivado: só aprovador edita. Demais status: editor+.
-    const travado = estudo.status === 'aprovado' || estudo.status === 'reprovado' || estudo.status === 'arquivado';
-    if (travado ? !podeAprovar : !podeEditor) {
+    //
+    // #660: a regra saiu daqui para `frontend/estudo-status.ts` — sem mudar,
+    // conferido pela tabela-verdade de `podeEditarEstudo` — porque o botão de
+    // editar o nome no Painel precisa da MESMA resposta para saber se aparece.
+    // Admin de app entra como `aprovador`, que é exatamente o que a listagem
+    // manda para a tela em `_funcao`.
+    const funcaoEfetiva = podeAprovar ? 'aprovador' : perm.ehEditor ? 'editor' : 'leitor';
+    if (!podeEditarEstudo(String(estudo.status), funcaoEfetiva)) {
       erro(res, 403, 'SEM_PERMISSAO', 'Sem permissão para editar este estudo');
       return;
     }
 
-    const decisao = montarPatchEstudo(req.body, estudo);
+    const decisao = montarPatchEstudo(req.body, {
+      nivel_analise: estudo.nivel_analise as string | undefined,
+      status: estudo.status as string | undefined,
+      tipo_empreendimento: estudo.tipo_empreendimento as string | undefined,
+      uf: estudo.uf as string | null | undefined,
+      sequencia: estudo.sequencia as number | null | undefined,
+      nome: estudo.nome as string | null | undefined,
+    });
     if ('codigo' in decisao) { erro(res, decisao.http, decisao.codigo, decisao.mensagem); return; }
     const dados = decisao.dados;
 
@@ -629,14 +734,18 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
 // POST /estudos/:id/status — transição validada
 // ---------------------------------------------------------------
 // Retorna o gate necessário ('editor' | 'aprovador') ou null se transição inválida.
-export function gateTransicao(de: string, para: string): 'editor' | 'aprovador' | null {
-  if (de === para) return null;
-  if (de === 'rascunho' && para === 'em_analise') return 'editor';
-  if (de === 'em_analise' && (para === 'aprovado' || para === 'reprovado' || para === 'rascunho')) return 'aprovador';
-  if (de === 'arquivado' && para === 'rascunho') return 'aprovador'; // reabrir
-  if (para === 'arquivado' && de !== 'aprovado' && de !== 'arquivado') return 'aprovador';
-  return null;
-}
+//
+// ⚠️ **A tabela saiu daqui e foi para `frontend/estudo-status.ts`** (#659), sem
+// mudar uma linha da regra. Motivo: a tela deixou de ter um `urbi-select` com os
+// cinco status e passou a desenhar um botão POR TRANSIÇÃO VÁLIDA — e para isso
+// ela precisa saber quais são as válidas. Copiar a tabela para lá seria a
+// "segunda fonte de verdade" que o comentário de `_renderStatus` avisava; um
+// import da mesma função não é. Este handler continua sendo o portão: ele
+// reavalia gate e alçada, e recusa igual, venha o pedido da tela ou de um curl.
+//
+// Continua exportado daqui porque é assim que `estudos.test.ts` o alcança, e
+// porque o gate é conceito de rota tanto quanto de tela.
+export { gateTransicao };
 
 rotasEstudos.post('/estudos/:id/status', async (req: Request, res: Response) => {
   try {

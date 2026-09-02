@@ -4,6 +4,129 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## A linha do Painel de estudos: Status vira badge, nome vira editável — #659 + #660 (2026-09-02)
+
+Dois pedidos do autor sobre a **mesma linha** da mesma tela, e é por isso que vieram no mesmo PR:
+separá-los faria dois PRs colidirem na coluna `acoes` do `_colunas()`.
+
+**#659** — o Status era um `urbi-select` com os cinco status para qualquer não-leitor. O usuário
+podia escolher qualquer um e descobria o que era proibido **tomando `422 TRANSICAO_INVALIDA`**.
+Agora é badge colorida para toda função, e as transições são botões dedicados, um por transição
+**válida**, filtrados pela alçada.
+
+**#660** — não havia como renomear um estudo depois de criado.
+
+### O que só apareceu ao ler o backend, e teria feito a #660 nascer quebrada
+
+`PATCH /estudos/:id` já aceitava `nome` (ele nunca esteve em `CAMPOS_BLOQUEADOS_PATCH`), então a
+leitura preguiçosa é *"é só frontend"*. **Não é.** A tela mostra `nome_exibicao || nome`, e
+`nome_exibicao` — `"INC - Pátio Urbitá - DF - 002"` — é montado **uma vez, na criação**, por
+`gerarIdentificacao`. Gravar só o `nome` novo devolveria **200 com a tela exibindo o nome velho para
+sempre**: o critério de aceite (*"recarregar a lista mostra o novo nome"*) reprovado com o servidor
+dizendo que deu certo.
+
+Conserto: `montarPatchEstudo` recompõe `nome_exibicao` das partes. `nome_exibicao` **continua**
+bloqueado para o cliente — quem o escreve é o servidor. `id_legivel` **não** é recomposto: é único e
+é a identidade estável; renomear muda como o estudo se apresenta, não quem ele é. E a `sequencia`
+usada é a que o estudo já tem — chamar `gerarIdentificacao` aqui **renumeraria** o estudo, porque ela
+consulta o banco pela *próxima*.
+
+A recomposição mora em `montarPatchEstudo`, e não no handler, pelo motivo que o comentário daquela
+função já registrava: enquanto a decisão morava inline, **nenhum teste a alcançava**.
+
+### A segunda fonte de verdade que a #659 quase criou
+
+O comentário de `_renderStatus` avisava, com todas as letras, que *"replicar a tabela de transições
+aqui criaria uma segunda fonte de verdade"*. Mas botão por transição válida **exige** que a tela
+saiba quais são as válidas. A saída não foi copiar a tabela — foi **compartilhá-la**:
+`frontend/estudo-status.ts` tem `gateTransicao`, e `backend/rotas/estudos.ts` passou a importá-la e
+reexportá-la, sem mudar uma linha da regra. A direção do import já era essa no repo
+(`backend/apelo-comercial.ts` importa `../frontend/proforma.js`).
+
+O backend continua sendo o **portão**: ele reavalia gate e alçada a cada chamada, venha o pedido da
+tela ou de um `curl`.
+
+### As mutações, porque teste verde não prova fiação
+
+Regra da casa: apague a chamada e rode a suíte. Seis mutações, todas com o controle verde antes:
+
+| Mutação | Resultado |
+|---|---|
+| `acoesTransicao` sai do componente | **8 falhas** |
+| botão de editar sem `podeEditarEstudo` | **1 falha** |
+| recomposição de `nome_exibicao` desligada | **8 falhas** |
+| validação de `nome` desligada | **2 falhas** |
+| UF lida só do registro, não do corpo | **1 falha** |
+| a linha de apoio some do modal | **2 falhas** (caso de render) |
+
+A terceira é a que importa mais: **antes de os testes de backend existirem, essa mesma mutação
+deixava os 35 testes da rota verdes.** Era o buraco exato da issue.
+
+⚠️ **E ainda assim esta bateria era insuficiente, o que só a revisão mostrou:** as seis mutações
+acima são todas dentro de `montarPatchEstudo` e do template — a função que eu tinha acabado de
+escrever. Outras seis, no **call site** (o handler) e na forma dos bindings, sobreviviam. Ver a
+subseção seguinte.
+
+E um erro meu que o próprio método pegou: o primeiro teste de fiação ancorava o fim da fatia em
+`'private _mudarStatus'`, mas o método é `private async _mudarStatus` — `indexOf` devolveu `-1`, a
+fatia virou "até o fim do arquivo" e o teste passou a medir o componente inteiro, onde os
+`urbi-select` **dos filtros** vivem. Fatia que erra o fim não acusa nada; hoje ela fecha no próximo
+membro da classe, achado pela indentação.
+
+### A revisão achou seis defeitos reais, e o padrão entre eles é UM só
+
+Codex (2 P2) mais oito lentes nativas. Nenhum achado falso, e a leitura que os une: **eu pus o
+fail-closed no campo de ENTRADA (`nome`) e deixei o campo de SAÍDA (`nome_exibicao`) sem guarda
+nenhuma** — armadilha 14 pelo avesso, fechar uma porta e abrir a irmã.
+
+| Defeito | Como aparecia |
+|---|---|
+| `nome` de 200 compõe rótulo de **217**, contra coluna de 200 | o 500 que o parser existe para evitar, um campo adiante — e o meu teste exercitava exatamente esse valor **sem aferir o derivado** |
+| sigla composta com o tipo **persistido** | `tipo_empreendimento` é editável em Rascunho; eu li a UF do corpo e o tipo não |
+| `uf` não-string → `TypeError` → 500 | `(v ?? '').trim()` só cobre `null`/`undefined` |
+| PATCH que muda só `uf`/tipo deixa o rótulo velho | o defeito da issue pelos outros dois eixos |
+| duas frases citando o caso de render `painel-acoes-linha` | **ele nunca existiu** — eu o planejei, descobri que `urbi-tabela` não é mensurável, renomeei o caso e deixei as duas frases |
+| seis mutantes sobrevivendo | entre eles: **apagar a checagem de alçada do PATCH**, e **matar a recomposição na rota real** |
+
+**As duas lições, e nenhuma é "teste mais".**
+
+**1 · Eu mutei a função pura e não o CALL SITE.** Minhas seis mutações da primeira rodada mataram o
+que eu tinha acabado de escrever em `montarPatchEstudo`. As que sobreviveram eram todas do
+**handler** — a alçada e as partes que ele passa. É a lição de 2026-08-24 repetida: *medição
+verdadeira sobre a pergunta errada é indistinguível de verificação boa*. A defesa agora é `FONTE_ROTA`,
+o mesmo idioma de fiação já usado no frontend.
+
+**2 · A frase falsa sobrevive à validação inteira, e nenhuma etapa a derruba.** `painel-acoes-linha`
+atravessou typecheck, 1012 testes, build e render em verde, porque nada lê prosa — e o caso de render
+que EXISTE diz literalmente o oposto, no mesmo diff. É a armadilha 11, e o custo dela é que a próxima
+sessão lê "a célula é medida" e não vai medir.
+
+**3 · `semComentarios` não removia `<!-- -->`,** que é a forma nativa de comentar dentro de template
+do lit. Ou seja: o helper que sustenta TODOS os testes de fiação desta tela tinha um buraco exatamente
+na sintaxe que alguém usaria para desligar uma chamada. Medido: a mesma mutação com `/* */` ficava
+vermelha; com `<!-- -->`, verde.
+
+### O que este ambiente NÃO mediu, e quem confirma
+
+- **A coluna de ações da linha não foi medida em DOM.** Ela vive dentro de `urbi-tabela`, que recebe
+  `colunas`/`linhas` por **propriedade**: o stub gerado do espelho não desenha o conteúdo da tabela,
+  então um caso de render pedindo a fila de botões mediria o vazio e voltaria **"limpo"** — a mesma
+  limitação já declarada em `funding-abas.ts`. A linha passou de 2 para **até 7** botões; o
+  `flex-wrap` está lá como defesa, mas **quem confirma a geometria é o autor, na instância
+  intermediária (Pinguim)**. O caso `painel-editar-nome` mede o que É mensurável: o modal novo.
+- **Typecheck de backend não roda aqui** (SDK 401, `dist/index.d.ts` ausente). O que **rodou** foram
+  os **testes de lógica pura** da rota, com `express` linkado do store: 35 → **49**, verdes. "Não deu
+  para rodar" não é "passou", e o typecheck do backend continua sendo do autor.
+- **Camada de contratos: NÃO EXECUTADA** — sem o bundle do SDK, não há como confirmar props de
+  primitivo além do espelho `docs/ui-urbiverso/`. Todas as usadas aqui existem lá
+  (`guard-props-urbi.mjs` verde).
+
+Medido nesta sessão: `validar-frontend.sh` verde com **1012** testes de frontend e **74** casos de
+render; `backend/rotas/estudos.test.ts` com **49**. Nenhuma migração, nenhuma coluna nova — a
+`versao` **não** bumpa.
+
+---
+
 ## O Grupo de receita nasce no formato canônico — #657 + #585 (2026-08-31)
 
 Reenquadramento do autor, e ele corrigiu o meu. Eu tratava o buraco da #585 como "o caso da linha
