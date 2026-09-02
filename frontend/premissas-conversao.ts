@@ -354,6 +354,16 @@ export function trocaBadgePremissas(
   // Trocar aqui é seguro e o motivo é verificável: com as duas colunas vazias,
   // `proforma.ts` lê 0 antes e 0 depois.
   if (valorAtual === null) return { trocar: true };
+
+  // ⚠️ **ZERO é canônico inequívoco, mesmo sem a grandeza de ligação.**
+  // `paraBase` recusa a conversão quando o link é 0 ou indefinido — ele testa a
+  // ligação ANTES de multiplicar. Mas `0 %` de qualquer VGV é R$ 0,00, e
+  // `0 R$/m²` sobre qualquer área é R$ 0,00: o valor do link não muda o produto
+  // quando o multiplicando é zero. Sem esta linha, uma infraestrutura legada de
+  // 0% ficava com a badge travada até existir VGV — bloqueio silencioso de um
+  // caso que não tem nada de ambíguo. Achado do revisor externo.
+  if (valorAtual === 0) return { trocar: true, canonico: 0 };
+
   const canonico = converterUnidade(convAtual, { tipo: 'identidade' }, valorAtual, ctx);
   if (canonico === null) return { trocar: false };
   return { trocar: true, canonico };

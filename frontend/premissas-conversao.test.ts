@@ -493,7 +493,7 @@ test('#570 ctxConversaoPreliminar: as duas bases de área vêm de `areaBasePermu
 });
 
 test('#570: a TELA usa `ctxConversaoPreliminar`, não monta o ctx à mão', () => {
-  const fonte = readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8');
+  const fonte = semComentarios(readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'));
   assert.ok(fonte.includes('return ctxConversaoPreliminar(calcularProforma('),
     '`_ctxConversao` de tela-premissas.ts precisa delegar para a função pura');
   // A mutação que este teste existe para pegar: voltar a montar o objeto
@@ -754,5 +754,32 @@ test('#515: a entrada é por OBJETO — trocar dois `number | null` posicionais 
   assert.ok(
     fonte.includes('{ valorAtual, canonicoPersistido, convAtual, ctx }: EntradaTrocaBadge'),
     'a assinatura voltou a ser posicional — dois `number | null` seguidos são intercambiáveis para o compilador',
+  );
+});
+
+test('#515: valor ativo ZERO troca mesmo sem grandeza de ligação — 0% de qualquer VGV é R$ 0,00', () => {
+  // `paraBase` recusa quando o link é 0, porque testa a ligação antes de
+  // multiplicar. Mas com multiplicando zero o link não muda o produto. Sem
+  // este caso, uma infraestrutura legada de 0% ficava travada até existir VGV.
+  const d = trocaBadgePremissas({
+    valorAtual: 0, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }),
+  });
+  assert.deepEqual(d, { trocar: true, canonico: 0 });
+
+  // Vale para as outras naturezas de conversão, pelo mesmo argumento.
+  const porArea0 = { tipo: 'por_area', link: 'areaVendavel' } as const;
+  assert.deepEqual(
+    trocaBadgePremissas({ valorAtual: 0, canonicoPersistido: null, convAtual: porArea0, ctx: ctx({ areaVendavel: 0 }) }),
+    { trocar: true, canonico: 0 },
+  );
+});
+
+test('#515: e o valor ativo NÃO zero sem ligação continua bloqueado — a distinção é essa', () => {
+  // Controle do teste acima: se o conserto do zero virasse "sempre troca", esta
+  // asserção reprova. É a fronteira exata entre "canônico inequívoco" e
+  // "derivação genuinamente impossível".
+  assert.equal(
+    trocaBadgePremissas({ valorAtual: 30, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
+    false,
   );
 });
