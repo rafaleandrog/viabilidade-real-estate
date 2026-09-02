@@ -31,7 +31,7 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 //   2. os indicadores de PROJETO já são desalavancados no app, e não por
 //      convenção — por construção: `tir`, `vpl`, `paybackMes` e
 //      `exposicaoMaxima` nascem dentro de `calcularFluxo`
-//      (`fluxo-caixa-motor.ts:2742-2746`), a partir de `fluxoMensal` /
+//      (`fluxo-caixa-motor.ts:2775`), a partir de `fluxoMensal` /
 //      `fluxoAcumulado`, e essa função nunca vê funding — ele é costurado
 //      depois, na tela. Proforma alavancada no meio de indicadores
 //      desalavancados produz uma margem que nenhum outro número reconcilia;
@@ -364,7 +364,13 @@ export function proformaAvancado(
   // e `K36` (nota de denominador gerada, também condicional à permuta física).
   // Com física E financeira zeradas as três linhas coincidem em valor e %, e
   // nem o rótulo nem a nota aparecem — degenerescência do critério de aceite 4.
-  const temPermutaFisica = Math.abs(c.vgvPermutaFisica) > 0.005;
+  // ⚠️ #512: o limiar de meio centavo ficou VACUOSO quando o motor passou a
+  // publicar `vgvPermutaFisica` já em 2 casas — o valor só pode ser `0` ou
+  // ≥ `0,01`, nunca no meio. Mantido como `> 0` explícito, que é o que a
+  // pergunta sempre foi ("há permuta física?"); manter o `0.005` faria a frase
+  // prometer uma tolerância que não existe mais, e frase falsa é pior que a
+  // ausência dela.
+  const temPermutaFisica = c.vgvPermutaFisica !== 0;
 
   linhas.push({ nome: '= Resultado', valor: resultado, nivel: 0, tipo: 'resultado', pctOverride: pctResultado });
   linhas.push({

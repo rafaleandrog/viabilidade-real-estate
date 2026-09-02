@@ -595,7 +595,11 @@ export function tabelaFluxo(
   // `Fluxo de Caixa Acumulado`) e o VPL de hoje (`c.vpl`), que é o contrato de
   // "renderiza exatamente como antes" declarado no cabeçalho desta função.
   const vplLivre = c.vpl;
-  const vplAlavancado = c.vpl + (funding?.vplLiquido ?? 0);
+  // #512 — soma de dois valores já publicados é, ela mesma, valor publicado:
+  // o C7 vale para ela. Sem o `round2` a soma de duas parcelas de 2 casas pode
+  // reintroduzir fração (ruído binário de ponto flutuante), e este é o número
+  // que a tela e o relatório mostram. Achado do revisor externo no PR da #512.
+  const vplAlavancado = Math.round((c.vpl + (funding?.vplLiquido ?? 0)) * 100) / 100;
   const fluxoMensalExib = funding?.fluxoMensal ?? c.fluxoMensal;
   const fluxoAcumuladoExib = funding?.fluxoAcumulado ?? c.fluxoAcumulado;
   const divisoria = html`<tr class="divisoria"><td class="c1"></td><td class="c2"></td><td class="c3"></td><td class="c4"></td><td class="c5"></td>${c.meses.map(() => html`<td></td>`)}</tr>`;

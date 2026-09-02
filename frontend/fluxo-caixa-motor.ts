@@ -30,6 +30,16 @@ const n = (v: any): number => Number(v) || 0;
 const round2 = (v: number): number => Math.round(v * 100) / 100;
 
 /**
+ * #512 — mata o ZERO NEGATIVO que `round2` produz para valor pequeno e negativo.
+ *
+ * `Math.round(-0.003 * 100) / 100` é `-0`. Ele não é inofensivo: `fmtR$(-0)`
+ * imprime **"-R$ 0,00"**, e `-0 >= 0` é `true`, então um limiar de sinal
+ * (`c.vpl >= 0 ? 'sucesso' : 'erro'`, `frontend/fluxo-tabela.ts:309`) muda de
+ * ramo. Publicar `0` em vez de `-0` tira as duas arestas de uma vez.
+ */
+const semZeroNegativo = (v: number): number => (v === 0 ? 0 : v);
+
+/**
  * #456: percentual de uma grandeza monetária sobre a Receita Bruta
  * (`receitaBruta`, grandeza 6 da taxonomia #229) — o divisor que os três KPIs
  * novos usam (juros/Receita Bruta, carteira máxima/VGV, exposição máxima/VGV).
@@ -2674,6 +2684,22 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   const vgvPermutaFisica = usaFonteNovaPermuta ? reservasPermuta.vgv : 0;
   const receitaBrutaVgv = ctxCusto.vgvTotal - vgvPermutaFisica;
 
+  // #512 — os valores PUBLICADOS, em 2 casas, com a identidade preservada.
+  //
+  // ⚠️ **Arredondar os três de forma independente QUEBRA
+  // `vgvVendavel = vgvTotal − vgvPermutaFisica` por um centavo** — achado do
+  // revisor externo, com contraexemplo: 50 unidades de 10,01 m² a R$ 1.000,01/m²
+  // com uma permutada publicam `500505,01`, `10010,10` e `490494,90`, mas os
+  // dois primeiros subtraem para `490494,91`. O card do Fluxo mostra a
+  // reconciliação, então a diferença é visível.
+  //
+  // Por isso o terceiro é DERIVADO dos dois primeiros já publicados: a
+  // subtração de dois valores de 2 casas é exata em 2 casas, e a identidade
+  // fecha por construção em vez de fechar por sorte.
+  const vgvTotalPub = semZeroNegativo(round2(ctxCusto.vgvTotal));
+  const vgvPermutaFisicaPub = semZeroNegativo(round2(vgvPermutaFisica));
+  const receitaBrutaVgvPub = semZeroNegativo(round2(vgvTotalPub - vgvPermutaFisicaPub));
+
   // #283: séries econômicas agregadas. Apenas linhas com `componentes`
   // produzem juros/carteira/repasse novos; as legadas continuam com principal
   // igual ao recebimento bruto e zeros nas séries opt-in.
@@ -2747,17 +2773,46 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
     prazo,
     meses: Array.from({ length: prazo }, (_, i) => rotuloMesRelativo(config.dataInicio, i)),
     receitaMensal, custoMensal, fluxoMensal, fluxoAcumulado,
-    vgvTotal: ctxCusto.vgvTotal,
-    vpl: vplFluxo(fluxoMensal, taxa),
+    // #512 — C7 na SAÍDA, e só na saída.
+    //
+    // As séries mensais deste retorno já passam por `round2` a cada depósito;
+    // estes agregados escalares saíam com precisão plena, contra o contrato
+    // "todo valor monetário resultado de fórmula tem 2 casas decimais — na
+    // apresentação, na entrada e no motor". Não é caso de borda: `vgvTotal`
+    // acumula `usada × area_privativa_m2 × preco_m2` e o VPL divide por
+    // `(1 + tm)^(i+1)` — os dois produzem fração de centavo com facilidade.
+    //
+    // ⚠️ **Quantizado aqui, NÃO na origem, e a diferença é de escopo.**
+    // `ctxCusto.vgvTotal` continua com precisão plena, e é ele que alimenta o
+    // rateio dos custos em `pct_vgv` (`resolverCustoTotal`). Arredondar lá
+    // moveria o resultado de todo estudo existente, e isso é decisão do autor,
+    // não desta issue — é também o que o contrato manda, porque representações
+    // derivadas carregam precisão plena internamente e arredondam para publicar.
+    //
+    // (Uma versão anterior deste comentário dizia que a origem alimenta também
+    // `receitaTotal` e `pct_receita`. **É falso, e foi medido:**
+    // `ctxCusto.receitaTotal` vem do VGV VENDÁVEL por linha
+    // (`receitaLiquidaLinha(vgvVendavelLinhaMotor(...))`), não de
+    // `ctxCusto.vgvTotal`. Só `pct_vgv` o consome.)
+    //
+    // Hoje o dano era contido por acidente, porque todo consumidor formata com
+    // `fmtR$`. Vira dano real no dia em que algo ler o campo direto: exportação,
+    // BI, uma rotina. É o mesmo formato de defeito da #442.
+    vgvTotal: vgvTotalPub,
+    vpl: semZeroNegativo(round2(vplFluxo(fluxoMensal, taxa))),
     tir: tirFluxo(fluxoMensal),
     paybackMes: paybackMes >= 0 ? paybackMes : null,
     paybackData: paybackMes >= 0 ? mesRelativoCompleto(config.dataInicio, paybackMes) : null,
     exposicaoMaxima,
     mesExposicaoMaxima,
-    vgvPermutaFisica,
+    vgvPermutaFisica: vgvPermutaFisicaPub,
     permutaFinanceiraTotal,
-    receitaBrutaVgv,
-    vgvVendavel: receitaBrutaVgv,
+    receitaBrutaVgv: receitaBrutaVgvPub,
+    // `vgvVendavel` é ALIAS de `receitaBrutaVgv` (mesmo valor, dois nomes por
+    // razões históricas). Os dois saem da MESMA constante, e não de duas
+    // chamadas iguais de `round2`: chamadas gêmeas dessincronizam em silêncio no
+    // dia em que alguém editar uma só.
+    vgvVendavel: receitaBrutaVgvPub,
     vendaBrutaContratada,
     descontoComercial,
     vendaLiquidaContratada,
