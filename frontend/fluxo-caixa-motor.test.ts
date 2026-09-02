@@ -3368,7 +3368,7 @@ const CFG_FRACIONARIO = (): FluxoConfig => ({
   ],
   linhasReceita: [{
     id: 1, nome: 'Vendas',
-    // 7 × 33,33 × 7.777,77 = 1.814.835,1887 — fração de centavo na origem.
+    // 7 × 33,33 × 7.777,77 = 1.814.631,5187 — fração de centavo na origem.
     tipologias: [{ id: 1, quantidade: 7, area_privativa_m2: 33.33, preco_m2: 7_777.77 }],
     absorcao: { modo: 'personalizado', meses: [{ mes: 3, pct: 100 }] },
     fluxo_pagamento: { componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }] },
@@ -3384,6 +3384,10 @@ test('#512 controle: a fixture PRODUZ fração de centavo na origem — senão o
   // errada" que o PR 661 pagou três vezes.
   const bruto = 7 * 33.33 * 7_777.77;
   assert.ok(casas(bruto) > 2, `a fixture precisa ter mais de 2 casas na origem, tem ${casas(bruto)}`);
+  // O número escrito no comentário da fixture: conferido aqui, não de cabeça.
+  // A primeira redação dizia 1.814.835,1887, que está errado — aritmética
+  // mental num artefato versionado é a armadilha 13 do CLAUDE.md.
+  assert.ok(Math.abs(bruto - 1_814_631.5187) < 0.001, `bruto medido: ${bruto}`);
 });
 
 test('#512: vgvTotal, vpl, vgvPermutaFisica e receitaBrutaVgv saem com no máximo 2 casas', () => {
@@ -3416,30 +3420,136 @@ test('#512: o valor não é só truncado — é o arredondamento correto do brut
 });
 
 /**
- * #512 — a ORIGEM continua com precisão plena, e esta asserção é de FONTE, não
- * de comportamento. O motivo é medido, não preguiça.
+ * #512 — a ORIGEM continua com precisão plena, e isto É observável.
  *
- * ⚠️ **A primeira versão deste teste era comportamental e NÃO media nada.** Ela
- * conferia que um custo em `pct_vgv` seguia o VGV bruto, com tolerância de
- * R$ 0,01. Mutação aplicada — `round2` acrescentado ao acumulador de origem —
- * e a suíte ficou **verde**: arredondar a origem move o VGV em menos de meio
- * centavo, e 6% disso são R$ 0,0003, três ordens de grandeza abaixo da
- * tolerância. Apertar a tolerância até detectar tornaria o teste refém de
- * ruído de ponto flutuante.
+ * ⚠️ **Eu afirmei que não era, e estava errado — o revisor externo mostrou como.**
+ * A minha primeira tentativa foi comportamental com tolerância de R$ 0,01, e a
+ * mutação passava verde: arredondar a origem move o VGV em menos de meio
+ * centavo, e 6% disso são R$ 0,0003. Concluí daí que a propriedade não era
+ * observável na fronteira pública, e troquei por uma asserção de texto-fonte —
+ * que quebra em refactor inocente e não mede comportamento nenhum.
  *
- * A conclusão honesta é que a propriedade **não é observável na fronteira
- * pública** — é justamente por isso que a issue trata arredondar na origem como
- * decisão de outra natureza ("muda o `vgvTotal` de estudos existentes e propaga
- * para tudo que dele deriva"): o efeito é sub-centavo por operação e só aparece
- * acumulado. O que É verificável, e o que de fato define o escopo desta issue,
- * é que o acumulador de origem não passa por `round2`.
+ * A conclusão era falsa. Basta escolher a fixture de modo que o custo derivado
+ * caia **nos dois lados de uma fronteira de centavo**: com 77 unidades de
+ * 10,01 m² a R$ 1.000,02/m², o VGV bruto é 770.785,4154 e 6% dele arredondam
+ * para **46.247,12**; se o VGV fosse arredondado ANTES (770.785,42), os mesmos
+ * 6% arredondam para **46.247,13**. Um centavo inteiro de diferença, medido —
+ * não uma tolerância espremida contra ruído de ponto flutuante.
+ *
+ * A lição, e ela é a mesma do PR anterior pelo avesso: "não consegui medir" não
+ * é "não é mensurável". É quase sempre a fixture que está no lugar errado.
  */
-const FONTE_MOTOR = readFileSync(new URL('./fluxo-caixa-motor.ts', import.meta.url), 'utf8');
+test('#512: o custo em pct_vgv segue o VGV BRUTO — a origem não pode ser arredondada', () => {
+  const r = calcularFluxo({
+    ...CFG_FRACIONARIO(),
+    linhasReceita: [{
+      id: 1, nome: 'Vendas',
+      tipologias: [{ id: 1, quantidade: 77, area_privativa_m2: 10.01, preco_m2: 1_000.02 }],
+      absorcao: { modo: 'personalizado', meses: [{ mes: 3, pct: 100 }] },
+      fluxo_pagamento: { componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }] },
+    }],
+    linhasCusto: [
+      { id: 1, grupo: 'diretos', categoria: 'Corretagem', orcamento_valor: 6, orcamento_unidade: 'pct_vgv', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  });
+  // Controle da própria fixture: os dois candidatos TÊM de diferir, senão o
+  // teste não distingue nada.
+  const bruto = 77 * 10.01 * 1_000.02;
+  const seArredondasseAntes = Math.round((Math.round(bruto * 100) / 100) * 0.06 * 100) / 100;
+  const comOrigemCrua = Math.round(bruto * 0.06 * 100) / 100;
+  assert.notEqual(comOrigemCrua, seArredondasseAntes, 'fixture inútil: os dois caminhos coincidem');
 
-test('#512: o acumulador de ORIGEM do vgvTotal NÃO é arredondado — o escopo é a saída', () => {
-  assert.ok(
-    FONTE_MOTOR.includes('    vgvTotal: linhasReceita.reduce((s, l) => s + vgvLinha(l.tipologias), 0),'),
-    'o acumulador de `ctxCusto.vgvTotal` mudou de forma — se ganhou round2, isso é mudança de '
-    + 'comportamento de todo estudo existente, que a #512 declara FORA de escopo e é decisão do autor',
-  );
+  assert.equal(r.linhasCusto[0]!.total, comOrigemCrua);
+});
+
+// ── #512, rodada 2 — o que a revisão achou que estes testes não cobriam ──
+
+/**
+ * Fixture COM permuta física, e ela existe por um motivo medido: na fixture
+ * anterior `vgvPermutaFisica` era **zero**, então `casas(0) === 0` passava a
+ * asserção sem exercitar o `round2` daquele campo. Tirar o `round2` dele
+ * deixava a suíte inteira verde — um dos quatro campos do título do teste não
+ * era medido por nada.
+ *
+ * Os números são os do contraexemplo do revisor externo: 50 unidades de
+ * 10,01 m² a R$ 1.000,01/m², uma delas permutada.
+ */
+const CFG_COM_PERMUTA = (): FluxoConfig => ({
+  ...CFG_FRACIONARIO(),
+  linhasReceita: [{
+    id: 1, nome: 'Vendas',
+    tipologias: [{ id: 1, tipologia_id: 1, nome: 'Studio', quantidade: 50, area_privativa_m2: 10.01, preco_m2: 1_000.01 }],
+    absorcao: { modo: 'personalizado', meses: [{ mes: 3, pct: 100 }] },
+    fluxo_pagamento: { componentes: [{ tipo: 'imediato', participacaoPct: 100, descontoPct: 0 }] },
+  }],
+  linhasCusto: [
+    // A linha de permuta não tem orçamento: só RESERVA tipologia + quantidade
+    // (#266). É `permuta_quantidade` que faz a reserva — foi o que a primeira
+    // versão desta fixture errou, e o teste de controle abaixo pegou.
+    { id: 1, grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física',
+      permuta_tipologia_id: 1, permuta_quantidade: 1, orcamento_valor: null },
+  ],
+});
+
+test('#512 controle: a fixture de permuta PRODUZ vgvPermutaFisica > 0 — senão o campo não é medido', () => {
+  // Sem este controle o teste seguinte volta a passar vazio, que foi o defeito.
+  const r = calcularFluxo(CFG_COM_PERMUTA());
+  assert.ok(r.vgvPermutaFisica > 0, `vgvPermutaFisica = ${r.vgvPermutaFisica}, a fixture não reserva permuta`);
+});
+
+test('#512: vgvPermutaFisica também sai em 2 casas — o quarto campo, agora exercitado', () => {
+  const r = calcularFluxo(CFG_COM_PERMUTA());
+  assert.ok(casas(r.vgvPermutaFisica) <= 2, `vgvPermutaFisica com ${casas(r.vgvPermutaFisica)} casas: ${r.vgvPermutaFisica}`);
+});
+
+test('#512: a IDENTIDADE fecha — vgvVendavel = vgvTotal − vgvPermutaFisica, ao centavo', () => {
+  // Achado do revisor externo: arredondar os três de forma independente quebra
+  // esta subtração por um centavo, e o card do Fluxo mostra a reconciliação.
+  // Por isso o terceiro é derivado dos dois já publicados.
+  const r = calcularFluxo(CFG_COM_PERMUTA());
+  // ⚠️ A comparação é contra a subtração ARREDONDADA, não contra a subtração
+  // crua: `490505.01 - 10010.10` em ponto flutuante é `490494.90999999997`, e
+  // exigir igualdade estrita contra isso reprovaria o código correto. O que a
+  // identidade promete é que os três valores PUBLICADOS fecham ao centavo.
+  const subtracao = Math.round((r.vgvTotal - r.vgvPermutaFisica) * 100) / 100;
+  assert.equal(r.vgvVendavel, subtracao);
+  assert.equal(r.receitaBrutaVgv, r.vgvVendavel);
+
+  // E o caso concreto do contraexemplo: com arredondamento independente saía
+  // 490.494,90; derivado dos dois publicados, sai 490.494,91.
+  assert.equal(r.vgvTotal, 500_505.01);
+  assert.equal(r.vgvPermutaFisica, 10_010.10);
+  assert.equal(r.vgvVendavel, 490_494.91);
+});
+
+/**
+ * `-0` não é inofensivo: `fmtR$(-0)` imprime **"-R$ 0,00"**, e `-0 >= 0` é
+ * `true`, então o limiar de sinal do card do VPL
+ * (`frontend/fluxo-tabela.ts`, `c.vpl >= 0 ? 'sucesso' : 'erro'`) muda de ramo.
+ *
+ * ⚠️ **A fixture não é exótica, e a primeira que escrevi não servia.** Eu usei
+ * um estudo vazio e o teste passava sem exercitar nada — `vpl` saía `0`
+ * positivo. Medido com a normalização desligada: basta **um custo de R$ 0,01
+ * num mês distante** para o VPL descontado cair em (-0,005; 0) e `round2`
+ * devolver `-0`. Três horizontes conferidos (mês 24, 48 e 96), os três
+ * produzem `-0` sem a guarda.
+ */
+const CFG_VPL_ZERO_NEGATIVO = (): FluxoConfig => ({
+  dataInicio: 'jan/2027', prazoMeses: 26, taxaDescontoAa: 60, areaTerreno: 0,
+  jurosTabelaAaEstudo: 0, cronograma: [], linhasReceita: [],
+  linhasCusto: [
+    { id: 1, grupo: 'indireto', categoria: 'X', orcamento_valor: 0.01, orcamento_unidade: 'rs', inicio_mes: 24, duracao_meses: 1 },
+  ],
+});
+
+test('#512 controle: a fixture PRODUZ um VPL que arredonda para zero — senão não há -0 a evitar', () => {
+  const r = calcularFluxo(CFG_VPL_ZERO_NEGATIVO());
+  assert.equal(r.vpl, 0, `vpl = ${r.vpl}; a fixture precisa cair na faixa que gera -0`);
+});
+
+test('#512: nenhum campo publicado sai como ZERO NEGATIVO', () => {
+  const r = calcularFluxo(CFG_VPL_ZERO_NEGATIVO());
+  for (const campo of ['vgvTotal', 'vpl', 'vgvPermutaFisica', 'receitaBrutaVgv', 'vgvVendavel'] as const) {
+    assert.ok(!Object.is(r[campo], -0), `${campo} saiu como -0`);
+  }
 });

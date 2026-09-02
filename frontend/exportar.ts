@@ -415,7 +415,11 @@ export function linhasFluxo(c: FluxoCalc, funding: FundingNoFluxo | null = null)
   // `c.vpl + vplLiquido`. Sem funding sai só a segunda seção, com os rótulos e
   // o VPL de sempre — o relatório de um estudo sem funding não muda em nada.
   const vplLivre = c.vpl;
-  const vplAlavancado = c.vpl + (funding?.vplLiquido ?? 0);
+  // #512 — soma de dois valores já publicados é, ela mesma, valor publicado:
+  // o C7 vale para ela. Sem o `round2` a soma de duas parcelas de 2 casas pode
+  // reintroduzir fração (ruído binário de ponto flutuante), e este é o número
+  // que a tela e o relatório mostram. Achado do revisor externo no PR da #512.
+  const vplAlavancado = Math.round((c.vpl + (funding?.vplLiquido ?? 0)) * 100) / 100;
   if (funding) {
     linhas.push({
       nivel: 0, nome: 'Fluxo de Caixa Livre Mensal', custo: false, separadorAntes: true,
