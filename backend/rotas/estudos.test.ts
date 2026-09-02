@@ -543,6 +543,14 @@ const ESTUDO_NOMEAVEL = {
   tipo_empreendimento: 'incorporacao',
   uf: 'DF',
   sequencia: 2,
+  // ⚠️ `nome` faltava aqui, e a falta CARIMBAVA um teste errado: como a
+  // recomposição exige um nome (do corpo ou do registro), um PATCH `{ uf }`
+  // sobre esta fixture não recompunha — e a asserção "não mexe em
+  // nome_exibicao" passava pelo motivo errado, afirmando o OPOSTO do contrato
+  // e contradizendo o teste do PATCH só-de-UF logo abaixo. `nome` é
+  // `obrigatorio: true` no `schema.json`: estudo real sempre o tem, e uma
+  // fixture que não o tem mede um registro impossível.
+  nome: 'Pátio Urbitá',
 };
 
 test('#660: PATCH com nome novo RECOMPÕE nome_exibicao — senão a tela mostra o nome velho para sempre', () => {
@@ -564,8 +572,10 @@ test('#660: id_legivel NÃO é recomposto — ele é único e é a identidade es
   assert.equal('id_legivel' in d.dados, false);
 });
 
-test('#660: PATCH sem tocar em nome não mexe em nome_exibicao', () => {
-  const d = montarPatchEstudo({ uf: 'GO' }, ESTUDO_NOMEAVEL);
+test('#660: PATCH que não toca em NENHUMA parte componente não mexe em nome_exibicao', () => {
+  // `notas` não compõe o rótulo. A versão anterior deste teste usava `uf` — que
+  // COMPÕE — e passava só porque a fixture não tinha `nome`.
+  const d = montarPatchEstudo({ notas: 'anotação qualquer' }, ESTUDO_NOMEAVEL);
   assert.ok('dados' in d);
   assert.equal('nome_exibicao' in d.dados, false);
 });
