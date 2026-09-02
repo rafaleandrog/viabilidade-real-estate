@@ -36,7 +36,12 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 #
 # O resultado esperado é estrutural, e por isso não envelhece: o guard
 # sempre-passa mata TODOS os casos que esperam `reprova`, o sempre-reprova mata
-# todos os que esperam `ok`, e os dois números somam o total. Não se anota aqui
+# todos os que esperam `ok`, e os dois números somam o total MENOS UM.
+#
+# ⚠️ O "menos um" é o caso de INVENTÁRIO, e a frase já esteve errada sem ele:
+# aquele caso não roda o guard como processo (faz `import` e lê `ORIGENS`), então
+# é imune às duas mutações e sobrevive às duas. Quem seguisse a receita achava a
+# soma um a menos que o total e ia caçar um caso quebrado que não existe. Não se anota aqui
 # quantos são — contador em artefato versionado diverge a cada caso novo sem nada
 # ficar vermelho (armadilha 13 do `CLAUDE.md`), e este texto já nasceu errado uma
 # vez, dizendo 13/7 para uma bateria que já tinha ido a 27 casos.
@@ -74,6 +79,7 @@ arvore() {
     printf "const IDS_TOPO = PAGINAS.map((a) => a.id) as AbaTopo[];\n"
     printf "declare function idDaSlug(v: string): string;\n"
     printf "declare const PADRAO: AbaTopo;\n"
+    printf "declare const MAPA: Record<string, number>;\n"
     printf "declare function property(o: unknown): any;\n"
     printf "export class ViabTelaAvancado {\n"
     printf '%s\n' "$1"
@@ -385,6 +391,59 @@ ALIAS_MUTAVEL="  set aba(v: string) {
   }
   private _aba: AbaTopo = 'resumo';"
 
+# ── Rodada 3: a testemunha que derrubou `??` como forma aceita ─────────────
+# Sem chamada NENHUMA — a derivacao esta textualmente dentro do no que o guard
+# le. `MAPA[v]` de slug desconhecido e `undefined`, `undefined | 0` e `0`, e o
+# default efetivo e `PAGINAS[0].id`. O `?? 'resumo'` e codigo morto.
+#
+# Importa porque a limitacao que o guard declarava na vespera dizia que o buraco
+# era "um default escondido atras de uma CHAMADA" — e este nao tem chamada.
+# Declarar uma fronteira nao a fecha, e aquela nem cobria o caso.
+NULLISH_MORTO_SEM_CHAMADA="  set aba(v: string) {
+    const idx = MAPA[v];
+    this._aba = PAGINAS[idx | 0].id ?? 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# ── Falsos positivos que a contagem grossa produzia ────────────────────────
+# `||` de PREDICADO nao e `||` de fallback, e a contagem nao distinguia.
+OR_BOOLEANO_NO_PREDICADO="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const val = (IDS_TOPO.includes(id as AbaTopo) || id === 'custos') ? (id as AbaTopo) : 'resumo';
+    this._aba = val;
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# Um `??` sem relacao nenhuma com o default, numa linha a um passo do setter de
+# producao (`this.requestUpdate('aba', antigo)`).
+NULLISH_ALHEIO="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const antigo = this._aba;
+    this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+    void (antigo ?? undefined);
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# Ternario dentro de uma ARROW aninhada: nao pode ser o fallback (o rastreio so
+# aceita ternario/if-else direto), entao conta-lo so produzia falso positivo.
+TERNARIO_EM_ARROW_ANINHADA="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const rotulo = () => PAGINAS.find((p) => p.id === id) ? 'sim' : 'nao';
+    void rotulo;
+    this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# `let` sem inicializador (switch, try/catch): o veredito e reprova, e o que este
+# caso trava e a CAUSA apontada. A mensagem ja disse "nao e declarado dentro do
+# setter" para uma variavel que E declarada, mandando investigar o lugar errado.
+LET_SEM_INICIALIZADOR="  set aba(v: string) {
+    let val: AbaTopo;
+    switch (v) { case 'obra': val = 'obra'; break; default: val = PAGINAS[0].id; }
+    this._aba = val;
+  }
+  private _aba: AbaTopo = 'resumo';"
+
 verificar() { # <nome> <raiz> <esperado: ok|reprova>
   local nome="$1" raiz="$2" esperado="$3" rc=0
   TOTAL=$((TOTAL+1))
@@ -419,7 +478,11 @@ verificar "13 ternário inocente ANTES não esconde derivação"    "$(arvore c1
 # enganado duas vezes. O custo é aceito e a mensagem diz o que fazer.
 verificar "14 segundo ternário no setter: ambíguo, reprova"     "$(arvore c14 "$TERNARIO_INOCENTE_COM_LITERAL")" reprova
 verificar "15 cadeia de aliases é rastreada até o ternário"     "$(arvore c15 "$ALIAS_EM_CADEIA")"           ok
-verificar "16 fallback por '??' com literal passa"              "$(arvore c16 "$FALLBACK_COM_NULLISH")"      ok
+# ⚠️ Este caso ESPERAVA `ok` e virou `reprova` na rodada 3, pelo mesmo argumento
+# do 14: `??`/`||` deixaram de ser forma aceita. O fallback deles só está VIVO se
+# o lado esquerdo puder ser nullish, e isso é ALCANÇABILIDADE, não forma. Ver o
+# caso 37, que é a testemunha que derrubou a regra antiga.
+verificar "16 fallback por '??', mesmo com literal, reprova"    "$(arvore c16 "$FALLBACK_COM_NULLISH")"      reprova
 verificar "17 fallback por '??' derivado reprova"               "$(arvore c17 "$FALLBACK_COM_NULLISH_DERIVADO")" reprova
 verificar "18 duas atribuições a _aba: ambíguo, reprova"        "$(arvore c18 "$DUAS_ATRIBUICOES")"          reprova
 verificar "19 valor vindo de fora do setter reprova"            "$(arvore c19 "$VALOR_DE_FORA")"             reprova
@@ -439,6 +502,11 @@ verificar "33 setter que ignora a entrada reprova"              "$(arvore c33 "$
 verificar "34 falso positivo: ternário sob 'satisfies' passa"   "$(arvore c34 "$TERNARIO_SOB_SATISFIES")"    ok
 verificar "35 ternário derivado sob 'satisfies' reprova"        "$(arvore c35 "$TERNARIO_SOB_SATISFIES_DERIVADO")" reprova
 verificar "36 alias MUTÁVEL reescrito com derivação reprova"    "$(arvore c36 "$ALIAS_MUTAVEL")"             reprova
+verificar "37 '??' morto sobre derivação, SEM chamada, reprova" "$(arvore c37 "$NULLISH_MORTO_SEM_CHAMADA")" reprova
+verificar "38 falso positivo: '||' de predicado não conta"      "$(arvore c38 "$OR_BOOLEANO_NO_PREDICADO")"  ok
+verificar "39 falso positivo: '??' alheio ao default não conta" "$(arvore c39 "$NULLISH_ALHEIO")"            ok
+verificar "40 falso positivo: ternário em arrow não conta"      "$(arvore c40 "$TERNARIO_EM_ARROW_ANINHADA")" ok
+verificar "41 'let' sem inicializador reprova"                  "$(arvore c41 "$LET_SEM_INICIALIZADOR")"     reprova
 
 # ── INVENTÁRIO: a metade do critério (a) que as fixtures não cobrem ────────
 #

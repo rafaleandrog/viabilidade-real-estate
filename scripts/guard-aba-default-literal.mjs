@@ -46,14 +46,22 @@
  * pior que nenhuma: ele lê o SETTER e o inicializador, e nada além. Duas coisas
  * ficam fora, as duas medidas:
  *
- *   · uma TERCEIRA origem de default, criada em outro membro da classe;
- *   · um default escondido atrás de uma CHAMADA — `const normal = normalize(v);
- *     this._aba = normal ?? 'resumo'` passa, e `normalize` pode devolver
- *     `PAGINAS[0].id`. Exigir que o ramo normal não chame função nenhuma
- *     reprovaria o próprio setter de produção, cujo `id` vem de `idDaSlug(v)`.
+ *   · **outro membro da classe que MATA a origem** — um `constructor()` com
+ *     `this._aba = PAGINAS[0].id` sobrescreve o inicializador, e o guard aprova
+ *     um nó que virou morto (medido: exit 0). Note a direção: não é uma origem
+ *     a mais que ele deixa de ver, é a origem declarada deixando de valer.
  *
- * As duas são pergunta de intenção ("este valor é um default?"), não de forma, e
- * quem as responde é a revisão. O guard fecha o que é decidível na árvore do
+ * ⚠️ Esta lista já teve uma segunda entrada — *"um default escondido atrás de uma
+ * CHAMADA"*, com a medição de `const normal = normalize(v); this._aba = normal ??
+ * 'resumo'` passando. Ela **deixou de ser verdadeira no mesmo dia**, quando `??`
+ * saiu das formas aceitas: os dois casos daquela nota reprovam hoje. Ficou aqui o
+ * registro porque o erro vale mais que a entrada — **declaração de limitação
+ * envelhece como qualquer outra prosa**, e uma que anuncia buraco já fechado
+ * convida a "consertar" o que está certo, além de mentir sobre a cobertura.
+ * Quem mexer nas formas aceitas relê ESTA lista na mesma alteração.
+ *
+ * A que sobrou é pergunta de intenção ("este valor é um default?"), não de forma,
+ * e quem a responde é a revisão. O guard fecha o que é decidível na árvore do
  * setter, e diz em voz alta onde essa fronteira está.
  *
  * E a pergunta é feita no lugar CERTO: o fallback do setter é rastreado a partir
@@ -222,12 +230,15 @@ function fallbackAtribuido(ts, setter, campo) {
 function formasDeFallback(ts, setter) {
   const achados = [];
   const varrer = (n) => {
+    // Função aninhada não pode SER o fallback: `resolverValor` só aceita um
+    // ternário ou um if/else direto, então um IIFE ou uma arrow auxiliar já
+    // reprova por outro caminho. Contá-la aqui só produziria falso positivo —
+    // um `p.id === id ? a : b` dentro de um `.find()` não é default de nada.
+    if (
+      ts.isFunctionExpression(n) || ts.isArrowFunction(n)
+      || ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)
+    ) return;
     if (ts.isConditionalExpression(n)) achados.push(n);
-    else if (
-      ts.isBinaryExpression(n)
-      && (n.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
-        || n.operatorToken.kind === ts.SyntaxKind.BarBarToken)
-    ) achados.push(n);
     else if (ts.isIfStatement(n) && n.elseStatement) achados.push(n);
     ts.forEachChild(n, varrer);
   };
@@ -280,18 +291,13 @@ function ramosDeUmIfSo(ts, atribuicoes) {
  * — o parâmetro, ou qualquer local do setter. Um ramo que ignora a entrada não é
  * "o caminho normal": é o default de verdade, disfarçado.
  *
- * ⚠️ O QUE ELA NÃO PEGA, medido, e dito porque cobertura afirmada a mais é pior
- * que nenhuma: qualquer local serve como prova de dependência — não se rastreia
- * o local até o parâmetro, e não adiantaria. Com a normalização movida para um
- * ajudante, `const normal = normalize(v); this._aba = normal ?? 'resumo'` PASSA
- * (medido: exit 0), e `normalize` pode devolver `PAGINAS[0].id` para slug
- * desconhecido. Achado pelo revisor externo na rodada 3.
- *
- * Não é falta de rigor, é a fronteira do arquivo: `normalize` mora fora do
- * setter, e exigir que o ramo normal não chame função nenhuma reprovaria o
- * PRÓPRIO setter de produção, cujo `id` vem de `idDaSlug(v)`. Um default
- * escondido atrás de uma chamada é a mesma limitação já declarada no topo deste
- * arquivo — pergunta de intenção, não de forma, e quem a responde é a revisão.
+ * ⚠️ Ela é SINTÁTICA: qualquer local do setter serve como prova de dependência,
+ * e o local não é rastreado até o parâmetro. Isso bastava para o ternário e o
+ * if/else, que é onde ela roda — mas NÃO bastava para `??`/`||`, e a tentativa de
+ * fazê-la bastar foi o erro da rodada 2: ela responde com FORMA ("o ramo menciona
+ * um local?") uma pergunta que ali era de ALCANÇABILIDADE ("o ramo pode ser
+ * nullish?"). Por isso `??`/`||` saíram das formas aceitas em vez de ganharem
+ * mais uma checagem — ver `resolverValor`.
  */
 function exigirDependenciaDaEntrada(ts, setter, ramoNormal, resultado) {
   const nomesLocais = new Set(setter.parameters.map((pm) => (ts.isIdentifier(pm.name) ? pm.name.text : '')));
@@ -332,13 +338,27 @@ function resolverValor(ts, setter, campo, expressao, aceitaLiteralDireto = false
     // `fonte-ts.mjs` já pagou uma vez — então aqui não se resolve: havendo mais
     // de uma ligação para o mesmo nome, REPROVA.
     const decls = [];
+    let semInicializador = false;
     const acharDecl = (n) => {
-      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === nome && n.initializer) {
-        decls.push(n.initializer);
+      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === nome) {
+        if (n.initializer) decls.push(n.initializer);
+        else semInicializador = true;
       }
       ts.forEachChild(n, acharDecl);
     };
     acharDecl(setter);
+    // ⚠️ `let val: AbaTopo;` + `switch`/`try` é declaração SEM inicializador, e
+    // dizer "não é declarado" mandava investigar o lugar errado. O veredito é o
+    // mesmo — o valor vem de escrita posterior, que este guard não rastreia —,
+    // mas a causa apontada tem de ser a verdadeira.
+    if (decls.length === 0 && semInicializador) {
+      return {
+        erro: `\`${nome}\` é declarado sem inicializador e recebe valor por atribuição depois `
+          + '(switch, try/catch, if em cadeia).\n      Este guard lê o inicializador, não escritas '
+          + 'posteriores — então não há como ele dizer qual é o\n      default. Dê a `'
+          + `${nome}\` um inicializador com o fallback visível`,
+      };
+    }
     if (decls.length > 1) {
       return {
         erro: `\`${nome}\` é declarado ${decls.length} vezes dentro do setter (sombra de nome em `
@@ -384,18 +404,43 @@ function resolverValor(ts, setter, campo, expressao, aceitaLiteralDireto = false
   if (ts.isConditionalExpression(valor)) {
     return exigirDependenciaDaEntrada(ts, setter, valor.whenTrue, { no: valor.whenFalse });
   }
-  if (
-    ts.isBinaryExpression(valor)
-    && (valor.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
-      || valor.operatorToken.kind === ts.SyntaxKind.BarBarToken)
-  ) {
-    return exigirDependenciaDaEntrada(ts, setter, valor.left, { no: valor.right });
+  // ⚠️ `??` e `||` NÃO são formas aceitas de fallback, e esta recusa é o achado
+  // mais instrutivo de todo o PR.
+  //
+  // Um `a ?? 'resumo'` só tem fallback VIVO se `a` puder ser nullish — e isso é
+  // pergunta de ALCANÇABILIDADE, que a árvore não responde. Quando `a` é
+  // incondicional, o `'resumo'` é código morto e o default de verdade é `a`.
+  // Medido na rodada 3: `this._aba = PAGINAS[idx | 0].id ?? 'resumo'` passava com
+  // exit 0 — sem chamada nenhuma, com a derivação textualmente dentro do nó que
+  // o guard lê. A tentativa anterior de cobrir isso (`exigirDependenciaDaEntrada`)
+  // respondia com FORMA ("o ramo menciona um local?") uma pergunta que é de
+  // alcançabilidade, e por isso não convergia.
+  //
+  // Pior: o guard ENSINAVA o bypass. O mesmo código sem o `??` reprovava com
+  // "o fallback precisa continuar visível" — e acrescentar `?? 'resumo'` ficava
+  // verde.
+  //
+  // Ternário e if/else não têm esse problema: os dois ramos são alcançáveis por
+  // construção. Sobram esses dois, e é a mesma regra do resto do arquivo — o que
+  // o guard não consegue decidir, ele reprova.
+
+  if (ts.isStringLiteral(valor) || ts.isNoSubstitutionTemplateLiteral(valor)) {
+    return {
+      erro: `o setter atribui o literal fixo \`${valor.getText()}\` a \`this.${campo}\` e IGNORA a `
+        + 'entrada.\n      Não há fallback porque não há caminho normal: toda URL cai no mesmo '
+        + 'valor. Se a\n      intenção era essa, ela não é um default de aba — e este guard não '
+        + 'tem o que guardar',
+    };
   }
 
   return {
-    erro: `o valor que chega em \`this.${campo}\` não expõe um fallback (nem ternário, nem \`??\`, `
-      + `nem \`||\`): \`${valor.getText().slice(0, 60)}\`. Se o fallback mudou de forma, ele precisa `
-      + 'continuar visível — um default escondido é o que este guard existe para impedir',
+    erro: `o valor que chega em \`this.${campo}\` não expõe um fallback em forma de TERNÁRIO nem `
+      + `de if/else: \`${valor.getText().slice(0, 60)}\`.\n`
+      + '      ⚠️ Não acrescente um `?? \'resumo\'` para calar isto: `??`/`||` NÃO são aceitos, de '
+      + 'propósito.\n      O fallback deles só está VIVO se o lado esquerdo puder ser nullish, e '
+      + 'isso a árvore não\n      responde — com o esquerdo incondicional, o literal é código morto '
+      + 'e o default de\n      verdade é o outro lado. Escreva o ternário, com o literal no ramo '
+      + 'de fallback',
   };
 }
 
