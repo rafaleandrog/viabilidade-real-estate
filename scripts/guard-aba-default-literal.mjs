@@ -49,13 +49,19 @@
  * membro da classe, ele não descobre sozinho. Isso é pergunta de intenção
  * ("este valor é um default?"), não de forma, e quem responde é a revisão.
  *
+ * E a pergunta é feita no lugar CERTO: o fallback do setter é rastreado a partir
+ * de `this._aba` — a atribuição, resolvendo aliases locais —, não pelo primeiro
+ * ternário que aparecer no corpo. A diferença não é acadêmica; ver o cabeçalho
+ * de `fallbackAtribuido`.
+ *
  * A pergunta é de ÁRVORE ("este nó é um literal de string?"), então quem
  * responde é o parser do TypeScript — a mesma autoridade de
  * `guard-fiacao-funding`, `guard-enderecos-doc` e dos guards de UI. Sem o
  * pacote `typescript` o guard RECUSA: "não deu para rodar" nunca é "passou".
  */
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { compilador, disponivel as tsDisponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
 
 // A raiz padrão é a do repositório; a bateria passa uma árvore de fixtures como
@@ -67,13 +73,28 @@ const BASE = process.argv[2] ?? '.';
  * As origens do default, uma entrada por origem.
  *
  * ⚠️ Lista mantida à mão, e por isso ela obedece aos três critérios do
- * `CLAUDE.md`: (a) o fecho é por CONTAGEM EXATA — a bateria confere que são
- * exatamente estas, e o guard reprova se uma origem sumir do arquivo, não só se
- * uma virar derivação; (b) cada entrada carrega o motivo escrito; (c) o eixo é
- * "onde o default nasce", que é propriedade estrutural do arquivo, não uma lista
- * de quem pode ou não fazer algo.
+ * `CLAUDE.md`:
+ *
+ *   (a) **fecha nos DOIS sentidos, por contagem exata.** Entrada a MENOS: as
+ *       fixtures da bateria exercitam as duas origens, e apagar qualquer uma
+ *       delas de `ORIGENS` deixa casos vermelhos. Entrada a MAIS: quem barra é
+ *       o caso "inventário" da bateria, que importa `ORIGENS` e compara
+ *       comprimento e chaves com o esperado.
+ *
+ *       ⚠️ Esta segunda metade NÃO EXISTIA na primeira redação, e o comentário
+ *       aqui já afirmou que existia. Medido pelo revisor: acrescentar uma 3ª
+ *       entrada duplicada deixava a bateria inteira VERDE. Invocar o critério
+ *       (a) sem cumpri-lo é a armadilha 11 do `CLAUDE.md` aplicada ao próprio
+ *       mecanismo que deveria impedi-la — e foi por isso que o guard passou a
+ *       exportar `ORIGENS` em vez de a prosa ser reescrita com mais ênfase.
+ *
+ *   (b) cada entrada carrega o motivo escrito, que é o que o revisor lê para
+ *       julgar se ela ainda vale;
+ *
+ *   (c) o eixo é "onde o default nasce" — propriedade estrutural do arquivo, não
+ *       uma lista de quem pode ou não fazer algo.
  */
-const ORIGENS = [
+export const ORIGENS = [
   {
     arquivo: 'frontend/tela-avancado.ts',
     classe: 'ViabTelaAvancado',
@@ -86,13 +107,160 @@ const ORIGENS = [
   {
     arquivo: 'frontend/tela-avancado.ts',
     classe: 'ViabTelaAvancado',
-    // O `else` do ternário do setter: é ele que vale para slug desconhecido
+    // O ramo de fallback do setter: é ele que vale para slug desconhecido
     // (URL antiga de Preliminar, link quebrado).
     tipo: 'fallback-setter',
     membro: 'aba',
+    // O campo que o setter ALIMENTA. É por ele que o valor é rastreado: o guard
+    // não pergunta "há um ternário aqui?", pergunta "o que chega em `this._aba`?".
+    campoEstado: '_aba',
     motivo: 'fallback do setter `aba` — a aba para a qual um slug desconhecido cai',
   },
 ];
+
+/**
+ * O fallback que de fato chega em `this.<campo>` dentro do setter — não "o
+ * primeiro ternário que aparecer".
+ *
+ * ⚠️ ESTA FUNÇÃO EXISTE POR CAUSA DE UM ACHADO, e a versão ingênua estava no
+ * PR que criou o guard. A primeira redação pegava o primeiro
+ * `ConditionalExpression` em ordem de árvore, e o revisor externo (Codex, P2,
+ * PR 665) mostrou o buraco: basta um ternário INOCENTE antes do real — uma
+ * normalização de entrada cujo ramo falso seja `'resumo'` — para o guard
+ * registrar aquele literal e aprovar o arquivo enquanto o fallback verdadeiro
+ * virou `PAGINAS[0].id`. Medido: `exit 0`, guard mudo, defesa de novo
+ * inexistente. Era o próprio defeito que o guard existe para barrar,
+ * reproduzido dentro dele.
+ *
+ * O rastreio: acha a atribuição a `this.<campo>`, resolve o valor por
+ * declarações locais (`const val = …`) e devolve o ramo de fallback.
+ *
+ * FAIL-CLOSED em toda ambiguidade — nenhuma atribuição, mais de uma, um alias
+ * que não resolve, ou um valor cuja forma não expõe um fallback. Guard que não
+ * conseguiu decidir REPROVA dizendo isso; "não deu para analisar" nunca é
+ * "passou".
+ */
+function fallbackAtribuido(ts, setter, campo) {
+  // 1 · as atribuições `this.<campo> = X` dentro do setter.
+  const atribuicoes = [];
+  const varrer = (n) => {
+    if (
+      ts.isBinaryExpression(n)
+      && n.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      && ts.isPropertyAccessExpression(n.left)
+      && n.left.expression.kind === ts.SyntaxKind.ThisKeyword
+      && n.left.name.text === campo
+    ) atribuicoes.push(n.right);
+    ts.forEachChild(n, varrer);
+  };
+  varrer(setter);
+
+  if (atribuicoes.length === 0) {
+    return { erro: `o setter não atribui a \`this.${campo}\` — não há valor a rastrear` };
+  }
+  if (atribuicoes.length > 1) {
+    // if/else é a MESMA forma ("isto, senão aquilo") escrita como statement, e
+    // reprová-la seria acusar código correto — o caminho mais curto para alguém
+    // desligar o guard. Quando as duas atribuições são os dois ramos do mesmo
+    // `if`, o fallback é o do `else`, exatamente como o `whenFalse` do ternário.
+    const ramos = ramosDeUmIfSo(ts, atribuicoes);
+    if (ramos) return resolverValor(ts, setter, campo, ramos.senao);
+    return {
+      erro: `o setter atribui a \`this.${campo}\` ${atribuicoes.length} vezes, e elas não são os `
+        + 'dois ramos de um mesmo if/else; qual delas é o fallback é ambíguo, e guard ambíguo '
+        + 'reprova em vez de escolher',
+    };
+  }
+
+  return resolverValor(ts, setter, campo, atribuicoes[0]);
+}
+
+/**
+ * Os dois ramos de UM mesmo `if/else`, ou `null` se as atribuições não formam
+ * esse par. Comparar os nós ancestrais é o que distingue
+ * `if (…) a = x; else a = y;` de duas atribuições soltas em sequência.
+ */
+function ramosDeUmIfSo(ts, atribuicoes) {
+  if (atribuicoes.length !== 2) return null;
+  // Sobe de cada atribuição até o `IfStatement` mais próximo.
+  const subir = (no) => {
+    for (let p = no.parent, i = 0; p && i < 12; p = p.parent, i++) {
+      if (ts.isIfStatement(p)) return p;
+    }
+    return null;
+  };
+  const [a, b] = atribuicoes;
+  const ifA = subir(a);
+  if (!ifA || ifA !== subir(b) || !ifA.elseStatement) return null;
+  // Qual das duas está DENTRO do `else`? Essa é o fallback.
+  const dentro = (raiz, alvo) => {
+    let achou = false;
+    const v = (n) => { if (achou) return; if (n === alvo) { achou = true; return; } ts.forEachChild(n, v); };
+    v(raiz);
+    return achou;
+  };
+  const aNoSenao = dentro(ifA.elseStatement, a);
+  const bNoSenao = dentro(ifA.elseStatement, b);
+  // Exatamente uma no `else`: senão o par não é "isto, senão aquilo".
+  if (aNoSenao === bNoSenao) return null;
+  return { senao: aNoSenao ? a : b };
+}
+
+/** Resolve aliases locais e extrai o ramo de fallback de um valor. */
+function resolverValor(ts, setter, campo, expressao) {
+  let valor = expressao;
+  // 2 · resolve aliases locais (`const val = …; this._aba = val;`). O limite
+  // existe só para que uma cadeia patológica termine — não é regra de negócio.
+  for (let i = 0; i < 8 && ts.isIdentifier(valor); i++) {
+    const nome = valor.text;
+    let decl = null;
+    const acharDecl = (n) => {
+      if (decl) return;
+      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === nome && n.initializer) {
+        decl = n.initializer;
+        return;
+      }
+      ts.forEachChild(n, acharDecl);
+    };
+    acharDecl(setter);
+    if (!decl) {
+      return {
+        erro: `\`this.${campo}\` recebe \`${nome}\`, que não é declarado dentro do setter — `
+          + 'o valor vem de fora e este guard não o alcança',
+      };
+    }
+    valor = decl;
+  }
+
+  // 3 · a forma tem de EXPOR um fallback. Ternário e `??`/`||` são as duas
+  // maneiras de escrever "isto, senão aquilo"; qualquer outra o guard recusa,
+  // em vez de adivinhar onde estaria o default.
+  while (ts.isParenthesizedExpression(valor) || ts.isAsExpression(valor)) valor = valor.expression;
+
+  // Um literal direto já É o fallback: é o caso do ramo `else` do if/else, onde
+  // "isto, senão aquilo" foi decidido pelo statement e não pela expressão.
+  if (ts.isStringLiteral(valor) || ts.isNoSubstitutionTemplateLiteral(valor)) return { no: valor };
+  if (ts.isConditionalExpression(valor)) return { no: valor.whenFalse };
+  if (
+    ts.isBinaryExpression(valor)
+    && (valor.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+      || valor.operatorToken.kind === ts.SyntaxKind.BarBarToken)
+  ) return { no: valor.right };
+
+  return {
+    erro: `o valor que chega em \`this.${campo}\` não expõe um fallback (nem ternário, nem \`??\`, `
+      + `nem \`||\`): \`${valor.getText().slice(0, 60)}\`. Se o fallback mudou de forma, ele precisa `
+      + 'continuar visível — um default escondido é o que este guard existe para impedir',
+  };
+}
+
+// Só executa quando chamado direto. Sem isto, o teste de inventário abaixo não
+// poderia importar `ORIGENS` — o import rodaria o guard e mataria o processo.
+const chamadoDireto = process.argv[1]
+  && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (!chamadoDireto) {
+  // Importado: exporta `ORIGENS` e não faz mais nada.
+} else {
 
 if (!tsDisponivel) {
   console.error('guard-aba-default-literal: RECUSADO — ' + porqueIndisponivel);
@@ -121,6 +289,8 @@ for (const origem of ORIGENS) {
 
   /** O nó do default, conforme o tipo de origem. `null` = não achei. */
   let alvo = null;
+  /** Por que o rastreio não conseguiu decidir. Preenchido = reprova. */
+  let recusa = null;
 
   const visitar = (no) => {
     if (ts.isClassDeclaration(no) && no.name?.text === origem.classe) {
@@ -133,26 +303,39 @@ for (const origem of ORIGENS) {
         ) {
           alvo = m.initializer ?? null;
         }
-        // Fallback do setter: o ramo `else` (`whenFalse`) do ternário que
-        // decide o valor. Um setter sem ternário também reprova — a ausência
-        // do fallback é tão defeito quanto a derivação dele.
+        // Fallback do setter: o valor que chega em `this._aba` pelo ramo de
+        // fallback — `whenFalse` do ternário, lado direito do `??`/`||`, ou o
+        // `else` do if/else. As três são a mesma forma ("isto, senão aquilo")
+        // escrita de três jeitos, e o guard aceita as três.
+        //
+        // ⚠️ Qualquer OUTRA forma REPROVA, e é preciso dizer por quê, porque a
+        // razão não é a que parece: não é que o fallback esteja ausente — pode
+        // muito bem estar, escondido dentro de uma função. É que o rastreio não
+        // consegue apontá-lo, e guard que não conseguiu decidir reprova em vez
+        // de aprovar no escuro. A mensagem diz isso ao usuário.
         if (
           origem.tipo === 'fallback-setter'
           && ts.isSetAccessorDeclaration(m)
           && m.name && ts.isIdentifier(m.name) && m.name.text === origem.membro
         ) {
-          const achaTernario = (n) => {
-            if (alvo) return;
-            if (ts.isConditionalExpression(n)) { alvo = n.whenFalse; return; }
-            ts.forEachChild(n, achaTernario);
-          };
-          achaTernario(m);
+          const r = fallbackAtribuido(ts, m, origem.campoEstado);
+          if (r.erro) recusa = r.erro;
+          else alvo = r.no;
         }
       }
     }
     ts.forEachChild(no, visitar);
   };
   visitar(sf);
+
+  if (recusa) {
+    falhas.push(
+      `${origem.arquivo}: não consegui rastrear a origem "${origem.tipo}" `
+      + `(${origem.classe}.${origem.membro}) — ${recusa}.\n`
+      + `      ${origem.motivo}`,
+    );
+    continue;
+  }
 
   if (!alvo) {
     falhas.push(
@@ -172,7 +355,7 @@ for (const origem of ORIGENS) {
   let nucleo = alvo;
   while (
     ts.isAsExpression(nucleo) || ts.isParenthesizedExpression(nucleo)
-    || ts.isTypeAssertionExpression?.(nucleo)
+    || ts.isTypeAssertionExpression?.(nucleo) || ts.isSatisfiesExpression?.(nucleo)
   ) {
     nucleo = nucleo.expression;
   }
@@ -198,6 +381,14 @@ for (const origem of ORIGENS) {
 // que abre por padrão deixaria de ser a mesma para onde um slug desconhecido
 // cai, e nenhuma das duas estaria errada isoladamente. A conferência é de graça
 // aqui, porque os valores já foram lidos.
+if (conferidas === 0 && falhas.length === 0) {
+  falhas.push(
+    'nenhuma origem foi conferida. Ou `ORIGENS` está vazia, ou nada nela casou com o código.\n'
+    + '      Um guard que não confere nada sai verde e não guarda coisa alguma — o modo de falha\n'
+    + '      mais caro que existe, porque é indistinguível de sucesso.',
+  );
+}
+
 const distintos = [...new Set(valores.map((v) => v.valor))];
 if (distintos.length > 1) {
   falhas.push(
@@ -220,3 +411,5 @@ console.log(
   `guard-aba-default-literal: ok (${conferidas} origem(ns) do default, `
   + `todas literais e todas em '${distintos[0]}')`,
 );
+
+}

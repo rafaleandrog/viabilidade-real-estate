@@ -143,12 +143,15 @@ export class ViabTelaAvancado extends LitElement {
   @property({ type: String })
   set aba(v: string) {
     const id = idDaSlug(v);
+    // #638: o `'resumo'` é literal DE PROPÓSITO — não o troque por `PAGINAS[0].id`
+    // "porque é o mesmo valor". Ver `scripts/guard-aba-default-literal.mjs`.
     const val = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
     const antigo = this._aba;
     this._aba = val;
     this.requestUpdate('aba', antigo);
   }
   get aba(): AbaTopo { return this._aba; }
+  // #638: literal de propósito — ver `scripts/guard-aba-default-literal.mjs`.
   private _aba: AbaTopo = 'resumo';
 
   // #251: subaba (2º nível) vinda da URL. Aplica-se à página ativa; sincronizada

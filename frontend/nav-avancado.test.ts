@@ -128,11 +128,20 @@ test('#589: selecionar Custos no menu leva o SLUG público para a URL, não o id
 // caixa-preta distingue o literal `'resumo'` de um `PAGINAS[0].id`. Medido de
 // novo em 2026-09-02, com a mutação nas DUAS origens do default (`_aba` inicial
 // e o fallback do setter, `frontend/tela-avancado.ts`): 1048 testes de frontend
-// e 74 casos de render VERDES. Este arquivo não enxerga a diferença, e não há
-// como fazê-lo enxergar — a pergunta não é de comportamento.
+// e 74 casos de render VERDES. Este arquivo não enxerga a diferença — e, SEM
+// mexer em produção, não há como fazê-lo enxergar.
 //
-// O que MUDOU é que a defesa passou a existir fora daqui, na única camada capaz
-// de respondê-la: `scripts/guard-aba-default-literal.mjs` (#638) pergunta à
+// ⚠️ A ressalva não é decorativa, e a #638 é quem a exige: a **Opção 2** dela
+// descreve uma costura de injeção em `PAGINAS` que tornaria a pergunta de
+// comportamento outra vez, e diz, com todas as letras, que essa seria a defesa
+// **mais forte**. Ela foi recusada aqui por ESCOPO — criar ponto de injeção em
+// produção só para viabilizar teste tem risco próprio —, não por ser impossível.
+// Escrever "não há como" sem a cláusula faria quem considerar a Opção 2 no futuro
+// ler impossibilidade onde houve escolha.
+//
+// O que MUDOU é que a defesa passou a existir fora daqui, na camada que responde
+// à pergunta sem tocar em produção: `scripts/guard-aba-default-literal.mjs`
+// (#638) pergunta à
 // ÁRVORE do TypeScript se cada origem do default é um literal de string, e
 // reprova a derivação, a indireção por variável e a origem que sumir. A regra é
 // positiva — pede o que é aceitável, em vez de enumerar as formas proibidas.

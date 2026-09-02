@@ -329,43 +329,60 @@ jobs:
           node scripts/guard-fiacao-funding.mjs
 
   aba-default-literal:
-    name: Aba default do Avancado e um literal, nao PAGINAS[0]
+    name: Aba default do Avançado é um literal, não PAGINAS[0]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
       URBI_TYPESCRIPT: ${{ github.workspace }}/.ts-guards/node_modules/typescript/lib/typescript.js
     steps:
       - uses: actions/checkout@v7
-      - name: Instalar so o typescript, isolado
+      - name: Instalar só o typescript, isolado
         run: |
           set -uo pipefail
-          # Mesmo padrao dos jobs `fiacao-funding`, `guards-ui` e
-          # `tabelas-obsoletas`: diretorio PROPRIO com package.json proprio,
+          # Mesmo padrão dos jobs `fiacao-funding`, `guards-ui` e
+          # `tabelas-obsoletas`: diretório PRÓPRIO com package.json próprio,
           # nunca a raiz — `npm install` na raiz tentaria baixar o
-          # `@urbiverso/sdk`, que e privado (401).
+          # `@urbiverso/sdk`, que é privado (401).
           #
-          # A pergunta deste guard e de ARVORE ("este no e um literal de
-          # string?"), e so o parser a responde. Sem o pacote, o guard sai 2
-          # (recusa) e o job fica vermelho: "nao deu para rodar" nunca e "passou".
+          # A pergunta deste guard é de ÁRVORE ("este nó é um literal de
+          # string?"), e só o parser a responde. Sem o pacote, o guard sai 2
+          # (recusa) e o job fica vermelho: "não deu para rodar" nunca é "passou".
           mkdir -p .ts-guards
           cd .ts-guards
           echo '{"name":"ts-guards","private":true}' > package.json
           npm install --no-audit --no-fund --loglevel=error typescript@5.9.3
           node -e "console.log('typescript', require('./node_modules/typescript').version)"
-      - name: Bateria do guard de default de aba (#638)
-        run: bash scripts/testar-guard-aba-default.sh
       - name: Guard do default de aba (#638)
         run: |
           set -uo pipefail
-          # Por que este job existe, medido em 2026-09-02: trocar as DUAS origens
-          # do default por `PAGINAS[0].id` deixou `validar-frontend.sh` 8/8 verde
-          # — 1048 testes de frontend e 74 casos de render. A aba default
-          # `'resumo'` E a 1a pagina, entao literal e derivacao produzem o MESMO
-          # resultado em toda entrada, e nenhuma assercao de comportamento as
-          # distingue. Reordenar `PAGINAS` e mexida de UI corriqueira: com o
-          # default acoplado, ela mudaria em silencio a aba que abre e a aba para
-          # onde um slug desconhecido cai.
-          node scripts/guard-aba-default-literal.mjs
+          # Por que este job existe, medido em 2026-09-02: com `PAGINAS[0].id` nas
+          # DUAS origens do default, o typecheck, a suíte de frontend e os casos
+          # de render ficam INTEIRAMENTE VERDES. A aba default `'resumo'` É a 1ª
+          # página, então literal e derivação produzem o MESMO resultado em toda
+          # entrada, e nenhuma asserção de comportamento as distingue. Reordenar
+          # `PAGINAS` é mexida de UI corriqueira: com o default acoplado, ela
+          # mudaria em silêncio a aba que abre e a aba para onde um slug
+          # desconhecido cai.
+          if ! node scripts/guard-aba-default-literal.mjs; then
+            echo "::error title=Default de aba derivado da lista::Uma origem do default do Avançado deixou de ser um literal de string, ou as duas deixaram de concordar. Derivar de PAGINAS acopla o default à ORDEM da lista, e nenhum teste de comportamento acusa isso. O log nomeia a origem e a linha."
+            exit 1
+          fi
+      - name: Bateria do guard de default de aba (#638)
+        # `always()` porque o veredito sobre o PRODUTO não pode depender da
+        # bateria: com a ordem invertida e sem isto, uma bateria quebrada faria o
+        # autor nunca saber se `tela-avancado.ts` viola a regra. É o que
+        # `guards-ui` e `enderecos-doc` já fazem — o `fiacao-funding` é o irmão
+        # mais antigo, e foi dele que este job copiou a ordem errada.
+        if: always()
+        run: |
+          set -uo pipefail
+          # Os dois sentidos importam. Falso NEGATIVO devolve o guard ao estado de
+          # decoração; falso POSITIVO acusa código correto, alguém desliga o job, e
+          # aí ele não guarda mais nada.
+          if ! bash scripts/testar-guard-aba-default.sh; then
+            echo "::error title=Bateria do guard de default de aba falhou::O guard não se comporta como o esperado. Veja quais casos falharam no log."
+            exit 1
+          fi
 
   tabelas-obsoletas:
     name: Tabela aposentada não é reusada por código novo
