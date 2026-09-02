@@ -27,7 +27,10 @@
 #      resolve — o arquivo existe, a linha existe, e o símbolo que a frase cita
 #      está a ±3 linhas do alvo. É a única afirmação do repo que nenhuma outra
 #      etapa consegue derrubar: um merge da `main` desloca as linhas do arquivo
-#      citado e a prosa passa a apontar para outra coisa, em verde;
+#      citado e a prosa passa a apontar para outra coisa, em verde. Nesta mesma
+#      etapa correm os outros dois guards que dependem do parser: o de FIAÇÃO
+#      (#446/#657) e o do DEFAULT DE ABA (#638) — os três fazem perguntas de
+#      árvore, e o parser só existe depois do link da etapa 3/8;
 #   6. typecheck do frontend (tsconfig só-frontend);
 #   7. testes de frontend e build do bundle via esbuild;
 #   8. verificação de RENDER em Chromium: monta quatro telas de verdade e mede
@@ -216,6 +219,22 @@ com_limite 120 bash scripts/testar-guard-fiacao.sh >/dev/null || {
   exit 1
 }
 echo "  ok: guard de fiação e bateria verdes"
+
+# #638: a aba default do Avançado é um LITERAL, não `PAGINAS[0]`. Mora nesta
+# etapa pelo mesmo motivo dos dois acima — decide pelo parser do typescript, que
+# só existe depois do link (etapa 3/8).
+#
+# Medido em 2026-09-02, e é a razão de o guard existir: trocar as DUAS origens do
+# default por `PAGINAS[0].id` deixou este script 8/8 VERDE — 1048 testes de
+# frontend e 74 casos de render. A coincidência de `'resumo'` ser a 1ª página
+# torna a derivação indistinguível do literal em toda asserção de comportamento;
+# só uma pergunta de ÁRVORE separa as duas.
+node scripts/guard-aba-default-literal.mjs || exit 1
+com_limite 120 bash scripts/testar-guard-aba-default.sh >/dev/null || {
+  echo "  bateria do guard de default de aba FALHOU — rode: bash scripts/testar-guard-aba-default.sh" >&2
+  exit 1
+}
+echo "  ok: guard de default de aba e bateria verdes"
 
 echo "== 6/8 typecheck do frontend =="
 # ⚠️ `scripts/**/*.ts` entra aqui, e NÃO é enfeite. O `tsconfig.json` da raiz

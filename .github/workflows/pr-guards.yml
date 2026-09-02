@@ -328,6 +328,45 @@ jobs:
           # nenhum.
           node scripts/guard-fiacao-funding.mjs
 
+  aba-default-literal:
+    name: Aba default do Avancado e um literal, nao PAGINAS[0]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      URBI_TYPESCRIPT: ${{ github.workspace }}/.ts-guards/node_modules/typescript/lib/typescript.js
+    steps:
+      - uses: actions/checkout@v7
+      - name: Instalar so o typescript, isolado
+        run: |
+          set -uo pipefail
+          # Mesmo padrao dos jobs `fiacao-funding`, `guards-ui` e
+          # `tabelas-obsoletas`: diretorio PROPRIO com package.json proprio,
+          # nunca a raiz — `npm install` na raiz tentaria baixar o
+          # `@urbiverso/sdk`, que e privado (401).
+          #
+          # A pergunta deste guard e de ARVORE ("este no e um literal de
+          # string?"), e so o parser a responde. Sem o pacote, o guard sai 2
+          # (recusa) e o job fica vermelho: "nao deu para rodar" nunca e "passou".
+          mkdir -p .ts-guards
+          cd .ts-guards
+          echo '{"name":"ts-guards","private":true}' > package.json
+          npm install --no-audit --no-fund --loglevel=error typescript@5.9.3
+          node -e "console.log('typescript', require('./node_modules/typescript').version)"
+      - name: Bateria do guard de default de aba (#638)
+        run: bash scripts/testar-guard-aba-default.sh
+      - name: Guard do default de aba (#638)
+        run: |
+          set -uo pipefail
+          # Por que este job existe, medido em 2026-09-02: trocar as DUAS origens
+          # do default por `PAGINAS[0].id` deixou `validar-frontend.sh` 8/8 verde
+          # — 1048 testes de frontend e 74 casos de render. A aba default
+          # `'resumo'` E a 1a pagina, entao literal e derivacao produzem o MESMO
+          # resultado em toda entrada, e nenhuma assercao de comportamento as
+          # distingue. Reordenar `PAGINAS` e mexida de UI corriqueira: com o
+          # default acoplado, ela mudaria em silencio a aba que abre e a aba para
+          # onde um slug desconhecido cai.
+          node scripts/guard-aba-default-literal.mjs
+
   tabelas-obsoletas:
     name: Tabela aposentada não é reusada por código novo
     runs-on: ubuntu-latest

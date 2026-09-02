@@ -55,6 +55,13 @@ type AbaTopo = 'resumo' | 'empreendimento' | 'viabilidade' | 'obra' | 'fluxo' | 
 // por chave — indiferentes a posição) e a aba default continua 'resumo', fixada
 // no fallback do setter e no `_aba` inicial, não pela 1ª posição deste array.
 // Quem for "arrumar" esta lista: a inversão é o pedido, não um descuido.
+//
+// #638: essa independência é GUARDADA, e não só afirmada aqui. `resumo` é, por
+// coincidência, a 1ª entrada — então `PAGINAS[0].id` produziria o mesmo
+// resultado em toda entrada, e nenhum teste de comportamento acusaria a troca
+// (medido: a suíte inteira e o render ficam verdes). Quem responde é
+// `scripts/guard-aba-default-literal.mjs`, pelo parser do TypeScript: cada
+// origem do default tem de ser um LITERAL, e as duas têm de concordar.
 const PAGINAS: { id: AbaTopo; label: string }[] = [
   { id: 'resumo',         label: 'Resumo' },
   { id: 'empreendimento', label: 'Empreendimento' },
