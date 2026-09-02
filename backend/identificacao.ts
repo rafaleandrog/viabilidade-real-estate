@@ -81,8 +81,31 @@ export function montarNomeExibicao(
 
   const completo = montar(nome);
   if (completo.length <= LIMITE_NOME_EXIBICAO) return completo;
+
   const excesso = completo.length - LIMITE_NOME_EXIBICAO;
-  return montar(nome.slice(0, Math.max(0, nome.length - excesso)).trimEnd());
+  const cortado = montar(cortarPorCodePoint(nome, nome.length - excesso).trimEnd());
+  // ⚠️ Rede final, e ela NÃO é paranoia: o corte acima encolhe só o NOME, e as
+  // partes estruturais não têm teto garantido aqui — `uf` chega crua do corpo do
+  // PATCH (a coluna declara `limite: 2`, mas nada no app o impõe). Com uma UF
+  // absurda, o nome já foi a zero e o resultado continuaria acima do limite.
+  // Sem esta linha, "o resultado nunca passa do limite" seria falso — e frase
+  // falsa é pior que a ausência dela, porque ninguém vai conferir de novo.
+  return cortado.length <= LIMITE_NOME_EXIBICAO
+    ? cortado
+    : cortarPorCodePoint(cortado, LIMITE_NOME_EXIBICAO);
+}
+
+/**
+ * Corta em `max` unidades UTF-16 **sem partir um par surrogate** — cortar no meio
+ * de um emoji deixa metade de um caractere no rótulo, e `slice` cru faz isso.
+ */
+function cortarPorCodePoint(texto: string, max: number): string {
+  if (max <= 0) return '';
+  if (max >= texto.length) return texto;
+  const codigo = texto.charCodeAt(max - 1);
+  // Alta metade de um par no último lugar: o par está partido, recua uma casa.
+  const fim = codigo >= 0xd800 && codigo <= 0xdbff ? max - 1 : max;
+  return texto.slice(0, fim);
 }
 
 /**

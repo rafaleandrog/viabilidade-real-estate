@@ -795,3 +795,49 @@ test('#660 fiação: o handler passa ao montarPatchEstudo as QUATRO partes do no
     assert.ok(FONTE_ROTA.includes(parte), `o handler deixou de passar \`${parte}\``);
   }
 });
+
+test('#660: a promessa "nunca passa do teto" vale mesmo com UF absurda vinda do corpo', () => {
+  // As partes ESTRUTURAIS não têm teto garantido: `uf` chega crua do PATCH (a
+  // coluna declara `limite: 2`, mas nada no app o impõe). Encolher só o nome
+  // não bastaria — o nome já teria ido a zero e o resultado seguiria acima.
+  const n = montarNomeExibicao({ sigla: 'INC', nome: 'Pátio', uf: 'X'.repeat(300), sequencia: 2 });
+  assert.ok(n.length <= LIMITE_NOME_EXIBICAO, `saiu com ${n.length}`);
+});
+
+/**
+ * Há metade de par surrogate SOLTA em qualquer posição da string?
+ *
+ * ⚠️ A primeira versão deste teste olhava só o ÚLTIMO caractere do rótulo — e o
+ * rótulo termina em " - DF - 002", nunca no ponto de corte. Ela media a ponta
+ * errada: apagar a guarda de surrogate deixava a suíte verde. Varrer a string
+ * inteira é o que faz a asserção cair sobre o lugar onde o corte acontece.
+ */
+function temSurrogateSolto(t: string): boolean {
+  for (let i = 0; i < t.length; i++) {
+    const c = t.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff) {
+      const prox = i + 1 < t.length ? t.charCodeAt(i + 1) : 0;
+      if (!(prox >= 0xdc00 && prox <= 0xdfff)) return true;
+      i++;
+    } else if (c >= 0xdc00 && c <= 0xdfff) {
+      return true;
+    }
+  }
+  return false;
+}
+
+test('#660: o corte não parte par surrogate — emoji no limite não vira meio caractere', () => {
+  // 120 emoji = 240 unidades UTF-16; o teto deixa 183 para o nome, que é ÍMPAR
+  // e portanto cai exatamente no meio de um par.
+  const n = montarNomeExibicao({ sigla: 'INC', nome: '😀'.repeat(120), uf: 'DF', sequencia: 2 });
+  assert.ok(n.length <= LIMITE_NOME_EXIBICAO, `saiu com ${n.length}`);
+  assert.equal(temSurrogateSolto(n), false, 'o corte partiu um par surrogate no meio');
+});
+
+test('#660 controle: o detector de surrogate solto realmente detecta', () => {
+  // Sem este controle, um `temSurrogateSolto` que sempre devolvesse `false`
+  // faria o teste acima passar sem medir nada.
+  assert.equal(temSurrogateSolto('😀'), false);
+  assert.equal(temSurrogateSolto('😀'.slice(0, 1)), true);
+  assert.equal(temSurrogateSolto('INC - Pátio'), false);
+});
