@@ -59,7 +59,7 @@
  * `guard-fiacao-funding`, `guard-enderecos-doc` e dos guards de UI. Sem o
  * pacote `typescript` o guard RECUSA: "não deu para rodar" nunca é "passou".
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compilador, disponivel as tsDisponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
@@ -141,6 +141,18 @@ export const ORIGENS = [
  * "passou".
  */
 function fallbackAtribuido(ts, setter, campo) {
+  // 0 · a INVERSÃO: mais de uma forma de fallback torna o setter ambíguo.
+  const formas = formasDeFallback(ts, setter);
+  if (formas.length > 1) {
+    return {
+      erro: `o setter tem ${formas.length} construções em forma de fallback (ternário, \`??\`, `
+        + '`||` ou `if/else`), e não dá para decidir por leitura qual delas é o default.\n'
+        + '      Não é falta de esforço do guard: uma delas pode ser derivada de `PAGINAS` enquanto '
+        + 'outra\n      exibe um literal plausível, e foi assim que duas versões deste guard foram '
+        + 'enganadas.\n      Deixe UMA no setter — mova normalização de entrada para fora dele',
+    };
+  }
+
   // 1 · as atribuições `this.<campo> = X` dentro do setter.
   const atribuicoes = [];
   const varrer = (n) => {
@@ -164,7 +176,10 @@ function fallbackAtribuido(ts, setter, campo) {
     // desligar o guard. Quando as duas atribuições são os dois ramos do mesmo
     // `if`, o fallback é o do `else`, exatamente como o `whenFalse` do ternário.
     const ramos = ramosDeUmIfSo(ts, atribuicoes);
-    if (ramos) return resolverValor(ts, setter, campo, ramos.senao);
+    if (ramos) {
+      const r = resolverValor(ts, setter, campo, ramos.senao, true);
+      return r.erro ? r : exigirDependenciaDaEntrada(ts, setter, ramos.entao, r);
+    }
     return {
       erro: `o setter atribui a \`this.${campo}\` ${atribuicoes.length} vezes, e elas não são os `
         + 'dois ramos de um mesmo if/else; qual delas é o fallback é ambíguo, e guard ambíguo '
@@ -173,6 +188,44 @@ function fallbackAtribuido(ts, setter, campo) {
   }
 
   return resolverValor(ts, setter, campo, atribuicoes[0]);
+}
+
+/**
+ * Quantas construções em FORMA DE FALLBACK existem no setter — ternário,
+ * `??`, `||` e `if` com `else`.
+ *
+ * ⚠️ ESTA É A INVERSÃO, e ela veio depois de a mesma classe voltar DUAS vezes.
+ * A primeira versão do guard elegia "o primeiro ternário"; a segunda elegia "o
+ * que alimenta `this._aba`" — e a rodada 2 mostrou que a segunda era a primeira
+ * um nó adiante, com TRÊS escapes medidos: um ternário derivado engolido por um
+ * `?? 'resumo'`; um `if/else` plausível com o fallback real no `then`; e uma
+ * variável homônima declarada num escopo interno anterior.
+ *
+ * Enumerar as formas aceitas não converge — é o que a armadilha 14 do
+ * `CLAUDE.md` manda parar de fazer na SEGUNDA reincidência. Então a pergunta
+ * deixou de ser "qual é o fallback?" e passou a ser **"existe mais de um lugar
+ * onde um fallback poderia estar?"**. Havendo, o setter é ambíguo para leitura
+ * automática e o guard REPROVA — não escolhe, não adivinha.
+ *
+ * O custo é real e é aceito: um ternário inocente no setter passa a reprovar.
+ * A mensagem diz o que fazer (tirar a normalização do setter). O custo oposto —
+ * aprovar um `PAGINAS[0].id` porque havia um literal plausível por perto — é o
+ * defeito que este arquivo inteiro existe para impedir.
+ */
+function formasDeFallback(ts, setter) {
+  const achados = [];
+  const varrer = (n) => {
+    if (ts.isConditionalExpression(n)) achados.push(n);
+    else if (
+      ts.isBinaryExpression(n)
+      && (n.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+        || n.operatorToken.kind === ts.SyntaxKind.BarBarToken)
+    ) achados.push(n);
+    else if (ts.isIfStatement(n) && n.elseStatement) achados.push(n);
+    ts.forEachChild(n, varrer);
+  };
+  ts.forEachChild(setter, varrer);
+  return achados;
 }
 
 /**
@@ -203,26 +256,78 @@ function ramosDeUmIfSo(ts, atribuicoes) {
   const bNoSenao = dentro(ifA.elseStatement, b);
   // Exatamente uma no `else`: senão o par não é "isto, senão aquilo".
   if (aNoSenao === bNoSenao) return null;
-  return { senao: aNoSenao ? a : b };
+  return aNoSenao ? { senao: a, entao: b } : { senao: b, entao: a };
+}
+
+/**
+ * "Fallback" só quer dizer alguma coisa se o OUTRO ramo depender da entrada.
+ *
+ * ⚠️ Achado da rodada 2, e o único que a inversão de `formasDeFallback` não
+ * pegou: `this._aba = PAGINAS[0].id ?? 'resumo'` tem UMA forma de fallback, e o
+ * ramo de fallback É um literal — o contrato do guard, ao pé da letra,
+ * satisfeito. Só que o outro lado é constante, o `??` nunca cai, e o default
+ * efetivo é `PAGINAS[0].id`. O guard aprovava.
+ *
+ * A condição é a mesma para as três formas, e é isto que a torna princípio e não
+ * remendo: **o ramo que não é o fallback tem de referenciar a entrada do setter**
+ * — o parâmetro, ou um local derivado dele. Um ramo que ignora a entrada não é
+ * "o caminho normal": é o default de verdade, disfarçado.
+ */
+function exigirDependenciaDaEntrada(ts, setter, ramoNormal, resultado) {
+  const nomesLocais = new Set(setter.parameters.map((pm) => (ts.isIdentifier(pm.name) ? pm.name.text : '')));
+  const colher = (n) => {
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) nomesLocais.add(n.name.text);
+    ts.forEachChild(n, colher);
+  };
+  colher(setter);
+
+  let usa = false;
+  const varrer = (n) => {
+    if (usa) return;
+    if (ts.isIdentifier(n) && nomesLocais.has(n.text)) { usa = true; return; }
+    ts.forEachChild(n, varrer);
+  };
+  varrer(ramoNormal);
+
+  if (usa) return resultado;
+  return {
+    erro: 'o ramo que NÃO é o fallback não usa a entrada do setter '
+      + `(\`${ramoNormal.getText().slice(0, 50)}\`), então o fallback nunca acontece e o default `
+      + 'de verdade é esse ramo.\n      Um "fallback" só significa alguma coisa quando o caminho '
+      + 'normal depende do que entrou',
+  };
 }
 
 /** Resolve aliases locais e extrai o ramo de fallback de um valor. */
-function resolverValor(ts, setter, campo, expressao) {
+function resolverValor(ts, setter, campo, expressao, aceitaLiteralDireto = false) {
   let valor = expressao;
   // 2 · resolve aliases locais (`const val = …; this._aba = val;`). O limite
   // existe só para que uma cadeia patológica termine — não é regra de negócio.
   for (let i = 0; i < 8 && ts.isIdentifier(valor); i++) {
     const nome = valor.text;
-    let decl = null;
+    // ⚠️ TODAS as declarações daquele nome, não a primeira. Escolher a primeira
+    // em ordem de árvore era o defeito antigo escrito um nó adiante: um `const
+    // val` num bloco ou numa arrow ANTERIOR sombreava o `val` de verdade, e o
+    // guard lia o literal errado. Resolver escopo à mão é a cauda que o
+    // `fonte-ts.mjs` já pagou uma vez — então aqui não se resolve: havendo mais
+    // de uma ligação para o mesmo nome, REPROVA.
+    const decls = [];
     const acharDecl = (n) => {
-      if (decl) return;
       if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === nome && n.initializer) {
-        decl = n.initializer;
-        return;
+        decls.push(n.initializer);
       }
       ts.forEachChild(n, acharDecl);
     };
     acharDecl(setter);
+    if (decls.length > 1) {
+      return {
+        erro: `\`${nome}\` é declarado ${decls.length} vezes dentro do setter (sombra de nome em `
+          + 'bloco, arrow ou escopo aninhado).\n      Qual ligação vale é pergunta de ESCOPO, e '
+          + 'este guard não a responde — resolver escopo à mão é a\n      cauda que o lexer '
+          + 'artesanal já custou a este repositório. Use nomes distintos',
+      };
+    }
+    const decl = decls[0] ?? null;
     if (!decl) {
       return {
         erro: `\`this.${campo}\` recebe \`${nome}\`, que não é declarado dentro do setter — `
@@ -237,15 +342,27 @@ function resolverValor(ts, setter, campo, expressao) {
   // em vez de adivinhar onde estaria o default.
   while (ts.isParenthesizedExpression(valor) || ts.isAsExpression(valor)) valor = valor.expression;
 
-  // Um literal direto já É o fallback: é o caso do ramo `else` do if/else, onde
-  // "isto, senão aquilo" foi decidido pelo statement e não pela expressão.
-  if (ts.isStringLiteral(valor) || ts.isNoSubstitutionTemplateLiteral(valor)) return { no: valor };
-  if (ts.isConditionalExpression(valor)) return { no: valor.whenFalse };
+  // Um literal direto é o fallback SÓ quando veio do ramo `else` de um if/else —
+  // ali o "isto, senão aquilo" foi decidido pelo statement, não pela expressão.
+  //
+  // ⚠️ Fora desse caso ele NÃO vale, e a distinção é de coerência: sem a flag,
+  // `this._aba = 'resumo';` como única atribuição passava — um setter que ignora
+  // a URL por completo —, enquanto `this._aba = idDaSlug(v) as AbaTopo;` reprovava
+  // por "não expõe um fallback". Nos dois o fallback deixou de existir; aprovar um
+  // e reprovar o outro tornava falsa a justificativa escrita na bateria.
+  if (aceitaLiteralDireto && (ts.isStringLiteral(valor) || ts.isNoSubstitutionTemplateLiteral(valor))) {
+    return { no: valor };
+  }
+  if (ts.isConditionalExpression(valor)) {
+    return exigirDependenciaDaEntrada(ts, setter, valor.whenTrue, { no: valor.whenFalse });
+  }
   if (
     ts.isBinaryExpression(valor)
     && (valor.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
       || valor.operatorToken.kind === ts.SyntaxKind.BarBarToken)
-  ) return { no: valor.right };
+  ) {
+    return exigirDependenciaDaEntrada(ts, setter, valor.left, { no: valor.right });
+  }
 
   return {
     erro: `o valor que chega em \`this.${campo}\` não expõe um fallback (nem ternário, nem \`??\`, `
@@ -256,8 +373,13 @@ function resolverValor(ts, setter, campo, expressao) {
 
 // Só executa quando chamado direto. Sem isto, o teste de inventário abaixo não
 // poderia importar `ORIGENS` — o import rodaria o guard e mataria o processo.
+// `realpathSync`, e não `resolve`: `import.meta.url` já vem resolvido por
+// realpath, então por SYMLINK os dois divergiam, `chamadoDireto` dava falso e o
+// guard saía 0 SEM UMA LINHA DE SAÍDA — o modo de falha mais caro que existe,
+// porque é indistinguível de sucesso. Nenhum call site usa symlink hoje; a
+// defesa é para quando alguém usar.
 const chamadoDireto = process.argv[1]
-  && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  && import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href;
 if (!chamadoDireto) {
   // Importado: exporta `ORIGENS` e não faz mais nada.
 } else {

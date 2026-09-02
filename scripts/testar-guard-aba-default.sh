@@ -34,9 +34,12 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 #     > scripts/.tmp-g.mjs
 #   URBI_GUARD_ABA=$PWD/scripts/.tmp-g.mjs bash scripts/testar-guard-aba-default.sh
 #
-# Medido em 2026-09-02, com a bateria de 20 casos: guard sempre-passa mata 13
-# casos (os 13 que esperam `reprova`), guard sempre-reprova mata 7 (os 7 que
-# esperam `ok`). Os dois lados têm quem os segure.
+# O resultado esperado é estrutural, e por isso não envelhece: o guard
+# sempre-passa mata TODOS os casos que esperam `reprova`, o sempre-reprova mata
+# todos os que esperam `ok`, e os dois números somam o total. Não se anota aqui
+# quantos são — contador em artefato versionado diverge a cada caso novo sem nada
+# ficar vermelho (armadilha 13 do `CLAUDE.md`), e este texto já nasceu errado uma
+# vez, dizendo 13/7 para uma bateria que já tinha ido a 27 casos.
 #
 # ⚠️ A CÓPIA TEM DE FICAR EM `scripts/`, e isto custou uma medição falsa. Posta
 # em `/tmp`, ela não resolve o `import './lib/fonte-ts.mjs'` e MORRE no
@@ -155,9 +158,10 @@ DISCORDAM="  set aba(v: string) {
   private _aba: AbaTopo = 'resumo';"
 
 # — origem que SUMIU. Sem o inicializador, o default do campo passa a ser
-# `undefined` e a regra não tem o que guardar; sem o ternário do setter, o
-# fallback deixou de existir. Os dois são tão graves quanto a derivação, e é
-# isto que fecha a lista de origens por CONTAGEM: ela não pode encolher calada.
+# `undefined` e a regra não tem o que guardar; sem NENHUMA forma de fallback no
+# setter, não há default que o guard possa apontar. Os dois são tão graves quanto
+# a derivação — o guard aprova o que consegue LER, e o que ele não consegue ler
+# ele reprova, em vez de aprovar no escuro. É o mesmo motivo do caso 33.
 SEM_INICIALIZADOR="  set aba(v: string) {
     const id = idDaSlug(v);
     const val = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
@@ -293,6 +297,65 @@ TERNARIO_EM_DECORATOR="  @property({ type: String, converter: PAGINAS.length ? u
 # e aí a bateria diagnostica ao contrário, mandando caçar falsos positivos que
 # não existem. Medido: com um `ReferenceError` no guard, 8 de 12 casos passavam
 # por acidente. Recusa e crash são falha DA BATERIA, e é assim que ela reporta.
+
+# ── Rodada 2: as TRÊS regressões que o conserto da rodada 1 introduziu ──────
+# Todas medidas contra `HEAD~1`: o guard INGÊNUO reprovava e o guard "consertado"
+# aprovava com `PAGINAS[0].id`. É a mesma classe voltando pela segunda vez, e foi
+# ela que motivou a inversão (ver `formasDeFallback` no guard).
+
+# P1-a · sombra de nome em BLOCO: um `const val` num escopo interno anterior, e
+# `acharDecl` pegava a primeira declaração em ordem de árvore.
+SOMBRA_EM_BLOCO="  set aba(v: string) {
+    const id = idDaSlug(v);
+    if (id === 'x') { const val = 'resumo'; void val; }
+    const val = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id;
+    this._aba = val;
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# P1-a (variante) · a mesma sombra dentro de uma ARROW — a forma mais provável
+# num refactor real.
+SOMBRA_EM_ARROW="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const registrar = () => { const val: AbaTopo = 'resumo'; return val; };
+    void registrar;
+    const val = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id;
+    this._aba = val;
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# P1-b · o ternário derivado engolido por um \`?? 'resumo'\`: o guard devolvia
+# \`.right\` sem olhar o que sobrara a ESQUERDA.
+TERNARIO_SOB_NULLISH="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = (IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id) ?? 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# P1-c · o fallback real no THEN. Le-se natural ("slug vazio -> aba default"), e
+# \`ramosDeUmIfSo\` so olhava o \`else\`.
+FALLBACK_NO_THEN="  set aba(v: string) {
+    const id = idDaSlug(v);
+    if (v !== '') { this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id; }
+    else { this._aba = 'resumo'; }
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# P1-b (degenerado) · nem ternario ha: a derivacao pura sob um \`??\` literal.
+DERIVADO_SOB_NULLISH="  set aba(v: string) {
+    this._aba = PAGINAS[0].id ?? 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# O setter que IGNORA a entrada: uma atribuicao so, literal direto, sem forma de
+# fallback nenhuma. Reprova pelo mesmo motivo que o \`SEM_TERNARIO\` — nos dois o
+# fallback deixou de existir, e aprovar um e reprovar o outro tornava falsa a
+# justificativa escrita ali em cima.
+SETTER_SO_LITERAL="  set aba(v: string) {
+    this._aba = 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
 verificar() { # <nome> <raiz> <esperado: ok|reprova>
   local nome="$1" raiz="$2" esperado="$3" rc=0
   TOTAL=$((TOTAL+1))
@@ -320,7 +383,12 @@ verificar "10 origem que sumiu: sem inicializador reprova"       "$(arvore c10 "
 verificar "11 origem que sumiu: setter sem ternário reprova"     "$(arvore c11 "$SEM_TERNARIO")"              reprova
 verificar "12 arquivo inteiro ausente reprova"                   "$TMPRAIZ/nao-existe"                        reprova
 verificar "13 ternário inocente ANTES não esconde derivação"    "$(arvore c13 "$TERNARIO_INOCENTE_ANTES")"   reprova
-verificar "14 ternário inocente ANTES não reprova literal"      "$(arvore c14 "$TERNARIO_INOCENTE_COM_LITERAL")" ok
+# ⚠️ Este caso ESPERAVA `ok` e passou a esperar `reprova`, de propósito, com a
+# inversão da rodada 2. Um segundo ternário no setter — ainda que o fallback de
+# verdade seja literal — torna o setter ambíguo para leitura automática, e o
+# guard reprova em vez de escolher. Foi exatamente por "escolher" que ele foi
+# enganado duas vezes. O custo é aceito e a mensagem diz o que fazer.
+verificar "14 segundo ternário no setter: ambíguo, reprova"     "$(arvore c14 "$TERNARIO_INOCENTE_COM_LITERAL")" reprova
 verificar "15 cadeia de aliases é rastreada até o ternário"     "$(arvore c15 "$ALIAS_EM_CADEIA")"           ok
 verificar "16 fallback por '??' com literal passa"              "$(arvore c16 "$FALLBACK_COM_NULLISH")"      ok
 verificar "17 fallback por '??' derivado reprova"               "$(arvore c17 "$FALLBACK_COM_NULLISH_DERIVADO")" reprova
@@ -333,6 +401,12 @@ verificar "23 falso positivo: 'satisfies' com literal passa"    "$(arvore c23 "$
 verificar "24 'satisfies' sobre derivação reprova"              "$(arvore c24 "$SATISFIES_DERIVADO")"        reprova
 verificar "25 ternário inocente em ARGUMENTO não cega o guard"  "$(arvore c25 "$TERNARIO_EM_ARGUMENTO")"     reprova
 verificar "26 ternário inocente em DECORATOR não cega o guard"  "$(arvore c26 "$TERNARIO_EM_DECORATOR")"     reprova
+verificar "28 sombra de nome em BLOCO reprova"                  "$(arvore c28 "$SOMBRA_EM_BLOCO")"           reprova
+verificar "29 sombra de nome em ARROW reprova"                  "$(arvore c29 "$SOMBRA_EM_ARROW")"           reprova
+verificar "30 ternário derivado sob '??' literal reprova"       "$(arvore c30 "$TERNARIO_SOB_NULLISH")"      reprova
+verificar "31 fallback real no THEN do if/else reprova"         "$(arvore c31 "$FALLBACK_NO_THEN")"          reprova
+verificar "32 derivação pura sob '??' literal reprova"          "$(arvore c32 "$DERIVADO_SOB_NULLISH")"      reprova
+verificar "33 setter que ignora a entrada reprova"              "$(arvore c33 "$SETTER_SO_LITERAL")"         reprova
 
 # ── INVENTÁRIO: a metade do critério (a) que as fixtures não cobrem ────────
 #
@@ -347,7 +421,7 @@ verificar "26 ternário inocente em DECORATOR não cega o guard"  "$(arvore c26 
 # que o CLAUDE.md § lista de exceção cobra.
 esperado_inventario='fallback-setter:aba|inicializador:_aba'
 real_inventario="$(node -e "
-  import('./scripts/guard-aba-default-literal.mjs').then((m) => {
+  import('$GUARD').then((m) => {
     const chaves = m.ORIGENS.map((o) => o.tipo + ':' + o.membro).sort();
     process.stdout.write(chaves.join('|'));
   });
@@ -355,6 +429,11 @@ real_inventario="$(node -e "
 TOTAL=$((TOTAL+1))
 if [ "$real_inventario" = "$esperado_inventario" ]; then
   ok "27 inventário de ORIGENS: exatamente as 2 origens esperadas"
+elif [ -z "$real_inventario" ]; then
+  # Distinguir "não mediu" de "mediu e divergiu": vazio quer dizer que o import
+  # nem rodou (guard com erro de sintaxe, caminho errado), e atribuir isso a
+  # "origem renomeada" mandaria caçar o defeito errado.
+  falha "27 inventário de ORIGENS" "o import de \`$GUARD\` não devolveu nada — a bateria NÃO mediu o inventário (guard quebrado ou caminho errado), não é divergência de origem"
 else
   falha "27 inventário de ORIGENS" "esperado \`$esperado_inventario\`, veio \`$real_inventario\` — origem acrescentada, removida ou renomeada sem atualizar esta bateria"
 fi
