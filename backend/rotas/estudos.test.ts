@@ -6,6 +6,7 @@ import {
   montarCopiasFilhas, FILHAS_SIMPLES,
 } from './estudos.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
+import { montarNomeExibicao, siglaDoTipo } from '../identificacao.js';
 import { readFileSync } from 'node:fs';
 
 // Ciclo de vida do estudo (spec §3):
@@ -519,4 +520,138 @@ test('#585 percentualEstrito não é Number(): rejeita hex, científica e espaç
   assert.equal(percentualEstrito(12.5), 12.5);
   assert.equal(percentualEstrito('12.5'), 12.5);
   assert.equal(percentualEstrito(' -3 '), -3, 'o sinal é lido; quem recusa negativo é o chamador');
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #660 — renomear um estudo pelo Painel.
+//
+// A armadilha desta issue não é o PATCH: é que a tela NÃO MOSTRA `nome`.
+// Ela mostra `nome_exibicao || nome`, e `nome_exibicao` ("INC - Pátio - DF -
+// 002") é montado UMA vez, na criação. Gravar só o `nome` novo devolveria 200
+// com a tela continuando a exibir o nome velho — falha calada, e o critério de
+// aceite ("recarregar a lista mostra o novo nome") reprovado com o servidor
+// dizendo que deu certo.
+//
+// Medido: com a recomposição desligada, os 35 testes que existiam antes destes
+// continuavam VERDES. É por isso que eles existem.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Um estudo persistido, com as partes que compõem `nome_exibicao`. */
+const ESTUDO_NOMEAVEL = {
+  nivel_analise: 'preliminar',
+  status: 'rascunho',
+  tipo_empreendimento: 'incorporacao',
+  uf: 'DF',
+  sequencia: 2,
+};
+
+test('#660: PATCH com nome novo RECOMPÕE nome_exibicao — senão a tela mostra o nome velho para sempre', () => {
+  const d = montarPatchEstudo({ nome: 'Pátio Urbitá 2' }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in d, JSON.stringify(d));
+  assert.equal(d.dados.nome, 'Pátio Urbitá 2');
+  assert.equal(d.dados.nome_exibicao, 'INC - Pátio Urbitá 2 - DF - 002');
+});
+
+test('#660: a sequência do estudo é PRESERVADA — recompor não pode renumerar', () => {
+  const d = montarPatchEstudo({ nome: 'Outro' }, { ...ESTUDO_NOMEAVEL, sequencia: 47 });
+  assert.ok('dados' in d);
+  assert.match(d.dados.nome_exibicao, /- 047$/);
+});
+
+test('#660: id_legivel NÃO é recomposto — ele é único e é a identidade estável do estudo', () => {
+  const d = montarPatchEstudo({ nome: 'Nome Novo' }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in d);
+  assert.equal('id_legivel' in d.dados, false);
+});
+
+test('#660: PATCH sem tocar em nome não mexe em nome_exibicao', () => {
+  const d = montarPatchEstudo({ uf: 'GO' }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in d);
+  assert.equal('nome_exibicao' in d.dados, false);
+});
+
+test('#660: nome_exibicao mandado pelo CLIENTE continua bloqueado — quem o escreve é o servidor', () => {
+  // O campo segue em CAMPOS_BLOQUEADOS_PATCH. Sem `nome` junto, ele é descartado
+  // e sobra "nenhum campo"; com `nome`, o valor que vale é o DERIVADO, nunca o
+  // que veio no corpo.
+  const so = montarPatchEstudo({ nome_exibicao: 'INVENTADO' }, ESTUDO_NOMEAVEL);
+  assert.ok('codigo' in so && so.codigo === 'NENHUM_CAMPO', JSON.stringify(so));
+
+  const junto = montarPatchEstudo({ nome: 'Real', nome_exibicao: 'INVENTADO' }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in junto);
+  assert.equal(junto.dados.nome_exibicao, 'INC - Real - DF - 002');
+});
+
+test('#660: UF que muda no MESMO PATCH entra no nome_exibicao recomposto', () => {
+  // A tela de Premissas manda o registro inteiro; sem ler a UF do corpo, o nome
+  // de exibição sairia com a UF antiga ao lado do nome novo.
+  const d = montarPatchEstudo({ nome: 'Pátio', uf: 'GO' }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in d);
+  assert.equal(d.dados.nome_exibicao, 'INC - Pátio - GO - 002');
+});
+
+test('#660: reenviar o MESMO nome é idempotente — o nome_exibicao não muda', () => {
+  // A tela de Premissas reenvia `nome` inalterado em todo salvamento. Se a
+  // recomposição não fosse idempotente, salvar Premissas mexeria no nome.
+  const original = montarNomeExibicao({
+    sigla: siglaDoTipo('incorporacao'), nome: 'Pátio Urbitá', uf: 'DF', sequencia: 2,
+  });
+  const d = montarPatchEstudo({ nome: 'Pátio Urbitá' }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in d);
+  assert.equal(d.dados.nome_exibicao, original);
+});
+
+test('#660: Loteamento usa a sigla LOT — a recomposição não é só de Incorporação', () => {
+  const d = montarPatchEstudo({ nome: 'Gleba Sul' }, { ...ESTUDO_NOMEAVEL, tipo_empreendimento: 'loteamento' });
+  assert.ok('dados' in d);
+  assert.equal(d.dados.nome_exibicao, 'LOT - Gleba Sul - DF - 002');
+});
+
+test('#660: estudo sem UF e sem sequência não vira "null" no nome — as partes vazias saem', () => {
+  const d = montarPatchEstudo({ nome: 'Sem partes' }, {
+    ...ESTUDO_NOMEAVEL, uf: null, sequencia: null,
+  });
+  assert.ok('dados' in d);
+  assert.equal(d.dados.nome_exibicao, 'INC - Sem partes');
+});
+
+test('#660: nome inválido é recusado no PORTÃO, com 400 NOME_INVALIDO', () => {
+  // `estudos.nome` é obrigatorio: true / limite: 200. A tela também barra, mas
+  // `PATCH /estudos/:id` é chamável direto — é aqui que a regra vale.
+  for (const v of ['', '   ', '\n', 0, 1, true, null, {}, [], 'x'.repeat(201)]) {
+    const d = montarPatchEstudo({ nome: v }, ESTUDO_NOMEAVEL);
+    assert.ok('codigo' in d, `aceitou nome ${JSON.stringify(v)}`);
+    assert.equal(d.codigo, 'NOME_INVALIDO');
+    assert.equal(d.http, 400);
+  }
+});
+
+test('#660: o nome gravado vem TRIMADO, e o de exibição também', () => {
+  const d = montarPatchEstudo({ nome: '  Pátio  ' }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in d);
+  assert.equal(d.dados.nome, 'Pátio');
+  assert.equal(d.dados.nome_exibicao, 'INC - Pátio - DF - 002');
+});
+
+test('#660: nome de exatamente 200 caracteres passa — o limite é do schema, não um chute', () => {
+  const nome = 'x'.repeat(200);
+  const d = montarPatchEstudo({ nome }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in d, JSON.stringify(d));
+  assert.equal(d.dados.nome, nome);
+});
+
+test('#660 montarNomeExibicao: as partes vazias somem, a UF sai em caixa alta, a seq com 3 dígitos', () => {
+  assert.equal(
+    montarNomeExibicao({ sigla: 'INC', nome: 'Pátio', uf: 'df', sequencia: 7 }),
+    'INC - Pátio - DF - 007',
+  );
+  assert.equal(montarNomeExibicao({ sigla: 'LOT', nome: 'Gleba', uf: '', sequencia: 1 }), 'LOT - Gleba - 001');
+  assert.equal(montarNomeExibicao({ sigla: 'LOT', nome: 'Gleba', uf: '  ', sequencia: null }), 'LOT - Gleba');
+  assert.equal(montarNomeExibicao({ sigla: 'INC', nome: 'X', sequencia: 1000 }), 'INC - X - 1000');
+});
+
+test('#660 siglaDoTipo: os dois tipos conhecidos, e o fallback de 3 letras para o desconhecido', () => {
+  assert.equal(siglaDoTipo('incorporacao'), 'INC');
+  assert.equal(siglaDoTipo('loteamento'), 'LOT');
+  assert.equal(siglaDoTipo('outro'), 'OUT');
 });

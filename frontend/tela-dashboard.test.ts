@@ -332,3 +332,75 @@ test('#611 controle: com investimento REAL o ROI é número — o conserto não 
   assert.notEqual(r, null);
   assert.equal(typeof r.roiPct, 'number', 'com custo lançado há denominador, e o ROI é medido');
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #659/#660 — a FIAÇÃO, que é onde esta classe de defeito mora.
+//
+// `frontend/estudo-status.test.ts` prova que `acoesTransicao`,
+// `podeEditarEstudo` e `nomeEstudoLimpo` respondem certo. Nenhum daqueles 22
+// testes fica vermelho se o componente parar de chamá-las — é a classe de
+// defeito nº 1 do CLAUDE.md, medida em sete PRs da Rodada 9. Estes testes
+// olham para o FONTE do componente, e o caso de render
+// `painel-acoes-linha` mede o resultado em DOM.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#659: a coluna Status não desenha mais seletor — o `urbi-select` saiu de _renderStatus', () => {
+  const i = FONTE_DASHBOARD.indexOf('private _renderStatus');
+  assert.ok(i > 0, '_renderStatus sumiu do componente');
+  // Fecha no PRÓXIMO membro da classe, achado pela indentação — não por um nome
+  // literal. Ancorar em 'private _mudarStatus' já falhou aqui: o método é
+  // `private async _mudarStatus`, o indexOf devolveu -1, o slice virou "até o
+  // fim do arquivo" e o teste passou a medir o componente inteiro (onde os
+  // `urbi-select` dos filtros vivem). Fatia que erra o fim não acusa nada.
+  const fim = FONTE_DASHBOARD.indexOf('\n  private ', i + 1);
+  assert.ok(fim > i, 'não achei o fim de _renderStatus — a fatia mediria o arquivo inteiro');
+  const corpo = FONTE_DASHBOARD.slice(i, fim);
+  assert.ok(!corpo.includes('urbi-select'), 'o Status voltou a ser um seletor editável na linha');
+  assert.ok(corpo.includes('urbi-badge'), 'o Status precisa sair como badge');
+  // O ramo por função saiu junto: badge é para TODA função, não só leitor.
+  assert.ok(!corpo.includes("'leitor'"), 'o Status não deve mais ramificar por função');
+});
+
+test('#659: a linha de ações monta os botões a partir de acoesTransicao — não de uma lista escrita ali', () => {
+  assert.ok(
+    FONTE_DASHBOARD.includes('acoesTransicao(String(l.status), l._funcao)'),
+    'sem esta chamada os 22 testes de estudo-status provam uma função que a tela não usa',
+  );
+  assert.ok(
+    FONTE_DASHBOARD.includes('this._mudarStatus(l, a.para)'),
+    'o botão de transição precisa chamar a rota que o backend valida',
+  );
+});
+
+test('#660: o botão de editar existe, é guardado por podeEditarEstudo e fica À ESQUERDA de Duplicar', () => {
+  assert.ok(
+    FONTE_DASHBOARD.includes('podeEditarEstudo(String(l.status), l._funcao)'),
+    'sem esta chamada o botão apareceria para quem o PATCH recusaria',
+  );
+  const iEditar = FONTE_DASHBOARD.indexOf('this._abrirEditarNome(l)');
+  const iDuplicar = FONTE_DASHBOARD.indexOf('this._duplicar(l.id)');
+  assert.ok(iEditar > 0 && iDuplicar > 0, 'um dos dois botões sumiu da coluna de ações');
+  assert.ok(iEditar < iDuplicar, 'o pedido da #660 é literal: editar entra À ESQUERDA de Duplicar');
+});
+
+test('#660: o modal de renomear edita `nome` cru e valida com o MESMO parser do portão', () => {
+  assert.ok(
+    FONTE_DASHBOARD.includes('nomeEstudoLimpo(this.editarNome)'),
+    'a tela precisa usar o parser compartilhado, não uma segunda regra de validação',
+  );
+  assert.ok(
+    FONTE_DASHBOARD.includes("this.editarNome = String(l.nome ?? '')"),
+    'o campo editável é `nome`; `nome_exibicao` é derivado e carrega sigla/UF/sequência',
+  );
+  assert.ok(
+    FONTE_DASHBOARD.includes('atualizarEstudo(alvo.id, { nome: limpo })'),
+    'salvar tem de chamar o PATCH — sem isso o modal fecha sem persistir',
+  );
+});
+
+test('#660: o modal está ligado ao render — estado sem montagem não desenha nada', () => {
+  assert.ok(
+    FONTE_DASHBOARD.includes('this.editarAlvo ? this._renderEditarNome() : nothing'),
+    'o modal existe mas nunca é montado',
+  );
+});
