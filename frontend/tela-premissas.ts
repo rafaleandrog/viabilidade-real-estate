@@ -573,13 +573,19 @@ export class ViabTelaPremissas extends LitElement {
     // zerado, área vendável zerada), o modo mudava com o canônico nulo — e aí
     // `proforma.ts` passava a ler a coluna do modo novo, que nunca foi
     // preenchida. O custo mudava de valor por um clique de apresentação.
-    const decisao = trocaBadgePremissas(
-      this._num(atual.campo),
-      this._num(cu.campoCanonico),
-      atual.conv,
-      this._ctxConversao(),
-    );
+    const decisao = trocaBadgePremissas({
+      valorAtual: this._num(atual.campo),
+      canonicoPersistido: this._num(cu.campoCanonico),
+      convAtual: atual.conv,
+      ctx: this._ctxConversao(),
+    });
     if (!decisao.trocar) return;
+    // ⚠️ **O canônico vem ANTES do modo, e a ordem é observável.** `_set`
+    // emite `viab:premissas-change`, então gravar o modo primeiro publica um
+    // estado intermediário — modo novo com canônico ainda nulo — que é
+    // precisamente o estado corrompido que a #515 conserta, e a Proforma-pai
+    // recalcula em cima dele. Inverter estas duas linhas deixava a suíte verde
+    // até o teste de ordem existir.
     if (decisao.canonico !== undefined) this._set(cu.campoCanonico, decisao.canonico);
     this._set(cu.modoKey, nova.valor);
   }

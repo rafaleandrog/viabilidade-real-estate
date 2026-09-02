@@ -136,7 +136,7 @@ export function numeroDaColuna(v: unknown): number | null {
 //
 // ELA ESTABELECE: o canônico é o número de registro, a badge troca só a
 // representação, e o valor mostrado em cada unidade é derivado do canônico
-// (`_valorUnidade`, `tela-premissas.ts:587`).
+// (`_valorUnidade`, `tela-premissas.ts:593`).
 //
 // ELA NÃO ESTABELECE que se deva escrever a coluna por unidade — ao contrário:
 // `_trocarUnidade` (`tela-premissas.ts:562-575`) **não escreve coluna nenhuma**,
@@ -305,17 +305,34 @@ export interface TrocaBadgePremissas {
   canonico?: number;
 }
 
+/** Entrada de `trocaBadgePremissas` — objeto, e o motivo está abaixo. */
+export interface EntradaTrocaBadge {
+  /** Valor da coluna da unidade que está ATIVA agora (`null` = campo vazio). */
+  valorAtual: number | null;
+  /** Campo canônico ANTES do clique (`null` em linha legada). */
+  canonicoPersistido: number | null;
+  /** Conversão da unidade ATIVA (a de origem). */
+  convAtual: ConvUnidade;
+  ctx: CtxConversao;
+}
+
 /**
  * Decide a troca de badge em Premissas.
  *
- * `canonicoPersistido` é o valor do campo canônico ANTES do clique (`null` em
- * linha legada); `valorAtual`, o da coluna da unidade que está ativa.
+ * ⚠️ **A entrada é um OBJETO, e isso não é estilo.** Com dois parâmetros
+ * posicionais `number | null` seguidos, trocá-los **compila limpo** — e o
+ * resultado é exatamente o defeito que esta função existe para consertar: a
+ * linha legada (`canonicoPersistido = null`, `valorAtual = 30`) entra pelo ramo
+ * do canônico persistido, devolve `{ trocar: true }` sem canônico, e o modo
+ * muda com o canônico nulo. Medido no PR desta issue: a troca dos dois
+ * argumentos passava no `tsc` **e** deixava os 166 testes verdes.
+ *
+ * A defesa que o `CLAUDE.md` recomenda para a classe de defeito nº 1 —
+ * "torne o parâmetro obrigatório, para a mutação virar `TS2554`" — **não cobre
+ * este eixo**, porque a aridade não muda. Nomear os campos cobre.
  */
 export function trocaBadgePremissas(
-  valorAtual: number | null,
-  canonicoPersistido: number | null,
-  convAtual: ConvUnidade,
-  ctx: CtxConversao,
+  { valorAtual, canonicoPersistido, convAtual, ctx }: EntradaTrocaBadge,
 ): TrocaBadgePremissas {
   // Já há canônico: a badge é pura apresentação daqui em diante.
   if (canonicoPersistido !== null && Number.isFinite(canonicoPersistido)) {
