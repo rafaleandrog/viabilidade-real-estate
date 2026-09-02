@@ -201,8 +201,13 @@ export class ViabTelaDashboard extends LitElement {
        partir de "Em análise", mais editar/duplicar/remover). Sem flex-wrap a
        fila empurra a célula e o documento inteiro na horizontal — a classe de
        defeito que só o render em Chromium enxerga, e que o urbi-kpi já
-       produziu quatro vezes (#176, #262, #326, #352). O caso
-       painel-acoes-linha mede exatamente esta célula. */
+       produziu quatro vezes (#176, #262, #326, #352).
+       ⚠️ E NENHUM caso de render mede esta célula — não por esquecimento: ela
+       vive dentro de urbi-tabela, que recebe colunas/linhas por PROPRIEDADE, e
+       o stub gerado do espelho não desenha o conteúdo da tabela. Um caso que a
+       pedisse mediria o vazio e voltaria limpo. Mesma limitação declarada em
+       frontend/render/casos/funding-abas.ts para a aba Operações. Quem confirma
+       a geometria desta linha é o autor, na instância intermediária. */
     .acoes-linha { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
     .cel-nome { font-weight: 600; }
     .cel-criador { display: inline-flex; align-items: center; }

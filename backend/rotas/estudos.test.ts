@@ -6,7 +6,7 @@ import {
   montarCopiasFilhas, FILHAS_SIMPLES,
 } from './estudos.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
-import { montarNomeExibicao, siglaDoTipo } from '../identificacao.js';
+import { montarNomeExibicao, siglaDoTipo, LIMITE_NOME_EXIBICAO } from '../identificacao.js';
 import { readFileSync } from 'node:fs';
 
 // Ciclo de vida do estudo (spec §3):
@@ -654,4 +654,144 @@ test('#660 siglaDoTipo: os dois tipos conhecidos, e o fallback de 3 letras para 
   assert.equal(siglaDoTipo('incorporacao'), 'INC');
   assert.equal(siglaDoTipo('loteamento'), 'LOT');
   assert.equal(siglaDoTipo('outro'), 'OUT');
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #660 rodada 2 — o teto do campo DERIVADO, e a fiação do handler.
+//
+// A rodada 1 da revisão achou seis defeitos aqui, e o padrão entre eles é um
+// só: o fail-closed foi posto no campo de ENTRADA (`nome`) e o campo de SAÍDA
+// (`nome_exibicao`) ficou sem guarda nenhuma. É a armadilha 14 do CLAUDE.md
+// pelo avesso — fechar uma porta e abrir a irmã.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#660: nome de 200 caracteres NÃO produz nome_exibicao acima do limite da coluna', () => {
+  // Medido antes do conserto: nome 200 → nome_exibicao 217, contra uma coluna
+  // `{"tipo":"texto","limite":200}`. O parser de entrada aceitava (o limite dele
+  // é o de `nome`, e está certo), e o 500 que ele existe para evitar acontecia
+  // um campo adiante. O teste anterior exercitava exatamente este valor e não
+  // aferia o derivado: carimbava o caso que quebrava.
+  const d = montarPatchEstudo({ nome: 'x'.repeat(200) }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in d);
+  assert.ok(
+    d.dados.nome_exibicao.length <= LIMITE_NOME_EXIBICAO,
+    `nome_exibicao saiu com ${d.dados.nome_exibicao.length} caracteres`,
+  );
+  // O nome CRU não é truncado — quem encolhe é só a representação.
+  assert.equal(d.dados.nome.length, 200);
+});
+
+test('#660: ao encolher, as partes ESTRUTURAIS sobrevivem — sigla, UF e sequência', () => {
+  const d = montarPatchEstudo({ nome: 'y'.repeat(200) }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in d);
+  assert.ok(d.dados.nome_exibicao.startsWith('INC - '), d.dados.nome_exibicao.slice(0, 20));
+  assert.ok(d.dados.nome_exibicao.endsWith(' - DF - 002'), d.dados.nome_exibicao.slice(-20));
+});
+
+test('#660: nome curto não é tocado — o corte só existe quando estoura', () => {
+  const d = montarPatchEstudo({ nome: 'Pátio' }, ESTUDO_NOMEAVEL);
+  assert.ok('dados' in d);
+  assert.equal(d.dados.nome_exibicao, 'INC - Pátio - DF - 002');
+});
+
+test('#660: o tipo do CORPO manda na sigla — em rascunho ele é editável no MESMO PATCH', () => {
+  // `tipo_empreendimento` muda em rascunho, e `tela-premissas` manda o registro
+  // inteiro. Usar o tipo persistido gravava o tipo novo com a sigla velha, e o
+  // rótulo ficava errado para sempre. A UF já era lida do corpo; o tipo não era.
+  const d = montarPatchEstudo(
+    { nome: 'Gleba', tipo_empreendimento: 'loteamento' },
+    ESTUDO_NOMEAVEL,
+  );
+  assert.ok('dados' in d, JSON.stringify(d));
+  assert.equal(d.dados.nome_exibicao, 'LOT - Gleba - DF - 002');
+});
+
+test('#660: PATCH que muda SÓ a UF recompõe o nome de exibição — o defeito da issue pelo outro eixo', () => {
+  const d = montarPatchEstudo({ uf: 'GO' }, { ...ESTUDO_NOMEAVEL, nome: 'Pátio Urbitá' });
+  assert.ok('dados' in d);
+  assert.equal(d.dados.nome_exibicao, 'INC - Pátio Urbitá - GO - 002');
+});
+
+test('#660: PATCH que muda SÓ o tipo (rascunho) também recompõe', () => {
+  const d = montarPatchEstudo(
+    { tipo_empreendimento: 'loteamento' },
+    { ...ESTUDO_NOMEAVEL, nome: 'Pátio Urbitá' },
+  );
+  assert.ok('dados' in d);
+  assert.equal(d.dados.nome_exibicao, 'LOT - Pátio Urbitá - DF - 002');
+});
+
+test('#660: PATCH sem nenhuma parte componente NÃO mexe em nome_exibicao', () => {
+  const d = montarPatchEstudo({ notas: 'oi' }, { ...ESTUDO_NOMEAVEL, nome: 'Pátio' });
+  assert.ok('dados' in d);
+  assert.equal('nome_exibicao' in d.dados, false);
+});
+
+test('#660: estudo sem nome persistido e PATCH que não traz nome — não inventa rótulo sem nome', () => {
+  const d = montarPatchEstudo({ uf: 'GO' }, { ...ESTUDO_NOMEAVEL, nome: undefined });
+  assert.ok('dados' in d);
+  assert.equal('nome_exibicao' in d.dados, false);
+});
+
+test('#660: uf não-string no corpo NÃO lança — antes virava TypeError e 500', () => {
+  // `uf` não tem validador e não é campo bloqueado: chega crua. `(v ?? '').trim()`
+  // só cobre null/undefined, então `uf: 12` estourava DENTRO da função que o
+  // handler trata como fronteira.
+  for (const uf of [12, true, {}, [], null]) {
+    const d = montarPatchEstudo({ nome: 'Pátio', uf }, ESTUDO_NOMEAVEL);
+    assert.ok('dados' in d, `lançou ou recusou com uf=${JSON.stringify(uf)}`);
+    assert.equal(typeof d.dados.nome_exibicao, 'string');
+  }
+});
+
+test('#660: sequência como STRING do driver vira 3 dígitos igual ao número', () => {
+  const comStr = montarNomeExibicao({ sigla: 'INC', nome: 'X', uf: 'DF', sequencia: '2' });
+  const comNum = montarNomeExibicao({ sigla: 'INC', nome: 'X', uf: 'DF', sequencia: 2 });
+  assert.equal(comStr, comNum);
+  assert.equal(comStr, 'INC - X - DF - 002');
+});
+
+test('#660: sequência lixo some do nome — nunca vira a string "null" nem "NaN"', () => {
+  for (const seq of [null, undefined, NaN, {}, 'abc', '']) {
+    const n = montarNomeExibicao({ sigla: 'INC', nome: 'X', uf: 'DF', sequencia: seq });
+    assert.equal(n, 'INC - X - DF', `sequencia=${JSON.stringify(seq)} vazou para o nome`);
+  }
+});
+
+// ── FIAÇÃO do handler ────────────────────────────────────────────────────
+//
+// Os testes acima exercitam `montarPatchEstudo`, que é pura. Nenhum deles fica
+// vermelho se o HANDLER parar de chamá-la direito — e foi medido: apagar a
+// checagem de alçada do PATCH, e passar `tipo_empreendimento: undefined` para a
+// função (o que desliga a recomposição na rota real, ou seja, o critério de
+// aceite inteiro da #660), deixavam os 49 testes verdes. É a classe de defeito
+// nº 1 do CLAUDE.md, e nenhum teste deste repositório sobe servidor.
+
+const FONTE_ROTA = readFileSync(new URL('./estudos.ts', import.meta.url), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .split('\n').map((l) => { const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i); })
+  .join('\n');
+
+test('#660 fiação: o handler PATCH decide a alçada por podeEditarEstudo, com o status do estudo', () => {
+  assert.ok(
+    FONTE_ROTA.includes('if (!podeEditarEstudo(String(estudo.status), funcaoEfetiva))'),
+    'apagar esta guarda deixa leitor renomear estudo aprovado, e a suíte inteira verde',
+  );
+  assert.ok(
+    FONTE_ROTA.includes("const funcaoEfetiva = podeAprovar ? 'aprovador' : perm.ehEditor ? 'editor' : 'leitor'"),
+    'o mapeamento para a função efetiva é o que faz admin de app valer como aprovador',
+  );
+});
+
+test('#660 fiação: o handler passa ao montarPatchEstudo as QUATRO partes do nome de exibição', () => {
+  // Sem qualquer uma delas a recomposição vira no-op na rota real — verde aqui,
+  // quebrado na tela, que é o defeito exato que a issue descreve.
+  for (const parte of [
+    'tipo_empreendimento: estudo.tipo_empreendimento',
+    'uf: estudo.uf',
+    'sequencia: estudo.sequencia',
+    'nome: estudo.nome',
+  ]) {
+    assert.ok(FONTE_ROTA.includes(parte), `o handler deixou de passar \`${parte}\``);
+  }
 });

@@ -62,11 +62,49 @@ Regra da casa: apague a chamada e rode a suíte. Seis mutações, todas com o co
 A terceira é a que importa mais: **antes de os testes de backend existirem, essa mesma mutação
 deixava os 35 testes da rota verdes.** Era o buraco exato da issue.
 
+⚠️ **E ainda assim esta bateria era insuficiente, o que só a revisão mostrou:** as seis mutações
+acima são todas dentro de `montarPatchEstudo` e do template — a função que eu tinha acabado de
+escrever. Outras seis, no **call site** (o handler) e na forma dos bindings, sobreviviam. Ver a
+subseção seguinte.
+
 E um erro meu que o próprio método pegou: o primeiro teste de fiação ancorava o fim da fatia em
 `'private _mudarStatus'`, mas o método é `private async _mudarStatus` — `indexOf` devolveu `-1`, a
 fatia virou "até o fim do arquivo" e o teste passou a medir o componente inteiro, onde os
 `urbi-select` **dos filtros** vivem. Fatia que erra o fim não acusa nada; hoje ela fecha no próximo
 membro da classe, achado pela indentação.
+
+### A revisão achou seis defeitos reais, e o padrão entre eles é UM só
+
+Codex (2 P2) mais oito lentes nativas. Nenhum achado falso, e a leitura que os une: **eu pus o
+fail-closed no campo de ENTRADA (`nome`) e deixei o campo de SAÍDA (`nome_exibicao`) sem guarda
+nenhuma** — armadilha 14 pelo avesso, fechar uma porta e abrir a irmã.
+
+| Defeito | Como aparecia |
+|---|---|
+| `nome` de 200 compõe rótulo de **217**, contra coluna de 200 | o 500 que o parser existe para evitar, um campo adiante — e o meu teste exercitava exatamente esse valor **sem aferir o derivado** |
+| sigla composta com o tipo **persistido** | `tipo_empreendimento` é editável em Rascunho; eu li a UF do corpo e o tipo não |
+| `uf` não-string → `TypeError` → 500 | `(v ?? '').trim()` só cobre `null`/`undefined` |
+| PATCH que muda só `uf`/tipo deixa o rótulo velho | o defeito da issue pelos outros dois eixos |
+| duas frases citando o caso de render `painel-acoes-linha` | **ele nunca existiu** — eu o planejei, descobri que `urbi-tabela` não é mensurável, renomeei o caso e deixei as duas frases |
+| seis mutantes sobrevivendo | entre eles: **apagar a checagem de alçada do PATCH**, e **matar a recomposição na rota real** |
+
+**As duas lições, e nenhuma é "teste mais".**
+
+**1 · Eu mutei a função pura e não o CALL SITE.** Minhas seis mutações da primeira rodada mataram o
+que eu tinha acabado de escrever em `montarPatchEstudo`. As que sobreviveram eram todas do
+**handler** — a alçada e as partes que ele passa. É a lição de 2026-08-24 repetida: *medição
+verdadeira sobre a pergunta errada é indistinguível de verificação boa*. A defesa agora é `FONTE_ROTA`,
+o mesmo idioma de fiação já usado no frontend.
+
+**2 · A frase falsa sobrevive à validação inteira, e nenhuma etapa a derruba.** `painel-acoes-linha`
+atravessou typecheck, 1012 testes, build e render em verde, porque nada lê prosa — e o caso de render
+que EXISTE diz literalmente o oposto, no mesmo diff. É a armadilha 11, e o custo dela é que a próxima
+sessão lê "a célula é medida" e não vai medir.
+
+**3 · `semComentarios` não removia `<!-- -->`,** que é a forma nativa de comentar dentro de template
+do lit. Ou seja: o helper que sustenta TODOS os testes de fiação desta tela tinha um buraco exatamente
+na sintaxe que alguém usaria para desligar uma chamada. Medido: a mesma mutação com `/* */` ficava
+vermelha; com `<!-- -->`, verde.
 
 ### O que este ambiente NÃO mediu, e quem confirma
 

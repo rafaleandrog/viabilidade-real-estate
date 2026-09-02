@@ -139,6 +139,10 @@ export function montarPatchEstudo(
     tipo_empreendimento?: string;
     uf?: string | null;
     sequencia?: number | null;
+    // #660: o `nome` PERSISTIDO. Ele entra porque a recomposição dispara também
+    // quando só a UF ou só o tipo mudam — e nesses PATCHes o nome não vem no
+    // corpo. Sem ele, mudar a UF gravaria um nome de exibição SEM o nome.
+    nome?: string | null;
   },
 ): { dados: Record<string, any> } | { http: number; codigo: string; mensagem: string } {
   const dados: Record<string, any> = {};
@@ -229,14 +233,33 @@ export function montarPatchEstudo(
   //
   // A `sequencia` usada é a que o estudo JÁ tem: `gerarIdentificacao` consulta o
   // banco pela PRÓXIMA sequência e renumeraria o estudo se fosse chamada aqui.
-  if (dados.nome !== undefined && estudo?.tipo_empreendimento) {
+  //
+  // ⚠️ **Dispara quando QUALQUER parte componente muda, não só o `nome`.** A
+  // primeira versão condicionava a recomposição a `dados.nome !== undefined`, e
+  // isso reproduzia o próprio defeito da issue pelos outros dois eixos: um PATCH
+  // que mudasse só a UF, ou só o `tipo_empreendimento` (editável em rascunho),
+  // gravava a parte nova e deixava o `nome_exibicao` com a antiga — a tela
+  // exibindo o rótulo velho para sempre, que é exatamente o que a #660 conserta.
+  //
+  // Cada parte vem do CORPO quando ele a traz, e do registro persistido quando
+  // não. A tela de Premissas manda o registro inteiro, então os três chegam
+  // juntos por lá; mas o PATCH é chamável direto, com qualquer subconjunto.
+  const parteDoNomeMudou = dados.nome !== undefined
+    || dados.uf !== undefined
+    || dados.tipo_empreendimento !== undefined;
+  const tipoEfetivo = dados.tipo_empreendimento !== undefined
+    ? dados.tipo_empreendimento
+    : estudo?.tipo_empreendimento;
+  const nomeEfetivo = dados.nome !== undefined ? dados.nome : estudo?.nome;
+  // Sem tipo ou sem nome não há o que compor: recompor aqui produziria um rótulo
+  // pior que o gravado. `siglaDoTipo` faz `slice` — tipo não-string lançaria.
+  if (parteDoNomeMudou && typeof tipoEfetivo === 'string' && tipoEfetivo !== ''
+      && typeof nomeEfetivo === 'string' && nomeEfetivo.trim() !== '') {
     dados.nome_exibicao = montarNomeExibicao({
-      sigla: siglaDoTipo(estudo.tipo_empreendimento),
-      nome: dados.nome,
-      // A UF pode estar mudando no MESMO PATCH (a tela de Premissas manda o
-      // registro inteiro): vale a do corpo quando ela vem, senão a persistida.
-      uf: dados.uf !== undefined ? dados.uf : estudo.uf,
-      sequencia: estudo.sequencia,
+      sigla: siglaDoTipo(tipoEfetivo),
+      nome: nomeEfetivo,
+      uf: dados.uf !== undefined ? dados.uf : estudo?.uf,
+      sequencia: estudo?.sequencia,
     });
   }
 
@@ -600,6 +623,7 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
       tipo_empreendimento: estudo.tipo_empreendimento as string | undefined,
       uf: estudo.uf as string | null | undefined,
       sequencia: estudo.sequencia as number | null | undefined,
+      nome: estudo.nome as string | null | undefined,
     });
     if ('codigo' in decisao) { erro(res, decisao.http, decisao.codigo, decisao.mensagem); return; }
     const dados = decisao.dados;

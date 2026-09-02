@@ -266,6 +266,14 @@ test('#578: paridade Loteamento×Incorporação — os dois tipos passam pelo ME
 // código que reverteu.
 function semComentarios(conteudo: string): string {
   return conteudo
+    // ⚠️ Comentário HTML entra aqui, e não é preciosismo: `<!-- ... -->` é a
+    // forma NATIVA de comentar dentro de um template do lit, então era por ela
+    // que uma chamada "apagada" continuava casando nas asserções de fonte
+    // abaixo. Medido: remover o `@click` do botão de editar e deixar
+    // `this._abrirEditarNome(l)` dentro de `<!-- -->` deixava a suíte inteira
+    // verde. A variante `/* */` já era removida e a mesma mutação ficava
+    // vermelha — ou seja, o buraco era exatamente esta forma.
+    .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
     .map((linha) => {
@@ -340,8 +348,19 @@ test('#611 controle: com investimento REAL o ROI é número — o conserto não 
 // `podeEditarEstudo` e `nomeEstudoLimpo` respondem certo. Nenhum daqueles 22
 // testes fica vermelho se o componente parar de chamá-las — é a classe de
 // defeito nº 1 do CLAUDE.md, medida em sete PRs da Rodada 9. Estes testes
-// olham para o FONTE do componente, e o caso de render
-// `painel-acoes-linha` mede o resultado em DOM.
+// olham para o FONTE do componente.
+//
+// ⚠️ **E é só isso que eles fazem — não há caso de render cobrindo a coluna de
+// ações.** Ela vive dentro de `urbi-tabela`, cujo stub não desenha
+// `colunas`/`linhas`; o único caso novo (`painel-editar-nome`) mede o MODAL, e
+// diz isso no próprio cabeçalho. Uma versão anterior deste comentário afirmava
+// que um caso `painel-acoes-linha` media a coluna em DOM: esse caso nunca
+// existiu. A frase falsa é pior que a ausência dela — sem ela alguém investiga.
+//
+// Por isso as asserções abaixo são LITERAIS quanto à forma, e não só quanto à
+// presença do símbolo: seis mutações plausíveis sobreviviam quando elas apenas
+// perguntavam "a função é citada?" — entre elas inverter a ternária do botão de
+// editar, e fixar `?desabilitado` em `true`.
 // ─────────────────────────────────────────────────────────────────────────
 
 test('#659: a coluna Status não desenha mais seletor — o `urbi-select` saiu de _renderStatus', () => {
@@ -364,18 +383,29 @@ test('#659: a coluna Status não desenha mais seletor — o `urbi-select` saiu d
 test('#659: a linha de ações monta os botões a partir de acoesTransicao — não de uma lista escrita ali', () => {
   assert.ok(
     FONTE_DASHBOARD.includes('acoesTransicao(String(l.status), l._funcao)'),
-    'sem esta chamada os 22 testes de estudo-status provam uma função que a tela não usa',
+    'sem esta chamada os testes de estudo-status provam uma função que a tela não usa',
   );
   assert.ok(
     FONTE_DASHBOARD.includes('this._mudarStatus(l, a.para)'),
     'o botão de transição precisa chamar a rota que o backend valida',
   );
+  // A forma LITERAL do binding, não só a presença do símbolo: fixar
+  // `?desabilitado` em `true` (nenhuma transição clicável) ou em `false`
+  // (clique duplo durante a chamada em curso) sobrevivia à asserção de presença.
+  assert.ok(
+    FONTE_DASHBOARD.includes('?desabilitado=${this.statusEmCurso === l.id}'),
+    'o botão de transição tem de desabilitar durante a transição em curso, e por ESTE predicado',
+  );
 });
 
 test('#660: o botão de editar existe, é guardado por podeEditarEstudo e fica À ESQUERDA de Duplicar', () => {
+  // ⚠️ A guarda é conferida pela forma INTEIRA da ternária, não pela presença da
+  // chamada. Medido: inverter os ramos — `podeEditarEstudo(...) ? nothing : html`
+  // — mostra o botão exatamente a quem o PATCH recusa, e a asserção de presença
+  // continuava verde, porque a chamada segue lá.
   assert.ok(
-    FONTE_DASHBOARD.includes('podeEditarEstudo(String(l.status), l._funcao)'),
-    'sem esta chamada o botão apareceria para quem o PATCH recusaria',
+    FONTE_DASHBOARD.includes('${podeEditarEstudo(String(l.status), l._funcao) ? html`'),
+    'a guarda tem de estar no ramo VERDADEIRO da ternária — invertida, ela mostra o botão a quem não pode',
   );
   const iEditar = FONTE_DASHBOARD.indexOf('this._abrirEditarNome(l)');
   const iDuplicar = FONTE_DASHBOARD.indexOf('this._duplicar(l.id)');
@@ -387,6 +417,13 @@ test('#660: o modal de renomear edita `nome` cru e valida com o MESMO parser do 
   assert.ok(
     FONTE_DASHBOARD.includes('nomeEstudoLimpo(this.editarNome)'),
     'a tela precisa usar o parser compartilhado, não uma segunda regra de validação',
+  );
+  // E o resultado do parser tem de GOVERNAR o botão. Sem esta asserção, trocar
+  // `?desabilitado=${limpo === null}` por `${false}` deixava a chamada no lugar,
+  // o resultado ignorado, e a suíte verde.
+  assert.ok(
+    FONTE_DASHBOARD.includes('?desabilitado=${limpo === null}'),
+    'o Salvar tem de estar desabilitado enquanto o nome não for válido — senão o parser é decorativo',
   );
   assert.ok(
     FONTE_DASHBOARD.includes("this.editarNome = String(l.nome ?? '')"),

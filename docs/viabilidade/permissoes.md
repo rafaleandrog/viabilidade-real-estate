@@ -50,7 +50,11 @@ O módulo mora em `frontend/` porque a direção do import já é essa no reposi
 
 `PATCH /estudos/:id` aceita `nome` (não vazio, até 200 caracteres — o limite da coluna) de quem `podeEditarEstudo` autoriza: **editor+** em Rascunho e Em análise, **só aprovador** em Aprovado, Reprovado e Arquivado. A mesma função decide se o botão de renomear aparece na linha do Painel.
 
-Ao gravar `nome`, o servidor **recompõe `nome_exibicao`** a partir das partes (sigla do tipo, nome, UF, sequência) — é `nome_exibicao` que as telas exibem, e sem a recomposição o nome novo ficaria invisível. `nome_exibicao` continua bloqueado para escrita pelo cliente: quem o escreve é o servidor. **`id_legivel` não muda** — ele é único e é a identidade estável do estudo; renomear altera como o estudo se apresenta, não quem ele é.
+O servidor **recompõe `nome_exibicao`** — o rótulo que as telas de fato exibem — sempre que **qualquer** parte que o compõe chega no PATCH: `nome`, `uf` ou `tipo_empreendimento` (este editável só em Rascunho). Recompor apenas quando o `nome` muda deixaria o rótulo com a UF ou a sigla antigas, que é o mesmo defeito por outro eixo. Cada parte vem do corpo quando ele a traz, e do registro persistido quando não.
+
+`nome_exibicao` continua bloqueado para escrita pelo cliente: quem o escreve é o servidor. **`id_legivel` não muda** — ele é único e é a identidade estável do estudo; renomear altera como o estudo se apresenta, não quem ele é.
+
+⚠️ **`nome` e `nome_exibicao` têm o mesmo limite de 200 caracteres, e o segundo é o primeiro MAIS sigla, UF e sequência.** Um nome de 200 caracteres — legal na coluna dele — compõe um rótulo de 217. Quem garante o teto é `montarNomeExibicao`, encolhendo a parte do **nome**: sigla, UF e sequência são estruturais e sobrevivem, porque são elas que fazem o rótulo ser reconhecível numa lista. O `nome` gravado nunca é truncado.
 
 ## Eventos
 
