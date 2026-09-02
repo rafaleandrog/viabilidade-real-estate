@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   camposDaTrocaDeUnidade,
+  trocaBadgePremissas,
   dadosDaTrocaDeUnidade,
   numeroDaColuna,
   converterUnidade,
@@ -501,4 +502,150 @@ test('#570: a TELA usa `ctxConversaoPreliminar`, não monta o ctx à mão', () =
     assert.ok(!fonte.includes(chave),
       `tela-premissas.ts voltou a montar "${chave}" à mão — a base da tela pode divergir do motor`);
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #515 — a badge de PREMISSAS não troca o modo quando não há canônico.
+//
+// A janela é estreita e real: estudo LEGADO (sem canônico) e SEM a grandeza
+// de ligação (VGV zerado, área vendável zerada, estudo sem tipologias). Ali o
+// modo trocava e o canônico ficava nulo — e `proforma.ts` passava a ler a
+// coluna do modo NOVO, que nunca foi preenchida.
+//
+// Não confundir com `camposDaTrocaDeUnidade`, que serve a tela IRMÃ (Custos do
+// Avançado) e tem a regra oposta por ter uma coluna só. Ver o comentário de
+// bloco das duas em `premissas-conversao.ts`.
+// ─────────────────────────────────────────────────────────────────────────
+
+const CONV_PCT_VGV = { tipo: 'pct', link: 'vgv' } as const;
+const CONV_IDENT = { tipo: 'identidade' } as const;
+
+test('#515: legado + grandeza de ligação ZERADA → não troca o modo e não grava canônico', () => {
+  // infra_pct = 30, infra_valor_canonico = null, VGV = 0.
+  const d = trocaBadgePremissas(30, null, CONV_PCT_VGV, ctx({ vgv: 0 }));
+  assert.equal(d.trocar, false);
+  assert.equal(d.canonico, undefined);
+});
+
+test('#515 controle: o MESMO estudo com VGV real troca o modo e grava o canônico', () => {
+  // Sem este controle, um conserto que devolvesse `{ trocar: false }` sempre
+  // passaria o teste acima e quebraria a tela inteira.
+  const d = trocaBadgePremissas(30, null, CONV_PCT_VGV, ctx({ vgv: 10_000_000 }));
+  assert.equal(d.trocar, true);
+  assert.equal(d.canonico, 3_000_000);
+});
+
+test('#515: com canônico JÁ persistido, a badge troca mesmo sem grandeza de ligação', () => {
+  // Depois do primeiro clique o canônico manda em tudo, e a badge é pura
+  // apresentação — bloquear aqui seria travar a tela sem motivo.
+  const d = trocaBadgePremissas(30, 3_000_000, CONV_PCT_VGV, ctx({ vgv: 0 }));
+  assert.equal(d.trocar, true);
+  assert.equal(d.canonico, undefined, 'não regrava canônico que já existe');
+});
+
+test('#515: campo vazio na unidade ativa → não troca (não há o que representar)', () => {
+  assert.deepEqual(trocaBadgePremissas(null, null, CONV_PCT_VGV, ctx({ vgv: 10_000_000 })), { trocar: false });
+});
+
+test('#515: valor não finito também não troca — mas quem barra é converterUnidade, não uma guarda daqui', () => {
+  // ⚠️ O comportamento é real e vale testar; a ATRIBUIÇÃO dele é que não é
+  // óbvia. `paraBase` já devolve null para não-finito, então este teste
+  // continua verde se a guarda de `trocaBadgePremissas` for apagada — medido.
+  // Ele mede o contrato da função, não a existência de uma linha específica.
+  for (const v of [NaN, Infinity, -Infinity]) {
+    assert.equal(trocaBadgePremissas(v, null, CONV_PCT_VGV, ctx({ vgv: 10_000_000 })).trocar, false, `aceitou ${v}`);
+  }
+  // E canônico persistido não finito não conta como canônico — ESTA é guarda
+  // própria desta função, e apagá-la reprova (8 vermelhos, medido).
+  assert.equal(trocaBadgePremissas(30, NaN, CONV_PCT_VGV, ctx({ vgv: 0 })).trocar, false);
+});
+
+test('#515: a unidade de ORIGEM identidade (R$) não depende de grandeza nenhuma', () => {
+  // Trocar de R$ para outra coisa sempre pode derivar o canônico: R$ já É o
+  // canônico. A guarda não pode travar este caminho.
+  const d = trocaBadgePremissas(250_000, null, CONV_IDENT, ctx({ vgv: 0 }));
+  assert.equal(d.trocar, true);
+  assert.equal(d.canonico, 250_000);
+});
+
+test('#515: as OUTRAS grandezas de ligação passam pela mesma guarda — não só o VGV', () => {
+  // Critério 4 da issue: os três CustoUnidade de custo mais os de permuta usam
+  // o mesmo método, então a guarda tem de valer para cada `link`.
+  const porArea = { tipo: 'por_area', link: 'areaVendavel' } as const;
+  assert.equal(trocaBadgePremissas(120, null, porArea, ctx({ areaVendavel: 0 })).trocar, false);
+  assert.equal(trocaBadgePremissas(120, null, porArea, ctx({ areaVendavel: 5_000 })).trocar, true);
+
+  const pctArea = { tipo: 'pct', link: 'areaVendavelR' } as const;
+  assert.equal(trocaBadgePremissas(10, null, pctArea, ctx({ areaVendavelR: 0 })).trocar, false);
+  assert.equal(trocaBadgePremissas(10, null, pctArea, ctx({ areaVendavelR: 2_000 })).trocar, true);
+});
+
+// ── o efeito na PROFORMA, que é o dano que a issue descreve ──
+
+/** Estudo de Loteamento legado: infra em % do VGV, sem canônico. */
+const ESTUDO_LEGADO = (over: Record<string, unknown> = {}) => ({
+  tipo_empreendimento: 'loteamento',
+  area_terreno: 100_000,
+  infra_modo: 'pct_vgv', infra_pct: 30, infra_valor_canonico: null,
+  infra_valor_fixo: null, custo_infra_m2: null,
+  ...over,
+});
+
+test('#515: o custo de infraestrutura NÃO muda por um clique de apresentação (VGV zerado)', () => {
+  // Este é o dano literal da issue: com o canônico nulo, `proforma.ts` cai no
+  // legado — e o legado passa a apontar para `infra_valor_fixo`, que é null.
+  const antes = calcularProforma(ESTUDO_LEGADO() as never);
+  const d = trocaBadgePremissas(30, null, CONV_PCT_VGV, ctx({ vgv: 0 }));
+  assert.equal(d.trocar, false, 'a guarda tem de impedir a troca neste cenário');
+
+  // O estado DEPOIS é o mesmo estado — a guarda não deixou nada mudar.
+  const depois = calcularProforma(ESTUDO_LEGADO() as never);
+  assert.equal(depois.infraestrutura, antes.infraestrutura);
+});
+
+test('#515: com VGV real, o clique preserva o custo — o canônico gravado reproduz o legado', () => {
+  const base = { produtos: [{ area_media_m2: 100, preco_venda_m2: 1_000, unidades: 100 }] };
+  const antes = calcularProforma(ESTUDO_LEGADO(base) as never);
+  const d = trocaBadgePremissas(30, null, CONV_PCT_VGV, ctx({ vgv: antes.vgv }));
+  assert.equal(d.trocar, true);
+
+  // Depois do clique: modo 'valor_fixo' e o canônico gravado. O custo tem de
+  // ser o MESMO — é o invariante de "a badge só muda apresentação".
+  const depois = calcularProforma(
+    ESTUDO_LEGADO({ ...base, infra_modo: 'valor_fixo', infra_valor_canonico: d.canonico }) as never,
+  );
+  assert.ok(
+    Math.abs(depois.infraestrutura - antes.infraestrutura) < 0.01,
+    `infraestrutura mudou: ${antes.infraestrutura} → ${depois.infraestrutura}`,
+  );
+});
+
+test('#515 fiação: a TELA delega a decisão da badge, e o `_set` do modo é GUARDADO', () => {
+  // O defeito da #515 não morava na conta — morava na ORDEM entre duas linhas
+  // deste método. Nenhum dos testes puros acima fica vermelho se a tela parar
+  // de consultar a decisão, ou se trocar o modo antes de consultá-la. É a
+  // classe de defeito nº 1 do CLAUDE.md, e este teste é a rede.
+  const fonte = readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8');
+  assert.ok(
+    fonte.includes('const decisao = trocaBadgePremissas('),
+    '`_trocarUnidade` precisa consultar a função pura — senão os testes dela provam algo que a tela não usa',
+  );
+  assert.ok(
+    fonte.includes('if (!decisao.trocar) return;'),
+    'sem esta guarda o modo troca mesmo quando não há canônico, que É o defeito da #515',
+  );
+  // A ordem importa: a guarda tem de vir ANTES dos dois `_set`.
+  const iGuarda = fonte.indexOf('if (!decisao.trocar) return;');
+  const iSetModo = fonte.indexOf('this._set(cu.modoKey, nova.valor);');
+  const iSetCanonico = fonte.indexOf('this._set(cu.campoCanonico, decisao.canonico);');
+  assert.ok(iGuarda > 0 && iSetModo > 0 && iSetCanonico > 0, 'sumiu uma das três linhas');
+  assert.ok(iGuarda < iSetCanonico && iGuarda < iSetModo, 'a guarda tem de vir antes de gravar qualquer coisa');
+  // E o método não pode mais derivar o canônico por conta própria: se voltar a
+  // chamar `converterUnidade` aqui, há duas regras de novo.
+  const i = fonte.indexOf('private _trocarUnidade');
+  const corpo = fonte.slice(i, fonte.indexOf('\n  private ', i + 1));
+  assert.ok(
+    !corpo.includes('converterUnidade('),
+    '`_trocarUnidade` voltou a converter por conta própria — a decisão é da função pura',
+  );
 });

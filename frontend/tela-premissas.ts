@@ -8,7 +8,7 @@ import {
 } from './viabilidade-api.js';
 import { calcularProforma, eficienciaParaFaixa, precoSugeridoM2, vgvProduto, totalProdutos, tipoProdutoEfetivo, type ProformaInput, type Proforma } from './proforma.js';
 import { camposObrigatorios, validarObrigatorios } from './premissas-validacao.js';
-import { converterUnidade, ctxConversaoPreliminar, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
+import { converterUnidade, ctxConversaoPreliminar, trocaBadgePremissas, type ConvUnidade, type CtxConversao } from './premissas-conversao.js';
 import { varianteFaixa } from './medidor-faixas.js';
 import { calcularCascata, deficitsDaCascata, linhaCortada, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO, type EstadoLinha, type UnidadeMestre, type LinhaResolvida } from './areas-cascata.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
@@ -563,14 +563,24 @@ export class ViabTelaPremissas extends LitElement {
     const modoAtual = modoEfetivo(cu, this.form[cu.modoKey]);
     if (nova.valor === modoAtual) return;
     const atual = cu.opcoes.find((o) => o.valor === modoAtual) ?? cu.opcoes[0];
-    // Estudos legados ainda não têm o canônico. Ao primeiro clique, derivamo-lo
-    // do campo ativo; depois disso a badge só muda apresentação, nunca valor.
-    if (this._num(cu.campoCanonico) === null) {
-      const valorAtual = this._num(atual.campo);
-      const canonico = valorAtual === null ? null
-        : converterUnidade(atual.conv, { tipo: 'identidade' }, valorAtual, this._ctxConversao());
-      if (canonico !== null) this._set(cu.campoCanonico, canonico);
-    }
+    // #515: a decisão saiu daqui para `trocaBadgePremissas`, pura e testável —
+    // pelo mesmo motivo da #255 e da #442: enquanto morava dentro deste método
+    // privado, nenhum teste a alcançava, e o defeito era exatamente uma ordem
+    // errada entre duas linhas.
+    //
+    // O que mudou: o modo trocava SEMPRE, e o canônico só era gravado quando a
+    // conversão dava certo. Em estudo legado SEM a grandeza de ligação (VGV
+    // zerado, área vendável zerada), o modo mudava com o canônico nulo — e aí
+    // `proforma.ts` passava a ler a coluna do modo novo, que nunca foi
+    // preenchida. O custo mudava de valor por um clique de apresentação.
+    const decisao = trocaBadgePremissas(
+      this._num(atual.campo),
+      this._num(cu.campoCanonico),
+      atual.conv,
+      this._ctxConversao(),
+    );
+    if (!decisao.trocar) return;
+    if (decisao.canonico !== undefined) this._set(cu.campoCanonico, decisao.canonico);
     this._set(cu.modoKey, nova.valor);
   }
 

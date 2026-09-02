@@ -136,7 +136,7 @@ export function numeroDaColuna(v: unknown): number | null {
 //
 // ELA ESTABELECE: o canônico é o número de registro, a badge troca só a
 // representação, e o valor mostrado em cada unidade é derivado do canônico
-// (`_valorUnidade`, `tela-premissas.ts:577-581`).
+// (`_valorUnidade`, `tela-premissas.ts:587`).
 //
 // ELA NÃO ESTABELECE que se deva escrever a coluna por unidade — ao contrário:
 // `_trocarUnidade` (`tela-premissas.ts:562-575`) **não escreve coluna nenhuma**,
@@ -260,4 +260,78 @@ export function dadosDaTrocaDeUnidade(
     // depender de a função de cima nunca devolver a chave.
     orcamento_unidade: nova,
   };
+}
+
+// ── troca de badge em PREMISSAS: trocar o modo, ou não trocar nada ───────────
+//
+// ⚠️ **Esta é a tela IRMÃ, e a regra dela é o oposto da de cima — de propósito.**
+// `camposDaTrocaDeUnidade` serve os Custos do Avançado, que têm **uma coluna só**
+// (`orcamento_valor`) rotulada por `orcamento_unidade`: lá o número precisa ser
+// reconvertido, senão fica o valor da unidade antiga sob o rótulo da nova (a
+// mentira da #442). Premissas tem **uma coluna POR unidade** (`infra_pct`,
+// `infra_valor_fixo`, `custo_infra_m2`), e por isso `infra_pct = 30` convivendo
+// com `infra_modo = 'valor_fixo'` não é contradição: é "o % que você digitou por
+// último, inativo", e o modo diz qual está valendo. Aqui **não se escreve coluna
+// por unidade**, e mexer nisso seria contra a regra da casa (`tela-premissas.ts`,
+// § "Fonte de verdade da quantidade econômica").
+//
+// ⚠️ **O DEFEITO QUE ELA CORRIGE (#515), e ele é estreito.** A versão anterior
+// trocava o modo **sempre**, e só gravava o canônico quando `converterUnidade`
+// conseguia — e ela devolve `null` quando a grandeza de ligação é 0 ou
+// indefinida (VGV zerado, área vendável zerada, estudo sem tipologias).
+//
+// Num estudo **legado** (sem canônico) e **sem a grandeza de ligação**, o clique
+// mudava o modo e deixava o canônico nulo. Aí `proforma.ts` passava a ler a
+// coluna do modo NOVO, que nunca foi preenchida, porque `canonico(...)` cai no
+// legado quando o canônico é nulo — e o legado agora aponta para a coluna
+// errada. **O custo de infraestrutura mudava de valor por um clique que deveria
+// ser só de apresentação**, ou virava 0.
+//
+// A saída é a única coerente: não há como trocar de representação sem saber o
+// que se está representando. Sem canônico ao fim do bloco — persistido de antes,
+// ou recém-derivado — a badge **não troca o modo**, e nada é gravado.
+//
+// Fora dessa janela nada muda: com o canônico presente ele manda em tudo, e
+// antes de qualquer clique modo e coluna concordam por construção.
+//
+// A #260, que aposenta as colunas por unidade, torna esta janela impossível — e
+// então esta função vira `{ trocar: true }` incondicional e sai.
+
+/** O que a troca de badge de Premissas deve fazer. */
+export interface TrocaBadgePremissas {
+  /** Trocar o modo? `false` = não fazer nada, nem gravar canônico. */
+  trocar: boolean;
+  /** Canônico a gravar, quando a linha era legada e a derivação funcionou. */
+  canonico?: number;
+}
+
+/**
+ * Decide a troca de badge em Premissas.
+ *
+ * `canonicoPersistido` é o valor do campo canônico ANTES do clique (`null` em
+ * linha legada); `valorAtual`, o da coluna da unidade que está ativa.
+ */
+export function trocaBadgePremissas(
+  valorAtual: number | null,
+  canonicoPersistido: number | null,
+  convAtual: ConvUnidade,
+  ctx: CtxConversao,
+): TrocaBadgePremissas {
+  // Já há canônico: a badge é pura apresentação daqui em diante.
+  if (canonicoPersistido !== null && Number.isFinite(canonicoPersistido)) {
+    return { trocar: true };
+  }
+  // Linha legada: deriva o canônico do campo ativo, uma vez só.
+  //
+  // ⚠️ Este `null` estreita o TIPO; ele não é a guarda de comportamento, e a
+  // distinção foi medida. Quem barra valor inválido é o `Number.isFinite` de
+  // `paraBase` (`frontend/premissas-conversao.ts:59`), então NaN, Infinity e o
+  // próprio nulo já sairiam barrados pela linha de baixo: apagar esta guarda
+  // deixa a suíte **verde**. Quem de fato decide é o `canonico === null` logo
+  // adiante. Escrever "guarda contra valor inválido" aqui seria a frase falsa
+  // que a armadilha 11 do CLAUDE.md descreve.
+  if (valorAtual === null) return { trocar: false };
+  const canonico = converterUnidade(convAtual, { tipo: 'identidade' }, valorAtual, ctx);
+  if (canonico === null) return { trocar: false };
+  return { trocar: true, canonico };
 }
