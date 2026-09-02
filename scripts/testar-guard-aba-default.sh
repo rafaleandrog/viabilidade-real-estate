@@ -356,6 +356,35 @@ SETTER_SO_LITERAL="  set aba(v: string) {
   }
   private _aba: AbaTopo = 'resumo';"
 
+# Rodada 3, achado do revisor externo: os invólucros de TIPO tinham de ser
+# desembrulhados nos DOIS lugares. `(ternário) satisfies AbaTopo` é código
+# legítimo e reprovava com "não expõe um fallback" — falso positivo, e do tipo
+# que faz alguém desligar o guard.
+TERNARIO_SOB_SATISFIES="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = (IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo') satisfies AbaTopo;
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+TERNARIO_SOB_SATISFIES_DERIVADO="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = (IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id) satisfies AbaTopo;
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# Alias MUTÁVEL, achado do revisor externo na rodada 2: `let val = <ternário
+# bom>; val = <ternário derivado>; this._aba = val`. Não precisou de conserto
+# próprio — a inversão da rodada 3 o reprova por AMBIGUIDADE (duas formas de
+# fallback no setter), que é o sinal de que a inversão foi a mudança certa: ela
+# fecha portas que ninguém enumerou. O caso fica para isso não regredir calado.
+ALIAS_MUTAVEL="  set aba(v: string) {
+    const id = idDaSlug(v);
+    let val = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+    val = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id;
+    this._aba = val;
+  }
+  private _aba: AbaTopo = 'resumo';"
+
 verificar() { # <nome> <raiz> <esperado: ok|reprova>
   local nome="$1" raiz="$2" esperado="$3" rc=0
   TOTAL=$((TOTAL+1))
@@ -407,6 +436,9 @@ verificar "30 ternário derivado sob '??' literal reprova"       "$(arvore c30 "
 verificar "31 fallback real no THEN do if/else reprova"         "$(arvore c31 "$FALLBACK_NO_THEN")"          reprova
 verificar "32 derivação pura sob '??' literal reprova"          "$(arvore c32 "$DERIVADO_SOB_NULLISH")"      reprova
 verificar "33 setter que ignora a entrada reprova"              "$(arvore c33 "$SETTER_SO_LITERAL")"         reprova
+verificar "34 falso positivo: ternário sob 'satisfies' passa"   "$(arvore c34 "$TERNARIO_SOB_SATISFIES")"    ok
+verificar "35 ternário derivado sob 'satisfies' reprova"        "$(arvore c35 "$TERNARIO_SOB_SATISFIES_DERIVADO")" reprova
+verificar "36 alias MUTÁVEL reescrito com derivação reprova"    "$(arvore c36 "$ALIAS_MUTAVEL")"             reprova
 
 # ── INVENTÁRIO: a metade do critério (a) que as fixtures não cobrem ────────
 #

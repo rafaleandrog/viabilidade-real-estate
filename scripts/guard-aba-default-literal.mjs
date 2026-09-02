@@ -43,11 +43,18 @@
  * cai. Custa nada — os valores já foram lidos para responder a regra 1.
  *
  * ⚠️ **O QUE ESTE GUARD NÃO FECHA**, dito porque uma cobertura afirmada a mais é
- * pior que nenhuma: ele confere as origens DECLARADAS em `ORIGENS`. Uma origem
- * que suma do arquivo reprova (é o que fecha a lista por contagem), e uma que
- * derive reprova — mas uma TERCEIRA origem de default, criada em algum outro
- * membro da classe, ele não descobre sozinho. Isso é pergunta de intenção
- * ("este valor é um default?"), não de forma, e quem responde é a revisão.
+ * pior que nenhuma: ele lê o SETTER e o inicializador, e nada além. Duas coisas
+ * ficam fora, as duas medidas:
+ *
+ *   · uma TERCEIRA origem de default, criada em outro membro da classe;
+ *   · um default escondido atrás de uma CHAMADA — `const normal = normalize(v);
+ *     this._aba = normal ?? 'resumo'` passa, e `normalize` pode devolver
+ *     `PAGINAS[0].id`. Exigir que o ramo normal não chame função nenhuma
+ *     reprovaria o próprio setter de produção, cujo `id` vem de `idDaSlug(v)`.
+ *
+ * As duas são pergunta de intenção ("este valor é um default?"), não de forma, e
+ * quem as responde é a revisão. O guard fecha o que é decidível na árvore do
+ * setter, e diz em voz alta onde essa fronteira está.
  *
  * E a pergunta é feita no lugar CERTO: o fallback do setter é rastreado a partir
  * de `this._aba` — a atribuição, resolvendo aliases locais —, não pelo primeiro
@@ -270,8 +277,21 @@ function ramosDeUmIfSo(ts, atribuicoes) {
  *
  * A condição é a mesma para as três formas, e é isto que a torna princípio e não
  * remendo: **o ramo que não é o fallback tem de referenciar a entrada do setter**
- * — o parâmetro, ou um local derivado dele. Um ramo que ignora a entrada não é
+ * — o parâmetro, ou qualquer local do setter. Um ramo que ignora a entrada não é
  * "o caminho normal": é o default de verdade, disfarçado.
+ *
+ * ⚠️ O QUE ELA NÃO PEGA, medido, e dito porque cobertura afirmada a mais é pior
+ * que nenhuma: qualquer local serve como prova de dependência — não se rastreia
+ * o local até o parâmetro, e não adiantaria. Com a normalização movida para um
+ * ajudante, `const normal = normalize(v); this._aba = normal ?? 'resumo'` PASSA
+ * (medido: exit 0), e `normalize` pode devolver `PAGINAS[0].id` para slug
+ * desconhecido. Achado pelo revisor externo na rodada 3.
+ *
+ * Não é falta de rigor, é a fronteira do arquivo: `normalize` mora fora do
+ * setter, e exigir que o ramo normal não chame função nenhuma reprovaria o
+ * PRÓPRIO setter de produção, cujo `id` vem de `idDaSlug(v)`. Um default
+ * escondido atrás de uma chamada é a mesma limitação já declarada no topo deste
+ * arquivo — pergunta de intenção, não de forma, e quem a responde é a revisão.
  */
 function exigirDependenciaDaEntrada(ts, setter, ramoNormal, resultado) {
   const nomesLocais = new Set(setter.parameters.map((pm) => (ts.isIdentifier(pm.name) ? pm.name.text : '')));
@@ -340,7 +360,15 @@ function resolverValor(ts, setter, campo, expressao, aceitaLiteralDireto = false
   // 3 · a forma tem de EXPOR um fallback. Ternário e `??`/`||` são as duas
   // maneiras de escrever "isto, senão aquilo"; qualquer outra o guard recusa,
   // em vez de adivinhar onde estaria o default.
-  while (ts.isParenthesizedExpression(valor) || ts.isAsExpression(valor)) valor = valor.expression;
+  // ⚠️ Desembrulhar aqui os MESMOS invólucros que a checagem de literal
+  // desembrulha lá embaixo. Faltavam `satisfies` e `<T>x`, e a assimetria era um
+  // FALSO POSITIVO: `(ternário) satisfies AbaTopo` — código legítimo — parava
+  // aqui como "não expõe um fallback", e `resolverValor` já tinha voltado com
+  // erro quando a normalização de literal, que sabe lidar com eles, ia rodar.
+  while (
+    ts.isParenthesizedExpression(valor) || ts.isAsExpression(valor)
+    || ts.isSatisfiesExpression?.(valor) || ts.isTypeAssertionExpression?.(valor)
+  ) valor = valor.expression;
 
   // Um literal direto é o fallback SÓ quando veio do ramo `else` de um if/else —
   // ali o "isto, senão aquilo" foi decidido pelo statement, não pela expressão.
