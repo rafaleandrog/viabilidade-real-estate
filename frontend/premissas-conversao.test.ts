@@ -542,7 +542,7 @@ const CONV_IDENT = { tipo: 'identidade' } as const;
 
 test('#515: legado + grandeza de ligação ZERADA → não troca o modo e não grava canônico', () => {
   // infra_pct = 30, infra_valor_canonico = null, VGV = 0.
-  const d = trocaBadgePremissas({ valorAtual: 30, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) });
+  const d = trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) });
   assert.equal(d.trocar, false);
   assert.equal(d.canonico, undefined);
 });
@@ -550,7 +550,7 @@ test('#515: legado + grandeza de ligação ZERADA → não troca o modo e não g
 test('#515 controle: o MESMO estudo com VGV real troca o modo e grava o canônico', () => {
   // Sem este controle, um conserto que devolvesse `{ trocar: false }` sempre
   // passaria o teste acima e quebraria a tela inteira.
-  const d = trocaBadgePremissas({ valorAtual: 30, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }) });
+  const d = trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }) });
   assert.equal(d.trocar, true);
   assert.equal(d.canonico, 3_000_000);
 });
@@ -558,7 +558,7 @@ test('#515 controle: o MESMO estudo com VGV real troca o modo e grava o canônic
 test('#515: com canônico JÁ persistido, a badge troca mesmo sem grandeza de ligação', () => {
   // Depois do primeiro clique o canônico manda em tudo, e a badge é pura
   // apresentação — bloquear aqui seria travar a tela sem motivo.
-  const d = trocaBadgePremissas({ valorAtual: 30, canonicoPersistido: 3_000_000, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) });
+  const d = trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: 3_000_000, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) });
   assert.equal(d.trocar, true);
   assert.equal(d.canonico, undefined, 'não regrava canônico que já existe');
 });
@@ -571,13 +571,13 @@ test('#515: linha VAZIA troca — não há nada representado, logo nada a corrom
   // preencher. Com as duas colunas vazias a Proforma lê 0 antes e 0 depois:
   // trocar é seguro. Achado do revisor externo.
   assert.deepEqual(
-    trocaBadgePremissas({ valorAtual: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }) }),
+    trocaBadgePremissas({ valorAtual: null, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }) }),
     { trocar: true },
   );
   // E vale também sem a grandeza de ligação — é o caso da linha nova num
   // estudo ainda sem catálogo.
   assert.deepEqual(
-    trocaBadgePremissas({ valorAtual: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }),
+    trocaBadgePremissas({ valorAtual: null, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }),
     { trocar: true },
   );
 });
@@ -587,7 +587,7 @@ test('#515: o que continua BLOQUEADO é a linha com valor ativo NÃO conversíve
   // segundo pode corromper, porque só ele tem número para a Proforma ler pela
   // coluna errada.
   assert.equal(
-    trocaBadgePremissas({ valorAtual: 30, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
+    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
     false,
   );
 });
@@ -598,7 +598,7 @@ test('#515: valor não finito também não troca — mas quem barra é converter
   // continua verde se a guarda de `trocaBadgePremissas` for apagada — medido.
   // Ele mede o contrato da função, não a existência de uma linha específica.
   for (const v of [NaN, Infinity, -Infinity]) {
-    assert.equal(trocaBadgePremissas({ valorAtual: v, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }) }).trocar, false, `aceitou ${v}`);
+    assert.equal(trocaBadgePremissas({ valorAtual: v, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }) }).trocar, false, `aceitou ${v}`);
   }
   // E canônico persistido não finito não conta como canônico — ESTA é guarda
   // própria desta função: apagar só o `Number.isFinite` dela reprova (1
@@ -609,13 +609,13 @@ test('#515: valor não finito também não troca — mas quem barra é converter
   // existe em `camposDaTrocaDeUnidade` — a função irmã — e o `replace` pegou a
   // primeira ocorrência. Mutar por texto num arquivo com duas funções gêmeas
   // mede a que vier primeiro; mutar por LINHA mede a que se quer.
-  assert.equal(trocaBadgePremissas({ valorAtual: 30, canonicoPersistido: NaN, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar, false);
+  assert.equal(trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: NaN, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar, false);
 });
 
 test('#515: a unidade de ORIGEM identidade (R$) não depende de grandeza nenhuma', () => {
   // Trocar de R$ para outra coisa sempre pode derivar o canônico: R$ já É o
   // canônico. A guarda não pode travar este caminho.
-  const d = trocaBadgePremissas({ valorAtual: 250_000, canonicoPersistido: null, convAtual: CONV_IDENT, ctx: ctx({ vgv: 0 }) });
+  const d = trocaBadgePremissas({ valorAtual: 250_000, valorDestino: null, canonicoPersistido: null, convAtual: CONV_IDENT, ctx: ctx({ vgv: 0 }) });
   assert.equal(d.trocar, true);
   assert.equal(d.canonico, 250_000);
 });
@@ -624,12 +624,12 @@ test('#515: as OUTRAS grandezas de ligação passam pela mesma guarda — não s
   // Critério 4 da issue: os três CustoUnidade de custo mais os de permuta usam
   // o mesmo método, então a guarda tem de valer para cada `link`.
   const porArea = { tipo: 'por_area', link: 'areaVendavel' } as const;
-  assert.equal(trocaBadgePremissas({ valorAtual: 120, canonicoPersistido: null, convAtual: porArea, ctx: ctx({ areaVendavel: 0 }) }).trocar, false);
-  assert.equal(trocaBadgePremissas({ valorAtual: 120, canonicoPersistido: null, convAtual: porArea, ctx: ctx({ areaVendavel: 5_000 }) }).trocar, true);
+  assert.equal(trocaBadgePremissas({ valorAtual: 120, valorDestino: null, canonicoPersistido: null, convAtual: porArea, ctx: ctx({ areaVendavel: 0 }) }).trocar, false);
+  assert.equal(trocaBadgePremissas({ valorAtual: 120, valorDestino: null, canonicoPersistido: null, convAtual: porArea, ctx: ctx({ areaVendavel: 5_000 }) }).trocar, true);
 
   const pctArea = { tipo: 'pct', link: 'areaVendavelR' } as const;
-  assert.equal(trocaBadgePremissas({ valorAtual: 10, canonicoPersistido: null, convAtual: pctArea, ctx: ctx({ areaVendavelR: 0 }) }).trocar, false);
-  assert.equal(trocaBadgePremissas({ valorAtual: 10, canonicoPersistido: null, convAtual: pctArea, ctx: ctx({ areaVendavelR: 2_000 }) }).trocar, true);
+  assert.equal(trocaBadgePremissas({ valorAtual: 10, valorDestino: null, canonicoPersistido: null, convAtual: pctArea, ctx: ctx({ areaVendavelR: 0 }) }).trocar, false);
+  assert.equal(trocaBadgePremissas({ valorAtual: 10, valorDestino: null, canonicoPersistido: null, convAtual: pctArea, ctx: ctx({ areaVendavelR: 2_000 }) }).trocar, true);
 });
 
 // ── o efeito na PROFORMA, que é o dano que a issue descreve ──
@@ -647,7 +647,7 @@ test('#515: o custo de infraestrutura NÃO muda por um clique de apresentação 
   // Este é o dano literal da issue: com o canônico nulo, `proforma.ts` cai no
   // legado — e o legado passa a apontar para `infra_valor_fixo`, que é null.
   const antes = calcularProforma(ESTUDO_LEGADO() as never);
-  const d = trocaBadgePremissas({ valorAtual: 30, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) });
+  const d = trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) });
   assert.equal(d.trocar, false, 'a guarda tem de impedir a troca neste cenário');
 
   // O estado DEPOIS é o mesmo estado — a guarda não deixou nada mudar.
@@ -658,7 +658,7 @@ test('#515: o custo de infraestrutura NÃO muda por um clique de apresentação 
 test('#515: com VGV real, o clique preserva o custo — o canônico gravado reproduz o legado', () => {
   const base = { produtos: [{ area_media_m2: 100, preco_venda_m2: 1_000, unidades: 100 }] };
   const antes = calcularProforma(ESTUDO_LEGADO(base) as never);
-  const d = trocaBadgePremissas({ valorAtual: 30, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: antes.vgv }) });
+  const d = trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: antes.vgv }) });
   assert.equal(d.trocar, true);
 
   // Depois do clique: modo 'valor_fixo' e o canônico gravado. O custo tem de
@@ -722,7 +722,7 @@ test('#515 fiação: a TELA delega a decisão da badge, e o `_set` do modo é GU
 
 test('#515: canônico persistido ZERO conta como canônico — a badge troca, e não regrava', () => {
   const d = trocaBadgePremissas({
-    valorAtual: 30, canonicoPersistido: 0, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }),
+    valorAtual: 30, valorDestino: null, canonicoPersistido: 0, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }),
   });
   assert.equal(d.trocar, true, 'canônico 0 é valor, não ausência');
   assert.equal(d.canonico, undefined, 'não regrava canônico que já existe, mesmo sendo 0');
@@ -730,7 +730,7 @@ test('#515: canônico persistido ZERO conta como canônico — a badge troca, e 
 
 test('#515: canônico DERIVADO zero é gravado — 0% de um VGV real é R$ 0,00, e é um valor', () => {
   const d = trocaBadgePremissas({
-    valorAtual: 0, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }),
+    valorAtual: 0, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }),
   });
   assert.equal(d.trocar, true);
   assert.equal(d.canonico, 0, 'o canônico derivado 0 tem de ser gravado, não descartado');
@@ -752,7 +752,7 @@ test('#515: a entrada é por OBJETO — trocar dois `number | null` posicionais 
   // → TS2554) não cobre este eixo, porque a aridade não muda. Nomear cobre.
   const fonte = readFileSync(new URL('./premissas-conversao.ts', import.meta.url), 'utf8');
   assert.ok(
-    fonte.includes('{ valorAtual, canonicoPersistido, convAtual, ctx }: EntradaTrocaBadge'),
+    fonte.includes('{ valorAtual, valorDestino, canonicoPersistido, convAtual, ctx }: EntradaTrocaBadge'),
     'a assinatura voltou a ser posicional — dois `number | null` seguidos são intercambiáveis para o compilador',
   );
 });
@@ -762,14 +762,14 @@ test('#515: valor ativo ZERO troca mesmo sem grandeza de ligação — 0% de qua
   // multiplicar. Mas com multiplicando zero o link não muda o produto. Sem
   // este caso, uma infraestrutura legada de 0% ficava travada até existir VGV.
   const d = trocaBadgePremissas({
-    valorAtual: 0, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }),
+    valorAtual: 0, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }),
   });
   assert.deepEqual(d, { trocar: true, canonico: 0 });
 
   // Vale para as outras naturezas de conversão, pelo mesmo argumento.
   const porArea0 = { tipo: 'por_area', link: 'areaVendavel' } as const;
   assert.deepEqual(
-    trocaBadgePremissas({ valorAtual: 0, canonicoPersistido: null, convAtual: porArea0, ctx: ctx({ areaVendavel: 0 }) }),
+    trocaBadgePremissas({ valorAtual: 0, valorDestino: null, canonicoPersistido: null, convAtual: porArea0, ctx: ctx({ areaVendavel: 0 }) }),
     { trocar: true, canonico: 0 },
   );
 });
@@ -779,7 +779,55 @@ test('#515: e o valor ativo NÃO zero sem ligação continua bloqueado — a dis
   // asserção reprova. É a fronteira exata entre "canônico inequívoco" e
   // "derivação genuinamente impossível".
   assert.equal(
-    trocaBadgePremissas({ valorAtual: 30, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
+    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
     false,
+  );
+});
+
+// ── #515, rodada 4: "campo ativo vazio" ≠ "linha vazia" ──
+//
+// As colunas das outras unidades sobrevivem como valor histórico inativo — é o
+// desenho da tela, não resíduo. Então trocar de uma coluna vazia para uma
+// coluna COM histórico **ativa** aquele número, e a Proforma sai de 0 para ele.
+// Achado do revisor externo, e era regressão que o conserto da rodada anterior
+// tinha introduzido.
+
+test('#515: ativo vazio + destino vazio → troca (a Proforma lê 0 antes e 0 depois)', () => {
+  assert.deepEqual(
+    trocaBadgePremissas({ valorAtual: null, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }),
+    { trocar: true },
+  );
+});
+
+test('#515: ativo vazio + destino COM histórico → NÃO troca (o clique ativaria o número)', () => {
+  assert.equal(
+    trocaBadgePremissas({ valorAtual: null, valorDestino: 500_000, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
+    false,
+  );
+});
+
+test('#515: e a Proforma prova o dano — 0 vira 500.000 se a troca acontecer', () => {
+  // O cenário do achado, medido pelo motor: `infra_pct` vazio com
+  // `infra_valor_fixo` histórico. É o que a guarda acima impede.
+  const linha = {
+    tipo_empreendimento: 'loteamento', area_terreno: 100_000,
+    infra_pct: null, infra_valor_canonico: null, infra_valor_fixo: 500_000, custo_infra_m2: null,
+  };
+  const antes = calcularProforma({ ...linha, infra_modo: 'pct_vgv' } as never);
+  const seTrocasse = calcularProforma({ ...linha, infra_modo: 'valor_fixo' } as never);
+  assert.equal(antes.infraestrutura, 0);
+  assert.equal(seTrocasse.infraestrutura, 500_000);
+  // E a decisão bloqueia exatamente esse clique.
+  assert.equal(
+    trocaBadgePremissas({ valorAtual: null, valorDestino: 500_000, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
+    false,
+  );
+});
+
+test('#515 fiação: a tela passa o valor da coluna de DESTINO', () => {
+  const fonte = semComentarios(readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'));
+  assert.ok(
+    fonte.includes('valorDestino: this._num(nova.campo),'),
+    'sem isto a decisão não sabe o que há na coluna de destino, e volta a ativar histórico',
   );
 });

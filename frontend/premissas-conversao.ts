@@ -309,6 +309,19 @@ export interface TrocaBadgePremissas {
 export interface EntradaTrocaBadge {
   /** Valor da coluna da unidade que está ATIVA agora (`null` = campo vazio). */
   valorAtual: number | null;
+  /**
+   * Valor da coluna da unidade de DESTINO (`null` = vazia).
+   *
+   * ⚠️ Ele existe porque "o campo ativo está vazio" **não** quer dizer "a linha
+   * está vazia": as colunas das outras unidades sobrevivem como valor histórico
+   * inativo, e esse é o desenho da tela, não um resíduo. Sem olhar o destino,
+   * trocar a badge de uma coluna vazia para uma coluna com histórico **ativa**
+   * aquele número — medido: `infra_pct = null`, canônico nulo,
+   * `infra_valor_fixo = 500000` → a Proforma vai de 0 para 500.000 num clique
+   * que deveria ser só de apresentação. E o estado é produzível pela própria
+   * UI, porque limpar o campo ativo zera o canônico mas não as colunas inativas.
+   */
+  valorDestino: number | null;
   /** Campo canônico ANTES do clique (`null` em linha legada). */
   canonicoPersistido: number | null;
   /** Conversão da unidade ATIVA (a de origem). */
@@ -332,7 +345,7 @@ export interface EntradaTrocaBadge {
  * este eixo**, porque a aridade não muda. Nomear os campos cobre.
  */
 export function trocaBadgePremissas(
-  { valorAtual, canonicoPersistido, convAtual, ctx }: EntradaTrocaBadge,
+  { valorAtual, valorDestino, canonicoPersistido, convAtual, ctx }: EntradaTrocaBadge,
 ): TrocaBadgePremissas {
   // Já há canônico: a badge é pura apresentação daqui em diante.
   if (canonicoPersistido !== null && Number.isFinite(canonicoPersistido)) {
@@ -340,20 +353,20 @@ export function trocaBadgePremissas(
   }
   // Linha legada: deriva o canônico do campo ativo, uma vez só.
   //
-  // ⚠️ **LINHA VAZIA TROCA, e distinguir isso do legado é o ponto.**
+  // Campo ativo VAZIO. Aqui não há canônico a derivar, então a pergunta passa a
+  // ser sobre o DESTINO — e é a mesma pergunta de sempre, escrita direto:
+  // **a Proforma lê o mesmo número antes e depois?**
   //
-  // Sem canônico E sem valor na unidade ativa, não há nada representado — logo
-  // não há nada a corromper, que é a única coisa que a guarda existe para
-  // impedir. Bloquear aqui deixava **inertes todas as badges alternativas de
-  // uma linha nova** (o caso concreto: uma permuta física recém-criada, cujo
-  // `permuta_fisica_area_m2` não tem padrão): como a tela só renderiza o input
-  // da unidade ATIVA, o usuário não conseguia escolher "% área venda" para
-  // então preencher — teria de inventar um valor em m² primeiro. Achado do
-  // revisor externo, e era regressão introduzida por este próprio conserto.
+  // Destino também vazio → lê 0 antes e 0 depois: troca. É o caso da linha nova
+  // (permuta física recém-criada não tem valor padrão), e bloqueá-lo deixava
+  // inertes todas as badges alternativas dela — como a tela só desenha o input
+  // da unidade ATIVA, o usuário teria de inventar um valor na unidade errada
+  // antes de poder escolher a certa.
   //
-  // Trocar aqui é seguro e o motivo é verificável: com as duas colunas vazias,
-  // `proforma.ts` lê 0 antes e 0 depois.
-  if (valorAtual === null) return { trocar: true };
+  // Destino COM histórico → o clique **ativaria** aquele número. Medido:
+  // `infra_pct = null`, canônico nulo, `infra_valor_fixo = 500000` → a Proforma
+  // vai de 0 para 500.000. Não troca.
+  if (valorAtual === null) return { trocar: valorDestino === null };
 
   // ⚠️ **ZERO é canônico inequívoco, mesmo sem a grandeza de ligação.**
   // `paraBase` recusa a conversão quando o link é 0 ou indefinido — ele testa a

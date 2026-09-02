@@ -575,6 +575,7 @@ export class ViabTelaPremissas extends LitElement {
     // preenchida. O custo mudava de valor por um clique de apresentação.
     const decisao = trocaBadgePremissas({
       valorAtual: this._num(atual.campo),
+      valorDestino: this._num(nova.campo),
       canonicoPersistido: this._num(cu.campoCanonico),
       convAtual: atual.conv,
       ctx: this._ctxConversao(),
