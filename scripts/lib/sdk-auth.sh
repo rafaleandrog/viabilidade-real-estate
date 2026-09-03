@@ -57,10 +57,16 @@
 # seguinte ao `source`. A exceção que este arquivo abre à outra metade da regra
 # (*"funções puras, sem efeito colateral"*) está declarada lá, com o motivo.
 #
-# ⚠️ Enquanto ativo, `NPM_CONFIG_USERCONFIG` SUBSTITUI o `~/.npmrc` para os
-# processos filhos: config pessoal de registry/proxy não é lida durante a
-# validação. É aceitável porque só acontece onde o token existe (sessão de
-# nuvem, container efêmero) e dura o tempo do script.
+# ⚠️ `NPM_CONFIG_USERCONFIG` SUBSTITUI o npmrc de usuário para os processos
+# filhos — e por isso este helper **COPIA o npmrc efetivo antes de acrescentar a
+# linha do token**, em vez de escrever um arquivo só com ela. A versão anterior
+# escrevia só o token e se justificava dizendo que *"só acontece onde o token
+# existe (sessão de nuvem, container efêmero)"* — premissa que este mesmo
+# cabeçalho nega poucas linhas acima (*"roda também na máquina do autor"*), que é
+# justamente onde token e `~/.npmrc` pessoal coexistem. Medido na época: um
+# `registry` de mirror interno, `proxy` e `cafile` corporativo eram descartados
+# durante o install. *"Nunca toca no `~/.npmrc`"* continua literalmente verdade —
+# mas não escrever não bastava; o que faltava era não SOMIR com ele.
 #
 # Uso:  . "$raiz"/scripts/lib/sdk-auth.sh
 #       urbi_sdk_auth
@@ -72,17 +78,30 @@
 # falha CALADO — o script segue, o `pnpm install || true` engole o 401, e o SDK
 # não fica no disco. Exatamente o estado que este arquivo existe para eliminar.
 
+# Caminho do npmrc de usuário em vigor. `${HOME:-}` e não `$HOME`: sob o `set -u`
+# do chamador, `$HOME` indefinido MATA o validador na expansão, e um helper de
+# auth não pode derrubar quem o chama.
+urbi_sdk_auth_npmrc() {
+  printf '%s' "${NPM_CONFIG_USERCONFIG:-${HOME:-/nao-existe}/.npmrc}"
+}
+
 # Verdadeiro só quando o npmrc efetivo carrega um token USÁVEL para o GitHub
 # Packages — não basta a chave existir (ver a nota de fail-closed no cabeçalho).
-# `${HOME:-}` e não `$HOME`: sob `set -u` do chamador, `$HOME` indefinido MATA o
-# validador na expansão, e um helper de auth não pode derrubar quem o chama.
+#
+# ⚠️ O parsing acompanha o que o ini do npm aceita, e cada tolerância aqui foi um
+# falso veredito medido: espaço em volta do `=`, linha indentada, aspas no valor,
+# e a chave com ou sem o `//` inicial. Do outro lado, o que NÃO é auth: valor
+# vazio e placeholder não resolvido — em `${VAR}` **e** em `$VAR`. O npm expande
+# só a primeira forma (`envReplace`), então `$NODE_AUTH_TOKEN` viajaria literal,
+# tomaria 401, e a guarda diria "já tem auth" suprimindo o token bom do ambiente.
 urbi_sdk_auth_ja_configurada() {
-  local arq="${NPM_CONFIG_USERCONFIG:-${HOME:-}/.npmrc}" linha valor
+  local arq valor
+  arq="$(urbi_sdk_auth_npmrc)"
   [ -f "$arq" ] || return 1
-  linha="$(grep -s -m1 '^//npm\.pkg\.github\.com/:_authToken=' "$arq")" || return 1
-  valor="${linha#*=}"
-  # vazio, ou placeholder `${VAR}` não resolvido → NÃO é auth.
-  case "$valor" in ''|'${'*) return 1 ;; esac
+  valor="$(sed -n 's|^[[:space:]]*\(//\)\{0,1\}npm\.pkg\.github\.com/:_authToken[[:space:]]*=[[:space:]]*||p' "$arq" | head -1)"
+  valor="${valor%\"}"; valor="${valor#\"}"
+  valor="${valor%\'}"; valor="${valor#\'}"
+  case "$valor" in ''|'${'*|'$'*) return 1 ;; esac
   return 0
 }
 
@@ -105,7 +124,21 @@ urbi_sdk_auth() {
     return 0
   }
   chmod 600 "$rc"
-  printf '//npm.pkg.github.com/:_authToken=%s\n' "$URBIVERSO_PACKAGES_TOKEN" > "$rc"
+  # COPIA o npmrc em vigor antes de acrescentar o token: sem isto, `registry` de
+  # mirror, `proxy` e `cafile` do usuário sumiriam durante o install (ver o
+  # cabeçalho). Arquivo ausente é o caso normal e não é erro.
+  local origem; origem="$(urbi_sdk_auth_npmrc)"
+  if [ -f "$origem" ] && ! cat "$origem" > "$rc"; then
+    echo "  aviso: não consegui copiar $origem — seguindo SEM auth do SDK." >&2
+    rm -f "$rc"; return 0
+  fi
+  # ⚠️ O `printf` do segredo é verificado. Sem isto, disco cheio deixa o arquivo
+  # truncado, o `export` roda mesmo assim, e o resultado é PIOR que o no-op: um
+  # npmrc sem o token sombreando o que autenticava. Fail-closed também aqui.
+  if ! printf '//npm.pkg.github.com/:_authToken=%s\n' "$URBIVERSO_PACKAGES_TOKEN" >> "$rc"; then
+    echo "  aviso: falha ao escrever o npmrc temporário — seguindo SEM auth do SDK." >&2
+    rm -f "$rc"; return 0
+  fi
   export NPM_CONFIG_USERCONFIG="$rc"
   URBI_SDK_AUTH_RC="$rc"
   # O `trap` mora aqui, e não no chamador, para o arquivo com o token sumir mesmo

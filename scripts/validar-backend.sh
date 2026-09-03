@@ -17,7 +17,9 @@
 #     então rodam com `tsx` sem subir servidor nem banco.
 #
 # O que este script NÃO cobre — continua sendo do autor, no UrbiVerso:
-#   · `urbi-empacotar` (empacotamento e publicação);
+#   · a PUBLICAÇÃO do pacote. O `urbi-empacotar` em si vem no bundle do SDK e
+#     roda aqui (depois de um `pnpm build`, que produz o `backend/rotas.js` que
+#     ele exige);
 #   · a materialização real das tabelas no Postgres — o passo 2 confere o
 #     `schema.json` contra o contrato do SDK (foi o que reprovou o pacote
 #     `0.1.12`: `"tipo": "logico"`, que nunca existiu), mas não executa o DDL;
