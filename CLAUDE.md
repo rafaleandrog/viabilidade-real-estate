@@ -778,10 +778,20 @@ variáveis do cloud environment**, e faltava só entregá-lo ao pnpm. Quem paga 
 sessão seguinte, que obedece e não confere — foi o que aconteceu por meses.
 
 **Hoje o SDK é instalado normalmente.** Quem faz isso é `scripts/lib/sdk-auth.sh`, sourced pelo
-`validar-frontend.sh` antes do `pnpm install` — e **só por ele**, porque é o único dos dois que
-chama o pnpm; o `validar-backend.sh` confere o que aquele já baixou. Ele escreve um npmrc temporário
-apontado por `NPM_CONFIG_USERCONFIG` e o apaga no fim — **nunca toca no `~/.npmrc` de ninguém**. Sem o token no
-ambiente ele é no-op, e o comportamento antigo (401, frontend validável mesmo assim) volta.
+`validar-frontend.sh` — e **só por ele**, porque é o único dos dois que chama o pnpm; o
+`validar-backend.sh` confere o que aquele já baixou. Ele é uma função de quatro linhas: passa o
+token como variável de config do npm ao comando, por `env`. **Não escreve arquivo nenhum, não lê nem
+substitui o `~/.npmrc` de ninguém, e o segredo vai no ambiente do filho — não no argv**, que o `ps`
+mostraria para qualquer usuário da máquina. Sem o token no ambiente ele é no-op, e o comportamento
+antigo (401, frontend validável mesmo assim) volta.
+
+> ⚠️ **A primeira versão deste helper escrevia um npmrc temporário, e o desenho estava errado.** Ele
+> custou quatro rodadas de revisão em defeitos DELE — `$HOME` indefinido matando o validador sob
+> `set -u`, guarda de "já tem auth" aceitando valor vazio e placeholder, `head -1` onde o npm usa a
+> última ocorrência, o temp com o segredo vazando na segunda chamada, `cat` sem newline final
+> colando `registry=` na linha do token. Nenhum desses casos existe no problema original; todos
+> vieram da máquina construída para resolvê-lo. **É a armadilha 14 na sua forma mais cara:** a
+> segunda entrada suja da mesma classe pedia inverter o desenho, não somar mais uma guarda.
 
 Consequências que valem em toda sessão com token:
 

@@ -136,11 +136,10 @@ echo "== 2/8 pnpm install =="
 # `$raiz`, não `$(dirname "$0")`: a linha 56 já fez `cd`, e o $0 aponta para um
 # diretório que não é mais a cwd — o source falharia CALADO (não há `set -e`).
 . "$raiz/scripts/lib/sdk-auth.sh"
-urbi_sdk_auth
 # O `|| true` FICA: sem token o 401 volta a acontecer, e o frontend continua
 # validável só com os pacotes públicos, que é o caso que este script atende
 # desde sempre. Quem depende do SDK é o validar-backend.sh, e ele tem gate próprio.
-pnpm install >/dev/null 2>&1 || true
+urbi_pnpm_install >/dev/null 2>&1 || true
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — o pnpm não conseguiu baixar nem os pacotes públicos (sem rede?)." >&2
   exit 1
