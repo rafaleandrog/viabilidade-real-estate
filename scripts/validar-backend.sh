@@ -4,9 +4,12 @@
 # Descoberta de 2026-07-29 que contraria o que o CLAUDE.md dizia ("backend só
 # roda no ambiente autenticado do autor"): dá para validar bastante coisa aqui.
 #
-#   · o `@urbiverso/sdk` já ESTÁ em `node_modules/@urbiverso/sdk` (com o
-#     `dist/index.d.ts`). O que falha com 401 é o `pnpm install` REINSTALAR o
-#     pacote — os tipos, que é o que o typecheck precisa, estão no disco;
+#   · o typecheck do backend precisa dos TIPOS do SDK (`dist/index.d.ts`), e
+#     eles vêm do `pnpm install`. Este cabeçalho afirmou por muito tempo que o
+#     SDK "já ESTÁ em node_modules" — falso em sessão nova, onde o repositório é
+#     clonado do zero. Desde 2026-09-03 ele está lá de verdade: o
+#     `scripts/lib/sdk-auth.sh` autentica o registry com o
+#     `URBIVERSO_PACKAGES_TOKEN` do ambiente, e o install baixa o pacote;
 #   · só `backend/rotas.ts` importa o SDK, e é `import '@urbiverso/sdk/express'`
 #     (augmentação de tipo, efeito colateral). Todo o resto do backend depende
 #     só do `express`, que é PÚBLICO e está no store do pnpm;
@@ -47,6 +50,10 @@ echo "== 0/5 guard: JSON estrito (schema.json, manifesto.json) =="
 node scripts/guard-json.mjs || exit 1
 
 echo "== 1/5 dependências públicas (express) =="
+# Idempotente com o do validar-frontend.sh: se aquele já rodou nesta shell, o
+# helper vê `NPM_CONFIG_USERCONFIG` definido e não faz nada. Aqui ele existe para
+# o caso de este script ser chamado sozinho.
+. "$(dirname "$0")/lib/sdk-auth.sh"
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — rode antes: bash scripts/validar-frontend.sh" >&2
   exit 1
@@ -68,6 +75,8 @@ link_pkg 'tsx@*'             'tsx'              'tsx'
 if [ ! -d node_modules/@urbiverso/sdk ]; then
   echo "ERRO: node_modules/@urbiverso/sdk ausente — sem os tipos do SDK o typecheck do" >&2
   echo "      backend não roda aqui. Esta validação fica para o ambiente do autor." >&2
+  echo "      Causa provável: URBIVERSO_PACKAGES_TOKEN ausente do ambiente. Com ele," >&2
+  echo "      scripts/lib/sdk-auth.sh autentica o registry e o pnpm baixa o pacote." >&2
   exit 1
 fi
 
