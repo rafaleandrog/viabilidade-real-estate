@@ -81,17 +81,41 @@ export const caso = {
   },
   // Roda DENTRO do navegador, depois do assentamento (ver
   // `scripts/render-check.mjs`) — é o que permite ler o `<input>` real de um
-  // `viab-num` aninhado em shadow root. O evento em si já foi capturado (ou
-  // não) por `montar`, bem antes deste ponto — ver o comentário acima.
+  // `viab-num` aninhado em shadow root.
+  //
+  // ⚠️ Segundo achado do revisor (Codex, PR 669, rodada 3), e ele é correto: o
+  // Lit aplica os property bindings ao FRAGMENTO CLONADO antes de inseri-lo na
+  // shadow tree — no primeiro render, um evento `bubbles`/`composed` disparado
+  // pelo setter de `valor` morreria no fragmento desconectado e NUNCA
+  // alcançaria o listener em `raiz`, mesmo registrado antes do `appendChild`
+  // (comentário de `montar`, acima). Esse instante nem é observável por
+  // bubbling — não tem ancestral nenhum enquanto o nó está desconectado.
+  //
+  // A saída (a mesma que o achado sugere): anexar um SEGUNDO listener direto
+  // no `viab-num` já montado e conectado, e então provocar uma NOVA atribuição
+  // de `null` — exercitando o caminho de update, que é onde qualquer
+  // resposta do componente à prop realmente aconteceria depois do primeiro
+  // paint. Estado de repouso (o `<input>` vazio) já prova que o primeiro
+  // render também não vazou `NaN`/`"null"`; o que faltava provar é que
+  // REATRIBUIR o mesmo `null` não dispara nada — e isso É observável.
   async medir(raiz: HTMLElement): Promise<{ valorInput: string; eventoDisparou: boolean }> {
     const tela = raiz.querySelector('viab-tela-premissas')!;
     const campos = [...tela.shadowRoot!.querySelectorAll('div.campo-unidade')];
     const permutaFisica = campos.find(
       (c) => c.querySelector('.cu-rotulo')?.textContent?.includes('Permuta física'),
     )!;
-    const num = permutaFisica.querySelector('viab-num.cu-valor')!;
+    const num = permutaFisica.querySelector('viab-num.cu-valor')! as any;
     const input = num.shadowRoot!.querySelector('input') as HTMLInputElement;
+    const valorInput = input.value;
 
-    return { valorInput: input.value, eventoDisparou: caso._eventoDisparou };
+    let eventoNaReatribuicao = false;
+    num.addEventListener('urbi:input-numero-change', () => { eventoNaReatribuicao = true; });
+    num.valor = null;
+    await num.updateComplete;
+
+    return {
+      valorInput,
+      eventoDisparou: caso._eventoDisparou || eventoNaReatribuicao,
+    };
   },
 };
