@@ -4,7 +4,11 @@
 //
 // A fonte canônica de props de primitivo `urbi-*` e de tokens CSS é o bundle do
 // SDK (`node_modules/@urbiverso/sdk/`). Neste ambiente ele NÃO EXISTE: o pacote é
-// GitHub Packages privado e tanto o `pnpm install` quanto o `npm view` dão 401.
+// GitHub Packages privado, e até 2026-09-03 acreditava-se que `pnpm install` e
+// `npm view` só davam 401 aqui. Não era verdade — faltava a auth, que hoje mora em
+// `scripts/lib/sdk-auth.sh`. O espelho continua valendo (os guards e o harness de
+// render rodam no CI, onde o node_modules é o do runner), mas o eixo do TEMPO
+// passou a ter conserto possível: dá para gerá-lo da versão que a app FIXA.
 //
 // O resultado prático é que a referência de UI vira leitura ad-hoc: um agente
 // abre `ui/src/` no monorepo, confere uma prop, e o conhecimento morre com a

@@ -103,7 +103,9 @@ leitor, o remapeamento delas entra junto.
 > tipo `arquivo`, e o binário pertence ao **shell**. Copiar a linha com o mesmo id deixa dois
 > registros sobre o mesmo arquivo — apagar uma das cópias pode levar o arquivo da outra junto —, e
 > duplicar o binário de verdade exige um verbo do SDK que a sessão de nuvem **não consegue
-> conferir** (pacote privado, 401). Consequência hoje: a cópia leva o **apelo comercial** (scores e
+> conferir** — a afirmação era de quando o SDK dava 401 aqui; desde 2026-09-03 ele é
+> baixado normalmente, e o verbo é conferível no `dist/index.d.ts` da versão fixada.
+> Consequência hoje: a cópia leva o **apelo comercial** (scores e
 > laudo) sem os documentos que o geraram.
 >
 > · **Membros** (`estudo_membros`): é ACL, não dado do estudo. Copiar a lista concederia acesso a
