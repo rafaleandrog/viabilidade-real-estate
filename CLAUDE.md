@@ -244,7 +244,7 @@ nunca lida/editável) — detalhe em `docs/viabilidade/funding-capital-stack.md`
 `PROGRESSO.md`.
 
 **Pendências do autor no ambiente autenticado** (o ambiente Claude Code não cobre — lista
-consolidada de todas as rodadas): `urbi-empacotar`; sincronização do `schema.json` pelo SDK
+consolidada de todas as rodadas): sincronização do `schema.json` pelo SDK
 (inclui as tabelas `analise_mercado`/`mercado_regioes`/`mercado_coletas` e a tabela nova
 `avancado_capital_instrumentos`); execução real de **todas** as migrações no Postgres (`001` a
 `028`, cadeia completa nunca rodada em produção); confirmação de que o shell descobre
@@ -700,15 +700,27 @@ proxy dá **403 no CONNECT** —, e **subagente nativo** quando não houver, **d
 como menos adversarial, por revisar patch escrito pela mesma família de modelo. O App **não
 dispensa** a fan-out: neste repositório os dois acharam classes de defeito diferentes.
 
-**A camada de contratos RODA — desde 2026-09-03.** Ela lê `node_modules/@urbiverso/sdk/`, e o
-pacote está no disco depois de qualquer validador (§ Validação): a auth vem de
-`scripts/lib/sdk-auth.sh`. A atestação sai com **`contratos=ok`**, e a lente de props de primitivo
-`urbi-*` e de verbos do SDK passa a ser cobrável em toda revisão.
+**A camada de contratos roda PELA METADE — e a metade que falta mudou de causa.** O pacote está no
+disco depois de qualquer validador (§ Validação), mas a superfície que a skill lê é
+`node_modules/@urbiverso/sdk/**docs/**`, e o bundle **0.50.3** — a versão que o `package.json` fixa —
+**não tem `docs/` nem `obsolescencias.json`**. Ele traz `README.md`, `package.json` e `dist/`. Medido
+em 2026-09-03.
 
-> Este parágrafo dizia o contrário — *"não roda neste ambiente, e isso é estrutural"* — e a palavra
-> **estrutural** é o que o tornava caro: ela dispensava qualquer sessão de tentar. O que continua
-> **não** verificável daqui é só a aderência de `shell_min` ao que a instância roda, que é pergunta
-> ao autor, não ao registry.
+| Lente de contrato | Superfície | Estado |
+|---|---|---|
+| props de primitivo `urbi-*` | `dist/index.d.ts` (68 `declare class Urbi*`) | ✅ **executável agora** |
+| verbos do SDK, obsolescências | `docs/`, `obsolescencias.json` | ❌ ausentes do 0.50.3 |
+| `shell_min` vs. o que a instância roda | — | pergunta ao autor, nunca ao registry |
+
+Então a atestação continua saindo **`contratos=nao-executados`**, e o relatório diz **qual** metade
+rodou. `contratos=ok` seria uma afirmação plausível e falsa — a classe de defeito que a armadilha 11
+descreve.
+
+> ⚠️ **A causa não é mais o 401, e confundir as duas custa a próxima sessão.** Este parágrafo dizia
+> que a camada não rodava *"e isso é estrutural"*, atribuindo tudo ao SDK ser privado. Com a auth em
+> pé (§ Validação), a causa restante é **a versão fixada**: o `npm view` mostra que versões
+> publicadas mais novas **trazem** `docs/`. Subir o pin é mudança de `package.json`, ou seja de
+> produto — escopo próprio, e o caminho para fechar a outra metade.
 
 **Cópia, não link vivo.** Mudou no monorepo, alguém porta para cá à mão — nada sincroniza sozinho.
 As adaptações deste repo estão marcadas `ADAPTADO` nos dois arquivos, **com o motivo ao lado**. Não
@@ -792,11 +804,15 @@ script pronto — é o "caminho simples" que sempre funciona:
 bash scripts/validar-frontend.sh
 ```
 
-Ele roda, em 5 etapas: os **guards estáticos** (aspas curvas em posição de atributo + **JSON
-estrito** em `schema.json`/`manifesto.json`), depois `pnpm install`
-(ignorando o 401 do SDK, que ainda assim baixa lit/typescript/tsx/esbuild para `.pnpm/`), linka
-esses pacotes e executa **typecheck do frontend + testes de frontend + build do bundle
-(esbuild)**. Verde = mudança de frontend validada.
+Ele roda os **guards estáticos** (aspas curvas em posição de atributo + **JSON estrito** em
+`schema.json`/`manifesto.json` + ciclos de FK), depois autentica o SDK
+(`scripts/lib/sdk-auth.sh`) e roda `pnpm install`, linka os pacotes e executa **typecheck do
+frontend + testes de frontend + build do bundle (esbuild) + os guards de UI e de endereços + o
+render em Chromium**. Verde = mudança de frontend validada.
+
+> Este parágrafo dizia "5 etapas" e "ignorando o 401 do SDK". Hoje são **8**, e o 401 não acontece
+> mais quando o token está no ambiente. O `|| true` do install **fica**: sem token o 401 volta, e o
+> frontend continua validável só com os pacotes públicos, porque ele não importa o SDK.
 
 > **Por que o guard de aspas curvas existe:** `variante=”alerta”` (aspa curva, U+201D) deixa o
 > atributo **inerte** — o parser inclui as aspas no valor, ele não casa com nada e o primitivo cai
@@ -900,7 +916,13 @@ barra os dois erros simétricos de versionamento: migração nova **sem** bump d
 > assim for a fonte usada, **diga no PR** — a prop pode existir lá e não na versão que a instância
 > roda.
 
-**Continua sendo do autor, no ambiente autenticado:** `urbi-empacotar`, a sincronização de
+> ⚠️ **`urbi-empacotar` saiu da lista de pendências do autor em 2026-09-03.** Ele vem no bundle do
+> SDK (`node_modules/.bin/urbi-empacotar`) e **executa aqui**: medido, ele chega a reprovar por
+> `backend/rotas.js` ausente, que é uma verificação de conteúdo do pacote — não um erro de auth.
+> Rode `pnpm build` antes. O que continua sendo do autor é a **publicação**, que precisa da
+> instância.
+
+**Continua sendo do autor, no ambiente autenticado:** a sincronização de
 `schema.json` pelo SDK (uma migração pode passar aqui e mesmo assim citar coluna que o schema não
 declara) e a execução real das migrações no Postgres. Registre isso no `PROGRESSO.md`/PR. No PC do
 autor o fluxo canônico segue valendo: `pnpm typecheck`, `pnpm build`, `pnpm test`,

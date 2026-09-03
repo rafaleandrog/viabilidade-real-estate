@@ -50,10 +50,11 @@ echo "== 0/5 guard: JSON estrito (schema.json, manifesto.json) =="
 node scripts/guard-json.mjs || exit 1
 
 echo "== 1/5 dependências públicas (express) =="
-# Idempotente com o do validar-frontend.sh: se aquele já rodou nesta shell, o
-# helper vê `NPM_CONFIG_USERCONFIG` definido e não faz nada. Aqui ele existe para
-# o caso de este script ser chamado sozinho.
-. "$(dirname "$0")/lib/sdk-auth.sh"
+# ⚠️ Este script NÃO chama `pnpm`/`npm` em lugar nenhum — ele confere o que o
+# `validar-frontend.sh` já baixou (a etapa abaixo aborta mandando rodá-lo antes).
+# Uma versão anterior deste PR sourceava aqui o `lib/sdk-auth.sh`: escrevia um
+# arquivo com o token em claro e não tinha um só consumidor para ele. Exposição
+# sem benefício, e por isso a chamada mora só no validar-frontend.sh.
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — rode antes: bash scripts/validar-frontend.sh" >&2
   exit 1
@@ -138,5 +139,6 @@ fi
 
 echo
 echo "✅ Backend validado: schema + typecheck + testes de rota + migrações + guard de versao."
-echo "   Falta o autor rodar no UrbiVerso: urbi-empacotar, sincronização de schema.json"
-echo "   e execução real das migrações."
+echo "   Falta o autor rodar no UrbiVerso: sincronização de schema.json e execução"
+echo "   real das migrações. (urbi-empacotar saiu desta lista: ele vem no bundle do"
+echo "   SDK e roda aqui, depois de um pnpm build.)"

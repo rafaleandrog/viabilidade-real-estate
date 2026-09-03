@@ -45,7 +45,9 @@ fi
 # como o repositório passou meses declarando backend/schema/migração "pendentes
 # do autor" por uma causa que não era a declarada.
 if [ -n "${URBIVERSO_PACKAGES_TOKEN:-}" ]; then
-  echo '[processo] SDK: autenticável — validar-backend.sh roda aqui (as 5 etapas), contratos=ok'
+  echo '[processo] SDK: autenticável — validar-backend.sh roda aqui (as 5 etapas).'
+  echo '[processo]     Contratos: props de urbi-* SIM (dist/index.d.ts); doc do SDK NÃO — o pin'
+  echo '[processo]     0.50.3 não traz docs/. Atestação segue contratos=nao-executados.'
 else
   echo '[processo] SDK: SEM token (URBIVERSO_PACKAGES_TOKEN ausente) — backend, schema e'
   echo '[processo]     migração ficam pendentes do autor, e o PR precisa DECLARAR isso.'

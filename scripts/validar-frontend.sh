@@ -131,7 +131,10 @@ echo "== 2/8 pnpm install =="
 # A auth do SDK vem daqui: sem ela o install termina em 401 e o `node_modules/
 # @urbiverso/sdk` não existe — que é o que fazia `validar-backend.sh` abortar na
 # etapa 1/5 e toda revisão sair com `contratos=nao-executados`.
-. "$(dirname "$0")/lib/sdk-auth.sh"
+# `$raiz`, não `$(dirname "$0")`: a linha 56 já fez `cd`, e o $0 aponta para um
+# diretório que não é mais a cwd — o source falharia CALADO (não há `set -e`).
+. "$raiz/scripts/lib/sdk-auth.sh"
+urbi_sdk_auth
 # O `|| true` FICA: sem token o 401 volta a acontecer, e o frontend continua
 # validável só com os pacotes públicos, que é o caso que este script atende
 # desde sempre. Quem depende do SDK é o validar-backend.sh, e ele tem gate próprio.

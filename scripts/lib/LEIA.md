@@ -10,6 +10,18 @@ Cada um exporta funções puras, sem efeito colateral, sem ler `process.argv` e 
 | Módulo | Quem importa | O que resolve |
 |---|---|---|
 | `fonte-ts.mjs` | `guard-tokens-css.mjs` · `guard-props-urbi.mjs` · `guard-box-model-urbi.mjs` | Onde termina um comentário, uma string, um template e um `${…}` — **nas três linguagens que vivem num `.ts` deste app** |
+| `sdk-auth.sh` | `validar-frontend.sh` | Entrega o `URBIVERSO_PACKAGES_TOKEN` ao pnpm para o `@urbiverso/sdk` (GitHub Packages privado) ser baixado |
+
+⚠️ **`sdk-auth.sh` é a exceção declarada à segunda metade da regra, e o motivo é que a exceção é a
+função dele.** Autenticar um registry **é** efeito colateral: ele escreve um npmrc temporário e
+exporta `NPM_CONFIG_USERCONFIG`. Uma "função pura de auth" não existe — o que existiria seria
+devolver o caminho do arquivo e deixar o chamador exportar, o que só moveria o mesmo efeito para
+duas linhas acima, em cada chamador.
+
+O que ele **cumpre** é a primeira metade, e essa não tem exceção: **ele não se invoca sozinho**. O
+`source` só define as funções; quem chama `urbi_sdk_auth` é o validador, na linha seguinte. A
+diferença importa porque um arquivo sourced que age no ato transforma todo `source` em ação
+invisível — e é assim que um `trap EXIT` alheio some sem ninguém notar.
 
 O `fonte-ts.test.mjs` daqui não é exceção à regra: quem o roda é o `node --test`, chamado por
 `scripts/testar-fonte-ts.sh`.

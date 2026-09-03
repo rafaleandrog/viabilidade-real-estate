@@ -27,35 +27,65 @@
 #
 # QUANDO ELE É NO-OP, E ISSO É O DESENHO
 #
-#   · sem `URBIVERSO_PACKAGES_TOKEN` (máquina do autor) — segue sem auth, e quem
-#     falha é o `pnpm install`, com a mensagem do próprio pnpm;
-#   · com `NPM_CONFIG_USERCONFIG` já definido (o CI usa `setup-node`, que escreve
-#     o npmrc do runner e passa o token por `NODE_AUTH_TOKEN`) — não sobrescreve
-#     o que o chamador configurou.
+#   · **auth já configurada** — o npmrc efetivo já tem linha de token para
+#     `npm.pkg.github.com`. É o caso do CI, onde o `setup-node` escreve o npmrc do
+#     runner a partir de `NODE_AUTH_TOKEN`. ⚠️ Esta guarda vem PRIMEIRO, e a ordem
+#     importa: a versão anterior testava só `NPM_CONFIG_USERCONFIG`, que o
+#     `setup-node` NÃO define — então no CI, autenticado, ela caía no ramo do
+#     token ausente e imprimia um aviso falso em todo run;
+#   · **sem `URBIVERSO_PACKAGES_TOKEN` e sem auth configurada** (máquina do autor
+#     sem credencial) — segue sem auth, com um aviso, e quem falha depois é o
+#     `pnpm install`, com a mensagem do próprio pnpm.
+#
+# ⚠️ Ele NÃO se invoca sozinho — `scripts/lib/LEIA.md` é explícito: *"aqui dentro
+# nada se roda sozinho"*. Quem chama é o validador, com `urbi_sdk_auth` na linha
+# seguinte ao `source`. A exceção que este arquivo abre à outra metade da regra
+# (*"funções puras, sem efeito colateral"*) está declarada lá, com o motivo.
 #
 # ⚠️ Enquanto ativo, `NPM_CONFIG_USERCONFIG` SUBSTITUI o `~/.npmrc` para os
 # processos filhos: config pessoal de registry/proxy não é lida durante a
 # validação. É aceitável porque só acontece onde o token existe (sessão de
 # nuvem, container efêmero) e dura o tempo do script.
 #
-# Uso:  . scripts/lib/sdk-auth.sh   (antes do primeiro `pnpm install`)
+# Uso:  . "$raiz"/scripts/lib/sdk-auth.sh
+#       urbi_sdk_auth
+#
+# ⚠️ O caminho do `source` sai de `$raiz`, NUNCA de `$(dirname "$0")`: os dois
+# validadores fazem `cd "$(dirname "$0")/.."` logo no começo, então na hora do
+# source o `$0` já é relativo a um diretório que não é mais a cwd. Com
+# `$(dirname "$0")` o source falha, e como nenhum dos dois usa `set -e`, ele
+# falha CALADO — o script segue, o `pnpm install || true` engole o 401, e o SDK
+# não fica no disco. Exatamente o estado que este arquivo existe para eliminar.
+
+# Verdadeiro quando o npmrc efetivo já autentica o GitHub Packages. Cobre o CI
+# (setup-node escreve `~/.npmrc` a partir de NODE_AUTH_TOKEN) e a máquina de quem
+# já configurou a auth à mão.
+urbi_sdk_auth_ja_configurada() {
+  grep -qs 'npm\.pkg\.github\.com/:_authToken' "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+}
 
 urbi_sdk_auth() {
-  [ -n "${URBIVERSO_PACKAGES_TOKEN:-}" ] || {
-    echo "  aviso: URBIVERSO_PACKAGES_TOKEN ausente — o @urbiverso/sdk não será baixado." >&2
-    return 0
-  }
+  urbi_sdk_auth_ja_configurada && return 0
   [ -n "${NPM_CONFIG_USERCONFIG:-}" ] && return 0
 
+  [ -n "${URBIVERSO_PACKAGES_TOKEN:-}" ] || {
+    echo "  aviso: sem auth para o npm.pkg.github.com (URBIVERSO_PACKAGES_TOKEN ausente)" >&2
+    echo "         — o @urbiverso/sdk não será baixado, e o typecheck do backend não roda." >&2
+    return 0
+  }
+
   local rc
-  rc="$(mktemp "${TMPDIR:-/tmp}/urbi-npmrc.XXXXXX")" || return 0
+  # `mktemp` já cria 0600; o modo é reafirmado por ser um arquivo com segredo.
+  rc="$(mktemp "${TMPDIR:-/tmp}/urbi-npmrc.XXXXXX")" || {
+    echo "  aviso: mktemp falhou — seguindo SEM auth do SDK (o pnpm dirá o resto)." >&2
+    return 0
+  }
   chmod 600 "$rc"
   printf '//npm.pkg.github.com/:_authToken=%s\n' "$URBIVERSO_PACKAGES_TOKEN" > "$rc"
   export NPM_CONFIG_USERCONFIG="$rc"
   URBI_SDK_AUTH_RC="$rc"
   # O `trap` mora aqui, e não no chamador, para o arquivo com o token sumir mesmo
-  # que a validação aborte no meio (`exit 1` de qualquer etapa).
+  # que a validação aborte no meio (`exit 1` de qualquer etapa). Nenhum dos dois
+  # validadores tem `trap` próprio hoje; quem acrescentar um, some com este.
   trap 'rm -f "${URBI_SDK_AUTH_RC:-}"' EXIT
 }
-
-urbi_sdk_auth

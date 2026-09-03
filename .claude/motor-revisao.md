@@ -11,6 +11,10 @@ máquina do autor e em sessão na nuvem.
 > **ADAPTADO — este repositório é o da app, não o monorepo.** `revisar-pr-shell` não existe aqui, e
 > a superfície de docs é sempre `node_modules/@urbiverso/sdk/docs/`. Onde o upstream oferece dois
 > caminhos (shell ou app), aqui só existe o de app.
+>
+> ⚠️ E o bundle **existe no disco** desde 2026-09-03 (auth por `scripts/lib/sdk-auth.sh`) — o que
+> mudou o estado das lentes de contrato de "nenhuma roda" para "props de primitivo roda, doc não".
+> A tabela do briefing, mais abaixo, traz o detalhe.
 
 As lentes dos passos 3 e 4 rodam **fora da conta Anthropic**, no Codex. O revisor lê muito e
 escreve pouco — uma lente engole um doc inteiro, o diff e o código em volta para devolver 400
@@ -200,7 +204,7 @@ resolvido antes de despachar**:
 | `WT` — a árvore que as lentes leem | a seção *A árvore que o motor lê*, abaixo |
 | `BASE` — o merge-base, nunca o nome da branch | passo 2 da skill |
 | Lentes, com id, tier e esforço | passos 2.1, 3 e 4 da skill |
-| **Superfície de docs** do briefing de contratos | fixa: `node_modules/@urbiverso/sdk/docs/`. **ADAPTADO:** ver a nota do preflight — neste repo ela costuma não existir, e aí a camada de contratos não é despachada |
+| **Superfície de docs** do briefing de contratos | fixa: `node_modules/@urbiverso/sdk/docs/`. **ADAPTADO:** desde 2026-09-03 o bundle É baixado (`scripts/lib/sdk-auth.sh`), mas o pin `0.50.3` **não traz `docs/`** — só `dist/`. Então a lente por doc segue **não despachada**, e a de props de primitivo, que lê `dist/index.d.ts`, **passa a ser despachada**. A causa mudou de "401" para "versão fixada" |
 | Faixas que sobem para `sol` | migração, `schema.json`, `manifesto.json`, permissões, contas, auditoria |
 
 ## Preflight — uma vez por sessão, antes de qualquer lente
