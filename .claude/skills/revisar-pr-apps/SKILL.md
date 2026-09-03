@@ -99,13 +99,18 @@ superfície usou**, sempre.
    > ⚠️ **ADAPTADO — o 401 acabou em 2026-09-03, e o que sobrou é OUTRA coisa. Não confunda as
    > duas.** A nota anterior (2026-08-21) dizia que `pnpm install` e `npm view` davam 401 e que a
    > camada de contratos por isso "não roda". **A auth existe** — `scripts/lib/sdk-auth.sh`
-   > entrega o `URBIVERSO_PACKAGES_TOKEN` do ambiente, e qualquer validador põe o bundle no disco.
+   > entrega o `URBIVERSO_PACKAGES_TOKEN` do ambiente, e o `validar-frontend.sh` põe o bundle no
+   > disco — ele é o único dos dois que instala; o `validar-backend.sh` aborta se aquele não tiver
+   > rodado antes.
    > Estado medido hoje, e ele é misto:
    >
    > - **`npm view @urbiverso/sdk` responde — mas NÃO pelado.** O comando do item 1 acima
    >   (`npm view @urbiverso/sdk dist-tags`) toma **401** sozinho: o `.npmrc` do repositório
    >   declara o registry e não o token. Passe a auth na chamada:
-   >   `npm view @urbiverso/sdk dist-tags --registry=https://npm.pkg.github.com --//npm.pkg.github.com/:_authToken="$URBIVERSO_PACKAGES_TOKEN"`.
+   >   `env "npm_config_//npm.pkg.github.com/:_authToken=$URBIVERSO_PACKAGES_TOKEN" npm view @urbiverso/sdk dist-tags`.
+   >   ⚠️ **Pelo `env`, e não por flag** (`--//…_authToken=…`): a flag põe o PAT no **argv**, que o
+   >   `ps` e o `/proc/<pid>/cmdline` expõem a qualquer usuário da máquina — e quem copia este
+   >   comando pode estar num host compartilhado. Achado P1 do Codex neste PR.
    >   Com isso a verificação *"esse verbo está publicado?"* é **executável** — não é mais
    >   pergunta ao autor. Sem o token no ambiente, volta a ser;
    > - **`dist/index.d.ts` está no disco.** A lente de **props de primitivo `urbi-*`** é

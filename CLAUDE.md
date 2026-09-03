@@ -701,7 +701,8 @@ como menos adversarial, por revisar patch escrito pela mesma família de modelo.
 dispensa** a fan-out: neste repositório os dois acharam classes de defeito diferentes.
 
 **A camada de contratos roda PELA METADE — e a metade que falta mudou de causa.** O pacote está no
-disco depois de qualquer validador (§ Validação), mas a superfície que a skill lê é
+disco depois do `validar-frontend.sh` — que é o único dos dois que instala; o
+`validar-backend.sh` aborta se ele não tiver rodado antes (§ Validação) —, mas a superfície que a skill lê é
 `node_modules/@urbiverso/sdk/**docs/**`, e o bundle **0.50.3** — a versão que o `package.json` fixa —
 **não tem `docs/` nem `obsolescencias.json`**. Ele traz `README.md`, `package.json` e `dist/`. Medido
 em 2026-09-03.
@@ -797,7 +798,10 @@ Consequências que valem em toda sessão com token:
 
 - **`bash scripts/validar-backend.sh` roda inteiro** — as 5 etapas, incluindo o typecheck do backend
   e o `schema.json` contra o contrato do SDK. *"Não deu para rodar"* deixa de ser desculpa aqui.
-- **A camada de contratos da revisão é executável** → a atestação sai com `contratos=ok`.
+- **A camada de contratos roda pela METADE.** A lente de props de primitivo `urbi-*` passa a ser
+  executável (`dist/index.d.ts`); a de doc do SDK, **não** — o pin `0.50.3` não traz `docs/`. A
+  atestação continua saindo **`contratos=nao-executados`**, e o relatório diz qual metade rodou.
+  Detalhe em § *A revisão em si*.
 - **`node_modules/@urbiverso/sdk/dist/index.d.ts` está no disco** — a fonte canônica de props de
   primitivo `urbi-*` volta a existir, e ler o monorepo para compensar deixa de ter desculpa.
 
@@ -918,7 +922,7 @@ barra os dois erros simétricos de versionamento: migração nova **sem** bump d
 > antes de usar (`grep -n "declare class UrbiGraficoArea" -A 30`). Atributo ou elemento inexistente
 > **não dá erro, só não faz nada** — leia antes de presumir.
 >
-> **Essa fonte existe aqui desde 2026-09-03** — qualquer validador põe o SDK no disco (§ Validação),
+> **Essa fonte existe aqui desde 2026-09-03** — o `validar-frontend.sh` põe o SDK no disco (§ Validação),
 > e a versão é a que o `package.json` fixa (`0.50.3`), que é justamente a autoridade certa.
 >
 > A alternativa antiga — ler `ui/src/urbi-<nome>.ts` no monorepo — **deixou de ter desculpa**. Ela

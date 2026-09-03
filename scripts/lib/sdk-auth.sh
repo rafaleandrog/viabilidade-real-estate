@@ -35,10 +35,26 @@
 #      entrada suja da mesma classe, o conserto não é mais uma guarda — é inverter
 #      o desenho. Aqui a inversão foi apagar a máquina de casos-limite inteira.
 #
-# **Exposição do segredo:** ele vai no ambiente do processo filho, não no argv.
-# `/proc/<pid>/environ` é legível só pelo dono; `ps` mostra a linha de comando
-# para qualquer usuário da máquina. Por isso `env VAR=… pnpm` e não
-# `pnpm --//…_authToken=…`, que funciona igual e vazaria no `ps`.
+# **Exposição do segredo, com a ressalva medida.** Ele vai no AMBIENTE do processo
+# filho, e `/proc/<pid>/environ` é legível só pelo dono — enquanto `ps` mostra o
+# argv para qualquer usuário da máquina. Por isso `env VAR=… pnpm` e não
+# `pnpm --//…_authToken=…`, que funciona igual e ficaria visível o tempo todo.
+#
+# ⚠️ **A ressalva, levantada pelo Codex neste PR (P2) e ACEITA como trade-off, não
+# refutada:** `env NAME=VALUE cmd` recebe o `NAME=VALUE` como **operando**, então o
+# segredo passa pelo argv do próprio `/usr/bin/env` até ele fazer `exec` do pnpm.
+# A janela é de microssegundos e exige um amostrador de `ps` rodando como outro
+# usuário na mesma máquina. A alternativa que fecharia essa janela é um arquivo
+# temporário com o token e `NPM_CONFIG_GLOBALCONFIG` — ou seja, **segredo em
+# repouso no disco** em vez de um instante no argv, mais `mktemp`, `trap` e os
+# caminhos de falha de cada um. Foi exatamente essa máquina que custou cinco
+# rodadas de revisão neste PR, e a troca não vale num container efêmero de um
+# usuário só.
+#
+# **Se o ambiente mudar** — máquina compartilhada, host de CI multiusuário —, a
+# decisão se inverte, e o caminho é `NPM_CONFIG_GLOBALCONFIG` (e **não**
+# `NPM_CONFIG_USERCONFIG`, que sombreia o `~/.npmrc` do usuário; o globalconfig
+# tem precedência menor e convive com ele).
 #
 # **No-op sem token** (máquina do autor, CI — que autentica pelo `setup-node`):
 # roda o `pnpm install` pelado, e quem falha, se falhar, é o pnpm com a mensagem
