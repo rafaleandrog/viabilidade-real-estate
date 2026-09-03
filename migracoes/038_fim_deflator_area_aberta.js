@@ -23,10 +23,18 @@
 //
 // ── IDEMPOTÊNCIA (o harness reexecuta toda migração sobre o próprio resultado) ──
 // `limparColuna` zera as células não-nulas e devolve quantas zerou. Na 2ª
-// execução não há mais célula não-nula: ela vira no-op com log. Numa instância
-// virgem a coluna nunca existiu — a poda pré-migrações já a derrubou a partir do
-// `schema.json`, e `limparColuna` também é no-op ali. O mesmo release converge
-// nas duas populações.
+// execução não há mais célula não-nula: ela vira no-op com log.
+//
+// ⚠️ **Instalação VIRGEM não é "no-op": é BASELINE.** Ali esta função nem chega a
+// executar — o `schema.json` é o genesis, o schema nasce no estado final (já sem a
+// coluna) e as migrações são registradas sem rodar (README § Contratos, item 3).
+// Dizer "vira no-op na instância virgem" descreveria o banco vazio artificial do
+// harness, não o ciclo real de instalação. Achado do revisor externo neste PR.
+//
+// Onde ela EXECUTA é na instância que já tem a app: esvazia o dado, e a poda do
+// reconciliador derruba a estrutura vazia no mesmo boot. Se a coluna nunca recebeu
+// valor naquela instância, `limparColuna` não encontra célula não-nula e devolve 0,
+// com log. O mesmo release converge nas duas populações — por caminhos diferentes.
 //
 // Só transforma dado existente — nenhum seed, nenhuma linha criada, nenhum valor
 // de negócio inventado. Sem retorno declarativo.

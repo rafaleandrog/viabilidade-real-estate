@@ -851,3 +851,21 @@ test('#660 controle: o detector de surrogate solto realmente detecta', () => {
   assert.equal(temSurrogateSolto('😀'.slice(0, 1)), true);
   assert.equal(temSurrogateSolto('INC - Pátio'), false);
 });
+
+test('#642: `deflator_area_aberta_pct` de cliente em voo e descartado nos DOIS niveis', () => {
+  // A coluna saiu do `schema.json` e o dado foi esvaziado pela migracao `038`.
+  // Mas remover a coluna nao esvazia o que ja esta EM TRANSITO: a aba de
+  // Premissas aberta atraves do deploy montou o `form` do registro inteiro antes
+  // da atualizacao, e reenvia o objeto todo filtrando so por denylist. Sem o
+  // descarte incondicional, o campo chega ao `req.dados.atualizar` contra um
+  // schema que nao o declara, e aquela sessao passa a FALHAR ao salvar ate o
+  // usuario recarregar a pagina. Cliente externo desatualizado nao tem nem isso.
+  //
+  // Por isso o teste cobre AVANCADO tambem: a guarda antiga era condicional ao
+  // nivel `preliminar`, e um payload em voo vem de estudo de qualquer nivel.
+  for (const estudo of [PRELIMINAR, AVANCADO]) {
+    const r = montarPatchEstudo({ nome: 'x', deflator_area_aberta_pct: 30 }, estudo);
+    assert.deepEqual(r, { dados: { nome: 'x' } },
+      `o campo aposentado atravessou o PATCH de um estudo ${estudo.nivel_analise}`);
+  }
+});

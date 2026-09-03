@@ -456,6 +456,24 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
     // #642: a `038` esvazia `estudos.deflator_area_aberta_pct`, que saiu do
     // `schema.json` na mesma alteração. Mesma mecânica da `003` acima: a fixture
     // semeia a coluna com valor, então este teste FALHA se o `limparColuna` sumir.
+    //
+    // ⚠️ E a fixture é conferida ANTES, porque o dente depende dela. Achado de
+    // revisão: zerar o `SEED` **e** apagar o `limparColuna` deixava o harness
+    // verde — a asserção ficava vácua sem nada acusar. Esta guarda transforma
+    // "a fixture parou de semear" em falha, que é a única forma de a asserção
+    // abaixo continuar significando alguma coisa.
+    const semeados = (SEED.estudos ?? [])
+      .filter((e) => e.deflator_area_aberta_pct !== null && e.deflator_area_aberta_pct !== undefined);
+    if (semeados.length === 0) {
+      erro(
+        'o SEED não semeia mais `estudos.deflator_area_aberta_pct` — sem valor semeado a asserção '
+          + 'da `038` passa de graça, com ou sem o `limparColuna`',
+        new Error('fixture vazia torna a asserção vácua'),
+      );
+    } else {
+      ok(`SEED semeia deflator_area_aberta_pct em ${semeados.length} estudo(s) — a asserção tem dente`);
+    }
+
     const comDeflator = (banco.db.get('estudos') ?? [])
       .filter((e) => e.deflator_area_aberta_pct !== null && e.deflator_area_aberta_pct !== undefined);
     if (comDeflator.length > 0) {

@@ -7,14 +7,24 @@ import { join } from 'node:path';
 import { vgvTipologia, vgvLinha, vgvVendavelLinha } from './fluxo-shared.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// #584 — a trava de que o DEFLATOR saiu, e de que a coluna ficou INERTE
+// #584 + #642 — a trava de que o DEFLATOR saiu, e de que a coluna MORREU
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Decisão do autor (leva Avançado 2026-08-26, item 7): "tirar campo deflator de
-// preço". O deflator entrou pela #462 e estava fiado no motor; esta issue o
-// desfaz. O caminho escolhido é o **A** do corpo da #584 — coluna INERTE: a UI
-// e a fiação saem, `estudos.deflator_area_aberta_pct` continua declarada no
-// `schema.json` SEM LEITOR, e não há migração (logo a `versao` não bumpa).
+// preço". O deflator entrou pela #462 e estava fiado no motor; a #584 o desfez.
+// Ela ofereceu dois caminhos, e os DOIS foram andados, nesta ordem:
+//
+//   · **A** (#584, PR 641) — coluna INERTE: a UI e a fiação saem,
+//     `estudos.deflator_area_aberta_pct` continua declarada no `schema.json` sem
+//     leitor, sem migração e sem bump de `versao`;
+//   · **B** (#642) — a coluna SAI do `schema.json`, a migração `038` esvazia o
+//     dado com `dados.limparColuna`, a entrada sai de `CAMPOS_SOMENTE_AVANCADO`
+//     na mesma alteração, e a `versao` bumpa (0.1.37).
+//
+// ⚠️ Este cabeçalho descrevia só o caminho A, e as quatro cláusulas dele
+// (inerte · declarada · sem migração · sem bump) ficaram FALSAS no dia em que o B
+// foi entregue — num arquivo cuja função é ser o registro. Quem mexer aqui de
+// novo atualiza o cabeçalho junto com a asserção.
 //
 // ⚠️ POR QUE UM TESTE QUE LÊ O FONTE, e não só testes de função pura.
 // O critério de aceite 5 da issue é uma propriedade do INVENTÁRIO — "grep por
@@ -128,14 +138,27 @@ test('#642 caminho B: `deflator_area_aberta_pct` só sobrevive na migração que
     // RASTREADO. Rodar este teste com a migração ainda sem `git add` devolve
     // `{}` — indistinguível de "a migração sumiu". Medido ao escrever a #642.
     'migracoes/038_fim_deflator_area_aberta.js': 1,
-    // O HARNESS, e as 5 são de propósito: 1 na fixture (`SEED`, que semeia a
-    // coluna preenchida) e 4 na asserção da etapa 4 (as duas comparações, a
-    // mensagem de erro e a de sucesso). Nenhuma é leitura de produção — juntas
-    // são o que dá DENTE à `038`: apagar o `limparColuna` dela deixa o harness
-    // vermelho, medido por mutação. Sem a fixture semeada a asserção passaria de
-    // graça, que é a armadilha que este número guarda. Se ele mudar, confira se
-    // o que mudou foi a asserção (esperado) ou um leitor novo (não esperado).
-    'scripts/migracoes-harness.mjs': 5,
+    // O HARNESS, e as 9 são de propósito: 1 na fixture (`SEED`, que semeia a
+    // coluna preenchida), 4 na asserção de efeito da etapa 4 (duas comparações,
+    // mensagem de erro e de sucesso) e 4 na guarda que confere a PRÓPRIA fixture
+    // (mesma estrutura). Nenhuma é leitura de produção — juntas são o que dá
+    // DENTE à `038`, e as duas mutações estão medidas:
+    //   · apagar o `limparColuna` da `038` → etapa 4 vermelha;
+    //   · zerar o `SEED` **e** apagar o `limparColuna` → a guarda da fixture
+    //     acusa. Sem ela essa combinação ficava VERDE, com a asserção vácua.
+    // Se este número mudar, confira se o que mudou foi a asserção (esperado) ou
+    // um leitor novo (não esperado).
+    'scripts/migracoes-harness.mjs': 9,
+    // O BACKEND, e a ocorrência aqui NÃO é leitor: é a entrada em
+    // `CAMPOS_APOSENTADOS`, a denylist que descarta o campo INCONDICIONALMENTE.
+    // Ela existe porque remover a coluna não esvazia o que está em TRÂNSITO — a
+    // aba de Premissas aberta através do deploy ainda manda a chave, e sem o
+    // descarte aquela sessão passa a falhar ao salvar. Achado do revisor externo
+    // no PR da #642; a #584 e a #642 não tinham previsto o caso.
+    'backend/rotas/estudos.ts': 1,
+    // O TESTE do descarte acima: o payload em voo e a mensagem de falha. Prova
+    // por mutação — apagar o `continue` da denylist deixa 1 vermelho.
+    'backend/rotas/estudos.test.ts': 2,
   });
 });
 

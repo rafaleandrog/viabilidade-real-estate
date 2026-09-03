@@ -98,12 +98,6 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
-    endereco: "backend/rotas/estudos.ts:180",
-    motivo:
-      "VENCIDO DE VERDADE — nada em ±3 linhas de :180 — \"NIVEL_IMUTAVEL\" está em :84. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
-  },
-  {
-    arquivo: "docs/viabilidade/padrao-incorporacao.md",
     endereco: "frontend/fluxo-shared.ts:237",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :237 — \"APOS_CHAVES_MESES\" está em :295. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
