@@ -27,7 +27,14 @@
 #      resolve — o arquivo existe, a linha existe, e o símbolo que a frase cita
 #      está a ±3 linhas do alvo. É a única afirmação do repo que nenhuma outra
 #      etapa consegue derrubar: um merge da `main` desloca as linhas do arquivo
-#      citado e a prosa passa a apontar para outra coisa, em verde;
+#      citado e a prosa passa a apontar para outra coisa, em verde. Nesta mesma
+#      etapa correm outros dois guards: o de FIAÇÃO (#446/#657) e o do DEFAULT DE
+#      ABA (#638). ⚠️ Os TRÊS precisam do pacote `typescript`, que só é linkado na
+#      etapa 3/8 — mas por motivos diferentes, e a distinção importa: os dois
+#      últimos perguntam à ÁRVORE (`compilador`, o AST), enquanto o de endereços
+#      usa o parser só para MASCARAR comentário e string (`analisar`). Os três
+#      guards de UI da etapa 4/8 também dependem do parser, então "os que
+#      dependem do parser" não são estes três;
 #   6. typecheck do frontend (tsconfig só-frontend);
 #   7. testes de frontend e build do bundle via esbuild;
 #   8. verificação de RENDER em Chromium: monta quatro telas de verdade e mede
@@ -173,7 +180,7 @@ com_limite 120 bash scripts/testar-guards-ui.sh >/dev/null || {
 }
 echo "  ok: baterias do lexer e dos guards de UI verdes"
 
-echo "== 5/8 guard de endereços de doc (arquivo:linha que deixou de resolver) =="
+echo "== 5/8 guards de parser (endereços de doc + fiação + default de aba) =="
 # Endereço `arquivo:linha` em prosa é a ÚNICA afirmação deste repositório que
 # nenhuma outra etapa consegue derrubar: `tsc`, `node --test`, o `esbuild` e o
 # render-check não leem prosa. Um merge da `main` desloca as linhas do arquivo
@@ -216,6 +223,30 @@ com_limite 120 bash scripts/testar-guard-fiacao.sh >/dev/null || {
   exit 1
 }
 echo "  ok: guard de fiação e bateria verdes"
+
+# #638: a aba default do Avançado é um LITERAL e não pode depender da ORDEM de
+# `PAGINAS`. São duas regras, e a segunda existe porque a primeira, sozinha, foi
+# furada em quatro rodadas de revisão: perguntar "onde está o fallback e ele é
+# literal?" depende de ALCANÇABILIDADE, que a árvore não responde. Mora nesta
+# etapa pelo mesmo motivo dos dois acima — decide pelo parser do typescript, que
+# só existe depois do link (etapa 3/8).
+#
+# Medido em 2026-09-02, e é a razão de o guard existir: trocar as DUAS origens do
+# default por `PAGINAS[0].id` deixa o typecheck, a suíte de frontend e os casos de
+# render INTEIRAMENTE VERDES. A coincidência de `'resumo'` ser a 1ª página torna a
+# derivação indistinguível do literal em toda asserção de comportamento; só uma
+# pergunta de ÁRVORE separa as duas, e hoje quem reprova é este guard — só ele.
+#
+# ⚠️ A frase acima já teve `este script 8/8 verde` como sujeito, e era
+# AUTO-FALSIFICANTE: o script é o que este commit muda, então repetir a medição
+# hoje dá 5/8 vermelho. É a armadilha de redação nomeada no `CLAUDE.md`
+# § Processo. O sujeito certo é a suíte, que continua sem enxergar a troca.
+node scripts/guard-aba-default-literal.mjs || exit 1
+com_limite 120 bash scripts/testar-guard-aba-default.sh >/dev/null || {
+  echo "  bateria do guard de default de aba FALHOU — rode: bash scripts/testar-guard-aba-default.sh" >&2
+  exit 1
+}
+echo "  ok: guard de default de aba e bateria verdes"
 
 echo "== 6/8 typecheck do frontend =="
 # ⚠️ `scripts/**/*.ts` entra aqui, e NÃO é enfeite. O `tsconfig.json` da raiz

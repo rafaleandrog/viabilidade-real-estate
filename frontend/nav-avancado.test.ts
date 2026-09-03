@@ -122,17 +122,39 @@ test('#589: selecionar Custos no menu leva o SLUG público para a URL, não o id
 // Critério 3 — a aba default continua `resumo`, inclusive para slug desconhecido
 // ─────────────────────────────────────────────────────────────────────────
 
-// ⚠️ O LIMITE DESTE TESTE, MEDIDO — e ele não cobre o que o título anterior
-// prometia. Este bloco já se chamou "a aba default não vira a 1ª posição do
-// array por acidente", e essa defesa NÃO EXISTE: `resumo` É `PAGINAS[0]`, então
-// nenhuma asserção de caixa-preta distingue o literal `'resumo'` de um
-// `PAGINAS[0].id`. Medido em 2026-08-29: trocar as DUAS origens do default
-// (`_aba` inicial e o fallback do setter, frontend/tela-avancado.ts) por
-// `PAGINAS[0].id` deixa 877/877 testes e 56/56 casos de render VERDES.
-// O que este teste de fato mede — e mede de verdade — é o comportamento: sem
-// URL, e com slug desconhecido, a aba resolvida é `resumo`. A independência
-// entre o default e a ordem do array é sustentada pelo LITERAL no código de
-// produção, não por este arquivo.
+// ⚠️ O LIMITE DESTE TESTE CONTINUA VALENDO, e agora ele tem par. Este bloco já
+// se chamou "a aba default não vira a 1ª posição do array por acidente", e essa
+// defesa não existia: `resumo` É `PAGINAS[0]`, então nenhuma asserção de
+// caixa-preta distingue o literal `'resumo'` de um `PAGINAS[0].id`. Medido de
+// novo em 2026-09-02, com a mutação nas DUAS origens do default (`_aba` inicial
+// e o fallback do setter, `frontend/tela-avancado.ts`): 1048 testes de frontend
+// e 74 casos de render VERDES. Este arquivo não enxerga a diferença — e, SEM
+// mexer em produção, não há como fazê-lo enxergar.
+//
+// ⚠️ A ressalva não é decorativa, e a #638 é quem a exige: a **Opção 2** dela
+// descreve uma costura de injeção em `PAGINAS` que tornaria a pergunta de
+// comportamento outra vez, e diz, com todas as letras, que essa seria a defesa
+// **mais forte**. Ela foi recusada aqui por ESCOPO — criar ponto de injeção em
+// produção só para viabilizar teste tem risco próprio —, não por ser impossível.
+// Escrever "não há como" sem a cláusula faria quem considerar a Opção 2 no futuro
+// ler impossibilidade onde houve escolha.
+//
+// O que MUDOU é que a defesa passou a existir fora daqui, na camada que responde
+// à pergunta sem tocar em produção: `scripts/guard-aba-default-literal.mjs`
+// (#638) pergunta à ÁRVORE do TypeScript duas coisas: se cada origem do default
+// é um literal de string que concorda com a outra, e se o setter ou o
+// inicializador leem as listas de páginas de um jeito sensível à ORDEM.
+//
+// A segunda regra não é redundante, e custou quatro rodadas de revisão para
+// aparecer: perguntar só "o fallback é literal?" depende de ALCANÇABILIDADE — um
+// ternário de condição sempre-verdadeira tem o ramo falso morto, e o literal
+// aprovado é código que não roda. A pergunta decidível na árvore é a da ordem, e
+// é a que a issue de fato faz.
+//
+// A divisão de trabalho, para não se procurar aqui o que não mora aqui: este
+// teste mede o COMPORTAMENTO (sem URL, e com slug desconhecido, a aba resolvida
+// é `resumo`); o guard mede a FORMA que sustenta esse comportamento quando
+// alguém reordenar `PAGINAS`.
 test('#589: a aba default continua `resumo`, inclusive para slug desconhecido', () => {
   // Sem nada vindo da URL.
   assert.equal(telaAvancado().aba, 'resumo');
