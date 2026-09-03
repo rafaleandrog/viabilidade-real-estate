@@ -247,7 +247,6 @@ Quem tratar essas duas como bug e "corrigir" **muda o resultado de estudos exist
 que vale: `financiamento_producao` tem **outra spec**; `divida` e `equity` seguem a planilha **com
 emendas declaradas**.
 
-
 ## Regras de precisão
 
 **Precisão de persistência** — o que a coluna guarda:
