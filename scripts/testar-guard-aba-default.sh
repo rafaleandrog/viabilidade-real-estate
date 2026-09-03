@@ -76,6 +76,7 @@ trap 'rm -rf "$TMPRAIZ"' EXIT
 # arvore <nome> <corpo-da-classe> — monta a tela mínima com as duas origens do
 # default. O preâmbulo (PAGINAS/IDS_TOPO) é o real, para que a derivação testada
 # seja a que de fato compilaria no arquivo de produção.
+# arvore <nome> <corpo-da-classe> [<codigo-extra-de-modulo>]
 arvore() {
   local raiz="$TMPRAIZ/$1/frontend"; shift
   mkdir -p "$raiz"
@@ -92,6 +93,7 @@ arvore() {
     printf "declare function defaultDaLista(): AbaTopo;\n"
     printf "const PAGINAS_TOPO = PAGINAS;\n"
     printf "declare function property(o: unknown): any;\n"
+    printf '%s\n' "${2:-}"
     printf "export class ViabTelaAvancado {\n"
     printf '%s\n' "$1"
     printf "  get aba(): AbaTopo { return this._aba; }\n"
@@ -460,9 +462,15 @@ FIND_ALHEIO_EM_ARROW="  set aba(v: string) {
   }
   private _aba: AbaTopo = 'resumo';"
 
-# ── Rodada 4: as seis brechas do ternario com ramo MORTO ───────────────────
-# Todas passavam no guard anterior. A regra A nao as pega -- o `whenFalse` E um
-# literal nas seis. Quem as fecha e a regra B, com uma regra so.
+# ── Rodada 4: o ternario com ramo MORTO ────────────────────────────────────
+# A regra A nao pega estas -- o `whenFalse` E um literal em todas. Quem as fecha
+# e a regra B.
+#
+# ⚠️ O texto daqui ja disse "as seis brechas, todas passavam no guard anterior",
+# e a ENUMERACAO estava errada: o caso 47 (ordem no inicializador) ja reprovava
+# antes, e a sexta que de fato passava e o caso 48, definido fora deste bloco.
+# Quem quiser a lista exata do que a regra B comprou roda a bateria com
+# `URBI_GUARD_ABA` apontando para a versao anterior, em vez de crer nesta prosa.
 #
 # A forma B e a que mais importa: e idiomatica, sai de uma refatoracao de boa-fe
 # ("acha a pagina; se nao achar cai na primeira; o `? :` fica por seguranca"), e
@@ -563,6 +571,58 @@ RENOME_COM_MENCAO="  set aba(v: string) {
   }
   private _aba: AbaTopo = 'resumo';"
 
+# ── Rodada 5, lente nativa: a regra B tinha escopo de MEMBRO ───────────────
+# Bastava mover a derivacao um passo para fora. As tres variantes foram medidas
+# no arquivo de PRODUCAO, nao em fixture -- e passavam com o guard verde, a
+# bateria verde, o tsc verde e 1048/1048 testes verdes, com a linha de sucesso
+# afirmando "2 lista(s) sem leitura por ordem".
+AJUDANTE_DE_MODULO_EXTRA="function normalizarAba(id: string): AbaTopo {
+  return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id;
+}"
+AJUDANTE_DE_MODULO="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const val = v.length > 0 ? normalizarAba(id) : 'resumo';
+    this._aba = val;
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+AJUDANTE_METODO_DA_CLASSE="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const val = v.length > 0 ? this._normalizar(id) : 'resumo';
+    this._aba = val;
+  }
+  private _normalizar(id: string): AbaTopo {
+    return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id;
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# Outro MEMBRO escreve o campo: o default sai das duas origens declaradas e o
+# guard nem olhava. Passava em todas as versoes anteriores.
+OUTRO_MEMBRO_ESCREVE="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+  }
+  connectedCallback() { this._aba = PAGINAS[0].id; }
+  private _aba: AbaTopo = 'resumo';"
+
+# `includes(x, fromIndex)` E sensivel a ordem: muda o conjunto de slugs aceitos
+# quando a lista e reordenada, e portanto o destino do fallback. Uma allowlist
+# que ignora argumentos nao e allowlist.
+INCLUDES_COM_FROMINDEX="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = IDS_TOPO.includes(id as AbaTopo, 1) ? (id as AbaTopo) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# O guard le UM arquivo. Um ajudante IMPORTADO seria cego por construcao --
+# entao a expressao do default nao pode chamar o que nao da para ler.
+AJUDANTE_IMPORTADO="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const val = v.length > 0 ? normalizarDeOutroModulo(id) : 'resumo';
+    this._aba = val;
+  }
+  private _aba: AbaTopo = 'resumo';"
+
 verificar() { # <nome> <raiz> <esperado: ok|reprova>
   local nome="$1" raiz="$2" esperado="$3" rc=0 saida=''
   TOTAL=$((TOTAL+1))
@@ -600,7 +660,7 @@ verificar "13 ternário inocente ANTES não esconde derivação"    "$(arvore c1
 # guard reprova em vez de escolher. Foi exatamente por "escolher" que ele foi
 # enganado duas vezes. O custo é aceito e a mensagem diz o que fazer.
 verificar "14 segundo ternário no setter: ambíguo, reprova"     "$(arvore c14 "$TERNARIO_INOCENTE_COM_LITERAL")" reprova
-verificar "15 cadeia de aliases é rastreada até o ternário"     "$(arvore c15 "$ALIAS_EM_CADEIA")"           ok
+verificar "15 cadeia de aliases de 2 níveis passa"     "$(arvore c15 "$ALIAS_EM_CADEIA")"           ok
 # ⚠️ Este caso ESPERAVA `ok` e virou `reprova` na rodada 3, pelo mesmo argumento
 # do 14: `??`/`||` deixaram de ser forma aceita — e desde a rodada 4 o que o
 # reprova é a regra A (o setter precisa de exatamente um ternário). O fallback
@@ -609,9 +669,9 @@ verificar "15 cadeia de aliases é rastreada até o ternário"     "$(arvore c15
 # caso 37, que é a testemunha que derrubou a regra antiga.
 verificar "16 fallback por '??', mesmo com literal, reprova"    "$(arvore c16 "$FALLBACK_COM_NULLISH")"      reprova
 verificar "17 fallback por '??' derivado reprova"               "$(arvore c17 "$FALLBACK_COM_NULLISH_DERIVADO")" reprova
-verificar "18 duas atribuições a _aba: ambíguo, reprova"        "$(arvore c18 "$DUAS_ATRIBUICOES")"          reprova
-verificar "19 valor vindo de fora do setter reprova"            "$(arvore c19 "$VALOR_DE_FORA")"             reprova
-verificar "20 sem fallback visível reprova"                     "$(arvore c20 "$SEM_FALLBACK_VISIVEL")"      reprova
+verificar "18 duas atribuições a _aba reprovam (hoje: 0 ternários)"        "$(arvore c18 "$DUAS_ATRIBUICOES")"          reprova
+verificar "19 valor de fora do setter reprova (hoje: 0 ternários)"            "$(arvore c19 "$VALOR_DE_FORA")"             reprova
+verificar "20 sem fallback visível reprova (hoje: 0 ternários)"                     "$(arvore c20 "$SEM_FALLBACK_VISIVEL")"      reprova
 # ⚠️ ESPERAVA `ok` e virou `reprova` na rodada 4, e e uma TROCA DECLARADA, nao
 # um defeito. A regra A pede um ternario; `if/else` reprova ainda que correto.
 # O setter de producao usa ternario, e a regra B cobre o acoplamento por ordem
@@ -629,7 +689,7 @@ verificar "29 sombra de nome em ARROW reprova"                  "$(arvore c29 "$
 verificar "30 ternário derivado sob '??' literal reprova"       "$(arvore c30 "$TERNARIO_SOB_NULLISH")"      reprova
 verificar "31 fallback real no THEN do if/else reprova"         "$(arvore c31 "$FALLBACK_NO_THEN")"          reprova
 verificar "32 derivação pura sob '??' literal reprova"          "$(arvore c32 "$DERIVADO_SOB_NULLISH")"      reprova
-verificar "33 setter que ignora a entrada reprova"              "$(arvore c33 "$SETTER_SO_LITERAL")"         reprova
+verificar "33 setter que ignora a entrada reprova (hoje: 0 ternários)"              "$(arvore c33 "$SETTER_SO_LITERAL")"         reprova
 verificar "34 falso positivo: ternário sob 'satisfies' passa"   "$(arvore c34 "$TERNARIO_SOB_SATISFIES")"    ok
 verificar "35 ternário derivado sob 'satisfies' reprova"        "$(arvore c35 "$TERNARIO_SOB_SATISFIES_DERIVADO")" reprova
 verificar "36 alias MUTÁVEL reescrito com derivação reprova"    "$(arvore c36 "$ALIAS_MUTAVEL")"             reprova
@@ -674,6 +734,11 @@ export class ViabTelaAvancado {
 }
 TS51
 verificar "51 renome com menção em COMENTÁRIO reprova"          "$TMPRAIZ/c51"                               reprova
+verificar "52 derivação em AJUDANTE DE MÓDULO reprova"          "$(arvore c52 "$AJUDANTE_DE_MODULO" "$AJUDANTE_DE_MODULO_EXTRA")" reprova
+verificar "53 derivação em MÉTODO da classe reprova"            "$(arvore c53 "$AJUDANTE_METODO_DA_CLASSE")" reprova
+verificar "54 outro MEMBRO escrevendo _aba reprova"             "$(arvore c54 "$OUTRO_MEMBRO_ESCREVE")"      reprova
+verificar "55 '.includes' com fromIndex reprova"                "$(arvore c55 "$INCLUDES_COM_FROMINDEX")"    reprova
+verificar "56 ajudante IMPORTADO (ilegível) reprova"            "$(arvore c56 "$AJUDANTE_IMPORTADO")"        reprova
 
 # ── INVENTÁRIO: a metade do critério (a) que as fixtures não cobrem ────────
 #

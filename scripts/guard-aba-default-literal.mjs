@@ -20,10 +20,16 @@
  *   A · **cada origem do default é um literal de string, e as origens
  *       concordam.** É o pedido literal da issue.
  *
- *   B · **nem o setter nem o inicializador podem ler as listas de páginas de um
- *       jeito sensível à ORDEM.** `IDS_TOPO.includes(id)` é indiferente a
- *       posição e passa; índice, `.find`, `.at`, `.length` — qualquer coisa que
- *       não esteja na allowlist — reprova.
+ *   B · **o default não pode ler as listas de páginas de um jeito sensível à
+ *       ORDEM.** `IDS_TOPO.includes(id)` (com um argumento só) passa; índice,
+ *       `.find`, `.at`, `.length` — qualquer coisa fora da allowlist — reprova.
+ *
+ *       O alcance de B é maior que os dois membros, e precisou ser: ele cobre o
+ *       que eles CHAMAM dentro do arquivo (funções de módulo, métodos da
+ *       classe), recusa chamada a algo que este arquivo não define, e proíbe
+ *       qualquer outro membro de escrever `_aba`. Com escopo de membro, bastava
+ *       mover a derivação um passo para fora — e bastou, em três formas
+ *       medidas.
  *
  * ── POR QUE A REGRA B EXISTE, e ela custou quatro rodadas de revisão ────────
  *
@@ -57,14 +63,30 @@
  * Executado: com a ordem atual, slug desconhecido cai em `resumo`; com `PAGINAS`
  * reordenado, cai em `obra`. É o defeito da #638, com o guard verde.
  *
- * ── O QUE FOI PODADO, e por quê ─────────────────────────────────────────────
+ * ── A PODA, e a correção de três coisas que este cabeçalho afirmou e eram falsas
  *
- * Saíram o rastreio de atribuição, a resolução de aliases, a contagem de formas
- * de fallback e a checagem de dependência da entrada — ~350 linhas. Medido: sem
- * elas o guard reprova as MESMAS coisas, mais as seis brechas acima, e deixa de
- * ter um falso positivo (o `requestUpdate` condicional, que o setter real está a
- * uma linha de escrever). Maquinaria que não sustenta nenhum caso sozinha é
- * custo de manutenção, não defesa.
+ * A troca de eixo permitiu podar a contagem de formas de fallback e a checagem
+ * de dependência da entrada, que não sustentavam nenhum caso sozinhas.
+ *
+ * ⚠️ Mas o texto que estava aqui dizia três coisas mensuráveis, e o revisor
+ * mediu as três como FALSAS. Ficam registradas porque são a armadilha 11 do
+ * `CLAUDE.md` cometida no comentário que se gabava de tê-la evitado:
+ *
+ *   · *"sem elas o guard reprova as MESMAS coisas"* — não reprovava. Três
+ *     fixtures da bateria passaram a reprovar por acidente (zero ternários), e
+ *     bastava acrescentar um ternário inócuo para virarem exit 0. A poda TINHA
+ *     removido proteção real; quem a devolveu foi a conferência de que o
+ *     ternário é o que chega em `this._aba`;
+ *   · *"deixa de ter um falso positivo — o `requestUpdate` condicional"* — o
+ *     one-liner `if (antigo !== val) this.requestUpdate(…)` **nunca** foi falso
+ *     positivo, porque o guard antigo contava `if` **com `else`**. O falso
+ *     positivo perdido era a forma com `else`, que não é idiomática;
+ *   · a contagem de linhas — vencida no dia seguinte, e ela não deveria estar
+ *     num arquivo versionado (armadilha 13).
+ *
+ * A lição, e é a mesma da fronteira que envelheceu em uma hora: **prosa que
+ * afirma o resultado de uma medição precisa ser remedida quando o código muda,
+ * ou não deve ser escrita.**
  *
  * ── A TROCA DECLARADA ───────────────────────────────────────────────────────
  *
@@ -185,10 +207,16 @@ function usosSensiveisAOrdem(raiz, sf) {
   const varrer = (n) => {
     if (ts.isIdentifier(n) && protegidas.has(n.text)) {
       const pai = n.parent;
+      // ⚠️ ARIDADE EXATA, e ela não é preciosismo: `includes(x, fromIndex)` É
+      // sensível à ordem. `IDS_TOPO.includes(id, 1)` — "a 1ª página nunca vem
+      // por slug, ela é só o default" — muda o conjunto de slugs aceitos quando
+      // a lista é reordenada, e portanto muda o destino do fallback. Medido:
+      // passava. Uma allowlist que ignora argumentos não é allowlist.
       const ehChamadaPermitida = pai
         && ts.isPropertyAccessExpression(pai) && pai.expression === n
         && METODOS_SEM_ORDEM.includes(pai.name.text)
-        && pai.parent && ts.isCallExpression(pai.parent) && pai.parent.expression === pai;
+        && pai.parent && ts.isCallExpression(pai.parent) && pai.parent.expression === pai
+        && pai.parent.arguments.length === 1;
       if (!ehChamadaPermitida) {
         const alvo = pai && (ts.isPropertyAccessExpression(pai) || ts.isElementAccessExpression(pai))
           ? pai : n;
@@ -283,6 +311,114 @@ function ternarioChegaEm(membro, ternario, campo) {
     };
   }
   return {};
+}
+
+/**
+ * Os corpos alcançáveis a partir de um membro, seguindo chamadas DENTRO do
+ * arquivo — funções de módulo, arrows de módulo e métodos da própria classe.
+ *
+ * ⚠️ POR QUE ISTO EXISTE. A regra B tinha escopo de MEMBRO, e bastava mover a
+ * derivação um passo para fora para ela ficar cega. Medido no arquivo de
+ * produção, com uma refatoração de boa-fé — extrair a normalização de slug para
+ * uma função pura de módulo:
+ *
+ *     function normalizarAba(id: string): AbaTopo {
+ *       return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id;
+ *     }
+ *     …
+ *     const val = v.length > 0 ? normalizarAba(idDaSlug(v)) : 'resumo';
+ *
+ * Um ternário só, e ele É o que chega em `this._aba`, e o setter não cita
+ * nenhuma das listas. Passava tudo — com a linha de sucesso do guard afirmando
+ * "2 lista(s) sem leitura por ordem" enquanto o default seguia `PAGINAS[0]`.
+ * Executado: reordenar `PAGINAS` mudava a aba do slug desconhecido.
+ *
+ * Seguir chamadas resolve isso sem varrer o arquivo inteiro — o que exigiria uma
+ * allowlist de sítios legítimos (a construção de `IDS_TOPO`, o `render`), e essa
+ * lista envelheceria a cada mexida de UI.
+ */
+function corposAlcancaveis(sf, classe, membro) {
+  const defsModulo = new Map();
+  for (const st of sf.statements) {
+    if (ts.isFunctionDeclaration(st) && st.name) defsModulo.set(st.name.text, st);
+    else if (ts.isVariableStatement(st)) {
+      for (const d of st.declarationList.declarations) {
+        if (ts.isIdentifier(d.name) && d.initializer
+          && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
+          defsModulo.set(d.name.text, d.initializer);
+        }
+      }
+    }
+  }
+  const defsClasse = new Map();
+  for (const m of classe.members) {
+    if ((ts.isMethodDeclaration(m) || ts.isGetAccessorDeclaration(m))
+      && m.name && ts.isIdentifier(m.name)) defsClasse.set(m.name.text, m);
+  }
+
+  const corpos = [membro];
+  const vistos = new Set();
+  const fila = [membro];
+  while (fila.length > 0 && corpos.length < 64) {
+    const atual = fila.shift();
+    const varrer = (n) => {
+      if (ts.isCallExpression(n)) {
+        let nome = null;
+        if (ts.isIdentifier(n.expression)) nome = n.expression.text;
+        else if (ts.isPropertyAccessExpression(n.expression)
+          && n.expression.expression.kind === ts.SyntaxKind.ThisKeyword) {
+          nome = n.expression.name.text;
+        }
+        const alvo = nome && (defsModulo.get(nome) ?? defsClasse.get(nome));
+        if (alvo && !vistos.has(alvo)) { vistos.add(alvo); corpos.push(alvo); fila.push(alvo); }
+      }
+      ts.forEachChild(n, varrer);
+    };
+    varrer(atual);
+  }
+  return corpos;
+}
+
+/**
+ * Chamadas, dentro da EXPRESSÃO que vira o default, para algo que este arquivo
+ * não define.
+ *
+ * ⚠️ O guard lê UM arquivo. `import { normalizarAba } from './nav-util.js'`
+ * seria cego por construção — e declarar isso como fronteira não bastaria,
+ * porque a rodada 3 já ensinou que fronteira declarada não é fronteira fechada.
+ * Então a expressão do default não pode chamar o que o guard não consegue ler.
+ *
+ * O recorte é a EXPRESSÃO, não o membro: `this.requestUpdate(...)` é statement
+ * ao lado, não entra no valor, e continua livre.
+ */
+function chamadasOpacas(sf, classe, expressao) {
+  const conhecidos = new Set();
+  for (const st of sf.statements) {
+    if (ts.isFunctionDeclaration(st) && st.name) conhecidos.add(st.name.text);
+    else if (ts.isVariableStatement(st)) {
+      for (const d of st.declarationList.declarations) {
+        if (ts.isIdentifier(d.name)) conhecidos.add(d.name.text);
+      }
+    }
+  }
+  for (const m of classe.members) {
+    if (m.name && ts.isIdentifier(m.name)) conhecidos.add(m.name.text);
+  }
+  const opacas = [];
+  const varrer = (n) => {
+    if (ts.isCallExpression(n)) {
+      let nome = null;
+      if (ts.isIdentifier(n.expression)) nome = n.expression.text;
+      else if (ts.isPropertyAccessExpression(n.expression)
+        && n.expression.expression.kind === ts.SyntaxKind.ThisKeyword) {
+        nome = n.expression.name.text;
+      }
+      if (nome && !conhecidos.has(nome)) opacas.push(nome);
+    }
+    ts.forEachChild(n, varrer);
+  };
+  varrer(expressao);
+  return opacas;
 }
 
 // ── execução ────────────────────────────────────────────────────────────────
@@ -387,6 +523,40 @@ if (chamadoDireto) {
         + '      vence" aprovaria a errada sem avisar.',
       );
     } else {
+      // ── B2 · só o setter escreve `_aba` ──────────────────────────────────
+      // Sem isto, um `connectedCallback() { this._aba = PAGINAS[0].id }` põe o
+      // default fora das duas origens declaradas e o guard nem olha. Medido:
+      // passava em todas as versões anteriores. É também o que fecha a
+      // limitação que este arquivo declarava sobre o construtor — ela deixou de
+      // ser fronteira e virou regra.
+      const CAMPO_ESTADO = '_aba';
+      for (const m of classe.members) {
+        const ehOSetter = ts.isSetAccessorDeclaration(m) && m.name && ts.isIdentifier(m.name)
+          && m.name.text === 'aba';
+        if (ehOSetter) continue;
+        const escreve = [];
+        const ver = (n) => {
+          if (
+            ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsToken
+            && ts.isPropertyAccessExpression(n.left)
+            && n.left.expression.kind === ts.SyntaxKind.ThisKeyword
+            && n.left.name.text === CAMPO_ESTADO
+          ) escreve.push(n);
+          ts.forEachChild(n, ver);
+        };
+        ver(m);
+        if (escreve.length > 0) {
+          const nomeM = m.name && ts.isIdentifier(m.name) ? m.name.text : '(anônimo)';
+          falhas.push(
+            `${ARQUIVO}:${sf.getLineAndCharacterOfPosition(escreve[0].getStart(sf)).line + 1} — `
+            + `\`${nomeM}\` escreve em \`this.${CAMPO_ESTADO}\`, e só o setter \`aba\` pode.\n`
+            + '      Um default posto em outro membro fica fora das duas origens declaradas, e o\n'
+            + '      guard não olharia para ele — foi assim que um `connectedCallback` derivado\n'
+            + '      passava em todas as versões anteriores deste arquivo.',
+          );
+        }
+      }
+
       for (const origem of ORIGENS) {
         const membros = classe.members.filter((m) => (
           origem.tipo === 'inicializador'
@@ -405,11 +575,16 @@ if (chamadoDireto) {
         }
         const membro = membros[0];
 
-        // ── regra B, nas duas origens ────────────────────────────────────────
-        for (const uso of usosSensiveisAOrdem(membro, sf)) {
+        // ── regra B, nas duas origens e no que elas CHAMAM ───────────────────
+        const alcancaveis = corposAlcancaveis(sf, classe, membro);
+        const usos = alcancaveis.flatMap((c) => usosSensiveisAOrdem(c, sf));
+        for (const uso of usos) {
           falhas.push(
-            `${ARQUIVO}:${uso.linha} — a origem "${origem.tipo}" lê \`${uso.texto}\`, que depende da `
-            + 'ORDEM da lista.\n'
+            `${ARQUIVO}:${uso.linha} — a origem "${origem.tipo}" lê \`${uso.texto}\`, que não está `
+            + 'na allowlist de operações indiferentes a posição.\n'
+            + '      ⚠️ Isto NÃO afirma que a operação lê a ordem: `.length` e `.find` por id não\n'
+            + '      leem. A allowlist é conservadora de propósito — enumerar o sensível a posição\n'
+            + '      é a API inteira de Array, e enumerar o permitido converge.\n'
             + `      ${origem.motivo}\n`
             + '      Reordenar a lista de páginas passaria a mudar o default EM SILÊNCIO — nenhum\n'
             + `      teste de comportamento acusa isso. Só \`.${METODOS_SEM_ORDEM.join('`/`.')}\` é `
@@ -447,6 +622,17 @@ if (chamadoDireto) {
             falhas.push(`${ARQUIVO}: ${chega.erro}\n      ${origem.motivo}`);
             continue;
           }
+          const opacas = chamadasOpacas(sf, classe, ternarios[0]);
+          if (opacas.length > 0) {
+            falhas.push(
+              `${ARQUIVO}: o ternário do default chama \`${[...new Set(opacas)].join('`, `')}\`, `
+              + 'que este arquivo não define.\n'
+              + '      O guard lê UM arquivo: um ajudante importado de outro módulo poderia derivar\n'
+              + '      o default de `PAGINAS` sem que nada aqui visse. Declarar isso como fronteira\n'
+              + '      não a fecharia — então a expressão do default não chama o que não dá para ler.',
+            );
+            continue;
+          }
           alvo = ternarios[0].whenFalse;
         }
 
@@ -457,7 +643,9 @@ if (chamadoDireto) {
             + `"${origem.tipo}" NÃO é um literal de string.\n`
             + `      ${origem.motivo}\n`
             + `      Achei: \`${alvo.getText(sf).slice(0, 60)}\`\n`
-            + '      Escreva o literal. Se o default mudou de valor, mude o literal.',
+            + '      Escreva o literal. Se o default mudou de valor, mude o literal.\n'
+            + '      ⚠️ Se a condição está INVERTIDA (o literal no ramo verdadeiro), inverta a\n'
+            + '      condição — o guard lê sempre o ramo falso, e não é para mover o literal.',
           );
         } else {
           valores.push({ origem, valor: nucleo.text });
