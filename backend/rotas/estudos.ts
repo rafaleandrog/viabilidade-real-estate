@@ -50,17 +50,30 @@ const CAMPOS_SOMENTE_AVANCADO = new Set([
   'financiamento_carencia_meses',
   'investidor_aporte_valor', 'investidor_retorno_tipo',
   'investidor_juros_aa', 'investidor_carencia_meses', 'investidor_parcelas',
-  // #584: o DEFLATOR foi retirado do app — nenhum código lê mais este valor.
-  // A entrada FICA nesta lista mesmo assim, e não é resíduo: ela não é um
-  // leitor, é um FILTRO. `estudos.deflator_area_aberta_pct` continua sendo
-  // coluna declarada e exclusiva do Avançado (caminho A da #584 mantém a
-  // coluna inerte no `schema.json`), e `tela-premissas.ts` monta o PATCH a
-  // partir do registro INTEIRO (`this.form = { ...this.estudo }`, `:477`,
-  // reenviado em `:1313-1320`). Tirar a entrada faria o campo voltar a
-  // alcançar o validador do shell num estudo Preliminar — o "Campo X deve ser
-  // um número" que é a razão de ser desta lista, descrita no comentário do
-  // topo. Se a coluna sair do schema pelo caminho canônico
-  // (`dados.limparColuna`), esta linha sai junto, e só então.
+]);
+
+// #642: `deflator_area_aberta_pct` saiu desta lista — mas NÃO deixou de ser
+// filtrado. Ele mudou de lista, e o motivo é a razão de `CAMPOS_APOSENTADOS`
+// existir, logo abaixo.
+
+// Campos que a app APOSENTOU — a coluna saiu do `schema.json` e o shell não a
+// declara mais. Descartados SEMPRE, independente do nível de análise.
+//
+// ⚠️ POR QUE INCONDICIONAL, e não uma entrada a mais em CAMPOS_SOMENTE_AVANCADO.
+// Achado do revisor externo no PR desta issue, e ele expõe um caso que a #642 não
+// previa: **a aba de Premissas aberta ATRAVÉS do deploy**. O `this.form` daquela
+// aba foi montado do registro inteiro ANTES da atualização, então ainda carrega a
+// chave; ela filtra por denylist e manda o resto. Sem esta lista, o campo chega a
+// `req.dados.atualizar` contra um schema que não o declara, e a sessão antiga
+// passa a falhar ao salvar até o usuário recarregar a página. Cliente externo
+// desatualizado tem o mesmo problema, e nele não há "recarregar".
+//
+// A condição de nível não serve aqui: o payload em trânsito vem de estudo de
+// qualquer nível. Remover a coluna não garante que nenhum payload em voo a
+// contenha — só garante que ela não deve mais ser gravada.
+const CAMPOS_APOSENTADOS = new Set([
+  // #584 retirou o deflator do app (caminho A); #642 tirou a coluna do schema
+  // e esvaziou o dado com a migração `038` (caminho B).
   'deflator_area_aberta_pct',
 ]);
 
@@ -148,6 +161,9 @@ export function montarPatchEstudo(
   const dados: Record<string, any> = {};
   for (const [k, v] of Object.entries(body ?? {})) {
     if (CAMPOS_BLOQUEADOS_PATCH.has(k)) continue;
+    // Campo aposentado: a coluna não existe mais. Descartado sempre — cliente em
+    // voo (aba aberta através do deploy) ainda o manda. Ver CAMPOS_APOSENTADOS.
+    if (CAMPOS_APOSENTADOS.has(k)) continue;
     // Campos exclusivos do Avançado nunca chegam ao validador quando o estudo
     // é Preliminar (valores null disparariam "deve ser um número" no shell).
     if (estudo?.nivel_analise === 'preliminar' && CAMPOS_SOMENTE_AVANCADO.has(k)) continue;

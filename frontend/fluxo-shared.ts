@@ -201,9 +201,11 @@ const n = (v: any): number => Number(v) || 0;
  * #584 (decisão do autor): o deflator de preço da área aberta, introduzido
  * pela #462 (`estudos.deflator_area_aberta_pct`), foi RETIRADO. Não ficou
  * parâmetro fantasma nesta cadeia — nenhuma função abaixo recebe mais um
- * deflator, e a coluna sobrevive apenas no `schema.json`, sem leitor
- * (caminho A da #584). Área aberta ausente/0 continua reproduzindo
- * exatamente `area_privativa_m2 × preco_m2`.
+ * deflator. A #642 fechou o ciclo: a coluna saiu do `schema.json` e a migração
+ * `038` esvaziou o dado. (Este parágrafo dizia que ela "sobrevive apenas no
+ * `schema.json`, sem leitor", que era o caminho A da #584 e deixou de valer.)
+ * Área aberta ausente/0 continua reproduzindo exatamente
+ * `area_privativa_m2 × preco_m2`.
  *
  * ⚠️ **A ASSOCIAÇÃO É DELIBERADA — não "simplifique" para `(fechada + aberta) × preço`.**
  * A forma antiga era `fechada × preço + aberta × preço × (1 − deflator)`, e com
