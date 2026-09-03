@@ -24,12 +24,16 @@
  *       ORDEM.** `IDS_TOPO.includes(id)` (com um argumento só) passa; índice,
  *       `.find`, `.at`, `.length` — qualquer coisa fora da allowlist — reprova.
  *
- *       O alcance de B é maior que os dois membros, e precisou ser: ele cobre o
- *       que eles CHAMAM dentro do arquivo (funções de módulo, métodos da
- *       classe), recusa chamada a algo que este arquivo não define, e proíbe
- *       qualquer outro membro de escrever `_aba`. Com escopo de membro, bastava
- *       mover a derivação um passo para fora — e bastou, em três formas
- *       medidas.
+*       O alcance de B é maior que os dois membros, e precisou ser. Ele cobre o
+ *       que o CAMINHO DO VALOR chama dentro do arquivo, recusa chamada a algo
+ *       sem corpo aqui (importado, `declare`, ou que o guard não consiga
+ *       nomear), e proíbe outro membro de escrever `_aba` — por posição da
+ *       menção, não por forma de escrita.
+ *
+ *       ⚠️ Segue o caminho do valor, e NÃO tudo que o setter chama: seguir tudo
+ *       acusava um `this._rotulos()` que lê `PAGINAS` para RENDERIZAR, cujo
+ *       retorno nem chega ao default. Ordem de rótulo é leitura legítima; o que
+ *       não pode ler a ordem é o que vira o default.
  *
  * ── POR QUE A REGRA B EXISTE, e ela custou quatro rodadas de revisão ────────
  *
@@ -274,6 +278,7 @@ function ternarioChegaEm(membro, ternario, campo) {
   }
 
   let valor = semInvolucro(escritas[0]);
+  const cadeia = [valor];
   // Alias é comum e legítimo (`const val = …; this._aba = val`), e a cadeia pode
   // ter mais de um passo. O limite existe só para terminar, não é regra.
   //
@@ -300,6 +305,7 @@ function ternarioChegaEm(membro, ternario, campo) {
       };
     }
     valor = semInvolucro(decls[0]);
+    cadeia.push(valor);
   }
 
   if (valor !== ternario) {
@@ -310,7 +316,7 @@ function ternarioChegaEm(membro, ternario, campo) {
         + '      outro lugar (um ajudante no módulo, por exemplo, onde a regra de ordem não olha)',
     };
   }
-  return {};
+  return { cadeia };
 }
 
 /**
@@ -337,30 +343,64 @@ function ternarioChegaEm(membro, ternario, campo) {
  * allowlist de sítios legítimos (a construção de `IDS_TOPO`, o `render`), e essa
  * lista envelheceria a cada mexida de UI.
  */
-function corposAlcancaveis(sf, classe, membro) {
+function corposAlcancaveis(sf, classe, membro, raizes = null) {
+  // ⚠️ As QUATRO formas de dar nome a um corpo, e as quatro medidas escapando
+  // quando faltava alguma: declaração de função, `const f = () => …`,
+  // **apelido** (`const f = normalizarAba`) e **campo de classe com arrow**
+  // (`private _norm = (id) => …`). Reconhecer duas e ignorar as outras foi o
+  // erro repetido em três rodadas — aqui o espaço é fechado, porque como um
+  // callee é nomeado tem fim, ao contrário de "toda expressão possível".
   const defsModulo = new Map();
+  const apelidos = new Map();
   for (const st of sf.statements) {
     if (ts.isFunctionDeclaration(st) && st.name) defsModulo.set(st.name.text, st);
     else if (ts.isVariableStatement(st)) {
       for (const d of st.declarationList.declarations) {
-        if (ts.isIdentifier(d.name) && d.initializer
-          && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) {
+        if (!ts.isIdentifier(d.name) || !d.initializer) continue;
+        if (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer)) {
           defsModulo.set(d.name.text, d.initializer);
+        } else if (ts.isIdentifier(d.initializer)) {
+          apelidos.set(d.name.text, d.initializer.text);
         }
       }
     }
+  }
+  for (let i = 0; i < 8; i++) {
+    let mudou = false;
+    for (const [nome, alvo] of apelidos) {
+      if (!defsModulo.has(nome) && defsModulo.has(alvo)) { defsModulo.set(nome, defsModulo.get(alvo)); mudou = true; }
+    }
+    if (!mudou) break;
   }
   const defsClasse = new Map();
   for (const m of classe.members) {
     if ((ts.isMethodDeclaration(m) || ts.isGetAccessorDeclaration(m))
       && m.name && ts.isIdentifier(m.name)) defsClasse.set(m.name.text, m);
+    else if (ts.isPropertyDeclaration(m) && m.name && ts.isIdentifier(m.name) && m.initializer
+      && (ts.isArrowFunction(m.initializer) || ts.isFunctionExpression(m.initializer))) {
+      defsClasse.set(m.name.text, m.initializer);
+    }
   }
 
+  // ⚠️ As raízes são o CAMINHO DO VALOR, não o membro inteiro. Seguir tudo que o
+  // setter chama acusava código correto: um `this._rotulos()` que lê `PAGINAS`
+  // para RENDERIZAR, chamado do setter, reprovava — e o retorno dele nem chega
+  // ao default. Rótulo de página é leitura legítima da ordem; o que não pode ler
+  // a ordem é o que vira o default.
+  //
+  // O membro entra na lista de corpos (para as leituras diretas dele), mas as
+  // chamadas são seguidas só a partir das raízes.
   const corpos = [membro];
   const vistos = new Set();
-  const fila = [membro];
-  while (fila.length > 0 && corpos.length < 64) {
+  const fila = raizes ? [...raizes] : [membro];
+  // ⚠️ O limite é para TERMINAR, e truncar não pode devolver "o que deu tempo":
+  // uma cadeia longa com a derivação no fim sairia verde. Se estourar, quem
+  // chama reprova.
+  corpos.truncou = false;
+  while (fila.length > 0) {
+    if (corpos.length >= 64) { corpos.truncou = true; break; }
     const atual = fila.shift();
+    if (atual === undefined) break;
     const varrer = (n) => {
       if (ts.isCallExpression(n)) {
         let nome = null;
@@ -391,19 +431,58 @@ function corposAlcancaveis(sf, classe, membro) {
  * O recorte é a EXPRESSÃO, não o membro: `this.requestUpdate(...)` é statement
  * ao lado, não entra no valor, e continua livre.
  */
-function chamadasOpacas(sf, classe, expressao) {
+function chamadasOpacas(sf, classe, expressao, membro = null) {
+  // ⚠️ "Conhecido" tem de significar COM CORPO PARA VARRER, não "o nome aparece
+  // no arquivo". `declare function normalizarExterno(…): AbaTopo;` declara o
+  // nome e não traz corpo nenhum — e era aceito, o que é o mesmo buraco do
+  // ajudante importado com outra cara. Sem corpo, a regra B não tem o que ler.
   const conhecidos = new Set();
   for (const st of sf.statements) {
-    if (ts.isFunctionDeclaration(st) && st.name) conhecidos.add(st.name.text);
+    if (ts.isFunctionDeclaration(st) && st.name && st.body) conhecidos.add(st.name.text);
     else if (ts.isVariableStatement(st)) {
       for (const d of st.declarationList.declarations) {
-        if (ts.isIdentifier(d.name)) conhecidos.add(d.name.text);
+        if (!ts.isIdentifier(d.name) || !d.initializer) continue;
+        // Só o que tem corpo, ou apelida algo que tenha.
+        if (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer)
+          || ts.isIdentifier(d.initializer)) conhecidos.add(d.name.text);
+        else conhecidos.add(d.name.text);
       }
     }
   }
   for (const m of classe.members) {
-    if (m.name && ts.isIdentifier(m.name)) conhecidos.add(m.name.text);
+    if (m.name && ts.isIdentifier(m.name)) {
+      const semCorpo = (ts.isMethodDeclaration(m) && !m.body);
+      if (!semCorpo) conhecidos.add(m.name.text);
+    }
   }
+  // ⚠️ A varredura alcança os LOCAIS que a expressão referencia. Sem isso,
+  // mover a chamada uma linha acima escapava:
+  //     const x = externo(idDaSlug(v));
+  //     this._aba = v.length ? x : 'resumo';
+  // O ternário só vê `x`, um identificador. Medido: passava.
+  const paraVarrer = [expressao];
+  if (membro) {
+    const jaVistos = new Set();
+    for (let i = 0; i < paraVarrer.length && i < 32; i++) {
+      const nomes = [];
+      const colher = (n) => {
+        if (ts.isIdentifier(n)) nomes.push(n.text);
+        ts.forEachChild(n, colher);
+      };
+      colher(paraVarrer[i]);
+      for (const nome of nomes) {
+        if (jaVistos.has(nome)) continue;
+        jaVistos.add(nome);
+        const acha = (n) => {
+          if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === nome
+            && n.initializer) paraVarrer.push(n.initializer);
+          ts.forEachChild(n, acha);
+        };
+        acha(membro);
+      }
+    }
+  }
+
   const opacas = [];
   const varrer = (n) => {
     if (ts.isCallExpression(n)) {
@@ -413,11 +492,26 @@ function chamadasOpacas(sf, classe, expressao) {
         && n.expression.expression.kind === ts.SyntaxKind.ThisKeyword) {
         nome = n.expression.name.text;
       }
-      if (nome && !conhecidos.has(nome)) opacas.push(nome);
+      // ⚠️ `nome === null` é o caso em que NÃO DÁ para dizer o que está sendo
+      // chamado — `helpers.defaultDaLista()`, `(cond ? f : g)()`, `arr[0]()`. Isso
+      // era IGNORADO, e ignorar o que não se entende é o modo de falha desta
+      // classe inteira: um objeto de módulo com a função dentro derivava o
+      // default e passava, porque o grafo de chamadas também só segue função
+      // solta e método de `this`. Agora reprova — a expressão do default não
+      // chama o que o guard não consegue nomear.
+      //
+      // Só a chamada em método de lista protegida é exceção: ela já é governada
+      // pela regra B, que confere o método e a aridade.
+      const ehMetodoDeListaProtegida = ts.isPropertyAccessExpression(n.expression)
+        && ts.isIdentifier(n.expression.expression)
+        && protegidas.has(n.expression.expression.text);
+      if (nome === null) {
+        if (!ehMetodoDeListaProtegida) opacas.push(n.expression.getText().slice(0, 40));
+      } else if (!conhecidos.has(nome)) opacas.push(nome);
     }
     ts.forEachChild(n, varrer);
   };
-  varrer(expressao);
+  for (const e of paraVarrer) varrer(e);
   return opacas;
 }
 
@@ -459,12 +553,39 @@ if (chamadoDireto) {
     // um nome protegido, e protegê-lo faria o guard acusar o código correto que
     // ele existe para abençoar. O apelidamento que interessa é o do módulo, onde
     // a lista ganha outro nome e some do radar.
+    // ⚠️ Três formas de ligação além do `const X = …` com nome simples, as três
+    // medidas passando: DESESTRUTURAÇÃO (`const [primeira] = PAGINAS`, que é uma
+    // linha idiomática, não um ataque), CAMPO ESTÁTICO de classe
+    // (`class Cfg { static L = PAGINAS }`) e ATRIBUIÇÃO no módulo
+    // (`let alias; alias = PAGINAS`). Coletar só uma delas era enumerar.
     for (const st of sf.statements) {
-      if (!ts.isVariableStatement(st)) continue;
-      for (const d of st.declarationList.declarations) {
-        if (!ts.isIdentifier(d.name)) continue;
-        declaradas.add(d.name.text);
-        if (d.initializer) inicializadores.set(d.name.text, d.initializer);
+      if (ts.isVariableStatement(st)) {
+        for (const d of st.declarationList.declarations) {
+          if (ts.isIdentifier(d.name)) {
+            declaradas.add(d.name.text);
+            if (d.initializer) inicializadores.set(d.name.text, d.initializer);
+          } else if (d.initializer) {
+            // desestruturação: cada nome ligado recebe algo POSICIONAL da lista
+            const nomes = [];
+            const colher = (b) => {
+              if (ts.isIdentifier(b)) nomes.push(b.text);
+              ts.forEachChild(b, colher);
+            };
+            colher(d.name);
+            for (const nm of nomes) inicializadores.set(nm, d.initializer);
+          }
+        }
+      } else if (ts.isClassDeclaration(st)) {
+        for (const m of st.members) {
+          if (ts.isPropertyDeclaration(m) && m.name && ts.isIdentifier(m.name) && m.initializer
+            && m.modifiers?.some((mo) => mo.kind === ts.SyntaxKind.StaticKeyword)) {
+            inicializadores.set(m.name.text, m.initializer);
+          }
+        }
+      } else if (ts.isExpressionStatement(st) && ts.isBinaryExpression(st.expression)
+        && st.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        && ts.isIdentifier(st.expression.left)) {
+        inicializadores.set(st.expression.left.text, st.expression.right);
       }
     }
 
@@ -475,20 +596,58 @@ if (chamadoDireto) {
     // mantida à mão, e lista à mão que não fecha sob a operação óbvia é a
     // "lista de exceção" que o `CLAUDE.md` manda desconfiar.
     //
-    // O fecho é por ponto fixo: quem cita um protegido vira protegido.
+    // O fecho é por ponto fixo e nos DOIS sentidos:
+    //
+    //   · para a FRENTE — quem cita um protegido vira protegido
+    //     (`const OUTRA = PAGINAS`);
+    //   · para TRÁS — quem é citado por um protegido vira protegido
+    //     (`const PAGINAS = LISTA_DE_PAGINAS`, um apelido de compatibilidade
+    //     deixado num renome: a declaração de `PAGINAS` satisfazia a checagem de
+    //     existência enquanto a lista de verdade, com outro nome, ficava
+    //     desprotegida. Medido — passava por um ajudante).
+    // ⚠️ Só APELIDO propaga, não "qualquer coisa que cite". A versão anterior
+    // marcava como protegido tudo cujo inicializador mencionasse um protegido —
+    // e isso acusava código correto: `const ehTopo = (id) =>
+    // IDS_TOPO.includes(id)` virava "protegido", e chamá-lo no setter reprovava
+    // com "não está na allowlist de operações indiferentes a posição", sobre uma
+    // função que não é operação de lista nenhuma. Falso positivo em refatoração
+    // idiomática é o caminho curto para alguém desligar o guard.
+    //
+    // Apelido é o inicializador que É a lista: um identificador protegido, ou um
+    // acesso direto a ele. Função, chamada e expressão composta não são.
+    const ehApelidoDe = (ini) => {
+      let x = ini;
+      while (ts.isParenthesizedExpression(x) || ts.isAsExpression(x)
+        || ts.isSatisfiesExpression?.(x) || ts.isNonNullExpression(x)) x = x.expression;
+      if (ts.isIdentifier(x)) return protegidas.has(x.text) ? [x.text] : [];
+      if (ts.isElementAccessExpression(x) || ts.isPropertyAccessExpression(x)) {
+        let base = x.expression;
+        while (ts.isElementAccessExpression(base) || ts.isPropertyAccessExpression(base)) {
+          base = base.expression;
+        }
+        if (ts.isIdentifier(base) && protegidas.has(base.text)) return [base.text];
+      }
+      return [];
+    };
+    const identificadoresDe = (ini) => {
+      let x = ini;
+      while (ts.isParenthesizedExpression(x) || ts.isAsExpression(x)
+        || ts.isSatisfiesExpression?.(x) || ts.isNonNullExpression(x)) x = x.expression;
+      return ts.isIdentifier(x) ? [x.text] : [];
+    };
     protegidas = new Set(LISTAS_ORDENADAS);
     for (let i = 0; i < 16; i++) {
       let mudou = false;
       for (const [nome, ini] of inicializadores) {
-        if (protegidas.has(nome)) continue;
-        let cita = false;
-        const ver = (n) => {
-          if (cita) return;
-          if (ts.isIdentifier(n) && protegidas.has(n.text)) { cita = true; return; }
-          ts.forEachChild(n, ver);
-        };
-        ver(ini);
-        if (cita) { protegidas.add(nome); mudou = true; }
+        // frente: `const OUTRA = PAGINAS` → OUTRA protegido
+        if (!protegidas.has(nome) && ehApelidoDe(ini).length > 0) { protegidas.add(nome); mudou = true; }
+        // trás: `const PAGINAS = LISTA_REAL` → LISTA_REAL protegido (apelido de
+        // compatibilidade deixado num renome)
+        if (protegidas.has(nome)) {
+          for (const c of identificadoresDe(ini)) {
+            if (inicializadores.has(c) && !protegidas.has(c)) { protegidas.add(c); mudou = true; }
+          }
+        }
       }
       if (!mudou) break;
     }
@@ -533,26 +692,54 @@ if (chamadoDireto) {
       for (const m of classe.members) {
         const ehOSetter = ts.isSetAccessorDeclaration(m) && m.name && ts.isIdentifier(m.name)
           && m.name.text === 'aba';
-        if (ehOSetter) continue;
+        // O getter lê o campo, e a declaração É o campo: as duas menções
+        // legítimas fora do setter.
+        const ehOGetter = ts.isGetAccessorDeclaration(m) && m.name && ts.isIdentifier(m.name)
+          && m.name.text === 'aba';
+        const ehADeclaracao = ts.isPropertyDeclaration(m) && m.name && ts.isIdentifier(m.name)
+          && m.name.text === CAMPO_ESTADO;
+        if (ehOSetter || ehOGetter || ehADeclaracao) continue;
+        // ⚠️ Classificando a POSIÇÃO de cada menção, e recusando a que não souber
+        // classificar. Procurar `this._aba = …` como `PropertyAccess` reconhecia
+        // UMA sintaxe e ignorava em silêncio as equivalentes — `this['_aba'] = …`
+        // é `ElementAccess`, e passava. Enumerar formas de escrita não converge
+        // (colchete, `Object.assign`, `Reflect.set`, chave computada), e proibir
+        // toda menção é forte demais: `updated()` LÊ o campo, legitimamente.
+        //
+        // Então: leitura passa, escrita reprova, e o que não der para classificar
+        // reprova também — é o caso da chave em literal de objeto, que é como um
+        // `Object.assign(this, { _aba: … })` entraria.
         const escreve = [];
         const ver = (n) => {
-          if (
-            ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsToken
-            && ts.isPropertyAccessExpression(n.left)
-            && n.left.expression.kind === ts.SyntaxKind.ThisKeyword
-            && n.left.name.text === CAMPO_ESTADO
-          ) escreve.push(n);
+          const casa = (ts.isIdentifier(n) && n.text === CAMPO_ESTADO)
+            || (ts.isStringLiteral(n) && n.text === CAMPO_ESTADO);
+          if (casa) {
+            const acesso = n.parent;
+            const ehAcesso = acesso
+              && (ts.isPropertyAccessExpression(acesso) || ts.isElementAccessExpression(acesso));
+            if (ehAcesso) {
+              const pai = acesso.parent;
+              const ehEscrita = pai && ts.isBinaryExpression(pai) && pai.left === acesso
+                && pai.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+                && pai.operatorToken.kind <= ts.SyntaxKind.LastAssignment;
+              if (ehEscrita) escreve.push({ no: n, porque: 'escreve em' });
+              // leitura: passa
+            } else {
+              escreve.push({ no: n, porque: 'menciona, em posição que não consigo classificar,' });
+            }
+          }
           ts.forEachChild(n, ver);
         };
         ver(m);
         if (escreve.length > 0) {
           const nomeM = m.name && ts.isIdentifier(m.name) ? m.name.text : '(anônimo)';
           falhas.push(
-            `${ARQUIVO}:${sf.getLineAndCharacterOfPosition(escreve[0].getStart(sf)).line + 1} — `
-            + `\`${nomeM}\` escreve em \`this.${CAMPO_ESTADO}\`, e só o setter \`aba\` pode.\n`
+            `${ARQUIVO}:${sf.getLineAndCharacterOfPosition(escreve[0].no.getStart(sf)).line + 1} — `
+            + `\`${nomeM}\` ${escreve[0].porque} \`${CAMPO_ESTADO}\`, e só o setter \`aba\` pode.\n`
             + '      Um default posto em outro membro fica fora das duas origens declaradas, e o\n'
-            + '      guard não olharia para ele — foi assim que um `connectedCallback` derivado\n'
-            + '      passava em todas as versões anteriores deste arquivo.',
+            + '      guard não olharia para ele. A regra é por MENÇÃO porque enumerar formas de\n'
+            + "      escrita não converge: `this['_aba'] = …` já passou por não ser um acesso por\n"
+            + '      ponto.',
           );
         }
       }
@@ -575,25 +762,10 @@ if (chamadoDireto) {
         }
         const membro = membros[0];
 
-        // ── regra B, nas duas origens e no que elas CHAMAM ───────────────────
-        const alcancaveis = corposAlcancaveis(sf, classe, membro);
-        const usos = alcancaveis.flatMap((c) => usosSensiveisAOrdem(c, sf));
-        for (const uso of usos) {
-          falhas.push(
-            `${ARQUIVO}:${uso.linha} — a origem "${origem.tipo}" lê \`${uso.texto}\`, que não está `
-            + 'na allowlist de operações indiferentes a posição.\n'
-            + '      ⚠️ Isto NÃO afirma que a operação lê a ordem: `.length` e `.find` por id não\n'
-            + '      leem. A allowlist é conservadora de propósito — enumerar o sensível a posição\n'
-            + '      é a API inteira de Array, e enumerar o permitido converge.\n'
-            + `      ${origem.motivo}\n`
-            + '      Reordenar a lista de páginas passaria a mudar o default EM SILÊNCIO — nenhum\n'
-            + `      teste de comportamento acusa isso. Só \`.${METODOS_SEM_ORDEM.join('`/`.')}\` é `
-            + 'aceito nestas listas aqui.',
-          );
-        }
-
         // ── regra A ──────────────────────────────────────────────────────────
         let alvo = null;
+        /** O caminho por onde o valor do default chega: raízes da regra B. */
+        let raizesDoValor = null;
         if (origem.tipo === 'inicializador') {
           alvo = membro.initializer ?? null;
           if (!alvo) {
@@ -622,7 +794,11 @@ if (chamadoDireto) {
             falhas.push(`${ARQUIVO}: ${chega.erro}\n      ${origem.motivo}`);
             continue;
           }
-          const opacas = chamadasOpacas(sf, classe, ternarios[0]);
+          // A opacidade vale para o CAMINHO DO VALOR, não só para o ternário:
+          // mover a chamada uma linha acima (`const x = externo(v); … ? x : …`)
+          // escapava. `ternarioChegaEm` já percorreu a cadeia; ela vem junto.
+          const opacas = [ternarios[0], ...(chega.cadeia ?? [])]
+            .flatMap((e) => chamadasOpacas(sf, classe, e, membro));
           if (opacas.length > 0) {
             falhas.push(
               `${ARQUIVO}: o ternário do default chama \`${[...new Set(opacas)].join('`, `')}\`, `
@@ -634,7 +810,37 @@ if (chamadoDireto) {
             continue;
           }
           alvo = ternarios[0].whenFalse;
+          raizesDoValor = [ternarios[0], ...(chega.cadeia ?? [])];
         }
+        if (raizesDoValor === null) raizesDoValor = [alvo];
+
+        // ── regra B, depois da A porque precisa do CAMINHO DO VALOR ──────────
+        // As raízes são o ternário e a cadeia de alias até ele (ou o próprio
+        // inicializador). Seguir tudo que o setter chama acusava código correto.
+        const alcancaveis = corposAlcancaveis(sf, classe, membro, raizesDoValor);
+        if (alcancaveis.truncou) {
+          falhas.push(
+            `${ARQUIVO}: a cadeia de chamadas a partir de "${origem.tipo}" é grande demais para o\n`
+            + '      guard percorrer inteira, e ele não devolve "o que deu tempo": uma derivação no\n'
+            + '      fim da cadeia sairia verde. Reduza a indireção entre o setter e o default.',
+          );
+          continue;
+        }
+        const usos = alcancaveis.flatMap((c) => usosSensiveisAOrdem(c, sf));
+        for (const uso of usos) {
+          falhas.push(
+            `${ARQUIVO}:${uso.linha} — a origem "${origem.tipo}" lê \`${uso.texto}\`, que não está `
+            + 'na allowlist de operações indiferentes a posição.\n'
+            + '      ⚠️ Isto NÃO afirma que a operação lê a ordem: `.length` e `.find` por id não\n'
+            + '      leem. A allowlist é conservadora de propósito — enumerar o sensível a posição\n'
+            + '      é a API inteira de Array, e enumerar o permitido converge.\n'
+            + `      ${origem.motivo}\n`
+            + '      Reordenar a lista de páginas passaria a mudar o default EM SILÊNCIO — nenhum\n'
+            + `      teste de comportamento acusa isso. Só \`.${METODOS_SEM_ORDEM.join('`/`.')}\` é `
+            + 'aceito nestas listas aqui.',
+          );
+        }
+
 
         const nucleo = semInvolucro(alvo);
         if (!ehLiteralDeTexto(nucleo)) {

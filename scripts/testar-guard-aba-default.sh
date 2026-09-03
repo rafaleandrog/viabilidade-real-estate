@@ -87,7 +87,12 @@ arvore() {
     printf "  { id: 'empreendimento', label: 'Empreendimento' },\n"
     printf "];\n"
     printf "const IDS_TOPO = PAGINAS.map((a) => a.id) as AbaTopo[];\n"
-    printf "declare function idDaSlug(v: string): string;\n"
+    # ⚠️ Com CORPO, espelhando producao (`frontend/tela-avancado.ts` declara
+    # `const idDaSlug = (s) => ID_POR_SLUG[s] ?? s`). Como `declare function`, ela
+    # nao tem corpo para a regra B varrer, e o guard passou a recusar -- com
+    # razao: e o mesmo buraco do ajudante importado. Fixture que diverge do
+    # arquivo real mede outra coisa.
+    printf "const idDaSlug = (s: string): string => s;\n"
     printf "declare const PADRAO: AbaTopo;\n"
     printf "declare const MAPA: Record<string, number>;\n"
     printf "declare function defaultDaLista(): AbaTopo;\n"
@@ -623,6 +628,123 @@ AJUDANTE_IMPORTADO="  set aba(v: string) {
   }
   private _aba: AbaTopo = 'resumo';"
 
+# ── Rodada 6, revisor externo: a mesma FORMA tres vezes ────────────────────
+# As tres reconheciam uma sintaxe e ignoravam em silencio as equivalentes. O
+# conserto nao foi acrescentar as formas que faltavam -- foi inverter: o que o
+# guard nao souber classificar, reprova.
+ESCRITA_POR_COLCHETE="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+  }
+  connectedCallback() { (this as any)['_aba'] = PAGINAS[0].id; }
+  private _aba: AbaTopo = 'resumo';"
+
+# O getter LE o campo, e `updated()` tambem -- leitura fora do setter e legitima
+# e nao pode reprovar, senao o guard acusa o arquivo real.
+LEITURA_FORA_DO_SETTER="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+  }
+  updated() { const x = this._aba; void x; }
+  private _aba: AbaTopo = 'resumo';"
+
+CHAMADA_POR_PROPRIEDADE_EXTRA="function defaultDaLista(): AbaTopo { return PAGINAS[0].id; }
+const helpers = { defaultDaLista };"
+CHAMADA_POR_PROPRIEDADE="  set aba(v: string) {
+    const id = idDaSlug(v); void id;
+    this._aba = v.length ? helpers.defaultDaLista() : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# Apelido de COMPATIBILIDADE deixado num renome: a declaracao de `PAGINAS`
+# satisfazia a checagem de existencia enquanto a lista de verdade, com outro
+# nome, ficava desprotegida. O fecho precisou passar a valer nos dois sentidos.
+ALIAS_REVERSO_EXTRA="const LISTA_REAL: { id: AbaTopo; label: string }[] = PAGINAS;
+function normalizarPelaReal(id: string): AbaTopo {
+  return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : LISTA_REAL[0].id;
+}"
+ALIAS_REVERSO="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = v.length ? normalizarPelaReal(id) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# ── Rodada 6, lente nativa: 9 formas, quatro familias, todas medidas ───────
+# A familia dominante e "reconheco uma sintaxe e ignoro as equivalentes". O
+# conserto nao foi acrescentar formas -- foi fechar os espacos que TEM fim (como
+# um callee e nomeado; como uma lista e ligada a um nome) e recusar o resto.
+
+CHAMADA_POR_COLCHETE="  set aba(v: string) {
+    this._aba = v.length ? (this as any)['_normalizar'](idDaSlug(v)) : 'resumo';
+  }
+  private _normalizar(id: string): AbaTopo { return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id; }
+  private _aba: AbaTopo = 'resumo';"
+
+APELIDO_DE_FUNCAO_EXTRA="function normalizarAba(id: string): AbaTopo { return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id; }
+const f = normalizarAba;"
+APELIDO_DE_FUNCAO="  set aba(v: string) {
+    this._aba = v.length ? f(idDaSlug(v)) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+CALLBACK_EXTRA="function normalizarAba(id: string): AbaTopo { return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id; }"
+CALLBACK="  set aba(v: string) {
+    this._aba = v.length ? [idDaSlug(v)].map(normalizarAba)[0] : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+CAMPO_ARROW="  set aba(v: string) {
+    this._aba = v.length ? this._norm(idDaSlug(v)) : 'resumo';
+  }
+  private _norm = (id: string): AbaTopo => { return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : PAGINAS[0].id; };
+  private _aba: AbaTopo = 'resumo';"
+
+DESESTRUTURACAO_EXTRA="const [primeira] = PAGINAS;
+function nz(id: string): AbaTopo { return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : primeira.id; }"
+DESESTRUTURACAO="  set aba(v: string) {
+    this._aba = v.length ? nz(idDaSlug(v)) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+CAMPO_ESTATICO_EXTRA="class Cfg { static L = PAGINAS; }
+function nzc(id: string): AbaTopo { return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : Cfg.L[0].id; }"
+CAMPO_ESTATICO="  set aba(v: string) {
+    this._aba = v.length ? nzc(idDaSlug(v)) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+ATRIBUICAO_NO_MODULO_EXTRA="let listaAlias: { id: AbaTopo; label: string }[]; listaAlias = PAGINAS;
+function nza(id: string): AbaTopo { return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : listaAlias[0].id; }"
+ATRIBUICAO_NO_MODULO="  set aba(v: string) {
+    this._aba = v.length ? nza(idDaSlug(v)) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+CHAMADA_ANTES_DO_TERNARIO_EXTRA="declare function externo(id: string): AbaTopo;"
+CHAMADA_ANTES_DO_TERNARIO="  set aba(v: string) {
+    const x = externo(idDaSlug(v));
+    this._aba = v.length ? x : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# ── Os dois FALSOS POSITIVOS que o alargamento de escopo tinha criado ──────
+# Os dois sao refatoracao normal, e reprovar qualquer um deles e o caminho curto
+# para alguem desligar o guard.
+PREDICADO_EXTRAIDO_EXTRA="const ehTopo = (id: string) => IDS_TOPO.includes(id as AbaTopo);"
+PREDICADO_EXTRAIDO="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = ehTopo(id) ? (id as AbaTopo) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+METODO_QUE_RENDERIZA="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+    this._rotulos();
+  }
+  private _rotulos() { return PAGINAS.map((p) => p.label); }
+  private _aba: AbaTopo = 'resumo';"
+
 verificar() { # <nome> <raiz> <esperado: ok|reprova>
   local nome="$1" raiz="$2" esperado="$3" rc=0 saida=''
   TOTAL=$((TOTAL+1))
@@ -739,6 +861,20 @@ verificar "53 derivação em MÉTODO da classe reprova"            "$(arvore c53
 verificar "54 outro MEMBRO escrevendo _aba reprova"             "$(arvore c54 "$OUTRO_MEMBRO_ESCREVE")"      reprova
 verificar "55 '.includes' com fromIndex reprova"                "$(arvore c55 "$INCLUDES_COM_FROMINDEX")"    reprova
 verificar "56 ajudante IMPORTADO (ilegível) reprova"            "$(arvore c56 "$AJUDANTE_IMPORTADO")"        reprova
+verificar "57 escrita por COLCHETE em outro membro reprova"     "$(arvore c57 "$ESCRITA_POR_COLCHETE")"      reprova
+verificar "58 LEITURA de _aba fora do setter passa"             "$(arvore c58 "$LEITURA_FORA_DO_SETTER")"    ok
+verificar "59 chamada por PROPRIEDADE de objeto reprova"        "$(arvore c59 "$CHAMADA_POR_PROPRIEDADE" "$CHAMADA_POR_PROPRIEDADE_EXTRA")" reprova
+verificar "60 apelido de compatibilidade (fecho reverso) reprova" "$(arvore c60 "$ALIAS_REVERSO" "$ALIAS_REVERSO_EXTRA")" reprova
+verificar "61 chamada de método por COLCHETE reprova"           "$(arvore c61 "$CHAMADA_POR_COLCHETE")"      reprova
+verificar "62 apelido de FUNÇÃO no módulo reprova"              "$(arvore c62 "$APELIDO_DE_FUNCAO" "$APELIDO_DE_FUNCAO_EXTRA")" reprova
+verificar "63 função passada como CALLBACK reprova"             "$(arvore c63 "$CALLBACK" "$CALLBACK_EXTRA")" reprova
+verificar "64 CAMPO de classe com arrow reprova"                "$(arvore c64 "$CAMPO_ARROW")"               reprova
+verificar "65 DESESTRUTURAÇÃO da lista reprova"                 "$(arvore c65 "$DESESTRUTURACAO" "$DESESTRUTURACAO_EXTRA")" reprova
+verificar "66 campo ESTÁTICO de classe reprova"                 "$(arvore c66 "$CAMPO_ESTATICO" "$CAMPO_ESTATICO_EXTRA")" reprova
+verificar "67 ATRIBUIÇÃO no módulo reprova"                     "$(arvore c67 "$ATRIBUICAO_NO_MODULO" "$ATRIBUICAO_NO_MODULO_EXTRA")" reprova
+verificar "68 chamada opaca ANTES do ternário reprova"          "$(arvore c68 "$CHAMADA_ANTES_DO_TERNARIO" "$CHAMADA_ANTES_DO_TERNARIO_EXTRA")" reprova
+verificar "69 falso positivo: predicado extraído passa"         "$(arvore c69 "$PREDICADO_EXTRAIDO" "$PREDICADO_EXTRAIDO_EXTRA")" ok
+verificar "70 falso positivo: método que RENDERIZA passa"       "$(arvore c70 "$METODO_QUE_RENDERIZA")"      ok
 
 # ── INVENTÁRIO: a metade do critério (a) que as fixtures não cobrem ────────
 #
