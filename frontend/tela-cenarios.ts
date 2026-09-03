@@ -123,17 +123,23 @@ export class ViabTelaCenarios extends LitElement {
        urbi-grafico-linha abriu mao da linha tracejada e dos marcadores verticais
        que o SVG customizado desenhava.
 
-       ⚠️ #595 CORRIGIU A JUSTIFICATIVA DESTE COMENTARIO. Ele dizia "SerieGrafico
-       so declara { rotulo, valores, cor }, sem dasharray/anotacao" — e essa
-       afirmacao NAO tem fonte. O espelho docs/ui-urbiverso/primitivos.json
-       declara "series" como Array e nao declara a forma dos itens; o unico lugar
-       que responderia e o dist/index.d.ts do SDK, que este ambiente nao tem
-       (GitHub Packages privado, 401). Ou seja: o repositorio nunca soube que
-       "cor" era honrada — e foi essa crenca sem fonte que sustentou tentativa
-       apos tentativa de colorir a serie por dado. O que continua VERDADE, e
-       basta para a decisao da #185, e que o primitivo nao declara prop de
-       dasharray nem de anotacao: nenhuma das 13 props do espelho serve para
-       isso. Quem for mexer aqui le o espelho, nao este paragrafo. */
+       ⚠️ #595 CORRIGIU ESTE PARAGRAFO UMA SEGUNDA VEZ, NA DIRECAO OPOSTA. A
+       redacao anterior dizia que "SerieGrafico so declara { rotulo, valores,
+       cor }, sem dasharray/anotacao" nao tinha fonte, porque o unico lugar que
+       responderia — o dist/index.d.ts do SDK — nao existia neste ambiente
+       (GitHub Packages privado, 401). O 401 acabou (CLAUDE.md, secao
+       Validacao): node_modules/@urbiverso/sdk/dist/index.d.ts esta no disco, e
+       ele CONFIRMA a afirmacao original, nao a desmente. "interface
+       SerieGrafico { rotulo: string; valores: (number | null)[]; cor?: string
+       }" — sem dasharray nem anotacao, exatamente como o paragrafo original
+       dizia. E o doc da familia, no mesmo arquivo, sobre UrbiGraficoLinha:
+       "Cores via paleta CSS (--urbi-grafico-cor-1..6), sobrescritas por
+       series[i].cor" — "cor" SEMPRE foi honrada; a tentativa por dado nunca
+       teve como funcionar por falta de fonte NENHUMA, so por outro motivo (a
+       colisao de contexto SVG que a custom property acima resolve). O que
+       continua VERDADE, e basta para a decisao da #185, e que o primitivo nao
+       declara prop de dasharray nem de anotacao. Quem for mexer aqui le o
+       dist/index.d.ts do SDK, nao este paragrafo. */
     .marcos-lista { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 0.78rem; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
     .marcos-lista strong { color: var(--cor-texto, rgba(255,255,255,0.85)); font-weight: 600; }
 
