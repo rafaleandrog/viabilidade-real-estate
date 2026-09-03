@@ -224,7 +224,10 @@ com_limite 120 bash scripts/testar-guard-fiacao.sh >/dev/null || {
 }
 echo "  ok: guard de fiação e bateria verdes"
 
-# #638: a aba default do Avançado é um LITERAL, não `PAGINAS[0]`. Mora nesta
+# #638: a aba default do Avançado é um LITERAL e não pode depender da ORDEM de
+# `PAGINAS`. São duas regras, e a segunda existe porque a primeira, sozinha, foi
+# furada em quatro rodadas de revisão: perguntar "onde está o fallback e ele é
+# literal?" depende de ALCANÇABILIDADE, que a árvore não responde. Mora nesta
 # etapa pelo mesmo motivo dos dois acima — decide pelo parser do typescript, que
 # só existe depois do link (etapa 3/8).
 #

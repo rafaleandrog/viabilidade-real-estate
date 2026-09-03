@@ -13,10 +13,19 @@
 #
 # O sentido oposto importa tanto quanto: guard que acusa código correto — um
 # `'resumo' as AbaTopo`, um literal entre parênteses — é guard que alguém
-# desliga, e aí ele não guarda mais nada — os casos rotulados "falso positivo"
-# e os que dizem "passa" existem só para isso. Não os cite por NÚMERO: numeração
-# de caso desloca quando alguém insere um no meio, e a frase envelhece calada
-# (esta linha já esteve errada em um, dizendo "os casos 5 a 7" quando eram 6 a 8).
+# desliga, e aí ele não guarda mais nada. Os casos rotulados "falso positivo" e
+# os que dizem "passa" existem só para isso. Não os cite por NÚMERO: numeração
+# desloca quando alguém insere um caso no meio, e a frase envelhece calada (esta
+# linha já esteve errada em um, dizendo "os casos 5 a 7" quando eram 6 a 8).
+#
+# ⚠️ MUITAS FIXTURES AQUI SÃO ARQUEOLOGIA, e é de propósito. As rodadas 1 a 4 de
+# revisão furaram quatro desenhos sucessivos do guard, e cada furo virou caso.
+# Boa parte deles hoje reprova por uma regra DIFERENTE da que os pegou quando
+# foram escritos — o `?? 'resumo'` sobre derivação, por exemplo, já foi barrado
+# por "forma não aceita" e hoje é barrado por "leitura por ordem". O comentário
+# de cada um conta a história do furo, não a regra vigente; quem quiser a regra
+# lê o cabeçalho do guard. Eles ficam porque um caso que só reprova por acidente
+# do desenho atual é exatamente o que regride calado no desenho seguinte.
 #
 # DETERMINÍSTICA POR CONSTRUÇÃO: cada caso monta uma árvore nova em `mktemp -d`
 # e roda o guard contra ELA (`node … <raiz>`). Nenhum caso lê a árvore de
@@ -307,7 +316,8 @@ TERNARIO_EM_DECORATOR="  @property({ type: String, converter: PAGINAS.length ? u
 # ── Rodada 2: as TRÊS regressões que o conserto da rodada 1 introduziu ──────
 # Todas medidas contra `HEAD~1`: o guard INGÊNUO reprovava e o guard "consertado"
 # aprovava com `PAGINAS[0].id`. É a mesma classe voltando pela segunda vez, e foi
-# ela que motivou a inversão (ver `formasDeFallback` no guard).
+# ela que motivou a inversão da rodada 3 — que a rodada 4 depois substituiu pela
+# regra de ORDEM, hoje quem as reprova.
 
 # P1-a · sombra de nome em BLOCO: um `const val` num escopo interno anterior, e
 # `acharDecl` pegava a primeira declaração em ordem de árvore.
@@ -428,11 +438,81 @@ NULLISH_ALHEIO="  set aba(v: string) {
 # aceita ternario/if-else direto), entao conta-lo so produzia falso positivo.
 TERNARIO_EM_ARROW_ANINHADA="  set aba(v: string) {
     const id = idDaSlug(v);
+    const rotulo = () => id === 'obra' ? 'Custos' : 'Outra';
+    void rotulo;
+    this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# A regra B varre o MEMBRO INTEIRO, inclusive funcao aninhada. Um `.find` numa
+# arrow que nem alimenta o default reprova -- conservador de proposito. A
+# alternativa seria restringir a proibicao ao que e "alcancavel a partir da
+# atribuicao", e ALCANCABILIDADE e exatamente a pergunta que furou quatro
+# versoes deste guard. Melhor reprovar um uso legitimo raro, com mensagem clara,
+# do que reabrir aquela cauda.
+FIND_ALHEIO_EM_ARROW="  set aba(v: string) {
+    const id = idDaSlug(v);
     const rotulo = () => PAGINAS.find((p) => p.id === id) ? 'sim' : 'nao';
     void rotulo;
     this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
   }
   private _aba: AbaTopo = 'resumo';"
+
+# ── Rodada 4: as seis brechas do ternario com ramo MORTO ───────────────────
+# Todas passavam no guard anterior. A regra A nao as pega -- o `whenFalse` E um
+# literal nas seis. Quem as fecha e a regra B, com uma regra so.
+#
+# A forma B e a que mais importa: e idiomatica, sai de uma refatoracao de boa-fe
+# ("acha a pagina; se nao achar cai na primeira; o `? :` fica por seguranca"), e
+# executando o setter ela muda a aba de fallback quando PAGINAS e reordenado.
+ORDEM_CLAMP="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const idx = IDS_TOPO.indexOf(id as AbaTopo);
+    const alvo = PAGINAS[Math.max(0, idx)];
+    this._aba = alvo ? alvo.id : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+ORDEM_FIND_NULLISH="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const alvo = PAGINAS.find((p) => p.id === id) ?? PAGINAS[0];
+    this._aba = alvo ? alvo.id : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+ORDEM_CONDICAO_CONSTANTE="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const idx = IDS_TOPO.indexOf(id as AbaTopo);
+    this._aba = PAGINAS.length ? PAGINAS[idx].id : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# A colisao de NOME: `exigirDependenciaDaEntrada` casava identificadores por
+# texto, e o `.id` de `PAGINAS[0].id` e um Identifier. Como o setter real ja
+# declara `const id = idDaSlug(v)`, o nome da propriedade colidia com o local e
+# a checagem concluia "usa a entrada". A regra B nao depende de nomes.
+ORDEM_COLISAO_DE_NOME="  set aba(v: string) {
+    const id = idDaSlug(v);
+    void id;
+    this._aba = PAGINAS.length > 1 ? PAGINAS[0].id : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# O caso 37 (`??` morto) reescrito com ternario: 12 caracteres de diferenca, e
+# o guard da rodada 4 passava de exit 1 para exit 0.
+ORDEM_37_COM_TERNARIO="  set aba(v: string) {
+    const idx = MAPA[v];
+    this._aba = PAGINAS[idx | 0] ? PAGINAS[idx | 0].id : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# O INICIALIZADOR tambem esta sob a regra B, e por um caminho que a regra A nao
+# veria: aqui o literal esta la, e a leitura por ordem esta no setter.
+ORDEM_NO_INICIALIZADOR="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+  }
+  private _aba: AbaTopo = PAGINAS[0] ? 'resumo' : 'resumo';"
 
 # `let` sem inicializador (switch, try/catch): o veredito e reprova, e o que este
 # caso trava e a CAUSA apontada. A mensagem ja disse "nao e declarado dentro do
@@ -479,7 +559,9 @@ verificar "13 ternário inocente ANTES não esconde derivação"    "$(arvore c1
 verificar "14 segundo ternário no setter: ambíguo, reprova"     "$(arvore c14 "$TERNARIO_INOCENTE_COM_LITERAL")" reprova
 verificar "15 cadeia de aliases é rastreada até o ternário"     "$(arvore c15 "$ALIAS_EM_CADEIA")"           ok
 # ⚠️ Este caso ESPERAVA `ok` e virou `reprova` na rodada 3, pelo mesmo argumento
-# do 14: `??`/`||` deixaram de ser forma aceita. O fallback deles só está VIVO se
+# do 14: `??`/`||` deixaram de ser forma aceita — e desde a rodada 4 o que o
+# reprova é a regra A (o setter precisa de exatamente um ternário). O fallback
+# de um `??` só está VIVO se
 # o lado esquerdo puder ser nullish, e isso é ALCANÇABILIDADE, não forma. Ver o
 # caso 37, que é a testemunha que derrubou a regra antiga.
 verificar "16 fallback por '??', mesmo com literal, reprova"    "$(arvore c16 "$FALLBACK_COM_NULLISH")"      reprova
@@ -487,7 +569,13 @@ verificar "17 fallback por '??' derivado reprova"               "$(arvore c17 "$
 verificar "18 duas atribuições a _aba: ambíguo, reprova"        "$(arvore c18 "$DUAS_ATRIBUICOES")"          reprova
 verificar "19 valor vindo de fora do setter reprova"            "$(arvore c19 "$VALOR_DE_FORA")"             reprova
 verificar "20 sem fallback visível reprova"                     "$(arvore c20 "$SEM_FALLBACK_VISIVEL")"      reprova
-verificar "21 if/else com literal no else passa"                "$(arvore c21 "$IF_ELSE_LITERAL")"           ok
+# ⚠️ ESPERAVA `ok` e virou `reprova` na rodada 4, e e uma TROCA DECLARADA, nao
+# um defeito. A regra A pede um ternario; `if/else` reprova ainda que correto.
+# O setter de producao usa ternario, e a regra B cobre o acoplamento por ordem
+# independentemente da forma -- entao o custo e "quem migrar para if/else mexe
+# no guard na mesma alteracao", contra a alternativa de aceitar mais uma forma e
+# reabrir a cauda de alcancabilidade que custou quatro rodadas.
+verificar "21 if/else, ainda que correto, reprova (troca declarada)" "$(arvore c21 "$IF_ELSE_LITERAL")"      reprova
 verificar "22 if/else com derivação no else reprova"            "$(arvore c22 "$IF_ELSE_DERIVADO")"          reprova
 verificar "23 falso positivo: 'satisfies' com literal passa"    "$(arvore c23 "$SATISFIES_LITERAL")"         ok
 verificar "24 'satisfies' sobre derivação reprova"              "$(arvore c24 "$SATISFIES_DERIVADO")"        reprova
@@ -507,6 +595,13 @@ verificar "38 falso positivo: '||' de predicado não conta"      "$(arvore c38 "
 verificar "39 falso positivo: '??' alheio ao default não conta" "$(arvore c39 "$NULLISH_ALHEIO")"            ok
 verificar "40 falso positivo: ternário em arrow não conta"      "$(arvore c40 "$TERNARIO_EM_ARROW_ANINHADA")" ok
 verificar "41 'let' sem inicializador reprova"                  "$(arvore c41 "$LET_SEM_INICIALIZADOR")"     reprova
+verificar "42 ordem: clamp de índice em PAGINAS reprova"        "$(arvore c42 "$ORDEM_CLAMP")"               reprova
+verificar "43 ordem: '.find ?? PAGINAS[0]' (idiomático) reprova" "$(arvore c43 "$ORDEM_FIND_NULLISH")"       reprova
+verificar "44 ordem: condição constante sobre PAGINAS reprova"  "$(arvore c44 "$ORDEM_CONDICAO_CONSTANTE")"  reprova
+verificar "45 ordem: colisão de nome não salva a derivação"     "$(arvore c45 "$ORDEM_COLISAO_DE_NOME")"     reprova
+verificar "46 ordem: o caso 37 reescrito com ternário reprova"  "$(arvore c46 "$ORDEM_37_COM_TERNARIO")"     reprova
+verificar "47 ordem: leitura por ordem no INICIALIZADOR reprova" "$(arvore c47 "$ORDEM_NO_INICIALIZADOR")"   reprova
+verificar "48 '.find' alheio em arrow reprova (conservador)"    "$(arvore c48 "$FIND_ALHEIO_EM_ARROW")"      reprova
 
 # ── INVENTÁRIO: a metade do critério (a) que as fixtures não cobrem ────────
 #
@@ -519,11 +614,15 @@ verificar "41 'let' sem inicializador reprova"                  "$(arvore c41 "$
 # A comparação é por CHAVES EXATAS, não por comprimento: contar 2 aceitaria
 # trocar uma origem por outra. E é por contagem, não por presença — é a diferença
 # que o CLAUDE.md § lista de exceção cobra.
-esperado_inventario='fallback-setter:aba|inicializador:_aba'
+esperado_inventario='fallback-setter:aba|inicializador:_aba :: IDS_TOPO,PAGINAS :: includes'
 real_inventario="$(node -e "
   import('$GUARD').then((m) => {
     const chaves = m.ORIGENS.map((o) => o.tipo + ':' + o.membro).sort();
-    process.stdout.write(chaves.join('|'));
+    process.stdout.write(
+      chaves.join('|')
+      + ' :: ' + [...m.LISTAS_ORDENADAS].sort().join(',')
+      + ' :: ' + [...m.METODOS_SEM_ORDEM].sort().join(','),
+    );
   });
 " 2>/dev/null)"
 TOTAL=$((TOTAL+1))

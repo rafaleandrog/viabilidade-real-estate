@@ -141,10 +141,15 @@ test('#589: selecionar Custos no menu leva o SLUG público para a URL, não o id
 //
 // O que MUDOU é que a defesa passou a existir fora daqui, na camada que responde
 // à pergunta sem tocar em produção: `scripts/guard-aba-default-literal.mjs`
-// (#638) pergunta à
-// ÁRVORE do TypeScript se cada origem do default é um literal de string, e
-// reprova a derivação, a indireção por variável e a origem que sumir. A regra é
-// positiva — pede o que é aceitável, em vez de enumerar as formas proibidas.
+// (#638) pergunta à ÁRVORE do TypeScript duas coisas: se cada origem do default
+// é um literal de string que concorda com a outra, e se o setter ou o
+// inicializador leem as listas de páginas de um jeito sensível à ORDEM.
+//
+// A segunda regra não é redundante, e custou quatro rodadas de revisão para
+// aparecer: perguntar só "o fallback é literal?" depende de ALCANÇABILIDADE — um
+// ternário de condição sempre-verdadeira tem o ramo falso morto, e o literal
+// aprovado é código que não roda. A pergunta decidível na árvore é a da ordem, e
+// é a que a issue de fato faz.
 //
 // A divisão de trabalho, para não se procurar aqui o que não mora aqui: este
 // teste mede o COMPORTAMENTO (sem URL, e com slug desconhecido, a aba resolvida
