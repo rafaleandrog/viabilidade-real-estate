@@ -172,9 +172,7 @@
         "investidor_retorno_tipo":          { "tipo": "texto", "limite": 16, "opcoes": ["remunerado", "pct_receita", "pct_resultado"], "padrao": "remunerado" },
         "investidor_juros_aa":              { "tipo": "decimal", "precisao": 5, "escala": 2, "padrao": 0 },
         "investidor_carencia_meses":        { "tipo": "inteiro", "padrao": 0 },
-        "investidor_parcelas":              { "tipo": "inteiro", "padrao": 0 },
-
-        "deflator_area_aberta_pct":         { "tipo": "inteiro", "padrao": 0 }
+        "investidor_parcelas":              { "tipo": "inteiro", "padrao": 0 }
       },
       "indices": [["tipo_empreendimento"], ["status"], ["autor_id"]],
       "unicos": [["id_legivel"]]

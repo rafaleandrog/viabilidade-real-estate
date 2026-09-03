@@ -111,21 +111,42 @@ function inventario(alvo: string): Record<string, number> {
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. A COLUNA: declarada uma vez no schema, lida em lugar nenhum.
 // ─────────────────────────────────────────────────────────────────────────────
-test('#584 caminho A: `deflator_area_aberta_pct` não tem LEITOR — só a declaração e o filtro', () => {
+test('#642 caminho B: `deflator_area_aberta_pct` só sobrevive na migração que a esvazia', () => {
   assert.deepEqual(inventario('deflator_area_aberta_pct'), {
-    // A coluna INERTE. Sai daqui só por migração com `dados.limparColuna`, que
-    // é mudança de schema (migração nova + bump de `versao`) e por isso ficou
-    // fora do escopo desta issue — está declarada como issue futura no PR.
-    'schema.json': 1,
-    // ⚠️ NÃO é leitor: é o FILTRO que impede o campo de alcançar o validador
-    // do shell num PATCH de estudo Preliminar. `tela-premissas.ts:477` monta o
-    // form com `{ ...this.estudo }` e `:1313-1320` reenvia o registro inteiro,
-    // então o campo VIAJA no payload mesmo sem nenhuma tela para editá-lo.
-    // Enquanto a coluna existir, esta entrada tem de existir — o valor nunca é
-    // lido, apenas descartado. Ela morre junto com a coluna, não antes.
-    'backend/rotas/estudos.ts': 1,
+    // A ÚNICA ocorrência viva, e ela é o esvaziamento em si:
+    // `dados.limparColuna('estudos', 'deflator_area_aberta_pct')`. A migração é
+    // retrato de um instante e não pode ser reescrita, então esta entrada é
+    // PERMANENTE — some só se a migração for renomeada.
+    //
+    // ⚠️ O mapa desta asserção NÃO é `{}`, e a issue #642 supunha que fosse. A
+    // migração entra no inventário porque `fontes()` enumera `git ls-files`,
+    // `migracoes/` não está em `PULAR_DIR`, e a chamada é CÓDIGO, não comentário
+    // — as menções no cabeçalho dela, essas sim, são descartadas por
+    // `semComentarios()`.
+    //
+    // ⚠️ E daí uma armadilha de execução: `git ls-files` só enxerga arquivo
+    // RASTREADO. Rodar este teste com a migração ainda sem `git add` devolve
+    // `{}` — indistinguível de "a migração sumiu". Medido ao escrever a #642.
+    'migracoes/038_fim_deflator_area_aberta.js': 1,
+    // O HARNESS, e as 5 são de propósito: 1 na fixture (`SEED`, que semeia a
+    // coluna preenchida) e 4 na asserção da etapa 4 (as duas comparações, a
+    // mensagem de erro e a de sucesso). Nenhuma é leitura de produção — juntas
+    // são o que dá DENTE à `038`: apagar o `limparColuna` dela deixa o harness
+    // vermelho, medido por mutação. Sem a fixture semeada a asserção passaria de
+    // graça, que é a armadilha que este número guarda. Se ele mudar, confira se
+    // o que mudou foi a asserção (esperado) ou um leitor novo (não esperado).
+    'scripts/migracoes-harness.mjs': 5,
   });
 });
+
+// ⚠️ O que este teste guardava até a #642, e por que a guarda continua valendo:
+// a coluna era declarada no `schema.json` e filtrada em `CAMPOS_SOMENTE_AVANCADO`
+// (`backend/rotas/estudos.ts`) — duas ocorrências, nenhuma leitora. A #642 tirou
+// as duas na MESMA alteração, que era a ordem obrigatória: a entrada da lista não
+// era resíduo, era o FILTRO que impedia o campo de alcançar o validador do shell
+// num PATCH de estudo Preliminar, e tirá-la antes da coluna produziria "Campo X
+// deve ser um número" em produção. A contagem exata acima é o que impede a volta
+// silenciosa de qualquer uma das duas.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. O PARÂMETRO: não sobrou fantasma nem default (critério de aceite 2).

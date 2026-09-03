@@ -25,7 +25,10 @@ const DIR = new URL('../migracoes/', import.meta.url);
 // TRANSFORMAÇÃO, não só o early-return de banco vazio.
 const SEED = {
   estudos: [
-    { id: 1, nome: 'Estudo A', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao' },
+    // #642: `deflator_area_aberta_pct` PREENCHIDO. Sem isto a asserção da `038`
+    // passaria mesmo se o `limparColuna` sumisse — a etapa 4 só tem dente sobre
+    // coluna que a fixture semeia com valor.
+    { id: 1, nome: 'Estudo A', nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao', deflator_area_aberta_pct: 15 },
     // #566: Preliminar com o modo aposentado 'unidade' nos dois pares
     // (R e NR) — exercita o caminho de TRANSFORMAÇÃO da `036`, não só o
     // early-return de banco vazio. Sem área/preço/unidades legados
@@ -448,6 +451,21 @@ console.log('\n4) cadeia completa em ordem, sobre dados existentes');
       );
     } else {
       ok('avancado_tipologias.linha_receita_id ficou vazia (poda derruba a estrutura no boot)');
+    }
+
+    // #642: a `038` esvazia `estudos.deflator_area_aberta_pct`, que saiu do
+    // `schema.json` na mesma alteração. Mesma mecânica da `003` acima: a fixture
+    // semeia a coluna com valor, então este teste FALHA se o `limparColuna` sumir.
+    const comDeflator = (banco.db.get('estudos') ?? [])
+      .filter((e) => e.deflator_area_aberta_pct !== null && e.deflator_area_aberta_pct !== undefined);
+    if (comDeflator.length > 0) {
+      erro(
+        `estudos.deflator_area_aberta_pct continua preenchida em ${comDeflator.length} linha(s) `
+          + 'depois da cadeia — a coluna saiu do schema.json e precisa ser esvaziada pela 038',
+        new Error('coluna órfã com dado deixa a app !saudavel no boot'),
+      );
+    } else {
+      ok('estudos.deflator_area_aberta_pct ficou vazia (poda derruba a estrutura no boot)');
     }
 
     // #585: a `037` faz o backfill de `estudos.juros_tabela_aa_padrao` a partir
