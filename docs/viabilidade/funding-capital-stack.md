@@ -475,7 +475,14 @@ custo de obra.
 prazo de parcelas nem principal dividido. A dívida é liquidada por **cash sweep** — existe caixa
 disponível, existe dívida amortizável, o caixa reduz a dívida — e o prazo é emergente. Por isso o
 editor da camada não oferece política de amortização, carência, prazo nem vencimento; quem precisa
-disso usa **Capital de giro** (§4.4), que mantém as três políticas.
+disso usa **`divida`** — calendário + Price com carência, ver
+[Fluxo do Investidor](fluxo-investidor-formulas).
+
+> ⚠️ **Esta frase dizia "usa Capital de giro (§4.4), que mantém as três políticas", e isso venceu.**
+> O produto da §4.4 foi apagado pela #355 — o banner do topo já a lista como supersedida —, e o
+> caminho de conversão `capital_giro` → `divida` está na migração `029`. A frase mandava o leitor,
+> em presente e de dentro do único bloco declarado vigente, usar um produto que não existe. Mesma
+> classe do sub-bloco de Capital de giro adiante, achada 43 linhas antes dele.
 
 ```text
 caixa_disponivel_t  = caixa_fechamento_{t−1} + fluxo_livre_t     # SEM a liberação de t
@@ -517,6 +524,24 @@ Com a dívida começando e terminando em zero, vale a identidade que serve de te
 No cenário de referência: R$ 98.277.107,77 = R$ 83.236.939,35 + R$ 15.040.168,42.
 
 ##### As outras políticas (Capital de giro)
+
+> 🔴 **Supersedida pela #355 (2026-08-12), apesar de morar dentro da §4.3.** Este sub-bloco descreve
+> políticas de **`capital_giro`**, um tipo de instrumento **apagado**: a tabela viva
+> `avancado_funding_operacoes` (`schema.json:408`) admite só `financiamento_producao`, `divida` e
+> `equity`; `capital_giro` (`schema.json:392`) sobrevive apenas na tabela aposentada
+> `avancado_capital_instrumentos` (`schema.json:388`). O produto que ele descreve é o da **§4.4**,
+> que o banner do topo já lista como supersedida — ele só está fisicamente alojado aqui.
+>
+> ⚠️ **A frase abaixo sobre "uma ÚNICA fila de prioridade de pagamento (§9)" NÃO vale**, e é a mais
+> perigosa do arquivo: ela está em presente, dentro do único bloco que o leitor é instruído a tratar
+> como vigente, e aponta como autoridade a §9 — que tem banner `🔴 Supersedida`. Não há fila de
+> prioridade nenhuma no modelo atual: as três operações são independentes, **sem waterfall, sem
+> prioridades e sem competição por caixa**. A §4.3 vigente cobre só `financiamento_producao`, e ali
+> a amortização é sempre **cash sweep**.
+>
+> Achado da revisão do PR da #504 — pela **fan-out nativa**, não pelo revisor externo, cujas duas
+> threads daquela rodada foram ambas em `modelo-de-dados.md`. É o próprio caso que aquela issue
+> existe para tratar: resíduo do Capital Stack sobrevivendo à remoção do código.
 
 **Cash sweep** (aplica o caixa disponível acima da reserva à dívida, respeitando vencimento e
 outras prioridades) · **bullet** (principal no vencimento) · **SAC** (amortização constante após
