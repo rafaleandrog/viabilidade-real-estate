@@ -615,19 +615,28 @@ if (chamadoDireto) {
     //
     // Apelido é o inicializador que É a lista: um identificador protegido, ou um
     // acesso direto a ele. Função, chamada e expressão composta não são.
+    // ⚠️ Apelido é qualquer coisa que CARREGUE a ordem, e enumerar as formas de
+    // carregá-la não converge: `PAGINAS`, `PAGINAS[0]`, `[...PAGINAS]`,
+    // `PAGINAS.slice()`, `PAGINAS.filter(…)`, `Array.from(PAGINAS)` — todas
+    // preservam a ordem, e `[...PAGINAS]` é a mais idiomática de todas.
+    //
+    // Então a regra inverteu: **menciona um protegido ⇒ é apelido**, com UMA
+    // exceção — inicializador que é FUNÇÃO. Essa exceção não é enumeração, é a
+    // distinção que importa: uma função que usa a lista não É a lista, e sem ela
+    // o guard acusava `const ehTopo = (id) => IDS_TOPO.includes(id)`, que é
+    // refatoração correta.
     const ehApelidoDe = (ini) => {
       let x = ini;
       while (ts.isParenthesizedExpression(x) || ts.isAsExpression(x)
         || ts.isSatisfiesExpression?.(x) || ts.isNonNullExpression(x)) x = x.expression;
-      if (ts.isIdentifier(x)) return protegidas.has(x.text) ? [x.text] : [];
-      if (ts.isElementAccessExpression(x) || ts.isPropertyAccessExpression(x)) {
-        let base = x.expression;
-        while (ts.isElementAccessExpression(base) || ts.isPropertyAccessExpression(base)) {
-          base = base.expression;
-        }
-        if (ts.isIdentifier(base) && protegidas.has(base.text)) return [base.text];
-      }
-      return [];
+      if (ts.isArrowFunction(x) || ts.isFunctionExpression(x)) return [];
+      const citados = [];
+      const ver = (n) => {
+        if (ts.isIdentifier(n) && protegidas.has(n.text)) citados.push(n.text);
+        ts.forEachChild(n, ver);
+      };
+      ver(x);
+      return citados;
     };
     const identificadoresDe = (ini) => {
       let x = ini;
@@ -718,12 +727,45 @@ if (chamadoDireto) {
             const ehAcesso = acesso
               && (ts.isPropertyAccessExpression(acesso) || ts.isElementAccessExpression(acesso));
             if (ehAcesso) {
+              // ⚠️ Um acesso só pode ser ESCRITO em três posições, e elas são
+              // fechadas pela gramática — ao contrário das "formas de escrever",
+              // que eu tentei enumerar e errei duas vezes:
+              //
+              //   · alvo de atribuição (`=`, `+=`, …);
+              //   · alvo de DESESTRUTURAÇÃO — `({ id: this._aba } = …)`, cujo pai
+              //     é `PropertyAssignment` e não `BinaryExpression`, e por isso
+              //     era lido como leitura e passava;
+              //   · `++`/`--`.
+              //
+              // Tudo o mais é leitura. Tentei o inverso (enumerar as LEITURAS
+              // provadas) e o guard acusou o arquivo real na primeira execução:
+              // `{ ...x, [this._aba]: y }` é chave computada, leitura legítima
+              // que eu não tinha listado. Enumerar leitura não converge melhor
+              // que enumerar escrita — mas POSIÇÃO DE ESCRITA converge, porque é
+              // a gramática que a fecha.
               const pai = acesso.parent;
-              const ehEscrita = pai && ts.isBinaryExpression(pai) && pai.left === acesso
+              const ehAlvoDeAtribuicao = pai && ts.isBinaryExpression(pai) && pai.left === acesso
                 && pai.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
                 && pai.operatorToken.kind <= ts.SyntaxKind.LastAssignment;
-              if (ehEscrita) escreve.push({ no: n, porque: 'escreve em' });
-              // leitura: passa
+              const ehIncremento = pai
+                && (ts.isPostfixUnaryExpression(pai) || ts.isPrefixUnaryExpression(pai))
+                && (pai.operator === ts.SyntaxKind.PlusPlusToken
+                  || pai.operator === ts.SyntaxKind.MinusMinusToken);
+              // Padrão de desestruturação: sobe até achar um literal que seja o
+              // LADO ESQUERDO de uma atribuição.
+              let ehAlvoDePadrao = false;
+              for (let a = acesso, i = 0; a && i < 8; a = a.parent, i++) {
+                const p2 = a.parent;
+                if (!p2) break;
+                if ((ts.isObjectLiteralExpression(a) || ts.isArrayLiteralExpression(a))
+                  && ts.isBinaryExpression(p2) && p2.left === a
+                  && p2.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+                  ehAlvoDePadrao = true; break;
+                }
+              }
+              if (ehAlvoDeAtribuicao || ehIncremento || ehAlvoDePadrao) {
+                escreve.push({ no: n, porque: 'escreve em' });
+              }
             } else {
               escreve.push({ no: n, porque: 'menciona, em posição que não consigo classificar,' });
             }
@@ -797,8 +839,19 @@ if (chamadoDireto) {
           // A opacidade vale para o CAMINHO DO VALOR, não só para o ternário:
           // mover a chamada uma linha acima (`const x = externo(v); … ? x : …`)
           // escapava. `ternarioChegaEm` já percorreu a cadeia; ela vem junto.
-          const opacas = [ternarios[0], ...(chega.cadeia ?? [])]
-            .flatMap((e) => chamadasOpacas(sf, classe, e, membro));
+          // ⚠️ Em TODOS os corpos alcançáveis, não só no ternário. Um envoltório
+          // local de um nível — `function local(v){ return externo(v); }` — era
+          // seguido pelo grafo (o corpo existe aqui) e a chamada aninhada a
+          // `externo` passava sem ninguém conferir. Checar opacidade só na raiz
+          // é a mesma falha de "conferir X só no lugar Y" que custou as últimas
+          // rodadas.
+          const raizes = [ternarios[0], ...(chega.cadeia ?? [])];
+          const corposDoValor = corposAlcancaveis(sf, classe, membro, raizes);
+          const opacas = [
+            ...raizes.flatMap((e) => chamadasOpacas(sf, classe, e, membro)),
+            ...corposDoValor.filter((c) => c !== membro)
+              .flatMap((c) => chamadasOpacas(sf, classe, c, null)),
+          ];
           if (opacas.length > 0) {
             falhas.push(
               `${ARQUIVO}: o ternário do default chama \`${[...new Set(opacas)].join('`, `')}\`, `

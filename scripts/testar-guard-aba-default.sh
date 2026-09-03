@@ -745,6 +745,45 @@ METODO_QUE_RENDERIZA="  set aba(v: string) {
   private _rotulos() { return PAGINAS.map((p) => p.label); }
   private _aba: AbaTopo = 'resumo';"
 
+# ── Rodada 7, revisor externo: "confiro X so no lugar Y" ───────────────────
+ENVOLTORIO_LOCAL_EXTRA="declare function externo(v: string): AbaTopo;
+function local(v: string): AbaTopo { return externo(v); }"
+ENVOLTORIO_LOCAL="  set aba(v: string) {
+    this._aba = v.length ? local(idDaSlug(v)) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# `[...PAGINAS]` e `.slice()` PRESERVAM a ordem, e sao as formas mais idiomaticas
+# de copiar uma lista. O fecho de apelidos so reconhecia identificador e acesso
+# direto.
+COPIA_QUE_PRESERVA_ORDEM_EXTRA="const OUTRA = [...PAGINAS];
+function nzc2(id: string): AbaTopo {
+  return IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : OUTRA[0].id;
+}"
+COPIA_QUE_PRESERVA_ORDEM="  set aba(v: string) {
+    this._aba = v.length ? nzc2(idDaSlug(v)) : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# Desestruturacao e posicao de ESCRITA, e o pai dela e `PropertyAssignment`, nao
+# `BinaryExpression` -- entao era lida como leitura e passava.
+ESCRITA_POR_DESESTRUTURACAO="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+  }
+  connectedCallback() { ({ id: this._aba } = { id: PAGINAS[0].id }); }
+  private _aba: AbaTopo = 'resumo';"
+
+# ⚠️ Leitura em CHAVE COMPUTADA -- `{ ...x, [this._aba]: y }` -- e o caso que
+# derrubou a tentativa de enumerar "leituras provadas" em vez de posicoes de
+# escrita: o arquivo real usa essa forma, e o guard o acusou na hora.
+LEITURA_EM_CHAVE_COMPUTADA="  set aba(v: string) {
+    const id = idDaSlug(v);
+    this._aba = IDS_TOPO.includes(id as AbaTopo) ? (id as AbaTopo) : 'resumo';
+  }
+  updated() { const m: Record<string, string> = {}; const x = { ...m, [this._aba]: 'a' }; void x; }
+  private _aba: AbaTopo = 'resumo';"
+
 verificar() { # <nome> <raiz> <esperado: ok|reprova>
   local nome="$1" raiz="$2" esperado="$3" rc=0 saida=''
   TOTAL=$((TOTAL+1))
@@ -875,6 +914,10 @@ verificar "67 ATRIBUIÇÃO no módulo reprova"                     "$(arvore c67
 verificar "68 chamada opaca ANTES do ternário reprova"          "$(arvore c68 "$CHAMADA_ANTES_DO_TERNARIO" "$CHAMADA_ANTES_DO_TERNARIO_EXTRA")" reprova
 verificar "69 falso positivo: predicado extraído passa"         "$(arvore c69 "$PREDICADO_EXTRAIDO" "$PREDICADO_EXTRAIDO_EXTRA")" ok
 verificar "70 falso positivo: método que RENDERIZA passa"       "$(arvore c70 "$METODO_QUE_RENDERIZA")"      ok
+verificar "71 envoltório local sobre chamada opaca reprova"     "$(arvore c71 "$ENVOLTORIO_LOCAL" "$ENVOLTORIO_LOCAL_EXTRA")" reprova
+verificar "72 cópia que preserva ordem ('[...PAGINAS]') reprova" "$(arvore c72 "$COPIA_QUE_PRESERVA_ORDEM" "$COPIA_QUE_PRESERVA_ORDEM_EXTRA")" reprova
+verificar "73 escrita por DESESTRUTURAÇÃO reprova"              "$(arvore c73 "$ESCRITA_POR_DESESTRUTURACAO")" reprova
+verificar "74 falso positivo: leitura em chave computada passa" "$(arvore c74 "$LEITURA_EM_CHAVE_COMPUTADA")" ok
 
 # ── INVENTÁRIO: a metade do critério (a) que as fixtures não cobrem ────────
 #
