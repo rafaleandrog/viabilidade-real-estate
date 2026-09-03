@@ -198,8 +198,16 @@ gravados (via adapter do JSON legado, EVI-010 / #230) e o inventário de dados l
 Duas restrições valem para todas: nenhum estudo **aprovado, reprovado ou arquivado** pode mudar de
 resultado por migração, e toda migração nova exige **bump da `versao`** do manifesto.
 
-### 🔴 "Instrumento de capital" — a evolução que foi cancelada, e o que existe no lugar
+Detalhe completo em `docs/lista-bugs-planejamento-2026-07-31.md` e, para o Capital Stack, em
+[Funding, Capital Stack e Retorno do Capital](funding-capital-stack).
 
+## 🔴 "Instrumento de capital" — a evolução que foi cancelada, e o que existe no lugar
+
+> **Seção PRÓPRIA, e isto é deliberado.** Ela ficou primeiro como subseção da consultiva acima — e
+> herdava o banner *"nada aqui existe no `schema.json`, em migração ou em runtime"*, que é falso
+> para o modelo vigente descrito no fim dela. Quem seguisse o banner leria
+> `avancado_funding_operacoes` como proposta, quando ela roda. Achado do revisor externo.
+>
 > **Registro histórico, não previsão.** Preservado com o motivo, seguindo o precedente de
 > [Funding, Capital Stack e Retorno do Capital](funding-capital-stack): a memória de por que o
 > waterfall foi projetado tem valor, e apagá-la faria a próxima sessão reinventá-lo.
@@ -221,14 +229,24 @@ Rodada 7 eliminou de propósito.
 |---|---|---|
 | **Operação de funding** — três tipos independentes, **sem waterfall, sem prioridades, sem competição por caixa**: `financiamento_producao` (única por estudo), `divida` e `equity` (quantas quiser, nomeáveis) | tabela `avancado_funding_operacoes` (migração `029`); motor `frontend/funding-motor.ts`; tela `frontend/tela-funding.ts`; rotas `backend/rotas/funding.ts` | [Fluxo do Investidor](fluxo-investidor-formulas) para `divida` e `equity` |
 
-⚠️ **`financiamento_producao` é a exceção, e ela continua vigente.** A **§4.3** de
+⚠️ **`financiamento_producao` tem SPEC PRÓPRIA, e ela continua vigente.** A **§4.3** de
 [Funding, Capital Stack e Retorno do Capital](funding-capital-stack) — gatilho de exposição mínima,
-catch-up retroativo e cash sweep — foi **preservada de propósito** pela #355 e aprovada pela #405. É
-o único produto que **não** segue a planilha do Fluxo do Investidor. Rebaixar aquele documento
-inteiro a histórico seria erro: só o resto dele é ADR.
+catch-up retroativo e cash sweep — foi **preservada de propósito** pela #355 e aprovada pela #405.
+Rebaixar aquele documento inteiro a histórico seria erro: só o resto dele é ADR.
 
-Detalhe completo em `docs/lista-bugs-planejamento-2026-07-31.md` e, para o Capital Stack, em
-[Funding, Capital Stack e Retorno do Capital](funding-capital-stack).
+⚠️ **Não confunda isso com "o único que diverge da planilha".** Esta frase já esteve aqui nessa
+forma, e era **falsa** — achado do revisor externo. `divida` e `equity` seguem a planilha do Fluxo
+do Investidor **como spec**, mas têm divergências deliberadas e documentadas dentro dela:
+
+- **`divida`** — tarifas, estruturação e encargos (#478) **não existem na planilha**; foram
+  acrescentados sem oráculo de valores, e entram na coluna de saídas, nunca no saldo;
+- **`equity`** — a base de receita líquida do retorno (#465) usa composição **diferente** da
+  planilha: só corretagem, sem marketing. É decisão do autor, verbatim, registrada no `CLAUDE.md`.
+
+Quem tratar essas duas como bug e "corrigir" **muda o resultado de estudos existentes**. A distinção
+que vale: `financiamento_producao` tem **outra spec**; `divida` e `equity` seguem a planilha **com
+emendas declaradas**.
+
 
 ## Regras de precisão
 

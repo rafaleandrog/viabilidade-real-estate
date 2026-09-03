@@ -518,6 +518,23 @@ No cenário de referência: R$ 98.277.107,77 = R$ 83.236.939,35 + R$ 15.040.168,
 
 ##### As outras políticas (Capital de giro)
 
+> 🔴 **Supersedida pela #355 (2026-08-12), apesar de morar dentro da §4.3.** Este sub-bloco descreve
+> políticas de **`capital_giro`**, um tipo de instrumento **apagado**: a tabela viva
+> (`avancado_funding_operacoes`) admite só `financiamento_producao`, `divida` e `equity`
+> (`schema.json:409`); `capital_giro` sobrevive apenas na tabela aposentada
+> `avancado_capital_instrumentos` (`schema.json:392`). O produto que ele descreve é o da **§4.4**,
+> que o banner do topo já lista como supersedida — ele só está fisicamente alojado aqui.
+>
+> ⚠️ **A frase abaixo sobre "uma ÚNICA fila de prioridade de pagamento (§9)" NÃO vale**, e é a mais
+> perigosa do arquivo: ela está em presente, dentro do único bloco que o leitor é instruído a tratar
+> como vigente, e aponta como autoridade a §9 — que tem banner `🔴 Supersedida`. Não há fila de
+> prioridade nenhuma no modelo atual: as três operações são independentes, **sem waterfall, sem
+> prioridades e sem competição por caixa**. A §4.3 vigente cobre só `financiamento_producao`, e ali
+> a amortização é sempre **cash sweep**.
+>
+> Achado do revisor externo na revisão do PR que fechou a #504, e ele é o próprio caso que aquela
+> issue existe para tratar: resíduo do Capital Stack sobrevivendo à remoção do código.
+
 **Cash sweep** (aplica o caixa disponível acima da reserva à dívida, respeitando vencimento e
 outras prioridades) · **bullet** (principal no vencimento) · **SAC** (amortização constante após
 carência) · **Price** (parcela constante após carência).
