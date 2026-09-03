@@ -520,9 +520,9 @@ No cenário de referência: R$ 98.277.107,77 = R$ 83.236.939,35 + R$ 15.040.168,
 
 > 🔴 **Supersedida pela #355 (2026-08-12), apesar de morar dentro da §4.3.** Este sub-bloco descreve
 > políticas de **`capital_giro`**, um tipo de instrumento **apagado**: a tabela viva
-> (`avancado_funding_operacoes`) admite só `financiamento_producao`, `divida` e `equity`
-> (`schema.json:409`); `capital_giro` sobrevive apenas na tabela aposentada
-> `avancado_capital_instrumentos` (`schema.json:392`). O produto que ele descreve é o da **§4.4**,
+> `avancado_funding_operacoes` (`schema.json:405`) admite só `financiamento_producao`, `divida` e
+> `equity`; `capital_giro` (`schema.json:392`) sobrevive apenas na tabela aposentada
+> `avancado_capital_instrumentos` (`schema.json:388`). O produto que ele descreve é o da **§4.4**,
 > que o banner do topo já lista como supersedida — ele só está fisicamente alojado aqui.
 >
 > ⚠️ **A frase abaixo sobre "uma ÚNICA fila de prioridade de pagamento (§9)" NÃO vale**, e é a mais
