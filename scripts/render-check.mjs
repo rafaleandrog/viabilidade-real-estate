@@ -1129,7 +1129,11 @@ export async function verificarRender(opcoes) {
     //
     // (Sem crase neste bloco, de propósito — mesmo motivo do aviso logo
     // acima: isto mora DENTRO do template literal deste arquivo.)
-    window.__extra = typeof caso.medir === 'function' ? await caso.medir(raiz) : null;
+    // window.__temMedir existe pra distinguir "o caso nao declara medir" de
+    // "o caso declara medir e o resultado, legitimamente, e null/undefined" —
+    // as duas dariam window.__extra nulo, e so a flag separa uma da outra.
+    window.__temMedir = typeof caso.medir === 'function';
+    window.__extra = window.__temMedir ? await caso.medir(raiz) : null;
     document.title = 'pronto';
   } catch (e) {
     window.__erroMontagem = String(e && e.stack || e);
@@ -1186,12 +1190,15 @@ export async function verificarRender(opcoes) {
       await pag.waitForFunction(() => document.title === 'pronto' || document.title === 'erro', null, { timeout: 30000 });
       const erroMontagem = await pag.evaluate(() => window.__erroMontagem ?? null);
       if (erroMontagem) throw new Error(`montagem do caso "${caso}" falhou:\n${erroMontagem}`);
-      // Só cria o mapa quando o caso de fato declara `medir` — do contrário
-      // todo caso ganharia `extra: { "900": null, ... }` em vez do `null`
-      // documentado em Achados, e um consumidor genérico que testasse
-      // `extra !== null` concluiria (errado) que há sonda para ler.
-      const extraDaLargura = await pag.evaluate(() => window.__extra ?? null);
-      if (extraDaLargura !== null) {
+      // Só cria o mapa quando o caso de fato DECLARA `medir` — decidido pela
+      // flag `__temMedir`, não pelo valor devolvido. Um caso pode legitimamente
+      // devolver `null`/`undefined` de `medir` (o retorno é `unknown`); testar
+      // `!== null` no valor confundiria essa sonda de verdade com a ausência
+      // de sonda, e o mapa nasceria com `extra: { "900": null, ... }` em vez
+      // do `null` documentado em Achados — achado do Codex, PR 669.
+      const temMedir = await pag.evaluate(() => window.__temMedir === true);
+      if (temMedir) {
+        const extraDaLargura = await pag.evaluate(() => window.__extra ?? null);
         achados.extra ??= {};
         achados.extra[largura] = extraDaLargura;
       }
