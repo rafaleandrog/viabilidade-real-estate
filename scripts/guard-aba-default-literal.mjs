@@ -137,6 +137,12 @@ if (!tsDisponivel) {
 
 const ts = compilador;
 
+/**
+ * Os nomes sob a regra B: as listas declaradas em `LISTAS_ORDENADAS` e tudo que
+ * for apelido delas. Preenchido na execução, quando o arquivo é lido.
+ */
+let protegidas = new Set(LISTAS_ORDENADAS);
+
 /** Desembrulha invólucros que não mudam o VALOR: `as`, `satisfies`, `<T>x`, (). */
 function semInvolucro(no) {
   let n = no;
@@ -177,7 +183,7 @@ function ternariosDiretos(no) {
 function usosSensiveisAOrdem(raiz, sf) {
   const proibidos = [];
   const varrer = (n) => {
-    if (ts.isIdentifier(n) && LISTAS_ORDENADAS.includes(n.text)) {
+    if (ts.isIdentifier(n) && protegidas.has(n.text)) {
       const pai = n.parent;
       const ehChamadaPermitida = pai
         && ts.isPropertyAccessExpression(pai) && pai.expression === n
@@ -196,6 +202,87 @@ function usosSensiveisAOrdem(raiz, sf) {
   };
   varrer(raiz);
   return proibidos;
+}
+
+/**
+ * O ternário eleito é mesmo o valor que chega em `this.<campo>`?
+ *
+ * ⚠️ Sem esta conferência, um ternário QUALQUER no setter satisfaz a regra A
+ * enquanto o default vem de outro lugar. Medido pelo revisor externo:
+ *
+ *     function defaultDaLista() { return PAGINAS[0].id; }   // fora da classe
+ *     …
+ *     const rotulo = IDS_TOPO.includes(id) ? id : 'resumo'; // ternário de fachada
+ *     this._aba = defaultDaLista();                          // o default de verdade
+ *
+ * A regra B não via nada porque só varre o membro, e o `PAGINAS[0]` mora no
+ * ajudante. A regra A aprovava o `'resumo'` do ternário de fachada. Exit 0.
+ *
+ * ⚠️ E isto NÃO é o rastreio de atribuição que foi podado. Aquele tentava
+ * DESCOBRIR qual construção é o fallback entre várias, e falhou quatro vezes
+ * porque a escolha depende de alcançabilidade. Aqui não há escolha: a regra A já
+ * garantiu que existe exatamente UM ternário. Isto é uma VERIFICAÇÃO — "o único
+ * ternário é o que chega?" — e ela é fail-closed: qualquer forma que o guard não
+ * saiba conferir reprova.
+ */
+function ternarioChegaEm(membro, ternario, campo) {
+  const escritas = [];
+  const varrer = (n) => {
+    if (
+      ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      && ts.isPropertyAccessExpression(n.left)
+      && n.left.expression.kind === ts.SyntaxKind.ThisKeyword
+      && n.left.name.text === campo
+    ) escritas.push(n.right);
+    ts.forEachChild(n, varrer);
+  };
+  varrer(membro);
+
+  if (escritas.length !== 1) {
+    return {
+      erro: `o setter escreve em \`this.${campo}\` ${escritas.length} vez(es), e precisa escrever `
+        + 'exatamente uma — com mais de uma, qual delas manda é ambíguo',
+    };
+  }
+
+  let valor = semInvolucro(escritas[0]);
+  // Alias é comum e legítimo (`const val = …; this._aba = val`), e a cadeia pode
+  // ter mais de um passo. O limite existe só para terminar, não é regra.
+  //
+  // ⚠️ Em CADA passo exige-se ligação ÚNICA. Era exatamente aqui que uma versão
+  // anterior se enganava: ela pegava a PRIMEIRA declaração daquele nome em ordem
+  // de árvore, então um `const val` sombreado num bloco ou numa arrow anterior
+  // fazia o guard ler o valor errado. Resolver escopo à mão é a cauda que o
+  // lexer artesanal já custou a este repositório — então não se resolve: havendo
+  // mais de uma ligação, reprova.
+  for (let i = 0; i < 8 && ts.isIdentifier(valor); i++) {
+    const nome = valor.text;
+    const decls = [];
+    const acharDecl = (n) => {
+      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === nome
+        && n.initializer) decls.push(n.initializer);
+      ts.forEachChild(n, acharDecl);
+    };
+    acharDecl(membro);
+    if (decls.length !== 1) {
+      return {
+        erro: `\`this.${campo}\` recebe \`${nome}\`, que tem ${decls.length} declaração(ões) com `
+          + 'valor dentro do setter — sem uma ligação única não dá para dizer qual valor chega, e '
+          + 'o guard reprova em vez de escolher',
+      };
+    }
+    valor = semInvolucro(decls[0]);
+  }
+
+  if (valor !== ternario) {
+    return {
+      erro: `o único ternário do setter NÃO é o que chega em \`this.${campo}\` — lá chega `
+        + `\`${escritas[0].getText().slice(0, 50)}\`.\n`
+        + '      Um ternário de fachada satisfaria a regra do literal enquanto o default vem de\n'
+        + '      outro lugar (um ajudante no módulo, por exemplo, onde a regra de ordem não olha)',
+    };
+  }
+  return {};
 }
 
 // ── execução ────────────────────────────────────────────────────────────────
@@ -217,14 +304,65 @@ if (chamadoDireto) {
   if (src !== null) {
     const sf = ts.createSourceFile(caminho, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 
-    // As listas ordenadas têm de existir: renomear uma faria o guard parar de
-    // proteger caladamente.
+    // As listas ordenadas têm de existir COMO DECLARAÇÃO: renomear uma faria o
+    // guard parar de proteger caladamente.
+    //
+    // ⚠️ Isto já foi um `new RegExp('\\b' + nome + '\\b').test(src)` sobre o texto
+    // cru, e era furado: um comentário que ainda citasse `PAGINAS`, ou um
+    // identificador mais longo, satisfazia a busca. Media-se a MENÇÃO quando a
+    // pergunta era pela DECLARAÇÃO — e aí bastava renomear a lista para
+    // `PAGINAS_TOPO`, deixar a palavra num comentário, e derivar o default dela
+    // à vontade. Achado do revisor externo; a pergunta é de árvore, como todo o
+    // resto deste arquivo.
+    const declaradas = new Set();
+    /** nome → nós de inicializador, para fechar o conjunto sob apelidamento. */
+    const inicializadores = new Map();
+    // Só escopo de MÓDULO. Uma declaração local não prova que a lista existe, e
+    // — mais importante — o fecho sob apelidamento não pode alcançar locais: o
+    // próprio `const val = IDS_TOPO.includes(id) ? … : 'resumo'` do setter cita
+    // um nome protegido, e protegê-lo faria o guard acusar o código correto que
+    // ele existe para abençoar. O apelidamento que interessa é o do módulo, onde
+    // a lista ganha outro nome e some do radar.
+    for (const st of sf.statements) {
+      if (!ts.isVariableStatement(st)) continue;
+      for (const d of st.declarationList.declarations) {
+        if (!ts.isIdentifier(d.name)) continue;
+        declaradas.add(d.name.text);
+        if (d.initializer) inicializadores.set(d.name.text, d.initializer);
+      }
+    }
+
+    // ⚠️ O conjunto protegido FECHA SOB APELIDAMENTO. Sem isto, `const OUTRA =
+    // PAGINAS;` no escopo do módulo cria um nome que a regra B não conhece, e
+    // `OUTRA[0].id` no setter passa — a proteção some por uma linha de
+    // indireção. Achado ao escrever a fixture do renome: a lista de nomes é
+    // mantida à mão, e lista à mão que não fecha sob a operação óbvia é a
+    // "lista de exceção" que o `CLAUDE.md` manda desconfiar.
+    //
+    // O fecho é por ponto fixo: quem cita um protegido vira protegido.
+    protegidas = new Set(LISTAS_ORDENADAS);
+    for (let i = 0; i < 16; i++) {
+      let mudou = false;
+      for (const [nome, ini] of inicializadores) {
+        if (protegidas.has(nome)) continue;
+        let cita = false;
+        const ver = (n) => {
+          if (cita) return;
+          if (ts.isIdentifier(n) && protegidas.has(n.text)) { cita = true; return; }
+          ts.forEachChild(n, ver);
+        };
+        ver(ini);
+        if (cita) { protegidas.add(nome); mudou = true; }
+      }
+      if (!mudou) break;
+    }
     for (const nome of LISTAS_ORDENADAS) {
-      if (!new RegExp(`\\b${nome}\\b`).test(src)) {
+      if (!declaradas.has(nome)) {
         falhas.push(
-          `${ARQUIVO}: a lista \`${nome}\` não existe mais neste arquivo.\n`
-          + '      A regra de ordem (B) protege nomes declarados; um nome que sumiu deixa de ser\n'
-          + '      protegido EM SILÊNCIO. Se ela foi renomeada, renomeie também em `LISTAS_ORDENADAS`.',
+          `${ARQUIVO}: não há declaração de \`${nome}\` neste arquivo.\n`
+          + '      A regra de ordem (B) protege nomes DECLARADOS; um nome que sumiu deixa de ser\n'
+          + '      protegido EM SILÊNCIO — e citá-lo num comentário não o traz de volta.\n'
+          + '      Se a lista foi renomeada, renomeie também em `LISTAS_ORDENADAS`.',
         );
       }
     }
@@ -302,6 +440,11 @@ if (chamadoDireto) {
               + '      guard foram enganadas. `if/else` também reprova aqui, de propósito: ver a\n'
               + '      TROCA DECLARADA no cabeçalho.',
             );
+            continue;
+          }
+          const chega = ternarioChegaEm(membro, ternarios[0], '_aba');
+          if (chega.erro) {
+            falhas.push(`${ARQUIVO}: ${chega.erro}\n      ${origem.motivo}`);
             continue;
           }
           alvo = ternarios[0].whenFalse;

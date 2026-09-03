@@ -89,6 +89,8 @@ arvore() {
     printf "declare function idDaSlug(v: string): string;\n"
     printf "declare const PADRAO: AbaTopo;\n"
     printf "declare const MAPA: Record<string, number>;\n"
+    printf "declare function defaultDaLista(): AbaTopo;\n"
+    printf "const PAGINAS_TOPO = PAGINAS;\n"
     printf "declare function property(o: unknown): any;\n"
     printf "export class ViabTelaAvancado {\n"
     printf '%s\n' "$1"
@@ -524,16 +526,57 @@ LET_SEM_INICIALIZADOR="  set aba(v: string) {
   }
   private _aba: AbaTopo = 'resumo';"
 
+# A assinatura que o guard imprime quando reprova de PROPÓSITO. Conferi-la é o
+# que distingue "reprovou" de "estourou".
+ASSINATURA_REPROVA='o default de aba não está protegido'
+
+# ⚠️ QUATRO desfechos, não três, e o quarto custou um achado do revisor externo.
+# `exit 1` sozinho NÃO prova reprovação: uma exceção não capturada também sai 1.
+# Medido: um guard com `throw` na própria trilha de erro — que portanto ESTOURA
+# em toda violação — passava esta bateria inteira, 48/48 verde, porque todo caso
+# `reprova` via o 1 e dava por satisfeito. Um guard que crasha ao achar defeito é
+# um guard que não guarda nada, e a bateria dizia que estava tudo bem.
+#
+# Por isso, para esperar `reprova` não basta o código de saída: a saída de erro
+# tem de trazer a assinatura do diagnóstico. Crash não a imprime.
+# ── Rodada 5, revisor externo ──────────────────────────────────────────────
+# TERNARIO DE FACHADA: a derivacao sai do setter para um ajudante do MODULO,
+# onde a regra de ordem nao olha, e um ternario qualquer satisfaz a regra do
+# literal. Exit 0 antes. Quem fecha e a conferencia de que o unico ternario e o
+# que de fato CHEGA em `this._aba`.
+TERNARIO_DE_FACHADA="  set aba(v: string) {
+    const id = idDaSlug(v);
+    const rotulo = IDS_TOPO.includes(id as AbaTopo) ? id : 'resumo';
+    void rotulo;
+    this._aba = defaultDaLista();
+  }
+  private _aba: AbaTopo = 'resumo';"
+
+# RENOME COM MENCAO SOBREVIVENTE: a existencia das listas era medida por regex no
+# texto cru, entao um comentario que ainda citasse `PAGINAS` bastava. Renomear a
+# declaracao para `PAGINAS_TOPO` e derivar dela ficava verde. Media-se a MENCAO
+# quando a pergunta era pela DECLARACAO.
+RENOME_COM_MENCAO="  set aba(v: string) {
+    const id = idDaSlug(v);
+    void id;
+    this._aba = PAGINAS_TOPO.length ? PAGINAS_TOPO[0].id : 'resumo';
+  }
+  private _aba: AbaTopo = 'resumo';"
+
 verificar() { # <nome> <raiz> <esperado: ok|reprova>
-  local nome="$1" raiz="$2" esperado="$3" rc=0
+  local nome="$1" raiz="$2" esperado="$3" rc=0 saida=''
   TOTAL=$((TOTAL+1))
-  node "$GUARD" "$raiz" >/dev/null 2>&1 || rc=$?
+  saida="$(node "$GUARD" "$raiz" 2>&1)" || rc=$?
   if [ "$rc" -ge 2 ]; then
-    falha "$nome" "o guard saiu $rc (recusa ou crash) — a bateria NÃO mediu a regra"
+    falha "$nome" "o guard saiu $rc (recusa) — a bateria NÃO mediu a regra"
   elif [ "$rc" -eq 0 ]; then
     [ "$esperado" = "ok" ] && ok "$nome" || falha "$nome" "o guard passou, e devia reprovar"
+  elif [ "$esperado" != "reprova" ]; then
+    falha "$nome" "o guard reprovou código correto (falso positivo)"
+  elif ! printf '%s' "$saida" | grep -qF "$ASSINATURA_REPROVA"; then
+    falha "$nome" "saiu 1 SEM o diagnóstico do guard — é crash, não reprovação deliberada"
   else
-    [ "$esperado" = "reprova" ] && ok "$nome" || falha "$nome" "o guard reprovou código correto (falso positivo)"
+    ok "$nome"
   fi
 }
 
@@ -602,6 +645,35 @@ verificar "45 ordem: colisão de nome não salva a derivação"     "$(arvore c4
 verificar "46 ordem: o caso 37 reescrito com ternário reprova"  "$(arvore c46 "$ORDEM_37_COM_TERNARIO")"     reprova
 verificar "47 ordem: leitura por ordem no INICIALIZADOR reprova" "$(arvore c47 "$ORDEM_NO_INICIALIZADOR")"   reprova
 verificar "48 '.find' alheio em arrow reprova (conservador)"    "$(arvore c48 "$FIND_ALHEIO_EM_ARROW")"      reprova
+verificar "49 ternário de FACHADA com ajudante do módulo reprova" "$(arvore c49 "$TERNARIO_DE_FACHADA")"     reprova
+verificar "50 apelido da lista no módulo não escapa da regra B" "$(arvore c50 "$RENOME_COM_MENCAO")"        reprova
+
+# Caso 51 monta ARVORE PROPRIA: ele precisa de um arquivo em que `PAGINAS` NAO
+# seja declarada e apareca so num comentario -- o preambulo padrao de `arvore()`
+# sempre a declara. E a testemunha exata do revisor externo: a existencia das
+# listas era medida por regex no texto cru, entao o comentario satisfazia a
+# busca enquanto a declaracao real tinha outro nome.
+raiz51="$TMPRAIZ/c51/frontend"
+mkdir -p "$raiz51"
+cat > "$raiz51/tela-avancado.ts" <<'TS51'
+type AbaTopo = 'resumo' | 'obra';
+// Historico: esta lista ja se chamou PAGINAS, e IDS_TOPO derivava dela.
+const LISTA_DE_PAGINAS: { id: AbaTopo; label: string }[] = [
+  { id: 'resumo', label: 'Resumo' },
+  { id: 'obra', label: 'Custos' },
+];
+declare function idDaSlug(v: string): string;
+export class ViabTelaAvancado {
+  set aba(v: string) {
+    const id = idDaSlug(v);
+    void id;
+    this._aba = LISTA_DE_PAGINAS.length ? LISTA_DE_PAGINAS[0].id : 'resumo';
+  }
+  get aba(): AbaTopo { return this._aba; }
+  private _aba: AbaTopo = 'resumo';
+}
+TS51
+verificar "51 renome com menção em COMENTÁRIO reprova"          "$TMPRAIZ/c51"                               reprova
 
 # ── INVENTÁRIO: a metade do critério (a) que as fixtures não cobrem ────────
 #
