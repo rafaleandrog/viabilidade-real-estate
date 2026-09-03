@@ -193,10 +193,39 @@ gravados (via adapter do JSON legado, EVI-010 / #230) e o inventário de dados l
 | **Subcategoria de Preço** | Quatro valores exatos: `Valor à vista`, `Parcelado`, `Permuta física`, `Permuta financeira`. Hoje há uma única `Permuta`, que o motor trata como **financeira** (`frontend/fluxo-caixa-motor.ts:385`). Migração aprovada: toda `Permuta` legada → `Permuta financeira`, preservando o resultado de todo estudo | #257 |
 | **Permuta física por tipologia** | Referência de tipologia + quantidade **na linha de custo do Terreno**, substituindo `avancado_tipologias.unidades_permutadas` como fonte de verdade. Exige base de valoração declarada quando a tipologia tem `preco_m2` diferente por Grupo | #258 · #266–#269 |
 | **Valor canônico multiunidade** | Quantidade econômica com precisão suficiente, independente da unidade exibida. Hoje o valor **exibido é o persistido**, em duas arquiteturas distintas: um campo por unidade nas Premissas, um único `orcamento_valor` + `orcamento_unidade` em Custos | #259 · #260 |
-| **Instrumento de capital** | Entidade de camada do Capital Stack: tipo, compromisso, prioridade de utilização, prioridade de pagamento, calendário de aporte/liberação, status (`rascunho` · `ativo` · `encerrado` · `revisão necessária`). Substitui `financiamento_*`, `investidor_*` e `estrutura_*_pct` como entrada; estes viram metadado legado | #239 · #271 |
+| ~~**Instrumento de capital**~~ | 🔴 **Evolução CANCELADA pela #355 (2026-08-12)** — ver o bloco abaixo | ~~#239 · #271~~ |
 
 Duas restrições valem para todas: nenhum estudo **aprovado, reprovado ou arquivado** pode mudar de
 resultado por migração, e toda migração nova exige **bump da `versao`** do manifesto.
+
+### 🔴 "Instrumento de capital" — a evolução que foi cancelada, e o que existe no lugar
+
+> **Registro histórico, não previsão.** Preservado com o motivo, seguindo o precedente de
+> [Funding, Capital Stack e Retorno do Capital](funding-capital-stack): a memória de por que o
+> waterfall foi projetado tem valor, e apagá-la faria a próxima sessão reinventá-lo.
+
+A linha acima descrevia uma entidade de camada do **Capital Stack** — tipo, compromisso, prioridade
+de utilização, prioridade de pagamento, calendário de aporte/liberação e status — que substituiria
+`financiamento_*`, `investidor_*` e `estrutura_*_pct` como entrada. **Ela nunca foi implementada, e
+deixou de ser o caminho.** A **#355** apagou o modelo de 4 instrumentos com waterfall em 2026-08-12;
+a epic #239 e as sub-issues #270–#279 não existem mais como plano.
+
+⚠️ **Por que isto era enganoso mesmo estando numa seção consultiva.** A seção inteira avisa que
+"nada aqui existe" — mas ela promete o que **vai** existir, e esta linha prometia um futuro
+cancelado. Quem a lesse sairia procurando (ou pior, recriando) uma competição por caixa que a
+Rodada 7 eliminou de propósito.
+
+**O que existe hoje**, e é a entidade vigente do domínio de funding:
+
+| Entidade vigente | Onde mora | Spec |
+|---|---|---|
+| **Operação de funding** — três tipos independentes, **sem waterfall, sem prioridades, sem competição por caixa**: `financiamento_producao` (única por estudo), `divida` e `equity` (quantas quiser, nomeáveis) | tabela `avancado_funding_operacoes` (migração `029`); motor `frontend/funding-motor.ts`; tela `frontend/tela-funding.ts`; rotas `backend/rotas/funding.ts` | [Fluxo do Investidor](fluxo-investidor-formulas) para `divida` e `equity` |
+
+⚠️ **`financiamento_producao` é a exceção, e ela continua vigente.** A **§4.3** de
+[Funding, Capital Stack e Retorno do Capital](funding-capital-stack) — gatilho de exposição mínima,
+catch-up retroativo e cash sweep — foi **preservada de propósito** pela #355 e aprovada pela #405. É
+o único produto que **não** segue a planilha do Fluxo do Investidor. Rebaixar aquele documento
+inteiro a histórico seria erro: só o resto dele é ADR.
 
 Detalhe completo em `docs/lista-bugs-planejamento-2026-07-31.md` e, para o Capital Stack, em
 [Funding, Capital Stack e Retorno do Capital](funding-capital-stack).
