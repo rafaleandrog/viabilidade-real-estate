@@ -48,8 +48,10 @@
 #      Depende do Playwright, que NÃO é dependência do produto: sem ele a etapa
 #      PULA com aviso alto. No CI ela é obrigatória (job `render`).
 #
-# Backend / `urbi-empacotar` / typecheck do backend precisam do SDK → só rodam no
-# ambiente autenticado do autor. Para mudanças de frontend, este script basta.
+# Backend, typecheck do backend e `urbi-empacotar` precisam do SDK — e desde
+# 2026-09-03 ele É baixado aqui (a etapa 2 autentica). Rode `scripts/validar-backend.sh`
+# depois deste; para mudanças só de frontend, este basta. O que continua sendo do
+# autor é a sincronização do schema.json pelo SDK e a execução real das migrações.
 #
 # Uso:  bash scripts/validar-frontend.sh
 set -uo pipefail

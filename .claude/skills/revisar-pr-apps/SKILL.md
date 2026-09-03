@@ -102,8 +102,12 @@ superfície usou**, sempre.
    > entrega o `URBIVERSO_PACKAGES_TOKEN` do ambiente, e qualquer validador põe o bundle no disco.
    > Estado medido hoje, e ele é misto:
    >
-   > - **`npm view @urbiverso/sdk` responde.** A verificação *"esse verbo está publicado?"*
-   >   passou a ser **executável** — não é mais pergunta ao autor;
+   > - **`npm view @urbiverso/sdk` responde — mas NÃO pelado.** O comando do item 1 acima
+   >   (`npm view @urbiverso/sdk dist-tags`) toma **401** sozinho: o `.npmrc` do repositório
+   >   declara o registry e não o token. Passe a auth na chamada:
+   >   `npm view @urbiverso/sdk dist-tags --registry=https://npm.pkg.github.com --//npm.pkg.github.com/:_authToken="$URBIVERSO_PACKAGES_TOKEN"`.
+   >   Com isso a verificação *"esse verbo está publicado?"* é **executável** — não é mais
+   >   pergunta ao autor. Sem o token no ambiente, volta a ser;
    > - **`dist/index.d.ts` está no disco.** A lente de **props de primitivo `urbi-*`** é
    >   executável, e conferir prop lendo o monorepo perdeu a desculpa;
    > - **`docs/` e `obsolescencias.json` NÃO estão no bundle `0.50.3`**, que é a versão que o

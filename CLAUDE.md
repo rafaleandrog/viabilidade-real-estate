@@ -777,9 +777,10 @@ tempo com `.npmrc` nem com token. A premissa era falsa: **`URBIVERSO_PACKAGES_TO
 variáveis do cloud environment**, e faltava só entregá-lo ao pnpm. Quem paga esse tipo de erro é a
 sessão seguinte, que obedece e não confere — foi o que aconteceu por meses.
 
-**Hoje o SDK é instalado normalmente.** Quem faz isso é `scripts/lib/sdk-auth.sh`, sourced pelos
-dois validadores antes do primeiro `pnpm install`; ele escreve um npmrc temporário apontado por
-`NPM_CONFIG_USERCONFIG` e o apaga no fim — **nunca toca no `~/.npmrc` de ninguém**. Sem o token no
+**Hoje o SDK é instalado normalmente.** Quem faz isso é `scripts/lib/sdk-auth.sh`, sourced pelo
+`validar-frontend.sh` antes do `pnpm install` — e **só por ele**, porque é o único dos dois que
+chama o pnpm; o `validar-backend.sh` confere o que aquele já baixou. Ele escreve um npmrc temporário
+apontado por `NPM_CONFIG_USERCONFIG` e o apaga no fim — **nunca toca no `~/.npmrc` de ninguém**. Sem o token no
 ambiente ele é no-op, e o comportamento antigo (401, frontend validável mesmo assim) volta.
 
 Consequências que valem em toda sessão com token:
