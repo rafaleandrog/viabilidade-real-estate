@@ -15,8 +15,20 @@
 ## Por que este diretório existe
 
 A fonte canônica de props de primitivo `urbi-*` e de tokens CSS é o **bundle do SDK**
-(`node_modules/@urbiverso/sdk/`). **Neste ambiente ele não existe:** o pacote é GitHub Packages
-privado, e tanto o `pnpm install` quanto o `npm view` devolvem 401.
+(`node_modules/@urbiverso/sdk/`).
+
+> ⚠️ **A justificativa original deste diretório era o 401, e ela caiu em 2026-09-03.** O texto
+> dizia: *"neste ambiente ele não existe: o pacote é GitHub Packages privado, e tanto o
+> `pnpm install` quanto o `npm view` devolvem 401"*. **O bundle está no disco** —
+> `scripts/lib/sdk-auth.sh` entrega o token do ambiente, e `dist/index.d.ts` traz 68
+> `declare class Urbi*`.
+>
+> **O espelho não vira dispensável por isso**, e é importante dizer por quê: ele é lido pelos guards
+> (`guard-props-urbi.mjs`, `guard-tokens-css.mjs`, `guard-box-model-urbi.mjs`) e pelo harness de
+> render, que rodam **no CI**, onde o `node_modules` é o do runner e não um artefato versionado. O
+> que muda é o **eixo do tempo**: hoje ele é gerado do `main` do monorepo, e com o bundle no disco
+> passa a ser gerável da versão que a app fixa — que é a referência certa. Isso é assunto próprio,
+> por R3.
 
 O efeito prático era pior do que "faltar informação". A referência virava leitura ad-hoc — um agente
 abria `ui/src/` no monorepo, conferia uma prop, e o conhecimento morria com a sessão. E a skill de

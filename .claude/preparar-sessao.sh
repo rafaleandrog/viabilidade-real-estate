@@ -7,11 +7,12 @@
 #
 # Diferenças deliberadas em relação ao hook do monorepo (não as "corrija"):
 #
-#   1. NÃO roda `pnpm install`. Aqui ele falha com 401 no @urbiverso/sdk por
-#      desenho (CLAUDE.md § Validação). Imprimir "AVISO: install falhou" em toda
-#      sessão treina o leitor a ignorar avisos — que é o oposto do que este repo
-#      quer. Quem precisa de dependências chama scripts/validar-frontend.sh, que
-#      já tolera o 401.
+#   1. NÃO roda `pnpm install`. Não é por causa do 401 — essa premissa caiu em
+#      2026-09-03, quando se descobriu que o URBIVERSO_PACKAGES_TOKEN está no
+#      ambiente e que scripts/lib/sdk-auth.sh basta para o install terminar
+#      limpo. É porque install em TODA sessão custa segundos que a maioria delas
+#      não usa: quem precisa de dependências chama scripts/validar-frontend.sh,
+#      que já autentica sozinho. O hook só REPORTA se a auth está disponível.
 #   2. NÃO é escopado a CLAUDE_CODE_REMOTE. O lembrete de processo vale em sessão
 #      local também; só o `codex login` depende de a chave existir.
 #
@@ -36,6 +37,20 @@ if [ "$BRANCH" = "main" ]; then
   echo '[processo] ⚠️  VOCÊ ESTÁ NA MAIN. Ela é só para puxar. Trabalho novo abre branch ANTES'
   echo '[processo]     de editar qualquer arquivo: git checkout -b claude/<descrição>'
   echo '[processo]     e logo depois git branch --unset-upstream (senão um push pelado vai pra main).'
+fi
+
+# ── SDK: medido, não presumido ───────────────────────────────────────────────
+# Esta linha existe porque a ausência de auth é INDISTINGUÍVEL de "tudo normal"
+# até alguém rodar o validar-backend.sh e tomar o abort na etapa 1/5 — que foi
+# como o repositório passou meses declarando backend/schema/migração "pendentes
+# do autor" por uma causa que não era a declarada.
+if [ -n "${URBIVERSO_PACKAGES_TOKEN:-}" ]; then
+  echo '[processo] SDK: autenticável — validar-backend.sh roda aqui (as 5 etapas).'
+  echo '[processo]     Contratos: props de urbi-* SIM (dist/index.d.ts); doc do SDK NÃO — o pin'
+  echo '[processo]     0.50.3 não traz docs/. Atestação segue contratos=nao-executados.'
+else
+  echo '[processo] SDK: SEM token (URBIVERSO_PACKAGES_TOKEN ausente) — backend, schema e'
+  echo '[processo]     migração ficam pendentes do autor, e o PR precisa DECLARAR isso.'
 fi
 
 # ── Motor de revisão: medido, não presumido ──────────────────────────────────

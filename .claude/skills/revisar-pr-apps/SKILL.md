@@ -96,16 +96,33 @@ superfície usou**, sempre.
    a app tem instalada. Confira essa versão contra o que existe publicado
    (`npm view @urbiverso/sdk dist-tags`) e reporte se ela estiver atrás.
 
-   > ⚠️ **ADAPTADO — neste ambiente as duas coisas falham, e é preciso saber que falham.**
-   > Medido em 2026-08-21: `node_modules/` **não existe** no clone (o `pnpm install` dá 401 no
-   > `@urbiverso/sdk`, que é GitHub Packages privado), **e `npm view @urbiverso/sdk` dá o mesmo
-   > `E401`**. Consequências, as duas obrigatórias no relatório:
+   > ⚠️ **ADAPTADO — o 401 acabou em 2026-09-03, e o que sobrou é OUTRA coisa. Não confunda as
+   > duas.** A nota anterior (2026-08-21) dizia que `pnpm install` e `npm view` davam 401 e que a
+   > camada de contratos por isso "não roda". **A auth existe** — `scripts/lib/sdk-auth.sh`
+   > entrega o `URBIVERSO_PACKAGES_TOKEN` do ambiente, e o `validar-frontend.sh` põe o bundle no
+   > disco — ele é o único dos dois que instala; o `validar-backend.sh` aborta se aquele não tiver
+   > rodado antes.
+   > Estado medido hoje, e ele é misto:
    >
-   > - a **camada de contratos não roda** — ver o item 2 abaixo, que aqui é a regra, não a
-   >   exceção;
-   > - a verificação *"esse verbo está publicado?"* é **inexecutável**. Ela não vira achado
-   >   inventado nem "conferido de memória": vira **pergunta ao autor** no relatório, porque só
-   >   ele tem credencial para responder.
+   > - **`npm view @urbiverso/sdk` responde — mas NÃO pelado.** O comando do item 1 acima
+   >   (`npm view @urbiverso/sdk dist-tags`) toma **401** sozinho: o `.npmrc` do repositório
+   >   declara o registry e não o token. Passe a auth na chamada:
+   >   `env "npm_config_//npm.pkg.github.com/:_authToken=$URBIVERSO_PACKAGES_TOKEN" npm view @urbiverso/sdk dist-tags`.
+   >   ⚠️ **Pelo `env`, e não por flag** (`--//…_authToken=…`): a flag põe o PAT no **argv**, que o
+   >   `ps` e o `/proc/<pid>/cmdline` expõem a qualquer usuário da máquina — e quem copia este
+   >   comando pode estar num host compartilhado. Achado P1 do Codex neste PR.
+   >   Com isso a verificação *"esse verbo está publicado?"* é **executável** — não é mais
+   >   pergunta ao autor. Sem o token no ambiente, volta a ser;
+   > - **`dist/index.d.ts` está no disco.** A lente de **props de primitivo `urbi-*`** é
+   >   executável, e conferir prop lendo o monorepo perdeu a desculpa;
+   > - **`docs/` e `obsolescencias.json` NÃO estão no bundle `0.50.3`**, que é a versão que o
+   >   `package.json` fixa. A lente de contrato por doc continua **não executada** — e agora por
+   >   causa da **versão fixada**, não por falta de credencial.
+   >
+   > ⚠️ **A versão que vale é a que o `package.json` FIXA**, não o `latest` do registry. Conferir
+   > contrato numa versão publicada mais nova é a mesma classe de erro que conferir no `main` do
+   > monorepo: mede a referência errada. Se o contrato só existe lá, **isso é o achado** — a app
+   > precisa subir o pin do SDK.
 
    **A SSOT do autor de app é documentação, não tipo.** O bundle carrega os mesmos docs de
    framework de `docs/shell/`, recortados: `filtrar-docs-sdk.js` embarca as seções marcadas
@@ -330,12 +347,17 @@ despachar:
 > bundled, e copiar doc do monorepo para dentro desta árvore é exatamente o que a proibição do
 > `CLAUDE.md` veda. Não recrie o bloco.
 
-> ⚠️ **E o risco que essa ausência cria: a linha "contratos não executados" vira papel de parede.**
-> Aqui ela vai aparecer em **100%** das revisões, e o que aparece sempre para de ser lido — aí
-> "revisão limpa" passa a ser lido como "contratos conferidos", que é falso. Duas defesas, use as
-> duas: `contratos=nao-executados` no comentário de máquina da §7 (greppável, contável), e o
-> relatório dizendo **o que exatamente ficou descoberto** — props de primitivo `urbi-*`, verbos do
-> SDK, e a aderência de `shell_min`/`sdk_min` ao que está publicado.
+> ⚠️ **E o risco que a ausência PARCIAL cria: a linha "contratos não executados" vira papel de
+> parede.** Enquanto o pin do SDK for uma versão sem `docs/`, ela continua aparecendo em toda
+> revisão — e o que aparece sempre para de ser lido, até "revisão limpa" passar a ser lido como
+> "contratos conferidos", que é falso. Duas defesas, use as duas: `contratos=nao-executados` no
+> comentário de máquina da §7 (greppável, contável), e o relatório dizendo **o que exatamente ficou
+> descoberto e o que NÃO ficou** — hoje props de primitivo `urbi-*` **rodam**; verbos do SDK e
+> obsolescências, não; a aderência de `shell_min` ao que a instância roda continua sendo pergunta ao
+> autor.
+>
+> **`contratos=ok` só quando a lente de doc de fato rodar.** Publicá-lo porque "o SDK está no disco"
+> é afirmação plausível e falsa — a classe que o `CLAUDE.md` registra como armadilha 11.
 
 Lente de contrato que não achou o doc é **não executada**, nunca aprovada.
 

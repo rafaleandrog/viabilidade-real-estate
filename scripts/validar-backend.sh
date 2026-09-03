@@ -4,9 +4,12 @@
 # Descoberta de 2026-07-29 que contraria o que o CLAUDE.md dizia ("backend só
 # roda no ambiente autenticado do autor"): dá para validar bastante coisa aqui.
 #
-#   · o `@urbiverso/sdk` já ESTÁ em `node_modules/@urbiverso/sdk` (com o
-#     `dist/index.d.ts`). O que falha com 401 é o `pnpm install` REINSTALAR o
-#     pacote — os tipos, que é o que o typecheck precisa, estão no disco;
+#   · o typecheck do backend precisa dos TIPOS do SDK (`dist/index.d.ts`), e
+#     eles vêm do `pnpm install`. Este cabeçalho afirmou por muito tempo que o
+#     SDK "já ESTÁ em node_modules" — falso em sessão nova, onde o repositório é
+#     clonado do zero. Desde 2026-09-03 ele está lá de verdade: o
+#     `scripts/lib/sdk-auth.sh` autentica o registry com o
+#     `URBIVERSO_PACKAGES_TOKEN` do ambiente, e o install baixa o pacote;
 #   · só `backend/rotas.ts` importa o SDK, e é `import '@urbiverso/sdk/express'`
 #     (augmentação de tipo, efeito colateral). Todo o resto do backend depende
 #     só do `express`, que é PÚBLICO e está no store do pnpm;
@@ -14,7 +17,9 @@
 #     então rodam com `tsx` sem subir servidor nem banco.
 #
 # O que este script NÃO cobre — continua sendo do autor, no UrbiVerso:
-#   · `urbi-empacotar` (empacotamento e publicação);
+#   · a PUBLICAÇÃO do pacote. O `urbi-empacotar` em si vem no bundle do SDK e
+#     roda aqui (depois de um `pnpm build`, que produz o `backend/rotas.js` que
+#     ele exige);
 #   · a materialização real das tabelas no Postgres — o passo 2 confere o
 #     `schema.json` contra o contrato do SDK (foi o que reprovou o pacote
 #     `0.1.12`: `"tipo": "logico"`, que nunca existiu), mas não executa o DDL;
@@ -47,6 +52,11 @@ echo "== 0/5 guard: JSON estrito (schema.json, manifesto.json) =="
 node scripts/guard-json.mjs || exit 1
 
 echo "== 1/5 dependências públicas (express) =="
+# ⚠️ Este script NÃO chama `pnpm`/`npm` em lugar nenhum — ele confere o que o
+# `validar-frontend.sh` já baixou (a etapa abaixo aborta mandando rodá-lo antes).
+# Uma versão anterior deste PR sourceava aqui o `lib/sdk-auth.sh`: escrevia um
+# arquivo com o token em claro e não tinha um só consumidor para ele. Exposição
+# sem benefício, e por isso a chamada mora só no validar-frontend.sh.
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — rode antes: bash scripts/validar-frontend.sh" >&2
   exit 1
@@ -68,6 +78,8 @@ link_pkg 'tsx@*'             'tsx'              'tsx'
 if [ ! -d node_modules/@urbiverso/sdk ]; then
   echo "ERRO: node_modules/@urbiverso/sdk ausente — sem os tipos do SDK o typecheck do" >&2
   echo "      backend não roda aqui. Esta validação fica para o ambiente do autor." >&2
+  echo "      Causa provável: URBIVERSO_PACKAGES_TOKEN ausente do ambiente. Com ele," >&2
+  echo "      scripts/lib/sdk-auth.sh autentica o registry e o pnpm baixa o pacote." >&2
   exit 1
 fi
 
@@ -129,5 +141,6 @@ fi
 
 echo
 echo "✅ Backend validado: schema + typecheck + testes de rota + migrações + guard de versao."
-echo "   Falta o autor rodar no UrbiVerso: urbi-empacotar, sincronização de schema.json"
-echo "   e execução real das migrações."
+echo "   Falta o autor rodar no UrbiVerso: sincronização de schema.json e execução"
+echo "   real das migrações. (urbi-empacotar saiu desta lista: ele vem no bundle do"
+echo "   SDK e roda aqui, depois de um pnpm build.)"

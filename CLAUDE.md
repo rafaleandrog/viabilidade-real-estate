@@ -244,7 +244,7 @@ nunca lida/editável) — detalhe em `docs/viabilidade/funding-capital-stack.md`
 `PROGRESSO.md`.
 
 **Pendências do autor no ambiente autenticado** (o ambiente Claude Code não cobre — lista
-consolidada de todas as rodadas): `urbi-empacotar`; sincronização do `schema.json` pelo SDK
+consolidada de todas as rodadas): sincronização do `schema.json` pelo SDK
 (inclui as tabelas `analise_mercado`/`mercado_regioes`/`mercado_coletas` e a tabela nova
 `avancado_capital_instrumentos`); execução real de **todas** as migrações no Postgres (`001` a
 `028`, cadeia completa nunca rodada em produção); confirmação de que o shell descobre
@@ -540,9 +540,10 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
    (`git ls-files`), nunca varra o disco.
 2. **Escrever contra o `main` do monorepo em vez do SDK publicado.** Seis `TS2339` no CI por um
    método que existe no `main` do monorepo (e no runtime `shell_min`) mas não no SDK que a app fixa
-   — agravado porque o 401 do SDK nesta sessão camufla o erro no ruído esperado. Defesa: a
-   autoridade é o **bundle do SDK instalado**; se a resposta não está ali, ela não existe para a
-   app.
+   — agravado porque o 401 do SDK, então tido como normal, camuflava o erro no ruído esperado (esse
+   agravante morreu em 2026-09-03: o install termina limpo). Defesa: a autoridade é o **bundle do
+   SDK instalado** — hoje literalmente no disco, em `node_modules/@urbiverso/sdk/` e na versão que o
+   `package.json` fixa; se a resposta não está ali, ela não existe para a app.
 3. **Atestar `bloqueantes=0` lendo só um canal do Codex.** Três achados reais parados 5 horas — o
    Codex publicou só em `get_review_comments`, e quem leu só `get_comments` viu silêncio. Defesa:
    **sempre os dois canais, na mesma passada** — silêncio num não é ausência de achado no outro.
@@ -699,12 +700,28 @@ proxy dá **403 no CONNECT** —, e **subagente nativo** quando não houver, **d
 como menos adversarial, por revisar patch escrito pela mesma família de modelo. O App **não
 dispensa** a fan-out: neste repositório os dois acharam classes de defeito diferentes.
 
-**A camada de contratos não roda neste ambiente, e isso é estrutural.** Ela lê
-`node_modules/@urbiverso/sdk/docs/`, e aqui **tanto o `pnpm install` quanto o `npm view
-@urbiverso/sdk` dão 401** — o SDK é GitHub Packages privado. Toda revisão vai trazer
-`contratos=nao-executados`. ⚠️ **Isso vira papel de parede se ninguém cobrar o que ficou
-descoberto:** props de primitivo `urbi-*`, verbos do SDK, e a aderência de `shell_min`/`sdk_min` ao
-que está **publicado** — esta última nem verificável daqui.
+**A camada de contratos roda PELA METADE — e a metade que falta mudou de causa.** O pacote está no
+disco depois do `validar-frontend.sh` — que é o único dos dois que instala; o
+`validar-backend.sh` aborta se ele não tiver rodado antes (§ Validação) —, mas a superfície que a skill lê é
+`node_modules/@urbiverso/sdk/**docs/**`, e o bundle **0.50.3** — a versão que o `package.json` fixa —
+**não tem `docs/` nem `obsolescencias.json`**. Ele traz `README.md`, `package.json` e `dist/`. Medido
+em 2026-09-03.
+
+| Lente de contrato | Superfície | Estado |
+|---|---|---|
+| props de primitivo `urbi-*` | `dist/index.d.ts` (68 `declare class Urbi*`) | ✅ **executável agora** |
+| verbos do SDK, obsolescências | `docs/`, `obsolescencias.json` | ❌ ausentes do 0.50.3 |
+| `shell_min` vs. o que a instância roda | — | pergunta ao autor, nunca ao registry |
+
+Então a atestação continua saindo **`contratos=nao-executados`**, e o relatório diz **qual** metade
+rodou. `contratos=ok` seria uma afirmação plausível e falsa — a classe de defeito que a armadilha 11
+descreve.
+
+> ⚠️ **A causa não é mais o 401, e confundir as duas custa a próxima sessão.** Este parágrafo dizia
+> que a camada não rodava *"e isso é estrutural"*, atribuindo tudo ao SDK ser privado. Com a auth em
+> pé (§ Validação), a causa restante é **a versão fixada**: o `npm view` mostra que versões
+> publicadas mais novas **trazem** `docs/`. Subir o pin é mudança de `package.json`, ou seja de
+> produto — escopo próprio, e o caminho para fechar a outra metade.
 
 **Cópia, não link vivo.** Mudou no monorepo, alguém porta para cá à mão — nada sincroniza sozinho.
 As adaptações deste repo estão marcadas `ADAPTADO` nos dois arquivos, **com o motivo ao lado**. Não
@@ -755,10 +772,44 @@ consegue contornar, e o que ela precisaria. Quem transporta isso para o monorepo
 
 ## Validação no ambiente Claude Code (web/remoto) — NÃO redescobrir isto
 
-⚠️ **Regra de ouro:** neste ambiente o `@urbiverso/sdk` está no GitHub Packages **privado**
-e a auth disponível **não tem acesso** a ele → `pnpm install` sempre falha com **401** e
-aborta o link dos pacotes. **Isso é esperado.** Não perca tempo caçando `GITHUB_TOKEN`,
-configurando `.npmrc` com token, tentando `--offline`, etc. — nada disso destrava o SDK aqui.
+⚠️ **A "regra de ouro" que morava aqui estava ERRADA, e foi corrigida em 2026-09-03.** Ela dizia
+que o `@urbiverso/sdk` era inalcançável neste ambiente e mandava, em caixa alta, **não** perder
+tempo com `.npmrc` nem com token. A premissa era falsa: **`URBIVERSO_PACKAGES_TOKEN` está nas
+variáveis do cloud environment**, e faltava só entregá-lo ao pnpm. Quem paga esse tipo de erro é a
+sessão seguinte, que obedece e não confere — foi o que aconteceu por meses.
+
+**Hoje o SDK é instalado normalmente.** Quem faz isso é `scripts/lib/sdk-auth.sh`, sourced pelo
+`validar-frontend.sh` — e **só por ele**, porque é o único dos dois que chama o pnpm; o
+`validar-backend.sh` confere o que aquele já baixou. Ele é uma função de quatro linhas: passa o
+token como variável de config do npm ao comando, por `env`. **Não escreve arquivo nenhum, não lê nem
+substitui o `~/.npmrc` de ninguém, e o segredo vai no ambiente do filho — não no argv**, que o `ps`
+mostraria para qualquer usuário da máquina. Sem o token no ambiente ele é no-op, e o comportamento
+antigo (401, frontend validável mesmo assim) volta.
+
+> ⚠️ **A primeira versão deste helper escrevia um npmrc temporário, e o desenho estava errado.** Ele
+> custou quatro rodadas de revisão em defeitos DELE — `$HOME` indefinido matando o validador sob
+> `set -u`, guarda de "já tem auth" aceitando valor vazio e placeholder, `head -1` onde o npm usa a
+> última ocorrência, o temp com o segredo vazando na segunda chamada, `cat` sem newline final
+> colando `registry=` na linha do token. Nenhum desses casos existe no problema original; todos
+> vieram da máquina construída para resolvê-lo. **É a armadilha 14 na sua forma mais cara:** a
+> segunda entrada suja da mesma classe pedia inverter o desenho, não somar mais uma guarda.
+
+Consequências que valem em toda sessão com token:
+
+- **`bash scripts/validar-backend.sh` roda inteiro** — as 5 etapas, incluindo o typecheck do backend
+  e o `schema.json` contra o contrato do SDK. *"Não deu para rodar"* deixa de ser desculpa aqui.
+- **A camada de contratos roda pela METADE.** A lente de props de primitivo `urbi-*` passa a ser
+  executável (`dist/index.d.ts`); a de doc do SDK, **não** — o pin `0.50.3` não traz `docs/`. A
+  atestação continua saindo **`contratos=nao-executados`**, e o relatório diz qual metade rodou.
+  Detalhe em § *A revisão em si*.
+- **`node_modules/@urbiverso/sdk/dist/index.d.ts` está no disco** — a fonte canônica de props de
+  primitivo `urbi-*` volta a existir, e ler o monorepo para compensar deixa de ter desculpa.
+
+⚠️ **A versão instalada é a que o `package.json` FIXA** — hoje `@urbiverso/sdk` **`0.50.3`**, exato,
+sem circunflexo. O registry serve versões muito à frente (em 2026-09-03, `56.0.0`); **elas não são a
+autoridade para esta app**. Conferir prop no `latest` é a mesma classe de erro que conferir no `main`
+do monorepo: mede a referência errada. Leia `node_modules/@urbiverso/sdk/`, não o que o `npm view`
+devolve.
 
 **Para mudanças de FRONTEND (a maioria):** o frontend **não importa o SDK**
 (usa o global `window.urbiVerso`), então valida-se 100% só com os pacotes públicos. Use o
@@ -768,11 +819,15 @@ script pronto — é o "caminho simples" que sempre funciona:
 bash scripts/validar-frontend.sh
 ```
 
-Ele roda, em 5 etapas: os **guards estáticos** (aspas curvas em posição de atributo + **JSON
-estrito** em `schema.json`/`manifesto.json`), depois `pnpm install`
-(ignorando o 401 do SDK, que ainda assim baixa lit/typescript/tsx/esbuild para `.pnpm/`), linka
-esses pacotes e executa **typecheck do frontend + testes de frontend + build do bundle
-(esbuild)**. Verde = mudança de frontend validada.
+Ele roda os **guards estáticos** (aspas curvas em posição de atributo + **JSON estrito** em
+`schema.json`/`manifesto.json` + ciclos de FK), depois autentica o SDK
+(`scripts/lib/sdk-auth.sh`) e roda `pnpm install`, linka os pacotes e executa **typecheck do
+frontend + testes de frontend + build do bundle (esbuild) + os guards de UI e de endereços + o
+render em Chromium**. Verde = mudança de frontend validada.
+
+> Este parágrafo dizia "5 etapas" e "ignorando o 401 do SDK". Hoje são **8**, e o 401 não acontece
+> mais quando o token está no ambiente. O `|| true` do install **fica**: sem token o 401 volta, e o
+> frontend continua validável só com os pacotes públicos, porque ele não importa o SDK.
 
 > **Por que o guard de aspas curvas existe:** `variante=”alerta”` (aspa curva, U+201D) deixa o
 > atributo **inerte** — o parser inclui as aspas no valor, ele não casa com nada e o primitivo cai
@@ -840,18 +895,16 @@ bash scripts/validar-backend.sh
 Ele roda **guard de JSON estrito (etapa 0/5, antes do portão do SDK) + typecheck do backend +
 testes de lógica pura das rotas + harness de migrações + guard de `versao`**.
 
-> 🔴 **Esta seção descrevia um estado que a sessão de nuvem não tem — corrigido em 2026-08-21.**
-> O texto dizia que "o `@urbiverso/sdk` **já está** em `node_modules/@urbiverso/sdk`". Numa sessão
-> nova o repositório é clonado do zero e **`node_modules/` não existe**, então o
-> `validar-backend.sh` **aborta na etapa 1/5**, no portão do SDK. Backend, `schema.json` e migração
-> **não têm typecheck aqui** — a validação deles é do autor, no ambiente autenticado, e o PR precisa
-> **declarar isso** em vez de deixar implícito. "Não deu para rodar" nunca é "passou".
+> ⚠️ **Esta nota já foi corrigida DUAS vezes, e a segunda inverteu a primeira.** Em 2026-08-21 ela
+> passou a dizer que o `validar-backend.sh` **abortava na etapa 1/5** numa sessão nova, porque
+> `node_modules/` não existe no clone — o que era verdade, e melhor que o texto anterior. Mas ela
+> concluía que backend, `schema.json` e migração **não têm typecheck aqui**, e atribuía isso ao 401.
+> **Em 2026-09-03 a atribuição caiu:** o 401 vinha de faltar auth, não de faltar acesso, e o token
+> estava no ambiente o tempo todo.
 >
-> Pior: **`npm view @urbiverso/sdk` dá o mesmo `E401`**. Não dá nem para perguntar ao registry o que
-> está publicado — o que também derruba a camada de contratos da revisão (§ Processo obrigatório).
->
-> O que **continua valendo** do texto original é a explicação de *por que ele funcionaria* com o
-> `node_modules` no disco:
+> **Hoje as 5 etapas rodam.** O portão da etapa 1/5 continua existindo — ele é a defesa certa para
+> quando o token **não** estiver lá —, e a mensagem dele agora nomeia essa causa. O que segue
+> valendo é a explicação de *por que* o script funciona uma vez que o `node_modules` está no disco:
 
 - o typecheck do backend só precisa dos **tipos** do SDK (`dist/index.d.ts`) — o que falha com 401 é
   baixar o pacote, não usá-lo depois de baixado;
@@ -869,12 +922,22 @@ barra os dois erros simétricos de versionamento: migração nova **sem** bump d
 > antes de usar (`grep -n "declare class UrbiGraficoArea" -A 30`). Atributo ou elemento inexistente
 > **não dá erro, só não faz nada** — leia antes de presumir.
 >
-> **Sem `node_modules` no disco, essa fonte não existe.** A alternativa é ler
-> `ui/src/urbi-<nome>.ts` no monorepo (leitura é permitida — § O monorepo é só leitura), sabendo que
-> ele está em `main` e **à frente** do SDK publicado. Conferiu por ali, **diga no PR** que a fonte
-> foi o `main` e não o bundle: a prop pode existir lá e não na versão que a instância roda.
+> **Essa fonte existe aqui desde 2026-09-03** — o `validar-frontend.sh` põe o SDK no disco (§ Validação),
+> e a versão é a que o `package.json` fixa (`0.50.3`), que é justamente a autoridade certa.
+>
+> A alternativa antiga — ler `ui/src/urbi-<nome>.ts` no monorepo — **deixou de ter desculpa**. Ela
+> continua permitida (§ O monorepo é só leitura) e continua medindo a referência errada: o `main`
+> está à frente do SDK publicado, que por sua vez está à frente do que esta app fixa. Se ainda
+> assim for a fonte usada, **diga no PR** — a prop pode existir lá e não na versão que a instância
+> roda.
 
-**Continua sendo do autor, no ambiente autenticado:** `urbi-empacotar`, a sincronização de
+> ⚠️ **`urbi-empacotar` saiu da lista de pendências do autor em 2026-09-03.** Ele vem no bundle do
+> SDK (`node_modules/.bin/urbi-empacotar`) e **executa aqui**: medido, ele chega a reprovar por
+> `backend/rotas.js` ausente, que é uma verificação de conteúdo do pacote — não um erro de auth.
+> Rode `pnpm build` antes. O que continua sendo do autor é a **publicação**, que precisa da
+> instância.
+
+**Continua sendo do autor, no ambiente autenticado:** a sincronização de
 `schema.json` pelo SDK (uma migração pode passar aqui e mesmo assim citar coluna que o schema não
 declara) e a execução real das migrações no Postgres. Registre isso no `PROGRESSO.md`/PR. No PC do
 autor o fluxo canônico segue valendo: `pnpm typecheck`, `pnpm build`, `pnpm test`,

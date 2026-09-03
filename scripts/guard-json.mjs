@@ -15,7 +15,8 @@
 // Por que nenhuma validação daqui pegou: o `scripts/validar-schema.mjs` FAZ o
 // parse estrito, mas é a etapa 2/5 do `validar-backend.sh` — e a etapa 1/5
 // aborta com `exit 1` quando `node_modules/@urbiverso/sdk` não existe, que é a
-// regra neste ambiente (SDK privado, 401). Ou seja: o parse nunca chegava a
+// regra até 2026-09-03, quando o SDK passou a ser baixado aqui (a auth existia,
+// e o CLAUDE.md dizia que não). Ou seja: o parse nunca chegava a
 // rodar aqui. Este guard não depende de SDK, de rede nem de `node_modules`,
 // então roda sempre — inclusive no CI de PR.
 //

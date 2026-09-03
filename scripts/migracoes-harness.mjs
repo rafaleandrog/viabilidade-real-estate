@@ -1,7 +1,7 @@
 // Harness de migrações — roda as migrações fora do UrbiVerso, sem o SDK.
 //
-// Por que existe: `urbi-empacotar` e a execução real das migrações exigem o
-// ambiente autenticado do autor, mas a superfície que uma migração usa é
+// Por que existe: a execução real das migrações exige o banco da instância, ou
+// seja o ambiente do autor, mas a superfície que uma migração usa é
 // minúscula — `dados.listar` / `dados.varrerTudo` / `dados.atualizar` /
 // `dados.criar` / `dados.limparColuna` / `dados.limparTabela` — e o módulo é
 // JS puro (`export default async function ({ dados })`). Dá para exercitá-las

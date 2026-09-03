@@ -2,12 +2,16 @@
 # Validação de mudanças de FRONTEND no ambiente Claude Code (web/remoto).
 #
 # Por que este script existe:
-#   O `@urbiverso/sdk` só está no GitHub Packages (privado) e a auth deste
-#   ambiente NÃO tem acesso a ele → `pnpm install` sempre termina em 401 e aborta
-#   o LINK dos pacotes. Porém, antes de falhar, o pnpm já baixa os pacotes PÚBLICOS
-#   (lit, typescript, tsx, esbuild, @types/*) para `node_modules/.pnpm/`.
-#   O frontend deste app NÃO importa o SDK (usa o global `window.urbiVerso`), então
-#   dá para validar 100% do frontend só com esses pacotes públicos.
+#   O frontend deste app NÃO importa o `@urbiverso/sdk` (usa o global
+#   `window.urbiVerso`), então ele valida com os pacotes públicos — lit,
+#   typescript, tsx, esbuild, @types/*.
+#
+#   ⚠️ Este cabeçalho dizia, até 2026-09-03, que o `pnpm install` "sempre termina
+#   em 401 e aborta o LINK dos pacotes", e que isso era esperado. NÃO É MAIS: o
+#   `scripts/lib/sdk-auth.sh` entrega o `URBIVERSO_PACKAGES_TOKEN` do ambiente ao
+#   pnpm, e o install termina limpo, com o SDK no disco. O que mudou não foi a
+#   plataforma — foi a descoberta de que o token estava lá o tempo todo. Onde o
+#   token não existir, o helper é no-op e o comportamento antigo volta.
 #
 # O que faz (o "caminho simples" — não perca tempo redescobrindo auth/token):
 #   1. guards estáticos: aspas curvas em posição de atributo (#162 — bug que nenhuma
@@ -15,7 +19,7 @@
 #      estrito em schema.json/manifesto.json (comentário `//` neles reprova o pacote
 #      na instalação — foi o que derrubou a v0.1.19) e ciclo de FK no schema.json
 #      (quebra a instalação numa instância virgem, e só lá);
-#   2. roda `pnpm install` (a falha de 401 do SDK é ESPERADA e ignorada);
+#   2. autentica o SDK (scripts/lib/sdk-auth.sh) e roda `pnpm install`;
 #   3. cria os symlinks de topo dos pacotes públicos a partir de `.pnpm/`;
 #   4. guards de UI contra o espelho `docs/ui-urbiverso/`: token que não existe,
 #      atributo que o primitivo não declara, `width`/`height` de fora num
@@ -44,8 +48,10 @@
 #      Depende do Playwright, que NÃO é dependência do produto: sem ele a etapa
 #      PULA com aviso alto. No CI ela é obrigatória (job `render`).
 #
-# Backend / `urbi-empacotar` / typecheck do backend precisam do SDK → só rodam no
-# ambiente autenticado do autor. Para mudanças de frontend, este script basta.
+# Backend, typecheck do backend e `urbi-empacotar` precisam do SDK — e desde
+# 2026-09-03 ele É baixado aqui (a etapa 2 autentica). Rode `scripts/validar-backend.sh`
+# depois deste; para mudanças só de frontend, este basta. O que continua sendo do
+# autor é a sincronização do schema.json pelo SDK e a execução real das migrações.
 #
 # Uso:  bash scripts/validar-frontend.sh
 set -uo pipefail
@@ -123,8 +129,17 @@ echo "  ok: nenhuma aspa curva em atributo"
 #     caixa maior que o pedido, e pinta sobre o vizinho (o urbi-kpi, quatro vezes
 #     reportado: #176, #262, #326, #352).
 # Nenhuma delas aparece no typecheck, nos testes ou no esbuild.
-echo "== 2/8 pnpm install (401 do @urbiverso/sdk é esperado e ignorado) =="
-pnpm install >/dev/null 2>&1 || true
+echo "== 2/8 pnpm install =="
+# A auth do SDK vem daqui: sem ela o install termina em 401 e o `node_modules/
+# @urbiverso/sdk` não existe — que é o que fazia `validar-backend.sh` abortar na
+# etapa 1/5 e toda revisão sair com `contratos=nao-executados`.
+# `$raiz`, não `$(dirname "$0")`: a linha 56 já fez `cd`, e o $0 aponta para um
+# diretório que não é mais a cwd — o source falharia CALADO (não há `set -e`).
+. "$raiz/scripts/lib/sdk-auth.sh"
+# O `|| true` FICA: sem token o 401 volta a acontecer, e o frontend continua
+# validável só com os pacotes públicos, que é o caso que este script atende
+# desde sempre. Quem depende do SDK é o validar-backend.sh, e ele tem gate próprio.
+urbi_pnpm_install >/dev/null 2>&1 || true
 if [ ! -d node_modules/.pnpm ]; then
   echo "ERRO: node_modules/.pnpm não existe — o pnpm não conseguiu baixar nem os pacotes públicos (sem rede?)." >&2
   exit 1

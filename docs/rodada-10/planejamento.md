@@ -90,7 +90,9 @@ Processo por PR: o obrigatório do `CLAUDE.md` (branch própria de `origin/main`
 `validar-frontend.sh`, corpo em arquivo + `preflight-pr.mjs`, PR via MCP, revisão via skill
 `revisar-pr-apps` com `@codex review` em todos, merge pela sessão com autorização do autor de
 2026-08-26 — condicionado a zero bloqueantes e às condições-padrão do § Merge). PRs com
-schema/migração declaram a validação de backend pendente do autor (SDK 401 na sessão de nuvem).
+schema/migração declaravam a validação de backend pendente do autor (SDK 401 na sessão de nuvem).
+⚠️ Isso valeu até 2026-09-03: com a auth em `scripts/lib/sdk-auth.sh`, `validar-backend.sh` roda as
+5 etapas aqui, e o PR que declarar backend "pendente" a partir daí está errado.
 
 ## Fora do escopo
 

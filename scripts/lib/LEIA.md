@@ -10,6 +10,18 @@ Cada um exporta funções puras, sem efeito colateral, sem ler `process.argv` e 
 | Módulo | Quem importa | O que resolve |
 |---|---|---|
 | `fonte-ts.mjs` | `guard-tokens-css.mjs` · `guard-props-urbi.mjs` · `guard-box-model-urbi.mjs` | Onde termina um comentário, uma string, um template e um `${…}` — **nas três linguagens que vivem num `.ts` deste app** |
+| `sdk-auth.sh` | `validar-frontend.sh` | `urbi_pnpm_install` — roda o `pnpm install` com o `URBIVERSO_PACKAGES_TOKEN` do ambiente, para o `@urbiverso/sdk` (GitHub Packages privado) ser baixado |
+
+✅ **`sdk-auth.sh` cumpre a regra inteira, e isso não foi de graça.** Ele exporta uma função só —
+`urbi_pnpm_install` —, que roda o `pnpm install` com o token do ambiente passado por `env`. Não
+escreve arquivo, não exporta variável para o resto do script, não instala `trap`, e **não se invoca
+sozinho**: o `source` só define, e quem chama é o validador.
+
+A primeira versão dele não era assim: escrevia um npmrc temporário, exportava `NPM_CONFIG_USERCONFIG`
+e instalava um `trap EXIT` — três efeitos colaterais, declarados aqui como exceção. Quatro rodadas de
+revisão depois, todos os defeitos achados eram **daquela máquina**, nenhum do problema que ela
+resolvia. A exceção sumiu junto com ela, e é por isso que esta linha existe: **exceção a esta regra é
+sinal de desenho errado antes de ser sinal de necessidade real.**
 
 O `fonte-ts.test.mjs` daqui não é exceção à regra: quem o roda é o `node --test`, chamado por
 `scripts/testar-fonte-ts.sh`.

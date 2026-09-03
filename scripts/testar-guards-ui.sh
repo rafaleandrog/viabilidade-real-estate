@@ -51,7 +51,8 @@ TOTAL=0
 # ⚠️ HONRA o `URBI_TYPESCRIPT` herdado antes de cair no `node_modules` da raiz.
 # A versão anterior SOBRESCREVIA a variável com o caminho da raiz — e no CI o
 # `typescript` é instalado isolado, em `.ts-guards/`, justamente para não ler o
-# `package.json` do repo e tomar 401 do SDK privado. Resultado: o job definia a
+# `package.json` do repo e tomar 401 do SDK privado (o 401 acabou em 2026-09-03,
+# mas a armadilha do diretório não). Resultado: o job definia a
 # variável certa, a bateria a jogava fora, procurava na raiz, não achava e
 # reprovava. Verde local, vermelho no CI.
 if [ -n "${URBI_TYPESCRIPT:-}" ] && [ -f "${URBI_TYPESCRIPT}" ]; then

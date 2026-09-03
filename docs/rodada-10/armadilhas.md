@@ -27,10 +27,13 @@ nome". (É o critério (c) do `CLAUDE.md` do monorepo sobre lista de exceção m
 código entregava a origem: citava `docs/shell/banco-de-dados.md` *"no monorepo"*.
 **Defesa:** a autoridade é o **bundle do SDK instalado**. Se a resposta não está ali, ela NÃO EXISTE
 para a app — a pergunta vira "quando isso é publicado?", não "deixa eu ver no shell".
-**Agravante que torna isto invisível:** neste ambiente o SDK dá **401**, então `req.dados` erra em
-TODO acesso e o erro do método ausente fica camuflado no ruído. O corpo do PR afirmava *"nenhum erro
-novo além dos já esperados por falta do SDK"* — afirmação que **parece medida e não é**. Só o CI, com
-o token, enxerga.
+**Agravante que tornava isto invisível — e que MORREU em 2026-09-03:** o SDK dava **401** neste
+ambiente, então `req.dados` errava em TODO acesso e o erro do método ausente ficava camuflado no
+ruído. O corpo do PR afirmava *"nenhum erro novo além dos já esperados por falta do SDK"* —
+afirmação que **parece medida e não é**. Hoje o `scripts/lib/sdk-auth.sh` põe o bundle no disco e
+`validar-backend.sh` roda o typecheck aqui: o ruído acabou, e a sessão enxerga o mesmo que o CI.
+**A armadilha em si continua valendo** — ela é sobre medir contra o `main` do monorepo em vez do
+bundle fixado, e isso não mudou.
 **Custo:** um ciclo inteiro de CI + reescrita. PR 648.
 
 ## 3 · Atestar `bloqueantes=0` lendo só UM canal do Codex
