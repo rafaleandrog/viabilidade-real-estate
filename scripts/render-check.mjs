@@ -1186,8 +1186,15 @@ export async function verificarRender(opcoes) {
       await pag.waitForFunction(() => document.title === 'pronto' || document.title === 'erro', null, { timeout: 30000 });
       const erroMontagem = await pag.evaluate(() => window.__erroMontagem ?? null);
       if (erroMontagem) throw new Error(`montagem do caso "${caso}" falhou:\n${erroMontagem}`);
-      achados.extra ??= {};
-      achados.extra[largura] = await pag.evaluate(() => window.__extra ?? null);
+      // Só cria o mapa quando o caso de fato declara `medir` — do contrário
+      // todo caso ganharia `extra: { "900": null, ... }` em vez do `null`
+      // documentado em Achados, e um consumidor genérico que testasse
+      // `extra !== null` concluiria (errado) que há sonda para ler.
+      const extraDaLargura = await pag.evaluate(() => window.__extra ?? null);
+      if (extraDaLargura !== null) {
+        achados.extra ??= {};
+        achados.extra[largura] = extraDaLargura;
+      }
 
       // PROVA DE MONTAGEM antes de qualquer medida. Ela LANÇA, e é intencional:
       // "não montou" não é achado a ponderar, é medição inválida. Devolver

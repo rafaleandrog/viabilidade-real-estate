@@ -49,7 +49,18 @@ export const caso = {
   aceitaNaoReproduzido: [
     'urbi-badge.interativo',
   ],
+  // ⚠️ Achado do revisor (Codex, PR 669): registrar o listener só em `medir` —
+  // depois de `montar` e do assentamento inteiro — deixa a janela entre o
+  // PRIMEIRO `.valor=${null}` (dentro de `montar`) e a leitura sem testemunha
+  // nenhuma. Um evento disparado durante o setter ou o ciclo inicial de
+  // `update()` do Lit passaria batido. Por isso o listener mora aqui, em
+  // capture na fase de bubble/composed do próprio `raiz` — ANTES de o
+  // elemento sequer existir — e não em `medir`.
+  _eventoDisparou: false,
   async montar(raiz: HTMLElement): Promise<void> {
+    caso._eventoDisparou = false;
+    raiz.addEventListener('urbi:input-numero-change', () => { caso._eventoDisparou = true; });
+
     (globalThis as any).urbiVerso.api = async () => ({ dados: [] });
     const el = document.createElement('viab-tela-premissas');
     forcarEstado(el, {
@@ -70,8 +81,8 @@ export const caso = {
   },
   // Roda DENTRO do navegador, depois do assentamento (ver
   // `scripts/render-check.mjs`) — é o que permite ler o `<input>` real de um
-  // `viab-num` aninhado em shadow root, e escutar o evento que ele NÃO deve
-  // disparar sozinho ao receber a prop nova.
+  // `viab-num` aninhado em shadow root. O evento em si já foi capturado (ou
+  // não) por `montar`, bem antes deste ponto — ver o comentário acima.
   async medir(raiz: HTMLElement): Promise<{ valorInput: string; eventoDisparou: boolean }> {
     const tela = raiz.querySelector('viab-tela-premissas')!;
     const campos = [...tela.shadowRoot!.querySelectorAll('div.campo-unidade')];
@@ -81,12 +92,6 @@ export const caso = {
     const num = permutaFisica.querySelector('viab-num.cu-valor')!;
     const input = num.shadowRoot!.querySelector('input') as HTMLInputElement;
 
-    let eventoDisparou = false;
-    num.addEventListener('urbi:input-numero-change', () => { eventoDisparou = true; });
-    // Duas voltas de rAF: qualquer disparo espúrio na própria montagem/
-    // assentamento já teria acontecido a esta altura.
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-    return { valorInput: input.value, eventoDisparou };
+    return { valorInput: input.value, eventoDisparou: caso._eventoDisparou };
   },
 };
