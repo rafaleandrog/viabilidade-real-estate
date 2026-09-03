@@ -66,7 +66,7 @@
 # justamente onde token e `~/.npmrc` pessoal coexistem. Medido na época: um
 # `registry` de mirror interno, `proxy` e `cafile` corporativo eram descartados
 # durante o install. *"Nunca toca no `~/.npmrc`"* continua literalmente verdade —
-# mas não escrever não bastava; o que faltava era não SOMIR com ele.
+# mas não escrever não bastava; o que faltava era não SUMIR com ele.
 #
 # Uso:  . "$raiz"/scripts/lib/sdk-auth.sh
 #       urbi_sdk_auth
@@ -88,17 +88,28 @@ urbi_sdk_auth_npmrc() {
 # Verdadeiro só quando o npmrc efetivo carrega um token USÁVEL para o GitHub
 # Packages — não basta a chave existir (ver a nota de fail-closed no cabeçalho).
 #
-# ⚠️ O parsing acompanha o que o ini do npm aceita, e cada tolerância aqui foi um
-# falso veredito medido: espaço em volta do `=`, linha indentada, aspas no valor,
-# e a chave com ou sem o `//` inicial. Do outro lado, o que NÃO é auth: valor
-# vazio e placeholder não resolvido — em `${VAR}` **e** em `$VAR`. O npm expande
-# só a primeira forma (`envReplace`), então `$NODE_AUTH_TOKEN` viajaria literal,
+# ⚠️ O parsing acompanha o que o ini do npm aceita: espaço em volta do `=`, linha
+# indentada, aspas no valor. Do outro lado, o que NÃO é auth: valor vazio e
+# placeholder não resolvido — em `${VAR}` **e** em `$VAR`. O npm expande só a
+# primeira forma (`envReplace`), então `$NODE_AUTH_TOKEN` viajaria literal,
 # tomaria 401, e a guarda diria "já tem auth" suprimindo o token bom do ambiente.
+#
+# ⚠️ **O `//` inicial é OBRIGATÓRIO, e uma versão anterior o tornou opcional
+# alegando que a tolerância vinha de "um falso veredito medido".** Não vinha: a
+# medição diz o contrário — com `npm.pkg.github.com/:_authToken=…`, sem as barras,
+# o npm **não manda header de auth nenhum**. Aceitar aquela forma era fail-OPEN,
+# desfazendo a própria inversão que este cabeçalho declara.
+#
+# ⚠️ **`tail -1`, não `head -1`: o npm resolve chave repetida pela ÚLTIMA
+# ocorrência.** Com um token bom seguido de um vazio, ler a primeira faria a
+# guarda dizer "já tem auth" sobre um npmrc que não autentica. E é a mesma
+# semântica de que a cópia abaixo depende: ela acrescenta a linha do token no FIM
+# justamente para vencer o que veio do npmrc do usuário.
 urbi_sdk_auth_ja_configurada() {
   local arq valor
   arq="$(urbi_sdk_auth_npmrc)"
   [ -f "$arq" ] || return 1
-  valor="$(sed -n 's|^[[:space:]]*\(//\)\{0,1\}npm\.pkg\.github\.com/:_authToken[[:space:]]*=[[:space:]]*||p' "$arq" | head -1)"
+  valor="$(sed -n 's|^[[:space:]]*//npm\.pkg\.github\.com/:_authToken[[:space:]]*=[[:space:]]*||p' "$arq" | tail -1)"
   valor="${valor%\"}"; valor="${valor#\"}"
   valor="${valor%\'}"; valor="${valor#\'}"
   case "$valor" in ''|'${'*|'$'*) return 1 ;; esac
@@ -115,6 +126,17 @@ urbi_sdk_auth() {
     echo "         e nenhum token usável no npmrc) — o @urbiverso/sdk não será baixado," >&2
     echo "         e o typecheck do backend não roda." >&2
     return 0
+  fi
+
+  # Segunda invocação na mesma shell: apaga o temp da primeira ANTES de criar o
+  # novo. Sem isto o `trap` e o `URBI_SDK_AUTH_RC` são sobrescritos e o primeiro
+  # arquivo — com o token em claro — sobrevive ao processo. Também é o que impede
+  # o auto-`cat` (`origem` seria o `$rc` anterior): `cat f > f` devolve 0 e deixa
+  # o arquivo VAZIO, sem erro, e a config do usuário sumiria calada.
+  if [ -n "${URBI_SDK_AUTH_RC:-}" ]; then
+    [ "${NPM_CONFIG_USERCONFIG:-}" = "$URBI_SDK_AUTH_RC" ] && unset NPM_CONFIG_USERCONFIG
+    rm -f "$URBI_SDK_AUTH_RC"
+    unset URBI_SDK_AUTH_RC
   fi
 
   local rc
