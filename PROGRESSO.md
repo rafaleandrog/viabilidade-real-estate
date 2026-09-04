@@ -4,6 +4,46 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Financiamento à produção vira operação ÚNICA e fixa, com checkbox ligar/desligar — #587 (2026-09-04)
+
+Antes, a aba de Financiamento à produção (FàP) era só mais uma aba de tipo, atrás da mesma
+lista/botão "Adicionar" de Dívida e Equity — mesmo já sendo ÚNICA por estudo desde o nascimento do
+modelo de 3 operações (#355, `conflitoFinanciamentoUnico` em `backend/rotas/funding.ts`, presente
+desde o primeiro commit da reescrita). Decisão do autor: a aba mostra sempre um formulário único,
+nunca lista, nunca botão adicionar — e ganha um checkbox "Ativo" para ligar/desligar sem apagar os
+parâmetros.
+
+**Coluna `ativo` genérica no schema, uso restrito no backend.** `avancado_funding_operacoes.ativo`
+(booleano, padrão `true`) existe nas 3 linhas de tipo — a tabela é compartilhada —, mas
+`validarCamposOperacao` (`backend/rotas/funding.ts`) só a aceita em `financiamento_producao`;
+Dívida/Equity continuam se resolvendo por existir/não existir a linha, sem status (a mesma razão
+pela qual a linha de crédito rotativa foi recusada na Rodada 8 — decisão 2). Migração `039`,
+forward-only, no-op: `true` em toda operação existente não muda comportamento de nenhum estudo.
+
+**Desligada não move nenhum número.** `simularFinanciamentoProducao` corta ANTES de qualquer conta
+quando `ativo === false` — todas as séries (entradas, saídas, juros, saldo, fluxoInvestidor) saem
+zeradas, mesmo com custo elegível e caixa disponível reais. E o horizonte do fluxo de caixa
+(`fluxo-caixa-motor.ts`, `ultimoFunding`) filtra operações desligadas antes de esticar o prazo — uma
+FàP desligada não pode alongar o Fluxo de Caixa com meses sem nenhum lançamento.
+
+**A tela cria a operação sozinha, desligada, na primeira carga editável** (`_garantirFinanciamento`)
+— nenhum estudo antigo precisa de migração de dado para ganhar a aba nova, e a criação é guardada
+contra duplicidade (`criandoFinanciamento`) porque é assíncrona e `_carregar` pode disparar de novo
+antes da resposta voltar.
+
+**A prova de fiação do checkbox precisou de um caso de render** — `funding-fap-checkbox.ts` —
+porque nenhum teste de função pura alcança "o clique do checkbox manda `ativo` para a API". Uma
+armadilha nova aqui: `urbi-checkbox` no stub do harness tem área ZERO (`:host{display:inline-block}`
+sem largura mínima, e o stub só pinta `rotulo`/`valor`, não `label`) — exigir o checkbox VISÍVEL no
+`exigir` reprova sempre, mesmo montado e funcionando; a prova certa é `medir()` achando o nó por
+`querySelector` (que enxerga oculto) e a visibilidade fica por conta de `urbi-card`.
+
+Efeito colateral do diff em `funding-motor.ts`/`funding.ts`/`fluxo-caixa-motor.ts`: deslocou ~20
+citações `arquivo:linha` em docs e comentários espalhados pelo repo (armadilha 2 do CLAUDE.md) —
+todas reconferidas e corrigidas no mesmo PR, `guard-enderecos-doc` limpo.
+
+---
+
 ## A linha do Painel de estudos: Status vira badge, nome vira editável — #659 + #660 (2026-09-02)
 
 Dois pedidos do autor sobre a **mesma linha** da mesma tela, e é por isso que vieram no mesmo PR:

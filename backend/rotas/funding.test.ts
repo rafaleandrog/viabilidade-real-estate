@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validarCamposOperacao, conflitoFinanciamentoUnico, somaRetornoExcede } from './funding.js';
+import {
+  validarCamposOperacao, conflitoFinanciamentoUnico, somaRetornoExcede, remocaoFinanciamentoBloqueada,
+} from './funding.js';
 
 // #355 — validação das operações de Funding. Só lógica pura: as rotas em si
 // exigem servidor e banco, que este ambiente não sobe (ver CLAUDE.md).
@@ -102,6 +104,66 @@ test('#355 custo_linha_ids precisa ser uma lista de números', () => {
 test('#355 amortizar_com_caixa_disponivel não passa pela checagem numérica (é booleano)', () => {
   assert.equal(validarCamposOperacao({ amortizar_com_caixa_disponivel: true }), null);
   assert.equal(validarCamposOperacao({ amortizar_com_caixa_disponivel: false }), null);
+});
+
+// ── #587 — `ativo`, genérico na coluna, restrito ao Financiamento à produção ──
+
+test('#587 ativo é aceito em financiamento_producao, ligado ou desligado', () => {
+  assert.equal(validarCamposOperacao({ tipo: 'financiamento_producao', ativo: true }), null);
+  assert.equal(validarCamposOperacao({ tipo: 'financiamento_producao', ativo: false }), null);
+});
+
+test('#587 ativo é recusado em divida e equity — o produto não tem status', () => {
+  for (const tipo of ['divida', 'equity']) {
+    const msg = validarCamposOperacao({ tipo, ativo: false });
+    assert.ok(msg, `tipo=${tipo} devia recusar`);
+    assert.match(msg!, /ativo.*Financiamento à produção/);
+  }
+});
+
+test('#587 ativo não numérico/string não passa como booleano válido', () => {
+  const msg = validarCamposOperacao({ tipo: 'financiamento_producao', ativo: 'sim' as any });
+  assert.ok(msg);
+  assert.match(msg!, /booleano/);
+});
+
+test('#587 PATCH: a checagem usa o TIPO FINAL (atual + patch), não só o corpo do patch', () => {
+  // Simula a chamada real do handler PATCH: validarCamposOperacao({ ...operacao, ...dados }).
+  // Um PATCH que manda só `{ ativo: false }` numa operação de dívida tem de
+  // recusar mesmo sem repetir `tipo` no corpo.
+  const operacaoExistente = { id: 1, tipo: 'divida', nome: 'Dívida A' };
+  const patch = { ativo: false };
+  const msg = validarCamposOperacao({ ...operacaoExistente, ...patch });
+  assert.ok(msg);
+  assert.match(msg!, /Financiamento à produção/);
+});
+
+test('#587 (achado do Codex, PR 671): PATCH que não toca `ativo` numa Dívida/Equity EXISTENTE não pode recusar', () => {
+  // Toda linha da tabela nasce com `ativo: true` (padrão do schema.json) —
+  // inclusive Dívida/Equity, onde o campo é inerte. `operacaoExistente`
+  // simula o que `req.dados!.buscar` devolve depois da migração 039: já traz
+  // `ativo: true`, mesmo sem o cliente nunca ter mandado esse campo. Um PATCH
+  // que só renomeia a operação (sem tocar `ativo`) tem que passar — testar
+  // `dados.ativo !== undefined` no estado FINAL rejeitaria isso sempre,
+  // porque o `ativo: true` herdado da linha nunca é `undefined`.
+  const operacaoExistente = { id: 2, tipo: 'divida', nome: 'Dívida A', ativo: true };
+  const patch = { nome: 'Dívida A renomeada' };
+  const msg = validarCamposOperacao({ ...operacaoExistente, ...patch });
+  assert.equal(msg, null, `PATCH que não toca ativo não pode ser recusado, e foi: ${msg}`);
+});
+
+test('#587: `ativo: true` explícito em Dívida/Equity é um no-op harmless, não erro', () => {
+  // Só `false` ("desligar") não faz sentido fora da FàP. `true` é o estado
+  // default e nunca precisa de bloqueio.
+  for (const tipo of ['divida', 'equity']) {
+    assert.equal(validarCamposOperacao({ tipo, ativo: true }), null);
+  }
+});
+
+test('#587 remocaoFinanciamentoBloqueada: só o Financiamento à produção é fixo', () => {
+  assert.equal(remocaoFinanciamentoBloqueada({ tipo: 'financiamento_producao' }), true);
+  assert.equal(remocaoFinanciamentoBloqueada({ tipo: 'divida' }), false);
+  assert.equal(remocaoFinanciamentoBloqueada({ tipo: 'equity' }), false);
 });
 
 // ── #435 — teto de `Σ pct_retorno` ────────────────────────────────────────

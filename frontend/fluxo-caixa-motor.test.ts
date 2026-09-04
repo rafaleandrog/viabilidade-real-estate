@@ -3317,6 +3317,20 @@ test('#446: estudo SEM funding tem horizonte idêntico ao baseline', () => {
   assert.deepEqual(semCampo.fluxoMensal, comCampoVazio.fluxoMensal);
 });
 
+test('#587: financiamento_producao DESLIGADA (ativo=false) não estica o horizonte', () => {
+  const ligada = calcularFluxo({
+    ...baseAte23(),
+    operacoesFunding: [{ tipo: 'financiamento_producao', inicio_mes: 40, ativo: true } as any],
+  });
+  const desligada = calcularFluxo({
+    ...baseAte23(),
+    operacoesFunding: [{ tipo: 'financiamento_producao', inicio_mes: 40, ativo: false } as any],
+  });
+  const semFunding = calcularFluxo(baseAte23());
+  assert.notEqual(ligada.prazo, semFunding.prazo, 'ancoragem: ligada tem que esticar, senão o teste não prova nada');
+  assert.equal(desligada.prazo, semFunding.prazo, 'desligada não pode esticar o horizonte além do operacional');
+});
+
 test('#446: esticar o horizonte NÃO move o resultado final desalavancado (#474)', () => {
   // Por que este teste existe: quatro telas (Resumo, Dashboard, Análise de
   // Mercado, Orçamento de Custos) leem o fluxo DESALAVANCADO e, de propósito,

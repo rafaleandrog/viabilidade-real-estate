@@ -553,7 +553,7 @@ export function validarFunding(
     // issue — ela não tem checagem hoje e não ganha uma aqui).
     if (s.operacao.tipo === 'equity') {
       // (a) RETORNO_EQUITY_NEGATIVO — erro. No modo `resultado_final`
-      // (`funding-motor.ts:564`) um `resultadoFinal` negativo produz saída
+      // (`funding-motor.ts:591`) um `resultadoFinal` negativo produz saída
       // negativa sem clamp. No modo progressivo (`funding-motor.ts:439-486`, decisão #432)
       // há clamp + carry-forward do déficit — não deveria acontecer, mas a
       // checagem cobre os dois modos porque lê `saidas` diretamente, sem
@@ -596,7 +596,7 @@ export function validarFunding(
 
   // (b) RETORNO_EQUITY_EXCEDE_RECEITA — alerta. Leitura MENSAL do teto de
   // 100% de `pct_retorno` (a leitura NOMINAL é a #435). Só operações de
-  // equity em modo `permuta_financeira` — o default de `funding-motor.ts:505`
+  // equity em modo `permuta_financeira` — o default de `funding-motor.ts:554`
   // quando `modo_retorno` é nulo/ausente, repetido aqui de propósito: sem
   // repetir o default, a operação legada sem `modo_retorno` escaparia da
   // checagem. `resultado_final` fica de fora — é pagamento único no repasse,

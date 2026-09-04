@@ -165,7 +165,7 @@ Com `ini = C9 + SE(C10; C11; 1)` e `fim = ini − 1 + C13`:
 | G — Fluxo investidor | `E − B` |
 
 Juros incidem sobre o saldo de **abertura** e só dentro da janela da operação. Implementação:
-`simularDivida` (`funding-motor.ts:299`).
+`simularDivida` (`funding-motor.ts:310`).
 
 > ⚠️ **Emenda do app — tarifas/estruturação/encargos (#478), a planilha NÃO modela isto.** A aba
 > `divida` da `fluxo_investidor_FORMULAS` tem exatamente as entradas `C8:C14` acima — nenhuma
@@ -181,7 +181,7 @@ Juros incidem sobre o saldo de **abertura** e só dentro da janela da operação
 > `MAX(0; saldo_ant + B + D − PMT)` sem nenhum termo de tarifa. A única coisa que a planilha
 > sustenta aqui é a **restrição estrutural**: tarifa não é nem principal (não soma em F) nem juros
 > (D continua sendo só `saldo_ant × C15`) — a generalização de `Σ E − Σ B = Σ D` vira
-> `Σ saídas − Σ B = Σ D + Σ tarifas`. Implementação: `simularDivida` (`funding-motor.ts:299`),
+> `Σ saídas − Σ B = Σ D + Σ tarifas`. Implementação: `simularDivida` (`funding-motor.ts:310`),
 > campo `tarifas` de `SerieOperacao`.
 
 ### 4.2 Equity (aba `equity` da planilha)
@@ -252,18 +252,18 @@ retorno.
 > `capital-stack-motor.ts` antes da #355 — aquele era um `Math.max(0, …)` seco, **sem memória de
 > déficit**, e teria produzido um total pago maior. O precedente interno do clamp (sem a memória) é
 > `frontend/fluxo-caixa-motor.ts:2125`, em `permutaFinanceiraLiquidaMensal` (`:1576-1587`). Implementação:
-> `simularEquity` (`funding-motor.ts:516`).
+> `simularEquity` (`funding-motor.ts:543`).
 
 **Decisão D8 — as premissas do projeto não são redigitadas.** A aba `equity` da planilha pede de
 novo VGV, % entrada/parcelas/repasse, corretagem, marketing, impostos, duração da obra e mês do
 repasse (`C4`–`C19`). O app **deriva tudo do próprio estudo**: `receitaLiquidaMensal`,
 `resultadoFinal` e `mesRepasseValor` chegam prontos a `simularEquity` por
-`fundingDoEstudo` (`funding-motor.ts:861`). Redigitar criaria uma segunda fonte de verdade,
+`fundingDoEstudo` (`funding-motor.ts:888`). Redigitar criaria uma segunda fonte de verdade,
 divergindo em silêncio da aba Resultados — exatamente o que as #349/#351 eliminaram.
 
 O invariante da curva vale como conferência: `Σ receita bruta = VGV`.
 
-Implementação: `simularEquity` (`funding-motor.ts:516`).
+Implementação: `simularEquity` (`funding-motor.ts:543`).
 
 > ⚠️ **#467 — o `+1` de `mesRepasse` existe para CANCELAR uma segunda divergência, não para
 > corrigi-la.** Esta é a nota que a advertência sobre `C8`, mais acima nesta seção, promete.
@@ -311,13 +311,13 @@ documento que continua vigente:
 Por isso é a **única** operação cujo desembolso e amortização dependem do fluxo de caixa do projeto;
 `divida` e `equity` seguem a matemática desta planilha sem checar caixa.
 
-Implementação: `simularFinanciamentoProducao` (`funding-motor.ts:398`) — a matemática da §4.3 foi
+Implementação: `simularFinanciamentoProducao` (`funding-motor.ts:409`) — a matemática da §4.3 foi
 apenas **realocada** de `capital-stack-motor.ts`, não reescrita. Oráculo próprio:
 `frontend/financiamento-producao-golden.test.ts` (80 períodos do cenário real, tolerância R$ 0,15).
 
 ## 5. Indicadores do investidor
 
-`indicadoresOperacao` (`funding-motor.ts:615`) devolve, na visão do investidor: investimento total
+`indicadoresOperacao` (`funding-motor.ts:642`) devolve, na visão do investidor: investimento total
 (negativo), retorno total, juros pagos, lucro, VPL, TIR mensal e anual, MOIC e payback.
 
 **Duas divergências deliberadas em relação à planilha:**
@@ -361,7 +361,7 @@ meses, lançamento no mês 2, obra 30, repasse no 32, 20% entrada / 30% parcelas
 
 ## 7. Como o funding entra na tabela de Resultados
 
-A costura é `FundingNoFluxo` (`funding-motor.ts:806`), criada pela #349 e preservada de propósito
+A costura é `FundingNoFluxo` (`funding-motor.ts:833`), criada pela #349 e preservada de propósito
 pela reescrita: as liberações/aportes entram como categoria de receita e as parcelas/retornos como
 categoria de custo, dentro da tabela principal — não há segunda tabela.
 

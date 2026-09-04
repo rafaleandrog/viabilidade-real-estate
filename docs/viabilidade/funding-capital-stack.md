@@ -74,7 +74,7 @@ ordem: 8
 > O vocabulário das `opcoes` de `tipo` (`schema.json:384`) —
 > `["financiamento_producao","capital_giro","preferred_equity","sponsor_equity"]` — é do modelo
 > apagado pela #355 e **não descreve nenhum tipo aceito hoje**. Os tipos vigentes são
-> `['financiamento_producao', 'divida', 'equity']` (`backend/rotas/funding.ts:43`), e a API
+> `['financiamento_producao', 'divida', 'equity']` (`backend/rotas/funding.ts:66`), e a API
 > **recusa** `capital_giro` explicitamente (`backend/rotas/funding.test.ts:23-30`). O produto
 > "capital de giro" existe, sob o tipo `divida` — ver a **#466**.
 
