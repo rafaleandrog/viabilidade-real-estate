@@ -366,7 +366,7 @@ for (const [padrao, cfg] of PADROES) {
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // MEDIDO: ele NÃO EXISTE, e a razão é estrutural, não sorte.
-// `_fundingCalcDe` (`frontend/tela-cenarios.ts:276-285`) decide por
+// `_fundingCalcDe` (`frontend/tela-cenarios.ts:292-301`) decide por
 // `this.operacoes.length === 0` — o MESMO campo para a base e para o cenário.
 // As duas leituras da tela sempre têm o mesmo conjunto de operações; o que
 // muda entre elas é o FLUXO sobre o qual o funding é simulado, nunca a
