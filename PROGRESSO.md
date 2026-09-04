@@ -27,6 +27,9 @@ Proforma, decisão do autor).
 
 Este PR não teve conserto de código — só a atualização de processo que o critério 3 pede: a tabela
 de backlog do `CLAUDE.md` (Rodada 10 de 🔄 para ✅) e este parágrafo.
+
+---
+
 ## Financiamento à produção vira operação ÚNICA e fixa, com checkbox ligar/desligar — #587 (2026-09-04)
 
 Antes, a aba de Financiamento à produção (FàP) era só mais uma aba de tipo, atrás da mesma
