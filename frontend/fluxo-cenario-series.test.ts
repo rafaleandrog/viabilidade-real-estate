@@ -281,10 +281,12 @@ test('#595 fiação: a aba Cenários monta o card por comparacaoCenario', () => 
 });
 
 test('#595 fiação: a cor das duas séries vem do CSS, não de uma chave no dado', () => {
-  // A chave `cor` dentro de `series` é o que a #595 tirou: o espelho declara
-  // `series` como Array e NÃO declara a forma dos itens, então o app não tem
-  // como afirmar que ela é honrada — e uma string `var(...)` entregue como dado
-  // é inválida se o primitivo a injetar num atributo de apresentação SVG.
+  // A chave `cor` dentro de `series` é o que a #595 tirou — não porque o
+  // primitivo IGNORE `cor` (o `dist/index.d.ts` do SDK confirma que
+  // `series[i].cor` é honrada), mas porque o canal certo pra uma referência a
+  // variável CSS é uma PROPRIEDADE CSS, não uma string dentro do dado: uma
+  // string `var(...)` entregue como dado é inválida se o primitivo a injetar
+  // num atributo de apresentação SVG (`stroke="var(...)"`).
   const bloco = TELA.slice(TELA.indexOf('<urbi-grafico-linha'), TELA.indexOf('</urbi-grafico-linha>'));
   assert.ok(bloco.length > 0, 'o urbi-grafico-linha sumiu da aba Cenários');
   assert.ok(

@@ -95,19 +95,20 @@ export class ViabTelaCenarios extends LitElement {
     .topo { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 16px; align-items: start; }
     @media (max-width: 860px) { .topo { grid-template-columns: 1fr; } }
     .graf-wrap { overflow-x: auto; }
-    /* #595: a cor de cada serie sai DAQUI, e nao de uma chave "cor" no dado.
-       O espelho docs/ui-urbiverso/primitivos.json declara "series" como Array e
-       NAO declara a forma dos itens — o repositorio nao tem como afirmar que o
-       primitivo honra "cor". O que ele DECLARA sao estas custom properties, no
-       :host de UrbiGraficoBase, e scripts/guard-tokens-css.mjs as reconhece como
-       ponto de customizacao legitimo. Aqui var() esta em valor de propriedade
-       CSS, que e o unico contexto em que ele resolve: entregue como STRING
-       dentro do dado, var(--x, #hex) so funciona se o primitivo a injetar
-       tambem num valor de propriedade CSS, e e INVALIDO se ele a injetar num
-       atributo de apresentacao SVG (stroke="var(...)") — caso em que o traco cai
-       para o inicial (none: some a linha) e o marcador para o fill inicial
-       (preto). Definir as duas custom properties vale nos dois casos, e e o que
-       garante o criterio 1 da #595: series em cores DISTINTAS entre si.
+    /* #595: a cor de cada serie sai DAQUI, e nao de uma chave "cor" no dado —
+       nao porque o primitivo IGNORE "cor" (o dist/index.d.ts do SDK confirma
+       que series[i].cor e honrada, ver o paragrafo do #185 mais abaixo), mas
+       porque o CANAL certo pra entregar uma referencia a variavel CSS e uma
+       PROPRIEDADE CSS, nao uma string dentro do dado. var(--x, #hex) so
+       resolve em valor de propriedade CSS: entregue como STRING dentro do
+       dado, so funciona se o primitivo a injetar tambem num valor de
+       propriedade CSS, e e INVALIDO se ele a injetar num atributo de
+       apresentacao SVG (stroke="var(...)") — caso em que o traco cai para o
+       inicial (none: some a linha) e o marcador para o fill inicial (preto).
+       Definir as duas custom properties, que scripts/guard-tokens-css.mjs
+       reconhece como ponto de customizacao legitimo no :host de
+       UrbiGraficoBase, vale nos dois casos — e e o que garante o criterio 1
+       da #595: series em cores DISTINTAS entre si.
        (Este bloco nao usa crase de proposito: o CSS mora dentro de um template
        literal marcado, e uma crase encerraria o template ali mesmo — erro que
        o typecheck acusa longe daqui, na linha do "static styles".) */
