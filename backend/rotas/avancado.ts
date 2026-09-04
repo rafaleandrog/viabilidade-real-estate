@@ -1748,9 +1748,12 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   //
   // ⚠️ A redação anterior deste comentário citava `docs/shell/banco-de-dados.md`
   // "no monorepo", e essa citação FOI a causa do defeito: o `main` do monorepo
-  // não é o contrato desta app — o SDK publicado é, e o que ela fixa (0.50.3)
-  // não declara `dados.varrerTudo`. Escrever contra o `main` é o vetor de
-  // contaminação que o CI acusou com seis `TS2339`.
+  // não é o contrato desta app — o SDK publicado é, e o que ela fixava então
+  // (`0.50.3`) não declarava `dados.varrerTudo`. Escrever contra o `main` é o
+  // vetor de contaminação que o CI acusou com seis `TS2339`.
+  //
+  // Desde 2026-09-04 o pin é `57.0.0` e o tipo existe — a lição sobre QUAL
+  // referência manda continua valendo, mas o fato que a ilustrava mudou.
   //
   // Catálogo de tipologias (nível estudo) — mapeando id antigo → novo.
   const tipologias = await varrerTudo(req.dados!, 'avancado_tipologias', {

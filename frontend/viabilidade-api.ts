@@ -1,5 +1,44 @@
 // Wrapper da API do app `viabilidade` sobre o global window.urbiVerso.
 // Espelha o padrão de okr-api.ts. urbiVerso.api(path) já resolve /api + auth.
+//
+// ⚠️ O CAMINHO É RELATIVO, SEMPRE — nunca escreva o `/viabilidade` você mesmo.
+// O shell injeta o `/<appId>` sozinho; repetir o slug à mão era um compat que
+// FOI REMOVIDO (obsolescência `api-slug-manual`, data-piso 2026-08-30), e hoje
+// o resolver do shell LANÇA antes de a requisição sair. Este arquivo já teve
+// uma constante `APP = '/viabilidade'` interpolada em 72 caminhos, e ela
+// derrubou a app inteira quando a data-piso venceu: toda tela caiu, e a lista
+// de estudos vazia (o `catch` de `tela-dashboard.ts` engole a exceção) passou
+// a impressão de que os dados tinham sido apagados — não tinham.
+//
+// QUEM DEFENDE ISTO, e é importante não confundir as duas coisas:
+//
+//   · `frontend/api-caminho-relativo.test.ts` é a defesa REAL. Ele exercita
+//     todas as funções exportadas daqui, reproduz a recusa do resolver do
+//     shell e afere as URLs que efetivamente chegam ao `api()` — inclusive as
+//     de ramos com query, e inclusive quando a função engole o próprio erro.
+//   · O compilador defende só UM caso: escrever `${APP}` sem declarar `APP`
+//     vira `TS2304`. Ele NÃO impede redeclarar a constante nem escrever o
+//     prefixo à mão numa string — `api(url: string)` aceita qualquer string, e
+//     o TypeScript não inspeciona o conteúdo de um literal.
+//
+// A distinção está escrita porque a primeira versão deste comentário afirmava
+// que "repor a constante é erro de compilação". Era falso, e uma frase falsa e
+// plausível é pior que nenhuma: ela desincentiva a conferência.
+//
+// As três exceções legítimas:
+//   · `urbiVerso.nucleo(`/glebas?${qs}`)` — nucleo() não passa pelo resolver;
+//   · `api('/shell/apps/...')`       — `shell` é namespace cross-app, sem injeção;
+//   · `fetch('/api/dados/viabilidade/...')` — fetch nativo, caminho absoluto.
+//
+// ⚠️ A fonte dessas três é o código do resolver no monorepo, NÃO o bundle do
+// SDK que esta app fixa: `SEGMENTOS_CROSS_APP` não aparece em lugar nenhum do
+// bundle, nem no pin `57.0.0` (conferido por grep). É leitura legítima, mas
+// mede uma referência à frente do que a app declara — então está declarado aqui
+// em vez de passar por verificado.
+//
+// (O motivo citado antes era outro: que o pin `0.50.3` não trazia `docs/`. Isso
+// deixou de valer em 2026-09-04, quando o pin subiu; a conclusão continua, a
+// premissa mudou.)
 
 interface UrbiVersoApi {
   api(url: string, opts?: RequestInit): Promise<any>;
@@ -23,23 +62,21 @@ declare global {
 
 export const urbiVerso = globalThis.urbiVerso as UrbiVersoApi;
 
-const APP = '/viabilidade';
-
 // ── Estudos ──
 export function listarEstudos(filtros: { tipo_empreendimento?: string; status?: string } = {}): Promise<any> {
   const qs = new URLSearchParams();
   if (filtros.tipo_empreendimento) qs.set('tipo_empreendimento', filtros.tipo_empreendimento);
   if (filtros.status) qs.set('status', filtros.status);
   const sufixo = qs.toString() ? `?${qs}` : '';
-  return urbiVerso.api(`${APP}/estudos${sufixo}`);
+  return urbiVerso.api(`/estudos${sufixo}`);
 }
 
 export function criarEstudo(dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos`, { method: 'POST', body: JSON.stringify(dados) });
+  return urbiVerso.api(`/estudos`, { method: 'POST', body: JSON.stringify(dados) });
 }
 
 export function buscarEstudo(id: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${id}`);
+  return urbiVerso.api(`/estudos/${id}`);
 }
 
 // `signal` (opcional) liga o PATCH a um AbortController — permite cancelar uma
@@ -47,86 +84,86 @@ export function buscarEstudo(id: number): Promise<any> {
 // antiga chegue depois e sobrescreva o valor atual do campo (#87). Chamadas sem
 // o argumento seguem idênticas (signal = undefined ⇒ fetch sem aborto).
 export function atualizarEstudo(id: number, dados: Record<string, any>, signal?: AbortSignal): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${id}`, { method: 'PATCH', body: JSON.stringify(dados), signal });
+  return urbiVerso.api(`/estudos/${id}`, { method: 'PATCH', body: JSON.stringify(dados), signal });
 }
 
 export function removerEstudo(id: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${id}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${id}`, { method: 'DELETE' });
 }
 
 export function duplicarEstudo(id: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${id}/duplicar`, { method: 'POST' });
+  return urbiVerso.api(`/estudos/${id}/duplicar`, { method: 'POST' });
 }
 
 export function transicaoStatus(id: number, status: string): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
+  return urbiVerso.api(`/estudos/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
 }
 
 // ── Membros ──
 export function listarMembros(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/membros`);
+  return urbiVerso.api(`/estudos/${estudoId}/membros`);
 }
 export function adicionarMembro(estudoId: number, usuarioId: number, funcao: string): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/membros`, {
+  return urbiVerso.api(`/estudos/${estudoId}/membros`, {
     method: 'POST', body: JSON.stringify({ usuario_id: usuarioId, funcao }),
   });
 }
 export function alterarFuncaoMembro(estudoId: number, usuarioId: number, funcao: string): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/membros/${usuarioId}`, {
+  return urbiVerso.api(`/estudos/${estudoId}/membros/${usuarioId}`, {
     method: 'PATCH', body: JSON.stringify({ funcao }),
   });
 }
 export function removerMembro(estudoId: number, usuarioId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/membros/${usuarioId}/remover`, { method: 'PATCH' });
+  return urbiVerso.api(`/estudos/${estudoId}/membros/${usuarioId}/remover`, { method: 'PATCH' });
 }
 
 // ── Imóveis ──
 export function listarImoveis(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/imoveis`);
+  return urbiVerso.api(`/estudos/${estudoId}/imoveis`);
 }
 export function vincularImovel(estudoId: number, imovelNucleoId: number, tipoImovel?: string): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/imoveis`, {
+  return urbiVerso.api(`/estudos/${estudoId}/imoveis`, {
     method: 'POST', body: JSON.stringify({ imovel_nucleo_id: imovelNucleoId, tipo_imovel: tipoImovel }),
   });
 }
 export function desvincularImovel(estudoId: number, vinculoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/imoveis/${vinculoId}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/imoveis/${vinculoId}`, { method: 'DELETE' });
 }
 
 // ── Benchmarks ──
 export function listarBenchmarks(tipo?: string): Promise<any> {
   const sufixo = tipo ? `?tipo_empreendimento=${tipo}` : '';
-  return urbiVerso.api(`${APP}/benchmarks${sufixo}`);
+  return urbiVerso.api(`/benchmarks${sufixo}`);
 }
 export function criarBenchmark(dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/benchmarks`, { method: 'POST', body: JSON.stringify(dados) });
+  return urbiVerso.api(`/benchmarks`, { method: 'POST', body: JSON.stringify(dados) });
 }
 export function atualizarBenchmark(id: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/benchmarks/${id}`, { method: 'PATCH', body: JSON.stringify(dados) });
+  return urbiVerso.api(`/benchmarks/${id}`, { method: 'PATCH', body: JSON.stringify(dados) });
 }
 export function removerBenchmark(id: number): Promise<any> {
-  return urbiVerso.api(`${APP}/benchmarks/${id}`, { method: 'DELETE' });
+  return urbiVerso.api(`/benchmarks/${id}`, { method: 'DELETE' });
 }
 export function semearBenchmarks(): Promise<any> {
-  return urbiVerso.api(`${APP}/benchmarks/semear`, { method: 'POST' });
+  return urbiVerso.api(`/benchmarks/semear`, { method: 'POST' });
 }
 
 // ── Config ──
 export function buscarConfig(): Promise<any> {
-  return urbiVerso.api(`${APP}/config`);
+  return urbiVerso.api(`/config`);
 }
 
 // ── Avançado: parâmetros globais e cronograma ──
 export function buscarParametrosAvancado(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/parametros`);
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/parametros`);
 }
 export function atualizarParametrosAvancado(estudoId: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/parametros`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/parametros`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
 export function buscarCronogramaAvancado(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cronograma`);
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/cronograma`);
 }
 /**
  * #252: salva vários eventos numa única chamada — uma reancoragem só. O
@@ -135,68 +172,68 @@ export function buscarCronogramaAvancado(estudoId: number): Promise<any> {
  * "UI e API andam sempre juntas" — endpoint sem tela que o chame é dívida.
  */
 export function atualizarCronogramaLote(estudoId: number, eventos: Record<string, Record<string, any>>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cronograma`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/cronograma`, {
     method: 'PATCH', body: JSON.stringify({ eventos }),
   });
 }
 
 // ── Avançado: curvas de distribuição (globais) ──
 export function listarCurvas(): Promise<any> {
-  return urbiVerso.api(`${APP}/avancado/curvas`);
+  return urbiVerso.api(`/avancado/curvas`);
 }
 export function criarCurva(dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/avancado/curvas`, { method: 'POST', body: JSON.stringify(dados) });
+  return urbiVerso.api(`/avancado/curvas`, { method: 'POST', body: JSON.stringify(dados) });
 }
 export function atualizarCurva(id: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/avancado/curvas/${id}`, { method: 'PATCH', body: JSON.stringify(dados) });
+  return urbiVerso.api(`/avancado/curvas/${id}`, { method: 'PATCH', body: JSON.stringify(dados) });
 }
 export function removerCurva(id: number): Promise<any> {
-  return urbiVerso.api(`${APP}/avancado/curvas/${id}`, { method: 'DELETE' });
+  return urbiVerso.api(`/avancado/curvas/${id}`, { method: 'DELETE' });
 }
 export function semearCurvas(): Promise<any> {
-  return urbiVerso.api(`${APP}/avancado/curvas/semear`, { method: 'POST' });
+  return urbiVerso.api(`/avancado/curvas/semear`, { method: 'POST' });
 }
 
 // ── Avançado: receitas no formato do motor (fases + alocações joinadas) ──
 // Usado por tela-fluxo-ver / gráficos / exportar (cada fase = uma linha de receita).
 export function listarReceitasAvancado(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/receitas`);
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/receitas`);
 }
 
 // ── Preliminar: catálogo de Produtos (#315) ──
 export function listarProdutosPreliminar(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/preliminar/produtos`);
+  return urbiVerso.api(`/estudos/${estudoId}/preliminar/produtos`);
 }
 export function criarProdutoPreliminar(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/preliminar/produtos`, {
+  return urbiVerso.api(`/estudos/${estudoId}/preliminar/produtos`, {
     method: 'POST', body: JSON.stringify(dados),
   });
 }
 export function atualizarProdutoPreliminar(estudoId: number, pid: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/preliminar/produtos/${pid}`, {
+  return urbiVerso.api(`/estudos/${estudoId}/preliminar/produtos/${pid}`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
 export function removerProdutoPreliminar(estudoId: number, pid: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/preliminar/produtos/${pid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/preliminar/produtos/${pid}`, { method: 'DELETE' });
 }
 
 // ── Avançado: catálogo de Tipologias (nível estudo — Lote 6 · #19) ──
 export function listarTipologiasCatalogo(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/tipologias`);
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/tipologias`);
 }
 export function criarTipologia(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/tipologias`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/tipologias`, {
     method: 'POST', body: JSON.stringify(dados),
   });
 }
 export function atualizarTipologia(estudoId: number, tid: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/tipologias/${tid}`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/tipologias/${tid}`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
 export function removerTipologia(estudoId: number, tid: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/tipologias/${tid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/tipologias/${tid}`, { method: 'DELETE' });
 }
 
 // ── Avançado: Fases (Absorção/Fluxo por fase — Lote 6 · #21) ──
@@ -205,91 +242,91 @@ export function removerTipologia(estudoId: number, tid: number): Promise<any> {
 // — #168: antes as duas telas faziam CRUD na mesma lista sem discriminador.
 export function listarFasesAvancado(estudoId: number, tipo?: 'cronograma' | 'receita'): Promise<any> {
   const sufixo = tipo ? `?tipo=${tipo}` : '';
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases${sufixo}`);
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases${sufixo}`);
 }
 export function criarFaseAvancado(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases`, {
     method: 'POST', body: JSON.stringify(dados),
   });
 }
 export function atualizarFaseAvancado(estudoId: number, fid: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases/${fid}`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases/${fid}`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
 export function removerFaseAvancado(estudoId: number, fid: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases/${fid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases/${fid}`, { method: 'DELETE' });
 }
 
 // ── Avançado: Alocações de venda (tipologia → fase — Lote 6 · #19) ──
 export function criarAlocacao(estudoId: number, fid: number, dados: Record<string, any> = {}): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases/${fid}/alocacoes`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases/${fid}/alocacoes`, {
     method: 'POST', body: JSON.stringify(dados),
   });
 }
 export function atualizarAlocacao(estudoId: number, fid: number, aid: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases/${fid}/alocacoes/${aid}`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases/${fid}/alocacoes/${aid}`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
 export function removerAlocacao(estudoId: number, fid: number, aid: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/fases/${fid}/alocacoes/${aid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/fases/${fid}/alocacoes/${aid}`, { method: 'DELETE' });
 }
 
 // ── Avançado: linhas de custo ──
 export function listarCustosAvancado(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos`);
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/custos`);
 }
 export function criarCustoAvancado(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/custos`, {
     method: 'POST', body: JSON.stringify(dados),
   });
 }
 export function atualizarCustoAvancado(estudoId: number, cid: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos/${cid}`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/custos/${cid}`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
 export function removerCustoAvancado(estudoId: number, cid: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/custos/${cid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/custos/${cid}`, { method: 'DELETE' });
 }
 
 // ── Avançado: Funding — operações (#355, substitui o Capital Stack) ──
 export function listarFundingOperacoes(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/funding`);
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/funding`);
 }
 export function criarFundingOperacao(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/funding`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/funding`, {
     method: 'POST', body: JSON.stringify(dados),
   });
 }
 export function atualizarFundingOperacao(estudoId: number, oid: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/funding/${oid}`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/funding/${oid}`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
 export function removerFundingOperacao(estudoId: number, oid: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/funding/${oid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/funding/${oid}`, { method: 'DELETE' });
 }
 
 // ── Avançado: Cenários salvos (Etapa 8 · #56) ──
 // Cada cenário guarda um par de deltas percentuais (preço de venda, custo de
 // obra); o motor reaplica-os (aplicarCenario) ao recalcular o fluxo.
 export function listarCenarios(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cenarios`);
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/cenarios`);
 }
 export function criarCenario(estudoId: number, dados: Record<string, any> = {}): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cenarios`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/cenarios`, {
     method: 'POST', body: JSON.stringify(dados),
   });
 }
 export function atualizarCenario(estudoId: number, cid: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cenarios/${cid}`, {
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/cenarios/${cid}`, {
     method: 'PATCH', body: JSON.stringify(dados),
   });
 }
 export function removerCenario(estudoId: number, cid: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/avancado/cenarios/${cid}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/avancado/cenarios/${cid}`, { method: 'DELETE' });
 }
 
 // ── Núcleo (glebas/lotes/imóveis) ──
@@ -312,43 +349,43 @@ export function buscarImovelNucleo(id: number): Promise<any> {
 
 // ── Apelo Comercial (IA) ──
 export function buscarApelo(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial`);
+  return urbiVerso.api(`/estudos/${estudoId}/apelo-comercial`);
 }
 
 // ── Análise de Mercado (#199) ──
 // Snapshot de MERCADO do estudo. `{ analise: null }` é resposta normal: o
 // estudo existe e nunca rodou a análise. Quem preenche é a rota de IA (#200).
 export function buscarAnaliseMercado(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/analise-mercado`);
+  return urbiVerso.api(`/estudos/${estudoId}/analise-mercado`);
 }
 // Roda a análise de IA (#200). Sob demanda — nunca por carga de tela. `projeto`
 // leva os números já derivados na tela, que entram só como contexto do prompt.
 export function rodarAnaliseMercado(estudoId: number, projeto: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/analise-mercado`, {
+  return urbiVerso.api(`/estudos/${estudoId}/analise-mercado`, {
     method: 'POST', body: JSON.stringify({ projeto }),
   });
 }
 export function definirRegiaoMercado(estudoId: number, regiaoId: number | null): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/analise-mercado/regiao`, {
+  return urbiVerso.api(`/estudos/${estudoId}/analise-mercado/regiao`, {
     method: 'PATCH', body: JSON.stringify({ regiao_mercado_id: regiaoId }),
   });
 }
 
 // ── Regiões monitoradas (#200) — registro global, coletadas diariamente ──
 export function listarRegioesMercado(): Promise<any> {
-  return urbiVerso.api(`${APP}/mercado/regioes`);
+  return urbiVerso.api(`/mercado/regioes`);
 }
 export function criarRegiaoMercado(dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/mercado/regioes`, { method: 'POST', body: JSON.stringify(dados) });
+  return urbiVerso.api(`/mercado/regioes`, { method: 'POST', body: JSON.stringify(dados) });
 }
 export function atualizarRegiaoMercado(id: number, dados: Record<string, any>): Promise<any> {
-  return urbiVerso.api(`${APP}/mercado/regioes/${id}`, { method: 'PATCH', body: JSON.stringify(dados) });
+  return urbiVerso.api(`/mercado/regioes/${id}`, { method: 'PATCH', body: JSON.stringify(dados) });
 }
 export function removerRegiaoMercado(id: number): Promise<any> {
-  return urbiVerso.api(`${APP}/mercado/regioes/${id}`, { method: 'DELETE' });
+  return urbiVerso.api(`/mercado/regioes/${id}`, { method: 'DELETE' });
 }
 export function listarColetasMercado(regiaoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/mercado/regioes/${regiaoId}/coletas`);
+  return urbiVerso.api(`/mercado/regioes/${regiaoId}/coletas`);
 }
 export async function uploadDocumentoApelo(file: File): Promise<{ upload_id: number }> {
   const fd = new FormData();
@@ -359,18 +396,18 @@ export async function uploadDocumentoApelo(file: File): Promise<{ upload_id: num
   return res.json();
 }
 export function anexarDocumentoApelo(estudoId: number, dados: { upload_id?: number; tipo_dado?: string; texto_adicional?: string; nome_arquivo?: string }): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial/documentos`, { method: 'POST', body: JSON.stringify(dados) });
+  return urbiVerso.api(`/estudos/${estudoId}/apelo-comercial/documentos`, { method: 'POST', body: JSON.stringify(dados) });
 }
 export function removerDocumentoApelo(estudoId: number, docId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial/documentos/${docId}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/apelo-comercial/documentos/${docId}`, { method: 'DELETE' });
 }
 export function analisarApelo(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/apelo-comercial`, { method: 'POST' });
+  return urbiVerso.api(`/estudos/${estudoId}/apelo-comercial`, { method: 'POST' });
 }
 
 // ── Empreendimento → Informações: anexos (imagem principal, renders, plantas) ──
 export function listarDocumentosEmpreendimento(estudoId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/empreendimento/documentos`);
+  return urbiVerso.api(`/estudos/${estudoId}/empreendimento/documentos`);
 }
 export async function uploadDocumentoEmpreendimento(file: File): Promise<{ upload_id: number }> {
   const fd = new FormData();
@@ -381,10 +418,10 @@ export async function uploadDocumentoEmpreendimento(file: File): Promise<{ uploa
   return res.json();
 }
 export function anexarDocumentoEmpreendimento(estudoId: number, dados: { upload_id: number; categoria?: string; nome_arquivo?: string }): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/empreendimento/documentos`, { method: 'POST', body: JSON.stringify(dados) });
+  return urbiVerso.api(`/estudos/${estudoId}/empreendimento/documentos`, { method: 'POST', body: JSON.stringify(dados) });
 }
 export function removerDocumentoEmpreendimento(estudoId: number, docId: number): Promise<any> {
-  return urbiVerso.api(`${APP}/estudos/${estudoId}/empreendimento/documentos/${docId}`, { method: 'DELETE' });
+  return urbiVerso.api(`/estudos/${estudoId}/empreendimento/documentos/${docId}`, { method: 'DELETE' });
 }
 
 // ── Usuários (para gestão de membros) ──

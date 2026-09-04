@@ -2,11 +2,22 @@
 //
 // ⚠️ POR QUE ISTO EXISTE EM VEZ DE `dados.varrerTudo`.
 //
-// A plataforma tem o verbo `varrerTudo` desde o shell 0.53.8, que já é o
-// `shell_min` deste app (#422) — então o RUNTIME o tem. O que não o tem é o
-// **SDK publicado**: este app fixa `@urbiverso/sdk` em `0.50.3`, e o tipo
-// `HelperDados` de lá não declara o método. Usá-lo direto reprova o typecheck
-// de backend com seis `TS2339: Property 'varrerTudo' does not exist`.
+// A plataforma tem o verbo `varrerTudo` desde o shell 0.53.8, e o `shell_min`
+// deste app está em `0.53.20` — acima disso — então o RUNTIME o tem.
+//
+// ⚠️ **A PREMISSA ORIGINAL DESTE HELPER CAIU em 2026-09-04, e ele sobreviveu a
+// ela.** Este comentário dizia que o SDK publicado não declarava o método:
+// verdade enquanto o pin era `0.50.3`, quando usá-lo direto reprovava o
+// typecheck com seis `TS2339: Property 'varrerTudo' does not exist`. Com o pin
+// em `57.0.0` o tipo EXISTE: `dados.varrerTudo` e `dados.limparColuna` são
+// declarados no `dist/index.d.ts` do bundle instalado (sem número de linha de
+// propósito — o arquivo mora em `node_modules/`, que não é versionado, e o
+// guard de endereços não o alcança).
+//
+// Ou seja, este helper virou dívida: dá para chamar `dados.varrerTudo`
+// diretamente e apagá-lo. Não foi feito aqui de propósito — trocar o caminho de
+// varredura de toda migração e rota que o usa é mudança de comportamento, e o
+// PR que subiu o pin não é lugar para ela. Fica como issue.
 //
 // A regra da plataforma é explícita sobre qual das duas referências manda:
 // a autoridade é o **bundle do SDK instalado**, não o `main` do monorepo. Se a

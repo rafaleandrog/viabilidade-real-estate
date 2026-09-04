@@ -4,6 +4,164 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Incidente — a app parou inteira na instância, e não era perda de dados (2026-09-04)
+
+**Sintoma relatado:** nenhuma tela carregava dado, não dava para criar estudo, e os estudos que
+existiam "sumiram" da lista.
+
+**Causa:** uma constante em `frontend/viabilidade-api.ts` repetia o slug da app no caminho da API —
+`const APP = '/viabilidade'`, interpolada em **72** chamadas. O shell sempre injetou o `/<appId>`
+sozinho; repetir o slug à mão era um compat com `console.warn`. Quando a obsolescência
+`api-slug-manual` venceu (data-piso 2026-08-30, encerrada na v0.54.0), o resolver do shell passou a
+**LANÇAR** — antes de a requisição sair. A instância roda **0.55.1**. Os 72 caminhos viraram 72
+exceções.
+
+**Os dados nunca foram tocados.** A requisição sequer chegava à rede; o `catch` de
+`tela-dashboard.ts:277-282` registrava no console e deixava `this.estudos` em `[]`, e lista vazia
+lê-se, de fora, como "apagaram tudo". Conferido: as migrações do shell 0.54.0→0.55.1 mexem só em
+`sentinela_*`/`config_sistema`/`faxina_jobs`/`shell.ia_chamadas`; as migrações recentes da app
+(`038`, `039`) não apagam linha; e a purga destrutiva de dados de app exige a app desinstalada.
+
+**Conserto:** a constante foi **apagada** (não zerada) e os 72 caminhos passaram a relativos
+(`api('/estudos')`). Zerar (`const APP = ''`) consertaria igual e deixaria 72 interpolações vazias
+que alguém repovoa sem que nada acuse; sem o símbolo, repor é `TS2304`. É a inversão para
+fail-closed da armadilha 14.
+
+**Segunda quebra, encontrada no mesmo diagnóstico:** os 7 parâmetros do `manifesto.json` usavam a
+chave obsoleta `inicial`, cuja entrada (`parametro-inicial`) **gateia em 2026-09-06** — dois dias
+depois. Passada a data, `urbi-empacotar` falha antes de montar o tarball e a instalação responde
+422; ou seja, o conserto acima ficaria **impublicável**. Daí os dois irem no mesmo PR: o assunto
+único é "realinhar a app aos contratos da plataforma que mudaram". `inicial` → `padrao` (mesmos
+valores), e `shell_min` sobe de `0.53.8` para **`0.53.20`**, que é onde `padrao` passa a ser
+reconhecido. **Não** subiu para `0.54.0`: o caminho relativo funciona em toda versão do resolver, a
+app não passa a *exigir* aquele shell. Sem migração nova ⇒ **`versao` fica em `0.1.38`**.
+
+**O que a suíte NÃO enxergava, e por que isso é o centro deste registro.** Com o bug presente, a
+suíte inteira ficava verde — **1056 testes na base `9d50055`, contra 1057 no head**, medidos em
+worktree com o glob que o `validar-frontend.sh` usa (`frontend/*.test.ts frontend/fixtures/*.test.ts`):
+os mocks de render casam por `rota.includes(<sufixo>)` e nenhum casa `/viabilidade`.
+
+> ⚠️ **Contagem de teste sem o glob ao lado é ambígua, e isto custou uma rodada.** Uma lente da
+> revisão contestou o par 1056/1057 medindo outros dois recortes — `frontend/*.test.ts` sozinho dá
+> **1029/1030** (não alcança `fixtures/`, a armadilha que o `CLAUDE.md` já registra) e o `npm test`
+> completo dá **1341/1342** (soma backend e render). Os três pares estão certos; o que faltava era
+> dizer **qual** deles. O delta +1 é o mesmo em todos, e é ele que sustenta a afirmação.
+
+> ⚠️ A primeira redação desta seção, e o corpo do PR e a mensagem de commit junto, diziam **1057**.
+> Errado, e errado do jeito clássico: 1057 é a contagem do HEAD, que **inclui o teste novo** — o
+> qual não existia na base. O número saiu de aritmética, não de medição, que é exatamente a
+> armadilha 13. A substância seguia verdadeira (a suíte era verde com a app quebrada) e agora está
+> medida dos dois lados: **1056 na base, 1057 no head**. A mensagem de commit não foi reescrita de
+> propósito — não se reescreve histórico com o ciclo de revisão aberto. É a classe de defeito nº 1 (o defeito mora na fiação) na forma mais cara — a app
+inteira caiu sem uma asserção sequer piscar. `frontend/api-caminho-relativo.test.ts` fecha isso:
+exercita **todas** as funções exportadas do wrapper e reproduz a recusa do resolver do shell, em vez
+de olhar o texto do arquivo (um guard sobre o literal pegaria só a forma já conhecida).
+
+**Mutações medidas nesta sessão** — sem elas o teste seria autoafirmação:
+
+| Mutação | Resultado |
+|---|---|
+| controle: código sem mutação, `tsc --noEmit` | exit **0** (a mutação significa algo) |
+| repor `/viabilidade` em **um** caminho | teste **vermelho**, nomeando `listarEstudos()` |
+| usar `${APP}` sem declarar a constante | **`TS2304: Cannot find name 'APP'`** |
+
+O teste também fecha por **contagem exata** (78 funções exportadas) e a lista de exceção fecha nos
+dois sentidos. Ela nasceu com o **eixo errado** — `listarUsuarios` entrou como exceção quando na
+verdade *chama* `api()`, só que no namespace cross-app `/shell/`, e portanto deve passar pela
+verificação como qualquer outra. O próprio teste acusou; a lista virou "quem não chama `api()`" (5
+entradas) e a chamada cross-app ganhou asserção própria.
+
+**Documentação corrigida junto, porque ela PRESCREVIA o bug:** `INSTRUCOES-CODE.md` e `README.md`
+mandavam escrever `urbiVerso.api('/viabilidade/...')`, cada um contradizendo o que ele mesmo já
+dizia noutro ponto ("o shell prefixa; nunca escreva o prefixo") — a uma linha de distância no
+`INSTRUCOES-CODE.md`, e a ~135 linhas no `README.md`. A terceira, e a mais citada de todas, só
+apareceu na revisão: o **Anexo E — API** de `docs/viabilidade/padrao-incorporacao.md`, onde as duas
+metades da contradição estavam na **mesma frase**. Sem isso a próxima sessão
+reintroduz o bug obedecendo à doc.
+
+**⚠️ O `urbi-empacotar` local NÃO serve de prova aqui, e medir isso valeu.** Ele empacota limpo,
+sem uma linha de obsolescência — e a leitura tentadora ("saiu limpo, logo migrou") é **falsa**. A
+lista de obsolescências viaja **embutida no bin**, e o pin desta app é `@urbiverso/sdk` **0.50.3**,
+anterior às duas entradas (`api-slug-manual` e `parametro-inicial`, ambas 0.53.x/0.54.0). Medido
+por controle: repondo `"inicial"` no manifesto de propósito, o empacotador **continua sem acusar**.
+Ou seja, para estas duas entradas a auditoria do empacotador local é **não-executada**, não
+"aprovada" — e teria sido igualmente silenciosa com a app quebrada.
+
+A evidência que de fato sustenta cada conserto é outra, e é direta: para o slug, o teste com as
+três mutações medidas acima; para o manifesto, `grep -c '"inicial"' manifesto.json` = **0** com os
+7 parâmetros em `padrao`, contra o validador do shell que aceita `padrao` desde 0.53.20. Quem
+gateia de verdade é a **instalação na instância** (shell 0.55.1), não o empacotador desta árvore.
+
+**O pin do SDK subiu junto: `0.50.3` → `57.0.0` (a pedido do autor, e é a causa raiz).** O
+`0.50.3` não trazia `docs/` nem `obsolescencias.json`, e a lista de obsolescências viaja **embutida
+no bin** — então a auditoria do `urbi-empacotar` rodava contra um catálogo de meses atrás e não
+acusava nada. Medido por controle no pin antigo: repondo `inicial` de propósito, empacotava limpo.
+**Foi por isso que nada avisou antes de a app cair inteira.** Com o `57.0.0`:
+
+- o empacotamento passa a auditar de verdade — e, no fonte corrigido, sai **sem uma linha de
+  obsolescência** (agora isso é evidência, não silêncio de auditor cego);
+- as duas lentes de contrato da revisão passam a ser executáveis (`docs/` + `obsolescencias.json`);
+- `validar-frontend.sh` **8/8**, `validar-backend.sh` **5/5**, 1057 testes, 76 render — o typecheck
+  do backend, que era o risco real do salto de 47 majors, passou limpo.
+
+**`sdk_min` NÃO foi declarado, e é decisão consciente.** A doc do SDK 57
+(`apps-em-repo-proprio.md:357`) dá a regra prática "copie o major contra o qual você compilou" —
+seria `57`. Mas ela mesma avisa (`:359`) que isso faz uma app **que não ganhou dependência nenhuma**
+passar a exigir o nível novo só por ter sido reempacotada. Esta app não importa o SDK em runtime (o
+frontend usa o global `window.urbiVerso`; só `backend/rotas.ts` o importa, e para augmentação de
+**tipo**, que não existe em runtime). Declarar `57` arriscaria recusa na instalação sem ganho algum.
+
+**Cinco afirmações envelheceram junto com o pin, e a rodada 5 as pegou** — é a classe do PR 494
+(o conserto envelhece a vizinhança), agora atravessando código e doc: `CLAUDE.md` em três pontos
+(inclusive contradizendo, duas linhas abaixo, a tabela que o próprio commit tinha atualizado),
+`backend/rotas/varrer-tudo.ts`, `backend/rotas/avancado.ts` e `frontend/viabilidade-api.ts`.
+Todas corrigidas aqui.
+
+A mais cara delas é a do `varrer-tudo.ts`: **a premissa que justifica a existência do helper caiu**.
+Ele foi escrito porque o SDK `0.50.3` não declarava `dados.varrerTudo`; o `57.0.0` declara os dois
+(`varrerTudo` e `limparColuna`, no `dist/index.d.ts` do bundle). O helper virou dívida — dá para chamar o
+verbo direto e apagá-lo. **Não fiz aqui de propósito**: trocar o caminho de varredura de toda
+migração e rota que o usa é mudança de comportamento, e o PR que sobe o pin não é lugar para ela.
+
+> ⚠️ **PENDENTE, e não cabe neste PR: `.claude/preparar-sessao.sh:50`.** Ele imprime, **em toda
+> sessão**, que "o pin 0.50.3 não traz docs/" e que "a atestação segue `contratos=nao-executados`" —
+> as duas agora falsas, e na superfície que é reinjetada a cada prompt, ou seja, a que mais
+> contamina a sessão seguinte. Corrigir ali é mudança de **processo** (`.claude/**`), e a regra R1
+> proíbe misturá-la com código de produto: o guard `escopo-processo` reprovaria este PR. Vai em PR
+> próprio, junto com a decisão da `versao` abaixo.
+
+---
+
+### ⚠️ Divergência a decidir: a `versao` deveria ter bumpado?
+
+Com o `docs/` do SDK legível pela primeira vez, apareceu um conflito direto entre o contrato
+publicado da plataforma e a regra local deste repositório:
+
+| Fonte | Diz |
+|---|---|
+| `sdk/docs/distribuicao.md:233` (SDK 57, **publicado**) | "A `versao` avança em todo release que altera `schema.json`, traz migração, **ou mexe em `shell_min` ou `sdk_min`**" |
+| `CLAUDE.md` deste repo (issue #422) | "Subir o piso **não** bumpa a `versao` — ela descreve o schema" |
+| `scripts/validar-backend.sh:115-133` | **reprova** o bump sem migração nova: *"FALHOU: versao mudou sem migração nova"* |
+
+Este PR sobe `shell_min` de `0.53.8` para `0.53.20` e **mantém** `versao` em `0.1.38`, porque é o
+que a regra local manda e o que o guard local permite — bumpar deixaria o `validar-backend.sh`
+vermelho. Mas pela doc publicada a `versao` deveria ir a `0.1.39`.
+
+**Não resolvi isso sozinho, de propósito**: mudar o guard é escopo de processo, e a decisão #422 é
+do autor. O risco prático é de instalação — a plataforma decide atualizar por `versao` maior **ou**
+por mesma versão com `build_sha` à frente, então a tag com sha (`viabilidade-v0.1.38_<sha8>`) faz o
+upgrade funcionar mesmo sem bump. Mas se a regra publicada for a que vale, a regra local e o guard
+precisam mudar juntos, num PR próprio.
+
+**Pendente do autor, no ambiente autenticado:** publicar a release (Actions → `release` → *Run
+workflow*, que gera a tag com sha — necessária para atualizar dentro da mesma `versao`), instalar no
+Pinguim marcando "Incluir não homologadas", conferir que **os estudos reaparecem** e que dá para
+criar um estudo, homologar, e então Laputa. Vale conferir os 7 parâmetros depois do upgrade: com
+`padrao` o default é **vivo**, e onde ninguém personalizou o valor do manifesto passa a valer
+sozinho (aqui nenhum valor mudou, então o esperado é nada mudar).
+
+---
+
 ## Encerramento da Rodada 10 — #574 (2026-09-04)
 
 As 12 issues da Rodada 10 (`lista_bugs_20260826.xlsx`, #563–#574) estão fechadas. A última,

@@ -23,7 +23,8 @@ nome". (É o critério (c) do `CLAUDE.md` do monorepo sobre lista de exceção m
 
 **Sintoma:** seis `TS2339: Property 'varrerTudo' does not exist on type 'HelperDados'` no CI.
 **Causa:** o método existe no `main` do monorepo (`sdk/src/contrato.ts:354`) e no runtime (shell
-0.53.8, que é o `shell_min`), mas **não no SDK que a app fixa** (`0.50.3`). O comentário do próprio
+0.53.8, que era o `shell_min` à época — hoje `0.53.20`), mas **não no SDK que a app fixa**
+(`0.50.3`). O comentário do próprio
 código entregava a origem: citava `docs/shell/banco-de-dados.md` *"no monorepo"*.
 **Defesa:** a autoridade é o **bundle do SDK instalado**. Se a resposta não está ali, ela NÃO EXISTE
 para a app — a pergunta vira "quando isso é publicado?", não "deixa eu ver no shell".

@@ -6,7 +6,7 @@ Este arquivo é lido automaticamente pelo Claude Code ao iniciar qualquer sessã
 
 ## Contexto do projeto
 
-App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell UrbiVerso (SDK `@urbiverso/sdk 0.50.3`). Dois tipos de estudo: **Preliminar** (análise estática) e **Avançado** (fluxo de caixa temporal). Frontend em Lit com web components `urbi-*`. Backend em `backend/rotas.js`, self-contained.
+App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell UrbiVerso (SDK `@urbiverso/sdk 57.0.0`). Dois tipos de estudo: **Preliminar** (análise estática) e **Avançado** (fluxo de caixa temporal). Frontend em Lit com web components `urbi-*`. Backend em `backend/rotas.js`, self-contained.
 
 **Fontes de verdade:**
 - `PROGRESSO.md` — estado atual, o que foi feito, pendências
@@ -700,22 +700,29 @@ proxy dá **403 no CONNECT** —, e **subagente nativo** quando não houver, **d
 como menos adversarial, por revisar patch escrito pela mesma família de modelo. O App **não
 dispensa** a fan-out: neste repositório os dois acharam classes de defeito diferentes.
 
-**A camada de contratos roda PELA METADE — e a metade que falta mudou de causa.** O pacote está no
-disco depois do `validar-frontend.sh` — que é o único dos dois que instala; o
-`validar-backend.sh` aborta se ele não tiver rodado antes (§ Validação) —, mas a superfície que a skill lê é
-`node_modules/@urbiverso/sdk/**docs/**`, e o bundle **0.50.3** — a versão que o `package.json` fixa —
-**não tem `docs/` nem `obsolescencias.json`**. Ele traz `README.md`, `package.json` e `dist/`. Medido
-em 2026-09-03.
+**A camada de contratos roda INTEIRA desde 2026-09-04.** O pacote está no disco depois do
+`validar-frontend.sh` — que é o único dos dois que instala; o `validar-backend.sh` aborta se ele não
+tiver rodado antes (§ Validação) —, e a superfície que a skill lê é
+`node_modules/@urbiverso/sdk/**docs/**`. Com o pin em **`57.0.0`** o bundle traz `docs/` (32
+arquivos) **e** `obsolescencias.json` (7 chaves).
+
+> ⚠️ **Até 2026-09-04 esta seção dizia o contrário, e a causa era o pin.** Com `0.50.3` o bundle
+> trazia só `README.md`, `package.json` e `dist/` — sem `docs/`, sem `obsolescencias.json` —, então
+> a lente de doc saía sempre **não executada**. Isso não era detalhe de revisão: a lista de
+> obsolescências viaja **embutida no bin**, então o `urbi-empacotar` também auditava contra um
+> catálogo velho e **não acusava nada**. Medido por controle nos dois pins, repondo a chave obsoleta
+> `inicial` de propósito: no `0.50.3` empacotava limpo; no `57.0.0` acusa
+> `⚠ OBSOLESCÊNCIA [parametro-inicial]`. Foi esse silêncio que deixou a app cair inteira sem aviso.
 
 | Lente de contrato | Superfície | Estado |
 |---|---|---|
 | props de primitivo `urbi-*` | `dist/index.d.ts` (68 `declare class Urbi*`) | ✅ **executável agora** |
-| verbos do SDK, obsolescências | `docs/`, `obsolescencias.json` | ❌ ausentes do 0.50.3 |
+| verbos do SDK, obsolescências | `docs/`, `obsolescencias.json` | ✅ **executável desde 2026-09-04** (pin `57.0.0`) |
 | `shell_min` vs. o que a instância roda | — | pergunta ao autor, nunca ao registry |
 
-Então a atestação continua saindo **`contratos=nao-executados`**, e o relatório diz **qual** metade
-rodou. `contratos=ok` seria uma afirmação plausível e falsa — a classe de defeito que a armadilha 11
-descreve.
+Com as duas lentes executáveis, a atestação **pode** sair `contratos=ok` — mas só quando as duas de
+fato rodarem naquela revisão. Publicá-lo porque "o SDK está no disco" continua sendo afirmação
+plausível e falsa, a classe da armadilha 11; o relatório diz sempre **o que** rodou.
 
 > ⚠️ **A causa não é mais o 401, e confundir as duas custa a próxima sessão.** Este parágrafo dizia
 > que a camada não rodava *"e isso é estrutural"*, atribuindo tudo ao SDK ser privado. Com a auth em
@@ -799,17 +806,23 @@ Consequências que valem em toda sessão com token:
 - **`bash scripts/validar-backend.sh` roda inteiro** — as 5 etapas, incluindo o typecheck do backend
   e o `schema.json` contra o contrato do SDK. *"Não deu para rodar"* deixa de ser desculpa aqui.
 - **A camada de contratos roda pela METADE.** A lente de props de primitivo `urbi-*` passa a ser
-  executável (`dist/index.d.ts`); a de doc do SDK, **não** — o pin `0.50.3` não traz `docs/`. A
-  atestação continua saindo **`contratos=nao-executados`**, e o relatório diz qual metade rodou.
-  Detalhe em § *A revisão em si*.
+  executável (`dist/index.d.ts`), **e a de doc do SDK também** desde 2026-09-04, quando o pin subiu
+  para `57.0.0` — o bundle passou a trazer `docs/` e `obsolescencias.json`. A atestação pode sair
+  **`contratos=ok`** quando as duas de fato rodarem. Detalhe em § *A revisão em si*.
 - **`node_modules/@urbiverso/sdk/dist/index.d.ts` está no disco** — a fonte canônica de props de
   primitivo `urbi-*` volta a existir, e ler o monorepo para compensar deixa de ter desculpa.
 
-⚠️ **A versão instalada é a que o `package.json` FIXA** — hoje `@urbiverso/sdk` **`0.50.3`**, exato,
-sem circunflexo. O registry serve versões muito à frente (em 2026-09-03, `56.0.0`); **elas não são a
-autoridade para esta app**. Conferir prop no `latest` é a mesma classe de erro que conferir no `main`
-do monorepo: mede a referência errada. Leia `node_modules/@urbiverso/sdk/`, não o que o `npm view`
-devolve.
+⚠️ **A versão instalada é a que o `package.json` FIXA** — hoje `@urbiverso/sdk` **`57.0.0`**, exato,
+sem circunflexo. Conferir prop numa versão diferente da fixada é a mesma classe de erro que conferir
+no `main` do monorepo: mede a referência errada. Leia `node_modules/@urbiverso/sdk/`, não o que o
+`npm view` devolve.
+
+> ⚠️ **O pin subiu de `0.50.3` para `57.0.0` em 2026-09-04, e o motivo é o incidente do slug.** O
+> `0.50.3` **não trazia `docs/` nem `obsolescencias.json`**, então a auditoria de obsolescência do
+> `urbi-empacotar` rodava contra um catálogo antigo e **não acusava nada** — medido por controle,
+> repondo a chave obsoleta `inicial` de propósito: empacotava limpo. Foi por isso que nem o
+> empacotamento nem a revisão avisaram antes de a app cair inteira. Com o `57.0.0` as duas lentes
+> de contrato passam a ser executáveis.
 
 **Para mudanças de FRONTEND (a maioria):** o frontend **não importa o SDK**
 (usa o global `window.urbiVerso`), então valida-se 100% só com os pacotes públicos. Use o
@@ -923,7 +936,7 @@ barra os dois erros simétricos de versionamento: migração nova **sem** bump d
 > **não dá erro, só não faz nada** — leia antes de presumir.
 >
 > **Essa fonte existe aqui desde 2026-09-03** — o `validar-frontend.sh` põe o SDK no disco (§ Validação),
-> e a versão é a que o `package.json` fixa (`0.50.3`), que é justamente a autoridade certa.
+> e a versão é a que o `package.json` fixa (hoje `57.0.0`), que é justamente a autoridade certa.
 >
 > A alternativa antiga — ler `ui/src/urbi-<nome>.ts` no monorepo — **deixou de ter desculpa**. Ela
 > continua permitida (§ O monorepo é só leitura) e continua medindo a referência errada: o `main`
@@ -951,11 +964,32 @@ Git Bash — ver PROGRESSO).
 - Backend 100% self-contained (`backend/rotas.js`, sem `--packages=external`)
 - Sem `instanceof` cruzando shell↔app
 - Seed fora de migração; migração só transforma dados existentes
-- `shell_min = "0.53.8"` — subiu de `0.50.3` em 2026-08-19 (issue #422). O piso existe para ser
-  **honesto**, e a plataforma retirou a alternativa: o retorno declarativo de migração
-  (`remover_colunas`) vira **gate** em 2026-08-23, e o fluxo canônico que o substitui exige
-  `dados.limparColuna` (shell **0.53.5**) e `dados.varrerTudo` (shell **0.53.8**). Subir o piso
+- `shell_min = "0.53.20"` — subiu de `0.53.8` em 2026-09-04, porque os 7 parâmetros do manifesto
+  migraram de `inicial` para `padrao` (obsolescência `parametro-inicial`, que **gateia** a partir
+  de 2026-09-06) e `padrao` só é reconhecido a partir de **0.53.20**; num shell anterior o
+  manifesto reprova com uma mensagem que nomeia o campo ANTIGO. **Não** subiu para `0.54.0`: o
+  caminho relativo de `api()` funciona em toda versão do resolver, então a app não passa a
+  **exigir** aquele shell — ela só parou de usar uma capacidade removida (`api-slug-manual`).
+  O degrau anterior (`0.50.3` → `0.53.8`, 2026-08-19, issue #422) veio do retorno declarativo de
+  migração (`remover_colunas`), cujo fluxo canônico substituto exige `dados.limparColuna`
+  (shell **0.53.5**) e `dados.varrerTudo` (shell **0.53.8**). Subir o piso
   **não** bumpa a `versao` — ela descreve o schema, e nada de schema mudou.
+
+- **Parâmetro do manifesto: `padrao`, e o default é VIVO.** A chave chama-se `padrao` (o nome
+  antigo, `inicial`, saiu em 2026-09-04) e a troca **não é só de nome**: o valor **não é
+  persistido**. O banco guarda exclusivamente a sobrescrita do admin, e enquanto ela não existir
+  `obter()` resolve o `padrao` do manifesto a cada leitura. Consequência prática: **mudar o
+  `padrao` num release novo passa a valer sozinho** em toda instância que nunca personalizou
+  aquele parâmetro — o default deixou de ficar congelado depois do primeiro release. Não duplique
+  o default no código: hoje há **seis** pontos que reimplementam um default de parâmetro com
+  `Number(...) || <literal>` — `frontend/tela-premissas.ts:502`, `tela-graficos.ts:91`,
+  `tela-proforma.ts:381`, `backend/rotas/manutencao.ts:20`, `backend/rotinas.ts:169` e
+  `scripts/conferir-estudo.ts:108`. Todos coincidem com o manifesto e por isso não divergem hoje,
+  mas são um segundo default, e o `||` **engole o `0`**.
+  > ⚠️ `frontend/proforma.ts:630` (`e.aliquota_ret_pct ?? 4`) **não** entra nessa lista, e a
+  > distinção importa duas vezes: ele lê a coluna do **estudo**, não o parâmetro, e usa `??`, que é
+  > exatamente o operador que **não** engole o `0`. Uma revisão já o incluiu por semelhança de
+  > forma — a forma do código não é o predicado.
 - Precisão: R$ e m² → `decimal(12,2)`; % digitado → inteiro; % calculado → `decimal(5,1)`
 - **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e
   no motor. Representações derivadas **não monetárias** (% e R$/m²) carregam **precisão plena**

@@ -14,7 +14,8 @@
 // (`scripts/migracoes-harness.mjs:148-153`), deixando a poda do reconciliador
 // derrubar a estrutura vazia. É literalmente o que o job `migracao-declarativa`
 // deste mesmo repositório manda fazer (`.github/workflows/pr-guards.yml:216`), e
-// o `shell_min` do manifesto já está em `0.53.8`.
+// o `shell_min` do manifesto (`0.53.20`) está acima dos pisos que esse fluxo exige
+// (`dados.limparColuna` pede 0.53.5; `dados.varrerTudo`, 0.53.8).
 //
 // O que impede é ESCOPO E DECISÃO: remover a tabela é mudança de schema, exige
 // migração nova e bump da `versao`, e a issue #479 põe a remoção explicitamente

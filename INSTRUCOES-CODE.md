@@ -67,12 +67,17 @@ Gráficos) · **Imóveis** (imóveis do Núcleo e em quais estudos são usados).
 - **Sem `instanceof` cruzando shell↔app** — matching por propriedade (`erro?.name`/`codigo`), `import type`.
 - **Seed fora de migração** — `schema.json` é o genesis; semente idempotente no boot; migração só
   transforma dados de instâncias que já têm a app.
-- **`shell_min` = `0.53.8`** (formato `x.y.z`), SDK alvo `0.50.3`. Subiu de `0.50.3` em
-  2026-08-19 (issue #422): a migração `003` saiu do retorno declarativo `remover_colunas` — que
-  vira **gate** da plataforma em 2026-08-23 — para o fluxo canônico, que usa `dados.limparColuna`
+- **`shell_min` = `0.53.20`** (formato `x.y.z`), SDK alvo `57.0.0`. Subiu de `0.53.8` em
+  2026-09-04: os 7 parâmetros do manifesto migraram de `inicial` para `padrao`, e `padrao` só é
+  reconhecido a partir de `0.53.20`. O degrau anterior (`0.50.3` → `0.53.8`, 2026-08-19,
+  issue #422) veio da migração `003`, que saiu do retorno declarativo `remover_colunas` — que
+  virou **gate** da plataforma em 2026-08-23 — para o fluxo canônico, que usa `dados.limparColuna`
   (shell 0.53.5) e `dados.varrerTudo` (shell 0.53.8). O `sdk_min` **não** foi declarado: ele exige
   `shell_min ≥ 0.53.10` pareado e um SDK em versionamento inteiro ("SDK N"), e o alvo aqui ainda é
   o `0.50.3`.
+- **Parâmetro do manifesto usa `padrao`, e o default é VIVO** — não é persistido; o banco guarda só
+  a sobrescrita do admin, e mudar o `padrao` num release passa a valer sozinho onde ninguém
+  personalizou. Não duplique o default no código.
 - **Precisão decimal:** R$ e m² → `decimal(12,2)`; % digitado/default → `inteiro`; % calculado →
   `decimal(5,1)`.
 - **Precisão de resultado (2026-08-01):** **todo valor monetário que é resultado de fórmula é
@@ -83,7 +88,9 @@ Gráficos) · **Imóveis** (imóveis do Núcleo e em quais estudos são usados).
   resultado é o defeito que a #259 corrige.
 - **Rotas relativas**, shell prefixa `/api/viabilidade/`; app nunca faz auth (`req.contexto` já vem);
   persistência via `req.dados`; tabelas de negócio com `acesso_externo:"restrito"`.
-- **Frontend:** Lit com decorators; `urbiVerso.api('/viabilidade/...')`; primitivos `urbi-*` por tag
+- **Frontend:** Lit com decorators; `urbiVerso.api('/estudos')` — **caminho relativo, o shell
+  injeta o `/viabilidade` sozinho; repetir o slug à mão LANÇA** (obsolescência `api-slug-manual`,
+  encerrada); primitivos `urbi-*` por tag
   (`import type` apenas); tokens CSS do design system.
 
 ## Disciplina de trabalho (toda etapa)
