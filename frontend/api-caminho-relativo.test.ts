@@ -101,8 +101,18 @@ type Registro = { fn: string; url: string };
  * primeiro segmento é o slug da app é RECUSADO. A query sai antes de fatiar,
  * como no original — senão `/viabilidade?x=1` escaparia da recusa.
  */
+/** Barra inicial normalizada, como o resolver do shell faz antes de fatiar. */
+function comBarra(caminho: string): string {
+  return caminho.startsWith('/') ? caminho : '/' + caminho;
+}
+
+/** O caminho é do namespace cross-app `/shell/…`, que não recebe injeção. */
+function ehCrossApp(url: string): boolean {
+  return comBarra(url.split(/[?#]/)[0]).startsWith('/shell/');
+}
+
 function resolverComoOShell(caminho: string, fn: string): void {
-  const norm = caminho.startsWith('/') ? caminho : '/' + caminho;
+  const norm = comBarra(caminho);
   const corte = norm.search(/[?#]/);
   const somentePath = corte === -1 ? norm : norm.slice(0, corte);
   if ((somentePath.split('/')[1] ?? '') === APP_ID) {
@@ -205,6 +215,11 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
   // em posição nenhuma. Isso é verdade por construção, porque o shell injeta o
   // prefixo sozinho; a única chamada legítima que contém a palavra é a do
   // namespace cross-app, declarada em `VIA_NAMESPACE_CROSS_APP`.
+  // A barra inicial é normalizada nos DOIS lados (`ehCrossApp`/`comBarra`), como
+  // o resolver do shell faz antes de fatiar. Sem isso, `api('shell/apps/…')` —
+  // que o resolver aceita — reprovava aqui: um falso positivo, e falso positivo
+  // é o que faz alguém desligar o guard, e aí ele não guarda mais nada.
+  //
   // ⚠️ A isenção é pela URL, NUNCA pela função — e a distinção não é estilo.
   // A versão anterior isentava `listarUsuarios` inteira, e com isso reabria
   // exatamente o buraco que a rodada anterior tinha fechado: uma segunda
@@ -212,9 +227,8 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
   // Isentar QUEM CHAMA isenta tudo que essa função venha a fazer depois;
   // isentar A URL isenta só o caminho que de fato é legítimo.
   const comSlug = chamadasApi.filter((c) => {
-    const path = c.url.split(/[?#]/)[0];
-    if (path.startsWith('/shell/')) return false;
-    return path.split('/').includes(APP_ID);
+    if (ehCrossApp(c.url)) return false;
+    return comBarra(c.url.split(/[?#]/)[0]).split('/').includes(APP_ID);
   });
   assert.deepEqual(
     comSlug.map((c) => `${c.fn}() → ${c.url}`),
@@ -262,7 +276,7 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
   );
 
   // A exceção cross-app continua sendo o que diz ser — e continua sendo UMA só.
-  const cross = chamadasApi.filter((c) => c.url.startsWith('/shell/'));
+  const cross = chamadasApi.filter((c) => ehCrossApp(c.url));
   assert.deepEqual(
     [...new Set(cross.map((c) => c.fn))].sort(),
     [...VIA_NAMESPACE_CROSS_APP].sort(),
