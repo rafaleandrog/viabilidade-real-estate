@@ -416,6 +416,41 @@ test('#355 fundingDoEstudo: sem operações devolve null', () => {
   assert.equal(fundingDoEstudo([], [0, 0, 0], [0, 0, 0], 0, 1, 12), null);
 });
 
+test('#587 (achado do Codex, PR 671): só uma financiamento_producao DESLIGADA se comporta como "nenhuma operação"', () => {
+  // Estado logo depois de `_garantirFinanciamento` criar a FàP desligada,
+  // antes do usuário ligar: sem isso, `fundingDoEstudo` devolvia um
+  // `FundingCalc` não-nulo mesmo sem nenhuma operação EFETIVA, e a tela de
+  // Fluxo de Caixa mostrava seções de Funding vazias + Livre/Alavancado
+  // duplicados.
+  const fapDesligada: OperacaoFunding & { id: number } = {
+    id: 9, tipo: 'financiamento_producao', nome: 'FàP', taxa_anual: 12.5,
+    exposicao_minima: 20, percentual_financiavel: 80, ativo: false,
+  } as any;
+  assert.equal(
+    fundingDoEstudo([fapDesligada], [0, 0, 0], [0, 0, 0], 0, 1, 12),
+    null,
+    'uma única operação desligada não pode produzir FundingCalc',
+  );
+});
+
+test('#587: financiamento_producao desligada NÃO entra no agregado quando há outras operações ativas', () => {
+  const fapDesligada: OperacaoFunding & { id: number } = {
+    id: 9, tipo: 'financiamento_producao', nome: 'FàP', taxa_anual: 12.5,
+    exposicao_minima: 20, percentual_financiavel: 80, ativo: false,
+  } as any;
+  const divida: OperacaoFunding & { id: number } = {
+    id: 10, tipo: 'divida', nome: 'Dívida A', valor: 1_000_000, inicio_mes: 0,
+    taxa_anual: 20, periodo_amortizacao_meses: 12,
+  } as any;
+  const calc = fundingDoEstudo([fapDesligada, divida], new Array(24).fill(0), new Array(24).fill(0), 0, 1, 12);
+  assert.ok(calc, 'com uma operação ativa, o cálculo não pode ser null');
+  assert.equal(
+    calc!.operacoes.some((s) => s.operacao.id === 9),
+    false,
+    'a operação desligada não pode aparecer nas séries do agregado',
+  );
+});
+
 test('#355 fundingDoEstudo: fluxo alavancado = livre + entradas − saídas', () => {
   const prazo = PRAZO_DIVIDA;
   const livre = new Array(prazo).fill(-100_000);

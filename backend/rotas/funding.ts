@@ -157,16 +157,24 @@ export function validarCamposOperacao(dados: Record<string, any>): string | null
   if (dados.aporte_meses !== undefined && Number(dados.aporte_meses) < 1) {
     return 'aporte_meses deve ser pelo menos 1';
   }
-  // #587: `ativo` é genérica na coluna (`schema.json`), mas o USO é só do
-  // Financiamento à produção — Dívida/Equity continuam se resolvendo por
-  // existir/não existir a linha, sem status. `dados` aqui é sempre o estado
-  // FINAL (o POST exige `tipo` antes de chamar este validador; o PATCH passa
-  // `{ ...operacao, ...dados }`), então `dados.tipo` está sempre resolvido.
-  if (dados.ativo !== undefined) {
-    if (typeof dados.ativo !== 'boolean') return 'ativo deve ser um booleano';
-    if (dados.tipo !== 'financiamento_producao') {
-      return 'ativo só é aplicável ao Financiamento à produção';
-    }
+  // #587: `ativo` é genérica na coluna (`schema.json`, padrão `true`), mas o
+  // USO é só do Financiamento à produção — Dívida/Equity continuam se
+  // resolvendo por existir/não existir a linha, sem status.
+  //
+  // ⚠️ Achado do Codex no PR #671, e é a razão pela qual a restrição de tipo
+  // olha só `=== false`, nunca `!== undefined`: `dados` aqui é o estado FINAL
+  // (`{ ...operacao, ...dados }` no PATCH), e como TODA linha já nasce com
+  // `ativo: true` (o padrão do schema), uma Dívida/Equity EXISTENTE sempre
+  // carrega `ativo: true` mesmo que o PATCH não tenha tocado o campo — testar
+  // `!== undefined` aqui rejeitaria QUALQUER PATCH numa operação antiga que
+  // não seja Financiamento à produção (ex.: só renomear uma Dívida). `true`
+  // é o estado harmless/default e nunca precisa de bloqueio; só `false`
+  // ("desligar") é a ação que não faz sentido fora da FàP.
+  if (dados.ativo !== undefined && typeof dados.ativo !== 'boolean') {
+    return 'ativo deve ser um booleano';
+  }
+  if (dados.ativo === false && dados.tipo !== 'financiamento_producao') {
+    return 'ativo só é aplicável ao Financiamento à produção';
   }
   return null;
 }

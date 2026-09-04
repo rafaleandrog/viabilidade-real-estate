@@ -894,7 +894,17 @@ export function fundingDoEstudo(
   taxaDescontoAa: number,
   contexto?: ContextoFinanciamentoProducao,
 ): FundingCalc | null {
-  if (!operacoes || operacoes.length === 0) return null;
+  // #587: uma `financiamento_producao` DESLIGADA (`ativo === false`) não
+  // participa do agregado — `simularFinanciamentoProducao` já zera a série
+  // dela, mas deixá-la no array faz esta função devolver um `FundingCalc`
+  // não-nulo mesmo quando ela é a ÚNICA operação do estudo (o estado logo
+  // depois de `_garantirFinanciamento` criá-la desligada), e a tela de Fluxo
+  // de Caixa passa a mostrar seções de Funding vazias e Livre/Alavancado
+  // duplicados — achado do Codex no PR #671. Filtrar aqui, antes de tudo,
+  // faz "só uma FàP desligada" se comportar como "nenhuma operação".
+  const operacoesEfetivas = (operacoes ?? []).filter((op) => op.ativo !== false);
+  if (operacoesEfetivas.length === 0) return null;
+  operacoes = operacoesEfetivas;
   const prazo = fluxoLivreMensal.length;
 
   const marcos = contexto?.cronograma ? marcosObra(contexto.cronograma) : null;
