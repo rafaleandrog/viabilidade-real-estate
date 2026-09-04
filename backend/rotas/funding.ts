@@ -180,6 +180,15 @@ export function validarCamposOperacao(dados: Record<string, any>): string | null
 }
 
 /**
+ * #587: Financiamento à produção é único E FIXO — nunca removida, só
+ * ligada/desligada por `PATCH ativo`. Pura e testável, no molde de
+ * `conflitoFinanciamentoUnico` — a rota DELETE só chama.
+ */
+export function remocaoFinanciamentoBloqueada(operacao: { tipo?: unknown }): boolean {
+  return operacao.tipo === 'financiamento_producao';
+}
+
+/**
  * Financiamento à produção é ÚNICO por estudo — exigência explícita do autor.
  * Devolve a operação conflitante, ou `null` quando pode criar/alterar.
  * `ignorarId` existe para o PATCH não conflitar consigo mesmo.
@@ -394,6 +403,16 @@ rotasFunding.delete('/estudos/:id/avancado/funding/:oid', async (req: Request, r
     const operacao = await req.dados!.buscar('avancado_funding_operacoes', oid);
     if (!operacao || Number(operacao.estudo_id) !== estudo.id) {
       erro(res, 404, 'OPERACAO_NAO_ENCONTRADA', 'Operação não encontrada neste estudo');
+      return;
+    }
+    // #587: sem esta guarda, uma chamada direta à API (a UI não expõe mais
+    // lixeira para a FàP — `_renderAbaTipo` só aceita 'divida'|'equity') podia
+    // apagar a linha, e `_garantirFinanciamento` a recriaria do zero na
+    // próxima carga, descartando todo parâmetro digitado — o oposto do que
+    // "desligar sem perder configuração" promete.
+    if (remocaoFinanciamentoBloqueada(operacao)) {
+      erro(res, 422, 'FINANCIAMENTO_FIXO',
+        'Financiamento à produção é único e fixo neste estudo — desligue pelo checkbox "Ativo" em vez de remover.');
       return;
     }
     await req.dados!.deletar('avancado_funding_operacoes', oid);

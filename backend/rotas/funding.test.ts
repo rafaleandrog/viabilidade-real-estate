@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validarCamposOperacao, conflitoFinanciamentoUnico, somaRetornoExcede } from './funding.js';
+import {
+  validarCamposOperacao, conflitoFinanciamentoUnico, somaRetornoExcede, remocaoFinanciamentoBloqueada,
+} from './funding.js';
 
 // #355 — validação das operações de Funding. Só lógica pura: as rotas em si
 // exigem servidor e banco, que este ambiente não sobe (ver CLAUDE.md).
@@ -156,6 +158,12 @@ test('#587: `ativo: true` explícito em Dívida/Equity é um no-op harmless, nã
   for (const tipo of ['divida', 'equity']) {
     assert.equal(validarCamposOperacao({ tipo, ativo: true }), null);
   }
+});
+
+test('#587 remocaoFinanciamentoBloqueada: só o Financiamento à produção é fixo', () => {
+  assert.equal(remocaoFinanciamentoBloqueada({ tipo: 'financiamento_producao' }), true);
+  assert.equal(remocaoFinanciamentoBloqueada({ tipo: 'divida' }), false);
+  assert.equal(remocaoFinanciamentoBloqueada({ tipo: 'equity' }), false);
 });
 
 // ── #435 — teto de `Σ pct_retorno` ────────────────────────────────────────
