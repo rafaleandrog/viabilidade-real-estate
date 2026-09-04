@@ -236,9 +236,12 @@ test('#595: na view Anual a cauda da série mais curta fica PLANA no último sal
 // `tela-graficos.test.ts`. Prova que a tela CHAMA `comparacaoCenario`, que ela
 // não voltou a carregar cor dentro do dado, e que o bloco CSS que define a cor
 // das duas séries continua lá. Não prova que o primitivo desenhou duas linhas:
-// isso depende do markup interno dele, que o harness de render substitui por um
-// stub e que o bundle do SDK — ausente neste ambiente (401) — descreveria.
-// A confirmação visual é do autor, na instância intermediária.
+// isso depende do markup interno dele, e nem o `dist/index.d.ts` do SDK — no
+// disco desde que o 401 acabou (CLAUDE.md, seção Validação) — descreve isso:
+// é declaração de TIPO, não de markup renderizado. O harness de render
+// também não alcança, porque substitui o primitivo por um stub gerado do
+// espelho de props. A confirmação visual é do autor, na instância
+// intermediária.
 //
 // Sem este bloco, apagar a chamada da tela deixa a suíte inteira VERDE: as duas
 // funções puras continuam passando, porque quem parou de chamá-las foi o
