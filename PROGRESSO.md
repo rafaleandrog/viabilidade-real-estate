@@ -4,6 +4,40 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Encerramento da Rodada 10 — #574 (2026-09-04)
+
+As 12 issues da Rodada 10 (`lista_bugs_20260826.xlsx`, #563–#574) estão fechadas. A última,
+**#574** (auditoria geral do Preliminar de Loteamento + propagação das correções de Incorporação),
+ficou aberta de propósito desde 2026-08-27 — o critério 3 dela ("o PR que fechar a última issue da
+rodada atualiza a tabela do `CLAUDE.md` e o `PROGRESSO.md` no mesmo diff") é exatamente esta
+entrada.
+
+**O trabalho substantivo de #574 já estava feito** antes deste PR: o relatório de auditoria
+(`docs/rodada-10/relatorio-574-loteamento.md`, fotografia de 2026-08-27) cobriu 37 conferências
+(35 linhas + 2 transversais) contra `docs/viabilidade/formulas.md`, achou 11 desvios, consertou 3
+na própria auditoria (pizza da gleba lendo campos aposentados pela migração `020`, zero casos de
+render de Loteamento, spec revogada em `formulas.md`) e despachou os outros 8 — por R3 ("um
+assunto por PR") — em issues próprias, todas já fechadas: #609 (duplicar não copiava o catálogo de
+Produtos, P1), #610 (Cenários sem estado vazio), #611 (`eficienciaPct`/`roiPct` viravam 0,0%
+vermelho em vez de indefinido), #612 (ALV podia ficar negativa) e #613 (benchmark de eficiência sem
+medidor) — mais dois achados entregues dentro de PRs de outras issues da própria rodada (permuta
+física reduzindo área em vez de VGV → PR 607/#570, com o RESIDUAL do memo fechado depois pela
+#615/PR 622, commit `7c7e92a`; rótulo de permuta divergente entre tela e exportação → PR 617/#572)
+e um achado que **foi** implementado, sem issue própria — a notação de sinal na exportação da
+Proforma saiu do CSV/PDF via PR 627 (commit `bc46212`), igualando `celulaProforma`/`pctVgvProforma`
+entre tela e exportação.
+
+> ⚠️ **Correção da rodada 1 de revisão do Codex no PR 672** (achado P2): a primeira redação deste
+> parágrafo tratava o residual do achado 1 como se PR 607/#570 tivesse fechado tudo, e o achado 10
+> como "registrado, decisão do autor" — sugerindo que nada foi feito. As duas coisas foram
+> **implementadas depois** (a #615/PR 622 e a PR 627, respectivamente), e omitir isso teria deixado
+> uma trilha de auditoria errada exatamente no arquivo cujo propósito é ser a memória entre sessões.
+
+Este PR não teve conserto de código — só a atualização de processo que o critério 3 pede: a tabela
+de backlog do `CLAUDE.md` (Rodada 10 de 🔄 para ✅) e este parágrafo.
+
+---
+
 ## Financiamento à produção vira operação ÚNICA e fixa, com checkbox ligar/desligar — #587 (2026-09-04)
 
 Antes, a aba de Financiamento à produção (FàP) era só mais uma aba de tipo, atrás da mesma
