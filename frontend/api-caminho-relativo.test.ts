@@ -42,6 +42,10 @@ import assert from 'node:assert/strict';
 
 const APP_ID = 'viabilidade';
 
+// Prefixo que marca a recusa vinda do resolver simulado, para distingui-la de
+// qualquer outra exceção que uma função do wrapper possa lançar.
+const MARCA_RECUSA = '[shell]';
+
 // As funções que NÃO chamam `urbiVerso.api()` — o eixo aqui é *por onde a
 // função sai*, não *que caminho ela escreve*. Cada entrada carrega o motivo (é
 // o que um revisor lê para julgar se a exceção ainda vale) e a lista fecha por
@@ -93,7 +97,7 @@ function resolverComoOShell(caminho: string, fn: string): void {
   const somentePath = corte === -1 ? norm : norm.slice(0, corte);
   if ((somentePath.split('/')[1] ?? '') === APP_ID) {
     throw new Error(
-      `[shell] ${fn}() passou "${caminho}", que começa com o slug da app ` +
+      `${MARCA_RECUSA} ${fn}() passou "${caminho}", que começa com o slug da app ` +
         `("/${APP_ID}"). O shell injeta o "/${APP_ID}" sozinho — passe o caminho ` +
         `relativo. Obsolescência api-slug-manual, encerrada.`
     );
@@ -130,6 +134,7 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
   const funcoes = Object.keys(api).filter((k) => typeof api[k] === 'function').sort();
 
   const recusadas: string[] = [];
+  const outrasExcecoes: string[] = [];
   for (const nome of funcoes) {
     fnAtual = nome;
     // Cada função é chamada DUAS vezes, e isso não é zelo: vários caminhos têm
@@ -150,7 +155,13 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
       try {
         await api[nome](...(args as any[]));
       } catch (e) {
-        recusadas.push(`  · ${(e as Error).message}`);
+        // Separar a recusa do resolver de QUALQUER outra exceção. Sem isto, um
+        // `TypeError` vindo de outro lugar era empilhado em `recusadas` e a
+        // falha saía com a mensagem "o slug da app voltou ao caminho" —
+        // ruidosa, mas apontando para um slug que não existe. Falhar pelo
+        // motivo errado manda quem lê procurar no lugar errado.
+        const msg = String((e as Error).message);
+        (msg.startsWith(MARCA_RECUSA) ? recusadas : outrasExcecoes).push(`  · ${nome}(): ${msg}`);
       }
     }
   }
@@ -167,15 +178,35 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
   // `chamadasApi` registra a URL ANTES de o mock lançar, então ela é o fato
   // primário; a exceção é consequência. Medir o fato primário torna a
   // verificação independente do que a função faz com o erro depois.
+  // ⚠️ A regra é por PRESENÇA do segmento, não por posição — e a inversão é
+  // deliberada. A versão anterior olhava só o PRIMEIRO segmento, espelhando o
+  // resolver do shell, e três formas passavam verdes: `/api/viabilidade/…`,
+  // `//viabilidade/…` e `./viabilidade/…`. A primeira é a perigosa de verdade,
+  // porque o literal `/api/dados/viabilidade/…` JÁ existe neste mesmo arquivo
+  // (nos dois uploads): copiá-lo para uma chamada de `api()` é o erro natural,
+  // e produz o mesmo 404 em toda tela que derrubou a app.
+  //
+  // Enumerar as formas sujas não converge — é a armadilha 14. Então o teste
+  // inverte: **nenhum caminho passado a `api()` carrega o segmento do slug**,
+  // em posição nenhuma. Isso é verdade por construção, porque o shell injeta o
+  // prefixo sozinho; a única chamada legítima que contém a palavra é a do
+  // namespace cross-app, declarada em `VIA_NAMESPACE_CROSS_APP`.
   const comSlug = chamadasApi.filter((c) => {
-    const somentePath = c.url.split(/[?#]/)[0];
-    return (somentePath.startsWith('/') ? somentePath : '/' + somentePath).split('/')[1] === APP_ID;
+    if (c.fn === VIA_NAMESPACE_CROSS_APP) return false;
+    return c.url.split(/[?#]/)[0].split('/').includes(APP_ID);
   });
   assert.deepEqual(
     comSlug.map((c) => `${c.fn}() → ${c.url}`),
     [],
     `chamada(s) a api() com o slug da app no caminho — o shell recusaria cada uma:\n` +
       comSlug.map((c) => `  · ${c.fn}() → ${c.url}`).join('\n')
+  );
+
+  assert.deepEqual(
+    outrasExcecoes,
+    [],
+    `função(ões) do wrapper lançaram por um motivo que NÃO é a recusa do resolver — ` +
+      `o teste não mediu o caminho delas:\n` + outrasExcecoes.join('\n')
   );
 
   // A recusa propagada é a verificação IRMÃ, não a principal: ela prova que o

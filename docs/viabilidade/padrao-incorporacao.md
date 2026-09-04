@@ -3265,14 +3265,14 @@ já estão certos.
 
 Rotas **relativas**; o shell prefixa tudo com `/api/viabilidade/`. O frontend chama via
 `urbiVerso.api('/estudos')`, `urbiVerso.api('/config')` — **caminho relativo, sem o slug da app**
-— e o Núcleo via `urbiVerso.nucleo('/glebas' | '/lotes' | '/imoveis/:id')`.
+— e o Núcleo via `urbiVerso.nucleo('/glebas' | '/lotes' | '/imoveis/:id')`. Persistência via
+`req.dados`; o cálculo é do frontend (a API **não** tem endpoint de "simular").
 
 > ⚠️ **Nunca escreva o `/viabilidade` você mesmo.** Esta linha já prescreveu
 > `urbiVerso.api('/viabilidade/…')`, contradizendo a própria frase anterior, e a obsolescência
 > `api-slug-manual` foi encerrada: o resolver do shell **lança** ao receber um caminho que começa
 > com o slug da app. Em 2026-09-04 isso derrubou a app inteira na instância — 72 chamadas passaram
-> a lançar de uma vez. Quem travar a regressão é `frontend/api-caminho-relativo.test.ts`. Persistência via `req.dados`; o cálculo é
-do frontend (a API **não** tem endpoint de "simular").
+> a lançar de uma vez. Quem trava a regressão é `frontend/api-caminho-relativo.test.ts`.
 
 Endpoints principais: `/estudos` (CRUD + duplicar + ciclo de status), `/benchmarks` (leitura livre;
 `POST`/`PATCH`/`DELETE` e `POST /benchmarks/semear` para admin), rotas de

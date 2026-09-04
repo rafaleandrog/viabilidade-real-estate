@@ -37,8 +37,15 @@ reconhecido. **Não** subiu para `0.54.0`: o caminho relativo funciona em toda v
 app não passa a *exigir* aquele shell. Sem migração nova ⇒ **`versao` fica em `0.1.38`**.
 
 **O que a suíte NÃO enxergava, e por que isso é o centro deste registro.** Com o bug presente, a
-suíte inteira ficava verde — **1056 testes, medidos em worktree na base `9d50055`**: os mocks de
-render casam por `rota.includes(<sufixo>)` e nenhum casa `/viabilidade`.
+suíte inteira ficava verde — **1056 testes na base `9d50055`, contra 1057 no head**, medidos em
+worktree com o glob que o `validar-frontend.sh` usa (`frontend/*.test.ts frontend/fixtures/*.test.ts`):
+os mocks de render casam por `rota.includes(<sufixo>)` e nenhum casa `/viabilidade`.
+
+> ⚠️ **Contagem de teste sem o glob ao lado é ambígua, e isto custou uma rodada.** Uma lente da
+> revisão contestou o par 1056/1057 medindo outros dois recortes — `frontend/*.test.ts` sozinho dá
+> **1029/1030** (não alcança `fixtures/`, a armadilha que o `CLAUDE.md` já registra) e o `npm test`
+> completo dá **1341/1342** (soma backend e render). Os três pares estão certos; o que faltava era
+> dizer **qual** deles. O delta +1 é o mesmo em todos, e é ele que sustenta a afirmação.
 
 > ⚠️ A primeira redação desta seção, e o corpo do PR e a mensagem de commit junto, diziam **1057**.
 > Errado, e errado do jeito clássico: 1057 é a contagem do HEAD, que **inclui o teste novo** — o
