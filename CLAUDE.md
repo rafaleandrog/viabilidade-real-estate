@@ -6,7 +6,7 @@ Este arquivo é lido automaticamente pelo Claude Code ao iniciar qualquer sessã
 
 ## Contexto do projeto
 
-App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell UrbiVerso (SDK `@urbiverso/sdk 0.50.3`). Dois tipos de estudo: **Preliminar** (análise estática) e **Avançado** (fluxo de caixa temporal). Frontend em Lit com web components `urbi-*`. Backend em `backend/rotas.js`, self-contained.
+App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell UrbiVerso (SDK `@urbiverso/sdk 57.0.0`). Dois tipos de estudo: **Preliminar** (análise estática) e **Avançado** (fluxo de caixa temporal). Frontend em Lit com web components `urbi-*`. Backend em `backend/rotas.js`, self-contained.
 
 **Fontes de verdade:**
 - `PROGRESSO.md` — estado atual, o que foi feito, pendências
@@ -710,7 +710,7 @@ em 2026-09-03.
 | Lente de contrato | Superfície | Estado |
 |---|---|---|
 | props de primitivo `urbi-*` | `dist/index.d.ts` (68 `declare class Urbi*`) | ✅ **executável agora** |
-| verbos do SDK, obsolescências | `docs/`, `obsolescencias.json` | ❌ ausentes do 0.50.3 |
+| verbos do SDK, obsolescências | `docs/`, `obsolescencias.json` | ✅ **executável desde 2026-09-04** (pin `57.0.0`) |
 | `shell_min` vs. o que a instância roda | — | pergunta ao autor, nunca ao registry |
 
 Então a atestação continua saindo **`contratos=nao-executados`**, e o relatório diz **qual** metade
@@ -799,17 +799,23 @@ Consequências que valem em toda sessão com token:
 - **`bash scripts/validar-backend.sh` roda inteiro** — as 5 etapas, incluindo o typecheck do backend
   e o `schema.json` contra o contrato do SDK. *"Não deu para rodar"* deixa de ser desculpa aqui.
 - **A camada de contratos roda pela METADE.** A lente de props de primitivo `urbi-*` passa a ser
-  executável (`dist/index.d.ts`); a de doc do SDK, **não** — o pin `0.50.3` não traz `docs/`. A
-  atestação continua saindo **`contratos=nao-executados`**, e o relatório diz qual metade rodou.
-  Detalhe em § *A revisão em si*.
+  executável (`dist/index.d.ts`), **e a de doc do SDK também** desde 2026-09-04, quando o pin subiu
+  para `57.0.0` — o bundle passou a trazer `docs/` e `obsolescencias.json`. A atestação pode sair
+  **`contratos=ok`** quando as duas de fato rodarem. Detalhe em § *A revisão em si*.
 - **`node_modules/@urbiverso/sdk/dist/index.d.ts` está no disco** — a fonte canônica de props de
   primitivo `urbi-*` volta a existir, e ler o monorepo para compensar deixa de ter desculpa.
 
-⚠️ **A versão instalada é a que o `package.json` FIXA** — hoje `@urbiverso/sdk` **`0.50.3`**, exato,
-sem circunflexo. O registry serve versões muito à frente (em 2026-09-03, `56.0.0`); **elas não são a
-autoridade para esta app**. Conferir prop no `latest` é a mesma classe de erro que conferir no `main`
-do monorepo: mede a referência errada. Leia `node_modules/@urbiverso/sdk/`, não o que o `npm view`
-devolve.
+⚠️ **A versão instalada é a que o `package.json` FIXA** — hoje `@urbiverso/sdk` **`57.0.0`**, exato,
+sem circunflexo. Conferir prop numa versão diferente da fixada é a mesma classe de erro que conferir
+no `main` do monorepo: mede a referência errada. Leia `node_modules/@urbiverso/sdk/`, não o que o
+`npm view` devolve.
+
+> ⚠️ **O pin subiu de `0.50.3` para `57.0.0` em 2026-09-04, e o motivo é o incidente do slug.** O
+> `0.50.3` **não trazia `docs/` nem `obsolescencias.json`**, então a auditoria de obsolescência do
+> `urbi-empacotar` rodava contra um catálogo antigo e **não acusava nada** — medido por controle,
+> repondo a chave obsoleta `inicial` de propósito: empacotava limpo. Foi por isso que nem o
+> empacotamento nem a revisão avisaram antes de a app cair inteira. Com o `57.0.0` as duas lentes
+> de contrato passam a ser executáveis.
 
 **Para mudanças de FRONTEND (a maioria):** o frontend **não importa o SDK**
 (usa o global `window.urbiVerso`), então valida-se 100% só com os pacotes públicos. Use o

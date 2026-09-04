@@ -92,6 +92,48 @@ três mutações medidas acima; para o manifesto, `grep -c '"inicial"' manifesto
 7 parâmetros em `padrao`, contra o validador do shell que aceita `padrao` desde 0.53.20. Quem
 gateia de verdade é a **instalação na instância** (shell 0.55.1), não o empacotador desta árvore.
 
+**O pin do SDK subiu junto: `0.50.3` → `57.0.0` (a pedido do autor, e é a causa raiz).** O
+`0.50.3` não trazia `docs/` nem `obsolescencias.json`, e a lista de obsolescências viaja **embutida
+no bin** — então a auditoria do `urbi-empacotar` rodava contra um catálogo de meses atrás e não
+acusava nada. Medido por controle no pin antigo: repondo `inicial` de propósito, empacotava limpo.
+**Foi por isso que nada avisou antes de a app cair inteira.** Com o `57.0.0`:
+
+- o empacotamento passa a auditar de verdade — e, no fonte corrigido, sai **sem uma linha de
+  obsolescência** (agora isso é evidência, não silêncio de auditor cego);
+- as duas lentes de contrato da revisão passam a ser executáveis (`docs/` + `obsolescencias.json`);
+- `validar-frontend.sh` **8/8**, `validar-backend.sh` **5/5**, 1057 testes, 76 render — o typecheck
+  do backend, que era o risco real do salto de 47 majors, passou limpo.
+
+**`sdk_min` NÃO foi declarado, e é decisão consciente.** A doc do SDK 57
+(`apps-em-repo-proprio.md:357`) dá a regra prática "copie o major contra o qual você compilou" —
+seria `57`. Mas ela mesma avisa (`:359`) que isso faz uma app **que não ganhou dependência nenhuma**
+passar a exigir o nível novo só por ter sido reempacotada. Esta app não importa o SDK em runtime (o
+frontend usa o global `window.urbiVerso`; só `backend/rotas.ts` o importa, e para augmentação de
+**tipo**, que não existe em runtime). Declarar `57` arriscaria recusa na instalação sem ganho algum.
+
+---
+
+### ⚠️ Divergência a decidir: a `versao` deveria ter bumpado?
+
+Com o `docs/` do SDK legível pela primeira vez, apareceu um conflito direto entre o contrato
+publicado da plataforma e a regra local deste repositório:
+
+| Fonte | Diz |
+|---|---|
+| `sdk/docs/distribuicao.md:233` (SDK 57, **publicado**) | "A `versao` avança em todo release que altera `schema.json`, traz migração, **ou mexe em `shell_min` ou `sdk_min`**" |
+| `CLAUDE.md` deste repo (issue #422) | "Subir o piso **não** bumpa a `versao` — ela descreve o schema" |
+| `scripts/validar-backend.sh:115-133` | **reprova** o bump sem migração nova: *"FALHOU: versao mudou sem migração nova"* |
+
+Este PR sobe `shell_min` de `0.53.8` para `0.53.20` e **mantém** `versao` em `0.1.38`, porque é o
+que a regra local manda e o que o guard local permite — bumpar deixaria o `validar-backend.sh`
+vermelho. Mas pela doc publicada a `versao` deveria ir a `0.1.39`.
+
+**Não resolvi isso sozinho, de propósito**: mudar o guard é escopo de processo, e a decisão #422 é
+do autor. O risco prático é de instalação — a plataforma decide atualizar por `versao` maior **ou**
+por mesma versão com `build_sha` à frente, então a tag com sha (`viabilidade-v0.1.38_<sha8>`) faz o
+upgrade funcionar mesmo sem bump. Mas se a regra publicada for a que vale, a regra local e o guard
+precisam mudar juntos, num PR próprio.
+
 **Pendente do autor, no ambiente autenticado:** publicar a release (Actions → `release` → *Run
 workflow*, que gera a tag com sha — necessária para atualizar dentro da mesma `versao`), instalar no
 Pinguim marcando "Incluir não homologadas", conferir que **os estudos reaparecem** e que dá para

@@ -37,7 +37,7 @@ Este README é o mapa do projeto. **Releia-o no início de cada sessão** antes 
 | **Nome da tag / release** | `viabilidade-v<x.y.z>_<sha8>` (ex.: `viabilidade-v0.1.0_c03c34e1`) — ver [Lançar uma release](#lançar-uma-release) |
 | **Web component** | `app-viabilidade` |
 | **Prefixo de rota** | shell prefixa tudo com `/api/viabilidade/` — **nunca** escreva o prefixo você mesmo |
-| **Versão do shell / SDK alvo** | `shell_min` = `0.53.20`; `@urbiverso/sdk` = `0.50.3` (os dois deixaram de andar juntos em 2026-08-19 — ver [Os 4 contratos inegociáveis](#os-4-contratos-inegociáveis)) |
+| **Versão do shell / SDK alvo** | `shell_min` = `0.53.20`; `@urbiverso/sdk` = `57.0.0` (os dois não andam juntos desde 2026-08-19 — ver [Os 4 contratos inegociáveis](#os-4-contratos-inegociáveis)) |
 | **Escopo** | **Somente MVP.** Tudo marcado como "v2" na spec fica **de fora**. |
 
 ### Fontes de verdade que você DEVE ler (não invente contratos)
@@ -176,9 +176,12 @@ esbuild frontend/index.ts --bundle --external:@urbiverso/ui --format=esm --outfi
 
 **Empacotar:** `pnpm build && pnpm exec urbi-empacotar viabilidade` → `dist/viabilidade-<versao>.urbiapp.tgz` + `.sha256`.
 
-> ⚠️ **Empacotar limpo NÃO é atestado de que a app passa no instalador.** A auditoria de
-> obsolescências viaja **embutida no bin do SDK**, e este repo fixa `@urbiverso/sdk` `0.50.3` —
-> muito atrás do publicado. Medido em 2026-09-04, por controle: com a chave obsoleta `inicial`
-> reposta de propósito no `manifesto.json`, o `urbi-empacotar` **empacotou sem uma linha de aviso**.
-> Para as obsolescências recentes a auditoria local é **não-executada**, não "aprovada" — quem
-> gateia de verdade é a instalação na instância. Subir o pin do SDK é o que devolveria esse alarme.
+> ✅ **A auditoria de obsolescências voltou a funcionar em 2026-09-04, quando o pin do SDK subiu
+> de `0.50.3` para `57.0.0`.** A lista viaja **embutida no bin**, então um pin velho auditava
+> contra um catálogo velho — e isso não é teoria: medido por controle no pin antigo, com a chave
+> obsoleta `inicial` reposta de propósito no `manifesto.json`, o `urbi-empacotar` **empacotava sem
+> uma linha de aviso**. Era por isso que nada alertou antes de a app cair. Com o pin novo o bundle
+> traz `docs/` e `obsolescencias.json`, e o empacotamento passa a acusar de verdade.
+>
+> Continua valendo o limite estrutural: fora do monorepo, `shell_min` e `sdk_min` só têm o
+> **formato** validado — a versão real da instância é desconhecida no empacotamento.

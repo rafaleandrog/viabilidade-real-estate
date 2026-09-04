@@ -67,7 +67,7 @@ Gráficos) · **Imóveis** (imóveis do Núcleo e em quais estudos são usados).
 - **Sem `instanceof` cruzando shell↔app** — matching por propriedade (`erro?.name`/`codigo`), `import type`.
 - **Seed fora de migração** — `schema.json` é o genesis; semente idempotente no boot; migração só
   transforma dados de instâncias que já têm a app.
-- **`shell_min` = `0.53.20`** (formato `x.y.z`), SDK alvo `0.50.3`. Subiu de `0.53.8` em
+- **`shell_min` = `0.53.20`** (formato `x.y.z`), SDK alvo `57.0.0`. Subiu de `0.53.8` em
   2026-09-04: os 7 parâmetros do manifesto migraram de `inicial` para `padrao`, e `padrao` só é
   reconhecido a partir de `0.53.20`. O degrau anterior (`0.50.3` → `0.53.8`, 2026-08-19,
   issue #422) veio da migração `003`, que saiu do retorno declarativo `remover_colunas` — que
