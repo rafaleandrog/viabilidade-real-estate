@@ -34,9 +34,21 @@ import {
 //
 // Diferente do modelo antigo, aqui os campos são COLUNAS, não um `config` JSON
 // solto — o shape é fixo e conhecido, então dá para validar campo a campo em
-// vez de só checar "é um objeto". Também não há `status`: uma operação existe
-// ou não existe, e toda operação existente conta no motor (o antigo
-// `status='ativo'` era um estado a mais para o usuário errar).
+// vez de só checar "é um objeto".
+//
+// ⚠️ #587 mudou a frase acima, e só para o Financiamento à produção. Ela dizia
+// "não há status: uma operação existe ou não existe, e toda operação
+// existente conta no motor" — o antigo `status='ativo'` proposto (linha de
+// crédito rotativa) foi RECUSADO pelo autor por reintroduzir competição por
+// caixa (ver o cabeçalho de `../../frontend/funding-motor.ts`), e essa recusa
+// continua de pé. O que mudou é outro pedido, específico do FàP: ele passou a
+// ser ÚNICO E FIXO por estudo (nunca criado/removido pelo usuário pela UI —
+// ver `_renderAbaFinanciamentoProducao` em `../../frontend/tela-funding.ts`),
+// e "ligar/desligar sem perder configuração" só faz sentido numa operação que
+// não se apaga. A coluna `ativo` (`schema.json`) existe nas 3, mas
+// `validarCamposOperacao` só a aceita em `financiamento_producao` —
+// `divida`/`equity` continuam se resolvendo por existir/não existir a linha,
+// sem status nenhum.
 //
 // O mês do aporte segue o mesmo padrão de âncora das linhas de Custo (#249):
 // `cronograma_evento` fixo ou `fase_ancora_id`, com `inicio_mes` DERIVADO no
@@ -144,6 +156,17 @@ export function validarCamposOperacao(dados: Record<string, any>): string | null
   }
   if (dados.aporte_meses !== undefined && Number(dados.aporte_meses) < 1) {
     return 'aporte_meses deve ser pelo menos 1';
+  }
+  // #587: `ativo` é genérica na coluna (`schema.json`), mas o USO é só do
+  // Financiamento à produção — Dívida/Equity continuam se resolvendo por
+  // existir/não existir a linha, sem status. `dados` aqui é sempre o estado
+  // FINAL (o POST exige `tipo` antes de chamar este validador; o PATCH passa
+  // `{ ...operacao, ...dados }`), então `dados.tipo` está sempre resolvido.
+  if (dados.ativo !== undefined) {
+    if (typeof dados.ativo !== 'boolean') return 'ativo deve ser um booleano';
+    if (dados.tipo !== 'financiamento_producao') {
+      return 'ativo só é aplicável ao Financiamento à produção';
+    }
   }
   return null;
 }

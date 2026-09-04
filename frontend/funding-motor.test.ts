@@ -200,6 +200,37 @@ test('#478 financiamento_producao e equity não têm tarifa (série zerada, camp
   assert.ok(eq.tarifas.every((v) => v === 0));
 });
 
+test('#587 financiamento_producao com ativo=false: TODAS as séries saem zeradas, mesmo com custo elegível e caixa reais', () => {
+  const op: OperacaoFunding = {
+    tipo: 'financiamento_producao', nome: 'FP desligado', taxa_anual: 12.5,
+    exposicao_minima: 20, percentual_financiavel: 80, amortizar_com_caixa_disponivel: true,
+    ativo: false,
+  } as any;
+  const fp = simularFinanciamentoProducao(
+    op, new Array(12).fill(1_000_000), null, null, new Array(12).fill(5_000_000), 12,
+  );
+  assert.ok(fp.entradas.every((v) => v === 0), 'entradas deviam ser zero com ativo=false');
+  assert.ok(fp.saidas.every((v) => v === 0), 'saidas deviam ser zero com ativo=false');
+  assert.ok(fp.juros.every((v) => v === 0), 'juros deviam ser zero com ativo=false');
+  assert.ok(fp.saldo.every((v) => v === 0), 'saldo devia ficar zero com ativo=false');
+  assert.ok(fp.fluxoInvestidor.every((v) => v === 0), 'fluxoInvestidor devia ficar zero com ativo=false');
+  assert.equal(fp.operacao, op, 'a operação em si é preservada — só o cálculo é zerado');
+});
+
+test('#587 financiamento_producao com ativo=true (ou omitido) continua calculando normalmente', () => {
+  const semAtivo: OperacaoFunding = {
+    tipo: 'financiamento_producao', nome: 'FP ligado', taxa_anual: 12.5,
+    exposicao_minima: 20, percentual_financiavel: 80, amortizar_com_caixa_disponivel: true,
+  } as any;
+  const comAtivoTrue = { ...semAtivo, ativo: true };
+  const custo = new Array(12).fill(1_000_000);
+  const caixa = new Array(12).fill(5_000_000);
+  const a = simularFinanciamentoProducao(semAtivo, custo, null, null, caixa, 12);
+  const b = simularFinanciamentoProducao(comAtivoTrue, custo, null, null, caixa, 12);
+  assert.deepEqual(a.entradas, b.entradas, 'ativo omitido e ativo=true têm que produzir o mesmo resultado');
+  assert.ok(a.entradas.some((v) => v !== 0), 'controle: com custo elegível e caixa reais, a operação ligada MOVE dinheiro');
+});
+
 test('#355 dívida sem distribuir: libera tudo num mês só e o PMT usa o valor cru', () => {
   const op: OperacaoFunding = { ...DIVIDA_GOLDEN, distribuir_aporte: false, aporte_meses: 3 };
   const s = simularDivida(op, PRAZO_DIVIDA);

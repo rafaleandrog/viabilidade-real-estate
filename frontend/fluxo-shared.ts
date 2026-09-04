@@ -911,6 +911,11 @@ export interface OperacaoParaHorizonte {
   aporte_meses?: number | string | null;
   distribuir_aporte?: boolean | null;
   periodo_amortizacao_meses?: number | string | null;
+  /** #587 — `false` só é válido em `financiamento_producao` (validado no
+   * backend). Uma FàP desligada não pode esticar o horizonte: quem filtra é
+   * o CHAMADOR (`fluxo-caixa-motor.ts`), não esta função — ela só descreve a
+   * forma mínima da operação. */
+  ativo?: boolean | null;
 }
 
 /**

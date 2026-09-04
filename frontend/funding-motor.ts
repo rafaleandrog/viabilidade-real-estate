@@ -187,6 +187,17 @@ export interface OperacaoFunding {
   amortizar_com_caixa_disponivel?: boolean;
   /** IDs de `avancado_linhas_custo` elegíveis. `null`/ausente = base padrão (`linhasFinanciaveisPadrao`). */
   custo_linha_ids?: number[] | null;
+  /**
+   * #587 — só `financiamento_producao` (validado em
+   * `backend/rotas/funding.ts`, `validarCamposOperacao`). `false` = a
+   * operação existe (preserva todos os parâmetros) mas não entra no cálculo:
+   * `simularFinanciamentoProducao` devolve série toda zerada, e
+   * `ultimoMesFunding` (`fluxo-shared.ts`) ignora a operação no horizonte.
+   * `undefined`/`true` = ligada — é o estado de todo estudo anterior à #587
+   * (default `true` no `schema.json`), então nenhum comportamento existente
+   * muda.
+   */
+  ativo?: boolean;
 }
 
 /**
@@ -414,6 +425,22 @@ export function simularFinanciamentoProducao(
   const alvoAcumulado = serieZerada(prazo);
   const liberacaoAcumulada = serieZerada(prazo);
   const caixaDisponivelAmortizacao = serieZerada(prazo);
+
+  // #587: desligada — a operação existe (preserva os parâmetros acima dela em
+  // `op`), mas não entra no cálculo. Corta ANTES de qualquer conta: todas as
+  // séries já nasceram zeradas.
+  if (op.ativo === false) {
+    return {
+      operacao: op, entradas, saidas,
+      fluxoInvestidor: serieZerada(prazo),
+      juros, saldo,
+      tarifas: serieZerada(prazo),
+      diagnostico: {
+        custoElegivel, custoElegivelAcumulado, percentualIncorrido,
+        liberacaoHabilitada, alvoAcumulado, liberacaoAcumulada, caixaDisponivelAmortizacao,
+      },
+    };
+  }
 
   const i = taxaMensalEquivalente(n(op.taxa_anual) / 100);
   const exposicaoMinima = n(op.exposicao_minima ?? PADRAO_EXPOSICAO_MINIMA) / 100;

@@ -104,6 +104,38 @@ test('#355 amortizar_com_caixa_disponivel não passa pela checagem numérica (é
   assert.equal(validarCamposOperacao({ amortizar_com_caixa_disponivel: false }), null);
 });
 
+// ── #587 — `ativo`, genérico na coluna, restrito ao Financiamento à produção ──
+
+test('#587 ativo é aceito em financiamento_producao, ligado ou desligado', () => {
+  assert.equal(validarCamposOperacao({ tipo: 'financiamento_producao', ativo: true }), null);
+  assert.equal(validarCamposOperacao({ tipo: 'financiamento_producao', ativo: false }), null);
+});
+
+test('#587 ativo é recusado em divida e equity — o produto não tem status', () => {
+  for (const tipo of ['divida', 'equity']) {
+    const msg = validarCamposOperacao({ tipo, ativo: false });
+    assert.ok(msg, `tipo=${tipo} devia recusar`);
+    assert.match(msg!, /ativo.*Financiamento à produção/);
+  }
+});
+
+test('#587 ativo não numérico/string não passa como booleano válido', () => {
+  const msg = validarCamposOperacao({ tipo: 'financiamento_producao', ativo: 'sim' as any });
+  assert.ok(msg);
+  assert.match(msg!, /booleano/);
+});
+
+test('#587 PATCH: a checagem usa o TIPO FINAL (atual + patch), não só o corpo do patch', () => {
+  // Simula a chamada real do handler PATCH: validarCamposOperacao({ ...operacao, ...dados }).
+  // Um PATCH que manda só `{ ativo: false }` numa operação de dívida tem de
+  // recusar mesmo sem repetir `tipo` no corpo.
+  const operacaoExistente = { id: 1, tipo: 'divida', nome: 'Dívida A' };
+  const patch = { ativo: false };
+  const msg = validarCamposOperacao({ ...operacaoExistente, ...patch });
+  assert.ok(msg);
+  assert.match(msg!, /Financiamento à produção/);
+});
+
 // ── #435 — teto de `Σ pct_retorno` ────────────────────────────────────────
 //
 // A regra é da spec vigente (`docs/viabilidade/fluxo-investidor-formulas.md`
