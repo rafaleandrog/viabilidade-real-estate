@@ -31,10 +31,14 @@
 //   · `fetch('/api/dados/viabilidade/...')` — fetch nativo, caminho absoluto.
 //
 // ⚠️ A fonte dessas três é o código do resolver no monorepo, NÃO o bundle do
-// SDK que esta app fixa: o pin `0.50.3` não traz `docs/` nem
-// `obsolescencias.json`, e `SEGMENTOS_CROSS_APP` não aparece em lugar nenhum
-// dele. É leitura legítima, mas mede uma referência à frente do que a app
-// declara — então está declarado aqui em vez de passar por verificado.
+// SDK que esta app fixa: `SEGMENTOS_CROSS_APP` não aparece em lugar nenhum do
+// bundle, nem no pin `57.0.0` (conferido por grep). É leitura legítima, mas
+// mede uma referência à frente do que a app declara — então está declarado aqui
+// em vez de passar por verificado.
+//
+// (O motivo citado antes era outro: que o pin `0.50.3` não trazia `docs/`. Isso
+// deixou de valer em 2026-09-04, quando o pin subiu; a conclusão continua, a
+// premissa mudou.)
 
 interface UrbiVersoApi {
   api(url: string, opts?: RequestInit): Promise<any>;

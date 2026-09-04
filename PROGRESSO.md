@@ -111,6 +111,25 @@ passar a exigir o nível novo só por ter sido reempacotada. Esta app não impor
 frontend usa o global `window.urbiVerso`; só `backend/rotas.ts` o importa, e para augmentação de
 **tipo**, que não existe em runtime). Declarar `57` arriscaria recusa na instalação sem ganho algum.
 
+**Cinco afirmações envelheceram junto com o pin, e a rodada 5 as pegou** — é a classe do PR 494
+(o conserto envelhece a vizinhança), agora atravessando código e doc: `CLAUDE.md` em três pontos
+(inclusive contradizendo, duas linhas abaixo, a tabela que o próprio commit tinha atualizado),
+`backend/rotas/varrer-tudo.ts`, `backend/rotas/avancado.ts` e `frontend/viabilidade-api.ts`.
+Todas corrigidas aqui.
+
+A mais cara delas é a do `varrer-tudo.ts`: **a premissa que justifica a existência do helper caiu**.
+Ele foi escrito porque o SDK `0.50.3` não declarava `dados.varrerTudo`; o `57.0.0` declara os dois
+(`varrerTudo` e `limparColuna`, no `dist/index.d.ts` do bundle). O helper virou dívida — dá para chamar o
+verbo direto e apagá-lo. **Não fiz aqui de propósito**: trocar o caminho de varredura de toda
+migração e rota que o usa é mudança de comportamento, e o PR que sobe o pin não é lugar para ela.
+
+> ⚠️ **PENDENTE, e não cabe neste PR: `.claude/preparar-sessao.sh:50`.** Ele imprime, **em toda
+> sessão**, que "o pin 0.50.3 não traz docs/" e que "a atestação segue `contratos=nao-executados`" —
+> as duas agora falsas, e na superfície que é reinjetada a cada prompt, ou seja, a que mais
+> contamina a sessão seguinte. Corrigir ali é mudança de **processo** (`.claude/**`), e a regra R1
+> proíbe misturá-la com código de produto: o guard `escopo-processo` reprovaria este PR. Vai em PR
+> próprio, junto com a decisão da `versao` abaixo.
+
 ---
 
 ### ⚠️ Divergência a decidir: a `versao` deveria ter bumpado?

@@ -700,12 +700,19 @@ proxy dá **403 no CONNECT** —, e **subagente nativo** quando não houver, **d
 como menos adversarial, por revisar patch escrito pela mesma família de modelo. O App **não
 dispensa** a fan-out: neste repositório os dois acharam classes de defeito diferentes.
 
-**A camada de contratos roda PELA METADE — e a metade que falta mudou de causa.** O pacote está no
-disco depois do `validar-frontend.sh` — que é o único dos dois que instala; o
-`validar-backend.sh` aborta se ele não tiver rodado antes (§ Validação) —, mas a superfície que a skill lê é
-`node_modules/@urbiverso/sdk/**docs/**`, e o bundle **0.50.3** — a versão que o `package.json` fixa —
-**não tem `docs/` nem `obsolescencias.json`**. Ele traz `README.md`, `package.json` e `dist/`. Medido
-em 2026-09-03.
+**A camada de contratos roda INTEIRA desde 2026-09-04.** O pacote está no disco depois do
+`validar-frontend.sh` — que é o único dos dois que instala; o `validar-backend.sh` aborta se ele não
+tiver rodado antes (§ Validação) —, e a superfície que a skill lê é
+`node_modules/@urbiverso/sdk/**docs/**`. Com o pin em **`57.0.0`** o bundle traz `docs/` (32
+arquivos) **e** `obsolescencias.json` (7 chaves).
+
+> ⚠️ **Até 2026-09-04 esta seção dizia o contrário, e a causa era o pin.** Com `0.50.3` o bundle
+> trazia só `README.md`, `package.json` e `dist/` — sem `docs/`, sem `obsolescencias.json` —, então
+> a lente de doc saía sempre **não executada**. Isso não era detalhe de revisão: a lista de
+> obsolescências viaja **embutida no bin**, então o `urbi-empacotar` também auditava contra um
+> catálogo velho e **não acusava nada**. Medido por controle nos dois pins, repondo a chave obsoleta
+> `inicial` de propósito: no `0.50.3` empacotava limpo; no `57.0.0` acusa
+> `⚠ OBSOLESCÊNCIA [parametro-inicial]`. Foi esse silêncio que deixou a app cair inteira sem aviso.
 
 | Lente de contrato | Superfície | Estado |
 |---|---|---|
@@ -713,9 +720,9 @@ em 2026-09-03.
 | verbos do SDK, obsolescências | `docs/`, `obsolescencias.json` | ✅ **executável desde 2026-09-04** (pin `57.0.0`) |
 | `shell_min` vs. o que a instância roda | — | pergunta ao autor, nunca ao registry |
 
-Então a atestação continua saindo **`contratos=nao-executados`**, e o relatório diz **qual** metade
-rodou. `contratos=ok` seria uma afirmação plausível e falsa — a classe de defeito que a armadilha 11
-descreve.
+Com as duas lentes executáveis, a atestação **pode** sair `contratos=ok` — mas só quando as duas de
+fato rodarem naquela revisão. Publicá-lo porque "o SDK está no disco" continua sendo afirmação
+plausível e falsa, a classe da armadilha 11; o relatório diz sempre **o que** rodou.
 
 > ⚠️ **A causa não é mais o 401, e confundir as duas custa a próxima sessão.** Este parágrafo dizia
 > que a camada não rodava *"e isso é estrutural"*, atribuindo tudo ao SDK ser privado. Com a auth em
@@ -929,7 +936,7 @@ barra os dois erros simétricos de versionamento: migração nova **sem** bump d
 > **não dá erro, só não faz nada** — leia antes de presumir.
 >
 > **Essa fonte existe aqui desde 2026-09-03** — o `validar-frontend.sh` põe o SDK no disco (§ Validação),
-> e a versão é a que o `package.json` fixa (`0.50.3`), que é justamente a autoridade certa.
+> e a versão é a que o `package.json` fixa (hoje `57.0.0`), que é justamente a autoridade certa.
 >
 > A alternativa antiga — ler `ui/src/urbi-<nome>.ts` no monorepo — **deixou de ter desculpa**. Ela
 > continua permitida (§ O monorepo é só leitura) e continua medindo a referência errada: o `main`
