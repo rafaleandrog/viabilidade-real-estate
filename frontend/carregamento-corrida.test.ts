@@ -41,7 +41,7 @@ function criarApiControlavel() {
     return p;
   };
   // Resolve a N-ésima chamada feita (0-based) — índice explícito, não FIFO por
-  // URL: `buscarConfig()` bate na MESMA URL (`/viabilidade/config`) para os
+  // URL: `buscarConfig()` bate na MESMA URL (`/config`) para os
   // dois estudos, então só a ordem de REGISTRO (que o teste controla ao
   // decidir quando chama `_init()`) distingue qual é qual.
   const resolverChamada = (indice: number, valor: any) => {

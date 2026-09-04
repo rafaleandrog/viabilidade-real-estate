@@ -951,10 +951,15 @@ Git Bash — ver PROGRESSO).
 - Backend 100% self-contained (`backend/rotas.js`, sem `--packages=external`)
 - Sem `instanceof` cruzando shell↔app
 - Seed fora de migração; migração só transforma dados existentes
-- `shell_min = "0.53.8"` — subiu de `0.50.3` em 2026-08-19 (issue #422). O piso existe para ser
-  **honesto**, e a plataforma retirou a alternativa: o retorno declarativo de migração
-  (`remover_colunas`) vira **gate** em 2026-08-23, e o fluxo canônico que o substitui exige
-  `dados.limparColuna` (shell **0.53.5**) e `dados.varrerTudo` (shell **0.53.8**). Subir o piso
+- `shell_min = "0.53.20"` — subiu de `0.53.8` em 2026-09-04, porque os 7 parâmetros do manifesto
+  migraram de `inicial` para `padrao` (obsolescência `parametro-inicial`, que **gateia** a partir
+  de 2026-09-06) e `padrao` só é reconhecido a partir de **0.53.20**; num shell anterior o
+  manifesto reprova com uma mensagem que nomeia o campo ANTIGO. **Não** subiu para `0.54.0`: o
+  caminho relativo de `api()` funciona em toda versão do resolver, então a app não passa a
+  **exigir** aquele shell — ela só parou de usar uma capacidade removida (`api-slug-manual`).
+  O degrau anterior (`0.50.3` → `0.53.8`, 2026-08-19, issue #422) veio do retorno declarativo de
+  migração (`remover_colunas`), cujo fluxo canônico substituto exige `dados.limparColuna`
+  (shell **0.53.5**) e `dados.varrerTudo` (shell **0.53.8**). Subir o piso
   **não** bumpa a `versao` — ela descreve o schema, e nada de schema mudou.
 - Precisão: R$ e m² → `decimal(12,2)`; % digitado → inteiro; % calculado → `decimal(5,1)`
 - **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e

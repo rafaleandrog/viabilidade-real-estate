@@ -37,7 +37,7 @@ Este README é o mapa do projeto. **Releia-o no início de cada sessão** antes 
 | **Nome da tag / release** | `viabilidade-v<x.y.z>_<sha8>` (ex.: `viabilidade-v0.1.0_c03c34e1`) — ver [Lançar uma release](#lançar-uma-release) |
 | **Web component** | `app-viabilidade` |
 | **Prefixo de rota** | shell prefixa tudo com `/api/viabilidade/` — **nunca** escreva o prefixo você mesmo |
-| **Versão do shell / SDK alvo** | `shell_min` = `0.53.8`; `@urbiverso/sdk` = `0.50.3` (os dois deixaram de andar juntos em 2026-08-19 — ver [Os 4 contratos inegociáveis](#os-4-contratos-inegociáveis)) |
+| **Versão do shell / SDK alvo** | `shell_min` = `0.53.20`; `@urbiverso/sdk` = `0.50.3` (os dois deixaram de andar juntos em 2026-08-19 — ver [Os 4 contratos inegociáveis](#os-4-contratos-inegociáveis)) |
 | **Escopo** | **Somente MVP.** Tudo marcado como "v2" na spec fica **de fora**. |
 
 ### Fontes de verdade que você DEVE ler (não invente contratos)
@@ -55,9 +55,13 @@ Se um contrato (comando, formato, assinatura de `req.*`, API do Núcleo) puder s
 1. **Backend 100% self-contained.** `backend/rotas.js` roda em produção sem `npm install`. Use o comando de build canônico (com `--minify` e o banner `createRequire`). Nada de `--packages=external` no backend.
 2. **Sem `instanceof` cruzando o limite shell↔app.** Faça matching por propriedade (`erro?.name === '...'` ou um `codigo` estável). Prefira `import type` quando só precisa da identidade de tipo.
 3. **Seed inicial fora de migração.** `schema.json` é o genesis da app — numa instalação virgem o schema nasce no estado final e as migrações sofrem baseline (registradas sem rodar). Dados semente devem ser idempotentes no boot ou declarativos. Migração é só para transformar dados de instâncias que já têm a app.
-4. **`shell_min` honesto.** `0.53.8`, formato `x.y.z` completo. Subiu de `0.50.3` em 2026-08-19
-   (issue #422): a migração `003` trocou o retorno declarativo `remover_colunas` — obsoleto e
-   **gate** da plataforma a partir de 2026-08-23 — pelo fluxo canônico, que precisa de
+4. **`shell_min` honesto.** `0.53.20`, formato `x.y.z` completo. Subiu de `0.53.8` para `0.53.20` em 2026-09-04: os 7 parâmetros do manifesto
+   migraram de `inicial` para `padrao`, e `padrao` só é reconhecido a partir de **0.53.20** —
+   num shell anterior o manifesto reprova nomeando o campo antigo. **Não** subiu para `0.54.0`:
+   o caminho relativo de `api()` sempre funcionou, então a app não passa a exigir aquele shell,
+   ela só parou de usar uma capacidade removida. Subir o piso **não** bumpa a `versao`.
+   O degrau anterior (`0.50.3` → `0.53.8`, 2026-08-19, issue #422) veio da migração `003`, que
+   trocou o retorno declarativo `remover_colunas` pelo fluxo canônico, que precisa de
    `dados.limparColuna` (shell 0.53.5) e `dados.varrerTudo` (shell 0.53.8). "Honesto" é literal:
    o piso declara o menor shell em que a app **de fato** roda, e mentir para baixo faz a app passar
    no gate de instalação e quebrar em runtime.
@@ -168,6 +172,6 @@ esbuild frontend/index.ts --bundle --external:@urbiverso/ui --format=esm --outfi
 
 **Backend:** `export const rotas: Router = Router()` com rotas **relativas**; `import '@urbiverso/sdk/express'` no topo para tipar `req.*`; `req.contexto` (usuário/nível/roles) já preenchido — a app **nunca** implementa autenticação; `req.dados` para persistência.
 
-**Frontend:** Lit com decorators (`@customElement('app-viabilidade')`, `@state`, `@property`); chamadas via `urbiVerso.api('/viabilidade/rota')`; tokens CSS do design system (`var(--cor-primaria-solida)`, `var(--espaco-4)`, …); primitivos `urbi-*` disponíveis globalmente (use pela tag, `import type` apenas — nunca `import @urbiverso/ui` em runtime).
+**Frontend:** Lit com decorators (`@customElement('app-viabilidade')`, `@state`, `@property`); chamadas via `urbiVerso.api('/rota')` — **caminho relativo; o shell injeta o `/viabilidade` sozinho, e repetir o slug à mão LANÇA** (obsolescência `api-slug-manual`, encerrada em 2026-08-30); tokens CSS do design system (`var(--cor-primaria-solida)`, `var(--espaco-4)`, …); primitivos `urbi-*` disponíveis globalmente (use pela tag, `import type` apenas — nunca `import @urbiverso/ui` em runtime).
 
 **Empacotar:** `pnpm build && pnpm exec urbi-empacotar viabilidade` → `dist/viabilidade-<versao>.urbiapp.tgz` + `.sha256`, já validado com as mesmas checagens do instalador.

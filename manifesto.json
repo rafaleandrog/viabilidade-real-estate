@@ -1,7 +1,7 @@
 {
   "nome": "Estudo de Viabilidade",
   "versao": "0.1.38",
-  "shell_min": "0.53.8",
+  "shell_min": "0.53.20",
   "descricao": "Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação) — proforma automática, comparação de cenários, sensibilidade e análise de mercado do imóvel por IA.",
   "rotas_publicas": [],
   "dependencias_nucleo": ["imoveis"],
@@ -89,43 +89,43 @@
     "imposto_padrao_pct": {
       "tipo": "numero",
       "nullable": false,
-      "inicial": 7,
+      "padrao": 7,
       "descricao": "Alíquota padrão de imposto sobre a receita (não-RET), em %"
     },
     "aliquota_ret_pct": {
       "tipo": "numero",
       "nullable": false,
-      "inicial": 4,
+      "padrao": 4,
       "descricao": "Alíquota fixa aplicada quando o estudo está sujeito ao RET, em %"
     },
     "corretagem_padrao_pct": {
       "tipo": "numero",
       "nullable": false,
-      "inicial": 5,
+      "padrao": 5,
       "descricao": "Taxa de corretagem padrão sobre o valor dos contratos, em %"
     },
     "marketing_padrao_pct": {
       "tipo": "numero",
       "nullable": false,
-      "inicial": 1,
+      "padrao": 1,
       "descricao": "Percentual padrão de marketing sobre o VGV, em %"
     },
     "gestao_indiretos_padrao_pct": {
       "tipo": "numero",
       "nullable": false,
-      "inicial": 1.25,
+      "padrao": 1.25,
       "descricao": "Percentual padrão de gestão e outros custos indiretos sobre o VGV, em %"
     },
     "prazo_arquivamento_dias": {
       "tipo": "numero",
       "nullable": false,
-      "inicial": 30,
+      "padrao": 30,
       "descricao": "Dias sem movimentação (exceto Aprovado) até o estudo ser arquivado automaticamente"
     },
     "mercado_busca_max_itens": {
       "tipo": "numero",
       "nullable": false,
-      "inicial": 10,
+      "padrao": 10,
       "descricao": "Máximo de itens guardados por região a cada coleta diária"
     }
   },

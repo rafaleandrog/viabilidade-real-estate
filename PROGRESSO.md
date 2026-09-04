@@ -4,6 +4,86 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Incidente — a app parou inteira na instância, e não era perda de dados (2026-09-04)
+
+**Sintoma relatado:** nenhuma tela carregava dado, não dava para criar estudo, e os estudos que
+existiam "sumiram" da lista.
+
+**Causa:** uma constante em `frontend/viabilidade-api.ts` repetia o slug da app no caminho da API —
+`const APP = '/viabilidade'`, interpolada em **72** chamadas. O shell sempre injetou o `/<appId>`
+sozinho; repetir o slug à mão era um compat com `console.warn`. Quando a obsolescência
+`api-slug-manual` venceu (data-piso 2026-08-30, encerrada na v0.54.0), o resolver do shell passou a
+**LANÇAR** — antes de a requisição sair. A instância roda **0.55.1**. Os 72 caminhos viraram 72
+exceções.
+
+**Os dados nunca foram tocados.** A requisição sequer chegava à rede; o `catch` de
+`tela-dashboard.ts:277-282` registrava no console e deixava `this.estudos` em `[]`, e lista vazia
+lê-se, de fora, como "apagaram tudo". Conferido: as migrações do shell 0.54.0→0.55.1 mexem só em
+`sentinela_*`/`config_sistema`/`faxina_jobs`/`shell.ia_chamadas`; as migrações recentes da app
+(`038`, `039`) não apagam linha; e a purga destrutiva de dados de app exige a app desinstalada.
+
+**Conserto:** a constante foi **apagada** (não zerada) e os 72 caminhos passaram a relativos
+(`api('/estudos')`). Zerar (`const APP = ''`) consertaria igual e deixaria 72 interpolações vazias
+que alguém repovoa sem que nada acuse; sem o símbolo, repor é `TS2304`. É a inversão para
+fail-closed da armadilha 14.
+
+**Segunda quebra, encontrada no mesmo diagnóstico:** os 7 parâmetros do `manifesto.json` usavam a
+chave obsoleta `inicial`, cuja entrada (`parametro-inicial`) **gateia em 2026-09-06** — dois dias
+depois. Passada a data, `urbi-empacotar` falha antes de montar o tarball e a instalação responde
+422; ou seja, o conserto acima ficaria **impublicável**. Daí os dois irem no mesmo PR: o assunto
+único é "realinhar a app aos contratos da plataforma que mudaram". `inicial` → `padrao` (mesmos
+valores), e `shell_min` sobe de `0.53.8` para **`0.53.20`**, que é onde `padrao` passa a ser
+reconhecido. **Não** subiu para `0.54.0`: o caminho relativo funciona em toda versão do resolver, a
+app não passa a *exigir* aquele shell. Sem migração nova ⇒ **`versao` fica em `0.1.38`**.
+
+**O que a suíte NÃO enxergava, e por que isso é o centro deste registro.** Com o bug presente, os
+1057 testes ficavam verdes: os mocks de render casam por `rota.includes(<sufixo>)` e nenhum casa
+`/viabilidade`. É a classe de defeito nº 1 (o defeito mora na fiação) na forma mais cara — a app
+inteira caiu sem uma asserção sequer piscar. `frontend/api-caminho-relativo.test.ts` fecha isso:
+exercita **todas** as funções exportadas do wrapper e reproduz a recusa do resolver do shell, em vez
+de olhar o texto do arquivo (um guard sobre o literal pegaria só a forma já conhecida).
+
+**Mutações medidas nesta sessão** — sem elas o teste seria autoafirmação:
+
+| Mutação | Resultado |
+|---|---|
+| controle: código sem mutação, `tsc --noEmit` | exit **0** (a mutação significa algo) |
+| repor `/viabilidade` em **um** caminho | teste **vermelho**, nomeando `listarEstudos()` |
+| usar `${APP}` sem declarar a constante | **`TS2304: Cannot find name 'APP'`** |
+
+O teste também fecha por **contagem exata** (78 funções exportadas) e a lista de exceção fecha nos
+dois sentidos. Ela nasceu com o **eixo errado** — `listarUsuarios` entrou como exceção quando na
+verdade *chama* `api()`, só que no namespace cross-app `/shell/`, e portanto deve passar pela
+verificação como qualquer outra. O próprio teste acusou; a lista virou "quem não chama `api()`" (5
+entradas) e a chamada cross-app ganhou asserção própria.
+
+**Documentação corrigida junto, porque ela PRESCREVIA o bug:** `INSTRUCOES-CODE.md` e `README.md`
+mandavam escrever `urbiVerso.api('/viabilidade/...')` — e cada um dos dois se contradizia poucas
+linhas antes, onde já dizia "o shell prefixa; nunca escreva o prefixo". Sem isso a próxima sessão
+reintroduz o bug obedecendo à doc.
+
+**⚠️ O `urbi-empacotar` local NÃO serve de prova aqui, e medir isso valeu.** Ele empacota limpo,
+sem uma linha de obsolescência — e a leitura tentadora ("saiu limpo, logo migrou") é **falsa**. A
+lista de obsolescências viaja **embutida no bin**, e o pin desta app é `@urbiverso/sdk` **0.50.3**,
+anterior às duas entradas (`api-slug-manual` e `parametro-inicial`, ambas 0.53.x/0.54.0). Medido
+por controle: repondo `"inicial"` no manifesto de propósito, o empacotador **continua sem acusar**.
+Ou seja, para estas duas entradas a auditoria do empacotador local é **não-executada**, não
+"aprovada" — e teria sido igualmente silenciosa com a app quebrada.
+
+A evidência que de fato sustenta cada conserto é outra, e é direta: para o slug, o teste com as
+três mutações medidas acima; para o manifesto, `grep -c '"inicial"' manifesto.json` = **0** com os
+7 parâmetros em `padrao`, contra o validador do shell que aceita `padrao` desde 0.53.20. Quem
+gateia de verdade é a **instalação na instância** (shell 0.55.1), não o empacotador desta árvore.
+
+**Pendente do autor, no ambiente autenticado:** publicar a release (Actions → `release` → *Run
+workflow*, que gera a tag com sha — necessária para atualizar dentro da mesma `versao`), instalar no
+Pinguim marcando "Incluir não homologadas", conferir que **os estudos reaparecem** e que dá para
+criar um estudo, homologar, e então Laputa. Vale conferir os 7 parâmetros depois do upgrade: com
+`padrao` o default é **vivo**, e onde ninguém personalizou o valor do manifesto passa a valer
+sozinho (aqui nenhum valor mudou, então o esperado é nada mudar).
+
+---
+
 ## Encerramento da Rodada 10 — #574 (2026-09-04)
 
 As 12 issues da Rodada 10 (`lista_bugs_20260826.xlsx`, #563–#574) estão fechadas. A última,
