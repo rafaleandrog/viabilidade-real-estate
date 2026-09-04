@@ -42,9 +42,16 @@ import assert from 'node:assert/strict';
 
 const APP_ID = 'viabilidade';
 
-// Prefixo que marca a recusa vinda do resolver simulado, para distingui-la de
-// qualquer outra exceção que uma função do wrapper possa lançar.
-const MARCA_RECUSA = '[shell]';
+// Marca da recusa vinda do resolver simulado, para distingui-la de qualquer
+// outra exceção que uma função do wrapper possa lançar.
+//
+// É um `Symbol` NA EXCEÇÃO, e não um prefixo de mensagem, porque texto é
+// falsificável: medido, um `throw new Error('[shell] indisponivel')` vindo de
+// outro lugar era classificado como recusa e a suíte falhava dizendo "o slug
+// da app voltou ao caminho" — sem slug nenhum no caminho. Falhar pelo motivo
+// errado manda quem lê procurar no lugar errado, que é justamente o defeito
+// que esta separação existe para evitar.
+const MARCA_RECUSA = Symbol('recusa-do-resolver');
 
 // As funções que NÃO chamam `urbiVerso.api()` — o eixo aqui é *por onde a
 // função sai*, não *que caminho ela escreve*. Cada entrada carrega o motivo (é
@@ -66,9 +73,12 @@ const SEM_CHAMADA_API: Record<string, string> = {
   uploadDocumentoEmpreendimento: 'fetch nativo em /api/dados/... — caminho absoluto, fora do resolver',
 };
 
-// A única função que sai por `api()` com caminho ABSOLUTO de shell, de
-// propósito: `/shell` está em SEGMENTOS_CROSS_APP no resolver.
-const VIA_NAMESPACE_CROSS_APP = 'listarUsuarios';
+// As funções que saem por `api()` com caminho ABSOLUTO de shell, de propósito:
+// `/shell` está em SEGMENTOS_CROSS_APP no resolver, então não recebe injeção.
+// Conjunto, e não escalar: uma segunda função cross-app legítima é plausível
+// (`/shell/apps/viabilidade/parametros`), e com escalar ela reprovaria em dois
+// pontos por uma razão que não é defeito.
+const VIA_NAMESPACE_CROSS_APP = new Set(['listarUsuarios']);
 
 // Argumento que LIGA todo ramo condicional de query do wrapper: é truthy (para
 // `if (busca)` e para `tipo ? … : ''`), interpola como '7' (serve de id numa
@@ -96,10 +106,13 @@ function resolverComoOShell(caminho: string, fn: string): void {
   const corte = norm.search(/[?#]/);
   const somentePath = corte === -1 ? norm : norm.slice(0, corte);
   if ((somentePath.split('/')[1] ?? '') === APP_ID) {
-    throw new Error(
-      `${MARCA_RECUSA} ${fn}() passou "${caminho}", que começa com o slug da app ` +
-        `("/${APP_ID}"). O shell injeta o "/${APP_ID}" sozinho — passe o caminho ` +
-        `relativo. Obsolescência api-slug-manual, encerrada.`
+    throw Object.assign(
+      new Error(
+        `[shell] ${fn}() passou "${caminho}", que começa com o slug da app ` +
+          `("/${APP_ID}"). O shell injeta o "/${APP_ID}" sozinho — passe o caminho ` +
+          `relativo. Obsolescência api-slug-manual, encerrada.`
+      ),
+      { [MARCA_RECUSA]: true }
     );
   }
 }
@@ -161,7 +174,8 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
         // ruidosa, mas apontando para um slug que não existe. Falhar pelo
         // motivo errado manda quem lê procurar no lugar errado.
         const msg = String((e as Error).message);
-        (msg.startsWith(MARCA_RECUSA) ? recusadas : outrasExcecoes).push(`  · ${nome}(): ${msg}`);
+        const ehRecusa = Boolean((e as any)?.[MARCA_RECUSA]);
+        (ehRecusa ? recusadas : outrasExcecoes).push(`  · ${nome}(): ${msg}`);
       }
     }
   }
@@ -191,9 +205,16 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
   // em posição nenhuma. Isso é verdade por construção, porque o shell injeta o
   // prefixo sozinho; a única chamada legítima que contém a palavra é a do
   // namespace cross-app, declarada em `VIA_NAMESPACE_CROSS_APP`.
+  // ⚠️ A isenção é pela URL, NUNCA pela função — e a distinção não é estilo.
+  // A versão anterior isentava `listarUsuarios` inteira, e com isso reabria
+  // exatamente o buraco que a rodada anterior tinha fechado: uma segunda
+  // chamada com o slug, dentro dela e engolida por um `try/catch`, saía verde.
+  // Isentar QUEM CHAMA isenta tudo que essa função venha a fazer depois;
+  // isentar A URL isenta só o caminho que de fato é legítimo.
   const comSlug = chamadasApi.filter((c) => {
-    if (c.fn === VIA_NAMESPACE_CROSS_APP) return false;
-    return c.url.split(/[?#]/)[0].split('/').includes(APP_ID);
+    const path = c.url.split(/[?#]/)[0];
+    if (path.startsWith('/shell/')) return false;
+    return path.split('/').includes(APP_ID);
   });
   assert.deepEqual(
     comSlug.map((c) => `${c.fn}() → ${c.url}`),
@@ -243,8 +264,8 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
   // A exceção cross-app continua sendo o que diz ser — e continua sendo UMA só.
   const cross = chamadasApi.filter((c) => c.url.startsWith('/shell/'));
   assert.deepEqual(
-    [...new Set(cross.map((c) => c.fn))],
-    [VIA_NAMESPACE_CROSS_APP],
+    [...new Set(cross.map((c) => c.fn))].sort(),
+    [...VIA_NAMESPACE_CROSS_APP].sort(),
     'apareceu (ou sumiu) uma chamada a api() num namespace cross-app'
   );
 

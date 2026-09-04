@@ -3272,7 +3272,10 @@ Rotas **relativas**; o shell prefixa tudo com `/api/viabilidade/`. O frontend ch
 > `urbiVerso.api('/viabilidade/…')`, contradizendo a própria frase anterior, e a obsolescência
 > `api-slug-manual` foi encerrada: o resolver do shell **lança** ao receber um caminho que começa
 > com o slug da app. Em 2026-09-04 isso derrubou a app inteira na instância — 72 chamadas passaram
-> a lançar de uma vez. Quem trava a regressão é `frontend/api-caminho-relativo.test.ts`.
+> a lançar de uma vez. Quem trava a regressão é `frontend/api-caminho-relativo.test.ts` — e ele é
+> **mais estrito que o shell de propósito**: o resolver recusa quando o slug é o *primeiro*
+> segmento, o teste recusa o segmento em *qualquer* posição. A diferença cobre `/api/viabilidade/…`,
+> que o shell não recusa mas transforma num 404 silencioso — o mesmo sintoma, sem o erro didático.
 
 Endpoints principais: `/estudos` (CRUD + duplicar + ciclo de status), `/benchmarks` (leitura livre;
 `POST`/`PATCH`/`DELETE` e `POST /benchmarks/semear` para admin), rotas de
