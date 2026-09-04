@@ -34,9 +34,21 @@ import {
 //
 // Diferente do modelo antigo, aqui os campos são COLUNAS, não um `config` JSON
 // solto — o shape é fixo e conhecido, então dá para validar campo a campo em
-// vez de só checar "é um objeto". Também não há `status`: uma operação existe
-// ou não existe, e toda operação existente conta no motor (o antigo
-// `status='ativo'` era um estado a mais para o usuário errar).
+// vez de só checar "é um objeto".
+//
+// ⚠️ #587 mudou a frase acima, e só para o Financiamento à produção. Ela dizia
+// "não há status: uma operação existe ou não existe, e toda operação
+// existente conta no motor" — o antigo `status='ativo'` proposto (linha de
+// crédito rotativa) foi RECUSADO pelo autor por reintroduzir competição por
+// caixa (ver o cabeçalho de `../../frontend/funding-motor.ts`), e essa recusa
+// continua de pé. O que mudou é outro pedido, específico do FàP: ele passou a
+// ser ÚNICO E FIXO por estudo (nunca criado/removido pelo usuário pela UI —
+// ver `_renderAbaFinanciamentoProducao` em `../../frontend/tela-funding.ts`),
+// e "ligar/desligar sem perder configuração" só faz sentido numa operação que
+// não se apaga. A coluna `ativo` (`schema.json`) existe nas 3, mas
+// `validarCamposOperacao` só a aceita em `financiamento_producao` —
+// `divida`/`equity` continuam se resolvendo por existir/não existir a linha,
+// sem status nenhum.
 //
 // O mês do aporte segue o mesmo padrão de âncora das linhas de Custo (#249):
 // `cronograma_evento` fixo ou `fase_ancora_id`, com `inicio_mes` DERIVADO no
@@ -145,7 +157,35 @@ export function validarCamposOperacao(dados: Record<string, any>): string | null
   if (dados.aporte_meses !== undefined && Number(dados.aporte_meses) < 1) {
     return 'aporte_meses deve ser pelo menos 1';
   }
+  // #587: `ativo` é genérica na coluna (`schema.json`, padrão `true`), mas o
+  // USO é só do Financiamento à produção — Dívida/Equity continuam se
+  // resolvendo por existir/não existir a linha, sem status.
+  //
+  // ⚠️ Achado do Codex no PR #671, e é a razão pela qual a restrição de tipo
+  // olha só `=== false`, nunca `!== undefined`: `dados` aqui é o estado FINAL
+  // (`{ ...operacao, ...dados }` no PATCH), e como TODA linha já nasce com
+  // `ativo: true` (o padrão do schema), uma Dívida/Equity EXISTENTE sempre
+  // carrega `ativo: true` mesmo que o PATCH não tenha tocado o campo — testar
+  // `!== undefined` aqui rejeitaria QUALQUER PATCH numa operação antiga que
+  // não seja Financiamento à produção (ex.: só renomear uma Dívida). `true`
+  // é o estado harmless/default e nunca precisa de bloqueio; só `false`
+  // ("desligar") é a ação que não faz sentido fora da FàP.
+  if (dados.ativo !== undefined && typeof dados.ativo !== 'boolean') {
+    return 'ativo deve ser um booleano';
+  }
+  if (dados.ativo === false && dados.tipo !== 'financiamento_producao') {
+    return 'ativo só é aplicável ao Financiamento à produção';
+  }
   return null;
+}
+
+/**
+ * #587: Financiamento à produção é único E FIXO — nunca removida, só
+ * ligada/desligada por `PATCH ativo`. Pura e testável, no molde de
+ * `conflitoFinanciamentoUnico` — a rota DELETE só chama.
+ */
+export function remocaoFinanciamentoBloqueada(operacao: { tipo?: unknown }): boolean {
+  return operacao.tipo === 'financiamento_producao';
 }
 
 /**
@@ -363,6 +403,16 @@ rotasFunding.delete('/estudos/:id/avancado/funding/:oid', async (req: Request, r
     const operacao = await req.dados!.buscar('avancado_funding_operacoes', oid);
     if (!operacao || Number(operacao.estudo_id) !== estudo.id) {
       erro(res, 404, 'OPERACAO_NAO_ENCONTRADA', 'Operação não encontrada neste estudo');
+      return;
+    }
+    // #587: sem esta guarda, uma chamada direta à API (a UI não expõe mais
+    // lixeira para a FàP — `_renderAbaTipo` só aceita 'divida'|'equity') podia
+    // apagar a linha, e `_garantirFinanciamento` a recriaria do zero na
+    // próxima carga, descartando todo parâmetro digitado — o oposto do que
+    // "desligar sem perder configuração" promete.
+    if (remocaoFinanciamentoBloqueada(operacao)) {
+      erro(res, 422, 'FINANCIAMENTO_FIXO',
+        'Financiamento à produção é único e fixo neste estudo — desligue pelo checkbox "Ativo" em vez de remover.');
       return;
     }
     await req.dados!.deletar('avancado_funding_operacoes', oid);

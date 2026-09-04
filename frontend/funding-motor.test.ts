@@ -200,6 +200,37 @@ test('#478 financiamento_producao e equity não têm tarifa (série zerada, camp
   assert.ok(eq.tarifas.every((v) => v === 0));
 });
 
+test('#587 financiamento_producao com ativo=false: TODAS as séries saem zeradas, mesmo com custo elegível e caixa reais', () => {
+  const op: OperacaoFunding = {
+    tipo: 'financiamento_producao', nome: 'FP desligado', taxa_anual: 12.5,
+    exposicao_minima: 20, percentual_financiavel: 80, amortizar_com_caixa_disponivel: true,
+    ativo: false,
+  } as any;
+  const fp = simularFinanciamentoProducao(
+    op, new Array(12).fill(1_000_000), null, null, new Array(12).fill(5_000_000), 12,
+  );
+  assert.ok(fp.entradas.every((v) => v === 0), 'entradas deviam ser zero com ativo=false');
+  assert.ok(fp.saidas.every((v) => v === 0), 'saidas deviam ser zero com ativo=false');
+  assert.ok(fp.juros.every((v) => v === 0), 'juros deviam ser zero com ativo=false');
+  assert.ok(fp.saldo.every((v) => v === 0), 'saldo devia ficar zero com ativo=false');
+  assert.ok(fp.fluxoInvestidor.every((v) => v === 0), 'fluxoInvestidor devia ficar zero com ativo=false');
+  assert.equal(fp.operacao, op, 'a operação em si é preservada — só o cálculo é zerado');
+});
+
+test('#587 financiamento_producao com ativo=true (ou omitido) continua calculando normalmente', () => {
+  const semAtivo: OperacaoFunding = {
+    tipo: 'financiamento_producao', nome: 'FP ligado', taxa_anual: 12.5,
+    exposicao_minima: 20, percentual_financiavel: 80, amortizar_com_caixa_disponivel: true,
+  } as any;
+  const comAtivoTrue = { ...semAtivo, ativo: true };
+  const custo = new Array(12).fill(1_000_000);
+  const caixa = new Array(12).fill(5_000_000);
+  const a = simularFinanciamentoProducao(semAtivo, custo, null, null, caixa, 12);
+  const b = simularFinanciamentoProducao(comAtivoTrue, custo, null, null, caixa, 12);
+  assert.deepEqual(a.entradas, b.entradas, 'ativo omitido e ativo=true têm que produzir o mesmo resultado');
+  assert.ok(a.entradas.some((v) => v !== 0), 'controle: com custo elegível e caixa reais, a operação ligada MOVE dinheiro');
+});
+
 test('#355 dívida sem distribuir: libera tudo num mês só e o PMT usa o valor cru', () => {
   const op: OperacaoFunding = { ...DIVIDA_GOLDEN, distribuir_aporte: false, aporte_meses: 3 };
   const s = simularDivida(op, PRAZO_DIVIDA);
@@ -383,6 +414,41 @@ test('#355 equity: o aporte não vira receita nem o retorno vira aporte (sinais)
 
 test('#355 fundingDoEstudo: sem operações devolve null', () => {
   assert.equal(fundingDoEstudo([], [0, 0, 0], [0, 0, 0], 0, 1, 12), null);
+});
+
+test('#587 (achado do Codex, PR 671): só uma financiamento_producao DESLIGADA se comporta como "nenhuma operação"', () => {
+  // Estado logo depois de `_garantirFinanciamento` criar a FàP desligada,
+  // antes do usuário ligar: sem isso, `fundingDoEstudo` devolvia um
+  // `FundingCalc` não-nulo mesmo sem nenhuma operação EFETIVA, e a tela de
+  // Fluxo de Caixa mostrava seções de Funding vazias + Livre/Alavancado
+  // duplicados.
+  const fapDesligada: OperacaoFunding & { id: number } = {
+    id: 9, tipo: 'financiamento_producao', nome: 'FàP', taxa_anual: 12.5,
+    exposicao_minima: 20, percentual_financiavel: 80, ativo: false,
+  } as any;
+  assert.equal(
+    fundingDoEstudo([fapDesligada], [0, 0, 0], [0, 0, 0], 0, 1, 12),
+    null,
+    'uma única operação desligada não pode produzir FundingCalc',
+  );
+});
+
+test('#587: financiamento_producao desligada NÃO entra no agregado quando há outras operações ativas', () => {
+  const fapDesligada: OperacaoFunding & { id: number } = {
+    id: 9, tipo: 'financiamento_producao', nome: 'FàP', taxa_anual: 12.5,
+    exposicao_minima: 20, percentual_financiavel: 80, ativo: false,
+  } as any;
+  const divida: OperacaoFunding & { id: number } = {
+    id: 10, tipo: 'divida', nome: 'Dívida A', valor: 1_000_000, inicio_mes: 0,
+    taxa_anual: 20, periodo_amortizacao_meses: 12,
+  } as any;
+  const calc = fundingDoEstudo([fapDesligada, divida], new Array(24).fill(0), new Array(24).fill(0), 0, 1, 12);
+  assert.ok(calc, 'com uma operação ativa, o cálculo não pode ser null');
+  assert.equal(
+    calc!.operacoes.some((s) => s.operacao.id === 9),
+    false,
+    'a operação desligada não pode aparecer nas séries do agregado',
+  );
 });
 
 test('#355 fundingDoEstudo: fluxo alavancado = livre + entradas − saídas', () => {

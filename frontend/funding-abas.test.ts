@@ -54,7 +54,7 @@ test('#586 critério 2: a aba Operações lista a UNIÃO exata das outras três 
   assert.equal(new Set(porAba.flat().map((o) => o.id)).size, operacoes.length);
 });
 
-test('#586: todo tipo declarado em TIPOS tem uma aba — tipo órfão sumiria da tela', () => {
+test('#586/#587: todo tipo declarado em TIPOS tem uma aba — tipo órfão sumiria da tela', () => {
   // Lê a fonte porque `TIPOS` e `ABAS` são privados do módulo da tela. O que
   // interessa é a relação entre as duas listas, e ela é o que quebra se alguém
   // acrescentar um 4º tipo de operação sem dar aba a ele.
@@ -73,8 +73,15 @@ test('#586: todo tipo declarado em TIPOS tem uma aba — tipo órfão sumiria da
   };
   const tipos = [...bloco('TIPOS').matchAll(/valor: '([a-z_]+)'/g)].map((m) => m[1]);
   assert.deepEqual(tipos.sort(), [...TIPOS_COM_ABA].sort(), 'TIPOS mudou — dê aba ao tipo novo');
+  // ⚠️ #587: `financiamento_producao` NÃO carrega `tipo:` em `ABAS` de propósito
+  // — ela tem render PRÓPRIO, roteado por `id: 'financiamento_producao'`, não
+  // pelo despacho genérico `a.tipo ? _renderAbaTipo(a.tipo) : ...`. A cobertura
+  // dela é o `id`, não o `tipo`; os outros dois tipos continuam pelo despacho
+  // genérico, então a checagem soma as DUAS rotas.
   const abasComTipo = [...bloco('ABAS').matchAll(/tipo: '([a-z_]+)'/g)].map((m) => m[1]);
-  assert.deepEqual(abasComTipo.sort(), [...TIPOS_COM_ABA].sort(), 'ABAS não cobre todos os tipos');
+  const abasComId = [...bloco('ABAS').matchAll(/id: '([a-z_]+)'/g)].map((m) => m[1]);
+  const cobertos = [...abasComTipo, ...abasComId.filter((id) => TIPOS_COM_ABA.includes(id) && !abasComTipo.includes(id))];
+  assert.deepEqual(cobertos.sort(), [...TIPOS_COM_ABA].sort(), 'ABAS não cobre todos os tipos (nem por tipo, nem por id dedicado)');
 });
 
 test('#586 critério 3: a barra de 3 botões do topo deixou de existir', () => {

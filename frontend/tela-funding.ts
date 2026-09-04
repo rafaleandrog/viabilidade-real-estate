@@ -75,11 +75,19 @@ const TIPOS: { valor: TipoOperacao; rotulo: string; icone: string }[] = [
 // no badge do card e na coluna Tipo da tabela de Operações. Os dois textos
 // coexistem de propósito: o do autor nomeia a aba, o do app nomeia o produto.
 //
-// `operacoes` não é um tipo — é a visão compilada, de leitura. As outras três
-// têm `tipo`, e é por ele que a aba filtra e que a tabela navega.
-const ABAS: { id: string; label: string; icone: string; tipo?: TipoOperacao }[] = [
+// `operacoes` não é um tipo — é a visão compilada, de leitura. Dívida e
+// Equity têm `tipo`, e é por ele que a aba filtra e a tabela navega.
+//
+// ⚠️ #587: `financiamento_producao` NÃO carrega `tipo` aqui de propósito —
+// desde a #586 ela usava o mesmo despacho genérico de Dívida/Equity
+// (`a.tipo ? _renderAbaTipo(a.tipo) : ...`), e agora tem render PRÓPRIO
+// (`_renderAbaFinanciamentoProducao`, roteado por `a.id` em `render()`).
+// Restringir o TIPO do campo para excluir `financiamento_producao` é o que
+// torna a rota genérica um erro de COMPILAÇÃO se alguém reatribuir `tipo` a
+// esta aba por engano — não só "deixar de chamar certo".
+const ABAS: { id: string; label: string; icone: string; tipo?: 'divida' | 'equity' }[] = [
   { id: 'operacoes', label: 'Operações', icone: 'fa-solid fa-table-list' },
-  { id: 'financiamento_producao', label: 'Financiamento à produção', icone: 'fa-solid fa-building-columns', tipo: 'financiamento_producao' },
+  { id: 'financiamento_producao', label: 'Financiamento à produção', icone: 'fa-solid fa-building-columns' },
   { id: 'divida', label: 'Dívida', icone: 'fa-solid fa-file-invoice-dollar', tipo: 'divida' },
   { id: 'equity', label: 'Equity', icone: 'fa-solid fa-handshake', tipo: 'equity' },
 ];
@@ -117,6 +125,10 @@ export class ViabFunding extends LitElement {
   @state() private movendoId: number | null = null;
   @state() private removerId: number | null = null;
   @state() private criando = false;
+  // #587: guarda contra criar duas vezes o Financiamento à produção — a
+  // criação é assíncrona, e `_carregar` pode ser chamado de novo (troca de
+  // estudo) antes da primeira resposta voltar.
+  @state() private criandoFinanciamento = false;
   @state() private calc: FluxoCalc | null = null;
   @state() private funding: FundingCalc | null = null;
   // #586: aba ativa — estado INTERNO, não vai para a URL. É a convenção do
@@ -247,6 +259,14 @@ export class ViabFunding extends LitElement {
         this.calc.receitaMensal, this.calc.linhasCusto, this.custos,
       );
       this._recalcular();
+
+      // #587: cria a operação de FàP (desligada) se o estudo ainda não tiver
+      // uma — DEPOIS do cálculo acima, porque ela muda `this.operacoes`.
+      // Inativa, ela não move nenhum número (`funding-motor.ts` zera a série
+      // e `fluxo-caixa-motor.ts` não a soma no horizonte), então não recalcula
+      // `this.calc` — só `this.funding`, para o card achar sua própria série.
+      await this._garantirFinanciamento();
+      this._recalcular();
     } finally {
       this.carregando = false;
     }
@@ -312,18 +332,70 @@ export class ViabFunding extends LitElement {
     return this.operacoes.some((o) => o.tipo === 'financiamento_producao');
   }
 
+  /** #587: a operação de FàP existente, se houver — a aba dedicada é dela. */
+  private _operacaoFinanciamento(): any | undefined {
+    return this.operacoes.find((o) => o.tipo === 'financiamento_producao');
+  }
+
+  /** §4.3 — os defaults da planilha `Incorp Individual`, para a camada não
+   * nascer inerte (sem gatilho de exposição mínima ela nunca libera).
+   * Extraído para não divergir entre `_adicionar` e `_garantirFinanciamento`
+   * (#587) — as duas criam a mesma operação, por caminhos diferentes. */
+  private _defaultsFinanciamentoProducao() {
+    return {
+      taxa_anual: 12.5, exposicao_minima: PADRAO_EXPOSICAO_MINIMA,
+      percentual_financiavel: PADRAO_PERCENTUAL_FINANCIAVEL,
+      amortizar_com_caixa_disponivel: PADRAO_AMORTIZAR_COM_CAIXA,
+    };
+  }
+
+  /**
+   * #587 — o Financiamento à produção é ÚNICO E FIXO: a tela cria a operação
+   * sozinha, DESLIGADA, na primeira vez que um estudo sem ela é aberto em
+   * modo edição, para a aba dedicada ter sempre um formulário sobre o qual
+   * desenhar o checkbox. Nasce `ativo: false` — é o estado "estudo sem FàP
+   * hoje" da regra de transição da #587: nenhum número entra no motor até o
+   * usuário ligar. Estudo que JÁ tinha a operação nunca passa por aqui
+   * (`_temFinanciamento()` corta antes) — o `ativo: true` default do
+   * `schema.json` é quem preserva esses como ligados.
+   *
+   * Só roda em modo edição: leitor sem permissão de escrita não pode criar
+   * nada, e `criarFundingOperacao` devolveria 403 — a aba trata a ausência
+   * como estado de leitura em vez de tentar escrever (ver
+   * `_renderAbaFinanciamentoProducao`).
+   */
+  private async _garantirFinanciamento(): Promise<void> {
+    if (!this.editavel || this._temFinanciamento() || this.criandoFinanciamento) return;
+    this.criandoFinanciamento = true;
+    try {
+      const r = await criarFundingOperacao(this.estudo.id, {
+        tipo: 'financiamento_producao', nome: this._nomePadrao('financiamento_producao'),
+        ordem: this._proximaOrdem(), ativo: false,
+        ...this._defaultsFinanciamentoProducao(),
+      });
+      if (r?.erro) {
+        urbiVerso.notificar(r.mensagem || 'Não foi possível preparar o Financiamento à produção.', 'erro');
+        return;
+      }
+      const ops = await listarFundingOperacoes(this.estudo.id);
+      this.operacoes = ops?.erro ? this.operacoes : (ops.dados || []);
+    } finally {
+      this.criandoFinanciamento = false;
+    }
+  }
+
+  private async _ligarDesligarFinanciamento(o: any, ativo: boolean): Promise<void> {
+    const r = await atualizarFundingOperacao(this.estudo.id, o.id, { ativo });
+    if (r?.erro) { urbiVerso.notificar(r.mensagem || 'Não foi possível salvar.', 'erro'); return; }
+    await this._carregar();
+  }
+
   private async _adicionar(tipo: TipoOperacao) {
     if (this.criando) return;
     this.criando = true;
     try {
       const defaults = tipo === 'financiamento_producao'
-        // §4.3 — os defaults da planilha `Incorp Individual`, para a camada
-        // não nascer inerte (sem gatilho de exposição mínima ela nunca libera).
-        ? {
-          taxa_anual: 12.5, exposicao_minima: PADRAO_EXPOSICAO_MINIMA,
-          percentual_financiavel: PADRAO_PERCENTUAL_FINANCIAVEL,
-          amortizar_com_caixa_disponivel: PADRAO_AMORTIZAR_COM_CAIXA,
-        }
+        ? this._defaultsFinanciamentoProducao()
         : eDivida(tipo)
           ? { taxa_anual: 12, periodo_amortizacao_meses: 36, periodo_carencia_meses: 12, aporte_meses: 1 }
           : { modo_retorno: 'permuta_financeira', pct_retorno: 0 };
@@ -786,21 +858,26 @@ export class ViabFunding extends LitElement {
     ];
   }
 
-  /** #586, abas 2 a 4 — o botão de criar do tipo e os cards DAQUELE tipo. Os
-   * `_renderCampos*` vêm inteiros, sem reescrita: a separação por tipo já
-   * existia na camada de campos, o que faltava era na navegação. */
-  private _renderAbaTipo(tipo: TipoOperacao): TemplateResult {
+  /** #586, abas Dívida e Equity — o botão de criar do tipo e os cards DAQUELE
+   * tipo. Os `_renderCampos*` vêm inteiros, sem reescrita: a separação por
+   * tipo já existia na camada de campos, o que faltava era na navegação.
+   *
+   * ⚠️ #587: `financiamento_producao` SAIU da assinatura — não é mais
+   * "lista + botão adicionar", é operação única e fixa, com sua própria aba
+   * dedicada (`_renderAbaFinanciamentoProducao`). Restringir o TIPO em vez de
+   * só parar de chamar com `'financiamento_producao'` é a defesa da classe de
+   * defeito nº 1 do CLAUDE.md: um `ABAS` editado de volta para despachar FàP
+   * para cá vira `TS2345`, não lista vazia calada.
+   */
+  private _renderAbaTipo(tipo: 'divida' | 'equity'): TemplateResult {
     const lista = this._operacoesDoTipo(tipo);
     const t = TIPOS.find((x) => x.valor === tipo)!;
-    const bloqueado = tipo === 'financiamento_producao' && this._temFinanciamento();
     return html`
       ${this.editavel ? html`
         <div class="acao-aba">
           <urbi-botao variante="secundario" pequeno icone=${t.icone}
-            ?desabilitado=${this.criando || bloqueado}
-            title=${bloqueado
-              ? 'Só pode haver um Financiamento à produção por estudo'
-              : `Adicionar ${t.rotulo}`}
+            ?desabilitado=${this.criando}
+            title=${`Adicionar ${t.rotulo}`}
             @click=${() => this._adicionar(tipo)}>Adicionar ${t.rotulo}</urbi-botao>
         </div>` : nothing}
 
@@ -808,6 +885,61 @@ export class ViabFunding extends LitElement {
         ? html`<urbi-estado-vazio icone=${t.icone}
             mensagem=${`Nenhuma operação de ${t.rotulo}.`}></urbi-estado-vazio>`
         : html`<div class="ops">${lista.map((o, i) => this._renderOperacao(o, i, lista))}</div>`}
+    `;
+  }
+
+  /**
+   * #587 — a aba `Financiamento à produção`: SEMPRE um formulário único,
+   * nunca lista, nunca botão "adicionar". O checkbox liga/desliga sem apagar
+   * a operação — é o que preserva os parâmetros que o `_remover` genérico
+   * jogaria fora — por isso este card não tem o botão de lixeira nem as
+   * setas ↑↓ de `_renderOperacao` (não há irmão do mesmo tipo para reordenar
+   * contra, e não há como remover: a operação é fixa).
+   */
+  private _renderAbaFinanciamentoProducao(): TemplateResult {
+    const o = this._operacaoFinanciamento();
+    const t = TIPOS.find((x) => x.valor === 'financiamento_producao')!;
+    if (!o) {
+      // Só alcançável em modo leitura (`_garantirFinanciamento` já criou a
+      // operação em modo edição, dentro de `_carregar`) — o leitor não pode
+      // escrever, então não há o que mostrar além do estado vazio.
+      return html`<urbi-estado-vazio icone=${t.icone}
+        mensagem="Nenhum Financiamento à produção configurado neste estudo."></urbi-estado-vazio>`;
+    }
+    const ativo = o.ativo !== false; // undefined = ligado (default do banco, e todo estudo anterior à #587)
+    const serie = this.funding?.operacoes.find((s) => String(s.operacao.id) === String(o.id));
+    const temDraft = !!this.draft[o.id];
+    return html`
+      <urbi-card>
+        <div class="op-cab">
+          <urbi-icone classe=${t.icone}></urbi-icone>
+          <urbi-input .valor=${this._valor(o, 'nome') ?? ''} ?desabilitado=${!this.editavel}
+            @urbi:input-change=${(e: CustomEvent) => this._set(o, 'nome', e.detail.valor)}
+          ></urbi-input>
+          <span class="espaco"></span>
+          <urbi-checkbox
+            label="Ativo"
+            ?desabilitado=${!this.editavel || this.criandoFinanciamento}
+            ?marcado=${ativo}
+            @urbi:checkbox-change=${(e: CustomEvent) => this._ligarDesligarFinanciamento(o, e.detail.marcado)}
+          ></urbi-checkbox>
+        </div>
+        ${ativo ? nothing : html`
+          <urbi-banner variante="info">
+            Desligado — não entra no Fluxo de Caixa. Os parâmetros abaixo ficam guardados; religue
+            para voltar a aplicá-los, sem digitar de novo.
+          </urbi-banner>`}
+
+        ${this._renderCamposFinanciamentoProducao(o)}
+        ${ativo && serie ? this._renderIndicadoresFinanciamentoProducao(serie) : nothing}
+
+        ${this.editavel ? html`
+          <div class="form-acoes">
+            <urbi-botao variante="primario" pequeno icone="fa-solid fa-floppy-disk"
+              ?desabilitado=${!temDraft || this.salvandoId === o.id}
+              @click=${() => this._salvar(o)}>Salvar</urbi-botao>
+          </div>` : nothing}
+      </urbi-card>
     `;
   }
 
@@ -856,7 +988,8 @@ export class ViabFunding extends LitElement {
       >
         ${ABAS.map((a) => html`
           <urbi-hospedeiro slot=${a.id}>
-            ${a.tipo ? this._renderAbaTipo(a.tipo) : this._renderAbaOperacoes()}
+            ${a.id === 'financiamento_producao' ? this._renderAbaFinanciamentoProducao()
+              : a.tipo ? this._renderAbaTipo(a.tipo) : this._renderAbaOperacoes()}
           </urbi-hospedeiro>`)}
       </urbi-abas>
 

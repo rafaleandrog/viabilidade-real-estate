@@ -1120,6 +1120,20 @@ export async function verificarRender(opcoes) {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     window.__exigir = caso.exigir;
     window.__aceita = caso.aceitaNaoReproduzido ?? [];
+    // medir é OPCIONAL: sonda extra que só o caso sabe fazer (ler um
+    // .value de um input num shadow root aninhado, checar que um evento
+    // NÃO disparou). As lentes genéricas de layout (sonda/sondaMontagem)
+    // nunca vão cobrir isto — são sobre geometria e cor, não sobre o que um
+    // componente FAZ com uma prop. Roda depois do assentamento, para medir a
+    // árvore já estabilizada, não o primeiro render.
+    //
+    // (Sem crase neste bloco, de propósito — mesmo motivo do aviso logo
+    // acima: isto mora DENTRO do template literal deste arquivo.)
+    // window.__temMedir existe pra distinguir "o caso nao declara medir" de
+    // "o caso declara medir e o resultado, legitimamente, e null/undefined" —
+    // as duas dariam window.__extra nulo, e so a flag separa uma da outra.
+    window.__temMedir = typeof caso.medir === 'function';
+    window.__extra = window.__temMedir ? await caso.medir(raiz) : null;
     document.title = 'pronto';
   } catch (e) {
     window.__erroMontagem = String(e && e.stack || e);
@@ -1146,7 +1160,7 @@ export async function verificarRender(opcoes) {
     let aceitoPeloCaso = [];
     const achados = {
       caso, larguras: {}, variantes: {}, erroConsole: [], nVariantes: temas.n,
-      fingerprint: null, navegador: versaoNavegador, avisos: [], montagem: null,
+      fingerprint: null, navegador: versaoNavegador, avisos: [], montagem: null, extra: null,
     };
     // ⚠️ A versão do motor de layout MUDA a geometria, e esta suíte asserta
     // pixel (os 22px de sobreposição do urbi-kpi). A versão é FIXADA pelo pin
@@ -1176,6 +1190,18 @@ export async function verificarRender(opcoes) {
       await pag.waitForFunction(() => document.title === 'pronto' || document.title === 'erro', null, { timeout: 30000 });
       const erroMontagem = await pag.evaluate(() => window.__erroMontagem ?? null);
       if (erroMontagem) throw new Error(`montagem do caso "${caso}" falhou:\n${erroMontagem}`);
+      // Só cria o mapa quando o caso de fato DECLARA `medir` — decidido pela
+      // flag `__temMedir`, não pelo valor devolvido. Um caso pode legitimamente
+      // devolver `null`/`undefined` de `medir` (o retorno é `unknown`); testar
+      // `!== null` no valor confundiria essa sonda de verdade com a ausência
+      // de sonda, e o mapa nasceria com `extra: { "900": null, ... }` em vez
+      // do `null` documentado em Achados — achado do Codex, PR 669.
+      const temMedir = await pag.evaluate(() => window.__temMedir === true);
+      if (temMedir) {
+        const extraDaLargura = await pag.evaluate(() => window.__extra ?? null);
+        achados.extra ??= {};
+        achados.extra[largura] = extraDaLargura;
+      }
 
       // PROVA DE MONTAGEM antes de qualquer medida. Ela LANÇA, e é intencional:
       // "não montou" não é achado a ponderar, é medição inválida. Devolver

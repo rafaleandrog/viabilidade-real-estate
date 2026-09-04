@@ -291,7 +291,7 @@ decisão **D14** — caixa acumulado negativo depois do funding (severidade `ale
 alimente o cash sweep.
 
 > ⚠️ **Linha rotativa e empréstimo-ponte não existem — capital de giro EXISTE.** Os tipos aceitos
-> são exatamente `['financiamento_producao','divida','equity']` (`backend/rotas/funding.ts:43`), e o
+> são exatamente `['financiamento_producao','divida','equity']` (`backend/rotas/funding.ts:66`), e o
 > literal `capital_giro` é recusado como tipo novo (`backend/rotas/funding.test.ts:26`). **Isso não
 > quer dizer que o produto falte:** `divida` **é** o capital de giro por calendário (decisão 2 do
 > autor), a migração `029_funding_operacoes.js:38-43,127-130` converte `capital_giro` para `divida`, e
@@ -393,7 +393,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
 | `frontend/tela-proforma.ts:70` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
-| `frontend/fluxo-caixa-motor.ts:2781` — **agregados escalares** do `FluxoCalc` (`vgvTotal`, `vpl`, `vgvPermutaFisica`, `receitaBrutaVgv` e o alias `vgvVendavel`) | 2 | ✅ desde a #512 — quantizados na SAÍDA; a origem segue com precisão plena, ver a nota abaixo |
+| `frontend/fluxo-caixa-motor.ts:2706` — **agregados escalares** do `FluxoCalc` (`vgvTotal`, `vpl`, `vgvPermutaFisica`, `receitaBrutaVgv` e o alias `vgvVendavel`) | 2 | ✅ desde a #512 — quantizados na SAÍDA; a origem segue com precisão plena, ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
 | `frontend/exportar.ts:69` — `celulaProforma`, a coluna R$ da Proforma na tela, no CSV e no PDF | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado para função pura pela #567, e movida de `tela-proforma.ts` para cá em 2026-08-28, quando a exportação passou a usá-la (a tela a reexporta) |
 | `frontend/tela-fluxo-receitas.ts:451,452` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
@@ -404,11 +404,11 @@ dízima e retornar exatamente ao mesmo canônico.
 > soma as séries sem requantizar e chega a publicar 10 casas — divergência conhecida, **fora do
 > escopo da #512**, que trata dos agregados escalares). Os quatro agregados que saíam com precisão
 > plena hoje passam por `round2` no retorno, cada um no seu endereço:
-> `vgvTotal` (`frontend/fluxo-caixa-motor.ts:2781`),
+> `vgvTotal` (`frontend/fluxo-caixa-motor.ts:2706`),
 > `vpl` (`frontend/fluxo-caixa-motor.ts:2771`),
-> `vgvPermutaFisica` (`frontend/fluxo-caixa-motor.ts:2808`),
-> `receitaBrutaVgv` (`frontend/fluxo-caixa-motor.ts:2810`)
-> e o alias `vgvVendavel` (`frontend/fluxo-caixa-motor.ts:2795`), que carrega o mesmo valor de
+> `vgvPermutaFisica` (`frontend/fluxo-caixa-motor.ts:2707`),
+> `receitaBrutaVgv` (`frontend/fluxo-caixa-motor.ts:2708`)
+> e o alias `vgvVendavel` (`frontend/fluxo-caixa-motor.ts:2822`), que carrega o mesmo valor de
 > `receitaBrutaVgv` e não podia discordar dele na segunda casa.
 >
 > ⚠️ **A quantização é na SAÍDA, e a origem continua com precisão plena — de propósito.**

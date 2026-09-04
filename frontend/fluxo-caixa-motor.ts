@@ -2419,7 +2419,14 @@ export function calcularFluxo(config: FluxoConfig): FluxoCalc {
   // `max`; dívida e equity NÃO — e o funding herda o horizonte já fechado
   // (`funding-motor.ts`: `const prazo = fluxoLivreMensal.length`), então a
   // operação era truncada sem que nada avisasse.
-  const ultimoFunding = Math.max(0, ...(config.operacoesFunding ?? []).map((op) => ultimoMesFunding(op, mesRepasse(crono))));
+  // #587: uma `financiamento_producao` DESLIGADA (`ativo === false`) não pode
+  // esticar o horizonte — ela não entra no cálculo (`funding-motor.ts` zera a
+  // série inteira), e um horizonte maior só por causa dela violaria
+  // `HORIZONTE_TRUNCA_FUNDING` na direção oposta: o fluxo teria meses a mais
+  // sem nenhum lançamento que os justifique.
+  const ultimoFunding = Math.max(0, ...(config.operacoesFunding ?? [])
+    .filter((op) => op.ativo !== false)
+    .map((op) => ultimoMesFunding(op, mesRepasse(crono))));
   const prazoDerivado = Math.max(ultimoCrono, ultimoRecebivel, ultimoCustos, ultimoFunding, 11) + 1;
   // #446: PISO, não teto. O `||` anterior descartava o derivado inteiro assim
   // que houvesse um valor digitado — armadilha armada para o primeiro chamador

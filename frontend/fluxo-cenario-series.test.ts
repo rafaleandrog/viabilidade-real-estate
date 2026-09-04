@@ -236,9 +236,12 @@ test('#595: na view Anual a cauda da série mais curta fica PLANA no último sal
 // `tela-graficos.test.ts`. Prova que a tela CHAMA `comparacaoCenario`, que ela
 // não voltou a carregar cor dentro do dado, e que o bloco CSS que define a cor
 // das duas séries continua lá. Não prova que o primitivo desenhou duas linhas:
-// isso depende do markup interno dele, que o harness de render substitui por um
-// stub e que o bundle do SDK — ausente neste ambiente (401) — descreveria.
-// A confirmação visual é do autor, na instância intermediária.
+// isso depende do markup interno dele, e nem o `dist/index.d.ts` do SDK — no
+// disco desde que o 401 acabou (CLAUDE.md, seção Validação) — descreve isso:
+// é declaração de TIPO, não de markup renderizado. O harness de render
+// também não alcança, porque substitui o primitivo por um stub gerado do
+// espelho de props. A confirmação visual é do autor, na instância
+// intermediária.
 //
 // Sem este bloco, apagar a chamada da tela deixa a suíte inteira VERDE: as duas
 // funções puras continuam passando, porque quem parou de chamá-las foi o
@@ -281,10 +284,12 @@ test('#595 fiação: a aba Cenários monta o card por comparacaoCenario', () => 
 });
 
 test('#595 fiação: a cor das duas séries vem do CSS, não de uma chave no dado', () => {
-  // A chave `cor` dentro de `series` é o que a #595 tirou: o espelho declara
-  // `series` como Array e NÃO declara a forma dos itens, então o app não tem
-  // como afirmar que ela é honrada — e uma string `var(...)` entregue como dado
-  // é inválida se o primitivo a injetar num atributo de apresentação SVG.
+  // A chave `cor` dentro de `series` é o que a #595 tirou — não porque o
+  // primitivo IGNORE `cor` (o `dist/index.d.ts` do SDK confirma que
+  // `series[i].cor` é honrada), mas porque o canal certo pra uma referência a
+  // variável CSS é uma PROPRIEDADE CSS, não uma string dentro do dado: uma
+  // string `var(...)` entregue como dado é inválida se o primitivo a injetar
+  // num atributo de apresentação SVG (`stroke="var(...)"`).
   const bloco = TELA.slice(TELA.indexOf('<urbi-grafico-linha'), TELA.indexOf('</urbi-grafico-linha>'));
   assert.ok(bloco.length > 0, 'o urbi-grafico-linha sumiu da aba Cenários');
   assert.ok(
