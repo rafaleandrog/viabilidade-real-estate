@@ -66,8 +66,7 @@ export interface Achados {
    * Retorno de `caso.medir(raiz)`, por largura — sonda opcional, própria de
    * cada caso, para o que as lentes genéricas de layout não enxergam: um
    * `.value` de `<input>` num shadow root aninhado, um evento que não devia
-   * disparar, uma chamada de API capturada. `null` quando o caso não
-   * declara `medir`.
+   * disparar. `null` quando o caso não declara `medir`.
    */
   extra: Record<string, unknown> | null;
 }

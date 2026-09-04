@@ -95,19 +95,20 @@ export class ViabTelaCenarios extends LitElement {
     .topo { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 16px; align-items: start; }
     @media (max-width: 860px) { .topo { grid-template-columns: 1fr; } }
     .graf-wrap { overflow-x: auto; }
-    /* #595: a cor de cada serie sai DAQUI, e nao de uma chave "cor" no dado.
-       O espelho docs/ui-urbiverso/primitivos.json declara "series" como Array e
-       NAO declara a forma dos itens — o repositorio nao tem como afirmar que o
-       primitivo honra "cor". O que ele DECLARA sao estas custom properties, no
-       :host de UrbiGraficoBase, e scripts/guard-tokens-css.mjs as reconhece como
-       ponto de customizacao legitimo. Aqui var() esta em valor de propriedade
-       CSS, que e o unico contexto em que ele resolve: entregue como STRING
-       dentro do dado, var(--x, #hex) so funciona se o primitivo a injetar
-       tambem num valor de propriedade CSS, e e INVALIDO se ele a injetar num
-       atributo de apresentacao SVG (stroke="var(...)") — caso em que o traco cai
-       para o inicial (none: some a linha) e o marcador para o fill inicial
-       (preto). Definir as duas custom properties vale nos dois casos, e e o que
-       garante o criterio 1 da #595: series em cores DISTINTAS entre si.
+    /* #595: a cor de cada serie sai DAQUI, e nao de uma chave "cor" no dado —
+       nao porque o primitivo IGNORE "cor" (o dist/index.d.ts do SDK confirma
+       que series[i].cor e honrada, ver o paragrafo do #185 mais abaixo), mas
+       porque o CANAL certo pra entregar uma referencia a variavel CSS e uma
+       PROPRIEDADE CSS, nao uma string dentro do dado. var(--x, #hex) so
+       resolve em valor de propriedade CSS: entregue como STRING dentro do
+       dado, so funciona se o primitivo a injetar tambem num valor de
+       propriedade CSS, e e INVALIDO se ele a injetar num atributo de
+       apresentacao SVG (stroke="var(...)") — caso em que o traco cai para o
+       inicial (none: some a linha) e o marcador para o fill inicial (preto).
+       Definir as duas custom properties, que scripts/guard-tokens-css.mjs
+       reconhece como ponto de customizacao legitimo no :host de
+       UrbiGraficoBase, vale nos dois casos — e e o que garante o criterio 1
+       da #595: series em cores DISTINTAS entre si.
        (Este bloco nao usa crase de proposito: o CSS mora dentro de um template
        literal marcado, e uma crase encerraria o template ali mesmo — erro que
        o typecheck acusa longe daqui, na linha do "static styles".) */
@@ -123,17 +124,23 @@ export class ViabTelaCenarios extends LitElement {
        urbi-grafico-linha abriu mao da linha tracejada e dos marcadores verticais
        que o SVG customizado desenhava.
 
-       ⚠️ #595 CORRIGIU A JUSTIFICATIVA DESTE COMENTARIO. Ele dizia "SerieGrafico
-       so declara { rotulo, valores, cor }, sem dasharray/anotacao" — e essa
-       afirmacao NAO tem fonte. O espelho docs/ui-urbiverso/primitivos.json
-       declara "series" como Array e nao declara a forma dos itens; o unico lugar
-       que responderia e o dist/index.d.ts do SDK, que este ambiente nao tem
-       (GitHub Packages privado, 401). Ou seja: o repositorio nunca soube que
-       "cor" era honrada — e foi essa crenca sem fonte que sustentou tentativa
-       apos tentativa de colorir a serie por dado. O que continua VERDADE, e
-       basta para a decisao da #185, e que o primitivo nao declara prop de
-       dasharray nem de anotacao: nenhuma das 13 props do espelho serve para
-       isso. Quem for mexer aqui le o espelho, nao este paragrafo. */
+       ⚠️ #595 CORRIGIU ESTE PARAGRAFO UMA SEGUNDA VEZ, NA DIRECAO OPOSTA. A
+       redacao anterior dizia que "SerieGrafico so declara { rotulo, valores,
+       cor }, sem dasharray/anotacao" nao tinha fonte, porque o unico lugar que
+       responderia — o dist/index.d.ts do SDK — nao existia neste ambiente
+       (GitHub Packages privado, 401). O 401 acabou (CLAUDE.md, secao
+       Validacao): node_modules/@urbiverso/sdk/dist/index.d.ts esta no disco, e
+       ele CONFIRMA a afirmacao original, nao a desmente. "interface
+       SerieGrafico { rotulo: string; valores: (number | null)[]; cor?: string
+       }" — sem dasharray nem anotacao, exatamente como o paragrafo original
+       dizia. E o doc da familia, no mesmo arquivo, sobre UrbiGraficoLinha:
+       "Cores via paleta CSS (--urbi-grafico-cor-1..6), sobrescritas por
+       series[i].cor" — "cor" SEMPRE foi honrada; a tentativa por dado nunca
+       teve como funcionar por falta de fonte NENHUMA, so por outro motivo (a
+       colisao de contexto SVG que a custom property acima resolve). O que
+       continua VERDADE, e basta para a decisao da #185, e que o primitivo nao
+       declara prop de dasharray nem de anotacao. Quem for mexer aqui le o
+       dist/index.d.ts do SDK, nao este paragrafo. */
     .marcos-lista { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 0.78rem; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
     .marcos-lista strong { color: var(--cor-texto, rgba(255,255,255,0.85)); font-weight: 600; }
 
