@@ -10,15 +10,31 @@
 // de estudos vazia (o `catch` de `tela-dashboard.ts` engole a exceção) passou
 // a impressão de que os dados tinham sido apagados — não tinham.
 //
-// A constante não voltou de propósito: sem o símbolo, repô-la é erro de
-// compilação, não um silêncio. Quem tenta reintroduzir o prefixo por outro
-// caminho esbarra em `frontend/api-caminho-relativo.test.ts`, que exercita
-// todas as funções daqui e reproduz a recusa do shell.
+// QUEM DEFENDE ISTO, e é importante não confundir as duas coisas:
 //
-// As três exceções legítimas, todas conferidas contra o resolver do shell:
-//   · `urbiVerso.nucleo('/glebas')`  — nucleo() não passa pelo resolver;
+//   · `frontend/api-caminho-relativo.test.ts` é a defesa REAL. Ele exercita
+//     todas as funções exportadas daqui, reproduz a recusa do resolver do
+//     shell e afere as URLs que efetivamente chegam ao `api()` — inclusive as
+//     de ramos com query, e inclusive quando a função engole o próprio erro.
+//   · O compilador defende só UM caso: escrever `${APP}` sem declarar `APP`
+//     vira `TS2304`. Ele NÃO impede redeclarar a constante nem escrever o
+//     prefixo à mão numa string — `api(url: string)` aceita qualquer string, e
+//     o TypeScript não inspeciona o conteúdo de um literal.
+//
+// A distinção está escrita porque a primeira versão deste comentário afirmava
+// que "repor a constante é erro de compilação". Era falso, e uma frase falsa e
+// plausível é pior que nenhuma: ela desincentiva a conferência.
+//
+// As três exceções legítimas:
+//   · `urbiVerso.nucleo(`/glebas?${qs}`)` — nucleo() não passa pelo resolver;
 //   · `api('/shell/apps/...')`       — `shell` é namespace cross-app, sem injeção;
 //   · `fetch('/api/dados/viabilidade/...')` — fetch nativo, caminho absoluto.
+//
+// ⚠️ A fonte dessas três é o código do resolver no monorepo, NÃO o bundle do
+// SDK que esta app fixa: o pin `0.50.3` não traz `docs/` nem
+// `obsolescencias.json`, e `SEGMENTOS_CROSS_APP` não aparece em lugar nenhum
+// dele. É leitura legítima, mas mede uma referência à frente do que a app
+// declara — então está declarado aqui em vez de passar por verificado.
 
 interface UrbiVersoApi {
   api(url: string, opts?: RequestInit): Promise<any>;

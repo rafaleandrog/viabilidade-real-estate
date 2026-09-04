@@ -75,6 +75,9 @@ Gráficos) · **Imóveis** (imóveis do Núcleo e em quais estudos são usados).
   (shell 0.53.5) e `dados.varrerTudo` (shell 0.53.8). O `sdk_min` **não** foi declarado: ele exige
   `shell_min ≥ 0.53.10` pareado e um SDK em versionamento inteiro ("SDK N"), e o alvo aqui ainda é
   o `0.50.3`.
+- **Parâmetro do manifesto usa `padrao`, e o default é VIVO** — não é persistido; o banco guarda só
+  a sobrescrita do admin, e mudar o `padrao` num release passa a valer sozinho onde ninguém
+  personalizou. Não duplique o default no código.
 - **Precisão decimal:** R$ e m² → `decimal(12,2)`; % digitado/default → `inteiro`; % calculado →
   `decimal(5,1)`.
 - **Precisão de resultado (2026-08-01):** **todo valor monetário que é resultado de fórmula é

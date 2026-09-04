@@ -198,8 +198,8 @@ export default async function ({ dados }) {
   // sem erro e sem volta"*. Aqui o risco é maior que num backfill de `estudos`,
   // porque `avancado_fases` guarda TODA linha de receita de TODO estudo da
   // instância: um teto fixo truncaria a varredura em silêncio e deixaria parte
-  // dos estudos sem backfill, sem nada ficar vermelho. Exige shell 0.53.8, que
-  // é o `shell_min` vigente.
+  // dos estudos sem backfill, sem nada ficar vermelho. Exige shell 0.53.8, e o
+  // `shell_min` vigente (`0.53.20`) está acima disso.
   const estudos = await dados.varrerTudo('estudos');
   const alvos = estudos.filter(
     (e) => e.juros_tabela_aa_padrao === null || e.juros_tabela_aa_padrao === undefined,

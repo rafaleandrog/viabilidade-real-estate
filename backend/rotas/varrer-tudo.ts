@@ -2,8 +2,8 @@
 //
 // ⚠️ POR QUE ISTO EXISTE EM VEZ DE `dados.varrerTudo`.
 //
-// A plataforma tem o verbo `varrerTudo` desde o shell 0.53.8, que já é o
-// `shell_min` deste app (#422) — então o RUNTIME o tem. O que não o tem é o
+// A plataforma tem o verbo `varrerTudo` desde o shell 0.53.8, e o `shell_min`
+// deste app está em `0.53.20` — acima disso — então o RUNTIME o tem. O que não o tem é o
 // **SDK publicado**: este app fixa `@urbiverso/sdk` em `0.50.3`, e o tipo
 // `HelperDados` de lá não declara o método. Usá-lo direto reprova o typecheck
 // de backend com seis `TS2339: Property 'varrerTudo' does not exist`.

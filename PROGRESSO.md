@@ -36,9 +36,16 @@ valores), e `shell_min` sobe de `0.53.8` para **`0.53.20`**, que é onde `padrao
 reconhecido. **Não** subiu para `0.54.0`: o caminho relativo funciona em toda versão do resolver, a
 app não passa a *exigir* aquele shell. Sem migração nova ⇒ **`versao` fica em `0.1.38`**.
 
-**O que a suíte NÃO enxergava, e por que isso é o centro deste registro.** Com o bug presente, os
-1057 testes ficavam verdes: os mocks de render casam por `rota.includes(<sufixo>)` e nenhum casa
-`/viabilidade`. É a classe de defeito nº 1 (o defeito mora na fiação) na forma mais cara — a app
+**O que a suíte NÃO enxergava, e por que isso é o centro deste registro.** Com o bug presente, a
+suíte inteira ficava verde — **1056 testes, medidos em worktree na base `9d50055`**: os mocks de
+render casam por `rota.includes(<sufixo>)` e nenhum casa `/viabilidade`.
+
+> ⚠️ A primeira redação desta seção, e o corpo do PR e a mensagem de commit junto, diziam **1057**.
+> Errado, e errado do jeito clássico: 1057 é a contagem do HEAD, que **inclui o teste novo** — o
+> qual não existia na base. O número saiu de aritmética, não de medição, que é exatamente a
+> armadilha 13. A substância seguia verdadeira (a suíte era verde com a app quebrada) e agora está
+> medida dos dois lados: **1056 na base, 1057 no head**. A mensagem de commit não foi reescrita de
+> propósito — não se reescreve histórico com o ciclo de revisão aberto. É a classe de defeito nº 1 (o defeito mora na fiação) na forma mais cara — a app
 inteira caiu sem uma asserção sequer piscar. `frontend/api-caminho-relativo.test.ts` fecha isso:
 exercita **todas** as funções exportadas do wrapper e reproduz a recusa do resolver do shell, em vez
 de olhar o texto do arquivo (um guard sobre o literal pegaria só a forma já conhecida).
@@ -58,8 +65,11 @@ verificação como qualquer outra. O próprio teste acusou; a lista virou "quem 
 entradas) e a chamada cross-app ganhou asserção própria.
 
 **Documentação corrigida junto, porque ela PRESCREVIA o bug:** `INSTRUCOES-CODE.md` e `README.md`
-mandavam escrever `urbiVerso.api('/viabilidade/...')` — e cada um dos dois se contradizia poucas
-linhas antes, onde já dizia "o shell prefixa; nunca escreva o prefixo". Sem isso a próxima sessão
+mandavam escrever `urbiVerso.api('/viabilidade/...')`, cada um contradizendo o que ele mesmo já
+dizia noutro ponto ("o shell prefixa; nunca escreva o prefixo") — a uma linha de distância no
+`INSTRUCOES-CODE.md`, e a ~135 linhas no `README.md`. A terceira, e a mais citada de todas, só
+apareceu na revisão: o **Anexo E — API** de `docs/viabilidade/padrao-incorporacao.md`, onde as duas
+metades da contradição estavam na **mesma frase**. Sem isso a próxima sessão
 reintroduz o bug obedecendo à doc.
 
 **⚠️ O `urbi-empacotar` local NÃO serve de prova aqui, e medir isso valeu.** Ele empacota limpo,

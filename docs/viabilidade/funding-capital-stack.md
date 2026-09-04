@@ -43,7 +43,8 @@ ordem: 8
 > `dados.limparTabela` (`scripts/migracoes-harness.mjs:322-330`), deixando a **poda do
 > reconciliador** derrubar a estrutura vazia no mesmo boot. É literalmente o que o job
 > `migracao-declarativa` deste repositório manda fazer (`.github/workflows/pr-guards.yml:216`), e o
-> `shell_min` do manifesto já está em **`0.53.8`**, acima dos pisos que esse fluxo exige.
+> `shell_min` do manifesto está em **`0.53.20`**, acima dos pisos que esse fluxo exige
+> (`dados.limparColuna` pede 0.53.5; `dados.varrerTudo`, 0.53.8).
 >
 > **O que impede é escopo:** remover a tabela é mudança de schema — pede migração nova e bump da
 > `versao` —, e a #479 põe a remoção explicitamente fora de escopo (regra **R3**, um assunto por PR).

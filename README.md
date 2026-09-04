@@ -172,6 +172,13 @@ esbuild frontend/index.ts --bundle --external:@urbiverso/ui --format=esm --outfi
 
 **Backend:** `export const rotas: Router = Router()` com rotas **relativas**; `import '@urbiverso/sdk/express'` no topo para tipar `req.*`; `req.contexto` (usuário/nível/roles) já preenchido — a app **nunca** implementa autenticação; `req.dados` para persistência.
 
-**Frontend:** Lit com decorators (`@customElement('app-viabilidade')`, `@state`, `@property`); chamadas via `urbiVerso.api('/rota')` — **caminho relativo; o shell injeta o `/viabilidade` sozinho, e repetir o slug à mão LANÇA** (obsolescência `api-slug-manual`, encerrada em 2026-08-30); tokens CSS do design system (`var(--cor-primaria-solida)`, `var(--espaco-4)`, …); primitivos `urbi-*` disponíveis globalmente (use pela tag, `import type` apenas — nunca `import @urbiverso/ui` em runtime).
+**Frontend:** Lit com decorators (`@customElement('app-viabilidade')`, `@state`, `@property`); chamadas via `urbiVerso.api('/rota')` — **caminho relativo; o shell injeta o `/viabilidade` sozinho, e repetir o slug à mão LANÇA** (obsolescência `api-slug-manual`: data-piso 2026-08-30, encerrada na v0.54.0 do shell); tokens CSS do design system (`var(--cor-primaria-solida)`, `var(--espaco-4)`, …); primitivos `urbi-*` disponíveis globalmente (use pela tag, `import type` apenas — nunca `import @urbiverso/ui` em runtime).
 
-**Empacotar:** `pnpm build && pnpm exec urbi-empacotar viabilidade` → `dist/viabilidade-<versao>.urbiapp.tgz` + `.sha256`, já validado com as mesmas checagens do instalador.
+**Empacotar:** `pnpm build && pnpm exec urbi-empacotar viabilidade` → `dist/viabilidade-<versao>.urbiapp.tgz` + `.sha256`.
+
+> ⚠️ **Empacotar limpo NÃO é atestado de que a app passa no instalador.** A auditoria de
+> obsolescências viaja **embutida no bin do SDK**, e este repo fixa `@urbiverso/sdk` `0.50.3` —
+> muito atrás do publicado. Medido em 2026-09-04, por controle: com a chave obsoleta `inicial`
+> reposta de propósito no `manifesto.json`, o `urbi-empacotar` **empacotou sem uma linha de aviso**.
+> Para as obsolescências recentes a auditoria local é **não-executada**, não "aprovada" — quem
+> gateia de verdade é a instalação na instância. Subir o pin do SDK é o que devolveria esse alarme.

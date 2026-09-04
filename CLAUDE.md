@@ -961,6 +961,17 @@ Git Bash — ver PROGRESSO).
   migração (`remover_colunas`), cujo fluxo canônico substituto exige `dados.limparColuna`
   (shell **0.53.5**) e `dados.varrerTudo` (shell **0.53.8**). Subir o piso
   **não** bumpa a `versao` — ela descreve o schema, e nada de schema mudou.
+
+- **Parâmetro do manifesto: `padrao`, e o default é VIVO.** A chave chama-se `padrao` (o nome
+  antigo, `inicial`, saiu em 2026-09-04) e a troca **não é só de nome**: o valor **não é
+  persistido**. O banco guarda exclusivamente a sobrescrita do admin, e enquanto ela não existir
+  `obter()` resolve o `padrao` do manifesto a cada leitura. Consequência prática: **mudar o
+  `padrao` num release novo passa a valer sozinho** em toda instância que nunca personalizou
+  aquele parâmetro — o default deixou de ficar congelado depois do primeiro release. Não duplique
+  o default no código: hoje há seis pontos com `Number(...) || <literal>`
+  (`frontend/tela-premissas.ts`, `tela-graficos.ts`, `tela-proforma.ts`, `proforma.ts`,
+  `backend/rotas/manutencao.ts`, `backend/rotinas.ts`) que coincidem com o manifesto e por isso não
+  divergem hoje — mas são um segundo default, e `||` engole o `0`.
 - Precisão: R$ e m² → `decimal(12,2)`; % digitado → inteiro; % calculado → `decimal(5,1)`
 - **Todo valor monetário resultado de fórmula tem 2 casas decimais** — na apresentação, na entrada e
   no motor. Representações derivadas **não monetárias** (% e R$/m²) carregam **precisão plena**

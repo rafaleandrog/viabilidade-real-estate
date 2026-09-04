@@ -66,6 +66,15 @@ const SEM_CHAMADA_API: Record<string, string> = {
 // propósito: `/shell` está em SEGMENTOS_CROSS_APP no resolver.
 const VIA_NAMESPACE_CROSS_APP = 'listarUsuarios';
 
+// Argumento que LIGA todo ramo condicional de query do wrapper: é truthy (para
+// `if (busca)` e para `tipo ? … : ''`), interpola como '7' (serve de id numa
+// rota), e traz as chaves de filtro que `listarEstudos` lê.
+const ARG_ATIVO = {
+  tipo_empreendimento: 'incorporacao',
+  status: 'ativo',
+  toString: () => '7',
+};
+
 // Quantas funções o wrapper exporta. Trava a porta que a lista de exceção
 // deixaria aberta: função nova que nasça com o slug entra no laço abaixo em
 // vez de passar despercebida.
@@ -120,32 +129,74 @@ test('nenhuma função do wrapper repete o slug da app no caminho', async () => 
 
   const funcoes = Object.keys(api).filter((k) => typeof api[k] === 'function').sort();
 
-  assert.equal(
-    funcoes.length,
-    FUNCOES_EXPORTADAS,
-    `o wrapper exporta ${funcoes.length} funções, e este teste está calibrado para ` +
-      `${FUNCOES_EXPORTADAS}. Se você acrescentou ou removeu uma, atualize a constante ` +
-      `— ela existe para que função nova não entre sem passar por esta verificação.`
-  );
-
   const recusadas: string[] = [];
   for (const nome of funcoes) {
     fnAtual = nome;
-    // `{}` para cada parâmetro declarado: serve como id interpolado, como
-    // objeto de `JSON.stringify` e como filtro cujos campos saem `undefined`.
-    const args = Array.from({ length: api[nome].length }, () => ({}));
-    try {
-      await api[nome](...args);
-    } catch (e) {
-      recusadas.push(`  · ${(e as Error).message}`);
+    // Cada função é chamada DUAS vezes, e isso não é zelo: vários caminhos têm
+    // um ramo condicional de query (`if (busca)`, `filtros.tipo_empreendimento`,
+    // `tipo ? ... : ''`), e chamar só de um jeito exercita só um dos ramos. Uma
+    // mutação que puser o slug apenas no ramo com query passaria verde —
+    // medido, antes desta correção.
+    //
+    //  · sem argumento nenhum → os parâmetros com default assumem o default, e
+    //    o ramo "sem query" é o exercitado;
+    //  · com ARG_ATIVO em todas as posições → todo ramo condicional liga.
+    //
+    // ARG_ATIVO é truthy, interpola como '7' (serve de id), carrega as chaves
+    // de filtro que o wrapper lê e sobrevive a `JSON.stringify`.
+    const aridade = Math.max(api[nome].length, 3);
+    const chamadas = [[], Array.from({ length: aridade }, () => ARG_ATIVO)];
+    for (const args of chamadas) {
+      try {
+        await api[nome](...(args as any[]));
+      } catch (e) {
+        recusadas.push(`  · ${(e as Error).message}`);
+      }
     }
   }
 
+  // ── A asserção PRINCIPAL: as URLs COLETADAS, não as exceções propagadas ────
+  //
+  // Esta ordem importa, e custou uma rodada de revisão para ficar certa. A
+  // versão anterior deste teste concluía só a partir de `recusadas`, ou seja,
+  // da exceção CHEGAR até aqui — e uma função do wrapper que engolisse o
+  // próprio erro num `try/catch` saía VERDE com o slug reposto. Medido, com a
+  // mutação aplicada. Era o mesmo padrão que o cabeçalho deste arquivo culpa
+  // por ter escondido o incidente original: o `catch` do dashboard.
+  //
+  // `chamadasApi` registra a URL ANTES de o mock lançar, então ela é o fato
+  // primário; a exceção é consequência. Medir o fato primário torna a
+  // verificação independente do que a função faz com o erro depois.
+  const comSlug = chamadasApi.filter((c) => {
+    const somentePath = c.url.split(/[?#]/)[0];
+    return (somentePath.startsWith('/') ? somentePath : '/' + somentePath).split('/')[1] === APP_ID;
+  });
+  assert.deepEqual(
+    comSlug.map((c) => `${c.fn}() → ${c.url}`),
+    [],
+    `chamada(s) a api() com o slug da app no caminho — o shell recusaria cada uma:\n` +
+      comSlug.map((c) => `  · ${c.fn}() → ${c.url}`).join('\n')
+  );
+
+  // A recusa propagada é a verificação IRMÃ, não a principal: ela prova que o
+  // erro do resolver chega a quem chamou, em vez de morrer no caminho.
   assert.deepEqual(
     recusadas,
     [],
     `o shell recusaria ${recusadas.length} chamada(s) — o slug da app voltou ao caminho:\n` +
       recusadas.join('\n')
+  );
+
+  // A contagem vem DEPOIS das duas asserções de URL, de propósito: a mensagem
+  // dela manda "atualize a constante", e se ela falhasse primeiro, quem
+  // seguisse a instrução converteria um vermelho de slug num bump de número.
+  assert.equal(
+    funcoes.length,
+    FUNCOES_EXPORTADAS,
+    `o wrapper exporta ${funcoes.length} funções, e este teste está calibrado para ` +
+      `${FUNCOES_EXPORTADAS}. Confira ANTES que as asserções de caminho acima estejam ` +
+      `verdes; só então atualize a constante — ela existe para que função nova não entre ` +
+      `sem passar por esta verificação.`
   );
 
   // As que NÃO passam por `api()` com caminho de app são exatamente as
