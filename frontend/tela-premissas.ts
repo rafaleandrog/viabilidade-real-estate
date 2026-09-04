@@ -591,10 +591,27 @@ export class ViabTelaPremissas extends LitElement {
     this._set(cu.modoKey, nova.valor);
   }
 
+  // #664 (caminho B): com canônico presente, o valor exibido SAI do canônico ou não
+  // sai — nunca cai no histórico da coluna por unidade.
+  //
+  // O defeito que isto corrige: quando a grandeza de LIGAÇÃO do destino está zerada
+  // (VGV 0, área vendável 0), `converterUnidade` devolve `null` porque não há por
+  // que dividir. O `?? this._num(op.campo)` que existia aqui então desenhava o
+  // valor HISTÓRICO daquela unidade — digamos `30` — enquanto a Proforma seguia
+  // aplicando o canônico, digamos R$ 1.000.000. A tela mostrava um número que o
+  // motor não usa, que é a mesma classe de mentira da #442.
+  //
+  // Campo vazio é a resposta honesta: não há valor NAQUELA unidade enquanto a
+  // ligação for zero. O cálculo nunca esteve errado — só a exibição.
+  //
+  // ⚠️ O ramo LEGADO (canônico ausente) não muda, e a diferença é o ponto: ali o
+  // histórico é a única fonte que existe, e lê-lo não contradiz motor nenhum.
+  // Escrever a coluna por unidade para "consertar" isto é proibido — § Fonte de
+  // verdade da quantidade econômica, e a #442/#515 já registraram o porquê.
   private _valorUnidade(cu: CustoUnidade, op: CustoUnidade['opcoes'][number]): number | null {
     const canonico = this._num(cu.campoCanonico);
     if (canonico === null) return this._num(op.campo); // estudo legado, sem mutação implícita
-    return converterUnidade({ tipo: 'identidade' }, op.conv, canonico, this._ctxConversao()) ?? this._num(op.campo);
+    return converterUnidade({ tipo: 'identidade' }, op.conv, canonico, this._ctxConversao());
   }
 
   private _editarCustoUnidade(cu: CustoUnidade, op: CustoUnidade['opcoes'][number], valor: number | null) {
