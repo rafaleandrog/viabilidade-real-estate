@@ -21,9 +21,17 @@ assunto por PR") — em issues próprias, todas já fechadas: #609 (duplicar nã
 Produtos, P1), #610 (Cenários sem estado vazio), #611 (`eficienciaPct`/`roiPct` viravam 0,0%
 vermelho em vez de indefinido), #612 (ALV podia ficar negativa) e #613 (benchmark de eficiência sem
 medidor) — mais dois achados entregues dentro de PRs de outras issues da própria rodada (permuta
-física reduzindo área em vez de VGV → PR 607/#570; rótulo de permuta divergente entre tela e
-exportação → PR 617/#572) e um registrado sem issue própria (notação de sinal na exportação da
-Proforma, decisão do autor).
+física reduzindo área em vez de VGV → PR 607/#570, com o RESIDUAL do memo fechado depois pela
+#615/PR 622, commit `7c7e92a`; rótulo de permuta divergente entre tela e exportação → PR 617/#572)
+e um achado que **foi** implementado, sem issue própria — a notação de sinal na exportação da
+Proforma saiu do CSV/PDF via PR 627 (commit `bc46212`), igualando `celulaProforma`/`pctVgvProforma`
+entre tela e exportação.
+
+> ⚠️ **Correção da rodada 1 de revisão do Codex no PR 672** (achado P2): a primeira redação deste
+> parágrafo tratava o residual do achado 1 como se PR 607/#570 tivesse fechado tudo, e o achado 10
+> como "registrado, decisão do autor" — sugerindo que nada foi feito. As duas coisas foram
+> **implementadas depois** (a #615/PR 622 e a PR 627, respectivamente), e omitir isso teria deixado
+> uma trilha de auditoria errada exatamente no arquivo cujo propósito é ser a memória entre sessões.
 
 Este PR não teve conserto de código — só a atualização de processo que o critério 3 pede: a tabela
 de backlog do `CLAUDE.md` (Rodada 10 de 🔄 para ✅) e este parágrafo.
