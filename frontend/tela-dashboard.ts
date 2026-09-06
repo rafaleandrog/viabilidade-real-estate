@@ -214,7 +214,15 @@ export class ViabTelaDashboard extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this._carregar();
+    // #683 (achado do Codex, rodada 2): landing direto em /terrenos, /benchmarks,
+    // /curvas ou /regioes ainda chamava _carregar() (Estudos) incondicionalmente
+    // aqui — o slot da aba errada já não montava mais, mas o fetch de
+    // listarEstudos() e o _calcularAvancados() que ele dispara em cascata
+    // (uma chamada por estudo Avançado) continuavam saindo mesmo sem a
+    // tabela de Estudos existir na tela. Landing direto em /estudos continua
+    // instantâneo (a condição é true de cara); navegar PARA estudos depois
+    // continua pelo guard de `updated()` logo abaixo, que já existia.
+    if (this.aba === 'estudos') this._carregar();
   }
 
   updated(changed: Map<string, unknown>) {
@@ -399,16 +407,22 @@ export class ViabTelaDashboard extends LitElement {
                instância de ViabTelaDashboard para as 5 abas. Slot é projeção
                de light DOM: o filho existe assim que este componente
                renderiza, independente de qual aba urbi-abas mostra por
-               dentro — então os 4 connectedCallback de
+               dentro — então os 3 connectedCallback de
                viabilidade-config-benchmarks/curvas/mercado (cada um chama
                _carregar() sem guard nenhum) disparavam juntos, na primeira
                renderização, não só quando a aba correspondente é aberta.
                Gateado por this.aba, igual ao padrão já usado no slot
                actions acima — trocar de aba agora MONTA e DESMONTA o
-               conteúdo (fetch lazy ao entrar), então estado interno
-               transitório desses 3 componentes (ex.: um filtro, um form
-               aberto) não sobrevive à troca de aba; nenhum dos 3 guardava
-               esse tipo de estado antes desta mudança. -->
+               conteúdo (fetch lazy ao entrar). Os 3 JÁ TINHAM estado de
+               formulário aberto (mostrarNovo/editando + campos, ex.
+               viabilidade-config-curvas.ts) — a diferença é que antes esse
+               estado SOBREVIVIA à troca de aba, porque o componente nunca
+               desconectava (os 5 hospedeiros ficavam sempre montados); agora
+               ele é perdido de verdade a cada desmontagem. É uma tela
+               admin-only, o dado nunca foi persistido (reabrir e preencher
+               de novo resolve), e nenhum dos 3 tem confirmação de descarte
+               — registrado como tradeoff aceito, não como algo a proteger
+               nesta issue. -->
           ${this.aba === 'estudos' ? html`
             <urbi-hospedeiro slot="estudos">${this._renderEstudos()}</urbi-hospedeiro>` : nothing}
           ${this.aba === 'terrenos' ? html`
