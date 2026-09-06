@@ -1029,7 +1029,7 @@ Git Bash — ver PROGRESSO).
     `rgba()`/`hsla()` no bundle por regex — inclusive o literal de **fallback** dentro de
     `var(--token-que-existe, #fallback)`, que é exatamente o padrão correto de uso de token
     (defesa contra token ainda não publicado na versão do shell instalada). Medido em 2026-09-06,
-    contando os 279 no bundle contra a fonte: **272 são fallback de `var()` de token real**
+    contando os 279 no bundle contra a fonte: **264 são fallback de `var()` de token real**
     (confirmado pelo `guard-tokens-css.mjs`, que passa limpo — todo `var()` do app referencia
     token existente) e os **15 restantes são, sem exceção, os literais de `frontend/exportar.ts`**
     já documentados na exceção acima. Não há literal "solto" em nenhum outro arquivo de
