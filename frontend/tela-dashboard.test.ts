@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resumoListagem, nivelExibicao, linhasEstudosFiltradas, type ResumoListagem } from './tela-dashboard.js';
 import { COR_NIVEL } from './viab-shared.js';
+import { calcularCascata, CASCATA_LOTEAMENTO, estadosCascataLoteamentoDoEstudo } from './areas-cascata.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #406: a listagem de Estudos mostrava "—" em VGV/Resultado/Margem para todo
@@ -58,7 +59,7 @@ test('#406: Avançado ainda sem entrada no mapa é "carregando", não "—"', ()
 test('#406: Avançado calculado e pronto devolve o resumo — MESMA grandeza da sub-aba Proforma', () => {
   const calc: ResumoListagem = {
     vgv: 48_000_000, resultado: 12_000_000, margemPct: 25,
-    areaPrivativa: 6_000, areaConstruida: 7_400, roiPct: 33.3,
+    areaLiquidaVenda: 6_000, roiPct: 33.3,
   };
   const estudo = { id: 42, nivel_analise: 'avancado' };
   assert.deepEqual(resumoListagem(estudo, { 42: calc }), calc);
@@ -73,7 +74,7 @@ test('#406: Avançado calculado com vgv <= 0 também vira "—" — mesmo guard 
   const estudo = { id: 42, nivel_analise: 'avancado' };
   const semReceita: ResumoListagem = {
     vgv: 0, resultado: 0, margemPct: 0,
-    areaPrivativa: 0, areaConstruida: 0, roiPct: 0,
+    areaLiquidaVenda: 0, roiPct: 0,
   };
   assert.equal(resumoListagem(estudo, { 42: semReceita }), null);
 });
@@ -81,7 +82,7 @@ test('#406: Avançado calculado com vgv <= 0 também vira "—" — mesmo guard 
 test('#406: cada estudo Avançado é resolvido pelo seu PRÓPRIO id — um "carregando" não contamina os outros', () => {
   const pronto: ResumoListagem = {
     vgv: 10_000_000, resultado: 2_000_000, margemPct: 20,
-    areaPrivativa: 1_200, areaConstruida: 1_500, roiPct: 25,
+    areaLiquidaVenda: 1_200, roiPct: 25,
   };
   const mapa = { 1: pronto, 2: 'indisponivel' as const };
   assert.deepEqual(resumoListagem({ id: 1, nivel_analise: 'avancado' }, mapa), pronto);
@@ -90,49 +91,49 @@ test('#406: cada estudo Avançado é resolvido pelo seu PRÓPRIO id — um "carr
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// Painel de estudos: as três grandezas novas (área privativa, área total
-// construída e ROI) precisam sair da MESMA definição nos dois níveis. Coluna
-// que compara Preliminar com Avançado e usa contas diferentes compara coisas
-// diferentes — e ninguém percebe olhando a tela.
+// #677: a coluna "Área líquida de venda" substitui "Área privativa" +
+// "Área total construída" — uma coluna só, buscando o campo certo em CADA
+// tipo de estudo (convenção C1: só a área FECHADA é vendável). E o ROI
+// precisa sair da MESMA definição nos dois níveis.
 // ─────────────────────────────────────────────────────────────────────────
 
-test('Painel: Preliminar entrega área privativa, área construída e ROI junto do resto', () => {
+test('#677: Loteamento Preliminar — areaLiquidaVenda é IDÊNTICA à linha ALV da cascata de áreas', () => {
   const estudo = {
-    id: 7, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
-    terreno_manual_area: 1000, origem_terreno: 'manual',
-    area_pvt_r_fechada: 800, area_comum_total: 200,
-    // A receita vem do catálogo; as áreas continuam vindo dos campos de área,
-    // que é justamente o que este teste afere.
-    produtos: [{ area_media_m2: 80, preco_venda_m2: 10000, unidades: 10 }],
-    custo_construcao_m2: 3000,
+    id: 7, nivel_analise: 'preliminar', tipo_empreendimento: 'loteamento',
+    terreno_manual_area: 10000, origem_terreno: 'manual',
+    area_app_modo: 'm2', area_app_valor: 500,
+    area_viario_publico_modo: 'm2', area_viario_publico_valor: 1000,
+    produtos: [{ area_media_m2: 250, preco_venda_m2: 500, unidades: 30 }],
   };
   const r = resumoListagem(estudo, {}) as ResumoListagem;
-  assert.ok(r && typeof r === 'object', 'deveria produzir resumo');
-  assert.equal(r.areaPrivativa, 800);
-  // areaConstruida = privativa + comum — a fórmula de proforma.ts
-  assert.equal(r.areaConstruida, 1000);
-  assert.equal(typeof r.roiPct, 'number');
+  assert.ok(r && typeof r === 'object', 'deveria produzir resumo — o estudo tem catálogo');
+  const cascata = calcularCascata(CASCATA_LOTEAMENTO, estadosCascataLoteamentoDoEstudo(estudo), 10000);
+  const alv = cascata.find((l) => l.id === 'alv')!.m2;
+  assert.ok(alv > 0, 'fixture inválida — a ALV precisa ser positiva para o teste valer algo');
+  assert.equal(r.areaLiquidaVenda, alv);
 });
 
-test('Painel: Loteamento não tem área comum — construída cai na privativa, nunca em zero', () => {
+test('#677: Incorporação Preliminar — areaLiquidaVenda soma só as parcelas FECHADAS, nunca as abertas', () => {
+  // As 4 parcelas com valores DIFERENTES: incluir a aberta por engano muda o
+  // número (critério de aceite 3 da #677) — e é também o teste de mutação do
+  // critério 6: trocar `p.areaVendavel` por `p.areaPrivativa` no ramo
+  // Preliminar de `resumoListagem` faria este teste esperar 1200, não 1000.
   const estudo = {
-    id: 8, nivel_analise: 'preliminar', tipo_empreendimento: 'loteamento',
-    terreno_manual_area: 10000, origem_terreno: 'manual',
-    preco_venda_m2: 500, area_media_lote_m2: 250,
-    produtos: [{ area_media_m2: 250, preco_venda_m2: 500, unidades: 40 }],
+    id: 8, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
+    terreno_manual_area: 5000, origem_terreno: 'manual',
+    area_pvt_r_fechada: 800, area_pvt_nr_fechada: 200,
+    area_pvt_r_aberta: 150, area_pvt_nr_aberta: 50,
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 8000, unidades: 10 }],
   };
-  const r = resumoListagem(estudo, {});
-  // Sem o `if`, e de propósito: com `resumoListagem` devolvendo null a asserção
-  // some, e o teste passava sem aferir nada.
-  assert.ok(r && r !== 'carregando', 'o estudo tem catálogo — a listagem tem que resolver');
-  assert.ok(r.areaConstruida > 0, 'área construída de loteamento não pode ser 0 com privativa > 0');
-  assert.equal(r.areaConstruida, r.areaPrivativa);
+  const r = resumoListagem(estudo, {}) as ResumoListagem;
+  assert.ok(r && typeof r === 'object', 'deveria produzir resumo — o estudo tem catálogo');
+  assert.equal(r.areaLiquidaVenda, 1000, 'esperado 800+200 (só fechadas) — 1200 significa que incluiu as abertas');
 });
 
-test('Painel: Avançado devolve as três grandezas novas vindas do mapa', () => {
+test('#677: Avançado devolve areaLiquidaVenda e ROI vindos do mapa', () => {
   const calc: ResumoListagem = {
     vgv: 1000, resultado: 250, margemPct: 25,
-    areaPrivativa: 500, areaConstruida: 620, roiPct: 33.3,
+    areaLiquidaVenda: 500, roiPct: 33.3,
   };
   const r = resumoListagem({ id: 42, nivel_analise: 'avancado' }, { 42: calc });
   assert.deepEqual(r, calc);
@@ -146,7 +147,7 @@ test('Painel: ROI do Avançado é resultado/investimento — a MESMA conta do Pr
   const esperado = (resultado / (custoDireto + custoIndireto)) * 100;
   const calc: ResumoListagem = {
     vgv: 1300, resultado, margemPct: 23.1,
-    areaPrivativa: 100, areaConstruida: 100, roiPct: esperado,
+    areaLiquidaVenda: 100, roiPct: esperado,
   };
   const r = resumoListagem({ id: 1, nivel_analise: 'avancado' }, { 1: calc }) as ResumoListagem;
   assert.equal(r.roiPct, 30);
@@ -487,8 +488,9 @@ test('#676: a tabela de Estudos tem exatamente as colunas esperadas, sem Cidade'
   assert.deepEqual(
     ids,
     [
-      'imagem', 'nome', 'status', 'nivel_analise', 'area_terreno', 'area_privativa',
-      'area_construida', 'vgv', 'margem', 'roi', 'criador', 'acoes',
+      // #677: 'area_privativa' + 'area_construida' viraram 'area_liquida_venda'.
+      'imagem', 'nome', 'status', 'nivel_analise', 'area_terreno', 'area_liquida_venda',
+      'vgv', 'margem', 'roi', 'criador', 'acoes',
     ],
     'a lista de colunas mudou — se foi para tirar/pôr uma coluna de propósito, atualize esta lista '
       + 'junto; "cidade" nunca deve reaparecer aqui',

@@ -653,6 +653,21 @@ export function areaPrivativaTotalLinhas(linhas: any[]): number {
       si + (n(t.area_privativa_m2) + n(t.area_privativa_aberta_m2)) * n(t.quantidade), 0), 0);
 }
 
+/** #677: área VENDÁVEL total do Avançado — só a parte FECHADA (`area_privativa_m2`),
+ * sem a aberta. É irmã de `areaPrivativaTotalLinhas`, não substituta: aquela
+ * inclui a aberta de propósito (Decisão 1 da #462, é a base do custo
+ * `rs_m2_priv` e não muda). Esta existe porque a convenção C1
+ * (`docs/viabilidade/padrao-incorporacao.md:3095`, "só a fechada é vendável")
+ * é a mesma que `proforma.ts` já aplica no Preliminar (`areaVendavel` da
+ * Incorporação = `rFech + nrFech`) — sem este helper, a coluna "Área líquida
+ * de venda" do Painel significaria "fechada" num nível e "fechada + aberta"
+ * no outro. */
+export function areaVendavelTotalLinhas(linhas: any[]): number {
+  return (linhas ?? []).reduce((s, l) =>
+    s + (l.tipologias ?? []).reduce((si: number, t: any) =>
+      si + n(t.area_privativa_m2) * n(t.quantidade), 0), 0);
+}
+
 /** Converte o orçamento de uma linha de custo para R$ absolutos. */
 export function resolverCustoTotal(custo: any, ctx: ContextoCusto): number {
   // #259: para linhas já convertidas, R$ canônico independe da unidade exibida.

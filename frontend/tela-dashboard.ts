@@ -5,7 +5,7 @@ import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct, fmtPctOuIndef, fmtNum, fmtM2 } from './viab-format.js';
 import { calcularProforma } from './proforma.js';
 import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
-import { areaPrivativaTotalLinhas } from './fluxo-shared.js';
+import { areaPrivativaTotalLinhas, areaVendavelTotalLinhas } from './fluxo-shared.js';
 import { proformaAvancado } from './proforma-avancado.js';
 import {
   acoesTransicao, nomeEstudoLimpo, podeEditarEstudo, LIMITE_NOME_ESTUDO,
@@ -26,11 +26,17 @@ import './viabilidade-config-mercado.js';
  * As grandezas que a listagem mostra, prontas — as mesmas que a sub-aba Proforma
  * do estudo mostra, para a tabela nunca contar história diferente da tela.
  *
- * `areaPrivativa`, `areaConstruida` e `roiPct` entraram com o Painel de estudos.
- * As três saem da MESMA definição nos dois níveis, o que é o ponto: coluna que
- * compara Preliminar com Avançado precisa comparar a mesma conta.
- *   - `areaConstruida` = área privativa + área comum (`proforma.ts`, cascata de
- *     Incorporação). Loteamento não tem área comum: fica igual à privativa.
+ * `areaLiquidaVenda` e `roiPct` entraram com o Painel de estudos. As duas saem
+ * da MESMA definição nos dois níveis, o que é o ponto: coluna que compara
+ * Preliminar com Avançado precisa comparar a mesma conta.
+ *   - `areaLiquidaVenda` (#677) = a área VENDÁVEL, convenção C1
+ *     (`docs/viabilidade/padrao-incorporacao.md:3095`, "só a fechada é
+ *     vendável"): no Loteamento, a ALV da cascata (`proforma.ts`); na
+ *     Incorporação Preliminar, `area_pvt_r_fechada + area_pvt_nr_fechada`
+ *     (exclui as parcelas abertas); no Avançado, o helper irmão
+ *     `areaVendavelTotalLinhas` (`fluxo-shared.ts`) — só a parte fechada das
+ *     tipologias, nunca `areaPrivativaTotalLinhas` (que inclui a aberta e é
+ *     base de custo, intocada por esta issue).
  *   - `roiPct` = resultado / (custo direto + indireto) × 100 — a fórmula do
  *     Preliminar, aplicada às séries do Avançado.
  */
@@ -38,8 +44,7 @@ export interface ResumoListagem {
   vgv: number;
   resultado: number;
   margemPct: number;
-  areaPrivativa: number;
-  areaConstruida: number;
+  areaLiquidaVenda: number;
   /**
    * #611: `null` quando o denominador não existe (`investimentoTotal <= 0`).
    * NÃO é `number` com fallback: ver o comentário do call site em
@@ -129,11 +134,10 @@ export function resumoListagem(
         // acima já garante `p.vgv > 0` aqui, então o `?? 0` é só para o
         // typechecker (que não relaciona os dois campos); nunca dispara.
         margemPct: p.margemLiquidaPct ?? 0,
-        areaPrivativa: p.areaPrivativa,
-        // Loteamento não modela área comum: `areaConstruida` fica 0 no motor, e
-        // exibir "0,00 m²" ao lado de uma área privativa real seria mentira. A
-        // área construída de um loteamento É a privativa (os lotes).
-        areaConstruida: p.areaConstruida > 0 ? p.areaConstruida : p.areaPrivativa,
+        // #677: `p.areaVendavel` já resolve por tipo dentro do motor — a ALV da
+        // cascata no Loteamento, as parcelas fechadas na Incorporação. A tela
+        // não tem (e não pode ter) uma segunda opinião sobre qual é a base.
+        areaLiquidaVenda: p.areaVendavel,
         // #611: `roiPct` é `null` quando `investimentoTotal <= 0`, e aqui ele
         // PASSA DIRETO — sem `?? 0`.
         //
@@ -344,14 +348,11 @@ export class ViabTelaDashboard extends LitElement {
       // este arquivo de volta à lista sem reintroduzir a chamada.
       const area = areaPrivativaTotalLinhas(linhasReceita);
       const p = proformaAvancado(c, area);
-      // A área privativa já era calculada aqui e DESCARTADA — o mapa só guardava
-      // VGV/Resultado/Margem. Agora ela sai junto, sem custo nenhum.
-      //
-      // Área construída: o Avançado não modela área comum nas suas séries, mas o
-      // estudo tem o campo `area_comum_total` (é o mesmo que o Preliminar soma em
-      // `proforma.ts`). Somar os dois mantém a coluna com UMA definição só nos
-      // dois níveis; sem o campo preenchido, cai na privativa, como no Loteamento.
-      const areaComum = Number(estudo?.area_comum_total) || 0;
+      // #677: área VENDÁVEL do Avançado — só a parte fechada das tipologias
+      // (`areaVendavelTotalLinhas`), NUNCA `areaPrivativaTotalLinhas` (usada
+      // acima só para `proformaAvancado`/custo, inclui a aberta de propósito
+      // — Decisão 1 da #462 — e não muda com esta issue).
+      const areaVendavel = areaVendavelTotalLinhas(linhasReceita);
       // #427 — a EVI fecha com TRÊS leituras (Resultado / +Perm. Financ. /
       // +Permutas — ver `proforma-avancado.ts`). O Painel só declara UMA: esta
       // continua sendo `p.resultado`/`p.margemPct`, a leitura "= Resultado"
@@ -371,8 +372,7 @@ export class ViabTelaDashboard extends LitElement {
           // de desenho de uma tabela compacta, e vale igualmente para o
           // Preliminar: fica fora desta issue, de propósito.
           margemPct: p.margemPct ?? 0,
-          areaPrivativa: p.areaPrivativa,
-          areaConstruida: p.areaPrivativa + areaComum,
+          areaLiquidaVenda: areaVendavel,
           // #611: idem para o Avançado — `roiPct` passa DIRETO, sem `?? 0`,
           // pelo mesmo motivo do ramo Preliminar: a guarda `calc.vgv > 0` de
           // `resumoListagem` não diz nada sobre `investimentoTotal`.
@@ -512,10 +512,8 @@ export class ViabTelaDashboard extends LitElement {
         id: 'area_terreno', label: 'Área do terreno', alinhamento: 'direita',
         valor: (l: any) => { const a = this._areaTerreno(l); return a == null ? '—' : fmtM2(a); },
       },
-      { id: 'area_privativa', label: 'Área privativa', alinhamento: 'direita',
-        valor: numero((p) => (p.areaPrivativa > 0 ? fmtM2(p.areaPrivativa) : '—')) },
-      { id: 'area_construida', label: 'Área total construída', alinhamento: 'direita',
-        valor: numero((p) => (p.areaConstruida > 0 ? fmtM2(p.areaConstruida) : '—')) },
+      { id: 'area_liquida_venda', label: 'Área líquida de venda', alinhamento: 'direita',
+        valor: numero((p) => (p.areaLiquidaVenda > 0 ? fmtM2(p.areaLiquidaVenda) : '—')) },
       {
         id: 'vgv', label: 'VGV', alinhamento: 'direita',
         render: numeroTitulo(

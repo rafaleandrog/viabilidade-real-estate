@@ -6,7 +6,7 @@ import {
   faixasAbsorcao, pctPosChavesDerivado, erroFormularioAbsorcao, problemaJanelaDuranteObra, APOS_CHAVES_MESES,
   ramoLegadoDeRecebiveis,
   pctAbsorcaoEfetivo, fimJanelaAbsorcao,
-  areaPrivativaTotalLinhas, resolverCustoTotal,
+  areaPrivativaTotalLinhas, areaVendavelTotalLinhas, resolverCustoTotal,
   eCorretagem, vgvVendidoBrutoMensal, vgvVendidoVendavelMensal, CATEGORIA_CORRETAGEM, periodosAnuais,
   totalAntesAlocacao, ePermutaFisica,
   mesAnoParaISO, isoParaMesAno,
@@ -393,6 +393,33 @@ test('areaPrivativaTotalLinhas soma área × quantidade de todas as tipologias',
     { tipologias: [{ area_privativa_m2: 85, quantidade: 60 }] },
   ];
   assert.equal(areaPrivativaTotalLinhas(linhas), 7000 + 5000 + 5100);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #677: `areaVendavelTotalLinhas` é a irmã de `areaPrivativaTotalLinhas` que
+// exclui a área ABERTA — convenção C1 (só a fechada é vendável), a mesma que
+// `proforma.ts` já aplica na Incorporação Preliminar. As duas precisam
+// DIVERGIR quando há área aberta, e `areaPrivativaTotalLinhas` precisa
+// continuar incluindo-a (ela é base do custo `rs_m2_priv` — #462 Decisão 1 —
+// e esta issue não pode mexer nisso).
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#677: areaVendavelTotalLinhas soma só a área FECHADA — diverge de areaPrivativaTotalLinhas quando há aberta', () => {
+  const linhas = [
+    { tipologias: [
+      { area_privativa_m2: 100, area_privativa_aberta_m2: 20, quantidade: 5 },
+      { area_privativa_m2: 50, area_privativa_aberta_m2: 10, quantidade: 2 },
+    ] },
+  ];
+  // Vendável: só a fechada × quantidade.
+  assert.equal(areaVendavelTotalLinhas(linhas), 100 * 5 + 50 * 2);
+  // Privativa total: fechada + aberta — comportamento intocado por esta issue.
+  assert.equal(areaPrivativaTotalLinhas(linhas), (100 + 20) * 5 + (50 + 10) * 2);
+});
+
+test('#677: sem área aberta, os dois helpers coincidem — área aberta ausente não é regressão', () => {
+  const linhas = [{ tipologias: [{ area_privativa_m2: 90, quantidade: 10 }] }];
+  assert.equal(areaVendavelTotalLinhas(linhas), areaPrivativaTotalLinhas(linhas));
 });
 
 test('vgvVendidoBrutoMensal reparte o VGV de cada linha pela sua absorção (#121)', () => {
