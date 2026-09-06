@@ -2,10 +2,11 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, COR_NIVEL } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
+import { nomeEstudoLimpo, LIMITE_NOME_ESTUDO, podeEditarEstudo } from './estudo-status.js';
 import './tela-preliminar.js';
 import './tela-avancado.js';
 import {
-  urbiVerso, buscarEstudo, transicaoStatus,
+  urbiVerso, buscarEstudo, transicaoStatus, atualizarEstudo,
   listarMembros, adicionarMembro, alterarFuncaoMembro, removerMembro, listarUsuarios,
 } from './viabilidade-api.js';
 
@@ -43,6 +44,11 @@ export class ViabTelaEstudo extends LitElement {
   @state() private novoMembroUsuario = '';
   @state() private novoMembroFuncao = 'leitor';
   @state() private confirmarStatus: { novo: string; label: string } | null = null;
+  // #678: renomear virou ação do cabeçalho do estudo (saiu do Painel).
+  @state() private editarAlvo = false;
+  @state() private editarNome = '';
+  @state() private editarErro = '';
+  @state() private salvandoNome = false;
 
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -51,7 +57,9 @@ export class ViabTelaEstudo extends LitElement {
     .membro-acoes { display: flex; gap: 8px; align-items: center; }
     .add-membro { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; margin-top: 16px; }
     .add-membro urbi-select { min-width: 180px; }
+    .form-campos { display: flex; flex-direction: column; gap: 12px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+    .apoio-nome { font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
   `];
 
   connectedCallback() {
@@ -95,6 +103,14 @@ export class ViabTelaEstudo extends LitElement {
 
     const p = this.estudo._permissao || {};
     const st = this.estudo.status;
+    // MESMA elevação que o backend aplica em `funcaoEfetiva`
+    // (`backend/rotas/estudos.ts`, PATCH /estudos/:id): admin de app age como
+    // aprovador mesmo sem ser membro do estudo, e `_permissao.funcao` (que o
+    // GET devolve cru, de `estudo_membros`) não carrega essa elevação —
+    // `p.podeAprovar` sim (`perm.ehAprovador || perm.ehAdminApp`). Usar
+    // `p.funcao` puro aqui esconderia o botão de um admin não-membro num
+    // estudo travado, mesmo o PATCH permitindo.
+    const funcaoEfetiva = p.podeAprovar ? 'aprovador' : (p.funcao === 'editor' ? 'editor' : 'leitor');
     return html`
       <urbi-shell-page dashboard .titulo=${this.estudo.nome_exibicao || this.estudo.nome}
         @viab:terreno-alterado=${() => this._carregar()}
@@ -110,6 +126,10 @@ export class ViabTelaEstudo extends LitElement {
           </urbi-badge>
           <span class="sec">${TIPO_LABEL[this.estudo.tipo_empreendimento] || this.estudo.tipo_empreendimento}</span>
           ${p.funcao ? html`<span class="sec">· sua função: ${p.funcao}</span>` : nothing}
+          ${podeEditarEstudo(st, funcaoEfetiva) ? html`
+            <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-pen"
+              @click=${this._abrirEditarNome}
+              title="Renomear estudo"></urbi-botao>` : nothing}
         </div>
 
         ${this.estudo.nivel_analise === 'avancado'
@@ -137,6 +157,7 @@ export class ViabTelaEstudo extends LitElement {
 
       ${this.mostrarMembros ? this._renderMembros(p) : nothing}
       ${this.confirmarStatus ? this._renderConfirmStatus() : nothing}
+      ${this.editarAlvo ? this._renderEditarNome() : nothing}
     `;
   }
 
@@ -219,6 +240,86 @@ export class ViabTelaEstudo extends LitElement {
       </urbi-modal>
     `;
   }
+
+  /**
+   * #678 — modal de renomear, movido do Painel (#660) para o cabeçalho do
+   * estudo. O campo edita `nome`, que é o campo REAL da coluna; a tela mostra
+   * `nome_exibicao || nome`, e `nome_exibicao` é derivado de `nome` pelo
+   * servidor a cada PATCH (ver `montarPatchEstudo`). Editar o nome de exibição
+   * diretamente não é opção: ele carrega sigla, UF e sequência, que não são do
+   * usuário.
+   */
+  private _renderEditarNome(): TemplateResult {
+    const limpo = nomeEstudoLimpo(this.editarNome);
+    return html`
+      <urbi-modal title="Editar nome do estudo" maxWidth="480px"
+        @urbi-modal:close=${() => this.editarAlvo = false}>
+        <div class="form-campos">
+          <urbi-input
+            label="Nome do estudo"
+            obrigatorio
+            placeholder="Ex: Pátio Urbitá 1"
+            .valor=${this.editarNome}
+            @urbi:input-change=${(e: CustomEvent) => {
+              this.editarNome = String(e.detail?.valor ?? '');
+              this.editarErro = '';
+            }}
+          ></urbi-input>
+          <div class="apoio-nome">
+            O identificador (${this.estudo?.id_legivel || '—'}) não muda: renomear altera como o
+            estudo aparece, não quem ele é.
+          </div>
+
+          ${this.editarErro ? html`<urbi-banner variante="erro">${this.editarErro}</urbi-banner>` : nothing}
+
+          <div class="form-acoes">
+            <urbi-botao variante="fantasma" @click=${() => this.editarAlvo = false}>Cancelar</urbi-botao>
+            <urbi-botao variante="primario"
+              ?carregando=${this.salvandoNome}
+              ?desabilitado=${limpo === null}
+              @click=${this._salvarNome}>Salvar</urbi-botao>
+          </div>
+        </div>
+      </urbi-modal>
+    `;
+  }
+
+  private _abrirEditarNome = () => {
+    this.editarAlvo = true;
+    // O campo editável é o `nome` cru — nunca o `nome_exibicao`, que é derivado.
+    this.editarNome = String(this.estudo?.nome ?? '');
+    this.editarErro = '';
+  };
+
+  private _salvarNome = async () => {
+    const estudo = this.estudo;
+    if (!estudo) return;
+    // MESMO parser do portão (`montarPatchEstudo`), importado do módulo
+    // compartilhado — não uma segunda regra de validação escrita aqui.
+    const limpo = nomeEstudoLimpo(this.editarNome);
+    if (limpo === null) {
+      this.editarErro = `Informe um nome de 1 a ${LIMITE_NOME_ESTUDO} caracteres.`;
+      return;
+    }
+    if (limpo === String(estudo.nome ?? '')) { this.editarAlvo = false; return; }
+    this.salvandoNome = true;
+    this.editarErro = '';
+    try {
+      const res = await atualizarEstudo(this.estudoId, { nome: limpo });
+      if (res?.erro) { this.editarErro = res.mensagem || 'Erro ao renomear'; return; }
+      // A resposta do PATCH é a linha gravada — inclusive o `nome_exibicao`
+      // recomposto pelo servidor, que é o que o cabeçalho mostra. Espalhar
+      // sobre `this.estudo` preserva o que já foi carregado e o PATCH não
+      // devolve (ex.: `membros`, `_permissao`).
+      this.estudo = { ...this.estudo, ...res };
+      this.editarAlvo = false;
+      urbiVerso.notificar('Nome do estudo atualizado.', 'sucesso');
+    } catch (e: any) {
+      this.editarErro = e?.message || 'Erro ao renomear';
+    } finally {
+      this.salvandoNome = false;
+    }
+  };
 
   private _pedirConfirmacao(novo: string, label: string) {
     this.confirmarStatus = { novo, label };
