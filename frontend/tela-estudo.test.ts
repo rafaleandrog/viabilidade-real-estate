@@ -36,7 +36,7 @@ const FONTE_ESTUDO = semComentarios(
   readFileSync(new URL('./tela-estudo.ts', import.meta.url), 'utf8'),
 );
 
-test('#678: o botão de renomear existe no cabeçalho e é guardado por podeEditarEstudo(st, p.funcao)', () => {
+test('#678: o botão de renomear existe no cabeçalho e é guardado por podeEditarEstudo(st, funcaoEfetiva)', () => {
   // ⚠️ A guarda é conferida pela forma INTEIRA da ternária, não pela presença
   // da chamada — mesma lição da #660: invertida, ela mostra o botão a quem o
   // PATCH recusa, e uma asserção de presença continuaria verde.
@@ -49,12 +49,26 @@ test('#678: o botão de renomear existe no cabeçalho e é guardado por podeEdit
   // 403 ao salvar — foi exatamente o defeito que esta issue introduziu na
   // primeira versão deste arquivo, achado relendo o próprio diff.
   assert.ok(
-    FONTE_ESTUDO.includes('${podeEditarEstudo(st, p.funcao) ? html`'),
+    FONTE_ESTUDO.includes('${podeEditarEstudo(st, funcaoEfetiva) ? html`'),
     'a guarda tem de ser a MESMA função que o PATCH usa, com o status do estudo — não só o papel do usuário',
   );
   assert.ok(
     FONTE_ESTUDO.includes('@click=${this._abrirEditarNome}'),
     'o botão do cabeçalho precisa abrir o modal de renomear',
+  );
+});
+
+test('#678: `funcaoEfetiva` eleva admin de app a aprovador, como o PATCH faz — não usa `p.funcao` cru', () => {
+  // Achado do Codex na 1ª correção (`7647f42`): `_permissao.funcao` vem CRU
+  // (`funcao: perm.funcao,`, `backend/rotas/estudos.ts:594`) e NÃO carrega a
+  // elevação de admin de app; `p.podeAprovar` sim (`perm.ehAprovador ||
+  // perm.ehAdminApp`). Usar `p.funcao` puro esconde o lápis de um admin
+  // não-membro num estudo travado, mesmo o PATCH permitindo — a mesma
+  // classe de defeito da guarda original, na direção oposta (esconde demais
+  // em vez de mostrar demais).
+  assert.ok(
+    FONTE_ESTUDO.includes("const funcaoEfetiva = p.podeAprovar ? 'aprovador' : (p.funcao === 'editor' ? 'editor' : 'leitor');"),
+    'a elevação de admin (`p.podeAprovar`) tem que vir ANTES do papel bruto — mesma prioridade do `funcaoEfetiva` do backend',
   );
 });
 

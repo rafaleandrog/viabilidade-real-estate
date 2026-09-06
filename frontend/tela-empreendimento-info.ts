@@ -62,6 +62,10 @@ export class ViabEmpreendimentoInfo extends LitElement {
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .grid { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
     .campo { display: flex; flex-direction: column; gap: 4px; }
+    /* #678 removeu o campo "Nome do empreendimento", mas a classe .campo.nome
+       segue em uso por "Nome do terreno" manual (_renderTerreno) — a regra
+       fica, sem ela esse campo perde a largura fixa e destoa de .matricula. */
+    .campo.nome urbi-input { width: 280px; }
     .campo.matricula urbi-input { width: 220px; }
     .rotulo { font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
     .valor-ro { font-weight: 600; font-variant-numeric: tabular-nums; padding: 8px 0; }

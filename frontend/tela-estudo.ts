@@ -103,6 +103,14 @@ export class ViabTelaEstudo extends LitElement {
 
     const p = this.estudo._permissao || {};
     const st = this.estudo.status;
+    // MESMA elevação que o backend aplica em `funcaoEfetiva`
+    // (`backend/rotas/estudos.ts`, PATCH /estudos/:id): admin de app age como
+    // aprovador mesmo sem ser membro do estudo, e `_permissao.funcao` (que o
+    // GET devolve cru, de `estudo_membros`) não carrega essa elevação —
+    // `p.podeAprovar` sim (`perm.ehAprovador || perm.ehAdminApp`). Usar
+    // `p.funcao` puro aqui esconderia o botão de um admin não-membro num
+    // estudo travado, mesmo o PATCH permitindo.
+    const funcaoEfetiva = p.podeAprovar ? 'aprovador' : (p.funcao === 'editor' ? 'editor' : 'leitor');
     return html`
       <urbi-shell-page dashboard .titulo=${this.estudo.nome_exibicao || this.estudo.nome}
         @viab:terreno-alterado=${() => this._carregar()}
@@ -118,7 +126,7 @@ export class ViabTelaEstudo extends LitElement {
           </urbi-badge>
           <span class="sec">${TIPO_LABEL[this.estudo.tipo_empreendimento] || this.estudo.tipo_empreendimento}</span>
           ${p.funcao ? html`<span class="sec">· sua função: ${p.funcao}</span>` : nothing}
-          ${podeEditarEstudo(st, p.funcao) ? html`
+          ${podeEditarEstudo(st, funcaoEfetiva) ? html`
             <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-pen"
               @click=${this._abrirEditarNome}
               title="Renomear estudo"></urbi-botao>` : nothing}
