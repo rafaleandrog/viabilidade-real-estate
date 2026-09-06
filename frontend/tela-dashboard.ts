@@ -8,12 +8,11 @@ import { calcularFluxo, type FluxoConfig } from './fluxo-caixa-motor.js';
 import { areaPrivativaTotalLinhas, areaVendavelTotalLinhas } from './fluxo-shared.js';
 import { proformaAvancado } from './proforma-avancado.js';
 import {
-  acoesTransicao, nomeEstudoLimpo, podeEditarEstudo, LIMITE_NOME_ESTUDO,
+  acoesTransicao,
   type AcaoTransicao,
 } from './estudo-status.js';
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo, transicaoStatus,
-  atualizarEstudo,
   listarGlebasNucleo, listarLotesNucleo,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   buscarCronogramaAvancado, buscarParametrosAvancado,
@@ -183,11 +182,6 @@ export class ViabTelaDashboard extends LitElement {
   @state() private salvando = false;
   @state() private formErro = '';
   @state() private removerAlvo: any = null;
-  // #660: edição do nome do estudo direto do Painel.
-  @state() private editarAlvo: any = null;
-  @state() private editarNome = '';
-  @state() private editarErro = '';
-  @state() private salvandoNome = false;
   @state() private terrenos: any[] = [];
   @state() private filtroTerreno = '';
   @state() private terrenosCarregando = false;
@@ -230,7 +224,6 @@ export class ViabTelaDashboard extends LitElement {
     .nivel-campo label { display: block; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-bottom: 6px; }
     .nivel-badges { display: flex; gap: 6px; }
     .nivel-apoio { margin-top: 6px; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
-    .apoio-nome { font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
   `];
 
   private readonly _abas = [
@@ -445,7 +438,6 @@ export class ViabTelaDashboard extends LitElement {
 
       ${this.mostrarForm ? this._renderForm() : nothing}
       ${this.removerAlvo ? this._renderConfirmRemover() : nothing}
-      ${this.editarAlvo ? this._renderEditarNome() : nothing}
     `;
   }
 
@@ -546,10 +538,10 @@ export class ViabTelaDashboard extends LitElement {
       },
       {
         id: 'acoes', label: '',
-        // #659 + #660: a linha de ações passou a carregar TRÊS grupos, nesta
-        // ordem — as transições de status (que saíram do `urbi-select` da
-        // coluna Status), o botão de editar o nome, e os dois que já existiam.
-        // "À esquerda do botão Duplicar" é o pedido literal da #660.
+        // #659: a linha de ações carrega DOIS grupos, nesta ordem — as
+        // transições de status (que saíram do `urbi-select` da coluna Status)
+        // e os dois que já existiam. #678: o lápis de renomear saiu daqui —
+        // renomear é ação do cabeçalho do estudo agora (`tela-estudo.ts`).
         render: (l: any) => html`
           <div class="acoes-linha">
             ${acoesTransicao(String(l.status), l._funcao).map((a: AcaoTransicao) => html`
@@ -557,10 +549,6 @@ export class ViabTelaDashboard extends LitElement {
                 ?desabilitado=${this.statusEmCurso === l.id}
                 @click=${(ev: Event) => { ev.stopPropagation(); this._mudarStatus(l, a.para); }}
                 title=${a.rotulo}></urbi-botao>`)}
-            ${podeEditarEstudo(String(l.status), l._funcao) ? html`
-              <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-pen"
-                @click=${(ev: Event) => { ev.stopPropagation(); this._abrirEditarNome(l); }}
-                title="Editar nome"></urbi-botao>` : nothing}
             <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-copy"
               @click=${(ev: Event) => { ev.stopPropagation(); this._duplicar(l.id); }}
               title="Duplicar">Duplicar</urbi-botao>
@@ -776,50 +764,6 @@ export class ViabTelaDashboard extends LitElement {
     `;
   }
 
-  /**
-   * #660 — modal de renomear, aberto pelo botão de lápis da linha.
-   *
-   * O campo edita `nome`, que é o campo REAL da coluna; a tela mostra
-   * `nome_exibicao || nome`, e `nome_exibicao` é derivado de `nome` pelo
-   * servidor a cada PATCH (ver `montarPatchEstudo`). Editar o nome de exibição
-   * diretamente não é opção: ele carrega sigla, UF e sequência, que não são do
-   * usuário.
-   */
-  private _renderEditarNome(): TemplateResult {
-    const limpo = nomeEstudoLimpo(this.editarNome);
-    return html`
-      <urbi-modal title="Editar nome do estudo" maxWidth="480px"
-        @urbi-modal:close=${() => this.editarAlvo = null}>
-        <div class="form-campos">
-          <urbi-input
-            label="Nome do estudo"
-            obrigatorio
-            placeholder="Ex: Pátio Urbitá 1"
-            .valor=${this.editarNome}
-            @urbi:input-change=${(e: CustomEvent) => {
-              this.editarNome = String(e.detail?.valor ?? '');
-              this.editarErro = '';
-            }}
-          ></urbi-input>
-          <div class="apoio-nome">
-            O identificador (${this.editarAlvo?.id_legivel || '—'}) não muda: renomear altera como o
-            estudo aparece, não quem ele é.
-          </div>
-
-          ${this.editarErro ? html`<urbi-banner variante="erro">${this.editarErro}</urbi-banner>` : nothing}
-
-          <div class="form-acoes">
-            <urbi-botao variante="fantasma" @click=${() => this.editarAlvo = null}>Cancelar</urbi-botao>
-            <urbi-botao variante="primario"
-              ?carregando=${this.salvandoNome}
-              ?desabilitado=${limpo === null}
-              @click=${this._salvarNome}>Salvar</urbi-botao>
-          </div>
-        </div>
-      </urbi-modal>
-    `;
-  }
-
   private _renderConfirmRemover(): TemplateResult {
     const nome = this.removerAlvo.nome_exibicao || this.removerAlvo.nome;
     return html`
@@ -868,43 +812,6 @@ export class ViabTelaDashboard extends LitElement {
       urbiVerso.notificar(e?.message || 'Erro ao duplicar', 'erro');
     }
   }
-
-  private _abrirEditarNome(l: any) {
-    this.editarAlvo = l;
-    // O campo editável é o `nome` cru — nunca o `nome_exibicao`, que é derivado.
-    this.editarNome = String(l.nome ?? '');
-    this.editarErro = '';
-  }
-
-  private _salvarNome = async () => {
-    const alvo = this.editarAlvo;
-    if (!alvo) return;
-    // MESMO parser do portão (`montarPatchEstudo`), importado do módulo
-    // compartilhado — não uma segunda regra de validação escrita aqui.
-    const limpo = nomeEstudoLimpo(this.editarNome);
-    if (limpo === null) {
-      this.editarErro = `Informe um nome de 1 a ${LIMITE_NOME_ESTUDO} caracteres.`;
-      return;
-    }
-    if (limpo === String(alvo.nome ?? '')) { this.editarAlvo = null; return; }
-    this.salvandoNome = true;
-    this.editarErro = '';
-    try {
-      const res = await atualizarEstudo(alvo.id, { nome: limpo });
-      if (res?.erro) { this.editarErro = res.mensagem || 'Erro ao renomear'; return; }
-      // A resposta do PATCH é a linha gravada — inclusive o `nome_exibicao`
-      // recomposto pelo servidor, que é o que a coluna Nome mostra. Espalhar
-      // sobre a linha existente preserva o que a listagem anexou e o PATCH não
-      // devolve (`_funcao`, `produtos`, `imagem_principal_url`).
-      this.estudos = this.estudos.map((e) => (e.id === alvo.id ? { ...e, ...res } : e));
-      this.editarAlvo = null;
-      urbiVerso.notificar('Nome do estudo atualizado.', 'sucesso');
-    } catch (e: any) {
-      this.editarErro = e?.message || 'Erro ao renomear';
-    } finally {
-      this.salvandoNome = false;
-    }
-  };
 
   private _confirmarRemover = async () => {
     const estudo = this.removerAlvo;

@@ -31,13 +31,13 @@ export class ViabEmpreendimentoInfo extends LitElement {
   @property({ type: Boolean }) podeEditar = false;
 
   @state() private form: {
-    nome: string; matricula: string; descricao: string;
+    matricula: string; descricao: string;
     terreno_manual_nome: string;
     terreno_manual_area: number | null;
     coef_aproveitamento_basico: number | null;
     coef_aproveitamento_maximo: number | null;
   } = {
-    nome: '', matricula: '', descricao: '',
+    matricula: '', descricao: '',
     terreno_manual_nome: '', terreno_manual_area: null,
     coef_aproveitamento_basico: null, coef_aproveitamento_maximo: null,
   };
@@ -62,7 +62,6 @@ export class ViabEmpreendimentoInfo extends LitElement {
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .grid { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
     .campo { display: flex; flex-direction: column; gap: 4px; }
-    .campo.nome urbi-input { width: 280px; }
     .campo.matricula urbi-input { width: 220px; }
     .rotulo { font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
     .valor-ro { font-weight: 600; font-variant-numeric: tabular-nums; padding: 8px 0; }
@@ -81,7 +80,6 @@ export class ViabEmpreendimentoInfo extends LitElement {
       this.carregado = true;
       const e = this.estudo;
       this.form = {
-        nome: e.nome || '',
         matricula: e.matricula || '',
         descricao: e.descricao || '',
         terreno_manual_nome: e.terreno_manual_nome || '',
@@ -110,12 +108,6 @@ export class ViabEmpreendimentoInfo extends LitElement {
     return html`
       <urbi-card titulo="Informações do empreendimento">
         <div class="grid">
-          <div class="campo nome">
-            <span class="rotulo">Nome do empreendimento</span>
-            <urbi-input ?desabilitado=${dis} .valor=${this.form.nome}
-              @urbi:input-change=${(e: CustomEvent) => { this.form = { ...this.form, nome: e.detail.valor }; this._agendarSalvarTexto(); }}
-            ></urbi-input>
-          </div>
           <div class="campo matricula">
             <span class="rotulo">Matrícula</span>
             <urbi-input ?desabilitado=${dis} placeholder="Nº da matrícula" .valor=${this.form.matricula}
@@ -219,7 +211,6 @@ export class ViabEmpreendimentoInfo extends LitElement {
   // Só os campos de identificação (texto) — os que salvam sozinhos ao digitar.
   private _dadosTexto(): Record<string, any> {
     return {
-      nome: this.form.nome.trim() || this.estudo.nome,
       matricula: this.form.matricula.trim() || null,
       descricao: this.form.descricao.trim() || null,
     };

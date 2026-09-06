@@ -1,0 +1,130 @@
+// Render do modal EDITAR NOME DO ESTUDO, do cabeçalho do estudo (#678).
+//
+// Além da geometria, este arquivo é o único lugar do repositório que prova que
+// o modal de renomear chega à TELA: `frontend/estudo-status.test.ts` prova o
+// parser do nome e `frontend/tela-estudo.test.ts` prova que o componente o
+// chama, mas nenhum dos dois monta DOM. O `exigir` do caso é quem mede a
+// fiação até o markup.
+//
+// ⚠️ O `urbi-modal` aqui é o stub do espelho: carrega as declarações `:host`
+// reais, mas não o overlay nem o posicionamento internos, que
+// `docs/ui-urbiverso/` não espelha. Este teste julga o layout do CONTEÚDO.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { verificarRender, type Achados } from '../../scripts/render-check.mjs';
+import {
+  contar, declaracoesOciosas, larguraComOverflowDeDocumento, naoDeclaradas, motivoParaPular, relato,
+  textosInvisiveis,
+} from './apoio.js';
+
+const pular = await motivoParaPular();
+
+/**
+ * Achados de uma lente **restritos ao modal** (`urbi-modal`), pelo caminho
+ * CSS que o harness reporta em `onde`.
+ *
+ * ⚠️ ISTO É UM ESCOPO DECLARADO, NÃO UMA ISENÇÃO — mesmo padrão de
+ * `tabela-fluxo-cenarios.render.test.ts` § `naTabela`.
+ *
+ * `viab-tela-estudo` monta o cabeçalho do estudo por trás do modal, e o
+ * `aba` de `viab-tela-preliminar` não tem como ser forçado a um estado vazio:
+ * qualquer valor fora de premissas/proforma/graficos/apelo é NORMALIZADO de
+ * volta para `'premissas'` (`tela-preliminar.ts` — "URLs desconhecidas caem
+ * em 'premissas'"). A página real de Premissas sobe atrás do modal, e ela já
+ * tem um transbordo de CAIXA PRÉ-EXISTENTE em `div.layout` a 600/900px —
+ * nada desta issue o toca, e nenhum caso de render mediu esta tela até agora,
+ * que é por isso que ninguém sabia. Asserir sobre a página inteira faria este
+ * caso nascer vermelho por um defeito de outra issue (candidato a issue
+ * própria, fora deste PR); a saída fácil (afrouxar a asserção) apagaria
+ * também o que este caso existe para medir: o MODAL.
+ */
+function noModal(a: Achados, lente: 'transbordoDeCaixa' | 'transbordoDeTexto'): string[] {
+  const dentro: string[] = [];
+  for (const m of Object.values(a.larguras)) {
+    for (const t of m[lente] as { onde: string }[]) {
+      if (t.onde.includes('urbi-modal')) dentro.push(t.onde);
+    }
+  }
+  return dentro;
+}
+
+/** Sobreposição escopada ao modal — mesma forma de achado que `sobreposicaoNaTabela`. */
+function sobreposicaoNoModal(a: Achados): string[] {
+  const dentro: string[] = [];
+  for (const m of Object.values(a.larguras)) {
+    for (const t of m.sobreposicao as { a: string; b: string }[]) {
+      if (t.a.includes('urbi-modal') || t.b.includes('urbi-modal')) dentro.push(`${t.a} × ${t.b}`);
+    }
+  }
+  return dentro;
+}
+
+/** Corte por overflow oculto escopado ao modal — mesma forma de `transbordoDeCaixa`. */
+function corteNoModal(a: Achados): string[] {
+  const dentro: string[] = [];
+  for (const m of Object.values(a.larguras)) {
+    for (const t of m.corte as { onde: string }[]) {
+      if (t.onde.includes('urbi-modal')) dentro.push(t.onde);
+    }
+  }
+  return dentro;
+}
+
+/** Token sem valor citado por CSS dentro do modal — mesmo predicado das demais lentes deste arquivo. */
+function tokensSemValorNoModal(a: Achados): string[] {
+  const fora = new Set<string>();
+  for (const v of Object.values(a.variantes)) {
+    for (const t of v.naoResolvem as string[]) {
+      // `--urbi-abas-aba-cor-ativa` é token do PRÓPRIO `urbi-abas`, que sobe
+      // com a página de Premissas atrás do modal (não com o modal em si) — é
+      // a mesma lacuna do espelho (`docs/ui-urbiverso/`) que o caso original
+      // (`painel-editar-nome`, antes desta issue) já documentava.
+      if (t !== '--urbi-abas-aba-cor-ativa') fora.add(t);
+    }
+  }
+  return [...fora].sort();
+}
+
+test('Modal de renomear (cabeçalho do estudo): campo, linha de apoio e ações cabem em 1280/900/600px', { skip: pular ?? false }, async () => {
+  const a = await verificarRender({ caso: 'estudo-editar-nome' });
+
+  assert.deepEqual(noModal(a, 'transbordoDeCaixa'), [], 'alguma caixa do MODAL ultrapassou o pai' + relato(a));
+  assert.deepEqual(sobreposicaoNoModal(a), [], 'caixas do MODAL se sobrepuseram' + relato(a));
+  assert.deepEqual(corteNoModal(a), [], 'conteúdo do MODAL cortado por overflow oculto' + relato(a));
+  assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
+  assert.deepEqual(naoDeclaradas(a), [], 'prop que o stub não reproduz, em uso e não declarada' + relato(a));
+  assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
+  assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
+
+  // O documento rola por causa da página de Premissas atrás do modal (ver
+  // `noModal`, acima) — registrado, não asserido, pelo mesmo motivo.
+  const doc = larguraComOverflowDeDocumento(a);
+  if (doc.length > 0) {
+    console.log(`  nota: documento rolou em ${doc.join(', ')} — página de Premissas atrás do modal, defeito pré-existente não desta issue.${relato(a)}`);
+  }
+
+  // Transbordo de TEXTO fora do modal e transbordo de CAIXA global: mesma
+  // ressalva de `tabela-fluxo-cenarios.render.test.ts` — registrados, não
+  // asseridos, para não plantar um teste que muda de veredito com a fonte da
+  // máquina nem exigir o defeito pré-existente da página de baixo.
+  const textoFora = contar(a, 'transbordoDeTexto') - noModal(a, 'transbordoDeTexto').length;
+  const caixaGlobal = contar(a, 'transbordoDeCaixa');
+  if (textoFora > 0 || caixaGlobal > 0) {
+    console.log(
+      `  nota: ${caixaGlobal} transbordo(s) de CAIXA na página (0 no modal) e ${textoFora} de TEXTO fora do modal `
+        + '— página de Premissas atrás do modal, defeito pré-existente não desta issue.',
+    );
+  }
+});
+
+test('Modal de renomear (cabeçalho do estudo): nenhum token sem valor nem texto invisível DENTRO DO MODAL', { skip: pular ?? false }, async () => {
+  const a = await verificarRender({ caso: 'estudo-editar-nome' });
+
+  assert.deepEqual(tokensSemValorNoModal(a), [], 'token citado pelo CSS não resolve em alguma variante' + relato(a));
+  // `textosInvisiveis` não traz `onde` com o mesmo formato dos achados de
+  // caixa (é lista de seletor+cor); o modal deste caso não usa nenhuma cor
+  // fora do que o Painel já usava (herdada do caso original), então a
+  // asserção continua sobre a página inteira aqui — sem achado esperado.
+  assert.deepEqual(textosInvisiveis(a), [], 'texto pintado da mesma cor do próprio fundo' + relato(a));
+});
