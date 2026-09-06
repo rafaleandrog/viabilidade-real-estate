@@ -1,6 +1,6 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, state, property } from 'lit/decorators.js';
-import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, formatarData } from './viab-shared.js';
+import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, COR_NIVEL, formatarData } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import { fmtR$, fmtPct, fmtPctOuIndef, fmtNum, fmtM2 } from './viab-format.js';
 import { calcularProforma } from './proforma.js';
@@ -540,7 +540,7 @@ export class ViabTelaDashboard extends LitElement {
         id: 'nivel_analise', label: 'Nível', alinhamento: 'centro',
         render: (l: any) => {
           const n = nivelExibicao(l);
-          return html`<urbi-badge cor=${n === 'avancado' ? 'info' : 'padrao'}>${NIVEL_LABEL[n]}</urbi-badge>`;
+          return html`<urbi-badge cor=${COR_NIVEL[n] ?? COR_NIVEL.preliminar}>${NIVEL_LABEL[n]}</urbi-badge>`;
         },
       },
       {

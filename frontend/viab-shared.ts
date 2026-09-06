@@ -30,6 +30,14 @@ export const COR_STATUS: Record<string, CorBadge> = {
   arquivado: 'padrao',
 };
 
+// Cor semântica da badge por nível de análise — mapa único (#675): Preliminar
+// é amarelo (`alerta`) nos dois lugares que a exibem (Painel e cabeçalho do
+// estudo), nunca cinza (`padrao`).
+export const COR_NIVEL: Record<string, CorBadge> = {
+  preliminar: 'alerta',
+  avancado: 'info',
+};
+
 export function formatarData(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);

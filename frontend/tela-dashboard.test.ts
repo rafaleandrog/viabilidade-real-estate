@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resumoListagem, nivelExibicao, linhasEstudosFiltradas, type ResumoListagem } from './tela-dashboard.js';
+import { COR_NIVEL } from './viab-shared.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #406: a listagem de Estudos mostrava "—" em VGV/Resultado/Margem para todo
@@ -439,5 +440,32 @@ test('#660: o modal está ligado ao render — estado sem montagem não desenha 
   assert.ok(
     FONTE_DASHBOARD.includes('this.editarAlvo ? this._renderEditarNome() : nothing'),
     'o modal existe mas nunca é montado',
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #675: badge de Nível saía cinza (`padrao`) no Painel e amarela (`alerta`)
+// dentro do estudo — mesma grandeza, duas cores, porque a escolha estava
+// escrita inline em dois arquivos. `COR_NIVEL` (`viab-shared.ts`) é agora o
+// único mapa nível→cor; este teste afere o MAPA, não o literal do template
+// — ele fica vermelho se alguém devolver `padrao` ao Preliminar de novo.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#675: COR_NIVEL manda Preliminar em amarelo (alerta), nunca cinza (padrao)', () => {
+  assert.equal(COR_NIVEL.preliminar, 'alerta');
+});
+
+test('#675: COR_NIVEL mantém Avançado em info', () => {
+  assert.equal(COR_NIVEL.avancado, 'info');
+});
+
+test('#675: a coluna Nível do Painel lê a cor do mapa, não de um literal inline', () => {
+  assert.ok(
+    FONTE_DASHBOARD.includes('COR_NIVEL[n]'),
+    'render da coluna nivel_analise precisa ler COR_NIVEL — sem isso o mapa existe mas a tabela não o usa',
+  );
+  assert.ok(
+    !/cor=\$\{n === 'avancado' \? 'info' : '(padrao|alerta)'\}/.test(FONTE_DASHBOARD),
+    'a escolha de cor não pode voltar a ser um ternário inline no template',
   );
 });
