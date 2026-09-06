@@ -206,19 +206,6 @@ export class ViabTelaDashboard extends LitElement {
     .acoes-linha { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
     .cel-nome { font-weight: 600; }
     .cel-criador { display: inline-flex; align-items: center; }
-    /* #475: o token que estava aqui nunca existiu — nem em compartilhado/tokens.css
-       nem em nenhum outro arquivo do monorepo. O fallback dele era, portanto, a cor
-       EFETIVA, sempre: branco a 6%, calibrado para tema escuro, e invisível nos três
-       temas claros que o shell tem desde 2026-08-19. O fallback agora é cinza médio,
-       que sobrevive aos quatro temas; scripts/guard-tokens-css.mjs impede a volta. */
-    .miniatura {
-      width: 40px; height: 28px; border-radius: 6px; object-fit: cover; display: block;
-      background: var(--cor-superficie-sutil, rgba(128,128,128,0.08));
-    }
-    .miniatura-vazia {
-      width: 40px; height: 28px; border-radius: 6px; display: block;
-      background: var(--cor-superficie-sutil, rgba(128,128,128,0.08));
-    }
     .filtros-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .filtros-bar urbi-select { min-width: 200px; }
     .nivel-campo label { display: block; font-size: var(--texto-rotulo, 0.75rem); color: var(--cor-texto-sec, rgba(255,255,255,0.5)); margin-bottom: 6px; }
@@ -476,10 +463,38 @@ export class ViabTelaDashboard extends LitElement {
     };
     return [
       {
-        id: 'imagem', label: '', largura: '52px',
+        // #679: SEM `largura` de propósito, e o estilo é INLINE, não classe.
+        //
+        // Medido (não só hipótese): `urbi-tabela` insere o retorno de `render`
+        // dentro do PRÓPRIO shadow root dele (`_renderLinha`, `<td>${conteudo}</td>`
+        // em `ui/src/urbi-tabela.ts`) — então `.miniatura`/`.miniatura-vazia`
+        // deste `static styles` (escopado ao shadow root de VIAB-TELA-DASHBOARD)
+        // nunca alcançam esse nó. Não é o caso de token que herda (`var(--cor-*)`
+        // atravessa por ser custom property) — é seletor de classe, que não.
+        //
+        // E `largura: '52px'` piorava, não ajudava: `urbi-tabela` só usa
+        // `largura` para um `style="width:..."` no `<th>` (layout automático,
+        // sem `table-layout:fixed`, sem colgroup). Reproduzindo o CSS real do
+        // primitivo num Chromium isolado com as 11 colunas do Painel: SEM
+        // `largura`, a `<td>` fica em 24px (vazio) ou 64px (com o conteúdo
+        // inline-estilado) nas três larguras — sempre o mínimo do conteúdo.
+        // COM `largura: '52px'`, a `<td>` ainda ficava 24px em 900/600px
+        // (tabela já rola, a dica não pesa), mas em 1280px (com sobra
+        // horizontal) o layout automático SOMAVA os 52px por cima do mínimo:
+        // 76px — a "faixa larga e vazia" que a issue descreve. `largura: '64px'`
+        // media pior ainda (88px). Removida a dica, a coluna nunca cresce além
+        // do próprio conteúdo, e a sobra vai para colunas que precisam dela
+        // (ex.: Nome do estudo). Script da medição no corpo do PR.
+        //
+        // #475: o fallback do token abaixo (cinza médio) não é decoração — o
+        // token `--cor-superficie-sutil` não existe em nenhum lugar do
+        // monorepo, e o fallback é, portanto, a cor EFETIVA sempre. Já foi
+        // branco a 6% (invisível nos temas claros); `scripts/guard-tokens-css.mjs`
+        // impede a volta.
+        id: 'imagem', label: '',
         render: (l: any) => l.imagem_principal_url
-          ? html`<img class="miniatura" src=${l.imagem_principal_url} alt="" loading="lazy">`
-          : html`<span class="miniatura-vazia" aria-hidden="true"></span>`,
+          ? html`<img class="miniatura" style="width:40px;height:28px;border-radius:6px;object-fit:cover;display:block;background:var(--cor-superficie-sutil, rgba(128,128,128,0.08))" src=${l.imagem_principal_url} alt="" loading="lazy">`
+          : html`<span class="miniatura-vazia" style="width:40px;height:28px;border-radius:6px;display:block;background:var(--cor-superficie-sutil, rgba(128,128,128,0.08))" aria-hidden="true"></span>`,
       },
       {
         id: 'nome', label: 'Nome do estudo',
