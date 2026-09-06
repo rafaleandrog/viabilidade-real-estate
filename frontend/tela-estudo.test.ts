@@ -36,13 +36,21 @@ const FONTE_ESTUDO = semComentarios(
   readFileSync(new URL('./tela-estudo.ts', import.meta.url), 'utf8'),
 );
 
-test('#678: o botão de renomear existe no cabeçalho e é guardado por p.podeEditar', () => {
+test('#678: o botão de renomear existe no cabeçalho e é guardado por podeEditarEstudo(st, p.funcao)', () => {
   // ⚠️ A guarda é conferida pela forma INTEIRA da ternária, não pela presença
   // da chamada — mesma lição da #660: invertida, ela mostra o botão a quem o
   // PATCH recusa, e uma asserção de presença continuaria verde.
+  //
+  // ⚠️ `p.podeEditar` sozinho NÃO BASTA aqui — é role-only (`perm.ehEditor ||
+  // podeAprovar`, `backend/rotas/estudos.ts:589`), e o PATCH real usa
+  // `podeEditarEstudo(status, funcao)` (`backend/rotas/estudos.ts:631`), que
+  // trava rascunho/aprovado/reprovado/arquivado para só o aprovador editar.
+  // Um editor num estudo travado veria o lápis com `p.podeEditar` e levaria
+  // 403 ao salvar — foi exatamente o defeito que esta issue introduziu na
+  // primeira versão deste arquivo, achado relendo o próprio diff.
   assert.ok(
-    FONTE_ESTUDO.includes('${p.podeEditar ? html`'),
-    'a guarda tem de estar no ramo VERDADEIRO da ternária — invertida, ela mostra o botão a quem não pode',
+    FONTE_ESTUDO.includes('${podeEditarEstudo(st, p.funcao) ? html`'),
+    'a guarda tem de ser a MESMA função que o PATCH usa, com o status do estudo — não só o papel do usuário',
   );
   assert.ok(
     FONTE_ESTUDO.includes('@click=${this._abrirEditarNome}'),

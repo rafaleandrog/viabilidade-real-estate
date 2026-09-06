@@ -2,7 +2,7 @@ import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, COR_NIVEL } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
-import { nomeEstudoLimpo, LIMITE_NOME_ESTUDO } from './estudo-status.js';
+import { nomeEstudoLimpo, LIMITE_NOME_ESTUDO, podeEditarEstudo } from './estudo-status.js';
 import './tela-preliminar.js';
 import './tela-avancado.js';
 import {
@@ -118,7 +118,7 @@ export class ViabTelaEstudo extends LitElement {
           </urbi-badge>
           <span class="sec">${TIPO_LABEL[this.estudo.tipo_empreendimento] || this.estudo.tipo_empreendimento}</span>
           ${p.funcao ? html`<span class="sec">· sua função: ${p.funcao}</span>` : nothing}
-          ${p.podeEditar ? html`
+          ${podeEditarEstudo(st, p.funcao) ? html`
             <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-pen"
               @click=${this._abrirEditarNome}
               title="Renomear estudo"></urbi-botao>` : nothing}
