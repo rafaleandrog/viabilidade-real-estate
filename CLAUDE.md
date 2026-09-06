@@ -1023,6 +1023,20 @@ Git Bash — ver PROGRESSO).
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa
     janela própria, fora do escopo das variáveis do shell — lá `var(--cor-*)` não resolve e cor
     literal é a única opção. Não "corrija" isso.
+  - ⚠️ **`urbi-empacotar` (SDK `57.0.0`) avisa "N literais de cor fora de token no bundle" — e isto
+    NÃO é o app violando o contrato.** O aviso é novo nesta versão do bin (não existia no pin
+    `0.50.3`) e a heurística (`auditoria-tokens.js`, embutida no SDK) conta **todo** `#hex`/
+    `rgba()`/`hsla()` no bundle por regex — inclusive o literal de **fallback** dentro de
+    `var(--token-que-existe, #fallback)`, que é exatamente o padrão correto de uso de token
+    (defesa contra token ainda não publicado na versão do shell instalada). Medido em 2026-09-06,
+    contando os 279 no bundle contra a fonte: **264 são fallback de `var()` de token real**
+    (confirmado pelo `guard-tokens-css.mjs`, que passa limpo — todo `var()` do app referencia
+    token existente) e os **15 restantes são, sem exceção, os literais de `frontend/exportar.ts`**
+    já documentados na exceção acima. Não há literal "solto" em nenhum outro arquivo de
+    `frontend/`. **Não** persiga este número tirando o fallback de cada `var()` — isso troca uma
+    defesa real (token indisponível numa instância com shell mais velho) por nenhuma, para calar
+    um aviso que já está explicado. Se o número mudar numa sessão futura, reconte pela mesma
+    metodologia (fallback vs. literal solto) antes de tratar como regressão.
 - Só usar primitivos `urbi-*` disponíveis no `ui.md` do shell — e **só as props que eles declaram**:
   atributo inexistente num primitivo não dá erro, ele simplesmente **não faz nada** (falha
   silenciosa). Na dúvida, leia `ui/src/urbi-<nome>.ts` no monorepo, não presuma a prop.
