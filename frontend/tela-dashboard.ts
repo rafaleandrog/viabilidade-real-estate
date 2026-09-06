@@ -192,18 +192,6 @@ export class ViabTelaDashboard extends LitElement {
   static styles = [estiloPrimitivo, estiloConteudo, css`
     .form-campos { display: flex; flex-direction: column; gap: 12px; }
     .form-acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
-    /* #659/#660: a linha passou de 2 para até 7 botões (4 transições possíveis a
-       partir de "Em análise", mais editar/duplicar/remover). Sem flex-wrap a
-       fila empurra a célula e o documento inteiro na horizontal — a classe de
-       defeito que só o render em Chromium enxerga, e que o urbi-kpi já
-       produziu quatro vezes (#176, #262, #326, #352).
-       ⚠️ E NENHUM caso de render mede esta célula — não por esquecimento: ela
-       vive dentro de urbi-tabela, que recebe colunas/linhas por PROPRIEDADE, e
-       o stub gerado do espelho não desenha o conteúdo da tabela. Um caso que a
-       pedisse mediria o vazio e voltaria limpo. Mesma limitação declarada em
-       frontend/render/casos/funding-abas.ts para a aba Operações. Quem confirma
-       a geometria desta linha é o autor, na instância intermediária. */
-    .acoes-linha { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
     .cel-nome { font-weight: 600; }
     .cel-criador { display: inline-flex; align-items: center; }
     .filtros-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -552,24 +540,56 @@ export class ViabTelaDashboard extends LitElement {
           </span>`,
       },
       {
-        id: 'acoes', label: '',
         // #659: a linha de ações carrega DOIS grupos, nesta ordem — as
         // transições de status (que saíram do `urbi-select` da coluna Status)
         // e os dois que já existiam. #678: o lápis de renomear saiu daqui —
         // renomear é ação do cabeçalho do estudo agora (`tela-estudo.ts`).
+        //
+        // #680: `alinhamento: 'direita'` para a coluna receber a classe do
+        // primitivo (sem isso a `<td>` não tem `text-align`/`justify-content`
+        // à direita — `justify-content:flex-end` sozinho num `inline-flex`
+        // só afeta a ÚLTIMA linha de uma fila QUEBRADA, nunca uma única linha
+        // já do tamanho do conteúdo).
+        //
+        // O estilo do container é INLINE, não classe — mesma razão medida na
+        // #679: `col.render(linha)` é inserido pelo PRÓPRIO `urbi-tabela`
+        // dentro do shadow root DELE (`_renderLinha`, `ui/src/urbi-tabela.ts`),
+        // então uma classe do `static styles` de VIAB-TELA-DASHBOARD nunca
+        // alcançaria este `<div>`. A defesa real contra o documento rolar na
+        // horizontal não é o `flex-wrap` (que dependia da classe morta) — é o
+        // `.wrap { overflow: auto }` do próprio `urbi-tabela`, que faz a
+        // TABELA rolar dentro do primitivo antes de a fila conseguir esticar
+        // o documento. Nenhum caso de render mede esta célula (colunas/linhas
+        // chegam por propriedade; o stub do espelho não desenha o conteúdo da
+        // tabela — mesma limitação de `frontend/render/casos/funding-abas.ts`
+        // para a aba Operações); quem confirma a geometria é o autor, na
+        // instância intermediária.
+        //
+        // Todo botão só-ícone da fila declara `.ariaLabel` — é property
+        // binding (`.ariaLabel=`), não atributo: `@property() ariaLabel = ''`
+        // em `ui/src/urbi-botao.ts` não tem `attribute:` customizado, então o
+        // atributo gerado por Lit seria `arialabel` (tudo minúsculo), NUNCA
+        // `aria-label` — escrever `aria-label="..."` no template marcaria o
+        // HOST (inofensivo, ignorado) e deixaria `this.ariaLabel` vazio por
+        // dentro, reproduzindo em silêncio o bug de acessibilidade que esta
+        // issue existe para consertar. `docs/ui-urbiverso/primitivos.json`
+        // (o espelho local) nem lista essa prop — está desatualizado em
+        // relação ao SDK 57.0.0 instalado; conferido direto em
+        // `node_modules/@urbiverso/sdk/dist/index.d.ts` e no monorepo (leitura).
+        id: 'acoes', label: '', alinhamento: 'direita',
         render: (l: any) => html`
-          <div class="acoes-linha">
+          <div class="acoes-linha" style="display:inline-flex;flex-wrap:nowrap;justify-content:flex-end;gap:6px;">
             ${acoesTransicao(String(l.status), l._funcao).map((a: AcaoTransicao) => html`
               <urbi-botao variante=${a.variante} pequeno icone=${a.icone}
                 ?desabilitado=${this.statusEmCurso === l.id}
                 @click=${(ev: Event) => { ev.stopPropagation(); this._mudarStatus(l, a.para); }}
-                title=${a.rotulo}></urbi-botao>`)}
+                title=${a.rotulo} .ariaLabel=${a.rotulo}></urbi-botao>`)}
             <urbi-botao variante="fantasma" pequeno icone="fa-solid fa-copy"
               @click=${(ev: Event) => { ev.stopPropagation(); this._duplicar(l.id); }}
-              title="Duplicar">Duplicar</urbi-botao>
+              title="Duplicar" .ariaLabel=${'Duplicar'}></urbi-botao>
             <urbi-botao variante="perigo" pequeno icone="fa-solid fa-trash"
               @click=${(ev: Event) => { ev.stopPropagation(); this.removerAlvo = l; }}
-              title="Remover"></urbi-botao>
+              title="Remover" .ariaLabel=${'Remover'}></urbi-botao>
           </div>`,
       },
     ];

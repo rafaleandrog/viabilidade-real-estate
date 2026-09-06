@@ -1,9 +1,9 @@
 {
   "carimbo": {
     "gerado_de": "main do monorepo urbiverso",
-    "sha": "22ba477aac5e2e3b6a5b9bfa0e8c64c9e6310ed0",
+    "sha": "ec0e347061606cf3e0518201b94588b915f58640",
     "versao_monorepo": "0.53.11",
-    "data_do_commit": "2026-08-22"
+    "data_do_commit": "2026-09-06"
   },
   "primitivos": {
     "urbi-abas": {
@@ -97,24 +97,6 @@
       "host": [
         {
           "seletor": ":host",
-          "prop": "display",
-          "valor": "flex",
-          "de": "UrbiPrimitivoDeLayout"
-        },
-        {
-          "seletor": ":host",
-          "prop": "flex-direction",
-          "valor": "column",
-          "de": "UrbiPrimitivoDeLayout"
-        },
-        {
-          "seletor": ":host",
-          "prop": "min-height",
-          "valor": "0",
-          "de": "UrbiPrimitivoDeLayout"
-        },
-        {
-          "seletor": ":host",
           "prop": "flex",
           "valor": "1",
           "de": "UrbiPrimitivoDeLayout"
@@ -134,25 +116,25 @@
         {
           "seletor": ":host",
           "prop": "--urbi-abas-borda",
-          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "var(--cor-borda)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-aba-cor",
-          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "valor": "var(--cor-texto-sec)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-aba-cor-hover",
-          "valor": "var(--cor-texto, rgba(255,255,255,0.85))",
+          "valor": "var(--cor-texto)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-aba-cor-ativa",
-          "valor": "var(--cor-primaria-solida, #2AA9E0)",
+          "valor": "var(--cor-primaria-solida)",
           "de": "UrbiAbas"
         },
         {
@@ -200,43 +182,43 @@
         {
           "seletor": ":host",
           "prop": "--urbi-abas-botao-bg",
-          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "valor": "var(--cor-superficie)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-botao-bg-hover",
-          "valor": "var(--cor-superficie-hover, rgba(255,255,255,0.08))",
+          "valor": "var(--cor-superficie-hover)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-botao-bg-ativo",
-          "valor": "var(--cor-primaria-fundo, rgba(42,169,224,0.12))",
+          "valor": "var(--cor-primaria-fundo)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-botao-borda",
-          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "var(--cor-borda)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-botao-borda-ativa",
-          "valor": "var(--cor-primaria-borda, rgba(42,169,224,0.30))",
+          "valor": "var(--cor-primaria-borda)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-botao-cor",
-          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "valor": "var(--cor-texto-sec)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-botao-cor-ativa",
-          "valor": "var(--cor-primaria-solida, #2AA9E0)",
+          "valor": "var(--cor-primaria-solida)",
           "de": "UrbiAbas"
         },
         {
@@ -248,43 +230,43 @@
         {
           "seletor": ":host",
           "prop": "--urbi-abas-acao-bg-hover",
-          "valor": "var(--cor-superficie-hover, rgba(255,255,255,0.08))",
+          "valor": "var(--cor-superficie-hover)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-acao-borda",
-          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "var(--cor-borda)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-acao-cor",
-          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "valor": "var(--cor-texto-sec)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-acao-cor-hover",
-          "valor": "var(--cor-texto-forte, rgba(255,255,255,0.95))",
+          "valor": "var(--cor-texto-forte)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-scroll-bg",
-          "valor": "var(--cor-overlay, rgba(0,0,0,0.6))",
+          "valor": "var(--cor-overlay)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-scroll-cor",
-          "valor": "var(--cor-texto, rgba(255,255,255,0.85))",
+          "valor": "var(--cor-texto)",
           "de": "UrbiAbas"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-abas-fade-cor",
-          "valor": "var(--cor-fundo, #0D1B2A)",
+          "valor": "var(--cor-fundo)",
           "de": "UrbiAbas"
         },
         {
@@ -459,14 +441,6 @@
           "tipo": "Boolean",
           "reflete": true,
           "de": "UrbiBadge"
-        },
-        {
-          "propriedade": "semQuebra",
-          "atributo": "sem-quebra",
-          "so_propriedade": false,
-          "tipo": "Boolean",
-          "reflete": true,
-          "de": "UrbiBadge"
         }
       ],
       "atributos_convencao": [
@@ -567,14 +541,6 @@
           "de": "UrbiBotaoVoltar"
         },
         {
-          "propriedade": "texto",
-          "atributo": "texto",
-          "so_propriedade": false,
-          "tipo": "String",
-          "reflete": false,
-          "de": "UrbiBotaoVoltar"
-        },
-        {
           "propriedade": "autoVoltar",
           "atributo": "auto-voltar",
           "so_propriedade": false,
@@ -632,6 +598,14 @@
           "de": "UrbiBotao"
         },
         {
+          "propriedade": "compacto",
+          "atributo": "compacto",
+          "so_propriedade": false,
+          "tipo": "Boolean",
+          "reflete": true,
+          "de": "UrbiBotao"
+        },
+        {
           "propriedade": "desabilitado",
           "atributo": "desabilitado",
           "so_propriedade": false,
@@ -658,6 +632,14 @@
         {
           "propriedade": "icone",
           "atributo": "icone",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiBotao"
+        },
+        {
+          "propriedade": "ariaLabel",
+          "atributo": "arialabel",
           "so_propriedade": false,
           "tipo": "String",
           "reflete": false,
@@ -793,30 +775,38 @@
       "risco_box_model": false,
       "risco_box_model_altura": false
     },
-    "urbi-chips-atalho": {
-      "classe": "UrbiChipsAtalho",
-      "arquivo": "ui/src/urbi-chips-atalho.ts",
+    "urbi-estado-vazio": {
+      "classe": "UrbiEstadoVazio",
+      "arquivo": "ui/src/urbi-estado-vazio.ts",
       "base": "UrbiPrimitivoDeConteudo",
       "linhagem": [
         "UrbiPrimitivoDeConteudo",
-        "UrbiChipsAtalho"
+        "UrbiEstadoVazio"
       ],
       "props": [
         {
-          "propriedade": "opcoes",
-          "atributo": null,
-          "so_propriedade": true,
-          "tipo": "String",
-          "reflete": false,
-          "de": "UrbiChipsAtalho"
-        },
-        {
-          "propriedade": "ativo",
-          "atributo": "ativo",
+          "propriedade": "icone",
+          "atributo": "icone",
           "so_propriedade": false,
           "tipo": "String",
           "reflete": false,
-          "de": "UrbiChipsAtalho"
+          "de": "UrbiEstadoVazio"
+        },
+        {
+          "propriedade": "mensagem",
+          "atributo": "mensagem",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiEstadoVazio"
+        },
+        {
+          "propriedade": "submensagem",
+          "atributo": "submensagem",
+          "so_propriedade": false,
+          "tipo": "String",
+          "reflete": false,
+          "de": "UrbiEstadoVazio"
         }
       ],
       "atributos_convencao": [
@@ -846,75 +836,6 @@
           "prop": "flex",
           "valor": "1",
           "de": "UrbiPrimitivoDeConteudo"
-        },
-        {
-          "seletor": ":host",
-          "prop": "display",
-          "valor": "flex",
-          "de": "UrbiChipsAtalho"
-        },
-        {
-          "seletor": ":host",
-          "prop": "flex-direction",
-          "valor": "row",
-          "de": "UrbiChipsAtalho"
-        },
-        {
-          "seletor": ":host",
-          "prop": "gap",
-          "valor": "8px",
-          "de": "UrbiChipsAtalho"
-        },
-        {
-          "seletor": ":host",
-          "prop": "flex-wrap",
-          "valor": "wrap",
-          "de": "UrbiChipsAtalho"
-        }
-      ],
-      "risco_box_model": false,
-      "risco_box_model_altura": false
-    },
-    "urbi-estado-vazio": {
-      "classe": "UrbiEstadoVazio",
-      "arquivo": "ui/src/urbi-estado-vazio.ts",
-      "base": "LitElement",
-      "linhagem": [
-        "UrbiEstadoVazio"
-      ],
-      "props": [
-        {
-          "propriedade": "icone",
-          "atributo": "icone",
-          "so_propriedade": false,
-          "tipo": "String",
-          "reflete": false,
-          "de": "UrbiEstadoVazio"
-        },
-        {
-          "propriedade": "mensagem",
-          "atributo": "mensagem",
-          "so_propriedade": false,
-          "tipo": "String",
-          "reflete": false,
-          "de": "UrbiEstadoVazio"
-        },
-        {
-          "propriedade": "submensagem",
-          "atributo": "submensagem",
-          "so_propriedade": false,
-          "tipo": "String",
-          "reflete": false,
-          "de": "UrbiEstadoVazio"
-        }
-      ],
-      "atributos_convencao": [],
-      "host": [
-        {
-          "seletor": ":host",
-          "prop": "display",
-          "valor": "block",
-          "de": "UrbiEstadoVazio"
         }
       ],
       "risco_box_model": false,
@@ -1085,79 +1006,79 @@
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-texto",
-          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "valor": "var(--cor-texto-sec)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-grade",
-          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "var(--cor-borda)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-1",
-          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "valor": "var(--cor-categoria-1)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-2",
-          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "valor": "var(--cor-categoria-2)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-3",
-          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "valor": "var(--cor-categoria-3)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-4",
-          "valor": "var(--cor-categoria-4, #F092B0)",
+          "valor": "var(--cor-categoria-4)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-5",
-          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "valor": "var(--cor-categoria-5)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-6",
-          "valor": "var(--cor-categoria-6, #9DC498)",
+          "valor": "var(--cor-categoria-6)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-7",
-          "valor": "var(--cor-categoria-7, #E9A082)",
+          "valor": "var(--cor-categoria-7)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-8",
-          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "valor": "var(--cor-categoria-8)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "background",
-          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "valor": "var(--cor-superficie)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "border",
-          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "1px solid var(--cor-borda)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "border-radius",
-          "valor": "var(--raio-md, 8px)",
+          "valor": "var(--raio-md)",
           "de": "UrbiGraficoBase"
         },
         {
@@ -1351,79 +1272,79 @@
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-texto",
-          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "valor": "var(--cor-texto-sec)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-grade",
-          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "var(--cor-borda)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-1",
-          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "valor": "var(--cor-categoria-1)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-2",
-          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "valor": "var(--cor-categoria-2)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-3",
-          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "valor": "var(--cor-categoria-3)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-4",
-          "valor": "var(--cor-categoria-4, #F092B0)",
+          "valor": "var(--cor-categoria-4)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-5",
-          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "valor": "var(--cor-categoria-5)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-6",
-          "valor": "var(--cor-categoria-6, #9DC498)",
+          "valor": "var(--cor-categoria-6)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-7",
-          "valor": "var(--cor-categoria-7, #E9A082)",
+          "valor": "var(--cor-categoria-7)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-8",
-          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "valor": "var(--cor-categoria-8)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "background",
-          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "valor": "var(--cor-superficie)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "border",
-          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "1px solid var(--cor-borda)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "border-radius",
-          "valor": "var(--raio-md, 8px)",
+          "valor": "var(--raio-md)",
           "de": "UrbiGraficoBase"
         },
         {
@@ -1625,79 +1546,79 @@
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-texto",
-          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "valor": "var(--cor-texto-sec)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-grade",
-          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "var(--cor-borda)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-1",
-          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "valor": "var(--cor-categoria-1)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-2",
-          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "valor": "var(--cor-categoria-2)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-3",
-          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "valor": "var(--cor-categoria-3)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-4",
-          "valor": "var(--cor-categoria-4, #F092B0)",
+          "valor": "var(--cor-categoria-4)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-5",
-          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "valor": "var(--cor-categoria-5)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-6",
-          "valor": "var(--cor-categoria-6, #9DC498)",
+          "valor": "var(--cor-categoria-6)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-7",
-          "valor": "var(--cor-categoria-7, #E9A082)",
+          "valor": "var(--cor-categoria-7)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-8",
-          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "valor": "var(--cor-categoria-8)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "background",
-          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "valor": "var(--cor-superficie)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "border",
-          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "1px solid var(--cor-borda)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "border-radius",
-          "valor": "var(--raio-md, 8px)",
+          "valor": "var(--raio-md)",
           "de": "UrbiGraficoBase"
         },
         {
@@ -1823,19 +1744,19 @@
         {
           "seletor": ":host",
           "prop": "background",
-          "valor": "var(--cor-superficie, rgba(255, 255, 255, 0.04))",
+          "valor": "var(--cor-superficie)",
           "de": "UrbiGraficoMedidor"
         },
         {
           "seletor": ":host",
           "prop": "border",
-          "valor": "1px solid var(--cor-borda, rgba(255, 255, 255, 0.08))",
+          "valor": "1px solid var(--cor-borda)",
           "de": "UrbiGraficoMedidor"
         },
         {
           "seletor": ":host",
           "prop": "border-radius",
-          "valor": "var(--raio-md, 8px)",
+          "valor": "var(--raio-md)",
           "de": "UrbiGraficoMedidor"
         },
         {
@@ -1865,19 +1786,19 @@
         {
           "seletor": ":host",
           "prop": "--urbi-medidor-cor-arco",
-          "valor": "var(--cor-texto-sec, rgba(255, 255, 255, 0.5))",
+          "valor": "var(--cor-texto-sec)",
           "de": "UrbiGraficoMedidor"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-medidor-cor-agulha",
-          "valor": "var(--cor-texto-forte, rgba(255, 255, 255, 0.95))",
+          "valor": "var(--cor-texto-forte)",
           "de": "UrbiGraficoMedidor"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-medidor-cor-trilho",
-          "valor": "var(--cor-borda, rgba(255, 255, 255, 0.08))",
+          "valor": "var(--cor-borda)",
           "de": "UrbiGraficoMedidor"
         },
         {
@@ -2047,79 +1968,79 @@
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-texto",
-          "valor": "var(--cor-texto-sec, rgba(255,255,255,0.5))",
+          "valor": "var(--cor-texto-sec)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-grade",
-          "valor": "var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "var(--cor-borda)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-1",
-          "valor": "var(--cor-categoria-1, #6CA1FF)",
+          "valor": "var(--cor-categoria-1)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-2",
-          "valor": "var(--cor-categoria-2, #B58CE5)",
+          "valor": "var(--cor-categoria-2)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-3",
-          "valor": "var(--cor-categoria-3, #66C9DC)",
+          "valor": "var(--cor-categoria-3)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-4",
-          "valor": "var(--cor-categoria-4, #F092B0)",
+          "valor": "var(--cor-categoria-4)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-5",
-          "valor": "var(--cor-categoria-5, #E7BC72)",
+          "valor": "var(--cor-categoria-5)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-6",
-          "valor": "var(--cor-categoria-6, #9DC498)",
+          "valor": "var(--cor-categoria-6)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-7",
-          "valor": "var(--cor-categoria-7, #E9A082)",
+          "valor": "var(--cor-categoria-7)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "--urbi-grafico-cor-8",
-          "valor": "var(--cor-categoria-8, #B3BCCC)",
+          "valor": "var(--cor-categoria-8)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "background",
-          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "valor": "var(--cor-superficie)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "border",
-          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "1px solid var(--cor-borda)",
           "de": "UrbiGraficoBase"
         },
         {
           "seletor": ":host",
           "prop": "border-radius",
-          "valor": "var(--raio-md, 8px)",
+          "valor": "var(--raio-md)",
           "de": "UrbiGraficoBase"
         },
         {
@@ -2166,33 +2087,28 @@
       ],
       "props": [],
       "atributos_convencao": [
+        "expandir",
         "papel-host",
         "preencher"
       ],
       "host": [
         {
-          "seletor": ":host",
-          "prop": "display",
-          "valor": "flex",
-          "de": "UrbiPrimitivoHospedeiro"
-        },
-        {
-          "seletor": ":host",
-          "prop": "flex-direction",
-          "valor": "column",
-          "de": "UrbiPrimitivoHospedeiro"
-        },
-        {
-          "seletor": ":host",
-          "prop": "min-height",
-          "valor": "0",
-          "de": "UrbiPrimitivoHospedeiro"
-        },
-        {
           "seletor": ":host([preencher])",
           "prop": "flex",
           "valor": "1",
           "de": "UrbiPrimitivoHospedeiro"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--hospedeiro-padding",
+          "valor": "16px",
+          "de": "UrbiHospedeiro"
+        },
+        {
+          "seletor": ":host",
+          "prop": "--hospedeiro-gap",
+          "valor": "12px",
+          "de": "UrbiHospedeiro"
         }
       ],
       "risco_box_model": false,
@@ -2572,19 +2488,19 @@
         {
           "seletor": ":host",
           "prop": "background",
-          "valor": "var(--cor-superficie, rgba(255,255,255,0.04))",
+          "valor": "var(--cor-superficie)",
           "de": "UrbiKpi"
         },
         {
           "seletor": ":host",
           "prop": "border",
-          "valor": "1px solid var(--cor-borda, rgba(255,255,255,0.08))",
+          "valor": "1px solid var(--cor-borda)",
           "de": "UrbiKpi"
         },
         {
           "seletor": ":host",
           "prop": "border-radius",
-          "valor": "var(--raio-md, 8px)",
+          "valor": "var(--raio-md)",
           "de": "UrbiKpi"
         },
         {
@@ -2597,6 +2513,36 @@
           "seletor": ":host",
           "prop": "min-width",
           "valor": "140px",
+          "de": "UrbiKpi"
+        },
+        {
+          "seletor": ":host",
+          "prop": "flex-direction",
+          "valor": "row",
+          "de": "UrbiKpi"
+        },
+        {
+          "seletor": ":host",
+          "prop": "align-items",
+          "valor": "baseline",
+          "de": "UrbiKpi"
+        },
+        {
+          "seletor": ":host",
+          "prop": "gap",
+          "valor": "8px",
+          "de": "UrbiKpi"
+        },
+        {
+          "seletor": ":host",
+          "prop": "padding",
+          "valor": "8px 12px",
+          "de": "UrbiKpi"
+        },
+        {
+          "seletor": ":host",
+          "prop": "min-width",
+          "valor": "0",
           "de": "UrbiKpi"
         }
       ],
@@ -2879,7 +2825,7 @@
         {
           "seletor": ":host",
           "prop": "font-family",
-          "valor": "var(--fonte, 'Montserrat', sans-serif)",
+          "valor": "var(--fonte)",
           "de": "UrbiNav"
         }
       ],
@@ -3145,14 +3091,6 @@
           "tipo": "Boolean",
           "reflete": true,
           "de": "UrbiShellPage"
-        },
-        {
-          "propriedade": "preencher",
-          "atributo": "preencher",
-          "so_propriedade": false,
-          "tipo": "Boolean",
-          "reflete": true,
-          "de": "UrbiShellPage"
         }
       ],
       "atributos_convencao": [
@@ -3163,24 +3101,6 @@
         "sem-expandir"
       ],
       "host": [
-        {
-          "seletor": ":host",
-          "prop": "display",
-          "valor": "flex",
-          "de": "UrbiPrimitivoDeLayout"
-        },
-        {
-          "seletor": ":host",
-          "prop": "flex-direction",
-          "valor": "column",
-          "de": "UrbiPrimitivoDeLayout"
-        },
-        {
-          "seletor": ":host",
-          "prop": "min-height",
-          "valor": "0",
-          "de": "UrbiPrimitivoDeLayout"
-        },
         {
           "seletor": ":host",
           "prop": "flex",

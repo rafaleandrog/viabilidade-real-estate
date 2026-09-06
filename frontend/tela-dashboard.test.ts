@@ -524,3 +524,60 @@ test('#679: a classe .miniatura/.miniatura-vazia não sobra em static styles —
       'root errado) — se precisar mudar o estilo, mude o inline acima, não reintroduza a classe',
   );
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #680: a fila de ações quebrava em várias linhas, o botão de Duplicar era o
+// único com texto no slot (várias vezes mais largo que os vizinhos só-ícone),
+// e a fila alinhava à ESQUERDA da célula porque a coluna não declarava
+// `alinhamento`. A mesma causa estrutural da #679 (classe do static styles
+// não atravessa o shadow root de urbi-tabela) se aplicava a `.acoes-linha` —
+// mesmo conserto: estilo inline, não classe.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#680: o botão de Duplicar não tem mais texto no slot — só ícone e title/ariaLabel', () => {
+  assert.ok(
+    !/>Duplicar</.test(FONTE_DASHBOARD),
+    'o texto "Duplicar" no slot fazia esse botão várias vezes mais largo que os vizinhos só-ícone',
+  );
+  assert.ok(
+    FONTE_DASHBOARD.includes('title="Duplicar" .ariaLabel=${\'Duplicar\'}></urbi-botao>'),
+    'title e ariaLabel continuam — só o texto do slot saiu',
+  );
+});
+
+test('#680: a coluna acoes declara alinhamento direita — sem isso a <td> não recebe a classe do primitivo, e justify-content:flex-end não tem efeito numa fila sem quebra', () => {
+  const bloco = FONTE_DASHBOARD.match(/id: 'acoes', label: ''[\s\S]{0,80}/)?.[0];
+  assert.ok(bloco, 'não encontrei a definição da coluna acoes — mudou de forma?');
+  assert.ok(
+    bloco!.includes("alinhamento: 'direita'"),
+    'alinhamento precisa estar colado à declaração da coluna (id + label), não em outro lugar',
+  );
+});
+
+test('#680: TODOS os urbi-botao da fila de ações declaram .ariaLabel — por CONTAGEM EXATA, para um botão novo sem label quebrar o teste', () => {
+  const bloco = FONTE_DASHBOARD.match(
+    /id: 'acoes', label: '', alinhamento: 'direita',[\s\S]*?render: \(l: any\) => html`[\s\S]*?<\/div>`,\n {6}\},/,
+  )?.[0];
+  assert.ok(bloco, 'não encontrei o bloco de render da coluna acoes — mudou de forma?');
+  const botoes = bloco!.match(/<urbi-botao/g)?.length ?? 0;
+  const comAriaLabel = bloco!.match(/\.ariaLabel=\$\{/g)?.length ?? 0;
+  assert.equal(botoes, 3, 'a fila tem 3 pontos de urbi-botao no FONTE (1 via .map de transições, duplicar, remover) — mudou?');
+  assert.equal(
+    comAriaLabel, botoes,
+    `${botoes} <urbi-botao> na fila, mas só ${comAriaLabel} com .ariaLabel — todo botão só-ícone precisa, ` +
+      'senão o leitor de tela anuncia um botão sem nome (title não nomeia o <button> do shadow DOM)',
+  );
+});
+
+test('#680: o estilo da fila é INLINE (não classe) e não quebra linha — mesma causa estrutural da #679 (classe do static styles não atravessa o shadow root de urbi-tabela)', () => {
+  assert.ok(
+    FONTE_DASHBOARD.includes(
+      '<div class="acoes-linha" style="display:inline-flex;flex-wrap:nowrap;justify-content:flex-end;gap:6px;">',
+    ),
+    'o container da fila precisa do estilo inline completo, com flex-wrap:nowrap — classe sozinha não chega ao nó real',
+  );
+  assert.ok(
+    !/\.acoes-linha\s*\{/.test(FONTE_DASHBOARD),
+    'regra de classe para .acoes-linha em static styles é INERTE aqui — mesmo motivo de .miniatura na #679',
+  );
+});
