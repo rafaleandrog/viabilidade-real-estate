@@ -471,3 +471,56 @@ test('#676: nada no arquivo referencia _cidade, this.regioes ou listarRegioesMer
     'o request extra (_carregarRegioes) e o import deveriam ter saído junto com a coluna',
   );
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #679: a coluna da miniatura comia uma faixa larga e vazia à esquerda da
+// tabela. Medido (script no corpo do PR, CSS real de `urbi-tabela` copiado
+// do monorepo, reproduzido num Chromium isolado): a causa é dupla —
+// (a) `largura: '52px'` no `<th>`, em layout automático sem `table-layout:
+// fixed`, fazia o layout SOMAR os 52px por cima do mínimo do conteúdo
+// sempre que a tabela tinha sobra horizontal (1280px): 24px → 76px; e
+// (b) `.miniatura`/`.miniatura-vazia` (classes do `static styles` de
+// VIAB-TELA-DASHBOARD) nunca alcançavam o `<img>`/`<span>` real, porque
+// `urbi-tabela` insere o retorno de `render` dentro do PRÓPRIO shadow root
+// dele — CSS de classe não atravessa fronteira de shadow DOM.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#679: a coluna da miniatura não declara `largura` — a dica é o que fazia o layout automático somar espaço por cima do mínimo', () => {
+  const bloco = FONTE_DASHBOARD.match(
+    /id: 'imagem', label: '',[\s\S]*?render: \(l: any\) => l\.imagem_principal_url[\s\S]*?\},/,
+  )?.[0];
+  assert.ok(bloco, 'não encontrei a definição da coluna imagem — mudou de forma?');
+  assert.ok(
+    !/largura:/.test(bloco!),
+    'largura reapareceu na coluna imagem — medido que isso faz a <td> crescer além do conteúdo ' +
+      'em 1280px (redistribuição de layout automático), reintroduzindo a faixa vazia da #679',
+  );
+});
+
+test('#679: os dois ramos da miniatura (com e sem capa) têm o MESMO tamanho, via estilo INLINE — a classe .miniatura não atravessa o shadow root de urbi-tabela', () => {
+  const ESTILO = 'width:40px;height:28px;border-radius:6px;';
+  assert.ok(
+    FONTE_DASHBOARD.includes(
+      `<img class="miniatura" style="${ESTILO}object-fit:cover;display:block;` +
+        'background:var(--cor-superficie-sutil, rgba(128,128,128,0.08))" src=${l.imagem_principal_url}',
+    ),
+    'o <img> precisa do estilo inline completo — classe sozinha não chega ao nó real (fica no shadow ' +
+      'root de urbi-tabela, não no de viab-tela-dashboard)',
+  );
+  assert.ok(
+    FONTE_DASHBOARD.includes(
+      `<span class="miniatura-vazia" style="${ESTILO}display:block;` +
+        'background:var(--cor-superficie-sutil, rgba(128,128,128,0.08))" aria-hidden="true">',
+    ),
+    'o placeholder vazio também precisa do MESMO estilo inline, com o MESMO tamanho do <img> — senão ' +
+      'a coluna muda de largura conforme o estudo tem capa ou não',
+  );
+});
+
+test('#679: a classe .miniatura/.miniatura-vazia não sobra em static styles — CSS morto que parece aplicar e não aplica é pior que CSS nenhum', () => {
+  assert.ok(
+    !/\.miniatura(-vazia)?\s*\{/.test(FONTE_DASHBOARD),
+    'regra de classe para .miniatura/.miniatura-vazia em static styles é sempre INERTE aqui (shadow ' +
+      'root errado) — se precisar mudar o estilo, mude o inline acima, não reintroduza a classe',
+  );
+});
