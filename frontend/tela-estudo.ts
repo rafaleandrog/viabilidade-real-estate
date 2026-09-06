@@ -1,6 +1,6 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS } from './viab-shared.js';
+import { STATUS_LABEL, TIPO_LABEL, NIVEL_LABEL, COR_STATUS, COR_NIVEL } from './viab-shared.js';
 import { estiloPrimitivo, estiloConteudo } from './estilos.js';
 import './tela-preliminar.js';
 import './tela-avancado.js';
@@ -105,7 +105,7 @@ export class ViabTelaEstudo extends LitElement {
 
         <div class="meta">
           <urbi-badge cor=${COR_STATUS[st] ?? 'padrao'}>${STATUS_LABEL[st] || st}</urbi-badge>
-          <urbi-badge cor=${this.estudo.nivel_analise === 'avancado' ? 'info' : 'alerta'}>
+          <urbi-badge cor=${COR_NIVEL[this.estudo.nivel_analise] ?? COR_NIVEL.preliminar}>
             ${NIVEL_LABEL[this.estudo.nivel_analise] || 'Preliminar'}
           </urbi-badge>
           <span class="sec">${TIPO_LABEL[this.estudo.tipo_empreendimento] || this.estudo.tipo_empreendimento}</span>
