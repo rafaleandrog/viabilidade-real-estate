@@ -97,11 +97,28 @@ export class ViabTelaPreliminar extends LitElement {
       border: 1px solid var(--cor-borda); border-radius: 8px;
       background: var(--cor-superficie-sutil, transparent);
       position: sticky; top: 0;
+      /* #686 — sem isto, width:100% do breakpoint abaixo é largura de
+         CONTEÚDO; a border de 1px soma 2px por fora e a caixa transborda
+         .layout. Mesmo mecanismo (padding/border sem box-sizing:border-box)
+         do urbi-kpi (ver comentário equivalente em tela-resumo.ts). */
+      box-sizing: border-box;
     }
     .conteudo { flex: 1 1 0%; min-width: 0; }
     @media (max-width: 900px) {
       .layout { flex-direction: column; }
       .nav-col { flex: 0 0 auto; max-width: none; width: 100%; position: static; }
+      /* #686 — .layout mantém align-items:flex-start em toda largura; em
+         flex-direction:column isso vira o eixo TRANSVERSAL (largura), e
+         flex-start não estica os itens — cada um fica do tamanho do seu
+         próprio conteúdo (fit-content), ignorando a largura do container.
+         .nav-col já cobre o próprio caso com width:100% (acima); .conteudo
+         nunca tinha o mesmo — flex:1 1 0% é propriedade de eixo PRINCIPAL
+         (altura, em coluna), não ajuda aqui. Sem isto, o filho mais largo
+         dentro de .conteudo (a table.areas de tela-premissas.ts, com
+         min-width:900px) força .conteudo a ficar tão largo quanto ele — a
+         caixa transborda em vez de a tabela rolar dentro do próprio
+         .areas-wrap (que já tem overflow-x:auto). */
+      .conteudo { width: 100%; }
     }
   `];
 
