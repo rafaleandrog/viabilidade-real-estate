@@ -395,19 +395,38 @@ export class ViabTelaDashboard extends LitElement {
                 : '/');
           }}
         >
-          <urbi-hospedeiro slot="estudos">${this._renderEstudos()}</urbi-hospedeiro>
-          <urbi-hospedeiro slot="terrenos">${this._renderTerrenos()}</urbi-hospedeiro>
+          <!-- #683: os 5 slots eram montados INCONDICIONALMENTE, mesma
+               instância de ViabTelaDashboard para as 5 abas. Slot é projeção
+               de light DOM: o filho existe assim que este componente
+               renderiza, independente de qual aba urbi-abas mostra por
+               dentro — então os 4 connectedCallback de
+               viabilidade-config-benchmarks/curvas/mercado (cada um chama
+               _carregar() sem guard nenhum) disparavam juntos, na primeira
+               renderização, não só quando a aba correspondente é aberta.
+               Gateado por this.aba, igual ao padrão já usado no slot
+               actions acima — trocar de aba agora MONTA e DESMONTA o
+               conteúdo (fetch lazy ao entrar), então estado interno
+               transitório desses 3 componentes (ex.: um filtro, um form
+               aberto) não sobrevive à troca de aba; nenhum dos 3 guardava
+               esse tipo de estado antes desta mudança. -->
+          ${this.aba === 'estudos' ? html`
+            <urbi-hospedeiro slot="estudos">${this._renderEstudos()}</urbi-hospedeiro>` : nothing}
+          ${this.aba === 'terrenos' ? html`
+            <urbi-hospedeiro slot="terrenos">${this._renderTerrenos()}</urbi-hospedeiro>` : nothing}
+          ${this.aba === 'benchmark' ? html`
           <urbi-hospedeiro slot="benchmark">
             <viabilidade-config-benchmarks
               .somenteLeitura=${urbiVerso.contexto()?.nivel !== 'admin'}
             ></viabilidade-config-benchmarks>
-          </urbi-hospedeiro>
+          </urbi-hospedeiro>` : nothing}
+          ${this.aba === 'curvas' ? html`
           <urbi-hospedeiro slot="curvas">
             <viabilidade-config-curvas></viabilidade-config-curvas>
-          </urbi-hospedeiro>
+          </urbi-hospedeiro>` : nothing}
+          ${this.aba === 'regioes' ? html`
           <urbi-hospedeiro slot="regioes">
             <viabilidade-config-mercado></viabilidade-config-mercado>
-          </urbi-hospedeiro>
+          </urbi-hospedeiro>` : nothing}
         </urbi-abas>
       </urbi-shell-page>
 
