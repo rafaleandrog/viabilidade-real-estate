@@ -14,7 +14,6 @@ import {
 import {
   urbiVerso, listarEstudos, criarEstudo, duplicarEstudo, removerEstudo, transicaoStatus,
   atualizarEstudo,
-  listarRegioesMercado,
   listarGlebasNucleo, listarLotesNucleo,
   listarReceitasAvancado, listarCustosAvancado, listarCurvas,
   buscarCronogramaAvancado, buscarParametrosAvancado,
@@ -175,8 +174,6 @@ export class ViabTelaDashboard extends LitElement {
   /** Arquivado sai da lista por padrão — é o estado "fora do radar". */
   @state() private mostrarArquivados = false;
   @state() private statusEmCurso: number | null = null;
-  /** id → região de mercado, para a coluna Cidade. Uma chamada por página, não por linha. */
-  @state() private regioes: Record<number, { nome: string; uf: string }> = {};
   @state() private mostrarForm = false;
   @state() private form: Record<string, any> = {};
   @state() private salvando = false;
@@ -281,25 +278,6 @@ export class ViabTelaDashboard extends LitElement {
     }
     this.carregando = false;
     this._calcularAvancados();
-    this._carregarRegioes();
-  }
-
-  /**
-   * Regiões de mercado, para a coluna Cidade. É GLOBAL (não por estudo), então
-   * vem uma vez por página — mesmo raciocínio de `listarCurvas()` em
-   * `_calcularAvancados`. Falha aqui não derruba a tabela: a coluna cai para a
-   * `uf`, que é o que o estudo já carrega.
-   */
-  private async _carregarRegioes() {
-    if (Object.keys(this.regioes).length > 0) return;
-    try {
-      const res = await listarRegioesMercado();
-      const mapa: Record<number, { nome: string; uf: string }> = {};
-      for (const r of res?.dados ?? []) mapa[Number(r.id)] = { nome: r.nome, uf: r.uf };
-      this.regioes = mapa;
-    } catch {
-      // Silêncio de propósito: a coluna degrada para `uf` e a tabela segue.
-    }
   }
 
   /**
@@ -471,19 +449,6 @@ export class ViabTelaDashboard extends LitElement {
     `;
   }
 
-  /**
-   * Cidade — o `schema.json` não tem a coluna. O mais próximo que o estudo já
-   * carrega é a região de mercado (`mercado_regioes.nome`, que na prática é o
-   * município) e a `uf`. Deriva daí em vez de inventar campo: a alternativa
-   * seria migração de schema, que é mudança de outra natureza e merece PR
-   * próprio. Sem nada dos dois, "—" honesto.
-   */
-  private _cidade(l: any): string {
-    const regiao = this.regioes[Number(l.regiao_mercado_id)];
-    if (regiao?.nome) return l.uf && regiao.uf !== l.uf ? `${regiao.nome} · ${l.uf}` : regiao.nome;
-    return l.uf || '—';
-  }
-
   /** Área do terreno: mesma escolha por origem que o motor faz (`proforma.ts`). */
   private _areaTerreno(l: any): number | null {
     const v = Number(l.terreno_manual_area) || Number(l.area_terreno_nucleo) || 0;
@@ -581,7 +546,6 @@ export class ViabTelaDashboard extends LitElement {
             <urbi-avatar tamanho="28" nome=${l.autor_nome || '?'} foto=${l.autor_avatar_url || ''}></urbi-avatar>
           </span>`,
       },
-      { id: 'cidade', label: 'Cidade', valor: (l: any) => this._cidade(l) },
       {
         id: 'acoes', label: '',
         // #659 + #660: a linha de ações passou a carregar TRÊS grupos, nesta
