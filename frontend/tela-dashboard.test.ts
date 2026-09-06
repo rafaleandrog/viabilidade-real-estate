@@ -469,3 +469,37 @@ test('#675: a coluna Nível do Painel lê a cor do mapa, não de um literal inli
     'a escolha de cor não pode voltar a ser um ternário inline no template',
   );
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// #676: a coluna Cidade saiu (não lia campo nenhum do estudo — era derivada
+// de uma região de mercado buscada só para ela) e o request extra que ela
+// disparava (`_carregarRegioes`) saiu junto. Inventário por CONTAGEM EXATA,
+// não por presença: coluna a mais e coluna a menos têm de quebrar o teste
+// igual, senão uma coluna nova entra de carona na entrada antiga.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#676: a tabela de Estudos tem exatamente as colunas esperadas, sem Cidade', () => {
+  const bloco = FONTE_DASHBOARD.match(
+    /private _colunas\(\) \{[\s\S]*?(?=\n {2}private _renderStatus\()/,
+  )?.[0];
+  assert.ok(bloco, 'não encontrei o corpo de _colunas() no fonte — o método mudou de forma?');
+  const ids = [...bloco!.matchAll(/id: '([a-z_]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(
+    ids,
+    [
+      'imagem', 'nome', 'status', 'nivel_analise', 'area_terreno', 'area_privativa',
+      'area_construida', 'vgv', 'margem', 'roi', 'criador', 'acoes',
+    ],
+    'a lista de colunas mudou — se foi para tirar/pôr uma coluna de propósito, atualize esta lista '
+      + 'junto; "cidade" nunca deve reaparecer aqui',
+  );
+});
+
+test('#676: nada no arquivo referencia _cidade, this.regioes ou listarRegioesMercado', () => {
+  assert.ok(!/\b_cidade\b/.test(FONTE_DASHBOARD), '_cidade() deveria ter sido apagada com a coluna');
+  assert.ok(!/this\.regioes\b/.test(FONTE_DASHBOARD), 'this.regioes deveria ter sido apagado com a coluna');
+  assert.ok(
+    !/\blistarRegioesMercado\b/.test(FONTE_DASHBOARD),
+    'o request extra (_carregarRegioes) e o import deveriam ter saído junto com a coluna',
+  );
+});
