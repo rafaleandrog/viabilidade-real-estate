@@ -214,7 +214,15 @@ export class ViabTelaDashboard extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this._carregar();
+    // #683 (achado do Codex, rodada 2): landing direto em /terrenos, /benchmarks,
+    // /curvas ou /regioes ainda chamava _carregar() (Estudos) incondicionalmente
+    // aqui — o slot da aba errada já não montava mais, mas o fetch de
+    // listarEstudos() e o _calcularAvancados() que ele dispara em cascata
+    // (uma chamada por estudo Avançado) continuavam saindo mesmo sem a
+    // tabela de Estudos existir na tela. Landing direto em /estudos continua
+    // instantâneo (a condição é true de cara); navegar PARA estudos depois
+    // continua pelo guard de `updated()` logo abaixo, que já existia.
+    if (this.aba === 'estudos') this._carregar();
   }
 
   updated(changed: Map<string, unknown>) {
@@ -395,19 +403,44 @@ export class ViabTelaDashboard extends LitElement {
                 : '/');
           }}
         >
-          <urbi-hospedeiro slot="estudos">${this._renderEstudos()}</urbi-hospedeiro>
-          <urbi-hospedeiro slot="terrenos">${this._renderTerrenos()}</urbi-hospedeiro>
+          <!-- #683: os 5 slots eram montados INCONDICIONALMENTE, mesma
+               instância de ViabTelaDashboard para as 5 abas. Slot é projeção
+               de light DOM: o filho existe assim que este componente
+               renderiza, independente de qual aba urbi-abas mostra por
+               dentro — então os 3 connectedCallback de
+               viabilidade-config-benchmarks/curvas/mercado (cada um chama
+               _carregar() sem guard nenhum) disparavam juntos, na primeira
+               renderização, não só quando a aba correspondente é aberta.
+               Gateado por this.aba, igual ao padrão já usado no slot
+               actions acima — trocar de aba agora MONTA e DESMONTA o
+               conteúdo (fetch lazy ao entrar). Os 3 JÁ TINHAM estado de
+               formulário aberto (mostrarNovo/editando + campos, ex.
+               viabilidade-config-curvas.ts) — a diferença é que antes esse
+               estado SOBREVIVIA à troca de aba, porque o componente nunca
+               desconectava (os 5 hospedeiros ficavam sempre montados); agora
+               ele é perdido de verdade a cada desmontagem. É uma tela
+               admin-only, o dado nunca foi persistido (reabrir e preencher
+               de novo resolve), e nenhum dos 3 tem confirmação de descarte
+               — registrado como tradeoff aceito, não como algo a proteger
+               nesta issue. -->
+          ${this.aba === 'estudos' ? html`
+            <urbi-hospedeiro slot="estudos">${this._renderEstudos()}</urbi-hospedeiro>` : nothing}
+          ${this.aba === 'terrenos' ? html`
+            <urbi-hospedeiro slot="terrenos">${this._renderTerrenos()}</urbi-hospedeiro>` : nothing}
+          ${this.aba === 'benchmark' ? html`
           <urbi-hospedeiro slot="benchmark">
             <viabilidade-config-benchmarks
               .somenteLeitura=${urbiVerso.contexto()?.nivel !== 'admin'}
             ></viabilidade-config-benchmarks>
-          </urbi-hospedeiro>
+          </urbi-hospedeiro>` : nothing}
+          ${this.aba === 'curvas' ? html`
           <urbi-hospedeiro slot="curvas">
             <viabilidade-config-curvas></viabilidade-config-curvas>
-          </urbi-hospedeiro>
+          </urbi-hospedeiro>` : nothing}
+          ${this.aba === 'regioes' ? html`
           <urbi-hospedeiro slot="regioes">
             <viabilidade-config-mercado></viabilidade-config-mercado>
-          </urbi-hospedeiro>
+          </urbi-hospedeiro>` : nothing}
         </urbi-abas>
       </urbi-shell-page>
 
