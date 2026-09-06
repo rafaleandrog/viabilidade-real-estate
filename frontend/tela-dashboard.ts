@@ -568,14 +568,17 @@ export class ViabTelaDashboard extends LitElement {
         // Todo botão só-ícone da fila declara `.ariaLabel` — é property
         // binding (`.ariaLabel=`), não atributo: `@property() ariaLabel = ''`
         // em `ui/src/urbi-botao.ts` não tem `attribute:` customizado, então o
-        // atributo gerado por Lit seria `arialabel` (tudo minúsculo), NUNCA
+        // atributo gerado por Lit é `arialabel` (tudo minúsculo), NUNCA
         // `aria-label` — escrever `aria-label="..."` no template marcaria o
         // HOST (inofensivo, ignorado) e deixaria `this.ariaLabel` vazio por
         // dentro, reproduzindo em silêncio o bug de acessibilidade que esta
-        // issue existe para consertar. `docs/ui-urbiverso/primitivos.json`
-        // (o espelho local) nem lista essa prop — está desatualizado em
-        // relação ao SDK 57.0.0 instalado; conferido direto em
-        // `node_modules/@urbiverso/sdk/dist/index.d.ts` e no monorepo (leitura).
+        // issue existe para consertar. Confirmado em
+        // `node_modules/@urbiverso/sdk/dist/index.d.ts` (SDK 57.0.0 instalado),
+        // no monorepo (leitura) e em `docs/ui-urbiverso/primitivos.json`
+        // (`"atributo": "arialabel"` para `ariaLabel` em `urbi-botao`) — este
+        // PR resincronizou esse espelho junto, porque a versão anterior dele
+        // (2026-08-22) ainda não conhecia a prop e o guard de props recusava
+        // `.ariaLabel=` como atributo inexistente.
         id: 'acoes', label: '', alinhamento: 'direita',
         render: (l: any) => html`
           <div class="acoes-linha" style="display:inline-flex;flex-wrap:nowrap;justify-content:flex-end;gap:6px;">
