@@ -6,10 +6,10 @@
 > | | |
 > |---|---|
 > | Fonte | `main` do monorepo `urbiverso/urbiverso` |
-> | SHA | `22ba477a` |
+> | SHA | `ec0e3470` |
 > | Versão do monorepo | `0.53.11` |
-> | Data do commit | 2026-08-22 |
-> | Conteúdo | 29 primitivos · 197 props (incluindo herdadas) · 85 tokens |
+> | Data do commit | 2026-09-06 |
+> | Conteúdo | 28 primitivos · 194 props (incluindo herdadas) · 85 tokens |
 <!-- CARIMBO:FIM -->
 
 ## Por que este diretório existe
