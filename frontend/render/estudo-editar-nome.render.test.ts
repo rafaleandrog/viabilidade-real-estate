@@ -31,13 +31,16 @@ const pular = await motivoParaPular();
  * `aba` de `viab-tela-preliminar` não tem como ser forçado a um estado vazio:
  * qualquer valor fora de premissas/proforma/graficos/apelo é NORMALIZADO de
  * volta para `'premissas'` (`tela-preliminar.ts` — "URLs desconhecidas caem
- * em 'premissas'"). A página real de Premissas sobe atrás do modal, e ela já
- * tem um transbordo de CAIXA PRÉ-EXISTENTE em `div.layout` a 600/900px —
- * nada desta issue o toca, e nenhum caso de render mediu esta tela até agora,
- * que é por isso que ninguém sabia. Asserir sobre a página inteira faria este
- * caso nascer vermelho por um defeito de outra issue (candidato a issue
- * própria, fora deste PR); a saída fácil (afrouxar a asserção) apagaria
- * também o que este caso existe para medir: o MODAL.
+ * em 'premissas'"). A página real de Premissas sobe atrás do modal.
+ *
+ * Até a #686, ela tinha um transbordo de CAIXA PRÉ-EXISTENTE em `div.layout`
+ * a 600/900px — este caso foi o primeiro a medir aquela tela, e foi assim que
+ * o defeito apareceu (documentado, não consertado, naquele momento: fora do
+ * escopo desta issue #678). A #686 consertou o defeito (`tela-preliminar.ts`,
+ * `.conteudo`/`.nav-col`); as duas asserções logo abaixo que eram só `nota`
+ * de console viraram asserção de verdade por isso. O escopo ao MODAL desta
+ * função continua existindo — não porque a página de baixo tenha um defeito
+ * conhecido, mas porque é o próprio motivo deste caso existir.
  */
 function noModal(a: Achados, lente: 'transbordoDeCaixa' | 'transbordoDeTexto'): string[] {
   const dentro: string[] = [];
@@ -97,23 +100,25 @@ test('Modal de renomear (cabeçalho do estudo): campo, linha de apoio e ações 
   assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 
-  // O documento rola por causa da página de Premissas atrás do modal (ver
-  // `noModal`, acima) — registrado, não asserido, pelo mesmo motivo.
+  // #686 consertou o transbordo de CAIXA pré-existente da página de
+  // Premissas atrás do modal (ver o comentário de `noModal`, acima) — agora
+  // são asserção de verdade, não só nota de console. `larguraComOverflowDeDocumento`
+  // e `transbordoDeCaixa` são geometria pura (não dependem de fonte).
   const doc = larguraComOverflowDeDocumento(a);
-  if (doc.length > 0) {
-    console.log(`  nota: documento rolou em ${doc.join(', ')} — página de Premissas atrás do modal, defeito pré-existente não desta issue.${relato(a)}`);
-  }
+  assert.deepEqual(doc, [], 'o documento rolou horizontalmente — a página de Premissas atrás do modal voltou a transbordar' + relato(a));
 
-  // Transbordo de TEXTO fora do modal e transbordo de CAIXA global: mesma
-  // ressalva de `tabela-fluxo-cenarios.render.test.ts` — registrados, não
-  // asseridos, para não plantar um teste que muda de veredito com a fonte da
-  // máquina nem exigir o defeito pré-existente da página de baixo.
-  const textoFora = contar(a, 'transbordoDeTexto') - noModal(a, 'transbordoDeTexto').length;
   const caixaGlobal = contar(a, 'transbordoDeCaixa');
-  if (textoFora > 0 || caixaGlobal > 0) {
+  assert.equal(caixaGlobal, 0, 'transbordo de CAIXA na página (fora do modal) — a página de Premissas atrás do modal voltou a transbordar' + relato(a));
+
+  // Transbordo de TEXTO fora do modal continua só NOTA — mesma ressalva de
+  // `tabela-fluxo-cenarios.render.test.ts`: depende da métrica de glifo da
+  // fonte instalada na máquina, que este harness não controla (ver o
+  // FINGERPRINT DE FONTE do próprio `render-check.mjs`).
+  const textoFora = contar(a, 'transbordoDeTexto') - noModal(a, 'transbordoDeTexto').length;
+  if (textoFora > 0) {
     console.log(
-      `  nota: ${caixaGlobal} transbordo(s) de CAIXA na página (0 no modal) e ${textoFora} de TEXTO fora do modal `
-        + '— página de Premissas atrás do modal, defeito pré-existente não desta issue.',
+      `  nota: ${textoFora} transbordo(s) de TEXTO fora do modal `
+        + '— depende da fonte da máquina, não asserido.',
     );
   }
 });
