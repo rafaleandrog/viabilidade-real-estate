@@ -2,7 +2,7 @@
 
 App UrbiVerso para análise econômico-financeira de empreendimentos imobiliários (**Loteamento** e **Incorporação**). Substitui planilhas dispersas por uma aplicação centralizada com cálculos automáticos, indicadores padronizados, comparação de cenários, análise de sensibilidade e avaliação de apelo comercial assistida por IA.
 
-Este repositório contém o código-fonte da app. Ele **não é** o monorepo do UrbiVerso — é um repositório de app própria, que é empacotada como tarball e instalada em qualquer instância UrbiVerso pela UI admin.
+Este repositório contém o código-fonte da app. Ele **não é** o monorepo do UrbiVerso — é um repositório de app própria própria, que é empacotada como tarball e instalada em qualquer instância UrbiVerso pela UI admin.
 
 ---
 
