@@ -115,6 +115,10 @@ export const caso = {
     // novo: cadeia de áreas da gleba e a cascata do resultado (Rodada 12).
     { seletor: 'viab-grafico-cadeia-areas', minimo: 1 },
     { seletor: 'viab-grafico-cascata', minimo: 1 },
+    // Faixa de consistência (handoff §4.5) — o mesmo loteamento de
+    // `alocacao-areas-loteamento.ts` cai no ramo "sobra". Asserção direta,
+    // não só via declaração ociosa (achado da revisão nativa, L3, PR #707).
+    { seletor: 'urbi-banner', minimo: 1 },
   ],
   aceitaNaoReproduzido: [
     // O espelho não desenha o ponteiro do velocímetro nem a legenda das faixas

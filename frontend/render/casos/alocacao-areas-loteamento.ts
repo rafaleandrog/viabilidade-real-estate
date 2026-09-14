@@ -74,6 +74,12 @@ export const caso = {
     // Rodada 12 — a cascata do resultado substituiu a pizza de custos e o
     // gráfico de barras Receita×Custos (achado 2.3 da auditoria).
     { seletor: 'viab-grafico-cascata', minimo: 1 },
+    // Faixa de consistência (handoff §4.5) — este fixture cai no ramo
+    // "sobra" (ver `aceitaNaoReproduzido` abaixo). Sem esta linha, apagar a
+    // chamada a `_renderConsistencia()` só seria pego indiretamente (a
+    // declaração de `urbi-banner.variante` viraria "ociosa") — achado da
+    // revisão nativa (L3, PR #707): a asserção direta é mais robusta.
+    { seletor: 'urbi-banner', minimo: 1 },
   ],
   aceitaNaoReproduzido: [
     'urbi-card.titulo',

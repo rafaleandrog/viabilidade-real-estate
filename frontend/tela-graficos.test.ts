@@ -65,15 +65,26 @@ test('#574: a aba Gráficos CHAMA calcularCascata para as duas cadeias (fiação
     'tela-graficos.ts importa calcularCascata mas não a CHAMA — apagar a chamada e voltar à ' +
     'leitura dos campos aposentados deixaria a suíte inteira verde sem este teste.',
   );
+  // ⚠️ A ÂNCORA é o PAR constante+resolvedor-de-estado, não a presença solta
+  // da string: as duas chaves aparecem juntas na linha de import
+  // (`CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO`), e `estadosCascata*DoEstudo`
+  // idem — um `includes()` de cada lado, solto, continuaria `true` mesmo se
+  // os dois RAMOS trocassem de cadeia entre si (Loteamento resolvendo com
+  // `CASCATA_INCORPORACAO` e vice-versa: as quatro strings continuam
+  // presentes no arquivo, só a combinação por ramo é que muda). Prender o
+  // par na MESMA chamada é o que amarra a constante ao resolvedor certo —
+  // achado real da revisão nativa (T4, PR #707).
   assert.ok(
-    FONTE.includes('CASCATA_LOTEAMENTO'),
-    'tela-graficos.ts parou de referenciar CASCATA_LOTEAMENTO — a cadeia de áreas do Loteamento ' +
-    'ficaria sem a chave que resolve a cascata correta.',
+    /calcularCascata\(CASCATA_LOTEAMENTO,\s*estadosCascataLoteamentoDoEstudo\(/.test(FONTE),
+    'tela-graficos.ts parou de chamar calcularCascata(CASCATA_LOTEAMENTO, ' +
+    'estadosCascataLoteamentoDoEstudo(...), ...) — a cadeia de áreas do Loteamento passaria a ' +
+    'resolver com a definição ou o estado errado, sem que a suíte acuse.',
   );
   assert.ok(
-    FONTE.includes('CASCATA_INCORPORACAO'),
-    'tela-graficos.ts parou de referenciar CASCATA_INCORPORACAO — a cadeia de áreas da ' +
-    'Incorporação ficaria sem a chave que resolve a cascata correta.',
+    /calcularCascata\(CASCATA_INCORPORACAO,\s*estadosCascataIncorporacaoDoEstudo\(/.test(FONTE),
+    'tela-graficos.ts parou de chamar calcularCascata(CASCATA_INCORPORACAO, ' +
+    'estadosCascataIncorporacaoDoEstudo(...), ...) — a cadeia de áreas da Incorporação passaria ' +
+    'a resolver com a definição ou o estado errado, sem que a suíte acuse.',
   );
 });
 
