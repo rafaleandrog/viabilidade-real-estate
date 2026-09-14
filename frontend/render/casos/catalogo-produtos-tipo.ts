@@ -67,7 +67,8 @@ export const caso = {
     'urbi-kpi.variante',
     // #573: as 2 linhas somam 7.160 m² alocados contra os 4.960 m²
     // registrados do `ESTUDO` base — excesso, então o indicador de área
-    // alocada desenha o `urbi-banner` do aviso, que liga `variante="erro"`.
+    // alocada desenha o `urbi-banner` do aviso, que liga `variante="alerta"`
+    // (#693; era "erro").
     // Efeito colateral esperado de o indicador ler o MESMO estudo/catálogo
     // que este caso já montava para outro propósito (#565) — mesma natureza
     // de `urbi-kpi.variante` acima.
