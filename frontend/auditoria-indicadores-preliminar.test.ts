@@ -138,8 +138,9 @@ test('2.5 — roiPct/margemLiquidaPct/custoObrasVgvPct são null (não 0) quando
 test('2.6 — as metas padrão não reprovam um estudo saudável em massa', () => {
   for (const entrada of [LOT, INCORP]) {
     const p = calcularProforma(entrada);
-    assert.ok(p.margemLiquidaPct !== null && p.margemLiquidaPct > 0, `margemLiquidaPct=${p.margemLiquidaPct}`);
-    assert.ok(p.custoObrasVgvPct !== null && p.custoObrasVgvPct < 100, `custoObrasVgvPct=${p.custoObrasVgvPct}`);
+    assert.ok(p.margemLiquidaPct !== null && p.margemLiquidaPct >= 20, `margemLiquidaPct=${p.margemLiquidaPct} (meta ≥20)`);
+    assert.ok(p.roiPct !== null && p.roiPct >= 15, `roiPct=${p.roiPct} (meta ≥15)`);
+    assert.ok(p.custoObrasVgvPct !== null && p.custoObrasVgvPct <= 35, `custoObrasVgvPct=${p.custoObrasVgvPct} (meta ≤35)`);
   }
 });
 

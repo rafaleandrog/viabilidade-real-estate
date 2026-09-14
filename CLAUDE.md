@@ -592,7 +592,7 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
     porque sem comentário alguém investiga.
 
     > ⚠️ **Este achado estava marcado "ainda aberto", e não está mais — corrigido e medido na
-    > Rodada 12 (2026-09-14).** `frontend/tela-dashboard.ts:157,352` já passam `p.roiPct` DIRETO,
+    > Rodada 12 (2026-09-14).** `frontend/tela-dashboard.ts:157,361` já passam `p.roiPct` DIRETO,
     > sem `?? 0`; `proforma.ts:719-720` garante `roiPct = null` (não `0`) quando
     > `investimentoTotal ≤ 0`. Confirmado por teste de regressão em
     > `frontend/auditoria-indicadores-preliminar.test.ts` (caso 2.5), não por leitura do código —
