@@ -828,6 +828,20 @@ export function roiParaFaixa(p: Proforma): number | null {
 }
 
 /**
+ * VGV bruto — antes da dedução de permuta física, a base que o handoff de
+ * KPIs/gráficos chama "VGV de tabela" (Rodada 12). É a mesma identidade que
+ * já vivia repetida em três call sites (`tela-proforma.ts:431,675`,
+ * `exportar.ts:168`, todos citando a MESMA fonte única, `exportar.ts:39`
+ * antes desta extração) — reembalada aqui como função pura, sem mudar o
+ * cálculo: `vgv` (líquido de permuta) + as duas permutas físicas efetivas
+ * reconstrói a base sem estourá-la, porque as duas parcelas já são as
+ * EFETIVAS (pós-cap), não as solicitadas.
+ */
+export function vgvBrutoDeProforma(p: Proforma): number {
+  return p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
+}
+
+/**
  * Preço Sugerido/m² (§1): menor preço de venda por m² para o resultado final (%)
  * atingir o piso do benchmark. Valor único (Incorporação usa o mesmo preço para
  * residencial e não residencial na busca). Resolve por bisseção sobre o preço.
