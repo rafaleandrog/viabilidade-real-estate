@@ -87,25 +87,29 @@ test('2.2 — ROI e Margem sobre VGV NÃO são redundantes pela identidade do ha
   }
 });
 
-// ── 2.3 — medidor duplicado (achado real, documentado; corrigido na PR seguinte da fila) ──
+// ── 2.3 — medidor duplicado (achado real, CONSERTADO nesta mesma rodada) ────
 //
-// ⚠️ Este teste documenta um BUG hoje presente em `tela-graficos.ts`
-// (`_renderMedidores` passa `resultado_final: p.margemLiquidaPct` — o MESMO
-// valor de `margem_liquida`, então os dois medidores de benchmark plotam o
-// mesmo número sob rótulos diferentes). A PR seguinte da fila remove esse
-// wiring; quando isso acontecer, este teste precisa ser reescrito para
-// confirmar a remoção (ex.: `resultado_final` sai do inventário de campos
-// passados), não para continuar provando a duplicata.
-test('2.3 — ACHADO: "Resultado final" e "Margem sobre VGV" hoje resolvem para o MESMO valor no medidor de benchmark', () => {
+// Até esta PR, `tela-graficos.ts` (`_renderMedidores`) passava
+// `resultado_final: p.margemLiquidaPct` — o MESMO valor de `margem_liquida`,
+// então os dois medidores de benchmark plotavam o mesmo número sob rótulos
+// diferentes. O conserto removeu essa chave da chamada a
+// `resolverIndicadoresBenchmark`; este teste confirma que, sem ela,
+// `resultado_final` é DESCARTADO (não aparece como medidor duplicado) — o
+// mesmo comportamento que `eficiencia_aproveitamento` já tem no Resumo do
+// Avançado, quando a tela não calcula aquele valor.
+test('2.3 — CONSERTADO: sem o wiring, "Resultado final" é descartado, não duplica "Margem sobre VGV"', () => {
   const p = calcularProforma(LOT);
   const benchmarks: BenchmarkCampo[] = [{ campo: 'margem_liquida' }, { campo: 'resultado_final' }];
-  const { exibiveis } = resolverIndicadoresBenchmark(benchmarks, {
+  const { exibiveis, descartados } = resolverIndicadoresBenchmark(benchmarks, {
     margem_liquida: p.margemLiquidaPct,
-    resultado_final: p.margemLiquidaPct,
+    // resultado_final NÃO é passado — é o conserto: tela-graficos.ts:254
+    // parou de mapeá-lo.
   });
-  const margem = exibiveis.find((m) => m.campo === 'margem_liquida');
-  const resultadoFinal = exibiveis.find((m) => m.campo === 'resultado_final');
-  assert.equal(margem?.valor, resultadoFinal?.valor);
+  assert.equal(exibiveis.length, 1);
+  assert.equal(exibiveis[0]?.campo, 'margem_liquida');
+  const descarte = descartados.find((d) => d.campo === 'resultado_final');
+  assert.ok(descarte, 'resultado_final deveria aparecer como descartado, com motivo');
+  assert.equal(descarte!.motivo, 'indicador existe, mas esta tela não calcula o valor');
 });
 
 // ── 2.4 — mesmo rótulo, valores diferentes em telas diferentes ──────────

@@ -17,7 +17,7 @@ import {
 
 const pular = await motivoParaPular();
 
-test('Loteamento: os 5 medidores (4 comuns + eficiência de aproveitamento) chegam à tela', { skip: pular ?? false }, async () => {
+test('Loteamento: os 4 medidores (3 comuns + eficiência de aproveitamento) chegam à tela', { skip: pular ?? false }, async () => {
   const a = await verificarRender({ caso: 'medidor-eficiencia-loteamento' });
 
   assert.equal(contar(a, 'transbordoDeCaixa'), 0, 'alguma caixa filha ultrapassou o pai' + relato(a));

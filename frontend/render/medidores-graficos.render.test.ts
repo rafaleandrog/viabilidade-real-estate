@@ -15,7 +15,7 @@ import {
 
 const pular = await motivoParaPular();
 
-test('Medidores vs. benchmark: os 4 indicadores e o aviso de fora da escala chegam à tela', { skip: pular ?? false }, async () => {
+test('Medidores vs. benchmark: os 3 indicadores wireados e o aviso de fora da escala chegam à tela', { skip: pular ?? false }, async () => {
   const a = await verificarRender({ caso: 'medidores-graficos' });
 
   assert.equal(contar(a, 'transbordoDeCaixa'), 0, 'alguma caixa filha ultrapassou o pai' + relato(a));
