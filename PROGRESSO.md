@@ -4,6 +4,27 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #693 · Aviso de excesso de área em Produtos deixa de parecer bloqueio (2026-09-14)
+
+O indicador de área alocada (`frontend/tela-premissas.ts:_renderAreaAlocada`, #573) nunca bloqueou
+o salvamento — `_salvar` só lê `validarObrigatorios`, que não conhece
+`diferencaAreaAlocada`/`excesso` — mas o estado de excesso usava `variante="erro"` (vermelho) no
+KPI "Diferença" e no `<urbi-banner>`, o que lia como proibição. Correção: os dois estados não
+neutros (excesso e sobra) agora usam `variante="alerta"` igualmente, e o texto do banner deixa
+explícito que é informativo. Mesmo componente cobre Preliminar, Incorporação e Loteamento — sem
+replicação necessária. Nenhuma mudança de cálculo (`proforma.ts`) nem de comportamento de
+salvamento.
+
+**Achado do Codex na revisão do PR #695, corrigido na mesma rodada.** A primeira redação do texto
+do banner dizia, sem qualificar, que "a área e o preço usados no cálculo vêm do catálogo de
+Produtos" — falso para Incorporação com custo de construção/decoração por m² e para Loteamento com
+infraestrutura por m²: `construcaoLegada`/`decoracao`/`infraestruturaLegada`
+(`frontend/proforma.ts:650-661`) continuam multiplicando por `areaPrivativa`/`areaVendavel`, a área
+REGISTRADA em Terreno & Áreas, não pela soma do catálogo. O texto final qualifica a afirmação: o
+catálogo manda no VGV/preço de venda; a área registrada continua sendo a base dos custos por m².
+
+---
+
 ## Incidente — a app parou inteira na instância, e não era perda de dados (2026-09-04)
 
 **Sintoma relatado:** nenhuma tela carregava dado, não dava para criar estudo, e os estudos que
