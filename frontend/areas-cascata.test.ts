@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calcularCascata, deficitsDaCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO,
-  estadosCascataLoteamentoDoEstudo, itensAlocacaoGleba, modoMestreDoSchema,
+  estadosCascataLoteamentoDoEstudo, estadosCascataIncorporacaoDoEstudo, etapasCadeiaAreas,
+  itensAlocacaoGleba, modoMestreDoSchema,
   type EstadoLinha,
 } from './areas-cascata.js';
 import { calcularProforma } from './proforma.js';
@@ -343,4 +344,48 @@ test('#612: nenhum caminho do motor consome área vendável negativa (critério 
   for (const i of itensAlocacaoGleba(estudoEstourado, 10_000)) {
     assert.ok(i.v >= 0, `fatia "${i.l}" negativa: ${i.v}`);
   }
+});
+
+// ── Rodada 12 (handoff de KPIs/gráficos §4.4) — cadeia de áreas ────────────
+
+test('etapasCadeiaAreas: Loteamento seleciona poligonal → parcelável → líquida → ALV, nessa ordem', () => {
+  const linhas = calcularCascata(CASCATA_LOTEAMENTO, ESTADOS_MACEDO, 90402.31);
+  const cadeia = etapasCadeiaAreas(linhas, true);
+  assert.deepEqual(cadeia.map((l) => l.id), ['poligonal', 'parcelavel', 'liquida', 'alv']);
+  // Cada estágio da cadeia é ≤ o anterior (subconjunto físico) — decrescente
+  // ou igual, nunca crescente.
+  for (let i = 1; i < cadeia.length; i++) {
+    assert.ok(cadeia[i].m2 <= cadeia[i - 1].m2 + 0.01, `${cadeia[i].id} (${cadeia[i].m2}) > ${cadeia[i - 1].id} (${cadeia[i - 1].m2})`);
+  }
+  // Os valores batem com a cascata resolvida diretamente (reembalagem, sem recálculo).
+  const porId = new Map(linhas.map((l) => [l.id, l.m2]));
+  for (const l of cadeia) assert.equal(l.m2, porId.get(l.id));
+});
+
+test('estadosCascataIncorporacaoDoEstudo + etapasCadeiaAreas: Incorporação seleciona terreno → construída total → privativa total', () => {
+  const estudo = {
+    area_pvt_r_fechada: 1_000, area_pvt_r_aberta: 200,
+    area_pvt_nr_fechada: 300, area_pvt_nr_aberta: 0,
+    area_comum_total: 500,
+  };
+  const estados = estadosCascataIncorporacaoDoEstudo(estudo);
+  assert.deepEqual(estados, {
+    pvt_r_fechada: { modo: 'm2', valor: 1_000 },
+    pvt_r_aberta: { modo: 'm2', valor: 200 },
+    pvt_nr_fechada: { modo: 'm2', valor: 300 },
+    pvt_nr_aberta: { modo: 'm2', valor: 0 },
+    comum: { modo: 'm2', valor: 500 },
+  });
+  const linhas = calcularCascata(CASCATA_INCORPORACAO, estados, 5_000);
+  const cadeia = etapasCadeiaAreas(linhas, false);
+  assert.deepEqual(cadeia.map((l) => l.id), ['terreno', 'construida_total', 'privativa_total']);
+  const porId = new Map(cadeia.map((l) => [l.id, l.m2]));
+  assert.equal(porId.get('terreno'), 5_000);
+  assert.equal(porId.get('privativa_total'), 1_500); // 1000+200+300+0
+  assert.equal(porId.get('construida_total'), 2_000); // 1500 (privativa) + 500 (comum)
+});
+
+test('estadosCascataIncorporacaoDoEstudo: campo ausente/nulo vira 0, não NaN', () => {
+  const estados = estadosCascataIncorporacaoDoEstudo(null);
+  for (const linhaId of Object.keys(estados)) assert.equal(estados[linhaId].valor, 0);
 });
