@@ -52,9 +52,9 @@ export const caso = {
     'urbi-botao.pequeno',
     'urbi-botao.icone',
     'urbi-botao.variante',
-    // Os 3 `urbi-kpi` do indicador ligam `variante` (o 3º vira "erro" em
-    // excesso) — mesma natureza de `aproveitamento-coeficiente-excedido.ts`.
-    // E o `urbi-banner` do aviso liga `variante="erro"` — mesma natureza.
+    // Os 3 `urbi-kpi` do indicador ligam `variante` (o 3º vira "alerta" em
+    // excesso, #693) — mesma natureza de `aproveitamento-coeficiente-excedido.ts`.
+    // E o `urbi-banner` do aviso liga `variante="alerta"` — mesma natureza.
     'urbi-kpi.variante',
     'urbi-banner.variante',
   ],
