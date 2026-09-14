@@ -586,10 +586,18 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
     cima**, porque a frase é plausível. Não era a mesma: a guarda testa `vgv`, mas o denominador de
     `roiPct` é `investimentoTotal`, ortogonal. Medido executando o motor: catálogo precificado sem
     custo lançado (o estado *default* de estudo novo) → `vgv = 10.000.000`, `investimentoTotal = 0`,
-    passa a guarda, e o Painel publica **ROI 0,0%** (achado no PR 649, ainda aberto). Defesa: quando um comentário disser "mesma
+    passa a guarda, e o Painel publicava **ROI 0,0%** (achado no PR 649). Defesa: quando um comentário disser "mesma
     convenção que X", **confira que o PREDICADO é o mesmo**, não que a forma do código é. Dois
     `?? 0` idênticos podem ter garantias opostas — e a frase falsa é **pior que a ausência dela**,
     porque sem comentário alguém investiga.
+
+    > ⚠️ **Este achado estava marcado "ainda aberto", e não está mais — corrigido e medido na
+    > Rodada 12 (2026-09-14).** `frontend/tela-dashboard.ts:157,361` já passam `p.roiPct` DIRETO,
+    > sem `?? 0`; `proforma.ts:719-720` garante `roiPct = null` (não `0`) quando
+    > `investimentoTotal ≤ 0`. Confirmado por teste de regressão em
+    > `frontend/auditoria-indicadores-preliminar.test.ts` (caso 2.5), não por leitura do código —
+    > é exatamente a defesa que este item pede: medir, não assumir. Se uma sessão futura achar o
+    > bug de volta, é fato novo para apurar e registrar aqui, não continuação deste parágrafo.
 12. **"Declarei que não medi" não é o mesmo que medir.** Atestei `bloqueantes=0` **duas vezes** no
     mesmo PR registrando com honestidade que a premissa era *"herdada, não medida"* — e a honestidade
     da declaração criou aparência de rigor enquanto o defeito passava. Um portão com uma nota anexada
