@@ -67,6 +67,13 @@ export class ViabTerrenoNucleo extends LitElement {
   // o seletor, só desliga o filtro com um aviso.
   @state() private _idsRegularizacao: Set<number> | null = null;
   @state() private _regularizacaoIndisponivel = false;
+  // Promise em voo de `_carregarIdsRegularizacao()`, para as duas corridas do
+  // primeiro mount (connectedCallback + updated()) ESPERAREM A MESMA busca em
+  // vez de disparar duas e escrever `_idsRegularizacao`/`_regularizacaoIndisponivel`
+  // sem guarda de sequência — a mais lenta das duas sobrescrevia o resultado
+  // da mais rápida, mesmo já descartada pelo `_cargaSeq`. Achado do Codex no
+  // PR #697.
+  private _idsRegularizacaoPromise: Promise<void> | null = null;
 
   static styles = [estiloConteudo, css`
     .lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -87,7 +94,17 @@ export class ViabTerrenoNucleo extends LitElement {
     this._carregar();
   }
   updated(ch: Map<string, unknown>) {
-    if (ch.has('estudo')) this._carregar();
+    // `1`, sempre — o ramo lote ignora este argumento (reseta o próprio
+    // cursor em `_carregar`), mas o ramo gleba usa `paginaGleba` como
+    // default de `_carregar()`. Sem o `1` explícito, trocar de estudo
+    // enquanto o seletor de gleba está na página 3 pedia a página 3 do
+    // estudo NOVO em vez de voltar para a 1.
+    if (ch.has('estudo')) this._carregar(1);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._buscaDebounce) { clearTimeout(this._buscaDebounce); this._buscaDebounce = null; }
   }
 
   private get _ehLoteamento(): boolean {
@@ -122,7 +139,10 @@ export class ViabTerrenoNucleo extends LitElement {
           .filter((o: any) => !usados.has(Number(o.id)))
           .map((o: any) => ({ valor: String(o.id), rotulo: o.id_legivel || `#${o.id}` }));
       } else {
-        if (this._idsRegularizacao === null) await this._carregarIdsRegularizacao();
+        if (this._idsRegularizacao === null) {
+          this._idsRegularizacaoPromise ??= this._carregarIdsRegularizacao();
+          await this._idsRegularizacaoPromise;
+        }
         if (seq !== this._cargaSeq) return;
         this._loteCursor = 1;
         this.opcoes = [];
@@ -159,9 +179,16 @@ export class ViabTerrenoNucleo extends LitElement {
       this._idsRegularizacao = ids;
       this._regularizacaoIndisponivel = false;
     } catch {
-      // Não bloqueia o seletor de lote por causa disto — só desliga o filtro.
-      this._idsRegularizacao = new Set();
+      // Não bloqueia o seletor de lote por causa disto — só desliga o filtro
+      // NESTA passada. Não grava um Set aqui: `_idsRegularizacao` fica
+      // `null`, que é o mesmo gatilho de "ainda não carregado" usado em
+      // `_carregar()` — uma falha transitória (rede, 5xx) não trava o filtro
+      // desligado para sempre; a próxima `_carregar()` (troca de estudo,
+      // por exemplo) tenta de novo, em vez de ficar presa ao resultado da
+      // primeira tentativa pela vida inteira do componente.
       this._regularizacaoIndisponivel = true;
+    } finally {
+      this._idsRegularizacaoPromise = null;
     }
   }
 
@@ -176,13 +203,27 @@ export class ViabTerrenoNucleo extends LitElement {
     if (opts.reiniciar) {
       this._loteCursor = 1;
       this.opcoes = [];
+      // Some com "Carregar mais" enquanto a página 1 da busca nova está em
+      // voo — sem isto, o botão da busca ANTERIOR fica visível e clicável
+      // nessa janela; um clique nele dispara `_carregarMaisLotes()` lendo o
+      // MESMO `_loteCursor` (1) e o MESMO `seq` da busca em andamento, e as
+      // duas chamadas pedem a página 1 duas vezes, duplicam candidatos e
+      // avançam o cursor duas vezes — a "próxima" página pula a 2. Achado do
+      // Codex no PR #697.
+      this._loteTemMais = false;
     }
     const lista = await listarLotesNucleo(this._busca, this._loteCursor, POR_PAGINA_LOTE);
     if (seq !== this._cargaSeq) return;
     const dados: any[] = lista?.dados ?? [];
     this._loteTotalBruto = Number(lista?.total) || 0;
     const totalPaginas = Number(lista?.paginas) || 1;
-    this._loteTemMais = dados.length === POR_PAGINA_LOTE && this._loteCursor < totalPaginas;
+    // `<`, não `===` contra `POR_PAGINA_LOTE` — o Núcleo clampeia
+    // `por_pagina` acima do teto silenciosamente (docs/shell/nucleo.md §
+    // Paginação); se o teto real cair abaixo do que este arquivo pede, uma
+    // igualdade estrita nunca mais bateria e "tem mais" ficaria preso em
+    // falso para sempre, mesmo havendo mais páginas. Mesmo critério de
+    // `_carregarIdsRegularizacao` (linha acima no arquivo).
+    this._loteTemMais = this._loteCursor < totalPaginas;
     const usados = new Set(this._vinculos.map((v) => Number(v.imovel_nucleo_id)));
     const idsReg = this._idsRegularizacao ?? new Set<number>();
     const novas = dados
@@ -216,7 +257,13 @@ export class ViabTerrenoNucleo extends LitElement {
       // carregamento inicial poderia chegar depois e sobrescrever o
       // resultado da busca do usuário.
       const seq = ++this._cargaSeq;
-      void this._carregarLotes({ reiniciar: true, seq });
+      // Sem `.catch`, uma rejeição de `/lotes` aqui virava rejeição não
+      // tratada: `reiniciar:true` já zerou `this.opcoes`, e sem aviso nem
+      // novo estado o seletor ficava vazio, em silêncio. Achado do Codex no
+      // PR #697 — mesmo tratamento que `_carregarMaisLotes` já tinha.
+      this._carregarLotes({ reiniciar: true, seq }).catch((e: any) => {
+        urbiVerso.notificar(e?.message || 'Erro ao buscar lotes', 'erro');
+      });
     }, DEBOUNCE_BUSCA_MS);
   }
 
