@@ -77,6 +77,33 @@ const CAMPOS_APOSENTADOS = new Set([
   'deflator_area_aberta_pct',
 ]);
 
+// #694: campos que continuam chegando `null` no payload inteiro que
+// `tela-premissas.ts` manda a cada "Salvar premissas" (ela copia o registro
+// inteiro do estudo e envia quase tudo) — mas que nenhuma tela de Premissas
+// de fato edita. `null` numa coluna `decimal` dispara "Campo X deve ser um
+// número" no validador do shell, mesmo sendo nullable — mesmo mecanismo que
+// motivou `CAMPOS_SOMENTE_AVANCADO`, mas aqui o campo é órfão em QUALQUER
+// nível de análise, não só Preliminar, então não pode reusar aquele filtro.
+//
+// `gabarito_maximo` nunca teve controle de UI em lugar nenhum do app, nem
+// default no `schema.json` — é sempre `null`. `ret_pct` tem controle de UI de
+// verdade, mas em `backend/rotas/avancado.ts` (`GET/PATCH
+// /estudos/:id/avancado/parametros`), não em Premissas; ele viaja sem querer
+// no payload inteiro e dispara o mesmo erro quando a coluna está `null`
+// (estudo criado antes do default da migração aplicar).
+//
+// ⚠️ **Por que isto NÃO é a inversão genérica** ("omitir todo campo fora do
+// conjunto que o formulário edita quando vier `null`") que a armadilha 14 do
+// CLAUDE.md prescreveria numa segunda ocorrência da mesma classe: medido em
+// `frontend/tela-premissas.ts:_editarCustoUnidade`, o app grava `null` DE
+// PROPÓSITO num campo fora de `TODOS_NUM` (`cu.campoCanonico` — ex.
+// `construcao_valor_canonico`) quando o usuário limpa um custo por unidade. A
+// inversão genérica omitiria essa escrita legítima. Por isso a lista aqui é
+// nomeada, como `CAMPOS_SOMENTE_AVANCADO` — o padrão certo quando "campo
+// tocado" não é decidível estaticamente pelo nome, só pela intenção de quem
+// escreve.
+const CAMPOS_OMITIR_SE_NULO = new Set(['gabarito_maximo', 'ret_pct']);
+
 // Nunca via PATCH: identidade/estado/autor gerados, colunas de soft-delete
 // geridas pelo framework (removido_em/removido_por_id — DADOS_CAMPO_RESERVADO se
 // repassadas a req.dados.atualizar). tipo_empreendimento só em rascunho.
@@ -167,6 +194,11 @@ export function montarPatchEstudo(
     // Campos exclusivos do Avançado nunca chegam ao validador quando o estudo
     // é Preliminar (valores null disparariam "deve ser um número" no shell).
     if (estudo?.nivel_analise === 'preliminar' && CAMPOS_SOMENTE_AVANCADO.has(k)) continue;
+    // #694: campos órfãos/legados — omitidos só quando NULO, em qualquer
+    // nível de análise. Um valor de verdade (usuário preencheu, ou o
+    // endpoint dedicado de `ret_pct` gravou algo) continua indo ao PATCH
+    // normalmente; nenhuma escrita legítima muda de comportamento.
+    if (CAMPOS_OMITIR_SE_NULO.has(k) && (v === null || v === undefined)) continue;
     if (k === 'tipo_empreendimento' && estudo?.status !== 'rascunho') {
       return { http: 422, codigo: 'TIPO_TRAVADO', mensagem: 'tipo_empreendimento só pode mudar em Rascunho' };
     }

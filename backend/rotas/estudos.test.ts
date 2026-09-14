@@ -254,6 +254,45 @@ test('PATCH: campo so-do-Avancado e filtrado em estudo Preliminar', () => {
   assert.deepEqual(montarPatchEstudo({ taxa_desconto_aa: 12 }, AVANCADO), { dados: { taxa_desconto_aa: 12 } });
 });
 
+// ── #694: gabarito_maximo/ret_pct nulos nao disparam "deve ser um numero" ──
+
+test('#694: gabarito_maximo e ret_pct nulos sao omitidos, em QUALQUER nivel', () => {
+  // Ao contrario de CAMPOS_SOMENTE_AVANCADO, este filtro nao depende de
+  // nivel_analise: os dois campos sao orfaos em Preliminar E em Avancado.
+  assert.deepEqual(
+    montarPatchEstudo({ nome: 'x', gabarito_maximo: null, ret_pct: null }, PRELIMINAR),
+    { dados: { nome: 'x' } });
+  assert.deepEqual(
+    montarPatchEstudo({ nome: 'x', gabarito_maximo: null, ret_pct: null }, AVANCADO),
+    { dados: { nome: 'x' } });
+});
+
+test('#694: os dois sozinhos e nulos dao NENHUM_CAMPO, nao dados vazios', () => {
+  const r = montarPatchEstudo({ gabarito_maximo: null, ret_pct: null }, PRELIMINAR);
+  assert.equal('codigo' in r && r.codigo, 'NENHUM_CAMPO');
+});
+
+test('#694: um valor de VERDADE em gabarito_maximo/ret_pct continua indo ao PATCH', () => {
+  // O filtro so omite NULO — nao apaga o campo do vocabulario. Precisa
+  // continuar editavel se algum dia ganhar tela, e ret_pct precisa continuar
+  // gravavel por aqui quando vem preenchido (mesmo a UI de verdade sendo o
+  // endpoint dedicado de avancado/parametros).
+  assert.deepEqual(
+    montarPatchEstudo({ gabarito_maximo: 12, ret_pct: 4 }, PRELIMINAR),
+    { dados: { gabarito_maximo: 12, ret_pct: 4 } });
+});
+
+test('#694: o filtro NAO e generico — campo fora da lista nomeada, nulo, continua indo ao PATCH', () => {
+  // A armadilha que a inversao genérica cairia: `tela-premissas.ts` grava
+  // `null` DE PROPOSITO em `*_valor_canonico`/`*_area_canonica`
+  // (`_editarCustoUnidade`, quando o usuario limpa um custo por unidade) para
+  // fora de `TODOS_NUM`. Nenhum desses campos esta em CAMPOS_OMITIR_SE_NULO,
+  // entao continuam indo ao PATCH mesmo nulos.
+  assert.deepEqual(
+    montarPatchEstudo({ construcao_valor_canonico: null }, AVANCADO),
+    { dados: { construcao_valor_canonico: null } });
+});
+
 // ── #609: duplicar copia absolutamente tudo ────────────────────────────────
 //
 // Decisão do autor (2026-08-28), verbatim: "o correto é copiar absolutamente
