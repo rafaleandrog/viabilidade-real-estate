@@ -1,8 +1,11 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$Kpi } from './viab-format.js';
-import { calcularProforma, eficienciaParaFaixa, roiParaFaixa, type Proforma, type ProformaInput } from './proforma.js';
+import { fmtR$Kpi, fmtR$, fmtPctOuIndef } from './viab-format.js';
+import {
+  calcularProforma, eficienciaParaFaixa, roiParaFaixa, vgvBrutoDeProforma,
+  type Proforma, type ProformaInput,
+} from './proforma.js';
 import { itensAlocacaoGleba } from './areas-cascata.js';
 import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
@@ -55,6 +58,30 @@ export class ViabTelaGraficos extends LitElement {
     .medidores { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
     .medidor-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .resultado { margin-top: 12px; }
+    /* Rodada 12 (handoff §3.1) — faixa de 5 KPIs com denominador visível. */
+    .kpis-preliminar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .kpi-card { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .kpi-rotulo {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+    }
+    .kpi-valor {
+      font-size: 20px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+    }
+    .kpi-rodape {
+      font-size: 11px;
+      color: var(--cor-texto-fraco, rgba(255, 255, 255, 0.4));
+    }
   `];
 
   connectedCallback() { super.connectedCallback(); this._init(); }
@@ -98,6 +125,7 @@ export class ViabTelaGraficos extends LitElement {
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
     const p = calcularProforma({ ...this.estudo, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
     return html`
+      ${this._renderKpisPreliminar(p)}
       <div class="graficos">
         <urbi-card titulo="Composição dos custos">
           <urbi-checkbox
@@ -113,6 +141,48 @@ export class ViabTelaGraficos extends LitElement {
       </div>
       ${this._renderAlocacaoAreas(p, lot)}
       ${this._renderMedidores(p)}
+    `;
+  }
+
+  // Rodada 12 (handoff de KPIs/gráficos §3.1) — faixa de 5 KPIs independentes,
+  // cada um com denominador visível no rodapé (requisito, não enfeite). Usa
+  // `urbi-card` (não `urbi-kpi`): o primitivo `urbi-kpi` não tem slot/prop de
+  // rodapé e carrega um bug conhecido de box-model (recorrente em
+  // #176/#262/#326/#352) — `urbi-card` não tem esse risco
+  // (`docs/ui-urbiverso/primitivos.json`).
+  //
+  // #1 e #2 usam `fmtR$Kpi` (sem casas decimais) — a exceção declarada de
+  // card de KPI (#581, `frontend/viab-format.ts:52`); entram no inventário
+  // fechado de `frontend/kpi-casas-decimais.test.ts`. #3–#5 são percentuais
+  // (`fmtPctOuIndef`, 1 casa, "—" quando o denominador é ≤0 — nunca "0,0%").
+  private _renderKpisPreliminar(p: Proforma): TemplateResult {
+    const vgvBruto = vgvBrutoDeProforma(p);
+    const margemVgvTabela = vgvBruto > 0 ? (p.resultado / vgvBruto) * 100 : null;
+    const margemReceitaLiquida = p.receitaLiquida > 0 ? (p.resultado / p.receitaLiquida) * 100 : null;
+    const obraSobreVgvTabela = vgvBruto > 0 ? (p.custoObras / vgvBruto) * 100 : null;
+    const kpis: { rotulo: string; valor: string; rodape: string }[] = [
+      { rotulo: 'VGV do incorporador', valor: fmtR$Kpi(p.vgv), rodape: `VGV de tabela: ${fmtR$(vgvBruto)}` },
+      { rotulo: 'Resultado final', valor: fmtR$Kpi(p.resultado), rodape: 'após indiretos' },
+      { rotulo: 'Margem sobre VGV de tabela', valor: fmtPctOuIndef(margemVgvTabela), rodape: 'base: VGV de tabela' },
+      { rotulo: 'Margem sobre receita líquida', valor: fmtPctOuIndef(margemReceitaLiquida), rodape: 'base: receita líquida' },
+      {
+        rotulo: 'Custo obras / VGV',
+        valor: fmtPctOuIndef(p.custoObrasVgvPct),
+        rodape: `sobre VGV de tabela: ${fmtPctOuIndef(obraSobreVgvTabela)}`,
+      },
+    ];
+    return html`
+      <div class="kpis-preliminar">
+        ${kpis.map((k) => html`
+          <urbi-card>
+            <div class="kpi-card">
+              <span class="kpi-rotulo">${k.rotulo}</span>
+              <span class="kpi-valor">${k.valor}</span>
+              <span class="kpi-rodape">${k.rodape}</span>
+            </div>
+          </urbi-card>
+        `)}
+      </div>
     `;
   }
 
