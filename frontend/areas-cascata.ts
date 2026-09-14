@@ -328,3 +328,50 @@ export function itensAlocacaoGleba(
     .filter((l) => l.papel.tipo === 'editavel' || l.id === 'alv')
     .map((l) => ({ l: l.label, v: l.m2 }));
 }
+
+// ── Rodada 12 (handoff de KPIs/gráficos §4.4) — cadeia de áreas ────────────
+
+/**
+ * id da linha editável da cascata da Incorporação → coluna em `estudos`.
+ * Mesma "ponte" que `CAMPO_POR_LINHA_LOTEAMENTO` já é, para o mesmo motivo:
+ * um consumidor de fora de `tela-premissas.ts` (aqui, a cadeia de áreas de
+ * `tela-graficos.ts`) precisa ler o estudo sem depender do `form` privado da
+ * tela de edição. Entrada só em m² — sem par `_modo` a reinterpretar (mesma
+ * observação de `tela-premissas.ts:_estadosCascataAreasInc`).
+ */
+export const CAMPO_POR_LINHA_INCORPORACAO: Record<string, string> = {
+  pvt_r_fechada: 'area_pvt_r_fechada', pvt_r_aberta: 'area_pvt_r_aberta',
+  pvt_nr_fechada: 'area_pvt_nr_fechada', pvt_nr_aberta: 'area_pvt_nr_aberta',
+  comum: 'area_comum_total',
+};
+
+/** Estados das 5 linhas editáveis da cascata da Incorporação, lidos de um estudo. */
+export function estadosCascataIncorporacaoDoEstudo(estudo: Record<string, any> | null | undefined): Record<string, EstadoLinha> {
+  const estados: Record<string, EstadoLinha> = {};
+  for (const [linhaId, campo] of Object.entries(CAMPO_POR_LINHA_INCORPORACAO)) {
+    estados[linhaId] = { modo: 'm2', valor: n(estudo?.[campo]) };
+  }
+  return estados;
+}
+
+/**
+ * Seleciona, de uma cascata já resolvida, só os estágios da cadeia FÍSICA
+ * resumida que o handoff de KPIs/gráficos pede (§4.4): a barra empilhada
+ * mostra o "funil" — não cada dedução editável (isso já é
+ * `itensAlocacaoGleba`), e sim os subtotais que encadeiam fisicamente um no
+ * outro.
+ *
+ * Loteamento: poligonal → parcelável → líquida → ALV.
+ * Incorporação: terreno → construída total → privativa total.
+ *
+ * A ordem de retorno é a da lista `ordem`, não a ordem de `linhas` — é o que
+ * garante a leitura visual "de fora para dentro" mesmo quando a definição da
+ * cascata resolve as linhas numa ordem diferente (a Incorporação computa
+ * `privativa_total` ANTES de `construida_total`, porque a segunda soma a
+ * primeira com `comum` — ver `CASCATA_INCORPORACAO`).
+ */
+export function etapasCadeiaAreas(linhas: LinhaResolvida[], lot: boolean): LinhaResolvida[] {
+  const ordem = lot ? ['poligonal', 'parcelavel', 'liquida', 'alv'] : ['terreno', 'construida_total', 'privativa_total'];
+  const porId = new Map(linhas.map((l) => [l.id, l]));
+  return ordem.map((id) => porId.get(id)).filter((l): l is LinhaResolvida => l != null);
+}
