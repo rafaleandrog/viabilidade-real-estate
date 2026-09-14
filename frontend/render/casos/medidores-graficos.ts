@@ -84,13 +84,10 @@ export const caso = {
     'urbi-grafico-medidor.max',
     'urbi-card.titulo',
     // `viab-tela-graficos` monta a aba INTEIRA (faixa de KPIs, cascata do
-    // resultado, pizzas de alocação de área), não só a seção de medidores
-    // que este caso mede — as props abaixo são dessas outras seções, sem
-    // restringir caixa nenhuma que a asserção deste caso confira.
+    // resultado, cadeia de áreas), não só a seção de medidores que este caso
+    // mede — a prop abaixo é dessas outras seções, sem restringir caixa
+    // nenhuma que a asserção deste caso confira.
     'urbi-badge.cor',
-    'urbi-grafico-pizza.categorias',
-    'urbi-grafico-pizza.formato',
-    'urbi-grafico-pizza.series',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     // Resposta específica de `/benchmarks` — mutação do MESMO objeto

@@ -1,12 +1,16 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$Kpi, fmtR$, fmtPctOuIndef } from './viab-format.js';
+import { fmtR$Kpi, fmtR$, fmtM2, fmtPctOuIndef } from './viab-format.js';
 import {
   calcularProforma, eficienciaParaFaixa, roiParaFaixa, vgvBrutoDeProforma,
   type Proforma, type ProformaInput,
 } from './proforma.js';
-import { itensAlocacaoGleba } from './areas-cascata.js';
+import {
+  calcularCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO,
+  estadosCascataLoteamentoDoEstudo, estadosCascataIncorporacaoDoEstudo, etapasCadeiaAreas,
+  type LinhaResolvida,
+} from './areas-cascata.js';
 import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
 // do seu `_carregar()`. Reusada, e não recopiada: a cópia inline divergiria da
@@ -17,8 +21,7 @@ import { resolverIndicadoresBenchmark } from './benchmarks-indicadores.js';
 import { calcularCascataResultado } from './cascata-resultado-motor.js';
 import './grafico-cascata.js';
 import './grafico-barra-ranqueada.js';
-
-const n = (v: any): number => Number(v) || 0;
+import './grafico-cadeia-areas.js';
 
 @customElement('viab-tela-graficos')
 export class ViabTelaGraficos extends LitElement {
@@ -68,6 +71,7 @@ export class ViabTelaGraficos extends LitElement {
     }
     .detalhamento-custo { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--cor-borda, rgba(255, 255, 255, 0.12)); }
     .detalhamento-custo urbi-checkbox { display: block; margin-bottom: 8px; }
+    urbi-banner.aviso-consistencia { display: block; margin-bottom: 16px; }
   `];
 
   connectedCallback() { super.connectedCallback(); this._init(); }
@@ -112,6 +116,7 @@ export class ViabTelaGraficos extends LitElement {
     const p = calcularProforma({ ...this.estudo, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
     return html`
       ${this._renderKpisPreliminar(p)}
+      ${this._renderConsistencia(p)}
       <div class="graficos">
         <urbi-card titulo="Cascata do resultado">
           ${this._renderCascata(p)}
@@ -209,61 +214,71 @@ export class ViabTelaGraficos extends LitElement {
     `;
   }
 
-  // #14: pizza(s) de alocação de áreas. Loteamento: composição da gleba. Incorporação:
-  // dois subgrupos — "geral" (áreas detalhadas) e "macro" (privativa R + privativa NR +
-  // áreas comuns = 100%).
+  // Rodada 12 (handoff §4.4) — cadeia de áreas, substituindo a(s) pizza(s) de
+  // alocação de área. Loteamento: poligonal → parcelável → líquida → ALV.
+  // Incorporação: terreno → construída total → privativa total. A eficiência
+  // (ALV/poligonal no Loteamento, privativa/construída na Incorporação) vai
+  // ao lado, não numa pizza à parte — é o "número" que o handoff pede.
   //
-  // ⚠️ #574: até 2026-08-27 a pizza do Loteamento era montada a partir dos 7
-  // campos "% da gleba" que a migração `020_areas_cascata_loteamento.js`
-  // APOSENTOU (`app_pct`, `faixas_nao_edificaveis_pct`, `sistema_viario_pct`,
-  // `elup_pct`, `epc_pct`, `epu_pct`,
-  // `areas_privativas_nao_vendaveis_pct`). Nenhuma tela os escreve desde a
-  // reestruturação do Preliminar — `frontend/proforma.ts` deixou de lê-los na
-  // mesma data —, então num loteamento criado depois dela as 7 deduções saíam
-  // ZERO e a pizza mostrava uma fatia só: "a gleba inteira é vendável". A
-  // composição agora sai da MESMA cascata que Premissas edita e que o motor
-  // usa para a área vendável (`itensAlocacaoGleba`, `frontend/areas-cascata.ts`).
+  // ⚠️ #574 (histórico, preservado do que esta função substitui): até
+  // 2026-08-27 a pizza do Loteamento era montada a partir de 7 campos "% da
+  // gleba" já aposentados pela migração `020` — a cascata de áreas (mesma
+  // fonte que Premissas edita e que o motor usa para a área vendável) já
+  // corrigiu isso, e `etapasCadeiaAreas` consome essa MESMA cascata.
   private _renderAlocacaoAreas(p: Proforma, lot: boolean): TemplateResult {
     const e = this.estudo;
-    if (lot) {
+    const linhas = lot
+      ? calcularCascata(CASCATA_LOTEAMENTO, estadosCascataLoteamentoDoEstudo(e), p.areaTerreno)
+      : calcularCascata(CASCATA_INCORPORACAO, estadosCascataIncorporacaoDoEstudo(e), p.areaTerreno);
+    const etapas = etapasCadeiaAreas(linhas, lot);
+    if (etapas.every((et) => et.m2 <= 0.005)) {
       return html`<div class="graficos">
-        <urbi-card titulo="Alocação de áreas da gleba">
-          ${this._pizzaAreas(itensAlocacaoGleba(e, p.areaTerreno))}
+        <urbi-card titulo="Cadeia de áreas">
+          <urbi-estado-vazio icone="fa-solid fa-layer-group" mensagem="Defina as áreas nas Premissas."></urbi-estado-vazio>
         </urbi-card>
       </div>`;
     }
-    const rF = n(e.area_pvt_r_fechada), rA = n(e.area_pvt_r_aberta);
-    const nrF = n(e.area_pvt_nr_fechada), nrA = n(e.area_pvt_nr_aberta);
-    const comum = n(e.area_comum_total);
-    const geral = [
-      { l: 'Priv. residencial fechada', v: rF },
-      { l: 'Priv. residencial aberta', v: rA },
-      { l: 'Priv. não residencial fechada', v: nrF },
-      { l: 'Priv. não residencial aberta', v: nrA },
-      { l: 'Áreas comuns', v: comum },
-    ];
-    const macro = [
-      { l: 'Privativa residencial', v: rF + rA },
-      { l: 'Privativa não residencial', v: nrF + nrA },
-      { l: 'Áreas comuns', v: comum },
-    ];
     return html`<div class="graficos">
-      <urbi-card titulo="Alocação de áreas — geral">${this._pizzaAreas(geral)}</urbi-card>
-      <urbi-card titulo="Alocação de áreas — macro">${this._pizzaAreas(macro)}</urbi-card>
+      <urbi-card titulo="Cadeia de áreas">
+        <viab-grafico-cadeia-areas
+          .etapas=${etapas}
+          rotuloEficiencia=${lot ? 'ALV / poligonal' : 'Privativa / construída'}
+          .eficienciaPct=${this._eficienciaCadeia(etapas, lot)}
+        ></viab-grafico-cadeia-areas>
+      </urbi-card>
     </div>`;
   }
 
-  private _pizzaAreas(itens: { l: string; v: number }[]): TemplateResult {
-    const validos = itens.filter((i) => i.v > 0.005);
-    if (validos.length === 0) {
-      return html`<urbi-estado-vazio icone="fa-solid fa-chart-pie" mensagem="Defina as áreas nas Premissas."></urbi-estado-vazio>`;
+  private _eficienciaCadeia(etapas: LinhaResolvida[], lot: boolean): number | null {
+    if (lot) {
+      const poligonal = etapas[0]?.m2 ?? 0;
+      const alv = etapas[etapas.length - 1]?.m2 ?? 0;
+      return poligonal > 0 ? (alv / poligonal) * 100 : null;
     }
+    const construida = etapas.find((l) => l.id === 'construida_total')?.m2 ?? 0;
+    const privativa = etapas.find((l) => l.id === 'privativa_total')?.m2 ?? 0;
+    return construida > 0 ? (privativa / construida) * 100 : null;
+  }
+
+  // Rodada 12 (handoff §4.5) — faixa de consistência: reexibe (não recalcula)
+  // a mesma trava que `tela-premissas.ts` (`_renderAreaAlocada`) já produz —
+  // continua só informativa, nunca bloqueia salvar (decisão registrada na
+  // #693; o handoff pede bloqueio, mas isso fica fora de escopo desta rodada).
+  private _renderConsistencia(p: Proforma): TemplateResult {
+    const excesso = p.diferencaAreaAlocada > 0;
+    const sobra = p.diferencaAreaAlocada < 0;
+    if (!excesso && !sobra) return html``;
     return html`
-      <urbi-grafico-pizza
-        formato="numero"
-        .categorias=${validos.map((i) => i.l)}
-        .series=${[{ rotulo: 'Áreas (m²)', valores: validos.map((i) => i.v) }]}
-      ></urbi-grafico-pizza>
+      ${excesso ? html`
+        <urbi-banner class="aviso-consistencia" variante="alerta">
+          A soma das áreas dos produtos (${fmtM2(p.areaProdutosAlocada)}) é maior que a área
+          registrada em Terreno &amp; Áreas (${fmtM2(p.areaPrivativa)}) — ver Premissas.
+        </urbi-banner>` : nothing}
+      ${sobra ? html`
+        <urbi-banner class="aviso-consistencia" variante="alerta">
+          Ainda faltam ${fmtM2(Math.abs(p.diferencaAreaAlocada))} para alocar nos produtos — ver
+          Premissas.
+        </urbi-banner>` : nothing}
     `;
   }
 

@@ -21,9 +21,6 @@ export const caso = {
     { seletor: 'span.kpi-valor', minimo: 5 },
   ],
   aceitaNaoReproduzido: [
-    'urbi-grafico-pizza.categorias',
-    'urbi-grafico-pizza.formato',
-    'urbi-grafico-pizza.series',
     'urbi-card.titulo',
   ],
   async montar(raiz: HTMLElement): Promise<void> {

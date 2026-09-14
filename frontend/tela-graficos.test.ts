@@ -2,17 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-// #574 — a fiação da composição da gleba (aba Gráficos do Preliminar).
+// #574 — a fiação da cadeia de áreas (aba Gráficos do Preliminar).
 //
 // ⚠️ O QUE ESTE ARQUIVO MEDE, E O QUE ELE NÃO MEDE. Ele lê o CÓDIGO-FONTE de
-// `tela-graficos.ts`, não o DOM: prova que o componente chama
-// `itensAlocacaoGleba` e que os 7 campos aposentados pela migração `020`
-// sumiram do arquivo. Não prova que a pizza desenhou as 8 fatias certas — o
-// stub do harness de render declaradamente não reproduz `.categorias` de
-// `urbi-grafico-pizza` (ver `aceitaNaoReproduzido` nos casos de render), então
-// nenhuma camada deste repositório consegue afirmar isso hoje. Quem confere os
-// VALORES é `areas-cascata.test.ts` (`itensAlocacaoGleba`, função pura); quem
-// confere que a tela de Loteamento monta e não quebra o layout é
+// `tela-graficos.ts`, não o DOM: prova que o componente chama `calcularCascata`
+// (Rodada 12 — substituiu `itensAlocacaoGleba` quando a cadeia de áreas
+// trocou de lugar com a(s) pizza(s) de alocação) e que os 7 campos
+// aposentados pela migração `020` sumiram do arquivo. Não prova que a barra
+// empilhada desenhou os estágios certos — quem confere os VALORES é
+// `areas-cascata.test.ts` (`etapasCadeiaAreas`, função pura); quem confere que
+// a tela de Loteamento monta e não quebra o layout é
 // `render/casos/alocacao-areas-loteamento.ts`.
 //
 // A técnica (ler o fonte com os comentários removidos) é a mesma de
@@ -56,15 +55,25 @@ test('#574: a aba Gráficos não lê nenhum dos 7 campos de área aposentados pe
   }
 });
 
-test('#574: a aba Gráficos CHAMA itensAlocacaoGleba (fiação, não só import)', () => {
+test('#574: a aba Gráficos CHAMA calcularCascata para as duas cadeias (fiação, não só import)', () => {
   assert.ok(
     FONTE.includes("from './areas-cascata.js'"),
     'tela-graficos.ts deixou de importar areas-cascata.js',
   );
   assert.ok(
-    /itensAlocacaoGleba\(/.test(FONTE),
-    'tela-graficos.ts importa itensAlocacaoGleba mas não a CHAMA — apagar a chamada e voltar ' +
-    'à leitura dos campos aposentados deixaria a suíte inteira verde sem este teste.',
+    /calcularCascata\(/.test(FONTE),
+    'tela-graficos.ts importa calcularCascata mas não a CHAMA — apagar a chamada e voltar à ' +
+    'leitura dos campos aposentados deixaria a suíte inteira verde sem este teste.',
+  );
+  assert.ok(
+    FONTE.includes('CASCATA_LOTEAMENTO'),
+    'tela-graficos.ts parou de referenciar CASCATA_LOTEAMENTO — a cadeia de áreas do Loteamento ' +
+    'ficaria sem a chave que resolve a cascata correta.',
+  );
+  assert.ok(
+    FONTE.includes('CASCATA_INCORPORACAO'),
+    'tela-graficos.ts parou de referenciar CASCATA_INCORPORACAO — a cadeia de áreas da ' +
+    'Incorporação ficaria sem a chave que resolve a cascata correta.',
   );
 });
 
