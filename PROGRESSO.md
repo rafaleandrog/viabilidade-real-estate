@@ -25,6 +25,9 @@ quando vier `null`" apagaria essa escrita legítima. Por isso a correção ficou
 
 Coberto por 4 testes novos em `backend/rotas/estudos.test.ts` — inclusive um que prova que o filtro
 NÃO é genérico, exercitando `construcao_valor_canonico: null` fora da lista.
+
+---
+
 ## #693 · Aviso de excesso de área em Produtos deixa de parecer bloqueio (2026-09-14)
 
 O indicador de área alocada (`frontend/tela-premissas.ts:_renderAreaAlocada`, #573) nunca bloqueou
