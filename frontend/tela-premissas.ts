@@ -1194,14 +1194,27 @@ export class ViabTelaPremissas extends LitElement {
   /**
    * §Tabela de áreas em cascata da Incorporação (#564) — mesmo modelo visual
    * da Loteamento (`_renderTabelaAreasLoteamento`): colunas Descrição · Área
-   * (m²) · ha · % Terreno · % Construída, linhas computadas em negrito/fundo.
-   * Sem a coluna de seletor de unidade — `_renderCampoAreaInc` é só um
-   * `viab-num` em m². A âncora 1 (Terreno) é só exibida aqui; a edição dela é
-   * a seção "Terreno" acima (origem Núcleo/manual, já existente).
+   * (m²) · ha · % Potencial · % Construída, linhas computadas em
+   * negrito/fundo. Sem a coluna de seletor de unidade — `_renderCampoAreaInc`
+   * é só um `viab-num` em m². A âncora 1 (Terreno) é só exibida aqui; a
+   * edição dela é a seção "Terreno" acima (origem Núcleo/manual, já
+   * existente).
+   *
+   * ⚠️ A base da coluna de % NÃO é a Área do Terreno — é a Área Potencial de
+   * construção (`terreno × coeficiente máximo`, o mesmo
+   * `tetoAproveitamentoM2` que o KPI "Teto do coeficiente máximo" já exibe
+   * logo abaixo, `_renderAproveitamentoCoeficiente`). "% Terreno" não tinha
+   * leitura útil: a cascata soma ÁREAS CONSTRUÍDAS, que ultrapassam 100% do
+   * terreno em qualquer prédio de mais de um pavimento (ex.: 251% na Área
+   * Privativa Residencial Fechada de um estudo real). "% do que pode ser
+   * construído" tem leitura direta — decisão do autor. Sem coeficiente
+   * preenchido a base sai 0 e `calcularCascata` mostra 0% (mesmo piso de
+   * "âncora sem valor" que o Loteamento já usa com poligonal = 0).
    */
   private _renderTabelaAreasIncorporacao(dis: boolean): TemplateResult {
     const ancora1 = this._areaTerreno();
-    const linhas = calcularCascata(CASCATA_INCORPORACAO, this._estadosCascataAreasInc(), ancora1);
+    const areaPotencial = calcularProforma(this._entradaProforma()).tetoAproveitamentoM2 ?? 0;
+    const linhas = calcularCascata(CASCATA_INCORPORACAO, this._estadosCascataAreasInc(), ancora1, areaPotencial);
     return html`
       <div class="areas-wrap">
         <table class="areas">
@@ -1209,7 +1222,7 @@ export class ViabTelaPremissas extends LitElement {
             <tr>
               <th>Descrição</th><th></th>
               <th class="num">Área (m²)</th><th class="num">ha</th>
-              <th class="num">% Terreno</th><th class="num">% Construída</th>
+              <th class="num">% Potencial</th><th class="num">% Construída</th>
             </tr>
           </thead>
           <tbody>
