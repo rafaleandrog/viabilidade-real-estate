@@ -673,7 +673,7 @@ export class ViabTelaProforma extends LitElement {
     // de exportar.ts:39), sem 2ª execução.
     const proforma = (fator: number) => calcularProforma(this._aplicarFator(fator));
     const vgvBrutoDe = (cen: Proforma) => cen.vgv + cen.vgvPermutaResidencial + cen.vgvPermutaNaoResidencial;
-    // Linhas monetárias (7) e, separados por uma divisória com mais respiro, os dois
+    // Linhas monetárias (8) e, separados por uma divisória com mais respiro, os dois
     // indicadores em % (Custo obras/VGV e Margem líquida) exibidos como urbi-badge
     // com a cor do cenário.
     // #11: `natureza` classifica cada linha como receita ou despesa para colorir o

@@ -385,3 +385,36 @@ test('#10 (2026-09-14): sem permuta física, a soma das sub-linhas de produto ba
     assert.ok(!r.semPct, `sub-linha de produto "${r.l}" não deveria ter semPct sem permuta física`);
   }
 });
+
+// Mesmo teste do primeiro deste bloco, mas para LOTEAMENTO — achado da revisão
+// do PR desta issue: os dois testes acima cobriam só Incorporação, e o
+// Loteamento passa pelo MESMO `if (p.areaPermutaFisica > 0)` que a correção
+// reestrutura (rótulo da dedução muda — "(-) Permuta física", sem
+// "residencial" —, mas o bloco é o mesmo). Sem este teste, uma regressão que
+// só quebrasse o ramo do Loteamento (ex.: o catálogo normalizado para
+// residencial não sendo repassado corretamente) passaria despercebida.
+test('#10 (2026-09-14): Loteamento com permuta física — mesma identidade e semPct, rótulo "(-) Permuta física" (sem "residencial")', () => {
+  const p = calcularProforma(LOT_COM_PERMUTA);
+  assert.ok(p.areaPermutaFisica > 0, 'o fixture precisa ter permuta física para o teste exercitar o bloco');
+  const linhas = montarLinhasProforma(p, vgvBrutoDe(p), ctxDe(LOT_COM_PERMUTA));
+
+  const somaProdutos = linhas.filter((r) => r.grupo === 'receita').reduce((s, r) => s + r.v, 0);
+  const vgvSemPermuta = valorDe(linhas, 'VGV sem permuta física');
+  const receitaBruta = valorDe(linhas, 'Receita bruta (VGV)');
+
+  assert.ok(perto(somaProdutos, vgvSemPermuta),
+    `soma dos produtos (${somaProdutos}) ≠ VGV sem permuta física (${vgvSemPermuta})`);
+  assert.ok(!perto(somaProdutos, receitaBruta),
+    `com permuta física > 0 a soma dos produtos não deveria bater com Receita bruta (VGV) — se bateu, o fixture parou de exercitar o caso`);
+
+  for (const r of linhas.filter((r) => r.grupo === 'receita')) {
+    assert.equal(r.semPct, true, `sub-linha de produto "${r.l}" deveria ter semPct`);
+  }
+  const headerVgvSemPermuta = linhas.find((r) => r.l === 'VGV sem permuta física')!;
+  assert.equal(headerVgvSemPermuta.semPct, true, '"VGV sem permuta física" deveria ter semPct');
+  const linhaPermuta = linhas.find((r) => r.l === '(-) Permuta física')!;
+  assert.ok(linhaPermuta, 'Loteamento deveria usar o rótulo "(-) Permuta física" (sem "residencial")');
+  assert.equal(linhaPermuta.semPct, true, '"(-) Permuta física" deveria ter semPct');
+  const headerReceitaBruta = linhas.find((r) => r.l === 'Receita bruta (VGV)')!;
+  assert.ok(!headerReceitaBruta.semPct, '"Receita bruta (VGV)" continua mostrando % VGV');
+});
