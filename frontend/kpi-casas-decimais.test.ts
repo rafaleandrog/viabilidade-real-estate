@@ -50,8 +50,8 @@ const CARDS: { arquivo: string; chamadas: number; quais: string }[] = [
       + '(Payback e TIR não são monetários)',
   },
   {
-    arquivo: 'tela-graficos.ts', chamadas: 3,
-    quais: 'o urbi-kpi "Resultado" + os cards "VGV do incorporador" e "Resultado final" da faixa de 5 KPIs (Rodada 12)',
+    arquivo: 'tela-graficos.ts', chamadas: 2,
+    quais: 'os cards "VGV do incorporador" e "Resultado final" da faixa de 5 KPIs (Rodada 12) — o urbi-kpi "Resultado" saiu junto com a pizza/barras que a cascata substituiu',
   },
   {
     arquivo: 'tela-premissas.ts', chamadas: 2,

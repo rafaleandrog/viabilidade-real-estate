@@ -68,31 +68,24 @@ const PRODUTOS_LOTEAMENTO: Record<string, any>[] = [
 export const caso = {
   nome: 'alocacao-areas-loteamento',
   exigir: [
-    // Composição dos custos · Receita × Custos · Alocação de áreas da gleba.
+    // Faixa de KPIs · Cascata do resultado · Alocação de áreas da gleba.
     // O Loteamento tem UM card de alocação (a Incorporação tem dois: geral e
-    // macro). `exigir` só tem piso, então 4 cards ainda passariam aqui; quem
-    // denuncia o ramo de Incorporação montado é o `urbi-grafico-pizza` abaixo
-    // (o ramo errado desenha 1 pizza, não 2).
-    { seletor: 'urbi-card', minimo: 3 },
-    // Pizza de custos + pizza da gleba. Um `urbi-estado-vazio` no lugar de
-    // qualquer uma delas derruba a contagem — é o que pega a tela montada com
-    // o estudo sem áreas ou sem catálogo.
-    { seletor: 'urbi-grafico-pizza', minimo: 2 },
-    { seletor: 'urbi-grafico-colunas', minimo: 1 },
-    { seletor: 'urbi-kpi', minimo: 1 },
+    // macro). `exigir` só tem piso, então cards a mais ainda passariam aqui;
+    // quem denuncia o ramo de Incorporação montado é o `urbi-grafico-pizza`
+    // abaixo (o ramo errado desenha 1 pizza, não a esperada).
+    { seletor: 'urbi-card', minimo: 2 },
+    // Pizza da gleba. Um `urbi-estado-vazio` no lugar dela derruba a
+    // contagem — é o que pega a tela montada com o estudo sem áreas.
+    { seletor: 'urbi-grafico-pizza', minimo: 1 },
+    // Rodada 12 — a cascata do resultado substituiu a pizza de custos e o
+    // gráfico de barras Receita×Custos (achado 2.3 da auditoria).
+    { seletor: 'viab-grafico-cascata', minimo: 1 },
   ],
   aceitaNaoReproduzido: [
     'urbi-card.titulo',
-    'urbi-checkbox.label',
-    'urbi-grafico-colunas.categorias',
-    'urbi-grafico-colunas.empilhado',
-    'urbi-grafico-colunas.formato',
-    'urbi-grafico-colunas.legenda',
-    'urbi-grafico-colunas.series',
     'urbi-grafico-pizza.categorias',
     'urbi-grafico-pizza.formato',
     'urbi-grafico-pizza.series',
-    'urbi-kpi.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     // `tela-graficos.ts` busca benchmarks, config e o catálogo de Produtos no

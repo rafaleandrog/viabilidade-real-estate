@@ -32,6 +32,7 @@ export class ViabGraficoCascata extends LitElement {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      min-width: 0;
     }
     .rotulo.clicavel { cursor: pointer; text-decoration: underline dotted; }
     .trilho {
@@ -40,6 +41,7 @@ export class ViabGraficoCascata extends LitElement {
       background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.08));
       border-radius: 3px;
       overflow: hidden;
+      min-width: 0;
     }
     .barra { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
     .barra.subtotal { background: var(--cor-texto-fraco, #9aa5b1); }
@@ -50,6 +52,10 @@ export class ViabGraficoCascata extends LitElement {
       text-align: right;
       font-variant-numeric: tabular-nums;
       color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
     .rodape {
       margin-top: 8px;
@@ -83,7 +89,7 @@ export class ViabGraficoCascata extends LitElement {
                   style="left: ${e.leftPct}%; width: ${e.widthPct}%;"
                 ></div>
               </div>
-              <span class="valor">${fmtR$(e.valor)}</span>
+              <span class="valor" title=${fmtR$(e.valor)}>${fmtR$(e.valor)}</span>
             </div>
           `;
         })}
