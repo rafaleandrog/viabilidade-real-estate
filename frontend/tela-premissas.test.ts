@@ -10,7 +10,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PERMUTA_UNIDADE, PERMUTA_FIS_NR, modoEfetivo, colunasProduto } from './tela-premissas.js';
+import { PERMUTA_UNIDADE, PERMUTA_FIS_NR, modoEfetivo, colunasProduto, linhasCascataIncorporacao } from './tela-premissas.js';
+import type { ProformaInput } from './proforma.js';
 
 test('#566: Permuta física (R/Loteamento) só oferece m² e % área de venda', () => {
   assert.deepEqual(PERMUTA_UNIDADE.opcoes.map((o) => o.valor), ['area_m2', 'pct_area_venda']);
@@ -66,4 +67,40 @@ test('rev1: as duas configurações diferem em UMA coluna, e só nela', () => {
   const inc = colunasProduto(false).map((c) => c.chave);
   assert.equal(inc.length, lot.length + 1, 'a diferença tem que ser exatamente uma coluna');
   assert.deepEqual(inc.filter((c) => c !== 'tipo'), lot);
+});
+
+// #698 — prova de FIAÇÃO: `linhasCascataIncorporacao` é a MESMA função que
+// `_renderTabelaAreasIncorporacao` chama (`frontend/tela-premissas.ts`), então
+// este teste quebra se o componente voltar a usar a Área do Terreno como base
+// da coluna de %, em vez da Área Potencial (`terreno × coeficiente máximo`).
+// Sem esta prova, só a função pura de `areas-cascata.ts` estaria coberta —
+// exatamente a classe de defeito "a fiação, não o cálculo" do CLAUDE.md.
+test('#698: linhasCascataIncorporacao usa a Área Potencial como base da %, não a Área do Terreno', () => {
+  const entrada: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual', terreno_manual_area: 5_760.27,
+    coef_aproveitamento_maximo: 3,
+  } as ProformaInput;
+  // área potencial = 5.760,27 × 3 = 17.280,81 (o mesmo `tetoAproveitamentoM2` do KPI).
+  const linhas = linhasCascataIncorporacao(
+    { pvt_r_fechada: { modo: 'm2', valor: 14_481.94 } },
+    5_760.27,
+    entrada,
+  );
+  const porId = Object.fromEntries(linhas.map((l) => [l.id, l]));
+  // Contra a Área do Terreno isso daria 100%; contra a Área Potencial, ~33,3%.
+  assert.ok(Math.abs(porId.terreno.pctAncora1 - (5_760.27 / 17_280.81) * 100) < 0.01);
+  assert.notEqual(Math.round(porId.terreno.pctAncora1), 100, 'regrediu para a base antiga (Área do Terreno)');
+  // Contra a Área do Terreno isso daria 251,4% (o número real que motivou a #698).
+  assert.ok(Math.abs(porId.pvt_r_fechada.pctAncora1 - (14_481.94 / 17_280.81) * 100) < 0.01);
+});
+
+test('#698: linhasCascataIncorporacao cai em 0% sem coeficiente máximo preenchido — sem divisão por zero', () => {
+  const entrada: ProformaInput = {
+    tipo_empreendimento: 'incorporacao', origem_terreno: 'manual', terreno_manual_area: 5_760.27,
+  } as ProformaInput;
+  const linhas = linhasCascataIncorporacao({ pvt_r_fechada: { modo: 'm2', valor: 100 } }, 5_760.27, entrada);
+  const porId = Object.fromEntries(linhas.map((l) => [l.id, l]));
+  assert.equal(porId.terreno.pctAncora1, 0);
+  assert.equal(porId.pvt_r_fechada.pctAncora1, 0);
 });
