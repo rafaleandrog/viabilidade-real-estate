@@ -1011,12 +1011,15 @@ export class ViabTelaPremissas extends LitElement {
    * tudo alocado (`=== 0`) e "alerta" nos dois estados não neutros — sobra
    * por alocar (`< 0`, falta produto para a área toda) ou catálogo excede a
    * área registrada (`> 0`) — os três estados do critério 2 da #573. Os dois
-   * estados não neutros são só informativos: os campos de Terreno & Áreas
-   * são referência, quem manda na área/preço usados no cálculo é o catálogo
-   * de Produtos (#693) — nunca houve bloqueio de salvamento aqui (`_salvar`
-   * só lê `validarObrigatorios`), mas o estilo "erro"/vermelho lia como se
-   * houvesse. O aviso abaixo só aparece nos dois estados não neutros, com o
-   * texto que diz qual lado está maior.
+   * estados não neutros são só informativos — nunca houve bloqueio de
+   * salvamento aqui (`_salvar` só lê `validarObrigatorios`), mas o estilo
+   * "erro"/vermelho lia como se houvesse (#693). O catálogo de Produtos é
+   * quem manda na área/preço de venda do VGV; a área registrada em Terreno &
+   * Áreas CONTINUA sendo a base dos custos por m² (`construcaoLegada`,
+   * `decoracao`, `infraestruturaLegada` em `proforma.ts`) — o banner de
+   * excesso não estende essa leitura de "só referência" para custo, achado
+   * do Codex no PR #695. O aviso abaixo só aparece nos dois estados não
+   * neutros, com o texto que diz qual lado está maior.
    */
   private _renderAreaAlocada(): TemplateResult {
     const p = calcularProforma(this._entradaProforma());
@@ -1035,8 +1038,9 @@ export class ViabTelaPremissas extends LitElement {
       ${excesso ? html`
         <urbi-banner class="aviso-area-alocada" variante="alerta">
           A soma dos produtos (${fmtM2(p.areaProdutosAlocada)}) é maior que a área registrada em
-          Terreno & Áreas (${fmtM2(p.areaPrivativa)}). Os campos de Terreno & Áreas servem de
-          referência — a área e o preço usados no cálculo vêm do catálogo de Produtos.
+          Terreno & Áreas (${fmtM2(p.areaPrivativa)}). A área e o preço de venda usados no VGV vêm
+          do catálogo de Produtos; a área registrada em Terreno & Áreas continua sendo a base dos
+          custos por m² (construção, decoração, infraestrutura).
         </urbi-banner>` : nothing}
       ${sobra ? html`
         <urbi-banner class="aviso-area-alocada" variante="alerta">
