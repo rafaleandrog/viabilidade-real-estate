@@ -178,6 +178,26 @@ export function colunasProduto(lot: boolean): ColunaProduto[] {
   ];
 }
 
+/**
+ * §Resolve as linhas da cascata de áreas da Incorporação — extraída de
+ * `_renderTabelaAreasIncorporacao` (issue #698) para ser testável fora do
+ * componente: `frontend/tela-premissas.test.ts` chama esta MESMA função
+ * para provar que a base da % é a Área Potencial (`terreno × coeficiente
+ * máximo`, `tetoAproveitamentoM2` de `calcularProforma`) e não a Área do
+ * Terreno — sem essa extração, a única prova seria a função pura de
+ * `areas-cascata.ts` testada isoladamente, e o call site do componente
+ * poderia reverter para `ancora1` sem nenhum teste ficar vermelho (a classe
+ * de defeito "o defeito mora na FIAÇÃO, não no cálculo" do `CLAUDE.md`).
+ */
+export function linhasCascataIncorporacao(
+  estados: Record<string, EstadoLinha>,
+  ancora1M2: number,
+  entradaProforma: ProformaInput,
+): LinhaResolvida[] {
+  const areaPotencial = calcularProforma(entradaProforma).tetoAproveitamentoM2 ?? 0;
+  return calcularCascata(CASCATA_INCORPORACAO, estados, ancora1M2, areaPotencial);
+}
+
 // Permuta financeira R e NR (#5): cada uma alterna entre % do VGV do tipo e um
 // valor absoluto em R$. Renderizadas na seção Deduções.
 const PERMUTA_FIN_R: CustoUnidade = {
@@ -1210,11 +1230,16 @@ export class ViabTelaPremissas extends LitElement {
    * construído" tem leitura direta — decisão do autor. Sem coeficiente
    * preenchido a base sai 0 e `calcularCascata` mostra 0% (mesmo piso de
    * "âncora sem valor" que o Loteamento já usa com poligonal = 0).
+   *
+   * A resolução das linhas mora em `linhasCascataIncorporacao` (módulo,
+   * exportada) — não inline aqui — de propósito: é a fiação real entre a
+   * tela e o motor (qual base a % usa), e a única forma de um teste provar
+   * que ela não regride para `ancora1` é chamar a MESMA função que o render
+   * chama, não uma cópia da lógica no arquivo de teste (`frontend/tela-premissas.test.ts`).
    */
   private _renderTabelaAreasIncorporacao(dis: boolean): TemplateResult {
     const ancora1 = this._areaTerreno();
-    const areaPotencial = calcularProforma(this._entradaProforma()).tetoAproveitamentoM2 ?? 0;
-    const linhas = calcularCascata(CASCATA_INCORPORACAO, this._estadosCascataAreasInc(), ancora1, areaPotencial);
+    const linhas = linhasCascataIncorporacao(this._estadosCascataAreasInc(), ancora1, this._entradaProforma());
     return html`
       <div class="areas-wrap">
         <table class="areas">
