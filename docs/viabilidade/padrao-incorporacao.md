@@ -3224,9 +3224,9 @@ primeira edição. A #260 migra todos os demais consumidores para o resolver can
 documento, contra o contrato **C7** do Anexo A.
 
 **Essa armadilha fechou com a #449** (2026-08-24): `fluxo-tabela.ts:40` e a exportação
-(`exportar.ts:319`, `celulaFx`) chamam a MESMA `celula` de `viab-format.ts`; a coluna R$ da Proforma
-(`celulaProforma`, `exportar.ts:69` — a tela a reexporta; e `celulaProformaM2`,
-`tela-proforma.ts:44` — ambas extraídas de método privado pela #567) e `tela-fluxo-receitas.ts:485-486`
+(`exportar.ts:334`, `celulaFx`) chamam a MESMA `celula` de `viab-format.ts`; a coluna R$ da Proforma
+(`celulaProforma`, `exportar.ts:73` — a tela a reexporta; e `celulaProformaM2`,
+`tela-proforma.ts:48` — ambas extraídas de método privado pela #567) e `tela-fluxo-receitas.ts:485-486`
 (`precoUnit`/`precoTotal`) chamam `fmtR$(v, false)`. A
 mesma célula sai `1.234,56` na tela, no CSV e no PDF. → **#281 fechada**; tabela de conformidade
 completa em `formulas.md`.
