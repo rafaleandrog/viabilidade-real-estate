@@ -14,35 +14,19 @@ import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viab
 import { respostaAindaVale } from './viab-imagem-principal.js';
 import { montarMedidor } from './medidor-faixas.js';
 import { resolverIndicadoresBenchmark } from './benchmarks-indicadores.js';
+import { calcularCascataResultado } from './cascata-resultado-motor.js';
+import './grafico-cascata.js';
+import './grafico-barra-ranqueada.js';
 
 const n = (v: any): number => Number(v) || 0;
-
-// Paleta categórica para segmentar os custos por cor: 12 posições, mais que os 6
-// da paleta padrão do gráfico, para não repetir cor entre custos.
-//
-// #476 / decisão D15 do autor (2026-08-22): as 12 posições vêm dos tokens do
-// tema — `--cor-categoria-1..8` nas oito primeiras e `--cor-escala-1..4` nas
-// quatro últimas. A CONTAGEM é a mesma de antes, na mesma ordem, então o
-// comportamento com N categorias de custo (inclusive o ciclo quando N > 12) é
-// idêntico; o que muda é que a pizza passa a acompanhar os quatro temas do
-// shell, como já fazem todos os outros gráficos do app.
-//
-// O hexadecimal de cada posição é o literal que ocupava aquela posição antes, e
-// fica como fallback — é o padrão de `fluxo-graficos.ts:18-24`, e é o que
-// preserva a aparência atual num shell que não tenha os tokens.
-const PALETA_CUSTOS = [
-  'var(--cor-categoria-1, #2AA9E0)', 'var(--cor-categoria-2, #13A98D)',
-  'var(--cor-categoria-3, #F7A111)', 'var(--cor-categoria-4, #D45A3A)',
-  'var(--cor-categoria-5, #8E7CC3)', 'var(--cor-categoria-6, #5BAF7A)',
-  'var(--cor-categoria-7, #E0699B)', 'var(--cor-categoria-8, #7FB3D5)',
-  'var(--cor-escala-1, #C0A16B)', 'var(--cor-escala-2, #59C3C3)',
-  'var(--cor-escala-3, #B57EDC)', 'var(--cor-escala-4, #9AA5B1)',
-];
 
 @customElement('viab-tela-graficos')
 export class ViabTelaGraficos extends LitElement {
   @property({ attribute: false }) estudo: any = null;
   @state() private excluirTerreno = false;
+  // Rodada 12 — a cascata do resultado expande o detalhamento de "Custo
+  // direto total" por categoria (barra ranqueada) ao clicar na linha.
+  @state() private custoExpandido = false;
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
   // O catálogo de Produtos é a fonte do VGV (`frontend/proforma.ts`). Sem ele
@@ -82,6 +66,8 @@ export class ViabTelaGraficos extends LitElement {
       font-size: 11px;
       color: var(--cor-texto-fraco, rgba(255, 255, 255, 0.4));
     }
+    .detalhamento-custo { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--cor-borda, rgba(255, 255, 255, 0.12)); }
+    .detalhamento-custo urbi-checkbox { display: block; margin-bottom: 8px; }
   `];
 
   connectedCallback() { super.connectedCallback(); this._init(); }
@@ -127,16 +113,8 @@ export class ViabTelaGraficos extends LitElement {
     return html`
       ${this._renderKpisPreliminar(p)}
       <div class="graficos">
-        <urbi-card titulo="Composição dos custos">
-          <urbi-checkbox
-            label="Excluir custo de aquisição do terreno"
-            ?marcado=${this.excluirTerreno}
-            @urbi:checkbox-change=${(e: CustomEvent) => this.excluirTerreno = e.detail.marcado}
-          ></urbi-checkbox>
-          ${this._renderPizza(p)}
-        </urbi-card>
-        <urbi-card titulo="Receita × Custos">
-          ${this._renderBarras(p)}
+        <urbi-card titulo="Cascata do resultado">
+          ${this._renderCascata(p)}
         </urbi-card>
       </div>
       ${this._renderAlocacaoAreas(p, lot)}
@@ -204,44 +182,30 @@ export class ViabTelaGraficos extends LitElement {
     return itens.filter((i) => i.v > 0.005 && !(i.terreno && excluirTerreno));
   }
 
-  private _renderPizza(p: Proforma): TemplateResult {
-    const custos = this._custos(p);
-    const total = custos.reduce((s, c) => s + c.v, 0);
-    if (total <= 0) {
-      return html`<urbi-estado-vazio icone="fa-solid fa-chart-pie" mensagem="Sem custos para exibir."></urbi-estado-vazio>`;
-    }
+  // Rodada 12 (handoff §4.1) — cascata horizontal do resultado, substituindo
+  // a pizza de custos e o gráfico de barras Receita×Custos. Clicar na linha
+  // "Custo direto total" expande o detalhamento por categoria abaixo, como
+  // barra ranqueada (regra 6 do handoff: pizza com mais de 4 fatias vira
+  // barra horizontal ranqueada) — é ali, e não mais na pizza, que mora o
+  // toggle "excluir terreno".
+  private _renderCascata(p: Proforma): TemplateResult {
+    const etapas = calcularCascataResultado(p);
     return html`
-      <urbi-grafico-pizza
-        formato="moeda"
-        .categorias=${custos.map((c) => c.l)}
-        .series=${[{ rotulo: 'Custos', valores: custos.map((c) => c.v) }]}
-      ></urbi-grafico-pizza>
-    `;
-  }
-
-  private _renderBarras(p: Proforma): TemplateResult {
-    // Coluna "Custos" empilhada e segmentada por cor (um segmento por custo),
-    // ao lado da coluna "Receita". Cada custo é uma série própria com valor só
-    // na categoria "Custos" (0 em "Receita", que o empilhado ignora). A legenda
-    // do gráfico mapeia cor → custo.
-    const itens = this._custos(p, false); // bars: sempre com todos os custos
-    const series = [
-      { rotulo: 'Receita (VGV)', valores: [p.vgv, 0], cor: 'var(--cor-sucesso, #13A98D)' },
-      ...itens.map((c, i) => ({ rotulo: c.l, valores: [0, c.v], cor: PALETA_CUSTOS[i % PALETA_CUSTOS.length] })),
-    ];
-    const custosTotal = itens.reduce((s, c) => s + c.v, 0);
-    const resultado = p.vgv - custosTotal;
-    return html`
-      <urbi-grafico-colunas
-        empilhado
-        legenda="sempre"
-        formato="moeda"
-        .categorias=${['Receita', 'Custos']}
-        .series=${series}
-      ></urbi-grafico-colunas>
-      <div class="resultado">
-        <urbi-kpi rotulo="Resultado" .valor=${fmtR$Kpi(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-      </div>
+      <viab-grafico-cascata
+        .etapas=${etapas}
+        .idExpandivel=${'custo_direto'}
+        @viab:cascata-linha-click=${() => { this.custoExpandido = !this.custoExpandido; }}
+      ></viab-grafico-cascata>
+      ${this.custoExpandido ? html`
+        <div class="detalhamento-custo">
+          <urbi-checkbox
+            label="Excluir custo de aquisição do terreno"
+            ?marcado=${this.excluirTerreno}
+            @urbi:checkbox-change=${(e: CustomEvent) => this.excluirTerreno = e.detail.marcado}
+          ></urbi-checkbox>
+          <viab-grafico-barra-ranqueada .itens=${this._custos(p)}></viab-grafico-barra-ranqueada>
+        </div>
+      ` : nothing}
     `;
   }
 

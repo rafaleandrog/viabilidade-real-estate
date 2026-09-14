@@ -21,17 +21,10 @@ export const caso = {
     { seletor: 'span.kpi-rodape', minimo: 5 },
   ],
   aceitaNaoReproduzido: [
-    'urbi-checkbox.label',
-    'urbi-grafico-colunas.categorias',
-    'urbi-grafico-colunas.empilhado',
-    'urbi-grafico-colunas.formato',
-    'urbi-grafico-colunas.legenda',
-    'urbi-grafico-colunas.series',
     'urbi-grafico-pizza.categorias',
     'urbi-grafico-pizza.formato',
     'urbi-grafico-pizza.series',
     'urbi-card.titulo',
-    'urbi-kpi.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     (globalThis as any).urbiVerso.api = async (rota: string) => {
