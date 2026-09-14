@@ -42,6 +42,14 @@ export interface LinhaResolvida {
   /** Sempre ≥ 0 — ver o piso da cascata em `calcularCascata` (#612). */
   m2: number;
   ha: number;
+  /**
+   * % contra a base de 100% da cascata — por padrão a própria âncora 1, mas
+   * `calcularCascata` aceita uma base alternativa (`baseM2ParaPct`) para
+   * cascatas em que a âncora 1 é um valor físico (ex.: Área do Terreno) e o
+   * que se quer comparar é outra grandeza derivada dela (ex.: Área
+   * Potencial = terreno × coeficiente máximo, Incorporação). O nome do campo
+   * ficou por compatibilidade — a semântica é "% da base de referência".
+   */
   pctAncora1: number;
   /** `null` = célula em branco (linha antes da âncora 2 existir, ou linha que não a compõe por regra de não-circularidade não aplicável aqui — ver `permiteAncora2`). */
   pctAncora2: number | null;
@@ -88,11 +96,23 @@ const n = (v: any): number => Number(v) || 0;
  * Capar em silêncio seria trocar um número errado por outro: cada linha
  * devolve em `deficitM2` o tamanho do corte, e a tela onde se corrige avisa
  * (mesma filosofia do cap de permuta da #563).
+ *
+ * `baseM2ParaPct` (opcional) — a base de 100% usada em `pctAncora1`. Sem ele,
+ * `pctAncora1` é contra a própria âncora 1 (`ancora1M2`), o comportamento
+ * histórico e o que o Loteamento continua usando (% da Poligonal). A
+ * Incorporação passa a Área Potencial (terreno × coeficiente máximo) aqui —
+ * decisão do autor: a cascata soma áreas CONSTRUÍDAS (que passam de 100% do
+ * terreno em qualquer prédio com mais de um pavimento), então "% Terreno"
+ * não tem leitura útil; "% da área potencial de construção" tem. A linha da
+ * âncora 1 continua mostrando seu próprio m² (o terreno em si) — só a base
+ * do percentual muda. Base ≤ 0 (coeficiente não preenchido) cai no mesmo
+ * piso de `ancora1 > 0` abaixo: 0%, não divisão por zero.
  */
 export function calcularCascata(
   definicao: DefinicaoLinha[],
   estados: Record<string, EstadoLinha>,
   ancora1M2: number,
+  baseM2ParaPct?: number,
 ): LinhaResolvida[] {
   const resolvidosM2: Record<string, number> = {};
   const deficits: Record<string, number> = {};
@@ -137,6 +157,7 @@ export function calcularCascata(
   // fração da âncora mesmo assim; isso é display, não cálculo de m², então
   // uma segunda passada resolve sem violar a não-circularidade dos valores).
   const ancora2 = ancora2Provisorio;
+  const baseParaPct = baseM2ParaPct !== undefined ? Math.max(0, n(baseM2ParaPct)) : ancora1;
   return definicao.map((def) => {
     const m2 = resolvidosM2[def.id];
     return {
@@ -145,7 +166,7 @@ export function calcularCascata(
       papel: def.papel,
       m2,
       ha: m2 / 10_000,
-      pctAncora1: ancora1 > 0 ? (m2 / ancora1) * 100 : 0,
+      pctAncora1: baseParaPct > 0 ? (m2 / baseParaPct) * 100 : 0,
       pctAncora2: def.mostraPctAncora2 && ancora2 != null && ancora2 > 0 ? (m2 / ancora2) * 100 : null,
       deficitM2: deficits[def.id] ?? 0,
     };

@@ -135,8 +135,34 @@ test('Incorporação — layout proposto: Privativa Total soma as 4 componentes;
   // (< 100%), não fica em branco (a âncora só é conhecida DEPOIS dela na
   // cascata, mas isso é resolvido na 2ª passada — ver comentário do motor).
   assert.ok(perto(porId.privativa_total.pctAncora2!, (6700 / 7500) * 100));
-  // Terreno é a âncora 1 — % Terreno de cada componente.
+  // Terreno é a âncora 1 — sem 4º argumento, `pctAncora1` continua contra a
+  // própria âncora 1 (comportamento histórico, preservado por padrão).
   assert.ok(perto(porId.pvt_r_fechada.pctAncora1, (5000 / 20000) * 100));
+});
+
+test('Incorporação — `baseM2ParaPct` troca a base de `pctAncora1` para a Área Potencial (terreno × coeficiente máximo), sem afetar o m² do terreno', () => {
+  const estados: Record<string, EstadoLinha> = {
+    pvt_r_fechada: { modo: 'm2', valor: 5000 },
+    pvt_r_aberta: { modo: 'm2', valor: 500 },
+    pvt_nr_fechada: { modo: 'm2', valor: 1000 },
+    pvt_nr_aberta: { modo: 'm2', valor: 200 },
+    comum: { modo: 'm2', valor: 800 },
+  };
+  // terreno = 20000, coeficiente máximo = 3 → área potencial = 60000.
+  const linhas = calcularCascata(CASCATA_INCORPORACAO, estados, 20000, 60000);
+  const porId = Object.fromEntries(linhas.map((l) => [l.id, l]));
+  assert.ok(perto(porId.terreno.m2, 20000)); // a linha do terreno continua o valor físico
+  assert.ok(perto(porId.terreno.pctAncora1, (20000 / 60000) * 100)); // 33,3%, não 100%
+  assert.ok(perto(porId.pvt_r_fechada.pctAncora1, (5000 / 60000) * 100));
+  assert.ok(perto(porId.construida_total.pctAncora1, (7500 / 60000) * 100));
+});
+
+test('Incorporação — `baseM2ParaPct` ausente ou ≤0 (coeficiente máximo não preenchido) cai em 0%, sem divisão por zero', () => {
+  const estados: Record<string, EstadoLinha> = { pvt_r_fechada: { modo: 'm2', valor: 5000 } };
+  const linhas = calcularCascata(CASCATA_INCORPORACAO, estados, 20000, 0);
+  const porId = Object.fromEntries(linhas.map((l) => [l.id, l]));
+  assert.equal(porId.pvt_r_fechada.pctAncora1, 0);
+  assert.equal(porId.terreno.pctAncora1, 0);
 });
 
 // ── #574: a cascata lida a partir das colunas de `estudos` ─────────────────
