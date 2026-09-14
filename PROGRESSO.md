@@ -4,6 +4,47 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Filtro do seletor de lote (Terreno & Áreas, Incorporação): exclui regularização fundiária + busca por texto (2026-09-14)
+
+Pedido do autor, sem issue prévia: o seletor "Adicionar lote" de `viab-terreno-nucleo.ts`
+(compartilhado por Preliminar e Avançado de Incorporação — Loteamento/gleba fica intocado, pedido
+explícito) só folheava 125 páginas de 50 sem filtro nenhum. Duas mudanças:
+
+1. **Exclusão por padrão dos lotes de regularização fundiária.** Não existe coluna de classificação
+   em lote/imóvel — é o booleano `parcelamentos.regularizacao` no Núcleo, e o lote só herda isso via
+   `parcelamento_id`. O Núcleo não tem filtro server-side por essa coluna (`camposFiltro` de `/lotes`
+   não faz join até `parcelamentos`) — mudar isso é escopo do shell, fora do alcance desta sessão
+   (monorepo só leitura). Solução no app: `listarParcelamentosNucleo` (nova, `viabilidade-api.ts`)
+   resolve o conjunto de ids com `regularizacao=true` uma vez por montagem, e `_carregarLotes`
+   filtra cada lote candidato contra esse conjunto antes de oferecê-lo no `<urbi-select>`.
+2. **Busca por texto**, usando o parâmetro `busca` que `listarLotesNucleo` já aceitava mas nenhum
+   chamador usava.
+
+Como a exclusão acontece DEPOIS da paginação do servidor, uma "página" de 50 pedida ao Núcleo pode
+vir com menos itens elegíveis — a navegação Anterior/Próxima por número de página deixou de fazer
+sentido para o ramo lote. Trocada por acumulação em lotes de 200 (teto do Núcleo) com um botão
+"Carregar mais". O ramo gleba (Loteamento) manteve a paginação numérica antiga, sem alteração.
+
+**Achado real durante a própria implementação, pego pelo render test em Chromium (classe de defeito
+nº 1 do CLAUDE.md):** `connectedCallback()` chama `_carregar()` e a primeira atribuição de `estudo`
+dispara `updated()`, que chama `_carregar()` de novo — as duas corridas sempre acontecem no primeiro
+mount. Para o ramo gleba isso é inofensivo (cada chamada SUBSTITUI `this.opcoes`), mas o ramo lote
+ACUMULA — sem guarda, as duas resoluções assíncronas duplicavam cada lote na lista. Corrigido com um
+contador de sequência (`_cargaSeq`) que invalida qualquer resultado de uma corrida mais antiga.
+Provado pela defesa que o `CLAUDE.md` pede: apagar o `.filter` de regularização deixava a suíte
+inteira verde exceto o novo caso de render (`terreno-nucleo-filtro-regularizacao.render.test.ts`).
+
+Dois casos de render novos (`terreno-nucleo-filtro-regularizacao`, `terreno-nucleo-loteamento-sem-
+filtro`) provam, em DOM real: o lote de parcelamento com `regularizacao=true` some do seletor; a
+busca por texto aparece só em Incorporação; o ramo Loteamento não ganha busca nem chamada a
+`/parcelamentos` e mantém a paginação numérica.
+
+`frontend/api-caminho-relativo.test.ts` bumpado (78→79 funções exportadas) e
+`listarParcelamentosNucleo` adicionada à lista `SEM_CHAMADA_API` (chama `urbiVerso.nucleo()`, não
+`api()` — mesmo padrão das outras três funções do Núcleo).
+
+---
+
 ## #694 · gabarito_maximo/ret_pct nulos deixam de disparar "deve ser um número" (2026-09-14)
 
 `frontend/tela-premissas.ts` monta o PATCH de "Salvar premissas" a partir de uma cópia integral do

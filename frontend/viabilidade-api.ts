@@ -343,6 +343,15 @@ export function listarLotesNucleo(busca = '', pagina = 1, porPagina = 100): Prom
   if (busca) qs.set('busca', busca);
   return urbiVerso.nucleo(`/lotes?${qs}`);
 }
+// Parcelamentos — usado só para descobrir quais são "regularização fundiária"
+// (`regularizacao=true`) e excluir os lotes deles do seletor de Incorporação
+// (#terreno-nucleo-filtro). Não há filtro server-side por essa coluna no
+// Núcleo hoje (camposFiltro de `lotes` não faz join até `parcelamentos`), daí
+// resolver o conjunto de ids aqui e filtrar no cliente.
+export function listarParcelamentosNucleo(pagina = 1, porPagina = 200): Promise<any> {
+  const qs = new URLSearchParams({ por_pagina: String(porPagina), pagina: String(pagina) });
+  return urbiVerso.nucleo(`/parcelamentos?${qs}`);
+}
 export function buscarImovelNucleo(id: number): Promise<any> {
   return urbiVerso.nucleo(`/imoveis/${id}`);
 }

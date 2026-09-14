@@ -68,6 +68,7 @@ const MARCA_RECUSA = Symbol('recusa-do-resolver');
 const SEM_CHAMADA_API: Record<string, string> = {
   listarGlebasNucleo: 'urbiVerso.nucleo() — não passa pelo resolver do shell',
   listarLotesNucleo: 'urbiVerso.nucleo() — não passa pelo resolver do shell',
+  listarParcelamentosNucleo: 'urbiVerso.nucleo() — não passa pelo resolver do shell',
   buscarImovelNucleo: 'urbiVerso.nucleo() — não passa pelo resolver do shell',
   uploadDocumentoApelo: 'fetch nativo em /api/dados/... — caminho absoluto, fora do resolver',
   uploadDocumentoEmpreendimento: 'fetch nativo em /api/dados/... — caminho absoluto, fora do resolver',
@@ -92,7 +93,7 @@ const ARG_ATIVO = {
 // Quantas funções o wrapper exporta. Trava a porta que a lista de exceção
 // deixaria aberta: função nova que nasça com o slug entra no laço abaixo em
 // vez de passar despercebida.
-const FUNCOES_EXPORTADAS = 78;
+const FUNCOES_EXPORTADAS = 79;
 
 type Registro = { fn: string; url: string };
 
