@@ -19,7 +19,7 @@ em `frontend/auditoria-indicadores-preliminar.test.ts`.
 |---|---|---|---|
 | 2.1 | Rótulo que não corresponde ao denominador | ✅ não achado — "Margem sobre VGV" reproduz `resultado/vgv` | teste `2.1`, `proforma.ts:708` |
 | 2.2 | Indicadores algebricamente redundantes | ✅ não achado — ROI e Margem sobre VGV **não** são redundantes pela identidade `retorno=margem/(1-margem)` do handoff; denominadores genuinamente distintos (`investimentoTotal` × `vgv`) | teste `2.2` |
-| 2.3 | Medidores duplicados com rótulos diferentes | 🔴 **achado real** — o medidor "Resultado final" plota o mesmo valor que "Margem sobre VGV" | teste `2.3` (documenta o bug), `tela-graficos.ts:254` |
+| 2.3 | Medidores duplicados com rótulos diferentes | ✅ **consertado** — o medidor "Resultado final" plotava o mesmo valor que "Margem sobre VGV"; aposentado | teste `2.3` (confirma o conserto), `tela-graficos.ts:254` |
 | 2.4 | Mesmo rótulo, valores diferentes em telas diferentes | ✅ não achado — "Margem sobre VGV" (Preliminar) e "Margem sobre Receita Bruta" (Avançado) são rótulos distintos | teste `2.4`, `frontend/rotulos-indicador.ts` |
 | 2.5 | Indicador que não reconcilia com nenhuma base | ✅ não achado (hoje) — `roiPct`/`margemLiquidaPct`/`custoObrasVgvPct` são `null`, não `0`, quando o denominador é ≤ 0 | teste `2.5` |
 | 2.6 | Benchmark que reprova metade do painel | ✅ não achado — metas padrão não reprovam estudos saudáveis em massa | teste `2.6` |
@@ -27,16 +27,19 @@ em `frontend/auditoria-indicadores-preliminar.test.ts`.
 
 ## Disposição de cada achado
 
-### 2.3 — medidor duplicado (bloqueante, consertado nesta rodada)
+### 2.3 — medidor duplicado (bloqueante, consertado)
 
-`tela-graficos.ts:_renderMedidores` passa `resultado_final: p.margemLiquidaPct` —
+`tela-graficos.ts:_renderMedidores` passava `resultado_final: p.margemLiquidaPct` —
 literalmente o mesmo valor de `margem_liquida` — para `resolverIndicadoresBenchmark`.
 `backend/rotas/benchmarks.ts` semeia os dois benchmarks (`resultado_final` meta 25%,
 `margem_liquida` meta 20%) em todo estudo novo. Resultado: dois medidores, dois rótulos, metas
 diferentes, o mesmo número plotado nos dois.
 
-**Disposição:** aposentar o medidor "Resultado final" (não reescalar) — decisão do autor, registrada
-no plano desta rodada. PR próprio na fila (depois desta auditoria).
+**Disposição:** aposentado, não reescalado — decisão do autor. A chave saiu da chamada a
+`resolverIndicadoresBenchmark`; `resultado_final` agora é descartado com o mesmo motivo que
+`eficiencia_aproveitamento` já tinha no Resumo do Avançado (`SEM_VALOR_NESTA_TELA_MOTIVO`). O
+backend continua semeando o benchmark `resultado_final` (compartilhado com o Avançado, fora do
+escopo desta rodada) — só o Preliminar parou de desenhar um medidor duplicado com ele.
 
 ### 2.7 — sensibilidade sem ranking (registrado, não corrigido)
 

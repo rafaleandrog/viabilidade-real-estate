@@ -251,7 +251,14 @@ export class ViabTelaGraficos extends LitElement {
     const { exibiveis } = resolverIndicadoresBenchmark(this.benchmarks, {
       custo_obras_vgv: p.custoObrasVgvPct,
       margem_liquida: p.margemLiquidaPct,
-      resultado_final: p.margemLiquidaPct,
+      // Rodada 12 (achado 2.3 da auditoria, docs/rodada-12/auditoria.md):
+      // "Resultado final" plotava o MESMO valor de "Margem sobre VGV" — dois
+      // rótulos, uma fórmula. Aposentado, não reescalado (decisão do autor):
+      // a grandeza em R$ do resultado não cabe bem numa escala de 0–100%,
+      // que é o que todo o resto dos medidores de benchmark usa. Sem essa
+      // chave, `resolverIndicadoresBenchmark` descarta `resultado_final` com
+      // `SEM_VALOR_NESTA_TELA_MOTIVO` — o mesmo motivo que já vale para
+      // `eficiencia_aproveitamento` no Resumo do Avançado.
       // #611: sem investimento não há denominador — `roiPct` já vem `null`
       // do motor desde a fase 2 da issue, e `roiParaFaixa` é hoje um alias
       // dele (mantido pelo call site continuar nomeado). `montarMedidor` é

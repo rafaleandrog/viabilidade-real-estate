@@ -17,11 +17,12 @@
 // (`backend/rotas/benchmarks.ts`, `benchmarksPadrao`) — a semente nem cria o
 // campo para o outro tipo.
 //
-// A ASSERÇÃO é o piso de CINCO medidores. Um Loteamento com os benchmarks
-// semeados tem exatamente 5 indicadores exibíveis (os 4 comuns + o dele);
-// apagar a linha `eficiencia_aproveitamento:` de `_renderMedidores` derruba a
-// contagem para 4 e reprova este caso. É a única camada deste repositório que
-// enxerga "o componente não chamou".
+// A ASSERÇÃO é o piso de QUATRO medidores (custo_obras_vgv, margem_liquida,
+// roi, eficiencia_aproveitamento — Rodada 12 aposentou "resultado_final" do
+// wiring, ver o comentário do benchmark id 3 abaixo). Apagar a linha
+// `eficiencia_aproveitamento:` de `_renderMedidores` derruba a contagem para
+// 3 e reprova este caso. É a única camada deste repositório que enxerga "o
+// componente não chamou".
 
 import '../../tela-graficos.js';
 import { forcarEstado } from './dados.js';
@@ -69,12 +70,12 @@ const PRODUTOS_LOTEAMENTO: Record<string, any>[] = [
   { id: 1, nome: 'Lote padrão', ordem: 0, area_media_m2: 300, preco_venda_m2: 1_000, unidades: 130 },
 ];
 
-// Os benchmarks que `benchmarksPadrao('loteamento')` semeia, com as 4 âncoras
+// Os benchmarks que `benchmarksPadrao('loteamento')` semeia, com as âncoras
 // de medidor preenchidas. Valores do fixture, conferidos por `calcularProforma`
 // e registrados no corpo do PR: `custoObrasVgvPct` = 30, `margemLiquidaPct` ≈
 // 23,78, `roiPct` ≈ 35,91 e `eficienciaPct` ≈ 52,20.
 //
-// As âncoras deixam os CINCO valores DENTRO da escala de propósito: sem
+// As âncoras deixam os valores DENTRO da escala de propósito: sem
 // `foraEscala` a aba não desenha nenhum `urbi-badge`, e a contagem de medidores
 // fica sendo a única variável que este caso mede. Quem cobre o aviso de fora da
 // escala é `casos/medidores-graficos.ts`.
@@ -83,17 +84,19 @@ const BENCHMARKS = [
     medidor_min: 10, medidor_faixa1_ate: 20, medidor_faixa2_ate: 30, medidor_max: 45 },
   { id: 2, campo: 'margem_liquida', valor: 20, regra_comparacao: 'atingir_ou_superar',
     medidor_min: 5, medidor_faixa1_ate: 15, medidor_faixa2_ate: 25, medidor_max: 40 },
-  { id: 3, campo: 'resultado_final', valor: 25, regra_comparacao: 'atingir_ou_superar',
-    medidor_min: 5, medidor_faixa1_ate: 15, medidor_faixa2_ate: 25, medidor_max: 40 },
   { id: 4, campo: 'roi', valor: 15, regra_comparacao: 'atingir_ou_superar',
     medidor_min: 10, medidor_faixa1_ate: 20, medidor_faixa2_ate: 30, medidor_max: 50 },
   // ⚠️ O CAMPO DA #613 — o exclusivo do Loteamento, com a meta de 40% da
   // semente. Sem a fiação em `_renderMedidores` ele volta para `descartados` e
-  // o piso de 5 medidores abaixo reprova.
+  // o piso de 4 medidores abaixo reprova.
   { id: 5, campo: 'eficiencia_aproveitamento', valor: 40, regra_comparacao: 'atingir_ou_superar',
     medidor_min: 30, medidor_faixa1_ate: 40, medidor_faixa2_ate: 50, medidor_max: 70 },
   // Semeados e DESCARTADOS, cada um pelo seu motivo — provam que os descartes
-  // continuam não travando a tela nem inflando a contagem acima.
+  // continuam não travando a tela nem inflando a contagem acima. `id: 3`
+  // (`resultado_final`) entrou nesta lista na Rodada 12: aposentado do
+  // wiring de `_renderMedidores` (achado 2.3 da auditoria), passa a ser
+  // descartado com `SEM_VALOR_NESTA_TELA_MOTIVO` como os outros dois.
+  { id: 3, campo: 'resultado_final', valor: 25, regra_comparacao: 'atingir_ou_superar' },
   { id: 6, campo: 'margem_bruta', valor: 30, regra_comparacao: 'atingir_ou_superar' },
   { id: 7, campo: 'preco', valor: 0, regra_comparacao: 'atingir_ou_superar' },
 ];
@@ -104,9 +107,10 @@ export const caso = {
     // Composição dos custos · Receita × Custos · Alocação de áreas da gleba ·
     // Indicadores vs. benchmark.
     { seletor: 'urbi-card', minimo: 4 },
-    // ⚠️ A ASSERÇÃO DA #613. Quatro indicadores comuns + a eficiência de
-    // aproveitamento. Com a fiação apagada sobram 4 e o caso reprova.
-    { seletor: 'urbi-grafico-medidor', minimo: 5 },
+    // ⚠️ A ASSERÇÃO DA #613. Três indicadores comuns (custo_obras_vgv,
+    // margem_liquida, roi) + a eficiência de aproveitamento. Com a fiação
+    // apagada sobram 3 e o caso reprova.
+    { seletor: 'urbi-grafico-medidor', minimo: 4 },
     // A aba de um Loteamento continua montando inteira ao redor do medidor
     // novo: pizza de custos + pizza da gleba, e a coluna Receita × Custos.
     { seletor: 'urbi-grafico-pizza', minimo: 2 },
