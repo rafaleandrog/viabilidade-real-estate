@@ -4,6 +4,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #694 · gabarito_maximo/ret_pct nulos deixam de disparar "deve ser um número" (2026-09-14)
+
+`frontend/tela-premissas.ts` monta o PATCH de "Salvar premissas" a partir de uma cópia integral do
+registro do estudo, e envia quase tudo — inclusive dois campos que nenhuma tela de Premissas edita:
+`gabarito_maximo` (coluna órfã, sem controle de UI em lugar nenhum, sempre `null`) e `ret_pct`
+(gerido de verdade por `backend/rotas/avancado.ts`, mas viaja sem querer no payload de Premissas).
+`null` numa coluna `decimal` dispara "Campo X deve ser um número" no validador do shell, mesmo
+sendo nullable — mesmo mecanismo que motivou `CAMPOS_SOMENTE_AVANCADO`, só que aqui o campo é órfão
+em qualquer nível de análise.
+
+**A inversão genérica (armadilha 14 do CLAUDE.md) foi considerada e descartada com evidência.**
+Investigação achou um contraexemplo real: `_editarCustoUnidade` (`frontend/tela-premissas.ts`)
+grava `null` DE PROPÓSITO em campos `*_valor_canonico`/`*_area_canonica` — fora de `TODOS_NUM` —
+quando o usuário limpa um custo por unidade. "Omitir todo campo fora do que o formulário edita
+quando vier `null`" apagaria essa escrita legítima. Por isso a correção ficou no backend
+(`backend/rotas/estudos.ts:montarPatchEstudo`), como uma lista nomeada `CAMPOS_OMITIR_SE_NULO`
+(mesmo padrão de `CAMPOS_SOMENTE_AVANCADO`) — só omite os dois campos conhecidos, e só quando
+`null`; um valor de verdade continua indo ao PATCH normalmente.
+
+Coberto por 4 testes novos em `backend/rotas/estudos.test.ts` — inclusive um que prova que o filtro
+NÃO é genérico, exercitando `construcao_valor_canonico: null` fora da lista.
+
+---
+
 ## Incidente — a app parou inteira na instância, e não era perda de dados (2026-09-04)
 
 **Sintoma relatado:** nenhuma tela carregava dado, não dava para criar estudo, e os estudos que
