@@ -3,8 +3,8 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtNum } from './viab-format.js';
 import {
-  urbiVerso, listarGlebasNucleo, listarLotesNucleo, buscarImovelNucleo,
-  vincularImovel, desvincularImovel, atualizarEstudo,
+  urbiVerso, listarGlebasNucleo, listarLotesNucleo, listarParcelamentosNucleo,
+  buscarImovelNucleo, vincularImovel, desvincularImovel, atualizarEstudo,
 } from './viabilidade-api.js';
 
 // Seleção do terreno vindo do Núcleo (§4.1/§6.6).
@@ -19,10 +19,24 @@ import {
 // A área autoritativa vem sempre de GET /imoveis/:id (a área é atributo do
 // supertipo `imoveis`; a listagem de subtipo pode não trazê-la). A listagem de
 // glebas/lotes serve só para o seletor de candidatos (rótulo = id_legivel).
+//
+// Filtro de lotes (Incorporação só): "regularização fundiária" é o booleano
+// `parcelamentos.regularizacao` no Núcleo, não uma coluna de lote/imóvel — o
+// lote herda isso via `parcelamento_id`. O Núcleo não tem filtro server-side
+// por essa coluna (camposFiltro de /lotes não faz join até parcelamentos), então
+// resolvemos o conjunto de ids "de regularização" à parte e filtramos no
+// cliente. Como a exclusão acontece depois da paginação do servidor, a
+// navegação por número de página deixa de fazer sentido (uma "página" pode vir
+// com menos itens do que pedimos) — o seletor de lote acumula em lotes de 200
+// (teto do Núcleo) com um botão "Carregar mais", em vez de Anterior/Próxima.
+// Loteamento (glebas) não usa nada disso e mantém a paginação numérica antiga.
 
 interface ImovelVinculado { vinculoId: number; imovelId: number; rotulo: string; area: number; }
+interface OpcaoCandidato { valor: string; rotulo: string; }
 
-const POR_PAGINA = 50;
+const POR_PAGINA_GLEBA = 50;
+const POR_PAGINA_LOTE = 200; // teto de paginação do Núcleo (docs/shell/nucleo.md § Paginação)
+const DEBOUNCE_BUSCA_MS = 400;
 
 @customElement('viab-terreno-nucleo')
 export class ViabTerrenoNucleo extends LitElement {
@@ -32,11 +46,27 @@ export class ViabTerrenoNucleo extends LitElement {
   @state() private carregando = true;
   @state() private disponivel = true;
   @state() private motivo = '';
-  @state() private opcoes: { valor: string; rotulo: string }[] = [];
+  @state() private opcoes: OpcaoCandidato[] = [];
   @state() private vinculados: ImovelVinculado[] = [];
   @state() private salvando = false;
+
+  // Paginação numérica — só usada pelo ramo Loteamento (gleba).
   @state() private _pagina = 1;
   @state() private _totalItens = 0;
+
+  // Acumulação — só usada pelo ramo Incorporação (lote).
+  @state() private _loteCursor = 1;
+  @state() private _loteTemMais = false;
+  @state() private _loteTotalBruto = 0;
+  @state() private _carregandoMais = false;
+  @state() private _busca = '';
+  private _buscaDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  // Conjunto de ids de parcelamento com regularizacao=true (Incorporação só).
+  // null = ainda não resolvido; undefined de fetch (indisponível) não bloqueia
+  // o seletor, só desliga o filtro com um aviso.
+  @state() private _idsRegularizacao: Set<number> | null = null;
+  @state() private _regularizacaoIndisponivel = false;
 
   static styles = [estiloConteudo, css`
     .lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -46,6 +76,7 @@ export class ViabTerrenoNucleo extends LitElement {
     .total { display: flex; justify-content: space-between; margin-top: 8px; font-weight: 600; }
     .add { display: flex; gap: 8px; align-items: flex-end; margin-top: 12px; }
     .add urbi-select { flex: 1; min-width: 180px; }
+    .busca { display: block; width: 100%; min-height: 32px; box-sizing: border-box; margin-top: 12px; }
     urbi-banner { margin-bottom: 12px; }
     .pag-info { display: block; margin-top: 8px; font-size: 0.75rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
     .pag-btns { display: flex; gap: 8px; margin-top: 8px; }
@@ -56,7 +87,7 @@ export class ViabTerrenoNucleo extends LitElement {
     this._carregar();
   }
   updated(ch: Map<string, unknown>) {
-    if (ch.has('estudo')) this._carregar(1);
+    if (ch.has('estudo')) this._carregar();
   }
 
   private get _ehLoteamento(): boolean {
@@ -65,33 +96,132 @@ export class ViabTerrenoNucleo extends LitElement {
   private get _subtipo(): string { return this._ehLoteamento ? 'gleba' : 'lote'; }
   private get _vinculos(): any[] { return this.estudo?.imoveis ?? []; }
 
-  private async _carregar(pagina = this._pagina) {
+  // `connectedCallback()` chama `_carregar()` e a primeira atribuição de
+  // `estudo` (o Lit conta null→objeto como mudança) dispara `updated()`, que
+  // chama de novo — as DUAS corridas acontecem sempre no primeiro mount. Para
+  // o ramo gleba isso é inofensivo (cada chamada SUBSTITUI `this.opcoes`),
+  // mas o ramo lote ACUMULA (`[...this.opcoes, ...novas]`) — sem guarda, as
+  // duas corridas resolvem uma depois da outra e duplicam cada lote na lista.
+  // Medido: sem este contador, o seletor mostrava "L2-OK" duas vezes.
+  private _cargaSeq = 0;
+
+  private async _carregar(paginaGleba = this._pagina) {
     if (!this.estudo) return;
+    const seq = ++this._cargaSeq;
     this.carregando = true;
     this.disponivel = true;
     this.motivo = '';
     try {
-      // Candidatos para o seletor (rótulo apenas), paginados.
-      const lista = this._ehLoteamento
-        ? await listarGlebasNucleo('', pagina, POR_PAGINA)
-        : await listarLotesNucleo('', pagina, POR_PAGINA);
-      this._totalItens = lista?.total ?? 0;
-      this._pagina = pagina;
-      const usados = new Set(this._vinculos.map((v) => Number(v.imovel_nucleo_id)));
-      this.opcoes = (lista?.dados ?? [])
-        .filter((o: any) => !usados.has(Number(o.id)))
-        .map((o: any) => ({ valor: String(o.id), rotulo: o.id_legivel || `#${o.id}` }));
+      if (this._ehLoteamento) {
+        const lista = await listarGlebasNucleo('', paginaGleba, POR_PAGINA_GLEBA);
+        if (seq !== this._cargaSeq) return;
+        this._totalItens = lista?.total ?? 0;
+        this._pagina = paginaGleba;
+        const usados = new Set(this._vinculos.map((v) => Number(v.imovel_nucleo_id)));
+        this.opcoes = (lista?.dados ?? [])
+          .filter((o: any) => !usados.has(Number(o.id)))
+          .map((o: any) => ({ valor: String(o.id), rotulo: o.id_legivel || `#${o.id}` }));
+      } else {
+        if (this._idsRegularizacao === null) await this._carregarIdsRegularizacao();
+        if (seq !== this._cargaSeq) return;
+        this._loteCursor = 1;
+        this.opcoes = [];
+        await this._carregarLotes({ reiniciar: true, seq });
+        if (seq !== this._cargaSeq) return;
+      }
       // Detalhe autoritativo (área) dos imóveis já vinculados.
-      this.vinculados = await this._resolverVinculados(this._vinculos);
+      const vinculados = await this._resolverVinculados(this._vinculos);
+      if (seq !== this._cargaSeq) return;
+      this.vinculados = vinculados;
     } catch (e: any) {
+      if (seq !== this._cargaSeq) return;
       this.disponivel = false;
       this.motivo = e?.message || 'Indisponível';
     }
-    this.carregando = false;
+    if (seq === this._cargaSeq) this.carregando = false;
+  }
+
+  // Resolve o conjunto de parcelamentos "de regularização fundiária" uma vez
+  // (não repete por lote/página). Pagina em laço até a página vir incompleta —
+  // o Núcleo não tem "trazer tudo" (docs/shell/nucleo.md § Paginação).
+  private async _carregarIdsRegularizacao(): Promise<void> {
+    const ids = new Set<number>();
+    try {
+      let pagina = 1;
+      for (;;) {
+        const lista = await listarParcelamentosNucleo(pagina, POR_PAGINA_LOTE);
+        const dados: any[] = lista?.dados ?? [];
+        for (const p of dados) if (p?.regularizacao) ids.add(Number(p.id));
+        const totalPaginas = Number(lista?.paginas) || 1;
+        if (dados.length < POR_PAGINA_LOTE || pagina >= totalPaginas) break;
+        pagina += 1;
+      }
+      this._idsRegularizacao = ids;
+      this._regularizacaoIndisponivel = false;
+    } catch {
+      // Não bloqueia o seletor de lote por causa disto — só desliga o filtro.
+      this._idsRegularizacao = new Set();
+      this._regularizacaoIndisponivel = true;
+    }
+  }
+
+  // Busca e acumula o próximo lote de candidatos (Incorporação). `reiniciar`
+  // zera a acumulação antes de buscar (troca de busca por texto ou de estudo).
+  // `seq` é o mesmo contador de `_carregar()` — sem checá-lo de novo aqui
+  // (não só no chamador), uma corrida que passou pelo `if (seq !== ...)` de
+  // `_carregar()` mas ainda está com este `await` em voo escreveria por cima
+  // do resultado de uma corrida mais nova de qualquer forma.
+  private async _carregarLotes(opts: { reiniciar?: boolean; seq?: number } = {}): Promise<void> {
+    const seq = opts.seq ?? this._cargaSeq;
+    if (opts.reiniciar) {
+      this._loteCursor = 1;
+      this.opcoes = [];
+    }
+    const lista = await listarLotesNucleo(this._busca, this._loteCursor, POR_PAGINA_LOTE);
+    if (seq !== this._cargaSeq) return;
+    const dados: any[] = lista?.dados ?? [];
+    this._loteTotalBruto = Number(lista?.total) || 0;
+    const totalPaginas = Number(lista?.paginas) || 1;
+    this._loteTemMais = dados.length === POR_PAGINA_LOTE && this._loteCursor < totalPaginas;
+    const usados = new Set(this._vinculos.map((v) => Number(v.imovel_nucleo_id)));
+    const idsReg = this._idsRegularizacao ?? new Set<number>();
+    const novas = dados
+      .filter((o: any) => !usados.has(Number(o.id)))
+      .filter((o: any) => !idsReg.has(Number(o.parcelamento_id)))
+      .map((o: any) => ({ valor: String(o.id), rotulo: o.id_legivel || `#${o.id}` }));
+    this.opcoes = [...this.opcoes, ...novas];
+    this._loteCursor += 1;
+  }
+
+  private async _carregarMaisLotes() {
+    if (this._carregandoMais || !this._loteTemMais) return;
+    this._carregandoMais = true;
+    const seq = this._cargaSeq;
+    try {
+      await this._carregarLotes({ seq });
+    } catch (e: any) {
+      urbiVerso.notificar(e?.message || 'Erro ao carregar mais lotes', 'erro');
+    } finally {
+      this._carregandoMais = false;
+    }
+  }
+
+  private _onBuscaInput(texto: string) {
+    this._busca = texto;
+    if (this._buscaDebounce) clearTimeout(this._buscaDebounce);
+    this._buscaDebounce = setTimeout(() => {
+      this._buscaDebounce = null;
+      // Bump do contador: invalida qualquer `_carregar()`/`_carregarLotes()`
+      // ainda em voo de ANTES da busca — sem isto, uma resposta lenta do
+      // carregamento inicial poderia chegar depois e sobrescrever o
+      // resultado da busca do usuário.
+      const seq = ++this._cargaSeq;
+      void this._carregarLotes({ reiniciar: true, seq });
+    }, DEBOUNCE_BUSCA_MS);
   }
 
   private _totalPaginas(): number {
-    return Math.max(1, Math.ceil(this._totalItens / POR_PAGINA));
+    return Math.max(1, Math.ceil(this._totalItens / POR_PAGINA_GLEBA));
   }
 
   private async _resolverVinculados(vinculos: any[]): Promise<ImovelVinculado[]> {
@@ -201,13 +331,17 @@ export class ViabTerrenoNucleo extends LitElement {
   }
 
   private _renderAdd(): TemplateResult {
+    return this._ehLoteamento ? this._renderAddGleba() : this._renderAddLote();
+  }
+
+  private _renderAddGleba(): TemplateResult {
     // Loteamento: 1 gleba só — some o seletor quando já há uma.
-    if (this._ehLoteamento && this.vinculados.length >= 1) {
+    if (this.vinculados.length >= 1) {
       return html`<p class="sec">Loteamento admite exatamente 1 gleba. Remova a atual para trocar.</p>`;
     }
     const totalPag = this._totalPaginas();
     const paginacaoInfo = this._totalItens > 0
-      ? html`<span class="pag-info">Página ${this._pagina} de ${totalPag} (${this._totalItens} ${this._subtipo}s)</span>`
+      ? html`<span class="pag-info">Página ${this._pagina} de ${totalPag} (${this._totalItens} glebas)</span>`
       : nothing;
     const paginacaoBotoes = totalPag > 1 ? html`
       <div class="pag-btns">
@@ -220,15 +354,15 @@ export class ViabTerrenoNucleo extends LitElement {
       </div>` : nothing;
     if (this.opcoes.length === 0) {
       return html`
-        <p class="sec">Nenhum ${this._subtipo} disponível nesta página para vincular.</p>
+        <p class="sec">Nenhuma gleba disponível nesta página para vincular.</p>
         ${paginacaoInfo}${paginacaoBotoes}
       `;
     }
     return html`
       <div class="add">
         <urbi-select
-          label=${this._ehLoteamento ? 'Gleba' : 'Adicionar lote'}
-          placeholder=${this._ehLoteamento ? 'Selecionar gleba…' : 'Selecionar lote…'}
+          label="Gleba"
+          placeholder="Selecionar gleba…"
           pesquisavel
           .valor=${''}
           .opcoes=${this.opcoes}
@@ -237,6 +371,54 @@ export class ViabTerrenoNucleo extends LitElement {
         ></urbi-select>
       </div>
       ${paginacaoInfo}${paginacaoBotoes}
+    `;
+  }
+
+  private _renderAddLote(): TemplateResult {
+    const busca = html`
+      <urbi-input class="busca" label="Buscar lote" placeholder="Número, quadra, conjunto ou rua…"
+        .valor=${this._busca}
+        @urbi:input-change=${(e: CustomEvent) => this._onBuscaInput(e.detail?.valor ?? '')}
+      ></urbi-input>
+      ${this._regularizacaoIndisponivel
+        ? html`<urbi-banner variante="alerta">
+            Não foi possível conferir a classificação de regularização fundiária no Núcleo — a
+            lista abaixo não está filtrada por essa regra.
+          </urbi-banner>`
+        : nothing}
+    `;
+    const carregarMaisBtn = this._loteTemMais ? html`
+      <div class="pag-btns">
+        <urbi-botao variante="secundario" pequeno icone="fa-solid fa-arrow-down"
+          ?carregando=${this._carregandoMais}
+          ?desabilitado=${this.salvando}
+          @click=${() => this._carregarMaisLotes()}>Carregar mais</urbi-botao>
+      </div>` : nothing;
+    const info = html`<span class="pag-info">
+      ${this.opcoes.length} lote${this.opcoes.length === 1 ? '' : 's'} elegível(is) carregado(s)
+      (de ${this._loteTotalBruto} no Núcleo, sem excluir regularização fundiária)
+    </span>`;
+    if (this.opcoes.length === 0) {
+      return html`
+        ${busca}
+        <p class="sec">Nenhum lote disponível para vincular${this._busca ? ' com esse filtro' : ''}.</p>
+        ${info}${carregarMaisBtn}
+      `;
+    }
+    return html`
+      ${busca}
+      <div class="add">
+        <urbi-select
+          label="Adicionar lote"
+          placeholder="Selecionar lote…"
+          pesquisavel
+          .valor=${''}
+          .opcoes=${this.opcoes}
+          ?desabilitado=${this.salvando}
+          @urbi:select-change=${(e: CustomEvent) => this._adicionar(parseInt(e.detail?.valor))}
+        ></urbi-select>
+      </div>
+      ${info}${carregarMaisBtn}
     `;
   }
 }
