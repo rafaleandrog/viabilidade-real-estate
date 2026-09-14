@@ -36,6 +36,10 @@ export interface NotacaoLinha {
   v: number;
   tipo?: 'receita' | 'consolidado' | 'resultado';
   natureza?: 'receita';
+  // Linha acima de "Receita bruta (VGV)" (VGV sem permuta física + as duas
+  // deduções de permuta) — mesmo campo de `Linha` (`frontend/tela-proforma.ts`).
+  // Ver `pctVgvProforma`.
+  semPct?: boolean;
 }
 
 // #567: receita (VGV, sub-linhas de produto, consolidados marcados
@@ -125,6 +129,11 @@ export function avisoPermutaCapada(p: Proforma): string {
  * Resultado negativo saía com % positiva no CSV e no PDF, e negativa na tela.
  */
 export function pctVgvProforma(r: NotacaoLinha, p: Proforma): string {
+  // #10 (2026-09-14): linhas acima de "Receita bruta (VGV)" — o bloco de
+  // permuta física e sua composição por produto — não mostram % VGV: a base
+  // da coluna, `p.vgv`, só existe DEPOIS delas, e uma % ali sugeriria uma
+  // relação que a própria tabela ainda não fechou naquele ponto.
+  if (r.semPct) return '—';
   if (p.vgv <= 0) return '—';
   return r.tipo === 'resultado'
     ? fmtPct(r.v / p.vgv * 100)
@@ -153,12 +162,15 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
     // teria como saber por quê.
     ...(p.permutaCapada ? [{ l: avisoPermutaCapada(p), v: 0, nota: true }] : []),
     ...(temPermuta ? [
-      { l: 'VGV sem permuta física', v: p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial, ocultarSeZero: true },
+      // `semPct: true` nas três — mesma exceção que a tela aplica desde
+      // 2026-09-14 (ver `pctVgvProforma`): acima de "Receita bruta (VGV)" não
+      // há % VGV.
+      { l: 'VGV sem permuta física', v: p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial, ocultarSeZero: true, semPct: true },
       // #574 (achado 7): rótulo espelha o que a tela já usa no Loteamento
       // (`tela-proforma.ts`, `montarLinhasProforma`) — não é rótulo novo, é a
       // exportação parar de divergir da tela.
-      { l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true },
-      { l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true },
+      { l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true, semPct: true },
+      { l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true, semPct: true },
     ] : []),
     { l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita' },
     { l: '= Deduções sobre VGV', v: deducoesVgv, tipo: 'consolidado' },

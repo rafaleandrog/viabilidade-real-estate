@@ -36,6 +36,10 @@ export interface Linha {
   semPermuta?: boolean;   // #10: linha "VGV sem permuta" (itálico, sub-linha de contexto)
   memo?: string;          // #8: descrição da conta, na 2ª coluna (menor, itálico)
   soLot?: boolean; soInc?: boolean; ocultarSeZero?: boolean;
+  // Linha acima de "Receita bruta (VGV)" (o bloco de permuta física e sua
+  // composição por produto): a % VGV não faz sentido ali, porque a base
+  // (`p.vgv`) é o valor DEPOIS dessas linhas, não antes. Ver `pctVgvProforma`.
+  semPct?: boolean;
 }
 
 // Coluna R$/m²: mesma decisão de sinal (`negativoContabil`) que `celula`
@@ -131,24 +135,39 @@ export function montarLinhasProforma(p: Proforma, vgvBruto: number, ctx: Context
   const deducoesVgv = p.imposto + p.corretagem + p.marketing + p.permutaFinResidencial + p.permutaFinNaoResidencial;
 
   const linhas: Linha[] = [];
+  // BUG7-10: uma sub-linha por produto do catálogo (mesmo padrão dos grupos
+  // de custo) — só existe na TELA (a exportação não lista o catálogo por
+  // linha). O valor de cada uma é o BRUTO do produto (`vgvProduto`, sem
+  // descontar permuta), então ela só pode ser filha do header que também é
+  // bruto: "VGV sem permuta física" quando há permuta, "Receita bruta (VGV)"
+  // quando não há. Presa ao header errado, a soma dos filhos não bate com o
+  // valor que ele mostra — era exatamente esse o defeito que gerava a
+  // impressão de "VGV duplicado" (issue do autor, 2026-09-14): o mesmo VGV
+  // bruto aparecia como linha fixa E, incorretamente, como soma dos filhos
+  // de um header líquido.
+  const linhasProduto: Linha[] = ctx.produtos.map((produto) => ({
+    l: produto.nome || `Produto ${produto.id}`, v: vgvProduto(produto),
+    grupo: 'receita', natureza: 'receita', ocultarSeZero: true,
+  }));
   // #572: bloco de permuta física (só quando houver) — ANTES da Receita
   // bruta (VGV). Residencial e Não Residencial separados. Ver o comentário
   // do topo desta função para a identidade aritmética que esta ordem fecha.
   if (p.areaPermutaFisica > 0) {
-    linhas.push({ l: 'VGV sem permuta física', v: vgvBruto, semPermuta: true, ocultarSeZero: true });
-    linhas.push({ l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true, memo: permMemo(p.areaPermutaResidencial) });
-    linhas.push({ l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true, memo: permMemo(p.areaPermutaNaoResidencial) });
-  }
-  // BUG7-10: Receita bruta (VGV) — header colapsável, com uma sub-linha por
-  // produto do catálogo (mesmo padrão dos grupos de custo). As sub-linhas de
-  // produto só existem na TELA (a exportação não lista o catálogo por linha)
-  // — ficam dentro do grupo 'receita', logo depois do header.
-  linhas.push({ l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita', toggle: 'receita' });
-  for (const produto of ctx.produtos) {
-    linhas.push({
-      l: produto.nome || `Produto ${produto.id}`, v: vgvProduto(produto),
-      grupo: 'receita', natureza: 'receita', ocultarSeZero: true,
-    });
+    // O toggle (e a composição por produto) mora aqui, não em "Receita bruta
+    // (VGV)": um único VGV colapsável, não dois — pedido do autor
+    // (2026-09-14). As linhas deste bloco (o header, os produtos e as duas
+    // deduções de permuta) ficam sem % VGV: a base da coluna, `p.vgv`, é o
+    // valor que só existe DEPOIS delas.
+    linhas.push({ l: 'VGV sem permuta física', v: vgvBruto, semPermuta: true, ocultarSeZero: true, toggle: 'receita', semPct: true });
+    for (const linha of linhasProduto) linhas.push({ ...linha, semPct: true });
+    linhas.push({ l: lot ? '(-) Permuta física' : '(-) Permuta física residencial', v: p.vgvPermutaResidencial, ocultarSeZero: true, memo: permMemo(p.areaPermutaResidencial), semPct: true });
+    linhas.push({ l: '(-) Permuta física não residencial', v: p.vgvPermutaNaoResidencial, soInc: true, ocultarSeZero: true, memo: permMemo(p.areaPermutaNaoResidencial), semPct: true });
+    linhas.push({ l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita' });
+  } else {
+    // Sem permuta física, "Receita bruta (VGV)" já É o bruto: o toggle e a
+    // composição por produto ficam nela, como antes da #572/BUG7-10.
+    linhas.push({ l: 'Receita bruta (VGV)', v: p.vgv, tipo: 'receita', toggle: 'receita' });
+    for (const linha of linhasProduto) linhas.push(linha);
   }
   // #9: "Deduções sobre VGV" consolida imposto+corretagem+marketing+permuta fin.,
   // como header colapsável logo abaixo da Receita bruta.
@@ -208,7 +227,10 @@ export class ViabTelaProforma extends LitElement {
   @state() private aliquotaRet = 4;
   @state() private varSens: VarSens = 'preco';
   // #9: grupos consolidados colapsados (default: expandido). O total é o header.
-  @state() private colapso: Record<Grupo, boolean> = { receita: false, deducoes: false, direto: false, indireto: false };
+  // `receita` é a exceção — default RECOLHIDO (2026-09-14): a composição por
+  // produto só existe para explicar o VGV quando pedida, não para duplicar a
+  // linha do header à primeira vista.
+  @state() private colapso: Record<Grupo, boolean> = { receita: true, deducoes: false, direto: false, indireto: false };
   // BUG7-10: catálogo de Produtos, para as sub-linhas de Receita bruta (VGV).
   @state() private produtos: any[] = [];
 
@@ -253,12 +275,14 @@ export class ViabTelaProforma extends LitElement {
       background: none; border: none; color: inherit; cursor: pointer;
       font-size: 0.85rem; line-height: 1; padding: 0 8px 0 0; width: 20px;
     }
-    /* Tipo 1 — Receita (identidade UP: azul primária). #10: mesmo peso/tamanho/
-       destaque da linha Resultado (bold, maior, com fundo), mantendo a cor azul
-       que a distingue do Resultado. */
+    /* Tipo 1 — Receita bruta (VGV). #10: mesmo peso/tamanho/destaque da linha
+       Resultado (bold, maior, com fundo). Cor verde — a mesma convenção de
+       "Receita líquida"/"Receita operacional" (.pf tr.consolidado.nat-receita
+       abaixo) — em vez do azul primário que a distinguia antes: era a cor de
+       identidade da marca, não a cor de receita do próprio app. */
     .pf tr.receita td {
-      color: var(--cor-primaria-solida, #2AA9E0); font-weight: 800; font-size: 1.05rem;
-      background: var(--cor-primaria-fundo, rgba(42,169,224,0.12));
+      color: var(--cor-sucesso); font-weight: 800; font-size: 1.05rem;
+      background: color-mix(in srgb, var(--cor-sucesso) 14%, transparent);
     }
     /* Tipo 2 — Consolidado (bold + fundo de destaque). */
     .pf tr.consolidado td {
@@ -649,7 +673,7 @@ export class ViabTelaProforma extends LitElement {
     // de exportar.ts:39), sem 2ª execução.
     const proforma = (fator: number) => calcularProforma(this._aplicarFator(fator));
     const vgvBrutoDe = (cen: Proforma) => cen.vgv + cen.vgvPermutaResidencial + cen.vgvPermutaNaoResidencial;
-    // Linhas monetárias (6) e, separados por uma divisória com mais respiro, os dois
+    // Linhas monetárias (8) e, separados por uma divisória com mais respiro, os dois
     // indicadores em % (Custo obras/VGV e Margem líquida) exibidos como urbi-badge
     // com a cor do cenário.
     // #11: `natureza` classifica cada linha como receita ou despesa para colorir o
@@ -662,6 +686,16 @@ export class ViabTelaProforma extends LitElement {
     const linhas: { l: string; f: (c: Cen) => number | null; natureza: Natureza; pct?: boolean; badge?: boolean; bmCampo?: string; divisoria?: boolean }[] = [
       { l: 'VGV', f: (c) => c.vgvBruto, natureza: 'receita' },
       { l: 'Receita bruta', f: (c) => c.p.vgv, natureza: 'receita' },
+      // Mesma linha da Proforma (`= Deduções sobre VGV`, `montarLinhasProforma`
+      // acima — imposto + corretagem + marketing + permuta financeira R/NR),
+      // sem cálculo próprio: `c.p.*` já vem do MESMO `calcularProforma` que a
+      // Proforma chama, reprecificado pelo fator do cenário. `permutaFinResidencial`/
+      // `permutaFinNaoResidencial` já escalam com `fatorSens('permuta_financeira')`
+      // dentro do motor (`frontend/proforma.ts`), então esta linha reage
+      // corretamente quando a variável estressada é "Permuta financeira" — sem
+      // isto, a única variável que a afeta, ela nem aparecia em Cenários
+      // (pedido do autor, 2026-09-14).
+      { l: 'Deduções sobre VGV', f: (c) => c.p.imposto + c.p.corretagem + c.p.marketing + c.p.permutaFinResidencial + c.p.permutaFinNaoResidencial, natureza: 'despesa' },
       { l: 'Receita líquida', f: (c) => c.p.receitaLiquida, natureza: 'receita' },
       { l: 'Custo direto total', f: (c) => c.p.custoDiretoTotal, natureza: 'despesa' },
       { l: 'Receita operacional', f: (c) => c.p.receitaOperacional, natureza: 'receita' },

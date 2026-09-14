@@ -29,19 +29,22 @@ export const caso = {
     // variável estressada — a prova de que a sub-aba montada é esta.
     { seletor: 'table.pf.sens', minimo: 2 },
     { seletor: 'urbi-select', minimo: 1 },
-    // 7 linhas monetárias × 3 cenários: as células com a cor do cenário. Se o
-    // `style` inline voltar no lugar das classes `cen-*`, a marca de negativo
-    // deixa de conseguir sobrepô-lo — e este seletor cai junto.
-    { seletor: 'table.pf.sens td.num.cen-base', minimo: 7 },
-    { seletor: 'table.pf.sens td.num.cen-bear', minimo: 7 },
-    { seletor: 'table.pf.sens td.num.cen-bull', minimo: 7 },
+    // 8 linhas monetárias × 3 cenários (2026-09-14: "Deduções sobre VGV" — a
+    // MESMA linha da Proforma — entrou entre "Receita bruta" e "Receita
+    // líquida", eram 7): as células com a cor do cenário. Se o `style` inline
+    // voltar no lugar das classes `cen-*`, a marca de negativo deixa de
+    // conseguir sobrepô-lo — e este seletor cai junto.
+    { seletor: 'table.pf.sens td.num.cen-base', minimo: 8 },
+    { seletor: 'table.pf.sens td.num.cen-bear', minimo: 8 },
+    { seletor: 'table.pf.sens td.num.cen-bull', minimo: 8 },
     // A PROVA DE FIAÇÃO: o Resultado negativo que só o Bear produz, e só se o
     // fator de stress tiver alcançado o catálogo de Produtos.
     { seletor: 'table.pf.sens td.num.cen-bear.neg', minimo: 1 },
-    // ...e as 5 linhas de receita do Base continuam positivas (as 2 de despesa
-    // não ganham classe de sinal, igual à tabela principal): se algum cenário
-    // "vazasse" para os outros, esta linha e a de cima não poderiam valer
-    // juntas.
+    // ...e as 5 linhas de receita do Base continuam positivas (as 3 de despesa
+    // — Custo direto total, Custo indireto total e, desde 2026-09-14,
+    // Deduções sobre VGV — não ganham classe de sinal, igual à tabela
+    // principal): se algum cenário "vazasse" para os outros, esta linha e a
+    // de cima não poderiam valer juntas.
     { seletor: 'table.pf.sens td.num.cen-base.pos', minimo: 5 },
     // Badges: 3 no cabeçalho de cada tabela + 2 linhas de indicador × 3.
     { seletor: 'urbi-badge', minimo: 12 },

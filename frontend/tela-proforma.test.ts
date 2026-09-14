@@ -299,3 +299,91 @@ test('#613: _renderKpis recebe `lot` como parâmetro OBRIGATÓRIO (a mutação v
     'o template deixou de passar `lot` para _renderKpis.',
   );
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// Cenários — "Deduções sobre VGV" entre Receita bruta e Receita líquida
+// (pedido do autor, 2026-09-14): a mesma linha que a Proforma já mostra
+// (`montarLinhasProforma`, `imposto + corretagem + marketing +
+// permutaFinResidencial + permutaFinNaoResidencial`) faltava na tabela de
+// Cenários — em particular ela é a ÚNICA linha monetária que reage à
+// variável "Permuta financeira" da análise de sensibilidade (`imposto`,
+// `corretagem` e `marketing` são % fixo do VGV; `permutaFinResidencial`/
+// `permutaFinNaoResidencial` são os únicos termos que `calcularProforma`
+// escala por `fatorSens('permuta_financeira')`, `frontend/proforma.ts:638,642`).
+//
+// A linha do array `linhas` de `_renderSensibilidade` é PRIVADA (nenhum
+// teste deste repositório monta `viab-tela-proforma` fora do harness de
+// render) — mesma situação de `_renderKpis` acima. A defesa é a mesma:
+// 1) lógica pura — a soma varia entre Bear/Base/Bull quando a variável
+//    estressada é "Permuta financeira", e a identidade Receita bruta −
+//    Deduções = Receita líquida fecha nos três cenários (prova o CÁLCULO);
+// 2) leitura de `FONTE_PROFORMA` — prova que o array de `_renderSensibilidade`
+//    de fato tem a linha, na posição certa (prova a FIAÇÃO).
+// ─────────────────────────────────────────────────────────────────────────
+
+const COM_PERMUTA_FINANCEIRA: ProformaInput = {
+  ...ESTUDO_SENSIBILIDADE,
+  permuta_financeira_residencial_pct: 5,
+};
+
+function cenarioPermutaFinanceira(fator: number): Proforma {
+  return calcularProforma({
+    ...COM_PERMUTA_FINANCEIRA, produtos: PRODUTOS_SENSIBILIDADE,
+    sensibilidade: { variavel: 'permuta_financeira', fator },
+  });
+}
+
+function deducoesSobreVgv(p: Proforma): number {
+  return p.imposto + p.corretagem + p.marketing + p.permutaFinResidencial + p.permutaFinNaoResidencial;
+}
+
+test('Cenários "Deduções sobre VGV": a soma varia entre Bear/Base/Bull quando a variável estressada é "Permuta financeira"', () => {
+  const bear = cenarioPermutaFinanceira(FATOR_BEAR);
+  const base = cenarioPermutaFinanceira(1);
+  const bull = cenarioPermutaFinanceira(FATOR_BULL);
+  assert.ok(bear.permutaFinResidencial > 0, 'o fixture precisa ter permuta financeira > 0 para o teste exercitar o caso');
+  const valores = [deducoesSobreVgv(bear), deducoesSobreVgv(base), deducoesSobreVgv(bull)];
+  assert.equal(new Set(valores.map((v) => v.toFixed(2))).size, 3,
+    `"Deduções sobre VGV" não variou entre os cenários: ${valores.join(' | ')}`);
+});
+
+test('Cenários "Deduções sobre VGV": Receita bruta − Deduções = Receita líquida fecha nos três cenários', () => {
+  // Tolerância maior que os outros `perto()` deste arquivo: `imposto`,
+  // `corretagem`, `marketing`, `permutaFinResidencial`, `permutaFinNaoResidencial`
+  // e `receitaLiquida` são arredondados a 2 casas CADA UM, independentemente
+  // (contrato C7, `frontend/proforma.ts:783-794`) — não a soma primeiro. Somar
+  // 5 valores já arredondados e comparar com um 6º também arredondado pode
+  // divergir por até ~0,025 (5 × 0,005) sem que nenhum dos dois esteja errado.
+  for (const fator of [FATOR_BEAR, 1, FATOR_BULL]) {
+    const p = cenarioPermutaFinanceira(fator);
+    assert.ok(perto(p.vgv - deducoesSobreVgv(p), p.receitaLiquida, 0.03),
+      `Receita bruta (${p.vgv}) − Deduções (${deducoesSobreVgv(p)}) ≠ Receita líquida (${p.receitaLiquida})`);
+  }
+});
+
+test('Cenários "Deduções sobre VGV": a linha "VGV"/"Receita bruta" NÃO varia com "Permuta financeira" — só a dedução varia', () => {
+  const bear = cenarioPermutaFinanceira(FATOR_BEAR);
+  const bull = cenarioPermutaFinanceira(FATOR_BULL);
+  assert.equal(bear.vgv, bull.vgv, 'Receita bruta (VGV) não deveria variar com a variável "Permuta financeira"');
+});
+
+test('Cenários — FIAÇÃO: o array de `_renderSensibilidade` tem "Deduções sobre VGV" entre "Receita bruta" e "Receita líquida"', () => {
+  const iReceitaBruta = FONTE_PROFORMA.indexOf("l: 'Receita bruta'");
+  const iDeducoes = FONTE_PROFORMA.indexOf("l: 'Deduções sobre VGV'");
+  const iReceitaLiquida = FONTE_PROFORMA.indexOf("l: 'Receita líquida'");
+  assert.ok(iReceitaBruta >= 0, '"Receita bruta" sumiu do array de Cenários');
+  assert.ok(iDeducoes >= 0, '"Deduções sobre VGV" não está no array de Cenários — a linha existe na Proforma mas não em Cenários');
+  assert.ok(iReceitaLiquida >= 0, '"Receita líquida" sumiu do array de Cenários');
+  assert.ok(iReceitaBruta < iDeducoes && iDeducoes < iReceitaLiquida,
+    '"Deduções sobre VGV" precisa vir ENTRE "Receita bruta" e "Receita líquida" no array de Cenários');
+  // A mesma fórmula da Proforma (`deducoesVgv`, `montarLinhasProforma`) — não
+  // uma reimplementação que pudesse divergir dela.
+  assert.ok(
+    /f:\s*\(c\)\s*=>\s*c\.p\.imposto\s*\+\s*c\.p\.corretagem\s*\+\s*c\.p\.marketing\s*\+\s*c\.p\.permutaFinResidencial\s*\+\s*c\.p\.permutaFinNaoResidencial/.test(FONTE_PROFORMA),
+    '"Deduções sobre VGV" em Cenários deixou de somar imposto + corretagem + marketing + permuta financeira R/NR',
+  );
+  assert.ok(
+    /l:\s*'Deduções sobre VGV'.*natureza:\s*'despesa'/.test(FONTE_PROFORMA),
+    '"Deduções sobre VGV" deveria ser `natureza: \'despesa\'` (sempre entre parênteses, sem classe pos/neg) — igual a Custo direto/indireto total',
+  );
+});
