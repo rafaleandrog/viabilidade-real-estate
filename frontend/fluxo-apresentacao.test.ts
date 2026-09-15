@@ -402,6 +402,14 @@ test('Proforma itemizada: cada linha de custo aparece pelo nome, e o subtotal do
   // itemização é aditiva, não substitui o subtotal.
   const subtotalObra = p.linhas.find((l) => l.nome === '(-) Custos de Obra')!;
   assert.ok(Math.abs(subtotalObra.valor - -c.linhasCusto.find((x) => x.grupo === 'obra')!.total) <= 0.01);
+
+  // Achado da revisão (PR #713): item e subtotal do grupo são AMBOS
+  // `nivel: 1` — sem um sinal a mais, ficam visualmente idênticos na tela.
+  // `subgrupo: true` é esse sinal (a tela usa para aplicar a classe CSS
+  // irmã de `fluxo-tabela.ts`), e só o subtotal do grupo carrega esse flag.
+  assert.equal(subtotalObra.subgrupo, true);
+  const itemObra = p.linhas.find((l) => l.nome === '(-) Obra')!;
+  assert.equal(itemObra.subgrupo, undefined);
 });
 
 // Item de custo com valor ~zero não aparece na lista, mas o subtotal do

@@ -154,6 +154,15 @@ export interface LinhaProformaAv {
    * só quando há permuta física.
    */
   notaBase?: string;
+  /**
+   * Proforma itemizada: marca a linha de SUBTOTAL de um grupo de custo,
+   * distinguindo-a das linhas de item individuais que ficam acima dela —
+   * ambas são `nivel: 1`, mas sem este flag ficam visualmente idênticas na
+   * tela (mesma indentação, mesmo peso). Mesma convenção de rótulo/estilo
+   * (`subgrupo` vs. `item`) que `fluxo-tabela.ts` já usa na aba Fluxo de
+   * Caixa — a tela consome este flag para aplicar a classe CSS irmã.
+   */
+  subgrupo?: boolean;
 }
 
 export interface ProformaAvancado {
@@ -326,7 +335,7 @@ export function proformaAvancado(
       if (Math.abs(item.total) <= 0.005) continue;
       linhas.push({ nome: `(-) ${item.nome}`, valor: -item.total, nivel: 1, tipo: 'custo' });
     }
-    linhas.push({ nome: `(-) ${ROTULO_PROFORMA[g] ?? GRUPO_CUSTO_LABEL[g]}`, valor: -total, nivel: 1, tipo: 'custo' });
+    linhas.push({ nome: `(-) ${ROTULO_PROFORMA[g] ?? GRUPO_CUSTO_LABEL[g]}`, valor: -total, nivel: 1, tipo: 'custo', subgrupo: true });
   }
   linhas.push({ nome: '= Custo direto total', valor: -custoDireto, nivel: 0, tipo: 'custo' });
 
@@ -337,7 +346,7 @@ export function proformaAvancado(
       if (Math.abs(item.total) <= 0.005) continue;
       linhas.push({ nome: `(-) ${item.nome}`, valor: -item.total, nivel: 1, tipo: 'custo' });
     }
-    linhas.push({ nome: `(-) ${GRUPO_CUSTO_LABEL.indireto}`, valor: -custoIndireto, nivel: 1, tipo: 'custo' });
+    linhas.push({ nome: `(-) ${GRUPO_CUSTO_LABEL.indireto}`, valor: -custoIndireto, nivel: 1, tipo: 'custo', subgrupo: true });
   }
   linhas.push({ nome: '= Custo indireto total', valor: -custoIndireto, nivel: 0, tipo: 'custo' });
 
