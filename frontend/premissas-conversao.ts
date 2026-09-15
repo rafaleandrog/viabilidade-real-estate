@@ -25,7 +25,13 @@ export type ConvUnidade =
 
 // Parcial: nem todo consumidor supre todas as grandezas (o Preliminar não usa
 // areaTerreno/receita; o Avançado não usa areaVendavel*). Chave ausente = base
-// indefinida → não converte (mesmo efeito de grandeza 0).
+// indefinida → não converte.
+//
+// ⚠️ Ausente e ZERO deixaram de ter "o mesmo efeito" (decisão do autor, #711).
+// Chave ausente é grandeza genuinamente DESCONHECIDA — não
+// converte. Chave presente com valor 0 é grandeza CONHECIDA e nula — % ou
+// R$/m² de uma base 0 é economicamente R$ 0, um valor real, não uma ausência.
+// Ver `paraBase`/`daBase`.
 export type CtxConversao = Partial<Record<LinkKey, number>>;
 
 /**
@@ -53,23 +59,46 @@ export function ctxConversaoPreliminar(p: Proforma): CtxConversao {
   };
 }
 
-// Valor da unidade → quantidade base. null = não há base definida (grandeza de
-// ligação 0/indefinida) ou valor inválido — nesse caso não se converte.
+// Valor da unidade → quantidade base. null = grandeza de ligação DESCONHECIDA
+// (chave ausente, não finita ou negativa) ou valor inválido — nesse caso não
+// se converte.
+//
+// ⚠️ #711: ligação CONHECIDA e igual a 0 deixou de bloquear. Multiplicar por
+// zero nunca divide por zero, e o produto (0) é o valor econômico ATUAL do
+// campo — 30% de um VGV de R$ 0 é R$ 0, não "não sei". Bloquear aqui trava a
+// badge de apresentação até o VGV existir, mesmo quando o número que ela
+// representa hoje já é conhecido (zero). Decisão do autor — ver a issue.
 export function paraBase(conv: ConvUnidade, valor: number, ctx: CtxConversao): number | null {
   if (!Number.isFinite(valor)) return null;
   if (conv.tipo === 'identidade') return valor;
   const x = ctx[conv.link];
-  if (x === undefined || !(x > 0)) return null;
-  return conv.tipo === 'pct' ? (valor / 100) * x : valor * x;
+  if (x === undefined || !Number.isFinite(x) || x < 0) return null;
+  const resultado = conv.tipo === 'pct' ? (valor / 100) * x : valor * x;
+  // valor negativo × ligação 0 produz -0 (`-0.1 * 0 === -0`), e -0 não é ===
+  // 0 para `Object.is`/`assert.strictEqual` — normaliza para não vazar um
+  // sinal negativo espúrio num canônico que é, na prática, zero.
+  return resultado === 0 ? 0 : resultado;
 }
 
-// Base → valor da unidade nova. null = não dá pra converter (grandeza 0).
+// Base → valor da unidade nova. null = não dá pra converter (grandeza
+// desconhecida, ou grandeza 0 com base ≠ 0 — ver #711 abaixo).
+//
+// ⚠️ #711: aqui a ligação é DENOMINADOR, então "conhecida e 0" não pode virar
+// "sempre converte" como em `paraBase` — divisão por zero é sempre um
+// problema, EXCETO quando o próprio numerador (`base`) também é 0: nesse caso
+// a resposta honesta é 0 (R$ 0 representado em qualquer unidade é 0), sem
+// dividir nada. Fora disso (base ≠ 0, ligação conhecida 0) continua
+// bloqueado — é o caso "destino irrepresentável" que a #442 já cobre
+// (R$ 9.000.000 virando "R$/m² de terreno" sobre um terreno de área 0 seria
+// inventar um número, não derivar um).
 export function daBase(conv: ConvUnidade, base: number, ctx: CtxConversao): number | null {
   if (!Number.isFinite(base)) return null;
   if (conv.tipo === 'identidade') return base;
   const x = ctx[conv.link];
-  if (x === undefined || !(x > 0)) return null;
-  return conv.tipo === 'pct' ? (base / x) * 100 : base / x;
+  if (x === undefined || !Number.isFinite(x) || x < 0) return null;
+  if (x === 0) return base === 0 ? 0 : null;
+  const resultado = conv.tipo === 'pct' ? (base / x) * 100 : base / x;
+  return resultado === 0 ? 0 : resultado; // idem paraBase: nunca -0
 }
 
 // Converte o valor da unidade atual para a unidade nova. Retorna null quando não
@@ -237,12 +266,15 @@ export function dadosDaTrocaDeUnidade(
 
   // ⚠️ SE O DESTINO NÃO PODE SER REPRESENTADO, NÃO SE TROCA NADA.
   // `camposDaTrocaDeUnidade` omite `orcamento_valor` quando `daBase` não
-  // consegue converter — grandeza de ligação do destino em 0 ou indefinida
-  // (estudo sem área de terreno indo para `rs_m2_terreno`, receita 0 indo para
-  // `pct_receita`). Trocar só a unidade nesse caso deixaria o número da unidade
-  // ANTIGA sob o rótulo da NOVA: R$ 9.000.000 lidos como "9.000.000 R$/m² de
-  // terreno". É a mentira da #442 de volta, e a tela nem denuncia — `_valorExibido`
-  // devolve `null` pela mesma impossibilidade, e o campo aparece vazio.
+  // consegue converter — grandeza de ligação do destino INDEFINIDA, ou
+  // CONHECIDA e 0 com um canônico ≠ 0 (estudo sem área de terreno indo para
+  // `rs_m2_terreno` com R$ 9.000.000 já lançados; #711 deixou de bloquear só
+  // o caso em que o canônico TAMBÉM é 0 — aí 0 em qualquer unidade é 0, sem
+  // inventar número). Trocar só a unidade fora disso deixaria o número da
+  // unidade ANTIGA sob o rótulo da NOVA: R$ 9.000.000 lidos como
+  // "9.000.000 R$/m² de terreno". É a mentira da #442 de volta, e a tela nem
+  // denuncia — `_valorExibido` devolve `null` pela mesma impossibilidade, e o
+  // campo aparece vazio.
   //
   // Então não se troca a unidade: não há como mudar de representação sem saber
   // representar. É a MESMA decisão que a #515 tomou para Premissas — lá a badge
@@ -394,11 +426,13 @@ export function trocaBadgePremissas(
 
   // (a) canônico derivável agora, do campo ativo.
   //
-  // ZERO é derivável sem a grandeza de ligação, e por isso vem antes de
-  // `converterUnidade`: `paraBase` recusa quando o link é 0 ou indefinido —
-  // ele testa a ligação ANTES de multiplicar —, mas `0 %` de qualquer VGV é
-  // R$ 0,00 e `0 R$/m²` sobre qualquer área é R$ 0,00. O valor do link não
-  // muda o produto quando o multiplicando é zero.
+  // ZERO é derivável mesmo sem a grandeza de ligação, e por isso o atalho
+  // continua explícito aqui em vez de delegar tudo a `converterUnidade`:
+  // desde a #711, `paraBase` já resolve sozinha o caso "link conhecido = 0"
+  // (o produto é 0), mas quando o link está genuinamente INDEFINIDO (chave
+  // ausente do `ctx`) ela ainda recusa — e `0 %`/`0 R$/m²` de uma base
+  // desconhecida também é R$ 0,00: o multiplicando zero manda, com ou sem
+  // saber o link. Este atalho é o que cobre esse caso residual.
   const derivado = valorAtual === 0 ? 0
     : valorAtual === null ? null
     : converterUnidade(convAtual, { tipo: 'identidade' }, valorAtual, ctx);
