@@ -369,8 +369,16 @@ export interface EntradaTrocaBadge {
    * canônico — o valor digitado fica gravado na coluna, mas a Proforma
    * continua lendo o 0 congelado para sempre, mesmo depois de a área existir.
    *
-   * A defesa: só congela em 0 quando o DESTINO é `identidade` (R$) — digitar
-   * num campo de R$ nunca depende de ligação nenhuma, então nunca trava.
+   * A defesa: só congela em 0 quando o DESTINO consegue representar esse 0
+   * sem travar depois — `identidade` (R$, nunca depende de ligação) OU um
+   * derivado cuja PRÓPRIA ligação já é conhecida e positiva (aí `paraBase`
+   * reconverte um valor digitado depois normalmente). Destino derivado com
+   * ligação ausente ou também zerada continua bloqueado — é o caso
+   * DERIVADA→DERIVADA das duas ligações em 0 que a rodada 2 achou. A rodada 4
+   * (P2, não bloqueante) apontou que restringir a `identidade` sozinho forçava
+   * um caminho de dois cliques via R$ mesmo quando o destino já tinha ligação
+   * positiva — daí esta extensão.
+   *
    * Omitir `convNova` (chamador antigo, ou teste que não testa este ramo)
    * cai no lado seguro: a relaxação simplesmente não se aplica, como se a
    * ligação estivesse indefinida.
@@ -457,19 +465,28 @@ export function trocaBadgePremissas(
   // sem chamar `converterUnidade`: multiplicar por uma ligação conhecida-zero
   // nunca precisa saber o valor do link, é sempre 0.
   //
-  // ⚠️ **E só quando o DESTINO é `identidade` — achado P1 do Codex, rodada 2
-  // do PR #712.** Sem essa condição, um clique DERIVADA→DERIVADA (`% VGV` →
-  // `R$/m²`, as duas com ligação 0) também caía aqui, congelava o canônico em
-  // 0 e **travava** — `_editarCustoUnidade` depois, tentando gravar um R$/m²
-  // real, usa `paraBase` (estrita) e não consegue recalcular enquanto a área
-  // seguir 0, então o 0 congelado nunca sai, mesmo com a área definida depois.
-  // Destino `identidade` não tem esse risco: um campo de R$ sempre aceita o
-  // que for digitado, sem depender de ligação nenhuma.
+  // ⚠️ **E só quando o DESTINO puder representar o 0 sem travar depois —
+  // achados P1 (rodada 2) e P2 (rodada 4) do Codex no PR #712.** Destino
+  // `identidade` (R$) nunca trava: um campo de R$ sempre aceita o que for
+  // digitado, sem depender de ligação nenhuma. Destino DERIVADO (%/R$-por-
+  // área) só é seguro quando a ligação DELE já é conhecida e POSITIVA — nesse
+  // caso `paraBase` consegue reconverter um valor digitado depois normalmente
+  // (rodada 3 também blindou o caminho geral: `_editarCustoUnidade` agora
+  // limpa o canônico quando a reconversão falha, em vez de deixá-lo
+  // congelado). Destino derivado com ligação AUSENTE ou também zerada
+  // continua bloqueado — é exatamente o caso DERIVADA→DERIVADA com as duas
+  // ligações em 0 que a rodada 2 achou.
+  const destinoAceitaZero = convNova !== undefined && (
+    convNova.tipo === 'identidade'
+    || (ctx[convNova.link] !== undefined
+      && Number.isFinite(ctx[convNova.link])
+      && (ctx[convNova.link] as number) > 0)
+  );
   const ligacaoConhecidaZero = convAtual.tipo !== 'identidade'
     && ctx[convAtual.link] !== undefined
     && Number.isFinite(ctx[convAtual.link])
     && (ctx[convAtual.link] as number) === 0
-    && convNova?.tipo === 'identidade';
+    && destinoAceitaZero;
   const derivado = valorAtual === 0 ? 0
     : valorAtual === null ? null
     : ligacaoConhecidaZero && Number.isFinite(valorAtual) ? 0

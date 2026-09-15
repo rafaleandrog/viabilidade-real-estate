@@ -653,6 +653,17 @@ test('#711 (achado do Codex, rodada 2): clique DERIVADA→DERIVADA com as duas l
   );
 });
 
+test('#711 (achado do Codex, rodada 4, P2): clique DERIVADA→DERIVADA troca direto quando o DESTINO já tem ligação positiva', () => {
+  // Infraestrutura em 30% VGV com VGV ainda 0, mas a área de venda JÁ existe
+  // (catálogo com área cadastrada, preço/VGV que seguem 0). Clicar direto
+  // para R$/m² é seguro: o destino consegue representar o 0, e um valor
+  // digitado depois reconverte normalmente (`paraBase` com `areaVendavel`
+  // positiva) — não precisa mais do caminho de dois cliques via R$.
+  const porArea = { tipo: 'por_area', link: 'areaVendavel' } as const;
+  const d = trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, convNova: porArea, ctx: ctx({ vgv: 0, areaVendavel: 5_000 }) });
+  assert.deepEqual(d, { trocar: true, canonico: 0 });
+});
+
 test('#711 (achado do Codex, rodada 2): omitir `convNova` é fail-closed — a relaxação não se aplica', () => {
   // Chamador que não sabe/não informa o destino (ex.: um teste antigo, ou um
   // consumidor futuro que ainda não foi atualizado) cai no lado seguro: a
