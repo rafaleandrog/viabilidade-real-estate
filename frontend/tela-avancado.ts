@@ -32,6 +32,10 @@ import './tela-analise-mercado.js';
 //   Resumo            → Resumo consolidado
 //   Empreendimento    → Informações · Cronograma · Tipologias
 //   Viabilidade       → Receitas · Financeiro (Premissas removida no Avançado · #88)
+//   Funding           → viab-funding direto — Operações · Financiamento à produção ·
+//                        Dívida · Equity, TODAS internas ao componente (#586). #718
+//                        promoveu Funding de sub-aba de Viabilidade a página de nível 1,
+//                        posicionada logo abaixo dela; a tela interna não mudou.
 //   Custos            → Terreno · Obra · Diretos · Indiretos · Financeiro
 //   Resultados        → Ver Fluxo (#350: era "Fluxo de Caixa")
 //   Cenários          → Simulação de cenários (sliders + fluxo do cenário)
@@ -45,7 +49,7 @@ import './tela-analise-mercado.js';
 // removido, só desambiguado. Decisão registrada em docs/viabilidade/analise-mercado.md.
 // ─────────────────────────────────────────────────────────────────────────
 
-type AbaTopo = 'resumo' | 'empreendimento' | 'viabilidade' | 'obra' | 'fluxo' | 'cenarios' | 'mercado' | 'apelo';
+type AbaTopo = 'resumo' | 'empreendimento' | 'viabilidade' | 'funding' | 'obra' | 'fluxo' | 'cenarios' | 'mercado' | 'apelo';
 
 // Páginas (nível 1) — ordem da lista lateral (urbi-nav). O id 'obra' é
 // preservado como slug de rota; só o rótulo virou "Custos" (#40).
@@ -62,11 +66,15 @@ type AbaTopo = 'resumo' | 'empreendimento' | 'viabilidade' | 'obra' | 'fluxo' | 
 // (medido: a suíte inteira e o render ficam verdes). Quem responde é
 // `scripts/guard-aba-default-literal.mjs`, pelo parser do TypeScript: cada
 // origem do default tem de ser um LITERAL, e as duas têm de concordar.
+// #718: Funding entra logo ABAIXO de Viabilidade — pedido explícito do autor.
+// É ordem de APRESENTAÇÃO, mesma nota da inversão Custos/Viabilidade acima: o
+// id 'funding' é literal de propósito e não veio de nenhuma outra página.
 const PAGINAS: { id: AbaTopo; label: string }[] = [
   { id: 'resumo',         label: 'Resumo' },
   { id: 'empreendimento', label: 'Empreendimento' },
   { id: 'obra',           label: 'Custos' },
   { id: 'viabilidade',    label: 'Viabilidade' },
+  { id: 'funding',        label: 'Funding' },
   { id: 'fluxo',          label: 'Resultados' },
   { id: 'cenarios',       label: 'Cenários' },
   { id: 'mercado',        label: 'Análise de mercado' },
@@ -101,13 +109,14 @@ const SUBABAS: Partial<Record<AbaTopo, SubAba[]>> = {
   // custos/impostos/deduções estáticos) só faz sentido no Preliminar. Os campos
   // seguem no schema — proforma.ts ainda os lê para os KPIs do Resumo — mas sem
   // superfície de edição aqui. Sobram Receitas e Financeiro.
+  //
+  // #718: Funding SAIU daqui — virou página de nível 1 própria (logo abaixo de
+  // Viabilidade em PAGINAS), porque a tela dela já tem 4 abas internas próprias
+  // (#586) e ficava 3 níveis fundo (Viabilidade → Funding → Operações). Ver
+  // `case 'funding'` em `_renderPagina()`.
   viabilidade: [
     { id: 'receitas',   label: 'Receitas',   icone: 'fa-solid fa-hand-holding-dollar' },
     { id: 'financeiro', label: 'Financeiro', icone: 'fa-solid fa-percent' },
-    // #355: substitui a aba Capital Stack (#239/FIN-08). O Bloco G (aba
-    // "Financeiro" acima) continua existindo até a FIN-10 (#279) decidir o
-    // que sai da interface (§13.4).
-    { id: 'funding', label: 'Funding', icone: 'fa-solid fa-building-columns' },
   ],
   // #351: Resultados (id interno 'fluxo') em 3 abas. As três leem o MESMO
   // `viab-fluxo-ver`, com a prop `vista` — um único componente carrega e roda
@@ -137,7 +146,7 @@ export class ViabTelaAvancado extends LitElement {
   @property({ type: Boolean }) podeEditar = false;
   @property({ type: String }) status = '';
 
-  // Página ativa — vem da URL via tela-estudo. Setter normaliza para uma das 8
+  // Página ativa — vem da URL via tela-estudo. Setter normaliza para uma das 9
   // (URLs antigas do Preliminar, ex. 'premissas', caem em 'resumo'). #250: o
   // slug 'custos' (e o alias 'obra') resolve para o id interno 'obra'.
   @property({ type: String })
@@ -245,6 +254,12 @@ export class ViabTelaAvancado extends LitElement {
         // fluxo. Componente exclusivo do Avançado; o Preliminar mantém sua aba
         // Gráficos estática em viab-tela-graficos (via tela-estudo).
         return html`<viab-tela-cenarios .estudo=${this.estudo}></viab-tela-cenarios>`;
+      case 'funding':
+        // #718: página de nível 1 própria. `viab-funding` já tem sua própria
+        // navegação interna (Operações · Financiamento à produção · Dívida ·
+        // Equity, #586) — nenhum `urbi-abas` de nível 2 aqui, mesmo padrão de
+        // 'cenarios'/'mercado'/'apelo' logo abaixo.
+        return html`<viab-funding .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-funding>`;
       case 'mercado':
         // #199: projeto × mercado (preço/custo por m², VSO, macros). O lado
         // "projeto" é derivado do estudo; o lado "mercado" vem do snapshot que
@@ -301,9 +316,9 @@ export class ViabTelaAvancado extends LitElement {
       switch (sub) {
         case 'financeiro':
           return html`<viab-tela-financeiro .estudo=${this.estudo} .editavel=${this._editavelPremissas}></viab-tela-financeiro>`;
-        case 'funding':
-          return html`<viab-funding .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-funding>`;
         // Premissas removida no Avançado (#88): a página abre em Receitas.
+        // Funding saiu daqui na #718 — virou página de nível 1 (ver 'funding'
+        // em `_renderPagina()`).
         case 'receitas':
         default:
           return html`<viab-fluxo-receitas .estudo=${this.estudo} .editavel=${this._editavelFluxo}></viab-fluxo-receitas>`;
