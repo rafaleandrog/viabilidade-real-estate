@@ -30,10 +30,11 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — ✅ RODADA 11 CONCLUÍDA (encerrada em 2026-09-06)
+## Estado do backlog — ✅ RODADA 12 CONCLUÍDA (encerrada em 2026-09-15)
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
+| **12 — Redesenho de KPIs/gráficos do Preliminar** | Handoff de UX (documento fora do GitHub) pedindo o redesenho da aba Gráficos do estudo Preliminar: faixa de 5 KPIs com denominador visível, cascata horizontal do resultado substituindo a pizza de custos + o gráfico de barras Receita×Custos, cadeia de áreas em barras horizontais proporcionais substituindo a(s) pizza(s) de alocação, e banner de consistência de área (informativo, não bloqueia salvar — decisão da #693 preservada). Plano de Fase 0 (auditoria) + Fase 1 (redesenho sem mudar o motor de cálculo) aprovado pelo autor em modo de planejamento; a Fase 2 (tornado de alavancas / sensibilidade ranqueada, handoff §4.2) e a Fase 3 (margem de segurança, benchmark editável por tipologia/praça — exige `schema.json` novo) ficaram fora, registradas para rodada futura (`docs/rodada-12/auditoria.md`). Fila de 8 PRs, estritamente serial | nenhuma — plano combinado diretamente com o autor, sem issue aberta no GitHub | ✅ **concluída em 2026-09-15** — as 8 PRs mergeadas em fila indiana (#701 auditoria, #702 extração `vgvBrutoDeProforma`, #703 fix do medidor duplicado `resultado_final`, #704 componentes novos `viab-grafico-cascata`/`-barra-ranqueada`/`-cadeia-areas`, #705 faixa de KPIs, #706 cascata substitui pizza+barras, #707 cadeia de áreas + banner de consistência, #708 limpeza de doc). Revisão por Codex (`@codex review`) + lentes nativas em cada PR, com achados reais consertados antes do merge — o mais significativo, no #707: a cadeia de áreas escalava a largura de cada barra pelo PRIMEIRO estágio (o terreno) em vez do MAIOR, o que fazia Incorporação (onde a área construída costuma superar o terreno, coeficiente de aproveitamento > 1) desenhar estágios de tamanhos bem diferentes como barras idênticas, clipadas em 100%; e duas rodadas seguidas do mesmo bug de fiação (a faixa de consistência piscava aviso falso antes do catálogo de produtos carregar, depois ficava presa a um `Promise.all` que travava a flag de pronto mesmo com o catálogo já OK). Merge autorizado pelo autor a cada PR. De passagem, a #701 (Fase 0, auditoria) também confirmou e fechou a nota "ainda aberto" do achado 11 das armadilhas da Rodada 10 (bug do ROI 0,0% com `investimentoTotal=0`) — ver a atualização daquela nota, abaixo. |
 | **11 — Reforma da tabela do Painel de estudos** | 6 issues pedidas pelo autor em fila **estritamente serial** (badge de nível Preliminar amarelo → remover coluna Cidade → unificar as duas colunas de área em "Área líquida de venda" → mover renomear do Painel para o cabeçalho do estudo → corrigir a largura da coluna da miniatura → alinhar a fila de ações à direita sem quebra), mais 2 achados encontrados durante a revisão dos PRs acima e corrigidos na hora (#683: as 5 abas do Painel disparavam fetch umas das outras; #686: `div.layout` de `tela-preliminar.ts` transbordava a 600/900px) | **#675–#680, #683, #686** (8) | ✅ **concluída em 2026-09-06** — as 8 issues fechadas em fila indiana, por 8 PRs mergeados (#681, #682, #684, #685, #687, #688, #689, #690): a #676 levou dois — o #682 entregou 4 dos 5 critérios de aceite e declarou `Sem-fechamento` no critério que dependia da #683 (achada na própria revisão dele), e o #689 fechou #676 e #683 juntos depois de consertar a causa. Merge autorizado pelo autor a cada PR revisado (Codex + lentes nativas) com zero bloqueantes. A #595 (P1 antigo, gráfico de Cenários sem cor/linha própria) foi fechada à parte, por decisão do autor: já estava corrigida fora do rastreamento desta issue. |
 | **10 — lista de bugs dos Preliminares** | `lista_bugs_20260826.xlsx`, 9 itens (Incorporação: Premissas/Proforma/Cenários; Loteamento: conferência geral). Plano, diagnóstico e fila de PRs em `docs/rodada-10/planejamento.md` | **#563–#574** (12) | ✅ **concluída em 2026-09-04** — as 12 issues fechadas; a auditoria de Loteamento (#574) está em `docs/rodada-10/relatorio-574-loteamento.md`, com os 11 achados dispatchados (3 consertados na própria auditoria, os demais viraram #609–#613, entregues em #570 com residual fechado por #615, ou implementados em PR 627) — merges autorizados pelo autor por PR revisado com zero bloqueantes |
 | **9 — execução da Rodada 8** | Ondas de PRs que entregam as issues #426–#493, na ordem de dependência | **#426–#493** | ✅ **concluída em 2026-08-24** — as 59 issues fechadas |
@@ -586,10 +587,18 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
     cima**, porque a frase é plausível. Não era a mesma: a guarda testa `vgv`, mas o denominador de
     `roiPct` é `investimentoTotal`, ortogonal. Medido executando o motor: catálogo precificado sem
     custo lançado (o estado *default* de estudo novo) → `vgv = 10.000.000`, `investimentoTotal = 0`,
-    passa a guarda, e o Painel publica **ROI 0,0%** (achado no PR 649, ainda aberto). Defesa: quando um comentário disser "mesma
+    passa a guarda, e o Painel publicava **ROI 0,0%** (achado no PR 649). Defesa: quando um comentário disser "mesma
     convenção que X", **confira que o PREDICADO é o mesmo**, não que a forma do código é. Dois
     `?? 0` idênticos podem ter garantias opostas — e a frase falsa é **pior que a ausência dela**,
     porque sem comentário alguém investiga.
+
+    > ⚠️ **Este achado estava marcado "ainda aberto", e não está mais — corrigido e medido na
+    > Rodada 12 (2026-09-14).** `frontend/tela-dashboard.ts:157,361` já passam `p.roiPct` DIRETO,
+    > sem `?? 0`; `proforma.ts:719-720` garante `roiPct = null` (não `0`) quando
+    > `investimentoTotal ≤ 0`. Confirmado por teste de regressão em
+    > `frontend/auditoria-indicadores-preliminar.test.ts` (caso 2.5), não por leitura do código —
+    > é exatamente a defesa que este item pede: medir, não assumir. Se uma sessão futura achar o
+    > bug de volta, é fato novo para apurar e registrar aqui, não continuação deste parágrafo.
 12. **"Declarei que não medi" não é o mesmo que medir.** Atestei `bloqueantes=0` **duas vezes** no
     mesmo PR registrando com honestidade que a premissa era *"herdada, não medida"* — e a honestidade
     da declaração criou aparência de rigor enquanto o defeito passava. Um portão com uma nota anexada

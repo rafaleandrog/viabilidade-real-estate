@@ -103,6 +103,28 @@ export const INVENTARIO_ROTULOS_INDICADOR: RotuloIndicador[] = [
     fonte: 'areaVendavel / areaTerreno — proforma.ts:eficienciaPct (Loteamento; null quando a gleba não foi informada, ver eficienciaParaFaixa)',
   },
 
+  // ── Faixa de 5 KPIs do Preliminar (Rodada 12, handoff de KPIs/gráficos §3.1) ──
+  {
+    rotulo: 'VGV do incorporador',
+    arquivos: ['frontend/tela-graficos.ts'],
+    fonte: 'p.vgv — proforma.ts (VGV líquido de permuta física, Preliminar)',
+  },
+  {
+    rotulo: 'Resultado final',
+    arquivos: ['frontend/tela-graficos.ts'],
+    fonte: 'p.resultado — proforma.ts (Preliminar)',
+  },
+  {
+    rotulo: 'Margem sobre VGV de tabela',
+    arquivos: ['frontend/tela-graficos.ts'],
+    fonte: 'resultado / vgvBrutoDeProforma(p) — proforma.ts (Preliminar)',
+  },
+  {
+    rotulo: 'Margem sobre receita líquida',
+    arquivos: ['frontend/tela-graficos.ts'],
+    fonte: 'resultado / receitaLiquida — proforma.ts (Preliminar)',
+  },
+
   // ── Painel de estudos (frontend/tela-dashboard.ts) ──────────────────────
   {
     rotulo: 'ROI',

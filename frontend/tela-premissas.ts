@@ -1393,7 +1393,7 @@ export class ViabTelaPremissas extends LitElement {
 
   private _salvar = async () => {
     // Bloqueia o salvamento se houver obrigatórios não preenchidos (≠ vazio e ≠ 0).
-    const { erros, faltando } = validarObrigatorios(this.form, this.estudo.tipo_empreendimento, this.produtos);
+    const { erros, faltando } = validarObrigatorios(this.form, this.estudo.tipo_empreendimento);
     this.erros = erros;
     if (faltando.length > 0) {
       this.erroGeral = `Preencha os campos obrigatórios: ${faltando.join(', ')}.`;

@@ -1,11 +1,10 @@
-// Render do medidor de eficiência de aproveitamento num LOTEAMENTO — #613,
-// critério de aceite 3.
+// Render da faixa de 5 KPIs — aba Gráficos (Preliminar), Rodada 12.
 //
-// Este arquivo é o único lugar do repositório que prova que a eficiência de
-// aproveitamento chega ao DOM como medidor. Ver o topo de
-// `casos/medidor-eficiencia-loteamento.ts` para por que a função pura sozinha
-// não basta (o campo é opcional no tipo, então omiti-lo na chamada não é nem
-// erro de compilação nem teste vermelho).
+// ⚠️ Este caso monta `viab-tela-graficos` inteira, então a cascata do
+// resultado (`viab-grafico-cascata`) também aparece na tela — o mesmo
+// transbordo de texto/corte já registrado e não asseverado em
+// `grafico-cascata.render.test.ts` (coluna de rótulo estreita de propósito,
+// elipse + `title`) se repete aqui pelo mesmo motivo.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,8 +16,8 @@ import {
 
 const pular = await motivoParaPular();
 
-test('Loteamento: os 4 medidores (3 comuns + eficiência de aproveitamento) chegam à tela', { skip: pular ?? false }, async () => {
-  const a = await verificarRender({ caso: 'medidor-eficiencia-loteamento' });
+test('Faixa de KPIs do Preliminar: rótulo, valor e denominador dos 5 indicadores chegam à tela', { skip: pular ?? false }, async () => {
+  const a = await verificarRender({ caso: 'kpis-graficos-preliminar' });
 
   assert.equal(contar(a, 'transbordoDeCaixa'), 0, 'alguma caixa filha ultrapassou o pai' + relato(a));
   assert.equal(contar(a, 'sobreposicao'), 0, 'caixas pintadas se sobrepuseram' + relato(a));
@@ -28,9 +27,6 @@ test('Loteamento: os 4 medidores (3 comuns + eficiência de aproveitamento) cheg
   assert.deepEqual(declaracoesOciosas(a), [], 'declaração ociosa em aceitaNaoReproduzido' + relato(a));
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 
-  // Rodada 12 — a cascata do resultado também monta aqui; o mesmo transbordo
-  // de texto/corte já registrado em `grafico-cascata.render.test.ts` (coluna
-  // de rótulo estreita de propósito) se repete, reportado e não asseverado.
   const texto = contar(a, 'transbordoDeTexto');
   const cortado = contar(a, 'corte');
   if (texto + cortado > 0) {
@@ -38,8 +34,8 @@ test('Loteamento: os 4 medidores (3 comuns + eficiência de aproveitamento) cheg
   }
 });
 
-test('Loteamento: nenhum token sem valor e nenhum texto invisível na aba com medidores', { skip: pular ?? false }, async () => {
-  const a = await verificarRender({ caso: 'medidor-eficiencia-loteamento', larguras: [1280] });
+test('Faixa de KPIs do Preliminar: nenhum token sem valor e nenhum texto invisível', { skip: pular ?? false }, async () => {
+  const a = await verificarRender({ caso: 'kpis-graficos-preliminar', larguras: [1280] });
 
   assert.deepEqual(tokensSemValor(a), [], 'token citado pelo CSS não resolve em alguma variante' + relato(a));
   assert.deepEqual(textosInvisiveis(a), [], 'texto pintado da mesma cor do próprio fundo' + relato(a));

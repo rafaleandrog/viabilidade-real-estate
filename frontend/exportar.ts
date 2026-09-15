@@ -7,7 +7,7 @@
 // `resultado / vgv`. O Avançado tem sua PRÓPRIA "Margem sobre Receita Bruta"
 // (`proforma-avancado.ts`), com denominador diferente — ver
 // `frontend/rotulos-indicador.ts` para o inventário completo.
-import type { Proforma } from './proforma.js';
+import { vgvBrutoDeProforma, type Proforma } from './proforma.js';
 // #349: `ROTULOS_COMPONENTES_*` saíram daqui junto com os blocos "Componente ·
 // …" e Carteira, que a exportação deixou de listar para espelhar a tabela.
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
@@ -165,7 +165,7 @@ export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {
       // `semPct: true` nas três — mesma exceção que a tela aplica desde
       // 2026-09-14 (ver `pctVgvProforma`): acima de "Receita bruta (VGV)" não
       // há % VGV.
-      { l: 'VGV sem permuta física', v: p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial, ocultarSeZero: true, semPct: true },
+      { l: 'VGV sem permuta física', v: vgvBrutoDeProforma(p), ocultarSeZero: true, semPct: true },
       // #574 (achado 7): rótulo espelha o que a tela já usa no Loteamento
       // (`tela-proforma.ts`, `montarLinhasProforma`) — não é rótulo novo, é a
       // exportação parar de divergir da tela.

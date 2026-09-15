@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
-import { calcularProforma, vgvProduto, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
+import { calcularProforma, vgvProduto, vgvBrutoDeProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 // ⚠️ `ehLinhaReceitaOuResultado`/`celulaProforma` MUDARAM DE ARQUIVO na
 // unificação da notação de sinal (registro dos PRs 617/618, achado 10 da
 // auditoria #574): moram em `./exportar.ts`, e são REEXPORTADAS logo abaixo.
@@ -428,7 +428,7 @@ export class ViabTelaProforma extends LitElement {
     // identidade que exportar.ts:39 já usa (fonte única, sem 2ª execução), e
     // ela continua fechando com o cap: as duas permutas do resultado são as
     // EFETIVAS, então a soma reconstrói a base sem estourá-la.
-    const vgvBruto = p.vgv + p.vgvPermutaResidencial + p.vgvPermutaNaoResidencial;
+    const vgvBruto = vgvBrutoDeProforma(p);
     return html`
       ${this.secao === 'proforma'
         ? (p.semProdutos ? this._renderSemProdutos('Proforma') : html`
@@ -672,7 +672,7 @@ export class ViabTelaProforma extends LitElement {
     // deriva-se do próprio Proforma já calculado do cenário (mesma identidade
     // de exportar.ts:39), sem 2ª execução.
     const proforma = (fator: number) => calcularProforma(this._aplicarFator(fator));
-    const vgvBrutoDe = (cen: Proforma) => cen.vgv + cen.vgvPermutaResidencial + cen.vgvPermutaNaoResidencial;
+    const vgvBrutoDe = (cen: Proforma) => vgvBrutoDeProforma(cen);
     // Linhas monetárias (8) e, separados por uma divisória com mais respiro, os dois
     // indicadores em % (Custo obras/VGV e Margem líquida) exibidos como urbi-badge
     // com a cor do cenário.

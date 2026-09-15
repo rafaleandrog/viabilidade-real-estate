@@ -1,9 +1,16 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$Kpi } from './viab-format.js';
-import { calcularProforma, eficienciaParaFaixa, roiParaFaixa, type Proforma, type ProformaInput } from './proforma.js';
-import { itensAlocacaoGleba } from './areas-cascata.js';
+import { fmtR$Kpi, fmtR$, fmtM2, fmtPctOuIndef } from './viab-format.js';
+import {
+  calcularProforma, eficienciaParaFaixa, roiParaFaixa, vgvBrutoDeProforma,
+  type Proforma, type ProformaInput,
+} from './proforma.js';
+import {
+  calcularCascata, CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO,
+  estadosCascataLoteamentoDoEstudo, estadosCascataIncorporacaoDoEstudo, etapasCadeiaAreas,
+  type LinhaResolvida,
+} from './areas-cascata.js';
 import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
 // do seu `_carregar()`. Reusada, e não recopiada: a cópia inline divergiria da
@@ -11,35 +18,18 @@ import { listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viab
 import { respostaAindaVale } from './viab-imagem-principal.js';
 import { montarMedidor } from './medidor-faixas.js';
 import { resolverIndicadoresBenchmark } from './benchmarks-indicadores.js';
-
-const n = (v: any): number => Number(v) || 0;
-
-// Paleta categórica para segmentar os custos por cor: 12 posições, mais que os 6
-// da paleta padrão do gráfico, para não repetir cor entre custos.
-//
-// #476 / decisão D15 do autor (2026-08-22): as 12 posições vêm dos tokens do
-// tema — `--cor-categoria-1..8` nas oito primeiras e `--cor-escala-1..4` nas
-// quatro últimas. A CONTAGEM é a mesma de antes, na mesma ordem, então o
-// comportamento com N categorias de custo (inclusive o ciclo quando N > 12) é
-// idêntico; o que muda é que a pizza passa a acompanhar os quatro temas do
-// shell, como já fazem todos os outros gráficos do app.
-//
-// O hexadecimal de cada posição é o literal que ocupava aquela posição antes, e
-// fica como fallback — é o padrão de `fluxo-graficos.ts:18-24`, e é o que
-// preserva a aparência atual num shell que não tenha os tokens.
-const PALETA_CUSTOS = [
-  'var(--cor-categoria-1, #2AA9E0)', 'var(--cor-categoria-2, #13A98D)',
-  'var(--cor-categoria-3, #F7A111)', 'var(--cor-categoria-4, #D45A3A)',
-  'var(--cor-categoria-5, #8E7CC3)', 'var(--cor-categoria-6, #5BAF7A)',
-  'var(--cor-categoria-7, #E0699B)', 'var(--cor-categoria-8, #7FB3D5)',
-  'var(--cor-escala-1, #C0A16B)', 'var(--cor-escala-2, #59C3C3)',
-  'var(--cor-escala-3, #B57EDC)', 'var(--cor-escala-4, #9AA5B1)',
-];
+import { calcularCascataResultado } from './cascata-resultado-motor.js';
+import './grafico-cascata.js';
+import './grafico-barra-ranqueada.js';
+import './grafico-cadeia-areas.js';
 
 @customElement('viab-tela-graficos')
 export class ViabTelaGraficos extends LitElement {
   @property({ attribute: false }) estudo: any = null;
   @state() private excluirTerreno = false;
+  // Rodada 12 — a cascata do resultado expande o detalhamento de "Custo
+  // direto total" por categoria (barra ranqueada) ao clicar na linha.
+  @state() private custoExpandido = false;
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
   // O catálogo de Produtos é a fonte do VGV (`frontend/proforma.ts`). Sem ele
@@ -47,6 +37,12 @@ export class ViabTelaGraficos extends LitElement {
   // seja, outro VGV — e desenhava gráfico e medidores de um estudo diferente
   // do que a aba ao lado mostra.
   @state() private produtos: any[] = [];
+  // Achado real da revisão (Codex, P2, PR #707): `produtos` nasce `[]` a
+  // cada `_init()`, antes do catálogo carregar — sem este estado, a faixa
+  // de consistência lia um catálogo vazio como "0 m² alocado" e desenhava
+  // o aviso "ainda faltam alocar" numa piscada, mesmo em estudo consistente
+  // (e para sempre, se a mesma `Promise.all` de benchmarks/config falhar).
+  @state() private produtosCarregados = false;
   private _idCarregado: number | null = null;
 
   static styles = [estiloConteudo, css`
@@ -55,6 +51,33 @@ export class ViabTelaGraficos extends LitElement {
     .medidores { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
     .medidor-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .resultado { margin-top: 12px; }
+    /* Rodada 12 (handoff §3.1) — faixa de 5 KPIs com denominador visível. */
+    .kpis-preliminar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .kpi-card { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .kpi-rotulo {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+    }
+    .kpi-valor {
+      font-size: 20px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+    }
+    .kpi-rodape {
+      font-size: 11px;
+      color: var(--cor-texto-fraco, rgba(255, 255, 255, 0.4));
+    }
+    .detalhamento-custo { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--cor-borda, rgba(255, 255, 255, 0.12)); }
+    .detalhamento-custo urbi-checkbox { display: block; margin-bottom: 8px; }
+    urbi-banner.aviso-consistencia { display: block; margin-bottom: 16px; }
   `];
 
   connectedCallback() { super.connectedCallback(); this._init(); }
@@ -81,15 +104,25 @@ export class ViabTelaGraficos extends LitElement {
     const id = this.estudo.id;
     this._idCarregado = id ?? null;
     this.produtos = [];
+    this.produtosCarregados = false;
+    // Achado real da revisão (Codex, P2, rodada 3 do PR #707): produtos
+    // não pode ficar preso ao MESMO Promise.all de benchmarks/config — se
+    // `/preliminar/produtos` responde mas um dos outros dois falha,
+    // `produtosCarregados` tem que virar `true` do mesmo jeito, senão a
+    // faixa de consistência fica em branco para sempre mesmo com o
+    // catálogo já conhecido. As duas cargas resolvem independentes.
+    listarProdutosPreliminar(id).then((prod) => {
+      if (!respostaAindaVale(id, this.estudo?.id)) return;
+      this.produtos = prod?.dados || [];
+      this.produtosCarregados = true;
+    }).catch((e) => console.error(e));
     try {
-      const [bm, cfg, prod] = await Promise.all([
+      const [bm, cfg] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
-        listarProdutosPreliminar(id),
       ]);
       if (!respostaAindaVale(id, this.estudo?.id)) return; // o estudo mudou enquanto isto estava em voo
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
-      this.produtos = prod?.dados || [];
     } catch (e) { console.error(e); }
   }
 
@@ -98,21 +131,57 @@ export class ViabTelaGraficos extends LitElement {
     const lot = this.estudo.tipo_empreendimento === 'loteamento';
     const p = calcularProforma({ ...this.estudo, aliquota_ret_pct: this.aliquotaRet, produtos: this.produtos } as ProformaInput);
     return html`
+      ${this._renderKpisPreliminar(p)}
+      ${this._renderConsistencia(p)}
       <div class="graficos">
-        <urbi-card titulo="Composição dos custos">
-          <urbi-checkbox
-            label="Excluir custo de aquisição do terreno"
-            ?marcado=${this.excluirTerreno}
-            @urbi:checkbox-change=${(e: CustomEvent) => this.excluirTerreno = e.detail.marcado}
-          ></urbi-checkbox>
-          ${this._renderPizza(p)}
-        </urbi-card>
-        <urbi-card titulo="Receita × Custos">
-          ${this._renderBarras(p)}
+        <urbi-card titulo="Cascata do resultado">
+          ${this._renderCascata(p)}
         </urbi-card>
       </div>
       ${this._renderAlocacaoAreas(p, lot)}
       ${this._renderMedidores(p)}
+    `;
+  }
+
+  // Rodada 12 (handoff de KPIs/gráficos §3.1) — faixa de 5 KPIs independentes,
+  // cada um com denominador visível no rodapé (requisito, não enfeite). Usa
+  // `urbi-card` (não `urbi-kpi`): o primitivo `urbi-kpi` não tem slot/prop de
+  // rodapé e carrega um bug conhecido de box-model (recorrente em
+  // #176/#262/#326/#352) — `urbi-card` não tem esse risco
+  // (`docs/ui-urbiverso/primitivos.json`).
+  //
+  // #1 e #2 usam `fmtR$Kpi` (sem casas decimais) — a exceção declarada de
+  // card de KPI (#581, `frontend/viab-format.ts:52`); entram no inventário
+  // fechado de `frontend/kpi-casas-decimais.test.ts`. #3–#5 são percentuais
+  // (`fmtPctOuIndef`, 1 casa, "—" quando o denominador é ≤0 — nunca "0,0%").
+  private _renderKpisPreliminar(p: Proforma): TemplateResult {
+    const vgvBruto = vgvBrutoDeProforma(p);
+    const margemVgvTabela = vgvBruto > 0 ? (p.resultado / vgvBruto) * 100 : null;
+    const margemReceitaLiquida = p.receitaLiquida > 0 ? (p.resultado / p.receitaLiquida) * 100 : null;
+    const obraSobreVgvTabela = vgvBruto > 0 ? (p.custoObras / vgvBruto) * 100 : null;
+    const kpis: { rotulo: string; valor: string; rodape: string }[] = [
+      { rotulo: 'VGV do incorporador', valor: fmtR$Kpi(p.vgv), rodape: `VGV de tabela: ${fmtR$(vgvBruto)}` },
+      { rotulo: 'Resultado final', valor: fmtR$Kpi(p.resultado), rodape: 'após indiretos' },
+      { rotulo: 'Margem sobre VGV de tabela', valor: fmtPctOuIndef(margemVgvTabela), rodape: 'base: VGV de tabela' },
+      { rotulo: 'Margem sobre receita líquida', valor: fmtPctOuIndef(margemReceitaLiquida), rodape: 'base: receita líquida' },
+      {
+        rotulo: 'Custo obras / VGV',
+        valor: fmtPctOuIndef(p.custoObrasVgvPct),
+        rodape: `sobre VGV de tabela: ${fmtPctOuIndef(obraSobreVgvTabela)}`,
+      },
+    ];
+    return html`
+      <div class="kpis-preliminar">
+        ${kpis.map((k) => html`
+          <urbi-card>
+            <div class="kpi-card">
+              <span class="kpi-rotulo">${k.rotulo}</span>
+              <span class="kpi-valor">${k.valor}</span>
+              <span class="kpi-rodape">${k.rodape}</span>
+            </div>
+          </urbi-card>
+        `)}
+      </div>
     `;
   }
 
@@ -134,102 +203,104 @@ export class ViabTelaGraficos extends LitElement {
     return itens.filter((i) => i.v > 0.005 && !(i.terreno && excluirTerreno));
   }
 
-  private _renderPizza(p: Proforma): TemplateResult {
-    const custos = this._custos(p);
-    const total = custos.reduce((s, c) => s + c.v, 0);
-    if (total <= 0) {
-      return html`<urbi-estado-vazio icone="fa-solid fa-chart-pie" mensagem="Sem custos para exibir."></urbi-estado-vazio>`;
-    }
+  // Rodada 12 (handoff §4.1) — cascata horizontal do resultado, substituindo
+  // a pizza de custos e o gráfico de barras Receita×Custos. Clicar na linha
+  // "Custo direto total" expande o detalhamento por categoria abaixo, como
+  // barra ranqueada (regra 6 do handoff: pizza com mais de 4 fatias vira
+  // barra horizontal ranqueada) — é ali, e não mais na pizza, que mora o
+  // toggle "excluir terreno".
+  private _renderCascata(p: Proforma): TemplateResult {
+    const etapas = calcularCascataResultado(p);
     return html`
-      <urbi-grafico-pizza
-        formato="moeda"
-        .categorias=${custos.map((c) => c.l)}
-        .series=${[{ rotulo: 'Custos', valores: custos.map((c) => c.v) }]}
-      ></urbi-grafico-pizza>
+      <viab-grafico-cascata
+        .etapas=${etapas}
+        .idExpandivel=${'custo_direto'}
+        @viab:cascata-linha-click=${() => { this.custoExpandido = !this.custoExpandido; }}
+      ></viab-grafico-cascata>
+      ${this.custoExpandido ? html`
+        <div class="detalhamento-custo">
+          <urbi-checkbox
+            label="Excluir custo de aquisição do terreno"
+            ?marcado=${this.excluirTerreno}
+            @urbi:checkbox-change=${(e: CustomEvent) => this.excluirTerreno = e.detail.marcado}
+          ></urbi-checkbox>
+          <viab-grafico-barra-ranqueada .itens=${this._custos(p)}></viab-grafico-barra-ranqueada>
+        </div>
+      ` : nothing}
     `;
   }
 
-  private _renderBarras(p: Proforma): TemplateResult {
-    // Coluna "Custos" empilhada e segmentada por cor (um segmento por custo),
-    // ao lado da coluna "Receita". Cada custo é uma série própria com valor só
-    // na categoria "Custos" (0 em "Receita", que o empilhado ignora). A legenda
-    // do gráfico mapeia cor → custo.
-    const itens = this._custos(p, false); // bars: sempre com todos os custos
-    const series = [
-      { rotulo: 'Receita (VGV)', valores: [p.vgv, 0], cor: 'var(--cor-sucesso, #13A98D)' },
-      ...itens.map((c, i) => ({ rotulo: c.l, valores: [0, c.v], cor: PALETA_CUSTOS[i % PALETA_CUSTOS.length] })),
-    ];
-    const custosTotal = itens.reduce((s, c) => s + c.v, 0);
-    const resultado = p.vgv - custosTotal;
-    return html`
-      <urbi-grafico-colunas
-        empilhado
-        legenda="sempre"
-        formato="moeda"
-        .categorias=${['Receita', 'Custos']}
-        .series=${series}
-      ></urbi-grafico-colunas>
-      <div class="resultado">
-        <urbi-kpi rotulo="Resultado" .valor=${fmtR$Kpi(resultado)} variante=${resultado >= 0 ? 'sucesso' : 'erro'}></urbi-kpi>
-      </div>
-    `;
-  }
-
-  // #14: pizza(s) de alocação de áreas. Loteamento: composição da gleba. Incorporação:
-  // dois subgrupos — "geral" (áreas detalhadas) e "macro" (privativa R + privativa NR +
-  // áreas comuns = 100%).
+  // Rodada 12 (handoff §4.4) — cadeia de áreas, substituindo a(s) pizza(s) de
+  // alocação de área. Loteamento: poligonal → parcelável → líquida → ALV.
+  // Incorporação: terreno → construída total → privativa total. A eficiência
+  // (ALV/poligonal no Loteamento, privativa/construída na Incorporação) vai
+  // ao lado, não numa pizza à parte — é o "número" que o handoff pede.
   //
-  // ⚠️ #574: até 2026-08-27 a pizza do Loteamento era montada a partir dos 7
-  // campos "% da gleba" que a migração `020_areas_cascata_loteamento.js`
-  // APOSENTOU (`app_pct`, `faixas_nao_edificaveis_pct`, `sistema_viario_pct`,
-  // `elup_pct`, `epc_pct`, `epu_pct`,
-  // `areas_privativas_nao_vendaveis_pct`). Nenhuma tela os escreve desde a
-  // reestruturação do Preliminar — `frontend/proforma.ts` deixou de lê-los na
-  // mesma data —, então num loteamento criado depois dela as 7 deduções saíam
-  // ZERO e a pizza mostrava uma fatia só: "a gleba inteira é vendável". A
-  // composição agora sai da MESMA cascata que Premissas edita e que o motor
-  // usa para a área vendável (`itensAlocacaoGleba`, `frontend/areas-cascata.ts`).
+  // ⚠️ #574 (histórico, preservado do que esta função substitui): até
+  // 2026-08-27 a pizza do Loteamento era montada a partir de 7 campos "% da
+  // gleba" já aposentados pela migração `020` — a cascata de áreas (mesma
+  // fonte que Premissas edita e que o motor usa para a área vendável) já
+  // corrigiu isso, e `etapasCadeiaAreas` consome essa MESMA cascata.
   private _renderAlocacaoAreas(p: Proforma, lot: boolean): TemplateResult {
     const e = this.estudo;
-    if (lot) {
+    const linhas = lot
+      ? calcularCascata(CASCATA_LOTEAMENTO, estadosCascataLoteamentoDoEstudo(e), p.areaTerreno)
+      : calcularCascata(CASCATA_INCORPORACAO, estadosCascataIncorporacaoDoEstudo(e), p.areaTerreno);
+    const etapas = etapasCadeiaAreas(linhas, lot);
+    if (etapas.every((et) => et.m2 <= 0.005)) {
       return html`<div class="graficos">
-        <urbi-card titulo="Alocação de áreas da gleba">
-          ${this._pizzaAreas(itensAlocacaoGleba(e, p.areaTerreno))}
+        <urbi-card titulo="Cadeia de áreas">
+          <urbi-estado-vazio icone="fa-solid fa-layer-group" mensagem="Defina as áreas nas Premissas."></urbi-estado-vazio>
         </urbi-card>
       </div>`;
     }
-    const rF = n(e.area_pvt_r_fechada), rA = n(e.area_pvt_r_aberta);
-    const nrF = n(e.area_pvt_nr_fechada), nrA = n(e.area_pvt_nr_aberta);
-    const comum = n(e.area_comum_total);
-    const geral = [
-      { l: 'Priv. residencial fechada', v: rF },
-      { l: 'Priv. residencial aberta', v: rA },
-      { l: 'Priv. não residencial fechada', v: nrF },
-      { l: 'Priv. não residencial aberta', v: nrA },
-      { l: 'Áreas comuns', v: comum },
-    ];
-    const macro = [
-      { l: 'Privativa residencial', v: rF + rA },
-      { l: 'Privativa não residencial', v: nrF + nrA },
-      { l: 'Áreas comuns', v: comum },
-    ];
     return html`<div class="graficos">
-      <urbi-card titulo="Alocação de áreas — geral">${this._pizzaAreas(geral)}</urbi-card>
-      <urbi-card titulo="Alocação de áreas — macro">${this._pizzaAreas(macro)}</urbi-card>
+      <urbi-card titulo="Cadeia de áreas">
+        <viab-grafico-cadeia-areas
+          .etapas=${etapas}
+          rotuloEficiencia=${lot ? 'ALV / poligonal' : 'Privativa / construída'}
+          .eficienciaPct=${this._eficienciaCadeia(etapas, lot)}
+        ></viab-grafico-cadeia-areas>
+      </urbi-card>
     </div>`;
   }
 
-  private _pizzaAreas(itens: { l: string; v: number }[]): TemplateResult {
-    const validos = itens.filter((i) => i.v > 0.005);
-    if (validos.length === 0) {
-      return html`<urbi-estado-vazio icone="fa-solid fa-chart-pie" mensagem="Defina as áreas nas Premissas."></urbi-estado-vazio>`;
+  private _eficienciaCadeia(etapas: LinhaResolvida[], lot: boolean): number | null {
+    if (lot) {
+      const poligonal = etapas[0]?.m2 ?? 0;
+      const alv = etapas[etapas.length - 1]?.m2 ?? 0;
+      return poligonal > 0 ? (alv / poligonal) * 100 : null;
     }
+    const construida = etapas.find((l) => l.id === 'construida_total')?.m2 ?? 0;
+    const privativa = etapas.find((l) => l.id === 'privativa_total')?.m2 ?? 0;
+    return construida > 0 ? (privativa / construida) * 100 : null;
+  }
+
+  // Rodada 12 (handoff §4.5) — faixa de consistência: reexibe (não recalcula)
+  // a mesma trava que `tela-premissas.ts` (`_renderAreaAlocada`) já produz —
+  // continua só informativa, nunca bloqueia salvar (decisão registrada na
+  // #693; o handoff pede bloqueio, mas isso fica fora de escopo desta rodada).
+  private _renderConsistencia(p: Proforma): TemplateResult {
+    // Achado real da revisão (Codex, P2, PR #707): sem este portão, o
+    // instante entre `connectedCallback()` e o catálogo carregar (produtos
+    // ainda `[]`) computava `diferencaAreaAlocada` contra 0 m² alocado e
+    // desenhava "ainda faltam alocar" para qualquer estudo com área — uma
+    // piscada de aviso falso, permanente se a mesma `Promise.all` falhar.
+    if (!this.produtosCarregados) return html``;
+    const excesso = p.diferencaAreaAlocada > 0;
+    const sobra = p.diferencaAreaAlocada < 0;
+    if (!excesso && !sobra) return html``;
     return html`
-      <urbi-grafico-pizza
-        formato="numero"
-        .categorias=${validos.map((i) => i.l)}
-        .series=${[{ rotulo: 'Áreas (m²)', valores: validos.map((i) => i.v) }]}
-      ></urbi-grafico-pizza>
+      ${excesso ? html`
+        <urbi-banner class="aviso-consistencia" variante="alerta">
+          A soma das áreas dos produtos (${fmtM2(p.areaProdutosAlocada)}) é maior que a área
+          registrada em Terreno &amp; Áreas (${fmtM2(p.areaPrivativa)}) — ver Premissas.
+        </urbi-banner>` : nothing}
+      ${sobra ? html`
+        <urbi-banner class="aviso-consistencia" variante="alerta">
+          Ainda faltam ${fmtM2(Math.abs(p.diferencaAreaAlocada))} para alocar nos produtos — ver
+          Premissas.
+        </urbi-banner>` : nothing}
     `;
   }
 
@@ -251,7 +322,14 @@ export class ViabTelaGraficos extends LitElement {
     const { exibiveis } = resolverIndicadoresBenchmark(this.benchmarks, {
       custo_obras_vgv: p.custoObrasVgvPct,
       margem_liquida: p.margemLiquidaPct,
-      resultado_final: p.margemLiquidaPct,
+      // Rodada 12 (achado 2.3 da auditoria, docs/rodada-12/auditoria.md):
+      // "Resultado final" plotava o MESMO valor de "Margem sobre VGV" — dois
+      // rótulos, uma fórmula. Aposentado, não reescalado (decisão do autor):
+      // a grandeza em R$ do resultado não cabe bem numa escala de 0–100%,
+      // que é o que todo o resto dos medidores de benchmark usa. Sem essa
+      // chave, `resolverIndicadoresBenchmark` descarta `resultado_final` com
+      // `SEM_VALOR_NESTA_TELA_MOTIVO` — o mesmo motivo que já vale para
+      // `eficiencia_aproveitamento` no Resumo do Avançado.
       // #611: sem investimento não há denominador — `roiPct` já vem `null`
       // do motor desde a fase 2 da issue, e `roiParaFaixa` é hoje um alias
       // dele (mantido pelo call site continuar nomeado). `montarMedidor` é

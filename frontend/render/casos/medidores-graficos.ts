@@ -11,15 +11,24 @@
 // (#447).
 //
 // O `exigir` de `urbi-badge.fora-escala` é a prova: sem a chamada ligada aos
-// 4 indicadores (não só os 2 antigos) e sem o `foraEscala` propagado ao
-// template, o seletor não casa nada e o harness rejeita o caso — em vez de
-// reportar "limpo" para uma tela que nunca desenhou o aviso.
+// indicadores e sem o `foraEscala` propagado ao template, o seletor não casa
+// nada e o harness rejeita o caso — em vez de reportar "limpo" para uma tela
+// que nunca desenhou o aviso.
 //
 // Os valores dos benchmarks abaixo NÃO são os medidos em Pinguim (dados.ts é
 // deliberadamente pequeno e fixo — ver o topo daquele arquivo); o de `roi`
 // reusa as metas REAIS da semente (`backend/rotas/benchmarks.ts:25-31`:
 // 11/18/22/29) porque o `roiPct` do fixture (58%) já as estoura por
 // construção, sem precisar inventar limite.
+//
+// ⚠️ Rodada 12 (achado 2.3 da auditoria, docs/rodada-12/auditoria.md):
+// `resultado_final` deixou de ser wireado em `_renderMedidores`
+// (tela-graficos.ts) — plotava o MESMO valor que `margem_liquida`, dois
+// rótulos para uma fórmula. Este fixture tinha uma entrada `resultado_final`
+// (id 3) que EXERCITAVA esse wiring; removida junto, e o `minimo` de
+// `urbi-grafico-medidor` caiu de 4 para 3 — o campo agora é DESCARTADO por
+// `SEM_VALOR_NESTA_TELA_MOTIVO`, mesmo motivo de `eficiencia_aproveitamento`
+// no Resumo do Avançado.
 
 import '../../tela-graficos.js';
 import { ESTUDO, PRODUTOS, forcarEstado } from './dados.js';
@@ -27,7 +36,7 @@ import { ESTUDO, PRODUTOS, forcarEstado } from './dados.js';
 // `custoObrasVgvPct` ≈ 37,45 e `roiPct` ≈ 58,03 para o `ESTUDO` deste espelho
 // (calculado por `calcularProforma`, conferido no PR). Os medidores abaixo
 // são calibrados para deixar um de cada tipo — dentro e fora da escala — nos
-// 4 campos que `resolverIndicadoresBenchmark` agora reconhece.
+// 3 campos que `_renderMedidores` wireia hoje.
 const BENCHMARKS = [
   // FORA da escala (acima do máximo) — nao_exceder.
   { id: 1, campo: 'custo_obras_vgv', valor: 35, regra_comparacao: 'nao_exceder',
@@ -35,11 +44,7 @@ const BENCHMARKS = [
   // DENTRO da escala — atingir_ou_superar.
   { id: 2, campo: 'margem_liquida', valor: 20, regra_comparacao: 'atingir_ou_superar',
     medidor_min: 15, medidor_faixa1_ate: 25, medidor_faixa2_ate: 35, medidor_max: 45 },
-  // DENTRO da escala — a entrada NOVA (não existia no MAPA antes da #451).
-  { id: 3, campo: 'resultado_final', valor: 25, regra_comparacao: 'atingir_ou_superar',
-    medidor_min: 12, medidor_faixa1_ate: 18, medidor_faixa2_ate: 25, medidor_max: 35 },
-  // FORA da escala — a outra entrada NOVA, com a meta e o medidor REAIS da
-  // semente (11/18/22/29).
+  // FORA da escala — meta e medidor REAIS da semente (11/18/22/29).
   { id: 4, campo: 'roi', valor: 15, regra_comparacao: 'atingir_ou_superar',
     medidor_min: 11, medidor_faixa1_ate: 18, medidor_faixa2_ate: 22, medidor_max: 29 },
   // Sem indicador correspondente hoje (#453) — prova que ele é DESCARTADO, não
@@ -48,15 +53,22 @@ const BENCHMARKS = [
     medidor_min: 30, medidor_faixa1_ate: 40, medidor_faixa2_ate: 50, medidor_max: 70 },
   // Indicador de sensibilidade — também descartado, motivo diferente.
   { id: 6, campo: 'preco', valor: 0, regra_comparacao: 'atingir_ou_superar' },
+  // "Resultado final" — Rodada 12: DESCARTADO de propósito (SEM_VALOR_NESTA_TELA_MOTIVO,
+  // ver o comentário no topo do arquivo). A entrada continua configurada aqui
+  // para provar que o benchmark existir não basta — sem o wiring, nenhum
+  // medidor a mais aparece.
+  { id: 3, campo: 'resultado_final', valor: 25, regra_comparacao: 'atingir_ou_superar',
+    medidor_min: 12, medidor_faixa1_ate: 18, medidor_faixa2_ate: 25, medidor_max: 35 },
 ];
 
 export const caso = {
   nome: 'medidores-graficos',
   exigir: [
     { seletor: 'urbi-card', minimo: 1 },
-    // Os 4 indicadores que `resolverIndicadoresBenchmark` reconhece hoje —
-    // não só os 2 que o `MAPA` hardcoded lia antes da #451.
-    { seletor: 'urbi-grafico-medidor', minimo: 4 },
+    // Os 3 indicadores que `_renderMedidores` wireia hoje (custo_obras_vgv,
+    // margem_liquida, roi) — `resultado_final` está configurado no benchmark
+    // acima e MESMO ASSIM não deve virar um 4º medidor (Rodada 12).
+    { seletor: 'urbi-grafico-medidor', minimo: 3 },
     // A prova de fiação do estado novo: sem `cfg.foraEscala` chegando ao
     // template, este seletor não casa nada.
     { seletor: 'urbi-badge.fora-escala', minimo: 2 },
@@ -71,21 +83,11 @@ export const caso = {
     'urbi-grafico-medidor.min',
     'urbi-grafico-medidor.max',
     'urbi-card.titulo',
-    // `viab-tela-graficos` monta a aba INTEIRA (pizza de custos, barras
-    // Receita×Custos, faixa de KPIs), não só a seção de medidores que este
-    // caso mede — as props abaixo são dessas outras seções, sem restringir
-    // caixa nenhuma que a asserção deste caso confira.
+    // `viab-tela-graficos` monta a aba INTEIRA (faixa de KPIs, cascata do
+    // resultado, cadeia de áreas), não só a seção de medidores que este caso
+    // mede — a prop abaixo é dessas outras seções, sem restringir caixa
+    // nenhuma que a asserção deste caso confira.
     'urbi-badge.cor',
-    'urbi-checkbox.label',
-    'urbi-grafico-colunas.categorias',
-    'urbi-grafico-colunas.empilhado',
-    'urbi-grafico-colunas.formato',
-    'urbi-grafico-colunas.legenda',
-    'urbi-grafico-colunas.series',
-    'urbi-grafico-pizza.categorias',
-    'urbi-grafico-pizza.formato',
-    'urbi-grafico-pizza.series',
-    'urbi-kpi.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     // Resposta específica de `/benchmarks` — mutação do MESMO objeto
