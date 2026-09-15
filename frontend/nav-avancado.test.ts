@@ -88,7 +88,7 @@ test('#718: Funding é página de nível 1, logo abaixo de Viabilidade', () => {
   assert.equal(itens.find((p) => p.label === 'Funding')?.id, 'funding');
 });
 
-test('#718: Funding (nível 1) renderiza viab-funding direto, já na aba Operações (padrão)', () => {
+test('#718: Funding (nível 1) renderiza viab-funding direto, sem urbi-abas de 2º nível', () => {
   const el = telaAvancado();
   el.aba = 'funding';
   // A CHAMADA, como o resto do arquivo: o conteúdo da página é o valor que cai

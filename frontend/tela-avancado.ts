@@ -146,7 +146,7 @@ export class ViabTelaAvancado extends LitElement {
   @property({ type: Boolean }) podeEditar = false;
   @property({ type: String }) status = '';
 
-  // Página ativa — vem da URL via tela-estudo. Setter normaliza para uma das 8
+  // Página ativa — vem da URL via tela-estudo. Setter normaliza para uma das 9
   // (URLs antigas do Preliminar, ex. 'premissas', caem em 'resumo'). #250: o
   // slug 'custos' (e o alias 'obra') resolve para o id interno 'obra'.
   @property({ type: String })
