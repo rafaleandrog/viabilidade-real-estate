@@ -943,6 +943,28 @@ test('#711 fiação: a tela passa a CONVERSÃO de destino — sem ela a relaxaç
   );
 });
 
+test('#711 fiação, rodada 3 (achado do Codex): editar um campo derivado LIMPA o canônico quando não consegue reconvertê-lo', () => {
+  // O caminho de dois cliques que a rodada 3 achou: %VGV → R$ (grava
+  // canônico 0, permitido — destino é R$) → R$ → R$/m² (permitido, porque o
+  // canônico JÁ existe — `trocaBadgePremissas` não reconsulta `convNova`
+  // quando `canonicoPersistido` está presente) → usuário digita um R$/m²
+  // real, mas a área de venda ainda é 0. Se `_editarCustoUnidade` deixasse o
+  // canônico 0 intocado (o antigo `if (canonico !== null) this._set(...)`),
+  // o valor digitado nunca teria como derrubar aquele 0 — travado para
+  // sempre, mesmo depois de a área existir. Gravar `canonico` incondicional
+  // (`null` incluso) devolve a linha para "legado" quando a conversão falha,
+  // e a Proforma volta a acompanhar `op.campo` assim que a ligação existir.
+  const fonte = semComentarios(readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'));
+  assert.ok(
+    !fonte.includes('if (canonico !== null) this._set(cu.campoCanonico, canonico);'),
+    'o `_set` do canônico em `_editarCustoUnidade` precisa ser incondicional — inclusive quando `canonico` é `null`',
+  );
+  assert.ok(
+    fonte.includes('this._set(cu.campoCanonico, canonico);'),
+    '`_editarCustoUnidade` precisa gravar o resultado da conversão (mesmo `null`) no canônico',
+  );
+});
+
 // ── #515, rodada 5: a regra virou UMA invariante, e estes são os cantos ──
 //
 // A lista de casos não convergia — cinco rodadas, cinco entradas distintas no

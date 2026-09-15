@@ -641,7 +641,18 @@ export class ViabTelaPremissas extends LitElement {
     this._set(op.campo, valor);
     if (valor === null) { this._set(cu.campoCanonico, null); return; }
     const canonico = converterUnidade(op.conv, { tipo: 'identidade' }, valor, this._ctxConversao());
-    if (canonico !== null) this._set(cu.campoCanonico, canonico);
+    // #711, rodada 3 (achado do Codex): quando a conversão FALHA (ligação
+    // ainda indefinida/zerada), o canônico antigo não pode ficar parado —
+    // ele passaria a descrever um número que o usuário acabou de substituir.
+    // Isso é sério sobretudo quando o canônico antigo é um ZERO plantado por
+    // um clique de badge anterior (#711): sem limpar aqui, o valor digitado
+    // (`op.campo`, já gravado acima) nunca teria como derrubar aquele 0 —
+    // `proforma.ts` continuaria lendo o canônico congelado para sempre,
+    // mesmo depois de a ligação existir. Limpar volta a linha para "legado":
+    // a Proforma passa a ler `op.campo` dinamicamente, acompanhando a
+    // ligação assim que ela existir — exatamente o que já acontece quando o
+    // campo é esvaziado (`valor === null`, acima).
+    this._set(cu.campoCanonico, canonico);
   }
 
   render() {
