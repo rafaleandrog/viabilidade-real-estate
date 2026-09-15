@@ -1018,7 +1018,13 @@ Git Bash — ver PROGRESSO).
   > (`frontend/tela-fluxo-receitas.ts:452-453`) trocaram `fmtNum` sem 2º argumento por
   > `fmtR$(v, false)`. A #281 está fechada — a tabela de conformidade completa é
   > `docs/viabilidade/formulas.md` §"Estado de conformidade".
-  > ⚠️ **UMA exceção, declarada pelo autor em 2026-08-26** (leva Avançado, item 4 — issue #581):
+  > ⚠️ **DUAS exceções de EXIBIÇÃO, e só duas.** As duas seguem o mesmo desenho, de propósito:
+  > símbolo próprio (não um parâmetro de `fmtR$`) para a exceção ser **greppável**, e inventário de
+  > call sites travado por **contagem exata** — chamada a menos e chamada a mais reprovam igual.
+  > **`fmtR$` não mudou em nenhuma das duas**, e em nenhuma delas persistência, entrada, motor,
+  > tabelas, Proforma, Fluxo de Caixa ou exportação saem das 2 casas.
+  >
+  > **1ª — card de KPI, declarada pelo autor em 2026-08-26** (leva Avançado, item 4 — issue #581):
   > **o valor em R$ exibido em CARD DE KPI sai sem casas decimais**, e o percentual em card sai com
   > **uma** casa. (a) A exceção existe e é decisão de desenho, não bug. (b) Ela vale **só** para o
   > valor exibido no card de KPI — a figura que o card publica. (c) **Persistência, entrada, motor,
@@ -1028,6 +1034,17 @@ Git Bash — ver PROGRESSO).
   > (`frontend/viab-format.ts:52`) — símbolo próprio, e não um parâmetro de `fmtR$`, para a exceção
   > ser **greppável**; o inventário de call sites é travado por contagem exata em
   > `frontend/kpi-casas-decimais.test.ts`. `fmtR$` não mudou.
+  >
+  > **2ª — rótulo de barra da cascata do resultado, declarada pelo autor em 2026-09-15**: na aba
+  > Gráficos do Preliminar, **o valor que cada COLUNA da cascata publica sai em R$ MILHÕES, com uma
+  > casa** — `R$ 26.540.000` aparece como `R$ 26,5`. O motivo é de leitura: com VGV de nove dígitos
+  > são 14 barras cujo rótulo em reais cheios não cabe, e a escala única em milhões é o que deixa as
+  > barras comparáveis de relance. (a) Vale **só** para o rótulo que a barra publica — o valor
+  > **exato, em 2 casas**, continua no `title` de cada coluna e no rodapé da escala, então nada de
+  > precisão se perde. (b) Não alcança card de KPI, que tem a sua própria regra acima. (c) Quem a
+  > implementa é `fmtR$Milhoes`, e a trava é `frontend/cascata-milhoes.test.ts`, que confere a
+  > contagem exata no único consumidor **e** zero ocorrências em todo o resto do frontend
+  > versionado (enumerado por `git ls-files`, nunca varrendo o disco).
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa

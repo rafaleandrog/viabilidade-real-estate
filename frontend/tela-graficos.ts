@@ -203,12 +203,15 @@ export class ViabTelaGraficos extends LitElement {
     return itens.filter((i) => i.v > 0.005 && !(i.terreno && excluirTerreno));
   }
 
-  // Rodada 12 (handoff §4.1) — cascata horizontal do resultado, substituindo
-  // a pizza de custos e o gráfico de barras Receita×Custos. Clicar na linha
-  // "Custo direto total" expande o detalhamento por categoria abaixo, como
-  // barra ranqueada (regra 6 do handoff: pizza com mais de 4 fatias vira
-  // barra horizontal ranqueada) — é ali, e não mais na pizza, que mora o
-  // toggle "excluir terreno".
+  // Rodada 12 (handoff §4.1) — cascata do resultado, substituindo a pizza de
+  // custos e o gráfico de barras Receita×Custos. Desenhada em COLUNAS
+  // VERTICAIS, com o valor de cada barra em R$ milhões (`fmtR$Milhoes`, a
+  // segunda exceção declarada ao contrato C7 — ver `CLAUDE.md` § Contratos e
+  // a trava `frontend/cascata-milhoes.test.ts`). Clicar na coluna "Custo
+  // direto total" expande o detalhamento por categoria abaixo, como barra
+  // ranqueada (regra 6 do handoff: pizza com mais de 4 fatias vira barra
+  // horizontal ranqueada) — é ali, e não mais na pizza, que mora o toggle
+  // "excluir terreno".
   private _renderCascata(p: Proforma): TemplateResult {
     const etapas = calcularCascataResultado(p);
     return html`

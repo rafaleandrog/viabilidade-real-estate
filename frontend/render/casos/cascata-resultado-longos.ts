@@ -17,7 +17,8 @@ export const caso = {
   nome: 'cascata-resultado-longos',
   exigir: [
     { seletor: 'viab-grafico-cascata', minimo: 1 },
-    { seletor: 'div.linha', minimo: 5 },
+    { seletor: 'div.coluna', minimo: 5 },
+    { seletor: 'span.valor', minimo: 5 },
     { seletor: 'span.kpi-valor', minimo: 5 },
   ],
   aceitaNaoReproduzido: [
