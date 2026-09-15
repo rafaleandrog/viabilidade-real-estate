@@ -83,6 +83,27 @@ Fora de escopo, registrado como issue própria: **#720**, resultado negativo des
 — o motor clampa a geometria em `[0,100]` desde a Rodada 12, e representar déficit abaixo de uma
 linha-zero muda o contrato de geometria. A mitigação que entrou é só de exibição: `min-height: 2px`,
 para a coluna clampada deixar um filete em vez de sumir.
+## Banner "regularização fundiária indisponível" era falta de permissão no manifesto, não bug de lógica (2026-09-15)
+
+O seletor de lote de Terreno e Áreas (Incorporação) sempre mostrava o banner "Não foi possível
+conferir a classificação de regularização fundiária no Núcleo", em toda instância, desde que a
+feature foi introduzida (2026-09-14). A lógica de `_carregarIdsRegularizacao`
+(`frontend/tela-terreno-nucleo.ts:167-193`) sempre esteve correta e testada — o defeito era que o
+`manifesto.json` nunca declarou a entidade `parcelamentos` em `dependencias_nucleo`/
+`permissoes_nucleo` (só `imoveis`), então `GET /parcelamentos` sempre tomava
+`403 NUCLEO_FLAG_NAO_PEDIDA` — categoria diferente de "admin desligou a flag": a flag nunca aparecia
+para ser concedida, porque a entidade nunca foi pedida.
+
+**Pendência do autor no ambiente autenticado:** depois deste PR mergeado, um admin precisa conceder
+a flag nova em **Admin → Apps → viabilidade → Núcleo**, em cada instância (Pinguim, e depois Laputa
+quando homologado). Sem isso o comportamento observado continua o mesmo de hoje — a diferença é que
+agora existe algo para conceder.
+
+Um PR seguinte trata da falta de filtros de Parcelamento/Incorporação/Setor Habitacional no mesmo
+seletor de lote (diagnóstico feito na mesma sessão, ver o PR do manifesto para o detalhe).
+
+---
+
 ## `decimal` atravessa a API como STRING — a causa real do "deve ser um número" (2026-09-15)
 
 **O fato que faltava, e que quatro correções não tinham:** toda coluna `decimal` do `schema.json`

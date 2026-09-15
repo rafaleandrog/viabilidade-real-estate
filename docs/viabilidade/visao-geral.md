@@ -50,7 +50,7 @@ das duas altera identificador interno de domínio nem o `manifesto.json`.
 
 Na criação, escolhe-se **Buscar terreno** (Núcleo) ou **Inserir novo** (manual, nome + área digitados).
 
-No modo **Núcleo**, o estudo referencia imóveis do Núcleo compartilhado — **1 gleba** para Loteamento, **1 ou mais lotes** para Incorporação — e o app consome a **área** desses imóveis (somada) como área do terreno da Proforma. A seleção é feita na aba Premissas e só é editável em Rascunho. O acesso ao Núcleo é declarado no manifesto (`dependencias_nucleo: ["imoveis"]`, `permissoes_nucleo: { "imoveis": ["ler"] }`) e precisa ser **autorizado pelo admin da instância** em *Admin → Apps → viabilidade → Núcleo*. Enquanto a permissão não for concedida (ou a instância não expuser glebas/lotes), o modo Núcleo degrada com um aviso e o modo **manual** continua disponível.
+No modo **Núcleo**, o estudo referencia imóveis do Núcleo compartilhado — **1 gleba** para Loteamento, **1 ou mais lotes** para Incorporação — e o app consome a **área** desses imóveis (somada) como área do terreno da Proforma. A seleção é feita na aba Premissas e só é editável em Rascunho. O acesso ao Núcleo é declarado no manifesto (`dependencias_nucleo: ["imoveis", "parcelamentos"]`, `permissoes_nucleo: { "imoveis": ["ler"], "parcelamentos": ["ler"] }`) e precisa ser **autorizado pelo admin da instância** em *Admin → Apps → viabilidade → Núcleo*. Enquanto a permissão não for concedida (ou a instância não expuser glebas/lotes), o modo Núcleo degrada com um aviso e o modo **manual** continua disponível.
 
 ## Ciclo de vida
 
