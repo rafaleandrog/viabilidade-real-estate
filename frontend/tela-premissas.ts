@@ -296,6 +296,28 @@ const CAMPO_POR_LINHA_INC: Record<string, string> = {
 // Todas as definições de campo-com-unidade (para coletar seus campos numéricos).
 const CAMPOS_UNIDADE: CustoUnidade[] = [...CUSTOS_UNIDADE, PERMUTA_UNIDADE, PERMUTA_FIS_NR, PERMUTA_FIN_R, PERMUTA_FIN_NR];
 
+/**
+ * Um campo mudou em relação ao retrato que a tela carregou? Normaliza
+ * `''`/`null` para o mesmo valor antes de comparar, porque um input limpo
+ * devolve `''` onde o registro trazia `null`, e isso não é edição.
+ *
+ * ⚠️ **É o predicado que decide DUAS coisas de uma vez**: a faixa de
+ * "alterações não salvas" (`_formDifereSnapshot`) e **o que o Salvar manda**
+ * (`_salvar`). Se os dois divergirem, a faixa passa a falar de um conjunto de
+ * campos e o PATCH de outro — por isso é uma função só, exportada para teste.
+ */
+export function campoMudou(
+  form: Record<string, any>,
+  snapshot: Record<string, any>,
+  k: string,
+): boolean {
+  const a = form[k];
+  const b = snapshot[k];
+  const an = (a === '' || a == null) ? null : a;
+  const bn = (b === '' || b == null) ? null : b;
+  return String(an) !== String(bn);
+}
+
 const TODOS_NUM = new Set<string>([
   ...CUSTOS, ...IMPOSTOS, ...DEDUCOES, ...AREAS_LOT, ...AREAS_INC,
   ...PRODUTOS_LOT, ...PRODUTOS_INC, ...TERRENO_COEF,
@@ -559,15 +581,12 @@ export class ViabTelaPremissas extends LitElement {
   }
 
 
+  private _campoMudou(k: string): boolean {
+    return campoMudou(this.form, this._snapshot, k);
+  }
+
   private _formDifereSnapshot(): boolean {
-    for (const k of Object.keys(this.form)) {
-      const a = this.form[k];
-      const b = this._snapshot[k];
-      const an = (a === '' || a == null) ? null : a;
-      const bn = (b === '' || b == null) ? null : b;
-      if (String(an) !== String(bn)) return true;
-    }
-    return false;
+    return Object.keys(this.form).some((k) => this._campoMudou(k));
   }
 
   private _num(k: string): number | null {
@@ -1454,13 +1473,46 @@ export class ViabTelaPremissas extends LitElement {
     this.erroGeral = '';
     this.salvando = true;
     try {
+      // ── Manda só o que MUDOU nesta tela. ────────────────────────────────
+      //
+      // Esta tela monta o formulário como cópia integral do registro
+      // (`this.form = { ...this.estudo }`) e, até 2026-09-15, mandava o
+      // registro quase inteiro a cada save — tudo menos uma denylist de 16
+      // chaves de identidade. Enquanto o PATCH falhava (a coluna `decimal`
+      // volta do Postgres como STRING e o shell recusava por `typeof`), o
+      // estrago ficava escondido atrás do erro. Com o PATCH funcionando, esse
+      // eco vira **sobrescrita silenciosa**: Premissas regravaria, a partir de
+      // um retrato feito quando a aba carregou, campos cujo dono é outra tela —
+      // `ret_pct`/`considerar_ret` (Custos → Financeiro, por
+      // `PATCH /estudos/:id/avancado/parametros`), `area_terreno_nucleo`
+      // (Terreno & Áreas), `nome` (cabeçalho do estudo), e num estudo Avançado
+      // a aba Financeiro inteira, que o filtro de nível do backend não protege
+      // (ele só vale em Preliminar).
+      //
+      // O retrato **não é refeito** enquanto o id do estudo não muda
+      // (`willUpdate`), então ele envelhece durante a sessão — é por isso que o
+      // conserto não é "recarregar antes de salvar".
+      //
+      // Mandar o diff resolve a classe inteira sem lista nomeada nenhuma: campo
+      // que a tela não edita nunca muda em relação ao retrato, logo nunca viaja.
+      // E `_campoMudou` é o mesmo predicado da faixa de "alterações não salvas",
+      // de propósito.
       const dados: Record<string, any> = {};
       for (const [k, v] of Object.entries(this.form)) {
         if (['id', 'id_legivel', 'nome_exibicao', 'sequencia', 'status', 'autor_id', 'criado_em', 'atualizado_em',
           'removido_em', 'removido_por_id',
           'membros', 'imoveis', '_permissao', '_funcao', 'autor_nome', 'autor_avatar_url'].includes(k)) continue;
+        if (!this._campoMudou(k)) continue;
         if (TODOS_NUM.has(k)) dados[k] = v === '' || v == null ? null : Number(v);
         else dados[k] = v;
+      }
+      // Nada mudou: o backend responderia 400 NENHUM_CAMPO, que a tela
+      // mostraria como erro num save legítimo.
+      if (Object.keys(dados).length === 0) {
+        this._snapshot = { ...this.form };
+        this._dirty = false;
+        urbiVerso.notificar('Nenhuma alteração para salvar.', 'sucesso');
+        return;
       }
       const res = await atualizarEstudo(this.estudo.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }

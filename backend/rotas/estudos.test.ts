@@ -384,10 +384,16 @@ test('#609 lista vazia, nula ou indefinida devolve lista vazia', () => {
 // ── Duplicação: "Campo X deve ser um número" ao duplicar (bug relatado) ──
 //
 // `montarCopiasFilhas` preserva `null` de propósito (teste "#609 valor NULO
-// viaja" acima) — mas esse `null` nunca pode chegar cru a `req.dados!.criar`,
-// porque o validador do shell recusa `null` em coluna decimal/inteiro na
-// criação, mesmo sendo nullable. `omitirValoresNulos` é o filtro que fica só
-// nessa fronteira de escrita, entre `montarCopiasFilhas` e `criar`.
+// viaja" acima), e `omitirValoresNulos` é o filtro que fica só na fronteira de
+// escrita, entre `montarCopiasFilhas` e `criar`.
+//
+// ⚠️ **A justificativa que estava escrita aqui era FALSA** — dizia que "o
+// validador do shell recusa `null` em coluna decimal/inteiro na criação, mesmo
+// sendo nullable". Ele ACEITA (`validarInsert` pula `null` em coluna opcional
+// antes de olhar o tipo); o que ele recusa é STRING. Ver o cabeçalho de
+// `./coercao-numerica.ts`. `omitirValoresNulos` continua aqui pelo motivo
+// revisado em `./duplicar-utils.ts`, que é de FIDELIDADE de cópia, não de
+// validação.
 
 test('omitirValoresNulos remove só as chaves com valor null', () => {
   assert.deepEqual(

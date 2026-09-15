@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { varrerTudo } from './varrer-tudo.js';
 import { exigirMembro, exigirEditor, exigirAprovador } from '../permissoes-estudo.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
-import { coagirNumericosOuLancar } from './coercao-numerica.js';
+import { coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 
 // Rotas do nível AVANÇADO (fluxo de caixa temporal). Todo o conjunto só opera
 // sobre estudos com nivel_analise === 'avancado' — em estudos preliminares as
@@ -500,8 +500,12 @@ rotasAvancado.patch('/estudos/:id/avancado/parametros', async (req: Request, res
       dados.data_inicio_projeto = v || null;
     }
     if (req.body.taxa_desconto_aa !== undefined) {
-      const t = Number(req.body.taxa_desconto_aa);
-      if (!Number.isFinite(t) || t < 0 || t > 100) {
+      // `numeroEstrito`, não `Number()`: este é o MESMO campo que
+      // `montarPatchEstudo` valida, e dois validadores com regras diferentes
+      // para a mesma coluna é o corolário mais caro da armadilha 14 do
+      // `CLAUDE.md`. `Number('0x10')` vale 16 e passaria a faixa 0–100.
+      const t = numeroEstrito(req.body.taxa_desconto_aa);
+      if (t === null || t < 0 || t > 100) {
         erro(res, 400, 'TAXA_INVALIDA', 'taxa_desconto_aa deve ser um percentual entre 0 e 100');
         return;
       }
@@ -514,8 +518,9 @@ rotasAvancado.patch('/estudos/:id/avancado/parametros', async (req: Request, res
       dados.considerar_ret = Boolean(req.body.considerar_ret);
     }
     if (req.body.ret_pct !== undefined) {
-      const t = Number(req.body.ret_pct);
-      if (!Number.isFinite(t) || t < 0 || t > 100) {
+      // Mesma razão do `taxa_desconto_aa` acima: parser único.
+      const t = numeroEstrito(req.body.ret_pct);
+      if (t === null || t < 0 || t > 100) {
         erro(res, 400, 'RET_PCT_INVALIDO', 'ret_pct deve ser um percentual entre 0 e 100');
         return;
       }

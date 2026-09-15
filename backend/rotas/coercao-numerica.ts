@@ -25,15 +25,19 @@
 // E a app manda STRING. `decimal` do `schema.json` vira `NUMERIC(p,s)` no
 // Postgres, e o shell registra um único type parser customizado do `pg` — o de
 // `DATE`. Sem parser para `NUMERIC` (OID 1700), o driver devolve **string**
-// (medido: `pg-types@2.2.0`, `getTypeParser(1700)('4.00') === '4.00'`; já
-// `INT4` devolve número). Então `GET /estudos/:id` responde `ret_pct: "4.00"`, a
+// (medido em 2026-09-15 no `pg-types@2.2.0` que o shell usa:
+// `getTypeParser(1700)('4.00') === '4.00'`, enquanto `INT4` devolve número —
+// esta app não tem `pg` em `node_modules`, então a medição NÃO é reproduzível a
+// partir deste repositório; o que é reproduzível aqui é o sintoma). Então `GET /estudos/:id` responde `ret_pct: "4.00"`, a
 // tela copia o registro inteiro para o formulário e devolve a string no PATCH.
 //
 // Por isso as correções anteriores não pegaram: `CAMPOS_OMITIR_SE_NULO` (#694) e
 // `omitirValoresNulos` (#714) filtram `null` — e o valor nunca foi `null`. As
-// duas listas que pareciam funcionar (`CAMPOS_SOMENTE_AVANCADO`,
-// `CAMPOS_APOSENTADOS`) funcionam por omitirem a chave SEMPRE, o que escapa do
-// `typeof` por tabela.
+// duas listas que pareciam funcionar escapam do `typeof` por outro caminho:
+// elas omitem a CHAVE, não o valor. `CAMPOS_APOSENTADOS` faz isso
+// incondicionalmente; `CAMPOS_SOMENTE_AVANCADO`, só quando o estudo é
+// Preliminar — então num estudo Avançado ela nunca protegeu nada, e é ali que
+// o eco da tela de Premissas fazia o maior estrago.
 //
 // Quatro listas nomeadas para a mesma classe é exatamente o gatilho da armadilha
 // 14 do `CLAUDE.md`: *"na segunda entrada suja da mesma classe, pare de
@@ -48,7 +52,7 @@
 //
 //   | valor                         | resultado                                |
 //   |-------------------------------|------------------------------------------|
-//   | `null` / `undefined`          | passa intacto (o shell aceita, medido)   |
+//   | `null` / `undefined`          | passa intacto (ver a ressalva abaixo)    |
 //   | `number` finito               | passa                                    |
 //   | string decimal estrita        | `Number(v)`                              |
 //   | qualquer outra coisa          | **falha nomeando o campo**               |
@@ -56,6 +60,15 @@
 // Fail-closed de propósito: `''`, `'0x10'`, `'1e3'`, `NaN`, `Infinity`, `true`,
 // objeto — nada disso vira número plausível, tudo vira erro. É a lição da
 // armadilha 14, que já custou seis rodadas no PR 656 com `Number()` cru.
+//
+// ⚠️ **A linha do `null` tem uma ressalva, e ela é do shell, não daqui.** O
+// shell aceita `null` em coluna OPCIONAL; em coluna `obrigatorio` ele recusa,
+// com `DADOS_CAMPO_OBRIGATORIO` — outra mensagem, outro código. Este módulo
+// **não** lê `obrigatorio` de propósito: quem decide obrigatoriedade é o shell,
+// e duplicar essa regra aqui criaria o segundo validador que o módulo existe
+// para evitar. `estudos` não tem coluna numérica `obrigatorio`; algumas tabelas
+// filhas têm (`avancado_alocacoes.fase_id`, `estudo_imoveis.imovel_nucleo_id`),
+// e nelas um `null` atravessa daqui e é recusado LÁ, que é o desejado.
 //
 // `null` PASSA, e isso é requisito, não descuido: `_editarCustoUnidade`
 // (`frontend/tela-premissas.ts`) grava `null` DE PROPÓSITO em
@@ -96,7 +109,10 @@ export function numeroEstrito(v: unknown): number | null {
 /** Colunas numéricas por tabela, derivadas do `schema.json` (fonte única). */
 const NUMERICAS_POR_TABELA: Map<string, Map<string, boolean>> = (() => {
   const mapa = new Map<string, Map<string, boolean>>();
-  const tabelas = (esquema as any).tabelas as Record<string, { colunas: Record<string, { tipo: string }> }>;
+  // Guarda no TOPO, e não só no `def.colunas ?? {}` abaixo: esta IIFE roda no
+  // import, então `Object.entries(undefined)` derrubaria o bundle inteiro no
+  // carregamento do módulo — não na chamada. Achado da revisão.
+  const tabelas = ((esquema as any)?.tabelas ?? {}) as Record<string, { colunas?: Record<string, { tipo: string }> }>;
   for (const [tabela, def] of Object.entries(tabelas)) {
     const colunas = new Map<string, boolean>();
     for (const [coluna, col] of Object.entries(def.colunas ?? {})) {
@@ -122,7 +138,14 @@ function exigirTabela(tabela: string): Map<string, boolean> {
 }
 
 export interface FalhaCoercao {
-  campo: string;
+  /** Todos os campos que falharam, na ordem em que apareceram no payload. */
+  campos: string[];
+  /**
+   * Uma mensagem por campo, juntas por `'; '` — a MESMA forma do shell
+   * (`helper-dados.ts` junta os erros de `validarUpdate` assim). Reportar só o
+   * primeiro campo faria o usuário consertar um de cada vez, e o sintoma
+   * original desta correção nomeava DOIS campos numa mensagem só.
+   */
   mensagem: string;
 }
 
@@ -136,19 +159,25 @@ export function coagirNumericosDeclarados(
 ): { dados: Record<string, any> } | { falha: FalhaCoercao } {
   const colunas = exigirTabela(tabela);
   const saida: Record<string, any> = {};
+  const campos: string[] = [];
+  const mensagens: string[] = [];
   for (const [campo, valor] of Object.entries(dados ?? {})) {
     const exigeInteiro = colunas.get(campo);
     if (exigeInteiro === undefined) { saida[campo] = valor; continue; }
     if (valor === null || valor === undefined) { saida[campo] = valor; continue; }
     const n = numeroEstrito(valor);
     if (n === null) {
-      return { falha: { campo, mensagem: `Campo "${campo}" deve ser um número` } };
+      campos.push(campo); mensagens.push(`Campo "${campo}" deve ser um número`);
+      continue;
     }
     if (exigeInteiro && !Number.isInteger(n)) {
-      return { falha: { campo, mensagem: `Campo "${campo}" deve ser um número inteiro` } };
+      campos.push(campo); mensagens.push(`Campo "${campo}" deve ser um número inteiro`);
+      continue;
     }
     saida[campo] = n;
   }
+  // Varre TUDO antes de falhar — não retorna no primeiro campo ruim.
+  if (campos.length > 0) return { falha: { campos, mensagem: mensagens.join('; ') } };
   return { dados: saida };
 }
 

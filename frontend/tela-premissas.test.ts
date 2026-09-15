@@ -10,7 +10,17 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PERMUTA_UNIDADE, PERMUTA_FIS_NR, modoEfetivo, colunasProduto, linhasCascataIncorporacao } from './tela-premissas.js';
+import { readFileSync } from 'node:fs';
+import { PERMUTA_UNIDADE, PERMUTA_FIS_NR, modoEfetivo, colunasProduto, linhasCascataIncorporacao, campoMudou } from './tela-premissas.js';
+
+/** Mesma função das outras suítes de fiação — comentário não pode fingir chamada. */
+function semComentariosPremissas(conteudo: string): string {
+  return conteudo
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((linha) => { const i = linha.indexOf('//'); return i === -1 ? linha : linha.slice(0, i); })
+    .join('\n');
+}
 import type { ProformaInput } from './proforma.js';
 
 test('#566: Permuta física (R/Loteamento) só oferece m² e % área de venda', () => {
@@ -103,4 +113,56 @@ test('#698: linhasCascataIncorporacao cai em 0% sem coeficiente máximo preenchi
   const porId = Object.fromEntries(linhas.map((l) => [l.id, l]));
   assert.equal(porId.terreno.pctAncora1, 0);
   assert.equal(porId.pvt_r_fechada.pctAncora1, 0);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Salvar premissas manda só o DIFF — as duas camadas
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Por que existe: até 2026-09-15 `_salvar` mandava o registro quase inteiro
+// (tudo menos 16 chaves de identidade) a partir de um retrato feito quando a
+// aba carregou. Enquanto o PATCH falhava — a coluna `decimal` volta do
+// Postgres como STRING e o shell recusava por `typeof` —, o estrago ficava
+// escondido atrás do erro. Com o PATCH consertado, o eco vira SOBRESCRITA
+// silenciosa de campos cujo dono é outra tela (`ret_pct` é escrito por
+// Custos → Financeiro; num estudo Avançado, a aba Financeiro inteira, que o
+// filtro de nível do backend não protege).
+//
+// Duas camadas, como `tela-estudo.test.ts` faz: a SEMÂNTICA do predicado, e a
+// FIAÇÃO dele (que olha o fonte, porque teste de função pura não prova que o
+// componente a chama — classe de defeito nº 1 do CLAUDE.md).
+
+test('campoMudou: campo intocado não conta como alteração, inclusive decimal em string', () => {
+  const registro = { ret_pct: '4.00', gabarito_maximo: '12.00', nome: 'X', custo_construcao_m2: '4800.00' };
+  const form = { ...registro };
+  for (const k of Object.keys(registro)) {
+    assert.equal(campoMudou(form, registro, k), false, `${k} não deveria contar como alterado`);
+  }
+});
+
+test('campoMudou: `\'\'` e `null` são a mesma coisa — limpar input vazio não é edição', () => {
+  assert.equal(campoMudou({ a: '' }, { a: null }, 'a'), false);
+  assert.equal(campoMudou({ a: null }, { a: '' }, 'a'), false);
+  assert.equal(campoMudou({ a: undefined }, { a: null }, 'a'), false);
+});
+
+test('campoMudou: edição de verdade conta — inclusive limpar um valor', () => {
+  assert.equal(campoMudou({ a: 5 }, { a: '4.00' }, 'a'), true);
+  assert.equal(campoMudou({ a: null }, { a: '4.00' }, 'a'), true, 'limpar um custo por unidade é edição');
+  assert.equal(campoMudou({ a: 'novo' }, { a: 'velho' }, 'a'), true);
+});
+
+test('fiação: `_salvar` pula o campo que não mudou, e usa o MESMO predicado da faixa de não-salvo', () => {
+  // Mutação que este teste existe para pegar: apagar o `continue` de `_salvar`
+  // devolve o eco do registro inteiro, e nenhum teste de função pura fica
+  // vermelho por causa disso.
+  const fonte = semComentariosPremissas(
+    readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'),
+  );
+  assert.match(fonte, /if \(!this\._campoMudou\(k\)\) continue;/,
+    '`_salvar` deixou de filtrar pelo diff — o registro inteiro voltou a viajar');
+  assert.match(fonte, /_campoMudou\(k: string\): boolean \{\s*return campoMudou\(this\.form, this\._snapshot, k\);/,
+    '`_campoMudou` deixou de delegar à função pura testada acima');
+  assert.match(fonte, /_formDifereSnapshot\(\): boolean \{\s*return Object\.keys\(this\.form\)\.some\(\(k\) => this\._campoMudou\(k\)\);/,
+    'a faixa de "alterações não salvas" deixou de usar o mesmo predicado do Salvar');
 });

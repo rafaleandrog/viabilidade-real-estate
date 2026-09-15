@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import type { AddressInfo } from 'node:net';
 import { rotasEstudos } from './estudos.js';
-import { colunasNumericas } from './coercao-numerica.js';
+import esquemaApp from '../../schema.json';
 
 // #634 — PROVA DE FIAÇÃO DE PONTA A PONTA. A leitura de `avancado_linhas_custo`
 // dentro de `duplicarDadosAvancado` usava `listar(..., por_pagina: 500)`: um
@@ -217,7 +217,7 @@ test('#634 fiação: POST /estudos/:id/duplicar copia TODAS as 501 linhas de cus
 //
 // ⚠️ **Este dublê já implementou a regra ERRADA, e foi ELE que deixou quatro
 // correções passarem verdes enquanto o bug seguia vivo em produção.** Ele se
-// chamava `DadosFakeComValidadorDoShell` e lançava quando o valor era `null` —
+// chamava `DadosFakeComValidadorDeNulo` e lançava quando o valor era `null` —
 // o oposto do shell. A suíte media a crença da app, não o shell.
 //
 // Regra do shell 0.55.22, a versão que a instância roda
@@ -234,13 +234,33 @@ test('#634 fiação: POST /estudos/:id/duplicar copia TODAS as 501 linhas de cus
 // customizado para `DATE`. É essa string, e não o `null`, que quebrava a
 // duplicação.
 class DadosFakeComValidadorDoShell extends DadosFake {
+  // ⚠️ **A tabela de tipos é derivada AQUI, do `schema.json` cru — nunca de
+  // `colunasNumericas()`.** Usar o helper do módulo sob revisão faria do dublê
+  // um oráculo CIRCULAR: por construção ele só validaria os campos que a
+  // própria coerção já converteu, e o conjunto de falha possível seria vazio.
+  // Perder um tipo em `TIPOS_NUMERICOS` cegaria correção e oráculo juntos, com
+  // a suíte verde. Achado convergente de duas lentes na revisão do PR.
+  private static tipoDaColuna(tabela: string, campo: string): string | undefined {
+    const t = (esquemaApp as any)?.tabelas?.[tabela]?.colunas?.[campo];
+    return t?.tipo;
+  }
+
   private static validar(tabela: string, dados: Record<string, any>): void {
-    const numericas = colunasNumericas(tabela);
     const erros: string[] = [];
     for (const [campo, valor] of Object.entries(dados)) {
       if (valor === null || valor === undefined) continue; // coluna opcional: aceito
-      if (!numericas.has(campo)) continue;
-      if (typeof valor !== 'number') erros.push(`Campo "${campo}" deve ser um número`);
+      const tipo = DadosFakeComValidadorDoShell.tipoDaColuna(tabela, campo);
+      if (tipo === 'decimal') {
+        if (typeof valor !== 'number') erros.push(`Campo "${campo}" deve ser um número`);
+      } else if (tipo === 'inteiro' || tipo === 'referencia') {
+        // O shell exige `Number.isInteger`, não só `typeof` — sem isto o dublê
+        // é MAIS FROUXO que o shell que ele diz reproduzir, e um `unidades:
+        // 12.5` passaria verde aqui e seria recusado em produção. Achado P2 do
+        // Codex nesta revisão.
+        if (typeof valor !== 'number' || !Number.isInteger(valor)) {
+          erros.push(`Campo "${campo}" deve ser um número inteiro`);
+        }
+      }
     }
     // Mesma forma do shell: UM erro por campo, juntos por '; ', lançados como
     // `Error` cru (`helper-dados.ts`) — sem status e sem código.
@@ -424,28 +444,89 @@ test('fiação: valor sujo num campo numérico devolve 400 CAMPO_INVALIDO, não 
   });
 });
 
-test('fiação: recusa de validação do shell vira 422, não 500 ERRO_INTERNO', async () => {
-  // Um campo numérico que a coerção não alcança porque o `schema.json` não o
-  // declara numérico chega ao shell e é recusado lá. O que este teste fixa é a
-  // TRADUÇÃO: 422 com código, em vez de 500 ERRO_INTERNO — foi o 500 que fez a
-  // falha parecer defeito de infra por meses.
-  class DadosSempreRecusa extends DadosFake {
-    async atualizar(): Promise<any> {
-      throw new Error('Erros de validação: Campo "x" deve ser um número');
-    }
-  }
-  const dados = new DadosSempreRecusa();
-  const estudoId = dados.semear('estudos', {
-    id: 1, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
-    nome: 'Estudo', uf: 'DF', status: 'em_analise', sequencia: 1,
+
+// ── Fiação das TABELAS FILHAS com decimal em string ────────────────────────
+//
+// Achado da revisão do PR desta correção: dos 11 pontos onde a coerção foi
+// ligada, só 2 ficavam vermelhos ao apagar a chamada — os testes acima semeiam
+// as filhas com NÚMERO, e número é no-op da coerção. Este teste semeia a linha
+// FILHA como o Postgres a devolve (decimal em STRING) e exercita os pontos de
+// `estudo_imoveis`, do laço `FILHAS_SIMPLES` e dos sete `criar` de
+// `duplicarDadosAvancado`.
+test('fiação: duplicar copia FILHAS cujos decimais vêm do banco como string', async () => {
+  const dados = new DadosFakeComValidadorDoShell();
+  const origId = dados.semear('estudos', {
+    id: 1, nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao',
+    nome: 'Estudo com filhas em string', uf: 'DF', status: 'rascunho', sequencia: 1,
   });
+  // `estudo_imoveis` — `imovel_nucleo_id` é `inteiro`.
+  dados.semear('estudo_imoveis', { estudo_id: origId, imovel_nucleo_id: 77, tipo_imovel: 'lote' });
+  // `FILHAS_SIMPLES` → `analise_mercado`, com os indicadores em string.
+  dados.semear('analise_mercado', {
+    estudo_id: origId, abrangencia: 'cidade', localidade: 'Brasília',
+    preco_medio_m2: '9500.00', custo_obra_m2: '4800.00', vso_pct: '12.50',
+    ipca_pct: '4.20', selic_pct: '10.50', incc_pct: null,
+  });
+  // Avançado: tipologia, fase, alocação, linha de custo, cenário — decimais em
+  // string, inteiros como número (é o que o `pg` devolve de cada tipo).
+  const tipId = dados.semear('avancado_tipologias', {
+    estudo_id: origId, nome: 'Studio', tipo_unidade: 'apartamento',
+    area_privativa_m2: '32.50', area_privativa_aberta_m2: null,
+    dormitorios: 1, vagas: 1, quantidade: 40, unidades_permutadas: 0,
+    preco_m2: '9000.00', ordem: 0,
+  });
+  // ⚠️ `avancado_fases` NÃO tem coluna `decimal` (`absorcao`/`fluxo_pagamento`
+  // são `json`), então a coerção é no-op ali — o teste não finge o contrário.
+  const faseId = dados.semear('avancado_fases', {
+    estudo_id: origId, tipo: 'lancamento', nome: 'Lançamento', ordem: 0,
+    inicio_mes: 0, duracao_meses: 6, absorcao: null, fluxo_pagamento: null,
+  });
+  dados.semear('avancado_alocacoes', {
+    estudo_id: origId, fase_id: faseId, tipologia_id: tipId,
+    unidades: 20, preco_m2: '9100.00', ordem: 0,
+  });
+  dados.semear('avancado_cronograma', { estudo_id: origId, inicio_mes: 3, duracao_meses: 12 });
+  dados.semear('avancado_linhas_custo', {
+    estudo_id: origId, nome: 'Obra', orcamento_valor: '1250000.00',
+    orcamento_valor_canonico: null, inicio_mes: 0, duracao_meses: 24, ordem: 0,
+  });
+  dados.semear('avancado_funding_operacoes', {
+    estudo_id: origId, tipo: 'equity', nome: 'Aporte',
+    valor: '5000000.00', taxa_anual: '18.00', ordem: 0,
+  });
+  dados.semear('avancado_cenarios', {
+    estudo_id: origId, nome: 'Base', preco_venda_pct: '0.00',
+    custo_obra_pct: '5.00', ordem: 0,
+  });
+
   await comServidor(criarApp(dados), async (base) => {
-    const res = await fetch(`${base}/estudos/${estudoId}`, {
-      method: 'PATCH', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ nome: 'Outro nome' }),
-    });
+    const res = await fetch(`${base}/estudos/${origId}/duplicar`, { method: 'POST' });
     const corpo = await res.json();
-    assert.equal(res.status, 422, 'recusa de validação não é erro interno');
-    assert.equal(corpo.codigo, 'DADOS_VALIDACAO_FALHOU');
+    assert.equal(res.status, 201,
+      `duplicar deveria suceder com decimais de FILHA em string, veio ${res.status}: ${JSON.stringify(corpo)}`);
+    const novoId = Number(corpo.id);
+
+    const imoveis = await dados.listar('estudo_imoveis', { filtros: { estudo_id: novoId }, por_pagina: 10 });
+    assert.equal(imoveis.total, 1, 'estudo_imoveis não foi copiado');
+
+    const mercado = await dados.listar('analise_mercado', { filtros: { estudo_id: novoId }, por_pagina: 10 });
+    assert.equal(mercado.dados[0].preco_medio_m2, 9500, 'analise_mercado: decimal não coagido');
+    assert.equal(mercado.dados[0].vso_pct, 12.5);
+
+    const tips = await dados.listar('avancado_tipologias', { filtros: { estudo_id: novoId }, por_pagina: 10 });
+    assert.equal(tips.dados[0].area_privativa_m2, 32.5, 'tipologia: decimal não coagido');
+
+    const custos = await dados.listar('avancado_linhas_custo', { filtros: { estudo_id: novoId }, por_pagina: 10 });
+    assert.equal(custos.dados[0].orcamento_valor, 1250000, 'linha de custo: decimal não coagido');
+
+    const funding = await dados.listar('avancado_funding_operacoes', { filtros: { estudo_id: novoId }, por_pagina: 10 });
+    assert.equal(funding.dados[0].valor, 5000000, 'funding: decimal não coagido');
+    assert.equal(funding.dados[0].taxa_anual, 18);
+
+    const alocs = await dados.listar('avancado_alocacoes', { filtros: { estudo_id: novoId }, por_pagina: 10 });
+    assert.equal(alocs.dados[0].preco_m2, 9100, 'alocação: decimal não coagido');
+
+    const cens = await dados.listar('avancado_cenarios', { filtros: { estudo_id: novoId }, por_pagina: 10 });
+    assert.equal(cens.dados[0].custo_obra_pct, 5, 'cenário: decimal não coagido');
   });
 });

@@ -306,10 +306,12 @@ export function montarPatchEstudo(
   // (`{ ...this.estudo }`) e só aplica `Number()` nos campos que TÊM controle
   // na tela. Como toda coluna `decimal` volta do Postgres como string, os
   // demais campos numéricos voltavam ao PATCH como `"4.00"` — e o shell recusa
-  // por `typeof`. A Fase 2 desta correção também estreitou o que a tela manda,
-  // mas a tela é feedback, não fronteira: `PATCH /estudos/:id` é chamável
-  // direto, e cliente antigo (aba aberta através do deploy) continua mandando o
-  // registro inteiro. Quem garante é esta linha.
+  // por `typeof`. No mesmo PR a tela passou a mandar só o DIFF contra o retrato
+  // que carregou (`_salvar`, `frontend/tela-premissas.ts`), o que retira esses
+  // campos do payload na origem — mas tela é feedback, não fronteira:
+  // `PATCH /estudos/:id` é chamável direto, e um cliente antigo (aba aberta
+  // através do deploy) continua mandando o registro inteiro. Quem garante é
+  // esta linha.
   const coagido = coagirNumericosDeclarados('estudos', dados);
   if ('falha' in coagido) {
     return { http: 400, codigo: 'CAMPO_INVALIDO', mensagem: coagido.falha.mensagem };
@@ -347,27 +349,6 @@ function erro(res: Response, http: number, codigo: string, mensagem: string) {
   res.status(http).json({ erro: true, codigo, mensagem });
 }
 
-/**
- * Falha de ESCRITA vinda do `req.dados` do shell. Ele lança um `Error` cru cuja
- * mensagem começa com `Erros de validação: ` — sem status e sem código —, e o
- * `catch` de rota transformava isso num **500 `ERRO_INTERNO`**.
- *
- * Isso custou meses de diagnóstico no bug do "Salvar premissas": uma recusa de
- * validação (que é 4xx, e diz exatamente qual campo está errado) chegava
- * rotulada como erro interno do servidor, então parecia defeito de infra e não
- * payload inválido. Aqui ela volta a ser o que é: **422**, com o código que o
- * próprio shell usa nas rotas HTTP de dados (`DADOS_VALIDACAO_FALHOU`).
- */
-function erroDeEscrita(res: Response, e: any, contexto: string): void {
-  const mensagem = String(e?.message ?? '');
-  if (mensagem.startsWith('Erros de validação:') || mensagem.startsWith('Erros de referência')) {
-    console.error(`${contexto}:`, e);
-    erro(res, 422, 'DADOS_VALIDACAO_FALHOU', mensagem);
-    return;
-  }
-  console.error(`${contexto}:`, e);
-  erro(res, 500, 'ERRO_INTERNO', mensagem);
-}
 
 // Anexa `imagem_principal_url` (URL assinada da capa) a cada estudo da lista, para
 // o thumbnail da tabela de estudos (S7 · #90). `estudo_documentos` é `restrito` →
@@ -558,7 +539,16 @@ rotasEstudos.post('/estudos', async (req: Request, res: Response) => {
       if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
     }
 
-    const estudo = await req.dados!.criar('estudos', dados);
+    // `terreno_manual_area` é `decimal` e vem CRU do corpo — a mesma fronteira
+    // que o PATCH: sem isto, a string que o PATCH converte para número aqui
+    // chegaria ao shell e viraria 500. Achado da revisão do PR desta correção.
+    const coagidoCriacao = coagirNumericosDeclarados('estudos', dados);
+    if ('falha' in coagidoCriacao) {
+      erro(res, 400, 'CAMPO_INVALIDO', coagidoCriacao.falha.mensagem);
+      return;
+    }
+
+    const estudo = await req.dados!.criar('estudos', coagidoCriacao.dados);
 
     // Criador vira editor do estudo.
     const funcao = await garantirMembro(req, estudo.id, req.contexto!.usuario.id, 'editor');
@@ -706,7 +696,8 @@ rotasEstudos.patch('/estudos/:id', async (req: Request, res: Response) => {
     const atualizado = await req.dados!.atualizar('estudos', estudoId, dados);
     res.json(atualizado);
   } catch (e: any) {
-    erroDeEscrita(res, e, 'Erro em PATCH /estudos/:id');
+    console.error('Erro em PATCH /estudos/:id:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 });
 
@@ -806,7 +797,8 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
     await publicarEvento(req, 'estudo_criado', payloadEstudoCriado(novo, req.contexto!.usuario.nome));
     res.status(201).json(novo);
   } catch (e: any) {
-    erroDeEscrita(res, e, 'Erro em POST /estudos/:id/duplicar');
+    console.error('Erro em POST /estudos/:id/duplicar:', e);
+    erro(res, 500, 'ERRO_INTERNO', e.message);
   }
 });
 

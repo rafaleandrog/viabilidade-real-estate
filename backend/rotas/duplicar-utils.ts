@@ -24,9 +24,9 @@
  * **Então por que esta função continua?** Porque removê-la é uma mudança de
  * comportamento de DUPLICAÇÃO, não de validação, e merece decisão própria:
  * omitir a chave faz o shell aplicar o `padrao` da coluna, enquanto mandar
- * `null` reproduziria o `null` do original. Hoje, para as ~45 colunas de
- * `estudos` com `padrao` não-nulo, a cópia diverge do original quando o campo
- * está `null` na origem — comportamento que já existia antes deste arquivo e
+ * `null` reproduziria o `null` do original. Hoje, para as 76 colunas de
+ * `estudos` com `padrao` (este helper é agnóstico a tipo — 45 delas são
+ * numéricas), a cópia diverge do original quando o campo está `null` na origem — comportamento que já existia antes deste arquivo e
  * que está aceito e testado (`estudos.test.ts`). Manter é o status quo;
  * remover é o conserto de fidelidade. **Não é mais uma defesa contra erro de
  * validação, e não deve ser citada como tal.**

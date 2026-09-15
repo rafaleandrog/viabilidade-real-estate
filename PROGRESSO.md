@@ -42,20 +42,34 @@ duplicação (`estudos.ts` e `avancado.ts`). `CAMPOS_OMITIR_SE_NULO` saiu;
 `CAMPOS_SOMENTE_AVANCADO` ficou, agora com o motivo **semântico** escrito (não escrever campo do
 Avançado por uma tela de Preliminar).
 
-Também: recusa de validação do shell deixa de virar **500 `ERRO_INTERNO`** e passa a **422
-`DADOS_VALIDACAO_FALHOU`** (`erroDeEscrita`, em `estudos.ts`). Foi o 500 que fez a falha parecer
-defeito de infra por meses.
+**E a tela passou a mandar só o DIFF.** `frontend/tela-premissas.ts:_salvar` montava o payload a
+partir de uma cópia integral do registro, menos 16 chaves de identidade. Enquanto o PATCH falhava,
+o estrago ficava escondido atrás do erro; **com o PATCH consertado, o eco vira sobrescrita
+silenciosa** — a tela regravaria, a partir de um retrato feito quando a aba carregou (e que não é
+refeito enquanto o id não muda), campos cujo dono é outra tela: `ret_pct`/`considerar_ret`
+(Custos → Financeiro), `area_terreno_nucleo`, `nome`, e **num estudo Avançado a aba Financeiro
+inteira**, porque `CAMPOS_SOMENTE_AVANCADO` só filtra em Preliminar. Agora `_salvar` pula todo
+campo que não difere do retrato, pelo mesmo predicado (`campoMudou`) que decide a faixa de
+"alterações não salvas" — campo que a tela não edita nunca muda, logo nunca viaja, e a classe morre
+sem lista nomeada nenhuma.
 
-Cobertura: `backend/rotas/coercao-numerica.test.ts` (11 testes, com inventário por **contagem
-exata** — 104 colunas numéricas em `estudos`), mais testes de **fiação de rota** que exercitam
-`PATCH /estudos/:id` e `POST /estudos/:id/duplicar` com o payload real (decimais em string) contra
-o dublê fiel. Controle de mutação medido: apagar a coerção do PATCH deixa **5 testes vermelhos**;
-apagar a da duplicação, **1**.
+> ⚠️ **Este bloqueante foi achado na revisão do próprio PR, não antes dele** — e é o caso didático
+> de que consertar um erro duro pode piorar o dado: trocar "falha ruidosa" por "grava o valor
+> errado em silêncio" teria sido um retrocesso, com a suíte verde.
 
-**Fica em aberto, para PR próprio:** `tela-premissas.ts` continua ecoando o registro inteiro a cada
-save (`{ ...this.estudo }` menos 16 chaves), o que além do ruído sobrescreve com um retrato velho
-campos que outras telas editam (`ret_pct` é gerido por `PATCH /estudos/:id/avancado/parametros`). O
-conserto natural é mandar só o **diff contra `_snapshot`**, que a tela já mantém.
+Cobertura: `backend/rotas/coercao-numerica.test.ts` (inventário por **contagem exata** — 104
+colunas numéricas em `estudos`), testes de **fiação de rota** que exercitam `PATCH /estudos/:id` e
+`POST /estudos/:id/duplicar` com o payload real (decimais em string, inclusive nas tabelas
+**filhas**) contra um dublê fiel ao shell, e a bateria de fiação da tela. Controle de mutação
+medido em cada ponto de chamada: apagar a coerção do PATCH → **5 vermelhos**; a de
+`montarCopiaEstudo` → **1**; a das filhas (`FILHAS_SIMPLES` e `avancado_linhas_custo`) → **1** cada;
+apagar o filtro de diff da tela → **1**.
+
+**O que a revisão retirou do PR, e por quê.** A primeira versão mapeava a recusa do shell para
+**422** em vez de 500 (`erroDeEscrita`). Saiu: o mapeamento casava um **prefixo de mensagem que o
+SDK não documenta** (`Erros de validação:`) — uma mudança de redação no shell o reverteria a 500 em
+silêncio —, e `api()` do shell **lança em não-2xx** (`overview.md`), então o usuário vê exatamente
+o mesmo texto com 422 ou com 500. Ganho nenhum, superfície não publicada: não vale o risco.
 
 ---
 
