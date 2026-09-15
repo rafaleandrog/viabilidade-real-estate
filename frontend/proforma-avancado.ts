@@ -307,19 +307,36 @@ export function proformaAvancado(
   const linhasDoGrupo = (g: string) => c.linhasCusto.filter((x) => x.grupo === g);
   const totalDoGrupo = (g: string) => linhasDoGrupo(g).reduce((s, x) => s + x.total, 0);
 
+  // #Proforma itemizada: além do subtotal por grupo, lista cada linha de
+  // custo INDIVIDUAL que o usuário cadastrou em Custos, com o nome que ele
+  // mesmo deu a ela (`x.nome`, já resolvido por `nomeLinhaCusto` dentro do
+  // motor — inclui categoria + subcategoria quando o grupo é `terreno`).
+  // Mesmo critério de magnitude que a linha "Impostos e deduções" já usa:
+  // item com total ~zero não aparece, mas o subtotal do grupo continua
+  // somando TODAS as linhas (inclusive as zeradas), para não divergir do
+  // Custo Total que a aba Fluxo de Caixa mostra para o mesmo estudo.
   const diretos = GRUPOS_CUSTO.filter((g) => g !== 'indireto');
   let custoDireto = 0;
   for (const g of diretos) {
+    const doGrupo = linhasDoGrupo(g);
+    if (doGrupo.length === 0) continue;
     const total = totalDoGrupo(g);
-    const temLinha = linhasDoGrupo(g).length > 0;
-    if (!temLinha) continue;
     custoDireto += total;
+    for (const item of doGrupo) {
+      if (Math.abs(item.total) <= 0.005) continue;
+      linhas.push({ nome: `(-) ${item.nome}`, valor: -item.total, nivel: 1, tipo: 'custo' });
+    }
     linhas.push({ nome: `(-) ${ROTULO_PROFORMA[g] ?? GRUPO_CUSTO_LABEL[g]}`, valor: -total, nivel: 1, tipo: 'custo' });
   }
   linhas.push({ nome: '= Custo direto total', valor: -custoDireto, nivel: 0, tipo: 'custo' });
 
+  const doIndireto = linhasDoGrupo('indireto');
   const custoIndireto = totalDoGrupo('indireto');
-  if (linhasDoGrupo('indireto').length > 0) {
+  if (doIndireto.length > 0) {
+    for (const item of doIndireto) {
+      if (Math.abs(item.total) <= 0.005) continue;
+      linhas.push({ nome: `(-) ${item.nome}`, valor: -item.total, nivel: 1, tipo: 'custo' });
+    }
     linhas.push({ nome: `(-) ${GRUPO_CUSTO_LABEL.indireto}`, valor: -custoIndireto, nivel: 1, tipo: 'custo' });
   }
   linhas.push({ nome: '= Custo indireto total', valor: -custoIndireto, nivel: 0, tipo: 'custo' });
