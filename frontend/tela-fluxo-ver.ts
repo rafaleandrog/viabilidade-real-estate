@@ -174,6 +174,11 @@ export class ViabFluxoVer extends LitElement {
     table.proforma th { color: var(--cor-texto-sec, rgba(255,255,255,0.55)); font-weight: 600; }
     table.proforma tr.n1 td:first-child { padding-left: 26px; color: var(--cor-texto-sec, rgba(255,255,255,0.6)); }
     table.proforma tr.n0 td { font-weight: 700; border-top: 1px solid var(--cor-borda, rgba(255,255,255,0.14)); }
+    /* Proforma itemizada — mesma convenção subgrupo vs. item simples que
+       fluxo-tabela.ts (linha 168) já usa na aba Fluxo de Caixa: sem isto, o
+       subtotal de um grupo de custo (nivel 1, igual aos itens que ele soma)
+       ficava indistinguível deles na tela — achado da revisão do PR 713. */
+    table.proforma tr.n1.subgrupo td { font-weight: 600; border-top: 1px solid var(--cor-borda-sutil, rgba(255,255,255,0.1)); }
 
     /* #593 — cor por natureza de linha, o mesmo princípio que o Preliminar já
        usa. As classes (receita / custo / resultado / informativo, mais n0/n1)
@@ -503,7 +508,7 @@ export class ViabFluxoVer extends LitElement {
               // receita/resultado se leia igual em R$, R$/m² e % VGV.
               const sinal = sinalLinhaProformaAv(l);
               return html`
-              <tr class=${`n${l.nivel} ${l.tipo}`}>
+              <tr class=${`n${l.nivel} ${l.tipo}${l.subgrupo ? ' subgrupo' : ''}`}>
                 <td>${l.nome}${l.notaBase ? html` <span class="nota-base">(${l.notaBase})</span>` : ''}</td>
                 <td class="num ${sinal}">${fmtR$(l.valor)}</td>
                 <td class="num ${sinal}">${fmtNum(porM2(l.valor))}</td>

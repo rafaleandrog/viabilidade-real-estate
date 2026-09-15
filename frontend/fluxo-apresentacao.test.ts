@@ -371,6 +371,69 @@ test('#351 proforma: Resultado reconcilia com o fluxo do motor (sem funding)', (
   assert.ok(Math.abs((direto + indireto) - soma(c.custoMensal)) <= 0.01);
 });
 
+// Proforma itemizada: cada linha de custo cadastrada em Custos aparece
+// individualmente pelo nome que o usuário deu, além do subtotal do grupo —
+// classe de defeito nº 1 do CLAUDE.md ("o defeito mora na fiação"): sem este
+// teste, apagar o `for (const item of doGrupo)` dentro de `proformaAvancado`
+// deixaria a suíte inteira verde (o teste acima só confere os TOTAIS).
+test('Proforma itemizada: cada linha de custo aparece pelo nome, e o subtotal do grupo soma todas', () => {
+  const c = calcularFluxo(CONFIG_COMPLETA);
+  const p = proformaAvancado(c, 1000);
+
+  // CONFIG_COMPLETA tem uma linha por grupo, com `categoria` próprio —
+  // `nomeLinhaCusto` (fluxo-caixa-motor.ts) resolve o nome de exibição.
+  const itens: Array<[string, string]> = [
+    ['(-) Preço', 'terreno'],
+    ['(-) Obra', 'obra'],
+    ['(-) Corretagem de vendas', 'diretos'],
+    ['(-) Projetos', 'indireto'],
+    ['(-) Taxas bancárias', 'financeiro'],
+  ];
+  for (const [nomeItem, grupo] of itens) {
+    const linhaItem = p.linhas.find((l) => l.nome === nomeItem);
+    assert.ok(linhaItem, `linha de item "${nomeItem}" (grupo ${grupo}) não apareceu na Proforma`);
+    assert.equal(linhaItem!.nivel, 1);
+    assert.equal(linhaItem!.tipo, 'custo');
+    const esperado = c.linhasCusto.find((x) => x.grupo === grupo)!.total;
+    assert.ok(Math.abs(linhaItem!.valor - -esperado) <= 0.01, `valor do item "${nomeItem}"`);
+  }
+
+  // O subtotal do grupo continua existindo, com o MESMO valor de antes — a
+  // itemização é aditiva, não substitui o subtotal.
+  const subtotalObra = p.linhas.find((l) => l.nome === '(-) Custos de Obra')!;
+  assert.ok(Math.abs(subtotalObra.valor - -c.linhasCusto.find((x) => x.grupo === 'obra')!.total) <= 0.01);
+
+  // Achado da revisão (PR #713): item e subtotal do grupo são AMBOS
+  // `nivel: 1` — sem um sinal a mais, ficam visualmente idênticos na tela.
+  // `subgrupo: true` é esse sinal (a tela usa para aplicar a classe CSS
+  // irmã de `fluxo-tabela.ts`), e só o subtotal do grupo carrega esse flag.
+  assert.equal(subtotalObra.subgrupo, true);
+  const itemObra = p.linhas.find((l) => l.nome === '(-) Obra')!;
+  assert.equal(itemObra.subgrupo, undefined);
+});
+
+// Item de custo com valor ~zero não aparece na lista, mas o subtotal do
+// grupo continua somando TODAS as linhas — mesmo critério que a linha
+// "(-) Impostos e deduções sobre a receita" já usa (`Math.abs(v) > 0.005`).
+test('Proforma itemizada: item de custo zerado some da lista, mas o subtotal do grupo não muda', () => {
+  const comItemZerado: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      { id: 99, grupo: 'obra', categoria: 'Item zerado', orcamento_valor: 0, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  };
+  const semZerado = calcularFluxo(CONFIG_COMPLETA);
+  const comZerado = calcularFluxo(comItemZerado);
+  const pSemZerado = proformaAvancado(semZerado, 1000);
+  const pComZerado = proformaAvancado(comZerado, 1000);
+
+  assert.equal(pComZerado.linhas.find((l) => l.nome === '(-) Item zerado'), undefined);
+  const subtotalSemZerado = pSemZerado.linhas.find((l) => l.nome === '(-) Custos de Obra')!.valor;
+  const subtotalComZerado = pComZerado.linhas.find((l) => l.nome === '(-) Custos de Obra')!.valor;
+  assert.equal(subtotalComZerado, subtotalSemZerado);
+});
+
 // ⚠️ SUBSTITUI o teste `#351 proforma: custo do funding entra em Custos
 // Financeiros; aporte NÃO vira receita`. Aquele teste TRAVAVA O DEFEITO: a
 // última asserção dele exigia `semFunding.resultado − comFunding.resultado ===
