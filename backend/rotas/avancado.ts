@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { varrerTudo } from './varrer-tudo.js';
 import { exigirMembro, exigirEditor, exigirAprovador } from '../permissoes-estudo.js';
+import { omitirValoresNulos } from './duplicar-utils.js';
 
 // Rotas do nível AVANÇADO (fluxo de caixa temporal). Todo o conjunto só opera
 // sobre estudos com nivel_analise === 'avancado' — em estudos preliminares as
@@ -1724,6 +1725,13 @@ const CAMPOS_CRONOGRAMA = ['evento', 'inicio_mes', 'duracao_meses', 'travado_ini
 const CAMPOS_FASE_COPIA = ['tipo', 'nome', 'ordem', 'inicio_mes', 'duracao_meses', 'absorcao', 'fluxo_pagamento'];
 const CAMPOS_ALOCACAO_COPIA = ['unidades', 'preco_m2', 'ordem'];
 
+// `extrairCampos` preserva `null` explícito de propósito (campo ausente ≠ campo
+// apagado) — mas o validador do shell recusa `null` em coluna decimal/inteiro na
+// criação, mesmo sendo nullable (mesmo motivo de `montarCopiaEstudo` em
+// `estudos.ts`). Todo `req.dados!.criar(...)` desta função passa o payload por
+// `omitirValoresNulos` na fronteira de escrita, sem mudar o contrato de
+// `extrairCampos` nem dos remapeamentos de FK acima (`fase_ancora_id`,
+// `permuta_tipologia_id`, `custo_linha_ids`) — que também podem chegar `null`.
 export async function duplicarDadosAvancado(req: Request, origId: number, novoId: number): Promise<void> {
   // Cronograma (5 eventos FIXOS por estudo — `avancado_cronograma` nunca tem
   // mais linhas que isso, então `por_pagina: 10` não é o defeito da #634:
@@ -1732,9 +1740,9 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     filtros: { estudo_id: origId }, por_pagina: 10,
   });
   for (const linha of crono.dados) {
-    await req.dados!.criar('avancado_cronograma', {
+    await req.dados!.criar('avancado_cronograma', omitirValoresNulos({
       estudo_id: novoId, ...extrairCampos(linha, CAMPOS_CRONOGRAMA),
-    });
+    }));
   }
 
   // #634: as cinco leituras abaixo (tipologias, fases, alocações, linhas de
@@ -1761,9 +1769,9 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
   });
   const mapaTipologia = new Map<number, number>();
   for (const tip of tipologias) {
-    const nova = await req.dados!.criar('avancado_tipologias', {
+    const nova = await req.dados!.criar('avancado_tipologias', omitirValoresNulos({
       estudo_id: novoId, ...extrairCampos(tip, CAMPOS_TIPOLOGIA),
-    });
+    }));
     mapaTipologia.set(Number(tip.id), Number(nova.id));
   }
 
@@ -1791,17 +1799,17 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
 
   const mapaFase = new Map<number, number>();
   for (const fase of fases) {
-    const nova = await req.dados!.criar('avancado_fases', {
+    const nova = await req.dados!.criar('avancado_fases', omitirValoresNulos({
       estudo_id: novoId, ...extrairCampos(fase, CAMPOS_FASE_COPIA),
-    });
+    }));
     mapaFase.set(Number(fase.id), Number(nova.id));
     for (const aloc of alocacoesPorFase.get(Number(fase.id)) ?? []) {
       const novaTipologia = mapaTipologia.get(Number(aloc.tipologia_id));
       if (!novaTipologia) continue; // tipologia órfã (não deveria ocorrer)
-      await req.dados!.criar('avancado_alocacoes', {
+      await req.dados!.criar('avancado_alocacoes', omitirValoresNulos({
         estudo_id: novoId, fase_id: nova.id, tipologia_id: novaTipologia,
         ...extrairCampos(aloc, CAMPOS_ALOCACAO_COPIA),
-      });
+      }));
     }
   }
 
@@ -1832,7 +1840,7 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     if (custo.permuta_tipologia_id !== null && custo.permuta_tipologia_id !== undefined) {
       copia.permuta_tipologia_id = mapaTipologia.get(Number(custo.permuta_tipologia_id)) ?? null;
     }
-    const nova = await req.dados!.criar('avancado_linhas_custo', copia);
+    const nova = await req.dados!.criar('avancado_linhas_custo', omitirValoresNulos(copia));
     mapaCusto.set(Number(custo.id), Number(nova.id));
   }
 
@@ -1854,7 +1862,7 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     if (op.custo_linha_ids !== null && op.custo_linha_ids !== undefined) {
       copia.custo_linha_ids = remapearCustoLinhaIds(op.custo_linha_ids, mapaCusto);
     }
-    await req.dados!.criar('avancado_funding_operacoes', copia);
+    await req.dados!.criar('avancado_funding_operacoes', omitirValoresNulos(copia));
   }
 
   // Cenários salvos (Etapa 8 · #56) — deltas percentuais, sem dado derivado.
@@ -1862,9 +1870,9 @@ export async function duplicarDadosAvancado(req: Request, origId: number, novoId
     filtros: { estudo_id: origId }, ordenar: 'ordem', ordem: 'asc',
   });
   for (const cen of cenarios) {
-    await req.dados!.criar('avancado_cenarios', {
+    await req.dados!.criar('avancado_cenarios', omitirValoresNulos({
       estudo_id: novoId, ...extrairCampos(cen, CAMPOS_CENARIO),
-    });
+    }));
   }
 }
 

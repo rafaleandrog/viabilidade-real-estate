@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { omitirValoresNulos } from './duplicar-utils.js';
 import {
   remapearCustoLinhaIds,
   CAMPOS_OPERACAO,
@@ -344,6 +345,40 @@ test('extrairCampos projeta só os campos pedidos e descarta id/estudo_id/timest
   const copia = extrairCampos(linha, ['nome', 'fase_label', 'tipo', 'ordem', 'absorcao']);
   assert.deepEqual(copia, { nome: 'Sales', fase_label: 'Fase 1', ordem: 0, absorcao: { modo: 'linear' } });
   assert.ok(!('id' in copia) && !('estudo_id' in copia) && !('criado_em' in copia));
+});
+
+test('reproduz o bug: tipologia com dormitorios/vagas nulos não deve carregar null para o criar()', () => {
+  // `extrairCampos` preserva `null` explícito (campo ausente ≠ campo apagado,
+  // mesma decisão da #609 em `montarCopiasFilhas`) — mas o validador do shell
+  // recusa `null` em coluna decimal/inteiro na criação, mesmo sendo nullable.
+  // `duplicarDadosAvancado` filtra com `omitirValoresNulos` na fronteira de
+  // escrita, exatamente como esta composição reproduz.
+  //
+  // ⚠️ `dormitorios`/`vagas` são os campos nulos do exemplo DE PROPÓSITO: nenhum
+  // dos dois tem `padrao` em `schema.json`, então omitir a chave cai em NULL —
+  // igual ao original. `area_privativa_aberta_m2` (que TEM `padrao: 0`) segue
+  // preenchida aqui — usá-la como exemplo de null trocaria silenciosamente o
+  // valor original por `0` na cópia, que é exatamente o risco que
+  // `duplicar-utils.ts` documenta (achado do Codex + L1 na revisão do PR).
+  const tipologia = {
+    id: 5, estudo_id: 7, nome: 'Studio', tipo_unidade: 'apartamento',
+    area_privativa_m2: 32.5, area_privativa_aberta_m2: 4.2,
+    dormitorios: null, vagas: null, quantidade: 40, preco_m2: 9000, ordem: 0,
+  };
+  const campos = ['nome', 'tipo_unidade', 'area_privativa_m2', 'area_privativa_aberta_m2', 'dormitorios', 'vagas', 'quantidade', 'preco_m2', 'ordem'];
+  const copia = extrairCampos(tipologia, campos);
+  // Confirma que a representação intermediária ainda preserva os nulos.
+  assert.equal(copia.dormitorios, null);
+
+  const payloadParaCriar = omitirValoresNulos<Record<string, any>>({ estudo_id: 99, ...copia });
+  for (const chave of Object.keys(payloadParaCriar)) {
+    assert.notEqual(payloadParaCriar[chave], null, `${chave} não pode ir null para criar()`);
+  }
+  assert.deepEqual(payloadParaCriar, {
+    estudo_id: 99, nome: 'Studio', tipo_unidade: 'apartamento',
+    area_privativa_m2: 32.5, area_privativa_aberta_m2: 4.2,
+    quantidade: 40, preco_m2: 9000, ordem: 0,
+  });
 });
 
 // ── Fluxo de pagamento (Lote 6 · #20: multi-linha, repasse derivado) ──
