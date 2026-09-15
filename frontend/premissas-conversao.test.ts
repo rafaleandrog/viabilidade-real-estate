@@ -572,11 +572,14 @@ function semComentarios(conteudo: string): string {
 const CONV_PCT_VGV = { tipo: 'pct', link: 'vgv' } as const;
 const CONV_IDENT = { tipo: 'identidade' } as const;
 
-test('#711: legado + grandeza de ligação CONHECIDA e ZERADA → troca e grava canônico 0', () => {
+test('#711: legado + grandeza de ligação CONHECIDA e ZERADA → troca e grava canônico 0 (destino R$)', () => {
   // infra_pct = 30, infra_valor_canonico = null, VGV = 0 (conhecido, não
-  // indefinido). Até a #711 isto ficava bloqueado — decisão do autor: 30% de
-  // um VGV de R$ 0 É R$ 0, um valor conhecido, não uma ausência de dado.
-  const d = trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) });
+  // indefinido), clicando para R$ fixo. Até a #711 isto ficava bloqueado —
+  // decisão do autor: 30% de um VGV de R$ 0 É R$ 0, um valor conhecido, não
+  // uma ausência de dado. `convNova: CONV_IDENT` é o que autoriza a
+  // relaxação (rodada 2, achado do Codex — ver a nota em `convNova` na
+  // interface `EntradaTrocaBadge`).
+  const d = trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, convNova: CONV_IDENT, ctx: ctx({ vgv: 0 }) });
   assert.equal(d.trocar, true);
   assert.equal(d.canonico, 0);
 });
@@ -616,22 +619,48 @@ test('#515: linha VAZIA troca — não há nada representado, logo nada a corrom
   );
 });
 
-test('#711: o que continua bloqueado é a ligação INDEFINIDA — não mais a zerada', () => {
+test('#711: o que continua bloqueado é a ligação INDEFINIDA — não mais a zerada, quando o destino é R$', () => {
   // A distinção pós-#711: chave ausente do ctx é grandeza DESCONHECIDA (não
   // se converte); chave presente com 0 é grandeza CONHECIDA e nula (converte,
-  // dando 0). O helper `ctx()` deste arquivo preenche toda grandeza com 0 por
-  // padrão — para testar "indefinida" de verdade é preciso um objeto `{}`
-  // literal, sem passar pelo helper, como já faz `camposDaTrocaDeUnidade` em
-  // outros testes deste arquivo.
+  // dando 0, mas só quando o DESTINO é identidade — ver a nota em `convNova`
+  // sobre o achado do Codex na rodada 2). O helper `ctx()` deste arquivo
+  // preenche toda grandeza com 0 por padrão — para testar "indefinida" de
+  // verdade é preciso um objeto `{}` literal, sem passar pelo helper, como já
+  // faz `camposDaTrocaDeUnidade` em outros testes deste arquivo.
   assert.equal(
-    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: {} }).trocar,
+    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, convNova: CONV_IDENT, ctx: {} }).trocar,
     false,
     'ligação indefinida (chave ausente) continua bloqueando',
   );
   assert.equal(
-    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
+    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, convNova: CONV_IDENT, ctx: ctx({ vgv: 0 }) }).trocar,
     true,
-    'ligação conhecida e zerada não bloqueia mais — é a #711',
+    'ligação conhecida e zerada, destino R$, não bloqueia mais — é a #711',
+  );
+});
+
+test('#711 (achado do Codex, rodada 2): clique DERIVADA→DERIVADA com as duas ligações zeradas continua bloqueado', () => {
+  // O caso exato que a rodada 2 achou: `% VGV` → `R$/m²` num Loteamento sem
+  // catálogo (VGV 0) e sem área de venda ainda cadastrada (área 0). Sem a
+  // checagem de `convNova`, isto congelaria o canônico em 0 e — pior —
+  // TRAVARIA lá, porque `_editarCustoUnidade` depois usa `paraBase` estrita
+  // para recalcular, e ela não consegue enquanto a área seguir 0.
+  const porArea = { tipo: 'por_area', link: 'areaVendavel' } as const;
+  assert.equal(
+    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, convNova: porArea, ctx: ctx({ vgv: 0, areaVendavel: 0 }) }).trocar,
+    false,
+    'destino derivado (não identidade) não ativa a relaxação, mesmo com origem e destino conhecidos-zero',
+  );
+});
+
+test('#711 (achado do Codex, rodada 2): omitir `convNova` é fail-closed — a relaxação não se aplica', () => {
+  // Chamador que não sabe/não informa o destino (ex.: um teste antigo, ou um
+  // consumidor futuro que ainda não foi atualizado) cai no lado seguro: a
+  // ligação conhecida-zero deixa de valer, como se fosse indefinida. Mesmo
+  // padrão de "chave ausente = não converte" que o resto do arquivo já usa.
+  assert.equal(
+    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }).trocar,
+    false,
   );
 });
 
@@ -674,16 +703,18 @@ test('#515: a unidade de ORIGEM identidade (R$) não depende de grandeza nenhuma
 test('#515/#711: as OUTRAS grandezas de ligação passam pela mesma guarda — não só o VGV', () => {
   // Critério 4 da issue: os três CustoUnidade de custo mais os de permuta usam
   // o mesmo método, então a guarda tem de valer para cada `link`. Pós-#711:
-  // ligação CONHECIDA e zerada troca (canônico 0); só a INDEFINIDA bloqueia.
+  // ligação CONHECIDA e zerada troca (canônico 0) quando o destino é R$; só a
+  // INDEFINIDA bloqueia nesse caso. Sem `convNova: CONV_IDENT`, a relaxação
+  // não se aplica de qualquer forma (fail-closed).
   const porArea = { tipo: 'por_area', link: 'areaVendavel' } as const;
-  assert.equal(trocaBadgePremissas({ valorAtual: 120, valorDestino: null, canonicoPersistido: null, convAtual: porArea, ctx: {} }).trocar, false, 'indefinida bloqueia');
-  assert.equal(trocaBadgePremissas({ valorAtual: 120, valorDestino: null, canonicoPersistido: null, convAtual: porArea, ctx: ctx({ areaVendavel: 0 }) }).trocar, true, 'conhecida e 0 não bloqueia mais');
-  assert.equal(trocaBadgePremissas({ valorAtual: 120, valorDestino: null, canonicoPersistido: null, convAtual: porArea, ctx: ctx({ areaVendavel: 5_000 }) }).trocar, true);
+  assert.equal(trocaBadgePremissas({ valorAtual: 120, valorDestino: null, canonicoPersistido: null, convAtual: porArea, convNova: CONV_IDENT, ctx: {} }).trocar, false, 'indefinida bloqueia');
+  assert.equal(trocaBadgePremissas({ valorAtual: 120, valorDestino: null, canonicoPersistido: null, convAtual: porArea, convNova: CONV_IDENT, ctx: ctx({ areaVendavel: 0 }) }).trocar, true, 'conhecida e 0, destino R$, não bloqueia mais');
+  assert.equal(trocaBadgePremissas({ valorAtual: 120, valorDestino: null, canonicoPersistido: null, convAtual: porArea, convNova: CONV_IDENT, ctx: ctx({ areaVendavel: 5_000 }) }).trocar, true);
 
   const pctArea = { tipo: 'pct', link: 'areaVendavelR' } as const;
-  assert.equal(trocaBadgePremissas({ valorAtual: 10, valorDestino: null, canonicoPersistido: null, convAtual: pctArea, ctx: {} }).trocar, false, 'indefinida bloqueia');
-  assert.equal(trocaBadgePremissas({ valorAtual: 10, valorDestino: null, canonicoPersistido: null, convAtual: pctArea, ctx: ctx({ areaVendavelR: 0 }) }).trocar, true, 'conhecida e 0 não bloqueia mais');
-  assert.equal(trocaBadgePremissas({ valorAtual: 10, valorDestino: null, canonicoPersistido: null, convAtual: pctArea, ctx: ctx({ areaVendavelR: 2_000 }) }).trocar, true);
+  assert.equal(trocaBadgePremissas({ valorAtual: 10, valorDestino: null, canonicoPersistido: null, convAtual: pctArea, convNova: CONV_IDENT, ctx: {} }).trocar, false, 'indefinida bloqueia');
+  assert.equal(trocaBadgePremissas({ valorAtual: 10, valorDestino: null, canonicoPersistido: null, convAtual: pctArea, convNova: CONV_IDENT, ctx: ctx({ areaVendavelR: 0 }) }).trocar, true, 'conhecida e 0, destino R$, não bloqueia mais');
+  assert.equal(trocaBadgePremissas({ valorAtual: 10, valorDestino: null, canonicoPersistido: null, convAtual: pctArea, convNova: CONV_IDENT, ctx: ctx({ areaVendavelR: 2_000 }) }).trocar, true);
 });
 
 // ── o efeito na PROFORMA, que é o dano que a issue descreve ──
@@ -704,8 +735,8 @@ test('#711: o custo de infraestrutura NÃO muda por um clique de apresentação 
   // dinheiro que o motor aplica" continua de pé, só que agora com `trocar:
   // true` em vez de bloquear a badge para sempre.
   const antes = calcularProforma(ESTUDO_LEGADO() as never);
-  const d = trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) });
-  assert.equal(d.trocar, true, 'ligação conhecida e zerada agora troca');
+  const d = trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, convNova: CONV_IDENT, ctx: ctx({ vgv: 0 }) });
+  assert.equal(d.trocar, true, 'ligação conhecida e zerada, destino R$, agora troca');
   assert.equal(d.canonico, 0, 'e o canônico gravado é 0 — o mesmo que o legado já aplicava');
 
   const depois = calcularProforma({ ...ESTUDO_LEGADO(), infra_valor_canonico: d.canonico } as never);
@@ -809,20 +840,19 @@ test('#515: a entrada é por OBJETO — trocar dois `number | null` posicionais 
   // → TS2554) não cobre este eixo, porque a aridade não muda. Nomear cobre.
   const fonte = readFileSync(new URL('./premissas-conversao.ts', import.meta.url), 'utf8');
   assert.ok(
-    fonte.includes('{ valorAtual, valorDestino, canonicoPersistido, convAtual, ctx }: EntradaTrocaBadge'),
+    fonte.includes('{ valorAtual, valorDestino, canonicoPersistido, convAtual, convNova, ctx }: EntradaTrocaBadge'),
     'a assinatura voltou a ser posicional — dois `number | null` seguidos são intercambiáveis para o compilador',
   );
 });
 
 test('#515: valor ativo ZERO troca mesmo com a ligação apenas CONHECIDA (não precisa nem consultá-la) — 0% de qualquer VGV é R$ 0,00', () => {
   // Este caso é resolvido pelo atalho `valorAtual === 0 ? 0` de
-  // `trocaBadgePremissas` (linha ~450), que nem chega a chamar `paraBase` —
-  // por isso o `ctx({ vgv: 0 })' abaixo é só ilustrativo, não é o que garante
-  // o resultado: o mesmo `d` sairia idêntico com `ctx: {}` (ligação
-  // INDEFINIDA). Desde a #711, `paraBase` também resolveria sozinha (produto
-  // 0 é seguro mesmo sem o atalho), mas o atalho segue cobrindo o caso
-  // residual em que a ligação é genuinamente desconhecida — ver o teste
-  // logo abaixo, que isola exatamente essa diferença.
+  // `trocaBadgePremissas`, que nem chega a consultar `ctx`/`convNova` — por
+  // isso o `ctx({ vgv: 0 })` abaixo é só ilustrativo, não é o que garante o
+  // resultado: o mesmo `d` sairia idêntico com `ctx: {}` (ligação
+  // INDEFINIDA) e sem `convNova` nenhum. `paraBase` segue estrita mesmo
+  // depois da #711 (ver a nota em `paraBase`) — este atalho é quem cobre o
+  // caso "multiplicando zero", independente de qualquer ligação.
   const d = trocaBadgePremissas({
     valorAtual: 0, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }),
   });
@@ -842,14 +872,14 @@ test('#711: a fronteira mudou — agora é "ligação indefinida", não "ligaç�
   // impossível de derivar é a ligação INDEFINIDA (chave ausente do ctx) — não
   // mais a ligação conhecida e igual a 0, que agora deriva canônico 0.
   assert.equal(
-    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: {} }).trocar,
+    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, convNova: CONV_IDENT, ctx: {} }).trocar,
     false,
     'ligação indefinida continua bloqueando um valor ativo não-zero',
   );
   assert.deepEqual(
-    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) }),
+    trocaBadgePremissas({ valorAtual: 30, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, convNova: CONV_IDENT, ctx: ctx({ vgv: 0 }) }),
     { trocar: true, canonico: 0 },
-    'ligação conhecida e zerada deriva canônico 0',
+    'ligação conhecida e zerada, destino R$, deriva canônico 0',
   );
 });
 
@@ -901,6 +931,18 @@ test('#515 fiação: a tela passa o valor da coluna de DESTINO', () => {
   );
 });
 
+test('#711 fiação: a tela passa a CONVERSÃO de destino — sem ela a relaxação nunca se aplica de verdade', () => {
+  // `convNova` é opcional e fail-closed: se a tela esquecesse de passá-lo, o
+  // clique voltaria a ficar travado sempre que a ligação for conhecida-zero
+  // (mesmo indo para R$) — sem erro nenhum, só a badge inerte de novo. Achado
+  // do Codex na rodada 2 do PR #712.
+  const fonte = semComentarios(readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'));
+  assert.ok(
+    fonte.includes('convNova: nova.conv,'),
+    'sem isto a badge de R$ volta a ficar travada com VGV/área conhecidos e zerados',
+  );
+});
+
 // ── #515, rodada 5: a regra virou UMA invariante, e estes são os cantos ──
 //
 // A lista de casos não convergia — cinco rodadas, cinco entradas distintas no
@@ -947,19 +989,19 @@ test('#515: a fronteira do ramo (b) — nulo/zero passa, qualquer outro valor ba
 test('#515/#711: valor ativo NEGATIVO deriva canônico normalmente — não é caso especial', () => {
   // Sinal nunca foi tratado à parte, e não deve ser: -10% de 10M é -1M, um
   // canônico tão legítimo quanto qualquer outro. O que o barra é a ligação
-  // INDEFINIDA (pós-#711) — ligação conhecida e zerada deriva -10% × 0 = 0,
-  // como qualquer outro valor ativo não-nulo.
+  // INDEFINIDA (pós-#711) — ligação conhecida e zerada, com destino R$,
+  // deriva -10% × 0 = 0, como qualquer outro valor ativo não-nulo.
   assert.deepEqual(
     trocaBadgePremissas({ valorAtual: -10, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 10_000_000 }) }),
     { trocar: true, canonico: -1_000_000 },
   );
   assert.equal(
-    trocaBadgePremissas({ valorAtual: -10, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: {} }).trocar,
+    trocaBadgePremissas({ valorAtual: -10, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, convNova: CONV_IDENT, ctx: {} }).trocar,
     false,
     'ligação indefinida continua bloqueando',
   );
-  const d = trocaBadgePremissas({ valorAtual: -10, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }) });
-  assert.equal(d.trocar, true, 'ligação conhecida e zerada não bloqueia mais');
+  const d = trocaBadgePremissas({ valorAtual: -10, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, convNova: CONV_IDENT, ctx: ctx({ vgv: 0 }) });
+  assert.equal(d.trocar, true, 'ligação conhecida e zerada, destino R$, não bloqueia mais');
   assert.equal(d.canonico, 0);
 });
 

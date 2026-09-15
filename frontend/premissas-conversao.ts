@@ -356,6 +356,26 @@ export interface EntradaTrocaBadge {
   canonicoPersistido: number | null;
   /** Conversão da unidade ATIVA (a de origem). */
   convAtual: ConvUnidade;
+  /**
+   * Conversão da unidade de DESTINO (para onde o clique está indo).
+   *
+   * ⚠️ **Opcional, e a ausência é fail-closed — #711, achado P1 do Codex na
+   * revisão do PR #712.** A primeira versão da relaxação "ligação CONHECIDA e
+   * zerada deriva canônico 0" não olhava para o destino, e isso permitia um
+   * clique DERIVADA→DERIVADA (ex.: `% VGV` → `R$/m²`, ambas com ligação 0)
+   * congelar o canônico em 0 e depois **travá-lo lá**: `_editarCustoUnidade`
+   * tentando digitar um R$/m² real usa `paraBase`, que continua estrita, e
+   * enquanto a área de venda seguir 0 ela nunca consegue recalcular o
+   * canônico — o valor digitado fica gravado na coluna, mas a Proforma
+   * continua lendo o 0 congelado para sempre, mesmo depois de a área existir.
+   *
+   * A defesa: só congela em 0 quando o DESTINO é `identidade` (R$) — digitar
+   * num campo de R$ nunca depende de ligação nenhuma, então nunca trava.
+   * Omitir `convNova` (chamador antigo, ou teste que não testa este ramo)
+   * cai no lado seguro: a relaxação simplesmente não se aplica, como se a
+   * ligação estivesse indefinida.
+   */
+  convNova?: ConvUnidade;
   ctx: CtxConversao;
 }
 
@@ -375,7 +395,7 @@ export interface EntradaTrocaBadge {
  * este eixo**, porque a aridade não muda. Nomear os campos cobre.
  */
 export function trocaBadgePremissas(
-  { valorAtual, valorDestino, canonicoPersistido, convAtual, ctx }: EntradaTrocaBadge,
+  { valorAtual, valorDestino, canonicoPersistido, convAtual, convNova, ctx }: EntradaTrocaBadge,
 ): TrocaBadgePremissas {
   // ⚠️ **A regra é UMA, e ela substituiu uma lista de casos que não convergia.**
   //
@@ -436,10 +456,20 @@ export function trocaBadgePremissas(
   // resolve sozinha (de propósito: ver a nota lá em cima). Resolve-se aqui,
   // sem chamar `converterUnidade`: multiplicar por uma ligação conhecida-zero
   // nunca precisa saber o valor do link, é sempre 0.
+  //
+  // ⚠️ **E só quando o DESTINO é `identidade` — achado P1 do Codex, rodada 2
+  // do PR #712.** Sem essa condição, um clique DERIVADA→DERIVADA (`% VGV` →
+  // `R$/m²`, as duas com ligação 0) também caía aqui, congelava o canônico em
+  // 0 e **travava** — `_editarCustoUnidade` depois, tentando gravar um R$/m²
+  // real, usa `paraBase` (estrita) e não consegue recalcular enquanto a área
+  // seguir 0, então o 0 congelado nunca sai, mesmo com a área definida depois.
+  // Destino `identidade` não tem esse risco: um campo de R$ sempre aceita o
+  // que for digitado, sem depender de ligação nenhuma.
   const ligacaoConhecidaZero = convAtual.tipo !== 'identidade'
     && ctx[convAtual.link] !== undefined
     && Number.isFinite(ctx[convAtual.link])
-    && (ctx[convAtual.link] as number) === 0;
+    && (ctx[convAtual.link] as number) === 0
+    && convNova?.tipo === 'identidade';
   const derivado = valorAtual === 0 ? 0
     : valorAtual === null ? null
     : ligacaoConhecidaZero && Number.isFinite(valorAtual) ? 0

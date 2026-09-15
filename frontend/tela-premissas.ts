@@ -600,6 +600,7 @@ export class ViabTelaPremissas extends LitElement {
       valorDestino: this._num(nova.campo),
       canonicoPersistido: this._num(cu.campoCanonico),
       convAtual: atual.conv,
+      convNova: nova.conv,
       ctx: this._ctxConversao(),
     });
     if (!decisao.trocar) return;
