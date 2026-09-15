@@ -1039,14 +1039,19 @@ Git Bash — ver PROGRESSO).
     `rgba()`/`hsla()` no bundle por regex — inclusive o literal de **fallback** dentro de
     `var(--token-que-existe, #fallback)`, que é exatamente o padrão correto de uso de token
     (defesa contra token ainda não publicado na versão do shell instalada). Medido em 2026-09-06,
-    contando os 279 no bundle contra a fonte: **264 são fallback de `var()` de token real**
+    contando os 279 no bundle contra a fonte: 264 eram fallback de `var()` de token real
     (confirmado pelo `guard-tokens-css.mjs`, que passa limpo — todo `var()` do app referencia
-    token existente) e os **15 restantes são, sem exceção, os literais de `frontend/exportar.ts`**
-    já documentados na exceção acima. Não há literal "solto" em nenhum outro arquivo de
-    `frontend/`. **Não** persiga este número tirando o fallback de cada `var()` — isso troca uma
-    defesa real (token indisponível numa instância com shell mais velho) por nenhuma, para calar
-    um aviso que já está explicado. Se o número mudar numa sessão futura, reconte pela mesma
-    metodologia (fallback vs. literal solto) antes de tratar como regressão.
+    token existente) e os 15 restantes eram, sem exceção, os literais de `frontend/exportar.ts`
+    já documentados na exceção acima. **Reconferido em 2026-09-15, reproduzindo a heurística exata
+    do `auditoria-tokens.js` (`RE_HEX` + `RE_FUNCAO_COR`) contra o bundle do commit `c53c382`: o
+    total subiu para 299, todo o crescimento (264→284) é fallback de `var()` novo, adicionado pelos
+    componentes da Rodada 12 (`viab-grafico-cascata`, `-barra-ranqueada`, `-cadeia-areas`) — e os
+    15 literais soltos continuam sendo, sem exceção, os mesmos de `frontend/exportar.ts`.** Não há
+    literal "solto" em nenhum outro arquivo de `frontend/`. **Não** persiga este número tirando o
+    fallback de cada `var()` — isso troca uma defesa real (token indisponível numa instância com
+    shell mais velho) por nenhuma, para calar um aviso que já está explicado. Se o número mudar
+    numa sessão futura, reconte pela mesma metodologia (fallback vs. literal solto) antes de tratar
+    como regressão.
 - Só usar primitivos `urbi-*` disponíveis no `ui.md` do shell — e **só as props que eles declaram**:
   atributo inexistente num primitivo não dá erro, ele simplesmente **não faz nada** (falha
   silenciosa). Na dúvida, leia `ui/src/urbi-<nome>.ts` no monorepo, não presuma a prop.
