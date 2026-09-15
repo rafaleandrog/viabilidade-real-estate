@@ -105,16 +105,24 @@ export class ViabTelaGraficos extends LitElement {
     this._idCarregado = id ?? null;
     this.produtos = [];
     this.produtosCarregados = false;
+    // Achado real da revisão (Codex, P2, rodada 3 do PR #707): produtos
+    // não pode ficar preso ao MESMO Promise.all de benchmarks/config — se
+    // `/preliminar/produtos` responde mas um dos outros dois falha,
+    // `produtosCarregados` tem que virar `true` do mesmo jeito, senão a
+    // faixa de consistência fica em branco para sempre mesmo com o
+    // catálogo já conhecido. As duas cargas resolvem independentes.
+    listarProdutosPreliminar(id).then((prod) => {
+      if (!respostaAindaVale(id, this.estudo?.id)) return;
+      this.produtos = prod?.dados || [];
+      this.produtosCarregados = true;
+    }).catch((e) => console.error(e));
     try {
-      const [bm, cfg, prod] = await Promise.all([
+      const [bm, cfg] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
-        listarProdutosPreliminar(id),
       ]);
       if (!respostaAindaVale(id, this.estudo?.id)) return; // o estudo mudou enquanto isto estava em voo
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
-      this.produtos = prod?.dados || [];
-      this.produtosCarregados = true;
     } catch (e) { console.error(e); }
   }
 
