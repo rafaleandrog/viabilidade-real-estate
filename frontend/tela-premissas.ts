@@ -329,6 +329,16 @@ export class ViabTelaPremissas extends LitElement {
   // persistência otimista, como `tela-empreendimento-tipologias.ts`), não faz
   // parte do "Salvar premissas" único.
   @state() private produtos: any[] = [];
+  // ⚠️ #711, rodada 5 (achado P1 do Codex): `produtos` começa `[]` ANTES do
+  // fetch em `_init` terminar — janela síncrona em que `_ctxConversao()` já
+  // calcula VGV como 0, só que é um 0 PROVISÓRIO (catálogo ainda não
+  // chegou), não o "conhecido e zerado" que a relaxação da #711 precisa. Se
+  // o clique da badge acontecesse nessa janela (ou o fetch falhasse, caindo
+  // no `catch` de `_init` e nunca marcando isto), o canônico congelaria em 0
+  // com base num dado que nem chegou — a mesma classe de bug das rodadas
+  // 1-3, agora na camada de carregamento. Só vira `true` depois que
+  // `listarProdutosPreliminar` resolve com sucesso; nunca no `catch`.
+  @state() private _catalogoCarregado = false;
   @state() private confirmRemoverProduto: any | null = null;
   // Validação de obrigatórios (ao salvar): `erros` por campo + resumo em banner.
   @state() private erros: Record<string, string> = {};
@@ -512,6 +522,7 @@ export class ViabTelaPremissas extends LitElement {
     this.erros = {};
     this.erroGeral = '';
     this.produtos = [];
+    this._catalogoCarregado = false;
     try {
       const [bm, cfg, prod] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
@@ -521,9 +532,12 @@ export class ViabTelaPremissas extends LitElement {
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
       this.produtos = prod?.dados || [];
+      this._catalogoCarregado = true;
     } catch (e) {
       if (!respostaAindaVale(id, this.estudo?.id)) return;
       console.error(e);
+      // ⚠️ Nunca marca `_catalogoCarregado` aqui: o VGV segue INDEFINIDO (não
+      // 0) até um fetch bem-sucedido, mesmo que a sessão nunca volte a tentar.
     }
   }
 
@@ -572,7 +586,20 @@ export class ViabTelaPremissas extends LitElement {
   // eram lidas AQUI dos campos legados enquanto o motor já usava o catálogo —
   // a badge "% área venda" convertia sobre uma base e o cálculo usava outra.
   private _ctxConversao(): CtxConversao {
-    return ctxConversaoPreliminar(calcularProforma(this._entradaProforma()));
+    const ctx = ctxConversaoPreliminar(calcularProforma(this._entradaProforma()));
+    // ⚠️ #711, rodada 5: enquanto o catálogo de Produtos não terminou de
+    // carregar (ou falhou), `calcularProforma` já devolve VGV = 0 — mas é um
+    // 0 PROVISÓRIO (`produtos` está `[]` só porque o fetch não chegou), não
+    // um VGV conhecido. Apagar as chaves de VGV aqui as torna genuinamente
+    // INDEFINIDAS para `paraBase`/`trocaBadgePremissas`, que já sabem tratar
+    // "chave ausente" como "não converte" — sem isso, um clique de badge (ou
+    // uma edição) durante essa janela congelaria o canônico em 0 com base
+    // num dado que ainda nem chegou.
+    if (!this._catalogoCarregado) {
+      const { vgv, vgvResidencial, vgvNaoResidencial, ...resto } = ctx;
+      return resto;
+    }
+    return ctx;
   }
 
   // Troca a unidade de um campo (Parte 2): converte o valor atual para a unidade

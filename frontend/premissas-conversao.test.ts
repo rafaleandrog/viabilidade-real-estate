@@ -526,7 +526,13 @@ test('#570 ctxConversaoPreliminar: as duas bases de área vêm de `areaBasePermu
 
 test('#570: a TELA usa `ctxConversaoPreliminar`, não monta o ctx à mão', () => {
   const fonte = semComentarios(readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'));
-  assert.ok(fonte.includes('return ctxConversaoPreliminar(calcularProforma('),
+  // ⚠️ #711, rodada 5: deixou de ser um `return` direto — `_ctxConversao`
+  // agora apaga as chaves de VGV enquanto o catálogo não carrega (ver o
+  // teste "#711 fiação, rodada 5" acima) — mas a chamada em si continua
+  // delegando para a função pura, só que via `const ctx = ...` em vez de
+  // `return ...`. O substring sem o `return` continua pegando quem voltar a
+  // montar o objeto à mão.
+  assert.ok(fonte.includes('ctxConversaoPreliminar(calcularProforma('),
     '`_ctxConversao` de tela-premissas.ts precisa delegar para a função pura');
   // A mutação que este teste existe para pegar: voltar a montar o objeto
   // literal na tela. Qualquer reconstrução à mão reintroduz estas chaves.
@@ -973,6 +979,41 @@ test('#711 fiação, rodada 3 (achado do Codex): editar um campo derivado LIMPA 
   assert.ok(
     fonte.includes('this._set(cu.campoCanonico, canonico);'),
     '`_editarCustoUnidade` precisa gravar o resultado da conversão (mesmo `null`) no canônico',
+  );
+});
+
+test('#711 fiação, rodada 5 (achado do Codex): VGV fica INDEFINIDO — não 0 — enquanto o catálogo não termina de carregar', () => {
+  // `produtos` começa `[]` antes do fetch de `_init` terminar (linha síncrona
+  // antes do `await`), então `_ctxConversao()` calcularia VGV = 0 nessa
+  // janela — um 0 PROVISÓRIO, não o "conhecido e zerado" que a relaxação da
+  // #711 precisa. Clicar uma badge (ou editar) durante essa janela, ou depois
+  // de o fetch falhar, congelaria o canônico em 0 com base num catálogo que
+  // ainda nem chegou. A defesa: `_catalogoCarregado` só vira `true` depois de
+  // um fetch bem-sucedido (nunca no `catch`), e `_ctxConversao()` apaga as
+  // chaves de VGV do `ctx` enquanto ele for `false` — chave ausente é
+  // exatamente o "indefinida" que `paraBase`/`trocaBadgePremissas` já tratam
+  // como bloqueio, sem precisar de mecanismo novo.
+  const fonte = semComentarios(readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'));
+  assert.ok(
+    fonte.includes('this._catalogoCarregado = false;'),
+    '`_init` precisa resetar o estado de carregamento a cada troca de estudo',
+  );
+  assert.ok(
+    fonte.includes('this._catalogoCarregado = true;'),
+    '`_init` precisa marcar sucesso só depois do fetch resolver',
+  );
+  // O `catch` de `_init` não pode conter a marcação de sucesso — senão um
+  // fetch que falha ainda destrava a relaxação com VGV 0 provisório.
+  const iCatch = fonte.indexOf('} catch (e) {', fonte.indexOf('private async _init()'));
+  const iFimInit = fonte.indexOf('\n  }', iCatch);
+  const corpoCatch = fonte.slice(iCatch, iFimInit);
+  assert.ok(
+    !corpoCatch.includes('this._catalogoCarregado = true;'),
+    'o catch de `_init` não pode marcar o catálogo como carregado — o VGV tem de seguir indefinido',
+  );
+  assert.ok(
+    fonte.includes('const { vgv, vgvResidencial, vgvNaoResidencial, ...resto } = ctx;'),
+    '`_ctxConversao` precisa apagar as chaves de VGV do ctx enquanto o catálogo não carregou',
   );
 });
 
