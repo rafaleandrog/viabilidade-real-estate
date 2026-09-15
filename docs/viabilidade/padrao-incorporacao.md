@@ -373,8 +373,8 @@ Quando o Avançado detalhar um valor agregado do Preliminar, a aplicação deve 
 > **Comportamento vigente — NÃO EXISTE promoção de nível (#486).** Um estudo nasce Preliminar ou
 > Avançado e **continua o que nasceu**. Duas metades, cada uma no seu lugar:
 >
-> - a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:504`;
-> - `NIVEL_IMUTAVEL` recusa a alteração no `PATCH`, com **422** — `backend/rotas/estudos.ts:210`. A duplicação **preserva** o nível — ela copia os dados do Avançado justamente
+> - a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:531`;
+> - `NIVEL_IMUTAVEL` recusa a alteração no `PATCH`, com **422** — `backend/rotas/estudos.ts:197`. A duplicação **preserva** o nível — ela copia os dados do Avançado justamente
 > quando `novo.nivel_analise === 'avancado'` (`:420-422`). Nenhuma rota promove.
 >
 > Quem preserva o nível na duplicação é `CAMPOS_NAO_COPIAVEIS` (`:46-50`) **não** listar
@@ -3239,8 +3239,8 @@ Toda correção de flag precisa valer **na leitura**, não só na criação. →
 
 **A14 — Não existe promoção Preliminar → Avançado, e o conserto dela tem grandeza diferente por
 tipo (#486).** Duas metades, cada uma no seu lugar:
-a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:504`;
-e `NIVEL_IMUTAVEL` recusa a alteração no `PATCH` com 422 — `backend/rotas/estudos.ts:210`. Quem
+a escrita de `nivel_analise` acontece só na criação — `backend/rotas/estudos.ts:531`;
+e `NIVEL_IMUTAVEL` recusa a alteração no `PATCH` com 422 — `backend/rotas/estudos.ts:197`. Quem
 supuser que existe promoção vai procurar um bug de conversão que não existe — o estado
 `permuta_fisica_modo: 'area_m2'` com nulos é **indistinguível do padrão de criação**
 (`schema.json:116,121`), e como não há promoção, a hipótese de resíduo de conversão cai

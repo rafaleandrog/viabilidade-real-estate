@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import type { AddressInfo } from 'node:net';
 import { rotasEstudos } from './estudos.js';
+import { colunasNumericas } from './coercao-numerica.js';
 
 // #634 — PROVA DE FIAÇÃO DE PONTA A PONTA. A leitura de `avancado_linhas_custo`
 // dentro de `duplicarDadosAvancado` usava `listar(..., por_pagina: 500)`: um
@@ -214,25 +215,51 @@ test('#634 fiação: POST /estudos/:id/duplicar copia TODAS as 501 linhas de cus
 
 // ── Bug relatado: "Campo X deve ser um número" ao duplicar ──
 //
-// O shell recusa `null` explícito em coluna decimal/inteiro na CRIAÇÃO, mesmo
-// quando ela é nullable (comportamento já documentado e contornado uma vez
-// nesta app para a tabela `estudos` — `montarCopiaEstudo`). O `DadosFake` do
-// teste #634 acima nunca reproduzia isso: seu `criar()` grava qualquer coisa.
-// Este fake simula o validador de verdade, para provar a FIAÇÃO — não só a
-// composição pura das funções de cópia — sem contaminar os testes acima.
-class DadosFakeComValidadorDeNulo extends DadosFake {
-  async criar(tabela: string, dados: Record<string, any>) {
+// ⚠️ **Este dublê já implementou a regra ERRADA, e foi ELE que deixou quatro
+// correções passarem verdes enquanto o bug seguia vivo em produção.** Ele se
+// chamava `DadosFakeComValidadorDoShell` e lançava quando o valor era `null` —
+// o oposto do shell. A suíte media a crença da app, não o shell.
+//
+// Regra do shell 0.55.22, a versão que a instância roda
+// (`shell/backend/src/dados/validacao-dados.ts`, `validarInsert`/`validarUpdate`):
+//
+//   1. `null`/`undefined` em coluna OPCIONAL: `continue` — **aceito**, sem
+//      olhar o tipo;
+//   2. o resto passa por `validarValor`, e `decimal` é `typeof valor !==
+//      'number'` → "Campo X deve ser um número"; `inteiro`/`referencia` exigem
+//      ainda `Number.isInteger`.
+//
+// O que importa aqui é o item 2 sobre STRING: coluna `decimal` volta do
+// Postgres como string (`"4.00"`), porque o shell só registra type parser
+// customizado para `DATE`. É essa string, e não o `null`, que quebrava a
+// duplicação.
+class DadosFakeComValidadorDoShell extends DadosFake {
+  private static validar(tabela: string, dados: Record<string, any>): void {
+    const numericas = colunasNumericas(tabela);
+    const erros: string[] = [];
     for (const [campo, valor] of Object.entries(dados)) {
-      if (valor === null) {
-        throw new Error(`Campo "${campo}" deve ser um número`);
-      }
+      if (valor === null || valor === undefined) continue; // coluna opcional: aceito
+      if (!numericas.has(campo)) continue;
+      if (typeof valor !== 'number') erros.push(`Campo "${campo}" deve ser um número`);
     }
+    // Mesma forma do shell: UM erro por campo, juntos por '; ', lançados como
+    // `Error` cru (`helper-dados.ts`) — sem status e sem código.
+    if (erros.length > 0) throw new Error(`Erros de validação: ${erros.join('; ')}`);
+  }
+
+  async criar(tabela: string, dados: Record<string, any>) {
+    DadosFakeComValidadorDoShell.validar(tabela, dados);
     return super.criar(tabela, dados);
+  }
+
+  async atualizar(tabela: string, id: number, patch: Record<string, any>) {
+    DadosFakeComValidadorDoShell.validar(tabela, patch);
+    return super.atualizar(tabela, id, patch);
   }
 }
 
 test('reproduz o bug: duplicar um estudo com Apelo Comercial recém-anexado (scores nulos) não quebra mais', async () => {
-  const dados = new DadosFakeComValidadorDeNulo();
+  const dados = new DadosFakeComValidadorDoShell();
   const origId = dados.semear('estudos', {
     id: 1, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
     nome: 'Estudo com apelo comercial pendente', uf: 'DF', status: 'rascunho', sequencia: 1,
@@ -261,7 +288,7 @@ test('reproduz o bug: duplicar um estudo com Apelo Comercial recém-anexado (sco
 });
 
 test('reproduz o bug: duplicar um estudo Avançado com tipologia sem dormitorios/vagas não quebra mais', async () => {
-  const dados = new DadosFakeComValidadorDeNulo();
+  const dados = new DadosFakeComValidadorDoShell();
   const origId = dados.semear('estudos', {
     id: 1, nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao',
     nome: 'Estudo com tipologia incompleta', uf: 'DF', status: 'rascunho', sequencia: 1,
@@ -294,5 +321,131 @@ test('#634 controle: com só 3 linhas de custo (bem abaixo do antigo teto de 500
       filtros: { estudo_id: novoId }, por_pagina: 100,
     });
     assert.equal(custosCopia.total, 3);
+  });
+});
+
+// ── O defeito de verdade: `decimal` chega do Postgres como STRING ───────────
+//
+// Este é o caso que os quatro consertos anteriores nunca exerciram, porque o
+// dublê antigo media `null`. `semear` aqui grava o que o `pg` de verdade
+// devolve numa coluna `NUMERIC`: string. Sem `coagirNumericosOuLancar` em
+// `montarCopiaEstudo`/`duplicarDadosAvancado`, a duplicação estoura no
+// primeiro `criar`.
+test('duplicar um estudo cujos decimais vêm do banco como STRING (o que o pg devolve) sucede', async () => {
+  const dados = new DadosFakeComValidadorDoShell();
+  const origId = dados.semear('estudos', {
+    id: 1, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
+    nome: 'Estudo com decimais em string', uf: 'DF', status: 'rascunho', sequencia: 1,
+    // Exatamente o shape de `GET /estudos/:id`: `decimal` string, `inteiro` número.
+    ret_pct: '4.00',
+    gabarito_maximo: '12.00',
+    coef_aproveitamento_maximo: '3.00',
+    custo_construcao_m2: '4800.00',
+    permuta_fisica_pct: '18.00',
+    num_unidades_residencial: 120,
+  });
+
+  await comServidor(criarApp(dados), async (base) => {
+    const res = await fetch(`${base}/estudos/${origId}/duplicar`, { method: 'POST' });
+    const corpo = await res.json();
+    assert.equal(res.status, 201,
+      `duplicar deveria suceder com decimais em string, veio ${res.status}: ${JSON.stringify(corpo)}`);
+    const novo = await dados.buscar('estudos', Number(corpo.id));
+    // A cópia guarda NÚMERO, não a string — é o que o shell aceita gravar.
+    assert.equal(novo!.ret_pct, 4, 'ret_pct deveria ter sido coagido para número');
+    assert.equal(novo!.gabarito_maximo, 12, 'gabarito_maximo deveria ter sido coagido para número');
+    assert.equal(novo!.custo_construcao_m2, 4800);
+    assert.equal(novo!.permuta_fisica_pct, 18);
+    assert.equal(novo!.num_unidades_residencial, 120, 'inteiro já vem número e passa intacto');
+  });
+});
+
+// ── O BUG RELATADO, de ponta a ponta: "Salvar premissas" ───────────────────
+//
+// Vive neste arquivo por causa do harness (`DadosFake` + `criarApp` +
+// `comServidor` montam `rotasEstudos` inteiro); o assunto é a mesma fiação.
+//
+// É a prova que faltava nas quatro correções anteriores: elas testavam
+// `montarPatchEstudo` como função pura, com `null`. Aqui o payload é o que a
+// tela realmente manda — o registro inteiro que o `GET` devolveu, com os
+// `decimal` em string — e o dublê recusa como o shell recusa.
+test('fiação: PATCH /estudos/:id com o registro inteiro (decimais em string) grava, não dá "deve ser um número"', async () => {
+  const dados = new DadosFakeComValidadorDoShell();
+  const estudoId = dados.semear('estudos', {
+    id: 1, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
+    nome: 'INC - [teste] PU 2 Esquadra', uf: 'DF', status: 'em_analise', sequencia: 1,
+    gabarito_maximo: '12.00', ret_pct: '4.00', coef_aproveitamento_maximo: '3.00',
+    permuta_fisica_pct: '18.00', num_unidades_residencial: 120,
+  });
+
+  await comServidor(criarApp(dados), async (base) => {
+    // O eco integral que `tela-premissas.ts` produzia: tudo que veio do GET.
+    const corpoDoEco = {
+      nome: 'INC - [teste] PU 2 Esquadra',
+      gabarito_maximo: '12.00',
+      ret_pct: '4.00',
+      coef_aproveitamento_maximo: 3,     // este a tela coagia (tem controle)
+      permuta_fisica_pct: 18,            // idem
+      num_unidades_residencial: 120,
+    };
+    const res = await fetch(`${base}/estudos/${estudoId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(corpoDoEco),
+    });
+    const corpo = await res.json();
+    assert.equal(res.status, 200,
+      `Salvar premissas deveria gravar, veio ${res.status}: ${JSON.stringify(corpo)}`);
+
+    const persistido = await dados.buscar('estudos', estudoId);
+    assert.equal(persistido!.gabarito_maximo, 12, 'gabarito_maximo não foi gravado como número');
+    assert.equal(persistido!.ret_pct, 4, 'ret_pct não foi gravado como número');
+  });
+});
+
+test('fiação: valor sujo num campo numérico devolve 400 CAMPO_INVALIDO, não 500', async () => {
+  const dados = new DadosFakeComValidadorDoShell();
+  const estudoId = dados.semear('estudos', {
+    id: 1, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
+    nome: 'Estudo', uf: 'DF', status: 'em_analise', sequencia: 1,
+  });
+  await comServidor(criarApp(dados), async (base) => {
+    const res = await fetch(`${base}/estudos/${estudoId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ret_pct: '0x10' }),
+    });
+    const corpo = await res.json();
+    assert.equal(res.status, 400);
+    assert.equal(corpo.codigo, 'CAMPO_INVALIDO');
+    // E NÃO gravou 16.
+    const persistido = await dados.buscar('estudos', estudoId);
+    assert.equal(persistido!.ret_pct, undefined);
+  });
+});
+
+test('fiação: recusa de validação do shell vira 422, não 500 ERRO_INTERNO', async () => {
+  // Um campo numérico que a coerção não alcança porque o `schema.json` não o
+  // declara numérico chega ao shell e é recusado lá. O que este teste fixa é a
+  // TRADUÇÃO: 422 com código, em vez de 500 ERRO_INTERNO — foi o 500 que fez a
+  // falha parecer defeito de infra por meses.
+  class DadosSempreRecusa extends DadosFake {
+    async atualizar(): Promise<any> {
+      throw new Error('Erros de validação: Campo "x" deve ser um número');
+    }
+  }
+  const dados = new DadosSempreRecusa();
+  const estudoId = dados.semear('estudos', {
+    id: 1, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
+    nome: 'Estudo', uf: 'DF', status: 'em_analise', sequencia: 1,
+  });
+  await comServidor(criarApp(dados), async (base) => {
+    const res = await fetch(`${base}/estudos/${estudoId}`, {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nome: 'Outro nome' }),
+    });
+    const corpo = await res.json();
+    assert.equal(res.status, 422, 'recusa de validação não é erro interno');
+    assert.equal(corpo.codigo, 'DADOS_VALIDACAO_FALHOU');
   });
 });
