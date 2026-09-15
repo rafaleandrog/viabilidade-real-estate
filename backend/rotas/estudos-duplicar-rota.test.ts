@@ -212,6 +212,75 @@ test('#634 fiação: POST /estudos/:id/duplicar copia TODAS as 501 linhas de cus
   });
 });
 
+// ── Bug relatado: "Campo X deve ser um número" ao duplicar ──
+//
+// O shell recusa `null` explícito em coluna decimal/inteiro na CRIAÇÃO, mesmo
+// quando ela é nullable (comportamento já documentado e contornado uma vez
+// nesta app para a tabela `estudos` — `montarCopiaEstudo`). O `DadosFake` do
+// teste #634 acima nunca reproduzia isso: seu `criar()` grava qualquer coisa.
+// Este fake simula o validador de verdade, para provar a FIAÇÃO — não só a
+// composição pura das funções de cópia — sem contaminar os testes acima.
+class DadosFakeComValidadorDeNulo extends DadosFake {
+  async criar(tabela: string, dados: Record<string, any>) {
+    for (const [campo, valor] of Object.entries(dados)) {
+      if (valor === null) {
+        throw new Error(`Campo "${campo}" deve ser um número`);
+      }
+    }
+    return super.criar(tabela, dados);
+  }
+}
+
+test('reproduz o bug: duplicar um estudo com Apelo Comercial recém-anexado (scores nulos) não quebra mais', async () => {
+  const dados = new DadosFakeComValidadorDeNulo();
+  const origId = dados.semear('estudos', {
+    id: 1, nivel_analise: 'preliminar', tipo_empreendimento: 'incorporacao',
+    nome: 'Estudo com apelo comercial pendente', uf: 'DF', status: 'rascunho', sequencia: 1,
+  });
+  // Estado real assim que um documento é anexado, antes de a IA gerar o
+  // resultado (`backend/rotas/apelo-comercial.ts` § garantirApelo).
+  dados.semear('apelo_comercial', {
+    estudo_id: origId, resultado: null,
+    score_localizacao: null, score_infraestrutura: null, score_vetor_crescimento: null,
+    score_concorrencia: null, score_demanda: null, score_seguranca_juridica: null,
+    score_geral: null,
+  });
+
+  await comServidor(criarApp(dados), async (base) => {
+    const res = await fetch(`${base}/estudos/${origId}/duplicar`, { method: 'POST' });
+    const corpo = await res.json();
+    assert.equal(res.status, 201,
+      `duplicar deveria suceder mesmo com Apelo Comercial vazio, veio ${res.status}: ${JSON.stringify(corpo)}`);
+    const novoId = Number(corpo.id);
+
+    const apeloCopia = await dados.listar('apelo_comercial', { filtros: { estudo_id: novoId }, por_pagina: 10 });
+    assert.equal(apeloCopia.total, 1, 'a linha de apelo comercial deveria ter sido copiada');
+    assert.equal(apeloCopia.dados[0].score_geral, undefined,
+      'campo nulo vira ausente na cópia — não é reenviado ao criar()');
+  });
+});
+
+test('reproduz o bug: duplicar um estudo Avançado com tipologia sem dormitorios/vagas não quebra mais', async () => {
+  const dados = new DadosFakeComValidadorDeNulo();
+  const origId = dados.semear('estudos', {
+    id: 1, nivel_analise: 'avancado', tipo_empreendimento: 'incorporacao',
+    nome: 'Estudo com tipologia incompleta', uf: 'DF', status: 'rascunho', sequencia: 1,
+  });
+  dados.semear('avancado_tipologias', {
+    estudo_id: origId, nome: 'Studio', tipo_unidade: 'apartamento',
+    area_privativa_m2: 32.5, area_privativa_aberta_m2: null,
+    dormitorios: null, vagas: null, quantidade: 40, unidades_permutadas: 0,
+    preco_m2: 9000, ordem: 0,
+  });
+
+  await comServidor(criarApp(dados), async (base) => {
+    const res = await fetch(`${base}/estudos/${origId}/duplicar`, { method: 'POST' });
+    const corpo = await res.json();
+    assert.equal(res.status, 201,
+      `duplicar deveria suceder mesmo com tipologia incompleta, veio ${res.status}: ${JSON.stringify(corpo)}`);
+  });
+});
+
 test('#634 controle: com só 3 linhas de custo (bem abaixo do antigo teto de 500), a duplicação sempre funcionou — prova que o teste acima mede o caso de BORDA, não qualquer duplicação', async () => {
   const dados = new DadosFake();
   const { origId } = semearEstudoComCustos(dados, 3);

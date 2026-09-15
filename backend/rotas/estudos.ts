@@ -21,6 +21,7 @@ import {
 } from '../../frontend/estudo-status.js';
 import { duplicarDadosAvancado } from './avancado.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
+import { omitirValoresNulos } from './duplicar-utils.js';
 
 export const rotasEstudos: ReturnType<typeof Router> = Router();
 
@@ -332,10 +333,10 @@ export function montarCopiaEstudo(orig: Record<string, any>): Record<string, any
   const copia: Record<string, any> = {};
   for (const [k, v] of Object.entries(orig)) {
     if (CAMPOS_NAO_COPIAVEIS.has(k)) continue;
-    if (v === null || v === undefined) continue;
+    if (v === undefined) continue;
     copia[k] = v;
   }
-  return copia;
+  return omitirValoresNulos(copia);
 }
 
 function erro(res: Response, http: number, codigo: string, mensagem: string) {
@@ -735,11 +736,11 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
       // Copiar imóveis vinculados.
       const imoveis = await req.dados!.listar('estudo_imoveis', { filtros: { estudo_id: estudoId }, por_pagina: 100 });
       for (const im of imoveis.dados) {
-        await req.dados!.criar('estudo_imoveis', {
+        await req.dados!.criar('estudo_imoveis', omitirValoresNulos({
           estudo_id: novo.id,
           imovel_nucleo_id: im.imovel_nucleo_id,
           tipo_imovel: im.tipo_imovel,
-        });
+        }));
       }
 
       // #609 — as estruturas filhas de remapeamento simples (catálogo de
@@ -747,12 +748,21 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
       // para a lista, os campos de cada uma e o que ficou de fora, com o
       // motivo. Dentro do try/catch de propósito: falhar aqui remove o estudo
       // recém-criado, em vez de deixar um clone pela metade.
+      //
+      // `montarCopiasFilhas` preserva `null` explícito de propósito (linha
+      // ausente ≠ campo apagado) — mas o validador do shell recusa `null` em
+      // coluna decimal/inteiro na criação, mesmo sendo nullable. É praticamente
+      // garantido em `apelo_comercial` (as 7 colunas de score nascem nulas
+      // assim que um documento é anexado, antes da IA gerar o resultado) e
+      // comum em `analise_mercado` (indicadores parcialmente coletados) —
+      // `omitirValoresNulos` filtra só na fronteira de escrita, sem mexer no
+      // contrato de `montarCopiasFilhas`.
       for (const { tabela, campos, porPagina } of FILHAS_SIMPLES) {
         const linhas = await req.dados!.listar(tabela, {
           filtros: { estudo_id: estudoId }, por_pagina: porPagina,
         });
         for (const copiaFilha of montarCopiasFilhas(linhas.dados, Number(novo.id), campos)) {
-          await req.dados!.criar(tabela, copiaFilha);
+          await req.dados!.criar(tabela, omitirValoresNulos(copiaFilha));
         }
       }
 

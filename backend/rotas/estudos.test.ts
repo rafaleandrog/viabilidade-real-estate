@@ -6,6 +6,7 @@ import {
   montarCopiasFilhas, FILHAS_SIMPLES,
 } from './estudos.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
+import { omitirValoresNulos } from './duplicar-utils.js';
 import { montarNomeExibicao, siglaDoTipo, LIMITE_NOME_EXIBICAO } from '../identificacao.js';
 import { readFileSync } from 'node:fs';
 
@@ -347,6 +348,65 @@ test('#609 lista vazia, nula ou indefinida devolve lista vazia', () => {
   assert.deepEqual(montarCopiasFilhas([], 1, CAMPOS_PRODUTO), []);
   assert.deepEqual(montarCopiasFilhas(null as any, 1, CAMPOS_PRODUTO), []);
   assert.deepEqual(montarCopiasFilhas(undefined as any, 1, CAMPOS_PRODUTO), []);
+});
+
+// ── Duplicação: "Campo X deve ser um número" ao duplicar (bug relatado) ──
+//
+// `montarCopiasFilhas` preserva `null` de propósito (teste "#609 valor NULO
+// viaja" acima) — mas esse `null` nunca pode chegar cru a `req.dados!.criar`,
+// porque o validador do shell recusa `null` em coluna decimal/inteiro na
+// criação, mesmo sendo nullable. `omitirValoresNulos` é o filtro que fica só
+// nessa fronteira de escrita, entre `montarCopiasFilhas` e `criar`.
+
+test('omitirValoresNulos remove só as chaves com valor null', () => {
+  assert.deepEqual(
+    omitirValoresNulos({ a: 1, b: null, c: 0, d: false, e: '', f: undefined, g: 'x' }),
+    { a: 1, c: 0, d: false, e: '', f: undefined, g: 'x' },
+  );
+});
+
+test('reproduz o bug: apelo_comercial recém-criado (scores nulos) não deve carregar null para o criar()', () => {
+  // Estado real assim que um documento é anexado, antes de a IA gerar o
+  // resultado: `garantirApelo` cria a linha só com `estudo_id`, e os 7 scores
+  // nascem `null` (`backend/rotas/apelo-comercial.ts`). Duplicar esse estudo é
+  // o caso mais comum que disparava a lista inteira de "Campo X deve ser um
+  // número".
+  const linhaOrigem = {
+    id: 1, estudo_id: 3, resultado: null,
+    score_localizacao: null, score_infraestrutura: null, score_vetor_crescimento: null,
+    score_concorrencia: null, score_demanda: null, score_seguranca_juridica: null,
+    score_geral: null,
+  };
+  const campos = FILHAS_SIMPLES.find((f) => f.tabela === 'apelo_comercial')!.campos;
+  const [copiaFilha] = montarCopiasFilhas([linhaOrigem], 99, campos);
+  // Confirma que a representação intermediária ainda preserva os nulos (#609).
+  assert.equal(copiaFilha.score_geral, null);
+
+  const payloadParaCriar = omitirValoresNulos(copiaFilha);
+  for (const chave of Object.keys(payloadParaCriar)) {
+    assert.notEqual(payloadParaCriar[chave], null, `${chave} não pode ir null para criar()`);
+  }
+  assert.deepEqual(payloadParaCriar, { estudo_id: 99 });
+});
+
+test('reproduz o bug: analise_mercado com indicadores parcialmente nulos não deve carregar null para o criar()', () => {
+  const linhaOrigem = {
+    id: 2, estudo_id: 3, abrangencia: 'bairro', localidade: 'Águas Claras',
+    preco_medio_m2: 8500, custo_obra_m2: null, vso_pct: null,
+    ipca_pct: 4.5, selic_pct: null, incc_pct: null, focus_ipca_pct: null, focus_selic_pct: null,
+    riscos: null, resultado: null, origem: 'coleta', data_referencia: '2026-09-01',
+    gerado_em: null, modelo: null,
+  };
+  const campos = FILHAS_SIMPLES.find((f) => f.tabela === 'analise_mercado')!.campos;
+  const [copiaFilha] = montarCopiasFilhas([linhaOrigem], 99, campos);
+  const payloadParaCriar = omitirValoresNulos(copiaFilha);
+  for (const chave of Object.keys(payloadParaCriar)) {
+    assert.notEqual(payloadParaCriar[chave], null, `${chave} não pode ir null para criar()`);
+  }
+  assert.deepEqual(payloadParaCriar, {
+    estudo_id: 99, abrangencia: 'bairro', localidade: 'Águas Claras',
+    preco_medio_m2: 8500, ipca_pct: 4.5, origem: 'coleta', data_referencia: '2026-09-01',
+  });
 });
 
 test('#609 o catálogo de Produtos está entre as filhas copiadas, com os campos da rota', () => {
