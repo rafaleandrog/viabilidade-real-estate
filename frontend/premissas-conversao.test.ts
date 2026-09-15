@@ -982,17 +982,20 @@ test('#711 fiação, rodada 3 (achado do Codex): editar um campo derivado LIMPA 
   );
 });
 
-test('#711 fiação, rodada 5 (achado do Codex): VGV fica INDEFINIDO — não 0 — enquanto o catálogo não termina de carregar', () => {
+test('#711 fiação, rodadas 5-6 (achados do Codex): toda grandeza CATALOG-DERIVED fica indefinida enquanto o catálogo não carrega', () => {
   // `produtos` começa `[]` antes do fetch de `_init` terminar (linha síncrona
   // antes do `await`), então `_ctxConversao()` calcularia VGV = 0 nessa
   // janela — um 0 PROVISÓRIO, não o "conhecido e zerado" que a relaxação da
-  // #711 precisa. Clicar uma badge (ou editar) durante essa janela, ou depois
-  // de o fetch falhar, congelaria o canônico em 0 com base num catálogo que
-  // ainda nem chegou. A defesa: `_catalogoCarregado` só vira `true` depois de
-  // um fetch bem-sucedido (nunca no `catch`), e `_ctxConversao()` apaga as
-  // chaves de VGV do `ctx` enquanto ele for `false` — chave ausente é
-  // exatamente o "indefinida" que `paraBase`/`trocaBadgePremissas` já tratam
-  // como bloqueio, sem precisar de mecanismo novo.
+  // #711 precisa. A rodada 5 apagou as 3 chaves de VGV; a rodada 6 achou que
+  // `areaVendavelR`/`areaVendavelNR` (permuta física da Incorporação) têm o
+  // MESMO problema — `proforma.ts` também as deriva do catálogo, caindo no
+  // fallback legado quando `produtos` está `[]`, um falso "sem catálogo"
+  // durante o carregamento.
+  //
+  // A defesa mudou de FORMA na rodada 6: em vez de listar mais uma chave
+  // contaminada (a mesma classe de bug se repetindo), `_ctxConversao` virou
+  // um ALLOWLIST do que é comprovadamente síncrono (`areaVendavel`,
+  // `areaPrivativa`) — qualquer chave nova nasce excluída por padrão.
   const fonte = semComentarios(readFileSync(new URL('./tela-premissas.ts', import.meta.url), 'utf8'));
   assert.ok(
     fonte.includes('this._catalogoCarregado = false;'),
@@ -1012,8 +1015,8 @@ test('#711 fiação, rodada 5 (achado do Codex): VGV fica INDEFINIDO — não 0 
     'o catch de `_init` não pode marcar o catálogo como carregado — o VGV tem de seguir indefinido',
   );
   assert.ok(
-    fonte.includes('const { vgv, vgvResidencial, vgvNaoResidencial, ...resto } = ctx;'),
-    '`_ctxConversao` precisa apagar as chaves de VGV do ctx enquanto o catálogo não carregou',
+    fonte.includes("return { areaVendavel: ctx.areaVendavel, areaPrivativa: ctx.areaPrivativa };"),
+    '`_ctxConversao` precisa ser um ALLOWLIST (só as 2 chaves comprovadamente síncronas) enquanto o catálogo não carregou — não uma lista do que excluir',
   );
 });
 

@@ -587,17 +587,27 @@ export class ViabTelaPremissas extends LitElement {
   // a badge "% área venda" convertia sobre uma base e o cálculo usava outra.
   private _ctxConversao(): CtxConversao {
     const ctx = ctxConversaoPreliminar(calcularProforma(this._entradaProforma()));
-    // ⚠️ #711, rodada 5: enquanto o catálogo de Produtos não terminou de
-    // carregar (ou falhou), `calcularProforma` já devolve VGV = 0 — mas é um
-    // 0 PROVISÓRIO (`produtos` está `[]` só porque o fetch não chegou), não
-    // um VGV conhecido. Apagar as chaves de VGV aqui as torna genuinamente
-    // INDEFINIDAS para `paraBase`/`trocaBadgePremissas`, que já sabem tratar
-    // "chave ausente" como "não converte" — sem isso, um clique de badge (ou
-    // uma edição) durante essa janela congelaria o canônico em 0 com base
-    // num dado que ainda nem chegou.
+    // ⚠️ #711, rodadas 5 e 6: enquanto o catálogo de Produtos não terminou de
+    // carregar (ou falhou), `calcularProforma` devolve VALORES PROVISÓRIOS
+    // para toda grandeza que depende do catálogo — não só VGV (rodada 5):
+    // `areaVendavelR`/`areaVendavelNR` também caem no fallback legado quando
+    // `produtos` está `[]` (`semProdutos`, em `proforma.ts`), que durante o
+    // carregamento é um FALSO "sem catálogo" — o estudo salvo pode ter um
+    // catálogo real que só ainda não chegou. A rodada 5 apagou só as 3
+    // chaves de VGV e a rodada 6 achou que as outras duas grandezas
+    // catalog-derived ficaram de fora — a mesma classe de bug, achada de
+    // novo por listar o que apagar em vez de listar o que É seguro.
+    //
+    // Inversão (armadilha 14 do CLAUDE.md): em vez de enumerar mais uma
+    // chave contaminada a cada rodada, um ALLOWLIST do que é comprovadamente
+    // síncrono — nunca depende de `produtos` — e por isso sempre confiável
+    // mesmo durante o carregamento: `areaVendavel` (Loteamento vem da
+    // cascata do terreno; Incorporação soma `area_pvt_*`, campos do form) e
+    // `areaPrivativa` (mesma fonte). Qualquer chave nova que
+    // `ctxConversaoPreliminar` vier a expor no futuro nasce EXCLUÍDA por
+    // padrão, não incluída por engano.
     if (!this._catalogoCarregado) {
-      const { vgv, vgvResidencial, vgvNaoResidencial, ...resto } = ctx;
-      return resto;
+      return { areaVendavel: ctx.areaVendavel, areaPrivativa: ctx.areaPrivativa };
     }
     return ctx;
   }
