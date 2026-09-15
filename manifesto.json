@@ -4,9 +4,10 @@
   "shell_min": "0.53.20",
   "descricao": "Análise econômico-financeira de empreendimentos imobiliários (Loteamento e Incorporação) — proforma automática, comparação de cenários, sensibilidade e análise de mercado do imóvel por IA.",
   "rotas_publicas": [],
-  "dependencias_nucleo": ["imoveis"],
+  "dependencias_nucleo": ["imoveis", "parcelamentos"],
   "permissoes_nucleo": {
-    "imoveis": ["ler"]
+    "imoveis": ["ler"],
+    "parcelamentos": ["ler"]
   },
   "roles": {
     "leitura": {

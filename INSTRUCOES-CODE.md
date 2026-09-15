@@ -119,7 +119,7 @@ component Lit) e `recrutamento/` (IA + exportação).
 - Tabelas (spec §6.1): `estudos`, `estudo_imoveis`, `estudo_membros`, `benchmarks`, `apelo_comercial`,
   `apelo_comercial_documentos` — todas `acesso_externo:"restrito"`, respeitando precisão decimal.
 - Manifesto: `appId=viabilidade`, roles (leitor/editor/aprovador), nav, `ia`, eventos (§6.9),
-  `dependencias_nucleo:["imoveis"]` + `permissoes_nucleo:{imoveis:["ler"]}`, params configuráveis (§6.5).
+  `dependencias_nucleo:["imoveis","parcelamentos"]` + `permissoes_nucleo:{imoveis:["ler"],parcelamentos:["ler"]}`, params configuráveis (§6.5).
 - Done: schema valida, manifesto valida, `urbi-empacotar` aceita.
 
 ### Etapa 2 — Backend núcleo
