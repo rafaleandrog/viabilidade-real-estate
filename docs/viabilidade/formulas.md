@@ -207,6 +207,14 @@ hierarquia de linhas do Preliminar, para que os dois níveis se comparem na mesm
 (`investimentoTotal` e `roiPct` são literalmente a fórmula do Preliminar — ver
 `frontend/proforma-avancado.ts:150-162`).
 
+> **A proforma é itemizada por linha de custo, não só por grupo.** Além do subtotal de cada um dos
+> 5 grupos de custo, a tabela lista cada linha de custo individual que o usuário cadastrou em
+> Custos, pelo nome que ele mesmo deu a ela (`nomeLinhaCusto`, `frontend/fluxo-caixa-motor.ts`),
+> logo acima do subtotal do grupo — item com valor ~zero não aparece, mas o subtotal continua
+> somando TODAS as linhas do grupo. A tela distingue item de subtotal pela classe `subgrupo`
+> (`LinhaProformaAv.subgrupo`), a mesma convenção que `frontend/fluxo-tabela.ts` já usa na aba
+> Fluxo de Caixa.
+
 > ⚠️ **A proforma do Avançado é DESALAVANCADA — nenhum lado do funding entra nela.** Nem as saídas
 > (parcelas, retorno ao investidor), nem as entradas (liberações, aportes). É visão **econômica** do
 > empreendimento, antes de decidir como ele é capitalizado, e é o que mantém TIR, VPL e ROI
