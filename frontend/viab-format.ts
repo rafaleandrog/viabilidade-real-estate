@@ -66,6 +66,41 @@ export function fmtR$Kpi(v: number): string {
   }).format(Math.abs(valor) < 0.5 ? 0 : valor);
 }
 
+/**
+ * Rótulo de barra da **cascata do resultado** (aba Gráficos do Preliminar):
+ * R$ em MILHÕES, com UMA casa decimal — `26.540.000` vira `"R$ 26,5"`.
+ *
+ * ⚠️ É a SEGUNDA exceção declarada ao contrato C7 ("todo valor monetário
+ * resultado de fórmula tem 2 casas"), depois de `fmtR$Kpi` (#581). Ela vale
+ * **só** para o rótulo que a barra publica: persistência, entrada, motor,
+ * tabelas, Proforma, Fluxo de Caixa e exportação continuam em 2 casas, sem
+ * exceção — e o valor exato, com as 2 casas, continua acessível no `title` de
+ * cada coluna. Ver `CLAUDE.md` § Contratos inegociáveis.
+ *
+ * Símbolo próprio, e não um parâmetro de `fmtR$`, pelo mesmo motivo de
+ * `fmtR$Kpi`: a exceção precisa ser **greppável**. O inventário de call sites
+ * é travado por contagem exata em `frontend/cascata-milhoes.test.ts`.
+ *
+ * O sinal é normalizado APÓS o arredondamento, como em `fmtR$Kpi`: entre
+ * -R$ 50.000 (exclusivo) e R$ 0 o Intl arredonda a fração fora mas preserva o
+ * sinal, e a barra publicaria "-R$ 0,0" — zero negativo não é um valor. O
+ * critério é o DO PRÓPRIO Intl (half away from zero), aplicado à escala de
+ * milhões: |v/1e6| < 0,05.
+ */
+export function fmtR$Milhoes(v: number): string {
+  // `Number.isFinite`, e nao `v || 0`: o `||` engole `NaN` e `undefined` mas
+  // deixa `Infinity` passar, e o Intl publica "R$ ∞" na barra. Achado da lente
+  // T4 (Kimi) na rodada 1 do PR — o teste dizia cobrir "entrada nao finita" e
+  // exercitava so `NaN`.
+  const milhoes = (Number.isFinite(v) ? v : 0) / 1e6;
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(Math.abs(milhoes) < 0.05 ? 0 : milhoes);
+}
+
 export const fmtNum = (v: number, d = 0) =>
   new Intl.NumberFormat('pt-BR', { maximumFractionDigits: d }).format(v || 0);
 

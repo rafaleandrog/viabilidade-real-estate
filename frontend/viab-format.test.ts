@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtR$Kpi, fmtPct, fmtPctOuIndef, fmtPctEntrada, fmtM2, parseNumeroBR, celula, negativoContabil,
+  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtR$Kpi, fmtR$Milhoes, fmtPct, fmtPctOuIndef, fmtPctEntrada, fmtM2, parseNumeroBR, celula, negativoContabil,
 } from './viab-format.js';
 
 test('#281: fmtR$ é a fonte única de valores monetários com 2 casas', () => {
@@ -184,4 +184,59 @@ test('#567 celula: sempreExibir NÃO muda a notação — custo sempre parêntes
   assert.equal(celula(-259_500_000, { comParenteses: true, custo: false, sempreExibir: true }), '(259.500.000,00)');
   assert.equal(celula(259_500_000, { comParenteses: true, custo: false, sempreExibir: true }), '259.500.000,00');
   assert.equal(celula(259_500_000, { comParenteses: true, custo: true, sempreExibir: true }), '(259.500.000,00)');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// fmtR$Milhoes — a SEGUNDA exceção declarada ao contrato C7 (rótulo de barra da
+// cascata do resultado). O inventário de call sites é travado à parte, em
+// `frontend/cascata-milhoes.test.ts`; aqui só a função pura.
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// `\u00A0` é literal e deliberado: o Intl pt-BR separa símbolo e número com
+// ESPAÇO NÃO SEPARÁVEL (U+00A0), e escrevê-lo escapado evita que a asserção
+// dependa de um caractere invisível no fonte.
+
+test('fmtR$Milhoes: o caso do pedido — R$ 26.540.000 vira "R$ 26,5"', () => {
+  assert.equal(fmtR$Milhoes(26_540_000), 'R$\u00A026,5');
+});
+
+test('fmtR$Milhoes: uma casa decimal, mínimo E máximo', () => {
+  assert.equal(fmtR$Milhoes(264_400_000), 'R$\u00A0264,4');
+  assert.equal(fmtR$Milhoes(219_400_000), 'R$\u00A0219,4');
+  // Valor redondo NÃO perde a casa — o mínimo é 1, como o máximo.
+  assert.equal(fmtR$Milhoes(45_000_000), 'R$\u00A045,0');
+  assert.equal(fmtR$Milhoes(0), 'R$\u00A00,0');
+});
+
+test('fmtR$Milhoes: abaixo de um milhão continua legível, não vira vazio', () => {
+  assert.equal(fmtR$Milhoes(2_194_000), 'R$\u00A02,2');
+  assert.equal(fmtR$Milhoes(450_000), 'R$\u00A00,5');
+  // Item pequeno colapsa para "R$ 0,0" — é o preço da escala única, e o valor
+  // exato continua no `title` da coluna.
+  assert.equal(fmtR$Milhoes(40_000), 'R$\u00A00,0');
+});
+
+test('fmtR$Milhoes: zero negativo normalizado APÓS o arredondamento', () => {
+  // Sem a normalização o Intl preservaria o sinal e a barra publicaria
+  // "-R$ 0,0" — zero negativo não é um valor. Mesma defesa de `fmtR$Kpi`.
+  assert.equal(fmtR$Milhoes(-10_000), 'R$\u00A00,0');
+  assert.equal(fmtR$Milhoes(-49_999), 'R$\u00A00,0');
+  assert.equal(fmtR$Milhoes(-0), 'R$\u00A00,0');
+  assert.equal(fmtR$Milhoes(49_999), 'R$\u00A00,0');
+  // As DUAS fronteiras exatas de R$ 50.000, simétricas (half away from zero).
+  // Testar só o lado negativo deixaria passar regressão assimétrica no limiar
+  // — achado da lente T4 (Kimi) na rodada 1 do PR.
+  assert.equal(fmtR$Milhoes(-50_000), '-R$\u00A00,1');
+  assert.equal(fmtR$Milhoes(50_000), 'R$\u00A00,1');
+  assert.equal(fmtR$Milhoes(-12_300_000), '-R$\u00A012,3');
+});
+
+test('fmtR$Milhoes: entrada não finita vira zero, nunca "∞" nem "NaN" na tela', () => {
+  // ⚠️ `v || 0` NÃO basta, e o título antigo deste teste mentia: o `||` engole
+  // `NaN` e `undefined` mas deixa `Infinity` passar intacto, e o Intl publica
+  // "R$ ∞" na barra (medido). A guarda é `Number.isFinite`.
+  assert.equal(fmtR$Milhoes(NaN), 'R$\u00A00,0');
+  assert.equal(fmtR$Milhoes(undefined as unknown as number), 'R$\u00A00,0');
+  assert.equal(fmtR$Milhoes(Infinity), 'R$\u00A00,0');
+  assert.equal(fmtR$Milhoes(-Infinity), 'R$\u00A00,0');
 });

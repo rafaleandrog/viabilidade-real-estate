@@ -1,61 +1,160 @@
-// Cascata horizontal do resultado (Rodada 12, handoff de KPIs/gráficos §4.1).
-// Componente customizado — nenhum primitivo `urbi-*` cobre cascata/waterfall
-// (confirmado contra `docs/ui-urbiverso/primitivos.json` e
-// `node_modules/@urbiverso/sdk/dist/index.d.ts` antes de escrever este
-// arquivo). Consome `EtapaCascata[]` já pronta de
-// `frontend/cascata-resultado-motor.ts` — não recalcula nada.
+// Cascata VERTICAL do resultado (Rodada 12, handoff de KPIs/gráficos §4.1;
+// virada de horizontal para vertical a pedido do autor).
+//
+// Componente customizado — **não existe primitivo de cascata/waterfall** na
+// família `urbi-grafico-*` (fechada em `colunas`, `linha`, `area`, `pizza`,
+// `medidor`; conferido em `docs/ui-urbiverso/primitivos.json`, carimbo
+// `0.53.11`/`ec0e347`). `urbi-grafico-colunas` com `empilhado` desenharia a
+// geometria, mas não serve para este pedido por três razões medidas:
+//   · não desenha rótulo de valor POR BARRA — o valor só aparece nos ticks do
+//     eixo Y e no `<title>` de hover, e o pedido é o número ao lado da coluna;
+//   · `formato` só tem `numero`/`moeda`/`porcentagem` e nenhum é compacto, então
+//     não há como publicar "R$ 26,5";
+//   · `empilhado` BLOQUEIA valores negativos (estado de erro), e cascata
+//     deficitária é justamente o caso que precisa sobreviver ao desenho.
+//
+// O que ele TOMA do contrato de UI da plataforma, em vez de inventar: os tokens
+// de cor (`--cor-sucesso`/`--cor-erro`/`--cor-texto-*`/`--cor-borda-sutil`), o
+// `urbi-estado-vazio` do irmão ranqueado, o `title` como equivalente DOM do
+// `<title>` SVG que a família usa para tooltip, e o default de `altura`
+// (`240px`) de `UrbiGraficoBase`. Cor NUNCA viaja como dado (decisão das
+// #595/#632) — ela vem de CSS.
+//
+// ⚠️ Dentro do bloco `static styles = css`...``, NENHUM comentário pode usar
+// crase: ela fecha o template literal, e o erro que sai é um TS1005 a dezenas
+// de linhas dali, que não aponta para a causa.
+//
+// Consome `EtapaCascata[]` já pronta de `frontend/cascata-resultado-motor.ts` —
+// não recalcula nada. A geometria que o motor devolve é neutra de eixo
+// (`inicioPct`/`tamanhoPct`); é AQUI que ela vira `bottom`/`height`.
 
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { EtapaCascata } from './cascata-resultado-motor.js';
-import { fmtR$ } from './viab-format.js';
+import { fmtR$, fmtR$Milhoes } from './viab-format.js';
+
+/**
+ * Altura minima, em px, da barra que nao tem altura propria. Interpolada nos
+ * DOIS lugares que precisam concordar: o min-height da folha e o clamp do
+ * bottom no template. Duplicar o literal deixava o clamp defasado quando o
+ * filete mudasse, e o corte que ele evita voltaria calado (achado da rodada 2).
+ */
+const FILETE_PX = 2;
 
 @customElement('viab-grafico-cascata')
 export class ViabGraficoCascata extends LitElement {
   @property({ attribute: false }) etapas: EtapaCascata[] = [];
-  /** Rótulo da linha clicável que expande detalhamento (ex.: "custo_direto"). */
+  /** Rótulo da coluna clicável que expande detalhamento (ex.: "custo_direto"). */
   @property({ attribute: false }) idExpandivel: string | null = null;
+  /** Altura do trilho das colunas. Mesmo nome e default de `UrbiGraficoBase`. */
+  @property() altura = '240px';
+  /**
+   * Se o painel que a coluna de `idExpandivel` abre está aberto AGORA. Só
+   * existe para alimentar `aria-expanded`: quem guarda o estado é a tela, e sem
+   * ele o leitor de tela anunciaria um botão de alternância cujo estado nunca
+   * muda (achado da rodada 2 de revisão).
+   *
+   * `attribute: false` como `etapas` e `idExpandivel`, e não como `altura`. O
+   * critério NÃO é o tipo — `idExpandivel` também é string e não declara
+   * atributo; é se a prop foi pensada para ser escrita em HTML, e só `altura`
+   * foi. A escolha não é por gosto: o conversor
+   * `Boolean` do Lit lê PRESENÇA de atributo, então um `expandido="false"`
+   * escrito em HTML viraria `true`. Sem atributo, essa armadilha não existe
+   * (achado da rodada 3 de revisão).
+   */
+  @property({ attribute: false }) expandido = false;
 
   static styles = css`
     :host { display: block; }
-    .linha {
-      display: grid;
-      grid-template-columns: 148px 1fr 78px;
-      align-items: center;
-      gap: 8px;
-      min-height: 28px;
+    /* Rola por dentro do card em viewport estreita: 14 colunas não cabem a
+       600px, e estourar o documento reprova no harness de render. */
+    .colunas {
+      display: flex;
+      align-items: flex-end;
+      /* flex-start, e NAO center: num container com overflow-x, centralizar
+         empurra o inicio do conteudo para fora da caixa quando ele estoura, e
+         a area que sobra a esquerda fica INALCANCAVEL pelo scroll — a primeira
+         coluna (VGV de tabela) simplesmente nao teria como ser vista a 600px. */
+      justify-content: flex-start;
+      gap: 18px;
+      overflow-x: auto;
+      padding-bottom: 4px;
     }
-    .linha + .linha { margin-top: 2px; }
-    .rotulo {
-      font-size: 12px;
-      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+    /* flex-basis 0 com flex-grow 1: as colunas dividem a largura disponivel em
+       partes iguais e o grafico ocupa a faixa inteira do card, em vez de
+       terminar num vazio a direita. min-width e o piso que forca o rolamento
+       interno em viewport estreita, em vez de espremer a barra ate sumir; com
+       ele, o gap largo sobrevive e sobra espaco para o titulo na horizontal. */
+    .coluna {
+      flex: 1 1 0;
+      min-width: 76px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+    }
+    .valor {
+      font-size: 11px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-width: 0;
+      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
     }
-    .rotulo.clicavel { cursor: pointer; text-decoration: underline dotted; }
+    /* A altura vem INLINE, da prop altura, e nao de uma custom property
+       propria: o harness de render exige que todo var() citado pelo CSS
+       resolva em todas as variantes de tema, e uma custom property definida
+       por este componente nao resolve quando o CSS e analisado fora dele. */
     .trilho {
       position: relative;
-      height: 14px;
+      width: 100%;
       background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.08));
       border-radius: 3px;
       overflow: hidden;
-      min-width: 0;
     }
-    .barra { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
-    .barra.subtotal { background: var(--cor-texto-fraco, #9aa5b1); }
+    /* min-height e o piso de altura da barra: quando a altura calculada fica
+       abaixo de FILETE_PX, ela assume, e a coluna deixa um rastro visivel em
+       vez de sumir da tela. E so isso -- nao tente enumerar aqui QUAIS casos
+       do motor caem nesse piso: duas versoes deste comentario tentaram e as
+       duas erraram, porque o motor clampa INICIO e TAMANHO por caminhos
+       diferentes (cascata-resultado-motor.ts). Quem quiser a analise por caso
+       tem os numeros no motor e na issue 720. */
+    .barra {
+      position: absolute;
+      left: 12%;
+      right: 12%;
+      min-height: ${FILETE_PX}px;
+      border-radius: 3px;
+    }
+    /* Cor por natureza economica, a pedido do autor: subtotal e RECEITA
+       (VGV de tabela, receita bruta, liquida, operacional) e sai verde;
+       deducao e DESPESA e sai vermelha; o Resultado final, que nao e nem uma
+       nem outra, sai azul para se distinguir dos dois. Sem cinza. */
+    .barra.subtotal { background: var(--cor-sucesso, #13a98d); }
     .barra.deducao { background: var(--cor-erro, #d45a3a); }
-    .barra.total { background: var(--cor-sucesso, #13a98d); }
-    .valor {
-      font-size: 12px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
-      white-space: nowrap;
+    .barra.total { background: var(--cor-primaria-solida, #2aa9e0); }
+    /* Rotulo na HORIZONTAL: com a coluna dividindo a largura toda e um gap de
+       18px, o titulo cabe em ate tres linhas, que le muito melhor que texto
+       girado. Altura fixa para as colunas alinharem a base entre si;
+       overflow-wrap quebra "residencial" quando a coluna e estreita, e o
+       title (tooltip) guarda o rotulo inteiro do que passar de tres linhas. */
+    .rotulo {
+      height: 44px;
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.25;
+      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+      overflow-wrap: anywhere;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
-      min-width: 0;
+    }
+    .rotulo.clicavel, .coluna.clicavel .trilho { cursor: pointer; }
+    .rotulo.clicavel { text-decoration: underline dotted; }
+    .coluna.clicavel:focus-visible {
+      outline: 2px solid var(--cor-primaria-solida, #2aa9e0);
+      outline-offset: 2px;
+      border-radius: 4px;
     }
     .rodape {
       margin-top: 8px;
@@ -69,33 +168,65 @@ export class ViabGraficoCascata extends LitElement {
     this.dispatchEvent(new CustomEvent('viab:cascata-linha-click', { detail: { id }, bubbles: true, composed: true }));
   }
 
+  // Enter e Espaco, porque a coluna expansivel e um `div` com `role="button"`:
+  // o navegador so ativa por teclado o que e botao de verdade, e sem isto o
+  // detalhamento de custo direto seria alcancavel apenas por mouse.
+  //
+  // `ev.repeat` é descartado: segurar a tecla dispara auto-repeat, e sem a
+  // guarda o evento sairia em rajada, alternando o painel dezenas de vezes
+  // (achado da rodada 2). Botão nativo ativa o Espaço no `keyup`, uma vez por
+  // pressão; aqui a guarda de repetição resolve o efeito prático sem a
+  // maquinaria de rastrear a pressão entre dois handlers.
+  private _tecla(ev: KeyboardEvent, id: string) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    // `preventDefault` ANTES da guarda de repetição, e a ordem é o conserto:
+    // com a guarda na frente, cada `keydown` de auto-repeat saía pelo `return`
+    // sem cancelar o default, e o default do Espaço num `div` é ROLAR A PÁGINA
+    // — a guarda trocava "alterna em rajada" por "rola em rajada" (achado da
+    // rodada 3 de revisão).
+    ev.preventDefault();
+    if (ev.repeat) return;
+    this._clique(id);
+  }
+
   render(): TemplateResult {
-    if (this.etapas.length === 0) return html``;
+    if (this.etapas.length === 0) {
+      return html`<urbi-estado-vazio icone="fa-solid fa-chart-simple" mensagem="Sem etapas para exibir."></urbi-estado-vazio>`;
+    }
     const base = this.etapas.find((e) => e.id === 'vgv_tabela')?.valor ?? 0;
     return html`
-      <div>
+      <div class="colunas">
         ${this.etapas.map((e) => {
           const clicavel = e.id === this.idExpandivel;
+          const exato = fmtR$(e.valor);
           return html`
-            <div class="linha">
-              <span
-                class="rotulo ${clicavel ? 'clicavel' : ''}"
-                title=${e.rotulo}
-                @click=${() => this._clique(e.id)}
-              >${e.rotulo}</span>
-              <div class="trilho">
+            <div
+              class="coluna ${clicavel ? 'clicavel' : ''}"
+              title="${e.rotulo} — ${exato}"
+              role=${clicavel ? 'button' : nothing}
+              tabindex=${clicavel ? '0' : nothing}
+              aria-label=${clicavel ? `${e.rotulo} — ${exato}` : nothing}
+              aria-expanded=${clicavel ? String(this.expandido) : nothing}
+              @click=${clicavel ? () => this._clique(e.id) : nothing}
+              @keydown=${clicavel ? (ev: KeyboardEvent) => this._tecla(ev, e.id) : nothing}
+            >
+              <span class="valor">${fmtR$Milhoes(e.valor)}</span>
+              <div class="trilho" style="height: ${this.altura};">
                 <div
                   class="barra ${e.tipo}"
-                  style="left: ${e.leftPct}%; width: ${e.widthPct}%;"
+                  style="bottom: min(${e.inicioPct}%, calc(100% - ${FILETE_PX}px)); height: ${e.tamanhoPct}%;"
                 ></div>
               </div>
-              <span class="valor" title=${fmtR$(e.valor)}>${fmtR$(e.valor)}</span>
+              <span class="rotulo ${clicavel ? 'clicavel' : ''}">${e.rotulo}</span>
             </div>
           `;
         })}
       </div>
       ${base > 0
-        ? html`<div class="rodape">Escala: largura total = VGV de tabela (${fmtR$(base)}).</div>`
+        ? html`<div class="rodape">
+            Escala: altura total = VGV de tabela (${fmtR$(base)}). Valores das barras em R$ milhões;
+            o valor exato aparece ao passar o mouse.
+          </div>`
         : nothing}
     `;
   }
