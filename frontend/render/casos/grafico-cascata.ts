@@ -75,6 +75,7 @@ export const caso = {
   async medir(raiz: HTMLElement): Promise<{
     enter: number; espaco: number; repetido: number; outraTecla: number;
     defaultCancelado: boolean; defaultCanceladoNoRepeat: boolean;
+    rotulosDeValor: string[];
   }> {
     const el = raiz.querySelector('viab-grafico-cascata')! as any;
     const alvo = el.shadowRoot!.querySelector('div.coluna.clicavel')! as HTMLElement;
@@ -96,6 +97,18 @@ export const caso = {
     atual = 'repetido'; const canceladoNoRepeat = teclar(' ', true);
     atual = 'outraTecla'; teclar('a');
     await el.updateComplete;
-    return { ...contagem, defaultCancelado: cancelado, defaultCanceladoNoRepeat: canceladoNoRepeat };
+
+    // O TEXTO que cada barra publica, lido do DOM renderizado. É a única
+    // medida que distingue `fmtR$Milhoes` de `fmtR$` onde importa — na tela —
+    // e ela não depende de onde a chamada mora no fonte.
+    const rotulosDeValor = [...el.shadowRoot!.querySelectorAll('span.valor')]
+      .map((n: Element) => (n.textContent ?? '').trim());
+
+    return {
+      ...contagem,
+      defaultCancelado: cancelado,
+      defaultCanceladoNoRepeat: canceladoNoRepeat,
+      rotulosDeValor,
+    };
   },
 };

@@ -54,7 +54,9 @@ export class ViabGraficoCascata extends LitElement {
    * ele o leitor de tela anunciaria um botão de alternância cujo estado nunca
    * muda (achado da rodada 2 de revisão).
    *
-   * `attribute: false` como os dois irmãos acima, e não por gosto: o conversor
+   * `attribute: false` como `etapas` e `idExpandivel` — e NÃO como `altura`,
+   * que é o vizinho imediato e declara atributo porque é string. A escolha não
+   * é por gosto: o conversor
    * `Boolean` do Lit lê PRESENÇA de atributo, então um `expandido="false"`
    * escrito em HTML viraria `true`. Sem atributo, essa armadilha não existe
    * (achado da rodada 3 de revisão).

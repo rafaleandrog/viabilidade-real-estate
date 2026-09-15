@@ -28,13 +28,21 @@ import { fmtR$Milhoes } from './viab-format.js';
 // chamada a menos (alguém reverteu o rótulo para `fmtR$`) e chamada a mais
 // (alguém vazou a abreviação para uma tabela) reprovam igual.
 //
-// ⚠️ Contagem exata sozinha NÃO pega REALOCAÇÃO — achado da lente T4 (Kimi) na
-// rodada 1 do PR: mover a chamada para um ponto morto do mesmo arquivo e
-// devolver o rótulo a `fmtR$` mantém a contagem em 1, no mesmo arquivo, e
-// passaria. Por isso o teste seguinte ancora a chamada no ELEMENTO que ela
-// alimenta — é o mais perto de "propriedade comportamental" que dá para chegar
-// sem DOM, já que o `exigir` de `scripts/render-check.mjs` só aceita
-// `{seletor, minimo}` e nunca texto.
+// ⚠️ Contagem exata sozinha NÃO pega REALOCAÇÃO: mover a chamada para um ponto
+// morto do mesmo arquivo e devolver o rótulo a `fmtR$` mantém a contagem em 1 e
+// passaria aqui. Essa metade do problema **não é resolvida neste arquivo** —
+// ela é medida no DOM, pela sonda `medir()` de
+// `frontend/render/casos/grafico-cascata.ts`, que lê o texto de cada
+// `span.valor` e exige UMA casa decimal.
+//
+// Três versões de uma âncora por regex sobre o fonte moraram aqui e foram
+// removidas: por linha (reprovava o span quebrado em duas), por tag colada
+// (reprovava conteúdo antes do valor), e por `[^<]*` (aceitava a chamada
+// realocada para um ATRIBUTO do mesmo span). Cada conserto trocava um falso
+// positivo por um falso negativo na mesma classe, porque a propriedade é sobre
+// o que a TELA publica, e regex de fonte não alcança isso. A lição é a
+// armadilha 14 do `CLAUDE.md`: na segunda guarda da mesma classe, inverta o
+// mecanismo em vez de somar mais uma.
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const RAIZ = resolve(AQUI, '..');
@@ -74,38 +82,16 @@ test('a exceção de milhões é chamada EXATAMENTE onde deve, por contagem', ()
   );
 });
 
-test('a chamada alimenta o rótulo de valor da barra, não um ponto morto', () => {
-  // Ancora a chamada no elemento: se alguém devolver `span.valor` a `fmtR$` e
-  // deixar `fmtR$Milhoes` sobrando em outro ponto do arquivo, a contagem acima
-  // continua 1 e SÓ este teste acusa.
-  //
-  // ⚠️ A busca é sobre o fonte com o espaço em branco COLAPSADO, não linha a
-  // linha. A primeira versão casava `class="valor"` e `fmtR$Milhoes(` na mesma
-  // linha, e isso reprova código CORRETO: hoje o `<span>` cabe numa linha por
-  // acidente de largura, e quebrá-lo em duas — ao acrescentar um atributo, por
-  // exemplo — zeraria a contagem com uma mensagem acusando realocação que não
-  // houve. Falso positivo derruba guard, e guard derrubado não guarda nada
-  // (achado da rodada 2 de revisão).
-  const achatado = semComentarios(fonte(CONSUMIDOR.arquivo)).replace(/\s+/g, ' ');
-  // `[^<]*` e não `[^>]*> *`: a versão anterior exigia a chamada COLADA no `>`
-  // que fecha a tag, e reprovava código correto em dois casos reais — conteúdo
-  // antes do valor (`>${sinal}${fmtR$Milhoes(v)}`) e atributo cujo valor contém
-  // `>`. Trocar "mesma linha" por "mesma tag colada" não tinha resolvido a
-  // classe (achado da rodada 3 de revisão). O `[^<]*` casa até a próxima tag,
-  // que é o limite do conteúdo textual deste `span`.
-  const naBarra = achatado.match(/class="valor"[^<]*fmtR\$Milhoes\(/g) ?? [];
-  assert.equal(
-    naBarra.length, 1,
-    'o `span class="valor"` da coluna precisa ser formatado por `fmtR$Milhoes` — '
-    + 'contagem exata no arquivo não distingue a chamada viva de uma realocada',
-  );
-});
-
 /** Onde o símbolo PODE aparecer sem ser um call site de exibição. */
 const EXCECOES = [
   'frontend/viab-format.ts',          // a definição
   'frontend/cascata-milhoes.test.ts', // esta trava
   'frontend/viab-format.test.ts',     // o teste da função pura
+  // A sonda de DOM que hoje é a defesa PRINCIPAL contra realocação: ela nomeia
+  // o símbolo na mensagem de asserção, dentro de uma string (o `semComentarios`
+  // não a remove, e não deveria). Entrou porque o guard a acusou, que é o guard
+  // fazendo o trabalho dele.
+  'frontend/render/grafico-cascata.render.test.ts',
 ];
 
 test('a exceção de milhões NÃO vazou para nenhum outro arquivo do frontend', () => {

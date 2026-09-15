@@ -37,6 +37,7 @@ test('Cascata do resultado: as colunas, trilhos, barras e valores chegam à tela
   const k = a.extra?.['900'] as {
     enter: number; espaco: number; repetido: number; outraTecla: number;
     defaultCancelado: boolean; defaultCanceladoNoRepeat: boolean;
+    rotulosDeValor: string[];
   } | undefined;
   assert.ok(k, 'o caso não devolveu a medida extra — `medir()` não rodou' + relato(a));
   assert.equal(k!.enter, 1, 'Enter não ativou a coluna expansível' + relato(a));
@@ -48,6 +49,22 @@ test('Cascata do resultado: as colunas, trilhos, barras e valores chegam à tela
     k!.defaultCanceladoNoRepeat, true,
     'o Espaço REPETIDO não cancelou o default — com a guarda de `ev.repeat` antes do '
     + '`preventDefault`, segurar a tecla rola a página em rajada' + relato(a),
+  );
+
+  // ⚠️ Esta é a prova de que o rótulo sai em MILHÕES, e ela mede o DOM, não o
+  // fonte. Três versões de uma âncora por regex sobre `grafico-cascata.ts`
+  // falharam em sequência — cada conserto trocava um falso positivo por um
+  // falso negativo, ou vice-versa —, porque a propriedade é sobre o que a tela
+  // publica e regex de fonte não alcança isso. `fmtR$Milhoes` produz UMA casa
+  // decimal (`R$ 26,5`); `fmtR$` produz duas (`R$ 26.540.000,00`). Reverter o
+  // rótulo, ou realocar a chamada para qualquer ponto morto — atributo,
+  // variável não usada —, muda o texto e reprova aqui.
+  const UMA_CASA = /^-?R\$\u00A0\d{1,3}(\.\d{3})*,\d$/;
+  assert.ok(k!.rotulosDeValor.length >= 5, 'nenhum rótulo de valor foi lido do DOM' + relato(a));
+  assert.deepEqual(
+    k!.rotulosDeValor.filter((t) => !UMA_CASA.test(t)), [],
+    'rótulo de barra fora do formato de milhões — o `span.valor` voltou a `fmtR$` '
+    + 'ou a chamada a `fmtR$Milhoes` foi realocada para um ponto morto' + relato(a),
   );
 
   const texto = contar(a, 'transbordoDeTexto');
