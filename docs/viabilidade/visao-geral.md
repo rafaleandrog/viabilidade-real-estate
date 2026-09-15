@@ -25,8 +25,8 @@ App do UrbiVerso que substitui planilhas dispersas por uma aplicação centraliz
   - **Proforma** — tabela linha a linha, comparação de cenários e análise de sensibilidade; exportação PDF/Excel.
   - **Gráficos** — faixa de 5 KPIs (VGV do incorporador, Resultado final, Margem sobre VGV de
     tabela, Margem sobre receita líquida, Custo obras / VGV), cascata do resultado (substituiu
-    pizza de custos + barras Receita×Custos, Rodada 12), cadeia de áreas em barra empilhada
-    (substituiu a(s) pizza(s) de alocação, Rodada 12) e indicadores vs. benchmark.
+    pizza de custos + barras Receita×Custos, Rodada 12), cadeia de áreas em barras horizontais
+    proporcionais (substituiu a(s) pizza(s) de alocação, Rodada 12) e indicadores vs. benchmark.
   - **Apelo Comercial** — análise qualitativa por IA (6 fatores) a partir de documentos anexados.
 - **Estudo Avançado** — páginas próprias, nesta ordem na lista lateral: Resumo, Empreendimento, Custos, Viabilidade, Resultados, Cenários, **Análise de mercado** e **Apelo Comercial**. Custos precede Viabilidade desde a #589 — é ordem de apresentação, não mudança de rota: os slugs públicos seguem `custos` e `resultados`, com `obra`/`fluxo` aceitos como alias.
   - **Análise de mercado** (#199) — compara os números do estudo com os do mercado (preço e custo por m², velocidade de vendas, macros). O lado "projeto" é derivado do próprio estudo, não digitado. Ver [Análise de Mercado](analise-mercado).
