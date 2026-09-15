@@ -1,8 +1,10 @@
-// Caso de render standalone: <viab-grafico-cascata> (Rodada 12, PR4 da fila
-// de KPIs/gráficos) — o componente ainda não está plugado em
-// `tela-graficos.ts` (isso é PR à parte, mais adiante na fila); este caso
-// monta o elemento sozinho, com dados de `calcularCascataResultado` sobre um
-// estudo real.
+// Caso de render standalone: <viab-grafico-cascata> — monta o elemento
+// sozinho, com dados de `calcularCascataResultado` sobre um estudo real.
+//
+// Desde a virada para COLUNAS VERTICAIS, o que este caso guarda é que as
+// colunas, os trilhos e as barras chegam à tela, que o rótulo de valor em
+// milhões é emitido, e que `idExpandivel` chega ao template (a coluna e o
+// rótulo recebem a classe `clicavel`).
 
 import '../../grafico-cascata.js';
 import { calcularProforma, type ProformaInput } from '../../proforma.js';
@@ -33,12 +35,16 @@ const ESTUDO_INCORP: ProformaInput = {
 export const caso = {
   nome: 'grafico-cascata',
   exigir: [
-    { seletor: 'div.linha', minimo: 5 },
+    { seletor: 'div.coluna', minimo: 5 },
     { seletor: 'div.trilho', minimo: 5 },
     { seletor: 'div.barra', minimo: 5 },
-    // A linha "Custo direto total" é a expansível (idExpandivel) — recebe a
-    // classe `clicavel`, prova de que a prop chegou ao template.
+    // Uma etiqueta de valor por coluna — é o que `fmtR$Milhoes` publica.
+    { seletor: 'span.valor', minimo: 5 },
+    // A coluna "Custo direto total" é a expansível (idExpandivel) — ela e o
+    // rótulo recebem a classe `clicavel`, prova de que a prop chegou ao
+    // template.
     { seletor: 'span.rotulo.clicavel', minimo: 1 },
+    { seletor: 'div.coluna.clicavel', minimo: 1 },
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const p = calcularProforma(ESTUDO_INCORP);

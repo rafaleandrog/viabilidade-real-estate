@@ -4,6 +4,85 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Cascata do resultado: colunas verticais e valores em R$ milhões (2026-09-15)
+
+Pedido do autor (issue #719): a "Cascata do resultado" da aba Gráficos do Preliminar era horizontal,
+com o valor de cada etapa numa coluna de 78px formatado em reais cheios — com VGV de nove dígitos o
+número saía cortado (`R$ 264.400....`), e onze a quatorze valores longos empilhados não deixam
+comparar as etapas de relance.
+
+**A premissa do primitivo foi conferida antes de escrever qualquer linha, e é meio verdadeira.**
+`urbi-grafico-colunas` existe e, com `empilhado` mais uma série-base invisível, desenharia a
+*geometria* de uma cascata. Mas não serve para este pedido, por três limites lidos na fonte do
+primitivo: ele **não desenha rótulo de valor por barra** (o valor só aparece nos ticks do eixo Y e
+no `<title>` de hover); o `formato` dele só tem `numero`/`moeda`/`porcentagem`, **nenhum compacto**,
+então não há como publicar `R$ 26,5`; e `empilhado` **bloqueia valores negativos** com estado de
+erro. Não existe primitivo de cascata/waterfall na plataforma — a família é fechada em `colunas`,
+`linha`, `area`, `pizza`, `medidor`. Então o componente seguiu customizado, como os três irmãos da
+Rodada 12, mas vestido com o contrato de UI da plataforma: tokens de cor do tema,
+`urbi-estado-vazio`, `title` como tooltip, e o mesmo nome e default de `altura` que
+`UrbiGraficoBase` publica. **Cor não viaja como dado** — decisão das #595/#632, preservada.
+
+O que mudou:
+
+- **`frontend/grafico-cascata.ts`** — reescrito para colunas verticais: valor em cima, trilho no
+  meio, rótulo embaixo. As colunas dividem a largura do card em partes iguais (`flex: 1 1 0`), com
+  `min-width: 76px` como piso — que é o que força o rolamento **por dentro do card** em viewport
+  estreita em vez de espremer a barra até sumir. Com o gap de 18px sobrou largura para o **título na
+  horizontal**, em até três linhas (`-webkit-line-clamp`), que lê bem melhor que texto girado 90°.
+- **Cor por natureza econômica, decisão do autor (nada de cinza):** subtotal é RECEITA e sai
+  **verde** (`--cor-sucesso`); dedução é DESPESA e sai **vermelha** (`--cor-erro`); o **Resultado**
+  final, que não é nem uma nem outra, sai **azul** (`--cor-primaria-solida`) para se distinguir dos
+  dois. Antes o subtotal era cinza (`--cor-texto-fraco`) e o resultado, verde.
+- **`frontend/viab-format.ts`** — `fmtR$Milhoes`, a **segunda** exceção declarada ao contrato C7,
+  inserida DEPOIS de `fmtR$Kpi` de propósito, para não deslocar os três endereços `arquivo:linha`
+  que a prosa cita (`viab-format.ts:52` em dois lugares e `:11-23` num terceiro).
+- **`frontend/cascata-resultado-motor.ts`** — `leftPct`/`widthPct` viraram `inicioPct`/`tamanhoPct`.
+  **Os números não mudaram**: a mesma fração do VGV de tabela que era `left`/`width` virou
+  `bottom`/`height`. O nome antigo descrevia eixo horizontal e passaria a mentir.
+- **`frontend/cascata-milhoes.test.ts`** (novo) — a trava da exceção, no desenho de
+  `kpi-casas-decimais.test.ts`: contagem exata no único consumidor **e** zero ocorrências em todo o
+  resto do frontend versionado, enumerado por `git ls-files` (nunca varrendo o disco — armadilha 1).
+
+**Três coisas que custaram tempo e vale não redescobrir:**
+
+1. **Crase dentro de `static styles = css` fecha o template literal.** Escrever um comentário CSS
+   com `` `min-height` `` ou `` `title` `` entre crases produz um `TS1005` **dezenas de linhas
+   adiante**, que não aponta para a causa — e o guard de UI reprova com "comentário CSS `/*` sem
+   `*/`" numa linha que não tem problema nenhum. Aconteceu duas vezes seguidas. Há agora um aviso no
+   cabeçalho do arquivo.
+2. **Custom property própria reprova no harness de render.** A altura chegava por
+   `var(--viab-cascata-altura, 240px)`, e o harness exige que **todo** `var()` citado pelo CSS
+   resolva em **todas** as variantes de tema — reprovou em 4 casos, inclusive telas onde a cascata
+   nem é montada. A altura passou a ser inline, da prop `altura`.
+3. **`justify-content: center` num container com `overflow-x` é armadilha.** Quando o conteúdo
+   estoura, o início é empurrado para fora da caixa e a área à esquerda fica **inalcançável pelo
+   scroll** — a 600px a primeira coluna (VGV de tabela) não teria como ser vista. Ficou
+   `flex-start`, com o motivo escrito no CSS.
+
+**Controle de mutação medido, não deduzido:** apagar a chamada a `fmtR$Milhoes` no componente e
+trocá-la por `fmtR$` deixa `cascata-milhoes.test.ts` com **1 vermelho** (a contagem exata); sem a
+mutação, os três arquivos de teste do assunto dão **34 verdes**. É a defesa contra a classe de
+defeito nº 1 — o harness de render não alcança este caso, porque o `exigir` de `render-check.mjs` só
+aceita `{seletor, minimo}`, nunca texto.
+
+**Auditoria de literais de cor, reconferida pela metodologia real:** `bash scripts/validar-frontend.sh`
+verde (typecheck, guards, testes, build e render). A heurística do `auditoria-tokens` do SDK foi
+reproduzida contra a árvore ANTES (`main` `931c537`) e DEPOIS: **308 nos dois**, e 7 nos dois dentro
+de `grafico-cascata.ts` — o diff não move o número.
+
+> ⚠️ **Observação que vale apurar em alteração própria, e por isso NÃO virou mudança aqui:** a nota
+> do `CLAUDE.md` sobre esse aviso diz contar "no bundle", e a função do SDK
+> (`contarLiteraisDeCor`/`auditarTokensTema`, em `dist/cli/empacotar.js`) varre os **arquivos-fonte
+> de `frontend/`**, não o bundle — ela também descarta comentários de bloco e ignora `#NNNNN` de
+> dígitos puros, que é por que `#595`/`#632` em prosa não contam. Medindo pela função real dá
+> **308**, não os 279/299 que a nota registra. Como o meu diff não move o número, corrigir a nota é
+> outro assunto.
+
+Fora de escopo, registrado como issue própria: **#720**, resultado negativo desenhando coluna zerada
+— o motor clampa a geometria em `[0,100]` desde a Rodada 12, e representar déficit abaixo de uma
+linha-zero muda o contrato de geometria. A mitigação que entrou é só de exibição: `min-height: 2px`,
+para a coluna clampada deixar um filete em vez de sumir.
 ## `decimal` atravessa a API como STRING — a causa real do "deve ser um número" (2026-09-15)
 
 **O fato que faltava, e que quatro correções não tinham:** toda coluna `decimal` do `schema.json`

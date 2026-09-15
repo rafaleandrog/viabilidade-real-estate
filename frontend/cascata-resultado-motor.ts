@@ -2,7 +2,9 @@
 // função pura, sem DOM/I/O. Reagrupa os MESMOS campos que
 // `frontend/tela-proforma.ts` (`montarLinhasProforma`) já usa para a tabela
 // da Proforma em subtotal/dedução/total — não recalcula nada, só reembala
-// para o desenho de cascata horizontal.
+// para o desenho de cascata. A geometria que ele devolve é NEUTRA DE EIXO
+// (`inicioPct`/`tamanhoPct`): quem decide se isso vira `left`/`width` ou
+// `bottom`/`height` é o componente — hoje, colunas verticais.
 //
 // Estágios: VGV de tabela (subtotal) → deduções de permuta física → Receita
 // bruta/VGV do incorporador (subtotal) → deduções comerciais (imposto,
@@ -22,10 +24,17 @@ export interface EtapaCascata {
   rotulo: string;
   valor: number;
   tipo: 'subtotal' | 'deducao' | 'total';
-  /** `left` do trilho, em % da largura (0–100), já dividido pelo VGV de tabela. */
-  leftPct: number;
-  /** `width` do trilho, em % da largura (0–100), já dividido pelo VGV de tabela. */
-  widthPct: number;
+  /**
+   * Onde a barra COMEÇA no trilho, em % do eixo de valor (0–100), já dividido
+   * pelo VGV de tabela. Neutro de eixo de propósito: a cascata é desenhada na
+   * VERTICAL (`bottom`), e já foi horizontal (`left`) — o número é o mesmo.
+   */
+  inicioPct: number;
+  /**
+   * TAMANHO da barra no trilho, em % do eixo de valor (0–100), já dividido pelo
+   * VGV de tabela. Vira `height` no desenho vertical.
+   */
+  tamanhoPct: number;
 }
 
 interface EtapaBruta {
@@ -69,12 +78,13 @@ export function calcularCascataResultado(p: Proforma): EtapaCascata[] {
       const left = vgvBruto > 0 ? (acumulado / vgvBruto) * 100 : 0;
       const width = vgvBruto > 0 ? (b.valor / vgvBruto) * 100 : 0;
       // Deficitário (dedução maior que o acumulado): clampa a 0 em vez de
-      // desenhar um trilho fora da caixa — o número exato continua em `valor`.
-      etapas.push({ ...b, leftPct: Math.max(0, left), widthPct: Math.max(0, Math.min(100, width)) });
+      // desenhar um trilho fora da caixa — o número exato continua em `valor`,
+      // e o componente garante um filete mínimo para a coluna não sumir.
+      etapas.push({ ...b, inicioPct: Math.max(0, left), tamanhoPct: Math.max(0, Math.min(100, width)) });
     } else {
       acumulado = b.valor;
       const width = vgvBruto > 0 ? (b.valor / vgvBruto) * 100 : 0;
-      etapas.push({ ...b, leftPct: 0, widthPct: Math.max(0, Math.min(100, width)) });
+      etapas.push({ ...b, inicioPct: 0, tamanhoPct: Math.max(0, Math.min(100, width)) });
     }
   }
   return etapas;

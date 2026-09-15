@@ -69,14 +69,14 @@ test('calcularCascataResultado: os subtotais batem com os campos do motor (sem r
   assert.ok(perto(porId.get('receita_operacional')!, p.receitaOperacional));
 });
 
-test('calcularCascataResultado: subtotais partem de left=0; deduções nunca têm width negativa', () => {
+test('calcularCascataResultado: subtotais partem de inicioPct=0; nenhum tamanho é negativo', () => {
   for (const entrada of [LOT, INCORP]) {
     const p = calcularProforma(entrada);
     const etapas = calcularCascataResultado(p);
     for (const e of etapas) {
-      assert.ok(e.widthPct >= 0 && e.widthPct <= 100, `${e.id} widthPct=${e.widthPct}`);
-      assert.ok(e.leftPct >= 0 && e.leftPct <= 100, `${e.id} leftPct=${e.leftPct}`);
-      if (e.tipo !== 'deducao') assert.equal(e.leftPct, 0, `${e.id} deveria partir de 0`);
+      assert.ok(e.tamanhoPct >= 0 && e.tamanhoPct <= 100, `${e.id} tamanhoPct=${e.tamanhoPct}`);
+      assert.ok(e.inicioPct >= 0 && e.inicioPct <= 100, `${e.id} inicioPct=${e.inicioPct}`);
+      if (e.tipo !== 'deducao') assert.equal(e.inicioPct, 0, `${e.id} deveria partir de 0`);
     }
   }
 });
@@ -90,11 +90,11 @@ test('calcularCascataResultado: deduções zeradas (abaixo do limiar) não entra
   assert.equal(etapas.find((e) => e.id === 'permuta_fisica_nr'), undefined);
 });
 
-test('calcularCascataResultado: estudo vazio não quebra (vgv=0 → widths em 0, sem NaN)', () => {
+test('calcularCascataResultado: estudo vazio não quebra (vgv=0 → tamanhos em 0, sem NaN)', () => {
   const p = calcularProforma({ tipo_empreendimento: 'loteamento' } as ProformaInput);
   const etapas = calcularCascataResultado(p);
   for (const e of etapas) {
-    assert.ok(Number.isFinite(e.leftPct), `${e.id} leftPct não finito`);
-    assert.ok(Number.isFinite(e.widthPct), `${e.id} widthPct não finito`);
+    assert.ok(Number.isFinite(e.inicioPct), `${e.id} inicioPct não finito`);
+    assert.ok(Number.isFinite(e.tamanhoPct), `${e.id} tamanhoPct não finito`);
   }
 });
