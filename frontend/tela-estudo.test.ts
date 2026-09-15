@@ -43,7 +43,7 @@ test('#678: o botão de renomear existe no cabeçalho e é guardado por podeEdit
   //
   // ⚠️ `p.podeEditar` sozinho NÃO BASTA aqui — é role-only (`perm.ehEditor ||
   // podeAprovar`, `backend/rotas/estudos.ts:589`), e o PATCH real usa
-  // `podeEditarEstudo(status, funcao)` (`backend/rotas/estudos.ts:680`), que
+  // `podeEditarEstudo(status, funcao)` (`backend/rotas/estudos.ts:690`), que
   // trava rascunho/aprovado/reprovado/arquivado para só o aprovador editar.
   // Um editor num estudo travado veria o lápis com `p.podeEditar` e levaria
   // 403 ao salvar — foi exatamente o defeito que esta issue introduziu na

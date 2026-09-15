@@ -163,6 +163,8 @@ test('fiação: `_salvar` pula o campo que não mudou, e usa o MESMO predicado d
     '`_salvar` deixou de filtrar pelo diff — o registro inteiro voltou a viajar');
   assert.match(fonte, /_campoMudou\(k: string\): boolean \{\s*return campoMudou\(this\.form, this\._snapshot, k\);/,
     '`_campoMudou` deixou de delegar à função pura testada acima');
-  assert.match(fonte, /_formDifereSnapshot\(\): boolean \{\s*return Object\.keys\(this\.form\)\.some\(\(k\) => this\._campoMudou\(k\)\);/,
-    'a faixa de "alterações não salvas" deixou de usar o mesmo predicado do Salvar');
+  assert.match(fonte, /_formDifereSnapshot\(\): boolean \{\s*return Object\.keys\(this\.form\)\s*\.filter\(\(k\) => !CHAVES_NAO_ENVIADAS\.has\(k\)\)\s*\.some\(\(k\) => this\._campoMudou\(k\)\);/,
+    'a faixa de "alterações não salvas" deixou de varrer o MESMO conjunto de chaves do Salvar');
+  assert.match(fonte, /if \(CHAVES_NAO_ENVIADAS\.has\(k\)\) continue;/,
+    '`_salvar` deixou de usar a lista compartilhada — duas listas iguais divergem');
 });

@@ -240,16 +240,25 @@ class DadosFakeComValidadorDoShell extends DadosFake {
   // própria coerção já converteu, e o conjunto de falha possível seria vazio.
   // Perder um tipo em `TIPOS_NUMERICOS` cegaria correção e oráculo juntos, com
   // a suíte verde. Achado convergente de duas lentes na revisão do PR.
-  private static tipoDaColuna(tabela: string, campo: string): string | undefined {
-    const t = (esquemaApp as any)?.tabelas?.[tabela]?.colunas?.[campo];
-    return t?.tipo;
+  private static coluna(tabela: string, campo: string): { tipo?: string; obrigatorio?: boolean } | undefined {
+    return (esquemaApp as any)?.tabelas?.[tabela]?.colunas?.[campo];
   }
 
   private static validar(tabela: string, dados: Record<string, any>): void {
     const erros: string[] = [];
     for (const [campo, valor] of Object.entries(dados)) {
-      if (valor === null || valor === undefined) continue; // coluna opcional: aceito
-      const tipo = DadosFakeComValidadorDoShell.tipoDaColuna(tabela, campo);
+      const col = DadosFakeComValidadorDoShell.coluna(tabela, campo);
+      if (valor === null || valor === undefined) {
+        // O shell pula `null` em coluna OPCIONAL, antes de olhar o tipo — mas
+        // recusa em coluna `obrigatorio`, com OUTRA mensagem e outro código
+        // (`DADOS_CAMPO_OBRIGATORIO`). Sem esta metade o dublê nunca reproduzia
+        // a classe que `coercao-numerica.ts` declara existir em
+        // `avancado_alocacoes.fase_id` e `estudo_imoveis.imovel_nucleo_id` —
+        // exatamente a que ele existe para pegar. Achado da revisão.
+        if (col?.obrigatorio === true) erros.push(`Campo obrigatório "${campo}" não pode ser nulo`);
+        continue;
+      }
+      const tipo = col?.tipo;
       if (tipo === 'decimal') {
         if (typeof valor !== 'number') erros.push(`Campo "${campo}" deve ser um número`);
       } else if (tipo === 'inteiro' || tipo === 'referencia') {

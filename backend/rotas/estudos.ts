@@ -277,8 +277,14 @@ export function montarPatchEstudo(
   // exibindo o rótulo velho para sempre, que é exatamente o que a #660 conserta.
   //
   // Cada parte vem do CORPO quando ele a traz, e do registro persistido quando
-  // não. A tela de Premissas manda o registro inteiro, então os três chegam
-  // juntos por lá; mas o PATCH é chamável direto, com qualquer subconjunto.
+  // não — e é por isso que a recomposição não depende de os três virem juntos.
+  //
+  // ⚠️ Esta frase dizia "a tela de Premissas manda o registro inteiro, então os
+  // três chegam juntos por lá". **Deixou de ser verdade no mesmo PR que este
+  // comentário:** `_salvar` passou a mandar só o diff contra o retrato
+  // carregado, então um PATCH de Premissas pode trazer `uf` sem `nome`. O
+  // fallback para o registro persistido é o que mantém a recomposição correta
+  // nesse caso — antes ele era redundante por aqui, agora não é.
   const parteDoNomeMudou = dados.nome !== undefined
     || dados.uf !== undefined
     || dados.tipo_empreendimento !== undefined;
@@ -535,20 +541,29 @@ rotasEstudos.post('/estudos', async (req: Request, res: Response) => {
       ...ident,
     };
     // Campos opcionais de terreno manual, se vierem já na criação.
-    for (const campo of ['terreno_manual_nome', 'terreno_manual_area', 'notas']) {
-      if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
-    }
-
+    //
     // `terreno_manual_area` é `decimal` e vem CRU do corpo — a mesma fronteira
-    // que o PATCH: sem isto, a string que o PATCH converte para número aqui
-    // chegaria ao shell e viraria 500. Achado da revisão do PR desta correção.
-    const coagidoCriacao = coagirNumericosDeclarados('estudos', dados);
+    // que o PATCH: sem coerção, a string que o PATCH converte para número aqui
+    // chegaria ao shell e viraria 500.
+    //
+    // ⚠️ **A coerção roda SÓ sobre o que veio do cliente**, e isso é
+    // deliberado: `...ident`, `autor_id` e `sequencia` são gerados pelo
+    // SERVIDOR. Coagi-los junto faria uma mudança futura naqueles geradores
+    // (um `usuario.id` que deixasse de ser inteiro, por exemplo) devolver
+    // **400 culpando o cliente** por um campo que ele nem mandou. Achado da
+    // revisão do PR desta correção.
+    const doCliente: Record<string, any> = {};
+    for (const campo of ['terreno_manual_nome', 'terreno_manual_area', 'notas']) {
+      if (req.body[campo] !== undefined) doCliente[campo] = req.body[campo];
+    }
+    const coagidoCriacao = coagirNumericosDeclarados('estudos', doCliente);
     if ('falha' in coagidoCriacao) {
       erro(res, 400, 'CAMPO_INVALIDO', coagidoCriacao.falha.mensagem);
       return;
     }
+    Object.assign(dados, coagidoCriacao.dados);
 
-    const estudo = await req.dados!.criar('estudos', coagidoCriacao.dados);
+    const estudo = await req.dados!.criar('estudos', dados);
 
     // Criador vira editor do estudo.
     const funcao = await garantirMembro(req, estudo.id, req.contexto!.usuario.id, 'editor');

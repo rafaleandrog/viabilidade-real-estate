@@ -115,7 +115,10 @@ const NUMERICAS_POR_TABELA: Map<string, Map<string, boolean>> = (() => {
   const tabelas = ((esquema as any)?.tabelas ?? {}) as Record<string, { colunas?: Record<string, { tipo: string }> }>;
   for (const [tabela, def] of Object.entries(tabelas)) {
     const colunas = new Map<string, boolean>();
-    for (const [coluna, col] of Object.entries(def.colunas ?? {})) {
+    // `def?.colunas`, não `def.colunas`: `Object.entries({t: null})` devolve
+    // `['t', null]`, e o acesso estouraria no IMPORT — o cenário exato que a
+    // guarda acima diz evitar, pela porta de dentro. Achado da revisão.
+    for (const [coluna, col] of Object.entries(def?.colunas ?? {})) {
       if (TIPOS_NUMERICOS.has(col.tipo)) colunas.set(coluna, TIPOS_INTEIROS.has(col.tipo));
     }
     mapa.set(tabela, colunas);

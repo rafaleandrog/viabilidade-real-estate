@@ -297,14 +297,32 @@ const CAMPO_POR_LINHA_INC: Record<string, string> = {
 const CAMPOS_UNIDADE: CustoUnidade[] = [...CUSTOS_UNIDADE, PERMUTA_UNIDADE, PERMUTA_FIS_NR, PERMUTA_FIN_R, PERMUTA_FIN_NR];
 
 /**
+ * Chaves que o Salvar NUNCA manda: identidade e estado gerados pelo servidor,
+ * colunas de soft-delete geridas pelo framework, e as estruturas de junção que
+ * o GET anexa ao registro (`membros`, `imoveis`, `_permissao`, …).
+ *
+ * ⚠️ **A faixa de "alterações não salvas" usa a MESMA lista.** Se ela varresse
+ * chaves que o Salvar descarta, `_dirty` poderia ficar `true` com payload
+ * vazio — a faixa acusando alteração que o PATCH nunca mandaria. Achado da
+ * revisão deste PR; a defesa é a lista ser uma só, não duas iguais.
+ */
+const CHAVES_NAO_ENVIADAS = new Set([
+  'id', 'id_legivel', 'nome_exibicao', 'sequencia', 'status', 'autor_id', 'criado_em', 'atualizado_em',
+  'removido_em', 'removido_por_id',
+  'membros', 'imoveis', '_permissao', '_funcao', 'autor_nome', 'autor_avatar_url',
+]);
+
+/**
  * Um campo mudou em relação ao retrato que a tela carregou? Normaliza
  * `''`/`null` para o mesmo valor antes de comparar, porque um input limpo
  * devolve `''` onde o registro trazia `null`, e isso não é edição.
  *
- * ⚠️ **É o predicado que decide DUAS coisas de uma vez**: a faixa de
- * "alterações não salvas" (`_formDifereSnapshot`) e **o que o Salvar manda**
- * (`_salvar`). Se os dois divergirem, a faixa passa a falar de um conjunto de
- * campos e o PATCH de outro — por isso é uma função só, exportada para teste.
+ * ⚠️ **É o predicado que decide DUAS coisas**: a faixa de "alterações não
+ * salvas" (`_formDifereSnapshot`) e **o que o Salvar manda** (`_salvar`). Os
+ * dois varrem o MESMO conjunto de chaves — `Object.keys(form)` menos
+ * `CHAVES_NAO_ENVIADAS` — porque divergir ali faria a faixa falar de um
+ * conjunto e o PATCH de outro. Predicado e lista são únicos, e esta função é
+ * exportada para ser testada direto.
  */
 export function campoMudou(
   form: Record<string, any>,
@@ -586,7 +604,9 @@ export class ViabTelaPremissas extends LitElement {
   }
 
   private _formDifereSnapshot(): boolean {
-    return Object.keys(this.form).some((k) => this._campoMudou(k));
+    return Object.keys(this.form)
+      .filter((k) => !CHAVES_NAO_ENVIADAS.has(k))
+      .some((k) => this._campoMudou(k));
   }
 
   private _num(k: string): number | null {
@@ -1499,9 +1519,7 @@ export class ViabTelaPremissas extends LitElement {
       // de propósito.
       const dados: Record<string, any> = {};
       for (const [k, v] of Object.entries(this.form)) {
-        if (['id', 'id_legivel', 'nome_exibicao', 'sequencia', 'status', 'autor_id', 'criado_em', 'atualizado_em',
-          'removido_em', 'removido_por_id',
-          'membros', 'imoveis', '_permissao', '_funcao', 'autor_nome', 'autor_avatar_url'].includes(k)) continue;
+        if (CHAVES_NAO_ENVIADAS.has(k)) continue;
         if (!this._campoMudou(k)) continue;
         if (TODOS_NUM.has(k)) dados[k] = v === '' || v == null ? null : Number(v);
         else dados[k] = v;
@@ -1516,6 +1534,12 @@ export class ViabTelaPremissas extends LitElement {
       }
       const res = await atualizarEstudo(this.estudo.id, dados);
       if (res?.erro) { urbiVerso.notificar(res.mensagem || 'Erro ao salvar', 'erro'); return; }
+      // ⚠️ O retrato novo é `form`, **não** a resposta do servidor, e a
+      // distinção é armadilha: `atualizado` traz as colunas `decimal` como
+      // STRING (`"4.00"`), enquanto `form` guarda o número que o usuário
+      // digitou. Ressincronizar pela resposta faria todo campo numérico
+      // aparecer como "mudou" no save seguinte — e o eco do registro inteiro,
+      // que este PR acabou de matar, voltaria por essa porta.
       this._snapshot = { ...this.form };
       this._dirty = false;
       urbiVerso.notificar('Premissas salvas.', 'sucesso');
