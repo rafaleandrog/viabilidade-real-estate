@@ -38,13 +38,15 @@ import { fmtR$Milhoes } from './viab-format.js';
 //     publica, e **ela é PULÁVEL**: `motivoParaPular()` desliga o caso sem
 //     Chromium, então numa máquina sem Playwright ela não roda. No CI ela é
 //     obrigatória (`RENDER_CHECK_OBRIGATORIO: '1'`, job `render`);
-//   · **a rede sempre ligada** é a contagem de `fmtR$(` logo abaixo, que roda
-//     em `node --test` puro. Trocar o rótulo por `fmtR$` sobe essa contagem e
-//     reprova mesmo sem navegador.
+//   · **a rede de node** é a contagem de `fmtR$(` logo abaixo, que roda em
+//     `node --test` puro e pega a reversão que ACRESCENTA uma chamada.
 //
-// A segunda existe porque a primeira versão desta inversão deixou a defesa
-// principal atrás de um skip, e "correta mas opcional" é pior que "imperfeita
-// mas sempre ligada" quando se pode ter as duas.
+// ⚠️ A rede de node é parcial, e a fronteira importa: ela conta, então só vê
+// mutação que muda o TOTAL. Uma reversão que MOVE a chamada — apagar
+// `const exato = fmtR$(e.valor)` e escrever `fmtR$(e.valor)` no rótulo —
+// mantém o total em 2 e passa por ela. Esse caso é do DOM, e só dele. A rede
+// existe porque a primeira versão desta inversão deixou a defesa ÚNICA atrás
+// de um skip; ela reduz a janela sem navegador, não a fecha.
 //
 // Três versões de uma âncora por regex sobre o fonte moraram aqui e foram
 // removidas: por linha (reprovava o span quebrado em duas), por tag colada
@@ -94,19 +96,24 @@ test('a exceção de milhões é chamada EXATAMENTE onde deve, por contagem', ()
 });
 
 // Quantas vezes `grafico-cascata.ts` chama `fmtR$` — o formatador de 2 casas.
-// Hoje são duas, e nenhuma delas é o rótulo da barra: o `title` da coluna
-// (`const exato`) e a base no rodapé da escala. Se alguém devolver o rótulo a
-// `fmtR$`, esta contagem sobe para três e reprova — sem navegador, sem regex
-// sobre o template, e sem depender de onde no arquivo a chamada está.
+// Hoje são duas, e nenhuma delas é o rótulo da barra: `const exato` (que
+// alimenta o `title` E o `aria-label` da coluna) e a base no rodapé da escala.
+//
+// É uma trava de INVENTÁRIO, não de rótulo: ela afirma que o componente usa
+// `fmtR$` exatamente nesses dois pontos. Uma chamada a mais reprova — seja a
+// reversão do rótulo, seja um uso novo e legítimo, e nos dois casos o certo é
+// vir aqui decidir. Sem navegador, sem regex sobre o template, e sem depender
+// de onde no arquivo a chamada está.
 const CHAMADAS_FMTRS = 2;
 
 test('o rótulo da barra NÃO voltou a `fmtR$` — rede sempre ligada, sem navegador', () => {
   assert.equal(
     ocorrencias(fonte(CONSUMIDOR.arquivo), 'fmtR$('),
     CHAMADAS_FMTRS,
-    `${CONSUMIDOR.arquivo} deveria chamar fmtR$ ${CHAMADAS_FMTRS}× — o title da coluna e a `
-    + 'base do rodapé. Uma a mais é o rótulo da barra tendo voltado a 2 casas; uma a menos, '
-    + 'o valor exato tendo sumido de um dos dois canais de detalhe',
+    `${CONSUMIDOR.arquivo} deveria chamar fmtR$ ${CHAMADAS_FMTRS}× — \`const exato\` (title `
+    + 'e aria-label) e a base do rodapé. Divergiu: ou o rótulo da barra voltou a 2 casas, ou '
+    + 'um canal de detalhe sumiu, ou entrou um uso novo e legítimo — nos três o certo é '
+    + 'decidir aqui, e ajustar CHAMADAS_FMTRS só no terceiro',
   );
 });
 
