@@ -60,6 +60,7 @@ test('#589: a lista lateral do Avançado mostra Custos ANTES de Viabilidade', ()
     'Empreendimento',
     'Custos',
     'Viabilidade',
+    'Funding',
     'Resultados',
     'Cenários',
     'Análise de mercado',
@@ -72,13 +73,51 @@ test('#589: a lista lateral do Avançado mostra Custos ANTES de Viabilidade', ()
 });
 
 // ─────────────────────────────────────────────────────────────────────────
+// #718 — Funding promovida de sub-aba (dentro de Viabilidade) a página de
+// nível 1, logo abaixo de Viabilidade.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#718: Funding é página de nível 1, logo abaixo de Viabilidade', () => {
+  const secoes = bindingPorSufixo(telaAvancado().render(), '.secoes=') as { itens: { id: string; label: string }[] }[];
+  const itens = secoes[0].itens;
+  assert.equal(itens.length, 9, 'a lista lateral do Avançado agora tem 9 páginas');
+  const idxViabilidade = itens.findIndex((p) => p.label === 'Viabilidade');
+  const idxFunding = itens.findIndex((p) => p.label === 'Funding');
+  assert.notEqual(idxFunding, -1, '"Funding" precisa existir na lista lateral');
+  assert.equal(idxFunding, idxViabilidade + 1, 'Funding vem IMEDIATAMENTE abaixo de Viabilidade');
+  assert.equal(itens.find((p) => p.label === 'Funding')?.id, 'funding');
+});
+
+test('#718: Funding (nível 1) renderiza viab-funding direto, já na aba Operações (padrão)', () => {
+  const el = telaAvancado();
+  el.aba = 'funding';
+  // A CHAMADA, como o resto do arquivo: o conteúdo da página é o valor que cai
+  // em `<div class="conteudo">${...}</div>` no render() real da tela.
+  const conteudo = bindingPorSufixo(el.render(), 'class="conteudo">') as ResultadoLit;
+  const marcado = conteudo.strings.some((s) => s.includes('<viab-funding'));
+  assert.ok(marcado, 'a página funding tem que montar <viab-funding>');
+  // Nenhum `urbi-abas` de nível 2 nesta página: viab-funding tem navegação
+  // própria (#586), e envolvê-la duplicaria chassi de navegação.
+  assert.ok(!conteudo.strings.some((s) => s.includes('<urbi-abas')),
+    'a página Funding não usa urbi-abas de nível 2 — a navegação interna é do próprio componente');
+});
+
+test('#718: a página Viabilidade perdeu a aba Funding — só Receitas e Financeiro', () => {
+  const el = telaAvancado();
+  el.aba = 'viabilidade';
+  const conteudo = bindingPorSufixo(el.render(), 'class="conteudo">') as ResultadoLit;
+  const abas = bindingPorSufixo(conteudo, '.abas=') as { id: string; label: string }[];
+  assert.deepEqual(abas.map((a) => a.label), ['Receitas', 'Financeiro']);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
 // Critério 2 — nada mais muda: ids internos, slugs públicos e aliases
 // ─────────────────────────────────────────────────────────────────────────
 
 test('#589: o id interno da página de Custos continua `obra` (#40)', () => {
   const secoes = bindingPorSufixo(telaAvancado().render(), '.secoes=') as { itens: { id: string; label: string }[] }[];
   const ids = secoes[0].itens.map((p) => p.id);
-  assert.deepEqual(ids, ['resumo', 'empreendimento', 'obra', 'viabilidade', 'fluxo', 'cenarios', 'mercado', 'apelo']);
+  assert.deepEqual(ids, ['resumo', 'empreendimento', 'obra', 'viabilidade', 'funding', 'fluxo', 'cenarios', 'mercado', 'apelo']);
   assert.equal(secoes[0].itens.find((p) => p.label === 'Custos')?.id, 'obra');
   assert.equal(secoes[0].itens.find((p) => p.label === 'Resultados')?.id, 'fluxo');
 });
