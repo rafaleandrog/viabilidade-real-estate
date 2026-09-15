@@ -223,12 +223,20 @@ test('fmtR$Milhoes: zero negativo normalizado APÓS o arredondamento', () => {
   assert.equal(fmtR$Milhoes(-49_999), 'R$\u00A00,0');
   assert.equal(fmtR$Milhoes(-0), 'R$\u00A00,0');
   assert.equal(fmtR$Milhoes(49_999), 'R$\u00A00,0');
-  // A fronteira exata de -R$ 50.000 é negativa de verdade (half away from zero).
+  // As DUAS fronteiras exatas de R$ 50.000, simétricas (half away from zero).
+  // Testar só o lado negativo deixaria passar regressão assimétrica no limiar
+  // — achado da lente T4 (Kimi) na rodada 1 do PR.
   assert.equal(fmtR$Milhoes(-50_000), '-R$\u00A00,1');
+  assert.equal(fmtR$Milhoes(50_000), 'R$\u00A00,1');
   assert.equal(fmtR$Milhoes(-12_300_000), '-R$\u00A012,3');
 });
 
-test('fmtR$Milhoes: entrada não finita não vira NaN na tela', () => {
+test('fmtR$Milhoes: entrada não finita vira zero, nunca "∞" nem "NaN" na tela', () => {
+  // ⚠️ `v || 0` NÃO basta, e o título antigo deste teste mentia: o `||` engole
+  // `NaN` e `undefined` mas deixa `Infinity` passar intacto, e o Intl publica
+  // "R$ ∞" na barra (medido). A guarda é `Number.isFinite`.
   assert.equal(fmtR$Milhoes(NaN), 'R$\u00A00,0');
   assert.equal(fmtR$Milhoes(undefined as unknown as number), 'R$\u00A00,0');
+  assert.equal(fmtR$Milhoes(Infinity), 'R$\u00A00,0');
+  assert.equal(fmtR$Milhoes(-Infinity), 'R$\u00A00,0');
 });

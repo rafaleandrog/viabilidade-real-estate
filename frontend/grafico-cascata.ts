@@ -88,9 +88,12 @@ export class ViabGraficoCascata extends LitElement {
       border-radius: 3px;
       overflow: hidden;
     }
-    /* min-height e o filete do caso clampado: deducao maior que o acumulado,
-       ou resultado deficitario, zeram tamanhoPct e a coluna sumiria da tela
-       sem deixar rastro. O numero exato continua no rotulo e no title. */
+    /* min-height e o filete do caso em que a barra e pequena demais para ter
+       altura propria: deducao maior que o acumulado, resultado deficitario, ou
+       uma deducao real de valor minusculo. Sem ele a coluna sumiria da tela sem
+       deixar rastro. O numero exato NAO esta no rotulo de valor, que sai em
+       milhoes e colapsa para "R$ 0,0" nesses casos -- ele esta no title da
+       coluna, e so ali. */
     .barra {
       position: absolute;
       left: 12%;
@@ -124,6 +127,11 @@ export class ViabGraficoCascata extends LitElement {
     }
     .rotulo.clicavel, .coluna.clicavel .trilho { cursor: pointer; }
     .rotulo.clicavel { text-decoration: underline dotted; }
+    .coluna.clicavel:focus-visible {
+      outline: 2px solid var(--cor-primaria-solida, #2aa9e0);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
     .rodape {
       margin-top: 8px;
       font-size: 11px;
@@ -134,6 +142,15 @@ export class ViabGraficoCascata extends LitElement {
   private _clique(id: string) {
     if (id !== this.idExpandivel) return;
     this.dispatchEvent(new CustomEvent('viab:cascata-linha-click', { detail: { id }, bubbles: true, composed: true }));
+  }
+
+  // Enter e Espaco, porque a coluna expansivel e um `div` com `role="button"`:
+  // o navegador so ativa por teclado o que e botao de verdade, e sem isto o
+  // detalhamento de custo direto seria alcancavel apenas por mouse.
+  private _tecla(ev: KeyboardEvent, id: string) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault();
+    this._clique(id);
   }
 
   render(): TemplateResult {
@@ -150,13 +167,17 @@ export class ViabGraficoCascata extends LitElement {
             <div
               class="coluna ${clicavel ? 'clicavel' : ''}"
               title="${e.rotulo} — ${exato}"
-              @click=${() => this._clique(e.id)}
+              role=${clicavel ? 'button' : nothing}
+              tabindex=${clicavel ? '0' : nothing}
+              aria-label=${clicavel ? `${e.rotulo} — ${exato}. Abrir detalhamento.` : `${e.rotulo} — ${exato}`}
+              @click=${clicavel ? () => this._clique(e.id) : nothing}
+              @keydown=${clicavel ? (ev: KeyboardEvent) => this._tecla(ev, e.id) : nothing}
             >
               <span class="valor">${fmtR$Milhoes(e.valor)}</span>
               <div class="trilho" style="height: ${this.altura};">
                 <div
                   class="barra ${e.tipo}"
-                  style="bottom: ${e.inicioPct}%; height: ${e.tamanhoPct}%;"
+                  style="bottom: min(${e.inicioPct}%, calc(100% - 2px)); height: ${e.tamanhoPct}%;"
                 ></div>
               </div>
               <span class="rotulo ${clicavel ? 'clicavel' : ''}">${e.rotulo}</span>

@@ -2,12 +2,14 @@
 // VERTICAIS.
 //
 // ⚠️ O transbordo de TEXTO/corte por overflow oculto deste caso é REPORTADO
-// E NÃO ASSEVERADO, mesmo padrão de `tabela-fluxo.render.test.ts`: o rótulo
-// da coluna é um bloco VERTICAL de altura fixa (132px), estreito de propósito
-// para 14 colunas caberem, e rótulos longos em português ("(-) Permuta
-// financeira não residencial") truncam com elipse + `title` (tooltip) — o
-// veredito de quantos pixels truncam depende da métrica de glifo da fonte da
-// máquina, não da da instância (Montserrat).
+// E NÃO ASSEVERADO, mesmo padrão de `tabela-fluxo.render.test.ts`: o rótulo da
+// coluna é um bloco de altura fixa de **44px** (`frontend/grafico-cascata.ts`,
+// `.rotulo`) — três linhas de 11px com `line-height: 1.25`, cortadas por
+// `-webkit-line-clamp: 3` —, estreito de propósito para 14 colunas caberem, e
+// rótulos longos em português ("(-) Permuta financeira não residencial")
+// truncam, com o texto inteiro no `title` (tooltip). Quantas linhas cabem e
+// quantos pixels truncam depende da métrica de glifo da fonte da máquina, não
+// da da instância (Montserrat).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

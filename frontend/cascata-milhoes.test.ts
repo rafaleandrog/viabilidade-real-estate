@@ -27,6 +27,14 @@ import { fmtR$Milhoes } from './viab-format.js';
 // A lista fecha nos DOIS sentidos, por CONTAGEM EXATA e não por presença:
 // chamada a menos (alguém reverteu o rótulo para `fmtR$`) e chamada a mais
 // (alguém vazou a abreviação para uma tabela) reprovam igual.
+//
+// ⚠️ Contagem exata sozinha NÃO pega REALOCAÇÃO — achado da lente T4 (Kimi) na
+// rodada 1 do PR: mover a chamada para um ponto morto do mesmo arquivo e
+// devolver o rótulo a `fmtR$` mantém a contagem em 1, no mesmo arquivo, e
+// passaria. Por isso o teste seguinte ancora a chamada no ELEMENTO que ela
+// alimenta — é o mais perto de "propriedade comportamental" que dá para chegar
+// sem DOM, já que o `exigir` de `scripts/render-check.mjs` só aceita
+// `{seletor, minimo}` e nunca texto.
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const RAIZ = resolve(AQUI, '..');
@@ -66,13 +74,28 @@ test('a exceção de milhões é chamada EXATAMENTE onde deve, por contagem', ()
   );
 });
 
+test('a chamada alimenta o rótulo de valor da barra, não um ponto morto', () => {
+  // Ancora a chamada no elemento: se alguém devolver `span.valor` a `fmtR$` e
+  // deixar `fmtR$Milhoes` sobrando em outro ponto do arquivo, a contagem acima
+  // continua 1 e SÓ este teste acusa.
+  const linhas = semComentarios(fonte(CONSUMIDOR.arquivo)).split('\n');
+  const naBarra = linhas.filter((l) => l.includes('class="valor"') && l.includes('fmtR$Milhoes('));
+  assert.equal(
+    naBarra.length, 1,
+    'o `span class="valor"` da coluna precisa ser formatado por `fmtR$Milhoes` — '
+    + 'contagem exata no arquivo não distingue a chamada viva de uma realocada',
+  );
+});
+
+/** Onde o símbolo PODE aparecer sem ser um call site de exibição. */
+const EXCECOES = [
+  'frontend/viab-format.ts',          // a definição
+  'frontend/cascata-milhoes.test.ts', // esta trava
+  'frontend/viab-format.test.ts',     // o teste da função pura
+];
+
 test('a exceção de milhões NÃO vazou para nenhum outro arquivo do frontend', () => {
-  const excecoes = new Set([
-    CONSUMIDOR.arquivo,
-    'frontend/viab-format.ts',        // a definição
-    'frontend/cascata-milhoes.test.ts', // esta trava
-    'frontend/viab-format.test.ts',   // o teste da função pura
-  ]);
+  const excecoes = new Set([CONSUMIDOR.arquivo, ...EXCECOES]);
   const vazamentos = fontesVersionadas()
     .filter((f) => !excecoes.has(f))
     .filter((f) => ocorrencias(fonte(f), 'fmtR$Milhoes') > 0);
@@ -83,14 +106,22 @@ test('a exceção de milhões NÃO vazou para nenhum outro arquivo do frontend',
   );
 });
 
-test('o inventário aponta para arquivos que existem', () => {
-  // Sem isto, renomear `grafico-cascata.ts` deixaria a trava verde contra um
-  // arquivo fantasma — a contagem de um arquivo inexistente nunca é conferida
-  // porque `fonte()` estouraria... e só estoura se alguém rodar o teste. Aqui
-  // o erro é explícito.
-  assert.ok(
-    fontesVersionadas().includes(CONSUMIDOR.arquivo),
-    `${CONSUMIDOR.arquivo} não está versionado — o inventário desta trava envelheceu`,
+test('todo caminho do inventário aponta para arquivo versionado', () => {
+  // ⚠️ A redação anterior deste teste justificava-se com uma premissa FALSA —
+  // que um arquivo inexistente deixaria a trava "verde contra um fantasma".
+  // Não deixaria: `fonte()` usa `readFileSync`, que estoura ENOENT e reprova o
+  // teste da contagem. Achado da lente T4 (Kimi) na rodada 1 do PR.
+  //
+  // O trabalho REAL é outro, e é sobre o conjunto `EXCECOES`: entrada que
+  // envelhece ali (arquivo renomeado ou apagado) vira exceção CEGA — ela deixa
+  // de excluir o que pretendia e ninguém percebe, porque exceção a mais não
+  // quebra nada. Por isso a conferência é sobre TODOS os caminhos, não só o do
+  // consumidor.
+  const versionadas = new Set(fontesVersionadas());
+  const orfaos = [CONSUMIDOR.arquivo, ...EXCECOES].filter((f) => !versionadas.has(f));
+  assert.deepEqual(
+    orfaos, [],
+    'caminho do inventário que não está mais versionado — exceção cega ou consumidor renomeado',
   );
 });
 

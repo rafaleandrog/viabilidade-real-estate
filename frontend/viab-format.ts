@@ -88,7 +88,11 @@ export function fmtR$Kpi(v: number): string {
  * milhões: |v/1e6| < 0,05.
  */
 export function fmtR$Milhoes(v: number): string {
-  const milhoes = (v || 0) / 1e6;
+  // `Number.isFinite`, e nao `v || 0`: o `||` engole `NaN` e `undefined` mas
+  // deixa `Infinity` passar, e o Intl publica "R$ ∞" na barra. Achado da lente
+  // T4 (Kimi) na rodada 1 do PR — o teste dizia cobrir "entrada nao finita" e
+  // exercitava so `NaN`.
+  const milhoes = (Number.isFinite(v) ? v : 0) / 1e6;
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
