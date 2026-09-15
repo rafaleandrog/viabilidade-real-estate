@@ -59,8 +59,19 @@ test('Cascata do resultado: as colunas, trilhos, barras e valores chegam à tela
   // decimal (`R$ 26,5`); `fmtR$` produz duas (`R$ 26.540.000,00`). Reverter o
   // rótulo, ou realocar a chamada para qualquer ponto morto — atributo,
   // variável não usada —, muda o texto e reprova aqui.
-  const UMA_CASA = /^-?R\$\u00A0\d{1,3}(\.\d{3})*,\d$/;
-  assert.ok(k!.rotulosDeValor.length >= 5, 'nenhum rótulo de valor foi lido do DOM' + relato(a));
+  //
+  // `[\u00A0 ]` e não `\u00A0` cravado: o separador entre símbolo e número sai
+  // do ICU do **Chromium do harness**, que é "qualquer um instalado" e não tem
+  // versão controlada — e o CLDR já mudou o espaçamento de moeda BRL no
+  // passado. Cravar o NBSP acoplaria a guarda a um ICU específico e a faria
+  // reprovar código correto num Chromium diferente. A discriminação que importa
+  // (uma casa decimal contra duas) mora no `,\d$`, e não no espaço.
+  const UMA_CASA = /^-?R\$[\u00A0 ]\d{1,3}(\.\d{3})*,\d$/;
+  assert.ok(
+    k!.rotulosDeValor.length >= 5,
+    `a sonda leu ${k!.rotulosDeValor.length} rótulo(s) de valor no DOM, esperava ao menos 5`
+    + relato(a),
+  );
   assert.deepEqual(
     k!.rotulosDeValor.filter((t) => !UMA_CASA.test(t)), [],
     'rótulo de barra fora do formato de milhões — o `span.valor` voltou a `fmtR$` '

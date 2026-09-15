@@ -28,12 +28,23 @@ import { fmtR$Milhoes } from './viab-format.js';
 // chamada a menos (alguém reverteu o rótulo para `fmtR$`) e chamada a mais
 // (alguém vazou a abreviação para uma tabela) reprovam igual.
 //
-// ⚠️ Contagem exata sozinha NÃO pega REALOCAÇÃO: mover a chamada para um ponto
-// morto do mesmo arquivo e devolver o rótulo a `fmtR$` mantém a contagem em 1 e
-// passaria aqui. Essa metade do problema **não é resolvida neste arquivo** —
-// ela é medida no DOM, pela sonda `medir()` de
-// `frontend/render/casos/grafico-cascata.ts`, que lê o texto de cada
-// `span.valor` e exige UMA casa decimal.
+// ⚠️ Contagem exata de `fmtR$Milhoes(` sozinha NÃO pega REALOCAÇÃO: mover a
+// chamada para um ponto morto do mesmo arquivo e devolver o rótulo a `fmtR$`
+// mantém a contagem em 1. Essa metade é coberta em DUAS camadas, de propósito:
+//
+//   · **a prova de verdade** é o DOM — a sonda `medir()` de
+//     `frontend/render/casos/grafico-cascata.ts` lê o texto de cada
+//     `span.valor` e exige UMA casa decimal. É a única que mede o que a tela
+//     publica, e **ela é PULÁVEL**: `motivoParaPular()` desliga o caso sem
+//     Chromium, então numa máquina sem Playwright ela não roda. No CI ela é
+//     obrigatória (`RENDER_CHECK_OBRIGATORIO: '1'`, job `render`);
+//   · **a rede sempre ligada** é a contagem de `fmtR$(` logo abaixo, que roda
+//     em `node --test` puro. Trocar o rótulo por `fmtR$` sobe essa contagem e
+//     reprova mesmo sem navegador.
+//
+// A segunda existe porque a primeira versão desta inversão deixou a defesa
+// principal atrás de um skip, e "correta mas opcional" é pior que "imperfeita
+// mas sempre ligada" quando se pode ter as duas.
 //
 // Três versões de uma âncora por regex sobre o fonte moraram aqui e foram
 // removidas: por linha (reprovava o span quebrado em duas), por tag colada
@@ -79,6 +90,23 @@ test('a exceção de milhões é chamada EXATAMENTE onde deve, por contagem', ()
     `${CONSUMIDOR.arquivo} deveria chamar fmtR$Milhoes ${CONSUMIDOR.chamadas}× — `
     + 'a menos significa que o rótulo da barra voltou a `fmtR$`; a mais, que a '
     + 'abreviação ganhou um call site novo sem passar por aqui',
+  );
+});
+
+// Quantas vezes `grafico-cascata.ts` chama `fmtR$` — o formatador de 2 casas.
+// Hoje são duas, e nenhuma delas é o rótulo da barra: o `title` da coluna
+// (`const exato`) e a base no rodapé da escala. Se alguém devolver o rótulo a
+// `fmtR$`, esta contagem sobe para três e reprova — sem navegador, sem regex
+// sobre o template, e sem depender de onde no arquivo a chamada está.
+const CHAMADAS_FMTRS = 2;
+
+test('o rótulo da barra NÃO voltou a `fmtR$` — rede sempre ligada, sem navegador', () => {
+  assert.equal(
+    ocorrencias(fonte(CONSUMIDOR.arquivo), 'fmtR$('),
+    CHAMADAS_FMTRS,
+    `${CONSUMIDOR.arquivo} deveria chamar fmtR$ ${CHAMADAS_FMTRS}× — o title da coluna e a `
+    + 'base do rodapé. Uma a mais é o rótulo da barra tendo voltado a 2 casas; uma a menos, '
+    + 'o valor exato tendo sumido de um dos dois canais de detalhe',
   );
 });
 
