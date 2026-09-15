@@ -23,7 +23,7 @@
 | §5 Telas (dashboard, detalhe, imóveis) | ✅ / ✏️ | 3 abas + 4ª aba "Apelo Comercial". Aba Terrenos lista glebas/lotes do Núcleo (degrada com aviso se sem permissão). Componentes autocontidos (ver §0.2). |
 | §6.1 Schema · §6.2 Proforma · §6.5 Params · §6.9 Eventos | ✅ | |
 | §6.3 Exportação | ✏️ | Gerada no **frontend** (PDF via impressão do navegador com estilos do app; Excel via CSV). Ver §0.2. |
-| §6.6 Dependências do Núcleo | ✅ / ✏️ | `dependencias_nucleo: ["imoveis"]` + `permissoes_nucleo: { "imoveis": ["ler"] }`. Terreno via gleba (Loteamento) / lote(s) (Incorporação); área somada em `area_terreno_nucleo`. Filtro de exclusão ainda pendente (degrada mostrando todos). |
+| §6.6 Dependências do Núcleo | ✅ / ✏️ | `dependencias_nucleo: ["imoveis", "parcelamentos"]` + `permissoes_nucleo: { "imoveis": ["ler"], "parcelamentos": ["ler"] }`. Terreno via gleba (Loteamento) / lote(s) (Incorporação); área somada em `area_terreno_nucleo`. Filtro de exclusão por regularização fundiária implementado (Incorporação); depende da flag `parcelamentos.ler` concedida pelo admin da instância. |
 | §6.7 IA — Apelo Comercial | ✅ | 6 fatores × 4 perguntas, upload de docs + texto, scores, relatório. Requer framework de IA habilitado na instância. |
 | §6.8 Rotas customizadas | ✅ / ✏️ | Todas implementadas, exceto `GET /exportar/:formato` (substituída por exportação no frontend). |
 | §6.10 Documentação | ✅ | `docs/viabilidade/*` (7 docs). |
@@ -32,7 +32,7 @@
 
 Registrados para rastreabilidade — nas próximas versões, tratar como o comportamento vigente:
 
-1. **Núcleo — integração via supertipo `imoveis`.** O acesso é declarado com `dependencias_nucleo: ["imoveis"]` e `permissoes_nucleo: { "imoveis": ["ler"] }` (array de flags, conforme `docs/shell/nucleo.md`). Consumo padrão: `urbiVerso.nucleo('/glebas' | '/lotes' | '/imoveis/:id')` no frontend, servido pelas rotas `/api/viabilidade/nucleo/*` que o shell provê para apps com `dependencias_nucleo`. Se a instância não expõe glebas/lotes ou o admin não liga o toggle, os endpoints dão 403 e a UI degrada com aviso — o modo **manual** permanece disponível. *(Versão anterior do MVP ficou em modo manual com `dependencias_nucleo: []` porque a instância não expunha essas entidades.)*
+1. **Núcleo — integração via supertipo `imoveis`, mais `parcelamentos`.** O acesso é declarado com `dependencias_nucleo: ["imoveis", "parcelamentos"]` e `permissoes_nucleo: { "imoveis": ["ler"], "parcelamentos": ["ler"] }` (array de flags, conforme `docs/shell/nucleo.md`). Consumo padrão: `urbiVerso.nucleo('/glebas' | '/lotes' | '/imoveis/:id' | '/parcelamentos')` no frontend, servido pelas rotas `/api/viabilidade/nucleo/*` que o shell provê para apps com `dependencias_nucleo`. `parcelamentos` é usada só para resolver quais lotes pertencem a parcelamento com `regularizacao=true` e excluí-los do seletor de terreno da Incorporação. Se a instância não expõe glebas/lotes/parcelamentos ou o admin não liga o toggle de alguma das duas entidades, os endpoints dão 403 e a UI degrada com aviso — o modo **manual** permanece disponível. *(Versão anterior do MVP ficou em modo manual com `dependencias_nucleo: []` porque a instância não expunha essas entidades.)*
 2. **Precisão de percentuais.** Campos de % usam `decimal(5,2)`, não `inteiro` (§6.1), porque vários defaults são fracionários (6,73% / 1,6% / 0,25% / 1,25%).
 3. **Benchmarks admin-only.** §2 diz "editor edita benchmarks", mas §6.8 + `acesso_externo: restrito` dizem admin. Seguimos **admin-only** (aprovador/nível admin).
 4. **Custo do terreno** incide sobre a **área do terreno** (não "área privativa" como no texto literal de §4.4/§6.2).
@@ -698,9 +698,10 @@ Candidatos a parâmetros configuráveis pelo admin:
 
 ```json
 {
-  "dependencias_nucleo": ["imoveis"],
+  "dependencias_nucleo": ["imoveis", "parcelamentos"],
   "permissoes_nucleo": {
-    "imoveis": ["ler"]
+    "imoveis": ["ler"],
+    "parcelamentos": ["ler"]
   }
 }
 ```
