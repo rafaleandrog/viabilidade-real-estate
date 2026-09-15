@@ -4,18 +4,16 @@
 // repositório montavam estudos de INCORPORAÇÃO — `casos/dados.ts` declara
 // `tipo_empreendimento: 'incorporacao'` e todos os outros derivam dele. Todo
 // ramo `if (lot)` de tela (a cascata de áreas de Premissas, o KPI "Vendável /
-// gleba", o campo único de permuta física, esta pizza) nunca tinha sido
-// montado em DOM nenhum. Este é o primeiro.
+// gleba", o campo único de permuta física, esta cadeia de áreas) nunca tinha
+// sido montado em DOM nenhum. Este é o primeiro.
 //
-// ⚠️ E O QUE ELE NÃO MEDE. O stub do harness não reproduz `.categorias` de
-// `urbi-grafico-pizza` (ver `aceitaNaoReproduzido` abaixo), então nenhum caso
-// de render consegue afirmar QUAIS fatias a pizza recebeu. Quem confere os
-// valores das 8 fatias é `frontend/areas-cascata.test.ts`
-// (`itensAlocacaoGleba`, função pura); quem confere que o componente a chama é
-// `frontend/tela-graficos.test.ts` (fiação lida no código-fonte). Este caso
-// mede o que só o DOM sabe: que a aba de um Loteamento monta inteira, sem
-// transbordo, sem sobreposição e com todos os tokens resolvendo nas quatro
-// variantes de tema.
+// ⚠️ E O QUE ELE NÃO MEDE. Quem confere os VALORES de cada estágio da cadeia
+// (poligonal→parcelável→líquida→ALV) é `frontend/areas-cascata.test.ts`
+// (`calcularCascata`/`etapasCadeiaAreas`, função pura); quem confere que o
+// componente a chama é `frontend/tela-graficos.test.ts` (fiação lida no
+// código-fonte). Este caso mede o que só o DOM sabe: que a aba de um
+// Loteamento monta inteira, sem transbordo, sem sobreposição e com todos os
+// tokens resolvendo nas quatro variantes de tema.
 
 import '../../tela-graficos.js';
 import { forcarEstado } from './dados.js';
@@ -68,24 +66,28 @@ const PRODUTOS_LOTEAMENTO: Record<string, any>[] = [
 export const caso = {
   nome: 'alocacao-areas-loteamento',
   exigir: [
-    // Faixa de KPIs · Cascata do resultado · Alocação de áreas da gleba.
-    // O Loteamento tem UM card de alocação (a Incorporação tem dois: geral e
-    // macro). `exigir` só tem piso, então cards a mais ainda passariam aqui;
-    // quem denuncia o ramo de Incorporação montado é o `urbi-grafico-pizza`
-    // abaixo (o ramo errado desenha 1 pizza, não a esperada).
+    // Faixa de KPIs · Cascata do resultado · Cadeia de áreas da gleba.
     { seletor: 'urbi-card', minimo: 2 },
-    // Pizza da gleba. Um `urbi-estado-vazio` no lugar dela derruba a
-    // contagem — é o que pega a tela montada com o estudo sem áreas.
-    { seletor: 'urbi-grafico-pizza', minimo: 1 },
+    // Cadeia de áreas da gleba. Um `urbi-estado-vazio` no lugar dela derruba
+    // a contagem — é o que pega a tela montada com o estudo sem áreas.
+    { seletor: 'viab-grafico-cadeia-areas', minimo: 1 },
     // Rodada 12 — a cascata do resultado substituiu a pizza de custos e o
     // gráfico de barras Receita×Custos (achado 2.3 da auditoria).
     { seletor: 'viab-grafico-cascata', minimo: 1 },
+    // Faixa de consistência (handoff §4.5) — este fixture cai no ramo
+    // "sobra" (ver `aceitaNaoReproduzido` abaixo). Sem esta linha, apagar a
+    // chamada a `_renderConsistencia()` só seria pego indiretamente (a
+    // declaração de `urbi-banner.variante` viraria "ociosa") — achado da
+    // revisão nativa (L3, PR #707): a asserção direta é mais robusta.
+    { seletor: 'urbi-banner', minimo: 1 },
   ],
   aceitaNaoReproduzido: [
     'urbi-card.titulo',
-    'urbi-grafico-pizza.categorias',
-    'urbi-grafico-pizza.formato',
-    'urbi-grafico-pizza.series',
+    // Rodada 12 (handoff §4.5) — a ALV deste fixture (47.189,21 m², cascata
+    // de áreas) é maior que a área do único produto cadastrado (300×130 =
+    // 39.000 m²), então `diferencaAreaAlocada` < 0 e a faixa de consistência
+    // desenha o `urbi-banner` de "ainda faltam alocar".
+    'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     // `tela-graficos.ts` busca benchmarks, config e o catálogo de Produtos no

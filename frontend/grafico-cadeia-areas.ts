@@ -5,10 +5,15 @@
 // eficiência como número ao lado. Componente customizado — nenhum primitivo
 // `urbi-*` desenha barra empilhada horizontal.
 //
-// Cada estágio é um SUBCONJUNTO físico do anterior (não uma soma de partes
-// lado a lado) — por isso o desenho é um funil de barras alinhadas à
-// esquerda, largura proporcional ao primeiro estágio (a âncora), não uma
-// pilha de segmentos concatenados.
+// A largura de cada barra é proporcional ao MAIOR estágio da cadeia, não ao
+// primeiro — achado real da revisão (Codex, PR #707): no Loteamento o
+// primeiro estágio (poligonal) já é o maior, então nada muda ali; mas na
+// Incorporação "Área Construída Total" é privativa+comum e costuma superar o
+// terreno em qualquer prédio com mais de um pavimento (coeficiente de
+// aproveitamento > 1) — terreno NÃO é superconjunto físico dos estágios
+// seguintes nesse ramo. Escalar pelo primeiro estágio deixava esses casos
+// clipados em 100% pelo `overflow: hidden` do trilho, tornando estágios de
+// tamanhos bem diferentes visualmente idênticos.
 
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
@@ -68,7 +73,7 @@ export class ViabGraficoCadeiaAreas extends LitElement {
 
   render(): TemplateResult {
     if (this.etapas.length === 0) return html``;
-    const base = this.etapas[0]?.m2 ?? 0;
+    const base = Math.max(0, ...this.etapas.map((e) => e.m2));
     return html`
       <div>
         ${this.etapas.map((e, i) => html`

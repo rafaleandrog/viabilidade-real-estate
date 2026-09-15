@@ -112,9 +112,13 @@ export const caso = {
     // apagada sobram 3 e o caso reprova.
     { seletor: 'urbi-grafico-medidor', minimo: 4 },
     // A aba de um Loteamento continua montando inteira ao redor do medidor
-    // novo: pizza da gleba e a cascata do resultado (Rodada 12).
-    { seletor: 'urbi-grafico-pizza', minimo: 1 },
+    // novo: cadeia de áreas da gleba e a cascata do resultado (Rodada 12).
+    { seletor: 'viab-grafico-cadeia-areas', minimo: 1 },
     { seletor: 'viab-grafico-cascata', minimo: 1 },
+    // Faixa de consistência (handoff §4.5) — o mesmo loteamento de
+    // `alocacao-areas-loteamento.ts` cai no ramo "sobra". Asserção direta,
+    // não só via declaração ociosa (achado da revisão nativa, L3, PR #707).
+    { seletor: 'urbi-banner', minimo: 1 },
   ],
   aceitaNaoReproduzido: [
     // O espelho não desenha o ponteiro do velocímetro nem a legenda das faixas
@@ -125,10 +129,11 @@ export const caso = {
     'urbi-grafico-medidor.max',
     'urbi-grafico-medidor.min',
     'urbi-card.titulo',
-    // Props das outras seções da aba, que `viab-tela-graficos` monta inteira.
-    'urbi-grafico-pizza.categorias',
-    'urbi-grafico-pizza.formato',
-    'urbi-grafico-pizza.series',
+    // Rodada 12 (handoff §4.5) — o mesmo loteamento de
+    // `alocacao-areas-loteamento.ts` tem `diferencaAreaAlocada` < 0 (ALV maior
+    // que a área dos produtos cadastrados), então a faixa de consistência
+    // desenha o `urbi-banner` de "ainda faltam alocar".
+    'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     // `_init()` de `tela-graficos.ts` busca benchmarks, config e o catálogo de

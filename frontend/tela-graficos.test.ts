@@ -2,17 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-// #574 — a fiação da composição da gleba (aba Gráficos do Preliminar).
+// #574 — a fiação da cadeia de áreas (aba Gráficos do Preliminar).
 //
 // ⚠️ O QUE ESTE ARQUIVO MEDE, E O QUE ELE NÃO MEDE. Ele lê o CÓDIGO-FONTE de
-// `tela-graficos.ts`, não o DOM: prova que o componente chama
-// `itensAlocacaoGleba` e que os 7 campos aposentados pela migração `020`
-// sumiram do arquivo. Não prova que a pizza desenhou as 8 fatias certas — o
-// stub do harness de render declaradamente não reproduz `.categorias` de
-// `urbi-grafico-pizza` (ver `aceitaNaoReproduzido` nos casos de render), então
-// nenhuma camada deste repositório consegue afirmar isso hoje. Quem confere os
-// VALORES é `areas-cascata.test.ts` (`itensAlocacaoGleba`, função pura); quem
-// confere que a tela de Loteamento monta e não quebra o layout é
+// `tela-graficos.ts`, não o DOM: prova que o componente chama `calcularCascata`
+// (Rodada 12 — substituiu `itensAlocacaoGleba` quando a cadeia de áreas
+// trocou de lugar com a(s) pizza(s) de alocação) e que os 7 campos
+// aposentados pela migração `020` sumiram do arquivo. Não prova que a barra
+// empilhada desenhou os estágios certos — quem confere os VALORES é
+// `areas-cascata.test.ts` (`etapasCadeiaAreas`, função pura); quem confere que
+// a tela de Loteamento monta e não quebra o layout é
 // `render/casos/alocacao-areas-loteamento.ts`.
 //
 // A técnica (ler o fonte com os comentários removidos) é a mesma de
@@ -56,15 +55,36 @@ test('#574: a aba Gráficos não lê nenhum dos 7 campos de área aposentados pe
   }
 });
 
-test('#574: a aba Gráficos CHAMA itensAlocacaoGleba (fiação, não só import)', () => {
+test('#574: a aba Gráficos CHAMA calcularCascata para as duas cadeias (fiação, não só import)', () => {
   assert.ok(
     FONTE.includes("from './areas-cascata.js'"),
     'tela-graficos.ts deixou de importar areas-cascata.js',
   );
   assert.ok(
-    /itensAlocacaoGleba\(/.test(FONTE),
-    'tela-graficos.ts importa itensAlocacaoGleba mas não a CHAMA — apagar a chamada e voltar ' +
-    'à leitura dos campos aposentados deixaria a suíte inteira verde sem este teste.',
+    /calcularCascata\(/.test(FONTE),
+    'tela-graficos.ts importa calcularCascata mas não a CHAMA — apagar a chamada e voltar à ' +
+    'leitura dos campos aposentados deixaria a suíte inteira verde sem este teste.',
+  );
+  // ⚠️ A ÂNCORA é o PAR constante+resolvedor-de-estado, não a presença solta
+  // da string: as duas chaves aparecem juntas na linha de import
+  // (`CASCATA_LOTEAMENTO, CASCATA_INCORPORACAO`), e `estadosCascata*DoEstudo`
+  // idem — um `includes()` de cada lado, solto, continuaria `true` mesmo se
+  // os dois RAMOS trocassem de cadeia entre si (Loteamento resolvendo com
+  // `CASCATA_INCORPORACAO` e vice-versa: as quatro strings continuam
+  // presentes no arquivo, só a combinação por ramo é que muda). Prender o
+  // par na MESMA chamada é o que amarra a constante ao resolvedor certo —
+  // achado real da revisão nativa (T4, PR #707).
+  assert.ok(
+    /calcularCascata\(CASCATA_LOTEAMENTO,\s*estadosCascataLoteamentoDoEstudo\(/.test(FONTE),
+    'tela-graficos.ts parou de chamar calcularCascata(CASCATA_LOTEAMENTO, ' +
+    'estadosCascataLoteamentoDoEstudo(...), ...) — a cadeia de áreas do Loteamento passaria a ' +
+    'resolver com a definição ou o estado errado, sem que a suíte acuse.',
+  );
+  assert.ok(
+    /calcularCascata\(CASCATA_INCORPORACAO,\s*estadosCascataIncorporacaoDoEstudo\(/.test(FONTE),
+    'tela-graficos.ts parou de chamar calcularCascata(CASCATA_INCORPORACAO, ' +
+    'estadosCascataIncorporacaoDoEstudo(...), ...) — a cadeia de áreas da Incorporação passaria ' +
+    'a resolver com a definição ou o estado errado, sem que a suíte acuse.',
   );
 });
 
