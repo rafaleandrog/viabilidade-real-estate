@@ -33,6 +33,14 @@ import { customElement, property } from 'lit/decorators.js';
 import type { EtapaCascata } from './cascata-resultado-motor.js';
 import { fmtR$, fmtR$Milhoes } from './viab-format.js';
 
+/**
+ * Altura minima, em px, da barra que nao tem altura propria. Interpolada nos
+ * DOIS lugares que precisam concordar: o min-height da folha e o clamp do
+ * bottom no template. Duplicar o literal deixava o clamp defasado quando o
+ * filete mudasse, e o corte que ele evita voltaria calado (achado da rodada 2).
+ */
+const FILETE_PX = 2;
+
 @customElement('viab-grafico-cascata')
 export class ViabGraficoCascata extends LitElement {
   @property({ attribute: false }) etapas: EtapaCascata[] = [];
@@ -40,6 +48,13 @@ export class ViabGraficoCascata extends LitElement {
   @property({ attribute: false }) idExpandivel: string | null = null;
   /** Altura do trilho das colunas. Mesmo nome e default de `UrbiGraficoBase`. */
   @property() altura = '240px';
+  /**
+   * Se o painel que a coluna de `idExpandivel` abre está aberto AGORA. Só
+   * existe para alimentar `aria-expanded`: quem guarda o estado é a tela, e sem
+   * ele o leitor de tela anunciaria um botão de alternância cujo estado nunca
+   * muda (achado da rodada 2 de revisão).
+   */
+  @property({ type: Boolean }) expandido = false;
 
   static styles = css`
     :host { display: block; }
@@ -88,17 +103,22 @@ export class ViabGraficoCascata extends LitElement {
       border-radius: 3px;
       overflow: hidden;
     }
-    /* min-height e o filete do caso em que a barra e pequena demais para ter
-       altura propria: deducao maior que o acumulado, resultado deficitario, ou
-       uma deducao real de valor minusculo. Sem ele a coluna sumiria da tela sem
-       deixar rastro. O numero exato NAO esta no rotulo de valor, que sai em
-       milhoes e colapsa para "R$ 0,0" nesses casos -- ele esta no title da
-       coluna, e so ali. */
+    /* min-height e o filete da barra que nao tem altura propria. Sao tres casos,
+       e eles diferem no que o rotulo mostra -- a versao anterior deste
+       comentario dizia que os tres colapsavam para "R$ 0,0", e isso e falso em
+       dois deles (achado da rodada 2 de revisao):
+         - deducao maior que o acumulado, e resultado deficitario: a GEOMETRIA e
+           clampada a zero pelo motor, mas o campo de valor fica integro, entao
+           o rotulo publica o numero de verdade (um deficit de 5 milhoes sai
+           como -R$ 5,0);
+         - deducao real de valor minusculo: ai sim o rotulo em milhoes colapsa
+           para "R$ 0,0", e o unico canal com o numero exato e o title.
+       Sem o filete, nos tres a coluna sumiria da tela sem deixar rastro. */
     .barra {
       position: absolute;
       left: 12%;
       right: 12%;
-      min-height: 2px;
+      min-height: ${FILETE_PX}px;
       border-radius: 3px;
     }
     /* Cor por natureza economica, a pedido do autor: subtotal e RECEITA
@@ -147,7 +167,14 @@ export class ViabGraficoCascata extends LitElement {
   // Enter e Espaco, porque a coluna expansivel e um `div` com `role="button"`:
   // o navegador so ativa por teclado o que e botao de verdade, e sem isto o
   // detalhamento de custo direto seria alcancavel apenas por mouse.
+  //
+  // `ev.repeat` é descartado: segurar a tecla dispara auto-repeat, e sem a
+  // guarda o evento sairia em rajada, alternando o painel dezenas de vezes
+  // (achado da rodada 2). Botão nativo ativa o Espaço no `keyup`, uma vez por
+  // pressão; aqui a guarda de repetição resolve o efeito prático sem a
+  // maquinaria de rastrear a pressão entre dois handlers.
   private _tecla(ev: KeyboardEvent, id: string) {
+    if (ev.repeat) return;
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
     ev.preventDefault();
     this._clique(id);
@@ -169,7 +196,8 @@ export class ViabGraficoCascata extends LitElement {
               title="${e.rotulo} — ${exato}"
               role=${clicavel ? 'button' : nothing}
               tabindex=${clicavel ? '0' : nothing}
-              aria-label=${clicavel ? `${e.rotulo} — ${exato}. Abrir detalhamento.` : `${e.rotulo} — ${exato}`}
+              aria-label=${clicavel ? `${e.rotulo} — ${exato}` : nothing}
+              aria-expanded=${clicavel ? String(this.expandido) : nothing}
               @click=${clicavel ? () => this._clique(e.id) : nothing}
               @keydown=${clicavel ? (ev: KeyboardEvent) => this._tecla(ev, e.id) : nothing}
             >
@@ -177,7 +205,7 @@ export class ViabGraficoCascata extends LitElement {
               <div class="trilho" style="height: ${this.altura};">
                 <div
                   class="barra ${e.tipo}"
-                  style="bottom: min(${e.inicioPct}%, calc(100% - 2px)); height: ${e.tamanhoPct}%;"
+                  style="bottom: min(${e.inicioPct}%, calc(100% - ${FILETE_PX}px)); height: ${e.tamanhoPct}%;"
                 ></div>
               </div>
               <span class="rotulo ${clicavel ? 'clicavel' : ''}">${e.rotulo}</span>

@@ -78,8 +78,16 @@ test('a chamada alimenta o rótulo de valor da barra, não um ponto morto', () =
   // Ancora a chamada no elemento: se alguém devolver `span.valor` a `fmtR$` e
   // deixar `fmtR$Milhoes` sobrando em outro ponto do arquivo, a contagem acima
   // continua 1 e SÓ este teste acusa.
-  const linhas = semComentarios(fonte(CONSUMIDOR.arquivo)).split('\n');
-  const naBarra = linhas.filter((l) => l.includes('class="valor"') && l.includes('fmtR$Milhoes('));
+  //
+  // ⚠️ A busca é sobre o fonte com o espaço em branco COLAPSADO, não linha a
+  // linha. A primeira versão casava `class="valor"` e `fmtR$Milhoes(` na mesma
+  // linha, e isso reprova código CORRETO: hoje o `<span>` cabe numa linha por
+  // acidente de largura, e quebrá-lo em duas — ao acrescentar um atributo, por
+  // exemplo — zeraria a contagem com uma mensagem acusando realocação que não
+  // houve. Falso positivo derruba guard, e guard derrubado não guarda nada
+  // (achado da rodada 2 de revisão).
+  const achatado = semComentarios(fonte(CONSUMIDOR.arquivo)).replace(/\s+/g, ' ');
+  const naBarra = achatado.match(/class="valor"[^>]*> *\$\{ *fmtR\$Milhoes\(/g) ?? [];
   assert.equal(
     naBarra.length, 1,
     'o `span class="valor"` da coluna precisa ser formatado por `fmtR$Milhoes` — '
@@ -122,6 +130,19 @@ test('todo caminho do inventário aponta para arquivo versionado', () => {
   assert.deepEqual(
     orfaos, [],
     'caminho do inventário que não está mais versionado — exceção cega ou consumidor renomeado',
+  );
+
+  // A OUTRA metade da exceção cega, e a que a primeira versão deste teste
+  // deixava passar (achado da rodada 2): o arquivo continua versionado mas
+  // deixou de conter o símbolo — a exceção perdeu a razão de existir e fica
+  // perdoando um vazamento futuro naquele arquivo, calada. É a mesma regra do
+  // `guard-enderecos-doc`, que reprova quando uma exceção deixa de ser
+  // necessária.
+  const desnecessarias = EXCECOES.filter((f) => ocorrencias(fonte(f), 'fmtR$Milhoes') === 0);
+  assert.deepEqual(
+    desnecessarias, [],
+    'exceção que não é mais necessária — o arquivo não cita mais `fmtR$Milhoes`, '
+    + 'e mantê-la na lista desliga a conferência dele para sempre',
   );
 });
 

@@ -45,6 +45,16 @@ export const caso = {
     // template.
     { seletor: 'span.rotulo.clicavel', minimo: 1 },
     { seletor: 'div.coluna.clicavel', minimo: 1 },
+    // Acessibilidade da coluna expansível: sem estes três, `role`/`tabindex`/
+    // `aria-expanded` podem sumir do template e a suíte inteira fica verde —
+    // o detalhamento volta a ser alcançável só por mouse, em silêncio.
+    { seletor: 'div.coluna[role="button"]', minimo: 1 },
+    { seletor: 'div.coluna[tabindex="0"]', minimo: 1 },
+    { seletor: 'div.coluna[aria-expanded]', minimo: 1 },
+    // O clamp do `bottom` que mantém o filete de 2px DENTRO do trilho. Sem
+    // este seletor, reverter para `bottom: ${e.inicioPct}%` deixa tudo verde e
+    // a barra minúscula no topo volta a ser cortada pelo `overflow: hidden`.
+    { seletor: 'div.barra[style*="min("]', minimo: 5 },
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const p = calcularProforma(ESTUDO_INCORP);

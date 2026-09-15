@@ -218,6 +218,7 @@ export class ViabTelaGraficos extends LitElement {
       <viab-grafico-cascata
         .etapas=${etapas}
         .idExpandivel=${'custo_direto'}
+        .expandido=${this.custoExpandido}
         @viab:cascata-linha-click=${() => { this.custoExpandido = !this.custoExpandido; }}
       ></viab-grafico-cascata>
       ${this.custoExpandido ? html`

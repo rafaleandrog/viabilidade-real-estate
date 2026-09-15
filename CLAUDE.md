@@ -1040,9 +1040,9 @@ Git Bash — ver PROGRESSO).
   > casa** — `R$ 26.540.000` aparece como `R$ 26,5`. O motivo é de leitura: com VGV de nove dígitos
   > são 14 barras cujo rótulo em reais cheios não cabe, e a escala única em milhões é o que deixa as
   > barras comparáveis de relance. (a) Vale **só** para o rótulo que a barra publica — o valor
-  > **exato, em 2 casas**, continua no `title` de cada coluna, e é o único lugar onde ele está: o
-  > rodapé publica só a BASE da escala (o VGV de tabela), não o valor de cada barra. Precisão não
-  > se perde, mas ela mora num canal só. (b) Não alcança card de KPI, que tem a sua própria regra acima. (c) Quem a
+  > **exato, em 2 casas**, continua no `title` de cada coluna — e, na coluna expansível, no
+  > `aria-label`. O rodapé publica só a BASE da escala (o VGV de tabela), não o valor de cada
+  > barra. Precisão não se perde; ela sai do rótulo e passa a morar nos canais de detalhe. (b) Não alcança card de KPI, que tem a sua própria regra acima. (c) Quem a
   > implementa é `fmtR$Milhoes`, e a trava é `frontend/cascata-milhoes.test.ts`, que confere a
   > contagem exata no único consumidor **e** zero ocorrências em todo o resto do frontend
   > versionado (enumerado por `git ls-files`, nunca varrendo o disco).
