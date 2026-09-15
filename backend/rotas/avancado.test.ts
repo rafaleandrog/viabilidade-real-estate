@@ -349,10 +349,15 @@ test('extrairCampos projeta só os campos pedidos e descarta id/estudo_id/timest
 
 test('reproduz o bug: tipologia com dormitorios/vagas nulos não deve carregar null para o criar()', () => {
   // `extrairCampos` preserva `null` explícito (campo ausente ≠ campo apagado,
-  // mesma decisão da #609 em `montarCopiasFilhas`) — mas o validador do shell
-  // recusa `null` em coluna decimal/inteiro na criação, mesmo sendo nullable.
-  // `duplicarDadosAvancado` filtra com `omitirValoresNulos` na fronteira de
-  // escrita, exatamente como esta composição reproduz.
+  // mesma decisão da #609 em `montarCopiasFilhas`), e `duplicarDadosAvancado`
+  // filtra com `omitirValoresNulos` na fronteira de escrita, exatamente como
+  // esta composição reproduz.
+  //
+  // ⚠️ **A justificativa escrita aqui era FALSA** — dizia que o shell "recusa
+  // `null` em coluna decimal/inteiro na criação, mesmo sendo nullable". Ele
+  // ACEITA `null` em coluna opcional; o que recusa é STRING. Ver
+  // `./coercao-numerica.ts`. O filtro continua pelo motivo de fidelidade de
+  // cópia descrito em `./duplicar-utils.ts`.
   //
   // ⚠️ `dormitorios`/`vagas` são os campos nulos do exemplo DE PROPÓSITO: nenhum
   // dos dois tem `padrao` em `schema.json`, então omitir a chave cai em NULL —

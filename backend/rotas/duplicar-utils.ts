@@ -4,31 +4,37 @@
 // de volta de `estudos.ts`.
 
 /**
- * Remove do objeto as chaves cujo valor é `null` — o validador do shell rejeita `null`
- * explícito em coluna `decimal`/`inteiro` na criação (`req.dados!.criar`), mesmo quando
- * a coluna é `nullable`, e sem alternativa: o mesmo validador recusa `null` também no
- * `atualizar` (PATCH — #694), então não existe um "cria sem o campo, depois grava null
- * por cima" que escape da rejeição. Omitir a chave é a ÚNICA forma de a criação suceder.
+ * Remove do objeto as chaves cujo valor é `null`.
  *
- * Aplicar SÓ nesta fronteira de escrita, nunca dentro de `montarCopiasFilhas`/
+ * ⚠️ **A justificativa original desta função era FALSA, e foi corrigida em
+ * 2026-09-15.** Ela dizia que *"o validador do shell rejeita `null` explícito em
+ * coluna `decimal`/`inteiro`, mesmo quando a coluna é nullable"*. Medido contra
+ * o shell 0.55.22, `shell/backend/src/dados/validacao-dados.ts` faz, tanto em
+ * `validarInsert` quanto em `validarUpdate`:
+ *
+ *     if (valor === null || valor === undefined) continue;  // optional field set to null is fine
+ *
+ * `null` em coluna opcional é **aceito**. O que o shell recusa é
+ * `typeof valor !== 'number'` — ou seja **string**, que é como toda coluna
+ * `decimal` volta do Postgres (o shell só registra type parser customizado para
+ * `DATE`). Era essa string, e não o `null`, que quebrava a duplicação na #714 e
+ * o "Salvar premissas" na #694. Quem resolve isso é `./coercao-numerica.ts`,
+ * que tem o histórico completo.
+ *
+ * **Então por que esta função continua?** Porque removê-la é uma mudança de
+ * comportamento de DUPLICAÇÃO, não de validação, e merece decisão própria:
+ * omitir a chave faz o shell aplicar o `padrao` da coluna, enquanto mandar
+ * `null` reproduziria o `null` do original. Hoje, para as 76 colunas de
+ * `estudos` com `padrao` (este helper é agnóstico a tipo — 45 delas são
+ * numéricas), a cópia diverge do original quando o campo está `null` na origem — comportamento que já existia antes deste arquivo e
+ * que está aceito e testado (`estudos.test.ts`). Manter é o status quo;
+ * remover é o conserto de fidelidade. **Não é mais uma defesa contra erro de
+ * validação, e não deve ser citada como tal.**
+ *
+ * Aplicar SÓ na fronteira de escrita, nunca dentro de `montarCopiasFilhas`/
  * `extrairCampos`: essas funções preservam `null` de propósito (#609), para
  * distinguir "usuário apagou o valor" de "campo nunca existiu" na representação
  * intermediária da linha copiada.
- *
- * ⚠️ **Limite conhecido, não coberto por este helper: coluna com `padrao` NÃO-nulo no
- * `schema.json`.** Omitir a chave nesse caso não reproduz `null` — o shell aplica o
- * `padrao` da coluna, e a cópia diverge do original nesse campo específico (achado
- * cruzado do Codex e da lente L1 na revisão do PR que introduziu este arquivo). Não é
- * um caso novo: é o MESMO comportamento que `montarCopiaEstudo`, abaixo, já tem — e já
- * tinha antes deste arquivo existir — para as 45 colunas de `estudos` com `padrao`
- * não-nulo, aceito e testado (`estudos.test.ts` "omite numéricos nulos do Avançado").
- * A razão de continuar aceitável: nenhum caminho de escrita deste app grava `null`
- * numa coluna com `padrao` não-nulo — todo formulário que edita um desses campos
- * coage para um número real antes de mandar ao backend (ex.: `_num` em
- * `tela-funding.ts` faz `e.detail.valor ?? 0`), então o cenário em que a divergência
- * se manifestaria não é alcançável pela app hoje. Se um caminho de escrita novo
- * algum dia permitir gravar `null` explícito num campo com `padrao` (ex.: uma rota
- * de API chamada fora da tela), essa nota deixa de valer e o achado reabre.
  */
 export function omitirValoresNulos<T extends Record<string, any>>(obj: T): Partial<T> {
   const saida: Partial<T> = {};

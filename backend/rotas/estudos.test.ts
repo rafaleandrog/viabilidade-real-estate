@@ -255,43 +255,74 @@ test('PATCH: campo so-do-Avancado e filtrado em estudo Preliminar', () => {
   assert.deepEqual(montarPatchEstudo({ taxa_desconto_aa: 12 }, AVANCADO), { dados: { taxa_desconto_aa: 12 } });
 });
 
-// ── #694: gabarito_maximo/ret_pct nulos nao disparam "deve ser um numero" ──
+// ── A COERÇÃO NUMÉRICA DO PATCH (substitui os 4 testes da #694) ────────────
+//
+// A #694 media a coisa errada: ela testava que `gabarito_maximo`/`ret_pct`
+// NULOS eram omitidos. Só que `null` sempre foi aceito pelo shell — o que ele
+// recusa é `typeof valor !== 'number'`, e o que a tela mandava era STRING
+// (coluna `decimal` volta do Postgres assim). Os testes abaixo exercitam o
+// valor que o usuário de verdade produz.
 
-test('#694: gabarito_maximo e ret_pct nulos sao omitidos, em QUALQUER nivel', () => {
-  // Ao contrario de CAMPOS_SOMENTE_AVANCADO, este filtro nao depende de
-  // nivel_analise: os dois campos sao orfaos em Preliminar E em Avancado.
+test('PATCH: decimal que chega como STRING é coagido para número — o bug do Salvar premissas', () => {
+  // Shape literal de `GET /estudos/:id`. Antes desta correção isto atravessava
+  // `montarPatchEstudo` intacto e o shell devolvia
+  // `Erros de validação: Campo "gabarito_maximo" deve ser um número; ...`
   assert.deepEqual(
-    montarPatchEstudo({ nome: 'x', gabarito_maximo: null, ret_pct: null }, PRELIMINAR),
-    { dados: { nome: 'x' } });
-  assert.deepEqual(
-    montarPatchEstudo({ nome: 'x', gabarito_maximo: null, ret_pct: null }, AVANCADO),
-    { dados: { nome: 'x' } });
-});
-
-test('#694: os dois sozinhos e nulos dao NENHUM_CAMPO, nao dados vazios', () => {
-  const r = montarPatchEstudo({ gabarito_maximo: null, ret_pct: null }, PRELIMINAR);
-  assert.equal('codigo' in r && r.codigo, 'NENHUM_CAMPO');
-});
-
-test('#694: um valor de VERDADE em gabarito_maximo/ret_pct continua indo ao PATCH', () => {
-  // O filtro so omite NULO — nao apaga o campo do vocabulario. Precisa
-  // continuar editavel se algum dia ganhar tela, e ret_pct precisa continuar
-  // gravavel por aqui quando vem preenchido (mesmo a UI de verdade sendo o
-  // endpoint dedicado de avancado/parametros).
-  assert.deepEqual(
-    montarPatchEstudo({ gabarito_maximo: 12, ret_pct: 4 }, PRELIMINAR),
+    montarPatchEstudo({ gabarito_maximo: '12.00', ret_pct: '4.00' }, PRELIMINAR),
     { dados: { gabarito_maximo: 12, ret_pct: 4 } });
+  assert.deepEqual(
+    montarPatchEstudo({ coef_aproveitamento_maximo: '3.00', custo_construcao_m2: '4800.00' }, PRELIMINAR),
+    { dados: { coef_aproveitamento_maximo: 3, custo_construcao_m2: 4800 } });
 });
 
-test('#694: o filtro NAO e generico — campo fora da lista nomeada, nulo, continua indo ao PATCH', () => {
-  // A armadilha que a inversao genérica cairia: `tela-premissas.ts` grava
-  // `null` DE PROPOSITO em `*_valor_canonico`/`*_area_canonica`
-  // (`_editarCustoUnidade`, quando o usuario limpa um custo por unidade) para
-  // fora de `TODOS_NUM`. Nenhum desses campos esta em CAMPOS_OMITIR_SE_NULO,
-  // entao continuam indo ao PATCH mesmo nulos.
+test('PATCH: null continua passando — a escrita de _editarCustoUnidade sobrevive', () => {
+  // `frontend/tela-premissas.ts:_editarCustoUnidade` grava `null` DE PROPÓSITO
+  // em `*_valor_canonico` quando o usuário limpa um custo por unidade, e o
+  // shell ACEITA `null` em coluna opcional (`validacao-dados.ts`, validarUpdate:
+  // `if (valor === null || valor === undefined) continue;`). Omitir seria
+  // apagar a escrita legítima — foi a objeção correta registrada na #694,
+  // contra a inversão ERRADA.
   assert.deepEqual(
     montarPatchEstudo({ construcao_valor_canonico: null }, AVANCADO),
     { dados: { construcao_valor_canonico: null } });
+  assert.deepEqual(
+    montarPatchEstudo({ nome: 'x', gabarito_maximo: null, ret_pct: null }, PRELIMINAR),
+    { dados: { nome: 'x', gabarito_maximo: null, ret_pct: null } });
+});
+
+test('PATCH: número já correto passa intacto, e inteiro continua inteiro', () => {
+  assert.deepEqual(
+    montarPatchEstudo({ gabarito_maximo: 12, ret_pct: 4 }, PRELIMINAR),
+    { dados: { gabarito_maximo: 12, ret_pct: 4 } });
+  assert.deepEqual(
+    montarPatchEstudo({ num_unidades_residencial: 120 }, PRELIMINAR),
+    { dados: { num_unidades_residencial: 120 } });
+});
+
+test('PATCH: entrada suja é RECUSADA, não vira número plausível (armadilha 14)', () => {
+  // `Number()` cru aceitaria os cinco: '' -> 0, '0x10' -> 16, '1e3' -> 1000,
+  // ' ' -> 0, e true -> 1. Nenhum é percentual/valor que o usuário digitou.
+  for (const sujo of ['', '0x10', '1e3', '   ', 'abc', true, {}, []]) {
+    const r = montarPatchEstudo({ ret_pct: sujo as any }, PRELIMINAR);
+    assert.equal('codigo' in r && r.codigo, 'CAMPO_INVALIDO',
+      `valor sujo ${JSON.stringify(sujo)} deveria ser recusado, veio ${JSON.stringify(r)}`);
+  }
+});
+
+test('PATCH: decimal fracionário em coluna INTEIRA é recusado', () => {
+  const r = montarPatchEstudo({ num_unidades_residencial: '12.5' }, PRELIMINAR);
+  assert.equal('codigo' in r && r.codigo, 'CAMPO_INVALIDO');
+  // E o inteiro escrito como string inteira passa.
+  assert.deepEqual(
+    montarPatchEstudo({ num_unidades_residencial: '12' }, PRELIMINAR),
+    { dados: { num_unidades_residencial: 12 } });
+});
+
+test('PATCH: campo de TEXTO com cara de número não é tocado pela coerção', () => {
+  // `data_inicio_projeto` é `texto` no schema.json — coagir viraria NaN/erro.
+  assert.deepEqual(
+    montarPatchEstudo({ data_inicio_projeto: '2026-01-01' }, AVANCADO),
+    { dados: { data_inicio_projeto: '2026-01-01' } });
 });
 
 // ── #609: duplicar copia absolutamente tudo ────────────────────────────────
@@ -353,10 +384,16 @@ test('#609 lista vazia, nula ou indefinida devolve lista vazia', () => {
 // ── Duplicação: "Campo X deve ser um número" ao duplicar (bug relatado) ──
 //
 // `montarCopiasFilhas` preserva `null` de propósito (teste "#609 valor NULO
-// viaja" acima) — mas esse `null` nunca pode chegar cru a `req.dados!.criar`,
-// porque o validador do shell recusa `null` em coluna decimal/inteiro na
-// criação, mesmo sendo nullable. `omitirValoresNulos` é o filtro que fica só
-// nessa fronteira de escrita, entre `montarCopiasFilhas` e `criar`.
+// viaja" acima), e `omitirValoresNulos` é o filtro que fica só na fronteira de
+// escrita, entre `montarCopiasFilhas` e `criar`.
+//
+// ⚠️ **A justificativa que estava escrita aqui era FALSA** — dizia que "o
+// validador do shell recusa `null` em coluna decimal/inteiro na criação, mesmo
+// sendo nullable". Ele ACEITA (`validarInsert` pula `null` em coluna opcional
+// antes de olhar o tipo); o que ele recusa é STRING. Ver o cabeçalho de
+// `./coercao-numerica.ts`. `omitirValoresNulos` continua aqui pelo motivo
+// revisado em `./duplicar-utils.ts`, que é de FIDELIDADE de cópia, não de
+// validação.
 
 test('omitirValoresNulos remove só as chaves com valor null', () => {
   assert.deepEqual(

@@ -4,6 +4,75 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## `decimal` atravessa a API como STRING — a causa real do "deve ser um número" (2026-09-15)
+
+**O fato que faltava, e que quatro correções não tinham:** toda coluna `decimal` do `schema.json`
+vira `NUMERIC(p,s)` no Postgres, e o shell registra **um único** type parser customizado do `pg`, o
+de `DATE`. Sem parser para `NUMERIC` (OID 1700), o driver devolve **string** — medido no
+`pg-types@2.2.0`: `getTypeParser(1700)('4.00') === '4.00'`, enquanto `INT4` devolve número. Então
+`GET /estudos/:id` responde `ret_pct: "4.00"`, e quem ecoar esse valor de volta num PATCH leva
+`Erros de validação: Campo "ret_pct" deve ser um número`.
+
+**E a premissa que o repositório escrevia era falsa.** Quatro lugares afirmavam que *"o validador do
+shell rejeita `null` explícito em coluna `decimal`/`inteiro`, mesmo sendo nullable"*. Medido contra o
+shell **0.55.22** (a versão da instância), `shell/backend/src/dados/validacao-dados.ts` faz, em
+`validarInsert` E em `validarUpdate`, `if (valor === null || valor === undefined) continue;` —
+`null` em coluna opcional é **aceito**, sem olhar o tipo. O que ele recusa é
+`typeof valor !== 'number'`.
+
+Consequência: `CAMPOS_OMITIR_SE_NULO` (#694) e `omitirValoresNulos` (#714) eram **no-op para o
+sintoma** — os valores nunca foram `null`. E `ret_pct` tem `padrao: 4`, então praticamente nenhum
+estudo o tem nulo: *Salvar premissas* falhava por inteiro, e **nada era gravado** (a validação roda
+antes de qualquer SQL). As duas listas que pareciam funcionar (`CAMPOS_SOMENTE_AVANCADO`,
+`CAMPOS_APOSENTADOS`) funcionam por omitirem a chave SEMPRE, o que escapa do `typeof` por tabela —
+pelo motivo certo, com a explicação errada escrita ao lado.
+
+**Por que atravessou quatro rodadas de revisão:** `backend/rotas/estudos-duplicar-rota.test.ts` tinha
+um dublê chamado `DadosFakeComValidadorDeNulo` que lançava quando o valor era `null` — **a regra
+oposta à do shell**. A suíte media a crença da app, não o shell. Ele virou
+`DadosFakeComValidadorDoShell`, que replica a regra real (aceita `null`, recusa não-`number` em
+coluna numérica, junta as mensagens com `'; '` como `helper-dados.ts`).
+
+**A correção é a inversão da armadilha 14** — quatro listas nomeadas para a mesma classe é
+exatamente o gatilho dela. `backend/rotas/coercao-numerica.ts` é o parser único, fail-closed,
+derivado do `schema.json`: `null`/`undefined` passam, `number` finito passa, string decimal estrita
+vira número, e **todo o resto falha nomeando o campo** (`''`, `'0x10'`, `'1e3'`, `NaN`, booleano,
+objeto). Aplicado em `montarPatchEstudo`, em `montarCopiaEstudo` e em todo `req.dados!.criar` da
+duplicação (`estudos.ts` e `avancado.ts`). `CAMPOS_OMITIR_SE_NULO` saiu;
+`CAMPOS_SOMENTE_AVANCADO` ficou, agora com o motivo **semântico** escrito (não escrever campo do
+Avançado por uma tela de Preliminar).
+
+**E a tela passou a mandar só o DIFF.** `frontend/tela-premissas.ts:_salvar` montava o payload a
+partir de uma cópia integral do registro, menos 16 chaves de identidade. Enquanto o PATCH falhava,
+o estrago ficava escondido atrás do erro; **com o PATCH consertado, o eco vira sobrescrita
+silenciosa** — a tela regravaria, a partir de um retrato feito quando a aba carregou (e que não é
+refeito enquanto o id não muda), campos cujo dono é outra tela: `ret_pct`/`considerar_ret`
+(Custos → Financeiro), `area_terreno_nucleo`, `nome`, e **num estudo Avançado a aba Financeiro
+inteira**, porque `CAMPOS_SOMENTE_AVANCADO` só filtra em Preliminar. Agora `_salvar` pula todo
+campo que não difere do retrato, pelo mesmo predicado (`campoMudou`) que decide a faixa de
+"alterações não salvas" — campo que a tela não edita nunca muda, logo nunca viaja, e a classe morre
+sem lista nomeada nenhuma.
+
+> ⚠️ **Este bloqueante foi achado na revisão do próprio PR, não antes dele** — e é o caso didático
+> de que consertar um erro duro pode piorar o dado: trocar "falha ruidosa" por "grava o valor
+> errado em silêncio" teria sido um retrocesso, com a suíte verde.
+
+Cobertura: `backend/rotas/coercao-numerica.test.ts` (inventário por **contagem exata** — 104
+colunas numéricas em `estudos`), testes de **fiação de rota** que exercitam `PATCH /estudos/:id` e
+`POST /estudos/:id/duplicar` com o payload real (decimais em string, inclusive nas tabelas
+**filhas**) contra um dublê fiel ao shell, e a bateria de fiação da tela. Controle de mutação
+medido em cada ponto de chamada: apagar a coerção do PATCH → **5 vermelhos**; a de
+`montarCopiaEstudo` → **1**; a das filhas (`FILHAS_SIMPLES` e `avancado_linhas_custo`) → **1** cada;
+apagar o filtro de diff da tela → **1**.
+
+**O que a revisão retirou do PR, e por quê.** A primeira versão mapeava a recusa do shell para
+**422** em vez de 500 (`erroDeEscrita`). Saiu: o mapeamento casava um **prefixo de mensagem que o
+SDK não documenta** (`Erros de validação:`) — uma mudança de redação no shell o reverteria a 500 em
+silêncio —, e `api()` do shell **lança em não-2xx** (`overview.md`), então o usuário vê exatamente
+o mesmo texto com 422 ou com 500. Ganho nenhum, superfície não publicada: não vale o risco.
+
+---
+
 ## Filtro do seletor de lote (Terreno & Áreas, Incorporação): exclui regularização fundiária + busca por texto (2026-09-14)
 
 Pedido do autor, sem issue prévia: o seletor "Adicionar lote" de `viab-terreno-nucleo.ts`
@@ -54,6 +123,15 @@ registro do estudo, e envia quase tudo — inclusive dois campos que nenhuma tel
 `null` numa coluna `decimal` dispara "Campo X deve ser um número" no validador do shell, mesmo
 sendo nullable — mesmo mecanismo que motivou `CAMPOS_SOMENTE_AVANCADO`, só que aqui o campo é órfão
 em qualquer nível de análise.
+
+> 🔴 **Esta seção descreve uma correção que NÃO funcionou, e a premissa dela é falsa — medido e
+> corrigido em 2026-09-15 (ver a seção do topo).** O shell **aceita** `null` em coluna opcional; o
+> que ele recusa é STRING, e `decimal` volta do Postgres como string. Como `ret_pct` tem
+> `padrao: 4` e quase nunca é nulo, `CAMPOS_OMITIR_SE_NULO` era no-op para o sintoma relatado — o
+> erro continuou aparecendo, palavra por palavra, depois do merge. A lista foi removida e
+> substituída por `backend/rotas/coercao-numerica.ts`. Duas afirmações desta seção também não se
+> sustentam: `gabarito_maximo` **não** é "sempre `null`" (o próprio erro relatado prova que há dado
+> gravado nele), e os 4 testes citados abaixo mediam `null` — o caso que nunca foi o defeito.
 
 **A inversão genérica (armadilha 14 do CLAUDE.md) foi considerada e descartada com evidência.**
 Investigação achou um contraexemplo real: `_editarCustoUnidade` (`frontend/tela-premissas.ts`)

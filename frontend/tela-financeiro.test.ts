@@ -107,12 +107,18 @@ test('#585 FIAÇÃO: a tela BARRA antes de persistir e PROPAGA depois de salvar'
 // #585 — a TABELA que mantém os três validadores da coluna alinhados
 // ─────────────────────────────────────────────────────────────────────────
 //
-// `estudos.juros_tabela_aa_padrao` é validada em TRÊS lugares, e eles não
-// compartilham código porque rodam em runtimes diferentes:
+// `estudos.juros_tabela_aa_padrao` é validada em TRÊS lugares, que rodam em
+// runtimes diferentes:
 //
 //   · `erroJurosTabelaEstudo`      — aqui, no navegador (feedback imediato);
 //   · `percentualEstrito`          — `backend/rotas/estudos.ts` (a fronteira);
 //   · `numeroLimpo`                — `migracoes/037_…` (runner de migração).
+//
+// ⚠️ **"e eles não compartilham código" deixou de ser verdade em 2026-09-15**:
+// `percentualEstrito` passou a delegar a `numeroEstrito`
+// (`backend/rotas/coercao-numerica.ts`), o parser único da fronteira de
+// escrita. Os outros dois seguem com código próprio, e é por isso que esta
+// tabela continua sendo a única coisa que os mantém alinhados.
 //
 // ⚠️ **Três regras para um campo é exatamente como a classe de defeito desta
 // issue começa.** Medido antes deste conserto: a migração rejeitava `'0x10'`,
