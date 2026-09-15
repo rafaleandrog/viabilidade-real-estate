@@ -353,9 +353,16 @@ test('reproduz o bug: tipologia com dormitorios/vagas nulos não deve carregar n
   // recusa `null` em coluna decimal/inteiro na criação, mesmo sendo nullable.
   // `duplicarDadosAvancado` filtra com `omitirValoresNulos` na fronteira de
   // escrita, exatamente como esta composição reproduz.
+  //
+  // ⚠️ `dormitorios`/`vagas` são os campos nulos do exemplo DE PROPÓSITO: nenhum
+  // dos dois tem `padrao` em `schema.json`, então omitir a chave cai em NULL —
+  // igual ao original. `area_privativa_aberta_m2` (que TEM `padrao: 0`) segue
+  // preenchida aqui — usá-la como exemplo de null trocaria silenciosamente o
+  // valor original por `0` na cópia, que é exatamente o risco que
+  // `duplicar-utils.ts` documenta (achado do Codex + L1 na revisão do PR).
   const tipologia = {
     id: 5, estudo_id: 7, nome: 'Studio', tipo_unidade: 'apartamento',
-    area_privativa_m2: 32.5, area_privativa_aberta_m2: null,
+    area_privativa_m2: 32.5, area_privativa_aberta_m2: 4.2,
     dormitorios: null, vagas: null, quantidade: 40, preco_m2: 9000, ordem: 0,
   };
   const campos = ['nome', 'tipo_unidade', 'area_privativa_m2', 'area_privativa_aberta_m2', 'dormitorios', 'vagas', 'quantidade', 'preco_m2', 'ordem'];
@@ -369,7 +376,8 @@ test('reproduz o bug: tipologia com dormitorios/vagas nulos não deve carregar n
   }
   assert.deepEqual(payloadParaCriar, {
     estudo_id: 99, nome: 'Studio', tipo_unidade: 'apartamento',
-    area_privativa_m2: 32.5, quantidade: 40, preco_m2: 9000, ordem: 0,
+    area_privativa_m2: 32.5, area_privativa_aberta_m2: 4.2,
+    quantidade: 40, preco_m2: 9000, ordem: 0,
   });
 });
 
