@@ -329,6 +329,16 @@ export class ViabTelaPremissas extends LitElement {
   // persistência otimista, como `tela-empreendimento-tipologias.ts`), não faz
   // parte do "Salvar premissas" único.
   @state() private produtos: any[] = [];
+  // ⚠️ #711, rodada 5 (achado P1 do Codex): `produtos` começa `[]` ANTES do
+  // fetch em `_init` terminar — janela síncrona em que `_ctxConversao()` já
+  // calcula VGV como 0, só que é um 0 PROVISÓRIO (catálogo ainda não
+  // chegou), não o "conhecido e zerado" que a relaxação da #711 precisa. Se
+  // o clique da badge acontecesse nessa janela (ou o fetch falhasse, caindo
+  // no `catch` de `_init` e nunca marcando isto), o canônico congelaria em 0
+  // com base num dado que nem chegou — a mesma classe de bug das rodadas
+  // 1-3, agora na camada de carregamento. Só vira `true` depois que
+  // `listarProdutosPreliminar` resolve com sucesso; nunca no `catch`.
+  @state() private _catalogoCarregado = false;
   @state() private confirmRemoverProduto: any | null = null;
   // Validação de obrigatórios (ao salvar): `erros` por campo + resumo em banner.
   @state() private erros: Record<string, string> = {};
@@ -512,6 +522,7 @@ export class ViabTelaPremissas extends LitElement {
     this.erros = {};
     this.erroGeral = '';
     this.produtos = [];
+    this._catalogoCarregado = false;
     try {
       const [bm, cfg, prod] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
@@ -521,9 +532,12 @@ export class ViabTelaPremissas extends LitElement {
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
       this.produtos = prod?.dados || [];
+      this._catalogoCarregado = true;
     } catch (e) {
       if (!respostaAindaVale(id, this.estudo?.id)) return;
       console.error(e);
+      // ⚠️ Nunca marca `_catalogoCarregado` aqui: o VGV segue INDEFINIDO (não
+      // 0) até um fetch bem-sucedido, mesmo que a sessão nunca volte a tentar.
     }
   }
 
@@ -572,13 +586,38 @@ export class ViabTelaPremissas extends LitElement {
   // eram lidas AQUI dos campos legados enquanto o motor já usava o catálogo —
   // a badge "% área venda" convertia sobre uma base e o cálculo usava outra.
   private _ctxConversao(): CtxConversao {
-    return ctxConversaoPreliminar(calcularProforma(this._entradaProforma()));
+    const ctx = ctxConversaoPreliminar(calcularProforma(this._entradaProforma()));
+    // ⚠️ #711, rodadas 5 e 6: enquanto o catálogo de Produtos não terminou de
+    // carregar (ou falhou), `calcularProforma` devolve VALORES PROVISÓRIOS
+    // para toda grandeza que depende do catálogo — não só VGV (rodada 5):
+    // `areaVendavelR`/`areaVendavelNR` também caem no fallback legado quando
+    // `produtos` está `[]` (`semProdutos`, em `proforma.ts`), que durante o
+    // carregamento é um FALSO "sem catálogo" — o estudo salvo pode ter um
+    // catálogo real que só ainda não chegou. A rodada 5 apagou só as 3
+    // chaves de VGV e a rodada 6 achou que as outras duas grandezas
+    // catalog-derived ficaram de fora — a mesma classe de bug, achada de
+    // novo por listar o que apagar em vez de listar o que É seguro.
+    //
+    // Inversão (armadilha 14 do CLAUDE.md): em vez de enumerar mais uma
+    // chave contaminada a cada rodada, um ALLOWLIST do que é comprovadamente
+    // síncrono — nunca depende de `produtos` — e por isso sempre confiável
+    // mesmo durante o carregamento: `areaVendavel` (Loteamento vem da
+    // cascata do terreno; Incorporação soma `area_pvt_*`, campos do form) e
+    // `areaPrivativa` (mesma fonte). Qualquer chave nova que
+    // `ctxConversaoPreliminar` vier a expor no futuro nasce EXCLUÍDA por
+    // padrão, não incluída por engano.
+    if (!this._catalogoCarregado) {
+      return { areaVendavel: ctx.areaVendavel, areaPrivativa: ctx.areaPrivativa };
+    }
+    return ctx;
   }
 
   // Troca a unidade de um campo (Parte 2): converte o valor atual para a unidade
   // nova (equivalente), depois muda o modo. Se a base não estiver definida
-  // (grandeza de ligação = 0) ou o valor estiver vazio, não converte — mantém o
-  // valor atual do campo destino.
+  // (grandeza de ligação genuinamente AUSENTE do ctx — #711 deixou a ligação
+  // CONHECIDA e igual a 0 de contar como indefinida, só para esta decisão de
+  // troca de badge; ver `trocaBadgePremissas`) ou o valor estiver vazio, não
+  // converte — mantém o valor atual do campo destino.
   private _trocarUnidade(cu: CustoUnidade, nova: CustoUnidade['opcoes'][number]) {
     const modoAtual = modoEfetivo(cu, this.form[cu.modoKey]);
     if (nova.valor === modoAtual) return;
@@ -598,6 +637,7 @@ export class ViabTelaPremissas extends LitElement {
       valorDestino: this._num(nova.campo),
       canonicoPersistido: this._num(cu.campoCanonico),
       convAtual: atual.conv,
+      convNova: nova.conv,
       ctx: this._ctxConversao(),
     });
     if (!decisao.trocar) return;
@@ -638,7 +678,18 @@ export class ViabTelaPremissas extends LitElement {
     this._set(op.campo, valor);
     if (valor === null) { this._set(cu.campoCanonico, null); return; }
     const canonico = converterUnidade(op.conv, { tipo: 'identidade' }, valor, this._ctxConversao());
-    if (canonico !== null) this._set(cu.campoCanonico, canonico);
+    // #711, rodada 3 (achado do Codex): quando a conversão FALHA (ligação
+    // ainda indefinida/zerada), o canônico antigo não pode ficar parado —
+    // ele passaria a descrever um número que o usuário acabou de substituir.
+    // Isso é sério sobretudo quando o canônico antigo é um ZERO plantado por
+    // um clique de badge anterior (#711): sem limpar aqui, o valor digitado
+    // (`op.campo`, já gravado acima) nunca teria como derrubar aquele 0 —
+    // `proforma.ts` continuaria lendo o canônico congelado para sempre,
+    // mesmo depois de a ligação existir. Limpar volta a linha para "legado":
+    // a Proforma passa a ler `op.campo` dinamicamente, acompanhando a
+    // ligação assim que ela existir — exatamente o que já acontece quando o
+    // campo é esvaziado (`valor === null`, acima).
+    this._set(cu.campoCanonico, canonico);
   }
 
   render() {

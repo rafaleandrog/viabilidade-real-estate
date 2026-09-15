@@ -55,6 +55,20 @@ export function ctxConversaoPreliminar(p: Proforma): CtxConversao {
 
 // Valor da unidade → quantidade base. null = não há base definida (grandeza de
 // ligação 0/indefinida) ou valor inválido — nesse caso não se converte.
+//
+// ⚠️ **Deliberadamente estrita, mesmo depois da #711.** A #711 quis destravar
+// só o CLIQUE de badge (troca de unidade) quando a ligação é CONHECIDA e
+// igual a 0 — não qualquer chamador. `paraBase`/`daBase` são usadas também
+// por quem EDITA o valor (`_editarCustoUnidade`/`_editarOrcamento`, que
+// gravam o canônico sempre que a conversão sucede) e por quem EXIBE
+// (`_valorUnidade`/`_valorExibido`). Relaxar aqui faria uma tecla digitada
+// enquanto o VGV ainda não foi precificado **congelar** o canônico em 0 — a
+// #259 já congela no primeiro evento que deriva canônico, e digitar é um
+// evento tanto quanto clicar. Esse era exatamente o achado do Codex na
+// revisão do PR #712: relaxar a função COMPARTILHADA vazava a exceção de
+// apresentação para a escrita. A relaxação vive só em `trocaBadgePremissas`
+// (e seria replicada em `camposDaTrocaDeUnidade` se um dia o Avançado
+// precisar do mesmo botão) — nunca aqui.
 export function paraBase(conv: ConvUnidade, valor: number, ctx: CtxConversao): number | null {
   if (!Number.isFinite(valor)) return null;
   if (conv.tipo === 'identidade') return valor;
@@ -64,6 +78,8 @@ export function paraBase(conv: ConvUnidade, valor: number, ctx: CtxConversao): n
 }
 
 // Base → valor da unidade nova. null = não dá pra converter (grandeza 0).
+// Mesma nota de `paraBase`: fica estrita de propósito, a relaxação da #711
+// mora só na decisão do clique de badge.
 export function daBase(conv: ConvUnidade, base: number, ctx: CtxConversao): number | null {
   if (!Number.isFinite(base)) return null;
   if (conv.tipo === 'identidade') return base;
@@ -136,10 +152,10 @@ export function numeroDaColuna(v: unknown): number | null {
 //
 // ELA ESTABELECE: o canônico é o número de registro, a badge troca só a
 // representação, e o valor mostrado em cada unidade é derivado do canônico
-// (`_valorUnidade`, `tela-premissas.ts:631`).
+// (`_valorUnidade`, `tela-premissas.ts:671`).
 //
 // ELA NÃO ESTABELECE que se deva escrever a coluna por unidade — ao contrário:
-// `_trocarUnidade` (`tela-premissas.ts:582-595`) **não escreve coluna nenhuma**,
+// `_trocarUnidade` (`tela-premissas.ts:611-624`) **não escreve coluna nenhuma**,
 // nem a de destino nem a de origem. O único `_set(op.campo, …)` do arquivo está
 // em `_editarCustoUnidade:571`, quando o usuário DIGITA. A coluna por unidade lá
 // não é espelho: é valor histórico congelado que só o teclado atualiza.
@@ -244,6 +260,11 @@ export function dadosDaTrocaDeUnidade(
   // terreno". É a mentira da #442 de volta, e a tela nem denuncia — `_valorExibido`
   // devolve `null` pela mesma impossibilidade, e o campo aparece vazio.
   //
+  // ⚠️ **Não recebeu a relaxação da #711.** Esta função serve os Custos do
+  // Avançado, que a #711 nunca tocou — a issue era só sobre as badges de
+  // Premissas (Infraestrutura/Projetos). Ver a nota em `paraBase`/`daBase`
+  // sobre por que a relaxação não é global.
+  //
   // Então não se troca a unidade: não há como mudar de representação sem saber
   // representar. É a MESMA decisão que a #515 tomou para Premissas — lá a badge
   // não muda o modo quando o canônico não pôde ser estabelecido.
@@ -279,6 +300,15 @@ export function dadosDaTrocaDeUnidade(
 // trocava o modo **sempre**, e só gravava o canônico quando `converterUnidade`
 // conseguia — e ela devolve `null` quando a grandeza de ligação é 0 ou
 // indefinida (VGV zerado, área vendável zerada, estudo sem tipologias).
+//
+// ⚠️ **A #711 abriu uma exceção a ISTO, mas só aqui dentro — não em
+// `converterUnidade`/`paraBase`.** Ligação CONHECIDA e igual a 0 (VGV
+// existente e igual a R$ 0, não indefinido) passou a contar como canônico 0
+// também, mas a lógica dessa exceção mora **localmente**, logo abaixo, e não
+// nas funções puras compartilhadas — ver a nota em `paraBase`/`daBase` sobre
+// por que (achado do Codex na revisão do PR #712: relaxar a função
+// compartilhada vazava para `_editarCustoUnidade`, congelando em 0 um valor
+// que o usuário só tinha DIGITADO, não clicado para trocar de unidade).
 //
 // Num estudo **legado** (sem canônico) e **sem a grandeza de ligação**, o clique
 // mudava o modo e deixava o canônico nulo. Aí `proforma.ts` passava a ler a
@@ -326,6 +356,34 @@ export interface EntradaTrocaBadge {
   canonicoPersistido: number | null;
   /** Conversão da unidade ATIVA (a de origem). */
   convAtual: ConvUnidade;
+  /**
+   * Conversão da unidade de DESTINO (para onde o clique está indo).
+   *
+   * ⚠️ **Opcional, e a ausência é fail-closed — #711, achado P1 do Codex na
+   * revisão do PR #712.** A primeira versão da relaxação "ligação CONHECIDA e
+   * zerada deriva canônico 0" não olhava para o destino, e isso permitia um
+   * clique DERIVADA→DERIVADA (ex.: `% VGV` → `R$/m²`, ambas com ligação 0)
+   * congelar o canônico em 0 e depois **travá-lo lá**: `_editarCustoUnidade`
+   * tentando digitar um R$/m² real usa `paraBase`, que continua estrita, e
+   * enquanto a área de venda seguir 0 ela nunca consegue recalcular o
+   * canônico — o valor digitado fica gravado na coluna, mas a Proforma
+   * continua lendo o 0 congelado para sempre, mesmo depois de a área existir.
+   *
+   * A defesa: só congela em 0 quando o DESTINO consegue representar esse 0
+   * sem travar depois — `identidade` (R$, nunca depende de ligação) OU um
+   * derivado cuja PRÓPRIA ligação já é conhecida e positiva (aí `paraBase`
+   * reconverte um valor digitado depois normalmente). Destino derivado com
+   * ligação ausente ou também zerada continua bloqueado — é o caso
+   * DERIVADA→DERIVADA das duas ligações em 0 que a rodada 2 achou. A rodada 4
+   * (P2, não bloqueante) apontou que restringir a `identidade` sozinho forçava
+   * um caminho de dois cliques via R$ mesmo quando o destino já tinha ligação
+   * positiva — daí esta extensão.
+   *
+   * Omitir `convNova` (chamador antigo, ou teste que não testa este ramo)
+   * cai no lado seguro: a relaxação simplesmente não se aplica, como se a
+   * ligação estivesse indefinida.
+   */
+  convNova?: ConvUnidade;
   ctx: CtxConversao;
 }
 
@@ -345,7 +403,7 @@ export interface EntradaTrocaBadge {
  * este eixo**, porque a aridade não muda. Nomear os campos cobre.
  */
 export function trocaBadgePremissas(
-  { valorAtual, valorDestino, canonicoPersistido, convAtual, ctx }: EntradaTrocaBadge,
+  { valorAtual, valorDestino, canonicoPersistido, convAtual, convNova, ctx }: EntradaTrocaBadge,
 ): TrocaBadgePremissas {
   // ⚠️ **A regra é UMA, e ela substituiu uma lista de casos que não convergia.**
   //
@@ -399,8 +457,39 @@ export function trocaBadgePremissas(
   // ele testa a ligação ANTES de multiplicar —, mas `0 %` de qualquer VGV é
   // R$ 0,00 e `0 R$/m²` sobre qualquer área é R$ 0,00. O valor do link não
   // muda o produto quando o multiplicando é zero.
+  //
+  // ⚠️ #711: e quando o multiplicando NÃO é zero, mas a ligação é CONHECIDA
+  // (chave presente no `ctx`, finita, ≥ 0) e igual a 0? Economicamente é o
+  // mesmo caso — 30% de um VGV de R$ 0 também é R$ 0 —, mas `paraBase` não
+  // resolve sozinha (de propósito: ver a nota lá em cima). Resolve-se aqui,
+  // sem chamar `converterUnidade`: multiplicar por uma ligação conhecida-zero
+  // nunca precisa saber o valor do link, é sempre 0.
+  //
+  // ⚠️ **E só quando o DESTINO puder representar o 0 sem travar depois —
+  // achados P1 (rodada 2) e P2 (rodada 4) do Codex no PR #712.** Destino
+  // `identidade` (R$) nunca trava: um campo de R$ sempre aceita o que for
+  // digitado, sem depender de ligação nenhuma. Destino DERIVADO (%/R$-por-
+  // área) só é seguro quando a ligação DELE já é conhecida e POSITIVA — nesse
+  // caso `paraBase` consegue reconverter um valor digitado depois normalmente
+  // (rodada 3 também blindou o caminho geral: `_editarCustoUnidade` agora
+  // limpa o canônico quando a reconversão falha, em vez de deixá-lo
+  // congelado). Destino derivado com ligação AUSENTE ou também zerada
+  // continua bloqueado — é exatamente o caso DERIVADA→DERIVADA com as duas
+  // ligações em 0 que a rodada 2 achou.
+  const destinoAceitaZero = convNova !== undefined && (
+    convNova.tipo === 'identidade'
+    || (ctx[convNova.link] !== undefined
+      && Number.isFinite(ctx[convNova.link])
+      && (ctx[convNova.link] as number) > 0)
+  );
+  const ligacaoConhecidaZero = convAtual.tipo !== 'identidade'
+    && ctx[convAtual.link] !== undefined
+    && Number.isFinite(ctx[convAtual.link])
+    && (ctx[convAtual.link] as number) === 0
+    && destinoAceitaZero;
   const derivado = valorAtual === 0 ? 0
     : valorAtual === null ? null
+    : ligacaoConhecidaZero && Number.isFinite(valorAtual) ? 0
     : converterUnidade(convAtual, { tipo: 'identidade' }, valorAtual, ctx);
   if (derivado !== null) return { trocar: true, canonico: derivado };
 
