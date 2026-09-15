@@ -577,8 +577,10 @@ export class ViabTelaPremissas extends LitElement {
 
   // Troca a unidade de um campo (Parte 2): converte o valor atual para a unidade
   // nova (equivalente), depois muda o modo. Se a base não estiver definida
-  // (grandeza de ligação = 0) ou o valor estiver vazio, não converte — mantém o
-  // valor atual do campo destino.
+  // (grandeza de ligação genuinamente AUSENTE do ctx — #711 deixou a ligação
+  // CONHECIDA e igual a 0 de contar como indefinida, só para esta decisão de
+  // troca de badge; ver `trocaBadgePremissas`) ou o valor estiver vazio, não
+  // converte — mantém o valor atual do campo destino.
   private _trocarUnidade(cu: CustoUnidade, nova: CustoUnidade['opcoes'][number]) {
     const modoAtual = modoEfetivo(cu, this.form[cu.modoKey]);
     if (nova.valor === modoAtual) return;

@@ -7,7 +7,6 @@ import {
   numeroDaColuna,
   converterUnidade,
   ctxConversaoPreliminar,
-  paraBase,
   type CtxConversao,
 } from './premissas-conversao.js';
 import { dinheiroParaRotulo, resolverCustoTotal } from './fluxo-shared.js';
@@ -58,21 +57,31 @@ test('permuta financeira: % do VGV do tipo ↔ R$', () => {
   assert.equal(converterUnidade(pctNR, IDENT, 25, c), 1_000_000); // 25% de 4M
 });
 
-test('#711: base CONHECIDA e igual a 0 — converte quando o resultado é honesto, bloqueia quando não é', () => {
+test('sem base definida (grandeza de ligação = 0): não converte (null)', () => {
+  // ⚠️ `paraBase`/`daBase` continuam ESTRITAS mesmo depois da #711 — a
+  // relaxação de "ligação conhecida e zerada" vive só dentro de
+  // `trocaBadgePremissas` (decisão de clique de badge), nunca aqui. Ver a
+  // nota grande no topo de `paraBase`, em `premissas-conversao.ts`, e os
+  // testes de `trocaBadgePremissas` mais abaixo para a relaxação em si.
   const c = ctx({ areaVendavelR: 0 });
   const areaParaPct = { tipo: 'pct', link: 'areaVendavelR' } as const;
-  // m² → %: o DESTINO precisa dividir por uma área 0 para representar um
-  // valor ≠ 0 — impossível, continua null (mesmo caso "destino irrepresentável" da #442).
-  assert.equal(converterUnidade(IDENT, areaParaPct, 2000, c), null);
-  // % → m²: a ORIGEM (5% de uma área 0) já é R$/m² 0 — não precisa dividir
-  // nada, e bloquear aqui é que seria a mentira (esconder que já se sabe que é 0).
-  assert.equal(converterUnidade(areaParaPct, IDENT, 5, c), 0);
+  assert.equal(converterUnidade(IDENT, areaParaPct, 2000, c), null); // m² → % sem área
+  assert.equal(converterUnidade(areaParaPct, IDENT, 5, c), null);    // % → m² sem área
 });
 
-test('sem base definida (grandeza INDEFINIDA, não apenas 0): não converte (null)', () => {
-  const areaParaPct = { tipo: 'pct', link: 'areaVendavelR' } as const;
-  assert.equal(converterUnidade(IDENT, areaParaPct, 2000, {}), null);
-  assert.equal(converterUnidade(areaParaPct, IDENT, 5, {}), null);
+test('#711 (achado do Codex, PR #712): DIGITAR um valor com ligação zerada não congela nada — só o CLIQUE de badge tem a relaxação', () => {
+  // `_editarCustoUnidade`/`_editarOrcamento` (o usuário digitando um número
+  // novo no campo ativo) chamam `converterUnidade` direto — o mesmo caminho
+  // deste teste. Se este caminho relaxasse como `trocaBadgePremissas` relaxa,
+  // digitar "30" em Infraestrutura (% VGV) num Loteamento sem catálogo ainda
+  // precificado gravaria `infra_valor_canonico = 0` na hora — e por causa da
+  // #259 (o canônico manda sempre que existe), o custo de infraestrutura
+  // ficaria CONGELADO em R$ 0 para sempre, mesmo depois de o VGV real
+  // aparecer. É exatamente o achado do Codex na revisão da #711: continua
+  // `null` (sem congelar) aqui, porque este é o caminho de EDIÇÃO, não o de
+  // troca de badge.
+  const pctVgv = { tipo: 'pct', link: 'vgv' } as const;
+  assert.equal(converterUnidade(pctVgv, IDENT, 30, ctx({ vgv: 0 })), null);
 });
 
 test('valor inválido/vazio (NaN) não converte', () => {
@@ -460,25 +469,17 @@ test('#442 destino irrepresentável NÃO troca a unidade — a #442 de volta ser
   assert.equal(patch?.orcamento_unidade, 'rs_m2_terreno');
 });
 
-test('#711: ligação CONHECIDA e zerada deixa de bloquear também no Avançado (camposDaTrocaDeUnidade)', () => {
-  // Espelho do caso da Premissas, para o consumidor irmão: uma linha legada
-  // em `pct_vgv` (30%) com VGV conhecido e igual a 0 agora deriva canônico 0
-  // e grava `orcamento_valor: 0` no destino — em vez de não mexer em nada.
+test('#711: o Avançado (camposDaTrocaDeUnidade) NÃO recebeu a relaxação — ligação zerada continua bloqueando', () => {
+  // A #711 é só sobre as badges de Premissas (Infraestrutura/Projetos no
+  // Preliminar). `camposDaTrocaDeUnidade` serve os Custos do Avançado, uma
+  // fiação diferente (`_editarOrcamento` chama `converterUnidade` direto, sem
+  // passar por uma função de decisão própria como `trocaBadgePremissas`) —
+  // dar a mesma relaxação aqui exigiria blindar `_editarOrcamento` da mesma
+  // forma, o que está fora do escopo desta issue. Uma linha legada em
+  // `pct_vgv` (30%) com VGV conhecido e igual a 0 continua sem mexer em nada.
   const comLigacaoZerada = camposDaTrocaDeUnidade(30, null, PCT_VGV, RS, { vgv: 0 });
-  assert.equal(comLigacaoZerada.orcamento_valor_canonico, 0);
-  assert.equal(comLigacaoZerada.orcamento_valor, 0);
-
-  // Controle: com a chave AUSENTE (ligação indefinida, não apenas 0), continua
-  // sem mexer em nada — é o mesmo teste que já existia (`#442 sem canônico e
-  // sem grandeza de ligação`), reafirmado aqui para a dupla ficar lado a lado.
-  const semLigacao = camposDaTrocaDeUnidade(30, null, PCT_VGV, RS, {});
-  assert.equal('orcamento_valor' in semLigacao, false);
-  assert.equal('orcamento_valor_canonico' in semLigacao, false);
-
-  // E o caso "destino zerado com canônico ≠ 0" continua irrepresentável —
-  // dividir R$ 5.000.000 por uma área de terreno 0 não pode virar 0.
-  const destinoZeradoComCanonico = camposDaTrocaDeUnidade(0.24, 5_000_000, PCT_VGV, RS_M2_PRIV, { vgv: 171_448_400, areaPrivativa: 0 });
-  assert.equal('orcamento_valor' in destinoZeradoComCanonico, false);
+  assert.equal('orcamento_valor' in comLigacaoZerada, false);
+  assert.equal('orcamento_valor_canonico' in comLigacaoZerada, false);
 });
 
 test('#442 linha VAZIA troca de unidade normalmente — não há o que contradizer', () => {
@@ -813,10 +814,15 @@ test('#515: a entrada é por OBJETO — trocar dois `number | null` posicionais 
   );
 });
 
-test('#515: valor ativo ZERO troca mesmo sem grandeza de ligação — 0% de qualquer VGV é R$ 0,00', () => {
-  // `paraBase` recusa quando o link é 0, porque testa a ligação antes de
-  // multiplicar. Mas com multiplicando zero o link não muda o produto. Sem
-  // este caso, uma infraestrutura legada de 0% ficava travada até existir VGV.
+test('#515: valor ativo ZERO troca mesmo com a ligação apenas CONHECIDA (não precisa nem consultá-la) — 0% de qualquer VGV é R$ 0,00', () => {
+  // Este caso é resolvido pelo atalho `valorAtual === 0 ? 0` de
+  // `trocaBadgePremissas` (linha ~450), que nem chega a chamar `paraBase` —
+  // por isso o `ctx({ vgv: 0 })' abaixo é só ilustrativo, não é o que garante
+  // o resultado: o mesmo `d` sairia idêntico com `ctx: {}` (ligação
+  // INDEFINIDA). Desde a #711, `paraBase` também resolveria sozinha (produto
+  // 0 é seguro mesmo sem o atalho), mas o atalho segue cobrindo o caso
+  // residual em que a ligação é genuinamente desconhecida — ver o teste
+  // logo abaixo, que isola exatamente essa diferença.
   const d = trocaBadgePremissas({
     valorAtual: 0, valorDestino: null, canonicoPersistido: null, convAtual: CONV_PCT_VGV, ctx: ctx({ vgv: 0 }),
   });
