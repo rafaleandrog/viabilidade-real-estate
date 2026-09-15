@@ -37,6 +37,12 @@ export class ViabTelaGraficos extends LitElement {
   // seja, outro VGV — e desenhava gráfico e medidores de um estudo diferente
   // do que a aba ao lado mostra.
   @state() private produtos: any[] = [];
+  // Achado real da revisão (Codex, P2, PR #707): `produtos` nasce `[]` a
+  // cada `_init()`, antes do catálogo carregar — sem este estado, a faixa
+  // de consistência lia um catálogo vazio como "0 m² alocado" e desenhava
+  // o aviso "ainda faltam alocar" numa piscada, mesmo em estudo consistente
+  // (e para sempre, se a mesma `Promise.all` de benchmarks/config falhar).
+  @state() private produtosCarregados = false;
   private _idCarregado: number | null = null;
 
   static styles = [estiloConteudo, css`
@@ -98,6 +104,7 @@ export class ViabTelaGraficos extends LitElement {
     const id = this.estudo.id;
     this._idCarregado = id ?? null;
     this.produtos = [];
+    this.produtosCarregados = false;
     try {
       const [bm, cfg, prod] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
@@ -107,6 +114,7 @@ export class ViabTelaGraficos extends LitElement {
       this.benchmarks = bm?.dados || [];
       this.aliquotaRet = Number(cfg?.parametros?.aliquota_ret_pct) || 4;
       this.produtos = prod?.dados || [];
+      this.produtosCarregados = true;
     } catch (e) { console.error(e); }
   }
 
@@ -265,6 +273,12 @@ export class ViabTelaGraficos extends LitElement {
   // continua só informativa, nunca bloqueia salvar (decisão registrada na
   // #693; o handoff pede bloqueio, mas isso fica fora de escopo desta rodada).
   private _renderConsistencia(p: Proforma): TemplateResult {
+    // Achado real da revisão (Codex, P2, PR #707): sem este portão, o
+    // instante entre `connectedCallback()` e o catálogo carregar (produtos
+    // ainda `[]`) computava `diferencaAreaAlocada` contra 0 m² alocado e
+    // desenhava "ainda faltam alocar" para qualquer estudo com área — uma
+    // piscada de aviso falso, permanente se a mesma `Promise.all` falhar.
+    if (!this.produtosCarregados) return html``;
     const excesso = p.diferencaAreaAlocada > 0;
     const sobra = p.diferencaAreaAlocada < 0;
     if (!excesso && !sobra) return html``;
