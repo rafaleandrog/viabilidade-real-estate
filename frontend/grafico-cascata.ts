@@ -53,8 +53,13 @@ export class ViabGraficoCascata extends LitElement {
    * existe para alimentar `aria-expanded`: quem guarda o estado é a tela, e sem
    * ele o leitor de tela anunciaria um botão de alternância cujo estado nunca
    * muda (achado da rodada 2 de revisão).
+   *
+   * `attribute: false` como os dois irmãos acima, e não por gosto: o conversor
+   * `Boolean` do Lit lê PRESENÇA de atributo, então um `expandido="false"`
+   * escrito em HTML viraria `true`. Sem atributo, essa armadilha não existe
+   * (achado da rodada 3 de revisão).
    */
-  @property({ type: Boolean }) expandido = false;
+  @property({ attribute: false }) expandido = false;
 
   static styles = css`
     :host { display: block; }
@@ -103,17 +108,13 @@ export class ViabGraficoCascata extends LitElement {
       border-radius: 3px;
       overflow: hidden;
     }
-    /* min-height e o filete da barra que nao tem altura propria. Sao tres casos,
-       e eles diferem no que o rotulo mostra -- a versao anterior deste
-       comentario dizia que os tres colapsavam para "R$ 0,0", e isso e falso em
-       dois deles (achado da rodada 2 de revisao):
-         - deducao maior que o acumulado, e resultado deficitario: a GEOMETRIA e
-           clampada a zero pelo motor, mas o campo de valor fica integro, entao
-           o rotulo publica o numero de verdade (um deficit de 5 milhoes sai
-           como -R$ 5,0);
-         - deducao real de valor minusculo: ai sim o rotulo em milhoes colapsa
-           para "R$ 0,0", e o unico canal com o numero exato e o title.
-       Sem o filete, nos tres a coluna sumiria da tela sem deixar rastro. */
+    /* min-height e o piso de altura da barra: quando a altura calculada fica
+       abaixo de FILETE_PX, ela assume, e a coluna deixa um rastro visivel em
+       vez de sumir da tela. E so isso -- nao tente enumerar aqui QUAIS casos
+       do motor caem nesse piso: duas versoes deste comentario tentaram e as
+       duas erraram, porque o motor clampa INICIO e TAMANHO por caminhos
+       diferentes (cascata-resultado-motor.ts). Quem quiser a analise por caso
+       tem os numeros no motor e na issue 720. */
     .barra {
       position: absolute;
       left: 12%;
@@ -174,9 +175,14 @@ export class ViabGraficoCascata extends LitElement {
   // pressão; aqui a guarda de repetição resolve o efeito prático sem a
   // maquinaria de rastrear a pressão entre dois handlers.
   private _tecla(ev: KeyboardEvent, id: string) {
-    if (ev.repeat) return;
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    // `preventDefault` ANTES da guarda de repetição, e a ordem é o conserto:
+    // com a guarda na frente, cada `keydown` de auto-repeat saía pelo `return`
+    // sem cancelar o default, e o default do Espaço num `div` é ROLAR A PÁGINA
+    // — a guarda trocava "alterna em rajada" por "rola em rajada" (achado da
+    // rodada 3 de revisão).
     ev.preventDefault();
+    if (ev.repeat) return;
     this._clique(id);
   }
 

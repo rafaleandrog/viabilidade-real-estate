@@ -87,7 +87,13 @@ test('a chamada alimenta o rótulo de valor da barra, não um ponto morto', () =
   // houve. Falso positivo derruba guard, e guard derrubado não guarda nada
   // (achado da rodada 2 de revisão).
   const achatado = semComentarios(fonte(CONSUMIDOR.arquivo)).replace(/\s+/g, ' ');
-  const naBarra = achatado.match(/class="valor"[^>]*> *\$\{ *fmtR\$Milhoes\(/g) ?? [];
+  // `[^<]*` e não `[^>]*> *`: a versão anterior exigia a chamada COLADA no `>`
+  // que fecha a tag, e reprovava código correto em dois casos reais — conteúdo
+  // antes do valor (`>${sinal}${fmtR$Milhoes(v)}`) e atributo cujo valor contém
+  // `>`. Trocar "mesma linha" por "mesma tag colada" não tinha resolvido a
+  // classe (achado da rodada 3 de revisão). O `[^<]*` casa até a próxima tag,
+  // que é o limite do conteúdo textual deste `span`.
+  const naBarra = achatado.match(/class="valor"[^<]*fmtR\$Milhoes\(/g) ?? [];
   assert.equal(
     naBarra.length, 1,
     'o `span class="valor"` da coluna precisa ser formatado por `fmtR$Milhoes` — '
