@@ -22,6 +22,7 @@ import {
 import { duplicarDadosAvancado } from './avancado.js';
 import { CAMPOS as CAMPOS_PRODUTO } from './preliminar-produtos.js';
 import { omitirValoresNulos } from './duplicar-utils.js';
+import { coagirNumericosDeclarados, coagirNumericosOuLancar, numeroEstrito } from './coercao-numerica.js';
 
 export const rotasEstudos: ReturnType<typeof Router> = Router();
 
@@ -29,9 +30,18 @@ const TIPOS = ['loteamento', 'incorporacao'];
 const STATUS = ['rascunho', 'em_analise', 'aprovado', 'reprovado', 'arquivado'];
 
 // Campos exclusivos do estudo Avançado (aba Financeiro + estrutura de capital).
-// Num estudo Preliminar esses campos nunca são preenchidos e chegam como null no
-// payload, disparando a validação numérica do shell. Filtrá-los no PATCH elimina
-// o erro "Campo X deve ser um número" ao salvar Premissas de um Preliminar.
+// Filtrá-los no PATCH impede que a tela de Premissas de um Preliminar ESCREVA
+// campo que não é do nível dela — é um filtro semântico, e é só isso.
+//
+// ⚠️ **O motivo escrito aqui até 2026-09-15 era outro, e era falso:** dizia que
+// esses campos "chegam como null e disparam a validação numérica do shell".
+// Medido contra o shell 0.55.22, `validarUpdate` faz
+// `if (valor === null || valor === undefined) continue;` — `null` em coluna
+// opcional é ACEITO. O que o shell recusa é `typeof valor !== 'number'`, e o
+// que a tela mandava era STRING (coluna `decimal` volta do Postgres como
+// string). Quem trata isso agora é `coagirNumericosDeclarados`
+// (`./coercao-numerica.ts`), que tem o histórico completo. Esta lista continua
+// porque o motivo SEMÂNTICO acima vale por si.
 const CAMPOS_SOMENTE_AVANCADO = new Set([
   'taxa_desconto_aa', 'juros_tabela_aa_padrao',
   'estrutura_capital_proprio_pct', 'estrutura_financiamento_pct',
@@ -78,32 +88,14 @@ const CAMPOS_APOSENTADOS = new Set([
   'deflator_area_aberta_pct',
 ]);
 
-// #694: campos que continuam chegando `null` no payload inteiro que
-// `tela-premissas.ts` manda a cada "Salvar premissas" (ela copia o registro
-// inteiro do estudo e envia quase tudo) — mas que nenhuma tela de Premissas
-// de fato edita. `null` numa coluna `decimal` dispara "Campo X deve ser um
-// número" no validador do shell, mesmo sendo nullable — mesmo mecanismo que
-// motivou `CAMPOS_SOMENTE_AVANCADO`, mas aqui o campo é órfão em QUALQUER
-// nível de análise, não só Preliminar, então não pode reusar aquele filtro.
-//
-// `gabarito_maximo` nunca teve controle de UI em lugar nenhum do app, nem
-// default no `schema.json` — é sempre `null`. `ret_pct` tem controle de UI de
-// verdade, mas em `backend/rotas/avancado.ts` (`GET/PATCH
-// /estudos/:id/avancado/parametros`), não em Premissas; ele viaja sem querer
-// no payload inteiro e dispara o mesmo erro quando a coluna está `null`
-// (estudo criado antes do default da migração aplicar).
-//
-// ⚠️ **Por que isto NÃO é a inversão genérica** ("omitir todo campo fora do
-// conjunto que o formulário edita quando vier `null`") que a armadilha 14 do
-// CLAUDE.md prescreveria numa segunda ocorrência da mesma classe: medido em
-// `frontend/tela-premissas.ts:_editarCustoUnidade`, o app grava `null` DE
-// PROPÓSITO num campo fora de `TODOS_NUM` (`cu.campoCanonico` — ex.
-// `construcao_valor_canonico`) quando o usuário limpa um custo por unidade. A
-// inversão genérica omitiria essa escrita legítima. Por isso a lista aqui é
-// nomeada, como `CAMPOS_SOMENTE_AVANCADO` — o padrão certo quando "campo
-// tocado" não é decidível estaticamente pelo nome, só pela intenção de quem
-// escreve.
-const CAMPOS_OMITIR_SE_NULO = new Set(['gabarito_maximo', 'ret_pct']);
+// ⚠️ **Aqui morava `CAMPOS_OMITIR_SE_NULO` (#694), e a lista foi removida porque
+// nunca resolveu o que dizia resolver.** Ela omitia `gabarito_maximo`/`ret_pct`
+// quando `null`, contra o erro "Campo X deve ser um número" do Salvar premissas.
+// Só que o shell ACEITA `null` (medido em `validarUpdate`, no shell) e recusa
+// STRING — e `ret_pct` tem `padrao: 4`, então nunca é `null`: a lista era um
+// no-op para o sintoma que motivou a issue. Quem resolve é
+// `coagirNumericosDeclarados` (`./coercao-numerica.ts`). Não recrie a lista.
+
 
 // Nunca via PATCH: identidade/estado/autor gerados, colunas de soft-delete
 // geridas pelo framework (removido_em/removido_por_id — DADOS_CAMPO_RESERVADO se
@@ -159,12 +151,12 @@ const CAMPOS_BLOQUEADOS_PATCH = new Set([
  * `frontend/tela-financeiro.ts` e `TETO_COLUNA_AA` na migração `037`. */
 export const TETO_JUROS_TABELA_AA = 999.99;
 
+// Delega ao parser único (`coercao-numerica.ts`). Ter a regra escrita duas
+// vezes é o corolário mais caro da armadilha 14 do `CLAUDE.md` — "conte quantos
+// validadores existem para o mesmo campo"; aqui existe UM, e este símbolo
+// sobrevive só como o nome de domínio que as chamadas de percentual usam.
 export function percentualEstrito(v: unknown): number | null {
-  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  if (typeof v !== 'string') return null;
-  if (!/^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/.test(v)) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+  return numeroEstrito(v);
 }
 
 export function montarPatchEstudo(
@@ -192,14 +184,8 @@ export function montarPatchEstudo(
     // Campo aposentado: a coluna não existe mais. Descartado sempre — cliente em
     // voo (aba aberta através do deploy) ainda o manda. Ver CAMPOS_APOSENTADOS.
     if (CAMPOS_APOSENTADOS.has(k)) continue;
-    // Campos exclusivos do Avançado nunca chegam ao validador quando o estudo
-    // é Preliminar (valores null disparariam "deve ser um número" no shell).
+    // Campos exclusivos do Avançado não são escritos por uma tela de Preliminar.
     if (estudo?.nivel_analise === 'preliminar' && CAMPOS_SOMENTE_AVANCADO.has(k)) continue;
-    // #694: campos órfãos/legados — omitidos só quando NULO, em qualquer
-    // nível de análise. Um valor de verdade (usuário preencheu, ou o
-    // endpoint dedicado de `ret_pct` gravou algo) continua indo ao PATCH
-    // normalmente; nenhuma escrita legítima muda de comportamento.
-    if (CAMPOS_OMITIR_SE_NULO.has(k) && (v === null || v === undefined)) continue;
     if (k === 'tipo_empreendimento' && estudo?.status !== 'rascunho') {
       return { http: 422, codigo: 'TIPO_TRAVADO', mensagem: 'tipo_empreendimento só pode mudar em Rascunho' };
     }
@@ -291,8 +277,14 @@ export function montarPatchEstudo(
   // exibindo o rótulo velho para sempre, que é exatamente o que a #660 conserta.
   //
   // Cada parte vem do CORPO quando ele a traz, e do registro persistido quando
-  // não. A tela de Premissas manda o registro inteiro, então os três chegam
-  // juntos por lá; mas o PATCH é chamável direto, com qualquer subconjunto.
+  // não — e é por isso que a recomposição não depende de os três virem juntos.
+  //
+  // ⚠️ Esta frase dizia "a tela de Premissas manda o registro inteiro, então os
+  // três chegam juntos por lá". **Deixou de ser verdade no mesmo PR que este
+  // comentário:** `_salvar` passou a mandar só o diff contra o retrato
+  // carregado, então um PATCH de Premissas pode trazer `uf` sem `nome`. O
+  // fallback para o registro persistido é o que mantém a recomposição correta
+  // nesse caso — antes ele era redundante por aqui, agora não é.
   const parteDoNomeMudou = dados.nome !== undefined
     || dados.uf !== undefined
     || dados.tipo_empreendimento !== undefined;
@@ -312,7 +304,25 @@ export function montarPatchEstudo(
     });
   }
 
-  return { dados };
+  // ── A fronteira numérica. É AQUI que o bug histórico do "Salvar premissas"
+  // fecha, e por isso ela roda por ÚLTIMO: sobre o payload já filtrado e já
+  // recomposto, de modo que nenhum ramo acima possa escapar dela.
+  //
+  // `tela-premissas.ts` monta o formulário como cópia integral do registro
+  // (`{ ...this.estudo }`) e só aplica `Number()` nos campos que TÊM controle
+  // na tela. Como toda coluna `decimal` volta do Postgres como string, os
+  // demais campos numéricos voltavam ao PATCH como `"4.00"` — e o shell recusa
+  // por `typeof`. No mesmo PR a tela passou a mandar só o DIFF contra o retrato
+  // que carregou (`_salvar`, `frontend/tela-premissas.ts`), o que retira esses
+  // campos do payload na origem — mas tela é feedback, não fronteira:
+  // `PATCH /estudos/:id` é chamável direto, e um cliente antigo (aba aberta
+  // através do deploy) continua mandando o registro inteiro. Quem garante é
+  // esta linha.
+  const coagido = coagirNumericosDeclarados('estudos', dados);
+  if ('falha' in coagido) {
+    return { http: 400, codigo: 'CAMPO_INVALIDO', mensagem: coagido.falha.mensagem };
+  }
+  return { dados: coagido.dados };
 }
 
 // Campos que não são copiados na duplicação (gerados ou de junção do shell).
@@ -323,12 +333,14 @@ const CAMPOS_NAO_COPIAVEIS = new Set([
 ]);
 
 // Monta o payload de campos copiáveis de um estudo para a duplicação.
-// Além dos gerados/de junção (CAMPOS_NAO_COPIAVEIS), **omite valores nulos**: um
-// Preliminar deixa os numéricos exclusivos do Avançado em `null`, e reenviá-los
-// dispara "Campo X deve ser um número" no validador do shell (mesmo motivo do
-// filtro CAMPOS_SOMENTE_AVANCADO no PATCH). Campo ausente na criação cai no
-// default da coluna — idêntico ao POST /estudos, que só seta o que veio no body.
+// Além dos gerados/de junção (CAMPOS_NAO_COPIAVEIS), coage os numéricos
+// declarados: a linha ORIGEM vem do Postgres, e toda coluna `decimal` chega
+// como string (`"4.00"`) — reenviá-la ao `criar` dispara "Campo X deve ser um
+// número". É o mesmo defeito do PATCH, no caminho da duplicação.
 // `status`, `autor_id` e a identificação são atribuídos pelo chamador depois.
+//
+// ⚠️ `omitirValoresNulos` continua aplicado, mas NÃO é o que protege daquele
+// erro (ver `./duplicar-utils.ts`): `null` sempre foi aceito pelo shell.
 export function montarCopiaEstudo(orig: Record<string, any>): Record<string, any> {
   const copia: Record<string, any> = {};
   for (const [k, v] of Object.entries(orig)) {
@@ -336,12 +348,13 @@ export function montarCopiaEstudo(orig: Record<string, any>): Record<string, any
     if (v === undefined) continue;
     copia[k] = v;
   }
-  return omitirValoresNulos(copia);
+  return coagirNumericosOuLancar('estudos', omitirValoresNulos(copia));
 }
 
 function erro(res: Response, http: number, codigo: string, mensagem: string) {
   res.status(http).json({ erro: true, codigo, mensagem });
 }
+
 
 // Anexa `imagem_principal_url` (URL assinada da capa) a cada estudo da lista, para
 // o thumbnail da tabela de estudos (S7 · #90). `estudo_documentos` é `restrito` →
@@ -528,9 +541,27 @@ rotasEstudos.post('/estudos', async (req: Request, res: Response) => {
       ...ident,
     };
     // Campos opcionais de terreno manual, se vierem já na criação.
+    //
+    // `terreno_manual_area` é `decimal` e vem CRU do corpo — a mesma fronteira
+    // que o PATCH: sem coerção, a string que o PATCH converte para número aqui
+    // chegaria ao shell e viraria 500.
+    //
+    // ⚠️ **A coerção roda SÓ sobre o que veio do cliente**, e isso é
+    // deliberado: `...ident`, `autor_id` e `sequencia` são gerados pelo
+    // SERVIDOR. Coagi-los junto faria uma mudança futura naqueles geradores
+    // (um `usuario.id` que deixasse de ser inteiro, por exemplo) devolver
+    // **400 culpando o cliente** por um campo que ele nem mandou. Achado da
+    // revisão do PR desta correção.
+    const doCliente: Record<string, any> = {};
     for (const campo of ['terreno_manual_nome', 'terreno_manual_area', 'notas']) {
-      if (req.body[campo] !== undefined) dados[campo] = req.body[campo];
+      if (req.body[campo] !== undefined) doCliente[campo] = req.body[campo];
     }
+    const coagidoCriacao = coagirNumericosDeclarados('estudos', doCliente);
+    if ('falha' in coagidoCriacao) {
+      erro(res, 400, 'CAMPO_INVALIDO', coagidoCriacao.falha.mensagem);
+      return;
+    }
+    Object.assign(dados, coagidoCriacao.dados);
 
     const estudo = await req.dados!.criar('estudos', dados);
 
@@ -736,11 +767,11 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
       // Copiar imóveis vinculados.
       const imoveis = await req.dados!.listar('estudo_imoveis', { filtros: { estudo_id: estudoId }, por_pagina: 100 });
       for (const im of imoveis.dados) {
-        await req.dados!.criar('estudo_imoveis', omitirValoresNulos({
+        await req.dados!.criar('estudo_imoveis', coagirNumericosOuLancar('estudo_imoveis', omitirValoresNulos({
           estudo_id: novo.id,
           imovel_nucleo_id: im.imovel_nucleo_id,
           tipo_imovel: im.tipo_imovel,
-        }));
+        })));
       }
 
       // #609 — as estruturas filhas de remapeamento simples (catálogo de
@@ -749,20 +780,18 @@ rotasEstudos.post('/estudos/:id/duplicar', async (req: Request, res: Response) =
       // motivo. Dentro do try/catch de propósito: falhar aqui remove o estudo
       // recém-criado, em vez de deixar um clone pela metade.
       //
-      // `montarCopiasFilhas` preserva `null` explícito de propósito (linha
-      // ausente ≠ campo apagado) — mas o validador do shell recusa `null` em
-      // coluna decimal/inteiro na criação, mesmo sendo nullable. É praticamente
-      // garantido em `apelo_comercial` (as 7 colunas de score nascem nulas
-      // assim que um documento é anexado, antes da IA gerar o resultado) e
-      // comum em `analise_mercado` (indicadores parcialmente coletados) —
-      // `omitirValoresNulos` filtra só na fronteira de escrita, sem mexer no
-      // contrato de `montarCopiasFilhas`.
+      // As linhas copiadas vêm do Postgres, então toda coluna `decimal` chega
+      // como STRING — `coagirNumericosOuLancar` a converte antes do `criar`,
+      // senão o shell recusa por `typeof` ("Campo X deve ser um número"). Era
+      // esse, e não o `null`, o defeito que a #714 tentou resolver.
+      // `omitirValoresNulos` segue aplicado pelo motivo revisado em
+      // `./duplicar-utils.ts` — não por causa daquele erro.
       for (const { tabela, campos, porPagina } of FILHAS_SIMPLES) {
         const linhas = await req.dados!.listar(tabela, {
           filtros: { estudo_id: estudoId }, por_pagina: porPagina,
         });
         for (const copiaFilha of montarCopiasFilhas(linhas.dados, Number(novo.id), campos)) {
-          await req.dados!.criar(tabela, omitirValoresNulos(copiaFilha));
+          await req.dados!.criar(tabela, coagirNumericosOuLancar(tabela, omitirValoresNulos(copiaFilha)));
         }
       }
 
