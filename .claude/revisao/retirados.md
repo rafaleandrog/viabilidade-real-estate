@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v13-17a7f873 -->
+<!-- corpus=v13-7b776c47 -->
 
 # Achados retirados — não levante de novo sem evidência nova
 
@@ -25,6 +25,13 @@ falso; a lista tira o **automático**, não o julgamento.
 
 Entrada que **deixou de valer** — o código mudou e o achado voltaria a ser verdadeiro — não é
 apagada: ganha a linha `- **Revogada:** <motivo> · <data>` e sai de circulação com história.
+
+⚠️ **Entradas se separam por linha em branco, nunca por `---`.** Este arquivo tem **exatamente uma**
+divisória `---`, a que fecha esta explicação — e é ela que o carimbador e a bateria usam para excluir
+o molde acima da contagem de entradas. Uma segunda divisória, em qualquer posição, reprova
+`scripts/testar-corpus-revisao.mjs`. A regra está aqui porque é aqui que se escreve entrada; sem
+isso, quem separasse duas entradas com uma divisória tomava vermelho com uma mensagem sobre o molde,
+que não descreve o caso dele. Achado de lente.
 
 ---
 

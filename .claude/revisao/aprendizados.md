@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v13-17a7f873 -->
+<!-- corpus=v13-7b776c47 -->
 
 # Aprendizados — o que toda lente deste repositório precisa saber antes de olhar o diff
 
