@@ -163,47 +163,46 @@ function funcoesDoBash(texto) {
   let atual = null;
   let emBash = false;
   let fimHeredoc = null;
-  for (const linha of linhas) {
+  let heredocTab = false;
+  linhas.forEach((linha, i) => {
     // ⚠️ Heredoc ANTES de fence, e a ordem é o ponto. Testar o fence primeiro fazia uma linha
-    // ``` DENTRO do corpo de um heredoc ser lida como fence de verdade, zerando `atual` e
-    // `fimHeredoc` — e o comentário abaixo já promete que "nada ali abre ou fecha função". O
-    // motor tem heredoc com conteúdo markdown (o perfil da lente), que é exatamente onde um
-    // fence pode aparecer. Achado de lente.
-    if (fimHeredoc !== null) { if (linha.trim() === fimHeredoc) fimHeredoc = null; continue; }
-    if (/^```/.test(linha)) { emBash = /^```bash\b/.test(linha) || /^```bash\s*$/.test(linha); atual = null; continue; }
-    if (!emBash) continue;
-    // Corpo de heredoc é DADO, não código: nada ali abre ou fecha função. O `<<-` do bash permite
-    // o delimitador indentado por TAB, então o fecho é comparado com a linha aparada nas pontas.
-    const h = /<<-?\s*'?"?([A-Za-z_][A-Za-z0-9_]*)'?"?\s*$/.exec(linha);
-    if (h) { fimHeredoc = h[1]; continue; }
+    // ``` DENTRO do corpo de um heredoc ser lida como fence de verdade, zerando o estado — e o
+    // comentário abaixo promete que "nada ali abre ou fecha função". O motor tem heredoc com
+    // conteúdo markdown (o perfil da lente), que é exatamente onde um fence pode aparecer.
+    //
+    // ⚠️ E o fecho segue a regra do bash, não um `trim()`. Aparar as duas pontas casava ALÉM do
+    // que o bash casa: uma linha de corpo `"  EOF"` (espaços) não fecha heredoc nenhum de
+    // verdade, mas fechava o do parser — e as linhas seguintes do corpo viravam "código", onde um
+    // `nome() {` abre a função fantasma que engole a de despacho real. O laço fechado NÃO pega
+    // esse caso, porque a marca fica dentro do corpo do fantasma e as contagens concordam. Só
+    // `<<-` permite indentação, e só por TAB. Achado de lente.
+    if (fimHeredoc !== null) {
+      const fecha = heredocTab ? linha.replace(/^\t+/, '') : linha;
+      if (fecha === fimHeredoc) fimHeredoc = null;
+      return;
+    }
+    if (/^```/.test(linha)) { emBash = /^```bash\b/.test(linha); atual = null; return; }
+    if (!emBash) return;
+    // Corpo de heredoc é DADO, não código: nada ali abre ou fecha função.
+    const h = /<<(-?)\s*'?"?([A-Za-z_][A-Za-z0-9_]*)'?"?\s*$/.exec(linha);
+    if (h) { heredocTab = h[1] === '-'; fimHeredoc = h[2]; return; }
     if (atual === null) {
       // `nome() {` ou `function nome {` — as duas formas que o bash aceita, na coluna zero.
       const m = /^(?:function\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(\))?\s*\{/.exec(linha);
-      if (m) atual = { nome: m[1], corpo: [] };
-      continue;
+      if (m) atual = { nome: m[1], corpo: [], linhas: [] };
+      return;
     }
-    if (/^\}/.test(linha)) { achadas.push({ ...atual, corpo: atual.corpo.join('\n') }); atual = null; continue; }
+    if (/^\}/.test(linha)) { achadas.push({ ...atual, corpo: atual.corpo.join('\n') }); atual = null; return; }
     atual.corpo.push(linha);
-  }
+    atual.linhas.push(i);
+  });
   return achadas;
 }
-// ⚠️ Comentário de linha INTEIRA e comentário INLINE. O predicado é "o PROMPT interpola", e um
-// `includes` sobre o texto cru media "a string aparece em algum lugar" — verde com `${COMUM}`
-// citado só num comentário. A primeira correção filtrou `/^\s*#/`, que deixava passar o inline
-// (`echo … # interpola ${COMUM}`); o corte de `\s#` até o fim da linha pega os dois. Ele pode
-// cortar um `#` dentro de string entre aspas, e isso é de propósito: o erro fica do lado de
-// acusar a mais, que é o lado seguro numa guarda de fiação. Achados de lente, duas rodadas.
-// Conta a marca no DOCUMENTO INTEIRO, sem reconhecer fence nem função. A independência tem que
-// ser total, e a primeira versão não era: ela também pulava fence não reconhecido, então uma
-// função de despacho dentro de um ```bash com info-string sumia dos DOIS lados e as contagens
-// concordavam no número errado — o laço fechado ficava verde justamente no caso que ele existe
-// para pegar. Medido, e foi por isso que esta contagem saiu de dentro do fence.
-//
-// O preço é que uma ocorrência da marca em prosa (fora de função) passa a reprovar. É o lado
-// certo de errar — a marca é o gravador do `execucao.txt`, não há motivo para citá-la solta, e
-// reprovar pede uma decisão de quem escreveu em vez de deixar passar calado.
-funcoesDoBash.marcasNoDoc = (texto, marca) =>
-  texto.split('\n').filter((l) => l.replace(/(^|\s)#.*$/, '').includes(marca)).length;
+
+// As LINHAS do documento que trazem a marca do despacho, sem depender de fence nem de função —
+// é essa independência que faz o laço fechado valer alguma coisa.
+funcoesDoBash.linhasComMarca = (texto, marca) =>
+  texto.split('\n').flatMap((l, i) => (l.replace(/(^|\s)#.*$/, '').includes(marca) ? [i] : []));
 
 const semComentario = (txt) => txt.split('\n').map((l) => l.replace(/(^|\s)#.*$/, '')).join('\n');
 
@@ -217,16 +216,24 @@ assert.ok(
 // ⚠️ LAÇO FECHADO, e é ele que faz esta guarda não depender de um número. Antes, o que segurava
 // toda falha do parser era o `>= 2` casar com o documento ter hoje exatamente duas funções de
 // despacho — propriedade do TEXTO, não da guarda: bastava um terceiro fence ganhar a marca para
-// qualquer queda do parser virar falha ABERTA, com a contagem satisfeita e uma função real sem ser
-// medida. Achado de lente. Contando as ocorrências da marca de forma independente do parser e
-// exigindo que batam, qualquer função perdida no caminho — fence com info-string, heredoc mal
-// fechado, fence fechando antes do `}` — passa a ser vermelha, com quantas funções existirem.
-const ocorrencias = funcoesDoBash.marcasNoDoc(motor, MARCA_DESPACHO);
+// qualquer queda do parser virar falha ABERTA, com a contagem satisfeita e uma função real sem
+// ser medida.
+//
+// ⚠️ E a forma do laço é INCLUSÃO, não igualdade de contagens. Comparar dois números falhava nos
+// dois sentidos: uma função que citasse a marca duas vezes (o `echo` real mais uma mensagem de
+// erro que a reproduzisse) reprovava sem defeito — as unidades eram função de um lado e linha do
+// outro —, e uma função perdida pelo parser somada a uma ocorrência espúria em prosa se
+// CANCELAVA, deixando verde exatamente o caso a pegar. Perguntar se toda linha com a marca está
+// DENTRO de um corpo reconhecido não tem nenhum dos dois problemas, e é a pergunta que interessa.
+// Achados de lente.
+const dentroDeDespacho = new Set(despachos.flatMap((f) => f.linhas));
+const orfas = funcoesDoBash.linhasComMarca(motor, MARCA_DESPACHO).filter((n) => !dentroDeDespacho.has(n));
 assert.equal(
-  despachos.length, ocorrencias,
-  `o parser reconheceu ${despachos.length} função(ões) de despacho, mas a marca ${JSON.stringify(MARCA_DESPACHO)} ` +
-    `aparece ${ocorrencias} vez(es) no motor. A diferença é função de despacho que o parser ` +
-    'PERDEU — e função perdida não é medida por guarda nenhuma abaixo.',
+  orfas.length, 0,
+  `a marca ${JSON.stringify(MARCA_DESPACHO)} aparece em linha(s) do motor que o parser NÃO reconheceu ` +
+    `como corpo de função de despacho: ${orfas.map((n) => n + 1).join(', ')}. Ou é função de despacho que o ` +
+    'parser perdeu — e função perdida não é medida por guarda nenhuma abaixo —, ou é a marca citada solta, ' +
+    'que não deveria existir: ela é o gravador do `execucao.txt`.',
 );
 // ⚠️ A checagem é sobre a INVOCAÇÃO, não sobre o corpo todo. `includes` no corpo aceitava
 // qualquer referência executável: um refactor que tirasse `${COMUM}` do argumento do prompt e
@@ -305,6 +312,38 @@ else falha('contrato', 'nenhum template de saída tem CORPUS: — "não li" fica
   }
   if (canonico(alvo, m) === alvo) ok('o reparo é idempotente (reparar o canônico não o muda)');
   else falha('reparo', 'aplicar o reparo ao arquivo já canônico o altera — o carimbador nunca estabilizaria');
+}
+
+// ── 2c. O parser segue a regra do bash, e isso é medido, não afirmado ────────
+// A regra do fecho de heredoc é a única coisa entre o parse correto e a função FANTASMA que
+// engole a de despacho real. E ela não é observável a partir do motor de hoje — as duas regras
+// dão o mesmo veredito nele —, então a prova tem de ser sobre a função, com um documento
+// construído. Sem este caso, trocar a regra de volta por um `trim()` não deixaria nada vermelho.
+{
+  const doc = [
+    '```bash',
+    "cat > x <<'FIM'",
+    'linha de dados',
+    '  FIM',          // indentado: NÃO fecha um heredoc de `<<` no bash
+    'fantasma() {',   // portanto isto ainda é DADO, não abertura de função
+    'FIM',            // aqui sim
+    'despacho() {',
+    '  echo "$id exit=$rc motor=x" >> "$OUT/execucao.txt"',
+    '}',
+    '```',
+  ].join('\n');
+  const achadas = funcoesDoBash(doc);
+  const nomes = achadas.map((f) => f.nome);
+  if (nomes.length === 1 && nomes[0] === 'despacho') {
+    ok('o parser segue a regra do bash no fecho de heredoc (linha indentada não fecha `<<`)');
+  } else {
+    falha('parser', `com heredoc "fechado" por linha indentada, o parser achou [${nomes.join(', ')}] em vez de [despacho] — ` +
+      'a função fantasma engole a de despacho real, e o `ok()` sai atribuído ao nome errado');
+  }
+  // E o `<<-`, que o bash DEIXA indentar por TAB — o outro lado da mesma regra.
+  const comTab = ['```bash', 'cat > x <<-FIM', 'dados', '\tFIM', 'despacho() {', '  algo', '}', '```'].join('\n');
+  if (funcoesDoBash(comTab).map((f) => f.nome).join(',') === 'despacho') ok('o parser honra o `<<-`, que o bash deixa fechar com TAB');
+  else falha('parser', 'com `<<-` e fecho indentado por TAB o parser não reencontrou o código — o heredoc engoliu o resto do bloco');
 }
 
 // ── 3. Toda entrada de `retirados.md` tem os quatro campos ───────────────────

@@ -527,13 +527,11 @@ git -C "$WT" rev-parse --verify --quiet "$BASE^{commit}" >/dev/null || {
 mkdir -p "$OUT/corpus" || { echo 'não consegui criar $OUT/corpus — NÃO despache'; exit 1; }
 for f in aprendizados retirados; do
   alvo="$BASE:.claude/revisao/$f.md"
-  # ⚠️ Duas perguntas DIFERENTES, e juntá-las num `||` só foi o defeito: "o arquivo não existe
-  # nesta base" (legítimo — é o caso do PR que INTRODUZ o corpo) e "o `git show` falhou" (base
-  # inválida, worktree no commit errado, objeto corrompido) davam os dois no mesmo lugar, com o
-  # placeholder afirmando o primeiro como fato. O resultado era uma revisão sem corpo
-  # indistinguível do caso legítimo, com o diagnóstico errado carimbado — e o `2>/dev/null`
-  # apagava a única evidência de qual tinha sido. Achado de lente. `cat-file -e` responde só a
-  # primeira; depois dela, falha do `show` é erro de verdade e ABORTA.
+  # ⚠️ TRÊS perguntas diferentes, e o defeito, duas rodadas seguidas, foi colapsá-las: "o arquivo
+  # não existe nesta base" (legítimo — é o caso do PR que INTRODUZ o corpo), "não consegui ler" e
+  # "o `git show` falhou" caíam todas no mesmo ramo, com o placeholder afirmando a PRIMEIRA como
+  # fato — e o `2>/dev/null` apagando a evidência de qual tinha sido. Cada uma tem a sua resposta
+  # abaixo. Achado de lente.
   # ⚠️ `ls-tree`, e não `cat-file -e`. O `-e` sai não-zero em QUALQUER erro de leitura, não só na
   # ausência — blob faltando num clone parcial (o `rev-parse` acima passa, porque o objeto do
   # COMMIT está local e o do blob não), objeto corrompido, `alternates` quebrado —, então "não
@@ -545,12 +543,20 @@ for f in aprendizados retirados; do
   # árvore?" e a saída responde "o caminho está nela?". Ele lê o objeto de árvore, não o blob.
   listagem=$(git -C "$WT" ls-tree -r --name-only "$BASE" -- ".claude/revisao/$f.md") || {
     echo "não consegui ler a árvore de $BASE — NÃO despache"; exit 1; }
-  if [ -n "$listagem" ]; then
-    # O caminho ESTÁ na base: daqui em diante, qualquer falha é erro de verdade e aborta. Sem
+  # ⚠️ Igualdade EXATA, não `[ -n "$listagem" ]`. Com `-r`, um caminho que exista como DIRETÓRIO
+  # faz o `ls-tree` listar os arquivos sob ele: saída não-vazia, o `show` de um tree também tem
+  # sucesso (imprime o cabeçalho e a listagem), o `test -s` passa — e a lente recebe uma listagem
+  # de diretório apresentada como corpo de conhecimento. Mesmo placebo silencioso das duas
+  # rodadas anteriores, agora com carimbo de "EXISTE na base". A saída de um blob é a própria
+  # linha do caminho; a de um diretório nunca é. Achado de lente.
+  if [ "$listagem" = ".claude/revisao/$f.md" ]; then
+    # É o arquivo, e é blob: daqui em diante, qualquer falha é erro de verdade e aborta. Sem
     # `2>/dev/null` — apagar o stderr foi o vício que deixou a rodada anterior sem diagnóstico.
     git -C "$WT" show "$alvo" > "$OUT/corpus/$f.md" || {
       echo "git show falhou em $alvo (o arquivo EXISTE na base) — NÃO despache"; exit 1; }
     test -s "$OUT/corpus/$f.md" || { echo "$alvo saiu vazio — NÃO despache"; exit 1; }
+  elif [ -n "$listagem" ]; then
+    echo ".claude/revisao/$f.md existe em $BASE mas NÃO é um arquivo — NÃO despache"; exit 1
   else
     # Ausente na base, de verdade. Corpo vazio e DECLARADO — nunca queda para o head, que é o que
     # esta extração existe para não fazer.
