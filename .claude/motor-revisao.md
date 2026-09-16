@@ -1,6 +1,11 @@
 <!-- Portado de urbiverso/urbiverso `.claude/motor-revisao.md` @ b0361f6 (PR #2540), em
      2026-08-21. CÓPIA, NÃO LINK VIVO: mudou lá, alguém porta para cá à mão. As adaptações
-     deste repo estão marcadas com `ADAPTADO:` — não as "corrija" de volta para o upstream. -->
+     deste repo estão marcadas com `ADAPTADO:` — não as "corrija" de volta para o upstream.
+
+     2026-09-16: portado o SEGUNDO motor externo (Kimi) do mesmo arquivo upstream — preflight,
+     tabela de tier com a coluna Kimi, o comando próprio, a trava de somente-leitura e o
+     fallback cruzado. Motivo em `CLAUDE.md` § A revisão em si: neste ambiente o CLI do Codex
+     não sobe (sem `OPENAI_API_KEY`, `api.openai.com` com 403 no CONNECT) e o `kimi` sobe. -->
 
 # Motor da fan-out de revisão
 
@@ -12,17 +17,55 @@ máquina do autor e em sessão na nuvem.
 > a superfície de docs é sempre `node_modules/@urbiverso/sdk/docs/`. Onde o upstream oferece dois
 > caminhos (shell ou app), aqui só existe o de app.
 >
-> ⚠️ E o bundle **existe no disco** desde 2026-09-03 (auth por `scripts/lib/sdk-auth.sh`) — o que
-> mudou o estado das lentes de contrato de "nenhuma roda" para "props de primitivo roda, doc não".
-> A tabela do briefing, mais abaixo, traz o detalhe.
+> ⚠️ E o bundle **existe no disco** desde 2026-09-03 (auth por `scripts/lib/sdk-auth.sh`). Com o
+> pin em `57.0.0` ele traz `dist/`, `docs/` **e** `obsolescencias.json`, então as **duas** lentes de
+> contrato são executáveis — este parágrafo dizia "props de primitivo roda, doc não", o que valia
+> com o pin antigo (`0.50.3`, sem `docs/`) e deixou de valer em 2026-09-04. Medido em 2026-09-16
+> neste repositório: `node_modules/@urbiverso/sdk` na versão `57.0.0`, `docs/` com 32 arquivos,
+> `obsolescencias.json` com 7 chaves. A tabela do briefing, mais abaixo, traz o detalhe.
 
-As lentes dos passos 3 e 4 rodam **fora da conta Anthropic**, no Codex. O revisor lê muito e
-escreve pouco — uma lente engole um doc inteiro, o diff e o código em volta para devolver 400
-palavras —, então o custo mora no input, e é ali que o motor externo paga.
+As lentes dos passos 3 e 4 rodam **fora da conta Anthropic**, em motores externos. O revisor lê
+muito e escreve pouco — uma lente engole um doc inteiro, o diff e o código em volta para devolver
+400 palavras —, então o custo mora no input, e é ali que o motor externo paga.
 
-**Codex primeiro, nativo se falhar.** Não existe pergunta ao usuário no meio: o preflight
-abaixo tenta, e o que ele não conseguir vira fan-out em subagente Anthropic, **declarada** no
-relatório e na linha de anúncio. O que nunca acontece é lente sumir porque o motor caiu.
+**São dois motores externos, escolhidos por preço no papel da lente, com fallback cruzado.** Codex
+(`gpt-5.6-luna`/`terra`) nas lentes baratas e nas de meio; Kimi (`kimi-k3`) nas de contrato
+sensível, onde o tier equivalente seria o `gpt-5.6-sol` e o Kimi custa 40% menos no input e metade
+no output. Kimi é mais barato que exatamente **um** dos três tiers, e é nesse que ele entra — nos
+outros dois ele custaria 1,5× (`terra`) e 15× (`luna`). A divisão é a alocação mínima que o preço
+justifica, não preferência por um motor.
+
+**Quem falha cai no outro; só se os dois caírem é que vai para o nativo.** Não existe pergunta ao
+usuário no meio: os preflights tentam, cada lente sabe qual é o seu motor alternativo, e toda troca
+é **declarada** no relatório e na linha de anúncio. O que nunca acontece é lente sumir porque um
+motor caiu.
+
+**O ganho da mistura não é só preço — é opinião independente.** Motor único erra junto consigo
+mesmo, e é por isso que a cascata cruza em vez de degradar sempre para o mesmo lugar. Vale
+lembrar o que o `CLAUDE.md` deste repo registra sobre a Rodada 9: com o App do Codex mudo, a
+revisão inteira virou autoatestação por agentes da mesma família de modelo do autor do patch — e
+isso não apareceu como falha em lugar nenhum.
+
+> ✅ **ADAPTADO — 2026-09-16: neste ambiente o motor externo que roda é o Kimi, e o CLI do Codex
+> não roda.** Medido nesta máquina, e é o estado que inverte o default de todas as linhas abaixo:
+>
+> | Fato | Medição |
+> |---|---|
+> | `kimi` no PATH | `/opt/node22/bin/kimi`, versão `0.38.0` |
+> | `MOONSHOT_API_KEY` | presente no ambiente |
+> | smoke `kimi -p "responda apenas OK"` | **verde, rc=0, ~10 s** |
+> | `codex` no PATH | **ausente** |
+> | `OPENAI_API_KEY` | **ausente** |
+> | `api.openai.com` | **403 no CONNECT** do proxy de saída |
+>
+> Consequência prática: o preflight do Codex falha e o do Kimi passa, então a tabela de decisão
+> abaixo manda **tudo em Kimi**, pela coluna *Kimi* da tabela de tier. Isso **não** dispensa a
+> camada A (o App `@codex review` no PR), que é outro caminho e continua ligada — ver a tabela
+> das duas camadas, adiante.
+>
+> ⚠️ **Não presuma que esta medição continua valendo.** Se uma sessão futura achar o `kimi` fora
+> do ar ou a `OPENAI_API_KEY` presente, é fato novo para medir e registrar aqui — não é
+> continuação deste parágrafo. O jeito de conferir é o smoke test, não a memória.
 
 > ✅ **ADAPTADO — 2026-08-23: existe um TERCEIRO caminho, e neste repositório ele é o que funciona.**
 >
@@ -53,9 +96,10 @@ relatório e na linha de anúncio. O que nunca acontece é lente sumir porque o 
 > | Camada | O que é | Quando |
 > |---|---|---|
 > | **A — revisão do App** | `@codex review` no PR | **Sempre** que houver PR aberto. É o caminho normal, e não substitui a camada B |
-> | **B — fan-out das lentes** | `codex exec` (preflight abaixo) **ou** subagente nativo | **Sempre.** O `codex exec` quando a chave e a rede existirem; **nativo** quando não, declarado como menos adversarial |
+> | **B — fan-out das lentes** | `codex exec` **ou** `kimi -p` (preflights abaixo) **ou** subagente nativo | **Sempre.** Motor externo quando o preflight daquele motor passar; **nativo** só quando os DOIS caírem, declarado como menos adversarial |
 >
-> A escolha condicional é **dentro da camada B** — CLI × nativo. A camada A não dispensa a B.
+> A escolha condicional é **dentro da camada B** — Codex × Kimi × nativo. A camada A não dispensa a
+> B, e hoje a camada B deste repositório roda em **Kimi** (ver a medição acima).
 >
 > **As duas camadas não competem — somam.** No PR 494 a divisão foi limpa e vale registrar: o
 > Codex achou os defeitos de **lógica** (uma guarda que não testava o que dizia testar; um caminho
@@ -204,12 +248,18 @@ resolvido antes de despachar**:
 | `WT` — a árvore que as lentes leem | a seção *A árvore que o motor lê*, abaixo |
 | `BASE` — o merge-base, nunca o nome da branch | passo 2 da skill |
 | Lentes, com id, tier e esforço | passos 2.1, 3 e 4 da skill |
-| **Superfície de docs** do briefing de contratos | fixa: `node_modules/@urbiverso/sdk/docs/`. **ADAPTADO:** desde 2026-09-03 o bundle É baixado (`scripts/lib/sdk-auth.sh`), mas o pin `0.50.3` **não traz `docs/`** — só `dist/`. Então a lente por doc segue **não despachada**, e a de props de primitivo, que lê `dist/index.d.ts`, **passa a ser despachada**. A causa mudou de "401" para "versão fixada" |
+| **Superfície de docs** do briefing de contratos | fixa: `node_modules/@urbiverso/sdk/docs/`. **ADAPTADO:** o bundle é baixado desde 2026-09-03 (`scripts/lib/sdk-auth.sh`) e, com o pin em `57.0.0`, traz `docs/` e `obsolescencias.json` — as **duas** lentes de contrato (doc e props de primitivo, esta lendo `dist/index.d.ts`) são despachadas. Só é `contratos=ok` quando as duas de fato rodaram naquela revisão; "o SDK está no disco" não é o predicado |
 | Faixas que sobem para `sol` | migração, `schema.json`, `manifesto.json`, permissões, contas, auditoria |
 
 ## Preflight — uma vez por sessão, antes de qualquer lente
 
-Três passos, nesta ordem. Cada um é idempotente e barato; o terceiro é o que decide o motor.
+**Dois preflights, um por motor externo.** Rode os dois: é o resultado do par que decide quem
+despacha o quê (tabela *O que cada resultado decide*, no fim desta seção). Cada passo é idempotente
+e barato.
+
+### Codex
+
+Três passos, nesta ordem. O terceiro é o que decide.
 
 ```bash
 command -v codex >/dev/null 2>&1 || npm i -g @openai/codex >/dev/null 2>&1
@@ -248,20 +298,142 @@ quadro de execução da §7.
 > derruba a **camada de contratos**; este é a ausência de chave da OpenAI e derruba o **motor**. Um
 > não conserta o outro.
 
+### Kimi
+
+**O `export` faz parte do preflight, não da prosa.** Este bloco é a definição do provedor: sem ele o
+`kimi` não tem modelo nenhum configurado e **toda** lente morre em ~3 s. Copie o bloco inteiro; não
+reconstitua as variáveis de memória.
+
+```bash
+# $OUT nasce AQUI, não na fan-out: o preflight roda antes de tudo e já escreve arquivo.
+OUT="${CLAUDE_SCRATCHPAD:-/tmp}/revisao"; mkdir -p "$OUT"
+
+# Ferramentas que os blocos deste arquivo assumem. Faltando qualquer uma, a lente morre
+# com diagnóstico vazio e o sintoma imita motor fora do ar.
+for f in jq timeout; do command -v "$f" >/dev/null 2>&1 || echo "FALTA $f"; done
+command -v kimi >/dev/null 2>&1 || npm i -g @moonshot-ai/kimi-code@0.38.0 >/dev/null 2>&1
+[ -n "${MOONSHOT_API_KEY:-}" ] || echo "SEM CHAVE"   # distingue chave ausente de chave ruim
+                                                     # sem esperar os 120s do smoke
+
+# Provedor sintetizado na hora. NAME e API_KEY são o mínimo viável; as outras três são
+# opcionais — mas PROVIDER_TYPE, se você escrever, tem que ser exatamente `kimi`
+# (nem `kimi-code`, nem `moonshot` — ver "A armadilha do provedor" abaixo).
+export KIMI_MODEL_NAME=kimi-k3
+export KIMI_MODEL_API_KEY="$MOONSHOT_API_KEY"
+export KIMI_MODEL_PROVIDER_TYPE=kimi
+export KIMI_MODEL_BASE_URL=https://api.moonshot.ai/v1
+export KIMI_CODE_NO_AUTO_UPDATE=1 KIMI_DISABLE_TELEMETRY=1
+export KIMI_CODE_HOME="$OUT/kimi-home"                     # fora do $HOME real e fora do $WT
+
+# O perfil somente-leitura é a ÚNICA trava contra a lente escrever (o `kimi -p` escreve
+# sem pedir). Ele é criado aqui, num heredoc executável — perfil que "existe no doc" mas
+# não no disco faz o --agent-file falhar e a trava sumir.
+cat > "$OUT/lente.md" <<'PERFIL'
+---
+name: lente
+description: Lente de revisao adversarial, somente leitura.
+tools: Read, Grep, Glob
+---
+Voce e uma lente de revisao. So le arquivos. Nunca edita, nunca commita, nunca propoe
+patch aplicado. Nunca acessa rota de API de instancia nenhuma.
+Nao leia, nao abra, nao faca grep e nao escreva nada em /home/user/urbiverso.
+PERFIL
+
+# Smoke test: exercita o CLI de verdade. Um 200 em /v1/models prova que a chave é boa,
+# NÃO que o `kimi -p` completa um turno — e foi por confiar no curl que uma revisão
+# inteira despachou lentes para um motor que não rodava.
+smoke=$(KIMI_MODEL_THINKING_EFFORT=low timeout 120 kimi -p "responda apenas OK" \
+  --output-format stream-json </dev/null 2>"$OUT/smoke.err"); rc=$?
+echo "$smoke" | jq -e 'select(.role=="assistant" and .content != null and .content != "")' \
+  >/dev/null 2>&1 && [ "$rc" = 0 ] && echo "KIMI OK" || { echo "KIMI FORA:"; head -4 "$OUT/smoke.err"; }
+```
+
+- **O smoke test usa a mesma guarda da colheita** — exit 0 **e** um `role=assistant` com
+  `.content` — porque é a mesma pergunta ("este motor completa um turno?") feita uma vez, antes de
+  decidir, em vez de lente a lente. **O preflight do Codex nunca teve esse buraco por acidente de
+  forma:** `codex login status` exercita o binário; o do Kimi só falaria HTTP.
+- **A receita não usa `login`.** O `kimi-code` aceita `/login` e `config.toml` — a mensagem de erro
+  dele cita os dois —, mas **esta receita não usa nenhum dos dois**: o provedor é sintetizado por
+  variável de ambiente, sem device-code e sem arquivo de configuração.
+- **A versão é pinada em `0.38.0`.** `npm i -g` sem pin faz cada revisão pegar o que estiver
+  publicado no dia. Ao mover o pin, rode o smoke test antes de commitar.
+- **A chave é `MOONSHOT_API_KEY`**, vinda do ambiente.
+- **ADAPTADO — neste repositório o `kimi` já vem instalado e as `KIMI_MODEL_*` já vêm no ambiente
+  do *cloud environment*.** O bloco continua sendo copiado inteiro assim mesmo: ele é idempotente,
+  e depender de o ambiente já ter exportado é a diferença entre uma revisão que roda e uma que
+  morre em 3 s sem diagnóstico. O que **não** se pula é o smoke test.
+
+#### A armadilha do provedor — o CLI morre com um erro que não é o erro
+
+Duas configurações erradas derrubam o `kimi` com **a mesma exceção crua**, e ela não menciona nem
+provedor nem modelo:
+
+```
+Error: Agent event 'agent.activity.updated' has no active lifecycle context
+```
+
+Sai como stack trace do Node no stderr, com `exit=1` e só a linha `system.version` no stdout. Quem
+vê isso conclui "o CLI está quebrado em headless". Não está. Os dois gatilhos, ambos medidos no
+upstream:
+
+| Configuração | Resultado |
+|---|---|
+| `KIMI_MODEL_PROVIDER_TYPE=moonshot` (ou qualquer valor inválido) | **crash de lifecycle** |
+| `-m <alias>` com alias diferente do `KIMI_MODEL_NAME` | **crash de lifecycle** |
+| `KIMI_MODEL_PROVIDER_TYPE=kimi` · `=openai` · **ausente** | funciona |
+| sem `KIMI_MODEL_BASE_URL`, ou só `NAME` + `API_KEY` | funciona |
+
+`moonshot` é o palpite natural — o host é `api.moonshot.ai`, o pacote é `@moonshot-ai/kimi-code` — e
+é justamente o que quebra. O valor certo é **`kimi`**.
+
+**Nunca passe `-m` ao `kimi`.** O provedor sintetizado registra **um** alias, o valor de
+`KIMI_MODEL_NAME`; qualquer outro alias no `-m` não resolve e cai no mesmo crash — inclusive um
+modelo Moonshot que existe de verdade. `-m` só "funciona" quando repete o `KIMI_MODEL_NAME`, o que o
+torna inútil. **O eixo do modelo no Kimi é `KIMI_MODEL_NAME`**, e é ele que a coluna *Kimi* da
+tabela de tier alimenta.
+
+### O que cada resultado decide
+
+| Codex | Kimi | Efeito |
+|---|---|---|
+| ok | ok | tabela de tier abaixo, cada lente no seu motor default |
+| ok | falhou | **tudo em Codex**, pela coluna *Codex* da tabela |
+| falhou | ok | **tudo em Kimi**, pela coluna *Kimi* da tabela |
+| falhou | falhou | **motor nativo** para a revisão inteira (seção final) |
+
+Não pergunte, não pare, não repita o preflight lente a lente: decidiu uma vez, vale para a revisão
+inteira, e o motivo entra no anúncio do passo 2.1 e no quadro de execução da §7.
+
+**ADAPTADO — a linha que este repositório vive hoje é a terceira** (`codex falhou · kimi ok`), pela
+medição do topo deste arquivo. Nada disso alcança a camada A: o App `@codex review` é outro caminho,
+e continua sendo acionado.
+
 ## Tier por papel
 
 Uma lente, um comando, um tier. É o tier que faz o trabalho que num subagente nativo o modelo
-faria:
+faria. A coluna **Default** diz quem roda quando os dois motores estão de pé; as outras duas são, ao
+mesmo tempo, o alvo do fallback cruzado daquela lente e o mapa de "um motor inteiro caiu":
 
-| Papel | Codex | Nativo (fallback) |
-|---|---|---|
-| L1 varredura, L5 armadilhas de linguagem, S1 documentação, e a camada de contratos de PR **só de doc** | `gpt-5.6-luna` | `sonnet` |
-| L2 comportamento removido, L3 rastreador, L4 concorrência, T1–T3, S2, S3, e a camada de contratos em geral | `gpt-5.6-terra` | `sonnet` |
-| Contratos de framework sensível no **Profundo** (as faixas que a skill chamadora listou) | `gpt-5.6-sol` | `opus` |
+| Papel | Default | Codex | Kimi | Nativo |
+|---|---|---|---|---|
+| L1 varredura, L5 armadilhas de linguagem, S1 documentação, e a camada de contratos de PR **só de doc** | Codex | `gpt-5.6-luna` · medium | `kimi-k3` · low | `sonnet` |
+| L2 comportamento removido, L3 rastreador, L4 concorrência, T1–T3, S2, S3, e a camada de contratos em geral | Codex | `gpt-5.6-terra` · medium | `kimi-k3` · high | `sonnet` |
+| Contratos de framework sensível no **Profundo** (as faixas que a skill chamadora listou) | **Kimi** | `gpt-5.6-sol` · high | `kimi-k3` · max | `opus` |
 
-A camada de contratos fica em `terra` por padrão de propósito: a §4 manda cortar da camada
-adversarial antes de cortar dela, então ela não é o lugar de economizar. `luna` só quando o PR
-é doc puro; `sol` só nas faixas em que contrato perdido custa caro.
+A camada de contratos fica na linha do meio por padrão de propósito: a §4 manda cortar da camada
+adversarial antes de cortar dela, então ela não é o lugar de economizar. A primeira linha só quando
+o PR é doc puro; a terceira só nas faixas em que contrato perdido custa caro.
+
+**O eixo de esforço não é o mesmo nos dois.** Codex aceita `low|medium|high`
+(`-c model_reasoning_effort=`); Kimi aceita `low|high|max` (`KIMI_MODEL_THINKING_EFFORT`), sempre
+pensa e assume `max` se ninguém disser nada — **fixe sempre o valor**, porque o default caro infla o
+output. A tabela acima já traz o par por linha; ao cruzar de motor, use o valor da coluna de
+destino, nunca o da origem.
+
+**ADAPTADO — com o Codex CLI fora, tudo roda pela coluna *Kimi*.** As três linhas viram
+`kimi-k3` com esforço `low`, `high` e `max`. Isso está declarado no relatório, e não é o mesmo que
+"rodou no default": o quadro de execução da §7 diz `Codex→Kimi` nas linhas em que o default era
+Codex.
 
 ## A árvore que o motor lê — passo obrigatório, e o mais fácil de esquecer
 
@@ -301,6 +473,27 @@ fosse do PR** — e some do PR depois. O relatório fica falando de código que 
 Confira o commit **antes** de despachar qualquer coisa — worktree no commit errado é a mesma revisão
 vazia com outra roupa. Ao terminar, `git worktree remove "$WT" --force`.
 
+**Dois passos a mais quando o motor for o Kimi**, e os dois são obrigatórios:
+
+```bash
+# 1. O Kimi não tem Bash e não monta o diff sozinho: ele é pré-gerado aqui e entregue por
+#    leitura, com `--add-dir "$OUT"` dando acesso. Sem esta linha o briefing aponta para
+#    um arquivo que não existe, e a lente volta vazia — que é laudo limpo falso.
+git -C "$WT" diff "$BASE"...HEAD > "$OUT/DIFF.patch"
+
+# 2. Override de agente vindo do repositório substitui o system prompt da lente —
+#    é o vetor de sequestro do revisor.
+ls -d "$WT/.kimi-code/agents" "$WT/.agents/agents" 2>/dev/null
+```
+
+> **ADAPTADO — aqui é `ls`, não `rm -rf`.** O upstream apaga os dois diretórios antes de despachar,
+> e lá isso é seguro porque `WT` é **sempre** uma worktree descartável. Neste repositório o caso
+> normal é `WT` ser a **própria árvore de trabalho da sessão** (ver a adaptação acima), e um
+> `rm -rf` dentro dela apagaria arquivo do autor sem perguntar. Então a adaptação inverte o verbo:
+> **confira**; achando qualquer um dos dois, **pare e avise** em vez de apagar — num repositório que
+> não versiona nenhum deles, a presença é o fato a investigar, não o lixo a varrer. Em worktree
+> descartável, apagar continua sendo aceitável.
+
 > **ADAPTADO — proibição de saída.** `WT` **nunca** aponta para fora deste repositório. Em
 > particular, `/home/user/urbiverso` (o monorepo) pode estar clonado nesta máquina e é **só
 > referência de leitura do autor**: não é superfície de revisão, não é worktree, não é destino de
@@ -333,7 +526,7 @@ Todo briefing carrega, além da lente ou do framework:
 
 Lente de contrato que não achou o doc é **não executada**, nunca aprovada.
 
-## O comando
+## O comando — Codex
 
 `-s read-only` e `-C` são opções do `codex exec` e vão **antes** do subcomando `review`;
 `--json`, `-m` e o briefing vão **depois**. Trocar a ordem dá `unexpected argument`.
@@ -354,6 +547,40 @@ codex exec -s read-only -C "$WT" --ephemeral -c model_reasoning_effort=<esforço
 - **`--ephemeral`** para não acumular arquivo de sessão.
 - **`</dev/null` não é enfeite:** sem ele o `codex` fica lendo stdin e a lente trava.
 
+## O comando — Kimi
+
+O `kimi` não tem subcomando de revisão nem sandbox de sistema operacional. **Três diferenças mudam o
+comando inteiro, e cada uma já falhou:**
+
+```bash
+cd "$WT" || return 1                       # não existe -C: a lente lê o cwd
+# As KIMI_MODEL_* já vêm exportadas do preflight. Aqui só variam o esforço e — quando a
+# lente muda de tier — o KIMI_MODEL_NAME. Nunca use -m: ver "A armadilha do provedor".
+KIMI_MODEL_NAME=<modelo do tier> KIMI_MODEL_THINKING_EFFORT=<esforço> timeout 900 kimi \
+  --agent-file "$OUT/lente.md" --add-dir "$OUT" \
+  -p "<briefing>" --output-format stream-json </dev/null \
+  > "$OUT/<id>.jsonl" 2> "$OUT/<id>.err"
+```
+
+- **Não existe modo leitura em headless.** `--plan` recusa (`error: Cannot combine --prompt with
+  --plan`). E, sem `--yolo`, o `kimi -p` **não trava esperando aprovação — ele escreve**. A trava é o
+  `--agent-file` com allowlist de ferramentas, verificada no upstream: com `tools: Read, Grep, Glob`
+  o agente não criou o arquivo, só imprimiu o comando que teria rodado. **O `--agent-file` é
+  obrigatório, não opcional.** O perfil é criado pelo heredoc do preflight — não o reescreva à mão
+  aqui: perfil que existe no doc mas não no disco faz o `--agent-file` falhar e a trava sumir junto.
+  Os nomes das ferramentas casam **exato e com maiúscula** (`Read`, não `read`); nome inexistente
+  vira aviso e não bloqueia nada. Note o que a lista **exclui** de propósito além de `Write`/`Edit`:
+  `Bash`, `FetchURL` e `Agent`.
+- **Sem `Bash`, a lente não monta o diff.** O Codex roda `git diff <merge-base>...HEAD` por conta
+  própria; o Kimi não pode. O diff vai pré-gerado em `$OUT/DIFF.patch` (ver a seção da árvore), e **o
+  briefing manda ler esse arquivo primeiro**. Briefing de lente Kimi que repita a instrução do Codex
+  ("revise o diff de `git diff BASE...HEAD`") manda a lente rodar um comando que ela não tem.
+- **Não existe `--ephemeral`.** Para não sujar o `$HOME` real, `KIMI_CODE_HOME` aponta para o
+  scratchpad da sessão, junto com `KIMI_CODE_NO_AUTO_UPDATE=1` e `KIMI_DISABLE_TELEMETRY=1`.
+- **`$OUT` fica fora de `$WT`, sempre.** Escrever o JSONL dentro da árvore revisada faz a própria
+  lente listar `<id>.jsonl` como arquivo do projeto.
+- **`</dev/null` vale igual**, pelo mesmo motivo do Codex.
+
 ## A fan-out — Bash em background, sem subagente
 
 **Não use subagente de invólucro.** O `&`/`wait` do próprio Bash dá paralelismo de verdade:
@@ -369,7 +596,11 @@ o cru.
 Dispare o lote inteiro numa chamada Bash só:
 
 ```bash
-OUT="${CLAUDE_SCRATCHPAD:-/tmp}/revisao"; mkdir -p "$OUT"; rm -f "$OUT"/*   # scratchpad da sessão; apague ao terminar
+# $OUT, $WT, $OUT/lente.md e $OUT/DIFF.patch já vêm do preflight e da seção da árvore.
+# ⚠️ Limpe SÓ a saída das lentes: um `rm -f "$OUT"/*` apagaria o perfil somente-leitura e o
+# diff pré-gerado, e a fan-out seguinte rodaria SEM TRAVA e apontando para um arquivo
+# inexistente — as duas falhas caladas de uma vez.
+OUT="${CLAUDE_SCRATCHPAD:-/tmp}/revisao"; mkdir -p "$OUT"; rm -f "$OUT"/*.jsonl "$OUT"/*.err "$OUT"/execucao.txt
 BASE=<merge-base>
 
 COMUM='<as regras fixas do briefing — ver "O briefing viaja sozinho".
@@ -391,9 +622,28 @@ ${COMUM}" </dev/null > "$OUT/$id.jsonl" 2> "$OUT/$id.err" || rc=$?
   echo "$id exit=$rc tier=$tier esforco=$esf dur=$(( $(date +%s) - ini ))s" >> "$OUT/execucao.txt"
 }
 
+# A mesma função, quando o motor da lente é o Kimi. Note o que muda: `cd` em vez de `-C`,
+# `--agent-file` obrigatório, o esforço por variável de ambiente, e o briefing mandando LER
+# $OUT/DIFF.patch em vez de rodar `git diff`.
+lente_kimi() {  # lente_kimi <id> <modelo> <esforço> <briefing>
+  local id=$1 modelo=$2 esf=$3 brief=$4
+  local ini=$(date +%s) rc=0
+  ( cd "$WT" || exit 1
+    KIMI_MODEL_NAME="$modelo" KIMI_MODEL_THINKING_EFFORT="$esf" timeout 900 kimi \
+      --agent-file "$OUT/lente.md" --add-dir "$OUT" --output-format stream-json \
+      -p "ESCOPO OBRIGATÓRIO: o diff em revisão está em $OUT/DIFF.patch — LEIA esse arquivo primeiro e revise exclusivamente o que ele toca. Você não tem Bash: não tente rodar git.
+Não edite arquivo, não commite, não proponha patch aplicado. Não acesse rota de API de instância nenhuma. Não leia nem escreva em /home/user/urbiverso.
+Responda em português.
+
+${brief}
+
+${COMUM}" </dev/null ) > "$OUT/$id.jsonl" 2> "$OUT/$id.err" || rc=$?
+  echo "$id exit=$rc motor=kimi modelo=$modelo esforco=$esf dur=$(( $(date +%s) - ini ))s" >> "$OUT/execucao.txt"
+}
+
 lente L2 gpt-5.6-terra medium "<briefing da L2>" &
 lente T1 gpt-5.6-sol   high   "<briefing da T1>" &
-# … uma linha por lente do orçamento do passo 2.1
+# … uma linha por lente do orçamento do passo 2.1, cada uma na função do SEU motor
 wait
 cat "$OUT/execucao.txt"
 ```
@@ -439,17 +689,20 @@ Contam como **lente não executada**: `turn.failed`, evento `error`, "Review was
 saída vazia, exit diferente de zero, `timeout` estourado, payload inválido.
 
 Re-despache **uma** vez. Persistindo numa lente só, ela entra no comentário do PR como não
-executada, **com o motivo**. Persistindo em bloco — todas falhando igual —, isso é o motor
-caindo no meio: refaça o preflight uma vez e, se não voltar, **termine a revisão no motor
-nativo** e diga no relatório quais lentes trocaram de motor.
+executada, **com o motivo**. Persistindo em bloco — todas falhando igual —, isso é o motor caindo no
+meio: refaça o preflight daquele motor uma vez e, não voltando, **passe as lentes dele para o motor
+cruzado**, pela coluna correspondente da tabela de tier. **O nativo só entra quando os DOIS
+externos caírem.** Em qualquer dos casos, diga no relatório quais lentes trocaram de motor e por quê
+— a coluna *Motor* do quadro de execução existe para isso.
 
 Uma lente não executada **nunca** vira linha do "o que foi confrontado e passou" da §7. Esse é
 o único jeito de a ausência de resultado virar ausência visível, em vez de laudo limpo falso.
 
-## Motor nativo — o fallback
+## Motor nativo — o fallback do fallback
 
-Vale quando o preflight falhou, ou quando o Codex caiu em bloco no meio da revisão. Mesmas
-lentes, mesmos briefings, mesmo orçamento: muda o veículo.
+Vale quando **os dois** preflights falharam, ou quando os dois motores externos caíram em bloco no
+meio da revisão. Um só caindo não chega aqui: a lente vai para o motor cruzado. Mesmas lentes,
+mesmos briefings, mesmo orçamento — muda o veículo.
 
 - **Subagente por lente**, todos numa mensagem só, `subagent_type: "general-purpose"`.
 - **`model` explícito, sempre** — pela coluna *Nativo* da tabela de tier. Sem o parâmetro o
@@ -473,8 +726,28 @@ lentes, mesmos briefings, mesmo orçamento: muda o veículo.
   `NAO_EXECUTADA` e o motivo cru. Subagente que "resume o que provavelmente teria sido achado"
   transforma falha em laudo.
 - O quadro de execução da §7 mostra `nativo` na coluna Motor, e o anúncio do passo 2.1 diz que
-  o Codex não estava disponível — **com o motivo**. Fallback silencioso é o mesmo laudo limpo
-  falso com outro nome.
+  **nenhum dos dois** motores externos estava disponível — **com o motivo de cada um**. Fallback
+  silencioso é o mesmo laudo limpo falso com outro nome.
+
+## Como o relatório declara o motor
+
+O quadro de execução da §7 ganha um valor por lente na coluna *Motor*, e a troca fica visível:
+
+| Valor | Significa |
+|---|---|
+| `Codex` / `Kimi` | rodou no motor default daquela linha da tabela de tier |
+| `Codex→Kimi` / `Kimi→Codex` | o default falhou, o cruzado entregou |
+| `nativo` | os dois externos indisponíveis |
+| `não executada` | esgotou a escada; o motivo vai junto |
+
+A linha de anúncio do passo 2.1 diz a composição da rodada, não um motor só — por exemplo
+`motor Codex+Kimi`, ou `motor Kimi (Codex indisponível: sem OPENAI_API_KEY e 403 no CONNECT)`.
+
+**E a linha de máquina da atestação segue o mesmo valor**, com o vocabulário que o job
+`revisao-registrada` lê: `motor=codex|kimi|nativo`, minúsculo, um valor só — é a composição
+**predominante** da fan-out. O detalhe por lente mora no quadro de execução, não ali. ⚠️ O parser
+(`.github/workflows/revisao-registrada.yml`, `grep -o 'motor=[a-z]*'`) casa só `[a-z]`: `kimi` passa,
+`Codex→Kimi` **não** — a seta e a maiúscula ficam fora da linha de máquina, sempre.
 
 ## O que nunca sai daqui
 

@@ -1,6 +1,6 @@
 ---
 name: revisar-pr-apps
-description: Revisa um PR deste repositório antes do merge — revisão adversarial delegada ao Codex (nativo quando o Codex não estiver disponível), mais confronto do diff contra os contratos dos frameworks tal como o SDK publicado os expõe, nunca contra o monorepo. Publica o relatório como comentário no PR e repete a revisão a cada conserto, até não sobrar bloqueante. Use sempre que um PR deste repo precisar de revisão — é o passo 6 do processo obrigatório do CLAUDE.md, não uma etapa opcional.
+description: Revisa um PR deste repositório antes do merge — revisão adversarial delegada a motor externo (Codex e Kimi, com fallback cruzado; nativo só quando os dois caírem), mais confronto do diff contra os contratos dos frameworks tal como o SDK publicado os expõe, nunca contra o monorepo. Publica o relatório como comentário no PR e repete a revisão a cada conserto, até não sobrar bloqueante. Use sempre que um PR deste repo precisar de revisão — é o passo 6 do processo obrigatório do CLAUDE.md, não uma etapa opcional.
 ---
 
 <!-- Portado de urbiverso/urbiverso `.claude/skills/revisar-pr-apps/SKILL.md` @ b0361f6 (PR #2540),
@@ -115,9 +115,12 @@ superfície usou**, sempre.
    >   pergunta ao autor. Sem o token no ambiente, volta a ser;
    > - **`dist/index.d.ts` está no disco.** A lente de **props de primitivo `urbi-*`** é
    >   executável, e conferir prop lendo o monorepo perdeu a desculpa;
-   > - **`docs/` e `obsolescencias.json` NÃO estão no bundle `0.50.3`**, que é a versão que o
-   >   `package.json` fixa. A lente de contrato por doc continua **não executada** — e agora por
-   >   causa da **versão fixada**, não por falta de credencial.
+   > - **`docs/` e `obsolescencias.json` ESTÃO no bundle `57.0.0`**, que é a versão que o
+   >   `package.json` fixa desde 2026-09-04. A lente de contrato por doc é **executável** — este
+   >   trecho dizia o contrário, e valia para o pin anterior (`0.50.3`, que trazia só `dist/`).
+   >   Medido em 2026-09-16: `node_modules/@urbiverso/sdk` em `57.0.0`, `docs/` com 32 arquivos,
+   >   `obsolescencias.json` com 7 chaves. ⚠️ Executável **não** é o mesmo que executada: só
+   >   publique `contratos=ok` quando as duas lentes de fato rodaram naquela revisão.
    >
    > ⚠️ **A versão que vale é a que o `package.json` FIXA**, não o `latest` do registry. Conferir
    > contrato numa versão publicada mais nova é a mesma classe de erro que conferir no `main` do
@@ -298,7 +301,7 @@ segundos e os agentes levam minutos: se discordar, ele interrompe, e isso é gr�
 
 ```
 Revisando o PR #<n> (rodada <N>). <N> arquivos, +<x>/−<y>, <áreas>.
-Esforço <nível>: <N> lentes, motor <Codex|nativo — motivo>. Início <timestamp>.
+Esforço <nível>: <N> lentes, motor <Codex+Kimi|Kimi|Codex|nativo — e o motivo de quem faltou>. Início <timestamp>.
 ```
 
 **Override explícito manda mais que o diagnóstico:** se o usuário pedir `completo` ou
@@ -307,10 +310,17 @@ escolheu.
 
 ## 2.2 Motor da fan-out — mora fora desta skill
 
-Leia **`.claude/motor-revisao.md`** deste repositório, por inteiro. Ele traz o preflight do Codex, o
-fallback nativo, os tiers por papel, a regra da árvore que o motor lê, o que todo briefing carrega e
-as invariantes de falha. **Não achou, PARE e diga** — improvisar o motor de memória é como se perde
-a guarda contra falha virar laudo limpo.
+Leia **`.claude/motor-revisao.md`** deste repositório, por inteiro. Ele traz os **dois** preflights
+(Codex e Kimi), o fallback cruzado entre eles, o fallback nativo quando os dois caem, os tiers por
+papel, a regra da árvore que o motor lê — incluindo a pré-geração de `$OUT/DIFF.patch`, sem a qual
+lente Kimi nenhuma enxerga o diff —, o que todo briefing carrega e as invariantes de falha. **Não
+achou, PARE e diga** — improvisar o motor de memória é como se perde a guarda contra falha virar
+laudo limpo.
+
+⚠️ Duas coisas do motor que não se reconstituem de memória, e que já custaram caro no upstream: o
+`--agent-file` do Kimi é a **única** trava de somente-leitura (sem ele o `kimi -p` escreve arquivo
+sem pedir), e **`-m` nunca é passado ao `kimi`** — derruba o CLI com uma exceção que não menciona
+nem modelo nem provedor.
 
 > **ADAPTADO.** O upstream avisava que "numa sessão de app o `.claude/` pode não estar na árvore que
 > você tem aberta". Aqui está: skill e motor moram no mesmo repositório que está sendo revisado.
@@ -595,7 +605,7 @@ Estrutura do comentário:
 - **ADAPTADO — primeiro, uma linha legível por máquina**, invisível para quem lê, no topo do corpo:
 
   ```
-  <!-- revisao-viabilidade rodada=N head=<sha8> motor=codex|nativo bloqueantes=<n> contratos=ok|nao-executados -->
+  <!-- revisao-viabilidade rodada=N head=<sha8> motor=codex|kimi|nativo bloqueantes=<n> contratos=ok|nao-executados -->
   ```
 
   É o que o job `revisao-registrada` do CI procura para saber que **houve revisão neste head**, e
@@ -603,15 +613,22 @@ Estrutura do comentário:
   **comentário**, nunca na descrição do PR — a API remove HTML da descrição, e a linha some sem
   erro. Só isto sobreviveu do protocolo de duas sessões que este repo tinha antes; o resto
   (máquina de estados, teto de rodadas, papéis) morreu com ele.
-- Uma linha de cabeçalho humana: `Revisão de app — rodada <N> · head <sha curto> · motor <Codex|nativo>`.
+- Uma linha de cabeçalho humana: `Revisão de app — rodada <N> · head <sha curto> · motor <Codex+Kimi|Kimi|Codex|nativo>`.
   É por ela que a rodada seguinte se localiza, e o `<sha>` é o que você **de fato** revisou.
+  ⚠️ A **linha de máquina** acima aceita só `[a-z]` em `motor=` (o `grep` do job): ali vai um valor
+  só, minúsculo, sem seta e sem maiúscula. A composição detalhada vive nesta linha humana e no
+  quadro de execução.
 - **Qual superfície de leitura foi usada**, logo no começo: bundle do SDK instalado (**com a
   versão**, e se ela é a mais nova publicada) ou **nenhuma** — e então **quais** lentes de contrato
   não rodaram e **o que ficou descoberto**. Quem lê precisa saber contra qual contrato o "passou"
   foi conferido: um achado ausente pode significar "não existe" ou "não havia contrato para ler".
-  **ADAPTADO:** neste repositório o caso normal é "nenhuma"; e quando o motor for nativo, diga
-  também, em uma linha, que revisão nativa de patch escrito pela mesma família de modelo é **menos
-  adversarial**.
+  **ADAPTADO:** este trecho dizia que *"neste repositório o caso normal é 'nenhuma'"*, e isso
+  deixou de valer — o bundle está no disco desde 2026-09-03 e, com o pin `57.0.0`, traz `dist/`,
+  `docs/` e `obsolescencias.json`. O caso normal passou a ser **declarar a versão instalada** e
+  quais lentes rodaram de fato. E quando o motor for **nativo**, diga também, em uma linha, que
+  revisão nativa de patch escrito pela mesma família de modelo é **menos adversarial** — o que
+  **não** vale para Codex nem Kimi, que são de outros provedores e é justamente o que se ganha
+  ao usá-los.
 - Achados ordenados do mais grave para o mais leve, em **três blocos distintos** — **ADAPTADO:**
   o upstream tem dois, e o terceiro foi salvo da geração anterior deste repo, porque a §9 depende
   do conceito e não o previa como bloco:
@@ -632,9 +649,14 @@ Estrutura do comentário:
 
   | Lente | Motor | Tier | Esforço | Duração | Veredito |
   |---|---|---|---|---|---|
-  | L2 · comportamento removido | Codex | `gpt-5.6-terra` | medium | 2m10s | 0 achados |
-  | contratos · permissoes | Codex | `gpt-5.6-sol` | low | 3m02s | 1 achado |
-  | S3 · UI | Codex | `gpt-5.6-terra` | medium | — | **não executada** (timeout) |
+  | L2 · comportamento removido | Codex→Kimi | `kimi-k3` | high | 2m10s | 0 achados |
+  | contratos · permissoes | Kimi | `kimi-k3` | max | 3m02s | 1 achado |
+  | S3 · UI | Codex→Kimi | `kimi-k3` | high | — | **não executada** (timeout) |
+
+  A coluna *Motor* usa o vocabulário do § *Como o relatório declara o motor* do
+  `.claude/motor-revisao.md`: `Codex`/`Kimi` quando rodou no default daquela linha da tabela de
+  tier, `Codex→Kimi`/`Kimi→Codex` quando o default caiu e o cruzado entregou, `nativo` quando os
+  dois externos estavam fora. Troca de motor **nunca** é silenciosa.
 
   **Lente não executada aparece nesse quadro com o motivo** — motor indisponível, tempo
   estourado, saída inválida. Sumir do relatório é pior que aparecer como falha: quem lê presume

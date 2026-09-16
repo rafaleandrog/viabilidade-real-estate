@@ -37,7 +37,7 @@ preencher estas linhas sem ter revisado não deixa o PR verde.
 
 - Relatório: <!-- link do comentário da última rodada -->
 - Head revisado: <!-- sha curto -->
-- Motor: <!-- codex | nativo (e o motivo, se nativo) -->
+- Motor: <!-- codex | kimi | nativo (e o motivo de quem faltou) -->
 
 ## Validação
 

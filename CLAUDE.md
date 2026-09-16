@@ -689,11 +689,12 @@ rodadas e encerramento obrigatório. Este último não faz falta porque a sessã
 inscreve em nada — ela revisa quando chamada e termina. Vale saber por que isso às vezes importa: **com uma sessão só, quem revisa
 é quem escreveu** — a §8 da skill compensa com lentes novas a cada rodada, mas não é a mesma coisa.
 
-**O motor é Codex, e ele está ligado** — por **`@codex review`** no PR, não pelo CLI. O GitHub App
-está instalado neste repositório e foi exercitado em rodadas sucessivas no PR 494 (~2 min cada), com
-achados P1 e P2 reais. É o **caminho normal**, e a sequência obrigatória — acionar, esperar com teto de 15 min,
-colher os *review threads*, verificar, só então atestar — está em `.claude/motor-revisao.md`
-§ *Sequência obrigatória do App*.
+**O motor da camada A é o Codex, e ele está ligado** — por **`@codex review`** no PR, não pelo CLI.
+O GitHub App está instalado neste repositório e foi exercitado em rodadas sucessivas no PR 494
+(~2 min cada), com achados P1 e P2 reais. É o **caminho normal** dessa camada, e a sequência
+obrigatória — acionar, esperar com teto de 15 min, colher os *review threads*, verificar, só então
+atestar — está em `.claude/motor-revisao.md` § *Sequência obrigatória do App*. O motor da **camada
+B**, a fan-out das lentes, é outra escolha e está logo abaixo.
 
 > ⚠️ **`bloqueantes=` conta os achados do Codex ainda não resolvidos**, porque
 > `revisao-registrada.yml` filtra comentários **pelo autor do PR** e nunca enxerga o bot. E se o App
@@ -704,11 +705,29 @@ colher os *review threads*, verificar, só então atestar — está em `.claude/
 > sobrescreve.
 
 **São duas camadas que somam, não uma fila.** A **revisão do App** (`@codex review`) e a **fan-out
-das lentes** rodam as duas. O que é condicional é o motor *dentro* da fan-out: **CLI local**
-(`codex exec`) quando houver `OPENAI_API_KEY` **e** a liberação de `api.openai.com` — aqui não há, o
-proxy dá **403 no CONNECT** —, e **subagente nativo** quando não houver, **declarado** no relatório
-como menos adversarial, por revisar patch escrito pela mesma família de modelo. O App **não
-dispensa** a fan-out: neste repositório os dois acharam classes de defeito diferentes.
+das lentes** rodam as duas. O que é condicional é o motor *dentro* da fan-out, e desde 2026-09-16 há
+**dois motores externos com fallback cruzado**: **Codex** por `codex exec` e **Kimi** por `kimi -p`,
+com o **subagente nativo** só quando os dois caírem — e aí **declarado** no relatório como menos
+adversarial, por revisar patch escrito pela mesma família de modelo. O App **não dispensa** a
+fan-out: neste repositório os dois acharam classes de defeito diferentes.
+
+> ⚠️ **Neste ambiente quem roda é o Kimi, e o CLI do Codex não roda.** Medido em 2026-09-16:
+> `kimi` `0.38.0` em `/opt/node22/bin/kimi`, `MOONSHOT_API_KEY` no ambiente, smoke `kimi -p` verde
+> em ~10 s com `kimi-k3`; `codex` **ausente** do PATH, `OPENAI_API_KEY` **ausente**, e
+> `api.openai.com` com **403 no CONNECT** pelo proxy de saída. A fan-out sai portanto com
+> `motor=kimi` na linha de máquina, e o quadro de execução marca `Codex→Kimi` nas lentes cujo
+> default era Codex. A receita inteira — preflight, tiers, o comando e a trava de somente-leitura —
+> está em `.claude/motor-revisao.md`.
+>
+> Três coisas do Kimi que não se reconstituem de memória, e cada uma já custou uma revisão no
+> upstream: **`--agent-file` é a única trava de somente-leitura** (sem ele o `kimi -p` escreve
+> arquivo sem pedir, não trava pedindo aprovação); **`-m` nunca é passado** (derruba o CLI com uma
+> exceção que não menciona modelo nem provedor — o eixo do modelo é `KIMI_MODEL_NAME`); e **a
+> lente não tem `Bash`**, então o diff vai pré-gerado em `$OUT/DIFF.patch`, senão ela volta vazia.
+>
+> ⚠️ **Não presuma que esta medição continua valendo.** Sessão futura que achar o `kimi` fora do ar,
+> ou a `OPENAI_API_KEY` presente, tem um fato novo para medir e registrar aqui — não a continuação
+> deste parágrafo. O jeito de conferir é o smoke test, nunca a memória.
 
 **A camada de contratos roda INTEIRA desde 2026-09-04.** O pacote está no disco depois do
 `validar-frontend.sh` — que é o único dos dois que instala; o `validar-backend.sh` aborta se ele não

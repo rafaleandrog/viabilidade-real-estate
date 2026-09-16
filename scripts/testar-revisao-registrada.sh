@@ -79,6 +79,23 @@ printf '%s' "$L" | grep -q 'rodada=9' && falha "comentário forjado" "a linha do
 [ "$(veredito "$L" cccc3333)" = "sem-revisao" ] && ok "head nunca revisado → sem revisão" \
   || falha "veredito sem-revisao" "veio $(veredito "$L" cccc3333)"
 
+# ⚠️ O vocabulário de `motor=`. O `.claude/motor-revisao.md` e a skill prometem que `kimi` é um
+# valor válido e que um valor composto (`Codex→Kimi`) NUNCA entra na linha de máquina. Promessa de
+# doc não é defesa: quem decide é o `grep` do workflow, e ele casa só `[a-z]`. Os dois casos abaixo
+# medem isso — e o primeiro assert existe para o teste falhar se o workflow trocar o padrão, em vez
+# de continuar exercitando uma cópia que divergiu em silêncio.
+grep -qF "grep -o 'motor=[a-z]*'" "$WF" \
+  && ok "o workflow extrai 'motor=' pelo padrão que esta bateria exercita" \
+  || falha "padrão de motor" "o workflow mudou o grep de motor=; atualize esta bateria junto"
+
+motor_de() { printf '%s' "$1" | grep -o 'motor=[a-z]*' | cut -d= -f2; }
+[ "$(motor_de '<!-- revisao-viabilidade rodada=1 head=aaaa1111 motor=kimi bloqueantes=0 -->')" = "kimi" ] \
+  && ok "motor=kimi é lido pelo job (o valor novo desta rodada)" \
+  || falha "motor=kimi" "o job não leu 'kimi' na linha de máquina"
+[ -z "$(motor_de '<!-- revisao-viabilidade rodada=1 head=aaaa1111 motor=Codex→Kimi bloqueantes=0 -->')" ] \
+  && ok "motor composto (seta/maiúscula) NÃO é lido — por isso ele fica fora da linha de máquina" \
+  || falha "motor composto" "esperava vazio; o doc promete que a composição vive no quadro de execução"
+
 # `set +e` é o que mantém a invariante "o job sempre passa": o shell do Actions é
 # `bash -e {0}`, e `set -uo pipefail` NÃO remove o errexit herdado.
 grep -q '^          set +e$' "$WF" && ok "'set +e' presente (o Actions roda bash -e)" \

@@ -30,8 +30,12 @@ else
   REMOTO="nunca empurrada"
 fi
 
+# Prontidão dos DOIS motores externos (.claude/motor-revisao.md). Medir só o Codex fazia esta
+# linha dizer `motor=nativo` num ambiente com o Kimi instalado e funcionando — e ela é reinjetada
+# a cada prompt, então o fato errado é o que sobrevive à compactação.
 MOTOR="nativo"
-[ -n "${OPENAI_API_KEY:-}" ] && MOTOR="codex"
+[ -n "${MOONSHOT_API_KEY:-}" ] && command -v kimi >/dev/null 2>&1 && MOTOR="kimi"
+[ -n "${OPENAI_API_KEY:-}" ] && { [ "$MOTOR" = "kimi" ] && MOTOR="codex+kimi" || MOTOR="codex"; }
 
 echo "[processo] branch=$BRANCH · $ESTADO · $REMOTO · motor=$MOTOR"
 

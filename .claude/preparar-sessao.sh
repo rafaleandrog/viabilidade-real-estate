@@ -46,8 +46,9 @@ fi
 # do autor" por uma causa que não era a declarada.
 if [ -n "${URBIVERSO_PACKAGES_TOKEN:-}" ]; then
   echo '[processo] SDK: autenticável — validar-backend.sh roda aqui (as 5 etapas).'
-  echo '[processo]     Contratos: props de urbi-* SIM (dist/index.d.ts); doc do SDK NÃO — o pin'
-  echo '[processo]     0.50.3 não traz docs/. Atestação segue contratos=nao-executados.'
+  echo '[processo]     Contratos: as DUAS lentes são executáveis — props de urbi-* (dist/index.d.ts)'
+  echo '[processo]     e doc do SDK (docs/ + obsolescencias.json, no pin 57.0.0). contratos=ok só'
+  echo '[processo]     quando as duas de fato rodarem na revisão.'
 else
   echo '[processo] SDK: SEM token (URBIVERSO_PACKAGES_TOKEN ausente) — backend, schema e'
   echo '[processo]     migração ficam pendentes do autor, e o PR precisa DECLARAR isso.'
@@ -55,18 +56,30 @@ fi
 
 # ── Motor de revisão: medido, não presumido ──────────────────────────────────
 # Sem isto, a queda para o motor nativo só é descoberta no relatório, no fim.
-if [ -z "${OPENAI_API_KEY:-}" ]; then
-  echo '[processo] motor de revisão: NATIVO (OPENAI_API_KEY ausente no ambiente)'
-  echo '[processo]     → para ter Codex, o autor põe a chave nas variáveis do cloud environment.'
-elif ! command -v codex >/dev/null 2>&1; then
-  echo '[processo] motor de revisão: CODEX após instalar (chave presente, CLI ausente)'
-  echo '[processo]     → o preflight do .claude/motor-revisao.md instala o @openai/codex sozinho.'
-elif [ -s "$HOME/.codex/auth.json" ]; then
-  echo '[processo] motor de revisão: CODEX (já autenticado)'
-elif printenv OPENAI_API_KEY | codex login --with-api-key >/dev/null 2>&1; then
-  echo '[processo] motor de revisão: CODEX (autenticado agora por API key)'
+#
+# ⚠️ São DOIS motores externos desde 2026-09-16 (ver .claude/motor-revisao.md), e este bloco
+# media só um. Enquanto media só o Codex, ele imprimia NATIVO num ambiente em que o Kimi
+# estava instalado, com chave e funcionando — fato medido e falso é pior que fato ausente,
+# porque ninguém confere o que o hook afirma.
+#
+# Aqui a medição é barata e de PRONTIDÃO (binário + chave), não de turno completo: o smoke
+# test de verdade (`kimi -p`) leva ~10s e mora no preflight da revisão, não num hook que roda
+# na abertura de toda sessão.
+CODEX_PRONTO=0
+if [ -n "${OPENAI_API_KEY:-}" ]; then CODEX_PRONTO=1; fi     # o CLI o preflight instala sozinho
+KIMI_PRONTO=0
+if [ -n "${MOONSHOT_API_KEY:-}" ] && command -v kimi >/dev/null 2>&1; then KIMI_PRONTO=1; fi
+
+if [ "$CODEX_PRONTO" = 1 ] && [ "$KIMI_PRONTO" = 1 ]; then
+  echo '[processo] motor de revisão: CODEX+KIMI (os dois prontos; o smoke test de cada um é no preflight)'
+elif [ "$KIMI_PRONTO" = 1 ]; then
+  echo '[processo] motor de revisão: KIMI (Codex sem OPENAI_API_KEY no ambiente)'
+  echo '[processo]     → a fan-out roda pela coluna Kimi da tabela de tier; atestação sai motor=kimi.'
+elif [ "$CODEX_PRONTO" = 1 ]; then
+  echo '[processo] motor de revisão: CODEX (Kimi sem MOONSHOT_API_KEY ou sem o CLI no PATH)'
 else
-  echo '[processo] motor de revisão: NATIVO (codex login falhou)'
+  echo '[processo] motor de revisão: NATIVO (nenhum motor externo pronto)'
+  echo '[processo]     → o autor põe OPENAI_API_KEY e/ou MOONSHOT_API_KEY nas variáveis do ambiente.'
 fi
 
 exit 0
