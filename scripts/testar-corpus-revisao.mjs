@@ -82,8 +82,19 @@ const retirados = ler('.claude/revisao/retirados.md');
 // O cabeçalho do arquivo traz um MOLDE dentro de bloco de código, com os mesmos `###` e campos.
 // Contá-lo como entrada faria a bateria medir o próprio exemplo; o corte é o `---` que separa
 // a explicação das entradas de verdade.
+const divisorias = (retirados.match(/\n---\n/g) ?? []).length;
+assert.notEqual(divisorias, 0, 'retirados.md perdeu a divisória `---` entre a explicação e as entradas');
+// ⚠️ UMA divisória, e a unicidade é o que sustenta o corte — nos DOIS scripts, que usam
+// `indexOf` e portanto pegam a primeira. Com uma divisória a mais no cabeçalho, o `### ` do
+// MOLDE volta para dentro do recorte: o carimbador o conta como entrada e esta bateria NÃO
+// reprova, porque o molde tem os quatro campos. Os dois passariam a concordar no número
+// errado — exatamente o descompasso que o corte existe para eliminar. Achado de lente.
+assert.equal(
+  divisorias, 1,
+  `retirados.md tem ${divisorias} divisórias \`---\`; o corte dos dois scripts é por indexOf e ` +
+    'pressupõe UMA. Com mais de uma, o molde do cabeçalho volta a contar como entrada e nada fica vermelho.',
+);
 const corte = retirados.indexOf('\n---\n');
-assert.notEqual(corte, -1, 'retirados.md perdeu a divisória `---` entre a explicação e as entradas');
 const entradas = retirados.slice(corte).split(/^### /m).slice(1);
 assert.ok(entradas.length > 0, 'retirados.md não tem nenhuma entrada — o registro nasceu vazio');
 for (const entrada of entradas) {

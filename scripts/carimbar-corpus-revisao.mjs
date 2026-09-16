@@ -41,6 +41,8 @@ export function calcular(raizRepo = raiz) {
   // molde entra na conta e o `n` fica uma unidade acima do que esta prosa promete — e, pior, os dois
   // scripts passam a definir "entrada" de formas OPOSTAS, porque `testar-corpus-revisao.mjs` corta
   // exatamente aí. Foi o que aconteceu: duas lentes independentes acharam o `v14` com 13 entradas.
+  // O corte é pela PRIMEIRA divisória, e isso só é correto porque há exatamente uma — quem
+  // garante a unicidade é `scripts/testar-corpus-revisao.mjs`, que reprova o arquivo com duas.
   const corte = textos[1].indexOf('\n---\n');
   const entradasRetirados = corte === -1 ? textos[1] : textos[1].slice(corte);
   const entradas = (textos[0].match(/^## /gm) ?? []).length + (entradasRetirados.match(/^### /gm) ?? []).length;
