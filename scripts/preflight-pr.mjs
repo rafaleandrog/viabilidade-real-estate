@@ -57,7 +57,7 @@
 import { readFileSync, existsSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -381,9 +381,16 @@ if (arquivos.length === 0 && fecha.length > 0) {
 }
 
 // ── 4. Os guards do CI, com a mesma entrada ─────────────────────────────────
+// O interpretador sai do SUFIXO: as baterias do job `processo-integro` não são todas `.mjs` —
+// duas delas são shell, e foi por isso que ficaram fora do preflight quando ele só sabia chamar
+// o node. Escolher pelo sufixo é o que permite o preflight cobrir **todas as baterias do job que
+// não invocam o próprio preflight** — `testar-preflight-pr.sh` fica estruturalmente de fora, por
+// recursão, e só o CI a roda. Não escreva aqui "cobre o job inteiro": é falso, e é exatamente a
+// sobreafirmação que o § passo 4 do `CLAUDE.md` registra como já tendo passado por um merge.
 const rodar = (rotulo, script, env) => {
+  const bash = script.endsWith('.sh');
   try {
-    const saida = execFileSync(process.execPath, [resolve(RAIZ, script)], {
+    const saida = execFileSync(bash ? 'bash' : process.execPath, [resolve(RAIZ, script)], {
       cwd: RAIZ,
       encoding: 'utf8',
       env: { ...process.env, ...env },
@@ -412,11 +419,58 @@ rodar('guard de escopo (regra R1)', 'scripts/guard-pr-escopo-processo.mjs', {
 rodar('guard de JSON estrito', 'scripts/guard-json.mjs', {});
 rodar('guard de ciclos no schema', 'scripts/guard-schema-ciclos.mjs', {});
 rodar('guard da rede do processo', 'scripts/guard-processo.mjs', {});
-// O corpo de conhecimento das lentes: editar um dos arquivos sem re-carimbar deixa o job
-// `processo-integro` VERMELHO, e o `guard-processo.mjs` acima não pega — ele confere que os
-// arquivos existem, não que o marcador fecha. Sem esta linha, o preflight aprovava um PR cujo
-// CI já estava condenado, que é o oposto do que ele existe para fazer.
-rodar('bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', {});
+// As baterias do job `processo-integro` entram logo abaixo, na tabela `BATERIAS`. Elas pegam o que
+// os guards acima não pegam: o `guard-processo.mjs` confere que os arquivos do corpo EXISTEM, não
+// que o marcador fecha — sem elas, o preflight aprovava um PR cujo CI já estava condenado, que é o
+// oposto do que ele existe para fazer.
+// ⚠️ NENHUMA das quatro baterias `testar-*` roda em `--declarado`, e isso é sobre TEMPO DE CI. O
+// modo declarado é entrada sintética: `scripts/testar-preflight-pr.sh` o usa para exercitar o
+// PARSING deste script, dezenas de vezes, e ainda repete a suíte numa worktree hermética. Como as
+// baterias leem a ÁRVORE — que a fixture não muda —, cada repetição refazia trabalho idêntico.
+// Medido: das 1871 ms de uma invocação, 1625 ms (87%) eram as baterias; o passo ia de ~8 s para
+// ~96 s, contra um `timeout-minutes: 5` do job. Achado P2 do App do Codex.
+//
+// A fiação continua coberta: `testar-preflight-pr.sh` tem UM caso que invoca sem `--declarado` e
+// exige as baterias na saída — sem ele, inverter este gate deixava zero baterias rodando em modo
+// real e a suíte VERDE. Medido também. `--declarado` nunca é usado por contribuinte real, e o CI
+// roda as cinco como passos independentes do `processo-integro` de qualquer jeito.
+
+// ⚠️ FERRAMENTAS, não uma ferramenta. Até o PR anterior o preflight só precisava de `node` e
+// `git` (ver o cabeçalho, § contrato). Plugar as baterias trouxe dependências novas, e a lista
+// nasceu como `COM_JQ` — nomeada por UMA ferramenta quando o conceito é "o que as baterias
+// precisam". Isso não convergiu: o `jq` veio numa rodada de revisão, o `bash` na seguinte, cada
+// um como achado separado. Terceira instância da mesma classe pede INVERTER (§ 6 do corpo de
+// conhecimento, armadilha 14 do `CLAUDE.md`) — então a dependência passa a ser declarada POR
+// BATERIA, e quem acrescentar bateria declara as ferramentas dela aqui.
+//
+// Faltando a ferramenta, a bateria não roda e sai AVISO, não bloqueante: ela falharia por falta de
+// FERRAMENTA, não por defeito do PR, e falso positivo no portão local é o que faz alguém desligar
+// a guarda. O CI (ubuntu, com as duas) roda todas de qualquer jeito.
+const BATERIAS = [
+  ['bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', ['bash']],
+  ['bateria da colheita do motor', 'scripts/testar-colheita-motor.mjs', ['bash', 'jq']],
+  ['bateria da guarda do monorepo', 'scripts/testar-guarda-monorepo.sh', ['bash', 'jq']],
+  ['bateria do parsing do revisao-registrada', 'scripts/testar-revisao-registrada.sh', ['bash', 'jq']],
+];
+// `spawnSync` sem shell: `command -v` precisaria de um shell, e é justamente o shell que pode
+// faltar. `spawnSync(f, ['--version'])` devolve `error` quando o binário não existe, sem lançar.
+const temFerramenta = (f) => spawnSync(f, ['--version'], { stdio: 'ignore' }).error === undefined;
+const ferramentas = new Map();
+if (!MODO_DECLARADO) {
+  for (const [rotulo, script, precisa] of BATERIAS) {
+    const faltando = precisa.filter((f) => {
+      if (!ferramentas.has(f)) ferramentas.set(f, temFerramenta(f));
+      return !ferramentas.get(f);
+    });
+    if (faltando.length === 0) rodar(rotulo, script, {});
+    else {
+      avisos.push(
+        `\`${faltando.join('`, `')}\` não está nesta máquina: a ${rotulo} NÃO rodou aqui. O CI a ` +
+          'roda — mas se reprovar lá, o erro aparece depois do push.',
+      );
+    }
+  }
+}
 
 // ── 5. Armadilhas de redação que nenhum guard pega ──────────────────────────
 // Não são bloqueantes: são avisos, porque cada um tem um uso legítimo raro.
