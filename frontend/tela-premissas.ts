@@ -200,6 +200,19 @@ export function linhasCascataIncorporacao(
 
 // Permuta financeira R e NR (#5): cada uma alterna entre % do VGV do tipo e um
 // valor absoluto em R$. Renderizadas na seção Deduções.
+//
+// #740: Loteamento só tem UM campo de permuta financeira (o motor normaliza o
+// catálogo inteiro no bucket residencial — mesma razão de `PERMUTA_UNIDADE`
+// acima, para Permuta física) — então ele usa esta constante sem sufixo, no
+// mesmo molde. `PERMUTA_FIN_R`/`PERMUTA_FIN_NR`, com os rótulos
+// "residencial"/"não residencial", continuam exclusivas da Incorporação.
+const PERMUTA_FIN_LOT: CustoUnidade = {
+  modoKey: 'permuta_financeira_residencial_modo', rotulo: 'Permuta financeira', padrao: 'pct_vgv', campoCanonico: 'permuta_financeira_residencial_valor_canonico',
+  opcoes: [
+    { valor: 'pct_vgv', rotulo: '% VGV', campo: 'permuta_financeira_residencial_pct', sufixo: '% VGV', conv: { tipo: 'pct', link: 'vgvResidencial' } },
+    { valor: 'valor_fixo', rotulo: 'R$', campo: 'permuta_financeira_residencial_valor', sufixo: 'R$', conv: { tipo: 'identidade' } },
+  ],
+};
 const PERMUTA_FIN_R: CustoUnidade = {
   modoKey: 'permuta_financeira_residencial_modo', rotulo: 'Permuta financeira residencial', padrao: 'pct_vgv', campoCanonico: 'permuta_financeira_residencial_valor_canonico',
   opcoes: [
@@ -859,8 +872,9 @@ export class ViabTelaPremissas extends LitElement {
           <div class="secao grupo grupo-b">
             <h4>Permuta financeira</h4>
             <div class="grid">
-              ${this._custoUnidade(PERMUTA_FIN_R, dis)}
-              ${lot ? nothing : this._custoUnidade(PERMUTA_FIN_NR, dis)}
+              ${lot
+                ? this._custoUnidade(PERMUTA_FIN_LOT, dis)
+                : html`${this._custoUnidade(PERMUTA_FIN_R, dis)}${this._custoUnidade(PERMUTA_FIN_NR, dis)}`}
             </div>
           </div>
 
