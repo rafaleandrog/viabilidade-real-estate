@@ -193,6 +193,31 @@ contem 'ACIONA o App' 'avisa sobre @codex no corpo' \
 contem 'estado da árvore:' 'reporta o estado da árvore em qualquer ambiente' \
   'Nada a citar.'
 
+# ── Fiação das baterias: elas rodam em modo REAL ────────────────────────────
+# ⚠️ ESTE caso é o único que invoca o preflight SEM `--declarado`, e é de propósito. Todos os
+# outros usam o modo declarado — que existe para exercitar o parsing com entrada sintética e, por
+# isso, PULA as baterias (senão a suíte as re-executava dezenas de vezes: medido, 96s contra 8s).
+#
+# O efeito colateral disso é que as chamadas das baterias ficariam sem consumidor de teste:
+# inverter o gate para `if (MODO_DECLARADO)` deixava ZERO baterias rodando em modo real e a suíte
+# inteira VERDE — medido. É a classe de defeito nº 1 do `CLAUDE.md` (o defeito mora na FIAÇÃO)
+# dentro da própria máquina que o repositório usa para não cair nela. Achado de lente.
+#
+# Uma invocação real custa ~1,9s; o teto do job é 5 min. Uma é o preço certo por cobrir a fiação.
+saida_real="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" --titulo 'titulo sintetico' 2>&1)"
+faltando=''
+for b in 'bateria do corpo de conhecimento' 'bateria da colheita do motor' \
+         'bateria da guarda do monorepo' 'bateria do parsing do revisao-registrada'; do
+  case "$saida_real" in *"$b"*) ;; *) faltando="$faltando $b" ;; esac
+done
+if [ -z "$faltando" ]; then
+  passou=$((passou + 1)); echo '  ok   em modo REAL o preflight roda as 4 baterias do processo-integro'
+else
+  falhou=$((falhou + 1))
+  echo "  FALHA em modo real faltaram baterias:$faltando"
+  echo '        (sem este caso, inverter o gate de MODO_DECLARADO fica verde)'
+fi
+
 # ── Contrato de uso ─────────────────────────────────────────────────────────
 node scripts/preflight-pr.mjs > /dev/null 2>&1
 if [ $? -eq 2 ]; then
