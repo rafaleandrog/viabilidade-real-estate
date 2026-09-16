@@ -103,9 +103,13 @@ assert.notEqual(
     'sem a âncora, o teste rodaria o passo do `git diff` em vez da guarda',
 );
 const blocoOv = blocoBruto.slice(inicioGuarda);
+// A sentinela é larga de propósito: o teste EXECUTA este trecho com `bash -c`, então
+// qualquer comando que escreva ou apague precisa esbarrar aqui. A primeira versão casava
+// só `git ` com espaço literal e `rm -rf` literal, e deixava passar `rm -r`, `find -delete`
+// e qualquer redirect para caminho absoluto — mais furada que a placa que anunciava.
 assert.doesNotMatch(
-  blocoOv, /git |rm -rf|>\s*"\$OUT/,
-  'o recorte da guarda não pode conter comando de git, remoção ou redirect: ' +
+  blocoOv, /\b(git|rm|mv|cp|find|tee|dd|truncate|install)\b|>\s*["']?[/$]/,
+  'o recorte da guarda não pode conter comando que escreva, mova ou apague, nem redirect: ' +
     'o teste executa este trecho, e ele tem que ser inerte fora da própria checagem',
 );
 // A prova é EXECUTAR, não casar regex: a forma antiga (`if ls -d "$a" "$b"`) também

@@ -102,16 +102,17 @@ isso não apareceu como falha em lugar nenhum.
 > B, e hoje a camada B deste repositório roda em **Kimi** (ver a medição acima).
 >
 > ⚠️ **As duas rodam JUNTAS, e em PARALELO — decisão do autor, 2026-09-16.** Acione o
-> `@codex review` **antes** de despachar a fan-out, não depois: o App responde em ~2 min e a
-> fan-out leva ~4–5, então a espera da camada A cabe inteira por baixo da camada B e custa zero
-> de relógio. Em série, custa o dobro. Sempre que os dois estiverem disponíveis, os dois rodam —
-> a rodada só cai para um deles quando o outro está fora, e aí o relatório diz qual e por quê.
+> `@codex review` **antes** de despachar a fan-out, não depois: a resposta do App é bem mais
+> rápida que a fan-out, então a espera da camada A cabe por baixo da camada B e custa zero de
+> relógio. Em série, custa o dobro. Sempre que os dois estiverem disponíveis, os dois rodam — a
+> rodada só cai para um deles quando o outro está fora, e aí o relatório diz qual e por quê.
 >
-> **E o ganho não é só de tempo — é de cobertura, medido neste repositório.** Na adoção do Kimi
-> (PR 737), as duas camadas acharam conjuntos quase disjuntos: o App do Codex levantou quatro P1
-> que as lentes Kimi não pegaram (a colheita cega ao formato do Kimi, o `motor=` ausente no
-> `lente()` do Codex, o `tail -1` do re-despacho e a guarda de override falhando aberta), e as
-> lentes Kimi levantaram oito que o App não levantou. Motor único erra junto consigo mesmo.
+> **E o ganho não é só de tempo — é de cobertura.** Na adoção do Kimi (PR 737) as duas camadas
+> acharam conjuntos quase disjuntos: só o App pegou a colheita cega ao formato do Kimi, o
+> `motor=` ausente no `lente()` do Codex e a guarda de override falhando aberta; só as lentes
+> Kimi pegaram a prontidão assimétrica dos hooks, o `DIFF.patch` velho servível e as fixturas que
+> passavam pelo motivo errado. **Motor único erra junto consigo mesmo.** (O placar numérico vive
+> no PR, não aqui — ver a regra do contador, acima.)
 >
 > **As duas camadas não competem — somam.** No PR 494 a divisão foi limpa e vale registrar: o
 > Codex achou os defeitos de **lógica** (uma guarda que não testava o que dizia testar; um caminho
