@@ -21,7 +21,7 @@ test('seletor de lote exclui regularização fundiária e mostra busca por texto
 
   const extra = a.extra?.['900'] as {
     chamadas: string[]; opcoesValores: string[]; opcoesRotulos: string[]; temBuscaInput: boolean;
-    temSelect: boolean;
+    temSelect: boolean; imovelVinculadoNoPost: number | null;
   } | undefined;
   assert.ok(extra, 'o caso não devolveu a medida extra — medir() não rodou' + relato(a));
 
@@ -51,5 +51,12 @@ test('seletor de lote exclui regularização fundiária e mostra busca por texto
     extra!.temSelect, false,
     'campo único: não pode existir um <urbi-select> separado no fluxo de lote — a lista de '
       + 'resultados fica anexada ao mesmo <urbi-input class="busca">' + relato(a),
+  );
+
+  assert.equal(
+    extra!.imovelVinculadoNoPost, 2,
+    'clicar no item do <urbi-lista> (evento urbi:lista-click) tem que chegar a _adicionar() e '
+      + 'virar um POST /estudos/:id/imoveis com o lote #2 (o elegível) — sem isso a lista só '
+      + 'prova que POPULA, não que o clique VINCULA o lote certo' + relato(a),
   );
 });

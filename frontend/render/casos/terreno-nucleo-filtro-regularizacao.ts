@@ -41,7 +41,14 @@ export const caso = {
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     (globalThis as any).__chamadasNucleo = [];
-    (globalThis as any).urbiVerso.api = async () => ({ dados: [] });
+    // Grava toda chamada a `urbiVerso.api` — usado pelo teste de clique (medir())
+    // para provar que `urbi:lista-click` chega a `_adicionar` e vira o POST
+    // certo, com o `imovel_nucleo_id` do lote ELEGÍVEL (não o excluído).
+    (globalThis as any).__chamadasApi = [];
+    (globalThis as any).urbiVerso.api = async (rota: string, opts?: any) => {
+      (globalThis as any).__chamadasApi.push({ rota, opts });
+      return { dados: [] };
+    };
     (globalThis as any).urbiVerso.nucleo = async (rota: string) => {
       (globalThis as any).__chamadasNucleo.push(rota);
       if (rota.startsWith('/parcelamentos')) {
@@ -87,7 +94,7 @@ export const caso = {
   },
   async medir(raiz: HTMLElement): Promise<{
     chamadas: string[]; opcoesValores: string[]; opcoesRotulos: string[]; temBuscaInput: boolean;
-    temSelect: boolean;
+    temSelect: boolean; imovelVinculadoNoPost: number | null;
   }> {
     const tela = raiz.querySelector('viab-tela-premissas') as any;
     const terreno = tela.shadowRoot!.querySelector('viab-terreno-nucleo') as any;
@@ -95,6 +102,24 @@ export const caso = {
     const lista = terreno.shadowRoot!.querySelector('urbi-lista') as any;
     const opcoes = (lista?.itens ?? []) as { valor: string; rotulo: string }[];
     const buscaInput = terreno.shadowRoot!.querySelector('urbi-input.busca');
+
+    // Prova a metade INTERATIVA do campo único: dispara o MESMO evento que o
+    // <urbi-lista> real dispararia ao clicar no item (`detail: { item, indice }`
+    // — ver `ui/src/urbi-lista.ts` § `_onClick`) e confere que chega a
+    // `_adicionar` e vira o POST certo. Sem isto, só provávamos que a lista
+    // POPULA, não que o clique VINCULA o lote certo — achado da revisão
+    // (Kimi, lente confirmatória).
+    if (lista && opcoes.length > 0) {
+      lista.dispatchEvent(new CustomEvent('urbi:lista-click', {
+        detail: { item: opcoes[0], indice: 0 }, bubbles: true, composed: true,
+      }));
+      await new Promise((r) => setTimeout(r, 0));
+      await terreno.updateComplete;
+    }
+    const chamadasApi = ((globalThis as any).__chamadasApi ?? []) as { rota: string; opts?: any }[];
+    const postVinculo = chamadasApi.find((c) => /\/imoveis$/.test(c.rota) && c.opts?.method === 'POST');
+    const corpo = postVinculo?.opts?.body ? JSON.parse(postVinculo.opts.body) : null;
+
     return {
       chamadas: (globalThis as any).__chamadasNucleo ?? [],
       opcoesValores: opcoes.map((o) => o.valor),
@@ -102,6 +127,7 @@ export const caso = {
       temBuscaInput: !!buscaInput,
       // Campo único: não pode existir um <urbi-select> separado neste fluxo.
       temSelect: !!terreno.shadowRoot!.querySelector('urbi-select'),
+      imovelVinculadoNoPost: corpo ? Number(corpo.imovel_nucleo_id) : null,
     };
   },
 };
