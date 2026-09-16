@@ -232,13 +232,31 @@ const BUCKETS_DIRETO: Array<{ rotulo: string; casa: (l: LinhaCalc) => boolean }>
   // Custos do Avançado (só existe como `manutencao_pct` no Preliminar) — sem
   // bucket aqui, de propósito: nenhuma linha bateria nele, e um bucket morto
   // não é diferente de omiti-lo.
-  { rotulo: 'Contingências', casa: (l) => l.nome === 'Contingência' },
+  //
+  // ⚠️ #742 (achado do Codex, rodada 1): "Contingências" NÃO entra nesta
+  // lista — ela precisa ser emitida DEPOIS de "Despesas Financeiras" (ordem
+  // canônica pedida pelo autor: "... Decoração, Despesas Financeiras,
+  // Contingências"), e o bucket de financeiro é processado fora deste laço,
+  // logo abaixo. Se "Contingências" estivesse aqui, sairia ANTES do bloco
+  // financeiro, invertendo a ordem quando um estudo tem as duas.
 ];
+
+const BUCKET_CONTINGENCIA: { rotulo: string; casa: (l: LinhaCalc) => boolean } = {
+  rotulo: 'Contingências', casa: (l) => l.nome === 'Contingência',
+};
 
 const BUCKETS_INDIRETO: Array<{ rotulo: string; casa: (l: LinhaCalc) => boolean }> = [
   { rotulo: 'Marketing global', casa: (l) => l.nome === 'Marketing global' },
   { rotulo: 'Stand e estrutura de vendas', casa: (l) => l.nome === 'Stand de vendas' },
-  { rotulo: 'Gestão e outros custos indiretos', casa: (l) => l.nome === 'Gestão' || l.nome === 'Outro' },
+  // ⚠️ #742 (achado do Codex, rodada 1): "Outro" É AMBÍGUO — o catálogo de
+  // Custos oferece a categoria "Outro" em TODOS os 5 grupos (terreno, obra,
+  // diretos, indireto, financeiro), então casar só pelo nome roubaria um
+  // "Outro" de terreno/obra/diretos para dentro do indireto, antes que o
+  // fallback (que decide pelo `grupo` original) pudesse vê-lo. "Gestão" não
+  // tem esse problema — só existe no catálogo do grupo `indireto` ("Gestão
+  // da obra", do grupo `obra`, é um nome distinto) — então continua casando
+  // só pelo nome, como os demais buckets nomeados.
+  { rotulo: 'Gestão e outros custos indiretos', casa: (l) => l.nome === 'Gestão' || (l.nome === 'Outro' && l.grupo === 'indireto') },
 ];
 
 /** Soma e ITEMIZA (nome a nome, > R$ 0,005) as linhas de um subconjunto — usada pelos dois blocos (direto/indireto) e por "Despesas Financeiras". */
@@ -368,6 +386,12 @@ export function proformaAvancado(
       valor: -totalFinanceiro, nivel: 1, tipo: 'custo', subgrupo: true,
     });
   }
+
+  // "Contingências" — depois de "Despesas Financeiras", conforme a ordem
+  // canônica pedida (ver o comentário de `BUCKET_CONTINGENCIA` acima).
+  const contingencias = [...restantes].filter((l) => BUCKET_CONTINGENCIA.casa(l));
+  for (const l of contingencias) restantes.delete(l);
+  custoDiretoExibido += itemizar(contingencias, linhas);
 
   // ── Buckets nomeados do custo INDIRETO (mesma regra: por nome, não grupo).
   // As linhas só são EMPILHADAS depois de "Receita operacional" (mais abaixo)

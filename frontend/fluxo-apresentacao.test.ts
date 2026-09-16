@@ -820,6 +820,18 @@ test('#742: item sem categoria canônica (grupo "Outro"/livre) não é descartad
   // do motor, menos Corretagem/Marketing que saíram para a dedução de receita).
   const corretagem = c.linhasCusto.find((x) => x.nome === 'Corretagem de vendas')!.total;
   assert.ok(Math.abs((custoDireto + custoIndireto) - (soma(c.custoMensal) - corretagem)) <= 0.01);
+
+  // #742 (achado do Codex, rodada 1): o teste acima só confere o AGREGADO —
+  // um "Outro" que trocasse de lado (ex.: o de `diretos` cair no indireto por
+  // casar pelo NOME "Outro" no bucket "Gestão e outros custos indiretos")
+  // ainda bateria na soma, porque o total do motor não muda. Confira o LADO
+  // de cada um, individualmente: "Outro" de `diretos` (id 101, R$ 50.000) tem
+  // que compor `= Custo direto total`, nunca o indireto — e vice-versa para
+  // o de `indireto` (id 102, R$ 30.000).
+  const outroDiretos = c.linhasCusto.find((l) => l.nome === 'Outro' && l.grupo === 'diretos')!;
+  const outroIndireto = c.linhasCusto.find((l) => l.nome === 'Outro' && l.grupo === 'indireto')!;
+  assert.ok(custoDireto >= outroDiretos.total - 0.01, '"Outro" de `diretos` tem que estar no custo DIRETO');
+  assert.ok(custoIndireto >= outroIndireto.total - 0.01, '"Outro" de `indireto` tem que estar no custo INDIRETO');
 });
 
 test('#742: "(-) Imposto" isolado bate com o RET medido, mesmo com Corretagem e Permuta financeira presentes', () => {
@@ -848,6 +860,22 @@ test('#742: rodapé de resultado mostra "Resultado + Permutas" primeiro e "Resul
   ]);
   // A ÚLTIMA linha é o resultado de fato — sem nenhuma permuta somada de volta.
   assert.ok(Math.abs(linhasResultado[2].valor - p.resultado) <= 0.01);
+});
+
+test('#742 (achado do Codex, rodada 1): com Contingência E financeiro no mesmo estudo, "Despesas Financeiras" vem ANTES de "Contingências"', () => {
+  const CONFIG_CONTINGENCIA_E_FINANCEIRO: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      { id: 200, grupo: 'obra', categoria: 'Contingência', orcamento_valor: 80_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  };
+  const c = calcularFluxo(CONFIG_CONTINGENCIA_E_FINANCEIRO);
+  const p = proformaAvancado(c, 1000);
+  const idxFinanceiro = p.linhas.findIndex((l) => l.nome.startsWith('(-) Despesas Financeiras'));
+  const idxContingencia = p.linhas.findIndex((l) => l.nome === '(-) Contingência');
+  assert.ok(idxFinanceiro >= 0 && idxContingencia >= 0, 'as duas linhas têm que existir na fixture');
+  assert.ok(idxFinanceiro < idxContingencia, 'ordem canônica: "... Despesas Financeiras, Contingências"');
 });
 
 // ─────────────────────────────────────────────────────────────────────────
