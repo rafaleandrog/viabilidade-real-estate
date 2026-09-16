@@ -417,6 +417,11 @@ rodar('guard da rede do processo', 'scripts/guard-processo.mjs', {});
 // arquivos existem, não que o marcador fecha. Sem esta linha, o preflight aprovava um PR cujo
 // CI já estava condenado, que é o oposto do que ele existe para fazer.
 rodar('bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', {});
+// Pelo MESMO motivo, a colheita. Ela era step de CI desde o PR que adotou o Kimi e não tinha
+// caminho local nenhum — quem editasse `.claude/motor-revisao.md` descobria a quebra depois do
+// push. Enquanto essa lacuna existiu, a frase do passo 4 do `CLAUDE.md` ("o preflight roda tudo
+// que um PR reprovaria depois") era falsa; é mais barato torná-la verdadeira do que enfraquecê-la.
+rodar('bateria da colheita do motor', 'scripts/testar-colheita-motor.mjs', {});
 
 // ── 5. Armadilhas de redação que nenhum guard pega ──────────────────────────
 // Não são bloqueantes: são avisos, porque cada um tem um uso legítimo raro.

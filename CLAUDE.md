@@ -30,10 +30,11 @@ dois documentos contra EVIs reais do projeto Calliandra, está em
 
 ---
 
-## Estado do backlog — ✅ RODADA 12 CONCLUÍDA (encerrada em 2026-09-15)
+## Estado do backlog — 🔄 RODADA 13 EM ANDAMENTO (aberta em 2026-09-16)
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
+| **13 — Tornado de alavancas e margem de segurança (aba Cenários do Preliminar)** | A **Fase 2** do mesmo handoff de UX da Rodada 12, que aquela rodada registrou como fora de escopo (`docs/rodada-12/auditoria.md:48-50` e `:63-65`): tornado de alavancas ranqueadas (§4.2), bloco de margem de segurança (§4.3) e a aba Cenários reconstruída (§4.6) — hoje um dropdown de UMA variável mais três colunas de valores absolutos (`frontend/tela-proforma.ts:655-791`). ⚠️ A auditoria da Rodada 12 supôs que a margem de segurança exigiria um campo `base_calculo` por linha de custo; o plano da 13 **inverteu o motor numericamente** (secante + bisseção, o precedente é `precoSugeridoM2` em `frontend/proforma.ts:849`), então **nenhuma PR desta rodada mexe em `schema.json` nem bumpa a `versao`**. Fila de 12 PRs, estritamente serial; plano em `docs/rodada-13/planejamento.md` | **#724–#736** (13) | 🔄 **em andamento** — os 2 PRs de **processo** estão mergeados (#737 adotou o **Kimi** como segundo motor externo de revisão, com colheita por roster; #739 criou o **corpo de conhecimento das lentes**, lido da BASE). **Nenhuma PR de produto ainda**: #724–#736 seguem todas abertas. |
 | **12 — Redesenho de KPIs/gráficos do Preliminar** | Handoff de UX (documento fora do GitHub) pedindo o redesenho da aba Gráficos do estudo Preliminar: faixa de 5 KPIs com denominador visível, cascata horizontal do resultado substituindo a pizza de custos + o gráfico de barras Receita×Custos, cadeia de áreas em barras horizontais proporcionais substituindo a(s) pizza(s) de alocação, e banner de consistência de área (informativo, não bloqueia salvar — decisão da #693 preservada). Plano de Fase 0 (auditoria) + Fase 1 (redesenho sem mudar o motor de cálculo) aprovado pelo autor em modo de planejamento; a Fase 2 (tornado de alavancas / sensibilidade ranqueada, handoff §4.2) e a Fase 3 (margem de segurança, benchmark editável por tipologia/praça — exige `schema.json` novo) ficaram fora, registradas para rodada futura (`docs/rodada-12/auditoria.md`). Fila de 8 PRs, estritamente serial | nenhuma — plano combinado diretamente com o autor, sem issue aberta no GitHub | ✅ **concluída em 2026-09-15** — as 8 PRs mergeadas em fila indiana (#701 auditoria, #702 extração `vgvBrutoDeProforma`, #703 fix do medidor duplicado `resultado_final`, #704 componentes novos `viab-grafico-cascata`/`-barra-ranqueada`/`-cadeia-areas`, #705 faixa de KPIs, #706 cascata substitui pizza+barras, #707 cadeia de áreas + banner de consistência, #708 limpeza de doc). Revisão por Codex (`@codex review`) + lentes nativas em cada PR, com achados reais consertados antes do merge — o mais significativo, no #707: a cadeia de áreas escalava a largura de cada barra pelo PRIMEIRO estágio (o terreno) em vez do MAIOR, o que fazia Incorporação (onde a área construída costuma superar o terreno, coeficiente de aproveitamento > 1) desenhar estágios de tamanhos bem diferentes como barras idênticas, clipadas em 100%; e duas rodadas seguidas do mesmo bug de fiação (a faixa de consistência piscava aviso falso antes do catálogo de produtos carregar, depois ficava presa a um `Promise.all` que travava a flag de pronto mesmo com o catálogo já OK). Merge autorizado pelo autor a cada PR. De passagem, a #701 (Fase 0, auditoria) também confirmou e fechou a nota "ainda aberto" do achado 11 das armadilhas da Rodada 10 (bug do ROI 0,0% com `investimentoTotal=0`) — ver a atualização daquela nota, abaixo. |
 | **11 — Reforma da tabela do Painel de estudos** | 6 issues pedidas pelo autor em fila **estritamente serial** (badge de nível Preliminar amarelo → remover coluna Cidade → unificar as duas colunas de área em "Área líquida de venda" → mover renomear do Painel para o cabeçalho do estudo → corrigir a largura da coluna da miniatura → alinhar a fila de ações à direita sem quebra), mais 2 achados encontrados durante a revisão dos PRs acima e corrigidos na hora (#683: as 5 abas do Painel disparavam fetch umas das outras; #686: `div.layout` de `tela-preliminar.ts` transbordava a 600/900px) | **#675–#680, #683, #686** (8) | ✅ **concluída em 2026-09-06** — as 8 issues fechadas em fila indiana, por 8 PRs mergeados (#681, #682, #684, #685, #687, #688, #689, #690): a #676 levou dois — o #682 entregou 4 dos 5 critérios de aceite e declarou `Sem-fechamento` no critério que dependia da #683 (achada na própria revisão dele), e o #689 fechou #676 e #683 juntos depois de consertar a causa. Merge autorizado pelo autor a cada PR revisado (Codex + lentes nativas) com zero bloqueantes. A #595 (P1 antigo, gráfico de Cenários sem cor/linha própria) foi fechada à parte, por decisão do autor: já estava corrigida fora do rastreamento desta issue. |
 | **10 — lista de bugs dos Preliminares** | `lista_bugs_20260826.xlsx`, 9 itens (Incorporação: Premissas/Proforma/Cenários; Loteamento: conferência geral). Plano, diagnóstico e fila de PRs em `docs/rodada-10/planejamento.md` | **#563–#574** (12) | ✅ **concluída em 2026-09-04** — as 12 issues fechadas; a auditoria de Loteamento (#574) está em `docs/rodada-10/relatorio-574-loteamento.md`, com os 11 achados dispatchados (3 consertados na própria auditoria, os demais viraram #609–#613, entregues em #570 com residual fechado por #615, ou implementados em PR 627) — merges autorizados pelo autor por PR revisado com zero bloqueantes |
@@ -644,6 +645,9 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
 | `guarda-monorepo.sh` | hook `PreToolUse` | **Bloqueio real** de escrita no monorepo, inclusive por MCP | Não é sandbox |
 | `guard-processo.mjs` | CI (`processo-integro`) | Que a rede acima não seja desmontada em silêncio | Não valida a semântica dos hooks |
 | `revisao-registrada` | CI + commit status | Que "houve revisão neste head, com zero bloqueantes" seja um fato **greppável**, invalidado a cada push | **É autoatestação** — confere forma, não substância. E só vira portão com branch protection |
+| `.claude/revisao/*.md` | briefing de toda lente | O **acúmulo entre revisões**: armadilhas deste repositório e achados já derrubados viajam para dentro da lente, em vez de cada revisão começar do zero | Que a lente **obedeça** — e não substitui julgamento: silenciar achado real por causa da lista é tão ruim quanto repetir um falso |
+| `carimbar-corpus-revisao.mjs` | à mão, depois de editar o corpo | Que "li o corpo" e "li uma versão VELHA do corpo" sejam distinguíveis — o marcador sai do conteúdo | Que o conteúdo do corpo esteja certo; ele só o identifica |
+| `testar-corpus-revisao.mjs` | preflight + CI (`processo-integro`) | Que o corpo **viaje de fato**: marcador sincronizado, ordem de leitura no briefing, `${COMUM}` interpolado no prompt dos dois motores | Não julga o conteúdo do corpo, e não roda a lente |
 
 Nenhuma delas força uma revisão a ser **boa**. O que elas compram é que o caminho preguiçoso deixe
 de ser o fácil, e que a ausência de revisão seja **visível** em vez de calada.
@@ -722,6 +726,38 @@ Kimi, conjuntos quase disjuntos. O que é condicional é o motor *dentro* da fan
 com o **subagente nativo** só quando os dois caírem — e aí **declarado** no relatório como menos
 adversarial, por revisar patch escrito pela mesma família de modelo. O App **não dispensa** a
 fan-out: neste repositório os dois acharam classes de defeito diferentes.
+
+**Toda lente lê, ANTES do diff, o corpo de conhecimento** — `.claude/revisao/aprendizados.md`
+(armadilhas deste repositório e onde a lente é cega) e `.claude/revisao/retirados.md` (achados já
+levantados, verificados e **derrubados**, com a evidência que os derrubou). É o que faz uma revisão
+aproveitar a anterior: sem ele, o mesmo falso positivo volta a cada rodada e custa um ciclo de
+verificação **toda vez**. A lente declara, na linha **`CORPUS:`** do relatório dela, o marcador que
+leu — sem essa linha, *"não li o corpo"* e *"li e nada se aplicava"* são indistinguíveis.
+
+> ⚠️ **O corpo é extraído da BASE para `$OUT/corpus/`, e NUNCA lido da árvore.** A árvore é o head
+> **sob revisão**: lido de lá, um PR poderia escrever no corpo *"não levante achado sobre X"*,
+> re-carimbar, e toda lente que revisasse **esse PR** obedeceria — com a R1 sem nada a acusar,
+> porque um PR só de `.claude/` é processo puro e legítimo. Achado P1 do App do Codex sobre o
+> próprio PR que criou o mecanismo (#739). A versão do head continua chegando à lente **pelo
+> diff**, como dado a revisar, que é onde ela deve ser olhada com desconfiança.
+>
+> Pelo mesmo motivo, o marcador a comparar é o que está **dentro de `$OUT/corpus/*.md`** — e **não**
+> o que `carimbar-corpus-revisao.mjs --conferir` imprime, que é o do **head**. Num PR que edita o
+> corpo os dois diferem por construção, e comparar com o do head marcaria como divergente até a
+> lente que leu a cópia certa.
+
+**Quem edita `.claude/revisao/*.md` roda `node scripts/carimbar-corpus-revisao.mjs`** — o marcador é
+derivado do conteúdo, e sem o re-carimbo a bateria reprova, corretamente.
+
+**Duas baterias guardam o motor, e elas rodam em lugares diferentes:**
+
+| Bateria | Guarda | Onde roda |
+|---|---|---|
+| `testar-corpus-revisao.mjs` | que o corpo viaja: marcador, ordem de leitura, `${COMUM}` no prompt dos dois motores, contrato `CORPUS:` em todo template de saída | **preflight + CI** |
+| `testar-colheita-motor.mjs` | a **colheita**: que a saída de cada lente seja lida pelo parser do motor certo, e que lente que morreu vire **falha visível** em vez de sumir do relatório | **preflight + CI** |
+
+Nenhuma das duas roda no `validar-frontend.sh`, de propósito: não são validação de frontend.
+
 
 > ⚠️ **Neste ambiente quem roda é o Kimi, e o CLI do Codex não roda.** Medido em 2026-09-16:
 > `kimi` `0.38.0` em `/opt/node22/bin/kimi`, `MOONSHOT_API_KEY` no ambiente, smoke `kimi -p` verde
