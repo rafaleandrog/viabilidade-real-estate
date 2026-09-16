@@ -221,7 +221,14 @@ const round2 = (v: number): number => Math.round(v * 100) / 100;
  * (direto/indireto) — nunca é descartado.
  */
 const BUCKETS_DIRETO: Array<{ rotulo: string; casa: (l: LinhaCalc) => boolean }> = [
-  { rotulo: 'Terreno', casa: (l) => l.grupo === 'terreno' && l.nome.startsWith('Preço') },
+  // ⚠️ #742 (achado do Codex, rodada 3): "Terreno" era o ÚNICO bucket direto
+  // que ainda casava por GRUPO além do nome — todos os outros já eram por
+  // nome puro. O catálogo de Custos só oferece "Preço" dentro do grupo
+  // `terreno`, mas o backend aceita qualquer combinação categoria×grupo (é a
+  // mesma classe dos 3 achados anteriores), então uma linha "Preço"
+  // cadastrada fora do `terreno` caía no catch-all financeiro/fallback em vez
+  // do bucket "Terreno". Casamento só por nome, como os demais.
+  { rotulo: 'Terreno', casa: (l) => l.nome.startsWith('Preço') },
   { rotulo: 'Projetos e aprovações', casa: (l) => l.nome === 'Projetos' || l.nome === 'Licenças e Aprovações' },
   { rotulo: 'Outorga', casa: (l) => l.nome === 'Outorga' },
   { rotulo: 'Incorporação e registro', casa: (l) => l.nome === 'Registro' },

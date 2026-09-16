@@ -916,6 +916,29 @@ test('#742 (achado do Codex, rodada 2): nome canônico vence o grupo mesmo quand
   assert.ok(idxReceitaOperacional < idxMarketingGlobal && idxMarketingGlobal < idxCustoIndiretoTotal);
 });
 
+test('#742 (achado do Codex, rodada 3): "Preço" casa por nome mesmo fora do grupo `terreno`', () => {
+  const CONFIG_PRECO_FORA_DO_TERRENO: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      // Combinação que o backend aceita hoje, embora o catálogo de Custos só
+      // ofereça "Preço" dentro do grupo `terreno`: aqui ela vem do `financeiro`.
+      { id: 400, grupo: 'financeiro', categoria: 'Preço', orcamento_valor: 70_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  };
+  const c = calcularFluxo(CONFIG_PRECO_FORA_DO_TERRENO);
+  const p = proformaAvancado(c, 1000);
+
+  // Tem que existir DUAS linhas "(-) Preço" — a do terreno de CONFIG_COMPLETA
+  // (id 1) e esta nova (id 400) — ambas no bucket "Terreno", nunca dentro de
+  // "Despesas Financeiras".
+  const itensPreco = p.linhas.filter((l) => l.nome === '(-) Preço');
+  assert.equal(itensPreco.length, 2, 'as duas linhas "Preço" (terreno e financeiro) têm que casar pelo bucket Terreno');
+
+  const linhaFinanceiro = p.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras'))!;
+  assert.ok(Math.abs(linhaFinanceiro.valor - -100_000) <= 0.01, '"Preço" não pode inflar "Despesas Financeiras" (só a Taxas bancárias original)');
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // #591 — a dedução sobre a receita é CUSTO, e as três vistas concordam.
 //
