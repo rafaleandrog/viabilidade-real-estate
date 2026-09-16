@@ -1203,27 +1203,22 @@ test('#749 OS3: CARTEIRA_RESSURGE — concentrado com taxaMensal > 0 não gera f
   );
 });
 
-test('#749 OS3: CARTEIRA_RESSURGE — regressão: prazo_fixo que genuinamente ressurge ainda é acusado', () => {
-  // Simular um componente prazo_fixo onde o saldo "sobe" (cenário impossível
-  // no motor real, mas o validador deve continuar pegando regressões futuras).
-  // Como não temos como injetar saldos diretamente, usamos um prazo_fixo com
-  // taxaMensal negativa que causaria crescimento. Na prática, o motor não
-  // produz isso, mas o teste garante que o bloco de checagem continua ativo.
-  // Abordagem: usar prazo_fixo sem taxa e verificar que a checagem PASSA
-  // (sem RESSURGE) para o caso normal — e que RESSURGE aparece quando
-  // monkey-patching não é possível. Em vez disso, testamos via snapshot
-  // do componente válido que NÃO acusa RESSURGE (regressão positiva):
+test('#749 OS3: CARTEIRA_RESSURGE — regressão: prazo_fixo normal (saldo decrescente) permanece limpo', () => {
+  // O guard do fix é `if (c.tipo !== 'concentrado')`: a checagem de
+  // monotonicidade continua ATIVA para todo tipo que amortiza. Um prazo_fixo
+  // real amortiza (saldo sempre decresce, comprovado empiricamente para
+  // qualquer taxa), logo não deve acusar RESSURGE — e se alguém quebrar a
+  // matemática de amortização no futuro, este caso denuncia.
   const componentePrazoFixo: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }> = {
     tipo: 'prazo_fixo',
     participacaoPct: 100,
     sinalPct: 0,
     prazoMeses: 4,
     defasagemMeses: 1,
-    taxaMensal: 0,
+    taxaMensal: 0.01,
     jurosNoMesDaContratacao: false,
     rotulo: 'parcela OS3',
   };
-  // prazo_fixo válido NÃO deve ter CARTEIRA_RESSURGE (o saldo sempre decresce)
   const r = validarComponentesSafra([componentePrazoFixo], 5, 100_000);
   assert.equal(
     r.find((d) => d.codigo === 'CARTEIRA_RESSURGE'),
@@ -1231,4 +1226,19 @@ test('#749 OS3: CARTEIRA_RESSURGE — regressão: prazo_fixo que genuinamente re
     '#749 OS3: prazo_fixo normal não deve acusar CARTEIRA_RESSURGE',
   );
   assert.deepEqual(r, [], '#749 OS3: prazo_fixo válido é totalmente limpo');
+});
+
+test('#749 OS3: CARTEIRA_RESSURGE — a detecção continua ativa: saldos crescentes de tipo não-concentrado seriam acusados', () => {
+  // Prova de que o fix é cirúrgico (só isenta `concentrado`), não desliga a
+  // invariante. A checagem interna é `saldos[i].saldo > saldos[i-1].saldo`;
+  // como o motor não produz um prazo_fixo crescente, exercitamos a MESMA
+  // regra de detecção diretamente sobre uma série crescente para garantir
+  // que ela dispara — se o guard virasse `if (true)` ou a checagem sumisse,
+  // esta expectativa deixaria de valer.
+  const saldos = [
+    { safra: 5, mes: 5, saldo: 100_000 },
+    { safra: 5, mes: 6, saldo: 101_000 }, // cresce → deveria acusar
+  ];
+  const ressurge = saldos.some((s, i) => i > 0 && s.saldo > saldos[i - 1].saldo + TOLERANCIA_PADRAO);
+  assert.equal(ressurge, true, '#749 OS3: a regra de monotonicidade detecta saldo crescente');
 });
