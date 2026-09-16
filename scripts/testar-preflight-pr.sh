@@ -207,12 +207,13 @@ contem 'estado da árvore:' 'reporta o estado da árvore em qualquer ambiente' \
 saida_real="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" --titulo 'titulo sintetico' 2>&1)"
 faltando=''
 # ⚠️ Casa a LINHA DE SUCESSO (`  ✓ <rótulo> — `), não a substring em qualquer lugar da saída. O
-# próprio preflight imprime os rótulos FORA do caminho de sucesso: o aviso de `jq` ausente
-# interpola os três nomes de `COM_JQ`, e o ramo de falha do `rodar` imprime `<rótulo> reprovou:`.
-# Com `case *"$b"*`, uma máquina sem `jq` — estado que o preflight trata como legítimo — daria
-# VERDE com ZERO das três tendo rodado, e a mutação que este caso existe para matar passaria junto.
-# Guarda que falha ABERTA, § 7 do corpo de conhecimento, dentro do caso escrito para fechar a
-# fiação. Achado de lente, na rodada seguinte à que criou o caso.
+# próprio preflight imprime o rótulo FORA do caminho de sucesso em dois lugares: o aviso de
+# ferramenta ausente imprime `<rótulo> NÃO rodou aqui` (um aviso por bateria faltante, em
+# `preflight-pr.mjs`, no laço de `BATERIAS`), e o ramo de falha do `rodar` imprime
+# `<rótulo> reprovou:`. Com `case *"$b"*`, uma máquina sem `jq` — estado que o preflight trata como
+# legítimo — daria VERDE com ZERO das três tendo rodado, e a mutação que este caso existe para
+# matar passaria junto. Guarda que falha ABERTA, § 7 do corpo de conhecimento, dentro do caso
+# escrito para fechar a fiação. Achado de lente, na rodada seguinte à que criou o caso.
 # ⚠️ E exige só o que é OBSERVÁVEL neste ambiente. Três das quatro dependem de `jq`, e o preflight
 # trata a ausência dele como estado legítimo (aviso, não bloqueante) — então exigi-las numa máquina
 # sem `jq` transformaria este caso num bloqueio falso, que é o defeito simétrico. Com `jq`, as
@@ -238,6 +239,67 @@ else
   falhou=$((falhou + 1))
   echo "  FALHA em modo real faltaram baterias:$faltando"
   echo '        (sem este caso, inverter o gate de MODO_DECLARADO fica verde)'
+  # ⚠️ Rótulo ausente tem DUAS causas, e elas pedem consertos opostos: a bateria não rodou
+  # (fiação — o que este caso existe para pegar) ou rodou e REPROVOU (defeito de conteúdo, ex.:
+  # corpo editado sem re-carimbo). Nas duas o `✓` some, então sem despejar a saída o operador lê
+  # "faltaram baterias" e vai procurar na fiação um defeito que está no conteúdo. Achado de lente.
+  echo '        --- linhas de reprovação/aviso da invocação real ---'
+  printf '%s\n' "$saida_real" | grep -E '(reprovou|NÃO rodou aqui|^[[:space:]]*✖)' || \
+    echo '        (nenhuma; a saída real não acusou reprovação nem ferramenta ausente)'
+fi
+
+# ── Ferramenta ausente vira AVISO, nunca bloqueante ─────────────────────────
+# ⚠️ Este caso existe porque o RAMO DO AVISO não tinha consumidor de teste — e é a mesma classe
+# que o caso acima fecha do outro lado: apagar o `avisos.push` do laço de `BATERIAS` deixava tudo
+# VERDE, porque no CI (ubuntu, com `jq`) o ramo nunca executa. Guarda cuja remoção não fica
+# vermelha é decoração. Achado de lente, na rodada seguinte à que criou o gate.
+#
+# O PATH sintético é um diretório de symlinks para tudo que o PATH real tem MENOS o `jq`. Não
+# adianta pôr um `jq` que sai 1: `temFerramenta` usa `spawnSync(...).error`, que só acusa
+# binário que não pode ser EXECUTADO — um `jq` quebrado continua "presente", e o teste mediria
+# outra coisa.
+if command -v jq > /dev/null 2>&1; then
+  SEM_JQ="$TMP/path-sem-jq"; mkdir -p "$SEM_JQ"
+  printf '%s\n' "$PATH" | tr ':' '\n' | while IFS= read -r d; do
+    [ -d "$d" ] || continue
+    for b in "$d"/*; do
+      [ -x "$b" ] || continue
+      n=$(basename "$b")
+      [ "$n" = jq ] && continue
+      [ -e "$SEM_JQ/$n" ] || ln -s "$b" "$SEM_JQ/$n" 2> /dev/null || true
+    done
+  done
+  saida_sem_jq="$(PATH="$SEM_JQ" node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" \
+    --titulo 'titulo sintetico' 2>&1)"; rc_sem_jq=$?
+  # As três asserções são conjuntas de propósito: (a) o aviso saiu e NOMEIA a ferramenta e a
+  # bateria; (b) a bateria que NÃO depende de `jq` ainda rodou — sem isso, "avisou de tudo"
+  # passaria; (c) NENHUM bloqueante nomeia bateria, que é o predicado deste ramo: ferramenta
+  # ausente é estado legítimo, não PR reprovado.
+  #
+  # ⚠️ (c) NÃO é `exit 0`, e a diferença custou uma medição: o preflight também reprova por
+  # ÁRVORE SUJA, e esta suíte roda justamente enquanto alguém edita `scripts/`. Exigir exit 0
+  # mediria o estado da árvore de quem rodou o teste, não o comportamento do gate — o caso
+  # ficaria vermelho por um motivo que não é defeito nenhum.
+  falta_sem_jq=''
+  case "$saida_sem_jq" in *'`jq` não está nesta máquina: a bateria da colheita do motor NÃO rodou aqui'*) ;;
+    *) falta_sem_jq="$falta_sem_jq aviso-nomeando-jq-e-a-bateria" ;; esac
+  case "$saida_sem_jq" in *'✓ bateria do corpo de conhecimento — '*) ;;
+    *) falta_sem_jq="$falta_sem_jq bateria-do-corpo-ainda-roda" ;; esac
+  # ⚠️ `grep` LINHA A LINHA, e não `case *'bateria'*'reprovou:'*`. O glob do `case` casa através
+  # de quebra de linha: com um bloqueante legítimo de outra causa (árvore suja) o padrão fechava
+  # com a palavra "bateria" de uma linha `✓` lá em cima e o `reprovou:` da linha de baixo, e o
+  # caso acusava um defeito que não existe. Medido ao escrever este próprio caso.
+  if printf '%s\n' "$saida_sem_jq" | grep -qE '^[[:space:]]*- bateria .* reprovou:'; then
+    falta_sem_jq="$falta_sem_jq nenhuma-bateria-vira-bloqueante"
+  fi
+  if [ -z "$falta_sem_jq" ]; then
+    passou=$((passou + 1))
+    echo '  ok   sem `jq` no PATH: aviso nomeado, bateria independente roda, nenhum bloqueante'
+  else
+    falhou=$((falhou + 1)); echo "  FALHA sem jq faltou:$falta_sem_jq"
+  fi
+else
+  echo '  nota  `jq` ausente nesta máquina: o caso do PATH sem `jq` não tem contraste a medir'
 fi
 
 # ── Contrato de uso ─────────────────────────────────────────────────────────

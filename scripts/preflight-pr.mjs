@@ -382,8 +382,11 @@ if (arquivos.length === 0 && fecha.length > 0) {
 
 // ── 4. Os guards do CI, com a mesma entrada ─────────────────────────────────
 // O interpretador sai do SUFIXO: as baterias do job `processo-integro` não são todas `.mjs` —
-// três delas são shell, e foi por isso que ficaram fora do preflight quando ele só sabia chamar
-// o node. Escolher pelo sufixo é o que permite o preflight cobrir o job inteiro.
+// duas delas são shell, e foi por isso que ficaram fora do preflight quando ele só sabia chamar
+// o node. Escolher pelo sufixo é o que permite o preflight cobrir **todas as baterias do job que
+// não invocam o próprio preflight** — `testar-preflight-pr.sh` fica estruturalmente de fora, por
+// recursão, e só o CI a roda. Não escreva aqui "cobre o job inteiro": é falso, e é exatamente a
+// sobreafirmação que o § passo 4 do `CLAUDE.md` registra como já tendo passado por um merge.
 const rodar = (rotulo, script, env) => {
   const bash = script.endsWith('.sh');
   try {
