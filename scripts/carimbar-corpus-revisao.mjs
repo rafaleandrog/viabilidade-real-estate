@@ -35,11 +35,26 @@ export function calcular(raizRepo = raiz) {
   }
   // Entradas materiais: `## ` nos aprendizados, `### ` nos retirados. São o que a lente usa,
   // então é o que o número conta — um marcador que não mexesse com entrada nova seria decorativo.
-  const entradas = (textos[0].match(/^## /gm) ?? []).length + (textos[1].match(/^### /gm) ?? []).length;
-  // Separador visível de propósito: um `\u0000` literal aqui fazia o git tratar ESTE arquivo
-  // como binário — o diff sumia, `Read` recusava, e ninguém conseguia revisar o script que o
-  // CI executa. Achado bloqueante de três lentes no PR que o introduziu.
-  const hash = createHash('sha256').update(textos.map(semMarcador).join('\n<<<corpus>>>\n')).digest('hex').slice(0, 8);
+  //
+  // ⚠️ O corte por `\n---\n` em `retirados.md` NÃO é detalhe: o cabeçalho do arquivo traz um MOLDE
+  // dentro de bloco de código, com um `### ` igualzinho ao das entradas de verdade. Sem o corte, o
+  // molde entra na conta e o `n` fica uma unidade acima do que esta prosa promete — e, pior, os dois
+  // scripts passam a definir "entrada" de formas OPOSTAS, porque `testar-corpus-revisao.mjs` corta
+  // exatamente aí. Foi o que aconteceu: duas lentes independentes acharam o `v14` com 13 entradas.
+  const corte = textos[1].indexOf('\n---\n');
+  const entradasRetirados = corte === -1 ? textos[1] : textos[1].slice(corte);
+  const entradas = (textos[0].match(/^## /gm) ?? []).length + (entradasRetirados.match(/^### /gm) ?? []).length;
+  // O NUL literal que morava aqui como separador fazia o git tratar ESTE arquivo como binário —
+  // o diff sumia, `Read` recusava, e ninguém conseguia revisar o script que o CI executa.
+  //
+  // A troca por um separador visível reabriu outra porta, e ela também é fechada aqui: texto
+  // digitável PODE aparecer no conteúdo, e aí dois pares de arquivos distintos hasheiam igual
+  // (conteúdo migra de um arquivo para o outro sem o marcador mudar). Por isso o enquadramento é
+  // por COMPRIMENTO, e não por separador: `<n>:<texto>` é não-ambíguo por construção, sem depender
+  // de o conteúdo evitar alguma sequência mágica.
+  const hash = createHash('sha256')
+    .update(textos.map((t) => { const c = semMarcador(t); return `${c.length}:${c}`; }).join(''))
+    .digest('hex').slice(0, 8);
   return { marcador: `v${entradas}-${hash}`, entradas, textos };
 }
 

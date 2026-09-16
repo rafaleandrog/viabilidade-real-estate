@@ -47,11 +47,12 @@ const motor = ler('.claude/motor-revisao.md');
 // "a ORDEM DE LEITURA nomeia este caminho". As duas primeiras formulações ficaram VERDES sob a
 // mutação que troca o caminho na ordem de leitura, e o recorte por item é a terceira.
 //
-// ⚠️ O PORQUÊ das duas primeiras falharem não é reproduzível a partir deste commit, e por isso
-// não está escrito como se fosse: o layout do motor mudou no mesmo PR. Quem quiser conferir a
-// guarda confere o que ela faz HOJE — a mutação abaixo, descrita no corpo do PR, é o que
-// sustenta a afirmação. Explicação histórica que o artefato atual não sustenta é a classe do
-// § 5 de `.claude/revisao/aprendizados.md`, e foi uma lente que apontou esta aqui.
+// ⚠️ O PORQUÊ das duas primeiras falharem não é reproduzível a partir deste commit — o layout do
+// motor mudou no mesmo PR — e por isso não está escrito como se fosse. O que sustenta a guarda é
+// o que ela FAZ, aqui embaixo: recortar o item da ordem de leitura e exigir os dois caminhos
+// dentro dele. Quem quiser a prova roda a mutação (trocar um dos caminhos no item) e confirma que
+// esta bateria fica vermelha. Explicação histórica que o artefato não sustenta é a classe do § 5
+// de `.claude/revisao/aprendizados.md`, e foi uma lente que apontou esta aqui.
 const ANCORA = '- **O corpo de conhecimento das lentes';
 const iItem = motor.indexOf(ANCORA);
 assert.notEqual(
