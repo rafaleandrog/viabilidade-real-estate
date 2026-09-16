@@ -44,10 +44,14 @@ try {
 // renomear um arquivo do corpo sem mexer no motor, o corpo para de viajar e nada mais avisa.
 const motor = ler('.claude/motor-revisao.md');
 // ⚠️ A pergunta não é "o caminho aparece no arquivo", nem "aparece na seção do briefing" — é
-// "a ORDEM DE LEITURA nomeia este caminho". As duas versões anteriores desta guarda mediram as
-// duas primeiras e ficaram VERDES quando a ordem passou a apontar para outro arquivo, porque o
-// caminho certo também aparece na prosa vizinha (a nota sobre o `AGENTS.md`). Medido por
-// mutação, duas vezes. O recorte é o ITEM que carrega a ordem, e nada mais.
+// "a ORDEM DE LEITURA nomeia este caminho". As duas primeiras formulações ficaram VERDES sob a
+// mutação que troca o caminho na ordem de leitura, e o recorte por item é a terceira.
+//
+// ⚠️ O PORQUÊ das duas primeiras falharem não é reproduzível a partir deste commit, e por isso
+// não está escrito como se fosse: o layout do motor mudou no mesmo PR. Quem quiser conferir a
+// guarda confere o que ela faz HOJE — a mutação abaixo, descrita no corpo do PR, é o que
+// sustenta a afirmação. Explicação histórica que o artefato atual não sustenta é a classe do
+// § 5 de `.claude/revisao/aprendizados.md`, e foi uma lente que apontou esta aqui.
 const ANCORA = '- **O corpo de conhecimento das lentes';
 const iItem = motor.indexOf(ANCORA);
 assert.notEqual(
