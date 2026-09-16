@@ -381,9 +381,13 @@ if (arquivos.length === 0 && fecha.length > 0) {
 }
 
 // ── 4. Os guards do CI, com a mesma entrada ─────────────────────────────────
+// O interpretador sai do SUFIXO: as baterias do job `processo-integro` não são todas `.mjs` —
+// três delas são shell, e foi por isso que ficaram fora do preflight quando ele só sabia chamar
+// o node. Escolher pelo sufixo é o que permite o preflight cobrir o job inteiro.
 const rodar = (rotulo, script, env) => {
+  const bash = script.endsWith('.sh');
   try {
-    const saida = execFileSync(process.execPath, [resolve(RAIZ, script)], {
+    const saida = execFileSync(bash ? 'bash' : process.execPath, [resolve(RAIZ, script)], {
       cwd: RAIZ,
       encoding: 'utf8',
       env: { ...process.env, ...env },
@@ -419,9 +423,22 @@ rodar('guard da rede do processo', 'scripts/guard-processo.mjs', {});
 rodar('bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', {});
 // Pelo MESMO motivo, a colheita. Ela era step de CI desde o PR que adotou o Kimi e não tinha
 // caminho local nenhum — quem editasse `.claude/motor-revisao.md` descobria a quebra depois do
-// push. Enquanto essa lacuna existiu, a frase do passo 4 do `CLAUDE.md` ("o preflight roda tudo
-// que um PR reprovaria depois") era falsa; é mais barato torná-la verdadeira do que enfraquecê-la.
+// push. Ela é a primeira de quatro que faltavam; as outras três vêm logo abaixo.
 rodar('bateria da colheita do motor', 'scripts/testar-colheita-motor.mjs', {});
+// E as três restantes do mesmo job, que também leem a ÁRVORE e também não tinham caminho local.
+// Enquanto elas ficaram de fora, a frase do passo 4 do `CLAUDE.md` continuava falsa — e um
+// comentário aqui chegou a declarar a lacuna fechada quando ela não estava, que é pior que a
+// ausência dele (§5 do corpo de conhecimento: afirmação plausível que o código não sustenta).
+// Achado de lente.
+//
+// ⚠️ `testar-preflight-pr.sh` fica de fora, e é o ÚNICO passo do job que fica — não por
+// esquecimento, mas porque ele INVOCA o preflight (`scripts/testar-preflight-pr.sh:57,78,197,204`).
+// Rodá-lo daqui é recursão infinita: medido, o processo se replicou até 114 cópias vivas antes de
+// eu conseguir matá-las. A bateria do preflight é a única do `processo-integro` que só o CI pode
+// rodar, e isso é estrutural. Quem acrescentar um passo àquele job acrescenta a linha aqui — com
+// esta exceção declarada, senão a frase do passo 4 volta a ser falsa.
+rodar('bateria da guarda do monorepo', 'scripts/testar-guarda-monorepo.sh', {});
+rodar('bateria do parsing do revisao-registrada', 'scripts/testar-revisao-registrada.sh', {});
 
 // ── 5. Armadilhas de redação que nenhum guard pega ──────────────────────────
 // Não são bloqueantes: são avisos, porque cada um tem um uso legítimo raro.

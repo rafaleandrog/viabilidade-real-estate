@@ -81,6 +81,12 @@ correto se uma linha mudar de base amanhã.
 
 Serial não é preferência: o `PROGRESSO.md` é prependado por todo PR (armadilha 10 do `CLAUDE.md`).
 
+> **A #724 não está na fila, e isso é deliberado.** `licenciamento_modo` / `licenciamento_pct` /
+> `licenciamento_valor_fixo` existem no `schema.json` e no `ProformaInput`, e **nenhum leitor os
+> consome** — o usuário digita um custo de licenciamento e ele não entra no proforma. É bug de motor
+> com dinheiro dentro, achado de passagem, e **consertá-lo muda número existente**: quando entra é
+> decisão do autor, não desta fila. Fica registrada aqui para não sumir.
+
 | # | Issue | Entrega |
 |---|---|---|
 | 1 | #725 | `VariavelSensibilidade` ganha `custo_terreno` e `custo_indireto`; `fatorSens` incide em `proforma.ts:646` e `:678,680`. Sem isso o tornado tem 4 barras e a imagem do autor tem 5 |

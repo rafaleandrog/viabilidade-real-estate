@@ -49,11 +49,19 @@ Esse último virou a **§10 do corpo de conhecimento** e mudou o desenho da bate
 **extrai os comandos prescritos dos documentos e os executa**, como `testar-colheita-motor.mjs` já
 fazia com o bloco da colheita.
 
-Toda guarda deste PR é provada por **mutação com controle verde** — `canonico()` convergindo de 7
-estados de marcador para um arquivo byte a byte idêntico, a extração exercitada em 6 estados
-(incluindo um repositório construído com o caminho do corpo como **diretório**), e o parser de bash
-provado contra um documento sintético, porque a diferença entre a regra do bash e um `trim()` **não
-é observável** no motor de hoje.
+As guardas **de código** deste PR são provadas por **mutação com controle verde**: `canonico()`
+convergindo de 7 estados de marcador para um arquivo byte a byte idêntico
+(`scripts/testar-corpus-revisao.mjs` § 2c), e o parser de bash provado contra um documento
+sintético (§ 2d), porque a diferença entre a regra do bash e um `trim()` **não é observável** no
+motor de hoje.
+
+> ⚠️ **Uma lacuna registrada, e ela é a mais importante do mecanismo.** O bloco que extrai o corpo
+> da BASE — a defesa contra o vetor de injeção — foi exercitado **em sessão**, em 6 estados
+> (base inválida, `$BASE` apontando para tree, `WT` que não é repositório, caminho existindo como
+> **diretório**, base sem os arquivos, base com os arquivos), mas **não tem teste na árvore**: a
+> bateria só confere que as strings `$BASE:.claude/revisao/` e `$OUT/corpus/` aparecem no motor.
+> Medição de sessão não é regressão — some quando a sessão acaba. Achado de lente, e a frase
+> anterior deste parágrafo dizia "toda guarda", o que era falso por arrasto.
 
 ### Ressalva honesta, para a próxima sessão
 
