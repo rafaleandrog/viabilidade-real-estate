@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v13-ecce9abf -->
+<!-- corpus=v13-33723605 -->
 
 # Aprendizados — o que toda lente deste repositório precisa saber antes de olhar o diff
 
@@ -98,6 +98,15 @@ inversão fechou as cinco portas conhecidas **e expôs a sexta**.
 **Corolário, e é o achado mais caro:** conte quantos validadores existem para o **mesmo campo**. Um
 caso tinha três — tela, PATCH e migração — com regras diferentes, e a única fronteira real aceitava
 o que as outras rejeitavam.
+
+**Vale igual quando o que não converge é a GUARDA, e não o dado.** Uma guarda que recorta código
+por regex — fatia preguiçosa, classe de nome, contagem mínima — é a mesma forma: cada fresta
+fechada expõe a seguinte, porque o regex aproxima uma estrutura em vez de a delimitar. Um caso
+deste repositório levou três frestas distintas, achadas por três lentes independentes na mesma
+rodada, antes de a saída aparecer: **parsear de verdade** (a função delimitada pelo `}` da coluna
+zero) em vez de casar até onde o regex resolveu andar. **O que procurar:** guarda cujo predicado é
+um regex sobre um documento inteiro, e cujo comentário promete uma propriedade estrutural que o
+regex não implementa — as duas coisas aparecem juntas, e a segunda é o sintoma legível.
 
 ## 7. Guarda que falha ABERTA
 

@@ -50,10 +50,16 @@ const arquivos = entrada.split(separador).map((l) => l.trim()).filter(Boolean);
 // Sem isto, um PR podia enfraquecer `guard-pr-escopo-processo.mjs` no mesmo diff
 // que o código que ele deveria barrar, e passar pela regra que estava alterando.
 // `guard-processo.mjs` só confere que o arquivo EXISTE, então não pegaria.
+// Os dois scripts do corpo de conhecimento entram pelo MESMO motivo da guarda acima: eles
+// definem e conferem o que toda lente de revisão lê antes do diff, então um PR que os
+// enfraquecesse junto de código de produto estaria alterando a régua e a peça medida no mesmo
+// diff. Achado do App do Codex no PR 739.
 const PROCESSO = [
   /^\.claude\//,
   /^scripts\/guard-pr-escopo-processo\.mjs$/,
   /^scripts\/guard-processo\.mjs$/,
+  /^scripts\/carimbar-corpus-revisao\.mjs$/,
+  /^scripts\/testar-corpus-revisao\.mjs$/,
 ];
 
 // ⚠️ O job `escopo-processo` do `.github/workflows/pr-guards.yml` NÃO entra aqui,
@@ -99,7 +105,7 @@ if (deProcesso.length > 0 && deProduto.length > 0) {
 }
 
 if (deProcesso.length > 0) {
-  console.log(`  ok: PR de processo puro (${deProcesso.length} arquivo(s) em .claude/), sem código de produto.`);
+  console.log(`  ok: PR de processo puro (${deProcesso.length} arquivo(s) de processo), sem código de produto.`);
 } else {
   console.log(`  ok: PR não toca arquivo de processo (${arquivos.length} arquivo(s) conferido(s)).`);
 }

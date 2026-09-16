@@ -24,6 +24,12 @@ import { fileURLToPath } from 'node:url';
 import { ARQUIVOS, canonico, conferir } from './carimbar-corpus-revisao.mjs';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// O briefing nomeia a cópia da BASE (`$OUT/corpus/…`), nunca a da árvore — a da árvore é o head
+// sob revisão, e mandá-la ser lida COMO INSTRUÇÃO deixaria um PR ditar como a revisão dele é
+// feita. Achado P1 do App doCeodex sobre este PR; a extração está em `.claude/motor-revisao.md`,
+// seção da árvore. Estes são os caminhos que as guardas do briefing exigem.
+const NA_BASE = ARQUIVOS.map((a) => `$OUT/corpus/${a.replace('.claude/revisao/', '')}`);
 const ler = (p) => readFileSync(join(raiz, p), 'utf8');
 
 let falhas = 0;
@@ -67,9 +73,27 @@ assert.notEqual(
 const restante = motor.slice(iItem + ANCORA.length);
 const mFim = /^- /m.exec(restante);
 const ordem = ANCORA + (mFim ? restante.slice(0, mFim.index) : restante);
-for (const a of ARQUIVOS) {
+for (const a of NA_BASE) {
   if (ordem.includes(a)) ok(`a ordem de leitura do briefing nomeia ${a}`);
   else falha('briefing', `${a} não está na ORDEM DE LEITURA do briefing — o corpo existe e não viaja`);
+}
+// ⚠️ E o briefing tem que DIZER que a cópia da árvore não é para ser lida. Nomear a da base não
+// basta: toda lente enxerga `.claude/revisao/` — é a árvore revisada —, e sem a proibição escrita
+// ela pode ir ler a de lá por conta própria, com o head voltando a ditar a própria revisão.
+// Achado P1 do App do Codex.
+if (/\.claude\/revisao\/ da árvore/.test(motor)) {
+  ok('o briefing proíbe explicitamente ler o corpo da ÁRVORE (o head sob revisão)');
+} else {
+  falha('briefing', 'o briefing não proíbe ler `.claude/revisao/` da árvore — o head voltaria a ditar a própria revisão');
+}
+// ⚠️ E alguém tem que CRIAR `$OUT/corpus/`. Briefing que aponta para arquivo que nenhum passo
+// escreve manda a lente ler o que não existe — e a lente volta sem corpo, que é indistinguível de
+// "leu e nada se aplicava". É o mesmo modo de falha que o `DIFF.patch` já tinha. A extração mora
+// na seção da árvore do motor, e sai da BASE.
+if (/git -C "\$WT" show "\$BASE:\.claude\/revisao\//.test(motor)) {
+  ok('o motor EXTRAI o corpo da base para $OUT/corpus/ (o briefing não aponta para o vazio)');
+} else {
+  falha('briefing', 'nenhum passo do motor extrai o corpo de $BASE para $OUT/corpus/ — a lente leria arquivo inexistente');
 }
 if (/antes de abrir o diff/i.test(ordem)) ok('a ordem põe o corpo ANTES do diff');
 else falha('briefing', 'a ordem não diz que o corpo é lido ANTES do diff — a precedência é o que o faz servir');
@@ -91,7 +115,7 @@ else falha('contrato', 'o bloco COMUM não exige CORPUS: — a lente Codex sairi
 // vizinha, da ordem de leitura, não cobre isso: ela mede outro trecho do motor, que a mutação
 // não toca. Predicado e mensagem tinham divergido — a classe do § 5 dos aprendizados. Achado
 // de lente.
-for (const a of ARQUIVOS) {
+for (const a of NA_BASE) {
   if (comum.includes(a)) ok(`o briefing COMUM nomeia ${a}`);
   else falha('contrato', `o bloco COMUM não nomeia ${a} — só o template de um dos motores carregaria a ordem`);
 }
@@ -101,29 +125,72 @@ for (const a of ARQUIVOS) {
 // classe de defeito nº 1 deste repositório (`.claude/revisao/aprendizados.md` § 3) dentro da
 // própria guarda que existe para o corpo viajar, e é a mesma asserção que
 // `scripts/testar-colheita-motor.mjs` já faz do outro lado, para o campo `motor=`. Achado de lente.
-// ⚠️ O recorte é por PROPRIEDADE ESTRUTURAL — qualquer função cujo corpo termina no `echo` do
-// `execucao.txt` é uma função de despacho —, e não por uma lista de nomes. A primeira versão
-// casava literalmente `lente` e `lente_kimi`, com `>= 2`: uma `lente_nativo()` acrescentada
-// amanhã sem `${COMUM}` deixaria a bateria verde, e a mensagem do `assert` prometeria uma
-// cobertura que o predicado não tinha. É o critério (c) do `CLAUDE.md` sobre lista de exceção —
-// quando a lista nomeia *quem* e a regra fala de propriedade estrutural, o eixo está errado e ela
-// diverge da realidade sozinha. Achado de lente.
-const corpos = [...motor.matchAll(/^[a-z_]+\(\) \{[\s\S]*?echo "\$id exit=\$rc/gm)].map((m) => m[0]);
+// ⚠️ O recorte NÃO é por regex sobre o documento inteiro, e essa foi a segunda inversão desta
+// bateria. As duas versões anteriores eram recortes com `matchAll` e uma classe de nome
+// (`lente|lente_kimi`, depois `[a-z_]+`) casando de forma preguiçosa até o `echo` — e três lentes
+// independentes acharam três frestas distintas nessa mesma forma: a fatia preguiçosa ATRAVESSA
+// funções (uma auxiliar declarada antes engole a função de despacho seguinte, que nunca é
+// medida, e o `>= 2` continua satisfeito); `[a-z_]+` não casa dígito nem maiúscula, então uma
+// `lente_v2()` escapava calada; e a fatia parava no PRIMEIRO `echo`, deixando de fora o resto do
+// corpo. O `CLAUDE.md` (armadilha 14) diz o que fazer na segunda entrada da mesma classe: parar
+// de somar guarda e **inverter**. Aqui isso quer dizer delimitar a função pelo que a delimita de
+// verdade em bash — o `}` na coluna zero — em vez de por quanto o regex resolve andar.
+//
+// Com o corpo INTEIRO em mãos, "é função de despacho" volta a ser a propriedade estrutural que o
+// texto promete: o corpo grava a linha do `execucao.txt`. Nome nenhum entra no predicado.
+function funcoesDoBash(texto) {
+  const linhas = texto.split('\n');
+  const achadas = [];
+  let atual = null;
+  for (const linha of linhas) {
+    if (atual === null) {
+      // `nome() {` ou `function nome {` — as duas formas que o bash aceita, na coluna zero.
+      const m = /^(?:function\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(\))?\s*\{/.exec(linha);
+      if (m) atual = { nome: m[1], corpo: [] };
+      continue;
+    }
+    if (/^\}/.test(linha)) { achadas.push({ ...atual, corpo: atual.corpo.join('\n') }); atual = null; continue; }
+    atual.corpo.push(linha);
+  }
+  return achadas;
+}
+// ⚠️ Comentário de linha INTEIRA e comentário INLINE. O predicado é "o PROMPT interpola", e um
+// `includes` sobre o texto cru media "a string aparece em algum lugar" — verde com `${COMUM}`
+// citado só num comentário. A primeira correção filtrou `/^\s*#/`, que deixava passar o inline
+// (`echo … # interpola ${COMUM}`); o corte de `\s#` até o fim da linha pega os dois. Ele pode
+// cortar um `#` dentro de string entre aspas, e isso é de propósito: o erro fica do lado de
+// acusar a mais, que é o lado seguro numa guarda de fiação. Achados de lente, duas rodadas.
+const semComentario = (txt) => txt.split('\n').map((l) => l.replace(/(^|\s)#.*$/, '')).join('\n');
+
+const despachos = funcoesDoBash(motor).filter((f) => semComentario(f.corpo).includes('echo "$id exit=$rc'));
 assert.ok(
-  corpos.length >= 2,
-  'não achei as funções de despacho do motor (as que terminam no `echo` do execucao.txt) — sem ' +
-    'elas esta guarda não tem o que medir, e o COMUM poderia deixar de viajar sem nada ficar vermelho',
+  despachos.length >= 2,
+  'não achei as funções de despacho do motor (as cujo corpo grava a linha do `execucao.txt`) — ' +
+    'sem elas esta guarda não tem o que medir, e o COMUM poderia deixar de viajar sem nada ficar vermelho',
 );
-for (const c of corpos) {
-  const nome = c.slice(0, c.indexOf('('));
-  // ⚠️ Sem as linhas de COMENTÁRIO. O predicado é "o PROMPT interpola", e `includes` sobre a fatia
-  // inteira media "a string aparece em algum lugar da função" — um refactor que documentasse
-  // `${COMUM}` num comentário enquanto o tirasse do prompt passava verde. Predicado e mensagem
-  // tinham divergido, a classe do § 5 dos aprendizados, dentro da guarda que existe por causa do
-  // § 3. Achado de lente.
-  const codigo = c.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
-  if (codigo.includes('${COMUM}')) ok(`a função de despacho \`${nome}()\` interpola \${COMUM} no prompt`);
-  else falha('fiação', `\`${nome}()\` não interpola \${COMUM} no prompt — o bloco existe e não chega à lente`);
+// ⚠️ A checagem é sobre a INVOCAÇÃO, não sobre o corpo todo. `includes` no corpo aceitava
+// qualquer referência executável: um refactor que tirasse `${COMUM}` do argumento do prompt e
+// deixasse um `local diagnostico="${COMUM}"` para log ficava verde com o corpo não chegando à
+// lente. A invocação é a região da linha que dispara o motor (`timeout … codex|kimi`) até a que
+// redireciona para `$OUT/$id.jsonl` — é ali, e só ali, que o prompt é passado. Achado do App do
+// Codex, na terceira rodada sobre esta mesma guarda; a inversão que fez as outras duas pararem
+// (parsear em vez de casar) é a mesma aqui — delimitar a região, não procurar a string solta.
+const invocacao = (corpo) => {
+  const linhas = semComentario(corpo).split('\n');
+  const ini = linhas.findIndex((l) => /timeout\s+\d+\s+(codex|kimi)\b/.test(l));
+  if (ini === -1) return null;
+  const fim = linhas.findIndex((l, i) => i >= ini && /\$OUT\/\$id\.jsonl/.test(l));
+  return fim === -1 ? null : linhas.slice(ini, fim + 1).join('\n');
+};
+for (const f of despachos) {
+  const cmd = invocacao(f.corpo);
+  if (cmd === null) {
+    falha('fiação', `não achei a invocação do motor em \`${f.nome}()\` (de \`timeout N codex|kimi\` até o redirecionamento para $OUT/$id.jsonl) — sem ela não dá para medir se o prompt carrega o corpo`);
+  } else if (cmd.includes('${COMUM}')) {
+    ok(`a invocação de \`${f.nome}()\` passa \${COMUM} no prompt`);
+  } else {
+    falha('fiação', `\`${f.nome}()\` não passa \${COMUM} no PROMPT — o bloco pode existir no corpo e não chegar à lente`);
+  }
 }
 if (/^\s*CORPUS:/m.test(motor)) ok('os templates de saída trazem a linha CORPUS:');
 else falha('contrato', 'nenhum template de saída tem CORPUS: — "não li" ficaria indistinguível de "li"');
