@@ -663,8 +663,15 @@ Estrutura do comentário:
 
   **Lente que voltou sem `CORPUS:`, ou com marcador divergente do vigente, aparece com essa
   nota.** Não invalida o achado dela — invalida a garantia de que ela não está repetindo algo já
-  derrubado, e isso quem lê precisa saber. O marcador vigente sai de
-  `node scripts/carimbar-corpus-revisao.mjs --conferir`.
+  derrubado, e isso quem lê precisa saber. O marcador a comparar é o que está **dentro da cópia
+  que a lente leu** — `grep -o 'corpus=[^ ]*' "$OUT/corpus/aprendizados.md"`.
+
+  > ⚠️ **Não é `node scripts/carimbar-corpus-revisao.mjs --conferir`.** Aquele roda na árvore
+  > checada e calcula o marcador do **head**; as lentes leem a cópia da **base**, e num PR que
+  > edita o corpo os dois diferem por construção. Comparando com o do head, toda lente daquele PR
+  > apareceria "com marcador divergente" e este quadro declararia ter perdido a garantia do corpo
+  > justamente onde ele mudou. A regra está em `.claude/motor-revisao.md`, § *O briefing viaja
+  > sozinho* — e esta linha já apontou para o comando errado, contradizendo o motor no mesmo PR.
 
   A coluna *Motor* usa o vocabulário do § *Como o relatório declara o motor* do
   `.claude/motor-revisao.md`: `Codex`/`Kimi` quando rodou no default daquela linha da tabela de

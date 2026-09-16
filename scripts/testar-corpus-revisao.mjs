@@ -111,7 +111,12 @@ assert.equal(
     'caminho do corpo como texto cru. Use aspas duplas, e defina o COMUM depois de `OUT`.',
 );
 const iComum = motor.indexOf('COMUM="');
-assert.notEqual(iComum, -1, 'o bloco COMUM do briefing sumiu do motor (âncora `COMUM="`)');
+assert.notEqual(
+  iComum, -1,
+  'não achei `COMUM="` no motor. Outras formas que expandem o `$OUT` (heredoc sem aspas no\n' +
+    'delimitador, concatenação) seriam corretas em bash, mas esta bateria mede a forma literal — ' +
+    'então o motor fica nela, e mudar a forma é mudar esta guarda junto.',
+);
 const comum = motor.slice(iComum, motor.indexOf('"', iComum + 8) + 1);
 if (/CORPUS:/.test(comum)) ok('o briefing COMUM (os dois motores) exige a linha CORPUS:');
 else falha('contrato', 'o bloco COMUM não exige CORPUS: — a lente Codex sairia sem confirmação de corpo');
@@ -259,16 +264,31 @@ assert.equal(
 // menciona" de "a lente recebe".
 const promptDaInvocacao = (corpo) => {
   const txt = semComentario(corpo);
-  const m = /(?:-p|review --json -m\s+\S+)\s+"/.exec(txt);
+  // ⚠️ A âncora do prompt é procurada DEPOIS do comando do motor, não no corpo inteiro. Soltar a
+  // busca fazia o primeiro `-p "` da função virar "o prompt" — um `echo 'uso: kimi -p "…"'` ou um
+  // log antes do `timeout` bastava para a guarda medir outro texto. É a fragilidade de procurar a
+  // string solta, que esta mesma guarda levou três formas para largar. Achado de lente.
+  const cmd = /timeout\s+\d+\s+(?:codex|kimi)\b/.exec(txt);
+  if (!cmd) return null;
+  const depois = txt.slice(cmd.index);
+  const m = /(?:-p|review --json -m\s+\S+)\s+"/.exec(depois);
   if (!m) return null;
   const ini = m.index + m[0].length;
-  // Até a primeira aspa dupla NÃO escapada — o prompt traz `\"` no meio, de propósito.
+  // Até a primeira aspa dupla NÃO escapada. ⚠️ Contando as barras invertidas CONSECUTIVAS antes
+  // dela, e não olhando só a anterior: em `\\"` a barra é literal e a aspa FECHA a string, mas o
+  // teste de um caractere lia isso como aspa escapada e saltava o terminador de verdade —
+  // capturando além do prompt, onde um `${COMUM}` posterior daria verde falso. Número ÍMPAR de
+  // barras escapa a aspa; par, não. Achado de lente.
   let i = ini;
-  while (i < txt.length) {
-    if (txt[i] === '"' && txt[i - 1] !== '\\') break;
+  while (i < depois.length) {
+    if (depois[i] === '"') {
+      let barras = 0;
+      while (depois[i - 1 - barras] === '\\') barras += 1;
+      if (barras % 2 === 0) break;
+    }
     i += 1;
   }
-  return i >= txt.length ? null : txt.slice(ini, i);
+  return i >= depois.length ? null : depois.slice(ini, i);
 };
 for (const f of despachos) {
   const prompt = promptDaInvocacao(f.corpo);
@@ -282,15 +302,34 @@ for (const f of despachos) {
 }
 
 // ── 2a. Os templates de saída mandam declarar o marcador da cópia da BASE ───
-// ⚠️ Esta guarda já existiu, sumiu num refactor deste próprio PR e voltou junto com o achado que
-// ela deveria ter pego — os dois fatos valem a linha: guarda apagada não fica vermelha, e foi só
-// o App do Codex que notou o contrato do fallback NATIVO ter ficado para trás, ainda apontando
-// para `.claude/revisao/*.md` (o head) depois que a extração da base entrou. Reabria o vetor de
-// injeção exatamente no motor que entra quando os dois externos caem. Por isso a guarda percorre
-// TODOS os templates, e não "algum".
-const templates = motor.split('\n').filter((l) => /^\s*CORPUS:/.test(l));
-if (templates.length > 0) ok(`os ${templates.length} template(s) de saída trazem a linha CORPUS:`);
-else falha('contrato', 'nenhum template de saída tem CORPUS: — "não li" ficaria indistinguível de "li"');
+// O contrato do fallback NATIVO já ficou para trás uma vez, ainda mandando declarar o marcador
+// lido em `.claude/revisao/*.md` — o head — depois que a extração da base entrou, o que reabria o
+// vetor de injeção no motor que entra quando os dois externos caem. Por isso a guarda percorre
+// TODOS os blocos de contrato, e não "algum". A prova de que ela pega é a mutação: trocar o
+// caminho num dos blocos, ou apagar o bloco, deixa esta bateria vermelha.
+// ⚠️ A unidade é o BLOCO de contrato de saída (o que abre com `LENTE: <id>`), não a linha
+// `CORPUS:`. Contar linhas `CORPUS:` e exigir `> 0` não percebia template APAGADO — sumir com o
+// contrato do motor nativo inteiro deixava a bateria verde com os restantes, que é exatamente o
+// modo de falha que esta guarda existe para pegar: um motor sem a exigência, invisível. Achado
+// de lente.
+const blocos = motor.split('\n').flatMap((l, i) => (/^\s*LENTE: <id>/.test(l) ? [i] : []));
+assert.ok(
+  blocos.length >= 2,
+  `achei ${blocos.length} bloco(s) de contrato de saída (\`LENTE: <id>\`) no motor; são pelo menos ` +
+    'dois — o do Kimi e o do fallback nativo. Bloco a menos é um motor que deixou de exigir o ' +
+    'corpo, e some sem nada ficar vermelho.',
+);
+const linhas = motor.split('\n');
+const templates = [];
+for (const b of blocos) {
+  // O bloco vai até a linha em branco que o fecha; a `CORPUS:` mora dentro dele.
+  const corpo = [];
+  for (let i = b; i < linhas.length && linhas[i].trim() !== ''; i += 1) corpo.push(linhas[i]);
+  const corpus = corpo.find((l) => /^\s*CORPUS:/.test(l));
+  if (corpus === undefined) falha('contrato', `o bloco de contrato da linha ${b + 1} não tem CORPUS: — "não li" ficaria indistinguível de "li"`);
+  else templates.push(corpus);
+}
+if (templates.length === blocos.length) ok(`os ${blocos.length} blocos de contrato de saída trazem a linha CORPUS:`);
 for (const t of templates) {
   const nome = t.trim().slice(0, 34);
   if (t.includes('$OUT/corpus/')) ok(`o template "${nome}…" manda declarar o marcador da cópia da BASE`);
