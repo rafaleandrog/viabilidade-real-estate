@@ -421,24 +421,34 @@ rodar('guard da rede do processo', 'scripts/guard-processo.mjs', {});
 // arquivos existem, não que o marcador fecha. Sem esta linha, o preflight aprovava um PR cujo
 // CI já estava condenado, que é o oposto do que ele existe para fazer.
 rodar('bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', {});
-// Pelo MESMO motivo, a colheita. Ela era step de CI desde o PR que adotou o Kimi e não tinha
-// caminho local nenhum — quem editasse `.claude/motor-revisao.md` descobria a quebra depois do
-// push. Ela é a primeira de quatro que faltavam; as outras três vêm logo abaixo.
-rodar('bateria da colheita do motor', 'scripts/testar-colheita-motor.mjs', {});
-// E as três restantes do mesmo job, que também leem a ÁRVORE e também não tinham caminho local.
-// Enquanto elas ficaram de fora, a frase do passo 4 do `CLAUDE.md` continuava falsa — e um
-// comentário aqui chegou a declarar a lacuna fechada quando ela não estava, que é pior que a
-// ausência dele (§5 do corpo de conhecimento: afirmação plausível que o código não sustenta).
-// Achado de lente.
+// ⚠️ TRÊS baterias deste job precisam de `jq`, e a lista está declarada de uma vez só — não uma
+// guarda por bateria. A primeira versão gateava só as duas `.sh` que uma lente apontou, e a
+// mutação que escondeu o `jq` do PATH expôs a terceira na hora: a da **colheita**, que extrai do
+// motor um bloco que usa `jq` seis vezes. Segunda instância da mesma classe pede INVERTER, não
+// somar mais uma guarda (§ 6 do corpo de conhecimento, e armadilha 14 do `CLAUDE.md`).
 //
-// ⚠️ `testar-preflight-pr.sh` fica de fora, e é o ÚNICO passo do job que fica — não por
-// esquecimento, mas porque ele INVOCA o preflight (`scripts/testar-preflight-pr.sh:57,78,197,204`).
-// Rodá-lo daqui é recursão infinita: medido, o processo se replicou até 114 cópias vivas antes de
-// eu conseguir matá-las. A bateria do preflight é a única do `processo-integro` que só o CI pode
-// rodar, e isso é estrutural. Quem acrescentar um passo àquele job acrescenta a linha aqui — com
-// esta exceção declarada, senão a frase do passo 4 volta a ser falsa.
-rodar('bateria da guarda do monorepo', 'scripts/testar-guarda-monorepo.sh', {});
-rodar('bateria do parsing do revisao-registrada', 'scripts/testar-revisao-registrada.sh', {});
+// Sem `jq`, cada uma delas falharia por falta de FERRAMENTA, não por defeito do PR — e o preflight
+// bloquearia um PR correto. Falso positivo no portão local é o que faz alguém desligar a guarda,
+// então a ausência vira AVISO: o CI (ubuntu, `jq` pré-instalado) roda as três de qualquer jeito.
+// Quem acrescentar bateria que dependa de `jq` acrescenta o nome aqui.
+const COM_JQ = [
+  ['bateria da colheita do motor', 'scripts/testar-colheita-motor.mjs'],
+  ['bateria da guarda do monorepo', 'scripts/testar-guarda-monorepo.sh'],
+  ['bateria do parsing do revisao-registrada', 'scripts/testar-revisao-registrada.sh'],
+];
+const temJq = (() => {
+  try { execFileSync('bash', ['-c', 'command -v jq'], { stdio: 'ignore' }); return true; }
+  catch { return false; }
+})();
+if (temJq) {
+  for (const [rotulo, script] of COM_JQ) rodar(rotulo, script, {});
+} else {
+  avisos.push(
+    `\`jq\` não está nesta máquina: ${COM_JQ.length} bateria(s) do \`processo-integro\` NÃO rodaram ` +
+      `aqui (${COM_JQ.map(([r]) => r).join(', ')}). O CI as roda — mas se reprovarem lá, o erro ` +
+      'aparece depois do push. Instale `jq` para o preflight cobrir o job inteiro.',
+  );
+}
 
 // ── 5. Armadilhas de redação que nenhum guard pega ──────────────────────────
 // Não são bloqueantes: são avisos, porque cada um tem um uso legítimo raro.

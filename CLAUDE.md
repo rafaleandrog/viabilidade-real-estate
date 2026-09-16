@@ -356,6 +356,13 @@ numerada contra a `main` do momento, com a `versao` bumpada.
    árvore suja) que o CI já não pode pegar, e **as baterias do job `processo-integro`** — a rede do
    processo, o corpo de conhecimento das lentes, a colheita do motor, a guarda do monorepo e o
    parsing do `revisao-registrada`.
+   > ⚠️ **Três dessas baterias precisam de `jq`** — colheita, guarda do monorepo e parsing do
+   > `revisao-registrada`. Sem ele, elas falhariam por falta de FERRAMENTA e o preflight bloquearia
+   > um PR correto, então a ausência vira **aviso**, não bloqueante: o CI (ubuntu, `jq`
+   > pré-instalado) roda as três de qualquer jeito. A lista está declarada num lugar só
+   > (`COM_JQ`, em `scripts/preflight-pr.mjs`) porque gatear uma por uma não convergiu — a mutação
+   > que escondeu o `jq` do PATH expôs a terceira no instante em que as duas primeiras foram
+   > gateadas (§6 do corpo de conhecimento, armadilha 14).
    > ⚠️ **Uma única exceção, e ela é estrutural:** `testar-preflight-pr.sh` fica de fora, porque ele
    > **invoca o preflight** — rodá-lo de dentro é recursão infinita. Medido ao tentar: o processo se
    > replicou até 114 cópias vivas. É a única bateria daquele job que só o CI roda. Quem acrescentar
