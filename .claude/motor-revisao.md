@@ -517,13 +517,33 @@ vazia com outra roupa. Ao terminar, `git worktree remove "$WT" --force`.
 # Achado P1 do App do Codex, sobre este próprio PR. A saída é a mesma de sempre: instrução vem de
 # revisão confiável, e a versão do head entra como DADO A REVISAR — ela está no diff, que é
 # exatamente onde o revisor deve olhá-la com desconfiança.
-mkdir -p "$OUT/corpus"
+# ⚠️ A BASE primeiro, e SEPARADO. Sem esta linha, uma `$BASE` inválida faz o `cat-file -e` de
+# cada arquivo responder "não existe" — e a revisão sai com o corpo vazio e o diagnóstico
+# "ausente na base", que é a MESMA frase falsa, só movida um passo adiante. Medido: com
+# `BASE=deadbeef…` o bloco escrevia o placeholder e devolvia rc=0. São três perguntas distintas,
+# e cada uma precisa da sua resposta: a base existe? o arquivo existe nela? o `show` funcionou?
+git -C "$WT" rev-parse --verify --quiet "$BASE^{commit}" >/dev/null || {
+  echo "\$BASE ($BASE) não é um commit nesta árvore — NÃO despache"; exit 1; }
+mkdir -p "$OUT/corpus" || { echo 'não consegui criar $OUT/corpus — NÃO despache'; exit 1; }
 for f in aprendizados retirados; do
-  git -C "$WT" show "$BASE:.claude/revisao/$f.md" > "$OUT/corpus/$f.md" 2>/dev/null || {
-    # Ausente na base (o PR que INTRODUZ o corpo é o caso normal disto). Corpo vazio e declarado —
-    # nunca cair para o head, que é justamente o que esta extração existe para não fazer.
-    printf '%s\n' "(este arquivo não existe em $BASE — o corpo está VAZIO nesta revisão)" > "$OUT/corpus/$f.md"
-  }
+  alvo="$BASE:.claude/revisao/$f.md"
+  # ⚠️ Duas perguntas DIFERENTES, e juntá-las num `||` só foi o defeito: "o arquivo não existe
+  # nesta base" (legítimo — é o caso do PR que INTRODUZ o corpo) e "o `git show` falhou" (base
+  # inválida, worktree no commit errado, objeto corrompido) davam os dois no mesmo lugar, com o
+  # placeholder afirmando o primeiro como fato. O resultado era uma revisão sem corpo
+  # indistinguível do caso legítimo, com o diagnóstico errado carimbado — e o `2>/dev/null`
+  # apagava a única evidência de qual tinha sido. Achado de lente. `cat-file -e` responde só a
+  # primeira; depois dela, falha do `show` é erro de verdade e ABORTA.
+  if git -C "$WT" cat-file -e "$alvo" 2>/dev/null; then
+    git -C "$WT" show "$alvo" > "$OUT/corpus/$f.md" || {
+      echo "git show falhou em $alvo (o arquivo EXISTE na base) — NÃO despache"; exit 1; }
+    test -s "$OUT/corpus/$f.md" || { echo "$alvo saiu vazio — NÃO despache"; exit 1; }
+  else
+    # Ausente na base, de verdade. Corpo vazio e DECLARADO — nunca queda para o head, que é o que
+    # esta extração existe para não fazer.
+    printf '%s\n' "(este arquivo não existe em $BASE — o corpo está VAZIO nesta revisão)" \
+      > "$OUT/corpus/$f.md" || { echo "não consegui escrever $OUT/corpus/$f.md — NÃO despache"; exit 1; }
+  fi
 done
 ```
 

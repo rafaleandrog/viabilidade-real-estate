@@ -50,10 +50,11 @@ const arquivos = entrada.split(separador).map((l) => l.trim()).filter(Boolean);
 // Sem isto, um PR podia enfraquecer `guard-pr-escopo-processo.mjs` no mesmo diff
 // que o código que ele deveria barrar, e passar pela regra que estava alterando.
 // `guard-processo.mjs` só confere que o arquivo EXISTE, então não pegaria.
-// Os dois scripts do corpo de conhecimento entram pelo MESMO motivo da guarda acima: eles
-// definem e conferem o que toda lente de revisão lê antes do diff, então um PR que os
-// enfraquecesse junto de código de produto estaria alterando a régua e a peça medida no mesmo
-// diff. Achado do App do Codex no PR 739.
+// Os dois scripts do corpo de conhecimento entram pelo MESMO motivo da guarda acima. Um carimba
+// o marcador que diz QUAL versão do corpo a lente leu; o outro confere esse marcador e a fiação
+// do briefing que entrega o corpo. Nenhum dos dois julga o CONTEÚDO do corpo — mas os dois são a
+// régua que diz se ele chegou, e um PR que os enfraquecesse junto de código de produto estaria
+// mexendo na régua e na peça medida no mesmo diff. Achado do App do Codex no PR 739.
 const PROCESSO = [
   /^\.claude\//,
   /^scripts\/guard-pr-escopo-processo\.mjs$/,

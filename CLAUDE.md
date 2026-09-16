@@ -355,6 +355,11 @@ numerada contra a `main` do momento, com a `versao` bumpada.
    árvore suja) que o CI já não pode pegar, e as baterias do job `processo-integro` que leem a
    **árvore** — a rede do processo (`guard-processo.mjs`) e o corpo de conhecimento das lentes
    (`testar-corpus-revisao.mjs`, que confere o marcador do corpo e a fiação do briefing).
+   > ⚠️ **Editou `.claude/revisao/*.md`? Rode `node scripts/carimbar-corpus-revisao.mjs`** antes do
+   > preflight. O marcador daqueles arquivos é derivado do conteúdo, e sem o re-carimbo a bateria
+   > acima reprova — corretamente, porque a lente declararia ter lido uma versão que não é a
+   > vigente. Esta linha existe porque o remédio estava só no cabeçalho dos próprios arquivos: quem
+   > editasse o corpo via o preflight vermelho e não tinha onde ler o comando. Achado de lente.
    Verde → **abra o PR passando esse mesmo arquivo**, sem reescrever o corpo na chamada do MCP;
    reescrever desfaz o que foi verificado.
 5. **Abrir o PR pelas ferramentas MCP do GitHub** (o `gh` não existe aqui — ver a nota de ambiente

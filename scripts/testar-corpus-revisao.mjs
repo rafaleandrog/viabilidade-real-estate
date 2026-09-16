@@ -27,7 +27,7 @@ const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // O briefing nomeia a cópia da BASE (`$OUT/corpus/…`), nunca a da árvore — a da árvore é o head
 // sob revisão, e mandá-la ser lida COMO INSTRUÇÃO deixaria um PR ditar como a revisão dele é
-// feita. Achado P1 do App doCeodex sobre este PR; a extração está em `.claude/motor-revisao.md`,
+// feita. Achado P1 do App do Codex sobre este PR; a extração está em `.claude/motor-revisao.md`,
 // seção da árvore. Estes são os caminhos que as guardas do briefing exigem.
 const NA_BASE = ARQUIVOS.map((a) => `$OUT/corpus/${a.replace('.claude/revisao/', '')}`);
 const ler = (p) => readFileSync(join(raiz, p), 'utf8');
@@ -77,23 +77,19 @@ for (const a of NA_BASE) {
   if (ordem.includes(a)) ok(`a ordem de leitura do briefing nomeia ${a}`);
   else falha('briefing', `${a} não está na ORDEM DE LEITURA do briefing — o corpo existe e não viaja`);
 }
-// ⚠️ E o briefing tem que DIZER que a cópia da árvore não é para ser lida. Nomear a da base não
-// basta: toda lente enxerga `.claude/revisao/` — é a árvore revisada —, e sem a proibição escrita
-// ela pode ir ler a de lá por conta própria, com o head voltando a ditar a própria revisão.
-// Achado P1 do App do Codex.
-if (/\.claude\/revisao\/ da árvore/.test(motor)) {
-  ok('o briefing proíbe explicitamente ler o corpo da ÁRVORE (o head sob revisão)');
-} else {
-  falha('briefing', 'o briefing não proíbe ler `.claude/revisao/` da árvore — o head voltaria a ditar a própria revisão');
-}
 // ⚠️ E alguém tem que CRIAR `$OUT/corpus/`. Briefing que aponta para arquivo que nenhum passo
 // escreve manda a lente ler o que não existe — e a lente volta sem corpo, que é indistinguível de
 // "leu e nada se aplicava". É o mesmo modo de falha que o `DIFF.patch` já tinha. A extração mora
 // na seção da árvore do motor, e sai da BASE.
-if (/git -C "\$WT" show "\$BASE:\.claude\/revisao\//.test(motor)) {
-  ok('o motor EXTRAI o corpo da base para $OUT/corpus/ (o briefing não aponta para o vazio)');
+// As duas metades da extração, e as duas precisam existir: a FONTE é `$BASE:.claude/revisao/`
+// (nunca o head) e o DESTINO é `$OUT/corpus/`, que é para onde o briefing aponta. Citar uma sem a
+// outra deixaria passar a extração que lê do lugar certo e escreve no errado, ou o contrário.
+const temFonte = /\$BASE:\.claude\/revisao\//.test(motor);
+const temDestino = /> "\$OUT\/corpus\//.test(motor);
+if (temFonte && temDestino) {
+  ok('o motor EXTRAI o corpo de $BASE para $OUT/corpus/ (o briefing não aponta para o vazio)');
 } else {
-  falha('briefing', 'nenhum passo do motor extrai o corpo de $BASE para $OUT/corpus/ — a lente leria arquivo inexistente');
+  falha('briefing', `a extração do corpo está incompleta no motor (fonte $BASE: ${temFonte}, destino $OUT/corpus/: ${temDestino}) — a lente leria arquivo inexistente, ou leria do head`);
 }
 if (/antes de abrir o diff/i.test(ordem)) ok('a ordem põe o corpo ANTES do diff');
 else falha('briefing', 'a ordem não diz que o corpo é lido ANTES do diff — a precedência é o que o faz servir');
@@ -119,6 +115,20 @@ for (const a of NA_BASE) {
   if (comum.includes(a)) ok(`o briefing COMUM nomeia ${a}`);
   else falha('contrato', `o bloco COMUM não nomeia ${a} — só o template de um dos motores carregaria a ordem`);
 }
+// ⚠️ E o briefing tem que DIZER que a cópia da árvore não é para ser lida. Nomear a da base não
+// basta: toda lente enxerga `.claude/revisao/` — é a árvore revisada —, e sem a proibição escrita
+// ela pode ir ler a de lá por conta própria, com o head voltando a ditar a própria revisão.
+// Achado P1 do App do Codex.
+//
+// ⚠️ Conferida no bloco COMUM, não no documento inteiro. Medir o arquivo todo deixava a frase
+// viver na PROSA — que não viaja ao motor — enquanto sumia do briefing que chega à lente. É a
+// mesma lição que a guarda do `CORPUS:` logo abaixo já tinha aprendido, e que esta não aplicou de
+// primeira. Achado de lente.
+if (/\.claude\/revisao\/ da árvore/.test(comum)) {
+  ok('o briefing COMUM proíbe explicitamente ler o corpo da ÁRVORE (o head sob revisão)');
+} else {
+  falha('briefing', 'o bloco COMUM não proíbe ler `.claude/revisao/` da árvore — o head voltaria a ditar a própria revisão');
+}
 // ⚠️ E o bloco COMUM só vale se ele for INTERPOLADO nos prompts. Tudo acima mede o CONTEÚDO da
 // string; nada media a FIAÇÃO — apagar `${COMUM}` do fim do prompt das duas funções de despacho
 // deixava esta bateria inteira verde, com nenhuma lente recebendo nem a ordem nem o campo. É a
@@ -138,11 +148,28 @@ for (const a of NA_BASE) {
 //
 // Com o corpo INTEIRO em mãos, "é função de despacho" volta a ser a propriedade estrutural que o
 // texto promete: o corpo grava a linha do `execucao.txt`. Nome nenhum entra no predicado.
+//
+// ⚠️ E o parse roda SÓ dentro de bloco ```bash, pulando corpo de heredoc. Isto não é zelo: o
+// motor é markdown, e a primeira versão varria o arquivo inteiro como se fosse bash. Uma linha na
+// coluna zero que casasse `nome() {` — um exemplo em prosa, um `function x() {` dentro de outro
+// fence, o corpo YAML de um heredoc como o do perfil da lente — abria uma função FANTASMA que
+// engolia tudo até o próximo `}` de coluna zero, absorvendo o corpo real de `lente()`. E como o
+// corpo engolido ainda contém o `echo` e o `${COMUM}`, as duas asserções ficavam VERDES, com o
+// `ok()` atribuído ao nome fantasma: falha aberta na guarda que existe para não falhar aberta.
+// Achado de lente.
 function funcoesDoBash(texto) {
   const linhas = texto.split('\n');
   const achadas = [];
   let atual = null;
+  let emBash = false;
+  let fimHeredoc = null;
   for (const linha of linhas) {
+    if (/^```/.test(linha)) { emBash = /^```bash\s*$/.test(linha); atual = null; fimHeredoc = null; continue; }
+    if (!emBash) continue;
+    // Corpo de heredoc é DADO, não código: nada ali abre ou fecha função.
+    if (fimHeredoc !== null) { if (linha.trimEnd() === fimHeredoc) fimHeredoc = null; continue; }
+    const h = /<<-?\s*'?"?([A-Za-z_][A-Za-z0-9_]*)'?"?\s*$/.exec(linha);
+    if (h) { fimHeredoc = h[1]; continue; }
     if (atual === null) {
       // `nome() {` ou `function nome {` — as duas formas que o bash aceita, na coluna zero.
       const m = /^(?:function\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(\))?\s*\{/.exec(linha);
