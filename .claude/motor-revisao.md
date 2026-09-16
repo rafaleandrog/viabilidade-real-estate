@@ -786,6 +786,11 @@ for id in $LENTES; do
   rc=$(grep -o "^$id exit=[0-9]*" "$OUT/execucao.txt" 2>/dev/null | tail -1 | sed 's/.*=//')
   if [ ! -s "$f" ] || [ -z "$motor" ]; then
     echo "### $id — NÃO EXECUTADA (sem saída: o processo da lente não chegou a escrever)"
+    # O stderr é a ÚNICA pista aqui, e é onde moram as falhas de configuração — binário
+    # sumido, `cd "$WT"` falhando, perfil do --agent-file inacessível. Sem esta linha o
+    # relatório reduz todas elas ao mesmo texto genérico, e o degrau 2 da escada não
+    # consegue distinguir falha transitória de erro de config (que re-despachar não cura).
+    grep -viE 'websocket|Reconnecting|bubblewrap|Falling back|resuming' "$OUT/$id.err" 2>/dev/null | tail -3
     echo; continue
   fi
   if [ "$motor" = codex ]; then
@@ -864,6 +869,10 @@ zero, `timeout` estourado, payload inválido.
 A escada tem três degraus, e **cada troca é declarada**:
 
 1. **Re-despache uma vez, no mesmo motor.** Falha isolada costuma ser transitória.
+   ⚠️ **Guarde a tentativa anterior ANTES de re-despachar**, senão o degrau 2 não tem como
+   reportar "com os dois motivos": o redirecionamento das funções de despacho é `>`, e a
+   segunda tentativa apaga o `.jsonl` e o `.err` da primeira. Uma linha resolve:
+   `for e in jsonl err; do mv "$OUT/$id.$e" "$OUT/$id.tentativa1.$e" 2>/dev/null; done`
 2. **Persistindo numa lente só → troque de motor**, para a coluna cruzada da tabela de tier
    (default Codex cai em Kimi; default Kimi cai em Codex), com o esforço da coluna de **destino**.
    Re-despache uma vez lá. Falhou de novo, ela entra no comentário do PR como **não executada**,

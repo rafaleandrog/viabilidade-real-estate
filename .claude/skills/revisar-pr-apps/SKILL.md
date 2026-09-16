@@ -622,8 +622,10 @@ Estrutura do comentário:
 - Uma linha de cabeçalho humana: `Revisão de app — rodada <N> · head <sha curto> · motor <Codex+Kimi|Kimi|Codex|nativo>`.
   É por ela que a rodada seguinte se localiza, e o `<sha>` é o que você **de fato** revisou.
   ⚠️ A **linha de máquina** acima aceita só `[a-z]` em `motor=` (o `grep` do job): ali vai um valor
-  só, minúsculo, sem seta e sem maiúscula. A composição detalhada vive nesta linha humana e no
-  quadro de execução.
+  só, minúsculo, sem seta e sem maiúscula — e **`codex+kimi` não serve**, porque o `+` não casa
+  `[a-z]` e o valor sairia truncado em `codex`. Numa rodada mista, a linha de máquina leva o motor
+  **predominante** da fan-out; a composição vive nesta linha humana, no campo `- Motor:` do
+  template do PR (que aceita `codex+kimi`) e no quadro de execução.
 - **Qual superfície de leitura foi usada**, logo no começo: bundle do SDK instalado (**com a
   versão**, e se ela é a mais nova publicada) ou **nenhuma** — e então **quais** lentes de contrato
   não rodaram e **o que ficou descoberto**. Quem lê precisa saber contra qual contrato o "passou"
