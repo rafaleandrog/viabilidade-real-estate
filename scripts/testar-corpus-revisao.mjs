@@ -351,7 +351,12 @@ const NA_SKILL = [
   // contrafactual logo abaixo, no mesmo arquivo, também a contém — então apagar a frase que
   // OBRIGA o registro deixava a guarda verde pela menção vizinha. Mesma cegueira compartilhada
   // que já apareceu duas vezes neste PR. Achado do App do Codex.
-  ['a nota da lente sem CORPUS: no quadro de execução', /com marcador divergente do vigente, aparece com essa\s+nota/],
+  // ⚠️ As DUAS metades do mandato, `sem CORPUS:` e `marcador divergente` — ele cobre dois casos
+  // distintos e apagar um deles deixava o outro casando sozinho. Medido pelo App do Codex,
+  // reproduzindo a mutação: com `sem CORPUS:, ou` removido, a bateria continuava dizendo que a
+  // nota estava mantida. Terceira forma desta âncora, e a lição é a de sempre: o predicado tem
+  // que cobrir o que a MENSAGEM promete.
+  ['a nota da lente sem CORPUS: no quadro de execução', /sem `CORPUS:`, ou com marcador divergente do vigente, aparece com essa\s+nota/],
   ['o marcador lido da cópia da BASE, não do head', /\$OUT\/corpus\/aprendizados\.md/],
   ['a ressalva de que `--conferir` mede o HEAD', /--conferir/],
   ['o passo de registrar o achado retirado', /retirados\.md/],
