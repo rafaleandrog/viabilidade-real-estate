@@ -6,7 +6,7 @@ import { linhasFluxo, celulaFx } from './exportar.js';
 import { chavesColapso, GRUPO_CUSTO_LABEL, celula as celulaTela } from './fluxo-tabela.js';
 import { seriesEconomicasFluxo } from './fluxo-graficos.js';
 import { fundingDoEstudo, type OperacaoFunding } from './funding-motor.js';
-import { proformaAvancado, linhaInformativaFunding } from './proforma-avancado.js';
+import { proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi, comInformativasAntesDoResultado } from './proforma-avancado.js';
 
 const CRONO = [
   { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6 },
@@ -937,6 +937,61 @@ test('#742 (achado do Codex, rodada 3): "Preço" casa por nome mesmo fora do gru
 
   const linhaFinanceiro = p.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras'))!;
   assert.ok(Math.abs(linhaFinanceiro.valor - -100_000) <= 0.01, '"Preço" não pode inflar "Despesas Financeiras" (só a Taxas bancárias original)');
+});
+
+test('#742 (achado do Codex, rodada 4): nome canônico casa mesmo com sufixo de subcategoria do terreno', () => {
+  const CONFIG_SUFIXO_TERRENO: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      // `nomeLinhaCusto` só junta categoria+subcategoria quando grupo===
+      // 'terreno' — o backend aceita qualquer categoria ali, então esta linha
+      // sai como "Corretagem de vendas — algumacoisa", não "Corretagem de
+      // vendas" pura.
+      { id: 500, grupo: 'terreno', categoria: 'Corretagem de vendas', subcategoria: 'algumacoisa', orcamento_valor: 20_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  };
+  const c = calcularFluxo(CONFIG_SUFIXO_TERRENO);
+  const p = proformaAvancado(c, 1000);
+
+  // Tem que virar dedução de receita ("(-) Corretagem"), não ficar presa no
+  // fallback de custo direto com o nome completo sufixado.
+  const linhaCorretagem = p.linhas.find((l) => l.nome === '(-) Corretagem')!;
+  assert.ok(linhaCorretagem, '"(-) Corretagem" tem que existir mesmo com o nome sufixado');
+  const corretagemOriginal = c.linhasCusto.find((x) => x.nome.startsWith('Corretagem de vendas') && x.grupo === 'diretos')!.total;
+  const corretagemSuficada = c.linhasCusto.find((x) => x.grupo === 'terreno' && x.nome.startsWith('Corretagem'))!.total;
+  assert.ok(Math.abs(-linhaCorretagem.valor - (corretagemOriginal + corretagemSuficada)) <= 0.01, 'as duas Corretagens (com e sem sufixo) somam na mesma dedução');
+
+  // E não pode sobrar solta como item de custo direto com o nome completo.
+  assert.equal(p.linhas.find((l) => l.nome.includes('— algumacoisa')), undefined);
+});
+
+test('#742 (achado do Codex, rodada 4): `comInformativasAntesDoResultado` preserva "= Resultado" como a última linha', () => {
+  const c = calcularFluxo(CONFIG_PERMUTAS);
+  const p = proformaAvancado(c, 1000);
+  const informativas = [
+    linhaInformativaFunding(50_000)!,
+    linhaInformativaReceitaLiquidaEvi(123_456),
+  ];
+  const linhas = comInformativasAntesDoResultado(p.linhas, informativas);
+
+  // A última linha da lista RENDERIZADA continua sendo o resultado efetivo —
+  // as informativas não podem empurrá-lo para o meio.
+  assert.equal(linhas[linhas.length - 1].nome, '= Resultado');
+  assert.equal(linhas[linhas.length - 1].tipo, 'resultado');
+
+  // As duas informativas continuam presentes, só que ANTES do bloco de
+  // resultado (`tipo: 'resultado'`), não depois.
+  const idxPrimeiroResultado = linhas.findIndex((l) => l.tipo === 'resultado');
+  const idxInformativas = linhas
+    .map((l, i) => (l.tipo === 'informativo' ? i : -1))
+    .filter((i) => i !== -1);
+  assert.equal(idxInformativas.length, 2);
+  for (const i of idxInformativas) assert.ok(i < idxPrimeiroResultado);
+
+  // Caso sem informativas: devolve a lista original intocada.
+  const semInformativas = comInformativasAntesDoResultado(p.linhas, []);
+  assert.deepEqual(semInformativas, p.linhas);
 });
 
 // ─────────────────────────────────────────────────────────────────────────

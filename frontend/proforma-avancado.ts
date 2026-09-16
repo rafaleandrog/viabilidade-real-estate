@@ -207,6 +207,21 @@ const soma = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
 const round2 = (v: number): number => Math.round(v * 100) / 100;
 
 /**
+ * #742 (achado do Codex, rodada 4): `nomeLinhaCusto` (no motor,
+ * `fluxo-caixa-motor.ts:62`) só junta `categoria — subcategoria` quando
+ * `grupo === 'terreno'` — mas o backend aceita QUALQUER categoria (inclusive
+ * "Corretagem de vendas", "Marketing & Publicidade", "Contingência", …)
+ * classificada no grupo `terreno` com subcategoria preenchida. Nesse caso
+ * `l.nome` sai como `"Corretagem de vendas — algumacoisa"`, e toda
+ * comparação EXATA (`l.nome === 'X'`) contra o nome canônico falhava,
+ * deixando a linha presa no fallback em vez de casar pelo bucket certo — a
+ * mesma classe dos achados 1-3 (nome tem que vencer, sempre, independente do
+ * que mais estiver anexado a ele). `catBase` isola só a categoria, e é usada
+ * em TODA comparação de igualdade exata contra nome nesta função.
+ */
+const catBase = (l: LinhaCalc): string => l.nome.split(' — ')[0];
+
+/**
  * #742 — casamento por NOME, não por grupo. `LinhaCalc.nome` (a única coisa
  * que esta função recebe sobre cada linha de custo — ver o comentário de
  * arity mais abaixo) já É a categoria que o usuário escolheu na aba Custos,
@@ -228,13 +243,13 @@ const BUCKETS_DIRETO: Array<{ rotulo: string; casa: (l: LinhaCalc) => boolean }>
   // mesma classe dos 3 achados anteriores), então uma linha "Preço"
   // cadastrada fora do `terreno` caía no catch-all financeiro/fallback em vez
   // do bucket "Terreno". Casamento só por nome, como os demais.
-  { rotulo: 'Terreno', casa: (l) => l.nome.startsWith('Preço') },
-  { rotulo: 'Projetos e aprovações', casa: (l) => l.nome === 'Projetos' || l.nome === 'Licenças e Aprovações' },
-  { rotulo: 'Outorga', casa: (l) => l.nome === 'Outorga' },
-  { rotulo: 'Incorporação e registro', casa: (l) => l.nome === 'Registro' },
-  { rotulo: 'Construção', casa: (l) => l.nome === 'Construção' },
-  { rotulo: 'Gestão da construção', casa: (l) => l.nome === 'Gestão da obra' },
-  { rotulo: 'Decoração', casa: (l) => l.nome === 'Decoração' },
+  { rotulo: 'Terreno', casa: (l) => catBase(l).startsWith('Preço') },
+  { rotulo: 'Projetos e aprovações', casa: (l) => catBase(l) === 'Projetos' || catBase(l) === 'Licenças e Aprovações' },
+  { rotulo: 'Outorga', casa: (l) => catBase(l) === 'Outorga' },
+  { rotulo: 'Incorporação e registro', casa: (l) => catBase(l) === 'Registro' },
+  { rotulo: 'Construção', casa: (l) => catBase(l) === 'Construção' },
+  { rotulo: 'Gestão da construção', casa: (l) => catBase(l) === 'Gestão da obra' },
+  { rotulo: 'Decoração', casa: (l) => catBase(l) === 'Decoração' },
   // "Manutenção pós-obra" não tem categoria correspondente no catálogo de
   // Custos do Avançado (só existe como `manutencao_pct` no Preliminar) — sem
   // bucket aqui, de propósito: nenhuma linha bateria nele, e um bucket morto
@@ -249,12 +264,12 @@ const BUCKETS_DIRETO: Array<{ rotulo: string; casa: (l: LinhaCalc) => boolean }>
 ];
 
 const BUCKET_CONTINGENCIA: { rotulo: string; casa: (l: LinhaCalc) => boolean } = {
-  rotulo: 'Contingências', casa: (l) => l.nome === 'Contingência',
+  rotulo: 'Contingências', casa: (l) => catBase(l) === 'Contingência',
 };
 
 const BUCKETS_INDIRETO: Array<{ rotulo: string; casa: (l: LinhaCalc) => boolean }> = [
-  { rotulo: 'Marketing global', casa: (l) => l.nome === 'Marketing global' },
-  { rotulo: 'Stand e estrutura de vendas', casa: (l) => l.nome === 'Stand de vendas' },
+  { rotulo: 'Marketing global', casa: (l) => catBase(l) === 'Marketing global' },
+  { rotulo: 'Stand e estrutura de vendas', casa: (l) => catBase(l) === 'Stand de vendas' },
   // ⚠️ #742 (achado do Codex, rodada 1): "Outro" É AMBÍGUO — o catálogo de
   // Custos oferece a categoria "Outro" em TODOS os 5 grupos (terreno, obra,
   // diretos, indireto, financeiro), então casar só pelo nome roubaria um
@@ -263,7 +278,7 @@ const BUCKETS_INDIRETO: Array<{ rotulo: string; casa: (l: LinhaCalc) => boolean 
   // tem esse problema — só existe no catálogo do grupo `indireto` ("Gestão
   // da obra", do grupo `obra`, é um nome distinto) — então continua casando
   // só pelo nome, como os demais buckets nomeados.
-  { rotulo: 'Gestão e outros custos indiretos', casa: (l) => l.nome === 'Gestão' || (l.nome === 'Outro' && l.grupo === 'indireto') },
+  { rotulo: 'Gestão e outros custos indiretos', casa: (l) => catBase(l) === 'Gestão' || (catBase(l) === 'Outro' && l.grupo === 'indireto') },
 ];
 
 /** Soma e ITEMIZA (nome a nome, > R$ 0,005) as linhas de um subconjunto — usada pelos dois blocos (direto/indireto) e por "Despesas Financeiras". */
@@ -323,6 +338,26 @@ export function linhaInformativaReceitaLiquidaEvi(receitaLiquidaEviTotal: number
 }
 
 /**
+ * #742 (achado do Codex, rodada 4): `proformaAvancado` garante que
+ * `tipo: 'resultado'` fecha `linhas` — "= Resultado" é sempre a ÚLTIMA delas.
+ * Mas as linhas informativas (funding, EVI) são montadas FORA desta função
+ * (arity travada, ver o comentário acima) e anexadas pela TELA — um simples
+ * `[...linhas, ...informativas]` desfaz a garantia, porque as informativas
+ * acabam depois do "= Resultado" de fato. Esta função insere as informativas
+ * ANTES do primeiro `tipo: 'resultado'`, preservando a garantia na lista que
+ * de fato chega à tela.
+ */
+export function comInformativasAntesDoResultado(
+  linhas: LinhaProformaAv[],
+  informativas: LinhaProformaAv[],
+): LinhaProformaAv[] {
+  if (informativas.length === 0) return linhas;
+  const idx = linhas.findIndex((l) => l.tipo === 'resultado');
+  if (idx === -1) return [...linhas, ...informativas];
+  return [...linhas.slice(0, idx), ...informativas, ...linhas.slice(idx)];
+}
+
+/**
  * Monta a proforma econômica do Avançado — sempre DESALAVANCADA.
  *
  * ⚠️ Não existe parâmetro de funding, e a ausência é deliberada (#426): o
@@ -350,8 +385,8 @@ export function proformaAvancado(
   let corretagemTotal = 0;
   let marketingTotal = 0;
   for (const l of c.linhasCusto) {
-    if (l.nome === 'Corretagem de vendas') { corretagemTotal += l.total; usados.add(l); }
-    else if (l.nome === 'Marketing & Publicidade') { marketingTotal += l.total; usados.add(l); }
+    if (catBase(l) === 'Corretagem de vendas') { corretagemTotal += l.total; usados.add(l); }
+    else if (catBase(l) === 'Marketing & Publicidade') { marketingTotal += l.total; usados.add(l); }
   }
 
   // ── Bloco 1: Receita bruta → deduções de receita → Receita líquida ──

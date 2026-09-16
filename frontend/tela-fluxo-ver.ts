@@ -8,6 +8,7 @@ import {
 import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
 import {
   proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi,
+  comInformativasAntesDoResultado,
   type LinhaProformaAv,
 } from './proforma-avancado.js';
 import { calcularFluxo, agregarFluxoPorPeriodos, receitaLiquidaDeProformaMensal, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
@@ -520,7 +521,16 @@ export class ViabFluxoVer extends LitElement {
     const receitaLiquidaEvi = receitaLiquidaDeProformaMensal(c.receitaMensal, c.linhasCusto, this.dados?.custos ?? [])
       .reduce((s, v) => s + v, 0);
     const informativaEvi = linhaInformativaReceitaLiquidaEvi(receitaLiquidaEvi);
-    const linhas: LinhaProformaAv[] = [...p.linhas, informativa, informativaEvi].filter((l): l is LinhaProformaAv => l !== null);
+    // ⚠️ #742 (achado do Codex, rodada 4): as informativas NÃO podem ir depois
+    // do rodapé de resultado — `proformaAvancado` já garante que "= Resultado"
+    // é a ÚLTIMA linha de `p.linhas` (rodada 1), mas um `[...p.linhas,
+    // informativa, informativaEvi]` desfazia essa garantia aqui na tela,
+    // porque as duas linhas informativas são sempre anexadas DEPOIS.
+    // `comInformativasAntesDoResultado` insere as duas ANTES do primeiro
+    // `tipo: 'resultado'`, preservando "= Resultado" como a última linha
+    // renderizada de fato.
+    const informativas = [informativa, informativaEvi].filter((l): l is LinhaProformaAv => l !== null);
+    const linhas: LinhaProformaAv[] = comInformativasAntesDoResultado(p.linhas, informativas);
     const porM2 = (v: number) => (p.areaPrivativa > 0 ? v / p.areaPrivativa : 0);
     // #427 — % VGV de toda linha usa o VGV puro, EXCETO os fechos cujo
     // `pctOverride` já veio calculado com a base própria (`= Resultado +
