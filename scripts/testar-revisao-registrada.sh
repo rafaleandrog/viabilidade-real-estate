@@ -79,6 +79,31 @@ printf '%s' "$L" | grep -q 'rodada=9' && falha "comentário forjado" "a linha do
 [ "$(veredito "$L" cccc3333)" = "sem-revisao" ] && ok "head nunca revisado → sem revisão" \
   || falha "veredito sem-revisao" "veio $(veredito "$L" cccc3333)"
 
+# ⚠️ O vocabulário de `motor=`. O `.claude/motor-revisao.md` e a skill prometem que `kimi` é um
+# valor válido e que um valor composto (`Codex→Kimi`) NUNCA entra na linha de máquina. Promessa de
+# doc não é defesa: quem decide é o pipeline do workflow.
+#
+# O pipeline é **lido do workflow e executado**, como já se faz com a expressão jq acima — não
+# copiado. Uma cópia só prende o `grep`: trocar o `cut -d= -f2` por outra coisa lá deixaria a
+# cópia verde e divergente, que é exatamente o modo de falha que estes casos existem para impedir.
+#
+# `LC_ALL=C` não é enfeite: em locale com colação estilo en_US, `[a-z]` pode casar maiúscula, e aí
+# o caso do valor composto viraria vermelho por acidente de ambiente. Fixado, a promessa do doc
+# passa a valer por construção, não por qual locale a máquina tem instalado.
+PIPE_MOTOR="$(grep -o "grep -o 'motor=\[a-z\]\*' | cut -d= -f2" "$WF" | head -1)"
+if [ -z "$PIPE_MOTOR" ]; then
+  falha "pipeline de motor" "não achei o pipeline de extração de motor= em $WF (mudou o formato?)"
+else
+  ok "pipeline de 'motor=' lido do workflow, não copiado"
+  motor_de() { printf '%s' "$1" | LC_ALL=C eval "$PIPE_MOTOR"; }
+  [ "$(motor_de '<!-- revisao-viabilidade rodada=1 head=aaaa1111 motor=kimi bloqueantes=0 -->')" = "kimi" ] \
+    && ok "motor=kimi é lido pelo job (o valor novo desta rodada)" \
+    || falha "motor=kimi" "o job não leu 'kimi' na linha de máquina"
+  [ -z "$(motor_de '<!-- revisao-viabilidade rodada=1 head=aaaa1111 motor=Codex→Kimi bloqueantes=0 -->')" ] \
+    && ok "motor composto (seta/maiúscula) NÃO é lido — por isso ele fica fora da linha de máquina" \
+    || falha "motor composto" "esperava vazio; o doc promete que a composição vive no quadro de execução"
+fi
+
 # `set +e` é o que mantém a invariante "o job sempre passa": o shell do Actions é
 # `bash -e {0}`, e `set -uo pipefail` NÃO remove o errexit herdado.
 grep -q '^          set +e$' "$WF" && ok "'set +e' presente (o Actions roda bash -e)" \

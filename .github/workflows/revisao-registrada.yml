@@ -4,7 +4,7 @@
 # O que ele faz: procura, entre os comentários do PR, a linha de máquina que a
 # skill `revisar-pr-apps` publica no topo do relatório (§7):
 #
-#   <!-- revisao-viabilidade rodada=N head=<sha8> motor=codex|nativo bloqueantes=<n> contratos=ok|nao-executados -->
+#   <!-- revisao-viabilidade rodada=N head=<sha8> motor=codex|kimi|nativo bloqueantes=<n> contratos=ok|nao-executados -->
 #
 # e publica o commit status `revisao/bloqueantes` no head do PR: sucesso quando
 # há revisão NESTE head com zero bloqueantes, falha caso contrário.

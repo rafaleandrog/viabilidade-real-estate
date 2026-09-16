@@ -282,6 +282,19 @@ jobs:
             echo "::error title=Parsing da atestação de revisão falhou::A extração da linha de máquina não se comporta como o esperado — o status revisao/bloqueantes reprovaria PR revisado."
             exit 1
           fi
+      - name: Bateria da colheita do motor de revisão
+        if: always()
+        run: |
+          set -uo pipefail
+          # A colheita é a única defesa entre "a lente caiu" e "a lente não achou nada",
+          # e as duas se parecem. O teste EXTRAI o bloco bash do .claude/motor-revisao.md
+          # e roda — cópia divergiria em silêncio, que é o modo de falha que ela combate.
+          # Já falhou de verdade: a colheita só conhecia o formato do Codex, e toda lente
+          # Kimi bem-sucedida saía "NÃO EXECUTADA".
+          if ! node scripts/testar-colheita-motor.mjs; then
+            echo "::error title=Colheita do motor falhou::A colheita do .claude/motor-revisao.md não separa lente que caiu de lente que não achou nada. Veja quais fixturas falharam no log."
+            exit 1
+          fi
 
   fiacao-funding:
     name: Consumidor de funding passa operacoesFunding ao horizonte

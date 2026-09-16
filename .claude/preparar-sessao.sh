@@ -46,8 +46,9 @@ fi
 # do autor" por uma causa que não era a declarada.
 if [ -n "${URBIVERSO_PACKAGES_TOKEN:-}" ]; then
   echo '[processo] SDK: autenticável — validar-backend.sh roda aqui (as 5 etapas).'
-  echo '[processo]     Contratos: props de urbi-* SIM (dist/index.d.ts); doc do SDK NÃO — o pin'
-  echo '[processo]     0.50.3 não traz docs/. Atestação segue contratos=nao-executados.'
+  echo '[processo]     Contratos: as DUAS lentes são executáveis — props de urbi-* (dist/index.d.ts)'
+  echo '[processo]     e doc do SDK (docs/ + obsolescencias.json, no pin 57.0.0). contratos=ok só'
+  echo '[processo]     quando as duas de fato rodarem na revisão.'
 else
   echo '[processo] SDK: SEM token (URBIVERSO_PACKAGES_TOKEN ausente) — backend, schema e'
   echo '[processo]     migração ficam pendentes do autor, e o PR precisa DECLARAR isso.'
@@ -55,18 +56,42 @@ fi
 
 # ── Motor de revisão: medido, não presumido ──────────────────────────────────
 # Sem isto, a queda para o motor nativo só é descoberta no relatório, no fim.
-if [ -z "${OPENAI_API_KEY:-}" ]; then
-  echo '[processo] motor de revisão: NATIVO (OPENAI_API_KEY ausente no ambiente)'
-  echo '[processo]     → para ter Codex, o autor põe a chave nas variáveis do cloud environment.'
-elif ! command -v codex >/dev/null 2>&1; then
-  echo '[processo] motor de revisão: CODEX após instalar (chave presente, CLI ausente)'
-  echo '[processo]     → o preflight do .claude/motor-revisao.md instala o @openai/codex sozinho.'
-elif [ -s "$HOME/.codex/auth.json" ]; then
-  echo '[processo] motor de revisão: CODEX (já autenticado)'
-elif printenv OPENAI_API_KEY | codex login --with-api-key >/dev/null 2>&1; then
-  echo '[processo] motor de revisão: CODEX (autenticado agora por API key)'
+#
+# ⚠️ São DOIS motores externos desde 2026-09-16 (ver .claude/motor-revisao.md), e este bloco
+# media só um. Enquanto media só o Codex, ele imprimia NATIVO num ambiente em que o Kimi
+# estava instalado, com chave e funcionando — fato medido e falso é pior que fato ausente,
+# porque ninguém confere o que o hook afirma.
+#
+# Aqui a medição é barata e de PRONTIDÃO (binário + chave), não de turno completo: o smoke
+# test de verdade (`kimi -p`) leva ~10s e mora no preflight da revisão, não num hook que roda
+# na abertura de toda sessão.
+#
+# ⚠️ A prontidão é medida pela CHAVE, não pelo binário, e para os DOIS motores igual. O
+# preflight de cada um instala o próprio CLI (`npm i -g @openai/codex` / `@moonshot-ai/kimi-code`),
+# então binário ausente não é motor ausente. Exigir o binário só de um dos dois — que foi a
+# primeira versão deste bloco — reproduz o defeito que ele existe para consertar: ambiente com
+# MOONSHOT_API_KEY e sem o CLI seria reportado NATIVO, e o autor mandado pôr uma chave que já
+# está lá. Achado de três lentes independentes na revisão do PR que trouxe este bloco.
+CODEX_PRONTO=0
+# `auth.json` cobre a sessão de ChatGPT já feita, que vale sem a variável — era um ramo do
+# bloco anterior e voltaria a sumir se a prontidão olhasse só o ambiente.
+# HOME testado antes de expandido, pelo mesmo motivo do outro hook: sob `set -u`, um
+# `$HOME` ausente mataria o script, e este aqui tem contrato de NUNCA falhar. O
+# curto-circuito também evita cair em `/.codex/auth.json`, que o CLI não leria.
+if [ -n "${OPENAI_API_KEY:-}" ] || { [ -n "${HOME:-}" ] && [ -s "$HOME/.codex/auth.json" ]; }; then CODEX_PRONTO=1; fi
+KIMI_PRONTO=0
+if [ -n "${MOONSHOT_API_KEY:-}" ]; then KIMI_PRONTO=1; fi
+
+if [ "$CODEX_PRONTO" = 1 ] && [ "$KIMI_PRONTO" = 1 ]; then
+  echo '[processo] motor de revisão: CODEX+KIMI (os dois prontos; o smoke test de cada um é no preflight)'
+elif [ "$KIMI_PRONTO" = 1 ]; then
+  echo '[processo] motor de revisão: KIMI (Codex sem OPENAI_API_KEY nem sessão em ~/.codex)'
+  echo '[processo]     → a fan-out roda pela coluna Kimi da tabela de tier; atestação sai motor=kimi.'
+elif [ "$CODEX_PRONTO" = 1 ]; then
+  echo '[processo] motor de revisão: CODEX (Kimi sem MOONSHOT_API_KEY no ambiente)'
 else
-  echo '[processo] motor de revisão: NATIVO (codex login falhou)'
+  echo '[processo] motor de revisão: NATIVO (nenhum motor externo pronto)'
+  echo '[processo]     → o autor põe OPENAI_API_KEY e/ou MOONSHOT_API_KEY nas variáveis do ambiente.'
 fi
 
 exit 0

@@ -689,11 +689,12 @@ rodadas e encerramento obrigatório. Este último não faz falta porque a sessã
 inscreve em nada — ela revisa quando chamada e termina. Vale saber por que isso às vezes importa: **com uma sessão só, quem revisa
 é quem escreveu** — a §8 da skill compensa com lentes novas a cada rodada, mas não é a mesma coisa.
 
-**O motor é Codex, e ele está ligado** — por **`@codex review`** no PR, não pelo CLI. O GitHub App
-está instalado neste repositório e foi exercitado em rodadas sucessivas no PR 494 (~2 min cada), com
-achados P1 e P2 reais. É o **caminho normal**, e a sequência obrigatória — acionar, esperar com teto de 15 min,
-colher os *review threads*, verificar, só então atestar — está em `.claude/motor-revisao.md`
-§ *Sequência obrigatória do App*.
+**O motor da camada A é o Codex, e ele está ligado** — por **`@codex review`** no PR, não pelo CLI.
+O GitHub App está instalado neste repositório e foi exercitado em rodadas sucessivas no PR 494
+(~2 min cada), com achados P1 e P2 reais. É o **caminho normal** dessa camada, e a sequência
+obrigatória — acionar, esperar com teto de 15 min, colher os *review threads*, verificar, só então
+atestar — está em `.claude/motor-revisao.md` § *Sequência obrigatória do App*. O motor da **camada
+B**, a fan-out das lentes, é outra escolha e está logo abaixo.
 
 > ⚠️ **`bloqueantes=` conta os achados do Codex ainda não resolvidos**, porque
 > `revisao-registrada.yml` filtra comentários **pelo autor do PR** e nunca enxerga o bot. E se o App
@@ -703,12 +704,34 @@ colher os *review threads*, verificar, só então atestar — está em `.claude/
 > **republica `success`**. Ausência de linha nova não apaga linha velha — só uma linha nova
 > sobrescreve.
 
-**São duas camadas que somam, não uma fila.** A **revisão do App** (`@codex review`) e a **fan-out
-das lentes** rodam as duas. O que é condicional é o motor *dentro* da fan-out: **CLI local**
-(`codex exec`) quando houver `OPENAI_API_KEY` **e** a liberação de `api.openai.com` — aqui não há, o
-proxy dá **403 no CONNECT** —, e **subagente nativo** quando não houver, **declarado** no relatório
-como menos adversarial, por revisar patch escrito pela mesma família de modelo. O App **não
-dispensa** a fan-out: neste repositório os dois acharam classes de defeito diferentes.
+**São duas camadas que somam, não uma fila — e rodam em PARALELO.** A **revisão do App**
+(`@codex review`) e a **fan-out das lentes** rodam as duas, sempre que as duas estiverem
+disponíveis (decisão do autor, 2026-09-16). O acionamento do App vai **antes** do despacho da
+fan-out: a resposta dele é bem mais rápida que a das lentes, então a camada A sai de graça no
+relógio. Em série, custa o dobro. E as duas acham classes diferentes de defeito — na adoção do
+Kimi, conjuntos quase disjuntos. O que é condicional é o motor *dentro* da fan-out, e desde 2026-09-16 há
+**dois motores externos com fallback cruzado**: **Codex** por `codex exec` e **Kimi** por `kimi -p`,
+com o **subagente nativo** só quando os dois caírem — e aí **declarado** no relatório como menos
+adversarial, por revisar patch escrito pela mesma família de modelo. O App **não dispensa** a
+fan-out: neste repositório os dois acharam classes de defeito diferentes.
+
+> ⚠️ **Neste ambiente quem roda é o Kimi, e o CLI do Codex não roda.** Medido em 2026-09-16:
+> `kimi` `0.38.0` em `/opt/node22/bin/kimi`, `MOONSHOT_API_KEY` no ambiente, smoke `kimi -p` verde
+> em ~10 s com `kimi-k3`; `codex` **ausente** do PATH, `OPENAI_API_KEY` **ausente**, e
+> `api.openai.com` com **403 no CONNECT** pelo proxy de saída. A fan-out sai portanto com
+> `motor=kimi` na linha de máquina, e o quadro de execução marca `Codex→Kimi` nas lentes cujo
+> default era Codex. A receita inteira — preflight, tiers, o comando e a trava de somente-leitura —
+> está em `.claude/motor-revisao.md`.
+>
+> Três coisas do Kimi que não se reconstituem de memória, e cada uma já custou uma revisão no
+> upstream: **`--agent-file` é a única trava de somente-leitura** (sem ele o `kimi -p` escreve
+> arquivo sem pedir, não trava pedindo aprovação); **`-m` nunca é passado** (derruba o CLI com uma
+> exceção que não menciona modelo nem provedor — o eixo do modelo é `KIMI_MODEL_NAME`); e **a
+> lente não tem `Bash`**, então o diff vai pré-gerado em `$OUT/DIFF.patch`, senão ela volta vazia.
+>
+> ⚠️ **Não presuma que esta medição continua valendo.** Sessão futura que achar o `kimi` fora do ar,
+> ou a `OPENAI_API_KEY` presente, tem um fato novo para medir e registrar aqui — não a continuação
+> deste parágrafo. O jeito de conferir é o smoke test, nunca a memória.
 
 **A camada de contratos roda INTEIRA desde 2026-09-04.** O pacote está no disco depois do
 `validar-frontend.sh` — que é o único dos dois que instala; o `validar-backend.sh` aborta se ele não
@@ -734,11 +757,13 @@ Com as duas lentes executáveis, a atestação **pode** sair `contratos=ok` — 
 fato rodarem naquela revisão. Publicá-lo porque "o SDK está no disco" continua sendo afirmação
 plausível e falsa, a classe da armadilha 11; o relatório diz sempre **o que** rodou.
 
-> ⚠️ **A causa não é mais o 401, e confundir as duas custa a próxima sessão.** Este parágrafo dizia
-> que a camada não rodava *"e isso é estrutural"*, atribuindo tudo ao SDK ser privado. Com a auth em
-> pé (§ Validação), a causa restante é **a versão fixada**: o `npm view` mostra que versões
-> publicadas mais novas **trazem** `docs/`. Subir o pin é mudança de `package.json`, ou seja de
-> produto — escopo próprio, e o caminho para fechar a outra metade.
+> ⚠️ **Esta nota descrevia duas causas que já morreram, uma depois da outra.** Primeiro ela dizia
+> que a camada não rodava *"e isso é estrutural"*, atribuindo tudo ao SDK ser privado — caiu em
+> 2026-09-03, quando a auth entrou em pé (§ Validação). Depois passou a dizer que a causa restante
+> era **a versão fixada**, e que subir o pin seria "o caminho para fechar a outra metade" — isso
+> caiu em 2026-09-04, quando o pin subiu para `57.0.0`. **Não há metade aberta nem causa
+> restante**: as duas lentes de contrato são executáveis. O que sobra é a disciplina de só publicar
+> `contratos=ok` quando as duas tiverem rodado de fato.
 
 **Cópia, não link vivo.** Mudou no monorepo, alguém porta para cá à mão — nada sincroniza sozinho.
 As adaptações deste repo estão marcadas `ADAPTADO` nos dois arquivos, **com o motivo ao lado**. Não
@@ -773,7 +798,7 @@ caminho não casar:
 > exatamente por que o hook cobre o mesmo caso.
 
 As baterias `scripts/testar-guarda-monorepo.sh` (57 casos) e
-`scripts/testar-revisao-registrada.sh` (9 casos), as duas no CI, cobrem os dois sentidos: falso
+`scripts/testar-revisao-registrada.sh` (12 casos), as duas no CI, cobrem os dois sentidos: falso
 negativo deixa a escrita passar; **falso positivo atrapalha trabalho legítimo, alguém desliga o
 hook, e aí ele não guarda mais nada.**
 
@@ -815,10 +840,12 @@ Consequências que valem em toda sessão com token:
 
 - **`bash scripts/validar-backend.sh` roda inteiro** — as 5 etapas, incluindo o typecheck do backend
   e o `schema.json` contra o contrato do SDK. *"Não deu para rodar"* deixa de ser desculpa aqui.
-- **A camada de contratos roda pela METADE.** A lente de props de primitivo `urbi-*` passa a ser
-  executável (`dist/index.d.ts`), **e a de doc do SDK também** desde 2026-09-04, quando o pin subiu
-  para `57.0.0` — o bundle passou a trazer `docs/` e `obsolescencias.json`. A atestação pode sair
-  **`contratos=ok`** quando as duas de fato rodarem. Detalhe em § *A revisão em si*.
+- **A camada de contratos roda INTEIRA.** As duas lentes são executáveis: props de primitivo
+  `urbi-*` (`dist/index.d.ts`) e doc do SDK (`docs/` + `obsolescencias.json`), desde 2026-09-04,
+  quando o pin subiu para `57.0.0`. A atestação pode sair **`contratos=ok`** quando as duas de
+  fato rodarem — executável não é o mesmo que executada. Detalhe em § *A revisão em si*.
+  > ⚠️ Este item dizia "roda pela METADE" e já se contradizia na frase seguinte, que anunciava a
+  > segunda lente como executável. O título é que tinha ficado para trás do próprio texto.
 - **`node_modules/@urbiverso/sdk/dist/index.d.ts` está no disco** — a fonte canônica de props de
   primitivo `urbi-*` volta a existir, e ler o monorepo para compensar deixa de ter desculpa.
 

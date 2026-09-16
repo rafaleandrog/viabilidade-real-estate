@@ -30,8 +30,29 @@ else
   REMOTO="nunca empurrada"
 fi
 
+# Prontidão dos DOIS motores externos (.claude/motor-revisao.md). Medir só o Codex fazia esta
+# linha dizer `motor=nativo` num ambiente com o Kimi instalado e funcionando — e ela é reinjetada
+# a cada prompt, então o fato errado é o que sobrevive à compactação.
+#
+# O predicado é a CHAVE, igual para os dois: o preflight de cada motor instala o próprio CLI.
+# Mesmo critério de `preparar-sessao.sh`, e pelo mesmo motivo escrito lá.
+#
+# `codex+kimi` é informativo e NUNCA é o valor da linha de máquina da atestação — aquela aceita
+# um valor só, minúsculo (`grep -o 'motor=[a-z]*'`), e um composto seria truncado em silêncio.
 MOTOR="nativo"
-[ -n "${OPENAI_API_KEY:-}" ] && MOTOR="codex"
+[ -n "${MOONSHOT_API_KEY:-}" ] && MOTOR="kimi"
+# `auth.json` entra aqui pelo mesmo motivo que entra no outro hook: sessão de ChatGPT já
+# feita vale sem a variável. Sem ela, os dois hooks discordariam do motor no mesmo ambiente,
+# e o comentário acima ("mesmo critério") seria falso — a classe que este bloco combate.
+# HOME é testado ANTES de ser expandido, e a ordem é o que importa: este hook roda sob
+# `set -u`, onde um `$HOME` ausente mata o script com "unbound variable" — que aqui não é
+# um aviso a menos, é rc≠0 no UserPromptSubmit, e rc≠0 ali TRAVA o prompt do usuário (ver
+# o cabeçalho). O `[ -n "${HOME:-}" ] &&` protege a expansão pelo curto-circuito, e de
+# quebra impede o caminho `/.codex/auth.json` na raiz — que o CLI do Codex nunca leria,
+# já que ele também localiza a sessão por $HOME.
+if [ -n "${OPENAI_API_KEY:-}" ] || { [ -n "${HOME:-}" ] && [ -s "$HOME/.codex/auth.json" ]; }; then
+  [ "$MOTOR" = "kimi" ] && MOTOR="codex+kimi" || MOTOR="codex"
+fi
 
 echo "[processo] branch=$BRANCH · $ESTADO · $REMOTO · motor=$MOTOR"
 
