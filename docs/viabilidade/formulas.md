@@ -205,15 +205,36 @@ O Avançado tem proforma própria (`frontend/proforma-avancado.ts`), que **não*
 do Preliminar: ela relê as séries mensais já calculadas por `calcularFluxo` e as achata na mesma
 hierarquia de linhas do Preliminar, para que os dois níveis se comparem na mesma coluna
 (`investimentoTotal` e `roiPct` são literalmente a fórmula do Preliminar — ver
-`frontend/proforma-avancado.ts:150-162`).
+`frontend/proforma-avancado.ts:182-202`).
 
-> **A proforma é itemizada por linha de custo, não só por grupo.** Além do subtotal de cada um dos
-> 5 grupos de custo, a tabela lista cada linha de custo individual que o usuário cadastrou em
-> Custos, pelo nome que ele mesmo deu a ela (`nomeLinhaCusto`, `frontend/fluxo-caixa-motor.ts`),
-> logo acima do subtotal do grupo — item com valor ~zero não aparece, mas o subtotal continua
-> somando TODAS as linhas do grupo. A tela distingue item de subtotal pela classe `subgrupo`
+> **#742 — a tabela é itemizada por linha de custo, casada por NOME em buckets canônicos.** Cada
+> linha de custo que o usuário cadastrou em Custos aparece pelo nome que ele mesmo deu a ela
+> (`nomeLinhaCusto`, `frontend/fluxo-caixa-motor.ts` — para linhas fora do grupo `terreno`, o nome
+> **é** a categoria escolhida), posicionada na ordem canônica que o autor pediu (Terreno →
+> Projetos e aprovações → Outorga → Incorporação e registro → Construção → Gestão da construção →
+> Decoração → Despesas Financeiras → Contingências, e Marketing global → Stand e estrutura de
+> vendas → Gestão e outros custos indiretos do lado indireto) — **independente de em qual dos 5
+> grupos da aba Custos ela foi classificada** (`BUCKETS_DIRETO`/`BUCKETS_INDIRETO`,
+> `frontend/proforma-avancado.ts`). Corretagem e Marketing (categorias "Corretagem de vendas" e
+> "Marketing & Publicidade") saíram do custo direto para a seção de DEDUÇÃO DE RECEITA, junto com
+> Imposto e Permuta financeira — mesma leitura do Preliminar. Item sem categoria canônica ("Outro",
+> ou combinação que o catálogo ainda não prevê) nunca é descartado: cai no fallback do bloco
+> direto/indireto correspondente, decidido pelo grupo original. Item com valor ~zero não aparece,
+> mas o único subtotal-de-bucket que resta ("Despesas Financeiras", o grupo `financeiro` inteiro)
+> continua somando TODAS as suas linhas. A tela distingue item de subtotal pela classe `subgrupo`
 > (`LinhaProformaAv.subgrupo`), a mesma convenção que `frontend/fluxo-tabela.ts` já usa na aba
-> Fluxo de Caixa.
+> Fluxo de Caixa. `investimentoTotal`/`roiPct` **não** mudam de valor por causa desta
+> reclassificação — continuam somando todo o custo do motor, ver o comentário do campo.
+>
+> O rodapé de resultado (as três leituras da EVI, abaixo) também mudou de ORDEM: a leitura mais
+> inclusiva ("= Resultado + Permutas") vem primeiro, e só a última linha ("= Resultado") é o
+> resultado efetivo, sem nenhuma permuta somada de volta — pedido do autor, os três VALORES não
+> mudam.
+>
+> Acima da tabela, quando o estudo tem permuta física declarada, um resumo mostra quantas unidades
+> (e de qual tipo) estão sendo permutadas e o m² segmentado por família residencial/não residencial
+> (`_resumoPermutaFisica`, `frontend/tela-fluxo-ver.ts` — reusa `this.permutaFisica`, já calculado
+> para a aba Fluxo de Caixa, e `permutaFisicaDerivadaCatalogo`, `frontend/fluxo-invariantes.ts`).
 
 > ⚠️ **A proforma do Avançado é DESALAVANCADA — nenhum lado do funding entra nela.** Nem as saídas
 > (parcelas, retorno ao investidor), nem as entradas (liberações, aportes). É visão **econômica** do
@@ -231,12 +252,14 @@ hierarquia de linhas do Preliminar, para que os dois níveis se comparem na mesm
 > funding. Todo estudo Avançado **com** funding aparecia no painel como prejuízo catastrófico.
 > Corrigido pela issue #426 (medição em Pinguim: `docs/rodada-8/04-regras-reconciliacao.md:1512-1517`).
 
-> ⚠️ **"Custos Financeiros" não significa a mesma coisa em toda tela.** Na proforma (aqui) o grupo
-> vale só o custo que o usuário classificou como financeiro — por isso o rótulo desta tela leva o
-> parêntese "(exclui serviço da dívida)" (#447). Na aba Fluxo de Caixa e no Resumo o rótulo
-> permanece sem parêntese e inclui as duas pontas do funding — são visões diferentes de propósito,
-> não uma inconsistência. A tabela completa das três superfícies está no cabeçalho de
-> `frontend/proforma-avancado.ts:48-70`.
+> ⚠️ **"Despesas Financeiras" (renomeada de "Custos Financeiros" na #742) não significa a mesma
+> coisa em toda tela.** Na proforma (aqui) o grupo vale só o custo que o usuário classificou como
+> financeiro — por isso o rótulo desta tela leva o parêntese "(exclui serviço da dívida)" (#447).
+> Na aba Fluxo de Caixa e no Resumo o rótulo permanece "Custos Financeiros", sem parêntese, e
+> inclui as duas pontas do funding — são visões diferentes de propósito, não uma inconsistência
+> (o mapa compartilhado `GRUPO_CUSTO_LABEL.financeiro`, que as duas outras telas consomem, não
+> mudou). A tabela completa das três superfícies está no cabeçalho de
+> `frontend/proforma-avancado.ts:54-68`.
 
 ### O fecho de três linhas (#427)
 
@@ -405,6 +428,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
 | `frontend/exportar.ts:73` — `celulaProforma`, a coluna R$ da Proforma na tela, no CSV e no PDF | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado para função pura pela #567, e movida de `tela-proforma.ts` para cá em 2026-08-28, quando a exportação passou a usá-la (a tela a reexporta) |
 | `frontend/tela-fluxo-receitas.ts:451,452` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
+| `frontend/tela-fluxo-ver.ts` — coluna R$ da Proforma do **Avançado** (`_renderProforma`) | 2 | ✅ desde a #742 — trocou `fmtR$` cru (sinal de menos) por `celula`/`negativoContabil` de `viab-format.ts`, a mesma notação contábil (parênteses) do Preliminar; a coluna R$/m² segue o mesmo critério de sinal, com `fmtNum` |
 
 > ✅ **O motor passou a ser conforme ao C7 também nos agregados escalares — #512.** As **séries
 > mensais do `calcularFluxo`** sempre passaram por `round2` a cada depósito (a ressalva importa: o

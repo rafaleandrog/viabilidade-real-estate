@@ -6,7 +6,7 @@ import { linhasFluxo, celulaFx } from './exportar.js';
 import { chavesColapso, GRUPO_CUSTO_LABEL, celula as celulaTela } from './fluxo-tabela.js';
 import { seriesEconomicasFluxo } from './fluxo-graficos.js';
 import { fundingDoEstudo, type OperacaoFunding } from './funding-motor.js';
-import { proformaAvancado, linhaInformativaFunding } from './proforma-avancado.js';
+import { proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi, comInformativasAntesDoResultado } from './proforma-avancado.js';
 
 const CRONO = [
   { evento: 'planejamento', inicio_mes: 0, duracao_meses: 6 },
@@ -362,30 +362,41 @@ test('#351 proforma: Resultado reconcilia com o fluxo do motor (sem funding)', (
 
   const nome = (n: string) => p.linhas.find((l) => l.nome === n)!;
   assert.equal(nome('Receita bruta (VGV)').valor, c.receitaBruta);
-  assert.ok(Math.abs(nome('= Receita líquida').valor - soma(c.receitaMensal)) <= 0.01);
-  // A ponte de deduções é a mesma da tabela do fluxo (RET + permuta financeira).
-  assert.ok(nome('(-) Impostos e deduções sobre a receita').valor < 0);
-  // Custo direto + indireto somam o Custo Total do motor.
+  // #742: "= Receita líquida" agora também deduz Corretagem e Marketing (que
+  // viraram dedução de receita, não mais custo) — não é mais igual a
+  // `soma(c.receitaMensal)` (que só deduz RET + permuta financeira). CONFIG_COMPLETA
+  // tem uma linha "Corretagem de vendas" (grupo diretos) — é ela que diverge.
+  const corretagem = c.linhasCusto.find((x) => x.nome === 'Corretagem de vendas')!.total;
+  assert.ok(Math.abs(nome('= Receita líquida').valor - (soma(c.receitaMensal) - corretagem)) <= 0.01);
+  // A dedução de Imposto aparece isolada (CONFIG_COMPLETA tem RET ativo).
+  assert.ok(nome('(-) Imposto').valor < 0);
+  assert.ok(nome('(-) Corretagem').valor < 0);
+  // Custo direto + indireto somam o Custo Total do motor MENOS Corretagem
+  // (que saiu do custo direto para a seção de deduções).
   const direto = -nome('= Custo direto total').valor;
   const indireto = -nome('= Custo indireto total').valor;
-  assert.ok(Math.abs((direto + indireto) - soma(c.custoMensal)) <= 0.01);
+  assert.ok(Math.abs((direto + indireto) - (soma(c.custoMensal) - corretagem)) <= 0.01);
 });
 
 // Proforma itemizada: cada linha de custo cadastrada em Custos aparece
-// individualmente pelo nome que o usuário deu, além do subtotal do grupo —
-// classe de defeito nº 1 do CLAUDE.md ("o defeito mora na fiação"): sem este
-// teste, apagar o `for (const item of doGrupo)` dentro de `proformaAvancado`
-// deixaria a suíte inteira verde (o teste acima só confere os TOTAIS).
-test('Proforma itemizada: cada linha de custo aparece pelo nome, e o subtotal do grupo soma todas', () => {
+// individualmente pelo nome que o usuário deu — classe de defeito nº 1 do
+// CLAUDE.md ("o defeito mora na fiação"): sem este teste, apagar o `for (const
+// l of doGrupo)` dentro de `itemizar` (proforma-avancado.ts) deixaria a suíte
+// inteira verde (o teste acima só confere os TOTAIS).
+test('Proforma itemizada: cada linha de custo aparece pelo nome, no bucket canônico certo', () => {
   const c = calcularFluxo(CONFIG_COMPLETA);
   const p = proformaAvancado(c, 1000);
 
-  // CONFIG_COMPLETA tem uma linha por grupo, com `categoria` próprio —
-  // `nomeLinhaCusto` (fluxo-caixa-motor.ts) resolve o nome de exibição.
+  // CONFIG_COMPLETA (#742): 'Preço' (terreno) → bucket "Terreno"; 'Obra'
+  // (categoria livre, não bate com nenhum bucket nomeado) → fallback direto;
+  // 'Corretagem de vendas' (diretos) → dedução de receita, não mais item
+  // itemizado do custo direto; 'Projetos' (classificada em `indireto` na
+  // fixture, DE PROPÓSITO — #742 casa por NOME, não por grupo/aba) ainda
+  // cai no bucket "Projetos e aprovações" do custo DIRETO;
+  // 'Taxas bancárias' (financeiro) → bucket "Despesas Financeiras".
   const itens: Array<[string, string]> = [
     ['(-) Preço', 'terreno'],
     ['(-) Obra', 'obra'],
-    ['(-) Corretagem de vendas', 'diretos'],
     ['(-) Projetos', 'indireto'],
     ['(-) Taxas bancárias', 'financeiro'],
   ];
@@ -397,30 +408,32 @@ test('Proforma itemizada: cada linha de custo aparece pelo nome, e o subtotal do
     const esperado = c.linhasCusto.find((x) => x.grupo === grupo)!.total;
     assert.ok(Math.abs(linhaItem!.valor - -esperado) <= 0.01, `valor do item "${nomeItem}"`);
   }
+  // Corretagem não é mais item do custo direto — virou dedução de receita.
+  assert.equal(p.linhas.find((l) => l.nome === '(-) Corretagem de vendas'), undefined);
 
-  // O subtotal do grupo continua existindo, com o MESMO valor de antes — a
-  // itemização é aditiva, não substitui o subtotal.
-  const subtotalObra = p.linhas.find((l) => l.nome === '(-) Custos de Obra')!;
-  assert.ok(Math.abs(subtotalObra.valor - -c.linhasCusto.find((x) => x.grupo === 'obra')!.total) <= 0.01);
+  // O subtotal de "Despesas Financeiras" continua existindo, com o MESMO
+  // valor de antes (só o rótulo mudou de "Custos Financeiros" para
+  // "Despesas Financeiras", pedido do autor na #742).
+  const subtotalFinanceiro = p.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras'))!;
+  assert.ok(Math.abs(subtotalFinanceiro.valor - -c.linhasCusto.find((x) => x.grupo === 'financeiro')!.total) <= 0.01);
 
-  // Achado da revisão (PR #713): item e subtotal do grupo são AMBOS
+  // Achado da revisão (PR #713): item e subtotal do bucket são AMBOS
   // `nivel: 1` — sem um sinal a mais, ficam visualmente idênticos na tela.
-  // `subgrupo: true` é esse sinal (a tela usa para aplicar a classe CSS
-  // irmã de `fluxo-tabela.ts`), e só o subtotal do grupo carrega esse flag.
-  assert.equal(subtotalObra.subgrupo, true);
+  // `subgrupo: true` é esse sinal, e só o subtotal carrega esse flag.
+  assert.equal(subtotalFinanceiro.subgrupo, true);
   const itemObra = p.linhas.find((l) => l.nome === '(-) Obra')!;
   assert.equal(itemObra.subgrupo, undefined);
 });
 
 // Item de custo com valor ~zero não aparece na lista, mas o subtotal do
-// grupo continua somando TODAS as linhas — mesmo critério que a linha
-// "(-) Impostos e deduções sobre a receita" já usa (`Math.abs(v) > 0.005`).
-test('Proforma itemizada: item de custo zerado some da lista, mas o subtotal do grupo não muda', () => {
+// bucket continua somando TODAS as linhas — mesmo critério que a linha
+// "(-) Imposto" já usa (`Math.abs(v) > 0.005`).
+test('Proforma itemizada: item de custo zerado some da lista, mas o subtotal do bucket não muda', () => {
   const comItemZerado: FluxoConfig = {
     ...CONFIG_COMPLETA,
     linhasCusto: [
       ...CONFIG_COMPLETA.linhasCusto,
-      { id: 99, grupo: 'obra', categoria: 'Item zerado', orcamento_valor: 0, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+      { id: 99, grupo: 'financeiro', categoria: 'Item zerado', orcamento_valor: 0, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
     ],
   };
   const semZerado = calcularFluxo(CONFIG_COMPLETA);
@@ -429,8 +442,8 @@ test('Proforma itemizada: item de custo zerado some da lista, mas o subtotal do 
   const pComZerado = proformaAvancado(comZerado, 1000);
 
   assert.equal(pComZerado.linhas.find((l) => l.nome === '(-) Item zerado'), undefined);
-  const subtotalSemZerado = pSemZerado.linhas.find((l) => l.nome === '(-) Custos de Obra')!.valor;
-  const subtotalComZerado = pComZerado.linhas.find((l) => l.nome === '(-) Custos de Obra')!.valor;
+  const subtotalSemZerado = pSemZerado.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras'))!.valor;
+  const subtotalComZerado = pComZerado.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras'))!.valor;
   assert.equal(subtotalComZerado, subtotalSemZerado);
 });
 
@@ -471,16 +484,18 @@ test('#426 proforma do Avançado é DESALAVANCADA (D14)', () => {
   assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01,
     `Resultado ${p.resultado} != Σ fluxoMensal ${soma(c.fluxoMensal)}`);
 
-  // 2. "(-) Custos Financeiros (exclui serviço da dívida)" vale EXATAMENTE as
-  //    linhas de custo que o usuário classificou no grupo `financeiro` —
-  //    nunca o serviço da dívida (#447: rótulo desambiguado da proforma).
+  // 2. "(-) Despesas Financeiras (exclui serviço da dívida)" vale EXATAMENTE
+  //    as linhas de custo que o usuário classificou no grupo `financeiro` —
+  //    nunca o serviço da dívida (#447: rótulo desambiguado da proforma;
+  //    renomeado de "Custos Financeiros" para "Despesas Financeiras" na #742,
+  //    a pedido do autor).
   const custoFinanceiroProprio = c.linhasCusto
     .filter((x) => x.grupo === 'financeiro')
     .reduce((s, x) => s + x.total, 0);
-  const linhaFinanceira = p.linhas.find((l) => l.nome.startsWith('(-) Custos Financeiros'))!;
+  const linhaFinanceira = p.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras'))!;
   assert.ok(linhaFinanceira, 'a fixture tem linha no grupo financeiro; a proforma precisa mostrá-la');
   assert.ok(Math.abs(-linhaFinanceira.valor - custoFinanceiroProprio) <= 0.01,
-    'Custos Financeiros da proforma tem que ser só o custo próprio do estudo');
+    'Despesas Financeiras da proforma tem que ser só o custo próprio do estudo');
   assert.ok(Math.abs(-linhaFinanceira.valor - (custoFinanceiroProprio + saidas)) > 0.01,
     'se bater com custo próprio + serviço da dívida, o defeito da #426 voltou');
 
@@ -497,10 +512,12 @@ test('#426 proforma do Avançado é DESALAVANCADA (D14)', () => {
 test('#447 a proforma rotula o grupo diferente da aba Fluxo, sem editar o mapa compartilhado', () => {
   const c = calcularFluxo(CONFIG_COMPLETA);
   const p = proformaAvancado(c, 1000);
-  const linhaFinanceira = p.linhas.find((l) => l.nome.startsWith('(-) Custos Financeiros'))!;
+  const linhaFinanceira = p.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras'))!;
 
-  // O rótulo da proforma NÃO é o do mapa compartilhado, e cita a exclusão.
+  // O rótulo da proforma NÃO é o do mapa compartilhado (nem o antigo "Custos
+  // Financeiros", nem uma versão sem o parêntese), e cita a exclusão.
   assert.notEqual(linhaFinanceira.nome, '(-) Custos Financeiros');
+  assert.notEqual(linhaFinanceira.nome, '(-) Despesas Financeiras');
   assert.ok(linhaFinanceira.nome.includes('exclui serviço da dívida'),
     `rótulo "${linhaFinanceira.nome}" precisa declarar a exclusão`);
 
@@ -543,10 +560,11 @@ test('#447 linha informativa do funding aparece sem linha de custo financeira pr
   const totalSaidas = funding.linhasSaida.reduce((s, l) => s + l.total, 0);
   assert.ok(totalSaidas > 0, 'a fixture precisa gerar serviço de dívida, senão o teste não prova nada');
 
-  // Na proforma: sem linha de custo própria no grupo, "(-) Custos Financeiros…"
-  // não aparece — o grupo só existe aqui através da linha informativa.
+  // Na proforma: sem linha de custo própria no grupo, "(-) Despesas
+  // Financeiras…" não aparece — o grupo só existe aqui através da linha
+  // informativa.
   const p = proformaAvancado(c, 1000);
-  assert.equal(p.linhas.find((l) => l.nome.startsWith('(-) Custos Financeiros')), undefined);
+  assert.equal(p.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras')), undefined);
 
   const informativa = linhaInformativaFunding(totalSaidas);
   assert.ok(informativa, 'com serviço de dívida > 0, a linha informativa tem que existir');
@@ -700,10 +718,12 @@ test('#427 proforma fecha com três leituras, cada uma com sua própria base', (
   // só porque há permuta física — o rótulo/nota condicionais (K35/K36).
   const linhasResultado = p.linhas.filter((l) => l.tipo === 'resultado');
   assert.equal(linhasResultado.length, 3);
-  assert.equal(linhasResultado[0].nome, '= Resultado');
+  // #742: ordem invertida a pedido do autor — a leitura mais inclusiva
+  // primeiro, o resultado de fato (sem nenhuma permuta somada) por último.
+  assert.equal(linhasResultado[0].nome, '= Resultado + Permutas');
+  assert.equal(linhasResultado[0].notaBase, '1 / (VGV + Permutas Físicas)');
   assert.equal(linhasResultado[1].nome, '= Resultado + Perm. Financ.');
-  assert.equal(linhasResultado[2].nome, '= Resultado + Permutas');
-  assert.equal(linhasResultado[2].notaBase, '1 / (VGV + Permutas Físicas)');
+  assert.equal(linhasResultado[2].nome, '= Resultado');
   assert.ok(linhasResultado.every((l) => typeof l.pctOverride === 'number'));
 });
 
@@ -721,10 +741,11 @@ test('#427 degenerescência: sem permutas as três linhas coincidem, sem rótulo
 
   const linhasResultado = p.linhas.filter((l) => l.tipo === 'resultado');
   assert.equal(linhasResultado.length, 3);
-  // Sem permuta física, o rótulo da 3ª linha cai para "= Resultado" (molde de
-  // K35) e a nota de denominador não aparece (molde de K36).
-  assert.equal(linhasResultado[2].nome, '= Resultado');
-  assert.equal(linhasResultado[2].notaBase, undefined);
+  // Sem permuta física, o rótulo da 1ª linha (a leitura "+ Permutas", #742
+  // reordenou o rodapé — ela é a primeira agora) cai para "= Resultado"
+  // (molde de K35) e a nota de denominador não aparece (molde de K36).
+  assert.equal(linhasResultado[0].nome, '= Resultado');
+  assert.equal(linhasResultado[0].notaBase, undefined);
 });
 
 test('#427 não-regressão: o campo `resultado` de #351/#426 não muda de valor com esta issue', () => {
@@ -735,6 +756,242 @@ test('#427 não-regressão: o campo `resultado` de #351/#426 não muda de valor 
   const c = calcularFluxo(CONFIG_PERMUTAS);
   const p = proformaAvancado(c, 1000);
   assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #742 — reordenação/reclassificação da Proforma do Avançado a pedido do
+// autor: Corretagem/Marketing viram dedução de receita, os demais custos
+// diretos/indiretos ganham posição canônica por NOME (independente do grupo
+// da aba Custos), e o rodapé de resultado é exibido na ordem inversa.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#742: Corretagem e Marketing viram dedução de receita, independente do grupo em que foram cadastradas', () => {
+  const CONFIG_MARKETING_FORA_DE_LUGAR: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      // Cadastrada em `indireto` de propósito — a #742 casa por NOME
+      // ("Marketing & Publicidade" é a categoria da dedução de receita,
+      // distinta de "Marketing global", que é custo indireto de verdade).
+      { id: 100, grupo: 'indireto', categoria: 'Marketing & Publicidade', orcamento_valor: 200_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 6 },
+    ],
+  };
+  const c = calcularFluxo(CONFIG_MARKETING_FORA_DE_LUGAR);
+  const p = proformaAvancado(c, 1000);
+
+  const marketing = c.linhasCusto.find((x) => x.nome === 'Marketing & Publicidade')!.total;
+  const corretagem = c.linhasCusto.find((x) => x.nome === 'Corretagem de vendas')!.total;
+  assert.ok(marketing > 0, 'a fixture precisa mesmo gerar a linha, senão o teste não prova nada');
+
+  const linhaMarketing = p.linhas.find((l) => l.nome === '(-) Marketing')!;
+  assert.ok(linhaMarketing, '"(-) Marketing" tem que existir mesmo vindo do grupo indireto');
+  assert.ok(Math.abs(linhaMarketing.valor - -marketing) <= 0.01);
+  // E não aparece de novo como item de custo indireto (nem some, nem duplica).
+  assert.equal(p.linhas.find((l) => l.nome === '(-) Marketing & Publicidade'), undefined);
+
+  // Resultado não muda de valor por causa de ONDE a linha foi cadastrada —
+  // só de apresentação.
+  assert.ok(Math.abs(p.resultado - soma(c.fluxoMensal)) <= 0.01);
+  void corretagem;
+});
+
+test('#742: item sem categoria canônica (grupo "Outro"/livre) não é descartado — cai no fallback do próprio bloco', () => {
+  const CONFIG_COM_OUTRO: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      { id: 101, grupo: 'diretos', categoria: 'Outro', subcategoria: 'Brinde de lançamento', orcamento_valor: 50_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+      { id: 102, grupo: 'indireto', categoria: 'Outro', orcamento_valor: 30_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  };
+  const c = calcularFluxo(CONFIG_COM_OUTRO);
+  const p = proformaAvancado(c, 1000);
+
+  // grupo='diretos' não tem `subcategoria` no nome (nomeLinhaCusto só junta
+  // categoria+subcategoria quando grupo==='terreno') — o nome exibido é só
+  // "Outro".
+  const itensOutro = p.linhas.filter((l) => l.nome === '(-) Outro');
+  assert.equal(itensOutro.length, 2, 'as duas linhas "Outro" (diretos e indireto) têm que aparecer, sem se fundir');
+
+  const custoDireto = -p.linhas.find((l) => l.nome === '= Custo direto total')!.valor;
+  const custoIndireto = -p.linhas.find((l) => l.nome === '= Custo indireto total')!.valor;
+  // O "Outro" de `diretos` soma no custo direto; o de `indireto`, no indireto
+  // — nenhum dos dois é descartado (a soma dos dois totais bate com o custo
+  // do motor, menos Corretagem/Marketing que saíram para a dedução de receita).
+  const corretagem = c.linhasCusto.find((x) => x.nome === 'Corretagem de vendas')!.total;
+  assert.ok(Math.abs((custoDireto + custoIndireto) - (soma(c.custoMensal) - corretagem)) <= 0.01);
+
+  // #742 (achado do Codex, rodada 1): o teste acima só confere o AGREGADO —
+  // um "Outro" que trocasse de lado (ex.: o de `diretos` cair no indireto por
+  // casar pelo NOME "Outro" no bucket "Gestão e outros custos indiretos")
+  // ainda bateria na soma, porque o total do motor não muda. Confira o LADO
+  // de cada um, individualmente: "Outro" de `diretos` (id 101, R$ 50.000) tem
+  // que compor `= Custo direto total`, nunca o indireto — e vice-versa para
+  // o de `indireto` (id 102, R$ 30.000).
+  const outroDiretos = c.linhasCusto.find((l) => l.nome === 'Outro' && l.grupo === 'diretos')!;
+  const outroIndireto = c.linhasCusto.find((l) => l.nome === 'Outro' && l.grupo === 'indireto')!;
+  assert.ok(custoDireto >= outroDiretos.total - 0.01, '"Outro" de `diretos` tem que estar no custo DIRETO');
+  assert.ok(custoIndireto >= outroIndireto.total - 0.01, '"Outro" de `indireto` tem que estar no custo INDIRETO');
+});
+
+test('#742: "(-) Imposto" isolado bate com o RET medido, mesmo com Corretagem e Permuta financeira presentes', () => {
+  const c = calcularFluxo(CONFIG_PERMUTAS);
+  const p = proformaAvancado(c, 1000);
+  const imposto = p.linhas.find((l) => l.nome === '(-) Imposto')!;
+  assert.ok(imposto, 'CONFIG_PERMUTAS tem RET ativo — a linha tem que existir');
+
+  // Identidade: Receita líquida canônica (RET + permuta financeira, só) menos
+  // a permuta financeira isola o RET — é exatamente o que "(-) Imposto"
+  // publica, independente de haver Corretagem/Marketing no estudo.
+  const receitaLiquidaCanonica = soma(c.receitaMensal);
+  const impostoEsperado = -(receitaLiquidaCanonica - c.receitaBruta) - c.permutaFinanceiraTotal;
+  assert.ok(Math.abs(-imposto.valor - impostoEsperado) <= 0.01);
+});
+
+test('#742: rodapé de resultado mostra "Resultado + Permutas" primeiro e "Resultado" (o efetivo) por último', () => {
+  const c = calcularFluxo(CONFIG_PERMUTAS);
+  const p = proformaAvancado(c, 1000);
+  const linhasResultado = p.linhas.filter((l) => l.tipo === 'resultado');
+  assert.equal(linhasResultado.length, 3);
+  assert.deepEqual(linhasResultado.map((l) => l.nome), [
+    '= Resultado + Permutas',
+    '= Resultado + Perm. Financ.',
+    '= Resultado',
+  ]);
+  // A ÚLTIMA linha é o resultado de fato — sem nenhuma permuta somada de volta.
+  assert.ok(Math.abs(linhasResultado[2].valor - p.resultado) <= 0.01);
+});
+
+test('#742 (achado do Codex, rodada 1): com Contingência E financeiro no mesmo estudo, "Despesas Financeiras" vem ANTES de "Contingências"', () => {
+  const CONFIG_CONTINGENCIA_E_FINANCEIRO: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      { id: 200, grupo: 'obra', categoria: 'Contingência', orcamento_valor: 80_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  };
+  const c = calcularFluxo(CONFIG_CONTINGENCIA_E_FINANCEIRO);
+  const p = proformaAvancado(c, 1000);
+  const idxFinanceiro = p.linhas.findIndex((l) => l.nome.startsWith('(-) Despesas Financeiras'));
+  const idxContingencia = p.linhas.findIndex((l) => l.nome === '(-) Contingência');
+  assert.ok(idxFinanceiro >= 0 && idxContingencia >= 0, 'as duas linhas têm que existir na fixture');
+  assert.ok(idxFinanceiro < idxContingencia, 'ordem canônica: "... Despesas Financeiras, Contingências"');
+});
+
+test('#742 (achado do Codex, rodada 2): nome canônico vence o grupo mesmo quando a linha está em `financeiro`', () => {
+  const CONFIG_NOME_CANONICO_NO_GRUPO_FINANCEIRO: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      // Combinação que o backend aceita hoje: nome de bucket canônico, mas
+      // classificado no grupo `financeiro` em vez do grupo "natural" dele.
+      { id: 300, grupo: 'financeiro', categoria: 'Contingência', orcamento_valor: 40_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+      { id: 301, grupo: 'financeiro', categoria: 'Marketing global', orcamento_valor: 60_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  };
+  const c = calcularFluxo(CONFIG_NOME_CANONICO_NO_GRUPO_FINANCEIRO);
+  const p = proformaAvancado(c, 1000);
+
+  // As duas têm que aparecer pelo BUCKET NOMEADO, nunca dentro do catch-all
+  // "Despesas Financeiras" — a classificação é por NOME, independente do
+  // grupo em que o usuário classificou a linha (decisão do autor, #742).
+  assert.ok(p.linhas.find((l) => l.nome === '(-) Contingência'), '"Contingência" tem que aparecer pelo nome, mesmo vindo do grupo financeiro');
+  assert.ok(p.linhas.find((l) => l.nome === '(-) Marketing global'), '"Marketing global" tem que aparecer pelo nome, mesmo vindo do grupo financeiro');
+
+  // "Despesas Financeiras" continua existindo (CONFIG_COMPLETA já tem uma
+  // linha 'Taxas bancárias'/financeiro, R$ 100.000, que ESSA sim não tem
+  // nome canônico e cai no catch-all) — mas o valor tem que ser EXATAMENTE
+  // essa, sem as duas linhas de nome canônico (Contingência R$ 40.000 e
+  // Marketing global R$ 60.000) misturadas dentro.
+  const linhaFinanceiro = p.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras'))!;
+  assert.ok(linhaFinanceiro, '"Despesas Financeiras" continua existindo — só não pode incluir as linhas de nome canônico');
+  assert.ok(Math.abs(linhaFinanceiro.valor - -100_000) <= 0.01, 'só a linha SEM nome canônico ("Taxas bancárias") pode estar em Despesas Financeiras');
+
+  // Ordem preservada: "Contingência" continua depois de onde "Despesas
+  // Financeiras" estaria, e "Marketing global" continua entre "Receita
+  // operacional" e "= Custo indireto total" (não vira custo direto).
+  const idxReceitaOperacional = p.linhas.findIndex((l) => l.nome === '= Receita operacional');
+  const idxMarketingGlobal = p.linhas.findIndex((l) => l.nome === '(-) Marketing global');
+  const idxCustoIndiretoTotal = p.linhas.findIndex((l) => l.nome === '= Custo indireto total');
+  assert.ok(idxReceitaOperacional < idxMarketingGlobal && idxMarketingGlobal < idxCustoIndiretoTotal);
+});
+
+test('#742 (achado do Codex, rodada 3): "Preço" casa por nome mesmo fora do grupo `terreno`', () => {
+  const CONFIG_PRECO_FORA_DO_TERRENO: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      // Combinação que o backend aceita hoje, embora o catálogo de Custos só
+      // ofereça "Preço" dentro do grupo `terreno`: aqui ela vem do `financeiro`.
+      { id: 400, grupo: 'financeiro', categoria: 'Preço', orcamento_valor: 70_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  };
+  const c = calcularFluxo(CONFIG_PRECO_FORA_DO_TERRENO);
+  const p = proformaAvancado(c, 1000);
+
+  // Tem que existir DUAS linhas "(-) Preço" — a do terreno de CONFIG_COMPLETA
+  // (id 1) e esta nova (id 400) — ambas no bucket "Terreno", nunca dentro de
+  // "Despesas Financeiras".
+  const itensPreco = p.linhas.filter((l) => l.nome === '(-) Preço');
+  assert.equal(itensPreco.length, 2, 'as duas linhas "Preço" (terreno e financeiro) têm que casar pelo bucket Terreno');
+
+  const linhaFinanceiro = p.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras'))!;
+  assert.ok(Math.abs(linhaFinanceiro.valor - -100_000) <= 0.01, '"Preço" não pode inflar "Despesas Financeiras" (só a Taxas bancárias original)');
+});
+
+test('#742 (achado do Codex, rodada 4): nome canônico casa mesmo com sufixo de subcategoria do terreno', () => {
+  const CONFIG_SUFIXO_TERRENO: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      // `nomeLinhaCusto` só junta categoria+subcategoria quando grupo===
+      // 'terreno' — o backend aceita qualquer categoria ali, então esta linha
+      // sai como "Corretagem de vendas — algumacoisa", não "Corretagem de
+      // vendas" pura.
+      { id: 500, grupo: 'terreno', categoria: 'Corretagem de vendas', subcategoria: 'algumacoisa', orcamento_valor: 20_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  };
+  const c = calcularFluxo(CONFIG_SUFIXO_TERRENO);
+  const p = proformaAvancado(c, 1000);
+
+  // Tem que virar dedução de receita ("(-) Corretagem"), não ficar presa no
+  // fallback de custo direto com o nome completo sufixado.
+  const linhaCorretagem = p.linhas.find((l) => l.nome === '(-) Corretagem')!;
+  assert.ok(linhaCorretagem, '"(-) Corretagem" tem que existir mesmo com o nome sufixado');
+  const corretagemOriginal = c.linhasCusto.find((x) => x.nome.startsWith('Corretagem de vendas') && x.grupo === 'diretos')!.total;
+  const corretagemSuficada = c.linhasCusto.find((x) => x.grupo === 'terreno' && x.nome.startsWith('Corretagem'))!.total;
+  assert.ok(Math.abs(-linhaCorretagem.valor - (corretagemOriginal + corretagemSuficada)) <= 0.01, 'as duas Corretagens (com e sem sufixo) somam na mesma dedução');
+
+  // E não pode sobrar solta como item de custo direto com o nome completo.
+  assert.equal(p.linhas.find((l) => l.nome.includes('— algumacoisa')), undefined);
+});
+
+test('#742 (achado do Codex, rodada 4): `comInformativasAntesDoResultado` preserva "= Resultado" como a última linha', () => {
+  const c = calcularFluxo(CONFIG_PERMUTAS);
+  const p = proformaAvancado(c, 1000);
+  const informativas = [
+    linhaInformativaFunding(50_000)!,
+    linhaInformativaReceitaLiquidaEvi(123_456),
+  ];
+  const linhas = comInformativasAntesDoResultado(p.linhas, informativas);
+
+  // A última linha da lista RENDERIZADA continua sendo o resultado efetivo —
+  // as informativas não podem empurrá-lo para o meio.
+  assert.equal(linhas[linhas.length - 1].nome, '= Resultado');
+  assert.equal(linhas[linhas.length - 1].tipo, 'resultado');
+
+  // As duas informativas continuam presentes, só que ANTES do bloco de
+  // resultado (`tipo: 'resultado'`), não depois.
+  const idxPrimeiroResultado = linhas.findIndex((l) => l.tipo === 'resultado');
+  const idxInformativas = linhas
+    .map((l, i) => (l.tipo === 'informativo' ? i : -1))
+    .filter((i) => i !== -1);
+  assert.equal(idxInformativas.length, 2);
+  for (const i of idxInformativas) assert.ok(i < idxPrimeiroResultado);
+
+  // Caso sem informativas: devolve a lista original intocada.
+  const semInformativas = comInformativasAntesDoResultado(p.linhas, []);
+  assert.deepEqual(semInformativas, p.linhas);
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -800,11 +1057,17 @@ for (const [padrao, cfg] of [
     assert.ok(deducaoFx, 'com RET ativo a linha-ponte de deduções tem que existir');
     assert.ok(deducaoFx.total < 0, 'a dedução é negativa (líquida − bruta)');
 
-    // A MESMA linha, na Proforma do Avançado. `tipo: 'custo'` lá é o lado que
-    // sempre esteve certo — é contra ele que a exportação é confrontada.
+    // A MESMA linha, na Proforma do Avançado — que desde a #742 mostra o
+    // Imposto isolado (`(-) Imposto`), não mais uma linha combinada. Nestas
+    // duas fixtures não há permuta financeira, então o valor de "(-) Imposto"
+    // é exatamente a ponte que `linhasFluxo` soma. `tipo: 'custo'` lá é o
+    // lado que sempre esteve certo — é contra ele que a exportação é
+    // confrontada.
     const pf = proformaAvancado(c, 1000);
-    const deducaoPf = pf.linhas.find((l) => l.nome === '(-) Impostos e deduções sobre a receita')!;
-    assert.ok(deducaoPf, 'a Proforma do Avançado também lista a dedução');
+    const deducaoPf = pf.linhas.find((l) => l.nome === '(-) Imposto')!;
+    assert.ok(deducaoPf, 'a Proforma do Avançado também lista o Imposto');
+    assert.ok(Math.abs(deducaoPf.valor - deducaoFx.total) <= 0.01,
+      'sem permuta financeira nestas fixtures, "(-) Imposto" tem que bater com a ponte do Fluxo de Caixa');
     assert.equal(deducaoPf.tipo, 'custo');
 
     assert.equal(

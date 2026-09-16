@@ -5,9 +5,10 @@ import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, rotuloMesRelativo,
   type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
 import {
   proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi,
+  comInformativasAntesDoResultado,
   type LinhaProformaAv,
 } from './proforma-avancado.js';
 import { calcularFluxo, agregarFluxoPorPeriodos, receitaLiquidaDeProformaMensal, type FluxoCalc, type FluxoConfig } from './fluxo-caixa-motor.js';
@@ -25,7 +26,8 @@ import {
 } from './funding-motor.js';
 import {
   validarFluxoCalc, validarProduto, validarContratacao, validarSafrasReceita, validarReconciliacaoCamadas,
-  validarFunding, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia, TOLERANCIA_PADRAO,
+  validarFunding, validarPermutaFisica, validarCustosDuplicados, permutaFisicaPorTipologia,
+  permutaFisicaDerivadaCatalogo, TOLERANCIA_PADRAO,
   type Divergencia, type PermutaFisicaTipologia,
 } from './fluxo-invariantes.js';
 import {
@@ -226,6 +228,17 @@ export class ViabFluxoVer extends LitElement {
        exibida quando a base difere do VGV (molde de Premissas e
        Resultados K36 da EVI: a nota é gerada e some quando não se aplica). */
     table.proforma .nota-base { font-size: 0.72rem; font-weight: 400; color: var(--cor-texto-sec, rgba(255,255,255,0.55)); }
+    /* #742 — espaçamento visual entre os blocos da Proforma (dedução de
+       receita / custo direto / custo indireto / rodapé de resultado), no
+       molde da planilha de referência do autor: uma linha em branco entre
+       cada bloco, sem precisar de borda ou cor — só respiro. */
+    table.proforma tr.espaco td { padding: 0; height: 14px; border: none; }
+    /* #742 — bloco de permuta física acima da Proforma: mesma tipografia de
+       apoio que o rodapé (".sec") já usa, para não competir com o título do
+       card. */
+    p.permuta-fisica-resumo {
+      margin: 0 0 12px; font-size: 0.82rem; color: var(--cor-texto-sec, rgba(255,255,255,0.7));
+    }
 
     /* #594 — a abertura por parte tem 8 colunas, contra as 2 das tabelas
        acima. A classe .tabela-wrap é o MESMO padrão declarado do Cronograma
@@ -471,6 +484,27 @@ export class ViabFluxoVer extends LitElement {
    * função não recebe) chega até ela. `linhaInformativaFunding` devolve
    * `null` sem funding ou sem saída, e o `.filter` a tira da lista.
    */
+  /**
+   * #742 — bloco informativo acima da tabela: quantas unidades (e de qual
+   * tipo) estão sendo permutadas fisicamente, e o m² segmentado por família
+   * residencial/não residencial. Só aparece quando o estudo tem permuta
+   * física declarada. `this.permutaFisica` já é calculado em `_carregar`
+   * (`permutaFisicaPorTipologia`, usado também pela aba Fluxo de Caixa —
+   * `tabelaPermutaFisica`) — não recalcula nada, só resume.
+   */
+  private _resumoPermutaFisica(): TemplateResult | typeof nothing {
+    if (this.permutaFisica.length === 0) return nothing;
+    const totalUnidades = this.permutaFisica.reduce((s, t) => s + t.quantidadePermutada, 0);
+    const porTipo = this.permutaFisica.map((t) => `${fmtNum(t.quantidadePermutada)} ${t.nome}`).join(', ');
+    const familia = permutaFisicaDerivadaCatalogo(this.dados?.custos ?? [], this.dados?.tipologias ?? []);
+    const partesArea: string[] = [];
+    if (familia.residencial.quantidade > 0) partesArea.push(`${fmtNum(familia.residencial.areaM2)} m² residencial`);
+    if (familia.naoResidencial.quantidade > 0) partesArea.push(`${fmtNum(familia.naoResidencial.areaM2)} m² não residencial`);
+    return html`<p class="permuta-fisica-resumo">
+      Permuta física: ${fmtNum(totalUnidades)} unidade(s) (${porTipo})${partesArea.length ? html` — ${partesArea.join(' + ')}` : ''}.
+    </p>`;
+  }
+
   private _renderProforma(c: FluxoCalc): TemplateResult {
     const area = areaPrivativaTotalLinhas(this.dados?.receitas ?? []);
     const p = proformaAvancado(c, area);
@@ -480,12 +514,23 @@ export class ViabFluxoVer extends LitElement {
     const informativa = linhaInformativaFunding(totalSaidasFunding);
     // #465: "Receita líquida de proforma" — composição de 4 parcelas da EVI
     // (imposto + corretagem + marketing + permuta financeira), ao lado da
-    // "= Receita líquida" existente (que só deduz RET + permuta financeira,
-    // #228). As duas convivem; nenhuma substitui a outra.
+    // "= Receita líquida" existente (que desde a #742 já deduz as mesmas
+    // quatro parcelas — as duas leituras tendem a coincidir num estudo comum,
+    // mas continuam sendo calculadas por caminhos diferentes). As duas
+    // convivem; nenhuma substitui a outra.
     const receitaLiquidaEvi = receitaLiquidaDeProformaMensal(c.receitaMensal, c.linhasCusto, this.dados?.custos ?? [])
       .reduce((s, v) => s + v, 0);
     const informativaEvi = linhaInformativaReceitaLiquidaEvi(receitaLiquidaEvi);
-    const linhas: LinhaProformaAv[] = [...p.linhas, informativa, informativaEvi].filter((l): l is LinhaProformaAv => l !== null);
+    // ⚠️ #742 (achado do Codex, rodada 4): as informativas NÃO podem ir depois
+    // do rodapé de resultado — `proformaAvancado` já garante que "= Resultado"
+    // é a ÚLTIMA linha de `p.linhas` (rodada 1), mas um `[...p.linhas,
+    // informativa, informativaEvi]` desfazia essa garantia aqui na tela,
+    // porque as duas linhas informativas são sempre anexadas DEPOIS.
+    // `comInformativasAntesDoResultado` insere as duas ANTES do primeiro
+    // `tipo: 'resultado'`, preservando "= Resultado" como a última linha
+    // renderizada de fato.
+    const informativas = [informativa, informativaEvi].filter((l): l is LinhaProformaAv => l !== null);
+    const linhas: LinhaProformaAv[] = comInformativasAntesDoResultado(p.linhas, informativas);
     const porM2 = (v: number) => (p.areaPrivativa > 0 ? v / p.areaPrivativa : 0);
     // #427 — % VGV de toda linha usa o VGV puro, EXCETO os fechos cujo
     // `pctOverride` já veio calculado com a base própria (`= Resultado +
@@ -495,8 +540,25 @@ export class ViabFluxoVer extends LitElement {
     // `fmtPctOuIndef`, porque um percentual sem denominador não foi medido.
     // Mesmo mecanismo que a #571 levou ao Preliminar.
     const pctVgv = (v: number): number | null => (p.vgv > 0 ? (v / p.vgv) * 100 : null);
+    // #742 — notação contábil (parênteses para negativo/custo), igual ao
+    // Preliminar (`celula`/`negativoContabil`, `frontend/viab-format.ts`) —
+    // antes esta tabela usava `fmtR$`/`fmtNum` crus, com sinal de menos.
+    // Só linha de CUSTO entra sempre entre parênteses (a app grava custo como
+    // valor positivo); receita/resultado/informativo mostram o sinal real.
+    const ehCusto = (l: LinhaProformaAv) => l.tipo === 'custo';
+    const celulaM2 = (l: LinhaProformaAv): string => {
+      if (p.areaPrivativa <= 0) return '—';
+      const abs = fmtNum(Math.abs(porM2(l.valor)));
+      return negativoContabil(l.valor, ehCusto(l)) ? `(${abs})` : abs;
+    };
+    // #742 — espaçamento visual entre os 4 blocos da Proforma (dedução de
+    // receita+Receita líquida / custo direto+Receita operacional / custo
+    // indireto / rodapé de resultado), no molde da planilha de referência:
+    // uma linha em branco logo depois do fecho de cada bloco.
+    const ESPACO_APOS = new Set(['= Receita líquida', '= Receita operacional', '= Custo indireto total']);
     return html`
       <urbi-card titulo="Proforma">
+        ${this._resumoPermutaFisica()}
         <table class="proforma">
           <thead>
             <tr><th>Linha</th><th class="num">R$</th><th class="num">R$/m²</th><th class="num">% VGV</th></tr>
@@ -510,8 +572,8 @@ export class ViabFluxoVer extends LitElement {
               return html`
               <tr class=${`n${l.nivel} ${l.tipo}${l.subgrupo ? ' subgrupo' : ''}`}>
                 <td>${l.nome}${l.notaBase ? html` <span class="nota-base">(${l.notaBase})</span>` : ''}</td>
-                <td class="num ${sinal}">${fmtR$(l.valor)}</td>
-                <td class="num ${sinal}">${fmtNum(porM2(l.valor))}</td>
+                <td class="num ${sinal}">${celula(l.valor, { comParenteses: true, custo: ehCusto(l), sempreExibir: true })}</td>
+                <td class="num ${sinal}">${celulaM2(l)}</td>
                 <td class="num ${sinal}">${fmtPctOuIndef(
                   // ⚠️ #604 — `!== undefined`, e NÃO `??`, porque `null` aqui
                   // significa "base própria inválida", não "sem override": o
@@ -535,7 +597,8 @@ export class ViabFluxoVer extends LitElement {
                   // está declarada como tal em vez de contada como entrega.
                   l.pctOverride !== undefined ? l.pctOverride : pctVgv(l.valor),
                 )}</td>
-              </tr>`;
+              </tr>
+              ${ESPACO_APOS.has(l.nome) ? html`<tr class="espaco"><td colspan="4"></td></tr>` : nothing}`;
             })}
           </tbody>
         </table>
@@ -543,7 +606,7 @@ export class ViabFluxoVer extends LitElement {
           A coluna "Margem" do Painel de estudos usa esta mesma linha — "= Resultado", sem permutas
           (para a linha do Avançado; ver o atributo "title" da célula no Painel — #443).
           Esta proforma é desalavancada: nenhuma ponta do funding entra aqui — nem liberações e aportes
-          na receita, nem amortização e juros no custo. “Custos Financeiros” vale só as linhas de custo
+          na receita, nem amortização e juros no custo. “Despesas Financeiras” vale só as linhas de custo
           que você classificou nesse grupo. Quem quiser ler o efeito do funding lê a aba Fluxo de Caixa,
           não esta.</p>
       </urbi-card>
