@@ -101,16 +101,29 @@ for (const a of ARQUIVOS) {
 // classe de defeito nº 1 deste repositório (`.claude/revisao/aprendizados.md` § 3) dentro da
 // própria guarda que existe para o corpo viajar, e é a mesma asserção que
 // `scripts/testar-colheita-motor.mjs` já faz do outro lado, para o campo `motor=`. Achado de lente.
-const corpos = [...motor.matchAll(/^lente(?:_kimi)?\(\) \{[\s\S]*?echo "\$id exit=\$rc/gm)].map((m) => m[0]);
+// ⚠️ O recorte é por PROPRIEDADE ESTRUTURAL — qualquer função cujo corpo termina no `echo` do
+// `execucao.txt` é uma função de despacho —, e não por uma lista de nomes. A primeira versão
+// casava literalmente `lente` e `lente_kimi`, com `>= 2`: uma `lente_nativo()` acrescentada
+// amanhã sem `${COMUM}` deixaria a bateria verde, e a mensagem do `assert` prometeria uma
+// cobertura que o predicado não tinha. É o critério (c) do `CLAUDE.md` sobre lista de exceção —
+// quando a lista nomeia *quem* e a regra fala de propriedade estrutural, o eixo está errado e ela
+// diverge da realidade sozinha. Achado de lente.
+const corpos = [...motor.matchAll(/^[a-z_]+\(\) \{[\s\S]*?echo "\$id exit=\$rc/gm)].map((m) => m[0]);
 assert.ok(
   corpos.length >= 2,
-  'não achei as duas funções de despacho (`lente()` e `lente_kimi()`) no motor — sem elas esta ' +
-    'guarda não tem o que medir, e o COMUM poderia deixar de viajar sem nada ficar vermelho',
+  'não achei as funções de despacho do motor (as que terminam no `echo` do execucao.txt) — sem ' +
+    'elas esta guarda não tem o que medir, e o COMUM poderia deixar de viajar sem nada ficar vermelho',
 );
 for (const c of corpos) {
-  const nome = c.slice(0, c.indexOf('(')); 
-  if (c.includes('${COMUM}')) ok(`a função de despacho \`${nome}()\` interpola \${COMUM} no prompt`);
-  else falha('fiação', `\`${nome}()\` não interpola \${COMUM} — o bloco existe e não chega à lente`);
+  const nome = c.slice(0, c.indexOf('('));
+  // ⚠️ Sem as linhas de COMENTÁRIO. O predicado é "o PROMPT interpola", e `includes` sobre a fatia
+  // inteira media "a string aparece em algum lugar da função" — um refactor que documentasse
+  // `${COMUM}` num comentário enquanto o tirasse do prompt passava verde. Predicado e mensagem
+  // tinham divergido, a classe do § 5 dos aprendizados, dentro da guarda que existe por causa do
+  // § 3. Achado de lente.
+  const codigo = c.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  if (codigo.includes('${COMUM}')) ok(`a função de despacho \`${nome}()\` interpola \${COMUM} no prompt`);
+  else falha('fiação', `\`${nome}()\` não interpola \${COMUM} no prompt — o bloco existe e não chega à lente`);
 }
 if (/^\s*CORPUS:/m.test(motor)) ok('os templates de saída trazem a linha CORPUS:');
 else falha('contrato', 'nenhum template de saída tem CORPUS: — "não li" ficaria indistinguível de "li"');
@@ -133,6 +146,23 @@ else falha('contrato', 'nenhum template de saída tem CORPUS: — "não li" fica
     ausente: semLinha,
     desatualizado: controle.replace(/^<!-- corpus=.* -->$/m, '<!-- corpus=v1-00000000 -->'),
   };
+  // Estados degenerados: não são o formato destes dois arquivos hoje, e é por isso que estão
+  // aqui. O predicado antigo (`replace(/^(.*\n)/, …)`) virava NO-OP em todos os três — devolvia
+  // o texto sem marcador nenhum —, e no-op é justamente o modo de falha que este bloco existe
+  // para pegar: a escrita dizia ok sem gravar, e o arquivo que era só o marcador sem quebra final
+  // saía VAZIO. Achado de lente.
+  const degenerados = {
+    'uma linha só, sem quebra final': '# Aprendizados',
+    'sem quebra final, com marcador': '# Aprendizados\n<!-- corpus=v9-aaaaaaaa -->',
+    vazio: '',
+  };
+  for (const [nome, estado] of Object.entries(degenerados)) {
+    const reparado = canonico(estado, m);
+    const marcadores = (reparado.match(/^<!-- corpus=.* -->$/gm) ?? []).length;
+    if (marcadores !== 1) falha(`reparo: ${nome}`, `o canônico saiu com ${marcadores} marcador(es), não 1 — o reparo virou no-op`);
+    else if (canonico(reparado, m) !== reparado) falha(`reparo: ${nome}`, 'reparar duas vezes dá resultados diferentes');
+    else ok(`reparo converge a partir de: ${nome}`);
+  }
   for (const [nome, estado] of Object.entries(estados)) {
     const reparado = canonico(estado, m);
     const marcadores = (reparado.match(/^<!-- corpus=.* -->$/gm) ?? []).length;

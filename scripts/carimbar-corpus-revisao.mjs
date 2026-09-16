@@ -95,12 +95,28 @@ export function calcular(raizRepo = raiz, exigirMarcador = true) {
  * e com a linha DUPLICADA (o que uma resolução de conflito produz sem esforço) isso era verdade
  * com o arquivo expondo dois marcadores contraditórios a toda lente: o `--conferir` dizia **ok**,
  * e o modo de escrita saía pelo atalho do "nada a fazer" ANTES do laço de reparo — então o estado
- * duplicado sobrevivia a quantas passadas se rodasse. Medido: 2 marcadores antes, 2 depois, rc=0
- * nas duas pontas. Trocar o predicado por *o arquivo É o canônico* faz os dois modos concordarem
- * por construção, e o reparo passa a ser idempotente de verdade.
+ * duplicado sobrevivia a quantas passadas se rodasse. Trocar o predicado por *o arquivo É o
+ * canônico* faz os dois modos concordarem por construção, e o reparo passa a ser idempotente de
+ * verdade. A prova está em `scripts/testar-corpus-revisao.mjs` § 2b, que exercita os estados —
+ * medição escrita aqui descreveria um código que este mesmo commit apagou, e ninguém a
+ * reproduziria a partir da árvore.
  */
-export const canonico = (txt, marcador) =>
-  semMarcador(txt).replace(/^(.*\n)/, `$1<!-- corpus=${marcador} -->\n`);
+export const canonico = (txt, marcador) => {
+  const limpo = semMarcador(txt);
+  // ⚠️ Fatiar pelo primeiro `\n`, e NÃO `replace(/^(.*\n)/, …)`. Aquele regex exige que exista
+  // uma primeira linha TERMINADA em `\n`; num arquivo vazio, de uma linha só, ou cuja única linha
+  // é o próprio marcador sem quebra final, ele não casa e a função devolvia o texto **sem
+  // marcador nenhum** — um no-op silencioso, que é a forma exata do defeito que este predicado
+  // existe para eliminar. Os efeitos eram os dois piores possíveis: a escrita via
+  // `txt === canonico(txt)`, não punha o arquivo em `divergentes`, e imprimia `ok` com rc=0 sem
+  // ter gravado nada, enquanto o `--conferir` seguinte estourava — os modos discordando de novo;
+  // e o arquivo cujo conteúdo era só o marcador sem `\n` saía **vazio**, sobrescrito com rc=0.
+  // Achado de lente. A fatia abaixo sempre emite exatamente um marcador, para qualquer entrada.
+  const q = limpo.indexOf('\n');
+  const cabecalho = q === -1 ? limpo : limpo.slice(0, q);
+  const resto = q === -1 ? '' : limpo.slice(q + 1);
+  return `${cabecalho}\n<!-- corpus=${marcador} -->\n${resto}`;
+};
 
 export function conferir(raizRepo = raiz) {
   const { marcador, textos } = calcular(raizRepo, true);
