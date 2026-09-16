@@ -420,7 +420,18 @@ rodar('guard da rede do processo', 'scripts/guard-processo.mjs', {});
 // `processo-integro` VERMELHO, e o `guard-processo.mjs` acima não pega — ele confere que os
 // arquivos existem, não que o marcador fecha. Sem esta linha, o preflight aprovava um PR cujo
 // CI já estava condenado, que é o oposto do que ele existe para fazer.
-rodar('bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', {});
+if (!MODO_DECLARADO) rodar('bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', {});
+// ⚠️ NENHUMA bateria roda em `--declarado`, e isso é sobre TEMPO DE CI, não sobre rigor. O modo
+// declarado é entrada sintética: `scripts/testar-preflight-pr.sh` o usa para exercitar o PARSING
+// deste script, dezenas de vezes, e ainda repete a suíte inteira numa worktree hermética. Como as
+// baterias leem a ÁRVORE — que a fixture não muda —, cada repetição refazia trabalho idêntico.
+// Medido: das 1871 ms de uma invocação, 1625 ms (87%) eram as quatro baterias; multiplicado pelas
+// invocações da suíte, o passo passava de ~1 min para ~3 min contra um `timeout-minutes: 5` do job.
+// Achado P2 do App do Codex, e nenhuma das lentes o viu — elas leram correção, não custo.
+//
+// Isto não abre buraco: `--declarado` nunca é usado por contribuinte real, só pela própria bateria,
+// e o CI roda as cinco como passos independentes do `processo-integro` de qualquer jeito.
+
 // ⚠️ TRÊS baterias deste job precisam de `jq`, e a lista está declarada de uma vez só — não uma
 // guarda por bateria. A primeira versão gateava só as duas `.sh` que uma lente apontou, e a
 // mutação que escondeu o `jq` do PATH expôs a terceira na hora: a da **colheita**, que extrai do
@@ -440,7 +451,9 @@ const temJq = (() => {
   try { execFileSync('bash', ['-c', 'command -v jq'], { stdio: 'ignore' }); return true; }
   catch { return false; }
 })();
-if (temJq) {
+if (MODO_DECLARADO) {
+  // ver a nota acima: em modo declarado as baterias não rodam
+} else if (temJq) {
   for (const [rotulo, script] of COM_JQ) rodar(rotulo, script, {});
 } else {
   avisos.push(
