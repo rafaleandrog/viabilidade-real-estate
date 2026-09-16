@@ -75,8 +75,9 @@ fi
 CODEX_PRONTO=0
 # `auth.json` cobre a sessão de ChatGPT já feita, que vale sem a variável — era um ramo do
 # bloco anterior e voltaria a sumir se a prontidão olhasse só o ambiente.
-# `${HOME:-}` pelo mesmo motivo do outro hook: sob `set -u`, HOME ausente mataria o
-# script, e este aqui tem contrato de NUNCA falhar.
+# HOME testado antes de expandido, pelo mesmo motivo do outro hook: sob `set -u`, um
+# `$HOME` ausente mataria o script, e este aqui tem contrato de NUNCA falhar. O
+# curto-circuito também evita cair em `/.codex/auth.json`, que o CLI não leria.
 if [ -n "${OPENAI_API_KEY:-}" ] || { [ -n "${HOME:-}" ] && [ -s "$HOME/.codex/auth.json" ]; }; then CODEX_PRONTO=1; fi
 KIMI_PRONTO=0
 if [ -n "${MOONSHOT_API_KEY:-}" ]; then KIMI_PRONTO=1; fi

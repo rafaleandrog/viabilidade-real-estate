@@ -44,9 +44,12 @@ MOTOR="nativo"
 # `auth.json` entra aqui pelo mesmo motivo que entra no outro hook: sessão de ChatGPT já
 # feita vale sem a variável. Sem ela, os dois hooks discordariam do motor no mesmo ambiente,
 # e o comentário acima ("mesmo critério") seria falso — a classe que este bloco combate.
-# `${HOME:-}` e não `$HOME`: este hook roda sob `set -u`, e um HOME ausente mataria o
-# script com "unbound variable" — que aqui não é um aviso a menos, é rc≠0 no
-# UserPromptSubmit, e rc≠0 ali TRAVA o prompt do usuário (ver o cabeçalho).
+# HOME é testado ANTES de ser expandido, e a ordem é o que importa: este hook roda sob
+# `set -u`, onde um `$HOME` ausente mata o script com "unbound variable" — que aqui não é
+# um aviso a menos, é rc≠0 no UserPromptSubmit, e rc≠0 ali TRAVA o prompt do usuário (ver
+# o cabeçalho). O `[ -n "${HOME:-}" ] &&` protege a expansão pelo curto-circuito, e de
+# quebra impede o caminho `/.codex/auth.json` na raiz — que o CLI do Codex nunca leria,
+# já que ele também localiza a sessão por $HOME.
 if [ -n "${OPENAI_API_KEY:-}" ] || { [ -n "${HOME:-}" ] && [ -s "$HOME/.codex/auth.json" ]; }; then
   [ "$MOTOR" = "kimi" ] && MOTOR="codex+kimi" || MOTOR="codex"
 fi
