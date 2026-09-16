@@ -348,23 +348,29 @@ despachar:
   novo **não** tem `node_modules` (ele não é compartilhado): ou instale na árvore, ou use a árvore
   da sessão com a branch do PR checada. Instalar é preferível — a versão do SDK que o lockfile do PR
   resolve é parte do que se está revisando.
-- **Sem o bundle — que é o caso normal deste repositório** — não despache lente de contrato nenhuma.
+- **Sem o bundle** — hoje a **exceção**, não a regra — não despache lente de contrato nenhuma.
   Elas entram no relatório como **não executadas, com o motivo**, e o resumo curto da §7 diz isso em
   uma linha. **Não substitua por cópia de `docs/shell/` nem por memória.**
+  **ADAPTADO:** este item dizia *"o caso normal deste repositório"*, e isso deixou de valer — o
+  `validar-frontend.sh` põe o bundle no disco e o pin `57.0.0` traz `docs/`. O caso sem bundle é
+  o da árvore que nunca rodou o validador.
 
 > **ADAPTADO — o bloco `.docs-shell` do upstream foi removido.** Ele mandava copiar
 > `docs/shell/*.md` do monorepo para dentro da árvore quando a app fosse *bundled*. Esta app nunca é
 > bundled, e copiar doc do monorepo para dentro desta árvore é exatamente o que a proibição do
 > `CLAUDE.md` veda. Não recrie o bloco.
 
-> ⚠️ **E o risco que a ausência PARCIAL cria: a linha "contratos não executados" vira papel de
-> parede.** Enquanto o pin do SDK for uma versão sem `docs/`, ela continua aparecendo em toda
-> revisão — e o que aparece sempre para de ser lido, até "revisão limpa" passar a ser lido como
-> "contratos conferidos", que é falso. Duas defesas, use as duas: `contratos=nao-executados` no
-> comentário de máquina da §7 (greppável, contável), e o relatório dizendo **o que exatamente ficou
-> descoberto e o que NÃO ficou** — hoje props de primitivo `urbi-*` **rodam**; verbos do SDK e
-> obsolescências, não; a aderência de `shell_min` ao que a instância roda continua sendo pergunta ao
-> autor.
+> ⚠️ **O risco que a ausência cria: a linha "contratos não executados" vira papel de parede.**
+> Enquanto ela aparecer em toda revisão, para de ser lida, até "revisão limpa" passar a ser lido
+> como "contratos conferidos", que é falso. Duas defesas, use as duas: `contratos=nao-executados`
+> no comentário de máquina da §7 (greppável, contável), e o relatório dizendo **o que exatamente
+> ficou descoberto e o que NÃO ficou**.
+>
+> **ADAPTADO — este parágrafo descrevia uma ausência PARCIAL que acabou.** Ele dizia *"enquanto o
+> pin do SDK for uma versão sem `docs/`"* e listava verbos do SDK e obsolescências como
+> descobertos. Com o pin `57.0.0` as duas lentes rodam, e a única pergunta que continua sendo do
+> autor é a aderência de `shell_min` ao que a instância de fato roda — essa nenhum bundle
+> responde.
 >
 > **`contratos=ok` só quando a lente de doc de fato rodar.** Publicá-lo porque "o SDK está no disco"
 > é afirmação plausível e falsa — a classe que o `CLAUDE.md` registra como armadilha 11.

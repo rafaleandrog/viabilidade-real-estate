@@ -33,8 +33,14 @@ fi
 # Prontidão dos DOIS motores externos (.claude/motor-revisao.md). Medir só o Codex fazia esta
 # linha dizer `motor=nativo` num ambiente com o Kimi instalado e funcionando — e ela é reinjetada
 # a cada prompt, então o fato errado é o que sobrevive à compactação.
+#
+# O predicado é a CHAVE, igual para os dois: o preflight de cada motor instala o próprio CLI.
+# Mesmo critério de `preparar-sessao.sh`, e pelo mesmo motivo escrito lá.
+#
+# `codex+kimi` é informativo e NUNCA é o valor da linha de máquina da atestação — aquela aceita
+# um valor só, minúsculo (`grep -o 'motor=[a-z]*'`), e um composto seria truncado em silêncio.
 MOTOR="nativo"
-[ -n "${MOONSHOT_API_KEY:-}" ] && command -v kimi >/dev/null 2>&1 && MOTOR="kimi"
+[ -n "${MOONSHOT_API_KEY:-}" ] && MOTOR="kimi"
 [ -n "${OPENAI_API_KEY:-}" ] && { [ "$MOTOR" = "kimi" ] && MOTOR="codex+kimi" || MOTOR="codex"; }
 
 echo "[processo] branch=$BRANCH · $ESTADO · $REMOTO · motor=$MOTOR"

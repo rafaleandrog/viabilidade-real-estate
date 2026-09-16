@@ -753,11 +753,13 @@ Com as duas lentes executáveis, a atestação **pode** sair `contratos=ok` — 
 fato rodarem naquela revisão. Publicá-lo porque "o SDK está no disco" continua sendo afirmação
 plausível e falsa, a classe da armadilha 11; o relatório diz sempre **o que** rodou.
 
-> ⚠️ **A causa não é mais o 401, e confundir as duas custa a próxima sessão.** Este parágrafo dizia
-> que a camada não rodava *"e isso é estrutural"*, atribuindo tudo ao SDK ser privado. Com a auth em
-> pé (§ Validação), a causa restante é **a versão fixada**: o `npm view` mostra que versões
-> publicadas mais novas **trazem** `docs/`. Subir o pin é mudança de `package.json`, ou seja de
-> produto — escopo próprio, e o caminho para fechar a outra metade.
+> ⚠️ **Esta nota descrevia duas causas que já morreram, uma depois da outra.** Primeiro ela dizia
+> que a camada não rodava *"e isso é estrutural"*, atribuindo tudo ao SDK ser privado — caiu em
+> 2026-09-03, quando a auth entrou em pé (§ Validação). Depois passou a dizer que a causa restante
+> era **a versão fixada**, e que subir o pin seria "o caminho para fechar a outra metade" — isso
+> caiu em 2026-09-04, quando o pin subiu para `57.0.0`. **Não há metade aberta nem causa
+> restante**: as duas lentes de contrato são executáveis. O que sobra é a disciplina de só publicar
+> `contratos=ok` quando as duas tiverem rodado de fato.
 
 **Cópia, não link vivo.** Mudou no monorepo, alguém porta para cá à mão — nada sincroniza sozinho.
 As adaptações deste repo estão marcadas `ADAPTADO` nos dois arquivos, **com o motivo ao lado**. Não
@@ -792,7 +794,7 @@ caminho não casar:
 > exatamente por que o hook cobre o mesmo caso.
 
 As baterias `scripts/testar-guarda-monorepo.sh` (57 casos) e
-`scripts/testar-revisao-registrada.sh` (9 casos), as duas no CI, cobrem os dois sentidos: falso
+`scripts/testar-revisao-registrada.sh` (12 casos), as duas no CI, cobrem os dois sentidos: falso
 negativo deixa a escrita passar; **falso positivo atrapalha trabalho legítimo, alguém desliga o
 hook, e aí ele não guarda mais nada.**
 
@@ -834,10 +836,12 @@ Consequências que valem em toda sessão com token:
 
 - **`bash scripts/validar-backend.sh` roda inteiro** — as 5 etapas, incluindo o typecheck do backend
   e o `schema.json` contra o contrato do SDK. *"Não deu para rodar"* deixa de ser desculpa aqui.
-- **A camada de contratos roda pela METADE.** A lente de props de primitivo `urbi-*` passa a ser
-  executável (`dist/index.d.ts`), **e a de doc do SDK também** desde 2026-09-04, quando o pin subiu
-  para `57.0.0` — o bundle passou a trazer `docs/` e `obsolescencias.json`. A atestação pode sair
-  **`contratos=ok`** quando as duas de fato rodarem. Detalhe em § *A revisão em si*.
+- **A camada de contratos roda INTEIRA.** As duas lentes são executáveis: props de primitivo
+  `urbi-*` (`dist/index.d.ts`) e doc do SDK (`docs/` + `obsolescencias.json`), desde 2026-09-04,
+  quando o pin subiu para `57.0.0`. A atestação pode sair **`contratos=ok`** quando as duas de
+  fato rodarem — executável não é o mesmo que executada. Detalhe em § *A revisão em si*.
+  > ⚠️ Este item dizia "roda pela METADE" e já se contradizia na frase seguinte, que anunciava a
+  > segunda lente como executável. O título é que tinha ficado para trás do próprio texto.
 - **`node_modules/@urbiverso/sdk/dist/index.d.ts` está no disco** — a fonte canônica de props de
   primitivo `urbi-*` volta a existir, e ler o monorepo para compensar deixa de ter desculpa.
 

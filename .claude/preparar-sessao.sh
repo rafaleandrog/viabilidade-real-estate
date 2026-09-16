@@ -65,18 +65,27 @@ fi
 # Aqui a medição é barata e de PRONTIDÃO (binário + chave), não de turno completo: o smoke
 # test de verdade (`kimi -p`) leva ~10s e mora no preflight da revisão, não num hook que roda
 # na abertura de toda sessão.
+#
+# ⚠️ A prontidão é medida pela CHAVE, não pelo binário, e para os DOIS motores igual. O
+# preflight de cada um instala o próprio CLI (`npm i -g @openai/codex` / `@moonshot-ai/kimi-code`),
+# então binário ausente não é motor ausente. Exigir o binário só de um dos dois — que foi a
+# primeira versão deste bloco — reproduz o defeito que ele existe para consertar: ambiente com
+# MOONSHOT_API_KEY e sem o CLI seria reportado NATIVO, e o autor mandado pôr uma chave que já
+# está lá. Achado de três lentes independentes na revisão do PR que trouxe este bloco.
 CODEX_PRONTO=0
-if [ -n "${OPENAI_API_KEY:-}" ]; then CODEX_PRONTO=1; fi     # o CLI o preflight instala sozinho
+# `auth.json` cobre a sessão de ChatGPT já feita, que vale sem a variável — era um ramo do
+# bloco anterior e voltaria a sumir se a prontidão olhasse só o ambiente.
+if [ -n "${OPENAI_API_KEY:-}" ] || [ -s "$HOME/.codex/auth.json" ]; then CODEX_PRONTO=1; fi
 KIMI_PRONTO=0
-if [ -n "${MOONSHOT_API_KEY:-}" ] && command -v kimi >/dev/null 2>&1; then KIMI_PRONTO=1; fi
+if [ -n "${MOONSHOT_API_KEY:-}" ]; then KIMI_PRONTO=1; fi
 
 if [ "$CODEX_PRONTO" = 1 ] && [ "$KIMI_PRONTO" = 1 ]; then
   echo '[processo] motor de revisão: CODEX+KIMI (os dois prontos; o smoke test de cada um é no preflight)'
 elif [ "$KIMI_PRONTO" = 1 ]; then
-  echo '[processo] motor de revisão: KIMI (Codex sem OPENAI_API_KEY no ambiente)'
+  echo '[processo] motor de revisão: KIMI (Codex sem OPENAI_API_KEY nem sessão em ~/.codex)'
   echo '[processo]     → a fan-out roda pela coluna Kimi da tabela de tier; atestação sai motor=kimi.'
 elif [ "$CODEX_PRONTO" = 1 ]; then
-  echo '[processo] motor de revisão: CODEX (Kimi sem MOONSHOT_API_KEY ou sem o CLI no PATH)'
+  echo '[processo] motor de revisão: CODEX (Kimi sem MOONSHOT_API_KEY no ambiente)'
 else
   echo '[processo] motor de revisão: NATIVO (nenhum motor externo pronto)'
   echo '[processo]     → o autor põe OPENAI_API_KEY e/ou MOONSHOT_API_KEY nas variáveis do ambiente.'

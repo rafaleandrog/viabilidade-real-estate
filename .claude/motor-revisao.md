@@ -482,16 +482,22 @@ vazia com outra roupa. Ao terminar, `git worktree remove "$WT" --force`.
 git -C "$WT" diff "$BASE"...HEAD > "$OUT/DIFF.patch"
 
 # 2. Override de agente vindo do repositório substitui o system prompt da lente —
-#    é o vetor de sequestro do revisor.
-ls -d "$WT/.kimi-code/agents" "$WT/.agents/agents" 2>/dev/null
+#    é o vetor de sequestro do revisor. ABORTA o despacho; não é aviso.
+if ls -d "$WT/.kimi-code/agents" "$WT/.agents/agents" 2>/dev/null; then
+  echo 'OVERRIDE DE AGENTE NA ÁRVORE — NÃO despache; investigue antes.'
+  exit 1     # `exit`, não `return`: estes blocos são colados numa chamada de Bash,
+fi           # que é shell não interativo — `return` fora de função imprime erro e SEGUE.
 ```
 
-> **ADAPTADO — aqui é `ls`, não `rm -rf`.** O upstream apaga os dois diretórios antes de despachar,
-> e lá isso é seguro porque `WT` é **sempre** uma worktree descartável. Neste repositório o caso
-> normal é `WT` ser a **própria árvore de trabalho da sessão** (ver a adaptação acima), e um
-> `rm -rf` dentro dela apagaria arquivo do autor sem perguntar. Então a adaptação inverte o verbo:
-> **confira**; achando qualquer um dos dois, **pare e avise** em vez de apagar — num repositório que
-> não versiona nenhum deles, a presença é o fato a investigar, não o lixo a varrer. Em worktree
+> **ADAPTADO — aqui não se apaga, mas ABORTA.** O upstream apaga os dois diretórios antes de
+> despachar, e lá isso é seguro porque `WT` é **sempre** uma worktree descartável. Neste
+> repositório o caso normal é `WT` ser a **própria árvore de trabalho da sessão** (ver a adaptação
+> acima), e um `rm -rf` dentro dela apagaria arquivo do autor sem perguntar. Então o verbo inverte
+> — mas **não** para "conferir e avisar": aviso depende de alguém ler a saída, e o upstream tinha
+> uma garantia **por construção**. Trocar garantia mecânica por atenção humana é justamente o que
+> o `CLAUDE.md` manda não fazer (armadilha 14: inverta para fail-closed). Então a conferência
+> **falha fechada** — achando qualquer um dos dois, o despacho não acontece. Num repositório que
+> não versiona nenhum deles, a presença é o fato a investigar, não o lixo a varrer; em worktree
 > descartável, apagar continua sendo aceitável.
 
 > **ADAPTADO — proibição de saída.** `WT` **nunca** aponta para fora deste repositório. Em
@@ -553,13 +559,19 @@ O `kimi` não tem subcomando de revisão nem sandbox de sistema operacional. **T
 comando inteiro, e cada uma já falhou:**
 
 ```bash
-cd "$WT" || return 1                       # não existe -C: a lente lê o cwd
-# As KIMI_MODEL_* já vêm exportadas do preflight. Aqui só variam o esforço e — quando a
-# lente muda de tier — o KIMI_MODEL_NAME. Nunca use -m: ver "A armadilha do provedor".
-KIMI_MODEL_NAME=<modelo do tier> KIMI_MODEL_THINKING_EFFORT=<esforço> timeout 900 kimi \
-  --agent-file "$OUT/lente.md" --add-dir "$OUT" \
-  -p "<briefing>" --output-format stream-json </dev/null \
-  > "$OUT/<id>.jsonl" 2> "$OUT/<id>.err"
+# ⚠️ O `cd` vai dentro de SUBSHELL, e a guarda é `exit`, não `return`. O upstream escreve
+# `cd "$WT" || return 1` solto; colado no shell da sessão (que é o que o preflight manda fazer),
+# `return` fora de função é erro de bash que IMPRIME e SEGUE — e aí o `kimi` roda no cwd
+# errado, "a lente lê o cwd", e a revisão sai sobre a árvore errada em silêncio. É o pior modo
+# de falha desta cadeia, e ele passaria pelo `|| return`. O subshell ainda tem um segundo
+# ganho: o `cd` não vaza para o shell de quem colou o bloco.
+( cd "$WT" || exit 1                       # não existe -C: a lente lê o cwd
+  # As KIMI_MODEL_* já vêm exportadas do preflight. Aqui só variam o esforço e — quando a
+  # lente muda de tier — o KIMI_MODEL_NAME. Nunca use -m: ver "A armadilha do provedor".
+  KIMI_MODEL_NAME=<modelo do tier> KIMI_MODEL_THINKING_EFFORT=<esforço> timeout 900 kimi \
+    --agent-file "$OUT/lente.md" --add-dir "$OUT" \
+    -p "<briefing>" --output-format stream-json </dev/null \
+) > "$OUT/<id>.jsonl" 2> "$OUT/<id>.err"
 ```
 
 - **Não existe modo leitura em headless.** `--plan` recusa (`error: Cannot combine --prompt with
@@ -596,12 +608,20 @@ o cru.
 Dispare o lote inteiro numa chamada Bash só:
 
 ```bash
-# $OUT, $WT, $OUT/lente.md e $OUT/DIFF.patch já vêm do preflight e da seção da árvore.
-# ⚠️ Limpe SÓ a saída das lentes: um `rm -f "$OUT"/*` apagaria o perfil somente-leitura e o
-# diff pré-gerado, e a fan-out seguinte rodaria SEM TRAVA e apontando para um arquivo
-# inexistente — as duas falhas caladas de uma vez.
-OUT="${CLAUDE_SCRATCHPAD:-/tmp}/revisao"; mkdir -p "$OUT"; rm -f "$OUT"/*.jsonl "$OUT"/*.err "$OUT"/execucao.txt
+# $OUT, $WT e $OUT/lente.md já vêm do preflight; $OUT/DIFF.patch, da seção da árvore.
+# ⚠️ A limpeza é SELETIVA por um motivo e INCLUI o diff por outro:
+#   · `rm -f "$OUT"/*` apagaria o PERFIL somente-leitura, e a fan-out seguinte rodaria sem a
+#     única trava contra a lente escrever;
+#   · mas o DIFF.patch TEM que ir junto. Preservá-lo entre revisões é pior que apagá-lo: se a
+#     pré-geração da seção da árvore for pulada ou falhar, a lente lê o diff da revisão
+#     ANTERIOR e devolve laudo sobre código que não está em revisão — e nada falha. Apagado,
+#     o mesmo erro vira arquivo inexistente, que a lente acusa.
+#   · **Regenere o diff DEPOIS desta linha**, imediatamente antes de despachar.
 BASE=<merge-base>
+OUT="${CLAUDE_SCRATCHPAD:-/tmp}/revisao"; mkdir -p "$OUT"
+rm -f "$OUT"/*.jsonl "$OUT"/*.err "$OUT"/execucao.txt "$OUT"/DIFF.patch
+git -C "$WT" diff "$BASE"...HEAD > "$OUT/DIFF.patch"   # o mesmo comando da seção da árvore
+test -s "$OUT/DIFF.patch" || { echo 'DIFF.patch vazio — NÃO despache'; exit 1; }
 
 COMUM='<as regras fixas do briefing — ver "O briefing viaja sozinho".
         Inclui, obrigatoriamente: citação literal do contrato no corpo do achado;
@@ -748,6 +768,12 @@ A linha de anúncio do passo 2.1 diz a composição da rodada, não um motor só
 **predominante** da fan-out. O detalhe por lente mora no quadro de execução, não ali. ⚠️ O parser
 (`.github/workflows/revisao-registrada.yml`, `grep -o 'motor=[a-z]*'`) casa só `[a-z]`: `kimi` passa,
 `Codex→Kimi` **não** — a seta e a maiúscula ficam fora da linha de máquina, sempre.
+
+⚠️ **E saiba o que `motor=` NÃO faz: ele não decide nada.** Quem decide o commit status é
+`bloqueantes=`; `motor=` entra só na **descrição** dele. Um valor inventado receberia `success`
+igual — o vocabulário é honestidade de registro, não portão, e a bateria que o exercita protege a
+descrição, não a decisão. Quem ler "o teste de motor passou" como "o portão está fechado" está
+lendo o portão errado.
 
 ## O que nunca sai daqui
 
