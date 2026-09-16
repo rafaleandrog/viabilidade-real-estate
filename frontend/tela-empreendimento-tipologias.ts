@@ -117,10 +117,17 @@ export class ViabEmpreendimentoTipologias extends LitElement {
     col.c-nome   { width: 150px; }
     col.c-tipo   { width: 160px; }
     col.c-area   { width: 16ch; font-size: var(--texto-corpo, 0.8125rem); }    /* 6 dígitos + milhar + decimais + sufixo "m²" */
-    col.c-dorm   { width: 7ch; font-size: var(--texto-corpo, 0.8125rem); }     /* 2 dígitos */
+    /* #741: "Dormitórios" (11 caracteres) quebrava em duas linhas ruins
+       ("Dormitóri"/"os") porque a coluna era dimensionada só pelo CONTEÚDO
+       numérico (2 dígitos), sem espaço para o próprio rótulo do cabeçalho —
+       pedido do autor para alargar um pouco a coluna. Os 3ch a mais saem de
+       c-areatot, que já era dimensionada com folga deliberada ("tende a
+       ser maior") e não usa viab-num (é texto simples, sem o overhead de
+       input+borda das outras colunas numéricas). */
+    col.c-dorm   { width: 10ch; font-size: var(--texto-corpo, 0.8125rem); }    /* 2 dígitos + rótulo "Dormitórios" no cabeçalho */
     col.c-vagas  { width: 7ch; font-size: var(--texto-corpo, 0.8125rem); }     /* 2 dígitos */
     col.c-un     { width: 8ch; font-size: var(--texto-corpo, 0.8125rem); }     /* 4 dígitos (5 com separador de milhar em ≥1000) */
-    col.c-areatot { width: 17ch; font-size: var(--texto-corpo, 0.8125rem); }   /* área privativa × unidades — tende a ser maior */
+    col.c-areatot { width: 14ch; font-size: var(--texto-corpo, 0.8125rem); }   /* área privativa × unidades — tende a ser maior */
     col.c-acao   { width: 90px; }
 
     table.tip td.nome urbi-input { width: 100%; }
