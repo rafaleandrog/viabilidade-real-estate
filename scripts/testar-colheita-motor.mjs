@@ -202,6 +202,24 @@ const CASOS = [
     contem: 'ACHADO: P2',
   },
   {
+    id: 'kimi_preliminar',
+    motor: 'kimi',
+    exit: 0,
+    // Observado em colheita real: a lente escreve mensagens preliminares ("agora vou
+    // conferir X") ANTES da resposta. A regra do doc é "a última mensagem de assistente
+    // com conteúdo"; um `select` sem `last` emite todas e o `tail -c` trunca a
+    // concatenação — o preliminar entra no relatório como se fosse achado.
+    jsonl: [
+      '{"role":"assistant","content":"Agora vou conferir o contexto do repositorio:"}',
+      '{"role":"assistant","content":null,"tool_calls":[{"name":"Read"}]}',
+      '{"role":"assistant","content":"VEREDITO: sem-achado\\nRESPOSTA_FINAL_UNICA"}',
+    ],
+    err: '',
+    esperaColhido: true,
+    contem: 'RESPOSTA_FINAL_UNICA',
+    naoContem: 'Agora vou conferir',
+  },
+  {
     id: 'kimi_exit0_sem_content',
     motor: 'kimi',
     exit: 0,
@@ -327,6 +345,10 @@ try {
       continue;
     }
     if (!f.includes(c.contem)) { falha(c.id, `a saída não contém ${JSON.stringify(c.contem)}`); continue; }
+    if (c.naoContem && f.includes(c.naoContem)) {
+      falha(c.id, `a saída contém ${JSON.stringify(c.naoContem)} — o texto preliminar vazou para o relatório`);
+      continue;
+    }
     ok(`${c.id} → ${c.esperaColhido ? 'colhido' : 'não executada'} (${c.contem})`);
   }
 

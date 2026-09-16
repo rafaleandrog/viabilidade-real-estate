@@ -351,7 +351,10 @@ command -v kimi >/dev/null 2>&1 || npm i -g @moonshot-ai/kimi-code@0.38.0 >/dev/
 # opcionais — mas PROVIDER_TYPE, se você escrever, tem que ser exatamente `kimi`
 # (nem `kimi-code`, nem `moonshot` — ver "A armadilha do provedor" abaixo).
 export KIMI_MODEL_NAME=kimi-k3
-export KIMI_MODEL_API_KEY="$MOONSHOT_API_KEY"
+# `${MOONSHOT_API_KEY:-}`: sem a guarda, um ambiente sem a chave mata o shell aqui — sob
+# `set -u`, que é a convenção destes blocos — e a revisão aborta ANTES de chegar à tabela
+# de decisão, em vez de registrar "Kimi indisponível" e seguir só com o Codex ou o nativo.
+export KIMI_MODEL_API_KEY="${MOONSHOT_API_KEY:-}"
 export KIMI_MODEL_PROVIDER_TYPE=kimi
 export KIMI_MODEL_BASE_URL=https://api.moonshot.ai/v1
 export KIMI_CODE_NO_AUTO_UPDATE=1 KIMI_DISABLE_TELEMETRY=1
@@ -791,7 +794,13 @@ for id in $LENTES; do
     printf '%s' "$texto" | grep -qi 'Review was interrupted' && falha=interrompida
   else
     falha=""
-    texto=$(jq -r 'select(.role=="assistant" and .content != null and .content != "") | .content' "$f" 2>/dev/null | tail -c 8000)
+    # `-s … | last`: a resposta é a ÚLTIMA mensagem de assistente com conteúdo, e o `select`
+    # sozinho emite TODAS — inclusive as preliminares ("agora vou conferir X") que a lente
+    # escreve antes de responder. Um `tail -c` depois disso trunca a CONCATENAÇÃO, que não é
+    # a mesma coisa: o texto preliminar entra no relatório e, passando de 8 KB, desloca o fim
+    # da resposta de verdade. Medido numa colheita real: as duas primeiras linhas eram
+    # preliminares da lente.
+    texto=$(jq -rs '[.[] | select(.role=="assistant" and .content != null and .content != "")] | last | .content // empty' "$f" 2>/dev/null | tail -c 8000)
   fi
   if [ -n "$falha" ] || [ "${rc:-1}" != "0" ] || [ -z "$texto" ]; then
     echo "### $id — NÃO EXECUTADA (motor $motor · ${falha:-exit=${rc:-?}, saída vazia})"
