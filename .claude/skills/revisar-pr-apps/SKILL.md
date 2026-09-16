@@ -661,6 +661,22 @@ Estrutura do comentário:
   | contratos · permissoes | Kimi | `kimi-k3` | max | 3m02s | 1 achado |
   | S3 · UI | Codex→Kimi | `kimi-k3` | high | — | **não executada** (timeout) |
 
+  **Lente que voltou sem `CORPUS:`, ou com marcador divergente do vigente, aparece com essa
+  nota.** Não invalida o achado dela — invalida a garantia de que ela não está repetindo algo já
+  derrubado, e isso quem lê precisa saber. O marcador a comparar é o que está **dentro da cópia
+  que a lente leu** — `sed -n 's/.*corpus=\([^ ]*\).*/\1/p' "$OUT/corpus/aprendizados.md"`.
+
+  > ⚠️ Sem o prefixo `corpus=`. Um `grep -o 'corpus=…'` devolve `corpus=v13-…`, e a lente declara
+  > `v13-…` — comparar literalmente marcaria como divergente até a lente que leu a cópia certa.
+  > Achado do App do Codex.
+
+  > ⚠️ **Não é `node scripts/carimbar-corpus-revisao.mjs --conferir`.** Aquele roda na árvore
+  > checada e calcula o marcador do **head**; as lentes leem a cópia da **base**, e num PR que
+  > edita o corpo os dois diferem por construção. Comparando com o do head, toda lente daquele PR
+  > apareceria "com marcador divergente" e este quadro declararia ter perdido a garantia do corpo
+  > justamente onde ele mudou. A regra está em `.claude/motor-revisao.md`, § *O briefing viaja
+  > sozinho* — e esta linha já apontou para o comando errado, contradizendo o motor no mesmo PR.
+
   A coluna *Motor* usa o vocabulário do § *Como o relatório declara o motor* do
   `.claude/motor-revisao.md`: `Codex`/`Kimi` quando rodou no default daquela linha da tabela de
   tier, `Codex→Kimi`/`Kimi→Codex` quando o default caiu e o cruzado entregou, `nativo` quando os
@@ -845,6 +861,31 @@ Quando alguém contesta um achado com evidência — comentário no PR, ou a pr�
 consertar —, **abra o arquivo e confira**. Achado seu que morre na contestação é desfecho
 certo: registre "**achado retirado**", com o motivo, no relatório da rodada, e ele sai da
 conta de bloqueantes pendentes. Insistir num achado já derrubado queima rodada.
+
+> **E o registro não para no relatório: ele vai para `.claude/revisao/retirados.md`.** O relatório
+> fica no PR e morre com ele; a próxima revisão levantaria o mesmo falso positivo e pagaria o mesmo
+> ciclo de verificação. O arquivo é o que o briefing manda toda lente ler antes de escrever achado —
+> é ali que a retirada vira conhecimento acumulado em vez de anedota.
+>
+> ⚠️ **Mas NÃO no mesmo PR, quando o PR é de produto.** `.claude/**` é processo, e
+> `guard-pr-escopo-processo.mjs` reprova o PR que misture processo com `frontend/`, `backend/`,
+> migração ou manifesto — é a regra **R1**. Seguir o registro "na mesma alteração" faria o job
+> `escopo-processo` ficar vermelho e **travaria o próprio ciclo** que a retirada estava fechando.
+> Achado do App do Codex no PR que criou este passo.
+>
+> Então: **PR de processo → registre no mesmo PR**, que é o caso natural. **PR de produto → abra um
+> PR de processo à parte, na mesma sessão**, e nomeie-o no relatório da rodada. "Na mesma sessão" é
+> o que substitui "na mesma alteração": o que fica para outro dia é o que não acontece.
+>
+> Quatro campos obrigatórios (afirmação, por que é falsa, evidência, data), e **re-carimbe o
+> marcador**: `node scripts/carimbar-corpus-revisao.mjs`. A bateria
+> `scripts/testar-corpus-revisao.mjs` reprova entrada incompleta e marcador desincronizado — e ela
+> roda no CI, então "registro depois" fica visível em vez de silencioso.
+>
+> Mesma regra para o outro sentido: rodada que descobre uma **classe** de defeito nova — não o
+> defeito, a classe, algo que uma lente futura consiga procurar — acrescenta a seção em
+> `.claude/revisao/aprendizados.md`. Lição de processo para humano continua no `CLAUDE.md`; o corpo
+> das lentes só carrega o que uma lente consegue **procurar**.
 
 ## 9. Conclusão do ciclo — e merge só se autorizado
 

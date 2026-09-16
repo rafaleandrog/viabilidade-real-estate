@@ -295,6 +295,17 @@ jobs:
             echo "::error title=Colheita do motor falhou::A colheita do .claude/motor-revisao.md não separa lente que caiu de lente que não achou nada. Veja quais fixturas falharam no log."
             exit 1
           fi
+      - name: Bateria do corpo de conhecimento das lentes
+        if: always()
+        run: |
+          set -uo pipefail
+          # O acúmulo de conhecimento entre revisões falha SEM SINTOMA: a lente que não recebeu
+          # o corpo revisa igual, devolve achados plausíveis, e a única diferença é que os
+          # falsos positivos já derrubados voltam. Não há teste vermelho — por isso este.
+          if ! node scripts/testar-corpus-revisao.mjs; then
+            echo "::error title=Corpo de conhecimento das lentes falhou::O corpo de .claude/revisao/ não está carimbado, não é citado pelo briefing, ou tem entrada incompleta. Veja o log."
+            exit 1
+          fi
 
   fiacao-funding:
     name: Consumidor de funding passa operacoesFunding ao horizonte

@@ -412,6 +412,11 @@ rodar('guard de escopo (regra R1)', 'scripts/guard-pr-escopo-processo.mjs', {
 rodar('guard de JSON estrito', 'scripts/guard-json.mjs', {});
 rodar('guard de ciclos no schema', 'scripts/guard-schema-ciclos.mjs', {});
 rodar('guard da rede do processo', 'scripts/guard-processo.mjs', {});
+// O corpo de conhecimento das lentes: editar um dos arquivos sem re-carimbar deixa o job
+// `processo-integro` VERMELHO, e o `guard-processo.mjs` acima não pega — ele confere que os
+// arquivos existem, não que o marcador fecha. Sem esta linha, o preflight aprovava um PR cujo
+// CI já estava condenado, que é o oposto do que ele existe para fazer.
+rodar('bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', {});
 
 // ── 5. Armadilhas de redação que nenhum guard pega ──────────────────────────
 // Não são bloqueantes: são avisos, porque cada um tem um uso legítimo raro.

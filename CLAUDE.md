@@ -349,9 +349,17 @@ numerada contra a `main` do momento, com a `versao` bumpada.
 4. **Escrever o corpo do PR num arquivo e rodar o preflight** — `node scripts/preflight-pr.mjs
    --corpo <arquivo.md> --titulo "<título do PR>"`. **O título é obrigatório**: o job `diff-vazio`
    do CI concatena título + corpo + commits, e sem ele um PR com `Closes #NNN` só no título e diff
-   vazio passa aqui e reprova lá. Ele roda, **antes** do PR existir, os guards que só leem corpo e diff:
-   fechamento de issue, escopo R1, diff vazio, JSON, ciclos de schema, regra da migração, mais as
-   armadilhas de árvore (branch `main`, upstream armado, árvore suja) que o CI já não pode pegar.
+   vazio passa aqui e reprova lá. Ele roda, **antes** do PR existir, tudo que um PR reprovaria
+   depois: os guards que leem corpo e diff (fechamento de issue, escopo R1, diff vazio, JSON,
+   ciclos de schema, regra da migração), as armadilhas de árvore (branch `main`, upstream armado,
+   árvore suja) que o CI já não pode pegar, e as baterias do job `processo-integro` que leem a
+   **árvore** — a rede do processo (`guard-processo.mjs`) e o corpo de conhecimento das lentes
+   (`testar-corpus-revisao.mjs`, que confere o marcador do corpo e a fiação do briefing).
+   > ⚠️ **Editou `.claude/revisao/*.md`? Rode `node scripts/carimbar-corpus-revisao.mjs`** antes do
+   > preflight. O marcador daqueles arquivos é derivado do conteúdo, e sem o re-carimbo a bateria
+   > acima reprova — corretamente, porque a lente declararia ter lido uma versão que não é a
+   > vigente. Esta linha existe porque o remédio estava só no cabeçalho dos próprios arquivos: quem
+   > editasse o corpo via o preflight vermelho e não tinha onde ler o comando. Achado de lente.
    Verde → **abra o PR passando esse mesmo arquivo**, sem reescrever o corpo na chamada do MCP;
    reescrever desfaz o que foi verificado.
 5. **Abrir o PR pelas ferramentas MCP do GitHub** (o `gh` não existe aqui — ver a nota de ambiente
