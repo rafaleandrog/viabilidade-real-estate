@@ -278,21 +278,34 @@ codex login status        # tem que dizer "Logged in using an API key"
   connect to websocket` e `Falling back from WebSockets to HTTPS transport` no stderr são
   normais; o que importa é o resultado.
 
-**Preflight falhou** — sem rede para o npm, sem `OPENAI_API_KEY`, `login status` negativo —
-→ **motor nativo** (seção final). Não pergunte, não pare, não repita o preflight lente a lente:
-decidiu uma vez, vale para a revisão inteira, e o motivo entra no anúncio do passo 2.1 e no
-quadro de execução da §7.
+**Preflight do Codex falhou** — sem rede para o npm, sem `OPENAI_API_KEY`, `login status`
+negativo — **registre o resultado DESTE motor e siga para o preflight do Kimi**. A escolha do
+motor não acontece aqui: ela é da tabela *O que cada resultado decide*, no fim desta seção, e
+depende do par.
 
-> **ADAPTADO — o estado medido deste repositório, em 2026-08-21.** `codex` estava **ausente** do
-> PATH e `OPENAI_API_KEY` estava **vazia**, então o preflight morre no passo 2 e a revisão inteira
-> roda no **motor nativo**. Isso é o **estado normal** até o autor colocar a chave nas variáveis do
-> *cloud environment* deste repo — não é incidente, não tente consertar caçando token. O passo 1
-> funciona: `npm view @openai/codex version` responde daqui, então o `npm i -g` instala o CLI
-> sozinho assim que houver chave para usá-lo.
+> ⚠️ **Este parágrafo dizia "→ motor nativo (seção final)", e seguir a frase ao pé da letra
+> pularia o preflight do Kimi inteiro** — que é exatamente o caso deste repositório, onde o Codex
+> falha e o Kimi sobe. Achado P2 do App do Codex na rodada 1 do PR que trouxe o segundo motor:
+> a instrução nova e a antiga se contradiziam, e a antiga vinha primeiro na leitura. Nativo só
+> entra quando os **dois** preflights falham.
+
+Não pergunte, não pare, não repita o preflight lente a lente: decidido o par, vale para a revisão
+inteira, e o motivo entra no anúncio do passo 2.1 e no quadro de execução da §7.
+
+> **ADAPTADO — o estado medido deste repositório.** `codex` está **ausente** do PATH e
+> `OPENAI_API_KEY` está **vazia**, então este preflight morre no passo 2. Isso é o **estado
+> normal** até o autor colocar a chave nas variáveis do *cloud environment* deste repo — não é
+> incidente, não tente consertar caçando token. O passo 1 funciona: `npm view @openai/codex
+> version` responde daqui, então o `npm i -g` instala o CLI sozinho assim que houver chave.
 >
-> Enquanto for nativo, o relatório da §7 diz isso **em uma linha explícita**, não só marcando
-> `motor=nativo`: revisão nativa de um patch escrito pela mesma família de modelo é **menos
-> adversarial**, e quem lê o laudo precisa saber que perdeu os olhos do outro provedor.
+> ⚠️ **Esta nota dizia "e a revisão inteira roda no motor nativo", e isso deixou de valer em
+> 2026-09-16**, quando o Kimi entrou como segundo motor externo: com o Codex fora e o Kimi de pé,
+> a fan-out roda em **Kimi**, não em nativo. Nativo é o fallback do fallback.
+>
+> Se um dia for **nativo** de verdade — os dois externos fora —, o relatório da §7 diz isso **em
+> uma linha explícita**, não só marcando `motor=nativo`: revisão nativa de um patch escrito pela
+> mesma família de modelo é **menos adversarial**, e quem lê o laudo precisa saber que perdeu os
+> olhos do outro provedor.
 >
 > ⚠️ Não confunda este 401 com o do `@urbiverso/sdk`. São dois: o do SDK é do GitHub Packages e
 > derruba a **camada de contratos**; este é a ausência de chave da OpenAI e derruba o **motor**. Um
@@ -676,13 +689,26 @@ O `execucao.txt` é o que alimenta o quadro de execução da §7 — tier, esfor
 **Turno que falha AINDA emite um `agent_message`** dizendo *"Review was interrupted. Please
 re-run /review and wait for it to complete."* Lido sem guarda, isso vira um relatório de zero
 achados — a falha vira `approve`. A colheita testa `turn.failed`/`error` **antes** de olhar a
-mensagem:
+mensagem.
+
+> ⚠️ **Os dois motores emitem formatos DIFERENTES, e a colheita tem que conhecer os dois.** O
+> Codex fecha em `{"type":"item.completed","item":{"type":"agent_message","text":…}}`; o Kimi, em
+> `{"role":"assistant","content":…}` — é a mesma forma que o smoke test do preflight já
+> exercita. Uma colheita que só conheça o formato do Codex devolve `texto` **vazio** para toda
+> lente Kimi, e o `[ -z "$texto" ]` logo abaixo as reporta como **NÃO EXECUTADA** — ou seja, num
+> ambiente em que a fan-out inteira roda em Kimi, a revisão volta sem achado nenhum e **parecendo
+> um problema de motor**. É o laudo limpo falso pela porta oposta à que esta seção existe para
+> fechar. Achado P1 do App do Codex na rodada 1 do PR que trouxe o Kimi para cá — e ele passou
+> pelas cinco lentes Kimi, que liam o próprio JSONL por outro caminho.
 
 ```bash
 for f in "$OUT"/*.jsonl; do
   id=$(basename "$f" .jsonl)
   falha=$(jq -rc 'select(.type=="turn.failed" or .type=="error") | .type' "$f" 2>/dev/null | head -1)
+  # Codex primeiro; vazio, tenta o formato do Kimi. Os dois filtros são seguros no arquivo do
+  # outro motor: cada `select` simplesmente não casa nada, então a ordem não esconde erro.
   texto=$(jq -r 'select(.type=="item.completed" and .item.type=="agent_message") | .item.text' "$f" 2>/dev/null | tail -c 8000)
+  [ -n "$texto" ] || texto=$(jq -rs '[.[] | select(.role=="assistant" and .content != null and .content != "")] | last | .content // empty' "$f" 2>/dev/null | tail -c 8000)
   if [ -n "$falha" ] || [ -z "$texto" ] || printf '%s' "$texto" | grep -qi 'Review was interrupted'; then
     echo "### $id — NÃO EXECUTADA (${falha:-saída vazia/interrompida})"
     # com `--json` o erro sai no próprio JSONL, não no stderr — o motivo vem daqui
