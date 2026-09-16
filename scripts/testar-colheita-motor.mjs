@@ -23,7 +23,7 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -76,6 +76,41 @@ for (const d of despachos) {
 
 // Única adaptação: o roster é DADO da revisão, não lógica. Trocado pelo das fixturas.
 const bloco = (roster) => blocoOriginal.replace(/^LENTES=.*$/m, `LENTES="${roster.join(' ')}"`);
+
+// ── A guarda de override de agente, extraída da seção da árvore ──────────────
+// Ela é a única trava contra o vetor de sequestro do revisor (um `agent.md` com
+// `override: true` no repositório revisado substitui o system prompt da lente), e
+// ela já falhou ABERTA: escrita como `if ls -d "$a" "$b"`, com só UM dos diretórios
+// existindo — o caso real de um PR hostil — o `ls` imprime o que achou e sai rc=2 por
+// causa do que faltou, então o `if` não entra no corpo e o despacho segue. Medido.
+// Os três casos abaixo cobrem os três estados, e o do meio é o que a forma antiga perdia.
+const secaoArvore = motor.indexOf('## A árvore que o motor lê');
+assert.notEqual(secaoArvore, -1, 'seção "A árvore que o motor lê" sumiu do motor');
+const marcaOv = motor.indexOf('OVERRIDE DE AGENTE NA ÁRVORE', secaoArvore);
+assert.notEqual(marcaOv, -1, 'a guarda de override de agente sumiu da seção da árvore');
+const abreOv = motor.lastIndexOf('```bash', marcaOv);
+const fechaOv = motor.indexOf('```', marcaOv);
+const blocoOv = motor.slice(abreOv + 7, fechaOv);
+// A prova é EXECUTAR, não casar regex: a forma antiga (`if ls -d "$a" "$b"`) também
+// "menciona" os dois caminhos, e passaria por qualquer asserção textual.
+const estadoOverride = (dirs) => {
+  const wt = mkdtempSync(join(tmpdir(), 'wt-'));
+  try {
+    for (const d of dirs) mkdirSync(join(wt, ...d.split('/')), { recursive: true });
+    try {
+      execFileSync('bash', ['-c', `WT=${JSON.stringify(wt)}\n${blocoOv}`], { encoding: 'utf8', timeout: 30_000 });
+      return 0;
+    } catch (e) { return e.status ?? -1; }
+  } finally { rmSync(wt, { recursive: true, force: true }); }
+};
+assert.equal(estadoOverride([]), 0, 'árvore limpa: a guarda não pode abortar');
+assert.notEqual(
+  estadoOverride(['.kimi-code/agents']), 0,
+  'SÓ .kimi-code/agents presente — o caso real de um PR hostil — e a guarda NÃO abortou: ' +
+    'é a falha ABERTA que a forma `ls` de dois operandos produzia (rc=2 sem entrar no corpo)',
+);
+assert.notEqual(estadoOverride(['.agents/agents']), 0, 'só .agents/agents presente e a guarda não abortou');
+assert.notEqual(estadoOverride(['.kimi-code/agents', '.agents/agents']), 0, 'os dois presentes e a guarda não abortou');
 
 // ── Fixturas ─────────────────────────────────────────────────────────────────
 // `jsonl: null` = a lente não chegou a escrever arquivo nenhum.

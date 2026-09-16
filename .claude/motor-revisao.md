@@ -496,10 +496,18 @@ git -C "$WT" diff "$BASE"...HEAD > "$OUT/DIFF.patch"
 
 # 2. Override de agente vindo do repositório substitui o system prompt da lente —
 #    é o vetor de sequestro do revisor. ABORTA o despacho; não é aviso.
-if ls -d "$WT/.kimi-code/agents" "$WT/.agents/agents" 2>/dev/null; then
-  echo 'OVERRIDE DE AGENTE NA ÁRVORE — NÃO despache; investigue antes.'
-  exit 1     # `exit`, não `return`: estes blocos são colados numa chamada de Bash,
-fi           # que é shell não interativo — `return` fora de função imprime erro e SEGUE.
+#
+#    ⚠️ Um diretório por teste, nunca `ls` com os dois de uma vez. Com dois operandos e
+#    só UM existindo — o caso real de um PR hostil —, o `ls` imprime o que achou e sai
+#    com rc=2 por causa do que faltou, então um `if ls …` NÃO entra no corpo e a guarda
+#    falha ABERTA exatamente quando importa. Medido. `exit`, e não `return`: estes blocos
+#    são colados numa chamada de Bash, shell não interativo, onde `return` fora de função
+#    imprime erro e SEGUE.
+for d in "$WT/.kimi-code/agents" "$WT/.agents/agents"; do
+  [ -e "$d" ] || continue
+  echo "OVERRIDE DE AGENTE NA ÁRVORE: $d — NÃO despache; investigue antes."
+  exit 1
+done
 ```
 
 > **ADAPTADO — aqui não se apaga, mas ABORTA.** O upstream apaga os dois diretórios antes de
