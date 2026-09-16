@@ -97,7 +97,7 @@ export function calcular(raizRepo = raiz, exigirMarcador = true) {
  * e o modo de escrita saía pelo atalho do "nada a fazer" ANTES do laço de reparo — então o estado
  * duplicado sobrevivia a quantas passadas se rodasse. Trocar o predicado por *o arquivo É o
  * canônico* faz os dois modos concordarem por construção, e o reparo passa a ser idempotente de
- * verdade. A prova está em `scripts/testar-corpus-revisao.mjs` § 2b, que exercita os estados —
+ * verdade. A prova está em `scripts/testar-corpus-revisao.mjs` § 2c, que exercita os estados —
  * medição escrita aqui descreveria um código que este mesmo commit apagou, e ninguém a
  * reproduziria a partir da árvore.
  */

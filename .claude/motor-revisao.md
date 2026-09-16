@@ -667,7 +667,7 @@ Todo briefing carrega, além da lente ou do framework:
 - **A linha `CORPUS:` é como você sabe que o corpo viajou.** Sem ela, "a lente não leu o corpo" e
   "leu e nada se aplicava" são indistinguíveis — e o primeiro caso é o que acontece quando alguém
   remonta o briefing de memória. O marcador a comparar é o que está **dentro de `$OUT/corpus/*.md`** —
-  a cópia da base —, e se lê com `grep -o 'corpus=[^ ]*' "$OUT/corpus/aprendizados.md"`. Um marcador
+  a cópia da base —, e se lê com `sed -n 's/.*corpus=\([^ ]*\).*/\\1/p' "$OUT/corpus/aprendizados.md"` — com o `corpus=` **fora**, que é a forma em que a lente declara. Um marcador
   **diferente desse** denuncia: a lente leu outra coisa.
 
   > ⚠️ **Não use `node scripts/carimbar-corpus-revisao.mjs --conferir` para isso.** Ele roda na

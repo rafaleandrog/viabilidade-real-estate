@@ -336,7 +336,7 @@ for (const t of templates) {
   else falha('contrato', `o template "${nome}…" não aponta para $OUT/corpus/ — apontando para a árvore, o head volta a ditar a própria revisão`);
 }
 
-// ── 2d. A metade do mecanismo que vive na SKILL também é medida ─────────────
+// ── 2b. A metade do mecanismo que vive na SKILL também é medida ─────────────
 // ⚠️ A bateria lia SÓ o motor, e metade do canal mora na skill: a nota que obriga a registrar a
 // lente sem `CORPUS:`, e o passo que manda o achado retirado para `retirados.md`. Apagar
 // qualquer um dos dois deixava CI, preflight e esta bateria inteiramente verdes — o mesmo
@@ -346,7 +346,11 @@ for (const t of templates) {
 // sumir sem sintoma. Achado de lente.
 const skill = ler('.claude/skills/revisar-pr-apps/SKILL.md');
 const NA_SKILL = [
-  ['a nota da lente sem CORPUS: no quadro de execução', /marcador divergente/],
+  // ⚠️ A âncora é o MANDATO inteiro, não a expressão `marcador divergente` solta: a ressalva
+  // contrafactual logo abaixo, no mesmo arquivo, também a contém — então apagar a frase que
+  // OBRIGA o registro deixava a guarda verde pela menção vizinha. Mesma cegueira compartilhada
+  // que já apareceu duas vezes neste PR. Achado do App do Codex.
+  ['a nota da lente sem CORPUS: no quadro de execução', /com marcador divergente do vigente, aparece com essa\s+nota/],
   ['o marcador lido da cópia da BASE, não do head', /\$OUT\/corpus\/aprendizados\.md/],
   ['a ressalva de que `--conferir` mede o HEAD', /--conferir/],
   ['o passo de registrar o achado retirado', /retirados\.md/],
@@ -356,7 +360,7 @@ for (const [oque, re] of NA_SKILL) {
   else falha('skill', `a SKILL perdeu ${oque} — metade do canal do corpo mora lá, e apagá-la não deixava nada vermelho`);
 }
 
-// ── 2b. O reparo CONVERGE, a partir de qualquer estado do marcador ───────────
+// ── 2c. O reparo CONVERGE, a partir de qualquer estado do marcador ───────────
 // `canonico()` é o predicado único dos dois modos do carimbador (conferir e escrever), então é
 // aqui que se prova que o reparo é reparo. O estado que motivou isto é o DUPLICADO: com o
 // predicado antigo ("o marcador certo aparece em algum lugar"), o `--conferir` dizia ok e a
@@ -408,7 +412,7 @@ for (const [oque, re] of NA_SKILL) {
   else falha('reparo', 'aplicar o reparo ao arquivo já canônico o altera — o carimbador nunca estabilizaria');
 }
 
-// ── 2c. O parser segue a regra do bash, e isso é medido, não afirmado ────────
+// ── 2d. O parser segue a regra do bash, e isso é medido, não afirmado ────────
 // A regra do fecho de heredoc é a única coisa entre o parse correto e a função FANTASMA que
 // engole a de despacho real. E ela não é observável a partir do motor de hoje — as duas regras
 // dão o mesmo veredito nele —, então a prova tem de ser sobre a função, com um documento
