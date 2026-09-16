@@ -27,6 +27,10 @@ export const caso = {
     'urbi-input.label',
     'urbi-input.placeholder',
     'urbi-kpi.variante',
+    'urbi-lista.clicavel',
+    'urbi-lista.itens',
+    'urbi-lista.mensagemVazio',
+    'urbi-lista.render_item',
     'urbi-seletor-arquivo.accept',
     'urbi-seletor-arquivo.texto',
   ],
@@ -88,12 +92,13 @@ export const caso = {
     const tela = raiz.querySelector('viab-tela-premissas') as any;
     const terreno = tela.shadowRoot!.querySelector('viab-terreno-nucleo') as any;
     await terreno.updateComplete;
-    const botoes = Array.from(terreno.shadowRoot!.querySelectorAll('button.resultado-lote')) as HTMLButtonElement[];
+    const lista = terreno.shadowRoot!.querySelector('urbi-lista') as any;
+    const opcoes = (lista?.itens ?? []) as { valor: string; rotulo: string }[];
     const buscaInput = terreno.shadowRoot!.querySelector('urbi-input.busca') as any;
     return {
       chamadasLotes: ((globalThis as any).__chamadasNucleo ?? []).filter((r: string) => r.startsWith('/lotes')),
-      opcoesValores: botoes.map((b) => b.getAttribute('data-valor') ?? ''),
-      opcoesRotulos: botoes.map((b) => (b.textContent ?? '').trim()),
+      opcoesValores: opcoes.map((o) => o.valor),
+      opcoesRotulos: opcoes.map((o) => o.rotulo),
       buscaDigitada: buscaInput?.valor ?? '',
     };
   },

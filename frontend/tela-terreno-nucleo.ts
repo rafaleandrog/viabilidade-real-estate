@@ -90,21 +90,6 @@ export class ViabTerrenoNucleo extends LitElement {
     urbi-banner { margin-bottom: 12px; }
     .pag-info { display: block; margin-top: 8px; font-size: 0.75rem; color: var(--cor-texto-sec, rgba(255,255,255,0.5)); }
     .pag-btns { display: flex; gap: 8px; margin-top: 8px; }
-    /* Lista de resultados do lote — anexada ao MESMO <urbi-input class="busca">
-       acima, não um segundo campo/seletor independente. */
-    .lista-resultados {
-      display: flex; flex-direction: column; gap: 2px; margin-top: 8px;
-      max-height: 240px; overflow-y: auto;
-      border: 1px solid var(--cor-borda, rgba(255,255,255,0.12));
-      border-radius: 8px; padding: 4px;
-    }
-    .resultado-lote {
-      display: block; width: 100%; text-align: left; background: transparent;
-      border: none; border-radius: 6px; padding: 8px 10px; color: inherit;
-      font: inherit; cursor: pointer;
-    }
-    .resultado-lote:hover:not(:disabled) { background: var(--cor-superficie-hover, rgba(255,255,255,0.08)); }
-    .resultado-lote:disabled { opacity: 0.5; cursor: default; }
   `];
 
   connectedCallback() {
@@ -490,26 +475,16 @@ export class ViabTerrenoNucleo extends LitElement {
       (de ${this._loteTotalBruto} no Núcleo, sem excluir regularização fundiária)
     </span>`;
 
-    let corpo: TemplateResult;
-    if (this._buscando) {
-      corpo = html`<p class="sec">Buscando…</p>`;
-    } else if (this.opcoes.length === 0) {
-      corpo = html`<p class="sec">Nenhum lote disponível para vincular${this._busca ? ' com esse filtro' : ''}.</p>`;
-    } else {
-      corpo = html`
-        <div class="lista-resultados">
-          ${this.opcoes.map((o) => html`
-            <button type="button" class="resultado-lote" data-valor=${o.valor} ?disabled=${this.salvando}
-              @click=${() => this._adicionar(parseInt(o.valor))}
-            >${o.rotulo}</button>
-          `)}
-        </div>
-      `;
-    }
-
     return html`
       ${busca}
-      ${corpo}
+      <urbi-lista
+        .itens=${this.opcoes}
+        .render_item=${(item: unknown) => html`${(item as OpcaoCandidato).rotulo}`}
+        ?clicavel=${!this.salvando}
+        ?carregando=${this._buscando}
+        .mensagemVazio=${`Nenhum lote disponível para vincular${this._busca ? ' com esse filtro' : ''}.`}
+        @urbi:lista-click=${(e: CustomEvent) => this._adicionar(parseInt((e.detail?.item as OpcaoCandidato)?.valor))}
+      ></urbi-lista>
       ${info}${carregarMaisBtn}
     `;
   }

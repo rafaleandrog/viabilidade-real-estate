@@ -7,8 +7,10 @@
 // `<urbi-input class="busca">` — a classe de defeito nº 1 do CLAUDE.md
 // (função pura correta, componente não liga, ou liga errado) só se prova
 // atravessando o DOM real. Desde a redesenho de campo único (2026-09-16) não
-// existe mais `<urbi-select>` nesse fluxo — ver `terreno-nucleo-lote-pagina-vazia.ts`
-// para o caso que cobre a causa raiz (página 1 zerada pelo filtro).
+// existe mais `<urbi-select>` nesse fluxo — a lista de resultados é um
+// `<urbi-lista>` anexado ao mesmo `<urbi-input class="busca">`. Ver
+// `terreno-nucleo-lote-pagina-vazia.ts` para o caso que cobre a causa raiz
+// (página 1 zerada pelo filtro).
 
 import '../../tela-premissas.js';
 import { ESTUDO, forcarEstado } from './dados.js';
@@ -30,6 +32,10 @@ export const caso = {
     'urbi-input.label',
     'urbi-input.placeholder',
     'urbi-kpi.variante',
+    'urbi-lista.clicavel',
+    'urbi-lista.itens',
+    'urbi-lista.mensagemVazio',
+    'urbi-lista.render_item',
     'urbi-seletor-arquivo.accept',
     'urbi-seletor-arquivo.texto',
   ],
@@ -86,12 +92,13 @@ export const caso = {
     const tela = raiz.querySelector('viab-tela-premissas') as any;
     const terreno = tela.shadowRoot!.querySelector('viab-terreno-nucleo') as any;
     await terreno.updateComplete;
-    const botoes = Array.from(terreno.shadowRoot!.querySelectorAll('button.resultado-lote')) as HTMLButtonElement[];
+    const lista = terreno.shadowRoot!.querySelector('urbi-lista') as any;
+    const opcoes = (lista?.itens ?? []) as { valor: string; rotulo: string }[];
     const buscaInput = terreno.shadowRoot!.querySelector('urbi-input.busca');
     return {
       chamadas: (globalThis as any).__chamadasNucleo ?? [],
-      opcoesValores: botoes.map((b) => b.getAttribute('data-valor') ?? ''),
-      opcoesRotulos: botoes.map((b) => (b.textContent ?? '').trim()),
+      opcoesValores: opcoes.map((o) => o.valor),
+      opcoesRotulos: opcoes.map((o) => o.rotulo),
       temBuscaInput: !!buscaInput,
       // Campo único: não pode existir um <urbi-select> separado neste fluxo.
       temSelect: !!terreno.shadowRoot!.querySelector('urbi-select'),
