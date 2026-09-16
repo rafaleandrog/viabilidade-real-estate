@@ -1,11 +1,16 @@
-// Caso de render: filtro do seletor "Adicionar lote" (Terreno & Áreas,
+// Caso de render: filtro da lista de resultados de lote (Terreno & Áreas,
 // Incorporação) — excluir lotes de parcelamento com `regularizacao=true` e
 // mostrar o campo de busca por texto. A função que faz a exclusão está em
 // `viab-terreno-nucleo` (`_carregarLotes`), mas a FIAÇÃO é o que este caso
 // mede: se o componente chama `/parcelamentos`, resolve o conjunto certo, e
-// de fato tira o lote errado da lista que o `<urbi-select>` recebe — a
-// classe de defeito nº 1 do CLAUDE.md (função pura correta, componente não
-// liga, ou liga errado) só se prova atravessando o DOM real.
+// de fato tira o lote errado da lista de resultados anexada ao
+// `<urbi-input class="busca">` — a classe de defeito nº 1 do CLAUDE.md
+// (função pura correta, componente não liga, ou liga errado) só se prova
+// atravessando o DOM real. Desde a redesenho de campo único (2026-09-16) não
+// existe mais `<urbi-select>` nesse fluxo — a lista de resultados é um
+// `<urbi-lista>` anexado ao mesmo `<urbi-input class="busca">`. Ver
+// `terreno-nucleo-lote-pagina-vazia.ts` para o caso que cobre a causa raiz
+// (página 1 zerada pelo filtro).
 
 import '../../tela-premissas.js';
 import { ESTUDO, forcarEstado } from './dados.js';
@@ -27,16 +32,23 @@ export const caso = {
     'urbi-input.label',
     'urbi-input.placeholder',
     'urbi-kpi.variante',
-    'urbi-select.label',
-    'urbi-select.opcoes',
-    'urbi-select.pesquisavel',
-    'urbi-select.placeholder',
+    'urbi-lista.clicavel',
+    'urbi-lista.itens',
+    'urbi-lista.mensagemVazio',
+    'urbi-lista.render_item',
     'urbi-seletor-arquivo.accept',
     'urbi-seletor-arquivo.texto',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     (globalThis as any).__chamadasNucleo = [];
-    (globalThis as any).urbiVerso.api = async () => ({ dados: [] });
+    // Grava toda chamada a `urbiVerso.api` — usado pelo teste de clique (medir())
+    // para provar que `urbi:lista-click` chega a `_adicionar` e vira o POST
+    // certo, com o `imovel_nucleo_id` do lote ELEGÍVEL (não o excluído).
+    (globalThis as any).__chamadasApi = [];
+    (globalThis as any).urbiVerso.api = async (rota: string, opts?: any) => {
+      (globalThis as any).__chamadasApi.push({ rota, opts });
+      return { dados: [] };
+    };
     (globalThis as any).urbiVerso.nucleo = async (rota: string) => {
       (globalThis as any).__chamadasNucleo.push(rota);
       if (rota.startsWith('/parcelamentos')) {
@@ -82,18 +94,40 @@ export const caso = {
   },
   async medir(raiz: HTMLElement): Promise<{
     chamadas: string[]; opcoesValores: string[]; opcoesRotulos: string[]; temBuscaInput: boolean;
+    temSelect: boolean; imovelVinculadoNoPost: number | null;
   }> {
     const tela = raiz.querySelector('viab-tela-premissas') as any;
     const terreno = tela.shadowRoot!.querySelector('viab-terreno-nucleo') as any;
     await terreno.updateComplete;
-    const select = terreno.shadowRoot!.querySelector('urbi-select') as any;
-    const opcoes = (select?.opcoes ?? []) as { valor: string; rotulo: string }[];
+    const lista = terreno.shadowRoot!.querySelector('urbi-lista') as any;
+    const opcoes = (lista?.itens ?? []) as { valor: string; rotulo: string }[];
     const buscaInput = terreno.shadowRoot!.querySelector('urbi-input.busca');
+
+    // Prova a metade INTERATIVA do campo único: dispara o MESMO evento que o
+    // <urbi-lista> real dispararia ao clicar no item (`detail: { item, indice }`
+    // — ver `ui/src/urbi-lista.ts` § `_onClick`) e confere que chega a
+    // `_adicionar` e vira o POST certo. Sem isto, só provávamos que a lista
+    // POPULA, não que o clique VINCULA o lote certo — achado da revisão
+    // (Kimi, lente confirmatória).
+    if (lista && opcoes.length > 0) {
+      lista.dispatchEvent(new CustomEvent('urbi:lista-click', {
+        detail: { item: opcoes[0], indice: 0 }, bubbles: true, composed: true,
+      }));
+      await new Promise((r) => setTimeout(r, 0));
+      await terreno.updateComplete;
+    }
+    const chamadasApi = ((globalThis as any).__chamadasApi ?? []) as { rota: string; opts?: any }[];
+    const postVinculo = chamadasApi.find((c) => /\/imoveis$/.test(c.rota) && c.opts?.method === 'POST');
+    const corpo = postVinculo?.opts?.body ? JSON.parse(postVinculo.opts.body) : null;
+
     return {
       chamadas: (globalThis as any).__chamadasNucleo ?? [],
       opcoesValores: opcoes.map((o) => o.valor),
       opcoesRotulos: opcoes.map((o) => o.rotulo),
       temBuscaInput: !!buscaInput,
+      // Campo único: não pode existir um <urbi-select> separado neste fluxo.
+      temSelect: !!terreno.shadowRoot!.querySelector('urbi-select'),
+      imovelVinculadoNoPost: corpo ? Number(corpo.imovel_nucleo_id) : null,
     };
   },
 };

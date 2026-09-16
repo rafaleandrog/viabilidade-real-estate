@@ -60,6 +60,9 @@ export class ViabTerrenoNucleo extends LitElement {
   @state() private _loteTotalBruto = 0;
   @state() private _carregandoMais = false;
   @state() private _busca = '';
+  // Só cobre a busca disparada por digitação (debounce) — o carregamento
+  // inicial já fica atrás do spinner de página inteira (`carregando`).
+  @state() private _buscando = false;
   private _buscaDebounce: ReturnType<typeof setTimeout> | null = null;
 
   // Conjunto de ids de parcelamento com regularizacao=true (Incorporação só).
@@ -198,6 +201,16 @@ export class ViabTerrenoNucleo extends LitElement {
   // (não só no chamador), uma corrida que passou pelo `if (seq !== ...)` de
   // `_carregar()` mas ainda está com este `await` em voo escreveria por cima
   // do resultado de uma corrida mais nova de qualquer forma.
+  //
+  // A página 1 é ordenada por `id DESC` (recência), não por elegibilidade —
+  // se os candidatos mais recentes calharem de ser TODOS excluídos (já
+  // vinculados ou de regularização fundiária), essa página sozinha fica
+  // vazia mesmo havendo milhares de lotes elegíveis adiante. Por isso o laço
+  // abaixo continua pedindo a próxima página sozinho enquanto não achar
+  // nenhum candidato elegível e ainda houver mais — sem isto, a tela mostrava
+  // "0 lotes elegíveis" na busca vazia e só populava depois que o usuário
+  // digitava um termo (que muda para busca por texto no servidor, um
+  // conjunto diferente e normalmente menor). Achado do usuário, 2026-09-16.
   private async _carregarLotes(opts: { reiniciar?: boolean; seq?: number } = {}): Promise<void> {
     const seq = opts.seq ?? this._cargaSeq;
     if (opts.reiniciar) {
@@ -212,26 +225,29 @@ export class ViabTerrenoNucleo extends LitElement {
       // Codex no PR #697.
       this._loteTemMais = false;
     }
-    const lista = await listarLotesNucleo(this._busca, this._loteCursor, POR_PAGINA_LOTE);
-    if (seq !== this._cargaSeq) return;
-    const dados: any[] = lista?.dados ?? [];
-    this._loteTotalBruto = Number(lista?.total) || 0;
-    const totalPaginas = Number(lista?.paginas) || 1;
-    // `<`, não `===` contra `POR_PAGINA_LOTE` — o Núcleo clampeia
-    // `por_pagina` acima do teto silenciosamente (docs/shell/nucleo.md §
-    // Paginação); se o teto real cair abaixo do que este arquivo pede, uma
-    // igualdade estrita nunca mais bateria e "tem mais" ficaria preso em
-    // falso para sempre, mesmo havendo mais páginas. Mesmo critério de
-    // `_carregarIdsRegularizacao` (linha acima no arquivo).
-    this._loteTemMais = this._loteCursor < totalPaginas;
-    const usados = new Set(this._vinculos.map((v) => Number(v.imovel_nucleo_id)));
-    const idsReg = this._idsRegularizacao ?? new Set<number>();
-    const novas = dados
-      .filter((o: any) => !usados.has(Number(o.id)))
-      .filter((o: any) => !idsReg.has(Number(o.parcelamento_id)))
-      .map((o: any) => ({ valor: String(o.id), rotulo: o.id_legivel || `#${o.id}` }));
-    this.opcoes = [...this.opcoes, ...novas];
-    this._loteCursor += 1;
+    for (;;) {
+      const lista = await listarLotesNucleo(this._busca, this._loteCursor, POR_PAGINA_LOTE);
+      if (seq !== this._cargaSeq) return;
+      const dados: any[] = lista?.dados ?? [];
+      this._loteTotalBruto = Number(lista?.total) || 0;
+      const totalPaginas = Number(lista?.paginas) || 1;
+      // `<`, não `===` contra `POR_PAGINA_LOTE` — o Núcleo clampeia
+      // `por_pagina` acima do teto silenciosamente (docs/shell/nucleo.md §
+      // Paginação); se o teto real cair abaixo do que este arquivo pede, uma
+      // igualdade estrita nunca mais bateria e "tem mais" ficaria preso em
+      // falso para sempre, mesmo havendo mais páginas. Mesmo critério de
+      // `_carregarIdsRegularizacao` (linha acima no arquivo).
+      this._loteTemMais = this._loteCursor < totalPaginas;
+      const usados = new Set(this._vinculos.map((v) => Number(v.imovel_nucleo_id)));
+      const idsReg = this._idsRegularizacao ?? new Set<number>();
+      const novas = dados
+        .filter((o: any) => !usados.has(Number(o.id)))
+        .filter((o: any) => !idsReg.has(Number(o.parcelamento_id)))
+        .map((o: any) => ({ valor: String(o.id), rotulo: o.id_legivel || `#${o.id}` }));
+      this.opcoes = [...this.opcoes, ...novas];
+      this._loteCursor += 1;
+      if (this.opcoes.length > 0 || !this._loteTemMais) return;
+    }
   }
 
   private async _carregarMaisLotes() {
@@ -257,13 +273,22 @@ export class ViabTerrenoNucleo extends LitElement {
       // carregamento inicial poderia chegar depois e sobrescrever o
       // resultado da busca do usuário.
       const seq = ++this._cargaSeq;
+      // `_carregarLotes` agora pode encadear várias páginas sozinho (ver
+      // comentário lá) antes de assentar — `_buscando` cobre essa janela
+      // para a lista não piscar "nenhum lote" entre uma página vazia e a
+      // próxima.
+      this._buscando = true;
       // Sem `.catch`, uma rejeição de `/lotes` aqui virava rejeição não
       // tratada: `reiniciar:true` já zerou `this.opcoes`, e sem aviso nem
       // novo estado o seletor ficava vazio, em silêncio. Achado do Codex no
       // PR #697 — mesmo tratamento que `_carregarMaisLotes` já tinha.
-      this._carregarLotes({ reiniciar: true, seq }).catch((e: any) => {
-        urbiVerso.notificar(e?.message || 'Erro ao buscar lotes', 'erro');
-      });
+      this._carregarLotes({ reiniciar: true, seq })
+        .catch((e: any) => {
+          urbiVerso.notificar(e?.message || 'Erro ao buscar lotes', 'erro');
+        })
+        .finally(() => {
+          if (seq === this._cargaSeq) this._buscando = false;
+        });
     }, DEBOUNCE_BUSCA_MS);
   }
 
@@ -421,6 +446,10 @@ export class ViabTerrenoNucleo extends LitElement {
     `;
   }
 
+  // Campo único: o <urbi-input> abaixo é a ÚNICA entrada visível — a lista
+  // de resultados é anexada a ele mesmo (não um <urbi-select> separado que
+  // o usuário precisaria abrir à parte). Ver comentário de `_carregarLotes`
+  // para a causa raiz que fazia a busca vazia não mostrar nada.
   private _renderAddLote(): TemplateResult {
     const busca = html`
       <urbi-input class="busca" label="Buscar lote" placeholder="Número, quadra, conjunto ou rua…"
@@ -445,26 +474,17 @@ export class ViabTerrenoNucleo extends LitElement {
       ${this.opcoes.length} lote${this.opcoes.length === 1 ? '' : 's'} elegível(is) carregado(s)
       (de ${this._loteTotalBruto} no Núcleo, sem excluir regularização fundiária)
     </span>`;
-    if (this.opcoes.length === 0) {
-      return html`
-        ${busca}
-        <p class="sec">Nenhum lote disponível para vincular${this._busca ? ' com esse filtro' : ''}.</p>
-        ${info}${carregarMaisBtn}
-      `;
-    }
+
     return html`
       ${busca}
-      <div class="add">
-        <urbi-select
-          label="Adicionar lote"
-          placeholder="Selecionar lote…"
-          pesquisavel
-          .valor=${''}
-          .opcoes=${this.opcoes}
-          ?desabilitado=${this.salvando}
-          @urbi:select-change=${(e: CustomEvent) => this._adicionar(parseInt(e.detail?.valor))}
-        ></urbi-select>
-      </div>
+      <urbi-lista
+        .itens=${this.opcoes}
+        .render_item=${(item: unknown) => html`${(item as OpcaoCandidato).rotulo}`}
+        ?clicavel=${!this.salvando}
+        ?carregando=${this._buscando}
+        .mensagemVazio=${`Nenhum lote disponível para vincular${this._busca ? ' com esse filtro' : ''}.`}
+        @urbi:lista-click=${(e: CustomEvent) => this._adicionar(parseInt((e.detail?.item as OpcaoCandidato)?.valor))}
+      ></urbi-lista>
       ${info}${carregarMaisBtn}
     `;
   }
