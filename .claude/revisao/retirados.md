@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v14-b2cd8f27 -->
+<!-- corpus=v15-8c46447f -->
 
 # Achados retirados — não levante de novo sem evidência nova
 
@@ -76,3 +76,23 @@ que não descreve o caso dele. Achado de lente.
 > **premissa de desenho** que foi medida e reprovada. Mora aqui pelo mesmo motivo — sem o registro,
 > a próxima sessão lê o doc do monorepo e tenta de novo. É por causa dela que o briefing **manda
 > ler** este corpo em vez de confiar em injeção automática.
+
+### `_editarCustoUnidade:729` não segue o deslocamento imposto pelo merge
+
+- **Afirmação:** *"o merge altera `tela-premissas.ts` em dois hunks (+13 e +1) … `_editarCustoUnidade:571`
+  virou `:729`, um salto de +158, sem nenhum hunk no diff que o justifique; pelo mesmo deslocamento
+  seria `:584`"* — acusando endereço `arquivo:linha` que teria deixado de resolver.
+- **Por que é falsa:** a lente inferiu o deslocamento **só pelos hunks que o diff daquele PR
+  mostrava**, e a função já tinha se movido num commit anterior da `main`, fora daquele patch. Ela
+  mesma declarou o limite (*"a lente só enxerga o diff"*) e mesmo assim tratou a inferência como
+  medição — é a classe do § 1: **o que você não consegue ler se declara NÃO VERIFICÁVEL, nunca
+  "não resolve"**. O endereço estava certo.
+- **Evidência:** `grep -n '_editarCustoUnidade' frontend/tela-premissas.ts` devolve `729:  private
+  _editarCustoUnidade(...)` — exatamente o endereço acusado; `:584` é outra coisa (o `Promise.all`
+  do carregamento de catálogo). E `scripts/guard-enderecos-doc.mjs` passa **verde** sobre
+  `frontend/`, o que só acontece se o símbolo citado aparecer a ±3 linhas do alvo.
+- **Data:** 2026-09-16 · PR 744
+
+> **Se você é uma lente e for acusar endereço deslocado:** o diff do PR **não** é o histórico do
+> arquivo. Um símbolo pode ter andado antes da base que você enxerga. Confirme com `grep -n` no
+> arquivo real — que você tem — antes de derivar a posição por aritmética de hunks.

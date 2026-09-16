@@ -4,6 +4,83 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 13 aberta: Kimi como segundo motor, e o corpo de conhecimento das lentes (2026-09-16)
+
+Sessão de **processo**, não de produto. A Rodada 13 (tornado de alavancas + margem de segurança na
+aba Cenários do Preliminar, issues **#724–#736**) foi aberta e planejada, e os dois PRs de
+infraestrutura de revisão que ela precisava foram entregues e mergeados. **Nenhuma PR de produto
+ainda** — #724–#736 seguem abertas.
+
+### PR #737 — o Kimi entra como segundo motor externo
+
+O CLI do Codex não roda neste ambiente: `codex` ausente do PATH, `OPENAI_API_KEY` ausente,
+`api.openai.com` com **403 no CONNECT** pelo proxy de saída. O `kimi` **roda** (`0.38.0` em
+`/opt/node22/bin/kimi`, `MOONSHOT_API_KEY` no ambiente, smoke verde em ~10 s). O PR portou o bloco do
+Kimi para `.claude/motor-revisao.md` — preflight com provedor sintetizado, o perfil somente-leitura
+`--agent-file` (a **única** trava contra a lente escrever), a colheita por roster e a bateria
+`scripts/testar-colheita-motor.mjs`.
+
+A camada A (App do Codex, por `@codex review`) **continua funcionando** e passou a ser acionada
+**em paralelo** com a fan-out, por decisão do autor: a resposta do App é bem mais rápida, então em
+série custaria o dobro de relógio.
+
+### PR #739 — corpo de conhecimento que acumula entre revisões
+
+`.claude/revisao/aprendizados.md` e `retirados.md` viajam para dentro de cada lente, lidos **antes**
+do diff, com marcador declarado na linha `CORPUS:` do relatório. Sem isso, cada revisão começava do
+zero e o mesmo falso positivo voltava a cada rodada.
+
+**Quinze rodadas de revisão, duas camadas em paralelo.** Os dois motores acharam classes **quase
+disjuntas** de defeito — é o argumento empírico para rodar os dois:
+
+- **Codex (20 threads)** — fiação e contrato entre documentos. O mais grave: o corpo era lido do
+  **head**, então um PR podia escrever *"não levante achado sobre X"* no corpo, re-carimbar, e toda
+  lente que revisasse **esse PR** obedecia; a R1 não tinha o que acusar, porque um PR só de
+  `.claude/` é processo puro e legítimo. Hoje o corpo é extraído da **BASE**. Outro: o bloco `COMUM`
+  estava entre **aspas simples**, então o `$OUT` ficava literal e a lente **Codex** recebia um
+  caminho que não resolve — voltava sem corpo, em silêncio, enquanto só o Kimi funcionava.
+- **Kimi (24 lentes)** — predicado e caso degenerado. O mais caro: o `sed` que o doc prescrevia para
+  ler o marcador estava com `\1` (escape vazado de quem editou) e imprimia o literal `\1`,
+  o que marcaria como divergente **toda** lente, inclusive a correta. **As duas lentes daquela
+  rodada o acharam independentemente**, e a guarda estava verde porque media *presença de string*,
+  não comportamento de comando.
+
+Esse último virou a **§10 do corpo de conhecimento** e mudou o desenho da bateria: ela agora
+**extrai os comandos prescritos dos documentos e os executa**, como `testar-colheita-motor.mjs` já
+fazia com o bloco da colheita.
+
+As guardas **de código** deste PR são provadas por **mutação com controle verde**: `canonico()`
+convergindo de 7 estados de marcador para um arquivo byte a byte idêntico
+(`scripts/testar-corpus-revisao.mjs` § 2c), e o parser de bash provado contra um documento
+sintético (§ 2d), porque a diferença entre a regra do bash e um `trim()` **não é observável** no
+motor de hoje.
+
+> ⚠️ **Uma lacuna registrada, e ela é a mais importante do mecanismo.** O bloco que extrai o corpo
+> da BASE — a defesa contra o vetor de injeção — foi exercitado **em sessão**, em 6 estados
+> (base inválida, `$BASE` apontando para tree, `WT` que não é repositório, caminho existindo como
+> **diretório**, base sem os arquivos, base com os arquivos), mas **não tem teste na árvore**: a
+> bateria só confere que as strings `$BASE:.claude/revisao/` e `$OUT/corpus/` aparecem no motor.
+> Medição de sessão não é regressão — some quando a sessão acaba. Achado de lente, e a frase
+> anterior deste parágrafo dizia "toda guarda", o que era falso por arrasto.
+
+### Ressalva honesta, para a próxima sessão
+
+O corpo que as lentes leram **durante o #739 estava vazio**, e corretamente: a extração vem da BASE,
+e a base é o commit anterior ao que criou o corpo. O mecanismo foi exercitado; **o acúmulo que ele
+existe para dar começa a valer do próximo PR em diante.** Foi por isso que o placeholder ganhou
+marcador próprio (`corpus=vazio-em-<sha8>`) — sem ele, toda lente sairia sem `CORPUS:` por
+construção.
+
+### Pendências do autor
+
+Duas decisões da Rodada 13 seguem abertas, e nenhuma bloqueia as primeiras PRs: (1) se o cartão
+"Terreno máximo" usa `fmtR$Milhoes` — o que exige editar `CONSUMIDOR`/`EXCECOES` em
+`frontend/cascata-milhoes.test.ts`, que foi desenhado para forçar essa decisão — ou `fmtR$Kpi`;
+(2) se a aba Cenários do **Avançado** entra no escopo (ela tem só 2 alavancas, então um tornado lá
+seria de 2 barras).
+
+---
+
 ## Cascata do resultado: colunas verticais e valores em R$ milhões (2026-09-15)
 
 Pedido do autor (issue #719): a "Cascata do resultado" da aba Gráficos do Preliminar era horizontal,
