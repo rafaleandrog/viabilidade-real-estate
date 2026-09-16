@@ -98,9 +98,21 @@ else falha('briefing', 'a ordem não diz que o corpo é lido ANTES do diff — a
 // Kimi, enquanto a lente Codex nunca recebia nem a ordem nem o campo. Achado do App do Codex: a
 // guarda media "o documento menciona CORPUS:" quando a pergunta é "TODA lente recebe a exigência".
 // O lugar certo da exigência é o bloco `COMUM`, que os dois motores usam.
-const iComum = motor.indexOf("COMUM='");
-assert.notEqual(iComum, -1, "o bloco COMUM do briefing sumiu do motor (âncora \"COMUM='\")");
-const comum = motor.slice(iComum, motor.indexOf("'", iComum + 8) + 1);
+// ⚠️ Aspas DUPLAS, e a bateria EXIGE isso. Com aspas simples o `$OUT` do COMUM fica literal, e
+// interpolar `${COMUM}` depois, dentro de outra string, não reexpande o que está embutido — nem o
+// `OUT` é exportado para o filho. A lente Codex recebia `$OUT/corpus/aprendizados.md` como texto
+// cru, um caminho que ela não resolve, e voltava sem corpo; só o prompt direto do Kimi, que traz
+// os caminhos no próprio texto, funcionava. A guarda mora aqui porque o sintoma é invisível: o
+// briefing "menciona" o corpo, a lente não acha o arquivo, e o relatório sai igual. Achado P2 do
+// App do Codex.
+assert.equal(
+  motor.includes("COMUM='"), false,
+  'o bloco COMUM está entre aspas SIMPLES: o `$OUT` não expande, e a lente Codex receberia o ' +
+    'caminho do corpo como texto cru. Use aspas duplas, e defina o COMUM depois de `OUT`.',
+);
+const iComum = motor.indexOf('COMUM="');
+assert.notEqual(iComum, -1, 'o bloco COMUM do briefing sumiu do motor (âncora `COMUM="`)');
+const comum = motor.slice(iComum, motor.indexOf('"', iComum + 8) + 1);
 if (/CORPUS:/.test(comum)) ok('o briefing COMUM (os dois motores) exige a linha CORPUS:');
 else falha('contrato', 'o bloco COMUM não exige CORPUS: — a lente Codex sairia sem confirmação de corpo');
 // ⚠️ Pelo caminho INTEIRO, e não pelo basename. A primeira versão fazia
@@ -235,32 +247,55 @@ assert.equal(
     'parser perdeu — e função perdida não é medida por guarda nenhuma abaixo —, ou é a marca citada solta, ' +
     'que não deveria existir: ela é o gravador do `execucao.txt`.',
 );
-// ⚠️ A checagem é sobre a INVOCAÇÃO, não sobre o corpo todo. `includes` no corpo aceitava
-// qualquer referência executável: um refactor que tirasse `${COMUM}` do argumento do prompt e
-// deixasse um `local diagnostico="${COMUM}"` para log ficava verde com o corpo não chegando à
-// lente. A invocação é a região da linha que dispara o motor (`timeout … codex|kimi`) até a que
-// redireciona para `$OUT/$id.jsonl` — é ali, e só ali, que o prompt é passado. Achado do App do
-// Codex, na terceira rodada sobre esta mesma guarda; a inversão que fez as outras duas pararem
-// (parsear em vez de casar) é a mesma aqui — delimitar a região, não procurar a string solta.
-const invocacao = (corpo) => {
-  const linhas = semComentario(corpo).split('\n');
-  const ini = linhas.findIndex((l) => /timeout\s+\d+\s+(codex|kimi)\b/.test(l));
-  if (ini === -1) return null;
-  const fim = linhas.findIndex((l, i) => i >= ini && /\$OUT\/\$id\.jsonl/.test(l));
-  return fim === -1 ? null : linhas.slice(ini, fim + 1).join('\n');
+// ⚠️ A checagem é sobre o ARGUMENTO DO PROMPT, e chegar aqui levou três formas. `includes` no
+// corpo inteiro aceitava qualquer referência executável (`local diagnostico="${COMUM}"` para log);
+// restringir à REGIÃO da invocação — de `timeout … codex|kimi` até o redirecionamento — ainda
+// aceitava uma atribuição de prefixo na própria linha do comando (`DIAGNOSTICO="${COMUM}" timeout
+// 900 codex …`). O que interessa é uma coisa só: o texto que o motor recebe COMO PROMPT. Achados
+// do App do Codex, três rodadas sobre esta guarda.
+//
+// O prompt é o argumento entre aspas duplas que começa depois de `-p ` (Kimi) ou depois do tier do
+// `review -m <tier> ` (Codex), e vai até a aspa que o fecha. Fatiar por aí é o que separa "o corpo
+// menciona" de "a lente recebe".
+const promptDaInvocacao = (corpo) => {
+  const txt = semComentario(corpo);
+  const m = /(?:-p|review --json -m\s+\S+)\s+"/.exec(txt);
+  if (!m) return null;
+  const ini = m.index + m[0].length;
+  // Até a primeira aspa dupla NÃO escapada — o prompt traz `\"` no meio, de propósito.
+  let i = ini;
+  while (i < txt.length) {
+    if (txt[i] === '"' && txt[i - 1] !== '\\') break;
+    i += 1;
+  }
+  return i >= txt.length ? null : txt.slice(ini, i);
 };
 for (const f of despachos) {
-  const cmd = invocacao(f.corpo);
-  if (cmd === null) {
-    falha('fiação', `não achei a invocação do motor em \`${f.nome}()\` (de \`timeout N codex|kimi\` até o redirecionamento para $OUT/$id.jsonl) — sem ela não dá para medir se o prompt carrega o corpo`);
-  } else if (cmd.includes('${COMUM}')) {
-    ok(`a invocação de \`${f.nome}()\` passa \${COMUM} no prompt`);
+  const prompt = promptDaInvocacao(f.corpo);
+  if (prompt === null) {
+    falha('fiação', `não achei o argumento do prompt em \`${f.nome}()\` (o texto entre aspas depois de \`-p\` ou do tier do \`review\`) — sem ele não dá para medir se o corpo chega à lente`);
+  } else if (prompt.includes('${COMUM}')) {
+    ok(`o PROMPT de \`${f.nome}()\` carrega \${COMUM}`);
   } else {
-    falha('fiação', `\`${f.nome}()\` não passa \${COMUM} no PROMPT — o bloco pode existir no corpo e não chegar à lente`);
+    falha('fiação', `o prompt de \`${f.nome}()\` não carrega \${COMUM} — o bloco pode estar no corpo, numa atribuição ou num log, e não chegar à lente`);
   }
 }
-if (/^\s*CORPUS:/m.test(motor)) ok('os templates de saída trazem a linha CORPUS:');
+
+// ── 2a. Os templates de saída mandam declarar o marcador da cópia da BASE ───
+// ⚠️ Esta guarda já existiu, sumiu num refactor deste próprio PR e voltou junto com o achado que
+// ela deveria ter pego — os dois fatos valem a linha: guarda apagada não fica vermelha, e foi só
+// o App do Codex que notou o contrato do fallback NATIVO ter ficado para trás, ainda apontando
+// para `.claude/revisao/*.md` (o head) depois que a extração da base entrou. Reabria o vetor de
+// injeção exatamente no motor que entra quando os dois externos caem. Por isso a guarda percorre
+// TODOS os templates, e não "algum".
+const templates = motor.split('\n').filter((l) => /^\s*CORPUS:/.test(l));
+if (templates.length > 0) ok(`os ${templates.length} template(s) de saída trazem a linha CORPUS:`);
 else falha('contrato', 'nenhum template de saída tem CORPUS: — "não li" ficaria indistinguível de "li"');
+for (const t of templates) {
+  const nome = t.trim().slice(0, 34);
+  if (t.includes('$OUT/corpus/')) ok(`o template "${nome}…" manda declarar o marcador da cópia da BASE`);
+  else falha('contrato', `o template "${nome}…" não aponta para $OUT/corpus/ — apontando para a árvore, o head volta a ditar a própria revisão`);
+}
 
 // ── 2b. O reparo CONVERGE, a partir de qualquer estado do marcador ───────────
 // `canonico()` é o predicado único dos dois modos do carimbador (conferir e escrever), então é

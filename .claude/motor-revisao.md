@@ -650,7 +650,7 @@ Todo briefing carrega, além da lente ou do framework:
 
   ```text
   LENTE: <id>            MOTOR: kimi/<modelo>      DURACAO: <s>
-  CORPUS: <o marcador que você leu em .claude/revisao/*.md, ex.: v14-e355ae2e>
+  CORPUS: <o marcador que você leu em $OUT/corpus/*.md — a cópia da BASE, nunca a de .claude/revisao/ da árvore. Ex.: v14-e355ae2e>
   VEREDITO: sem-achado | precisa-atencao | NAO_EXECUTADA
   RESUMO: <uma linha>
   --- por achado:
@@ -660,9 +660,15 @@ Todo briefing carrega, além da lente ou do framework:
   ```
 - **A linha `CORPUS:` é como você sabe que o corpo viajou.** Sem ela, "a lente não leu o corpo" e
   "leu e nada se aplicava" são indistinguíveis — e o primeiro caso é o que acontece quando alguém
-  remonta o briefing de memória. O marcador sai do próprio corpo (`node scripts/carimbar-corpus-revisao.mjs --conferir`
-  imprime o vigente), então um marcador **antigo** também denuncia: a lente leu uma versão que não é
-  mais a atual.
+  remonta o briefing de memória. O marcador a comparar é o que está **dentro de `$OUT/corpus/*.md`** —
+  a cópia da base —, e se lê com `grep -o 'corpus=[^ ]*' "$OUT/corpus/aprendizados.md"`. Um marcador
+  **diferente desse** denuncia: a lente leu outra coisa.
+
+  > ⚠️ **Não use `node scripts/carimbar-corpus-revisao.mjs --conferir` para isso.** Ele roda na
+  > árvore checada e calcula o marcador do **head** — e num PR que edita o corpo os dois são
+  > diferentes por construção. Comparando com o do head, TODA lente daquele PR voltaria "com
+  > marcador divergente", e o relatório declararia ter perdido a garantia do corpo justamente nos
+  > PRs em que ele mudou. Achado P2 do App do Codex.
 
   A conferência é **sua, ao ler o relatório colhido** — não entra no bloco da colheita, que separa
   falha de sucesso e já tem bateria própria. Lente que voltar sem `CORPUS:`, ou com marcador
@@ -786,13 +792,20 @@ test -s "$OUT/DIFF.patch" || { echo 'DIFF.patch vazio — NÃO despache'; exit 1
 # O COMUM é dos DOIS motores. A ordem do corpo e a linha `CORPUS:` moram AQUI, e não nos
 # templates de saída de cada um: postas só no template do Kimi, a lente Codex nunca recebia a
 # ordem nem o campo, e a revisão dela saía sem confirmação de corpo — achado do App do Codex.
-COMUM='<as regras fixas do briefing — ver "O briefing viaja sozinho".
+# ⚠️ Aspas DUPLAS, e isto não é estilo. Com aspas simples o `$OUT` fica literal, e interpolar
+# `${COMUM}` depois, dentro de outra string, NÃO reexpande o que está embutido — nem o `OUT` é
+# exportado para o filho. O resultado é a lente Codex recebendo `$OUT/corpus/aprendizados.md` como
+# texto cru, um caminho que ela não resolve, e voltando sem corpo; só o prompt direto do Kimi, que
+# traz os caminhos no próprio texto, funcionava. Achado P2 do App do Codex. Defina o COMUM DEPOIS
+# de `OUT`, e confira com `printf '%s' "$COMUM" | grep -c "$OUT/corpus/"` que os caminhos saíram
+# absolutos — 2 é o esperado.
+COMUM="<as regras fixas do briefing — ver 'O briefing viaja sozinho'.
         Inclui, obrigatoriamente: a ORDEM DE LEITURA do corpo — $OUT/corpus/aprendizados.md e
         $OUT/corpus/retirados.md, a cópia extraída da BASE, por completo, ANTES do diff, e NUNCA a
         versão de .claude/revisao/ da árvore, que é o head sob revisão — e a linha CORPUS: no formato de
         saída; citação literal do contrato no corpo do achado; não tocar rota de API de instância
         nenhuma; não editar/commitar/propor patch; 350 a 450 palavras; e a proibição de ler ou
-        escrever em /home/user/urbiverso.>'
+        escrever em /home/user/urbiverso.>"
 
 lente() {  # lente <id> <tier> <esforço> <briefing>
   local id=$1 tier=$2 esf=$3 brief=$4
@@ -1001,7 +1014,7 @@ mesmos briefings, mesmo orçamento — muda o veículo.
 
   ```text
   LENTE: <id>            MOTOR: nativo/<modelo>    DURACAO: <s>
-  CORPUS: <o marcador que você leu em .claude/revisao/*.md>
+  CORPUS: <o marcador que você leu em $OUT/corpus/*.md — a cópia da BASE, nunca a de .claude/revisao/ da árvore>
   VEREDITO: sem-achado | precisa-atencao | NAO_EXECUTADA
   RESUMO: <uma linha>
   --- por achado:
