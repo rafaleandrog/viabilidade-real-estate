@@ -1,22 +1,24 @@
-import { GRUPOS_CUSTO, GRUPO_CUSTO_LABEL } from './fluxo-tabela.js';
-import type { FluxoCalc } from './fluxo-caixa-motor.js';
+import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
-// #351: Proforma do nível AVANÇADO — a segunda sub-aba de Resultados.
+// #351/#742: Proforma do nível AVANÇADO — a segunda sub-aba de Resultados.
 //
 // É uma leitura ECONÔMICA do mesmo `FluxoCalc` que alimenta a aba Fluxo de
-// Caixa, na segmentação da imagem de referência da planilha (aba `#43`):
-// Receita bruta (VGV) → deduções → Receita líquida → custo direto → custo
-// indireto → Resultado, com três colunas (R$ · R$/m² · % VGV).
+// Caixa, na segmentação que a planilha de referência do autor usa — a mesma
+// do Preliminar: Receita bruta (VGV) → Impostos/Corretagem/Marketing/Permuta
+// financeira → Receita líquida → custos diretos nomeados → Custo direto
+// total → Receita operacional → custos indiretos nomeados → Custo indireto
+// total → Resultado, com três colunas (R$ · R$/m² · % VGV).
 //
 // Por que uma leitura nova em vez de reusar `proforma.ts` do Preliminar: o
 // Preliminar calcula a proforma a partir de CAMPOS FIXOS do estudo
 // (`custo_construcao_m2`, `outorga_pct`, …), que no Avançado não existem — lá
-// o custo é uma LISTA livre de linhas classificadas em 5 grupos. Alimentar
-// `calcularProforma` com um `ProformaInput` sintetizado exigiria inventar
-// valores para campos que o Avançado não tem, e o resultado divergiria do
-// fluxo. Aqui a proforma deriva das mesmas séries do motor, então as duas
-// sub-abas nunca contam histórias diferentes.
+// o custo é uma LISTA livre de linhas classificadas em 5 grupos (Terreno /
+// Obra / Diretos / Indiretos / Financeiro). Alimentar `calcularProforma` com
+// um `ProformaInput` sintetizado exigiria inventar valores para campos que o
+// Avançado não tem, e o resultado divergiria do fluxo. Aqui a proforma deriva
+// das mesmas séries do motor, então as duas sub-abas nunca contam histórias
+// diferentes.
 //
 // ⚠️ ESTA PROFORMA É DESALAVANCADA, E A FUNÇÃO NEM RECEBE `funding` (#426).
 // Nenhuma ponta do funding entra: nem as entradas (liberações e aportes) na
@@ -45,7 +47,7 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 //      Avançado é DESALAVANCADA (D14)": R$ 1.053.567,77 de resíduo sobre
 //      R$ 5.000.000,00 liberados.
 //
-// ⚠️ DESAMBIGUAÇÃO DO RÓTULO "Custos Financeiros" — ele significa coisas
+// ⚠️ DESAMBIGUAÇÃO DO RÓTULO "Despesas Financeiras" — ele significa coisas
 // diferentes em duas telas, e sem saber disso alguém reabre o bug ao contrário
 // ("sumiu o custo financeiro"):
 //
@@ -67,53 +69,29 @@ import type { FluxoCalc } from './fluxo-caixa-motor.js';
 //   | (esta função)           | antes de    |                               |
 //   |                         | capitalizar |                               |
 //
-// ⚠️ **A #596 APAGOU a quarta leitura**, por decisão do autor. Era o KPI (e a
-// coluna homônima da tabela de cenários) "Resultado após custo financeiro":
-// visão ECONÔMICA menos o custo de capital — subtraía juros de toda dívida
-// mais o retorno de equity do resultado DESTA função, **nunca o principal**.
+// Aqui "(-) Despesas Financeiras (exclui serviço da dívida)" vale EXATAMENTE
+// as linhas de custo que o usuário classificou no grupo `financeiro` — nunca
+// o serviço da dívida do funding.
 //
-// Ela não era redundante, e é exatamente por isso que saiu: depois da #592 a
-// tela de Cenários passou a exibir três grandezas próximas, e essa terceira
-// competia com o vocabulário novo sem que o rótulo dissesse que ela ignora o
-// principal. A distinção era invisível para quem lesse os rótulos lado a lado.
+// ⚠️ #742 — REORGANIZAÇÃO DA APRESENTAÇÃO, decisão do autor. Corretagem e
+// Marketing (categorias 'Corretagem de vendas'/'Marketing & Publicidade')
+// eram, até esta issue, linhas de CUSTO como qualquer outra do grupo
+// `diretos`, contando para "Custo direto total". A pedido do autor, a
+// Proforma passa a mostrá-las como DEDUÇÃO DE RECEITA (entre "Receita bruta"
+// e "Receita líquida"), igual ao Preliminar e à planilha de referência —
+// **independente de em qual dos 5 grupos elas estão classificadas na aba
+// Custos**: a identificação é pelo NOME da linha (que já É a categoria
+// escolhida — `nomeLinhaCusto`, `fluxo-caixa-motor.ts`), não pelo grupo.
 //
-// Quem for reintroduzi-la: o problema nunca foi a conta — era publicá-la sem
-// dizer o que ela deixa de fora.
-//
-// ⚠️ A #592 mudou a PRIMEIRA linha desta tabela, e a correção veio junto com a
-// #596. Antes ela dizia que o serviço da dívida vivia "dentro do subtotal do
-// grupo `financeiro`" — verdade até a #592, falsa depois dela: o grupo
-// `financeiro` voltou a valer só as linhas que o USUÁRIO classificou ali, e o
-// serviço ganhou bloco próprio. Doc que descreve estrutura antiga é pior que
-// doc ausente: manda o próximo leitor procurar no lugar errado e concluir que
-// sumiu.
-//
-// Quem for reabrir o rótulo (#447) precisa das TRÊS leituras que sobraram — e
-// de saber que existiu uma quarta, apagada pela #596 (o bloco acima), porque a
-// pergunta "sumiu o custo financeiro de Cenários?" tem resposta, e ela é "saiu
-// de propósito", não "regrediu".
-//
-// ⚠️ Note que "as duas pontas" NÃO quer dizer que elas se anulam: o principal
-// devolvido cancela o principal liberado, mas os juros e qualquer saldo
-// devedor remanescente no fim do horizonte não — é exatamente por isso que
-// creditar as duas pontas AQUI não resolveria nada (razão 4 acima).
-//
-// Quem quiser ler o efeito do funding lê a aba Fluxo de Caixa, não esta. Aqui
-// "(-) Custos Financeiros" vale EXATAMENTE as linhas de custo que o usuário
-// classificou no grupo `financeiro` — nunca o serviço da dívida.
-//
-// 📎 Nota de referência (consultiva, não normativa): a planilha EVI do autor é
-// PARCIALMENTE alavancada — ela agrega despesa financeira junto com os juros do
-// financiamento à produção, em vez de deixar a proforma limpa. O app foi além e
-// desalavancou a proforma inteira, pelas razões 2 e 3 acima. A divergência é
-// deliberada e está registrada; a EVI é consultiva e não governa o runtime.
-//
-// ⚠️ O que desta nota é VERIFICÁVEL a partir deste repositório: a agregação da
-// despesa financeira com os juros, em `docs/rodada-8/02-regras-evi.md:702`
-// (célula `Premissas!P28`). O resto — o rótulo exato "Despesas Financeiras", a
-// colocação dentro do "Custo direto total" e o "não soma amortização" — vem da
-// leitura da planilha, que NÃO está no repo. Quem for citar isso numa issue
-// (#447, #448) confira na planilha antes, em vez de citar este comentário.
+// Isso muda ONDE cada custo aparece na cascata, mas não quanto ela soma:
+// `resultado` continua sendo receita líquida (agora com mais duas deduções)
+// menos custo direto (agora sem essas duas linhas) menos custo indireto —
+// algebricamente idêntico ao que já era (prova no comentário de `resultado`,
+// abaixo). Já `investimentoTotal` (e o `roiPct` que depende dele) **não**
+// muda de definição: continua somando TODO o custo do motor, corretagem e
+// marketing inclusive — só a APRESENTAÇÃO na Proforma reclassifica; o ROI
+// que o Painel de estudos usa em outras telas não pode mudar de valor por
+// causa de um reordenamento de tabela.
 // ─────────────────────────────────────────────────────────────────────────
 
 export interface LinhaProformaAv {
@@ -155,12 +133,12 @@ export interface LinhaProformaAv {
    */
   notaBase?: string;
   /**
-   * Proforma itemizada: marca a linha de SUBTOTAL de um grupo de custo,
+   * Proforma itemizada: marca a linha de SUBTOTAL de um bucket nomeado
+   * (hoje só "Despesas Financeiras", que continua sendo o grupo inteiro),
    * distinguindo-a das linhas de item individuais que ficam acima dela —
    * ambas são `nivel: 1`, mas sem este flag ficam visualmente idênticas na
-   * tela (mesma indentação, mesmo peso). Mesma convenção de rótulo/estilo
-   * (`subgrupo` vs. `item`) que `fluxo-tabela.ts` já usa na aba Fluxo de
-   * Caixa — a tela consome este flag para aplicar a classe CSS irmã.
+   * tela (mesma indentação, mesmo peso). A tela consome este flag para
+   * aplicar a classe CSS irmã de `fluxo-tabela.ts`.
    */
   subgrupo?: boolean;
 }
@@ -202,15 +180,18 @@ export interface ProformaAvancado {
   pctResultadoMaisPermutas: number | null;
   /**
    * Custo direto + custo indireto — a MESMA definição do Preliminar
-   * (`proforma.ts`, `investimentoTotal = custoDiretoTotal + custoIndiretoTotal`).
-   * Exposto porque a listagem precisa de ROI, e ROI sem denominador comum entre
-   * os dois níveis compara coisas diferentes na mesma coluna.
+   * (`proforma.ts`, `investimentoTotal = custoDiretoTotal + custoIndiretoTotal`)
+   * e a MESMA de antes da #742: soma TODO o custo do motor, incluindo
+   * Corretagem e Marketing — a reclassificação delas para "dedução de
+   * receita" é só de APRESENTAÇÃO na tabela (ver o cabeçalho do arquivo); o
+   * ROI que o Painel de estudos usa não pode mudar de valor por causa de um
+   * reordenamento de linhas.
    */
   investimentoTotal: number;
   /**
-   * `resultado / investimentoTotal * 100` — de novo, literalmente a fórmula do
-   * Preliminar. Não é indicador novo: é o mesmo indicador, calculado a partir das
-   * séries do Avançado em vez dos campos fixos que ele não tem.
+   * `resultado / investimentoTotal * 100` — de novo, literalmente a fórmula
+   * do Preliminar. Não é indicador novo: é o mesmo indicador, calculado a
+   * partir das séries do Avançado em vez dos campos fixos que ele não tem.
    *
    * #611 — `null` quando `investimentoTotal <= 0`: mesmo padrão que a #571
    * levou a `margemLiquidaPct`/`custoObrasVgvPct` no Preliminar, e que
@@ -226,20 +207,49 @@ const soma = (serie: number[]): number => serie.reduce((s, v) => s + v, 0);
 const round2 = (v: number): number => Math.round(v * 100) / 100;
 
 /**
- * #447: override LOCAL de rótulo, só para esta proforma — nunca edite
- * `GRUPO_CUSTO_LABEL` (`fluxo-tabela.ts:25`) para "consertar" isto, porque
- * esse mapa é compartilhado pela aba Fluxo de Caixa (`fluxo-tabela.ts`) e
- * pelo Resumo (`tela-resumo.ts`), e uma edição ali renomeia as duas.
+ * #742 — casamento por NOME, não por grupo. `LinhaCalc.nome` (a única coisa
+ * que esta função recebe sobre cada linha de custo — ver o comentário de
+ * arity mais abaixo) já É a categoria que o usuário escolheu na aba Custos,
+ * resolvida por `nomeLinhaCusto` dentro do motor (`fluxo-caixa-motor.ts:62`):
+ * `[categoria, subcategoria (só terreno)].join(' — ')`. Por isso comparar
+ * `l.nome` com o texto exato da categoria funciona sem precisar da linha de
+ * config bruta (`custosRaw`), que esta função não recebe.
  *
- * Aqui, e só aqui, "Custos Financeiros" ganha o parêntese porque esta
- * proforma é DESALAVANCADA (ver o cabeçalho do arquivo): o grupo vale
- * EXATAMENTE as linhas de custo que o usuário classificou como financeiras,
- * nunca o serviço da dívida do funding — que na aba Fluxo de Caixa está
- * incluído no mesmo rótulo, sem parêntese. Duas grandezas, dois rótulos.
+ * Cada bucket é tentado NA ORDEM do pedido do autor; uma linha cai no
+ * primeiro que casar. O que sobra (categoria "Outro", ou combinação que o
+ * catálogo de Custos ainda não previu) cai no fallback do próprio bloco
+ * (direto/indireto) — nunca é descartado.
  */
-const ROTULO_PROFORMA: Partial<Record<string, string>> = {
-  financeiro: 'Custos Financeiros (exclui serviço da dívida)',
-};
+const BUCKETS_DIRETO: Array<{ rotulo: string; casa: (l: LinhaCalc) => boolean }> = [
+  { rotulo: 'Terreno', casa: (l) => l.grupo === 'terreno' && l.nome.startsWith('Preço') },
+  { rotulo: 'Projetos e aprovações', casa: (l) => l.nome === 'Projetos' || l.nome === 'Licenças e Aprovações' },
+  { rotulo: 'Outorga', casa: (l) => l.nome === 'Outorga' },
+  { rotulo: 'Incorporação e registro', casa: (l) => l.nome === 'Registro' },
+  { rotulo: 'Construção', casa: (l) => l.nome === 'Construção' },
+  { rotulo: 'Gestão da construção', casa: (l) => l.nome === 'Gestão da obra' },
+  { rotulo: 'Decoração', casa: (l) => l.nome === 'Decoração' },
+  // "Manutenção pós-obra" não tem categoria correspondente no catálogo de
+  // Custos do Avançado (só existe como `manutencao_pct` no Preliminar) — sem
+  // bucket aqui, de propósito: nenhuma linha bateria nele, e um bucket morto
+  // não é diferente de omiti-lo.
+  { rotulo: 'Contingências', casa: (l) => l.nome === 'Contingência' },
+];
+
+const BUCKETS_INDIRETO: Array<{ rotulo: string; casa: (l: LinhaCalc) => boolean }> = [
+  { rotulo: 'Marketing global', casa: (l) => l.nome === 'Marketing global' },
+  { rotulo: 'Stand e estrutura de vendas', casa: (l) => l.nome === 'Stand de vendas' },
+  { rotulo: 'Gestão e outros custos indiretos', casa: (l) => l.nome === 'Gestão' || l.nome === 'Outro' },
+];
+
+/** Soma e ITEMIZA (nome a nome, > R$ 0,005) as linhas de um subconjunto — usada pelos dois blocos (direto/indireto) e por "Despesas Financeiras". */
+function itemizar(linhas: LinhaCalc[], destino: LinhaProformaAv[]): number {
+  let total = 0;
+  for (const l of linhas) {
+    total += l.total;
+    if (Math.abs(l.total) > 0.005) destino.push({ nome: `(-) ${l.nome}`, valor: -l.total, nivel: 1, tipo: 'custo' });
+  }
+  return total;
+}
 
 /**
  * #447: linha do rodapé que avisa sobre o serviço da dívida do funding —
@@ -271,9 +281,12 @@ export function linhaInformativaFunding(totalSaidasFunding: number): LinhaProfor
  * `categoria` — a arity é a mesma travada pela #426), então quem monta é a
  * TELA (`tela-fluxo-ver.ts`, que tem `d.custos`).
  *
- * `informativo`, nunca somada em `resultado` — é uma SEGUNDA leitura de
- * "receita líquida", ao lado de `= Receita líquida` (que continua sendo
- * `receitaMensal`, sem corretagem/marketing). Nenhum cálculo existente muda.
+ * ⚠️ #742: desde que Corretagem/Marketing viraram deduções de receita
+ * também em `= Receita líquida` (não só nesta linha informativa), as duas
+ * leituras tendem a coincidir num estudo comum — mas continuam sendo DUAS
+ * grandezas, calculadas por caminhos diferentes (`receitaMensal` vs.
+ * `receitaLiquidaDeProformaMensal`), e esta linha continua informativa,
+ * nunca somada. Ver o comentário do cabeçalho do arquivo.
  */
 export function linhaInformativaReceitaLiquidaEvi(receitaLiquidaEviTotal: number): LinhaProformaAv {
   return {
@@ -298,67 +311,116 @@ export function proformaAvancado(
 ): ProformaAvancado {
   const linhas: LinhaProformaAv[] = [];
   const receitaBruta = c.receitaBruta;
-  const receitaLiquida = soma(c.receitaMensal);
+  const receitaLiquidaCanonica = soma(c.receitaMensal);
   // Mesma ponte da tabela do fluxo (#349): a diferença entre bruta e líquida
-  // é o RET mais a permuta financeira. Negativa, como toda dedução aqui.
-  const deducoes = receitaLiquida - receitaBruta;
+  // canônica é o RET mais a permuta financeira — nada mais. Corretagem e
+  // Marketing NÃO entram aqui: no motor elas continuam sendo custo (ver o
+  // cabeçalho do arquivo), e é dessa diferença que `impostoTotal` é
+  // derivado, sem precisar de uma série própria de RET.
+  const permutaFinanceiraDeducao = c.permutaFinanceiraTotal;
+  const impostoTotal = round2(-(receitaLiquidaCanonica - receitaBruta) - permutaFinanceiraDeducao);
 
-  linhas.push({ nome: 'Receita bruta (VGV)', valor: receitaBruta, nivel: 0, tipo: 'receita' });
-  if (Math.abs(deducoes) > 0.005) {
-    linhas.push({ nome: '(-) Impostos e deduções sobre a receita', valor: deducoes, nivel: 1, tipo: 'custo' });
+  // ── Classificação das linhas de custo — uma única passada, por NOME ──
+  const usados = new Set<LinhaCalc>();
+  let corretagemTotal = 0;
+  let marketingTotal = 0;
+  for (const l of c.linhasCusto) {
+    if (l.nome === 'Corretagem de vendas') { corretagemTotal += l.total; usados.add(l); }
+    else if (l.nome === 'Marketing & Publicidade') { marketingTotal += l.total; usados.add(l); }
   }
+
+  // ── Bloco 1: Receita bruta → deduções de receita → Receita líquida ──
+  linhas.push({ nome: 'Receita bruta (VGV)', valor: receitaBruta, nivel: 0, tipo: 'receita' });
+  if (Math.abs(impostoTotal) > 0.005) linhas.push({ nome: '(-) Imposto', valor: -impostoTotal, nivel: 1, tipo: 'custo' });
+  if (Math.abs(corretagemTotal) > 0.005) linhas.push({ nome: '(-) Corretagem', valor: -corretagemTotal, nivel: 1, tipo: 'custo' });
+  if (Math.abs(marketingTotal) > 0.005) linhas.push({ nome: '(-) Marketing', valor: -marketingTotal, nivel: 1, tipo: 'custo' });
+  if (Math.abs(permutaFinanceiraDeducao) > 0.005) {
+    linhas.push({ nome: '(-) Permuta financeira', valor: -permutaFinanceiraDeducao, nivel: 1, tipo: 'custo' });
+  }
+  const receitaLiquida = round2(receitaBruta - impostoTotal - corretagemTotal - marketingTotal - permutaFinanceiraDeducao);
   linhas.push({ nome: '= Receita líquida', valor: receitaLiquida, nivel: 0, tipo: 'receita' });
 
-  // Custo DIRETO = tudo que não é o grupo `indireto`. É a tradução da
-  // segmentação da imagem (que põe Terreno, Construção, Gestão, Decoração,
-  // Manutenção e Despesas Financeiras no direto, e só Marketing global e
-  // Gestão/outros no indireto) para os 5 grupos que o Avançado modela.
-  const linhasDoGrupo = (g: string) => c.linhasCusto.filter((x) => x.grupo === g);
-  const totalDoGrupo = (g: string) => linhasDoGrupo(g).reduce((s, x) => s + x.total, 0);
-
-  // #Proforma itemizada: além do subtotal por grupo, lista cada linha de
-  // custo INDIVIDUAL que o usuário cadastrou em Custos, com o nome que ele
-  // mesmo deu a ela (`x.nome`, já resolvido por `nomeLinhaCusto` dentro do
-  // motor — inclui categoria + subcategoria quando o grupo é `terreno`).
-  // Mesmo critério de magnitude que a linha "Impostos e deduções" já usa:
-  // item com total ~zero não aparece, mas o subtotal do grupo continua
-  // somando TODAS as linhas (inclusive as zeradas), para não divergir do
-  // Custo Total que a aba Fluxo de Caixa mostra para o mesmo estudo.
-  const diretos = GRUPOS_CUSTO.filter((g) => g !== 'indireto');
-  let custoDireto = 0;
-  for (const g of diretos) {
-    const doGrupo = linhasDoGrupo(g);
-    if (doGrupo.length === 0) continue;
-    const total = totalDoGrupo(g);
-    custoDireto += total;
-    for (const item of doGrupo) {
-      if (Math.abs(item.total) <= 0.005) continue;
-      linhas.push({ nome: `(-) ${item.nome}`, valor: -item.total, nivel: 1, tipo: 'custo' });
-    }
-    linhas.push({ nome: `(-) ${ROTULO_PROFORMA[g] ?? GRUPO_CUSTO_LABEL[g]}`, valor: -total, nivel: 1, tipo: 'custo', subgrupo: true });
+  // ── Buckets nomeados, casados por NOME — independente do grupo/aba em que
+  // a linha está classificada na tela de Custos (decisão do autor, #742).
+  // Um item de 'Projetos' cadastrado por engano no grupo `indireto` ainda cai
+  // no bucket "Projetos e aprovações" da seção de custo DIRETO. Só o que
+  // sobra depois das duas rodadas de bucket nomeado usa o grupo original
+  // como critério de fallback (direto × indireto) — é o único papel que o
+  // grupo ainda desempenha aqui.
+  const restantes = new Set(c.linhasCusto.filter((l) => !usados.has(l)));
+  let custoDiretoExibido = 0;
+  for (const bucket of BUCKETS_DIRETO) {
+    const doBucket = [...restantes].filter((l) => bucket.casa(l));
+    for (const l of doBucket) restantes.delete(l);
+    custoDiretoExibido += itemizar(doBucket, linhas);
   }
-  linhas.push({ nome: '= Custo direto total', valor: -custoDireto, nivel: 0, tipo: 'custo' });
-
-  const doIndireto = linhasDoGrupo('indireto');
-  const custoIndireto = totalDoGrupo('indireto');
-  if (doIndireto.length > 0) {
-    for (const item of doIndireto) {
-      if (Math.abs(item.total) <= 0.005) continue;
-      linhas.push({ nome: `(-) ${item.nome}`, valor: -item.total, nivel: 1, tipo: 'custo' });
-    }
-    linhas.push({ nome: `(-) ${GRUPO_CUSTO_LABEL.indireto}`, valor: -custoIndireto, nivel: 1, tipo: 'custo', subgrupo: true });
+  // "Despesas Financeiras" — o grupo `financeiro` inteiro, como um bucket só
+  // (mantém o rótulo com parêntese: ver o cabeçalho do arquivo). Este é o
+  // ÚNICO bucket que ainda casa pelo `grupo`, não pelo nome — porque
+  // representa o grupo inteiro, não uma categoria específica dele.
+  const financeiros = [...restantes].filter((l) => l.grupo === 'financeiro');
+  for (const l of financeiros) restantes.delete(l);
+  if (financeiros.length > 0) {
+    const totalFinanceiro = itemizar(financeiros, linhas);
+    custoDiretoExibido += totalFinanceiro;
+    linhas.push({
+      nome: '(-) Despesas Financeiras (exclui serviço da dívida)',
+      valor: -totalFinanceiro, nivel: 1, tipo: 'custo', subgrupo: true,
+    });
   }
-  linhas.push({ nome: '= Custo indireto total', valor: -custoIndireto, nivel: 0, tipo: 'custo' });
+
+  // ── Buckets nomeados do custo INDIRETO (mesma regra: por nome, não grupo).
+  // As linhas só são EMPILHADAS depois de "Receita operacional" (mais abaixo)
+  // — aqui só se decide QUEM entra em cada lado e se soma o total.
+  const linhasIndiretoPendentes: LinhaCalc[] = [];
+  for (const bucket of BUCKETS_INDIRETO) {
+    const doBucket = [...restantes].filter((l) => bucket.casa(l));
+    for (const l of doBucket) { restantes.delete(l); linhasIndiretoPendentes.push(l); }
+  }
+
+  // Fallback: qualquer linha que nenhum bucket nomeado reivindicou (categoria
+  // "Outro", ou combinação que o catálogo ainda não prevê) — nunca descartada,
+  // só sem rótulo canônico. Aqui, e só aqui, o GRUPO ORIGINAL decide se ela
+  // soma no custo direto ou no indireto.
+  const sobrouDireto = [...restantes].filter((l) => l.grupo !== 'indireto');
+  const sobrouIndireto = [...restantes].filter((l) => l.grupo === 'indireto');
+  linhasIndiretoPendentes.push(...sobrouIndireto);
+
+  const custoIndiretoExibido = linhasIndiretoPendentes.reduce((s, l) => s + l.total, 0);
+  custoDiretoExibido += sobrouDireto.reduce((s, l) => s + l.total, 0);
+  for (const l of sobrouDireto) {
+    if (Math.abs(l.total) > 0.005) linhas.push({ nome: `(-) ${l.nome}`, valor: -l.total, nivel: 1, tipo: 'custo' });
+  }
+
+  linhas.push({ nome: '= Custo direto total', valor: -custoDiretoExibido, nivel: 0, tipo: 'custo' });
+
+  const receitaOperacional = round2(receitaLiquida - custoDiretoExibido);
+  linhas.push({ nome: '= Receita operacional', valor: receitaOperacional, nivel: 0, tipo: 'receita' });
+
+  itemizar(linhasIndiretoPendentes, linhas);
+  linhas.push({ nome: '= Custo indireto total', valor: -custoIndiretoExibido, nivel: 0, tipo: 'custo' });
 
   // #427 (achado do Codex, rodada 1): normaliza a 2 casas AQUI, antes de
-  // derivar os outros dois fechos. `receitaLiquida`/`custoDireto`/
-  // `custoIndireto` são somas de séries já round2'das mês a mês, mas somar
-  // dezenas/centenas de valores de 2 casas em ponto flutuante ainda pode
-  // deixar resíduo (`0.1 + 0.2 = 0.30000000000000004`). Sem este round2, a
-  // 1ª linha (sem round2) e as duas linhas novas (com round2 explícito logo
-  // abaixo) podiam divergir na última casa — quebrando o C7 na 1ª linha e a
-  // igualdade exata que a degenerescência (permutas zeradas) promete.
-  const resultado = round2(receitaLiquida - custoDireto - custoIndireto);
+  // derivar os outros dois fechos. `receitaLiquida`/`custoDiretoExibido`/
+  // `custoIndiretoExibido` são somas de séries já round2'das mês a mês, mas
+  // somar dezenas/centenas de valores de 2 casas em ponto flutuante ainda
+  // pode deixar resíduo (`0.1 + 0.2 = 0.30000000000000004`). Sem este
+  // round2, a 1ª linha (sem round2) e as duas linhas novas (com round2
+  // explícito logo abaixo) podiam divergir na última casa.
+  //
+  // ⚠️ #742 — esta conta é ALGEBRICAMENTE IDÊNTICA à de antes da issue, ainda
+  // que `custoDiretoExibido` já não seja "todo o custo direto do motor"
+  // (Corretagem/Marketing saíram para a seção de deduções). A prova: seja
+  // `X` a soma de Corretagem+Marketing.
+  //   antes:  resultado = receitaLiquidaCanonica − custoDiretoTodo − custoIndireto
+  //         (custoDiretoTodo = custoDiretoExibido + X)
+  //   agora:  resultado = (receitaLiquidaCanonica − X) − custoDiretoExibido − custoIndireto
+  // Os dois se cancelam — o `X` que saiu da receita líquida é exatamente o
+  // `X` que saiu do custo direto. `custoIndiretoExibido` não muda em nenhum
+  // dos dois casos (Corretagem/Marketing nunca foram `indireto`). Coberto por
+  // `fluxo-apresentacao.test.ts`, "#427 não-regressão" e "#351 Resultado
+  // reconcilia com o fluxo do motor".
+  const resultado = round2(receitaOperacional - custoIndiretoExibido);
 
   // #427 — a EVI fecha com TRÊS leituras do mesmo projeto
   // (`Premissas e Resultados!K35/K37/K39`), cada uma com sua própria base:
@@ -368,7 +430,7 @@ export function proformaAvancado(
   // `permutaFinanceiraTotal` já vem ESTORNADO (positivo) do motor — somar,
   // não subtrair, é o mecanismo de `P37 = P39 − P15 − P16`. A permuta física
   // nunca passou pela receita, então soma no numerador E no denominador da
-  // 3ª linha; a financeira já está dentro do VGV, então não muda a base.
+  // 3ª leitura; a financeira já está dentro do VGV, então não muda a base.
   const resultadoMaisPermutaFinanceira = round2(resultado + c.permutaFinanceiraTotal);
   const resultadoMaisPermutas = round2(resultadoMaisPermutaFinanceira + c.vgvPermutaFisica);
   const baseComPermutaFisica = receitaBruta + c.vgvPermutaFisica;
@@ -392,20 +454,13 @@ export function proformaAvancado(
   // nem o rótulo nem a nota aparecem — degenerescência do critério de aceite 4.
   // ⚠️ #512: o limiar de meio centavo ficou VACUOSO quando o motor passou a
   // publicar `vgvPermutaFisica` já em 2 casas — o valor só pode ser `0` ou
-  // ≥ `0,01`, nunca no meio. Mantido como `> 0` explícito, que é o que a
-  // pergunta sempre foi ("há permuta física?"); manter o `0.005` faria a frase
-  // prometer uma tolerância que não existe mais, e frase falsa é pior que a
-  // ausência dela.
+  // ≥ `0,01`, nunca no meio. Mantido como `> 0` explícito.
   const temPermutaFisica = c.vgvPermutaFisica !== 0;
 
-  linhas.push({ nome: '= Resultado', valor: resultado, nivel: 0, tipo: 'resultado', pctOverride: pctResultado });
-  linhas.push({
-    nome: '= Resultado + Perm. Financ.',
-    valor: resultadoMaisPermutaFinanceira,
-    nivel: 0,
-    tipo: 'resultado',
-    pctOverride: pctResultadoMaisPermutaFinanceira,
-  });
+  // #742 — rodapé de resultados na ordem que o autor pediu: primeiro a
+  // leitura mais inclusiva (todas as permutas), depois só a financeira, e só
+  // na ÚLTIMA linha o resultado de fato (sem nenhuma permuta somada de
+  // volta). Os TRÊS VALORES não mudam — só a ordem de exibição.
   linhas.push({
     nome: temPermutaFisica ? '= Resultado + Permutas' : '= Resultado',
     valor: resultadoMaisPermutas,
@@ -414,8 +469,21 @@ export function proformaAvancado(
     pctOverride: pctResultadoMaisPermutas,
     ...(temPermutaFisica ? { notaBase: '1 / (VGV + Permutas Físicas)' } : {}),
   });
+  linhas.push({
+    nome: '= Resultado + Perm. Financ.',
+    valor: resultadoMaisPermutaFinanceira,
+    nivel: 0,
+    tipo: 'resultado',
+    pctOverride: pctResultadoMaisPermutaFinanceira,
+  });
+  linhas.push({ nome: '= Resultado', valor: resultado, nivel: 0, tipo: 'resultado', pctOverride: pctResultado });
 
-  const investimentoTotal = custoDireto + custoIndireto;
+  // ⚠️ investimentoTotal NÃO usa custoDiretoExibido/custoIndiretoExibido — ver
+  // o comentário do campo homônimo na interface. Soma TODO o custo do motor,
+  // Corretagem e Marketing inclusive, porque a reclassificação delas é só de
+  // apresentação na tabela e o ROI não pode mudar de valor por causa disso.
+  const custoTotalMotor = c.linhasCusto.reduce((s, l) => s + l.total, 0);
+  const investimentoTotal = custoTotalMotor;
 
   return {
     linhas,
@@ -429,9 +497,7 @@ export function proformaAvancado(
     pctResultadoMaisPermutas,
     investimentoTotal,
     // #611: denominador inválido devolve `null`, nunca 0 — mesmo mecanismo do
-    // `roiPct` gêmeo em proforma.ts. A #604 (PR 647) deliberadamente não
-    // tocou este campo, deixando-o para esta issue — ver o teste nomeado em
-    // `frontend/proforma-avancado-vgv-zero.test.ts`, reescrito abaixo.
+    // `roiPct` gêmeo em proforma.ts.
     roiPct: investimentoTotal > 0 ? (resultado / investimentoTotal) * 100 : null,
   };
 }
