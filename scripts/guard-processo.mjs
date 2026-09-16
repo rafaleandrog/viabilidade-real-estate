@@ -46,6 +46,7 @@ const OBRIGATORIOS = [
   ['.claude/guarda-monorepo.sh', 'hook PreToolUse — a única defesa contra escrita no monorepo'],
   ['scripts/testar-guarda-monorepo.sh', 'a bateria da guarda'],
   ['scripts/testar-revisao-registrada.sh', 'a bateria do parsing da atestação'],
+  ['scripts/testar-colheita-motor.mjs', 'a bateria da colheita — sem ela, falha de lente vira laudo limpo'],
   ['scripts/guard-pr-escopo-processo.mjs', 'a regra R1 — processo não viaja com código de produto'],
   ['scripts/preflight-pr.mjs', 'o portão que roda os guards de corpo/diff ANTES de abrir o PR'],
   ['scripts/testar-preflight-pr.sh', 'a bateria do preflight — portão sem bateria dá licença'],

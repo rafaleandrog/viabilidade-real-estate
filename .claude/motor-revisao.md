@@ -537,6 +537,29 @@ Todo briefing carrega, além da lente ou do framework:
   frase evita relatório escrito como se fosse aplicar.
 - **Limite rígido de 350 a 450 palavras.** Só achados materiais, com arquivo e linha; nada de
   estilo, preferência, nem código que o diff não toca. O que passou vira **uma** linha no fim.
+- **No Kimi, o CONTRATO DE SAÍDA também vai no briefing** — e ele não é opcional. O Codex tem
+  subcomando `review` e devolve markdown padronizado sozinho; **o Kimi não tem formato nenhum**, e
+  sem o contrato ele devolve prosa livre: os achados aparecem, mas sem severidade declarada e sem
+  separar achado de contexto, e a deduplicação vira trabalho manual do orquestrador. O formato é o
+  **mesmo do motor nativo**, de propósito, para que o texto continue comparável quando uma lente
+  troca de motor no meio da escada de falha:
+
+  ```text
+  LENTE: <id>            MOTOR: kimi/<modelo>      DURACAO: <s>
+  VEREDITO: sem-achado | precisa-atencao | NAO_EXECUTADA
+  RESUMO: <uma linha>
+  --- por achado:
+  ACHADO: <severidade> | <arquivo>:<linha> | <título>
+  CITACAO: "<a citação literal>"
+  CORPO: <2 a 3 frases>
+  ```
+- **No Kimi, diga à lente ONDE ela é cega.** As ferramentas dela são `Read`/`Grep`/`Glob` com o
+  cwd na árvore revisada mais o `--add-dir "$OUT"`; **fora disso ela não enxerga nada** — `/opt`,
+  `/usr`, `$HOME`, o resto do disco. Sem essa frase ela traduz *"não consigo ler"* em *"não
+  existe"* e devolve achado falso com aparência de fato medido. Aconteceu: uma lente afirmou que o
+  binário do próprio `kimi` não estava em `/opt/node22/bin`, e estava. A frase é: *"você só
+  enxerga a árvore do repositório e o diretório do diff; o que estiver fora disso você NÃO
+  consegue ler — e isso se declara como **não verificável**, nunca como ausente."*
 - **ADAPTADO — não ler nem escrever em `/home/user/urbiverso`.** O monorepo pode estar clonado
   nesta máquina e ser gravável; o upstream confiava em ele simplesmente não estar. Aqui a frase é
   obrigatória, porque a lente não tem como saber: *"não leia, não abra, não faça `grep` e não
@@ -686,60 +709,122 @@ O `execucao.txt` é o que alimenta o quadro de execução da §7 — tier, esfor
 
 ## A colheita — e a guarda que impede falha virar laudo limpo
 
-**Turno que falha AINDA emite um `agent_message`** dizendo *"Review was interrupted. Please
-re-run /review and wait for it to complete."* Lido sem guarda, isso vira um relatório de zero
-achados — a falha vira `approve`. A colheita testa `turn.failed`/`error` **antes** de olhar a
-mensagem.
+**Os dois motores falham de jeitos diferentes, e nenhum dos dois falha alto.** Cada um precisa da
+sua guarda; usar a do outro é o mesmo laudo limpo falso com outra roupa.
 
-> ⚠️ **Os dois motores emitem formatos DIFERENTES, e a colheita tem que conhecer os dois.** O
-> Codex fecha em `{"type":"item.completed","item":{"type":"agent_message","text":…}}`; o Kimi, em
-> `{"role":"assistant","content":…}` — é a mesma forma que o smoke test do preflight já
-> exercita. Uma colheita que só conheça o formato do Codex devolve `texto` **vazio** para toda
-> lente Kimi, e o `[ -z "$texto" ]` logo abaixo as reporta como **NÃO EXECUTADA** — ou seja, num
-> ambiente em que a fan-out inteira roda em Kimi, a revisão volta sem achado nenhum e **parecendo
-> um problema de motor**. É o laudo limpo falso pela porta oposta à que esta seção existe para
-> fechar. Achado P1 do App do Codex na rodada 1 do PR que trouxe o Kimi para cá — e ele passou
-> pelas cinco lentes Kimi, que liam o próprio JSONL por outro caminho.
+- **Codex:** turno que falha **AINDA emite um `agent_message`** dizendo *"Review was interrupted.
+  Please re-run /review and wait for it to complete."* Lido sem guarda, isso vira relatório de zero
+  achados. A guarda testa `turn.failed`/`error` **antes** de olhar a mensagem.
+- **Kimi:** **não existe `turn.failed`, não existe `item.completed`, não existe "Review was
+  interrupted"** — o schema do `stream-json` não parece em nada com o do Codex. O que existe é uma
+  linha por mensagem (`{"role":"assistant","tool_calls":[…]}`, `{"role":"tool",…}`,
+  `{"role":"assistant","content":"<a resposta>"}`) mais dois `role:"meta"`. A resposta é o **último
+  `role=assistant` com `.content` não-nulo**; o sinal de falha é exit ≠ 0 ou ausência dessa linha.
+  Falha interna sai como `INTERNAL_ERROR` no stderr.
+
+> ⚠️ **Esta seção já custou um P1.** A primeira versão do port do Kimi neste repositório manteve a
+> colheita só do Codex, e com ela **toda lente Kimi bem-sucedida saía "NÃO EXECUTADA, texto
+> vazio"** — num ambiente em que a fan-out inteira roda em Kimi, a revisão voltaria limpa por
+> construção, parecendo problema de motor. Medido contra os JSONL reais daquela revisão: duas
+> lentes que tinham devolvido achados de 3.059 e 3.068 caracteres eram lidas como vazias.
+
+**Colha pela lista de lentes que você despachou, nunca pelos arquivos que existem.** Um
+`for f in "$OUT"/*.jsonl` parece equivalente e não é: a lente cujo processo morreu **antes** do
+redirecionamento não deixa arquivo nenhum, e **some do relatório** em vez de aparecer como falha —
+o modo de falha que a §7 chama de pior que a falha. `LENTES` é o mesmo roster do orçamento do
+passo 2.1.
 
 ```bash
-for f in "$OUT"/*.jsonl; do
-  id=$(basename "$f" .jsonl)
-  falha=$(jq -rc 'select(.type=="turn.failed" or .type=="error") | .type' "$f" 2>/dev/null | head -1)
-  # Codex primeiro; vazio, tenta o formato do Kimi. Os dois filtros são seguros no arquivo do
-  # outro motor: cada `select` simplesmente não casa nada, então a ordem não esconde erro.
-  texto=$(jq -r 'select(.type=="item.completed" and .item.type=="agent_message") | .item.text' "$f" 2>/dev/null | tail -c 8000)
-  [ -n "$texto" ] || texto=$(jq -rs '[.[] | select(.role=="assistant" and .content != null and .content != "")] | last | .content // empty' "$f" 2>/dev/null | tail -c 8000)
-  if [ -n "$falha" ] || [ -z "$texto" ] || printf '%s' "$texto" | grep -qi 'Review was interrupted'; then
-    echo "### $id — NÃO EXECUTADA (${falha:-saída vazia/interrompida})"
-    # com `--json` o erro sai no próprio JSONL, não no stderr — o motivo vem daqui
-    jq -r 'select(.type=="turn.failed" or .type=="error") | (.error.message // .message)' "$f" 2>/dev/null | head -c 400
-    grep -viE 'websocket|Reconnecting|bubblewrap|Falling back' "$OUT/$id.err" | tail -2
+LENTES="L1 L2 S1 S2 T4"   # o roster do passo 2.1
+
+for id in $LENTES; do
+  f="$OUT/$id.jsonl"
+  motor=$(grep -o "^$id .*motor=[a-z]*" "$OUT/execucao.txt" 2>/dev/null | sed 's/.*motor=//')
+  rc=$(grep -o "^$id exit=[0-9]*" "$OUT/execucao.txt" 2>/dev/null | sed 's/.*=//')
+  if [ ! -s "$f" ] || [ -z "$motor" ]; then
+    echo "### $id — NÃO EXECUTADA (sem saída: o processo da lente não chegou a escrever)"
+    echo; continue
+  fi
+  if [ "$motor" = codex ]; then
+    falha=$(jq -rc 'select(.type=="turn.failed" or .type=="error") | .type' "$f" 2>/dev/null | head -1)
+    texto=$(jq -r 'select(.type=="item.completed" and .item.type=="agent_message") | .item.text' "$f" 2>/dev/null | tail -c 8000)
+    printf '%s' "$texto" | grep -qi 'Review was interrupted' && falha=interrompida
   else
-    echo "### $id"; printf '%s\n' "$texto"
+    falha=""
+    texto=$(jq -r 'select(.role=="assistant" and .content != null and .content != "") | .content' "$f" 2>/dev/null | tail -c 8000)
+  fi
+  if [ -n "$falha" ] || [ "${rc:-1}" != "0" ] || [ -z "$texto" ]; then
+    echo "### $id — NÃO EXECUTADA (motor $motor · ${falha:-exit=${rc:-?}, saída vazia})"
+    jq -r 'select(.type=="turn.failed" or .type=="error") | (.error.message // .message)' "$f" 2>/dev/null | head -c 400
+    # A linha de diagnóstico vem no TOPO de um stack trace e no fim de um erro de uma linha.
+    # `tail -2` sozinho devolve o rodapé do stack ("at Module._compile...") e perde o motivo.
+    ruido='websocket|Reconnecting|bubblewrap|Falling back|resuming'
+    { grep -viE "$ruido" "$OUT/$id.err" 2>/dev/null | grep -iE '^\s*(error|Error):|failed to run prompt' | head -2
+      grep -viE "$ruido" "$OUT/$id.err" 2>/dev/null | tail -2; } | awk '!vista[$0]++' | head -3
+  else
+    echo "### $id  (motor $motor)"; printf '%s\n' "$texto"
   fi
   echo
 done
 ```
 
-O relatório vem em markdown, sempre no mesmo formato: uma linha de resumo, depois `Full review
-comments:`, depois um item por achado — `- [P1] <título> — <caminho absoluto>:<linha
-inicial>-<linha final>`, com o corpo indentado abaixo. Sem achado nenhum, o bloco `Full review
-comments:` simplesmente não aparece: aí o veredito é `approve`.
+⚠️ **A checagem de `exit` NÃO é redundante com a de texto**, e remover qualquer uma das duas abre
+um buraco diferente. O caso que só o exit pega: **turno cortado depois de já ter escrito um
+`content` válido** — o texto não é vazio e o stderr é vazio, e a única coisa entre isso e um laudo
+limpo é o `rc != 0`.
 
-Os caminhos vêm **absolutos**, apontando para dentro do worktree — **relativize para a raiz do
-repo antes de citar no PR**, porque a árvore da revisão não existe para quem lê.
+**O formato do que volta também difere, e é o BRIEFING que tem que impor o do Kimi.** O Codex
+devolve markdown padronizado pelo próprio subcomando `review`: uma linha de resumo, `Full review
+comments:`, e um item por achado — `- [P1] <título> — <caminho absoluto>:<linha inicial>-<linha
+final>` com o corpo indentado. Sem achado, o bloco simplesmente não aparece. **O Kimi não tem
+formato nenhum**: quem carrega o contrato de saída é o briefing dele, e o contrato é o mesmo do
+motor nativo (`VEREDITO` / `RESUMO` / `ACHADO` / `CITACAO` / `CORPO` — ver a seção final). Sem
+isso o Kimi devolve prosa livre: os achados existem, mas sem severidade declarada e sem separar
+achado de contexto, e a deduplicação vira trabalho manual do orquestrador.
+
+Os caminhos do Codex vêm **absolutos**, apontando para dentro do worktree — **relativize para a
+raiz do repo antes de citar no PR**, porque a árvore da revisão não existe para quem lê.
+
+### A guarda tem teste, e o teste roda o código DESTE arquivo
+
+`node scripts/testar-colheita-motor.mjs` extrai o bloco bash da seção *A colheita* **daqui** e roda
+contra fixturas — não reimplementa nada, para que uma cópia não divirja em silêncio, que é o modo
+de falha que a própria guarda combate. É a mesma técnica que `scripts/testar-revisao-registrada.sh`
+usa para a expressão do workflow.
+
+As fixturas de falha não são inventadas: cada uma reproduz uma forma **observada** rodando os CLIs
+de verdade. As do Kimi, medidas pelo upstream:
+
+| Indução | exit | stdout | stderr |
+|---|---|---|---|
+| chave inválida | 1 | só a linha `system.version` | `provider.auth_error: 401 Invalid Authentication` |
+| modelo inexistente | 1 | só a linha `system.version` | `provider.api_error: 404 Not found the model` |
+| `timeout` no meio | 124 | corta no meio de uma linha JSON | **vazio** |
+| sem as `KIMI_MODEL_*` | 1 | só a linha `system.version` | `failed to run prompt: No model configured` |
+| `PROVIDER_TYPE` inválido, ou `-m` | 1 | só a linha `system.version` | stack trace do Node; a linha útil (`Error: Agent event … lifecycle context`) fica no **topo** |
+
+Se você mudar a colheita, rode o teste. Se ele ficar verde de primeira, quebre uma guarda de
+propósito e confirme que fica vermelho.
 
 ## Falha é falha, nunca "passou"
 
 Contam como **lente não executada**: `turn.failed`, evento `error`, "Review was interrupted",
-saída vazia, exit diferente de zero, `timeout` estourado, payload inválido.
+**ausência de `role=assistant` com `.content`** (o caso do Kimi), saída vazia, exit diferente de
+zero, `timeout` estourado, payload inválido.
 
-Re-despache **uma** vez. Persistindo numa lente só, ela entra no comentário do PR como não
-executada, **com o motivo**. Persistindo em bloco — todas falhando igual —, isso é o motor caindo no
-meio: refaça o preflight daquele motor uma vez e, não voltando, **passe as lentes dele para o motor
-cruzado**, pela coluna correspondente da tabela de tier. **O nativo só entra quando os DOIS
-externos caírem.** Em qualquer dos casos, diga no relatório quais lentes trocaram de motor e por quê
-— a coluna *Motor* do quadro de execução existe para isso.
+A escada tem três degraus, e **cada troca é declarada**:
+
+1. **Re-despache uma vez, no mesmo motor.** Falha isolada costuma ser transitória.
+2. **Persistindo numa lente só → troque de motor**, para a coluna cruzada da tabela de tier
+   (default Codex cai em Kimi; default Kimi cai em Codex), com o esforço da coluna de **destino**.
+   Re-despache uma vez lá. Falhou de novo, ela entra no comentário do PR como **não executada**,
+   com os dois motivos.
+3. **Persistindo em bloco — todas as lentes daquele motor falhando igual** — isso é o motor caindo
+   no meio. Refaça o preflight **daquele motor** uma vez; não voltou, **mova todas as lentes dele
+   para o outro motor** e siga. Os dois fora → termine no motor nativo.
+
+O relatório diz quais lentes trocaram de motor e por quê. **Fallback silencioso é laudo limpo falso
+com outro nome** — e agora existem dois caminhos de silêncio, não um.
 
 Uma lente não executada **nunca** vira linha do "o que foi confrontado e passou" da §7. Esse é
 o único jeito de a ausência de resultado virar ausência visível, em vez de laudo limpo falso.
@@ -756,7 +841,9 @@ mesmos briefings, mesmo orçamento — muda o veículo.
   lente e por rodada. `haiku` **nunca** numa lente: lente caça defeito sem diagnóstico nenhum.
   **Nunca `fable` num subagente** — tarefa delimitada não é assento dele.
 - **Texto livre em formato fixo, nunca saída estruturada** (`StructuredOutput`/`schema` falha
-  100% das vezes nesta instalação — ver `CLAUDE.md`):
+  100% das vezes nesta instalação — ver `CLAUDE.md`). **É o mesmo bloco que o briefing do Kimi
+  impõe** (ver *O briefing viaja sozinho*), e não é coincidência: quando uma lente cai de Kimi para
+  nativo, ou o contrário, o texto que volta tem que ser comparável sem retrabalho:
 
   ```text
   LENTE: <id>            MOTOR: nativo/<modelo>    DURACAO: <s>
