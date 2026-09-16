@@ -878,6 +878,44 @@ test('#742 (achado do Codex, rodada 1): com Contingência E financeiro no mesmo 
   assert.ok(idxFinanceiro < idxContingencia, 'ordem canônica: "... Despesas Financeiras, Contingências"');
 });
 
+test('#742 (achado do Codex, rodada 2): nome canônico vence o grupo mesmo quando a linha está em `financeiro`', () => {
+  const CONFIG_NOME_CANONICO_NO_GRUPO_FINANCEIRO: FluxoConfig = {
+    ...CONFIG_COMPLETA,
+    linhasCusto: [
+      ...CONFIG_COMPLETA.linhasCusto,
+      // Combinação que o backend aceita hoje: nome de bucket canônico, mas
+      // classificado no grupo `financeiro` em vez do grupo "natural" dele.
+      { id: 300, grupo: 'financeiro', categoria: 'Contingência', orcamento_valor: 40_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+      { id: 301, grupo: 'financeiro', categoria: 'Marketing global', orcamento_valor: 60_000, orcamento_unidade: 'rs', inicio_mes: 0, duracao_meses: 1 },
+    ],
+  };
+  const c = calcularFluxo(CONFIG_NOME_CANONICO_NO_GRUPO_FINANCEIRO);
+  const p = proformaAvancado(c, 1000);
+
+  // As duas têm que aparecer pelo BUCKET NOMEADO, nunca dentro do catch-all
+  // "Despesas Financeiras" — a classificação é por NOME, independente do
+  // grupo em que o usuário classificou a linha (decisão do autor, #742).
+  assert.ok(p.linhas.find((l) => l.nome === '(-) Contingência'), '"Contingência" tem que aparecer pelo nome, mesmo vindo do grupo financeiro');
+  assert.ok(p.linhas.find((l) => l.nome === '(-) Marketing global'), '"Marketing global" tem que aparecer pelo nome, mesmo vindo do grupo financeiro');
+
+  // "Despesas Financeiras" continua existindo (CONFIG_COMPLETA já tem uma
+  // linha 'Taxas bancárias'/financeiro, R$ 100.000, que ESSA sim não tem
+  // nome canônico e cai no catch-all) — mas o valor tem que ser EXATAMENTE
+  // essa, sem as duas linhas de nome canônico (Contingência R$ 40.000 e
+  // Marketing global R$ 60.000) misturadas dentro.
+  const linhaFinanceiro = p.linhas.find((l) => l.nome.startsWith('(-) Despesas Financeiras'))!;
+  assert.ok(linhaFinanceiro, '"Despesas Financeiras" continua existindo — só não pode incluir as linhas de nome canônico');
+  assert.ok(Math.abs(linhaFinanceiro.valor - -100_000) <= 0.01, 'só a linha SEM nome canônico ("Taxas bancárias") pode estar em Despesas Financeiras');
+
+  // Ordem preservada: "Contingência" continua depois de onde "Despesas
+  // Financeiras" estaria, e "Marketing global" continua entre "Receita
+  // operacional" e "= Custo indireto total" (não vira custo direto).
+  const idxReceitaOperacional = p.linhas.findIndex((l) => l.nome === '= Receita operacional');
+  const idxMarketingGlobal = p.linhas.findIndex((l) => l.nome === '(-) Marketing global');
+  const idxCustoIndiretoTotal = p.linhas.findIndex((l) => l.nome === '= Custo indireto total');
+  assert.ok(idxReceitaOperacional < idxMarketingGlobal && idxMarketingGlobal < idxCustoIndiretoTotal);
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // #591 — a dedução sobre a receita é CUSTO, e as três vistas concordam.
 //

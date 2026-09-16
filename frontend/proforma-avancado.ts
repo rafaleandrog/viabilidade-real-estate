@@ -372,10 +372,35 @@ export function proformaAvancado(
     for (const l of doBucket) restantes.delete(l);
     custoDiretoExibido += itemizar(doBucket, linhas);
   }
+  // ⚠️ #742 (achado do Codex, rodada 2): os buckets NOMEADOS (Contingências e
+  // os de custo indireto) têm que reivindicar seus matches ANTES do catch-all
+  // "Despesas Financeiras" rodar — senão uma linha como
+  // `{ nome: 'Marketing global', grupo: 'financeiro' }` (combinação que o
+  // backend aceita hoje) seria varrida para dentro do financeiro só por
+  // `grupo`, antes de o bucket nomeado (que casa por NOME, independente do
+  // grupo) poder vê-la. Aqui só se DECIDE quem entra em cada bucket nomeado —
+  // "Contingências" e os indiretos ainda não são EMPILHADOS: a ORDEM de
+  // emissão ("... Despesas Financeiras, Contingências") é decidida abaixo,
+  // depois do catch-all financeiro rodar sobre o que sobrar.
+  const contingencias = [...restantes].filter((l) => BUCKET_CONTINGENCIA.casa(l));
+  for (const l of contingencias) restantes.delete(l);
+
+  // ── Buckets nomeados do custo INDIRETO (mesma regra: por nome, não grupo).
+  // As linhas só são EMPILHADAS depois de "Receita operacional" (mais abaixo)
+  // — aqui só se decide QUEM entra em cada lado e se soma o total.
+  const linhasIndiretoPendentes: LinhaCalc[] = [];
+  for (const bucket of BUCKETS_INDIRETO) {
+    const doBucket = [...restantes].filter((l) => bucket.casa(l));
+    for (const l of doBucket) { restantes.delete(l); linhasIndiretoPendentes.push(l); }
+  }
+
   // "Despesas Financeiras" — o grupo `financeiro` inteiro, como um bucket só
   // (mantém o rótulo com parêntese: ver o cabeçalho do arquivo). Este é o
   // ÚNICO bucket que ainda casa pelo `grupo`, não pelo nome — porque
-  // representa o grupo inteiro, não uma categoria específica dele.
+  // representa o grupo inteiro, não uma categoria específica dele. Roda por
+  // ÚLTIMO entre os buckets de custo direto/indireto (ver o comentário acima
+  // sobre a ordem de reivindicação), só sobre o que os buckets nomeados NÃO
+  // reivindicaram.
   const financeiros = [...restantes].filter((l) => l.grupo === 'financeiro');
   for (const l of financeiros) restantes.delete(l);
   if (financeiros.length > 0) {
@@ -387,20 +412,9 @@ export function proformaAvancado(
     });
   }
 
-  // "Contingências" — depois de "Despesas Financeiras", conforme a ordem
-  // canônica pedida (ver o comentário de `BUCKET_CONTINGENCIA` acima).
-  const contingencias = [...restantes].filter((l) => BUCKET_CONTINGENCIA.casa(l));
-  for (const l of contingencias) restantes.delete(l);
+  // "Contingências" — EMPILHADA agora, depois de "Despesas Financeiras",
+  // conforme a ordem canônica pedida (a reivindicação já aconteceu acima).
   custoDiretoExibido += itemizar(contingencias, linhas);
-
-  // ── Buckets nomeados do custo INDIRETO (mesma regra: por nome, não grupo).
-  // As linhas só são EMPILHADAS depois de "Receita operacional" (mais abaixo)
-  // — aqui só se decide QUEM entra em cada lado e se soma o total.
-  const linhasIndiretoPendentes: LinhaCalc[] = [];
-  for (const bucket of BUCKETS_INDIRETO) {
-    const doBucket = [...restantes].filter((l) => bucket.casa(l));
-    for (const l of doBucket) { restantes.delete(l); linhasIndiretoPendentes.push(l); }
-  }
 
   // Fallback: qualquer linha que nenhum bucket nomeado reivindicou (categoria
   // "Outro", ou combinação que o catálogo ainda não prevê) — nunca descartada,
