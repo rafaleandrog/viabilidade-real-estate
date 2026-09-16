@@ -534,7 +534,20 @@ for f in aprendizados retirados; do
   # indistinguível do caso legítimo, com o diagnóstico errado carimbado — e o `2>/dev/null`
   # apagava a única evidência de qual tinha sido. Achado de lente. `cat-file -e` responde só a
   # primeira; depois dela, falha do `show` é erro de verdade e ABORTA.
-  if git -C "$WT" cat-file -e "$alvo" 2>/dev/null; then
+  # ⚠️ `ls-tree`, e não `cat-file -e`. O `-e` sai não-zero em QUALQUER erro de leitura, não só na
+  # ausência — blob faltando num clone parcial (o `rev-parse` acima passa, porque o objeto do
+  # COMMIT está local e o do blob não), objeto corrompido, `alternates` quebrado —, então "não
+  # existe" e "não consegui responder" voltavam a cair no mesmo ramo, escrevendo o placebo que
+  # afirma o primeiro como FATO. Era a mesma frase falsa de novo, um passo adiante, agora com o
+  # carimbo de já-consertada. Achado de lente, segunda rodada sobre este bloco.
+  #
+  # O `ls-tree` separa os dois porque dá DOIS sinais: o código de saída responde "consegui ler a
+  # árvore?" e a saída responde "o caminho está nela?". Ele lê o objeto de árvore, não o blob.
+  listagem=$(git -C "$WT" ls-tree -r --name-only "$BASE" -- ".claude/revisao/$f.md") || {
+    echo "não consegui ler a árvore de $BASE — NÃO despache"; exit 1; }
+  if [ -n "$listagem" ]; then
+    # O caminho ESTÁ na base: daqui em diante, qualquer falha é erro de verdade e aborta. Sem
+    # `2>/dev/null` — apagar o stderr foi o vício que deixou a rodada anterior sem diagnóstico.
     git -C "$WT" show "$alvo" > "$OUT/corpus/$f.md" || {
       echo "git show falhou em $alvo (o arquivo EXISTE na base) — NÃO despache"; exit 1; }
     test -s "$OUT/corpus/$f.md" || { echo "$alvo saiu vazio — NÃO despache"; exit 1; }

@@ -164,10 +164,16 @@ function funcoesDoBash(texto) {
   let emBash = false;
   let fimHeredoc = null;
   for (const linha of linhas) {
-    if (/^```/.test(linha)) { emBash = /^```bash\s*$/.test(linha); atual = null; fimHeredoc = null; continue; }
+    // ⚠️ Heredoc ANTES de fence, e a ordem é o ponto. Testar o fence primeiro fazia uma linha
+    // ``` DENTRO do corpo de um heredoc ser lida como fence de verdade, zerando `atual` e
+    // `fimHeredoc` — e o comentário abaixo já promete que "nada ali abre ou fecha função". O
+    // motor tem heredoc com conteúdo markdown (o perfil da lente), que é exatamente onde um
+    // fence pode aparecer. Achado de lente.
+    if (fimHeredoc !== null) { if (linha.trim() === fimHeredoc) fimHeredoc = null; continue; }
+    if (/^```/.test(linha)) { emBash = /^```bash\b/.test(linha) || /^```bash\s*$/.test(linha); atual = null; continue; }
     if (!emBash) continue;
-    // Corpo de heredoc é DADO, não código: nada ali abre ou fecha função.
-    if (fimHeredoc !== null) { if (linha.trimEnd() === fimHeredoc) fimHeredoc = null; continue; }
+    // Corpo de heredoc é DADO, não código: nada ali abre ou fecha função. O `<<-` do bash permite
+    // o delimitador indentado por TAB, então o fecho é comparado com a linha aparada nas pontas.
     const h = /<<-?\s*'?"?([A-Za-z_][A-Za-z0-9_]*)'?"?\s*$/.exec(linha);
     if (h) { fimHeredoc = h[1]; continue; }
     if (atual === null) {
@@ -187,13 +193,40 @@ function funcoesDoBash(texto) {
 // (`echo … # interpola ${COMUM}`); o corte de `\s#` até o fim da linha pega os dois. Ele pode
 // cortar um `#` dentro de string entre aspas, e isso é de propósito: o erro fica do lado de
 // acusar a mais, que é o lado seguro numa guarda de fiação. Achados de lente, duas rodadas.
+// Conta a marca no DOCUMENTO INTEIRO, sem reconhecer fence nem função. A independência tem que
+// ser total, e a primeira versão não era: ela também pulava fence não reconhecido, então uma
+// função de despacho dentro de um ```bash com info-string sumia dos DOIS lados e as contagens
+// concordavam no número errado — o laço fechado ficava verde justamente no caso que ele existe
+// para pegar. Medido, e foi por isso que esta contagem saiu de dentro do fence.
+//
+// O preço é que uma ocorrência da marca em prosa (fora de função) passa a reprovar. É o lado
+// certo de errar — a marca é o gravador do `execucao.txt`, não há motivo para citá-la solta, e
+// reprovar pede uma decisão de quem escreveu em vez de deixar passar calado.
+funcoesDoBash.marcasNoDoc = (texto, marca) =>
+  texto.split('\n').filter((l) => l.replace(/(^|\s)#.*$/, '').includes(marca)).length;
+
 const semComentario = (txt) => txt.split('\n').map((l) => l.replace(/(^|\s)#.*$/, '')).join('\n');
 
-const despachos = funcoesDoBash(motor).filter((f) => semComentario(f.corpo).includes('echo "$id exit=$rc'));
+const MARCA_DESPACHO = 'echo "$id exit=$rc';
+const despachos = funcoesDoBash(motor).filter((f) => semComentario(f.corpo).includes(MARCA_DESPACHO));
 assert.ok(
   despachos.length >= 2,
   'não achei as funções de despacho do motor (as cujo corpo grava a linha do `execucao.txt`) — ' +
     'sem elas esta guarda não tem o que medir, e o COMUM poderia deixar de viajar sem nada ficar vermelho',
+);
+// ⚠️ LAÇO FECHADO, e é ele que faz esta guarda não depender de um número. Antes, o que segurava
+// toda falha do parser era o `>= 2` casar com o documento ter hoje exatamente duas funções de
+// despacho — propriedade do TEXTO, não da guarda: bastava um terceiro fence ganhar a marca para
+// qualquer queda do parser virar falha ABERTA, com a contagem satisfeita e uma função real sem ser
+// medida. Achado de lente. Contando as ocorrências da marca de forma independente do parser e
+// exigindo que batam, qualquer função perdida no caminho — fence com info-string, heredoc mal
+// fechado, fence fechando antes do `}` — passa a ser vermelha, com quantas funções existirem.
+const ocorrencias = funcoesDoBash.marcasNoDoc(motor, MARCA_DESPACHO);
+assert.equal(
+  despachos.length, ocorrencias,
+  `o parser reconheceu ${despachos.length} função(ões) de despacho, mas a marca ${JSON.stringify(MARCA_DESPACHO)} ` +
+    `aparece ${ocorrencias} vez(es) no motor. A diferença é função de despacho que o parser ` +
+    'PERDEU — e função perdida não é medida por guarda nenhuma abaixo.',
 );
 // ⚠️ A checagem é sobre a INVOCAÇÃO, não sobre o corpo todo. `includes` no corpo aceitava
 // qualquer referência executável: um refactor que tirasse `${COMUM}` do argumento do prompt e
