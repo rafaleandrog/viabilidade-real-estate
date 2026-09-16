@@ -704,8 +704,11 @@ B**, a fan-out das lentes, é outra escolha e está logo abaixo.
 > **republica `success`**. Ausência de linha nova não apaga linha velha — só uma linha nova
 > sobrescreve.
 
-**São duas camadas que somam, não uma fila.** A **revisão do App** (`@codex review`) e a **fan-out
-das lentes** rodam as duas. O que é condicional é o motor *dentro* da fan-out, e desde 2026-09-16 há
+**São duas camadas que somam, não uma fila — e rodam em PARALELO.** A **revisão do App**
+(`@codex review`) e a **fan-out das lentes** rodam as duas, sempre que as duas estiverem
+disponíveis (decisão do autor, 2026-09-16). O acionamento do App vai **antes** do despacho da
+fan-out: ele responde em ~2 min, ela leva ~4–5, então a camada A sai de graça no relógio. Em
+série, custa o dobro. O que é condicional é o motor *dentro* da fan-out, e desde 2026-09-16 há
 **dois motores externos com fallback cruzado**: **Codex** por `codex exec` e **Kimi** por `kimi -p`,
 com o **subagente nativo** só quando os dois caírem — e aí **declarado** no relatório como menos
 adversarial, por revisar patch escrito pela mesma família de modelo. O App **não dispensa** a

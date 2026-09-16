@@ -101,6 +101,18 @@ isso não apareceu como falha em lugar nenhum.
 > A escolha condicional é **dentro da camada B** — Codex × Kimi × nativo. A camada A não dispensa a
 > B, e hoje a camada B deste repositório roda em **Kimi** (ver a medição acima).
 >
+> ⚠️ **As duas rodam JUNTAS, e em PARALELO — decisão do autor, 2026-09-16.** Acione o
+> `@codex review` **antes** de despachar a fan-out, não depois: o App responde em ~2 min e a
+> fan-out leva ~4–5, então a espera da camada A cabe inteira por baixo da camada B e custa zero
+> de relógio. Em série, custa o dobro. Sempre que os dois estiverem disponíveis, os dois rodam —
+> a rodada só cai para um deles quando o outro está fora, e aí o relatório diz qual e por quê.
+>
+> **E o ganho não é só de tempo — é de cobertura, medido neste repositório.** Na adoção do Kimi
+> (PR 737), as duas camadas acharam conjuntos quase disjuntos: o App do Codex levantou quatro P1
+> que as lentes Kimi não pegaram (a colheita cega ao formato do Kimi, o `motor=` ausente no
+> `lente()` do Codex, o `tail -1` do re-despacho e a guarda de override falhando aberta), e as
+> lentes Kimi levantaram oito que o App não levantou. Motor único erra junto consigo mesmo.
+>
 > **As duas camadas não competem — somam.** No PR 494 a divisão foi limpa e vale registrar: o
 > Codex achou os defeitos de **lógica** (uma guarda que não testava o que dizia testar; um caminho
 > absoluto que não existe noutro layout), e as lentes nativas acharam as **imprecisões factuais** do
@@ -119,6 +131,12 @@ isso não apareceu como falha em lugar nenhum.
 espera, o relatório sai antes de o achado chegar e o status fica verde sobre uma revisão que ainda
 não aconteceu. Era exatamente o furo que esta seção existia para fechar, aberto de novo pela falta
 de um passo.
+
+⚠️ **Acionar cedo, esperar tarde.** O passo 2 (acionar) vai **antes** de despachar a fan-out da
+camada B; o passo 3 (esperar e colher) vem **depois** que ela volta. Assim os ~2 min do App correm
+por baixo dos ~4–5 min das lentes, e a camada A sai de graça no relógio. Acionar depois da fan-out
+é o erro caro — e é o que acontece por inércia, porque a sequência abaixo está escrita em ordem
+de leitura, não de execução.
 
 Então, **antes** de publicar o relatório da §7, execute nesta ordem:
 
@@ -504,6 +522,11 @@ git -C "$WT" diff "$BASE"...HEAD > "$OUT/DIFF.patch"
 #    são colados numa chamada de Bash, shell não interativo, onde `return` fora de função
 #    imprime erro e SEGUE.
 for d in "$WT/.kimi-code/agents" "$WT/.agents/agents"; do
+  # `-e` e não `-d`, de propósito: um ARQUIVO nesses caminhos não injeta agente, mas num
+  # repositório que não versiona nenhum dos dois a presença é o fato a investigar — e a
+  # postura aqui é fail-closed. O caso que `-e` deixa passar é o symlink PENDURADO, que
+  # também não injeta nada. Se um dia isto virar falso positivo incômodo, a troca é para
+  # `-d` e a bateria ganha o caso do arquivo; hoje o custo de abortar à toa é um aviso.
   [ -e "$d" ] || continue
   echo "OVERRIDE DE AGENTE NA ÁRVORE: $d — NÃO despache; investigue antes."
   exit 1

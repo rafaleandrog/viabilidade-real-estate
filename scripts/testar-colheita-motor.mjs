@@ -90,7 +90,24 @@ const marcaOv = motor.indexOf('OVERRIDE DE AGENTE NA ÁRVORE', secaoArvore);
 assert.notEqual(marcaOv, -1, 'a guarda de override de agente sumiu da seção da árvore');
 const abreOv = motor.lastIndexOf('```bash', marcaOv);
 const fechaOv = motor.indexOf('```', marcaOv);
-const blocoOv = motor.slice(abreOv + 7, fechaOv);
+const blocoBruto = motor.slice(abreOv + 7, fechaOv);
+// O bloco da seção da árvore tem DOIS passos, e só o segundo é a guarda. Rodar o bloco
+// inteiro executaria o passo 1 (`git -C "$WT" diff … > "$OUT/DIFF.patch"`) com `OUT`
+// indefinido — ou seja, um redirect para `/DIFF.patch`, escrita fora do tempdir. Não é
+// hipótese: a primeira versão desta bateria criou esse arquivo na raiz, rodando como root.
+// Então o recorte é explícito, e falha FECHADO se a âncora sumir.
+const inicioGuarda = blocoBruto.indexOf('for d in ');
+assert.notEqual(
+  inicioGuarda, -1,
+  'não achei o `for d in` da guarda de override dentro do bloco da seção da árvore — ' +
+    'sem a âncora, o teste rodaria o passo do `git diff` em vez da guarda',
+);
+const blocoOv = blocoBruto.slice(inicioGuarda);
+assert.doesNotMatch(
+  blocoOv, /git |rm -rf|>\s*"\$OUT/,
+  'o recorte da guarda não pode conter comando de git, remoção ou redirect: ' +
+    'o teste executa este trecho, e ele tem que ser inerte fora da própria checagem',
+);
 // A prova é EXECUTAR, não casar regex: a forma antiga (`if ls -d "$a" "$b"`) também
 // "menciona" os dois caminhos, e passaria por qualquer asserção textual.
 const estadoOverride = (dirs) => {
@@ -104,6 +121,14 @@ const estadoOverride = (dirs) => {
   } finally { rmSync(wt, { recursive: true, force: true }); }
 };
 assert.equal(estadoOverride([]), 0, 'árvore limpa: a guarda não pode abortar');
+// O estado negativo que faltava, e sem ele uma regressão passaria verde: guarda que
+// testasse o diretório PAI (`[ -e "$WT/.kimi-code" ]`) abortaria todo PR que versione
+// `.kimi-code/settings.json` sem agente nenhum — falso positivo que bloqueia revisão
+// legítima. Fail-closed não é licença para abortar o que não é ameaça.
+assert.equal(
+  estadoOverride(['.kimi-code/nao-e-agents', '.agents/nao-e-agents']), 0,
+  'diretório-pai presente sem `agents/`: a guarda não pode abortar — ela olha o caminho exato',
+);
 assert.notEqual(
   estadoOverride(['.kimi-code/agents']), 0,
   'SÓ .kimi-code/agents presente — o caso real de um PR hostil — e a guarda NÃO abortou: ' +
