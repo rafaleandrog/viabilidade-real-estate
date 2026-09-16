@@ -561,6 +561,11 @@ então tudo que a lente precisa saber tem que estar escrito no briefing dela.
 
 Todo briefing carrega, além da lente ou do framework:
 
+- **O corpo de conhecimento das lentes, lido ANTES do diff.** `.claude/revisao/aprendizados.md`
+  (armadilhas deste repositório e onde a lente é cega) e `.claude/revisao/retirados.md` (achados já
+  derrubados com evidência — repetir um custa um ciclo de verificação toda vez). A ordem no briefing
+  é literal: *"leia por completo, com `Read`, antes de abrir o diff"*. É o acúmulo entre revisões, e
+  sem ele toda lente começa do zero.
 - Para a camada de contratos: **o caminho do doc na superfície que a skill definiu, a ordem de
   ler o doc por inteiro, e a de listar as asserções verificáveis antes de abrir qualquer
   código** — é isso que impede o motor de apenas concordar com o que o PR afirma.
@@ -581,6 +586,7 @@ Todo briefing carrega, além da lente ou do framework:
 
   ```text
   LENTE: <id>            MOTOR: kimi/<modelo>      DURACAO: <s>
+  CORPUS: <o marcador que você leu em .claude/revisao/*.md, ex.: v14-e355ae2e>
   VEREDITO: sem-achado | precisa-atencao | NAO_EXECUTADA
   RESUMO: <uma linha>
   --- por achado:
@@ -588,6 +594,16 @@ Todo briefing carrega, além da lente ou do framework:
   CITACAO: "<a citação literal>"
   CORPO: <2 a 3 frases>
   ```
+- **A linha `CORPUS:` é como você sabe que o corpo viajou.** Sem ela, "a lente não leu o corpo" e
+  "leu e nada se aplicava" são indistinguíveis — e o primeiro caso é o que acontece quando alguém
+  remonta o briefing de memória. O marcador sai do próprio corpo (`node scripts/carimbar-corpus-revisao.mjs --conferir`
+  imprime o vigente), então um marcador **antigo** também denuncia: a lente leu uma versão que não é
+  mais a atual.
+
+  A conferência é **sua, ao ler o relatório colhido** — não entra no bloco da colheita, que separa
+  falha de sucesso e já tem bateria própria. Lente que voltar sem `CORPUS:`, ou com marcador
+  divergente, entra no quadro de execução da §7 com essa nota. O achado dela continua valendo; o que
+  você perde é a garantia de que ela não está repetindo algo já derrubado.
 - **No Kimi, diga à lente ONDE ela é cega.** As ferramentas dela são `Read`/`Grep`/`Glob` com o
   cwd na árvore revisada mais o `--add-dir "$OUT"`; **fora disso ela não enxerga nada** — `/opt`,
   `/usr`, `$HOME`, o resto do disco. Sem essa frase ela traduz *"não consigo ler"* em *"não
@@ -600,6 +616,15 @@ Todo briefing carrega, além da lente ou do framework:
   obrigatória, porque a lente não tem como saber: *"não leia, não abra, não faça `grep` e não
   escreva nada em `/home/user/urbiverso`. Se o contrato que você precisa não está na superfície de
   docs indicada, a lente é NÃO EXECUTADA — nunca compense lendo o monorepo."*
+
+> ⚠️ **Não substitua a ordem de leitura acima por um `AGENTS.md` na raiz.** O doc do monorepo afirma
+> que os dois motores injetam esse arquivo sozinhos, e **nesta escala de repositório isso é falso** —
+> medido, com quatro execuções e zero chamadas de ferramenta: num repositório minúsculo o CLI injeta
+> um retrato do projeto (acerta até arquivo que o `AGENTS.md` nunca apontou, o que mostra que não é o
+> `AGENTS.md` que está sendo seguido), e no repositório real nem o `CLAUDE.md` nem um `AGENTS.md` na
+> raiz chegam à lente. O canal que funciona é o briefing **mandar ler** — o mesmo pelo qual o
+> `DIFF.patch` chega. A evidência das quatro execuções está registrada em
+> `.claude/revisao/retirados.md`, para a próxima sessão que ler o doc do monorepo não tentar de novo.
 
 Lente de contrato que não achou o doc é **não executada**, nunca aprovada.
 
@@ -905,6 +930,7 @@ mesmos briefings, mesmo orçamento — muda o veículo.
 
   ```text
   LENTE: <id>            MOTOR: nativo/<modelo>    DURACAO: <s>
+  CORPUS: <o marcador que você leu em .claude/revisao/*.md>
   VEREDITO: sem-achado | precisa-atencao | NAO_EXECUTADA
   RESUMO: <uma linha>
   --- por achado:
