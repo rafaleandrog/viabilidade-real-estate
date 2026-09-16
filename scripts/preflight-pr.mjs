@@ -424,7 +424,7 @@ rodar('bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', {
 // ⚠️ TRÊS baterias deste job precisam de `jq`, e a lista está declarada de uma vez só — não uma
 // guarda por bateria. A primeira versão gateava só as duas `.sh` que uma lente apontou, e a
 // mutação que escondeu o `jq` do PATH expôs a terceira na hora: a da **colheita**, que extrai do
-// motor um bloco que usa `jq` seis vezes. Segunda instância da mesma classe pede INVERTER, não
+// motor um bloco que usa `jq` quatro vezes. Segunda instância da mesma classe pede INVERTER, não
 // somar mais uma guarda (§ 6 do corpo de conhecimento, e armadilha 14 do `CLAUDE.md`).
 //
 // Sem `jq`, cada uma delas falharia por falta de FERRAMENTA, não por defeito do PR — e o preflight
