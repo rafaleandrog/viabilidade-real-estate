@@ -336,6 +336,26 @@ for (const t of templates) {
   else falha('contrato', `o template "${nome}…" não aponta para $OUT/corpus/ — apontando para a árvore, o head volta a ditar a própria revisão`);
 }
 
+// ── 2d. A metade do mecanismo que vive na SKILL também é medida ─────────────
+// ⚠️ A bateria lia SÓ o motor, e metade do canal mora na skill: a nota que obriga a registrar a
+// lente sem `CORPUS:`, e o passo que manda o achado retirado para `retirados.md`. Apagar
+// qualquer um dos dois deixava CI, preflight e esta bateria inteiramente verdes — o mesmo
+// "guarda apagada não fica vermelha" que este PR documentou para o motor, reaparecendo um
+// arquivo ao lado, e que só não foi pago porque uma lente o viu. A conferência do marcador em si
+// continua sendo humana, e isso é declarado; o que não pode é o texto que a torna obrigatória
+// sumir sem sintoma. Achado de lente.
+const skill = ler('.claude/skills/revisar-pr-apps/SKILL.md');
+const NA_SKILL = [
+  ['a nota da lente sem CORPUS: no quadro de execução', /marcador divergente/],
+  ['o marcador lido da cópia da BASE, não do head', /\$OUT\/corpus\/aprendizados\.md/],
+  ['a ressalva de que `--conferir` mede o HEAD', /--conferir/],
+  ['o passo de registrar o achado retirado', /retirados\.md/],
+];
+for (const [oque, re] of NA_SKILL) {
+  if (re.test(skill)) ok(`a SKILL mantém ${oque}`);
+  else falha('skill', `a SKILL perdeu ${oque} — metade do canal do corpo mora lá, e apagá-la não deixava nada vermelho`);
+}
+
 // ── 2b. O reparo CONVERGE, a partir de qualquer estado do marcador ───────────
 // `canonico()` é o predicado único dos dois modos do carimbador (conferir e escrever), então é
 // aqui que se prova que o reparo é reparo. O estado que motivou isto é o DUPLICADO: com o

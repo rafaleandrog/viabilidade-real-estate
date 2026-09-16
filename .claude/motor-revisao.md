@@ -560,7 +560,13 @@ for f in aprendizados retirados; do
   else
     # Ausente na base, de verdade. Corpo vazio e DECLARADO — nunca queda para o head, que é o que
     # esta extração existe para não fazer.
-    printf '%s\n' "(este arquivo não existe em $BASE — o corpo está VAZIO nesta revisão)" \
+    # ⚠️ O placeholder carrega um MARCADOR, e não é enfeite: o briefing manda a lente declarar
+    # "o marcador que você leu", e sem um aqui ela não tem o que declarar — toda lente volta sem
+    # `CORPUS:` e o quadro de execução as marca como divergentes, por construção, justamente nos
+    # PRs cuja base precede o corpo (o primeiro deles é o que INTRODUZ o mecanismo). `vazio-em-…`
+    # é declarável e não se confunde com marcador de conteúdo. Achado de lente.
+    printf '%s\n%s\n' "<!-- corpus=vazio-em-$(echo "$BASE" | cut -c1-8) -->" \
+      "(este arquivo não existe em $BASE — o corpo está VAZIO nesta revisão)" \
       > "$OUT/corpus/$f.md" || { echo "não consegui escrever $OUT/corpus/$f.md — NÃO despache"; exit 1; }
   fi
 done
