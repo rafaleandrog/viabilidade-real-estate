@@ -21,7 +21,7 @@
 import type { FluxoCalc, ComponentePagamento, ResiduoAteMarco } from './fluxo-caixa-motor.js';
 import {
   carteiraSaldoSafra, componentesIntegradosSafra, componentesPagamento,
-  linhasReceitaComPermutaReservada, vendaLiquidaContratadaMensal,
+  linhasReceitaComPermutaReservada, vendaLiquidaContratadaMensal, vendaBrutaContratadaMensal,
 } from './fluxo-caixa-motor.js';
 import {
   absorcaoMensal, ePermutaFisica, fimJanelaAbsorcao, pctAbsorcaoEfetivo, ultimoMesFunding, vgvVendavelLinha,
@@ -161,16 +161,11 @@ export function validarContratacao(
   const linhas = linhasCusto.length > 0
     ? linhasReceitaComPermutaReservada(linhasReceita, linhasCusto)
     : linhasReceita;
+  // esperado calculado com a mesma aritmética do motor (round2 por mês) para não gerar falso positivo de arredondamento
   let esperado = 0;
   for (const linha of linhas) {
-    const vgv = vgvVendavelLinha(linha.tipologias ?? []);
-    const abs = absorcaoMensal(linha.absorcao ?? { modo: 'linear' }, cronograma);
-    if (!abs) continue;
-    const pctNoHorizonte = abs.pcts.reduce((s, pct, i) => {
-      const mes = abs.inicio + i;
-      return s + (mes >= 0 && mes < prazo ? Number(pct ?? 0) : 0);
-    }, 0);
-    esperado += vgv * pctNoHorizonte / 100;
+    const serie = vendaBrutaContratadaMensal(linha, cronograma, prazo);
+    esperado += serie.reduce((s, v) => s + v, 0);
   }
   esperado = Math.round((esperado + Number.EPSILON) * 100) / 100;
   if (Math.abs(esperado - vendaBrutaEncontrada) <= tol) return [];
@@ -705,16 +700,19 @@ export function validarComponentesSafra(
       });
     }
 
-    for (let i = 1; i < saldos.length; i++) {
-      if (saldos[i].saldo > saldos[i - 1].saldo + tol) {
-        out.push({
-          codigo: 'CARTEIRA_RESSURGE', severidade: 'erro', linha, safra, mes: saldos[i].mes,
-          esperado: saldos[i - 1].saldo, encontrado: saldos[i].saldo,
-          diferenca: saldos[i].saldo - saldos[i - 1].saldo,
-          mensagem: `Safra ${safra}, ${linha}: carteira cresceu no mês ${saldos[i].mes} ` +
-            `(${saldos[i - 1].saldo} → ${saldos[i].saldo}) — defeito do tipo Urbitá, não deveria ocorrer.`,
-        });
-        break; // 1ª divergência já localiza a causa para este componente
+    // concentrado capitaliza juros até o pagamento único — saldo crescente é esperado, não RESSURGE
+    if (c.tipo !== 'concentrado') {
+      for (let i = 1; i < saldos.length; i++) {
+        if (saldos[i].saldo > saldos[i - 1].saldo + tol) {
+          out.push({
+            codigo: 'CARTEIRA_RESSURGE', severidade: 'erro', linha, safra, mes: saldos[i].mes,
+            esperado: saldos[i - 1].saldo, encontrado: saldos[i].saldo,
+            diferenca: saldos[i].saldo - saldos[i - 1].saldo,
+            mensagem: `Safra ${safra}, ${linha}: carteira cresceu no mês ${saldos[i].mes} ` +
+              `(${saldos[i - 1].saldo} → ${saldos[i].saldo}) — defeito do tipo Urbitá, não deveria ocorrer.`,
+          });
+          break; // 1ª divergência já localiza a causa para este componente
+        }
       }
     }
   }
