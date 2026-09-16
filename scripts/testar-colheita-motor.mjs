@@ -236,6 +236,24 @@ const CASOS = [
     contem: 'NÃO EXECUTADA',
   },
   {
+    id: 'kimi_linha_truncada',
+    motor: 'kimi',
+    exit: 0,
+    // O `-rs` (slurp) é estrito: uma linha malformada em QUALQUER posição zera a saída,
+    // mesmo com a resposta final intacta depois dela. O parser antigo, em streaming,
+    // emitiria as linhas válidas. A troca foi de propósito (é ela que implementa "a
+    // ÚLTIMA mensagem"), e a direção da falha é a segura — NÃO EXECUTADA, nunca laudo
+    // limpo. Esta fixtura existe para que a mudança seja DECLARADA e não descoberta.
+    jsonl: [
+      '{"role":"assistant","content":"preambulo"}',
+      '{"role":"assistant","content":"cor',   // linha cortada no meio, como num timeout
+      '{"role":"assistant","content":"VEREDITO: sem-achado"}',
+    ],
+    err: '',
+    esperaColhido: false,
+    contem: 'NÃO EXECUTADA',
+  },
+  {
     id: 'kimi_stack_trace',
     motor: 'kimi',
     exit: 1,

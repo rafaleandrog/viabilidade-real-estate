@@ -47,7 +47,7 @@ MOTOR="nativo"
 # `${HOME:-}` e não `$HOME`: este hook roda sob `set -u`, e um HOME ausente mataria o
 # script com "unbound variable" — que aqui não é um aviso a menos, é rc≠0 no
 # UserPromptSubmit, e rc≠0 ali TRAVA o prompt do usuário (ver o cabeçalho).
-if [ -n "${OPENAI_API_KEY:-}" ] || [ -s "${HOME:-}/.codex/auth.json" ]; then
+if [ -n "${OPENAI_API_KEY:-}" ] || { [ -n "${HOME:-}" ] && [ -s "$HOME/.codex/auth.json" ]; }; then
   [ "$MOTOR" = "kimi" ] && MOTOR="codex+kimi" || MOTOR="codex"
 fi
 
