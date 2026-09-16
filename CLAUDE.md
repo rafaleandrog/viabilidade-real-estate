@@ -357,19 +357,21 @@ numerada contra a `main` do momento, com a `versao` bumpada.
    processo, o corpo de conhecimento das lentes, a colheita do motor, a guarda do monorepo e o
    parsing do `revisao-registrada`.
    > ⚠️ **As quatro baterias `testar-*` não rodam em `--declarado`** — a rede do processo
-   > (`guard-processo.mjs`) roda sempre, porque é guard barato, não bateria. Isto é sobre tempo de CI. O modo declarado é
-   > entrada sintética: `scripts/testar-preflight-pr.sh` o usa para exercitar o parsing do preflight
-   > dezenas de vezes, e repete a suíte numa worktree hermética. Como as baterias leem a **árvore**,
-   > que a fixture não muda, cada repetição refazia trabalho idêntico. Medido: **96 s → 8 s** no
-   > passo, contra um `timeout-minutes: 5` do job. Não abre buraco — `--declarado` nunca é usado por
-   > contribuinte real, e o CI roda as cinco como passos independentes de qualquer jeito.
-   > ⚠️ **Três dessas baterias precisam de `jq`** — colheita, guarda do monorepo e parsing do
-   > `revisao-registrada`. Sem ele, elas falhariam por falta de FERRAMENTA e o preflight bloquearia
-   > um PR correto, então a ausência vira **aviso**, não bloqueante: o CI (ubuntu, `jq`
-   > pré-instalado) roda as três de qualquer jeito. A lista está declarada num lugar só
-   > (`COM_JQ`, em `scripts/preflight-pr.mjs`) porque gatear uma por uma não convergiu — a mutação
-   > que escondeu o `jq` do PATH expôs a terceira no instante em que as duas primeiras foram
-   > gateadas (§6 do corpo de conhecimento, armadilha 14).
+   > (`guard-processo.mjs`) roda sempre, porque é guard barato, não bateria. Isto é sobre tempo de
+   > CI. O modo declarado é entrada sintética: `scripts/testar-preflight-pr.sh` o usa para
+   > exercitar o parsing do preflight dezenas de vezes, e repete a suíte numa worktree hermética.
+   > Como as baterias leem a **árvore**, que a fixture não muda, cada repetição refazia trabalho
+   > idêntico. Medido: **96 s → 8 s** no passo, contra um `timeout-minutes: 5` do job. Não abre
+   > buraco — `--declarado` nunca é usado por contribuinte real, e o CI roda as cinco como passos
+   > independentes de qualquer jeito.
+   > ⚠️ **As baterias dependem de ferramentas que o preflight antes não exigia** — `bash` e `jq`,
+   > além do `node` e do `git` do contrato original. Faltando a ferramenta, a bateria falharia por
+   > falta de FERRAMENTA e o preflight bloquearia um PR correto, então a ausência vira **aviso**,
+   > não bloqueante: o CI (ubuntu, com as duas) roda todas de qualquer jeito. A dependência é
+   > declarada **por bateria**, na tabela `BATERIAS` de `scripts/preflight-pr.mjs`, porque gatear
+   > ferramenta a ferramenta não convergiu — o `jq` veio numa rodada de revisão, o `bash` na
+   > seguinte, cada um como achado separado (§6 do corpo de conhecimento, armadilha 14). Quem
+   > acrescentar bateria declara as ferramentas dela ali.
    > ⚠️ **Uma única exceção, e ela é estrutural:** `testar-preflight-pr.sh` fica de fora, porque ele
    > **invoca o preflight** — rodá-lo de dentro é recursão infinita. Medido ao tentar: o processo se
    > replicou até 114 cópias vivas. É a única bateria daquele job que só o CI roda. Quem acrescentar

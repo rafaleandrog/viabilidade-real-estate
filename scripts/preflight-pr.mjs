@@ -57,7 +57,7 @@
 import { readFileSync, existsSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -416,51 +416,57 @@ rodar('guard de escopo (regra R1)', 'scripts/guard-pr-escopo-processo.mjs', {
 rodar('guard de JSON estrito', 'scripts/guard-json.mjs', {});
 rodar('guard de ciclos no schema', 'scripts/guard-schema-ciclos.mjs', {});
 rodar('guard da rede do processo', 'scripts/guard-processo.mjs', {});
-// O corpo de conhecimento das lentes: editar um dos arquivos sem re-carimbar deixa o job
-// `processo-integro` VERMELHO, e o `guard-processo.mjs` acima não pega — ele confere que os
-// arquivos existem, não que o marcador fecha. Sem esta linha, o preflight aprovava um PR cujo
-// CI já estava condenado, que é o oposto do que ele existe para fazer.
-if (!MODO_DECLARADO) rodar('bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', {});
-// ⚠️ NENHUMA bateria roda em `--declarado`, e isso é sobre TEMPO DE CI, não sobre rigor. O modo
-// declarado é entrada sintética: `scripts/testar-preflight-pr.sh` o usa para exercitar o PARSING
-// deste script, dezenas de vezes, e ainda repete a suíte inteira numa worktree hermética. Como as
+// As baterias do job `processo-integro` entram logo abaixo, na tabela `BATERIAS`. Elas pegam o que
+// os guards acima não pegam: o `guard-processo.mjs` confere que os arquivos do corpo EXISTEM, não
+// que o marcador fecha — sem elas, o preflight aprovava um PR cujo CI já estava condenado, que é o
+// oposto do que ele existe para fazer.
+// ⚠️ NENHUMA das quatro baterias `testar-*` roda em `--declarado`, e isso é sobre TEMPO DE CI. O
+// modo declarado é entrada sintética: `scripts/testar-preflight-pr.sh` o usa para exercitar o
+// PARSING deste script, dezenas de vezes, e ainda repete a suíte numa worktree hermética. Como as
 // baterias leem a ÁRVORE — que a fixture não muda —, cada repetição refazia trabalho idêntico.
-// Medido: das 1871 ms de uma invocação, 1625 ms (87%) eram as quatro baterias; multiplicado pelas
-// invocações da suíte, o passo passava de ~1 min para ~3 min contra um `timeout-minutes: 5` do job.
-// Achado P2 do App do Codex, e nenhuma das lentes o viu — elas leram correção, não custo.
+// Medido: das 1871 ms de uma invocação, 1625 ms (87%) eram as baterias; o passo ia de ~8 s para
+// ~96 s, contra um `timeout-minutes: 5` do job. Achado P2 do App do Codex.
 //
-// Isto não abre buraco: `--declarado` nunca é usado por contribuinte real, só pela própria bateria,
-// e o CI roda as cinco como passos independentes do `processo-integro` de qualquer jeito.
+// A fiação continua coberta: `testar-preflight-pr.sh` tem UM caso que invoca sem `--declarado` e
+// exige as baterias na saída — sem ele, inverter este gate deixava zero baterias rodando em modo
+// real e a suíte VERDE. Medido também. `--declarado` nunca é usado por contribuinte real, e o CI
+// roda as cinco como passos independentes do `processo-integro` de qualquer jeito.
 
-// ⚠️ TRÊS baterias deste job precisam de `jq`, e a lista está declarada de uma vez só — não uma
-// guarda por bateria. A primeira versão gateava só as duas `.sh` que uma lente apontou, e a
-// mutação que escondeu o `jq` do PATH expôs a terceira na hora: a da **colheita**, que extrai do
-// motor um bloco que usa `jq` quatro vezes. Segunda instância da mesma classe pede INVERTER, não
-// somar mais uma guarda (§ 6 do corpo de conhecimento, e armadilha 14 do `CLAUDE.md`).
+// ⚠️ FERRAMENTAS, não uma ferramenta. Até o PR anterior o preflight só precisava de `node` e
+// `git` (ver o cabeçalho, § contrato). Plugar as baterias trouxe dependências novas, e a lista
+// nasceu como `COM_JQ` — nomeada por UMA ferramenta quando o conceito é "o que as baterias
+// precisam". Isso não convergiu: o `jq` veio numa rodada de revisão, o `bash` na seguinte, cada
+// um como achado separado. Terceira instância da mesma classe pede INVERTER (§ 6 do corpo de
+// conhecimento, armadilha 14 do `CLAUDE.md`) — então a dependência passa a ser declarada POR
+// BATERIA, e quem acrescentar bateria declara as ferramentas dela aqui.
 //
-// Sem `jq`, cada uma delas falharia por falta de FERRAMENTA, não por defeito do PR — e o preflight
-// bloquearia um PR correto. Falso positivo no portão local é o que faz alguém desligar a guarda,
-// então a ausência vira AVISO: o CI (ubuntu, `jq` pré-instalado) roda as três de qualquer jeito.
-// Quem acrescentar bateria que dependa de `jq` acrescenta o nome aqui.
-const COM_JQ = [
-  ['bateria da colheita do motor', 'scripts/testar-colheita-motor.mjs'],
-  ['bateria da guarda do monorepo', 'scripts/testar-guarda-monorepo.sh'],
-  ['bateria do parsing do revisao-registrada', 'scripts/testar-revisao-registrada.sh'],
+// Faltando a ferramenta, a bateria não roda e sai AVISO, não bloqueante: ela falharia por falta de
+// FERRAMENTA, não por defeito do PR, e falso positivo no portão local é o que faz alguém desligar
+// a guarda. O CI (ubuntu, com as duas) roda todas de qualquer jeito.
+const BATERIAS = [
+  ['bateria do corpo de conhecimento', 'scripts/testar-corpus-revisao.mjs', ['bash']],
+  ['bateria da colheita do motor', 'scripts/testar-colheita-motor.mjs', ['bash', 'jq']],
+  ['bateria da guarda do monorepo', 'scripts/testar-guarda-monorepo.sh', ['bash', 'jq']],
+  ['bateria do parsing do revisao-registrada', 'scripts/testar-revisao-registrada.sh', ['bash', 'jq']],
 ];
-const temJq = (() => {
-  try { execFileSync('bash', ['-c', 'command -v jq'], { stdio: 'ignore' }); return true; }
-  catch { return false; }
-})();
-if (MODO_DECLARADO) {
-  // ver a nota acima: em modo declarado as baterias não rodam
-} else if (temJq) {
-  for (const [rotulo, script] of COM_JQ) rodar(rotulo, script, {});
-} else {
-  avisos.push(
-    `\`jq\` não está nesta máquina: ${COM_JQ.length} bateria(s) do \`processo-integro\` NÃO rodaram ` +
-      `aqui (${COM_JQ.map(([r]) => r).join(', ')}). O CI as roda — mas se reprovarem lá, o erro ` +
-      'aparece depois do push. Instale `jq` para o preflight cobrir o job inteiro.',
-  );
+// `spawnSync` sem shell: `command -v` precisaria de um shell, e é justamente o shell que pode
+// faltar. `spawnSync(f, ['--version'])` devolve `error` quando o binário não existe, sem lançar.
+const temFerramenta = (f) => spawnSync(f, ['--version'], { stdio: 'ignore' }).error === undefined;
+const ferramentas = new Map();
+if (!MODO_DECLARADO) {
+  for (const [rotulo, script, precisa] of BATERIAS) {
+    const faltando = precisa.filter((f) => {
+      if (!ferramentas.has(f)) ferramentas.set(f, temFerramenta(f));
+      return !ferramentas.get(f);
+    });
+    if (faltando.length === 0) rodar(rotulo, script, {});
+    else {
+      avisos.push(
+        `\`${faltando.join('`, `')}\` não está nesta máquina: a ${rotulo} NÃO rodou aqui. O CI a ` +
+          'roda — mas se reprovar lá, o erro aparece depois do push.',
+      );
+    }
+  }
 }
 
 // ── 5. Armadilhas de redação que nenhum guard pega ──────────────────────────
