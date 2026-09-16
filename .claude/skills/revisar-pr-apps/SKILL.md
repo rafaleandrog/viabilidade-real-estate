@@ -851,10 +851,20 @@ consertar —, **abra o arquivo e confira**. Achado seu que morre na contestaç�
 certo: registre "**achado retirado**", com o motivo, no relatório da rodada, e ele sai da
 conta de bloqueantes pendentes. Insistir num achado já derrubado queima rodada.
 
-> **E o registro não para no relatório: ele vai para `.claude/revisao/retirados.md`, na MESMA
-> alteração.** O relatório fica no PR e morre com ele; a próxima revisão levantaria o mesmo falso
-> positivo e pagaria o mesmo ciclo de verificação. O arquivo é o que o briefing manda toda lente ler
-> antes de escrever achado — é ali que a retirada vira conhecimento acumulado em vez de anedota.
+> **E o registro não para no relatório: ele vai para `.claude/revisao/retirados.md`.** O relatório
+> fica no PR e morre com ele; a próxima revisão levantaria o mesmo falso positivo e pagaria o mesmo
+> ciclo de verificação. O arquivo é o que o briefing manda toda lente ler antes de escrever achado —
+> é ali que a retirada vira conhecimento acumulado em vez de anedota.
+>
+> ⚠️ **Mas NÃO no mesmo PR, quando o PR é de produto.** `.claude/**` é processo, e
+> `guard-pr-escopo-processo.mjs` reprova o PR que misture processo com `frontend/`, `backend/`,
+> migração ou manifesto — é a regra **R1**. Seguir o registro "na mesma alteração" faria o job
+> `escopo-processo` ficar vermelho e **travaria o próprio ciclo** que a retirada estava fechando.
+> Achado do App do Codex no PR que criou este passo.
+>
+> Então: **PR de processo → registre no mesmo PR**, que é o caso natural. **PR de produto → abra um
+> PR de processo à parte, na mesma sessão**, e nomeie-o no relatório da rodada. "Na mesma sessão" é
+> o que substitui "na mesma alteração": o que fica para outro dia é o que não acontece.
 >
 > Quatro campos obrigatórios (afirmação, por que é falsa, evidência, data), e **re-carimbe o
 > marcador**: `node scripts/carimbar-corpus-revisao.mjs`. A bateria

@@ -719,10 +719,15 @@ rm -f "$OUT"/*.jsonl "$OUT"/*.err "$OUT"/execucao.txt "$OUT"/DIFF.patch
 git -C "$WT" diff "$BASE"...HEAD > "$OUT/DIFF.patch"   # o mesmo comando da seção da árvore
 test -s "$OUT/DIFF.patch" || { echo 'DIFF.patch vazio — NÃO despache'; exit 1; }
 
+# O COMUM é dos DOIS motores. A ordem do corpo e a linha `CORPUS:` moram AQUI, e não nos
+# templates de saída de cada um: postas só no template do Kimi, a lente Codex nunca recebia a
+# ordem nem o campo, e a revisão dela saía sem confirmação de corpo — achado do App do Codex.
 COMUM='<as regras fixas do briefing — ver "O briefing viaja sozinho".
-        Inclui, obrigatoriamente: citação literal do contrato no corpo do achado;
-        não tocar rota de API de instância nenhuma; não editar/commitar/propor patch;
-        350 a 450 palavras; e a proibição de ler ou escrever em /home/user/urbiverso.>'
+        Inclui, obrigatoriamente: a ORDEM DE LEITURA do corpo (.claude/revisao/aprendizados.md e
+        .claude/revisao/retirados.md, por completo, ANTES do diff) e a linha CORPUS: no formato de
+        saída; citação literal do contrato no corpo do achado; não tocar rota de API de instância
+        nenhuma; não editar/commitar/propor patch; 350 a 450 palavras; e a proibição de ler ou
+        escrever em /home/user/urbiverso.>'
 
 lente() {  # lente <id> <tier> <esforço> <briefing>
   local id=$1 tier=$2 esf=$3 brief=$4
@@ -751,7 +756,8 @@ lente_kimi() {  # lente_kimi <id> <modelo> <esforço> <briefing>
   ( cd "$WT" || exit 1
     KIMI_MODEL_NAME="$modelo" KIMI_MODEL_THINKING_EFFORT="$esf" timeout 900 kimi \
       --agent-file "$OUT/lente.md" --add-dir "$OUT" --output-format stream-json \
-      -p "ESCOPO OBRIGATÓRIO: o diff em revisão está em $OUT/DIFF.patch — LEIA esse arquivo primeiro e revise exclusivamente o que ele toca. Você não tem Bash: não tente rodar git.
+      -p "ANTES DE TUDO leia, por completo e com Read, .claude/revisao/aprendizados.md e depois .claude/revisao/retirados.md — e declare o marcador deles na linha CORPUS: da sua resposta.
+SÓ DEPOIS: o diff em revisão está em $OUT/DIFF.patch — leia esse arquivo e revise exclusivamente o que ele toca. Você não tem Bash: não tente rodar git.
 Não edite arquivo, não commite, não proponha patch aplicado. Não acesse rota de API de instância nenhuma. Não leia nem escreva em /home/user/urbiverso.
 Responda em português.
 

@@ -73,8 +73,22 @@ for (const a of ARQUIVOS) {
 }
 if (/antes de abrir o diff/i.test(ordem)) ok('a ordem põe o corpo ANTES do diff');
 else falha('briefing', 'a ordem não diz que o corpo é lido ANTES do diff — a precedência é o que o faz servir');
-if (/^\s*CORPUS:/m.test(motor)) ok('o contrato de saída pede a linha CORPUS:');
-else falha('contrato', 'o contrato de saída do motor não tem a linha CORPUS: — "não li" ficaria indistinguível de "li"');
+// ⚠️ Escopado ao briefing COMPARTILHADO, não ao arquivo inteiro. A primeira versão casava
+// `CORPUS:` em qualquer lugar do motor — e passava verde com o campo existindo só no template do
+// Kimi, enquanto a lente Codex nunca recebia nem a ordem nem o campo. Achado do App do Codex: a
+// guarda media "o documento menciona CORPUS:" quando a pergunta é "TODA lente recebe a exigência".
+// O lugar certo da exigência é o bloco `COMUM`, que os dois motores usam.
+const iComum = motor.indexOf("COMUM='");
+assert.notEqual(iComum, -1, "o bloco COMUM do briefing sumiu do motor (âncora \"COMUM='\")");
+const comum = motor.slice(iComum, motor.indexOf("'", iComum + 8) + 1);
+if (/CORPUS:/.test(comum)) ok('o briefing COMUM (os dois motores) exige a linha CORPUS:');
+else falha('contrato', 'o bloco COMUM não exige CORPUS: — a lente Codex sairia sem confirmação de corpo');
+for (const a of ARQUIVOS) {
+  if (comum.includes(a.replace('.claude/revisao/', ''))) ok(`o briefing COMUM nomeia ${a}`);
+  else falha('contrato', `o bloco COMUM não nomeia ${a} — só o template de um dos motores carregaria a ordem`);
+}
+if (/^\s*CORPUS:/m.test(motor)) ok('os templates de saída trazem a linha CORPUS:');
+else falha('contrato', 'nenhum template de saída tem CORPUS: — "não li" ficaria indistinguível de "li"');
 
 // ── 3. Toda entrada de `retirados.md` tem os quatro campos ───────────────────
 const CAMPOS = ['**Afirmação:**', '**Por que é falsa:**', '**Evidência:**', '**Data:**'];

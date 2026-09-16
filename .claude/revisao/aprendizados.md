@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v13-7b776c47 -->
+<!-- corpus=v13-06831fea -->
 
 # Aprendizados — o que toda lente deste repositório precisa saber antes de olhar o diff
 
@@ -13,9 +13,19 @@ Quem edita este arquivo re-carimba o marcador: `node scripts/carimbar-corpus-rev
 
 ## 1. Onde você é cega — e o que fazer com isso
 
-Suas ferramentas são `Read`, `Grep` e `Glob`, com o diretório de trabalho na **árvore do
-repositório** mais o diretório do diff que o briefing indicar. **Fora disso você não enxerga
-nada**: `/opt`, `/usr`, `$HOME`, o resto do disco, a rede, o histórico do git, o PR no GitHub.
+**O que você enxerga depende do motor em que você está rodando, e este corpo é compartilhado** —
+então leia a linha que é a sua:
+
+- **Kimi:** suas ferramentas são `Read`, `Grep` e `Glob`, com o diretório de trabalho na árvore do
+  repositório mais o diretório do diff que o briefing indicar. **Fora disso você não enxerga nada**:
+  `/opt`, `/usr`, `$HOME`, o resto do disco, a rede, o histórico do git, o PR no GitHub.
+- **Codex:** você monta o diff sozinho e alcança o histórico do git, então o que está acima **não é
+  seu limite**. Continua fora: a rede, rota de API de qualquer instância, e o monorepo em
+  `/home/user/urbiverso`.
+- **Nativo:** trate-se como o Kimi, salvo o que o seu briefing disser explicitamente.
+
+Em qualquer motor, o PR no GitHub — comentários, rodadas anteriores, respostas do autor — está fora
+do seu alcance.
 
 **Ilegibilidade não é ausência.** O que você não consegue ler se declara **NÃO VERIFICÁVEL**, nunca
 "não existe". Já custou dois achados falsos neste repositório (ver `retirados.md`), e a forma do

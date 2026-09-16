@@ -22,15 +22,30 @@ import { fileURLToPath } from 'node:url';
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const ARQUIVOS = ['.claude/revisao/aprendizados.md', '.claude/revisao/retirados.md'];
 const LINHA = /^<!-- corpus=.* -->$/m;
+/** A mesma linha, com o `\n` dela, para poder REMOVER em vez de só substituir. */
+const LINHA_COM_QUEBRA = /^<!-- corpus=.* -->\n?/m;
 
-/** O texto que entra no hash: o conteúdo SEM a linha do marcador. */
-const semMarcador = (txt) => txt.replace(LINHA, '<!-- corpus=? -->');
+/**
+ * O texto que entra no hash: o conteúdo com a linha do marcador REMOVIDA.
+ *
+ * ⚠️ Removida, e não substituída por um placeholder. Com placeholder, o mesmo arquivo hasheava
+ * diferente conforme tivesse ou não a linha — e aí o modo de reparo (que roda justamente quando
+ * ela falta) gravava um marcador que a conferência seguinte recusava. A remoção torna o hash
+ * indiferente à presença da linha, que é a propriedade que o reparo precisa.
+ */
+const semMarcador = (txt) => txt.replace(LINHA_COM_QUEBRA, '');
 
-export function calcular(raizRepo = raiz) {
+export function calcular(raizRepo = raiz, exigirMarcador = true) {
   const textos = ARQUIVOS.map((a) => readFileSync(join(raizRepo, a), 'utf8'));
-  for (const [i, t] of textos.entries()) {
-    if (!LINHA.test(t)) {
-      throw new Error(`${ARQUIVOS[i]} não tem a linha do marcador (<!-- corpus=… -->)`);
+  // ⚠️ Marcador AUSENTE não é erro no modo de escrita: é exatamente o que este script existe
+  // para consertar. Lançar aqui fazia o comando que o doc manda rodar (`node scripts/…`) morrer
+  // antes de escrever, e o CI ficava irreparável pelo caminho prescrito — achado do App do Codex.
+  // A exigência vale no `--conferir`, onde ausência É o defeito a reportar.
+  if (exigirMarcador) {
+    for (const [i, t] of textos.entries()) {
+      if (!LINHA.test(t)) {
+        throw new Error(`${ARQUIVOS[i]} não tem a linha do marcador (<!-- corpus=… -->)`);
+      }
     }
   }
   // Entradas materiais: `## ` nos aprendizados, `### ` nos retirados. São o que a lente usa,
@@ -61,7 +76,7 @@ export function calcular(raizRepo = raiz) {
 }
 
 export function conferir(raizRepo = raiz) {
-  const { marcador, textos } = calcular(raizRepo);
+  const { marcador, textos } = calcular(raizRepo, true);
   const divergentes = ARQUIVOS.filter((_, i) => !textos[i].includes(`<!-- corpus=${marcador} -->`));
   return { marcador, divergentes };
 }
@@ -69,7 +84,10 @@ export function conferir(raizRepo = raiz) {
 // Só age quando executado direto — importado pela bateria, não deve escrever nada.
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const soConferir = process.argv.includes('--conferir');
-  const { marcador, divergentes } = conferir();
+  // No modo de escrita, marcador ausente é o caso a CONSERTAR, não a reportar.
+  const { marcador, divergentes } = soConferir
+    ? conferir()
+    : (() => { const { marcador: m, textos } = calcular(raiz, false); return { marcador: m, divergentes: ARQUIVOS.filter((_, i) => !textos[i].includes(`<!-- corpus=${m} -->`)) }; })();
   if (divergentes.length === 0) {
     console.log(`ok: corpo de conhecimento carimbado com ${marcador} nos ${ARQUIVOS.length} arquivos.`);
     process.exit(0);
@@ -80,9 +98,16 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.error('  Rode: node scripts/carimbar-corpus-revisao.mjs');
     process.exit(1);
   }
+  const { marcador: marcadorEscrita } = calcular(raiz, false);
   for (const a of ARQUIVOS) {
     const caminho = join(raiz, a);
-    writeFileSync(caminho, readFileSync(caminho, 'utf8').replace(LINHA, `<!-- corpus=${marcador} -->`));
+    const txt = readFileSync(caminho, 'utf8');
+    // Falta a linha? Insere depois do cabeçalho de procedência (a primeira linha do arquivo),
+    // que é onde ela mora — em vez de morrer e deixar o CI irreparável pelo caminho prescrito.
+    const novo = LINHA.test(txt)
+      ? txt.replace(LINHA, `<!-- corpus=${marcadorEscrita} -->`)
+      : txt.replace(/^(.*\n)/, `$1<!-- corpus=${marcadorEscrita} -->\n`);
+    writeFileSync(caminho, novo);
   }
   console.log(`ok: carimbado ${marcador} em ${ARQUIVOS.length} arquivo(s).`);
 }
