@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v13-33723605 -->
+<!-- corpus=v14-b2cd8f27 -->
 
 # Aprendizados — o que toda lente deste repositório precisa saber antes de olhar o diff
 
@@ -130,7 +130,20 @@ tabela que **já existe** nunca nascem — só saem no `CREATE TABLE`.
 frontend/backend **não** bumpa. **Acusar "faltou bumpar a versão" num PR que só sobe o piso é
 achado inventado**, e era recorrente.
 
-## 10. O que NÃO é achado aqui
+## 10. Comando que o doc prescreve é para ser EXECUTADO, não lido
+
+Um `sed -n 's/…/\\1/p'` entrou num doc deste repositório com **duas** barras — escape que vazou de
+quem editou — e imprime o literal `\1` em vez do grupo capturado. O passo prescrito ficou inerte, e
+a guarda que existia ficou verde: ela conferia que o doc **mencionava o caminho do arquivo**, não
+que o comando funcionava.
+
+**O que procurar:** doc ou comentário que prescreve um comando com escape (`sed`, `awk`, `grep -o`,
+regex em aspas), especialmente num diff que também mexeu em quem o escreve. Rode o comando **como
+ele está escrito**, extraído do próprio arquivo — nunca redigitado, porque redigitar conserta o
+escape sem querer. Se não der para executar na revisão, isso é o achado: guarda que mede presença
+de string não mede comportamento de comando.
+
+## 11. O que NÃO é achado aqui
 
 - Cor literal no CSS de impressão/PDF de `frontend/exportar.ts`: roda em janela própria, onde
   `var(--cor-*)` não resolve. É exceção declarada.

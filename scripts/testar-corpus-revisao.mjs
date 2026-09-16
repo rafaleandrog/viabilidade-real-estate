@@ -18,6 +18,7 @@
 // Roda com: node scripts/testar-corpus-revisao.mjs
 
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -358,6 +359,38 @@ const NA_SKILL = [
 for (const [oque, re] of NA_SKILL) {
   if (re.test(skill)) ok(`a SKILL mantém ${oque}`);
   else falha('skill', `a SKILL perdeu ${oque} — metade do canal do corpo mora lá, e apagá-la não deixava nada vermelho`);
+}
+
+// ── 2b2. O comando do marcador é EXTRAÍDO do doc e EXECUTADO ────────────────
+// ⚠️ Conferir que o doc "menciona o caminho" não diz nada sobre o comando funcionar. Foi
+// exatamente assim que um `sed` com `\\1` (duas barras — escape que vazou de quem editou) entrou
+// nos dois documentos: ele imprime o literal `\1` em vez do marcador, então a conferência
+// marcaria como divergente TODA lente, inclusive a que leu a cópia certa — o oposto exato do que
+// a ressalva ao lado dele diz corrigir —, e a bateria ficava verde porque só media presença de
+// string. Achado de duas lentes, na mesma rodada.
+//
+// A saída é a mesma de `scripts/testar-colheita-motor.mjs`: extrair do doc e RODAR. Comando que o
+// doc prescreve e não funciona é a classe mais cara daqui, porque o sintoma aparece na próxima
+// sessão, não no CI.
+{
+  const doc = motor + '\n' + ler('.claude/skills/revisar-pr-apps/SKILL.md');
+  const cmds = [...doc.matchAll(/`(sed -n 's[^']*'p?)\s*"\$OUT\/corpus\/aprendizados\.md"`/g)].map((m) => m[1]);
+  if (cmds.length < 2) {
+    falha('marcador', `achei ${cmds.length} comando(s) de extração do marcador nos dois documentos; são 2 (motor e SKILL) — um que suma deixa a conferência sem receita`);
+  } else {
+    const amostra = '<!-- corpus=v13-33723605 -->\n';
+    for (const cmd of cmds) {
+      let saida;
+      try {
+        saida = execFileSync('bash', ['-c', `${cmd} -`], { input: amostra, encoding: 'utf8' }).trim();
+      } catch (e) {
+        falha('marcador', `o comando extraído do doc falhou ao rodar: ${cmd} — ${e.message}`);
+        continue;
+      }
+      if (saida === 'v13-33723605') ok('o comando do marcador, extraído do doc e EXECUTADO, devolve o valor sem o prefixo');
+      else falha('marcador', `o comando do doc devolveu ${JSON.stringify(saida)} em vez de "v13-33723605" — a conferência marcaria toda lente como divergente. Comando: ${cmd}`);
+    }
+  }
 }
 
 // ── 2c. O reparo CONVERGE, a partir de qualquer estado do marcador ───────────

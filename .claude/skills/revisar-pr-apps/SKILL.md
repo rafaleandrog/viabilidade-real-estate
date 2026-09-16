@@ -664,7 +664,7 @@ Estrutura do comentário:
   **Lente que voltou sem `CORPUS:`, ou com marcador divergente do vigente, aparece com essa
   nota.** Não invalida o achado dela — invalida a garantia de que ela não está repetindo algo já
   derrubado, e isso quem lê precisa saber. O marcador a comparar é o que está **dentro da cópia
-  que a lente leu** — `sed -n 's/.*corpus=\([^ ]*\).*/\\1/p' "$OUT/corpus/aprendizados.md"`.
+  que a lente leu** — `sed -n 's/.*corpus=\([^ ]*\).*/\1/p' "$OUT/corpus/aprendizados.md"`.
 
   > ⚠️ Sem o prefixo `corpus=`. Um `grep -o 'corpus=…'` devolve `corpus=v13-…`, e a lente declara
   > `v13-…` — comparar literalmente marcaria como divergente até a lente que leu a cópia certa.
