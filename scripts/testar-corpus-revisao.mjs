@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ARQUIVOS, conferir } from './carimbar-corpus-revisao.mjs';
+import { ARQUIVOS, canonico, conferir } from './carimbar-corpus-revisao.mjs';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ler = (p) => readFileSync(join(raiz, p), 'utf8');
@@ -83,12 +83,72 @@ assert.notEqual(iComum, -1, "o bloco COMUM do briefing sumiu do motor (âncora \
 const comum = motor.slice(iComum, motor.indexOf("'", iComum + 8) + 1);
 if (/CORPUS:/.test(comum)) ok('o briefing COMUM (os dois motores) exige a linha CORPUS:');
 else falha('contrato', 'o bloco COMUM não exige CORPUS: — a lente Codex sairia sem confirmação de corpo');
+// ⚠️ Pelo caminho INTEIRO, e não pelo basename. A primeira versão fazia
+// `comum.includes(a.replace('.claude/revisao/', ''))` — e aí a mutação que troca, dentro do
+// COMUM, `.claude/revisao/aprendizados.md` por `.claude/aprendizados.md` passava VERDE: a
+// lente receberia ordem de ler um arquivo que não existe, a ordem morreria em silêncio, e a
+// mensagem desta guarda continuaria prometendo que o COMUM "nomeia" o caminho certo. A guarda
+// vizinha, da ordem de leitura, não cobre isso: ela mede outro trecho do motor, que a mutação
+// não toca. Predicado e mensagem tinham divergido — a classe do § 5 dos aprendizados. Achado
+// de lente.
 for (const a of ARQUIVOS) {
-  if (comum.includes(a.replace('.claude/revisao/', ''))) ok(`o briefing COMUM nomeia ${a}`);
+  if (comum.includes(a)) ok(`o briefing COMUM nomeia ${a}`);
   else falha('contrato', `o bloco COMUM não nomeia ${a} — só o template de um dos motores carregaria a ordem`);
+}
+// ⚠️ E o bloco COMUM só vale se ele for INTERPOLADO nos prompts. Tudo acima mede o CONTEÚDO da
+// string; nada media a FIAÇÃO — apagar `${COMUM}` do fim do prompt das duas funções de despacho
+// deixava esta bateria inteira verde, com nenhuma lente recebendo nem a ordem nem o campo. É a
+// classe de defeito nº 1 deste repositório (`.claude/revisao/aprendizados.md` § 3) dentro da
+// própria guarda que existe para o corpo viajar, e é a mesma asserção que
+// `scripts/testar-colheita-motor.mjs` já faz do outro lado, para o campo `motor=`. Achado de lente.
+const corpos = [...motor.matchAll(/^lente(?:_kimi)?\(\) \{[\s\S]*?echo "\$id exit=\$rc/gm)].map((m) => m[0]);
+assert.ok(
+  corpos.length >= 2,
+  'não achei as duas funções de despacho (`lente()` e `lente_kimi()`) no motor — sem elas esta ' +
+    'guarda não tem o que medir, e o COMUM poderia deixar de viajar sem nada ficar vermelho',
+);
+for (const c of corpos) {
+  const nome = c.slice(0, c.indexOf('(')); 
+  if (c.includes('${COMUM}')) ok(`a função de despacho \`${nome}()\` interpola \${COMUM} no prompt`);
+  else falha('fiação', `\`${nome}()\` não interpola \${COMUM} — o bloco existe e não chega à lente`);
 }
 if (/^\s*CORPUS:/m.test(motor)) ok('os templates de saída trazem a linha CORPUS:');
 else falha('contrato', 'nenhum template de saída tem CORPUS: — "não li" ficaria indistinguível de "li"');
+
+// ── 2b. O reparo CONVERGE, a partir de qualquer estado do marcador ───────────
+// `canonico()` é o predicado único dos dois modos do carimbador (conferir e escrever), então é
+// aqui que se prova que o reparo é reparo. O estado que motivou isto é o DUPLICADO: com o
+// predicado antigo ("o marcador certo aparece em algum lugar"), o `--conferir` dizia ok e a
+// escrita saía pelo atalho do "nada a fazer" — o arquivo ficava com dois marcadores
+// contraditórios para sempre, e nada ficava vermelho. Achado do App do Codex.
+{
+  const controle = ler(ARQUIVOS[0]);
+  const m = 'v0-teste0000';
+  const alvo = canonico(controle, m);
+  const linhas = controle.split('\n');
+  const semLinha = controle.replace(/^<!-- corpus=.* -->\n/m, '');
+  const estados = {
+    'duplicado (o obsoleto DEPOIS do certo)': [...linhas.slice(0, 2), '<!-- corpus=v99-obsoleto -->', ...linhas.slice(2)].join('\n'),
+    'duplicado (o obsoleto ANTES do certo)': [linhas[0], '<!-- corpus=v99-obsoleto -->', ...linhas.slice(1)].join('\n'),
+    ausente: semLinha,
+    desatualizado: controle.replace(/^<!-- corpus=.* -->$/m, '<!-- corpus=v1-00000000 -->'),
+  };
+  for (const [nome, estado] of Object.entries(estados)) {
+    const reparado = canonico(estado, m);
+    const marcadores = (reparado.match(/^<!-- corpus=.* -->$/gm) ?? []).length;
+    if (estado === reparado) {
+      falha(`reparo: ${nome}`, 'o estado defeituoso já é o canônico — a conferência não o acusaria, e a escrita não o consertaria');
+    } else if (reparado !== alvo) {
+      falha(`reparo: ${nome}`, 'reparar não levou ao mesmo arquivo que o controle leva');
+    } else if (marcadores !== 1) {
+      falha(`reparo: ${nome}`, `sobraram ${marcadores} marcador(es); o canônico tem exatamente 1`);
+    } else {
+      ok(`reparo converge a partir de: ${nome}`);
+    }
+  }
+  if (canonico(alvo, m) === alvo) ok('o reparo é idempotente (reparar o canônico não o muda)');
+  else falha('reparo', 'aplicar o reparo ao arquivo já canônico o altera — o carimbador nunca estabilizaria');
+}
 
 // ── 3. Toda entrada de `retirados.md` tem os quatro campos ───────────────────
 const CAMPOS = ['**Afirmação:**', '**Por que é falsa:**', '**Evidência:**', '**Data:**'];

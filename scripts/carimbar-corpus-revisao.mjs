@@ -22,8 +22,19 @@ import { fileURLToPath } from 'node:url';
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const ARQUIVOS = ['.claude/revisao/aprendizados.md', '.claude/revisao/retirados.md'];
 const LINHA = /^<!-- corpus=.* -->$/m;
-/** A mesma linha, com o `\n` dela, para poder REMOVER em vez de só substituir. */
-const LINHA_COM_QUEBRA = /^<!-- corpus=.* -->\n?/m;
+/**
+ * A mesma linha, com o `\n` dela, para poder REMOVER em vez de só substituir — e com `g`, para
+ * pegar TODAS.
+ *
+ * ⚠️ O `g` não é zelo. Sem ele, um arquivo com a linha DUPLICADA (o que uma resolução de conflito
+ * produz sem esforço) hasheava a segunda ocorrência como se fosse conteúdo, e o modo de escrita
+ * substituía só a primeira: o `--conferir` seguinte dizia **ok** com o arquivo expondo dois
+ * marcadores contraditórios a toda lente. Achado do App do Codex. A saída é a da armadilha 14 do
+ * `CLAUDE.md` — não somar uma guarda que conte marcadores, e sim **inverter**: remover todos antes
+ * de inserir um, de modo que o estado duplicado não seja um caso a detectar, e sim um caso que não
+ * sobrevive a uma passada do carimbador.
+ */
+const LINHA_COM_QUEBRA = /^<!-- corpus=.* -->\n?/gm;
 
 /**
  * O texto que entra no hash: o conteúdo com a linha do marcador REMOVIDA.
@@ -75,19 +86,35 @@ export function calcular(raizRepo = raiz, exigirMarcador = true) {
   return { marcador: `v${entradas}-${hash}`, entradas, textos };
 }
 
+/**
+ * O texto CANÔNICO de um arquivo do corpo: sem nenhuma linha de marcador, e com exatamente uma
+ * reinserida logo depois do cabeçalho de procedência (a primeira linha), que é onde ela mora.
+ *
+ * ⚠️ Este é o predicado ÚNICO dos dois modos, e essa unicidade é o conserto. Antes, "está ok" era
+ * `txt.includes('<!-- corpus=' + marcador + ' -->')` — *o marcador certo aparece em algum lugar* —,
+ * e com a linha DUPLICADA (o que uma resolução de conflito produz sem esforço) isso era verdade
+ * com o arquivo expondo dois marcadores contraditórios a toda lente: o `--conferir` dizia **ok**,
+ * e o modo de escrita saía pelo atalho do "nada a fazer" ANTES do laço de reparo — então o estado
+ * duplicado sobrevivia a quantas passadas se rodasse. Medido: 2 marcadores antes, 2 depois, rc=0
+ * nas duas pontas. Trocar o predicado por *o arquivo É o canônico* faz os dois modos concordarem
+ * por construção, e o reparo passa a ser idempotente de verdade.
+ */
+export const canonico = (txt, marcador) =>
+  semMarcador(txt).replace(/^(.*\n)/, `$1<!-- corpus=${marcador} -->\n`);
+
 export function conferir(raizRepo = raiz) {
   const { marcador, textos } = calcular(raizRepo, true);
-  const divergentes = ARQUIVOS.filter((_, i) => !textos[i].includes(`<!-- corpus=${marcador} -->`));
+  const divergentes = ARQUIVOS.filter((_, i) => textos[i] !== canonico(textos[i], marcador));
   return { marcador, divergentes };
 }
 
 // Só age quando executado direto — importado pela bateria, não deve escrever nada.
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const soConferir = process.argv.includes('--conferir');
-  // No modo de escrita, marcador ausente é o caso a CONSERTAR, não a reportar.
-  const { marcador, divergentes } = soConferir
-    ? conferir()
-    : (() => { const { marcador: m, textos } = calcular(raiz, false); return { marcador: m, divergentes: ARQUIVOS.filter((_, i) => !textos[i].includes(`<!-- corpus=${m} -->`)) }; })();
+  // No modo de escrita, marcador ausente é o caso a CONSERTAR, não a reportar — por isso o
+  // `exigirMarcador = false`. O predicado de divergência é o MESMO nos dois modos.
+  const { marcador, textos } = calcular(raiz, soConferir);
+  const divergentes = ARQUIVOS.filter((_, i) => textos[i] !== canonico(textos[i], marcador));
   if (divergentes.length === 0) {
     console.log(`ok: corpo de conhecimento carimbado com ${marcador} nos ${ARQUIVOS.length} arquivos.`);
     process.exit(0);
@@ -98,16 +125,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.error('  Rode: node scripts/carimbar-corpus-revisao.mjs');
     process.exit(1);
   }
-  const { marcador: marcadorEscrita } = calcular(raiz, false);
-  for (const a of ARQUIVOS) {
-    const caminho = join(raiz, a);
-    const txt = readFileSync(caminho, 'utf8');
-    // Falta a linha? Insere depois do cabeçalho de procedência (a primeira linha do arquivo),
-    // que é onde ela mora — em vez de morrer e deixar o CI irreparável pelo caminho prescrito.
-    const novo = LINHA.test(txt)
-      ? txt.replace(LINHA, `<!-- corpus=${marcadorEscrita} -->`)
-      : txt.replace(/^(.*\n)/, `$1<!-- corpus=${marcadorEscrita} -->\n`);
-    writeFileSync(caminho, novo);
+  for (const [i, a] of ARQUIVOS.entries()) {
+    writeFileSync(join(raiz, a), canonico(textos[i], marcador));
   }
   console.log(`ok: carimbado ${marcador} em ${ARQUIVOS.length} arquivo(s).`);
 }

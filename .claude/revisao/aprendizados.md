@@ -1,5 +1,5 @@
 <!-- CORPUS-REVISAO: marcador carimbado por scripts/carimbar-corpus-revisao.mjs. NÃO edite à mão. -->
-<!-- corpus=v13-06831fea -->
+<!-- corpus=v13-ecce9abf -->
 
 # Aprendizados — o que toda lente deste repositório precisa saber antes de olhar o diff
 
@@ -22,7 +22,12 @@ então leia a linha que é a sua:
 - **Codex:** você monta o diff sozinho e alcança o histórico do git, então o que está acima **não é
   seu limite**. Continua fora: a rede, rota de API de qualquer instância, e o monorepo em
   `/home/user/urbiverso`.
-- **Nativo:** trate-se como o Kimi, salvo o que o seu briefing disser explicitamente.
+- **Nativo:** você é um subagente `general-purpose`, com o conjunto de ferramentas completo —
+  então você alcança o `Bash`, o histórico do git e o que estiver legível no disco, e **a linha
+  do Kimi não é a sua**. Continua fora: a rede, rota de API de qualquer instância, e o monorepo
+  em `/home/user/urbiverso`. ⚠️ Esta linha já disse *"trate-se como o Kimi"*, e era o erro pelo
+  avesso: fazia a lente nativa declarar **não verificável** o que ela consegue medir, e achado
+  real morria por timidez.
 
 Em qualquer motor, o PR no GitHub — comentários, rodadas anteriores, respostas do autor — está fora
 do seu alcance.
