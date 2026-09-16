@@ -4,6 +4,44 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Bug relatado pelo usuário: seletor de lote (Terreno & Áreas, Incorporação) — campo único + causa raiz (2026-09-16)
+
+Fora de rodada — relato direto do usuário (não uma issue do backlog), print da aba Premissas →
+Terreno & Áreas de um estudo de Incorporação: a busca de lote mostrava "0 lotes elegível(is)
+carregado(s) (de 6232 no Núcleo...)" com o campo vazio, e um segundo campo ("Adicionar lote", um
+`<urbi-select>` separado) só aparecia depois de digitar algo na busca.
+
+**Duas causas, uma de dado e uma de UI, as duas em `frontend/tela-terreno-nucleo.ts`:**
+
+1. **Causa raiz.** `_carregarLotes` pedia sempre a página 1 do Núcleo (ordenada por `id DESC`, teto
+   de 200), filtrada no cliente (já vinculados + regularização fundiária). Se os 200 mais recentes
+   caíssem **todos** num parcelamento de regularização, a lista final ficava vazia mesmo havendo
+   milhares de lotes elegíveis adiante — e o componente não avançava sozinho para a próxima página.
+   Consertado com um laço que continua buscando página seguinte enquanto `opcoes` estiver vazia e
+   `_loteTemMais` for `true`, guardado pelas mesmas defesas de corrida já existentes (`_cargaSeq`)
+   que o PR #697 tinha introduzido.
+2. **Campo único, por decisão do usuário** (confirmada via pergunta explícita, não presumida): o
+   `<urbi-select>` "Adicionar lote" — uma caixa independente que só aparecia com `opcoes.length > 0`
+   — foi substituído por uma lista de resultados simples (botões clicáveis), sempre anexada ao mesmo
+   `<urbi-input class="busca">`, sem precisar abrir uma segunda caixa. `urbi-select` no modo
+   `pesquisavel` não emite evento no input interno (só filtra no cliente sobre `.opcoes` já
+   carregado), então não dava para reaproveitá-lo para a busca server-side sem mudar o primitivo do
+   shell — fora de escopo (monorepo é só leitura). O fluxo de gleba (Loteamento) não muda.
+
+Novo estado `_buscando` cobre a janela em que o laço de auto-paginação (disparado por digitação)
+ainda está em voo, para a lista não piscar "nenhum lote" entre uma página vazia e a próxima.
+
+**Cobertura de render:** `terreno-nucleo-filtro-regularizacao.render.test.ts` foi ajustado para medir
+a nova lista (antes lia `.opcoes` de um `<urbi-select>`) e ganhou a asserção `temSelect: false` —
+campo único, sem exceção. Caso novo, `terreno-nucleo-lote-pagina-vazia.render.test.ts`, reproduz
+exatamente o bug relatado (página 1 100% excluída pelo filtro, página 2 com 1 lote elegível) e prova
+que o lote aparece **sem digitar nada** — a fiação, não só o cálculo (classe de defeito nº 1).
+
+`bash scripts/validar-frontend.sh` verde (86 casos de render, nenhuma regressão). Sem instância viva
+disponível nesta sessão para teste manual de UI.
+
+---
+
 ## Rodada 13 aberta: Kimi como segundo motor, e o corpo de conhecimento das lentes (2026-09-16)
 
 Sessão de **processo**, não de produto. A Rodada 13 (tornado de alavancas + margem de segurança na

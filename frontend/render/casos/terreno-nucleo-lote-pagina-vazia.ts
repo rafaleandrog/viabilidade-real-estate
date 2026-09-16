@@ -1,27 +1,24 @@
-// Caso de render: filtro da lista de resultados de lote (Terreno & Áreas,
-// Incorporação) — excluir lotes de parcelamento com `regularizacao=true` e
-// mostrar o campo de busca por texto. A função que faz a exclusão está em
-// `viab-terreno-nucleo` (`_carregarLotes`), mas a FIAÇÃO é o que este caso
-// mede: se o componente chama `/parcelamentos`, resolve o conjunto certo, e
-// de fato tira o lote errado da lista de resultados anexada ao
-// `<urbi-input class="busca">` — a classe de defeito nº 1 do CLAUDE.md
-// (função pura correta, componente não liga, ou liga errado) só se prova
-// atravessando o DOM real. Desde a redesenho de campo único (2026-09-16) não
-// existe mais `<urbi-select>` nesse fluxo — ver `terreno-nucleo-lote-pagina-vazia.ts`
-// para o caso que cobre a causa raiz (página 1 zerada pelo filtro).
+// Caso de render: causa raiz do bug relatado pelo usuário em 2026-09-16 — a
+// busca vazia de lote (Terreno & Áreas, Incorporação) pedia só a página 1 do
+// Núcleo (ordenada por `id DESC`, não por elegibilidade) e, se essa página
+// inteira caísse no filtro de regularização fundiária, a lista de resultados
+// ficava vazia mesmo havendo lotes elegíveis na página seguinte — o usuário
+// só via algo depois de digitar um termo (que muda para busca por texto no
+// servidor, um conjunto diferente). Este caso reproduz exatamente isso: a
+// página 1 de `/lotes` é 100% de um parcelamento de regularização, a página 2
+// tem 1 lote elegível, e a medida prova que ele aparece SEM o usuário digitar
+// nada — a fiação de `_carregarLotes` (não só a função pura) é o que este
+// caso exercita.
 
 import '../../tela-premissas.js';
 import { ESTUDO, forcarEstado } from './dados.js';
 
 export const caso = {
-  nome: 'terreno-nucleo-filtro-regularizacao',
+  nome: 'terreno-nucleo-lote-pagina-vazia',
   exigir: [
     { seletor: 'viab-terreno-nucleo', minimo: 1 },
     { seletor: 'urbi-input.busca', minimo: 1 },
   ],
-  // Props que o stub NÃO reproduz e este caso usa mesmo assim, medidas —
-  // quase todas da PÁGINA DE PREMISSAS inteira, que sobe junto (não há como
-  // montar só `viab-terreno-nucleo`, ela é filha de `viab-tela-premissas`).
   aceitaNaoReproduzido: [
     'urbi-botao.variante',
     'urbi-card.titulo',
@@ -46,14 +43,18 @@ export const caso = {
         };
       }
       if (rota.startsWith('/lotes')) {
-        // Lote 1 pertence ao parcelamento de regularização (10) — tem que
-        // sumir do seletor. Lote 2 pertence ao parcelamento normal (20).
+        const pagina = Number(new URL(rota, 'http://x').searchParams.get('pagina')) || 1;
+        if (pagina === 1) {
+          // Página 1 inteira do parcelamento de regularização — some do
+          // filtro por completo. Só o cursor avançar sozinho revela a 2.
+          return {
+            dados: [{ id: 1, id_legivel: 'L1-REGULARIZACAO', parcelamento_id: 10 }],
+            total: 2, pagina: 1, por_pagina: 200, paginas: 2,
+          };
+        }
         return {
-          dados: [
-            { id: 1, id_legivel: 'L1-REGULARIZACAO', parcelamento_id: 10 },
-            { id: 2, id_legivel: 'L2-OK', parcelamento_id: 20 },
-          ],
-          total: 2, pagina: 1, por_pagina: 200, paginas: 1,
+          dados: [{ id: 2, id_legivel: 'L2-OK', parcelamento_id: 20 }],
+          total: 2, pagina: 2, por_pagina: 200, paginas: 2,
         };
       }
       return { dados: [] };
@@ -69,9 +70,11 @@ export const caso = {
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;
-    // `_carregar()` do `viab-terreno-nucleo` encadeia dois `await` (ids de
-    // regularização, depois lotes) — dá pelo menos duas voltas de microtask
-    // antes de assentar de verdade (mesma técnica de `painel-abas-lazy-terrenos`).
+    // `_carregar()` encadeia: ids de regularização, depois lotes (que agora
+    // pode encadear DUAS páginas sozinho) — várias voltas de microtask antes
+    // de assentar de verdade.
+    await new Promise((r) => setTimeout(r, 0));
+    await (el as any).updateComplete;
     await new Promise((r) => setTimeout(r, 0));
     await (el as any).updateComplete;
     await new Promise((r) => setTimeout(r, 0));
@@ -80,21 +83,18 @@ export const caso = {
     await terreno.updateComplete;
   },
   async medir(raiz: HTMLElement): Promise<{
-    chamadas: string[]; opcoesValores: string[]; opcoesRotulos: string[]; temBuscaInput: boolean;
-    temSelect: boolean;
+    chamadasLotes: string[]; opcoesValores: string[]; opcoesRotulos: string[]; buscaDigitada: string;
   }> {
     const tela = raiz.querySelector('viab-tela-premissas') as any;
     const terreno = tela.shadowRoot!.querySelector('viab-terreno-nucleo') as any;
     await terreno.updateComplete;
     const botoes = Array.from(terreno.shadowRoot!.querySelectorAll('button.resultado-lote')) as HTMLButtonElement[];
-    const buscaInput = terreno.shadowRoot!.querySelector('urbi-input.busca');
+    const buscaInput = terreno.shadowRoot!.querySelector('urbi-input.busca') as any;
     return {
-      chamadas: (globalThis as any).__chamadasNucleo ?? [],
+      chamadasLotes: ((globalThis as any).__chamadasNucleo ?? []).filter((r: string) => r.startsWith('/lotes')),
       opcoesValores: botoes.map((b) => b.getAttribute('data-valor') ?? ''),
       opcoesRotulos: botoes.map((b) => (b.textContent ?? '').trim()),
-      temBuscaInput: !!buscaInput,
-      // Campo único: não pode existir um <urbi-select> separado neste fluxo.
-      temSelect: !!terreno.shadowRoot!.querySelector('urbi-select'),
+      buscaDigitada: buscaInput?.valor ?? '',
     };
   },
 };
