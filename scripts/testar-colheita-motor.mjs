@@ -50,6 +50,30 @@ assert.match(
     'lente que morre antes de escrever some do relatório em vez de virar falha',
 );
 
+// A extração é first-match dentro da seção. Se algum dia a prosa ganhar um bloco ```bash
+// ANTES do da colheita — um exemplo didático da linha do roster, digamos —, ele seria o
+// extraído, e a bateria rodaria verde sobre um exemplo em vez da guarda. Estas duas marcas
+// são o que só o bloco real tem; com elas, o exemplo falha FECHADO em vez de passar.
+for (const marca of ['execucao.txt', 'item.completed', 'role=="assistant"']) {
+  assert.ok(
+    blocoOriginal.includes(marca),
+    `o bloco extraído da seção "A colheita" não contém ${JSON.stringify(marca)} — ` +
+      'a extração pegou o primeiro ```bash da seção, e ele não é a colheita',
+  );
+}
+
+// A colheita escolhe o parser pelo campo `motor=` do execucao.txt — então as fixturas só
+// valem se o PRODUTOR daquele arquivo gravar o campo. As duas funções de despacho vivem no
+// mesmo doc; sem esta asserção, a bateria ficaria verde exercitando um formato que a fan-out
+// real não produz. Já aconteceu: a `lente()` do Codex gravava `tier=` e não `motor=`, e toda
+// lente Codex bem-sucedida seria colhida como "não chegou a escrever".
+const despachos = [...motor.matchAll(/echo "\$id exit=\$rc[^"]*"\s*>>\s*"\$OUT\/execucao\.txt"/g)]
+  .map((m) => m[0]);
+assert.ok(despachos.length >= 2, 'não achei as duas funções de despacho (Codex e Kimi) no motor');
+for (const d of despachos) {
+  assert.match(d, /motor=/, `função de despacho sem \`motor=\`: a colheita leria a lente como não executada — ${d}`);
+}
+
 // Única adaptação: o roster é DADO da revisão, não lógica. Trocado pelo das fixturas.
 const bloco = (roster) => blocoOriginal.replace(/^LENTES=.*$/m, `LENTES="${roster.join(' ')}"`);
 
@@ -71,9 +95,18 @@ const CASOS = [
   {
     id: 'codex_turn_failed',
     motor: 'codex',
-    exit: 1,
-    // Observado: com --json o erro sai no próprio JSONL, não no stderr.
-    jsonl: ['{"type":"turn.failed","error":{"message":"sandbox denied"}}'],
+    exit: 0,
+    // exit 0 E texto presente, os dois DE PROPÓSITO: é o que faz esta fixtura isolar a
+    // guarda do `jq`. Com exit 1, o ramo `rc != 0` condenaria a lente; com texto vazio,
+    // o `[ -z "$texto" ]` condenaria — nos dois casos apagar o `jq` inteiro deixaria a
+    // fixtura verde, e ela mediria outra guarda que não a que diz medir. Medido: a
+    // primeira versão desta fixtura tinha exit 1 e caía nessa armadilha.
+    // Observado: com --json o erro sai no próprio JSONL, não no stderr, e o turno pode
+    // falhar DEPOIS de já ter emitido a mensagem.
+    jsonl: [
+      '{"type":"item.completed","item":{"type":"agent_message","text":"ACHADO: P3 | d.ts:2 | parcial"}}',
+      '{"type":"turn.failed","error":{"message":"sandbox denied"}}',
+    ],
     esperaColhido: false,
     contem: 'NÃO EXECUTADA',
   },
@@ -103,6 +136,39 @@ const CASOS = [
     ],
     esperaColhido: true,
     contem: 'ACHADO: P2',
+  },
+  {
+    id: 'kimi_exit0_sem_content',
+    motor: 'kimi',
+    exit: 0,
+    // O caso do P1, ISOLADO: a lente terminou limpa (exit 0) e não deixou resposta.
+    // Nenhuma outra fixtura tem exit 0 com texto vazio, então esta é a única que
+    // condena a ausência de `[ -z "$texto" ]` na condição — sem ela, apagar a guarda
+    // de texto deixaria a bateria inteira verde, que é o oposto do que este arquivo faz.
+    jsonl: [
+      '{"role":"meta","type":"system.version","content":"0.38.0"}',
+      '{"role":"assistant","content":null,"tool_calls":[{"name":"Read"}]}',
+    ],
+    err: '',
+    esperaColhido: false,
+    contem: 'NÃO EXECUTADA',
+  },
+  {
+    id: 'kimi_stack_trace',
+    motor: 'kimi',
+    exit: 1,
+    // A quinta forma da tabela do doc: PROVIDER_TYPE inválido (ou `-m`) derruba o CLI
+    // com um stack trace do Node cuja linha ÚTIL fica no TOPO. É o caso que motivou o
+    // pipeline de diagnóstico (`grep … | head -2` antes do `tail -2`): um `tail` sozinho
+    // devolveria o rodapé do stack e perderia o motivo.
+    jsonl: ['{"role":"meta","type":"system.version","content":"0.38.0"}'],
+    err: [
+      "Error: Agent event 'agent.activity.updated' has no active lifecycle context",
+      '    at Agent.emit (node:events:518:28)',
+      '    at Module._compile (node:internal/modules/cjs/loader:1364:14)',
+    ].join('\n'),
+    esperaColhido: false,
+    contem: 'lifecycle context',   // o motivo tem que sobreviver ao filtro de ruído
   },
   {
     id: 'kimi_sem_content',
@@ -176,10 +242,14 @@ try {
   ok('a colheita itera o roster de lentes, não o glob dos arquivos');
 
   // Cada fixtura tem a sua própria fatia da saída: do cabeçalho dela até o próximo.
+  // A âncora é `### <id>` seguido de espaço ou fim de linha — sem isso, um id que seja
+  // PREFIXO de outro (`kimi` vs `kimi_ok`) casaria o cabeçalho errado e o teste mediria
+  // a lente vizinha achando que mediu a certa.
   const fatia = (id) => {
-    const i = saida.indexOf(`### ${id}`);
-    if (i === -1) return null;
-    const resto = saida.slice(i + 1);
+    const re = new RegExp(`^### ${id}(?=[ \\n])`, 'm');
+    const m = re.exec(saida);
+    if (!m) return null;
+    const resto = saida.slice(m.index + m[0].length);
     const j = resto.indexOf('\n### ');
     return j === -1 ? resto : resto.slice(0, j);
   };
@@ -196,10 +266,14 @@ try {
     ok(`${c.id} → ${c.esperaColhido ? 'colhido' : 'não executada'} (${c.contem})`);
   }
 
-  // O texto de uma lente NUNCA pode vazar para a fatia de outra.
-  const fkimi = fatia('kimi_ok') ?? '';
-  if (fkimi.includes('ACHADO: P1')) falha('isolamento', 'texto do Codex vazou para a fatia do Kimi');
-  else ok('cada lente colhe só o próprio arquivo');
+  // O texto de uma lente NUNCA pode vazar para a fatia de outra — nos DOIS sentidos, e
+  // com fatia não-vazia, senão a asserção passaria por ausência em vez de por isolamento.
+  const fkimi = fatia('kimi_ok');
+  const fcodex = fatia('codex_ok');
+  if (!fkimi || !fcodex) falha('isolamento', 'uma das fatias veio vazia — a asserção passaria por ausência');
+  else if (fkimi.includes('ACHADO: P1')) falha('isolamento', 'texto do Codex vazou para a fatia do Kimi');
+  else if (fcodex.includes('ACHADO: P2')) falha('isolamento', 'texto do Kimi vazou para a fatia do Codex');
+  else ok('cada lente colhe só o próprio arquivo (conferido nos dois sentidos)');
 } finally {
   rmSync(OUT, { recursive: true, force: true });
 }

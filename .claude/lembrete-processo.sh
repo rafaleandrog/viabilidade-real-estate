@@ -41,7 +41,12 @@ fi
 # um valor só, minúsculo (`grep -o 'motor=[a-z]*'`), e um composto seria truncado em silêncio.
 MOTOR="nativo"
 [ -n "${MOONSHOT_API_KEY:-}" ] && MOTOR="kimi"
-[ -n "${OPENAI_API_KEY:-}" ] && { [ "$MOTOR" = "kimi" ] && MOTOR="codex+kimi" || MOTOR="codex"; }
+# `auth.json` entra aqui pelo mesmo motivo que entra no outro hook: sessão de ChatGPT já
+# feita vale sem a variável. Sem ela, os dois hooks discordariam do motor no mesmo ambiente,
+# e o comentário acima ("mesmo critério") seria falso — a classe que este bloco combate.
+if [ -n "${OPENAI_API_KEY:-}" ] || [ -s "$HOME/.codex/auth.json" ]; then
+  [ "$MOTOR" = "kimi" ] && MOTOR="codex+kimi" || MOTOR="codex"
+fi
 
 echo "[processo] branch=$BRANCH · $ESTADO · $REMOTO · motor=$MOTOR"
 

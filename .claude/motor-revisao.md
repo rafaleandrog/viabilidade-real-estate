@@ -675,7 +675,11 @@ Responda em português.
 ${brief}
 
 ${COMUM}" </dev/null > "$OUT/$id.jsonl" 2> "$OUT/$id.err" || rc=$?
-  echo "$id exit=$rc tier=$tier esforco=$esf dur=$(( $(date +%s) - ini ))s" >> "$OUT/execucao.txt"
+  # `motor=` é OBRIGATÓRIO nas duas funções: a colheita lê esse campo para escolher o
+  # parser, e a lente cuja linha não o traz é lida como "não chegou a escrever". Este
+  # `echo` já ficou sem ele, e o efeito era toda lente Codex bem-sucedida sair NÃO
+  # EXECUTADA — o espelho do defeito que a colheita nova consertou do lado do Kimi.
+  echo "$id exit=$rc motor=codex tier=$tier esforco=$esf dur=$(( $(date +%s) - ini ))s" >> "$OUT/execucao.txt"
 }
 
 # A mesma função, quando o motor da lente é o Kimi. Note o que muda: `cd` em vez de `-C`,
@@ -739,8 +743,12 @@ LENTES="L1 L2 S1 S2 T4"   # o roster do passo 2.1
 
 for id in $LENTES; do
   f="$OUT/$id.jsonl"
-  motor=$(grep -o "^$id .*motor=[a-z]*" "$OUT/execucao.txt" 2>/dev/null | sed 's/.*motor=//')
-  rc=$(grep -o "^$id exit=[0-9]*" "$OUT/execucao.txt" 2>/dev/null | sed 's/.*=//')
+  # `tail -1` porque o re-despacho da escada de falha ACRESCENTA uma segunda linha do
+  # mesmo id (a limpeza do execucao.txt é só na abertura do lote). Sem ele, `rc` vira
+  # "1\n0", que não é "0", e a lente que teve SUCESSO na segunda tentativa é colhida
+  # como não executada — falha falsa, que é o laudo limpo pelo avesso.
+  motor=$(grep -o "^$id .*motor=[a-z]*" "$OUT/execucao.txt" 2>/dev/null | tail -1 | sed 's/.*motor=//')
+  rc=$(grep -o "^$id exit=[0-9]*" "$OUT/execucao.txt" 2>/dev/null | tail -1 | sed 's/.*=//')
   if [ ! -s "$f" ] || [ -z "$motor" ]; then
     echo "### $id — NÃO EXECUTADA (sem saída: o processo da lente não chegou a escrever)"
     echo; continue
