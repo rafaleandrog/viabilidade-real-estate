@@ -356,7 +356,8 @@ numerada contra a `main` do momento, com a `versao` bumpada.
    árvore suja) que o CI já não pode pegar, e **as baterias do job `processo-integro`** — a rede do
    processo, o corpo de conhecimento das lentes, a colheita do motor, a guarda do monorepo e o
    parsing do `revisao-registrada`.
-   > ⚠️ **Nenhuma delas roda em `--declarado`**, e isso é sobre tempo de CI. O modo declarado é
+   > ⚠️ **As quatro baterias `testar-*` não rodam em `--declarado`** — a rede do processo
+   > (`guard-processo.mjs`) roda sempre, porque é guard barato, não bateria. Isto é sobre tempo de CI. O modo declarado é
    > entrada sintética: `scripts/testar-preflight-pr.sh` o usa para exercitar o parsing do preflight
    > dezenas de vezes, e repete a suíte numa worktree hermética. Como as baterias leem a **árvore**,
    > que a fixture não muda, cada repetição refazia trabalho idêntico. Medido: **96 s → 8 s** no

@@ -206,12 +206,34 @@ contem 'estado da árvore:' 'reporta o estado da árvore em qualquer ambiente' \
 # Uma invocação real custa ~1,9s; o teto do job é 5 min. Uma é o preço certo por cobrir a fiação.
 saida_real="$(node scripts/preflight-pr.mjs --corpo "$TMP/corpo.md" --titulo 'titulo sintetico' 2>&1)"
 faltando=''
-for b in 'bateria do corpo de conhecimento' 'bateria da colheita do motor' \
-         'bateria da guarda do monorepo' 'bateria do parsing do revisao-registrada'; do
-  case "$saida_real" in *"$b"*) ;; *) faltando="$faltando $b" ;; esac
-done
+# ⚠️ Casa a LINHA DE SUCESSO (`  ✓ <rótulo> — `), não a substring em qualquer lugar da saída. O
+# próprio preflight imprime os rótulos FORA do caminho de sucesso: o aviso de `jq` ausente
+# interpola os três nomes de `COM_JQ`, e o ramo de falha do `rodar` imprime `<rótulo> reprovou:`.
+# Com `case *"$b"*`, uma máquina sem `jq` — estado que o preflight trata como legítimo — daria
+# VERDE com ZERO das três tendo rodado, e a mutação que este caso existe para matar passaria junto.
+# Guarda que falha ABERTA, § 7 do corpo de conhecimento, dentro do caso escrito para fechar a
+# fiação. Achado de lente, na rodada seguinte à que criou o caso.
+# ⚠️ E exige só o que é OBSERVÁVEL neste ambiente. Três das quatro dependem de `jq`, e o preflight
+# trata a ausência dele como estado legítimo (aviso, não bloqueante) — então exigi-las numa máquina
+# sem `jq` transformaria este caso num bloqueio falso, que é o defeito simétrico. Com `jq`, as
+# quatro; sem, a do corpo, que não depende dele. O que não dá para observar é DITO, não presumido.
+esperadas='bateria do corpo de conhecimento'
+if command -v jq > /dev/null 2>&1; then
+  esperadas="$esperadas
+bateria da colheita do motor
+bateria da guarda do monorepo
+bateria do parsing do revisao-registrada"
+else
+  echo '  nota  `jq` ausente: só a bateria do corpo é observável neste ambiente'
+fi
+while IFS= read -r b; do
+  case "$saida_real" in *"✓ $b — "*) ;; *) faltando="$faltando $b" ;; esac
+done <<EOF_ESPERADAS
+$esperadas
+EOF_ESPERADAS
 if [ -z "$faltando" ]; then
-  passou=$((passou + 1)); echo '  ok   em modo REAL o preflight roda as 4 baterias do processo-integro'
+  n_esp=$(printf '%s\n' "$esperadas" | grep -c .)
+  passou=$((passou + 1)); echo "  ok   em modo REAL o preflight roda as $n_esp bateria(s) observavel(is) aqui"
 else
   falhou=$((falhou + 1))
   echo "  FALHA em modo real faltaram baterias:$faltando"
