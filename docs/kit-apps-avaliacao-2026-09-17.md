@@ -66,10 +66,12 @@ contra o repositório:
   Contrato de ambiente: `URBIVERSO_URL` e `URBIVERSO_TOKEN`.
 - **`qa`** — exercita a API de uma instância viva a partir do diff de um PR (ou de um roteiro
   escrito em comentário), com um pool reutilizável de usuários de serviço `QA <Tipo> <n>` que ela
-  mesma reserva, configura e devolve a cada rodada. Não temos o `ola_mundo` instalado, então o
-  roteiro fixo de smoke do primeiro app (`smoke-primeiro-app.md`, § 7 origem "c" da skill) não se
-  aplica aqui — ele veio junto por ser parte inseparável do pacote da skill, mas só dispara sob
-  pedido explícito ("roda o smoke do primeiro app") e não atrapalha o resto. Contrato de ambiente:
+  mesma reserva, configura e devolve a cada rodada. **Não verificado nesta sessão** (sem acesso à
+  API da instância ainda — nenhuma das duas variáveis de ambiente existe aqui), mas pelo que
+  sabemos não instalamos o `ola_mundo` nesta instância, então o roteiro fixo de smoke do primeiro
+  app (`smoke-primeiro-app.md`, § 7 origem "c" da skill) provavelmente não se aplica aqui — ele
+  veio junto por ser parte inseparável do pacote da skill, mas só dispara sob pedido explícito
+  ("roda o smoke do primeiro app") e não atrapalha o resto. Contrato de ambiente:
   `URBIVERSO_QA_URL` e `URBIVERSO_QA_TOKEN_PCPAL`.
 
 Nenhuma das duas está configurada nesta sessão — nenhuma das duas variáveis de ambiente existe
