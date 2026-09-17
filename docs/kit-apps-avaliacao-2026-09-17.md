@@ -126,8 +126,11 @@ versões intermediárias do pacote. Não fiz esse bump aqui. Quando o autor quis
 ## O que ficou para o autor
 
 - Rodar **"configure o meu acesso à instância"** numa sessão nova para ativar `instancia-urbiverso`
-  e `qa` de verdade (cria o usuário de serviço, as alçadas e as variáveis de ambiente da sessão de
-  nuvem).
+  de verdade (cria o usuário de serviço `Claude - sob <nome>`, as alçadas e
+  `URBIVERSO_URL`/`URBIVERSO_TOKEN`). **`qa` tem preparação própria e separada** — peça "prepare o
+  ambiente de QA" (cria o usuário de serviço "QA Principal" e
+  `URBIVERSO_QA_URL`/`URBIVERSO_QA_TOKEN_PCPAL`). As duas variáveis de ambiente são independentes;
+  rodar uma não ativa a outra.
 - Confirmar, na instância, se o token de serviço já tem leitura liberada também para o pacote
   `kit-apps` (o passo 9.4 do `instancia-no-ar.md` novo pede os dois pacotes, `sdk` **e**
   `kit-apps`) — testei o acesso de leitura ao `@urbiverso/kit-apps` com o token atual do ambiente

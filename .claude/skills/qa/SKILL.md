@@ -119,10 +119,19 @@ falhar. Cada degrau distingue um modo de falha diferente, e a mensagem certa dep
    anterior à 0.55.6 — aborte pela § 2.
 4. **A identidade não é a de um principal válido** — `usuario.tipo` é `"sysadmin"` **ou**
    `"operador"` (os dois são elegíveis à alçada `plataforma`, ver § 8.1 — rejeitar só sysadmin
-   deixaria passar um operador), ou `alcadas` sem `usuarios` ou sem `contas`, ou nome sem `QA`,
-   ou **`credencial.somente_leitura: true`** (o roster inteiro escreve — ativar, conceder
-   alçada, cunhar token —, e um principal só-leitura falharia no meio da § 5.4 em vez de já
-   aqui): passo do usuário no roteiro de preparação, nomeando o que falhou.
+   deixaria passar um operador), ou nome sem `QA`, ou **`credencial.somente_leitura: true`** (o
+   roster inteiro escreve — ativar, conceder alçada, cunhar token —, e um principal só-leitura
+   falharia no meio da § 5.4 em vez de já aqui): passo do usuário no roteiro de preparação,
+   nomeando o que falhou.
+
+   **`alcadas` sem `usuarios` ou sem `contas` tem duas causas, e elas pedem consertos
+   diferentes.** `alcadas` é o escopo do **token**, não o cadastro do usuário — confira
+   `credencial.alcadas_fora_do_escopo` antes de concluir qual é: se `usuarios`/`contas` aparece
+   ali, o usuário **tem** a alçada e só o token não a carrega — manda **recunhar o token** com o
+   escopo certo (rápido, mesma tela); se não aparece em nenhum dos dois campos, o usuário de
+   fato não tem a alçada — manda o **passo do usuário** no roteiro de preparação (concede a
+   alçada primeiro, token depois). Tratar os dois como o mesmo caso manda gente refazer o
+   cadastro inteiro quando bastava reemitir um token.
 
 Passou pelos quatro: ambiente configurado, siga para a § 4. Em nenhum degrau se imprime token.
 

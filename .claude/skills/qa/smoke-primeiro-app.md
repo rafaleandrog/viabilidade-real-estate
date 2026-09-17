@@ -66,7 +66,8 @@ falhar poupa sete diagnósticos errados. Falhou um, **pare e relate** — não s
    **Numa instalação nova, o principal não tem permissão nenhuma no app** — a instalação não dá
    acesso a ninguém, nem a quem instalou. Sem isso o cenário 5 devolve `403`, não `200`. Antes de
    rodá-lo, confira (`GET /api/shell/apps/ola_mundo/permissoes/<id do principal>` ou o painel de
-   Acesso do app) e, faltando, conceda `leitura` com a autorização da § 4:
+   Acesso do app) e, faltando, conceda `leitura`: diga que vai conceder `leitura` no `ola_mundo`
+   para o principal, que revoga no fim da rodada, e espere a confirmação antes de escrever —
    `PUT /api/shell/apps/ola_mundo/permissoes/<id do principal>` com `{"nivel":"leitura"}`. É
    resíduo — revogue no fim (ver § Resíduo, abaixo).
 6. **Sem credencial.** É o negativo que prova que a rota é autenticada de verdade. **`ola_mundo`
@@ -83,9 +84,11 @@ falhar poupa sete diagnósticos errados. Falhou um, **pare e relate** — não s
    o mesmo usuário reaparece aqui com `leitura` residual, e o cenário devolve `200` em vez de
    `403`, lido como regressão do produto que não existe. `GET
    /api/shell/apps/ola_mundo/permissoes/<usuarioId>` antes de disparar o cenário; achando
-   permissão, revogue com a autorização da § 4 antes de seguir.
+   permissão, diga que vai revogá-la e por quê, espere a confirmação, e só então
+   `DELETE /api/shell/apps/ola_mundo/permissoes/<usuarioId>`.
 8. **Com permissão, `200`.** A escrita que separa 7 de 8 é
-   `PUT /api/shell/apps/ola_mundo/permissoes/<usuarioId>` com `{"nivel":"leitura"}`, da alçada
+   `PUT /api/shell/apps/ola_mundo/permissoes/<usuarioId>` com `{"nivel":"leitura"}` — mesma
+   regra de autorização do cenário 5 acima —, da alçada
    `usuarios` — que o principal tem por definição (§ 2). Cunhe o token do usuário do pool
    **antes** do cenário 7, não entre 7 e 8: token novo no meio confunde "não tinha permissão"
    com "não tinha token".
