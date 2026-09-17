@@ -62,6 +62,13 @@ falhar poupa sete diagnósticos errados. Falhou um, **pare e relate** — não s
 5. **O nome é a asserção.** `200` com corpo genérico não prova nada: o que este app existe para
    provar é que `req.contexto.usuario` chegou ao backend da app, e a prova é o nome do principal
    aparecer na resposta. Compare a string, não o código.
+
+   **Numa instalação nova, o principal não tem permissão nenhuma no app** — a instalação não dá
+   acesso a ninguém, nem a quem instalou. Sem isso o cenário 5 devolve `403`, não `200`. Antes de
+   rodá-lo, confira (`GET /api/shell/apps/ola_mundo/permissoes/<id do principal>` ou o painel de
+   Acesso do app) e, faltando, conceda `leitura` com a autorização da § 4:
+   `PUT /api/shell/apps/ola_mundo/permissoes/<id do principal>` com `{"nivel":"leitura"}`. É
+   resíduo — revogue no fim (ver § Resíduo, abaixo).
 6. **Sem credencial.** É o negativo que prova que a rota é autenticada de verdade. **`ola_mundo`
    não tem rota pública** — não existe `/api/pub/ola_mundo/*` e não deve existir: o app de
    exemplo é mínimo de propósito. Se o pedido falar em "rota pública da app", diga que este app
@@ -84,6 +91,10 @@ A § 12 do `SKILL.md` vale inteira, e este roteiro acrescenta **um** item própr
   no fim, sempre — inclusive quando o smoke falhou depois dela. Usuário do pool que fica com
   acesso a um app carrega esse acesso para a próxima rodada e faz o cenário 7 passar por engano,
   que é a pior falha possível aqui: um negativo que não nega.
+- **A permissão do principal, se você a concedeu no cenário 5, também é resíduo** — mesma rota,
+  com o id do principal. Diferente da do pool, o principal é reutilizado rodada após rodada, então
+  isto só importa quando você concedeu; se ele já tinha `leitura` antes do smoke (outra rodada
+  deixou), não revogue algo que não foi seu.
 
 Não mexa em nada mais do app: não desligue, não desinstale, não altere a **permissão padrão**.
 A permissão padrão é do app inteiro e vale para gente de verdade; mudá-la para testar abriria o

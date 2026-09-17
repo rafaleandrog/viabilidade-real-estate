@@ -36,9 +36,13 @@ não rodamos o kit aqui, o que foi adotado dele e o que ficou de fora) em
 bastante para este layout: `instancia-urbiverso` (Claude configura identidade própria — "Claude -
 sob `<nome>`" — e opera a instância pela API: instalar/homologar app, permissão, pessoas) e `qa`
 (exercita a API de uma instância viva a partir do diff de um PR, com um pool de usuários de
-serviço). As duas pedem `URBIVERSO_URL`/`URBIVERSO_TOKEN` (ou `URBIVERSO_QA_URL`/
-`URBIVERSO_QA_TOKEN_PCPAL`) no ambiente — ainda não configuradas nesta sessão; peça "configure o
-meu acesso à instância" numa sessão nova para começar.
+serviço). São **duas preparações distintas, cada uma com seu próprio par de variáveis**:
+`instancia-urbiverso` pede `URBIVERSO_URL`/`URBIVERSO_TOKEN` — peça "configure o meu acesso à
+instância" para criá-las. `qa` pede `URBIVERSO_QA_URL`/`URBIVERSO_QA_TOKEN_PCPAL`, de um usuário de
+serviço **"QA Principal"** separado — peça "prepare o ambiente de QA" (ou "roda o smoke do primeiro
+app", que dispara a preparação sozinha se faltar) para essa. Nenhuma das duas está configurada
+nesta sessão; a primeira pergunta que valer a pena não é "que skill preciso" — é "qual das duas
+variáveis eu já configurei".
 
 ---
 

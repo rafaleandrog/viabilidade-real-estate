@@ -176,7 +176,7 @@ com o nome (`QA Externo 1` que é `colaborador`) é inconsistência: não use, e
 parâmetro não filtra por inativo, ele deixa de esconder os inativos (sem ele, só os ativos
 saem). Uma chamada basta; o campo `ativo` de cada linha diz o estado. Filtre pelo nome da
 convenção e registre, por usuário: nome, ID, tipo, ativo e alçadas atuais
-(`GET /usuarios/:id/alcadas`).
+(`GET /api/shell/usuarios/:id/alcadas`).
 
 **Ativo é indício de que outra sessão está usando — não prova.** A skill inativa o pool ao sair
 (§ 12), então um usuário do pool ativo na largada é, ou outra sessão em andamento, ou uma
@@ -220,11 +220,11 @@ Para cada usuário reservado, nesta ordem:
 
 1. **Ative**, se inativo: `PUT /api/shell/usuarios/:id` com `ativo: true`. Conceder alçada a
    usuário inativo é `422 USUARIO_INATIVO`, por isso primeiro.
-2. **Zere as alçadas**: revogue **todas** as que ele tiver (`DELETE /usuarios/:id/alcadas/:alcada`),
+2. **Zere as alçadas**: revogue **todas** as que ele tiver (`DELETE /api/shell/usuarios/:id/alcadas/:alcada`),
    inclusive as que a rodada vai conceder de novo. Alçada que sobrou de uma sessão morta é o
    modo de falha que invalida a prova de "alçada sozinha", e zerar é o que torna o estado
    inicial independente da história.
-3. **Conceda exatamente as do papel** (`PUT /usuarios/:id/alcadas/:alcada`) — só as que o
+3. **Conceda exatamente as do papel** (`PUT /api/shell/usuarios/:id/alcadas/:alcada`) — só as que o
    principal detém; o resto é lacuna (§ 9.3). Pool de "sem alçada" fica em zero.
 4. **Cunhe o token**: `POST /api/shell/tokens-api` com `{ nome: "qa-<carimbo>-<papel>",
    usuario_id, alcadas, expira_em, somente_leitura? }`, onde `<carimbo>` é `AAAAMMDD-HHMM` da
@@ -528,11 +528,11 @@ rodada, mesmo abortada no meio, para cada usuário do pool que a rodada reservou
    eles (o nome `qa-<carimbo>-*` os identifica; `GET /tokens-api?usuario_id=N` lista). A
    expiração de 2h é a rede de segurança para o caso em que este passo não roda; não é motivo
    para pulá-lo.
-2. **Revogue as alçadas** que concedeu (`DELETE /usuarios/:id/alcadas/:alcada`) — **antes** de
+2. **Revogue as alçadas** que concedeu (`DELETE /api/shell/usuarios/:id/alcadas/:alcada`) — **antes** de
    inativar. Desativar usuário não revoga alçada, e um usuário inativo com alçada volta com ela
    na próxima rodada, que por isso zera na entrada (§ 5.4) — mas zerar na saída é o que deixa
    o pool legível para quem olha a tela de Usuários.
-3. **Inative os usuários** da rodada (`PUT /usuarios/:id` com `ativo: false`) — **todos menos o
+3. **Inative os usuários** da rodada (`PUT /api/shell/usuarios/:id` com `ativo: false`) — **todos menos o
    principal**, que fica ativo sempre. Inativo é o estado de repouso do pool, e é o que a
    próxima sessão lê como "livre" (§ 5.2). Se este passo não rodar, o passo 1 não rodou
    também, e é o token vigente que a próxima sessão vai ler — até ele expirar.
