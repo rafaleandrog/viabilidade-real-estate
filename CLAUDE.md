@@ -28,6 +28,18 @@ está em `docs/rodada-5-evi-2026-07-31.md`. A revisão de recebíveis por safras
 dois documentos contra EVIs reais do projeto Calliandra, está em
 `docs/revisao-recebiveis-calliandra-2026-07-31.md`.
 
+**Este repositório é "app em repositório próprio"** (`node_modules/@urbiverso/sdk/docs/apps-em-repo-proprio.md`
+— app na raiz, não sob `apps/<appId>/`), **não** um "repo de solução" instalado via `npx
+@urbiverso/kit-apps`. Os dois são caminhos oficiais e distintos do SDK; avaliação completa (por que
+não rodamos o kit aqui, o que foi adotado dele e o que ficou de fora) em
+`docs/kit-apps-avaliacao-2026-09-17.md`. Duas skills novas vieram de lá e **são** genéricas o
+bastante para este layout: `instancia-urbiverso` (Claude configura identidade própria — "Claude -
+sob `<nome>`" — e opera a instância pela API: instalar/homologar app, permissão, pessoas) e `qa`
+(exercita a API de uma instância viva a partir do diff de um PR, com um pool de usuários de
+serviço). As duas pedem `URBIVERSO_URL`/`URBIVERSO_TOKEN` (ou `URBIVERSO_QA_URL`/
+`URBIVERSO_QA_TOKEN_PCPAL`) no ambiente — ainda não configuradas nesta sessão; peça "configure o
+meu acesso à instância" numa sessão nova para começar.
+
 ---
 
 ## Estado do backlog — 🔄 RODADA 13 EM ANDAMENTO (aberta em 2026-09-16)
