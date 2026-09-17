@@ -130,8 +130,10 @@ Passos:
 
 Variável de ambiente só entra na largada da sessão, então a conferência é numa sessão nova:
 
-> Abra uma sessão nova no ambiente **QA <nome>** — qualquer repositório serve — e mande:
-> `valide o ambiente de QA`. A skill vai alcançar a instância, confirmar quem é o QA Principal,
+> Abra uma sessão nova **neste repositório**, no ambiente **QA <nome>**, e mande:
+> `valide o ambiente de QA`. A skill só é descoberta em repositórios que a têm em
+> `.claude/skills/qa/` — "qualquer repositório" não serve. A skill vai alcançar a instância,
+> confirmar quem é o QA Principal,
 > ler as alçadas dele e imprimir o cabeçalho de uma rodada, sem executar teste nenhum. Se
 > algum passo falhar, ela diz qual destes cinco refazer.
 
