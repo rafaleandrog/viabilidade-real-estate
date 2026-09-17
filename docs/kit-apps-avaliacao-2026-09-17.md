@@ -52,10 +52,14 @@ adotar, seletivamente, o que é novo e não conflita.
 
 ## O que foi adotado
 
-Duas skills novas, copiadas da árvore descartável para `.claude/skills/` — nenhuma das duas está
-na lista de seis que o kit reescreve sozinho no formato "repo de solução" com conflito de layout;
-as duas são agnósticas a onde o código do app mora, porque operam contra a **instância**, não
-contra o repositório:
+Duas skills novas, copiadas da árvore descartável para `.claude/skills/` — as duas **estão** na
+lista de seis que o kit reescreve sozinho (ver acima), então um `npx @urbiverso/kit-apps` real
+neste repositório voltaria a sobrescrevê-las sem pedir. O que as torna seguras de copiar não é
+estarem fora dessa lista — é serem **agnósticas a onde o código do app mora**, porque operam
+contra a **instância**, não contra o repositório, ao contrário de `especificar`/`implementar`/
+`revisar-pr-apps`, que assumem o layout `apps/<appId>/`. Se o kit for atualizado de novo no
+futuro, `instancia-urbiverso` e `qa` precisam ser reconferidas e recopiadas à mão, como
+`revisar-pr-apps` já é — nenhuma das três sincroniza sozinha:
 
 - **`instancia-urbiverso`** — Claude configura uma identidade própria na instância
   (`Claude - sob <nome da pessoa>`, um usuário de serviço com token e alçadas escolhidas por quem

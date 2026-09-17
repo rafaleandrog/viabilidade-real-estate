@@ -117,9 +117,10 @@ falhar. Cada degrau distingue um modo de falha diferente, e a mensagem certa dep
 3. **`GET /api/shell/auth/identidade` com o principal devolve `401`.** Token inválido,
    desativado ou expirado: passo do token no roteiro de preparação. **`404`** aqui é alvo
    anterior à 0.55.6 — aborte pela § 2.
-4. **A identidade não é a de um principal válido** — `usuario.tipo === "sysadmin"`, ou
-   `alcadas` sem `usuarios` ou sem `contas`, ou nome sem `QA`: passo do usuário no roteiro de
-   preparação, nomeando o que falhou.
+4. **A identidade não é a de um principal válido** — `usuario.tipo` é `"sysadmin"` **ou**
+   `"operador"` (os dois são elegíveis à alçada `plataforma`, ver § 8.1 — rejeitar só sysadmin
+   deixaria passar um operador), ou `alcadas` sem `usuarios` ou sem `contas`, ou nome sem `QA`:
+   passo do usuário no roteiro de preparação, nomeando o que falhou.
 
 Passou pelos quatro: ambiente configurado, siga para a § 4. Em nenhum degrau se imprime token.
 
@@ -188,8 +189,12 @@ deixa o usuário ativo e o token morre sozinho em até 2h. Logo:
 
 - **ativo + token vigente** → trate como em uso por outra sessão: entra no plano com a pergunta
   (§ 5.3), e só se usa com autorização;
-- **ativo sem token vigente** → provável sessão que morreu: use, mas diga no plano e no
-  cabeçalho que o encontrou assim (a sobra de alçada é zerada de qualquer jeito, § 5.4);
+- **ativo sem token vigente** → provável sessão que morreu, **mas também pode ser uma sessão
+  viva entre o passo 1 (ativar) e o passo 4 (cunhar token) da § 5.4** — a janela em que ela
+  ainda não tem token vigente sem estar morta. As duas causas são indistinguíveis por esta
+  leitura sozinha, então trate igual ao caso anterior: entra no plano com a mesma pergunta
+  explícita (§ 5.3), nunca usado sem autorização (a sobra de alçada é zerada de qualquer jeito,
+  § 5.4);
 - **inativo** → livre.
 
 **A palavra do usuário é soberana** nos três casos: se ele disser que o ativo com token é dele
@@ -203,16 +208,17 @@ pedem "só `marcas`" usam o mesmo usuário; três que pedem usuários distintos 
 três), case contra o pool e mande **uma mensagem só**, em texto corrido, com duas listas:
 
 1. **Vou usar:** os usuários do pool que a rodada reserva, com o papel de cada um nesta rodada —
-   e o pedido de que **nenhuma outra sessão os use enquanto isso**. Usuário que estava **ativo
-   com token vigente** entra nesta lista marcado como tal, com a pergunta explícita; ativo sem
-   token vigente entra marcado como "encontrado ativo, sem token vigente", sem pergunta.
+   e o pedido de que **nenhuma outra sessão os use enquanto isso**. Usuário que estava **ativo**
+   — com token vigente ou sem ele — entra nesta lista marcado como tal (dizendo qual dos dois
+   estados encontrou), com a mesma pergunta explícita: a ausência de token vigente não distingue
+   sessão morta de sessão viva no meio da § 5.4, então as duas pedem a mesma autorização.
 2. **Preciso criar:** os que faltam, já com o nome que vão receber (próximo número livre da
    convenção, por tipo) — e o pedido de **autorização**.
 
-**Espere resposta se houver algo a autorizar** — usuário ativo com token vigente na lista 1 ou
-qualquer entrada na lista 2. Se as duas condições estão vazias (pool inativo suficiente), a mensagem é
-informativa e a rodada segue sem esperar. Não crie usuário sem autorização, e não use usuário
-ativo sem ela.
+**Espere resposta se houver algo a autorizar** — qualquer usuário ativo (com ou sem token
+vigente) na lista 1, ou qualquer entrada na lista 2. Se as duas condições estão vazias (pool
+inativo suficiente), a mensagem é informativa e a rodada segue sem esperar. Não crie usuário sem
+autorização, e não use usuário ativo sem ela.
 
 ### 5.4 Configurar — o que é por rodada
 
@@ -273,10 +279,11 @@ Chame uma vez por token — o do principal na largada, os da rodada logo depois 
 registre o que voltou. O que importa é o que ele devolve **agora**, porque o usuário do pool é o
 mesmo de rodadas anteriores e só a configuração desta rodada conta. Como ler:
 
-- **`usuario.tipo === "sysadmin"` → aborte** (§ 3.4), nomeando o usuário. Vale para qualquer
-  token, não só o principal: um sysadmin no roster é o que tornaria as rotas proibidas
-  alcançáveis sem ninguém notar — e, como a skill não consegue cunhar token para alvo mais
-  poderoso que o principal, um sysadmin ali só existe se o ambiente trouxe o token errado.
+- **`usuario.tipo` é `"sysadmin"` ou `"operador"` → aborte** (§ 3.4), nomeando o usuário. Vale
+  para qualquer token, não só o principal: os dois tipos são elegíveis à alçada `plataforma`
+  (§ 8.1), e um deles no roster é o que tornaria as rotas proibidas alcançáveis sem ninguém
+  notar — e, como a skill não consegue cunhar token para alvo mais poderoso que o principal, um
+  deles ali só existe se o ambiente trouxe o token errado.
 - **`alcadas` é a lista completa e autoritativa.** Alçada nova aparece sozinha, sem tabela
   mantida à mão.
 - **`credencial.alcadas_fora_do_escopo`** é o que o usuário detém e aquele token não carrega:
@@ -525,7 +532,7 @@ Criar lixo na instância é permitido. **Desfaça o que der, liste o que sobrou.
 rodada, mesmo abortada no meio, para cada usuário do pool que a rodada reservou:
 
 1. **Revogue os tokens que cunhou** — `DELETE /api/shell/tokens-api/:id`, os da rodada e só
-   eles (o nome `qa-<carimbo>-*` os identifica; `GET /tokens-api?usuario_id=N` lista). A
+   eles (o nome `qa-<carimbo>-*` os identifica; `GET /api/shell/tokens-api?usuario_id=N` lista). A
    expiração de 2h é a rede de segurança para o caso em que este passo não roda; não é motivo
    para pulá-lo.
 2. **Revogue as alçadas** que concedeu (`DELETE /api/shell/usuarios/:id/alcadas/:alcada`) — **antes** de
@@ -604,8 +611,8 @@ Cabeçalho, sempre, nesta ordem:
   ele não detém
 - **Roster da rodada**: papel → usuário do pool (nome, ID), alçadas desta rodada,
   somente-leitura, expiração do token — confirmado pela rota de identidade — e, por usuário, como
-  foi encontrado: inativo, ativo sem token vigente, ativo com token vigente (usado sob
-  autorização), ou criado nesta rodada
+  foi encontrado: inativo, ativo (com ou sem token vigente — os dois usados sob autorização), ou
+  criado nesta rodada
 - **App alvo**, quando houver
 
 Corpo: por cenário, o que foi exercitado, com que credencial, e o resultado. Achado carrega
