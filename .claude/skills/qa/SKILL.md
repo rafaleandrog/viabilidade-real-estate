@@ -119,8 +119,10 @@ falhar. Cada degrau distingue um modo de falha diferente, e a mensagem certa dep
    anterior à 0.55.6 — aborte pela § 2.
 4. **A identidade não é a de um principal válido** — `usuario.tipo` é `"sysadmin"` **ou**
    `"operador"` (os dois são elegíveis à alçada `plataforma`, ver § 8.1 — rejeitar só sysadmin
-   deixaria passar um operador), ou `alcadas` sem `usuarios` ou sem `contas`, ou nome sem `QA`:
-   passo do usuário no roteiro de preparação, nomeando o que falhou.
+   deixaria passar um operador), ou `alcadas` sem `usuarios` ou sem `contas`, ou nome sem `QA`,
+   ou **`credencial.somente_leitura: true`** (o roster inteiro escreve — ativar, conceder
+   alçada, cunhar token —, e um principal só-leitura falharia no meio da § 5.4 em vez de já
+   aqui): passo do usuário no roteiro de preparação, nomeando o que falhou.
 
 Passou pelos quatro: ambiente configurado, siga para a § 4. Em nenhum degrau se imprime token.
 
@@ -157,6 +159,19 @@ criar e inativar a cada uso é desperdício e acumula usuários na instância. E
 de usuários de serviço** que já existe na instância, criado sob autorização e reaproveitado
 para sempre. O que é por rodada é a **configuração** deles — alçadas e tokens —, e os dois se
 desfazem no fim.
+
+> ⚠️ **Limitação conhecida: a reserva não é atômica, nem para usuário `ativo` nem para
+> `inativo`.** As § 5.2–5.3 descrevem como reduzir a janela de colisão entre duas rodadas de QA
+> concorrentes na mesma instância — mas o que a API oferece é leitura e escrita comuns, sem um
+> `POST` de "reservar com exclusividade". Duas sessões que mapeiem o pool quase ao mesmo tempo
+> podem, as duas, ver o mesmo usuário livre e configurá-lo em paralelo, e o pedido de
+> autorização da § 5.3 não fecha isso: ele serializa sessão-contra-humano, não
+> sessão-contra-sessão — duas conversas separadas do mesmo humano podem receber o mesmo plano e
+> as duas serem respondidas sem que uma veja a outra. A defesa real é **procedural, não
+> mecânica**: não rode duas rodadas de QA ao mesmo tempo contra a mesma instância. Se isso
+> aconteceu — dois relatórios do mesmo host em janelas de tempo sobrepostas — trate qualquer
+> achado de permissão/alçada inesperada como suspeito de colisão antes de reportá-lo como
+> defeito do produto (§ 11, corrida entre sessões paralelas).
 
 ### 5.1 A convenção do pool
 

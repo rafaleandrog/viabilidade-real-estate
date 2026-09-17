@@ -77,6 +77,13 @@ falhar poupa sete diagnósticos errados. Falhou um, **pare e relate** — não s
    todo mundo na primeira vez. Use um usuário do pool reservado na rodada (§ 5), nunca o
    principal: o principal tem `usuarios` e concede a si mesmo, então ele não é testemunha válida
    de uma negativa de `nivelApp`.
+
+   **Confira antes que o usuário do pool não já tenha acesso.** Uma rodada anterior abortada
+   entre conceder a permissão do cenário 8 e revogá-la no resíduo deixa esse acesso para trás —
+   o mesmo usuário reaparece aqui com `leitura` residual, e o cenário devolve `200` em vez de
+   `403`, lido como regressão do produto que não existe. `GET
+   /api/shell/apps/ola_mundo/permissoes/<usuarioId>` antes de disparar o cenário; achando
+   permissão, revogue com a autorização da § 4 antes de seguir.
 8. **Com permissão, `200`.** A escrita que separa 7 de 8 é
    `PUT /api/shell/apps/ola_mundo/permissoes/<usuarioId>` com `{"nivel":"leitura"}`, da alçada
    `usuarios` — que o principal tem por definição (§ 2). Cunhe o token do usuário do pool
