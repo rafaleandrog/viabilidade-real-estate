@@ -736,9 +736,15 @@ export class ViabTelaProforma extends LitElement {
     // com `valor: 0` é uma meta degenerada, mas explícita — `||` a engoliria
     // de volta para 20 em silêncio (a mesma classe de armadilha do `||` que
     // reimplementa default de parâmetro, CLAUDE.md § Contratos inegociáveis;
-    // achado da lente L1, PR #757).
+    // achado da lente L1, PR #757). A coluna `valor` NÃO é obrigatória
+    // (`schema.json`, tabela `benchmarks`) e `POST /benchmarks` grava
+    // `valor ?? null` (`backend/rotas/benchmarks.ts:105`) — um admin pode
+    // limpar o campo e persistir `null`. `null !== undefined` passa pela
+    // checagem, e `Number(null) === 0` é finito: sem excluir `null`
+    // explicitamente, um benchmark limpo virava meta 0% em silêncio, em vez
+    // de cair no fallback de 20 (achado do App do Codex, PR #757, rodada 3).
     const bmValorMargem = this._bm('margem_liquida')?.valor;
-    const margemAlvoPct = bmValorMargem !== undefined && Number.isFinite(Number(bmValorMargem))
+    const margemAlvoPct = bmValorMargem !== undefined && bmValorMargem !== null && Number.isFinite(Number(bmValorMargem))
       ? Number(bmValorMargem) : 20;
     const varObra: VarSens = lot ? 'custo_infra' : 'custo_obras';
     const rotuloObra = lot ? 'Estouro máximo de infraestrutura' : 'Estouro máximo de obra';
