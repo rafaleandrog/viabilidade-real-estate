@@ -6,6 +6,8 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ## Rodada 13 — tornado de alavancas + margem de segurança: primeiro PR de produto (2026-09-18)
 
+PR 757, aberto e aguardando revisão/autorização de merge do autor.
+
 Resposta ao pedido direto do usuário ("teve uma issue que eu tinha criado para colocar esse tipo de
 gráfico... verifique como isso ficou"), com a imagem do handoff anexada de novo. Conferido: a issue
 **não foi esquecida** — é a Rodada 13 (`docs/rodada-13/planejamento.md`, issues #724–#736), aberta em
