@@ -33,7 +33,7 @@ import type { FluxoCalc, LinhaCalc } from './fluxo-caixa-motor.js';
 //   2. os indicadores de PROJETO já são desalavancados no app, e não por
 //      convenção — por construção: `tir`, `vpl`, `paybackMes` e
 //      `exposicaoMaxima` nascem dentro de `calcularFluxo`
-//      (`fluxo-caixa-motor.ts:2673`), a partir de `fluxoMensal` /
+//      (`fluxo-caixa-motor.ts:2687`), a partir de `fluxoMensal` /
 //      `fluxoAcumulado`, e essa função nunca vê funding — ele é costurado
 //      depois, na tela. Proforma alavancada no meio de indicadores
 //      desalavancados produz uma margem que nenhum outro número reconcilia;

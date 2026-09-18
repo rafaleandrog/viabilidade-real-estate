@@ -759,7 +759,7 @@ export class ViabFluxoCustos extends LitElement {
             <span class="orc">
               ${ePermutaFisica(c) ? html`
                 <span class="orc-permuta-fisica">
-                  <urbi-select placeholder="Tipologia…"
+                  <urbi-select placeholder="Tipologia…" ?desabilitado=${dis}
                     .valor=${c.permuta_tipologia_id ? String(c.permuta_tipologia_id) : ''}
                     .opcoes=${this.tipologiasCatalogo.map((t) => ({ valor: String(t.id), rotulo: t.nome || `Tipologia ${t.id}` }))}
                     @urbi:select-change=${(e: CustomEvent) =>

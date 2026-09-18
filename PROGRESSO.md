@@ -4,6 +4,61 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #753 — Permuta física (Avançado, Custos → Terreno): a linha nunca entrava nesse estado pela tela (2026-09-18)
+
+Pedido direto do autor, com print: "permuta física precisa corrigir a caixa de seleção para escolher a
+tipologia e quantidade de unidades". A caixa **já existia** desde a #266 (`frontend/tela-fluxo-custos.ts`,
+ramo `ePermutaFisica(c)` da célula Orçamento) — o que o print mostrava (badges `R$`/`R$/m² terreno`,
+Resultado `R$ 0,00`, select "Unit Delivery") era o **ramo genérico** de Preço, porque a linha nunca
+conseguia virar "Permuta física".
+
+**Causa raiz, de fiação, não de feature:** a tela salva subcategoria, tipologia e quantidade em três
+PATCHes independentes, e `validarPermutaFisica` (`backend/rotas/avancado.ts`) exigia tipologia **e**
+quantidade ≥ 1 em qualquer PATCH que deixasse a linha como "Permuta física". O primeiro PATCH (só a
+subcategoria) tomava `400 PERMUTA_TIPOLOGIA_OBRIGATORIA`; `_salvar` só fazia toast e retornava; o
+modelo ficava na subcategoria anterior; o `urbi-select` seguia mostrando "Permuta física" porque o
+`.valor` que o Lit conhece não mudou. Mesmo que passasse, tipologia e quantidade se bloqueavam
+mutuamente (uma sozinha tomava 400 pela outra). Nenhum teste referenciava os dois códigos. O motor
+(`reservarPermutasFisicas`) e os invariantes já ignoravam a linha incompleta — o backend era o único
+lugar que a tratava como erro, e no momento errado.
+
+**Conserto:**
+
+1. `backend/rotas/avancado.ts` — `validarPermutaFisica` aceita linha **incompleta** (sem tipologia →
+   `return true`; quantidade < 1 → `return true`); mantém same-study e o `422 PERMUTA_SALDO_EXCEDIDO`,
+   que é a única porta dura. De passagem, o `return false` **mudo** do same-study (a requisição
+   pendurava quando a tipologia gravada era de outro estudo) virou `400 PERMUTA_TIPOLOGIA_INVALIDA`.
+2. `frontend/fluxo-invariantes.ts` — `validarPermutaFisica` emite **`PERMUTA_FISICA_INCOMPLETA`**
+   (severidade `alerta`) para linha sem tipologia ou com quantidade < 1: a obrigatoriedade mora na
+   Reconciliação, não no PATCH. Sem fiação extra — a função já é espalhada por `tela-fluxo-ver.ts` e
+   `relatorioReconciliacao` imprime qualquer código.
+3. `frontend/tela-fluxo-custos.ts` — o `urbi-select` de tipologia ganha `?desabilitado=${dis}`, como o
+   `viab-num` ao lado (estudo só-leitura deixava trocar a tipologia).
+
+**Prova de fiação, nas três camadas:** `backend/rotas/avancado-custos-rota.test.ts` (Express real) faz
+os três PATCHes na ordem da tela e confere que o saldo continua 422 e que a quantidade pode vir antes
+da tipologia; **mutação executada**: repor a guarda antiga deixa dois desses testes vermelhos.
+`frontend/fluxo-invariantes.test.ts` cobre o alerta (sem tipologia, quantidade 0, linha completa).
+`frontend/render/custos-permuta-fisica.render.test.ts` renderiza em Chromium a coluna Orçamento de
+`_colunas()` — a `urbi-tabela` do stub não desenha linha, o mesmo limite documentado em
+`casos/funding-abas.ts` — e exige o seletor + a quantidade na linha **incompleta**, zero badges de R$,
+e o seletor desabilitado em estudo só-leitura.
+
+Preliminar não entra: a permuta física por unidade saiu de lá por decisão do autor (#566). Sem
+migração; `versao` não bumpa.
+
+**Rodada 1 de revisão (Kimi, seis lentes, zero bloqueantes) — três observações consertadas no
+mesmo PR:** (1) `reservarPermutasFisicas` ganhou guarda explícita de tipologia nula — antes
+`Number(null)` era `0`, finito, e a linha incompleta entrava no mapa de reservas sob a chave 0, só
+não reservando porque a chave 0 não casava com nenhuma tipologia de receita (garantia por ausência
+de colisão, não por guarda; teste direto novo em `fluxo-caixa-motor.test.ts`); (2) alerta, backend e
+motor passaram a usar o mesmo critério de "completa" (tipologia + quantidade inteira ≥ 1; no
+frontend com tolerância de ruído decimal — armadilha 14); (3) o ramo `!tip` do novo 400 (tipologia gravada e depois apagada)
+ganhou teste HTTP. Uma quarta observação — `listar` com `por_pagina: 1000` onde o contrato do SDK
+manda `varrerTudo`, 6 ocorrências pré-existentes em `avancado.ts` — virou a issue #756.
+
+---
+
 ## Bug relatado pelo usuário: seletor de lote (Terreno & Áreas, Incorporação) — campo único + causa raiz (2026-09-16)
 
 Fora de rodada — relato direto do usuário (não uma issue do backlog), print da aba Premissas →
