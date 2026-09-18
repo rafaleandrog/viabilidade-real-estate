@@ -1,9 +1,13 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
+import { fmtR$, fmtR$Milhoes, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, vgvBrutoDeProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
+import { rankearAlavancas } from './tornado-alavancas.js';
+import { margemDeSeguranca, terrenoMaximo, type MargemDeSeguranca } from './margem-seguranca.js';
+import { fmtVariacao } from './cenario-variacao.js';
+import './grafico-tornado.js';
 // ⚠️ `ehLinhaReceitaOuResultado`/`celulaProforma` MUDARAM DE ARQUIVO na
 // unificação da notação de sinal (registro dos PRs 617/618, achado 10 da
 // auditoria #574): moram em `./exportar.ts`, e são REEXPORTADAS logo abaixo.
@@ -225,7 +229,12 @@ export class ViabTelaProforma extends LitElement {
 
   @state() private benchmarks: any[] = [];
   @state() private aliquotaRet = 4;
-  @state() private varSens: VarSens = 'preco';
+  // Rodada 13 (#729): a variável estressada deixou de ser um literal — o
+  // tornado seleciona a de maior amplitude por padrão. `null` = "segue o
+  // ranking"; um clique na barra grava a escolha explícita do usuário, que
+  // então vence mesmo quando o ranking recalcula (passo, edição de Premissas).
+  @state() private _varSensManual: VarSens | null = null;
+  @state() private _passoPct: 5 | 10 | 15 = 10;
   // #9: grupos consolidados colapsados (default: expandido). O total é o header.
   // `receita` é a exceção — default RECOLHIDO (2026-09-14): a composição por
   // produto só existe para explicar o VGV quando pedida, não para duplicar a
@@ -254,7 +263,57 @@ export class ViabTelaProforma extends LitElement {
     /* Mesmo respiro do estado vazio do catálogo em Premissas → Produtos. */
     .pf-vazio { padding: 8px 0; }
     .barra-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; justify-content: flex-end; }
-    .sens-var { max-width: 320px; margin-bottom: 12px; }
+    .sens-var {
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+    }
+    .sens-var strong { color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95)); }
+    /* Rodada 13 (#729/#733) — os dois cartões novos da aba Cenários, lado a
+       lado quando a viewport permitir e empilhados abaixo de ~600px (o mesmo
+       piso de teste do restante do app). */
+    .cenarios-topo {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .cenarios-subtitulo {
+      margin: -4px 0 12px;
+      font-size: 12px;
+      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+    }
+    .sens-passo { max-width: 200px; margin-top: 12px; }
+    .margem-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .margem-cartao {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.06));
+      min-width: 0;
+    }
+    .margem-rotulo {
+      font-size: 11px;
+      color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
+    }
+    .margem-valor {
+      font-size: 18px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95));
+      overflow-wrap: anywhere;
+    }
+    .margem-rodape {
+      margin: 12px 0 0;
+      font-size: 11px;
+      color: var(--cor-texto-fraco, rgba(255, 255, 255, 0.4));
+    }
     urbi-card + urbi-card { margin-top: 16px; }
     strong.total { color: var(--cor-texto-forte, rgba(255,255,255,0.95)); }
 
@@ -623,46 +682,118 @@ export class ViabTelaProforma extends LitElement {
     </urbi-card>`;
   }
 
-  private _variaveis(lot: boolean): { valor: VarSens; rotulo: string }[] {
-    return [
-      { valor: 'preco', rotulo: lot ? 'Preço/m² de venda' : 'Preço/m² (res + não res)' },
-      { valor: 'permuta_fisica', rotulo: 'Permuta física' },
-      { valor: 'permuta_financeira', rotulo: 'Permuta financeira' },
-      lot ? { valor: 'custo_infra' as VarSens, rotulo: 'Custo de infraestrutura' } : { valor: 'custo_obras' as VarSens, rotulo: 'Custo de obras' },
-    ];
-  }
-
   // BUG7-08: antes escalava campos legados por variável/modo (frágil — o
   // motor prioriza o canônico quando existe, então escalar só o legado virava
   // no-op, e alguns modos sequer eram cobertos: custo_obras nunca escalava
   // construcao_valor_total; custo_infra não cobria infra_valor_fixo). Agora o
   // fator é parâmetro de calcularProforma, que escala o valor JÁ RESOLVIDO
   // (canônico ou legado, qualquer modo) num lugar só — ver proforma.ts.
-  private _aplicarFator(fator: number): ProformaInput {
-    return this._entrada({ sensibilidade: { variavel: this.varSens, fator } });
+  //
+  // #729: recebe a variável explicitamente — `_variaveis(lot)` morreu junto
+  // com o dropdown; `rotuloAlavanca` (tornado-alavancas.ts) é hoje a ÚNICA
+  // tabela de rótulos das variáveis estressáveis (handoff §5, regra 7: um
+  // nome só por alavanca em todo o app).
+  private _aplicarFator(variavel: VarSens, fator: number): ProformaInput {
+    return this._entrada({ sensibilidade: { variavel, fator } });
   }
 
   // Variável estressada (VarSens) → `campo` do indicador de sensibilidade no
   // benchmark. custo_infra (loteamento) e custo_obras (incorporação) compartilham
   // o mesmo indicador "custo_obras".
+  //
+  // #729: `custo_terreno`/`custo_indireto` (as duas alavancas novas da #725)
+  // NÃO têm indicador semeado (`backend/rotas/benchmarks.ts` semeia só 4) —
+  // caem no fallback ±10% do call site (`Number(bmSens?...) || 10`), que é o
+  // comportamento CERTO e precisa estar escrito aqui, não descoberto depois.
+  // Os `campo` abaixo não colidem com nenhum indicador semeado de propósito.
   private _campoSensibilidade(v: VarSens): string {
     return v === 'preco' ? 'preco'
       : v === 'permuta_fisica' ? 'permuta_fisica'
       : v === 'permuta_financeira' ? 'permuta_financeira'
+      : v === 'custo_terreno' ? 'custo_terreno'
+      : v === 'custo_indireto' ? 'custo_indireto'
       : 'custo_obras';
   }
 
+  // Rodada 13 (#733, handoff §4.3): "quanto a premissa pode errar até o
+  // resultado zerar", em vez de "quanto o projeto ganha". O VALOR do cartão é
+  // o ponto de equilíbrio (resultado = 0) — o `title` guarda a folga até a
+  // margem-alvo, que é a segunda pergunta ("ainda dá pra bater a meta?").
+  private _renderMargemSeguranca(entrada: ProformaInput, lot: boolean): TemplateResult {
+    // Margem-alvo vem do benchmark (campo compartilhado com "Margem sobre
+    // VGV"), nunca de um literal na tela — meta 20 por padrão
+    // (backend/rotas/benchmarks.ts:26).
+    const margemAlvoPct = Number(this._bm('margem_liquida')?.valor) || 20;
+    const varObra: VarSens = lot ? 'custo_infra' : 'custo_obras';
+    const rotuloObra = lot ? 'Estouro máximo de infraestrutura' : 'Estouro máximo de obra';
+
+    const preco = margemDeSeguranca(entrada, 'preco', margemAlvoPct);
+    const obra = margemDeSeguranca(entrada, varObra, margemAlvoPct);
+    const permuta = margemDeSeguranca(entrada, 'permuta_fisica', margemAlvoPct);
+    const terreno = terrenoMaximo(entrada, margemAlvoPct);
+
+    const tituloFolga = (m: MargemDeSeguranca, rotulo: string): string => {
+      if (m.fatorEquilibrio === null) {
+        return `${rotulo}: o projeto não atinge o ponto de equilíbrio nesta faixa de estresse.`;
+      }
+      const alvo = m.fatorAlvo === null
+        ? `não atinge a margem-alvo de ${fmtPct(margemAlvoPct)} em nenhum cenário desta faixa`
+        : `até a margem-alvo (${fmtPct(margemAlvoPct)}): ${fmtVariacao((m.fatorAlvo - 1) * 100)}`;
+      return `${rotulo} — ponto de equilíbrio (resultado = 0). Margem-alvo: ${alvo}.`;
+    };
+
+    // "—", nunca "0,0%" ou um número plausível-e-errado — mesmo padrão
+    // null-safe do resto do app (#571/#611) e o próprio ponto da issue #732:
+    // sem raiz verificada, não há número para publicar.
+    const cartoes: { rotulo: string; valor: string; titulo: string }[] = [
+      { rotulo: 'Queda máxima de preço', valor: preco.folgaPct === null ? '—' : fmtVariacao(preco.folgaPct), titulo: tituloFolga(preco, 'Queda máxima de preço') },
+      { rotulo: rotuloObra, valor: obra.folgaPct === null ? '—' : fmtVariacao(obra.folgaPct), titulo: tituloFolga(obra, rotuloObra) },
+      { rotulo: 'Permuta física máxima', valor: permuta.folgaPct === null ? '—' : fmtVariacao(permuta.folgaPct), titulo: tituloFolga(permuta, 'Permuta física máxima') },
+      {
+        rotulo: 'Terreno máximo',
+        // Segunda exceção declarada ao contrato C7 (a 1ª é o card de KPI,
+        // #581): "R$ 39,0 M" em vez de "R$ 39.000.000" — mesmo motivo da
+        // cascata (frontend/cascata-milhoes.test.ts, consumidor #2).
+        valor: fmtR$Milhoes(terreno.valorRS),
+        titulo: `Valor residual do terreno até a margem-alvo (${fmtPct(margemAlvoPct)} sobre receita líquida): `
+          + `${fmtR$(terreno.valorRS)}${terreno.porM2 !== null ? ` (${fmtR$(terreno.porM2)}/m²)` : ''}.`,
+      },
+    ];
+
+    return html`
+      <urbi-card titulo="Margem de segurança">
+        <p class="cenarios-subtitulo">Quanto a premissa pode errar até o resultado zerar</p>
+        <div class="margem-grid">
+          ${cartoes.map((c) => html`
+            <div class="margem-cartao" title=${c.titulo}>
+              <span class="margem-rotulo">${c.rotulo}</span>
+              <span class="margem-valor">${c.valor}</span>
+            </div>
+          `)}
+        </div>
+        <p class="margem-rodape">Margem-alvo de referência: ${fmtPct(margemAlvoPct)} sobre receita líquida</p>
+      </urbi-card>
+    `;
+  }
+
   private _renderSensibilidade(lot: boolean): TemplateResult {
+    const entrada = this._entrada();
+    // Rodada 13 (#727/#729): o tornado ranqueia as alavancas e escolhe a
+    // seleção inicial — a de maior amplitude, não mais o literal `'preco'`.
+    // Uma escolha manual do usuário (clique numa barra) vence o ranking.
+    const alavancas = rankearAlavancas(entrada, this._passoPct, lot);
+    const varSensAtual: VarSens = this._varSensManual ?? alavancas[0]?.variavel ?? 'preco';
+
     // A variação +/- vem do indicador de sensibilidade do benchmark (por variável),
     // não mais de um par único do estudo. Sem benchmark → fallback 10%.
-    const bmSens = this.benchmarks.find((b) => b.campo === this._campoSensibilidade(this.varSens));
+    const bmSens = this.benchmarks.find((b) => b.campo === this._campoSensibilidade(varSensAtual));
     const varPos = Number(bmSens?.variacao_positiva_pct) || 10;
     const varNeg = Number(bmSens?.variacao_negativa_pct) || 10;
     // Bull = cenário otimista (melhor resultado); Bear = pessimista. Para o
     // PREÇO, otimista é preço maior. Para variáveis de CUSTO/permuta (que pioram
     // o resultado quando sobem), o Bull é uma REDUÇÃO — a conta é invertida
     // em relação ao preço (bug #13).
-    const custoLike = this.varSens !== 'preco';
+    const custoLike = varSensAtual !== 'preco';
     const fatorBull = custoLike ? 1 - varPos / 100 : 1 + varPos / 100;
     const fatorBear = custoLike ? 1 + varNeg / 100 : 1 - varNeg / 100;
     // VGV bruto por cenário = VGV se a permuta física NÃO fosse entregue (vendida).
@@ -671,7 +802,7 @@ export class ViabTelaProforma extends LitElement {
     // motor de novo com os campos legados zerados (no-op quando há canônico),
     // deriva-se do próprio Proforma já calculado do cenário (mesma identidade
     // de exportar.ts:39), sem 2ª execução.
-    const proforma = (fator: number) => calcularProforma(this._aplicarFator(fator));
+    const proforma = (fator: number) => calcularProforma(this._aplicarFator(varSensAtual, fator));
     const vgvBrutoDe = (cen: Proforma) => vgvBrutoDeProforma(cen);
     // Linhas monetárias (8) e, separados por uma divisória com mais respiro, os dois
     // indicadores em % (Custo obras/VGV e Margem líquida) exibidos como urbi-badge
@@ -764,30 +895,50 @@ export class ViabTelaProforma extends LitElement {
           return html`<td class="num cen-${c.id} ${sinal}">${txt}</td>`;
         })}
       </tr>`;
-    return html`<urbi-card titulo="Análise de sensibilidade">
-      <div class="sens-var">
-        <urbi-select
-          label="Variável estressada (−${varNeg}% / +${varPos}%)"
-          .valor=${this.varSens}
-          .opcoes=${this._variaveis(lot)}
-          @urbi:select-change=${(e: CustomEvent) => this.varSens = e.detail.valor as VarSens}
-        ></urbi-select>
+    return html`
+      <div class="cenarios-topo">
+        <urbi-card titulo="Alavancas do resultado">
+          <p class="cenarios-subtitulo">Variação do resultado para ±${this._passoPct}% na premissa</p>
+          <viab-grafico-tornado
+            .alavancas=${alavancas}
+            .ativa=${varSensAtual}
+            @viab:tornado-selecionar=${(e: CustomEvent) => { this._varSensManual = e.detail.variavel as VarSens; }}
+          ></viab-grafico-tornado>
+          <div class="sens-passo">
+            <urbi-select
+              label="Passo"
+              .valor=${String(this._passoPct)}
+              .opcoes=${[
+                { valor: '5', rotulo: '±5%' },
+                { valor: '10', rotulo: '±10%' },
+                { valor: '15', rotulo: '±15%' },
+              ]}
+              @urbi:select-change=${(e: CustomEvent) => { this._passoPct = Number(e.detail.valor) as 5 | 10 | 15; }}
+            ></urbi-select>
+          </div>
+        </urbi-card>
+        ${this._renderMargemSeguranca(entrada, lot)}
       </div>
-      <div class="pf-wrap">
-        <table class="pf sens">
-          ${colgroup}
-          ${cabecalho}
-          <tbody>${linhasMonetarias.map(renderLinha)}</tbody>
-        </table>
-      </div>
-      <div class="pf-wrap sens-indicadores">
-        <table class="pf sens">
-          ${colgroup}
-          ${cabecalho}
-          <tbody>${linhasIndicadores.map(renderLinha)}</tbody>
-        </table>
-      </div>
-    </urbi-card>`;
+      <urbi-card titulo="Análise de sensibilidade">
+        <p class="sens-var">
+          Variável estressada: <strong>${alavancas.find((a) => a.variavel === varSensAtual)?.rotulo ?? varSensAtual}</strong>
+          (−${varNeg}% / +${varPos}%) — clique numa alavanca acima para trocar.
+        </p>
+        <div class="pf-wrap">
+          <table class="pf sens">
+            ${colgroup}
+            ${cabecalho}
+            <tbody>${linhasMonetarias.map(renderLinha)}</tbody>
+          </table>
+        </div>
+        <div class="pf-wrap sens-indicadores">
+          <table class="pf sens">
+            ${colgroup}
+            ${cabecalho}
+            <tbody>${linhasIndicadores.map(renderLinha)}</tbody>
+          </table>
+        </div>
+      </urbi-card>`;
   }
 
   private _exportar(formato: string) {

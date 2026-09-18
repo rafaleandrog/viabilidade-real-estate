@@ -422,7 +422,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/tela-financeiro.ts:154` — `_n` (`casas-decimais="2"`) | 2 | ✅ |
 | `frontend/tela-empreendimento-tipologias.ts:178` | 2 (default) | ✅ |
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
-| `frontend/tela-proforma.ts:74` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
+| `frontend/tela-proforma.ts:78` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
 | `frontend/fluxo-caixa-motor.ts:2706` — **agregados escalares** do `FluxoCalc` (`vgvTotal`, `vpl`, `vgvPermutaFisica`, `receitaBrutaVgv` e o alias `vgvVendavel`) | 2 | ✅ desde a #512 — quantizados na SAÍDA; a origem segue com precisão plena, ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
@@ -470,7 +470,7 @@ dízima e retornar exatamente ao mesmo canônico.
 > `fmtR$(v, false)`, que fixa 2 casas sempre (`fmtNum` declara só `maximumFractionDigits`, então
 > "até 2" podia sair "0"). `fmtNum` em si **não mudou de assinatura** — continua servindo m²,
 > hectare, unidades e percentual, grandezas **não monetárias** que carregam precisão plena e
-> arredondam só para exibir; `celulaProformaM2` (`frontend/tela-proforma.ts:48`, R$/m²) é da mesma
+> arredondam só para exibir; `celulaProformaM2` (`frontend/tela-proforma.ts:52`, R$/m²) é da mesma
 > família e continua fora do escopo do C7 monetário.
 >
 > ✅ **A #567 (2026-08-27) extraiu `_fmtContabil`/`_fmtContabilM2` — métodos privados de

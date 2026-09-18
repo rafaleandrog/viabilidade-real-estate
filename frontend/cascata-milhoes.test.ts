@@ -73,8 +73,22 @@ const semComentarios = (texto: string) => texto
 
 const ocorrencias = (texto: string, alvo: string) => semComentarios(texto).split(alvo).length - 1;
 
-/** O único consumidor da exceção, e quantas vezes ele a chama. */
-const CONSUMIDOR = { arquivo: 'frontend/grafico-cascata.ts', chamadas: 1 };
+/**
+ * Os consumidores da exceção, e quantas vezes cada um a chama.
+ *
+ * #733 (Rodada 13): o cartão "Terreno máximo" do bloco "Margem de segurança"
+ * (aba Cenários do Preliminar) virou o SEGUNDO consumidor declarado — a
+ * imagem que o autor anexou à Rodada 13 mostra "R$ 39,0 M", e `fmtR$Kpi`
+ * (a exceção de card de KPI, #581) imprimiria "R$ 39.000.000" num cartão
+ * pequeno. É exatamente o que uma lista de exceção por CONTAGEM EXATA existe
+ * para permitir: entrada nova, com motivo ao lado, sem afrouxar a trava — os
+ * dois sentidos (chamada a menos ou a mais, em QUALQUER dos consumidores)
+ * continuam reprovando.
+ */
+const CONSUMIDORES = [
+  { arquivo: 'frontend/grafico-cascata.ts', chamadas: 1 },
+  { arquivo: 'frontend/tela-proforma.ts', chamadas: 1 },
+];
 
 // ⚠️ Enumerar por `git ls-files` e não varrendo o disco: o passo `Build` do
 // `validation.yml` gera `backend/rotas.js` antes dos testes, e um inventário que
@@ -86,13 +100,15 @@ const fontesVersionadas = (): string[] =>
     .filter((f) => f.endsWith('.ts'));
 
 test('a exceção de milhões é chamada EXATAMENTE onde deve, por contagem', () => {
-  assert.equal(
-    ocorrencias(fonte(CONSUMIDOR.arquivo), 'fmtR$Milhoes('),
-    CONSUMIDOR.chamadas,
-    `${CONSUMIDOR.arquivo} deveria chamar fmtR$Milhoes ${CONSUMIDOR.chamadas}× — `
-    + 'a menos significa que o rótulo da barra voltou a `fmtR$`; a mais, que a '
-    + 'abreviação ganhou um call site novo sem passar por aqui',
-  );
+  for (const c of CONSUMIDORES) {
+    assert.equal(
+      ocorrencias(fonte(c.arquivo), 'fmtR$Milhoes('),
+      c.chamadas,
+      `${c.arquivo} deveria chamar fmtR$Milhoes ${c.chamadas}× — `
+      + 'a menos significa que o rótulo voltou a `fmtR$`/`fmtR$Kpi`; a mais, que a '
+      + 'abreviação ganhou um call site novo sem passar por aqui',
+    );
+  }
 });
 
 // Quantas vezes `grafico-cascata.ts` chama `fmtR$` — o formatador de 2 casas.
@@ -106,11 +122,13 @@ test('a exceção de milhões é chamada EXATAMENTE onde deve, por contagem', ()
 // de onde no arquivo a chamada está.
 const CHAMADAS_FMTRS = 2;
 
+const ARQUIVO_CASCATA = 'frontend/grafico-cascata.ts';
+
 test('o rótulo da barra NÃO voltou a `fmtR$` — rede sempre ligada, sem navegador', () => {
   assert.equal(
-    ocorrencias(fonte(CONSUMIDOR.arquivo), 'fmtR$('),
+    ocorrencias(fonte(ARQUIVO_CASCATA), 'fmtR$('),
     CHAMADAS_FMTRS,
-    `${CONSUMIDOR.arquivo} deveria chamar fmtR$ ${CHAMADAS_FMTRS}× — \`const exato\` (title `
+    `${ARQUIVO_CASCATA} deveria chamar fmtR$ ${CHAMADAS_FMTRS}× — \`const exato\` (title `
     + 'e aria-label) e a base do rodapé. Divergiu: ou o rótulo da barra voltou a 2 casas, ou '
     + 'um canal de detalhe sumiu, ou entrou um uso novo e legítimo — nos três o certo é '
     + 'decidir aqui, e ajustar CHAMADAS_FMTRS só no terceiro',
@@ -130,7 +148,7 @@ const EXCECOES = [
 ];
 
 test('a exceção de milhões NÃO vazou para nenhum outro arquivo do frontend', () => {
-  const excecoes = new Set([CONSUMIDOR.arquivo, ...EXCECOES]);
+  const excecoes = new Set([...CONSUMIDORES.map((c) => c.arquivo), ...EXCECOES]);
   const vazamentos = fontesVersionadas()
     .filter((f) => !excecoes.has(f))
     .filter((f) => ocorrencias(fonte(f), 'fmtR$Milhoes') > 0);
@@ -153,7 +171,7 @@ test('todo caminho do inventário aponta para arquivo versionado', () => {
   // quebra nada. Por isso a conferência é sobre TODOS os caminhos, não só o do
   // consumidor.
   const versionadas = new Set(fontesVersionadas());
-  const orfaos = [CONSUMIDOR.arquivo, ...EXCECOES].filter((f) => !versionadas.has(f));
+  const orfaos = [...CONSUMIDORES.map((c) => c.arquivo), ...EXCECOES].filter((f) => !versionadas.has(f));
   assert.deepEqual(
     orfaos, [],
     'caminho do inventário que não está mais versionado — exceção cega ou consumidor renomeado',
