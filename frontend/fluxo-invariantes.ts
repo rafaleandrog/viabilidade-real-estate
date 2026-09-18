@@ -742,6 +742,41 @@ export function validarPermutaFisica(
   const permutadaPorTipologia = quantidadesPermutadas(linhasCusto);
 
   const out: Divergencia[] = [];
+  // #753: linha INCOMPLETA — sem tipologia, ou com quantidade < 1. Não é
+  // erro: é o estado natural entre trocar a subcategoria e escolher os dois
+  // campos (a tela salva cada um num PATCH próprio), e o backend a aceita
+  // desde a #753 — antes recusava com 400 e a linha nunca chegava a existir.
+  // Fica como ALERTA para a linha não ser esquecida assim: o motor a ignora
+  // por guarda explícita (`reservarPermutasFisicas` pula tipologia nula e
+  // quantidade que não é inteiro >= 1), então ela não reserva unidade nenhuma.
+  // "Completa" segue o mesmo critério do backend (`validarPermutaFisica`):
+  // tipologia presente E quantidade inteira >= 1 — dois validadores do mesmo
+  // campo com regras diferentes é a armadilha 14 do CLAUDE.md. A única
+  // diferença é o ruído de casa decimal: o backend usa `Number.isInteger`
+  // estrito, aqui "inteira" é dentro da tolerância deste módulo (`tol`), como
+  // a comparação de estoque logo abaixo — 20,005 é 20 com ruído; 2,5 não é
+  // quantidade nenhuma; 0,995 é 1 (o `>= 1` compara o valor ARREDONDADO, como
+  // o motor reserva). Num ruído de até `tol` em torno de um inteiro os dois
+  // lados do frontend concordam; o backend estrito diverge só nesse ruído, e a
+  // coluna é `inteiro` no schema com o PATCH barrando não inteiro — dado legado.
+  for (const c of linhasCusto) {
+    if (!ePermutaFisica(c)) continue;
+    const semTipologia = c.permuta_tipologia_id == null || c.permuta_tipologia_id === '';
+    const quantidade = Number(c.permuta_quantidade ?? 0) || 0;
+    const inteira = Math.abs(quantidade - Math.round(quantidade)) <= tol;
+    if (!semTipologia && inteira && Math.round(quantidade) >= 1) continue;
+    const tip = semTipologia ? null : tipologiasCatalogo.find((t) => Number(t.id) === Number(c.permuta_tipologia_id));
+    const nome = semTipologia ? 'Permuta física' : (tip?.nome || `tipologia ${c.permuta_tipologia_id}`);
+    out.push({
+      codigo: 'PERMUTA_FISICA_INCOMPLETA', severidade: 'alerta', linha: nome,
+      esperado: 1, encontrado: quantidade, diferenca: quantidade - 1,
+      mensagem: semTipologia
+        ? 'Permuta física sem tipologia: escolha a tipologia e a quantidade em Custos → Terreno — '
+          + 'enquanto isso a linha não reserva unidade nenhuma.'
+        : `${nome}: permuta física com quantidade ${quantidade} — informe pelo menos uma unidade; `
+          + 'enquanto isso a linha não reserva unidade nenhuma.',
+    });
+  }
   for (const [id, quantidadePermutada] of permutadaPorTipologia) {
     const tip = tipologiasCatalogo.find((t) => Number(t.id) === id);
     const quantidadeTotal = Number(tip?.quantidade ?? 0);
