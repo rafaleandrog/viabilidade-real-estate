@@ -263,6 +263,13 @@ test('#753 validarPermutaFisica: quantidade NÃO inteira é incompleta — o mes
   assert.equal(r.filter((d) => d.codigo === 'PERMUTA_FISICA_INCOMPLETA').length, 1);
 });
 
+test('#753 validarPermutaFisica: 0,995 é 1 com ruído — completa, como o motor reserva (sem fresta [1−tol, 1))', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 0.995 },
+  ];
+  assert.deepEqual(validarPermutaFisica(linhasCusto, TIPOLOGIAS), []);
+});
+
 test('#753 validarPermutaFisica: linha completa (tipologia + quantidade ≥ 1) NÃO gera alerta INCOMPLETA', () => {
   const linhasCusto = [
     { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 1 },

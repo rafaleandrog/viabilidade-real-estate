@@ -1102,7 +1102,7 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 >
 > **O que ainda falta para o modelo econômico:** não há campo de **taxa** nem de **sinal** — é a
 > **#428**. O adaptador `componentesDoLegado` continua fixando `taxaMensal: 0`
-> (`fluxo-caixa-motor.ts:605,603,610,619`) e `sinalPct: 0` (`:590,602,608`), porque o espelho legado
+> (`fluxo-caixa-motor.ts:605,617,624,633`) e `sinalPct: 0` (`:604,616,622`), porque o espelho legado
 > não tem onde guardar essas grandezas.
 >
 > **O que MUDOU na #431:** `fluxoPagamentoParaSalvar` não grava mais

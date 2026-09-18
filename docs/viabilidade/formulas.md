@@ -172,7 +172,7 @@ em `s + defasagemMeses`, carteira por safra e repasse — estão descritas nos d
 > (estudo 5 de Pinguim: `0.0098636` = 12,5% a.a., R$ 1.259.273,59 de juros de clientes). O modal de
 > Fluxo de Pagamento não oferece campo de **taxa** nem de **sinal** (`_renderModalPagamento`,
 > `frontend/tela-fluxo-receitas.ts`) — é a **#428** —, e o adaptador `componentesDoLegado` fixa
-> `taxaMensal: 0` (`frontend/fluxo-caixa-motor.ts:605,603,610,619`) e `sinalPct: 0`
+> `taxaMensal: 0` (`frontend/fluxo-caixa-motor.ts:605,617,624,633`) e `sinalPct: 0`
 > (`:590,602,608` — o ramo `concentrado` de `:619` não emite `sinalPct`) porque o espelho legado não
 > tem onde guardar essas grandezas.
 >

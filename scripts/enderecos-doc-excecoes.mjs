@@ -62,7 +62,7 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/formulas.md",
-    endereco: "frontend/fluxo-caixa-motor.ts:605,603,610,619",
+    endereco: "frontend/fluxo-caixa-motor.ts:605,617,624,633",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :591,603,610,619 — \"taxaMensal\" está em :691; \"sinalPct\" está em :688. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },
@@ -110,7 +110,7 @@ export const EXCECOES = [
   },
   {
     arquivo: "docs/viabilidade/padrao-incorporacao.md",
-    endereco: "fluxo-caixa-motor.ts:605,603,610,619",
+    endereco: "fluxo-caixa-motor.ts:605,617,624,633",
     motivo:
       "VENCIDO DE VERDADE — nada em ±3 linhas de :591,603,610,619 — \"sinalPct\" está em :688. Conserto e mudanca de documentacao de PRODUTO: sai em PR separado (regra R3), nunca no PR que introduz o guard (regra R1).",
   },

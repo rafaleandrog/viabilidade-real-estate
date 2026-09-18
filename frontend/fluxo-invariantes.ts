@@ -755,15 +755,16 @@ export function validarPermutaFisica(
   // diferença é o ruído de casa decimal: o backend usa `Number.isInteger`
   // estrito, aqui "inteira" é dentro da tolerância deste módulo (`tol`), como
   // a comparação de estoque logo abaixo — 20,005 é 20 com ruído; 2,5 não é
-  // quantidade nenhuma. No intervalo (1, 1,01] os dois lados divergem e
-  // convergem em silêncio; a coluna é `inteiro` no schema e o PATCH barra não
-  // inteiro, então o caso é só dado legado.
+  // quantidade nenhuma; 0,995 é 1 (o `>= 1` compara o valor ARREDONDADO, como
+  // o motor reserva). Num ruído de até `tol` em torno de um inteiro os dois
+  // lados do frontend concordam; o backend estrito diverge só nesse ruído, e a
+  // coluna é `inteiro` no schema com o PATCH barrando não inteiro — dado legado.
   for (const c of linhasCusto) {
     if (!ePermutaFisica(c)) continue;
     const semTipologia = c.permuta_tipologia_id == null || c.permuta_tipologia_id === '';
     const quantidade = Number(c.permuta_quantidade ?? 0) || 0;
     const inteira = Math.abs(quantidade - Math.round(quantidade)) <= tol;
-    if (!semTipologia && inteira && quantidade >= 1) continue;
+    if (!semTipologia && inteira && Math.round(quantidade) >= 1) continue;
     const tip = semTipologia ? null : tipologiasCatalogo.find((t) => Number(t.id) === Number(c.permuta_tipologia_id));
     const nome = semTipologia ? 'Permuta física' : (tip?.nome || `tipologia ${c.permuta_tipologia_id}`);
     out.push({
