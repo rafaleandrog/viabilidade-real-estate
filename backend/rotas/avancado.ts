@@ -1489,8 +1489,9 @@ function validarCamposCusto(
  * subcategoria tomava 400, o modelo ficava na subcategoria anterior e a linha
  * seguia renderizando o ramo genérico de Preço (#753). A obrigatoriedade é
  * alerta de Reconciliação (`PERMUTA_FISICA_INCOMPLETA`, fluxo-invariantes.ts),
- * não 400 — o motor ignora a linha incompleta (`reservarPermutasFisicas`), então
- * ela não reserva unidade nenhuma enquanto não estiver completa.
+ * não 400 — o motor pula a linha incompleta por guarda explícita
+ * (`reservarPermutasFisicas`: tipologia nula ou quantidade 0), então ela não
+ * reserva unidade nenhuma enquanto não estiver completa.
  */
 async function validarPermutaFisica(
   req: Request, res: Response, estudoId: number, dados: Record<string, any>, atual?: Record<string, any> | null,

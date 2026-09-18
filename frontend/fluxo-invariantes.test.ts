@@ -252,6 +252,17 @@ test('#753 validarPermutaFisica: Permuta física com tipologia e quantidade 0 ge
   assert.equal(r[0].encontrado, 0);
 });
 
+test('#753 validarPermutaFisica: quantidade NÃO inteira é incompleta — o mesmo predicado do backend (armadilha 14)', () => {
+  // O backend (`validarPermutaFisica` da rota) classifica 2.5 como incompleta
+  // e não confere saldo; o alerta tem de dizer o mesmo, senão são dois
+  // validadores do mesmo campo com regras diferentes.
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 2.5 },
+  ];
+  const r = validarPermutaFisica(linhasCusto, TIPOLOGIAS);
+  assert.equal(r.filter((d) => d.codigo === 'PERMUTA_FISICA_INCOMPLETA').length, 1);
+});
+
 test('#753 validarPermutaFisica: linha completa (tipologia + quantidade ≥ 1) NÃO gera alerta INCOMPLETA', () => {
   const linhasCusto = [
     { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 1 },

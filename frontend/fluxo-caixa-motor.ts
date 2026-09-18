@@ -88,7 +88,12 @@ export function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]
   const usaFonteNova = custos.length > 0;
   const reservas = new Map<number, number>();
   for (const c of custos) {
-    const tipologiaId = Number(c.permuta_tipologia_id);
+    // #753: linha INCOMPLETA (sem tipologia) é ignorada por guarda explícita.
+    // Antes, `Number(null)` dava 0 — finito —, e a linha entrava no mapa sob a
+    // chave 0; só não reservava porque nenhuma tipologia tem id 0. Garantia
+    // por ausência de colisão não é guarda (achado S2 da revisão do PR 755).
+    const semTipologia = c.permuta_tipologia_id == null || c.permuta_tipologia_id === '';
+    const tipologiaId = semTipologia ? NaN : Number(c.permuta_tipologia_id);
     const quantidade = Math.max(0, Math.round(n(c.permuta_quantidade)));
     if (Number.isFinite(tipologiaId) && quantidade > 0) {
       reservas.set(tipologiaId, (reservas.get(tipologiaId) ?? 0) + quantidade);

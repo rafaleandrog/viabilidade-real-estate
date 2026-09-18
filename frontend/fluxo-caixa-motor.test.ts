@@ -15,8 +15,7 @@ import {
   vplFluxo, tirFluxo, calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos, pctDeReceitaBruta,
   permutaFinanceiraBrutaMensal, permutaFinanceiraLiquidaMensal, permutaFinanceiraDeduzidaMensal,
   areaVendidaMensal, unidadesVendidasMensal, estoqueM2Mensal, estoqueM2Semente, vsoMensal,
-  type FluxoConfig, type FluxoCalc, type ComponentePagamento, type ResiduoAteMarco,
-} from './fluxo-caixa-motor.js';
+  type FluxoConfig, type FluxoCalc, type ComponentePagamento, type ResiduoAteMarco, reservarPermutasFisicas } from './fluxo-caixa-motor.js';
 import { periodosAnuais, CATEGORIA_CORRETAGEM, type EventoCrono } from './fluxo-shared.js';
 import {
   CALLIANDRA_G1, CALLIANDRA_G2, G1_ESPERADO, G2_ESPERADO,
@@ -3566,4 +3565,25 @@ test('#512: nenhum campo publicado sai como ZERO NEGATIVO', () => {
   for (const campo of ['vgvTotal', 'vpl', 'vgvPermutaFisica', 'receitaBrutaVgv', 'vgvVendavel'] as const) {
     assert.ok(!Object.is(r[campo], -0), `${campo} saiu como -0`);
   }
+});
+
+// ── #753: reservarPermutasFisicas ignora linha INCOMPLETA por guarda explícita ──
+//
+// Antes, `Number(null)` (0, finito) fazia a linha sem tipologia entrar no mapa
+// de reservas sob a chave 0 — e só não reservar porque nenhuma tipologia tem
+// id 0. Achado S2 da revisão do PR 755: garantia por ausência de colisão não
+// é guarda. Este teste fixa a guarda de verdade.
+test('#753 reservarPermutasFisicas: linha sem tipologia com quantidade ≥ 1 não reserva nada, nem sob a chave 0', () => {
+  const linhasReceita = [
+    { tipologias: [{ tipologia_id: 0, quantidade: 5, area_privativa_m2: 30, preco_m2: 10_000 },
+                   { tipologia_id: 11, quantidade: 5, area_privativa_m2: 30, preco_m2: 10_000 }] },
+  ];
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: null, permuta_quantidade: 3 },
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: '', permuta_quantidade: 3 },
+  ];
+  const r = reservarPermutasFisicas(linhasReceita, linhasCusto);
+  assert.equal(r.usaFonteNova, true);
+  assert.equal(r.porTipologia.size, 0, 'nenhuma reserva — nem sob a chave 0');
+  assert.equal(r.vgv, 0);
 });

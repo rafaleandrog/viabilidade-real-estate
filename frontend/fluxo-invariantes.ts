@@ -747,12 +747,19 @@ export function validarPermutaFisica(
   // campos (a tela salva cada um num PATCH próprio), e o backend a aceita
   // desde a #753 — antes recusava com 400 e a linha nunca chegava a existir.
   // Fica como ALERTA para a linha não ser esquecida assim: o motor a ignora
-  // (`reservarPermutasFisicas`), então ela não reserva unidade nenhuma.
+  // por guarda explícita (`reservarPermutasFisicas` pula tipologia nula e
+  // quantidade 0), então ela não reserva unidade nenhuma.
+  // "Completa" aqui é o MESMO predicado do backend (`validarPermutaFisica`):
+  // tipologia presente E quantidade inteira >= 1 — dois validadores do mesmo
+  // campo com regras diferentes é a armadilha 14 do CLAUDE.md. "Inteira" com a
+  // tolerância deste módulo (`tol`), como a comparação de estoque logo abaixo:
+  // 20,005 é 20 com ruído de casa decimal; 2,5 não é quantidade nenhuma.
   for (const c of linhasCusto) {
     if (!ePermutaFisica(c)) continue;
     const semTipologia = c.permuta_tipologia_id == null || c.permuta_tipologia_id === '';
     const quantidade = Number(c.permuta_quantidade ?? 0) || 0;
-    if (!semTipologia && quantidade >= 1) continue;
+    const inteira = Math.abs(quantidade - Math.round(quantidade)) <= tol;
+    if (!semTipologia && inteira && quantidade >= 1) continue;
     const tip = semTipologia ? null : tipologiasCatalogo.find((t) => Number(t.id) === Number(c.permuta_tipologia_id));
     const nome = semTipologia ? 'Permuta física' : (tip?.nome || `tipologia ${c.permuta_tipologia_id}`);
     out.push({

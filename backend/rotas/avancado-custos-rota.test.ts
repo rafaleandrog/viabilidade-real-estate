@@ -285,3 +285,18 @@ test('#753 controle negativo: tipologia GRAVADA que não é deste estudo toma 40
     assert.equal(r.corpo.codigo, 'PERMUTA_TIPOLOGIA_INVALIDA');
   });
 });
+
+test('#753 controle negativo: tipologia GRAVADA que já não existe (apagada depois) toma 400 com resposta — o outro disjuntivo do `!tip ||`', async () => {
+  const dados = new DadosFake();
+  dados.semear('estudos', { id: 1, nivel_analise: 'avancado', status: 'em_analise' });
+  // Nenhuma tipologia semeada: `buscar` devolve null → ramo `!tip`.
+  const cid = dados.semear('avancado_linhas_custo', precoTerrenoBase(1, {
+    subcategoria: 'Permuta física', orcamento_valor: null, orcamento_valor_canonico: null, permuta_tipologia_id: 77,
+  }));
+
+  await comServidor(criarApp(dados), async (base) => {
+    const r = await patch(base, cid, { permuta_quantidade: 1 });
+    assert.equal(r.status, 400, `esperava 400, veio ${r.status}: ${JSON.stringify(r.corpo)}`);
+    assert.equal(r.corpo.codigo, 'PERMUTA_TIPOLOGIA_INVALIDA');
+  });
+});

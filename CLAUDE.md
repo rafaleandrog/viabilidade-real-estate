@@ -241,7 +241,7 @@ critério de aceite não é código:
 > O maior buraco daquela triagem — nove issues da cadeia EVI de recebíveis (#230, #232–#237, #240,
 > #241) com a matemática pronta mas **não ligada a `calcularFluxo`** — **foi fechado pela #283**:
 > `recebimentoBrutoMensal` consulta o contrato canônico em
-> `frontend/fluxo-caixa-motor.ts:1749-1750` e `calcularFluxo` agrega juros, principal, carteira e
+> `frontend/fluxo-caixa-motor.ts:1754-1755` e `calcularFluxo` agrega juros, principal, carteira e
 > repasse em `:2593-2634` (teste `frontend/fluxo-caixa-motor.test.ts:2365-2390`). A porta é
 > `fluxo_pagamento.componentes`, que `fluxoPagamentoParaSalvar` grava em toda escrita.
 > **O que continua faltando não é a integração, é o INPUT de taxa e de sinal no modal (#428):** há
