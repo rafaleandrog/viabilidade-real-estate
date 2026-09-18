@@ -739,7 +739,7 @@ O período começa no primeiro mês posterior ao fim da Obra.
 > O que mudou é que `absorcaoMensal` devolve `pctTotal`/`pctDescartado`/`mesesDescartados` ao lado
 > de `pcts` (`frontend/fluxo-shared.ts:365-376`, acumulados em `:424-432` no modo `personalizado`
 > e em `:439-457` no `distribuido`), `calcularFluxo` emite `console.warn`
-> (`frontend/fluxo-caixa-motor.ts:1773-1791`) e o painel de Reconciliação acusa
+> (`frontend/fluxo-caixa-motor.ts:1782-1800`) e o painel de Reconciliação acusa
 > **`ABSORCAO_NAO_FECHA`** (severidade `erro`, `encontrado:` a absorção efetiva; `esperado:` 100,
 > ou o total que a curva declarou quando houve descarte —
 > `frontend/fluxo-invariantes.ts:266-322`, chamada por `validarProduto:333`).
@@ -936,7 +936,7 @@ A configuração informa quanto do estoque do Grupo será vendido em cada perío
 > O que a #477 estabeleceu e **continua valendo**: cada Grupo participa do `jurosClientes` e do
 > `receitaPorComponenteMensal` do estudo independentemente, com sua própria carteira de safras —
 > o motor nunca mistura a carteira de um Grupo com a de outro
-> (`frontend/fluxo-caixa-motor.ts:1099`: cada safra é isolada por linha). O que mudou foi a
+> (`frontend/fluxo-caixa-motor.ts:1108`: cada safra é isolada por linha). O que mudou foi a
 > TAXA que entra nessas carteiras, não o isolamento delas.
 >
 > O papel de `estudos.juros_tabela_aa_padrao` também mudou: era **default de criação** (#477,
@@ -1098,11 +1098,11 @@ Misturar os dois conceitos impede a correta apuração de corretagem, carteira e
 > (`100 − entradas − parcelas`, `:807-817`), sempre no 1º mês após o fim da Obra. O checkbox de
 > juros foi **removido**; a badge de periodicidade também (#342) — linha nova nasce `mensal` e
 > linha legada mantém a periodicidade gravada, que o motor continua lendo
-> (`fluxo-caixa-motor.ts:323-325`).
+> (`fluxo-caixa-motor.ts:332-334`).
 >
 > **O que ainda falta para o modelo econômico:** não há campo de **taxa** nem de **sinal** — é a
 > **#428**. O adaptador `componentesDoLegado` continua fixando `taxaMensal: 0`
-> (`fluxo-caixa-motor.ts:596,603,610,619`) e `sinalPct: 0` (`:590,602,608`), porque o espelho legado
+> (`fluxo-caixa-motor.ts:605,603,610,619`) e `sinalPct: 0` (`:590,602,608`), porque o espelho legado
 > não tem onde guardar essas grandezas.
 >
 > **O que MUDOU na #431:** `fluxoPagamentoParaSalvar` não grava mais
@@ -1299,7 +1299,7 @@ outra — e **muda os números de estudos existentes**.
 
 | Issue | O que pedia | Onde está |
 |---|---|---|
-| **EVI-010 / #230** | contrato canônico pelas quatro regras de componente | `ComponentePagamento` (`fluxo-caixa-motor.ts:524-555`) |
+| **EVI-010 / #230** | contrato canônico pelas quatro regras de componente | `ComponentePagamento` (`fluxo-caixa-motor.ts:533-564`) |
 | **EVI-012 / #232** | componente de prazo fixo por safra (curta 36, longa 120) | `pagamentosComponenteSafra` `:1058` |
 | **EVI-013 / #233** | componente até marco, 1ª parcela no mês seguinte | mesmo motor, `tipo: 'ate_marco'` |
 | **EVI-014 / #234** | pagamento concentrado e repasse, com juros convencionados | `tipo: 'concentrado'`, `taxaMensal` |
@@ -1323,7 +1323,7 @@ A fronteira é explícita: vendas até o mês da entrega preservam o plano do Gr
 O comprador pode pagar parte diretamente e financiar parte com o banco, mas ambas chegam à incorporadora no mesmo mês.
 
 > ✅ **Comportamento vigente no caminho canônico (#235/#283).** `ehVendaAposChaves`
-> (`frontend/fluxo-caixa-motor.ts:963-965`) marca como Após-chaves toda safra com
+> (`frontend/fluxo-caixa-motor.ts:972-974`) marca como Após-chaves toda safra com
 > `safra > mesEntrega`, e `componentesEfetivosSafra` (`:962`) substitui os componentes do Grupo
 > por um único `imediato` de 100% sem desconto — sem sinal futuro, parcela nem repasse para aquela
 > venda. Cada safra é tratada isoladamente: contratos antigos não são afetados. A aplicação por
@@ -1808,7 +1808,7 @@ A permuta física:
 > coluna Orçamento dessa linha renderiza **só** a tipologia e a quantidade
 > (`frontend/tela-fluxo-custos.ts:704-716`): não há campo de valor. E `reservarPermutasFisicas`
 > calcula o KPI como `quantidade × area_privativa_m2 × preco_m2` da tipologia alocada
-> (`frontend/fluxo-caixa-motor.ts:85`), **sem ler `orcamento_valor`**. Quem procurar uma entrada de
+> (`frontend/fluxo-caixa-motor.ts:88`), **sem ler `orcamento_valor`**. Quem procurar uma entrada de
 > valor ou uma regra de valoração própria não vai achar: elas não existem. O CRUD de tipologias deixou de ler e
 > escrever `unidades_permutadas` (`backend/rotas/avancado.ts:780`, #253); a coluna permanece no
 > schema como dado histórico. O motor resolve a reserva em `reservarPermutasFisicas`
@@ -1852,7 +1852,7 @@ base líquida
 > separou os dois na mesma direção: `permuta_financeira_deduzir_imposto` e
 > `permuta_financeira_deduzir_corretagem`, editáveis por linha de custo, defaults `false`/`false`.
 >
-> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2099`) **subtrai** cada
+> `permutaFinanceiraDeduzidaMensal` (`frontend/fluxo-caixa-motor.ts:2108`) **subtrai** cada
 > série ativada diretamente do recebimento do mês — `max(0, v − (deduzirImposto ? imposto : 0) −
 > (deduzirCorretagem ? corretagem : 0))` — e só então aplica o percentual: é a **subtração direta**
 > que o padrão pede, a dedução não é composta multiplicativamente, e as duas deduções agem cada
@@ -2216,7 +2216,7 @@ O app não deve deslocar recebimentos excedentes para o último mês apenas para
 
 Quando um vencimento ultrapassar o horizonte, o horizonte deve ser ampliado.
 
-> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2335`)
+> ✅ **Comportamento vigente (#231, #446).** `calcularFluxo` (`frontend/fluxo-caixa-motor.ts:2344`)
 > dimensiona o horizonte por `max(último mês do Cronograma, último recebível de qualquer linha,
 > último mês de custo, último mês das operações de Funding, 11) + 1`, com `ultimoMesRecebivelLinha`
 > derivando o recebível a partir dos componentes normalizados e `ultimoMesFunding`
@@ -2826,7 +2826,7 @@ Esses fundamentos devem ser preservados.
 
 | A lista dizia | Hoje |
 |---|---|
-| não cria safras | ✅ laço das contratações, `fluxo-caixa-motor.ts:1112` |
+| não cria safras | ✅ laço das contratações, `fluxo-caixa-motor.ts:1121` |
 | não calcula PMT | ✅ `pmt` `:666` |
 | não separa prazo fixo de até marco | ✅ `tipo: 'prazo_fixo'` × `'ate_marco'` |
 | não controla o primeiro vencimento | ✅ `defasagemMeses` por componente |

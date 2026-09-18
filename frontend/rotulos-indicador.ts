@@ -39,7 +39,7 @@ export const INVENTARIO_ROTULOS_INDICADOR: RotuloIndicador[] = [
   {
     rotulo: 'VGV potencial',
     arquivos: ['frontend/tela-resumo.ts'],
-    fonte: 'c.vgvTotal — grandeza 1 da taxonomia (fluxo-caixa-motor.ts:239)',
+    fonte: 'c.vgvTotal — grandeza 1 da taxonomia (fluxo-caixa-motor.ts:248)',
   },
   {
     rotulo: 'Margem de caixa',

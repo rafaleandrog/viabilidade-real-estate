@@ -50,10 +50,10 @@ migração; `versao` não bumpa.
 **Rodada 1 de revisão (Kimi, seis lentes, zero bloqueantes) — três observações consertadas no
 mesmo PR:** (1) `reservarPermutasFisicas` ganhou guarda explícita de tipologia nula — antes
 `Number(null)` era `0`, finito, e a linha incompleta entrava no mapa de reservas sob a chave 0, só
-não reservando porque nenhuma tipologia tem id 0 (garantia por ausência de colisão, não por guarda;
-teste direto novo em `fluxo-caixa-motor.test.ts`); (2) o alerta e o backend passaram a usar o
-**mesmo** predicado de "completa" (tipologia + quantidade inteira ≥ 1, com a tolerância do módulo
-de invariantes — armadilha 14); (3) o ramo `!tip` do novo 400 (tipologia gravada e depois apagada)
+não reservando porque a chave 0 não casava com nenhuma tipologia de receita (garantia por ausência
+de colisão, não por guarda; teste direto novo em `fluxo-caixa-motor.test.ts`); (2) alerta, backend e
+motor passaram a usar o mesmo critério de "completa" (tipologia + quantidade inteira ≥ 1; no
+frontend com tolerância de ruído decimal — armadilha 14); (3) o ramo `!tip` do novo 400 (tipologia gravada e depois apagada)
 ganhou teste HTTP. Uma quarta observação — `listar` com `por_pagina: 1000` onde o contrato do SDK
 manda `varrerTudo`, 6 ocorrências pré-existentes em `avancado.ts` — virou a issue #756.
 

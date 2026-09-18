@@ -192,7 +192,7 @@ gravados (via adapter do JSON legado, EVI-010 / #230) e o inventário de dados l
 | Conceito | O que precisa ser representado | Issue |
 |---|---|---|
 | **Linha Preço canônica** | Identidade `obrigatoria` garantida em **todo** estudo, inclusive nos que o backfill da `007` não alcançou — a migração cobre só `terreno/Compra` de menor id por estudo | #256 |
-| **Subcategoria de Preço** | Quatro valores exatos: `Valor à vista`, `Parcelado`, `Permuta física`, `Permuta financeira`. Hoje há uma única `Permuta`, que o motor trata como **financeira** (`frontend/fluxo-caixa-motor.ts:390`). Migração aprovada: toda `Permuta` legada → `Permuta financeira`, preservando o resultado de todo estudo | #257 |
+| **Subcategoria de Preço** | Quatro valores exatos: `Valor à vista`, `Parcelado`, `Permuta física`, `Permuta financeira`. Hoje há uma única `Permuta`, que o motor trata como **financeira** (`frontend/fluxo-caixa-motor.ts:399`). Migração aprovada: toda `Permuta` legada → `Permuta financeira`, preservando o resultado de todo estudo | #257 |
 | **Permuta física por tipologia** | Referência de tipologia + quantidade **na linha de custo do Terreno**, substituindo `avancado_tipologias.unidades_permutadas` como fonte de verdade. Exige base de valoração declarada quando a tipologia tem `preco_m2` diferente por Grupo | #258 · #266–#269 |
 | **Valor canônico multiunidade** | Quantidade econômica com precisão suficiente, independente da unidade exibida. Hoje o valor **exibido é o persistido**, em duas arquiteturas distintas: um campo por unidade nas Premissas, um único `orcamento_valor` + `orcamento_unidade` em Custos | #259 · #260 |
 | ~~**Instrumento de capital**~~ | 🔴 **Evolução CANCELADA pela #355 (2026-08-12)** — ver o bloco abaixo | ~~#239 · #271~~ |

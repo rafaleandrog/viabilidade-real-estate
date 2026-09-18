@@ -3570,9 +3570,10 @@ test('#512: nenhum campo publicado sai como ZERO NEGATIVO', () => {
 // ── #753: reservarPermutasFisicas ignora linha INCOMPLETA por guarda explícita ──
 //
 // Antes, `Number(null)` (0, finito) fazia a linha sem tipologia entrar no mapa
-// de reservas sob a chave 0 — e só não reservar porque nenhuma tipologia tem
-// id 0. Achado S2 da revisão do PR 755: garantia por ausência de colisão não
-// é guarda. Este teste fixa a guarda de verdade.
+// de reservas sob a chave 0 — e só não reservar porque a chave 0 não casava
+// com nenhuma tipologia de receita. Achado da revisão do PR 755: garantia por
+// ausência de colisão não é guarda. Este teste fixa a guarda de verdade — o
+// que prova é `porTipologia.size === 0` (o código antigo deixaria a chave 0).
 test('#753 reservarPermutasFisicas: linha sem tipologia com quantidade ≥ 1 não reserva nada, nem sob a chave 0', () => {
   const linhasReceita = [
     { tipologias: [{ tipologia_id: 0, quantidade: 5, area_privativa_m2: 30, preco_m2: 10_000 },
@@ -3586,4 +3587,16 @@ test('#753 reservarPermutasFisicas: linha sem tipologia com quantidade ≥ 1 nã
   assert.equal(r.usaFonteNova, true);
   assert.equal(r.porTipologia.size, 0, 'nenhuma reserva — nem sob a chave 0');
   assert.equal(r.vgv, 0);
+});
+
+test('#753 reservarPermutasFisicas: quantidade não inteira (2,5) é incompleta — não reserva, como backend e alerta', () => {
+  const linhasReceita = [
+    { tipologias: [{ tipologia_id: 11, quantidade: 5, area_privativa_m2: 30, preco_m2: 10_000 }] },
+  ];
+  const semRuido = [{ grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 11, permuta_quantidade: 2.5 }];
+  assert.equal(reservarPermutasFisicas(linhasReceita, semRuido).porTipologia.size, 0, '2,5 não é quantidade nenhuma');
+  // Ruído de casa decimal (20,005 → 20) continua reservando: mesma tolerância do alerta.
+  const comRuido = [{ grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 11, permuta_quantidade: 2.005 }];
+  const r = reservarPermutasFisicas(linhasReceita, comRuido);
+  assert.equal([...r.porTipologia.values()].reduce((a, b) => a + b, 0), 2);
 });

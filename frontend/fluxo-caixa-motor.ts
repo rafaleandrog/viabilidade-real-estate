@@ -74,6 +74,9 @@ export function chaveTipologiaLinha(linha: any, linhaIndex: number, tipologia: a
   return `${linha?.id ?? linhaIndex}:${tipologia?.id ?? tipologiaIndex}`;
 }
 
+/** #753: ruído de casa decimal tolerado ao decidir se a quantidade permutada é inteira. */
+const TOLERANCIA_QUANTIDADE_PERMUTA = 0.01;
+
 /**
  * Aloca as unidades reservadas em Custos às alocações de Receitas da mesma
  * tipologia. A quantidade é consumida uma única vez, mesmo quando a tipologia
@@ -88,13 +91,19 @@ export function reservarPermutasFisicas(linhasReceita: any[], linhasCusto: any[]
   const usaFonteNova = custos.length > 0;
   const reservas = new Map<number, number>();
   for (const c of custos) {
-    // #753: linha INCOMPLETA (sem tipologia) é ignorada por guarda explícita.
-    // Antes, `Number(null)` dava 0 — finito —, e a linha entrava no mapa sob a
-    // chave 0; só não reservava porque nenhuma tipologia tem id 0. Garantia
-    // por ausência de colisão não é guarda (achado S2 da revisão do PR 755).
+    // #753: linha INCOMPLETA é ignorada por guarda explícita — sem tipologia,
+    // ou com quantidade que não é um inteiro >= 1 (o mesmo critério do alerta
+    // `PERMUTA_FISICA_INCOMPLETA` de fluxo-invariantes.ts, com a mesma
+    // tolerância de ruído decimal). Antes, `Number(null)` dava 0 — finito — e
+    // a linha entrava no mapa sob a chave 0; só não reservava porque a chave 0
+    // não casava com nenhuma tipologia de receita (o lado da leitura também
+    // converte nulo em 0). Garantia por ausência de colisão não é guarda —
+    // achado da revisão do PR 755.
     const semTipologia = c.permuta_tipologia_id == null || c.permuta_tipologia_id === '';
     const tipologiaId = semTipologia ? NaN : Number(c.permuta_tipologia_id);
-    const quantidade = Math.max(0, Math.round(n(c.permuta_quantidade)));
+    const bruta = n(c.permuta_quantidade);
+    const inteira = Math.abs(bruta - Math.round(bruta)) <= TOLERANCIA_QUANTIDADE_PERMUTA;
+    const quantidade = inteira ? Math.max(0, Math.round(bruta)) : 0;
     if (Number.isFinite(tipologiaId) && quantidade > 0) {
       reservas.set(tipologiaId, (reservas.get(tipologiaId) ?? 0) + quantidade);
     }
