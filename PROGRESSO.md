@@ -8,6 +8,38 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 PR 757, aberto e aguardando revisão/autorização de merge do autor.
 
+**Rodada 1 de revisão (10 lentes: App do Codex + 9 Kimi) achou 5 bloqueantes reais, todos
+consertados na mesma sessão:**
+
+1. `circular` (tornado e margem de segurança) ignorava `infra_valor_canonico` — com o canônico
+   preenchido o motor usa o valor FIXO e ignora `infra_modo` por inteiro, então a alavanca deixa de
+   ser circular. Extraído para `ehCircular` (`frontend/tornado-alavancas.ts`), uma cópia só, também
+   consumida por `margem-seguranca.ts` (achado do App do Codex).
+2. `resolverFator` não distinguia "a meta nunca é atingida" de "a meta já é atingida no intervalo
+   inteiro" — os dois casos são "sem troca de sinal" e caíam no mesmo `null`. Novo campo
+   `alvoSempreAtingido` desfaz a ambiguidade; `tituloFolga` (tela-proforma.ts) passa a dizer "já
+   atinge... em toda esta faixa" em vez de "não atinge... em nenhum cenário" (achado do App do
+   Codex).
+3. A seleção automática do tornado (`alavancas[0]`) não filtrava a alavanca circular — podia abrir
+   a tabela Bear/Base/Bull já estressando a variável que o próprio gráfico diz "não medir nada
+   isolado" (achado da lente L1).
+4. `custoLike` reimplementado inline em `tela-proforma.ts` em vez de consumir `ehCustoLike` — o
+   docblock da função prometia "uma cópia só" e não era verdade (achado convergente de duas lentes,
+   L3 e S2).
+5. A linha do tornado tinha `role="listitem"` (semântica passiva) apesar de ser clicável/navegável
+   por teclado, e o comentário afirmava seguir a convenção `role="button"` da cascata sem segui-la —
+   trocado para `role="button"` + `aria-pressed` (achado da lente S3).
+
+Mais 7 observações não-bloqueantes corrigidas de passagem (comentário de fixture com números
+trocados, justificativa desatualizada num caso de render, `||` engolindo benchmark `valor: 0`,
+dois endereços `arquivo:linha` deslocados pelo próprio diff, precisão da identidade
+`marketingGlobal + gestaoIndiretos`, token de cor cosmético do cartão de margem, e
+`_varSensManual` agora reseta ao trocar de estudo). Dois casos de render novos provam os
+consertos de fiação (#3 e o filtro de circular). `bash scripts/validar-frontend.sh` verde (8/8);
+1494 testes (`node --test` do comando do `package.json`), 0 falhas — 90 casos de render.
+
+Relatório completo da rodada 1: comentário no PR 757.
+
 Resposta ao pedido direto do usuário ("teve uma issue que eu tinha criado para colocar esse tipo de
 gráfico... verifique como isso ficou"), com a imagem do handoff anexada de novo. Conferido: a issue
 **não foi esquecida** — é a Rodada 13 (`docs/rodada-13/planejamento.md`, issues #724–#736), aberta em
@@ -20,7 +52,7 @@ entre sessões, e esta sessão implementou o pacote inteiro de uma vez. Itens en
 o critério de aceite da issue original conferido):
 
 - **#725** — `VariavelSensibilidade` ganha `custo_terreno`/`custo_indireto`; `fatorSens` incide nos
-  dois pontos (`frontend/proforma.ts:646`, `:678-680`), com o desligamento (`considerar_custo_terreno
+  dois pontos (`frontend/proforma.ts:649`, `:686-687`), com o desligamento (`considerar_custo_terreno
   === false`) continuando soberano e a identidade `marketingGlobal + gestaoIndiretos ===
   custoIndiretoTotal` preservada.
 - **#727** — `frontend/tornado-alavancas.ts` (motor puro): `rankearAlavancas` roda 1 execução base +

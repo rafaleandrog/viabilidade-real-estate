@@ -53,6 +53,23 @@ export function ehCustoLike(variavel: VariavelSensibilidade): boolean {
   return variavel !== 'preco';
 }
 
+/**
+ * Base de cálculo circular (§4.6.E e §4.3): `custo_infra` só é circular
+ * quando o motor de fato o computa como % do VGV — `infra_modo === 'pct_vgv'`
+ * **e** sem `infra_valor_canonico`. Com o canônico preenchido,
+ * `canonico(v, legado)` (`frontend/proforma.ts:397`) usa o valor FIXO e
+ * ignora `infra_modo` por inteiro, então a dependência circular do preço
+ * deixa de existir — marcar `circular: true` ali publicaria um "não mede
+ * nada isolado" falso. Mesmo predicado de `canonico`, de propósito: uma
+ * cópia só, para as duas leituras não divergirem (achado do App do Codex,
+ * PR #757).
+ */
+export function ehCircular(variavel: VariavelSensibilidade, entrada: ProformaInput): boolean {
+  return variavel === 'custo_infra'
+    && entrada.infra_modo === 'pct_vgv'
+    && (entrada.infra_valor_canonico === null || entrada.infra_valor_canonico === undefined);
+}
+
 // As 5 alavancas que o tornado desenha (handoff, imagem anexada pelo autor):
 // Preço de venda, Custo de obra/infra, Permuta física, Permuta financeira,
 // Custo indireto. `custo_terreno` fica de fora do tornado por decisão do
@@ -88,7 +105,7 @@ export function rankearAlavancas(
     const amplitudePct = resultadoBase !== 0 && Math.abs(resultadoBase) > limiar
       ? (amplitudeRS / (2 * Math.abs(resultadoBase))) * 100
       : null;
-    const circular = variavel === 'custo_infra' && entrada.infra_modo === 'pct_vgv';
+    const circular = ehCircular(variavel, entrada);
     return {
       variavel, rotulo: rotuloAlavanca(variavel, lot),
       resultadoBear, resultadoBull, resultadoBase, amplitudeRS, amplitudePct, circular,

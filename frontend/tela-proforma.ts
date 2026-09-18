@@ -4,7 +4,7 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtR$Milhoes, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, vgvBrutoDeProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
-import { rankearAlavancas } from './tornado-alavancas.js';
+import { rankearAlavancas, ehCustoLike, ehCircular } from './tornado-alavancas.js';
 import { margemDeSeguranca, terrenoMaximo, type MargemDeSeguranca } from './margem-seguranca.js';
 import { fmtVariacao } from './cenario-variacao.js';
 import './grafico-tornado.js';
@@ -295,7 +295,11 @@ export class ViabTelaProforma extends LitElement {
       gap: 4px;
       padding: 10px 12px;
       border-radius: 6px;
-      background: var(--cor-borda-sutil, rgba(255, 255, 255, 0.06));
+      /* Mesmo padrão de superfície + borda de .kpi-card (fluxo-tabela.ts:82-84)
+         — achado da lente S3 (PR #757): um token de borda como preenchimento,
+         sem borda, divergia do padrão caseiro do app. */
+      background: var(--cor-superficie, rgba(255, 255, 255, 0.04));
+      border: 1px solid var(--cor-borda, rgba(255, 255, 255, 0.08));
       min-width: 0;
     }
     .margem-rotulo {
@@ -454,6 +458,12 @@ export class ViabTelaProforma extends LitElement {
     const id = this.estudo.id;
     this._idCarregado = id ?? null;
     this.produtos = [];
+    // A escolha manual do tornado é do ESTUDO — trocar de estudo (inclusive
+    // entre Loteamento e Incorporação, que têm alavancas diferentes:
+    // custo_infra × custo_obras) sem resetar deixaria uma variável
+    // inexistente presa no novo estudo, estressando uma linha sempre zero em
+    // silêncio (achado da lente L3, PR #757).
+    this._varSensManual = null;
     try {
       const [bm, cfg, prod] = await Promise.all([
         listarBenchmarks(this.estudo.tipo_empreendimento), buscarConfig(),
@@ -722,8 +732,14 @@ export class ViabTelaProforma extends LitElement {
   private _renderMargemSeguranca(entrada: ProformaInput, lot: boolean): TemplateResult {
     // Margem-alvo vem do benchmark (campo compartilhado com "Margem sobre
     // VGV"), nunca de um literal na tela — meta 20 por padrão
-    // (backend/rotas/benchmarks.ts:26).
-    const margemAlvoPct = Number(this._bm('margem_liquida')?.valor) || 20;
+    // (backend/rotas/benchmarks.ts:26). `??`, não `||`: um benchmark semeado
+    // com `valor: 0` é uma meta degenerada, mas explícita — `||` a engoliria
+    // de volta para 20 em silêncio (a mesma classe de armadilha do `||` que
+    // reimplementa default de parâmetro, CLAUDE.md § Contratos inegociáveis;
+    // achado da lente L1, PR #757).
+    const bmValorMargem = this._bm('margem_liquida')?.valor;
+    const margemAlvoPct = bmValorMargem !== undefined && Number.isFinite(Number(bmValorMargem))
+      ? Number(bmValorMargem) : 20;
     const varObra: VarSens = lot ? 'custo_infra' : 'custo_obras';
     const rotuloObra = lot ? 'Estouro máximo de infraestrutura' : 'Estouro máximo de obra';
 
@@ -732,13 +748,22 @@ export class ViabTelaProforma extends LitElement {
     const permuta = margemDeSeguranca(entrada, 'permuta_fisica', margemAlvoPct);
     const terreno = terrenoMaximo(entrada, margemAlvoPct);
 
-    const tituloFolga = (m: MargemDeSeguranca, rotulo: string): string => {
+    const tituloFolga = (m: MargemDeSeguranca, rotulo: string, circular: boolean): string => {
+      if (circular) {
+        return `${rotulo}: base orçada como % do VGV — estressar esta premissa move o preço junto e não mede nada isolado.`;
+      }
       if (m.fatorEquilibrio === null) {
         return `${rotulo}: o projeto não atinge o ponto de equilíbrio nesta faixa de estresse.`;
       }
-      const alvo = m.fatorAlvo === null
-        ? `não atinge a margem-alvo de ${fmtPct(margemAlvoPct)} em nenhum cenário desta faixa`
-        : `até a margem-alvo (${fmtPct(margemAlvoPct)}): ${fmtVariacao((m.fatorAlvo - 1) * 100)}`;
+      // `fatorAlvo === null` cobre DOIS casos opostos que `alvoSempreAtingido`
+      // desfaz (achado do App do Codex, PR #757): a meta nunca é atingida, ou
+      // ela já é atingida no intervalo inteiro — dizer "não atinge" no
+      // segundo caso seria o oposto da verdade.
+      const alvo = m.fatorAlvo !== null
+        ? `até a margem-alvo (${fmtPct(margemAlvoPct)}): ${fmtVariacao((m.fatorAlvo - 1) * 100)}`
+        : m.alvoSempreAtingido
+          ? `já atinge a margem-alvo de ${fmtPct(margemAlvoPct)} em toda esta faixa de estresse`
+          : `não atinge a margem-alvo de ${fmtPct(margemAlvoPct)} em nenhum cenário desta faixa`;
       return `${rotulo} — ponto de equilíbrio (resultado = 0). Margem-alvo: ${alvo}.`;
     };
 
@@ -746,9 +771,9 @@ export class ViabTelaProforma extends LitElement {
     // null-safe do resto do app (#571/#611) e o próprio ponto da issue #732:
     // sem raiz verificada, não há número para publicar.
     const cartoes: { rotulo: string; valor: string; titulo: string }[] = [
-      { rotulo: 'Queda máxima de preço', valor: preco.folgaPct === null ? '—' : fmtVariacao(preco.folgaPct), titulo: tituloFolga(preco, 'Queda máxima de preço') },
-      { rotulo: rotuloObra, valor: obra.folgaPct === null ? '—' : fmtVariacao(obra.folgaPct), titulo: tituloFolga(obra, rotuloObra) },
-      { rotulo: 'Permuta física máxima', valor: permuta.folgaPct === null ? '—' : fmtVariacao(permuta.folgaPct), titulo: tituloFolga(permuta, 'Permuta física máxima') },
+      { rotulo: 'Queda máxima de preço', valor: preco.folgaPct === null ? '—' : fmtVariacao(preco.folgaPct), titulo: tituloFolga(preco, 'Queda máxima de preço', false) },
+      { rotulo: rotuloObra, valor: obra.folgaPct === null ? '—' : fmtVariacao(obra.folgaPct), titulo: tituloFolga(obra, rotuloObra, ehCircular(varObra, entrada)) },
+      { rotulo: 'Permuta física máxima', valor: permuta.folgaPct === null ? '—' : fmtVariacao(permuta.folgaPct), titulo: tituloFolga(permuta, 'Permuta física máxima', false) },
       {
         rotulo: 'Terreno máximo',
         // Segunda exceção declarada ao contrato C7 (a 1ª é o card de KPI,
@@ -782,7 +807,14 @@ export class ViabTelaProforma extends LitElement {
     // seleção inicial — a de maior amplitude, não mais o literal `'preco'`.
     // Uma escolha manual do usuário (clique numa barra) vence o ranking.
     const alavancas = rankearAlavancas(entrada, this._passoPct, lot);
-    const varSensAtual: VarSens = this._varSensManual ?? alavancas[0]?.variavel ?? 'preco';
+    // A seleção automática pula a alavanca circular — o próprio tornado a
+    // desenha atenuada e fora do destaque porque ela "não mede nada isolado"
+    // (tornado-alavancas.ts); deixá-la virar a seleção DEFAULT da tabela
+    // Bear/Base/Bull contradiria isso (achado da lente L1, PR #757).
+    const varSensAtual: VarSens = this._varSensManual
+      ?? alavancas.find((a) => !a.circular)?.variavel
+      ?? alavancas[0]?.variavel
+      ?? 'preco';
 
     // A variação +/- vem do indicador de sensibilidade do benchmark (por variável),
     // não mais de um par único do estudo. Sem benchmark → fallback 10%.
@@ -792,8 +824,9 @@ export class ViabTelaProforma extends LitElement {
     // Bull = cenário otimista (melhor resultado); Bear = pessimista. Para o
     // PREÇO, otimista é preço maior. Para variáveis de CUSTO/permuta (que pioram
     // o resultado quando sobem), o Bull é uma REDUÇÃO — a conta é invertida
-    // em relação ao preço (bug #13).
-    const custoLike = varSensAtual !== 'preco';
+    // em relação ao preço (bug #13). `ehCustoLike` é a mesma função que
+    // `rankearAlavancas` usa — uma cópia só (achado das lentes L3/S2, PR #757).
+    const custoLike = ehCustoLike(varSensAtual);
     const fatorBull = custoLike ? 1 - varPos / 100 : 1 + varPos / 100;
     const fatorBear = custoLike ? 1 + varNeg / 100 : 1 - varNeg / 100;
     // VGV bruto por cenário = VGV se a permuta física NÃO fosse entregue (vendida).

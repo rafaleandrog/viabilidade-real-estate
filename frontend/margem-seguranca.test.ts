@@ -8,10 +8,10 @@ const perto = (a: number, b: number, tol = 0.02) => Math.abs(a - b) <= tol;
 // Golden: incorporação de números redondos, resultado AFIM em `fp` (permuta
 // física) dentro da faixa não capada — a folga é calculável à mão.
 // vgv bruto = 10.000.000 (100 un × 100 m² × R$ 1.000); permuta física parte
-// de 400 m² × fator, preço médio R$ 1.000/m² ⇒ vgvPermuta(fator) = 400.000×fator;
+// de 40 m² × fator, preço médio R$ 1.000/m² ⇒ vgvPermuta(fator) = 40.000×fator;
 // custo fixo (construção) R$ 2.000.000, sem outras deduções/custos.
-// resultado(fator) = 10.000.000 − 400.000×fator − 2.000.000 = 8.000.000 − 400.000×fator.
-// Raiz (resultado = 0): fator = 20 — fora do teto do motor (5), então SEM
+// resultado(fator) = 10.000.000 − 40.000×fator − 2.000.000 = 8.000.000 − 40.000×fator.
+// Raiz (resultado = 0): fator = 200 — fora do teto do motor (5), então SEM
 // RAIZ é o resultado esperado (ver teste "nunca atinge").
 const GOLDEN: ProformaInput = {
   tipo_empreendimento: 'incorporacao',
@@ -127,4 +127,45 @@ test('#732: variável não circular (infra_modo valor_m2) calcula normalmente', 
   const m = margemDeSeguranca(lotNaoCircular, 'custo_infra', 20);
   assert.ok(m.fatorEquilibrio !== null || m.fatorEquilibrio === null); // não deve lançar
   assert.notEqual(m.folgaPct, undefined);
+});
+
+// Achado do App do Codex, PR #757: com o valor CANÔNICO preenchido, o motor
+// usa esse valor fixo e ignora `infra_modo` por inteiro (`canonico()`,
+// proforma.ts:397) — não é mais circular, e a margem de segurança volta a
+// ser calculável.
+test('#757: infra_modo pct_vgv com infra_valor_canonico preenchido NÃO é circular — folga calculável', () => {
+  const lotCanonico: ProformaInput = {
+    tipo_empreendimento: 'loteamento',
+    terreno_manual_area: 100_000,
+    produtos: [{ area_media_m2: 300, preco_venda_m2: 1_000, unidades: 250 }], // vgv bruto = 75.000.000
+    infra_modo: 'pct_vgv', infra_pct: 30, // ignorado pelo motor por causa do canônico
+    // 20.000.000 × fator cruza os 75.000.000 do VGV dentro de [0,5] (em ≈3,75)
+    // — grande o bastante para o ponto de equilíbrio cair dentro do teto do motor.
+    infra_valor_canonico: 20_000_000,
+  };
+  const m = margemDeSeguranca(lotCanonico, 'custo_infra', 20);
+  assert.notEqual(m.fatorEquilibrio, null, 'com canônico preenchido, a alavanca deveria ser calculável');
+  assert.ok(m.fatorEquilibrio! > 0 && m.fatorEquilibrio! < 5, `fatorEquilibrio=${m.fatorEquilibrio} esperado dentro de (0,5)`);
+});
+
+// Achado do App do Codex, PR #757: `resolverFator` sem troca de sinal cobre
+// dois casos opostos — a meta nunca é atingida (já testado acima, "nunca
+// atinge") e a meta É atingida no intervalo INTEIRO. `alvoSempreAtingido`
+// desfaz a ambiguidade.
+test('#757: margem-alvo sempre atingida no intervalo (alvoSempreAtingido=true), nunca "nunca atinge"', () => {
+  // Meta bem baixa (1%) e permuta física pequena o bastante para a margem
+  // continuar acima da meta em TODO fator de [0,5].
+  const semprePositivo: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual',
+    terreno_manual_area: 500,
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 1_000, unidades: 100 }], // vgv bruto = 10.000.000
+    permuta_fisica_modo: 'area_m2',
+    permuta_fisica_area_m2: 10, // impacto pequeno mesmo em fator=5
+    construcao_modo: 'valor_total',
+    construcao_valor_total: 500_000,
+  };
+  const m = margemDeSeguranca(semprePositivo, 'permuta_fisica', 1);
+  assert.equal(m.fatorAlvo, null);
+  assert.equal(m.alvoSempreAtingido, true, 'a margem deveria superar a meta de 1% em todo o intervalo');
 });

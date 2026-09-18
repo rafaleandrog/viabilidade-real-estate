@@ -5,18 +5,29 @@
 // exigiria um campo `base_calculo` por linha de custo no schema — mas essa
 // decomposição é um jeito de CALCULAR, não o resultado: `calcularProforma` já
 // sabe, no código, qual base cada linha usa. Invertendo o motor numericamente
-// (o precedente é `precoSugeridoM2`, `frontend/proforma.ts:856`) recuperam-se
+// (o precedente é `precoSugeridoM2`, `frontend/proforma.ts:860`) recuperam-se
 // os mesmos números sem campo novo, sem migração — e continua correto se uma
 // linha mudar de base amanhã.
 
 import { calcularProforma, type ProformaInput, type Proforma, type VariavelSensibilidade } from './proforma.js';
+import { ehCircular } from './tornado-alavancas.js';
 
 export interface MargemDeSeguranca {
   variavel: VariavelSensibilidade;
   /** Fator no ponto de equilíbrio (resultado = 0). `null` = não existe raiz no intervalo. */
   fatorEquilibrio: number | null;
-  /** Fator que ainda entrega a margem-alvo. `null` = inalcançável. */
+  /**
+   * Fator na fronteira da margem-alvo. `null` quando não há UMA fronteira em
+   * `[FATOR_MIN, FATOR_MAX]` — o que acontece em DOIS casos opostos que
+   * `resolverFator` não distingue sozinho (ambos são "sem troca de sinal"):
+   * a margem nunca atinge a meta, OU ela já atinge a meta no intervalo
+   * INTEIRO. `alvoSempreAtingido` desfaz a ambiguidade (achado do App do
+   * Codex, PR #757) — só é preenchido quando `fatorAlvo` é `null`.
+   */
   fatorAlvo: number | null;
+  /** Só definido quando `fatorAlvo` é `null`. `true` = a meta já é batida em
+   * todo o intervalo (nada a temer); `false` = nunca é batida. */
+  alvoSempreAtingido?: boolean;
   /** Variação percentual até o equilíbrio: −40,2 para "o preço pode cair 40,2%". */
   folgaPct: number | null;
 }
@@ -79,11 +90,11 @@ export function margemDeSeguranca(
   margemAlvoPct: number,
   calcular: (e: ProformaInput) => Proforma = calcularProforma,
 ): MargemDeSeguranca {
-  // Base circular (marcada pelo motor do tornado): premissa orçada como % do
-  // VGV, que o próprio preço estressado move junto — estressá-la não mede
-  // nada isolado, e devolver um fator aqui publicaria um número inventado.
-  const circular = variavel === 'custo_infra' && entrada.infra_modo === 'pct_vgv';
-  if (circular) return { variavel, fatorEquilibrio: null, fatorAlvo: null, folgaPct: null };
+  // Base circular (mesmo predicado do motor do tornado — `ehCircular`, uma
+  // cópia só): premissa orçada como % do VGV, que o próprio preço estressado
+  // move junto — estressá-la não mede nada isolado, e devolver um fator aqui
+  // publicaria um número inventado.
+  if (ehCircular(variavel, entrada)) return { variavel, fatorEquilibrio: null, fatorAlvo: null, folgaPct: null };
 
   const proformaNoFator = (fator: number): Proforma => calcular({ ...entrada, sensibilidade: { variavel, fator } });
 
@@ -93,15 +104,27 @@ export function margemDeSeguranca(
   // resultado / receitaLiquida × 100 ≥ margemAlvoPct. Sem receita líquida
   // positiva a razão é indefinida — nunca "mediu zero" (mesmo padrão null-safe
   // de `margemLiquidaPct`/`roiPct`, #571/#611).
-  const fatorAlvo = resolverFator((fator) => {
+  const fAlvo = (fator: number): number => {
     const p = proformaNoFator(fator);
-    if (p.receitaLiquida <= 0) return Number.POSITIVE_INFINITY; // nunca atinge ⇒ sem raiz
+    if (p.receitaLiquida <= 0) return Number.POSITIVE_INFINITY; // sem base para medir
     return (p.resultado / p.receitaLiquida) * 100 - margemAlvoPct;
-  });
+  };
+  const fatorAlvo = resolverFator(fAlvo);
+  // `resolverFator` devolve `null` tanto quando a meta NUNCA é atingida
+  // quanto quando ela é atingida no intervalo INTEIRO — "sem troca de sinal"
+  // é o mesmo sintoma nos dois casos opostos (achado do App do Codex, PR
+  // #757). Desfaz a ambiguidade avaliando o sinal dos dois extremos
+  // diretamente: positivo nos dois ⇒ sempre acima da meta.
+  let alvoSempreAtingido: boolean | undefined;
+  if (fatorAlvo === null) {
+    const fMin = fAlvo(FATOR_MIN);
+    const fMax = fAlvo(FATOR_MAX);
+    alvoSempreAtingido = Number.isFinite(fMin) && Number.isFinite(fMax) && fMin > 0 && fMax > 0;
+  }
 
   const folgaPct = fatorEquilibrio === null ? null : (fatorEquilibrio - 1) * 100;
 
-  return { variavel, fatorEquilibrio, fatorAlvo, folgaPct };
+  return { variavel, fatorEquilibrio, fatorAlvo, alvoSempreAtingido, folgaPct };
 }
 
 /**

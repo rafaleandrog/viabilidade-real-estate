@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { calcularProforma, type ProformaInput, type Proforma } from './proforma.js';
-import { rankearAlavancas, ehCustoLike, rotuloAlavanca } from './tornado-alavancas.js';
+import { rankearAlavancas, ehCustoLike, rotuloAlavanca, ehCircular } from './tornado-alavancas.js';
 
 // Incorporação de margem fina, números redondos, montada para que a ordem
 // esperada seja conhecida à mão: preço domina (o VGV inteiro escala), custo
@@ -79,6 +79,17 @@ test('#727: apagar a passagem de passoPct faz o teste de ordem ficar vermelho (m
   // "esquecer de passar o passo" (equivalente a passoPct fixo em 0).
   const semPasso = rankearAlavancas(BASE, 0, false);
   for (const a of semPasso) assert.equal(a.amplitudeRS, 0, `${a.variavel}: passo 0 não deveria mover nada`);
+});
+
+// Achado do App do Codex no PR #757: `infra_valor_canonico` faz o motor usar
+// um valor FIXO (canônico.() em proforma.ts) e ignorar `infra_modo` por
+// inteiro — marcar `circular` só olhando `infra_modo` publicava "não mede
+// nada isolado" para uma alavanca que na verdade é independente.
+test('#757 ehCircular: infra_modo pct_vgv com valor CANÔNICO preenchido não é circular', () => {
+  assert.equal(ehCircular('custo_infra', { tipo_empreendimento: 'loteamento', infra_modo: 'pct_vgv', infra_valor_canonico: 500_000 }), false);
+  assert.equal(ehCircular('custo_infra', { tipo_empreendimento: 'loteamento', infra_modo: 'pct_vgv' }), true);
+  assert.equal(ehCircular('custo_infra', { tipo_empreendimento: 'loteamento', infra_modo: 'valor_m2' }), false);
+  assert.equal(ehCircular('preco', { tipo_empreendimento: 'loteamento', infra_modo: 'pct_vgv' }), false);
 });
 
 test('#727: ehCustoLike e rotuloAlavanca — uma tabela só de rótulos e sentido', () => {

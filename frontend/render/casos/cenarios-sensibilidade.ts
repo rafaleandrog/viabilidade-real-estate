@@ -46,9 +46,14 @@ export const caso = {
     // A PROVA DE FIAÇÃO: o Resultado negativo que só o Bear produz, e só se o
     // fator de stress tiver alcançado o catálogo de Produtos. O caso força
     // `_varSensManual: 'preco'` (abaixo) para este teste continuar
-    // determinístico — sem isso, a seleção passaria a ser "a maior amplitude
-    // do ranking", e este fixture não tem outra alavanca com efeito (permuta
-    // física/financeira ausentes) para o teste presumir qual seria.
+    // determinístico — sem isso, a seleção seguiria "a maior amplitude do
+    // ranking", que É medida (o fixture tem outras alavancas com efeito real:
+    // `custo_obras` via `custo_construcao_m2` e `custo_indireto` via
+    // `marketing_global_pct`/`gestao_indiretos_pct` — achado da lente L2, PR
+    // #757) e portanto sujeita a mudar de variável a cada edição do motor ou
+    // do fixture, sem que ninguém precise tocar este arquivo. Fixar a
+    // variável é o que faz a prova (o fator alcança o catálogo) resistir a
+    // essas edições futuras.
     { seletor: 'table.pf.sens td.num.cen-bear.neg', minimo: 1 },
     // ...e as 5 linhas de receita do Base continuam positivas (as 3 de despesa
     // — Custo direto total, Custo indireto total e, desde 2026-09-14,

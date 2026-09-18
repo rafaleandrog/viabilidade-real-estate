@@ -681,7 +681,11 @@ export function calcularProforma(e: ProformaInput): Proforma {
   // #725: o fator incide nas DUAS parcelas, não na soma — a alternativa
   // (aplicar só em `custoIndiretoTotal`) quebraria a identidade
   // `marketingGlobal + gestaoIndiretos === custoIndiretoTotal` que a tela e os
-  // testes verificam campo a campo.
+  // testes verificam campo a campo. Exata AQUI, antes do arredondamento; no
+  // objeto público os três campos passam por `moeda()` independentemente
+  // (ver `monetarios`, adiante), então na superfície a igualdade vale a
+  // ±0,02 — é o que `frontend/proforma.test.ts` mede (achado da lente S2,
+  // PR #757).
   const marketingGlobal = ((e.considerar_marketing_global === false ? 0 : vgv * n(e.marketing_global_pct) / 100)
     + (lot ? n(e.stand_vendas_valor) : 0)) * fatorSens('custo_indireto');
   const gestaoIndiretos = (e.considerar_gestao_indiretos === false ? 0 : vgv * n(e.gestao_indiretos_pct) / 100) * fatorSens('custo_indireto');

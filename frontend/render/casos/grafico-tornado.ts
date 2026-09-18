@@ -49,7 +49,7 @@ export const caso = {
     { seletor: 'div.linha.ativa', minimo: 1 },
     { seletor: 'div.barra.destaque', minimo: 1 },
     { seletor: 'div.barra.neutra', minimo: 1 },
-    { seletor: 'div[role="listitem"][tabindex="0"]', minimo: 5 },
+    { seletor: 'div[role="button"][tabindex="0"]', minimo: 5 },
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     const el = document.createElement('viab-grafico-tornado');

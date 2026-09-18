@@ -113,7 +113,7 @@ export class ViabGraficoTornado extends LitElement {
       this.alavancas.filter((a) => !a.circular).slice(0, N_DESTAQUE).map((a) => a.variavel),
     );
     return html`
-      <div role="list">
+      <div>
         ${this.alavancas.map((a) => {
           const ativa = this.ativa === a.variavel;
           const emDestaque = destaque.has(a.variavel);
@@ -129,8 +129,8 @@ export class ViabGraficoTornado extends LitElement {
             <div
               class="linha ${a.circular ? 'circular' : ''} ${ativa ? 'ativa' : ''}"
               data-variavel=${a.variavel}
-              role="listitem"
-              aria-current=${ativa ? 'true' : nothing}
+              role="button"
+              aria-pressed=${ativa ? 'true' : 'false'}
               tabindex="0"
               title=${titulo}
               @click=${() => this._selecionar(a.variavel)}
