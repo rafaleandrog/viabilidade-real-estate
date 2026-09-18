@@ -303,7 +303,7 @@ Chame uma vez por token — o do principal na largada, os da rodada logo depois 
 registre o que voltou. O que importa é o que ele devolve **agora**, porque o usuário do pool é o
 mesmo de rodadas anteriores e só a configuração desta rodada conta. Como ler:
 
-- **`usuario.tipo` é `"sysadmin"` ou `"operador"` → aborte** (§ 3.4), nomeando o usuário. Vale
+- **`usuario.tipo` é `"sysadmin"` ou `"operador"` → aborte** (§ 3, degrau 4), nomeando o usuário. Vale
   para qualquer token, não só o principal: os dois tipos são elegíveis à alçada `plataforma`
   (§ 8.1), e um deles no roster é o que tornaria as rotas proibidas alcançáveis sem ninguém
   notar — e, como a skill não consegue cunhar token para alvo mais poderoso que o principal, um
@@ -442,7 +442,7 @@ simultâneos, ou token estreito/leitura sobre qual deles.
 ### 9.2 Reservar
 
 Reduza o inventário de perfis ao **conjunto mínimo** de usuários e tokens que cobre o roteiro,
-confronte com o teto do principal (§ 4.4) e com o pool mapeado (§ 5.2), mande o plano ao
+confronte com o teto do principal (§ 4, item 4 — "leia o catálogo de alçadas") e com o pool mapeado (§ 5.2), mande o plano ao
 usuário (§ 5.3) e, autorizado o que precisava de autorização, configure (§ 5.4). Depois, **uma
 chamada de identidade por token** (§ 6): o servidor confirma o que você cravou, e é isso que
 vai no cabeçalho como roster.
@@ -565,8 +565,10 @@ rodada, mesmo abortada no meio, para cada usuário do pool que a rodada reservou
    o pool legível para quem olha a tela de Usuários.
 3. **Inative os usuários** da rodada (`PUT /api/shell/usuarios/:id` com `ativo: false`) — **todos menos o
    principal**, que fica ativo sempre. Inativo é o estado de repouso do pool, e é o que a
-   próxima sessão lê como "livre" (§ 5.2). Se este passo não rodar, o passo 1 não rodou
-   também, e é o token vigente que a próxima sessão vai ler — até ele expirar.
+   próxima sessão lê como "livre" (§ 5.2). Se a sessão morrer antes deste passo, o usuário fica
+   **ativo**: com token vigente se também morreu antes do passo 1, sem token vigente se chegou a
+   revogá-lo e morreu depois — os dois são exatamente os dois casos que a § 5.2 já cobre, e os
+   dois pedem a mesma autorização da próxima sessão antes de reusar o usuário.
 
 Usuário criado nesta rodada sob autorização (§ 5.3) **fica**: ele agora é pool, e entra no
 mesmo ciclo de ativar/inativar. Não há rota que apague usuário, e não é para haver aqui — o
@@ -675,7 +677,7 @@ Fecho, nesta ordem:
 - **Nunca `UPDATE`/`INSERT`/`DELETE`/DDL manual** em banco, nem como correção nem como setup.
   Cenário se monta pela API; SELECT de diagnóstico, quando houver acesso, pode.
 - **Nunca use `AskUserQuestion`** — bugada nesta instalação. Pergunta vai em texto corrido,
-  inclusive a da § 3.1.
+  inclusive a do degrau 1 da § 3.
 - A branch principal é só para puxar.
 
 ## 15. Operação

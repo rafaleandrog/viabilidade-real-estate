@@ -40,7 +40,7 @@ falhar poupa sete diagnósticos errados. Falhou um, **pare e relate** — não s
 | # | Cenário | Credencial | Espera |
 |---|---|---|---|
 | 1 | `GET /api/shell/status` | **nenhuma** | `200`, com `versao` |
-| 2 | `GET /api/shell/auth/identidade` | principal | `200`, nome com `QA`, `tipo` não-sysadmin |
+| 2 | `GET /api/shell/auth/identidade` | principal | `200`, nome com `QA`, `tipo` não-sysadmin e não-operador, credencial com escrita |
 | 3 | `GET /api/shell/apps` | principal | `ola_mundo` na lista, instalado e **ligado** |
 | 4 | `GET /api/shell/apps/ola_mundo/saude` | principal | saudável, sem erro de carga do bundle |
 | 5 | `GET /api/ola_mundo/ola` | principal | `200`, `mensagem` terminando no **nome do principal** |
@@ -87,9 +87,10 @@ falhar poupa sete diagnósticos errados. Falhou um, **pare e relate** — não s
    permissão, diga que vai revogá-la e por quê, espere a confirmação, e só então
    `DELETE /api/shell/apps/ola_mundo/permissoes/<usuarioId>`.
 8. **Com permissão, `200`.** A escrita que separa 7 de 8 é
-   `PUT /api/shell/apps/ola_mundo/permissoes/<usuarioId>` com `{"nivel":"leitura"}` — mesma
-   regra de autorização do cenário 5 acima —, da alçada
-   `usuarios` — que o principal tem por definição (§ 2). Cunhe o token do usuário do pool
+   `PUT /api/shell/apps/ola_mundo/permissoes/<usuarioId>` com `{"nivel":"leitura"}`, da alçada
+   `usuarios` — que o principal tem por definição (§ 2). Diga que vai conceder `leitura` no
+   `ola_mundo` para este usuário do pool, que revoga ao fim da rodada, e espere a confirmação
+   antes de escrever. Cunhe o token do usuário do pool
    **antes** do cenário 7, não entre 7 e 8: token novo no meio confunde "não tinha permissão"
    com "não tinha token".
 

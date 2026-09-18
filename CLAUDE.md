@@ -40,7 +40,7 @@ serviço). São **duas preparações distintas, cada uma com seu próprio par de
 `instancia-urbiverso` pede `URBIVERSO_URL`/`URBIVERSO_TOKEN` — peça "configure o meu acesso à
 instância" para criá-las. `qa` pede `URBIVERSO_QA_URL`/`URBIVERSO_QA_TOKEN_PCPAL`, de um usuário de
 serviço **"QA Principal"** separado — peça "prepare o ambiente de QA" (ou "roda o smoke do primeiro
-app", que dispara a preparação sozinha se faltar) para essa. Nenhuma das duas está configurada
+app", que conduz a preparação se faltar, perguntando antes de configurar) para essa. Nenhuma das duas está configurada
 nesta sessão; a primeira pergunta que valer a pena não é "que skill preciso" — é "qual das duas
 variáveis eu já configurei".
 
