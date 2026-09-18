@@ -28,6 +28,22 @@ está em `docs/rodada-5-evi-2026-07-31.md`. A revisão de recebíveis por safras
 dois documentos contra EVIs reais do projeto Calliandra, está em
 `docs/revisao-recebiveis-calliandra-2026-07-31.md`.
 
+**Este repositório é "app em repositório próprio"** (`node_modules/@urbiverso/sdk/docs/apps-em-repo-proprio.md`
+— app na raiz, não sob `apps/<appId>/`), **não** um "repo de solução" instalado via `npx
+@urbiverso/kit-apps`. Os dois são caminhos oficiais e distintos do SDK; avaliação completa (por que
+não rodamos o kit aqui, o que foi adotado dele e o que ficou de fora) em
+`docs/kit-apps-avaliacao-2026-09-17.md`. Duas skills novas vieram de lá e **são** genéricas o
+bastante para este layout: `instancia-urbiverso` (Claude configura identidade própria — "Claude -
+sob `<nome>`" — e opera a instância pela API: instalar/homologar app, permissão, pessoas) e `qa`
+(exercita a API de uma instância viva a partir do diff de um PR, com um pool de usuários de
+serviço). São **duas preparações distintas, cada uma com seu próprio par de variáveis**:
+`instancia-urbiverso` pede `URBIVERSO_URL`/`URBIVERSO_TOKEN` — peça "configure o meu acesso à
+instância" para criá-las. `qa` pede `URBIVERSO_QA_URL`/`URBIVERSO_QA_TOKEN_PCPAL`, de um usuário de
+serviço **"QA Principal"** separado — peça "prepare o ambiente de QA" (ou "roda o smoke do primeiro
+app", que conduz a preparação se faltar, perguntando antes de configurar) para essa. Nenhuma das duas está configurada
+nesta sessão; a primeira pergunta que valer a pena não é "que skill preciso" — é "qual das duas
+variáveis eu já configurei".
+
 ---
 
 ## Estado do backlog — 🔄 RODADA 13 EM ANDAMENTO (aberta em 2026-09-16)
