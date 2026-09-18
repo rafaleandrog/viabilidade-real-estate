@@ -169,3 +169,25 @@ test('#757: margem-alvo sempre atingida no intervalo (alvoSempreAtingido=true), 
   assert.equal(m.fatorAlvo, null);
   assert.equal(m.alvoSempreAtingido, true, 'a margem deveria superar a meta de 1% em todo o intervalo');
 });
+
+// Achado do App do Codex, PR #757, rodada 2: para a alavanca `preco`, o fator
+// 0 SEMPRE zera o VGV (preço × 0), então `fAlvo(0) = +Infinity` em todo
+// estudo — antes deste conserto, `resolverFator` abortava a busca inteira ao
+// ver um extremo não-finito, e `fatorAlvo` nunca era calculado para a
+// alavanca mais citada do painel. `faixaFinita` restringe a busca ao
+// subintervalo onde a receita é positiva.
+test('#757 rodada 2: alavanca "preco" (fator 0 zera a receita) calcula fatorAlvo dentro da faixa finita', () => {
+  const m = margemDeSeguranca(GOLDEN, 'preco', 20);
+  assert.notEqual(m.fatorAlvo, null, 'fatorAlvo deveria ser calculável em (0,5], onde a receita é positiva');
+  assert.ok(m.fatorAlvo! > 0 && m.fatorAlvo! <= 5, `fatorAlvo=${m.fatorAlvo} esperado dentro de (0,5]`);
+  const p = calcularProforma({ ...GOLDEN, sensibilidade: { variavel: 'preco', fator: m.fatorAlvo! } });
+  const margemNoFator = (p.resultado / p.receitaLiquida) * 100;
+  assert.ok(perto(margemNoFator, 20, 0.1), `margem no fatorAlvo deveria ser ~20%, foi ${margemNoFator}`);
+});
+
+test('#757 rodada 2: alavanca "preco" também calcula fatorEquilibrio (resultado não usa receita, não deveria ter sido afetado — controle)', () => {
+  const m = margemDeSeguranca(GOLDEN, 'preco', 20);
+  assert.notEqual(m.fatorEquilibrio, null);
+  const p = calcularProforma({ ...GOLDEN, sensibilidade: { variavel: 'preco', fator: m.fatorEquilibrio! } });
+  assert.ok(Math.abs(p.resultado) <= 0.02, `resultado no fatorEquilibrio deveria ser ~0, foi ${p.resultado}`);
+});

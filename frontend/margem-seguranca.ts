@@ -41,42 +41,80 @@ const FATOR_MAX = 5;
 const TOLERANCIA_RS = 0.01;
 
 /**
+ * Acha o subintervalo de `[FATOR_MIN, FATOR_MAX]` onde `f` é finita — para
+ * `fAlvo` (abaixo), receita líquida não positiva devolve `+Infinity` porque a
+ * razão resultado/receita não tem base para medir. Assume que a região
+ * inválida é uma PONTA contígua do domínio, nunca um buraco no meio: só uma
+ * variável é estressada por vez, e a receita é monótona nela (ex.: `preco` no
+ * fator 0 zera o VGV — inválido só ali, cresce daí em diante). Sem esta
+ * restrição, um extremo infinito abortava a busca inteira mesmo quando a raiz
+ * real mora no resto do intervalo — `preco` tinha `fAlvo(0) = +Infinity`
+ * SEMPRE (VGV zera em todo estudo), então `fatorAlvo` nunca era calculado
+ * para a alavanca mais citada do painel (achado do App do Codex, PR #757,
+ * rodada 2).
+ */
+function faixaFinita(f: (fator: number) => number): { lo: number; hi: number; fLo: number; fHi: number } | null {
+  const fMinBruto = f(FATOR_MIN);
+  const fMaxBruto = f(FATOR_MAX);
+  const minFinito = Number.isFinite(fMinBruto);
+  const maxFinito = Number.isFinite(fMaxBruto);
+  if (minFinito && maxFinito) return { lo: FATOR_MIN, hi: FATOR_MAX, fLo: fMinBruto, fHi: fMaxBruto };
+  // Os dois extremos inválidos: sem ponto finito conhecido para ancorar a
+  // busca — não há faixa a explorar.
+  if (!minFinito && !maxFinito) return null;
+
+  // Um extremo é finito, o outro não: bisseca a fronteira entre os dois,
+  // assumindo que a invalidez é contígua a partir do extremo não-finito.
+  let loFinito = minFinito ? FATOR_MIN : FATOR_MAX;
+  let hiInfinito = minFinito ? FATOR_MAX : FATOR_MIN;
+  for (let i = 0; i < 40; i++) {
+    const meio = (loFinito + hiInfinito) / 2;
+    if (Number.isFinite(f(meio))) loFinito = meio; else hiInfinito = meio;
+  }
+  const lo = minFinito ? FATOR_MIN : loFinito;
+  const hi = minFinito ? loFinito : FATOR_MAX;
+  return { lo, hi, fLo: f(lo), fHi: f(hi) };
+}
+
+/**
  * Busca a raiz de `f` (uma função do fator, cujo zero é o que se quer achar)
- * em `[FATOR_MIN, FATOR_MAX]`: secante a partir dos dois extremos primeiro —
- * o motor costuma ser afim na maioria dos fatores, e nesse caso a secante
- * acerta de primeira —, com bisseção de garantia quando ela não converge ou
- * sai do intervalo. **A verificação do resíduo é obrigatória**: um solver que
- * devolve o último palpite sem reavaliar `f` nele publica um número plausível
- * e errado (a armadilha 11 do CLAUDE.md). Sem raiz de verdade no intervalo
- * (sem troca de sinal), devolve `null` — nunca um número.
+ * dentro da faixa FINITA de `[FATOR_MIN, FATOR_MAX]` (`faixaFinita`): secante
+ * a partir dos dois extremos primeiro — o motor costuma ser afim na maioria
+ * dos fatores, e nesse caso a secante acerta de primeira —, com bisseção de
+ * garantia quando ela não converge ou sai do intervalo. **A verificação do
+ * resíduo é obrigatória**: um solver que devolve o último palpite sem
+ * reavaliar `f` nele publica um número plausível e errado (a armadilha 11 do
+ * CLAUDE.md). Sem raiz de verdade na faixa finita (sem troca de sinal),
+ * devolve `null` — nunca um número.
  */
 function resolverFator(f: (fator: number) => number): number | null {
-  const fMin = f(FATOR_MIN);
-  const fMax = f(FATOR_MAX);
-  if (!Number.isFinite(fMin) || !Number.isFinite(fMax)) return null;
-  if (Math.abs(fMin) <= TOLERANCIA_RS) return FATOR_MIN;
-  if (Math.abs(fMax) <= TOLERANCIA_RS) return FATOR_MAX;
-  // Sem troca de sinal no intervalo inteiro: a raiz, se existir, está fora do
-  // que o motor permite (fator negativo não existe) — não há o que achar.
-  if ((fMin > 0) === (fMax > 0)) return null;
+  const faixa = faixaFinita(f);
+  if (faixa === null) return null;
+  const { lo, hi, fLo, fHi } = faixa;
+  if (Math.abs(fLo) <= TOLERANCIA_RS) return lo;
+  if (Math.abs(fHi) <= TOLERANCIA_RS) return hi;
+  // Sem troca de sinal na faixa finita inteira: a raiz, se existir, está fora
+  // do que é medível (fator negativo não existe, ou a outra ponta é inválida)
+  // — não há o que achar.
+  if ((fLo > 0) === (fHi > 0)) return null;
 
-  if (fMax !== fMin) {
-    const secante = FATOR_MAX - fMax * (FATOR_MAX - FATOR_MIN) / (fMax - fMin);
-    if (secante >= FATOR_MIN && secante <= FATOR_MAX && Number.isFinite(secante)) {
+  if (fHi !== fLo) {
+    const secante = hi - fHi * (hi - lo) / (fHi - fLo);
+    if (secante >= lo && secante <= hi && Number.isFinite(secante)) {
       const residuo = f(secante);
-      if (Math.abs(residuo) <= TOLERANCIA_RS) return secante;
+      if (Number.isFinite(residuo) && Math.abs(residuo) <= TOLERANCIA_RS) return secante;
     }
   }
 
   // Bisseção de garantia: converge por construção dentro de um intervalo com
   // sinal trocado, inclusive através de quinas (permuta capando, piso em 0).
-  let lo = FATOR_MIN, hi = FATOR_MAX, fLo = fMin;
-  let mid = (lo + hi) / 2;
+  let loB = lo, hiB = hi, fLoB = fLo;
+  let mid = (loB + hiB) / 2;
   for (let i = 0; i < 60; i++) {
-    mid = (lo + hi) / 2;
+    mid = (loB + hiB) / 2;
     const fMid = f(mid);
     if (Math.abs(fMid) <= TOLERANCIA_RS) return mid;
-    if ((fMid > 0) === (fLo > 0)) { lo = mid; fLo = fMid; } else { hi = mid; }
+    if ((fMid > 0) === (fLoB > 0)) { loB = mid; fLoB = fMid; } else { hiB = mid; }
   }
   // 60 iterações sobre um intervalo de 5 já resolvem a precisão de centavo —
   // se ainda assim o resíduo não bater, a verificação final barra o palpite.
@@ -111,15 +149,20 @@ export function margemDeSeguranca(
   };
   const fatorAlvo = resolverFator(fAlvo);
   // `resolverFator` devolve `null` tanto quando a meta NUNCA é atingida
-  // quanto quando ela é atingida no intervalo INTEIRO — "sem troca de sinal"
-  // é o mesmo sintoma nos dois casos opostos (achado do App do Codex, PR
-  // #757). Desfaz a ambiguidade avaliando o sinal dos dois extremos
-  // diretamente: positivo nos dois ⇒ sempre acima da meta.
+  // quanto quando ela é atingida na faixa finita INTEIRA — "sem troca de
+  // sinal" é o mesmo sintoma nos dois casos opostos (achado do App do Codex,
+  // PR #757, rodada 1). Desfaz a ambiguidade avaliando o sinal dos dois
+  // extremos da mesma faixa FINITA que `resolverFator` usou — não dos
+  // extremos brutos `FATOR_MIN`/`FATOR_MAX`, que podem ser infinitos (ex.:
+  // `preco` no fator 0, onde o VGV zera): positivo nos dois ⇒ sempre acima da
+  // meta na região onde há receita para medir (achado do App do Codex, PR
+  // #757, rodada 2).
   let alvoSempreAtingido: boolean | undefined;
   if (fatorAlvo === null) {
-    const fMin = fAlvo(FATOR_MIN);
-    const fMax = fAlvo(FATOR_MAX);
-    alvoSempreAtingido = Number.isFinite(fMin) && Number.isFinite(fMax) && fMin > 0 && fMax > 0;
+    const faixa = faixaFinita(fAlvo);
+    // `faixa === null`: nenhum ponto do intervalo tem receita válida — não há
+    // o que avaliar, `alvoSempreAtingido` fica indefinido.
+    if (faixa !== null) alvoSempreAtingido = faixa.fLo > 0 && faixa.fHi > 0;
   }
 
   const folgaPct = fatorEquilibrio === null ? null : (fatorEquilibrio - 1) * 100;
