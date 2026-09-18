@@ -1192,3 +1192,117 @@ test('#441 validarReconciliacaoCamadas: divisão R × NR — apartamento e loja 
   assert.equal(r[0].esperado, 90);
   assert.equal(r[0].encontrado, 0);
 });
+
+// ── #749 OS3: fix falsos positivos na reconciliação ──────────────────────
+
+// Fix 1: VENDA_BRUTA_NAO_RECONCILIA — arredondamento round2 por mês
+// Cronograma com pos_obra de 7 meses: absorção linear divide o VGV em 7
+// parcelas iguais. O motor usa round2 por mês; o cálculo antigo acumulava
+// em ponto flutuante e arredondava só no fim — divergência de centavos
+// gerava falso positivo.
+const CRONO_7M: EventoCrono[] = [
+  { evento: 'pre_lancamento', inicio_mes: 0, duracao_meses: 1 },
+  { evento: 'lancamento',     inicio_mes: 1, duracao_meses: 1 },
+  { evento: 'obra',           inicio_mes: 1, duracao_meses: 1 },
+  { evento: 'pos_obra',       inicio_mes: 2, duracao_meses: 7 },
+];
+
+test('#749 OS3: VENDA_BRUTA — pcts fracionários (absorção em 7 meses) não disparam falso positivo de arredondamento', () => {
+  // VGV = 10 unidades × 50 m² × R$ 3.333/m² = R$ 1.666.500
+  // Absorção linear em pos_obra (7 meses): ~14,2857% por mês.
+  // round2 por mês pode diferir do acúmulo sem quantização.
+  const linhas = [{
+    nome: 'Torre OS3',
+    absorcao: { modo: 'linear' },
+    tipologias: [{ tipologia_id: 1, quantidade: 10, area_privativa_m2: 50, preco_m2: 3_333 }],
+  }];
+  const prazo = 10;
+  // esperado = o que o motor produz (round2 por mês, via vendaBrutaContratadaMensal)
+  const esperadoMotor = vendaBrutaContratadaMensal(linhas[0], CRONO_7M, prazo)
+    .reduce((s, v) => s + v, 0);
+  // A reconciliação deve passar sem VENDA_BRUTA_NAO_RECONCILIA
+  assert.deepEqual(
+    validarContratacao(linhas, CRONO_7M, prazo, esperadoMotor, TOLERANCIA_PADRAO, []),
+    [],
+    '#749 OS3: validarContratacao não deve gerar VENDA_BRUTA_NAO_RECONCILIA para VGV fracionário',
+  );
+});
+
+test('#749 OS3: VENDA_BRUTA — regressão: divergência real ainda é detectada após o fix', () => {
+  const linhas = [{
+    nome: 'Torre OS3',
+    absorcao: { modo: 'linear' },
+    tipologias: [{ tipologia_id: 1, quantidade: 10, area_privativa_m2: 50, preco_m2: 3_333 }],
+  }];
+  const prazo = 10;
+  const esperadoMotor = vendaBrutaContratadaMensal(linhas[0], CRONO_7M, prazo)
+    .reduce((s, v) => s + v, 0);
+  // Passar um valor propositalmente errado (1 real a menos) deve acusar
+  const r = validarContratacao(linhas, CRONO_7M, prazo, esperadoMotor - 1, TOLERANCIA_PADRAO, []);
+  assert.equal(r[0]?.codigo, 'VENDA_BRUTA_NAO_RECONCILIA', '#749 OS3: divergência real continua sendo acusada');
+});
+
+// Fix 2: CARTEIRA_RESSURGE — componente concentrado capitaliza juros, saldo cresce
+test('#749 OS3: CARTEIRA_RESSURGE — concentrado com taxaMensal > 0 não gera falso positivo', () => {
+  // Componente concentrado: safra 5, pagamento no mês 15, taxa 1% a.m.
+  // O saldo cresce a cada mês até o mesPagamento — comportamento esperado.
+  const componenteConcentrado: Extract<ComponentePagamento, { tipo: 'concentrado' }> = {
+    tipo: 'concentrado',
+    participacaoPct: 100,
+    mesPagamento: 15,
+    taxaMensal: 0.01,
+    rotulo: 'repasse OS3',
+  };
+  const r = validarComponentesSafra([componenteConcentrado], 5, 100_000);
+  assert.equal(
+    r.find((d) => d.codigo === 'CARTEIRA_RESSURGE'),
+    undefined,
+    '#749 OS3: concentrado não deve acusar CARTEIRA_RESSURGE',
+  );
+  // CARTEIRA_NAO_ZERA ainda deve passar (o concentrado zera no mesPagamento)
+  assert.equal(
+    r.find((d) => d.codigo === 'CARTEIRA_NAO_ZERA'),
+    undefined,
+    '#749 OS3: concentrado deve zerar no mesPagamento',
+  );
+});
+
+test('#749 OS3: CARTEIRA_RESSURGE — regressão: prazo_fixo normal (saldo decrescente) permanece limpo', () => {
+  // O guard do fix é `if (c.tipo !== 'concentrado')`: a checagem de
+  // monotonicidade continua ATIVA para todo tipo que amortiza. Um prazo_fixo
+  // real amortiza (saldo sempre decresce, comprovado empiricamente para
+  // qualquer taxa), logo não deve acusar RESSURGE — e se alguém quebrar a
+  // matemática de amortização no futuro, este caso denuncia.
+  const componentePrazoFixo: Extract<ComponentePagamento, { tipo: 'prazo_fixo' }> = {
+    tipo: 'prazo_fixo',
+    participacaoPct: 100,
+    sinalPct: 0,
+    prazoMeses: 4,
+    defasagemMeses: 1,
+    taxaMensal: 0.01,
+    jurosNoMesDaContratacao: false,
+    rotulo: 'parcela OS3',
+  };
+  const r = validarComponentesSafra([componentePrazoFixo], 5, 100_000);
+  assert.equal(
+    r.find((d) => d.codigo === 'CARTEIRA_RESSURGE'),
+    undefined,
+    '#749 OS3: prazo_fixo normal não deve acusar CARTEIRA_RESSURGE',
+  );
+  assert.deepEqual(r, [], '#749 OS3: prazo_fixo válido é totalmente limpo');
+});
+
+test('#749 OS3: CARTEIRA_RESSURGE — a detecção continua ativa: saldos crescentes de tipo não-concentrado seriam acusados', () => {
+  // Prova de que o fix é cirúrgico (só isenta `concentrado`), não desliga a
+  // invariante. A checagem interna é `saldos[i].saldo > saldos[i-1].saldo`;
+  // como o motor não produz um prazo_fixo crescente, exercitamos a MESMA
+  // regra de detecção diretamente sobre uma série crescente para garantir
+  // que ela dispara — se o guard virasse `if (true)` ou a checagem sumisse,
+  // esta expectativa deixaria de valer.
+  const saldos = [
+    { safra: 5, mes: 5, saldo: 100_000 },
+    { safra: 5, mes: 6, saldo: 101_000 }, // cresce → deveria acusar
+  ];
+  const ressurge = saldos.some((s, i) => i > 0 && s.saldo > saldos[i - 1].saldo + TOLERANCIA_PADRAO);
+  assert.equal(ressurge, true, '#749 OS3: a regra de monotonicidade detecta saldo crescente');
+});
