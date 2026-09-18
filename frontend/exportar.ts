@@ -13,7 +13,7 @@ import { vgvBrutoDeProforma, type Proforma } from './proforma.js';
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira } from './viab-format.js';
 import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
@@ -71,7 +71,8 @@ export function ehLinhaReceitaOuResultado(r: Pick<NotacaoLinha, 'tipo' | 'nature
  * Sem símbolo "R$" — o cabeçalho da coluna já o informa, nos três destinos.
  */
 export function celulaProforma(r: NotacaoLinha): string {
-  return celulaCompartilhada(r.v, { comParenteses: true, custo: !ehLinhaReceitaOuResultado(r), sempreExibir: true });
+  // #754: INTEIROS — a terceira exceção ao C7, declarada em `celulaInteira`.
+  return celulaInteira(r.v, { comParenteses: true, custo: !ehLinhaReceitaOuResultado(r), sempreExibir: true });
 }
 
 /**

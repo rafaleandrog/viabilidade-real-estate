@@ -137,7 +137,7 @@ test('#571: CSV e PDF mostram "—" na % VGV e em "Margem sobre VGV" quando vgv 
   assert.equal(p.semProdutos, false, 'catálogo presente — o caso vivo da #571, não "sem produtos"');
 
   const csv = csvProforma(ESTUDO, p, false);
-  assert.ok(csv.includes('Receita bruta (VGV);0,00;—'), `linha da Receita bruta sem "—" no CSV:\n${csv}`);
+  assert.ok(csv.includes('Receita bruta (VGV);0;—'), `linha da Receita bruta sem "—" no CSV:\n${csv}`);
   assert.ok(csv.includes('Margem sobre VGV;—'), `"Margem sobre VGV" não saiu "—" no CSV:\n${csv}`);
   assert.ok(!csv.includes('0,0%'), `CSV mostrou "0,0%" com VGV indefinido:\n${csv}`);
 
@@ -165,10 +165,10 @@ const DEFICITARIO: ProformaInput = {
 test('notação: custo/dedução SEMPRE entre parênteses no CSV — nunca "-R$" nem número pelado', () => {
   const p = calcularProforma(DEFICITARIO);
   const csv = csvProforma(ESTUDO, p, false);
-  assert.ok(csv.includes('(-) Terreno;(15.000.000,00);'), `linha do Terreno sem parênteses:\n${csv}`);
-  assert.ok(csv.includes('= Custo direto total;(15.000.000,00);'), `consolidado de custo sem parênteses:\n${csv}`);
+  assert.ok(csv.includes('(-) Terreno;(15.000.000);'), `linha do Terreno sem parênteses:\n${csv}`);
+  assert.ok(csv.includes('= Custo direto total;(15.000.000);'), `consolidado de custo sem parênteses:\n${csv}`);
   // A receita, positiva, sai PLANA — o conserto não pode virar "tudo entre parênteses".
-  assert.ok(csv.includes('Receita bruta (VGV);10.000.000,00;'), `a receita positiva ganhou marca:\n${csv}`);
+  assert.ok(csv.includes('Receita bruta (VGV);10.000.000;'), `a receita positiva ganhou marca:\n${csv}`);
 });
 
 test('notação: valor negativo sai entre parênteses, não com sinal de menos (CSV e PDF)', () => {
@@ -180,7 +180,8 @@ test('notação: valor negativo sai entre parênteses, não com sinal de menos (
   const html = htmlProforma(ESTUDO, p, false);
   // A marca do defeito: `fmtR$` cru punha o sinal de menos ANTES do número.
   for (const [onde, texto] of [['CSV', csv], ['PDF', html]] as const) {
-    assert.ok(!/-\s?[\d.]+,\d\d/.test(texto.replace(/-\) /g, '')), `${onde} ainda tem número com sinal de menos:\n${texto}`);
+    // #754: a coluna R$ é inteira; a % VGV (`-45,7%`) pode levar sinal e fica fora do casamento.
+    assert.ok(!/(?<![\w-])-\s?\d[\d.]*(?![\w.,]*[%\w])/.test(texto.replace(/-\) /g, '')), `${onde} ainda tem número com sinal de menos:\n${texto}`);
     assert.ok(!texto.includes('-R$'), `${onde} ainda tem "-R$":\n${texto}`);
   }
   assert.ok(csv.includes('= Receita operacional;('), `Receita operacional negativa sem parênteses no CSV:\n${csv}`);

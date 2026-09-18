@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtR$Kpi, fmtR$Milhoes, fmtPct, fmtPctOuIndef, fmtPctEntrada, fmtM2, parseNumeroBR, celula, negativoContabil,
+  CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtR$Kpi, fmtR$Milhoes, celulaInteira, fmtPct, fmtPctOuIndef, fmtPctEntrada, fmtM2, parseNumeroBR, celula, negativoContabil,
 } from './viab-format.js';
 
 test('#281: fmtR$ é a fonte única de valores monetários com 2 casas', () => {
@@ -239,4 +239,37 @@ test('fmtR$Milhoes: entrada não finita vira zero, nunca "∞" nem "NaN" na tela
   assert.equal(fmtR$Milhoes(undefined as unknown as number), 'R$\u00A00,0');
   assert.equal(fmtR$Milhoes(Infinity), 'R$\u00A00,0');
   assert.equal(fmtR$Milhoes(-Infinity), 'R$\u00A00,0');
+});
+
+// ── #754: celulaInteira — a TERCEIRA exceção ao C7 (coluna R$ da Proforma) ──
+
+test('#754 celulaInteira: inteiro, separador de milhar pt-BR, sem símbolo R$', () => {
+  assert.equal(celulaInteira(1234.56, { comParenteses: false }), '1.235');
+  assert.equal(celulaInteira(283_411_826.35, { comParenteses: true }), '283.411.826');
+  assert.equal(celulaInteira(1234.49, { comParenteses: false }), '1.234');
+});
+
+test('#754 celulaInteira: sinal normalizado DEPOIS de arredondar — receita a −0,3 sai "0", nunca "(0)"', () => {
+  assert.equal(celulaInteira(-0.3, { comParenteses: true, sempreExibir: true }), '0');
+  assert.equal(celulaInteira(-0.5, { comParenteses: true, sempreExibir: true }), '(1)');
+  assert.equal(celulaInteira(-1234.56, { comParenteses: true }), '(1.235)');
+  assert.equal(celulaInteira(-1234.56, { comParenteses: false }), '-1.235');
+});
+
+test('#754 celulaInteira: custo SEMPRE entre parênteses, inclusive zero — "(0)"', () => {
+  assert.equal(celulaInteira(0, { comParenteses: true, custo: true, sempreExibir: true }), '(0)');
+  assert.equal(celulaInteira(10_000, { comParenteses: true, custo: true }), '(10.000)');
+  assert.equal(celulaInteira(10_000, { comParenteses: false, custo: true }), '10.000');
+});
+
+test('#754 celulaInteira: célula vazia abaixo de 0,5 sem sempreExibir; "0" com sempreExibir; não finito vira 0', () => {
+  assert.equal(celulaInteira(0.4, { comParenteses: true }), '');
+  assert.equal(celulaInteira(0, { comParenteses: true }), '');
+  assert.equal(celulaInteira(0, { comParenteses: true, sempreExibir: true }), '0');
+  assert.equal(celulaInteira(NaN, { comParenteses: true, sempreExibir: true }), '0');
+  assert.equal(celulaInteira(Infinity, { comParenteses: true, sempreExibir: true }), '0');
+});
+
+test('#754 celulaInteira: `celula` (Fluxo de Caixa) continua em 2 casas — a exceção não a alcança', () => {
+  assert.equal(celula(1234.56, { comParenteses: false }), '1.234,56');
 });

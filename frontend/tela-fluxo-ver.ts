@@ -5,7 +5,7 @@ import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, rotuloMesRelativo,
   type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celulaInteira, negativoContabil } from './viab-format.js';
 import {
   proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi,
   comInformativasAntesDoResultado,
@@ -572,7 +572,7 @@ export class ViabFluxoVer extends LitElement {
               return html`
               <tr class=${`n${l.nivel} ${l.tipo}${l.subgrupo ? ' subgrupo' : ''}`}>
                 <td>${l.nome}${l.notaBase ? html` <span class="nota-base">(${l.notaBase})</span>` : ''}</td>
-                <td class="num ${sinal}">${celula(l.valor, { comParenteses: true, custo: ehCusto(l), sempreExibir: true })}</td>
+                <td class="num ${sinal}">${celulaInteira(l.valor, { comParenteses: true, custo: ehCusto(l), sempreExibir: true })}</td>
                 <td class="num ${sinal}">${celulaM2(l)}</td>
                 <td class="num ${sinal}">${fmtPctOuIndef(
                   // ⚠️ #604 — `!== undefined`, e NÃO `??`, porque `null` aqui

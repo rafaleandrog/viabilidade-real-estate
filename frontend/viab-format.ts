@@ -101,6 +101,47 @@ export function fmtR$Milhoes(v: number): string {
   }).format(Math.abs(milhoes) < 0.05 ? 0 : milhoes);
 }
 
+/**
+ * Célula da coluna **R$ da Proforma** — Preliminar e Avançado, tela, tabela de
+ * sensibilidade, CSV e PDF —, em **inteiros**: `283.411.826,35` sai
+ * `283.411.826`; `(11.336.473,05)` sai `(11.336.473)`.
+ *
+ * ⚠️ É a TERCEIRA exceção declarada ao contrato C7 ("todo valor monetário
+ * resultado de fórmula tem 2 casas"), depois de `fmtR$Kpi` (#581) e
+ * `fmtR$Milhoes` (cascata). Pedido do autor em 2026-09-18 (#754): "todos
+ * [os valores em R$ do proforma] devem mostrar números inteiros sempre. Isso
+ * em qualquer proforma, preliminar ou avançado." Diferente das duas
+ * anteriores, esta ALCANÇA a exportação da Proforma (CSV/PDF): elas
+ * compartilham `celulaProforma` com a tela, e a paridade tela×arquivo é
+ * contrato (`frontend/proforma-ordem-linhas.test.ts`). O que NÃO muda:
+ * persistência, entrada, motor, Fluxo de Caixa (`celula`/`celulaFx`), as
+ * demais tabelas e os textos de detalhe dentro do card — tudo em 2 casas.
+ *
+ * Símbolo próprio, e não um parâmetro de `celula`/`fmtR$`, pelo mesmo motivo
+ * das duas anteriores: a exceção precisa ser **greppável**, e `celula` é a
+ * fonte única do Fluxo de Caixa. O inventário de call sites é travado por
+ * contagem exata em `frontend/proforma-inteiros.test.ts`. Não delega para
+ * `fmtR$Kpi` de propósito: `kpi-casas-decimais.test.ts` exige exatamente UMA
+ * ocorrência dele neste arquivo.
+ *
+ * Mesma regra de sinal de `celula` (`negativoContabil`), aplicada ao valor
+ * JÁ arredondado — como em `fmtR$Kpi`/`fmtR$Milhoes`: uma receita a −0,3
+ * arredonda para 0 e sai `0`, nunca `(0)`; um custo a 0 sai `(0)`, porque a
+ * app grava custo como valor positivo e a notação contábil marca despesa
+ * independente do sinal. `sempreExibir` tem a mesma semântica de `celula`,
+ * com o limiar de célula vazia no análogo inteiro (< 0,5).
+ */
+export function celulaInteira(v: number, opcoes: OpcoesCelula = { comParenteses: true }): string {
+  const valor = Number.isFinite(v) ? v : 0;
+  // Half away from zero, como o Intl (e `fmtR$Kpi`): `Math.round(-0.5)` daria -0.
+  const arredondado = Math.abs(valor) < 0.5 ? 0 : Math.sign(valor) * Math.round(Math.abs(valor));
+  if (!opcoes.sempreExibir && arredondado === 0) return '';
+  const abs = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    .format(Math.abs(arredondado));
+  if (!opcoes.comParenteses) return arredondado < 0 ? `-${abs}` : abs;
+  return negativoContabil(arredondado, !!opcoes.custo) ? `(${abs})` : abs;
+}
+
 export const fmtNum = (v: number, d = 0) =>
   new Intl.NumberFormat('pt-BR', { maximumFractionDigits: d }).format(v || 0);
 

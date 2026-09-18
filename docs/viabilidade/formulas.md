@@ -411,24 +411,33 @@ dízima e retornar exatamente ao mesmo canônico.
 > quanto o vazamento da exceção para tabela ou exportação. **A tabela abaixo segue valendo
 > integralmente** — nenhuma linha dela é card de KPI.
 
-**Estado de conformidade, conferido em 2026-08-23:**
+> ⚠️ **Terceira exceção de exibição, declarada pelo autor em 2026-09-18 (#754):** a **coluna R$ da
+> Proforma** — Preliminar e Avançado, tela, tabela de sensibilidade, CSV e PDF — sai em **inteiros**.
+> Diferente das duas anteriores (card de KPI, rótulo da cascata), esta alcança uma tabela e a sua
+> exportação, porque tela e arquivo compartilham `celulaProforma` e a paridade entre eles é contrato.
+> Quem a implementa é `celulaInteira` (`viab-format.ts`, símbolo próprio, não um parâmetro de
+> `celula`), e a trava é `frontend/proforma-inteiros.test.ts` (contagem exata nos consumidores, zero
+> no resto). Nada persistido muda; `% VGV`, `R$/m²`, o Fluxo de Caixa e os textos de detalhe do card
+> continuam como estão. As linhas marcadas **0** na tabela abaixo são exatamente as dessa exceção.
+
+**Estado de conformidade, conferido em 2026-08-23 e atualizado em 2026-09-18 (#754):**
 
 | Ponto | Casas hoje | Conforme? |
 |---|---|---|
 | `frontend/viab-format.ts:11-23` — `fmtR$` (`CASAS_DECIMAIS_MONETARIAS = 2`) | 2 | ✅ |
 | `frontend/exportar.ts:16` — importa `fmtR$`, sem formatador próprio | 2 | ✅ |
-| `frontend/exportar.ts` — `celulaProforma` (CSV e PDF da Proforma), desde 2026-08-28 a MESMA função da tela, com a notação de sinal junto | 2 | ✅ fonte única com a tabela da Proforma |
+| `frontend/exportar.ts` — `celulaProforma` (CSV e PDF da Proforma), desde 2026-08-28 a MESMA função da tela, com a notação de sinal junto | **0** | ✅ fonte única com a tabela da Proforma — **terceira exceção ao C7 (#754)**: a coluna R$ da Proforma sai em inteiros, tela e arquivo juntos |
 | `frontend/exportar.ts:334` — `celulaFx` (CSV e PDF), desde a #449 delega para `celula` de `viab-format.ts` — fonte única com a tela | 2 | ✅ corte em R$ 0,005 |
 | `frontend/tela-financeiro.ts:154` — `_n` (`casas-decimais="2"`) | 2 | ✅ |
 | `frontend/tela-empreendimento-tipologias.ts:178` | 2 (default) | ✅ |
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |
-| `frontend/tela-proforma.ts:74` — `celulaSensibilidade`, a tabela de cenários | 2 | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) |
+| `frontend/tela-proforma.ts:74` — `celulaSensibilidade`, a tabela de cenários | **0** | ✅ desde a #492; pela #568 delega para `celulaProforma` (fonte única com a tabela principal, inclusive na notação de sinal) — e por isso herda a exceção de inteiros da #754 |
 | `frontend/fluxo-caixa-motor.ts` — **séries mensais** (`deposita`/`round2`) | 2 | ✅ |
 | `frontend/fluxo-caixa-motor.ts:2720` — **agregados escalares** do `FluxoCalc` (`vgvTotal`, `vpl`, `vgvPermutaFisica`, `receitaBrutaVgv` e o alias `vgvVendavel`) | 2 | ✅ desde a #512 — quantizados na SAÍDA; a origem segue com precisão plena, ver a nota abaixo |
 | `frontend/fluxo-tabela.ts:40` — `celula` da tabela do Fluxo | 2 | ✅ desde a #449, fonte única com a exportação (ver `viab-format.ts`) |
-| `frontend/exportar.ts:73` — `celulaProforma`, a coluna R$ da Proforma na tela, no CSV e no PDF | 2 | ✅ desde a #449, via `fmtR$(v, false)`; extraída de método privado para função pura pela #567, e movida de `tela-proforma.ts` para cá em 2026-08-28, quando a exportação passou a usá-la (a tela a reexporta) |
+| `frontend/exportar.ts:73` — `celulaProforma`, a coluna R$ da Proforma na tela, no CSV e no PDF | **0** | ✅ **exceção declarada (#754, 2026-09-18)**: chama `celulaInteira` de `viab-format.ts` — inteiros, sinal normalizado depois de arredondar, mesma notação contábil. Histórico: 2 casas desde a #449 via `fmtR$(v, false)`; extraída de método privado pela #567; movida de `tela-proforma.ts` para cá em 2026-08-28 (a tela a reexporta) |
 | `frontend/tela-fluxo-receitas.ts:451,452` — `precoUnit` e `precoTotal` | 2 | ✅ desde a #449, via `fmtR$(v, false)` |
-| `frontend/tela-fluxo-ver.ts` — coluna R$ da Proforma do **Avançado** (`_renderProforma`) | 2 | ✅ desde a #742 — trocou `fmtR$` cru (sinal de menos) por `celula`/`negativoContabil` de `viab-format.ts`, a mesma notação contábil (parênteses) do Preliminar; a coluna R$/m² segue o mesmo critério de sinal, com `fmtNum` |
+| `frontend/tela-fluxo-ver.ts` — coluna R$ da Proforma do **Avançado** (`_renderProforma`) | **0** | ✅ **exceção declarada (#754)**: `celulaInteira`, como o Preliminar. Histórico: a #742 trocou `fmtR$` cru (sinal de menos) por `celula`/`negativoContabil`, a mesma notação contábil (parênteses) do Preliminar; a coluna R$/m² segue o mesmo critério de sinal, com `fmtNum`. As outras duas tabelas do arquivo ("Fluxo de Caixa Livre × Fluxo de Caixa", "ROI do projeto") seguem em 2 casas |
 
 > ✅ **O motor passou a ser conforme ao C7 também nos agregados escalares — #512.** As **séries
 > mensais do `calcularFluxo`** sempre passaram por `round2` a cada depósito (a ressalva importa: o

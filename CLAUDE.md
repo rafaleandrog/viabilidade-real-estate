@@ -1128,11 +1128,12 @@ Git Bash — ver PROGRESSO).
   > (`frontend/tela-fluxo-receitas.ts:452-453`) trocaram `fmtNum` sem 2º argumento por
   > `fmtR$(v, false)`. A #281 está fechada — a tabela de conformidade completa é
   > `docs/viabilidade/formulas.md` §"Estado de conformidade".
-  > ⚠️ **DUAS exceções de EXIBIÇÃO, e só duas.** As duas seguem o mesmo desenho, de propósito:
+  > ⚠️ **TRÊS exceções de EXIBIÇÃO, e só três.** As três seguem o mesmo desenho, de propósito:
   > símbolo próprio (não um parâmetro de `fmtR$`) para a exceção ser **greppável**, e inventário de
   > call sites travado por **contagem exata** — chamada a menos e chamada a mais reprovam igual.
-  > **`fmtR$` não mudou em nenhuma das duas**, e em nenhuma delas persistência, entrada, motor,
-  > tabelas, Proforma, Fluxo de Caixa ou exportação saem das 2 casas.
+  > **`fmtR$` e `celula` não mudaram em nenhuma das três**, e em nenhuma delas persistência, entrada,
+  > motor ou Fluxo de Caixa saem das 2 casas. A terceira é a única que alcança uma TABELA e a sua
+  > exportação — a Proforma —, e está dito abaixo por quê.
   >
   > **1ª — card de KPI, declarada pelo autor em 2026-08-26** (leva Avançado, item 4 — issue #581):
   > **o valor em R$ exibido em CARD DE KPI sai sem casas decimais**, e o percentual em card sai com
@@ -1156,6 +1157,23 @@ Git Bash — ver PROGRESSO).
   > implementa é `fmtR$Milhoes`, e a trava é `frontend/cascata-milhoes.test.ts`, que confere a
   > contagem exata no único consumidor **e** zero ocorrências em todo o resto do frontend
   > versionado (enumerado por `git ls-files`, nunca varrendo o disco).
+  >
+  > **3ª — coluna R$ da Proforma, declarada pelo autor em 2026-09-18 (issue #754)**: **a coluna R$ das
+  > duas Proformas (Preliminar e Avançado), da tabela de sensibilidade da aba Cenários do Preliminar e
+  > do CSV/PDF da Proforma sai em INTEIROS** — `283.411.826,35` aparece como `283.411.826`. (a) É
+  > decisão de desenho do autor ("todos eles devem mostrar números inteiros sempre. Isso em qualquer
+  > proforma, preliminar ou avançado"), não bug. (b) **Diferente das duas anteriores, esta alcança a
+  > exportação da Proforma**: CSV e PDF compartilham `celulaProforma` com a tela, e a paridade
+  > tela×arquivo é contrato (`frontend/proforma-ordem-linhas.test.ts`) — arredondar só na tela
+  > quebraria a paridade. É arredondamento de EXIBIÇÃO: nada persistido muda, o motor segue em 2
+  > casas, e `% VGV` e `R$/m²` (já inteira) não são alcançadas. (c) Não alcança o Fluxo de Caixa
+  > (`celula`/`celulaFx`, 2 casas), as outras tabelas de `tela-fluxo-ver.ts` ("Fluxo de Caixa Livre ×
+  > Fluxo de Caixa" e "ROI do projeto"), nem os textos de detalhe dentro do card da Proforma. Quem a
+  > implementa é `celulaInteira` (`frontend/viab-format.ts`) — símbolo próprio, e **não** um parâmetro
+  > de `celula`, que é a fonte única do Fluxo de Caixa; o sinal é normalizado depois de arredondar,
+  > como nas outras duas. A trava é `frontend/proforma-inteiros.test.ts`: contagem exata nos três
+  > consumidores (`exportar.ts`, `tela-fluxo-ver.ts`, a declaração), zero no resto do frontend
+  > versionado, e a rede de que `celulaProforma` e a Proforma do Avançado não voltaram a `celula`.
 - Rotas relativas; shell prefixa `/api/viabilidade/`
 - Tokens CSS do design system — nunca cores literais
   - **Exceção real:** o CSS dos documentos de impressão/PDF em `frontend/exportar.ts` roda numa

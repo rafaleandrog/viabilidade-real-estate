@@ -4,6 +4,38 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #754 — coluna R$ da Proforma em inteiros: a TERCEIRA exceção de exibição ao C7 (2026-09-18)
+
+Pedido direto do autor, com print da Proforma de um estudo Avançado: "tira as duas casas decimais dos
+valores em R$ do proforma, todos eles devem mostrar números inteiros sempre. Isso em qualquer
+proforma, preliminar ou avançado." Não é bug — é decisão de desenho que abre a terceira exceção ao
+contrato C7, e por isso entrou com o mesmo desenho das duas anteriores (`fmtR$Kpi`, #581;
+`fmtR$Milhoes`, Rodada 12) **e** com CLAUDE.md § Contratos, `docs/viabilidade/formulas.md` § Estado de
+conformidade e a linha C7 do anexo A de `padrao-incorporacao.md` no mesmo diff.
+
+**O que mudou:** `celulaInteira` em `frontend/viab-format.ts` — símbolo próprio, e não um parâmetro
+de `celula` (que é a fonte única do Fluxo de Caixa) nem de `fmtR$`; formata inline com 0 casas, sem
+delegar a `fmtR$Kpi` (a trava do card exige exatamente uma ocorrência dele no arquivo); sinal
+normalizado **depois** de arredondar, half away from zero como o Intl (`Math.round(-0.5)` daria -0).
+`celulaProforma` (`exportar.ts`, que serve tela do Preliminar, sensibilidade, CSV e PDF) e a
+`_renderProforma` do Avançado (`tela-fluxo-ver.ts`) passam a chamá-la. `R$/m²` já era inteira;
+`% VGV`, Fluxo de Caixa, as outras duas tabelas de `tela-fluxo-ver.ts` e os textos de detalhe do
+card não mudam.
+
+**Decisão registrada:** diferente das duas exceções anteriores, esta **alcança o CSV e o PDF** da
+Proforma — eles compartilham `celulaProforma` com a tela, e a paridade tela×arquivo é contrato
+(`proforma-ordem-linhas.test.ts`). Está escrito nos três documentos.
+
+**Trava:** `frontend/proforma-inteiros.test.ts`, espelho de `cascata-milhoes.test.ts` — enumeração
+por `git ls-files`, contagem exata nos três consumidores, zero no resto do frontend, rede de que
+`celulaProforma` não voltou a `celula` e que `tela-fluxo-ver.ts` não chama mais `celula(`, e teste de
+exceção órfã. Asserções de string atualizadas em `tela-proforma.test.ts`, `exportar-proforma.test.ts`
+(inclusive a regex de "sinal de menos", que com inteiros passou a precisar de fronteira de palavra —
+casava `utf-8` no PDF) e `viab-format.test.ts`; os motivos de `kpi-casas-decimais.test.ts` reescritos
+(contagem segue 0). Sem migração; `versao` não bumpa.
+
+---
+
 ## #753 — Permuta física (Avançado, Custos → Terreno): a linha nunca entrava nesse estado pela tela (2026-09-18)
 
 Pedido direto do autor, com print: "permuta física precisa corrigir a caixa de seleção para escolher a
