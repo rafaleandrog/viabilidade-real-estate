@@ -742,6 +742,29 @@ export function validarPermutaFisica(
   const permutadaPorTipologia = quantidadesPermutadas(linhasCusto);
 
   const out: Divergencia[] = [];
+  // #753: linha INCOMPLETA — sem tipologia, ou com quantidade < 1. Não é
+  // erro: é o estado natural entre trocar a subcategoria e escolher os dois
+  // campos (a tela salva cada um num PATCH próprio), e o backend a aceita
+  // desde a #753 — antes recusava com 400 e a linha nunca chegava a existir.
+  // Fica como ALERTA para a linha não ser esquecida assim: o motor a ignora
+  // (`reservarPermutasFisicas`), então ela não reserva unidade nenhuma.
+  for (const c of linhasCusto) {
+    if (!ePermutaFisica(c)) continue;
+    const semTipologia = c.permuta_tipologia_id == null || c.permuta_tipologia_id === '';
+    const quantidade = Number(c.permuta_quantidade ?? 0) || 0;
+    if (!semTipologia && quantidade >= 1) continue;
+    const tip = semTipologia ? null : tipologiasCatalogo.find((t) => Number(t.id) === Number(c.permuta_tipologia_id));
+    const nome = semTipologia ? 'Permuta física' : (tip?.nome || `tipologia ${c.permuta_tipologia_id}`);
+    out.push({
+      codigo: 'PERMUTA_FISICA_INCOMPLETA', severidade: 'alerta', linha: nome,
+      esperado: 1, encontrado: quantidade, diferenca: quantidade - 1,
+      mensagem: semTipologia
+        ? 'Permuta física sem tipologia: escolha a tipologia e a quantidade em Custos → Terreno — '
+          + 'enquanto isso a linha não reserva unidade nenhuma.'
+        : `${nome}: permuta física com quantidade ${quantidade} — informe pelo menos uma unidade; `
+          + 'enquanto isso a linha não reserva unidade nenhuma.',
+    });
+  }
   for (const [id, quantidadePermutada] of permutadaPorTipologia) {
     const tip = tipologiasCatalogo.find((t) => Number(t.id) === id);
     const quantidadeTotal = Number(tip?.quantidade ?? 0);

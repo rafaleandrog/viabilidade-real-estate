@@ -205,10 +205,56 @@ test('validarPermutaFisica: soma DUAS linhas para a mesma tipologia antes de com
   assert.equal(r[0].encontrado, 21);
 });
 
-test('validarPermutaFisica: ignora linhas que não são Permuta física e sem tipologia referenciada', () => {
+test('validarPermutaFisica: ignora linhas que não são Permuta física; linha sem tipologia não conta contra o estoque (#753: vira alerta INCOMPLETA, não erro)', () => {
   const linhasCusto = [
     { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Valor à vista', orcamento_valor: 1_000_000 },
     { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: null, permuta_quantidade: 5 },
+  ];
+  const r = validarPermutaFisica(linhasCusto, TIPOLOGIAS);
+  // Antes da #753 este caso devolvia `[]` — a linha sem tipologia era
+  // invisível. Agora ela é ALERTA, e continua sem gerar ERRO de estoque.
+  assert.equal(r.length, 1);
+  assert.equal(r[0].codigo, 'PERMUTA_FISICA_INCOMPLETA');
+  assert.equal(r[0].severidade, 'alerta');
+  assert.ok(r.every((d) => d.codigo !== 'PERMUTA_FISICA_EXCEDE_ESTOQUE'));
+});
+
+// ── #753: linha incompleta é ALERTA, não 400 ─────────────────────────────
+//
+// A tela salva subcategoria, tipologia e quantidade em três PATCHes; entre o
+// primeiro e o terceiro a linha existe incompleta. O backend deixou de recusar
+// esse estado (era o que tornava "Permuta física" inalcançável pela tela); a
+// obrigatoriedade mora aqui, como alerta de Reconciliação.
+
+test('#753 validarPermutaFisica: Permuta física SEM tipologia gera alerta PERMUTA_FISICA_INCOMPLETA', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: null, permuta_quantidade: 0 },
+  ];
+  const r = validarPermutaFisica(linhasCusto, TIPOLOGIAS);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].codigo, 'PERMUTA_FISICA_INCOMPLETA');
+  assert.equal(r[0].severidade, 'alerta');
+  assert.equal(r[0].linha, 'Permuta física');
+  assert.equal(r[0].esperado, 1);
+  assert.equal(r[0].encontrado, 0);
+  assert.match(r[0].mensagem, /sem tipologia/);
+});
+
+test('#753 validarPermutaFisica: Permuta física com tipologia e quantidade 0 gera alerta INCOMPLETA nomeando a tipologia', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 0 },
+  ];
+  const r = validarPermutaFisica(linhasCusto, TIPOLOGIAS);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].codigo, 'PERMUTA_FISICA_INCOMPLETA');
+  assert.equal(r[0].severidade, 'alerta');
+  assert.equal(r[0].linha, 'Studio');
+  assert.equal(r[0].encontrado, 0);
+});
+
+test('#753 validarPermutaFisica: linha completa (tipologia + quantidade ≥ 1) NÃO gera alerta INCOMPLETA', () => {
+  const linhasCusto = [
+    { grupo: 'terreno', categoria: 'Preço', subcategoria: 'Permuta física', permuta_tipologia_id: 1, permuta_quantidade: 1 },
   ];
   assert.deepEqual(validarPermutaFisica(linhasCusto, TIPOLOGIAS), []);
 });

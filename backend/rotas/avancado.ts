@@ -1476,7 +1476,22 @@ function validarCamposCusto(
   return true;
 }
 
-/** #266: `permuta_tipologia_id` precisa referenciar uma tipologia do MESMO estudo. */
+/**
+ * #266/#753: `permuta_tipologia_id` precisa referenciar uma tipologia do MESMO
+ * estudo, e a quantidade não pode estourar o saldo da tipologia.
+ *
+ * Linha INCOMPLETA (sem tipologia, ou com quantidade < 1) é ACEITA. A tela
+ * salva cada campo num PATCH próprio (`tela-fluxo-custos.ts`: subcategoria,
+ * depois tipologia, depois quantidade), então entre trocar a subcategoria e
+ * escolher os dois campos a linha passa obrigatoriamente por esse estado.
+ * Exigir os dois aqui (`PERMUTA_TIPOLOGIA_OBRIGATORIA`/`_QUANTIDADE_OBRIGATORIA`)
+ * tornava o estado "Permuta física" INALCANÇÁVEL pela tela: o PATCH da
+ * subcategoria tomava 400, o modelo ficava na subcategoria anterior e a linha
+ * seguia renderizando o ramo genérico de Preço (#753). A obrigatoriedade é
+ * alerta de Reconciliação (`PERMUTA_FISICA_INCOMPLETA`, fluxo-invariantes.ts),
+ * não 400 — o motor ignora a linha incompleta (`reservarPermutasFisicas`), então
+ * ela não reserva unidade nenhuma enquanto não estiver completa.
+ */
 async function validarPermutaFisica(
   req: Request, res: Response, estudoId: number, dados: Record<string, any>, atual?: Record<string, any> | null,
 ): Promise<boolean> {
@@ -1486,16 +1501,18 @@ async function validarPermutaFisica(
   if (grupo !== 'terreno' || categoria !== 'Preço' || subcategoria !== 'Permuta física') return true;
   const tipologiaId = dados.permuta_tipologia_id !== undefined ? dados.permuta_tipologia_id : atual?.permuta_tipologia_id;
   const quantidade = dados.permuta_quantidade !== undefined ? dados.permuta_quantidade : atual?.permuta_quantidade;
-  if (tipologiaId === null || tipologiaId === undefined || tipologiaId === '') {
-    erro(res, 400, 'PERMUTA_TIPOLOGIA_OBRIGATORIA', 'Permuta física exige uma tipologia');
-    return false;
-  }
-  if (!Number.isInteger(Number(quantidade)) || Number(quantidade) < 1) {
-    erro(res, 400, 'PERMUTA_QUANTIDADE_OBRIGATORIA', 'Permuta física exige pelo menos uma unidade');
-    return false;
-  }
+  // Incompleta: nada a conferir contra o estoque ainda.
+  if (tipologiaId === null || tipologiaId === undefined || tipologiaId === '') return true;
+  if (!Number.isInteger(Number(quantidade)) || Number(quantidade) < 1) return true;
   const tip = await req.dados!.buscar('avancado_tipologias', tipologiaId);
-  if (!tip || Number(tip.estudo_id) !== estudoId) return false;
+  if (!tip || Number(tip.estudo_id) !== estudoId) {
+    // #753: antes era `return false` SEM resposta — a requisição pendurava
+    // quando a tipologia GRAVADA (vinda de `atual`) já não existia ou era de
+    // outro estudo. Mesma resposta que `validarPermutaTipologia` dá ao campo
+    // enviado no corpo.
+    erro(res, 400, 'PERMUTA_TIPOLOGIA_INVALIDA', 'permuta_tipologia_id deve ser uma tipologia deste estudo');
+    return false;
+  }
   const vendida = await req.dados!.listar('avancado_alocacoes', { filtros: { tipologia_id: tipologiaId }, por_pagina: 1000 });
   const custos = await req.dados!.listar('avancado_linhas_custo', { filtros: { estudo_id: estudoId }, por_pagina: 1000 });
   const usada = vendida.dados.reduce((sum: number, a: any) => sum + (Number(a.unidades) || 0), 0);
