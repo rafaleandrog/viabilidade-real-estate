@@ -25,10 +25,16 @@ export const caso = {
   nome: 'cenarios-sensibilidade',
   // `exigir` é OBRIGATÓRIO em todo caso, e o harness lança sem ele.
   exigir: [
-    // As duas tabelas da sensibilidade (monetária e indicadores) e o seletor da
-    // variável estressada — a prova de que a sub-aba montada é esta.
+    // As duas tabelas da sensibilidade (monetária e indicadores) e o seletor
+    // de PASSO (±5/±10/±15) — o único `urbi-select` que sobra depois do #729:
+    // o dropdown de variável estressada morreu, substituído pelo tornado.
     { seletor: 'table.pf.sens', minimo: 2 },
     { seletor: 'urbi-select', minimo: 1 },
+    // Rodada 13 (#729): a prova de que o TORNADO é quem seleciona a variável
+    // agora, não mais o dropdown — o componente monta com 5 alavancas.
+    { seletor: 'viab-grafico-tornado', minimo: 1 },
+    // Rodada 13 (#733): o bloco "Margem de segurança", 4 cartões.
+    { seletor: 'div.margem-cartao', minimo: 4 },
     // 8 linhas monetárias × 3 cenários (2026-09-14: "Deduções sobre VGV" — a
     // MESMA linha da Proforma — entrou entre "Receita bruta" e "Receita
     // líquida", eram 7): as células com a cor do cenário. Se o `style` inline
@@ -38,7 +44,16 @@ export const caso = {
     { seletor: 'table.pf.sens td.num.cen-bear', minimo: 8 },
     { seletor: 'table.pf.sens td.num.cen-bull', minimo: 8 },
     // A PROVA DE FIAÇÃO: o Resultado negativo que só o Bear produz, e só se o
-    // fator de stress tiver alcançado o catálogo de Produtos.
+    // fator de stress tiver alcançado o catálogo de Produtos. O caso força
+    // `_varSensManual: 'preco'` (abaixo) para este teste continuar
+    // determinístico — sem isso, a seleção seguiria "a maior amplitude do
+    // ranking", que É medida (o fixture tem outras alavancas com efeito real:
+    // `custo_obras` via `custo_construcao_m2` e `custo_indireto` via
+    // `marketing_global_pct`/`gestao_indiretos_pct` — achado da lente L2, PR
+    // #757) e portanto sujeita a mudar de variável a cada edição do motor ou
+    // do fixture, sem que ninguém precise tocar este arquivo. Fixar a
+    // variável é o que faz a prova (o fator alcança o catálogo) resistir a
+    // essas edições futuras.
     { seletor: 'table.pf.sens td.num.cen-bear.neg', minimo: 1 },
     // ...e as 5 linhas de receita do Base continuam positivas (as 3 de despesa
     // — Custo direto total, Custo indireto total e, desde 2026-09-14,
@@ -61,9 +76,8 @@ export const caso = {
     'urbi-badge.cor',
     // Binding de PROPRIEDADE (o Lit nem escreve atributo); o stub não desenha
     // opção nenhuma — mesma natureza documentada em modal-pagamento.ts,
-    // kpis-resumo.ts e grupo-badge-legado.ts. O seletor de variável estressada
-    // fica, portanto, mais estreito e mais baixo aqui do que na tela real: as
-    // duas tabelas medidas abaixo dele não dependem dessa altura.
+    // kpis-resumo.ts e grupo-badge-legado.ts. Hoje é só o seletor de PASSO
+    // (±5/±10/±15) — o de variável estressada morreu com o #729.
     'urbi-select.label',
     'urbi-select.opcoes',
   ],
@@ -79,9 +93,12 @@ export const caso = {
     const el = document.createElement('viab-tela-proforma');
     // `benchmarks: []` de propósito: sem indicador de sensibilidade o
     // componente cai no fallback de ±10%, que é o que o fixture documenta.
+    // `_varSensManual: 'preco'` fixa a seleção — ver o comentário acima do
+    // seletor `cen-bear.neg`.
     forcarEstado(el, {
       estudo: ESTUDO_SENSIBILIDADE, secao: 'cenarios', benchmarks: [],
       produtos: PRODUTOS_SENSIBILIDADE, aliquotaRet: 4,
+      _varSensManual: 'preco',
     });
     raiz.appendChild(el);
     await (el as any).updateComplete;

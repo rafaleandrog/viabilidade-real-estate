@@ -4,6 +4,105 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 13 — tornado de alavancas + margem de segurança: primeiro PR de produto (2026-09-18)
+
+PR 757, aberto e aguardando revisão/autorização de merge do autor.
+
+**Rodada 1 de revisão (10 lentes: App do Codex + 9 Kimi) achou 5 bloqueantes reais, todos
+consertados na mesma sessão:**
+
+1. `circular` (tornado e margem de segurança) ignorava `infra_valor_canonico` — com o canônico
+   preenchido o motor usa o valor FIXO e ignora `infra_modo` por inteiro, então a alavanca deixa de
+   ser circular. Extraído para `ehCircular` (`frontend/tornado-alavancas.ts`), uma cópia só, também
+   consumida por `margem-seguranca.ts` (achado do App do Codex).
+2. `resolverFator` não distinguia "a meta nunca é atingida" de "a meta já é atingida no intervalo
+   inteiro" — os dois casos são "sem troca de sinal" e caíam no mesmo `null`. Novo campo
+   `alvoSempreAtingido` desfaz a ambiguidade; `tituloFolga` (tela-proforma.ts) passa a dizer "já
+   atinge... em toda esta faixa" em vez de "não atinge... em nenhum cenário" (achado do App do
+   Codex).
+3. A seleção automática do tornado (`alavancas[0]`) não filtrava a alavanca circular — podia abrir
+   a tabela Bear/Base/Bull já estressando a variável que o próprio gráfico diz "não medir nada
+   isolado" (achado da lente L1).
+4. `custoLike` reimplementado inline em `tela-proforma.ts` em vez de consumir `ehCustoLike` — o
+   docblock da função prometia "uma cópia só" e não era verdade (achado convergente de duas lentes,
+   L3 e S2).
+5. A linha do tornado tinha `role="listitem"` (semântica passiva) apesar de ser clicável/navegável
+   por teclado, e o comentário afirmava seguir a convenção `role="button"` da cascata sem segui-la —
+   trocado para `role="button"` + `aria-pressed` (achado da lente S3).
+
+Mais 7 observações não-bloqueantes corrigidas de passagem (comentário de fixture com números
+trocados, justificativa desatualizada num caso de render, `||` engolindo benchmark `valor: 0`,
+dois endereços `arquivo:linha` deslocados pelo próprio diff, precisão da identidade
+`marketingGlobal + gestaoIndiretos`, token de cor cosmético do cartão de margem, e
+`_varSensManual` agora reseta ao trocar de estudo). Dois casos de render novos provam os
+consertos de fiação (#3 e o filtro de circular). `bash scripts/validar-frontend.sh` verde (8/8);
+1494 testes (`node --test` do comando do `package.json`), 0 falhas — 90 casos de render.
+
+Relatório completo da rodada 1: comentário no PR 757.
+
+Resposta ao pedido direto do usuário ("teve uma issue que eu tinha criado para colocar esse tipo de
+gráfico... verifique como isso ficou"), com a imagem do handoff anexada de novo. Conferido: a issue
+**não foi esquecida** — é a Rodada 13 (`docs/rodada-13/planejamento.md`, issues #724–#736), aberta em
+2026-09-16, com plano completo e fila de 12 PRs. Até este PR, **zero PRs de produto** tinham
+mergeado (só os 2 de processo, #737/#739).
+
+**Este PR entrega 6 dos 12 itens da fila num commit só, em vez de 6 PRs sequenciais** — desvio
+deliberado do plano original, registrado aqui porque a fila foi desenhada para revisão granular
+entre sessões, e esta sessão implementou o pacote inteiro de uma vez. Itens entregues (cada um com
+o critério de aceite da issue original conferido):
+
+- **#725** — `VariavelSensibilidade` ganha `custo_terreno`/`custo_indireto`; `fatorSens` incide nos
+  dois pontos (`frontend/proforma.ts:649`, `:686-687`), com o desligamento (`considerar_custo_terreno
+  === false`) continuando soberano e a identidade `marketingGlobal + gestaoIndiretos ===
+  custoIndiretoTotal` preservada.
+- **#727** — `frontend/tornado-alavancas.ts` (motor puro): `rankearAlavancas` roda 1 execução base +
+  2 por alavanca (10 no total, 5 alavancas — preço, permuta física, permuta financeira, custo de
+  obra/infra, custo indireto; terreno fica de fora do tornado por decisão já registrada na #725),
+  ordena por `|amplitudeRS|` (nunca por %, que é `null` quando o resultado base não serve de
+  denominador), e marca `circular` quando `infra_modo === 'pct_vgv'`.
+- **#728** — `frontend/grafico-tornado.ts` (`viab-grafico-tornado`): barras bidirecionais a partir de
+  um eixo central, escaladas pela MAIOR amplitude do conjunto (não a primeira — o achado mais caro
+  da Rodada 12), as 3 maiores em destaque exceto a circular, seleção por clique/teclado emitindo
+  `viab:tornado-selecionar`.
+- **#729** — fiação: o tornado substitui o `urbi-select` de variável estressada em
+  `frontend/tela-proforma.ts`; a seleção inicial é a de maior amplitude (`rankearAlavancas(...)[0]`),
+  não mais o literal `'preco'` — provado por um caso de render dedicado
+  (`cenarios-tornado-default`) com um fixture onde 'custo_obras' vence o ranking, para a prova não
+  ser ambígua com o comportamento antigo. Passo configurável ±5/±10/±15%.
+- **#732** — `frontend/margem-seguranca.ts` (motor puro): inversão numérica (secante com verificação
+  de resíduo obrigatória, bisseção de garantia em `[0,5]` quando a secante erra ou sai do intervalo)
+  sobre `calcularProforma`, igual ao precedente `precoSugeridoM2`. Testado inclusive com um fixture
+  de quina (permuta física capando) onde a secante ingênua erra por 2 unidades de fator e a
+  verificação+bisseção corrige.
+- **#733** — bloco "Margem de segurança" (4 cartões 2×2) em `frontend/tela-proforma.ts`. "Terreno
+  máximo" virou o **segundo consumidor** declarado de `fmtR$Milhoes` (a exceção de milhões da
+  cascata, Rodada 12) — `frontend/cascata-milhoes.test.ts` generalizado de um `CONSUMIDOR` singular
+  para uma lista `CONSUMIDORES`, preservando a contagem exata nos dois sentidos.
+
+**Ficaram de fora, deliberadamente:**
+
+- **#726** — achado de motor (`fatorSens('custo_obras')` não cobre `decoracao`/`gestaoConstrucao`,
+  só `construcao`), não conserto — é decisão do autor, como a issue original já registrava.
+- **#730/#731** — tabela com Δ%/amplitude e faixa bear-base-bull contra benchmark (reusando
+  `calcularVariacao`/`montarMedidor`) não entraram: a imagem que motivou o pedido mostra só os dois
+  cartões (tornado + margem de segurança), e a tabela "Análise de sensibilidade" existente continua
+  funcionando, agora dirigida pela seleção do tornado.
+- **#734** (consumo do colchão / alerta de cenário inviável), **#735** (cenário composto — exige
+  `fatorSens` multivariável) e **#736** (fechamento da rodada) seguem para PRs futuros.
+
+**Uma decisão de interpretação não coberta pelas issues, registrada para o autor confirmar:** a
+margem-alvo da margem de segurança foi implementada como **% sobre a RECEITA LÍQUIDA** (`resultado /
+receitaLiquida × 100`), não sobre o VGV como o campo existente `Proforma.margemLiquidaPct` (usado na
+linha "Margem sobre VGV" da tabela) — porque é isso que a imagem do handoff diz literalmente no
+rodapé ("Margem-alvo de referência: 15% sobre receita líquida"), embora a issue #733 cite o mesmo
+benchmark `margem_liquida` (padrão 20) sem especificar o denominador. O VALOR do cartão (ponto de
+equilíbrio, resultado = 0) não depende dessa escolha — só o número secundário no `title` e o texto do
+rodapé.
+
+Validação: `bash scripts/validar-frontend.sh` verde (8/8 etapas, incluindo render em Chromium — 88
+casos, 2 novos: `grafico-tornado` e `cenarios-tornado-default`). Contagem de testes do comando do
+`package.json` (`node --test` sobre backend+frontend+fixtures+render): **1478**, 0 falhas. Sem
+migração — a `versao` do manifesto não bumpa, como o plano previu.
 ## #753 — Permuta física (Avançado, Custos → Terreno): a linha nunca entrava nesse estado pela tela (2026-09-18)
 
 Pedido direto do autor, com print: "permuta física precisa corrigir a caixa de seleção para escolher a

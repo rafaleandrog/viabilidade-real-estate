@@ -1009,6 +1009,39 @@ test('BUG7-08 custo_obras: escala os 2 modos (R$/m², valor total) e o canônico
   assert.ok(perto(canon.construcao, 6_000_000), `canonico=${canon.construcao}`);
 });
 
+// #725 — o tornado de alavancas (Rodada 13) precisa estressar também o custo
+// do terreno e os custos indiretos, que até aqui não tinham fator.
+test('#725 custo_terreno: fatorSens escala só custoTerreno', () => {
+  const sem = calcularProforma(LOT);
+  const com = calcularProforma({ ...LOT, sensibilidade: { variavel: 'custo_terreno', fator: 1.1 } });
+  assert.ok(perto(com.custoTerreno, sem.custoTerreno * 1.1), `custoTerreno=${com.custoTerreno}`);
+  assert.ok(perto(com.construcao, sem.construcao), `construcao=${com.construcao}`);
+  assert.ok(perto(com.infraestrutura, sem.infraestrutura), `infra=${com.infraestrutura}`);
+  assert.ok(perto(com.custoIndiretoTotal, sem.custoIndiretoTotal), `indireto=${com.custoIndiretoTotal}`);
+});
+
+test('#725 custo_terreno: considerar_custo_terreno=false continua soberano com fator', () => {
+  const p = calcularProforma({ ...LOT, considerar_custo_terreno: false, sensibilidade: { variavel: 'custo_terreno', fator: 1.5 } });
+  assert.equal(p.custoTerreno, 0);
+});
+
+test('#725 custo_indireto: fatorSens escala custoIndiretoTotal preservando a identidade das duas parcelas', () => {
+  const sem = calcularProforma(LOT);
+  const com = calcularProforma({ ...LOT, sensibilidade: { variavel: 'custo_indireto', fator: 1.1 } });
+  assert.ok(perto(com.custoIndiretoTotal, sem.custoIndiretoTotal * 1.1), `indireto=${com.custoIndiretoTotal}`);
+  assert.ok(perto(com.marketingGlobal + com.gestaoIndiretos, com.custoIndiretoTotal, 0.02), 'identidade marketingGlobal+gestaoIndiretos');
+  assert.ok(perto(com.custoTerreno, sem.custoTerreno), `terreno=${com.custoTerreno}`);
+});
+
+test('#725: fator 0 ou negativo nunca produz custo negativo (terreno e indireto)', () => {
+  const zeroTerreno = calcularProforma({ ...LOT, sensibilidade: { variavel: 'custo_terreno', fator: 0 } });
+  assert.equal(zeroTerreno.custoTerreno, 0);
+  const negTerreno = calcularProforma({ ...LOT, sensibilidade: { variavel: 'custo_terreno', fator: -1 } });
+  assert.equal(negTerreno.custoTerreno, 0);
+  const negIndireto = calcularProforma({ ...LOT, sensibilidade: { variavel: 'custo_indireto', fator: -1 } });
+  assert.equal(negIndireto.custoIndiretoTotal, 0);
+});
+
 test('BUG7-08: sensibilidade ausente/fator neutro preserva o comportamento anterior', () => {
   const semSens = calcularProforma(LOT);
   const comFator1 = calcularProforma({ ...LOT, sensibilidade: { variavel: 'preco', fator: 1 } });
