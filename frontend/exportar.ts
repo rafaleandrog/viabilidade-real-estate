@@ -60,13 +60,16 @@ export function ehLinhaReceitaOuResultado(r: Pick<NotacaoLinha, 'tipo' | 'nature
 }
 
 /**
- * Célula monetária da Proforma — TELA, CSV e PDF. Delega para `celula`
- * (`frontend/viab-format.ts`), a mesma fonte única de 2 casas decimais (C7) e
- * da regra de parênteses que o Fluxo de Caixa usa desde a #449.
+ * Célula monetária da Proforma — TELA, CSV e PDF. Delega para `celulaInteira`
+ * (`frontend/viab-format.ts`): INTEIROS, a terceira exceção de exibição ao C7
+ * (#754, decisão do autor — ver `CLAUDE.md` § Contratos inegociáveis), com a
+ * MESMA regra de parênteses (`negativoContabil`) que o Fluxo de Caixa usa
+ * desde a #449 — aplicada ao valor já arredondado. O Fluxo de Caixa segue em
+ * `celula` (2 casas); esta função é o único ponto em que a Proforma diverge.
  *
  * `sempreExibir` porque a Proforma controla visibilidade por LINHA
  * (`ocultarSeZero`), não por célula perto de zero: um header como "Custo
- * indireto total" que fecha em zero precisa mostrar "(0,00)", não sumir.
+ * indireto total" que fecha em zero precisa mostrar "(0)", não sumir.
  *
  * Sem símbolo "R$" — o cabeçalho da coluna já o informa, nos três destinos.
  */

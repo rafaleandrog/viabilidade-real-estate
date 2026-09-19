@@ -3227,9 +3227,11 @@ documento, contra o contrato **C7** do Anexo A.
 (`exportar.ts:339`, `celulaFx`) chamam a MESMA `celula` de `viab-format.ts`; a coluna R$ da Proforma
 (`celulaProforma`, `exportar.ts:73` — a tela a reexporta; e `celulaProformaM2`,
 `tela-proforma.ts:48` — ambas extraídas de método privado pela #567) e `tela-fluxo-receitas.ts:485-486`
-(`precoUnit`/`precoTotal`) chamam `fmtR$(v, false)`. A
-mesma célula sai `1.234,56` na tela, no CSV e no PDF. → **#281 fechada**; tabela de conformidade
-completa em `formulas.md`.
+(`precoUnit`/`precoTotal`) passaram a compartilhar formatador com a tela. A mesma célula sai
+idêntica na tela, no CSV e no PDF — e, desde a #754, a coluna R$ da Proforma sai em **inteiros**
+(`celulaInteira`, terceira exceção de exibição ao C7; `1.234,56` vira `1.235` nos três destinos,
+paridade preservada), enquanto o Fluxo de Caixa e `precoUnit`/`precoTotal` seguem em 2 casas. →
+**#281 fechada**; tabela de conformidade completa em `formulas.md`.
 
 **A12 — `travado_*` legado não é normalizado em leitura.** `recalcularTravados` corrige
 `travado_inicio` de três eventos e **nunca toca `travado_duracao`**
