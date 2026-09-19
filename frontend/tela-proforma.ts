@@ -891,14 +891,15 @@ export class ViabTelaProforma extends LitElement {
       { l: 'Custo obras / VGV', f: (c) => c.p.custoObrasVgvPct, natureza: 'despesa', pct: true, badge: true, bmCampo: 'custo_obras_vgv', divisoria: true },
       { l: 'Margem sobre VGV', f: (c) => c.p.margemLiquidaPct, natureza: 'receita', pct: true, badge: true, bmCampo: 'margem_liquida' },
     ];
-    // BUG7-12: sem símbolo "R$" — número puro com 2 casas decimais.
+    // BUG7-12: sem símbolo "R$" — número puro (o cabeçalho da coluna já o diz).
     // #492: `fmtNum` com 2 casas dava *até* 2 casas (declara só o
     // `maximumFractionDigits`, nunca o `minimumFractionDigits`), então
     // a vírgula decimal não batia entre as linhas de uma coluna alinhada à direita.
-    // #568: o arredondamento monetário do contrato C7 (#281) continua o mesmo —
-    // ele agora chega por `celulaSensibilidade`, que é `celulaProforma`, que é
-    // `celula`/`fmtR$(v, false)`. O que muda é a NOTAÇÃO: despesa entre
-    // parênteses, receita/resultado com o sinal real, igual à tabela principal.
+    // #568: a formatação chega por `celulaSensibilidade`, que é `celulaProforma`
+    // — e a NOTAÇÃO é a da tabela principal: despesa entre parênteses,
+    // receita/resultado com o sinal real. #754: `celulaProforma` publica
+    // INTEIROS (`celulaInteira`, terceira exceção de exibição ao C7), então
+    // esta tabela herda os inteiros da tabela principal — sem casa decimal.
     // #571: `v === null` só acontece nas duas linhas `pct: true` com o
     // cenário em VGV ≤ 0 — "—", nunca "0,0%". As monetárias nunca chegam `null`.
     const fmt = (m: { pct?: boolean; natureza: Natureza }, v: number | null) =>
