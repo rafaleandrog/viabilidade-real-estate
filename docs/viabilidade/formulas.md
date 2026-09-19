@@ -395,12 +395,14 @@ canônico (R$, 2 casas)  ──derivação exata──▶  % do VGV, R$/m²   (e
 com precisão plena até a apresentação. Assim, R$ 10.000.000 pode atravessar uma porcentagem com
 dízima e retornar exatamente ao mesmo canônico.
 
-> ⚠️ **A única exceção ao C7, declarada pelo autor em 2026-08-26** (leva Avançado, item 4 —
-> issue #581). **(a)** A exceção existe: valor em R$ exibido em **card de KPI** sai **sem casas
+> ⚠️ **A primeira exceção ao C7, declarada pelo autor em 2026-08-26** (leva Avançado, item 4 —
+> issue #581; hoje são três — as outras duas são o rótulo da cascata e a coluna R$ da Proforma,
+> abaixo). **(a)** A exceção existe: valor em R$ exibido em **card de KPI** sai **sem casas
 > decimais**, e percentual em card sai com **uma** casa. **(b)** Ela vale **só** para o valor
 > exibido no card — a figura grande que o card publica; o `title` de detalhe de um card e os cards
 > de comparação de R$/m² da Análise de mercado ficam de fora. **(c)** **Persistência, entrada,
-> motor, tabelas, Proforma, Fluxo de Caixa e exportação continuam em 2 casas, sem exceção.**
+> motor, Fluxo de Caixa e as demais tabelas continuam em 2 casas** — a Proforma tem a SUA exceção
+> (#754, abaixo).
 >
 > É arredondamento **de exibição**: nada persistido muda, nenhuma migração, e um estudo antigo passa
 > a exibir sem centavos sem ser reeditado. `R$ 171.448.400` num card e `R$ 171.448.400,00` numa

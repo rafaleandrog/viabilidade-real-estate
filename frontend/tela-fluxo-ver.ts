@@ -5,7 +5,7 @@ import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, rotuloMesRelativo,
   type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celulaInteira, negativoContabil } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celulaInteira, inteiroExibido, negativoContabil } from './viab-format.js';
 import {
   proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi,
   comInformativasAntesDoResultado,
@@ -53,7 +53,9 @@ import {
  */
 export function sinalLinhaProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>): '' | 'pos' | 'neg' {
   if (l.tipo !== 'receita' && l.tipo !== 'resultado') return '';
-  return l.valor < 0 ? 'neg' : 'pos';
+  // #754: sobre o valor PUBLICADO (inteiro arredondado) — a célula chama
+  // `celulaInteira`, e a classe tem de acompanhar o texto, não o valor cru.
+  return inteiroExibido(l.valor) < 0 ? 'neg' : 'pos';
 }
 
 /**

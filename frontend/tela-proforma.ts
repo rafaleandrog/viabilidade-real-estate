@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil, inteiroExibido } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, vgvBrutoDeProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 // ⚠️ `ehLinhaReceitaOuResultado`/`celulaProforma` MUDARAM DE ARQUIVO na
@@ -83,7 +83,8 @@ export function celulaSensibilidade(v: number, natureza: NaturezaSensibilidade):
  * "receita boa" um valor negativo.
  */
 export function sinalSensibilidade(v: number, natureza: NaturezaSensibilidade): '' | 'pos' | 'neg' {
-  return natureza === 'receita' ? (v < 0 ? 'neg' : 'pos') : '';
+  // #754: sobre o valor PUBLICADO (inteiro arredondado), como a tabela principal.
+  return natureza === 'receita' ? (inteiroExibido(v) < 0 ? 'neg' : 'pos') : '';
 }
 
 /** Dados de fora do motor que `montarLinhasProforma` precisa (equivalente ao
@@ -586,7 +587,9 @@ export class ViabTelaProforma extends LitElement {
               // ganhava a classe, e "Receita líquida"/"Receita operacional"
               // (`natureza: 'receita'`) num estudo deficitário ficavam sem
               // nenhuma marca visual mesmo exibindo o valor negativo.
-              const sinal = ehLinhaReceitaOuResultado(r) ? (r.v < 0 ? 'neg' : 'pos') : '';
+              // #754: o sinal segue o valor PUBLICADO (inteiro arredondado), não o cru —
+              // −R$ 0,30 mostra "0" e não pode sair pintado de negativo.
+              const sinal = ehLinhaReceitaOuResultado(r) ? (inteiroExibido(r.v) < 0 ? 'neg' : 'pos') : '';
               return html`<tr class=${cls}>
                 <td>
                   ${r.toggle

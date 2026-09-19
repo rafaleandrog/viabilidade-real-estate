@@ -134,10 +134,23 @@ export function fmtR$Milhoes(v: number): string {
  * independente do sinal. `sempreExibir` tem a mesma semântica de `celula`,
  * com o limiar de célula vazia no análogo inteiro (< 0,5).
  */
-export function celulaInteira(v: number, opcoes: OpcoesCelula = { comParenteses: true }): string {
+/**
+ * #754: o valor que a coluna R$ da Proforma PUBLICA — o inteiro já arredondado e
+ * com o sinal normalizado (−0,3 vira 0, nunca −0). É a fonte única para
+ * `celulaInteira` E para as classes de sinal (`pos`/`neg`) das linhas da
+ * Proforma: a classe tem de acompanhar o texto exibido, não o valor cru —
+ * senão uma receita a −R$ 0,30 publica "0" pintado de vermelho (achado P2 do
+ * App do Codex no PR 758). Half away from zero, como o Intl (e `fmtR$Kpi`);
+ * `Math.round(-0.5)` daria -0.
+ */
+export function inteiroExibido(v: number): number {
   const valor = Number.isFinite(v) ? v : 0;
-  // Half away from zero, como o Intl (e `fmtR$Kpi`): `Math.round(-0.5)` daria -0.
-  const arredondado = Math.abs(valor) < 0.5 ? 0 : Math.sign(valor) * Math.round(Math.abs(valor));
+  if (Math.abs(valor) < 0.5) return 0;
+  return (Math.sign(valor) * Math.round(Math.abs(valor))) || 0;
+}
+
+export function celulaInteira(v: number, opcoes: OpcoesCelula = { comParenteses: true }): string {
+  const arredondado = inteiroExibido(v);
   if (!opcoes.sempreExibir && arredondado === 0) return '';
   const abs = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
     .format(Math.abs(arredondado));

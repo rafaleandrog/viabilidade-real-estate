@@ -33,7 +33,7 @@ import {
 // esperado dos casos abaixo é o inteiro pt-BR, não `fmtR$` de 2 casas.
 // Half away from zero, como `celulaInteira` e o Intl — `Math.round(-900.5)` daria -900.
 const inteiro = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
-  .format(Math.sign(v) * Math.round(Math.abs(v)));
+  .format((Math.sign(v) * Math.round(Math.abs(v))) || 0); // `|| 0`: -0 sairia "-0" no Intl
 
 test('#567 ehLinhaReceitaOuResultado: classifica receita, natureza-receita e resultado; o resto é custo/dedução', () => {
   assert.equal(ehLinhaReceitaOuResultado({ tipo: 'receita' }), true);
@@ -208,6 +208,9 @@ test('#568 sinalSensibilidade: só receita ganha pos/neg; despesa fica sem class
   assert.equal(sinalSensibilidade(10, 'receita'), 'pos');
   assert.equal(sinalSensibilidade(-10, 'receita'), 'neg');
   assert.equal(sinalSensibilidade(0, 'receita'), 'pos');
+  // #754 (achado P2 do App do Codex): −0,3 publica "0" — a classe não pode ser `neg`.
+  assert.equal(sinalSensibilidade(-0.3, 'receita'), 'pos');
+  assert.equal(sinalSensibilidade(-0.5, 'receita'), 'neg');
   assert.equal(sinalSensibilidade(-10, 'despesa'), '');
   assert.equal(sinalSensibilidade(10, 'despesa'), '');
 });

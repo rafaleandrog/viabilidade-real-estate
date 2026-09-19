@@ -10,8 +10,9 @@ import { fmtR$, fmtR$Kpi } from './viab-format.js';
 //
 // Decisão do autor em 2026-08-26 (leva Avançado, item 4): valor em R$ exibido em
 // CARD DE KPI sai sem casas decimais; percentual em card sai com uma casa. Tudo
-// o mais — persistência, entrada, motor, tabelas, Proforma, Fluxo de Caixa e
-// exportação — segue em 2 casas, sem exceção (`CLAUDE.md` § Contratos
+// o mais — persistência, entrada, motor, Fluxo de Caixa e as demais tabelas —
+// segue em 2 casas; a cascata e a Proforma têm as SUAS exceções (`fmtR$Milhoes`,
+// `celulaInteira`/#754), cada uma com a sua trava (`CLAUDE.md` § Contratos
 // inegociáveis; `docs/viabilidade/formulas.md` § Estado de conformidade).
 //
 // ⚠️ POR QUE UM TESTE QUE LÊ O FONTE, e não um teste da função pura.
