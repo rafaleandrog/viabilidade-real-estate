@@ -46,7 +46,14 @@ arquivo tem duas tabelas com dois formatadores, e um classificador só. Conserto
 silencioso —, e `frontend/proforma-cores.test.ts` confronta a classe com o TEXTO que cada
 formatador publica (`celulaInteira` e `fmtR$`, valor a valor) e trava por contagem exata qual tabela
 chama com qual modo. Mutações executadas: trocar `'centavos'` por `'inteira'` na Análise Financeira
-reprova a contagem; apagar o argumento não compila.
+reprova a contagem; apagar o argumento não compila. (3) E a terceira volta da mesma classe (P2 do
+App, rodada 4): a classe de sinal é da LINHA e passou a seguir o R$ inteiro, mas R$/m² e % VGV
+seguiam formatando o valor CRU — para −R$ 0,30 a linha mostrava `0` · `(0)` · `-0,0%`, tudo verde.
+Conserto: `semZeroNegativo` (`frontend/viab-format.ts`) — quando o R$ publica 0, o valor que alimenta
+as duas derivadas vira 0; fora dessa faixa é o cru (a magnitude de R$/m² e % VGV não é arredondada).
+Uma função para `celulaProformaM2` (Preliminar), `pctVgvProforma` (tela + CSV + PDF) e
+`celulaM2ProformaAv` (Avançado, extraída da closure para ser aferível); testes confrontam, valor a
+valor, que a R$/m² tem parêntese e a % VGV tem sinal exatamente quando a classe da linha é `neg`.
 
 ---
 

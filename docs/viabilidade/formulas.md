@@ -429,7 +429,7 @@ dízima e retornar exatamente ao mesmo canônico.
 | `frontend/viab-format.ts:11-23` — `fmtR$` (`CASAS_DECIMAIS_MONETARIAS = 2`) | 2 | ✅ |
 | `frontend/exportar.ts:16` — importa `fmtR$`, sem formatador próprio | 2 | ✅ |
 | `frontend/exportar.ts` — `celulaProforma` (CSV e PDF da Proforma), desde 2026-08-28 a MESMA função da tela, com a notação de sinal junto | **0** | ✅ fonte única com a tabela da Proforma — **terceira exceção ao C7 (#754)**: a coluna R$ da Proforma sai em inteiros, tela e arquivo juntos |
-| `frontend/exportar.ts:334` — `celulaFx` (CSV e PDF), desde a #449 delega para `celula` de `viab-format.ts` — fonte única com a tela | 2 | ✅ corte em R$ 0,005 |
+| `frontend/exportar.ts:339` — `celulaFx` (CSV e PDF), desde a #449 delega para `celula` de `viab-format.ts` — fonte única com a tela | 2 | ✅ corte em R$ 0,005 |
 | `frontend/tela-financeiro.ts:154` — `_n` (`casas-decimais="2"`) | 2 | ✅ |
 | `frontend/tela-empreendimento-tipologias.ts:178` | 2 (default) | ✅ |
 | `frontend/tela-fluxo-custos.ts:673,933` — Orçamento em `rs` | 2 | ✅ |

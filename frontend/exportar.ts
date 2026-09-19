@@ -13,7 +13,7 @@ import { vgvBrutoDeProforma, type Proforma } from './proforma.js';
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira, semZeroNegativo } from './viab-format.js';
 import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
@@ -136,9 +136,13 @@ export function pctVgvProforma(r: NotacaoLinha, p: Proforma): string {
   // relação que a própria tabela ainda não fechou naquele ponto.
   if (r.semPct) return '—';
   if (p.vgv <= 0) return '—';
+  // #754: herda o sinal do R$ publicado — quando a coluna R$ mostra "0", esta
+  // não mostra "-0,0%" (`semZeroNegativo`, `frontend/viab-format.ts`). Vale
+  // para tela, CSV e PDF de uma vez, porque os três chamam esta função.
+  const v = semZeroNegativo(r.v);
   return r.tipo === 'resultado'
-    ? fmtPct(r.v / p.vgv * 100)
-    : fmtPct(Math.abs(r.v) / p.vgv * 100);
+    ? fmtPct(v / p.vgv * 100)
+    : fmtPct(Math.abs(v) / p.vgv * 100);
 }
 
 export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {

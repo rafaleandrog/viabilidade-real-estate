@@ -149,6 +149,21 @@ export function inteiroExibido(v: number): number {
   return (Math.sign(valor) * Math.round(Math.abs(valor))) || 0;
 }
 
+/**
+ * #754 — as colunas DERIVADAS da linha da Proforma (R$/m², % VGV) herdam o
+ * sinal do R$ publicado. Quando a coluna R$ publica "0" (|v| < 0,5), o valor
+ * cru que alimenta as outras duas vira 0 — senão a mesma linha mostraria "0"
+ * em R$ e "(0)" / "-0,0%" em R$/m² e % VGV, com a classe de sinal da linha
+ * (que segue o R$) pintando de positivo um texto com marca de negativo
+ * (achado P2 do App do Codex no PR 758, rodada 4). Fora dessa faixa devolve
+ * o valor CRU: a magnitude de R$/m² e % VGV não é arredondada, só o ruído de
+ * zero negativo sai. Uma função para as três superfícies (Preliminar,
+ * Avançado, CSV/PDF), para a regra não divergir por cópia.
+ */
+export function semZeroNegativo(v: number): number {
+  return inteiroExibido(v) === 0 ? 0 : v;
+}
+
 export function celulaInteira(v: number, opcoes: OpcoesCelula = { comParenteses: true }): string {
   const arredondado = inteiroExibido(v);
   if (!opcoes.sempreExibir && arredondado === 0) return '';

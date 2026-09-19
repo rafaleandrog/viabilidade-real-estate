@@ -7,6 +7,7 @@ import {
 } from './tela-proforma.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
 import { fmtR$, fmtNum } from './viab-format.js';
+import { pctVgvProforma } from './exportar.js';
 import {
   ESTUDO_SENSIBILIDADE, PRODUTOS_SENSIBILIDADE, FATOR_BEAR, FATOR_BULL,
   VGV_BASE, VGV_BEAR, VGV_BULL,
@@ -82,6 +83,31 @@ test('#567 celulaProformaM2: mesma regra de sinal da coluna R$, formatação pr�
   assert.equal(celulaProformaM2({ v: -100_000, tipo: 'consolidado', natureza: 'receita' }, areaVendavel), `(${fmtNum(100)})`);
   assert.equal(celulaProformaM2({ v: 50_000, tipo: 'consolidado' }, areaVendavel), `(${fmtNum(50)})`); // custo: sempre parênteses
   assert.equal(celulaProformaM2({ v: -50_000, tipo: 'resultado' }, areaVendavel), `(${fmtNum(50)})`);
+});
+
+test('#754: R$/m² e % VGV herdam o sinal do R$ publicado — "0" em R$ nunca vem com "(0)" ou "-0,0%" ao lado', () => {
+  const areaVendavel = 1_000;
+  const p = { vgv: 10_000_000 } as Proforma;
+  // Faixa em que o R$ publica "0" (|v| < 0,5): sem marca de negativo nas derivadas.
+  assert.equal(celulaProformaM2({ v: -0.3, tipo: 'resultado' }, areaVendavel), '0');
+  assert.equal(pctVgvProforma({ v: -0.3, tipo: 'resultado' } as Linha, p), '0,0%');
+  assert.equal(celulaProformaM2({ v: -0.49, tipo: 'consolidado', natureza: 'receita' }, areaVendavel), '0');
+  // Fora dela, o valor CRU: a magnitude não é arredondada, e o sinal é o do valor.
+  assert.equal(celulaProformaM2({ v: -0.6, tipo: 'resultado' }, areaVendavel), '(0)');
+  assert.equal(pctVgvProforma({ v: -0.6, tipo: 'resultado' } as Linha, p), '-0,0%');
+  assert.equal(celulaProformaM2({ v: -1_234.56, tipo: 'resultado' }, areaVendavel), '(1)');
+  assert.equal(pctVgvProforma({ v: -2_500_000, tipo: 'resultado' } as Linha, p), '-25,0%');
+  assert.equal(pctVgvProforma({ v: 2_500_000, tipo: 'resultado' } as Linha, p), '25,0%');
+  // Custo: sempre entre parênteses (#567), inclusive na faixa do zero; % VGV em módulo.
+  assert.equal(celulaProformaM2({ v: 0.3, tipo: 'consolidado' }, areaVendavel), '(0)');
+  assert.equal(pctVgvProforma({ v: -0.3, tipo: 'consolidado' } as Linha, p), '0,0%');
+  // A linha inteira concorda com a classe que `_renderTabela` deriva do R$ publicado.
+  for (const v of [-1_000_000, -1, -0.5, -0.49, -0.3, -0, 0, 0.3, 1]) {
+    const r = { v, tipo: 'resultado' } as Linha;
+    const neg = (Math.abs(v) >= 0.5) && v < 0;   // = `inteiroExibido(v) < 0`
+    assert.equal(celulaProformaM2(r, areaVendavel).startsWith('('), neg, `R$/m² para ${v}`);
+    assert.equal(pctVgvProforma(r, p).startsWith('-'), neg, `% VGV para ${v}`);
+  }
 });
 
 test('#567 celulaProformaM2: área vendável zerada ou negativa vira "—" (guarda de divisão por zero, comportamento preexistente)', () => {

@@ -1166,7 +1166,10 @@ Git Bash — ver PROGRESSO).
   > exportação da Proforma**: CSV e PDF compartilham `celulaProforma` com a tela, e a paridade
   > tela×arquivo é contrato (`frontend/proforma-ordem-linhas.test.ts`) — arredondar só na tela
   > quebraria a paridade. É arredondamento de EXIBIÇÃO: nada persistido muda, o motor segue em 2
-  > casas, e `% VGV` e `R$/m²` (já inteira) não são alcançadas. (c) Não alcança o Fluxo de Caixa
+  > casas, e `% VGV` e `R$/m²` (já inteira) não mudam de precisão — mas **herdam o sinal do R$
+  > publicado** (`semZeroNegativo`, `frontend/viab-format.ts`): quando a coluna R$ mostra `0`, as
+  > duas derivadas não mostram `(0)` nem `-0,0%`, porque a classe de sinal é da LINHA e segue o R$
+  > (achado do App do Codex na revisão). (c) Não alcança o Fluxo de Caixa
   > (`celula`/`celulaFx`, 2 casas), as outras tabelas de `tela-fluxo-ver.ts` ("Fluxo de Caixa Livre ×
   > Fluxo de Caixa" e "ROI do projeto"), nem os textos de detalhe dentro do card da Proforma. Quem a
   > implementa é `celulaInteira` (`frontend/viab-format.ts`) — símbolo próprio, e **não** um parâmetro

@@ -24,9 +24,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { sinalLinhaProformaAv } from './tela-fluxo-ver.js';
+import { sinalLinhaProformaAv, celulaM2ProformaAv } from './tela-fluxo-ver.js';
 import { sinalSensibilidade } from './tela-proforma.js';
-import { celulaInteira, fmtR$ } from './viab-format.js';
+import { celulaInteira, fmtR$, semZeroNegativo } from './viab-format.js';
 
 const PRELIMINAR = readFileSync(new URL('./tela-proforma.ts', import.meta.url), 'utf8');
 const AVANCADO = readFileSync(new URL('./tela-fluxo-ver.ts', import.meta.url), 'utf8');
@@ -177,7 +177,8 @@ test('#593: receita e resultado recebem o sinal do próprio valor', () => {
   assert.equal(sinalLinhaProformaAv(linha('receita', -3), 'inteira'), 'neg');
   assert.equal(sinalLinhaProformaAv(linha('resultado', 2_500_000), 'inteira'), 'pos');
   assert.equal(sinalLinhaProformaAv(linha('resultado', -2_500_000), 'inteira'), 'neg');
-  // Zero é `pos`, não `neg` — mesma convenção do Preliminar (`v < 0`).
+  // Zero é `pos`, não `neg` — mesma convenção do Preliminar (sinal sobre o
+  // valor PUBLICADO, `inteiroExibido(v) < 0`, desde a #754).
   assert.equal(sinalLinhaProformaAv(linha('resultado', 0), 'inteira'), 'pos');
 });
 
@@ -264,3 +265,28 @@ test('#754: cada tabela de tela-fluxo-ver.ts declara o formatador que a sua cél
   assert.equal(contar(/sinalLinhaProformaAv\([^)]*\}, 'centavos'\)/g), 3, 'Análise Financeira: três chamadas, centavos');
   assert.equal(contar(/sinalLinhaProformaAv\(/g), 4 + 1, 'total = 4 chamadas + a declaração');
 });
+
+test('#754: R$/m² do Avançado herda o sinal do R$ publicado — "0" em R$ nunca vem com "(0)" ao lado', () => {
+  const AREA = 1_000;
+  // Faixa em que o R$ publica "0": nada de marca de negativo nas derivadas.
+  assert.equal(celulaM2ProformaAv({ tipo: 'receita', valor: -0.3 }, AREA), '0');
+  assert.equal(celulaM2ProformaAv({ tipo: 'resultado', valor: -0.49 }, AREA), '0');
+  // Fora dela, o valor CRU: magnitude intacta e sinal do próprio valor.
+  assert.equal(celulaM2ProformaAv({ tipo: 'resultado', valor: -0.6 }, AREA), '(0)');
+  assert.equal(celulaM2ProformaAv({ tipo: 'resultado', valor: -2_500_000 }, AREA), '(2.500)');
+  assert.equal(celulaM2ProformaAv({ tipo: 'receita', valor: 12_000_000 }, AREA), '12.000');
+  // Custo: sempre entre parênteses (#742), inclusive na faixa do zero.
+  assert.equal(celulaM2ProformaAv({ tipo: 'custo', valor: 0.3 }, AREA), '(0)');
+  assert.equal(celulaM2ProformaAv({ tipo: 'custo', valor: 1_000_000 }, AREA), '(1.000)');
+  assert.equal(celulaM2ProformaAv({ tipo: 'receita', valor: 1 }, 0), '—');
+  // A linha inteira concorda: onde o R$ é 'pos' por publicar "0", a R$/m² não
+  // tem parêntese; onde é 'neg', tem. Confronto direto, valor a valor.
+  for (const v of [-1_000_000, -1, -0.5, -0.49, -0.3, -0, 0, 0.3, 1]) {
+    const sinal = sinalLinhaProformaAv({ tipo: 'resultado', valor: v }, 'inteira');
+    const m2 = celulaM2ProformaAv({ tipo: 'resultado', valor: v }, AREA);
+    assert.equal(m2.startsWith('('), sinal === 'neg', `valor ${v}: R$/m² "${m2}" com classe ${sinal}`);
+    assert.equal(semZeroNegativo(v) === 0, sinal === 'pos' && inteiroZero(v), `valor ${v}`);
+  }
+});
+
+function inteiroZero(v: number): boolean { return Math.abs(v) < 0.5; }

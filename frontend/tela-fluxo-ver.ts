@@ -5,7 +5,7 @@ import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, rotuloMesRelativo,
   type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celulaInteira, inteiroExibido, negativoContabil } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celulaInteira, inteiroExibido, semZeroNegativo, negativoContabil } from './viab-format.js';
 import {
   proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi,
   comInformativasAntesDoResultado,
@@ -62,6 +62,19 @@ import {
  * "-R$ 0,30" da Análise Financeira — achado P2 do App do Codex no PR 758.
  */
 export type ExibicaoR$ = 'inteira' | 'centavos';
+
+/**
+ * #754 — coluna R$/m² da Proforma do Avançado. Exportada (era closure de
+ * `_renderProforma`) para a regra de sinal ficar aferível sem montar a tela:
+ * herda o sinal do R$ publicado — quando a coluna R$ mostra "0", esta não
+ * mostra "(0)" (`semZeroNegativo`); custo sempre entre parênteses (#742).
+ */
+export function celulaM2ProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>, areaPrivativa: number): string {
+  if (areaPrivativa <= 0) return '—';
+  const v = semZeroNegativo(l.valor);
+  const abs = fmtNum(Math.abs(v / areaPrivativa));
+  return negativoContabil(v, l.tipo === 'custo') ? `(${abs})` : abs;
+}
 
 export function sinalLinhaProformaAv(
   l: Pick<LinhaProformaAv, 'tipo' | 'valor'>,
@@ -547,7 +560,6 @@ export class ViabFluxoVer extends LitElement {
     // renderizada de fato.
     const informativas = [informativa, informativaEvi].filter((l): l is LinhaProformaAv => l !== null);
     const linhas: LinhaProformaAv[] = comInformativasAntesDoResultado(p.linhas, informativas);
-    const porM2 = (v: number) => (p.areaPrivativa > 0 ? v / p.areaPrivativa : 0);
     // #427 — % VGV de toda linha usa o VGV puro, EXCETO os fechos cujo
     // `pctOverride` já veio calculado com a base própria (`= Resultado +
     // Permutas` soma a permuta física ao denominador — ver proforma-avancado.ts).
@@ -562,11 +574,7 @@ export class ViabFluxoVer extends LitElement {
     // Só linha de CUSTO entra sempre entre parênteses (a app grava custo como
     // valor positivo); receita/resultado/informativo mostram o sinal real.
     const ehCusto = (l: LinhaProformaAv) => l.tipo === 'custo';
-    const celulaM2 = (l: LinhaProformaAv): string => {
-      if (p.areaPrivativa <= 0) return '—';
-      const abs = fmtNum(Math.abs(porM2(l.valor)));
-      return negativoContabil(l.valor, ehCusto(l)) ? `(${abs})` : abs;
-    };
+    const celulaM2 = (l: LinhaProformaAv): string => celulaM2ProformaAv(l, p.areaPrivativa);
     // #742 — espaçamento visual entre os 4 blocos da Proforma (dedução de
     // receita+Receita líquida / custo direto+Receita operacional / custo
     // indireto / rodapé de resultado), no molde da planilha de referência:
@@ -611,7 +619,9 @@ export class ViabFluxoVer extends LitElement {
                   // VGV. Trocar de volta seria escrever uma armadilha para essa
                   // linha futura. Não é conserto de defeito vivo — é guarda, e
                   // está declarada como tal em vez de contada como entrega.
-                  l.pctOverride !== undefined ? l.pctOverride : pctVgv(l.valor),
+                  // #754: herda o sinal do R$ publicado (`semZeroNegativo`) —
+                  // quando a coluna R$ mostra "0", esta não mostra "-0,0%".
+                  l.pctOverride !== undefined ? l.pctOverride : pctVgv(semZeroNegativo(l.valor)),
                 )}</td>
               </tr>
               ${ESPACO_APOS.has(l.nome) ? html`<tr class="espaco"><td colspan="4"></td></tr>` : nothing}`;

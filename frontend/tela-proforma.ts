@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil, inteiroExibido } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil, inteiroExibido, semZeroNegativo } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, vgvBrutoDeProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 // ⚠️ `ehLinhaReceitaOuResultado`/`celulaProforma` MUDARAM DE ARQUIVO na
@@ -47,8 +47,11 @@ export interface Linha {
 // e sem "/m²": a unidade já está no cabeçalho "R$/m²"). #9/#33.
 export function celulaProformaM2(r: Pick<Linha, 'v' | 'tipo' | 'natureza'>, areaVendavel: number): string {
   if (areaVendavel <= 0) return '—';
-  const abs = fmtNum(Math.abs(r.v / areaVendavel));
-  return negativoContabil(r.v, !ehLinhaReceitaOuResultado(r)) ? `(${abs})` : abs;
+  // #754: herda o sinal do R$ publicado — quando a coluna R$ mostra "0", esta
+  // não mostra "(0)" (`semZeroNegativo`, `frontend/viab-format.ts`).
+  const v = semZeroNegativo(r.v);
+  const abs = fmtNum(Math.abs(v / areaVendavel));
+  return negativoContabil(v, !ehLinhaReceitaOuResultado(r)) ? `(${abs})` : abs;
 }
 
 // BUG7-08: mesmo conjunto de variáveis estressáveis que o motor resolve —
