@@ -295,29 +295,40 @@ test('#754: R$/m² do Avançado herda o sinal do R$ publicado — "0" em R$ nunc
 
 test('#754: % VGV do Avançado herda o sinal do R$ publicado — nos DOIS ramos, override incluído', () => {
   const VGV = 10_000_000;
+  const res = (valor: number, pctOverride?: number | null) =>
+    ({ tipo: 'resultado', valor, ...(pctOverride === undefined ? {} : { pctOverride }) }) as any;
   // Ramo do VGV puro (sem override).
-  assert.equal(pctVgvProformaAv({ valor: -0.3 }, VGV), (0.3 / VGV) * 100, 'em módulo, magnitude intacta');
-  assert.equal(pctVgvProformaAv({ valor: -0.6 }, VGV), (-0.6 / VGV) * 100);
+  assert.equal(pctVgvProformaAv(res(-0.3), VGV), (0.3 / VGV) * 100, 'em módulo, magnitude intacta');
+  assert.equal(pctVgvProformaAv(res(-0.6), VGV), (-0.6 / VGV) * 100);
   // Denominador minúsculo: a conta certa sobrevive, só o sinal sai; positivo na faixa passa intacto.
-  assert.equal(pctVgvProformaAv({ valor: -0.3 }, 0.49), (0.3 / 0.49) * 100);
-  assert.equal(pctVgvProformaAv({ valor: 0.3 }, 0.49), (0.3 / 0.49) * 100);
-  assert.equal(pctVgvProformaAv({ valor: 0.49 }, 0.49), 100, 'Receita bruta de um VGV de R$ 0,49 é 100%, não 0%');
-  assert.equal(pctVgvProformaAv({ valor: -2_500_000 }, VGV), -25);
-  assert.equal(pctVgvProformaAv({ valor: 1 }, 0), null, 'VGV ≤ 0 → null, nunca 0 (#604)');
+  assert.equal(pctVgvProformaAv(res(-0.3), 0.49), (0.3 / 0.49) * 100);
+  assert.equal(pctVgvProformaAv(res(0.3), 0.49), (0.3 / 0.49) * 100);
+  assert.equal(pctVgvProformaAv({ tipo: 'receita', valor: 0.49 } as any, 0.49), 100, 'Receita bruta de um VGV de R$ 0,49 é 100%, não 0%');
+  assert.equal(pctVgvProformaAv(res(-2_500_000), VGV), -25);
+  assert.equal(pctVgvProformaAv(res(1), 0), null, 'VGV ≤ 0 → null, nunca 0 (#604)');
   // Ramo do override — as três linhas de fecho de `proforma-avancado.ts` vêm por
   // aqui, com o percentual PRÉ-CALCULADO do valor cru: era a fresta que sobrou.
-  assert.equal(pctVgvProformaAv({ valor: -0.3, pctOverride: -0.000003 }, VGV), 0.000003);
-  assert.equal(pctVgvProformaAv({ valor: -0.3, pctOverride: -61.2 }, 0.49), 61.2, 'override em módulo, magnitude intacta');
-  assert.equal(pctVgvProformaAv({ valor: -0.6, pctOverride: -0.000006 }, VGV), -0.000006);
-  assert.equal(pctVgvProformaAv({ valor: -2_500_000, pctOverride: -20 }, VGV), -20, 'override vence o VGV puro');
-  assert.equal(pctVgvProformaAv({ valor: 5, pctOverride: null }, VGV), null, '`null` é "base própria inválida", não "sem override" (#604)');
+  assert.equal(pctVgvProformaAv(res(-0.3, -0.000003), VGV), 0.000003);
+  assert.equal(pctVgvProformaAv(res(-0.3, -61.2), 0.49), 61.2, 'override em módulo, magnitude intacta');
+  assert.equal(pctVgvProformaAv(res(-0.6, -0.000006), VGV), -0.000006);
+  assert.equal(pctVgvProformaAv(res(-2_500_000, -20), VGV), -20, 'override vence o VGV puro');
+  assert.equal(pctVgvProformaAv(res(5, null), VGV), null, '`null` é "base própria inválida", não "sem override" (#604)');
+  // CUSTO não é normalizado: guarda `valor` NEGATIVO no Avançado, não recebe classe
+  // de sinal, e o percentual negativo é a leitura normal da coluna — inclusive na
+  // faixa do zero (App do Codex, rodada 11: com VGV 0,49 um custo de −0,30 é
+  // "-61,2%", não "61,2%"). Informativo idem.
+  assert.equal(pctVgvProformaAv({ tipo: 'custo', valor: -0.3 } as any, 0.49), (-0.3 / 0.49) * 100);
+  assert.equal(pctVgvProformaAv({ tipo: 'custo', valor: -1_000_000 } as any, VGV), -10);
+  assert.equal(pctVgvProformaAv({ tipo: 'informativo', valor: -0.3 } as any, 0.49), (-0.3 / 0.49) * 100);
   // A linha inteira concorda com a classe: o texto da % VGV tem sinal exatamente
-  // quando a classe da linha é `neg` — nos dois ramos.
-  for (const v of [-1_000_000, -1, -0.5, -0.49, -0.3, -0, 0, 0.3, 1]) {
-    const sinal = sinalLinhaProformaAv({ tipo: 'resultado', valor: v }, 'inteira');
-    for (const l of [{ valor: v }, { valor: v, pctOverride: (v / VGV) * 100 }]) {
-      const txt = fmtPctOuIndef(pctVgvProformaAv(l, VGV));
-      assert.equal(txt.startsWith('-'), sinal === 'neg', `valor ${v}, override=${'pctOverride' in l}: "${txt}" com classe ${sinal}`);
+  // quando a classe da linha é `neg` — nos dois ramos, para receita e resultado.
+  for (const tipo of ['receita', 'resultado'] as const) {
+    for (const v of [-1_000_000, -1, -0.5, -0.49, -0.3, -0, 0, 0.3, 1]) {
+      const sinal = sinalLinhaProformaAv({ tipo, valor: v }, 'inteira');
+      for (const l of [{ tipo, valor: v }, { tipo, valor: v, pctOverride: (v / VGV) * 100 }]) {
+        const txt = fmtPctOuIndef(pctVgvProformaAv(l as any, VGV));
+        assert.equal(txt.startsWith('-'), sinal === 'neg', `${tipo} ${v}, override=${'pctOverride' in l}: "${txt}" com classe ${sinal}`);
+      }
     }
   }
 });

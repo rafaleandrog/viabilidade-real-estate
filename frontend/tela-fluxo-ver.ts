@@ -102,16 +102,23 @@ export function celulaM2ProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>, a
  * `proforma-avancado.ts`, e normalizar só o ramo do VGV puro deixava
  * exatamente essas linhas de fora (achado do App do Codex e da lente na
  * rodada 5 do PR 758). Fora dessa faixa o percentual é o cru.
+ *
+ * ⚠️ SÓ receita e resultado — as linhas que recebem a classe `pos`/`neg`
+ * (`sinalLinhaProformaAv`) e cujo texto tem de acompanhá-la. Linha de CUSTO
+ * guarda `valor` NEGATIVO no Avançado, não recebe classe, e o seu percentual
+ * negativo é a leitura normal da coluna: normalizá-la publicaria "61,2%"
+ * onde a conta é "-61,2%" (achado P2 do App do Codex na rodada 11).
  */
 export function pctVgvProformaAv(
-  l: Pick<LinhaProformaAv, 'valor' | 'pctOverride'>,
+  l: Pick<LinhaProformaAv, 'tipo' | 'valor' | 'pctOverride'>,
   vgv: number,
 ): number | null {
   const pct = l.pctOverride !== undefined
     ? l.pctOverride
     : (vgv > 0 ? (l.valor / vgv) * 100 : null);
   if (pct === null) return null;
-  return inteiroExibido(l.valor) === 0 ? Math.abs(pct) : pct;
+  const comClasseDeSinal = l.tipo === 'receita' || l.tipo === 'resultado';
+  return comClasseDeSinal && inteiroExibido(l.valor) === 0 ? Math.abs(pct) : pct;
 }
 
 export function sinalLinhaProformaAv(
