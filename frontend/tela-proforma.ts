@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtR$Milhoes, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
+import { fmtR$, fmtR$Milhoes, fmtNum, fmtPct, fmtPctOuIndef, negativoContabil, inteiroExibido, semZeroNegativo } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, vgvBrutoDeProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 import { rankearAlavancas, ehCustoLike, ehCircular } from './tornado-alavancas.js';
@@ -51,8 +51,11 @@ export interface Linha {
 // e sem "/m²": a unidade já está no cabeçalho "R$/m²"). #9/#33.
 export function celulaProformaM2(r: Pick<Linha, 'v' | 'tipo' | 'natureza'>, areaVendavel: number): string {
   if (areaVendavel <= 0) return '—';
-  const abs = fmtNum(Math.abs(r.v / areaVendavel));
-  return negativoContabil(r.v, !ehLinhaReceitaOuResultado(r)) ? `(${abs})` : abs;
+  // #754: herda o sinal do R$ publicado — quando a coluna R$ mostra "0", esta
+  // não mostra "(0)" (`semZeroNegativo`, `frontend/viab-format.ts`).
+  const v = semZeroNegativo(r.v);
+  const abs = fmtNum(Math.abs(v / areaVendavel));
+  return negativoContabil(v, !ehLinhaReceitaOuResultado(r)) ? `(${abs})` : abs;
 }
 
 // BUG7-08: mesmo conjunto de variáveis estressáveis que o motor resolve —
@@ -87,7 +90,8 @@ export function celulaSensibilidade(v: number, natureza: NaturezaSensibilidade):
  * "receita boa" um valor negativo.
  */
 export function sinalSensibilidade(v: number, natureza: NaturezaSensibilidade): '' | 'pos' | 'neg' {
-  return natureza === 'receita' ? (v < 0 ? 'neg' : 'pos') : '';
+  // #754: sobre o valor PUBLICADO (inteiro arredondado), como a tabela principal.
+  return natureza === 'receita' ? (inteiroExibido(v) < 0 ? 'neg' : 'pos') : '';
 }
 
 /** Dados de fora do motor que `montarLinhasProforma` precisa (equivalente ao
@@ -655,7 +659,9 @@ export class ViabTelaProforma extends LitElement {
               // ganhava a classe, e "Receita líquida"/"Receita operacional"
               // (`natureza: 'receita'`) num estudo deficitário ficavam sem
               // nenhuma marca visual mesmo exibindo o valor negativo.
-              const sinal = ehLinhaReceitaOuResultado(r) ? (r.v < 0 ? 'neg' : 'pos') : '';
+              // #754: o sinal segue o valor PUBLICADO (inteiro arredondado), não o cru —
+              // −R$ 0,30 mostra "0" e não pode sair pintado de negativo.
+              const sinal = ehLinhaReceitaOuResultado(r) ? (inteiroExibido(r.v) < 0 ? 'neg' : 'pos') : '';
               return html`<tr class=${cls}>
                 <td>
                   ${r.toggle
@@ -885,14 +891,15 @@ export class ViabTelaProforma extends LitElement {
       { l: 'Custo obras / VGV', f: (c) => c.p.custoObrasVgvPct, natureza: 'despesa', pct: true, badge: true, bmCampo: 'custo_obras_vgv', divisoria: true },
       { l: 'Margem sobre VGV', f: (c) => c.p.margemLiquidaPct, natureza: 'receita', pct: true, badge: true, bmCampo: 'margem_liquida' },
     ];
-    // BUG7-12: sem símbolo "R$" — número puro com 2 casas decimais.
+    // BUG7-12: sem símbolo "R$" — número puro (o cabeçalho da coluna já o diz).
     // #492: `fmtNum` com 2 casas dava *até* 2 casas (declara só o
     // `maximumFractionDigits`, nunca o `minimumFractionDigits`), então
     // a vírgula decimal não batia entre as linhas de uma coluna alinhada à direita.
-    // #568: o arredondamento monetário do contrato C7 (#281) continua o mesmo —
-    // ele agora chega por `celulaSensibilidade`, que é `celulaProforma`, que é
-    // `celula`/`fmtR$(v, false)`. O que muda é a NOTAÇÃO: despesa entre
-    // parênteses, receita/resultado com o sinal real, igual à tabela principal.
+    // #568: a formatação chega por `celulaSensibilidade`, que é `celulaProforma`
+    // — e a NOTAÇÃO é a da tabela principal: despesa entre parênteses,
+    // receita/resultado com o sinal real. #754: `celulaProforma` publica
+    // INTEIROS (`celulaInteira`, terceira exceção de exibição ao C7), então
+    // esta tabela herda os inteiros da tabela principal — sem casa decimal.
     // #571: `v === null` só acontece nas duas linhas `pct: true` com o
     // cenário em VGV ≤ 0 — "—", nunca "0,0%". As monetárias nunca chegam `null`.
     const fmt = (m: { pct?: boolean; natureza: Natureza }, v: number | null) =>

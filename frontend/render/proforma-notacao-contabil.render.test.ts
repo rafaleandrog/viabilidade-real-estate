@@ -30,6 +30,14 @@ test('Proforma deficitária: Receita operacional e Resultado negativos chegam à
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 });
 
+test('#754: a coluna R$ da Proforma publica INTEIROS na tela — sonda de DOM contra realocação', { skip: pular ?? false }, async () => {
+  const a = await verificarRender({ caso: 'proforma-deficitaria', larguras: [1280] });
+  const m = a.extra?.['1280'] as { celulasRs: number; comCentavos: string[] } | undefined;
+  assert.ok(m, 'o caso não devolveu a medida extra — `medir()` não rodou' + relato(a));
+  assert.ok(m!.celulasRs >= 5, `poucas células R$ medidas (${m!.celulasRs}) — a tabela não montou inteira` + relato(a));
+  assert.deepEqual(m!.comCentavos, [], 'célula da coluna R$ da Proforma publicou centavos — a exceção de inteiros (#754) não chegou à tela' + relato(a));
+});
+
 test('Proforma deficitária: a cor de negativo (vermelho, não o verde fixo de receita) resolve em todas as variantes de tema', { skip: pular ?? false }, async () => {
   const a = await verificarRender({ caso: 'proforma-deficitaria', larguras: [1280] });
 

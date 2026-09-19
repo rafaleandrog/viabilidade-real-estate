@@ -67,4 +67,20 @@ export const caso = {
     raiz.appendChild(el);
     await (el as any).updateComplete;
   },
+  // #754: a sonda de DOM contra REALOCAÇÃO — a trava `proforma-inteiros.test.ts`
+  // conta chamadas de `celulaInteira(` por arquivo, e contagem não vê a chamada
+  // movida para um ponto morto com a célula devolvida a `fmtR$` (mesmo limite
+  // que `cascata-milhoes.test.ts` documenta e fecha com a sonda de
+  // `casos/grafico-cascata.ts`). Só o texto publicado na tela responde isso:
+  // toda célula da coluna R$ tem de sair SEM centavos.
+  async medir(raiz: HTMLElement): Promise<{ celulasRs: number; comCentavos: string[] }> {
+    const tela = raiz.querySelector('viab-tela-proforma')! as any;
+    // A linha da `table.pf` tem CINCO células: toggle+nome, memo (`.desc`), R$,
+    // R$/m², % VGV — a coluna R$ é a TERCEIRA. A primeira versão desta sonda lia
+    // a segunda (o memo) e ficava verde para sempre: bloqueante da rodada 2.
+    const textos = [...tela.shadowRoot!.querySelectorAll('table.pf tr td:nth-child(3)')]
+      .map((td) => ((td as HTMLElement).textContent ?? '').trim())
+      .filter((t) => /\d/.test(t));
+    return { celulasRs: textos.length, comCentavos: textos.filter((t) => /\d,\d{2}\)?$/.test(t)) };
+  },
 };

@@ -22,14 +22,16 @@ export function fmtR$(v: number, comSimbolo = true): string {
   return new Intl.NumberFormat('pt-BR', opcoes).format(v || 0);
 }
 /**
- * #581 — EXCEÇÃO DECLARADA ao contrato C7, e a única que existe.
+ * #581 — a PRIMEIRA exceção declarada ao contrato C7 (hoje são três: esta,
+ * `fmtR$Milhoes` e `celulaInteira` — ver `CLAUDE.md` § Contratos inegociáveis).
  *
  * Decisão do autor em 2026-08-26 (leva Avançado, item 4): "ajustar valores em
  * R$ nos urbi-kpis para não terem casas decimais". Ela vale **só para o valor
  * exibido no card de KPI** — a figura grande que o card publica. Persistência,
- * entrada, motor, tabelas, Proforma, Fluxo de Caixa e exportação continuam em
- * 2 casas, sem exceção: `R$ 171.448.400` num card e `R$ 171.448.400,00` numa
- * linha de tabela são O MESMO número, e a diferença é tipográfica.
+ * entrada, motor, Fluxo de Caixa e as demais tabelas continuam em 2 casas (a
+ * Proforma tem a SUA exceção, `celulaInteira`, #754): `R$ 171.448.400` num card
+ * e `R$ 171.448.400,00` numa linha do Fluxo de Caixa são O MESMO número, e a
+ * diferença é tipográfica.
  *
  * ⚠️ É uma função PRÓPRIA, e não um segundo parâmetro de `fmtR$`, de propósito.
  * Parâmetro opcional espalharia a exceção por um argumento que qualquer
@@ -73,8 +75,9 @@ export function fmtR$Kpi(v: number): string {
  * ⚠️ É a SEGUNDA exceção declarada ao contrato C7 ("todo valor monetário
  * resultado de fórmula tem 2 casas"), depois de `fmtR$Kpi` (#581). Ela vale
  * **só** para o rótulo que a barra publica: persistência, entrada, motor,
- * tabelas, Proforma, Fluxo de Caixa e exportação continuam em 2 casas, sem
- * exceção — e o valor exato, com as 2 casas, continua acessível no `title` de
+ * Fluxo de Caixa e as demais tabelas continuam em 2 casas (a Proforma tem a
+ * SUA exceção, `celulaInteira`, #754) — e o valor exato, com as 2 casas,
+ * continua acessível no `title` de
  * cada coluna. Ver `CLAUDE.md` § Contratos inegociáveis.
  *
  * Símbolo próprio, e não um parâmetro de `fmtR$`, pelo mesmo motivo de
@@ -99,6 +102,80 @@ export function fmtR$Milhoes(v: number): string {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   }).format(Math.abs(milhoes) < 0.05 ? 0 : milhoes);
+}
+
+/**
+ * Célula da coluna **R$ da Proforma** — Preliminar e Avançado, tela, tabela de
+ * sensibilidade, CSV e PDF —, em **inteiros**: `283.411.826,35` sai
+ * `283.411.826`; `(11.336.473,05)` sai `(11.336.473)`.
+ *
+ * ⚠️ É a TERCEIRA exceção declarada ao contrato C7 ("todo valor monetário
+ * resultado de fórmula tem 2 casas"), depois de `fmtR$Kpi` (#581) e
+ * `fmtR$Milhoes` (cascata). Pedido do autor em 2026-09-18 (#754): "todos
+ * [os valores em R$ do proforma] devem mostrar números inteiros sempre. Isso
+ * em qualquer proforma, preliminar ou avançado." Diferente das duas
+ * anteriores, esta ALCANÇA a exportação da Proforma (CSV/PDF): elas
+ * compartilham `celulaProforma` com a tela, e a paridade tela×arquivo é
+ * contrato (`frontend/proforma-ordem-linhas.test.ts`). O que NÃO muda:
+ * persistência, entrada, motor, Fluxo de Caixa (`celula`/`celulaFx`), as
+ * demais tabelas e os textos de detalhe dentro do card — tudo em 2 casas.
+ *
+ * Símbolo próprio, e não um parâmetro de `celula`/`fmtR$`, pelo mesmo motivo
+ * das duas anteriores: a exceção precisa ser **greppável**, e `celula` é a
+ * fonte única do Fluxo de Caixa. O inventário de call sites é travado por
+ * contagem exata em `frontend/proforma-inteiros.test.ts`. Não delega para
+ * `fmtR$Kpi` de propósito: `kpi-casas-decimais.test.ts` exige exatamente UMA
+ * ocorrência dele neste arquivo.
+ *
+ * Mesma regra de sinal de `celula` (`negativoContabil`), aplicada ao valor
+ * JÁ arredondado — como em `fmtR$Kpi`/`fmtR$Milhoes`: uma receita a −0,3
+ * arredonda para 0 e sai `0`, nunca `(0)`; um custo a 0 sai `(0)`, porque a
+ * app grava custo como valor positivo e a notação contábil marca despesa
+ * independente do sinal. `sempreExibir` tem a mesma semântica de `celula`,
+ * com o limiar de célula vazia no análogo inteiro (< 0,5).
+ */
+/**
+ * #754: o valor que a coluna R$ da Proforma PUBLICA — o inteiro já arredondado e
+ * com o sinal normalizado (−0,3 vira 0, nunca −0). É a fonte única para
+ * `celulaInteira` E para as classes de sinal (`pos`/`neg`) das linhas da
+ * Proforma: a classe tem de acompanhar o texto exibido, não o valor cru —
+ * senão uma receita a −R$ 0,30 publica "0" pintado de vermelho (achado P2 do
+ * App do Codex no PR 758). Half away from zero, como o Intl (e `fmtR$Kpi`);
+ * `Math.round(-0.5)` daria -0.
+ */
+export function inteiroExibido(v: number): number {
+  const valor = Number.isFinite(v) ? v : 0;
+  if (Math.abs(valor) < 0.5) return 0;
+  return (Math.sign(valor) * Math.round(Math.abs(valor))) || 0;
+}
+
+/**
+ * #754 — as colunas DERIVADAS da linha da Proforma (R$/m², % VGV) herdam o
+ * sinal do R$ publicado. Quando a coluna R$ publica "0" (|v| < 0,5), o valor
+ * cru que alimenta as outras duas perde o SINAL (vira o módulo) — senão a
+ * mesma linha mostraria "0" em R$ e "(0)" / "-0,0%" em R$/m² e % VGV, com a
+ * classe de sinal da linha (que segue o R$) pintando de positivo um texto com
+ * marca de negativo (achado P2 do App do Codex no PR 758, rodada 4). Só o
+ * SINAL é normalizado, nunca a magnitude: com um denominador minúsculo
+ * (área 0,01 m², VGV de R$ 0,49) a R$/m² e a % VGV de um valor na faixa do
+ * zero continuam sendo o número certo ("30", "61,2%"), e um valor POSITIVO
+ * na faixa passa intacto — zerar a magnitude publicaria "0,0%" onde a conta é
+ * 100% (achado P2 do App na rodada 7). Fora da faixa devolve o valor CRU. Uma
+ * função para as três superfícies (Preliminar, Avançado, CSV/PDF), para a
+ * regra não divergir por cópia.
+ */
+export function semZeroNegativo(v: number): number {
+  if (!Number.isFinite(v)) return 0;   // mesma guarda de `inteiroExibido`: NaN/Infinity publicam 0
+  return inteiroExibido(v) === 0 ? Math.abs(v) : v;
+}
+
+export function celulaInteira(v: number, opcoes: OpcoesCelula = { comParenteses: true }): string {
+  const arredondado = inteiroExibido(v);
+  if (!opcoes.sempreExibir && arredondado === 0) return '';
+  const abs = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    .format(Math.abs(arredondado));
+  if (!opcoes.comParenteses) return arredondado < 0 ? `-${abs}` : abs;
+  return negativoContabil(arredondado, !!opcoes.custo) ? `(${abs})` : abs;
 }
 
 export const fmtNum = (v: number, d = 0) =>

@@ -5,7 +5,7 @@ import {
   periodosAnuais, areaPrivativaTotalLinhas, mesRepasse, rotuloMesRelativo,
   type EventoCrono, type PeriodoAgregado,
 } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celulaInteira, inteiroExibido, semZeroNegativo, negativoContabil } from './viab-format.js';
 import {
   proformaAvancado, linhaInformativaFunding, linhaInformativaReceitaLiquidaEvi,
   comInformativasAntesDoResultado,
@@ -50,10 +50,87 @@ import {
  * o mapeamento fica aferível sem montar a tela, e apagar a CHAMADA
  * (`class="num ${sinal}"`) deixa o caso de render vermelho — que é onde a
  * fiação é medida.
+ *
+ * #754: a classe tem de acompanhar o TEXTO que a célula publica, não o valor
+ * cru — e o arquivo tem DUAS tabelas com formatadores diferentes. A Proforma
+ * (`_renderProforma`) publica `celulaInteira` (inteiro; −0,30 vira "0"), e a
+ * Análise Financeira (`_renderAnaliseFinanceira`) segue em `fmtR$` (2 casas;
+ * −0,30 vira "-R$ 0,30", e todo negativo leva o sinal de menos, inclusive o
+ * que arredonda a "-R$ 0,00"). Por isso `exibicao` é OBRIGATÓRIO, sem default:
+ * o chamador declara qual formatador a célula usa, e omitir é erro de
+ * compilação (TS2554), não um `'inteira'` silencioso pintando de verde um
+ * "-R$ 0,30" da Análise Financeira — achado P2 do App do Codex no PR 758.
  */
-export function sinalLinhaProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>): '' | 'pos' | 'neg' {
+export type ExibicaoR$ = 'inteira' | 'centavos';
+
+/**
+ * #754 — coluna R$/m² da Proforma do Avançado. Exportada (era closure de
+ * `_renderProforma`) para a regra de sinal ficar aferível sem montar a tela:
+ * herda o sinal do R$ publicado — quando a coluna R$ mostra "0", esta não
+ * mostra "(0)" (`semZeroNegativo`); custo sempre entre parênteses (#742).
+ */
+export function celulaM2ProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>, areaPrivativa: number): string {
+  if (areaPrivativa <= 0) return '—';
+  const v = semZeroNegativo(l.valor);
+  const abs = fmtNum(Math.abs(v / areaPrivativa));
+  return negativoContabil(v, l.tipo === 'custo') ? `(${abs})` : abs;
+}
+
+/**
+ * #754 — % VGV da linha da Proforma do Avançado, como NÚMERO (`null` = sem
+ * denominador; `fmtPctOuIndef` imprime "—"). Exportada para a regra ficar
+ * aferível sem montar a tela — e porque ela tem DOIS ramos que precisam da
+ * mesma normalização:
+ *
+ * ⚠️ #604 — `!== undefined`, e NÃO `??`, porque `null` em `pctOverride`
+ * significa "base própria inválida", não "sem override": o `??` cairia no VGV
+ * puro e publicaria um número com o denominador errado. Hoje essa troca é
+ * **inobservável**, e isso está MEDIDO — as três bases de `pctOverride`
+ * derivam de `receitaBruta` (`baseComPermutaFisica = receitaBruta +
+ * vgvPermutaFisica`, com a permuta ≥ 0) e `p.vgv` É `receitaBruta`, então
+ * `pctOverride === null` IMPLICA `pctVgv === null`. Fica assim mesmo: é o
+ * contrato de três estados que torna seguro existir `pctOverride: null`, e
+ * ele passa a morder no dia em que alguma linha ganhar base própria
+ * independente do VGV. É guarda declarada, não conserto de defeito vivo.
+ *
+ * #754 — a coluna herda o sinal do R$ publicado: quando a coluna R$ mostra
+ * "0" (|valor| < 0,5), esta publica o percentual EM MÓDULO, e não "-0,0%" —
+ * nos DOIS ramos, e só o sinal muda (`semZeroNegativo`: com VGV minúsculo a
+ * magnitude continua sendo a conta certa). O `pctOverride` das três linhas
+ * de fecho ("= Resultado", "= Resultado + Permutas", "= Resultado + Perm.
+ * Financ.", todas `tipo: 'resultado'`) vem pré-calculado do valor cru em
+ * `proforma-avancado.ts`, e normalizar só o ramo do VGV puro deixava
+ * exatamente essas linhas de fora (achado do App do Codex e da lente na
+ * rodada 5 do PR 758). Fora dessa faixa o percentual é o cru.
+ *
+ * ⚠️ Vale para toda linha formatada com SINAL REAL — receita, resultado e
+ * informativo, cujas células R$ (`celulaInteira` sem `custo`) e R$/m²
+ * (`celulaM2ProformaAv`) já publicam o módulo na faixa do zero; as três
+ * células da linha têm de concordar. Fica de fora só a linha de CUSTO: ela
+ * guarda `valor` NEGATIVO no Avançado, é notação contábil (parêntese sempre,
+ * indiferente ao sinal), não recebe classe, e o seu percentual negativo é a
+ * leitura normal da coluna — normalizá-la publicaria "61,2%" onde a conta é
+ * "-61,2%" (achados P2 do App do Codex nas rodadas 11 e 12).
+ */
+export function pctVgvProformaAv(
+  l: Pick<LinhaProformaAv, 'tipo' | 'valor' | 'pctOverride'>,
+  vgv: number,
+): number | null {
+  const pct = l.pctOverride !== undefined
+    ? l.pctOverride
+    : (vgv > 0 ? (l.valor / vgv) * 100 : null);
+  if (pct === null) return null;
+  const sinalReal = l.tipo !== 'custo';   // custo é contábil: parêntese sempre, percentual cru
+  return sinalReal && inteiroExibido(l.valor) === 0 ? Math.abs(pct) : pct;
+}
+
+export function sinalLinhaProformaAv(
+  l: Pick<LinhaProformaAv, 'tipo' | 'valor'>,
+  exibicao: ExibicaoR$,
+): '' | 'pos' | 'neg' {
   if (l.tipo !== 'receita' && l.tipo !== 'resultado') return '';
-  return l.valor < 0 ? 'neg' : 'pos';
+  const publicado = exibicao === 'inteira' ? inteiroExibido(l.valor) : l.valor;
+  return publicado < 0 ? 'neg' : 'pos';
 }
 
 /**
@@ -531,26 +608,19 @@ export class ViabFluxoVer extends LitElement {
     // renderizada de fato.
     const informativas = [informativa, informativaEvi].filter((l): l is LinhaProformaAv => l !== null);
     const linhas: LinhaProformaAv[] = comInformativasAntesDoResultado(p.linhas, informativas);
-    const porM2 = (v: number) => (p.areaPrivativa > 0 ? v / p.areaPrivativa : 0);
     // #427 — % VGV de toda linha usa o VGV puro, EXCETO os fechos cujo
     // `pctOverride` já veio calculado com a base própria (`= Resultado +
     // Permutas` soma a permuta física ao denominador — ver proforma-avancado.ts).
-    //
     // #604 — com VGV ≤ 0 devolve `null`, não 0: a coluna imprime "—" via
-    // `fmtPctOuIndef`, porque um percentual sem denominador não foi medido.
-    // Mesmo mecanismo que a #571 levou ao Preliminar.
-    const pctVgv = (v: number): number | null => (p.vgv > 0 ? (v / p.vgv) * 100 : null);
+    // `fmtPctOuIndef`. A regra inteira (os dois ramos, o `!== undefined` e a
+    // normalização de sinal da #754) mora em `pctVgvProformaAv`, acima.
     // #742 — notação contábil (parênteses para negativo/custo), igual ao
     // Preliminar (`celula`/`negativoContabil`, `frontend/viab-format.ts`) —
     // antes esta tabela usava `fmtR$`/`fmtNum` crus, com sinal de menos.
     // Só linha de CUSTO entra sempre entre parênteses (a app grava custo como
     // valor positivo); receita/resultado/informativo mostram o sinal real.
     const ehCusto = (l: LinhaProformaAv) => l.tipo === 'custo';
-    const celulaM2 = (l: LinhaProformaAv): string => {
-      if (p.areaPrivativa <= 0) return '—';
-      const abs = fmtNum(Math.abs(porM2(l.valor)));
-      return negativoContabil(l.valor, ehCusto(l)) ? `(${abs})` : abs;
-    };
+    const celulaM2 = (l: LinhaProformaAv): string => celulaM2ProformaAv(l, p.areaPrivativa);
     // #742 — espaçamento visual entre os 4 blocos da Proforma (dedução de
     // receita+Receita líquida / custo direto+Receita operacional / custo
     // indireto / rodapé de resultado), no molde da planilha de referência:
@@ -568,35 +638,13 @@ export class ViabFluxoVer extends LitElement {
               // #593 — mesma decisão do Preliminar (#567): o sinal vai nas TRÊS
               // colunas numéricas, não só na de R$, para que o negativo de uma
               // receita/resultado se leia igual em R$, R$/m² e % VGV.
-              const sinal = sinalLinhaProformaAv(l);
+              const sinal = sinalLinhaProformaAv(l, 'inteira');
               return html`
               <tr class=${`n${l.nivel} ${l.tipo}${l.subgrupo ? ' subgrupo' : ''}`}>
                 <td>${l.nome}${l.notaBase ? html` <span class="nota-base">(${l.notaBase})</span>` : ''}</td>
-                <td class="num ${sinal}">${celula(l.valor, { comParenteses: true, custo: ehCusto(l), sempreExibir: true })}</td>
+                <td class="num ${sinal}">${celulaInteira(l.valor, { comParenteses: true, custo: ehCusto(l), sempreExibir: true })}</td>
                 <td class="num ${sinal}">${celulaM2(l)}</td>
-                <td class="num ${sinal}">${fmtPctOuIndef(
-                  // ⚠️ #604 — `!== undefined`, e NÃO `??`, porque `null` aqui
-                  // significa "base própria inválida", não "sem override": o
-                  // `??` cairia no VGV puro e publicaria um número com o
-                  // denominador errado.
-                  //
-                  // ⚠️ E A HONESTIDADE SOBRE O ALCANCE: hoje essa troca é
-                  // **inobservável**, e isso está MEDIDO — reverter para `??`
-                  // deixa a suíte inteira verde. O motivo é estrutural: as três
-                  // bases de `pctOverride` derivam de `receitaBruta`
-                  // (`baseComPermutaFisica = receitaBruta + vgvPermutaFisica`,
-                  // com a permuta ≥ 0) e `p.vgv` É `receitaBruta` — então
-                  // `pctOverride === null` IMPLICA `pctVgv(...) === null`, e os
-                  // dois operadores dão o mesmo resultado.
-                  //
-                  // Fica assim mesmo: é o contrato de três estados que torna
-                  // seguro existir `pctOverride: null`, e ele passa a morder no
-                  // dia em que alguma linha ganhar base própria independente do
-                  // VGV. Trocar de volta seria escrever uma armadilha para essa
-                  // linha futura. Não é conserto de defeito vivo — é guarda, e
-                  // está declarada como tal em vez de contada como entrega.
-                  l.pctOverride !== undefined ? l.pctOverride : pctVgv(l.valor),
-                )}</td>
+                <td class="num ${sinal}">${fmtPctOuIndef(pctVgvProformaAv(l, p.vgv))}</td>
               </tr>
               ${ESPACO_APOS.has(l.nome) ? html`<tr class="espaco"><td colspan="4"></td></tr>` : nothing}`;
             })}
@@ -636,9 +684,11 @@ export class ViabFluxoVer extends LitElement {
     // override `td.neg` nunca aparecia. Mesma função, mesma decisão do
     // Preliminar (#567): a linha de custo fica sem sinal de propósito, porque
     // ali o negativo é o estado normal.
-    const sinalLivre = sinalLinhaProformaAv({ tipo: 'receita', valor: livre });
-    const sinalFunding = sinalLinhaProformaAv({ tipo: 'custo', valor: -custoFunding });
-    const sinalReal = sinalLinhaProformaAv({ tipo: 'resultado', valor: real });
+    // #754: `'centavos'`, porque estas três células publicam `fmtR$` (2 casas),
+    // não `celulaInteira` — a classe segue o texto desta tabela, não o da Proforma.
+    const sinalLivre = sinalLinhaProformaAv({ tipo: 'receita', valor: livre }, 'centavos');
+    const sinalFunding = sinalLinhaProformaAv({ tipo: 'custo', valor: -custoFunding }, 'centavos');
+    const sinalReal = sinalLinhaProformaAv({ tipo: 'resultado', valor: real }, 'centavos');
     return html`
       ${kpisFluxo(c)}
       ${this._renderRoiProjeto(this.calcProjeto ?? c)}

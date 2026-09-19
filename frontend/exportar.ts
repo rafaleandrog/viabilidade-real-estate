@@ -13,7 +13,7 @@ import { vgvBrutoDeProforma, type Proforma } from './proforma.js';
 // Continuam exportados pelo motor e usados por quem ainda os precisa.
 import { type FluxoCalc, type LinhaCalc } from './fluxo-caixa-motor.js';
 import { rotuloMesRelativo, DEDUCOES_RECEITA_EH_CUSTO } from './fluxo-shared.js';
-import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada } from './viab-format.js';
+import { fmtR$, fmtNum, fmtPct, fmtPctOuIndef, celula as celulaCompartilhada, celulaInteira, semZeroNegativo } from './viab-format.js';
 import { type FundingNoFluxo, type FormatoLinhaFinanciamento } from './funding-motor.js';
 import type { Divergencia, PermutaFisicaTipologia } from './fluxo-invariantes.js';
 
@@ -60,18 +60,22 @@ export function ehLinhaReceitaOuResultado(r: Pick<NotacaoLinha, 'tipo' | 'nature
 }
 
 /**
- * Célula monetária da Proforma — TELA, CSV e PDF. Delega para `celula`
- * (`frontend/viab-format.ts`), a mesma fonte única de 2 casas decimais (C7) e
- * da regra de parênteses que o Fluxo de Caixa usa desde a #449.
+ * Célula monetária da Proforma — TELA, CSV e PDF. Delega para `celulaInteira`
+ * (`frontend/viab-format.ts`): INTEIROS, a terceira exceção de exibição ao C7
+ * (#754, decisão do autor — ver `CLAUDE.md` § Contratos inegociáveis), com a
+ * MESMA regra de parênteses (`negativoContabil`) que o Fluxo de Caixa usa
+ * desde a #449 — aplicada ao valor já arredondado. O Fluxo de Caixa segue em
+ * `celula` (2 casas); esta função é o único ponto em que a Proforma diverge.
  *
  * `sempreExibir` porque a Proforma controla visibilidade por LINHA
  * (`ocultarSeZero`), não por célula perto de zero: um header como "Custo
- * indireto total" que fecha em zero precisa mostrar "(0,00)", não sumir.
+ * indireto total" que fecha em zero precisa mostrar "(0)", não sumir.
  *
  * Sem símbolo "R$" — o cabeçalho da coluna já o informa, nos três destinos.
  */
 export function celulaProforma(r: NotacaoLinha): string {
-  return celulaCompartilhada(r.v, { comParenteses: true, custo: !ehLinhaReceitaOuResultado(r), sempreExibir: true });
+  // #754: INTEIROS — a terceira exceção ao C7, declarada em `celulaInteira`.
+  return celulaInteira(r.v, { comParenteses: true, custo: !ehLinhaReceitaOuResultado(r), sempreExibir: true });
 }
 
 /**
@@ -135,9 +139,13 @@ export function pctVgvProforma(r: NotacaoLinha, p: Proforma): string {
   // relação que a própria tabela ainda não fechou naquele ponto.
   if (r.semPct) return '—';
   if (p.vgv <= 0) return '—';
+  // #754: herda o sinal do R$ publicado — quando a coluna R$ mostra "0", esta
+  // não mostra "-0,0%" (`semZeroNegativo`, `frontend/viab-format.ts`). Vale
+  // para tela, CSV e PDF de uma vez, porque os três chamam esta função.
+  const v = semZeroNegativo(r.v);
   return r.tipo === 'resultado'
-    ? fmtPct(r.v / p.vgv * 100)
-    : fmtPct(Math.abs(r.v) / p.vgv * 100);
+    ? fmtPct(v / p.vgv * 100)
+    : fmtPct(Math.abs(v) / p.vgv * 100);
 }
 
 export function linhasProforma(p: Proforma, lot: boolean): LinhaPf[] {

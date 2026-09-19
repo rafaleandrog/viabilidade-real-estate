@@ -10,8 +10,9 @@ import { fmtR$, fmtR$Kpi } from './viab-format.js';
 //
 // Decisão do autor em 2026-08-26 (leva Avançado, item 4): valor em R$ exibido em
 // CARD DE KPI sai sem casas decimais; percentual em card sai com uma casa. Tudo
-// o mais — persistência, entrada, motor, tabelas, Proforma, Fluxo de Caixa e
-// exportação — segue em 2 casas, sem exceção (`CLAUDE.md` § Contratos
+// o mais — persistência, entrada, motor, Fluxo de Caixa e as demais tabelas —
+// segue em 2 casas; a cascata e a Proforma têm as SUAS exceções (`fmtR$Milhoes`,
+// `celulaInteira`/#754), cada uma com a sua trava (`CLAUDE.md` § Contratos
 // inegociáveis; `docs/viabilidade/formulas.md` § Estado de conformidade).
 //
 // ⚠️ POR QUE UM TESTE QUE LÊ O FONTE, e não um teste da função pura.
@@ -71,11 +72,11 @@ const CARDS: { arquivo: string; chamadas: number; quais: string }[] = [
  * aqui é vazamento.
  */
 const SEM_EXCECAO: { arquivo: string; motivo: string }[] = [
-  { arquivo: 'exportar.ts', motivo: 'CSV e PDF — o C7 vale integralmente (#449)' },
-  { arquivo: 'tela-proforma.ts', motivo: 'coluna R$ da Proforma e tabela de sensibilidade (#492/#567)' },
+  { arquivo: 'exportar.ts', motivo: 'CSV e PDF do Fluxo de Caixa em 2 casas (#449); a Proforma exportada usa `celulaInteira` (#754), a SUA exceção, nunca a do card' },
+  { arquivo: 'tela-proforma.ts', motivo: 'coluna R$ da Proforma e tabela de sensibilidade passam por `celulaProforma`/`celulaInteira` (#754), nunca pelo formatador de card' },
   { arquivo: 'tela-fluxo-custos.ts', motivo: 'Orçamento de Custos, em `rs` com casas-decimais=2' },
   { arquivo: 'tela-fluxo-receitas.ts', motivo: '`precoUnit`/`precoTotal` da alocação de receitas' },
-  { arquivo: 'tela-fluxo-ver.ts', motivo: 'células da tabela do Fluxo de Caixa' },
+  { arquivo: 'tela-fluxo-ver.ts', motivo: 'células da tabela do Fluxo de Caixa em 2 casas; a Proforma do Avançado usa `celulaInteira` (#754), não o formatador de card' },
   { arquivo: 'tela-dashboard.ts', motivo: 'coluna VGV da listagem de estudos' },
 ];
 

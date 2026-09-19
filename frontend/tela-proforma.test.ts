@@ -7,6 +7,7 @@ import {
 } from './tela-proforma.js';
 import { calcularProforma, type Proforma, type ProformaInput } from './proforma.js';
 import { fmtR$, fmtNum } from './viab-format.js';
+import { pctVgvProforma } from './exportar.js';
 import {
   ESTUDO_SENSIBILIDADE, PRODUTOS_SENSIBILIDADE, FATOR_BEAR, FATOR_BULL,
   VGV_BASE, VGV_BEAR, VGV_BULL,
@@ -29,6 +30,12 @@ import {
 // resultado só quando negativo" numa terceira cópia.
 // ─────────────────────────────────────────────────────────────────────────
 
+// #754: a coluna R$ da Proforma sai em INTEIROS (terceira exceção ao C7) — o
+// esperado dos casos abaixo é o inteiro pt-BR, não `fmtR$` de 2 casas.
+// Half away from zero, como `celulaInteira` e o Intl — `Math.round(-900.5)` daria -900.
+const inteiro = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
+  .format((Math.sign(v) * Math.round(Math.abs(v))) || 0); // `|| 0`: -0 sairia "-0" no Intl
+
 test('#567 ehLinhaReceitaOuResultado: classifica receita, natureza-receita e resultado; o resto é custo/dedução', () => {
   assert.equal(ehLinhaReceitaOuResultado({ tipo: 'receita' }), true);
   assert.equal(ehLinhaReceitaOuResultado({ natureza: 'receita' }), true);
@@ -42,32 +49,32 @@ test('#567 ehLinhaReceitaOuResultado: classifica receita, natureza-receita e res
 test('#567 celulaProforma: receita/resultado mostram o SINAL REAL — negativo entre parênteses, positivo sem marca', () => {
   const positiva: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: 1_234.56, tipo: 'receita' };
   const negativa: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: -1_234.56, tipo: 'receita' };
-  assert.equal(celulaProforma(positiva), '1.234,56');
-  assert.equal(celulaProforma(negativa), '(1.234,56)');
+  assert.equal(celulaProforma(positiva), '1.235');
+  assert.equal(celulaProforma(negativa), '(1.235)');
 
   const consolidadoReceitaNeg: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: -500, tipo: 'consolidado', natureza: 'receita' };
-  assert.equal(celulaProforma(consolidadoReceitaNeg), '(500,00)');
+  assert.equal(celulaProforma(consolidadoReceitaNeg), '(500)');
 
   const resultadoPos: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: 900, tipo: 'resultado' };
   const resultadoNeg: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: -900, tipo: 'resultado' };
-  assert.equal(celulaProforma(resultadoPos), '900,00');
-  assert.equal(celulaProforma(resultadoNeg), '(900,00)');
+  assert.equal(celulaProforma(resultadoPos), '900');
+  assert.equal(celulaProforma(resultadoNeg), '(900)');
 });
 
 test('#567 celulaProforma: custo/dedução SEMPRE entre parênteses — mesmo positivo (a app grava custo como valor positivo)', () => {
   const custoPositivo: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: 10_000 };
   const custoConsolidado: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: 34_750_000, tipo: 'consolidado' }; // "= Custo direto total"
-  assert.equal(celulaProforma(custoPositivo), '(10.000,00)');
-  assert.equal(celulaProforma(custoConsolidado), '(34.750.000,00)');
+  assert.equal(celulaProforma(custoPositivo), '(10.000)');
+  assert.equal(celulaProforma(custoConsolidado), '(34.750.000)');
 });
 
-test('#567 celulaProforma: linha-total que fecha em ZERO continua mostrando "0,00"/"(0,00)" — nunca célula vazia (diferente do Fluxo de Caixa)', () => {
+test('#567/#754 celulaProforma: linha-total que fecha em ZERO continua mostrando "0"/"(0)" — nunca célula vazia (diferente do Fluxo de Caixa)', () => {
   // `sempreExibir` é o que distingue: a Proforma esconde linha zerada por
   // ROW (`ocultarSeZero`), não por célula — um header como "Custo indireto
   // total" que fecha em zero precisa continuar visível.
-  assert.equal(celulaProforma({ v: 0, tipo: 'consolidado' }), '(0,00)');
-  assert.equal(celulaProforma({ v: 0, tipo: 'consolidado', natureza: 'receita' }), '0,00');
-  assert.equal(celulaProforma({ v: 0, tipo: 'resultado' }), '0,00');
+  assert.equal(celulaProforma({ v: 0, tipo: 'consolidado' }), '(0)');
+  assert.equal(celulaProforma({ v: 0, tipo: 'consolidado', natureza: 'receita' }), '0');
+  assert.equal(celulaProforma({ v: 0, tipo: 'resultado' }), '0');
 });
 
 test('#567 celulaProformaM2: mesma regra de sinal da coluna R$, formatação própria (fmtNum, sem "R$" nem "/m²")', () => {
@@ -76,6 +83,38 @@ test('#567 celulaProformaM2: mesma regra de sinal da coluna R$, formatação pr�
   assert.equal(celulaProformaM2({ v: -100_000, tipo: 'consolidado', natureza: 'receita' }, areaVendavel), `(${fmtNum(100)})`);
   assert.equal(celulaProformaM2({ v: 50_000, tipo: 'consolidado' }, areaVendavel), `(${fmtNum(50)})`); // custo: sempre parênteses
   assert.equal(celulaProformaM2({ v: -50_000, tipo: 'resultado' }, areaVendavel), `(${fmtNum(50)})`);
+});
+
+test('#754: R$/m² e % VGV herdam o sinal do R$ publicado — "0" em R$ nunca vem com "(0)" ou "-0,0%" ao lado', () => {
+  const areaVendavel = 1_000;
+  const p = { vgv: 10_000_000 } as Proforma;
+  // Faixa em que o R$ publica "0" (|v| < 0,5): sem marca de negativo nas derivadas.
+  assert.equal(celulaProformaM2({ v: -0.3, tipo: 'resultado' }, areaVendavel), '0');
+  assert.equal(pctVgvProforma({ v: -0.3, tipo: 'resultado' } as Linha, p), '0,0%');
+  assert.equal(celulaProformaM2({ v: -0.49, tipo: 'consolidado', natureza: 'receita' }, areaVendavel), '0');
+  // Fora dela, o valor CRU: a magnitude não é arredondada, e o sinal é o do valor.
+  assert.equal(celulaProformaM2({ v: -0.6, tipo: 'resultado' }, areaVendavel), '(0)');
+  assert.equal(pctVgvProforma({ v: -0.6, tipo: 'resultado' } as Linha, p), '-0,0%');
+  assert.equal(celulaProformaM2({ v: -1_234.56, tipo: 'resultado' }, areaVendavel), '(1)');
+  assert.equal(pctVgvProforma({ v: -2_500_000, tipo: 'resultado' } as Linha, p), '-25,0%');
+  assert.equal(pctVgvProforma({ v: 2_500_000, tipo: 'resultado' } as Linha, p), '25,0%');
+  // Custo: sempre entre parênteses (#567), inclusive na faixa do zero; % VGV em módulo.
+  assert.equal(celulaProformaM2({ v: 0.3, tipo: 'consolidado' }, areaVendavel), '(0)');
+  assert.equal(pctVgvProforma({ v: -0.3, tipo: 'consolidado' } as Linha, p), '0,0%');
+  // Só o SINAL é normalizado, nunca a magnitude: com denominador minúsculo a conta
+  // certa sobrevive, e um valor positivo na faixa passa intacto (App, rodada 7).
+  assert.equal(celulaProformaM2({ v: -0.3, tipo: 'resultado' }, 0.01), '30');
+  assert.equal(celulaProformaM2({ v: 0.3, tipo: 'resultado' }, 0.01), '30');
+  assert.equal(pctVgvProforma({ v: -0.3, tipo: 'resultado' } as Linha, { vgv: 0.49 } as Proforma), '61,2%');
+  assert.equal(pctVgvProforma({ v: 0.3, tipo: 'resultado' } as Linha, { vgv: 0.49 } as Proforma), '61,2%');
+  assert.equal(pctVgvProforma({ v: 0.49, tipo: 'receita' } as Linha, { vgv: 0.49 } as Proforma), '100,0%');
+  // A linha inteira concorda com a classe que `_renderTabela` deriva do R$ publicado.
+  for (const v of [-1_000_000, -1, -0.5, -0.49, -0.3, -0, 0, 0.3, 1]) {
+    const r = { v, tipo: 'resultado' } as Linha;
+    const neg = (Math.abs(v) >= 0.5) && v < 0;   // = `inteiroExibido(v) < 0`
+    assert.equal(celulaProformaM2(r, areaVendavel).startsWith('('), neg, `R$/m² para ${v}`);
+    assert.equal(pctVgvProforma(r, p).startsWith('-'), neg, `% VGV para ${v}`);
+  }
 });
 
 test('#567 celulaProformaM2: área vendável zerada ou negativa vira "—" (guarda de divisão por zero, comportamento preexistente)', () => {
@@ -142,12 +181,13 @@ test('#567: Receita operacional e Resultado negativos aparecem com parênteses e
   const receitaOperacional: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: p.receitaOperacional, tipo: 'consolidado', natureza: 'receita' };
   const resultado: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: p.resultado, tipo: 'resultado' };
 
-  const esperadoOperacional = `(${fmtR$(Math.abs(p.receitaOperacional), false)})`;
-  const esperadoResultado = `(${fmtR$(Math.abs(p.resultado), false)})`;
+  // #754: a coluna R$ da Proforma sai em INTEIROS (terceira exceção ao C7).
+  const esperadoOperacional = `(${inteiro(Math.abs(p.receitaOperacional))})`;
+  const esperadoResultado = `(${inteiro(Math.abs(p.resultado))})`;
   // O que o `_fmtContabil` antigo devolvia para `natureza: 'receita'`: SEMPRE
   // `Math.abs`, sem parênteses — indistinguível de uma receita operacional
   // POSITIVA do mesmo valor absoluto. É exatamente o bug que a #567 fecha.
-  const bugAntigo = fmtR$(Math.abs(p.receitaOperacional), false);
+  const bugAntigo = inteiro(Math.abs(p.receitaOperacional));
 
   assert.equal(celulaProforma(receitaOperacional), esperadoOperacional);
   assert.equal(celulaProforma(resultado), esperadoResultado);
@@ -159,8 +199,8 @@ test('#567: Custo direto/indireto total (linhas de custo) continuam SEMPRE entre
   const p = calcularProforma(DEFICIT);
   const custoDireto: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: p.custoDiretoTotal, tipo: 'consolidado' };
   const custoIndireto: Pick<Linha, 'v' | 'tipo' | 'natureza'> = { v: p.custoIndiretoTotal, tipo: 'consolidado' };
-  assert.equal(celulaProforma(custoDireto), `(${fmtR$(p.custoDiretoTotal, false)})`);
-  assert.equal(celulaProforma(custoIndireto), `(${fmtR$(p.custoIndiretoTotal, false)})`);
+  assert.equal(celulaProforma(custoDireto), `(${inteiro(p.custoDiretoTotal)})`);
+  assert.equal(celulaProforma(custoIndireto), `(${inteiro(p.custoIndiretoTotal)})`);
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -184,23 +224,26 @@ function cenario(fator: number): { p: Proforma; vgvBruto: number } {
 }
 
 test('#568 celulaSensibilidade: receita com o SINAL REAL, despesa SEMPRE entre parênteses — a mesma notação da tabela principal', () => {
-  assert.equal(celulaSensibilidade(1_234.56, 'receita'), '1.234,56');
-  assert.equal(celulaSensibilidade(-1_234.56, 'receita'), '(1.234,56)');
+  assert.equal(celulaSensibilidade(1_234.56, 'receita'), '1.235');
+  assert.equal(celulaSensibilidade(-1_234.56, 'receita'), '(1.235)');
   // Despesa: a app grava custo como valor POSITIVO, e a notação contábil o
   // marca independentemente do sinal.
-  assert.equal(celulaSensibilidade(10_000, 'despesa'), '(10.000,00)');
+  assert.equal(celulaSensibilidade(10_000, 'despesa'), '(10.000)');
   // Fonte única: é literalmente a célula da tabela principal.
   assert.equal(celulaSensibilidade(-900, 'receita'), celulaProforma({ v: -900, tipo: 'resultado' }));
   assert.equal(celulaSensibilidade(900, 'despesa'), celulaProforma({ v: 900, tipo: 'consolidado' }));
   // Linha que fecha em zero continua visível (`sempreExibir`), como na principal.
-  assert.equal(celulaSensibilidade(0, 'receita'), '0,00');
-  assert.equal(celulaSensibilidade(0, 'despesa'), '(0,00)');
+  assert.equal(celulaSensibilidade(0, 'receita'), '0');
+  assert.equal(celulaSensibilidade(0, 'despesa'), '(0)');
 });
 
 test('#568 sinalSensibilidade: só receita ganha pos/neg; despesa fica sem classe (espelha a tabela principal)', () => {
   assert.equal(sinalSensibilidade(10, 'receita'), 'pos');
   assert.equal(sinalSensibilidade(-10, 'receita'), 'neg');
   assert.equal(sinalSensibilidade(0, 'receita'), 'pos');
+  // #754 (achado P2 do App do Codex): −0,3 publica "0" — a classe não pode ser `neg`.
+  assert.equal(sinalSensibilidade(-0.3, 'receita'), 'pos');
+  assert.equal(sinalSensibilidade(-0.5, 'receita'), 'neg');
   assert.equal(sinalSensibilidade(-10, 'despesa'), '');
   assert.equal(sinalSensibilidade(10, 'despesa'), '');
 });
@@ -209,7 +252,7 @@ test('#568: a linha "VGV" da tabela de cenários varia entre Bear/Base/Bull — 
   const celulas = [FATOR_BEAR, 1, FATOR_BULL]
     .map((f) => celulaSensibilidade(cenario(f).vgvBruto, 'receita'));
   assert.deepEqual(celulas, [
-    fmtR$(VGV_BEAR, false), fmtR$(VGV_BASE, false), fmtR$(VGV_BULL, false),
+    inteiro(VGV_BEAR), inteiro(VGV_BASE), inteiro(VGV_BULL),
   ]);
   assert.equal(new Set(celulas).size, 3, `a linha VGV não variou: ${celulas.join(' | ')}`);
 });
@@ -220,10 +263,10 @@ test('#568: o Resultado deficitário do Bear sai entre parênteses — não com 
   assert.ok(bear.resultado < 0, `o cenário Bear deveria ser deficitário: ${bear.resultado}`);
   assert.ok(base.resultado > 0, `o cenário Base deveria ser positivo: ${base.resultado}`);
   const celula = celulaSensibilidade(bear.resultado, 'receita');
-  assert.equal(celula, `(${fmtR$(Math.abs(bear.resultado), false)})`);
+  assert.equal(celula, `(${inteiro(Math.abs(bear.resultado))})`);
   // O formato ANTERIOR desta tabela, e a razão do critério 4 da issue: a mesma
   // grandeza saía com sinal de menos aqui e entre parênteses logo acima.
-  assert.notEqual(celula, fmtR$(bear.resultado, false),
+  assert.notEqual(celula, `-${inteiro(Math.abs(bear.resultado))}`,
     'regressão: a tabela de cenários voltou ao fmtR$ cru, divergindo da tabela principal');
   // E é a classe `neg` que pinta esse número de vermelho mesmo na coluna Base.
   assert.equal(sinalSensibilidade(bear.resultado, 'receita'), 'neg');
@@ -233,8 +276,8 @@ test('#568: o Resultado deficitário do Bear sai entre parênteses — não com 
 test('#568: as linhas de CUSTO da tabela de cenários seguem entre parênteses nos três cenários', () => {
   for (const fator of [FATOR_BEAR, 1, FATOR_BULL]) {
     const { p } = cenario(fator);
-    assert.equal(celulaSensibilidade(p.custoDiretoTotal, 'despesa'), `(${fmtR$(p.custoDiretoTotal, false)})`);
-    assert.equal(celulaSensibilidade(p.custoIndiretoTotal, 'despesa'), `(${fmtR$(p.custoIndiretoTotal, false)})`);
+    assert.equal(celulaSensibilidade(p.custoDiretoTotal, 'despesa'), `(${inteiro(p.custoDiretoTotal)})`);
+    assert.equal(celulaSensibilidade(p.custoIndiretoTotal, 'despesa'), `(${inteiro(p.custoIndiretoTotal)})`);
   }
 });
 

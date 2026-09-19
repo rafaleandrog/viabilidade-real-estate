@@ -4,6 +4,65 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## #754 — coluna R$ da Proforma em inteiros: a TERCEIRA exceção de exibição ao C7 (2026-09-18)
+
+Pedido direto do autor, com print da Proforma de um estudo Avançado: "tira as duas casas decimais dos
+valores em R$ do proforma, todos eles devem mostrar números inteiros sempre. Isso em qualquer
+proforma, preliminar ou avançado." Não é bug — é decisão de desenho que abre a terceira exceção ao
+contrato C7, e por isso entrou com o mesmo desenho das duas anteriores (`fmtR$Kpi`, #581;
+`fmtR$Milhoes`, Rodada 12) **e** com CLAUDE.md § Contratos, `docs/viabilidade/formulas.md` § Estado de
+conformidade e a linha C7 do anexo A de `padrao-incorporacao.md` no mesmo diff.
+
+**O que mudou:** `celulaInteira` em `frontend/viab-format.ts` — símbolo próprio, e não um parâmetro
+de `celula` (que é a fonte única do Fluxo de Caixa) nem de `fmtR$`; formata inline com 0 casas, sem
+delegar a `fmtR$Kpi` (a trava do card exige exatamente uma ocorrência dele no arquivo); sinal
+normalizado **depois** de arredondar, half away from zero como o Intl (`Math.round(-0.5)` daria -0).
+`celulaProforma` (`exportar.ts`, que serve tela do Preliminar, sensibilidade, CSV e PDF) e a
+`_renderProforma` do Avançado (`tela-fluxo-ver.ts`) passam a chamá-la. `R$/m²` já era inteira;
+`% VGV`, Fluxo de Caixa, as outras duas tabelas de `tela-fluxo-ver.ts` e os textos de detalhe do
+card não mudam.
+
+**Decisão registrada:** diferente das duas exceções anteriores, esta **alcança o CSV e o PDF** da
+Proforma — eles compartilham `celulaProforma` com a tela, e a paridade tela×arquivo é contrato
+(`proforma-ordem-linhas.test.ts`). Está escrito nos três documentos.
+
+**Trava:** `frontend/proforma-inteiros.test.ts`, espelho de `cascata-milhoes.test.ts` — enumeração
+por `git ls-files`, contagem exata nos três consumidores, zero no resto do frontend, rede de que
+`celulaProforma` não voltou a `celula` e que `tela-fluxo-ver.ts` não chama mais `celula(`, e teste de
+exceção órfã. Asserções de string atualizadas em `tela-proforma.test.ts`, `exportar-proforma.test.ts`
+(inclusive a regex de "sinal de menos", que com inteiros passou a precisar de fronteira de palavra —
+casava `utf-8` no PDF) e `viab-format.test.ts`; os motivos de `kpi-casas-decimais.test.ts` reescritos
+(contagem segue 0). Sem migração; `versao` não bumpa.
+
+**O que a revisão achou, e vale registrar porque é a classe de defeito nº 1 (fiação) duas vezes
+seguidas.** (1) A classe de sinal `pos`/`neg` vinha do valor CRU enquanto a célula passava a publicar
+o inteiro: uma receita a −R$ 0,30 mostrava "0" pintado de vermelho (P2 do App do Codex, rodada 2).
+Conserto: `inteiroExibido` (`frontend/viab-format.ts`) é a fonte única do valor publicado, usada por
+`celulaInteira` e pelos classificadores. (2) Esse conserto criou o defeito seguinte (P2 do App, rodada
+3): `sinalLinhaProformaAv` é reusada pela tabela "Fluxo de Caixa Livre × Fluxo de Caixa" da Análise
+Financeira, cujas células **seguem em `fmtR$`** — lá "-R$ 0,30" passava a sair pintado de verde. O
+arquivo tem duas tabelas com dois formatadores, e um classificador só. Conserto: o parâmetro
+`exibicao: 'inteira' | 'centavos'` é **obrigatório**, sem default — omitir é `TS2554`, não um modo
+silencioso —, e `frontend/proforma-cores.test.ts` confronta a classe com o TEXTO que cada
+formatador publica (`celulaInteira` e `fmtR$`, valor a valor) e trava por contagem exata qual tabela
+chama com qual modo. Mutações executadas: trocar `'centavos'` por `'inteira'` na Análise Financeira
+reprova a contagem; apagar o argumento não compila. (3) E a terceira volta da mesma classe (P2 do
+App, rodada 4): a classe de sinal é da LINHA e passou a seguir o R$ inteiro, mas R$/m² e % VGV
+seguiam formatando o valor CRU — para −R$ 0,30 a linha mostrava `0` · `(0)` · `-0,0%`, tudo verde.
+Conserto: `semZeroNegativo` (`frontend/viab-format.ts`) — quando o R$ publica 0, o valor que alimenta
+as duas derivadas perde o SINAL (vira o módulo); fora dessa faixa é o cru. Só o sinal, nunca a
+magnitude: a primeira versão zerava o valor, e o App achou na rodada 7 que isso apagava a conta
+certa de R$/m² e % VGV com denominador minúsculo (VGV de R$ 0,49 → "0,0%" onde é 100%) e zerava até
+valor POSITIVO na faixa, que não tem sinal a normalizar. E a normalização da % VGV vale para toda linha de sinal real (receita, resultado, informativo — as três células da linha concordam), e NÃO para custo: no Avançado ele guarda `valor` negativo, é notação contábil (parêntese sempre), não recebe classe, e o seu percentual negativo é a leitura normal da coluna (App, rodadas 11 e 12).
+Uma função para `celulaProformaM2` (Preliminar), `pctVgvProforma` (tela + CSV + PDF) e
+`celulaM2ProformaAv` e `pctVgvProformaAv` (Avançado, extraídas das closures para serem aferíveis —
+a segunda porque a primeira versão do conserto normalizou só o ramo do VGV puro e deixou de fora o
+`pctOverride` das três linhas de fecho, que vem pré-calculado do valor cru: o App e a lente acharam a
+mesma fresta na rodada seguinte); testes confrontam, valor a valor e nos dois ramos, que a R$/m² tem
+parêntese e a % VGV tem sinal exatamente quando a classe da linha é `neg`.
+
+---
+
 ## Rodada 13 — tornado de alavancas + margem de segurança: primeiro PR de produto (2026-09-18)
 
 PR 757, aberto e aguardando revisão/autorização de merge do autor.
