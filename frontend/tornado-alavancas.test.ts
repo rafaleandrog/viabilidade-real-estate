@@ -92,6 +92,33 @@ test('#757 ehCircular: infra_modo pct_vgv com valor CANÔNICO preenchido não é
   assert.equal(ehCircular('preco', { tipo_empreendimento: 'loteamento', infra_modo: 'pct_vgv' }), false);
 });
 
+// Achado do App do Codex, PR #757, rodada 5: o limiar de `amplitudePct`
+// (§ critério 2 da #727) barrava só pelo tamanho de `resultadoBase` relativo
+// à receita líquida — mas a AMPLITUDE (bull−bear) pode ser muito maior que a
+// base mesmo quando ela passa no limiar, publicando o percentual de 4
+// dígitos que o campo promete nunca mostrar. Fixture idêntico ao exemplo do
+// App: receita líquida R$ 10M, resultado base R$ 51 mil (0,51% — passa o
+// limiar de 0,5%), amplitude de preço R$ 2M ⇒ ~1.960,8% sem a guarda nova.
+test('#757 rodada 5: amplitudePct cai para null quando o percentual RESULTANTE seria de 4 dígitos, mesmo com resultadoBase acima do limiar', () => {
+  const quaseEquilibrio: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual',
+    terreno_manual_area: 500,
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 1_000, unidades: 100 }], // vgv bruto = 10.000.000
+    construcao_modo: 'valor_total',
+    construcao_valor_total: 9_949_000, // resultado base = 51.000 (0,51% da receita — acima do limiar de 0,5%)
+  };
+  const base = calcularProforma(quaseEquilibrio);
+  assert.ok(Math.abs(base.resultado) > Math.abs(base.receitaLiquida) * 0.005, 'resultadoBase deveria passar o limiar de 0,5%');
+
+  const alavancas = rankearAlavancas(quaseEquilibrio, 10, false);
+  const preco = alavancas.find((a) => a.variavel === 'preco')!;
+  // Sem a guarda nova: 2.000.000 / (2 × 51.000) × 100 ≈ 1.960,8% — o
+  // percentual de 4 dígitos que o docblock promete nunca publicar.
+  assert.equal(preco.amplitudePct, null, `amplitudePct deveria cair para null (bruto seria ~${(preco.amplitudeRS / (2 * Math.abs(preco.resultadoBase)) * 100).toFixed(1)}%)`);
+  assert.ok(preco.amplitudeRS > 0, 'a amplitude em R$ continua publicada — só o percentual cai');
+});
+
 test('#727: ehCustoLike e rotuloAlavanca — uma tabela só de rótulos e sentido', () => {
   assert.equal(ehCustoLike('preco'), false);
   assert.equal(ehCustoLike('custo_obras'), true);

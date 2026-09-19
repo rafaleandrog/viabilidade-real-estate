@@ -17,7 +17,11 @@ export interface Alavanca {
   /**
    * Variação percentual do resultado, ±X: metade da amplitude sobre o
    * resultado base. `null` quando `|resultadoBase|` não serve de denominador
-   * (menor que 0,5% da receita líquida) — nunca um percentual de 4 dígitos.
+   * (menor que 0,5% da receita líquida) OU quando o percentual RESULTANTE
+   * ultrapassaria 4 dígitos mesmo com um denominador que passou no limiar —
+   * `resultadoBase` pode clarear o piso da receita e mesmo assim ser muito
+   * menor que a AMPLITUDE (bull−bear), inflando o percentual (achado do App
+   * do Codex, PR #757, rodada 5). Nunca um percentual de 4 dígitos.
    */
   amplitudePct: number | null;
   /**
@@ -102,8 +106,18 @@ export function rankearAlavancas(
     // `resultadoBase !== 0` evita divisão por zero quando a receita líquida
     // também é zero (estudo sem catálogo efetivo) — nesse caso o limiar cai
     // para 0 e `> limiar` sozinho deixaria de barrar o caso degenerado.
-    const amplitudePct = resultadoBase !== 0 && Math.abs(resultadoBase) > limiar
+    const amplitudePctBruto = resultadoBase !== 0 && Math.abs(resultadoBase) > limiar
       ? (amplitudeRS / (2 * Math.abs(resultadoBase))) * 100
+      : null;
+    // O limiar acima barra só pelo tamanho do DENOMINADOR relativo à receita
+    // — mas a AMPLITUDE (bull−bear) pode ser bem maior que o resultado base
+    // mesmo quando ele passa no limiar, publicando o percentual de 4 dígitos
+    // que este campo promete nunca mostrar (ex.: resultadoBase ≈ R$ 51 mil,
+    // amplitude de preço ≈ R$ 2 milhões ⇒ ~1.960,8%). Barra o percentual
+    // RESULTANTE também (achado do App do Codex, PR #757, rodada 5).
+    const LIMITE_PCT_LEGIVEL = 999.9;
+    const amplitudePct = amplitudePctBruto !== null && amplitudePctBruto <= LIMITE_PCT_LEGIVEL
+      ? amplitudePctBruto
       : null;
     const circular = ehCircular(variavel, entrada);
     return {
