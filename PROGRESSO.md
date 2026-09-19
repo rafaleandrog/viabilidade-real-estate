@@ -34,6 +34,20 @@ exceção órfã. Asserções de string atualizadas em `tela-proforma.test.ts`, 
 casava `utf-8` no PDF) e `viab-format.test.ts`; os motivos de `kpi-casas-decimais.test.ts` reescritos
 (contagem segue 0). Sem migração; `versao` não bumpa.
 
+**O que a revisão achou, e vale registrar porque é a classe de defeito nº 1 (fiação) duas vezes
+seguidas.** (1) A classe de sinal `pos`/`neg` vinha do valor CRU enquanto a célula passava a publicar
+o inteiro: uma receita a −R$ 0,30 mostrava "0" pintado de vermelho (P2 do App do Codex, rodada 2).
+Conserto: `inteiroExibido` (`frontend/viab-format.ts`) é a fonte única do valor publicado, usada por
+`celulaInteira` e pelos classificadores. (2) Esse conserto criou o defeito seguinte (P2 do App, rodada
+3): `sinalLinhaProformaAv` é reusada pela tabela "Fluxo de Caixa Livre × Fluxo de Caixa" da Análise
+Financeira, cujas células **seguem em `fmtR$`** — lá "-R$ 0,30" passava a sair pintado de verde. O
+arquivo tem duas tabelas com dois formatadores, e um classificador só. Conserto: o parâmetro
+`exibicao: 'inteira' | 'centavos'` é **obrigatório**, sem default — omitir é `TS2554`, não um modo
+silencioso —, e `frontend/proforma-cores.test.ts` confronta a classe com o TEXTO que cada
+formatador publica (`celulaInteira` e `fmtR$`, valor a valor) e trava por contagem exata qual tabela
+chama com qual modo. Mutações executadas: trocar `'centavos'` por `'inteira'` na Análise Financeira
+reprova a contagem; apagar o argumento não compila.
+
 ---
 
 ## #753 — Permuta física (Avançado, Custos → Terreno): a linha nunca entrava nesse estado pela tela (2026-09-18)

@@ -50,12 +50,26 @@ import {
  * o mapeamento fica aferível sem montar a tela, e apagar a CHAMADA
  * (`class="num ${sinal}"`) deixa o caso de render vermelho — que é onde a
  * fiação é medida.
+ *
+ * #754: a classe tem de acompanhar o TEXTO que a célula publica, não o valor
+ * cru — e o arquivo tem DUAS tabelas com formatadores diferentes. A Proforma
+ * (`_renderProforma`) publica `celulaInteira` (inteiro; −0,30 vira "0"), e a
+ * Análise Financeira (`_renderAnaliseFinanceira`) segue em `fmtR$` (2 casas;
+ * −0,30 vira "-R$ 0,30", e todo negativo leva o sinal de menos, inclusive o
+ * que arredonda a "-R$ 0,00"). Por isso `exibicao` é OBRIGATÓRIO, sem default:
+ * o chamador declara qual formatador a célula usa, e omitir é erro de
+ * compilação (TS2554), não um `'inteira'` silencioso pintando de verde um
+ * "-R$ 0,30" da Análise Financeira — achado P2 do App do Codex no PR 758.
  */
-export function sinalLinhaProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>): '' | 'pos' | 'neg' {
+export type ExibicaoR$ = 'inteira' | 'centavos';
+
+export function sinalLinhaProformaAv(
+  l: Pick<LinhaProformaAv, 'tipo' | 'valor'>,
+  exibicao: ExibicaoR$,
+): '' | 'pos' | 'neg' {
   if (l.tipo !== 'receita' && l.tipo !== 'resultado') return '';
-  // #754: sobre o valor PUBLICADO (inteiro arredondado) — a célula chama
-  // `celulaInteira`, e a classe tem de acompanhar o texto, não o valor cru.
-  return inteiroExibido(l.valor) < 0 ? 'neg' : 'pos';
+  const publicado = exibicao === 'inteira' ? inteiroExibido(l.valor) : l.valor;
+  return publicado < 0 ? 'neg' : 'pos';
 }
 
 /**
@@ -570,7 +584,7 @@ export class ViabFluxoVer extends LitElement {
               // #593 — mesma decisão do Preliminar (#567): o sinal vai nas TRÊS
               // colunas numéricas, não só na de R$, para que o negativo de uma
               // receita/resultado se leia igual em R$, R$/m² e % VGV.
-              const sinal = sinalLinhaProformaAv(l);
+              const sinal = sinalLinhaProformaAv(l, 'inteira');
               return html`
               <tr class=${`n${l.nivel} ${l.tipo}${l.subgrupo ? ' subgrupo' : ''}`}>
                 <td>${l.nome}${l.notaBase ? html` <span class="nota-base">(${l.notaBase})</span>` : ''}</td>
@@ -638,9 +652,11 @@ export class ViabFluxoVer extends LitElement {
     // override `td.neg` nunca aparecia. Mesma função, mesma decisão do
     // Preliminar (#567): a linha de custo fica sem sinal de propósito, porque
     // ali o negativo é o estado normal.
-    const sinalLivre = sinalLinhaProformaAv({ tipo: 'receita', valor: livre });
-    const sinalFunding = sinalLinhaProformaAv({ tipo: 'custo', valor: -custoFunding });
-    const sinalReal = sinalLinhaProformaAv({ tipo: 'resultado', valor: real });
+    // #754: `'centavos'`, porque estas três células publicam `fmtR$` (2 casas),
+    // não `celulaInteira` — a classe segue o texto desta tabela, não o da Proforma.
+    const sinalLivre = sinalLinhaProformaAv({ tipo: 'receita', valor: livre }, 'centavos');
+    const sinalFunding = sinalLinhaProformaAv({ tipo: 'custo', valor: -custoFunding }, 'centavos');
+    const sinalReal = sinalLinhaProformaAv({ tipo: 'resultado', valor: real }, 'centavos');
     return html`
       ${kpisFluxo(c)}
       ${this._renderRoiProjeto(this.calcProjeto ?? c)}

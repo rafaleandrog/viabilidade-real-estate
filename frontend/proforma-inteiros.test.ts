@@ -100,6 +100,7 @@ const EXCECOES = [
   'frontend/proforma-inteiros.test.ts', // esta trava
   'frontend/viab-format.test.ts',       // o teste da função pura
   'frontend/kpi-casas-decimais.test.ts', // cita o símbolo nos MOTIVOS das entradas de zero (string, não comentário)
+  'frontend/proforma-cores.test.ts',     // confronta a classe `pos`/`neg` com o TEXTO que `celulaInteira` publica (não formata célula)
 ];
 
 test('#754: a exceção de inteiros NÃO vazou para nenhum outro arquivo do frontend', () => {

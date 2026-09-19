@@ -26,6 +26,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { sinalLinhaProformaAv } from './tela-fluxo-ver.js';
 import { sinalSensibilidade } from './tela-proforma.js';
+import { celulaInteira, fmtR$ } from './viab-format.js';
 
 const PRELIMINAR = readFileSync(new URL('./tela-proforma.ts', import.meta.url), 'utf8');
 const AVANCADO = readFileSync(new URL('./tela-fluxo-ver.ts', import.meta.url), 'utf8');
@@ -163,21 +164,21 @@ test('#593: só receita e resultado ganham pos/neg — custo e informativo, nunc
   // Custo é NEGATIVO por construção na Proforma do Avançado
   // (`frontend/proforma-avancado.ts`, `(-) …` e `= Custo … total`). Marcá-lo
   // como `neg` pintaria de "erro" o estado normal da tabela.
-  assert.equal(sinalLinhaProformaAv(linha('custo', -1_000_000)), '');
-  assert.equal(sinalLinhaProformaAv(linha('custo', 0)), '');
+  assert.equal(sinalLinhaProformaAv(linha('custo', -1_000_000), 'inteira'), '');
+  assert.equal(sinalLinhaProformaAv(linha('custo', 0), 'inteira'), '');
   // A linha do serviço da dívida do funding (#447) e a da receita líquida da
   // EVI (#465) são somadas de fora — não pertencem à leitura vertical.
-  assert.equal(sinalLinhaProformaAv(linha('informativo', -500)), '');
-  assert.equal(sinalLinhaProformaAv(linha('informativo', 500)), '');
+  assert.equal(sinalLinhaProformaAv(linha('informativo', -500), 'inteira'), '');
+  assert.equal(sinalLinhaProformaAv(linha('informativo', 500), 'inteira'), '');
 });
 
 test('#593: receita e resultado recebem o sinal do próprio valor', () => {
-  assert.equal(sinalLinhaProformaAv(linha('receita', 12_000_000)), 'pos');
-  assert.equal(sinalLinhaProformaAv(linha('receita', -3)), 'neg');
-  assert.equal(sinalLinhaProformaAv(linha('resultado', 2_500_000)), 'pos');
-  assert.equal(sinalLinhaProformaAv(linha('resultado', -2_500_000)), 'neg');
+  assert.equal(sinalLinhaProformaAv(linha('receita', 12_000_000), 'inteira'), 'pos');
+  assert.equal(sinalLinhaProformaAv(linha('receita', -3), 'inteira'), 'neg');
+  assert.equal(sinalLinhaProformaAv(linha('resultado', 2_500_000), 'inteira'), 'pos');
+  assert.equal(sinalLinhaProformaAv(linha('resultado', -2_500_000), 'inteira'), 'neg');
   // Zero é `pos`, não `neg` — mesma convenção do Preliminar (`v < 0`).
-  assert.equal(sinalLinhaProformaAv(linha('resultado', 0)), 'pos');
+  assert.equal(sinalLinhaProformaAv(linha('resultado', 0), 'inteira'), 'pos');
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -212,7 +213,54 @@ test('#593: a convenção de sinal é a MESMA do Preliminar, para os dois sinais
   // Confronto direto com a função do Preliminar, em vez de reafirmar a regra:
   // se um dos dois mudar de convenção, este teste acusa.
   for (const v of [-1_000_000, -0.01, 0, 0.01, 1_000_000]) {
-    assert.equal(sinalLinhaProformaAv(linha('receita', v)), sinalSensibilidade(v, 'receita'), `valor ${v}`);
-    assert.equal(sinalLinhaProformaAv(linha('custo', v)), sinalSensibilidade(v, 'despesa'), `valor ${v}`);
+    assert.equal(sinalLinhaProformaAv(linha('receita', v), 'inteira'), sinalSensibilidade(v, 'receita'), `valor ${v}`);
+    assert.equal(sinalLinhaProformaAv(linha('custo', v), 'inteira'), sinalSensibilidade(v, 'despesa'), `valor ${v}`);
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// #754 — a classe acompanha o TEXTO da célula, e o arquivo tem dois formatadores
+// ─────────────────────────────────────────────────────────────────────────
+
+test('#754: `exibicao` casa a classe com o texto que cada formatador publica', () => {
+  // Confronto direto com os formatadores, em vez de reafirmar a regra: a classe
+  // `neg` existe se e só se o texto publicado leva marca de negativo.
+  const VALORES = [-1_000_000, -1, -0.5, -0.49, -0.3, -0.004, -0, 0, 0.3, 0.5, 1, 1_000_000];
+  for (const v of VALORES) {
+    const textoInteiro = celulaInteira(v, { comParenteses: false, sempreExibir: true });
+    assert.equal(
+      sinalLinhaProformaAv(linha('receita', v), 'inteira'),
+      textoInteiro.startsWith('-') ? 'neg' : 'pos',
+      `inteira, valor ${v} → texto "${textoInteiro}"`,
+    );
+    const textoCentavos = fmtR$(v);
+    assert.equal(
+      sinalLinhaProformaAv(linha('resultado', v), 'centavos'),
+      textoCentavos.startsWith('-') ? 'neg' : 'pos',
+      `centavos, valor ${v} → texto "${textoCentavos}"`,
+    );
+  }
+  // O ponto em que os dois DIVERGEM — e o motivo de `exibicao` existir: a mesma
+  // receita a −R$ 0,30 publica "0" na Proforma (inteira → `pos`) e "-R$ 0,30"
+  // na Análise Financeira (centavos → `neg`). Achado P2 do App do Codex no PR 758.
+  assert.equal(sinalLinhaProformaAv(linha('receita', -0.3), 'inteira'), 'pos');
+  assert.equal(sinalLinhaProformaAv(linha('receita', -0.3), 'centavos'), 'neg');
+  // Custo e informativo continuam sem classe nos dois modos.
+  assert.equal(sinalLinhaProformaAv(linha('custo', -0.3), 'centavos'), '');
+  assert.equal(sinalLinhaProformaAv(linha('informativo', -0.3), 'centavos'), '');
+});
+
+test('#754: cada tabela de tela-fluxo-ver.ts declara o formatador que a sua célula usa', () => {
+  // Fiação, não lógica: a Proforma (`_renderProforma`, `celulaInteira`) chama com
+  // `'inteira'`; a Análise Financeira (`_renderAnaliseFinanceira`, `fmtR$`) chama
+  // com `'centavos'`, nas três linhas. Contagem EXATA nos dois sentidos — trocar
+  // um modo pelo outro, ou acrescentar um chamador sem decidir, reprova aqui.
+  const fonte = AVANCADO
+    .split('\n')
+    .map((l) => { const i = l.indexOf('//'); return i === -1 ? l : l.slice(0, i); })
+    .join('\n');
+  const contar = (re: RegExp) => (fonte.match(re) ?? []).length;
+  assert.equal(contar(/sinalLinhaProformaAv\(l, 'inteira'\)/g), 1, 'Proforma: uma chamada, inteira');
+  assert.equal(contar(/sinalLinhaProformaAv\([^)]*\}, 'centavos'\)/g), 3, 'Análise Financeira: três chamadas, centavos');
+  assert.equal(contar(/sinalLinhaProformaAv\(/g), 4 + 1, 'total = 4 chamadas + a declaração');
 });
