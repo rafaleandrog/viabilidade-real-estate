@@ -50,7 +50,10 @@ reprova a contagem; apagar o argumento não compila. (3) E a terceira volta da m
 App, rodada 4): a classe de sinal é da LINHA e passou a seguir o R$ inteiro, mas R$/m² e % VGV
 seguiam formatando o valor CRU — para −R$ 0,30 a linha mostrava `0` · `(0)` · `-0,0%`, tudo verde.
 Conserto: `semZeroNegativo` (`frontend/viab-format.ts`) — quando o R$ publica 0, o valor que alimenta
-as duas derivadas vira 0; fora dessa faixa é o cru (a magnitude de R$/m² e % VGV não é arredondada).
+as duas derivadas perde o SINAL (vira o módulo); fora dessa faixa é o cru. Só o sinal, nunca a
+magnitude: a primeira versão zerava o valor, e o App achou na rodada 7 que isso apagava a conta
+certa de R$/m² e % VGV com denominador minúsculo (VGV de R$ 0,49 → "0,0%" onde é 100%) e zerava até
+valor POSITIVO na faixa, que não tem sinal a normalizar.
 Uma função para `celulaProformaM2` (Preliminar), `pctVgvProforma` (tela + CSV + PDF) e
 `celulaM2ProformaAv` e `pctVgvProformaAv` (Avançado, extraídas das closures para serem aferíveis —
 a segunda porque a primeira versão do conserto normalizou só o ramo do VGV puro e deixou de fora o

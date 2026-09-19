@@ -94,13 +94,14 @@ export function celulaM2ProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>, a
  * independente do VGV. É guarda declarada, não conserto de defeito vivo.
  *
  * #754 — a coluna herda o sinal do R$ publicado: quando a coluna R$ mostra
- * "0" (|valor| < 0,5), esta publica 0, e não "-0,0%" — nos DOIS ramos. O
- * `pctOverride` das três linhas de fecho ("= Resultado", "= Resultado +
- * Permutas", "= Resultado + Perm. Financ.", todas `tipo: 'resultado'`) vem
- * pré-calculado do valor cru em `proforma-avancado.ts`, e normalizar só o
- * ramo do VGV puro deixava exatamente essas linhas de fora (achado do App do
- * Codex e da lente na rodada 5 do PR 758). Fora dessa faixa o percentual é o
- * cru: a magnitude não é arredondada.
+ * "0" (|valor| < 0,5), esta publica o percentual EM MÓDULO, e não "-0,0%" —
+ * nos DOIS ramos, e só o sinal muda (`semZeroNegativo`: com VGV minúsculo a
+ * magnitude continua sendo a conta certa). O `pctOverride` das três linhas
+ * de fecho ("= Resultado", "= Resultado + Permutas", "= Resultado + Perm.
+ * Financ.", todas `tipo: 'resultado'`) vem pré-calculado do valor cru em
+ * `proforma-avancado.ts`, e normalizar só o ramo do VGV puro deixava
+ * exatamente essas linhas de fora (achado do App do Codex e da lente na
+ * rodada 5 do PR 758). Fora dessa faixa o percentual é o cru.
  */
 export function pctVgvProformaAv(
   l: Pick<LinhaProformaAv, 'valor' | 'pctOverride'>,
@@ -110,7 +111,7 @@ export function pctVgvProformaAv(
     ? l.pctOverride
     : (vgv > 0 ? (l.valor / vgv) * 100 : null);
   if (pct === null) return null;
-  return semZeroNegativo(l.valor) === 0 ? 0 : pct;
+  return inteiroExibido(l.valor) === 0 ? Math.abs(pct) : pct;
 }
 
 export function sinalLinhaProformaAv(

@@ -285,22 +285,29 @@ test('#754: R$/m² do Avançado herda o sinal do R$ publicado — "0" em R$ nunc
     const sinal = sinalLinhaProformaAv({ tipo: 'resultado', valor: v }, 'inteira');
     const m2 = celulaM2ProformaAv({ tipo: 'resultado', valor: v }, AREA);
     assert.equal(m2.startsWith('('), sinal === 'neg', `valor ${v}: R$/m² "${m2}" com classe ${sinal}`);
-    assert.equal(semZeroNegativo(v) === 0, sinal === 'pos' && inteiroZero(v), `valor ${v}`);
+    assert.equal(semZeroNegativo(v) < 0, sinal === 'neg', `valor ${v}`);
+    assert.equal(Math.abs(semZeroNegativo(v)), Math.abs(v), `valor ${v}: só o sinal é normalizado, nunca a magnitude`);
   }
+  // Magnitude preservada com denominador minúsculo — só o sinal sai (App, rodada 7).
+  assert.equal(celulaM2ProformaAv({ tipo: 'resultado', valor: -0.3 }, 0.01), '30');
+  assert.equal(celulaM2ProformaAv({ tipo: 'resultado', valor: 0.3 }, 0.01), '30');
 });
-
-function inteiroZero(v: number): boolean { return Math.abs(v) < 0.5; }
 
 test('#754: % VGV do Avançado herda o sinal do R$ publicado — nos DOIS ramos, override incluído', () => {
   const VGV = 10_000_000;
   // Ramo do VGV puro (sem override).
-  assert.equal(pctVgvProformaAv({ valor: -0.3 }, VGV), 0);
+  assert.equal(pctVgvProformaAv({ valor: -0.3 }, VGV), (0.3 / VGV) * 100, 'em módulo, magnitude intacta');
   assert.equal(pctVgvProformaAv({ valor: -0.6 }, VGV), (-0.6 / VGV) * 100);
+  // Denominador minúsculo: a conta certa sobrevive, só o sinal sai; positivo na faixa passa intacto.
+  assert.equal(pctVgvProformaAv({ valor: -0.3 }, 0.49), (0.3 / 0.49) * 100);
+  assert.equal(pctVgvProformaAv({ valor: 0.3 }, 0.49), (0.3 / 0.49) * 100);
+  assert.equal(pctVgvProformaAv({ valor: 0.49 }, 0.49), 100, 'Receita bruta de um VGV de R$ 0,49 é 100%, não 0%');
   assert.equal(pctVgvProformaAv({ valor: -2_500_000 }, VGV), -25);
   assert.equal(pctVgvProformaAv({ valor: 1 }, 0), null, 'VGV ≤ 0 → null, nunca 0 (#604)');
   // Ramo do override — as três linhas de fecho de `proforma-avancado.ts` vêm por
   // aqui, com o percentual PRÉ-CALCULADO do valor cru: era a fresta que sobrou.
-  assert.equal(pctVgvProformaAv({ valor: -0.3, pctOverride: -0.000003 }, VGV), 0);
+  assert.equal(pctVgvProformaAv({ valor: -0.3, pctOverride: -0.000003 }, VGV), 0.000003);
+  assert.equal(pctVgvProformaAv({ valor: -0.3, pctOverride: -61.2 }, 0.49), 61.2, 'override em módulo, magnitude intacta');
   assert.equal(pctVgvProformaAv({ valor: -0.6, pctOverride: -0.000006 }, VGV), -0.000006);
   assert.equal(pctVgvProformaAv({ valor: -2_500_000, pctOverride: -20 }, VGV), -20, 'override vence o VGV puro');
   assert.equal(pctVgvProformaAv({ valor: 5, pctOverride: null }, VGV), null, '`null` é "base própria inválida", não "sem override" (#604)');

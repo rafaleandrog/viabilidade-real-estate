@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CASAS_DECIMAIS_MONETARIAS, fmtR$, fmtR$Kpi, fmtR$Milhoes, celulaInteira, fmtPct, fmtPctOuIndef, fmtPctEntrada, fmtM2, parseNumeroBR, celula, negativoContabil,
-} from './viab-format.js';
+ semZeroNegativo } from './viab-format.js';
 
 test('#281: fmtR$ é a fonte única de valores monetários com 2 casas', () => {
   assert.equal(CASAS_DECIMAIS_MONETARIAS, 2);
@@ -272,4 +272,15 @@ test('#754 celulaInteira: célula vazia abaixo de 0,5 sem sempreExibir; "0" com 
 
 test('#754 celulaInteira: `celula` (Fluxo de Caixa) continua em 2 casas — a exceção não a alcança', () => {
   assert.equal(celula(1234.56, { comParenteses: false }), '1.234,56');
+});
+
+test('#754 semZeroNegativo: só o sinal sai na faixa em que o R$ publica "0"; a magnitude nunca', () => {
+  assert.equal(semZeroNegativo(-0.3), 0.3);
+  assert.equal(semZeroNegativo(-0.49), 0.49);
+  assert.equal(semZeroNegativo(0.3), 0.3);
+  assert.equal(Object.is(semZeroNegativo(-0), 0), true);
+  assert.equal(semZeroNegativo(-0.5), -0.5, 'fora da faixa (R$ publica "(1)"): cru');
+  assert.equal(semZeroNegativo(-1_234.56), -1_234.56);
+  assert.equal(semZeroNegativo(5), 5);
+  assert.equal(semZeroNegativo(NaN), 0);
 });

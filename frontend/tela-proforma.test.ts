@@ -101,6 +101,13 @@ test('#754: R$/m² e % VGV herdam o sinal do R$ publicado — "0" em R$ nunca ve
   // Custo: sempre entre parênteses (#567), inclusive na faixa do zero; % VGV em módulo.
   assert.equal(celulaProformaM2({ v: 0.3, tipo: 'consolidado' }, areaVendavel), '(0)');
   assert.equal(pctVgvProforma({ v: -0.3, tipo: 'consolidado' } as Linha, p), '0,0%');
+  // Só o SINAL é normalizado, nunca a magnitude: com denominador minúsculo a conta
+  // certa sobrevive, e um valor positivo na faixa passa intacto (App, rodada 7).
+  assert.equal(celulaProformaM2({ v: -0.3, tipo: 'resultado' }, 0.01), '30');
+  assert.equal(celulaProformaM2({ v: 0.3, tipo: 'resultado' }, 0.01), '30');
+  assert.equal(pctVgvProforma({ v: -0.3, tipo: 'resultado' } as Linha, { vgv: 0.49 } as Proforma), '61,2%');
+  assert.equal(pctVgvProforma({ v: 0.3, tipo: 'resultado' } as Linha, { vgv: 0.49 } as Proforma), '61,2%');
+  assert.equal(pctVgvProforma({ v: 0.49, tipo: 'receita' } as Linha, { vgv: 0.49 } as Proforma), '100,0%');
   // A linha inteira concorda com a classe que `_renderTabela` deriva do R$ publicado.
   for (const v of [-1_000_000, -1, -0.5, -0.49, -0.3, -0, 0, 0.3, 1]) {
     const r = { v, tipo: 'resultado' } as Linha;

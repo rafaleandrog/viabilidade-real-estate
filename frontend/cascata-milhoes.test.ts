@@ -154,8 +154,8 @@ test('a exceção de milhões NÃO vazou para nenhum outro arquivo do frontend',
     .filter((f) => ocorrencias(fonte(f), 'fmtR$Milhoes') > 0);
   assert.deepEqual(
     vazamentos, [],
-    'a abreviação em milhões vale SÓ no rótulo de barra da cascata — '
-    + 'tabela, Fluxo de Caixa e exportação seguem em 2 casas (C7); a Proforma tem a sua própria exceção (#754)',
+    'a abreviação em milhões vale só nos consumidores declarados em CONSUMIDORES (rótulo de barra da cascata '
+    + 'e cartão de terreno máximo) — tabela, Fluxo de Caixa e exportação seguem em 2 casas (C7); a Proforma tem a sua própria exceção (#754)',
   );
 });
 

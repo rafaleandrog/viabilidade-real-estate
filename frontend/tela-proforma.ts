@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { estiloConteudo } from './estilos.js';
-import { fmtR$, fmtR$Milhoes, fmtNum, fmtPct, fmtPctOuIndef, celula, negativoContabil, inteiroExibido, semZeroNegativo } from './viab-format.js';
+import { fmtR$, fmtR$Milhoes, fmtNum, fmtPct, fmtPctOuIndef, negativoContabil, inteiroExibido, semZeroNegativo } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, vgvBrutoDeProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
 import { rankearAlavancas, ehCustoLike, ehCircular } from './tornado-alavancas.js';
