@@ -97,7 +97,7 @@ export interface ProformaInput {
   sensibilidade?: FatorSensibilidade;
 }
 
-export type VariavelSensibilidade = 'preco' | 'permuta_fisica' | 'permuta_financeira' | 'custo_infra' | 'custo_obras';
+export type VariavelSensibilidade = 'preco' | 'permuta_fisica' | 'permuta_financeira' | 'custo_infra' | 'custo_obras' | 'custo_terreno' | 'custo_indireto';
 export interface FatorSensibilidade { variavel: VariavelSensibilidade; fator: number; }
 
 export interface ProdutoPreliminar {
@@ -643,7 +643,10 @@ export function calcularProforma(e: ProformaInput): Proforma {
   const receitaLiquida = vgv - imposto - corretagem - marketing - permutaFinResidencial - permutaFinNaoResidencial;
 
   // ── Custos diretos ──
-  const custoTerreno = e.considerar_custo_terreno === false ? 0 : n(e.custo_terreno_m2) * areaTerreno;
+  // #725: o fator incide DEPOIS do ramo `considerar_custo_terreno === false`,
+  // para que o desligamento continue soberano — um custo desligado estressado
+  // continua zero, nunca "zero × fator" virando outra coisa.
+  const custoTerreno = (e.considerar_custo_terreno === false ? 0 : n(e.custo_terreno_m2) * areaTerreno) * fatorSens('custo_terreno');
 
   // Infraestrutura (loteamento) — 3 modos (#5): % do VGV, valor fixo em R$, ou
   // R$/m² × área privativa dos lotes (= área vendável bruta).
@@ -675,9 +678,17 @@ export function calcularProforma(e: ProformaInput): Proforma {
     + construcao + gestaoConstrucao + decoracao + manutencao + contingencias;
 
   // ── Custos indiretos ──
-  const marketingGlobal = (e.considerar_marketing_global === false ? 0 : vgv * n(e.marketing_global_pct) / 100)
-    + (lot ? n(e.stand_vendas_valor) : 0);
-  const gestaoIndiretos = e.considerar_gestao_indiretos === false ? 0 : vgv * n(e.gestao_indiretos_pct) / 100;
+  // #725: o fator incide nas DUAS parcelas, não na soma — a alternativa
+  // (aplicar só em `custoIndiretoTotal`) quebraria a identidade
+  // `marketingGlobal + gestaoIndiretos === custoIndiretoTotal` que a tela e os
+  // testes verificam campo a campo. Exata AQUI, antes do arredondamento; no
+  // objeto público os três campos passam por `moeda()` independentemente
+  // (ver `monetarios`, adiante), então na superfície a igualdade vale a
+  // ±0,02 — é o que `frontend/proforma.test.ts` mede (achado da lente S2,
+  // PR #757).
+  const marketingGlobal = ((e.considerar_marketing_global === false ? 0 : vgv * n(e.marketing_global_pct) / 100)
+    + (lot ? n(e.stand_vendas_valor) : 0)) * fatorSens('custo_indireto');
+  const gestaoIndiretos = (e.considerar_gestao_indiretos === false ? 0 : vgv * n(e.gestao_indiretos_pct) / 100) * fatorSens('custo_indireto');
   const custoIndiretoTotal = marketingGlobal + gestaoIndiretos;
 
   // Receita operacional = receita líquida − custo direto total (antes dos indiretos).
