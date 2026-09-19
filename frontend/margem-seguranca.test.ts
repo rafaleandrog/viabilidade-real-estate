@@ -170,6 +170,45 @@ test('#757: margem-alvo sempre atingida no intervalo (alvoSempreAtingido=true), 
   assert.equal(m.alvoSempreAtingido, true, 'a margem deveria superar a meta de 1% em todo o intervalo');
 });
 
+// Achado do App do Codex, PR #757, rodada 4: `fatorEquilibrio === null` tinha
+// a MESMA ambiguidade que `fatorAlvo` tinha antes da rodada 1 — "sem troca de
+// sinal" cobre tanto "nunca lucra" quanto "sempre lucra", e o fixture ACIMA
+// (usado para provar `alvoSempreAtingido: true`) é evidência viva: o projeto
+// SEMPRE lucra, então também nunca cruza resultado=0.
+test('#757 rodada 4: resultado sempre positivo (resultadoSemprePositivo=true) quando fatorEquilibrio é null', () => {
+  const semprePositivo: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual',
+    terreno_manual_area: 500,
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 1_000, unidades: 100 }],
+    permuta_fisica_modo: 'area_m2',
+    permuta_fisica_area_m2: 10,
+    construcao_modo: 'valor_total',
+    construcao_valor_total: 500_000,
+  };
+  const m = margemDeSeguranca(semprePositivo, 'permuta_fisica', 1);
+  assert.equal(m.fatorEquilibrio, null, 'não deveria haver raiz — o resultado nunca cruza zero');
+  assert.equal(m.resultadoSemprePositivo, true, 'o resultado deveria ser positivo em todo o intervalo');
+});
+
+test('#757 rodada 4: resultado sempre negativo (resultadoSemprePositivo=false) quando fatorEquilibrio é null', () => {
+  // Custo de construção maior que o VGV bruto em todo o intervalo — o
+  // resultado é negativo mesmo no fator 0 (sem estresse nenhum).
+  const semprePrejuizo: ProformaInput = {
+    tipo_empreendimento: 'incorporacao',
+    origem_terreno: 'manual',
+    terreno_manual_area: 500,
+    produtos: [{ area_media_m2: 100, preco_venda_m2: 1_000, unidades: 100 }], // vgv bruto = 10.000.000
+    permuta_fisica_modo: 'area_m2',
+    permuta_fisica_area_m2: 10,
+    construcao_modo: 'valor_total',
+    construcao_valor_total: 50_000_000, // 5x o VGV bruto
+  };
+  const m = margemDeSeguranca(semprePrejuizo, 'permuta_fisica', 1);
+  assert.equal(m.fatorEquilibrio, null, 'não deveria haver raiz — o resultado nunca cruza zero');
+  assert.equal(m.resultadoSemprePositivo, false, 'o resultado deveria ser negativo em todo o intervalo');
+});
+
 // Achado do App do Codex, PR #757, rodada 2: para a alavanca `preco`, o fator
 // 0 SEMPRE zera o VGV (preço × 0), então `fAlvo(0) = +Infinity` em todo
 // estudo — antes deste conserto, `resolverFator` abortava a busca inteira ao

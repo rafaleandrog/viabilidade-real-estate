@@ -758,18 +758,29 @@ export class ViabTelaProforma extends LitElement {
       if (circular) {
         return `${rotulo}: base orçada como % do VGV — estressar esta premissa move o preço junto e não mede nada isolado.`;
       }
-      if (m.fatorEquilibrio === null) {
-        return `${rotulo}: o projeto não atinge o ponto de equilíbrio nesta faixa de estresse.`;
-      }
       // `fatorAlvo === null` cobre DOIS casos opostos que `alvoSempreAtingido`
-      // desfaz (achado do App do Codex, PR #757): a meta nunca é atingida, ou
-      // ela já é atingida no intervalo inteiro — dizer "não atinge" no
-      // segundo caso seria o oposto da verdade.
+      // desfaz (achado do App do Codex, PR #757, rodada 1): a meta nunca é
+      // atingida, ou ela já é atingida no intervalo inteiro — dizer "não
+      // atinge" no segundo caso seria o oposto da verdade.
       const alvo = m.fatorAlvo !== null
         ? `até a margem-alvo (${fmtPct(margemAlvoPct)}): ${fmtVariacao((m.fatorAlvo - 1) * 100)}`
         : m.alvoSempreAtingido
           ? `já atinge a margem-alvo de ${fmtPct(margemAlvoPct)} em toda esta faixa de estresse`
           : `não atinge a margem-alvo de ${fmtPct(margemAlvoPct)} em nenhum cenário desta faixa`;
+      // `fatorEquilibrio === null` tinha o MESMO problema que `fatorAlvo`
+      // tinha antes da #757 rodada 1: um early-return que descartava a
+      // classificação da margem-alvo por inteiro, e não distinguia "o
+      // projeto nunca lucra" de "o projeto sempre lucra" — as duas produzem
+      // "sem troca de sinal" em `resolverFator`. `resultadoSemprePositivo`
+      // desfaz essa ambiguidade, e a margem-alvo (já calculada
+      // independentemente) sempre é reportada, mesmo quando não há ponto de
+      // equilíbrio a citar (achado do App do Codex, PR #757, rodada 4).
+      if (m.fatorEquilibrio === null) {
+        const equilibrio = m.resultadoSemprePositivo
+          ? 'o resultado é positivo em toda esta faixa de estresse'
+          : 'o projeto não atinge o ponto de equilíbrio nesta faixa de estresse';
+        return `${rotulo}: ${equilibrio}. Margem-alvo: ${alvo}.`;
+      }
       return `${rotulo} — ponto de equilíbrio (resultado = 0). Margem-alvo: ${alvo}.`;
     };
 

@@ -16,6 +16,12 @@ export interface MargemDeSeguranca {
   variavel: VariavelSensibilidade;
   /** Fator no ponto de equilíbrio (resultado = 0). `null` = não existe raiz no intervalo. */
   fatorEquilibrio: number | null;
+  /** Só definido quando `fatorEquilibrio` é `null` — mesma ambiguidade de
+   * "sem troca de sinal" que `alvoSempreAtingido` desfaz para `fatorAlvo`,
+   * aqui para o RESULTADO: `true` = positivo em toda a faixa de estresse
+   * (o projeto nunca perde, nada a temer); `false` = nunca fica positivo
+   * (sempre no prejuízo). Achado do App do Codex, PR #757, rodada 4. */
+  resultadoSemprePositivo?: boolean;
   /**
    * Fator na fronteira da margem-alvo. `null` quando não há UMA fronteira em
    * `[FATOR_MIN, FATOR_MAX]` — o que acontece em DOIS casos opostos que
@@ -137,6 +143,14 @@ export function margemDeSeguranca(
   const proformaNoFator = (fator: number): Proforma => calcular({ ...entrada, sensibilidade: { variavel, fator } });
 
   const fatorEquilibrio = resolverFator((fator) => proformaNoFator(fator).resultado);
+  // `resultado` nunca é infinito (é subtração pura, sem divisão) — os
+  // extremos brutos FATOR_MIN/FATOR_MAX já bastam, sem faixaFinita.
+  let resultadoSemprePositivo: boolean | undefined;
+  if (fatorEquilibrio === null) {
+    const rMin = proformaNoFator(FATOR_MIN).resultado;
+    const rMax = proformaNoFator(FATOR_MAX).resultado;
+    resultadoSemprePositivo = rMin > 0 && rMax > 0;
+  }
 
   // Margem-alvo é sobre a RECEITA LÍQUIDA (o rodapé do painel declara a base):
   // resultado / receitaLiquida × 100 ≥ margemAlvoPct. Sem receita líquida
@@ -167,7 +181,7 @@ export function margemDeSeguranca(
 
   const folgaPct = fatorEquilibrio === null ? null : (fatorEquilibrio - 1) * 100;
 
-  return { variavel, fatorEquilibrio, fatorAlvo, alvoSempreAtingido, folgaPct };
+  return { variavel, fatorEquilibrio, resultadoSemprePositivo, fatorAlvo, alvoSempreAtingido, folgaPct };
 }
 
 /**
