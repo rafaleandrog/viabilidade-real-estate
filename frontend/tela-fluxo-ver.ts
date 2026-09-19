@@ -103,11 +103,14 @@ export function celulaM2ProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>, a
  * exatamente essas linhas de fora (achado do App do Codex e da lente na
  * rodada 5 do PR 758). Fora dessa faixa o percentual é o cru.
  *
- * ⚠️ SÓ receita e resultado — as linhas que recebem a classe `pos`/`neg`
- * (`sinalLinhaProformaAv`) e cujo texto tem de acompanhá-la. Linha de CUSTO
- * guarda `valor` NEGATIVO no Avançado, não recebe classe, e o seu percentual
- * negativo é a leitura normal da coluna: normalizá-la publicaria "61,2%"
- * onde a conta é "-61,2%" (achado P2 do App do Codex na rodada 11).
+ * ⚠️ Vale para toda linha formatada com SINAL REAL — receita, resultado e
+ * informativo, cujas células R$ (`celulaInteira` sem `custo`) e R$/m²
+ * (`celulaM2ProformaAv`) já publicam o módulo na faixa do zero; as três
+ * células da linha têm de concordar. Fica de fora só a linha de CUSTO: ela
+ * guarda `valor` NEGATIVO no Avançado, é notação contábil (parêntese sempre,
+ * indiferente ao sinal), não recebe classe, e o seu percentual negativo é a
+ * leitura normal da coluna — normalizá-la publicaria "61,2%" onde a conta é
+ * "-61,2%" (achados P2 do App do Codex nas rodadas 11 e 12).
  */
 export function pctVgvProformaAv(
   l: Pick<LinhaProformaAv, 'tipo' | 'valor' | 'pctOverride'>,
@@ -117,8 +120,8 @@ export function pctVgvProformaAv(
     ? l.pctOverride
     : (vgv > 0 ? (l.valor / vgv) * 100 : null);
   if (pct === null) return null;
-  const comClasseDeSinal = l.tipo === 'receita' || l.tipo === 'resultado';
-  return comClasseDeSinal && inteiroExibido(l.valor) === 0 ? Math.abs(pct) : pct;
+  const sinalReal = l.tipo !== 'custo';   // custo é contábil: parêntese sempre, percentual cru
+  return sinalReal && inteiroExibido(l.valor) === 0 ? Math.abs(pct) : pct;
 }
 
 export function sinalLinhaProformaAv(

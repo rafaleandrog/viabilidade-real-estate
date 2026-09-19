@@ -53,7 +53,7 @@ Conserto: `semZeroNegativo` (`frontend/viab-format.ts`) — quando o R$ publica 
 as duas derivadas perde o SINAL (vira o módulo); fora dessa faixa é o cru. Só o sinal, nunca a
 magnitude: a primeira versão zerava o valor, e o App achou na rodada 7 que isso apagava a conta
 certa de R$/m² e % VGV com denominador minúsculo (VGV de R$ 0,49 → "0,0%" onde é 100%) e zerava até
-valor POSITIVO na faixa, que não tem sinal a normalizar. E a normalização da % VGV vale SÓ para receita e resultado — as linhas com classe de sinal —, porque custo no Avançado guarda `valor` negativo, não recebe classe, e o seu percentual negativo é a leitura normal da coluna (App, rodada 11).
+valor POSITIVO na faixa, que não tem sinal a normalizar. E a normalização da % VGV vale para toda linha de sinal real (receita, resultado, informativo — as três células da linha concordam), e NÃO para custo: no Avançado ele guarda `valor` negativo, é notação contábil (parêntese sempre), não recebe classe, e o seu percentual negativo é a leitura normal da coluna (App, rodadas 11 e 12).
 Uma função para `celulaProformaM2` (Preliminar), `pctVgvProforma` (tela + CSV + PDF) e
 `celulaM2ProformaAv` e `pctVgvProformaAv` (Avançado, extraídas das closures para serem aferíveis —
 a segunda porque a primeira versão do conserto normalizou só o ramo do VGV puro e deixou de fora o

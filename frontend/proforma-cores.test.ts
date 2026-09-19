@@ -26,7 +26,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { sinalLinhaProformaAv, celulaM2ProformaAv, pctVgvProformaAv } from './tela-fluxo-ver.js';
 import { sinalSensibilidade } from './tela-proforma.js';
-import { celulaInteira, fmtR$, fmtPctOuIndef, semZeroNegativo } from './viab-format.js';
+import { celulaInteira, fmtR$, fmtPctOuIndef, semZeroNegativo, inteiroExibido } from './viab-format.js';
 
 const PRELIMINAR = readFileSync(new URL('./tela-proforma.ts', import.meta.url), 'utf8');
 const AVANCADO = readFileSync(new URL('./tela-fluxo-ver.ts', import.meta.url), 'utf8');
@@ -313,21 +313,30 @@ test('#754: % VGV do Avançado herda o sinal do R$ publicado — nos DOIS ramos,
   assert.equal(pctVgvProformaAv(res(-0.6, -0.000006), VGV), -0.000006);
   assert.equal(pctVgvProformaAv(res(-2_500_000, -20), VGV), -20, 'override vence o VGV puro');
   assert.equal(pctVgvProformaAv(res(5, null), VGV), null, '`null` é "base própria inválida", não "sem override" (#604)');
-  // CUSTO não é normalizado: guarda `valor` NEGATIVO no Avançado, não recebe classe
-  // de sinal, e o percentual negativo é a leitura normal da coluna — inclusive na
-  // faixa do zero (App do Codex, rodada 11: com VGV 0,49 um custo de −0,30 é
-  // "-61,2%", não "61,2%"). Informativo idem.
+  // CUSTO não é normalizado: guarda `valor` NEGATIVO no Avançado, é notação contábil
+  // (parêntese sempre), não recebe classe de sinal, e o percentual negativo é a leitura
+  // normal da coluna — inclusive na faixa do zero (App do Codex, rodada 11: com VGV 0,49
+  // um custo de −0,30 é "-61,2%", não "61,2%").
   assert.equal(pctVgvProformaAv({ tipo: 'custo', valor: -0.3 } as any, 0.49), (-0.3 / 0.49) * 100);
   assert.equal(pctVgvProformaAv({ tipo: 'custo', valor: -1_000_000 } as any, VGV), -10);
-  assert.equal(pctVgvProformaAv({ tipo: 'informativo', valor: -0.3 } as any, 0.49), (-0.3 / 0.49) * 100);
-  // A linha inteira concorda com a classe: o texto da % VGV tem sinal exatamente
-  // quando a classe da linha é `neg` — nos dois ramos, para receita e resultado.
-  for (const tipo of ['receita', 'resultado'] as const) {
+  // INFORMATIVO é sinal real (R$ "0" e R$/m² "0" na faixa, como receita/resultado), então
+  // a % VGV acompanha — as três células da linha concordam (App do Codex, rodada 12).
+  assert.equal(pctVgvProformaAv({ tipo: 'informativo', valor: -0.3 } as any, 0.49), (0.3 / 0.49) * 100);
+  assert.equal(pctVgvProformaAv({ tipo: 'informativo', valor: -0.6 } as any, 0.49), (-0.6 / 0.49) * 100, 'fora da faixa: cru');
+  // A linha inteira concorda: o texto da % VGV tem sinal exatamente quando o R$ publicado
+  // é negativo — nos dois ramos, para toda linha de sinal real (receita, resultado,
+  // informativo). Para receita/resultado isso é também a classe `neg` da linha.
+  for (const tipo of ['receita', 'resultado', 'informativo'] as const) {
     for (const v of [-1_000_000, -1, -0.5, -0.49, -0.3, -0, 0, 0.3, 1]) {
-      const sinal = sinalLinhaProformaAv({ tipo, valor: v }, 'inteira');
+      const negativoPublicado = inteiroExibido(v) < 0;
+      if (tipo !== 'informativo') {
+        assert.equal(sinalLinhaProformaAv({ tipo, valor: v }, 'inteira') === 'neg', negativoPublicado, `${tipo} ${v}: classe`);
+      }
       for (const l of [{ tipo, valor: v }, { tipo, valor: v, pctOverride: (v / VGV) * 100 }]) {
         const txt = fmtPctOuIndef(pctVgvProformaAv(l as any, VGV));
-        assert.equal(txt.startsWith('-'), sinal === 'neg', `${tipo} ${v}, override=${'pctOverride' in l}: "${txt}" com classe ${sinal}`);
+        assert.equal(txt.startsWith('-'), negativoPublicado, `${tipo} ${v}, override=${'pctOverride' in l}: "${txt}" com R$ publicado ${inteiroExibido(v)}`);
+        const m2 = celulaM2ProformaAv({ tipo, valor: v }, 1_000);
+        assert.equal(m2.startsWith('('), negativoPublicado, `${tipo} ${v}: R$/m² "${m2}"`);
       }
     }
   }
