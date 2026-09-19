@@ -52,8 +52,11 @@ seguiam formatando o valor CRU — para −R$ 0,30 a linha mostrava `0` · `(0)`
 Conserto: `semZeroNegativo` (`frontend/viab-format.ts`) — quando o R$ publica 0, o valor que alimenta
 as duas derivadas vira 0; fora dessa faixa é o cru (a magnitude de R$/m² e % VGV não é arredondada).
 Uma função para `celulaProformaM2` (Preliminar), `pctVgvProforma` (tela + CSV + PDF) e
-`celulaM2ProformaAv` (Avançado, extraída da closure para ser aferível); testes confrontam, valor a
-valor, que a R$/m² tem parêntese e a % VGV tem sinal exatamente quando a classe da linha é `neg`.
+`celulaM2ProformaAv` e `pctVgvProformaAv` (Avançado, extraídas das closures para serem aferíveis —
+a segunda porque a primeira versão do conserto normalizou só o ramo do VGV puro e deixou de fora o
+`pctOverride` das três linhas de fecho, que vem pré-calculado do valor cru: o App e a lente acharam a
+mesma fresta na rodada seguinte); testes confrontam, valor a valor e nos dois ramos, que a R$/m² tem
+parêntese e a % VGV tem sinal exatamente quando a classe da linha é `neg`.
 
 ---
 

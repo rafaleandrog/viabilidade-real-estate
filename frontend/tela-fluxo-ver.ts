@@ -76,6 +76,43 @@ export function celulaM2ProformaAv(l: Pick<LinhaProformaAv, 'tipo' | 'valor'>, a
   return negativoContabil(v, l.tipo === 'custo') ? `(${abs})` : abs;
 }
 
+/**
+ * #754 — % VGV da linha da Proforma do Avançado, como NÚMERO (`null` = sem
+ * denominador; `fmtPctOuIndef` imprime "—"). Exportada para a regra ficar
+ * aferível sem montar a tela — e porque ela tem DOIS ramos que precisam da
+ * mesma normalização:
+ *
+ * ⚠️ #604 — `!== undefined`, e NÃO `??`, porque `null` em `pctOverride`
+ * significa "base própria inválida", não "sem override": o `??` cairia no VGV
+ * puro e publicaria um número com o denominador errado. Hoje essa troca é
+ * **inobservável**, e isso está MEDIDO — as três bases de `pctOverride`
+ * derivam de `receitaBruta` (`baseComPermutaFisica = receitaBruta +
+ * vgvPermutaFisica`, com a permuta ≥ 0) e `p.vgv` É `receitaBruta`, então
+ * `pctOverride === null` IMPLICA `pctVgv === null`. Fica assim mesmo: é o
+ * contrato de três estados que torna seguro existir `pctOverride: null`, e
+ * ele passa a morder no dia em que alguma linha ganhar base própria
+ * independente do VGV. É guarda declarada, não conserto de defeito vivo.
+ *
+ * #754 — a coluna herda o sinal do R$ publicado: quando a coluna R$ mostra
+ * "0" (|valor| < 0,5), esta publica 0, e não "-0,0%" — nos DOIS ramos. O
+ * `pctOverride` das três linhas de fecho ("= Resultado", "= Resultado +
+ * Permutas", "= Resultado + Perm. Financ.", todas `tipo: 'resultado'`) vem
+ * pré-calculado do valor cru em `proforma-avancado.ts`, e normalizar só o
+ * ramo do VGV puro deixava exatamente essas linhas de fora (achado do App do
+ * Codex e da lente na rodada 5 do PR 758). Fora dessa faixa o percentual é o
+ * cru: a magnitude não é arredondada.
+ */
+export function pctVgvProformaAv(
+  l: Pick<LinhaProformaAv, 'valor' | 'pctOverride'>,
+  vgv: number,
+): number | null {
+  const pct = l.pctOverride !== undefined
+    ? l.pctOverride
+    : (vgv > 0 ? (l.valor / vgv) * 100 : null);
+  if (pct === null) return null;
+  return semZeroNegativo(l.valor) === 0 ? 0 : pct;
+}
+
 export function sinalLinhaProformaAv(
   l: Pick<LinhaProformaAv, 'tipo' | 'valor'>,
   exibicao: ExibicaoR$,
@@ -563,11 +600,9 @@ export class ViabFluxoVer extends LitElement {
     // #427 — % VGV de toda linha usa o VGV puro, EXCETO os fechos cujo
     // `pctOverride` já veio calculado com a base própria (`= Resultado +
     // Permutas` soma a permuta física ao denominador — ver proforma-avancado.ts).
-    //
     // #604 — com VGV ≤ 0 devolve `null`, não 0: a coluna imprime "—" via
-    // `fmtPctOuIndef`, porque um percentual sem denominador não foi medido.
-    // Mesmo mecanismo que a #571 levou ao Preliminar.
-    const pctVgv = (v: number): number | null => (p.vgv > 0 ? (v / p.vgv) * 100 : null);
+    // `fmtPctOuIndef`. A regra inteira (os dois ramos, o `!== undefined` e a
+    // normalização de sinal da #754) mora em `pctVgvProformaAv`, acima.
     // #742 — notação contábil (parênteses para negativo/custo), igual ao
     // Preliminar (`celula`/`negativoContabil`, `frontend/viab-format.ts`) —
     // antes esta tabela usava `fmtR$`/`fmtNum` crus, com sinal de menos.
@@ -598,31 +633,7 @@ export class ViabFluxoVer extends LitElement {
                 <td>${l.nome}${l.notaBase ? html` <span class="nota-base">(${l.notaBase})</span>` : ''}</td>
                 <td class="num ${sinal}">${celulaInteira(l.valor, { comParenteses: true, custo: ehCusto(l), sempreExibir: true })}</td>
                 <td class="num ${sinal}">${celulaM2(l)}</td>
-                <td class="num ${sinal}">${fmtPctOuIndef(
-                  // ⚠️ #604 — `!== undefined`, e NÃO `??`, porque `null` aqui
-                  // significa "base própria inválida", não "sem override": o
-                  // `??` cairia no VGV puro e publicaria um número com o
-                  // denominador errado.
-                  //
-                  // ⚠️ E A HONESTIDADE SOBRE O ALCANCE: hoje essa troca é
-                  // **inobservável**, e isso está MEDIDO — reverter para `??`
-                  // deixa a suíte inteira verde. O motivo é estrutural: as três
-                  // bases de `pctOverride` derivam de `receitaBruta`
-                  // (`baseComPermutaFisica = receitaBruta + vgvPermutaFisica`,
-                  // com a permuta ≥ 0) e `p.vgv` É `receitaBruta` — então
-                  // `pctOverride === null` IMPLICA `pctVgv(...) === null`, e os
-                  // dois operadores dão o mesmo resultado.
-                  //
-                  // Fica assim mesmo: é o contrato de três estados que torna
-                  // seguro existir `pctOverride: null`, e ele passa a morder no
-                  // dia em que alguma linha ganhar base própria independente do
-                  // VGV. Trocar de volta seria escrever uma armadilha para essa
-                  // linha futura. Não é conserto de defeito vivo — é guarda, e
-                  // está declarada como tal em vez de contada como entrega.
-                  // #754: herda o sinal do R$ publicado (`semZeroNegativo`) —
-                  // quando a coluna R$ mostra "0", esta não mostra "-0,0%".
-                  l.pctOverride !== undefined ? l.pctOverride : pctVgv(semZeroNegativo(l.valor)),
-                )}</td>
+                <td class="num ${sinal}">${fmtPctOuIndef(pctVgvProformaAv(l, p.vgv))}</td>
               </tr>
               ${ESPACO_APOS.has(l.nome) ? html`<tr class="espaco"><td colspan="4"></td></tr>` : nothing}`;
             })}

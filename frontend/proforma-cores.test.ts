@@ -24,9 +24,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { sinalLinhaProformaAv, celulaM2ProformaAv } from './tela-fluxo-ver.js';
+import { sinalLinhaProformaAv, celulaM2ProformaAv, pctVgvProformaAv } from './tela-fluxo-ver.js';
 import { sinalSensibilidade } from './tela-proforma.js';
-import { celulaInteira, fmtR$, semZeroNegativo } from './viab-format.js';
+import { celulaInteira, fmtR$, fmtPctOuIndef, semZeroNegativo } from './viab-format.js';
 
 const PRELIMINAR = readFileSync(new URL('./tela-proforma.ts', import.meta.url), 'utf8');
 const AVANCADO = readFileSync(new URL('./tela-fluxo-ver.ts', import.meta.url), 'utf8');
@@ -290,3 +290,27 @@ test('#754: R$/m² do Avançado herda o sinal do R$ publicado — "0" em R$ nunc
 });
 
 function inteiroZero(v: number): boolean { return Math.abs(v) < 0.5; }
+
+test('#754: % VGV do Avançado herda o sinal do R$ publicado — nos DOIS ramos, override incluído', () => {
+  const VGV = 10_000_000;
+  // Ramo do VGV puro (sem override).
+  assert.equal(pctVgvProformaAv({ valor: -0.3 }, VGV), 0);
+  assert.equal(pctVgvProformaAv({ valor: -0.6 }, VGV), (-0.6 / VGV) * 100);
+  assert.equal(pctVgvProformaAv({ valor: -2_500_000 }, VGV), -25);
+  assert.equal(pctVgvProformaAv({ valor: 1 }, 0), null, 'VGV ≤ 0 → null, nunca 0 (#604)');
+  // Ramo do override — as três linhas de fecho de `proforma-avancado.ts` vêm por
+  // aqui, com o percentual PRÉ-CALCULADO do valor cru: era a fresta que sobrou.
+  assert.equal(pctVgvProformaAv({ valor: -0.3, pctOverride: -0.000003 }, VGV), 0);
+  assert.equal(pctVgvProformaAv({ valor: -0.6, pctOverride: -0.000006 }, VGV), -0.000006);
+  assert.equal(pctVgvProformaAv({ valor: -2_500_000, pctOverride: -20 }, VGV), -20, 'override vence o VGV puro');
+  assert.equal(pctVgvProformaAv({ valor: 5, pctOverride: null }, VGV), null, '`null` é "base própria inválida", não "sem override" (#604)');
+  // A linha inteira concorda com a classe: o texto da % VGV tem sinal exatamente
+  // quando a classe da linha é `neg` — nos dois ramos.
+  for (const v of [-1_000_000, -1, -0.5, -0.49, -0.3, -0, 0, 0.3, 1]) {
+    const sinal = sinalLinhaProformaAv({ tipo: 'resultado', valor: v }, 'inteira');
+    for (const l of [{ valor: v }, { valor: v, pctOverride: (v / VGV) * 100 }]) {
+      const txt = fmtPctOuIndef(pctVgvProformaAv(l, VGV));
+      assert.equal(txt.startsWith('-'), sinal === 'neg', `valor ${v}, override=${'pctOverride' in l}: "${txt}" com classe ${sinal}`);
+    }
+  }
+});
