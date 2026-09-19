@@ -180,8 +180,11 @@ test('notação: valor negativo sai entre parênteses, não com sinal de menos (
   const html = htmlProforma(ESTUDO, p, false);
   // A marca do defeito: `fmtR$` cru punha o sinal de menos ANTES do número.
   for (const [onde, texto] of [['CSV', csv], ['PDF', html]] as const) {
-    // #754: a coluna R$ é inteira; a % VGV (`-45,7%`) pode levar sinal e fica fora do casamento.
-    assert.ok(!/(?<![\w-])-\s?\d[\d.]*(?![\w.,]*[%\w])/.test(texto.replace(/-\) /g, '')), `${onde} ainda tem número com sinal de menos:\n${texto}`);
+    // #754: a coluna R$ é inteira, mas a regex continua casando a forma com centavos
+    // (`-15.000.000,00`, a marca do `fmtR$` cru) — regressão a 2 casas COM sinal não pode
+    // passar em branco. A % VGV (`-45,7%`) pode levar sinal e fica fora do casamento; o
+    // lookbehind exclui `utf-8` do `<meta charset>` e datas.
+    assert.ok(!/(?<![\w-])-\s?\d[\d.]*(?:,\d+)?(?![\d,]*%)(?!\w)/.test(texto.replace(/-\) /g, '')), `${onde} ainda tem número com sinal de menos:\n${texto}`);
     assert.ok(!texto.includes('-R$'), `${onde} ainda tem "-R$":\n${texto}`);
   }
   assert.ok(csv.includes('= Receita operacional;('), `Receita operacional negativa sem parênteses no CSV:\n${csv}`);

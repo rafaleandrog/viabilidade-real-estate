@@ -11,10 +11,10 @@ import { fmtR$Milhoes } from './viab-format.js';
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Pedido do autor: a cascata do resultado publica valores em MILHÕES, com uma
-// casa ("R$ 26,5"). Tudo o mais — persistência, entrada, motor, tabelas,
-// Proforma, Fluxo de Caixa, exportação e os cards de KPI (que têm a SUA própria
-// exceção, `fmtR$Kpi`/#581) — fica como está (`CLAUDE.md` § Contratos
-// inegociáveis).
+// casa ("R$ 26,5"). Tudo o mais — persistência, entrada, motor, Fluxo de Caixa,
+// as demais tabelas e exportações, os cards de KPI (que têm a SUA própria
+// exceção, `fmtR$Kpi`/#581) e a Proforma (que tem a SUA, `celulaInteira`/#754)
+// — fica como está (`CLAUDE.md` § Contratos inegociáveis).
 //
 // ⚠️ POR QUE UM TESTE QUE LÊ O FONTE, e não só um teste da função pura.
 // `fmtR$Milhoes` é trivial, e um teste dela prova apenas que ela divide por um
@@ -137,7 +137,7 @@ test('a exceção de milhões NÃO vazou para nenhum outro arquivo do frontend',
   assert.deepEqual(
     vazamentos, [],
     'a abreviação em milhões vale SÓ no rótulo de barra da cascata — '
-    + 'tabela, Proforma, Fluxo de Caixa e exportação seguem em 2 casas (C7)',
+    + 'tabela, Fluxo de Caixa e exportação seguem em 2 casas (C7); a Proforma tem a sua própria exceção (#754)',
   );
 });
 

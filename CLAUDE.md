@@ -1139,7 +1139,7 @@ Git Bash — ver PROGRESSO).
   > **o valor em R$ exibido em CARD DE KPI sai sem casas decimais**, e o percentual em card sai com
   > **uma** casa. (a) A exceção existe e é decisão de desenho, não bug. (b) Ela vale **só** para o
   > valor exibido no card de KPI — a figura que o card publica. (c) **Persistência, entrada, motor,
-  > tabelas, Proforma, Fluxo de Caixa e exportação continuam em 2 casas, sem exceção**: é
+  > tabelas, Fluxo de Caixa e exportação continuam em 2 casas** (a Proforma tem a SUA exceção, a 3ª abaixo): é
   > arredondamento de EXIBIÇÃO, nada persistido muda, e `R$ 171.448.400` num card é o mesmo número
   > que `R$ 171.448.400,00` numa linha de tabela. Quem a implementa é `fmtR$Kpi`
   > (`frontend/viab-format.ts:52`) — símbolo próprio, e não um parâmetro de `fmtR$`, para a exceção

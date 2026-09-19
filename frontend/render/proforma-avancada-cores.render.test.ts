@@ -34,6 +34,14 @@ test('Proforma do Avançado: a marca de sinal chega à célula (fiação da #593
   assert.equal(a.montagem?.assentou, true, 'o Lit não assentou antes da medição' + relato(a));
 });
 
+test('#754: a coluna R$ da Proforma do Avançado publica INTEIROS na tela — sonda de DOM contra realocação', { skip: pular ?? false }, async () => {
+  const a = await verificarRender({ caso: 'proforma-avancada-cores', larguras: [1280] });
+  const m = a.extra?.['1280'] as { celulasRs: number; comCentavos: string[] } | undefined;
+  assert.ok(m, 'o caso não devolveu a medida extra — `medir()` não rodou' + relato(a));
+  assert.ok(m!.celulasRs >= 5, `poucas células R$ medidas (${m!.celulasRs}) — a Proforma não montou inteira` + relato(a));
+  assert.deepEqual(m!.comCentavos, [], 'célula da coluna R$ da Proforma do Avançado publicou centavos — a exceção de inteiros (#754) não chegou à tela' + relato(a));
+});
+
 test('Proforma do Avançado: as cores novas resolvem e nenhum texto some no fundo', { skip: pular ?? false }, async () => {
   const a = await verificarRender({ caso: 'proforma-avancada-cores', larguras: [1280] });
 

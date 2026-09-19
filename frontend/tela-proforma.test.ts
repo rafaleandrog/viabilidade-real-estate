@@ -31,7 +31,9 @@ import {
 
 // #754: a coluna R$ da Proforma sai em INTEIROS (terceira exceção ao C7) — o
 // esperado dos casos abaixo é o inteiro pt-BR, não `fmtR$` de 2 casas.
-const inteiro = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(Math.round(v));
+// Half away from zero, como `celulaInteira` e o Intl — `Math.round(-900.5)` daria -900.
+const inteiro = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
+  .format(Math.sign(v) * Math.round(Math.abs(v)));
 
 test('#567 ehLinhaReceitaOuResultado: classifica receita, natureza-receita e resultado; o resto é custo/dedução', () => {
   assert.equal(ehLinhaReceitaOuResultado({ tipo: 'receita' }), true);

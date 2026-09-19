@@ -22,14 +22,16 @@ export function fmtR$(v: number, comSimbolo = true): string {
   return new Intl.NumberFormat('pt-BR', opcoes).format(v || 0);
 }
 /**
- * #581 — EXCEÇÃO DECLARADA ao contrato C7, e a única que existe.
+ * #581 — a PRIMEIRA exceção declarada ao contrato C7 (hoje são três: esta,
+ * `fmtR$Milhoes` e `celulaInteira` — ver `CLAUDE.md` § Contratos inegociáveis).
  *
  * Decisão do autor em 2026-08-26 (leva Avançado, item 4): "ajustar valores em
  * R$ nos urbi-kpis para não terem casas decimais". Ela vale **só para o valor
  * exibido no card de KPI** — a figura grande que o card publica. Persistência,
- * entrada, motor, tabelas, Proforma, Fluxo de Caixa e exportação continuam em
- * 2 casas, sem exceção: `R$ 171.448.400` num card e `R$ 171.448.400,00` numa
- * linha de tabela são O MESMO número, e a diferença é tipográfica.
+ * entrada, motor, Fluxo de Caixa e as demais tabelas continuam em 2 casas (a
+ * Proforma tem a SUA exceção, `celulaInteira`, #754): `R$ 171.448.400` num card
+ * e `R$ 171.448.400,00` numa linha do Fluxo de Caixa são O MESMO número, e a
+ * diferença é tipográfica.
  *
  * ⚠️ É uma função PRÓPRIA, e não um segundo parâmetro de `fmtR$`, de propósito.
  * Parâmetro opcional espalharia a exceção por um argumento que qualquer
@@ -73,8 +75,9 @@ export function fmtR$Kpi(v: number): string {
  * ⚠️ É a SEGUNDA exceção declarada ao contrato C7 ("todo valor monetário
  * resultado de fórmula tem 2 casas"), depois de `fmtR$Kpi` (#581). Ela vale
  * **só** para o rótulo que a barra publica: persistência, entrada, motor,
- * tabelas, Proforma, Fluxo de Caixa e exportação continuam em 2 casas, sem
- * exceção — e o valor exato, com as 2 casas, continua acessível no `title` de
+ * Fluxo de Caixa e as demais tabelas continuam em 2 casas (a Proforma tem a
+ * SUA exceção, `celulaInteira`, #754) — e o valor exato, com as 2 casas,
+ * continua acessível no `title` de
  * cada coluna. Ver `CLAUDE.md` § Contratos inegociáveis.
  *
  * Símbolo próprio, e não um parâmetro de `fmtR$`, pelo mesmo motivo de

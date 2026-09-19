@@ -96,4 +96,15 @@ export const caso = {
     raiz.appendChild(el);
     await (el as any).updateComplete;
   },
+  // #754: sonda de DOM contra REALOCAÇÃO na Proforma do AVANÇADO — o par da
+  // sonda de `casos/proforma-deficitaria.ts`. A trava por contagem não vê a
+  // chamada de `celulaInteira(` movida para um ponto morto de
+  // `tela-fluxo-ver.ts` com a célula devolvida a `fmtR$`; o texto publicado vê.
+  async medir(raiz: HTMLElement): Promise<{ celulasRs: number; comCentavos: string[] }> {
+    const tela = raiz.querySelector('viab-fluxo-ver')! as any;
+    const textos = [...tela.shadowRoot!.querySelectorAll('table.proforma tr td:nth-child(2)')]
+      .map((td) => ((td as HTMLElement).textContent ?? '').trim())
+      .filter((t) => /\d/.test(t));
+    return { celulasRs: textos.length, comCentavos: textos.filter((t) => /\d,\d{2}\)?$/.test(t)) };
+  },
 };
