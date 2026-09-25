@@ -53,6 +53,8 @@ export const caso = {
     'urbi-grafico-linha.formato',
     'urbi-grafico-linha.legenda',
     'urbi-grafico-linha.marcadores',
+    'urbi-grafico-linha.minY',
+    'urbi-grafico-linha.maxY',
     'urbi-grafico-linha.series',
     'urbi-botao.desabilitado',
     'urbi-estado-vazio.icone',

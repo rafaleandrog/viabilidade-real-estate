@@ -9,6 +9,22 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — #747: o gráfico de Cenários do Avançado ganha eixo Y estático e séries em R$ milhões
+
+Dois defeitos no uso do `urbi-grafico-linha` da aba Cenários (`frontend/tela-cenarios.ts`),
+diagnosticados no comentário da issue: sem `min-y`/`max-y` o primitivo recalculava o domínio a
+cada pixel do slider (o que andava era o eixo, não o dado), e com `formato="moeda"` o tick de nove
+dígitos saía clipado pela esquerda (`0.000.000,00`). Agora `dominioYEstatico`
+(`frontend/fluxo-graficos.ts`) calcula o domínio pelo envelope da base e dos quatro cantos das
+faixas dos sliders, sempre com o zero, arredondado para fora em passo 1/2/5 × 10^k; `emMilhoes`
+divide as séries por 1e6 e o card publica a unidade no título, com `formato="numero"`. Testes: o
+domínio, a divisão pura, uma grade que mede a premissa de linearidade (nenhuma posição
+intermediária dos sliders sai do domínio dos cantos) e a fiação — apagar `min-y`/`max-y` do
+template deixa o teste vermelho, medido. Caso de render `tabela-fluxo-cenarios` declara os dois
+atributos; `docs/avancado.md` descreve o eixo fixo. `minY`/`maxY` e o union de `formato` conferidos
+em `node_modules/@urbiverso/sdk/dist/index.d.ts` no pin `57.0.0`.
+
 ## 2026-09-25 — #756: as seis leituras de "todas as linhas" de `avancado.ts` viram `varrerTudo`
 
 `backend/rotas/avancado.ts` lia alocações e linhas de custo com `listar(..., por_pagina: 1000)`

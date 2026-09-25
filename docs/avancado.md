@@ -86,7 +86,10 @@ financiável; é a única operação com o interruptor **Ativo**. As regras de c
 
 Cenários simulados sobre o estudo real: dê um nome, altere os **parâmetros do cenário** e compare a
 variação de TIR, VPL e exposição máxima contra o cenário real, com o gráfico **Fluxo acumulado —
-cenário real × cenário simulado**. Os cenários ficam salvos no estudo.
+cenário real × cenário simulado (R$ milhões)**. O eixo vertical do gráfico é fixo: ele cobre o
+fluxo acumulado da base e o de todas as posições dos dois controles, então mover um controle move
+a curva, não a escala, e a ordem de grandeza da variação fica visível. Os cenários ficam salvos no
+estudo.
 
 ### Análise de mercado e Apelo Comercial
 

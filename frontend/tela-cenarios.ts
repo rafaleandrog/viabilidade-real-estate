@@ -9,7 +9,7 @@ import {
   calcularFluxo, aplicarCenario, agregarFluxoPorPeriodos,
   type FluxoCalc, type FluxoConfig, type CenarioParams,
 } from './fluxo-caixa-motor.js';
-import { marcos, comparacaoCenario } from './fluxo-graficos.js';
+import { marcos, comparacaoCenario, emMilhoes, dominioYEstatico, ESCALA_MILHOES } from './fluxo-graficos.js';
 import {
   estiloFluxoTabela, kpisFluxo, tabelaFluxo, chavesColapso, alternarColapso, controlesFluxo,
 } from './fluxo-tabela.js';
@@ -337,6 +337,22 @@ export class ViabTelaCenarios extends LitElement {
   // `frontend/proforma-avancado.ts` registra as que sobraram.
   // ─────────────────────────────────────────────────────────────────────
 
+  /**
+   * #747: as séries (em R$ milhões) que delimitam o eixo Y do card — a base e
+   * os QUATRO cantos das faixas dos sliders (`faixaPreco` × `faixaCusto`).
+   * Passa por `_calc`, então os cantos ficam no mesmo memo dos sliders.
+   */
+  private _envelopeCenarios(base: FluxoCalc): number[][] {
+    const cantos: CenarioParams[] = [
+      { precoVendaPct: this.faixaPreco.min, custoObraPct: this.faixaCusto.min },
+      { precoVendaPct: this.faixaPreco.min, custoObraPct: this.faixaCusto.max },
+      { precoVendaPct: this.faixaPreco.max, custoObraPct: this.faixaCusto.min },
+      { precoVendaPct: this.faixaPreco.max, custoObraPct: this.faixaCusto.max },
+    ];
+    return [base, ...cantos.map((c) => this._calc(c))]
+      .map((c) => c.fluxoAcumulado.map((v) => v / ESCALA_MILHOES));
+  }
+
   /** Sliders fora do zero — há um cenário alternativo a comparar com a base. */
   private get _alterado(): boolean {
     return this.precoPct !== 0 || this.custoPct !== 0;
@@ -398,18 +414,28 @@ export class ViabTelaCenarios extends LitElement {
     // porque `agregarFluxoPorPeriodos` preenche a cauda da série mais curta
     // com zeros (`serie[p.fim] ?? 0`) e a curva desabaria em vez de ficar
     // plana — ver a nota da função.
-    const comparacao = comparacaoCenario(
+    // #747: as séries vão ao gráfico em R$ MILHÕES (divisão pura, e o título
+    // do card publica a unidade) — com `formato="moeda"` o tick de nove
+    // dígitos não cabe na margem fixa do primitivo e sai clipado.
+    const comparacao = emMilhoes(comparacaoCenario(
       base, cenario, alterado ? this._rotuloCenario() : 'Cenário simulado', periodos,
-    );
+    ));
+    // #747: o eixo Y é ESTÁTICO — o envelope da base e dos quatro cantos das
+    // faixas dos sliders (assimétricas, dos benchmarks), arredondado para fora.
+    // Sem `min-y`/`max-y` o primitivo refaz o domínio a cada pixel do slider,
+    // e o que anda na tela é o eixo, não o dado.
+    const dominio = dominioYEstatico(this._envelopeCenarios(base));
     return html`
       <div class="topo">
         ${this._renderControles()}
-        <urbi-card titulo="Fluxo acumulado — cenário real × cenário simulado">
+        <urbi-card titulo="Fluxo acumulado — cenário real × cenário simulado (R$ milhões)">
           <div class="graf-wrap"><div class="graf">
             <urbi-grafico-linha
-              formato="moeda"
+              formato="numero"
               legenda="sempre"
               marcadores
+              min-y=${dominio.minY}
+              max-y=${dominio.maxY}
               .categorias=${comparacao.categorias}
               .series=${comparacao.series}
             ></urbi-grafico-linha>

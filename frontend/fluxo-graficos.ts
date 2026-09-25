@@ -137,6 +137,66 @@ export function comparacaoCenario(
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// #747 — o EIXO Y do card de comparação é estático, e as séries vão em
+// R$ milhões.
+//
+// Dois defeitos relatados pelo autor, os dois no uso do primitivo
+// `urbi-grafico-linha`: (1) sem `min-y`/`max-y` o primitivo recalcula o domínio
+// a cada render, e cada pixel do slider re-renderiza — o que "anda" na tela é
+// o eixo, não o dado, e a ordem de grandeza das variações some; (2) com
+// `formato="moeda"` e valores de nove dígitos o tick não cabe na margem fixa
+// do primitivo e é clipado pela esquerda (sobra `0.000.000,00`). Não há prop
+// de notação compacta nem de largura de eixo no primitivo, então a app escala
+// a série para milhões e publica a unidade no título do card.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Divisor da escala do card de comparação: as séries vão em R$ milhões. */
+export const ESCALA_MILHOES = 1_000_000;
+
+/** A comparação com os valores divididos por `ESCALA_MILHOES` (divisão pura). */
+export function emMilhoes(c: ComparacaoCenario): ComparacaoCenario {
+  return {
+    categorias: c.categorias,
+    series: c.series.map((s) => ({ ...s, valores: s.valores.map((v) => v / ESCALA_MILHOES) })),
+  };
+}
+
+export interface DominioY { minY: number; maxY: number; }
+
+/**
+ * Domínio Y ESTÁTICO a partir do envelope de várias séries: o `[min, max]`
+ * global, sempre incluindo o zero, arredondado PARA FORA num passo "bonito"
+ * (1, 2 ou 5 × 10^k, cerca de cinco divisões) — o primitivo não faz
+ * nice-round com limites manuais, então o arredondamento é da app.
+ *
+ * Quem chama passa a série da base MAIS os quatro cantos das faixas dos
+ * sliders: o fluxo acumulado é linear no preço e no custo, então o extremo de
+ * cada mês está num canto, e nenhuma posição intermediária dos sliders sai do
+ * domínio (`frontend/fluxo-cenario-series.test.ts` mede isso numa grade).
+ * `null`/`NaN` são ignorados; sem valor finito nenhum, `{ 0, 1 }`.
+ */
+export function dominioYEstatico(series: number[][]): DominioY {
+  let min = 0;
+  let max = 0;
+  for (const s of series) {
+    for (const v of s) {
+      if (!Number.isFinite(v)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
+  if (max === min) return { minY: min, maxY: min + 1 };
+  const bruto = (max - min) / 5;
+  const pot = 10 ** Math.floor(Math.log10(bruto));
+  const razao = bruto / pot;
+  const passo = (razao <= 1 ? 1 : razao <= 2 ? 2 : razao <= 5 ? 5 : 10) * pot;
+  return {
+    minY: Math.floor(min / passo) * passo,
+    maxY: Math.ceil(max / passo) * passo,
+  };
+}
+
 // Gráficos SVG autocontidos do Fluxo de Caixa (mensal + acumulado).
 //
 // Extraídos de tela-fluxo-ver.ts (Lote 8 · #23) para serem reusados pela aba
