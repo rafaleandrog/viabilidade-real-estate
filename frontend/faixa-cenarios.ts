@@ -103,7 +103,7 @@ export class ViabFaixaCenarios extends LitElement {
     const ligacao = m.bear !== null && m.bull !== null
       ? { de: Math.min(m.bear, m.bull), ate: Math.max(m.bear, m.bull) }
       : null;
-    const titulo = `${this.rotulo}: Bear ${v(f.valores.bear)} · Base ${v(f.valores.base)} · Bull ${v(f.valores.bull)} — escala de ${fmtPct(f.min)} a ${fmtPct(f.max)}`;
+    const titulo = `${this.rotulo}: Bear ${v(f.valores.bear)} · Base ${v(f.valores.base)} · Bull ${v(f.valores.bull)} — escala de ${fmtPct(f.min)} a ${fmtPct(f.max)}${f.estendida ? ' (estendida além do benchmark para caber os cenários)' : ''}`;
     return html`
       <div class="linha" title=${titulo} role="img" aria-label=${titulo}>
         <span class="rotulo">${this.rotulo}</span>
@@ -122,7 +122,7 @@ export class ViabFaixaCenarios extends LitElement {
           <span class="base">📊 ${v(f.valores.base)}</span>
           <span class="bull">🚀 ${v(f.valores.bull)}</span>
         </div>
-        <div class="extremos"><span>${fmtPct(f.min)}</span><span>${fmtPct(f.max)}</span></div>
+        <div class="extremos"><span>${fmtPct(f.min)}</span><span>${f.estendida ? 'escala estendida · ' : ''}${fmtPct(f.max)}</span></div>
       </div>
     `;
   }
