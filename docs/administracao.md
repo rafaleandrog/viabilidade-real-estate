@@ -28,12 +28,13 @@ de estudo avisa e só o terreno manual fica disponível.
 ### Parâmetros
 
 Em *Admin → Apps → viabilidade*, os parâmetros do app. Cada um tem um valor padrão que vale
-enquanto o administrador não o sobrescrever; a sobrescrita é o único valor persistido, e o valor
-vigente é lido a cada uso — mudar o parâmetro vale na hora, sem reinstalar.
+enquanto o administrador não o sobrescrever; a sobrescrita é o único valor persistido, e quem lê o
+parâmetro lê o valor vigente — mudar o parâmetro vale a partir da próxima leitura (tela reaberta,
+próxima execução da rotina ou da manutenção), sem reinstalar.
 
 | Parâmetro | Padrão | Onde é usado |
 |---|---|---|
-| **Alíquota do RET** | 4 % | a alíquota fixa aplicada na Proforma quando o estudo está **Sujeito a RET**; lida a cada cálculo, em Premissas, Resultado e Gráficos |
+| **Alíquota do RET** | 4 % | a alíquota fixa aplicada na Proforma quando o estudo está **Sujeito a RET**; lida ao abrir Premissas, Resultado e Gráficos |
 | **Prazo de arquivamento** | 30 dias | dias sem movimentação (exceto Aprovado) até a manutenção arquivar o estudo |
 | **Máximo de itens por região** | 10 | teto de itens guardados por região a cada coleta diária |
 | **Alíquota padrão de imposto** (não RET) | 7 % | declarado e devolvido por `GET /config`; nenhuma tela o lê hoje |
@@ -49,15 +50,22 @@ nenhum.
 ### Benchmarks
 
 Aba **Benchmark** do Painel (também em *Admin → Apps → viabilidade → Benchmarks*). Um conjunto por
-tipo de empreendimento, escolhido nas fichas **Loteamento** e **Incorporação**. Cada indicador tem
-**Regra** (*atingir ou superar* ou *não exceder*), **Valor**, **Var + (%)** e **Var − (%)** — as
-variações padrão dos cenários Bull e Bear — e **Mín** e **Máx**, a faixa aceitável.
+tipo de empreendimento, escolhido nas fichas **Loteamento** e **Incorporação**, em três seções:
 
-Na primeira abertura por quem pode escrever, o app semeia sozinho os seis indicadores padrão que
-ainda faltam para aquele tipo: `margem_bruta`, `margem_liquida`, `roi`, `custo_obras_vgv`,
-`eficiencia_aproveitamento` e `resultado_final`. **Novo indicador** cria um com identificador
-próprio; **Remover** apaga. Só o `admin` do app escreve; os demais veem a tela em modo de leitura.
-O que cada indicador valida está em [Benchmarks](benchmarks).
+- **Indicador de Benchmark** — os indicadores de meta, com **Valor** e **Regra** (*atingir ou
+  superar* ou *não exceder*): `margem_bruta`, `margem_liquida`, `roi`, `custo_obras_vgv`,
+  `resultado_final` e, só no Loteamento, `eficiencia_aproveitamento`.
+- **Faixas do medidor** — para os mesmos indicadores de meta, **Mín**, **Faixa 1 até**, **Faixa 2
+  até** e **Máx**: os limites e cortes do velocímetro da aba Gráficos; em branco, as faixas saem
+  automaticamente da meta.
+- **Indicador de Sensibilidade** — as quatro variáveis que a análise de sensibilidade estressa
+  (`preco`, `permuta_fisica`, `permuta_financeira`, `custo_obras`), com **Var + (%)** e **Var − (%)**,
+  as variações padrão dos cenários Bull e Bear.
+
+Na primeira abertura por quem pode escrever, o app semeia sozinho, nos dois tipos, os indicadores
+padrão que ainda faltam — os de meta e os quatro de sensibilidade. **Novo indicador** cria um com
+identificador próprio; **Remover** apaga. Só o `admin` do app escreve; os demais veem a aba do
+Painel em modo de leitura. O que cada indicador valida está em [Benchmarks](benchmarks).
 
 ### Curvas de distribuição
 
@@ -65,8 +73,8 @@ Aba **Curvas** do Painel (também em *Admin → Apps → viabilidade → Curvas 
 curva é um nome e uma lista de percentuais por mês, que somam 100 e repartem um custo do estudo
 Avançado ao longo da sua duração. **Nova Curva** abre o editor (**Nome da curva**, **Adicionar
 mês**, **Tirar**); **Editar** e **Excluir** agem sobre a linha. A **Curva S** padrão, em doze
-meses, é criada sozinha na primeira leitura do catálogo, e **Criar Curva S padrão** a recria se
-tiver sido apagada. A curva escolhida em cada linha de custo está descrita em
+meses, é criada sozinha na primeira leitura do catálogo e não pode ser excluída; **Criar Curva S
+padrão** só a recria se por algum motivo ela faltar. A curva escolhida em cada linha de custo está descrita em
 [Estudo Avançado](avancado).
 
 ### Regiões monitoradas
