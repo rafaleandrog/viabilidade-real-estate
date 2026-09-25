@@ -69,9 +69,9 @@ do imóvel por IA, a partir de documentos anexados.
 
 Páginas na lista lateral, nesta ordem: **Resumo**; **Empreendimento** (sub-abas Informações — dados
 do terreno, imagem e anexos —, Cronograma e Tipologias); **Custos** (Terreno, Obras, Diretos,
-Indiretos e Financeiro; cada linha de custo escolhe como se distribui no tempo — linear, por uma
-curva do catálogo ou, nas linhas que oferecem a opção, atrelada à entrega das unidades ou à
-receita de vendas); **Viabilidade** (Receitas —
+Indiretos e Financeiro; a distribuição de cada custo no tempo é linear ou por uma curva do
+catálogo, o preço do terreno pode também ser atrelado à entrega das unidades ou à receita de
+vendas, e corretagem e permutas seguem as vendas sem escolha); **Viabilidade** (Receitas —
 absorção de vendas e fluxo de pagamento — e Financeiro); **Funding** (dívida, equity e financiamento
 à produção); **Resultados** (Fluxo de Caixa, Proforma e Análise Financeira); **Cenários**; **Análise
 de mercado** (os números do estudo contra os do mercado) e **Apelo Comercial** (a avaliação por IA). Ver
@@ -117,6 +117,7 @@ Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão é
 | Recurso | Rotas |
 |---|---|
 | Estudos | `GET /estudos` · `POST /estudos` · `GET /estudos/:id` · `PATCH /estudos/:id` · `DELETE /estudos/:id` · `POST /estudos/:id/duplicar` · `POST /estudos/:id/status` |
+| Produtos do Preliminar | `GET`/`POST /estudos/:id/preliminar/produtos` · `PATCH`/`DELETE /estudos/:id/preliminar/produtos/:pid` |
 | Membros | `GET /estudos/:id/membros` · `POST /estudos/:id/membros` · `PATCH /estudos/:id/membros/:usuarioId` · `PATCH /estudos/:id/membros/:usuarioId/remover` |
 | Terreno (Núcleo) | `GET /estudos/:id/imoveis` · `POST /estudos/:id/imoveis` · `DELETE /estudos/:id/imoveis/:vinculoId` |
 | Apelo comercial | `GET`/`POST /estudos/:id/apelo-comercial` · `POST /estudos/:id/apelo-comercial/documentos` · `DELETE …/documentos/:docId` |
