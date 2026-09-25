@@ -88,6 +88,9 @@ export const caso = {
     // (±5/±10/±15) — o de variável estressada morreu com o #729.
     'urbi-select.label',
     'urbi-select.opcoes',
+    // #734: o alerta de cenário inviável (o preço deste fixture suporta cair
+    // ~7% e o Bear aplica −10%) — a variante do banner não é reproduzida.
+    'urbi-banner.variante',
   ],
   async montar(raiz: HTMLElement): Promise<void> {
     // `_init()` roda no `connectedCallback`, é assíncrono e ESCREVE POR CIMA do

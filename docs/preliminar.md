@@ -65,7 +65,13 @@ tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [F
   **Permuta financeira**, **Custo de obra** ou **Custo de infraestrutura**, **Custo indireto**) é
   variada em ±5, ±10 ou ±15 % (o passo é escolhido no card) e ranqueada pela amplitude do impacto
   no resultado. A barra mais longa é a premissa que mais merece atenção. O custo do terreno não
-  entra no tornado: ele tem o próprio cartão ao lado.
+  entra no tornado: ele tem o próprio cartão ao lado. Abaixo do tornado, para a alavanca
+  selecionada, a leitura decisória: o **ponto de equilíbrio** (quanto ela pode errar até o
+  resultado zerar, e até a margem-alvo), o **consumo do colchão** — o estresse do Bear dividido
+  pela folga; se passa de 100 %, a tela diz em palavras que o cenário Bear já é inviável —, a
+  nota de **baixa alavanca** quando a variação do resultado fica abaixo de 2 % (o resultado é
+  insensível à premissa neste projeto) e o motivo de uma premissa de base circular ficar fora do
+  ranking.
 - **Margem de segurança** — quatro cartões. **Queda máxima de preço**, **Estouro máximo de obra**
   (**de infraestrutura**, no Loteamento) e **Permuta física máxima** dizem, em percentual sobre o
   valor atual, quanto a premissa pode errar até o resultado zerar; **Terreno máximo** sai em R$ e é

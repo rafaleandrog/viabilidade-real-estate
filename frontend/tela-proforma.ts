@@ -4,7 +4,7 @@ import { estiloConteudo } from './estilos.js';
 import { fmtR$, fmtR$Milhoes, fmtNum, fmtPct, fmtPctOuIndef, negativoContabil, inteiroExibido, semZeroNegativo } from './viab-format.js';
 import { urbiVerso, listarBenchmarks, buscarConfig, listarProdutosPreliminar } from './viabilidade-api.js';
 import { calcularProforma, vgvProduto, vgvBrutoDeProforma, type Proforma, type ProformaInput, type VariavelSensibilidade } from './proforma.js';
-import { rankearAlavancas, ehCustoLike, ehCircular } from './tornado-alavancas.js';
+import { rankearAlavancas, ehCustoLike, ehCircular, type Alavanca } from './tornado-alavancas.js';
 import { margemDeSeguranca, terrenoMaximo, type MargemDeSeguranca } from './margem-seguranca.js';
 import { fmtVariacao } from './cenario-variacao.js';
 import {
@@ -25,6 +25,9 @@ import {
 export { ehLinhaReceitaOuResultado, celulaProforma };
 import { bolaFaixa, varianteFaixa } from './medidor-faixas.js';
 import { montarFaixaCenarios } from './faixa-cenarios-motor.js';
+import {
+  consumoDoColchao, ehBaixaAlavanca, textoConsumo, textoPontoDeEquilibrio, TEXTO_BAIXA_ALAVANCA, TEXTO_CIRCULAR,
+} from './consumo-colchao.js';
 import './faixa-cenarios.js';
 // A mesma guarda de corrida que `viab-imagem-principal.ts` usa nos três pontos
 // do seu `_carregar()`, e que `tela-graficos.ts` reusa (PR 580/#597). Reusada,
@@ -297,6 +300,20 @@ export class ViabTelaProforma extends LitElement {
       color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5));
     }
     .sens-passo { max-width: 200px; margin-top: 12px; }
+    /* #734 — a leitura decisória da variável selecionada, abaixo do tornado. */
+    .colchao {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--cor-borda-sutil, rgba(255, 255, 255, 0.08));
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .colchao-var { margin: 0; font-size: 12px; color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5)); }
+    .colchao-var strong { color: var(--cor-texto-forte, rgba(255, 255, 255, 0.95)); }
+    .colchao-texto { margin: 0; font-size: 0.85rem; line-height: 1.4; }
+    .colchao-baixa { color: var(--cor-texto-sec, rgba(255, 255, 255, 0.5)); font-style: italic; }
+    .colchao-circular { color: var(--cor-texto-fraco, rgba(255, 255, 255, 0.4)); font-size: 0.78rem; }
     .margem-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -768,6 +785,55 @@ export class ViabTelaProforma extends LitElement {
   // resultado zerar", em vez de "quanto o projeto ganha". O VALOR do cartão é
   // o ponto de equilíbrio (resultado = 0) — o `title` guarda a folga até a
   // margem-alvo, que é a segunda pergunta ("ainda dá pra bater a meta?").
+  /** A margem-alvo do benchmark `margem_liquida`, com o fallback de 20 — ver a nota em `_renderMargemSeguranca`. */
+  private _margemAlvoPct(): number {
+    const bmValorMargem = this._bm('margem_liquida')?.valor;
+    return bmValorMargem !== undefined && bmValorMargem !== null && Number.isFinite(Number(bmValorMargem))
+      ? Number(bmValorMargem) : 20;
+  }
+
+  /**
+   * #734 (handoff §4.6.D/E) — a leitura DECISÓRIA da variável selecionada no
+   * tornado: o ponto de equilíbrio dela, quanto do colchão o Bear consome, o
+   * alerta em palavras quando passa de 100%, a regra da baixa alavanca e o
+   * motivo visível de uma base circular. As duas pontas do consumo vêm de
+   * módulos diferentes (o estresse do benchmark e a folga da margem de
+   * segurança) e são percentuais ASSINADOS sobre a mesma premissa — a
+   * divisão em módulo mora em `consumoDoColchao`, não aqui.
+   */
+  private _renderColchao(
+    entrada: ProformaInput, alavancas: Alavanca[], variavel: VarSens, varNeg: number, custoLike: boolean,
+  ): TemplateResult {
+    const alavanca = alavancas.find((a) => a.variavel === variavel);
+    const rotulo = alavanca?.rotulo ?? variavel;
+    const circulares = alavancas.filter((a) => a.circular);
+    if (alavanca?.circular) {
+      return html`
+        <div class="colchao">
+          <p class="colchao-var">Variável selecionada: <strong>${rotulo}</strong></p>
+          <p class="colchao-texto">${TEXTO_CIRCULAR}</p>
+        </div>`;
+    }
+    const margem = margemDeSeguranca(entrada, variavel, this._margemAlvoPct());
+    // O estresse do Bear no sentido DESFAVORÁVEL: queda para o preço, alta
+    // para toda variável custo-like — o mesmo sentido de `fatorBear`.
+    const estresseBear = custoLike ? varNeg : -varNeg;
+    const consumo = consumoDoColchao(estresseBear, margem.folgaPct);
+    const baixa = ehBaixaAlavanca(alavanca?.amplitudePct ?? null);
+    return html`
+      <div class="colchao ${consumo?.inviavel ? 'inviavel' : ''}">
+        <p class="colchao-var">Variável selecionada: <strong>${rotulo}</strong></p>
+        <p class="colchao-texto">${textoPontoDeEquilibrio(margem, this._margemAlvoPct())}</p>
+        ${consumo?.inviavel
+          ? html`<urbi-banner variante="alerta">${textoConsumo(consumo, estresseBear)}</urbi-banner>`
+          : html`<p class="colchao-texto">${textoConsumo(consumo, estresseBear)}</p>`}
+        ${baixa ? html`<p class="colchao-texto colchao-baixa">${TEXTO_BAIXA_ALAVANCA}</p>` : nothing}
+        ${circulares.length > 0
+          ? html`<p class="colchao-texto colchao-circular">Fora do ranking: ${circulares.map((a) => a.rotulo).join(', ')} — ${TEXTO_CIRCULAR}</p>`
+          : nothing}
+      </div>`;
+  }
+
   private _renderMargemSeguranca(entrada: ProformaInput, lot: boolean): TemplateResult {
     // Margem-alvo vem do benchmark (campo compartilhado com "Margem sobre
     // VGV"), nunca de um literal na tela — meta 20 por padrão
@@ -782,9 +848,7 @@ export class ViabTelaProforma extends LitElement {
     // checagem, e `Number(null) === 0` é finito: sem excluir `null`
     // explicitamente, um benchmark limpo virava meta 0% em silêncio, em vez
     // de cair no fallback de 20 (achado do App do Codex, PR #757, rodada 3).
-    const bmValorMargem = this._bm('margem_liquida')?.valor;
-    const margemAlvoPct = bmValorMargem !== undefined && bmValorMargem !== null && Number.isFinite(Number(bmValorMargem))
-      ? Number(bmValorMargem) : 20;
+    const margemAlvoPct = this._margemAlvoPct();
     const varObra: VarSens = lot ? 'custo_infra' : 'custo_obras';
     const rotuloObra = lot ? 'Estouro máximo de infraestrutura' : 'Estouro máximo de obra';
 
@@ -1058,6 +1122,7 @@ export class ViabTelaProforma extends LitElement {
               @urbi:select-change=${(e: CustomEvent) => { this._passoPct = Number(e.detail.valor) as 5 | 10 | 15; }}
             ></urbi-select>
           </div>
+          ${this._renderColchao(entrada, alavancas, varSensAtual, varNeg, custoLike)}
         </urbi-card>
         ${this._renderMargemSeguranca(entrada, lot)}
       </div>
