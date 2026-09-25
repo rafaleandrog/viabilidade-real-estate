@@ -104,12 +104,12 @@ test('#632: nenhuma das quatro custom properties usa --cor-primaria (gradiente)'
 // "Carteira de clientes" com a MESMA cor em 3 dos 4 temas. Nenhum teste de
 // FONTE (os de cima) pega isso: os dois eram tokens "corretos" e distintos
 // por NOME, só coincidiam por VALOR. Este teste lê o espelho de tokens —
-// `docs/ui-urbiverso/tokens.json`, a mesma fonte que `scripts/guard-tokens-css.mjs`
+// `referencia/ui-urbiverso/tokens.json`, a mesma fonte que `scripts/guard-tokens-css.mjs`
 // usa — e resolve os 4 tokens escolhidos em cada uma das 4 variantes, travando
 // que as 4 séries continuem visualmente distintas em TODO tema.
 test('#632: as 4 cores do gráfico econômico resolvem para hex DISTINTOS em toda variante de tema', () => {
-  const caminhoTokens = new URL('../docs/ui-urbiverso/tokens.json', import.meta.url);
-  assert.ok(existsSync(caminhoTokens), 'docs/ui-urbiverso/tokens.json não existe — espelho ausente');
+  const caminhoTokens = new URL('../referencia/ui-urbiverso/tokens.json', import.meta.url);
+  assert.ok(existsSync(caminhoTokens), 'referencia/ui-urbiverso/tokens.json não existe — espelho ausente');
   const espelho = JSON.parse(readFileSync(caminhoTokens, 'utf8'));
   const tokens = espelho.tokens as Record<string, string[]>;
 

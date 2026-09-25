@@ -259,7 +259,7 @@ test('#578: paridade Loteamento×Incorporação — os dois tipos passam pelo ME
 // reintroduzir o chip (ligado a um estado só seu, sem tocar
 // `linhasEstudosFiltradas`) sem que nada acima acusasse. Como `urbi-tabela`
 // e `urbi-chips-atalho` recebem props por *binding de propriedade*
-// (`docs/ui-urbiverso/primitivos.json`), o harness de render não desenha
+// (`referencia/ui-urbiverso/primitivos.json`), o harness de render não desenha
 // esse conteúdo (mesma limitação registrada na #577) — então a prova
 // possível aqui é ler o FONTE, como `tela-graficos.test.ts` já faz para a
 // pizza de área. Comentários são removidos antes: o parágrafo do JSDoc de

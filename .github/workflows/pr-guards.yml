@@ -494,10 +494,10 @@ jobs:
           echo '{"name":"ts-guards","private":true}' > package.json
           npm install --no-audit --no-fund --loglevel=error typescript@5.9.3
           node -e "console.log('typescript', require('./node_modules/typescript').version)"
-      - name: Guards de UI contra o espelho docs/ui-urbiverso/
+      - name: Guards de UI contra o espelho referencia/ui-urbiverso/
         run: |
           set -uo pipefail
-          # Os três leem `docs/ui-urbiverso/`, que é conteúdo DESTE repositório (o
+          # Os três leem `referencia/ui-urbiverso/`, que é conteúdo DESTE repositório (o
           # espelho versionado da referência do urbiverso). Sem SDK, sem
           # credencial. Faltando o `typescript`, eles RECUSAM analisar em vez de
           # aprovar — "não deu para rodar" nunca é "passou".

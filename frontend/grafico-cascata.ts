@@ -3,7 +3,7 @@
 //
 // Componente customizado — **não existe primitivo de cascata/waterfall** na
 // família `urbi-grafico-*` (fechada em `colunas`, `linha`, `area`, `pizza`,
-// `medidor`; conferido em `docs/ui-urbiverso/primitivos.json`, carimbo
+// `medidor`; conferido em `referencia/ui-urbiverso/primitivos.json`, carimbo
 // `0.53.11`/`ec0e347`). `urbi-grafico-colunas` com `empilhado` desenharia a
 // geometria, mas não serve para este pedido por três razões medidas:
 //   · não desenha rótulo de valor POR BARRA — o valor só aparece nos ticks do

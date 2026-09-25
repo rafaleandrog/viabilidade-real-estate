@@ -17,7 +17,7 @@
 // COMO ELE DECIDE QUEM ESTA EM RISCO
 //
 // Nao recalcula nada: le `risco_box_model` (eixo da LARGURA) e
-// `risco_box_model_altura` de `docs/ui-urbiverso/primitivos.json`. O espelho ja
+// `risco_box_model_altura` de `referencia/ui-urbiverso/primitivos.json`. O espelho ja
 // julga pelo VALOR EFETIVO — `padding: 0 16px` soma, `border: none` nao soma,
 // `border-radius` nao e espessura, e so `border-box` protege (nem `content-box`
 // nem `inherit`). Recalcular aqui seria uma segunda implementacao para divergir
@@ -53,7 +53,7 @@ import { fileURLToPath } from 'node:url';
 import { superficies, lerTags, limparCss, disponivel, porqueIndisponivel } from './lib/fonte-ts.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ESPELHO = join(RAIZ, 'docs', 'ui-urbiverso', 'primitivos.json');
+const ESPELHO = join(RAIZ, 'referencia', 'ui-urbiverso', 'primitivos.json');
 
 // ── dispensas ───────────────────────────────────────────────────────────────
 // Defeito REAL, ja aberto, cujo conserto e de outro PR. A dispensa existe para o
@@ -78,7 +78,7 @@ function morrer(msg) {
 
 if (!existsSync(ESPELHO)) {
   morrer(
-    'docs/ui-urbiverso/primitivos.json nao existe.\n' +
+    'referencia/ui-urbiverso/primitivos.json nao existe.\n' +
       '      Rode `node scripts/sincronizar-referencia-ui.mjs` (precisa do monorepo clonado).',
   );
 }

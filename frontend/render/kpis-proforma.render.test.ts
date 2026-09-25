@@ -46,7 +46,7 @@ test('KPIs da Proforma: min-width:0 não estoura a célula em 1280/900/600px', {
 test('KPIs da Proforma: as cores resolvem em todas as variantes de tema do espelho', { skip: pular ?? false }, async () => {
   const a = await verificarRender({ caso: 'kpis-proforma', larguras: [1280] });
 
-  // O NÚMERO de variantes vem do dado, não daqui: `docs/ui-urbiverso/tokens.json`
+  // O NÚMERO de variantes vem do dado, não daqui: `referencia/ui-urbiverso/tokens.json`
   // guarda, por token, todos os valores que ele assume. Cravar "4" neste teste
   // faria dele o único lugar do repositório a saber quantos temas existem — e o
   // lugar que ficaria errado quando o shell ganhasse o quinto.

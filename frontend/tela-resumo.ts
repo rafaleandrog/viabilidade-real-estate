@@ -69,7 +69,7 @@ export class ViabTelaResumo extends LitElement {
        (R$ 171.448.400,00, o exemplo literal da issue) não cabe nos 180px
        herdados da #488, que resolveu a CAIXA (contra a track), não o VALOR
        (contra a caixa). urbi-kpi não declara prop de quebra/tamanho de fonte
-       (docs/ui-urbiverso/primitivos.json), e o :host dele soma padding:
+       (referencia/ui-urbiverso/primitivos.json), e o :host dele soma padding:
        14px 16px ao conteúdo — folga real de ~198px, medida contra o caso de
        render kpis-resumo (frontend/render/kpis-resumo.render.test.ts).
        NÃO é herança de overflow-wrap/word-break pelo shadow boundary: medi

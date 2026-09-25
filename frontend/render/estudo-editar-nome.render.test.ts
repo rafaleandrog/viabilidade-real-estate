@@ -8,7 +8,7 @@
 //
 // ⚠️ O `urbi-modal` aqui é o stub do espelho: carrega as declarações `:host`
 // reais, mas não o overlay nem o posicionamento internos, que
-// `docs/ui-urbiverso/` não espelha. Este teste julga o layout do CONTEÚDO.
+// `referencia/ui-urbiverso/` não espelha. Este teste julga o layout do CONTEÚDO.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -81,7 +81,7 @@ function tokensSemValorNoModal(a: Achados): string[] {
     for (const t of v.naoResolvem as string[]) {
       // `--urbi-abas-aba-cor-ativa` é token do PRÓPRIO `urbi-abas`, que sobe
       // com a página de Premissas atrás do modal (não com o modal em si) — é
-      // a mesma lacuna do espelho (`docs/ui-urbiverso/`) que o caso original
+      // a mesma lacuna do espelho (`referencia/ui-urbiverso/`) que o caso original
       // (`painel-editar-nome`, antes desta issue) já documentava.
       if (t !== '--urbi-abas-aba-cor-ativa') fora.add(t);
     }

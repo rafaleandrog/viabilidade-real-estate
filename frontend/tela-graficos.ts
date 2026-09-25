@@ -148,7 +148,7 @@ export class ViabTelaGraficos extends LitElement {
   // `urbi-card` (não `urbi-kpi`): o primitivo `urbi-kpi` não tem slot/prop de
   // rodapé e carrega um bug conhecido de box-model (recorrente em
   // #176/#262/#326/#352) — `urbi-card` não tem esse risco
-  // (`docs/ui-urbiverso/primitivos.json`).
+  // (`referencia/ui-urbiverso/primitivos.json`).
   //
   // #1 e #2 usam `fmtR$Kpi` (sem casas decimais) — a exceção declarada de
   // card de KPI (#581, `frontend/viab-format.ts:52`); entram no inventário

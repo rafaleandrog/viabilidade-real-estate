@@ -15,9 +15,9 @@
 #
 # COMO ELA É DETERMINÍSTICA
 #
-# Nada aqui lê o `frontend/` nem o `docs/ui-urbiverso/` do repositório. Cada caso
+# Nada aqui lê o `frontend/` nem o `referencia/ui-urbiverso/` do repositório. Cada caso
 # monta um REPOSITÓRIO DE MENTIRA num diretório temporário — `scripts/` com os
-# guards copiados, `docs/ui-urbiverso/` com um espelho sintético escrito aqui
+# guards copiados, `referencia/ui-urbiverso/` com um espelho sintético escrito aqui
 # dentro, `frontend/` com o arquivo do caso — e roda o guard contra ele. Logo:
 #   · ressincronizar o espelho não muda veredito nenhum;
 #   · consertar (ou quebrar) um arquivo do app não muda veredito nenhum;
@@ -70,11 +70,11 @@ fi
 export URBI_TYPESCRIPT="$TS_REAL"
 
 # ── espelho sintético ───────────────────────────────────────────────────────
-mkdir -p "$TMP/base/scripts/lib" "$TMP/base/docs/ui-urbiverso"
+mkdir -p "$TMP/base/scripts/lib" "$TMP/base/referencia/ui-urbiverso"
 cp scripts/guard-tokens-css.mjs scripts/guard-props-urbi.mjs scripts/guard-box-model-urbi.mjs "$TMP/base/scripts/"
 cp scripts/lib/fonte-ts.mjs "$TMP/base/scripts/lib/"
 
-cat > "$TMP/base/docs/ui-urbiverso/tokens.json" <<'JSON'
+cat > "$TMP/base/referencia/ui-urbiverso/tokens.json" <<'JSON'
 {
   "carimbo": { "gerado_de": "fixture", "sha": "0000000000", "versao_monorepo": "0.0.0", "data_do_commit": "2026-01-01" },
   "tokens": {
@@ -94,7 +94,7 @@ JSON
 #                      seletor real. O risco dele é declarado POR ESTA FIXTURE,
 #                      não lido do monorepo: no dia em que o `:host` de verdade
 #                      ganhar `box-sizing`, nada aqui muda de veredito.
-cat > "$TMP/base/docs/ui-urbiverso/primitivos.json" <<'JSON'
+cat > "$TMP/base/referencia/ui-urbiverso/primitivos.json" <<'JSON'
 {
   "carimbo": { "gerado_de": "fixture", "sha": "0000000000", "versao_monorepo": "0.0.0", "data_do_commit": "2026-01-01" },
   "primitivos": {
@@ -200,10 +200,10 @@ caso() {
   local com_dispensa="$COM_DISPENSA"; COM_DISPENSA=0
   N=$((N+1)); TOTAL=$((TOTAL+1))
   local dir="$TMP/c$N"
-  mkdir -p "$dir/scripts/lib" "$dir/docs/ui-urbiverso" "$dir/frontend"
+  mkdir -p "$dir/scripts/lib" "$dir/referencia/ui-urbiverso" "$dir/frontend"
   cp "$TMP/base/scripts/"*.mjs "$dir/scripts/"
   cp "$TMP/base/scripts/lib/"*.mjs "$dir/scripts/lib/"
-  cp "$TMP/base/docs/ui-urbiverso/"*.json "$dir/docs/ui-urbiverso/"
+  cp "$TMP/base/referencia/ui-urbiverso/"*.json "$dir/referencia/ui-urbiverso/"
   cat > "$dir/frontend/caso.ts"
   # `COM_DISPENSA=1` injeta uma entrada SINTÉTICA na cópia do guard deste caso.
   # `COM_DISPENSA=2` injeta a entrada mas NÃO escreve o arquivo que ela casaria —

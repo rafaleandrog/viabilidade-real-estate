@@ -15,7 +15,7 @@ export interface SerieEconomicaFluxo {
  *
  * ⚠️ **Nenhuma série carrega `cor`, e isso é decisão da #632** (mesmo
  * diagnóstico da #595, aplicado a este gráfico). O espelho
- * `docs/ui-urbiverso/primitivos.json` declara `series` como `Array` e **não
+ * `referencia/ui-urbiverso/primitivos.json` declara `series` como `Array` e **não
  * declara a forma dos itens** — o repositório não tem como afirmar que um
  * item honra a chave `cor`. O que o espelho DECLARA são as custom properties
  * `--urbi-grafico-cor-1..8` no `:host` de `UrbiGraficoBase`; a cor das quatro
@@ -90,7 +90,7 @@ function alinharAcumulado(valores: readonly number[], n: number): number[] {
  * Anual com `Math.max(base.prazo, cenario.prazo)`.
  *
  * ⚠️ **Nenhuma série carrega `cor`, e isso é decisão da #595.** O espelho
- * `docs/ui-urbiverso/primitivos.json` declara `series` como `Array` e **não
+ * `referencia/ui-urbiverso/primitivos.json` declara `series` como `Array` e **não
  * declara a forma dos itens** — ou seja, o repositório **não tem como afirmar**
  * que um item honra a chave `cor`. O que o espelho DECLARA são as custom
  * properties `--urbi-grafico-cor-1..8` no `:host` de `UrbiGraficoBase`, que o
