@@ -1,59 +1,85 @@
 ---
 titulo: Permissões e Ciclo de Vida
-descricao: Permissão por estudo (membership) e regras de transição de status.
+descricao: As três funções por estudo (leitor, editor, aprovador), o que cada uma pode, as transições de status e quem as valida, o renomear e os eventos.
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
 # Permissões e Ciclo de Vida
 
-O app usa **permissão por estudo** (4ª camada, sobre o nível de app do shell): cada estudo tem seus próprios membros. Não há leitura global.
+> A permissão é por estudo: cada estudo tem os próprios membros, com uma função cada. Não há leitura global — quem não é membro (nem administrador do app) não vê o estudo.
 
-## Funções por estudo
+## O que é
+
+Sobre o nível de acesso ao app que a instância dá a cada pessoa (`leitura`, `escrita`, `admin` —
+ver [Administração](administracao)), o app põe uma quarta camada: a **função no estudo**. Ela decide
+o que a pessoa pode fazer dentro de um estudo específico e quais transições de status pode
+disparar.
+
+## Para usuários
+
+### Funções por estudo
 
 | Função | Pode |
 |---|---|
-| **Leitor** | Visualiza e exporta. Não vê estudos em Rascunho ou Arquivado. |
-| **Editor** | Cria, edita, duplica; edita imóveis (só em Rascunho); avança Rascunho → Em análise. Inclui o Leitor. |
-| **Aprovador** | Aprova, reprova, devolve ao Rascunho e reabre Arquivado; edita qualquer campo mesmo após submissão (exceto trocar imóvel fora de Rascunho). Inclui o Editor. |
+| `leitor` | ver e exportar. Não vê estudos em Rascunho nem Arquivado. |
+| `editor` | criar, editar, duplicar; vincular e desvincular imóveis (só em Rascunho); enviar Rascunho para Em análise. Inclui o leitor. |
+| `aprovador` | aprovar, reprovar, devolver ao Rascunho e reabrir um Arquivado; editar em qualquer status (exceto trocar imóvel fora de Rascunho). Inclui o editor. |
 
-O criador do estudo entra como **editor**. Um administrador de app (nível `admin`) age como aprovador em qualquer estudo. Estudo sem membros: qualquer usuário com escrita+ assume editor.
+Quem cria o estudo entra como `editor`. O `admin` do app age como aprovador em qualquer estudo. Num
+estudo ainda sem membros, qualquer usuário com nível `escrita` ou superior é aceito como editor.
 
-## Ciclo de vida
+### Ciclo de vida
 
-```
+```text
 Rascunho ──(editor)──▶ Em análise ──(aprovador)──▶ Aprovado
    ▲                        │  └──(aprovador)──▶ Reprovado
    └──(aprovador devolve)───┘
 Arquivado ──(aprovador reabre)──▶ Rascunho
 ```
 
-- **Imóvel vinculado:** editável apenas em Rascunho (restrição absoluta, mesmo para aprovador).
-- **Aprovado é terminal.** Não há transição de saída de Aprovado — nem arquivar, nem reabrir, para função nenhuma. É comportamento de sempre (`gateTransicao` exclui `de === 'aprovado'` do ramo de arquivamento), registrado aqui porque a tela agora **mostra** essa ausência: a linha do estudo Aprovado não desenha botão de transição.
-- **Arquivamento automático:** estudos parados (exceto Aprovado) por `prazo_arquivamento_dias` (default 30) → Arquivado. Regra em `POST /manutencao/arquivar-inativos` (idempotente); o disparo automático depende do agendador da instância.
+- **Aprovado é final.** Não há transição de saída — nem arquivar, nem reabrir, para função nenhuma —
+  e a linha do estudo Aprovado não desenha botão de transição.
+- **Imóvel vinculado** só muda em Rascunho, para qualquer função.
+- **Arquivamento.** Estudos parados (exceto Aprovados) por mais dias que o prazo configurado são
+  arquivados pela manutenção que o administrador dispara ou agenda; ver [Administração](administracao).
 
-## Onde a regra mora, e quem a lê
+Na tela, a coluna **Status** do Painel é informativa (uma badge), e as transições são botões
+dedicados na coluna de ações — um por transição válida, filtrados pela sua função no estudo — para
+não oferecer o que o servidor recusaria.
 
-A tabela de transições é **uma só**, em `frontend/estudo-status.ts` (`gateTransicao`), e tem **dois leitores**:
+### Editar Premissas por status
 
-| Leitor | Para quê |
-|---|---|
-| `POST /estudos/:id/status` (`backend/rotas/estudos.ts`) | **O portão.** Reavalia gate e alçada a cada chamada e recusa com `422 TRANSICAO_INVALIDA` ou `403 SEM_PERMISSAO`. Vale igual para pedido vindo da tela ou de um `curl`. |
-| Painel de estudos (`frontend/tela-dashboard.ts`) | **Feedback.** `acoesTransicao(status, funcao)` decide quais botões a linha desenha, para não oferecer o que o servidor recusaria. |
+No Preliminar, as sub-abas de Premissas são editáveis em Rascunho e Em análise por `editor` e
+`aprovador`; em Aprovado e Reprovado ficam em modo de leitura para todos. Em Arquivado a tela deixa
+digitar, mas só o `aprovador` consegue salvar: o servidor recusa o `editor` ao gravar.
 
-O módulo mora em `frontend/` porque a direção do import já é essa no repositório (`backend/apelo-comercial.ts` importa `../frontend/proforma.js`) e o backend é bundle self-contained; ele não importa `lit` nem toca DOM.
+### Renomear um estudo
 
-**A coluna Status do Painel é somente informativa** — badge colorida, para toda função. As transições são botões dedicados na coluna de ações, **um por transição válida**, filtrados pela função do usuário no estudo. Até 2026-09 a coluna era um `urbi-select` com os cinco status para qualquer não-leitor, e o usuário descobria o que era proibido tomando `422`.
+Renomeia-se no cabeçalho do estudo aberto: quem pode editar o estudo naquele status pode
+renomeá-lo (`editor` e `aprovador` em Rascunho e Em análise; só `aprovador` em Aprovado,
+Reprovado e Arquivado). O nome tem até 200 caracteres e não pode ficar vazio. O identificador
+legível não muda ao renomear: é a identidade estável do estudo.
 
-## Renomear um estudo
+## Instruções para não humanos
 
-`PATCH /estudos/:id` aceita `nome` (não vazio, até 200 caracteres — o limite da coluna) de quem `podeEditarEstudo` autoriza: **editor+** em Rascunho e Em análise, **só aprovador** em Aprovado, Reprovado e Arquivado. A mesma função decide se o botão de renomear aparece na linha do Painel.
-
-O servidor **recompõe `nome_exibicao`** — o rótulo que as telas de fato exibem — sempre que **qualquer** parte que o compõe chega no PATCH: `nome`, `uf` ou `tipo_empreendimento` (este editável só em Rascunho). Recompor apenas quando o `nome` muda deixaria o rótulo com a UF ou a sigla antigas, que é o mesmo defeito por outro eixo. Cada parte vem do corpo quando ele a traz, e do registro persistido quando não.
-
-`nome_exibicao` continua bloqueado para escrita pelo cliente: quem o escreve é o servidor. **`id_legivel` não muda** — ele é único e é a identidade estável do estudo; renomear altera como o estudo se apresenta, não quem ele é.
-
-⚠️ **`nome` e `nome_exibicao` têm o mesmo limite de 200 caracteres, e o segundo é o primeiro MAIS sigla, UF e sequência.** Um nome de 200 caracteres — legal na coluna dele — compõe um rótulo de 217. Quem garante o teto é `montarNomeExibicao`, encolhendo a parte do **nome**: sigla, UF e sequência são estruturais e sobrevivem, porque são elas que fazem o rótulo ser reconhecível numa lista. O `nome` gravado nunca é truncado.
+- `POST /estudos/:id/status` é o portão: reavalia a transição e a alçada a cada chamada e recusa
+  com `422 TRANSICAO_INVALIDA` ou `403 SEM_PERMISSAO`, venha o pedido da tela ou de um cliente
+  qualquer. A tabela de transições é uma só, compartilhada com o Painel, que a usa para decidir
+  quais botões desenhar.
+- `PATCH /estudos/:id` aceita `nome` de quem pode editar o estudo no status atual. O servidor
+  recompõe `nome_exibicao` — o rótulo que as telas mostram — sempre que qualquer parte que o compõe
+  chega no pedido (`nome`, `uf` ou `tipo_empreendimento`, este só em Rascunho). `nome_exibicao` não
+  aceita escrita do cliente, e `id_legivel` nunca muda. Como `nome_exibicao` é o nome mais sigla,
+  UF e sequência, e tem o mesmo limite de 200 caracteres, o servidor encolhe a parte do nome quando
+  o rótulo estouraria; o `nome` gravado nunca é truncado.
+- As rotas com `/estudos/:id/` exigem membro do estudo, `admin` do app, ou nível `escrita`+ num
+  estudo ainda sem membros.
 
 ## Eventos
 
-`estudo_criado`, `estudo_status_alterado` (cobre aprovação/reprovação/devolução/arquivamento) e `apelo_comercial_concluido`. Membros são inscritos automaticamente (forte).
+`estudo_criado`, `estudo_status_alterado` (cobre aprovação, reprovação, devolução e arquivamento) e
+`apelo_comercial_concluido`. Os membros do estudo são inscritos automaticamente.
+
+## Veja também
+
+- [Estudo de Viabilidade](readme) · [Administração](administracao) · [Estudo Preliminar](preliminar)
