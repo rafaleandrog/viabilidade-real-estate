@@ -20,12 +20,14 @@ import {
 // supertipo `imoveis`; a listagem de subtipo pode não trazê-la). A listagem de
 // glebas/lotes serve só para o seletor de candidatos (rótulo = id_legivel).
 //
-// Filtro de lotes (Incorporação só): "regularização fundiária" é o booleano
-// `parcelamentos.regularizacao` no Núcleo, não uma coluna de lote/imóvel — o
-// lote herda isso via `parcelamento_id`. O Núcleo não tem filtro server-side
-// por essa coluna (camposFiltro de /lotes não faz join até parcelamentos), então
-// resolvemos o conjunto de ids "de regularização" à parte e filtramos no
-// cliente. Como a exclusão acontece depois da paginação do servidor, a
+// Filtro de lotes (Incorporação só): ficam de fora os lotes de parcelamento em
+// "regularização fundiária" (o booleano `parcelamentos.regularizacao` no
+// Núcleo) E os de parcelamento vinculado a um setor habitacional
+// (`parcelamentos.setor_habitacional_id` preenchido) — os dois critérios que o
+// autor pediu (#746). Nenhum dos dois é coluna de lote/imóvel: o lote herda
+// isso via `parcelamento_id`. O Núcleo não tem filtro server-side por essas
+// colunas (camposFiltro de /lotes não faz join até parcelamentos), então
+// resolvemos o conjunto de ids excluídos à parte e filtramos no cliente. Como a exclusão acontece depois da paginação do servidor, a
 // navegação por número de página deixa de fazer sentido (uma "página" pode vir
 // com menos itens do que pedimos) — o seletor de lote acumula em lotes de 200
 // (teto do Núcleo) com um botão "Carregar mais", em vez de Anterior/Próxima.
@@ -65,7 +67,8 @@ export class ViabTerrenoNucleo extends LitElement {
   @state() private _buscando = false;
   private _buscaDebounce: ReturnType<typeof setTimeout> | null = null;
 
-  // Conjunto de ids de parcelamento com regularizacao=true (Incorporação só).
+  // Conjunto de ids de parcelamento excluídos — regularizacao=true OU
+  // setor_habitacional_id preenchido (Incorporação só).
   // null = ainda não resolvido; undefined de fetch (indisponível) não bloqueia
   // o seletor, só desliga o filtro com um aviso.
   @state() private _idsRegularizacao: Set<number> | null = null;
@@ -164,8 +167,8 @@ export class ViabTerrenoNucleo extends LitElement {
     if (seq === this._cargaSeq) this.carregando = false;
   }
 
-  // Resolve o conjunto de parcelamentos "de regularização fundiária" uma vez
-  // (não repete por lote/página). Pagina em laço até a página vir incompleta —
+  // Resolve o conjunto de parcelamentos excluídos (regularização fundiária ou
+  // setor habitacional) uma vez (não repete por lote/página). Pagina em laço até a página vir incompleta —
   // o Núcleo não tem "trazer tudo" (docs/shell/nucleo.md § Paginação).
   private async _carregarIdsRegularizacao(): Promise<void> {
     const ids = new Set<number>();
@@ -174,7 +177,10 @@ export class ViabTerrenoNucleo extends LitElement {
       for (;;) {
         const lista = await listarParcelamentosNucleo(pagina, POR_PAGINA_LOTE);
         const dados: any[] = lista?.dados ?? [];
-        for (const p of dados) if (p?.regularizacao) ids.add(Number(p.id));
+        for (const p of dados) {
+          // #746: os dois critérios. `!= null` de propósito — `0` seria um id.
+          if (p?.regularizacao || p?.setor_habitacional_id != null) ids.add(Number(p.id));
+        }
         const totalPaginas = Number(lista?.paginas) || 1;
         if (dados.length < POR_PAGINA_LOTE || pagina >= totalPaginas) break;
         pagina += 1;
@@ -458,8 +464,8 @@ export class ViabTerrenoNucleo extends LitElement {
       ></urbi-input>
       ${this._regularizacaoIndisponivel
         ? html`<urbi-banner variante="alerta">
-            Não foi possível conferir a classificação de regularização fundiária no Núcleo — a
-            lista abaixo não está filtrada por essa regra.
+            Não foi possível conferir no Núcleo quais parcelamentos são de regularização
+            fundiária ou de setor habitacional — a lista abaixo não está filtrada por essa regra.
           </urbi-banner>`
         : nothing}
     `;
@@ -472,7 +478,7 @@ export class ViabTerrenoNucleo extends LitElement {
       </div>` : nothing;
     const info = html`<span class="pag-info">
       ${this.opcoes.length} lote${this.opcoes.length === 1 ? '' : 's'} elegível(is) carregado(s)
-      (de ${this._loteTotalBruto} no Núcleo, sem excluir regularização fundiária)
+      (de ${this._loteTotalBruto} no Núcleo, sem excluir regularização fundiária e setores habitacionais)
     </span>`;
 
     return html`

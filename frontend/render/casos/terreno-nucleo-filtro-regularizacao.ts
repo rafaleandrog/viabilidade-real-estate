@@ -1,6 +1,7 @@
 // Caso de render: filtro da lista de resultados de lote (Terreno & Áreas,
-// Incorporação) — excluir lotes de parcelamento com `regularizacao=true` e
-// mostrar o campo de busca por texto. A função que faz a exclusão está em
+// Incorporação) — excluir lotes de parcelamento com `regularizacao=true` OU
+// com `setor_habitacional_id` preenchido (#746) e mostrar o campo de busca por
+// texto. A função que faz a exclusão está em
 // `viab-terreno-nucleo` (`_carregarLotes`), mas a FIAÇÃO é o que este caso
 // mede: se o componente chama `/parcelamentos`, resolve o conjunto certo, e
 // de fato tira o lote errado da lista de resultados anexada ao
@@ -52,21 +53,28 @@ export const caso = {
     (globalThis as any).urbiVerso.nucleo = async (rota: string) => {
       (globalThis as any).__chamadasNucleo.push(rota);
       if (rota.startsWith('/parcelamentos')) {
-        // Parcelamento 10 = regularização fundiária; 20 = normal.
+        // Parcelamento 10 = regularização fundiária; 20 = normal; 30 = setor
+        // habitacional (#746) — sem `regularizacao`, excluído só pelo setor.
         return {
-          dados: [{ id: 10, regularizacao: true }, { id: 20, regularizacao: false }],
-          total: 2, pagina: 1, por_pagina: 200, paginas: 1,
+          dados: [
+            { id: 10, regularizacao: true, setor_habitacional_id: null },
+            { id: 20, regularizacao: false, setor_habitacional_id: null },
+            { id: 30, regularizacao: false, setor_habitacional_id: 7 },
+          ],
+          total: 3, pagina: 1, por_pagina: 200, paginas: 1,
         };
       }
       if (rota.startsWith('/lotes')) {
-        // Lote 1 pertence ao parcelamento de regularização (10) — tem que
-        // sumir do seletor. Lote 2 pertence ao parcelamento normal (20).
+        // Lote 1 pertence ao parcelamento de regularização (10) e lote 3 ao
+        // de setor habitacional (30) — os dois têm que sumir do seletor. Lote
+        // 2 pertence ao parcelamento normal (20).
         return {
           dados: [
             { id: 1, id_legivel: 'L1-REGULARIZACAO', parcelamento_id: 10 },
             { id: 2, id_legivel: 'L2-OK', parcelamento_id: 20 },
+            { id: 3, id_legivel: 'L3-SETOR-HABITACIONAL', parcelamento_id: 30 },
           ],
-          total: 2, pagina: 1, por_pagina: 200, paginas: 1,
+          total: 3, pagina: 1, por_pagina: 200, paginas: 1,
         };
       }
       return { dados: [] };

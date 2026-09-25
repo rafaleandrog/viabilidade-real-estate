@@ -1,8 +1,9 @@
 // Render do filtro do seletor "Adicionar lote" (Terreno & Áreas, Incorporação):
-// excluir lotes de parcelamento com `regularizacao=true` e mostrar a busca por
-// texto. Ver `casos/terreno-nucleo-filtro-regularizacao.ts` para o cenário —
-// dois lotes vindos do Núcleo, um preso a um parcelamento de regularização
-// fundiária, o outro não.
+// excluir lotes de parcelamento com `regularizacao=true` ou com
+// `setor_habitacional_id` preenchido (#746) e mostrar a busca por texto. Ver
+// `casos/terreno-nucleo-filtro-regularizacao.ts` para o cenário — três lotes
+// vindos do Núcleo: um preso a um parcelamento de regularização fundiária, um
+// a um parcelamento de setor habitacional, e um a um parcelamento normal.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +12,7 @@ import { naoDeclaradas, declaracoesOciosas, motivoParaPular, relato } from './ap
 
 const pular = await motivoParaPular();
 
-test('seletor de lote exclui regularização fundiária e mostra busca por texto', { skip: pular ?? false }, async () => {
+test('seletor de lote exclui regularização fundiária e setor habitacional e mostra busca por texto', { skip: pular ?? false }, async () => {
   const a = await verificarRender({ caso: 'terreno-nucleo-filtro-regularizacao', larguras: [900] });
 
   assert.deepEqual(a.erroConsole, [], 'a página lançou erro durante a montagem' + relato(a));
@@ -37,8 +38,8 @@ test('seletor de lote exclui regularização fundiária e mostra busca por texto
 
   assert.deepEqual(
     extra!.opcoesValores, ['2'],
-    'o lote #1 (parcelamento 10, regularizacao=true) tinha que sumir da lista de resultados, e só '
-      + `o lote #2 (parcelamento 20, normal) ficar. Opções vistas: ${JSON.stringify(extra!.opcoesRotulos)}`
+    'o lote #1 (parcelamento 10, regularizacao=true) e o lote #3 (parcelamento 30, setor_habitacional_id=7) '
+      + `tinham que sumir da lista de resultados, e só o lote #2 (parcelamento 20, normal) ficar. Opções vistas: ${JSON.stringify(extra!.opcoesRotulos)}`
       + relato(a),
   );
 
