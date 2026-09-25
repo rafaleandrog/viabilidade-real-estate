@@ -59,6 +59,9 @@ export interface ConsumoColchao {
 export function consumoDoColchao(estressePct: number, folgaPct: number | null): ConsumoColchao | null {
   if (folgaPct === null || !Number.isFinite(folgaPct) || !Number.isFinite(estressePct)) return null;
   if (Math.abs(folgaPct) < 1e-9) return null;
+  // Estresse zero não é "sinal divergente": é consumo zero (a tela nunca o
+  // produz — `|| 10` —, mas a função é exportada; achado do Kimi, rodada 2).
+  if (Math.abs(estressePct) < 1e-9) return { consumoPct: 0, inviavel: false, baseDeficitaria: false, folgaPct };
   if (Math.sign(estressePct) !== Math.sign(folgaPct)) {
     return { consumoPct: null, inviavel: true, baseDeficitaria: true, folgaPct };
   }

@@ -44,7 +44,7 @@ test('#734: sinais OPOSTOS são base deficitária — a raiz está do lado favor
   const m = margemDeSeguranca(deficit, 'preco', 20);
   assert.ok(m.folgaPct !== null && m.folgaPct > 0, `folga do preço deveria ser positiva (${m.folgaPct})`);
   assert.equal(consumoDoColchao(-10, m.folgaPct)!.baseDeficitaria, true);
-  assert.match(textoPontoDeEquilibrio(m, 20, false), /precisa melhorar \+\d+,\d% para o resultado zerar \(já é negativo na base\)/);
+  assert.match(textoPontoDeEquilibrio(m, 20, false), /precisa melhorar \+[\d.]+,\d% para o resultado zerar \(já é negativo na base\)/);
 });
 
 test('#734 critério 2: estresse maior que a folga ⇒ consumo > 100% E o texto do alerta aparece, em palavras', () => {
@@ -60,6 +60,8 @@ test('#734 critério 3: folgaPct === null ⇒ nenhum consumo publicado, nenhuma 
   assert.equal(consumoDoColchao(-10, null), null);
   assert.equal(consumoDoColchao(-10, 0), null);
   assert.equal(consumoDoColchao(NaN, -40), null);
+  // Estresse zero: consumo zero, nunca "base deficitária".
+  assert.deepEqual(consumoDoColchao(0, -40), { consumoPct: 0, inviavel: false, baseDeficitaria: false, folgaPct: -40 });
   const texto = textoConsumo(null, -10);
   assert.match(texto, /Não há colchão a consumir/);
   assert.doesNotMatch(texto, /Infinity|NaN/);

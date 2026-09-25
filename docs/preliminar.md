@@ -71,7 +71,7 @@ tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [F
   pela folga; se passa de 100 %, ou se o resultado já é negativo na base e a premissa precisaria
   melhorar para zerar, a tela diz em palavras que o cenário Bear já é inviável —, a nota de
   **baixa alavanca** quando a amplitude do resultado entre Bull e Bear fica abaixo de 2 % do
-  resultado (o resultado é insensível à premissa neste projeto) e o motivo de uma premissa de base
+  resultado base (o resultado é insensível à premissa neste projeto) e o motivo de uma premissa de base
   circular ficar fora do ranking.
 - **Margem de segurança** — quatro cartões. **Queda máxima de preço**, **Estouro máximo de obra**
   (**de infraestrutura**, no Loteamento) e **Permuta física máxima** dizem, em percentual sobre o
