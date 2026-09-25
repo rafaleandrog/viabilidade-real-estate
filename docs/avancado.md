@@ -41,21 +41,21 @@ Acumulado** e os **Indicadores vs. benchmark** — a página de leitura do estud
 ### Custos
 
 Cinco sub-abas, uma por grupo: **Terreno**, **Obras**, **Diretos**, **Indiretos** e **Financeiro**.
-Cada linha de custo tem uma **categoria** — no Terreno, o preço, as permutas física e financeira e o
-registro; nas Obras, construção, outorga, decoração, gestão da obra e contingência; nos Diretos,
-marketing e publicidade, corretagem de vendas, projetos e licenças e aprovações; nos Indiretos,
-marketing global, stand de vendas e gestão; no Financeiro, juros de financiamento, taxas bancárias,
-estruturação de dívida e investidores; e em todo grupo a categoria **Outro**. Só o Terreno tem a
-coluna **Subcategoria** (à vista ou parcelado para o preço; **Descreva…** para Outro). O orçamento é
-lançado na unidade escolhida (R$, R$/m² privativo, R$/m² de terreno, % do VGV, % da receita ou % da
-obra) e a **distribuição no tempo** diz o início (uma fase do cronograma, ou **Customizado** para um
-mês), a duração e a forma — **Linear** ou uma **curva** do catálogo do Painel (aba **Curvas**), que
-reparte o valor pelos meses. O preço do terreno pode, em vez disso, acompanhar a receita das
-vendas: **Unit Delivery** o distribui na proporção da receita que entra em caixa (sinal, parcelas e
-repasse) e **Sales Revenue** na proporção do VGV vendido pela curva de absorção; três linhas não
-escolhem — a corretagem sai no mês da venda, a permuta física na entrega das unidades e a permuta
-financeira conforme a receita entra. Cada sub-aba mostra o consolidado do seu grupo; o **Avanço da
-obra** aparece junto do custo de construção, no grupo Obras.
+Cada linha de custo tem uma **categoria** — no Terreno, o preço e o registro; nas Obras, construção,
+outorga, decoração, gestão da obra e contingência; nos Diretos, marketing e publicidade, corretagem
+de vendas, projetos e licenças e aprovações; nos Indiretos, marketing global, stand de vendas e
+gestão; no Financeiro, juros de financiamento, taxas bancárias, estruturação de dívida e
+investidores; e em todo grupo a categoria **Outro**. Só o Terreno tem a coluna **Subcategoria**:
+para o preço, à vista, parcelado, permuta física ou permuta financeira; para Outro, o texto de
+**Descreva…**. O orçamento é lançado na unidade escolhida (R$, R$/m² privativo, R$/m² de terreno, %
+do VGV, % da receita ou % da obra) e a **distribuição no tempo** diz o início (uma fase do
+cronograma, ou **Customizado** para um mês), a duração e a forma — **Linear** ou uma **curva** do
+catálogo do Painel (aba **Curvas**), que reparte o valor pelos meses. O preço do terreno pode, em
+vez disso, acompanhar a receita das vendas: **Unit Delivery** o distribui na proporção da receita
+que entra em caixa (sinal, parcelas e repasse) e **Sales Revenue** na proporção do VGV vendido pela
+curva de absorção; três linhas não escolhem — a corretagem sai no mês da venda, a permuta física na
+entrega das unidades e a permuta financeira conforme a receita entra. Cada sub-aba mostra o
+consolidado do seu grupo; o **Avanço da obra** aparece junto do custo de construção, no grupo Obras.
 
 ### Viabilidade
 

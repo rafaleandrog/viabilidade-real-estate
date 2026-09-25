@@ -52,8 +52,8 @@ permuta física. A tabela, de cima para baixo: **Receita bruta (VGV)** (precedid
 permuta física** e das permutas quando há permuta física); **= Deduções sobre VGV**, que abre
 imposto, corretagem, marketing e permuta financeira; **= Receita líquida**; **= Custo direto total**,
 que abre os custos diretos; **= Receita operacional**; **= Custo indireto total**, que abre os
-indiretos; e **= Resultado**. Os totais são cabeçalhos que mostram ou escondem as linhas do grupo;
-linha zerada não aparece. Cada linha traz R$, percentual do VGV e R$/m²; a coluna R$ sai em inteiros. O bloco
+indiretos; e **= Resultado**. Receita bruta e os três totais de grupo são cabeçalhos que mostram
+ou escondem as linhas do grupo, e linha de grupo zerada não aparece. Cada linha traz R$, percentual do VGV e R$/m²; a coluna R$ sai em inteiros. O bloco
 **Unidades e preço médio por tipo** resume o catálogo. Botões **PDF** e **Excel** exportam a mesma
 tabela (ver [Exportação](exportacao)). As fórmulas de cada linha estão em [Fórmulas da Proforma](formulas).
 
