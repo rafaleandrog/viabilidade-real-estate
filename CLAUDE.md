@@ -12,6 +12,8 @@ App UrbiVerso de estudo de viabilidade imobiliária. Construída sobre o shell U
 - `PROGRESSO.md` — estado atual, o que foi feito, pendências
 - `INSTRUCOES-CODE.md` — master plan e contratos inegociáveis da plataforma
 - `schema.json` — schema de dados atual (genesis da app)
+- `docs/*.md` — a documentação **servida** na instância (12 guias, `README.md` = visão geral); ver
+  § Documentação da app
 - `docs/shell/*.md` no monorepo `urbiverso/urbiverso` — fonte de verdade da plataforma
 
 **Contexto de negócio (consultivo — NÃO governa comportamento):**
@@ -46,10 +48,11 @@ variáveis eu já configurei".
 
 ---
 
-## Estado do backlog — 🔄 RODADA 13 EM ANDAMENTO (aberta em 2026-09-16)
+## Estado do backlog — 🔄 RODADA 13 EM ANDAMENTO (aberta em 2026-09-16) · ✅ RODADA 14 CONCLUÍDA (2026-09-25)
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
+| **14 — Documentação do app no estilo dos apps do UrbiVerso** | Pedido direto do autor, com captura da página Documentação da instância listando só notas datadas: a página lista só os `.md` do topo de `docs/`, e os guias viviam em subpasta. Plano em `historico/rodada-14/planejamento.md`: `docs/` passa a conter só a documentação servida (`referencia/` para o consultivo, `historico/` para o datado, `ideias.md` na raiz), e cada guia é reescrito pela régua do framework — só comportamento vigente, sem issue, rodada, data ou endereço `arquivo:linha`. Layout e régua em § Documentação da app | nenhuma — pedido direto, sem issue | ✅ **concluída em 2026-09-25** — 9 PRs mergeados em fila indiana (#759 estrutura, #760 espelho de UI, #761 processo, #762 README, #763 guias Preliminar e Avançado, #764 Funding, #765 Administração, #766 Fórmulas e Modelo de Dados, #767 guias curtos e `ideias.md`), cada um revisado até zero bloqueantes; o tarball passa a levar só os 12 `.md` de `docs/`. O App do Codex revisou os PRs 1 a 5 e esgotou a cota; o Kimi cobriu as duas camadas dali em diante, declarado em cada relatório. A lição medida PR a PR: **rótulo existir no arquivo não prova que a tela o renderiza** — conferir um guia é ler a função que desenha a sub-aba, não o `grep` que acha a constante. Merge autorizado pelo autor para a fila inteira. |
 | **13 — Tornado de alavancas e margem de segurança (aba Cenários do Preliminar)** | A **Fase 2** do mesmo handoff de UX da Rodada 12, que aquela rodada registrou como fora de escopo (`historico/rodada-12/auditoria.md:48-50` e `:63-65`): tornado de alavancas ranqueadas (§4.2), bloco de margem de segurança (§4.3) e a aba Cenários reconstruída (§4.6) — hoje um dropdown de UMA variável mais três colunas de valores absolutos (`frontend/tela-proforma.ts:655-791`). ⚠️ A auditoria da Rodada 12 supôs que a margem de segurança exigiria um campo `base_calculo` por linha de custo; o plano da 13 **inverteu o motor numericamente** (secante + bisseção, o precedente é `precoSugeridoM2` em `frontend/proforma.ts:860`), então **nenhuma PR desta rodada mexe em `schema.json` nem bumpa a `versao`**. Fila de 12 PRs, estritamente serial; plano em `historico/rodada-13/planejamento.md` | **#724–#736** (13), das quais **12 na fila** — a **#724** (custo de licenciamento digitado, salvo e que **nunca entra no proforma**) é bug de motor achado de passagem no planejamento, com dinheiro dentro, e fica **fora da fila**: é decisão do autor quando entra | 🔄 **em andamento** — os 2 PRs de **processo** estão mergeados (#737 adotou o **Kimi** como segundo motor externo de revisão, com colheita por roster; #739 criou o **corpo de conhecimento das lentes**, lido da BASE). **Primeiro PR de produto: PR 757, aberto em 2026-09-18**, respondendo a pedido direto do usuário (a mesma imagem do handoff, reanexada) — consolida **6 dos 12 itens da fila num PR só** (#725, #727, #728, #729, #732, #733), desvio deliberado do plano serial original por praticidade de sessão única, registrado no corpo do PR e em `PROGRESSO.md`. `#726` (decisão do autor), `#730`, `#731`, `#734`, `#735` e `#736` seguem abertas para rodadas futuras. Merge pendente de autorização do autor. |
 | **12 — Redesenho de KPIs/gráficos do Preliminar** | Handoff de UX (documento fora do GitHub) pedindo o redesenho da aba Gráficos do estudo Preliminar: faixa de 5 KPIs com denominador visível, cascata horizontal do resultado substituindo a pizza de custos + o gráfico de barras Receita×Custos, cadeia de áreas em barras horizontais proporcionais substituindo a(s) pizza(s) de alocação, e banner de consistência de área (informativo, não bloqueia salvar — decisão da #693 preservada). Plano de Fase 0 (auditoria) + Fase 1 (redesenho sem mudar o motor de cálculo) aprovado pelo autor em modo de planejamento; a Fase 2 (tornado de alavancas / sensibilidade ranqueada, handoff §4.2) e a Fase 3 (margem de segurança, benchmark editável por tipologia/praça — exige `schema.json` novo) ficaram fora, registradas para rodada futura (`historico/rodada-12/auditoria.md`). Fila de 8 PRs, estritamente serial | nenhuma — plano combinado diretamente com o autor, sem issue aberta no GitHub | ✅ **concluída em 2026-09-15** — as 8 PRs mergeadas em fila indiana (#701 auditoria, #702 extração `vgvBrutoDeProforma`, #703 fix do medidor duplicado `resultado_final`, #704 componentes novos `viab-grafico-cascata`/`-barra-ranqueada`/`-cadeia-areas`, #705 faixa de KPIs, #706 cascata substitui pizza+barras, #707 cadeia de áreas + banner de consistência, #708 limpeza de doc). Revisão por Codex (`@codex review`) + lentes nativas em cada PR, com achados reais consertados antes do merge — o mais significativo, no #707: a cadeia de áreas escalava a largura de cada barra pelo PRIMEIRO estágio (o terreno) em vez do MAIOR, o que fazia Incorporação (onde a área construída costuma superar o terreno, coeficiente de aproveitamento > 1) desenhar estágios de tamanhos bem diferentes como barras idênticas, clipadas em 100%; e duas rodadas seguidas do mesmo bug de fiação (a faixa de consistência piscava aviso falso antes do catálogo de produtos carregar, depois ficava presa a um `Promise.all` que travava a flag de pronto mesmo com o catálogo já OK). Merge autorizado pelo autor a cada PR. De passagem, a #701 (Fase 0, auditoria) também confirmou e fechou a nota "ainda aberto" do achado 11 das armadilhas da Rodada 10 (bug do ROI 0,0% com `investimentoTotal=0`) — ver a atualização daquela nota, abaixo. |
 | **11 — Reforma da tabela do Painel de estudos** | 6 issues pedidas pelo autor em fila **estritamente serial** (badge de nível Preliminar amarelo → remover coluna Cidade → unificar as duas colunas de área em "Área líquida de venda" → mover renomear do Painel para o cabeçalho do estudo → corrigir a largura da coluna da miniatura → alinhar a fila de ações à direita sem quebra), mais 2 achados encontrados durante a revisão dos PRs acima e corrigidos na hora (#683: as 5 abas do Painel disparavam fetch umas das outras; #686: `div.layout` de `tela-preliminar.ts` transbordava a 600/900px) | **#675–#680, #683, #686** (8) | ✅ **concluída em 2026-09-06** — as 8 issues fechadas em fila indiana, por 8 PRs mergeados (#681, #682, #684, #685, #687, #688, #689, #690): a #676 levou dois — o #682 entregou 4 dos 5 critérios de aceite e declarou `Sem-fechamento` no critério que dependia da #683 (achada na própria revisão dele), e o #689 fechou #676 e #683 juntos depois de consertar a causa. Merge autorizado pelo autor a cada PR revisado (Codex + lentes nativas) com zero bloqueantes. A #595 (P1 antigo, gráfico de Cenários sem cor/linha própria) foi fechada à parte, por decisão do autor: já estava corrigida fora do rastreamento desta issue. |
@@ -1204,6 +1207,45 @@ Git Bash — ver PROGRESSO).
 - Só usar primitivos `urbi-*` disponíveis no `ui.md` do shell — e **só as props que eles declaram**:
   atributo inexistente num primitivo não dá erro, ele simplesmente **não faz nada** (falha
   silenciosa). Na dúvida, leia `ui/src/urbi-<nome>.ts` no monorepo, não presuma a prop.
+
+---
+
+## Documentação da app
+
+A página **Documentação** da instância lista **só os `.md` do topo de `docs/`** (subpasta é ignorada
+com aviso; `README.md` vem primeiro com o nome do app como título; o resto ordena alfabeticamente
+por `titulo`, e `ordem` no frontmatter é ignorado). O empacotador copia `docs/` **inteiro** para o
+tarball — subpasta e JSON viajariam para toda instância mesmo sem aparecer. Daí o layout, fixado na
+Rodada 14:
+
+| Pasta | O que é | Servido? | Empacotado? |
+|---|---|---|---|
+| `docs/` | os guias do app, **só `.md` no topo**, um por macro-feature, `README.md` = visão geral | sim | sim |
+| `referencia/` | conhecimento de negócio consultivo (`padrao-incorporacao`, `inteligencia-evi-incorporacao`), a spec da planilha do investidor (`fluxo-investidor-formulas`), ADRs (`funding-capital-stack`, `modelo-de-dados-evolucoes`) e o espelho de UI | não | não |
+| `historico/` | notas datadas: rodadas, auditorias, triagens, a spec original | não | não |
+| `ideias.md` (raiz) | braindump no formato do framework (Braindump / Aprovadas / Descartadas) | não | não |
+
+Régua de um guia em `docs/` — a mesma do framework (`documentacao.md` no bundle do SDK) e de
+`apps/fabrica/docs/` no monorepo, o modelo vivo: frontmatter só com `titulo` e `descricao` (a
+`descricao` vira o subtítulo da barra lateral e alimenta o assistente de docs), termo
+identificador **primeiro** no `titulo` (a ordem é alfabética), H1 + resumo de uma linha em `>`,
+seções progressivas `## O que é` → conceitos → `## Para usuários` → `## Para administradores` →
+`## Instruções para não humanos` → `## Veja também`; links entre guias como `[texto](slug)`, sem
+`.md`, e só para slug que exista em `docs/` (`README.md` tem o slug `readme`). **Não entra**:
+número de issue ou rodada, data, correção de linha anterior ("esta linha já dizia…"), endereço
+`arquivo:linha` (evidência mora em `referencia/` e no `PROGRESSO.md`), "evolução prevista" (vai
+para a issue, ou para `ideias.md`). Mudança de comportamento do app atualiza o guia correspondente
+em `docs/` **no mesmo PR**.
+
+> ⚠️ **Rótulo existir no arquivo não prova que a tela o renderiza.** A Rodada 14 pagou isso PR a
+> PR: um guia descrevia a sub-aba Terreno & Áreas pela lista de campos do modelo (`AREAS_LOT`), que
+> a tela não desenha mais; outro atribuía ao Fluxo de Caixa os gráficos que vivem em Análise
+> Financeira. Conferir um guia é ler a função que desenha a sub-aba (`_render…`), não o `grep` que
+> acha a constante.
+
+Ferramentas que leem esses caminhos, para não redescobrir: `scripts/guard-enderecos-doc.mjs`
+varre `docs/` e `referencia/` (e não `historico/`, que é fotografia datada e deve envelhecer);
+`scripts/guard-tabelas-obsoletas.mjs` admite menção histórica nas três pastas.
 
 ---
 
