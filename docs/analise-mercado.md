@@ -51,7 +51,7 @@ Como o lado projeto é derivado:
 |---|---|---|
 | **Preço de venda (R$/m²)** | `VGV total ÷ área privativa total` | média ponderada pela área, não a média aritmética dos preços por tipologia |
 | **Custo de obra (R$/m²)** | `Σ das linhas do grupo Obras ÷ área privativa total` | usa as linhas já resolvidas pelo motor do fluxo, na unidade certa |
-| **Velocidade de vendas (%/mês)** | média de `100 ÷ meses com venda`, ponderada pelo VGV de cada fase | lê a absorção como velocidade de vendas |
+| **Velocidade de vendas (%/mês)** | por fase, `Σ da absorção nos meses com venda ÷ meses com venda`; a média entre fases é ponderada pelo VGV de cada uma | lê a absorção como velocidade de vendas |
 
 Sem dado para derivar (sem tipologia, sem linha de obra, sem cronograma) o indicador sai como `—`,
 nunca como zero — zero é um valor, e diria outra coisa.

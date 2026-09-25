@@ -50,8 +50,8 @@ não oferecer o que o servidor recusaria.
 ### Editar Premissas por status
 
 No Preliminar, as sub-abas de Premissas são editáveis em Rascunho e Em análise por `editor` e
-`aprovador`; em Aprovado e Reprovado ficam em modo de leitura para todos; em Arquivado, só o
-`aprovador` edita.
+`aprovador`; em Aprovado e Reprovado ficam em modo de leitura para todos. Em Arquivado a tela deixa
+digitar, mas só o `aprovador` consegue salvar: o servidor recusa o `editor` ao gravar.
 
 ### Renomear um estudo
 

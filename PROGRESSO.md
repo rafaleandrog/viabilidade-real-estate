@@ -21,7 +21,7 @@ que as PRs 7 e 8 mediram (quatro parâmetros sem consumidor, fonte externa da co
 sem indicador, taxa e sinal no fluxo de pagamento), mais as duas ideias descartadas por decisão do
 autor.
 
-**O que a fila entregou, no todo.** A página Documentação da instância passa a listar treze guias
+**O que a fila entregou, no todo.** A página Documentação da instância passa a listar doze guias
 por tema — Estudo de Viabilidade (o README), Administração, Análise de Mercado, Apelo Comercial
 (IA), Benchmarks, Estudo Avançado, Estudo Preliminar, Exportação, Fórmulas da Proforma, Funding,
 Modelo de Dados, Permissões e Ciclo de Vida —, todos no estilo dos apps do UrbiVerso e sem nenhum

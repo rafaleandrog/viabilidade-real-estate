@@ -45,12 +45,14 @@ exportação própria.
 ### Fluxo de Caixa do Avançado
 
 Na sub-aba **Fluxo de Caixa** de **Resultados**, os botões **CSV** e **PDF** exportam a tabela na
-visão selecionada — mensal ou anual — com a mesma hierarquia da tela: contratação bruta, descontos
-comerciais, contratação líquida, principal e juros recebidos, contratação por fase e tipologia,
-recebimentos e carteiras por componente, receita líquida, custos, funding e o relatório de
-reconciliação. Quando o estudo tem permuta física declarada, a tabela por tipologia (quantidade
-permutada, quantidade total do catálogo e área permutada) sai junto, da mesma fonte da tela. As
-células monetárias saem em duas casas, com o mesmo limiar de célula vazia da tela.
+visão selecionada — mensal ou anual — com a mesma hierarquia da tela: a Receita Bruta (VGV) com as
+divisões por grupo de receitas, os cinco grupos de custos, as operações de funding e o fluxo. Ao
+fim vêm os totais e indicadores — TIR, VPL, payback, exposição máxima, venda bruta, desconto
+comercial e venda líquida contratadas, receita bruta, juros de clientes, carteira máxima e o mês
+dela — e o relatório de reconciliação. Quando o estudo tem permuta física declarada, a tabela por
+tipologia (quantidade permutada, quantidade total do catálogo e área permutada) sai junto, da mesma
+fonte da tela. As células monetárias saem em duas casas, com o mesmo limiar de célula vazia da
+tela.
 
 A Proforma do Avançado não tem exportação própria.
 

@@ -24,7 +24,8 @@ a comparação numérica com o mercado da região (ver [Análise de Mercado](ana
 2. Clique em **Analisar com IA**. O servidor extrai o conteúdo dos arquivos, monta o prompt e
    consulta o modelo com um esquema de resposta estruturado.
 3. O card **Resultado** mostra o **Score geral**, o score de cada fator e o relatório; o evento
-   `apelo_comercial_concluido` é publicado para os membros do estudo.
+   `apelo_comercial_concluido` é publicado, e os editores e aprovadores do estudo o recebem (os
+   leitores são inscritos só nas mudanças de status).
 
 **Contexto do empreendimento.** Antes das fontes, o prompt inclui um bloco com a localidade, o
 tipo de empreendimento, o número de unidades, a área média por unidade e o preço de venda

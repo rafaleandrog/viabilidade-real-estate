@@ -22,7 +22,8 @@ adiante, crie um estudo Avançado.
 O estudo abre em quatro abas: **Premissas**, **Resultado**, **Gráficos** e **Análise de Mercado**.
 As Premissas são editáveis em Rascunho e Em análise por `editor` e `aprovador`. Num estudo
 Aprovado ou Reprovado as quatro sub-abas de Premissas ficam em modo de leitura para todos; num
-Arquivado, só o `aprovador` edita (ver [Permissões e ciclo de vida](permissoes)).
+Arquivado a tela deixa digitar, mas só o `aprovador` consegue salvar (ver
+[Permissões e ciclo de vida](permissoes)).
 
 ### Premissas
 
