@@ -4,6 +4,17 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 ---
 
+## Rodada 14, PR 3 — processo: a skill de revisão cobra o guia em `docs/*.md` (2026-09-25)
+
+PR de processo puro (regra R1: `.claude/**` não viaja com código de produto). A convenção "Doc no
+mesmo PR" da `revisar-pr-apps` (§5) ainda mandava atualizar `docs/viabilidade/*.md`, pasta que a PR 1
+da rodada eliminou; agora aponta para o guia servido em `docs/*.md` e diz que `referencia/` e
+`historico/` não substituem o guia. `.claude/revisao/*.md` não citavam caminho velho (grep), então
+o marcador do corpo não muda. Verificação: `guard-processo.mjs` e as baterias do `processo-integro`
+via `preflight-pr.mjs`.
+
+---
+
 ## Rodada 14, PR 2 — espelho de UI sai de `docs/`: `docs/ui-urbiverso/` → `referencia/ui-urbiverso/` (2026-09-25)
 
 Segunda PR da fila do plano (`historico/rodada-14/planejamento.md`). O espelho gerado da referência
