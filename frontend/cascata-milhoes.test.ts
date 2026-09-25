@@ -112,15 +112,17 @@ test('a exceção de milhões é chamada EXATAMENTE onde deve, por contagem', ()
 });
 
 // Quantas vezes `grafico-cascata.ts` chama `fmtR$` — o formatador de 2 casas.
-// Hoje são duas, e nenhuma delas é o rótulo da barra: `const exato` (que
-// alimenta o `title` E o `aria-label` da coluna) e a base no rodapé da escala.
+// Hoje são quatro, e nenhuma delas é o rótulo da barra: `const exato` (que
+// alimenta o `title` E o `aria-label` da coluna) e, no rodapé da escala, a
+// base em cada um dos dois ramos (saudável e deficitário) mais o piso
+// `eixoMin` do ramo deficitário (#720 — a escala com linha do zero).
 //
 // É uma trava de INVENTÁRIO, não de rótulo: ela afirma que o componente usa
-// `fmtR$` exatamente nesses dois pontos. Uma chamada a mais reprova — seja a
+// `fmtR$` exatamente nesses pontos. Uma chamada a mais reprova — seja a
 // reversão do rótulo, seja um uso novo e legítimo, e nos dois casos o certo é
 // vir aqui decidir. Sem navegador, sem regex sobre o template, e sem depender
 // de onde no arquivo a chamada está.
-const CHAMADAS_FMTRS = 2;
+const CHAMADAS_FMTRS = 4;
 
 const ARQUIVO_CASCATA = 'frontend/grafico-cascata.ts';
 
@@ -129,7 +131,7 @@ test('o rótulo da barra NÃO voltou a `fmtR$` — rede sempre ligada, sem naveg
     ocorrencias(fonte(ARQUIVO_CASCATA), 'fmtR$('),
     CHAMADAS_FMTRS,
     `${ARQUIVO_CASCATA} deveria chamar fmtR$ ${CHAMADAS_FMTRS}× — \`const exato\` (title `
-    + 'e aria-label) e a base do rodapé. Divergiu: ou o rótulo da barra voltou a 2 casas, ou '
+    + 'e aria-label), a base do rodapé nos dois ramos e o piso do ramo deficitário. Divergiu: ou o rótulo da barra voltou a 2 casas, ou '
     + 'um canal de detalhe sumiu, ou entrou um uso novo e legítimo — nos três o certo é '
     + 'decidir aqui, e ajustar CHAMADAS_FMTRS só no terceiro',
   );
