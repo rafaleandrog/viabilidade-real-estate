@@ -16,6 +16,30 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — #735: cenário composto — as três maiores alavancas estressadas juntas
+
+Rodada 13, PR 10 da fila, a última de código. O motor passa a aceitar um CONJUNTO de fatores:
+`sensibilidade` em `frontend/proforma.ts` é `{ variavel, fator }` (a forma de sempre) OU
+`{ fatores: { preco: 0.9, custo_obras: 1.1, … } }`, normalizados por `fatoresDe` num mapa só, uma
+vez, no topo de `calcularProforma` — os oito pontos que consultam `fatorSens` não sabem qual forma
+chegou, e o piso `Math.max(0, …)` continua por fator. Todos os testes de `fatorSens` existentes
+passam sem edição. `frontend/cenario-composto.ts` (puro) escolhe as `N_COMPOSTO = 3` alavancas de
+maior amplitude entre as não circulares, monta os fatores de cada lado (Bear: todas desfavoráveis;
+Bull: todas favoráveis, pelo mesmo `ehCustoLike` do tornado) e roda o motor com as três juntas —
+o resultado composto DIFERE da soma dos deltas isolados, e o teste prova (custos percentuais sobre
+o VGV fazem os efeitos interagir). O tornado (`viab-grafico-tornado`) ganha a prop `composto` e o
+desenha como o item do topo, selecionável; a tela (`frontend/tela-proforma.ts`) aceita a seleção
+`'composto'`, roda a tabela Bear/Base/Bull com o conjunto e declara as três premissas no cabeçalho
+("📉 Bear −10% Preço de venda · +10% Custo de obra · +10% Permuta financeira") e no subtítulo;
+margem de segurança e colchão continuam por premissa, e o bloco diz isso. Provas:
+`frontend/cenario-composto.test.ts` (as duas formas dão a mesma Proforma; três fatores movem as
+três grandezas e o piso é por fator; composto ≠ soma e pior que o pior isolado; escolha entre as
+não circulares — reduzir `N_COMPOSTO` a 2 deixa vermelho, medido; rótulos; fiação) e o caso de
+render `cenarios-composto`, que clica no item do topo e lê o cabeçalho com as três premissas e o
+Resultado do Bear composto pior que o do Bear de preço. Sete citações `arquivo:linha` de
+`proforma.ts` foram reapontadas pelo guard de endereços. `docs/preliminar.md` descreve o composto.
+
 ## 2026-09-25 — #734: consumo do colchão, alerta de cenário inviável e a regra da baixa alavanca
 
 Rodada 13, PR 9 da fila. Abaixo do tornado, para a alavanca selecionada, a aba Cenários do
