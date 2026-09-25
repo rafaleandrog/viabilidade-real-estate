@@ -27,8 +27,8 @@
 #      atravessam typecheck, teste e build em verde. Depois do link porque o
 #      lexer deles é o parser do `typescript`;
 #   5. guard de ENDEREÇOS de doc: todo `arquivo:linha` citado em
+      `docs/` (servido), `referencia/` (consultivo) e em comentário de `frontend/`/`backend/` ainda
 #      `docs/` e em comentário de `frontend/`/`backend/` ainda
-#      resolve — o arquivo existe, a linha existe, e o símbolo que a frase cita
 #      está a ±3 linhas do alvo. É a única afirmação do repo que nenhuma outra
 #      etapa consegue derrubar: um merge da `main` desloca as linhas do arquivo
 #      citado e a prosa passa a apontar para outra coisa, em verde. Nesta mesma

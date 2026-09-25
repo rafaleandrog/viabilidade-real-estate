@@ -81,7 +81,7 @@ Sobreposição vira dependência, tracker, issue de UX, issue de teste ou emenda
 | **#278** | FIN-09 | Fluxo, KPIs, cenários e exportações | FIN-03 a FIN-08 |
 | **#279** | FIN-10 | Limpeza, ativação definitiva e compatibilidade | FIN-02 a FIN-09 |
 
-Especificação funcional completa: [`docs/viabilidade/funding-capital-stack.md`](viabilidade/funding-capital-stack.md).
+Especificação funcional completa: [`docs/viabilidade/funding-capital-stack.md`](../referencia/funding-capital-stack.md).
 
 ---
 

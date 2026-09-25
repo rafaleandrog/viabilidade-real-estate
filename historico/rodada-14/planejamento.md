@@ -120,7 +120,10 @@ Caminho fixo em: `scripts/sincronizar-referencia-ui.mjs:43,350`, `guard-tokens-c
 `guard-props-urbi.mjs:52`, `guard-box-model-urbi.mjs:56`, `render-check.mjs:80-81,275,298,424,1231`,
 `render-em-escopo.mjs:36,69`, `testar-guards-ui.sh:73,77,97,203,206`,
 `frontend/fluxo-economico-series.test.ts:111-112`, `validar-frontend.sh:24,118`,
-`.github/workflows/pr-guards.yml:497-500` (nome do passo/comentário). Depois: `node
+`.github/workflows/pr-guards.yml:497-500` (nome do passo/comentário) — e
+`scripts/enderecos-doc-excecoes.mjs`: a exceção de `docs/ui-urbiverso/LEIA.md` (caminho do monorepo
+citado num arquivo gerado) muda de caminho junto, senão vira exceção morta e o guard reprova
+(achado da rodada 1 de revisão da PR 1). Depois: `node
 scripts/sincronizar-referencia-ui.mjs` não deve mudar nada além do caminho.
 
 ### PR 3 — Processo (só `.claude/`): a skill de revisão passa a exigir doc em `docs/*.md`

@@ -27,7 +27,11 @@ rodada, spec e JSON do espelho de UI iam para toda instância.
   → `referencia/`: são consultivos (CLAUDE.md: não descrevem o app, não governam o runtime) e
   somam 6.900 linhas. Links dos guias para eles viram menção em prosa com o caminho — o
   visualizador só abre slug listado.
-- `docs/rodada-*`, `docs/spec/` e os 7 `.md` datados do topo → `historico/`.
+- `docs/rodada-*`, `docs/spec/` e os 7 `.md` datados do topo → `historico/`. Histórico não se
+  reescreve, com uma exceção medida: o único link relativo que resolvia antes e a movimentação
+  quebrou (`historico/lista-bugs-planejamento-2026-07-31.md`, para o ADR de funding) foi
+  retargetado — achado P2 do App do Codex na rodada 1. Os slugs nus de `historico/rodada-8/*.md`
+  já não resolviam antes e ficam como estão.
 - Fiação: `guard-enderecos-doc.mjs` varre `docs/` + `referencia/` (não `historico/`); as 17
   exceções de `enderecos-doc-excecoes.mjs` e a bateria `testar-guard-enderecos-doc.sh` seguem os
   caminhos novos; `guard-tabelas-obsoletas.mjs` admite `referencia/` e `historico/` (fixture nova
