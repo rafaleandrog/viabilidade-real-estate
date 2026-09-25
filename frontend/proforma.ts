@@ -57,7 +57,10 @@ export interface ProformaInput {
   // custos diretos
   considerar_custo_terreno?: boolean; custo_terreno_m2?: number | string;
   projetos_modo?: string; projetos_pct?: number | string; projetos_valor_fixo?: number | string; projetos_valor_canonico?: number | string;
-  licenciamento_modo?: string; licenciamento_pct?: number | string; licenciamento_valor_fixo?: number | string;
+  // As três colunas de licenciamento (`*_modo`, `*_pct`, `*_valor_fixo`) NÃO
+  // entram aqui: existem no `schema.json` desde a primeira versão, mas nenhuma
+  // tela as oferece e o motor nunca as leu — aposentadas (#724, ramo b). A
+  // trava é `frontend/campos-aposentados.test.ts`.
   infra_modo?: string; custo_infra_m2?: number | string; infra_pct?: number | string; infra_valor_fixo?: number | string; infra_valor_canonico?: number | string;
   incorporacao_registro_pct?: number | string;
   construcao_modo?: string; custo_construcao_m2?: number | string; construcao_valor_total?: number | string; construcao_valor_canonico?: number | string;

@@ -21,6 +21,12 @@ descricao: As tabelas do app, o que cada uma guarda, as relações entre elas, o
 | `apelo_comercial_documentos` | As fontes anexadas à avaliação (`documento`, `tipo_dado`, `texto_adicional`). |
 | `analise_mercado` | O retrato de **mercado** do estudo: preço e custo por m², velocidade de vendas, macros (IPCA, Selic, INCC e Focus), `riscos` JSON, `abrangencia` (município, UF ou nacional), `origem` e `data_referencia`. Guarda só o lado mercado; o lado projeto é derivado do estudo ao renderizar, nunca persistido. Ver [Análise de Mercado](analise-mercado). |
 
+**Colunas aposentadas de `estudos`:** `licenciamento_modo`, `licenciamento_pct` e
+`licenciamento_valor_fixo` estão declaradas no schema desde a primeira versão, mas nenhuma tela as
+oferece e o motor da Proforma nunca as leu — um valor gravado nelas pela API não entra em custo,
+resultado ou indicador nenhum. Continuam no schema porque removê-las é mudança de schema
+(migração e `versao`); não as use.
+
 ## Tabelas do Avançado
 
 | Tabela | O que guarda |

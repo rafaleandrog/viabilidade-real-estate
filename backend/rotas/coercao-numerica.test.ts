@@ -118,7 +118,6 @@ test('inventário: os campos do bug histórico estão cobertos', () => {
   for (const campo of [
     'gabarito_maximo', 'ret_pct',            // os dois do erro relatado
     'area_terreno_nucleo',                   // aparece quando o terreno vem do Núcleo
-    'licenciamento_pct', 'licenciamento_valor_fixo',
     'sensibilidade_variacao_positiva_pct', 'sensibilidade_variacao_negativa_pct',
   ]) {
     assert.ok(cols.has(campo), `${campo} deveria estar coberto pela coerção`);

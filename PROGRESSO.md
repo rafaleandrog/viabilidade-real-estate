@@ -11,6 +11,27 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 
 
 
+
+## 2026-09-25 — #724: as colunas de licenciamento estão aposentadas (ramo b), e a premissa da issue era outra
+
+A issue descrevia um custo "digitado, salvo e que nunca entra no proforma". A metade certa: as
+três colunas (`licenciamento_modo`, `_pct`, `_valor_fixo`) existem no `schema.json` desde a
+primeira versão e são coagidas pelo PATCH genérico, e o motor nunca as leu. A metade que não se
+sustenta: **nenhuma tela as oferece** — `grep licenciamento frontend/tela-premissas.ts` devolve
+zero, e `git log -S` mostra que nunca devolveu; só `ProformaInput` as declarava, o que as fazia
+parecer entrada viva do motor. Sem tela, o ramo (a) da issue (ligar como linha de custo) seria
+inventar um produto — campo novo em Premissas, linha na Proforma, na cascata e na exportação —
+que o autor reservou para si; o ramo (b) é remover a declaração morta sem mudar número nenhum, e
+foi o escolhido. Mudanças: a linha some de `ProformaInput` (`frontend/proforma.ts`);
+`docs/formulas.md` deixa de dizer que "licenciamento em % incide sobre o VGV";
+`docs/modelo-de-dados.md` registra as três como **colunas aposentadas** (ficam no schema porque
+removê-las é migração + `versao`); a referência `padrao-incorporacao.md` anota o mesmo; a lista
+ilustrativa de `backend/rotas/coercao-numerica.test.ts` deixa de citá-las (a coerção continua
+derivada do schema, 104 colunas). A trava é `frontend/campos-aposentados.test.ts`, fail-closed nos
+dois sentidos: nenhum `.ts` versionado de `frontend/`, `backend/` e `scripts/` cita
+`licenciamento_`, e o schema declara as três **se e só se** o guia as registra como aposentadas —
+as duas mutações medidas. Se o autor quiser o ramo (a), é feature nova, com issue própria.
+
 ## 2026-09-25 — #746: o seletor de lotes exclui também parcelamentos vinculados a setor habitacional
 
 O filtro do seletor **Buscar lote** (Incorporação, `frontend/tela-terreno-nucleo.ts`) já excluía os
