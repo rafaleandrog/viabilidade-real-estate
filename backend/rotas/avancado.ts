@@ -1029,10 +1029,12 @@ rotasAvancado.get('/estudos/:id/avancado/fases', async (req: Request, res: Respo
     if (tipo) filtrosFases.tipo = tipo;
     const [fases, alocacoes] = await Promise.all([
       req.dados!.listar('avancado_fases', { filtros: filtrosFases, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
-      req.dados!.listar('avancado_alocacoes', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 1000 }),
+      // Varre em `id asc` (default) e ordena em memória: `ordenar` numa varredura
+      // paginada com a app no ar pode repetir ou pular linha (doc do SDK).
+      req.dados!.varrerTudo('avancado_alocacoes', { filtros: { estudo_id: estudo.id } }).then(porOrdem),
     ]);
     const porFase = new Map<number, any[]>();
-    for (const a of alocacoes.dados) {
+    for (const a of alocacoes) {
       const chave = Number(a.fase_id);
       if (!porFase.has(chave)) porFase.set(chave, []);
       porFase.get(chave)!.push(a);
@@ -1157,6 +1159,11 @@ rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', async (req: Request, re
 
 // ── Alocações de venda (tipologia → fase) ──
 
+/** Ordena linhas por `ordem` crescente (desempate pelo `id asc` da varredura). */
+function porOrdem<T extends { ordem?: unknown }>(linhas: T[]): T[] {
+  return [...linhas].sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0));
+}
+
 /**
  * Σ de unidades desta tipologia entregues como PERMUTA FÍSICA no estudo — as
  * linhas de custo `terreno / Preço / Permuta física` que apontam para ela
@@ -1165,10 +1172,8 @@ rotasAvancado.delete('/estudos/:id/avancado/fases/:fid', async (req: Request, re
 async function unidadesPermutadasNoEstudo(
   req: Request, estudoId: number, tipologiaId: number, ignorarCustoId?: number,
 ): Promise<number> {
-  const r = await req.dados!.listar('avancado_linhas_custo', {
-    filtros: { estudo_id: estudoId }, por_pagina: 1000,
-  });
-  return r.dados
+  const custos = await req.dados!.varrerTudo('avancado_linhas_custo', { filtros: { estudo_id: estudoId } });
+  return custos
     .filter((c: any) => Number(c.id) !== Number(ignorarCustoId)
       && c.grupo === 'terreno' && c.categoria === 'Preço' && c.subcategoria === 'Permuta física'
       && Number(c.permuta_tipologia_id) === Number(tipologiaId))
@@ -1186,13 +1191,11 @@ async function unidadesPermutadasNoEstudo(
 async function saldoTipologiaNoEstudo(
   req: Request, tipologia: any, ignorarAlocId?: number,
 ): Promise<number> {
-  const r = await req.dados!.listar('avancado_alocacoes', {
-    filtros: { tipologia_id: tipologia.id }, por_pagina: 1000,
-  });
+  const alocacoes = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tipologia.id } });
   const [permutadas] = await Promise.all([
     unidadesPermutadasNoEstudo(req, Number(tipologia.estudo_id), Number(tipologia.id)),
   ]);
-  const vendido = r.dados
+  const vendido = alocacoes
     .filter((a: any) => Number(a.id) !== Number(ignorarAlocId))
     .reduce((s: number, a: any) => s + (Number(a.unidades) || 0), 0);
   return (Number(tipologia.quantidade) || 0) - vendido - permutadas;
@@ -1350,10 +1353,12 @@ rotasAvancado.get('/estudos/:id/avancado/receitas', async (req: Request, res: Re
     // gantt, sem alocação, e não devem virar "linhas de receita" vazias no motor.
     const [fases, alocacoes, tipologias] = await Promise.all([
       req.dados!.listar('avancado_fases', { filtros: { estudo_id: estudo.id, tipo: 'receita' }, ordenar: 'ordem', ordem: 'asc', por_pagina: 100 }),
-      req.dados!.listar('avancado_alocacoes', { filtros: { estudo_id: estudo.id }, ordenar: 'ordem', ordem: 'asc', por_pagina: 1000 }),
+      // Varre em `id asc` (default) e ordena em memória: `ordenar` numa varredura
+      // paginada com a app no ar pode repetir ou pular linha (doc do SDK).
+      req.dados!.varrerTudo('avancado_alocacoes', { filtros: { estudo_id: estudo.id } }).then(porOrdem),
       req.dados!.listar('avancado_tipologias', { filtros: { estudo_id: estudo.id }, por_pagina: 500 }),
     ]);
-    const linhas = montarLinhasReceita(fases.dados, alocacoes.dados, tipologias.dados);
+    const linhas = montarLinhasReceita(fases.dados, alocacoes, tipologias.dados);
     res.json({ dados: linhas, total: fases.total });
   } catch (e: any) {
     console.error('Erro em GET /avancado/receitas:', e);
@@ -1514,10 +1519,13 @@ async function validarPermutaFisica(
     erro(res, 400, 'PERMUTA_TIPOLOGIA_INVALIDA', 'permuta_tipologia_id deve ser uma tipologia deste estudo');
     return false;
   }
-  const vendida = await req.dados!.listar('avancado_alocacoes', { filtros: { tipologia_id: tipologiaId }, por_pagina: 1000 });
-  const custos = await req.dados!.listar('avancado_linhas_custo', { filtros: { estudo_id: estudoId }, por_pagina: 1000 });
-  const usada = vendida.dados.reduce((sum: number, a: any) => sum + (Number(a.unidades) || 0), 0);
-  const reservada = custos.dados
+  // "Todas as linhas" é `varrerTudo`, nunca um `por_pagina` grande: com mais
+  // de uma página de alocações ou de linhas de custo, `listar` subcontava o
+  // já reservado, `disponivel` inflava e a guarda 422 falhava ABERTA.
+  const vendida = await req.dados!.varrerTudo('avancado_alocacoes', { filtros: { tipologia_id: tipologiaId } });
+  const custos = await req.dados!.varrerTudo('avancado_linhas_custo', { filtros: { estudo_id: estudoId } });
+  const usada = vendida.reduce((sum: number, a: any) => sum + (Number(a.unidades) || 0), 0);
+  const reservada = custos
     .filter((c: any) => Number(c.id) !== Number(atual?.id)
       && c.grupo === 'terreno' && c.categoria === 'Preço' && c.subcategoria === 'Permuta física'
       && Number(c.permuta_tipologia_id) === Number(tipologiaId))
