@@ -10,7 +10,7 @@ import { receitaLiquidaDeProformaMensal } from './fluxo-caixa-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #355 — golden cases da planilha `fluxo_investidor_FORMULAS.xlsx`, transcrita
-// em docs/funding.md §4. Cobre `divida` e
+// em referencia/fluxo-investidor-formulas.md §4. Cobre `divida` e
 // `equity` — a matemática de calendário/PMT da planilha nova.
 //
 // `financiamento_producao` NÃO segue esta planilha: preserva o modelo de
@@ -323,7 +323,7 @@ test('#355 equity (resultado final): paga tudo de uma vez, no mês do repasse', 
 // cronograma próprio (corretagem integral no mês da venda, #121), e o mês de
 // lançamento cujo sinal é menor que a corretagem produz base NEGATIVA.
 //
-// Decisão do autor, 2026-08-22 — ver `docs/funding.md`
+// Decisão do autor, 2026-08-22 — ver `referencia/fluxo-investidor-formulas.md`
 // §4.2, bloco "Divergência deliberada do app".
 
 const EQUITY_432: OperacaoFunding = {

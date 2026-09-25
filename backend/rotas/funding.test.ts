@@ -168,7 +168,7 @@ test('#587 remocaoFinanciamentoBloqueada: só o Financiamento à produção é f
 
 // ── #435 — teto de `Σ pct_retorno` ────────────────────────────────────────
 //
-// A regra é da spec vigente (`docs/funding.md`
+// A regra é da spec vigente (`referencia/fluxo-investidor-formulas.md`
 // §2, "Teto de Σ pct_retorno"), NÃO da planilha: a planilha tem uma operação
 // só e é fonte nula aqui. O enunciado original vivia na §6 de
 // `funding-capital-stack.md`, que é ADR supersedido.

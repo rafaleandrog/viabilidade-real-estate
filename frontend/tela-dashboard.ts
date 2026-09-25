@@ -320,7 +320,7 @@ export class ViabTelaDashboard extends LitElement {
       // Avançado desalavancada) tiraram daqui a chamada a `fundingDoEstudo`
       // que existia na vistoria de pré-PR da issue. `proformaAvancado` nem
       // recebe funding (#426). Os cinco consumidores reais estão listados em
-      // `docs/funding.md` §9 — não adicione
+      // `referencia/fluxo-investidor-formulas.md` §9 — não adicione
       // este arquivo de volta à lista sem reintroduzir a chamada.
       const area = areaPrivativaTotalLinhas(linhasReceita);
       const p = proformaAvancado(c, area);

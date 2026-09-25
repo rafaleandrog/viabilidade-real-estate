@@ -1,7 +1,7 @@
 // 029_funding_operacoes.js — item 48 da planilha (Rodada 7, #355)
 //
 // A tela de Funding foi reescrita do zero segundo `fluxo_investidor_FORMULAS`
-// (transcrita em docs/funding.md). O modelo de 4
+// (transcrita em referencia/fluxo-investidor-formulas.md). O modelo de 4
 // instrumentos com waterfall (`avancado_capital_instrumentos`, migração 019)
 // dá lugar a 3 operações independentes em `avancado_funding_operacoes`:
 // Financiamento à produção (único por estudo), Dívida e Equity.

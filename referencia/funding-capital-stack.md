@@ -12,7 +12,7 @@ descricao: ADR do modelo de Capital Stack (4 instrumentos com waterfall), supers
 > waterfall de pagamentos §6, ordem mensal do motor §7, KPIs §8, interface §9, relatórios §10,
 > validações §12, migração §13) foi **substituído** por 3 operações independentes — sem waterfall,
 > sem prioridades, sem competição por caixa — especificadas em
-> **[Fluxo do Investidor — fórmulas das operações de Funding](../docs/funding.md)**:
+> **[Fluxo do Investidor — fórmulas das operações de Funding](fluxo-investidor-formulas.md)**:
 > `financiamento_producao` (única por estudo), `divida` (livre) e `equity` (2 modos). Tabela nova:
 > `avancado_funding_operacoes` (migração `029`); motor novo: `frontend/funding-motor.ts`; tela nova:
 > `frontend/tela-funding.ts` (`viab-funding`, aba "Funding"). O modelo antigo (tabela
@@ -475,7 +475,7 @@ prazo de parcelas nem principal dividido. A dívida é liquidada por **cash swee
 disponível, existe dívida amortizável, o caixa reduz a dívida — e o prazo é emergente. Por isso o
 editor da camada não oferece política de amortização, carência, prazo nem vencimento; quem precisa
 disso usa **`divida`** — calendário + Price com carência, ver
-[Fluxo do Investidor](../docs/funding.md).
+[Fluxo do Investidor](fluxo-investidor-formulas.md).
 
 > ⚠️ **Esta frase dizia "usa Capital de giro (§4.4), que mantém as três políticas", e isso venceu.**
 > O produto da §4.4 foi apagado pela #355 — o banner do topo já a lista como supersedida —, e o
