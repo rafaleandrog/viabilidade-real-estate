@@ -490,8 +490,9 @@ que só existem neste repo, e **menos** a regra da `versao`, que diverge (ver o 
 - **UI e API andam juntas.** Capacidade na API sem controle correspondente na tela é feature
   invisível. Se não merece UI, não deve existir na API.
 - **Doc no mesmo PR.** Mudou o comportamento → mudou o guia correspondente em `docs/*.md` — a
-  documentação **servida** na instância (`CLAUDE.md` § Documentação da app). `referencia/` e
-  `historico/` não substituem o guia: são consultivo e fotografia datada.
+  documentação **servida** na instância (layout fixado na Rodada 14,
+  `historico/rodada-14/planejamento.md`). `referencia/` e `historico/` não substituem o guia: são
+  consultivo e fotografia datada.
 - **Telas usam os primitivos `urbi-*`** — e **só as props que eles declaram**. Atributo inexistente
   não dá erro: ele simplesmente não faz nada. Ver S3.
 - **Permissão usa `nivelApp`/`rolesApp`**, nunca `usuario.tipo`.
