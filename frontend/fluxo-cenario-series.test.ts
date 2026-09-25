@@ -6,7 +6,7 @@ import {
   type FluxoCalc, type FluxoConfig,
 } from './fluxo-caixa-motor.js';
 import { periodosAnuais } from './fluxo-shared.js';
-import { comparacaoCenario } from './fluxo-graficos.js';
+import { comparacaoCenario, emMilhoes, dominioYEstatico, ESCALA_MILHOES } from './fluxo-graficos.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // #595 — o card "Fluxo acumulado — cenário real × cenário simulado"
@@ -304,4 +304,92 @@ test('#595 fiação: a cor das duas séries vem do CSS, não de uma chave no dad
       + 'primitivo, e o critério 1 da #595 (cores DISTINTAS, escolhidas pelo app) deixa de valer.',
     );
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #747 — eixo Y estático e séries em R$ milhões no card de comparação
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('#747: dominioYEstatico inclui o zero, arredonda PARA FORA em passo bonito e ignora não-finitos', () => {
+  // Tudo positivo: o mínimo ainda é o zero.
+  assert.deepEqual(dominioYEstatico([[12.4, 37.9], [55.1]]), { minY: 0, maxY: 60 });
+  // Tudo negativo: o máximo ainda é o zero.
+  assert.deepEqual(dominioYEstatico([[-12.4, -37.9]]), { minY: -40, maxY: 0 });
+  // Mistura: os dois lados saem para fora do dado, nunca para dentro.
+  const d = dominioYEstatico([[-8.3, 26.5], [-11.2, 30.1]]);
+  assert.ok(d.minY <= -11.2 && d.maxY >= 30.1, `${JSON.stringify(d)} não contém [-11.2, 30.1]`);
+  assert.deepEqual(d, { minY: -20, maxY: 40 });
+  // Ordem das séries e posição dos extremos não mudam o resultado.
+  assert.deepEqual(dominioYEstatico([[30.1, -11.2], [26.5, -8.3]]), d);
+  // NaN/Infinity não contam; sem valor finito, um domínio degenerado mas válido.
+  assert.deepEqual(dominioYEstatico([[NaN, 5, Infinity]]), { minY: 0, maxY: 5 });
+  assert.deepEqual(dominioYEstatico([[NaN], []]), { minY: 0, maxY: 1 });
+  assert.deepEqual(dominioYEstatico([]), { minY: 0, maxY: 1 });
+});
+
+test('#747: emMilhoes é divisão pura por 1e6, preserva eixo e rótulos e não muda comprimento', () => {
+  const base = calcularFluxo(INCORPORACAO);
+  const c = comparacaoCenario(base, base, 'Cenário simulado');
+  const m = emMilhoes(c);
+  assert.strictEqual(m.categorias, c.categorias);
+  assert.equal(m.series.length, c.series.length);
+  for (let i = 0; i < c.series.length; i++) {
+    assert.equal(m.series[i].rotulo, c.series[i].rotulo);
+    assert.equal(m.series[i].valores.length, c.series[i].valores.length);
+    for (let j = 0; j < c.series[i].valores.length; j++) {
+      assert.equal(m.series[i].valores[j], c.series[i].valores[j] / ESCALA_MILHOES);
+    }
+  }
+  assert.equal(ESCALA_MILHOES, 1_000_000);
+});
+
+// A premissa que a tela usa: o fluxo acumulado é linear no preço e no custo,
+// então o envelope dos QUATRO CANTOS das faixas contém toda posição
+// intermediária dos sliders. Medido numa grade, não afirmado.
+test('#747: o domínio dos quatro cantos das faixas contém toda posição intermediária dos sliders', () => {
+  const faixaPreco = { min: -20, max: 10 };   // assimétrica de propósito, como os benchmarks
+  const faixaCusto = { min: -15, max: 25 };
+  const calc = (p: number, c: number) => calcularFluxo(aplicarCenario(INCORPORACAO, { precoVendaPct: p, custoObraPct: c }));
+  const emM = (f: FluxoCalc) => f.fluxoAcumulado.map((v) => v / ESCALA_MILHOES);
+  const base = calc(0, 0);
+  const cantos = [
+    calc(faixaPreco.min, faixaCusto.min), calc(faixaPreco.min, faixaCusto.max),
+    calc(faixaPreco.max, faixaCusto.min), calc(faixaPreco.max, faixaCusto.max),
+  ];
+  const d = dominioYEstatico([base, ...cantos].map(emM));
+  let pontos = 0;
+  for (let p = faixaPreco.min; p <= faixaPreco.max; p += 5) {
+    for (let c = faixaCusto.min; c <= faixaCusto.max; c += 5) {
+      for (const v of emM(calc(p, c))) {
+        assert.ok(v >= d.minY && v <= d.maxY, `preço ${p}% / obra ${c}%: ${v} fora de [${d.minY}, ${d.maxY}]`);
+        pontos++;
+      }
+    }
+  }
+  assert.ok(pontos > 100, 'a grade tem que exercer o motor de verdade');
+  // E o domínio é o MESMO para qualquer posição dos sliders — ele não lê o cenário exibido.
+  assert.deepEqual(dominioYEstatico([base, ...cantos].map(emM)), d);
+});
+
+test('#747 fiação: o card publica min-y/max-y estáticos e as séries em R$ milhões com formato="numero"', () => {
+  const bloco = TELA.slice(TELA.indexOf('<urbi-grafico-linha'), TELA.indexOf('</urbi-grafico-linha>'));
+  assert.ok(bloco.length > 0, 'o urbi-grafico-linha sumiu da aba Cenários');
+  // Mutação declarada no PR: apagar `min-y`/`max-y` do template deixa isto vermelho.
+  assert.ok(bloco.includes('min-y=${dominio.minY}'), 'o gráfico deixou de travar o mínimo do eixo Y — o eixo volta a andar com o slider');
+  assert.ok(bloco.includes('max-y=${dominio.maxY}'), 'o gráfico deixou de travar o máximo do eixo Y — o eixo volta a andar com o slider');
+  assert.ok(bloco.includes('formato="numero"'), 'o gráfico voltou a formato="moeda": tick de nove dígitos sai clipado pela esquerda');
+  assert.ok(!bloco.includes('formato="moeda"'));
+  // O domínio sai da função pura, sobre o envelope da base + cantos das faixas.
+  assert.ok(TELA.includes('dominioYEstatico(this._envelopeCenarios(base))'), 'o domínio deixou de vir de dominioYEstatico sobre o envelope');
+  for (const canto of [
+    'precoVendaPct: this.faixaPreco.min, custoObraPct: this.faixaCusto.min',
+    'precoVendaPct: this.faixaPreco.min, custoObraPct: this.faixaCusto.max',
+    'precoVendaPct: this.faixaPreco.max, custoObraPct: this.faixaCusto.min',
+    'precoVendaPct: this.faixaPreco.max, custoObraPct: this.faixaCusto.max',
+  ]) {
+    assert.ok(TELA.includes(canto), `o envelope perdeu o canto { ${canto} } — o eixo pode clipar uma série`);
+  }
+  // As séries passam por emMilhoes ANTES de chegar ao gráfico, e o card diz a unidade.
+  assert.match(TELA, /emMilhoes\(comparacaoCenario\(/, 'as séries deixaram de ser escaladas para milhões');
+  assert.ok(TELA.includes('cenário real × cenário simulado (R$ milhões)'), 'o título do card deixou de declarar a unidade');
 });
