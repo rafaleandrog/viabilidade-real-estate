@@ -1,7 +1,7 @@
 // 019_capital_stack_camadas.js — FIN-02 (#271)
 //
 // Cria a tabela `avancado_capital_instrumentos` (camadas do Capital Stack,
-// §2.4/§4 de docs/viabilidade/funding-capital-stack.md) e migra os campos
+// §2.4/§4 de referencia/funding-capital-stack.md) e migra os campos
 // legados do Bloco G (`estudos.financiamento_*`/`investidor_*`) para camadas
 // RASCUNHO — regra conservadora do §13:
 //

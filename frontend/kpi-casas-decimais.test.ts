@@ -13,7 +13,7 @@ import { fmtR$, fmtR$Kpi } from './viab-format.js';
 // o mais — persistência, entrada, motor, Fluxo de Caixa e as demais tabelas —
 // segue em 2 casas; a cascata e a Proforma têm as SUAS exceções (`fmtR$Milhoes`,
 // `celulaInteira`/#754), cada uma com a sua trava (`CLAUDE.md` § Contratos
-// inegociáveis; `docs/viabilidade/formulas.md` § Estado de conformidade).
+// inegociáveis; `docs/formulas.md` § Estado de conformidade).
 //
 // ⚠️ POR QUE UM TESTE QUE LÊ O FONTE, e não um teste da função pura.
 // `fmtR$Kpi` é trivial e um teste dela (em `viab-format.test.ts`) prova só que a

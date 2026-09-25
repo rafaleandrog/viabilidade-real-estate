@@ -46,7 +46,7 @@ Este README é o mapa do projeto. **Releia-o no início de cada sessão** antes 
    - `docs/shell/banco-de-dados.md`, `docs/shell/permissoes.md`, `docs/shell/ia.md`, `docs/shell/ui.md`, `docs/shell/nucleo.md`, `docs/shell/eventos.md`, `docs/shell/documentacao.md`
    - `sdk/README.md` (o que o `@urbiverso/sdk` exporta, lockstep de versão)
    - `apps/` — leia um app existente que usa **permissão por membership** (OKRs e/ou Recrutamento) como modelo vivo de estrutura, rotas e frontend. **Copie o padrão, não reinvente.**
-2. **A spec completa do app:** `docs/spec/estudo-de-viabilidade-spec.md` neste repositório (commitada antes de você começar). É o contrato funcional. Toda regra de negócio, fórmula, tabela, evento e tela está lá.
+2. **A spec completa do app:** `historico/spec/estudo-de-viabilidade-spec.md` neste repositório (commitada antes de você começar). É o contrato funcional. Toda regra de negócio, fórmula, tabela, evento e tela está lá.
 
 Se um contrato (comando, formato, assinatura de `req.*`, API do Núcleo) puder ser lido no monorepo, **leia-o de lá** em vez de deduzir. O que envelhece mora no framework, não na sua memória.
 
@@ -101,9 +101,9 @@ viabilidade-real-estate/
 ├── backend/rotas.ts
 ├── frontend/index.ts
 ├── migracoes/                 (vazio no MVP — schema.json é o genesis)
-├── docs/
-│   ├── spec/                  (a spec original — commitada antes de começar)
-│   └── viabilidade/           (docs do app, criados na Etapa 7, seguindo documentacao.md)
+├── docs/                      (documentação SERVIDA na instância: só .md no topo, README.md primeiro)
+├── referencia/                (conhecimento de negócio e ADRs — consultivo, não empacotado)
+├── historico/                 (notas datadas: rodadas, auditorias, a spec original em spec/)
 ├── package.json
 ├── tsconfig.json
 ├── .npmrc                     (@urbiverso:registry=https://npm.pkg.github.com)

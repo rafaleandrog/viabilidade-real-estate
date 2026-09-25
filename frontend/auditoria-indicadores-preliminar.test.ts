@@ -10,7 +10,7 @@ import { INVENTARIO_ROTULOS_INDICADOR } from './rotulos-indicador.js';
 // estudo de produção neste ambiente — a reprodutibilidade pedida pelo
 // handoff é satisfeita por fixtures, no mesmo padrão que
 // `frontend/proforma.test.ts` já usa). Cada `test()` é um dos defeitos
-// 2.1–2.7; a disposição de cada achado está em `docs/rodada-12/auditoria.md`.
+// 2.1–2.7; a disposição de cada achado está em `historico/rodada-12/auditoria.md`.
 
 const perto = (a: number, b: number, tol = 0.01) => Math.abs(a - b) <= tol;
 
@@ -157,4 +157,4 @@ test('2.6 — as metas padrão não reprovam um estudo saudável em massa', () =
 // sem ranquear por impacto no resultado (o "tornado de alavancas" do
 // handoff, §4.2, é o que resolveria isso — Fase 2, dependente do campo
 // `base_calculo` por linha de custo, fora de escopo aqui). Registrado em
-// `docs/rodada-12/auditoria.md`.
+// `historico/rodada-12/auditoria.md`.

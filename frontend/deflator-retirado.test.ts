@@ -45,7 +45,7 @@ const RAIZ = fileURLToPath(new URL('../', import.meta.url));
 
 // Diretórios que não são fonte do repositório, mais `docs/`: documentação é
 // memória DATADA (o mesmo motivo pelo qual `guard-enderecos-doc.mjs` deixa
-// `docs/rodada-8/**` de fora) — a #462 é história, e apagá-la dos documentos
+// `historico/rodada-8/**` de fora) — a #462 é história, e apagá-la dos documentos
 // apagaria o registro de por que a coluna existe.
 const PULAR_DIR = new Set(['.git', 'node_modules', 'dist', '.pnpm', 'coverage', '.turbo', 'docs']);
 const EXT = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs', '.json']);

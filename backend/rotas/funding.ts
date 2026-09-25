@@ -210,7 +210,7 @@ export function conflitoFinanciamentoUnico<T extends Record<string, any>>(
  * `conflitoFinanciamentoUnico` (de onde vem o `ignorarId`).
  *
  * A regra está na spec vigente:
- * `docs/viabilidade/fluxo-investidor-formulas.md` §2, "Teto de Σ pct_retorno".
+ * `docs/funding.md` §2, "Teto de Σ pct_retorno".
  * Ela NÃO vem da planilha `fluxo_investidor_FORMULAS`, que é fonte nula aqui
  * (tem uma operação só, `C25` é um número digitado sem soma nem validação); o
  * que a planilha dá é o denominador — `C18`/`C19` são grandezas únicas, e

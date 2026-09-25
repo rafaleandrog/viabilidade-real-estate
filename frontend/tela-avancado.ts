@@ -46,7 +46,7 @@ import './tela-analise-mercado.js';
 // outra coisa: o Apelo pontua o ATIVO (localização, infraestrutura, vetor de
 // crescimento) e não compara o projeto com o mercado. A aba passou a ser a
 // análise de mercado de verdade e o Apelo ganhou página própria — nada foi
-// removido, só desambiguado. Decisão registrada em docs/viabilidade/analise-mercado.md.
+// removido, só desambiguado. Decisão registrada em docs/analise-mercado.md.
 // ─────────────────────────────────────────────────────────────────────────
 
 type AbaTopo = 'resumo' | 'empreendimento' | 'viabilidade' | 'funding' | 'obra' | 'fluxo' | 'cenarios' | 'mercado' | 'apelo';

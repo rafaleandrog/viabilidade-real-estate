@@ -86,11 +86,11 @@ export const OBSOLETAS = {
   },
 };
 
-// Onde a menção é LEGÍTIMA. Migração e docs porque é lá que o modelo antigo é
+// Onde a menção é LEGÍTIMA. Migração, docs, referência e histórico porque é lá que o modelo antigo é
 // lido e explicado; `scripts/` porque é onde vivem este registro e o harness que
 // exercita as migrações `019`/`028`/`029`; os três arquivos de raiz porque são
 // memória de projeto, não código.
-const PERMITIDOS_PREFIXO = ['migracoes/', 'docs/'];
+const PERMITIDOS_PREFIXO = ['migracoes/', 'docs/', 'referencia/', 'historico/'];
 
 // ⚠️ `scripts/` NAO e prefixo permitido, e ja foi. Qualquer consumidor novo
 // posto ali escapava do guard inteiro — reproduzido com um `scripts/reusar.mjs`
@@ -409,7 +409,7 @@ function main() {
       for (const c of meta.consumidores) console.error(`      · ${c}`);
     }
     console.error('');
-    console.error('  Use a tabela substituta. Se a menção for histórica, ela pertence a docs/ ou a');
+    console.error('  Use a tabela substituta. Se a menção for histórica, ela pertence a historico/, referencia/, docs/ ou a');
     console.error('  um COMENTÁRIO — a porção comentada não é acusada, de propósito. Note que a');
     console.error('  dispensa é da porção, não da linha: código depois de `/* … */` continua valendo.');
     console.error(`  Caminhos onde a menção é legítima: ${[...PERMITIDOS_PREFIXO, ...PERMITIDOS_EXATOS].join(' ')}`);

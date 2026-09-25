@@ -1,8 +1,6 @@
 ---
-titulo: Fluxo do Investidor — fórmulas das operações de Funding
+titulo: Funding — operações de Dívida, Equity e Financiamento à produção
 descricao: Especificação vigente das operações de Funding (Dívida e Equity), transcrita da planilha fluxo_investidor_FORMULAS. Financiamento à produção é exceção e segue a §4.3 de funding-capital-stack.
-tipo: app
-ordem: 9
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
@@ -13,7 +11,7 @@ ordem: 9
 > `backend/rotas/funding.ts`, tabela `avancado_funding_operacoes`, migração `029`).
 >
 > O modelo anterior — 4 instrumentos com waterfall e prioridades — está em
-> [Funding, Capital Stack e Retorno do Capital](funding-capital-stack), hoje majoritariamente ADR
+> Funding, Capital Stack e Retorno do Capital (`referencia/funding-capital-stack.md`), hoje majoritariamente ADR
 > histórico. **A exceção é a §4.3 daquele documento**, que continua vigente e descreve
 > `financiamento_producao` — ver a §4.3 aqui.
 
@@ -92,7 +90,7 @@ e no `PATCH` (`422 RETORNO_EXCEDE_RECEITA`). A validação nasce **só no backen
 deixa salvar e mostra o erro depois.
 
 > ⚠️ **De onde vem esta regra, e por que ela está aqui.** O enunciado original é
-> [funding-capital-stack](funding-capital-stack) §6.2 — *"a soma das participações de receita não
+> funding-capital-stack (`referencia/funding-capital-stack.md`) §6.2 — *"a soma das participações de receita não
 > pode superar 100%"* —, mas aquela §6 é **ADR histórico supersedido** pela reescrita do Funding, e
 > não serve de norma. A planilha `fluxo_investidor_FORMULAS` é **fonte nula** para esta regra: ela
 > tem **uma** operação só (`C25` é um número digitado, sem soma nem validação), então nunca
@@ -297,7 +295,7 @@ Implementação: `simularEquity` (`funding-motor.ts:543`).
 
 Decisão do autor (2026-08-12): as duas planilhas especificam **produtos diferentes**, e o app
 precisa dos dois. `financiamento_producao` preserva o modelo da planilha `Incorp Individual`,
-especificado na **§4.3 de [funding-capital-stack](funding-capital-stack)** — a única seção daquele
+especificado na **§4.3 de funding-capital-stack (`referencia/funding-capital-stack.md`)** — a única seção daquele
 documento que continua vigente:
 
 - liberação **incondicional contra medição de custo elegível**, não por necessidade de caixa;
@@ -377,7 +375,7 @@ As KPIs desalavancadas (§8.1) são preservadas pela linha "Fluxo de Caixa Livre
 | O quê | Onde |
 |---|---|
 | Diagnóstico completo e decisões D8–D14 | issue **#355**, comentário de 2026-08-11 |
-| Modelo antigo (ADR) e a §4.3 vigente | [funding-capital-stack](funding-capital-stack) |
+| Modelo antigo (ADR) e a §4.3 vigente | funding-capital-stack (`referencia/funding-capital-stack.md`) |
 | Financiamento à produção — decodificação da planilha `Incorp Individual` | PR **#405** |
 | Motor | `frontend/funding-motor.ts` |
 | Tela | `frontend/tela-funding.ts` |
@@ -388,7 +386,7 @@ As KPIs desalavancadas (§8.1) são preservadas pela linha "Fluxo de Caixa Livre
 
 ## 9. Passos 23–25 — montagem por consumidor, e a recusa da fonte única (#474)
 
-`docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594` (Passos 23–25) descreve **uma**
+`referencia/inteligencia-evi-incorporacao.md:1584-1594` (Passos 23–25) descreve **uma**
 sequência, executada **uma** vez: processar os instrumentos de funding → formar o fluxo final →
 atualizar acumulados e indicadores. **No app essa sequência não existe como código.** Ela é
 remontada, à mão, por consumidores independentes, cada um com a sua montagem — e é o que a #474

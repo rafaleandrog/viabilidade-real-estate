@@ -1,8 +1,6 @@
 ---
 titulo: Permissões e Ciclo de Vida
 descricao: Permissão por estudo (membership) e regras de transição de status.
-tipo: app
-ordem: 6
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 

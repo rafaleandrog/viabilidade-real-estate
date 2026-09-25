@@ -25,7 +25,7 @@
 //
 // O QUE NAO E ACUSADO, E POR QUE
 //
-//  · `min-width: 0` — e a correcao RECOMENDADA (`docs/rodada-8/06-auditoria-ui.md:816-822`):
+//  · `min-width: 0` — e a correcao RECOMENDADA (`historico/rodada-8/06-auditoria-ui.md:816-822`):
 //    permite encolher, nao impoe tamanho. Acusa-la seria o falso positivo que faz
 //    alguem desligar a guarda. Vale para todo valor que nao impoe tamanho:
 //    `auto`, `none`, `fit-content`, `inherit`…

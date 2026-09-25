@@ -9,8 +9,8 @@
 // Origem: dois EVIs do projeto Calliandra (um loteamento). Importa-se apenas a
 // MECÂNICA de recebíveis — safra, sinal, primeiro vencimento (s+1), PMT, marco
 // (N_s = M − s) e repasse concentrado —, idêntica na Incorporação. Não se
-// importa produto, tipologia, custo nem obra. Ver `docs/viabilidade/
-// padrao-incorporacao.md` Anexo G e `docs/revisao-recebiveis-calliandra-2026-07-31.md`.
+// importa produto, tipologia, custo nem obra. Ver `referencia/
+// padrao-incorporacao.md` Anexo G e `historico/revisao-recebiveis-calliandra-2026-07-31.md`.
 //
 // Convenções aprovadas (Fase 0, 2026-08-01):
 //  · primeira parcela recorrente em s+1 (o mês da contratação recebe só os

@@ -15,7 +15,7 @@
 //     usos de `maxWidth=` no `frontend/` que FUNCIONAM — o parser HTML minusculiza
 //     o nome escrito e o resultado casa. Um guard que exigisse kebab reprovaria os
 //     17, e um falso positivo desse tamanho e o que faz alguem desligar a guarda.
-//     Ver `docs/rodada-8/06-auditoria-ui.md:142-144` — "nao corrija para
+//     Ver `historico/rodada-8/06-auditoria-ui.md:142-144` — "nao corrija para
 //     max-width: ESSA sim ficaria inerte".
 //
 //  2. **`attribute: false` nao tem atributo.** Essas props se passam por

@@ -1,8 +1,6 @@
 ---
 titulo: Modelo de Dados
 descricao: Tabelas, relações e regras de precisão do app de viabilidade.
-tipo: app
-ordem: 2
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
@@ -165,7 +163,7 @@ O guard `scripts/guard-schema-ciclos.mjs` (etapa 1/5 do `validar-frontend.sh` e 
 > da Rodada 5 forem aprovadas e implementadas. **Nenhuma tabela ou coluna deve ser criada a partir
 > deste texto** — só a partir de issue aprovada.
 
-A revisão de recebíveis Calliandra (`docs/revisao-recebiveis-calliandra-2026-07-31.md`) concluiu que
+A revisão de recebíveis Calliandra (`historico/revisao-recebiveis-calliandra-2026-07-31.md`) concluiu que
 a unidade financeira elementar do fluxo avançado **não é o mês**, e sim a **safra**.
 
 | Conceito | O que precisa ser representado |
@@ -200,8 +198,8 @@ gravados (via adapter do JSON legado, EVI-010 / #230) e o inventário de dados l
 Duas restrições valem para todas: nenhum estudo **aprovado, reprovado ou arquivado** pode mudar de
 resultado por migração, e toda migração nova exige **bump da `versao`** do manifesto.
 
-Detalhe completo em `docs/lista-bugs-planejamento-2026-07-31.md` e, para o Capital Stack, em
-[Funding, Capital Stack e Retorno do Capital](funding-capital-stack).
+Detalhe completo em `historico/lista-bugs-planejamento-2026-07-31.md` e, para o Capital Stack, em
+Funding, Capital Stack e Retorno do Capital (`referencia/funding-capital-stack.md`).
 
 ## 🔴 "Instrumento de capital" — a evolução que foi cancelada, e o que existe no lugar
 
@@ -211,7 +209,7 @@ Detalhe completo em `docs/lista-bugs-planejamento-2026-07-31.md` e, para o Capit
 > `avancado_funding_operacoes` como proposta, quando ela roda. Achado do revisor externo.
 >
 > **Registro histórico, não previsão.** Preservado com o motivo, seguindo o precedente de
-> [Funding, Capital Stack e Retorno do Capital](funding-capital-stack): a memória de por que o
+> Funding, Capital Stack e Retorno do Capital (`referencia/funding-capital-stack.md`): a memória de por que o
 > waterfall foi projetado tem valor, e apagá-la faria a próxima sessão reinventá-lo.
 
 A linha acima descrevia uma entidade de camada do **Capital Stack** — tipo, compromisso, prioridade
@@ -229,10 +227,10 @@ Rodada 7 eliminou de propósito.
 
 | Entidade vigente | Onde mora | Spec |
 |---|---|---|
-| **Operação de funding** — três tipos independentes, **sem waterfall, sem prioridades, sem competição por caixa**: `financiamento_producao` (única por estudo), `divida` e `equity` (quantas quiser, nomeáveis) | tabela `avancado_funding_operacoes` (migração `029`); motor `frontend/funding-motor.ts`; tela `frontend/tela-funding.ts`; rotas `backend/rotas/funding.ts` | [Fluxo do Investidor](fluxo-investidor-formulas) para `divida` e `equity` |
+| **Operação de funding** — três tipos independentes, **sem waterfall, sem prioridades, sem competição por caixa**: `financiamento_producao` (única por estudo), `divida` e `equity` (quantas quiser, nomeáveis) | tabela `avancado_funding_operacoes` (migração `029`); motor `frontend/funding-motor.ts`; tela `frontend/tela-funding.ts`; rotas `backend/rotas/funding.ts` | [Fluxo do Investidor](funding) para `divida` e `equity` |
 
 ⚠️ **`financiamento_producao` tem SPEC PRÓPRIA, e ela continua vigente.** A **§4.3** de
-[Funding, Capital Stack e Retorno do Capital](funding-capital-stack) — gatilho de exposição mínima,
+Funding, Capital Stack e Retorno do Capital (`referencia/funding-capital-stack.md`) — gatilho de exposição mínima,
 catch-up retroativo e cash sweep — foi **preservada de propósito** pela #355 e aprovada pela #405.
 Rebaixar aquele documento inteiro a histórico seria erro: só o resto dele é ADR.
 
@@ -284,4 +282,4 @@ Template `{SIGLA} - {nome} - {UF} - {sequência}` (ex.: `INC - Pátio Urbitá 1 
 
 O app declara `dependencias_nucleo: ["imoveis", "parcelamentos"]` e `permissoes_nucleo: { "imoveis": ["ler"], "parcelamentos": ["ler"] }` no manifesto — leitura de glebas/lotes (o supertipo `imoveis` cobre ambos os subtipos) e leitura de `parcelamentos` (usada só para resolver quais lotes pertencem a parcelamento com `regularizacao=true`, e excluí-los do seletor de terreno da Incorporação). O consumo segue o contrato padrão do Núcleo (`docs/shell/nucleo.md`): o shell provê as rotas `/api/viabilidade/nucleo/*` e o frontend chama via `urbiVerso.nucleo('/glebas' | '/lotes' | '/imoveis/:id' | '/parcelamentos')`. O gate real (por entidade/flag) é ligado pelo admin da instância; sem isso, os endpoints retornam 403 e a UI degrada com aviso (sem quebrar).
 
-O app consome apenas a **área** (e o `id_legivel` para exibição) do imóvel. Ao vincular/desvincular imóveis (só em Rascunho, via `estudo_imoveis`), a área somada é persistida em `estudos.area_terreno_nucleo` para a Proforma calcular sobre o objeto estudo em todas as telas. Coeficientes, áreas dedutíveis e demais parâmetros continuam inputs do estudo. Ver [Visão Geral](visao-geral) para origem manual vs. Núcleo.
+O app consome apenas a **área** (e o `id_legivel` para exibição) do imóvel. Ao vincular/desvincular imóveis (só em Rascunho, via `estudo_imoveis`), a área somada é persistida em `estudos.area_terreno_nucleo` para a Proforma calcular sobre o objeto estudo em todas as telas. Coeficientes, áreas dedutíveis e demais parâmetros continuam inputs do estudo. Ver [Visão Geral](readme) para origem manual vs. Núcleo.

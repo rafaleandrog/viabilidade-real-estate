@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Cria e sincroniza no GitHub as issues descritas em `docs/rodada-8/25-issues-final.md`.
+// Cria e sincroniza no GitHub as issues descritas em `historico/rodada-8/25-issues-final.md`.
 //
 //   node scripts/criar-issues-rodada-8.mjs               # ensaio: não toca em nada
 //   node scripts/criar-issues-rodada-8.mjs --executar    # CRIA as que não têm `numero:`
@@ -35,7 +35,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const REPO = 'rafaleandrog/viabilidade-real-estate';
-const ENTRADA = 'docs/rodada-8/25-issues-final.md';
+const ENTRADA = 'historico/rodada-8/25-issues-final.md';
 
 // O documento usa P1/P2/P3 e `docs`; o repositório já tinha convenção própria
 // desde antes desta rodada. Traduzimos em vez de criar um esquema paralelo.
@@ -135,7 +135,7 @@ if (sincronizar) {
 
   for (const it of alvo) {
     const rodape = `\n\n---\n<sub>Rodada 8 · \`${it.id}\` · fontes: ${it.sources}`
-      + ` · contexto completo em \`docs/rodada-8/\`</sub>\n`;
+      + ` · contexto completo em \`historico/rodada-8/\`</sub>\n`;
     const arq = join(dirS, `${it.id}.md`);
     writeFileSync(arq, it.corpo + rodape, 'utf8');
 
@@ -188,7 +188,7 @@ for (const it of issues) {
   if (existentes.has(it.title)) { console.log(`· ${it.id} já existe, pulando`); puladas++; continue; }
 
   const rodape = `\n\n---\n<sub>Rodada 8 · \`${it.id}\` · fontes: ${it.sources}`
-    + ` · contexto completo em \`docs/rodada-8/\`</sub>\n`;
+    + ` · contexto completo em \`historico/rodada-8/\`</sub>\n`;
   const arq = join(dir, `${it.id}.md`);
   writeFileSync(arq, it.corpo + rodape, 'utf8');
 

@@ -1,7 +1,6 @@
 ---
 titulo: Padrão de Viabilidade — Incorporação
 descricao: Documento funcional de como o app representa, organiza, calcula e apresenta um estudo de viabilidade de Incorporação — com contratação por safras, componentes de pagamento, carteiras e contraste explícito entre o comportamento vigente e o modelo funcional de referência.
-tipo: app
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
@@ -11,7 +10,7 @@ tipo: app
 >
 > **Escopo principal:** dinâmica funcional do estudo avançado — produto, cronograma, Grupos comerciais, absorção, fluxo de pagamento, custos, funding, fluxo de caixa e resultados. Loteamento tem seu próprio conjunto de premissas e não é coberto aqui.
 
-Este documento descreve **como o aplicativo representa funcionalmente** o conhecimento econômico definido em [Inteligência EVI — Incorporação](inteligencia-evi-incorporacao).
+Este documento descreve **como o aplicativo representa funcionalmente** o conhecimento econômico definido em [Inteligência EVI — Incorporação](inteligencia-evi-incorporacao.md).
 
 Ele traduz conceitos de negócio em:
 
@@ -26,7 +25,7 @@ Este documento **não é uma especificação de código**. Ele não determina li
 
 > ⚠️ **Status: documento funcional CONSULTIVO, não normativo.**
 >
-> O código, o schema, as migrações, a especificação já aprovada (`docs/spec/estudo-de-viabilidade-spec.md`) e os contratos do UrbiVerso continuam sendo a fonte de verdade do comportamento que está em produção. Uma divergência entre este documento e o app deve gerar análise de impacto e, quando aprovada, uma issue específica. **A divergência não autoriza uma alteração automática ou uma refatoração ampla** — e, se o texto discordar do que o código faz, o código está certo até que uma issue aprovada diga o contrário.
+> O código, o schema, as migrações, a especificação já aprovada (`historico/spec/estudo-de-viabilidade-spec.md`) e os contratos do UrbiVerso continuam sendo a fonte de verdade do comportamento que está em produção. Uma divergência entre este documento e o app deve gerar análise de impacto e, quando aprovada, uma issue específica. **A divergência não autoriza uma alteração automática ou uma refatoração ampla** — e, se o texto discordar do que o código faz, o código está certo até que uma issue aprovada diga o contrário.
 
 A introdução deste padrão deve preservar o que já funciona. O objetivo é tornar explícita a dinâmica funcional de referência e permitir uma evolução controlada do aplicativo.
 
@@ -46,7 +45,7 @@ Uma seção **sem** esses rótulos descreve comportamento vigente e modelo de re
 
 Os identificadores `EVI-0NN` citados ao longo do texto correspondem às issues **#220–#241**, abertas
 na Rodada 5. A matriz de aderência completa — conceito, evidência em `arquivo:linha`, status e classe
-de impacto — está em `docs/rodada-5-evi-2026-07-31.md`.
+de impacto — está em `historico/rodada-5-evi-2026-07-31.md`.
 
 > **Revisão de recebíveis.** A validação posterior contra os dois arquivos de Calliandra corrige
 > premissas das issues EVI-001, EVI-008, EVI-009, EVI-010, EVI-012, EVI-013, EVI-014,
@@ -319,7 +318,7 @@ Ele não precisa reproduzir toda a dinâmica mensal de recebíveis, carteira e f
 > Premissas e a exportação. O backend **nunca** calcula indicadores — não há endpoint de "simular".
 >
 > O Avançado tem proforma própria e **desalavancada** — ver
-> [Fórmulas da Proforma](formulas) § A segunda proforma.
+> [Fórmulas da Proforma](../docs/formulas.md) § A segunda proforma.
 
 A navegação típica inclui:
 
@@ -459,7 +458,7 @@ Estudos inativos podem ser arquivados conforme a política da instância.
 > automaticamente. A função por estudo vive em `estudo_membros.funcao`
 > (`leitor` | `editor` | `aprovador`), sobre a permissão de app (`nivelApp`/`rolesApp`) do shell —
 > a app **nunca** implementa autenticação, usa `req.contexto`. Ver
-> [Permissões e Ciclo de Vida](permissoes).
+> [Permissões e Ciclo de Vida](../docs/permissoes.md).
 
 ### 5.3 Restrições funcionais
 
@@ -2023,14 +2022,14 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 
 > 🔄 **Atualizado em 2026-08-01.** O modelo funcional completo de funding — Capital Stack por
 > instrumentos, waterfall de pagamentos, retorno por provedor de capital e reconciliação mensal —
-> passou a viver em documento próprio: **[Funding, Capital Stack e Retorno do Capital](funding-capital-stack)**.
+> passou a viver em documento próprio: **[Funding, Capital Stack e Retorno do Capital](funding-capital-stack.md)**.
 > Esta seção continua sendo a visão funcional resumida dentro do padrão.
 >
 > ⚠️ **O que este parágrafo dizia a seguir venceu.** Ele chamava o documento novo de "especificação
 > vinculante da epic #239 e das dez sub-issues #270–#279". A **#355 apagou esse modelo inteiro**: a
 > epic e as sub-issues não existem mais como caminho, e do documento **só a §4.3** (Financiamento à
 > produção) continua vigente — o resto é **ADR histórico**. A spec de `divida`/`equity` é
-> [Fluxo do Investidor](fluxo-investidor-formulas). Ver o bloco de comportamento vigente abaixo,
+> [Fluxo do Investidor](../docs/funding.md). Ver o bloco de comportamento vigente abaixo,
 > que é a fonte de verdade desta seção.
 >
 > ✅ **Comportamento vigente desde a #355 (2026-08-12).** O funding existe e roda: três operações
@@ -2038,8 +2037,8 @@ A interface deve impedir duplicação acidental de categorias obrigatórias sem 
 > waterfall, sem prioridades e sem competição por caixa**. Motor: `frontend/funding-motor.ts`;
 > tela: `frontend/tela-funding.ts` (aba "Funding"); rotas: `backend/rotas/funding.ts`; tabela
 > `avancado_funding_operacoes` (migração `029`). A spec de `divida`/`equity` é
-> [Fluxo do Investidor](fluxo-investidor-formulas); a de `financiamento_producao` continua sendo a
-> §4.3 de [Funding, Capital Stack e Retorno do Capital](funding-capital-stack), preservada de
+> [Fluxo do Investidor](../docs/funding.md); a de `financiamento_producao` continua sendo a
+> §4.3 de [Funding, Capital Stack e Retorno do Capital](funding-capital-stack.md), preservada de
 > propósito. O resto daquele documento é **ADR histórico**.
 >
 > ✅ **#450 (2026-08-24): o inventário abaixo está desatualizado — os sete controles citados
@@ -2102,7 +2101,7 @@ O estudo completo deve conseguir representar:
 > Capital Stack (camada `financiamento_producao`), não no Bloco G. O modelo é o da planilha de
 > referência: gatilho de exposição mínima, **catch-up retroativo** na primeira liberação, juros
 > capitalizados sobre o saldo anterior e cash sweep até zerar. A especificação completa está em
-> `docs/viabilidade/funding-capital-stack.md` §4.3; o oráculo de regressão contra a planilha, em
+> `referencia/funding-capital-stack.md` §4.3; o oráculo de regressão contra a planilha, em
 > `frontend/financiamento-producao-golden.test.ts`.
 >
 > **O inventário do que sobrou inerte era o da §17** — e a #450 (2026-08-24) fechou até esse
@@ -2793,7 +2792,7 @@ O relatório é uma visão horizontal de séries temporais; o modelo interno dev
 
 Esta seção é diagnóstica. Ela não substitui o documento de issues e não autoriza mudanças diretas.
 
-A auditoria original está em `docs/rodada-5-evi-2026-07-31.md`. A validação posterior dos recebíveis
+A auditoria original está em `historico/rodada-5-evi-2026-07-31.md`. A validação posterior dos recebíveis
 concluiu que o motor-alvo precisa ser **por safras e componentes**.
 
 > ✅ **Esse motor-alvo foi construído — a #283 o ligou ao `calcularFluxo`.** O texto abaixo foi
@@ -3138,7 +3137,7 @@ são **digitados como número inteiro/decimal** (ex.: `7` = 7%), não como fraç
 >
 > O inventário vigente do que sobra sem efeito no Avançado está na **§17**.
 
-Para os campos das tabelas `avancado_*`, ver [Modelo de Dados](modelo-de-dados).
+Para os campos das tabelas `avancado_*`, ver [Modelo de Dados](../docs/modelo-de-dados.md).
 
 ## Anexo C — Modelo de dados
 
@@ -3155,7 +3154,7 @@ e permissão por estudo.
 **id_legivel** — template `{SIGLA} - {nome} - {UF} - {sequência}` (ex.: `INC - Pátio Urbitá 1 - DF -
 002`; na base `inc_patiourbita1_df_002`). A sequência incrementa por `tipo_empreendimento`.
 
-Detalhes de cada tabela e relações em [Modelo de Dados](modelo-de-dados).
+Detalhes de cada tabela e relações em [Modelo de Dados](../docs/modelo-de-dados.md).
 
 ## Anexo D — Armadilhas conhecidas
 
@@ -3449,15 +3448,15 @@ A fixture deve:
 
 ## Veja também
 
-- [Inteligência EVI — Incorporação](inteligencia-evi-incorporacao) — o significado econômico por trás deste padrão
-- [Estudo de Viabilidade — Visão Geral](visao-geral)
-- [Modelo de Dados](modelo-de-dados)
-- [Fórmulas da Proforma](formulas)
-- [Benchmarks e Sensibilidade](benchmarks)
-- [Apelo Comercial](apelo-comercial)
-- [Permissões e Ciclo de Vida](permissoes)
-- [Exportação](exportacao)
-- `docs/rodada-5-evi-2026-07-31.md` — matriz de aderência · `docs/issues-evi-propostas-2026-07-31.md` — issues preparadas
+- [Inteligência EVI — Incorporação](inteligencia-evi-incorporacao.md) — o significado econômico por trás deste padrão
+- [Estudo de Viabilidade — Visão Geral](../docs/README.md)
+- [Modelo de Dados](../docs/modelo-de-dados.md)
+- [Fórmulas da Proforma](../docs/formulas.md)
+- [Benchmarks e Sensibilidade](../docs/benchmarks.md)
+- [Apelo Comercial](../docs/apelo-comercial.md)
+- [Permissões e Ciclo de Vida](../docs/permissoes.md)
+- [Exportação](../docs/exportacao.md)
+- `historico/rodada-5-evi-2026-07-31.md` — matriz de aderência · `historico/issues-evi-propostas-2026-07-31.md` — issues preparadas
 
 ---
 

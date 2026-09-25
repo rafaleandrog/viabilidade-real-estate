@@ -485,7 +485,7 @@ export const FILHAS_SIMPLES: { tabela: string; campos: string[]; porPagina: numb
  * explicitamente (frontend/tela-premissas.ts) — mostraria os valores certos.
  *
  * São INPUTS persistidos, não valores derivados: devolver isto não move
- * cálculo para o backend (docs/viabilidade/formulas.md continua valendo).
+ * cálculo para o backend (docs/formulas.md continua valendo).
  *
  * Uma query só para toda a página, mutação in-place — mesmo padrão de
  * `anexarImagemPrincipal`. Estudo sem produto fica com lista vazia, que é o

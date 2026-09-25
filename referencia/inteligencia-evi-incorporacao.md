@@ -1,7 +1,6 @@
 ---
 titulo: Inteligência EVI — Incorporação
 descricao: Base de conhecimento de negócio sobre viabilidade econômico-financeira de incorporação — premissas, contratação por safras, recebíveis, carteiras, repasse, sequência mensal de cálculo e indicadores de decisão.
-tipo: app
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
@@ -12,14 +11,14 @@ tipo: app
 > ⚠️ **Status: documento CONSULTIVO de negócio, não normativo sobre o runtime.** Ele explica o
 > **significado econômico** esperado de um EVI — não descreve o que o app faz hoje e **não autoriza
 > alterar** cálculo, schema, API ou interface. A verdade sobre o comportamento instalado está no
-> código, no `schema.json`, na spec (`docs/spec/estudo-de-viabilidade-spec.md`) e nos docs de
+> código, no `schema.json`, na spec (`historico/spec/estudo-de-viabilidade-spec.md`) e nos docs de
 > referência. **Divergência entre este documento e o app gera issue** — nunca mudança automática.
 >
 > O caminho inverso também vale: este documento **não deve ser rebaixado** para coincidir com uma
 > limitação atual do app. A dinâmica funcional correspondente, com o contraste explícito entre
 > comportamento vigente e modelo de referência, está em
-> [Padrão de Viabilidade — Incorporação](padrao-incorporacao); a matriz de aderência conceito a
-> conceito está em `docs/rodada-5-evi-2026-07-31.md`.
+> [Padrão de Viabilidade — Incorporação](padrao-incorporacao.md); a matriz de aderência conceito a
+> conceito está em `historico/rodada-5-evi-2026-07-31.md`.
 
 Este documento define como a empresa raciocina sobre a viabilidade econômico-financeira de um empreendimento de incorporação: quais premissas descrevem o negócio, como produto, preço, comercialização, recebíveis, custos e funding se combinam, e como o dinheiro entra e sai ao longo do tempo.
 
@@ -1648,7 +1647,7 @@ Margem, TIR, VPL e exposição devem ser lidos juntos. A carteira e o endividame
 
 > 🔄 **Acrescentado em 2026-08-01.** Conhecimento econômico, como o resto deste documento —
 > **não governa o runtime** e não descreve o app. A representação funcional está em
-> [Funding, Capital Stack e Retorno do Capital](funding-capital-stack); a implementação depende da
+> [Funding, Capital Stack e Retorno do Capital](funding-capital-stack.md); a implementação depende da
 > epic #239.
 
 Os indicadores acima medem o **projeto**. Eles não respondem quem financiou o projeto nem quanto
@@ -2321,9 +2320,9 @@ Uma implementação é aderente quando reproduz os valores mensais dos cenários
 
 ## Veja também
 
-- [Padrão de Viabilidade — Incorporação](padrao-incorporacao) — a dinâmica funcional do app, com o contraste entre comportamento vigente e modelo de referência
-- [Visão Geral](visao-geral) · [Modelo de Dados](modelo-de-dados) · [Fórmulas da Proforma](formulas) · [Benchmarks](benchmarks) · [Permissões](permissoes) · [Exportação](exportacao)
-- `docs/rodada-5-evi-2026-07-31.md` — matriz de aderência entre este documento e o código
+- [Padrão de Viabilidade — Incorporação](padrao-incorporacao.md) — a dinâmica funcional do app, com o contraste entre comportamento vigente e modelo de referência
+- [Visão Geral](../docs/README.md) · [Modelo de Dados](../docs/modelo-de-dados.md) · [Fórmulas da Proforma](../docs/formulas.md) · [Benchmarks](../docs/benchmarks.md) · [Permissões](../docs/permissoes.md) · [Exportação](../docs/exportacao.md)
+- `historico/rodada-5-evi-2026-07-31.md` — matriz de aderência entre este documento e o código
 
 ---
 

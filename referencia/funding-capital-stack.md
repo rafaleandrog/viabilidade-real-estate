@@ -1,8 +1,6 @@
 ---
 titulo: Funding, Capital Stack e Retorno do Capital
 descricao: ADR do modelo de Capital Stack (4 instrumentos com waterfall), supersedido pela #355 — preserva vigente só a §4.3 (Financiamento à produção, catch-up retroativo); Dívida e Equity mudaram para fluxo-investidor-formulas.md.
-tipo: app
-ordem: 8
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
@@ -14,7 +12,7 @@ ordem: 8
 > waterfall de pagamentos §6, ordem mensal do motor §7, KPIs §8, interface §9, relatórios §10,
 > validações §12, migração §13) foi **substituído** por 3 operações independentes — sem waterfall,
 > sem prioridades, sem competição por caixa — especificadas em
-> **[Fluxo do Investidor — fórmulas das operações de Funding](fluxo-investidor-formulas)**:
+> **[Fluxo do Investidor — fórmulas das operações de Funding](../docs/funding.md)**:
 > `financiamento_producao` (única por estudo), `divida` (livre) e `equity` (2 modos). Tabela nova:
 > `avancado_funding_operacoes` (migração `029`); motor novo: `frontend/funding-motor.ts`; tela nova:
 > `frontend/tela-funding.ts` (`viab-funding`, aba "Funding"). O modelo antigo (tabela
@@ -142,7 +140,7 @@ ordem: 8
 > Caso 11.
 
 **Rótulos de status usados aqui**, no mesmo padrão de
-[Padrão de Viabilidade — Incorporação](padrao-incorporacao):
+[Padrão de Viabilidade — Incorporação](padrao-incorporacao.md):
 
 | Rótulo | Significado |
 |---|---|
@@ -477,7 +475,7 @@ prazo de parcelas nem principal dividido. A dívida é liquidada por **cash swee
 disponível, existe dívida amortizável, o caixa reduz a dívida — e o prazo é emergente. Por isso o
 editor da camada não oferece política de amortização, carência, prazo nem vencimento; quem precisa
 disso usa **`divida`** — calendário + Price com carência, ver
-[Fluxo do Investidor](fluxo-investidor-formulas).
+[Fluxo do Investidor](../docs/funding.md).
 
 > ⚠️ **Esta frase dizia "usa Capital de giro (§4.4), que mantém as três políticas", e isso venceu.**
 > O produto da §4.4 foi apagado pela #355 — o banner do topo já a lista como supersedida —, e o
@@ -806,7 +804,7 @@ Saldos
 ```
 
 Exportação CSV/PDF e cenários devem usar **exatamente os mesmos arrays** do motor. Ver
-[Exportação](exportacao).
+[Exportação](../docs/exportacao.md).
 
 ---
 
@@ -919,7 +917,7 @@ de colunas**, se desejada, é issue posterior e específica.
 > fizer falta, é decisão de produto futura, não um requisito não atendido desta issue.
 >
 > **Programa Financeiro (epic #239) encerrado nesta sessão** — FIN-01 a FIN-10 (#270–#279)
-> implementadas em 4 grupos (ver `docs/lista-bugs-planejamento-2026-07-31.md` §15 e o histórico da
+> implementadas em 4 grupos (ver `historico/lista-bugs-planejamento-2026-07-31.md` §15 e o histórico da
 > Fase 9 na trilha). O motor (`frontend/capital-stack-motor.ts`) cobre os 4 instrumentos do §4, a
 > prioridade de funding (§5) e o waterfall (§6); a interface (`viab-capital-stack`) consome o motor
 > de verdade. Fora de escopo nesta entrega original, registrado explicitamente em cada grupo:
@@ -1123,8 +1121,8 @@ distintas. As regras específicas de cada contrato continuam sendo premissas do 
 
 ## Veja também
 
-- [Visão Geral](visao-geral) · [Modelo de Dados](modelo-de-dados) · [Fórmulas](formulas) · [Exportação](exportacao)
-- [Padrão de Viabilidade — Incorporação](padrao-incorporacao) §17 — dinâmica funcional do Bloco G
-- [Inteligência EVI — Incorporação](inteligencia-evi-incorporacao) — significado econômico do custo de capital
-- `docs/lista-bugs-planejamento-2026-07-31.md` — mapa mestre dos 24 itens da lista de bugs
-- `docs/rodada-5-evi-2026-07-31.md` — matriz de aderência e evidência em `arquivo:linha`
+- [Visão Geral](../docs/README.md) · [Modelo de Dados](../docs/modelo-de-dados.md) · [Fórmulas](../docs/formulas.md) · [Exportação](../docs/exportacao.md)
+- [Padrão de Viabilidade — Incorporação](padrao-incorporacao.md) §17 — dinâmica funcional do Bloco G
+- [Inteligência EVI — Incorporação](inteligencia-evi-incorporacao.md) — significado econômico do custo de capital
+- `historico/lista-bugs-planejamento-2026-07-31.md` — mapa mestre dos 24 itens da lista de bugs
+- `historico/rodada-5-evi-2026-07-31.md` — matriz de aderência e evidência em `arquivo:linha`

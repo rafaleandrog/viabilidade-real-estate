@@ -3,7 +3,7 @@
 //
 // Este módulo é FIXTURE, não runtime: não entra no bundle de `index.ts`,
 // serve só a `evi-urbita-golden.test.ts`. Traz os NÚMEROS já apurados de
-// `docs/rodada-8/02-regras-evi.md` §3 (cenário dourado, reconciliado
+// `historico/rodada-8/02-regras-evi.md` §3 (cenário dourado, reconciliado
 // célula a célula contra `EVI_Urbita.xlsx`), como dado versionado — não
 // como expectativa sobre uma instância viva (que não existe: nenhum estudo
 // real reproduz este cenário em Pinguim hoje).

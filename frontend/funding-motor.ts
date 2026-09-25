@@ -6,7 +6,7 @@ import { vplFluxo } from './fluxo-caixa-motor.js';
 //
 // Substitui `capital-stack-motor.ts` (modelo de 4 instrumentos com waterfall
 // de 8 passos). O modelo novo, especificado pela planilha do autor e
-// transcrito em docs/viabilidade/fluxo-investidor-formulas.md, tem 3 tipos de
+// transcrito em docs/funding.md, tem 3 tipos de
 // operação INDEPENDENTES — sem waterfall, sem prioridades, sem competição por
 // caixa:
 //
@@ -68,7 +68,7 @@ const n = (v: any): number => Number(v) || 0;
  * de quatro parcelas da planilha, e um teste afirma que as duas divergem
  * de propósito — se algum dia alinhá-las por engano, o teste fica vermelho.
  * Nota completa, com a fórmula lado a lado:
- * `docs/viabilidade/fluxo-investidor-formulas.md` §4.2.
+ * `docs/funding.md` §4.2.
  */
 export function receitaLiquidaComCorretagemMensal(
   receitaMensal: number[],
@@ -564,7 +564,7 @@ export function simularEquity(
   // sinal é menor que a corretagem produz receita líquida negativa, e a fórmula
   // crua fazia o INVESTIDOR pagar ao projeto a título de "retorno".
   //
-  // Decisão do autor, 2026-08-22 (ver `docs/viabilidade/fluxo-investidor-formulas.md` §4.2):
+  // Decisão do autor, 2026-08-22 (ver `docs/funding.md` §4.2):
   // o mês paga zero, o déficit fica registrado e abate os meses seguintes até se
   // extinguir. NÃO é o `Math.max(0, …)` seco que existia em `capital-stack-motor.ts`
   // antes da #355 — aquele não tinha memória e inflava o total pago.
@@ -673,7 +673,7 @@ export function indicadoresOperacao(s: SerieOperacao, taxaDescontoAa: number): I
  *
  * `financiamento_producao` fica DE FORA, e não é simplificação: ele é uma linha
  * de crédito bancária atrelada à medição da obra (§4.3 de
- * `docs/viabilidade/funding-capital-stack.md`), não um investidor do projeto —
+ * `referencia/funding-capital-stack.md`), não um investidor do projeto —
  * por isso a tela de Funding já lhe dá um painel próprio e diferente
  * (`indicadoresFinanciamentoProducao`, abaixo, em vez de
  * `indicadoresOperacao`). O custo dele é custo do projeto, e portanto do
@@ -913,7 +913,7 @@ export function fundingDoEstudo(
 
   // #434 — DUAS PASSADAS, porque o cash sweep tem de enxergar o caixa que as
   // outras operações deixaram. Passos 23–24 de
-  // `docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`: processa-se
+  // `referencia/inteligencia-evi-incorporacao.md:1584-1594`: processa-se
   // o capital de giro e os demais instrumentos e só então se forma o
   // "fluxo final = fluxo de caixa livre + fluxos líquidos dos instrumentos de
   // funding" — no plural, e NUMA ORDEM.
@@ -938,7 +938,7 @@ export function fundingDoEstudo(
   // mesmo caixa`).
   //
   // O estado NÃO é impossível, só improvável: `financiamento_producao` é única
-  // por estudo (`docs/viabilidade/fluxo-investidor-formulas.md:27`), mas quem
+  // por estudo (`docs/funding.md:27`), mas quem
   // garante isso é `conflitoFinanciamentoUnico` em `backend/rotas/funding.ts`,
   // que LÊ e depois GRAVA (dois POSTs concorrentes passam os dois), e o
   // `schema.json` não tem índice único para o par — só `[["estudo_id"]]`.

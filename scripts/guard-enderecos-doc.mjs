@@ -3,7 +3,8 @@
 //
 // ── Por que existe ───────────────────────────────────────────────────────────
 // Este repositório cita código por endereço `arquivo:linha` em toda parte:
-// `docs/viabilidade/`, comentário de `frontend/` e de `backend/`. É a convenção
+// `docs/` (servido na instância), `referencia/` (consultivo) e comentário de
+// `frontend/` e de `backend/`. É a convenção
 // que dá evidência à prosa — e é a única afirmação do repositório que NENHUM
 // teste consegue derrubar. Um merge da `main`, ou o próprio diff do PR, desloca
 // as linhas do arquivo citado, e a citação passa a apontar para outra coisa.
@@ -41,7 +42,7 @@
 // de propósito: este guard deixa passar citação ambígua.
 //
 // ── Fora de escopo, e declarado para não parecer esquecimento ───────────────
-//   · `docs/rodada-8/**` e o resto de `docs/` — arquivo histórico DATADO, que é
+//   · `historico/**` — arquivo histórico DATADO, que é
 //     fotografia de um momento. Envelhecer é o comportamento CORRETO dele:
 //     "medido em Pinguim em 2026-08-22, naquela linha" não vira falso quando a
 //     linha anda. Consertá-lo apagaria a evidência que ele existe para guardar.
@@ -90,7 +91,7 @@ export async function carregarExcecoes(raiz) {
 // Onde se PROCURA citação. Não é "o repositório inteiro": é onde a citação tem
 // valor de contrato vivo. Ver "Fora de escopo" no cabeçalho.
 // ─────────────────────────────────────────────────────────────────────────────
-export const RAIZES = ['docs/viabilidade/', 'frontend/', 'backend/'];
+export const RAIZES = ['docs/', 'referencia/', 'frontend/', 'backend/'];
 
 // Extensões que um endereço pode citar. Fechada de propósito: aberta, um
 // `versao: 0.1.19` ou um horário viraria endereço.

@@ -175,7 +175,7 @@ export class ViabFluxoVer extends LitElement {
    * deste componente, e não três telas independentes.
    */
   @property({ type: String }) vista: 'fluxo-caixa' | 'proforma' | 'analise' = 'fluxo-caixa';
-  // item 2 (docs/viabilidade/funding-capital-stack.md §10): resultado do
+  // item 2 (referencia/funding-capital-stack.md §10): resultado do
   // Capital Stack, calculado sobre o fluxo mensal.
   // #349: a restrição "só na view Mensal" acabou — o funding entrou na tabela
   // principal e `agregarFundingPorPeriodos` o reagrupa junto com ela na view
@@ -437,10 +437,10 @@ export class ViabFluxoVer extends LitElement {
     this.funding = null;
     // #474 (Passos 23–25, D-Q03 2026-08-22): esta montagem
     // (resultadoFinal → fundingDoEstudo) é LOCAL. O app não tem uma função
-    // única para essa sequência (`docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`)
+    // única para essa sequência (`referencia/inteligencia-evi-incorporacao.md:1584-1594`)
     // — cada consumidor remonta à mão, e pode divergir (R-A36). Fonte única
     // foi CONSIDERADA E RECUSADA pelo autor; ver
-    // `docs/viabilidade/fluxo-investidor-formulas.md` §9. Os outros quatro
+    // `docs/funding.md` §9. Os outros quatro
     // consumidores: frontend/tela-funding.ts:239 · frontend/tela-cenarios.ts:240
     // · frontend/tela-resumo.ts:182 (só remonta resultadoFinal, não chama
     // fundingDoEstudo) · scripts/conferir-estudo.ts:153.

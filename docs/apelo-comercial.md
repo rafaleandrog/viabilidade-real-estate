@@ -1,8 +1,6 @@
 ---
-titulo: Análise de Mercado do Imóvel (IA)
+titulo: Apelo Comercial (IA)
 descricao: Análise qualitativa do imóvel por IA — 6 fatores, scoring e relatório.
-tipo: app
-ordem: 5
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 

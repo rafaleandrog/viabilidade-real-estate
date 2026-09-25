@@ -193,9 +193,9 @@ export class ViabTelaResumo extends LitElement {
   // função NÃO chama `fundingDoEstudo` (é a leitura "de caixa" do Resumo,
   // #443 "Margem de caixa") mas remonta o mesmo `resultadoFinal` da sequência
   // descrita em
-  // `docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`. Fonte
+  // `referencia/inteligencia-evi-incorporacao.md:1584-1594`. Fonte
   // única foi CONSIDERADA E RECUSADA pelo autor — ver
-  // `docs/viabilidade/fluxo-investidor-formulas.md` §9. Os outros quatro:
+  // `docs/funding.md` §9. Os outros quatro:
   // frontend/tela-fluxo-ver.ts:179 · frontend/tela-funding.ts:239 ·
   // frontend/tela-cenarios.ts:240 · scripts/conferir-estudo.ts:153.
   private _kpisAvancado(c: FluxoCalc) {

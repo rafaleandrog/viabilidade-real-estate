@@ -12,7 +12,7 @@
 // Custo direto total (dedução) → Receita operacional (subtotal) → Custo
 // indireto total (dedução) → Resultado (total).
 //
-// ⚠️ Gap conhecido, registrado em docs/rodada-12/auditoria.md: o handoff
+// ⚠️ Gap conhecido, registrado em historico/rodada-12/auditoria.md: o handoff
 // descreve uma etapa "desconto de tabela" separada de permuta física — o
 // motor (`proforma.ts`) não modela esse conceito, então esta cascata desenha
 // só o que `calcularProforma` de fato calcula.

@@ -589,7 +589,7 @@ jobs:
           # exceções deixa de ser necessária: entrada morta desligaria a
           # conferência daquele endereço para sempre, e caladamente.
           if ! node scripts/guard-enderecos-doc.mjs; then
-            echo "::error title=Endereço de doc não resolve::Um `arquivo:linha` citado em docs/viabilidade/ ou em comentário de frontend//backend/ deixou de apontar para o que a frase diz. O log traz a linha onde o símbolo está hoje."
+            echo "::error title=Endereço de doc não resolve::Um `arquivo:linha` citado em docs/, referencia/ ou em comentário de frontend//backend/ deixou de apontar para o que a frase diz. O log traz a linha onde o símbolo está hoje."
             exit 1
           fi
       - name: Bateria do guard de endereços

@@ -1,8 +1,6 @@
 ---
 titulo: Fórmulas da Proforma
 descricao: Referência das linhas e cálculos da Proforma do Preliminar (Loteamento e Incorporação) e da proforma desalavancada do Avançado.
-tipo: app
-ordem: 3
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
@@ -148,8 +146,8 @@ As fórmulas do **fluxo de caixa avançado por safras** — contratação bruta/
 componentes de pagamento (imediato, prazo fixo, até marco, concentrado), PMT, primeiro vencimento
 em `s + defasagemMeses`, carteira por safra e repasse — estão descritas nos dois documentos EVI:
 
-- [Inteligência EVI — Incorporação](inteligencia-evi-incorporacao) — significado econômico;
-- [Padrão de Viabilidade — Incorporação](padrao-incorporacao) §11 a §14 — dinâmica funcional, com
+- Inteligência EVI — Incorporação (`referencia/inteligencia-evi-incorporacao.md`) — significado econômico;
+- Padrão de Viabilidade — Incorporação (`referencia/padrao-incorporacao.md`) §11 a §14 — dinâmica funcional, com
   os cenários dourados no Anexo G.
 
 **Estão implementadas desde a #283** e são o caminho de cálculo real de toda linha de receita com
@@ -241,7 +239,7 @@ hierarquia de linhas do Preliminar, para que os dois níveis se comparem na mesm
 > empreendimento, antes de decidir como ele é capitalizado, e é o que mantém TIR, VPL e ROI
 > comparáveis entre estudos com e sem funding — a mesma decisão que `frontend/funding-motor.ts:685-689`
 > registra para as KPIs do projeto (e que a §8.1 de
-> [Funding, Capital Stack e Retorno do Capital](funding-capital-stack) guarda como **ADR histórico**,
+> Funding, Capital Stack e Retorno do Capital (`referencia/funding-capital-stack.md`) guarda como **ADR histórico**,
 > não como norma vigente — a seção está carimbada "Supersedida pela #355"). Quem quiser ler o efeito
 > do funding lê a **aba Fluxo de Caixa**, cuja tabela é visão de **caixa** e onde as duas pontas
 > existem e se cancelam no principal (`FundingNoFluxo.fluxoMensal`).
@@ -250,7 +248,7 @@ hierarquia de linhas do Preliminar, para que os dois níveis se comparem na mesm
 > o estudo 5 de Pinguim exibia −R$ 62.364.749,03 de resultado onde o valor real é
 > R$ 24.668.189,10 (margem −47,87% contra **18,94%**), e o Δ era, ao centavo, a Σ das saídas de
 > funding. Todo estudo Avançado **com** funding aparecia no painel como prejuízo catastrófico.
-> Corrigido pela issue #426 (medição em Pinguim: `docs/rodada-8/04-regras-reconciliacao.md:1512-1517`).
+> Corrigido pela issue #426 (medição em Pinguim: `historico/rodada-8/04-regras-reconciliacao.md:1512-1517`).
 
 > ⚠️ **"Despesas Financeiras" (renomeada de "Custos Financeiros" na #742) não significa a mesma
 > coisa em toda tela.** Na proforma (aqui) o grupo vale só o custo que o usuário classificou como
@@ -304,8 +302,8 @@ gatilho de exposição mínima, catch-up retroativo, juros capitalizados e cash 
 
 | Documento | Papel hoje |
 |---|---|
-| [Fluxo do Investidor — fórmulas das operações de Funding](fluxo-investidor-formulas) | **Spec vigente** de `divida` e `equity` |
-| [Funding, Capital Stack e Retorno do Capital](funding-capital-stack) | **ADR histórico** do modelo de 4 instrumentos com waterfall, apagado pela #355 — **exceto a §4.3**, que continua vigente e é a spec de `financiamento_producao` |
+| [Fluxo do Investidor — fórmulas das operações de Funding](funding) | **Spec vigente** de `divida` e `equity` |
+| Funding, Capital Stack e Retorno do Capital (`referencia/funding-capital-stack.md`) | **ADR histórico** do modelo de 4 instrumentos com waterfall, apagado pela #355 — **exceto a §4.3**, que continua vigente e é a spec de `financiamento_producao` |
 
 Duas identidades que o motor mantém:
 
@@ -380,7 +378,7 @@ denominador. Fundação em **#259**, consumidores em **#260**.
 
 > **Todo valor monetário que é resultado de fórmula tem 2 casas decimais** — na apresentação, na
 > entrada e no motor. Convenção **C7** do
-> [Padrão de Viabilidade](padrao-incorporacao#anexo-a--convenções-de-cálculo-do-app).
+> Padrão de Viabilidade (`referencia/padrao-incorporacao.md`).
 
 É essa regra que define **qual** representação é canônica: o **valor monetário**. `% do VGV` e
 `R$/m²` são **derivados** — carregam precisão plena internamente e arredondam **só para exibir**.

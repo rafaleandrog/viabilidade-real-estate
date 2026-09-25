@@ -20,19 +20,19 @@ São **dois documentos com papéis distintos**. ⚠️ A mesma ressalva vale par
 código/`schema.json`/spec, **o código está certo** — a divergência vira **issue**, nunca um ajuste
 automático de comportamento.
 
-- `docs/viabilidade/inteligencia-evi-incorporacao.md` — **significado econômico**: como a empresa raciocina sobre viabilidade de Incorporação (premissas, motor de vendas e recebíveis, carteira, repasse, indicadores de decisão). É conhecimento de negócio, **não descreve o app** e **não governa o runtime**. Também não deve ser rebaixado para casar com uma limitação atual do app.
-- `docs/viabilidade/padrao-incorporacao.md` — **dinâmica funcional**: como o app representa esse conhecimento. Leia-o quando precisar de contexto para implementar uma mudança ou resolver um issue. Ele rotula explicitamente cada trecho como **Comportamento vigente** (o que o código faz hoje), **Modelo funcional de referência** (a regra aprovada) ou **Evolução dependente de issue** — não presuma que uma regra descrita ali já está implementada. Os **anexos A–G** guardam o material do app instalado: convenções de cálculo, dicionário de campos reais, modelo de dados, armadilhas conhecidas, API, decisões históricas e os **cenários dourados de recebíveis**.
+- `referencia/inteligencia-evi-incorporacao.md` — **significado econômico**: como a empresa raciocina sobre viabilidade de Incorporação (premissas, motor de vendas e recebíveis, carteira, repasse, indicadores de decisão). É conhecimento de negócio, **não descreve o app** e **não governa o runtime**. Também não deve ser rebaixado para casar com uma limitação atual do app.
+- `referencia/padrao-incorporacao.md` — **dinâmica funcional**: como o app representa esse conhecimento. Leia-o quando precisar de contexto para implementar uma mudança ou resolver um issue. Ele rotula explicitamente cada trecho como **Comportamento vigente** (o que o código faz hoje), **Modelo funcional de referência** (a regra aprovada) ou **Evolução dependente de issue** — não presuma que uma regra descrita ali já está implementada. Os **anexos A–G** guardam o material do app instalado: convenções de cálculo, dicionário de campos reais, modelo de dados, armadilhas conhecidas, API, decisões históricas e os **cenários dourados de recebíveis**.
 
 A conciliação entre os dois e o código — conceito a conceito, com evidência em `arquivo:linha` —
-está em `docs/rodada-5-evi-2026-07-31.md`. A revisão de recebíveis por safras, que reconciliou os
+está em `historico/rodada-5-evi-2026-07-31.md`. A revisão de recebíveis por safras, que reconciliou os
 dois documentos contra EVIs reais do projeto Calliandra, está em
-`docs/revisao-recebiveis-calliandra-2026-07-31.md`.
+`historico/revisao-recebiveis-calliandra-2026-07-31.md`.
 
 **Este repositório é "app em repositório próprio"** (`node_modules/@urbiverso/sdk/docs/apps-em-repo-proprio.md`
 — app na raiz, não sob `apps/<appId>/`), **não** um "repo de solução" instalado via `npx
 @urbiverso/kit-apps`. Os dois são caminhos oficiais e distintos do SDK; avaliação completa (por que
 não rodamos o kit aqui, o que foi adotado dele e o que ficou de fora) em
-`docs/kit-apps-avaliacao-2026-09-17.md`. Duas skills novas vieram de lá e **são** genéricas o
+`historico/kit-apps-avaliacao-2026-09-17.md`. Duas skills novas vieram de lá e **são** genéricas o
 bastante para este layout: `instancia-urbiverso` (Claude configura identidade própria — "Claude -
 sob `<nome>`" — e opera a instância pela API: instalar/homologar app, permissão, pessoas) e `qa`
 (exercita a API de uma instância viva a partir do diff de um PR, com um pool de usuários de
@@ -50,10 +50,10 @@ variáveis eu já configurei".
 
 | Rodada | Escopo | Issues | Estado |
 |---|---|---|---|
-| **13 — Tornado de alavancas e margem de segurança (aba Cenários do Preliminar)** | A **Fase 2** do mesmo handoff de UX da Rodada 12, que aquela rodada registrou como fora de escopo (`docs/rodada-12/auditoria.md:48-50` e `:63-65`): tornado de alavancas ranqueadas (§4.2), bloco de margem de segurança (§4.3) e a aba Cenários reconstruída (§4.6) — hoje um dropdown de UMA variável mais três colunas de valores absolutos (`frontend/tela-proforma.ts:655-791`). ⚠️ A auditoria da Rodada 12 supôs que a margem de segurança exigiria um campo `base_calculo` por linha de custo; o plano da 13 **inverteu o motor numericamente** (secante + bisseção, o precedente é `precoSugeridoM2` em `frontend/proforma.ts:860`), então **nenhuma PR desta rodada mexe em `schema.json` nem bumpa a `versao`**. Fila de 12 PRs, estritamente serial; plano em `docs/rodada-13/planejamento.md` | **#724–#736** (13), das quais **12 na fila** — a **#724** (custo de licenciamento digitado, salvo e que **nunca entra no proforma**) é bug de motor achado de passagem no planejamento, com dinheiro dentro, e fica **fora da fila**: é decisão do autor quando entra | 🔄 **em andamento** — os 2 PRs de **processo** estão mergeados (#737 adotou o **Kimi** como segundo motor externo de revisão, com colheita por roster; #739 criou o **corpo de conhecimento das lentes**, lido da BASE). **Primeiro PR de produto: PR 757, aberto em 2026-09-18**, respondendo a pedido direto do usuário (a mesma imagem do handoff, reanexada) — consolida **6 dos 12 itens da fila num PR só** (#725, #727, #728, #729, #732, #733), desvio deliberado do plano serial original por praticidade de sessão única, registrado no corpo do PR e em `PROGRESSO.md`. `#726` (decisão do autor), `#730`, `#731`, `#734`, `#735` e `#736` seguem abertas para rodadas futuras. Merge pendente de autorização do autor. |
-| **12 — Redesenho de KPIs/gráficos do Preliminar** | Handoff de UX (documento fora do GitHub) pedindo o redesenho da aba Gráficos do estudo Preliminar: faixa de 5 KPIs com denominador visível, cascata horizontal do resultado substituindo a pizza de custos + o gráfico de barras Receita×Custos, cadeia de áreas em barras horizontais proporcionais substituindo a(s) pizza(s) de alocação, e banner de consistência de área (informativo, não bloqueia salvar — decisão da #693 preservada). Plano de Fase 0 (auditoria) + Fase 1 (redesenho sem mudar o motor de cálculo) aprovado pelo autor em modo de planejamento; a Fase 2 (tornado de alavancas / sensibilidade ranqueada, handoff §4.2) e a Fase 3 (margem de segurança, benchmark editável por tipologia/praça — exige `schema.json` novo) ficaram fora, registradas para rodada futura (`docs/rodada-12/auditoria.md`). Fila de 8 PRs, estritamente serial | nenhuma — plano combinado diretamente com o autor, sem issue aberta no GitHub | ✅ **concluída em 2026-09-15** — as 8 PRs mergeadas em fila indiana (#701 auditoria, #702 extração `vgvBrutoDeProforma`, #703 fix do medidor duplicado `resultado_final`, #704 componentes novos `viab-grafico-cascata`/`-barra-ranqueada`/`-cadeia-areas`, #705 faixa de KPIs, #706 cascata substitui pizza+barras, #707 cadeia de áreas + banner de consistência, #708 limpeza de doc). Revisão por Codex (`@codex review`) + lentes nativas em cada PR, com achados reais consertados antes do merge — o mais significativo, no #707: a cadeia de áreas escalava a largura de cada barra pelo PRIMEIRO estágio (o terreno) em vez do MAIOR, o que fazia Incorporação (onde a área construída costuma superar o terreno, coeficiente de aproveitamento > 1) desenhar estágios de tamanhos bem diferentes como barras idênticas, clipadas em 100%; e duas rodadas seguidas do mesmo bug de fiação (a faixa de consistência piscava aviso falso antes do catálogo de produtos carregar, depois ficava presa a um `Promise.all` que travava a flag de pronto mesmo com o catálogo já OK). Merge autorizado pelo autor a cada PR. De passagem, a #701 (Fase 0, auditoria) também confirmou e fechou a nota "ainda aberto" do achado 11 das armadilhas da Rodada 10 (bug do ROI 0,0% com `investimentoTotal=0`) — ver a atualização daquela nota, abaixo. |
+| **13 — Tornado de alavancas e margem de segurança (aba Cenários do Preliminar)** | A **Fase 2** do mesmo handoff de UX da Rodada 12, que aquela rodada registrou como fora de escopo (`historico/rodada-12/auditoria.md:48-50` e `:63-65`): tornado de alavancas ranqueadas (§4.2), bloco de margem de segurança (§4.3) e a aba Cenários reconstruída (§4.6) — hoje um dropdown de UMA variável mais três colunas de valores absolutos (`frontend/tela-proforma.ts:655-791`). ⚠️ A auditoria da Rodada 12 supôs que a margem de segurança exigiria um campo `base_calculo` por linha de custo; o plano da 13 **inverteu o motor numericamente** (secante + bisseção, o precedente é `precoSugeridoM2` em `frontend/proforma.ts:860`), então **nenhuma PR desta rodada mexe em `schema.json` nem bumpa a `versao`**. Fila de 12 PRs, estritamente serial; plano em `historico/rodada-13/planejamento.md` | **#724–#736** (13), das quais **12 na fila** — a **#724** (custo de licenciamento digitado, salvo e que **nunca entra no proforma**) é bug de motor achado de passagem no planejamento, com dinheiro dentro, e fica **fora da fila**: é decisão do autor quando entra | 🔄 **em andamento** — os 2 PRs de **processo** estão mergeados (#737 adotou o **Kimi** como segundo motor externo de revisão, com colheita por roster; #739 criou o **corpo de conhecimento das lentes**, lido da BASE). **Primeiro PR de produto: PR 757, aberto em 2026-09-18**, respondendo a pedido direto do usuário (a mesma imagem do handoff, reanexada) — consolida **6 dos 12 itens da fila num PR só** (#725, #727, #728, #729, #732, #733), desvio deliberado do plano serial original por praticidade de sessão única, registrado no corpo do PR e em `PROGRESSO.md`. `#726` (decisão do autor), `#730`, `#731`, `#734`, `#735` e `#736` seguem abertas para rodadas futuras. Merge pendente de autorização do autor. |
+| **12 — Redesenho de KPIs/gráficos do Preliminar** | Handoff de UX (documento fora do GitHub) pedindo o redesenho da aba Gráficos do estudo Preliminar: faixa de 5 KPIs com denominador visível, cascata horizontal do resultado substituindo a pizza de custos + o gráfico de barras Receita×Custos, cadeia de áreas em barras horizontais proporcionais substituindo a(s) pizza(s) de alocação, e banner de consistência de área (informativo, não bloqueia salvar — decisão da #693 preservada). Plano de Fase 0 (auditoria) + Fase 1 (redesenho sem mudar o motor de cálculo) aprovado pelo autor em modo de planejamento; a Fase 2 (tornado de alavancas / sensibilidade ranqueada, handoff §4.2) e a Fase 3 (margem de segurança, benchmark editável por tipologia/praça — exige `schema.json` novo) ficaram fora, registradas para rodada futura (`historico/rodada-12/auditoria.md`). Fila de 8 PRs, estritamente serial | nenhuma — plano combinado diretamente com o autor, sem issue aberta no GitHub | ✅ **concluída em 2026-09-15** — as 8 PRs mergeadas em fila indiana (#701 auditoria, #702 extração `vgvBrutoDeProforma`, #703 fix do medidor duplicado `resultado_final`, #704 componentes novos `viab-grafico-cascata`/`-barra-ranqueada`/`-cadeia-areas`, #705 faixa de KPIs, #706 cascata substitui pizza+barras, #707 cadeia de áreas + banner de consistência, #708 limpeza de doc). Revisão por Codex (`@codex review`) + lentes nativas em cada PR, com achados reais consertados antes do merge — o mais significativo, no #707: a cadeia de áreas escalava a largura de cada barra pelo PRIMEIRO estágio (o terreno) em vez do MAIOR, o que fazia Incorporação (onde a área construída costuma superar o terreno, coeficiente de aproveitamento > 1) desenhar estágios de tamanhos bem diferentes como barras idênticas, clipadas em 100%; e duas rodadas seguidas do mesmo bug de fiação (a faixa de consistência piscava aviso falso antes do catálogo de produtos carregar, depois ficava presa a um `Promise.all` que travava a flag de pronto mesmo com o catálogo já OK). Merge autorizado pelo autor a cada PR. De passagem, a #701 (Fase 0, auditoria) também confirmou e fechou a nota "ainda aberto" do achado 11 das armadilhas da Rodada 10 (bug do ROI 0,0% com `investimentoTotal=0`) — ver a atualização daquela nota, abaixo. |
 | **11 — Reforma da tabela do Painel de estudos** | 6 issues pedidas pelo autor em fila **estritamente serial** (badge de nível Preliminar amarelo → remover coluna Cidade → unificar as duas colunas de área em "Área líquida de venda" → mover renomear do Painel para o cabeçalho do estudo → corrigir a largura da coluna da miniatura → alinhar a fila de ações à direita sem quebra), mais 2 achados encontrados durante a revisão dos PRs acima e corrigidos na hora (#683: as 5 abas do Painel disparavam fetch umas das outras; #686: `div.layout` de `tela-preliminar.ts` transbordava a 600/900px) | **#675–#680, #683, #686** (8) | ✅ **concluída em 2026-09-06** — as 8 issues fechadas em fila indiana, por 8 PRs mergeados (#681, #682, #684, #685, #687, #688, #689, #690): a #676 levou dois — o #682 entregou 4 dos 5 critérios de aceite e declarou `Sem-fechamento` no critério que dependia da #683 (achada na própria revisão dele), e o #689 fechou #676 e #683 juntos depois de consertar a causa. Merge autorizado pelo autor a cada PR revisado (Codex + lentes nativas) com zero bloqueantes. A #595 (P1 antigo, gráfico de Cenários sem cor/linha própria) foi fechada à parte, por decisão do autor: já estava corrigida fora do rastreamento desta issue. |
-| **10 — lista de bugs dos Preliminares** | `lista_bugs_20260826.xlsx`, 9 itens (Incorporação: Premissas/Proforma/Cenários; Loteamento: conferência geral). Plano, diagnóstico e fila de PRs em `docs/rodada-10/planejamento.md` | **#563–#574** (12) | ✅ **concluída em 2026-09-04** — as 12 issues fechadas; a auditoria de Loteamento (#574) está em `docs/rodada-10/relatorio-574-loteamento.md`, com os 11 achados dispatchados (3 consertados na própria auditoria, os demais viraram #609–#613, entregues em #570 com residual fechado por #615, ou implementados em PR 627) — merges autorizados pelo autor por PR revisado com zero bloqueantes |
+| **10 — lista de bugs dos Preliminares** | `lista_bugs_20260826.xlsx`, 9 itens (Incorporação: Premissas/Proforma/Cenários; Loteamento: conferência geral). Plano, diagnóstico e fila de PRs em `historico/rodada-10/planejamento.md` | **#563–#574** (12) | ✅ **concluída em 2026-09-04** — as 12 issues fechadas; a auditoria de Loteamento (#574) está em `historico/rodada-10/relatorio-574-loteamento.md`, com os 11 achados dispatchados (3 consertados na própria auditoria, os demais viraram #609–#613, entregues em #570 com residual fechado por #615, ou implementados em PR 627) — merges autorizados pelo autor por PR revisado com zero bloqueantes |
 | **9 — execução da Rodada 8** | Ondas de PRs que entregam as issues #426–#493, na ordem de dependência | **#426–#493** | ✅ **concluída em 2026-08-24** — as 59 issues fechadas |
 | **8 — auditoria cruzada** | Reverificação da `lista bugs 20260807.xlsx` + regras derivadas das 3 planilhas (EVI Urbitá, fluxo do investidor) + conferência numérica em Pinguim + auditoria de UI | **#426–#493** (61 abertas; #461 e #480 fecharam por decisão) | ✅ **auditoria concluída em 2026-08-22** — o saldo de **59 issues** é executado pela Rodada 9 |
 | **7 — lista de bugs (2ª leva)** | `lista_bugs_20260807.xlsx`, 47 itens (numerados 1–41 e 43–48 — **o item 42 não existe na planilha**) | **#309–#355** (47) | ✅ **concluída em 2026-08-12** |
@@ -63,7 +63,7 @@ variáveis eu já configurei".
 ### Rodada 8 — o que é, e o placar honesto
 
 Oito agentes auditaram o app contra a lista de bugs `20260807`, a EVI Urbitá, a planilha
-`fluxo_investidor_FORMULAS` e a instância Pinguim; documentos em `docs/rodada-8/` (comece por
+`fluxo_investidor_FORMULAS` e a instância Pinguim; documentos em `historico/rodada-8/` (comece por
 `LEIA-PRIMEIRO.md`). A pergunta era: **o que da Rodada 7 realmente se sustenta no código, e que
 regras as três planilhas do autor exigem que o app ainda não representa?**
 
@@ -86,7 +86,7 @@ regras as três planilhas do autor exigem que o app ainda não representa?**
 **Decisões do autor, vinculantes:**
 
 1. **Nenhum bug foi consertado na Rodada 8 — tudo virou issue.** O autor autorizou o conserto de 3
-   bugs graves e depois **reverteu**; o material virou corpo de issue (`docs/rodada-8/09-consertos.md`).
+   bugs graves e depois **reverteu**; o material virou corpo de issue (`historico/rodada-8/09-consertos.md`).
 2. **Capital de giro: só o rótulo.** O tipo `divida` já **é** o produto de CG por calendário. A
    linha de crédito **rotativa** foi **recusada**: reintroduziria a competição por caixa que a #355
    apagou.
@@ -160,12 +160,12 @@ publicar `bloqueantes=0` onde a regra manda `bloqueantes=1` quando o App não re
 ambiente do Codex é pré-requisito para a próxima rodada ter revisão independente de verdade.**
 
 > ⚠️ **Isto era verdade na Rodada 9 e deixou de ser — corrigido em 2026-08-29 (Rodada 10), porque o
-> parágrafo acima seguia lido como estado atual.** O App voltou a responder: `docs/rodada-10/planejamento.md`
+> parágrafo acima seguia lido como estado atual.** O App voltou a responder: `historico/rodada-10/planejamento.md`
 > registra "Codex seletivo" de 2026-08-27 a 2026-08-28 (só nas 4 issues de motor mais arriscadas) e
 > reativação para **todos** os PRs a partir de 2026-08-28. Não é só resposta — são achados reais,
 > verificados: PR 641 devolveu 3 threads em `get_review_comments` (dois P2, um P3); PR 650 devolveu
 > um P1 **por rodada em duas rodadas**, o segundo desfeito não por ser falso, mas porque a `main`
-> mergeou embaixo dele antes do conserto (armadilha #8 de `docs/rodada-10/armadilhas.md`). **Não
+> mergeou embaixo dele antes do conserto (armadilha #8 de `historico/rodada-10/armadilhas.md`). **Não
 > presuma que esta correção continua valendo**: se uma sessão futura achar o App mudo de novo, é
 > fato novo para apurar e registrar aqui, não continuação deste parágrafo.
 
@@ -183,14 +183,14 @@ citada, só declaram a ordem.
 **O bloqueio D6 foi levantado.** A issue #355 (item 48, Funding/Capital Stack) esteve formalmente
 bloqueada porque o documento `fluxo_investidor_FORMULAS` não estava no repositório; o autor o anexou
 em **2026-08-11** e a Fase 11 foi entregue no dia seguinte pelo **PR #412**. A planilha está hoje
-transcrita em **`docs/viabilidade/fluxo-investidor-formulas.md`** — que é a **especificação vigente**
+transcrita em **`docs/funding.md`** — que é a **especificação vigente**
 de `divida` e `equity`.
 
 O Capital Stack (4 instrumentos com waterfall) **deixou de existir**: saíram
 `capital-stack-motor.ts`, `tela-capital-stack.ts`, `backend/rotas/capital-stack.ts` e os 16 golden
 cases de `frontend/fixtures/`. No lugar, 3 operações independentes — sem waterfall, sem prioridades,
 sem competição por caixa — em `funding-motor.ts` / `tela-funding.ts` / `backend/rotas/funding.ts`,
-tabela `avancado_funding_operacoes` (migração `029`). `docs/viabilidade/funding-capital-stack.md`
+tabela `avancado_funding_operacoes` (migração `029`). `referencia/funding-capital-stack.md`
 virou ADR histórico, **exceto a §4.3** (Financiamento à produção), que continua vigente: a #405
 aprovou ali o gatilho de exposição mínima, o catch-up retroativo e o cash sweep, e a #355 preservou
 esse produto de propósito — ele é o único que **não** segue a planilha nova.
@@ -203,7 +203,7 @@ esse produto de propósito — ele é o único que **não** segue a planilha nov
 > #355 apagou junto com `tela-capital-stack.ts`.
 >
 > **As quatro viraram #413, #414, #415 e #416, e todas fecharam com diff no commit `ba06add`
-> (PR #417, 2026-08-17).** Evidência hoje: `docs/viabilidade/fluxo-investidor-formulas.md` existe;
+> (PR #417, 2026-08-17).** Evidência hoje: `docs/funding.md` existe;
 > D14 está em `frontend/fluxo-invariantes.ts:633-642`
 > (`CAIXA_ACUMULADO_NEGATIVO_APOS_FUNDING`, severidade `alerta`); o aviso regulatório, em
 > `frontend/tela-funding.ts:822-828`.
@@ -236,7 +236,7 @@ critério de aceite não é código:
 >
 > **Menos da metade das duas rodadas se sustenta no código.** "Mergeado" nunca significou
 > "entregue". Cada issue aberta tem comentário dizendo o que falta; a tabela completa, com evidência
-> `arquivo:linha`, está em **`docs/triagem-issues-2026-08-03.md`**.
+> `arquivo:linha`, está em **`historico/triagem-issues-2026-08-03.md`**.
 >
 > O maior buraco daquela triagem — nove issues da cadeia EVI de recebíveis (#230, #232–#237, #240,
 > #241) com a matemática pronta mas **não ligada a `calcularFluxo`** — **foi fechado pela #283**:
@@ -259,7 +259,7 @@ critério de aceite não é código:
 A **segunda verificação da Fase 9** (Capital Stack, epic #239), pedida explicitamente pelo autor
 depois do merge, achou e corrigiu 3 defeitos reais que os 16 golden cases não exerciam (ordem
 principal×remuneração do §6.1, shape de migração da `preferred_equity`, `prioridade_pagamento`
-nunca lida/editável) — detalhe em `docs/viabilidade/funding-capital-stack.md` §13.4 e no
+nunca lida/editável) — detalhe em `referencia/funding-capital-stack.md` §13.4 e no
 `PROGRESSO.md`.
 
 **Pendências do autor no ambiente autenticado** (o ambiente Claude Code não cobre — lista
@@ -283,9 +283,9 @@ Rodadas anteriores, todas mergeadas na `main`:
 | 6 — lista de bugs (24 itens) | #238, #239, #244–#281 | ✅ concluída (2026-08-02) |
 
 Os mapas mestres das Rodadas 1–4 foram apagados quando fecharam — eram backlog puro, sem valor de
-evidência duradoura. **Os das Rodadas 5/6 foram mantidos** (`docs/issues-evi-propostas-2026-07-31.md`,
-`docs/rodada-5-evi-2026-07-31.md`, `docs/revisao-recebiveis-calliandra-2026-07-31.md`,
-`docs/lista-bugs-planejamento-2026-07-31.md`, `docs/viabilidade/funding-capital-stack.md`) — guardam
+evidência duradoura. **Os das Rodadas 5/6 foram mantidos** (`historico/issues-evi-propostas-2026-07-31.md`,
+`historico/rodada-5-evi-2026-07-31.md`, `historico/revisao-recebiveis-calliandra-2026-07-31.md`,
+`historico/lista-bugs-planejamento-2026-07-31.md`, `referencia/funding-capital-stack.md`) — guardam
 evidência `arquivo:linha` e o ADR de decisões (emendas Calliandra, waterfall do Capital Stack) que
 vale a pena não perder. Nenhum deles dispara mais trabalho: os disparos antigos (`Siga para a Fase
 N`, `Siga para o Grupo N`, `Resolva a issue #NNN`) **não existem mais** — não procure por eles. O
@@ -528,7 +528,7 @@ conferência daquele endereço para sempre, e caladamente.
 
 > Ele é deliberadamente **conservador** — prefere deixar passar citação ambígua a acusar prosa
 > correta, porque guard que atrapalha trabalho legítimo é desligado, e aí não guarda mais nada.
-> `docs/rodada-8/**` fica de fora de propósito: é fotografia datada, e envelhecer é o comportamento
+> `historico/rodada-8/**` fica de fora de propósito: é fotografia datada, e envelhecer é o comportamento
 > certo dela.
 
 **3 · CI verde sobre base vencida.**
@@ -580,7 +580,7 @@ perdidos, 66 chamadas de Bash, o diff parado em 446 linhas**, com a máquina oci
 > Numeração própria, não continuação da lista acima — a lista acima já é citada por número
 > (`classe de defeito nº 1`, `nº 2`) em ~15 arquivos de código; renumerar quebraria essa referência.
 > Cada uma aqui tem sintoma, causa, defesa executável e custo medido; o detalhe completo, com os PRs
-> que pagaram cada uma, está em `docs/rodada-10/armadilhas.md` — aqui só o número medido e o passo
+> que pagaram cada uma, está em `historico/rodada-10/armadilhas.md` — aqui só o número medido e o passo
 > que previne.
 
 1. **Teste de inventário que varre o disco enxerga artefato de build.** 1 falha de 953 no CI, verde
@@ -1127,7 +1127,7 @@ Git Bash — ver PROGRESSO).
   > (`frontend/tela-proforma.ts:358`) e `precoUnit`/`precoTotal`
   > (`frontend/tela-fluxo-receitas.ts:452-453`) trocaram `fmtNum` sem 2º argumento por
   > `fmtR$(v, false)`. A #281 está fechada — a tabela de conformidade completa é
-  > `docs/viabilidade/formulas.md` §"Estado de conformidade".
+  > `docs/formulas.md` §"Estado de conformidade".
   > ⚠️ **TRÊS exceções de EXIBIÇÃO, e só três.** As três seguem o mesmo desenho, de propósito:
   > símbolo próprio (não um parâmetro de `fmtR$`) para a exceção ser **greppável**, e inventário de
   > call sites travado por **contagem exata** — chamada a menos e chamada a mais reprovam igual.

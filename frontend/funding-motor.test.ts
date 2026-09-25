@@ -10,7 +10,7 @@ import { receitaLiquidaDeProformaMensal } from './fluxo-caixa-motor.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // #355 — golden cases da planilha `fluxo_investidor_FORMULAS.xlsx`, transcrita
-// em docs/viabilidade/fluxo-investidor-formulas.md §4. Cobre `divida` e
+// em docs/funding.md §4. Cobre `divida` e
 // `equity` — a matemática de calendário/PMT da planilha nova.
 //
 // `financiamento_producao` NÃO segue esta planilha: preserva o modelo de
@@ -323,7 +323,7 @@ test('#355 equity (resultado final): paga tudo de uma vez, no mês do repasse', 
 // cronograma próprio (corretagem integral no mês da venda, #121), e o mês de
 // lançamento cujo sinal é menor que a corretagem produz base NEGATIVA.
 //
-// Decisão do autor, 2026-08-22 — ver `docs/viabilidade/fluxo-investidor-formulas.md`
+// Decisão do autor, 2026-08-22 — ver `docs/funding.md`
 // §4.2, bloco "Divergência deliberada do app".
 
 const EQUITY_432: OperacaoFunding = {
@@ -545,7 +545,7 @@ test('#355 tirAnual devolve null quando não há troca de sinal', () => {
 // `fundingDoEstudo` simula em DUAS PASSADAS: primeiro as cegas ao caixa
 // (`divida`, `equity`), depois a dirigida por caixa (`financiamento_producao`)
 // contra `fluxoLivreMensal + entradasCegas − saidasCegas`. Passos 23–24 de
-// `docs/viabilidade/inteligencia-evi-incorporacao.md:1584-1594`.
+// `referencia/inteligencia-evi-incorporacao.md:1584-1594`.
 //
 // ⚠️ NÃO é o waterfall que a #355 apagou: sem prioridade, sem fila, sem
 // competição por caixa — só ordem de leitura.

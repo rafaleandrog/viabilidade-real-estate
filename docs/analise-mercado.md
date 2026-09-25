@@ -1,8 +1,6 @@
 ---
 titulo: Análise de Mercado — projeto × mercado
 descricao: Como o app compara os números do estudo com os do mercado (preço/m², custo de obra/m², VSO e macros), de onde vem cada lado e por que o lado "projeto" não é digitado.
-tipo: app
-ordem: 10
 ---
 <!-- Siga o framework de documentação (docs/shell/documentacao.md) ao editar este arquivo -->
 
@@ -184,6 +182,6 @@ concorrentes de "região boa".
 
 ## Veja também
 
-- `docs/viabilidade/apelo-comercial.md` — o score qualitativo do ativo, que **não** é isto
-- `docs/viabilidade/formulas.md` — demais fórmulas do app
-- `docs/viabilidade/modelo-de-dados.md` — schema completo
+- `docs/apelo-comercial.md` — o score qualitativo do ativo, que **não** é isto
+- `docs/formulas.md` — demais fórmulas do app
+- `docs/modelo-de-dados.md` — schema completo
