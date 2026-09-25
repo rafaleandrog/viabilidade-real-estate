@@ -69,7 +69,9 @@ do imóvel por IA, a partir de documentos anexados.
 
 Páginas na lista lateral, nesta ordem: **Resumo**; **Empreendimento** (sub-abas Informações — dados
 do terreno, imagem e anexos —, Cronograma e Tipologias); **Custos** (Terreno, Obras, Diretos,
-Indiretos e Financeiro, cada custo distribuído no tempo por uma curva); **Viabilidade** (Receitas —
+Indiretos e Financeiro; cada linha de custo escolhe como se distribui no tempo — linear, por uma
+curva do catálogo ou, nas linhas que oferecem a opção, atrelada à entrega das unidades ou à
+receita de vendas); **Viabilidade** (Receitas —
 absorção de vendas e fluxo de pagamento — e Financeiro); **Funding** (dívida, equity e financiamento
 à produção); **Resultados** (Fluxo de Caixa, Proforma e Análise Financeira); **Cenários**; **Análise
 de mercado** (os números do estudo contra os do mercado) e **Apelo Comercial** (a avaliação por IA). Ver
@@ -84,9 +86,10 @@ você estava. Sem o último segmento, a página abre na sub-aba padrão.
 ### Ciclo de vida
 
 `Rascunho → Em análise → Aprovado | Reprovado`. O `editor` envia para análise; o `aprovador` aprova,
-reprova ou devolve ao Rascunho. Estudos parados (exceto os Aprovados) são arquivados
-automaticamente depois do prazo configurado pelo administrador; o `aprovador` pode reabrir um
-Arquivado. Aprovado é estado final. Detalhe em [Permissões e ciclo de vida](permissoes).
+reprova ou devolve ao Rascunho. Estudos parados (exceto os Aprovados) há mais tempo que o prazo
+configurado pelo administrador são arquivados em lote pela rotina de manutenção — que o app não
+agenda sozinho: quem a dispara é o administrador ou o agendador da instância (ver a seção para
+administradores). O `aprovador` pode reabrir um Arquivado. Aprovado é estado final. Detalhe em [Permissões e ciclo de vida](permissoes).
 
 ### Exportar
 
@@ -101,7 +104,10 @@ Antes do primeiro estudo: conceda ao app a leitura de **imóveis** e **parcelame
 **benchmarks** de cada tipo de empreendimento; revise os **parâmetros** do app (alíquotas e
 percentuais padrão, prazo de arquivamento, limite da coleta de mercado) em *Admin → Apps →
 viabilidade*; e, se for usar a análise de mercado, cadastre as **regiões monitoradas**
-na aba do Painel. Ver [Benchmarks](benchmarks) e [Análise de Mercado](analise-mercado).
+na aba do Painel. O arquivamento de estudos parados **não é automático**: a rotina
+`POST /manutencao/arquivar-inativos` (só `admin` do app) arquiva os que passaram do prazo, e cabe
+ao administrador chamá-la ou agendá-la na instância — o manifesto do app declara só a rotina de
+coleta de mercado. Ver [Benchmarks](benchmarks) e [Análise de Mercado](analise-mercado).
 
 ## Instruções para não humanos
 
@@ -117,9 +123,13 @@ Rotas relativas; a instância as expõe sob `/api/viabilidade/`. A permissão é
 | Análise de mercado | `GET`/`POST /estudos/:id/analise-mercado` · `PATCH /estudos/:id/analise-mercado/regiao` · `GET`/`POST /mercado/regioes` · `PATCH`/`DELETE /mercado/regioes/:rid` · `GET /mercado/regioes/:rid/coletas` |
 | Benchmarks | `GET /benchmarks` · `POST /benchmarks` · `PATCH`/`DELETE /benchmarks/:id` · `POST /benchmarks/semear` |
 | Configuração e manutenção | `GET /config` · `POST /manutencao/arquivar-inativos` |
+| Avançado — cronograma e fases | `GET`/`PATCH /estudos/:id/avancado/cronograma` · `GET`/`POST /estudos/:id/avancado/fases` · `PATCH`/`DELETE /estudos/:id/avancado/fases/:fid` · `POST /estudos/:id/avancado/fases/:fid/alocacoes` · `PATCH`/`DELETE …/alocacoes/:aid` |
+| Avançado — tipologias, receitas, custos | `GET`/`POST /estudos/:id/avancado/tipologias` · `PATCH`/`DELETE …/tipologias/:tid` · `GET /estudos/:id/avancado/receitas` · `GET`/`POST /estudos/:id/avancado/custos` · `PATCH`/`DELETE …/custos/:cid` |
+| Avançado — parâmetros, funding, cenários | `GET`/`PATCH /estudos/:id/avancado/parametros` · `GET`/`POST /estudos/:id/avancado/funding` · `PATCH`/`DELETE …/funding/:oid` · `GET`/`POST /estudos/:id/avancado/cenarios` · `PATCH`/`DELETE …/cenarios/:cid` |
+| Avançado — curvas e anexos | `GET`/`POST /avancado/curvas` · `PATCH`/`DELETE /avancado/curvas/:cid` · `POST /avancado/curvas/semear` · `GET`/`POST /estudos/:id/empreendimento/documentos` · `DELETE …/documentos/:docId` |
 
-As páginas do estudo Avançado têm as próprias rotas, descritas em [Funding](funding) e em
-[Análise de Mercado](analise-mercado). As transições de status são validadas no servidor: uma transição inválida
+As regras de cálculo por trás das rotas do Avançado estão em [Funding](funding) e em
+[Fórmulas da Proforma](formulas). As transições de status são validadas no servidor: uma transição inválida
 responde `422 TRANSICAO_INVALIDA`, e uma sem alçada `403 SEM_PERMISSAO`.
 
 O app publica três eventos no barramento da instância: `estudo_criado`, `estudo_status_alterado` e
