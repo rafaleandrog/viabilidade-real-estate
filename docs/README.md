@@ -108,7 +108,8 @@ viabilidade*; e, se for usar a análise de mercado, cadastre as **regiões monit
 na aba do Painel. O arquivamento de estudos parados **não é automático**: a rotina
 `POST /manutencao/arquivar-inativos` (só `admin` do app) arquiva os que passaram do prazo, e cabe
 ao administrador chamá-la ou agendá-la na instância — o manifesto do app declara só a rotina de
-coleta de mercado. Ver [Benchmarks](benchmarks) e [Análise de Mercado](analise-mercado).
+coleta de mercado. Tudo isso, parâmetro a parâmetro e tela a tela, em [Administração](administracao);
+ver também [Benchmarks](benchmarks) e [Análise de Mercado](analise-mercado).
 
 ## Instruções para não humanos
 
@@ -139,7 +140,7 @@ O app publica três eventos no barramento da instância: `estudo_criado`, `estud
 
 ## Veja também
 
-- Telas: [Estudo Preliminar](preliminar) · [Estudo Avançado](avancado)
+- Telas: [Estudo Preliminar](preliminar) · [Estudo Avançado](avancado) · [Administração](administracao)
 - Regras: [Fórmulas da Proforma](formulas) · [Funding](funding) · [Benchmarks](benchmarks) · [Permissões e ciclo de vida](permissoes)
 - Mercado: [Análise de Mercado](analise-mercado) · [Apelo Comercial (IA)](apelo-comercial)
 - Dados: [Modelo de Dados](modelo-de-dados) · [Exportação](exportacao)

@@ -5,6 +5,35 @@ Memória entre sessões. Uma etapa por sessão. Atualizar ao fim de cada etapa.
 ---
 
 
+
+## 2026-09-25 — Rodada 14, PR 7: guia novo `docs/administracao.md`
+
+Sétima PR da fila da Rodada 14 (`historico/rodada-14/planejamento.md`). O que o administrador da
+instância precisa, num lugar só: permissão do Núcleo, os sete parâmetros do manifesto com o padrão
+e **onde cada um é lido**, as três telas de configuração com os campos e botões reais, a rotina
+diária de mercado, a manutenção que arquiva estudos parados, os níveis de acesso ao app e os
+eventos. O `README.md` linka o guia na seção de administradores e no Veja também.
+
+**Dois fatos medidos que o guia diz sem rodeio, porque documentação descreve o que existe:**
+
+- dos sete parâmetros, só três são consumidos — `aliquota_ret_pct` (lido de `GET /config` em
+  `tela-premissas.ts`, `tela-proforma.ts` e `tela-graficos.ts` a cada cálculo), `prazo_arquivamento_dias`
+  (`backend/rotas/manutencao.ts`) e `mercado_busca_max_itens` (`backend/rotinas.ts`). Os outros
+  quatro (`imposto_padrao_pct`, `corretagem_padrao_pct`, `marketing_padrao_pct`,
+  `gestao_indiretos_padrao_pct`) só aparecem em `manifesto.json` e em `backend/rotas/config.ts`:
+  `git grep` não acha nenhum outro consumidor. Os campos do estudo novo nascem com o `padrao` da
+  coluna no `schema.json` (7, 5, 1 e 1,25), não com o parâmetro. Sobrescrever esses quatro não
+  muda estudo nenhum;
+- a rotina **Coleta diária de mercado** roda em `sem_fonte_externa` e não grava item, porque o
+  manifesto não declara `mercado_busca_url`/`mercado_busca_chave` (removidos em 2026-07-29, ver a
+  nota em `backend/rotinas.ts`).
+
+Nenhum dos dois é conserto desta PR — são estado vigente, e o lugar deles é o `ideias.md` que a
+PR 9 cria. Fatos conferidos em `manifesto.json`, `backend/rotas/{config,manutencao,benchmarks,avancado,analise-mercado,estudos}.ts`,
+`backend/rotinas.ts`, `frontend/viabilidade-config-{benchmarks,curvas,mercado}.ts`,
+`frontend/tela-dashboard.ts` e `schema.json`. Sem migração, sem `schema.json` alterado, `versao`
+mantida.
+
 ## 2026-09-25 — Rodada 14, PR 6: `docs/funding.md` vira guia de usuário; a spec da planilha vai para `referencia/`
 
 Sexta PR da fila da Rodada 14 (`historico/rodada-14/planejamento.md`). O `docs/funding.md` servido era
