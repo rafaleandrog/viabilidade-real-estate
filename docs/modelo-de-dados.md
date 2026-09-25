@@ -12,7 +12,7 @@ descricao: As tabelas do app, o que cada uma guarda, as relações entre elas, o
 
 | Tabela | O que guarda |
 |---|---|
-| `estudos` | O registro central (com `soft_delete`): identidade (`id_legivel`, `nome_exibicao`, `sequencia` por tipo), status, origem do terreno, área do terreno (`terreno_manual_area` quando manual; `area_terreno_nucleo` como soma das áreas dos imóveis do Núcleo) e todas as premissas do Preliminar (áreas, custos, impostos, permutas). |
+| `estudos` | O registro central (com `soft_delete`): identidade (`id_legivel`, `nome_exibicao`, `sequencia` por tipo), status, origem do terreno, área do terreno (`terreno_manual_area` quando manual; `area_terreno_nucleo` como soma das áreas dos imóveis do Núcleo) e todas as premissas do Preliminar (áreas, custos, impostos, permutas). Sete colunas antigas de "% da gleba" (`app_pct`, `faixas_nao_edificaveis_pct`, `sistema_viario_pct`, `elup_pct`, `epc_pct`, `epu_pct`, `areas_privativas_nao_vendaveis_pct`) continuam no schema sem escritor em tela nem leitor em fórmula — a cascata de áreas as substituiu; não as leia. |
 | `preliminar_produtos` | O catálogo de Produtos do Preliminar — a única fonte do VGV. Só compõe catálogo a linha com `area_media_m2`, `preco_venda_m2` e `unidades` maiores que zero. `tipo` (`residencial` ou `nao_residencial`; sem valor conta como residencial) separa o cálculo por categoria na Incorporação. `GET /estudos` devolve a lista em `produtos` de cada estudo, para a listagem calcular VGV, resultado e margem. |
 | `estudo_imoveis` | A junção N:M com os imóveis do Núcleo (`imovel_nucleo_id` como referência lógica; `tipo_imovel` gleba ou lote). Único por `[estudo_id, imovel_nucleo_id]`. |
 | `estudo_membros` | A permissão por estudo (`funcao`: leitor, editor ou aprovador). Único por `[estudo_id, usuario_id]`. |
@@ -26,7 +26,7 @@ descricao: As tabelas do app, o que cada uma guarda, as relações entre elas, o
 | Tabela | O que guarda |
 |---|---|
 | `avancado_cronograma` | Os eventos do cronograma por estudo (planejamento, pré-lançamento, lançamento, obra, pós-obra) com `inicio_mes` a partir de zero e `duracao_meses`. Único por `[estudo_id, evento]`. |
-| `avancado_tipologias` | O catálogo de tipologias do estudo: nome, tipo de unidade, área privativa (fechada e aberta), dormitórios, vagas, `quantidade` (total de unidades), `unidades_permutadas` e `preco_m2` de referência. Desacoplado da receita. |
+| `avancado_tipologias` | O catálogo de tipologias do estudo: nome, tipo de unidade, área privativa (fechada e aberta), dormitórios, vagas, `quantidade` (total de unidades) e `preco_m2` de referência. Desacoplado da receita. A coluna `unidades_permutadas` continua no schema, mas o app não a lê nem a escreve: a fonte da permuta física do Avançado é a linha de custo Preço / Permuta física. |
 | `avancado_fases` | A fase de vendas, dona da **absorção** (`absorcao` JSON) e do **fluxo de pagamento** (`fluxo_pagamento` JSON). |
 | `avancado_alocacoes` | A alocação de venda: `unidades` de uma `tipologia_id` numa `fase_id`, a um `preco_m2`. Pode haver várias por tipologia. A trava de saldo vale no estudo inteiro: Σ unidades alocadas da tipologia em todas as fases + Σ unidades em permuta física ≤ `quantidade` do catálogo. |
 | `avancado_linhas_custo` | As linhas de custo, nos cinco grupos (terreno, obra, diretos, indireto, financeiro), com unidade de orçamento, valor canônico e ancoragem ao cronograma. |
@@ -46,7 +46,9 @@ repasse é derivado (`100 − Σ entrada − Σ parcelas`) e não é persistido 
 `parcelas` pela API não fecha 100 % por construção. O mesmo campo aceita o contrato canônico
 `componentes`: lista não vazia dos tipos `imediato`, `prazo_fixo`, `ate_marco` ou `concentrado`,
 cujas `participacaoPct` fecham 100 %, com `taxaMensal` e `sinalPct` por componente. A tela grava os
-componentes em toda escrita e preserva taxa e sinal que o espelho legado não sabe representar.
+componentes em toda escrita e preserva taxa e sinal que o espelho legado não sabe representar. Um
+sub-objeto `ret` por linha pode existir em JSON antigo e está morto: a RET é global do estudo
+(`estudos.considerar_ret` e `estudos.ret_pct`), e nada lê o `ret` do blob.
 
 Integridade: excluir uma tipologia com alocações é recusado (`422 TIPOLOGIA_EM_USO`); reduzir a
 `quantidade` do catálogo abaixo do já comprometido (alocações mais permuta física) é recusado
@@ -101,12 +103,13 @@ numa instância virgem: o sincronizador do shell emite a FK inline no `CREATE TA
 não existe ordem de criação que satisfaça as duas pontas. A instalação virgem não roda migrações;
 materializa tudo pelo `schema.json`, e é o único caminho que exercita essa ordem. A saída foi
 soltar o lado fraco: os dois `*_produto_id` são inteiros. Eles são inertes hoje — a seleção de
-produto saiu da tela de Permutas, que só aceita m² e % da área de venda, e o motor sempre consumiu
+produto saiu da sub-aba **Permutas**, que só aceita m² e % da área de venda, e o motor sempre consumiu
 o canônico em m². Um guard no repositório impede a volta do ciclo.
 
 ## Regras de precisão
 
-**Persistência** — o que a coluna guarda: R$ e m² em `decimal(12,2)`; percentuais de entrada em
+**Persistência** — o que a coluna guarda: R$ e m² em `decimal(12,2)` (o orçamento das linhas de
+custo do Avançado e o valor das operações de funding em `decimal(15,2)`); percentuais de entrada em
 `decimal(5,2)`; scores do apelo comercial em `decimal(3,1)`.
 
 **Resultado** — o que o cálculo produz: todo valor monetário resultado de fórmula tem duas casas

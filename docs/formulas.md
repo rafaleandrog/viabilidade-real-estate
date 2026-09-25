@@ -50,7 +50,7 @@ Duas regras governam essa fonte:
 
 - **Só compõe catálogo a linha com as três grandezas maiores que zero** (área média, preço e
   unidades). Uma linha recém-adicionada, em branco, não conta. Sem nenhuma linha efetiva o estudo
-  está em **estado vazio**: a Proforma e a aba Cenários não mostram tabela nem KPI, e nenhuma
+  está em **estado vazio**: a Proforma e a sub-aba **Cenários** não mostram tabela nem KPI, e nenhuma
   despesa em % do VGV produz valor. Não há fallback para os campos antigos de área × preço da
   linha do estudo — eles não têm entrada em tela.
 - **A permuta física é capada no VGV bruto da própria categoria.** A permuta pedida de cada tipo
@@ -82,7 +82,8 @@ Receita líquida = VGV − deduções
 
 ## Custos diretos
 
-Terreno (`custo por m² × área do terreno`, zerável pelo interruptor **Considerar**), projetos,
+Terreno (`custo por m² × área do terreno`, zerável pela caixa **Considerar custo de aquisição do
+terreno**), projetos,
 manutenção pós-obra e contingências (% do VGV) e, por tipo:
 
 - **Loteamento** — infraestrutura, em uma de três unidades: % do VGV, R$ fixo ou
@@ -106,8 +107,8 @@ Resultado           = Receita operacional − Custo indireto total
 Margem sobre VGV    = Resultado ÷ VGV × 100
 ```
 
-A tabela mostra também as leituras com as permutas somadas de volta — ver **O fecho de três
-linhas**, abaixo.
+A tabela do Preliminar termina em `= Resultado`; as leituras com as permutas somadas de volta
+existem só na Proforma do Avançado — ver **O fecho de três linhas**, abaixo.
 
 ## Preço sugerido por m²
 
@@ -134,6 +135,14 @@ fluxo de caixa — a contratação por safra, os componentes de pagamento, a car
 custos distribuídos no tempo — e as achata na hierarquia de linhas do Preliminar, para que os dois
 níveis se comparem na mesma coluna.
 
+As fórmulas do fluxo por safras — contratação bruta, desconto e líquido, os componentes de
+pagamento (imediato, prazo fixo, até marco, concentrado), a parcela, o primeiro vencimento, a
+carteira e o repasse — estão descritas, com os cenários de referência, nos documentos consultivos
+do repositório (`referencia/inteligencia-evi-incorporacao.md` e `referencia/padrao-incorporacao.md`,
+seções 11 a 14 e anexo G). A recorrência da carteira é por safra: `saldo_s,s = principal_s` e
+`saldo_s,t = saldo_s,t−1 + juros_s,t − pagamento_s,t`; o saldo nunca fica negativo nem volta a
+crescer depois da última parcela.
+
 - **Itemizada por linha de custo, em blocos canônicos.** Cada linha cadastrada em Custos aparece
   pelo nome que o usuário deu (fora do Terreno, o nome é a categoria escolhida), na ordem: Terreno
   → Projetos e aprovações → Outorga → Incorporação e registro → Construção → Gestão da construção →
@@ -146,9 +155,9 @@ níveis se comparem na mesma coluna.
 - **Desalavancada.** Nenhum lado do funding entra: nem as saídas (parcelas, retorno ao investidor)
   nem as entradas (liberações, aportes). É a visão econômica do empreendimento, antes de decidir
   como ele é capitalizado, e é o que mantém TIR, VPL e ROI comparáveis entre estudos com e sem
-  funding. O efeito do funding se lê na aba Fluxo de Caixa. Por isso **Despesas Financeiras** aqui
+  funding. O efeito do funding se lê na sub-aba **Fluxo de Caixa**. Por isso **Despesas Financeiras** aqui
   é só o custo que o usuário classificou como financeiro — o rótulo diz "exclui serviço da dívida"
-  —, enquanto na aba Fluxo de Caixa e no Resumo "Custos Financeiros" inclui as duas pontas do
+  —, enquanto na sub-aba **Fluxo de Caixa** e no **Resumo** "Custos Financeiros" inclui as duas pontas do
   funding. São visões diferentes de propósito.
 - **Investimento total e ROI** são a mesma fórmula do Preliminar, somando todo o custo do motor.
 
@@ -164,9 +173,10 @@ financeira não entra na base, porque já está dentro do VGV.
 | `= Resultado + Perm. Financ.` | `resultado + permuta financeira` | VGV |
 | `= Resultado` | `resultado` | VGV |
 
-A leitura mais inclusiva vem primeiro e a última linha é o resultado efetivo. A linha das permutas
-só aparece quando há permuta física; com as duas permutas zeradas as três coincidem e a tabela
-mostra só `= Resultado`. O Painel e os KPIs usam a leitura `= Resultado`.
+A leitura mais inclusiva vem primeiro e a última linha é o resultado efetivo. As três linhas
+aparecem sempre; sem permuta física, a primeira perde a nota de denominador e passa a se chamar
+`= Resultado`, e com as duas permutas zeradas as três coincidem em valor. O Painel e os KPIs usam
+a leitura `= Resultado`.
 
 ## Funding
 
@@ -183,9 +193,11 @@ Todo campo que aceita mais de uma unidade (R$, R$/m², % do VGV; m² ou % da ár
 físicas) guarda uma quantidade **canônica**: R$ a duas casas para custos e permutas financeiras, m²
 a duas casas para a permuta física. A unidade exibida é apresentação, e toda fórmula — Proforma,
 fluxo, Resumo, benchmarks, sensibilidade, cenários e exportações — consome o valor resolvido.
-Alternar a unidade regrava também o campo legado daquela unidade com o mesmo número que a tela
-mostra, para a coluna não descrever outro valor; o canônico não muda. Estudos antigos continuam
-legíveis: o valor ativo vira canônico na primeira edição deliberada.
+Trocar a unidade não muda o canônico. Nas Premissas do Preliminar, a troca grava só o canônico e
+o modo: a coluna por unidade é um valor histórico que só muda quando você digita. Nos Custos do
+Avançado, que têm uma coluna única de orçamento, a troca a regrava na unidade nova com o número que
+a tela mostra. Estudos antigos continuam legíveis: o valor ativo vira canônico na primeira edição
+deliberada.
 
 ## Precisão
 
@@ -206,7 +218,9 @@ canônico (R$, 2 casas)  ──derivação exata──▶  % do VGV, R$/m²   (e
 
 No fluxo de caixa, as séries mensais são quantizadas a duas casas a cada depósito, e os agregados
 escalares (VGV total, VPL, VGV da permuta física, receita bruta) na saída; a origem que rateia os
-custos em % do VGV segue com precisão plena, de propósito. Os três campos de VGV fecham a identidade
+custos em % do VGV segue com precisão plena, de propósito. A visão anual soma as séries mensais sem
+requantizar — a célula é formatada em duas casas, mas o número bruto agregado por período pode
+carregar mais casas. Os três campos de VGV fecham a identidade
 `VGV vendável = VGV total − VGV da permuta física` porque o terceiro é derivado dos dois já
 publicados.
 
