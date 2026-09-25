@@ -129,3 +129,37 @@ classe de defeito nº 1 do `CLAUDE.md`. O critério de aceite escrito na issue �
 
 Contagem de testes declarada em PR sai de comando rodado na mesma sequência
 (`node --test … | grep '^# tests'`), nunca de aritmética — armadilha 13.
+
+## Como foi executada — encerrada em 2026-09-25
+
+A fila de 12 saiu em **seis PRs de produto**, todos mergeados com revisão por lentes Kimi (o App do
+Codex ficou sem cota a partir do PR 763) e merge autorizado pelo autor para a sessão inteira:
+
+| PR | Issues | Entrega |
+|---|---|---|
+| 757 | #725, #727, #728, #729, #732, #733 | Tornado de alavancas (`frontend/tornado-alavancas.ts`, `viab-grafico-tornado`), passo ±5/±10/±15, margem de segurança (`frontend/margem-seguranca.ts`, os 4 cartões) — seis itens num PR só, desvio deliberado do serial por praticidade de sessão única |
+| 774 | #730 | Tabela com Δ% dos dois lados, amplitude ordenável e o grupo recolhido de invariantes (`frontend/sensibilidade-tabela.ts`) |
+| 775 | #731 | Faixa bear–base–bull contra o benchmark por indicador, numa escala única (`frontend/faixa-cenarios-motor.ts`, `viab-faixa-cenarios`) |
+| 776 | #734 | Consumo do colchão, alerta de cenário inviável em palavras, baixa alavanca e base circular (`frontend/consumo-colchao.ts`) — a revisão achou e o PR consertou um bloqueante real: base já deficitária lida como consumo |
+| 777 | #735 | Cenário composto: o motor aceita um conjunto de fatores (`fatoresDe`), as três maiores alavancas não circulares estressadas juntas (`frontend/cenario-composto.ts`), item do topo do tornado |
+| (este) | #736 | Fechamento: este doc, a tabela do `CLAUDE.md`, as notas envelhecidas da auditoria da Rodada 12 e o `PROGRESSO.md` |
+
+**Ficou de fora, e por quê:**
+
+- **#726** (estressar "custo de obras" move menos que o custo de obras que a tela publica —
+  `fatorSens('custo_obras')` toca só a construção, o KPI soma construção + decoração + gestão):
+  **decisão do autor**, porque muda número existente em todo estudo. Segue aberta.
+- **#724** (licenciamento): fechou pelo ramo (b), fora da fila, no PR 772 — a premissa da tela que
+  "aceita e salva" não se sustentou (nunca houve tela); as três colunas ficaram aposentadas.
+- **Aba Cenários do Avançado**: 2 alavancas só (`precoVendaPct`, `custoObraPct`), modelo de fluxo
+  temporal — um tornado ali seria de duas barras. Decisão pendente do autor.
+- **Benchmark por praça, versionado e editável** (handoff §5.3 / Fase 3): exige schema novo.
+- **Segunda camada de indicadores físicos** (§3.2) e a **Fase 4** inteira (TIR, VPL, exposição):
+  exigem fluxo de caixa, que o Preliminar não tem por definição.
+
+**As duas premissas que não se sustentaram**, registradas onde nasceram
+(`historico/rodada-12/auditoria.md`, notas datadas no lugar): o tornado "fica para uma rodada
+futura" — foi entregue; a margem de segurança "exige `base_calculo` no schema" — a inversão
+numérica do motor entregou os mesmos números sem campo novo, e nenhum PR da rodada tocou
+`schema.json` nem bumpou a `versao`.
+
